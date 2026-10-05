@@ -9,7 +9,7 @@
  * 一覧は実行ファイルの答え（`--explain --json` の trees と layers、`--lint --json` の苦情）を並べる。
  * 拡張が自分で見るのは、origin（ローカルの git を読み取り専用で起こす）、ワークスペースとプロジェクトの設定のルールファイル・
  * `.claude/` の有無、`.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
- * そのルールファイルの場所は layers（層）の答えを使い、`.ccnavi` から自分で組まない（組み方を実行ファイルとずらさない）。
+ * そのルールファイルの場所は layers（レイヤー）の答えを使い、`.ccnavi` から自分で組まない（組み方を実行ファイルとずらさない）。
  *
  * clone / fetch / pull は統合ターミナルへ送る。認証の対話はそこでユーザが行い、完了は `projects/<名前>/.git`
  * の出現を監視して拾う。書くのは、ユーザがボタンを押したときの `.gitignore`、置き場のディレクトリ、
@@ -548,7 +548,7 @@ function createSelfRules(current: PanelState, page: ProjectsPage): void {
     fail(current, "ccnavi の出力にワークスペースの設定が無いので、コピー先を決められません。更新してから押し直してください");
     return;
   }
-  copyCommonRules(current, page.selfRulesRel, "自身の層（self）", "ワークスペースの git");
+  copyCommonRules(current, page.selfRulesRel, "自身のレイヤー（self）", "ワークスペースの git");
 }
 
 /** 共通の設定のルールをワークスペースかプロジェクトの設定のルールファイル（ルートからの相対）に複製する。既にあれば上書きしない */

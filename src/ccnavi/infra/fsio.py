@@ -737,7 +737,8 @@ def load_text(path: str) -> str:
 # 読みの関数（`read_text`・`read_bytes`・`read_json`・`load_text`）は、`reading` の中だけ、
 # 読んだファイルの中身のハッシュを記録する。無かった・読めなかったファイルも「無い」として記録する
 # （後から現れれば判定が変わりうる）。溜める段（`staging`）から読んだ分は数えない（判定の
-# 入力ではなく、plan の途中の内容）。承認のダイジェスト（`agree.approval_digest`）がこれを使う。
+# 入力ではなく、plan の途中の内容）。承認のダイジェスト（`agree_digest.approval_digest`）が
+# これを使う。
 #
 # 中身は改行を LF に揃えた本文の SHA-256（UTF-8 として読めなければバイト列のまま）。機械の
 # 改行でハッシュが変わらないように（Chrome のコミットと手元の plan を LF に揃えたのと同じ理由）。
@@ -780,7 +781,7 @@ def note_exact(path: str, content: bytes | None) -> None:
     """読んだバイト列を、改行を揃えずに記録する（同じパスの前の記録を置き換える）。
 
     承認はバイト列をそのまま動かすので、動かす提案は改行や BOM だけの違いも判定の読みとして
-    覆う（`agree.carried`）。ほかの読みは `note_read` のまま（機械の改行でダイジェストが
+    覆う（`agree_digest.carried`）。ほかの読みは `note_read` のまま（機械の改行でダイジェストが
     変わらないように）。
     """
     if not _READERS:

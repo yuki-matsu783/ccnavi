@@ -20,7 +20,7 @@ import unittest
 
 from ccnavi.hook import core
 from ccnavi.infra import fsio, settings
-from ccnavi.tickets import agree, approval, approval_checks, syncstate
+from ccnavi.tickets import agree_digest, approval, approval_checks, syncstate, ticket_model
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, to_old_form, write
 
@@ -567,7 +567,7 @@ class BusyParentTest(AuthorityHarness):
 class MarkTest(AuthorityHarness):
     def test_an_earlier_reason_is_kept(self):
         self.record("gone")
-        Ticket = approval.ticket_mod.Ticket
+        Ticket = ticket_model.Ticket
         t = Ticket(
             ticket="i0001-01-01", parent="i0001", tree_root=self.parent_tree, blocked="前の理由"
         )
@@ -733,7 +733,7 @@ class PredecessorTest(AuthorityHarness):
     def test_the_parent_tree_does_not_loosen_a_predecessor(self):
         # 厳しくする向きだけ: 親のワークツリーで閉じていても、
         # 前の対応表で満たしていなければ満たさない。
-        Ticket = approval.ticket_mod.Ticket
+        Ticket = ticket_model.Ticket
         done = Ticket(
             ticket="i0001-01-09", parent="i0001", state="done", tree_root=self.parent_tree
         )
@@ -796,7 +796,7 @@ class DigestTest(AuthorityHarness):
         with fsio.reading() as seen:
             fsio.note_read(once, "a")
             fsio.note_read(record, "b")
-        keys = agree.read_set(self.conf(), self.root, seen)
+        keys = agree_digest.read_set(self.conf(), self.root, seen)
         self.assertEqual(["(控え):sync/self/families/i0001"], list(keys))
 
     def test_keys_do_not_depend_on_a_linked_root(self):
@@ -809,7 +809,7 @@ class DigestTest(AuthorityHarness):
         target = os.path.join(linked, ".claude", "worktrees", "i0001", "x.md")
         with fsio.reading() as seen:
             fsio.note_read(target, "x")
-        keys = agree.read_set(self.conf(), linked, seen)
+        keys = agree_digest.read_set(self.conf(), linked, seen)
         self.assertIn("self:i0001:x.md", keys)
         self.assertFalse([k for k in keys if k.startswith("(外)")], keys)
 
@@ -830,7 +830,7 @@ class DigestTest(AuthorityHarness):
             fsio.note_read(os.path.join(project, "x.md"), "b")
         conf = self.conf()
         conf.projects = os.path.join(self.root, "projects")
-        keys = agree.read_set(conf, self.root, seen)
+        keys = agree_digest.read_set(conf, self.root, seen)
         self.assertIn("self:main:x.md", keys)
         self.assertIn("web:main:x.md", keys)
         self.assertNotEqual(keys["self:main:x.md"], keys["web:main:x.md"])
@@ -923,7 +923,7 @@ class LintTest(AuthorityHarness):
             home=approval.tree.Tree("w0001", home, project="web", kind="worktree"),
         )
         problems = lint_layers._projected_layer_problems(conf, st, "(x)")
-        # 共通層の rules と、プロジェクトの統合先の phases が P の上に無い。
+        # 共通レイヤーの rules と、プロジェクトの統合先の phases が P の上に無い。
         self.assertEqual(2, len(problems), problems)
         write(os.path.join(home, ".ccnavi", "config", "rules.yml"), "rules: []\n")
         write(os.path.join(home, ".ccnavi", "config", "phases.yml"), "types: {}\r\n")

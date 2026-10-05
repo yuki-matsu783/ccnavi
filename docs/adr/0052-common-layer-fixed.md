@@ -1,29 +1,29 @@
 ---
 type: adr
-title: 共通層の置き場を .ccnavi/common/ に固定する
-description: 共通層（ルール、フェーズの種類、リスクの配点）の置き場を環境変数から固定に変え、3 層の決まり方を統一する
+title: 共通レイヤーの置き場を .ccnavi/common/ に固定する
+description: 共通レイヤー（ルール、フェーズの種類、リスクの配点）の置き場を環境変数から固定に変え、3 つのレイヤーの決まり方を統一する
 tags: [config, rules]
-keywords: [共通層, 置き場, .ccnavi/common, 環境変数, 固定, ルール, フェーズ, リスク]
+keywords: [共通レイヤー, 置き場, .ccnavi/common, 環境変数, 固定, ルール, フェーズ, リスク]
 ---
 
-# ADR-0052: 共通層の置き場を `.ccnavi/common/` に固定する
+# ADR-0052: 共通レイヤーの置き場を `.ccnavi/common/` に固定する
 
 状態: 採用
 
-追記（2026-09-24）: 状況の表にある `CCNAVI_PROJECTS` と `CCNAVI_PROJECT_HOME` も、ADR-0098 で廃止した。プロジェクトの層は `projects/<名前>/.ccnavi/config/...` に固定され、3 層とも env では動かない。
+追記（2026-09-24）: 状況の表にある `CCNAVI_PROJECTS` と `CCNAVI_PROJECT_HOME` も、ADR-0098 で廃止した。プロジェクトのレイヤーは `projects/<名前>/.ccnavi/config/...` に固定され、3 層とも env では動かない。
 
 ## 状況
 
-設定 3 本（ルール・フェーズの種類・リスクの配点）は 3 つの層に置く（11.2）。そのうち
-**共通層だけが環境変数で置き場を動かせた。**
+設定 3 本（ルール・フェーズの種類・リスクの配点）は 3 つのレイヤーに置く（11.2）。そのうち
+**共通レイヤーだけが環境変数で置き場を動かせた。**
 
-| 層 | 置き場の決まり方 |
+| レイヤー | 置き場の決まり方 |
 |---|---|
-| 共通層 | `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`。既定は `.ccnavi/common/{rules,phases,risks}.yml` |
-| 自身の層 | `<root>/<CCNAVI_PROJECT_HOME>/config/{rules,phases,risks}.yml` 固定 |
-| プロジェクトの層 | `<CCNAVI_PROJECTS>/<名前>/<CCNAVI_PROJECT_HOME>/config/...` 固定 |
+| 共通レイヤー | `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`。既定は `.ccnavi/common/{rules,phases,risks}.yml` |
+| 自身のレイヤー | `<root>/<CCNAVI_PROJECT_HOME>/config/{rules,phases,risks}.yml` 固定 |
+| プロジェクトのレイヤー | `<CCNAVI_PROJECTS>/<名前>/<CCNAVI_PROJECT_HOME>/config/...` 固定 |
 
-3 層のうち 1 層だけが別の決まり方をするので、置き場を読む側が「env を見て、無ければ既定」の
+3 つのレイヤーのうち 1 レイヤーだけが別の決まり方をするので、置き場を読む側が「env を見て、無ければ既定」の
 分岐をそれぞれ持っていた。実行ファイル（`settings.resolve` の overrides 表）、導入スクリプト
 （配る `env`）、VS Code 拡張の 4 画面（`envFromSettingsJson`）の 6 か所。
 
@@ -32,11 +32,11 @@ keywords: [共通層, 置き場, .ccnavi/common, 環境変数, 固定, ルール
 `CCNAVI_PHASES` と `CCNAVI_RISK` は `--all` を付けたときしか書かれない。つまり動いている
 どのワークスペースでも、この 3 本は既定の場所を指していた。
 
-`requirements.md` に該当する要求は無い。外から観測できる約束ではなく、実装の都合だった。
+`docs/requirements.md` に該当する要求は無い。外から観測できる約束ではなく、実装の都合だった。
 
 ## 決定
 
-共通層の置き場を `.ccnavi/common/{rules,phases,risks}.yml` に固定し、
+共通レイヤーの置き場を `.ccnavi/common/{rules,phases,risks}.yml` に固定し、
 `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` を廃止する。
 
 - `settings.py` から 3 つの定数と overrides 表の 3 行を落とす。**この表は環境変数と
@@ -45,7 +45,7 @@ keywords: [共通層, 置き場, .ccnavi/common, 環境変数, 固定, ルール
 - 導入スクリプトは配る `env` に 3 本を書かない（`--all` の一覧にも入れない）
 - VS Code 拡張の 4 画面は既定のパスを直に使う
 
-**フラグ `--rules` / `--phases` / `--risk` は残す。** 層の合成を確かめるテストが自分の
+**フラグ `--rules` / `--phases` / `--risk` は残す。** レイヤーの合成を確かめるテストが自分の
 一時ディレクトリを指すのに要る（`tests/config/` の全テスト）。hook は引数を渡さずに
 実行ファイルを起動するので、hook からの判定の入口は固定される。
 
@@ -54,7 +54,7 @@ keywords: [共通層, 置き場, .ccnavi/common, 環境変数, 固定, ルール
 （`cli.py` の `diagnosing`）が、この 3 本にその制限は無く、`ticket` / `review` の副命令でも
 そのまま使える。`.ccnavi/scripts/` の sh は受け取った引数を `"$@"` で実行ファイルへそのまま渡す
 ので、エージェントが `ccnavi-ticket.sh done <子> --risk <別の配点>` と打てば、実績リスクの
-採点を別の配点で行える。記録（`.risk.json` の `source`、フェーズのマーカー）は層の名前しか
+採点を別の配点で行える。記録（`.risk.json` の `source`、フェーズのマーカー）はレイヤーの名前しか
 持たないので、差し替えは後から追えない。
 
 この穴はこの ADR の変更が作ったものではない（`cli.py` は触っていない）。制限を足すと、
@@ -67,7 +67,7 @@ keywords: [共通層, 置き場, .ccnavi/common, 環境変数, 固定, ルール
 
 ## 理由
 
-3 層が同じ決まり方になる。「どこを見ているか」を、コードの分岐を追わずに言えるようになる。
+3 つのレイヤーが同じ決まり方になる。「どこを見ているか」を、コードの分岐を追わずに言えるようになる。
 
 読まれない語を設定ファイルに残さない。既定と同じ値を書いても動きは変わらないが、
 そこに語があると「直せば置き場が動く」と読める。実際に動くのは 1 つの経路だけなのに、
@@ -75,12 +75,12 @@ keywords: [共通層, 置き場, .ccnavi/common, 環境変数, 固定, ルール
 
 ## 残したもの
 
-`selfguard.common_shell_clause` は**消さなかった。** これは「共通層が既定の外にあるとき、
+`selfguard_shell.common_shell_clause` は**消さなかった。** これは「共通レイヤーが既定の外にあるとき、
 そのパスをシェルの書き込みの禁止に足す」働きで、当初は「固定になれば `_PLACES` の
 `\.ccnavi` が丸ごと拾う」として削除する計画だった。
 
 実際に消したところ、`tests/guard/test_fallback.py` が落ちた。フラグを残した以上、置き場は
-完全には固定されていない。フラグで動かした共通層に対して実測するとこうなる。
+完全には固定されていない。フラグで動かした共通レイヤーに対して実測するとこうなる。
 
 ```
 Write で書く  -> deny（builtin-guard-common-layer。conf が指す場所を追う）
@@ -100,7 +100,7 @@ ADR-0067 のあとは、その hook の command から動かす手段も閉じ�
 
 ## 代償
 
-- **共通層を既定の外へ置く手段が env から無くなる。** 複数のワークスペースで 1 本の
+- **共通レイヤーを既定の外へ置く手段が env から無くなる。** 複数のワークスペースで 1 本の
   `rules.yml` を共有する、読み取り専用の場所に置く、といった使い方は、hook の command に
   フラグを書き足すか、シンボリックリンクに頼ることになる（ADR-0067 でフラグの手段も
   閉じたので、残るのはシンボリックリンクだけ）
@@ -119,11 +119,11 @@ ADR-0067 のあとは、その hook の command から動かす手段も閉じ�
 
 ## 関連
 
-- ADR-0042（設定と記録の置き場）。共通層を `.ccnavi/common/` に置くと決めた回。
-  そこでは「共通層を動かすなら `CCNAVI_RULES` などで動かす」と書いたが、この ADR で
+- ADR-0042（設定と記録の置き場）。共通レイヤーを `.ccnavi/common/` に置くと決めた回。
+  そこでは「共通レイヤーを動かすなら `CCNAVI_RULES` などで動かす」と書いたが、この ADR で
   その手段を閉じる
 - ADR-0021（selfguard）。守る対象の一覧に「`CCNAVI_RULES` が指すファイル」とある。
   指す先は固定の既定になった
 - ADR-0051（`regex` も大文字小文字を区別しない）。同じ場所への書き込みが経路で食い違う
   形を作らない、という判断を引いている
-- ADR-0067（共通層の 3 本のフラグを診断の経路に限る）。ここで残した穴を閉じた回
+- ADR-0067（共通レイヤーの 3 本のフラグを診断の経路に限る）。ここで残した穴を閉じた回

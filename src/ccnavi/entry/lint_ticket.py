@@ -13,6 +13,7 @@ from ..policy import rules
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from ..tickets import (
     agree,
+    agree_candidates,
     approval,
     approval_checks,
     approval_marks,
@@ -20,17 +21,18 @@ from ..tickets import (
     ops,
     phase,
     review_host,
+    ticket_fold,
+    ticket_model,
 )
-from ..tickets import ticket as ticket_mod
 from . import lint_branch, lint_project
 
 
 def _copy_problems(
     root: str,
     conf: settings.Settings,
-    copies: list[ticket_mod.Ticket],
-    index: dict[str, ticket_mod.Ticket],
-    closed: list[ticket_mod.Ticket],
+    copies: list[ticket_model.Ticket],
+    index: dict[str, ticket_model.Ticket],
+    closed: list[ticket_model.Ticket],
     raw: approval.Raw | None = None,
 ) -> list[Problem]:
     """作業中の承認済みチケットを検査する。
@@ -99,8 +101,8 @@ def _copy_problems(
         if t.blocked:
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
             continue
-        types = resolve(agree.project_of(t, pool))
-        complaints, overflow = agree.validate(t, pool, types)
+        types = resolve(agree_candidates.project_of(t, pool))
+        complaints, overflow = agree_candidates.validate(t, pool, types)
         for p in complaints + overflow:
             problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
         parent = pool.get(t.parent) if t.is_child else None
@@ -200,8 +202,8 @@ def _start_unrecorded(conf: settings.Settings, t) -> str:
 def _types_resolver(conf: settings.Settings, root: str):
     """`project:` から、そのチケットに使う種類を引く（設計 11.4.1）。
 
-    承認の対象の中でもチケットごとに層が違いうるので、1 つに決めずに引く形で渡す。
-    読み込みは 1 層 1 回。
+    承認の対象の中でもチケットごとにレイヤーが違いうるので、1 つに決めずに引く形で渡す。
+    読み込みは 1 レイヤー 1 回。
     """
     cache: dict[str, dict | None] = {}
 
@@ -273,7 +275,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
                     SEVERITY_ERROR,
                     "(phases)",
                     f"{t.ticket} は計画を持つのにフェーズの種類の定義"
-                    f"（{conf.phases} と {t.project or '自身'} の層）が読めない",
+                    f"（{conf.phases} と {t.project or '自身'} のレイヤー）が読めない",
                 )
             )
 
@@ -370,10 +372,10 @@ def _approval_problems(
 ) -> list[Problem]:
     """承認で落ちるものを、承認の前に名指しする。ユーザが端末で初めて知るより早く。
 
-    **承認と同じ関数を通す**（`agree.candidates`）。ここだけ `agree.validate` を
-    当てる形にすると、順序で落ちる子（前のフェーズが閉じていない）・計画に無い番号・
-    `project:` の食い違い・改版の検査が抜ける。同じ事実を数える経路が 2 本あると、片方が
-    気づかないうちに弱くなる。`--agree --preview --verify` と同じ答えをここでも言う。
+    **承認と同じ関数を通す**（`agree_candidates.candidates`）。ここだけ
+    `agree_candidates.validate` を当てる形にすると、順序で落ちる子（前のフェーズが閉じていない）・
+    計画に無い番号・`project:` の食い違い・改版の検査が抜ける。同じ事実を数える経路が 2 本あると、
+    片方が気づかないうちに弱くなる。`--agree --preview --verify` と同じ答えをここでも言う。
 
     範囲の超過は承認では落ちないが、判定で止まるので同じく名指しする（warn）。
 
@@ -382,18 +384,18 @@ def _approval_problems(
     `--lint` はワークスペース全体を見る道具で、その終了コードは VS Code の設定画面が
     保存してよいかの判断にも使われる（`phases-panel.ts`）。ここを error にすると、
     編集と関わりのない提案 1 本で、設定の保存も CI も止まる。承認そのものは落とす
-    （`agree.candidates` の側は error のまま）ので、緩むのは報告の重さだけ。
+    （`agree_candidates.candidates` の側は error のまま）ので、緩むのは報告の重さだけ。
     """
     pending, revisions = agree.waiting(
         proposals,
         copies,
         closed,
         review,
-        agree.types_resolver(conf, root, copies),
+        agree_candidates.types_resolver(conf, root, copies),
     )
     if not pending and not revisions:
         return []
-    batch, rejected, _pool = agree.candidates(root, conf, pending, revisions, copies)
+    batch, rejected, _pool = agree_candidates.candidates(root, conf, pending, revisions, copies)
     problems: list[Problem] = []
     for cand in batch:
         for p in cand.complaints + cand.overflow:
@@ -455,21 +457,21 @@ def _proposal_problems(
         return (repo_of.get(at, at), at, state)
 
     seen: dict[str, list[tuple[str, str, str]]] = {}
-    # チケットそのものも識別子ごとに持つ。どれが本物か決まるかの判断は `ticket.collisions` が
+    # チケットそのものも識別子ごとに持つ。どれが本物か決まるかの判断は `ticket_fold.collisions` が
     # 決め、ボードの `scattered` と状態の操作が止まる条件に揃える（同じ答えを 2 か所で
     # 出さない）。数えるのは `index`（識別子ごとに 1 つ）ではなく全部。同じ識別子が 2 つ
     # 残っているのがまさに言いたい形なので、引き当ての表で数えると自分でまとめてしまう。
     held: dict[str, list] = {}
     for t in copies:
-        seen.setdefault(t.ticket, []).append(place(t, t.state or ticket_mod.DOING))
+        seen.setdefault(t.ticket, []).append(place(t, t.state or ticket_model.DOING))
         held.setdefault(t.ticket, []).append(t)
     for t in closed:
-        seen.setdefault(t.ticket, []).append(place(t, t.state or ticket_mod.DONE))
+        seen.setdefault(t.ticket, []).append(place(t, t.state or ticket_model.DONE))
         held.setdefault(t.ticket, []).append(t)
     for t in proposals:
         seen.setdefault(t.ticket, []).append(place(t, t.state))
         held.setdefault(t.ticket, []).append(t)
-        if t.state != ticket_mod.TODO:
+        if t.state != ticket_model.TODO:
             continue
         if t.ticket in index:
             current = index[t.ticket]
@@ -480,7 +482,7 @@ def _proposal_problems(
                     SEVERITY_WARN,
                     "(ticket)",
                     f"{t.ticket} は承認済み（{current.tree or '(ワークスペースルート)'} の "
-                    f"{current.state or ticket_mod.DOING}/）なのに todo/ にも在る"
+                    f"{current.state or ticket_model.DOING}/）なのに todo/ にも在る"
                     f"（{_rel(root, t.path)}）。"
                     "計画の改版でなければ todo/ の側を消してください",
                 )
@@ -541,7 +543,7 @@ def _proposal_problems(
         # 置き場に在る形（動かす途中で止まった形跡）。`todo/` に在るのは親の改版の途中なので
         # error にしない。ツリーをまたいだチケットはまとめれば 1 つに決まるので、
         # ここには出てこない。
-        caught = ticket_mod.collisions(held[ticket_id])
+        caught = ticket_fold.collisions(held[ticket_id])
         if not caught:
             continue
         where = ", ".join(

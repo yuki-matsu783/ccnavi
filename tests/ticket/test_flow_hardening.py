@@ -25,7 +25,7 @@ import unittest
 import yaml
 
 from ccnavi.infra import settings
-from ccnavi.tickets import approval_marks, flow
+from ccnavi.tickets import approval_marks, flow, flow_render, flow_text
 from tests.ticket.test_flow import (
     CHILD,
     WORKFLOW,
@@ -202,37 +202,39 @@ class FlowNeutralTest(unittest.TestCase):
             {"id": str(i), "type": "prompt", "name": n, "data": {"prompt": n}}
             for i, n in enumerate(self.NAMES)
         ]
-        lines, _ = flow.render({"nodes": nodes, "connections": []})
+        lines, _ = flow_render.render({"nodes": nodes, "connections": []})
         self.assertEqual(len(lines), len(self.NAMES))
         for line in lines:
             with self.subTest(line=line):
-                self.assertFalse(flow.impersonates(line), line)
+                self.assertFalse(flow_text.impersonates(line), line)
                 self.assertNotIn("[ccnavi", line.lower())
         self.assertIn("〔ccnavi dry-run〕 enable", lines[0])
-        self.assertIn(flow._FENCE_SHOWN, lines[6])
+        self.assertIn(flow_text._FENCE_SHOWN, lines[6])
         # 置き換えていない文はそのまま。
-        plain, _ = flow.render({"nodes": [{"id": "a", "type": "prompt", "name": "[note] x y"}]})
+        plain, _ = flow_render.render(
+            {"nodes": [{"id": "a", "type": "prompt", "name": "[note] x y"}]}
+        )
         self.assertIn("[note] x y", plain[0])
 
     def test_a_node_type_named_ccnavi_does_not_make_a_badge(self):
         """種類の名前が `ccnavi` でも、こちらの `[<種類>]` が接頭辞にならない。"""
-        lines, _ = flow.render({"nodes": [{"id": "a", "type": "ccnavi", "name": "DENY"}]})
-        self.assertFalse(flow.impersonates(lines[0]), lines[0])
+        lines, _ = flow_render.render({"nodes": [{"id": "a", "type": "ccnavi", "name": "DENY"}]})
+        self.assertFalse(flow_text.impersonates(lines[0]), lines[0])
         self.assertIn("〔ccnavi〕", lines[0])
 
     def test_labels_read_numbers_like_the_board(self):
         """整数の値の小数（`1.0`）は整数の表記、真偽値は空（ボードの線の言葉と同じ）。"""
-        self.assertEqual(flow._text(1.0), "1")
-        self.assertEqual(flow._text(2), "2")
-        self.assertEqual(flow._text(1.5), "1.5")
-        self.assertEqual(flow._text(True), "")
+        self.assertEqual(flow_text._text(1.0), "1")
+        self.assertEqual(flow_text._text(2), "2")
+        self.assertEqual(flow_text._text(1.5), "1.5")
+        self.assertEqual(flow_text._text(True), "")
         node = {
             "id": "q",
             "type": "ifElse",
             "data": {"branches": [{"id": True, "label": "T"}, {"id": 1.0, "label": "ONE"}]},
         }
-        self.assertEqual(flow._port_label(node, "1"), "ONE")
-        self.assertEqual(flow._port_label(node, "True"), "")
+        self.assertEqual(flow_render._port_label(node, "1"), "ONE")
+        self.assertEqual(flow_render._port_label(node, "True"), "")
 
 
 class FlowReadPlaceTest(FlowHarness):

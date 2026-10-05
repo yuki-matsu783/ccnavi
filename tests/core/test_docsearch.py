@@ -28,7 +28,7 @@ import unicodedata
 import unittest
 from unittest import mock
 
-from ccnavi.hook import docsearch
+from ccnavi.hook import docsearch, docsearch_index, docsearch_query
 from ccnavi.infra import settings
 from tests.inproc import run_ccnavi
 
@@ -99,7 +99,7 @@ class IndexTest(Repo):
     def test_writes_one_index_per_directory_with_the_row_shape(self):
         self.put("README.md", doc(type="guide", title="はじめに"))
         self.put("docs/adr/0001-a.md", doc(type="adr", tags="[git, worktree]"))
-        built = docsearch.build(self.root)
+        built = docsearch_index.build(self.root)
         self.assertEqual(sorted(built.written), ["docs/adr/index.jsonl", "index.jsonl"])
         (row,) = self.rows_of("docs/adr")
         self.assertEqual(
@@ -120,7 +120,7 @@ class IndexTest(Repo):
     def test_a_tree_that_ignores_no_index_is_left_out(self):
         write(os.path.join(self.root, ".gitignore"), "")
         self.put("a.md", doc(type="guide"))
-        built = docsearch.build(self.root)
+        built = docsearch_index.build(self.root)
         self.assertTrue(built.unignored)
         self.assertEqual((built.rows, built.written), ([], []))
         self.assertFalse(os.path.exists(self.index_of("")))
@@ -130,7 +130,7 @@ class IndexTest(Repo):
         self.put("docs/b.md", doc(type="adr"))
         write(self.index_of(""), "tracked\n")
         git(self.root, "add", "-f", "index.jsonl")
-        built = docsearch.build(self.root)
+        built = docsearch_index.build(self.root)
         self.assertFalse(built.unignored)
         self.assertEqual([r["concept_id"] for r in built.rows], ["a", "docs/b"])
         self.assertEqual(built.written, ["docs/index.jsonl"])
@@ -142,17 +142,17 @@ class IndexTest(Repo):
         self.put("new.md", doc(type="guide"))
         self.put("build/out.md", doc(type="guide"))
         self.put("notes.txt", "not md")
-        built = docsearch.build(self.root)
+        built = docsearch_index.build(self.root)
         self.assertEqual([r["concept_id"] for r in built.rows], ["new"])
 
     def test_skips_deleted_files_and_removes_the_index_of_an_emptied_directory(self):
         self.put("keep/a.md", doc(type="guide"))
         self.put("gone/b.md", doc(type="guide"))
         git(self.root, "add", "-A")
-        docsearch.build(self.root)
+        docsearch_index.build(self.root)
         self.assertTrue(os.path.exists(self.index_of("gone")))
         os.remove(os.path.join(self.root, "gone", "b.md"))
-        built = docsearch.build(self.root)
+        built = docsearch_index.build(self.root)
         self.assertEqual([r["concept_id"] for r in built.rows], ["keep/a"])
         self.assertFalse(os.path.exists(self.index_of("gone")))
         self.assertEqual(built.removed, ["gone/index.jsonl"])
@@ -160,13 +160,16 @@ class IndexTest(Repo):
     def test_leaves_out_the_ccnavi_directory(self):
         self.put(".ccnavi/approved/done/i0001.md", "---\nversion: 1\nticket: i0001\n---\n")
         self.put("a.md", doc(type="guide"))
-        built = docsearch.build(self.root, (".ccnavi",))
+        built = docsearch_index.build(self.root, (".ccnavi",))
         self.assertEqual([r["concept_id"] for r in built.rows], ["a"])
         self.assertFalse(os.path.exists(self.index_of(".ccnavi/approved/done")))
 
     def test_not_a_repository_raises(self):
-        with tempfile.TemporaryDirectory() as bare, self.assertRaises(docsearch.NotARepository):
-            docsearch.build(bare)
+        with (
+            tempfile.TemporaryDirectory() as bare,
+            self.assertRaises(docsearch_index.NotARepository),
+        ):
+            docsearch_index.build(bare)
 
 
 # --- 2. 差分 ---------------------------------------------------------------------------
@@ -176,34 +179,34 @@ class IncrementalTest(Repo):
     def test_reuses_rows_whose_mtime_did_not_move_and_does_not_rewrite(self):
         self.put("a.md", doc(type="guide"))
         self.put("b.md", doc(type="adr"))
-        first = docsearch.build(self.root)
+        first = docsearch_index.build(self.root)
         self.assertEqual((first.parsed, first.reused), (2, 0))
-        second = docsearch.build(self.root)
+        second = docsearch_index.build(self.root)
         self.assertEqual((second.parsed, second.reused), (0, 2))
         self.assertEqual(second.written, [])
 
     def test_a_row_is_reused_even_if_the_file_changed_within_the_same_mtime(self):
         # 使い回すかは concept_id と mtime だけで決める（読み直さない証拠）。
         self.put("a.md", doc(type="guide"))
-        docsearch.build(self.root)
+        docsearch_index.build(self.root)
         self.put("a.md", doc(type="changed"))  # 同じ mtime に戻す
-        self.assertEqual(docsearch.build(self.root).rows[0]["frontmatter"]["type"], "guide")
+        self.assertEqual(docsearch_index.build(self.root).rows[0]["frontmatter"]["type"], "guide")
 
     def test_a_moved_mtime_is_read_again(self):
         self.put("a.md", doc(type="guide"))
-        docsearch.build(self.root)
+        docsearch_index.build(self.root)
         self.put("a.md", doc(type="changed"), mtime=NOON + 60)
-        built = docsearch.build(self.root)
+        built = docsearch_index.build(self.root)
         self.assertEqual(built.parsed, 1)
         self.assertEqual(self.rows_of("")[0]["frontmatter"]["type"], "changed")
         self.assertEqual(built.written, ["index.jsonl"])
 
     def test_no_refresh_uses_existing_rows_and_writes_nothing(self):
         self.put("a.md", doc(type="guide"))
-        docsearch.build(self.root)
+        docsearch_index.build(self.root)
         self.put("a.md", doc(type="changed"), mtime=NOON + 60)
         self.put("b.md", doc(type="adr"))
-        built = docsearch.build(self.root, refresh=False)
+        built = docsearch_index.build(self.root, refresh=False)
         types = {r["concept_id"]: r["frontmatter"]["type"] for r in built.rows}
         self.assertEqual(types, {"a": "guide", "b": "adr"})
         self.assertEqual(built.written, [])
@@ -211,7 +214,7 @@ class IncrementalTest(Repo):
     def test_an_index_with_a_broken_line_is_not_ours_and_left_alone(self):
         self.put("a.md", doc(type="guide"))
         write(self.index_of(""), "{not json\n")
-        built = docsearch.build(self.root)
+        built = docsearch_index.build(self.root)
         self.assertEqual(built.parsed, 1)
         self.assertEqual([r["concept_id"] for r in built.rows], ["a"])
         self.assertEqual((built.written, built.foreign), ([], ["index.jsonl"]))
@@ -233,14 +236,16 @@ class FrontMatterTest(unittest.TestCase):
             b"---\n!!python/object:os.system x\n---\n",
         ):
             with self.subTest(raw=raw):
-                self.assertIsNone(docsearch.front_matter(raw))
+                self.assertIsNone(docsearch_index.front_matter(raw))
 
     def test_values_that_json_lacks_become_strings(self):
-        front = docsearch.front_matter(b"---\ndate: 2026-08-05\nn: .nan\nok: true\n---\n")
+        front = docsearch_index.front_matter(b"---\ndate: 2026-08-05\nn: .nan\nok: true\n---\n")
         self.assertEqual(front, {"date": "2026-08-05", "n": "nan", "ok": True})
 
     def test_bom_and_dots_end(self):
-        self.assertEqual(docsearch.front_matter("﻿---\ntype: a\n...\n".encode()), {"type": "a"})
+        self.assertEqual(
+            docsearch_index.front_matter("﻿---\ntype: a\n...\n".encode()), {"type": "a"}
+        )
 
 
 # --- 4. 引く ---------------------------------------------------------------------------
@@ -270,63 +275,64 @@ ROWS = [
 ]
 
 
-def ids(query: docsearch.Query) -> list[str]:
-    hits, _ = docsearch.search(ROWS, query)
+def ids(query: docsearch_query.Query) -> list[str]:
+    hits, _ = docsearch_query.search(ROWS, query)
     return [h["concept_id"] for h in hits]
 
 
 class SearchTest(unittest.TestCase):
     def test_type_tag_keyword_are_whole_values_ignoring_case(self):
         self.assertEqual(
-            ids(docsearch.Query(types=["adr"])), ["docs/adr/0001-git", "docs/adr/0002-ticket"]
+            ids(docsearch_query.Query(types=["adr"])), ["docs/adr/0001-git", "docs/adr/0002-ticket"]
         )
-        self.assertEqual(ids(docsearch.Query(types=["ad"])), [])
+        self.assertEqual(ids(docsearch_query.Query(types=["ad"])), [])
         # スカラーの tags も 1 要素のリストとして当たる。
         self.assertEqual(
-            ids(docsearch.Query(tags=["WORKTREE"])), ["docs/adr/0001-git", "docs/claude/worktree"]
+            ids(docsearch_query.Query(tags=["WORKTREE"])),
+            ["docs/adr/0001-git", "docs/claude/worktree"],
         )
-        self.assertEqual(ids(docsearch.Query(keywords=["承認"])), ["docs/adr/0002-ticket"])
+        self.assertEqual(ids(docsearch_query.Query(keywords=["承認"])), ["docs/adr/0002-ticket"])
 
     def test_same_option_is_or_and_different_options_are_and(self):
         self.assertEqual(
-            ids(docsearch.Query(types=["guide", "adr"])),
+            ids(docsearch_query.Query(types=["guide", "adr"])),
             ["README", "docs/adr/0001-git", "docs/adr/0002-ticket", "docs/claude/worktree"],
         )
         self.assertEqual(
-            ids(docsearch.Query(types=["guide"], tags=["worktree"])), ["docs/claude/worktree"]
+            ids(docsearch_query.Query(types=["guide"], tags=["worktree"])), ["docs/claude/worktree"]
         )
 
     def test_path_is_part_of_the_concept_id(self):
-        self.assertEqual(ids(docsearch.Query(paths=["CLAUDE/"])), ["docs/claude/worktree"])
+        self.assertEqual(ids(docsearch_query.Query(paths=["CLAUDE/"])), ["docs/claude/worktree"])
 
     def test_text_looks_at_values_not_keys(self):
         # キー名（title・tags・description）には当たらない。当たると全件になる。
-        self.assertEqual(ids(docsearch.Query(texts=["title"])), [])
-        self.assertEqual(ids(docsearch.Query(texts=["tags"])), [])
-        self.assertEqual(ids(docsearch.Query(texts=["description"])), ["README"])
-        self.assertEqual(ids(docsearch.Query(texts=["使い方"])), ["README"])
-        self.assertEqual(ids(docsearch.Query(texts=["2026-07"])), ["README"])
-        self.assertEqual(ids(docsearch.Query(texts=["plain"])), ["notes/plain"])
+        self.assertEqual(ids(docsearch_query.Query(texts=["title"])), [])
+        self.assertEqual(ids(docsearch_query.Query(texts=["tags"])), [])
+        self.assertEqual(ids(docsearch_query.Query(texts=["description"])), ["README"])
+        self.assertEqual(ids(docsearch_query.Query(texts=["使い方"])), ["README"])
+        self.assertEqual(ids(docsearch_query.Query(texts=["2026-07"])), ["README"])
+        self.assertEqual(ids(docsearch_query.Query(texts=["plain"])), ["notes/plain"])
 
     def test_since_and_date_only_until(self):
         self.assertEqual(
-            ids(docsearch.Query(since="2026-08-05", until="2026-08-05")),
+            ids(docsearch_query.Query(since="2026-08-05", until="2026-08-05")),
             ["docs/adr/0002-ticket", "notes/plain"],
         )
         self.assertEqual(
-            ids(docsearch.Query(until="2026-08-05T12:00")),
+            ids(docsearch_query.Query(until="2026-08-05T12:00")),
             ["README", "docs/adr/0001-git", "notes/plain"],
         )
 
     def test_sort_reverse_and_limit(self):
         self.assertEqual(
-            ids(docsearch.Query(sort="mtime", reverse=True, limit=2)),
+            ids(docsearch_query.Query(sort="mtime", reverse=True, limit=2)),
             ["docs/claude/worktree", "docs/adr/0002-ticket"],
         )
         # 大文字小文字を区別せず、同じ値は concept_id で並ぶ（`adr` と `ADR` は同じ値）。
         # frontmatter が無いものは空として先頭に来る。
         self.assertEqual(
-            ids(docsearch.Query(sort="type")),
+            ids(docsearch_query.Query(sort="type")),
             [
                 "notes/plain",
                 "docs/adr/0001-git",
@@ -336,46 +342,47 @@ class SearchTest(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            ids(docsearch.Query(sort="title"))[-2:], ["docs/adr/0002-ticket", "docs/adr/0001-git"]
+            ids(docsearch_query.Query(sort="title"))[-2:],
+            ["docs/adr/0002-ticket", "docs/adr/0001-git"],
         )
-        hits, matched = docsearch.search(ROWS, docsearch.Query(limit=2))
+        hits, matched = docsearch_query.search(ROWS, docsearch_query.Query(limit=2))
         self.assertEqual((len(hits), matched), (2, 5))
 
     def test_problems_name_bad_values(self):
-        said = docsearch.problems_of(
-            docsearch.Query(sort="size", format="xml", since="yesterday", until="2026-8-5")
+        said = docsearch_query.problems_of(
+            docsearch_query.Query(sort="size", format="xml", since="yesterday", until="2026-8-5")
         )
         self.assertEqual(len(said), 4)
 
 
-def render(query: docsearch.Query, rows=ROWS) -> str:
+def render(query: docsearch_query.Query, rows=ROWS) -> str:
     out = io.StringIO()
-    hits, matched = docsearch.search(rows, query)
-    docsearch.render(out, hits, matched, len(rows), query.format)
+    hits, matched = docsearch_query.search(rows, query)
+    docsearch_query.render(out, hits, matched, len(rows), query.format)
     return out.getvalue()
 
 
 class RenderTest(unittest.TestCase):
     def test_count_says_shown_only_when_cut(self):
-        self.assertEqual(render(docsearch.Query(format="count")), "matched=5 total=5\n")
+        self.assertEqual(render(docsearch_query.Query(format="count")), "matched=5 total=5\n")
         self.assertEqual(
-            render(docsearch.Query(format="count", limit=1)), "matched=5 shown=1 total=5\n"
+            render(docsearch_query.Query(format="count", limit=1)), "matched=5 shown=1 total=5\n"
         )
 
     def test_path_jsonl_json(self):
         self.assertEqual(
-            render(docsearch.Query(format="path", types=["guide"])),
+            render(docsearch_query.Query(format="path", types=["guide"])),
             "README\ndocs/claude/worktree\n",
         )
-        lines = render(docsearch.Query(format="jsonl", types=["guide"])).splitlines()
+        lines = render(docsearch_query.Query(format="jsonl", types=["guide"])).splitlines()
         self.assertEqual(
             [json.loads(line)["concept_id"] for line in lines], ["README", "docs/claude/worktree"]
         )
-        self.assertEqual(len(json.loads(render(docsearch.Query(format="json")))), 5)
+        self.assertEqual(len(json.loads(render(docsearch_query.Query(format="json")))), 5)
 
     def test_detail_folds_lines(self):
         rows = [row("a", type="guide", description="1 行目\n2 行目", tags=["x", "y"])]
-        text = render(docsearch.Query(format="detail"), rows)
+        text = render(docsearch_query.Query(format="detail"), rows)
         self.assertIn("  description: 1 行目 2 行目\n", text)
         self.assertIn("  tags       : x, y\n", text)
 
@@ -384,9 +391,9 @@ class RenderTest(unittest.TestCase):
             row("日本語/文書", type="ガイド", title="題"),
             row("ab", type="adr", title="t"),
         ]
-        lines = render(docsearch.Query(format="table"), rows).splitlines()
+        lines = render(docsearch_query.Query(format="table"), rows).splitlines()
         # タイトルの列が始まる見た目の位置が揃う。
-        starts = [docsearch.dwidth(line[: line.rindex(" ") + 1]) for line in lines]
+        starts = [docsearch_query.dwidth(line[: line.rindex(" ") + 1]) for line in lines]
         self.assertEqual(starts[0], starts[1])
         self.assertEqual(lines[0], "adr     ab           t")
 
@@ -395,10 +402,10 @@ class RenderTest(unittest.TestCase):
             {"concept_id": "x", "frontmatter": {"tags": {"a": 1}, "type": ["odd"]}, "mtime": None},
             {"concept_id": "y", "frontmatter": "not a mapping"},
         ]
-        for fmt in docsearch.FORMATS:
+        for fmt in docsearch_query.FORMATS:
             with self.subTest(fmt=fmt):
-                render(docsearch.Query(format=fmt, texts=[""], tags=["q"]), rows)
-                render(docsearch.Query(format=fmt, sort="title"), rows)
+                render(docsearch_query.Query(format=fmt, texts=[""], tags=["q"]), rows)
+                render(docsearch_query.Query(format=fmt, sort="title"), rows)
 
 
 # --- 5. CLI ----------------------------------------------------------------------------
@@ -523,7 +530,7 @@ class CliTest(Repo):
                 self.assertEqual(done.returncode, 1, done.stdout)
                 self.assertIn(f"--docs は {args[0]} と一緒に使えない", done.stderr)
                 self.assertEqual(done.stdout, "")
-                # 層の置き場の「診断でだけ効く」の文で先へ進まない。
+                # レイヤーの置き場の「診断でだけ効く」の文で先へ進まない。
                 self.assertNotIn("診断", done.stderr)
 
     def test_root_log_and_state_are_accepted(self):
@@ -687,7 +694,7 @@ class ForeignIndexTest(Repo):
         self.put("a.md", doc(type="guide"))
         foreign = '{"name": "other tool"}\n'
         write(self.index_of(""), foreign)
-        built = docsearch.build(self.root)
+        built = docsearch_index.build(self.root)
         self.assertEqual(built.foreign, ["index.jsonl"])
         self.assertIn("ccnavi の索引ではない", built.problems[0])
         with open(self.index_of(""), encoding="utf-8") as f:
@@ -699,14 +706,14 @@ class ForeignIndexTest(Repo):
         git(self.root, "add", "gone/b.md")
         write(self.index_of("gone"), "not ours\n")
         os.remove(os.path.join(self.root, "gone", "b.md"))
-        built = docsearch.build(self.root)
+        built = docsearch_index.build(self.root)
         self.assertTrue(os.path.exists(self.index_of("gone")))
         self.assertEqual(built.removed, [])
 
     def test_an_empty_index_is_ours(self):
         self.put("a.md", doc(type="guide"))
         write(self.index_of(""), "\n")
-        self.assertEqual(docsearch.build(self.root).written, ["index.jsonl"])
+        self.assertEqual(docsearch_index.build(self.root).written, ["index.jsonl"])
 
     def test_cli_and_session_start_name_it(self):
         self.put("a.md", doc(type="guide"))
@@ -729,14 +736,14 @@ class OutsideTest(Repo):
         write(os.path.join(path, "x.md"), doc(type="guide"))
         return path
 
-    def assert_nothing_outside(self, outside: str, built: docsearch.Built) -> None:
+    def assert_nothing_outside(self, outside: str, built: docsearch_index.Built) -> None:
         self.assertFalse(os.path.exists(os.path.join(outside, "index.jsonl")))
         self.assertEqual([r for r in built.rows if r["concept_id"].startswith("linked")], [])
 
     def test_under_refuses_a_path_outside(self):
         base = os.path.normcase(os.path.realpath(self.root))
-        self.assertTrue(docsearch._under(os.path.join(self.root, "docs"), base))
-        self.assertFalse(docsearch._under(self.outside(), base))
+        self.assertTrue(docsearch_index._under(os.path.join(self.root, "docs"), base))
+        self.assertFalse(docsearch_index._under(self.outside(), base))
 
     @unittest.skipUnless(os.name == "nt", "ジャンクションは Windows にしか無い")
     def test_a_junction_is_neither_read_nor_written(self):
@@ -746,16 +753,18 @@ class OutsideTest(Repo):
         link = os.path.join(self.root, "linked")
         _winapi.CreateJunction(outside, link)
         self.addCleanup(os.rmdir, link)
-        self.assertFalse(docsearch._under(link, os.path.normcase(os.path.realpath(self.root))))
+        self.assertFalse(
+            docsearch_index._under(link, os.path.normcase(os.path.realpath(self.root)))
+        )
         self.put("a.md", doc(type="guide"))
-        self.assert_nothing_outside(outside, docsearch.build(self.root))
+        self.assert_nothing_outside(outside, docsearch_index.build(self.root))
 
     @unittest.skipUnless(can_symlink_dirs(), "ディレクトリのシンボリックリンクを作れない")
     def test_a_symlinked_directory_is_neither_read_nor_written(self):
         outside = self.outside()
         os.symlink(outside, os.path.join(self.root, "linked"), target_is_directory=True)
         self.put("a.md", doc(type="guide"))
-        self.assert_nothing_outside(outside, docsearch.build(self.root))
+        self.assert_nothing_outside(outside, docsearch_index.build(self.root))
 
 
 class RobustTest(Repo):
@@ -763,26 +772,26 @@ class RobustTest(Repo):
 
     def test_front_matter_that_json_cannot_write_is_none(self):
         huge = b"---\nn: 1" + b"9" * 5000 + b"\n---\n"
-        self.assertIsNone(docsearch.front_matter(huge))
+        self.assertIsNone(docsearch_index.front_matter(huge))
 
     def test_a_deeply_nested_index_is_foreign_not_a_crash(self):
         self.put("a.md", doc(type="guide"))
         write(self.index_of(""), "[" * 100000 + "\n")
-        built = docsearch.build(self.root)
+        built = docsearch_index.build(self.root)
         self.assertEqual(built.foreign, ["index.jsonl"])
 
     def test_one_broken_directory_does_not_stop_the_others(self):
         self.put("bad/a.md", doc(type="guide"))
         self.put("good/b.md", doc(type="adr"))
-        real = docsearch._scan
+        real = docsearch_index._scan
 
         def broken(base, base_real, directory, *args):
             if directory == "bad":
                 raise RuntimeError("boom")
             return real(base, base_real, directory, *args)
 
-        with mock.patch.object(docsearch, "_scan", broken):
-            built = docsearch.build(self.root)
+        with mock.patch.object(docsearch_index, "_scan", broken):
+            built = docsearch_index.build(self.root)
         self.assertEqual([r["concept_id"] for r in built.rows], ["good/b"])
         self.assertIn("bad/ を読めない", built.problems[0])
 
@@ -810,11 +819,13 @@ class DeadlineTest(Repo):
 
     def test_parse_stops_between_files_and_keeps_the_rest_waiting(self):
         self.put("a.md", doc(type="guide"))
-        one = docsearch._Dir("", "index.jsonl", self.index_of(""), True, docsearch.ABSENT, {}, None)
+        one = docsearch_index._Dir(
+            "", "index.jsonl", self.index_of(""), True, docsearch_index.ABSENT, {}, None
+        )
         one.order = ["a"]
         one.pending = [("a.md", "a", "2026-01-01T00:00:00")]
-        built = docsearch.Built()
-        docsearch._parse_pending(self.root, [one], time.monotonic() - 1, built)
+        built = docsearch_index.Built()
+        docsearch_index._parse_pending(self.root, [one], time.monotonic() - 1, built)
         self.assertTrue(built.timed_out)
         self.assertEqual(built.parsed, 0)
         self.assertEqual(len(one.pending), 1)
@@ -825,7 +836,7 @@ class DeadlineTest(Repo):
         self.put("b.md", doc(type="guide"))
         old_b = {"concept_id": "b", "directory": ".", "frontmatter": None, "mtime": "x"}
         write(self.index_of(""), json.dumps(old_b) + "\n")
-        real = docsearch._read_head
+        real = docsearch_index._read_head
         reads = []
 
         def once(path):
@@ -834,10 +845,10 @@ class DeadlineTest(Repo):
             return real(path)
 
         with (
-            mock.patch.object(docsearch, "_read_head", once),
-            mock.patch.object(docsearch, "_past", lambda deadline: bool(reads)),
+            mock.patch.object(docsearch_index, "_read_head", once),
+            mock.patch.object(docsearch_index, "_past", lambda deadline: bool(reads)),
         ):
-            built = docsearch.build(self.root, deadline=time.monotonic() + 600)
+            built = docsearch_index.build(self.root, deadline=time.monotonic() + 600)
         self.assertTrue(built.timed_out)
         self.assertEqual(built.written, ["index.jsonl"])
         rows = {r["concept_id"]: r for r in map(json.loads, read(self.index_of("")).splitlines())}
@@ -845,7 +856,7 @@ class DeadlineTest(Repo):
         self.assertEqual(rows["b"], old_b)
 
         # 次の回に残りを読む。
-        built = docsearch.build(self.root)
+        built = docsearch_index.build(self.root)
         self.assertFalse(built.timed_out)
         rows = {r["concept_id"]: r for r in map(json.loads, read(self.index_of("")).splitlines())}
         self.assertEqual(rows["b"]["frontmatter"], {"type": "guide"})
@@ -856,7 +867,7 @@ class DeadlineTest(Repo):
             self.put(f"docs/d{i:03}.md", doc(type="guide"))
         self.put("zz/late.md", doc(type="adr"))
         budget = {"left": 0}
-        real = docsearch._read_head
+        real = docsearch_index._read_head
 
         def counted(path):
             budget["left"] -= 1
@@ -867,17 +878,17 @@ class DeadlineTest(Repo):
 
         seen = []
         with (
-            mock.patch.object(docsearch, "_read_head", counted),
-            mock.patch.object(docsearch, "_past", past),
+            mock.patch.object(docsearch_index, "_read_head", counted),
+            mock.patch.object(docsearch_index, "_past", past),
         ):
             for _ in range(3):
                 budget["left"] = 12  # 1 回に読めるのは 12 本まで
-                built = docsearch.build(self.root, deadline=time.monotonic() + 600)
+                built = docsearch_index.build(self.root, deadline=time.monotonic() + 600)
                 seen.append(len(built.rows))
                 self.assertIn("zz/late", [r["concept_id"] for r in built.rows])
         # 1 回目は zz/late と docs の 11 本、2 回目は docs の続き 12 本、3 回目で残りの 7 本。
         self.assertEqual(seen, [12, 24, 31])
-        built = docsearch.build(self.root)
+        built = docsearch_index.build(self.root)
         self.assertFalse(built.timed_out)
         self.assertEqual(built.parsed, 0)
 
@@ -889,7 +900,7 @@ class DeadlineTest(Repo):
         self.assertIn("--docs", said)
         self.assertFalse(os.path.exists(self.index_of("")))
 
-        docsearch.build(self.root)
+        docsearch_index.build(self.root)
         before = read(self.index_of(""))
         self.put("a.md", doc(type="adr"))
         os.utime(self.root + "/a.md", (time.time() + 5, time.time() + 5))
@@ -904,25 +915,27 @@ class DeadlineTest(Repo):
 
     def test_read_head_stops_early_without_front_matter(self):
         path = self.put("big.md", "x" * 20000)
-        self.assertEqual(len(docsearch._read_head(path)), docsearch.FIRST_READ)
+        self.assertEqual(len(docsearch_index._read_head(path)), docsearch_index.FIRST_READ)
         path = self.put("closed.md", "---\ntype: a\n---\n" + "y" * 20000)
-        self.assertEqual(len(docsearch._read_head(path)), docsearch.FIRST_READ)
+        self.assertEqual(len(docsearch_index._read_head(path)), docsearch_index.FIRST_READ)
         path = self.put("long.md", "---\nd: " + "z" * 10000 + "\n---\nbody")
-        self.assertEqual(docsearch.front_matter(docsearch._read_head(path))["d"], "z" * 10000)
+        self.assertEqual(
+            docsearch_index.front_matter(docsearch_index._read_head(path))["d"], "z" * 10000
+        )
 
 
 class GitFailureTest(Repo):
     """E: git に聞けなかったことを、git の外・無視されていないと取り違えない。"""
 
     def failing(self, verb: str):
-        real = docsearch.gitcmd.run
+        real = docsearch_index.gitcmd.run
 
         def run(cwd, args, *rest, **kwargs):
             if args[0] == verb:
-                return docsearch.gitcmd.Done(failure="timed out", timed_out=True)
+                return docsearch_index.gitcmd.Done(failure="timed out", timed_out=True)
             return real(cwd, args, *rest, **kwargs)
 
-        return mock.patch.object(docsearch.gitcmd, "run", run)
+        return mock.patch.object(docsearch_index.gitcmd, "run", run)
 
     def test_ls_files_failure_is_failed_not_outside_git(self):
         self.put("a.md", doc(type="guide"))
@@ -958,16 +971,16 @@ class NormalizationTest(unittest.TestCase):
     def test_nfd_rows_match_nfc_queries(self):
         rows = [row(f"docs/{self.NFD}", tags=[self.NFD], title=self.NFD)]
         for query in (
-            docsearch.Query(paths=["が"]),
-            docsearch.Query(tags=["が"]),
-            docsearch.Query(texts=["が"]),
+            docsearch_query.Query(paths=["が"]),
+            docsearch_query.Query(tags=["が"]),
+            docsearch_query.Query(texts=["が"]),
         ):
             with self.subTest(query=query):
-                self.assertEqual(len(docsearch.search(rows, query)[0]), 1)
+                self.assertEqual(len(docsearch_query.search(rows, query)[0]), 1)
 
     def test_combining_marks_have_no_width(self):
-        self.assertEqual(docsearch.dwidth(self.NFD), 2)
-        self.assertEqual(docsearch.dwidth("é"), 1)
+        self.assertEqual(docsearch_query.dwidth(self.NFD), 2)
+        self.assertEqual(docsearch_query.dwidth("é"), 1)
 
 
 class TempFileTest(Repo):
@@ -979,7 +992,7 @@ class TempFileTest(Repo):
         self.put("a.md", doc(type="guide"))
         git(self.root, "add", "a.md")
         git(self.root, "commit", "-q", "-m", "a")
-        docsearch.build(self.root)
+        docsearch_index.build(self.root)
         self.assertTrue(os.path.exists(self.index_of("")))
         self.assertEqual(git(self.root, "status", "--porcelain", "-uall"), "")
 
@@ -988,7 +1001,7 @@ class TempFileTest(Repo):
         git_dir = os.path.join(self.root, ".git")
         stale = write(os.path.join(git_dir, "ccnavi-index-1-0.tmp"), "x", mtime=NOON)
         fresh = write(os.path.join(git_dir, "ccnavi-index-1-1.tmp"), "x")
-        docsearch.build(self.root)
+        docsearch_index.build(self.root)
         self.assertFalse(os.path.exists(stale))
         self.assertTrue(os.path.exists(fresh))
         leftovers = [n for n in os.listdir(git_dir) if n.startswith("ccnavi-index-")]
@@ -1030,9 +1043,9 @@ class LineSeparatorTest(Repo):
         for escape, char in (("\\L", " "), ("\\P", " "), ("\\N", "\u0085")):
             with self.subTest(char=hex(ord(char))):
                 self.put("a.md", f'---\ntype: guide\ntitle: "x{escape}y"\n---\n')
-                docsearch.build(self.root)
+                docsearch_index.build(self.root)
                 self.assertIn(char, read(self.index_of("")))
-                built = docsearch.build(self.root)
+                built = docsearch_index.build(self.root)
                 self.assertEqual(built.foreign, [])
                 self.assertEqual(built.reused, 1)
                 self.assertEqual(built.rows[0]["frontmatter"]["title"], f"x{char}y")
@@ -1040,11 +1053,11 @@ class LineSeparatorTest(Repo):
 
     def test_crlf_lines_are_still_read(self):
         self.put("a.md", doc(type="guide"))
-        docsearch.build(self.root)
+        docsearch_index.build(self.root)
         text = read(self.index_of(""))
         with open(self.index_of(""), "w", encoding="utf-8", newline="") as f:
             f.write(text.replace("\n", "\r\n"))
-        built = docsearch.build(self.root)
+        built = docsearch_index.build(self.root)
         self.assertEqual(built.foreign, [])
         self.assertEqual(built.reused, 1)
 
@@ -1061,17 +1074,17 @@ class CrossDeviceTest(Repo):
                 raise OSError(errno.EXDEV, "Invalid cross-device link")
             return real(src, dst)
 
-        return mock.patch.object(docsearch.os, "replace", replace)
+        return mock.patch.object(docsearch_index.os, "replace", replace)
 
     def leftovers(self, rel_dir: str) -> list[str]:
         where = os.path.join(self.root, *[p for p in rel_dir.split("/") if p])
-        return [n for n in os.listdir(where) if n.startswith(docsearch.LOCAL_TMP_PREFIX)]
+        return [n for n in os.listdir(where) if n.startswith(docsearch_index.LOCAL_TMP_PREFIX)]
 
     def test_writes_through_a_temporary_beside_the_index(self):
         self.put("docs/a.md", doc(type="guide"))
         self.put("b.md", doc(type="adr"))
         with self.exdev():
-            built = docsearch.build(self.root)
+            built = docsearch_index.build(self.root)
         self.assertEqual(built.problems, [])
         self.assertEqual(sorted(built.written), ["docs/index.jsonl", "index.jsonl"])
         self.assertEqual(self.rows_of("docs")[0]["frontmatter"], {"type": "guide"})
@@ -1079,13 +1092,13 @@ class CrossDeviceTest(Repo):
         self.assertEqual(self.leftovers(""), [])
         status = git(self.root, "status", "--porcelain", "--untracked-files=all")
         self.assertNotIn("index.jsonl", status)
-        self.assertNotIn(docsearch.LOCAL_TMP_PREFIX, status)
+        self.assertNotIn(docsearch_index.LOCAL_TMP_PREFIX, status)
 
     def test_does_not_write_when_the_temporary_would_not_be_ignored(self):
         write(os.path.join(self.root, ".gitignore"), "/docs/index.jsonl\n")
         self.put("docs/a.md", doc(type="guide"))
         with self.exdev():
-            built = docsearch.build(self.root)
+            built = docsearch_index.build(self.root)
         self.assertEqual(built.written, [])
         self.assertIn("git に無視されない", " ".join(built.problems))
         self.assertFalse(os.path.exists(self.index_of("docs")))
@@ -1094,14 +1107,14 @@ class CrossDeviceTest(Repo):
 
     def test_sweeps_only_its_own_stale_leftovers(self):
         self.put("docs/a.md", doc(type="guide"))
-        old = time.time() - docsearch.TMP_STALE_SECONDS - 60
+        old = time.time() - docsearch_index.TMP_STALE_SECONDS - 60
         mine = write(os.path.join(self.root, "docs", ".ccnavi-tmp-1-1", "index.jsonl"), "x")
         theirs = write(os.path.join(self.root, "docs", ".ccnavi-tmp-2-2", "notes.txt"), "keep")
         fresh = write(os.path.join(self.root, "docs", ".ccnavi-tmp-3-3", "index.jsonl"), "x")
         for path in (mine, theirs):
             os.utime(os.path.dirname(path), (old, old))
         with self.exdev():
-            docsearch.build(self.root)
+            docsearch_index.build(self.root)
         self.assertFalse(os.path.exists(os.path.dirname(mine)))
         self.assertTrue(os.path.exists(theirs))
         self.assertTrue(os.path.exists(fresh))
@@ -1123,8 +1136,8 @@ class CrossDeviceTest(Repo):
             return Other(info) if os.fspath(path) == git_dir else info
 
         writer = None
-        with mock.patch.object(docsearch.os, "stat", stat):
-            writer = docsearch._Writer(self.root, git_dir, None)
+        with mock.patch.object(docsearch_index.os, "stat", stat):
+            writer = docsearch_index._Writer(self.root, git_dir, None)
         self.assertTrue(writer.beside)
 
 
@@ -1133,19 +1146,19 @@ class PathspecMagicTest(Repo):
 
     def test_check_ignore_takes_a_path_that_looks_like_magic(self):
         paths = [":(exclude)x/index.jsonl", ":!y/index.jsonl", "*/index.jsonl"]
-        self.assertEqual(docsearch._ignored(self.root, paths), set(paths))
+        self.assertEqual(docsearch_index._ignored(self.root, paths), set(paths))
 
     @unittest.skipIf(os.name == "nt", "Windows では `:` を名前に使えない")
     def test_a_directory_named_like_magic_is_indexed(self):
         self.put(":(exclude)x/a.md", doc(type="guide"))
-        built = docsearch.build(self.root)
+        built = docsearch_index.build(self.root)
         self.assertEqual(built.written, [":(exclude)x/index.jsonl"])
 
     def test_pathspec_environment_of_the_user_does_not_break_the_index(self):
         self.put("docs/a.md", doc(type="guide"))
         for name in ("GIT_LITERAL_PATHSPECS", "GIT_ICASE_PATHSPECS", "GIT_GLOB_PATHSPECS"):
             with self.subTest(name=name), mock.patch.dict(os.environ, {name: "1"}):
-                built = docsearch.build(self.root)
+                built = docsearch_index.build(self.root)
                 self.assertEqual([r["concept_id"] for r in built.rows], ["docs/a"])
 
 

@@ -1,10 +1,12 @@
-"""共通層の置き場は `.ccnavi/common/` 固定の受入テスト。
+"""共通レイヤーの置き場は `.ccnavi/common/` 固定の受入テスト。
 
-3 層のうち共通層だけが env（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`）で動き、
-自身の層とプロジェクトの層は `<ccnavi ディレクトリ>/config/` 固定、という非対称を無くす。
-env を渡しても共通層は既定の置き場のままになる。
+3 つのレイヤーのうち共通レイヤーだけが env（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`）
+で動き、
+自身のレイヤーとプロジェクトのレイヤーは `<ccnavi ディレクトリ>/config/` 固定、
+という非対称を無くす。
+env を渡しても共通レイヤーは既定の置き場のままになる。
 
-**フラグ（`--rules` / `--phases` / `--risk`）は残す。** ここを一緒に消すと、層の合成を
+**フラグ（`--rules` / `--phases` / `--risk`）は残す。** ここを一緒に消すと、レイヤーの合成を
 確かめるテストが自分の一時ディレクトリを指せなくなる（`ConfigUnionHarness`）。
 hook は引数を渡さずに起動するので、hook からの判定の入口は固定される。
 
@@ -28,7 +30,7 @@ from tests import ROOT
 from tests.config.test_config_union import ConfigUnionHarness, write
 from tests.inproc import run_ccnavi
 
-# 共通層に置いてあるものとは別の中身。env かフラグがこちらを指したときだけ当たる。
+# 共通レイヤーに置いてあるものとは別の中身。env かフラグがこちらを指したときだけ当たる。
 OTHER_RULES = {
     "version": 1,
     "deny": [
@@ -43,7 +45,7 @@ OTHER_RULES = {
 OTHER_PHASES = "version: 1\nphases:\n  only-here:\n    kind: work\n    title: よそ\n"
 OTHER_RISK = "version: 1\nfactors:\n  - id: only-here\n    lines_over: 1\n    points: 99\n"
 
-# 共通層の 3 本。(種類, env, フラグ, `--explain --json` の層の欄)。
+# 共通レイヤーの 3 本。(種類, env, フラグ, `--explain --json` のレイヤーの欄)。
 # 種類は土台の属性の名前を兼ねる。既定の置き場は `self.<種類>`、よそは `self.other_<種類>`。
 KINDS = (
     ("rules", "CCNAVI_RULES", "--rules", "rules"),
@@ -53,7 +55,7 @@ KINDS = (
 
 
 class CommonLayerPlaceHarness(ConfigUnionHarness):
-    """共通層の 3 本をフラグで渡さずに動かす道具。"""
+    """共通レイヤーの 3 本をフラグで渡さずに動かす道具。"""
 
     def setUp(self):
         super().setUp()
@@ -63,7 +65,7 @@ class CommonLayerPlaceHarness(ConfigUnionHarness):
         self.other_risk = write(os.path.join(elsewhere, "risks.yml"), OTHER_RISK)
 
     def bare(self, *args, env=None, guard="disable", flags=(), stdin=""):
-        """共通層の 3 本をフラグで渡さずに 1 回動かす。
+        """共通レイヤーの 3 本をフラグで渡さずに 1 回動かす。
 
         `flags` を渡したときだけ、そのフラグを足す（フラグが残っていることを確かめる側）。
         """
@@ -117,9 +119,9 @@ class CommonLayerPlaceHarness(ConfigUnionHarness):
             self.fail(f"--explain --json が読めない: {exc}\n{result.stdout}\n{result.stderr}")
 
     def common(self, **options):
-        """共通層の 1 件。"""
+        """共通レイヤーの 1 件。"""
         found = [layer for layer in self.layers(**options) if layer["name"] == "common"]
-        self.assertEqual(len(found), 1, "共通層は 1 件")
+        self.assertEqual(len(found), 1, "共通レイヤーは 1 件")
         return found[0]
 
     def reason(self, result):
@@ -138,10 +140,10 @@ class CommonLayerPlaceHarness(ConfigUnionHarness):
 
 
 class EnvDoesNotMoveTheCommonLayerTest(CommonLayerPlaceHarness):
-    """env は共通層を動かさない。"""
+    """env は共通レイヤーを動かさない。"""
 
     def test_each_env_does_not_move_the_common_layer(self):
-        """env を 1 本渡しても、共通層のその 1 本は `.ccnavi/common/` のまま。
+        """env を 1 本渡しても、共通レイヤーのその 1 本は `.ccnavi/common/` のまま。
 
         `CCNAVI_RULES` → `rules.yml`、`CCNAVI_PHASES` → `phases.yml`、`CCNAVI_RISK` → `risks.yml`。
         """
@@ -188,7 +190,7 @@ class FlagsStillMoveTheCommonLayerTest(CommonLayerPlaceHarness):
 
 
 class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
-    """診断の外では、フラグも共通層を動かさない（issue #65）。
+    """診断の外では、フラグも共通レイヤーを動かさない（issue #65）。
 
     `--project-rules-file` / `--project-phases-file` と揃える。有効なのは `--lint` /
     `--test` / `--test-samples` / `--explain` だけで、hook からの判定と

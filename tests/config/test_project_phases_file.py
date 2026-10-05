@@ -1,8 +1,9 @@
 """`--project-phases-file <名前>=<パス>` の受入テスト（REQ-DIA-09）。
 
-VS Code 拡張のフェーズ管理画面が、編集中の層の種類を保存せずに共通層と合成して検証するための
+VS Code 拡張のフェーズ管理画面が、
+編集中のレイヤーの種類を保存せずに共通レイヤーと合成して検証するための
 差し替え。fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ
-（共通層に `design`「設計」、自身の層に `docs`、lib の層に `build` / `release`）。
+（共通レイヤーに `design`「設計」、自身のレイヤーに `docs`、lib のレイヤーに `build` / `release`）。
 """
 
 from __future__ import annotations
@@ -13,13 +14,13 @@ import unittest
 
 from tests.config.test_config_union import LIB_PHASES, ConfigUnionHarness, layer_path, read, write
 
-# lib の層の build の表示名を、共通層の design と同じ「設計」にしたもの。
+# lib のレイヤーの build の表示名を、共通レイヤーの design と同じ「設計」にしたもの。
 LIB_TITLE_OVERLAP = LIB_PHASES.replace("title: ビルド", "title: 設計")
 
-# 共通層の種類と id も表示名も重ならない種類。`phases:` の続きに繋げる。
+# 共通レイヤーの種類と id も表示名も重ならない種類。`phases:` の続きに繋げる。
 NOTES_TYPE = "  notes:\n    kind: work\n    title: メモ\n    review: none\n    scope: inherit\n"
 
-# 種類の無い層。実行ファイルは読めないとして error にする（拡張はこの形を書き出さない）。
+# 種類の無いレイヤー。実行ファイルは読めないとして error にする（拡張はこの形を書き出さない）。
 EMPTY_LAYER = "version: 1\nphases: {}\n"
 
 
@@ -28,12 +29,12 @@ class ProjectPhasesFileTest(ConfigUnionHarness):
         return [p for p in self.problems("error", *args, where=where) if "(phases)" in p["where"]]
 
     def test_swaps_one_layers_phase_types_and_lints_them_merged_with_the_common_layer(self):
-        # 差し替えなしなら lib の層は共通層と合成できる。
+        # 差し替えなしなら lib のレイヤーは共通レイヤーと合成できる。
         self.assertEqual(self.phase_errors("(projects/lib)"), [])
 
         edited = write(os.path.join(self.ws, "tmp", "lib-phases.yml"), LIB_TITLE_OVERLAP)
         errors = self.phase_errors("(projects/lib)", "--project-phases-file", f"lib={edited}")
-        self.assertTrue(errors, "表示名の重なりが lib の層の error として出ない")
+        self.assertTrue(errors, "表示名の重なりが lib のレイヤーの error として出ない")
         # 差し替えは診断の中だけ。本来のファイルは書き換えない。
         self.assertEqual(read(layer_path(self.lib, "phases")), LIB_PHASES)
 
@@ -44,13 +45,13 @@ class ProjectPhasesFileTest(ConfigUnionHarness):
             own + "  clash:\n    kind: work\n    title: 設計\n    review: mr\n    scope: inherit\n",
         )
         errors = self.phase_errors("(self)", "--project-phases-file", f"self={edited}")
-        self.assertTrue(errors, "自身の層の差し替えが検証に届かない")
+        self.assertTrue(errors, "自身のレイヤーの差し替えが検証に届かない")
 
-        # 共通層と重ならない種類を足しただけなら通る。
+        # 共通レイヤーと重ならない種類を足しただけなら通る。
         added = write(os.path.join(self.ws, "tmp", "self-added.yml"), own + NOTES_TYPE)
         self.assertEqual(self.phase_errors("(self)", "--project-phases-file", f"self={added}"), [])
 
-        # 種類の無い層は error。拡張が層のファイルを最初の保存まで作らないのはこのため。
+        # 種類の無いレイヤーは error。拡張がレイヤーのファイルを最初の保存まで作らないのはこのため。
         empty = write(os.path.join(self.ws, "tmp", "empty.yml"), EMPTY_LAYER)
         self.assertTrue(self.phase_errors("(self)", "--project-phases-file", f"self={empty}"))
 

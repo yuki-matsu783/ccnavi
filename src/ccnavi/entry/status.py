@@ -25,8 +25,16 @@ from typing import TextIO
 
 from ..hook import c1
 from ..infra import fsio, gitcmd, settings, tree
-from ..tickets import approval, approval_checks, approval_times, history, ops, phase, syncstate
-from ..tickets import ticket as ticket_mod
+from ..tickets import (
+    approval,
+    approval_checks,
+    approval_times,
+    history,
+    ops,
+    phase,
+    syncstate,
+    ticket_model,
+)
 
 TIMEOUT_SECONDS = 10.0
 
@@ -43,13 +51,13 @@ FILE_UNKNOWN = "unknown"
 PARENT_ONLY = "（親（メインエージェント）だけが実行する）"
 
 _STATE_LABELS = {
-    ticket_mod.TODO: "承認待ち（todo/）",
-    ticket_mod.DOING: "作業中（doing/）",
-    ticket_mod.REVIEW: "レビュー待ち（review/）",
-    ticket_mod.DONE: "閉じた（done/）",
-    ticket_mod.CANCELLED: "閉じた（done/）",
+    ticket_model.TODO: "承認待ち（todo/）",
+    ticket_model.DOING: "作業中（doing/）",
+    ticket_model.REVIEW: "レビュー待ち（review/）",
+    ticket_model.DONE: "閉じた（done/）",
+    ticket_model.CANCELLED: "閉じた（done/）",
 }
-_CLOSED = (ticket_mod.DONE, ticket_mod.CANCELLED)
+_CLOSED = (ticket_model.DONE, ticket_model.CANCELLED)
 
 
 @dataclass
@@ -76,10 +84,10 @@ class Entry:
     """1 つの識別子の今。`hits` が 2 つ以上なら、どれが本物か決まらない。"""
 
     ident: str
-    hits: list[ticket_mod.Ticket] = field(default_factory=list)
+    hits: list[ticket_model.Ticket] = field(default_factory=list)
 
     @property
-    def t(self) -> ticket_mod.Ticket:
+    def t(self) -> ticket_model.Ticket:
         return self.hits[0]
 
 
@@ -92,7 +100,7 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
     review, more = approval.scan_review(conf, root, raw=raw)
     notes += more
     proposals, _ = approval.scan_proposals(conf, root, raw.everything)
-    todo = [p for p in proposals if p.state == ticket_mod.TODO]
+    todo = [p for p in proposals if p.state == ticket_model.TODO]
 
     entries: dict[str, Entry] = {}
     for t in doing + review + closed:
@@ -187,7 +195,7 @@ class _Family:
             + (f"  プロジェクト: {t.project}" if t.project else ""),
         ]
         file_state = self.files.get(t.path, FileState(FILE_UNKNOWN))
-        if t.state == ticket_mod.TODO:
+        if t.state == ticket_model.TODO:
             lines.append(f"    置き場のファイル: {file_state.label()}")
             lines.append(
                 "    次の一手: ユーザの承認を待つ（ボード、端末の ccnavi-agree.sh、"
@@ -212,7 +220,7 @@ class _Family:
             else "    着手: 未着手"
         )
         lines.append(f"    置き場のファイル: {file_state.label()}")
-        if t.state == ticket_mod.REVIEW:
+        if t.state == ticket_model.REVIEW:
             lines.append(
                 "    次の一手: ユーザのレビューを待つ（ユーザが ccnavi-review.sh confirm / decide"
                 " で done/ へ動かす）"
@@ -220,7 +228,7 @@ class _Family:
             return lines
         return lines + self._doing(t, file_state)
 
-    def _doing(self, t: ticket_mod.Ticket, file_state: FileState) -> list[str]:
+    def _doing(self, t: ticket_model.Ticket, file_state: FileState) -> list[str]:
         """作業中のチケットの、止まっている理由・注意・次の一手。"""
         stops: list[str] = []
         warns: list[str] = []
@@ -311,7 +319,7 @@ class _Family:
             )
         return lines + [f"    次の一手: {n}" for n in nexts]
 
-    def _start_lines(self, t: ticket_mod.Ticket) -> list[str]:
+    def _start_lines(self, t: ticket_model.Ticket) -> list[str]:
         owner = tree.project_root(self.conf.projects, t.project) or self.root
         worktree = tree.worktree_path(self.root, t.ticket)
         out = []
@@ -326,7 +334,7 @@ class _Family:
         out.append(f"'{self.ticket_sh} start {t.ticket}' で着手する{PARENT_ONLY}")
         return out
 
-    def _parent_not_started(self, t: ticket_mod.Ticket) -> str:
+    def _parent_not_started(self, t: ticket_model.Ticket) -> str:
         if not t.is_child:
             return ""
         e = self.entries.get(t.parent)
@@ -335,16 +343,16 @@ class _Family:
         if len(e.hits) > 1:
             return f"親 {t.parent} が複数の場所にある"
         parent = e.t
-        if parent.state == ticket_mod.TODO:
+        if parent.state == ticket_model.TODO:
             return f"親 {t.parent} がまだ承認されていない（todo/）"
-        if parent.state != ticket_mod.DOING:
+        if parent.state != ticket_model.DOING:
             return f"親 {t.parent} は作業中ではない（{parent.state}/）"
         if not parent.started_at:
             return f"親 {t.parent} が未着手。子より先に親に着手する"
         return ""
 
 
-def _started_recorded(conf: settings.Settings, t: ticket_mod.Ticket) -> bool:
+def _started_recorded(conf: settings.Settings, t: ticket_model.Ticket) -> bool:
     """状態の履歴に着手の行があるか。読めなければ、あるとみなす（言わない側）。"""
     if not t.tree_root:
         return True
@@ -352,9 +360,9 @@ def _started_recorded(conf: settings.Settings, t: ticket_mod.Ticket) -> bool:
     return bool(why) or any(x.get("kind") == history.KIND_STARTED for x in entries)
 
 
-def _file_states(root: str, found: list[ticket_mod.Ticket]) -> dict[str, FileState]:
+def _file_states(root: str, found: list[ticket_model.Ticket]) -> dict[str, FileState]:
     """チケットのファイルごと（パスで引く）の git での姿。ツリーごとに git を数回だけ打つ。"""
-    by_tree: dict[str, list[ticket_mod.Ticket]] = {}
+    by_tree: dict[str, list[ticket_model.Ticket]] = {}
     for t in found:
         if t.tree_root and t.path:
             by_tree.setdefault(t.tree_root, []).append(t)

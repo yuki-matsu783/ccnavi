@@ -1187,7 +1187,8 @@ class PlacesAreNotReadTest(SyncHarness):
         }
 
     def arrange(self):
-        """リモートに親の 1 件、統合先に done/ と層、提案だけの家族、家族の無いプロジェクト。"""
+        """リモートに親の 1 件、統合先に done/ とレイヤー、提案だけの家族、
+        家族の無いプロジェクト。"""
         self.head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
         self.remote_commit("main", ".ccnavi/approved/done/old.md", "old\n")
         self.remote_commit("main", ".ccnavi/config/phases.yml", "phases\n")
@@ -1211,7 +1212,7 @@ class PlacesAreNotReadTest(SyncHarness):
         self.assertEqual(self.head, fields(self.record)["sha"])
         other = os.path.join(self.state, "sync", "self", "families", "i0002")
         self.assertEqual("present", fields(other)["state"])
-        # 統合先の控えは既定の置き場の done/ と層（.ccnavi/config）を写す。
+        # 統合先の控えは既定の置き場の done/ とレイヤー（.ccnavi/config）を写す。
         for rel in (".ccnavi/approved/done/old.md", ".ccnavi/config/phases.yml"):
             self.assertTrue(os.path.isfile(os.path.join(self.mirror, rel)), rel)
         # プロジェクトは既定の projects/ の下で見つける。
@@ -1229,9 +1230,17 @@ class PlacesAreNotReadTest(SyncHarness):
         self.assertDefaultPlaces(done)
 
     def test_the_fallback_without_an_answer_uses_the_defaults(self):
-        """実行ファイルが `sync paths` に空で答える道（予備）。sh が既定の綴りを直に使う。"""
+        """実行ファイルが `sync paths` に空で答える道（予備）。sh が既定の綴りを直に使う。
+
+        `sync paths` だけを空で返し、ほか（`c1 family` の `branch` の行）は本物に答えさせる。
+        `c1 family` まで空だと、sh は親のブランチ名を知らずに取り込みを止める。
+        """
         self.arrange()
-        done = self.sync(CCNAVI_BIN_PATH=self.launcher("#!/bin/sh\nexit 0\n"), **self.moved())
+        body = (
+            '#!/bin/sh\nif [ "$3" = sync ] && [ "$4" = paths ]; then exit 0; fi\n'
+            f'PYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@"\n'
+        )
+        done = self.sync(CCNAVI_BIN_PATH=self.launcher(body), **self.moved())
         self.assertDefaultPlaces(done)
 
 

@@ -8,14 +8,15 @@ import os
 
 from ..infra import gitcmd, gitstate, settings, tree
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
-from ..tickets import ticket as ticket_mod
+from ..tickets import ticket_places
 
 
 def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
     """下書きの置き場が、そのリポジトリの git に追跡されていないか（REQ-TKT-44）。
 
-    実行前チェックはチケットの範囲を `scratchpad/` に当てない（`ticket.is_scratch_place`）。外して
-    よい根拠は「git が追跡しないので統合先のブランチに乗らない」ことの 1 つだけ。
+    実行前チェックはチケットの範囲を `scratchpad/` に当てない
+    （`ticket_places.is_scratch_place`）。外してよい根拠は「git が追跡しないので
+    統合先のブランチに乗らない」ことの 1 つだけ。
 
     **この警告で穴が無くなるわけではない。** 根拠が崩れた場合は、実行後チェックと
     サブエージェント終了時チェックが `scratchpad/` の変更を範囲外として報告する（`is_unscoped` の
@@ -40,14 +41,14 @@ def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
         return []
     problems: list[Problem] = []
     # 前置きは `(scratch)` にする。プロジェクトのぶんも `(projects/<名前>)` は前置きにしない。
-    # あちらはその層の設定についての苦情で、ここは追跡の話。同じ前置きにすると、
-    # 「層について何も言わない」ことを見ているテストや読み手に、別の話が入り込む。
+    # あちらはそのレイヤーの設定についての苦情で、ここは追跡の話。同じ前置きにすると、
+    # 「レイヤーについて何も言わない」ことを見ているテストや読み手に、別の話が入り込む。
     where = [("(scratch)", root)]
     where += [
         (f"(scratch/{p.name})", tree.project_root(conf.projects, p.name))
         for p in tree.projects(conf.projects)
     ]
-    place = ticket_mod.SCRATCH
+    place = ticket_places.SCRATCH
     for name, home in where:
         tracked = _tracked(home, place)
         ignored = _ignored(home, place + "/")
@@ -106,7 +107,8 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     置き場が無いのは不備ではない。あるなら、ワークスペースの git で無視されていること、
     予約名（`common` / `self`、表記違いも含む）を使っていないこと、プロジェクトが
     `.claude/` を持たないことを見る。層の中身は
-    `_layers` が見る。
+    `_layers` が見る。無視の確認は、置き場のディレクトリが在るなら、プロジェクトが 0 件でも行う。
+    ディレクトリ自体が無いワークスペースでは何も言わない（プロジェクトを使わない人への苦情になる）。
 
     その前に、置き場がワークスペースの git の索引に載っていないかを見る（`_in_index`）。
     載っていれば「無視されていない」の代わりにそれを言う。プロジェクトが 1 つも無くても
@@ -118,11 +120,14 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     indexed = _in_index(root, rel) if rel else None
     if indexed is not None:
         problems.append(Problem(SEVERITY_WARN, "(projects)", indexed))
-    found = tree.projects(conf.projects)
-    if not found:
-        return problems
-    rel = rel or os.path.relpath(conf.projects, root).replace(os.sep, "/")
-    if indexed is None and _ignored(root, rel) is False:
+    # 無視の確認は、置き場のディレクトリが在るときだけ行う（プロジェクトが 0 件でもよい）。
+    # ディレクトリが無いのはプロジェクトを使っていないワークスペースで、何も言わない。
+    # `rel` が空（`--projects ""` やワークスペースの外を指す診断のフラグ）のときは、
+    # ワークスペースの git の話ではないので確認を飛ばす。
+    # 末尾の `/` は付けない。`projects` がシンボリックリンクだと `projects/` は
+    # git が rc=128（beyond a symbolic link）で断る。ディレクトリが実在すれば、
+    # 末尾の `/` が無くても `/projects/` のようなディレクトリ向けの行に当たる。
+    if rel and indexed is None and os.path.isdir(conf.projects) and _ignored(root, rel) is False:
         problems.append(
             Problem(
                 SEVERITY_WARN,
@@ -131,7 +136,7 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                 "持つので、ワークスペースの `.gitignore` に入れてください",
             )
         )
-    for p in found:
+    for p in tree.projects(conf.projects):
         where = f"(projects/{p.name})"
         if settings.is_reserved_layer_name(p.name):
             reserved = " と ".join(f"`{name}`" for name in settings.RESERVED_LAYER_NAMES)
@@ -139,12 +144,14 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                 Problem(
                     SEVERITY_ERROR,
                     where,
-                    f"{reserved} は層の名前として予約してある（`{settings.LAYER_COMMON}` は共通層、"
-                    f"`{settings.LAYER_SELF}` はワークスペース自身の層）。このプロジェクトは"
-                    f"層として数えていない（id の `{p.name}:` がどちらの層を指すか決まらないため。"
+                    f"{reserved} はレイヤーの名前として予約してある"
+                    f"（`{settings.LAYER_COMMON}` は共通レイヤー、"
+                    f"`{settings.LAYER_SELF}` はワークスペース自身のレイヤー）。このプロジェクトは"
+                    f"レイヤーとして数えていない"
+                    f"（id の `{p.name}:` がどちらのレイヤーを指すか決まらないため。"
                     "大文字小文字の違いは問わない）。ここに置いた宣言は 1 件も効いておらず、"
                     "このプロジェクトを行き先にするパスを持つツール（Read / Grep / Glob / Write / "
-                    "Edit / NotebookEdit）は共通層だけで判定している。"
+                    "Edit / NotebookEdit）は共通レイヤーだけで判定している。"
                     "プロジェクトを別の名前に変えてください",
                 )
             )

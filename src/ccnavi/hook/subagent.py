@@ -14,9 +14,9 @@ from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import rules
 from ..records import audit
-from ..tickets import approval, approval_checks, flow, phase
+from ..tickets import approval, approval_checks, flow, phase, phase_scope, ticket_model
 from ..tickets import ticket as ticket_mod
-from . import judge, post, projskills, reasons
+from . import judge, post, post_findings, projskills, reasons
 
 # サブエージェントには Stop の振り返り（`match: Stop` のルールの文）が届かないので、
 # 始まりに 1 行だけ渡す。メインはこの節を集めて振り返りに使う（docs/claude/skill-review.md）。
@@ -163,13 +163,13 @@ def at_stop(
     t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
     copies, _ = approval.scan(conf, root)
     index = approval_checks.by_id(copies)
-    targets: list[ticket_mod.Ticket] = []
+    targets: list[ticket_model.Ticket] = []
     bound = tree.lookup(index, t.name) if t is not None and not t.is_main else None
     if bound is not None:
         targets = [bound] if bound.is_child else [c for c in copies if c.parent == bound.ticket]
     findings = []
     for child in targets:
-        outside, unreadable = phase.scope_findings(root, conf, child, index.get(child.parent))
+        outside, unreadable = phase_scope.scope_findings(root, conf, child, index.get(child.parent))
         if unreadable:
             stderr.write(f"ccnavi: {child.ticket} のワークツリーを読めない: {unreadable}\n")
             continue
@@ -184,9 +184,9 @@ def at_stop(
         return EXIT_OK
 
     record.decision, record.paths = audit.DENY, [f"{c.ticket}:{rel}" for c, rel, _ in findings]
-    record.rules, record.code = [reasons.TICKET_RULE], post.CODE_TICKET_SCOPE
+    record.rules, record.code = [reasons.TICKET_RULE], post_findings.CODE_TICKET_SCOPE
     lines = [
-        f"[ccnavi] {post.CODE_TICKET_SCOPE}: 子チケットの範囲の外に変更が残っています（"
+        f"[ccnavi] {post_findings.CODE_TICKET_SCOPE}: 子チケットの範囲の外に変更が残っています（"
         f"{len(findings)} 件）。範囲の中へ戻すか、要るなら親に伝えて次のチケットにしてください。"
     ]
     for child, rel, found in findings[: post.REPORT_LIMIT]:
@@ -207,17 +207,17 @@ def at_stop(
     return EXIT_OK
 
 
-def _limit_note(child: ticket_mod.Ticket, found: phase.ScopeVerdict) -> str:
+def _limit_note(child: ticket_model.Ticket, found: phase_scope.ScopeVerdict) -> str:
     """子の範囲の中なのに外とされたパスにつける、止めた上限の名指し。子の範囲の外なら空。
 
     つけないと、承認で見た範囲の中を書いたのに差し戻された理由が読めず、範囲の中へ
     戻せと言われても戻し先が分からない。
     """
-    if found.limit == phase.LIMIT_BLOCKED:
+    if found.limit == phase_scope.LIMIT_BLOCKED:
         return f"（チケットを信頼できない: {child.blocked}）"
-    if found.limit == phase.LIMIT_TYPE and found.type is not None:
+    if found.limit == phase_scope.LIMIT_TYPE and found.type is not None:
         return f"（種類 {found.type.title} の上限の外）"
-    if found.limit == phase.LIMIT_PARENT:
+    if found.limit == phase_scope.LIMIT_PARENT:
         return f"（親 {child.parent} の範囲の外）"
     return ""
 
@@ -231,7 +231,7 @@ def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
         return ""
     fsio.remove(_bounce_path(state_dir, payload.session_id, agent_id))
     return (
-        f"[ccnavi] {post.CODE_TICKET_SCOPE}: サブエージェント {agent_id} は範囲外の変更を"
+        f"[ccnavi] {post_findings.CODE_TICKET_SCOPE}: サブエージェント {agent_id} は範囲外の変更を"
         "差し戻されたまま終わっています。合流する前に、その子のワークツリーの範囲外の"
         "変更を確かめてください。"
     )

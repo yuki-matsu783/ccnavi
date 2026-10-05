@@ -14,10 +14,10 @@ from typing import TextIO
 
 from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
-from ..policy import builtin, ctxfile, ruleload, rules, selfguard
+from ..policy import builtin, ctxfile, ruleload, rules, selfguard, selfguard_targets
 from ..records import audit, prune, repeat
 from ..tickets import approval, approval_checks, branchfind, configsync, ops, phase
-from . import docsearch, judge, post, projskills, reasons, subagent
+from . import docsearch, judge, post, post_findings, projskills, reasons, subagent
 
 # `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
 CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
@@ -74,7 +74,7 @@ def watch_context(
     root: str,
     record: audit.Record,
     raw: approval.Raw | None = None,
-) -> tuple[list[post.Watched], post.ScopeGuard | None]:
+) -> tuple[list[post.Watched], post_findings.ScopeGuard | None]:
     """ターンの区切りで作業ツリーを見る 2 つが、共通して使う持ち物。
 
     保護領域も範囲も、実行前チェックと同じ経路で解く。別に書くと、実行前に
@@ -97,7 +97,7 @@ def watched_for(
 
     payload が無ければ全部のツリー（ターンの区切り）。あればワークスペースルートと、
     この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。
-    ルールの引き方は実行前チェックと同じで、共通層にそのツリーの層を足した和。
+    ルールの引き方は実行前チェックと同じで、共通レイヤーにそのツリーのレイヤーを足した和。
     別に書くと、実行前に通った書き込みがターンの終わりに報告される。
     """
     ws = tree.main_tree(root)
@@ -113,8 +113,9 @@ def watched_for(
     out = []
     for t in trees:
         if t.project not in loaded:
-            # 共通層はツリーの層ごとに読み直す（層を足すと集合が書き換わるため）。苦情は同じなので
-            # 最初の 1 回だけ書く。層の苦情はツリーごとに違うので、add_layers はそのまま書く。
+            # 共通レイヤーはツリーのレイヤーごとに読み直す（レイヤーを足すと集合が書き換わるため）。
+            # 苦情は同じなので
+            # 最初の 1 回だけ書く。レイヤーの苦情はツリーごとに違うので、add_layers はそのまま書く。
             said = stderr if not loaded else io.StringIO()
             rule_set, source = ruleload.load_rules(said, conf, record, root)
             if source != builtin.SOURCE:
@@ -129,7 +130,7 @@ def watched_for(
 
 def scope_guard(
     conf: settings.Settings, root: str, raw: approval.Raw | None = None
-) -> post.ScopeGuard | None:
+) -> post_findings.ScopeGuard | None:
     """承認済みチケットを、実行後の側から当てる持ち物。チケット制御が disable なら None。
 
     `raw` は呼び手が `approval.read_raw` で読んだもの。渡せば置き場を読み直さない。
@@ -137,12 +138,12 @@ def scope_guard(
     if not conf.tickets_enabled:
         return None
     copies, _ = approval.scan(conf, root, raw=raw)
-    # 種類の上限は層（計画を持つ親の `project:`）ごとに、ここで 1 度だけ読む。
+    # 種類の上限はレイヤー（計画を持つ親の `project:`）ごとに、ここで 1 度だけ読む。
     types: dict[str, dict] = {}
     for copy in copies:
         if copy.has_plan and copy.project not in types:
             types[copy.project] = phase.load_types(conf, root, copy.project) or {}
-    return post.ScopeGuard(
+    return post_findings.ScopeGuard(
         root=root,
         copies=approval_checks.by_id(copies),
         projects=conf.projects,
@@ -166,7 +167,7 @@ def decide_at_prompt(
     まだ何も起きていない時点で文を 1 つ足すことになる。ここでやるのは、
     ターンの終わりに「このターンで何が変わったか」を言えるようにする記録だけ。
 
-    承認されたことも伝えない。ボードの承認は拡張が承認の文（`agree.approved_text`）を渡し、
+    承認されたことも伝えない。ボードの承認は拡張が承認の文（`agree_screen.approved_text`）を渡し、
     ほかの経路の承認は、エージェントが `ccnavi-ticket.sh status` で聞く。hook が起点を取って
     増えた承認を数える形は、セッションの開始時の取り込みで届いた承認を起点に含めて取りこぼした。
 
@@ -281,7 +282,7 @@ def stop_rules_nudge(
     設定が持ち、ここは当てて数えるだけ（レビューの勧告と同じ分け方）。`every: 10` と書けば
     「ターンの終わり 10 回に 1 度」止める。
 
-    ルールは共通層とワークスペース自身の層からだけ引く（`ruleload.stop_rules`）。プロジェクトの層は
+    ルールは共通レイヤーとワークスペース自身のレイヤーからだけ引く（`ruleload.stop_rules`）。プロジェクトのレイヤーは
     外のリポジトリで、そこに書かれた 1 行が cwd に依らずメインのターンの終わりを止められて
     しまうため。本文のファイルもワークスペースルートの版だけを読む（ワークツリーやプロジェクトの
     版はエージェントが書き換えられる）。
@@ -387,7 +388,7 @@ def decide_at_start(
         conf.state,
         payload.session_id,
         root,
-        selfguard.targets(
+        selfguard_targets.targets(
             root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
         ),
     )
@@ -465,7 +466,8 @@ def decide_after(
     # 保護の根拠を、この呼び出しが触れる前の状態に返してから読む。
     # 書いた先を渡すのは、組み込みの既定を使っている間の修復を戻さないため
     # （selfguard._left_as_repair）。
-    # 着手のときに共通層でプロジェクトの層を上書きした分は、内容と上書きの記録で見分けて外す
+    # 着手のときに共通レイヤーでプロジェクトのレイヤーを上書きした分は、
+    # 内容と上書きの記録で見分けて外す
     # （設計 11.12）。戻す側と、報告する側の両方で同じ答えを使う。
     synced = functools.partial(configsync.is_synced_write, conf, root)
     restore = functools.partial(selfguard.after, written=_written(payload, record), synced=synced)

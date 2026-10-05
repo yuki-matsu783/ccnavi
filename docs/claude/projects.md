@@ -3,7 +3,7 @@ type: guide
 title: プロジェクトを置いて作業する
 description: ワークスペースに複数のリポジトリを置いて管理する方法。置き場、チケット、設定の関連
 tags: [projects, ticket]
-keywords: [プロジェクト, projects, リポジトリ, clone, チケット, マーカー, 記録, ワークツリー, 層, message, status, 承認済みチケットの状態]
+keywords: [プロジェクト, projects, リポジトリ, clone, チケット, マーカー, 記録, ワークツリー, レイヤー, message, status, 承認済みチケットの状態]
 ---
 
 # プロジェクトを置いて作業する
@@ -31,8 +31,8 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 | 閉じたチケットの退避（`ready`がDraftを外す前に、閉じた親子のチケットの`done/`・`phases/<親>/`・`events/`・`flows/`を移す）。手元の機械にだけ残る | ワークスペースの`logs/archive/<リポジトリ>/`。ワークスペース自身は`self`、プロジェクトはその名前。その下は承認済みの領域と同じ構成 |
 | 子のフローの下書き（エージェントが書く。効力は無い） | フローを保存するツリーと同じツリーの`wip/proposals/flows/<子>.yml`。プロジェクト向けは`projects/<名前>/wip/proposals/flows/<子>.yml` |
 | 下書きと使い捨てのファイル | そのワークツリーの`scratchpad/`で、追跡しない。ワークツリーが無いときは、ワークスペースの外にあるセッションのスクラッチパッド |
-| ワークスペースのルール | 共通層の`.ccnavi/common/rules.yml`。リスクの配点も同じ場所。フェーズの種類は自身の層の`.ccnavi/config/phases.yml` |
-| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/`（`rules.yml`・`phases.yml`・`risks.yml`）。元のファイルはここにある。親チケットに着手するとき、共通層にあるファイルはここの中身で上書きされる（設計11.12） |
+| ワークスペースのルール | 共通レイヤーの`.ccnavi/common/rules.yml`。リスクの配点も同じ場所。フェーズの種類は自身のレイヤーの`.ccnavi/config/phases.yml` |
+| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/`（`rules.yml`・`phases.yml`・`risks.yml`）。元のファイルはここにある。親チケットに着手するとき、共通レイヤーにあるファイルはここの中身で上書きされる（設計11.12） |
 
 プロジェクトのgitリポジトリに入るのは、提案、承認済みチケットとマーカー、プロジェクトの設定の3つ。
 承認とフェーズの進み具合は親チケットのブランチに含まれて他の機械へ届くので、cloneすれば続きから作業できる（設計9.2、REQ-MLT-14）。

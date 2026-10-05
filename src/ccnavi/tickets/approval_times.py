@@ -11,8 +11,7 @@ import sys
 from dataclasses import dataclass
 
 from ..infra import gitcmd, settings
-from . import history
-from . import ticket as ticket_mod
+from . import history, ticket_model
 
 # どこから引いた時刻か。
 APPROVED_FROM_HISTORY = "history"  # 状態の履歴の approved（続きの子は raised）
@@ -37,7 +36,7 @@ class ApprovedTime:
 
 
 def approved_times(
-    conf: settings.Settings, found: list[ticket_mod.Ticket], use_git: bool = True
+    conf: settings.Settings, found: list[ticket_model.Ticket], use_git: bool = True
 ) -> dict[str, ApprovedTime]:
     """承認済みチケットごと（パスで引く）の承認の時刻。表示（ボード・`--diagnose`）だけが読む。
 
@@ -57,7 +56,7 @@ def approved_times(
     （Chrome の Pyodide など、git の無い場）なら 3 を飛ばし、1 と 2 で取れなければ分からないとする。
     """
     out: dict[str, ApprovedTime] = {}
-    missing: dict[str, list[ticket_mod.Ticket]] = {}
+    missing: dict[str, list[ticket_model.Ticket]] = {}
     for t in found:
         where = settings.approved_dir(conf, t.tree_root) if t.tree_root else ""
         at = history_time(where, t.ticket) if where else ""
@@ -74,7 +73,7 @@ def approved_times(
         for t in waiting:
             if t.ticket in added:
                 out[t.path] = ApprovedTime(added[t.ticket], APPROVED_FROM_COMMIT)
-            elif ok and t.state == ticket_mod.DOING:
+            elif ok and t.state == ticket_model.DOING:
                 out[t.path] = ApprovedTime("", APPROVED_UNCOMMITTED)
     return out
 
@@ -97,7 +96,7 @@ def history_time(approved_dir: str, ident: str) -> str:
 
 def _added_times(conf: settings.Settings, tree_root: str) -> tuple[dict[str, str], bool]:
     """ツリーの `doing/` に足したコミットの時刻（識別子ごとに新しいもの）と、git を読めたか。"""
-    doing = os.path.join(settings.approved_dir(conf, tree_root), ticket_mod.DOING)
+    doing = os.path.join(settings.approved_dir(conf, tree_root), ticket_model.DOING)
     rel = os.path.relpath(doing, tree_root).replace(os.sep, "/")
     if rel.startswith(".."):
         return {}, False

@@ -128,5 +128,89 @@ class LintEveryTest(unittest.TestCase):
         self.assertEqual(self.said(done.stdout, "only-file"), [], done.stdout)
 
 
+class LintScriptPathTest(unittest.TestCase):
+    """message の `.ccnavi/scripts/` に `{root}` が付いていなければ warn（issue #211）。"""
+
+    setUp = LintEveryTest.setUp
+    lint = LintEveryTest.lint
+    said = LintEveryTest.said
+
+    def deny(self, name: str, message: str) -> dict:
+        return {"id": name, "match": "Bash", "glob": "*git push*", "message": message}
+
+    def test_bare_scripts_path_in_message_is_a_warning(self):
+        body = {
+            "version": 1,
+            "deny": [
+                self.deny("bare", "'sh .ccnavi/scripts/ccnavi-git.sh ...' を使ってください"),
+                self.deny("rooted", "'sh {root}/.ccnavi/scripts/ccnavi-git.sh ...' を使う"),
+                self.deny("plain", "push はユーザが行う"),
+            ],
+        }
+        path = write(os.path.join(self.root, "rules.yml"), json.dumps(body))
+        done = self.lint(path)
+        self.assertEqual(done.returncode, 0, done.stdout)
+        said = self.said(done.stdout, "bare")
+        self.assertTrue(any(s.startswith("warn:") and "{root}" in s for s in said), done.stdout)
+        self.assertEqual(self.said(done.stdout, "rooted"), [], done.stdout)
+        self.assertEqual(self.said(done.stdout, "plain"), [], done.stdout)
+
+    def lint_rules(self, *allow: dict) -> str:
+        body = {
+            "version": 1,
+            "deny": [self.deny("push", "push はユーザが行う")],
+            "allow": list(allow),
+        }
+        done = self.lint(write(os.path.join(self.root, "rules.yml"), json.dumps(body)))
+        self.assertEqual(done.returncode, 0, done.stdout)
+        return done.stdout
+
+    def test_other_text_fields_are_checked_and_named(self):
+        sh = "sh .ccnavi/scripts/x.sh"
+        out = self.lint_rules(
+            rule("ctx", additionalContext=sh),
+            rule("once", additionalContextOnce=sh),
+        )
+        ctx = self.said(out, "ctx")
+        once = self.said(out, "once")
+        self.assertTrue(any("warn:" in s and "additionalContext の" in s for s in ctx), out)
+        self.assertTrue(any("warn:" in s and "additionalContextOnce の" in s for s in once), out)
+
+    def test_absolute_paths_are_not_warned(self):
+        cases = {
+            "slash": "sh /opt/ws/.ccnavi/scripts/x.sh",
+            "home": "sh ~/ws/.ccnavi/scripts/x.sh",
+            "quoted": "sh '/opt/myws/.ccnavi/scripts/x.sh'",
+            "drive-back": "sh C:\\ws/.ccnavi/scripts/x.sh",
+            "drive-fwd": 'sh "d:/ws/.ccnavi/scripts/x.sh"',
+            "rooted": "sh {root}/.ccnavi/scripts/x.sh",
+            "space": "sh '/c/Users/John Smith/ws/.ccnavi/scripts/x.sh'",
+            "fullwidth": "（/opt/ws/.ccnavi/scripts/x.sh を使う）",
+            "corner": "「/opt/ws/.ccnavi/scripts/x.sh」を使う",
+            "link": "[x](/opt/ws/.ccnavi/scripts/x.sh)",
+            "equals": "sh --script=/opt/ws/.ccnavi/scripts/x.sh",
+            "var": "sh $CLAUDE_PROJECT_DIR/.ccnavi/scripts/x.sh",
+            "braced-var": "sh ${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/x.sh",
+        }
+        out = self.lint_rules(*(rule(k, additionalContext=v) for k, v in cases.items()))
+        for k in cases:
+            self.assertEqual(self.said(out, k), [], out)
+
+    def test_relative_paths_are_still_warned(self):
+        cases = {
+            "bare": "sh .ccnavi/scripts/x.sh",
+            "dot": "sh ./.ccnavi/scripts/x.sh",
+            "up": "sh ../../.ccnavi/scripts/x.sh",
+            "paren": "（.ccnavi/scripts/x.sh を使う）",
+            "corner": "「./.ccnavi/scripts/x.sh」を使う",
+            "equals": "sh --script=.ccnavi/scripts/x.sh",
+            "link": "[x](../.ccnavi/scripts/x.sh)",
+            "mixed": "sh /abs/.ccnavi/scripts/a.sh と sh .ccnavi/scripts/b.sh",
+        }
+        out = self.lint_rules(*(rule(k, additionalContext=v) for k, v in cases.items()))
+        for k in cases:
+            self.assertTrue(any(s.startswith("warn:") for s in self.said(out, k)), (k, out))
+
+
 if __name__ == "__main__":
     unittest.main()

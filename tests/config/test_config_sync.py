@@ -1,14 +1,15 @@
-"""着手の前に共通層でプロジェクトの層を上書きする（設計 11.12）。
+"""着手の前に共通レイヤーでプロジェクトのレイヤーを上書きする（設計 11.12）。
 
-共通層は各プロジェクトへ配る定義で、元のファイルはプロジェクトの `.ccnavi/config/`。
-プロジェクト向けの親の `ticket start` で、違うファイルを共通層の中身で上書きする。
+共通レイヤーは各プロジェクトへ配る定義で、元のファイルはプロジェクトの `.ccnavi/config/`。
+プロジェクト向けの親の `ticket start` で、違うファイルを共通レイヤーの中身で上書きする。
 
-fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。共通層は
-rules / phases / risks の 3 本を持ち、lib はそれぞれ別の中身を持つ。app は層を持たない。
+fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。共通レイヤーは
+rules / phases / risks の 3 本を持ち、lib はそれぞれ別の中身を持つ。app はレイヤーを持たない。
 
 見るのは 4 つ。
 
-1. 親の `ticket start` が、共通層にあるファイルだけを親のワークツリーへコピーし、上書きの記録を置く
+1. 親の `ticket start` が、共通レイヤーにあるファイルだけを親のワークツリーへコピーし、
+上書きの記録を置く
 2. 子の着手とワークスペース自身の作業ではコピーしない
 3. 最初のレビューの依頼の頭に載り、2 回目からは載らない
 4. コピーした書き込みを、実行後チェックとバックアップと復元が戻さず、報告もしない。コピーした後に
@@ -22,7 +23,7 @@ import os
 from unittest import mock
 
 from ccnavi.infra import settings
-from ccnavi.tickets import configsync, ops, phase, risk
+from ccnavi.tickets import configsync, ops, phase_forms, risk
 from tests.config.test_config_union import (
     COMMON_PHASES,
     COMMON_RISK,
@@ -62,7 +63,8 @@ class ConfigSyncTest(ConfigUnionHarness):
         return json.loads(read(path)) if os.path.exists(path) else None
 
     def test_parent_start_overwrites_the_project_layer_with_the_common_layer(self):
-        """1: 共通層の 3 本で、親のワークツリーの 3 本を上書きする。消えた識別子を名指しする。"""
+        """1: 共通レイヤーの 3 本で、親のワークツリーの 3 本を上書きする。
+        消えた識別子を名指しする。"""
         tree, started = self.start_parent()
 
         self.assertEqual(json.loads(read(config_of(tree, "rules"))), COMMON_RULES)
@@ -71,8 +73,8 @@ class ConfigSyncTest(ConfigUnionHarness):
         # 元リポジトリは触らない。判定が読むのはそちらで、上書きは親のブランチに乗って届く。
         self.assertNotEqual(read(config_of(self.lib, "phases")), COMMON_PHASES)
 
-        self.assertIn("共通層で上書きした", started.stdout)
-        # lib の phases の build / release は共通層に無いので、上書きで消える。
+        self.assertIn("共通レイヤーで上書きした", started.stdout)
+        # lib の phases の build / release は共通レイヤーに無いので、上書きで消える。
         self.assertIn("build", started.stdout)
         self.assertIn("release", started.stdout)
         mark = self.mark()
@@ -119,7 +121,7 @@ class ConfigSyncTest(ConfigUnionHarness):
         self.assertNotIn("置き場の外", started.stderr)
 
     def test_files_missing_from_the_common_layer_are_left_alone(self):
-        """1: 共通層に無いファイルは、プロジェクトの側を消さずに残す。"""
+        """1: 共通レイヤーに無いファイルは、プロジェクトの側を消さずに残す。"""
         os.remove(self.phases)
         before = read(config_of(self.lib, "phases"))
 
@@ -130,7 +132,7 @@ class ConfigSyncTest(ConfigUnionHarness):
         self.assertNotIn(".ccnavi/config/phases.yml", paths)
 
     def test_a_project_without_a_layer_gets_new_files(self):
-        """1: 層を持たないプロジェクトには、新しく置く。"""
+        """1: レイヤーを持たないプロジェクトには、新しく置く。"""
         tree, started = self.start_parent(project="app")
 
         self.assertEqual(read(config_of(tree, "risk")), COMMON_RISK)
@@ -150,14 +152,14 @@ class ConfigSyncTest(ConfigUnionHarness):
 
         _, started = self.start_parent()
 
-        self.assertNotIn("共通層で上書きした", started.stdout)
+        self.assertNotIn("共通レイヤーで上書きした", started.stdout)
         self.assertIsNone(self.mark())
 
     def test_workspace_tickets_are_not_synced(self):
-        """2: ワークスペース自身の作業は、共通層と同じリポジトリにあるので比べない。"""
+        """2: ワークスペース自身の作業は、共通レイヤーと同じリポジトリにあるので比べない。"""
         tree, started = self.start_parent(project="")
 
-        self.assertNotIn("共通層で上書きした", started.stdout)
+        self.assertNotIn("共通レイヤーで上書きした", started.stdout)
         self.assertIsNone(self.mark(project=""))
         self.assertNotEqual(read(config_of(tree, "phases")), COMMON_PHASES)
 
@@ -182,7 +184,7 @@ class ConfigSyncTest(ConfigUnionHarness):
         started = self.ccnavi("ticket", "start", "i0001-01-01")
 
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        self.assertNotIn("共通層で上書きした", started.stdout)
+        self.assertNotIn("共通レイヤーで上書きした", started.stdout)
         self.assertNotEqual(read(config_of(child, "phases")), COMMON_PHASES)
 
     def test_the_first_review_carries_the_notice_once(self):
@@ -223,7 +225,7 @@ class ConfigSyncTest(ConfigUnionHarness):
         self.assertIn("risks.yml", said.stdout + said.stderr)
 
     def test_is_synced_write_needs_both_the_content_and_the_mark(self):
-        """4: 共通層と同じ中身でも、上書きの記録が名指ししていなければ外さない。"""
+        """4: 共通レイヤーと同じ中身でも、上書きの記録が名指ししていなければ外さない。"""
         conf = self.settings()
         tree, _ = self.start_parent()
         target = config_of(tree, "rules")
@@ -286,7 +288,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
         self.assertFalse(configsync.is_synced_write(conf, self.ws, target))
 
     def test_a_child_worktree_is_not_exempt(self):
-        """子のワークツリーは上書きしないので、共通層の中身へ戻す書き込みも外さない。"""
+        """子のワークツリーは上書きしないので、共通レイヤーの中身へ戻す書き込みも外さない。"""
         conf = self.settings()
         self.propose(
             "i0001",
@@ -335,7 +337,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
         self.assertNotIn(".ccnavi/config", self.system_message(stopped))
 
     def test_scripts_the_risk_points_at_are_copied_too(self):
-        """配点が指す共通層のスクリプトもコピーし、指す先をプロジェクトの層のパスに直す。"""
+        """配点が指す共通レイヤーのスクリプトもコピーし、指す先をプロジェクトのレイヤーのパスに直す。"""
         conf = self.settings()
         write(self.risk, COMMON_SCRIPT_RISK)
         write(os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh"), COUNT_SH)
@@ -352,7 +354,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
         self.assertTrue(configsync.is_synced_write(conf, self.ws, config_of(tree, "risk")))
 
     def test_a_common_layer_that_the_project_cannot_read_stops_the_start(self):
-        """プロジェクトの層として読めない共通層はコピーせず、着手しない。"""
+        """プロジェクトのレイヤーとして読めない共通レイヤーはコピーせず、着手しない。"""
         write(self.risk, "version: 1\nfactors: [\n")
         self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
         self.assertEqual(self.approve().returncode, 0)
@@ -362,12 +364,12 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
         started = self.ccnavi("ticket", "start", "i0001")
 
         self.assertNotEqual(started.returncode, 0, started.stdout)
-        self.assertIn("プロジェクトの層として読めない", started.stderr)
+        self.assertIn("プロジェクトのレイヤーとして読めない", started.stderr)
         self.assertEqual(read(config_of(tree, "rules")), before)
         self.assertIsNone(self.mark())
 
     def test_a_common_file_that_vanishes_after_listing_stops_the_plan(self):
-        """一覧に載せたあとで消えた共通層は、空としてコピーせずに止める。"""
+        """一覧に載せたあとで消えた共通レイヤーは、空としてコピーせずに止める。"""
         conf = self.settings()
         self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
         self.assertEqual(self.approve().returncode, 0)
@@ -460,7 +462,7 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
 
     def test_config_synced_is_denied_to_the_agent(self):
         """エージェントが Bash で打つ形は、ユーザの判断の経路と同じ組み込みの deny が止める。"""
-        rule = phase.ticket_approval_rule("", self.ws)
+        rule = phase_forms.ticket_approval_rule("", self.ws)
         self.assertIsNotNone(rule.compiled.search("ccnavi --config-synced i0001"))
 
     def test_notified_only_after_the_notice_was_put_in_the_request(self):
@@ -550,7 +552,7 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
         self.assertTrue(os.path.islink(target))
 
     def test_writing_back_after_a_human_fix_is_not_exempt(self):
-        """コピーした分をコミットしたあとユーザが直したら、共通層の中身へ戻す書き込みは外さない。"""
+        """コピーした分をコミットしたあとユーザが直したら、共通レイヤーの中身へ戻す書き込みは外さない。"""
         conf = self.settings()
         tree, _ = self.start_parent()
         target = config_of(tree, "rules")
@@ -579,7 +581,7 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
         self.assertTrue(any("config-synced i0001" in p for p in problems), problems)
 
     def test_a_synced_script_factor_is_counted_once_after_it_lands(self):
-        """コピーした配点が統合先に入っても、共通層の同じ項目と 2 重に数えない。"""
+        """コピーした配点が統合先に入っても、共通レイヤーの同じ項目と 2 重に数えない。"""
         write(self.risk, COMMON_SCRIPT_RISK)
         write(os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh"), COUNT_SH)
         tree, _ = self.start_parent()

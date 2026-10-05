@@ -39,7 +39,7 @@ export interface LintJson {
 export interface LintFlow {
   readonly path: string;
   readonly data: unknown;
-  /** `SubagentStart` で担当に渡る手順の行（`flow.render`）。読めなければ null。古い実行ファイルなら無い */
+  /** `SubagentStart` で担当に渡る手順の行（`flow_render.render`）。読めなければ null。古い実行ファイルなら無い */
   readonly rendered?: readonly string[] | null;
   /** フローで選べるサブエージェントとスキルの名前（`flow.catalog`）。古い実行ファイルなら無い */
   readonly candidates?: LintFlowCandidates;

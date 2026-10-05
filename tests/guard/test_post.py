@@ -52,7 +52,7 @@ RULES = {
             "message": "proposals are moved by the scripts.",
         },
     ],
-    # `ask` も保護領域（post._guarding）。報告はされるが、戻す対象ではない
+    # `ask` も保護領域（post_findings._guarding）。報告はされるが、戻す対象ではない
     # （post._restorable）。文面は書かない。ask に message を書くと lint が error。
     "ask": [
         {
@@ -165,7 +165,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効。
+        # 共通レイヤーは既定の置き場へ。`--rules` は診断でだけ有効。
         self.rules = common_path(self.repo, "rules")
         write(self.rules, json.dumps(RULES))
         self.state = os.path.join(self.repo, "state")
@@ -404,7 +404,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertNotIn("would-restore", self.records()[-1].get("detail", ""))
 
     def test_モードが予行なら戻しの宣言によらず予行として言う(self):
-        # CCNAVI_MODE=dry-run は戻しの側も予行に落とす（cli.effective_setting）。
+        # CCNAVI_MODE=dry-run は戻しの側も予行に落とす（modes.effective_setting）。
         self.run_hook(mode="dry-run", command="ls")
         self.dirty()
 

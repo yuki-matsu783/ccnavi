@@ -96,7 +96,7 @@ export function branchKey(type: string): "branches" | "options" | undefined {
   return undefined;
 }
 
-/** 出入口の表記。`input` / `output` / `branch-<番号>`（実行ファイルの案内 `flow._port_label` も同じ表記で読む） */
+/** 出入口の表記。`input` / `output` / `branch-<番号>`（実行ファイルの案内 `flow_render._port_label` も同じ表記で読む） */
 export const INPUT_PORT = "input";
 export const OUTPUT_PORT = "output";
 export function branchPort(index: number): string {
@@ -995,7 +995,7 @@ export function portsOf(node: FlowNode, connections: readonly FlowConnection[]):
 
 /** 線につける言葉。`condition` があればそれ、無ければ出口の名前（実行ファイルの案内と同じ読み方） */
 /**
- * 線の言葉に使う値の表記。実行ファイルの `flow._text` と同じ読み方にする。真偽値は空、数は整数ならその表記
+ * 線の言葉に使う値の表記。実行ファイルの `flow_text._text` と同じ読み方にする。真偽値は空、数は整数ならその表記
  * （`1.0` は `1`）、文字列はそのまま、ほかは空
  */
 function labelText(value: unknown): string {
@@ -1018,7 +1018,7 @@ export function connectionLabel(doc: FlowDoc, c: FlowConnection): string {
     return "";
   }
   // 出口が項目の id とちょうど同じか、`branch-<番号>` の番号が項目の位置。部分一致や末尾の数字だけでは当てない
-  // （実行ファイルの案内 `flow._port_label` と同じ読み方。出口・id・言葉の値も `flow._text` と同じく、
+  // （実行ファイルの案内 `flow_render._port_label` と同じ読み方。出口・id・言葉の値も `flow_text._text` と同じく、
   // 真偽値は空として読む）
   const port = labelText(c.fromPort);
   if (port === "") {

@@ -188,9 +188,9 @@ class ApproveVerifyTest(PhaseHarness):
     # ---- 8. --lint が同じことを言う
 
     def test_lint_says_what_the_verify_says(self):
-        """承認で落ちるものを数える経路は 1 本（`agree.candidates`）。
+        """承認で落ちるものを数える経路は 1 本（`agree_candidates.candidates`）。
 
-        以前は `--lint` だけが `agree.validate` を当てていて、順序で落ちる子・計画に
+        以前は `--lint` だけが `agree_candidates.validate` を当てていて、順序で落ちる子・計画に
         無い番号・`project:` の食い違い・改版の検査について何も言わなかった。同じ事実を数える経路が
         2 本あると、片方が気づかないうちに弱くなる。`--lint` は severity の体系で終わるので、
         承認で落ちる提案（error）があれば非ゼロで終わる。

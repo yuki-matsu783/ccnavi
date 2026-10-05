@@ -2,20 +2,20 @@
 
 ワークスペース 1 つとプロジェクト 2 つ（app と lib）を一時ディレクトリに作る。
 ワークスペースは Claude Code を起動した場所で、自分の git を持つ。プロジェクトは
-`projects/` の直下に clone した別のリポジトリで、それぞれ層の 3 本の置き場
+`projects/` の直下に clone した別のリポジトリで、それぞれレイヤーの 3 本の置き場
 （`.ccnavi/config/`、設計 11.2）に rules.yml を持つ。
 
 見るのは 5 つ。
 
-1. パスを持つツールは共通層 + 行き先のプロジェクトの層で判定される。ワークスペースへの
-   書き込みは共通層 + 自身の層
-2. Bash は共通層と全部の層の和で判定され、cwd がどこでも同じ
-3. 読めない層は空として扱われ、記録が層の名前を残す。組み込みの既定へは落ちない
+1. パスを持つツールは共通レイヤー + 行き先のプロジェクトのレイヤーで判定される。ワークスペースへの
+   書き込みは共通レイヤー + 自身のレイヤー
+2. Bash は共通レイヤーと全部のレイヤーの和で判定され、cwd がどこでも同じ
+3. 読めないレイヤーは空として扱われ、記録がレイヤーの名前を残す。組み込みの既定へは落ちない
 4. プロジェクトから切ったワークツリーが認識され、元リポジトリとチケットの `project:` が
    食い違えば止まる
 5. `projects/` を数えない設定では、この機能が入る前と同じに動く
 
-層の和そのもの（重複の排除、同 id、`--explain`）は tests/config/test_config_union.py が見る。
+レイヤーの和そのもの（重複の排除、同 id、`--explain`）は tests/config/test_config_union.py が見る。
 ここが見るのは、置き場とツリーの結び付きが今までどおり合っていること。
 """
 
@@ -106,12 +106,12 @@ def write(path, text):
     return path
 
 
-# 層の 3 本の置き場（既定の ccnavi ディレクトリ）。
+# レイヤーの 3 本の置き場（既定の ccnavi ディレクトリ）。
 LAYER = os.path.join(".ccnavi", "config")
 
 
 def layer_rules(root):
-    """その git プロジェクトルートの層のルールファイル。"""
+    """その git プロジェクトルートのレイヤーのルールファイル。"""
     return os.path.join(root, LAYER, "rules.yml")
 
 
@@ -148,7 +148,7 @@ class ProjectsTest(unittest.TestCase):
         git(self.ws, "add", "-A")
         git(self.ws, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効。
+        # 共通レイヤーは既定の置き場へ。`--rules` は診断でだけ有効。
         self.rules = write(common_path(self.ws, "rules"), json.dumps(WS_RULES))
         self.projects = os.path.join(self.ws, "projects")
         self.app = self.project("app", APP_RULES)
@@ -188,7 +188,7 @@ class ProjectsTest(unittest.TestCase):
     def ccnavi(self, *args, stdin="", env=None):
         """実行ファイルを 1 回起動する。
 
-        `--projects` は渡さない。層を探す先を動かすフラグは診断でだけ有効な
+        `--projects` は渡さない。レイヤーを探す先を動かすフラグは診断でだけ有効な
         ので、置き場は `--root` の下の既定のまま。「`projects/` を
         数えない」は `projects/` を作らないワークスペースで言う（置き場は固定で、空文字の口は
         無い）。
@@ -307,9 +307,9 @@ class ProjectsTest(unittest.TestCase):
     # ---- 3. 読めないプロジェクトのルール
 
     def test_unreadable_project_rules_are_empty_and_drop_out_of_the_union(self):
-        """壊れた層は空として扱い、記録が層の名前を残す（設計 11.2、REQ-MLT-06）。
+        """壊れたレイヤーは空として扱い、記録がレイヤーの名前を残す（設計 11.2、REQ-MLT-06）。
 
-        組み込みの既定には戻らない。共通層が有るのに戻すと、共通層の deny が
+        組み込みの既定には戻らない。共通レイヤーが有るのに戻すと、共通レイヤーの deny が
         消える側になる。
         """
         write(layer_rules(self.app), "version: 1\ndeny: [\n")
@@ -320,7 +320,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("app", record["detail"])
         self.assertNotIn("built-in defaults", self.reason(passed))
 
-        # 共通層の deny は壊れた層の上でも当たったまま。
+        # 共通レイヤーの deny は壊れたレイヤーの上でも当たったまま。
         guarded = os.path.join(self.app, ".ccnavi", "approved", "x")
         denied = self.hook("Write", self.ws, file_path=guarded)
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
@@ -500,7 +500,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(tree, "wip", "proposals", "todo", "i0010.md")))
         started = self.ccnavi("ticket", "start", "i0010")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        # 着手で共通層をコピーしたので、レビューの無いこの親はユーザが端末で見てから
+        # 着手で共通レイヤーをコピーしたので、レビューの無いこの親はユーザが端末で見てから
         # 閉じる（設計 11.12）。
         seen = self.ccnavi("--config-synced", "i0010", stdin="y\n")
         self.assertEqual(seen.returncode, 0, seen.stdout + seen.stderr)
@@ -633,7 +633,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("(projects/lib)", out)
         self.assertIn(".claude/ を持つ", out)
 
-        # `--explain` は層ごとに並べる（設計 11.9）。読めない層はその位置で言う。
+        # `--explain` はレイヤーごとに並べる（設計 11.9）。読めないレイヤーはその位置で言う。
         explained = self.ccnavi("--explain")
         self.assertIn("■ rules app", explained.stdout)
         self.assertIn("■ rules lib", explained.stdout)

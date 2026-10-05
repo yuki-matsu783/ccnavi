@@ -6,7 +6,7 @@
 壊れたファイルを直すための呼び出しまで止まって回復できなくなる。既定モードが
 block なので、ファイルを置く前に hook を登録した時点でセッションの呼び出しが全部止まる。
 「設定が読めない」は「判断できない」ではなく「設定が壊れている」であり、
-扱いを分ける必要がある（REQ-PRE-06、requirements.md の REQ-PRE-04 の例外）。
+扱いを分ける必要がある（REQ-PRE-06、要件 REQ-PRE-04 の例外）。
 
 ## 何を入れて、何を入れないか
 
@@ -26,7 +26,7 @@ block なので、ファイルを置く前に hook を登録した時点でセ�
 壊す側と直す側で経路を分けることで、その手順を成り立たなくする。
 
 止めるのは書き込む形だけで、場所の名前が出たかどうかでは止めない。
-同じ場所には `selfguard.add_rules` の組み込みも当たる（ルールファイルが読める間の
+同じ場所には `selfguard_shell.add_rules` の組み込みも当たる（ルールファイルが読める間の
 `builtin-guard-setting-files`）。ルールファイルの側にシェルからの書き込みを止める 1 本は
 無いので、ここが落ちているときに残る保護はこれだけになる。
 場所の名前で止めると、`git add <パス>` も `git restore --ours -- <パス>` も止まる。
@@ -60,20 +60,20 @@ Write / Edit を通る。壊す側と直す側を分ける狙いはそこで保�
 from __future__ import annotations
 
 from ..infra import settings
-from . import rules, selfguard
+from . import rules, selfguard_shell
 
 
 def rule_data(root: str, conf: settings.Settings) -> dict:
     """組み込みの既定ルール。ファイルから読むルールと同じ形で、同じ `rules.parse` を通す。
 
     シェルの書き込みに当てる場所は、呼び出しごとに実際の設定から組む。実行ファイル・
-    ccnavi ディレクトリ・共通層の 3 本は設定で動くので、空の設定で 1 度だけ組んだ形だと、
+    ccnavi ディレクトリ・共通レイヤーの 3 本は設定で動くので、空の設定で 1 度だけ組んだ形だと、
     動かしたワークスペースではルールファイルが壊れたときにだけ保護が外れる。
 
     設定は省けない。省ける形にしておくと、渡し忘れた呼び出しがその弱い形のまま気づかないうちに動く。
     """
-    shell = selfguard.guard_shell_regex(
-        root, conf.bin, conf.project_home, selfguard.common_layer_files(conf)
+    shell = selfguard_shell.guard_shell_regex(
+        root, conf.bin, conf.project_home, selfguard_shell.common_layer_files(conf)
     )
     return {
         "version": rules.VERSION,

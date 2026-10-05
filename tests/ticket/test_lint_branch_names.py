@@ -24,7 +24,7 @@ import unicodedata
 import unittest
 
 from ccnavi.infra import settings
-from ccnavi.tickets import ticket as ticket_mod
+from ccnavi.tickets import ticket_ids, ticket_model
 from tests.inproc import run_ccnavi
 
 ADR = "（親のブランチ名の規則）"
@@ -53,11 +53,11 @@ def ticket_text(name, *, parent="", issue=None, approved=False):
 
 
 class BranchNameRulesTest(unittest.TestCase):
-    """`ticket.branch_name_problems` の見本表。識別子と `issue:` だけを見る。"""
+    """`ticket_ids.branch_name_problems` の見本表。識別子と `issue:` だけを見る。"""
 
     def problems(self, name, *, parent="", issue=None, issue_repo="", project="", **kw):
-        return ticket_mod.branch_name_problems(
-            ticket_mod.Ticket(
+        return ticket_ids.branch_name_problems(
+            ticket_model.Ticket(
                 ticket=name, parent=parent, issue=issue, issue_repo=issue_repo, project=project
             ),
             **kw,
@@ -102,16 +102,16 @@ class BranchNameRulesTest(unittest.TestCase):
 
     def test_the_integration_branch_is_reserved_when_given(self):
         # その時点の統合先の名前。環境変数は読まず、渡されたときだけ見る。
-        ticket = ticket_mod.Ticket(ticket="Trunk")
-        self.assertFalse(any("統合先" in f for f in ticket_mod.branch_name_problems(ticket)))
-        found = ticket_mod.branch_name_problems(ticket, "trunk")
+        ticket = ticket_model.Ticket(ticket="Trunk")
+        self.assertFalse(any("統合先" in f for f in ticket_ids.branch_name_problems(ticket)))
+        found = ticket_ids.branch_name_problems(ticket, "trunk")
         self.assertIn("統合先の名前（trunk）", found[0])
         # 固定のリストに当たるものは 1 行だけ。
-        main = ticket_mod.branch_name_problems(ticket_mod.Ticket(ticket="main"), "main")
+        main = ticket_ids.branch_name_problems(ticket_model.Ticket(ticket="main"), "main")
         self.assertEqual(1, len([f for f in main if "統合先" in f]), main)
         # 子は見ない。
-        child = ticket_mod.Ticket(ticket="trunk-01-01", parent="trunk")
-        self.assertEqual([], ticket_mod.branch_name_problems(child, "trunk-01-01"))
+        child = ticket_model.Ticket(ticket="trunk-01-01", parent="trunk")
+        self.assertEqual([], ticket_ids.branch_name_problems(child, "trunk-01-01"))
 
     def test_names_outside_the_form_are_named(self):
         """新しい親は `<先頭の語>-<番号>-<slug>`。前の形とユーザが付けた名前は warn。"""
@@ -162,44 +162,44 @@ class BranchNameRulesTest(unittest.TestCase):
         self.assertIn("48 文字を超える", found[0])
 
     def test_issue_identifier(self):
-        self.assertEqual("feature-12-issue", ticket_mod.issue_identifier(12))
+        self.assertEqual("feature-12-issue", ticket_ids.issue_identifier(12))
         self.assertEqual(
             "feature-63-integration-branch",
-            ticket_mod.issue_identifier(63, "Integration branch"),
+            ticket_ids.issue_identifier(63, "Integration branch"),
         )
-        self.assertEqual("feature-64-統合先の解決", ticket_mod.issue_identifier(64, "統合先の解決"))
+        self.assertEqual("feature-64-統合先の解決", ticket_ids.issue_identifier(64, "統合先の解決"))
         self.assertEqual(
-            "feature-12-web-login-form", ticket_mod.issue_identifier(12, "Login form", "web")
+            "feature-12-web-login-form", ticket_ids.issue_identifier(12, "Login form", "web")
         )
-        self.assertEqual("feature-12-web-issue", ticket_mod.issue_identifier(12, "", "web"))
-        self.assertEqual("hotfix-5-x", ticket_mod.issue_identifier(5, "x", prefix="hotfix"))
+        self.assertEqual("feature-12-web-issue", ticket_ids.issue_identifier(12, "", "web"))
+        self.assertEqual("hotfix-5-x", ticket_ids.issue_identifier(5, "x", prefix="hotfix"))
         # 全角英数は半角に、半角カナは全角に、記号と空白は `-` にまとめる
         self.assertEqual(
-            "feature-1-abc-ガイド-v2", ticket_mod.issue_identifier(1, "ＡＢＣ　ｶﾞｲﾄﾞ / v2!!")
+            "feature-1-abc-ガイド-v2", ticket_ids.issue_identifier(1, "ＡＢＣ　ｶﾞｲﾄﾞ / v2!!")
         )
         # 何も残らなければ `issue`
-        self.assertEqual("feature-2-issue", ticket_mod.issue_identifier(2, "！？ 😀"))
+        self.assertEqual("feature-2-issue", ticket_ids.issue_identifier(2, "！？ 😀"))
         # 子の形（`-<2 桁>`）で終わらせない
-        self.assertEqual("feature-3-release", ticket_mod.issue_identifier(3, "release 01"))
-        self.assertEqual("feature-4-issue", ticket_mod.issue_identifier(4, "07"))
+        self.assertEqual("feature-3-release", ticket_ids.issue_identifier(3, "release 01"))
+        self.assertEqual("feature-4-issue", ticket_ids.issue_identifier(4, "07"))
         # 長いタイトルは 48 文字で切る
-        long = ticket_mod.issue_identifier(5, "word " * 40)
-        self.assertLessEqual(len(long), ticket_mod.SUGGESTED_ID_LENGTH)
+        long = ticket_ids.issue_identifier(5, "word " * 40)
+        self.assertLessEqual(len(long), ticket_ids.SUGGESTED_ID_LENGTH)
         self.assertFalse(long.endswith("-"))
-        self.assertTrue(ticket_mod.is_valid_id(long))
+        self.assertTrue(ticket_ids.is_valid_id(long))
         for bad in (0, -1, True, "12"):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
-                ticket_mod.issue_identifier(bad)
+                ticket_ids.issue_identifier(bad)
         with self.assertRaises(ValueError):
-            ticket_mod.issue_identifier(12, "x", "../x")
+            ticket_ids.issue_identifier(12, "x", "../x")
         for prefix in ("release", "Main", "", "a-b"):
             with self.subTest(prefix=prefix), self.assertRaises(ValueError):
-                ticket_mod.issue_identifier(12, "x", prefix=prefix)
+                ticket_ids.issue_identifier(12, "x", prefix=prefix)
 
     def test_identifier_characters(self):
         for name in ("feature-64-統合先の解決", "a", "fix-1-カタカナー々", "i0055-01"):
             with self.subTest(name=name):
-                self.assertTrue(ticket_mod.is_valid_id(name), ticket_mod.id_problem(name))
+                self.assertTrue(ticket_ids.is_valid_id(name), ticket_ids.id_problem(name))
         nfd = unicodedata.normalize("NFD", "feature-1-が")
         for name, word in (
             (nfd, "NFC"),
@@ -214,15 +214,15 @@ class BranchNameRulesTest(unittest.TestCase):
             ("a" * 65, "長すぎる"),
         ):
             with self.subTest(name=name):
-                self.assertIn(word, ticket_mod.id_problem(name))
-        self.assertTrue(ticket_mod.is_valid_id("a" * 64))
+                self.assertIn(word, ticket_ids.id_problem(name))
+        self.assertTrue(ticket_ids.is_valid_id("a" * 64))
 
     def test_next_serial(self):
-        self.assertEqual(1, ticket_mod.next_serial([]))
-        self.assertEqual(1, ticket_mod.next_serial(["login", "abc-01-01"]))
+        self.assertEqual(1, ticket_ids.next_serial([]))
+        self.assertEqual(1, ticket_ids.next_serial(["login", "abc-01-01"]))
         self.assertEqual(
             71,
-            ticket_mod.next_serial(
+            ticket_ids.next_serial(
                 [
                     "i0062",
                     "feature-63-x",
@@ -233,8 +233,8 @@ class BranchNameRulesTest(unittest.TestCase):
                 ]
             ),
         )
-        self.assertEqual(3, ticket_mod.next_serial(["spike-9-x", "fix-2-y"]))
-        self.assertEqual(10, ticket_mod.next_serial(["spike-9-x"], ("spike",)))
+        self.assertEqual(3, ticket_ids.next_serial(["spike-9-x", "fix-2-y"]))
+        self.assertEqual(10, ticket_ids.next_serial(["spike-9-x"], ("spike",)))
 
     def test_children_are_only_checked_for_ref_safety(self):
         # 子の識別子は `<親>-<2 桁>-<2 桁>` で、親の名前の規則は親の側で見る。

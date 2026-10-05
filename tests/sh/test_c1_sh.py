@@ -21,7 +21,7 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
    1 回だけやり直す
 6. 届いていた push（応答だけ落ちた）は ls-remote で確かめて成功にする
 7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error（着手で configsync が
-   プロジェクトの層へ写したものは例外。tests/ticket/test_core.py と tests/config/ が見る）
+   プロジェクトのレイヤーへ写したものは例外。tests/ticket/test_core.py と tests/config/ が見る）
 8. hook の書きかけ（pending・skipped・状態の履歴の追記）はコミットし、
    ユーザの判断（c）と知らない変更（d）は止める
 9. ユーザの判断の入口（ccnavi-review.sh chat など）は、取り込み済みの親子のチケットなら

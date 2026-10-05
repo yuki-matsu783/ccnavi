@@ -9,7 +9,7 @@
         親子のチケットの取り込み状態
         （1 行 1 項目。sh は jq を使わない）
     <state の置き場>/sync/<リポジトリ>/integration/
-        統合先の取り込み結果（done/・層・設定のコピーと head）
+        統合先の取り込み結果（done/・レイヤー・設定のコピーと head）
 
 `<リポジトリ>` はワークスペース自身なら `self`、プロジェクトならその名前。
 
@@ -64,6 +64,7 @@ from dataclasses import dataclass
 
 from ..infra import fsio, settings, tree
 from . import ticket as ticket_mod
+from . import ticket_ids, ticket_model
 
 SYNC_DIR = "sync"
 FAMILIES_DIR = "families"
@@ -625,12 +626,12 @@ class Families:
     def branch_refusal(self, family_id: str, branch: str, project: str = "") -> str:
         """親のブランチ名 `branch` を親子のチケット `family_id` に使えない理由（使えれば空）。
 
-        識別子と同じ名前は今どおり使える。違う名前は `ticket.branch_problem` と統合先の名前
+        識別子と同じ名前は今どおり使える。違う名前は `ticket_ids.branch_problem` と統合先の名前
         （`integration_names`）を通ったものだけ。
         """
         if branch == family_id:
             return ""
-        why = ticket_mod.branch_problem(branch)
+        why = ticket_ids.branch_problem(branch)
         if why:
             return f"親のブランチ {branch} は使えない（{why}）"
         hits = [n for n in self.integration_names(project) if n.casefold() == branch.casefold()]
@@ -810,18 +811,18 @@ def _parent_branch(
     approved = settings.approved_dir(conf, tree_root)
     proposals = os.path.join(tree_root, conf.tickets.replace("/", os.sep))
     places = [
-        os.path.join(approved, ticket_mod.DOING, f"{family_id}.md"),
-        os.path.join(approved, ticket_mod.DONE, f"{family_id}.md"),
-        os.path.join(proposals, ticket_mod.REVIEW, f"{family_id}.md"),
+        os.path.join(approved, ticket_model.DOING, f"{family_id}.md"),
+        os.path.join(approved, ticket_model.DONE, f"{family_id}.md"),
+        os.path.join(proposals, ticket_model.REVIEW, f"{family_id}.md"),
     ]
     for path in places:
         front = _parent_front(path, family_id)
         if front is None:
             continue
-        raw = front.get(ticket_mod.BRANCH_KEY)
+        raw = front.get(ticket_ids.BRANCH_KEY)
         return raw.strip() if isinstance(raw, str) and raw.strip() else family_id
     if trust_todo:
-        todo = os.path.join(proposals, ticket_mod.TODO, f"{family_id}.md")
+        todo = os.path.join(proposals, ticket_model.TODO, f"{family_id}.md")
         if _parent_front(todo, family_id) is not None:
             return family_id
     return None
@@ -845,7 +846,7 @@ def _home_parent_copy(
     if home is None:
         return None
     base = settings.approved_dir(conf, home.root)
-    for state in (ticket_mod.DOING, ticket_mod.DONE):
+    for state in (ticket_model.DOING, ticket_model.DONE):
         text = fsio.read_text(os.path.join(base, state, f"{family_id}.md"))
         if text is not None:
             return _copy_fields(text)
@@ -859,9 +860,9 @@ ARCHIVE_PARTS = ("logs", "archive")
 
 def archived_copy(root: str, repo: str, ident: str) -> DoneCopy | None:
     """退避 `logs/archive/<リポジトリ>/done/<識別子>.md` の欄。無い・読めない・リンクなら None。"""
-    if not root or not ident or not ticket_mod.is_valid_id(ident):
+    if not root or not ident or not ticket_ids.is_valid_id(ident):
         return None
-    parts = (*ARCHIVE_PARTS, repo, ticket_mod.DONE, f"{ident}.md")
+    parts = (*ARCHIVE_PARTS, repo, ticket_model.DONE, f"{ident}.md")
     if _linked_below(root, parts) is not False:
         return None
     path = os.path.join(root, *parts)

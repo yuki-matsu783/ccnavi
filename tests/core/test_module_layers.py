@@ -5,9 +5,9 @@
 ディレクトリが言えるのは「どの役割か」までで、同じサブパッケージの中の読む順は言えない。
 段がそれを補う。2 つの表と食い違う import を名指しする。
 
-「層」ではなく「段」と呼ぶのは、このリポジトリでは層が設定の 3 層（共通層・
-自身の層・プロジェクトの層）を指すため。ここで言う段はモジュールを読む順で、
-別のもの。
+「レイヤー」ではなく「段」と呼ぶのは、このリポジトリではレイヤーが設定の 3 つのレイヤー
+（共通レイヤー・自身のレイヤー・プロジェクトのレイヤー）を指すため。ここで言う段は
+モジュールを読む順で、別のもの。
 
 読むのは `src/ccnavi/` の下の `.py` の import 文だけ。実行ファイルは起動しないので速い。
 モジュールはドットでつないだ名前で呼ぶ（`infra.fsio`）。直下の `__init__` と
@@ -69,7 +69,7 @@ PACKAGE = os.path.join(SRC, "ccnavi")
 PACKAGES: tuple[tuple[str, str], ...] = (
     ("infra", "土台。ファイル・git・パス照合・hook の入出力・設定・シェルの読み・ワークツリー"),
     ("records", "記録。伏せ字・判定の記録・診断ログ・後始末・拒否の数え"),
-    ("policy", "ルール。読み込み・照合・組み込み・層の合成・自己防衛・文脈ファイル"),
+    ("policy", "ルール。読み込み・照合・組み込み・レイヤーの合成・自己防衛・文脈ファイル"),
     (
         "tickets",
         "チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、フェーズ、操作",
@@ -100,7 +100,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "infra.hookio",
                 "infra.platformtag",
                 "infra.settings",
-                "infra.shellread",
+                "infra.shellread_scan",
+                "infra.shellread_words",
                 "infra.tree",
                 "infra.yamlread",
                 "records.redact",
@@ -113,6 +114,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         frozenset(
             {
                 "infra.gitstate",
+                "infra.shellread",
+                "infra.shellread_cd",
                 "infra.modes",
                 "policy.rules",
                 "records.audit",
@@ -131,22 +134,35 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "policy.builtin",
                 "policy.ctxfile",
                 "policy.selfguard",
+                "policy.selfguard_targets",
+                "policy.selfguard_shell",
                 "tickets.archive",
                 "tickets.flow",
+                "tickets.flow_text",
+                "tickets.flow_shape",
+                "tickets.flow_render",
                 "tickets.history",
                 "tickets.review_host",
                 "tickets.risk",
                 "tickets.syncstate",
                 "tickets.ticket",
+                "tickets.ticket_fields",
+                "tickets.ticket_fold",
+                "tickets.ticket_guard",
+                "tickets.ticket_ids",
+                "tickets.ticket_model",
+                "tickets.ticket_places",
             }
         ),
     ),
     (
         "compose",
-        "層ごとの設定を読んで、判定の材料に組む",
+        "レイヤーごとの設定を読んで、判定の材料に組む",
         frozenset(
             {
                 "hook.docsearch",
+                "hook.docsearch_index",
+                "hook.docsearch_query",
                 "hook.projskills",
                 "policy.ruleload",
                 "tickets.phasetypes",
@@ -161,6 +177,9 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
             {
                 "hook.reasons",
                 "tickets.agree",
+                "tickets.agree_candidates",
+                "tickets.agree_screen",
+                "tickets.agree_digest",
                 "tickets.approval",
                 "tickets.approval_checks",
                 "tickets.approval_marks",
@@ -168,6 +187,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.branchfind",
                 "tickets.configsync",
                 "tickets.phase",
+                "tickets.phase_forms",
+                "tickets.phase_scope",
             }
         ),
     ),
@@ -181,6 +202,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "hook.judge",
                 "tickets.ops",
                 "hook.post",
+                "hook.post_findings",
+                "hook.post_report",
                 "tickets.review",
                 "tickets.review_close",
                 "tickets.review_decide",
@@ -194,6 +217,9 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
             {
                 "__main__",
                 "entry.cli",
+                "entry.cli_usage",
+                "entry.cli_args",
+                "entry.cli_ops",
                 "entry.diagnose",
                 "entry.lint",
                 "entry.lint_branch",

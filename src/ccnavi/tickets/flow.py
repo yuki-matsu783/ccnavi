@@ -1,5 +1,8 @@
 """子チケットのフロー（作業の手順のグラフ）。設計 9.3.1・9.12。着手中は書き換えを止める。
 
+書かれた文字列の整え方は `flow_text`、形の検査は `flow_shape`、文への描き方は `flow_render` に
+分けてある。どれも flow を読まない。
+
 子チケット 1 本につき 1 本、担当のサブエージェントが作業中に読む手順書を置ける。
 置き場は**承認済みの領域**の `<承認済みチケットの置き場>/flows/<子>.yml`
 （既定 `.ccnavi/approved/flows/<子>.yml`）に固定で、チケットの欄では指さない。
@@ -12,7 +15,7 @@ Write / Edit / NotebookEdit を止め、パスの出るシェルからの書き�
 止まらないので、着手のあとの書き換えは知らせる。下の「着手のあとの書き換え」）。ユーザはボードのフロー編集画面で
 書き、承認済みチケットと同じく承認の push（`ccnavi-push-approved.sh`）でコミットする。
 実行後チェックは承認済みの領域を範囲の外として報告せず、frontmatter の無いファイルは
-副命令の書き込みとして外す（`post._script_writes`）。だからユーザが保存したフローが
+副命令の書き込みとして外す（`post_findings._script_writes`）。だからユーザが保存したフローが
 エージェントの範囲外の変更として報告されることもない。
 
 ## 下書き
@@ -56,14 +59,14 @@ YAML の 1 文書で、最上位はマッピング。ボードのフロー編集
 ハードリンク（外の名前から書き換えられる）も読まない（`read_bytes`）。
 
 形の誤り（最上位がマッピングでない、`nodes` が無い、ノードに `id` が無い・重なる、
-`connections` がリストでない）も読めない理由として 1 行で言う（`shape_problem`）。
+`connections` がリストでない）も読めない理由として 1 行で言う（`flow_shape.shape_problem`）。
 `ccnavi --lint --flow <パス>` は同じ読み手・同じ検査（`load`）でファイルを確かめ、読めなければ
 error で言う。ボードのフロー編集画面は、開くときと保存の前に編集中の本文を一時ファイルに書いて
 これに掛ける（拡張は判定を自分で出さない。正しいかの答えはここ 1 か所）。`--json` なら
 読めた中身も載せ（`as_json`）、画面は自分の読み（YAML 1.2）と見比べて、値の意味が食い違えば
 開かない・保存しない。
-読めたフローの線の構造（`structure_problems`）と名前の表記（`name_problems`）は warn で足し、
-読むのは止めない。
+読めたフローの線の構造（`flow_shape.structure_problems`）と名前の表記
+（`flow_shape.name_problems`）は warn で足し、読むのは止めない。
 
 読むのは本物とするツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリー上の版は読まない。
 
@@ -93,13 +96,11 @@ import math
 import os
 import posixpath
 import stat
-import unicodedata
-from collections import deque
 
 import yaml
 
 from ..infra import fsio, settings, tree, yamlread
-from . import ticket as ticket_mod
+from . import flow_render, flow_shape, flow_text, ticket_model
 
 # ロックで止めたときの理由コードと、記録のルール名。
 CODE_LOCKED = "DENY_TICKET_FLOW_LOCKED"
@@ -113,70 +114,9 @@ ANY_PROJECT = "*"
 
 # 読むファイルの大きさの上限（バイト）。超えたら読まずに知らせる。
 FILE_LIMIT = 256 * 1024
-# サブエージェントに並べる手順の上限。多ければファイルを読ませる。
-RENDER_LIMIT = 40
-# 1 行に載せる文の長さの上限。
-TEXT_LIMIT = 120
-# 1 ノードに並べる選択肢・分岐・次の上限。
-ITEM_LIMIT = 10
-# 子 1 本の手順の文の上限（文字）と、SubagentStart 全体でフローに使う上限。
-CHILD_TEXT_LIMIT = 4000
 TOTAL_TEXT_LIMIT = 12000
-
-# 止まってメインに返すノード。サブエージェントにはユーザに聞く道具が無い。
-ASK = "askUserQuestion"
-# 図の上の囲み（ボードの枠）。手順ではないので並べない
-GROUP = "group"
 # 入れ子のサブエージェントを起こすノード。
 SPAWN = ("subAgent", "subAgentFlow")
-# 出口を項目ごとに持つ種類と、項目の欄。
-BRANCH_KEYS = {"ifElse": "branches", "switch": "branches", "branch": "branches", ASK: "options"}
-
-# フローの文の中で ccnavi の接頭辞を真似させない。`[` / `［` の直後が（互換文字・書式の制御・
-# 結合文字・似た形の字をそろえて）`ccnavi` で始まる括弧は、亀甲括弧 `〔…〕` に置き換える。
-_BADGE_WORD = "ccnavi"
-_BADGE_OPEN = "〔"
-_BADGE_CLOSE = "〕"
-# 括弧の閉じを探す範囲（元の文字数）。
-_BADGE_REACH = 64
-# ラテン文字に似た形の字（キリル・ギリシャ・アルメニアなど）。`ccnavi` の表記に要る字だけ。
-_CONFUSABLE = {
-    "\u0441": "c",  # с キリル
-    "\u0421": "c",  # С
-    "\u03f2": "c",  # ϲ ギリシャ
-    "\u03f9": "c",  # Ϲ
-    "\u217d": "c",  # ⅽ
-    "\u0430": "a",  # а キリル
-    "\u0410": "a",  # А
-    "\u03b1": "a",  # α
-    "\u0391": "a",  # Α
-    "\u043f": "n",  # п キリル（小文字の n に似る）
-    "\u0578": "n",  # ո アルメニア
-    "\u03b7": "n",  # η
-    "\u0274": "n",  # ɴ
-    "\u03bd": "v",  # ν ギリシャ
-    "\u0475": "v",  # ѵ キリル
-    "\u0474": "v",  # Ѵ
-    "\u2174": "v",  # ⅴ
-    "\u0456": "i",  # і キリル
-    "\u0406": "i",  # І
-    "\u03b9": "i",  # ι
-    "\u0399": "i",  # Ι
-    "\u0131": "i",  # ı
-    "\u04cf": "i",  # ӏ
-    "\u2170": "i",  # ⅰ
-    "\u217c": "i",  # ⅼ
-    "\u01c0": "i",  # ǀ
-}
-# 案内の区切りの行に似せた文。フローの文の中に出たら置き換える。
-# プロジェクトのスキルの目録（projskills.FENCE_OPEN / FENCE_CLOSE）の区切りも同じく置き換える。
-_FENCE_PHRASES = (
-    "ここからユーザが書いたフローの本文",
-    "フローの本文ここまで",
-    "ここからプロジェクトのスキルの目録",
-    "目録ここまで",
-)
-_FENCE_SHOWN = "〔区切りに似た文〕"
 
 LINKED = "ファイルか、ツリーのルートからそこまでの途中がシンボリックリンクなので読まない"
 NOT_REGULAR = "ふつうのファイルではない（名前付きパイプ・デバイスなど）ので読まない"
@@ -283,7 +223,9 @@ def linked(tree_root: str, path: str) -> bool:
     return False
 
 
-def resolve(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> tuple[str, str, bool]:
+def resolve(
+    conf: settings.Settings, root: str, child: ticket_model.Ticket
+) -> tuple[str, str, bool]:
     """フローのファイルの絶対パスと、それを持つツリーのルートと、在るかどうか。
 
     読むのは本物とするツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの版は
@@ -297,7 +239,7 @@ def resolve(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> tup
     return path, base, os.path.lexists(path)
 
 
-def info(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> dict | None:
+def info(conf: settings.Settings, root: str, child: ticket_model.Ticket) -> dict | None:
     """ボード（`--explain --json`）に出すフローの欄。子でなければ None。
 
     閉じた子（終わった・取り消した）でフローが無ければ None。閉じた子にフローを作っても
@@ -313,7 +255,7 @@ def info(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> dict |
     if not child.is_child:
         return None
     path, base, exists = resolve(conf, root, child)
-    if not exists and child.state in (ticket_mod.DONE, ticket_mod.CANCELLED):
+    if not exists and child.state in (ticket_model.DONE, ticket_model.CANCELLED):
         return None
     draft = draft_file(conf, base, child.ticket)
     draft_exists = os.path.lexists(draft)
@@ -323,7 +265,7 @@ def info(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> dict |
         "tree": base,
         "exists": exists,
         "linked": exists and linked(base, path),
-        "locked": child.in_progress and child.state == ticket_mod.DOING,
+        "locked": child.in_progress and child.state == ticket_model.DOING,
         "draft": {
             "path": draft,
             "rel": draft_rel(conf, child.ticket),
@@ -375,8 +317,8 @@ def locate(conf: settings.Settings, root: str, path: str) -> tuple[str, str | No
 
 
 def lock_hit(
-    copies: list[ticket_mod.Ticket], project: str | None, name: str
-) -> ticket_mod.Ticket | None:
+    copies: list[ticket_model.Ticket], project: str | None, name: str
+) -> ticket_model.Ticket | None:
     """この書き込みを止める、着手中の子。無ければ None。
 
     `copies` はどのツリー上のチケットも並べたもの（識別子で 1 本にまとめる前）。どれか 1 本でも
@@ -407,8 +349,8 @@ def hard_linked(path: str) -> bool:
 
 
 def inode_hit(
-    conf: settings.Settings, root: str, copies: list[ticket_mod.Ticket], path: str
-) -> ticket_mod.Ticket | None:
+    conf: settings.Settings, root: str, copies: list[ticket_model.Ticket], path: str
+) -> ticket_model.Ticket | None:
     """書き込み先が、着手中の子のフローとハードリンクで同じ中身なら、その子。無ければ None。
 
     ハードリンクはパスに置き場が出ないので `locate` では当たらない（M-1）。書き込み先が
@@ -434,14 +376,15 @@ def inode_hit(
     return None
 
 
-def locked_message(conf: settings.Settings, child: ticket_mod.Ticket, path: str) -> str:
+def locked_message(conf: settings.Settings, child: ticket_model.Ticket, path: str) -> str:
     """ロックで止めたときの文面。"""
-    ticket = clean(child.ticket)
+    ticket = flow_text.clean(child.ticket)
     return "\n".join(
         [
-            f"[ccnavi] {CODE_LOCKED} (source: {clean(child.path)})",
-            f"ticket: {ticket} ({clean(child.title)}), started {clean(child.started_at)}",
-            f"path: {clean(path)}",
+            f"[ccnavi] {CODE_LOCKED} (source: {flow_text.clean(child.path)})",
+            f"ticket: {ticket} ({flow_text.clean(child.title)}), "
+            f"started {flow_text.clean(child.started_at)}",
+            f"path: {flow_text.clean(path)}",
             f"子チケット {ticket} は着手中なので、そのフロー"
             f"（`{flow_rel(conf, child.ticket)}`）は書き換えられません。"
             "担当のサブエージェントが読んでいる手順が作業の途中で変わるのを防ぐためです。"
@@ -499,7 +442,7 @@ def read_bytes(path: str, tree_root: str = "") -> tuple[bytes | None, str]:
             return None, f"大きすぎるので読まない（上限 {FILE_LIMIT} バイト）"
         return raw, ""
     except OSError as exc:
-        return None, f"読めない ({clean(exc.strerror or type(exc).__name__)})"
+        return None, f"読めない ({flow_text.clean(exc.strerror or type(exc).__name__)})"
     except Exception as exc:  # noqa: BLE001  壊れたデータで SubagentStart を落とさない
         return None, f"読めない ({type(exc).__name__})"
 
@@ -568,16 +511,16 @@ def parse(raw: bytes) -> tuple[dict | None, str]:
     except _AliasRefused:
         return None, ALIASED
     except OSError as exc:
-        return None, f"読めない ({clean(exc.strerror or type(exc).__name__)})"
+        return None, f"読めない ({flow_text.clean(exc.strerror or type(exc).__name__)})"
     except RecursionError:
         return None, "入れ子が深すぎて YAML として読めない"
     except yaml.YAMLError as exc:
-        return None, f"YAML として読めない ({_line(_yaml_problem(exc))})"
+        return None, f"YAML として読めない ({flow_text._line(_yaml_problem(exc))})"
     except (ValueError, TypeError) as exc:
-        return None, f"YAML として読めない ({_line(exc)})"
+        return None, f"YAML として読めない ({flow_text._line(exc)})"
     except Exception as exc:  # noqa: BLE001  壊れたデータで SubagentStart を落とさない
         return None, f"読めない ({type(exc).__name__})"
-    why = shape_problem(data)
+    why = flow_shape.shape_problem(data)
     if why:
         return None, why
     return data, ""
@@ -633,9 +576,9 @@ def as_json(value):
     if isinstance(value, bytes):
         return {JSON_MARK: "bytes", "text": base64.b64encode(value).decode("ascii")}
     if isinstance(value, (set, frozenset)):
-        return {JSON_MARK: "set", "text": _line(repr(sorted(map(repr, value))))}
+        return {JSON_MARK: "set", "text": flow_text._line(repr(sorted(map(repr, value))))}
     if isinstance(value, tuple):
-        return {JSON_MARK: "tuple", "text": _line(repr(value))}
+        return {JSON_MARK: "tuple", "text": flow_text._line(repr(value))}
     return {JSON_MARK: "other", "text": type(value).__name__}
 
 
@@ -644,182 +587,6 @@ def _digits(value: int) -> str:
         return str(value)
     except ValueError:  # 桁の上限（sys.set_int_max_str_digits）を越える
         return "(桁が多すぎる)"
-
-
-def shape_problem(data) -> str:
-    """読めた中身の形の誤り（最初の 1 つ）。無ければ空。例外は外に出さない。
-
-    SubagentStart の読み（`load`）と `--lint --flow` が同じここを通る。見るのは手順として
-    並べるのに要る形だけ。最上位がマッピング、`nodes` がマッピングのリストで、どれも空でない
-    文字列の `id` を持ち、`id` が重ならない。`connections` は在れば、マッピングのリスト。
-    `id` が無い・重なるノードは並べるときに落ちるので、気づかないうちに手順が欠けることのないよう、
-    読まない扱いにする。
-    """
-    if not isinstance(data, dict):
-        return "最上位がマッピングではない"
-    nodes = data.get("nodes")
-    if not isinstance(nodes, list):
-        return "`nodes` のリストが無い"
-    seen: set[str] = set()
-    for index, node in enumerate(nodes):
-        if not isinstance(node, dict):
-            return f"nodes[{index}] がマッピングではない"
-        node_id = node.get("id")
-        if not isinstance(node_id, str) or not node_id:
-            return f"nodes[{index}] に文字列の id が無い"
-        if node_id in seen:
-            return f"ノードの id が重なっている（{_line(node_id)}）"
-        seen.add(node_id)
-    if "connections" in data:
-        connections = data.get("connections")
-        if not isinstance(connections, list):
-            return "`connections` がリストではない"
-        for index, connection in enumerate(connections):
-            if not isinstance(connection, dict):
-                return f"connections[{index}] がマッピングではない"
-    return ""
-
-
-# ---- 線の構造と名前（`--lint --flow` の warn）
-#
-# 読めるか・形（`shape_problem`）の外にある、手順として怪しいところ。読むのは止めない（warn）。
-# `SubagentStart` は見ない（並べ方は `render` のまま）。巡回は意図して書くことがあるので言わない。
-
-# 並べない（手順でない）種類。構造の検査からも外す。
-_NOT_STEP = (GROUP,)
-
-
-def _step_nodes(data) -> list[dict]:
-    """構造を見るノード。辞書で `id` を持ち、グループでないもの（重なった `id` は最初の 1 つ）。"""
-    nodes: list[dict] = []
-    seen: set[str] = set()
-    for n in _list(_dict(data).get("nodes")):
-        if not isinstance(n, dict) or _text(n.get("type")) in _NOT_STEP:
-            continue
-        nid = _node_id(n)
-        if nid and nid not in seen:
-            seen.add(nid)
-            nodes.append(n)
-    return nodes
-
-
-def _named(node: dict) -> str:
-    """苦情で名指しするノード。`<id>（<名前>）`。"""
-    nid, name = _line(_node_id(node)), _line(node.get("name"))
-    return f"{nid}（{name}）" if name and name != nid else nid
-
-
-def _names(nodes: list[dict]) -> str:
-    return ", ".join(_capped([_named(n) for n in nodes[:ITEM_LIMIT]], len(nodes)))
-
-
-def _port_taken(node: dict, index: int, item: dict, ports: set[str]) -> bool:
-    """項目（分岐・選択肢）の出口に線があるか。
-
-    読み方は `_port_label` と同じ（項目の `id` か `branch-<番号>`）。
-    """
-    item_id = _text(item.get("id"))
-    if item_id and item_id in ports:
-        return True
-    return any(_branch_index(port) == index for port in ports)
-
-
-def structure_problems(data) -> list[str]:
-    """線の構造の怪しいところ（1 件 1 行）。無ければ空。例外は外に出さない。
-
-    見るのは、線の `from` / `to` が無いノードを指す、`start` から届かないノード、`start` に入る線、
-    `end` から出る線、分岐・問いの出口に線が無い、`end` が無い、`start` が無い。グループは外す
-    （手順ではない）。巡回は言わない。サブフロー（`subAgentFlows`）の中は見ない。
-
-    出口は画面（`flow-doc.ts` の `portsOf`）と同じに読む。複数選択（`multiSelect: true`）の問いは
-    選択肢ごとに出口を分けず、`output` の 1 本だけ。グループへ出る線も、出る側の出口は使っている
-    （線は手順に数えないが、「出口に線が無い」とは言わない）。無いノードを指す線は
-    `ITEM_LIMIT` 件まで言い、残りは数だけつける。
-    """
-    try:
-        return _structure_problems(data)
-    except Exception:  # noqa: BLE001  壊れたデータで lint を落とさない
-        return ["線の構造を確かめられない（中身の型が崩れている）"]
-
-
-def _structure_problems(data) -> list[str]:
-    data = _dict(data)
-    nodes = _step_nodes(data)
-    by_id = {_node_id(n): n for n in nodes}
-    groups = {
-        _node_id(n)
-        for n in _list(data.get("nodes"))
-        if isinstance(n, dict) and _text(n.get("type")) in _NOT_STEP
-    }
-    kinds = {nid: _text(n.get("type")) for nid, n in by_id.items()}
-    out: list[str] = []
-    missing: list[str] = []
-    edges: dict[str, list[str]] = {}
-    ports: dict[str, set[str]] = {}
-    for index, c in enumerate(_list(data.get("connections"))):
-        if not isinstance(c, dict):
-            continue
-        cid = _line(c.get("id")) or f"connections[{index}]"
-        src, dst = _text(c.get("from")), _text(c.get("to"))
-        bad = False
-        for end_name, ref in (("from", src), ("to", dst)):
-            if ref in groups:
-                continue
-            if ref not in by_id:
-                shown = _line(ref) or "(空)"
-                missing.append(f"線 {cid} の {end_name} が無いノード（{shown}）を指している")
-                bad = True
-        if not bad and src in by_id:
-            # グループへ出る線でも、出る側の出口は使っている
-            ports.setdefault(src, set()).add(_text(c.get("fromPort")) or "output")
-        if bad or src in groups or dst in groups:
-            continue
-        edges.setdefault(src, []).append(dst)
-        if kinds.get(dst) == "start":
-            out.append(f"線 {cid} が start（{_named(by_id[dst])}）に入っている")
-        if kinds.get(src) == "end":
-            out.append(f"線 {cid} が end（{_named(by_id[src])}）から出ている")
-    out.extend(missing[:ITEM_LIMIT])
-    if len(missing) > ITEM_LIMIT:
-        out.append(f"無いノードを指す線は…ほか {len(missing) - ITEM_LIMIT} 件")
-    starts = [nid for nid in by_id if kinds[nid] == "start"]
-    if not starts:
-        out.append("start が無い（どこから始めるかが決まらない）")
-    if not any(kind == "end" for kind in kinds.values()):
-        out.append("end が無い（どこで終わるかが決まらない）")
-    if starts:
-        reached: set[str] = set()
-        queue = deque(starts)
-        while queue:
-            current = queue.popleft()
-            if current in reached:
-                continue
-            reached.add(current)
-            queue.extend(edges.get(current, []))
-        lost = [n for nid, n in by_id.items() if nid not in reached]
-        if lost:
-            out.append(f"start から届かないノードがある: {_names(lost)}")
-    for nid, node in by_id.items():
-        key = BRANCH_KEYS.get(kinds[nid])
-        if key is None:
-            continue
-        taken = ports.get(nid, set())
-        if kinds[nid] == ASK and _dict(node.get("data")).get("multiSelect") is True:
-            # 複数選択の問いは出口を分けない（`output` の 1 本。画面の `portsOf` と同じ）
-            if "output" not in taken:
-                out.append(f"問い {_named(node)} の出口に線が無い: output（複数選択）")
-            continue
-        items = [i for i in _list(_dict(node.get("data")).get(key)) if isinstance(i, dict)]
-        empty = [
-            _line(item.get("label")) or f"{index + 1} 番目"
-            for index, item in enumerate(items)
-            if not _port_taken(node, index, item, taken)
-        ]
-        if empty:
-            what = "問い" if kinds[nid] == ASK else "分岐"
-            shown = ", ".join(_capped(empty[:ITEM_LIMIT], len(empty)))
-            out.append(f"{what} {_named(node)} の出口に線が無い: {shown}")
-    return out
 
 
 # ---- 選べるエージェントとスキルの名前（`--lint --json --flow` の `flow.candidates`）
@@ -874,7 +641,7 @@ def _front_name(path: str) -> str:
     except yaml.YAMLError:
         return ""
     value = meta.get("name") if isinstance(meta, dict) else None
-    return clean(value).strip() if isinstance(value, str) else ""
+    return flow_text.clean(value).strip() if isinstance(value, str) else ""
 
 
 def _entries(path: str, root: str) -> list[os.DirEntry]:
@@ -935,56 +702,6 @@ def _unique(items: list[dict]) -> list[dict]:
     return kept
 
 
-def _flow_nodes(data) -> list[dict]:
-    """名前を確かめるノード。最上位とサブフローの中の両方。"""
-    data = _dict(data)
-    nodes = [n for n in _list(data.get("nodes")) if isinstance(n, dict)]
-    for sub in _list(data.get("subAgentFlows")):
-        nodes.extend(n for n in _list(_dict(sub).get("nodes")) if isinstance(n, dict))
-    return nodes
-
-
-def name_problems(data, cat: dict[str, list[dict]]) -> list[str]:
-    """`subAgent` の種類（`builtInType`）と `skill` の名前（`name`）が候補に無いもの（1 件 1 行）。
-
-    書き誤りを見つけるため。空の欄は言わない（書きかけ）。スキルの `:` を含む名前
-    （プラグインのスキル）は、ディレクトリの中から確かめられないので言わない。大文字小文字だけが
-    違えば、正しい表記をつける。例外は外に出さない。
-    """
-    try:
-        return _name_problems(data, cat)
-    except Exception:  # noqa: BLE001  壊れたデータで lint を落とさない
-        return []
-
-
-def _name_problems(data, cat: dict[str, list[dict]]) -> list[str]:
-    agents = [i["name"] for i in cat.get("agents", [])]
-    skills = [i["name"] for i in cat.get("skills", [])]
-    out: list[str] = []
-    for node in _flow_nodes(data):
-        kind = _text(node.get("type"))
-        info = _dict(node.get("data"))
-        if kind == "subAgent":
-            what, value, known = "サブエージェントの種類", _text(info.get("builtInType")), agents
-        elif kind == "skill":
-            what, value, known = "スキル", _text(info.get("name")), skills
-            if ":" in value:
-                continue
-        else:
-            continue
-        value = value.strip()
-        if not value or value in known:
-            continue
-        near = [k for k in known if k.casefold() == value.casefold()]
-        hint = f"。大文字小文字が違う（{_line(near[0])}）" if near else ""
-        out.append(
-            f"ノード {_named(node)} の{what} {_line(value)} が候補に無い"
-            "（組み込みと .claude/ の下に無い。書き誤りかもしれない。"
-            f"ユーザ・プラグインのものなら気にしなくてよい）{hint}"
-        )
-    return out
-
-
 # ---- 着手のあとの書き換えを知らせる
 
 
@@ -1002,7 +719,7 @@ def fingerprint(path: str, tree_root: str = "") -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
-def digest_record_path(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> str:
+def digest_record_path(conf: settings.Settings, root: str, child: ticket_model.Ticket) -> str:
     """着手のときに保存したハッシュの記録の置き場。
 
     フローと同じツリーの `phases/<親>/<子>.flow.json`。
@@ -1013,7 +730,9 @@ def digest_record_path(conf: settings.Settings, root: str, child: ticket_mod.Tic
     return os.path.join(approved, PHASES_DIR, child.parent, f"{child.ticket}.{DIGEST_RECORD}.json")
 
 
-def record_digest(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> tuple[str, str]:
+def record_digest(
+    conf: settings.Settings, root: str, child: ticket_model.Ticket
+) -> tuple[str, str]:
     """着手のときのフローのハッシュを記録する。(書いた記録のパス, 書けなかった理由)。
 
     置き場は子の記録（`.risk.json` など）と同じ `phases/<親>/` で、承認済みの領域にあるので
@@ -1028,7 +747,7 @@ def record_digest(conf: settings.Settings, root: str, child: ticket_mod.Ticket) 
     }
     target = digest_record_path(conf, root, child)
     failed = fsio.write_text(target, json.dumps(data, ensure_ascii=False, indent=1) + "\n", "\n")
-    return target, clean(failed)
+    return target, flow_text.clean(failed)
 
 
 def _describe(mark: str) -> str:
@@ -1036,10 +755,10 @@ def _describe(mark: str) -> str:
         return "無い"
     if mark.startswith("sha256:"):
         return mark[: len("sha256:") + 12]
-    return clean(mark.partition(":")[2]) or "読めない"
+    return flow_text.clean(mark.partition(":")[2]) or "読めない"
 
 
-def changed_notice(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> str:
+def changed_notice(conf: settings.Settings, root: str, child: ticket_model.Ticket) -> str:
     """着手中の子のフローが、着手のときに記録したハッシュから変わっていれば、その知らせ。無ければ空。
 
     知らせるだけで止めない（厳しくする向き）。ロックと承認済みの領域の保護は Write / Edit と、
@@ -1059,7 +778,8 @@ def changed_notice(conf: settings.Settings, root: str, child: ticket_mod.Ticket)
             return ""
         return (
             f"[ccnavi] {CODE_CHANGED}: 着手後にフローが書き換わった。子チケット "
-            f"{clean(child.ticket)} のフロー {clean(path)} が、着手のとき（{_describe(before)}）と"
+            f"{flow_text.clean(child.ticket)} のフロー {flow_text.clean(path)} が、"
+            f"着手のとき（{_describe(before)}）と"
             f"違う（いま {_describe(now)}）。担当のサブエージェントが読んだ手順と、ユーザが渡した"
             "手順が食い違っているかもしれない。誰が書き換えたかをユーザが確かめてください"
             "（ロックは Write / Edit を止めるが、シェルから行き先を追えない形で書くと止まらない）"
@@ -1068,301 +788,10 @@ def changed_notice(conf: settings.Settings, root: str, child: ticket_mod.Ticket)
         return ""
 
 
-# ---- 並べる
-
-
-def clean(text) -> str:
-    """文脈に載せる値から、改行と制御文字（書式の制御も）を除く。"""
-    shown = str(text if text is not None else "")
-    return "".join(
-        " " if ch in "\r\n\t\v\f\x85  " else ch
-        for ch in shown
-        if ch in "\r\n\t\v\f\x85  " or unicodedata.category(ch) not in ("Cc", "Cf")
-    )
-
-
-def _text(value) -> str:
-    """文字列か数だけを文にする。リストや辞書は中身を辿らない（深い入れ子で落ちない）。"""
-    if isinstance(value, bool):
-        return ""
-    if isinstance(value, float) and value.is_integer() and abs(value) < 1e21:
-        # 整数の値の小数（`1.0`）は整数の表記にする。ボード（JavaScript の `String`）と揃える。
-        return str(int(value))
-    if isinstance(value, (str, int, float)):
-        return str(value)
-    return ""
-
-
-def _line(value) -> str:
-    """1 行にまとめて切る。ccnavi の接頭辞は真似させない。"""
-    if isinstance(value, Exception):
-        value = str(value)
-    text = value if isinstance(value, str) else _text(value)
-    shown = " ".join(clean(text[: TEXT_LIMIT * 8]).split())
-    shown = _neutral(shown)
-    if len(shown) > TEXT_LIMIT:
-        shown = shown[:TEXT_LIMIT] + "…"
-    return shown
-
-
-_IGNORED = ("Mn", "Mc", "Me", "Cf", "Cc", "Zs")
-
-
-def _skeleton(text: str) -> tuple[str, list[int]]:
-    """見た目で比べるための表記と、その 1 字ずつの元の位置。
-
-    互換分解（NFKD。全角の `［` は `[`、`ⅽ` は `c`）し、結合文字・書式の制御・制御文字・
-    空白を落とし、似た形の字（`_CONFUSABLE`）をラテン文字に置き換え、大文字小文字をそろえる。
-    """
-    chars: list[str] = []
-    origin: list[int] = []
-    for i, ch in enumerate(text):
-        for part in unicodedata.normalize("NFKD", ch):
-            if part.isspace() or unicodedata.category(part) in _IGNORED:
-                continue
-            for folded in _CONFUSABLE.get(part, part).casefold():
-                chars.append(_CONFUSABLE.get(folded, folded))
-                origin.append(i)
-    return "".join(chars), origin
-
-
-def _neutral(text: str) -> str:
-    """フローの文が ccnavi の知らせや案内の区切りに見えないようにする（L-a）。
-
-    - `[` / `［`（互換文字も）の直後が `ccnavi` で始まる括弧は、開きと、その先の最初の閉じ
-      （`]` / `］`）を `〔` `〕` に置き換える。`[ccnavi dry-run]`・`[CCNAVI]`・幅の無い字や
-      結合文字を挟んだもの・キリル文字の `с` で書いたものも同じ
-    - 案内の区切りの行の文（`_FENCE_PHRASES`）は `_FENCE_SHOWN` に置き換える
-    """
-    skeleton, origin = _skeleton(text)
-    replace: dict[int, str] = {}
-    word = _BADGE_WORD
-    at = skeleton.find("[")
-    while at >= 0:
-        if skeleton.startswith(word, at + 1):
-            start = origin[at]
-            replace[start] = _BADGE_OPEN
-            close = skeleton.find("]", at + 1)
-            if close >= 0 and origin[close] - start <= _BADGE_REACH:
-                replace[origin[close]] = _BADGE_CLOSE
-        at = skeleton.find("[", at + 1)
-    for phrase in _FENCE_PHRASES:
-        needle = _skeleton(phrase)[0]
-        at = skeleton.find(needle)
-        while at >= 0:
-            first, last = origin[at], origin[at + len(needle) - 1]
-            replace[first] = _FENCE_SHOWN
-            for i in range(first + 1, last + 1):
-                replace[i] = ""
-            at = skeleton.find(needle, at + len(needle))
-    if not replace:
-        return text
-    return "".join(replace.get(i, ch) for i, ch in enumerate(text))
-
-
-def impersonates(text: str) -> bool:
-    """文に ccnavi の接頭辞か案内の区切りに見える箇所が残っているか。テストと確かめ用。"""
-    skeleton, _ = _skeleton(text)
-    if any(_skeleton(p)[0] in skeleton for p in _FENCE_PHRASES):
-        return True
-    return f"[{_BADGE_WORD}" in skeleton
-
-
-def _dict(value) -> dict:
-    return value if isinstance(value, dict) else {}
-
-
-def _list(value) -> list:
-    return value if isinstance(value, list) else []
-
-
-def _capped(parts: list[str], total: int) -> list[str]:
-    """リストを ITEM_LIMIT で切り、残りの数をつける。"""
-    if total > len(parts):
-        return parts + [f"…ほか {total - len(parts)} 件"]
-    return parts
-
-
-def _labels(items, key: str) -> list[str]:
-    entries = [i for i in _list(items) if isinstance(i, dict)]
-    return _capped([_line(i.get(key)) for i in entries[:ITEM_LIMIT]], len(entries))
-
-
-def _summary(node: dict, flows: dict) -> str:
-    """ノード 1 つの中身を 1 行で。知らない種類は空。"""
-    kind = _text(node.get("type"))
-    data = _dict(node.get("data"))
-    if kind == "prompt":
-        return _line(data.get("prompt"))
-    if kind == "subAgent":
-        parts = [_line(data.get("description"))]
-        if _line(data.get("prompt")):
-            parts.append(f"プロンプト: {_line(data.get('prompt'))}")
-        if _line(data.get("builtInType")):
-            parts.append(f"種類: {_line(data.get('builtInType'))}")
-        return " / ".join(p for p in parts if p)
-    if kind == ASK:
-        options = " | ".join(_labels(data.get("options"), "label"))
-        multi = "（複数選択）" if data.get("multiSelect") is True else ""
-        return f"問い: {_line(data.get('questionText'))} 選択肢{multi}: {options}"
-    if kind in ("ifElse", "switch", "branch"):
-        branches = [b for b in _list(data.get("branches")) if isinstance(b, dict)]
-        parts = [
-            f"{_line(b.get('label'))}={_line(b.get('condition'))}" for b in branches[:ITEM_LIMIT]
-        ]
-        parts = _capped(parts, len(branches))
-        target = _line(data.get("evaluationTarget"))
-        return (f"{target}: " if target else "") + " | ".join(parts)
-    if kind == "skill":
-        return f"スキル {_line(data.get('name'))}: {_line(data.get('description'))}"
-    if kind == "mcp":
-        tool = _line(data.get("toolName"))
-        return f"MCP {_line(data.get('serverId'))}" + (f" / {tool}" if tool else "")
-    if kind == "subAgentFlow":
-        ref = flows.get(_text(data.get("subAgentFlowId")))
-        name = _line(ref.get("name")) if isinstance(ref, dict) else ""
-        return (_line(data.get("label")) or name) + (f"（サブフロー {name}）" if name else "")
-    if kind == "codex":
-        return f"Codex: {_line(data.get('prompt'))}"
-    if kind in ("branchSession", "start", "end"):
-        return _line(data.get("label"))
-    return ""
-
-
-def _branch_index(port: str) -> int | None:
-    """`branch-<番号>` の番号。番号は ASCII の数字だけ。違う表記なら None。"""
-    head, _, digits = port.rpartition("-")
-    if head != "branch" or not digits or not (digits.isascii() and digits.isdigit()):
-        return None
-    if len(digits) > 6:
-        return None
-    return int(digits)
-
-
-def _port_key(connection: dict) -> tuple:
-    """出口の並べ順。`branch-<番号>` は番号の順、それ以外は文字列の順で後ろ。"""
-    port = _text(connection.get("fromPort"))
-    index = _branch_index(port)
-    return (0, index, "") if index is not None else (1, 0, port)
-
-
-def _port_label(node: dict, port: str) -> str:
-    """分岐の出口の名前。
-
-    出口が項目の `id` とちょうど同じか、`branch-<番号>` の番号が項目の位置なら、その `label`。
-    部分一致は採らない（`b` が `branch-1` に当たる）。項目は種類で決まる欄（分岐は `branches`、
-    問いは `options`）の辞書だけを数える。ボードの線の言葉（`flow-doc.ts` の
-    `connectionLabel`）と同じ読み方。
-    """
-    key = BRANCH_KEYS.get(_text(node.get("type")))
-    if not port or key is None:
-        return ""
-    items = [i for i in _list(_dict(node.get("data")).get(key)) if isinstance(i, dict)]
-    for item in items:
-        if _text(item.get("id")) and _text(item.get("id")) == port:
-            return _line(item.get("label"))
-    index = _branch_index(port)
-    if index is not None and index < len(items):
-        return _line(items[index].get("label"))
-    return ""
-
-
-def _node_id(node: dict) -> str:
-    return _text(node.get("id"))
-
-
-def _order(ids: list[str], kinds: dict[str, str], out: dict[str, list[dict]]) -> list[str]:
-    """並べる順。`start` から辿り、辿れなかったものは後ろに元の順で足す。O(ノード + 線)。"""
-    known = set(ids)
-    starts = [i for i in ids if kinds.get(i) == "start"]
-    seen: dict[str, None] = {}
-    queue = deque(starts or ids[:1])
-    while queue:
-        current = queue.popleft()
-        if current in seen or current not in known:
-            continue
-        seen[current] = None
-        for c in out.get(current, []):
-            queue.append(_text(c.get("to")))
-    return list(seen) + [i for i in ids if i not in seen]
-
-
-def render(
-    data: dict, limit: int = RENDER_LIMIT, text_limit: int = CHILD_TEXT_LIMIT
-) -> tuple[list[str], set[str]]:
-    """フローを順に並べた行と、出てきたノードの種類の集合。例外は外に出さない。
-
-    YAML を読まなくても手順が追えるよう、1 ノード 1 行で `<番号>. [<種類>] <名前>: <中身>`
-    と次の番号を並べる。知らない種類は種類の名前と `name` だけ。ノードは `limit` 件まで、
-    文は `text_limit` 文字まで。
-    """
-    try:
-        return _render(data, limit, text_limit)
-    except Exception:  # noqa: BLE001  壊れたデータで SubagentStart を落とさない
-        return ["（フローを並べられない。ファイルを直接読んで判断してください）"], set()
-
-
-def _render(data, limit: int, text_limit: int) -> tuple[list[str], set[str]]:
-    data = _dict(data)
-    nodes: list[dict] = []
-    seen_ids: set[str] = set()
-    for n in _list(data.get("nodes")):
-        # グループは図の上の囲みで手順ではない。並べない（線が繋がっていても辿らない）
-        if isinstance(n, dict) and _text(n.get("type")) == GROUP:
-            continue
-        if isinstance(n, dict) and _node_id(n) and _node_id(n) not in seen_ids:
-            seen_ids.add(_node_id(n))
-            nodes.append(n)
-    connections = [c for c in _list(data.get("connections")) if isinstance(c, dict)]
-    flows = {
-        _text(f.get("id")): f
-        for f in _list(data.get("subAgentFlows"))
-        if isinstance(f, dict) and _text(f.get("id"))
-    }
-    by_id = {_node_id(n): n for n in nodes}
-    ids = list(by_id)
-    kinds_by = {i: _text(n.get("type")) for i, n in by_id.items()}
-    out: dict[str, list[dict]] = {}
-    for c in connections:
-        out.setdefault(_text(c.get("from")), []).append(c)
-    for edges in out.values():
-        edges.sort(key=_port_key)
-    order = _order(ids, kinds_by, out)
-    number = {nid: i + 1 for i, nid in enumerate(order)}
-    kinds = set(kinds_by.values())
-    lines: list[str] = []
-    used = 0
-    shown = 0
-    for nid in order[:limit]:
-        node = by_id[nid]
-        kind = _line(kinds_by[nid]) or "?"
-        name = _line(node.get("name")) or _line(nid)
-        body = _summary(node, flows)
-        text = f"{number[nid]}. [{kind}] {name}" + (f": {body}" if body else "")
-        edges = [c for c in out.get(nid, []) if _text(c.get("to")) in number]
-        nexts = []
-        for c in edges[:ITEM_LIMIT]:
-            label = _line(c.get("condition")) or _port_label(node, _text(c.get("fromPort")))
-            nexts.append(f"{number[_text(c.get('to'))]}" + (f"（{label}）" if label else ""))
-        nexts = _capped(nexts, len(edges))
-        if nexts:
-            text += " → " + ", ".join(nexts)
-        # 組み立てた行でも見る。種類の名前が `ccnavi…` だと、こちらの `[<種類>]` が接頭辞になる。
-        text = _neutral(text)
-        if used + len(text) > text_limit and lines:
-            break
-        lines.append(text)
-        used += len(text)
-        shown += 1
-    if len(order) > shown:
-        lines.append(f"…ほか {len(order) - shown} 件。続きはファイルを読んでください")
-    return lines, kinds
-
-
 def briefing(
     conf: settings.Settings,
     root: str,
-    child: ticket_mod.Ticket,
+    child: ticket_model.Ticket,
     scope: str,
     budget: int = TOTAL_TEXT_LIMIT,
     full: bool = True,
@@ -1383,7 +812,7 @@ def briefing(
     if not exists:
         return []
     if not full:
-        return [f"    フロー: {clean(path)}"]
+        return [f"    フロー: {flow_text.clean(path)}"]
     lock = (
         "着手中なので、終わるまで書き換えられない（ロック）。着手のあとに書き換わったら"
         " ccnavi が知らせる。"
@@ -1391,7 +820,8 @@ def briefing(
         else "着手すると、終わるまで書き換えられなくなる（ロック）。"
     )
     lines = [
-        f"    フロー: {clean(path)}（ユーザがボードで書いた {clean(child.ticket)} の手順。"
+        f"    フロー: {flow_text.clean(path)}"
+        f"（ユーザがボードで書いた {flow_text.clean(child.ticket)} の手順。"
         "承認済みの領域にあり、ユーザが持つもの。エージェントは編集しない）。作業の前にこのファイルを"
         "読み、その順に進めてください。文脈が要約されて見失ったら、"
         "このパスを読み直してください。" + lock
@@ -1400,21 +830,21 @@ def briefing(
     if data is None:
         lines.append(f"    フローを読めない: {why}。ユーザが確かめてください")
         return lines
-    room = max(0, min(budget, CHILD_TEXT_LIMIT))
+    room = max(0, min(budget, flow_render.CHILD_TEXT_LIMIT))
     if room == 0:
         lines.append(
             "    手順は SubagentStart の文の上限に達したので並べない。ファイルを読んでください"
         )
         return lines
-    steps, kinds = render(data, text_limit=room)
+    steps, kinds = flow_render.render(data, text_limit=room)
     lines.append(FENCE_OPEN)
     lines.extend(f"      {s}" for s in steps)
     lines.append(FENCE_CLOSE)
-    worktree = clean(tree.worktree_path(root, child.ticket))
-    ticket, scope = clean(child.ticket), clean(scope) or "(空)"
-    if ASK in kinds:
+    worktree = flow_text.clean(tree.worktree_path(root, child.ticket))
+    ticket, scope = flow_text.clean(child.ticket), flow_text.clean(scope) or "(空)"
+    if flow_shape.ASK in kinds:
         lines.append(
-            f"    {ASK} のノード: サブエージェントはユーザに聞けない"
+            f"    {flow_shape.ASK} のノード: サブエージェントはユーザに聞けない"
             "（AskUserQuestion は渡されない）。そのノードで手を止め、問いと選択肢を添えて"
             "メインに返してください。メインがユーザに聞き、答えを持って同じサブエージェントを再開させる。"
         )

@@ -12,10 +12,27 @@ from typing import TextIO
 
 from ..infra import fsio, hookio, modes, settings, shellread, tree
 from ..infra.modes import EXIT_OK
-from ..policy import builtin, ctxfile, ruleload, rules, selfguard
+from ..policy import (
+    builtin,
+    ctxfile,
+    ruleload,
+    rules,
+    selfguard,
+    selfguard_shell,
+    selfguard_targets,
+)
 from ..records import audit, repeat
-from ..tickets import approval, approval_checks, flow, phase
-from ..tickets import ticket as ticket_mod
+from ..tickets import (
+    approval,
+    approval_checks,
+    flow,
+    phase,
+    phase_forms,
+    phase_scope,
+    ticket_guard,
+    ticket_model,
+    ticket_places,
+)
 from . import projskills, reasons, wrapguard
 
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
@@ -78,8 +95,9 @@ SUBJECT_FIELDS: dict[str, str] = {
     "WebFetch": "url",
 }
 
-# 行き着く先まで解いてから当てるツール（パスを対象にするもの）。行き先の層を選ぶ一覧と
-# 同じものを使う。別に持つと、判定はパスに当てるのに層は共通層だけ、という食い違いが起きる。
+# 行き着く先まで解いてから当てるツール（パスを対象にするもの）。行き先のレイヤーを選ぶ一覧と
+# 同じものを使う。
+# 別に持つと、判定はパスに当てるのにレイヤーは共通レイヤーだけ、という食い違いが起きる。
 PATH_TOOLS = ruleload.PATH_TOOLS
 
 # 探す場所を省略できるツール。省略は「いま居る場所」の意味なので、cwd を対象にする。
@@ -118,7 +136,7 @@ def guard_setting_files(
         conf.state,
         payload.session_id,
         root,
-        selfguard.targets(
+        selfguard_targets.targets(
             root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
         ),
     )
@@ -169,23 +187,23 @@ def decide_before(
         record.fallback != builtin.FALLBACK
         and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
-        selfguard.add_rules(
+        selfguard_shell.add_rules(
             rule_set,
             conf.bin,
             conf.project_home,
             root,
-            selfguard.common_layer_files(conf),
+            selfguard_shell.common_layer_files(conf),
             (conf.log, conf.state),
             tool=payload.tool_name,
         )
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が有効なときだけ足す。
     if conf.tickets_enabled:
-        rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets, root))
+        rule_set.deny.extend(ticket_guard.guard_rules(conf.tickets, root))
         # ユーザの判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:
-            rule_set.deny.append(phase.ticket_approval_rule(conf.bin, root))
+            rule_set.deny.append(phase_forms.ticket_approval_rule(conf.bin, root))
 
     subject, bare, inner, rewrites = screen(payload.tool_name, record.subject, record)
 
@@ -199,9 +217,9 @@ def decide_before(
             hookio.write_context(stdout, hookio.PRE_TOOL_USE, guard)
         return EXIT_OK
 
-    # 組み込みの既定に戻ったときだけ言う。層が壊れて空になったのは組み込みへの
+    # 組み込みの既定に戻ったときだけ言う。レイヤーが壊れて空になったのは組み込みへの
     # 退避ではないので、同じ文面を出すと「既定で判定している」と読み違えられる。
-    # そちらは記録の `fallback` に層の名前が残り、`--lint` が error で言う。
+    # そちらは記録の `fallback` にレイヤーの名前が残り、`--lint` が error で言う。
     fallback = (
         reasons.fallen_back(record.detail or conf.rules)
         if record.fallback == builtin.FALLBACK
@@ -235,16 +253,16 @@ def decide_before(
             )
 
     # 記録と state を消す `ccnavi --prune`（`--preview` の無い形）は、チケット制御に依らず止める
-    # （phase.prune_form）。実行ファイルの端末要求は擬似端末を使えば通れる。記録と state の置き場を
-    # シェルの書き込みから守る組み込み（selfguard）と同じく、ガード自身を守る設定で切れる。
+    # （phase_forms.prune_form）。実行ファイルの端末要求は擬似端末を使えば通れる。記録と state の
+    # 置き場をシェルの書き込みから守る組み込み（selfguard）と同じく、ガード自身を守る設定で切れる。
     if (
-        payload.tool_name in phase.SHELL_TOOLS
+        payload.tool_name in phase_forms.SHELL_TOOLS
         and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
-        found = phase.prune_form(record.subject, conf.bin)
+        found = phase_forms.prune_form(record.subject, conf.bin)
         if found:
-            record.code = phase.CODE_RECORDS_PRUNE
-            record.rules = [phase.RECORDS_PRUNE_RULE_ID]
+            record.code = phase_forms.CODE_RECORDS_PRUNE
+            record.rules = [phase_forms.RECORDS_PRUNE_RULE_ID]
             return refuse(
                 stdout,
                 mode,
@@ -253,7 +271,7 @@ def decide_before(
                 notices
                 + [
                     reasons.builtin_refusal(
-                        phase.CODE_RECORDS_PRUNE, subject, phase.prune_message()
+                        phase_forms.CODE_RECORDS_PRUNE, subject, phase_forms.prune_message()
                     )
                 ],
                 conf=conf,
@@ -261,16 +279,16 @@ def decide_before(
 
     # ユーザの判断の経路のうち、hook のほかに保護が無い形（端末要求を切る形、ボードの経路の形）は
     # 止める。実行ファイルを呼ぶ表記は追い切れないので、呼び方ではなく文字列の組で見る
-    # （phase.human_path_form）。
+    # （phase_forms.human_path_form）。
     if (
         conf.tickets_enabled
         and conf.guard_ticket_approval != selfguard.DISABLE
-        and payload.tool_name in phase.SHELL_TOOLS
+        and payload.tool_name in phase_forms.SHELL_TOOLS
     ):
-        kind, found = phase.human_path_form(record.subject)
+        kind, found = phase_forms.human_path_form(record.subject)
         if found:
-            record.code = phase.CODE_TICKET_APPROVAL
-            record.rules = [phase.TICKET_APPROVAL_RULE_ID]
+            record.code = phase_forms.CODE_TICKET_APPROVAL
+            record.rules = [phase_forms.TICKET_APPROVAL_RULE_ID]
             return refuse(
                 stdout,
                 mode,
@@ -279,11 +297,11 @@ def decide_before(
                 notices
                 + [
                     reasons.builtin_refusal(
-                        phase.CODE_TICKET_APPROVAL,
+                        phase_forms.CODE_TICKET_APPROVAL,
                         subject,
-                        phase.guard_off_message(found)
+                        phase_forms.guard_off_message(found)
                         if kind == "guard-off"
-                        else phase.board_form_message(found),
+                        else phase_forms.board_form_message(found),
                     )
                 ],
                 conf=conf,
@@ -319,14 +337,14 @@ def decide_before(
     if (
         conf.tickets_enabled
         and payload.agent_id
-        and payload.tool_name in phase.SHELL_TOOLS
-        and phase.forbidden(subject, shellread.SEP.join(layer for _, layer, _ in inner))
+        and payload.tool_name in phase_forms.SHELL_TOOLS
+        and phase_forms.forbidden(subject, shellread.SEP.join(layer for _, layer, _ in inner))
     ):
         # 禁止は中で実行されるコマンドにも当てる。`env sh …ccnavi-ticket.sh start` を
         # 元の形だけで見ると、先頭の `sh` に固定した形が外れて止まらずに通る。
         runner, layer = ("", "")
-        if not phase.forbidden(subject):
-            runner, layer = next((r, x) for r, x, _ in inner if phase.forbidden(x))
+        if not phase_forms.forbidden(subject):
+            runner, layer = next((r, x) for r, x, _ in inner if phase_forms.forbidden(x))
         record.code, record.rules = phase.CODE_SUBAGENT, [reasons.TICKET_RULE]
         record.unwrapped = layer
         return refuse(
@@ -347,10 +365,10 @@ def decide_before(
     # サブエージェントの起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。
     # ルールより先に見る。置き場を読むのは cwd がワークツリーかプロジェクトの中のときだけ
     # （`phase.parent_at`）。
-    if conf.tickets_enabled and payload.tool_name in phase.HELD_TOOLS:
+    if conf.tickets_enabled and payload.tool_name in phase_forms.HELD_TOOLS:
         parent, raw = phase.parent_at(root, conf, payload.cwd, raw)
         held = phase.held_phase(root, conf, parent.ticket, raw) if parent is not None else None
-        exempt = payload.tool_name == "Bash" and phase.exempt(subject, record.degraded)
+        exempt = payload.tool_name == "Bash" and phase_forms.exempt(subject, record.degraded)
         if held is not None and not exempt:
             record.code, record.rules = phase.CODE_REVIEW, [reasons.TICKET_RULE]
             reason = phase.hold_reason(held, payload.tool_name, root)
@@ -362,7 +380,7 @@ def decide_before(
     # 条件は project_mismatch の早く返る条件と同じ式。ticket_verdict は dest で見るが、dest が
     # None でなければ target は dest そのものなので、先へ進むときはここも同じツリーで読んでいる。
     index = None
-    scanned: list[ticket_mod.Ticket] | None = None
+    scanned: list[ticket_model.Ticket] | None = None
     if (
         conf.tickets_enabled
         and target is not None
@@ -444,11 +462,11 @@ def decide_before(
             # 厳しい側へ外れるだけで、そのことは文面が断る。
             break
         # 中で実行されるコマンドは deny と ask にだけ当てる。止める側に足す当て先なので、
-        # 層を読み違えても当たるはずのものが当たらないだけで、元の形の判定は消えない。
+        # レイヤーを読み違えても当たるはずのものが当たらないだけで、元の形の判定は消えない。
         # allow に当てると逆になる。`sudo -u me cat /etc/hosts` は元の形では確認になるが、
         # 中の `cat …` が読み取りの allow に当たって通るようになる。
         #
-        # 引用の外の層を先に見る。同じルールが引用の中と外の両方に当たるなら、外で当たった
+        # 引用の外のレイヤーを先に見る。同じルールが引用の中と外の両方に当たるなら、外で当たった
         # ことにする。引用の中の断りは、引用の中にだけ当たったときに付けるものなので。
         layers = sorted(inner, key=lambda x: x[2]) if name != rules.ALLOW else []
         for rule in rule_set.section(name):
@@ -476,9 +494,9 @@ def decide_before(
 
     record.rules = [rule.id or f"({verdict})" for rule in group]
     record.unwrapped = shellread.SEP.join(dict.fromkeys(layer for _, layer, _ in via if layer))
-    # 判定を下したのは最初に当たったルール（設計 11.9）。その層を 1 欄で残す。
-    # id の前置きからも読めるが、欄にしておくと記録を層で数えられる。ルールファイルの
-    # 外から足したルール（組み込みの保護、チケット）は層を持たないので空のまま。
+    # 判定を下したのは最初に当たったルール（設計 11.9）。そのレイヤーを 1 欄で残す。
+    # id の前置きからも読めるが、欄にしておくと記録をレイヤーで数えられる。ルールファイルの
+    # 外から足したルール（組み込みの保護、チケット）はレイヤーを持たないので空のまま。
     if group:
         record.source = group[0].source
 
@@ -488,7 +506,7 @@ def decide_before(
     # 引用の中の中身を除いた読み（bare）に当て直して、当たらなければそうだとする。
     # こうするとルールの書き方（glob / regex、`^` / `(^|\x00)`）に依らない。
     # 中で実行されるコマンドで当たったルールは、bare に当て直せない（bare は元の形の読み）。
-    # そちらは、当たった層が引用の中から切り出したコマンドのものかどうかで決める。
+    # そちらは、当たったレイヤーが引用の中から切り出したコマンドのものかどうかで決める。
     inside = [False] * len(group)
     if verdict in (rules.DENY, rules.ASK):
         inside = [
@@ -515,7 +533,7 @@ def decide_before(
         if STRENGTH[ticket_decision] > STRENGTH[verdict]:
             verdict, ticket_reason, ticket_code = ticket_decision, text, code
             if ticket_reason:
-                # 判定を下したのは層を持たないチケット。狭められたルールの id は後ろに残し、
+                # 判定を下したのはレイヤーを持たないチケット。狭められたルールの id は後ろに残し、
                 # 「ルールは通したのにチケットが止めた」回を記録から数えられるようにする。
                 record.rules = [reasons.TICKET_RULE, *record.rules]
                 record.source = ""
@@ -526,10 +544,10 @@ def decide_before(
         stderr, conf.state, payload, group, ctxfile.bases(conf, root, target)
     )
     # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。判定には
-    # 足さない（`ticket_mod.propose_notice` の説明）ので、ルールの文と同じ経路
+    # 足さない（`ticket_guard.propose_notice` の説明）ので、ルールの文と同じ経路
     # （additionalContext）で渡す。応答は 1 つの JSON なので、まとめる。
     told = (
-        ticket_mod.propose_notice(stderr, conf, root, payload, record.subject)
+        ticket_guard.propose_notice(stderr, conf, root, payload, record.subject)
         if conf.tickets_enabled
         else ""
     )
@@ -585,8 +603,8 @@ def decide_before(
         # 生の文字列ではない。読み切れなかったことを根拠のコードにしない。
         read_through = all(layer for _, layer, _ in via)
         record.code = reasons.code_for(payload.tool_name, "" if read_through else record.degraded)
-        if any(rule.id == phase.TICKET_APPROVAL_RULE_ID for rule in group):
-            record.code = phase.CODE_TICKET_APPROVAL
+        if any(rule.id == phase_forms.TICKET_APPROVAL_RULE_ID for rule in group):
+            record.code = phase_forms.CODE_TICKET_APPROVAL
     elif verdict == rules.DENY:
         # チケットが止めた。範囲の外かチケットの deny で、ルールは何も言わないか、
         # allow / ask に当たっている（そのときは文面がルールの id を名指しする）。
@@ -768,7 +786,7 @@ def project_mismatch(
     root: str,
     t: tree.Tree,
     full: str,
-    index: dict[str, ticket_mod.Ticket] | None,
+    index: dict[str, ticket_model.Ticket] | None,
 ) -> str:
     """ワークツリーの元リポジトリと、そこに結び付く承認済みチケットの `project:` が
     違えば、その理由の文。
@@ -815,8 +833,8 @@ def flow_lock(
     root: str,
     payload: hookio.Input,
     full: str,
-    copies: list[ticket_mod.Ticket] | None,
-) -> tuple[str, list[ticket_mod.Ticket] | None]:
+    copies: list[ticket_model.Ticket] | None,
+) -> tuple[str, list[ticket_model.Ticket] | None]:
     """着手中の子のフローへの書き込みなら、その理由の文。と、読んだ承認済みチケットのリスト。
 
     当てるのは解いたパス（`full`）と、解く前のパス（payload のパスを cwd から繋いで `..` を
@@ -865,7 +883,7 @@ def ticket_verdict(
     tool: str,
     full: str,
     t: tree.Tree | None,
-    index: dict[str, ticket_mod.Ticket] | None,
+    index: dict[str, ticket_model.Ticket] | None,
     rule_hit: tuple[str, str] | None = None,
 ) -> tuple[str, str, str, str]:
     """チケットが承認された範囲について何を言うかを返す。判定と、理由の文と、注記と、理由のコード。
@@ -879,7 +897,7 @@ def ticket_verdict(
 
     範囲の中は allow、範囲の `ask` は ask、範囲の外とチケットの `deny` は deny。
     チケットが境界を明示している以上、外に出たことは「宣言に反した」になる。
-    子は親の範囲とフェーズの種類の上限で切り詰め、厳しい側を採る（phase.scope_verdict）。
+    子は親の範囲とフェーズの種類の上限で切り詰め、厳しい側を採る（phase_scope.scope_verdict）。
     承認は範囲の超過を警告で通すので、超えた分はここで止まる。止めた上限を `limit:` 行で
     名指しする。ルールの判定と比べて強い側を採るのは呼び手。
 
@@ -913,16 +931,16 @@ def ticket_verdict(
     if ticket is None:
         return "", "", "", ""
     rel = tree.relative(t, full)
-    if ticket_mod.is_unscoped(rel, conf.tickets, conf.approved):
+    if ticket_places.is_unscoped(rel, conf.tickets, conf.approved):
         return "", "", "", ""
     parent = index.get(ticket.parent) if ticket.is_child else None
     # 種類を読むのは、親が計画を持ち子の番号が計画に在るときだけ。番号だけの親では
     # phases.yml を開かない。
     pt, notice = None, ""
-    if parent is not None and phase.plan_item(ticket, parent) is not None:
+    if parent is not None and phase_scope.plan_item(ticket, parent) is not None:
         types = phase.load_types(conf, root, parent.project)
-        pt = phase.type_for(conf, root, ticket, parent, types or {})
-        missing = phase.unread_type(conf, root, ticket, parent, types)
+        pt = phase_scope.type_for(conf, root, ticket, parent, types or {})
+        missing = phase_scope.unread_type(conf, root, ticket, parent, types)
         if missing:
             notice = (
                 f"[ccnavi] {ticket.ticket} のフェーズ {ticket.phase} の種類 `{missing}` が"
@@ -931,11 +949,11 @@ def ticket_verdict(
                 "種類が消えている。ユーザに伝えて直してもらってください"
                 "（'ccnavi --lint' が箇所を言う）。"
             )
-    found = phase.scope_verdict(ticket, parent, pt, rel)
+    found = phase_scope.scope_verdict(ticket, parent, pt, rel)
     if found.verdict == rules.ALLOW:
         return rules.ALLOW, "", notice, ""
 
-    if found.limit == phase.LIMIT_BLOCKED:
+    if found.limit == phase_scope.LIMIT_BLOCKED:
         # 範囲の外に書いたのではなく、チケット自体が信頼できない。範囲を見せても
         # 直しようが無いので、代わりに引っかかった検査を名指しする。
         return (
@@ -994,7 +1012,7 @@ def ticket_verdict(
         )
     # 上限ごとに次にすることが違う。子の範囲の外なら提案し直し、親や種類の上限の外なら、
     # 範囲を広げても通らない（承認で超過を見せたうえで止めている）。
-    if found.limit == phase.LIMIT_TYPE and found.type is not None:
+    if found.limit == phase_scope.LIMIT_TYPE and found.type is not None:
         pt = found.type
         head.append(f"limit: phase type {pt.title} ({pt.id}): {', '.join(pt.scope_globs)}")
         body = (
@@ -1003,7 +1021,7 @@ def ticket_verdict(
             "a warning; writes there stay blocked. Do the work in a later phase whose type "
             "covers this path, or ask the user to change phases.yml."
         )
-    elif found.limit == phase.LIMIT_PARENT and parent is not None:
+    elif found.limit == phase_scope.LIMIT_PARENT and parent is not None:
         parent_area = ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK)) or "(空)"
         head.append(f"limit: parent {parent.ticket}: {parent_area}")
         body = (

@@ -77,7 +77,7 @@ def write(path: str, text: str) -> str:
 def rules_file(directory: str, *rule: dict, section: str = "deny") -> str:
     """ルールファイルを 1 枚書いてパスを返す。
 
-    置くのは共通層の既定の場所。hook として呼ぶ側は `--rules` を渡せない
+    置くのは共通レイヤーの既定の場所。hook として呼ぶ側は `--rules` を渡せない
     （診断でだけ有効な）ので、ワークスペースルートの下の既定のパスに要る。
     直に `rules.load` に渡すだけのテストは、どこに在っても同じ。
     """
@@ -285,12 +285,12 @@ class NotRootExpansionTest(unittest.TestCase):
         self.assertFalse(pattern.search(absolute(r"C:\other\a.md")))
         self.assertFalse(pattern.search(root + r"\a.py"))
 
-    # --- 観点 15: 層 ---
+    # --- 観点 15: レイヤー ---
 
     def test_the_placeholder_always_means_the_workspace_root(self):
-        """どの層に書いても展開先はワークスペースルート。設計 2.6。
+        """どのレイヤーに書いても展開先はワークスペースルート。設計 2.6。
 
-        層ごとにルートが変わると、プロジェクトの層に書いた 1 行が
+        レイヤーごとにルートが変わると、プロジェクトのレイヤーに書いた 1 行が
         別の場所を指すことになる。
         """
         root = absolute(r"C:\Users\u\ccnavi")

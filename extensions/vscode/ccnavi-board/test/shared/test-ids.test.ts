@@ -60,7 +60,7 @@ test("CB-T163 テストの ID は重複しない。足すときは最後尾の�
   assert.deepEqual(
     duplicated.map(([id, wheres]) => `${id}: ${wheres.join(" / ")}`),
     [],
-    "同じ ID が 2 つある。後から付けたほうを最後尾の次へ振り直す（README の「テストの ID」）",
+    "同じ ID が 2 つある。後から付けたほうを最後尾の次へ振り直す（docs/design/structure.md の「テストの ID」）",
   );
 });
 
