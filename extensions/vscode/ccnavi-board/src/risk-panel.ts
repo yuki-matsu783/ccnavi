@@ -19,7 +19,8 @@
  * チケット制御が disable のワークスペースでは開かない。配点は子チケットを閉じるときにしか
  * 読まれないので、disable の間は何も動かさない。入口（サイドパネル・コマンドパレット）も同じ鍵で隠れる。
  *
- * 検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、`--lint --risk <パス>` で渡す（対象がどれでも同じ）。
+ * 検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、`--lint` に渡す。共通の設定は `--risk <パス>`、ワークスペースの設定は `--project-risk-file self=<パス>`、
+ * プロジェクトは `--project-risk-file <名前>=<パス>`（レイヤーの配点は共通の設定と合わせて検証される）。
  * 保存は、検証（`--lint`）を通り、作業中のチケットが無く（共通の設定とワークスペースの設定はどのツリーでも、
  * プロジェクトの設定はそのプロジェクトの分だけ。配点は子を閉じるときに読まれるので、走っている最中に変えない）、
  * ファイルが外で変わっていないときだけ行う。
@@ -34,8 +35,8 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { loadBoard, runLint } from "./ccnavi.js";
-import { projectLayer, selfLayer } from "./core/layers.js";
+import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
+import { LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asRiskForm, BUILTIN_RISK_TEXT, readRisk, type RiskDocument } from "./core/risk-doc.js";
@@ -716,6 +717,18 @@ async function create(current: PanelState): Promise<void> {
   vscode.window.showInformationMessage(`${loaded.riskRel} を組み込みの配点で作りました。コミットは自分でしてください`);
 }
 
+/** 保存の前の検証に渡す差し替え。共通の設定は `--risk`、ほかは名前を付けて `--project-risk-file` */
+function overrideFor(target: RiskTarget, tmp: string): LintOverride {
+  switch (target.kind) {
+    case "workspace":
+      return { kind: "risk", path: tmp };
+    case "self":
+      return { kind: "layerRisk", name: LAYER_SELF, path: tmp };
+    case "project":
+      return { kind: "layerRisk", name: target.name, path: tmp };
+  }
+}
+
 async function save(current: PanelState, form: RiskForm): Promise<void> {
   const loaded = current.loaded;
   if (loaded === undefined) {
@@ -738,7 +751,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   }
 
   // 1. 検証。error が 1 件でもあれば保存しない。
-  const lint = await runLint(root, binSetting(), { kind: "risk", path: tmp });
+  const lint = await runLint(root, binSetting(), overrideFor(loaded.target, tmp));
   if (!alive(current)) {
     return;
   }

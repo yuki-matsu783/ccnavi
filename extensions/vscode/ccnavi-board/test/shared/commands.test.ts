@@ -6,6 +6,7 @@ import {
   c1TargetOf,
   decideArgs,
   decidePreviewArgs,
+  overrideArgs,
   previewArgs,
   pushApprovedCommand,
   reviewedPrompt,
@@ -137,4 +138,22 @@ test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリ
   assert.ok(!bare.includes("マージリクエスト:"));
   assert.ok(bare.includes("フェーズ 3 のレビューを終えた"));
   assert.ok(bare.includes("親のワークツリー C:/ws/.claude/worktrees/i0001 で 'sh C:/ws/.ccnavi/scripts/ccnavi-review.sh confirm --phase 3'"));
+});
+
+test("CB-T317 リスクの配点の差し替え: 共通は --risk、ワークスペースは self=、プロジェクトは名前= で --project-risk-file に渡す", () => {
+  assert.deepEqual(overrideArgs({ kind: "risk", path: "/tmp/r.yml" }), ["--risk", "/tmp/r.yml"]);
+  assert.deepEqual(overrideArgs({ kind: "layerRisk", name: "self", path: "/tmp/r.yml" }), [
+    "--project-risk-file",
+    "self=/tmp/r.yml",
+  ]);
+  assert.deepEqual(overrideArgs({ kind: "layerRisk", name: "lib", path: "/tmp/r.yml" }), [
+    "--project-risk-file",
+    "lib=/tmp/r.yml",
+  ]);
+  // ルールとフェーズ定義の差し替えは従来のまま
+  assert.deepEqual(overrideArgs({ kind: "self", path: "/tmp/x.yml" }), ["--project-rules-file", "self=/tmp/x.yml"]);
+  assert.deepEqual(overrideArgs({ kind: "layerPhases", name: "lib", path: "/tmp/x.yml" }), [
+    "--project-phases-file",
+    "lib=/tmp/x.yml",
+  ]);
 });

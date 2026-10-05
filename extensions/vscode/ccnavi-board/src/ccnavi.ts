@@ -11,8 +11,9 @@
  * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
  * 判定と検証はルールファイルを差し替えられる。
  * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
- * 検証はリスクの配点も `--risk` で、フェーズ定義も `--project-phases-file <名前>=<パス>`（ワークスペースの設定は `self=<パス>`）で
- * 差し替えられる（リスク管理画面・フェーズ管理画面）。
+ * 検証はリスクの配点も差し替えられる。共通の設定は `--risk`、プロジェクトの設定は `--project-risk-file <名前>=<パス>`
+ * （ワークスペースの設定は `self=<パス>`。共通の設定と合わせて検証される）。フェーズ定義は `--project-phases-file <名前>=<パス>`
+ * （同じく `self=<パス>`）で差し替えられる（リスク管理画面・フェーズ管理画面）。
  * 編集中の内容を一時ファイルに置いて試すため。承認済みチケットと state の置き場は外し、記録も残さない
  * （試し打ちで記録を汚さない）。
  */
@@ -34,11 +35,15 @@ import {
   c1TargetOf,
   decideArgs,
   decidePreviewArgs,
+  overrideArgs,
   previewArgs,
   REVIEW_SCRIPT,
   toPosixPath,
   type Launcher,
+  type LintOverride,
+  type RulesOverride,
 } from "./core/commands.js";
+export type { LintOverride, RulesOverride } from "./core/commands.js";
 import {
   parseDecidePreview,
   parseDecideResult,
@@ -106,46 +111,6 @@ const NOT_FOUND =
 
 /** 見るのはルールだけ。チケット制御と state の置き場は外し、記録も残さない */
 const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] as const;
-
-/**
- * 判定と検証に掛けるルールファイルの差し替え。共通の設定のルールは `--rules` で、
- * プロジェクト 1 つのルールは `--project-rules-file <名前>=<パス>` で（README「lint の JSON」）。
- * ワークスペースの設定は同じオプションに名前 `self` で渡す。実行ファイルはレイヤー（layer）の名前で差し替えを引き、
- * `self` という名前のプロジェクトはプロジェクトの設定として数えないので取り違えない。
- * どれも診断（`--lint` / `--test` / `--test-samples` / `--explain`）でだけ有効で、
- * hook からの判定にもチケットとレビューの副命令にも届かない（実行ファイルが診断以外では断る）。
- * 拡張がこれらを足すのは `--lint` と `--test` だけなので、そこは変わらない。
- */
-export type RulesOverride =
-  | { readonly kind: "workspace"; readonly path: string }
-  | { readonly kind: "project"; readonly name: string; readonly path: string }
-  | { readonly kind: "self"; readonly path: string };
-
-/**
- * 検証（`--lint`）に掛ける設定の差し替え。ルールに加えて、リスクの配点を `--risk` で、
- * ワークスペースの設定（`self`）かプロジェクトの設定のフェーズ定義を `--project-phases-file <名前>=<パス>` で差し替えられる。
- * フェーズ定義は足し算をしないので、その 1 本の中だけで確かめられる（共通の設定の `--phases` は使わない）。
- * 判定（`--test`）には配点も定義も関係ないので、そちらは RulesOverride だけを受ける。
- */
-export type LintOverride =
-  | RulesOverride
-  | { readonly kind: "risk"; readonly path: string }
-  | { readonly kind: "layerPhases"; readonly name: string; readonly path: string };
-
-function overrideArgs(override: LintOverride): string[] {
-  switch (override.kind) {
-    case "workspace":
-      return ["--rules", override.path];
-    case "project":
-      return ["--project-rules-file", `${override.name}=${override.path}`];
-    case "self":
-      return ["--project-rules-file", `self=${override.path}`];
-    case "risk":
-      return ["--risk", override.path];
-    case "layerPhases":
-      return ["--project-phases-file", `${override.name}=${override.path}`];
-  }
-}
 
 export function findLauncher(root: string, setting: string): Launcher | undefined {
   return locate({
