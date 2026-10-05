@@ -320,6 +320,37 @@ class WriteBytesAtomicTest(unittest.TestCase):
         self.assertEqual(self._read(), b"after")
         self.assertEqual(self._names(), ["i0001.md"])
 
+    def test_read_only_destination_is_not_replaced(self):
+        """書き込み権の無い行き先（0444・読み取り専用属性）は、差し替えでも上書きしない。
+
+        root は書き込み権が無くても書けるので、os.access をパッチして同じ判断を通す。
+        """
+        self.assertEqual(fsio.write_bytes_atomic(self.path, b"before"), "")
+        real = os.access
+
+        def no_write(path, mode, *args, **kwargs):
+            if path == self.path and mode == os.W_OK:
+                return False
+            return real(path, mode, *args, **kwargs)
+
+        with mock.patch("os.access", no_write):
+            self.assertNotEqual(fsio.write_bytes_atomic(self.path, b"after"), "")
+            self.assertNotEqual(fsio.write_text_durable(self.path, "after"), "")
+        self.assertEqual(self._read(), b"before")
+        self.assertEqual(self._names(), ["i0001.md"])
+
+    @unittest.skipIf(
+        os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0),
+        "root は 0444 にも書けるので、POSIX の一般ユーザでだけ見る",
+    )
+    def test_read_only_mode_is_not_replaced(self):
+        self.assertEqual(fsio.write_bytes_atomic(self.path, b"before"), "")
+        os.chmod(self.path, 0o444)
+        self.assertNotEqual(fsio.write_bytes_atomic(self.path, b"after"), "")
+        self.assertEqual(self._read(), b"before")
+        self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o444)
+        self.assertEqual(self._names(), ["i0001.md"])
+
     def test_put_back_restores_durably(self):
         """戻すのも承認済みチケットと同じ書き方。素の書き方に戻されると落ちる。"""
         self.assertEqual(fsio.write_bytes_atomic(self.path, b"new"), "")
