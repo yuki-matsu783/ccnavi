@@ -166,7 +166,7 @@ export function flowRequestPrompt(request: FlowRequest): string {
   return lines.join("\n");
 }
 
-/** 「提案あり」。下書きが在り、中身がいまのフローと違う（`sameFlow` が偽）か、読めない */
+/** 「提案あり」。下書きが在り、中身がいまのフローと違う（`sameFlowIgnoringLayout` が偽）か、読めない */
 export interface FlowOffer {
   /** 下書きのファイル（ワークスペースルートからの相対で見せる。外なら絶対） */
   readonly draftPath: string;
