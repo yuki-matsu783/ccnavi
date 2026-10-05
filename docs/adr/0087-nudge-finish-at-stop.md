@@ -31,7 +31,7 @@ keywords: [finish, nudge, Stop, チケット, 着手, コミット, 促し]
 | 応答は一番外の `decision: block` と `reason`。exit 2 と標準エラーは使わない | 同じ `Stop` でユーザへの報告（`systemMessage`）も返すので、1 つの JSON にまとめる。exit 2 だと標準出力の JSON は読まれず、報告が消える | exit 2 で返す。報告と促しのどちらかが落ちる |
 | 除くもの: `stop_hook_active` が真、チケット制御が `disable`、モードが `disable`、cwd がワークスペースルートかチケットの無いワークツリー、未着手、信じられない承認済みチケット（`blocked`。ADR-0058）、基準点が無い、未コミットの変更がある、基準点より先にコミットが無い、親で `close_problems` が空でない（開いている子・レビュー準備中／レビュー待ち・フィードバック計画待ち・終わっていないフェーズ）、git を読めない、`SubagentStop` | それぞれ「`finish` が通らない」か「作業が終わっていると言えない」形。親は `finish` と同じ関数（`close_problems`）で見るので、促したのに `finish` が断る、が起きない。レビュー準備中の親は既存の案内が「ターンを終えてユーザを待つ」と言っていて、促すと食い違う | 親は子と同じ条件だけで見る。開いた子を持つ親で毎回止まる |
 | `dry-run` では止めず、止めたはずの文をユーザへの報告（`systemMessage`）に載せる | 実行後チェックと同じ扱い。止めないことがモードの約束で、何が起きていたかは見られる | `dry-run` でも止める。モードの約束を破る |
-| 判定は実行ファイルの `ops.unfinished_at_stop` に置く。見るのは承認済みチケットと git（`status --porcelain --untracked-files=all`、`rev-parse`、`rev-list`）だけ | 実行ファイルの境界の中（ADR-0028）。ネットワークには出ない | sh で見る。判定は hook が受け持つ（ADR-0077） |
+| 判定は実行ファイルの `ops_stop.unfinished_at_stop` に置く。見るのは承認済みチケットと git（`status --porcelain --untracked-files=all`、`rev-parse`、`rev-list`）だけ | 実行ファイルの境界の中（ADR-0028）。ネットワークには出ない | sh で見る。判定は hook が受け持つ（ADR-0077） |
 | 記録（`logs/log.jsonl`）の `decision` は `nudge`。`deny` にしない | 促しはツール呼び出しの拒否ではない。`deny` の集計（止めた呼び出しの数）に混ぜると、ガードがどれだけ止めているかが読めなくなる | `deny` で残す。集計が膨らむ |
 
 ## 得たもの・失ったもの

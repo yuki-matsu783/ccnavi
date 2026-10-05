@@ -16,7 +16,7 @@ from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import builtin, ctxfile, ruleload, rules, selfguard, selfguard_targets
 from ..records import audit, prune, repeat
-from ..tickets import approval, approval_checks, branchfind, configsync, ops, phase
+from ..tickets import approval, approval_checks, branchfind, configsync, ops_stop, phase
 from . import docsearch, judge, post, post_findings, projskills, reasons, subagent
 
 # `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
@@ -228,7 +228,7 @@ def decide_at_stop(
     （`stop_rules_nudge`）。止め方とモードの扱いは `finish` の促しと同じ。
 
     承認済みチケットの置き場は、ここで 1 度だけ読んで範囲（`scope_guard`）と `finish` の促し
-    （`ops.unfinished_at_stop`）の両方に渡す。間の `post.at_stop` は報告するだけで作業ツリーを
+    （`ops_stop.unfinished_at_stop`）の両方に渡す。間の `post.at_stop` は報告するだけで作業ツリーを
     戻さず、`repeat.at_stop` は state を読むだけなので、置き場のファイルは動かない。
     """
     raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
@@ -344,17 +344,17 @@ def _finish_nudge(
     """
     if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
         return ""
-    found = ops.unfinished_at_stop(root, conf, payload.cwd, raw)
-    if found is None or ops.nudged_before(conf.state, payload.session_id, found):
+    found = ops_stop.unfinished_at_stop(root, conf, payload.cwd, raw)
+    if found is None or ops_stop.nudged_before(conf.state, payload.session_id, found):
         return ""
-    failed = ops.remember_nudge(conf.state, payload.session_id, found)
+    failed = ops_stop.remember_nudge(conf.state, payload.session_id, found)
     if failed:
         stderr.write(f"ccnavi: finish を促した記録を残せないので、促さない: {failed}\n")
         return ""
-    record.decision, record.code = audit.NUDGE, ops.CODE_FINISH_NUDGE
+    record.decision, record.code = audit.NUDGE, ops_stop.CODE_FINISH_NUDGE
     record.enforced = mode == modes.ENABLE
     record.tree = found.ticket.ticket
-    return ops.finish_nudge(root, found)
+    return ops_stop.finish_nudge(root, found)
 
 
 def decide_at_start(

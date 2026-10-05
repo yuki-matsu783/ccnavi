@@ -764,7 +764,7 @@ class TicketTest(unittest.TestCase):
     def close_parent_by_hand(self, name="i0001"):
         """親の承認済みチケットを `doing/` から `done/` へ手で動かす。
 
-        道具は開いた子がある親を閉じさせない（`ops.close_problems`）ので、この形は
+        道具は開いた子がある親を閉じさせない（`ops_close.close_problems`）ので、この形は
         置き場を手で動かしたときにしか作れない。GitHub の画面で閉じるのがそれにあたる。
         """
         os.makedirs(os.path.join(self.approved, "done"), exist_ok=True)

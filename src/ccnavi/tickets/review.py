@@ -53,7 +53,7 @@ from . import (
     approval_marks,
     approval_ops,
     configsync,
-    ops,
+    ops_close,
     phase,
     phase_forms,
     review_host,
@@ -602,13 +602,13 @@ def _parent_any(
     """cwd の親。閉じた承認済みチケットも引く（親を閉じたあとに Draft を外す `ready` のため）。"""
     parent = phase.parent_for_cwd(root, conf, cwd)
     if parent is not None:
-        return None if ops.family_stopped(stderr, root, conf, parent) else parent
+        return None if ops_close.family_stopped(stderr, root, conf, parent) else parent
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is not None and not t.is_main:
         closed, _ = approval.scan(conf, root, closed=True)
         found = tree.lookup(approval_checks.by_id(closed), t.name)
         if found is not None and not found.is_child:
-            return None if ops.family_stopped(stderr, root, conf, found) else found
+            return None if ops_close.family_stopped(stderr, root, conf, found) else found
     stderr.write("ccnavi: ここは親チケットのワークツリーではない（cwd から親を引けない）\n")
     return None
 
@@ -667,7 +667,7 @@ def _parent(
         return None
     # 取り込み済みの親子のチケットが決まらない・閉じているなら、
     # 依頼・確認・行き先・早めに閉じたことのマーカーも置かない。
-    if ops.family_stopped(stderr, root, conf, parent):
+    if ops_close.family_stopped(stderr, root, conf, parent):
         return None
     return parent
 

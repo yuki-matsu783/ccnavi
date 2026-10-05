@@ -43,7 +43,7 @@ keywords: [共通レイヤー, 配布, コピー, プロジェクト, レビュ�
 2 回目以降のレビューでは載せない。
 
 知らせるまで、親を閉じず Draft も外さない。`notified` が空のまま親の `ticket finish` か `review ready` を打つと止め
-（どちらも `ops.close_problems` を通る）、ユーザに端末で `ccnavi --config-synced <親>` を打ってもらうよう案内する
+（どちらも `ops_close.close_problems` を通る）、ユーザに端末で `ccnavi --config-synced <親>` を打ってもらうよう案内する
 （計画の無い親、全フェーズが `review: none` の親はこの経路になる）。`--config-synced` は知らせを出して `y` を受け、`notified` に `terminal` を書く。
 `--agree` と同じく端末を求め、エージェントが Bash で打つ形は組み込みの deny（`builtin-guard-ticket-approval`）が止める。
 早めに閉じる（`close-early`）ときは、閉じる前の確認に同じ知らせを出し、`y` で閉じたら `notified` に `terminal` を書く。

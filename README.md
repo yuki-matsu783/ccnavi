@@ -2724,6 +2724,8 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/review_decide.py` | 残った指摘の行き先を決める（`--reviewed` の決め方と `decide`） |
 | `src/ccnavi/tickets/review_close.py` | 親を閉じる（`review ready` と `close-early`） |
 | `src/ccnavi/tickets/ops.py` | チケットの状態を動かす `ticket start / finish / cancel / record-risk`。閉じるときに実績のリスクを数える |
+| `src/ccnavi/tickets/ops_close.py` | チケットを引いて動かしてよいかの検査。置き場の引き当て、取り込み済みの親子の停止、着手の前（親・先行）と終了の前（親を閉じられる・成果物）の検査 |
+| `src/ccnavi/tickets/ops_stop.py` | Stop で `finish` の打ち忘れを促す判定と、基準点の確認（git の読み取り） |
 | `src/ccnavi/hook/` | hook の判定。実行前チェック・文面・実行後チェック・イベント・サブエージェント |
 | `src/ccnavi/hook/post.py` | 実行後チェックの手順。作業ツリーの読み取り、前からあった変更の記録、復元 |
 | `src/ccnavi/hook/post_findings.py` | 変わったファイルを、守る場所とチケットの範囲に当てる。スクリプト自身の書き込みの見分け |
