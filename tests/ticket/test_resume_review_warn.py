@@ -7,6 +7,8 @@
 1. 作業中の子があり、レビューが要るフェーズに `reviewed` が残っていれば、lint と status が言う
 2. 言わないもの: `reviewed` が無い、子が閉じている（`done/`）、レビューが要らないフェーズ
 3. 警告は判定と `start` を止めない
+4. 延期したフェーズの子が作業中で、引き受けた側に `reviewed` が残っていれば言う。
+   消すのは引き受けた側。引き受けた側がレビュー前なら言わない
 """
 
 from __future__ import annotations
@@ -36,6 +38,25 @@ class ResumedReviewWarnTest(PhaseHarness):
                 os.path.join(self.approved, "phases", "i0001", "1.reviewed"),
                 '{"at": "2026-01-01T00:00:00+0000"}\n',
             )
+        self.commit_parent()
+
+    def setup_deferred(self, owner_mark):
+        """フェーズ 1（設計、延期）の子が作業中。2 は引き受け手で、owner_mark なら reviewed。"""
+        self.family(plan=[("design", "defer"), "acceptance", "implement"])
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/*",), True))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.start_parent()
+        self.worktree("i0001-01-01", "i0001")
+        started = self.ccnavi("ticket", "start", "i0001-01-01")
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        phases = os.path.join(self.approved, "phases", "i0001")
+        write(
+            os.path.join(phases, "1.skipped"),
+            '{"at": "2026-01-01T00:00:00+0000", "deferred_to": 2}\n',
+        )
+        if owner_mark:
+            write(os.path.join(phases, "2.reviewed"), '{"at": "2026-01-01T00:00:00+0000"}\n')
         self.commit_parent()
 
     def status_of_child(self):
@@ -107,5 +128,53 @@ class ResumedReviewWarnTest(PhaseHarness):
         # lint は warn だけで、終了コードを落とさない
         warned = self.ccnavi("--lint")
         self.assertIn(MARKER_WORDS, warned.stdout)
+        self.assertEqual(warned.returncode, 0, warned.stdout)
+        self.assertIn("error 0 件", warned.stdout)
+
+    # ---- 4. 延期したフェーズの子
+
+    def test_a_resumed_child_of_a_deferred_phase_is_warned_when_the_owner_is_reviewed(self):
+        self.setup_deferred(owner_mark=True)
+        for text in (self.lint(), self.status_of_child()):
+            self.assertIn("フェーズ 1（設計） は 1 から 2 へ延期されていて", text)
+            self.assertIn("再開後の作業は、そのレビューに含まれていません", text)
+            # 消すのは引き受けた側（2）のマーカー。延期の skipped ではない
+            self.assertIn("ccnavi-git.sh rm .ccnavi/approved/phases/i0001/2.reviewed", text)
+            self.assertNotIn("1.skipped", text)
+            self.assertIn("ツリー .claude/worktrees/i0001で", text)
+        self.assertTrue(
+            os.path.exists(os.path.join(self.approved, "phases", "i0001", "2.reviewed"))
+        )
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.skipped")))
+
+    def test_no_warning_for_a_deferred_child_while_the_owner_is_not_reviewed(self):
+        self.setup_deferred(owner_mark=False)
+        self.assertNotIn(MARKER_WORDS, self.lint())
+        self.assertNotIn("延期されていて", self.lint())
+        self.assertNotIn("延期されていて", self.status_of_child())
+
+    def test_no_warning_for_a_closed_child_of_a_deferred_phase(self):
+        self.setup_deferred(owner_mark=True)
+        os.makedirs(os.path.join(self.approved, "done"), exist_ok=True)
+        os.rename(
+            os.path.join(self.approved, "doing", "i0001-01-01.md"),
+            os.path.join(self.approved, "done", "i0001-01-01.md"),
+        )
+        self.commit_parent()
+        self.assertNotIn("延期されていて", self.lint())
+        self.assertNotIn("延期されていて", self.status_of_child())
+
+    def test_the_deferred_warning_does_not_stop_the_verdict_or_lint(self):
+        self.setup_deferred(owner_mark=True)
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
+        result = self.hook(
+            "PreToolUse",
+            "Write",
+            child,
+            file_path=os.path.join(child, "wip", "design", "x.md"),
+        )
+        self.assertNotIn("DENY", self.reason(result))
+        warned = self.ccnavi("--lint")
+        self.assertIn("延期されていて", warned.stdout)
         self.assertEqual(warned.returncode, 0, warned.stdout)
         self.assertIn("error 0 件", warned.stdout)
