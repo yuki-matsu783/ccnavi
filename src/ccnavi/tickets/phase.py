@@ -658,8 +658,11 @@ def resumed_review(
     延期したフェーズの子は、引き受けた側（`review_at`）の `reviewed` が残っているときに言う
     （消すのはその引き受けた側のマーカー。延期の `skipped` は消さない）。引き受けた側がまだ
     レビュー前なら、これからのレビューが再開後の作業も覆うので言わない。
-    レビューが要らないフェーズ（`reviewed_or_skipped` が `reviewed` を見ずに通る）と、
-    レビューが要らない引き受け手は、マーカーが残っていても止める条件に入らないので言わない。
+    閉じ直したときにレビューが要らないフェーズ（種類が `review: none` で、この子も
+    `human_review` を求めていない）と、レビューが要らない引き受け手は、マーカーが残っていても
+    止める条件に入らないので言わない。
+    引き受け手 M は、ゲートと同じく計画の待ち方のコピーから引く `review_at`（`N.skipped` の
+    `deferred_to` ではない。書いたあとに改版で引き受け手が動けば、skipped は古くなる）。
     文には子の識別子を入れない（呼び手が前に付ける）。
     """
     if child.state != ticket_model.DOING or not child.is_child or child.phase is None:
@@ -682,7 +685,10 @@ def resumed_review(
                 "残っています。再開後の作業は、そのレビューに含まれていません。"
             )
             return lead + _erase_steps(root, conf, child, owner.number)
-        if not ph.review_required:
+        # `review_kind` は子の要求（`human_review`）を `review/` と `done/` の子からしか数えない。
+        # 再開された子は `doing/` なので、閉じ直したときに要る分（この子の要求）も足して見る。
+        # ここだけで足し、`review_kind` は変えない（ゲートと告知とボードの判定を動かさないため）。
+        if not (ph.review_required or child.review_required):
             return ""
         if approval_marks.MARK_REVIEWED not in ph.marks:
             return ""
@@ -719,9 +725,11 @@ def _erase_steps(
 def _marker_tree(root: str, conf: settings.Settings, child: ticket_model.Ticket) -> str:
     """マーカーを置くツリー（`approval.home_dir` が決める）を、ルートからの相対で言う。
 
+    `phases_of` がマーカーを読むときと同じ引数（project なし）で引く。
+
     置き場の設定が絶対パスなどで、ツリーのルートを引けないときは「マーカーがあるツリー」。
     """
-    where = approval.home_dir(conf, root, child.parent, "", project=child.project)
+    where = approval.home_dir(conf, root, child.parent, "")
     rel = (conf.approved or settings.DEFAULT_APPROVED).replace("/", os.sep)
     suffix = os.sep + rel
     if not where.endswith(suffix):
