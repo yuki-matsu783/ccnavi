@@ -27,6 +27,10 @@
 * `diagnose_explain`: `--explain` の本文
 * `diagnose_board`: ボードの中身（`--explain --json`）
 * `diagnose_shared`: explain・board・try が共有するレイヤーの読み出しとルールの書き方
+
+テストでの patch は実体のモジュール（`diagnose_try` など）に対して行う。
+ファサードの名前を差し替えても、モジュール内部の呼び出しには効かない。
+効くのは、呼び手が `diagnose.<名前>` を属性参照で引く場合だけ。
 """
 
 from __future__ import annotations

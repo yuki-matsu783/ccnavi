@@ -11,6 +11,11 @@
 
 分けた先のモジュールは `core` を読まない（読むと循環する。tests/core/test_module_layers.py）。
 `mock.patch.object(cli.core, "approve")` のように、呼び手が引く `core` の名前を差し替えられる。
+
+テストでの patch は実体のモジュール（`core_approve` など）に対して行う。
+ファサードの名前を差し替えても、モジュール内部の呼び出しには効かない。
+効くのは、呼び手が `core.<名前>` を属性参照で引く場合だけ
+（`cli` が `core.approve` を引くときなど）。
 """
 
 from __future__ import annotations
