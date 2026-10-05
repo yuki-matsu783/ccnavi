@@ -29,29 +29,11 @@ import unittest
 
 from ccnavi.entry import version
 from ccnavi.tickets import review_host
-from tests import ROOT, can_symlink, common_sh
+from tests import ROOT, can_pass_argument, can_symlink, common_sh
 from tests.sh import github_host, gitlab_host
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 NEEDED = all(shutil.which(tool) for tool in ("git", "jq"))
-
-
-def can_pass_argument(size: int) -> bool:
-    """sh から jq へ、`size` 字の引数を渡せるか。実際に渡して確かめる。
-
-    取ってきた状態は `jq --argjson` の引数で渡すので、1 引数の上限（Windows は約 32,000 字）を
-    超える場面は、上限のある環境では取れない。
-    """
-    if SHELL is None or not NEEDED:
-        return True
-    done = subprocess.run(
-        [SHELL, "-c", "a=$(cat); jq -n --arg a \"$a\" '$a|length'"],
-        input="x" * size,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return done.returncode == 0 and done.stdout.strip() == str(size)
 
 
 def argument_keeps_quote() -> bool:

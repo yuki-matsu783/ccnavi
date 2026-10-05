@@ -49,7 +49,7 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT, common_path, live_sh_pid, requires_symlink
+from tests import ROOT, can_pass_argument, common_path, live_sh_pid, requires_symlink
 from tests.ticket.test_phases import PHASES, child_text, parent_text
 from tests.ticket.test_ticket import RULES
 
@@ -1614,8 +1614,11 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
 
     def test_unresolved_threads_and_change_requests_stop_both_the_same(self):
         self.request()
-        said = {s: self.same_refusal(s)["problems"][0] for s in self.STOPPING}
-        self.assertIn("未解決のスレッドが 4 件", said["paged"])
+        # paged の取ってきた状態は約 50,000 字。1 引数の上限が小さい環境（Windows）では取れない。
+        scenes = [s for s in self.STOPPING if s != "paged" or can_pass_argument(60_000)]
+        said = {s: self.same_refusal(s)["problems"][0] for s in scenes}
+        if "paged" in said:
+            self.assertIn("未解決のスレッドが 4 件", said["paged"])
         for scene in ("changes-requested", "cr-commented", "pending"):
             self.assertIn("変更要求のレビューが立っている", said[scene], scene)
 

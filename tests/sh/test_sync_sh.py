@@ -760,7 +760,7 @@ class SyncTest(SyncHarness):
         started = time.monotonic()
         done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="3", CCNAVI_SYNC_RETRY_WAIT="30")
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        # 待てば 30 秒を超える。1 回の取り込みに時間のかかる機械（Windows）でも、待ちと見分けられる。
+        # 待てば 30 秒を超える。1 回の取り込みが遅い機械（Windows）でも、待ちと見分けられる。
         self.assertLess(time.monotonic() - started, 30)
         self.assertEqual("closed", fields(self.record)["state"])
 
