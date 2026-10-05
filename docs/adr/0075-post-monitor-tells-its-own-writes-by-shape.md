@@ -14,7 +14,7 @@ keywords: [実行後チェック, 副命令, 書き込み, チケット, 内容,
 実行後チェックは、保護領域をルールファイルの `deny` と `ask` から導く（ADR-0017）。監視の対象から
 外していたのは、記録と state の置き場（`CCNAVI_LOG`、`CCNAVI_STATE`）だけだった。
 
-承認済みチケットの置き場（`.ccnavi/approved/`）は、このリポジトリの共通層が
+承認済みチケットの置き場（`.ccnavi/approved/`）は、このリポジトリの共通レイヤーが
 `deny`（`guard-approved-tickets`）と宣言している。ワークスペースルートでは `main-tree` も
 同じ場所に当たる。この置き場へ書き込むのは、ユーザの承認だけではない。**`ccnavi-ticket.sh` の
 `start` / `done` / `cancel` と、`ccnavi-review.sh` の `request` / `check` / `ready` も書き込む。**

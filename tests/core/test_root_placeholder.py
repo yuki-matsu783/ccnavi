@@ -34,7 +34,7 @@ class RootPlaceholderTest(unittest.TestCase):
         self.dir = tempfile.TemporaryDirectory()
         self.root = os.path.realpath(self.dir.name)
         self.addCleanup(self.dir.cleanup)
-        # 共通層は既定の置き場へ。`--rules` は診断でだけ有効。
+        # 共通レイヤーは既定の置き場へ。`--rules` は診断でだけ有効。
         self.rules = write(
             common_path(self.root, "rules"),
             json.dumps(

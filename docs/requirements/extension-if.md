@@ -34,7 +34,7 @@ JSON の欄の細かい形は README の各 JSON の節と [設計 10](../design
 | REQ-EXT-08 | 常時 | ccnavi は、使い方の誤りと読めない設定を、`ccnavi:` で始まる標準エラーの文と終了コード 1 で示すこと。終了コード 2 は hook の拒否と前の名前（`--approve`）の案内に、3 は確かめの「いいえ」（REQ-APV-13）に使い、1 と分けること |
 | REQ-EXT-09 | 常時 | ccnavi は、診断ログをワークスペースルートの `logs/diag/<出どころ>.log` に、sh・Python・拡張（TS）で同じ行の形（`<時刻> <レベル 5 字> <出どころ>[<pid>] <本文> <key=value>…`）で書くこと。出すレベルは `CCNAVI_LOG_LEVEL`（読めない値は `INFO`）で決め、新しいファイルは 0600 で作り、`logs`・`logs/diag`・書き込み先がシンボリックリンクなら書かないこと。片付け（`--prune` とセッションの開始）は、拡張が書いたものを含めて `logs/diag/*.log` を同じしきい値でローテートし、消すこと |
 | REQ-EXT-10 | 常時 | ccnavi は、時刻を次の形で書くこと。マーカーと記録の時刻は現地時刻とオフセット（`YYYY-MM-DDThh:mm:ss+hhmm`。`fsio.stamp`）、状態の履歴の `at` は UTC（`YYYY-MM-DDThh:mm:ssZ`）、診断ログは現地時刻とコロン付きのオフセット（`+hh:mm`）。時刻を固定する `fsio.clock` は `fsio.stamp` の形でない値を受けないこと |
-| REQ-EXT-11 | 常時 | ccnavi は、置き場（提案 `wip/proposals/`、承認済みチケット `.ccnavi/approved/`、共通層 `.ccnavi/common/`、記録と state `logs/`、プロジェクト `projects/`、自身の層とプロジェクトの層 `.ccnavi/config/`）を既定のパスに固定し、環境変数でも上書き設定ファイルでも動かさないこと。別の場所を指せるのは診断のフラグだけとすること |
+| REQ-EXT-11 | 常時 | ccnavi は、置き場（提案 `wip/proposals/`、承認済みチケット `.ccnavi/approved/`、共通レイヤー `.ccnavi/common/`、記録と state `logs/`、プロジェクト `projects/`、自身のレイヤーとプロジェクトのレイヤー `.ccnavi/config/`）を既定のパスに固定し、環境変数でも上書き設定ファイルでも動かさないこと。別の場所を指せるのは診断のフラグだけとすること |
 
 REQ-EXT-01 の探す順（拡張の設定 → `CCNAVI_BIN_PATH` → `dist/ccnavi/ccnavi` → 振り分けの sh → ソースなら `uv run python -m ccnavi`）は
 VS Code 拡張が決める。ccnavi が約束するのは置き場と名前と `<os>-<arch>` の語で、語は `src/ccnavi/infra/platformtag.py`・
@@ -66,9 +66,9 @@ sh は `<ワークスペースルート>/.ccnavi/scripts/` のものを絶対パ
 | REQ-EXT-19 | 事象 | `ccnavi c1 family <親>` を求められたとき、ccnavi は、何も書かずに、1 行目に `c1 1`、続けて `<鍵> <値>` の行（`target yes`・`target no`・`target stop` を含む）を返して 0 で終わること。識別子の形でない値には 1 で終わること |
 | REQ-EXT-20 | 事象 | `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-push-approved.sh [<親>...]` をユーザが打ったとき、ccnavi は、承認済みチケットの置き場の変更をコミットし、保護されたブランチでなければ push すること。親を並べたときは、その親子のチケットのうち取り込み済みのものだけを送ること（REQ-APV-10） |
 | REQ-EXT-21 | 状態 | フェーズをレビューで止めている間も、ccnavi は、親のワークツリーで単体で打った `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-review.sh confirm --phase <N>` を通すこと。sh のパスは realpath で解いたワークスペースルートから `/` 区切りで書き、空白やシェルの記号を含むときだけ引用する形（`settings.script_command`）を通すこと |
-| REQ-EXT-22 | 常時 | ccnavi は、VS Code 拡張が直接読み書きするファイルを次の場所に置くこと。提案はワークスペース・プロジェクト・ワークツリーの `wip/proposals/`、承認済みチケットとマーカーは同じツリーの `.ccnavi/approved/`、閉じたチケットの退避は `logs/archive/`、共通層は `.ccnavi/common/` の `rules.yml`・`risks.yml`・`phases.yml`・`rule-samples.yml`。自身の層とプロジェクトの層のパスは `--explain --json` の `layers[]` で示すこと |
+| REQ-EXT-22 | 常時 | ccnavi は、VS Code 拡張が直接読み書きするファイルを次の場所に置くこと。提案はワークスペース・プロジェクト・ワークツリーの `wip/proposals/`、承認済みチケットとマーカーは同じツリーの `.ccnavi/approved/`、閉じたチケットの退避は `logs/archive/`、共通レイヤーは `.ccnavi/common/` の `rules.yml`・`risks.yml`・`phases.yml`・`rule-samples.yml`。自身のレイヤーとプロジェクトのレイヤーのパスは `--explain --json` の `layers[]` で示すこと |
 | REQ-EXT-23 | 常時 | ccnavi は、チケット制御の宣言 `CCNAVI_TICKET_CONTROL`（`.claude/settings.json` か `.claude/settings.local.json` の env に書き、Claude Code がプロセスに渡すもの）を `enable` と `disable` の 2 値で読み、読めない値は `enable` として扱うこと。`--explain --json` の `settings.ticket_control` には、解決した値を必ず `enable` か `disable` で載せること（REQ-DIA-07） |
-| REQ-EXT-24 | 常時 | ccnavi は、層のファイル（`rules.yml`・`risks.yml`・`phases.yml`）を YAML 1.1（PyYAML の safe な読み手）で読み、頭の `version:` が読める書式の版（`--version --json` の `formats`）でなければ error にすること。拡張が書いたファイルも、hook と同じ読み手で読むこと |
+| REQ-EXT-24 | 常時 | ccnavi は、レイヤーのファイル（`rules.yml`・`risks.yml`・`phases.yml`）を YAML 1.1（PyYAML の safe な読み手）で読み、頭の `version:` が読める書式の版（`--version --json` の `formats`）でなければ error にすること。拡張が書いたファイルも、hook と同じ読み手で読むこと |
 | REQ-EXT-25 | 常時 | ccnavi は、子のフローを本物とする側のツリーの `.ccnavi/approved/flows/<子>.yml`（YAML、256 KiB まで）から読み、ファイルかツリーのルートからそこまでの途中がシンボリックリンクなら読まないこと。下書き `wip/proposals/flows/<子>.yml` には効力を持たせないこと。`ccnavi-push-approved.sh` は `flows/` の下の `.*.tmp` をコミットしないこと |
 
 JSON の欄の形は README の「[ボードの JSON](../../README.md#ボードの-json)」「[承認の JSON](../../README.md#承認の-json)」

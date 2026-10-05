@@ -115,6 +115,6 @@ ccnavi は Claude Code の hook から呼ばれ、危ないツール呼び出し
 | 8 | [design/self-guard.md](design/self-guard.md) | ルールの外で守るコアファイル、止める側と戻す側 |
 | 9 | [design/tickets.md](design/tickets.md) | チケット制御を使うかどうかと、置き場・提案・承認・状態遷移・フェーズ・レビューなどの各節 |
 | 10 | [design/diagnostics.md](design/diagnostics.md) | 診断のオプションと機械可読な出力 |
-| 11 | [design/multi-repo.md](design/multi-repo.md) | ワークスペースとプロジェクトの層、置き場・ツリー・ルールの合成・守るもの・共通層の配布などの各節 |
+| 11 | [design/multi-repo.md](design/multi-repo.md) | ワークスペースとプロジェクトのレイヤー、置き場・ツリー・ルールの合成・守るもの・共通レイヤーの配布などの各節 |
 | 12 | [design/limits.md](design/limits.md) | 保証しないこと、許容する誤検知、未実装、最終防衛線 |
 | 付録 A〜C | [design/appendix.md](design/appendix.md) | 理由コード、記録の 1 行、実測で確かめた前提 |

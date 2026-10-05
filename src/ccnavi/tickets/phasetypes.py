@@ -118,8 +118,8 @@ class PhaseType:
     after: list[str] = field(default_factory=list)
     agent: str = ""
     when: str = ""
-    # source はこの種類が書いてある層の名前（`common` / `self` / プロジェクト名）。
-    # id は裸のままで、層は記録と `--explain` の欄に出す（設計 11.4.1）。
+    # source はこの種類が書いてあるレイヤーの名前（`common` / `self` / プロジェクト名）。
+    # id は裸のままで、レイヤーは記録と `--explain` の欄に出す（設計 11.4.1）。
     source: str = ""
 
     @property
@@ -127,9 +127,9 @@ class PhaseType:
         return self.scope is None
 
     def key(self) -> tuple:
-        """層をまたいで「同じ定義か」を比べるための全欄。`source` は含めない。
+        """レイヤーをまたいで「同じ定義か」を比べるための全欄。`source` は含めない。
 
-        含めると、中身は同じで出どころの層だけが違う定義が衝突扱いになる。比べたいのは
+        含めると、中身は同じで出どころのレイヤーだけが違う定義が衝突扱いになる。比べたいのは
         中身で、置いてある場所ではない。
         """
         return (
@@ -163,8 +163,8 @@ class PhaseType:
 def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]]:
     """種類を読む。ファイルが無ければ None（種類を使わない）。壊れていれば None と苦情。
 
-    `refs` を False にすると `overlap` / `requires` / `after` が指す先の確認を飛ばす。層の
-    ファイルを単独で読むときに使う。層は共通層の種類を指してよく（設計 11.4.1）、
+    `refs` を False にすると `overlap` / `requires` / `after` が指す先の確認を飛ばす。レイヤーの
+    ファイルを単独で読むときに使う。レイヤーは共通レイヤーの種類を指してよく（設計 11.4.1）、
     その相手はファイルの中に無いので、1 本だけで確かめると必ず落ちる。確かめる
     のは合成したあと（`merge`）。
     """
@@ -215,14 +215,14 @@ def parse(
     for key, body in raw.items():
         ident = str(key).strip()
         if rules.ID_SEPARATOR in ident:
-            # 層の名前をつけた形（`lib:build`）と見分けが付かない。共通層に書けば
+            # レイヤーの名前をつけた形（`lib:build`）と見分けが付かない。共通レイヤーに書けば
             # lib の定義に見え、記録を読んだユーザがどのファイルを直すのか決められない。
             problems.append(
                 Problem(
                     SEVERITY_ERROR,
                     ident,
                     f"識別子に `{rules.ID_SEPARATOR}` は書けない。"
-                    f"層の名前を添えた形（`self{rules.ID_SEPARATOR}id` / "
+                    f"レイヤーの名前を添えた形（`self{rules.ID_SEPARATOR}id` / "
                     f"`<プロジェクト名>{rules.ID_SEPARATOR}id`）と見分けが付かない",
                 )
             )
@@ -262,7 +262,7 @@ def reference_problems(checked, pool: dict[str, PhaseType]) -> list[Problem]:
 
     `after` の先は `kind: work` の種類でなければならない。
 
-    見るのは `checked` の側だけで、あってよい先は `pool` 全部。層の種類が共通層の
+    見るのは `checked` の側だけで、あってよい先は `pool` 全部。レイヤーの種類が共通レイヤーの
     種類を指す形（設計 11.4.1）は、合成した集合を `pool` に渡せばそのまま通る。
     """
     problems: list[Problem] = []
@@ -348,13 +348,14 @@ def cycle_problems(pool: dict[str, PhaseType]) -> list[Problem]:
 
 
 def mark_source(types: dict[str, PhaseType] | None, layer: str) -> None:
-    """この集合の種類に、どの層から来たかを持たせる。記録の `source` になる。"""
+    """この集合の種類に、どのレイヤーから来たかを持たせる。記録の `source` になる。"""
     for pt in (types or {}).values():
         pt.source = layer
 
 
 def merged_order(*layers: PhaseTypes | None) -> str:
-    """層を合わせた `order`。ファイルを持つ層が全部 `dag` と書いたときだけ `dag`（設計 9.7）。"""
+    """レイヤーを合わせた `order`。
+    ファイルを持つレイヤーが全部 `dag` と書いたときだけ `dag`（設計 9.7）。"""
     present = [t.order for t in layers if t is not None]
     if present and all(o == ORDER_DAG for o in present):
         return ORDER_DAG
@@ -364,20 +365,21 @@ def merged_order(*layers: PhaseTypes | None) -> str:
 def merge(
     common: PhaseTypes | None, extra: PhaseTypes | None, layer: str
 ) -> tuple[PhaseTypes, list[Problem]]:
-    """共通層の種類に、行き先の層の種類を id ごとに足す（設計 11.4.1）。
+    """共通レイヤーの種類に、行き先のレイヤーの種類を id ごとに足す（設計 11.4.1）。
 
-    足すだけで、後ろの層が前の層を上書きすることはない。同 `id` で全欄が一致する
+    足すだけで、後ろのレイヤーが前のレイヤーを上書きすることはない。同 `id` で全欄が一致する
     ものは重複とみなして後ろを捨て（info）、中身が違えば error。`title` の重なりも
-    層をまたいで error（ユーザは表示名で見るので、承認画面で見分けられない）。
+    レイヤーをまたいで error（ユーザは表示名で見るので、承認画面で見分けられない）。
 
-    error があるとき、その層は空として扱い、共通層の種類だけを返す。衝突した片方を
+    error があるとき、そのレイヤーは空として扱い、共通レイヤーの種類だけを返す。衝突した片方を
     何も言わずに採ると、どちらの `review:` が使われているかをユーザが読めない。止まる側を採る。
 
-    `overlap` / `requires` / `after` が指す先は合成後の集合で確かめる。層から共通層の種類を
-    指すのは正しい形なので、層 1 本の中では確かめられない。
+    `overlap` / `requires` / `after` が指す先は合成後の集合で確かめる。
+    レイヤーから共通レイヤーの種類を
+    指すのは正しい形なので、レイヤー 1 本の中では確かめられない。
 
-    `order` は、ファイルを持つ層が全部 `dag` と書いたときだけ `dag`（`merged_order`）。
-    食い違いは warn。プロジェクトの層 1 本で緩む側へ切り替えられないようにする。
+    `order` は、ファイルを持つレイヤーが全部 `dag` と書いたときだけ `dag`（`merged_order`）。
+    食い違いは warn。プロジェクトのレイヤー 1 本で緩む側へ切り替えられないようにする。
     """
     order = merged_order(common, extra)
     base = PhaseTypes(common or {}, order=order)
@@ -393,8 +395,8 @@ def merge(
                     Problem(
                         SEVERITY_INFO,
                         ident,
-                        f"`{ident}` は前の層と全欄が同じなので、{layer} の側を捨てた。"
-                        "判定は前の層の 1 本で行う",
+                        f"`{ident}` は前のレイヤーと全欄が同じなので、{layer} の側を捨てた。"
+                        "判定は前のレイヤーの 1 本で行う",
                     )
                 )
             else:
@@ -402,8 +404,9 @@ def merge(
                     Problem(
                         SEVERITY_ERROR,
                         ident,
-                        f"`{ident}` は前の層（{prior.source or 'common'}）と同じ id で中身が違う。"
-                        f"{layer} の層は空として扱う。どちらの `review:` が効いているかを"
+                        f"`{ident}` は前のレイヤー（{prior.source or 'common'}）"
+                        "と同じ id で中身が違う。"
+                        f"{layer} のレイヤーは空として扱う。どちらの `review:` が効いているかを"
                         "ユーザが読み取れないので、断りなく片方を採ることはしない",
                     )
                 )
@@ -414,7 +417,7 @@ def merge(
                     SEVERITY_ERROR,
                     ident,
                     f"表示名 `{pt.title}` が `{titles[pt.title]}` と重なる。"
-                    f"{layer} の層は空として扱う",
+                    f"{layer} のレイヤーは空として扱う",
                 )
             )
             continue
@@ -425,7 +428,8 @@ def merge(
             Problem(
                 SEVERITY_WARN,
                 "(phases)",
-                f"`order` が層で食い違う（共通層 {common.order}、{layer} {extra.order}）。"
+                f"`order` がレイヤーで食い違う（共通レイヤー {common.order}、"
+                f"{layer} {extra.order}）。"
                 f"`{ORDER_SEQUENTIAL}` で待たせる",
             )
         )
@@ -572,15 +576,15 @@ def scope_problems(child: ticket_mod.Ticket, pt: PhaseType) -> list[Problem]:
     return problems
 
 
-# ---- 層ごとの種類の読み込み（設計 11.4）
+# ---- レイヤーごとの種類の読み込み（設計 11.4）
 
 
 def types_path(conf: settings.Settings, root: str, project: str) -> str:
-    """そのプロジェクトの層の phases.yml。空の `project` はワークスペース自身の層。
+    """そのプロジェクトのレイヤーの phases.yml。空の `project` はワークスペース自身のレイヤー。
 
-    予約名（`common` / `self`）のプロジェクトは層として数えないので、パスを持たない
-    （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
-    名前と一致し、そのプロジェクトの phases がワークスペースの層として合成される。
+    予約名（`common` / `self`）のプロジェクトはレイヤーとして数えないので、パスを持たない
+    （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身のレイヤーの
+    名前と一致し、そのプロジェクトの phases がワークスペースのレイヤーとして合成される。
     """
     if settings.is_reserved_layer_name(project):
         return ""
@@ -593,7 +597,7 @@ def types_path(conf: settings.Settings, root: str, project: str) -> str:
 def common_types(
     conf: settings.Settings,
 ) -> tuple[dict[str, PhaseType] | None, list[rules.Problem]]:
-    """共通層の種類。ファイルが無いか壊れていれば None（番号だけの挙動）。"""
+    """共通レイヤーの種類。ファイルが無いか壊れていれば None（番号だけの挙動）。"""
     if not conf.phases:
         return None, []
     types, notes = load(conf.phases)
@@ -604,18 +608,19 @@ def common_types(
 def layer_types(
     conf: settings.Settings, root: str, project: str = ""
 ) -> tuple[dict[str, PhaseType] | None, list[rules.Problem]]:
-    """共通層 + その層の種類と、**その層の**苦情（設計 11.4.1）。
+    """共通レイヤー + そのレイヤーの種類と、**そのレイヤーの**苦情（設計 11.4.1）。
 
-    どの層を足すかは親の承認済みチケットの `project:` が決める。空ならワークスペース自身の層。
-    共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
-    言うと、層の話を読みに来たユーザが同じ文を 2 度読むことになる。
+    どのレイヤーを足すかは親の承認済みチケットの `project:` が決める。
+    空ならワークスペース自身のレイヤー。
+    共通レイヤー自身の苦情は返さない。言う場所は `--lint` の共通レイヤーの項で、そこと二重に
+    言うと、レイヤーの話を読みに来たユーザが同じ文を 2 度読むことになる。
 
-    無い層は空（苦情なし）。壊れた層も空として扱うが、そちらは error を返す。
-    組み込みには戻さない。共通層が在るのに戻すと、共通層の種類が消える。
+    無いレイヤーは空（苦情なし）。壊れたレイヤーも空として扱うが、そちらは error を返す。
+    組み込みには戻さない。共通レイヤーが在るのに戻すと、共通レイヤーの種類が消える。
     """
     common, notes = common_types(conf)
     if common is None and notes:
-        # 共通層が壊れている。層は足さない（設計 11.2）。
+        # 共通レイヤーが壊れている。レイヤーは足さない（設計 11.2）。
         return None, []
     path = types_path(conf, root, project)
     if not path or not os.path.exists(path):
@@ -630,6 +635,6 @@ def layer_types(
 def load_types(
     conf: settings.Settings, root: str = "", project: str = ""
 ) -> dict[str, PhaseType] | None:
-    """判定が使うフェーズの種類。どの層にも無ければ None（番号だけの挙動）。"""
+    """判定が使うフェーズの種類。どのレイヤーにも無ければ None（番号だけの挙動）。"""
     types, _ = layer_types(conf, root, project)
     return types

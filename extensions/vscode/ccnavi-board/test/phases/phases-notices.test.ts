@@ -17,15 +17,15 @@ function notices(f: PhasesForm, layer = false): readonly string[] {
   return graphNotices(graphOf(f), f, layer);
 }
 
-test("CB-T212 注意は当てはまるときだけ。sequential の after は、線にならない（ほかの層を指す）ものでも言う", () => {
+test("CB-T212 注意は当てはまるときだけ。sequential の after は、線にならない（ほかのレイヤーを指す）ものでも言う", () => {
   assert.deepEqual(notices({ order: "dag", phases: [phase("a"), phase("b", { after: ["a"] })] }), []);
   // 行き先がこのファイルに無い after だけでも、sequential では判定に使われないと言う
-  const seq = notices({ order: "sequential", phases: [phase("a", { after: ["外の層の種類"] })] }, true);
+  const seq = notices({ order: "sequential", phases: [phase("a", { after: ["外のレイヤーの種類"] })] }, true);
   assert.ok(seq.some((line) => /sequential なので、after は判定に使われません/.test(line)));
   assert.ok(seq.some((line) => /共通の設定の種類を指しているならそのままで構いません/.test(line)));
 });
 
-test("CB-T213 層の画面で dag を選んでいたら、ほかの層が sequential なら効かないと言う。共通層では言わない", () => {
+test("CB-T213 レイヤーの画面で dag を選んでいたら、ほかのレイヤーが sequential なら効かないと言う。共通レイヤーでは言わない", () => {
   const f: PhasesForm = { order: "dag", phases: [phase("a"), phase("b", { after: ["a"] })] };
   assert.ok(notices(f, true).some((line) => /共通の設定が sequential なら、合わせたときの判定は sequential で待ちます/.test(line)));
   assert.ok(!notices(f, false).some((line) => /共通の設定/.test(line)));

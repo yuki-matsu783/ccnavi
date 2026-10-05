@@ -344,7 +344,9 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(json.loads(read(one)), {"env": {"A": "1"}})
         self.assertEqual(json.loads(read(two)), {"env": {"B": "2"}})
 
-    def test_プロジェクトの層は自分のgitから戻しワークツリー側の向きも元リポジトリで決まる(self):
+    def test_プロジェクトのレイヤーは自分のgitから戻しワークツリー側の向きも元リポジトリで決まる(
+        self,
+    ):
         # プロジェクトは自分の git を持つ。戻す先を聞く相手はワークスペースの git では
         # なくそのプロジェクトで、ワークツリー側の設定が入るのもそのプロジェクトから切った
         # ワークツリーのほう。ワークスペースから切った w1 の中に `projects/lib/...` のパスは無い。
@@ -382,7 +384,7 @@ class SelfGuardTest(unittest.TestCase):
         """ワークツリー w1 の中のワークツリー側の設定のパス。root からの相対で、並ぶ順のまま。
 
         ワークスペースから切ったツリーには、ワークスペースが追跡しているもの
-        だけが入る。設定ファイル 2 つは必ず入り、残りは渡した層のうち root の
+        だけが入る。設定ファイル 2 つは必ず入り、残りは渡したレイヤーのうち root の
         下に在るぶん。無いファイルもそのまま並ぶ（在るかどうかはバックアップの側が見る）。
         """
         head = (".claude", "worktrees", "w1")

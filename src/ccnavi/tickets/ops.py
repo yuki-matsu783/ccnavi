@@ -130,23 +130,23 @@ def _sync_config(
     found: ticket_mod.Ticket,
     worktree: str,
 ) -> list[str] | None:
-    """親の着手の前に、共通層でプロジェクトの層を上書きする（設計 11.12）。
+    """親の着手の前に、共通レイヤーでプロジェクトのレイヤーを上書きする（設計 11.12）。
 
     返すのは着手の出力に足す行。コピーできなければ None（着手しない）。子は親のブランチに
-    乗るので比べない。ワークスペース自身の作業は、共通層と同じリポジトリにあるので比べない。
+    乗るので比べない。ワークスペース自身の作業は、共通レイヤーと同じリポジトリにあるので比べない。
     """
     if found.is_child or not found.project:
         return []
     copied, why = configsync.plan(conf, root, worktree)
     if why:
-        stderr.write(f"ccnavi: {found.ticket} の設定を共通層からコピーできない: {why}\n")
+        stderr.write(f"ccnavi: {found.ticket} の設定を共通レイヤーからコピーできない: {why}\n")
         return None
     if not copied:
         return []
     busy, why = configsync.dirty(worktree, copied)
     if why or busy:
         stderr.write(
-            f"ccnavi: {found.ticket} の設定を共通層からコピーできない: "
+            f"ccnavi: {found.ticket} の設定を共通レイヤーからコピーできない: "
             + (
                 why
                 or f"未コミットの変更がある（{', '.join(busy)}）。"
@@ -158,11 +158,12 @@ def _sync_config(
     where = approval.home_dir(conf, root, found.ticket, "", project=found.project)
     failed = configsync.apply(where, found.ticket, copied)
     if failed:
-        stderr.write(f"ccnavi: {found.ticket} の設定を共通層からコピーできない: {failed}\n")
+        stderr.write(f"ccnavi: {found.ticket} の設定を共通レイヤーからコピーできない: {failed}\n")
         return None
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     lines = [
-        f"共通層とプロジェクト {found.project} の設定が違っていたので、共通層で上書きした。"
+        f"共通レイヤーとプロジェクト {found.project} の設定が違っていたので、"
+        "共通レイヤーで上書きした。"
         "最初のレビューで知らせる（レビューが無ければ、親を閉じる前にユーザが端末で見る）:"
     ]
     for c in copied:
@@ -372,7 +373,7 @@ def record_risk(
         "reason": reason.strip(),
         "head": head,
         "at": approval_marks.now(),
-        # その項目がどの層に書いてあるか（設計 11.9）。
+        # その項目がどのレイヤーに書いてあるか（設計 11.9）。
         "source": factor.source,
     }
     failed = approval_marks.write_child_record(
@@ -389,7 +390,7 @@ def record_risk(
 
 
 def _project_of(conf: settings.Settings, root: str, found: ticket_mod.Ticket) -> str:
-    """このチケットの層を決める `project:`（設計 11.4.1、11.4.2）。
+    """このチケットのレイヤーを決める `project:`（設計 11.4.1、11.4.2）。
 
     本物とするのは承認済みチケットの側。子は親から継ぐので、親の承認済みチケットを引く。提案の側に
     書いてある値はユーザが承認していないので、判定の根拠にしない。
@@ -467,7 +468,7 @@ def _score_child(
     record.update({"head": diff.head, "base": diff.base, "at": approval_marks.now()})
     record["summary"] = diff.summary()
     if definition.dropped:
-        # 空として扱った層の名前を残す（設計 11.2）。共通層だけで測ったことが、
+        # 空として扱ったレイヤーの名前を残す（設計 11.2）。共通レイヤーだけで測ったことが、
         # あとから記録を読んだユーザに分かる。
         record["fallback"] = ",".join(definition.dropped)
     failed = approval_marks.write_child_record(
@@ -727,13 +728,14 @@ def close_problems(
             f"{parent_id} には開いている子がある（{', '.join(open_children)}）。"
             "子を先に閉じてください"
         ]
-    # 着手で共通層をコピーした親は、それをユーザに知らせるまで閉じず、
+    # 着手で共通レイヤーをコピーした親は、それをユーザに知らせるまで閉じず、
     # Draft も外させない（設計 11.12）。知らせるのは最初のレビュー。レビューの無い親（計画が無い、
     # 全部 `review: none`、早めに閉じた）はそこを通らないので、ユーザが端末で見たことを残させる。
     # 早めに閉じた親でも問うので、この下の早い return より前に置く。
     if configsync.pending(approval.home_dir(conf, root, parent_id, ""), parent_id):
         return [
-            f"{parent_id} は着手のときに共通層で設定を上書きしたが、まだユーザに知らせていない"
+            f"{parent_id} は着手のときに共通レイヤーで設定を上書きしたが、"
+            "まだユーザに知らせていない"
             "（レビューを通っていない）。閉じる前に、ユーザに端末で "
             f"'{settings.script_command(root, 'ccnavi-review.sh')} config-synced {parent_id}' を"
             "打って見てもらってください"

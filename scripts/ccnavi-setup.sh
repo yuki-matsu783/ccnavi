@@ -99,9 +99,9 @@ DEPLOY_BIN_DIR="dist/ccnavi"
 # dist/ccnavi/ の外にあるので、copy_tree が配布先へコピーすることはない。
 DEPLOY_TARGET_FILE="dist/ccnavi.target"
 DEPLOY_RULES=".ccnavi/common/rules.yml"
-# 設定 3 本のひな形。rules と risk は汎用なので共通層（.ccnavi/common/）へ配る。
-# phases はワークスペースのレイアウト（scope のパス）に依存するので、自身の層
-# （.ccnavi/config/）へ配る。共通層に phases を置くと、その scope が
+# 設定 3 本のひな形。rules と risk は汎用なので共通レイヤー（.ccnavi/common/）へ配る。
+# phases はワークスペースのレイアウト（scope のパス）に依存するので、自身のレイヤー
+# （.ccnavi/config/）へ配る。共通レイヤーに phases を置くと、その scope が
 # projects/ の下のプロジェクトにも適用されてしまう（設計 11.2）。
 DEPLOY_RISK=".ccnavi/common/risks.yml"
 DEPLOY_PHASES=".ccnavi/config/phases.yml"
@@ -628,7 +628,7 @@ shape=$(printf '%s' "$current" | jq -r '
 # 書き込めてしまう。
 #
 # 置き場（記録・控え・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）の env は
-# 書かない。置き場は既定に固定で、env では動かないので、書いても読まれない（共通層の
+# 書かない。置き場は既定に固定で、env では動かないので、書いても読まれない（共通レイヤーの
 # 3 本も同じ）。読まれない語を設定項目の一覧に混ぜると、そこを直せば置き場が
 # 動くと読める。`--all` はその 4 つ（CCNAVI_STATE・CCNAVI_TICKETS_PROPOSAL・
 # CCNAVI_TICKETS_APPROVED・CCNAVI_PROJECT_HOME）を足すためのものだったので、今は足すものが無い。

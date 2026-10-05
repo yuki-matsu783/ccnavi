@@ -18,7 +18,7 @@ if SRC not in _sys.path:
 
 from ccnavi.infra import settings as _settings  # noqa: E402
 
-# 共通層の 3 本の既定のパス。ハーネスはここへ設定を置き、`--rules` / `--phases` /
+# 共通レイヤーの 3 本の既定のパス。ハーネスはここへ設定を置き、`--rules` / `--phases` /
 # `--risk` は渡さない。3 つは診断（`--lint` / `--test` / `--explain`）でだけ有効なので、
 # hook の判定とチケット・レビューの副命令には届かない。
 #
@@ -86,20 +86,20 @@ _FIXTURE_WORKSPACES: dict[str, str] = {}
 
 
 def common_relpath(kind: str) -> str:
-    """共通層のファイル（rules / phases / risk）の、ワークスペースルートからの相対パス。"""
+    """共通レイヤーのファイル（rules / phases / risk）の、ワークスペースルートからの相対パス。"""
     return _COMMON_FILES[kind]
 
 
 def common_path(root: str, kind: str) -> str:
-    """そのワークスペースルートの共通層のファイル（rules / phases / risk）のパス。"""
+    """そのワークスペースルートの共通レイヤーのファイル（rules / phases / risk）のパス。"""
     return os.path.join(root, common_relpath(kind))
 
 
 def fixture_workspace(name: str = "rules.yml") -> str:
-    """`tests/fixtures/<name>` を共通層のルールに据えたワークスペースルート。
+    """`tests/fixtures/<name>` を共通レイヤーのルールに据えたワークスペースルート。
 
     `--rules` は診断でだけ有効なので、見本のルールを指すのには使わない。
-    `--root` にここを渡して、共通層の既定の置き場から読ませる。
+    `--root` にここを渡して、共通レイヤーの既定の置き場から読ませる。
 
     リポジトリ自身をルートにしないので、走った機械の `.ccnavi/common/rules.yml` が
     判定に入り込まない。

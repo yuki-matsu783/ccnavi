@@ -21,5 +21,5 @@ Chrome 拡張「ccnavi 承認ボード」が何をするかを書く。承認者
 | レビュー済み。依頼済みのフェーズをレビュー済みにするときのふるまい | [requirements/reviewed.md](requirements/reviewed.md) |
 | PAT の期限。PAT の期限の読み方と知らせ方 | [requirements/pat.md](requirements/pat.md) |
 | GitLab。GitLab での読み書きと、書き込みがぶつかったときのふるまい | [requirements/gitlab.md](requirements/gitlab.md) |
-| プロジェクトのリポジトリ。プロジェクトのリポジトリの登録と、層・置き場の読み方 | [requirements/projects.md](requirements/projects.md) |
+| プロジェクトのリポジトリ。プロジェクトのリポジトリの登録と、レイヤー・置き場の読み方 | [requirements/projects.md](requirements/projects.md) |
 | issue から始める。「始める」で issue から親のブランチを作るときのふるまい | [requirements/start.md](requirements/start.md) |
