@@ -99,9 +99,9 @@ DEPLOY_BIN_DIR="dist/ccnavi"
 # dist/ccnavi/ の外にあるので、copy_tree が配布先へコピーすることはない。
 DEPLOY_TARGET_FILE="dist/ccnavi.target"
 DEPLOY_RULES=".ccnavi/common/rules.yml"
-# 設定 3 本のひな形。rules と risk は汎用なので共通層（.ccnavi/common/）へ配る。
-# phases はワークスペースのレイアウト（scope のパス）に依存するので、自身の層
-# （.ccnavi/config/）へ配る。共通層に phases を置くと、その scope が
+# 設定 3 本のひな形。rules と risk は汎用なので共通レイヤー（.ccnavi/common/）へ配る。
+# phases はワークスペースのレイアウト（scope のパス）に依存するので、自身のレイヤー
+# （.ccnavi/config/）へ配る。共通レイヤーに phases を置くと、その scope が
 # projects/ の下のプロジェクトにも適用されてしまう（設計 11.2）。
 DEPLOY_RISK=".ccnavi/common/risks.yml"
 DEPLOY_PHASES=".ccnavi/config/phases.yml"
@@ -121,10 +121,11 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # node_modules などが残ると worktree remove が途中で止まる。js が本体で、sh は node を探して js を渡す。
 # ccnavi-branches.sh は issue・MR に紐づくブランチを探す sh。UserPromptSubmit の hook が依頼文の
 # issue・MR の指定を見つけるとこの表記を案内するので、配らないと案内どおりに実行しても動かない。
+# ccnavi-start.sh は issue・MR の指定を受けた着手の入口で、hook がこの表記を案内する。中で ccnavi-branches.sh を呼ぶ。
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # git で追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順番も最後にする。途中で失敗したときに、
 # hook が起動する sh だけがあって、代わりに通る sh が無い状態を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-c1.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-agree.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-c1.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-agree.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-start.sh ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 
 mode="$DEFAULT_MODE"
@@ -628,7 +629,7 @@ shape=$(printf '%s' "$current" | jq -r '
 # 書き込めてしまう。
 #
 # 置き場（記録・控え・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）の env は
-# 書かない。置き場は既定に固定で、env では動かないので、書いても読まれない（共通層の
+# 書かない。置き場は既定に固定で、env では動かないので、書いても読まれない（共通レイヤーの
 # 3 本も同じ）。読まれない語を設定項目の一覧に混ぜると、そこを直せば置き場が
 # 動くと読める。`--all` はその 4 つ（CCNAVI_STATE・CCNAVI_TICKETS_PROPOSAL・
 # CCNAVI_TICKETS_APPROVED・CCNAVI_PROJECT_HOME）を足すためのものだったので、今は足すものが無い。

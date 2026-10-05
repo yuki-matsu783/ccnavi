@@ -110,7 +110,7 @@ def prepare(
     # 計画があれば、このレビューが含むフェーズを機械が先頭に書く。延期した分を
     # ユーザが読み落とさないように。
     body = _covered_header(root, conf, parent, ph) + body
-    # 着手のときに共通層でプロジェクトの設定を上書きしていれば、最初の依頼の頭に載せる
+    # 着手のときに共通レイヤーでプロジェクトの設定を上書きしていれば、最初の依頼の頭に載せる
     # （設計 11.12）。知らせたことは、投稿が済んでから `requested` が上書きの記録に残す。
     home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     synced = configsync.pending(home, parent.ticket)
@@ -341,7 +341,7 @@ def review_problems(
     if not unresolved:
         return []
     lines = [f"ccnavi: 未解決のスレッドが {len(unresolved)} 件残っている"]
-    lines += [f"  - {t.url} {t.path}:{t.line} {_first_line(t.body)}" for t in unresolved]
+    lines += [f"  - {thread_label(t)}" for t in unresolved]
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     if _is_last_feedback_review(parent, phase_no):
         # フィードバック対応の最後のレビュー。新しいフィードバック作業フェーズは
@@ -931,3 +931,15 @@ def _git(cwd: str, args: list[str]) -> tuple[int, str]:
 def _first_line(body: str) -> str:
     line = body.strip().splitlines()[0] if body.strip() else ""
     return line[:120]
+
+
+def thread_label(t: review_host.Thread) -> str:
+    """一覧に出す 1 スレッドの表示。`<url> <ファイル>:<行> <最初の行>`。
+
+    位置の無いスレッド（PR 全体へのコメントなど）は path が空で line が 0。そのときは
+    ` :0 ` と出さず、位置を省く。行だけ無いときはファイル名だけを出す。
+    """
+    where = ""
+    if t.path:
+        where = f"{t.path}:{t.line}" if t.line else t.path
+    return " ".join(part for part in (t.url, where, _first_line(t.body)) if part)

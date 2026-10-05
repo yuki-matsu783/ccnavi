@@ -63,8 +63,8 @@ class ScopeGuard:
     # チケットの置き場（ツリーのルートからの相対）。提案と承認済みチケット。
     tickets: str = ""
     approved: str = ""
-    # フェーズの種類。親の `project:` の層ごとに、作るときに 1 度だけ読んだもの。
-    # 変更 1 件ごとに phases.yml を開かない。読めない層は空。
+    # フェーズの種類。親の `project:` のレイヤーごとに、作るときに 1 度だけ読んだもの。
+    # 変更 1 件ごとに phases.yml を開かない。読めないレイヤーは空。
     types: dict[str, dict[str, phasetypes.PhaseType]] = field(default_factory=dict)
 
     def finding(self, full: str) -> tuple[rules.Rule, str] | None:
@@ -216,7 +216,8 @@ def _findings(
             continue
         if change.full in script:
             continue
-        # 着手のときに共通層でプロジェクトの層を上書きした分（`configsync.is_synced_write`）。
+        # 着手のときに共通レイヤーでプロジェクトのレイヤーを上書きした分
+        # （`configsync.is_synced_write`）。
         # 内容と上書きの記録で見分け、読めないものは外さない。渡すのは解く前のパス。
         # 解いた先で答えると、設定を別のコピーへのシンボリックリンクに差し替えた形が、
         # 指す先の中身で外れる。

@@ -131,7 +131,7 @@ class PhaseHarness(unittest.TestCase):
         write(os.path.join(self.root, ".gitignore"), ".claude/\n")
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
-        # 共通層は `--root` の下の既定の置き場に置く。`--rules` / `--phases` は診断
+        # 共通レイヤーは `--root` の下の既定の置き場に置く。`--rules` / `--phases` は診断
         # （`--lint` / `--test` / `--explain`）でだけ有効なので、hook の判定と `--reviewed`
         # には渡せない。差し替えたいテストはこのファイルに書き直す。
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
@@ -1108,7 +1108,7 @@ class WrapperFlagsComeOnceTest(PhaseHarness):
 
 
 class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
-    """`ticket` の副命令に `--phases` を足しても、種類は共通層のまま（issue #65）。
+    """`ticket` の副命令に `--phases` を足しても、種類は共通レイヤーのまま（issue #65）。
 
     `.ccnavi/scripts/ccnavi-ticket.sh` が引数をそのまま渡すので、この形はエージェントが
     Bash で打てる。通していた頃は、`review: mr` の種類を `review: none` と名乗る
@@ -1329,7 +1329,8 @@ class ChatReviewTest(PhaseHarness):
         self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
         self.commit_parent("close 02")
         self.merge("i0001-02-02")
-        # 承認のあとで種類が読めなくなる（ユーザが phases.yml を触っている最中、層の切り替え）。
+        # 承認のあとで種類が読めなくなる（ユーザが phases.yml を触っている最中、
+        # レイヤーの切り替え）。
         write(self.phases, "version: 1\nphases: {}\n")
         refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "2", "--chat", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
@@ -1536,7 +1537,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertNotIn("limit:", self.reason(result))
 
     def test_no_phases_file_anywhere_does_not_cut_by_type(self):
-        """11. どの層にも phases.yml が無ければ種類では切り詰めない（番号だけの挙動）。"""
+        """11. どのレイヤーにも phases.yml が無ければ種類では切り詰めない（番号だけの挙動）。"""
         from tests.ticket.test_ticket import ticket_text
 
         os.remove(self.phases)
@@ -1587,7 +1588,7 @@ class ScopeLimitTest(PhaseHarness):
             json.loads(result.stdout)
 
     def break_phases_encoding(self):
-        """共通層の phases.yml に、UTF-8 として読めないバイト列を混ぜる。"""
+        """共通レイヤーの phases.yml に、UTF-8 として読めないバイト列を混ぜる。"""
         with open(self.phases, "wb") as f:
             f.write(PHASES.encode("utf-8").replace("調査".encode(), b"\xff\xfe\x80"))
 
@@ -1619,7 +1620,7 @@ class ScopeLimitTest(PhaseHarness):
                 self.assert_answered(self.hook("PreToolUse", "Bash", tree, command=command))
 
     def test_no_phases_file_with_a_plan_says_nothing_about_the_type(self):
-        """8. 親が計画を持ち番号が計画にあっても、phases.yml がどの層にも無ければ注記しない。
+        """8. 親が計画を持ち番号が計画にあっても、phases.yml がどのレイヤーにも無ければ注記しない。
 
         「種類が読めない」は phases.yml が在って読めないときだけ。無いのは番号だけの挙動
         （設計 4.2 の表の 1 行目）で、注記を出すと毎回の Write に余計な 1 行が載る。

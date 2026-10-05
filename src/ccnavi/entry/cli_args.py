@@ -33,15 +33,15 @@ OVERRIDES = (
 )
 # 作業ツリーのルートからの相対で書く欄。区切りを "/" に揃え、前後の "/" を落とす。
 RELATIVE_OVERRIDES = ("tickets", "project_home")
-# 層の置き場を動かすフラグと、「渡されなかった」ときの値。`--project-rules-file` と
+# レイヤーの置き場を動かすフラグと、「渡されなかった」ときの値。`--project-rules-file` と
 # 同じで診断の経路でだけ使われる。3 つめの欄が既定なのは、渡されたかどうかを OVERRIDES /
 # RELATIVE_OVERRIDES と同じ読み方で決めるため（`--rules ""` は指定と数えず、
 # `--risk ""` は数える）。
 #
-# 前の 3 本は共通層の中身（ルール・フェーズの種類・リスクの配点）、後の 2 本は
-# **層を探す先**。`--projects` はプロジェクトの層の置き場、`--project-home` は
+# 前の 3 本は共通レイヤーの中身（ルール・フェーズの種類・リスクの配点）、後の 2 本は
+# **レイヤーを探す先**。`--projects` はプロジェクトのレイヤーの置き場、`--project-home` は
 # 各 git プロジェクトルートの下の ccnavi ディレクトリの名前で、どちらも外すと
-# プロジェクトの層がまるごと消える。実際に試すと `ticket finish <子> --project-home .nothere`
+# プロジェクトのレイヤーがまるごと消える。実際に試すと `ticket finish <子> --project-home .nothere`
 # で、実績リスク 55 (CRITICAL) の子が 25 (MEDIUM) になり、レビュー待ちを飛ばして
 # 閉じた。中身を差し替えるのと結果が同じなので、同じ制限に載せる。
 LAYER_OVERRIDES = (
@@ -58,7 +58,7 @@ DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）で�
 #
 # sh は自分のぶんを先に置き、エージェントの引数を後ろに繋ぐ
 # （`exec "$bin" --root "$root" ticket "$@"`）。argparse は同じオプションを後勝ちで読むので、
-# 後ろに 1 本足すだけで sh が渡した本物を上書きできた。`--root` は共通層の 3 本も
+# 後ろに 1 本足すだけで sh が渡した本物を上書きできた。`--root` は共通レイヤーの 3 本も
 # `projects` も `approved` もそこから導かれる（`settings.load`）ので、1 本で全部動く。
 # 実際に試すと、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子チケットが
 # 本物の置き場に「リスク 0」で閉じられた。
@@ -86,11 +86,11 @@ def _one_wrapper_flag_each(stderr: TextIO, args: argparse.Namespace) -> bool:
 
 
 def _drop_outside_diagnosis(stderr: TextIO, args: argparse.Namespace) -> None:
-    """診断の外で渡された層の置き場の差し替えを、標準エラーに出して落とす。
+    """診断の外で渡されたレイヤーの置き場の差し替えを、標準エラーに出して落とす。
 
     フラグは設定ファイルより強いので、落とさないと保存していない `rules.yml` /
-    `phases.yml` / `risks.yml` で判定と採点が走り、層そのものも外せる。届く経路は
-    `.ccnavi/scripts/` の sh で、受け取った引数を実行ファイルへそのまま渡す。だから層を動かす
+    `phases.yml` / `risks.yml` で判定と採点が走り、レイヤーそのものも外せる。届く経路は
+    `.ccnavi/scripts/` の sh で、受け取った引数を実行ファイルへそのまま渡す。だからレイヤーを動かす
     フラグは診断の経路（`--lint`・`--test` など）でだけ受ける。
     """
     for flag, name, absent in LAYER_OVERRIDES:
@@ -181,7 +181,7 @@ _NOT_WITH_DOCS = (
     "--project-rules-file",
     "--project-phases-file",
     # 判定・チケット・レビューの経路の設定と、sh が渡すパス。`--docs` は読まない。
-    # 層の置き場（`--rules` から `--project-home`）は診断の外では落として先へ進むが、
+    # レイヤーの置き場（`--rules` から `--project-home`）は診断の外では落として先へ進むが、
     # `--docs` で落とすと「そのプロジェクトの置き場で引いた」と読まれるので止める。
     # `--root` は引く場所そのもの、`--log` / `--state` は記録の置き場で `--docs` は何も記録
     # しないので、受けて効かせる（結果は変わらない）。

@@ -17,7 +17,7 @@
 
 ## 設計からの読み替え
 
-ccnavi.md 付録 D.2「診断コマンド」の `--lint` と D.4「設定lintの検証項目」は、
+設計 付録 D.2「診断コマンド」の `--lint` と D.4「設定lintの検証項目」は、
 config.yaml という 1 枚の設定ファイルに、ツールの許可・保護領域・
 禁止コマンドがまとめて書かれている前提で書かれている。現在の形はそうではない。
 設定は `.claude/settings.json` の env で渡す環境変数、防御の中身はルールファイルで、
@@ -194,7 +194,7 @@ def report(
 
     errors = sum(1 for p in problems if p.severity == SEVERITY_ERROR)
     warns = sum(1 for p in problems if p.severity == SEVERITY_WARN)
-    # info は数えるが、終了コードには影響しない。層をまたいだ重複のように「そう
+    # info は数えるが、終了コードには影響しない。レイヤーをまたいだ重複のように「そう
     # 書いてあるとおりに働いているが、書いたユーザが知りたいはずのこと」が入る。
     infos = sum(1 for p in problems if p.severity == SEVERITY_INFO)
     if as_json:
@@ -253,11 +253,12 @@ def report(
 # 止めない 2 つの値それぞれに文がある。
 _CORE_FILES_VOICE = {
     selfguard.DISABLE: (
-        "ccnavi 自身の設定ファイル（.claude/settings*.json と、共通層・自身の層・"
-        "プロジェクトの層それぞれの設定 3 本）のバックアップを取らず、書き換えられても戻さない。"
-        "ふだん実行前に足している組み込みの deny（実行ファイル・ccnavi ディレクトリ・共通層の"
-        " 3 本）も足さないので、ワークツリー側の層の設定は、ルールファイルが名指ししていなければ"
-        "書き込める"
+        "ccnavi 自身の設定ファイル（.claude/settings*.json と、共通レイヤー・自身のレイヤー・"
+        "プロジェクトのレイヤーそれぞれの設定 3 本）のバックアップを取らず、"
+        "書き換えられても戻さない。"
+        "ふだん実行前に足している組み込みの deny（実行ファイル・ccnavi ディレクトリ・共通レイヤーの"
+        " 3 本）も足さないので、ワークツリー側のレイヤーの設定は、"
+        "ルールファイルが名指ししていなければ書き込める"
     ),
     selfguard.DRY_RUN: (
         "ccnavi 自身の設定ファイルが書き換えられても戻さない（戻すはずだったことを報告するだけ）。"
@@ -351,7 +352,7 @@ def check(
     problems.extend(lint_ticket._ticket(conf, root))
     problems.extend(lint_places._scratch(conf, root))
     problems.extend(lint_places._projects(conf, root))
-    # 層の読み込みは判定と同じ経路（ruleload.survey）を通る。読めない層の苦情は
+    # レイヤーの読み込みは判定と同じ経路（ruleload.survey）を通る。読めないレイヤーの苦情は
     # そこが書く標準エラーにも出るので、受け皿で受け取って二重に言わない。
     problems.extend(lint_layers._layers(io.StringIO(), conf, root))
     problems.extend(lint_layers._layer_configs(conf, root))
@@ -388,7 +389,7 @@ def _sh_compat(root: str) -> list[Problem]:
 
     食い違っても判定は動くので warn。sh が使うフラグや出力の形が変わっていれば、sh の側で
     チケットやレビューの操作が落ちる。sh が無いワークスペース（試しの置き場）は言わない。
-    層のファイルの書式の版（`version:`）は、読む側が既に error で言う。
+    レイヤーのファイルの書式の版（`version:`）は、読む側が既に error で言う。
     """
     path = os.path.join(root, SH_COMPAT_FILE)
     try:
@@ -422,7 +423,7 @@ def _sh_compat(root: str) -> list[Problem]:
 
 
 def _risk(conf: settings.Settings, root: str) -> list[Problem]:
-    """共通層のリスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。
+    """共通レイヤーのリスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。
 
     `script:` が指す先が在ることも見る。走らせるときは「測れなかった」で重いほうに
     なるが、そこで気づくのは子を閉じる時点になる（設計 11.4.2）。
@@ -505,7 +506,7 @@ def family_check(
     """取り込みの後の検査（`ccnavi sync check <P> [<リポジトリ>]`）。
 
     この親子のチケットの承認済みチケットを判定し直し（C3）、本物とする側の検査（親のワークツリーの外のチケット・
-    決まらない）とあわせて、止める理由（error）を返す。層の食い違いは warn で返す。
+    決まらない）とあわせて、止める理由（error）を返す。レイヤーの食い違いは warn で返す。
     error があれば sh が親子のチケットの取り込み状態を `blocked` にする。
     `repo` は取り込み状態の名前（`self` かプロジェクト名）で、sh が渡す。
     無ければ取り込み状態のあるリポジトリを全部探す。

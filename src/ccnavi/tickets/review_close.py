@@ -2,7 +2,7 @@
 
 `ready` は Draft を外す前に、閉じたチケットとその記録を `logs/archive/` へ退避する。標準出力の
 1 行目にコメントの下書きのパス、2 行目に `tree <退避したツリーのルート>` を出し、sh はその
-ツリーで未コミットの変更を確かめてから Draft を外す（ccnavi.md 9.10）。下書きのファイル名・
+ツリーで未コミットの変更を確かめてから Draft を外す（設計 9.10）。下書きのファイル名・
 目印・標準出力の形は sh との契約で、値と形を変えない。
 review から分けた。review を読む末端で、review からは読まれない。
 """
@@ -334,7 +334,7 @@ def close_early(
         return 1
     home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     left = _leftovers(home, parent, phases, result)
-    # 着手で共通層をコピーしたことをまだ知らせていなければ、早めに閉じる前にここで見せる。
+    # 着手で共通レイヤーをコピーしたことをまだ知らせていなければ、早めに閉じる前にここで見せる。
     # y で閉じたら見たものとして残す。見せないと、
     # 早めに閉じたあとの finish でもう 1 度端末を求めることになる。
     synced = configsync.pending(home, parent.ticket)
@@ -459,9 +459,7 @@ def _show_leftovers(stdout: TextIO, parent: ticket_model.Ticket, left: Leftovers
     if left.unplanned:
         stdout.write("  - フィードバック計画: 未計画 → 対応なしの扱い\n")
     for t in left.unresolved:
-        stdout.write(
-            f"  - 未解決 {t.url} {t.path}:{t.line} {review._first_line(t.body)} → 受け入れる\n"
-        )
+        stdout.write(f"  - 未解決 {review.thread_label(t)} → 受け入れる\n")
     if left.nothing:
         stdout.write("  （何も残っていない。ready で足りる）\n")
     stdout.write("残りは別の issue に書き出す。早めに閉じてよいなら y、やめるならそれ以外: ")
@@ -552,9 +550,9 @@ def _close_early_drafts(
         rest.append("- フィードバック計画は立てていない")
     issue += rest or ["（残した作業は無い）"]
     issue += ["", "## 引き継ぐ指摘", ""]
-    issue += [
-        f"- {t.url} {t.path}:{t.line} {review._first_line(t.body)}" for t in left.unresolved
-    ] or ["（未解決のスレッドは残っていない）"]
+    issue += [f"- {review.thread_label(t)}" for t in left.unresolved] or [
+        "（未解決のスレッドは残っていない）"
+    ]
     issue.append("")
     issue_path = os.path.join(conf.state, CLOSE_EARLY_ISSUE_FILE.format(parent=parent.ticket))
     failed = review._write_text(issue_path, "\n".join(issue))

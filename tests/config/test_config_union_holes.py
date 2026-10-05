@@ -1,4 +1,4 @@
-"""`.ccnavi/` の組み込み deny と層の名前を、表記を変えて回避できないことの受入テスト。
+"""`.ccnavi/` の組み込み deny とレイヤーの名前を、表記を変えて回避できないことの受入テスト。
 
 どれも、直さないと組み込み deny が「守っている」と言いながら回避できる形。
 `.claude/` の側も同じ当て方で守られる。
@@ -6,16 +6,16 @@
 - A-2 大文字小文字: `glob` と `regex` で書いたルールと組み込みの保護を、どの機械でも
   区別せずに当てる。区別が要る `regex` は `(?-i:...)` で囲む
 - A-3 区切りが続かないパス: `rm -rf .ccnavi` / `mv .ccnavi .ccnavi.bak` / `rm -rf .claude`
-- A-4 生の `id` のコロン: 層の名前をつけた形と見分けが付かないものを error にする
+- A-4 生の `id` のコロン: レイヤーの名前をつけた形と見分けが付かないものを error にする
 - A-5 `self` の予約: `projects/Self/` も `self` と同じに扱って数えない
 - A-6 確認だけ: 既に参照されている `.ccnavi/scripts/` のスクリプトを、表記を変えた形でも
   区切りの無い形でも、Write / Edit とシェルの両方で書き換えられない
 
-層の名前（`self` / `common`）とプロジェクト名が同じときも、予約は両側に掛かる。
+レイヤーの名前（`self` / `common`）とプロジェクト名が同じときも、予約は両側に掛かる。
 
 - `projects/self/` への Write / Edit は、そのプロジェクトの deny で判定され、
-  ワークスペース自身の層のルールに落ちない（ReservedLayerNameTest）
-- `projects/common/` の層の 3 本は、バックアップの key が共通層と衝突せず、
+  ワークスペース自身のレイヤーのルールに落ちない（ReservedLayerNameTest）
+- `projects/common/` のレイヤーの 3 本は、バックアップの key が共通レイヤーと衝突せず、
   バックアップと復元の対象に入る（ReservedLayerRestoreTest）
 
 道具は外から動かす（`tests/inproc.py` の `run_ccnavi`）。fixture は
@@ -75,7 +75,7 @@ CASE_RULES = {
     "allow": [{"id": "anything-read", "match": "Read", "regex": "."}],
 }
 
-# A-4 の的。裸の `id` にコロンがある。共通層に置けば lib の定義に見える。
+# A-4 の的。裸の `id` にコロンがある。共通レイヤーに置けば lib の定義に見える。
 COLON_RULES = {
     "version": 1,
     "deny": [
@@ -105,7 +105,7 @@ factors:
   - {id: "lib:schema", points: 5, glob: "schema/**", message: スキーマに触った}
 """
 
-# A-5 の的。`projects/Self/` の層に置く deny。数えないので、当たってはいけない。
+# A-5 の的。`projects/Self/` のレイヤーに置く deny。数えないので、当たってはいけない。
 SELF_PROJECT_RULES = {
     "version": 1,
     "deny": [
@@ -118,8 +118,8 @@ SELF_PROJECT_RULES = {
     ],
 }
 
-# 穴 1 の的。ワークスペース自身の層に置く、広い allow と 1 本の deny。
-# 予約名のプロジェクトの層を名前で引くとこの層に当たるので、そのプロジェクトへの
+# 穴 1 の的。ワークスペース自身のレイヤーに置く、広い allow と 1 本の deny。
+# 予約名のプロジェクトのレイヤーを名前で引くとこのレイヤーに当たるので、そのプロジェクトへの
 # Write がここの allow で通り、ここの deny で止まる。どちらも起きてはいけない。
 WIDE_OWN_RULES = {
     "version": 1,
@@ -134,8 +134,8 @@ WIDE_OWN_RULES = {
     "allow": [{"id": "wide", "match": "Write|Edit", "glob": "*"}],
 }
 
-# 穴 1 の的。予約名のプロジェクトの層に置く deny。層として数えないので当たらない。
-# 当たらないことは「緩い」のではない。共通層だけで判定するので、allow も無い。
+# 穴 1 の的。予約名のプロジェクトのレイヤーに置く deny。レイヤーとして数えないので当たらない。
+# 当たらないことは「緩い」のではない。共通レイヤーだけで判定するので、allow も無い。
 RESERVED_PROJECT_RULES = {
     "version": 1,
     "deny": [
@@ -148,14 +148,14 @@ RESERVED_PROJECT_RULES = {
     ],
 }
 
-# 穴 2 の的。予約名のプロジェクトの層の phases / risk。中身は何でもよく、
+# 穴 2 の的。予約名のプロジェクトのレイヤーの phases / risk。中身は何でもよく、
 # バックアップと復元の対象に入るかだけを見る。
 RESERVED_PROJECT_PHASES = """\
 version: 1
 phases:
   reserved:
     kind: work
-    title: 予約名の層
+    title: 予約名のレイヤー
     review: none
     scope: ["src/*"]
 """
@@ -163,10 +163,10 @@ phases:
 RESERVED_PROJECT_RISK = """\
 version: 1
 factors:
-  - {id: reserved, points: 5, glob: "src/**", message: 予約名の層で数えた}
+  - {id: reserved, points: 5, glob: "src/**", message: 予約名のレイヤーで数えた}
 """
 
-# A-6 の的。層の risk が呼ぶスクリプト。これが書き換わると配点が 0 を返せる。
+# A-6 の的。レイヤーの risk が呼ぶスクリプト。これが書き換わると配点が 0 を返せる。
 COUNT_SCRIPT = 'printf \'{"points": 30, "message": "%s"}\' "$CCNAVI_TICKET"\n'
 COUNT_RISK = (
     "version: 1\nfactors:\n"
@@ -224,7 +224,7 @@ class GlobCaseTest(ConfigUnionHarness):
 class BuiltinGlobCaseTest(GuardHarness):
     """A-2: 組み込みの `*/.ccnavi/*` も、どの機械でも大文字小文字を区別せずに当たる（穴そのもの）。
 
-    的は app の層。fixture の app は `.ccnavi/` を持たないので、`.Ccnavi/` は
+    的は app のレイヤー。fixture の app は `.ccnavi/` を持たないので、`.Ccnavi/` は
     ディスクに無く、`os.path.realpath` がパスを補正しない。「まだ無いところを
     表記違いで作る」という、ちょうど回避が成り立つ形になる。
     """
@@ -290,9 +290,9 @@ class ShellPlaceTest(GuardHarness):
                 self.assert_not_denied(self.guarded_hook("Bash", self.ws, command=command))
 
     def test_copying_out_of_a_common_layer_file_is_not_denied(self):
-        """11.6: 共通層の 1 本をコピー元に書いただけの読みは通る。
+        """11.6: 共通レイヤーの 1 本をコピー元に書いただけの読みは通る。
 
-        共通層の節をコピーする側にも書き込む側と同じ `_TERM` で足すと、空白を名前の終わりに
+        共通レイヤーの節をコピーする側にも書き込む側と同じ `_TERM` で足すと、空白を名前の終わりに
         数えるのでコピー元に当たり、`cp .ccnavi/common/rules.yml /tmp/x` が止まっていた。
         """
         for name in ("rules.yml", "phases.yml", "risks.yml"):
@@ -306,7 +306,8 @@ class ShellPlaceTest(GuardHarness):
                     self.assert_not_denied(self.guarded_hook("Bash", self.ws, command=command))
 
     def test_copying_into_a_common_layer_file_is_still_denied(self):
-        """11.6: 共通層の 1 本が行き先なら、後ろにコマンドが続いても止まる。書き込みも止まる。"""
+        """11.6: 共通レイヤーの 1 本が行き先なら、後ろにコマンドが続いても止まる。
+        書き込みも止まる。"""
         for name in ("rules.yml", "phases.yml", "risks.yml"):
             for command in (
                 f"cp /tmp/x .ccnavi/common/{name}",
@@ -655,10 +656,10 @@ class HolderDestinationTest(GuardHarness):
 
 
 class ColonIdTest(ConfigUnionHarness):
-    """A-4: 生の `id` のコロン。層の名前をつけた形（`lib:custom`）と見分けが付かない。"""
+    """A-4: 生の `id` のコロン。レイヤーの名前をつけた形（`lib:custom`）と見分けが付かない。"""
 
     def test_a_colon_in_a_rule_id_is_named_by_lint(self):
-        """11.4: 共通層でも層でも、コロンを含む `id` は error で名指しする。"""
+        """11.4: 共通レイヤーでもレイヤーでも、コロンを含む `id` は error で名指しする。"""
         write(self.rules, json.dumps(COLON_RULES))
         errors = self.problems("error")
         self.assertTrue(any("lib:custom" in p["where"] for p in errors), errors)
@@ -708,25 +709,25 @@ class ReservedSelfTest(ConfigUnionHarness):
         self.assertTrue(any("self" in p["detail"] for p in errors), errors)
 
     def test_the_layer_is_not_counted(self):
-        """11.4: 数えないので、その層の deny は Bash の和に入らない。"""
+        """11.4: 数えないので、そのレイヤーの deny は Bash の和に入らない。"""
         self.assert_not_denied(self.hook("Bash", self.ws, command="kubectl get pods"))
-        # 普通の名前の層は和に入る。「そもそも和が使われていない」ではないことを見る。
+        # 普通の名前のレイヤーは和に入る。「そもそも和が使われていない」ではないことを見る。
         self.assert_denied(self.hook("Bash", self.ws, command="psql -c 'select 1'"), "lib:raw-psql")
 
 
 class ReservedLayerNameTest(ConfigUnionHarness):
-    """穴 1: 予約名のプロジェクトへの Write が、ワークスペース自身の層で判定される。
+    """穴 1: 予約名のプロジェクトへの Write が、ワークスペース自身のレイヤーで判定される。
 
     `layers` は `projects/self/` を数えないのに、`layer_for` は
-    `target.project or LAYER_SELF` を層の名前で引いていた。`target.project` が `"self"`
-    なら層の名前と一致するので、ワークスペース自身の層が返る。**そのプロジェクトへの
-    Write / Edit が、プロジェクト自身の deny を一度も読まずに、ワークスペースの層の
+    `target.project or LAYER_SELF` をレイヤーの名前で引いていた。`target.project` が `"self"`
+    ならレイヤーの名前と一致するので、ワークスペース自身のレイヤーが返る。**そのプロジェクトへの
+    Write / Edit が、プロジェクト自身の deny を一度も読まずに、ワークスペースのレイヤーの
     ルールで判定される。**
 
-    穴が再現する形に組む。ワークスペース自身の層に広い `allow`（`self:wide`）と
-    deny（`self:generated`）を置き、プロジェクトの層に deny（`secret`）を置く。
-    層の名前で引くと `self:wide` が採られて通り、`self:generated` で止まる。予約名の
-    プロジェクトは層無しなので共通層だけで判定し、どちらも記録に現れない。
+    穴が再現する形に組む。ワークスペース自身のレイヤーに広い `allow`（`self:wide`）と
+    deny（`self:generated`）を置き、プロジェクトのレイヤーに deny（`secret`）を置く。
+    レイヤーの名前で引くと `self:wide` が採られて通り、`self:generated` で止まる。予約名の
+    プロジェクトはレイヤー無しなので共通レイヤーだけで判定し、どちらも記録に現れない。
     """
 
     def setUp(self):
@@ -746,22 +747,23 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         self.assertIn("self:wide", record["rules"], record)
 
     def check_no_layer_is_borrowed(self, name):
-        """`projects/<name>/` への Write が、どの層の rules でも判定されないこと。"""
+        """`projects/<name>/` への Write が、どのレイヤーの rules でも判定されないこと。"""
         project = self.project(name, rules=RESERVED_PROJECT_RULES)
         self.assert_the_wide_allow_is_alive()
 
         result = self.hook("Write", self.ws, file_path=os.path.join(project, "secret", "x.txt"))
 
         record = self.last_record()
-        # 穴の本体。層の名前で引くと、ここに `self:wide` が入り、decision が allow になる。
+        # 穴の本体。レイヤーの名前で引くと、ここに `self:wide` が入り、decision が allow になる。
         self.assertNotIn("self:wide", record.get("rules", []), record)
         self.assertNotEqual(record["decision"], "allow", record)
-        # プロジェクトの層も足さない（層無し）。共通層に `*/secret/*` は無いので deny でもない。
+        # プロジェクトのレイヤーも足さない（レイヤー無し）。
+        # 共通レイヤーに `*/secret/*` は無いので deny でもない。
         self.assert_not_denied(result)
         self.assertNotIn(f"{name}:secret", record.get("rules", []), record)
 
     def check_the_workspace_deny_does_not_reach(self, name):
-        """ワークスペース自身の層の deny も、予約名のプロジェクトには当たらないこと。"""
+        """ワークスペース自身のレイヤーの deny も、予約名のプロジェクトには当たらないこと。"""
         project = self.project(name, rules=RESERVED_PROJECT_RULES)
         # 前提。同じパスはワークスペースのツリーでは止まる。
         self.assert_denied(
@@ -769,14 +771,15 @@ class ReservedLayerNameTest(ConfigUnionHarness):
             "self:generated",
         )
 
-        # 層の名前で引くと、ここも `self:generated` で止まる。層無しなら共通層だけ。
+        # レイヤーの名前で引くと、ここも `self:generated` で止まる。
+        # レイヤー無しなら共通レイヤーだけ。
         self.assert_not_denied(
             self.hook("Write", self.ws, file_path=os.path.join(project, "generated", "x.py"))
         )
         self.assertNotIn("self:generated", self.last_record().get("rules", []))
 
     def test_a_write_into_projects_self_is_not_judged_by_the_workspace_layer(self):
-        """11.4: `projects/self/` は層無し。ワークスペースの層の allow では通らない。"""
+        """11.4: `projects/self/` はレイヤー無し。ワークスペースのレイヤーの allow では通らない。"""
         self.check_no_layer_is_borrowed(settings.LAYER_SELF)
 
     def test_the_spelling_does_not_change_it(self):
@@ -784,20 +787,20 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         self.check_no_layer_is_borrowed("Self")
 
     def test_a_write_into_projects_common_is_not_judged_by_the_workspace_layer(self):
-        """11.4: `common` も予約。`projects/common/` も層無し。"""
+        """11.4: `common` も予約。`projects/common/` もレイヤー無し。"""
         self.check_no_layer_is_borrowed(settings.LAYER_COMMON)
 
     def test_the_workspace_layer_deny_does_not_reach_projects_self(self):
-        """11.4: 層を借りないので、ワークスペースの層の deny も当たらない。"""
+        """11.4: レイヤーを借りないので、ワークスペースのレイヤーの deny も当たらない。"""
         self.check_the_workspace_deny_does_not_reach(settings.LAYER_SELF)
 
     def test_a_project_whose_name_is_not_reserved_still_works(self):
-        """11.4 対照: 予約名でない `lib` は今までどおり自分の層で判定される。"""
+        """11.4 対照: 予約名でない `lib` は今までどおり自分のレイヤーで判定される。"""
         self.assert_denied(
             self.hook("Write", self.ws, file_path=os.path.join(self.lib, "schema", "x.sql")),
             "lib:schema",
         )
-        # 広い allow は行き先の 1 層にしか足さないので、lib には当たらない。
+        # 広い allow は行き先の 1 レイヤーにしか足さないので、lib には当たらない。
         self.assertNotIn("self:wide", self.last_record().get("rules", []))
         self.assert_denied(self.hook("Bash", self.ws, command="psql -c 'select 1'"), "lib:raw-psql")
 
@@ -847,14 +850,14 @@ class ReservedLayerNameTest(ConfigUnionHarness):
 
 
 class ReservedLayerRestoreTest(GuardHarness):
-    """穴 2: `projects/common/` の層の 3 本がバックアップと復元の対象から落ちる。
+    """穴 2: `projects/common/` のレイヤーの 3 本がバックアップと復元の対象から落ちる。
 
     `_layer_key` が `layer == LAYER_COMMON` の文字列比較で key を決めていた。
-    `projects/common/` があると、その層の key が `rules` / `phases` / `risk` になって
-    共通層の key と完全に一致し、`_places` の重複の排除で先に積んだ共通層だけが
+    `projects/common/` があると、そのレイヤーの key が `rules` / `phases` / `risk` になって
+    共通レイヤーの key と完全に一致し、`_places` の重複の排除で先に積んだ共通レイヤーだけが
     残る。プロジェクトが名前を 1 つ選ぶだけで、その 3 本が守られなくなる。
 
-    key が共通層と重なると、このクラスの最初の 2 つが落ちる（戻らないので中身が壊れたまま）。
+    key が共通レイヤーと重なると、このクラスの最初の 2 つが落ちる（戻らないので中身が壊れたまま）。
     """
 
     def setUp(self):
@@ -867,7 +870,7 @@ class ReservedLayerRestoreTest(GuardHarness):
         )
 
     def test_the_layer_of_a_project_named_common_is_restored(self):
-        """11.6: 名札と同じ名前のプロジェクトでも、層の 3 本がバックアップと復元の対象。"""
+        """11.6: 名札と同じ名前のプロジェクトでも、レイヤーの 3 本がバックアップと復元の対象。"""
         for kind in settings.LAYER_KINDS:
             with self.subTest(kind=kind):
                 path = layer_path(self.reserved, kind)
@@ -888,7 +891,7 @@ class ReservedLayerRestoreTest(GuardHarness):
         self.assertEqual(read(path), expected, self.said(result))
 
     def test_the_common_layer_is_still_restored_alongside_it(self):
-        """11.6: 共通層の phases / risk も同じ 1 回で戻る（key が衝突していない）。"""
+        """11.6: 共通レイヤーの phases / risk も同じ 1 回で戻る（key が衝突していない）。"""
         for path in (self.phases, self.risk):
             name = os.path.basename(path)
             with self.subTest(path=name):
@@ -897,7 +900,7 @@ class ReservedLayerRestoreTest(GuardHarness):
                 self.assertIn("restored", result.stdout, self.said(result, name))
 
     def test_the_layer_of_a_project_named_self_is_restored_too(self):
-        """11.6: `projects/self/` の 3 本も、ワークスペース自身の層とは別に守る。"""
+        """11.6: `projects/self/` の 3 本も、ワークスペース自身のレイヤーとは別に守る。"""
         project = self.project(
             settings.LAYER_SELF, rules=RESERVED_PROJECT_RULES, phases=RESERVED_PROJECT_PHASES
         )

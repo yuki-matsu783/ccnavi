@@ -26,7 +26,7 @@ warn で名指しする案内を一緒に置いた（`lint._legacy_tickets`）�
 
 案内と、案内のためだけにあったものを消す。`lint._legacy_tickets` と、そこだけが使っていた `_stale_by_tree`・
 `_left_behind`、旧のパスの定数 4 つ、検査のテスト 6 本。要求（REQ-TKT-24）からも旧の置き場の
-一文を落とし、設計書と README と HANDOVER から移行の案内を落とす。
+一文を落とし、設計書と README と 引き継ぎ文書（いまは廃止）から移行の案内を落とす。
 
 移行そのものは変わらない。旧の置き場に残っているものはユーザが手で動かす（`.ccnavi/tickets` を
 `.ccnavi/approved` に、`closed/` は `done/` に、提案の `doing/` `done/` `cancelled/` は閉じたものを

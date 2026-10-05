@@ -95,8 +95,9 @@ SUBJECT_FIELDS: dict[str, str] = {
     "WebFetch": "url",
 }
 
-# 行き着く先まで解いてから当てるツール（パスを対象にするもの）。行き先の層を選ぶ一覧と
-# 同じものを使う。別に持つと、判定はパスに当てるのに層は共通層だけ、という食い違いが起きる。
+# 行き着く先まで解いてから当てるツール（パスを対象にするもの）。行き先のレイヤーを選ぶ一覧と
+# 同じものを使う。
+# 別に持つと、判定はパスに当てるのにレイヤーは共通レイヤーだけ、という食い違いが起きる。
 PATH_TOOLS = ruleload.PATH_TOOLS
 
 # 探す場所を省略できるツール。省略は「いま居る場所」の意味なので、cwd を対象にする。
@@ -205,9 +206,9 @@ def decide_before(
             hookio.write_context(stdout, hookio.PRE_TOOL_USE, guard)
         return EXIT_OK
 
-    # 組み込みの既定に戻ったときだけ言う。層が壊れて空になったのは組み込みへの
+    # 組み込みの既定に戻ったときだけ言う。レイヤーが壊れて空になったのは組み込みへの
     # 退避ではないので、同じ文面を出すと「既定で判定している」と読み違えられる。
-    # そちらは記録の `fallback` に層の名前が残り、`--lint` が error で言う。
+    # そちらは記録の `fallback` にレイヤーの名前が残り、`--lint` が error で言う。
     fallback = (
         reasons.fallen_back(record.detail or conf.rules)
         if record.fallback == builtin.FALLBACK
@@ -433,11 +434,11 @@ def decide_before(
             # 厳しい側へ外れるだけで、そのことは文面が断る。
             break
         # 中で実行されるコマンドは deny と ask にだけ当てる。止める側に足す当て先なので、
-        # 層を読み違えても当たるはずのものが当たらないだけで、元の形の判定は消えない。
+        # レイヤーを読み違えても当たるはずのものが当たらないだけで、元の形の判定は消えない。
         # allow に当てると逆になる。`sudo -u me cat /etc/hosts` は元の形では確認になるが、
         # 中の `cat …` が読み取りの allow に当たって通るようになる。
         #
-        # 引用の外の層を先に見る。同じルールが引用の中と外の両方に当たるなら、外で当たった
+        # 引用の外のレイヤーを先に見る。同じルールが引用の中と外の両方に当たるなら、外で当たった
         # ことにする。引用の中の断りは、引用の中にだけ当たったときに付けるものなので。
         layers = sorted(inner, key=lambda x: x[2]) if name != rules.ALLOW else []
         for rule in rule_set.section(name):
@@ -460,9 +461,9 @@ def decide_before(
 
     record.rules = [rule.id or f"({verdict})" for rule in group]
     record.unwrapped = shellread.SEP.join(dict.fromkeys(layer for _, layer, _ in via if layer))
-    # 判定を下したのは最初に当たったルール（設計 11.9）。その層を 1 欄で残す。
-    # id の前置きからも読めるが、欄にしておくと記録を層で数えられる。ルールファイルの
-    # 外から足したルール（組み込みの保護、チケット）は層を持たないので空のまま。
+    # 判定を下したのは最初に当たったルール（設計 11.9）。そのレイヤーを 1 欄で残す。
+    # id の前置きからも読めるが、欄にしておくと記録をレイヤーで数えられる。ルールファイルの
+    # 外から足したルール（組み込みの保護、チケット）はレイヤーを持たないので空のまま。
     if group:
         record.source = group[0].source
 
@@ -472,7 +473,7 @@ def decide_before(
     # 引用の中の中身を除いた読み（bare）に当て直して、当たらなければそうだとする。
     # こうするとルールの書き方（glob / regex、`^` / `(^|\x00)`）に依らない。
     # 中で実行されるコマンドで当たったルールは、bare に当て直せない（bare は元の形の読み）。
-    # そちらは、当たった層が引用の中から切り出したコマンドのものかどうかで決める。
+    # そちらは、当たったレイヤーが引用の中から切り出したコマンドのものかどうかで決める。
     inside = [False] * len(group)
     if verdict in (rules.DENY, rules.ASK):
         inside = [
@@ -499,7 +500,7 @@ def decide_before(
         if STRENGTH[ticket_decision] > STRENGTH[verdict]:
             verdict, ticket_reason, ticket_code = ticket_decision, text, code
             if ticket_reason:
-                # 判定を下したのは層を持たないチケット。狭められたルールの id は後ろに残し、
+                # 判定を下したのはレイヤーを持たないチケット。狭められたルールの id は後ろに残し、
                 # 「ルールは通したのにチケットが止めた」回を記録から数えられるようにする。
                 record.rules = [reasons.TICKET_RULE, *record.rules]
                 record.source = ""

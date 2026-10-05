@@ -1,18 +1,40 @@
 """`--lint` のうち、ルールファイルの中身の検査。
 
 組み上がらないルール、止めないモード、どのツールにも当たらない match、広すぎる allow などを
-名指しする。層のルールファイルも同じ読みで見る（`lint_layers`）。提案（`suggest`）も候補を
+名指しする。レイヤーのルールファイルも同じ読みで見る（`lint_layers`）。提案（`suggest`）も候補を
 ここに通す。
 """
 
 from __future__ import annotations
 
 import os
+import re
 
 from ..hook import judge
 from ..infra import hookio
 from ..policy import ctxfile, rules
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
+
+# `.ccnavi/scripts/` のヒット。直前の `./` と `../` の連なりは、相対の書き方なので手前にたどる。
+_SCRIPTS = re.compile(r"(?:\.{1,2}/)*\.ccnavi/scripts/")
+# その手前の 1 文字がこれなら、ヒットはパスの途中（絶対パス・`$VAR/`・`{root}/`・`~/`・
+# ディレクトリ名の続き）。空白・引用符・括弧・`=`・`:` や語頭は、パスの始まりとして相対に数える。
+_PATH_MID = frozenset("/\\}~$._-")
+
+
+def _has_relative_scripts(text: str) -> bool:
+    """文面に、cwd に左右される相対パスの `.ccnavi/scripts/` があるか。
+
+    ヒットの直前（`./` と `../` の連なりを除いた位置）の 1 文字を見る。`/` `\\` `}` `~` `$`
+    `.` 英数字 `_` `-` ならパスの途中（絶対パス、`{root}/`、`$VAR/`、`~/` など）なので言わない。
+    語頭や、空白・引用符・括弧・`=`・`:` の直後なら相対パスの始まりとして言う。
+    """
+    for hit in _SCRIPTS.finditer(text):
+        before = text[hit.start() - 1] if hit.start() > 0 else ""
+        if before and (before.isascii() and before.isalnum() or before in _PATH_MID):
+            continue
+        return True
+    return False
 
 
 def _rules(
@@ -23,17 +45,18 @@ def _rules(
     rules.load をそのまま呼ぶ。別の読み方をすると、検証は通ったのに実運用で
     落ちるという、検証があるぶんかえって危ない形になる。
 
-    `home` は、ルールが指すファイル（additionalContextFile）を探す起点。層の
-    ルールならその層の git プロジェクトルート。省けばワークスペースルート、
+    `home` は、ルールが指すファイル（additionalContextFile）を探す起点。レイヤーの
+    ルールならそのレイヤーの git プロジェクトルート。省けばワークスペースルート、
     それも無ければルールファイルの隣。
 
-    `layer` は共通層より後ろの層かどうか。層は共通層に足すものなので、`deny` や
-    `allow` が空でも穴にはならない（空の層 = 何も足さない）。共通層で確かめている
-    「空のガードは入っていないのと同じ」の問いを、層にまで広げると、allow を
-    1 件だけ足した層が毎回 error を出し続けることになる。
+    `layer` は共通レイヤーより後ろのレイヤーかどうか。
+    レイヤーは共通レイヤーに足すものなので、`deny` や
+    `allow` が空でも穴にはならない（空のレイヤー = 何も足さない）。共通レイヤーで確かめている
+    「空のガードは入っていないのと同じ」の問いを、レイヤーにまで広げると、allow を
+    1 件だけ足したレイヤーが毎回 error を出し続けることになる。
 
-    `project` はプロジェクトの層かどうか。ターンの終わりのルール（`match: Stop`）は
-    プロジェクトの層から読まない（共通層と自身の層だけ）ので、そこに書いたものを言う。
+    `project` はプロジェクトのレイヤーかどうか。ターンの終わりのルール（`match: Stop`）は
+    プロジェクトのレイヤーから読まない（共通レイヤーと自身のレイヤーだけ）ので、そこに書いたものを言う。
     """
     home = home or root or os.path.dirname(os.path.abspath(path))
     try:
@@ -117,6 +140,27 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
             )
         )
 
+    # 文面の sh は `{root}` から書く。相対の `.ccnavi/scripts/...` は、cwd がプロジェクトの中
+    # だと見つからない（docs/claude/projects.md「ルールの文面にshを書くとき」）。
+    # 絶対パスは cwd に左右されないので言わない。
+    # 判定は変わらず、案内を受けたモデルの実行が失敗するだけなので warn。
+    # 見る欄は、モデルに渡る文面の 3 つ。`...File` は rules.yml の外のファイルを指すので見ない。
+    for field_name, text in (
+        ("message", rule.message),
+        ("additionalContext", rule.additional_context),
+        ("additionalContextOnce", rule.additional_context_once),
+    ):
+        if _has_relative_scripts(text):
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    name,
+                    f"{field_name} の `.ccnavi/scripts/` に `{{root}}` が付いていない。cwd が"
+                    "プロジェクトの中だと相対パスの sh が見つからない。"
+                    "`{root}/.ccnavi/scripts/...` と書いてください",
+                )
+            )
+
     # ルールが指すファイルは、ルートの中を指していて、いま在って、上限に収まるか。
     # 無いのは warn。作るまで何も足さないだけで、判定は変わらない。
     for key, rel in (
@@ -179,7 +223,7 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
 
     1. `deny` / `ask` に置いた。Stop で見るのは allow だけなので、`Stop` の部分は何も起きない
        （`Bash|Stop` なら `Bash` の部分はふつうに働く）
-    2. プロジェクトの層に置いた。ターンの終わりには共通層と自身の層しか読まない
+    2. プロジェクトのレイヤーに置いた。ターンの終わりには共通レイヤーと自身のレイヤーしか読まない
     3. 当てる先の `(stop)` に当たらない glob / regex。何も起きない
     4. `every` が 2 より小さい。実行時にも使わない（ターンの終わりのたびに止まらないように）
     """
@@ -203,8 +247,8 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
             Problem(
                 SEVERITY_WARN,
                 name,
-                f"プロジェクトの層の {rules.STOP_MATCH} のルールは使われない。ターンの終わりには"
-                "共通層と自身の層しか読まない"
+                f"プロジェクトのレイヤーの {rules.STOP_MATCH} のルールは使われない。"
+                "ターンの終わりには共通レイヤーと自身のレイヤーしか読まない"
                 "（外のリポジトリの 1 行でメインのターンを止めさせないため）",
             )
         ]

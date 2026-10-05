@@ -33,7 +33,7 @@ TURN_DEFINED = "ターン（ユーザが指示を出してから Claude が応�
 # push を含めるのは、リモートに置く枝は親ブランチ 1 本で、それを送るのが親の仕事だから。
 # git のラッパースクリプトも子チケットのツリーからの push を拒むが、そちらは cwd のツリーで見る。
 # サブエージェントが親のツリーへ cd して打てばラッパースクリプトは通すので、
-# サブエージェントかどうかで止める層をここに持つ。
+# サブエージェントかどうかで止めるレイヤーをここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
     r"(^|[;&|]\s*)(sh|bash)(\s+-\S+)*\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
     r"(start|finish|cancel|record-risk|request|confirm|comment|decide|ready|close-early|chat"
@@ -99,9 +99,9 @@ def exempt(subject: str, degraded: str) -> bool:
 def forbidden(subject: str, unwrapped: str = "") -> bool:
     """サブエージェントに許さない形を含むか。
 
-    unwrapped は shellread が作る、中で実行されるコマンドの層（`\\x00` でつないだもの）。
+    unwrapped は shellread が作る、中で実行されるコマンドのレイヤー（`\\x00` でつないだもの）。
     禁止の形はコマンドの先頭の `sh` に固定しているので、`env sh …` や `sh -c '…'` は
-    元の形では当たらない。層にも当てる。止める側にだけ足す当て先で、`exempt` には渡さない。
+    元の形では当たらない。レイヤーにも当てる。止める側にだけ足す当て先で、`exempt` には渡さない。
     """
     return any(_FORBIDDEN_COMMAND.search(c) for c in commands(subject) + commands(unwrapped))
 

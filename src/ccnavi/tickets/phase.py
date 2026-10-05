@@ -264,7 +264,8 @@ class Phase:
         return LABEL_WAITING if self.review_waiting else LABEL_PREPARING
 
 
-# 層ごとの種類の読み込みは phasetypes に置く（approval も読むため。approval は phase を読めない）。
+# レイヤーごとの種類の読み込みは phasetypes に置く
+# （approval も読むため。approval は phase を読めない）。
 types_path = phasetypes.types_path
 common_types = phasetypes.common_types
 layer_types = phasetypes.layer_types
@@ -304,7 +305,8 @@ def phases_of(
     if owner is None and proposed is not None and proposed.ticket == parent_id:
         owner = proposed
     if owner is not None and owner.has_plan:
-        # 層は親の承認済みチケットの `project:` が決める（設計 11.4.1）。ユーザが承認した値で、
+        # レイヤーは親の承認済みチケットの `project:` が決める（設計 11.4.1）。
+        # ユーザが承認した値で、
         # 子は親から継ぐので、判定が申告に依存する形にはならない。
         types = load_types(conf, root, owner.project) or {}
         if owner.workflow is None and owner.state == ticket_model.TODO:
@@ -460,10 +462,10 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
 
 
 def _type_source(phase: Phase) -> dict:
-    """種類を根拠に置くマーカーに足す、その種類の層（設計 11.9）。
+    """種類を根拠に置くマーカーに足す、その種類のレイヤー（設計 11.9）。
 
     `review:` が絡むマーカー（省略と保留）にだけ足す。他のマーカーは種類を見ずに置くので、
-    層を書いても根拠にならない。種類の無いフェーズでは欄そのものを置かない。
+    レイヤーを書いても根拠にならない。種類の無いフェーズでは欄そのものを置かない。
     """
     return {"source": phase.type.source} if phase.type is not None else {}
 

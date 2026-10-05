@@ -36,7 +36,8 @@ class Target:
     # 突き合わせは大きさと更新時刻で行う。
     heavy: bool = False
     # top は、この対象を git から戻すときに渡すルート。空なら root の側から戻す。
-    # 持つのは 2 通り。ワークツリー側の設定と、プロジェクトの層の設定。ワークスペースルートの git に
+    # 持つのは 2 通り。ワークツリー側の設定と、プロジェクトのレイヤーの設定。
+    # ワークスペースルートの git に
     # `.claude/worktrees/...` を聞いても、そこは `.gitignore` の中なので何も持っていない。
     # `projects/...` も同じで、プロジェクトは自分の git を持つ。持っているのは
     # そのワークツリー自身の git と、そのプロジェクト自身の git。
@@ -62,14 +63,14 @@ def targets(
     ルールファイルと実行ファイルは設定で動くので、解決済みのパスを受け取る。
     空なら、その設定を持たないということなので、対象からも外れる。
 
-    layers は `settings.LayerFile`（層の種別, 層の名前, kind, そのファイル）のリスト
-    （`ruleload.layer_files`）。kind は rules / phases / risk。共通層は phases と
+    layers は `settings.LayerFile`（レイヤーの種別, レイヤーの名前, kind, そのファイル）のリスト
+    （`ruleload.layer_files`）。kind は rules / phases / risk。共通レイヤーは phases と
     risk の 2 本で来る。rules は `rules_path` が渡していて、両方から並べると同じ
     ファイルを 2 度守ることになる。
 
-    バックアップの key は層ごとに分ける。共通層は kind そのまま（`rules` / `phases` /
+    バックアップの key はレイヤーごとに分ける。共通レイヤーは kind そのまま（`rules` / `phases` /
     `risk`）、それ以外は `rules:self` / `phases:lib` の形。key はそのままバックアップの
-    名前になるので、層が違えば別の断面として残り、取り違えが起きない。
+    名前になるので、レイヤーが違えば別の断面として残り、取り違えが起きない。
     """
     places = _places(root, projects_dir, rules_path, layers)
     found = [
@@ -101,7 +102,7 @@ def _places(
     """守る対象の (バックアップの key, 追跡している git プロジェクトルート, 絶対パス)。
 
     git プロジェクトルートを一緒に持つのは 2 つの用が在るから。git から戻すときに
-    どの git に聞くか（プロジェクトの層はそのプロジェクト自身の git）と、ワークツリー側の
+    どの git に聞くか（プロジェクトのレイヤーはそのプロジェクト自身の git）と、ワークツリー側の
     設定をどこからの相対で組むか（元リポジトリから）。
 
     同じ key が二度来たら後ろを捨てる。バックアップの名前が key で決まるので、重なったまま
@@ -132,15 +133,15 @@ def _places(
 
 
 def _layer_key(origin: str, layer: str, kind: str) -> str:
-    """バックアップの key。共通層は kind そのまま、それ以外は `<kind>:<層>`。
+    """バックアップの key。共通レイヤーは kind そのまま、それ以外は `<kind>:<レイヤー>`。
 
-    決めるのは層の種別（`settings.ORIGIN_*`）で、名札の表記ではない。名札で
-    比べると、`projects/common/` の 3 本が共通層と同じ key（`rules` / `phases` /
-    `risk`）になり、`_places` の重複の排除でその層の 3 本がバックアップと復元の対象から
+    決めるのはレイヤーの種別（`settings.ORIGIN_*`）で、名札の表記ではない。名札で
+    比べると、`projects/common/` の 3 本が共通レイヤーと同じ key（`rules` / `phases` /
+    `risk`）になり、`_places` の重複の排除でそのレイヤーの 3 本がバックアップと復元の対象から
     丸ごと落ちる。プロジェクトが名前を 1 つ選ぶだけで保護が外れることになる。
 
     予約名のプロジェクトは置き場をつける（`rules:projects/self`）。`projects/self/`
-    の 3 本を素の `rules:self` にすると、こんどはワークスペース自身の層と
+    の 3 本を素の `rules:self` にすると、こんどはワークスペース自身のレイヤーと
     ぶつかって、先に積んだほうだけが残る。名札に予約してある表記は名札の側で
     使い、プロジェクトの側は別の表記にする。
     """
@@ -152,11 +153,11 @@ def _layer_key(origin: str, layer: str, kind: str) -> str:
 
 
 def _layer_home(root: str, projects_dir: str, origin: str, layer: str) -> str:
-    """その層の設定を追跡している git プロジェクトルート。
+    """そのレイヤーの設定を追跡している git プロジェクトルート。
 
-    共通層と自身の層はワークスペースルート、プロジェクトの層はそのプロジェクト。
-    ここも層の名前では決めない。`projects/common/` の設定はそのプロジェクトの git が
-    追跡しているので、層の名前で共通層と同じに扱うと、ワークスペースの git に戻し方を
+    共通レイヤーと自身のレイヤーはワークスペースルート、プロジェクトのレイヤーはそのプロジェクト。
+    ここもレイヤーの名前では決めない。`projects/common/` の設定はそのプロジェクトの git が
+    追跡しているので、レイヤーの名前で共通レイヤーと同じに扱うと、ワークスペースの git に戻し方を
     聞きに行くことになる。
 
     名前を引けないものはワークスペースルートとして扱う。そこから切ったワークツリーに
@@ -190,7 +191,7 @@ def _worktree_copies(
 
     元リポジトリをつけて列挙する。ワークツリーはワークスペースからもプロジェクトからも
     切れて、中に入っているワークツリー側の設定は元リポジトリが追跡しているものだけになる。
-    lib から切ったツリーに `.claude/settings.json` は無いし、lib の層のパスは
+    lib から切ったツリーに `.claude/settings.json` は無いし、lib のレイヤーのパスは
     `projects/lib/.ccnavi/config/rules.yml` ではなく `.ccnavi/config/rules.yml`。
     ワークスペースルートからの相対で組むと、どちらの向きにも当たらない。
 

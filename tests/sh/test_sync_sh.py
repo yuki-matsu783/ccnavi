@@ -1187,7 +1187,8 @@ class PlacesAreNotReadTest(SyncHarness):
         }
 
     def arrange(self):
-        """リモートに親の 1 件、統合先に done/ と層、提案だけの家族、家族の無いプロジェクト。"""
+        """リモートに親の 1 件、統合先に done/ とレイヤー、提案だけの家族、
+        家族の無いプロジェクト。"""
         self.head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
         self.remote_commit("main", ".ccnavi/approved/done/old.md", "old\n")
         self.remote_commit("main", ".ccnavi/config/phases.yml", "phases\n")
@@ -1211,7 +1212,7 @@ class PlacesAreNotReadTest(SyncHarness):
         self.assertEqual(self.head, fields(self.record)["sha"])
         other = os.path.join(self.state, "sync", "self", "families", "i0002")
         self.assertEqual("present", fields(other)["state"])
-        # 統合先の控えは既定の置き場の done/ と層（.ccnavi/config）を写す。
+        # 統合先の控えは既定の置き場の done/ とレイヤー（.ccnavi/config）を写す。
         for rel in (".ccnavi/approved/done/old.md", ".ccnavi/config/phases.yml"):
             self.assertTrue(os.path.isfile(os.path.join(self.mirror, rel)), rel)
         # プロジェクトは既定の projects/ の下で見つける。

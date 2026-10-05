@@ -98,11 +98,11 @@ class Factor:
     # glob の上限。当たるごとに加点するので、無ければ青天井。
     max: int | None = None
     compiled: re.Pattern | None = None
-    # source はこの項目が書いてある層の名前（`common` / `self` / プロジェクト名）。
+    # source はこの項目が書いてあるレイヤーの名前（`common` / `self` / プロジェクト名）。
     # 記録の hit と judge の項目に残す（設計 11.9）。
     source: str = ""
-    # home は `script:` を解く基準ディレクトリ。共通層と自身の層はワークスペース
-    # ルート、プロジェクトの層はそのプロジェクトの git プロジェクトルート
+    # home は `script:` を解く基準ディレクトリ。共通レイヤーと自身のレイヤーはワークスペース
+    # ルート、プロジェクトのレイヤーはそのプロジェクトの git プロジェクトルート
     # （設計 11.4.2）。定義を読んだ側が埋める。
     home: str = ""
 
@@ -110,13 +110,13 @@ class Factor:
         return self.compiled is not None and self.compiled.match(rel) is not None
 
     def key(self) -> tuple:
-        """層をまたいで「同じ項目か」を比べるための全欄。`source` と `home` は含めない。
+        """レイヤーをまたいで「同じ項目か」を比べるための全欄。`source` と `home` は含めない。
 
-        `script:` は書かれたパスではなく、その層のスクリプトの置き場からの相対と、
-        指す先の中身で比べる。共通層は `.ccnavi/common/scripts/`、
-        各層は `<ccnavi ディレクトリ>/scripts/` を指すので、
-        着手で共通層をコピーした配点（設計 11.12）はパスが違う。パスで比べると同じ項目を
-        `<層>:<id>` として 2 重に数える。中身まで見るのは、
+        `script:` は書かれたパスではなく、そのレイヤーのスクリプトの置き場からの相対と、
+        指す先の中身で比べる。共通レイヤーは `.ccnavi/common/scripts/`、
+        各レイヤーは `<ccnavi ディレクトリ>/scripts/` を指すので、
+        着手で共通レイヤーをコピーした配点（設計 11.12）はパスが違う。パスで比べると同じ項目を
+        `<レイヤー>:<id>` として 2 重に数える。中身まで見るのは、
         名前だけ同じ別のスクリプトを同じ項目として捨てないため。
         """
         value = self.value
@@ -129,15 +129,15 @@ class Factor:
 @dataclass
 class Definition:
     # levels は**書かれた鍵だけ**。書かれていない鍵は DEFAULT_LEVELS で読む
-    # （`level_of`）。既定で埋めて持つと、合成のときに「書いていない層」が
-    # 共通層の緩めた境目の点を気づかないうちに戻すことになる（設計 11.4.2）。
+    # （`level_of`）。既定で埋めて持つと、合成のときに「書いていないレイヤー」が
+    # 共通レイヤーの緩めた境目の点を気づかないうちに戻すことになる（設計 11.4.2）。
     levels: dict[str, int] = field(default_factory=dict)
     factors: list[Factor] = field(default_factory=list)
     # どこから読んだか。組み込みなら BUILTIN。
     source: str = BUILTIN
-    # 読めなかった理由（組み込みに戻ったとき、か、層を空として扱ったとき）。
+    # 読めなかった理由（組み込みに戻ったとき、か、レイヤーを空として扱ったとき）。
     fallback: str = ""
-    # 空として扱った層の名前。記録の `fallback` にそのまま入る（設計 11.2）。
+    # 空として扱ったレイヤーの名前。記録の `fallback` にそのまま入る（設計 11.2）。
     dropped: list[str] = field(default_factory=list)
 
     @property
@@ -191,7 +191,7 @@ def builtin() -> Definition:
 
 
 def load(path: str) -> tuple[Definition, list[Problem]]:
-    """共通層の定義を読む。無ければ組み込み。壊れていれば組み込みに戻り、苦情を返す。"""
+    """共通レイヤーの定義を読む。無ければ組み込み。壊れていれば組み込みに戻り、苦情を返す。"""
     if not path:
         return builtin(), []
     try:
@@ -214,10 +214,10 @@ def load(path: str) -> tuple[Definition, list[Problem]]:
 
 
 def load_layer(path: str, script_homes: tuple[str, ...]) -> tuple[Definition | None, list[Problem]]:
-    """層の定義を読む。無ければ None（無い層 = 空）。壊れていても組み込みには戻さない。
+    """レイヤーの定義を読む。無ければ None（無いレイヤー = 空）。壊れていても組み込みには戻さない。
 
-    共通層が在るのに組み込みに戻すと、共通層の配点が消える側になる（設計 11.2）。
-    壊れた層は空として扱い、苦情だけを返す。
+    共通レイヤーが在るのに組み込みに戻すと、共通レイヤーの配点が消える側になる（設計 11.2）。
+    壊れたレイヤーは空として扱い、苦情だけを返す。
     """
     if not path:
         return None, []
@@ -234,9 +234,10 @@ def load_layer(path: str, script_homes: tuple[str, ...]) -> tuple[Definition | N
 def parse(
     text: str, where: str = "(risk)", script_homes: tuple[str, ...] = SCRIPT_HOMES
 ) -> tuple[Definition | None, list[Problem]]:
-    """定義 1 本を読む。`script_homes` はこの層で `script:` に書けるパスの先頭。
+    """定義 1 本を読む。`script_homes` はこのレイヤーで `script:` に書けるパスの先頭。
 
-    共通層は `.ccnavi/common/scripts/`、各層はその `<ccnavi ディレクトリ>/scripts/` だけ。
+    共通レイヤーは `.ccnavi/common/scripts/`、
+    各レイヤーはその `<ccnavi ディレクトリ>/scripts/` だけ。
     たがいの側を指す定義はここで error にする（設計 11.4.2）。プロジェクトの
     リポジトリに入る定義が、ワークスペースの道具に依存する形を作らないため。
     """
@@ -255,8 +256,9 @@ def parse(
                 f"版 {data.get('version')!r} は扱えない（このビルドが読むのは {VERSION}）",
             )
         ]
-    # 書かれた鍵だけを持つ。既定で埋めると、合成のときに「書いていない層」が
-    # 共通層の緩めた境目の点を気づかないうちに戻す（設計 11.4.2）。順を見るときだけ既定で補う。
+    # 書かれた鍵だけを持つ。既定で埋めると、合成のときに「書いていないレイヤー」が
+    # 共通レイヤーの緩めた境目の点を気づかないうちに戻す（設計 11.4.2）。
+    # 順を見るときだけ既定で補う。
     levels: dict[str, int] = {}
     raw_levels = data.get("levels")
     if raw_levels is not None:
@@ -315,14 +317,14 @@ def _factors(
             continue
         ident = str(item.get("id") or "").strip()
         if ID_SEPARATOR in ident:
-            # 層の名前をつけた形（`lib:schema`）と見分けが付かない。共通層に書けば
+            # レイヤーの名前をつけた形（`lib:schema`）と見分けが付かない。共通レイヤーに書けば
             # lib の配点に見え、記録を読んだユーザがどのファイルを直すのか決められない。
             problems.append(
                 Problem(
                     SEVERITY_ERROR,
                     where,
                     f"`factors[{i}].id` に `{ID_SEPARATOR}` は書けない。"
-                    f"層の名前を添えた形（`self{ID_SEPARATOR}id` / "
+                    f"レイヤーの名前を添えた形（`self{ID_SEPARATOR}id` / "
                     f"`<プロジェクト名>{ID_SEPARATOR}id`）と見分けが付かない",
                 )
             )
@@ -385,10 +387,10 @@ def _factors(
                     Problem(
                         SEVERITY_ERROR,
                         ident,
-                        f"`script` の `{rel}` はこの層から指せない。"
+                        f"`script` の `{rel}` はこのレイヤーから指せない。"
                         + " か ".join(f"`{h}`" for h in script_homes)
-                        + " の下に、その層の git プロジェクトルートからの相対で置く"
-                        "（守られた場所。層と共通層はたがいの側を指せない）",
+                        + " の下に、そのレイヤーの git プロジェクトルートからの相対で置く"
+                        "（守られた場所。レイヤーと共通レイヤーはたがいの側を指せない）",
                     )
                 )
                 continue
@@ -413,25 +415,26 @@ def _factors(
 
 
 def mark_layer(definition: Definition, layer: str, home: str) -> None:
-    """この定義の項目に、層の名前と `script:` を解く基準ディレクトリを持たせる。"""
+    """この定義の項目に、レイヤーの名前と `script:` を解く基準ディレクトリを持たせる。"""
     for f in definition.factors:
         f.source = layer
         f.home = home
 
 
 def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition, list[Problem]]:
-    """共通層の配点に、行き先の層の配点を足す（設計 11.4.2）。
+    """共通レイヤーの配点に、行き先のレイヤーの配点を足す（設計 11.4.2）。
 
     `factors` は連結。同 `id` で全欄が一致すれば重複として後ろを捨て（info）、
-    中身が違えば両方を数え、後ろの層の項目を `<層>:<id>` と名乗らせる（warn）。
-    `levels` は書かれた鍵だけを合わせ、キーごとに小さいほうを採る。どの層も書いて
+    中身が違えば両方を数え、後ろのレイヤーの項目を `<レイヤー>:<id>` と名乗らせる（warn）。
+    `levels` は書かれた鍵だけを合わせ、キーごとに小さいほうを採る。どのレイヤーも書いて
     いない鍵は既定（`DEFAULT_LEVELS`）。
 
-    同 `id` の衝突で層を空にしないのは、空にすると点が小さくなる側になるから。
+    同 `id` の衝突でレイヤーを空にしないのは、空にすると点が小さくなる側になるから。
     両方を数えれば、衝突は点を増やす向きにしか影響しない（ルールの同 `id` と同じ扱い）。
-    裸の `id` にコロンは書けないので、層の名前を前に付けた `id` が他の項目と重なることは無い。
+    裸の `id` にコロンは書けないので、レイヤーの名前を前に付けた `id` が他の項目と重なることは無い。
 
-    合成後の `levels` の順が崩れる error のときは、その層を空として扱い、共通層だけを返す。
+    合成後の `levels` の順が崩れる error のときは、そのレイヤーを空として扱い、
+    共通レイヤーだけを返す。
     """
     problems: list[Problem] = []
     ids = {f.id for f in common.factors}
@@ -443,8 +446,8 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
                 Problem(
                     SEVERITY_INFO,
                     f.id,
-                    f"`{f.id}` は前の層と全欄が同じなので、{layer} の側を捨てた。"
-                    "点は前の層の 1 本で数える",
+                    f"`{f.id}` は前のレイヤーと全欄が同じなので、{layer} の側を捨てた。"
+                    "点は前のレイヤーの 1 本で数える",
                 )
             )
             continue
@@ -454,7 +457,7 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
                 Problem(
                     SEVERITY_WARN,
                     f.id,
-                    f"`{f.id}` が前の層と同じ id で中身が違う。両方を数え、{layer} の側は"
+                    f"`{f.id}` が前のレイヤーと同じ id で中身が違う。両方を数え、{layer} の側は"
                     f" `{qualified}` と名乗る（記録と record-risk もこの名前）。"
                     "同じ項目のつもりなら全欄を揃え、別の項目なら id を変えてください",
                 )
@@ -473,7 +476,7 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
                 SEVERITY_ERROR,
                 "(levels)",
                 f"合成後の `levels` が medium {shown['medium']} <= high {shown['high']} <= "
-                f"critical {shown['critical']} になっていない。{layer} の層は空として扱う",
+                f"critical {shown['critical']} になっていない。{layer} のレイヤーは空として扱う",
             )
         )
     if any(p.severity == SEVERITY_ERROR for p in problems):
@@ -496,9 +499,9 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
 
 
 def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
-    """`script:` が指す先が、その層の git プロジェクトルートに在るか（設計 11.4.2）。
+    """`script:` が指す先が、そのレイヤーの git プロジェクトルートに在るか（設計 11.4.2）。
 
-    `layer` を渡すと、その層から来た項目だけを見る。走らせるときは今までどおり
+    `layer` を渡すと、そのレイヤーから来た項目だけを見る。走らせるときは今までどおり
     「測れなかった」でその項目の点を加えるが、`--lint` は在ることを先に言う。
     """
     problems: list[Problem] = []
@@ -521,12 +524,12 @@ def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
 
 
 def definition_path(conf: settings.Settings, root: str, project: str) -> str:
-    """そのプロジェクトの層の risks.yml。空の `project` はワークスペース自身の層。
+    """そのプロジェクトのレイヤーの risks.yml。空の `project` はワークスペース自身のレイヤー。
 
-    予約名（`common` / `self`）のプロジェクトは層として数えないので、パスを持たない
-    （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
-    名前と一致し、そのプロジェクトの配点がワークスペースの層として合成される。
-    配点を書ける側が層を選べると、自分のリスクを自分で下げる方法になる。
+    予約名（`common` / `self`）のプロジェクトはレイヤーとして数えないので、パスを持たない
+    （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身のレイヤーの
+    名前と一致し、そのプロジェクトの配点がワークスペースのレイヤーとして合成される。
+    配点を書ける側がレイヤーを選べると、自分のリスクを自分で下げる方法になる。
     """
     if settings.is_reserved_layer_name(project):
         return ""
@@ -539,11 +542,11 @@ def definition_path(conf: settings.Settings, root: str, project: str) -> str:
 def layer_definition(
     conf: settings.Settings, root: str = "", project: str = ""
 ) -> tuple[Definition, list[Problem]]:
-    """共通層 + その層の配点と、**その層の**苦情（設計 11.4.2）。
+    """共通レイヤー + そのレイヤーの配点と、**そのレイヤーの**苦情（設計 11.4.2）。
 
-    共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
-    言うと同じ文を 2 度読むことになる。共通層が壊れていれば組み込みに戻り、
-    そのときは層を足さない（設計 11.2）。
+    共通レイヤー自身の苦情は返さない。言う場所は `--lint` の共通レイヤーの項で、そこと二重に
+    言うと同じ文を 2 度読むことになる。共通レイヤーが壊れていれば組み込みに戻り、
+    そのときはレイヤーを足さない（設計 11.2）。
     """
     definition, _ = load(conf.risk)
     mark_layer(definition, settings.LAYER_COMMON, root)
@@ -557,18 +560,21 @@ def layer_definition(
     extra, notes = load_layer(path, (settings.layer_script_home(conf),))
     if extra is None:
         definition.dropped.append(layer)
-        definition.fallback = f"{layer} の配点が壊れている。この層は空として数える"
+        definition.fallback = f"{layer} の配点が壊れている。このレイヤーは空として数える"
         return definition, list(notes)
     mark_layer(extra, layer, home)
     merged, problems = merge(definition, extra, layer)
     if merged.dropped:
         dropped = ", ".join(merged.dropped)
-        merged.fallback = f"{dropped} の配点の境目の点が合成で逆転している。この層は空として数える"
+        merged.fallback = (
+            f"{dropped} の配点の境目の点が合成で逆転している。このレイヤーは空として数える"
+        )
     return merged, list(notes) + problems
 
 
 def load_definition(conf: settings.Settings, root: str = "", project: str = "") -> Definition:
-    """判定が使う配点。共通層に、親の承認済みチケットの `project:` が指す層を足したもの。"""
+    """判定が使う配点。
+    共通レイヤーに、親の承認済みチケットの `project:` が指すレイヤーを足したもの。"""
     definition, _ = layer_definition(conf, root, project)
     return definition
 
@@ -676,7 +682,7 @@ class Hit:
     id: str
     points: int
     detail: str
-    # この項目が書いてある層（設計 11.9）。記録に残す。
+    # この項目が書いてあるレイヤー（設計 11.9）。記録に残す。
     source: str = ""
 
 
@@ -719,7 +725,7 @@ def evaluate(
     """差分と判定から点を出す。定性項目に判定が無ければ pending に積む。"""
     score = Score()
     for f in definition.factors:
-        # 加点した項目には、その定義が書いてある層を残す（設計 11.9）。
+        # 加点した項目には、その定義が書いてあるレイヤーを残す（設計 11.9）。
         where = f.source
         if f.kind == KIND_LINES:
             if diff.lines > int(f.value):
@@ -749,8 +755,8 @@ def evaluate(
                 shown = ", ".join(hit[:3]) + ("…" if len(hit) > 3 else "")
                 score.hits.append(Hit(f.id, points, f"{f.message}（{shown}）", where))
         elif f.kind == KIND_SCRIPT:
-            # 解く基準はその層の git プロジェクトルート。共通層と自身の層は
-            # ワークスペースルート、プロジェクトの層はそのプロジェクト（設計 11.4.2）。
+            # 解く基準はそのレイヤーの git プロジェクトルート。共通レイヤーと自身のレイヤーは
+            # ワークスペースルート、プロジェクトのレイヤーはそのプロジェクト（設計 11.4.2）。
             points, note = run_script(f.home or root, str(f.value), worktree, env)
             if points is None:
                 score.hits.append(

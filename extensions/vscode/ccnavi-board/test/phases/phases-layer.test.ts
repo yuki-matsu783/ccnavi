@@ -1,5 +1,5 @@
 /**
- * 層（自身の層・プロジェクト）と共通層の種類。ファイルが無いときの見せ方と、無いファイルへの書き戻し。
+ * レイヤー（自身のレイヤー・プロジェクト）と共通レイヤーの種類。ファイルが無いときの見せ方と、無いファイルへの書き戻し。
  * 画面の側は React なので happy-dom で動かして見る。
  */
 import { test } from "node:test";
@@ -11,15 +11,15 @@ import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "res
 
 const MISSING: Partial<PhasesPage> = { exists: false, model: { version: null, form: { order: "sequential", phases: [] }, problems: [] } };
 
-test("CB-T114 層の種類のファイルが無いときは雛形を置かず、欄を触れるようにして最初の保存で作らせる", async () => {
+test("CB-T114 レイヤーの種類のファイルが無いときは雛形を置かず、欄を触れるようにして最初の保存で作らせる", async () => {
   const layer = await openPhases({ ...MISSING, layer: true, notices: ["読めない <理由>"] });
   try {
     assert.match(layer.one(".banner.missing").textContent, /最初の保存でファイルが作られます/);
-    assert.equal(layer.all('button[data-action="create"]').length, 0, "層に雛形は置かない");
+    assert.equal(layer.all('button[data-action="create"]').length, 0, "レイヤーに雛形は置かない");
     // 文面はそのまま出る（React が文字として入れるので、実体参照に変わらない）
     assert.equal(layer.all(".banner.warn:not(#changed)").length, 1);
     assert.equal(layer.one(".banner.warn:not(#changed)").textContent, "読めない <理由>");
-    // 無い層でも種類を足して保存できる
+    // 無いレイヤーでも種類を足して保存できる
     assert.ok(!layer.one<HTMLButtonElement>('button[data-action="add"]').disabled);
     assert.match(layer.one("#phases .empty").textContent, /種類を足して保存すると、ファイルが作られます/);
     layer.click(layer.one('button[data-action="add"]'));
@@ -30,7 +30,7 @@ test("CB-T114 層の種類のファイルが無いときは雛形を置かず、
   }
 });
 
-test("CB-T239 共通層のファイルが無いときは雛形を作らせず、種類は層に置くと案内して自身の層を開く道だけを出す", async () => {
+test("CB-T239 共通レイヤーのファイルが無いときは雛形を作らせず、種類はレイヤーに置くと案内して自身のレイヤーを開く道だけを出す", async () => {
   const common = await openPhases({ ...MISSING, phasesPath: ".ccnavi/common/phases.yml" });
   try {
     const banner = common.one(".banner.missing").textContent;
@@ -43,7 +43,7 @@ test("CB-T239 共通層のファイルが無いときは雛形を作らせず、
     assert.ok(common.one<HTMLButtonElement>('button[data-action="add"]').disabled);
     assert.match(common.one("#phases .empty").textContent, /種類はワークスペースかプロジェクトの設定に置いてください/);
     assert.equal(common.all(".banner.warn:not(#changed)").length, 0);
-    // 自身の層を開くボタンは、拡張ホストへ openSelf だけを送る（ファイルは作らない）
+    // 自身のレイヤーを開くボタンは、拡張ホストへ openSelf だけを送る（ファイルは作らない）
     assert.equal(common.one('button[data-action="open-self"]').textContent, "ワークスペースの設定を開く");
     common.click(common.one('button[data-action="open-self"]'));
     await common.settle();
@@ -80,7 +80,7 @@ test("CB-T116 無いファイル（空の本文）に種類を足して書き戻
   assert.match(text, /^version: 1$/m);
   assert.match(text, /^phases:\n {2}notes:\n/m);
   assert.ok(!text.includes("{}"));
-  // 層に作るときは先頭に説明のコメントを足す。足しても読み直して苦情が出ない
+  // レイヤーに作るときは先頭に説明のコメントを足す。足しても読み直して苦情が出ない
   const again = readPhases(`# 説明\n${text}`);
   assert.deepEqual(again.model.problems, []);
   assert.deepEqual(again.model.form.phases.map((p) => [p.id, p.title, p.inherit]), [["notes", "メモ", true]]);

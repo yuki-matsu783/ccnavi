@@ -311,7 +311,7 @@ def _committed_findings(
             uncounted.append(w.tree.name or ".")
             continue
         # 着手がコピーした分かどうかは、コミットされた中身で答える。ディスクで答えると、
-        # 好きな中身でコミットしてからディスクだけ共通層の中身へ戻す形が、呼び出しごとの
+        # 好きな中身でコミットしてからディスクだけ共通レイヤーの中身へ戻す形が、呼び出しごとの
         # チェック・バックアップと復元・ここの 3 つから同時に外れる。
         judged = (
             functools.partial(_committed_synced, synced, top, base, changes) if synced else None

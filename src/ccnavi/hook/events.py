@@ -97,7 +97,7 @@ def watched_for(
 
     payload が無ければ全部のツリー（ターンの区切り）。あればワークスペースルートと、
     この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。
-    ルールの引き方は実行前チェックと同じで、共通層にそのツリーの層を足した和。
+    ルールの引き方は実行前チェックと同じで、共通レイヤーにそのツリーのレイヤーを足した和。
     別に書くと、実行前に通った書き込みがターンの終わりに報告される。
     """
     ws = tree.main_tree(root)
@@ -113,8 +113,9 @@ def watched_for(
     out = []
     for t in trees:
         if t.project not in loaded:
-            # 共通層はツリーの層ごとに読み直す（層を足すと集合が書き換わるため）。苦情は同じなので
-            # 最初の 1 回だけ書く。層の苦情はツリーごとに違うので、add_layers はそのまま書く。
+            # 共通レイヤーはツリーのレイヤーごとに読み直す（レイヤーを足すと集合が書き換わるため）。
+            # 苦情は同じなので
+            # 最初の 1 回だけ書く。レイヤーの苦情はツリーごとに違うので、add_layers はそのまま書く。
             said = stderr if not loaded else io.StringIO()
             rule_set, source = ruleload.load_rules(said, conf, record, root)
             if source != builtin.SOURCE:
@@ -137,7 +138,7 @@ def scope_guard(
     if not conf.tickets_enabled:
         return None
     copies, _ = approval.scan(conf, root, raw=raw)
-    # 種類の上限は層（計画を持つ親の `project:`）ごとに、ここで 1 度だけ読む。
+    # 種類の上限はレイヤー（計画を持つ親の `project:`）ごとに、ここで 1 度だけ読む。
     types: dict[str, dict] = {}
     for copy in copies:
         if copy.has_plan and copy.project not in types:
@@ -281,7 +282,7 @@ def stop_rules_nudge(
     設定が持ち、ここは当てて数えるだけ（レビューの勧告と同じ分け方）。`every: 10` と書けば
     「ターンの終わり 10 回に 1 度」止める。
 
-    ルールは共通層とワークスペース自身の層からだけ引く（`ruleload.stop_rules`）。プロジェクトの層は
+    ルールは共通レイヤーとワークスペース自身のレイヤーからだけ引く（`ruleload.stop_rules`）。プロジェクトのレイヤーは
     外のリポジトリで、そこに書かれた 1 行が cwd に依らずメインのターンの終わりを止められて
     しまうため。本文のファイルもワークスペースルートの版だけを読む（ワークツリーやプロジェクトの
     版はエージェントが書き換えられる）。
@@ -465,7 +466,8 @@ def decide_after(
     # 保護の根拠を、この呼び出しが触れる前の状態に返してから読む。
     # 書いた先を渡すのは、組み込みの既定を使っている間の修復を戻さないため
     # （selfguard._left_as_repair）。
-    # 着手のときに共通層でプロジェクトの層を上書きした分は、内容と上書きの記録で見分けて外す
+    # 着手のときに共通レイヤーでプロジェクトのレイヤーを上書きした分は、
+    # 内容と上書きの記録で見分けて外す
     # （設計 11.12）。戻す側と、報告する側の両方で同じ答えを使う。
     synced = functools.partial(configsync.is_synced_write, conf, root)
     restore = functools.partial(selfguard.after, written=_written(payload, record), synced=synced)

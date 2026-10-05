@@ -304,9 +304,7 @@ def _ask_choices(
         stdout.write("  （issue に回せるのは、フィードバック計画が承認されたあとです）\n")
     choices: dict[str, str] = {}
     for i, t in enumerate(d.unresolved, 1):
-        stdout.write(
-            f"[{i}/{len(d.unresolved)}] {t.url} {t.path}:{t.line} {review._first_line(t.body)}\n"
-        )
+        stdout.write(f"[{i}/{len(d.unresolved)}] {review.thread_label(t)}\n")
         stdout.write(f"選択（{keys}）: ")
         stdout.flush()
         picked = _CHOICE_KEYS.get(fsio.read_line(stdin).strip().lower(), "")
@@ -506,7 +504,7 @@ def apply_decision(
 
 
 def _thread_line(t: review_host.Thread) -> str:
-    return f"{t.url} {t.path}:{t.line} {review._first_line(t.body)}"
+    return review.thread_label(t)
 
 
 def _write_decide_issue(

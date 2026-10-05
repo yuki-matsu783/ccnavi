@@ -281,7 +281,7 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     if sum(t in ("<<", "<<-") for t in tokens) > heads:
         # 走査がヒアドキュメントと読まなかった `<<` が、トークンに出た。引用が `<<` だけの
         # 1 語（`grep -n "<<" f`）で、shlex からは演算子と区別が付かない。今までどおり
-        # 閉じない本文として縮退する（ccnavi.md 12.2 の許容した誤検知）。
+        # 閉じない本文として縮退する（設計 12.2 の許容した誤検知）。
         return Reading(
             degraded=True, reason=shellread_scan.REASON_UNTERMINATED, rewrites=rewrites
         ), runnable

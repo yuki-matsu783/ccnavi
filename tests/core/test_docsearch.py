@@ -530,7 +530,7 @@ class CliTest(Repo):
                 self.assertEqual(done.returncode, 1, done.stdout)
                 self.assertIn(f"--docs は {args[0]} と一緒に使えない", done.stderr)
                 self.assertEqual(done.stdout, "")
-                # 層の置き場の「診断でだけ効く」の文で先へ進まない。
+                # レイヤーの置き場の「診断でだけ効く」の文で先へ進まない。
                 self.assertNotIn("診断", done.stderr)
 
     def test_root_log_and_state_are_accepted(self):
