@@ -370,7 +370,7 @@ class Raw:
 
     1 回の判定の中で `scan`・`scan(closed=True)`・`scan_review`・`scan_proposals` を続けて呼ぶ
     呼び手が、同じ置き場を何度も読まないために持ち回る（`read_raw`）。覚えておいたものではなく、その
-    呼び出しの中で今しがた読んだもの（`_everything` と同じ考え方）。
+    呼び出しの中で今しがた読んだもの（`all_tickets` と同じ考え方）。
     """
 
     open_all: list[ticket_model.Ticket]
@@ -422,12 +422,12 @@ def scan(
             approval_checks.mark_imported(conf, root, kept)
         return kept, list(notes)
     found, notes = scan_all(conf, root, closed)
-    # 読んだ側を `_everything` に渡す。渡さないと、この同じ式の中でまったく同じ
+    # 読んだ側を `all_tickets` に渡す。渡さないと、この同じ式の中でまったく同じ
     # `scan_all` をもう 1 度呼ぶことになる（下記）。
     if closed:
-        everything = _everything(conf, root, closed_all=found)
+        everything = all_tickets(conf, root, closed_all=found)
     else:
-        everything = _everything(conf, root, open_all=found)
+        everything = all_tickets(conf, root, open_all=found)
     kept = _authoritative(found, everything)
     if not closed:
         # 手元の退避にある（ready が閉じて移した）チケットの、子のワークツリーに残った古いチケットは
@@ -448,7 +448,7 @@ def scan_review(
         approval_checks.mark_imported(conf, root, kept)
         return kept, list(raw.review_notes)
     found, notes = review_all(conf, root)
-    kept = archive.drop_archived(root, _authoritative(found, _everything(conf, root, review=found)))
+    kept = archive.drop_archived(root, _authoritative(found, all_tickets(conf, root, review=found)))
     approval_checks.mark_imported(conf, root, kept)
     return kept, notes
 
@@ -486,7 +486,7 @@ def read_proposals(
     本物とするツリーの外に残った `todo/` の提案（`stale_proposals`）を 3 つ目に添える。
     """
     if everything is None:
-        everything = _everything(conf, root)
+        everything = all_tickets(conf, root)
     found, problems = ticket_mod.scan_all(root, conf.tickets, conf.projects)
     kept = ticket_fold.dedupe(found, everything)
     return kept, problems, stale_proposals(found, kept, everything)
@@ -591,7 +591,7 @@ def tree_path(conf: settings.Settings, root: str, name: str, project: str = "") 
     return "ワークスペースルート" if rel == "." else rel
 
 
-def _everything(
+def all_tickets(
     conf: settings.Settings,
     root: str,
     *,

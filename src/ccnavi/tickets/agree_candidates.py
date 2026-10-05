@@ -459,7 +459,7 @@ def _last_phase_with_children(conf: settings.Settings, root: str, parent_id: str
     """この親で、子が承認された（開いていても閉じていても）いちばん後ろの番号。"""
     numbers = [
         t.phase
-        for t in approval._everything(conf, root)
+        for t in approval.all_tickets(conf, root)
         if t.parent == parent_id and t.phase is not None
     ]
     return max(numbers) if numbers else 0

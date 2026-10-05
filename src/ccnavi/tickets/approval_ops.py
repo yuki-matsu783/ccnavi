@@ -228,7 +228,7 @@ def next_child_id(conf: settings.Settings, root: str, parent_id: str, phase_no: 
     top = ticket_ids.MAX_CHILD_NUMBER
     if not 0 <= phase_no <= top:
         raise ValueError(f"フェーズ {phase_no} は子の識別子に書けない（フェーズ番号は 0〜{top}）")
-    seen = approval._everything(conf, root)
+    seen = approval.all_tickets(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
     # 退避は親のリポジトリ（プロジェクト）のものだけを見る。親が置き場に無ければ全部を見る。
     projects = {t.project for t in seen + proposals if t.ticket == parent_id}

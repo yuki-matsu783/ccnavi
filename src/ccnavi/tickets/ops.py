@@ -81,7 +81,7 @@ def start(
             f"{_branch_words(found)}' で作ってください\n"
         )
         return 1
-    sha = ops_stop._head(worktree)
+    sha = ops_stop.worktree_head_sha(worktree)
     if not sha:
         stderr.write(f"ccnavi: {worktree} の HEAD を読めない\n")
         return 1
@@ -359,7 +359,7 @@ def record_risk(
         )
         return 1
     worktree = tree.worktree_path(root, ticket_id)
-    head = ops_stop._head(worktree)
+    head = ops_stop.worktree_head_sha(worktree)
     if not head:
         stderr.write(f"ccnavi: {worktree} の HEAD を読めない\n")
         return 1

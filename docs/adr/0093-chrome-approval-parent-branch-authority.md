@@ -257,7 +257,7 @@ REQ-APV-14 の案内（`ticket.py:1163-1179`）に「push してから依頼す�
 | `approval.home_dir`（`:313-347`） | 持っているツリー → 親 → 提案 → ワークスペースルート | 取り込み済みの親子のチケットは `P` のツリーだけ（無ければ書けない）。**それ以外は今のまま**（D11 と合わせる。origin の無い親子のチケットの「承認の後にワークツリーを作る」流れを止めない） |
 | `approval_ops.predecessor_pool`（`approval_ops.py:373-380`） | 手元の全ツリー | 取り込み済みの親子のチケットは 3.3 の 5 の閉包から作る対応表（Chrome と同じ）。それ以外は今のまま |
 | `ticket_fold.fold` / `behind` / `dedupe`（`ticket_fold.py:13-169`） | 同じ識別子を 1 つにまとめる | 残す（提案の重複をまとめる処理は別の用途） |
-| 全ツリーの走査（`_everything`） | 子の番号や先の計画を全ツリーから引く | 残す（`next_child_id` `approval_ops.py:219`、`_last_phase_with_children` `:2404`、`diagnose.py:749`） |
+| 全ツリーの走査（`all_tickets`） | 子の番号や先の計画を全ツリーから引く | 残す（`next_child_id` `approval_ops.py:219`、`_last_phase_with_children` `:2404`、`diagnose.py:749`） |
 | `phasetypes.types_path`（`phasetypes.py:583-595`） | ワークスペース自身のレイヤーはワークスペースルートの作業ツリー、プロジェクトのレイヤーは `projects/<名前>` の作業ツリー（`tree.project_root`、`:591-594`）から読む | 手元は変えない（決定 B1。3.3 の 6）。統合先の取り込み結果のレイヤー・D28 の計算との違いは lint の warn。Chrome は統合先のレイヤーと D28 の計算を読む |
 | `ops_close._undecided` と ADR-0073 の文面 | 「1 つにしてから」 | 3.6 の案内 |
 | `ccnavi-git.sh` push の保護（`:531-563`） | 全ツリーを探して子を見分ける | 子の見分けは変えない。親子のチケットの取り込み状態が `gone` の `P` への push を拒否。push が通ったら取り込み状態を作る（4.3 の最初の push） |

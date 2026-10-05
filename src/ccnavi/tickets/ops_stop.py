@@ -3,7 +3,7 @@
 メインエージェントが終わろうとしたとき、着手済みのまま `finish` されていないチケットを見つけ
 （`unfinished_at_stop`）、促しを 1 回だけ出す
 （`nudged_before` / `remember_nudge` / `finish_nudge`）。
-`base_off_head` は基準点がワークツリーの HEAD の祖先かを見る。`_head` は `ops.py` も使う。
+`base_off_head` は基準点がワークツリーの HEAD の祖先かを見る。`worktree_head_sha` は `ops.py` も使う。
 """
 
 from __future__ import annotations
@@ -66,7 +66,7 @@ def unfinished_at_stop(
         syncstate.Families(conf, root).branch(bound.parent, bound.project) if bound.is_child else ""
     )
     ahead = _own_commits(here.root, bound, parent_branch)
-    head = _head(here.root)
+    head = worktree_head_sha(here.root)
     if ahead <= 0 or not head:
         return None
     return Unfinished(bound, here.root, ahead, head)
@@ -165,7 +165,7 @@ def base_off_head(root: str, conf: settings.Settings, t: ticket_model.Ticket) ->
     worktree = tree.worktree_path(root, t.ticket)
     if not tree.is_worktree_of(owner, worktree):
         return ""
-    head = _head(worktree)
+    head = worktree_head_sha(worktree)
     if not head or _is_ancestor(worktree, t.base_sha, head):
         return ""
     return (
@@ -183,6 +183,6 @@ def _is_ancestor(worktree: str, base: str, head: str) -> bool:
     return done.ok
 
 
-def _head(worktree: str) -> str:
+def worktree_head_sha(worktree: str) -> str:
     rc, out = gitcmd.output(worktree, ["rev-parse", "HEAD"], ops_close.TIMEOUT_SECONDS)
     return out.strip() if rc == 0 else ""
