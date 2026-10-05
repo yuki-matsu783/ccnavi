@@ -142,6 +142,26 @@ def can_symlink() -> bool:
     return True
 
 
+def can_pass_argument(size: int) -> bool:
+    """sh から jq へ、`size` 字の引数を渡せるか。実際に渡して確かめる。
+
+    取ってきた状態は `jq --argjson` の引数で渡すので、1 引数の上限（Windows は約 32,000 字）を
+    超える場面は、上限のある環境では取れない。sh か jq が無ければ、確かめずに True を返す
+    （そちらは別の skip が受ける）。
+    """
+    sh = _shutil.which("sh") or _shutil.which("bash")
+    if sh is None or _shutil.which("jq") is None:
+        return True
+    done = _subprocess.run(
+        [sh, "-c", "a=$(cat); jq -n --arg a \"$a\" '$a|length'"],
+        input="x" * size,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return done.returncode == 0 and done.stdout.strip() == str(size)
+
+
 def live_sh_pid(test) -> int:
     """sh の `kill -0` から生きて見えるプロセスの pid。テストごとに 1 つ起こして使い回す。
 
