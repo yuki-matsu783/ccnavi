@@ -16,7 +16,7 @@ allow:
 - match: Write|Edit
   glob: wip/design/sample-ticket
 started_at: "2026-10-06T08:04:58+0900"
-completed_at: ''
+completed_at: "2026-10-06T08:06:27+0900"
 base_sha: "567ba9d5863dcda6ce7349515f72442d7413e491"
 followup_of:
 - feature-1-sample-ticket-02-01
