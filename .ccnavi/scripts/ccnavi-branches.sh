@@ -15,7 +15,7 @@
 #   - ホスト（GitHub / GitLab）はこの sh が読む。MR 指定なら、その MR の元ブランチ。issue 指定なら、
 #     その issue を参照している開いた MR の元ブランチ。繋ぎ方は ccnavi-common-host.sh の「ホスト（GitHub /
 #     GitLab）への接続」（ccnavi-review.sh と同じ。gh / glab か、curl と GITHUB_TOKEN / GITLAB_TOKEN）
-#   - 読んだ結果を JSON（形は ccnavi.md の 9.13）に書き、実行ファイルの
+#   - 読んだ結果を JSON（形は設計 9.13）に書き、実行ファイルの
 #     `ccnavi branches <issue|mr> <番号> --result <json>` に渡す。手元の候補（名前に番号を含むブランチ・
 #     ワークツリー・`issue:` を持つチケット）は実行ファイルが集め、合わせて 1 候補 1 行（--json なら JSON）で出す
 #   - ホストに繋げないときは止めない。理由を JSON に書き、実行ファイルが「ホストは見ていない」と言って

@@ -22,7 +22,7 @@ keywords: [フェーズ, グラフ, DAG, requires, overlap, 置き場所, id]
 最初の案は `requires` を辺にした有向グラフ（DAG）で、レイヤに分けて「先にやる種類」を左に置く
 ものだった。**これは間違っている。**
 
-- `ccnavi.md` の種類の表: `requires` は「計画にこの種類を置くなら一緒に置くべき種類」。用途は「承認」
+- 設計 9.7 の種類の表: `requires` は「計画にこの種類を置くなら一緒に置くべき種類」。用途は「承認」
 - `ccnavi/approval.py` の `for need in pt.requires: if need not in seen_types:` は、
   `plan:` に**入っているか**しか見ない。前後は見ない
 - `overlap` は定義からして対称

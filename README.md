@@ -2,8 +2,8 @@
 
 Claude Code のツール呼び出しを hook で止め、止めた理由と代わりに取る手段を返す。
 
-用語は [CONTEXT.md](CONTEXT.md)、要求は [requirements.md](requirements.md)、設計は
-[ccnavi.md](ccnavi.md)、判断の理由と経緯は [docs/adr/](docs/adr/README.md) にある。
+用語は [CONTEXT.md](docs/CONTEXT.md)、要求は [requirements.md](docs/requirements.md)、設計は
+[docs/design.md](docs/design.md)、判断の理由と経緯は [docs/adr/](docs/adr/README.md) にある。
 「承認済みチケット」「マーカー」「ワークツリー」「直接作業」のような呼び名は用語集で定義している。
 
 ## 導入
@@ -112,10 +112,17 @@ Python 3.12 以降。実行時の依存は PyYAML 1 本だけ。
 
 ```sh
 uv run python -m unittest discover -s tests -t .   # テスト
+uv run python -m unittest discover -s tests/core -t .  # 1 グループ（core guard config ticket sh e2e）
 uv run --with ruff ruff check .                    # 静的検査
 uv run --with ruff ruff format .                   # 整形
+uv run --with ruff ruff format --check .           # 整形の確認だけ
 uv run --with pyinstaller python build.py          # 実行ファイルの組み立て
 ```
+
+テストは `python -m unittest` で回す。ファイルを直接実行すると `tests` パッケージを import できずに落ちる。
+回すグループは `.claude/skills/commit/references/test-groups.md` の表で決める。
+
+`knowledge/` は参照専用の資料で git 管理外。Claude Code の hook にまつわる実測が入っている。
 
 手で 1 回動かす。
 
@@ -181,6 +188,16 @@ dist/ は新しい。.ccnavi/bin/<target>/ は前のまま
 振り分けの sh の不具合に気づけないこと。`ccnavi.settings.local.json` のキー `bin` でも
 `CCNAVI_BIN_PATH` を上書きできるが、変わるのは自己防衛が何を守るかだけで、hook が何を起動するかは変わらない。
 
+### 配布する sh を確かめる
+
+```sh
+uv run python -m unittest tests.e2e.test_e2e_sh -v
+```
+
+実行の最初に出る `sh =` がワークスペースルート側を指していることを確かめる。実際に使われるのはワークスペース側の 1 本だけ。
+写す前の版を測るときは `CCNAVI_SH_DIR=<場所>` で差し替える。組み立て済みの実行ファイルを試すので、
+`src/ccnavi/` を直したら組み立て直してから回す（無ければ skip）。モード B（`projects/` を使う形）に触ったら回す。
+
 ### 配布物
 
 PyInstaller の onedir で組み立てる。Windows なら `dist/ccnavi/ccnavi.exe`、
@@ -190,6 +207,45 @@ Linux なら `dist/ccnavi/ccnavi`。onefile は起動のたびにランタイム
 |---|---|---|
 | onedir | 約 220 ms | 17 MB のフォルダ |
 | onefile | 1000〜1500 ms | 7 MB の 1 ファイル |
+
+## 実測で分かった落とし穴
+
+Claude Code の振る舞いについて測った前提は設計書の付録 C。測り直したときは両方を直す。
+
+- **ワークツリーが消せない（Windows）。** uv のハードリンクで `.venv` の `_yaml.*.pyd` が全ツリーで同じ実体になり、
+  誰かのテストが読み込んでいる間は消せない。`pyproject.toml` の `link-mode = "copy"` で分けてあるが、
+  ハードリンクで作った `.venv` はそのままなので、テストが走っていないときに作り直す。自分のテストが走っている間は残る。
+  落ちたら残ったディレクトリを `mv` で `.claude/worktrees/` の外へ出して `git worktree prune`。
+  先に `sh .ccnavi/scripts/ccnavi-clean.sh <名前>` で生成物を消すと node_modules で止まる分は避けられる
+- **`${CLAUDE_PROJECT_DIR}` は hook の `command` では展開されるが `env` では展開されない。** `env` には相対パスを書く
+- **`env` ブロックは再読み込みされない。** セッションを開き直すまで古い値が残る。`command` は即座に反映される
+- **ツールのプロセスに `CLAUDE_PROJECT_DIR` は入っていない。** hook の環境にだけ来る
+- **`.claude/settings.json` は未知のトップレベルキーを拒否する**
+- **PyInstaller は指定したスクリプトをパッケージの外で走らせる。** 相対 import が解けないので、絶対 import の `main.py` を渡す
+- **`shlex` は引用・`#`・改行・行継続・`<<` の扱いがシェルと違う。** `shellread.py` は先に原文を走査してから語の分割だけを
+  shlex に任せる。走査か shlex のどちらかに手を入れたら `tests/core/test_shellread.py` の `SHELL_CASES`（bash 3.2 と zsh で実測）を回す。
+  引用された `<<` による縮退は許容する誤検知（設計 6.3、12.2）
+- **`$( )` の中の `case` は bash 3.2 と zsh で読みが分かれる。** `case` が現れたら縮退させている（許容した誤検知）
+- **複合コマンドは 1 つの区間が読めなければ全体が縮退する。** 安全側なのでそのまま
+- **Python の識別子に空白は入らない。** `def test_warn は…` のように英字と日本語の間に空白を入れると構文エラー
+- **Windows のコンソール経由で日本語を引数に渡すと CP932 になり、`jq --arg` が UTF-8 でない JSON を作る。** 本文はファイルで渡す。
+  `jq` の実体は `C:\Program Files\jq\jq` で、`"$JQ"` と引用しないと空白で分かれる
+- **Windows の `gitdir:` の表記**（git 2.39.2、Git Bash と PowerShell）。絶対パス、区切りは `/`、ドライブレターは大文字、
+  `gitdir:` の後ろは半角空白 1 個。`ccnavi_project`（sh）と `tree.py` がこれを前提にしている
+- **Docker Desktop を起動すると `restart=unless-stopped` の GitLab が勝手に上がり、2GB の VM では engine ごと落ちる。**
+  GitLab CE には 4GB 要る
+
+GitLab の実物（CE 18.5.4）で分かったこと。
+
+| 分かったこと | どうしたか |
+|---|---|
+| 変更要求（`POST .../request_changes`）は EE 限定 | 当てられない。CE の `reviewers` の `state` は `unreviewed` / `reviewed` / `approved` だけ |
+| URL にトークンを埋めた origin はそのままでは `origin` の出力に出る | sh はユーザの情報を落として伏せる。実行ファイルの `remote_kind` も読み飛ばす |
+| ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を落とすので、環境変数で credential helper を差し替えても反映されない | 認証は git の設定側に置く（probe はリポジトリの `credential.helper` を空にしてから足す） |
+| トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流して作れる（`tools/gitlab/make_gitlab_tokens.rb`） | root と reviewer の 2 人分を作る |
+| 起動直後は API の `PUT` が 30 秒を超えることがある | probe は 120 秒で 3 回まで待つ |
+
+`dist/`、`build/`、`logs/` は git 管理外。記録には絶対パスとコマンド全文が入るのでコミットしない。
 
 ## 設定
 
@@ -499,8 +555,8 @@ allow:
 ### ルールは 3 つのレイヤーの和で当たる
 
 ルールファイルは 3 種のレイヤーに置ける。当たるのは共通レイヤー + そのツリーのレイヤーの和で、
-足すだけ、上書き無し、厳しいほうが採られる。設計は [ccnavi.md](ccnavi.md) の 11.4、要求は
-[requirements.md](requirements.md) の REQ-MLT。
+足すだけ、上書き無し、厳しいほうが採られる。設計は [11.4](docs/design/multi-repo/rules.md)、要求は
+[要件 REQ-MLT](docs/requirements/multi-repo.md)。
 
 | レイヤー | 置き場 | 何を置くか |
 |---|---|---|
@@ -932,7 +988,7 @@ perl や python は縮退の対象に入れていない（`perl -pi -e 's/git pu
 引用の中、`\{`、ヒアドキュメントの本文、コメントのブレースは止まらない。`find . -exec rm {} \;` や
 `HEAD@{1}` のように、カンマも範囲も無いブレースも止まらない。代入の右辺（`x={a,b}`）、case のパターン
 （`case $x in {a,b})`）、`[[ $f == *.{jpg,png} ]]` はシェルが広げないが止まる。許容した誤検知で
-（[ccnavi.md](ccnavi.md) 12.2）、引用するか、パターンを `a|b)` や `*.jpg || … *.png` のように書けば通る。
+（[設計 12.2](docs/design/limits.md#122-許容する誤検知)）、引用するか、パターンを `a|b)` や `*.jpg || … *.png` のように書けば通る。
 
 #### コマンド名はそのまま書く
 
@@ -971,7 +1027,7 @@ Markdown など）、単一引用で包むか、`` \` `` と書くか、`--body-
 | コマンドの位置の `select` | `for` で回す |
 
 `$( )` の中の、コマンドの先頭ではない `case` の語（`"$(echo just in case)"`）でも止まる。許容した誤検知
-（[ccnavi.md](ccnavi.md) 12.2）。
+（[設計 12.2](docs/design/limits.md#122-許容する誤検知)）。
 
 ### 実行役のコマンドが中で実行するコマンドにも当てる
 
@@ -1060,7 +1116,7 @@ uv run python scratch.py    # 通る。scratch.py は Write で置く
 算術式の `$((1 << 2))` は左シフトなので、読む前に取り除いてある。
 
 `grep -n "<<" README.md` は止まる（引用された `<<` と素の `<<` を `shlex` が区別しない）。
-許容する誤検知として設計に記載してある（[ccnavi.md](ccnavi.md) 6.3、12.2）。対象をファイルへ移せば回避できる。
+許容する誤検知として設計に記載してある（設計 [6.3](docs/design/pre-check.md#63-bash-は実行される部分だけを見る)、[12.2](docs/design/limits.md#122-許容する誤検知)）。対象をファイルへ移せば回避できる。
 
 ## ファイルのパスは行き着く先で見る
 
@@ -1136,12 +1192,12 @@ ripgrep の既定の挙動で、ccnavi の側では変えられない。
 
 `disable` は `.claude/settings.json` に書いても有効にならない（その指定を名指しで無視し、理由を出す）。エージェントが書き換えられるファイルなので、
 監視される側が監視を止められないようにしている。`disable` にするときはセッションを起動する側の環境から渡す。
-読めない値は報告して `enable` として扱う。詳細は [ccnavi.md](ccnavi.md) の 4.4。
+読めない値は報告して `enable` として扱う。詳細は [設計 4.4](docs/design/startup-config.md#44-動作モード)。
 
 ## ツール実行後チェック
 
 実行前チェックは引数しか見ないので、引数に現れない書き込み（ビルドの出力、スクリプトの内部、読み切れないシェル構文）は
-止められずに通る。実行後チェックは、走ったあとの作業ツリーを `git status` で読んでそれを拾う。設計は [ccnavi.md](ccnavi.md) の 7。
+止められずに通る。実行後チェックは、走ったあとの作業ツリーを `git status` で読んでそれを拾う。設計は [7](docs/design/post-check.md)。
 
 保護領域は別に宣言しない。`match` に `Write` `Edit` `NotebookEdit` のどれかを含むルールが、そのまま保護領域の宣言になる。
 例外は ccnavi 自身の書き込み。記録と state の置き場は最初から保護領域に入らない。チケットの置き場では、ccnavi の副命令（`ticket start` / `finish` や
@@ -1195,7 +1251,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 
 `CCNAVI_RESTORE_IF_DENY=enable`（既定）のとき、ccnavi 自身が戻す。`dry-run` では戻さず、報告に `would-restore` の行を足す。
 `disable` では戻さず、その行も出さない。`CCNAVI_MODE=dry-run` のときは、こちらが `enable` でも `dry-run` として振る舞う
-（組み合わせは [requirements.md 2.2](requirements.md#22-共通の動作--req-cmn)）。
+（組み合わせは [要件 2.2](docs/requirements/common.md#22-共通の動作--req-cmn)）。
 
 戻す先はコミット済みの内容なので、保護領域に置いた未コミットの変更は失われる。守りたいなら `disable` にするか、宣言を狭める。
 現れたファイルは消さずに `logs/state/aside/<日時>/` へ退避し、退避先を報告に載せる。
@@ -1203,7 +1259,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 ### コアファイルを守る
 
 実行後チェックはルールファイルから保護領域を決めるので、ルールファイル自身はそこでは守れない。そこで次のものは組み込みで持つ。
-`CCNAVI_GUARD_CORE_FILES` が切り替える。設計は [ccnavi.md](ccnavi.md) の 8。
+`CCNAVI_GUARD_CORE_FILES` が切り替える。設計は [8](docs/design/self-guard.md)。
 
 | 対象 | 何が懸かっているか | バックアップを取る時点 |
 |---|---|---|
@@ -1261,7 +1317,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 
 ルールが「どこに書かせないか」を長く決めるのに対し、チケットは作業 1 本のあいだ「今回どこに書くか」を決める。
 チケットは複数を同時に有効にできる。親（メインエージェント）が作業を子チケットに分け、子は別々のワークツリーでサブエージェントが実行する。
-設計は [ccnavi.md](ccnavi.md) の 9、要求は [requirements.md](requirements.md) の REQ-TKT。
+設計は [9](docs/design/tickets.md)、要求は [要件 REQ-TKT](docs/requirements/tickets.md)。
 
 ### 使うかどうかはワークスペースが決める
 
@@ -1319,7 +1375,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 - 順序は「子の成果をマージ → finish → ワークツリーを消す」
 - 再開するときはユーザが `done/` から `doing/` へ戻す
 
-フェーズのマーカー（`pending` `skipped` `requested` `reviewed`）を含む遷移は [ccnavi.md](ccnavi.md) の 9.6。
+フェーズのマーカー（`pending` `skipped` `requested` `reviewed`）を含む遷移は [設計 9.6](docs/design/tickets/state-transitions.md)。
 
 ### 書式
 
@@ -1379,7 +1435,7 @@ base_sha: ""
 ### 効くのは承認したものだけ
 
 判定が読むのは `.ccnavi/approved/doing/` の承認済みチケットで、`wip/proposals/todo/` の提案ではない。承認のあとに同じ識別子の
-提案を書いても範囲は適用されない（親の計画の改版だけが承認の対象に入る）。承認の詳細は [ccnavi.md](ccnavi.md) の 9.4。
+提案を書いても範囲は適用されない（親の計画の改版だけが承認の対象に入る）。承認の詳細は [設計 9.4](docs/design/tickets/approval.md)。
 
 ```sh
 ccnavi --agree
@@ -1443,7 +1499,7 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 取り込んだ後は親子のチケットを判定し直し、error があればその取り込み状態を `blocked` にして止める（直してからオンラインで打ち直せば戻る。
 止める理由があるのに取り込み状態を書けなければ 3 回試し、それでも駄目なら終了コード 3）。
 取り込み状態のある親子のチケット（取り込み済みの親子のチケット）は、親のブランチ上のチケットだけを本物とし、取り込み状態が `gone`・`blocked`・壊れている、
-親のワークツリーが無いなどで決まらなければ、その親子のチケットの承認・状態の操作・実行前チェックを止める（ccnavi.md 9.2）。
+親のワークツリーが無いなどで決まらなければ、その親子のチケットの承認・状態の操作・実行前チェックを止める（設計 9.2）。
 親子のチケットの取り込み状態は親のワークツリーを片付けても消さずに残す。捨てた親子のチケットの取り込み状態は、片付けた後にユーザが
 `.ccnavi/scripts/ccnavi-sync.sh --forget <P>` で消す（エージェントからは組み込みの deny が止める）。
 取り込んだことがあるリポジトリでは、新規の提案の識別子を統合先の取り込み結果の `done/` と比べ、閉じた識別子と、
@@ -1535,7 +1591,7 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 
 フェーズの終わりは、ユーザの手が入るところ（HITL ポイント）の 1 つ。ユーザの手は範囲の承認・レビュー・未解決の受け入れの 3 か所にまとめてある。
 同じ親の同じ `phase` の子が `doing/` に 1 枚も無く、`review/` か `done/` に 1 枚以上あれば、そのフェーズは終わり。取り消しだけのフェーズは終わらない。
-設計は [ccnavi.md](ccnavi.md) の 9.8。
+設計は [9.8](docs/design/tickets/hitl.md)。
 
 ユーザがどこで見るかは `none` / `chat` / `mr` の 3 つで、次のうち厳しい側が採られる（`none` < `chat` < `mr`）。
 
@@ -1564,7 +1620,7 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 `phases.yml` に**フェーズの種類**を定義し、親が `plan:` にそのリストを書くと、フェーズに意味が付く。
 置き場はレイヤーごと（共通レイヤー `.ccnavi/common/`、自身のレイヤーとプロジェクトのレイヤー `.ccnavi/config/`）で、`scope` のパスが
 レイアウトに依存するならワークスペース自身のレイヤーに置く（このリポジトリもそう）。
-種類はユーザが持つ設定で、エージェントは書き換えない。どのレイヤーにも無ければ番号だけの挙動のまま。設計は [ccnavi.md](ccnavi.md) の 9.7。
+種類はユーザが持つ設定で、エージェントは書き換えない。どのレイヤーにも無ければ番号だけの挙動のまま。設計は [9.7](docs/design/tickets/phases.md)。
 
 ```yaml
 # .ccnavi/config/phases.yml
@@ -1661,7 +1717,7 @@ sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 2
 sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
 ```
 
-設計は [ccnavi.md](ccnavi.md) の 9.10 と 9.11。
+設計は [9.10](docs/design/tickets/review.md) と [9.11](docs/design/tickets/close.md)。
 
 - `request` には ELI5 の HTML（`--eli5`）が必須。変更の目的・何が変わるか・リスクを専門用語なしで書いた
   1 枚の HTML で、外部の読み込み（CSS・JS・画像の URL）は使わない。親のワークツリーの `wip/eli5/` の下（既定の名前は
@@ -1721,7 +1777,7 @@ JSON で渡す（`--result <path>`）。
 - origin の表記はポートと scheme をそのまま使う（`http://localhost:8929/g/p.git` なら `http://localhost:8929/api/v4`）。
   URL に埋めた資格情報は読み飛ばし、出力では伏せる
 - push の認証は git の設定側（Git Credential Manager か `credential.helper`）に置く。git のラッパースクリプトは `GIT_CONFIG_COUNT` を外し
-  `GIT_TERMINAL_PROMPT=0` で動くので、環境変数での差し替えも認証画面も使えない。GitLab の実物で分かった注意点は [HANDOVER.md](HANDOVER.md)、
+  `GIT_TERMINAL_PROMPT=0` で動くので、環境変数での差し替えも認証画面も使えない。GitLab の実物で分かった注意点は [実測で分かった落とし穴](#実測で分かった落とし穴)、
   確かめ直すための道具は `tools/gitlab/probe_gitlab.py`
 - `--result` を実行ファイルに直接渡せるのはユーザの手だけ（`CCNAVI_GUARD_TICKET_APPROVAL`）。エージェントはスクリプト 2 本を通す
 
@@ -1783,7 +1839,7 @@ Draft を外すので、squash でマージすると既定のブランチには�
 
 リスクは宣言ではなく実績で測る。子を `ticket finish` で閉じるとき、その子のワークツリーで `base_sha..HEAD` の差分を数えて点を付け、
 `phases/<親>/<子>.risk.json` に残す。フェーズの点は子の最大値。**HIGH 以上なら、宣言に関わらずそのフェーズは人間レビューが要る扱いになる。**
-宣言が `none` なら `chat` に上がり、マージリクエストを勧める文が出る（強制はしない）。設計は [ccnavi.md](ccnavi.md) の 9.9。
+宣言が `none` なら `chat` に上がり、マージリクエストを勧める文が出る（強制はしない）。設計は [9.9](docs/design/tickets/risk.md)。
 
 配点は `.ccnavi/common/risks.yml`（組み込みの deny が守る。エージェントは書き換えない）。無ければ組み込み。
 
@@ -1851,7 +1907,7 @@ Claude Code はそこを読まないので、ccnavi が `SessionStart` と `Suba
 
 ## ルールファイルが読めないとき
 
-組み込みの既定を使って判定を続ける。止まらない（止めると壊れた設定を直す操作まで止まる）。設計は [ccnavi.md](ccnavi.md) の 5.6。
+組み込みの既定を使って判定を続ける。止まらない（止めると壊れた設定を直す操作まで止まる）。設計は [5.6](docs/design/rules.md#56-ルールが読めないとき)。
 既定に入っているのは取り返しの付かない操作だけ。`rm -rf`、`git push`、`git reset --hard`、認証情報の置き場、シェルからガード自身の設定への書き込み。
 
 | 操作 | 既定での扱い | なぜ |
@@ -1864,7 +1920,7 @@ Claude Code はそこを読まないので、ccnavi が `SessionStart` と `Suba
 
 ## 記録
 
-判定した呼び出しは、通したものも含めて 1 行 1 件で追記される。全 23 欄は [ccnavi.md](ccnavi.md) の付録 B。
+判定した呼び出しは、通したものも含めて 1 行 1 件で追記される。全 23 欄は [設計 付録 B](docs/design/appendix.md#付録-b-記録の-1-行)。
 
 ```
 {"ts":"...","mode":"dry-run","event":"PreToolUse","tool":"Bash",
@@ -1876,7 +1932,7 @@ Claude Code はそこを読まないので、ccnavi が `SessionStart` と `Suba
 |---|---|
 | `decision` | `allow` `ask` `deny` `handover` `skip`。`handover` は権限モードに委ねた回 |
 | `enforced` | 実際に適用したか。`dry-run` は `false` |
-| `code` | 判定の根拠の種別。一覧は [ccnavi.md](ccnavi.md) の付録 A。よく出るのは `DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE` |
+| `code` | 判定の根拠の種別。一覧は [設計 付録 A](docs/design/appendix.md)。よく出るのは `DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE` |
 | `reason` | `skip` の理由。`mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、`payload-unusable`、`deadline-exceeded`、`tool-cannot-write`、`worktree-unreadable`（`detail` に理由）、`no-turn-baseline` の 9 つ |
 | `tree` / `project` | 呼び出しの行き先が属するツリーとプロジェクト |
 | `permission_mode` | Claude Code から来たモード。`handover` の行と合わせて読む |
@@ -2308,7 +2364,7 @@ ccnavi --explain --json
 | `scattered[]` | どれが本物か決まらない、チケットがある場所の全部。`{tree, state, path}`。決まっていれば空。本物とする側のツリー（親のツリー → 元ツリーの順）で絞り込んでも 2 つ以上残り、その残りが 2 つの置き場にまたがるか同じ置き場に重なるときに入る。状態の操作が「複数の場所にある」で止まる条件と、`--lint` が ERROR を出す条件と同じ。`seen_in` の数は食い違いを意味しない |
 | `flow` | 子のフロー（設計 9.3.1）。親と、フローが無い閉じた子（終わった・取り消した）は `null`（ボードはこのとき「フローを作る」を出さない）。`{path, rel, tree, exists, linked, locked, draft}`。`path` は読む先の絶対パス、`rel` はツリーのルートからの相対、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）、`draft` はエージェントが書く下書き（効力は無い）の `{path, rel, exists, linked}`。`path` が指すのは本物とする側のツリー＝承認済みチケットが在るツリーの版だけで、子のワークツリー上のフローは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く。`rel` は承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.yml` で、中身は YAML。`draft` の置き場はフローと同じツリーの `wip/proposals/flows/<子>.yml` で、ボードはパスを組まずにこれを読み、いまのフローと違えば「提案あり」を出す。読むのは承認済みチケット（無ければ提案）の欄。ボードは `locked` をそのまま写し、自分で組み直さない |
 | `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
-| `history[]` | 状態の履歴の新しい側 20 件を古い順に。`.ccnavi/approved/events/<識別子>.ndjson`（本物とする側のツリー＝承認済みチケットが在るツリーの版）の 1 行ずつで、`{at, ticket, kind, from, to, via, ...}`。`at` は UTC の ISO 8601、`kind` は `approved` / `revised` / `raised` / `started` / `finished` / `cancelled` / `settled` / `archived`（置き場が動いたもの。`archived` は `ready` が退避したことを示し、`to` は `archive`）と `phase-mark` / `phase-reopened` / `parent-mark`（マーカー。親の履歴に残り、`from` / `to` は `null` で `phase` / `mark` を持つ）、`from` / `to` は置き場の名前（`todo` / `doing` / `review` / `done`）、`via` は `cli`（sh の副命令）/ `terminal`（ユーザが端末で）/ `board`（ボード）/ `hook`。種類ごとに `phase`・`mark`・`reason`・`base_sha`・`tree`・`followup_of`・`cleared` が付く。補助で、状態は置き場の欄で決まる。履歴が無ければ空。読めない行があれば飛ばして `problems[]` で知らせる |
+| `history[]` | 状態の履歴の新しい側 20 件を古い順に。`.ccnavi/approved/events/<識別子>.ndjson`（本物とする側のツリー＝承認済みチケットが在るツリーの版）の 1 行ずつで、`{at, ticket, kind, from, to, via, ...}`。`at` は UTC の ISO 8601、`kind` は `approved` / `revised` / `raised` / `started` / `finished` / `cancelled` / `settled` / `archived`（置き場が動いたもの。`archived` は `ready` が退避したことを示し、`to` は `archive`）と `phase-mark` / `phase-reopened` / `parent-mark`（マーカー。親の履歴に残り、`from` / `to` は `null` で `phase` / `mark` を持つ）、`from` / `to` は置き場の名前（`todo` / `doing` / `review` / `done`）、`via` は `cli`（sh の副命令）/ `terminal`（ユーザが端末で）/ `board`（ボード）/ `hook` / `chrome`（Chrome 拡張）。種類ごとに `phase`・`mark`・`reason`・`base_sha`・`tree`・`followup_of`・`cleared` が付く。補助で、状態は置き場の欄で決まる。履歴が無ければ空。読めない行があれば飛ばして `problems[]` で知らせる |
 
 `parents[]` の 1 件。
 

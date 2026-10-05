@@ -13,7 +13,7 @@ from ..infra.modes import DRY_RUN
 from ..policy import rules
 from ..tickets import phase
 
-# 返す理由に載せる理由コード。ccnavi.md 付録 B の体系から、今のビルドが実際に
+# 返す理由に載せる理由コード。設計 付録 B の体系から、今のビルドが実際に
 # 下せる判定に対応するものだけを借りている。
 #
 # 付録 B のコードは「どの検査がその根拠を作ったか」の名前であって、ルール 1 件を
