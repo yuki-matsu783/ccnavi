@@ -15,7 +15,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import * as esbuild from "esbuild";
 import { buildPythonZip } from "./python.js";
 
@@ -52,7 +52,7 @@ function copyPyodide(out) {
 export async function build({ hostsFile = path.join(HERE, "hosts.json"), out = path.join(HERE, "dist") } = {}) {
   tsc("tsconfig.json");
   tsc("tsconfig.node.json");
-  const { parseHosts, manifest } = await import(path.join(HERE, "out", "src", "core", "hosts.js"));
+  const { parseHosts, manifest } = await import(pathToFileURL(path.join(HERE, "out", "src", "core", "hosts.js")).href);
   const hosts = parseHosts(fs.readFileSync(hostsFile, "utf8"));
   const version = JSON.parse(fs.readFileSync(path.join(HERE, "package.json"), "utf8")).version;
   // 同梱の ccnavi の互換の版（service worker が「始める」の前に統合先の CCNAVI_COMPAT と比べる）
