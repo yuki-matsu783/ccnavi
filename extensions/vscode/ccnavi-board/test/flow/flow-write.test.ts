@@ -20,6 +20,20 @@ function place(tree: string, name = "i0001-01-01"): string {
   return path.join(tree, ".ccnavi", "approved", "flows", `${name}.yml`);
 }
 
+/** シンボリックリンクを作れる環境か（Windows は権限が無いと作れない）。作れなければ呼び出し側が skip する。 */
+function canSymlink(): boolean {
+  const dir = scratch();
+  try {
+    fs.writeFileSync(path.join(dir, "a"), "");
+    fs.symlinkSync(path.join(dir, "a"), path.join(dir, "b"));
+    return true;
+  } catch {
+    return false;
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 const NEW = { exists: false, mtimeMs: 0 } as const;
 
 test("CB-T231 無い置き場は 1 段ずつ作って入れ替えで書く。一時ファイルは残らない。読むとその中身", () => {
@@ -40,7 +54,11 @@ test("CB-T231 無い置き場は 1 段ずつ作って入れ替えで書く。一
   assert.equal(readFlowFile(tree, place(tree, "i0001-01-09")), undefined);
 });
 
-test("CB-T232 ファイルか途中のディレクトリがリンクなら、読まないし書かない。リンクの先も変わらない", () => {
+test("CB-T232 ファイルか途中のディレクトリがリンクなら、読まないし書かない。リンクの先も変わらない", (t) => {
+  if (!canSymlink()) {
+    t.skip("リンクを作れない");
+    return;
+  }
   const tree = scratch();
   const outside = scratch();
   const target = path.join(outside, "real.yml");
@@ -225,7 +243,11 @@ test("CB-T297 取り込んだ下書きは、中身が取り込んだときと同
   assert.deepEqual(removeDraftFile(tree, file, sha("nodes: [x]\n")), { ok: true, removed: false });
 });
 
-test("CB-T298 リンク・ハードリンク・ふつうのファイルでないもの・ツリーの外の下書きは消さない", () => {
+test("CB-T298 リンク・ハードリンク・ふつうのファイルでないもの・ツリーの外の下書きは消さない", (t) => {
+  if (!canSymlink()) {
+    t.skip("リンクを作れない");
+    return;
+  }
   const tree = scratch();
   const outside = scratch();
   const target = path.join(outside, "real.yml");
