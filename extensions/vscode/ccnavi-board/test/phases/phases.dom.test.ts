@@ -607,3 +607,26 @@ test("CB-D151 設定の切り替えの欄は、選んだ対象を種類と名前
     await single.close();
   }
 });
+
+test("CB-D153 読み込みに失敗した画面にも設定の切り替えの欄を出し、共通の設定へ戻れる", async () => {
+  const dom = await openPage({
+    kind: "error",
+    error: "ファイルを読めません",
+    target: { kind: "project", name: "app" },
+    targets: [
+      { kind: "common", name: "", label: "共通の設定" },
+      { kind: "self", name: "", label: "ワークスペース" },
+      { kind: "project", name: "app", label: "プロジェクト app" },
+    ],
+  });
+  try {
+    const select = dom.one<HTMLSelectElement>("select#target");
+    assert.equal(select.value, "project:app");
+    dom.change(select, "common:");
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((m) => m.type === "switchTarget"), [{ type: "switchTarget", kind: "common", name: "" }]);
+  } finally {
+    await dom.close();
+  }
+});
+

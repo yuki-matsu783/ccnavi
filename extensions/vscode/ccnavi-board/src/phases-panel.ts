@@ -25,8 +25,7 @@
  * 組み込みの既定は無い（実行ファイルも持たない。既定を組み込むと、意図せずレビューの要否が決まる）。
  *
  * チケット制御が disable のワークスペースでは、対象がどれでも開かない。定義は親チケットの計画と
- * 子の範囲にしか読まれないので、disable の間は何も動かさない。入口（サイドパネル・コマンドパレット・
- * プロジェクト管理画面のボタン）も同じ鍵で隠れる。
+ * 子の範囲にしか読まれないので、disable の間は何も動かさない。入口（サイドパネル・コマンドパレット）も同じ鍵で隠れる。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -494,7 +493,13 @@ function show(current: PanelState): void {
 function showError(current: PanelState, error: string): void {
   current.loaded = undefined;
   current.error = error;
-  current.host.send({ kind: "error", error });
+  const target = currentKey(current.target);
+  current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, "common", target) });
+}
+
+/** 開いている対象の欄の値（`targets.ts` の `kind` と `name`） */
+function currentKey(target: PhasesTarget): { kind: string; name: string } {
+  return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
 }
 
 /**
@@ -654,7 +659,7 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     }
     case "switchTarget": {
       // 一覧にある対象だけを受ける。画面が古いまま、消えたプロジェクトを指していても開かない
-      const option = current.loaded?.targets.find((t) => t.kind === message.kind && t.name === message.name);
+      const option = (current.loaded?.targets ?? targetOptions(undefined, "common", currentKey(current.target))).find((t) => t.kind === message.kind && t.name === message.name);
       if (option === undefined) {
         return;
       }

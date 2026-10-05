@@ -484,7 +484,13 @@ function show(current: PanelState): void {
 function showError(current: PanelState, error: string): void {
   current.loaded = undefined;
   current.error = error;
-  current.host.send({ kind: "error", error });
+  const target = currentKey(current.target);
+  current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, "workspace", target) });
+}
+
+/** 開いている対象の欄の値（`targets.ts` の `kind` と `name`） */
+function currentKey(target: RulesTarget): { kind: string; name: string } {
+  return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
 }
 
 async function reload(current: PanelState): Promise<void> {
@@ -660,7 +666,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
     }
     case "switchTarget": {
       // 一覧にある対象だけを受ける。画面が古いまま、消えたプロジェクトを指していても開かない
-      const option = current.loaded?.targets.find((t) => t.kind === message.kind && t.name === message.name);
+      const option = (current.loaded?.targets ?? targetOptions(undefined, "workspace", currentKey(current.target))).find((t) => t.kind === message.kind && t.name === message.name);
       if (option === undefined) {
         return;
       }

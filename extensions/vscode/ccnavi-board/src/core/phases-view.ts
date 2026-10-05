@@ -121,7 +121,8 @@ export function editable(page: PhasesPage): boolean {
  */
 export type PhasesData =
   | { readonly kind: "page"; readonly page: PhasesPage }
-  | { readonly kind: "error"; readonly error: string }
+  /** `targets` は読めなかった画面から別の対象へ戻るための欄（共通・ワークスペースと、いま開いていた対象）。ボードを読めていないので、ほかのプロジェクトは載せない */
+  | { readonly kind: "error"; readonly error: string; readonly target?: { readonly kind: string; readonly name: string }; readonly targets?: readonly TargetOption[] }
   | { readonly kind: "loading"; readonly text: string };
 
 /** 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める */
@@ -144,7 +145,7 @@ export type PhasesMessage =
   /** 未保存の変更の有無が変わった。別の対象へ切り替えるときに聞くかを拡張ホストが決める */
   | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile" }
-  /** 共通レイヤーのファイルが無いときの案内から、自身のレイヤーを開く（プロジェクト管理画面の入口と同じ経路） */
+  /** 共通レイヤーのファイルが無いときの案内から、自身のレイヤーを開く（切り替えの欄で「ワークスペース」を選ぶのと同じ経路） */
   | { readonly type: "openSelf" }
   | { readonly type: "save"; readonly form: PhasesForm }
   /** 案内を閉じた。拡張ホストは見たことを残し、次からは初回の案内を送らない */

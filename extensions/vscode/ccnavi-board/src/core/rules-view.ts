@@ -126,7 +126,8 @@ export interface RulesPage {
  */
 export type RulesData =
   | { readonly kind: "page"; readonly page: RulesPage }
-  | { readonly kind: "error"; readonly error: string }
+  /** `targets` は読めなかった画面から別の対象へ戻るための欄（共通・ワークスペースと、いま開いていた対象）。ボードを読めていないので、ほかのプロジェクトは載せない */
+  | { readonly kind: "error"; readonly error: string; readonly target?: { readonly kind: string; readonly name: string }; readonly targets?: readonly TargetOption[] }
   | { readonly kind: "loading"; readonly text: string };
 
 /**

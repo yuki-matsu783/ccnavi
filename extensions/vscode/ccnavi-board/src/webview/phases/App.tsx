@@ -213,8 +213,9 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     return (
       <>
         <p className="empty">
-          フェーズ管理画面を読み込めませんでした。原因を直してから「更新」を押してください（同じ対象を開き直しても前面に出るだけです。別の対象を開けば、このタブの中身がその対象に替わります）。
+          フェーズ管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に替わります。
         </p>
+        <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
         <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
           更新
@@ -597,7 +598,7 @@ function Missing({ page, busy, onOpenSelf }: { readonly page: PhasesPage; readon
   return (
     <div className="banner missing">
       <span>
-        共通の設定に定義はありません（{page.phasesPath} がありません）。定義はワークスペースかプロジェクトの設定に置いてください。プロジェクト管理画面の「フェーズ管理」から開けます。
+        共通の設定に定義はありません（{page.phasesPath} がありません）。定義はワークスペースかプロジェクトの設定に置いてください。画面上部の「設定」の欄から開けます。
       </span>
       <button type="button" className="action primary" data-action="open-self" disabled={busy} onClick={onOpenSelf}>
         ワークスペースの設定を開く
