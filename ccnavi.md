@@ -2181,10 +2181,12 @@ compact の前後の hook でフローを入れ直すことはしない。どち
 **UserPromptSubmit。** チケット制御が有効なら、依頼文（payload の `prompt`）から issue・MR の指定を探す
 （`branchfind.prompt_refs`。`#152`・`issue 152`・`/issues/152`、`!5`・`MR 5`・`PR #12`・`/pull/5`・`/-/merge_requests/5`）。
 囲みのコードブロックの中、`C#`・`&#123;`・`##12`・`# 見出し`・`#fff`・0 で始まる番号・CSS の色の値・`すごい!5` は拾わない。
-見つけたら、指定ごとに `'{root}/.ccnavi/scripts/ccnavi-branches.sh --issue N'`（`--mr N`）を打ち、候補があれば一覧をユーザに
-見せて「既存のブランチで続ける（承認済みの `branch:` で使う。承認前の提案の `branch:` は使わない）・新しく
-`<先頭の語>-<番号>-<slug>` を切る・やめる」を聞いて返事を待つ、候補が無ければ進めてよい、という文を `additionalContext` で
-渡す（`branchfind.prompt_context`。sh のパスはワークスペースルートの絶対パス）。
+見つけたら、指定ごとに `'{root}/.ccnavi/scripts/ccnavi-start.sh --issue N'`（`--mr N`）を打たせる。`ccnavi-start.sh` は既存の候補を
+探し、無ければ Draft MR・ワークツリー・ブランチを作る。終了コードの扱いも添える。3（候補が複数）は何も作られていないので、
+一覧をユーザに見せて「既存のブランチで続ける（承認済みの `branch:` で使う。承認前の提案の `branch:` は使わない）・新しく
+`<先頭の語>-<番号>-<slug>` を切る・やめる」を聞いて返事を待つ。4（ホストに届かない）は出力の案内どおり MCP で代行し、
+同じコマンドを打ち直す、という文を `additionalContext` で渡す（`branchfind.prompt_context`。sh のパスはワークスペースルートの
+絶対パス）。
 dry-run でも渡す。判定は返さない。
 
 **`ccnavi-branches.sh (--issue N | --mr N) [--json]`。** cwd のリポジトリ（ワークスペース・`projects/<名前>`・そのワークツリー）

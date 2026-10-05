@@ -2,8 +2,9 @@
 
 見るのは 2 つ。
 
-1. UserPromptSubmit: 依頼文に issue・MR の指定があれば、`ccnavi-branches.sh` を打って候補をユーザに
-   確かめる指示が `additionalContext` に載る。表記はワークスペースルートの絶対パスから書く。
+1. UserPromptSubmit: 依頼文に issue・MR の指定があれば、`ccnavi-start.sh` を打って着手させ、
+   複数候補（終了コード 3）はユーザに確かめ、ホストに届かない（4）ときは MCP で代行させる指示が
+   `additionalContext` に載る。表記はワークスペースルートの絶対パスから書く。
    指定が無い・外れ・チケット制御が disable のときは載らない。判定（止める・聞く）は返さない
 2. 副命令 `ccnavi branches <issue|mr> <番号> --result <json>`: 手元の候補（名前に番号を含む
    ブランチ・ワークツリー・`issue:` を持つチケット）を集め、sh が書いたホストの結果と合わせて出す。
@@ -42,7 +43,7 @@ class PromptHintTest(PhaseHarness):
 
     def test_an_issue_and_an_mr_get_one_instruction_each(self):
         said = self.prompt("#152 と !5 を見て直して")
-        sh = settings.script_command(self.root, "ccnavi-branches.sh")
+        sh = settings.script_command(self.root, "ccnavi-start.sh")
         self.assertIn(f"'{sh} --issue 152'", said)
         self.assertIn(f"'{sh} --mr 5'", said)
         self.assertIn(os.path.realpath(self.root).replace("\\", "/"), said)
@@ -53,7 +54,10 @@ class PromptHintTest(PhaseHarness):
         self.assertIn("やめる", said)
         self.assertIn("承認前の提案の branch: は使わない", said)
         self.assertIn("ccnavi-git.sh", said)
-        self.assertIn("候補が無ければ、そのまま進めてよい", said)
+        self.assertIn("終了コード 3（候補が複数）", said)
+        self.assertIn("終了コード 4（ホストに届かない）", said)
+        self.assertIn("MCP で代行し、同じコマンドを打ち直す", said)
+        self.assertNotIn("ccnavi-branches.sh", said)
 
     def test_no_reference_no_instruction(self):
         self.assertEqual(self.prompt("README の見出し # 概要 を直して。色は #fff"), "")
