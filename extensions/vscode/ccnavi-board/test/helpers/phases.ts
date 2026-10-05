@@ -17,24 +17,24 @@ import { loadPageJsdom, type JsdomPage } from "./jsdom.js";
 export const NONCE = "TEST-NONCE-123";
 
 /**
- * 見本の種類（5 種類。README「フェーズの種類と計画」の例）。画面のテストの多くがこれを開く。
+ * 見本の定義（5 件。README「フェーズ定義と計画」の例）。画面のテストの多くがこれを開く。
  * 拡張がファイルを作るときの雛形だったが、共通レイヤーに雛形を置くとレイヤーの同じ id と中身が食い違うので、
  * 画面から作る方法ごと無くし、テストの見本としてだけ残す。
  *
  * **待ち方は dag で、流れを `after` で書く**（調査 → 設計と受入テスト作成 → 実装とテスト）。
- * feedback の種類は `after` を持てない（`phasetypes.py`）ので、レビュー後の対応として別に置く。
+ * feedback の定義は `after` を持てない（`phasetypes.py`）ので、レビュー後の対応として別に置く。
  */
-export const SAMPLE_PHASES_TEXT = `# フェーズの種類（設計 9.7）。ユーザが持つ設定で、エージェントは書き換えない。
+export const SAMPLE_PHASES_TEXT = `# フェーズ定義（設計 9.7）。ユーザが持つ設定で、エージェントは書き換えない。
 #
-# 親チケットの \`plan:\` に、ここで定義した種類の名前を順に並べる。それが全体計画で、
+# 親チケットの \`plan:\` に、ここで定義したものの名前を順に並べる。それが全体計画で、
 # \`ccnavi --agree\` が通ることが合意になる。レビューを受けたあとは \`feedback:\` に
-# \`kind: feedback\` の種類を並べて改版を出す（対応が無くても \`[]\` で出す）。
+# \`kind: feedback\` の定義を並べて改版を出す（対応が無くても \`[]\` で出す）。
 #
 # \`id\`（キー）と \`title\` はどちらも一意。重なれば --lint が error で止める。
 # このファイルが無ければ、フェーズは番号だけの挙動に戻る。
 #
-# \`order: dag\` なので、各項は \`after\` に挙げた種類（の祖先）だけを待ち、辺で繋がっていない
-# 種類は並行して進む。辺の書き漏れは並行として通るので、画面の図で確かめる。
+# \`order: dag\` なので、各項は \`after\` に挙げた定義（の祖先）だけを待ち、辺で繋がっていない
+# 定義は並行して進む。辺の書き漏れは並行として通るので、画面の図で確かめる。
 #
 # 下は雛形。scope のパスはこのプロジェクトの置き場に合わせて直す。
 version: 1
@@ -86,7 +86,7 @@ export function phasesHtml(data: PhasesData, options: Partial<RenderOptions> = {
   return renderPhasesPage(data, { nonce: NONCE, script: screenScript("phases"), style: screenStyle("phases"), ...options });
 }
 
-/** 見本の中身（`SAMPLE_PHASES_TEXT` の 5 種類）。差し替えたいところだけ渡す */
+/** 見本の中身（`SAMPLE_PHASES_TEXT` の 5 件）。差し替えたいところだけ渡す */
 export function page(overrides: Partial<PhasesPage> = {}): PhasesPage {
   return {
     root: "/ws",
@@ -105,7 +105,7 @@ export async function openPage(data: PhasesData, initialState?: unknown, options
   return dom;
 }
 
-/** 見本の種類を開く。差し替えたいところだけ渡す */
+/** 見本の定義を開く。差し替えたいところだけ渡す */
 export async function openPhases(overrides: Partial<PhasesPage> = {}, initialState?: unknown): Promise<DomPage> {
   return openPage({ kind: "page", page: page(overrides) }, initialState);
 }
@@ -120,7 +120,7 @@ export async function openGraph(overrides: Partial<PhasesPage> = {}, initialStat
   return dom;
 }
 
-/** 種類 1 行の中の要素。`li.phase[data-key=…]` の下だけを見る */
+/** 定義 1 行の中の要素。`li.phase[data-key=…]` の下だけを見る */
 export function rowSelector(key: string): string {
   return `.phase[data-key="${key}"]`;
 }

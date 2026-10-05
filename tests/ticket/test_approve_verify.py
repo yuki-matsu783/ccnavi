@@ -119,7 +119,7 @@ class ApproveVerifyTest(PhaseHarness):
 
     def test_scope_overflow_passes_but_is_shown(self):
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
-        # 種類（調査）の範囲を超える子。承認は止まらず、判定が切り詰める。
+        # 定義（調査）の範囲を超える子。承認は止まらず、判定が切り詰める。
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/design/*",)))
         self.commit_parent()
 

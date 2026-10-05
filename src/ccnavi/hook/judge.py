@@ -893,11 +893,11 @@ def ticket_verdict(
 
     範囲の中は allow、範囲の `ask` は ask、範囲の外とチケットの `deny` は deny。
     チケットが境界を明示している以上、外に出たことは「宣言に反した」になる。
-    子は親の範囲とフェーズの種類の上限で切り詰め、厳しい側を採る（phase_scope.scope_verdict）。
+    子は親の範囲とフェーズ定義の上限で切り詰め、厳しい側を採る（phase_scope.scope_verdict）。
     承認は範囲の超過を警告で通すので、超えた分はここで止まる。止めた上限を `limit:` 行で
     名指しする。ルールの判定と比べて強い側を採るのは呼び手。
 
-    注記は、親が計画を持つのに子の番号の種類が読めないときの 1 文。そのときは種類では
+    注記は、親が計画を持つのに子の番号の定義が読めないときの 1 文。そのときは定義では
     切り詰めない（親の範囲では切り詰める）ので、使われていない上限があることを判定につける。
 
     t は full の行き先のツリー（`ruleload.rules_for` が返したもの。cwd で置き換える前）。
@@ -930,7 +930,7 @@ def ticket_verdict(
     if ticket_places.is_unscoped(rel, conf.tickets, conf.approved):
         return "", "", "", ""
     parent = index.get(ticket.parent) if ticket.is_child else None
-    # 種類を読むのは、親が計画を持ち子の番号が計画に在るときだけ。番号だけの親では
+    # 定義を読むのは、親が計画を持ち子の番号が計画に在るときだけ。番号だけの親では
     # phases.yml を開かない。
     pt, notice = None, ""
     if parent is not None and phase_scope.plan_item(ticket, parent) is not None:
@@ -939,10 +939,10 @@ def ticket_verdict(
         missing = phase_scope.unread_type(conf, root, ticket, parent, types)
         if missing:
             notice = (
-                f"[ccnavi] {ticket.ticket} のフェーズ {ticket.phase} の種類 `{missing}` が"
-                "読めないので、種類の上限では切り詰めていない（親 "
+                f"[ccnavi] {ticket.ticket} のフェーズ {ticket.phase} の定義 `{missing}` が"
+                "読めないので、定義の上限では切り詰めていない（親 "
                 f"{parent.ticket} の範囲では切り詰めている）。phases.yml が壊れているか、"
-                "種類が消えている。ユーザに伝えて直してもらってください"
+                "定義が消えている。ユーザに伝えて直してもらってください"
                 "（'ccnavi --lint' が箇所を言う）。"
             )
     found = phase_scope.scope_verdict(ticket, parent, pt, rel)
@@ -1006,7 +1006,7 @@ def ticket_verdict(
             notice,
             "",
         )
-    # 上限ごとに次にすることが違う。子の範囲の外なら提案し直し、親や種類の上限の外なら、
+    # 上限ごとに次にすることが違う。子の範囲の外なら提案し直し、親や定義の上限の外なら、
     # 範囲を広げても通らない（承認で超過を見せたうえで止めている）。
     if found.limit == phase_scope.LIMIT_TYPE and found.type is not None:
         pt = found.type

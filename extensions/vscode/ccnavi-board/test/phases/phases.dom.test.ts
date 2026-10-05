@@ -22,7 +22,7 @@ function pick(dom: DomPage, field: string, id: string): void {
   option.dispatchEvent(new view.MouseEvent("mousedown", { bubbles: true, cancelable: true }));
 }
 
-test("CB-D20 既定は畳み、行を押すと開いて state に id が入る。ほかの種類との関係・補足は値がある種類だけ開く", async () => {
+test("CB-D20 既定は畳み、行を押すと開いて state に id が入る。ほかの定義との関係・補足は値がある定義だけ開く", async () => {
   const dom = await openPhases();
   try {
     assert.equal(dom.all(".phase").length, 5);
@@ -65,7 +65,7 @@ test("CB-D21 範囲を inherit に変えると glob の欄が消え、行は開�
   }
 });
 
-test("CB-D22 絞り込みは title と scope にも当たり、開いている行は隠さず、一致した行だけを数える。足した種類は開いて焦点が id に来る", async () => {
+test("CB-D22 絞り込みは title と scope にも当たり、開いている行は隠さず、一致した行だけを数える。足した定義は開いて焦点が id に来る", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
@@ -112,7 +112,7 @@ test("CB-D23 保存の往復の間は欄を止めるが、行の開閉のボタ�
   }
 });
 
-test("CB-T125 種類の欄名は日本語で、YAML のキー名は欄名の title に載せる", async () => {
+test("CB-T125 件の欄名は日本語で、YAML のキー名は欄名の title に載せる", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
@@ -120,7 +120,7 @@ test("CB-T125 種類の欄名は日本語で、YAML のキー名は欄名の tit
     const caps = dom.all(`${rowSelector("p1")} .row-body .field > .cap`);
     assert.deepEqual(
       caps.map((cap) => cap.textContent),
-      ["id", "タイトル", "区分", "レビュー", "範囲", "成果物", "並行できる種類", "一緒に必要な種類", "先に済ませる種類", "案内するエージェント", "使う場面"],
+      ["id", "タイトル", "区分", "レビュー", "範囲", "成果物", "並行できる定義", "一緒に必要な定義", "先に済ませる定義", "案内するエージェント", "使う場面"],
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),
@@ -151,7 +151,7 @@ test("CB-D59 リストの欄は , で区切って打て、打っている途中�
   }
 });
 
-test("CB-D60 種類の並べ替えと削除が保存に渡る形に出る", async () => {
+test("CB-D60 定義の並べ替えと削除が保存に渡る形に出る", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.all<HTMLButtonElement>(`${rowSelector("p3")} .buttons button`)[0]);
@@ -191,24 +191,24 @@ test("CB-D61 ファイルが外で変わったら帯を出し、届いた中身�
   }
 });
 
-test("CB-D62 読み直せなかったら理由を出し、種類は出さない", async () => {
-  const dom = await openPage({ kind: "error", error: "種類のファイルを読めない: EACCES" });
+test("CB-D62 読み直せなかったら理由を出し、定義は出さない", async () => {
+  const dom = await openPage({ kind: "error", error: "定義のファイルを読めない: EACCES" });
   try {
     assert.match(dom.one(".empty").textContent, /フェーズ管理画面を読み込めませんでした/);
-    assert.equal(dom.one("pre.load-error").textContent, "種類のファイルを読めない: EACCES");
+    assert.equal(dom.one("pre.load-error").textContent, "定義のファイルを読めない: EACCES");
     assert.equal(dom.all("#phases").length, 0);
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D63 種類が無いファイルは、保存する前に足すと言う。苦情と錠はそのまま出す", async () => {
+test("CB-D63 定義が無いファイルは、保存する前に足すと言う。苦情と錠はそのまま出す", async () => {
   const dom = await openPhases({
     model: readPhases("version: 1\nphases: nope\n").model,
     lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"] },
   });
   try {
-    assert.match(dom.one("#phases .empty").textContent, /種類がありません。種類が 1 つも無いファイルは実行ファイルが読めない/);
+    assert.match(dom.one("#phases .empty").textContent, /定義がありません。定義が 1 つも無いファイルは実行ファイルが読めない/);
     assert.match(dom.one(".problems").textContent, /phases がマップ（キーと値の組の集まり）ではありません/);
     assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02-02）");
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
@@ -217,7 +217,7 @@ test("CB-D63 種類が無いファイルは、保存する前に足すと言う�
   }
 });
 
-test("CB-D67 ほかの種類との関係・補足は、最後の値を消しても畳まれない（打っている欄が消えない）", async () => {
+test("CB-D67 ほかの定義との関係・補足は、最後の値を消しても畳まれない（打っている欄が消えない）", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
@@ -227,7 +227,7 @@ test("CB-D67 ほかの種類との関係・補足は、最後の値を消して�
     dom.type(dom.one(`${rowSelector("p1")} input.f-when`), "");
     await dom.settle();
     assert.ok(dom.one(`${rowSelector("p1")} details.more`).hasAttribute("open"), "値を消した拍子に、打っている欄ごと畳まない");
-    assert.match(dom.one(`${rowSelector("p1")} details.more > summary`).textContent, /ほかの種類との関係・補足（未設定）/);
+    assert.match(dom.one(`${rowSelector("p1")} details.more > summary`).textContent, /ほかの定義との関係・補足（未設定）/);
   } finally {
     await dom.close();
   }
@@ -287,7 +287,7 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
   }
 });
 
-test("CB-D85 関係の欄はほかの種類の id を複数選択で選べ、自分の id は候補に出ない。順序はファイルの順に揃う", async () => {
+test("CB-D85 関係の欄はほかの定義の id を複数選択で選べ、自分の id は候補に出ない。順序はファイルの順に揃う", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p4")} .row-head`));
@@ -300,7 +300,7 @@ test("CB-D85 関係の欄はほかの種類の id を複数選択で選べ、自
     // 見本の implement。自分（implement）は候補に出ない
     assert.deepEqual(values(".f-requires"), ["research", "design", "acceptance", "implement-feedback"]);
     assert.deepEqual(values(".f-requires", "checked"), ["acceptance"]);
-    // after の候補は work の種類だけ。feedback の種類は待つ先にできない
+    // after の候補は work の定義だけ。feedback の定義は待つ先にできない
     assert.deepEqual(values(".f-after"), ["research", "design", "acceptance"]);
     assert.deepEqual(values(".f-after", "checked"), ["acceptance"]);
     // 後から付けても、順序はファイルの順に揃う（YAML に余計な差分を出さない）
@@ -397,7 +397,7 @@ test("CB-D87 レイヤーの画面では、候補に無い id を打って足せ
   }
 });
 
-test("CB-D115 このファイルに無い id の説明は、共通の設定の画面では入力ミスとだけ言い、ワークスペースとプロジェクトの設定の画面では共通の設定の種類かもしれないと言う", async () => {
+test("CB-D115 このファイルに無い id の説明は、共通の設定の画面では入力ミスとだけ言い、ワークスペースとプロジェクトの設定の画面では共通の設定の定義かもしれないと言う", async () => {
   const base = readPhases(SAMPLE_PHASES_TEXT).model;
   const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: ["外の種類"] } : p));
   const titleOf = async (layer: boolean): Promise<string> => {
@@ -412,24 +412,24 @@ test("CB-D115 このファイルに無い id の説明は、共通の設定の�
   };
   const common = await titleOf(false);
   assert.match(common, /このファイルに無い id です（入力ミス）/);
-  assert.ok(!common.includes("共通の設定の種類か"), common);
+  assert.ok(!common.includes("共通の設定の定義か"), common);
   const layered = await titleOf(true);
-  assert.match(layered, /このファイルに無い id です（共通の設定の種類か、入力ミス）/);
+  assert.match(layered, /このファイルに無い id です（共通の設定の定義か、入力ミス）/);
 });
 
-test("CB-D88 feedback の種類は先に済ませる種類を持てないと言い、欄を出さない", async () => {
+test("CB-D88 feedback の定義は先に済ませる定義を持てないと言い、欄を出さない", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p5")} .row-head`));
     await dom.settle();
     assert.equal(dom.all(`${rowSelector("p5")} .f-after .id-option`).length, 0);
-    assert.match(dom.one(`${rowSelector("p5")} .f-after`).textContent ?? "", /feedback の種類には設定できません/);
+    assert.match(dom.one(`${rowSelector("p5")} .f-after`).textContent ?? "", /feedback の定義には設定できません/);
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D86 図を見ているときに種類を足すと、一覧へ移って足した行が見える", async () => {
+test("CB-D86 図を見ているときに定義を足すと、一覧へ移って足した行が見える", async () => {
   const dom = await openPhases({}, { view: "graph" });
   try {
     assert.ok(dom.one("#phases").classList.contains("hidden"));
@@ -453,7 +453,7 @@ test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最�
     assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
     await dom.send({ type: "tour" });
     await dom.settle();
-    assert.equal(dom.one("#tour-title").textContent, "フェーズの種類");
+    assert.equal(dom.one("#tour-title").textContent, "フェーズ定義");
     assert.ok(!dom.one("#phases").classList.contains("hidden"), "1 段目で一覧に切り替わっていない");
     const titles = [dom.one("#tour-title").textContent];
     for (let i = 0; i < 6; i += 1) {
@@ -465,7 +465,7 @@ test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最�
         assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"));
       }
     }
-    assert.deepEqual(titles, ["フェーズの種類", "ほかの種類との関係", "全体計画の待ち方", "図", "保存", "ヘルプ", "案内"]);
+    assert.deepEqual(titles, ["フェーズ定義", "ほかの定義との関係", "全体計画の待ち方", "図", "保存", "ヘルプ", "案内"]);
     // 途中の一覧と図の切り替えは state に書かない（途中でタブを閉じても、次は元の図で開く）
     assert.equal((dom.state() as { view?: string }).view, "graph");
     // 最後の段は「完了」。やめる × はどの段でも右上に出す
@@ -511,7 +511,7 @@ test("CB-D93 案内の間は Tab が吹き出しのボタンの中だけを巡�
 });
 
 test("CB-D91 案内は Esc か × でやめられ、やめても tourDone を返す。読み込み中に頼まれたら中身が出てから始める", async () => {
-  const dom = await openPage({ kind: "loading", text: "フェーズの種類を読み込み中…" });
+  const dom = await openPage({ kind: "loading", text: "フェーズ定義を読み込み中…" });
   try {
     await dom.send({ type: "tour" });
     await dom.settle();
@@ -533,16 +533,16 @@ test("CB-D147 案内は → で次の段へ、← で前の段へ動く。端の
   try {
     await dom.send({ type: "tour" });
     await dom.settle();
-    assert.equal(dom.one("#tour-title").textContent, "フェーズの種類");
+    assert.equal(dom.one("#tour-title").textContent, "フェーズ定義");
     dom.key("ArrowLeft");
     await dom.settle();
-    assert.equal(dom.one("#tour-title").textContent, "フェーズの種類");
+    assert.equal(dom.one("#tour-title").textContent, "フェーズ定義");
     dom.key("ArrowRight");
     await dom.settle();
-    assert.equal(dom.one("#tour-title").textContent, "ほかの種類との関係");
+    assert.equal(dom.one("#tour-title").textContent, "ほかの定義との関係");
     dom.key("ArrowLeft");
     await dom.settle();
-    assert.equal(dom.one("#tour-title").textContent, "フェーズの種類");
+    assert.equal(dom.one("#tour-title").textContent, "フェーズ定義");
     for (let i = 0; i < 8; i += 1) {
       dom.key("ArrowRight");
       await dom.settle();
@@ -568,7 +568,7 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッ�
     dom.click(dom.one('[data-action="tour"]'));
     await dom.settle();
     assert.equal(dom.all("#help").length, 0, "案内を始めたらヘルプは閉じる");
-    assert.equal(dom.one("#tour-title").textContent, "フェーズの種類");
+    assert.equal(dom.one("#tour-title").textContent, "フェーズ定義");
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
     assert.equal(dom.all(".tour").length, 0);

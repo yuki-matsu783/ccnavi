@@ -130,7 +130,7 @@ DEPLOY_SCRIPTS = (
 )
 RULES_PARTS = (".ccnavi", "common", "rules.yml")
 # --deploy が配る残りの設定 2 本（設計 11.9）。リスクの配点は共通レイヤー、
-# フェーズの種類は自身のレイヤー（scope がワークスペースのレイアウトに付くため）。
+# フェーズ定義は自身のレイヤー（scope がワークスペースのレイアウトに付くため）。
 RISK_PARTS = (".ccnavi", "common", "risks.yml")
 PHASES_PARTS = (".ccnavi", "config", "phases.yml")
 # 置き場は 2 つに分けて固定する（設計 launcher-scripts 1）。hook が起動する振り分けの sh は

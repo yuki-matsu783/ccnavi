@@ -75,7 +75,7 @@ keywords: [振り返り, スキル, SKILL.md, references, 候補, 提案, フィ
 1. 親のワークツリーの `scratchpad/skill-candidates.md` に候補を書く。書くのは、対象のスキル、作るか直すか、中身の下書き、根拠
 2. フィードバック計画を書くとき、次の3つがすべてそろっていれば `feedback:` に `skill-improve` を入れる
    - 候補が1つ以上ある
-   - `skill-improve` の種類がある
+   - `skill-improve` のフェーズ定義がある
    - 親の範囲に、対象のスキルの置き場が入っている
 3. フィードバック計画が承認されたら、`skill-improve` のフェーズに子チケットを提案して承認を受け、その子でスキルを直してMRで見てもらう
 

@@ -102,7 +102,7 @@ deny:
       ルールになる。直したい形は下書きを検証してユーザに渡す
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.ccnavi/common/phases.yml"
-    why: フェーズの種類はユーザが持つ。エージェントが書けるとレビュー不要の種類を作ってから使える
+    why: フェーズ定義はユーザが持つ。エージェントが書けるとレビュー不要のフェーズ定義を作ってから使える
   - tool: Edit
     subject: "/repo/.claude/worktrees/x/.ccnavi/common/rule-samples.yml"
     why: >-

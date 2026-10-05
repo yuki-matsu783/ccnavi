@@ -2,10 +2,10 @@
  * フェーズ管理画面の、拡張ホストと Webview の間の契約。リスク管理（`risk-view.ts`）と同じ作り。
  *
  * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。渡すのは「いま何を見せるか」
- * （`PhasesData`）だけで、画面が返すのはユーザが押した操作（`PhasesMessage`）だけ。画面は種類の意味を
+ * （`PhasesData`）だけで、画面が返すのはユーザが押した操作（`PhasesMessage`）だけ。画面は定義の意味を
  * 判定しない（子の範囲が上限に収まるか、レビューが要るかは実行ファイルが出す）。
  *
- * **種類の形（`PHASE_KINDS`・`PhaseForm` など）もここに置く。** 読み書き（`phases-doc.ts`）の側に
+ * **定義の形（`PHASE_KINDS`・`PhaseForm` など）もここに置く。** 読み書き（`phases-doc.ts`）の側に
  * 置いたままだと、画面がそこから `yaml` を辿ることになり、バンドルしたものに YAML の解析器が丸ごと入る。
  * 同じ理由で、ここには VS Code の API も DOM も node も入れない。
  *
@@ -16,9 +16,9 @@ import type { AppearanceMessage } from "./appearance.js";
 import type { Lock } from "./lock.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
 
-// ---- 種類の形（画面と読み書きで分け合う）
+// ---- 定義の形（画面と読み書きで分け合う）
 
-/** 種類の区分。ccnavi の phasetypes.KINDS と同じ順 */
+/** 定義の区分。ccnavi の phasetypes.KINDS と同じ順 */
 export const PHASE_KINDS = ["work", "feedback"] as const;
 export type PhaseKind = (typeof PHASE_KINDS)[number];
 
@@ -33,10 +33,10 @@ export type PhaseOrder = (typeof ORDERS)[number];
 /** 待ち方の説明。select のラベル */
 export const ORDER_LABELS: Readonly<Record<PhaseOrder, string>> = {
   sequential: "sequential（既定。全体計画を番号順に進め、前の番号をすべて待つ）",
-  dag: "dag（after でつないだ流れ。after をたどった先にある種類だけを待ち、他は並行して進む）",
+  dag: "dag（after でつないだ流れ。after をたどった先にある定義だけを待ち、他は並行して進む）",
 };
 
-/** 画面で編集する種類 1 件。`origin` は読み込んだときの位置で、新しい種類は null */
+/** 画面で編集する定義 1 件。`origin` は読み込んだときの位置で、新しい定義は null */
 export interface PhaseForm {
   readonly origin: number | null;
   /** 対応表のキー。識別子として使える文字かは lint が言う */
@@ -52,7 +52,7 @@ export interface PhaseForm {
   readonly deliverables: readonly string[];
   readonly overlap: readonly string[];
   readonly requires: readonly string[];
-  /** order: dag のとき、先に閉じてレビューが済んでいるべき種類（依存）。work の種類だけが持てる */
+  /** order: dag のとき、先に閉じてレビューが済んでいるべき定義（依存）。work の定義だけが持てる */
   readonly after: readonly string[];
   /** 案内にだけ使う。空なら欄を書かない */
   readonly agent: string;
@@ -73,8 +73,8 @@ export interface PhasesModel {
 
 /** 区分の説明。select のラベル */
 export const KIND_LABELS: Readonly<Record<PhaseKind, string>> = {
-  work: "work（全体計画 plan: に並べる種類）",
-  feedback: "feedback（フィードバック計画 feedback: に並べる種類。レビューは mr 固定）",
+  work: "work（全体計画 plan: に並べる定義）",
+  feedback: "feedback（フィードバック計画 feedback: に並べる定義。レビューは mr 固定）",
 };
 
 /** レビューの既定の説明。select のラベル */
@@ -87,17 +87,17 @@ export const REVIEW_LABELS: Readonly<Record<Review, string>> = {
 
 export interface PhasesPage {
   readonly root: string;
-  /** 種類の定義のファイル（ワークスペースルートからの相対で見せる） */
+  /** 定義のファイル（ワークスペースルートからの相対で見せる） */
   readonly phasesPath: string;
   /**
-   * ファイルが在るか。無ければ空の画面を見せる。共通の設定は画面から作らせず、種類はワークスペースかプロジェクトの設定に置くよう案内する
+   * ファイルが在るか。無ければ空の画面を見せる。共通の設定は画面から作らせず、定義はワークスペースかプロジェクトの設定に置くよう案内する
    * （共通の設定に雛形を置くと、ワークスペースやプロジェクトの設定の同じ id と中身が食い違い、その設定が空として扱われるため）
    */
   readonly exists: boolean;
   readonly model: PhasesModel;
   readonly lock: Lock;
   /**
-   * ワークスペースかプロジェクトの設定の種類か。どちらもファイルが無くても編集でき、最初の保存でファイルを作る
+   * ワークスペースかプロジェクトの設定の定義か。どちらもファイルが無くても編集でき、最初の保存でファイルを作る
    */
   readonly layer?: boolean;
   /** 上部に出す注意（実行ファイルがこの設定を読めていない、など） */
@@ -112,7 +112,7 @@ export function editable(page: PhasesPage): boolean {
 // ---- やり取り
 
 /**
- * 画面に見せる中身。読み直せなかったときは種類の代わりに文面を渡す。
+ * 画面に見せる中身。読み直せなかったときは定義の代わりに文面を渡す。
  * `loading` は開いているタブの対象を切り替えて、新しい対象を読んでいる間（ルール管理と同じ）
  */
 export type PhasesData =

@@ -98,7 +98,7 @@ class Entry:
         return self.glob[:cut]
 
 
-# 計画の項が書けるレビューの指定。`mr` は種類が none でも要る（強める）、`defer` は
+# 計画の項が書けるレビューの指定。`mr` は定義が none でも要る（強める）、`defer` は
 # 次にレビューがあるフェーズと一緒に見る（延期）。弱める向き（none）は書けない。
 PLAN_REVIEW_MR = "mr"
 PLAN_REVIEW_DEFER = "defer"
@@ -107,7 +107,7 @@ PLAN_REVIEWS = (PLAN_REVIEW_MR, PLAN_REVIEW_DEFER)
 
 @dataclass
 class PlanItem:
-    """親の計画の 1 項。フェーズの種類の名前と、レビューの指定。"""
+    """親の計画の 1 項。フェーズ定義の名前と、レビューの指定。"""
 
     type: str
     review: str = ""
@@ -180,7 +180,7 @@ class Ticket:
     # 置き場と違えば承認しない（approval_checks.project_problems）。`ticket.scan` を通さずに
     # 読んだとき（`ticket.load` を直に呼ぶ経路）は project と同じ値になる。
     declared_project: str = ""
-    # plan は全体計画（作業フェーズの種類のリスト）、feedback はフィードバック計画。
+    # plan は全体計画（作業のフェーズ定義のリスト）、feedback はフィードバック計画。
     # 親だけが持つ。feedback が None なのは「まだ計画していない」、[] は
     # 「見たうえで対応なし」。設計 9.7。
     plan: list[PlanItem] = field(default_factory=list)

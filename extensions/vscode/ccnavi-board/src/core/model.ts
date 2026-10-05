@@ -228,14 +228,14 @@ export interface LayerFileJson {
 }
 
 /**
- * レイヤー（layer）1 つ（設計 11.2。共通・ワークスペース・プロジェクトの設定のどれか）。拡張が使うのはルールとフェーズの種類のファイルの場所だけなので、それだけを読む。
+ * レイヤー（layer）1 つ（設計 11.2。共通・ワークスペース・プロジェクトの設定のどれか）。拡張が使うのはルールとフェーズ定義のファイルの場所だけなので、それだけを読む。
  * 宣言の中身と risk は読まない（リスク管理画面はワークスペースとプロジェクトの設定に追従していない、設計 11.11）。
  */
 export interface LayerJson {
   /** `common` / `self` / プロジェクトの名前 */
   readonly name: string;
   readonly rules: LayerFileJson;
-  /** フェーズの種類のファイル（`phases_file`）。共通の設定は `.ccnavi/common/phases.yml` 固定 */
+  /** フェーズ定義のファイル（`phases_file`）。共通の設定は `.ccnavi/common/phases.yml` 固定 */
   readonly phasesFile: LayerFileJson;
 }
 

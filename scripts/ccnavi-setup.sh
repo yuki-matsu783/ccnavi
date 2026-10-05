@@ -1289,7 +1289,7 @@ if [ "$vscode_linked" = yes ]; then
 	printf '%s はリンクだったので、リンクを保ったまま中身を書きました。\n' "$VSCODE_REL"
 fi
 
-# 配る。順は実行ファイル → 設定 3 本（ルール・リスクの配点・フェーズの種類）→
+# 配る。順は実行ファイル → 設定 3 本（ルール・リスクの配点・フェーズ定義）→
 # 代わりに通る sh → 振り分けの sh。途中で失敗したときに、判定するものだけがあって
 # 何を止めるかが無い、という状態にしないため。
 if [ "$deploy_work" = yes ]; then
@@ -1395,7 +1395,7 @@ if [ ! -f "$root/$DEPLOY_RISK" ]; then
 	note_missing "${DEPLOY_RISK}（リスクの配点。無いと組み込みの配点で測る）"
 fi
 if [ ! -f "$root/$DEPLOY_PHASES" ]; then
-	note_missing "${DEPLOY_PHASES}（フェーズの種類。無いと番号だけの挙動になる）"
+	note_missing "${DEPLOY_PHASES}（フェーズ定義。無いと番号だけの挙動になる）"
 fi
 # 配るものの一覧（DEPLOY_SCRIPTS）を使って確かめる。ここで名前を決め打ちすると、配る sh を
 # 足したときに、その sh が無いことをこの一覧だけが報告しなくなる。

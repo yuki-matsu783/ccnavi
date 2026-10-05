@@ -49,7 +49,7 @@ def _copy_problems(
     - フェーズの順序は warn。狂っていても範囲の決まり方には影響せず、判定も止めない
       （`approval_checks.blocking_problems`）。承認のときは error だが、承認済みのものに当てるのは
       「その順で始めた」という記録で、いま止める根拠にはならない
-    - 計画の形と、種類の定義が読めないことは `validate` が付けた severity のまま（error）。
+    - 計画の形と、フェーズ定義が読めないことは `validate` が付けた severity のまま（error）。
       判定は止めないが、承認の画面を通っていれば起きない形なので、置き場を動かして
       承認した分の不備を CI で止める。範囲の超過だけは `validate` も warn
     - 再開（`done/` から `doing/` へ手で戻す）で残った閉じるときの欄は warn。ユーザの再開を
@@ -200,7 +200,7 @@ def _start_unrecorded(conf: settings.Settings, t) -> str:
 
 
 def _types_resolver(conf: settings.Settings, root: str):
-    """`project:` から、そのチケットに使う種類を引く（設計 11.4.1）。
+    """`project:` から、そのチケットに使う定義を引く（設計 11.4.1）。
 
     承認の対象の中でもチケットごとにレイヤーが違いうるので、1 つに決めずに引く形で渡す。
     読み込みは 1 レイヤー 1 回。
@@ -274,7 +274,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
                 Problem(
                     SEVERITY_ERROR,
                     "(phases)",
-                    f"{t.ticket} は計画を持つのにフェーズの種類の定義"
+                    f"{t.ticket} は計画を持つのにフェーズ定義"
                     f"（{conf.phases} と {t.project or '自身'} のレイヤー）が読めない",
                 )
             )

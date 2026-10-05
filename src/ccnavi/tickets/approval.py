@@ -323,7 +323,7 @@ def settle_old_workflows(
 
     古い形とみなすのは記録 `ccnavi_approved` の欄が揃ったものだが、記録は手で書ける。欄の待ち方を
     そのまま採ると、手で書いた記録と `workflow:` で、ユーザが承認していない待ち方（並行に進める
-    など）を効かせられる。そこで、今の種類から `workflow.compute` で計算した待ち方と同じときだけ
+    など）を効かせられる。そこで、今の定義から `workflow.compute` で計算した待ち方と同じときだけ
     欄を採り、違えば欄を使わず一直線（前の番号を全部待つ。いちばん厳しい形）で読む。
     `Ticket.workflow_record_differs` を立て、`--lint` と status が warn で言う。
 

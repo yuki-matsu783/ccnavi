@@ -1,8 +1,8 @@
 /**
- * フェーズの種類の関係を図で見せる。点が種類、線が `requires` と `overlap` と `after`。
+ * フェーズ定義の関係を図で見せる。点が定義、線が `requires` と `overlap` と `after`。
  *
  * **矢印を付けるのは `after` だけ。** `requires` は「一緒に置くべき」で、順序ではない（`phases-graph.ts` の頭）。
- * 見る場所が `none` でない種類は、点の縁を強めて「ユーザが見る」を示す（種類の宣言。計画の延期や
+ * 見る場所が `none` でない定義は、点の縁を強めて「ユーザが見る」を示す（定義の宣言。計画の延期や
  * 実績のリスクで変わることは図の下の一言が言う）。
  * 図が判定をしないのも同じところに書いてある。ここは `graphOf` が組んだものを描くだけで、
  * 何が正しいかは言わない。
@@ -10,7 +10,7 @@
  * **編集はしない。** 点をドラッグで動かせるが、動かした先は画面の state（`state.ts` の spots）に入るだけで、
  * `phases.yml` には書かない。ユーザが持つ設定に座標は入れない。関係そのものを直すのは一覧のほう。
  *
- * 点を押すと一覧へ戻り、その種類の行が開く（`onPick`）。
+ * 点を押すと一覧へ戻り、その定義の行が開く（`onPick`）。
  *
  * 見た目は `Graph.css`。React Flow の CSS は `--xy-*` の変数で出来ているので、そこを
  * `--vscode-*` で上書きする。直書きの色を打ち消す `!important` は要らない。
@@ -61,7 +61,7 @@ function PhaseNodeView({ id, data }: NodeProps<PhaseNode>): JSX.Element {
           {data.review}
         </span>
         {data.review !== "none" && (
-          <span className="tag hitl" title="種類の宣言（review）です。計画の延期や実績のリスクで、実際に見る場所は変わります">
+          <span className="tag hitl" title="定義の宣言（review）です。計画の延期や実績のリスクで、実際に見る場所は変わります">
             ユーザが見る
           </span>
         )}
@@ -148,8 +148,8 @@ function boxesKey(state: { nodeLookup: Map<string, { internals: { positionAbsolu
  * work と feedback の枠と、その間の「レビュー後」の矢印。**点の上に重ねて描く**（`ViewportPortal`
  * は点より手前に来る）ので、枠は縁だけにして中を塗らず、押す操作も受けない（`Graph.css`）。
  *
- * 矢印は種類どうしの関係ではなく、区分の順（全体計画を終えてレビューを受けたあとに feedback の
- * 種類で直す）。両方の区分に種類があるときだけ描く。
+ * 矢印は定義どうしの関係ではなく、区分の順（全体計画を終えてレビューを受けたあとに feedback の
+ * 定義で直す）。両方の区分に定義があるときだけ描く。
  */
 function Groups(): JSX.Element | null {
   const key = useStore(boxesKey as (state: unknown) => string);
@@ -298,7 +298,7 @@ export function Graph({ graph, onPick }: { readonly graph: PhasesGraph; readonly
     saveSpots(spots);
   }, [spots]);
 
-  // 図に出なくなった種類の位置は state から落とす（id を打ち替えるたびに溜まるため）
+  // 図に出なくなった定義の位置は state から落とす（id を打ち替えるたびに溜まるため）
   const known = useRef<string>("");
   useEffect(() => {
     const ids = graph.nodes.map((node) => node.id).join("\u0000");
@@ -314,7 +314,7 @@ export function Graph({ graph, onPick }: { readonly graph: PhasesGraph; readonly
   }, []);
 
   if (graph.nodes.length === 0) {
-    return <p className="empty">図に出せる種類がありません（id を入れると出ます）。</p>;
+    return <p className="empty">図に出せる定義がありません（id を入れると出ます）。</p>;
   }
   return (
     <div className="graph" id="phase-graph" data-nodes={graph.nodes.length} data-edges={graph.edges.length}>

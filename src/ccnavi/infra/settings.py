@@ -26,7 +26,7 @@ from typing import NamedTuple
 
 # ccnavi が読む環境変数。
 #
-# 共通レイヤーの 3 本（ルール・フェーズの種類・リスクの配点）はここに無い。置き場は
+# 共通レイヤーの 3 本（ルール・フェーズ定義・リスクの配点）はここに無い。置き場は
 # `.ccnavi/common/` に固定で、env では動かない。3 つのレイヤーのうち共通レイヤーだけが別の決まり方を
 # していた非対称を無くしたもの。診断のためにここを動かすには `--rules` /
 # `--phases` / `--risk` のフラグを使う。hook は引数を渡さずに起動するので、
@@ -140,7 +140,7 @@ DEFAULT_TICKETS = "wip/proposals"
 # ルートに継ぎ足すときに os の区切りへ直す。
 # 下に `doing/`（作業中）と `done/`（閉じた）と `phases/`（マーカー）が並ぶ。
 DEFAULT_APPROVED = ".ccnavi/approved"
-# フェーズの種類はユーザが持つ設定なので、承認済みチケットと同じ保護の内側に置く。
+# フェーズ定義はユーザが持つ設定なので、承認済みチケットと同じ保護の内側に置く。
 DEFAULT_PHASES = os.path.join(".ccnavi", "common", "phases.yml")
 # リスクの配点もユーザが持つ設定。エージェントが配点を書けると、自分のリスクを自分で決められる。
 DEFAULT_RISK = os.path.join(".ccnavi", "common", "risks.yml")
@@ -356,7 +356,7 @@ class Settings:
     # チケット制御を使うかは ticket_control が決める。approved はパスでしかない。
     tickets: str = ""
     approved: str = ""
-    # phases はフェーズの種類の定義（絶対）。無ければフェーズは番号だけ。
+    # phases はフェーズ定義（絶対）。無ければフェーズは番号だけ。
     phases: str = ""
     # risk は実績で測るリスクの配点（絶対）。無ければ組み込みの配点。
     risk: str = ""
@@ -371,10 +371,10 @@ class Settings:
     # --test-samples / --lint / --explain）だけが使い、hook からの判定では空のまま。
     # VS Code 拡張が、編集中のプロジェクトのルールを保存せずに試すために使う。
     project_rules_files: dict[str, str] = field(default_factory=dict)
-    # project_phases_files は同じ差し替えをレイヤーのフェーズの種類に対して行う（名前 → 絶対パス）。
+    # project_phases_files は同じ差し替えをレイヤーのフェーズ定義に対して行う（名前 → 絶対パス）。
     # `--project-phases-file <名前>=<パス>` が入れる。名前は `self` かプロジェクトの名前で、
-    # 共通レイヤーの種類は今までどおり `--phases` で差し替える。VS Code 拡張のフェーズ管理画面が、
-    # 編集中のレイヤーの種類を保存せずに検証するために使う。
+    # 共通レイヤーの定義は今までどおり `--phases` で差し替える。VS Code 拡張のフェーズ管理画面が、
+    # 編集中のレイヤーの定義を保存せずに検証するために使う。
     project_phases_files: dict[str, str] = field(default_factory=dict)
     # branch_prefixes は親の識別子の先頭の語のリスト（`branch_prefixes`）。
     # branch_prefixes_rejected は環境変数に書かれていたが使えない語（lint が warn で名指しする）。

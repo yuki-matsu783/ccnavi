@@ -27,12 +27,12 @@ deny:
       事前に安全が確認されたコマンドのみを実行できるラッパースクリプトです。
       エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。
 
-  # ccnavi の設定（ルール・フェーズの種類・リスクの配点）
+  # ccnavi の設定（ルール・フェーズ定義・リスクの配点）
   - id: guard-ccnavi-config
     match: Write|Edit|NotebookEdit
     regex: '[\\/]\.ccnavi[\\/]common[\\/](rules|phases|risks)\.yml$'
     message: >-
-      ccnavi の設定（ルール・フェーズの種類・リスクの配点）です。エージェントの判断で
+      ccnavi の設定（ルール・フェーズ定義・リスクの配点）です。エージェントの判断で
       書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えてユーザに依頼してください
       （/ccnavi-config）
 

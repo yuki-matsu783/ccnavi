@@ -1,7 +1,7 @@
 """`--project-phases-file <名前>=<パス>` の受入テスト（REQ-DIA-09）。
 
 VS Code 拡張のフェーズ管理画面が、
-編集中のレイヤーの種類を保存せずに共通レイヤーと合成して検証するための
+編集中のレイヤーの定義を保存せずに共通レイヤーと合成して検証するための
 差し替え。fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ
 （共通レイヤーに `design`「設計」、自身のレイヤーに `docs`、lib のレイヤーに `build` / `release`）。
 """
@@ -17,10 +17,10 @@ from tests.config.test_config_union import LIB_PHASES, ConfigUnionHarness, layer
 # lib のレイヤーの build の表示名を、共通レイヤーの design と同じ「設計」にしたもの。
 LIB_TITLE_OVERLAP = LIB_PHASES.replace("title: ビルド", "title: 設計")
 
-# 共通レイヤーの種類と id も表示名も重ならない種類。`phases:` の続きに繋げる。
+# 共通レイヤーの定義と id も表示名も重ならない定義。`phases:` の続きに繋げる。
 NOTES_TYPE = "  notes:\n    kind: work\n    title: メモ\n    review: none\n    scope: inherit\n"
 
-# 種類の無いレイヤー。実行ファイルは読めないとして error にする（拡張はこの形を書き出さない）。
+# 定義の無いレイヤー。実行ファイルは読めないとして error にする（拡張はこの形を書き出さない）。
 EMPTY_LAYER = "version: 1\nphases: {}\n"
 
 
@@ -47,11 +47,11 @@ class ProjectPhasesFileTest(ConfigUnionHarness):
         errors = self.phase_errors("(self)", "--project-phases-file", f"self={edited}")
         self.assertTrue(errors, "自身のレイヤーの差し替えが検証に届かない")
 
-        # 共通レイヤーと重ならない種類を足しただけなら通る。
+        # 共通レイヤーと重ならない定義を足しただけなら通る。
         added = write(os.path.join(self.ws, "tmp", "self-added.yml"), own + NOTES_TYPE)
         self.assertEqual(self.phase_errors("(self)", "--project-phases-file", f"self={added}"), [])
 
-        # 種類の無いレイヤーは error。拡張がレイヤーのファイルを最初の保存まで作らないのはこのため。
+        # 定義の無いレイヤーは error。拡張がレイヤーのファイルを最初の保存まで作らないのはこのため。
         empty = write(os.path.join(self.ws, "tmp", "empty.yml"), EMPTY_LAYER)
         self.assertTrue(self.phase_errors("(self)", "--project-phases-file", f"self={empty}"))
 
