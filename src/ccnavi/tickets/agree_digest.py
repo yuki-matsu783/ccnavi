@@ -234,7 +234,7 @@ def revise_copy(
         return failed
     current.raw = revised_front(current, revised)
     with fsio.policy(restore=restore):
-        failed = approval_marks._write(
+        failed = approval_marks.write_ticket(
             approval.copy_path(approved_dir, current.ticket), ticket_mod.render(current)
         )
     if failed:

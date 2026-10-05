@@ -641,6 +641,108 @@ def reviewed_or_skipped(phase: Phase) -> bool:
     return approval_marks.MARK_REVIEWED in phase.marks
 
 
+def resumed_review(
+    root: str,
+    conf: settings.Settings,
+    child: ticket_model.Ticket,
+    raw: approval.Raw | None = None,
+) -> str:
+    """作業中（`doing/`）の子のフェーズに、レビュー済みのマーカーが残っている形の警告文。無ければ空。
+
+    運用の基本は、閉じたチケットを戻さず新しいチケットを作り直すこと。ユーザが `done/` から
+    `doing/` へ手で戻す再開は想定しておらず、されるとそのフェーズの `reviewed` が残って、
+    もう一度 `finish` しても止まらず、レビューの告知も出ない。機構はマーカーを消さない
+    （消すかはレビューをやり直すかどうかで、ユーザが決める）。判定も `start` も止めず、
+    `--lint` と `status` がこの文を warn で言う。
+
+    延期したフェーズの子は、引き受けた側（`review_at`）の `reviewed` が残っているときに言う
+    （消すのはその引き受けた側のマーカー。延期の `skipped` は消さない）。引き受けた側がまだ
+    レビュー前なら、これからのレビューが再開後の作業も覆うので言わない。
+    閉じ直したときにレビューが要らないフェーズ（種類が `review: none` で、この子も
+    `human_review` を求めていない）と、レビューが要らない引き受け手は、マーカーが残っていても
+    止める条件に入らないので言わない。
+    引き受け手 M は、ゲートと同じく計画の待ち方のコピーから引く `review_at`（`N.skipped` の
+    `deferred_to` ではない。書いたあとに改版で引き受け手が動けば、skipped は古くなる）。
+    文には子の識別子を入れない（呼び手が前に付ける）。
+    """
+    if child.state != ticket_model.DOING or not child.is_child or child.phase is None:
+        return ""
+    phases = phases_of(root, conf, child.parent, raw=raw)
+    for ph in phases:
+        if ph.number != child.phase:
+            continue
+        if ph.deferred:
+            # 延期したフェーズは、引き受けた側 M のレビューが覆う。M が済んでいれば、再開後の作業は
+            # そのレビューに含まれない。M がまだなら、これからのレビューが再開後の作業も見る。
+            owner = next((p for p in phases if p.number == ph.review_at), None)
+            if owner is None or owner is ph or not owner.review_required:
+                return ""
+            if approval_marks.MARK_REVIEWED not in owner.marks:
+                return ""
+            lead = (
+                f"作業中（doing/）ですが、このフェーズ {ph.label} は {ph.number} から "
+                f"{owner.number} へ延期されていて、フェーズ {owner.label} の reviewed マーカーが"
+                "残っています。再開後の作業は、そのレビューに含まれていません。"
+            )
+            return lead + _erase_steps(root, conf, child, owner.number)
+        # `review_kind` は子の要求（`human_review`）を `review/` と `done/` の子からしか数えない。
+        # 再開された子は `doing/` なので、閉じ直したときに要る分（この子の要求）も足して見る。
+        # ここだけで足し、`review_kind` は変えない（ゲートと告知とボードの判定を動かさないため）。
+        if not (ph.review_required or child.review_required):
+            return ""
+        if approval_marks.MARK_REVIEWED not in ph.marks:
+            return ""
+        lead = f"作業中（doing/）ですが、フェーズ {ph.label} の reviewed マーカーが残っています。"
+        return lead + _erase_steps(root, conf, child, ph.number)
+    return ""
+
+
+def _erase_steps(
+    root: str, conf: settings.Settings, child: ticket_model.Ticket, number: int
+) -> str:
+    """`number` 番の reviewed マーカーを消す手順と、残してよい場合の言い添え。"""
+    mark = "/".join(
+        (
+            conf.approved or settings.DEFAULT_APPROVED,
+            approval_marks.PHASES_DIR,
+            child.parent,
+            f"{number}.{approval_marks.MARK_REVIEWED}",
+        )
+    )
+    git = settings.script_command(root, "ccnavi-git.sh")
+    push = settings.script_command(root, "ccnavi-push-approved.sh")
+    return (
+        "レビューをやり直すならマーカーを消してください"
+        f"（消し方: ユーザが{_marker_tree(root, conf, child)}で '{git} rm {mark}' を打ち、"
+        "削除をコミットする。取り込み済みで origin があり、chat だけでない親子なら "
+        f"'{push} {child.parent}' が取り込んでから送る。それ以外は何もしないので、"
+        "ユーザが自分でコミットする）。"
+        "続きの作業だけなら、そのままで構いません。"
+        "運用の基本は、新しいチケットを作り直すことです"
+    )
+
+
+def _marker_tree(root: str, conf: settings.Settings, child: ticket_model.Ticket) -> str:
+    """マーカーを置くツリー（`approval.home_dir` が決める）を、ルートからの相対で言う。
+
+    `phases_of` がマーカーを読むときと同じ引数（project なし）で引く。
+
+    置き場の設定が絶対パスなどで、ツリーのルートを引けないときは「マーカーがあるツリー」。
+    """
+    where = approval.home_dir(conf, root, child.parent, "")
+    rel = (conf.approved or settings.DEFAULT_APPROVED).replace("/", os.sep)
+    suffix = os.sep + rel
+    if not where.endswith(suffix):
+        return "マーカーがあるツリー"
+    tree_root = where[: -len(suffix)]
+    shown = os.path.relpath(tree_root, root).replace(os.sep, "/")
+    if shown == ".":
+        return "ワークスペースルート"
+    if shown.startswith(".."):
+        return f"ツリー {tree_root}"
+    return f"ツリー {shown}"
+
+
 def order_problems(
     root: str,
     conf: settings.Settings,

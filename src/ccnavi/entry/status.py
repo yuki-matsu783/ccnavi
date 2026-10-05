@@ -31,6 +31,7 @@ from ..tickets import (
     approval_times,
     history,
     ops,
+    phase,
     syncstate,
     ticket_model,
 )
@@ -147,7 +148,7 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
             (e for e in entries.values() if home(e) == name),
             key=lambda e: (bool(e.t.parent), e.t.phase or 0, e.ident),
         )
-        ctx = _Family(root, conf, name, entries, pool, times, files, fams)
+        ctx = _Family(root, conf, name, entries, pool, times, files, fams, raw)
         stdout.write(f"\n== 親子 {name}\n")
         for e in members:
             for line in ctx.describe(e, e.ident in revisions):
@@ -158,10 +159,12 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
 class _Family:
     """1 つの親子のチケットの中で、チケットごとの行を組む。"""
 
-    def __init__(self, root, conf, name, entries, pool, times, files, fams):
+    def __init__(self, root, conf, name, entries, pool, times, files, fams, raw=None):
         self.root, self.conf, self.name = root, conf, name
         self.entries, self.pool, self.times, self.files = entries, pool, times, files
         self.fams = fams
+        # `run` の頭で読んだ置き場。status は置き場を動かさないので、子ごとに読み直さずに渡す。
+        self.raw = raw
         self._c1: tuple[str, str] | None = None
         self.ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
         self.push_sh = settings.script_command(root, "ccnavi-push-approved.sh")
@@ -269,6 +272,9 @@ class _Family:
                 f"作業中なのに {', '.join(left)} に値が残っている（done/ から手で戻した再開）。"
                 "ユーザにその欄を空にしてもらう"
             )
+        review_left = phase.resumed_review(self.root, self.conf, t, raw=self.raw)
+        if review_left:
+            warns.append(review_left)
         if (
             not t.is_child
             and t.has_plan

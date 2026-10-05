@@ -199,8 +199,10 @@ class WriteAtomicTest(unittest.TestCase):
 
         固定の名前（`<行き先>.part` など）だと、同時に書く 2 つが同じ一時
         ファイルを取り合い、片方の書きかけをもう片方が差し替える。
-        先頭と拡張子を残すのは、落ちて残った分を ctxfile.forget の
-        「`once-` で始まり `.json` で終わる」という条件で掃除させるため。
+        先頭の `.` と `.part` は、承認済みの置き場に残ったものを運ぶ側
+        （ccnavi-push-approved.sh と hook/c1.py）が除くため。元の名前と拡張子を
+        残すのは、先頭の `.` を外せば（`temp_origin`）ctxfile.forget の
+        「`once-` で始まり `.json` で終わる」という条件で掃除できるようにするため。
         """
         seen: list[str] = []
         real = tempfile.mkstemp
@@ -216,9 +218,352 @@ class WriteAtomicTest(unittest.TestCase):
 
         self.assertEqual(len(set(seen)), 3, f"一時ファイルの名前が重なった: {seen}")
         for name in seen:
-            self.assertTrue(name.startswith("once-abc-def."), name)
-            self.assertTrue(name.endswith(".json"), name)
-            self.assertNotEqual(name, "once-abc-def.json")
+            self.assertTrue(name.startswith(".once-abc-def."), name)
+            self.assertTrue(name.endswith(".part.json"), name)
+            self.assertRegex(name, r"^\.[^/]*\.part(\.[^/]*)?$")
+            origin = fsio.temp_origin(name)
+            self.assertTrue(origin.startswith("once-abc-def."), origin)
+            self.assertTrue(origin.endswith(".json"), origin)
+
+    def test_temp_origin_leaves_other_names_alone(self):
+        for name in ("once-abc-def.json", ".hidden.json", ".x.part", "a.b.part.json"):
+            self.assertEqual(fsio.temp_origin(name), name)
+        self.assertEqual(fsio.temp_origin(".a.b.c.x1y2_z.part.json"), "a.b.c.x1y2_z.part.json")
+
+
+class WriteBytesAtomicTest(unittest.TestCase):
+    """承認済みチケットの書き方（write_bytes_atomic）の受入テスト。
+
+    見るのは、書き切れなかったときに前の中身が残って一時ファイルが残らないこと、
+    バイト列を変えないこと、権限を引き継ぐこと、差し替えの前に fsync すること、
+    一時ファイルの名前が承認済みチケットとして読まれず、運ばれない形であること。
+    """
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="ccnavi-bytes-atomic-")
+        self.path = os.path.join(self.dir, "i0001.md")
+
+    def _names(self) -> list[str]:
+        return sorted(os.listdir(self.dir))
+
+    def _read(self) -> bytes:
+        with open(self.path, "rb") as f:
+            return f.read()
+
+    def test_keeps_the_bytes_as_they_are(self):
+        """改行も BOM も変えない。承認は提案とバイト単位で同じことが条件。"""
+        content = b"\xef\xbb\xbf---\r\nticket: i0001\r\n---\r\n\xe6\x9c\xac\xe6\x96\x87\n\r\n"
+        self.assertEqual(fsio.write_bytes_atomic(self.path, content), "")
+        self.assertEqual(self._read(), content)
+        self.assertEqual(self._names(), ["i0001.md"])
+
+    def test_makes_missing_parent(self):
+        deep = os.path.join(self.dir, "doing", "i0001.md")
+        self.assertEqual(fsio.write_bytes_atomic(deep, b"ok"), "")
+        with open(deep, "rb") as f:
+            self.assertEqual(f.read(), b"ok")
+
+    def test_failed_replace_keeps_the_previous_content_and_no_temporary_file(self):
+        self.assertEqual(fsio.write_bytes_atomic(self.path, b"before"), "")
+        with mock.patch("os.replace", side_effect=OSError(errno.ENOSPC, "no space")):
+            failed = fsio.write_bytes_atomic(self.path, b"after")
+        self.assertNotEqual(failed, "")
+        self.assertEqual(self._read(), b"before")
+        self.assertEqual(self._names(), ["i0001.md"])
+
+    def test_failed_sync_keeps_the_previous_content_and_no_temporary_file(self):
+        """fsync で落ちたら差し替えない。中身が届いたか分からないものを本番にしない。"""
+        self.assertEqual(fsio.write_bytes_atomic(self.path, b"before"), "")
+        with mock.patch.object(fsio, "_sync_file", side_effect=OSError(errno.EIO, "io")):
+            failed = fsio.write_bytes_atomic(self.path, b"after")
+        self.assertNotEqual(failed, "")
+        self.assertEqual(self._read(), b"before")
+        self.assertEqual(self._names(), ["i0001.md"])
+
+    @unittest.skipIf(os.name == "nt", "fcntl は POSIX だけ")
+    def test_failed_os_fsync_is_a_failed_write(self):
+        """`_sync_file` を差し替えずに os.fsync を落とす。握りつぶさず、書けなかったことにする。"""
+        import fcntl
+
+        self.assertEqual(fsio.write_bytes_atomic(self.path, b"before"), "")
+        # macOS の F_FULLFSYNC の枝を通らないようにして、os.fsync を確実に呼ばせる。
+        with (
+            mock.patch.object(fcntl, "F_FULLFSYNC", None, create=True),
+            mock.patch("os.fsync", side_effect=OSError(errno.EIO, "io")),
+        ):
+            failed = fsio.write_bytes_atomic(self.path, b"after")
+        self.assertNotEqual(failed, "")
+        self.assertEqual(self._read(), b"before")
+        self.assertEqual(self._names(), ["i0001.md"])
+
+    @unittest.skipIf(os.name == "nt", "fcntl は POSIX だけ")
+    def test_full_fsync_is_tried_first_and_falls_back_to_fsync(self):
+        """F_FULLFSYNC（macOS）を先に試し、受け付けなければ os.fsync に落とす。"""
+        import fcntl
+
+        full = getattr(fcntl, "F_FULLFSYNC", None) or 51
+        tried: list[int] = []
+        synced: list[int] = []
+
+        def refuse(fd, cmd, *args):
+            tried.append(cmd)
+            raise OSError(errno.ENOTSUP, "not supported")
+
+        with (
+            mock.patch.object(fcntl, "F_FULLFSYNC", full, create=True),
+            mock.patch.object(fcntl, "fcntl", refuse),
+            mock.patch.object(fsio, "_sync_directory"),
+            mock.patch("os.fsync", side_effect=synced.append),
+        ):
+            self.assertEqual(fsio.write_bytes_atomic(self.path, b"x"), "")
+        self.assertEqual(tried, [full])
+        self.assertEqual(len(synced), 1)
+        self.assertEqual(self._read(), b"x")
+
+        # F_FULLFSYNC が通れば os.fsync は呼ばない。
+        synced.clear()
+        with (
+            mock.patch.object(fcntl, "F_FULLFSYNC", full, create=True),
+            mock.patch.object(fcntl, "fcntl", lambda fd, cmd, *a: 0),
+            mock.patch.object(fsio, "_sync_directory"),
+            mock.patch("os.fsync", side_effect=synced.append),
+        ):
+            self.assertEqual(fsio.write_bytes_atomic(self.path, b"y"), "")
+        self.assertEqual(synced, [])
+
+        # 両方落ちれば書けなかったことにし、前の中身を残す。
+        with (
+            mock.patch.object(fcntl, "F_FULLFSYNC", full, create=True),
+            mock.patch.object(fcntl, "fcntl", refuse),
+            mock.patch("os.fsync", side_effect=OSError(errno.EIO, "io")),
+        ):
+            self.assertNotEqual(fsio.write_bytes_atomic(self.path, b"z"), "")
+        self.assertEqual(self._read(), b"y")
+        self.assertEqual(self._names(), ["i0001.md"])
+
+    def test_syncs_before_replacing(self):
+        order: list[str] = []
+        real_replace = os.replace
+
+        def replace(*args):
+            order.append("replace")
+            return real_replace(*args)
+
+        with (
+            mock.patch.object(fsio, "_sync_file", side_effect=lambda fd: order.append("sync")),
+            mock.patch.object(fsio, "_sync_directory", side_effect=lambda d: order.append("dir")),
+            mock.patch("os.replace", replace),
+        ):
+            self.assertEqual(fsio.write_bytes_atomic(self.path, b"x"), "")
+        self.assertEqual(order, ["sync", "replace", "dir"])
+
+    def test_unopenable_directory_is_not_a_failure(self):
+        """親ディレクトリの fsync は開けない環境（Windows）では飛ばす。差し替えは済んでいる。"""
+        real_open = os.open
+
+        def no_dir(path, flags, *rest):
+            if path == self.dir:
+                raise PermissionError(errno.EACCES, "denied")
+            return real_open(path, flags, *rest)
+
+        with mock.patch("os.open", no_dir):
+            self.assertEqual(fsio.write_bytes_atomic(self.path, b"x"), "")
+        self.assertEqual(self._read(), b"x")
+
+    def test_chmod_refused_by_the_filesystem_still_writes(self):
+        """chmod を受け付けないファイルシステム（vfat など）でも書ける。
+
+        権限の引き継ぎは最善努力。
+        """
+        self.assertEqual(fsio.write_bytes_atomic(self.path, b"before"), "")
+        with mock.patch("os.chmod", side_effect=PermissionError(errno.EPERM, "not permitted")):
+            self.assertEqual(fsio.write_bytes_atomic(self.path, b"after"), "")
+        self.assertEqual(self._read(), b"after")
+        self.assertEqual(self._names(), ["i0001.md"])
+
+    def test_read_only_destination_is_not_replaced(self):
+        """書き込み権の無い行き先（0444・読み取り専用属性）は、差し替えでも上書きしない。
+
+        root は書き込み権が無くても書けるので、os.access をパッチして同じ判断を通す。
+        """
+        self.assertEqual(fsio.write_bytes_atomic(self.path, b"before"), "")
+        real = os.access
+
+        def no_write(path, mode, *args, **kwargs):
+            if path == self.path and mode == os.W_OK:
+                return False
+            return real(path, mode, *args, **kwargs)
+
+        with mock.patch("os.access", no_write):
+            self.assertNotEqual(fsio.write_bytes_atomic(self.path, b"after"), "")
+            self.assertNotEqual(fsio.write_text_durable(self.path, "after"), "")
+        self.assertEqual(self._read(), b"before")
+        self.assertEqual(self._names(), ["i0001.md"])
+
+    @unittest.skipIf(
+        os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0),
+        "root は 0444 にも書けるので、POSIX の一般ユーザでだけ見る",
+    )
+    def test_read_only_mode_is_not_replaced(self):
+        self.assertEqual(fsio.write_bytes_atomic(self.path, b"before"), "")
+        os.chmod(self.path, 0o444)
+        self.assertNotEqual(fsio.write_bytes_atomic(self.path, b"after"), "")
+        self.assertEqual(self._read(), b"before")
+        self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o444)
+        self.assertEqual(self._names(), ["i0001.md"])
+
+    def test_put_back_restores_durably(self):
+        """戻すのも承認済みチケットと同じ書き方。素の書き方に戻されると落ちる。"""
+        self.assertEqual(fsio.write_bytes_atomic(self.path, b"new"), "")
+        seen: list[str] = []
+        real = fsio._replace_durably
+
+        def record(path, content):
+            seen.append(path)
+            return real(path, content)
+
+        with mock.patch.object(fsio, "_replace_durably", record):
+            fsio.put_back(((self.path, b"before"),))
+        self.assertEqual(seen, [self.path])
+        self.assertEqual(self._read(), b"before")
+
+    @unittest.skipIf(os.name == "nt", "POSIX の権限ビットを見る")
+    def test_keeps_the_mode_of_the_file_it_replaces(self):
+        with open(self.path, "wb") as f:
+            f.write(b"before")
+        os.chmod(self.path, 0o640)
+        self.assertEqual(fsio.write_bytes_atomic(self.path, b"after"), "")
+        self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o640)
+
+    @unittest.skipIf(os.name == "nt", "POSIX の権限ビットを見る")
+    def test_new_file_gets_the_mode_a_plain_open_would_give(self):
+        mask = os.umask(0o022)
+        try:
+            self.assertEqual(fsio.write_bytes_atomic(self.path, b"x"), "")
+        finally:
+            os.umask(mask)
+        self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o644)
+
+    def test_temporary_name_is_hidden_and_not_read_as_a_ticket(self):
+        """一時ファイルは `.<元の名前>.<一意>.part`。`.md` で終わらず、運ぶ側の除外に当たる。"""
+        seen: list[str] = []
+        real = tempfile.mkstemp
+
+        def watched(*args, **kwargs):
+            handle, part = real(*args, **kwargs)
+            seen.append(part)
+            return handle, part
+
+        with mock.patch("tempfile.mkstemp", watched):
+            for _ in range(2):
+                fsio.write_bytes_atomic(self.path, b"x")
+        self.assertEqual(len(set(seen)), 2, seen)
+        for part in seen:
+            self.assertEqual(os.path.dirname(part), self.dir)
+            name = os.path.basename(part)
+            self.assertTrue(name.startswith(".i0001.md."), name)
+            self.assertTrue(name.endswith(".part"), name)
+            # ccnavi-push-approved.sh と hook/c1.py が運ばない一時ファイルの形。
+            self.assertRegex(name, r"^\.[^/]*\.part(\.[^/]*)?$")
+
+    def test_staged_write_is_queued_as_its_own_kind(self):
+        with fsio.staging() as stage:
+            self.assertEqual(fsio.write_bytes_atomic(self.path, b"x"), "")
+            self.assertEqual(fsio.read_bytes(self.path), b"x")
+        self.assertFalse(os.path.exists(self.path))
+        (op,) = stage.items
+        self.assertEqual(op.kind, fsio.OP_BYTES_ATOMIC)
+        self.assertEqual(op.content, b"x")
+
+
+class WriteTextDurableTest(unittest.TestCase):
+    """承認済みチケットの書き直し（write_text_durable）。改行は write_text と同じに書く。"""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="ccnavi-text-durable-")
+        self.path = os.path.join(self.dir, "i0001.md")
+
+    def _read(self, path: str) -> bytes:
+        with open(path, "rb") as f:
+            return f.read()
+
+    def test_newline_matches_write_text(self):
+        plain = os.path.join(self.dir, "plain.md")
+        for newline in (None, "", "\n", "\r\n"):
+            with self.subTest(newline=newline):
+                text = "---\nticket: i0001\n---\n本文\n"
+                self.assertEqual(fsio.write_text(plain, text, newline), "")
+                self.assertEqual(fsio.write_text_durable(self.path, text, newline), "")
+                self.assertEqual(self._read(self.path), self._read(plain))
+
+    def test_failed_replace_keeps_the_previous_content(self):
+        self.assertEqual(fsio.write_text_durable(self.path, "before"), "")
+        with mock.patch("os.replace", side_effect=OSError(errno.ENOSPC, "no space")):
+            self.assertNotEqual(fsio.write_text_durable(self.path, "after"), "")
+        self.assertEqual(self._read(self.path), b"before")
+        self.assertEqual(sorted(os.listdir(self.dir)), ["i0001.md"])
+
+    def test_staged_write_keeps_lf_in_the_changes(self):
+        with fsio.staging() as stage:
+            self.assertEqual(fsio.write_text_durable(self.path, "a\nb\n"), "")
+            self.assertEqual(fsio.read_text(self.path), "a\nb\n")
+        self.assertFalse(os.path.exists(self.path))
+        (op,) = stage.items
+        self.assertEqual(op.kind, fsio.OP_TEXT_DURABLE)
+        self.assertEqual(op.content, b"a\nb\n")
+
+
+class WriteNewDurableTest(unittest.TestCase):
+    """フローの移し（write_new_durable）。在れば書かず、無ければ途中を見せずに置く。"""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="ccnavi-new-durable-")
+        self.path = os.path.join(self.dir, "flows", "i0001-01-01.yml")
+
+    def test_writes_when_absent(self):
+        self.assertEqual(fsio.write_new_durable(self.path, b"a: 1\r\n"), "")
+        with open(self.path, "rb") as f:
+            self.assertEqual(f.read(), b"a: 1\r\n")
+        self.assertEqual(os.listdir(os.path.dirname(self.path)), ["i0001-01-01.yml"])
+
+    def test_does_not_overwrite(self):
+        self.assertEqual(fsio.write_new_durable(self.path, b"before"), "")
+        failed = fsio.write_new_durable(self.path, b"after")
+        self.assertNotEqual(failed, "")
+        with open(self.path, "rb") as f:
+            self.assertEqual(f.read(), b"before")
+        self.assertEqual(os.listdir(os.path.dirname(self.path)), ["i0001-01-01.yml"])
+
+    def test_failed_replace_leaves_nothing(self):
+        with mock.patch("os.replace", side_effect=OSError(errno.ENOSPC, "no space")):
+            self.assertNotEqual(fsio.write_new_durable(self.path, b"x"), "")
+        self.assertEqual(os.listdir(os.path.dirname(self.path)), [])
+
+    def test_staged_write_refuses_an_existing_file(self):
+        os.makedirs(os.path.dirname(self.path))
+        with open(self.path, "wb") as f:
+            f.write(b"held")
+        with fsio.staging() as stage:
+            self.assertNotEqual(fsio.write_new_durable(self.path, b"x"), "")
+        self.assertEqual(stage.items, [])
+
+    def test_staged_write_is_queued_as_its_own_kind(self):
+        with fsio.staging() as stage:
+            self.assertEqual(fsio.write_new_durable(self.path, b"x"), "")
+        (op,) = stage.items
+        self.assertEqual(op.kind, fsio.OP_NEW_DURABLE)
+
+
+class TempNameTest(unittest.TestCase):
+    def test_temporary_names(self):
+        for name in (
+            ".workflow.yml.abc12345.part",
+            ".once-a-b.x1y2.part.json",
+            ".i0001.md.k_9.part",
+        ):
+            self.assertTrue(fsio.is_temp_name(name), name)
+        for name in ("workflow.yml", "1.pending", "1.requested", ".hidden", "a.b.part", ".part"):
+            self.assertFalse(fsio.is_temp_name(name), name)
 
 
 if __name__ == "__main__":
