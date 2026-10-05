@@ -145,7 +145,6 @@ def _project_settings(root: str) -> list[Problem]:
 
 
 # `.claude/settings.local.json` に置かせない、承認と判定に影響する値。
-# 置き場のパス・プロジェクトの置き場・ccnavi ディレクトリ・state の置き場（取り込み状態を読む先）・
 # チケット制御と承認の保護の切り替え・動作モード。例外は統合先の名前だけ（リポジトリに置かず、
 # 手元では環境変数で持つと決めた値なので）。
 LOCAL_SETTINGS = settings.LOCAL_CLAUDE_SETTINGS
@@ -153,21 +152,13 @@ LOCAL_SETTINGS = settings.LOCAL_CLAUDE_SETTINGS
 
 #
 # 保護と判定の働きを変える値（戻す働き・ccnavi 自身の設定の保護・確かめられないモードの止め・
-# 同じ理由の拒否の数え方・記録の置き場）も入れる。手元だけで切ると、ユーザが端末で打つ sh と
+# 同じ理由の拒否の数え方）も入れる。手元だけで切ると、ユーザが端末で打つ sh と
 # 他の機械で、同じ親子のチケットに掛かる保護が別になる。入れないのは、判定の答えを変えない
 # 次の値だけ。
 # 実行ファイルのパス（`CCNAVI_BIN_PATH`。hook の起動のために手元で差し替える。README の
 # 案内）、診断ログ（`CCNAVI_LOG_LEVEL` など）、タイムアウト監視と待ちの秒（`CCNAVI_*_TIMEOUT`・
 # `CCNAVI_LOCK_WAIT`）。
 _LOCAL_FORBIDDEN = (
-    # 置き場の env はもう読まない（置き場は既定に固定）が、置かれたら効いていると
-    # 思い込まないよう、今までどおり知らせる。
-    "CCNAVI_TICKETS_PROPOSAL",
-    "CCNAVI_TICKETS_APPROVED",
-    "CCNAVI_PROJECTS",
-    "CCNAVI_PROJECT_HOME",
-    "CCNAVI_STATE",
-    "CCNAVI_LOG",
     settings.TICKET_CONTROL_ENV,
     settings.GUARD_TICKET_APPROVAL_ENV,
     settings.GUARD_CORE_FILES_ENV,
