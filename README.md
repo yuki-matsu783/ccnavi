@@ -2742,7 +2742,11 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/entry/lint_layers.py` | lint のうち、設定のレイヤーと、取り込んだレイヤーの食い違いの検査 |
 | `src/ccnavi/entry/lint_ticket.py` | lint のうち、承認済みチケット・承認・提案と、親子の運用に要る hook の検査 |
 | `src/ccnavi/entry/lint_branch.py` | lint のうち、チケットのブランチ名・連番・既存ブランチ・ワークツリーの検査 |
-| `src/ccnavi/entry/diagnose.py` | 判定を実行せずに試す `--test` と `--explain` |
+| `src/ccnavi/entry/diagnose.py` | 判定を実行せずに試す `--test` と `--explain`。名前を引き受けるだけで、中身は下の 4 つに分けてある |
+| `src/ccnavi/entry/diagnose_try.py` | diagnose のうち、`--test` と `--test-samples`。判定と同じ経路で 1 件と見本を試す |
+| `src/ccnavi/entry/diagnose_explain.py` | diagnose のうち、`--explain` の本文 |
+| `src/ccnavi/entry/diagnose_board.py` | diagnose のうち、ボードの中身（`--explain --json`） |
+| `src/ccnavi/entry/diagnose_shared.py` | diagnose のうち、explain・board・try が共有するレイヤーの読み出しとルールの書き方 |
 | `src/ccnavi/entry/cli.py` | 1 回の起動の入口。標準入出力とコマンドラインを判定や各コマンドへ振り分け、ワークスペースルートを見つける |
 | `src/ccnavi/entry/cli_usage.py` | `--help` の本文 |
 | `src/ccnavi/entry/cli_args.py` | 引数の読み分け。設定を上書きする旗・診断だけの旗・`--docs` と並べられない旗と、パスの見分け |
