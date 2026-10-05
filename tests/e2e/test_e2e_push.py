@@ -197,11 +197,16 @@ class ApproveAndPushTest(unittest.TestCase):
         )
         self.assertIn("承認した", approved.stdout)
         self.assertNotIn("読めない", approved.stderr)
-        self.assertIn("ccnavi_approved:", self.read(self.approved_copy()))
+        # 承認は提案をそのまま動かす（欄を書き足さない）。
+        self.assertEqual(PROPOSAL_TEXT, self.read(self.approved_copy()))
         self.assertEqual(MESSAGE, out(self.tree, "log", "-1", "--format=%s"))
-        # コミットしたのは置き場と、承認で todo/ から消えた提案だけ。
+        # コミットしたのは置き場と、承認の記録（events/）と、承認で todo/ から消えた提案だけ。
+        events = ".ccnavi/approved/events"
         self.assertEqual(
-            sorted([f"{APPROVED}/{TICKET}.md", f"{PROPOSAL}/{TICKET}.md"]), self.committed()
+            sorted(
+                [f"{APPROVED}/{TICKET}.md", f"{events}/{TICKET}.ndjson", f"{PROPOSAL}/{TICKET}.md"]
+            ),
+            self.committed(),
         )
         self.assertEqual(proposed, out(self.tree, "rev-parse", "HEAD~1"))
         self.assertEqual(out(self.tree, "rev-parse", "HEAD"), self.remote_head())
@@ -210,7 +215,7 @@ class ApproveAndPushTest(unittest.TestCase):
         self.assertEqual("", out(self.tree, "diff", "--cached", "--name-only"))
         # 別の機械から、承認済みチケットが読め、提案は承認待ちに残っていない。
         there = self.clone("machine-b")
-        self.assertIn("ccnavi_approved:", self.read(self.approved_copy(there)))
+        self.assertEqual(PROPOSAL_TEXT, self.read(self.approved_copy(there)))
         self.assertFalse(os.path.exists(os.path.join(there, *PROPOSAL.split("/"), TICKET + ".md")))
         self.assertFalse(os.path.exists(os.path.join(there, "src", "draft.py")))
         self.assertEqual("seed\n", self.read(os.path.join(there, "seed.txt")))
@@ -231,7 +236,9 @@ class ApproveAndPushTest(unittest.TestCase):
         carried = self.ok(self.run_sh("ccnavi-push-approved.sh", cwd=self.tree))
         self.assertIn(TICKET, carried.stdout)
         self.assertNotIn(NOTHING, carried.stdout)
-        self.assertEqual([f"{APPROVED}/{TICKET}.md"], self.committed())
+        self.assertEqual(
+            sorted([f"{APPROVED}/{TICKET}.md", f"{events}/{TICKET}.ndjson"]), self.committed()
+        )
         self.assertEqual(pushed, out(self.tree, "rev-parse", "HEAD~1"))
         self.assertEqual(out(self.tree, "rev-parse", "HEAD"), self.remote_head())
         later = self.clone("machine-b-later")
