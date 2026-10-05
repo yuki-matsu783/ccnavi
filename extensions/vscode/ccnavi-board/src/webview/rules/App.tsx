@@ -543,7 +543,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </section>
       <section id="tab-judge" className={tab === "judge" ? "pane active" : "pane"}>
         <p className="hint">
-          セッションが dry-run でも、ここは enable のときの判定を返します。
+          dry-run モードの場合でも、ここは enable モードのときの判定を返します。
         </p>
         <div className="judge-form">
           <label>
