@@ -2,3 +2,4 @@
 {"at": "2026-10-05T15:06:03Z", "ticket": "feature-1-sample-ticket", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "8ec045528cfbfcffa180b8018e6aa93a62e4500b"}
 {"at": "2026-10-05T22:02:09Z", "ticket": "feature-1-sample-ticket", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 1, "mark": "skipped"}
 {"at": "2026-10-05T22:04:36Z", "ticket": "feature-1-sample-ticket", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 2, "mark": "pending"}
+{"at": "2026-10-05T22:05:56Z", "ticket": "feature-1-sample-ticket", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 2, "mark": "requested"}
