@@ -61,10 +61,7 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 .fact.copy-open::before, .fact.copy-review::before, .fact.copy-closed::before, .fact.mark-reviewed::before { content: "✓ "; }
 .fact.sha { font-family: var(--vscode-editor-font-family); }
 /* 親のフェーズ一覧。1 フェーズ 1 行。左の丸がフェーズで、右が状態。依頼へのリンクとボタンは 2 段目（.phase-actions）。
-   状態は要約（.phase-brief）と全文（.phase-full）を両方持ち、フェーズ一覧の幅（カードの内寸）で
-   どちらを見せるかを決める。480px 未満（1920px の画面で 4 列のときも含む）は要約だけを見せ、
-   他の列を畳むかドラッグで広げて 480px 以上になると全文に替わる。狭いとき全文は display: none
-   ではなく画面の外に置き、読み上げには残す。行の title にもあるので、マウスでも読める。
+   状態は全文（状態・マーカー・レビューの要否・リスクの点と理由）だけを出し、狭ければ折り返す。
    右の列を auto にすると状態の 1 行分の幅が行を占め、フェーズ名の列が 0 になって省略記号ごと
    消えるので、状態の列は 55% で止める。状態は項目（.phase-item）ごとに折り返さない塊にし、
    折り返すのは項目の間だけにする（1 項目が列より長いときだけ項目の中で折る）。
@@ -78,13 +75,8 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 .phase-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .phase .phase-label { font-weight: 600; color: var(--vscode-editor-foreground); }
 .phase-tickets::before { content: "·"; margin: 0 5px; }
-.phase-status { position: relative; min-width: 0; text-align: right; justify-self: end; }
+.phase-status { min-width: 0; text-align: right; justify-self: end; }
 .phase-item { display: inline-block; max-width: 100%; overflow-wrap: break-word; }
-.phase-full { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-@container (min-width: 480px) {
-  .phase-brief { display: none; }
-  .phase-full { position: static; width: auto; height: auto; overflow: visible; clip-path: none; white-space: normal; }
-}
 @container (max-width: 300px) {
   .phase { grid-template-columns: 12px minmax(0, 1fr); }
   .phase-status { grid-column: 2; justify-self: start; text-align: left; }

@@ -387,7 +387,9 @@
      "phase": 1,
      "mark": "reviewed"
     }
-   ]
+   ],
+   "issues": [],
+   "attention": false
   },
   {
    "ticket": "i0001-01-01",
@@ -484,7 +486,9 @@
      "via": "cli",
      "phase": 1
     }
-   ]
+   ],
+   "issues": [],
+   "attention": false
   },
   {
    "ticket": "i0001-02-02",
@@ -555,7 +559,9 @@
      "via": "cli",
      "base_sha": "0000000000000000000000000000000000000000"
     }
-   ]
+   ],
+   "issues": [],
+   "attention": false
   },
   {
    "ticket": "i0001-02-03",
@@ -618,7 +624,9 @@
    },
    "risk": null,
    "judge": null,
-   "history": []
+   "history": [],
+   "issues": [],
+   "attention": true
   },
   {
    "ticket": "i0001-02-04",
@@ -722,7 +730,9 @@
      "to": "review",
      "via": "cli"
     }
-   ]
+   ],
+   "issues": [],
+   "attention": false
   },
   {
    "ticket": "i0001-02-05",
@@ -779,7 +789,9 @@
      "via": "cli",
      "reason": "要らなくなった"
     }
-   ]
+   ],
+   "issues": [],
+   "attention": false
   }
  ],
  "parents": [

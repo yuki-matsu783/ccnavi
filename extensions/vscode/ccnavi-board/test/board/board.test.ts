@@ -71,7 +71,7 @@ test("CB-T06 カードに承認済みチケット・ワークツリー・マー�
   assert.match(cancelled.openPath, /\.ccnavi\/approved\/done\/i0001-02-05\.md$/);
 });
 
-test("CB-T07 提案が無ければ承認済みチケットの置き場が列。どちらにも無ければ不備として未着手に置く", () => {
+test("CB-T07 提案が無ければ承認済みチケットの置き場が列。どちらにも無ければ未着手に置き、不備の文は実行ファイルのものを出す", () => {
   const base = fixture();
   const doing: TicketJson = {
     ...base.tickets[1],
@@ -85,7 +85,12 @@ test("CB-T07 提案が無ければ承認済みチケットの置き場が列。�
     copy: { status: "closed", path: "/x/.ccnavi/approved/done/i0001-01-08.md" },
     cancelled_at: "2026-01-01T00:00:00+0000",
   };
-  const nowhere: TicketJson = { ...doing, ticket: "i0001-01-07", copy: { status: "none" } };
+  const nowhere: TicketJson = {
+    ...doing,
+    ticket: "i0001-01-07",
+    copy: { status: "none" },
+    issues: ["提案が見つかりません（承認済みチケットだけがあります）"],
+  };
   const json: BoardJson = { ...base, tickets: [...base.tickets, doing, closed, nowhere] };
   const cards = cardsOf(buildBoard(json));
   assert.equal(cards.get("i0001-01-09")!.column, "doing");
@@ -99,11 +104,15 @@ test("CB-T07 提案が無ければ承認済みチケットの置き場が列。�
   assert.equal(buildBoard(json).issueCount, 1);
 });
 
-test("CB-T08 親の無い子は不備", () => {
+test("CB-T08 不備は実行ファイルの issues をそのまま持ち、ボードは足しも削りもしない", () => {
   const base = fixture();
+  // 親の無い子でも、実行ファイルが言わなければボードは不備を作らない
   const stray: TicketJson = { ...base.tickets[1], ticket: "i0002-01-01", parent: "i0002" };
-  const cards = cardsOf(buildBoard({ ...base, tickets: [...base.tickets, stray] }));
-  assert.match(cards.get("i0002-01-01")!.issues[0], /親 i0002 が見つかりません/);
+  assert.deepEqual(cardsOf(buildBoard({ ...base, tickets: [...base.tickets, stray] })).get("i0002-01-01")!.issues, []);
+  const said: TicketJson = { ...stray, issues: ["親 i0002 が見つかりません"] };
+  const board = buildBoard({ ...base, tickets: [...base.tickets, said] });
+  assert.deepEqual(cardsOf(board).get("i0002-01-01")!.issues, ["親 i0002 が見つかりません"]);
+  assert.equal(board.issueCount, 1);
 });
 
 test("CB-T09 依頼済みで止まったフェーズに decide、早めに閉じた親にはバッジだけ", () => {
@@ -318,51 +327,40 @@ test("CB-T131 レビュー待ちのフェーズに「レビュー済み連絡」
   assert.deepEqual(quiet.phases[1].actions, []);
 });
 
-test("CB-T132 要対応は承認待ち・バッジ・不備・フェーズ行の要約の条件で、判定はし直さない", () => {
-  // 見本: 親は順調、閉じた子・作業中の子・レビュー待ちの子・取り消した子は順調、承認待ちでワークツリーの無い子だけが要対応
+test("CB-T132 要対応は実行ファイルの attention をそのまま持ち、条件をボードで組み直さない", () => {
+  // 見本: 実行ファイルは承認待ちでワークツリーの無い子だけを要対応と言っている
   const cards = cardsOf(buildBoard(fixture()));
-  assert.equal(cards.get("i0001")!.attention, false);
-  assert.equal(cards.get("i0001-01-01")!.attention, false);
-  assert.equal(cards.get("i0001-02-02")!.attention, false);
-  assert.equal(cards.get("i0001-02-03")!.attention, true);
-  assert.equal(cards.get("i0001-02-04")!.attention, false);
-  // 取り消した子はワークツリーが無いが、取り消しの列なので要対応ではない
-  assert.equal(cards.get("i0001-02-05")!.attention, false);
-  // 承認待ちは pending_approval で見る。親の改版は承認済みチケットが開いたまま（バッジの「未承認」は出ない）でも要対応。
-  // 落とすと「要対応のみ」の絞り込みで隠れ、承認の対象から外れる
+  assert.deepEqual(
+    [...cards.values()].filter((card) => card.attention).map((card) => card.id),
+    ["i0001-02-03"],
+  );
+  // 承認待ち・ワークツリーなし・HIGH のリスク・止まったフェーズを足しても、実行ファイルが偽と言えば偽のまま
   const base = fixture();
-  const revision = cardsOf(buildBoard({ ...base, pending_approval: [...base.pending_approval, "i0001"] }));
-  assert.equal(revision.get("i0001")!.copyStatus, "open");
-  assert.equal(revision.get("i0001")!.pendingApproval, true);
-  assert.equal(revision.get("i0001")!.attention, true);
-  // ワークツリーが無いのが要対応なのは未着手と作業中（レビュー待ちを含む）。閉じたものと取り消しは違う
-  const noTree: TicketJson = { ...base.tickets[4], worktree: { exists: false, path: "" } };
-  const reviewNoTree = cardsOf(buildBoard({ ...base, tickets: [...base.tickets.slice(0, 4), noTree, base.tickets[5]] }));
-  assert.equal(reviewNoTree.get("i0001-02-04")!.column, "doing");
-  assert.equal(reviewNoTree.get("i0001-02-04")!.attention, true);
-  const doingNoTree = cardsOf(buildBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-02-02" ? { ...t, worktree: { exists: false, path: "" } } : t)) }));
-  assert.equal(doingNoTree.get("i0001-02-02")!.attention, true);
-  // ユーザのレビュー待ちのフェーズがあれば、その子（レビュー待ち）も親（フェーズ行の要約）も要対応
-  const waiting = cardsOf(buildBoard(waitingWithMr("u")));
-  assert.equal(waiting.get("i0001")!.attention, true);
-  assert.equal(waiting.get("i0001-02-02")!.attention, true);
-  assert.equal(waiting.get("i0001-01-01")!.attention, false);
-  // HIGH 以上のリスクは要対応、MEDIUM は違う。不備（親が見つからない）も要対応
-  const risky = (level: string): TicketJson => ({ ...base.tickets[1], risk: { points: 70, level } });
-  const withRisk = (level: string) => cardsOf(buildBoard({ ...base, tickets: [base.tickets[0], risky(level), ...base.tickets.slice(2)] }));
-  assert.equal(withRisk("HIGH").get("i0001-01-01")!.attention, true);
-  assert.equal(withRisk("CRITICAL").get("i0001-01-01")!.attention, true);
-  assert.equal(withRisk("MEDIUM").get("i0001-01-01")!.attention, false);
-  const stray: TicketJson = { ...base.tickets[1], ticket: "i0002-01-01", parent: "i0002" };
-  assert.equal(cardsOf(buildBoard({ ...base, tickets: [...base.tickets, stray] })).get("i0002-01-01")!.attention, true);
+  const loud: TicketJson = {
+    ...base.tickets[2],
+    worktree: { exists: false, path: "" },
+    risk: { points: 70, level: "CRITICAL" },
+    scattered: [{ tree: "a", state: "doing", path: "x" }],
+    blocked: "止まっている",
+  };
+  const parent: ParentJson = { ...base.parents[0], phases: base.parents[0].phases.map((p) => ({ ...p, gate_closed: true, review_waiting: true })) };
+  const quiet = cardsOf(
+    buildBoard({ ...base, pending_approval: [...base.pending_approval, loud.ticket, "i0001"], tickets: base.tickets.map((t) => (t.ticket === loud.ticket ? loud : t)), parents: [parent] }),
+  );
+  assert.equal(quiet.get(loud.ticket)!.attention, false);
+  assert.equal(quiet.get("i0001")!.attention, false);
+  // 実行ファイルが真と言えば、ほかが順調でも真
+  const said = cardsOf(buildBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-01-01" ? { ...t, attention: true } : t)) }));
+  assert.equal(said.get("i0001-01-01")!.attention, true);
 });
 
-test("CB-T138 止まっているチケットは、不備の行に理由が出て注意を要する扱いになる", () => {
+test("CB-T138 止まっているチケットは、理由と実行ファイルが組んだ不備・要対応をそのまま持つ", () => {
   // 判定はこのチケットのワークツリーへの書き込みを全部止めるが、`copy.status` は `open` の
   // ままなので、列からも承認済みのバッジからも分からない。
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-02-02")!;
-  const stopped: TicketJson = { ...child, blocked: "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）" };
+  const blocked = "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）";
+  const stopped: TicketJson = { ...child, blocked, issues: [`書き込みが止まっています: ${blocked}`], attention: true };
   const parent = base.tickets.find((t) => t.ticket === "i0001")!;
   const card = cardsOf(buildBoard({ ...base, tickets: [parent, stopped] })).get("i0001-02-02")!;
 

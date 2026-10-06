@@ -164,6 +164,10 @@ export interface TicketJson {
   readonly flow: FlowJson | null;
   /** 状態の履歴の新しい側（古い順）。この欄を出さない古い実行ファイルでは空 */
   readonly history: readonly HistoryEntryJson[];
+  /** 読み手が気づくべき不備の文。実行ファイルが組み、ボードはそのまま出す */
+  readonly issues: readonly string[];
+  /** ユーザが動く必要があるか。実行ファイルが決め、ボードは「要対応のみ」でこれを見るだけ */
+  readonly attention: boolean;
 }
 
 /**
@@ -500,6 +504,8 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     judge: isRecord(raw.judge) ? raw.judge : null,
     flow: isRecord(raw.flow) ? flow(raw.flow) : null,
     history: list(raw.history).filter(isRecord).map(historyEntry),
+    issues: list(raw.issues).map(str),
+    attention: raw.attention === true,
   };
 }
 

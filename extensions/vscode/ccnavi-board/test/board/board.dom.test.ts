@@ -64,11 +64,12 @@ test("CB-D41 親で絞り込むと他の親子のチケットのカードが隠�
 });
 
 test("CB-D46 書き込みが止まっているカードは「要対応のみ」でも残る", async () => {
-  // 信頼できない理由（`blocked`）は不備として積まれ、`attention` が真になる（board.ts）。素の版では
-  // i0001-02-02 は隠れる（CB-D42）ので、理由を付けたときだけ残ることが確かめられる。
+  // 信頼できない理由（`blocked`）は、実行ファイルが不備として積み `attention` を真にする。素の版では
+  // i0001-02-02 は隠れる（CB-D42）ので、実行ファイルがそう言ったときだけ残ることが確かめられる。
   const base = fixture();
+  const blocked = "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）";
   const stopped = base.tickets.map((t) =>
-    t.ticket === "i0001-02-02" ? { ...t, blocked: "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）" } : t,
+    t.ticket === "i0001-02-02" ? { ...t, blocked, issues: [`書き込みが止まっています: ${blocked}`], attention: true } : t,
   );
   const page = await openBoard({ ...base, tickets: stopped });
   try {
@@ -139,7 +140,9 @@ test("CB-D43 「レビュー済み連絡」は親とフェーズを送り、提�
         : p,
     ),
   };
-  const page = await openBoard({ ...base, parents: [parent] });
+  // 実行ファイルはレビュー待ちのフェーズの子と親を要対応と言う
+  const tickets = base.tickets.map((t) => (t.ticket === "i0001" || t.ticket === "i0001-02-02" ? { ...t, attention: true } : t));
+  const page = await openBoard({ ...base, tickets, parents: [parent] });
   try {
     page.click(page.one('button[data-action="reviewed"][data-parent="i0001"][data-phase="2"]'));
     await page.settle();

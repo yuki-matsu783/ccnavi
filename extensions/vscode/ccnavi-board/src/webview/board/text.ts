@@ -63,13 +63,11 @@ export function worktreeName(path: string): string {
   return name === "" ? "あり" : name;
 }
 
-/** フェーズ行の状態の全文。`終了 · レビュー待ち · レビュー依頼済み · レビュー要 · リスク: 25 (MEDIUM) — …` */
-export function phaseStatusFull(p: PhaseChip): string {
-  return phaseStatusFullItems(p).join(" · ");
-}
-
-/** 全文の項目のリスト。画面は項目ごとに区切って、項目の途中では折り返さない */
-export function phaseStatusFullItems(p: PhaseChip): string[] {
+/**
+ * フェーズ行の状態の項目のリスト。画面は ` · ` で区切って並べ、項目の途中では折り返さない。
+ * `終了 · レビュー待ち · レビュー依頼済み · レビュー要 · リスク: 25 (MEDIUM) — …`
+ */
+export function phaseStatusItems(p: PhaseChip): string[] {
   const notes: string[] = [];
   if (p.gateClosed) {
     notes.push(holdLabel(p));
@@ -84,26 +82,6 @@ export function phaseStatusFullItems(p: PhaseChip): string[] {
     notes.push(p.riskLine);
   }
   return [PHASE_STATE_LABELS[p.state], ...notes];
-}
-
-/**
- * フェーズ行の状態の要約。ユーザが動くべきことだけで、無ければ空。項目はカードのバッジと同じ。
- * 止めている間は段の名前を 1 つだけ出す。
- */
-export function phaseStatusBrief(p: PhaseChip): string {
-  return phaseStatusBriefItems(p).join(" · ");
-}
-
-/** 要約の項目のリスト。無ければ空 */
-export function phaseStatusBriefItems(p: PhaseChip): string[] {
-  const notes: string[] = [];
-  if (p.gateClosed) {
-    notes.push(holdLabel(p));
-  }
-  if (isHighRisk(p.riskLevel)) {
-    notes.push(`リスク ${p.riskLevel}`);
-  }
-  return notes;
 }
 
 /** マージリクエストのバッジの文字。番号が読めなければ「マージリクエスト」だけ */
