@@ -16,8 +16,16 @@ ITEM_LIMIT = 10
 ASK = "askUserQuestion"
 # 図の上の囲み（ボードの枠）。手順ではないので並べない
 GROUP = "group"
+# 繰り返し。出口は `branches` の 2 項目（`body` = 繰り返す、`done` = 抜ける）で、上限の回数を持つ。
+LOOP = "loop"
 # 出口を項目ごとに持つ種類と、項目の欄。
-BRANCH_KEYS = {"ifElse": "branches", "switch": "branches", "branch": "branches", ASK: "options"}
+BRANCH_KEYS = {
+    "ifElse": "branches",
+    "switch": "branches",
+    "branch": "branches",
+    LOOP: "branches",
+    ASK: "options",
+}
 
 
 def shape_problem(data) -> str:
@@ -57,7 +65,8 @@ def shape_problem(data) -> str:
 # ---- 線の構造と名前（`--lint --flow` の warn）
 #
 # 読めるか・形（`shape_problem`）の外にある、手順として怪しいところ。読むのは止めない（warn）。
-# `SubagentStart` は見ない（並べ方は `render` のまま）。巡回は意図して書くことがあるので言わない。
+# `SubagentStart` は見ない（並べ方は `render` のまま）。巡回は `loop` を通るものだけが正しい巡回で、
+# 通らない巡回は warn で言う（`loop` の回数の上限が効かず、終わらなくなりうるため）。
 
 # 並べない（手順でない）種類。構造の検査からも外す。
 _NOT_STEP = (GROUP,)
@@ -102,8 +111,9 @@ def structure_problems(data) -> list[str]:
     """線の構造の怪しいところ（1 件 1 行）。無ければ空。例外は外に出さない。
 
     見るのは、線の `from` / `to` が無いノードを指す、`start` から届かないノード、`start` に入る線、
-    `end` から出る線、分岐・問いの出口に線が無い、`end` が無い、`start` が無い。グループは外す
-    （手順ではない）。巡回は言わない。サブフロー（`subAgentFlows`）の中は見ない。
+    `end` から出る線、分岐・問いの出口に線が無い、`end` が無い、`start` が無い、`loop` の上限の
+    回数と出口、`loop` を通らない巡回。グループは外す（手順ではない）。サブフロー
+    （`subAgentFlows`）の中は見ない。
 
     出口は画面（`flow-doc.ts` の `portsOf`）と同じに読む。複数選択（`multiSelect: true`）の問いは
     選択肢ごとに出口を分けず、`output` の 1 本だけ。グループへ出る線も、出る側の出口は使っている
@@ -194,10 +204,73 @@ def _structure_problems(data) -> list[str]:
             if not _port_taken(node, index, item, taken)
         ]
         if empty:
-            what = "問い" if kinds[nid] == ASK else "分岐"
+            what = {ASK: "問い", LOOP: "繰り返し"}.get(kinds[nid], "分岐")
             shown = ", ".join(flow_text._capped(empty[:ITEM_LIMIT], len(empty)))
             out.append(f"{what} {_named(node)} の出口に線が無い: {shown}")
+    out.extend(_loop_problems(by_id, kinds, edges))
     return out
+
+
+def _positive_int(value) -> bool:
+    """1 以上の整数か。真偽は数に数えない。整数の値の小数（`3.0`）は整数と読む。"""
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, float):
+        return value.is_integer() and value >= 1
+    return isinstance(value, int) and value >= 1
+
+
+def _loop_problems(
+    by_id: dict[str, dict], kinds: dict[str, str], edges: dict[str, list[str]]
+) -> list[str]:
+    """`loop` の上限の回数と出口、`loop` を通らない巡回（1 件 1 行）。"""
+    out: list[str] = []
+    for nid, node in by_id.items():
+        if kinds[nid] != LOOP:
+            continue
+        info = flow_text._dict(node.get("data"))
+        if not _positive_int(info.get("maxIterations")):
+            out.append(
+                f"繰り返し {_named(node)} の maxIterations が 1 以上の整数ではない"
+                "（回数の上限が無いと、終わりを決める手がかりが無くなる）"
+            )
+        items = [i for i in flow_text._list(info.get("branches")) if isinstance(i, dict)]
+        if len(items) != 2:
+            out.append(
+                f"繰り返し {_named(node)} の出口（branches）が 2 つではない（繰り返す・抜ける）"
+            )
+    out.extend(_cycle_problems(by_id, kinds, edges))
+    return out
+
+
+def _cycle_problems(
+    by_id: dict[str, dict], kinds: dict[str, str], edges: dict[str, list[str]]
+) -> list[str]:
+    """`loop` を通らない巡回。`loop` を外した線の中に残る巡回の上のノードを、1 行で言う。
+
+    `loop` は巡回の中に在れば上限の回数で止まる手がかりになるので、`loop` を外して巡回を探す。
+    入る線が無いノードと出る線が無いノードを残らなくなるまで外すと、巡回の上（と巡回どうしの間）だけが残る。
+    """
+    keep = {nid for nid in by_id if kinds[nid] != LOOP}
+    out_edges = {n: [d for d in edges.get(n, []) if d in keep] for n in keep}
+    in_edges: dict[str, list[str]] = {n: [] for n in keep}
+    for src, dsts in out_edges.items():
+        for dst in dsts:
+            in_edges[dst].append(src)
+    alive = set(keep)
+    changed = True
+    while changed:
+        changed = False
+        for n in list(alive):
+            if not any(d in alive for d in out_edges[n]) or not any(
+                s in alive for s in in_edges[n]
+            ):
+                alive.discard(n)
+                changed = True
+    if not alive:
+        return []
+    names = _names([by_id[n] for n in by_id if n in alive])
+    return [f"loop を通らない巡回がある: {names}（繰り返すなら loop を通し、回数の上限を決める）"]
 
 
 def _flow_nodes(data) -> list[dict]:

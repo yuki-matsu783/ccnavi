@@ -253,8 +253,30 @@ connections:
 """
 
 
+# loop の見本。start → p1 → l(loop) → 繰り返す: p1 / 抜ける: end。
+LOOP_BASE = """\
+nodes:
+  - {id: s, type: start, name: 開始}
+  - {id: p1, type: prompt, name: 直す, data: {prompt: 直す}}
+  - id: l
+    type: loop
+    name: 直す
+    data: {condition: テストが落ちる, maxIterations: 3, branches: [
+      {id: body, label: 繰り返す}, {id: done, label: 抜ける}]}
+  - {id: e, type: end, name: 終了}
+connections:
+  - {id: c1, from: s, to: p1}
+  - {id: c2, from: p1, to: l}
+  - {id: c3, from: l, to: p1, fromPort: body}
+  - {id: c4, from: l, to: e, fromPort: done}
+"""
+
+
 class FlowStructureTest(unittest.TestCase):
-    """線の構造（`flow_shape.structure_problems`）。読むのは止めない warn で、巡回は言わない。"""
+    """線の構造（`flow_shape.structure_problems`）。読むのは止めない warn。
+
+    巡回は `loop` を通らないものを言う。
+    """
 
     def problems(self, text: str) -> list[str]:
         data, why = flow.parse(text.encode("utf-8"))
@@ -309,9 +331,59 @@ connections:
         self.assertIn("start が無い（どこから始めるかが決まらない）", said)
         self.assertIn("end が無い（どこで終わるかが決まらない）", said)
 
-    def test_loops_are_not_warned(self):
+    def test_a_cycle_without_a_loop_node_is_warned(self):
         text = STRUCTURE_BASE + "  - {id: c5, from: p1, to: q}\n"
-        self.assertEqual(self.problems(text), [])
+        self.assertEqual(
+            self.problems(text),
+            [
+                "loop を通らない巡回がある: q（方針）, p1（読む）"
+                "（繰り返すなら loop を通し、回数の上限を決める）"
+            ],
+        )
+        # 自分に戻る線も巡回。
+        self.assertEqual(len(self.problems(STRUCTURE_BASE + "  - {id: c5, from: p1, to: p1}\n")), 1)
+
+    def test_a_cycle_through_a_loop_node_is_fine(self):
+        self.assertEqual(self.problems(LOOP_BASE), [])
+
+    def test_a_loop_needs_a_positive_integer_limit(self):
+        for bad in (
+            "maxIterations: 0, ",
+            "maxIterations: -1, ",
+            "maxIterations: x, ",
+            "maxIterations: 2.5, ",
+            "maxIterations: true, ",
+            "",
+        ):
+            said = self.problems(LOOP_BASE.replace("maxIterations: 3, ", bad))
+            self.assertEqual(
+                said,
+                [
+                    "繰り返し l（直す） の maxIterations が 1 以上の整数ではない"
+                    "（回数の上限が無いと、終わりを決める手がかりが無くなる）"
+                ],
+                bad,
+            )
+        # 整数の値の小数は整数と読む。
+        self.assertEqual(
+            self.problems(LOOP_BASE.replace("maxIterations: 3, ", "maxIterations: 3.0, ")), []
+        )
+
+    def test_a_loop_has_two_exits(self):
+        said = self.problems(
+            LOOP_BASE.replace(
+                "{id: body, label: 繰り返す}, {id: done, label: 抜ける}]}",
+                "{id: body, label: 繰り返す}]}",
+            )
+        )
+        self.assertIn(
+            "繰り返し l（直す） の出口（branches）が 2 つではない（繰り返す・抜ける）", said
+        )
+        # 出口の線が無いことも、分岐と同じく言う。
+        said = self.problems(
+            LOOP_BASE.replace("  - {id: c4, from: l, to: e, fromPort: done}\n", "")
+        )
+        self.assertIn("繰り返し l（直す） の出口に線が無い: 抜ける", said)
 
     def test_groups_are_left_out(self):
         # グループに繋がる線も、届かないグループも言わない（手順ではない）。

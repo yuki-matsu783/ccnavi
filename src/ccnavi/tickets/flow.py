@@ -848,6 +848,13 @@ def briefing(
             "（AskUserQuestion は渡されない）。そのノードで手を止め、問いと選択肢を添えて"
             "メインに返してください。メインがユーザに聞き、答えを持って同じサブエージェントを再開させる。"
         )
+    if flow_shape.LOOP in kinds:
+        lines.append(
+            f"    {flow_shape.LOOP} のノード: 条件が成り立つあいだ「繰り返す」側へ進み、"
+            "成り立たなくなったか、繰り返した回数が最大に達したら「抜ける」側へ進んでください。"
+            "回数は自分で数えてください。最大に達しても条件が成り立つままだったときは、"
+            "最後の報告にそのことを書いてください。"
+        )
     if kinds & set(SPAWN):
         lines.append(
             "    subAgent / subAgentFlow のノード: Agent ツールがあれば入れ子の"

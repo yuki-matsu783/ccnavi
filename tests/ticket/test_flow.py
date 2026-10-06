@@ -495,6 +495,80 @@ class FlowRenderTest(unittest.TestCase):
         return path
 
 
+LOOP_NODE_FLOW = {
+    "nodes": [
+        {"id": "s", "type": "start", "name": "開始", "data": {"label": "開始"}},
+        {"id": "p", "type": "prompt", "name": "直す", "data": {"prompt": "テストを直す"}},
+        {
+            "id": "l",
+            "type": "loop",
+            "name": "テストが通るまで",
+            "data": {
+                "condition": "テストが落ちる",
+                "maxIterations": 3,
+                "branches": [
+                    {"id": "body", "label": "繰り返す"},
+                    {"id": "done", "label": "抜ける"},
+                ],
+            },
+        },
+        {"id": "e", "type": "end", "name": "終了", "data": {"label": "終了"}},
+    ],
+    "connections": [
+        {"id": "c1", "from": "s", "to": "p"},
+        {"id": "c2", "from": "p", "to": "l"},
+        {"id": "c3", "from": "l", "to": "p", "fromPort": "body"},
+        {"id": "c4", "from": "l", "to": "e", "fromPort": "done"},
+    ],
+}
+
+
+class FlowLoopTest(unittest.TestCase):
+    """`loop`: 条件と上限の回数、出口の名前（繰り返す・抜ける）を 1 行に並べ、扱いを足して渡す。"""
+
+    def test_a_loop_is_one_line_with_condition_limit_and_named_exits(self):
+        lines, kinds = flow_render.render(LOOP_NODE_FLOW)
+        self.assertEqual(
+            lines[2],
+            "3. [loop] テストが通るまで: 条件: テストが落ちる / 最大 3 回"
+            " → 2（繰り返す）, 4（抜ける）",
+        )
+        self.assertIn("loop", kinds)
+
+    def test_exits_may_use_branch_numbers(self):
+        data = yaml.safe_load(yaml.safe_dump(LOOP_NODE_FLOW))
+        for c in data["connections"]:
+            if c["id"] == "c3":
+                c["fromPort"] = "branch-0"
+            if c["id"] == "c4":
+                c["fromPort"] = "branch-1"
+        lines, _ = flow_render.render(data)
+        self.assertIn("→ 2（繰り返す）, 4（抜ける）", lines[2])
+
+    def test_a_loop_without_a_limit_says_so_instead_of_hiding_it(self):
+        data = yaml.safe_load(yaml.safe_dump(LOOP_NODE_FLOW))
+        del data["nodes"][2]["data"]["maxIterations"]
+        lines, _ = flow_render.render(data)
+        self.assertIn("最大回数が書かれていない", lines[2])
+
+    def test_the_briefing_tells_how_to_count_and_where_to_go(self):
+        child = child_ticket(started=True)
+        with (
+            mock.patch.object(flow, "resolve", return_value=("/x/flows/f.yml", "", True)),
+            mock.patch.object(flow, "load", return_value=(LOOP_NODE_FLOW, "")),
+        ):
+            text = "\n".join(flow.briefing(conf_with(), "/w", child, "src/**"))
+        self.assertIn("loop のノード: 条件が成り立つあいだ「繰り返す」側へ進み", text)
+        self.assertIn("最大に達しても条件が成り立つままだったとき", text)
+        # loop が無いフローには足さない。
+        with (
+            mock.patch.object(flow, "resolve", return_value=("/x/flows/f.yml", "", True)),
+            mock.patch.object(flow, "load", return_value=(WORKFLOW, "")),
+        ):
+            plain = "\n".join(flow.briefing(conf_with(), "/w", child, "src/**"))
+        self.assertNotIn("loop のノード", plain)
+
+
 class FlowInfoTest(unittest.TestCase):
     """ボードの欄。閉じた子でフローが無ければ出さない（「フローを作る」を出させない）。"""
 
