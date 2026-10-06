@@ -102,7 +102,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
           {card.actions.map((action, i) => (
             <ActionButton key={i} action={action} id={card.id} />
           ))}
-          {card.flow !== null ? <FlowButton flow={card.flow} id={card.id} /> : null}
+          {card.flow !== null ? <FlowButton flow={card.flow} id={card.id} closed={card.column === "done" || card.column === "cancelled"} /> : null}
         </div>
       ) : null}
     </li>
@@ -323,8 +323,8 @@ function MrLink({ url, number, title }: { readonly url: string; readonly number:
  * 子のフローを開くボタン。言葉は在るか・着手中か（実行ファイルの答えをそのまま反映したもの）で変わる。
  * 着手中でも押せる（読むだけの画面が開く）。押したら拡張ホストへ返すだけ
  */
-function FlowButton({ flow, id }: { readonly flow: FlowJson; readonly id: string }): JSX.Element {
-  const state = flow.locked ? "locked" : flow.exists ? "edit" : "create";
+function FlowButton({ flow, id, closed }: { readonly flow: FlowJson; readonly id: string; readonly closed: boolean }): JSX.Element {
+  const state = flow.locked || closed ? "locked" : flow.exists ? "edit" : "create";
   return (
     <button
       type="button"
@@ -332,10 +332,10 @@ function FlowButton({ flow, id }: { readonly flow: FlowJson; readonly id: string
       data-action="flow"
       data-ticket={id}
       data-flow={state}
-      title={`子チケットの作業の手順（フロー）を図で${flow.locked ? "見ます。着手中は書き換えられません" : `${flow.exists ? "直します" : "作ります"}。着手すると、終わるまで書き換えられなくなります`}（${flow.rel}）`}
+      title={`子チケットの作業の手順（フロー）を図で${closed && !flow.locked ? "見ます。終了済みのため書き換える必要はありません" : flow.locked ? "見ます。着手中は書き換えられません" : `${flow.exists ? "直します" : "作ります"}。着手すると、終わるまで書き換えられなくなります`}（${flow.rel}）`}
       onClick={() => post({ type: "flow", ticket: id })}
     >
-      {flowButtonLabel(flow)}
+      {flowButtonLabel(flow, closed)}
     </button>
   );
 }

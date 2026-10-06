@@ -98,9 +98,12 @@ export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult
 }
 
 /** カードの「フロー」ボタンの言葉。在るか・着手中かで変わる（どちらも実行ファイルの答えのまま） */
-export function flowButtonLabel(flow: FlowJson): string {
+export function flowButtonLabel(flow: FlowJson, closed = false): string {
   if (flow.locked) {
     return "フロー: 閲覧（着手中）";
+  }
+  if (closed) {
+    return "フロー: 閲覧（終了済み）";
   }
   return flow.exists ? "フロー: 編集" : "フロー: 作成";
 }
