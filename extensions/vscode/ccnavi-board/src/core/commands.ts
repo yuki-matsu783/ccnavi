@@ -105,6 +105,8 @@ export function scriptCommand(root: string, name: string): string {
  * `confirm` を打ってマーカーを置くのは、この文を受けた親（メインエージェント）で、親のワークツリーで打つ。
  * そこは止まっているので、通るのは `sh …ccnavi-review.sh …` の形を連結せずに単体で打ったときだけ
  * （設計 9.8。`cd … && sh …` は止まる）。サブエージェントには同じ形が常に禁止される（9.12）。文はその 2 つを言う。
+ * 未解決の指摘の有無は、ボードが押したときに `decide <N> --preview` で読んで文に書く（`unresolved`。読めなければ `undefined`で、有無は言わない）。
+ * 判定は `confirm` が持ち、文はエージェントへの手がかりでしかない。
  * 未解決が残っていれば `confirm` が一覧と次の方法（解決してもらう・同じフェーズに子を足す・ユーザが decide で決める）を
  * 返すので、文はそれに従うことだけを言い、方法を先取りしない。
  */
@@ -115,10 +117,19 @@ export function reviewedPrompt(
   label: string,
   parentTree: string,
   mrUrl: string,
+  unresolved: number | undefined,
 ): string {
   const lines = [`[ccnavi] ユーザが親 ${parent} のフェーズ ${label || String(phase)} のレビューを終えた。`];
   if (mrUrl !== "") {
     lines.push(`- マージリクエスト: ${mrUrl}`);
+  }
+  // ボードが `decide <N> --preview` で読んだ未解決（Unresolved）の指摘。読めなかったときは有無を言わない
+  if (unresolved === undefined) {
+    lines.push("- 未解決の指摘の有無は、ボードでは読めなかった。レビューの状況をエージェントが確かめる。");
+  } else if (unresolved > 0) {
+    lines.push(`- 未解決の指摘があります（${unresolved} 件）。エージェントが指摘を確かめる。`);
+  } else {
+    lines.push("- 未解決の指摘はありません。");
   }
   const tree = toPosixPath(parentTree);
   lines.push(

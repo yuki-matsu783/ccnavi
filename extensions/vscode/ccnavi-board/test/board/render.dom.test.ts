@@ -374,14 +374,14 @@ test("CB-T13c フェーズ行は状態の全文だけを出す。段の名前・
     const rows = page.all(".card.parent .phase");
     assert.equal(rows[0].querySelector(".phase-status")?.textContent, "終了 · レビュー依頼済み · レビュー済み · レビュー要 · リスク: 40 (HIGH) — 行数が多い（6509 行 > 300）");
     assert.equal(rows[1].querySelector(".phase-status")?.textContent, "終了 · レビュー待ち · レビュー依頼済み · レビュー要");
-    assert.equal(rows[1].querySelectorAll('button[data-action="decide"]').length, 1);
+    assert.equal(rows[1].querySelectorAll('button[data-action="review-menu"]').length, 1);
     // 状態は項目ごとの塊で、区切りの「·」は前の項目の末尾に付く。ボタンは状態の列ではなく 2 段目
     assert.deepEqual(
       [...rows[1].querySelectorAll(".phase-status .phase-item")].map((item) => item.textContent),
       ["終了 ·", "レビュー待ち ·", "レビュー依頼済み ·", "レビュー要"],
     );
     assert.equal(rows[1].querySelectorAll(".phase-status button").length, 0);
-    assert.equal(rows[1].querySelectorAll('.phase-actions button[data-action="decide"]').length, 1);
+    assert.equal(rows[1].querySelectorAll('.phase-actions button[data-action="review-menu"]').length, 1);
     assert.equal(rows[0].querySelectorAll(".phase-actions").length, 0, "リンクもボタンも無い行には 2 段目を出さない");
     // 状態は 1 か所にだけ描く（要約と全文の二重描画はしない）
     assert.equal(page.all(".phase-brief, .phase-full").length, 0);
@@ -684,22 +684,41 @@ function waitingWithMr(url: string) {
 test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連絡」と依頼へのリンク、親カードにマージリクエストへのリンクを出す。http(s) 以外はリンクにしない", async () => {
   const page = await openBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5"));
   try {
-    // 残った指摘を決めるボタンの隣に連絡のボタン。マーカーを置く操作ではないと title で言う
-    const decide = page.one('button[data-action="decide"]');
-    assert.equal(decide.getAttribute("data-parent"), "i0001");
-    assert.equal(decide.getAttribute("data-phase"), "2");
+    // レビューの 2 操作は 1 つのメニューボタンにまとまる。本体は何も送らず、開くまで項目は出ない
+    const menu = page.one('button[data-action="review-menu"]');
+    assert.equal(menu.textContent, "レビューの対応");
+    assert.equal(menu.getAttribute("data-parent"), "i0001");
+    assert.equal(menu.getAttribute("data-phase"), "2");
+    assert.equal(menu.getAttribute("aria-haspopup"), "menu");
+    assert.equal(menu.getAttribute("aria-expanded"), "false");
+    assert.equal(page.all('button[data-action="decide"], button[data-action="reviewed"]').length, 0);
+    const before = page.posted.length;
+    page.click(menu);
+    await page.settle();
+    assert.equal(page.posted.length, before, "メニューの本体を押しても何も送らない");
+    assert.equal(page.one('button[data-action="review-menu"]').getAttribute("aria-expanded"), "true");
     const reviewed = page.one('button[data-action="reviewed"]');
     assert.equal(reviewed.textContent, "レビュー済み連絡");
-    assert.equal(
-      reviewed.getAttribute("title"),
-      "レビューを終えたことを Claude Code に伝える文を作ります（エージェントが ccnavi-review.sh confirm --phase 2 を実行して、レビュー済みを記録します）",
-    );
+    assert.ok((reviewed.getAttribute("title") ?? "").includes("ccnavi-review.sh confirm --phase 2 を実行して、レビュー済みを記録します"));
+    const decide = page.one('button[data-action="decide"]');
+    assert.equal(decide.textContent, "対応方針を決める");
+    assert.equal(decide.hasAttribute("disabled"), false, "指摘の有無で無効にしない");
     page.click(reviewed);
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "reviewed", parent: "i0001", phase: 2 });
-    page.click(decide);
+    assert.equal(page.all('button[data-action="reviewed"]').length, 0, "選んだらメニューは閉じる");
+    page.click(page.one('button[data-action="review-menu"]'));
+    await page.settle();
+    page.click(page.one('button[data-action="decide"]'));
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "decide", parent: "i0001", phase: 2 });
+    // メニュー外のクリックで閉じる
+    page.click(page.one('button[data-action="review-menu"]'));
+    await page.settle();
+    assert.equal(page.all('button[data-action="decide"]').length, 1);
+    page.click(page.one(".foot"));
+    await page.settle();
+    assert.equal(page.all('button[data-action="decide"]').length, 0);
     // フェーズ行は依頼の投稿へ、親カードはマージリクエスト自体へ
     const inPhase = page.one(".phase a.mr-link");
     assert.equal(inPhase.getAttribute("href"), "https://example.com/o/r/pull/18#issuecomment-5");

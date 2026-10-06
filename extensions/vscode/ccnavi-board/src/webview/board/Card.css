@@ -85,7 +85,11 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 .phase-active .phase-status { color: var(--board-info-text); }
 .phase.review-hold .phase-label, .phase.review-hold .phase-status { color: var(--board-error-text); }
 .phase-actions { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; min-width: 0; }
-.phase button.action { min-height: 20px; padding: 0 8px; font-size: .95em; }
+/* レビューの対応のメニュー。ボタンの下に流し込む（浮かせないので、カードの幅も画面の端も超えない） */
+.review-menu { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; max-width: 100%; min-width: 0; }
+.review-menu > button.action { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.review-menu-list { display: flex; flex-direction: column; gap: 4px; max-width: 100%; min-width: 0; }
+.review-menu-list > button.action { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }
 /* カードの不備。ツールバーの「不備 N 件」（.summary .issues）には当てない */
 .card .issues {
   list-style: none; margin: 6px 0 0; padding: 0;

@@ -43,8 +43,11 @@ export const COLUMNS: readonly ColumnDef[] = [
  */
 export type Action =
   | { readonly kind: "approve" }
-  | { readonly kind: "decide"; readonly parent: string; readonly phase: number }
-  | { readonly kind: "reviewed"; readonly parent: string; readonly phase: number };
+  /**
+   * レビューの対応。画面は 1 つのメニューボタンにして、中に「対応方針を決める」と「レビュー済み連絡」を並べる。
+   * 項目は指摘の有無で無効にしない（判定は `decide` と `confirm` が持つ）
+   */
+  | { readonly kind: "review"; readonly parent: string; readonly phase: number };
 
 export interface PhaseChip {
   readonly parent: string;
@@ -395,11 +398,10 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
   const marks = Object.keys(p.marks).sort();
   const actions: Action[] = [];
   // 残った指摘を決められるのは、ユーザのレビュー待ち（依頼を出したのに止まったまま）のとき。待ちかどうかは
-  // 判定が `review_waiting` で言う。子カードのバッジ・フェーズ行の「レビュー依頼済み」・「対応方針を決める」の操作はみな
+  // 判定が `review_waiting` で言う。子カードのバッジ・フェーズ行の「レビュー依頼済み」・「レビューの対応」の操作はみな
   // それを読み、止まっているかとマーカーからここで組み直さない。
   if (p.review_waiting) {
-    actions.push({ kind: "decide", parent: parent.ticket, phase: p.number });
-    actions.push({ kind: "reviewed", parent: parent.ticket, phase: p.number });
+    actions.push({ kind: "review", parent: parent.ticket, phase: p.number });
   }
   // 依頼のマーカー `{head, mr, url, host, since}`（設計 9.10）。URL は依頼の投稿を指す。中身を解釈せずそのまま渡すだけ。
   // 依頼のマーカーは mr と url を必ず一緒に持ち、リンクは url があるときだけ出すので、他のマーカーの mr は読まない

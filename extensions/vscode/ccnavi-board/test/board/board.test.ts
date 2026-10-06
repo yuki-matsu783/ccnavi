@@ -140,10 +140,7 @@ test("CB-T09 依頼済みで止まったフェーズに decide、早めに閉じ
   assert.equal(card.wrapped, true);
   assert.deepEqual(card.phases[0].actions, []);
   // 残った指摘を決めるボタンと、レビューを終えたことの連絡（マーカーは置かない）が並ぶ
-  assert.deepEqual(card.phases[1].actions, [
-    { kind: "decide", parent: "i0001", phase: 2 },
-    { kind: "reviewed", parent: "i0001", phase: 2 },
-  ]);
+  assert.deepEqual(card.phases[1].actions, [{ kind: "review", parent: "i0001", phase: 2 }]);
   assert.deepEqual(card.phases[1].marks, ["requested"]);
   // ユーザのレビュー待ちは JSON の review_waiting をそのまま使う。依頼していないフェーズ 1 は閉じていても待ちではない
   assert.equal(card.phases[0].reviewWaiting, false);
@@ -296,10 +293,7 @@ function waitingWithMr(url: string): BoardJson {
 test("CB-T131 レビュー待ちのフェーズに「レビュー済み連絡」も付き、依頼のマーカーのマージリクエストがフェーズ行と親カードに載る", () => {
   const cards = cardsOf(buildBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5")));
   const card = cards.get("i0001")!;
-  assert.deepEqual(card.phases[1].actions, [
-    { kind: "decide", parent: "i0001", phase: 2 },
-    { kind: "reviewed", parent: "i0001", phase: 2 },
-  ]);
+  assert.deepEqual(card.phases[1].actions, [{ kind: "review", parent: "i0001", phase: 2 }]);
   // フェーズ行は依頼の投稿を指す。親カードは断片を落としてマージリクエスト自体を指す。子カードには持たせない
   assert.equal(card.phases[1].mrUrl, "https://example.com/o/r/pull/18#issuecomment-5");
   assert.equal(card.phases[1].mrNumber, 18);

@@ -154,7 +154,7 @@ function assertNamed(step: Step, kinds_: readonly string[]): void {
   }
 }
 
-function toPrompt(step: Step): ApprovalState {
+function toReviewedLoading(step: Step): ApprovalState {
   return step(CLOSED, {
     kind: "reviewed",
     parent: "i0001",
@@ -163,6 +163,11 @@ function toPrompt(step: Step): ApprovalState {
     chip: chipOf(),
     root: "/w",
   }).state;
+}
+
+/** 連絡の文を見せている状態（指摘は読めて、1 件も残っていない） */
+function toPrompt(step: Step): ApprovalState {
+  return step(toReviewedLoading(step), { kind: "reviewedChecked", result: { ok: true, value: { ...decidePreviewOf(), threads: [] } } }).state;
 }
 
 function toDecideLoading(step: Step): ApprovalState {
@@ -641,21 +646,40 @@ test("CB-T177 レビュー済みの連絡は、閉じているときと、error 
     chip: chipOf(),
     root: "/w",
   };
+  // 押すと、未解決の指摘を読む（待ちの間は reviewedLoading）。マーカーは置かない
   const after = approvalStep(CLOSED, input);
-  assert.equal(after.state.overlay?.kind, "prompt");
+  assert.equal(after.state.overlay?.kind, "reviewedLoading");
   assert.equal(after.redraw, true);
-  assert.deepEqual(after.effects, [], "マーカーは置かない。文を組むだけ");
-  const overlay = after.state.overlay;
+  assert.deepEqual(after.effects, [{ kind: "loadReviewed", tree: "/w/.claude/worktrees/i0001", phase: 1 }]);
+  const none = approvalStep(after.state, { kind: "reviewedChecked", result: { ok: true, value: { ...decidePreviewOf(), threads: [] } } });
+  const overlay = none.state.overlay;
+  assert.equal(overlay?.kind, "prompt");
+  assert.deepEqual(none.effects, [], "マーカーは置かない。文を組むだけ");
   assert.equal(overlay?.kind === "prompt" ? overlay.title : "", "フェーズ 1 設計 のレビュー済み連絡");
   assert.match(
     overlay?.kind === "prompt" ? overlay.prompt : "",
     /ccnavi-review\.sh confirm --phase 1'/,
     "打つのは親のワークツリーでの check 1 本",
   );
+  assert.match(overlay?.kind === "prompt" ? overlay.prompt : "", /未解決の指摘はありません/);
+
+  // 指摘あり: 件数を言う
+  const found = approvalStep(after.state, { kind: "reviewedChecked", result: { ok: true, value: decidePreviewOf() } });
+  const foundPrompt = found.state.overlay?.kind === "prompt" ? found.state.overlay.prompt : "";
+  assert.match(foundPrompt, /未解決の指摘があります（2 件）/);
+
+  // 読めなかった: 有無を言わず、連絡は止めない
+  const failed = approvalStep(after.state, { kind: "reviewedChecked", result: { ok: false, error: "network" } });
+  const failedPrompt = failed.state.overlay?.kind === "prompt" ? failed.state.overlay.prompt : "";
+  assert.match(failedPrompt, /レビューの状況をエージェントが確かめる/);
+  assert.doesNotMatch(failedPrompt, /未解決の指摘(はありません|があります)/);
+
+  // 頼んでいない（閉じた・別の）ときに届いた答えは受けない
+  assert.equal(approvalStep(CLOSED, { kind: "reviewedChecked", result: { ok: true, value: decidePreviewOf() } }).state.overlay, undefined);
 
   // 読めなかった（error）の上には被せてよい
   const onError = approvalStep({ overlay: { kind: "error", error: "x" }, only: [] }, input);
-  assert.equal(onError.state.overlay?.kind, "prompt");
+  assert.equal(onError.state.overlay?.kind, "reviewedLoading");
 
   // ボードから引けなければ言うだけ
   const noTree = approvalStep(CLOSED, { ...input, tree: undefined });
@@ -680,14 +704,7 @@ test("CB-T178 文を渡したら閉じる。コピーと新しいセッション
   assert.equal(copied.redraw, true);
   assert.deepEqual(copied.effects, [{ kind: "copy", prompt: "承認の文", what: "承認の文" }]);
 
-  const prompt = approvalStep(CLOSED, {
-    kind: "reviewed",
-    parent: "i0001",
-    phase: 1,
-    tree: "/w/.claude/worktrees/i0001",
-    chip: chipOf(),
-    root: "/w",
-  }).state;
+  const prompt = toPrompt(approvalStep);
   const opened = approvalStep(prompt, { kind: "handOver", how: "promptOpen" });
   assert.equal(opened.state.overlay, undefined);
   assert.deepEqual(kinds(opened.effects), ["openSession"]);

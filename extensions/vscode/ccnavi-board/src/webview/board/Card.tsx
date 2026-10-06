@@ -2,7 +2,7 @@
  * 1 枚のカード。バッジ（ユーザが動く必要がある状態）・属性の行・親のフェーズ一覧・不備・操作。
  * 何を出すかは組み立て（core/board.ts）が決めた値のとおりで、ここで判定し直さない。
  */
-import type { JSX } from "react";
+import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { Action, Card, PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
@@ -357,35 +357,81 @@ function ActionButton({ action, id }: { readonly action: Action; readonly id: st
           この 1 件を承認
         </button>
       );
-    case "decide":
-      return (
-        <button
-          type="button"
-          className="action"
-          data-action="decide"
-          data-parent={action.parent}
-          data-phase={action.phase}
-          title={`未解決（Unresolved）の指摘の対応方針を 1 件ずつ決めます（対応しない・このフェーズで直す・issue に回す）`}
-          onClick={() => post({ type: "decide", parent: action.parent, phase: action.phase })}
-        >
-          対応方針を決める
-        </button>
-      );
-    case "reviewed":
-      // マーカーは置かない。レビューを終えたことを Claude Code に伝える文を組み、コピー / 新しいセッションで開く で渡す。
-      // confirm を打ってマーカーを置くのは、その文を受けたエージェント
-      return (
-        <button
-          type="button"
-          className="action"
-          data-action="reviewed"
-          data-parent={action.parent}
-          data-phase={action.phase}
-          title={`レビューを終えたことを Claude Code に伝える文を作ります（エージェントが ccnavi-review.sh confirm --phase ${action.phase} を実行して、レビュー済みを記録します）`}
-          onClick={() => post({ type: "reviewed", parent: action.parent, phase: action.phase })}
-        >
-          レビュー済み連絡
-        </button>
-      );
+    case "review":
+      return <ReviewMenu parent={action.parent} phase={action.phase} />;
   }
+}
+
+/**
+ * 「レビューの対応」。本体を押すとメニューが開くだけで、何も実行しない。項目は固定の 2 つで、前回の選択は覚えない。
+ * 項目は指摘の有無で無効にしない（判定は `decide` と `confirm` が持つ）。メニュー外のクリックで閉じる。
+ * 矢印キーと Esc は扱わない。
+ */
+function ReviewMenu({ parent, phase }: { readonly parent: string; readonly phase: number }): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const outside = (event: MouseEvent): void => {
+      if (!(event.target instanceof Node) || box.current === null || !box.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("click", outside);
+    return () => document.removeEventListener("click", outside);
+  }, [open]);
+  return (
+    <span className="review-menu" ref={box}>
+      <button
+        type="button"
+        className="action"
+        data-action="review-menu"
+        data-parent={parent}
+        data-phase={phase}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="レビューの対応を選びます。「対応方針を決める」は未解決（Unresolved）の指摘の行き先を 1 件ずつ決め、「レビュー済み連絡」はレビューを終えたことを Claude Code に伝える文を作ります"
+        onClick={() => setOpen(!open)}
+      >
+        レビューの対応
+      </button>
+      {open ? (
+        <span className="review-menu-list" role="menu">
+          <button
+            type="button"
+            role="menuitem"
+            className="action"
+            data-action="decide"
+            data-parent={parent}
+            data-phase={phase}
+            title="未解決（Unresolved）の指摘の対応方針を 1 件ずつ決めます（対応しない・このフェーズで直す・issue に回す）"
+            onClick={() => {
+              setOpen(false);
+              post({ type: "decide", parent, phase });
+            }}
+          >
+            対応方針を決める
+          </button>
+          {/* マーカーは置かない。未解決の指摘を読んで連絡文を組み、コピー / 新しいセッションで開く で渡す。confirm を打つのは文を受けたエージェント */}
+          <button
+            type="button"
+            role="menuitem"
+            className="action"
+            data-action="reviewed"
+            data-parent={parent}
+            data-phase={phase}
+            title={`レビューを終えたことを Claude Code に伝える文を作ります。未解決の指摘の有無を確かめて文に書きます（エージェントが ccnavi-review.sh confirm --phase ${phase} を実行して、レビュー済みを記録します）`}
+            onClick={() => {
+              setOpen(false);
+              post({ type: "reviewed", parent, phase });
+            }}
+          >
+            レビュー済み連絡
+          </button>
+        </span>
+      ) : null}
+    </span>
+  );
 }
