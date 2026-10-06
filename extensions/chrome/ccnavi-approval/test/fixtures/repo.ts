@@ -36,13 +36,18 @@ const COMMON_SH = (compat: number) => `#!/bin/sh
 CCNAVI_COMPAT=${compat}
 `;
 
+/** 計画の項の行。2 番目からは、すぐ前の項を待つ（`after`）一直線にする。最初の項は何も待たない */
+function planLines(plan: string[]): string[] {
+  return plan.map((p, i) => (i === 0 ? `  - ${p}` : `  - {type: ${p}, after: [${i}]}`));
+}
+
 function parent(id: string, title: string, body: string, plan = ["research", "design"]): string {
   return [
     "---",
     "version: 1",
     `ticket: ${id}`,
     "plan:",
-    ...plan.map((p) => `  - ${p}`),
+    ...planLines(plan),
     "human_review:",
     "  required: true",
     "  reason: 見本",
@@ -208,7 +213,7 @@ function approvedCopy(id: string, parentId: string | null, lines: string[], phas
     "---",
     "version: 1",
     `ticket: ${id}`,
-    ...(parentId ? [`parent: ${parentId}`, `phase: ${phase}`] : ["plan:", ...Array.from({ length: phases }, () => "  - design")]),
+    ...(parentId ? [`parent: ${parentId}`, `phase: ${phase}`] : ["plan:", ...planLines(Array.from({ length: phases }, () => "design"))]),
     `title: ${parentId ? `設計の子 ${id}` : `レビューを待つ親 ${id}`}`,
     "human_review:",
     "  required: true",

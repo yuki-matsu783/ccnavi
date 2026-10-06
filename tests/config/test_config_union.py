@@ -280,9 +280,10 @@ def ticket_text(
     if parent:
         lines += [f"parent: {parent}", f"phase: {phase}"]
     if plan:
+        # 計画の項は、すぐ前の項を待つ一直線にする（最初の項は何も待たない）。
         lines.append("plan:")
-        for item in plan:
-            lines.append(f"  - {item}")
+        for n, item in enumerate(plan, start=1):
+            lines.append(f"  - {{type: {item}, after: [{n - 1}]}}" if n > 1 else f"  - {item}")
     lines += [
         "human_review:",
         f"  required: {'true' if review else 'false'}",

@@ -9,7 +9,7 @@
       "path": ".ccnavi/approved/doing/i0001-01-01.md"
      },
      {
-      "content": "---\nversion: 1\nticket: i0001\nplan:\n  - research\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
+      "content": "---\nversion: 1\nticket: i0001\nplan:\n  - research\n  - {type: design, after: [1]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
       "op": "create",
       "path": ".ccnavi/approved/doing/i0001.md"
      },
@@ -38,7 +38,7 @@
      }
     ]
    },
-   "digest": "d6d05e259210acd324efbaf90bbf624f199683d6a5284ecef5bfdff586cd7c51",
+   "digest": "e8ece77a21fdc32e3f5e9a7a79ab84ad32697cbcf006c1c87ee04c369494fee4",
    "family": "i0001",
    "identifiers": [
     "i0001",
@@ -64,7 +64,7 @@
      "i0001": {
       "files": {
        "wip/proposals/todo/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: false\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/research/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
-       "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - research\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n"
+       "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - research\n  - {type: design, after: [1]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n"
       },
       "head": "0000000000000000000000000000000000000000"
      },
@@ -470,7 +470,7 @@
      }
     ]
    },
-   "digest": "1eaeacd4709f2ea2d6a5fbeaac6926f5ab781041fa45600d70339a7239a94bfc",
+   "digest": "cb99d8c0e5cdac1c8996962afc2ad5e808fb659042736c3813830391cf8bc9d4",
    "family": "i0001",
    "identifiers": [
     "i0001"
@@ -495,10 +495,10 @@
     "branches": {
      "i0001": {
       "files": {
-       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - research\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
+       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - research\n  - {type: design, after: [1]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
        ".ccnavi/approved/events/i0001.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n",
        ".ccnavi/approved/phases/i0001/workflow.yml": "order: sequential\nwaits:\n  1: []\n  2:\n  - 1\nreview_at: {}\n",
-       "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - research\n  - design\n  - acceptance\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n"
+       "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - research\n  - {type: design, after: [1]}\n  - {type: acceptance, after: [2]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n"
       },
       "head": "0000000000000000000000000000000000000000"
      },

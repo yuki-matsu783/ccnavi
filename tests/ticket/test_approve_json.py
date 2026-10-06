@@ -386,7 +386,11 @@ class ApproveJsonTest(PhaseHarness):
         with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
             before = f.read()
         self.assert_refused_after_edit(
-            path, "  - acceptance\n", "  - design\n", shown, tickets=["i0001"]
+            path,
+            "  - {type: acceptance, after: [2]}\n",
+            "  - {type: design, after: [2]}\n",
+            shown,
+            tickets=["i0001"],
         )
         with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
             self.assertEqual(f.read(), before)

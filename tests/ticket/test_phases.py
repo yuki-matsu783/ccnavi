@@ -74,21 +74,43 @@ phases:
 """
 
 
+def plan_item_lines(items, start=1) -> list[str]:
+    """計画の項を YAML の行にする。`start` はその計画の最初の番号（フィードバック計画は続き）。
+
+    項は定義の名前、`(名前, review)`、`{"type": …, "review": …, "after": […]}` のどれか。
+    `after` を書かない項は、すぐ前の項を待つ（一直線）。最初の項は何も待たない。
+    並行にしたい見本は辞書で `after` を明記する（`[]` なら何も待たない）。
+    """
+    lines = []
+    for i, item in enumerate(items):
+        if isinstance(item, dict):
+            kind, review = item["type"], item.get("review", "")
+            after = item.get("after")
+        elif isinstance(item, tuple):
+            kind, review, after = item[0], item[1], None
+        else:
+            kind, review, after = item, "", None
+        if after is None:
+            after = [start + i - 1] if i > 0 else []
+        fields = [f"type: {kind}"]
+        if review:
+            fields.append(f"review: {review}")
+        if after:
+            fields.append(f"after: [{', '.join(str(n) for n in after)}]")
+        lines.append(f"  - {kind}" if len(fields) == 1 else f"  - {{{', '.join(fields)}}}")
+    return lines
+
+
 def parent_text(name, plan, feedback=None, allow=("src/*", "wip/*", "tests/*"), issue=None):
     lines = ["---", "version: 1", f"ticket: {name}"]
     if issue is not None:
         lines.append(f"issue: {issue}")
     lines.append("plan:")
-    for item in plan:
-        if isinstance(item, tuple):
-            lines.append(f"  - {{type: {item[0]}, review: {item[1]}}}")
-        else:
-            lines.append(f"  - {item}")
+    lines += plan_item_lines(plan)
     if feedback is not None:
         if feedback:
             lines.append("feedback:")
-            for item in feedback:
-                lines.append(f"  - {item}")
+            lines += plan_item_lines(feedback, start=len(plan) + 1)
         else:
             lines.append("feedback: []")
     lines += ["human_review:", "  required: true", "  reason: t", "title: 親", "rationale: r"]
