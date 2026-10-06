@@ -58,6 +58,19 @@ export type ApprovalOverlay =
       readonly tree: string;
       readonly notice?: string;
     }
+  /**
+   * 「レビュー済み連絡」の文を組むために、未解決の指摘を読んでいる（`decide <N> --preview`）。
+   * `chip` の `label` と URL を文に使うので持ち越す
+   */
+  | {
+      readonly kind: "reviewedLoading";
+      readonly parent: string;
+      readonly phase: number;
+      readonly tree: string;
+      readonly label: string;
+      readonly mrUrl: string;
+      readonly root: string;
+    }
   /** 残った指摘を見せた。行き先を指摘ごとに選ぶ。押されるまで何も置かない */
   | { readonly kind: "decidePreview"; readonly preview: DecidePreview; readonly tree: string; readonly notice?: string }
   /** 選んだ行き先を置いている。**ここでは閉じない** */

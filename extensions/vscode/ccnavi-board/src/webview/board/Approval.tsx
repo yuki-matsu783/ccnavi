@@ -99,6 +99,15 @@ function Inner({ overlay }: { readonly overlay: ApprovalOverlay }): JSX.Element 
           </div>
         </>
       );
+    case "reviewedLoading":
+      return (
+        <>
+          <p className="approval-note">フェーズ {overlay.phase} の未解決（Unresolved）指摘を確かめて、連絡の文を作っています…</p>
+          <div className="approval-actions">
+            <Cancel label="やめる" />
+          </div>
+        </>
+      );
     case "decidePreview":
       return <DecideBody preview={overlay.preview} deciding={false} notice={overlay.notice} />;
     case "deciding":

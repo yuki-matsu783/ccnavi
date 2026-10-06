@@ -508,6 +508,13 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
       }
       return;
     }
+    case "loadReviewed": {
+      const result = await runDecidePreview(root, scriptShell(), effect.tree, effect.phase);
+      if (state === current) {
+        dispatch(current, { kind: "reviewedChecked", result });
+      }
+      return;
+    }
     case "decide": {
       const outcome = await runDecideYes(
         root,

@@ -116,10 +116,10 @@ test("CB-T19c 文面の sh のパスは実行ファイルの script_command と�
 });
 
 test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリーで confirm を単体で打つこととマージリクエストの URL を言い、マーカーは置かせない", () => {
-  const text = reviewedPrompt("/ws", "i0001", 2, "2（設計）", "/ws/.claude/worktrees/i0001", "https://example.com/pull/18#issuecomment-5");
+  const text = reviewedPrompt("/ws", "i0001", 2, "2（設計）", "/ws/.claude/worktrees/i0001", "https://example.com/pull/18#issuecomment-5", 0);
   assert.ok(
     text.startsWith(
-      "[ccnavi] ユーザが親 i0001 のフェーズ 2（設計） のレビューを終えた。\n- マージリクエスト: https://example.com/pull/18#issuecomment-5\n親（メインエージェント）が、親のワークツリー /ws/.claude/worktrees/i0001 で 'sh /ws/.ccnavi/scripts/ccnavi-review.sh confirm --phase 2' を打ち、",
+      "[ccnavi] ユーザが親 i0001 のフェーズ 2（設計） のレビューを終えた。\n- マージリクエスト: https://example.com/pull/18#issuecomment-5\n- 未解決の指摘はありません。\n親（メインエージェント）が、親のワークツリー /ws/.claude/worktrees/i0001 で 'sh /ws/.ccnavi/scripts/ccnavi-review.sh confirm --phase 2' を打ち、",
     ),
     text,
   );
@@ -134,7 +134,7 @@ test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリ
   assert.ok(!text.includes("依頼し直す"));
   assert.ok(text.includes("confirm が一覧と次の道を返すので、それに従う"));
   // マージリクエストが無ければ行ごと省き、フェーズの表示名が無ければ番号で言う。Windows の区切りは / にそろえる
-  const bare = reviewedPrompt("C:\\ws", "i0001", 3, "", "C:\\ws\\.claude\\worktrees\\i0001", "");
+  const bare = reviewedPrompt("C:\\ws", "i0001", 3, "", "C:\\ws\\.claude\\worktrees\\i0001", "", undefined);
   assert.ok(!bare.includes("マージリクエスト:"));
   assert.ok(bare.includes("フェーズ 3 のレビューを終えた"));
   assert.ok(bare.includes("親のワークツリー C:/ws/.claude/worktrees/i0001 で 'sh C:/ws/.ccnavi/scripts/ccnavi-review.sh confirm --phase 3'"));

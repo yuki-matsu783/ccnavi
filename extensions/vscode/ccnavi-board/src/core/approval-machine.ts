@@ -28,6 +28,7 @@
  * | `done` | 承認した。渡す文がある |
  * | `error` | 読めなかった |
  * | `prompt` | 承認以外で渡す文（レビュー済みの連絡、残った指摘を決めた結果） |
+ * | `reviewedLoading` | レビュー済み連絡の文のために、残った指摘を読んでいる |
  * | `decideLoading` | 残った指摘を読んでいる |
  * | `decidePreview` | 残った指摘を見せた。押されるまで何も置かない |
  * | `deciding` | 選んだ行き先を置いている。**ここでは閉じない** |
@@ -127,6 +128,8 @@ export type ApprovalInput =
       readonly chip: PhaseChip | undefined;
       readonly root: string;
     }
+  /** 連絡の文のための指摘の読み取り（`decide <N> --preview`）が返った */
+  | { readonly kind: "reviewedChecked"; readonly result: DecidePreviewParse }
   /** 承認の文・レビュー済みの連絡の文を渡した */
   | { readonly kind: "handOver"; readonly how: "promptCopy" | "promptOpen" }
   /**
@@ -161,6 +164,8 @@ export type ApprovalEffect =
   | { readonly kind: "carry" }
   /** 残った指摘を読む（`decide <N> --preview`）。返ったら `decidePreviewed` で戻す */
   | { readonly kind: "loadDecide"; readonly tree: string; readonly phase: number }
+  /** 連絡の文のために残った指摘を読む（`decide <N> --preview`）。返ったら `reviewedChecked` で戻す */
+  | { readonly kind: "loadReviewed"; readonly tree: string; readonly phase: number }
   /** 行き先を置く（`decide <N> --choices … --digest …`）。返ったら `decided` で戻す */
   | {
       readonly kind: "decide";
@@ -211,6 +216,8 @@ export function approvalStep(state: ApprovalState, input: ApprovalInput): Approv
       return closable(state) ? move(state, CLOSED) : stay(state);
     case "reviewed":
       return reviewed(state, input);
+    case "reviewedChecked":
+      return reviewedChecked(state, input.result);
     case "handOver":
       return handedOver(state, input.how);
     case "decide":
@@ -402,14 +409,40 @@ function reviewed(
       { kind: "refresh" },
     );
   }
+  // 押したときに未解決の指摘を読み、文に有無を書く。読む間はオーバーレイで待たせる（残った指摘を読むときと同じ）
+  return move(
+    state,
+    {
+      overlay: { kind: "reviewedLoading", parent, phase, tree, label: chip.label, mrUrl: chip.mrUrl, root: input.root },
+      only: state.only,
+    },
+    { kind: "loadReviewed", tree, phase },
+  );
+}
+
+/**
+ * 指摘の読み取りが返った。頼んだとき（`reviewedLoading`）のままでなければ受けない。
+ * 読めなかったとき（拡張のエラー・ネットワーク・ホストの応答など）や、別のフェーズの答えのときは、
+ * 指摘の有無を言わない文にする。連絡自体は止めない
+ */
+function reviewedChecked(state: ApprovalState, result: DecidePreviewParse): ApprovalStep {
+  const overlay = state.overlay;
+  if (overlay?.kind !== "reviewedLoading") {
+    return stay(state);
+  }
+  // 別のフェーズの一覧は、やめた前の連絡の遅れた答え。今の連絡の答えではないので捨てる
+  if (result.ok && (result.value.parent !== overlay.parent || result.value.phase !== overlay.phase)) {
+    return stay(state);
+  }
+  const unresolved = result.ok ? result.value.threads.length : undefined;
   return move(state, {
     overlay: {
       kind: "prompt",
-      title: `フェーズ ${chip.label} のレビュー済み連絡`,
+      title: `フェーズ ${overlay.label} のレビュー済み連絡`,
       note:
         "レビューを終えたことを Claude Code に伝える文を用意しました。コピーして進行中のセッションに貼るか、" +
         "新しいセッションで開いてください。送るときは自分で Enter を押してください。エージェントが confirm を実行して、レビュー済みを記録します。",
-      prompt: reviewedPrompt(input.root, parent, phase, chip.label, tree, chip.mrUrl),
+      prompt: reviewedPrompt(overlay.root, overlay.parent, overlay.phase, overlay.label, overlay.tree, overlay.mrUrl, unresolved),
     },
     only: state.only,
   });
@@ -448,7 +481,7 @@ function keptPrompt(state: ApprovalState): boolean {
 /** 残った指摘を決める途中（読み込み中・一覧・置いている最中）か */
 function busyDeciding(state: ApprovalState): boolean {
   const kind = state.overlay?.kind;
-  return kind === "decideLoading" || kind === "decidePreview" || kind === "deciding";
+  return kind === "reviewedLoading" || kind === "decideLoading" || kind === "decidePreview" || kind === "deciding";
 }
 
 /**
