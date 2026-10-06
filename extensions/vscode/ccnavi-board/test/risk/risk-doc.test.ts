@@ -91,8 +91,8 @@ test("CB-T76 加点条件を変えると前の加点条件の欄は消え、新�
   const doc = readRisk(TEXT);
   const f = doc.model.form;
   const changed: FactorForm = { ...f.factors[0], kind: "files_over", value: "10" };
-  const fresh: FactorForm = { origin: null, id: "deletes", points: "20", kind: "deleted_over", value: "3", max: "", message: "消したファイルが多い" };
-  const scripted: FactorForm = { origin: null, id: "complexity", points: "30", kind: "script", value: ".ccnavi/common/risk/complexity.sh", max: "", message: "" };
+  const fresh: FactorForm = { origin: null, id: "deletes", points: "20", kind: "deleted_over", value: "3", max: "", include: "", exclude: "", message: "消したファイルが多い" };
+  const scripted: FactorForm = { origin: null, id: "complexity", points: "30", kind: "script", value: ".ccnavi/common/risk/complexity.sh", max: "", include: "", exclude: "", message: "" };
   const out = doc.apply({ levels: f.levels, factors: [changed, fresh, scripted, f.factors[2]] });
   assert.match(out, /  - id: big-diff\n    points: 25\n    files_over: 10\n    message: 行数が多い\n/);
   assert.doesNotMatch(out, /lines_over/);
@@ -112,7 +112,7 @@ test("CB-T77 新しい glob は引用符で囲み、空の境目の点は書か�
   const doc = readRisk("version: 1\nfactors: []\n");
   const out = doc.apply({
     levels: { medium: "", high: "50", critical: "" },
-    factors: [{ origin: null, id: "agents", points: "1O", kind: "glob", value: "*.agent.md", max: "20", message: "" }],
+    factors: [{ origin: null, id: "agents", points: "1O", kind: "glob", value: "*.agent.md", max: "20", include: "", exclude: "", message: "" }],
   });
   assert.equal(out, 'version: 1\nlevels:\n  high: 50\nfactors:\n  - id: agents\n    points: 1O\n    glob: "*.agent.md"\n    max: 20\n');
   // 読み直しても同じ形。points は lint が「整数ではない」と言う値のまま
@@ -149,14 +149,14 @@ test("CB-T79 画面から来た内容は形を確かめてから受け取る", (
   const ok = asRiskForm({
     levels: { medium: 20, high: "40", critical: "" },
     factors: [
-      { origin: 0, id: "a", points: 25, kind: "lines_over", value: 300, max: "", message: "m" },
+      { origin: 0, id: "a", points: 25, kind: "lines_over", value: 300, max: "", include: "", exclude: "", message: "m" },
       { origin: null, id: "b", points: "", kind: "judge", value: "問い" },
     ],
   });
   assert.ok(ok);
   assert.deepEqual(ok.levels, { medium: "20", high: "40", critical: "" });
-  assert.deepEqual(ok.factors[0], { origin: 0, id: "a", points: "25", kind: "lines_over", value: "300", max: "", message: "m" });
-  assert.deepEqual(ok.factors[1], { origin: null, id: "b", points: "", kind: "judge", value: "問い", max: "", message: "" });
+  assert.deepEqual(ok.factors[0], { origin: 0, id: "a", points: "25", kind: "lines_over", value: "300", max: "", include: "", exclude: "", message: "m" });
+  assert.deepEqual(ok.factors[1], { origin: null, id: "b", points: "", kind: "judge", value: "問い", max: "", include: "", exclude: "", message: "" });
   assert.equal(asRiskForm({ factors: [] }), undefined);
   assert.equal(asRiskForm({ levels: {}, factors: [{ kind: "nope" }] }), undefined);
   assert.equal(asRiskForm({ levels: {}, factors: [{ origin: -1, kind: "glob" }] }), undefined);
@@ -200,7 +200,7 @@ test("CB-T100 PyYAML が別の型に読む語は引用符で囲み、それ以�
     factors: [
       { ...f.factors[0], message: "yes" },
       { ...f.factors[2], value: "1:30" },
-      { origin: null, id: "no", points: "1_000", kind: "script", value: "0755", max: "", message: "普通の文" },
+      { origin: null, id: "no", points: "1_000", kind: "script", value: "0755", max: "", include: "", exclude: "", message: "普通の文" },
     ],
   });
   assert.match(out, /    message: "yes"\n/);
@@ -213,4 +213,21 @@ test("CB-T100 PyYAML が別の型に読む語は引用符で囲み、それ以�
     ["untested", "30", "1:30", ""],
     ["no", "1_000", "0755", "普通の文"],
   ]);
+});
+
+test("CB-T327 include / exclude は数える加点条件だけに、glob のリストとして書き、読み戻せる", () => {
+  const doc = readRisk("version: 1\nfactors:\n  - id: a\n    points: 1\n    lines_over: 5\n    message: m\n");
+  const f = doc.model.form.factors[0];
+  assert.equal(f.include, "");
+  assert.equal(f.exclude, "");
+  const out = doc.apply({ levels: doc.model.form.levels, factors: [{ ...f, include: "src/**\n\n", exclude: "*.lock\ndocs/**" }] });
+  assert.equal(out, 'version: 1\nfactors:\n  - id: a\n    points: 1\n    lines_over: 5\n    include: [ "src/**" ]\n    exclude: [ "*.lock", "docs/**" ]\n    message: m\n');
+  const again = readRisk(out).model.form.factors[0];
+  assert.equal(again.include, "src/**");
+  assert.equal(again.exclude, "*.lock\ndocs/**");
+  // 空にすれば欄ごと消え、数えない加点条件へ変えても残らない。
+  const cleared = readRisk(out).apply({ levels: doc.model.form.levels, factors: [{ ...again, exclude: "" }] });
+  assert.doesNotMatch(cleared, /exclude/);
+  const judged = readRisk(out).apply({ levels: doc.model.form.levels, factors: [{ ...again, kind: "judge", value: "問い" }] });
+  assert.doesNotMatch(judged, /include|exclude/);
 });

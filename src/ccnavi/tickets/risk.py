@@ -33,10 +33,16 @@
     factors:
       - {id: big-diff,   points: 25, lines_over: 300,   message: 行数が多い}
       - {id: many-files, points: 15, files_over: 10,    message: ファイルが多い}
+      - {id: src-diff,   points: 25, lines_over: 300, include: ["src/**"], exclude: ["*.lock"]}
       - {id: ci,         points: 35, glob: ".github/**", max: 35, message: CI に触った}
       - {id: deletes,    points: 20, deleted_over: 3,   message: 消したファイルが多い}
       - {id: complexity, points: 30, script: .ccnavi/common/scripts/complexity.sh, message: 複雑度}
       - {id: untested,   points: 30, judge: テストの無い振る舞いの変更を含むか, message: テスト無し}
+
+`lines_over` / `files_over` / `deleted_over` には、数えるパスを `include` / `exclude`（glob のリスト）で絞れる。
+どちらも既定は無指定で、無指定なら差分全体を数える。`include` があれば当たったパスだけ、
+`exclude` に当たったパスは `include` に当たっていても数えない。`exclude` だけなら、それ以外は全部数える。
+バイナリの変更は行数 0 として数える（ファイル数と削除数には入る）。
 
 ファイルが無ければ組み込みの既定（上の定量 4 項目と同じ値）。壊れていれば組み込みに戻り、
 そのことは --lint と子を閉じるときの出力が言う。
@@ -98,6 +104,12 @@ class Factor:
     # glob の上限。当たるごとに加点するので、無ければ青天井。
     max: int | None = None
     compiled: re.Pattern | None = None
+    # lines_over / files_over / deleted_over だけが持つ、数える対象のパス（glob）。
+    # include が空なら全パスが対象、あれば当たったパスだけ。exclude に当たったパスは常に外す。
+    include: tuple[str, ...] = ()
+    exclude: tuple[str, ...] = ()
+    include_compiled: tuple[re.Pattern, ...] = ()
+    exclude_compiled: tuple[re.Pattern, ...] = ()
     # source はこの項目が書いてあるレイヤーの名前（`common` / `self` / プロジェクト名）。
     # 記録の hit と judge の項目に残す（設計 11.9）。
     source: str = ""
@@ -108,6 +120,12 @@ class Factor:
 
     def matches(self, rel: str) -> bool:
         return self.compiled is not None and self.compiled.match(rel) is not None
+
+    def in_scope(self, rel: str) -> bool:
+        """定量項目（行数・ファイル数・削除数）がこのパスを数えるか。"""
+        if self.include_compiled and not any(p.match(rel) for p in self.include_compiled):
+            return False
+        return not any(p.match(rel) for p in self.exclude_compiled)
 
     def key(self) -> tuple:
         """レイヤーをまたいで「同じ項目か」を比べるための全欄。`source` と `home` は含めない。
@@ -123,7 +141,16 @@ class Factor:
         if self.kind == KIND_SCRIPT:
             rel = str(self.value)
             value = (rel.split("/scripts/", 1)[-1], _file_digest(self.home, rel))
-        return (self.id, self.points, self.message, self.kind, value, self.max)
+        return (
+            self.id,
+            self.points,
+            self.message,
+            self.kind,
+            value,
+            self.max,
+            self.include,
+            self.exclude,
+        )
 
 
 @dataclass
@@ -360,9 +387,31 @@ def _factors(
             problems.append(Problem(SEVERITY_ERROR, ident, "`max` が 0 以上の整数ではない"))
             continue
         compiled = None
+        scope: dict[str, tuple[tuple[str, ...], tuple[re.Pattern, ...]]] = {}
+        if kind not in (KIND_LINES, KIND_FILES, KIND_DELETED):
+            stray = [k for k in ("include", "exclude") if k in item]
+            if stray:
+                problems.append(
+                    Problem(
+                        SEVERITY_ERROR,
+                        ident,
+                        f"`{stray[0]}` は {KIND_LINES} / {KIND_FILES} / {KIND_DELETED} の項目にだけ書ける",
+                    )
+                )
+                continue
         if kind in (KIND_LINES, KIND_FILES, KIND_DELETED):
             if not isinstance(value, int) or isinstance(value, bool) or value < 0:
                 problems.append(Problem(SEVERITY_ERROR, ident, f"`{kind}` が 0 以上の整数ではない"))
+                continue
+            bad = False
+            for name in ("include", "exclude"):
+                parsed, error = _globs(item.get(name))
+                if error:
+                    problems.append(Problem(SEVERITY_ERROR, ident, f"`{name}` {error}"))
+                    bad = True
+                    break
+                scope[name] = parsed
+            if bad:
                 continue
         elif kind == KIND_GLOB:
             if not isinstance(value, str) or not value.strip():
@@ -409,9 +458,32 @@ def _factors(
                 value=value,
                 max=maximum,
                 compiled=compiled,
+                include=scope.get("include", ((), ()))[0],
+                exclude=scope.get("exclude", ((), ()))[0],
+                include_compiled=scope.get("include", ((), ()))[1],
+                exclude_compiled=scope.get("exclude", ((), ()))[1],
             )
         )
     return factors, problems
+
+
+def _globs(raw: object) -> tuple[tuple[tuple[str, ...], tuple[re.Pattern, ...]], str]:
+    """`include` / `exclude` の glob のリストを式にする。書かれていなければ空。理由は空文字なら正常。"""
+    empty: tuple[tuple[str, ...], tuple[re.Pattern, ...]] = ((), ())
+    if raw is None:
+        return empty, ""
+    if not isinstance(raw, list) or not all(isinstance(g, str) and g.strip() for g in raw):
+        return empty, "は glob（文字列）のリストで書く"
+    globs: list[str] = []
+    compiled: list[re.Pattern] = []
+    for g in raw:
+        glob = g.strip().replace("\\", "/").strip("/")
+        try:
+            compiled.append(re.compile("^" + globmatch.translate(glob), re.IGNORECASE))
+        except re.error as exc:
+            return empty, f"の `{g}` を式にできない: {exc}"
+        globs.append(glob)
+    return (tuple(globs), tuple(compiled)), ""
 
 
 def mark_layer(definition: Definition, layer: str, home: str) -> None:
@@ -720,6 +792,14 @@ class Score:
         }
 
 
+def scoped(diff: Diff, factor: Factor) -> Diff:
+    """項目の include / exclude で絞った差分。どちらも無ければ差分そのもの。"""
+    if not factor.include_compiled and not factor.exclude_compiled:
+        return diff
+    kept = [c for c in diff.changes if factor.in_scope(c.path)]
+    return Diff(changes=kept, base=diff.base, head=diff.head)
+
+
 def evaluate(
     definition: Definition,
     diff: Diff,
@@ -733,22 +813,25 @@ def evaluate(
     for f in definition.factors:
         # 加点した項目には、その定義が書いてあるレイヤーを残す（設計 11.9）。
         where = f.source
+        if f.kind in (KIND_LINES, KIND_FILES, KIND_DELETED):
+            # include / exclude があれば、数える差分をその項目の対象パスに絞る。
+            counted = scoped(diff, f)
         if f.kind == KIND_LINES:
-            if diff.lines > int(f.value):
-                detail = f"{f.message}（{diff.lines} 行 > {f.value}）"
+            if counted.lines > int(f.value):
+                detail = f"{f.message}（{counted.lines} 行 > {f.value}）"
                 score.hits.append(Hit(f.id, f.points, detail, where))
         elif f.kind == KIND_FILES:
-            if diff.files > int(f.value):
+            if counted.files > int(f.value):
                 score.hits.append(
-                    Hit(f.id, f.points, f"{f.message}（{diff.files} ファイル > {f.value}）", where)
+                    Hit(f.id, f.points, f"{f.message}（{counted.files} ファイル > {f.value}）", where)
                 )
         elif f.kind == KIND_DELETED:
-            if diff.deleted_files > int(f.value):
+            if counted.deleted_files > int(f.value):
                 score.hits.append(
                     Hit(
                         f.id,
                         f.points,
-                        f"{f.message}（消した {diff.deleted_files} > {f.value}）",
+                        f"{f.message}（消した {counted.deleted_files} > {f.value}）",
                         where,
                     )
                 )

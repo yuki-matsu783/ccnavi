@@ -73,6 +73,53 @@ class DefinitionTest(unittest.TestCase):
                 self.assertIsNone(definition, name)
                 self.assertTrue(problems, name)
 
+    def test_scope_globs_are_validated(self):
+        cases = {
+            "include が文字列": "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 1, include: x}\n",
+            "exclude に空": "version: 1\nfactors:\n  - {id: a, points: 1, files_over: 1, exclude: ['']}\n",
+            "glob 項目には書けない": "version: 1\nfactors:\n"
+            "  - {id: a, points: 1, glob: x, include: [y]}\n",
+        }
+        for name, text in cases.items():
+            with self.subTest(case=name):
+                definition, problems = risk.parse(text)
+                self.assertIsNone(definition, name)
+                self.assertTrue(problems, name)
+
+    def test_include_and_exclude_narrow_what_is_counted(self):
+        text = (
+            "version: 1\nfactors:\n"
+            "  - {id: all, points: 1, lines_over: 0}\n"
+            "  - {id: inc, points: 2, files_over: 0, include: ['src/**']}\n"
+            "  - {id: exc, points: 4, lines_over: 3, exclude: ['*.lock', 'docs/**']}\n"
+            "  - {id: both, points: 8, deleted_over: 0, include: ['src/**'], exclude: ['src/gen/**']}\n"
+        )
+        definition, problems = risk.parse(text)
+        self.assertEqual([], problems)
+        diff = risk.Diff(
+            changes=[
+                risk.Change("src/a.py", added=2),
+                risk.Change("src/gen/b.py", status="D"),
+                risk.Change("uv.lock", added=100),
+                risk.Change("docs/x.md", added=100),
+            ]
+        )
+        score = risk.evaluate(definition, diff, "", "", {}, {})
+        hit = {h.id: h.points for h in score.hits}
+        self.assertEqual(1, hit["all"])
+        self.assertEqual(2, hit["inc"])
+        # exclude だけなら、それ以外を全部数える。残るのは src/a.py の 2 行で閾値 3 以下。
+        self.assertNotIn("exc", hit)
+        # src/gen は exclude が勝つので、消したファイルは 0。
+        self.assertNotIn("both", hit)
+
+    def test_scope_is_part_of_the_layer_dedupe_key(self):
+        a, _ = risk.parse("version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 1}\n")
+        b, _ = risk.parse(
+            "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 1, exclude: ['*.lock']}\n"
+        )
+        self.assertNotEqual(a.factors[0].key(), b.factors[0].key())
+
     def test_levels_have_fixed_names(self):
         definition, problems = risk.parse("version: 1\nlevels: {medium: 5, high: 10, severe: 99}\n")
         self.assertIsNotNone(definition)

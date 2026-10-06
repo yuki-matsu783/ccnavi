@@ -43,7 +43,7 @@ export function formOf(draft: Draft): RiskForm {
 
 /** 新しい項目。加点条件の既定は `lines_over` */
 export function emptyFactor(): FactorForm {
-  return { origin: null, id: "", points: "", kind: "lines_over", value: "", max: "", message: "" };
+  return { origin: null, id: "", points: "", kind: "lines_over", value: "", max: "", include: "", exclude: "", message: "" };
 }
 
 /** state に残してある「開いていた項目の id」。型が違うものは空として扱う */

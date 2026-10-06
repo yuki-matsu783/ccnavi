@@ -30,6 +30,8 @@ export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を�
 #
 # 項目は 3 系統。1 件につき加点条件を 1 つだけ書く。
 #   定量（組み込み）: lines_over / files_over / deleted_over / glob（当たるごとに加点。max で上限）
+#                    lines_over / files_over / deleted_over は include / exclude（glob のリスト）で数えるパスを絞れる。
+#                    無指定なら差分全体。include があれば当たったパスだけ、exclude に当たったパスは数えない
 #   定量（スクリプト）: script: <.ccnavi/common/scripts/ の下>。cwd は子のワークツリー、
 #                      CCNAVI_BASE_SHA / CCNAVI_HEAD / CCNAVI_TICKET / CCNAVI_PARENT を受け取り、
 #                      標準出力に整数か {"points": N, "message": "..."} を出す。失敗は重い側（points を加点）
@@ -139,8 +141,19 @@ function formOf(index: number, map: YAMLMap, kind: FactorKind): FactorForm {
     kind,
     value: scalarText(map, kind),
     max: scalarText(map, "max"),
+    include: globsText(map, "include"),
+    exclude: globsText(map, "exclude"),
     message: scalarText(map, "message"),
   };
+}
+
+/** include / exclude は glob のリスト。欄には 1 行に 1 つで出す（リストでない書き方は 1 つの値として出す） */
+function globsText(map: YAMLMap, key: string): string {
+  const value = map.get(key, true);
+  if (isSeq(value)) {
+    return value.items.map((item) => (item instanceof Scalar ? String(item.value) : "")).join("\n");
+  }
+  return scalarText(map, key);
 }
 
 function scalarText(map: YAMLMap, key: string): string {
@@ -271,6 +284,10 @@ function writeFactor(doc: Document, node: YAMLMap, form: FactorForm): void {
   } else {
     setValue(doc, node, form.kind, form.value, Scalar.PLAIN, "points");
   }
+  // include / exclude は数える項目（lines_over など）だけ。空なら欄ごと消す（全パスが対象）。
+  const counting = form.kind === "lines_over" || form.kind === "files_over" || form.kind === "deleted_over";
+  writeGlobs(doc, node, "include", counting ? form.include : "");
+  writeGlobs(doc, node, "exclude", counting ? form.exclude : "");
   // max は glob の上限。glob 以外の加点条件では意味が無く、画面にも出ないので消す。空なら欄ごと消す（青天井）。
   if (form.max === "" || form.kind !== "glob") {
     if (node.has("max")) {
@@ -286,6 +303,37 @@ function writeFactor(doc: Document, node: YAMLMap, form: FactorForm): void {
     }
   } else {
     setValue(doc, node, "message", form.message, Scalar.PLAIN);
+  }
+}
+
+/** glob のリストを書く。行ごとに 1 つ、空行は捨てる。変わっていなければ触らない（元の書き方を残す） */
+function writeGlobs(doc: Document, node: YAMLMap, key: string, text: string): void {
+  const globs = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
+  if (globs.length === 0) {
+    if (node.has(key)) {
+      node.delete(key);
+    }
+    return;
+  }
+  const current = node.get(key, true);
+  if (isSeq(current) && current.items.length === globs.length && current.items.every((item, i) => item instanceof Scalar && item.value === globs[i])) {
+    return;
+  }
+  const seq = new YAMLSeq();
+  seq.flow = true;
+  for (const glob of globs) {
+    // glob は引用符で囲む。`*` で始まる値を裸で書くと YAML が別名として読む。
+    const scalar = doc.createNode(glob) as Scalar;
+    scalar.type = Scalar.QUOTE_DOUBLE;
+    seq.items.push(scalar);
+  }
+  if (node.has(key)) {
+    node.set(key, seq);
+  } else {
+    insertAfter(doc, node, key, seq, key === "exclude" && node.has("include") ? "include" : KINDS.find((k) => node.has(k)));
   }
 }
 
@@ -377,6 +425,8 @@ function asFactor(raw: unknown): FactorForm | undefined {
     kind: r.kind as FactorKind,
     value: text(r.value),
     max: text(r.max),
+    include: text(r.include),
+    exclude: text(r.exclude),
     message: text(r.message),
   };
 }

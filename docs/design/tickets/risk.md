@@ -23,7 +23,7 @@ keywords: [リスク, risks.yml, risk.json, 差分, HIGH, 配点]
 
 | 系統 | 書き方 | 誰が測るか |
 |---|---|---|
-| 定量（組み込み） | `lines_over` / `files_over` / `deleted_over` / `glob`（当たるごとに加点。`max` で上限） | ccnavi が差分から数える |
+| 定量（組み込み） | `lines_over` / `files_over` / `deleted_over` / `glob`（当たるごとに加点。`max` で上限） | ccnavi が差分から数える。`lines_over` / `files_over` / `deleted_over` は、`include` / `exclude`（glob のリスト）で数えるパスを絞れる。無指定なら差分全体。`include` があれば当たったパスだけ、`exclude` に当たったパスは数えない（`exclude` だけなら、それ以外を全部数える）。バイナリの変更は行数 0 として数える |
 | 定量（スクリプト） | `script: <.ccnavi/common/scripts/ の下>`（共通レイヤー。ミラーも同じパス。レイヤーごとの解決先は 11.4.2） | ccnavi が `sh` で走らせる。cwd は子のワークツリー、`CCNAVI_BASE_SHA` / `CCNAVI_HEAD` / `CCNAVI_TICKET` / `CCNAVI_PARENT` を渡し、標準出力の整数か `{"points": N, "message": "…"}` を受け取る。失敗や読めない出力は重いほうとして扱い、その項目の点を加える |
 | 定性（サブエージェント） | `judge: <問い>` | 判定が揃うまで子は閉じられない。`finish` が問いと差分の要約を `state/risk-judge-<子>.md` に書き、親がサブエージェントに渡し、報告を `ccnavi-ticket.sh record-risk <子> <項目> yes\|no --reason` で記録する。判定は子の HEAD に結び、HEAD が動けば取り直し。記録できるのは親だけ |
 

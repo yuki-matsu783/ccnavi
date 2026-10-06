@@ -47,6 +47,10 @@ export interface FactorForm {
   readonly value: string;
   /** glob の上限。空なら青天井（欄を書かない） */
   readonly max: string;
+  /** lines_over / files_over / deleted_over が数えるパス（glob を 1 行に 1 つ）。空なら全パス（欄を書かない） */
+  readonly include: string;
+  /** 同じく数えないパス。include に当たっていても外す。空なら外さない（欄を書かない） */
+  readonly exclude: string;
   readonly message: string;
 }
 
