@@ -4,7 +4,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { diffFlows, isEmptyDiff, sameFlow, sameValue, textDiff } from "../../src/core/flow-diff.js";
+import { diffFlows, isEmptyDiff, sameFlow, sameFlowIgnoringLayout, sameValue, textDiff } from "../../src/core/flow-diff.js";
 import {
   absolutePosition,
   addNode,
@@ -19,6 +19,7 @@ import {
   parseFlow,
   pasteNodes,
   patchData,
+  placeNodes,
   removeNode,
   renameNode,
   setConditionAt,
@@ -288,6 +289,37 @@ test("CB-T292 下書きの差分は、変わった欄の名前だけでなく値
   const branches = textDiff(doc, setConditionAt(doc, 1, "変えた")).changes;
   assert.ok(branches.length > 0);
   assert.ok(branches.flatMap((c) => c.texts).some((t) => t.after === "変えた"));
+});
+
+test("CB-T306 下書きの見比べは、位置とグループ化の違いを見ない。中身が変われば見る", () => {
+  const doc = branched();
+  const moved = placeNodes(doc, [{ id: "end", position: { x: 999, y: 999 } }]);
+  assert.equal(sameFlow(doc, moved), false);
+  assert.equal(sameFlowIgnoringLayout(doc, moved), true);
+  assert.deepEqual(textDiff(doc, moved), { changes: [] });
+  // グループ化（枠のノード・所属・大きさ）も見ない
+  const flat = branched();
+  const ungrouped = { ...flat, nodes: flat.nodes.filter((n) => n.type !== "group").map(({ parentId: _parent, ...rest }) => rest) } as FlowDoc;
+  assert.equal(sameFlowIgnoringLayout(flat, ungrouped), true);
+  assert.deepEqual(textDiff(flat, ungrouped), { changes: [] });
+  // サブフロー（subAgentFlows）の中の位置・グループも見ない。通常のノードだけの style も見ない
+  const sub = (x: number, extra: object = {}): FlowDoc => ({
+    ...doc,
+    subAgentFlows: [{ id: "s", name: "S", nodes: [{ id: "n", type: "prompt", name: "N", position: { x, y: 0 }, data: { prompt: "p" }, ...extra }], connections: [] }],
+  });
+  assert.equal(sameFlowIgnoringLayout(sub(1), sub(2)), true);
+  assert.equal(sameFlowIgnoringLayout(sub(1), sub(1, { parentId: "g", style: { width: 1 } })), true);
+  assert.deepEqual(textDiff(sub(1), sub(2)), { changes: [] });
+  assert.equal(sameFlowIgnoringLayout(sub(1), { ...sub(1), subAgentFlows: [{ id: "s", name: "別名", nodes: [], connections: [] }] }), false);
+  const styled = { ...doc, nodes: doc.nodes.map((n) => (n.id === "end" ? { ...n, style: { width: 9 } } : n)) } as FlowDoc;
+  assert.equal(sameFlowIgnoringLayout(doc, styled), true);
+  // グループ枠の名前だけが違っても見ない（枠は手順ではない）
+  const renamed = { ...doc, nodes: doc.nodes.map((n) => (n.type === "group" ? { ...n, name: "別の枠" } : n)) } as FlowDoc;
+  assert.equal(sameFlowIgnoringLayout(doc, renamed), true);
+  // 中身（文）が違えば、位置が同じでも違う
+  const edited = patchData(doc, "p-1", { prompt: "別の手順" });
+  assert.equal(sameFlowIgnoringLayout(doc, edited), false);
+  assert.equal(textDiff(doc, edited).changes.length, 1);
 });
 
 test("CB-T299 欄の表記を真似たキーで本当の変更を隠せない。値の種類も前後に添える", () => {
