@@ -7,8 +7,9 @@
 やることは置き場を動かして欄を書くことだけ（状態は置き場が表す）。`start` は置き場を動かさず
 `doing/` の欄を書く。`finish` は `doing/` から `wip/proposals/review/`（レビュー要）か
 `.ccnavi/approved/done/`（不要）へ、`cancel` は `doing/` から `done/` へ動かす。
-ワークツリーの削除は親のマージ手順に任せる。順序は「子の成果をマージ → finish →
-ワークツリーを消す」で、finish の前にワークツリーを消すと base_sha の検査ができなくなる。
+ワークツリーはここでは消さない。子のワークツリーは、`confirm` が子を `done/` へ動かしたあとと、
+親の `finish` のあとに sh が `worktree tidy` で消す（worktrees.py）。finish の前にワークツリーを
+消すと base_sha の検査ができなくなり、レビュー待ちの間に指摘を直す場所も無くなる。
 
 ここに置くのは操作の本体（`start` / `finish` / `cancel` / `record_risk`）と、`finish` が閉じるときに
 実績のリスクを数える手順。チケットを引いて閉じてよいかを検査する部分は `ops_close.py`、Stop で
@@ -37,7 +38,27 @@ from . import (
     ticket_ids,
     ticket_model,
     ticket_places,
+    worktrees,
 )
+
+# 最後のレビューのあと、Draft を外すまでの手順がユーザの合意の範囲に入ることの言い切り。
+# `confirm` の知らせ（core_review.after_last_review）と親の `finish` の出力が同じ文を使う。
+# ユーザがレビュー済みにした時点で、ここまでは合意済み。外へ出る操作（push・Draft を外す）の前に
+# 確認を取り直すと、同じ流れの中で何度も許可を求めることになる。
+READY_FLOW_AGREED = (
+    "ここから Draft を外すまで（finish → push → ready。`wip/` の削除は ready に入っている）は、"
+    "ユーザのレビュー済みの合意の範囲に入る。"
+    "push と Draft を外す前に、ユーザへ確認を取り直さずに進める"
+    "（Claude Code の自動モードの分類器に止められたときだけ、ユーザに許可を頼む）"
+)
+
+
+def ready_command(root: str, parent_id: str) -> str:
+    """Draft を外す 1 本。親のワークツリーの外から打つ形（`--parent`）。
+
+    この形なら、Draft を外した最後に親のワークツリーも消える。
+    """
+    return f"{settings.script_command(root, 'ccnavi-review.sh')} ready --parent {parent_id}"
 
 
 def start(
@@ -250,21 +271,27 @@ def _close_parent(
             f"次は、この移動をコミットし、`{wip}/` を消して"
             f"（'{git_sh} rm -r {wip}'）コミットし、統合先のブランチに取り込んでください。"
             "このチケットにはマージリクエストで見るフェーズが無いので、"
-            "Draft を外す手順は無い。途中の作業は既定のブランチに残さない\n"
+            "Draft を外す手順は無い。途中の作業は既定のブランチに残さない。"
+            f"`{wip}/` で消えるのは追跡済みのファイルだけで、消す前のコミットから戻せる。"
+            f"{worktrees.classifier_note(root, f'{git_sh} rm -r {wip}')}\n"
         )
         return
     if approval_marks.read_parent_mark(where, found.ticket, approval_marks.PARENT_MARK_READY):
         stdout.write("Draft は外してある。マージはユーザが行う\n")
         return
-    review_sh = settings.script_command(root, "ccnavi-review.sh")
     stdout.write(
-        f"次は、この移動をコミットし、`{wip}/` を消して"
-        f"（'{git_sh} rm -r {wip}'）コミットし、"
-        f"push してから '{review_sh} ready' で Draft を外してください"
-        "（「マージに進んでよい」の合図）。ready は Draft を外す前に、閉じたチケットとその記録"
+        "次は、この移動をコミットして push し"
+        "（取り込み済みの親子では、この finish が済ませている）、"
+        f"'{ready_command(root, found.ticket)}' で Draft を外してください"
+        "（「マージに進んでよい」の合図）。"
+        "ready は Draft を外す前に、閉じたチケットとその記録"
         f"（`{conf.approved}/` の done/・phases/・events/・flows/）を手元の logs/archive/ へ移し、"
-        "その削除をコミットして push する。途中の作業もチケットも既定のブランチに残さない。"
-        "マージはユーザが squash で行う\n"
+        f"`{wip}/` の追跡済みのファイルを消して、その削除をコミットして push する"
+        f"（`{wip}/` に未追跡のファイルがあれば消さずに止まる。消したものは履歴から戻せる）。"
+        "Draft を外したあと、ready は親のワークツリーを消す（親のワークツリーの外から --parent で"
+        "打てば消える。中から --parent なしで打つと消さず、外に出てから打つ 1 本を出す）。"
+        "途中の作業もチケットも既定のブランチに残さない。マージはユーザが squash で行う。"
+        f"{READY_FLOW_AGREED}\n"
     )
 
 
@@ -501,10 +528,18 @@ def _move(
     )
     stdout.write(f"OK: {found.ticket} を {place} へ動かした（{said}）\n")
     if state == ticket_model.REVIEW:
+        # 依頼の前に「ユーザのレビューを待つ」と言わない。次に誰が何をするかを、
+        # 依頼の有無で言い分ける（phase.review_next）。
+        moved = replace(found, completed_at=fields.get("completed_at", ""))
+        # 誰がいつ done/ へ動かすかは review_next の文が言う（重ねて言わない）。
         stdout.write(
-            "ユーザのレビューを待つ。"
-            "レビューが済むとユーザの操作（confirm / decide / --reviewed）で "
-            f"{conf.approved}/{ticket_model.DONE}/ へ動く\n"
+            (
+                phase.review_next(root, conf, moved)
+                or "まだレビュー準備中。親がレビューを依頼するまで、ユーザには回らない。"
+                "依頼の後、ユーザがレビューを終えて confirm / decide / --reviewed を打つと "
+                f"{conf.approved}/{ticket_model.DONE}/ へ動く"
+            )
+            + "\n"
         )
     return 0
 

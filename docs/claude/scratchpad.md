@@ -13,6 +13,9 @@ keywords: [scratchpad, スクラッチパッド, 下書き, 使い捨て, 一時
 ## ワークツリーの`scratchpad/`
 
 `scratchpad/`は`.gitignore`に書かれているので追跡されず、`git status`にも出ない。中にファイルがあっても`worktree remove`は止まらず、ワークツリーを消せば下書きも一緒に消える。
+ccnaviがワークツリーを片付けるとき（`confirm`・`finish`・`cancel`・`ready`の後、`ccnavi-clean.sh --worktree`）も同じで、
+ワークツリー直下の`scratchpad/`の中身は確かめずに一緒に消える。残したい下書きは、片付けの前にワークツリーの外へ移しておく。
+直下以外の`scratchpad/`（`docs/scratchpad/`など）や`.env`のような、ほかのgitが無視しているファイルがあると、片付けは何も消さずに止まる
 
 チケットが結び付いたワークツリーでも、`scratchpad/`にはそのまま書き込める。実行前チェックは`scratchpad/`への書き込みをチケットの範囲と照らし合わせないので、範囲に`scratchpad/*`を足す必要は無い。
 

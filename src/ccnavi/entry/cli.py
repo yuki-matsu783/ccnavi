@@ -28,6 +28,7 @@ from ..tickets import (
     branchfind,
     configsync,
     history,
+    review,
 )
 from . import cli_args, cli_ops, cli_usage, diagnose, lint, suggest, version
 
@@ -323,8 +324,10 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
 
     C1 がコミットするのは状態だけ。
 
-    例外は 1 つだけ。`ticket start` の中で configsync がミラーしたプロジェクトの
-    `.ccnavi/common/`（`configsync.is_synced_write` が内容で読めるもの）。
+    例外は 2 つ。`ticket start` の中で configsync がミラーしたプロジェクトの
+    `.ccnavi/common/`（`configsync.is_synced_write` が内容で読めるもの）と、`review ready` が
+    消した途中の作業の置き場（`wip/`）のファイル（消したもの、つまり今は無いものだけ。
+    `review.remove_wip` が追跡済みのものだけを消す）。
     """
     conf, _ = settings.load(root)
     cli_args._override(conf, args)
@@ -334,9 +337,12 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
     )
     places = [cli_args._real(approved), cli_args._real(review_dir)]
     starting = list(args.command[:2]) == ["ticket", "start"]
+    readying = list(args.command[:2]) == ["review", "ready"]
     found = []
     for real in reals:
         if cli_args._inside(real, base) and any(cli_args._inside(real, p) for p in places):
+            continue
+        if readying and _ready_removed_wip(real, base):
             continue
         if (
             starting
@@ -346,6 +352,25 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
             continue
         found.append(real)
     return found
+
+
+def _ready_removed_wip(real: str, base: str) -> bool:
+    """`review ready` が消した途中の作業の置き場（`wip/`）の下のファイルか。
+
+    `ready` が消すものを選ぶのと同じ判定（`review.in_wip`。大文字小文字と `\\` の区切りを
+    問わない）を、C1 のツリー（`base`）からの相対に当てる。通すのは、そのツリーの中で、今は無い
+    （消した）ものだけ。ツリーの外・`..` を含む相対・今も在るものは通さない。
+    """
+    if os.path.lexists(real) or not cli_args._inside(real, base) or cli_args._same(real, base):
+        return False
+    try:
+        rel = os.path.relpath(real, base)
+    except ValueError:
+        return False
+    parts = rel.split(os.sep)
+    if any(p in ("", ".", "..") for p in parts):
+        return False
+    return review.in_wip("/".join(parts))
 
 
 def _record_place_problem(place: str, target: str, given: str) -> str:

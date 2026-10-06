@@ -7,7 +7,7 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh decide  <N>          （ユーザが端末で打つ）
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた時点の状態を JSON で見る）
 #   sh .ccnavi/scripts/ccnavi-review.sh merged                （MR がマージ済みか。ccnavi-sync.sh が使う）
-#   sh .ccnavi/scripts/ccnavi-review.sh ready                                  （閉じたチケットを logs/archive/ へ退避し、MR の Draft を外す）
+#   sh .ccnavi/scripts/ccnavi-review.sh ready [--parent <親>]                  （閉じたチケットを logs/archive/ へ退避し、MR の Draft を外し、親のワークツリーを消す）
 #   sh .ccnavi/scripts/ccnavi-review.sh close-early --reason <理由> [--no-issue]  （ユーザが端末で打つ。残りを issue に書き出して早めに閉じる）
 #   sh .ccnavi/scripts/ccnavi-review.sh origin                                 （origin をどう読んだか。ホスト・scheme・API の URL）
 #   sh .ccnavi/scripts/ccnavi-review.sh chat <N>              （ユーザが端末で打つ。chat のフェーズのレビュー済み）
@@ -52,14 +52,15 @@
 # ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、承認の push の打ち直しを案内する。
 # それ以外は今のまま。
 #
-# 親のワークツリーの中で実行すること。どの親かは cwd から引く。
+# 親のワークツリーの中で実行すること。どの親かは cwd から引く。ready だけは `--parent <親>` で
+# 外（ワークスペースルートなど）からも打てる。外から打てば、Draft を外したあとに親のワークツリーも消える。
 # 終了コード: 0 成功 / 1 前提の未充足 / 2 引数か環境の誤り
 
 set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-early|chat|fetch|origin|merged> [--phase <N>] [--body-file <path>] [--eli5 <html>]
+sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-early|chat|fetch|origin|merged> [--phase <N>] [--body-file <path>] [--eli5 <html>] [--parent <親>]
 
   request      --phase <N> --body-file <依頼文> --eli5 <HTML>
                                                   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く。
@@ -71,7 +72,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
   confirm      --phase <N>                        未解決（Unresolved）のスレッドが 1 つも無ければマーカーを置く（依頼の時刻では絞らない）
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに書き出す
   decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（ユーザが端末で打つ。--preview は一覧を JSON で見るだけ）
-  ready                                           閉じられ、wip を片付けて push 済みなら、閉じたチケットを logs/archive/ へ退避して削除を push し、Draft を外す（「マージに進んでよい」の合図。マージはユーザが squash で）
+  ready        [--parent <親>]                    閉じられて push 済みなら、閉じたチケットを logs/archive/ へ退避し wip/ の追跡済みのファイルを消して削除を push し、Draft を外す（「マージに進んでよい」の合図。マージはユーザが squash で）。最後に親のワークツリーを消す（中から打ったときは消さず、外から打つ 1 本を出す）。--parent なら親のワークツリーの外から打てる
   close-early  --reason <理由> [--no-issue]       まだ残っているが早めに閉じる判断（ユーザが端末で打つ）。残りを issue に書き出す。Draft は親が ready で外す
   chat         <N>                                chat で見るフェーズをユーザがこのセッションで見終えた（ユーザが端末で打つ。ccnavi --reviewed <N> --chat）
   fetch                                           リモートから取ってきた時点の状態を JSON で標準出力へ
@@ -122,6 +123,59 @@ root=$(ccnavi_workspace) ||
 ccnavi_log_root="$root"
 here="$(pwd -W 2>/dev/null || pwd)"
 state="$root/logs/state" # 固定
+# このスクリプトの置き場（絶対パス）。`ready --parent` は親のワークツリーへ cd するので、相対の `$0`
+# （`sh .ccnavi/scripts/ccnavi-review.sh`）をその後で解くと、親のワークツリーの中の写しを指すか、見失う。
+# cd の前に解いておき、以降はこれを使う。
+script_dir=$(cd "$(dirname "$0")" && pwd)
+# 実行ファイルに渡す cwd（どの親かを引く場所）。ふつうは打った場所で、`ready --parent <親>` のときだけ
+# 親のワークツリーにする。
+exe_cwd="$here"
+
+# ---- ready --parent <親>。親のワークツリーの外（ワークスペースルートなど）から打つ形。
+#
+# 親は cwd から引く決まりなので、ここで親のワークツリーへ移ってから先へ進む。git（origin・ブランチ・
+# 親の識別子）と実行ファイルの cwd は親のワークツリーになり、中から打ったときと同じに動く。
+# 打った場所（here）は覚えておき、最後に親のワークツリーを消すときの cwd に使う（外から打てば消せる）。
+# 消す前に打った場所へ戻る（自分の cwd が消す対象の中にあると、Windows では消せない）。
+ready_parent=""
+ready_from=""
+if [ "$sub" = ready ]; then
+	# `--parent` は 1 度だけ、値は空でないこと。`--parent=`（空）や `--parent X --parent` を黙って
+	# 読み飛ばすと、外から打ったつもりが中から打つ形で進む。
+	rp_prev=""
+	rp_count=0
+	for rp_arg in "$@"; do
+		if [ "$rp_prev" = --parent ]; then
+			ready_parent="$rp_arg"
+			[ -n "$rp_arg" ] || fail ready-parent-missing "ready の --parent には親の識別子が要る。" 2
+			rp_prev=""
+			continue
+		fi
+		case "$rp_arg" in
+		--parent=*)
+			rp_count=$((rp_count + 1))
+			ready_parent="${rp_arg#--parent=}"
+			[ -n "$ready_parent" ] || fail ready-parent-missing "ready の --parent には親の識別子が要る。" 2
+			;;
+		--parent) rp_count=$((rp_count + 1)) ;;
+		esac
+		rp_prev="$rp_arg"
+	done
+	if [ "$rp_prev" = --parent ]; then
+		fail ready-parent-missing "ready の --parent には親の識別子が要る。" 2
+	fi
+	[ "$rp_count" -le 1 ] || fail ready-parent-twice "ready の --parent は 1 度だけ渡せる。" 2
+	if [ -n "$ready_parent" ]; then
+		ccnavi_is_ident "$ready_parent" ||
+			fail ready-parent-ident "ready の --parent の値（${ready_parent}）は識別子の形ではない。" 2
+		ready_dir="$root/.claude/worktrees/$ready_parent"
+		[ -d "$ready_dir" ] && [ ! -L "$ready_dir" ] && [ -e "$ready_dir/.git" ] ||
+			fail ready-parent-tree "親 ${ready_parent} のワークツリー（${ready_dir}）が無い。ready は親のワークツリーで行う。" 2
+		ready_from="$(pwd)"
+		cd "$ready_dir" || fail ready-parent-cd "親 ${ready_parent} のワークツリー（${ready_dir}）に移れない。" 2
+		exe_cwd="$(pwd -W 2>/dev/null || pwd)"
+	fi
+fi
 
 # ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 
@@ -140,10 +194,10 @@ tell_skew() {
 if bin=$(ccnavi_bin "$root"); then
 	ccnavi() {
 		tell_skew
-		"$bin" --root "$root" --cwd "$here" "$@"
+		"$bin" --root "$root" --cwd "$exe_cwd" "$@"
 	}
 elif [ -f "$root/src/ccnavi/__main__.py" ]; then
-	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$here" "$@"); }
+	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$exe_cwd" "$@"); }
 elif [ "$sub" != merged ]; then
 	# merged は実行ファイルを起こさない（ホストに聞くだけ）ので、無くても進める。
 	fail no-bin "ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。" 2
@@ -560,7 +614,7 @@ trap 'ccnavi_c1_end; exit 130' INT TERM HUP
 # ---- C1 と、ユーザの判断を送る承認の push
 ccnavi_c1_root="$root"
 ccnavi_c1_label=ccnavi-review
-ccnavi_c1_sh="$(dirname "$0")"
+ccnavi_c1_sh="$script_dir"
 ccnavi_c1_exe() { ccnavi "$@"; }
 c1_on=no
 
@@ -677,9 +731,24 @@ confirm)
 	exe_knows --actor && actor=$(account || :)
 	log_debug マーカーのアカウント -- "actor=${actor:+set}"
 	[ -z "$actor" ] || set -- "$@" "--actor=$actor"
+	confirm_phase=""
+	confirm_prev=""
+	for a in "$@"; do
+		case "$a" in
+		--phase=*) confirm_phase="${a#--phase=}" ;;
+		*) [ "$confirm_prev" = --phase ] && confirm_phase="$a" ;;
+		esac
+		confirm_prev="$a"
+	done
 	c1_start "$family"
 	fetch_all >"$result"
 	c1_ccnavi "$branch のレビュー済みを置いた" -- review confirm "$@" --result "$result"
+	# done/ へ動いた子のワークツリーを消す（C1 なら送り終えた後。push の失敗で戻ったときに、指摘を直す場所を
+	# 残すため）。消せなかったもの（cwd が中・未コミット）は名指しされるだけで、confirm は成功のまま。
+	case "$confirm_phase" in
+	'' | *[!0-9]*) ;;
+	*) ccnavi worktree tidy "$family" --phase "$confirm_phase" || : ;;
+	esac
 	;;
 request)
 	# 段 -1: ELI5 の HTML。--eli5 を抜き出し、残りを実行ファイルへ渡す（実行ファイルは
@@ -995,24 +1064,47 @@ ready)
 	c1_start "$family"
 	fetch_all >"$result"
 	tell_skew
+	# 互換の版が食い違っていても ready は止めない。実行ファイルは条件の確かめ・退避・wip/ の片付けを、
+	# sh は push・Draft 外し・コメントを受け持ち、契約（標準出力の形）は前の版と変わらないため。
+	# 組み立て直しはエージェントが勝手に回さない決まりなので、誰が何をするかを言う。
+	if [ -n "${skew:-}" ]; then
+		printf 'ccnavi-review: 食い違いがあっても ready は続ける。エージェントは build.py を回さず、終わったらユーザに実行ファイルの組み立て直し（または配り直し）を頼む。\n' >&2
+	fi
 	ccnavi_c1_capture="$state/review-ready-$$.out"
 	ready_rc=0
 	c1_ccnavi "$branch の Draft を外すマーカーを置いた" -- review ready --result "$result" || ready_rc=$?
 	# 実行ファイルの標準出力は、1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`。
+	# wip/ から消したものがあれば、続けて `wip-from <消す前の HEAD>` と `wip <パス>`（1 行 1 本）。
 	noted=$(sed -n '1p' "$ccnavi_c1_capture" 2>/dev/null || :)
 	ready_tree=$(sed -n 's/^tree //p' "$ccnavi_c1_capture" 2>/dev/null | head -n 1)
+	wip_from=$(sed -n 's/^wip-from //p' "$ccnavi_c1_capture" 2>/dev/null | head -n 1)
+	wip_gone=$(sed -n 's/^wip //p' "$ccnavi_c1_capture" 2>/dev/null || :)
 	rm -f "$ccnavi_c1_capture"
 	ccnavi_c1_capture=""
 	[ "$ready_rc" -eq 0 ] || exit "$ready_rc"
+	if [ -n "$wip_gone" ]; then
+		printf 'wip/ の追跡済みのファイルを消した（%s 件。消す前のコミット %s から戻せる）:\n' \
+			"$(printf '%s\n' "$wip_gone" | wc -l | tr -d ' ')" "$(printf '%.12s' "$wip_from")"
+		printf '%s\n' "$wip_gone" | sed 's/^/  /'
+	fi
 	# C1 の外（取り込み済みでない親子のチケット）では、退避の削除をここでは送らない。
 	# 送る前に Draft を外すと、チケットを残したままマージされうるので、送ってから打ち直してもらう。
 	# 見るのは退避したツリー（実行ファイルが答えたもの）。古い実行ファイルが答えなければ cwd のツリー。
 	if [ "$c1_on" != yes ]; then
-		[ -n "$ready_tree" ] || ready_tree=$(git -C "$here" rev-parse --show-toplevel 2>/dev/null || :)
+		[ -n "$ready_tree" ] || ready_tree=$(git -C "$exe_cwd" rev-parse --show-toplevel 2>/dev/null || :)
 		ready_place="${ccnavi_c1_approved:-.ccnavi/approved}"
+		# wip/ は、実行ファイルが消したと答えたパス（`wip <パス>` の行）をそのまま確かめる。実行ファイルは
+		# 大文字小文字と `\` の区切りを問わずに wip/ と見る（`WIP/…`・`wip\…`）ので、固定の `wip` だけでは
+		# 見落とす。答えない古い実行ファイルのために `wip` も残す。
+		set -- ":(literal)$ready_place" ":(literal)wip"
+		while IFS= read -r ready_wip; do
+			[ -n "$ready_wip" ] && set -- "$@" ":(literal)$ready_wip"
+		done <<EOF_WIP
+$wip_gone
+EOF_WIP
 		if [ -n "$ready_tree" ] &&
-			[ -n "$(git -C "$ready_tree" status --porcelain --untracked-files=no -- ":(literal)$ready_place" 2>/dev/null)" ]; then
-			fail ready-unsent "${ready_tree} の置き場（${ready_place}）に未コミットの変更がある（閉じたチケットを logs/archive/ へ退避した削除など）。コミットして push してから、もう一度 ready を打ってください（Draft はまだ外していない）。"
+			[ -n "$(git -C "$ready_tree" status --porcelain --untracked-files=no -- "$@" 2>/dev/null)" ]; then
+			fail ready-unsent "${ready_tree} の置き場（${ready_place}）か wip/ に未コミットの変更がある（閉じたチケットを logs/archive/ へ退避した削除や、wip/ の追跡済みのファイルの削除など）。コミットして push してから、もう一度 ready を打ってください（Draft はまだ外していない）。"
 		fi
 	fi
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
@@ -1023,6 +1115,14 @@ ready)
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi
 	printf 'OK: Draft を外した（%s）。マージはユーザが行う\n' "$url"
+	# 最後に親のワークツリーを片付ける。Draft を外す前には消さない（ready を打ち直せなくなる）。
+	# 打った場所（--parent なら外）を cwd として渡す。中から打っていれば実行ファイルは消さず、外に出てから
+	# 打つ 1 本を出す。消せなくても ready は成功のまま。
+	if [ -n "$ready_from" ]; then
+		cd "$ready_from" || cd "$root"
+	fi
+	exe_cwd="$here"
+	ccnavi worktree drop "$family" || :
 	;;
 close-early)
 	# ユーザが端末で打つ。exe が残りを見せて y/N を取り、マーカーを置いて下書きを書く。

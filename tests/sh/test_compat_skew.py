@@ -191,6 +191,16 @@ class CompatAgreesTest(unittest.TestCase):
         """
         self.assertGreaterEqual(version.COMPAT, 7)
 
+    def test_v11_ready_removing_wip_raised_the_compat_to_8(self):
+        """V11 `review ready` が `wip/` の追跡済みのファイルを消すようになった。C1 の外では sh が
+        その削除の未コミットを確かめてから Draft を外す。なので 8 以上。
+
+        確かめを持たない古い sh（互換 7）と新しい実行ファイルを組み合わせると、`wip/` の削除が
+        未コミットのまま Draft が外れうるので、食い違いとして知らせる。sh は `worktree drop|tidy`
+        （古い実行ファイルの知らない副命令）も呼ぶ。
+        """
+        self.assertGreaterEqual(version.COMPAT, 8)
+
 
 @unittest.skipIf(not SHELL, "sh も bash も見つからない")
 class TicketStatusPassTest(unittest.TestCase):

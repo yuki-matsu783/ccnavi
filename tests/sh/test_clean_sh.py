@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -264,6 +265,76 @@ class CleanCases:
         result = self.run_clean("wt")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(os.path.exists(os.path.join(top, "node_modules")))
+
+
+@unittest.skipUnless(SHELL and GIT, "sh と git が要る")
+class WorktreeOptionTest(unittest.TestCase):
+    """`--worktree <名前>`。掃除とワークツリーの削除を実行ファイル（`worktree drop`）に任せる。
+
+    実行ファイルの代わりに、このツリーのソースを起こす（CCNAVI_BIN_PATH）。
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.ws = os.path.join(self._tmp.name, "ws")
+        scripts = os.path.join(self.ws, ".ccnavi", "scripts")
+        os.makedirs(scripts)
+        for name in SCRIPTS:
+            shutil.copy(os.path.join(SH_DIR, name), scripts)
+        self.bin = os.path.join(self._tmp.name, "bin", "ccnavi")
+        write(
+            self.bin,
+            f"#!/bin/sh\nPYTHONPATH='{ROOT}/src' exec '{sys.executable}' -m ccnavi \"$@\"\n",
+        )
+        os.chmod(self.bin, 0o755)
+        git(self.ws, "init", "-q", "-b", "main")
+        git(self.ws, "config", "user.email", "t@example.invalid")
+        git(self.ws, "config", "user.name", "t")
+        write(os.path.join(self.ws, ".gitignore"), "node_modules/\n.claude/worktrees/\nlogs/\n")
+        git(self.ws, "add", ".gitignore")
+        git(self.ws, "commit", "-q", "-m", "seed")
+        git(self.ws, "worktree", "add", "-q", ".claude/worktrees/wt", "-b", "wt", "main")
+        self.top = os.path.join(self.ws, ".claude", "worktrees", "wt")
+        write(os.path.join(self.top, "node_modules", "x.js"))
+
+    def run_clean(self, *args, cwd=None):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env.pop("CLAUDE_PROJECT_DIR", None)
+        env["CCNAVI_BIN_PATH"] = self.bin
+        script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-clean.sh").replace(os.sep, "/")
+        return subprocess.run(
+            [SHELL, script, *args],
+            cwd=cwd or self.ws,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+
+    def test_removes_the_worktree_from_outside_and_keeps_the_branch(self):
+        result = self.run_clean("--worktree", "wt")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("ワークツリー wt を消した", result.stdout)
+        self.assertFalse(os.path.exists(self.top))
+        branches = subprocess.run(
+            ["git", "branch", "--list", "wt"], cwd=self.ws, capture_output=True, text=True
+        )
+        self.assertEqual(branches.stdout.strip(), "wt")
+
+    def test_keeps_the_worktree_when_the_cwd_is_inside(self):
+        result = self.run_clean("--worktree", "wt", cwd=self.top)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("cwd がワークツリー wt の中にあるので消さなかった", result.stdout)
+        self.assertIn("ccnavi-clean.sh --worktree wt", result.stdout)
+        self.assertTrue(os.path.exists(os.path.join(self.top, "node_modules", "x.js")))
+
+    def test_rejects_paths_and_dry_run(self):
+        for args in (("--worktree", "wt", "--dry-run"), ("--worktree", "../wt"), ("--worktree",)):
+            with self.subTest(args=args):
+                result = self.run_clean(*args)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertTrue(os.path.isdir(self.top))
 
 
 @unittest.skipUnless(SHELL and NODE, "sh と node が要る")

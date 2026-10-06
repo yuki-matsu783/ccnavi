@@ -214,6 +214,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.review",
                 "tickets.review_close",
                 "tickets.review_decide",
+                "tickets.worktrees",
             }
         ),
     ),

@@ -3,7 +3,7 @@ type: guide
 title: ワークツリーで作業する
 description: ワークツリーの作成、他セッションの変更への対応、統合先へのマージ方法
 tags: [git, worktree]
-keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マージ, マージリクエスト, fast-forward, 片付け, 他セッション, issue, MR, 既存のブランチ, ccnavi-branches.sh, ccnavi-start.sh, MCP]
+keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マージ, マージリクエスト, fast-forward, 片付け, 他セッション, issue, MR, 既存のブランチ, ccnavi-branches.sh, ccnavi-start.sh, MCP, ready, wip, ccnavi-clean.sh, 分類器, 自動モード]
 ---
 
 # ワークツリーで作業する
@@ -115,13 +115,38 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
 - `<統合先>`が保護されていて直接は取り込めないなら、マージはしない
 - `<統合先>`に直接取り込んだ場合は、取り込みが済んでから`ccnavi-git.sh worktree remove <パス>`と
   `ccnavi-git.sh branch -d <名前>`で片付ける
-- マージリクエストに出した場合は、マージを待たずに、`ready`でDraftを外した直後にワークツリーを片付ける。
-  順番は「`ready` → `ccnavi-clean.sh` → `worktree remove`」とする。`ready`はDraftを外す前に、閉じたチケットとその記録
+- マージリクエストに出した場合は、親を`finish`で閉じてpushし、親のワークツリーの外（ワークスペースルートなど）から
+  `ready --parent <親>`を打つ。ここ（`finish` → push → `ready`）までは、ユーザがレビュー済みにした時点で合意の範囲に入る。
+  pushとDraftを外す前に、ユーザへ確認を取り直さずに進める（分類器に止められたときだけ許可を頼む）。`ready`はDraftを外す前に、閉じたチケットとその記録
   （`.ccnavi/approved/`の`done/`・`phases/<親>/`・`events/`・`flows/`。マーカー`ready.json`も含む）をワークスペースの
-  `logs/archive/`へ移し、その削除をコミットしてpushする。`ready`が「置き場に未コミットの変更がある」と言って止まったときは、
-  その削除をコミットしてpushしてから`ready`を打ち直し、Draftが外れてから片付ける。
-  親に取り込んで閉じた子のワークツリーも、このときに片付ける
+  `logs/archive/`へ移し、`wip/`の追跡済みのファイルを消して、その削除をコミットしてpushする。`wip/`を自分で消す手順（`rm -r wip`）は要らない。
+  消したファイルと、戻せる版（消す前のHEAD）が出力に出る。`wip/`に未追跡のファイルがあると、履歴から戻せないので消さずに名指しして止まる。
+  要るものは別の場所へ移し、要らないものはユーザに確かめてから消して打ち直す。
+  `ready`が「置き場かwip/に未コミットの変更がある」と言って止まったときは、その削除をコミットしてpushしてから`ready`を打ち直す
+- ワークツリーはccnaviが片付ける。マージを待たない
+  - 方針は、閉じた子のワークツリーは完了でも取り消しでも消すこと。閉じた子の続きを進めるときは、新しいチケットで
+    新しいワークツリーを切る。残るのは、作業中（`doing/`）の子と、レビュー待ち（`review/`）の子（指摘を直す場所）の
+    ワークツリー。`decide`・`chat`・Chromeのレビュー済みで`done/`へ動いた子のワークツリーは、その場では消えず、
+    次にその親子で`finish`か`cancel`が打たれるまで残る
+  - 子のワークツリーは、`confirm`が子を`done/`へ動かしたあと（そのフェーズの子）と、`finish`・`cancel`のあと
+    （親でも子でも、その親子の閉じた子を全部。親の`finish`では取りこぼしを拾う安全網）に消える。
+    レビュー待ち（`review/`）の子のものは、指摘を直す場所として残す
+  - 親のワークツリーは、`ready`がDraftを外したあとの最後に消す。Draftを外す前と、外せなかったときは消さない
+  - 消し方は生成物の掃除（`ccnavi-clean.sh`と同じもの）のあと`worktree remove`（`--force`なし）で、ブランチは消さない
+  - cwdが消す対象の中にあると消さず、「cwdが中にあるので消さなかった」と、外に出てから打つ1本
+    （`sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-clean.sh --worktree <名前>`）が出る。`ready`を親のワークツリーの中から
+    `--parent`なしで打ったときはこの形になる。ExitWorktreeか`cd`でワークスペースルートに出てから、出た1本をそのまま打つ
+  - 未コミットの変更があるワークツリーは、何も消さずに名指しされる。別のセッションの作業かもしれないので、ユーザに確かめる
+  - gitが無視しているファイル（`.env`など）があるワークツリーも、何も消さずに名指しされる。`worktree remove`はそれごと消し、
+    履歴から戻せないため。残したいならワークツリーの外へ退避し、要らないならユーザに確かめて消してから打ち直す。
+    数えないのは、生成物（`ccnavi-clean.sh`が消すもの）と、ワークツリー直下の`scratchpad/`（下書きの置き場。
+    docs/claude/scratchpad.md）だけ。`scratchpad/`の中身はワークツリーごと消える
+- 片付けの1本（`ccnavi-clean.sh --worktree`）や`ccnavi-git.sh rm -r wip`がClaude Codeの自動モードの分類器に止められたら、迂回しない。
+  ユーザに許可を頼む。続けて許すなら、ユーザがホームの`~/.claude/settings.json`の`permissions.allow`に、操作ごとに絞った許可
+  （例 `Bash(sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-clean.sh --worktree *)`）を足す。分類器はプロジェクトの
+  `.claude/settings.json`を読まないので、そこに足しても効かない。`ccnavi-git.sh *`のような広い許可はpushまで分類器を通さなくなるので勧めない
 - マージリクエストに出したブランチは消さない。リモートのブランチは、マージのときにホストが消す。ローカルのブランチはsquashで取り込まれるため
   `branch -d`が通らず、ラッパースクリプトは`-D`を通さない。残ったローカルのブランチはユーザが消す
-- `worktree remove`の前に`ccnavi-clean.sh <名前>`でnode_modules・.venvなどの生成物を消す。Windowsで削除が
-  途中で止まるのを防ぐためである。未コミットの変更があるワークツリーでは、`ccnavi-clean.sh`は何も消さずに止まる
+- 自分で`worktree remove`を打つとき（`<統合先>`に直接取り込んだワークツリーなど）は、その前に`ccnavi-clean.sh <名前>`で
+  node_modules・.venvなどの生成物を消す。Windowsで削除が途中で止まるのを防ぐためである。未コミットの変更があるワークツリーでは、
+  `ccnavi-clean.sh`は何も消さずに止まる。`ccnavi-clean.sh --worktree <名前>`は掃除と`worktree remove`を1本で行う
