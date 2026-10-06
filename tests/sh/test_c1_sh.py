@@ -840,11 +840,23 @@ class TidyAfterFinishTest(C1Harness):
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         with open(log, encoding="utf-8") as f:
             called = f.read()
-        self.assertIn(f"worktree tidy {CHILD}", called)
+        # 子の識別子は親の識別子に直して頼む。この子はレビュー待ち（review/）へ動いたので、
+        # 指摘を直す場所としてワークツリーは残る（消すのは confirm が done/ へ動かした後）
+        self.assertIn(f"worktree tidy {PARENT}", called)
         self.assertIn("--cwd", called)
-        # 子の識別子には子が無いので、何も消さない
-        # （子のワークツリーは親の finish か confirm が消す）
         self.assertTrue(os.path.isdir(tree))
+
+    def test_cancel_drops_the_cancelled_childs_worktree(self):
+        """取り消した子は作業中でないので、送った後にそのワークツリーを消す（ブランチは残す）。"""
+        self.assertEqual(self.ticket("start", PARENT).returncode, 0)
+        tree = self.child_tree()
+        self.assertEqual(self.ticket("start", CHILD).returncode, 0)
+        result = self.ticket("cancel", CHILD, "--reason", "やめた")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        self.assertIn(f"ワークツリー {CHILD} を消した", result.stdout)
+        self.assertFalse(os.path.exists(tree))
+        self.assertEqual(git(self.ws, "branch", "--list", CHILD).stdout.strip(), CHILD)
 
 
 class PlacesAreNotReadTest(C1Harness):
@@ -1401,6 +1413,50 @@ class C1HostTest(C1HostHarness):
         self.carried(old)
         self.assertFalse(os.path.exists(os.path.join(self.tree, *old.split("/"))))
         self.assertEqual(git(self.tree, "ls-tree", "HEAD", "--", old).stdout, "")
+
+    def test_ready_from_outside_drops_the_parent_worktree_after_undrafting(self):
+        """`ready --parent <親>` を親のワークツリーの外（ワークスペースルート）から打つ。
+        中から打ったときと同じに Draft を外し、最後に親のワークツリーを消す（ブランチは残す）。"""
+        ready = self.sh(
+            "ccnavi-review.sh",
+            "ready",
+            "--parent",
+            PARENT,
+            cwd=self.ws,
+            PATH=self.path,
+            GITLAB_TOKEN="t0k",
+            CCNAVI_BIN_PATH=self.half,
+            HALF_TREE=self.tree,
+        )
+        self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
+        self.assertIn("Draft を外した", ready.stdout)
+        self.assertIn(f"ワークツリー {PARENT} を消した", ready.stdout)
+        self.assertLess(
+            ready.stdout.index("Draft を外した"),
+            ready.stdout.index(f"ワークツリー {PARENT} を消した"),
+        )
+        self.assertFalse(os.path.exists(self.tree))
+        self.assertEqual(git(self.ws, "branch", "--list", PARENT).stdout.strip(), PARENT)
+        # 送ったものはリモートに届いている（ready のマーカー）
+        shown = git(self.ws, "show", "--name-only", "--format=", f"{PARENT}").stdout
+        self.assertIn(f"{APPROVED}/phases/{PARENT}/ready.json", shown)
+
+    def test_ready_parent_refuses_what_is_not_a_parent_worktree(self):
+        for args in (("--parent",), ("--parent", "../x"), ("--parent", "i0009")):
+            with self.subTest(args=args):
+                refused = self.sh(
+                    "ccnavi-review.sh",
+                    "ready",
+                    *args,
+                    cwd=self.ws,
+                    PATH=self.path,
+                    GITLAB_TOKEN="t0k",
+                    CCNAVI_BIN_PATH=self.half,
+                    HALF_TREE=self.tree,
+                )
+                self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
+                self.assertNotIn("Draft を外した", refused.stdout)
+        self.assertTrue(os.path.isdir(self.tree))
 
     def test_ready_commits_the_wip_removals_and_names_them(self):
         """ready が消した wip/ の追跡済みのファイルは、C1 が退避と一緒にコミットして push する。

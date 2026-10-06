@@ -891,6 +891,9 @@ class PhaseTest(PhaseHarness):
         self.assertNotIn("rm -r wip", closed.stdout)
         self.assertIn("ready", closed.stdout)
         self.assertIn("`wip/` の追跡済みのファイルを消して", closed.stdout)
+        self.assertIn("ready --parent i0001", closed.stdout)
+        self.assertIn("合意の範囲に入る", closed.stdout)
+        self.assertIn("確認を取り直さずに進める", closed.stdout)
         self.assertIn("squash", closed.stdout)
         # 閉じた記録は進め方によらず置く（REQ-TKT-47）。
         record = read_json(os.path.join(self.approved, "phases", "i0001", "closed.json"))

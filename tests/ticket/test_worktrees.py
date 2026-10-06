@@ -8,7 +8,7 @@
    閉じたら、依頼し直しが要ると言う。`status` の次の一手も同じ
 2. 最後のレビューを `confirm` したら、親の finish から ready までの流れを言う
 3. `worktree tidy <親> --phase <N>` は done/ に動いた子のワークツリーを消し、ブランチは残す。
-   取り消しで閉じた子のワークツリーは残す
+   取り消しで閉じた子のワークツリーも消す（ワークツリーがあるのは作業中の子だけ）
 4. `worktree drop <名前>` は生成物を消してから `git worktree remove` する。cwd が中にある・
    未コミットの変更がある・git のワークツリーでないときは何も消さずに言う
 """
@@ -114,6 +114,10 @@ class ReviewTurnTest(PhaseHarness):
         self.assertIn("finish i0001", confirmed.stdout)
         self.assertIn("ready", confirmed.stdout)
         self.assertIn("`wip/` の追跡済みのファイル", confirmed.stdout)
+        self.assertIn("ready --parent i0001", confirmed.stdout)
+        # push と Draft 解除はレビュー済みの合意の範囲に入ると言い切る
+        self.assertIn("合意の範囲に入る", confirmed.stdout)
+        self.assertIn("確認を取り直さずに進める", confirmed.stdout)
         # confirm の後に sh が打つ片付け。done/ に動いた子のワークツリーを消し、ブランチは残す
         tidy = self.ccnavi("--cwd", self.root, "worktree", "tidy", "i0001", "--phase", "1")
         self.assertEqual(tidy.returncode, 0, tidy.stdout + tidy.stderr)
@@ -150,7 +154,7 @@ class TidyTest(PhaseHarness):
     def tidy(self, cwd=None):
         return self.ccnavi("--cwd", cwd or self.root, "worktree", "tidy", "i0001")
 
-    def test_cancelled_children_keep_their_worktrees(self):
+    def test_cancelled_children_lose_their_worktrees_too(self):
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["src/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
@@ -159,8 +163,18 @@ class TidyTest(PhaseHarness):
         self.assertEqual(cancelled.returncode, 0, cancelled.stderr)
         tidy = self.tidy()
         self.assertEqual(tidy.returncode, 0, tidy.stdout + tidy.stderr)
-        self.assertIn("ワークツリー i0001-01-01 は残す", tidy.stdout)
-        self.assertIn("ccnavi-clean.sh --worktree i0001-01-01", tidy.stdout)
+        self.assertIn("ワークツリー i0001-01-01 を消した", tidy.stdout)
+        self.assertFalse(os.path.exists(tree))
+        self.assertEqual(git(self.root, "branch", "--list", "i0001-01-01").strip(), "i0001-01-01")
+
+    def test_doing_children_keep_their_worktrees(self):
+        # ワークツリーがあるのは作業中の子だけ。作業中の子のものは消さない
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["src/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        tree = self.run_child("i0001-01-01")
+        tidy = self.tidy()
+        self.assertEqual((tidy.returncode, tidy.stdout), (0, ""))
         self.assertTrue(os.path.isdir(tree))
 
     def test_a_closed_child_with_uncommitted_changes_is_named_and_kept(self):
