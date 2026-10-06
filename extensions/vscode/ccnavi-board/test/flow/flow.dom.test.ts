@@ -52,10 +52,10 @@ test("CB-D107 図はノードと線を描き、問いには「メインに戻る
       Array.from(ask.querySelectorAll(".flow-port")).map((port) => port.getAttribute("data-port")),
       ["branch-0", "branch-1"],
     );
-    // 部品箱は 8 種類
+    // 部品箱は 9 種類
     assert.deepEqual(
       dom.all('[data-action="add-node"]').map((button) => button.getAttribute("data-type")),
-      ["start", "end", "prompt", "subAgent", "askUserQuestion", "ifElse", "switch", "skill"],
+      ["start", "end", "prompt", "subAgent", "askUserQuestion", "ifElse", "switch", "loop", "skill"],
     );
     // 読んだまま（在るファイル）なら保存は押せない
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled);

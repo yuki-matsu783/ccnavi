@@ -61,7 +61,7 @@
 .flow-node[data-type="prompt"], .flow-node[data-type="skill"] { border-left-color: var(--vscode-charts-blue, var(--vscode-focusBorder)); }
 .flow-node[data-type="subAgent"] { border-left-color: var(--vscode-charts-purple, var(--vscode-focusBorder)); }
 .flow-node[data-type="askUserQuestion"] { border-left-color: var(--vscode-editorWarning-foreground); }
-.flow-node[data-type="ifElse"], .flow-node[data-type="switch"] { border-left-color: var(--vscode-charts-orange, var(--vscode-editorWarning-foreground)); }
+.flow-node[data-type="ifElse"], .flow-node[data-type="switch"], .flow-node[data-type="loop"] { border-left-color: var(--vscode-charts-orange, var(--vscode-editorWarning-foreground)); }
 .flow-node[data-type="other"] { border-left-style: dashed; opacity: .85; }
 .flow-node-type { font-size: .8em; color: var(--vscode-descriptionForeground); }
 .flow-node-name { font-weight: 600; overflow-wrap: anywhere; }

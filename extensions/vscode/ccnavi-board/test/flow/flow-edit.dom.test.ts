@@ -515,3 +515,38 @@ test("CB-D136 順序だけ変わって未保存のときも保存前の一覧を
     await dom.close();
   }
 });
+
+test("CB-D154 繰り返しを足すと出口が 2 つ並び、右の欄で名前・条件・上限を直せる。出口の増減と名前の編集はできず、上限は数のまま保存する", async () => {
+  const dom = await openFlow({ doc: three() });
+  try {
+    dom.click(dom.one('[data-action="add-node"][data-type="loop"]'));
+    await dom.settle();
+    const node = dom.one('.react-flow__node[data-id="loop-1"]');
+    assert.deepEqual(
+      Array.from(node.querySelectorAll(".flow-port")).map((port) => [port.getAttribute("data-port"), port.textContent]),
+      [["branch-0", "繰り返す"], ["branch-1", "抜ける"]],
+    );
+    assert.equal(node.querySelector(".flow-badge"), null);
+    assert.equal(dom.one<HTMLInputElement>("#inspector input.f-maxIterations").value, "3");
+    assert.equal(dom.one<HTMLInputElement>("#inspector input.f-maxIterations").getAttribute("min"), "1");
+    assert.equal(dom.all('#inspector [data-action="add-branch"]').length, 0);
+    assert.equal(dom.all('#inspector [data-action="remove-branch"]').length, 0);
+    assert.ok(dom.all<HTMLInputElement>("#inspector input.f-branch-label").every((input) => input.disabled));
+    dom.type(dom.one<HTMLInputElement>("#inspector input.f-name"), "直す");
+    dom.type(dom.one<HTMLInputElement>("#inspector input.f-condition"), "テストが落ちる");
+    dom.type(dom.one<HTMLInputElement>("#inspector input.f-maxIterations"), "5");
+    await dom.settle();
+    dom.click(button(dom, "save"));
+    await dom.settle();
+    const saved = savedDoc(dom).nodes.find((n) => n.id === "loop-1");
+    assert.equal(saved?.name, "直す");
+    assert.deepEqual(saved?.data, {
+      label: "",
+      condition: "テストが落ちる",
+      maxIterations: 5,
+      branches: [{ id: "body", label: "繰り返す" }, { id: "done", label: "抜ける" }],
+    });
+  } finally {
+    await dom.close();
+  }
+});
