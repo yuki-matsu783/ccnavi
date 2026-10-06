@@ -75,8 +75,10 @@ class DefinitionTest(unittest.TestCase):
 
     def test_scope_globs_are_validated(self):
         cases = {
-            "include が文字列": "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 1, include: x}\n",
-            "exclude に空": "version: 1\nfactors:\n  - {id: a, points: 1, files_over: 1, exclude: ['']}\n",
+            "include が文字列": "version: 1\nfactors:\n"
+            "  - {id: a, points: 1, lines_over: 1, include: x}\n",
+            "exclude に空": "version: 1\nfactors:\n"
+            "  - {id: a, points: 1, files_over: 1, exclude: ['']}\n",
             "glob 項目には書けない": "version: 1\nfactors:\n"
             "  - {id: a, points: 1, glob: x, include: [y]}\n",
         }
@@ -92,7 +94,8 @@ class DefinitionTest(unittest.TestCase):
             "  - {id: all, points: 1, lines_over: 0}\n"
             "  - {id: inc, points: 2, files_over: 0, include: ['src/**']}\n"
             "  - {id: exc, points: 4, lines_over: 3, exclude: ['*.lock', 'docs/**']}\n"
-            "  - {id: both, points: 8, deleted_over: 0, include: ['src/**'], exclude: ['src/gen/**']}\n"
+            "  - {id: both, points: 8, deleted_over: 0,\n"
+            "     include: ['src/**'], exclude: ['src/gen/**']}\n"
         )
         definition, problems = risk.parse(text)
         self.assertEqual([], problems)

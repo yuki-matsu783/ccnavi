@@ -39,9 +39,10 @@
       - {id: complexity, points: 30, script: .ccnavi/common/scripts/complexity.sh, message: 複雑度}
       - {id: untested,   points: 30, judge: テストの無い振る舞いの変更を含むか, message: テスト無し}
 
-`lines_over` / `files_over` / `deleted_over` には、数えるパスを `include` / `exclude`（glob のリスト）で絞れる。
-どちらも既定は無指定で、無指定なら差分全体を数える。`include` があれば当たったパスだけ、
-`exclude` に当たったパスは `include` に当たっていても数えない。`exclude` だけなら、それ以外は全部数える。
+`lines_over` / `files_over` / `deleted_over` には、数えるパスを
+`include` / `exclude`（glob のリスト）で絞れる。どちらも既定は無指定で、無指定なら差分全体を数える。
+`include` があれば当たったパスだけ、`exclude` に当たったパスは `include` に当たっていても
+数えない。`exclude` だけなら、それ以外は全部数える。
 バイナリの変更は行数 0 として数える（ファイル数と削除数には入る）。
 
 ファイルが無ければ組み込みの既定（上の定量 4 項目と同じ値）。壊れていれば組み込みに戻り、
@@ -395,7 +396,8 @@ def _factors(
                     Problem(
                         SEVERITY_ERROR,
                         ident,
-                        f"`{stray[0]}` は {KIND_LINES} / {KIND_FILES} / {KIND_DELETED} の項目にだけ書ける",
+                        f"`{stray[0]}` は {KIND_LINES} / {KIND_FILES} / {KIND_DELETED} "
+                        "の項目にだけ書ける",
                     )
                 )
                 continue
@@ -468,7 +470,8 @@ def _factors(
 
 
 def _globs(raw: object) -> tuple[tuple[tuple[str, ...], tuple[re.Pattern, ...]], str]:
-    """`include` / `exclude` の glob のリストを式にする。書かれていなければ空。理由は空文字なら正常。"""
+    """`include` / `exclude` の glob のリストを式にする。書かれていなければ空。
+    戻りの 2 つ目は error の理由で、空文字なら正常。"""
     empty: tuple[tuple[str, ...], tuple[re.Pattern, ...]] = ((), ())
     if raw is None:
         return empty, ""
@@ -822,9 +825,8 @@ def evaluate(
                 score.hits.append(Hit(f.id, f.points, detail, where))
         elif f.kind == KIND_FILES:
             if counted.files > int(f.value):
-                score.hits.append(
-                    Hit(f.id, f.points, f"{f.message}（{counted.files} ファイル > {f.value}）", where)
-                )
+                detail = f"{f.message}（{counted.files} ファイル > {f.value}）"
+                score.hits.append(Hit(f.id, f.points, detail, where))
         elif f.kind == KIND_DELETED:
             if counted.deleted_files > int(f.value):
                 score.hits.append(
