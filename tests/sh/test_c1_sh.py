@@ -812,6 +812,41 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.dirty(), "")
 
 
+class TidyAfterFinishTest(C1Harness):
+    """finish が通ったら、sh が実行ファイルに `worktree tidy <識別子>` を頼む。
+
+    C1 なら送った後に頼む。
+    """
+
+    def test_finish_asks_the_exe_to_tidy_after_sending(self):
+        log = os.path.join(self._tmp.name, "tidy.log")
+        logger = executable(
+            os.path.join(self._tmp.name, "bin", "logger"),
+            "#!/bin/sh\n"
+            'case " $* " in\n'
+            f"*\" worktree tidy \"*) printf '%s\\n' \"$*\" >>'{log}' ;;\n"
+            "esac\n"
+            f"exec '{self.bin}' \"$@\"\n",
+        )
+        self.assertEqual(self.ticket("start", PARENT, CCNAVI_BIN_PATH=logger).returncode, 0)
+        self.assertFalse(os.path.exists(log))
+        tree = self.child_tree()
+        self.assertEqual(self.ticket("start", CHILD, CCNAVI_BIN_PATH=logger).returncode, 0)
+        write(os.path.join(tree, "wip", "design", "a.md"), "a\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "-q", "-m", "work")
+        result = self.ticket("finish", CHILD, CCNAVI_BIN_PATH=logger)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        with open(log, encoding="utf-8") as f:
+            called = f.read()
+        self.assertIn(f"worktree tidy {CHILD}", called)
+        self.assertIn("--cwd", called)
+        # 子の識別子には子が無いので、何も消さない
+        # （子のワークツリーは親の finish か confirm が消す）
+        self.assertTrue(os.path.isdir(tree))
+
+
 class PlacesAreNotReadTest(C1Harness):
     """控えの置き場を動かす環境変数は読まない（置き場は固定。A9）。
 
@@ -1310,12 +1345,33 @@ class C1HostTest(C1HostHarness):
         # 指摘はユーザが crit push で行のスレッドとして送る
         self.assertIn(f"`crit review {ELI5}`", Host.notes[0]["body"])
         self.assertIn("`crit push 1`", Host.notes[0]["body"])
-        confirmed = self.review("confirm", "--phase", "1")
+        log = os.path.join(self._tmp.name, "tidy.log")
+        logger = executable(
+            os.path.join(self._tmp.name, "bin", "logger"),
+            "#!/bin/sh\n"
+            'case " $* " in\n'
+            f"*\" worktree \"*) printf '%s\\n' \"$*\" >>'{log}' ;;\n"
+            "esac\n"
+            f"exec '{self.half}' \"$@\"\n",
+        )
+        confirmed = self.review("confirm", "--phase", "1", CCNAVI_BIN_PATH=logger)
         self.assertEqual(confirmed.returncode, 0, confirmed.stdout + confirmed.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/1.reviewed")
-        ready = self.review("ready")
+        # done/ へ動いた子のワークツリーの片付けを、送った後に実行ファイルへ頼む
+        with open(log, encoding="utf-8") as f:
+            self.assertIn(f"worktree tidy {PARENT} --phase 1", f.read())
+        ready = self.review("ready", CCNAVI_BIN_PATH=logger)
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/ready.json")
+        # 最後に親のワークツリーを消そうとするが、cwd が中にあるので消さず、外から打つ 1 本を出す
+        with open(log, encoding="utf-8") as f:
+            self.assertIn(f"worktree drop {PARENT}", f.read())
+        self.assertIn(f"cwd がワークツリー {PARENT} の中にあるので消さなかった", ready.stdout)
+        self.assertIn(f"ccnavi-clean.sh --worktree {PARENT}", ready.stdout)
+        self.assertLess(
+            ready.stdout.index("Draft を外した"), ready.stdout.index("cwd がワークツリー")
+        )
+        self.assertTrue(os.path.isdir(self.tree))
 
     def test_ready_commits_and_pushes_the_archive_removals_before_undrafting(self):
         """ready の退避（閉じたチケットの削除）は、C1 がコミットして push してから Draft を外す。"""
@@ -1345,6 +1401,39 @@ class C1HostTest(C1HostHarness):
         self.carried(old)
         self.assertFalse(os.path.exists(os.path.join(self.tree, *old.split("/"))))
         self.assertEqual(git(self.tree, "ls-tree", "HEAD", "--", old).stdout, "")
+
+    def test_ready_commits_the_wip_removals_and_names_them(self):
+        """ready が消した wip/ の追跡済みのファイルは、C1 が退避と一緒にコミットして push する。
+        消したものと、戻せる版（消す前の HEAD）を出す。"""
+        self.eli5()
+        head = self.sha(self.tree, "HEAD")
+        mover = executable(
+            os.path.join(self._tmp.name, "bin", "mover"),
+            "#!/bin/sh\n"
+            'case " $* " in\n'
+            '*" review ready "*)\n'
+            '  prev=""; for a in "$@"; do\n'
+            '    [ "$prev" = --record-writes ] && list="$a"\n'
+            '    [ "$prev" = --record-tree ] && tree="$a"\n'
+            '    [ "$prev" = --root ] && root="$a"\n'
+            '    prev="$a"; done\n'
+            f'  rm "$tree/{ELI5}"\n'
+            f"  printf '{ELI5}\\n' >\"$list\"\n"
+            '  mkdir -p "$root/logs/state"; : >"$root/logs/state/note.md"\n'
+            "  printf '%s\\n' \"$root/logs/state/note.md\"\n"
+            "  printf 'tree %s\\n' \"$tree\"\n"
+            f"  printf 'wip-from {head}\\nwip {ELI5}\\n'\n"
+            "  exit 0 ;;\n"
+            "esac\n"
+            f"exec '{self.half}' \"$@\"\n",
+        )
+        ready = self.review("ready", CCNAVI_BIN_PATH=mover)
+        self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
+        self.assertIn("wip/ の追跡済みのファイルを消した（1 件", ready.stdout)
+        self.assertIn(head[:12], ready.stdout)
+        self.assertIn(f"  {ELI5}", ready.stdout)
+        self.carried(ELI5)
+        self.assertEqual(git(self.tree, "ls-tree", "HEAD", "--", ELI5).stdout, "")
 
     def test_the_real_ready_moves_the_rest_again_after_a_failed_push(self):
         """本物の実行ファイルの ready（退避を始めた後の打ち直し）を C1 の中で通す。
@@ -1695,6 +1784,17 @@ class C1HostNotImportedTest(C1HostHarness):
         ready = self.review("ready", CCNAVI_BIN_PATH=self.mover(f"printf 'tree %s\\n' '{other}'"))
         self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.assertIn("未コミットの変更がある", ready.stderr)
+        self.assertNotIn("Draft を外した", ready.stdout)
+
+    def test_ready_stops_when_wip_removals_are_not_sent(self):
+        # ready が消した wip/ の追跡済みのファイル（未コミット）。送るまで Draft を外さない。
+        self.eli5()
+        os.remove(os.path.join(self.tree, *ELI5.split("/")))
+        ready = self.review(
+            "ready", CCNAVI_BIN_PATH=self.mover(f"printf 'tree %s\\n' '{self.tree}'")
+        )
+        self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
+        self.assertIn("wip/ に未コミットの変更がある", ready.stderr)
         self.assertNotIn("Draft を外した", ready.stdout)
 
     def test_ready_goes_on_when_the_archived_tree_is_clean(self):

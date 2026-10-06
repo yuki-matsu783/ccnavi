@@ -879,33 +879,68 @@ class PhaseTest(PhaseHarness):
         self.start_parent()
         self.propose("i0001", parent_text("i0001", ["design"], feedback=[]))
         self.assertEqual(self.approve().returncode, 0)
-        # 閉じられる状態になったが、wip/ が追跡されたままなら外せない。
+        # 閉じられる状態になった。wip/ が追跡されていても、それは ready が消すので止めない。
         refused = self.ready(fixture)
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("`wip/` に追跡されているファイル", refused.stderr)
-        self.assertIn("rm -r wip", refused.stderr)
-        # 親を閉じる。案内は「片付けて push して ready」。
+        self.assertNotIn("`wip/` に追跡されているファイル", refused.stderr)
+        tracked = git(self.parent_tree, "ls-files", "--", "wip").split()
+        self.assertTrue(tracked)
+        # 親を閉じる。案内は「push して ready」。wip/ を消す手順（rm -r wip）は案内しない。
         closed = self.ccnavi("ticket", "finish", "i0001")
         self.assertEqual(closed.returncode, 0, closed.stderr)
-        self.assertIn("rm -r wip", closed.stdout)
+        self.assertNotIn("rm -r wip", closed.stdout)
+        self.assertIn("ready", closed.stdout)
+        self.assertIn("`wip/` の追跡済みのファイルを消して", closed.stdout)
         self.assertIn("squash", closed.stdout)
         # 閉じた記録は進め方によらず置く（REQ-TKT-47）。
         record = read_json(os.path.join(self.approved, "phases", "i0001", "closed.json"))
         self.assertEqual(record["reviews"], {"1": "mr"})
         self.commit_parent("状態の移動")
-        git(self.parent_tree, "rm", "-r", "-q", "wip")
-        git(self.parent_tree, "commit", "--quiet", "-m", "chore: wip を片付ける")
         # push していなければまだ外せない。
         refused = self.ready(fixture)
         self.assertIn("push されていない", refused.stderr)
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        # 片付いて push 済み。ready が通り、マーカーと note の下書きができる。
-        passed = self.ready(fixture)
+        # wip/ に未追跡のファイルがあれば、消さずに名指しして止める（履歴から戻せないため）。
+        write(os.path.join(self.parent_tree, "wip", "memo.txt"), "メモ\n")
+        refused = self.ready(fixture)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("未追跡のファイルが 1 件", refused.stderr)
+        self.assertIn("wip/memo.txt", refused.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.parent_tree, "wip", "memo.txt")))
+        os.remove(os.path.join(self.parent_tree, "wip", "memo.txt"))
+        # push 済み。ready が通り、マーカーと note の下書きができる。
+        # wip/ の追跡済みのファイルは消える。
+        head = git(self.parent_tree, "rev-parse", "HEAD").strip()
+        # C1 と同じく書いたパスを集めて打つ。wip/ の削除は C1 がコミットしてよいもの
+        # （置き場の外でも止めない）
+        listed = os.path.join(self.root, "logs", "state", "c1", "ready.writes")
+        passed = self.ccnavi(
+            "--record-writes",
+            listed,
+            "--record-tree",
+            self.parent_tree,
+            "--cwd",
+            self.parent_tree,
+            "review",
+            "ready",
+            "--result",
+            fixture,
+        )
         self.assertEqual(passed.returncode, 0, passed.stderr)
-        with open(passed.stdout.splitlines()[0], encoding="utf-8") as f:
+        with open(listed, encoding="utf-8") as f:
+            written = f.read().splitlines()
+        for rel in tracked:
+            self.assertIn(rel, written)
+        lines = passed.stdout.splitlines()
+        with open(lines[0], encoding="utf-8") as f:
             note = f.read()
         self.assertIn("ccnavi:ready", note)
         self.assertIn("squash", note)
+        self.assertIn(f"wip-from {head}", lines)
+        self.assertEqual(sorted(x[len("wip ") :] for x in lines if x.startswith("wip ")), tracked)
+        for rel in tracked:
+            self.assertFalse(os.path.exists(os.path.join(self.parent_tree, *rel.split("/"))))
+        self.assertFalse(os.path.exists(os.path.join(self.parent_tree, "wip")))
         # マーカーは閉じたチケットと一緒に手元の退避（logs/archive/）へ移る
         archived = os.path.join(self.root, "logs", "archive", "self")
         mark = read_json(os.path.join(archived, "phases", "i0001", "ready.json"))
@@ -983,11 +1018,10 @@ class PhaseTest(PhaseHarness):
             os.path.exists(os.path.join(self.approved, "phases", "i0001", "ready.json"))
         )
         self.commit_parent("状態の移動")
-        git(self.parent_tree, "rm", "-r", "-q", "wip")
-        git(self.parent_tree, "commit", "--quiet", "-m", "chore: wip を片付ける")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         passed = self.ready(fixture)
         self.assertEqual(passed.returncode, 0, passed.stderr)
+        self.assertIn("wip wip/research/summary.md", passed.stdout.splitlines())
 
     def test_close_early_is_a_human_path(self):
         """close-early は端末を求める。サブエージェントと直接の exe 呼び出しは止まる。"""

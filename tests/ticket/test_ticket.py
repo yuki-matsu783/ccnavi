@@ -1619,16 +1619,26 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(shown.returncode, 0, shown.stderr)
         keys = [t["key"] for t in json.loads(shown.stdout)["threads"]]
         self.assertEqual(keys, ["https://example/mr/7#discussion_crit-1"])
-        # ready の前提: wip/ が追跡されている間は落ち、消してコミットして push すると外れる
+        # ready の前提: wip/ の追跡済みのファイルは ready が消すので止めない。未追跡のものは
+        # 戻せないので名指しして止める
         conf, _ = settings.load(self.root)
         problems = review._merge_problems(self.parent_tree, conf, self.root)
-        self.assertTrue(any("`wip/` に追跡されているファイル" in p for p in problems), problems)
-        git(self.parent_tree, "rm", "-r", "-q", "wip")
-        git(self.parent_tree, "commit", "--quiet", "-m", "chore: wip を片付ける")
-        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        problems = review._merge_problems(self.parent_tree, conf, self.root)
         self.assertFalse(any("wip/" in p for p in problems), problems)
-        self.assertEqual(git(self.parent_tree, "ls-files", "--", "wip").strip(), "")
+        self.assertIn(eli5, review.wip_tracked(self.parent_tree))
+        draft = os.path.join(self.parent_tree, "wip", "eli5", "draft.html")
+        write(draft, "<p>下書き</p>\n")
+        problems = review._merge_problems(self.parent_tree, conf, self.root)
+        self.assertTrue(any("未追跡のファイルが 1 件" in p for p in problems), problems)
+        self.assertTrue(any("wip/eli5/draft.html" in p for p in problems), problems)
+        os.remove(draft)
+        # ready の片付けは追跡済みのものだけを消し、消す前の HEAD を返す（履歴から戻せる）
+        head = git(self.parent_tree, "rev-parse", "HEAD").strip()
+        removed, before, failed = review.remove_wip(self.parent_tree)
+        self.assertEqual(failed, "")
+        self.assertEqual(before, head)
+        self.assertIn(eli5, removed)
+        self.assertFalse(os.path.exists(os.path.join(self.parent_tree, *eli5.split("/"))))
+        self.assertEqual(git(self.parent_tree, "show", f"{head}:{eli5}").count("やさしい説明"), 1)
 
     def test_an_eli5_only_commit_does_not_move_the_request(self):
         """依頼の後に `wip/eli5/` の下だけを変えたコミットは、HEAD が動いたと数えない。
@@ -1684,7 +1694,7 @@ class TicketTest(unittest.TestCase):
 
     @unittest.skipIf(os.name == "nt", "大文字違いの並存と名前の \\ は Windows では作れない")
     def test_ready_catches_wip_in_any_case_and_a_backslashed_name(self):
-        """ready の前提は `WIP/eli5/…` と `wip\\eli5\\…`（名前に `\\` を含む 1 ファイル）も止める。
+        """ready は `WIP/eli5/…` と `wip\\eli5\\…`（名前に `\\` を含む 1 ファイル）も片付ける。
 
         大文字小文字を区別しない FS では範囲の除外が `WIP/eli5/` を通しうるので、ready の側で
         区別せずに拾う。
@@ -1705,11 +1715,11 @@ class TicketTest(unittest.TestCase):
                 git(self.parent_tree, "add", "--", rel)
                 git(self.parent_tree, "commit", "--quiet", "-m", f"add {rel}")
                 git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-                problems = review._merge_problems(self.parent_tree, conf, self.root)
-                self.assertTrue(
-                    any("`wip/` に追跡されているファイルが 1 件" in p for p in problems), problems
-                )
-                git(self.parent_tree, "rm", "-q", "--", rel)
+                self.assertEqual(review.wip_tracked(self.parent_tree), [rel])
+                removed, _, failed = review.remove_wip(self.parent_tree)
+                self.assertEqual((removed, failed), ([rel], ""))
+                self.assertFalse(os.path.lexists(os.path.join(self.parent_tree, *rel.split("/"))))
+                git(self.parent_tree, "add", "-A")
                 git(self.parent_tree, "commit", "--quiet", "-m", f"rm {rel}")
                 git(self.parent_tree, "push", "--quiet", "origin", "i0001")
 
