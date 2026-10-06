@@ -41,7 +41,7 @@ keywords: [フェーズ定義, plan, after, 先行, 待ち方, workflow.yml 廃�
 
 ### 変えないもの
 
-- 承認はチケットの中身を変えない（承認は提案をバイト単位でそのまま動かす）。待ち方のファイルが無くなるので、承認で書くものは提案の移動だけになる
+- 承認はチケットの中身を変えない。新規の承認は提案をバイト単位でそのまま動かすだけで、待ち方のファイルが無くなるので書き足すものも無い。改版は今までどおり承認済みチケットを書き直し、差し替えるのは計画（`plan:` / `feedback:`）と `phases:`
 - 判定が読む待ち方の型（`ticket_model.Workflow` の `waits` / `review_at`）。読む側（`Ticket.review_at`・`covered_by`、`phase.py`、受け入れの適用範囲、`review.py`）は読み方を変えず、一直線の枝とフィードバック計画の別扱いだけを外す。`waits` は今と同じく推移的に辿った全部の先行を並べる
 - `allow:`。親の `allow` / `ask` / `deny`、子の範囲、`scope: inherit`（親の `allow` そのもの）は今のまま。子の範囲は「子 ⊆ 定義の `scope` ⊆ 親の `allow`」で、定義の `scope` が親に固定したもの（5b）になるだけ
 - レビュー準備中・レビュー待ちで止める単位は親ごと。受け入れは受け入れたフェーズとその子孫にだけ効く
@@ -82,7 +82,7 @@ feedback:
 - 番号は既にフェーズの名前になっている（子の `phase:`、マーカー、`--explain` の「待つ: 1, 2」）。同じ定義を 2 回置いても番号なら必ず 1 つに決まる。新しい名前の空間を作らない
 - 「小さい番号だけ」にすると、今のコードの前提（待つのは前の番号、終端は最後の番号、延期の引き受け手は後ろの番号、順序の検査は前のフェーズを順に見る）がそのまま保てる。並びを変えたいときは番号の振り直しで吸収する
 - 改版で項を足せるのは子が承認されていない番号だけなので、番号が詰め直されて先行がずれるのは、まだ始まっていない項の中だけになる
-- エージェントは `--explain` の「待つ: …」をそのまま `after` に写せる（推移的に並べた先行を書いても、意味は同じ）
+- エージェントは `--explain` の「待つ: …」をそのまま `after` に写せる（推移的に並べた先行を書いても、意味は同じ。改版の比べ方も推移的な待ちで比べるので、写しても違いにならない）
 
 ### 代案
 
@@ -179,15 +179,20 @@ feedback:
 
 ### 改版
 
-- 改版になるのは、提案の `plan` / `feedback`（`after` を含む）が承認済みチケットと違うときだけ。待ち方は計画から決まるので、待ち方だけの改版は無い。`approval.plan_differs` は `PlanItem.__eq__` で比べるので、`__eq__` に `after` を入れる（入れないと、`after` だけを直した改版が見つからない）
+- 改版になるのは、提案の計画か `phases:` が承認済みチケットと違うとき。待ち方は計画から決まるので、待ち方だけの改版は無い
+  - 計画が違うかは、項ごとの「定義・`review`・推移的に辿った待ち（`compute` の `waits`）」の並びで比べる（`approval.plan_differs` をこの形に替える）。`PlanItem.__eq__` は使わず、`after` も入れない。`after: [2]` と、`--explain` の「待つ: 1, 2」を写した `after: [1, 2]` は同じ待ちなので、違いにしない
+  - `phases:` が違うかは、定義を読んだ形で比べる。計画が同じで `phases:` だけが違う提案も改版の候補にする（`--fill-phases` で今の `phases.yml` に揃えた提案を出せるように。固定した番号が使う定義は変えられない規則のまま）
 - **錠は番号ごとにする（決定済み）。** 子が承認された（開いていても閉じていても）番号の集合を「固定した番号」とし、その番号の項は定義・`review`・番号を変えられない。今の「子が承認されたいちばん後ろの番号までの前置を丸ごと固定する」（`agree_candidates.revision_problems` の `plan[:frozen]` と、延期の検査の `n <= frozen`）を置き換える
-- 固定した番号の待ちは、**推移的に辿った待ち**（`compute` の `waits`）で比べる。承認済みチケットの計画から計算した `waits[n]` と、提案から計算した `waits[n]` が同じでなければ error。直接の先行で比べないのは、エージェントが「待つ: …」（推移的に並べたもの）を写しても、直接の先行だけを書いても、同じ意味なら通すため。この比較は `__eq__` を使わない（`__eq__` は `after` の書き方の違いでも偽になる）
-- 延期の引き受け手を変えさせない検査も、固定した番号の集合で見る。延期した番号か、その引き受け手が固定した番号に入るものは、承認済みと提案で `review_at` が同じでなければ error
+- 固定した番号の待ちは、**推移的に辿った待ち**（`compute` の `waits`）で比べる。承認済みチケットの計画から計算した `waits[n]` と、提案から計算した `waits[n]` が同じでなければ error。直接の先行で比べないのは、エージェントが「待つ: …」（推移的に並べたもの）を写しても、直接の先行だけを書いても、同じ意味なら通すため。この比較も `__eq__` は使わない
+- 延期の引き受け手を変えさせない検査は、**引き受け手が固定した番号かどうか**で見る。承認済みの引き受け手か、提案の引き受け手のどちらかが固定した番号なら、両方が同じ固定した番号でなければ error（固定した番号は振り直しで動かないので、番号で比べてよい）。両方が固定していない番号なら、番号が変わっても通す。まだ始まっていない項の間で引き受け手が入れ替わるだけで、済んだレビューが延期した作業を引き受けたことにはならないため
+  - 例: 承認済みの a(1, 延期, 子あり)・x(2, 先行なし)・b(3, `after: [1, 2]`) の引き受け手は b(3)。タブで x→b を消して b→x を引くと b が 2 番、x が 3 番になり、引き受け手は 3 番から 2 番に変わるが、どちらも b で固定していない番号なので通る。番号だけで比べると、ここで落ちていた
+- `--plan-order <親> --json --order` も改版の錠（固定した番号の定義・`review`・待ち・引き受け手）を当て、落ちる形は保存の前に「改版で通らない」と返す。タブは保存させない
 - `--agree` を通った親では、固定した番号の先行は固定した番号だけになる（子が承認されたフェーズは、待つフェーズが済んでから承認されている）。なので振り直しは固定した番号を動かさずに、空いた番号へ承認されていない項を詰められる。詰められないとき（空いた番号を埋める項が無い）は、`--plan-order <親> --json --order` がその線を「詰められない」と返し、タブは線を引く前の形に戻す（判定は実行ファイル。6）
 - **固定した番号の先行がすべて固定した番号であることを確かめる。** 子を手で動かして承認した親では、固定した番号が固定していない番号を待つことがある（固定した 3 の待ちが [1, 2] で、2 に子が無い）。このとき番号だけで待ちを比べると、2 番の項を別の定義に入れ替える改版が通ってしまう。固定していない先行を持つ固定した番号は、先行を番号ではなく項の同一性（その番号の定義と `review`）でも比べ、違えば error
-- **フィードバック計画があれば（`feedback:` が None でなければ）、全体計画を変える改版は止める。** フィードバック計画の番号は全体計画の続きなので、全体計画に項を足すとフィードバック計画の番号と `after` がずれる。フィードバック計画は全体計画の最後のレビューが済んでから立てるので、そのあとに全体計画を変える場面は無い
+- **フィードバック計画があれば（`feedback:` が None でなければ）、全体計画を変える改版は止める。**「全体計画を変えたか」も上の並び（定義・`review`・推移的な待ち）で比べる。`after` の書き方の違いだけでは止めない。 フィードバック計画の番号は全体計画の続きなので、全体計画に項を足すとフィードバック計画の番号と `after` がずれる。フィードバック計画は全体計画の最後のレビューが済んでから立てるので、そのあとに全体計画を変える場面は無い
 - 改版の画面の差分は、承認済みチケットの計画から計算した待ち方と、提案から計算した待ち方を比べて出す
-- 改版の図の初期値は提案の `after`。エージェントは改版を書くとき、今の待ち方（`--explain` の「待つ」）を写す
+- 改版の図の初期値は提案の `after`。エージェントは改版を書くとき、今の待ち方（`--explain` の「待つ」）を写してよい（推移的に並べても違いにならない）
+- **改版の書き込み（`agree_digest.revised_front`）は、計画に加えて `phases:` も提案の値に差し替える。** 今は承認済みチケットの frontmatter を写して `plan` と `feedback` だけを差し替えるので、そのままだと改版の `phases:` が捨てられる。フィードバック計画の立案は必ず改版なので、承認したとたん「項が `phases:` に無い定義名を使う」で親と子が全部止まる。`revision_problems` の「変えてよい欄」に `phases:` を足し、5b の規則で検査する。ダイジェストに入れる書く中身（`agree_digest.carried`）と、承認画面の「`phases:` の差分」は、`revised_front` が実際に書くものから組む
 
 例。承認済みの計画が a(1)・b(2)・c(3)・d(4) で、b と c は a だけを待ち、d は b と c を待つ（d が終端）。1 と 3 に子があり、2 と 4 には無い（c は a だけを待つので、b が始まる前に承認できる）。改版で e(5) を足す（e は a を待つ）。
 
@@ -216,7 +221,7 @@ feedback:
 **親の `phases:` も同じく信じる（決定済み）。** 手で動かした承認では `--agree` の検査（`phases:` が `phases.yml` と同じか）が働かないので、エージェントが書いた `phases:` がそのまま効く。判定の側で `phases:` と `phases.yml` を合わせる処理は入れない（判定は `phases.yml` を読まない）。`--lint` は食い違いを warn で言う。
 
 - 信じてよい理由: 承認を本物とするのは置き場で、承認済みの置き場へ動かすのはユーザだけ（エージェントの書き込みは組み込みの止めとルールが止める）。ユーザが自分で動かした＝中身を承認した、と読む。`after` を信じるのと同じ向き
-- 前の版で、手で書いた `workflow:` 欄を承認済みの待ち方として効かせなかったのとの違い: 待ち方は計画から計算で作り直せるので、手で書いた欄を信じる理由が無かった。`phases:` は計算で作れず、ユーザが読んで承認した中身そのもの（範囲・見る場所・成果物）なので、置き場を本物とする決まりに沿えば効かせることになる
+- 前の版では、手で書いた `workflow:` 欄を承認済みの待ち方として効かせなかった。欄を読むと、手で書いた値が判定と手で動かした承認に効いてしまう（ユーザが承認していない待ち方を効かせられる）からで、待ち方をファイルに固定したのはこの穴を塞ぐためでもあった。`phases:` では、この「手で書いた欄を効かせない」方針を採らない。手で動かした承認では、置き場へ動かしたユーザが中身を承認したと読み、`phases:` を効かせる
 - 理由の弱いところ: ユーザは承認の前に `phases:` の中身を `phases.yml` と見比べるとは限らない。手で動かすときは承認画面の「この親が使う定義」「使わない定義」の区分も、`phases.yml` との一致の検査も見ない。エージェントが `review: none` や広い `scope` を書いた `phases:` を、ユーザが気づかずに動かせば、その定義が効く。`--agree` を通る承認ではこの穴は無い
 
 その代わり、`--agree` の検査を通っていない計画が壊れていても判定が進まないように、**判定の側で、承認済みチケットだけを読んで済む検査を当てる。** 定義は親の `phases:`（5b）から読むので、`phases.yml` は読まない。
@@ -284,7 +289,7 @@ plan:
 
 - 欄名は `phases:`。中身は、この親が使う定義の id をキーにした辞書で、各定義の欄は `phases.yml` と同じ（`kind` `title` `review` `scope` `deliverables` `agent` `when`）。読むのは `phasetypes` の定義の読み（今の `_one`）と同じ関数で、形の誤りも同じ文で言う
 - `plan:` / `feedback:` の項の `type` は `phases:` のキーを指す。項の書き方は変えない
-- `ticket_model.Ticket` に `phase_types: PhaseTypes | None` を足す。`ticket.py` が読む
+- `ticket_model.Ticket` には生の辞書 `phases_raw` を足し、`ticket.py` はそれだけを読む。定義にした `phase_types` は work 層（`approval.load_copy` / `scan_all`、`agree_candidates`、`--plan-order`）が入れる。`Ticket` の欄の型は前方参照の文字列で書き、state 層から compose 層を読み込まない（型注釈でも層の検査に捕まるため）
 - 子（`parent:` を持つ）に `phases:` があれば error。子の `phase:`（番号）と名前が似ているので、取り違えを読む段で止める
 - 計画を持たない親に `phases:` があれば、全部が「使われていない定義」として warn になる（下の表）
 
@@ -307,7 +312,7 @@ plan:
 
 | 案 | 中身 | 良いところ | 困るところ |
 |---|---|---|---|
-| **補助のフラグ（決定済み）** | `ccnavi --plan-order <親> --fill-phases`。提案の `plan:` / `feedback:` の項が使う定義だけを `phases.yml` から読み、`phases:` の値をその定義の集まりに差し替える（無ければ足す。項が使わない定義は外す）。ほかのバイトは変えない。`--plan-order` と同じく `--agree` の外の独立したフラグで、エージェントが打ってよい | 写し間違いが起きない。`phases.yml` を直したあとに提案を追いつかせるのも同じ 1 本 | フラグが 1 つ増える。`phases:` の値の中のコメントは消える |
+| **補助のフラグ（決定済み）** | `ccnavi --plan-order <親> --fill-phases`。提案の `plan:` / `feedback:` の項が使う定義だけを `phases.yml` から読み、`phases:` の値をその定義の集まりに差し替える（無ければ足す。項が使わない定義は外す）。ほかのバイトは変えない（書く前に全文を読み直し、`phases` のほかの欄が読んだ形で元と同じことを確かめる。6 の「子の提案の追従」と同じ）。`--plan-order` と同じく `--agree` の外の独立したフラグで、エージェントが打ってよい | 写し間違いが起きない。`phases.yml` を直したあとに提案を追いつかせるのも同じ 1 本 | フラグが 1 つ増える。`phases:` の値の中のコメントは消える |
 | エージェントが手で書き、検査で落とすだけ | 足すものが無い | 写し間違いで何度も落ちる。`phases.yml` を直すたびに全部の提案を手で直す |
 
 補助のフラグにする（決定済み）。`--agree` が「`phases:` が `phases.yml` と違う」で落とすとき、文面に `--plan-order <親> --fill-phases` を出す。ワークフロー編集タブの保存（`--write`）は `phases:` に触れない（順序だけを書く）。
@@ -347,7 +352,7 @@ plan:
 | **広げる（決定済み）** | `after` の形・終端・最後の項の延期・延期の引き受け手に加えて、計画が使う定義が `phases:` にある・`kind` が置いた計画と合う・引き受け手にレビューがある（`phases:` の `review` と項の `review: mr`）・`phases:` の定義の形 | `--agree` の検査とほぼ同じ答えを、手で動かした承認にも当てられる。読むのは承認済みチケットだけなので、承認のあとに `phases.yml` を直しても進行中の親は止まらない | 判定の検査が増える（チケットを読むたびに 1 回。項の数に比例して小さい） |
 | 今のまま | `after` の形・終端・延期の引き受け手だけ | 検査が少ない | 手で動かした承認で、引き受け手にレビューの無い計画が通る |
 
-「定義の有無・`kind`・`review` は `--lint` の warn」という前の決め方は、判定が `phases.yml` を読むと承認のあとの定義の変更で進行中の親が止まるのを避けるためだった。`phases:` を読むならその心配は無いので、広げる。`phases.yml` と `phases:` の食い違いは、`--lint` の warn（「進行中の親には効かない。反映するには固定していない番号なら改版、固定した番号ならユーザが承認済みチケットを直す」）で言う。
+「定義の有無・`kind`・`review` は `--lint` の warn」という前の決め方は、判定が `phases.yml` を読むと承認のあとの定義の変更で進行中の親が止まるのを避けるためだった。`phases:` を読むならその心配は無いので、広げる。`phases.yml` と `phases:` の食い違いは、`--lint` の warn（「進行中の親には効かない。反映するには、固定していない番号の定義なら `--plan-order <親> --fill-phases` を打った改版を出す。計画が同じでも改版になる。固定した番号の定義ならユーザが承認済みチケットを直す」）で言う。
 
 ### 承認画面での見せ方
 
@@ -363,7 +368,7 @@ plan:
 ### 大きさの上限
 
 - 定義の `scope` と `deliverables` は、それぞれ `MAX_SCOPE_ENTRIES`（20 件。チケットの範囲と同じ上限）までにする（決定済み）。`phases.yml` の読みで error にし（`--lint` も同じ）、コピーにも同じ上限が当たる。今の `phases.yml` には件数の上限が無いので、ユーザの設定に新しい制約が 1 つ増える（このワークスペースの定義は最大 8 件）
-- `phases:` の定義は、計画が使うものと、使われていない定義（warn）だけ。使われていない定義は補助のフラグが外すので、ふつうは定義の数が計画の項の数以下になる。`phases:` の定義の数は `phases.yml` の定義の数を超えられない（同じ名前の定義が要るため）。チケット全体の大きさには別の上限を足さない
+- `phases:` の定義は、計画が使うものと、使われていない定義（warn）だけ。使われていない定義は補助のフラグが外すので、ふつうは定義の数が計画の項の数以下になる。`--agree` を通る承認では、`phases:` の定義の数は `phases.yml` の定義の数を超えられない（同じ名前の定義が要るため）。手で動かした承認にはこの縛りは効かず、判定の側も数を見ない（承認済みの置き場を信じる決まりに合わせる）。チケット全体の大きさには別の上限を足さない
 
 ## 6. ワークフロー編集タブと承認画面（VS Code）
 
@@ -394,7 +399,7 @@ plan:
 - 線を引く（m から n へ）＝ n が m を待つ。線を消す＝待たない。並びの逆向き（大きい番号から小さい番号へ）の線も引ける
 - 引いている最中に断るのは、自分へ・start へ入る・end から出る（`flow-doc.ts` の `canConnect` の規則）と、**循環になる線**（n から m へ既に辿れる）と、子が承認された番号へ入る線。React Flow の `isValidConnection` で断るので、放しても線はできない。循環は線と点だけで決まる形の検査で、計画の良し悪しの判定ではない
 - 線を変えるたびに、番号をトポロジカル順に振り直す。決まりは「先行が全部前に並んだ項のうち、元の番号がいちばん小さいものから順に番号を振る」（Kahn の方法で、同じ段の項は元の番号順を保つ）。線を変えても並びが崩れなければ、番号は変わらない
-- 改版では、子が承認された番号を動かさない。空いている番号に、承認されていない項を上の決まりで詰める。詰められない線（承認された番号より前に置くことになる線）は、`--plan-order <親> --json --order` が「詰められない」と返し、タブは線を引く前の形に戻す。固定した番号を考えに入れた振り直しを画面で組むと画面の判定になるので、画面は答えを受けて戻すだけにする
+- 改版では、子が承認された番号を動かさない。空いている番号に、承認されていない項を上の決まりで詰める。詰められない線（承認された番号より前に置くことになる線）は、`--plan-order <親> --json --order` が「詰められない」と返し、タブは線を引く前の形に戻す。固定した番号を考えに入れた振り直しを画面で組むと画面の判定になるので、画面は答えを受けて戻すだけにする。改版の錠（5 の改版）に落ちる形も `--plan-order` が返し、タブは保存させない
 - `after` の指す先は振り直した番号に付け替える。`review: defer` は項に付いたまま動く。延期の引き受け手は保存せず計算するので、振り直した番号で実行ファイルが計算し直す
 - 「案に戻す」で、提案に書いてある先行と番号に戻す
 
@@ -442,6 +447,7 @@ plan:
 - 承認済みの子（`doing/`・`review/`・`done/`）には触れない。その番号は固定した番号で、振り直しで動かない（5 の改版）
 - ハッシュ: `--plan-order <親> --json` が返す `source_sha` は、親の提案と書き換えの対象になりうる子の提案（その親の `todo/` の子の全部）のバイト列をまとめたもの。`--expect` が今のまとめと違えば何も書かない。子の提案が増えた・消えた、も違いになる
 - 原子性: 書く前に全部の新しい中身を組み、検査が通ってから、ファイルごとに一時ファイルへ書いて入れ替える。途中で落ちたら、入れ替えたものを前の中身へ戻す（承認の書き込みと同じ戻し方。`fsio.policy` の `restore`）。戻しまで落ちた形（電源断など）は防げない。そのときは親の計画と子の `phase:` が食い違い、子の承認が「その番号の項は親の計画に無い／違う」で落ちるか、別の項を指したまま通る。後者を避けるため、書く順は子の提案が先、親の計画が最後にする（途中で止まれば親は前の番号のままで、書き換えた子だけがずれる。`--plan-order <親> --json` が「子の `phase:` が計画と食い違う」と言い、タブがもう一度保存させる）
+- **書く前に、組んだ全文を読み直して確かめる。** `plan:` / `feedback:` / `phases:` の値に YAML のアンカーがあり、ほかの欄から別名で参照されていると、値を差し替えると別名の行き先が無くなる。`--plan-order --write` と `--fill-phases` は、組んだ全文を読み直し、親は `plan` / `feedback` / `phases`、子は `phase` のほかの欄が、読んだ形で元と同じでなければ何も書かない
 - 承認の前に書くので、子の提案の書き換えもコミットされない。承認した子は、親と同じ理由で取り下げられない（5 の取り下げ）
 - タブは保存の前に、書き換える子の提案と、変わる番号（`phase: 2 → 4`）を一覧で見せる
 
@@ -533,7 +539,7 @@ Chrome 拡張の承認と手で動かした承認も直す手段を持たない�
 | **手で動かした承認が、計画の `after` で並行に進む（判定が緩む側の変更）。** 今はファイルが無いことを合図に一直線で読んでいた | `after` は承認済みの置き場にあるチケットの中身で、ユーザが動かしたもの。判定の側で、承認済みチケットだけを読んで済む検査（`after` の形・終端・延期の引き受け手、親の `phases:` から読む定義の有無・`kind`・引き受け手のレビュー）を当て、壊れていれば親を止め、子の承認・着手・書き込みも止める（5・5b）。残るのは、形は正しいが意図と違う並行で、これは `--agree` を通しても同じく図と本文で見るしかない |
 | **手で動かした承認では、エージェントが書いた `phases:` がそのまま効く。** `--agree` の検査（`phases.yml` と同じか）が働かず、判定も `phases.yml` を読まない | 塞がない（決定済み）。承認済みの置き場へ動かすのはユーザで、動かした中身を承認したと読む（5 の「手で動かした承認」）。`--lint` が `phases.yml` との食い違いを warn で言う。理由の弱いところ（ユーザが見比べずに動かせば、`review: none` や広い `scope` が効く）は 5 に書いた |
 | **計算の決まりを後の版で直すと、進行中の親の待ちが変わる。** ファイルなら承認したときの答えが残った | 決まりは「`after` を推移的に辿る」「延期は、延期した項を待つ延期していない最小の番号が引き受ける」の 2 つだけにし、設計 9.7 に書く。直すときは ADR を立てる。待ち方の決まりの見張りは、計画と待ち方の見本の表（`tests/fixtures/plan-waits.json`）を固定し、実行ファイルの答えがその表と同じことを確かめるテストにする（版ずれのテスト `tests/sh/test_compat_skew.py` は互換の版の履歴を見るもので、待ち方の決まりの変化は捕まえられない。こちらには互換の版 9 の履歴を足す）。互換の版（`COMPAT`）はこの変更で上げる（8） |
-| **`phases.yml` を承認のあとに直しても、進行中の親に届かない**（範囲を狭めても、その親の子には効かない） | 子の無い番号の定義は、改版で `--fill-phases` を打ち直せば今の `phases.yml` に揃う。子が承認された番号の定義は、ユーザが承認済みチケットの `phases:` を手で直す（エージェントは書けない）。`--lint` が食い違いを warn で言う |
+| **`phases.yml` を承認のあとに直しても、進行中の親に届かない**（範囲を狭めても、その親の子には効かない） | 子の無い番号の定義は、`--fill-phases` を打ち直した改版を出せば今の `phases.yml` に揃う（計画が同じで `phases:` だけが違う提案も改版の候補になる）。子が承認された番号の定義は、ユーザが承認済みチケットの `phases:` を手で直す（エージェントは書けない）。`--lint` が食い違いを warn で言う |
 | `phases.yml` を直すと、承認待ちの全部の提案が「`phases:` が違う」で `--agree` に落ちる | 文面に `--plan-order <親> --fill-phases` を出す。エージェントが打ち直せば通る |
 | 親チケットが大きくなる（定義のコピーのぶん） | 計画が使う定義だけを持つ。定義の `scope` と `deliverables` は 20 件まで |
 | `phases.yml` の定義の `scope` と `deliverables` に 20 件の上限が新しく付く | このワークスペースの定義は最大 8 件。上限を超えた設定は `--lint` が error で言う |
@@ -549,16 +555,17 @@ Chrome 拡張の承認と手で動かした承認も直す手段を持たない�
 
 | ファイル | 何を |
 |---|---|
-| `tickets/ticket_model.py` | `PlanItem.after`、`as_raw`・`__eq__`（`after` を入れる。改版を見つける `plan_differs` が使う）、`Ticket.review_at` / `covered_by` がフィードバック計画も `workflow` で読む。`workflow_unreadable`・`workflow_from_record`・`workflow_record_differs` を、計画の検査の error に置き換える |
+| `tickets/ticket_model.py` | `PlanItem.after`・`after_errors`、`as_raw`（`__eq__` には `after` を入れない。改版の比べ方は `plan_differs` の新しい比較で行う）、`Ticket.review_at` / `covered_by` がフィードバック計画も `workflow` で読む。`workflow_unreadable`・`workflow_from_record`・`workflow_record_differs` を、計画の検査の error に置き換える |
 | `tickets/ticket.py` | `_plan` で `after` を読む。形の誤りでは読み込みを落とさず、`PlanItem` に持たせる（誤りは `workflow.problems` が言う）。`parse_workflow` を消す（`workflow:` 欄は読まずに error の対象にするだけ） |
 | `tickets/workflow.py` | `compute`（項の `after`）、`problems`（5 の表。終端は両方の計画）、`effective` の分岐を消す、`waits_of`（フィードバック計画も `workflow` で読む）、`lines`（全部の番号、「すぐ始まる」「最後の項が待たない」）、`loose` |
 | `tickets/plan_order.py`（新） | `--order` から振り直した計画を作る（Kahn の方法、元の番号順、固定した番号を動かさない）。親の提案の `plan:` / `feedback:` の値と、子の提案の `phase:` の値だけを差し替えたバイト列を作る。まとめたハッシュ、書き込みと戻し |
 | 層の決まり（`tests/core/test_module_layers.py`） | `tickets.ticket`・`ticket_model` は state 層、`phasetypes`・`workflow` は compose 層で、`phasetypes` は `ticket` を読む。`ticket.py` で `phases:` を読んで定義にする・待ち方を計算すると、上向きの読み込みで循環になる。**`ticket.py` は `phases:` を生の辞書（`Ticket.phases_raw`）と、`after` の整数と誤り（`PlanItem.after` / `after_errors`）だけを読む。** 定義にする（`phasetypes` で読む）のと `workflow.compute` は work 層で入れる: 承認済みは `approval.load_copy` / `scan_all`、提案は `agree_candidates` が候補を組むときと `--plan-order`。新しい `tickets/plan_order.py` は work 層、`entry/plan_order.py` は entry 層に置き、層の表に足す |
 | `tickets/phasetypes.py`（`phases:` の読み） | 定義 1 つを読む関数を、`phases.yml` と親の `phases:` の両方から使える形にする。`scope` と `deliverables` の 20 件の上限。定義どうしを読んだ形で比べる関数 |
-| `tickets/ticket.py`・`tickets/ticket_model.py`（`phases:`） | `phases:` を読んで `Ticket.phase_types` に入れる。子の `phases:` は error |
+| `tickets/ticket.py`・`tickets/ticket_model.py`（`phases:`） | `phases:` を生の辞書 `phases_raw` として読む。`phase_types` の欄は前方参照の型で置き、入れるのは work 層。子の `phases:` は読む段で落とさず `blocked` の理由にする |
 | `tickets/phase_scope.py`（定義の引き方） | `type_for` は親の `phase_types` から引く。`unread_type` を消す |
 | `tickets/phase.py`（`phases_of`）・`hook/judge.py`（`ticket_verdict`）・`hook/post_findings.py`・`hook/subagent.py`・`hook/events.py`・`tickets/ops_close.py`（`deliverables_missing`） | 承認済みの親の定義を `phases:` から読み、`phase.load_types` を読まない |
 | `tickets/agree_candidates.py`（定義の引き方） | `validate` と、定義を引く `types_for`（今は `phase.load_types`。96〜100・247〜252・494〜505 行付近）を、親が承認済みならその `phase_types`、提案ならその提案の `phases:` から引く形にする。`phase.order_problems` に渡す定義も同じ |
+| `tickets/approval_checks.py`（`child_problems` の説明） | 「フェーズ定義が読めないはここに入れない」（669〜670 行付近）を、親の計画と `phases:` の誤りを入れる新しい扱いに合わせて書き直す |
 | `tickets/approval_checks.py`（`blocking_problems` の説明） | 「計画の形と順序は範囲に影響しないので入れない」（705〜711 行付近）の理由を、計画と定義が範囲を決めるようになったことに合わせて書き直す |
 | `tickets/agree_candidates.py`（`phases:`）・`tickets/agree_screen.py`・`tickets/agree.py` | `phases:` の検査（5b の表）、改版の規則（固定した番号の定義は変えない）、承認画面の 3 つの区分と改版の差分、`--agree` の文面に `--fill-phases` |
 | `entry/plan_order.py`（`--fill-phases`） | 項が使う定義だけを差し込む補助のフラグ |
@@ -568,7 +575,8 @@ Chrome 拡張の承認と手で動かした承認も直す手段を持たない�
 | `tickets/agree_candidates.py` | `plan_problems` から `requires` とフィードバック計画の延期の別扱いを外す。`revision_problems` の錠を前置（`plan[:frozen]`・`n <= frozen`）から固定した番号の集合に替え、定義・`review`・推移的な待ち・延期の引き受け手で比べる。フィードバック計画があれば全体計画の変更を止める。`validate` は `child_problems` を通して親の計画の error を引き継ぐ |
 | `tickets/agree.py` | preview の JSON に `plans`（`--plan-order` と同じ関数）。`_workflow_differs` を消し、承認で待ち方を書く段を外す |
 | `tickets/agree_screen.py` | 待ちの一覧の出し方、改版の差分、承認を渡す文にいつも「番号は承認済みチケットで読み直す」 |
-| `tickets/agree_digest.py` | `_workflow_to_write` を消し、書く中身はチケットのバイト列だけにする。`revise_copy` から待ち方の書き込みと戻しを外す |
+| `tickets/agree_digest.py` | `_workflow_to_write` を消し、書く中身はチケットのバイト列だけにする。`revise_copy` から待ち方の書き込みと戻しを外す。`revised_front` が `phases:` も提案の値に差し替える。`carried`（ダイジェストに入れる書く中身）は `revised_front` が書くものから組む |
+| `tickets/approval.py`（`plan_differs`） | 計画の比較を、項ごとの定義・`review`・推移的な待ちの並びで行う。`phases:` の違いも改版の条件に入れる（`agree.py` の改版の候補の組み方も同じ） |
 | `tickets/approval.py`・`approval_ops.py`・`approval_checks.py` | `load_copy` が `compute` の結果を入れる。ファイルの読み書きと `settle_old_workflows` を消す。`admit` から待ち方の書き込みと戻しを外す。`blocking_problems` に `workflow.problems` のうち `phases.yml` を読まない検査を当てる。`child_problems` に「親の計画が壊れている」を足す（5）。`mark_blocked` の引数は変えない |
 | `tickets/phase.py`（`order_problems`）・`tickets/phase_scope.py` | 親の計画が壊れていれば子の順序を数えずに落とす。`phase_scope` は子の `blocked` で止まる（`child_problems` が付ける）ことを確かめる |
 | `tickets/approval_marks.py` | `WORKFLOW_FILE` を消す |
@@ -610,10 +618,10 @@ VS Code 拡張（`extensions/vscode/ccnavi-board/`）
 | `src/webview/flow/Canvas.tsx` | 承認の図からも使えるように、フロー固有の部分（点の種類・検査の印・`isValidConnection`）を差し替えられる形にする |
 | `src/core/approvemodel.ts`・`approval-machine.ts`・`board-view.ts`・`src/board-panel.ts`・`src/ccnavi.ts` | `plans` を読む。`--plan-order`（`--write`） を呼ぶ（`ccnavi.ts`）。タブを開く入口。未保存のタブがある親を含む一覧は承認を打たないガード |
 | `src/core/version.ts` | `EXTENSION_COMPAT` を 9 に上げる |
-| `src/core/model.ts`・ボードのカード | 定義の題や見る場所を `--explain --json` から読むなら変わらない（実行ファイルが `phases:` から出す）。見本の `test/fixtures/board.json` に `phases:` を持つ親を足す |
+| `src/core/model.ts`・ボードのカード | 321・457 行付近の `phases.order` を読むところを外す（実行ファイルが `order` を渡さなくなる）。定義の題や見る場所は `--explain --json` から読むので変わらない（実行ファイルが `phases:` から出す）。見本の `test/fixtures/board.json` に `phases:` を持つ親を足す |
 | `test/fixtures/board.json` | `"order": "sequential"` を外し、見本の計画を `after` の付いた形にする |
 | `src/core/tour-sample.ts` | 見本の親の計画に `after` を書き、フィードバック計画は最後の項が受ける形にする。ワークフロー編集タブの案内に使う見本の計画 |
-| `test/phases/phases-graph*.test.ts`・`phases-notices.test.ts`・`phases-doc.test.ts`・`phases.dom.test.ts`・`phases-layer.test.ts`・`test/helpers/phases.ts` | 図のテストを消し、残りを直す |
+| `test/phases/phases-route.test.ts`（`phases-route.ts` を消すので消す）・`test/phases/phases-graph*.test.ts`・`phases-notices.test.ts`・`phases-doc.test.ts`・`phases.dom.test.ts`・`phases-layer.test.ts`・`test/helpers/phases.ts` | 図のテストを消し、残りを直す |
 | `test/shared/approval-machine.test.ts`（変異テストを含む） | 未保存のタブがある親を含む一覧は承認を打たないガード |
 | `test/workflow/plan-graph*.test.ts`（新。`tests/fixtures/plan-reorder.json` を読む）、`test/workflow/workflow-view.test.ts`・`workflow.dom.test.ts`（新）、`test/board/approval-graph.dom.test.ts`（新） | 図の組み立てと振り直し、循環の線を断る、タブの保存・外の変化・未保存の扱い、オーバーレイの図が読むだけであること |
 | `test/shared/style.test.ts`・バンドルの検査 | ボードと `workflow` の CSS に React Flow が入ること、新しい画面の CSS の置き方 |
@@ -628,8 +636,9 @@ Chrome 拡張（待ち方のファイルを運ばなくなる。同梱の ccnavi
 - `docs/design/tickets/phases.md`（9.7 の欄の表・親の `phases:`・`order` の表・待ち方を都度計算すること・承認の検査・判定の側の検査・改版）、`docs/design/tickets/state-transitions.md`（取り下げで消すもの）、`docs/design/tickets/proposal-format.md`（`after` の書き方、フィードバック計画の合流）、`docs/design/tickets/approval.md`（`--plan-order` と `--order`・`--write`・`--expect`、子の提案の追従）、`docs/design/tickets/hitl.md`、`docs/design/multi-repo/rules.md`、`docs/requirements/acceptance.md`、`README.md`
 - `docs/requirements/tickets.md`（REQ-TKT-26 のフェーズ定義の欄、REQ-TKT-28 の延期の引き受け手、REQ-TKT-29 の子の承認が待つフェーズ）
 - `extensions/vscode/ccnavi-board/README.md`（承認の JSON の `plans`、`--plan-order` の契約、ワークフロー編集タブの手動確認の手順）、`extensions/vscode/ccnavi-board/docs/requirements/phases.md`（図をなくす）、`extensions/vscode/ccnavi-board/docs/requirements/workflow.md`（新。ワークフロー編集タブの要件。`flow.md` と同じ節立て）、`extensions/vscode/ccnavi-board/docs/requirements/board.md`（カードの入口、オーバーレイの読むだけの図と未保存の注意）、`extensions/vscode/ccnavi-board/docs/design/structure.md`（`phases-graph`・`Graph.tsx` の行を消し、新しいファイルを足す）
+- `docs/claude/skill-review.md`（76 行付近の「`feedback:` に `skill-improve` を入れる」。後ろに足すだけだと終端の検査で落ちるので、最後の項が `skill-improve` も待つように置くか、`skill-improve` を最後に置いてほかの全部を待たせる、と案内する。`phases:` にも `skill-improve` を入れる）
 - `.claude/skills/ccnavi-config/SKILL.md`・`references/add.md`・`references/check.md`（関係の欄の説明を消し、順序は計画で書くと案内する）
-- `docs/adr/0109-*.md`（新）と `docs/adr/README.md` の索引。`0026`・`0070`・`0078`・`0082`・`0093`・`0104`・`0105` の状態の行に置き換えを書く（`0093` は Chrome の承認と取り下げが運ぶものから、待ち方のファイルが外れる）
+- `docs/adr/0109-*.md`（新）と `docs/adr/README.md` の索引。`0026`・`0043`・`0058`・`0070`・`0078`・`0082`・`0093`・`0104`・`0105`・`0107` の状態の行に置き換えを書く（`0093` は Chrome の承認と取り下げが運ぶものから、待ち方のファイルが外れる）
 
 待ち方のファイルの廃止で、上の一覧に新たに入ったものはおよそ 20 本ある（レビューの指摘で足した、1 行の計画を持つテスト 14 本・互換の版・独立フラグ・子の追従のぶんは別）: 実行ファイル 4（`approval_marks.py`・`hook/c1.py`・`hook/core.py` の取り下げで消すもの・`entry/lint_ticket.py`）、Chrome の見本 6、テスト 6（Chrome 3、Python 3: `test_core.py`・`test_c1.py`・`test_compat_skew.py`）、文書 4（Chrome の `VERIFY.md`・`withdraw.md`、`state-transitions.md`、承認の書き込みを決めた ADR の状態の行）。
 
@@ -639,6 +648,7 @@ Chrome 拡張（待ち方のファイルを運ばなくなる。同梱の ccnavi
 |---|---|---|
 | `.ccnavi/scripts/ccnavi-common.sh` | `wip/design/scripts/ccnavi-common.sh`（全文） | `CCNAVI_COMPAT=8` を `9` にする。実行ファイルの `COMPAT`、拡張の `EXTENSION_COMPAT` と同じ時に入れる（揃わないと、sh と拡張が版の違いを言って止まる） |
 | `.ccnavi/scripts/ccnavi-ticket.sh` | `wip/design/scripts/ccnavi-ticket.sh`（全文） | 使い方の文（65〜68 行付近）の「提案の plan に書くフェーズ定義は phases.yml を見る」とレイヤーの置き場の案内を、今の置き場（親の `project:` が指す `config/phases.yml` の 1 本）と、項の `after`・親の `phases:`・`--plan-order <親> --fill-phases` の案内に直す |
+| `.ccnavi/common/rules.yml` | `wip/design/scripts/common-rules.yml`（全文） | `skill-review-at-proposal`（172 行付近）の案内「あれば skill-improve を入れる」に、終端の検査に合う置き方（最後の項が待つ）と `phases:` への追加を足す |
 | `.ccnavi/config/phases.yml` | `wip/design/scripts/phases.yml`（全文） | `acceptance.overlap`・`implement.requires`・`staging.requires` を消す。頭のコメントの「名前を順に並べる」を「項に `after` で先行を書く。最後の項がほかの全部を待つようにする」に直す。`implement` と `staging` の `when` に「受入テスト作成を先に置く」、`implement-feedback` の `when` に「フィードバック計画の最後に置き、ほかの対応を受ける」を足す |
 
 `.ccnavi/scripts/` のほかの sh（`ccnavi-common.sh` と `ccnavi-ticket.sh` は上の表）・`.claude/hooks/`・`rules.yml` は、調べた範囲では順序の欄にも `workflow.yml` にも `phases:` にも触れていないので、直すものは無い見込み（`ccnavi-push-approved.sh` は承認済みの置き場をまるごと運ぶので、ファイルが無くなっても直すものは無い）。実装の段で `grep` し直す。
@@ -649,7 +659,7 @@ Chrome 拡張（待ち方のファイルを運ばなくなる。同梱の ccnavi
 | 段 | 中身 | 確かめ方 |
 |---|---|---|
 | 0 | 見本の計画を `after` の付いた形に直す（`parent_text` などの helper、1 行の計画を持つテスト 14 本、拡張の `test/fixtures/board.json`、Chrome の `test/fixtures/repo.ts`）。今の実行ファイルは `after` を知らない欄として読み飛ばすので、この段だけで先に入れられる | `uv run pytest` と拡張のテストが今のまま通る |
-| 1 | 実行ファイル: 全体計画の項の `after`（形の誤りは読み込みで落とさない）、`compute` と `problems`（終端・延期）、`phases.yml` の古い欄を読まない（warn）、改版の見つけ方（`__eq__` に `after`）と番号ごとの錠・推移的な待ちの比較・フィードバック計画があるときの拒否、端末の待ちの一覧。文書 9.7 と提案の書式。`phases.yml` の staging。Chrome の見本の作り直し | `uv run pytest`。端末で `ccnavi --agree` を打ち、`after` を書いた親・書き漏れた親（終端の error）・延期の親で本文を見る |
+| 1 | 実行ファイル: 全体計画の項の `after`（形の誤りは読み込みで落とさない）、`compute` と `problems`（終端・延期）、`phases.yml` の古い欄を読まない（warn）、改版の見つけ方（定義・`review`・推移的な待ちの並び、`phases:` の違い）と番号ごとの錠・推移的な待ちの比較・引き受け手の比べ方・フィードバック計画があるときの拒否、端末の待ちの一覧。**`PhaseType.overlaps` を消すと `workflow.waits_of` のフィードバック計画の枝（91〜104 行付近）が壊れるので、段 3 までの間はフィードバック計画を一直線（`overlap` を見ない。前の番号を全部待つ）で読む手当てをこの段に入れる。**文書 9.7 と提案の書式。`phases.yml` の staging。Chrome の見本の作り直し | `uv run pytest`。端末で `ccnavi --agree` を打ち、`after` を書いた親・書き漏れた親（終端の error）・延期の親で本文を見る |
 | 1b | 待ち方のファイルの廃止: `load_copy` が `compute` を入れる、ファイルの読み書き・ダイジェストの待ち方・`_workflow_differs`・`settle_old_workflows`・取り下げのファイルの比較と削除・C1 の名前・`--lint` と `status` の warn を外す。判定の側で `workflow.problems`（`phases.yml` を読まない検査）を当て、`child_problems` で子に引き継ぐ。前の版の形の親の取り下げを止める。互換の版を 9 に上げ、`ccnavi-common.sh` の staging と `version.ts` を同じ時に入れる。待ち方の見本の表のテスト。Chrome の見本とテスト、`state-transitions.md`・Chrome の要件 | `uv run pytest`、Chrome 拡張のテスト。手で動かした承認の親が `after` で並行に読まれ、終端の壊れた計画を手で動かすと親が止まり、子の `--agree`・着手・書き込みも止まることを見る。`ccnavi --lint` が互換の版の食い違いを言わないことを見る。取り下げがチケットのバイト一致だけで通る・止まることを見る |
 | 1c（1b のあと） | 親に定義を固定する（5b）: `phases:` の読み、`--agree` の検査と改版の規則、`--fill-phases`、判定・`phases_of`・`ops_close`・`subagent`・`events` が `phases:` を読む、判定の側の検査を広げる、承認画面の 3 つの区分、`unread_type` を消す、`scope` / `deliverables` の上限。見本の計画に `phases:` を足す（段 0 の helper に `phases:` を足す）。Chrome の見本 | `uv run pytest`、Chrome 拡張のテスト。`phases.yml` を直しても進行中の親の範囲が変わらないこと、`phases:` の値を書き換えた提案が落ちること、使わない定義を外した提案が通り承認画面に「使わない」と出ること、`phases:` の無い計画付きの親を手で動かすと止まることを見る |
 | 2 | フェーズ管理画面: 図・関係の欄・`order` を消す。雛形を直す | 拡張のテスト（phases のグループ）。古い欄のある `phases.yml` で「読まない欄」の表示と、保存で欄が残ることを見る |
