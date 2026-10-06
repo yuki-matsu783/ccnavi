@@ -561,7 +561,7 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッ�
   }
 });
 
-test("CB-D151 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が 1 つだけなら出さない", async () => {
+test("CB-D151 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が 1 つだけでも出す", async () => {
   const targets = [
     { kind: "self", name: "", label: "ワークスペース" },
     { kind: "project", name: "app:x", label: "プロジェクト app:x" },
@@ -584,7 +584,7 @@ test("CB-D151 設定の切り替えの欄は、選んだ対象を種類と名前
 
   const single = await openPhases({ target: { kind: "self", name: "" }, targets: targets.slice(0, 1) });
   try {
-    assert.equal(single.all("select#target").length, 0);
+    assert.equal(single.all("select#target option").length, 1);
   } finally {
     await single.close();
   }

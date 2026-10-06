@@ -1,6 +1,8 @@
 /**
  * ルール管理とフェーズ管理の、設定の対象を切り替える欄。共通の設定・ワークスペース・プロジェクトの 3 種から選ぶ。
  *
+ * 対象が 1 つだけでも欄は出す（フェーズ管理はプロジェクトが無いと「ワークスペース」だけになる。欄が消えると切り替えられることが分からない）。
+ *
  * 選んだ値は `onSwitch` で拡張ホストへ送るだけで、画面は自分で切り替えない。未保存の変更があれば拡張ホストが
  * 破棄してよいかを聞き、やめたときは中身を入れ替えないので、欄の値は `page.target` に従ったまま変わらない
  * （制御された `<select>` なので、選び直した値は描き直しで元に戻る）。
@@ -17,7 +19,7 @@ export interface TargetSelectProps {
 }
 
 export function TargetSelect({ target, targets, disabled, onSwitch }: TargetSelectProps): JSX.Element | null {
-  if (target === undefined || targets === undefined || targets.length < 2) {
+  if (target === undefined || targets === undefined) {
     return null;
   }
   return (

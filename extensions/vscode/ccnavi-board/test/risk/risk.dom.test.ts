@@ -378,7 +378,7 @@ test("CB-D100 拡張ホストが頼んだらリスク管理の案内を出し、
   }
 });
 
-test("CB-T313 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が 1 つだけなら出さない。読み込み中と、読めなかった画面にも出る", async () => {
+test("CB-T313 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が 1 つだけでも出す。読み込み中と、読めなかった画面にも出る", async () => {
   const targets = [
     { kind: "workspace", name: "", label: "共通の設定" },
     { kind: "self", name: "", label: "ワークスペース" },
@@ -401,7 +401,7 @@ test("CB-T313 設定の切り替えの欄は、選んだ対象を種類と名前
   }
   const single = await openRisk({ target: { kind: "workspace", name: "" }, targets: targets.slice(0, 1) });
   try {
-    assert.equal(single.all("select#target").length, 0);
+    assert.equal(single.all("select#target option").length, 1);
   } finally {
     await single.close();
   }

@@ -647,7 +647,7 @@ test("CB-D106 読み込み中に頼まれた案内はルールが出てから始
   }
 });
 
-test("CB-D150 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が 1 つだけなら出さない", async () => {
+test("CB-D150 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が 1 つだけでも出す", async () => {
   const targets = [
     { kind: "workspace", name: "", label: "共通の設定" },
     { kind: "self", name: "", label: "ワークスペース" },
@@ -670,7 +670,7 @@ test("CB-D150 設定の切り替えの欄は、選んだ対象を種類と名前
 
   const single = await openRules({ target: { kind: "workspace", name: "" }, targets: targets.slice(0, 1) });
   try {
-    assert.equal(single.all("select#target").length, 0);
+    assert.equal(single.all("select#target option").length, 1);
   } finally {
     await single.close();
   }
