@@ -1263,6 +1263,8 @@ class Host(__import__("http.server").server.BaseHTTPRequestHandler):
 
     notes: list = []
     port = 0
+    # 真なら Draft を外す PUT に Draft のままと答える（外し損ねの試験）
+    keep_draft = False
 
     def log_message(self, *args):
         pass
@@ -1291,7 +1293,7 @@ class Host(__import__("http.server").server.BaseHTTPRequestHandler):
     def do_PUT(self):
         length = int(self.headers.get("Content-Length", "0") or 0)
         self.rfile.read(length)
-        self.reply(200, {"draft": False})
+        self.reply(200, {"draft": Host.keep_draft})
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", "0") or 0)
@@ -1313,6 +1315,7 @@ class C1HostHarness(C1Harness):
         import threading
 
         Host.notes = []
+        Host.keep_draft = False
         server = __import__("http.server").server.HTTPServer(("127.0.0.1", 0), Host)
         Host.port = server.server_address[1]
         threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -1442,6 +1445,28 @@ class C1HostTest(C1HostHarness):
         shown = git(self.ws, "show", "--name-only", "--format=", f"{PARENT}").stdout
         self.assertIn(f"{APPROVED}/phases/{PARENT}/ready.json", shown)
 
+    def test_ready_keeps_the_parent_worktree_when_the_draft_stays(self):
+        """Draft を外し損ねたら、外から打っても親のワークツリーは消さない。
+
+        ready を打ち直せるようにするため。
+        """
+        Host.keep_draft = True
+        ready = self.sh(
+            "ccnavi-review.sh",
+            "ready",
+            "--parent",
+            PARENT,
+            cwd=self.ws,
+            PATH=self.path,
+            GITLAB_TOKEN="t0k",
+            CCNAVI_BIN_PATH=self.half,
+            HALF_TREE=self.tree,
+        )
+        self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
+        self.assertIn("Draft を外せなかった", ready.stderr)
+        self.assertNotIn("を消した", ready.stdout)
+        self.assertTrue(os.path.isdir(self.tree))
+
     def test_ready_from_outside_by_a_relative_script_path(self):
         """ワークスペースルートから相対パス（`sh .ccnavi/scripts/ccnavi-review.sh`）で打っても、
         親のワークツリーへ移った後に C1 の取り込み（ccnavi-sync.sh）を見失わない。
@@ -1471,7 +1496,15 @@ class C1HostTest(C1HostHarness):
         self.assertFalse(os.path.exists(self.tree))
 
     def test_ready_parent_refuses_what_is_not_a_parent_worktree(self):
-        for args in (("--parent",), ("--parent", "../x"), ("--parent", "i0009")):
+        for args in (
+            ("--parent",),
+            ("--parent", "../x"),
+            ("--parent", "i0009"),
+            ("--parent=",),
+            ("--parent", ""),
+            ("--parent", PARENT, "--parent"),
+            ("--parent", PARENT, f"--parent={PARENT}"),
+        ):
             with self.subTest(args=args):
                 refused = self.sh(
                     "ccnavi-review.sh",
@@ -1881,6 +1914,34 @@ class C1HostNotImportedTest(C1HostHarness):
         self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.assertIn("wip/ に未コミットの変更がある", ready.stderr)
         self.assertNotIn("Draft を外した", ready.stdout)
+
+    @unittest.skipIf(os.name == "nt", "大文字違いの並存と名前の \\ は Windows では作れない")
+    def test_ready_stops_when_wip_removals_in_any_case_are_not_sent(self):
+        """実行ファイルが消した `WIP/…` や `wip\\…` の削除も、送るまで Draft を外さない。
+
+        実行ファイルは大文字小文字・\\ を問わず wip/ と見る。確かめるのは実行ファイルが出した
+        `wip <パス>` の行そのもの。
+        """
+        for rel in ("WIP/eli5/a.html", "wip\\eli5\\b.html"):
+            with self.subTest(rel=rel):
+                write(os.path.join(self.tree, rel), "<p>x</p>\n")
+                git(self.tree, "add", "--", rel)
+                git(self.tree, "commit", "-q", "-m", f"add {rel}")
+                git(self.tree, "push", "-q", "origin", PARENT)
+                os.remove(os.path.join(self.tree, rel))
+                ready = self.review(
+                    "ready",
+                    CCNAVI_BIN_PATH=self.mover(
+                        f"printf 'tree %s\\nwip-from x\\n' '{self.tree}'; "
+                        f"printf '%s\\n' 'wip {rel}'"
+                    ),
+                )
+                self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
+                self.assertIn("未コミットの変更がある", ready.stderr)
+                self.assertNotIn("Draft を外した", ready.stdout)
+                git(self.tree, "rm", "-q", "--cached", "--", rel)
+                git(self.tree, "commit", "-q", "-m", f"rm {rel}")
+                git(self.tree, "push", "-q", "origin", PARENT)
 
     def test_ready_goes_on_when_the_archived_tree_is_clean(self):
         ready = self.review(

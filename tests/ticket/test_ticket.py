@@ -1692,6 +1692,30 @@ class TicketTest(unittest.TestCase):
         done = confirm()
         self.assertEqual(done.returncode, 0, done.stderr)
 
+    def test_remove_wip_does_not_follow_a_linked_directory_out_of_the_tree(self):
+        """追跡済みの wip/eli5/x.html の途中のディレクトリがリンク（無視されている）に置き換わって
+        いても、リンクの先（ツリーの外）のファイルは消さない。名指しして止める。"""
+        rel = "wip/eli5/x.html"
+        write(os.path.join(self.parent_tree, *rel.split("/")), "<p>x</p>\n")
+        git(self.parent_tree, "add", "--", rel)
+        git(self.parent_tree, "commit", "--quiet", "-m", "eli5")
+        outside = os.path.join(self.root, "outside")
+        write(os.path.join(outside, "x.html"), "大事\n")
+        shutil.rmtree(os.path.join(self.parent_tree, "wip", "eli5"))
+        try:
+            os.symlink(outside, os.path.join(self.parent_tree, "wip", "eli5"))
+        except OSError:
+            self.skipTest("リンクが作れない")
+        # ready の前提の時点で止まる（退避より前）
+        conf, _ = settings.load(self.root)
+        problems = review._merge_problems(self.parent_tree, conf, self.root)
+        self.assertTrue(any(rel in p and "リンク" in p for p in problems), problems)
+        removed, _, failed = review.remove_wip(self.parent_tree)
+        self.assertIn(rel, failed)
+        self.assertIn("リンク", failed)
+        self.assertEqual(removed, [])
+        self.assertTrue(os.path.exists(os.path.join(outside, "x.html")))
+
     @unittest.skipIf(os.name == "nt", "大文字違いの並存と名前の \\ は Windows では作れない")
     def test_ready_catches_wip_in_any_case_and_a_backslashed_name(self):
         """ready は `WIP/eli5/…` と `wip\\eli5\\…`（名前に `\\` を含む 1 ファイル）も片付ける。
