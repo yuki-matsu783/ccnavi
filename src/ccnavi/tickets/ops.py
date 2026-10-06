@@ -41,6 +41,25 @@ from . import (
     worktrees,
 )
 
+# 最後のレビューのあと、Draft を外すまでの手順がユーザの合意の範囲に入ることの言い切り。
+# `confirm` の知らせ（core_review.after_last_review）と親の `finish` の出力が同じ文を使う。
+# ユーザがレビュー済みにした時点で、ここまでは合意済み。外へ出る操作（push・Draft を外す）の前に
+# 確認を取り直すと、同じ流れの中で何度も許可を求めることになる。
+READY_FLOW_AGREED = (
+    "ここから Draft を外すまで（finish → push → ready。`wip/` の削除は ready に入っている）は、"
+    "ユーザのレビュー済みの合意の範囲に入る。"
+    "push と Draft を外す前に、ユーザへ確認を取り直さずに進める"
+    "（Claude Code の自動モードの分類器に止められたときだけ、ユーザに許可を頼む）"
+)
+
+
+def ready_command(root: str, parent_id: str) -> str:
+    """Draft を外す 1 本。親のワークツリーの外から打つ形（`--parent`）。
+
+    この形なら、Draft を外した最後に親のワークツリーも消える。
+    """
+    return f"{settings.script_command(root, 'ccnavi-review.sh')} ready --parent {parent_id}"
+
 
 def start(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
@@ -260,18 +279,19 @@ def _close_parent(
     if approval_marks.read_parent_mark(where, found.ticket, approval_marks.PARENT_MARK_READY):
         stdout.write("Draft は外してある。マージはユーザが行う\n")
         return
-    review_sh = settings.script_command(root, "ccnavi-review.sh")
     stdout.write(
         "次は、この移動をコミットして push し"
         "（取り込み済みの親子では、この finish が済ませている）、"
-        f"'{review_sh} ready' で Draft を外してください（「マージに進んでよい」の合図）。"
+        f"'{ready_command(root, found.ticket)}' で Draft を外してください"
+        "（「マージに進んでよい」の合図）。"
         "ready は Draft を外す前に、閉じたチケットとその記録"
         f"（`{conf.approved}/` の done/・phases/・events/・flows/）を手元の logs/archive/ へ移し、"
         f"`{wip}/` の追跡済みのファイルを消して、その削除をコミットして push する"
         f"（`{wip}/` に未追跡のファイルがあれば消さずに止まる。消したものは履歴から戻せる）。"
-        "Draft を外したあと、ready は親のワークツリーを片付ける（cwd が中にあれば消さず、"
-        "外に出てから打つ 1 本を出す）。途中の作業もチケットも既定のブランチに残さない。"
-        "マージはユーザが squash で行う\n"
+        "Draft を外したあと、ready は親のワークツリーを消す（親のワークツリーの外から --parent で"
+        "打てば消える。中から --parent なしで打つと消さず、外に出てから打つ 1 本を出す）。"
+        "途中の作業もチケットも既定のブランチに残さない。マージはユーザが squash で行う。"
+        f"{READY_FLOW_AGREED}\n"
     )
 
 

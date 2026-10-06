@@ -2,15 +2,18 @@
 
 `tidy` は `--phase <N>` でそのフェーズの子に絞れる。
 
-閉じた子と、Draft を外した親のワークツリーを ccnavi が消す。判断の要らない片付けを、エージェントへの
+閉じた子と、Draft を外した親のワークツリーを ccnavi が消す。ワークツリーがあるのは
+作業中（`doing/`）の子だけにする（`keeps_worktree`）。判断の要らない片付けを、エージェントへの
 案内（`ccnavi-clean.sh` → `worktree remove`）で済ませず、ccnavi の側に寄せる。呼ぶのは sh で、
 状態を書く操作が済んでから呼ぶ。
 
 - `confirm` が子を `done/` へ動かした後（`ccnavi-review.sh confirm`）: そのフェーズの子（延期を
   引き受けた分を含む）のワークツリー
-- 親の `finish` の後（`ccnavi-ticket.sh finish <親>`）: 残っている子のワークツリー。
-  取りこぼしを拾う安全網
-- `ready` が Draft を外した後（`ccnavi-review.sh ready`）: 親のワークツリー
+- `finish`・`cancel` の後（`ccnavi-ticket.sh`）: その親子の閉じた子のワークツリー。
+  レビュー不要の子の finish と子の cancel ならその子のもの、親の finish なら残っているもの全部
+  （取りこぼしを拾う安全網）
+- `ready` が Draft を外した後（`ccnavi-review.sh ready`）: 親のワークツリー。外から
+  `ready --parent <親>` で打てば消える
 
 C1 の中では書いたものが push の失敗で戻ることがあるので、C1 が送り終えてから呼ぶ。
 
@@ -74,13 +77,14 @@ class Dropped:
 
 
 def keeps_worktree(t: ticket_model.Ticket) -> bool:
-    """閉じた子のワークツリーを残すか。
+    """子のワークツリーを残すか。
 
-    いまは「完了」以外（取り消し。`cancelled_at` がある）で閉じた子を残す。取り消した理由や
-    書きかけを後から見返せるようにするため。この扱いは暫定で、ユーザに確かめている。変えるときは
-    ここだけを直す（`tidy` と案内の文面はこの答えに従う）。
+    ワークツリーがあるのは作業中（`doing/`）の子だけ。閉じた子は、完了でも取り消しでも消す。
+    閉じた子をまた進めるときは、新しいチケットで新しいワークツリーを切る。変えるときはここだけを
+    直す（`tidy` はこの答えに従う）。レビュー待ち（`review/`）の子は `tidy` の候補に入らない
+    （指摘を直す場所として残す。消すのは `confirm` が `done/` へ動かした後）。
     """
-    return bool(t.cancelled_at)
+    return t.state == ticket_model.DOING
 
 
 def classifier_note(root: str, allow: str) -> str:
@@ -213,7 +217,7 @@ def run_tidy(
     phase_no: int | None,
     cwd: str,
 ) -> int:
-    """`worktree tidy <親> [--phase <N>]`。閉じた子のワークツリーを消す。
+    """`worktree tidy <親> [--phase <N>]`。閉じた（完了・取り消し）子のワークツリーを消す。
 
     消さなかったもの（cwd・未コミット・登録が無いなど）が 1 本でもあれば 1。何も無ければ黙って 0。
     """
@@ -223,10 +227,6 @@ def run_tidy(
         if not os.path.lexists(path):
             continue
         if keeps_worktree(t):
-            stdout.write(
-                f"ワークツリー {t.ticket} は残す（完了ではなく取り消しで閉じた子。"
-                f"要らなければ '{retry_command(root, t.ticket)}' で消せる）\n"
-            )
             continue
         d = drop(root, t.ticket, cwd)
         report(stdout, root, d)

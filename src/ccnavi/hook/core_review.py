@@ -19,6 +19,7 @@ from ..tickets import (
     approval_checks,
     approval_marks,
     history,
+    ops,
     ops_close,
     phase,
     review,
@@ -165,19 +166,22 @@ def after_last_review(root: str, conf: settings.Settings, parent_id: str) -> str
     if ops_close.close_problems(root, conf, parent_id):
         return ""
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-    review_sh = settings.script_command(root, "ccnavi-review.sh")
     return "\n".join(
         [
             f"全部のフェーズのレビューが済み、親 {parent_id} を閉じられる。"
             "ここから Draft を外すまでの流れ:",
             f"  1. '{ticket_sh} finish {parent_id}' で親を閉じる"
             "（取り込み済みの親子なら、finish が移動をコミットして push する。"
-            "そうでなければ、移動をコミットして push する）。残っている子のワークツリーも片付く",
-            f"  2. '{review_sh} ready' で Draft を外す。ready は閉じたチケットの記録と"
+            "そうでなければ、移動をコミットして push する）。"
+            "残っている子のワークツリーも片付く",
+            f"  2. 親のワークツリーの外（ワークスペースルートなど）に出て、"
+            f"'{ops.ready_command(root, parent_id)}' で Draft を外す。"
+            "ready は閉じたチケットの記録と"
             f" `{ticket_places.WIP_ROOT}/` の追跡済みのファイルを消してコミットし、push してから"
-            " Draft を外し、最後に親のワークツリーを片付ける"
-            "（cwd が中にあれば消さず、外に出てから打つ 1 本を出す）",
+            " Draft を外し、最後に親のワークツリーを消す"
+            "（中から --parent なしで打つと消さず、外に出てから打つ 1 本を出す）",
             "  マージはユーザが squash で行う",
+            f"  {ops.READY_FLOW_AGREED}",
         ]
     )
 
