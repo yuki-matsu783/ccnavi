@@ -110,7 +110,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
 }
 
 /** カードの上で押しても提案を開かない場所。ボタン・リンク・折りたためる履歴 */
-const NOT_OPENING = "button, a, details";
+const NOT_OPENING = "button, a, details, .review-menu";
 
 /**
  * 状態の履歴。既定で折りたたみ、開くと新しい順に並ぶ。補助の記録で、列やバッジはここから決めない

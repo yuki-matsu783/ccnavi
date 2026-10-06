@@ -430,10 +430,11 @@ function reviewedChecked(state: ApprovalState, result: DecidePreviewParse): Appr
   if (overlay?.kind !== "reviewedLoading") {
     return stay(state);
   }
-  const unresolved =
-    result.ok && result.value.parent === overlay.parent && result.value.phase === overlay.phase
-      ? result.value.threads.length
-      : undefined;
+  // 別のフェーズの一覧は、やめた前の連絡の遅れた答え。今の連絡の答えではないので捨てる
+  if (result.ok && (result.value.parent !== overlay.parent || result.value.phase !== overlay.phase)) {
+    return stay(state);
+  }
+  const unresolved = result.ok ? result.value.threads.length : undefined;
   return move(state, {
     overlay: {
       kind: "prompt",

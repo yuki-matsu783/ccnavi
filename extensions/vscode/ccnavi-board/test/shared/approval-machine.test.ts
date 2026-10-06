@@ -674,6 +674,17 @@ test("CB-T177 レビュー済みの連絡は、閉じているときと、error 
   assert.match(failedPrompt, /レビューの状況をエージェントが確かめる/);
   assert.doesNotMatch(failedPrompt, /未解決の指摘(はありません|があります)/);
 
+  // 別のフェーズの答え（やめたあとに遅れて届いた前の連絡の分）は捨てて、待ちを続ける
+  const stale = approvalStep(after.state, { kind: "reviewedChecked", result: { ok: true, value: { ...decidePreviewOf(), phase: 2 } } });
+  assert.equal(stale.state, after.state);
+  // 読み込み中に、承認・決める・連絡をもう一度押しても被せない。やめれば閉じ、遅れた答えは受けない
+  assert.equal(approvalStep(after.state, { kind: "approve", tickets: [], filtered: false, pending: [] }).state, after.state);
+  assert.equal(approvalStep(after.state, { kind: "decide", parent: "i0001", phase: 1, tree: "/w/.claude/worktrees/i0001", chip: chipOf() }).state, after.state);
+  assert.equal(approvalStep(after.state, input).state, after.state);
+  const cancelled = approvalStep(after.state, { kind: "cancel" });
+  assert.equal(cancelled.state.overlay, undefined);
+  assert.equal(approvalStep(cancelled.state, { kind: "reviewedChecked", result: { ok: true, value: decidePreviewOf() } }).state.overlay, undefined);
+
   // 頼んでいない（閉じた・別の）ときに届いた答えは受けない
   assert.equal(approvalStep(CLOSED, { kind: "reviewedChecked", result: { ok: true, value: decidePreviewOf() } }).state.overlay, undefined);
 
