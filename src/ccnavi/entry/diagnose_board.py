@@ -22,6 +22,7 @@ from ..tickets import (
     flow,
     history,
     phase,
+    risk,
     ticket_fold,
     ticket_model,
 )
@@ -150,6 +151,8 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         if parent.is_child:
             continue
         payload["parents"].append(_parent_record(conf, root, parent, closed_index, raw))
+    # 不備と要対応は全チケットと親が揃ってから決める（親が在るか、親のフェーズの状態を見る）。
+    _mark_attention(payload)
     payload["archived"] = _archived_records(
         root, {(t["project"], t["ticket"]) for t in payload["tickets"]}, problems
     )
@@ -399,6 +402,80 @@ def _ticket_record(
             where, source.parent, ticket_id, approval_marks.CHILD_RECORD_JUDGE
         )
     return record
+
+
+def _mark_attention(payload: dict) -> None:
+    """各チケットに `issues`（不備の文）と `attention`（ユーザが動く必要があるか）を足す。
+
+    ボードはこの 2 つを読むだけで、組み直さない（判定と同じ答えを 2 か所で出さない）。
+    `issues` はこの順に並ぶ。
+
+    1. `blocked` が空でない: `書き込みが止まっています: <blocked>`
+    2. 提案が無く、承認済みチケットも `open`（`doing/`）・`closed`（`done/`）に無い:
+       `提案が見つかりません（承認済みチケットだけがあります）`
+    3. 子で、親の識別子のチケットが `tickets` に無い: `親 <親> が見つかりません`
+
+    `attention` は次のどれかで真。
+
+    - `pending_approval` に入っている（新規の未承認と親の改版）
+    - 子で、自分のフェーズが `gate_closed`（レビュー準備中／レビュー待ち）
+    - 子で、自分のフェーズが `review_waiting`
+    - 未着手・作業中の列（提案が無く `closed` のもの以外）なのに、ワークツリーが無い
+    - 自分の実績のリスクが HIGH 以上（`risk.ESCALATE_FROM`）
+    - `scattered` が空でない（どれが本物か決まらない）
+    - `issues` が空でない
+    - 親で、フェーズのどれかが `gate_closed` / `review_waiting` / `risk_escalates`
+    """
+    ids = {t["ticket"] for t in payload["tickets"]}
+    parents = {p["ticket"]: p for p in payload["parents"]}
+    pending = set(payload["pending_approval"])
+    for record in payload["tickets"]:
+        record["issues"] = _issues(record, ids)
+        record["attention"] = _attention(record, parents, pending)
+
+
+def _issues(record: dict, ids: set[str]) -> list[str]:
+    """チケット 1 件の不備の文（`_mark_attention`）。"""
+    out = []
+    if record["blocked"]:
+        out.append(f"書き込みが止まっています: {record['blocked']}")
+    if record["proposal"] is None and record["copy"]["status"] not in ("open", "closed"):
+        out.append("提案が見つかりません（承認済みチケットだけがあります）")
+    if record["parent"] and record["parent"] not in ids:
+        out.append(f"親 {record['parent']} が見つかりません")
+    return out
+
+
+def _attention(record: dict, parents: dict[str, dict], pending: set[str]) -> bool:
+    """チケット 1 件が要対応か（`_mark_attention`）。`issues` を足した後に呼ぶ。"""
+    is_parent = not record["parent"]
+    family = parents.get(record["ticket"] if is_parent else record["parent"])
+    phases = family["phases"] if family is not None else []
+    own = (
+        next((p for p in phases if p["number"] == record["phase"]), None)
+        if not is_parent and record["phase"] is not None
+        else None
+    )
+    # 提案が無く閉じた承認済みチケットは完了・取り消しの列。それ以外は未着手か作業中の列
+    open_column = not (record["proposal"] is None and record["copy"]["status"] == "closed")
+    return (
+        record["ticket"] in pending
+        or (own is not None and own["gate_closed"])
+        or (own is not None and own["review_waiting"])
+        or (open_column and not record["worktree"]["exists"])
+        or _high_risk(record["risk"])
+        or bool(record["scattered"])
+        or bool(record["issues"])
+        or (
+            is_parent
+            and any(p["gate_closed"] or p["review_waiting"] or p["risk_escalates"] for p in phases)
+        )
+    )
+
+
+def _high_risk(record: object) -> bool:
+    """実績のリスクの記録が HIGH 以上か。フェーズの `risk_escalates` と同じ水準で見る。"""
+    return isinstance(record, dict) and record.get("level") in risk.ESCALATE_FROM
 
 
 def _phase_record(ph: phase.Phase) -> dict:

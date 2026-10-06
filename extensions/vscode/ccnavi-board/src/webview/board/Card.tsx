@@ -21,9 +21,7 @@ import {
   isHttpUrl,
   movedLabel,
   mrText,
-  phaseStatusBriefItems,
-  phaseStatusFull,
-  phaseStatusFullItems,
+  phaseStatusItems,
   riskText,
   worktreeName,
 } from "./text.js";
@@ -236,9 +234,8 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
 }
 
 /**
- * 親カードのフェーズ一覧。1 フェーズ 1 行で、左の丸がフェーズ。右の状態は要約（狭い列）と全文（広げたとき）を
- * 両方持ち、どちらを見せるかは CSS が幅で決める。要約は見た目だけのもの（aria-hidden）で、
- * 全文は狭いときも読み上げには渡す。狭いままマウスで読むときのために、全文は行の tooltip にも置く。
+ * 親カードのフェーズ一覧。1 フェーズ 1 行で、左の丸がフェーズ。右の状態は全文（状態・マーカー・レビューの要否・
+ * リスクの点と理由）だけを出し、狭い列では折り返す。見えている文がそのまま読み上げにも渡る。
  * 依頼へのリンクとボタンは状態の列に入れず、行の 2 段目（`.phase-actions`）に左寄せで並べる。
  * 状態の列に入れると、55% で止めた列の中でボタンが縦に積まれて行が高くなるため。
  */
@@ -246,21 +243,15 @@ function Phases({ phases }: { readonly phases: readonly PhaseChip[] }): JSX.Elem
   return (
     <ul className="phases">
       {phases.map((p) => {
-        const full = phaseStatusFull(p);
         return (
-          <li key={p.number} className={`phase phase-${p.state}${p.gateClosed ? " review-hold" : ""}`} title={full}>
+          <li key={p.number} className={`phase phase-${p.state}${p.gateClosed ? " review-hold" : ""}`}>
             <span className="phase-dot" aria-hidden="true" />
             <span className="phase-name">
               <span className="phase-label">{p.label}</span>
               {p.tickets.length > 0 ? <span className="phase-tickets">{p.tickets.join(", ")}</span> : null}
             </span>
             <span className="phase-status">
-              <span className="phase-brief" aria-hidden="true">
-                <StatusItems items={phaseStatusBriefItems(p)} />
-              </span>
-              <span className="phase-full">
-                <StatusItems items={phaseStatusFullItems(p)} />
-              </span>
+              <StatusItems items={phaseStatusItems(p)} />
             </span>
             {p.mrUrl !== "" || p.actions.length > 0 ? (
               <span className="phase-actions">
@@ -281,7 +272,7 @@ function Phases({ phases }: { readonly phases: readonly PhaseChip[] }): JSX.Elem
 /**
  * 状態の項目を 1 つずつ折り返さない塊（`.phase-item`）にして並べる。区切りの「·」は前の項目の末尾に付け、
  * 折り返すのは項目の間の空白だけにする（「リスク / HIGH」のように項目の途中で割れない）。
- * 文字としては `phaseStatusFull` と同じ `a · b` になる
+ * 文字としては項目を ` · ` で区切った `a · b` になる
  */
 function StatusItems({ items }: { readonly items: readonly string[] }): JSX.Element {
   return (
