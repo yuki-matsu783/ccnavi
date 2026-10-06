@@ -476,7 +476,7 @@ function loopFlow(): FlowDoc {
   };
 }
 
-test("CB-T318 繰り返し（loop）は部品箱の 7 番目で、足すと出口 2 つ（繰り返す / 抜ける）と上限 3 の既定で作る", () => {
+test("CB-T322 繰り返し（loop）は部品箱の 7 番目で、足すと出口 2 つ（繰り返す / 抜ける）と上限 3 の既定で作る", () => {
   assert.deepEqual([...PALETTE], ["start", "end", "prompt", "subAgent", "askUserQuestion", "ifElse", "switch", "loop", "skill"]);
   const added = addNode(templateFlow("i0001-01-01", "調査"), "loop", { x: 1, y: 2 });
   assert.equal(added.id, "loop-1");
@@ -499,7 +499,7 @@ test("CB-T318 繰り返し（loop）は部品箱の 7 番目で、足すと出�
   assert.deepEqual(portsOf(node, []).inputs, [{ id: "input", label: "" }]);
 });
 
-test("CB-T319 繰り返しの線の言葉は出口の項目の id（body / done）か branch-<番号> で当たり、項目の label が出る。欄を直しても出口は変わらない", () => {
+test("CB-T323 繰り返しの線の言葉は出口の項目の id（body / done）か branch-<番号> で当たり、項目の label が出る。欄を直しても出口は変わらない", () => {
   const doc = loopFlow();
   assert.deepEqual(connectionsOf(doc).map((c) => connectionLabel(doc, c)), ["", "抜ける", "繰り返す"]);
   const body = connect(doc, "loop-1", "body", "end", "input");
@@ -509,7 +509,7 @@ test("CB-T319 繰り返しの線の言葉は出口の項目の id（body / done�
   assert.deepEqual(node?.data, { label: "", condition: "テストが落ちる", maxIterations: 5, branches: [{ id: "body", label: "繰り返す" }, { id: "done", label: "抜ける" }] });
 });
 
-test("CB-T320 書き出して読み直しても maxIterations は数のまま（文字列にならない）。出口の id も残る", () => {
+test("CB-T324 書き出して読み直しても maxIterations は数のまま（文字列にならない）。出口の id も残る", () => {
   const doc = patchData(loopFlow(), "loop-1", { condition: "テストが落ちる", maxIterations: 7 });
   const text = serializeFlow(doc);
   assert.match(text, /maxIterations: 7\n/);
@@ -522,7 +522,7 @@ test("CB-T320 書き出して読み直しても maxIterations は数のまま（
   assert.deepEqual(parse(text), parse(serializeFlow(read.doc)));
 });
 
-test("CB-T321 繰り返しを複製・貼り付けしても出口の項目（body / done）と上限は同じで、線の出口（done / branch-0）も付いたまま", () => {
+test("CB-T325 繰り返しを複製・貼り付けしても出口の項目（body / done）と上限は同じで、線の出口（done / branch-0）も付いたまま", () => {
   const doc = loopFlow();
   const dup = duplicateNodes(doc, ["loop-1", "end"]);
   assert.ok(dup !== undefined);
