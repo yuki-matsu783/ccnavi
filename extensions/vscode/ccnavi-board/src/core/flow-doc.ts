@@ -989,7 +989,14 @@ export function portsOf(node: FlowNode, connections: readonly FlowConnection[]):
   if (type === "end") {
     // 出口なし
   } else if (key !== undefined && !multi) {
-    branchItems(node).forEach((item, index) => outputs.push({ id: branchPort(index), label: str(item.label) }));
+    // 線が項目の `id`（`body` / `done` など）で出口を指しているなら、その `id` を出口にする（`branch-<番号>` と
+    // 別の出口が並ぶのを避ける。実行ファイルの出口の読み方と同じく、項目の `id` でも `branch-<番号>` でも当たる）
+    const used = new Set(connections.filter((c) => connectionFrom(c) === node.id).map((c) => connectionFromPort(c)));
+    branchItems(node).forEach((item, index) => {
+      const id = labelText(item.id);
+      const byId = id !== "" && used.has(id) && !used.has(branchPort(index));
+      outputs.push({ id: byId ? id : branchPort(index), label: str(item.label) });
+    });
   } else {
     outputs.push({ id: OUTPUT_PORT, label: "" });
   }

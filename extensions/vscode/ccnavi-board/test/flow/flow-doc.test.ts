@@ -476,7 +476,7 @@ function loopFlow(): FlowDoc {
   };
 }
 
-test("CB-T322 繰り返し（loop）は部品箱の 7 番目で、足すと出口 2 つ（繰り返す / 抜ける）と上限 3 の既定で作る", () => {
+test("CB-T322 繰り返し（loop）は部品箱の 8 番目で、足すと出口 2 つ（繰り返す / 抜ける）と上限 3 の既定で作る", () => {
   assert.deepEqual([...PALETTE], ["start", "end", "prompt", "subAgent", "askUserQuestion", "ifElse", "switch", "loop", "skill"]);
   const added = addNode(templateFlow("i0001-01-01", "調査"), "loop", { x: 1, y: 2 });
   assert.equal(added.id, "loop-1");
@@ -536,4 +536,23 @@ test("CB-T325 繰り返しを複製・貼り付けしても出口の項目（bod
   assert.ok(clip !== undefined);
   const pasted = pasteNodes(doc, clip);
   assert.deepEqual(portsOf(pasted.doc.nodes.find((n) => n.id === pasted.ids[0]) as FlowNode, []).outputs.map((p) => p.label), ["繰り返す", "抜ける"]);
+});
+
+test("CB-T326 項目の id（body / done）で書いた線は、branch-<番号> の出口と別に並べず、その id を出口にする。両方で書けば id の出口が足される", () => {
+  const doc = loopFlow();
+  const node = doc.nodes.find((n) => n.id === "loop-1") as FlowNode;
+  const byId = [
+    { id: "c2", from: "loop-1", to: "end", fromPort: "done", toPort: "input" },
+    { id: "c3", from: "loop-1", to: "end", fromPort: "body", toPort: "input" },
+  ];
+  assert.deepEqual(portsOf(node, byId).outputs, [
+    { id: "body", label: "繰り返す" },
+    { id: "done", label: "抜ける" },
+  ]);
+  // `branch-<番号>` で書いた線だけなら従来どおり。
+  const byIndex = byId.map((c, i) => ({ ...c, fromPort: `branch-${1 - i}` }));
+  assert.deepEqual(portsOf(node, byIndex).outputs.map((p) => p.id), ["branch-0", "branch-1"]);
+  // 片方ずつ別の表記なら、それぞれの出口になる。
+  const mixed = [byId[0], { ...byId[1], fromPort: "branch-0" }];
+  assert.deepEqual(portsOf(node, mixed).outputs.map((p) => p.id), ["branch-0", "done"]);
 });
