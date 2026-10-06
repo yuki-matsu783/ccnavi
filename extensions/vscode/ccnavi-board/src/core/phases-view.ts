@@ -99,7 +99,7 @@ export interface PhasesPage {
   readonly lock: Lock;
   /** 上部に出す注意（実行ファイルがこの設定を読めていない、など） */
   readonly notices?: readonly string[];
-  /** 上部に error の帯で出す文（共通の設定に phases.yml がある、など）。画面は開いたまま、保存も止めない */
+  /** 上部に error の帯で出す文（共通の設定に phases.yml がある、など）。画面は開いたまま。`--lint` が error を言う間は保存できない（先に消すか config へ移す） */
   readonly errors?: readonly string[];
   /** 開いている対象と、切り替えられる対象。無ければ切り替えの欄を出さない */
   readonly target?: { readonly kind: string; readonly name: string };
