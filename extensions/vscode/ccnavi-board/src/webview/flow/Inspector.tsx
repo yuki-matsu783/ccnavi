@@ -229,6 +229,23 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
         </>
       )}
       {(type === "ifElse" || type === "switch") && text("evaluationTarget", "何で分けるか")}
+      {type === "loop" && (
+        <>
+          {text("condition", "繰り返す条件")}
+          <label className="field">
+            <span title="data.maxIterations">繰り返す回数の上限</span>
+            <input
+              type="number"
+              className="f-maxIterations"
+              min={1}
+              step={1}
+              value={dataText(node, "maxIterations")}
+              disabled={readOnly}
+              onChange={(event) => onChange(patchData(doc, node.id, { maxIterations: /^\d{1,15}$/.test(event.target.value) ? Number(event.target.value) : event.target.value }), `node:${node.id}:maxIterations`)}
+            />
+          </label>
+        </>
+      )}
       {type === "skill" && (
         <>
           {pickable("name", "スキルの名前", candidates?.skills, "flow-skill-candidates", "")}
@@ -288,7 +305,9 @@ function Branches({ doc, node, readOnly, onChange }: { readonly doc: FlowDoc; re
   const items = branchItems(node);
   const second = options ? "description" : "condition";
   // if / else の出口は真と偽の 2 本で決まっている（増やすなら switch）
-  const fixed = nodeType(node) === "ifElse";
+  // 繰り返しの出口は「繰り返す」と「抜ける」の 2 本で決まっていて、名前も直せない
+  const loop = nodeType(node) === "loop";
+  const fixed = nodeType(node) === "ifElse" || loop;
   return (
     <fieldset className="branches">
       <legend title={`data.${key ?? ""}`}>{options ? "選択肢（1 件ずつが出口）" : "出口"}</legend>
@@ -299,17 +318,17 @@ function Branches({ doc, node, readOnly, onChange }: { readonly doc: FlowDoc; re
             className="f-branch-label"
             value={str(item.label)}
             placeholder="名前"
-            disabled={readOnly}
+            disabled={readOnly || loop}
             onChange={(event) => onChange(patchBranch(doc, node.id, index, { label: event.target.value }), `node:${node.id}:branch:${index}:label`)}
           />
-          <input
+          {!loop && <input
             type="text"
             className={`f-branch-${second}`}
             value={str(item[second])}
             placeholder={options ? "説明" : "条件"}
             disabled={readOnly}
             onChange={(event) => onChange(patchBranch(doc, node.id, index, { [second]: event.target.value }), `node:${node.id}:branch:${index}:${second}`)}
-          />
+          />}
           {!fixed && (
             <button type="button" className="action small" data-action="remove-branch" disabled={readOnly || items.length <= 1} title="この出口と、そこから出る線を消します" onClick={() => onChange(removeBranch(doc, node.id, index))}>
               消す

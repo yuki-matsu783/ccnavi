@@ -53,6 +53,8 @@ export function summaryOf(node: FlowNode): string {
       const target = dataText(node, "evaluationTarget");
       return line(target !== "" ? target : branchItems(node).map((b) => String(b.label ?? "")).join(" / "));
     }
+    case "loop":
+      return line(dataText(node, "condition"));
     case "skill":
       return line(dataText(node, "name"));
     case "mcp":

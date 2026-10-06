@@ -43,7 +43,7 @@ YAML の 1 文書で、最上位はマッピング。ボードのフロー編集
 膨らむ（billion laughs）。手順書に別名は要らないので、量で切らずに別名ごと読まない。
 
 ノードの種類（`type`）のうち、ここが中身を読むのは `start` `end` `prompt` `subAgent`
-`askUserQuestion` `ifElse` `switch` `branch` `skill` `mcp` `subAgentFlow` `codex`
+`askUserQuestion` `ifElse` `switch` `loop` `branch` `skill` `mcp` `subAgentFlow` `codex`
 `branchSession`。知らない種類は落とさず、種類の名前と `name` だけで並べる。
 `group` は図の上の囲み（ボードの枠）で手順ではないので並べない（中のノードは `parentId` が
 あっても、ほかのノードと同じに並べる）。
@@ -847,6 +847,13 @@ def briefing(
             f"    {flow_shape.ASK} のノード: サブエージェントはユーザに聞けない"
             "（AskUserQuestion は渡されない）。そのノードで手を止め、問いと選択肢を添えて"
             "メインに返してください。メインがユーザに聞き、答えを持って同じサブエージェントを再開させる。"
+        )
+    if flow_shape.LOOP in kinds:
+        lines.append(
+            f"    {flow_shape.LOOP} のノード: 条件が成り立つあいだ「繰り返す」側へ進み、"
+            "成り立たなくなったか、繰り返した回数が最大に達したら「抜ける」側へ進んでください。"
+            "回数は自分で数えてください。最大に達しても条件が成り立つままだったときは、"
+            "最後の報告にそのことを書いてください。"
         )
     if kinds & set(SPAWN):
         lines.append(

@@ -9,6 +9,8 @@ import {
   addBranch,
   addNode,
   connect,
+  copyNodes,
+  duplicateNodes,
   connectionLabel,
   connectionsOf,
   flowNotices,
@@ -17,6 +19,8 @@ import {
   moveNode,
   nesting,
   parseFlow,
+  PALETTE,
+  pasteNodes,
   patchBranch,
   patchData,
   placeNode,
@@ -457,4 +461,98 @@ test("CB-T258 グループの大きさを変える。左や上の辺を動かし
   // 変わらなければ同じものを返す。グループでないものは変えない
   assert.equal(resizeGroup(doc, "group-1", { width: 238, height: 166 }, { x: 76, y: 48 }), doc);
   assert.equal(resizeGroup(doc, "a", { width: 500, height: 500 }), doc);
+});
+
+function loopFlow(): FlowDoc {
+  const base = templateFlow("i0001-01-01", "調査");
+  const added = addNode(base, "loop", { x: 200, y: 100 });
+  return {
+    ...added.doc,
+    connections: [
+      { id: "c1", from: "start", to: added.id, fromPort: "output", toPort: "input" },
+      { id: "c2", from: added.id, to: "end", fromPort: "done", toPort: "input" },
+      { id: "c3", from: added.id, to: added.id === "end" ? "start" : "end", fromPort: "branch-0", toPort: "input" },
+    ],
+  };
+}
+
+test("CB-T322 繰り返し（loop）は部品箱の 8 番目で、足すと出口 2 つ（繰り返す / 抜ける）と上限 3 の既定で作る", () => {
+  assert.deepEqual([...PALETTE], ["start", "end", "prompt", "subAgent", "askUserQuestion", "ifElse", "switch", "loop", "skill"]);
+  const added = addNode(templateFlow("i0001-01-01", "調査"), "loop", { x: 1, y: 2 });
+  assert.equal(added.id, "loop-1");
+  const node = added.doc.nodes.find((n) => n.id === "loop-1");
+  assert.ok(node !== undefined);
+  assert.equal(node.name, "繰り返し");
+  assert.deepEqual(node.data, {
+    label: "",
+    condition: "",
+    maxIterations: 3,
+    branches: [
+      { id: "body", label: "繰り返す" },
+      { id: "done", label: "抜ける" },
+    ],
+  });
+  assert.deepEqual(portsOf(node, []).outputs, [
+    { id: "branch-0", label: "繰り返す" },
+    { id: "branch-1", label: "抜ける" },
+  ]);
+  assert.deepEqual(portsOf(node, []).inputs, [{ id: "input", label: "" }]);
+});
+
+test("CB-T323 繰り返しの線の言葉は出口の項目の id（body / done）か branch-<番号> で当たり、項目の label が出る。欄を直しても出口は変わらない", () => {
+  const doc = loopFlow();
+  assert.deepEqual(connectionsOf(doc).map((c) => connectionLabel(doc, c)), ["", "抜ける", "繰り返す"]);
+  const body = connect(doc, "loop-1", "body", "end", "input");
+  assert.equal(connectionLabel(body, connectionsOf(body)[connectionsOf(body).length - 1]), "繰り返す");
+  const patched = patchData(patchData(doc, "loop-1", { condition: "テストが落ちる" }), "loop-1", { maxIterations: 5 });
+  const node = patched.nodes.find((n) => n.id === "loop-1");
+  assert.deepEqual(node?.data, { label: "", condition: "テストが落ちる", maxIterations: 5, branches: [{ id: "body", label: "繰り返す" }, { id: "done", label: "抜ける" }] });
+});
+
+test("CB-T324 書き出して読み直しても maxIterations は数のまま（文字列にならない）。出口の id も残る", () => {
+  const doc = patchData(loopFlow(), "loop-1", { condition: "テストが落ちる", maxIterations: 7 });
+  const text = serializeFlow(doc);
+  assert.match(text, /maxIterations: 7\n/);
+  assert.doesNotMatch(text, /maxIterations: ["']/);
+  const read = parseFlow(text);
+  assert.ok(read.ok);
+  const node = read.doc.nodes.find((n) => n.id === "loop-1");
+  assert.strictEqual(node?.data && (node.data as Record<string, unknown>).maxIterations, 7);
+  assert.deepEqual((node?.data as Record<string, unknown>).branches, [{ id: "body", label: "繰り返す" }, { id: "done", label: "抜ける" }]);
+  assert.deepEqual(parse(text), parse(serializeFlow(read.doc)));
+});
+
+test("CB-T325 繰り返しを複製・貼り付けしても出口の項目（body / done）と上限は同じで、線の出口（done / branch-0）も付いたまま", () => {
+  const doc = loopFlow();
+  const dup = duplicateNodes(doc, ["loop-1", "end"]);
+  assert.ok(dup !== undefined);
+  assert.deepEqual(dup.ids, ["end-1", "loop-2"]);
+  const copy = dup.doc.nodes.find((n) => n.id === "loop-2");
+  const orig = dup.doc.nodes.find((n) => n.id === "loop-1");
+  assert.deepEqual(copy?.data, orig?.data);
+  assert.notEqual(copy?.data, orig?.data);
+  assert.deepEqual(connectionsOf(dup.doc).slice(3).map((c) => [c.from, c.fromPort, c.to]), [["loop-2", "done", "end-1"], ["loop-2", "branch-0", "end-1"]]);
+  const clip = copyNodes(doc, ["loop-1"]);
+  assert.ok(clip !== undefined);
+  const pasted = pasteNodes(doc, clip);
+  assert.deepEqual(portsOf(pasted.doc.nodes.find((n) => n.id === pasted.ids[0]) as FlowNode, []).outputs.map((p) => p.label), ["繰り返す", "抜ける"]);
+});
+
+test("CB-T326 項目の id（body / done）で書いた線は、branch-<番号> の出口と別に並べず、その id を出口にする。両方で書けば id の出口が足される", () => {
+  const doc = loopFlow();
+  const node = doc.nodes.find((n) => n.id === "loop-1") as FlowNode;
+  const byId = [
+    { id: "c2", from: "loop-1", to: "end", fromPort: "done", toPort: "input" },
+    { id: "c3", from: "loop-1", to: "end", fromPort: "body", toPort: "input" },
+  ];
+  assert.deepEqual(portsOf(node, byId).outputs, [
+    { id: "body", label: "繰り返す" },
+    { id: "done", label: "抜ける" },
+  ]);
+  // `branch-<番号>` で書いた線だけなら従来どおり。
+  const byIndex = byId.map((c, i) => ({ ...c, fromPort: `branch-${1 - i}` }));
+  assert.deepEqual(portsOf(node, byIndex).outputs.map((p) => p.id), ["branch-0", "branch-1"]);
+  // 片方ずつ別の表記なら、それぞれの出口になる。
+  const mixed = [byId[0], { ...byId[1], fromPort: "branch-0" }];
+  assert.deepEqual(portsOf(node, mixed).outputs.map((p) => p.id), ["branch-0", "done"]);
 });

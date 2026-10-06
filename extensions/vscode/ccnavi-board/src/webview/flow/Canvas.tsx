@@ -366,6 +366,7 @@ function minimapColor(node: FlowNodeView): string {
       return "var(--vscode-editorWarning-foreground)";
     case "ifElse":
     case "switch":
+    case "loop":
       return "var(--vscode-charts-orange, var(--vscode-editorWarning-foreground))";
     default:
       return "var(--vscode-descriptionForeground)";

@@ -156,6 +156,7 @@ subAgentFlows:             # 無くてよい
 | `subAgent` | `description`・`prompt`・`builtInType` |
 | `askUserQuestion` | `questionText`・`options[].label`・`multiSelect` |
 | `ifElse` / `switch` / `branch` | `evaluationTarget`・`branches[].label` / `condition` |
+| `loop` | `condition`・`maxIterations`・`branches[].label`（出口は `body` = 繰り返す・`done` = 抜ける） |
 | `skill` | `name`・`description` |
 | `mcp` | `serverId`・`toolName` |
 | `subAgentFlow` | `label`・`subAgentFlowId`（`subAgentFlows[]` の名前を引く） |
@@ -163,6 +164,13 @@ subAgentFlows:             # 無くてよい
 
 **`group` は並べない。** ボードの図の上の囲み（枠）で、手順ではない。線が繋がっていても辿らない。中のノード
 （`parentId` を持つ）はほかのノードと同じに並べる。読めるか・形（`shape_problem`）の検査はほかのノードと同じ。
+
+**`loop` は反復。** 条件が成り立つあいだ「繰り返す」側（`body`）へ進み、成り立たなくなるか `maxIterations` 回に達したら
+「抜ける」側（`done`）へ進む。回の数え方と判断はサブエージェントがする（フローは案内で、ccnavi は数えない）。
+`SubagentStart` の手順には `5. [loop] 名前: 条件: … / 最大 3 回 → 2（繰り返す）, 6（抜ける）` と 1 行で並び、`loop` が
+あるフローには、数え方と「最大に達しても条件が成り立つままなら最後の報告に書く」という段落が足される。出口は分岐と同じ
+仕組み（`branches` の項目の `id` か `branch-<番号>`）で、画面は 2 項目を固定する。`maxIterations` が無い・1 以上の整数でない
+ときの手順は「最大回数が書かれていない（1 以上の整数でない）」と並ぶ。
 
 **知らない種類も落とさない。** 種類の名前と `name` だけで並べ、サブエージェントに中身を読ませる。
 分岐の出口は、`condition` があればそれ、無ければ出口の名前（`fromPort`）が項目の `id` とちょうど同じか、
@@ -190,11 +198,11 @@ subAgentFlows:             # 無くてよい
 error があれば理由を出して開かない・保存しない。
 
 **手順として怪しいところは warn。** 読めたフローには、線の構造（`flow_shape.structure_problems`。無いノードを指す線、
-`start` から届かないノード、`start` に入る線・`end` から出る線、分岐・問いの出口に線が無い、`start` / `end` が無い。
+`start` から届かないノード、`start` に入る線・`end` から出る線、分岐・問いの出口に線が無い、`start` / `end` が無い、`loop` の条件（`condition` が空）・上限（`maxIterations`）・出口（`branches` の 2 項目）、`loop` の「繰り返す」側（`body`）を通らない巡回。
 出口は画面の `portsOf` と同じに読み、複数選択の問いは `output` の 1 本、グループへ出る線も出口を使ったと数える。
 無いノードを指す線は `ITEM_LIMIT` 件まで言い、残りは数だけ）と、
 `subAgent` の種類・`skill` の名前の表記（`flow_shape.name_problems`。候補は `flow.catalog`）を `(flow)` の warn で足す。
-読むのも保存も止めない（既に在るフローを読めなくしない）。巡回は意図して書くことがあるので言わない。`SubagentStart` は
+読むのも保存も止めない（既に在るフローを読めなくしない）。巡回は `loop` の「繰り返す」側の線を通るものだけを正しい巡回として扱い、通らない巡回（「抜ける」側が巡回に戻る形を含む）は warn で言う（回数の上限が効かず終わらなくなりうる）。`SubagentStart` は
 これを見ない。`--json` には、渡る手順の行（`flow.rendered`。`flow_render.render` のまま）と選べる名前（`flow.candidates`。
 組み込みと、ワークスペースの `.claude/agents` `.claude/skills`。ディレクトリの中だけを見る）も載せる。
 

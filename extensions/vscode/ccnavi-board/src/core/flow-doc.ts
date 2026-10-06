@@ -59,7 +59,7 @@ export type FlowRead = { readonly ok: true; readonly doc: FlowDoc } | { readonly
 // ---- 種類
 
 /** 画面の部品箱に並べる種類。並べる順もこの順 */
-export const PALETTE = ["start", "end", "prompt", "subAgent", "askUserQuestion", "ifElse", "switch", "skill"] as const;
+export const PALETTE = ["start", "end", "prompt", "subAgent", "askUserQuestion", "ifElse", "switch", "loop", "skill"] as const;
 export type PaletteType = (typeof PALETTE)[number];
 
 /** 種類の呼び名。部品箱とノードの見出しに出す */
@@ -71,6 +71,7 @@ export const TYPE_LABELS: Readonly<Record<string, string>> = {
   askUserQuestion: "ユーザに聞く",
   ifElse: "分岐（if / else）",
   switch: "分岐（switch）",
+  loop: "繰り返し",
   branch: "分岐",
   skill: "スキル",
   mcp: "MCP",
@@ -87,7 +88,7 @@ export function isEditableType(type: string): type is PaletteType {
 
 /** 分岐の出口を持つ種類。出口は `data` のリスト（`branches` か `options`）の 1 件ずつ */
 export function branchKey(type: string): "branches" | "options" | undefined {
-  if (type === "ifElse" || type === "switch" || type === "branch") {
+  if (type === "ifElse" || type === "switch" || type === "loop" || type === "branch") {
     return "branches";
   }
   if (type === "askUserQuestion") {
@@ -366,6 +367,16 @@ export function defaultData(type: PaletteType): Record<string, unknown> {
         branches: [
           { label: "ケース 1", condition: "" },
           { label: "既定", condition: "default" },
+        ],
+      };
+    case "loop":
+      return {
+        label: "",
+        condition: "",
+        maxIterations: 3,
+        branches: [
+          { id: "body", label: "繰り返す" },
+          { id: "done", label: "抜ける" },
         ],
       };
     case "skill":
@@ -978,7 +989,14 @@ export function portsOf(node: FlowNode, connections: readonly FlowConnection[]):
   if (type === "end") {
     // 出口なし
   } else if (key !== undefined && !multi) {
-    branchItems(node).forEach((item, index) => outputs.push({ id: branchPort(index), label: str(item.label) }));
+    // 線が項目の `id`（`body` / `done` など）で出口を指しているなら、その `id` を出口にする（`branch-<番号>` と
+    // 別の出口が並ぶのを避ける。実行ファイルの出口の読み方と同じく、項目の `id` でも `branch-<番号>` でも当たる）
+    const used = new Set(connections.filter((c) => connectionFrom(c) === node.id).map((c) => connectionFromPort(c)));
+    branchItems(node).forEach((item, index) => {
+      const id = labelText(item.id);
+      const byId = id !== "" && used.has(id) && !used.has(branchPort(index));
+      outputs.push({ id: byId ? id : branchPort(index), label: str(item.label) });
+    });
   } else {
     outputs.push({ id: OUTPUT_PORT, label: "" });
   }

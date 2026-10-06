@@ -2332,8 +2332,8 @@ ccnavi --lint --json --flow /tmp/flow.yml
 
 読めたフローには、手順として怪しいところを `(flow)` の warn で足す（読むのも保存も止めない）。線の `from` / `to` が
 無いノードを指す、`start` から届かないノード（`group` は外す）、`start` に入る線、`end` から出る線、分岐・問いの出口に
-線が無い、`start` / `end` が無い、`subAgent` の `builtInType` と `skill` の `name` が `flow.candidates` に無い
-（大文字小文字だけ違えば正しい表記を添える。空の欄と `:` を含むプラグインのスキルは報告しない）。巡回は報告しない。
+線が無い、`start` / `end` が無い、`loop` の `condition` が空・`maxIterations` が 1 以上の整数でない・出口（`branches`）が 2 つでない、`loop` の繰り返す側を通らない巡回、`subAgent` の `builtInType` と `skill` の `name` が `flow.candidates` に無い
+（大文字小文字だけ違えば正しい表記を添える。空の欄と `:` を含むプラグインのスキルは報告しない）。`loop` の繰り返す側を通る巡回は報告しない。
 `detail` は error と同じく渡したパスで始まる。
 
 `flow.data` は読めた中身を JSON にしたもの（`flow.as_json`）。PyYAML（YAML 1.1）の読みのままで、`0755` は 493、
