@@ -5,7 +5,7 @@
  * - `diffFlows` は足した・消した・変えたノードと線。ノードは `id` で、線は両端と出入口
  *   （`from` `fromPort` `to` `toPort`）で突き合わせる（ユーザが書いた線は `id` が無いことも重なることもある）。
  *   同じ両端と出入口の線が何本もあれば、配列の順に突き合わせる
- * - `sameFlowIgnoringLayout` は位置とグループ化（`position` `style` `parentId`・`type: group` のノード）を除いて見比べる。
+ * - `sameFlowIgnoringLayout` は位置とグループ化（`position` `style` `parentId`・`type: group` のノード。サブフローの中も）を除いて見比べる。
  *   「提案あり」の判定に使う。`textDiff` も同じ除き方をする
  * - `textDiff` は同じ突き合わせで、変わった欄の名前だけでなく値の前後（文はそのまま）まで並べる。エージェントの
  *   下書きを取り込む前に見せる。フローの文は担当のサブエージェントへの案内文になるので、ユーザが
@@ -57,12 +57,19 @@ export function sameFlow(a: FlowDoc, b: FlowDoc): boolean {
 /** 見た目だけの欄（位置・グループの大きさと所属）。担当に渡る手順に効かない */
 const LAYOUT_KEYS: ReadonlySet<string> = new Set(["position", "style", "parentId"]);
 
-/** 位置とグループを除いたフロー。グループの枠（`type: group`）のノードも除く。下書きの見比べに使う */
-function withoutLayout(doc: FlowDoc): FlowDoc {
-  const nodes = doc.nodes
+function nodesWithoutLayout(nodes: readonly FlowNode[]): FlowNode[] {
+  return nodes
     .filter((node) => nodeType(node) !== "group")
     .map((node) => Object.fromEntries(Object.entries(node).filter(([key]) => !LAYOUT_KEYS.has(key))) as FlowNode);
-  return { ...doc, nodes };
+}
+
+/** 位置とグループを除いたフロー。グループの枠（`type: group`）のノードも除く。サブフロー（`subAgentFlows`）の中も同じ。下書きの見比べに使う */
+function withoutLayout(doc: FlowDoc): FlowDoc {
+  const flows = doc.subAgentFlows;
+  const subFlows = Array.isArray(flows)
+    ? flows.map((flow) => (isRecord(flow) && Array.isArray(flow.nodes) ? { ...flow, nodes: nodesWithoutLayout(flow.nodes as FlowNode[]) } : flow))
+    : flows;
+  return { ...doc, nodes: nodesWithoutLayout(doc.nodes), ...(flows === undefined ? {} : { subAgentFlows: subFlows }) };
 }
 
 /** 位置とグループ化の違いを無視して、中身が同じか（「提案あり」の判定） */

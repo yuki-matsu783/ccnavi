@@ -302,6 +302,20 @@ test("CB-T306 下書きの見比べは、位置とグループ化の違いを見
   const ungrouped = { ...flat, nodes: flat.nodes.filter((n) => n.type !== "group").map(({ parentId: _parent, ...rest }) => rest) } as FlowDoc;
   assert.equal(sameFlowIgnoringLayout(flat, ungrouped), true);
   assert.deepEqual(textDiff(flat, ungrouped), { changes: [] });
+  // サブフロー（subAgentFlows）の中の位置・グループも見ない。通常のノードだけの style も見ない
+  const sub = (x: number, extra: object = {}): FlowDoc => ({
+    ...doc,
+    subAgentFlows: [{ id: "s", name: "S", nodes: [{ id: "n", type: "prompt", name: "N", position: { x, y: 0 }, data: { prompt: "p" }, ...extra }], connections: [] }],
+  });
+  assert.equal(sameFlowIgnoringLayout(sub(1), sub(2)), true);
+  assert.equal(sameFlowIgnoringLayout(sub(1), sub(1, { parentId: "g", style: { width: 1 } })), true);
+  assert.deepEqual(textDiff(sub(1), sub(2)), { changes: [] });
+  assert.equal(sameFlowIgnoringLayout(sub(1), { ...sub(1), subAgentFlows: [{ id: "s", name: "別名", nodes: [], connections: [] }] }), false);
+  const styled = { ...doc, nodes: doc.nodes.map((n) => (n.id === "end" ? { ...n, style: { width: 9 } } : n)) } as FlowDoc;
+  assert.equal(sameFlowIgnoringLayout(doc, styled), true);
+  // グループ枠の名前だけが違っても見ない（枠は手順ではない）
+  const renamed = { ...doc, nodes: doc.nodes.map((n) => (n.type === "group" ? { ...n, name: "別の枠" } : n)) } as FlowDoc;
+  assert.equal(sameFlowIgnoringLayout(doc, renamed), true);
   // 中身（文）が違えば、位置が同じでも違う
   const edited = patchData(doc, "p-1", { prompt: "別の手順" });
   assert.equal(sameFlowIgnoringLayout(doc, edited), false);
