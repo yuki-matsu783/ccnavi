@@ -74,7 +74,7 @@ EVENTS = (
     "SubagentStop",
 )
 REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_BIN_PATH")
-# 置き場を動かしていた 6 つ。廃止した（置き場は固定）。導入スクリプトは書かず、既にあれば外す。
+# 置き場を動かしていた 6 つ。廃止した（置き場は固定）。導入スクリプトは書かない。
 # 値は既定の置き場（設計 wip/design/i0064-fixed-places.md §1）。
 PLACE_ENV_DEFAULTS = {
     "CCNAVI_PROJECTS": "projects",
@@ -342,7 +342,7 @@ class WritesTheExpectedShape(SetupTest):
         """env の値そのものを見る。存在するだけでは、取り違えを見つけられない。
 
         置き場を動かす 6 つは書かない（置き場は固定）ので、ここでは見ない。書かないことは
-        `RemovesThePlaceVariables` が見る。
+        `DoesNotWriteThePlaceVariables` が見る。
         """
         self.run_setup("--mode", "enable")
         env = self.read_settings()["env"]
@@ -453,15 +453,11 @@ class WritesTheExpectedShape(SetupTest):
             self.assertTrue(names(missing, f".ccnavi/scripts/{name}"), name)
 
 
-class RemovesThePlaceVariables(SetupTest):
-    """置き場を動かす 6 つの env は書かず、既にあれば外す（置き場は固定。設計 §5、A7）。
+class DoesNotWriteThePlaceVariables(SetupTest):
+    """置き場を動かす 6 つの env は書かない（置き場は固定。設計 §5、A7）。
 
-    `env` は導入スクリプトが持つ欄で、読まれない語を残さない（共通レイヤーの 3 本と同じ理由）。
-    外した値が既定と違っていれば、名前と値を 1 行ずつ出す。既定と同じ値は黙って外す。
-    導入は止めず、終了コードも変えない。
-
-    実装前は赤。赤の理由は、導入スクリプトがまだ `CCNAVI_LOG` を書き、`--all` が 4 つを書き、
-    既存の 6 つを外さないこと。
+    `env` は導入スクリプトが持つ欄で、読まれない語を混ぜない（共通レイヤーの 3 本と同じ理由）。
+    導入済みの env からの除去はしない（旧版の配布先が無いため）。
     """
 
     def written(self, *args):
@@ -476,96 +472,6 @@ class RemovesThePlaceVariables(SetupTest):
             for name in PLACE_ENV_DEFAULTS:
                 with self.subTest(args=args, name=name):
                     self.assertNotIn(name, env)
-
-    def existing(self, **differing):
-        """6 つを既定と同じ値で並べ、`differing` の分だけ別の値にした env。"""
-        env = dict(PLACE_ENV_DEFAULTS)
-        env.update(differing)
-        env["PYTHONUTF8"] = "1"
-        return env
-
-    def test_removes_all_six_from_an_existing_env_and_keeps_the_rest(self):
-        self.write_settings({"env": self.existing()})
-
-        env = self.written("--mode", "enable")
-
-        for name in PLACE_ENV_DEFAULTS:
-            with self.subTest(name=name):
-                self.assertNotIn(name, env)
-        self.assertEqual(env["PYTHONUTF8"], "1")
-        self.assertEqual(env["CCNAVI_MODE"], "enable")
-
-    def test_names_only_the_values_that_differ_from_the_default(self):
-        """既定と違う値だけを、名前と値つきで 1 行ずつ言う。既定と同じ値は黙って外す。"""
-        self.write_settings(
-            {"env": self.existing(CCNAVI_STATE="/var/ccnavi/state", CCNAVI_PROJECT_HOME=".navi")}
-        )
-
-        result = self.run_setup("--mode", "enable")
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        lines = result.stdout.splitlines()
-        state = [line for line in lines if "CCNAVI_STATE" in line]
-        self.assertEqual(len(state), 1, result.stdout)
-        self.assertIn(
-            "CCNAVI_STATE を .claude/settings.json から外しました（値: /var/ccnavi/state）",
-            state[0],
-        )
-        self.assertIn("logs/state", state[0])
-        self.assertIn("に固定されています", state[0])
-        home = [line for line in lines if "CCNAVI_PROJECT_HOME" in line]
-        self.assertEqual(len(home), 1, result.stdout)
-        self.assertIn("値: .navi）", home[0])
-        # 既定と同じ値だった 4 つは、名前も出さない。
-        for name in (
-            "CCNAVI_PROJECTS",
-            "CCNAVI_TICKETS_PROPOSAL",
-            "CCNAVI_TICKETS_APPROVED",
-            "CCNAVI_LOG",
-        ):
-            with self.subTest(name=name):
-                self.assertNotIn(name, result.stdout)
-
-    def test_names_the_old_record_name_written_by_an_earlier_setup(self):
-        """以前の導入スクリプトが書いた `CCNAVI_LOG=logs/log.jsonl` は、既定と違うとして名指しする。
-
-        記録のファイル名は `logs/decisions.jsonl` に改名された。env は読まれないので、
-        外すと記録の書き先が変わる。黙って外すと気付けない。
-        """
-        self.write_settings({"env": self.existing(CCNAVI_LOG="logs/log.jsonl")})
-
-        result = self.run_setup("--mode", "enable")
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        lines = [line for line in result.stdout.splitlines() if "CCNAVI_LOG" in line]
-        self.assertEqual(len(lines), 1, result.stdout)
-        self.assertIn("値: logs/log.jsonl）", lines[0])
-        self.assertIn("logs/decisions.jsonl", lines[0])
-
-    def test_says_nothing_when_every_value_was_the_default(self):
-        self.write_settings({"env": self.existing()})
-
-        result = self.run_setup("--mode", "enable")
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotIn("外しました", result.stdout)
-
-    def test_check_counts_a_leftover_as_not_settled_and_writes_nothing(self):
-        """`--check` は、6 つのどれかが残っていれば「揃っていない」に数える。打ち直せば消える。"""
-        self.run_setup("--mode", "enable")
-        data = self.read_settings()
-        data["env"]["CCNAVI_STATE"] = "logs/state"
-        self.write_settings(data)
-
-        checked = self.run_setup("--mode", "enable", "--check")
-
-        self.assertEqual(checked.returncode, 1, checked.stdout)
-        self.assertIn("CCNAVI_STATE", checked.stdout)
-        self.assertEqual(self.read_settings(), data, "--check が書いた")
-
-        self.run_setup("--mode", "enable")
-        self.assertNotIn("CCNAVI_STATE", self.read_settings()["env"])
-        self.assertEqual(self.run_setup("--mode", "enable", "--check").returncode, 0)
 
 
 @unittest.skipUnless(shutil.which("git"), "git が見つからない")

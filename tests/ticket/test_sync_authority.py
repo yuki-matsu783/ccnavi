@@ -879,8 +879,8 @@ class LintTest(AuthorityHarness):
                 {
                     "env": {
                         "CCNAVI_INTEGRATION_BRANCH": "develop",
-                        "CCNAVI_TICKETS_APPROVED": "elsewhere",
-                        "CCNAVI_STATE": "x",
+                        "CCNAVI_MODE": "disable",
+                        "CCNAVI_RESTORE_IF_DENY": "disable",
                         "CCNAVI_LOG_LEVEL": "DEBUG",
                     }
                 }
@@ -890,8 +890,8 @@ class LintTest(AuthorityHarness):
         named = [p for p in problems if "settings.local.json" in p["detail"]]
         self.assertEqual(2, len(named), named)
         self.assertTrue(all(p["severity"] == "error" for p in named))
-        self.assertTrue(any("CCNAVI_TICKETS_APPROVED" in p["detail"] for p in named))
-        self.assertTrue(any("CCNAVI_STATE" in p["detail"] for p in named))
+        self.assertTrue(any("CCNAVI_MODE" in p["detail"] for p in named))
+        self.assertTrue(any("CCNAVI_RESTORE_IF_DENY" in p["detail"] for p in named))
 
     def test_a_parent_tree_on_another_branch_is_named(self):
         git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
