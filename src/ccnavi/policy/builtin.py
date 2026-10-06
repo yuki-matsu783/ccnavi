@@ -166,8 +166,9 @@ _DENY: list[dict] = [
         "match": "Bash|Read|Write|Edit",
         # 先頭の境界（行頭・空白・区切り）を付ける。常時有効の土台なので、`jq '.env.X'` のような
         # フィールド参照や `process.env` を巻き込まない（リポジトリ自身の `credentials` と同じ形）。
+        # `.env` の後ろに続く `.envrc` `.env.local` は止める。
         "regex": (
-            r"(^|[ \\/\x00])\.(env|netrc|npmrc)\b"
+            r"(^|[ \\/\x00])\.(env|netrc|npmrc)"
             r"|(^|[ \\/\x00])\.ssh[\\/]"
             r"|\b(id_rsa|id_ed25519)\b"
         ),

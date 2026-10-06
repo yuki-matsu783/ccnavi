@@ -75,6 +75,8 @@ class AbsentRulesTest(ConfigUnionHarness):
         self.remove_common_rules()
         for tool, field, value in (
             ("Bash", "command", "cat .env"),
+            ("Bash", "command", "cat .envrc"),
+            ("Bash", "command", "cat x/.env.local"),
             ("Bash", "command", "cat ~/.ssh/id_rsa"),
             ("Read", "file_path", os.path.join(self.ws, ".env")),
             ("Write", "file_path", os.path.join(self.ws, "x", ".npmrc")),
