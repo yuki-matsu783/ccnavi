@@ -221,9 +221,18 @@ class _Family:
         )
         lines.append(f"    置き場のファイル: {file_state.label()}")
         if t.state == ticket_model.REVIEW:
+            # 依頼の前は「レビュー準備中」で、動くのは親（合流・ELI5・request）。
+            # 依頼の後に初めてユーザを待つ。
+            nxt = phase.review_next(self.root, self.conf, t, raw=self.raw)
+            if nxt and "request --phase" in nxt:
+                nxt += PARENT_ONLY
             lines.append(
-                "    次の一手: ユーザのレビューを待つ（ユーザが ccnavi-review.sh confirm / decide"
-                " で done/ へ動かす）"
+                "    次の一手: "
+                + (
+                    nxt
+                    or "ユーザのレビューを待つ（ユーザが ccnavi-review.sh confirm / decide"
+                    " で done/ へ動かす）"
+                )
             )
             return lines
         return lines + self._doing(t, file_state)

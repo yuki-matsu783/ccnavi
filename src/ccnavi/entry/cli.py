@@ -28,6 +28,7 @@ from ..tickets import (
     branchfind,
     configsync,
     history,
+    ticket_places,
 )
 from . import cli_args, cli_ops, cli_usage, diagnose, lint, suggest, version
 
@@ -323,8 +324,10 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
 
     C1 がコミットするのは状態だけ。
 
-    例外は 1 つだけ。`ticket start` の中で configsync がミラーしたプロジェクトの
-    `.ccnavi/common/`（`configsync.is_synced_write` が内容で読めるもの）。
+    例外は 2 つ。`ticket start` の中で configsync がミラーしたプロジェクトの
+    `.ccnavi/common/`（`configsync.is_synced_write` が内容で読めるもの）と、`review ready` が
+    消した途中の作業の置き場（`wip/`）のファイル（消したもの、つまり今は無いものだけ。
+    `review.remove_wip` が追跡済みのものだけを消す）。
     """
     conf, _ = settings.load(root)
     cli_args._override(conf, args)
@@ -334,9 +337,17 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
     )
     places = [cli_args._real(approved), cli_args._real(review_dir)]
     starting = list(args.command[:2]) == ["ticket", "start"]
+    readying = list(args.command[:2]) == ["review", "ready"]
+    wip = os.path.normcase(os.path.join(base, ticket_places.WIP_ROOT))
     found = []
     for real in reals:
         if cli_args._inside(real, base) and any(cli_args._inside(real, p) for p in places):
+            continue
+        if (
+            readying
+            and not os.path.lexists(real)
+            and os.path.normcase(real).startswith(wip + os.sep)
+        ):
             continue
         if (
             starting

@@ -1,0 +1,351 @@
+"""ワークツリーの片付け。`ccnavi worktree drop <名前>` と `ccnavi worktree tidy <親>`。
+
+`tidy` は `--phase <N>` でそのフェーズの子に絞れる。
+
+閉じた子と、Draft を外した親のワークツリーを ccnavi が消す。判断の要らない片付けを、エージェントへの
+案内（`ccnavi-clean.sh` → `worktree remove`）で済ませず、ccnavi の側に寄せる。呼ぶのは sh で、
+状態を書く操作が済んでから呼ぶ。
+
+- `confirm` が子を `done/` へ動かした後（`ccnavi-review.sh confirm`）: そのフェーズの子（延期を
+  引き受けた分を含む）のワークツリー
+- 親の `finish` の後（`ccnavi-ticket.sh finish <親>`）: 残っている子のワークツリー。
+  取りこぼしを拾う安全網
+- `ready` が Draft を外した後（`ccnavi-review.sh ready`）: 親のワークツリー
+
+C1 の中では書いたものが push の失敗で戻ることがあるので、C1 が送り終えてから呼ぶ。
+
+消し方は、生成物（`node_modules` など。`ccnavi-clean.js` と同じ名前）を先に消してから
+`git worktree remove`（`--force` なし）。Windows で深い `node_modules` が `worktree remove` を
+途中で止めるのを防ぐ。ブランチは消さない（コミットは残り、squash でマージするとローカルの
+ブランチは `branch -d` で消えないので、ユーザが消す）。
+
+消さないとき（何も消さずに理由を言う）:
+
+- cwd が消す対象の中にある。消すと呼び手の居場所が無くなり、Windows ではロックにもなる。
+  外へ出てから打つ 1 本（`ccnavi-clean.sh --worktree <名前>`）を出す
+- 未コミットの変更（未追跡を含む。無視したファイルは数えない）がある。別のセッションが作業している
+  見込みがあるので、変更を名指しする
+- git のワークツリーとして登録されていない、リンクである、など。任意の場所を消す手段にしない
+
+ネットワークには出ない。git はローカルの操作（`status`・`rev-parse`・`worktree remove`）だけ。
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import stat
+from dataclasses import dataclass
+from typing import TextIO
+
+from ..infra import gitcmd, settings, tree
+from . import approval, approval_checks, phase, ticket_model
+
+TIMEOUT_SECONDS = 30.0
+
+# どこにあっても生成物と言える名前と、隣に package.json があるときだけ生成物と見る名前。
+# `ccnavi-clean.js` の ALWAYS・BESIDE_PACKAGE_JSON と揃える。
+ALWAYS = frozenset({"node_modules", ".venv", "__pycache__", ".pytest_cache"})
+BESIDE_PACKAGE_JSON = frozenset({"out"})
+
+# drop の結果。
+REMOVED = "removed"
+ABSENT = "absent"
+CWD_INSIDE = "cwd"
+DIRTY = "dirty"
+REFUSED = "refused"
+
+# 未コミットの変更を名指しする行の上限。
+_SHOWN = 10
+
+
+@dataclass
+class Dropped:
+    """1 本のワークツリーを消した結果。`detail` は名指しする変更や、消せなかった理由。"""
+
+    name: str
+    status: str
+    path: str
+    detail: str = ""
+
+    @property
+    def removed(self) -> bool:
+        return self.status in (REMOVED, ABSENT)
+
+
+def keeps_worktree(t: ticket_model.Ticket) -> bool:
+    """閉じた子のワークツリーを残すか。
+
+    いまは「完了」以外（取り消し。`cancelled_at` がある）で閉じた子を残す。取り消した理由や
+    書きかけを後から見返せるようにするため。この扱いは暫定で、ユーザに確かめている。変えるときは
+    ここだけを直す（`tidy` と案内の文面はこの答えに従う）。
+    """
+    return bool(t.cancelled_at)
+
+
+def classifier_note(root: str, allow: str) -> str:
+    """自動モードの分類器に止められたときの道。`allow` は許可に足す 1 本の例。"""
+    return (
+        "Claude Code の自動モードの分類器に止められたら、迂回せずにユーザに許可を頼む。"
+        "続けて許すなら、ユーザがホームの ~/.claude/settings.json の permissions.allow に、"
+        f"この操作だけに絞った許可（例 `Bash({allow})`）を足す"
+        "（分類器はプロジェクトの .claude/settings.json を読まない。"
+        f"`{settings.script_command(root, 'ccnavi-git.sh')} *` のような広い許可は push まで"
+        "分類器を通さなくなるので勧めない）"
+    )
+
+
+def retry_command(root: str, name: str) -> str:
+    """外へ出てから打ち直す 1 本。"""
+    return f"{settings.script_command(root, 'ccnavi-clean.sh')} --worktree {name}"
+
+
+def drop(root: str, name: str, cwd: str) -> Dropped:
+    """`.claude/worktrees/<名前>` を消す。消さないときは理由を持って返す（何も消さない）。"""
+    path = tree.worktree_path(root, name)
+    if not name or name in (".", "..") or any(c in name for c in ("/", "\\", ":")):
+        return Dropped(
+            name, REFUSED, path, "名前にパスは書けない（.claude/worktrees/ の直下の名前）"
+        )
+    if not os.path.lexists(path):
+        return Dropped(name, ABSENT, path)
+    if os.path.islink(path) or _is_junction(path):
+        return Dropped(name, REFUSED, path, "リンクなので、リンクの先は消さない")
+    if not os.path.isdir(path):
+        return Dropped(name, REFUSED, path, "ディレクトリでない")
+    if _inside(cwd, path):
+        return Dropped(name, CWD_INSIDE, path)
+    owner, why = _owner(path)
+    if not owner:
+        return Dropped(name, REFUSED, path, why)
+    done = gitcmd.run(
+        path,
+        ["status", "--porcelain", "--untracked-files=all"],
+        TIMEOUT_SECONDS,
+        raw_paths=True,
+    )
+    if not done.ok:
+        return Dropped(
+            name, REFUSED, path, "git の状態を読めない。未コミットの変更を確かめられない"
+        )
+    changes = [line for line in done.out.splitlines() if line.strip()]
+    if changes:
+        shown = changes[:_SHOWN] + (
+            [f"…ほか {len(changes) - _SHOWN} 件"] if len(changes) > _SHOWN else []
+        )
+        return Dropped(name, DIRTY, path, "\n".join(shown))
+    failed = _clean_generated(path)
+    if failed:
+        return Dropped(name, REFUSED, path, failed)
+    done = gitcmd.run(owner, ["worktree", "remove", path], TIMEOUT_SECONDS)
+    if not done.ok:
+        said = (done.err or done.failure or "").strip().splitlines()
+        return Dropped(
+            name,
+            REFUSED,
+            path,
+            f"git worktree remove が通らない（{said[0] if said else '理由不明'}）",
+        )
+    return Dropped(name, REMOVED, path)
+
+
+def report(stdout: TextIO, root: str, d: Dropped) -> None:
+    """drop の結果を言う。消さなかったときも標準出力へ（呼び手の操作そのものは成功している）。"""
+    if d.status == REMOVED:
+        stdout.write(f"ワークツリー {d.name} を消した（{d.path}。ブランチは残してある）\n")
+    elif d.status == ABSENT:
+        stdout.write(f"ワークツリー {d.name} は無い（消すものが無い）\n")
+    elif d.status == CWD_INSIDE:
+        stdout.write(
+            f"cwd がワークツリー {d.name} の中にあるので消さなかった。"
+            "外（ワークスペースルートなど。エージェントは ExitWorktree か cd で出る）に出てから、"
+            "次を打つ:\n"
+            f"  {retry_command(root, d.name)}\n"
+            f"  {classifier_note(root, retry_command(root, d.name))}\n"
+        )
+    elif d.status == DIRTY:
+        stdout.write(
+            f"ワークツリー {d.name} に未コミットの変更があるので、何も消さなかった"
+            "（別のセッションが作業している見込みがある）。ユーザに確かめてもらう:\n"
+        )
+        for line in d.detail.splitlines():
+            stdout.write(f"  {line}\n")
+    else:
+        stdout.write(f"ワークツリー {d.name} を消さなかった: {d.detail}\n")
+
+
+def run_drop(stdout: TextIO, stderr: TextIO, root: str, name: str, cwd: str) -> int:
+    """`worktree drop <名前>`。消したか、もともと無ければ 0。消さなかったら 1。"""
+    d = drop(root, name, cwd)
+    report(stdout, root, d)
+    return 0 if d.removed else 1
+
+
+def tidy_targets(
+    root: str, conf: settings.Settings, family: str, phase_no: int | None = None
+) -> list[ticket_model.Ticket]:
+    """片付けの候補。閉じた（`done/` の）子のうち、`phase_no` があればそのフェーズ（延期を
+    引き受けた分を含む）の子。残すかどうか（`keeps_worktree`）はまだ見ない。"""
+    closed, _ = approval.scan(conf, root, closed=True)
+    children = approval_checks.children_of(closed, family)
+    if phase_no is not None:
+        numbers = {phase_no}
+        for ph in phase.phases_of(root, conf, family):
+            if ph.number == phase_no:
+                numbers |= set(ph.covers)
+        children = [t for t in children if t.phase in numbers]
+    seen: set[str] = set()
+    out = []
+    for t in sorted(children, key=lambda t: t.ticket):
+        if t.ticket in seen:
+            continue
+        seen.add(t.ticket)
+        out.append(t)
+    return out
+
+
+def run_tidy(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    family: str,
+    phase_no: int | None,
+    cwd: str,
+) -> int:
+    """`worktree tidy <親> [--phase <N>]`。閉じた子のワークツリーを消す。
+
+    消さなかったもの（cwd・未コミット・登録が無いなど）が 1 本でもあれば 1。何も無ければ黙って 0。
+    """
+    code = 0
+    for t in tidy_targets(root, conf, family, phase_no):
+        path = tree.worktree_path(root, t.ticket)
+        if not os.path.lexists(path):
+            continue
+        if keeps_worktree(t):
+            stdout.write(
+                f"ワークツリー {t.ticket} は残す（完了ではなく取り消しで閉じた子。"
+                f"要らなければ '{retry_command(root, t.ticket)}' で消せる）\n"
+            )
+            continue
+        d = drop(root, t.ticket, cwd)
+        report(stdout, root, d)
+        if not d.removed:
+            code = 1
+    return code
+
+
+def _owner(path: str) -> tuple[str, str]:
+    """ワークツリーの元リポジトリ（`worktree remove` を打つ場所）。無ければ ("", 理由)。
+
+    `.git` がファイル（リンクされたワークツリー）であることを求める。ディレクトリなら
+    それ自身がリポジトリで、ワークツリーとして消す対象ではない。
+    """
+    if not os.path.isfile(os.path.join(path, ".git")):
+        return "", "git のワークツリーとして登録されていない（.git のファイルが無い）ので消さない"
+    done = gitcmd.run(path, ["rev-parse", "--git-common-dir"], TIMEOUT_SECONDS)
+    common = done.out.strip() if done.ok else ""
+    if not common:
+        return "", "元のリポジトリを読めない（git rev-parse --git-common-dir が通らない）"
+    if not os.path.isabs(common):
+        common = os.path.join(path, common)
+    common = os.path.normpath(common)
+    if os.path.basename(common) != ".git":
+        return "", f"元のリポジトリの形が読めない（{common}）"
+    return os.path.dirname(common), ""
+
+
+def _inside(cwd: str, path: str) -> bool:
+    if not cwd:
+        return False
+    here = _canonical(cwd)
+    top = _canonical(path)
+    return here == top or here.startswith(top + os.sep)
+
+
+def _canonical(path: str) -> str:
+    try:
+        resolved = os.path.realpath(path)
+    except OSError:
+        resolved = os.path.abspath(path)
+    return os.path.normcase(os.path.normpath(resolved))
+
+
+def _is_junction(path: str) -> bool:
+    check = getattr(os.path, "isjunction", None)
+    return bool(check and check(path))
+
+
+def _long(path: str) -> str:
+    """Windows では 260 文字を超えるパスを扱える表記にする。ほかはそのまま。"""
+    if os.name != "nt":
+        return path
+    full = os.path.abspath(path)
+    if full.startswith("\\\\?\\"):
+        return full
+    if full.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + full[2:]
+    return "\\\\?\\" + full
+
+
+def generated(top: str) -> list[str]:
+    """消す生成物（ワークツリーのルートからの相対。区切りは "/"）。リンクはたどらない。"""
+    found: list[str] = []
+    stack = [top]
+    while stack:
+        here = stack.pop()
+        try:
+            with os.scandir(here) as it:
+                entries = list(it)
+        except OSError:
+            continue
+        has_package = any(e.name == "package.json" and _plain_file(e) for e in entries)
+        for e in entries:
+            full = os.path.join(here, e.name)
+            linked = e.is_symlink() or _is_junction(full)
+            if e.name in ALWAYS or (has_package and e.name in BESIDE_PACKAGE_JSON):
+                if linked or e.is_dir(follow_symlinks=False):
+                    found.append(os.path.relpath(full, top).replace(os.sep, "/"))
+                continue
+            if e.name == ".git" or linked:
+                continue
+            if e.is_dir(follow_symlinks=False):
+                stack.append(full)
+    return sorted(found)
+
+
+def _plain_file(e: os.DirEntry) -> bool:
+    try:
+        return e.is_file(follow_symlinks=False)
+    except OSError:
+        return False
+
+
+def _clean_generated(top: str) -> str:
+    """生成物を消す。消し残しがあれば理由。リンクはリンクそのものだけを消す。"""
+    left = []
+    for rel in generated(top):
+        full = os.path.join(top, *rel.split("/"))
+        try:
+            if os.path.islink(full):
+                os.unlink(full)
+            elif _is_junction(full):
+                os.rmdir(full)
+            else:
+                shutil.rmtree(_long(full), onexc=_writable_and_retry)
+        except OSError as exc:
+            left.append(f"{rel}（{exc.strerror or exc}）")
+    if left:
+        return (
+            "生成物を消しきれなかった（"
+            + "、".join(left)
+            + "）。Windows では、読み込まれている DLL（uv の .venv の .pyd）は消せない。"
+            "使っているプロセスが終わってから打ち直す"
+        )
+    return ""
+
+
+def _writable_and_retry(func, path, _exc) -> None:
+    """読み取り専用のファイル（Windows）を書けるようにしてやり直す。駄目なら投げる。"""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)

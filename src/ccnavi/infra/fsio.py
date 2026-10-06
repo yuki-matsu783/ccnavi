@@ -854,6 +854,16 @@ def note_input(path: str) -> None:
         _record(path)
 
 
+def note_removed(path: str) -> None:
+    """もう無いパスを、消したものとして一覧に載せる（無いときだけ）。
+
+    `ready` が `wip/` を片付けるとき、作業ツリーから先に消えていた追跡済みのファイルの削除も
+    C1 のコミットに含めるため。
+    """
+    if _RECORDERS and not os.path.lexists(path):
+        _record(path)
+
+
 def _recorded(path: str, failed: str) -> str:
     if not failed:
         _record(path)

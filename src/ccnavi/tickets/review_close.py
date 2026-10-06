@@ -1,9 +1,11 @@
 """親を閉じる。`ccnavi review ready`（Draft を外す前）と `ccnavi review close-early`。
 
-`ready` は Draft を外す前に、閉じたチケットとその記録を `logs/archive/` へ退避する。標準出力の
-1 行目にコメントの下書きのパス、2 行目に `tree <退避したツリーのルート>` を出し、sh はその
-ツリーで未コミットの変更を確かめてから Draft を外す（設計 9.10）。下書きのファイル名・
-目印・標準出力の形は sh との契約で、値と形を変えない。
+`ready` は Draft を外す前に、閉じたチケットとその記録を `logs/archive/` へ退避し、途中の作業の
+置き場（`wip/`）の追跡済みのファイルを消す。標準出力の 1 行目にコメントの下書きのパス、2 行目に
+`tree <退避したツリーのルート>` を出し、sh はそのツリーで未コミットの変更を確かめてから Draft を
+外す（設計 9.10）。`wip/` から消したものがあれば、続けて `wip-from <消す前の HEAD>` と
+`wip <消したパス>`（1 行 1 本）を出す。sh はそれを、履歴から戻す手順と一緒にユーザに見せる。
+下書きのファイル名・目印・標準出力の形は sh との契約で、値と形を変えない（足すのは後ろの行だけ）。
 review から分けた。review を読む末端で、review からは読まれない。
 """
 
@@ -53,8 +55,9 @@ def ready(
 
     条件を確かめてマーカーを置いたあと、親のツリーの承認済みの領域から、閉じた親（今回の親と、統合先に
     たまっていた過去の親）の `done/` の親子のチケット・`phases/<親>/`・`events/`・`flows/` を
-    手元の `logs/archive/` へ退避する（archive.py）。git の上では削除になり、C1 がコミットして
-    push してから sh が Draft を外す。squash でマージすると、既定のブランチにチケットは残らない。
+    手元の `logs/archive/` へ退避し、`wip/` の追跡済みのファイルを消す（`review.remove_wip`）。
+    git の上では削除になり、C1 がコミットして push してから sh が Draft を外す。squash で
+    マージすると、既定のブランチにチケットは残らない。
     退避した後に打ち直したとき（親が退避にだけある）は、条件の確かめのうちワークツリーの側
     （未コミット・push 済み）だけを見て、下書きを書き直し、前の回が途中で止まった残りを移す。
     """
@@ -149,9 +152,18 @@ def _archive_closed(
     if failed:
         stderr.write(f"ccnavi: 閉じたチケットを logs/archive/ へ退避できなかった: {failed}\n")
         return 1
+    # 途中の作業の置き場（wip/）の追跡済みのファイルも、同じ流れで消す（C1 が一緒にコミットする）。
+    removed, head, failed = review.remove_wip(tree_root) if tree_root else ([], "", "")
+    if failed:
+        stderr.write(f"ccnavi: `{ticket_places.WIP_ROOT}/` を片付けられなかった: {failed}\n")
+        return 1
     stdout.write(path + "\n")
     if tree_root:
         stdout.write(f"tree {tree_root}\n")
+    if removed:
+        stdout.write(f"wip-from {head}\n")
+        for rel in removed:
+            stdout.write(f"wip {rel}\n")
     return 0
 
 
@@ -180,7 +192,8 @@ def _ready_note(conf: settings.Settings, parent: str, wrapped: dict | None) -> t
     """Draft を外したときのコメントの下書きを書く。パスと、書けなかった理由（無ければ空）。"""
     text = [review_host.MARKER_READY, f"チケット `{parent}` の作業は終わり、Draft を外した。"]
     text.append(
-        f"`{ticket_places.WIP_ROOT}/` は片付けてある。閉じたチケットとその記録"
+        f"`{ticket_places.WIP_ROOT}/` の追跡済みのファイルは ready が消した（履歴から戻せる）。"
+        "閉じたチケットとその記録"
         f"（`{conf.approved}/` の done/・phases/・events/・flows/）は手元の `logs/archive/` へ"
         "退避し、このブランチからは消してある。マージするかどうかはユーザが決める。"
         "取り込むときは squash で、途中のコミットを既定のブランチに残さない。"
@@ -290,8 +303,8 @@ def close_early(
     親のマーカー `close-early.json` を置く。残りを別の issue に書き出す下書きを書き、sh がそれで
     issue を作る。ユーザが知らないうちに消えるものは作らない。
 
-    Draft を外すのはここではなく `ready`。早めに閉じたあとに親が状態の移動をコミットし、
-    途中の作業の置き場を消して push する。それが済んだことを `ready` が確かめて外す。
+    Draft を外すのはここではなく `ready`。早めに閉じたあとに親が状態の移動をコミットして
+    push する。それが済んだことを `ready` が確かめ、途中の作業の置き場を片付けてから外す。
     外す経路を `ready` の 1 つにしておくと、外れたマージリクエストは必ず
     「片付いて push 済み」になる。
 
@@ -380,8 +393,9 @@ def close_early(
     # state の置き場の決まった名前（親の識別子 = ブランチ名）で拾う。
     stdout.write(
         f"OK: {parent.ticket} を早めに閉じた。あとは親に、状態の移動をコミットし、"
-        f"'ticket finish {parent.ticket}' で閉じ、`{ticket_places.WIP_ROOT}/` を消して push し、"
-        "'ccnavi-review.sh ready' で Draft を外させる\n"
+        f"'ticket finish {parent.ticket}' で閉じて push し、"
+        "'ccnavi-review.sh ready' で Draft を外させる"
+        f"（`{ticket_places.WIP_ROOT}/` の追跡済みのファイルは ready が消す）\n"
     )
     return 0
 

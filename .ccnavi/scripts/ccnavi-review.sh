@@ -677,9 +677,24 @@ confirm)
 	exe_knows --actor && actor=$(account || :)
 	log_debug マーカーのアカウント -- "actor=${actor:+set}"
 	[ -z "$actor" ] || set -- "$@" "--actor=$actor"
+	confirm_phase=""
+	confirm_prev=""
+	for a in "$@"; do
+		case "$a" in
+		--phase=*) confirm_phase="${a#--phase=}" ;;
+		*) [ "$confirm_prev" = --phase ] && confirm_phase="$a" ;;
+		esac
+		confirm_prev="$a"
+	done
 	c1_start "$family"
 	fetch_all >"$result"
 	c1_ccnavi "$branch のレビュー済みを置いた" -- review confirm "$@" --result "$result"
+	# done/ へ動いた子のワークツリーを消す（C1 なら送り終えた後。push の失敗で戻ったときに、指摘を直す場所を
+	# 残すため）。消せなかったもの（cwd が中・未コミット）は名指しされるだけで、confirm は成功のまま。
+	case "$confirm_phase" in
+	'' | *[!0-9]*) ;;
+	*) ccnavi worktree tidy "$family" --phase "$confirm_phase" || : ;;
+	esac
 	;;
 request)
 	# 段 -1: ELI5 の HTML。--eli5 を抜き出し、残りを実行ファイルへ渡す（実行ファイルは
@@ -995,15 +1010,29 @@ ready)
 	c1_start "$family"
 	fetch_all >"$result"
 	tell_skew
+	# 互換の版が食い違っていても ready は止めない。実行ファイルは条件の確かめ・退避・wip/ の片付けを、
+	# sh は push・Draft 外し・コメントを受け持ち、契約（標準出力の形）は前の版と変わらないため。
+	# 組み立て直しはエージェントが勝手に回さない決まりなので、誰が何をするかを言う。
+	if [ -n "${skew:-}" ]; then
+		printf 'ccnavi-review: 食い違いがあっても ready は続ける。エージェントは build.py を回さず、終わったらユーザに実行ファイルの組み立て直し（または配り直し）を頼む。\n' >&2
+	fi
 	ccnavi_c1_capture="$state/review-ready-$$.out"
 	ready_rc=0
 	c1_ccnavi "$branch の Draft を外すマーカーを置いた" -- review ready --result "$result" || ready_rc=$?
 	# 実行ファイルの標準出力は、1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`。
+	# wip/ から消したものがあれば、続けて `wip-from <消す前の HEAD>` と `wip <パス>`（1 行 1 本）。
 	noted=$(sed -n '1p' "$ccnavi_c1_capture" 2>/dev/null || :)
 	ready_tree=$(sed -n 's/^tree //p' "$ccnavi_c1_capture" 2>/dev/null | head -n 1)
+	wip_from=$(sed -n 's/^wip-from //p' "$ccnavi_c1_capture" 2>/dev/null | head -n 1)
+	wip_gone=$(sed -n 's/^wip //p' "$ccnavi_c1_capture" 2>/dev/null || :)
 	rm -f "$ccnavi_c1_capture"
 	ccnavi_c1_capture=""
 	[ "$ready_rc" -eq 0 ] || exit "$ready_rc"
+	if [ -n "$wip_gone" ]; then
+		printf 'wip/ の追跡済みのファイルを消した（%s 件。消す前のコミット %s から戻せる）:\n' \
+			"$(printf '%s\n' "$wip_gone" | wc -l | tr -d ' ')" "$(printf '%.12s' "$wip_from")"
+		printf '%s\n' "$wip_gone" | sed 's/^/  /'
+	fi
 	# C1 の外（取り込み済みでない親子のチケット）では、退避の削除をここでは送らない。
 	# 送る前に Draft を外すと、チケットを残したままマージされうるので、送ってから打ち直してもらう。
 	# 見るのは退避したツリー（実行ファイルが答えたもの）。古い実行ファイルが答えなければ cwd のツリー。
@@ -1011,8 +1040,8 @@ ready)
 		[ -n "$ready_tree" ] || ready_tree=$(git -C "$here" rev-parse --show-toplevel 2>/dev/null || :)
 		ready_place="${ccnavi_c1_approved:-.ccnavi/approved}"
 		if [ -n "$ready_tree" ] &&
-			[ -n "$(git -C "$ready_tree" status --porcelain --untracked-files=no -- ":(literal)$ready_place" 2>/dev/null)" ]; then
-			fail ready-unsent "${ready_tree} の置き場（${ready_place}）に未コミットの変更がある（閉じたチケットを logs/archive/ へ退避した削除など）。コミットして push してから、もう一度 ready を打ってください（Draft はまだ外していない）。"
+			[ -n "$(git -C "$ready_tree" status --porcelain --untracked-files=no -- ":(literal)$ready_place" ":(literal)wip" 2>/dev/null)" ]; then
+			fail ready-unsent "${ready_tree} の置き場（${ready_place}）か wip/ に未コミットの変更がある（閉じたチケットを logs/archive/ へ退避した削除や、wip/ の追跡済みのファイルの削除など）。コミットして push してから、もう一度 ready を打ってください（Draft はまだ外していない）。"
 		fi
 	fi
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
@@ -1023,6 +1052,9 @@ ready)
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi
 	printf 'OK: Draft を外した（%s）。マージはユーザが行う\n' "$url"
+	# 最後に親のワークツリーを片付ける。Draft を外す前には消さない（ready を打ち直せなくなる）。
+	# cwd が中にあれば実行ファイルは消さず、外に出てから打つ 1 本を出す。消せなくても ready は成功のまま。
+	ccnavi worktree drop "$family" || :
 	;;
 close-early)
 	# ユーザが端末で打つ。exe が残りを見せて y/N を取り、マーカーを置いて下書きを書く。

@@ -30,6 +30,7 @@
 
 from __future__ import annotations
 
+import datetime
 import os
 from dataclasses import dataclass, field, replace
 from typing import TextIO
@@ -40,6 +41,7 @@ from . import (
     approval,
     approval_checks,
     approval_marks,
+    history,
     phase_forms,
     phasetypes,
     risk,
@@ -638,6 +640,109 @@ def reviewed_or_skipped(phase: Phase) -> bool:
     if not phase.review_required:
         return True
     return approval_marks.MARK_REVIEWED in phase.marks
+
+
+def review_next(
+    root: str,
+    conf: settings.Settings,
+    child: ticket_model.Ticket,
+    raw: approval.Raw | None = None,
+) -> str:
+    """レビュー待ち（`review/`）の子について、ユーザに回るまでに誰が何をするかの 1 文。
+
+    `finish` の出力と `status` の「次の一手」が使う。子を `review/` に置いただけでは、ユーザには
+    回らない。親が合流・ELI5・`request` を済ませて初めて「レビュー待ち」になる（それまでは
+    「レビュー準備中」。設計 9.8）。依頼の前に「ユーザのレビューを待つ」と言うと、依頼を打ち忘れる。
+
+    言い分けるのは次のとおり。見るのは子のフェーズのレビューを引き受けるフェーズ（延期なら
+    `review_at`）のマーカー。
+
+    - レビュー済み: 済んでいる（ユーザの操作で done/ へ動く）
+    - このセッションで見る（`review: chat`）: 親が見せて、ユーザが端末で `chat` を打つ
+    - 依頼済みで、この子が依頼より前に閉じた: ユーザのレビューを待つ
+    - 依頼済みで、この子が依頼より後に閉じた: 依頼し直しが要る
+    - 未依頼: レビュー準備中。子がまだ残っていればそれを言い、前に依頼していた（続きの子を足した
+      ときに依頼の記録が外れた）なら、依頼し直しが要ることも言う
+    """
+    review_sh = settings.script_command(root, "ccnavi-review.sh")
+    if not child.is_child or child.phase is None:
+        return ""
+    phases = phases_of(root, conf, child.parent, raw=raw)
+    ph = next((p for p in phases if p.number == child.phase), None)
+    if ph is None:
+        return ""
+    owner = ph
+    if ph.deferred and ph.review_at is not None:
+        owner = next((p for p in phases if p.number == ph.review_at), ph)
+    n = owner.number
+    lead = ""
+    if owner is not ph:
+        lead = f"フェーズ {ph.label} のレビューは {owner.label} と一緒に見る計画。"
+    if approval_marks.MARK_REVIEWED in owner.marks:
+        return (
+            f"{lead}フェーズ {owner.label} はレビュー済み。ユーザの操作（confirm / decide）で "
+            f"{conf.approved}/{ticket_model.DONE}/ へ動く"
+        )
+    if owner.review_in_chat and approval_marks.MARK_REQUESTED not in owner.marks:
+        return (
+            f"{lead}まだ{LABEL_PREPARING}。このフェーズはこのセッションで見る計画（review: chat）。"
+            "親が子の成果を合流してユーザに差分を見てもらい、ユーザが親のワークツリーの端末で "
+            f"'{review_sh} chat {n}' を打つまで、先へは進まない"
+        )
+    request = (
+        f"'{review_sh} request --phase {n} --body-file <依頼文> --eli5 wip/eli5/phase-{n}.html'"
+    )
+    requested = owner.marks.get(approval_marks.MARK_REQUESTED)
+    if requested is not None:
+        if _later(child.completed_at, str(requested.get("at") or "")):
+            return (
+                f"{lead}フェーズ {owner.label} は依頼済みだが、この子は前回の依頼より後に閉じた。"
+                "依頼し直すまで、この子の分はユーザに回らない。親が合流・ELI5 を済ませて push し、"
+                f"{request} で依頼し直す"
+            )
+        return (
+            f"{lead}フェーズ {owner.label} は依頼済み（{LABEL_WAITING}）。ユーザのレビューを待つ"
+            "（ユーザが confirm / decide で done/ へ動かす）"
+        )
+    if not ph.ended or not owner.ended:
+        left = "このフェーズ" if owner is ph else f"フェーズ {owner.label}"
+        text = (
+            f"{lead}まだ{LABEL_PREPARING}。{left}にはまだ閉じていない子がある。全部閉じてから、"
+            f"親が合流・ELI5・{request} を済ませるまで、ユーザには回らない"
+        )
+    else:
+        text = (
+            f"{lead}まだ{LABEL_PREPARING}。親が合流・ELI5・{request} を済ませるまで、"
+            "ユーザには回らない"
+        )
+    if _was_requested(conf, root, child.parent, n):
+        text += (
+            f"。フェーズ {owner.label} は前に依頼したが、続きの子を足したときに依頼の記録が外れた。"
+            "前回の依頼より後に閉じた子があるので、依頼し直しが要る"
+        )
+    return text
+
+
+def _later(a: str, b: str) -> bool:
+    """時刻 `a` が `b` より後か。どちらかが読めなければ False（依頼し直しを言わない側）。"""
+    try:
+        return datetime.datetime.fromisoformat(a) > datetime.datetime.fromisoformat(b)
+    except (TypeError, ValueError):
+        return False
+
+
+def _was_requested(conf: settings.Settings, root: str, parent: str, number: int) -> bool:
+    """このフェーズの依頼の記録が、続きの子を足したときに消されたことがあるか（親の状態の履歴）。"""
+    where = approval.home_dir(conf, root, parent, "")
+    entries, _ = history.read(where, parent, limit=0)
+    for entry in entries:
+        if (
+            entry.get("kind") == history.KIND_PHASE_REOPENED
+            and entry.get("phase") == number
+            and approval_marks.MARK_REQUESTED in (entry.get("cleared") or [])
+        ):
+            return True
+    return False
 
 
 def resumed_review(

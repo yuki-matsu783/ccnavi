@@ -32,6 +32,10 @@
 # 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
 # 通るまで完了にしない。送れなければ書いたものを戻す。record-risk は C1 にしない（その子の finish がコミットして送る）。
 # それ以外の親子のチケットは今のまま（書くだけ。コミットと push はエージェント）。
+#
+# 親の finish が通ったら、残っている子のワークツリーを実行ファイルの `worktree tidy <親>` で片付ける
+# （C1 なら送り終えた後）。取り消しで閉じた子のワークツリーと、未コミットの変更があるもの・cwd が中に
+# あるものは消さずに名指しする。片付けが済まなくても finish の終了コードは変えない。
 # 終了コード: 0 成功 / 1 前提の未充足（C1 で止めた・送れなかったを含む） / 2 引数か環境の誤り
 
 set -eu
@@ -113,6 +117,43 @@ else
 	exit 2
 fi
 
+here="$(pwd -W 2>/dev/null || pwd)"
+
+# 識別子を実行ファイル（argparse）と同じに読む。`--` と `--reason <値>` を読み飛ばした最初の語。
+# 副命令（1 つ目の語）は読まない。
+ticket_id() {
+	ti_id=""
+	ti_skip=""
+	ti_first=yes
+	for ti_arg in "$@"; do
+		if [ -n "$ti_first" ]; then
+			ti_first=""
+			continue
+		fi
+		if [ -n "$ti_skip" ]; then
+			ti_skip=""
+			continue
+		fi
+		case "$ti_arg" in
+		--reason) ti_skip=yes ;;
+		--* | -?*) ;;
+		*) [ -n "$ti_id" ] || ti_id="$ti_arg" ;;
+		esac
+	done
+	printf '%s' "$ti_id"
+}
+
+# 親の finish が通った後に、残っている子のワークツリーを片付ける（取りこぼしを拾う安全網）。
+# 子のワークツリーは、ふつうは confirm が子を done/ へ動かした後に消えている。取り消しで閉じた子の
+# ワークツリーは残す。消せなかったもの（cwd が中・未コミット）は名指しされるだけで、finish は成功のまま。
+# 子の finish では何もしない（実行ファイルが子を持たない識別子として何も消さない）。
+tidy_after() {
+	[ "$1" = finish ] || return 0
+	ta_id=$(ticket_id "$@")
+	ccnavi_is_ident "$ta_id" || return 0
+	ccnavi_c1_exe --cwd "$here" worktree tidy "$ta_id" || :
+}
+
 # C1（取り込み済みの親子のチケットの start・finish・cancel）。
 case "$1" in
 start | finish | cancel)
@@ -122,26 +163,8 @@ start | finish | cancel)
 	ccnavi_c1_sh="$(dirname "$0")"
 	trap 'ccnavi_c1_end' EXIT
 	trap 'ccnavi_c1_end; exit 130' INT TERM HUP
-	# 識別子は実行ファイル（argparse）と同じに読む。`--` と `--reason <値>` を読み飛ばした最初の語
-	# （`start -- <親>` で C1 を経ずに通らないようにする）。
-	c1_id=""
-	c1_skip=""
-	c1_first=yes
-	for c1_arg in "$@"; do
-		if [ -n "$c1_first" ]; then
-			c1_first=""
-			continue
-		fi
-		if [ -n "$c1_skip" ]; then
-			c1_skip=""
-			continue
-		fi
-		case "$c1_arg" in
-		--reason) c1_skip=yes ;;
-		--* | -?*) ;;
-		*) [ -n "$c1_id" ] || c1_id="$c1_arg" ;;
-		esac
-	done
+	# 識別子は実行ファイル（argparse）と同じに読む（ticket_id。`start -- <親>` で C1 を経ずに通らないようにする）。
+	c1_id=$(ticket_id "$@")
 	if ! ccnavi_is_ident "$c1_id"; then
 		printf 'ccnavi-ticket: %s には識別子が要る（%s は識別子の形ではない）。\n' "$1" "${c1_id:-（無い）}" >&2
 		exit 2
@@ -162,6 +185,8 @@ start | finish | cancel)
 		c1_rc=0
 		ccnavi_c1_write "ccnavi: ${c1_words}" -- ticket "$@" || c1_rc=$?
 		ccnavi_c1_end
+		trap - EXIT INT TERM HUP
+		[ "$c1_rc" -ne 0 ] || tidy_after "$@"
 		exit "$c1_rc"
 		;;
 	esac
@@ -170,8 +195,7 @@ start | finish | cancel)
 	;;
 esac
 
-if [ -n "${bin:-}" ]; then
-	exec "$bin" --root "$root" ticket "$@"
-fi
-cd "$root"
-exec uv run python -m ccnavi --root "$root" ticket "$@"
+rc=0
+ccnavi_c1_exe ticket "$@" || rc=$?
+[ "$rc" -ne 0 ] || tidy_after "$@"
+exit "$rc"

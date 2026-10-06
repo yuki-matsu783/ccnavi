@@ -187,6 +187,15 @@ scripts in .ccnavi/scripts/, which call
     ccnavi review requested --cwd <dir> --phase N --result <json>
     ccnavi review confirm   --cwd <dir> --phase N --result <json> [--actor <account>]
     ccnavi review ready     --cwd <dir> --result <json>
+        (stdout: the comment draft, "tree <dir>", then "wip-from <sha>" and one
+         "wip <path>" per tracked file it removed from wip/)
+    ccnavi worktree drop <name> [--cwd <dir>]
+        (cleans the build outputs and runs `git worktree remove` without --force on
+         .claude/worktrees/<name>; keeps the branch; does nothing when --cwd is
+         inside it or it has uncommitted changes, and says so)
+    ccnavi worktree tidy <parent> [--phase N] [--cwd <dir>]
+        (drops the worktrees of the closed children, of phase N when given; keeps
+         the ones of cancelled children)
     ccnavi sync paths
         (for .ccnavi/scripts/ccnavi-sync.sh: one "<key> <value>" per line - the
          approved and proposal places, the ccnavi directory, and the integration

@@ -19,9 +19,11 @@ from ..tickets import (
     approval_checks,
     approval_marks,
     history,
+    ops_close,
     phase,
     review,
     ticket_model,
+    ticket_places,
 )
 from . import core_base
 
@@ -145,7 +147,39 @@ def confirm_local(
         stderr.write(line + "\n")
     if checked.changes is None:
         return 1
-    return core_base.write_fs(stdout, stderr, checked.changes.planned).code
+    code = core_base.write_fs(stdout, stderr, checked.changes.planned).code
+    if code == 0:
+        after = after_last_review(root, conf, parent.ticket)
+        if after:
+            stdout.write(after + "\n")
+    return code
+
+
+def after_last_review(root: str, conf: settings.Settings, parent_id: str) -> str:
+    """最後のレビューが済んだときに、親を閉じてから Draft を外すまでの流れ。まだ先があれば空。
+
+    「最後」は、親を閉じられる状態（`ops_close.close_problems` が空）になったこと。
+    `confirm` の知らせが「次のフェーズへ進める」だけだと、最後のフェーズのあとに何をするか
+    （親の finish、push、ready）が、親の finish の出力で初めて出てくる。
+    """
+    if ops_close.close_problems(root, conf, parent_id):
+        return ""
+    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+    review_sh = settings.script_command(root, "ccnavi-review.sh")
+    return "\n".join(
+        [
+            f"全部のフェーズのレビューが済み、親 {parent_id} を閉じられる。"
+            "ここから Draft を外すまでの流れ:",
+            f"  1. '{ticket_sh} finish {parent_id}' で親を閉じる"
+            "（取り込み済みの親子なら、finish が移動をコミットして push する。"
+            "そうでなければ、移動をコミットして push する）。残っている子のワークツリーも片付く",
+            f"  2. '{review_sh} ready' で Draft を外す。ready は閉じたチケットの記録と"
+            f" `{ticket_places.WIP_ROOT}/` の追跡済みのファイルを消してコミットし、push してから"
+            " Draft を外し、最後に親のワークツリーを片付ける"
+            "（cwd が中にあれば消さず、外に出てから打つ 1 本を出す）",
+            "  マージはユーザが squash で行う",
+        ]
+    )
 
 
 def reviewable(snapshot: core_base.Snapshot, parent_id: str) -> list[dict]:

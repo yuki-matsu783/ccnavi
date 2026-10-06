@@ -41,6 +41,7 @@ sh ならプロジェクトごとに直せる。
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import re
@@ -483,7 +484,7 @@ def _diff_paths(tree_root: str, ref: str) -> tuple[list[str], str]:
     return [path for path in out.split("\0") if path], ""
 
 
-def _dirty(tree_root: str, conf: settings.Settings) -> bool:
+def _dirty(tree_root: str, conf: settings.Settings, wip_removals: bool = False) -> bool:
     """ワークツリーに未コミットの変更があるか。ccnavi 自身の置き場は数えない。
 
     承認済みチケットとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する（設計 9.2）。
@@ -503,6 +504,10 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     # 入り込むのを避けるため。phase_scope.scope_findings と同じ読み方。
     for entry in status.split("\0"):
         if len(entry) > 3 and entry[2] == " " and not _is_own_place(conf, entry[3:]):
+            if wip_removals and "D" in entry[:2] and _in_wip(entry[3:]):
+                # `ready` が消した（追跡済みの）`wip/` のファイル。C1 がコミットするか、
+                # C1 の外では sh がコミットと push を求めて止める。打ち直しの ready は止めない。
+                continue
             return True
     return False
 
@@ -516,37 +521,61 @@ def _in_wip(path: str) -> bool:
     )
 
 
+def wip_tracked(tree_root: str) -> list[str] | None:
+    """途中の作業の置き場（`wip`）の下で追跡されているファイル（git の表記）。読めなければ None。
+
+    大文字小文字を区別せずに見る。区別しない FS で `WIP/eli5/` を先に作ると、範囲の判定
+    （`tree.relative` は書いたパスを返す）は `wip/eli5/` として通すのに、
+    git には `WIP/...` で入る。
+    区別して見ると、それが既定のブランチまで残る。名前に `\\` を含む 1 ファイル（`wip\\eli5\\x`。
+    Linux / macOS では作れる）も `wip` の下と見なす。pathspec の `:(icase)` に
+    頼らず全部を `-z` で読んで絞るのは、`\\` の名前を pathspec で拾えないのと、
+    git の版に依らないため。
+    """
+    rc, tracked = _git(tree_root, ["ls-files", "-z"])
+    if rc != 0:
+        return None
+    return [p for p in tracked.split("\0") if p and _in_wip(p)]
+
+
+def _wip_untracked(tree_root: str) -> list[str] | None:
+    """`wip` の下の未追跡のファイル（無視したものは数えない）。読めなければ None。"""
+    rc, out = _git(tree_root, ["ls-files", "-z", "--others", "--exclude-standard"])
+    if rc != 0:
+        return None
+    return [p for p in out.split("\0") if p and _in_wip(p)]
+
+
 def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[str]:
     """マージに進む前にワークツリーの側で満たしていること。root は文面の sh のパスに使う。
 
-    途中の作業の置き場が追跡から消えていること、未コミットが無いこと、push 済みであること。
-    ユーザがマージするときに見るのはリモートの HEAD なので、手元にだけあるものは無いのと同じ。
+    未コミットが無いこと、push 済みであること。ユーザがマージするときに見るのはリモートの HEAD
+    なので、手元にだけあるものは無いのと同じ。
+
+    途中の作業の置き場（`wip/`）の追跡済みのファイルは、`ready` が消してコミットに含める
+    （`remove_wip`）ので、ここでは止めない。消すのは追跡済みのものだけで、履歴から戻せる。
+    未追跡のファイルは履歴に無く、消すと戻せないので、残っていれば名指しして止める。
     """
     problems: list[str] = []
     if not os.path.isdir(tree_root):
         return [f"親のワークツリーが無い ({tree_root})"]
     wip = ticket_places.WIP_ROOT
-    # 大文字小文字を区別せずに見る。区別しない FS で `WIP/eli5/` を先に作ると、範囲の判定
-    # （`tree.relative` は書いたパスを返す）は `wip/eli5/` として通すのに、
-    # git には `WIP/...` で入る。
-    # 区別して見ると、それが既定のブランチまで残る。名前に `\` を含む 1 ファイル（`wip\eli5\x`。
-    # Linux / macOS では作れる）も `wip` の下と見なして止める。pathspec の `:(icase)` に
-    # 頼らず全部を `-z` で読んで絞るのは、`\` の名前を pathspec で拾えないのと、
-    # git の版に依らないため。
-    rc, tracked = _git(tree_root, ["ls-files", "-z"])
-    names = [p for p in tracked.split("\0") if p and _in_wip(p)] if rc == 0 else []
-    if rc != 0:
+    if wip_tracked(tree_root) is None:
         problems.append(f"`{wip}/` が追跡されているかを読めない")
-    elif names:
-        tops = sorted({p.split("/", 1)[0] for p in names})
-        git_sh = settings.script_command(root, "ccnavi-git.sh")
-        removes = " と ".join(f"'{git_sh} rm -r {top}'" for top in tops)
-        problems.append(
-            f"`{wip}/` に追跡されているファイルが {len(names)} 件ある。"
-            "途中の作業は既定のブランチに残さない。"
-            f"{removes} で消してコミットしてください"
+    untracked = _wip_untracked(tree_root)
+    if untracked is None:
+        problems.append(f"`{wip}/` に未追跡のファイルがあるかを読めない")
+    elif untracked:
+        shown = "、".join(untracked[:10]) + (
+            f" ほか {len(untracked) - 10} 件" if len(untracked) > 10 else ""
         )
-    if _dirty(tree_root, conf):
+        problems.append(
+            f"`{wip}/` に未追跡のファイルが {len(untracked)} 件ある（{shown}）。"
+            f"ready が消すのは `{wip}/` の追跡済みのファイルだけ（履歴から戻せるもの）で、"
+            "未追跡のものは戻せないので消さずに止めた。要るものは別の場所へ移し、"
+            "要らないものはユーザに確かめて消してから打ち直してください"
+        )
+    if _dirty(tree_root, conf, wip_removals=True):
         problems.append("親のワークツリーに未コミットの変更がある")
     branch = _branch(tree_root)
     if not branch:
@@ -556,6 +585,48 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
         if rc != 0 or ahead.strip():
             problems.append("親ブランチの HEAD が push されていない")
     return problems
+
+
+def remove_wip(tree_root: str) -> tuple[list[str], str, str]:
+    """`wip` の下の追跡済みのファイルを消す（`ready` が退避と同じ流れで使う）。
+
+    返すのは（消したパス、消す前の HEAD、止まった理由）。消すのは fsio を通すので、C1 の一覧に載り、
+    C1 がコミットして push する。未追跡のものは `_merge_problems` が先に止めているので、ここでは
+    追跡済みのものだけを見る。消す前の HEAD は、消したものを履歴から戻すときの版（案内に使う）。
+    空になったディレクトリは下から消す（git は空のディレクトリを持たない）。
+    """
+    names = wip_tracked(tree_root)
+    if names is None:
+        return [], "", f"`{ticket_places.WIP_ROOT}/` が追跡されているかを読めない"
+    if not names:
+        return [], "", ""
+    rc, head = _git(tree_root, ["rev-parse", "HEAD"])
+    head = head.strip() if rc == 0 else ""
+    removed: list[str] = []
+    for rel in names:
+        full = os.path.join(tree_root, *rel.split("/"))
+        if not os.path.lexists(full):
+            # 作業ツリーから先に消えていた（削除が未コミット）。消したものとして一覧に載せ、
+            # C1 のコミットに含める。
+            fsio.note_removed(full)
+            removed.append(rel)
+            continue
+        failed = fsio.unlink(full)
+        if failed:
+            return removed, head, f"{rel} を消せない（{failed}）"
+        removed.append(rel)
+    for top in sorted({p.split("/", 1)[0] for p in names}):
+        _prune_empty(os.path.join(tree_root, top))
+    return removed, head, ""
+
+
+def _prune_empty(directory: str) -> None:
+    """空になったディレクトリを下から消す。リンクはたどらない。"""
+    if os.path.islink(directory) or not os.path.isdir(directory):
+        return
+    for here, _dirs, _files in sorted(os.walk(directory), key=lambda w: -len(w[0])):
+        with contextlib.suppress(OSError):
+            os.rmdir(here)
 
 
 def _parent_any(

@@ -3,6 +3,12 @@
 #
 #   sh .ccnavi/scripts/ccnavi-clean.sh <名前>
 #   sh .ccnavi/scripts/ccnavi-clean.sh <名前> --dry-run
+#   sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>
+#
+# --worktree は生成物の掃除と `git worktree remove`（--force なし）を 1 本で行う。ccnavi が ready の
+# 最後や confirm の後に消せなかったワークツリー（cwd が中にあった、など）を、外から消し直すための入口。
+# 中身は ccnavi の実行ファイルの `worktree drop <名前>`（消すかどうかの判断も実行ファイルが持つ）。
+# cwd がそのワークツリーの中なら消さない。未コミットの変更があれば何も消さない。ブランチは消さない。
 #
 # Windows では、pnpm の node_modules が深すぎる（260 文字を超える）ことと、uv の
 # .venv が使用中であることで、`git worktree remove` が途中で止まり、消しきれなかったディレクトリが残る。
@@ -32,9 +38,12 @@ set -eu
 usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-clean.sh <名前> [--dry-run]
+sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>
 
-  <名前>     .claude/worktrees/ の直下の名前。パスは書けない
-  --dry-run  消すものを並べるだけで、消さない
+  <名前>      .claude/worktrees/ の直下の名前。パスは書けない
+  --dry-run   消すものを並べるだけで、消さない
+  --worktree  生成物を消してから、ワークツリーそのものも消す（git worktree remove。--force なし）。
+              cwd がその中なら消さない。ブランチは残す
 
 消すもの: node_modules / .venv / __pycache__ / .pytest_cache と、package.json の隣の out
 未コミットの変更があるワークツリーでは、何も消さずに止まる
@@ -43,6 +52,7 @@ USAGE
 
 name=""
 dry=""
+whole=""
 for arg in "$@"; do
 	case "$arg" in
 	-h | --help | help)
@@ -52,8 +62,11 @@ for arg in "$@"; do
 	--dry-run)
 		dry=1
 		;;
+	--worktree)
+		whole=1
+		;;
 	-*)
-		printf 'ccnavi-clean: %s は通しません。使えるのは --dry-run だけです。\n' "$arg" >&2
+		printf 'ccnavi-clean: %s は通しません。使えるのは --dry-run と --worktree だけです。\n' "$arg" >&2
 		exit 2
 		;;
 	*)
@@ -82,6 +95,24 @@ root=$(ccnavi_workspace) || {
 	printf 'ccnavi-clean: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
 }
+
+# --worktree: 掃除とワークツリーの削除を実行ファイルに任せる（cwd の確かめ・未コミットの確かめ・
+# 生成物の掃除・worktree remove）。見つからなければソース（ccnavi のリポジトリ）で動かす。
+if [ -n "$whole" ]; then
+	if [ -n "$dry" ]; then
+		printf 'ccnavi-clean: --worktree と --dry-run は一緒に使えません（消すものを見るだけなら --dry-run だけで打つ）。\n' >&2
+		exit 2
+	fi
+	here="$(pwd -W 2>/dev/null || pwd)"
+	if bin=$(ccnavi_bin "$root"); then
+		exec "$bin" --root "$root" --cwd "$here" worktree drop "$name"
+	elif [ -f "$root/src/ccnavi/__main__.py" ]; then
+		cd "$root"
+		exec uv run python -m ccnavi --root "$root" --cwd "$here" worktree drop "$name"
+	fi
+	printf 'ccnavi-clean: ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。\n' >&2
+	exit 2
+fi
 
 target="$root/.claude/worktrees/$name"
 

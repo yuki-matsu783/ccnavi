@@ -15,7 +15,16 @@ from typing import TextIO
 from ..hook import c1, core
 from ..infra import fsio, settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
-from ..tickets import history, ops, phase, review, review_close, review_decide, ticket_ids
+from ..tickets import (
+    history,
+    ops,
+    phase,
+    review,
+    review_close,
+    review_decide,
+    ticket_ids,
+    worktrees,
+)
 from . import cli_args, cli_usage, lint, status
 
 
@@ -33,10 +42,15 @@ def operate(
     ユーザが打つ `--reviewed` と `--close-early`。どれも payload を読まず、判定も記録もしない。
     リモートから取得した結果は `--result <json>` で受け取る。exe はネットワークに出ない。
     """
+    cwd = args.cwd or os.getcwd()
+    words = list(args.command)
+    if words[:1] == ["worktree"]:
+        # ワークツリーの片付けはチケット制御が無くても打てる（ccnavi-clean.sh --worktree の中身）。
+        # tidy はチケットを読むので、チケット制御が要る。
+        return _worktree(stdout, stderr, conf, root, args, words, cwd)
     if not conf.tickets_enabled:
         stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
         return EXIT_ERROR
-    cwd = args.cwd or os.getcwd()
     bypass = _c1_bypass(root, conf, args, cwd)
     if bypass:
         stderr.write(
@@ -114,7 +128,6 @@ def operate(
         )
         return EXIT_OK if code == 0 else EXIT_ERROR
 
-    words = list(args.command)
     kind = words[0] if words else ""
     verb = words[1] if len(words) > 1 else ""
     target = words[2] if len(words) > 2 else ""
@@ -163,6 +176,38 @@ def operate(
             code = review_close.ready(stdout, stderr, root, conf, cwd, args.result)
     else:
         stderr.write(cli_usage.USAGE)
+    return EXIT_OK if code == 0 else EXIT_ERROR
+
+
+def _worktree(
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    args: argparse.Namespace,
+    words: list[str],
+    cwd: str,
+) -> int:
+    """`worktree drop <名前>` と `worktree tidy <親> [--phase <N>]`（worktrees.py）。
+
+    sh が状態を書く操作の後に呼ぶ。名前は識別子の形だけを受ける（パスを渡して任意の場所を
+    消させない）。
+    """
+    verb = words[1] if len(words) > 1 else ""
+    if verb not in ("drop", "tidy") or len(words) != 3:
+        stderr.write("ccnavi: worktree drop <名前> か worktree tidy <親> [--phase <N>]\n")
+        return EXIT_ERROR
+    target = words[2]
+    if not ticket_ids.is_valid_id(target):
+        stderr.write(f"ccnavi: worktree {verb} の {target!r} は識別子の形ではない\n")
+        return EXIT_ERROR
+    if verb == "drop":
+        code = worktrees.run_drop(stdout, stderr, root, target, cwd)
+    elif not conf.tickets_enabled:
+        stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
+        return EXIT_ERROR
+    else:
+        code = worktrees.run_tidy(stdout, stderr, root, conf, target, args.phase, cwd)
     return EXIT_OK if code == 0 else EXIT_ERROR
 
 
