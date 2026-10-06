@@ -145,29 +145,21 @@ def _project_settings(root: str) -> list[Problem]:
 
 
 # `.claude/settings.local.json` に置かせない、承認と判定に影響する値。
-# 置き場のパス・プロジェクトの置き場・ccnavi ディレクトリ・state の置き場（取り込み状態を読む先）・
 # チケット制御と承認の保護の切り替え・動作モード。例外は統合先の名前だけ（リポジトリに置かず、
-# 手元では環境変数で持つと決めた値なので）。
+# 手元では環境変数で持つと決めた値なので）。置き場は既定に固定で env では動かないので、
+# 置き場の env は数えない。
 LOCAL_SETTINGS = settings.LOCAL_CLAUDE_SETTINGS
 
 
 #
 # 保護と判定の働きを変える値（戻す働き・ccnavi 自身の設定の保護・確かめられないモードの止め・
-# 同じ理由の拒否の数え方・記録の置き場）も入れる。手元だけで切ると、ユーザが端末で打つ sh と
+# 同じ理由の拒否の数え方）も入れる。手元だけで切ると、ユーザが端末で打つ sh と
 # 他の機械で、同じ親子のチケットに掛かる保護が別になる。入れないのは、判定の答えを変えない
 # 次の値だけ。
 # 実行ファイルのパス（`CCNAVI_BIN_PATH`。hook の起動のために手元で差し替える。README の
 # 案内）、診断ログ（`CCNAVI_LOG_LEVEL` など）、タイムアウト監視と待ちの秒（`CCNAVI_*_TIMEOUT`・
 # `CCNAVI_LOCK_WAIT`）。
 _LOCAL_FORBIDDEN = (
-    # 置き場の env はもう読まない（置き場は既定に固定）が、置かれたら効いていると
-    # 思い込まないよう、今までどおり知らせる。
-    "CCNAVI_TICKETS_PROPOSAL",
-    "CCNAVI_TICKETS_APPROVED",
-    "CCNAVI_PROJECTS",
-    "CCNAVI_PROJECT_HOME",
-    "CCNAVI_STATE",
-    "CCNAVI_LOG",
     settings.TICKET_CONTROL_ENV,
     settings.GUARD_TICKET_APPROVAL_ENV,
     settings.GUARD_CORE_FILES_ENV,
@@ -181,9 +173,9 @@ _LOCAL_FORBIDDEN = (
 def _local_settings(root: str) -> list[Problem]:
     """`.claude/settings.local.json` の env に、承認に影響する値が無いかを見る。
 
-    承認と判定は、置き場のパスなどを統合先（リポジトリに乗る設定）と揃えて読む前提で組む。
+    承認と判定は、保護の切り替えや動作モードを統合先（リポジトリに乗る設定）と揃えて読む前提で組む。
     手元だけのファイルに置いた値は Claude Code が起こしたプロセスにだけ使われ、Chrome と
-    ユーザが端末で打つ sh には使われないので、同じ親子のチケットを別のパスで読むことになる。
+    ユーザが端末で打つ sh には使われないので、同じ親子のチケットにプロセスごとに別の保護が掛かる。
     例外は `CCNAVI_INTEGRATION_BRANCH` だけ（統合先の名前はリポジトリに置かず、手元では環境変数で
     持つと決めた）。
     """
@@ -204,8 +196,8 @@ def _local_settings(root: str) -> list[Problem]:
             "(project)",
             f"{LOCAL_SETTINGS} の env に {name} がある。承認と判定に効く値は手元だけの"
             "ファイルに置かない（Chrome と端末の sh には使われないので、"
-            "同じ親子のチケットを"
-            "プロセスごとに別のパスで読むことになる）。"
+            "同じ親子のチケットに"
+            "プロセスごとに別の保護が掛かることになる）。"
             f"{PROJECT_SETTINGS} に置いてコミットするか、セッションを起動する側の環境から"
             "渡してください。"
             f"ここに置けるのは {settings.INTEGRATION_ENV} だけ",

@@ -17,8 +17,7 @@
 #   --no-fetch               セッション開始時の取り込み（ccnavi-fetch.sh）を hook に登録しない
 #
 # 何度実行しても同じ結果になる。既に登録されている hook は足さず、既にある env には
-# 触らない。ccnavi と関係のない hook や設定はそのまま残す。例外は廃止した置き場の
-# env 6 つで、既にあれば外す（置き場は固定）。
+# 触らない。ccnavi と関係のない hook や設定はそのまま残す。
 #
 # 入れ終わったところで、ワークスペースの git の索引に projects/ の下が載っていないかを見て、
 # 載っていれば --lint と同じ文面で知らせる（止めない。索引も変えない）。
@@ -181,8 +180,7 @@ CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）�
 行があれば足さない）。
 
 置き場（記録・控え・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）は既定に
-固定で、env では動かない。既存の env に CCNAVI_PROJECTS・CCNAVI_PROJECT_HOME・
-CCNAVI_TICKETS_PROPOSAL・CCNAVI_TICKETS_APPROVED・CCNAVI_LOG・CCNAVI_STATE があれば外す。
+固定で、env では動かない。
 USAGE
 }
 
@@ -631,9 +629,8 @@ shape=$(printf '%s' "$current" | jq -r '
 # 置き場（記録・控え・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）の env は
 # 書かない。置き場は既定に固定で、env では動かないので、書いても読まれない（共通レイヤーの
 # 3 本も同じ）。読まれない語を設定項目の一覧に混ぜると、そこを直せば置き場が
-# 動くと読める。`--all` はその 4 つ（CCNAVI_STATE・CCNAVI_TICKETS_PROPOSAL・
-# CCNAVI_TICKETS_APPROVED・CCNAVI_PROJECT_HOME）を足すためのものだったので、今は足すものが無い。
-# 打ち慣れた手順が断られないように、オプションとしては受ける。
+# 動くと読める。`--all` は今は足すものが無い。打ち慣れた手順が断られないように、
+# オプションとしては受ける。
 env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "$ticket_control" '{
 	CCNAVI_MODE: $mode,
 	CCNAVI_BIN_PATH: $bin,
@@ -643,32 +640,6 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "
 	CCNAVI_GUARD_UNWATCHED: "enable",
 	CCNAVI_TICKET_CONTROL: $ticket_control
 }')
-
-# 廃止した置き場の env と、その既定（置き場は固定。設計 wip/design/i0064-fixed-places.md §1・§5）。
-# 既に入っている settings.json の env にあれば外す。env は導入スクリプトが持つ欄なので、
-# 読まれない語を残さない。外した値が既定と違っていたら、名前と値を 1 行ずつ出す。
-# 既定と同じ値は黙って外す。導入は止めず、終了コードも変えない（--check では
-# 「揃っていない」に数える。打ち直せば外れる）。
-# CCNAVI_LOG の既定は改名後の logs/decisions.jsonl。以前の導入スクリプトが
-# 書いた logs/log.jsonl は既定と違うものとして名指しする。記録の書き先が変わるので、黙らない。
-PLACE_ENV_DEFAULTS='{
-	"CCNAVI_PROJECTS": "projects",
-	"CCNAVI_PROJECT_HOME": ".ccnavi",
-	"CCNAVI_TICKETS_PROPOSAL": "wip/proposals",
-	"CCNAVI_TICKETS_APPROVED": ".ccnavi/approved",
-	"CCNAVI_LOG": "logs/decisions.jsonl",
-	"CCNAVI_STATE": "logs/state"
-}'
-# 残っているもの全部（--check が並べる）と、そのうち既定と違うもの（書いたあとに名指しする）。
-leftover_places=$(printf '%s' "$current" | jq -r --argjson places "$PLACE_ENV_DEFAULTS" '
-	(.env // {}) as $cur | $places | keys_unsorted[] | . as $k | select($cur | has($k))
-	| "\($k): \($cur[$k])"
-')
-removed_places=$(printf '%s' "$current" | jq -r --argjson places "$PLACE_ENV_DEFAULTS" '
-	(.env // {}) as $cur | $places | to_entries[]
-	| .key as $k | select(($cur | has($k)) and $cur[$k] != .value)
-	| "\(.key) を .claude/settings.json から外しました（値: \($cur[.key])）。置き場は既定の \(.value) に固定されています。"
-')
 
 events_json=$(printf '%s\n' $EVENTS | jq -R -s 'split("\n") | map(select(length > 0))')
 
@@ -991,26 +962,6 @@ fi
 if [ -n "$bin_custom" ]; then
 	settled=no
 fi
-# 廃止した置き場の env が残っていれば数える。既定と同じ値でも数える（読まれない語が残っている）。
-if [ -n "$leftover_places" ]; then
-	settled=no
-fi
-
-# 廃止した置き場の env のうち、残っているもの。--check が書かずに並べる。
-report_places_plan() {
-	if [ -n "$leftover_places" ]; then
-		printf '外す env（置き場は既定に固定で、env では動かない。打ち直すと外します）:\n'
-		printf '%s\n' "$leftover_places" | sed 's/^/  /'
-	fi
-}
-
-# 外したもののうち、既定と違う値だったもの。既定と同じ値は黙って外す。
-report_places_done() {
-	if [ -n "$removed_places" ]; then
-		printf '%s\n' "$removed_places"
-	fi
-}
-
 # ワークスペースの git の索引に projects/ の下が載っているときの知らせ（設計 §4.1・§4.4）。
 #
 # 条件と文面は `ccnavi --lint` の `(projects)` の warn と同じ（src/ccnavi/entry/lint.py の _in_index）。
@@ -1134,7 +1085,6 @@ report_projects() {
 if [ "$check" = yes ]; then
 	printf '%s\n' "$settings"
 	report_missing
-	report_places_plan
 	report_deploy_plan
 	report_projects
 	if [ "$settled" = yes ]; then
@@ -1152,7 +1102,7 @@ fi
 # 登録は、このスクリプトが触らないので数えない。ただし、何も言わずには終わらせない。
 settings_work=no
 if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] || [ -n "$missing_fetch" ] ||
-	[ -n "$replacing_env" ] || [ -n "$leftover_places" ]; then
+	[ -n "$replacing_env" ]; then
 	settings_work=yes
 fi
 vscode_work=no
@@ -1237,11 +1187,10 @@ if [ "$settings_work" = yes ]; then
 		--arg fetch "$fetch" \
 		--arg fetch_cmd "$FETCH_COMMAND" \
 		--argjson fetch_timeout "$FETCH_TIMEOUT" \
-		--argjson places "$PLACE_ENV_DEFAULTS" "
+		"
 		$REGISTERED
 		(\$env | with_entries(select(.key as \$k | \$forced | index(\$k) != null))) as \$overrides
 		| .env = (\$env + (.env // {}) + \$overrides)
-		| .env |= with_entries(select(.key as \$k | \$places | has(\$k) | not))
 		| reduce \$events[] as \$ev (
 			.;
 			if (exact(\$ev; \$cmd)) or (looks(\$ev)) then .
@@ -1275,7 +1224,6 @@ if [ "$vscode_work" = yes ]; then
 fi
 
 report '足した' 'ccnavi を登録した' '置き換えた' '登録した'
-report_places_done
 if [ "$settings_backed_up" = yes ]; then
 	printf '書き換える前の内容は %s.bak にあります（バックアップは最初の 1 回だけ取ります）。\n' "$SETTINGS_REL"
 fi
