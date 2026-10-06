@@ -182,7 +182,7 @@ factors:
 
 | 加点条件 | 何を数えるか | 決めるときに考えること |
 |---|---|---|
-| `lines_over` / `files_over` / `deleted_over` | 差分の行数・ファイル数・消したファイル数が基準を超えたら加点 | 基準はこのプロジェクトの普通の子の大きさで決める。`ccnavi-git.sh log --shortstat` で最近の差分を見る。生成物やロックファイルが差分を膨らませるなら `exclude: ["*.lock"]` のように外し、一部のディレクトリだけ測るなら `include: ["src/**"]` を書く（どちらも既定は無指定＝全パス。`exclude` は `include` に当たっていても外す。バイナリは行数 0）。`**/` は 1 階層以上の下にしか当たらないので、ルート直下は `*.lock` と別に書く |
+| `lines_over` / `files_over` / `deleted_over` | 差分の行数・ファイル数・消したファイル数が基準を超えたら加点 | 基準はこのプロジェクトの普通の子の大きさで決める。`ccnavi-git.sh log --shortstat` で最近の差分を見る。生成物やロックファイルが差分を膨らませるなら `exclude: ["*.lock"]` のように外し、一部のディレクトリだけ測るなら `include: ["src/**"]` を書く（どちらも既定は無指定＝全パス。`exclude` は `include` に当たっていても外す。バイナリは行数 0）。`*` は `/` をまたぐので `*.lock` は下の階層の `x.lock` にも当たる。`**/*.lock` はルート直下の `x.lock` に当たらない。末尾が `/` の glob はディレクトリ（`src/` は `src/**`）。rename は元のパスも見る（`include` は旧新どちらか、`exclude` は両方に当たったときだけ外す） |
 | `glob` | 当たったファイルごとに加点。`max` で上限 | 触ったらユーザが見るべき場所（CI、移行、`.claude/`）。ワークツリーのルートからの相対。`` が使える |
 | `script` | レイヤーの `scripts/` の下の sh（共通レイヤーは `.ccnavi/common/scripts/`（プロジェクトの `.ccnavi/common/` のミラーも同じ表記）、自身のレイヤーとプロジェクトのレイヤーは `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子のワークツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は重いほうとして扱われ、`points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
 | `judge` | 問いの文。親がサブエージェントに差分を読ませ、`ccnavi-ticket.sh record-risk <子> <項目> yes\|no --reason` で記録。揃うまで子は閉じられない | 差分を読んで yes / no で答えられる問いにする。「品質は十分か」は答えられない |

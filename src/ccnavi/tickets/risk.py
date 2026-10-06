@@ -42,7 +42,9 @@
 `lines_over` / `files_over` / `deleted_over` には、数えるパスを
 `include` / `exclude`（glob のリスト）で絞れる。どちらも既定は無指定で、無指定なら差分全体を数える。
 `include` があれば当たったパスだけ、`exclude` に当たったパスは `include` に当たっていても
-数えない。`exclude` だけなら、それ以外は全部数える。
+数えない。`exclude` だけなら、それ以外は全部数える。末尾が `/` の glob はディレクトリ
+（`src/` は `src/**`）。rename / copy は元のパスも見て、`include` は旧新どちらかが当たれば数え、
+`exclude` は旧新の両方が当たったときだけ外す。
 バイナリの変更は行数 0 として数える（ファイル数と削除数には入る）。
 
 ファイルが無ければ組み込みの既定（上の定量 4 項目と同じ値）。壊れていれば組み込みに戻り、
@@ -122,11 +124,19 @@ class Factor:
     def matches(self, rel: str) -> bool:
         return self.compiled is not None and self.compiled.match(rel) is not None
 
-    def in_scope(self, rel: str) -> bool:
-        """定量項目（行数・ファイル数・削除数）がこのパスを数えるか。"""
-        if self.include_compiled and not any(p.match(rel) for p in self.include_compiled):
+    def in_scope(self, change: Change) -> bool:
+        """定量項目（行数・ファイル数・削除数）がこの変更を数えるか。
+
+        rename / copy は元のパスも見る。新しいパスだけで見ると、対象の外へ動かしたファイルの
+        書き換えが数えから消え、リスクが軽い側へ倒れる。include はどちらかが当たれば数え、
+        exclude は両方が当たったときだけ外す。
+        """
+        paths = [change.path] + ([change.old] if change.old else [])
+        if self.include_compiled and not any(
+            p.match(x) for p in self.include_compiled for x in paths
+        ):
             return False
-        return not any(p.match(rel) for p in self.exclude_compiled)
+        return not all(any(p.match(x) for p in self.exclude_compiled) for x in paths)
 
     def key(self) -> tuple:
         """レイヤーをまたいで「同じ項目か」を比べるための全欄。`source` と `home` は含めない。
@@ -149,8 +159,8 @@ class Factor:
             self.kind,
             value,
             self.max,
-            self.include,
-            self.exclude,
+            tuple(sorted(set(self.include))),
+            tuple(sorted(set(self.exclude))),
         )
 
 
@@ -480,7 +490,11 @@ def _globs(raw: object) -> tuple[tuple[tuple[str, ...], tuple[re.Pattern, ...]],
     globs: list[str] = []
     compiled: list[re.Pattern] = []
     for g in raw:
-        glob = g.strip().replace("\\", "/").strip("/")
+        glob = g.strip().replace("\\", "/")
+        # 末尾の `/` はディレクトリ。`src/` を `src/**` として読む（`src` だけでは何も当たらない）。
+        glob = (
+            glob.strip("/") + "/**" if glob.endswith("/") and glob.strip("/") else glob.strip("/")
+        )
         try:
             compiled.append(re.compile("^" + globmatch.translate(glob), re.IGNORECASE))
         except re.error as exc:
@@ -670,6 +684,8 @@ class Change:
     deleted: int = 0
     # A / M / D / R など。git の name-status の 1 文字目。
     status: str = "M"
+    # rename / copy の元のパス。無ければ空。
+    old: str = ""
 
 
 @dataclass
@@ -719,12 +735,14 @@ def measure(worktree: str, base: str, head: str = "HEAD") -> tuple[Diff | None, 
         added = _int(cols[0])
         deleted = _int(cols[1])
         path = cols[2]
+        old = ""
         if path == "" and i + 1 < len(parts):
             # rename: 次の 2 つが旧と新。
+            old = parts[i].replace("\\", "/")
             path = parts[i + 1]
             i += 2
         path = path.replace("\\", "/")
-        changes[path] = Change(path=path, added=added, deleted=deleted)
+        changes[path] = Change(path=path, added=added, deleted=deleted, old=old)
     # 消したファイルの数は name-status から数える。読めなければ測れなかったとして止める
     # （0 件と数えると軽い側へ倒れる）。
     rc, out = _git(worktree, ["diff", "--name-status", "-z", f"{base}..{head}"])
@@ -799,7 +817,7 @@ def scoped(diff: Diff, factor: Factor) -> Diff:
     """項目の include / exclude で絞った差分。どちらも無ければ差分そのもの。"""
     if not factor.include_compiled and not factor.exclude_compiled:
         return diff
-    kept = [c for c in diff.changes if factor.in_scope(c.path)]
+    kept = [c for c in diff.changes if factor.in_scope(c)]
     return Diff(changes=kept, base=diff.base, head=diff.head)
 
 
