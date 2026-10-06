@@ -425,6 +425,18 @@ def _factors(
                 scope[name] = parsed
             if bad:
                 continue
+            # ワイルドカードの無い include はそのファイル名にしか当たらない。ディレクトリの
+            # つもりで `src` と書くと、何も数えず点が 0 になる（黙って軽い側へ倒れる）。
+            for glob in scope["include"][0]:
+                if not any(ch in glob for ch in "*?["):
+                    problems.append(
+                        Problem(
+                            SEVERITY_WARN,
+                            ident,
+                            f"`include` の `{glob}` はワイルドカードが無いので、その名前の"
+                            f"ファイルにしか当たらない。ディレクトリなら `{glob}/**` か `{glob}/`",
+                        )
+                    )
         elif kind == KIND_GLOB:
             if not isinstance(value, str) or not value.strip():
                 problems.append(Problem(SEVERITY_ERROR, ident, "`glob` が文字列ではない"))

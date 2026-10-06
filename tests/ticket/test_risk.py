@@ -18,6 +18,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+from ccnavi.policy.rules import SEVERITY_WARN
 from ccnavi.tickets import risk
 from tests import common_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
@@ -123,6 +124,23 @@ class DefinitionTest(unittest.TestCase):
         diff = risk.Diff(changes=[risk.Change("src/a/b.py", added=3), risk.Change("x.py", added=9)])
         score = risk.evaluate(definition, diff, "", "", {}, {})
         self.assertIn("3 行", score.hits[0].detail)
+
+    def test_include_without_a_wildcard_is_warned_but_still_loads(self):
+        text = "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 0, include: [src]}\n"
+        definition, problems = risk.parse(text)
+        self.assertIsNotNone(definition)
+        self.assertEqual([SEVERITY_WARN], [p.severity for p in problems])
+        self.assertIn("src/**", problems[0].detail)
+        # exclude は、ファイル名そのものを外す使い方がふつうなので言わない。
+        _, quiet = risk.parse(
+            "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 0, exclude: [x]}\n"
+        )
+        self.assertEqual([], quiet)
+        # 末尾 / や ** を書けば言わない。
+        _, ok = risk.parse(
+            "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 0, include: ['src/']}\n"
+        )
+        self.assertEqual([], ok)
 
     def test_a_rename_is_judged_by_both_old_and_new_paths(self):
         text = (
