@@ -32,12 +32,13 @@ test("CX-T022 パスを tree と blob に引き、tree は再帰で読む。無�
   const m = new MockGitHub(fixture());
   const c = client(m.fetch);
   const head = m.head("main") as string;
-  const objs = await gh.pathObjects(c, "acme", "widgets", head, [".ccnavi/common", ".claude/settings.json", "wip/proposals"]);
-  assert.equal(objs[".ccnavi/common"]?.type, "tree");
+  const objs = await gh.pathObjects(c, "acme", "widgets", head, [".ccnavi/config", ".claude/settings.json", "wip/proposals"]);
+  assert.equal(objs[".ccnavi/config"]?.type, "tree");
   assert.equal(objs[".claude/settings.json"]?.type, "blob");
   assert.equal(objs["wip/proposals"], null);
-  const entries = await gh.tree(c, "acme", "widgets", objs[".ccnavi/common"]?.oid as string);
-  assert.deepEqual(entries.map((e) => e.path), ["phases.yml", "rules.yml"]);
+  const entries = await gh.tree(c, "acme", "widgets", objs[".ccnavi/config"]?.oid as string);
+  // フェーズ定義は config にだけ置く（共通レイヤーには置けない）
+  assert.deepEqual(entries.map((e) => e.path), ["phases.yml"]);
   const texts = await gh.blobs(c, "acme", "widgets", [entries[0].sha]);
   assert.equal(blobSha(texts[entries[0].sha].text as string), entries[0].sha);
 });

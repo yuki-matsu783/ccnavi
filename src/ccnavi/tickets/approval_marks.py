@@ -189,8 +189,7 @@ def read_parent_mark(approved_dir: str, parent: str, name: str) -> dict | None:
     return fsio.read_dict(parent_mark_path(approved_dir, parent, name))
 
 
-# 親のマーカーのうち、状態の履歴（history）に残すもの。親の閉じ方と Draft を外したこと。上書きの記録
-# （configsync）は状態ではないので残さない。
+# 親のマーカーのうち、状態の履歴（history）に残すもの。親の閉じ方と Draft を外したこと。
 PARENT_MARKS_IN_HISTORY = (PARENT_MARK_READY, PARENT_MARK_CLOSE_EARLY, PARENT_MARK_CLOSED)
 
 

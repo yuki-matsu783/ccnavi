@@ -7,9 +7,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readRules } from "../../src/core/rules-doc.js";
 import { KNOWN_TOOLS, type Sections } from "../../src/core/rules-view.js";
+import { rulesSums } from "../../src/core/sums.js";
 import type { RuleHitJson, TestJson } from "../../src/core/testmodel.js";
 import { openPage, openRules, page, rowSelector } from "../helpers/rules.js";
 import type { DomPage } from "../helpers/dom.js";
+import { sumsBoard } from "../helpers/sums.js";
 import type { HTMLButtonElement, HTMLInputElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
 
 /** 直前に送った保存の中身 */
@@ -696,3 +698,69 @@ test("CB-D152 読み込みに失敗した画面にも設定の切り替えの欄
   }
 });
 
+
+test("CB-T310 足し算は読み取り専用の表で出し、編集する 1 本の欄とは別にする。選んだ足し算の共通のルールと設定のルールが由来付きで並ぶ", async () => {
+  const sums = rulesSums(sumsBoard());
+  const dom = await openRules({ target: { kind: "project", name: "lib" }, sums });
+  try {
+    // 開いている対象（lib）の足し算が最初に出る。折りたたみは閉じてあるので、押して開く
+    const select = dom.one<HTMLSelectElement>("select#sum-select");
+    assert.equal(select.value, "lib");
+    assert.deepEqual([...select.options].map((o) => o.textContent), ["ワークスペースの足し算（共通の設定 + ワークスペースの設定）", "プロジェクト lib の足し算（共通の設定 + lib の設定）"]);
+    assert.match(dom.one("#sum .hint").textContent, /パスを持たないツール（Bash など）が当てるのは、全プロジェクトの設定を足した和ではありません/);
+    const rows = (section: string) => dom.all(`#sum .sum-section[data-section="${section}"] tbody tr`).map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
+    assert.deepEqual(rows("deny").map((r) => [r[0], r[1], r[3]]), [["guard-approved", "Write|Edit", "共通の設定"], ["lib:no-tmp", "Write", "lib"]]);
+    assert.deepEqual(rows("ask").map((r) => r[0]), ["lib:deps"]);
+    assert.equal(dom.all('#sum .sum-section[data-section="allow"] tbody tr').length, 0);
+    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3 件（common + lib）");
+    // 足し算を切り替えても、拡張ホストへは何も送らない（見せるだけ。判定も合成もしない）
+    dom.change(select, "self");
+    await dom.settle();
+    assert.deepEqual(rows("deny").map((r) => r[0]), ["guard-approved"]);
+    assert.equal(dom.all("#sum button").length, 0, "足し算に操作は無い");
+    assert.deepEqual(dom.posted.filter((m) => m.type !== "ready"), []);
+    // 編集する 1 本のルールの一覧は足し算と混ざらない
+    assert.equal(dom.all("#tab-rules .rule").length, 3);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-T311 共通の設定を開いているときはワークスペースの足し算が最初に出る。足し算が無ければ（ボードを読めない）欄ごと出さない。読めない設定は空として扱っていると言う", async () => {
+  const sums = rulesSums(sumsBoard()).map((s) => (s.name === "lib" ? { ...s, unreadable: "YAML として読めない", deny: [], ask: [] } : s));
+  const dom = await openRules({ target: { kind: "workspace", name: "" }, sums });
+  try {
+    assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
+    dom.change(dom.one("select#sum-select"), "lib");
+    await dom.settle();
+    assert.match(dom.one("#sum .banner.warn").textContent, /読めず、その設定を空として扱っています.*YAML として読めない/);
+  } finally {
+    await dom.close();
+  }
+  const none = await openRules({ sums: [] });
+  try {
+    assert.equal(none.all("#sum").length, 0);
+  } finally {
+    await none.close();
+  }
+  const absent = await openRules();
+  try {
+    assert.equal(absent.all("#sum").length, 0);
+  } finally {
+    await absent.close();
+  }
+});
+
+test("CB-T312 ルールのファイルが無いのは正常で、不備の帯は出さず、欄は触れて保存できる。エディタで開くだけが押せない", async () => {
+  const dom = await openRules({ exists: false, model: readRules("").model });
+  try {
+    assert.equal(dom.all(".banner").filter((b) => !b.classList.contains("hidden")).length, 0);
+    assert.ok(dom.one<HTMLButtonElement>('button[data-action="open-rules"]').disabled);
+    dom.click(dom.one('button[data-action="add"][data-section="deny"]'));
+    await dom.settle();
+    assert.ok(!dom.one<HTMLButtonElement>("#save").disabled);
+    assert.equal(dom.all(".rule").length, 1);
+  } finally {
+    await dom.close();
+  }
+});

@@ -36,8 +36,8 @@ export function activate(context: vscode.ExtensionContext): void {
     // 承認はボードのボタンだけ。パレットからは打てない（承認内容を見ずに押せる入口を作らない）。
     vscode.commands.registerCommand("ccnaviBoard.openRules", () => void screens().rules({ kind: "workspace" })),
     vscode.commands.registerCommand("ccnaviBoard.openProjects", () => void screens().projects()),
-    vscode.commands.registerCommand("ccnaviBoard.openRisk", () => void screens().risk()),
-    vscode.commands.registerCommand("ccnaviBoard.openPhases", () => void screens().phases({ kind: "common" })),
+    vscode.commands.registerCommand("ccnaviBoard.openRisk", () => void screens().risk({ kind: "workspace" })),
+    vscode.commands.registerCommand("ccnaviBoard.openPhases", () => void screens().phases({ kind: "self" })),
     vscode.commands.registerCommand("ccnaviBoard.appearance", () => void pickAppearance()),
   );
 }

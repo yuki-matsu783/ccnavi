@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
 import { graphOf } from "../../core/phases-graph.js";
-import { editable as canEdit, ORDER_LABELS, ORDERS, type PhaseForm, type PhaseKind, type PhaseOrder, type PhasesData, type PhasesPage, type ToPhases } from "../../core/phases-view.js";
+import { ORDER_LABELS, ORDERS, type PhaseForm, type PhaseKind, type PhaseOrder, type PhasesData, type PhasesPage, type ToPhases } from "../../core/phases-view.js";
 import { applyAppearance } from "../appearance.js";
 import { Graph, Legend } from "./Graph.js";
 import { Phase } from "./Phase.js";
@@ -95,7 +95,6 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 
   const { draft, open, more } = editing;
   const page = pageOf(data);
-  const editable = page !== undefined && canEdit(page);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent): void => {
@@ -410,6 +409,11 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 
   return (
     <>
+      {(page?.errors ?? []).map((error, index) => (
+        <div key={`error-${index}`} className="banner error" data-banner="common-phases">
+          {error}
+        </div>
+      ))}
       {(page?.notices ?? []).map((notice, index) => (
         <div key={index} className="banner warn">
           {notice}
@@ -448,7 +452,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             className="action primary"
             id="save"
             data-action="save"
-            disabled={!dirty || lock.locked || busy || !editable || dup.size > 0}
+            disabled={!dirty || lock.locked || busy || dup.size > 0}
             onClick={() => {
               setBusy(true);
               setStatus({ text: "検証して保存中…", error: false });
@@ -470,14 +474,13 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           ))}
         </ul>
       )}
-      {page !== undefined && !page.exists && <Missing page={page} busy={busy} onOpenSelf={() => post({ type: "openSelf" })} />}
       <section className="block">
         <h2>
           フェーズ定義{" "}
           <span className="count" id="phase-count">
             {countText(draft.rows.length, query, shown, kept)}
           </span>
-          <button type="button" className="action small" data-action="add" disabled={busy || !editable} onClick={add}>
+          <button type="button" className="action small" data-action="add" disabled={busy} onClick={add}>
             ＋ 定義を追加
           </button>
           <button
@@ -506,7 +509,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             id="f-order"
             data-yaml-key="order"
             value={draft.order}
-            disabled={busy || !editable}
+            disabled={busy}
             onChange={(event) => editDraft({ ...draft, order: event.target.value as PhaseOrder })}
           >
             {ORDERS.map((order) => (
@@ -529,7 +532,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきものです。
             <code>overlap</code> は並行してよい定義（対称）、<code>requires</code> は計画に入れるなら一緒に必要な定義です。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき定義）で、書かない定義は何も待ちません。
             after の書き漏れがあると、その定義は並行してよいものとして扱われるので、図で確かめてください。待ち方は親チケットの承認のときに親へコピーされ、あとで直しても進行中の親には反映されません。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には使いません。
-            関係の欄はこのファイルのほかの定義から選びます（ワークスペースとプロジェクトの設定の画面では、共通の設定の定義の id を入力して足せます）。範囲と成果物は <code>,</code> で区切ります。
+            関係の欄はこのファイルのほかの定義から選びます（フェーズ定義は足し算をしないので、ほかの設定の定義は指せません）。範囲と成果物は <code>,</code> で区切ります。
             </p>
             <p className="hint">
               図の「ユーザが見る」は定義の宣言（<code>review</code>）で、計画の延期や実績のリスクで実際に見る場所は変わります。判定が使う待ち方は、設定を合わせたうえで親チケットの承認のときに決まります（合わせる設定のどれかが{" "}
@@ -541,7 +544,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <>
             <Graph graph={graph} onPick={pick} />
             <Legend />
-            {graphNotices(graph, formOf(draft), page?.layer === true).map((notice) => (
+            {graphNotices(graph, formOf(draft)).map((notice) => (
               <p key={notice} className="graph-note">
                 {notice}
               </p>
@@ -559,9 +562,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               open={open.has(row.key)}
               moreOpen={more.get(row.key) === true}
               kinds={kinds}
-              layer={page?.layer === true}
               duplicate={dup.has(row.phase.id.trim())}
-              disabled={busy || !editable}
+              disabled={busy}
               onToggle={() => toggle(row.key)}
               onToggleMore={(value) => toggleMore(row.key, value)}
               onChange={(phase) => editRow(row.key, phase)}
@@ -569,7 +571,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               onRemove={() => remove(row.key)}
             />
           ))}
-          {draft.rows.length === 0 && <li className="empty">{emptyNote(page?.exists === true, editable)}</li>}
+          {draft.rows.length === 0 && <li className="empty">{emptyNote(page?.exists === true)}</li>}
         </ul>
       </section>
       {touring && <Tour steps={tourSteps} onClose={endTour} />}
@@ -577,32 +579,5 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         <span id="status">{shownStatus?.text ?? ""}</span>
       </footer>
     </>
-  );
-}
-
-/**
- * ファイルが無いときの帯。ワークスペースとプロジェクトの設定は欄を触れ、最初の保存でファイルを作る。
- * どの設定にも雛形は置かない。雛形の id は共通の設定の定義と重なりやすく、中身が違えばその設定が空として扱われる。
- * 共通の設定は画面から作らせず、定義を置くワークスペースの設定を開く方法だけを出す。
- */
-function Missing({ page, busy, onOpenSelf }: { readonly page: PhasesPage; readonly busy: boolean; readonly onOpenSelf: () => void }): JSX.Element {
-  if (page.layer === true) {
-    return (
-      <div className="banner missing">
-        <span>
-          {page.phasesPath} がありません。ファイルが無ければこの設定は空で、共通の設定の定義だけが使われます。この設定に定義を足すなら、下で足して保存してください（最初の保存でファイルが作られます）。雛形は作りません。雛形の id は共通の設定の定義と重なりやすく、中身が違えばこの設定が空として扱われるためです。
-        </span>
-      </div>
-    );
-  }
-  return (
-    <div className="banner missing">
-      <span>
-        共通の設定に定義はありません（{page.phasesPath} がありません）。定義はワークスペースかプロジェクトの設定に置いてください。画面上部の「設定」の欄から開けます。
-      </span>
-      <button type="button" className="action primary" data-action="open-self" disabled={busy} onClick={onOpenSelf}>
-        ワークスペースの設定を開く
-      </button>
-    </div>
   );
 }

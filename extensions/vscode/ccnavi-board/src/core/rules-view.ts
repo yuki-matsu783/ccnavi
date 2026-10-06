@@ -18,6 +18,7 @@ import type { AppearanceMessage } from "./appearance.js";
 import type { HookEntry } from "./hooks.js";
 import type { Lock } from "./lock.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
+import type { RulesSum } from "./sums.js";
 import type { TargetOption } from "./targets.js";
 import type { SuggestJson } from "./suggestmodel.js";
 import type { SamplesJson, TestJson } from "./testmodel.js";
@@ -100,6 +101,11 @@ export interface RulesPage {
   readonly root: string;
   /** ルールファイル（ワークスペースルートからの相対で見せる） */
   readonly rulesPath: string;
+  /**
+   * ルールファイルが在るか。省くと在る。無いのは「設定が無い」正常な状態で、画面は空として出し、不備の注意は出さない
+   * （欄は触れ、保存でファイルが作られる）
+   */
+  readonly exists?: boolean;
   /** `.claude/settings.json` の env.CCNAVI_MODE。空なら未設定 */
   readonly mode: string;
   readonly model: RulesModel;
@@ -113,6 +119,11 @@ export interface RulesPage {
   /** 開いている対象と、切り替えられる対象。無ければ切り替えの欄を出さない */
   readonly target?: { readonly kind: string; readonly name: string };
   readonly targets?: readonly TargetOption[];
+  /**
+   * 読み取り専用の足し算（共通の設定 + ワークスペース、共通の設定 + 各プロジェクト）。実行ファイルが出した結果で、拡張は合成しない。
+   * 保存済みの内容の和で、編集中の内容は含まない。ボードを読めなかったときは無い
+   */
+  readonly sums?: readonly RulesSum[];
 }
 
 // ---- やり取り

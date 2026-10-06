@@ -206,6 +206,8 @@ def bin_command(bin_path: str) -> str:
 
 # ccnavi ディレクトリの下の固定のパス。レイヤーはこの形でしか置けない。
 LAYER_CONFIG_DIR = "config"
+# 共通レイヤーとそのミラーの置き場（ccnavi ディレクトリからの相対）。
+COMMON_DIR = "common"
 # レイヤーが持てる設定。3 本は独立に無くてよい。
 KIND_RULES = "rules"
 KIND_PHASES = "phases"
@@ -224,6 +226,8 @@ RESERVED_LAYER_NAMES = (LAYER_COMMON, LAYER_SELF)
 # 予約名のプロジェクトのバックアップの key につける前置き。名札の側（`rules:self`）と
 # プロジェクトの側を分ける（_layer_key）。
 PROJECT_KEY_HOME = "projects/"
+# ミラーのバックアップの key につける前置き（`rules:mirror/lib`）。
+MIRROR_KEY_HOME = "mirror/"
 
 # レイヤーの種別。そのレイヤーがどこから来たかを、名札の表記とは別に持つ（設計 11.4）。
 #
@@ -234,6 +238,9 @@ PROJECT_KEY_HOME = "projects/"
 ORIGIN_COMMON = "common-layer"
 ORIGIN_SELF = "self-layer"
 ORIGIN_PROJECT = "project-layer"
+# プロジェクトの `.ccnavi/common/`（共通レイヤーのミラー。設計 11.12）。ワークスペースの中では
+# 判定に読まれないが、守る対象には入る。
+ORIGIN_MIRROR = "mirror-layer"
 
 
 class LayerFile(NamedTuple):
@@ -278,11 +285,13 @@ def approved_dir(conf: Settings, tree_root: str) -> str:
 
 
 def layer_script_home(conf: Settings) -> str:
-    """各レイヤーの `script:` に書ける唯一のパス（設計 11.4.2）。
+    """自身のレイヤーとプロジェクトのレイヤーの `script:` に書ける唯一のパス（設計 11.4.2）。
 
     形は `<ccnavi ディレクトリ>/scripts/` で、"/" 区切り。
+    解く基準はそのレイヤーの git プロジェクトルート。
 
-    共通レイヤーだけは `.ccnavi/common/scripts/`（risk.SCRIPT_HOMES）。
+    共通レイヤー（と単体 clone でそれになるミラー）だけは `.ccnavi/common/scripts/`
+    （risk.SCRIPT_HOMES。解く基準は、そのとき共通レイヤーを持つルート）。
     たがいの側は指せない。プロジェクトの `.ccnavi/` はそのプロジェクトだけで閉じる。
     """
     home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
@@ -376,6 +385,11 @@ class Settings:
     # 共通レイヤーの定義は今までどおり `--phases` で差し替える。VS Code 拡張のフェーズ管理画面が、
     # 編集中のレイヤーの定義を保存せずに検証するために使う。
     project_phases_files: dict[str, str] = field(default_factory=dict)
+    # project_risk_files は同じ差し替えをレイヤーのリスクの配点に対して行う（名前 → 絶対パス）。
+    # `--project-risk-file <名前>=<パス>` が入れる。名前は `self` かプロジェクトの名前で、
+    # 共通レイヤーの配点は今までどおり `--risk` で差し替える。VS Code 拡張のリスク管理画面が、
+    # 編集中のレイヤーの配点を保存せずに、共通レイヤーと合わせて検証するために使う。
+    project_risk_files: dict[str, str] = field(default_factory=dict)
     # branch_prefixes は親の識別子の先頭の語のリスト（`branch_prefixes`）。
     # branch_prefixes_rejected は環境変数に書かれていたが使えない語（lint が warn で名指しする）。
     branch_prefixes: tuple = DEFAULT_BRANCH_PREFIXES
@@ -480,11 +494,15 @@ def layer_path(conf: Settings, home_root: str, kind: str, layer: str = "") -> st
     プロジェクトのレイヤーならその git プロジェクトルートを渡す。3 種とも同じ形なので、
     rules だけの経路を別に持たない。
 
-    `--project-rules-file` / `--project-phases-file` で名前が差し替えられていれば、rules / phases に
-    限ってそのパス。差し替えは診断のためのもので、risk には当てはまらない。守る対象（selfguard）は
+    `--project-rules-file` / `--project-phases-file` / `--project-risk-file` で名前が差し替えられて
+    いれば、その種類のそのパス。差し替えは診断のためのもので、守る対象（selfguard）は
     差し替えを見ない `layer_real_path` を使う。
     """
-    swaps = {KIND_RULES: conf.project_rules_files, KIND_PHASES: conf.project_phases_files}.get(kind)
+    swaps = {
+        KIND_RULES: conf.project_rules_files,
+        KIND_PHASES: conf.project_phases_files,
+        KIND_RISK: conf.project_risk_files,
+    }.get(kind)
     if swaps:
         override = swaps.get(layer or _layer_name(home_root))
         if override:
@@ -496,6 +514,12 @@ def layer_real_path(conf: Settings, home_root: str, kind: str) -> str:
     """レイヤーの設定ファイルが本来ある場所。差し替えを見ない。"""
     home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("/", os.sep)
     return os.path.join(home_root, home, LAYER_CONFIG_DIR, LAYER_FILE_NAMES[kind])
+
+
+def mirror_real_path(conf: Settings, home_root: str, kind: str) -> str:
+    """プロジェクトの `.ccnavi/common/`（共通レイヤーのミラー）の設定ファイルの場所。"""
+    home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("/", os.sep)
+    return os.path.join(home_root, home, COMMON_DIR, LAYER_FILE_NAMES[kind])
 
 
 def _layer_name(home_root: str) -> str:

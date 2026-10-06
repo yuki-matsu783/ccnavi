@@ -154,3 +154,47 @@ export function c1TargetOf(stdout: string): string {
   const found = lines.find((line) => line.startsWith("target "));
   return found === undefined ? "" : found.slice("target ".length).trim();
 }
+
+/**
+ * 判定と検証に掛けるルールファイルの差し替え。共通の設定のルールは `--rules` で、
+ * プロジェクト 1 つのルールは `--project-rules-file <名前>=<パス>` で（README「lint の JSON」）。
+ * ワークスペースの設定は同じオプションに名前 `self` で渡す。実行ファイルはレイヤー（layer）の名前で差し替えを引き、
+ * `self` という名前のプロジェクトはプロジェクトの設定として数えないので取り違えない。
+ * どれも診断（`--lint` / `--test` / `--test-samples` / `--explain`）でだけ有効で、
+ * hook からの判定にもチケットとレビューの副命令にも届かない（実行ファイルが診断以外では断る）。
+ * 拡張がこれらを足すのは `--lint` と `--test` だけなので、そこは変わらない。
+ */
+export type RulesOverride =
+  | { readonly kind: "workspace"; readonly path: string }
+  | { readonly kind: "project"; readonly name: string; readonly path: string }
+  | { readonly kind: "self"; readonly path: string };
+
+/**
+ * 検証（`--lint`）に掛ける設定の差し替え。ルールに加えて、共通の設定のリスクの配点を `--risk` で、
+ * ワークスペースの設定（`self`）かプロジェクトの設定の配点を `--project-risk-file <名前>=<パス>` で（共通の設定と合わせて検証される）、
+ * 同じくフェーズ定義を `--project-phases-file <名前>=<パス>` で差し替えられる。
+ * フェーズ定義は足し算をしないので、その 1 本の中だけで確かめられる（共通の設定の `--phases` は使わない）。
+ * 判定（`--test`）には配点も定義も関係ないので、そちらは RulesOverride だけを受ける。
+ */
+export type LintOverride =
+  | RulesOverride
+  | { readonly kind: "risk"; readonly path: string }
+  | { readonly kind: "layerRisk"; readonly name: string; readonly path: string }
+  | { readonly kind: "layerPhases"; readonly name: string; readonly path: string };
+
+export function overrideArgs(override: LintOverride): string[] {
+  switch (override.kind) {
+    case "workspace":
+      return ["--rules", override.path];
+    case "project":
+      return ["--project-rules-file", `${override.name}=${override.path}`];
+    case "self":
+      return ["--project-rules-file", `self=${override.path}`];
+    case "risk":
+      return ["--risk", override.path];
+    case "layerRisk":
+      return ["--project-risk-file", `${override.name}=${override.path}`];
+    case "layerPhases":
+      return ["--project-phases-file", `${override.name}=${override.path}`];
+  }
+}

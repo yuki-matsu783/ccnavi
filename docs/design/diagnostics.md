@@ -25,13 +25,15 @@ state も内部で外す。拡張と `tools/check_rules.py` は念のため `--l
 | `--lint [--json] --flow <パス>` | 上に加えて、子のフロー 1 本（9.3.1）を `SubagentStart` と同じ読み手・同じ検査で読み、読めなければ場所 `(flow)` の error で言う。読めたフローの構造と名前の怪しいところは warn。`--json` なら読めた中身を `flow.data`、渡る手順の行を `flow.rendered` に載せ（読めなければどちらも `null`）、選べる名前を `flow.candidates` に載せる。パスは起動した場所からの相対でよい | error があれば 1 |
 | `--docs [絞り込み] [--sort …] [-r] [--limit N] [--format table\|path\|detail\|json\|jsonl\|count]` | ワークスペースと、プロジェクトの置き場の直下の各プロジェクト（別の git）の md（それぞれの `git ls-files --cached --others --exclude-standard`、ccnavi ディレクトリの下は除く）を、頭の frontmatter の索引で横断して引く（`docsearch`）。パスはワークスペースルートから。md が直下にあるディレクトリごとの `index.jsonl` を差分で新しくしてから引く。書くのは git がそこの `index.jsonl` を無視しているときだけで、どのディレクトリでも無視していないツリーは対象外にして名指しする（`.gitignore` は書き換えない。ワークスペースの 1 行は導入スクリプトが配るときに足す）。ccnavi の形でない `index.jsonl` は上書きも削除もせず、実体がツリーの外に出るディレクトリは読まない。一時ファイルは `.git/` の中に作る（`.git` が別のファイルシステムなら、そのディレクトリの下の git に無視される `.ccnavi-tmp-*/index.jsonl`）。git への問い合わせの失敗は対象外と分けて言う。形は README「ドキュメントの索引」 | 引ければ 0（0 件でも）。使い方の誤りは 1 |
 
-**レイヤーの置き場を動かすフラグは 7 本あり、どれも診断でだけ有効になる**。共通レイヤーの中身は
+**レイヤーの置き場を動かすフラグは 8 本あり、どれも診断でだけ有効になる**。共通レイヤーの中身は
 `--rules` / `--phases` / `--risk`、レイヤーを探す先は `--projects`（プロジェクトのレイヤーの置き場）と
 `--project-home`（ccnavi ディレクトリの名前）、1 つのレイヤーだけを差し替えるのは
 `--project-rules-file <名前>=<パス>`（その名前のプロジェクトのルールの代わり）と
-`--project-phases-file <名前>=<パス>`（その名前のレイヤー。`self` は自身のレイヤーのフェーズ定義の代わり）。
+`--project-phases-file <名前>=<パス>`（その名前のレイヤー。`self` は自身のレイヤーのフェーズ定義の代わり）と
+`--project-risk-file <名前>=<パス>`（同じく配点の代わり。足し算なので共通レイヤーと合わせて検証する。境目の逆転、同 `id` の衝突、
+`script:` の存在確認はそのレイヤーの git プロジェクトルートが基準）。
 診断の外（hook からの判定、`ticket` / `review` の副命令）に渡すと落とし、落としたことを標準エラーに
-出す。守る対象も本来の場所のまま。レイヤーの配点にはまだ差し替えが無い。
+出す。守る対象も本来の場所のまま（守る側は差し替えを見ない `layer_real_path` を引く）。
 
 **互換の版**（`src/ccnavi/entry/version.py` の `COMPAT`）は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh の `CCNAVI_COMPAT`、拡張の
 `EXTENSION_COMPAT`）の契約の版で、3 か所に同じ値を書く。sh は実行ファイルを起動する前に、拡張は起動のときに `--version` を読んで
@@ -59,7 +61,7 @@ JSON の形は README の「試験の JSON」「lint の JSON」「ボードの 
 URL はリンクとして出すが、その先の状態は見に行かない。
 
 設定を画面で直す 3 つ（ルール管理・リスク管理・フェーズ管理）は、編集中の内容を一時ファイルに書いて
-`--rules` / `--risk` / `--phases` で渡し、`--lint` が error を返さないときだけ保存する。フロー編集画面も
+`--rules` / `--risk` / `--phases`（ワークスペースとプロジェクトの設定のレイヤーは `--project-rules-file` / `--project-risk-file` / `--project-phases-file`）で渡し、`--lint` が error を返さないときだけ保存する。フロー編集画面も
 本文を一時ファイルに書いて `--lint --json --flow` に渡し、`(flow)` の error が無く、`flow.data` が画面の中身と
 同じときだけ開く・保存する（ほかの設定の指摘では止めない。`--version` の `flags` に `--flow` が無いか、`--version` を知らない古い実行ファイルでは開かない）。
 

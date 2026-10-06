@@ -37,7 +37,7 @@ TURN_DEFINED = "ターン（ユーザが指示を出してから Claude が応�
 _FORBIDDEN_COMMAND = re.compile(
     r"(^|[;&|]\s*)(sh|bash)(\s+-\S+)*\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
     r"(start|finish|cancel|record-risk|request|confirm|comment|decide|ready|close-early|chat"
-    r"|config-synced|push)\b"
+    r"|push)\b"
 )
 
 # シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に当てる。
@@ -75,7 +75,7 @@ _PREVIEW_END = rf"[ \t;&|\r\n{re.escape(shellread.SEP)}]"
 _PREVIEW_WORD = rf"[ \t]--preview(?={_PREVIEW_END}|$)"
 _NOT_PREVIEW = rf"(?![^{selfguard_shell._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 _CLI_FORMS = (
-    rf"(--yes\b|--(?:agree|approve)\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b|--config-synced\b"
+    rf"(--yes\b|--(?:agree|approve)\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b"
     r"|\b(ticket|review)\s+"
     r"(start|finish|cancel|record-risk|prepare|requested|confirm|ready)\b)"
 )
@@ -358,9 +358,9 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
         # 打つのはユーザ。
         r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-sync\.sh\s[^\x00]*--forget\b"
         # ユーザの判断に使うスクリプト。中で `--reviewed --chat`・
-        # `--config-synced`・`--close-early` を起こし、最後に承認の push を呼ぶ。打つのはユーザ。
+        # `--close-early` を起こし、最後に承認の push を呼ぶ。打つのはユーザ。
         r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-review\.sh\s+"
-        r"(chat|config-synced|close-early)\b"
+        r"(chat|close-early)\b"
     )
     # 大文字小文字を区別しない。Windows と macOS の既定のファイルシステムは名前の大小を
     # 区別しないので、`SH .ccnavi/scripts/CCNAVI-AGREE.sh` や `CCNAVI.EXE --agree` でも
@@ -387,7 +387,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）もユーザが打ちます。"
             "親子のチケットの取り込み状態を消す "
             f"'{settings.script_command(root, 'ccnavi-sync.sh')} --forget' と、ユーザの判断の入口"
-            f"（'{settings.script_command(root, 'ccnavi-review.sh')} chat / config-synced / "
+            f"（'{settings.script_command(root, 'ccnavi-review.sh')} chat / "
             "close-early'）もユーザが打ちます。"
             "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
             "エージェントは打ちません。"

@@ -17,14 +17,14 @@ keywords: [リスク, risks.yml, risk.json, 差分, HIGH, 配点]
 上げるのは要否だけで、見る場所は指さない（9.8）。宣言が `none` だったフェーズは `chat` に上がり、
 マージリクエストを勧める文が出る。勧めるだけで、選ぶのは端末に座っているユーザ。
 
-配点は `risks.yml`（共通レイヤーと親の `project:` のレイヤーの和。11.4.2）。どのレイヤーにも無ければ組み込みの 4 項目、壊れていれば
+配点は `risks.yml`（共通レイヤーと、親の `project:` が指す config のレイヤーの和。どちらも無くてよい。11.4.2）。両方に無ければ組み込みの 4 項目（共通だけ無く config が在るときは、共通を空として config の項目だけを数え、組み込みの 4 項目は使わない）、壊れていれば
 組み込みを使い、そのことを `--lint` と閉じたときの出力が言う。リスクレベルの名前は `LOW` / `MEDIUM` / `HIGH` /
 `CRITICAL` で固定し、境目の点（既定 20 / 40 / 70）だけを動かせる。境目の点は「以上」で判定する。
 
 | 系統 | 書き方 | 誰が測るか |
 |---|---|---|
 | 定量（組み込み） | `lines_over` / `files_over` / `deleted_over` / `glob`（当たるごとに加点。`max` で上限） | ccnavi が差分から数える |
-| 定量（スクリプト） | `script: <.ccnavi/common/scripts/ の下>`（共通レイヤー。レイヤーごとの解決先は 11.4.2） | ccnavi が `sh` で走らせる。cwd は子のワークツリー、`CCNAVI_BASE_SHA` / `CCNAVI_HEAD` / `CCNAVI_TICKET` / `CCNAVI_PARENT` を渡し、標準出力の整数か `{"points": N, "message": "…"}` を受け取る。失敗や読めない出力は重いほうとして扱い、その項目の点を加える |
+| 定量（スクリプト） | `script: <.ccnavi/common/scripts/ の下>`（共通レイヤー。ミラーも同じパス。レイヤーごとの解決先は 11.4.2） | ccnavi が `sh` で走らせる。cwd は子のワークツリー、`CCNAVI_BASE_SHA` / `CCNAVI_HEAD` / `CCNAVI_TICKET` / `CCNAVI_PARENT` を渡し、標準出力の整数か `{"points": N, "message": "…"}` を受け取る。失敗や読めない出力は重いほうとして扱い、その項目の点を加える |
 | 定性（サブエージェント） | `judge: <問い>` | 判定が揃うまで子は閉じられない。`finish` が問いと差分の要約を `state/risk-judge-<子>.md` に書き、親がサブエージェントに渡し、報告を `ccnavi-ticket.sh record-risk <子> <項目> yes\|no --reason` で記録する。判定は子の HEAD に結び、HEAD が動けば取り直し。記録できるのは親だけ |
 
 点・リスクレベル・加点した理由は、閉じたときの出力、フェーズの終わりの文面、`--explain`、レビューの

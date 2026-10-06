@@ -6,9 +6,9 @@
 の親子のチケットを、
    手元と同じ形の仮のツリー（ワークスペースルート + `projects/<名前>` + そのワークツリー）で判定し、
    承認で書くもの（Changes）はその親子のチケットの親のブランチだけ
-2. プロジェクトのレイヤーは計算で決める（プロジェクトの統合先のレイヤーに、
-ワークスペースの共通レイヤーを
-   `configsync.projected` でコピーしたもの）。親のブランチの上のレイヤーは読まない
+2. プロジェクトのレイヤーは、プロジェクトの統合先の `.ccnavi/config/` をそのまま使う。
+   共通レイヤーはワークスペースの統合先の `.ccnavi/common/` だけで、プロジェクトの
+   `.ccnavi/common/`（親の着手が配るミラー）は読まない。親のブランチの上のレイヤーも読まない
 3. 取り込み状態はワークスペース（`sync/self/`）とプロジェクト（`sync/<名前>/`）に分けて組む
 4. 「始める」: issue の番号から識別子（`feature-12-<slug>`、プロジェクトのリポジトリなら
    `feature-12-web-<slug>`）を決め、統合先の `done/` にある・同じ名前のブランチがある・
@@ -40,11 +40,14 @@ factors:
     points: 1
 """
 
+# ミラー（プロジェクトの `.ccnavi/common/`）。ワークスペースの中では共通レイヤーとして読まれない。
+MIRROR_RULES = '{"version": 1, "deny": [{"id": "mirror-only", "match": "Bash", "glob": "*x*"}]}\n'
+
 
 def workspace(compat=version.COMPAT, **extra):
     files = {
         ".claude/settings.json": json.dumps({"env": {"CCNAVI_TICKET_CONTROL": "enable"}}) + "\n",
-        ".ccnavi/common/phases.yml": PHASES,
+        ".ccnavi/common/rules.yml": '{"version": 1, "deny": []}\n',
         COMPAT: f"#!/bin/sh\nCCNAVI_COMPAT={compat}\n",
     }
     files.update(extra)
@@ -57,7 +60,11 @@ def workspace(compat=version.COMPAT, **extra):
 
 
 def project_integration(**extra):
-    files = {".ccnavi/config/rules.yml": '{"version": 1, "deny": []}\n'}
+    # フェーズ定義は config にだけ置く。親の `project:` が指すプロジェクトの config 1 本が使われる
+    files = {
+        ".ccnavi/config/rules.yml": '{"version": 1, "deny": []}\n',
+        ".ccnavi/config/phases.yml": PHASES,
+    }
     files.update(extra)
     return {"head": HEAD, "files": files, "binary": []}
 
@@ -131,15 +138,18 @@ class ChromeProjectTest(unittest.TestCase):
         self.assertIn('"via": "chrome"', events)
         self.assertIn('"actor": "lab-approver"', events)
 
-    def test_the_project_layer_is_computed_from_the_integration_branches(self):
+    def test_the_project_layer_is_the_integration_config_as_it_is(self):
         place = self.chrome._placement()
+        risks = "version: 1\nfactors: []\n"
         snap = {
             "integration": {"name": "trunk"},
             "branches": {
                 "trunk": project_integration(
                     **{
-                        ".ccnavi/config/phases.yml": "version: 1\nphases: {}\n",
-                        ".ccnavi/config/risks.yml": "version: 1\nfactors: []\n",
+                        ".ccnavi/config/risks.yml": risks,
+                        # 親の着手が配るミラー。ワークスペースの中では共通レイヤーとして読まない
+                        ".ccnavi/common/rules.yml": MIRROR_RULES,
+                        "README.md": "r\n",
                     }
                 )
             },
@@ -147,11 +157,38 @@ class ChromeProjectTest(unittest.TestCase):
             "workspace": workspace(**{".ccnavi/common/risks.yml": RISK_COMMON}),
         }
         layer = self.chrome.project_layer(snap, place)
-        # 共通レイヤーにあるファイルはコピーし（配点の script はプロジェクトのレイヤーの置き場へ）、
-        # 無いものは残す
-        self.assertEqual(layer[".ccnavi/config/phases.yml"], PHASES)
-        self.assertIn("script: .ccnavi/scripts/risk.sh", layer[".ccnavi/config/risks.yml"])
-        self.assertEqual(layer[".ccnavi/config/rules.yml"], '{"version": 1, "deny": []}\n')
+        # プロジェクトの config はそのまま（共通レイヤーのファイルで上書きしない）。
+        # config 以外（ミラーなど）は入らない
+        self.assertEqual(
+            layer,
+            {
+                ".ccnavi/config/rules.yml": '{"version": 1, "deny": []}\n',
+                ".ccnavi/config/phases.yml": PHASES,
+                ".ccnavi/config/risks.yml": risks,
+            },
+        )
+
+    def test_the_project_family_is_judged_by_the_project_phases_and_ignores_the_mirror(self):
+        """フェーズ定義は親の `project:` が指す config の 1 本だけ。ミラーは足さない。"""
+        trunk = project_integration(
+            **{".ccnavi/common/phases.yml": PHASES, ".ccnavi/common/rules.yml": MIRROR_RULES}
+        )
+        branches = {"trunk": trunk, "web-i0012": {"head": HEAD, "files": family_files()}}
+        board = self.ask("board", branches=branches)
+        self.assertNotIn("error", board, board)
+        self.assertEqual([e["ticket"] for e in board["batch"]], ["web-i0012", "web-i0012-01-01"])
+        # プロジェクトの config に定義が無ければ、ミラーの定義があっても計画の定義が見つからない
+        bare = {
+            "trunk": {
+                **trunk,
+                "files": {k: v for k, v in trunk["files"].items() if "config/phases.yml" not in k},
+            }
+        }
+        bare["web-i0012"] = branches["web-i0012"]
+        self.assertNotEqual(
+            [e["ticket"] for e in self.ask("board", branches=bare).get("batch", [])],
+            ["web-i0012", "web-i0012-01-01"],
+        )
 
     def test_records_are_kept_apart_for_the_workspace_and_the_project(self):
         place = self.chrome._placement()
@@ -171,7 +208,8 @@ class ChromeProjectTest(unittest.TestCase):
         self.assertIn("branch trunk", records["sync/web/integration/head"])
         self.assertIn("branch main", records["sync/self/integration/head"])
         self.assertIn("sync/web/integration/.ccnavi/approved/done/web-i0001.md", records)
-        self.assertIn("sync/self/integration/.ccnavi/common/phases.yml", records)
+        self.assertIn("sync/self/integration/.ccnavi/common/rules.yml", records)
+        self.assertIn("sync/web/integration/.ccnavi/config/phases.yml", records)
         self.assertNotIn("sync/web/integration/README.md", records)
         self.assertIn("state present", records["sync/web/families/web-i0012"])
         self.assertIn("state gone", records["sync/web/families/web-i0009"])

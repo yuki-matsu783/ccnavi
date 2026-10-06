@@ -1,209 +1,171 @@
-"""着手の前に、共通レイヤーの設定をプロジェクトのレイヤーへコピーする（設計 11.12）。
+"""着手の前に、共通レイヤーをプロジェクトの `.ccnavi/common/` へミラーする（設計 11.12）。
 
-共通レイヤー（`.ccnavi/common/`）は、共通の設定を各プロジェクトへ配るための定義で、判定が読むのは
-各プロジェクトの `.ccnavi/config/` のほう。
-共通レイヤーはワークスペースの git にあるので、プロジェクトだけを
-clone したユーザからは見えない。そこで親チケットに着手するとき、共通レイヤーの各ファイルと、親の
-ワークツリーにあるプロジェクトのレイヤーの同じ名前のファイルを比べ、違えば共通レイヤーで上書きする。
+共通レイヤー（ワークスペースルートの `.ccnavi/common/`）はワークスペースの git にあるので、
+プロジェクトだけを clone したユーザからは見えない。そこで親チケットの `ticket start` で、
+共通レイヤーの中身を、親のワークツリーにあるプロジェクトの `.ccnavi/common/` へ写す。
+プロジェクトの `.ccnavi/config/` には触れない。
 
-- コピーするのは共通レイヤーにあるファイルだけ。共通レイヤーに無いファイル（このワークスペースでは
-  `phases.yml`）は、プロジェクトの側を消さずに残す
-- 配点の `script:` が指す共通レイヤーのスクリプトもコピーし、
-指す先をプロジェクトのレイヤーのパスに直す。
-  レイヤーから共通レイヤーのスクリプトは指せないので、直さずにコピーするとプロジェクトの配点が壊れる
-- コピーする前に、プロジェクトのレイヤーとして読めるかを確かめる。
-読めなければ何もコピーせず、着手しない
-- 上書きで消える識別子と、中身の変わる識別子を名指しする
-- コピー先に未コミットの変更があれば、ユーザの書きかけを上書きしないよう何もコピーしない
-- コピーしたことは親の上書きの記録 `config-sync.json` に残し、最初のレビューで知らせる。
-  レビューが無いまま親を閉じようとしたら止め、ユーザが端末で見たことを残すまで閉じさせない
+- 共通レイヤーが無い、または空なら、何も配らず、ミラーも消さない（着手は止めない）
+- 写すのは `rules.yml`・`risks.yml`・`rule-samples.yml` と、配点の `script:` が指す
+  `.ccnavi/common/scripts/` の下。中身の違うものだけ上書きし、共通レイヤーから無くなった
+  ファイルはミラーからも消す。ミラーは共通レイヤーの写しで誰も編集しないので、失うものは無い
+- `script:` の値は書き換えない。ミラーの置き場も `.ccnavi/common/scripts/` で、共通レイヤーと
+  同じ表記のまま指せる
+- 写す前に、ミラーとして（単体 clone では共通レイヤーとして）読めるかを確かめる。error が
+  あれば何も写さず、着手しない。共通レイヤーに `phases.yml` があるときも error で、配らない
+- 写し先かその途中がシンボリックリンクなら止める
+- 上書きと削除は一時ファイルからの置き換えで行う。途中で止まれば、した分を元へ戻す
 
-コピーしたレイヤーのファイルは、実行後チェックとバックアップと復元（どちらも `.ccnavi/` を
-守る）から見ればエージェントの書き込みと区別が付かない。区別は内容で付ける（`is_synced_write`）。
-誰が書いたかの台帳は持たない。台帳は git に入らないので、clone した別の機械には届かず、
-同じコピーしたレイヤーがその機械でだけ報告される。内容で見れば、上書きの記録は git を通じて届く。
+ミラーの書き込みは、実行後チェックとバックアップと復元（どちらも `.ccnavi/` を守る）から見れば
+エージェントの書き込みと区別が付かない。区別は内容で付ける（`is_synced_write`）。
+誰が書いたかの台帳は持たない。台帳は git に入らないので、clone した別の機械には届かない。
 """
 
 from __future__ import annotations
 
-import hashlib
+import contextlib
 import os
-import re
-from dataclasses import dataclass, field
-from typing import TextIO
+from dataclasses import dataclass
 
 import yaml
 
-from ..infra import fsio, gitcmd, settings, tree, yamlread
+from ..infra import fsio, settings, tree, yamlread
 from ..policy import rules
-from . import approval, approval_checks, approval_marks, phasetypes, risk, syncstate
+from . import approval, approval_checks, risk
 
-# 親ごとの上書きの記録の名前。`phases/<親>/config-sync.json`。
-MARK = "config-sync"
-# 上書きの記録の `files` で、配点が指すスクリプトを表す種類。
-KIND_SCRIPT = "script"
-# `is_synced_write` の `prior` を渡さなかった目印。None は「その版に無い」の意味で使う。
+COMMON_DIR = settings.COMMON_DIR
+# 共通レイヤーの見本のファイル名。
+SAMPLES_NAME = "rule-samples.yml"
+# `is_synced_write` の `content` を渡さなかった目印。None は「そのファイルが無い」の意味で使う。
 UNSET = object()
-# 端末で見たと残すときの `notified` の値。
-NOTIFIED_TERMINAL = "terminal"
 
 
 @dataclass
-class Copied:
-    """コピーする（コピーした）1 本。"""
+class Change:
+    """ミラーに加える（加えた）変更 1 本。"""
 
-    kind: str
     # 親のワークツリーからの相対。"/" 区切り。
     rel: str
     target: str
-    content: bytes
-    # 上書きする前の中身。無ければ None。戻すときに使う。
+    # 書く中身。None なら消す。
+    content: bytes | None
+    # 変える前の中身。無ければ None。戻すときに使う。
     before: bytes | None = None
-    # 上書きで消える識別子と、同じ識別子のまま中身が変わるもの。
-    lost: list[str] = field(default_factory=list)
-    changed: list[str] = field(default_factory=list)
-    # 上書き前を識別子のリストとして読めなかった（消える識別子を名指しできない）。
-    unparsed: bool = False
 
     @property
-    def existed(self) -> bool:
-        return self.before is not None
-
-    @property
-    def digest(self) -> str:
-        return _digest(self.content)
-
-    @property
-    def before_digest(self) -> str | None:
-        return _digest(self.before) if self.before is not None else None
+    def deletes(self) -> bool:
+        return self.content is None
 
 
-def common_files(conf: settings.Settings) -> dict[str, str]:
-    """共通レイヤーの 3 本のうち、置いてあるもの。kind → 絶対パス。"""
-    found = {}
-    for kind, path in (
-        (settings.KIND_RULES, conf.rules),
-        (settings.KIND_PHASES, conf.phases),
-        (settings.KIND_RISK, conf.risk),
-    ):
-        if path and os.path.isfile(path):
-            found[kind] = path
-    return found
+def mirror_dir(conf: settings.Settings, tree_root: str) -> str:
+    """そのツリーのミラーの置き場（絶対）。"""
+    return os.path.join(tree_root, _home(conf).replace("/", os.sep), COMMON_DIR)
 
 
-def projected(conf: settings.Settings, kind: str, content: bytes) -> bytes:
-    """共通レイヤーの中身を、プロジェクトのレイヤーに置くときの形にする。
+def common_dir(conf: settings.Settings, root: str) -> str:
+    """ワークスペースルートの共通レイヤーの置き場（絶対）。"""
+    return mirror_dir(conf, root)
 
-    配点だけ、`script:` の値の頭にある共通レイヤーの置き場を、プロジェクトのレイヤーの置き場へ直す。
-    直すのは `script:` の値だけ。`glob` や `message` に同じ文字列があっても触らない
-    （「共通レイヤーのスクリプトの変更に点を付ける」項目が、意味ごと別の項目に変わるため）。
+
+def sources(conf: settings.Settings, root: str) -> tuple[dict[str, bytes], str]:
+    """共通レイヤーのうち、ミラーへ写すもの。ミラーの置き場からの相対 → 中身。
+
+    読めなければ理由を返す（何も写さない）。共通レイヤーに `phases.yml` があるときも理由を返す
+    （置けないものなので配らない）。
     """
-    if kind != settings.KIND_RISK:
-        return content
-    common_home = re.escape(risk.SCRIPT_HOMES[0].encode())
-    project_home = settings.layer_script_home(conf).encode()
-    return re.sub(
-        rb"(\bscript\s*:\s*[\"']?)" + common_home,
-        lambda m: m.group(1) + project_home,
-        content,
-    )
-
-
-def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Copied], str]:
-    """コピーするものの一覧。コピーできない理由があれば、それを返す（何もコピーしない）。"""
-    out: list[Copied] = []
-    scripts: list[tuple[str, str]] = []
-    for kind, common in common_files(conf).items():
-        raw, why = _read_strict(common)
-        # 一覧を作ったあとに消えたもの（raw が None）も読めないとして止める。空として
-        # コピーすると、プロジェクトのレイヤーを中身の無い設定で上書きする。
-        if why or raw is None:
-            name = os.path.basename(common)
-            return [], f"共通レイヤーの {name} を読めない ({why or '無い'})"
-        content = projected(conf, kind, raw)
-        why = _unreadable_as_layer(conf, kind, content)
-        if why:
-            name = os.path.basename(common)
-            return [], f"共通レイヤーの {name} をプロジェクトのレイヤーとして読めない: {why}"
-        if kind == settings.KIND_RISK:
-            scripts = _scripts_of(conf, root, raw)
-        copied, why = _compare(
-            kind, tree_root, settings.layer_real_path(conf, tree_root, kind), content
+    base = common_dir(conf, root)
+    out: dict[str, bytes] = {}
+    phases = os.path.join(base, settings.LAYER_FILE_NAMES[settings.KIND_PHASES])
+    if os.path.lexists(phases):
+        return {}, (
+            "共通レイヤーに phases.yml がある（置けないので配らない。"
+            "フェーズ定義は config の phases.yml に置く）"
         )
+    risk_raw = b""
+    for name in (
+        settings.LAYER_FILE_NAMES[settings.KIND_RULES],
+        settings.LAYER_FILE_NAMES[settings.KIND_RISK],
+        SAMPLES_NAME,
+    ):
+        raw, why = _read_strict(os.path.join(base, name))
         if why:
-            return [], why
-        if copied is not None:
-            out.append(copied)
-    for source, rel in scripts:
-        raw, why = _read_strict(source)
+            return {}, f"共通レイヤーの {name} を読めない ({why})"
+        if raw is None:
+            continue
+        out[name] = raw
+        if name == settings.LAYER_FILE_NAMES[settings.KIND_RISK]:
+            risk_raw = raw
+    for kind in (settings.KIND_RULES, settings.KIND_RISK):
+        name = settings.LAYER_FILE_NAMES[kind]
+        if name in out:
+            why = _unreadable_as_common(kind, out[name])
+            if why:
+                return {}, f"共通レイヤーの {name} を、ミラーとして読めない: {why}"
+    for rel in _script_values(risk_raw):
+        raw, why = _read_strict(os.path.join(root, rel.replace("/", os.sep)))
         if why or raw is None:
-            return [], f"共通レイヤーの配点が指すスクリプト {source} を読めない ({why or '無い'})"
-        target = os.path.join(tree_root, rel.replace("/", os.sep))
-        copied, why = _compare(KIND_SCRIPT, tree_root, target, raw)
-        if why:
-            return [], why
-        if copied is not None:
-            out.append(copied)
+            return {}, f"共通レイヤーの配点が指すスクリプト {rel} を読めない ({why or '無い'})"
+        out[rel.removeprefix(_script_prefix())] = raw
     return out, ""
 
 
-def dirty(tree_root: str, copied: list[Copied]) -> tuple[list[str], str]:
-    """コピー先のうち、未コミットの変更があるもの。git を読めなければ理由を返す。"""
-    if not copied:
+def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Change], str]:
+    """ミラーに加える変更の一覧。写せない理由があれば、それを返す（何も写さない）。"""
+    wanted, why = sources(conf, root)
+    if why:
+        return [], why
+    if not wanted:
+        # 共通レイヤーが無い、または空。「設定が無い」正常で、配るものが無い。ミラーは消さない
+        # （共通を消し忘れた・取り違えたときに、ミラーを全部失わないため）。着手は止めない。
         return [], ""
-    rc, out = gitcmd.output(
-        tree_root,
-        ["status", "--porcelain", "-z", "--", *[f":(literal){c.rel}" for c in copied]],
-    )
-    if rc != 0:
-        return [], "git の状態を読めない"
-    found = []
-    for entry in out.split("\0"):
-        if len(entry) > 3:
-            found.append(entry[3:])
-    return found, ""
+    base = mirror_dir(conf, tree_root)
+    if not _inside(tree_root, base) or _linked(tree_root, base):
+        return [], f"{_rel_plain(tree_root, base)} がシンボリックリンクか、その下にある。写さない"
+    present, why = _scan(base)
+    if why:
+        return [], why
+    out: list[Change] = []
+    for name in sorted(wanted):
+        target = os.path.join(base, name.replace("/", os.sep))
+        if _linked(tree_root, target):
+            return (
+                [],
+                f"{_rel_plain(tree_root, target)} がシンボリックリンクか、その下にある。写さない",
+            )
+        before, why = _read_strict(target)
+        if why:
+            return [], f"{_rel(tree_root, target)} を読めない ({why})"
+        if before is not None and _same(before, wanted[name]):
+            continue
+        out.append(Change(_rel(tree_root, target), target, wanted[name], before))
+    for name in sorted(present):
+        if name in wanted:
+            continue
+        target = os.path.join(base, name.replace("/", os.sep))
+        before, why = _read_strict(target)
+        if why or before is None:
+            return [], f"{_rel(tree_root, target)} を読めない ({why or '無い'})"
+        out.append(Change(_rel(tree_root, target), target, None, before))
+    return out, ""
 
 
-def apply(approved_dir: str, parent: str, copied: list[Copied]) -> str:
-    """上書きの記録を置いてから上書きする。書けなかった理由を返す。書けたら空文字。
+def apply(changes: list[Change], base: str = "") -> str:
+    """ミラーへ変更を加える。書けなかった理由を返す。書けたら空文字。
 
-    先に上書きの記録を置くのは、上書きのあとに着手が止まっても、上書きしたことが知らせに残るように
-    するため。1 本でも書けなければ、書いた分と上書きの記録を元に戻す。
+    1 本でも書けなければ、した分を元へ戻し、戻せなかったものを名指しする。`base` を渡せば、
+    消して空になったディレクトリを base の下から片付ける。
     """
-    path = approval_marks.parent_mark_path(approved_dir, parent, MARK)
-    previous = _read(path)
-    mark = approval_marks.read_parent_mark(approved_dir, parent, MARK) or {}
-    entries = {str(f.get("path")): f for f in mark.get("files") or [] if isinstance(f, dict)}
-    for c in copied:
-        entries[c.rel] = {
-            "kind": c.kind,
-            "path": c.rel,
-            "sha256": c.digest,
-            "before_sha256": c.before_digest,
-            "existed": c.existed,
-            "lost": c.lost,
-            "changed": c.changed,
-            "unparsed": c.unparsed,
-        }
-    failed = approval_marks.write_parent_mark(
-        approved_dir,
-        parent,
-        MARK,
-        {"files": list(entries.values()), "notified": "", "prepared": None},
-    )
-    if failed:
-        return f"上書きの記録を書けない: {failed}"
-    written: list[Copied] = []
-    for c in copied:
-        failed = _replace(c.target, c.content)
+    done: list[Change] = []
+    for c in changes:
+        failed = _put(c.target, c.content)
         if failed:
-            stuck = [w.rel for w in written if not _restore(w.target, w.before)]
-            if not _restore(path, previous):
-                stuck.append(path)
+            stuck = [w.rel for w in reversed(done) if _put(w.target, w.before) != ""]
             if stuck:
                 return f"{c.rel} を書けない: {failed}（戻せなかったもの: {', '.join(stuck)}）"
-            return f"{c.rel} を書けない: {failed}（書いた分と上書きの記録は戻した）"
-        written.append(c)
+            return f"{c.rel} を書けない: {failed}（した分は戻した）"
+        done.append(c)
+    if base:
+        _prune_empty(base)
     return ""
 
 
@@ -211,72 +173,41 @@ def is_synced_write(
     conf: settings.Settings,
     root: str,
     path: str,
-    content: bytes | None = None,
-    prior: bytes | None | object = UNSET,
+    content: bytes | None | object = UNSET,
 ) -> bool:
-    """その変更が、親の着手で共通レイヤーをコピーしたものだと読めるか。
+    """その変更が、親の着手がミラーへ配った書き込みだと読めるか（設計 11.12）。
 
-    `content` は変更後の中身（渡さなければディスク上の今の中身）、`prior` は変更前として
-    比べるコミット済みの中身（渡さなければそのワークツリーの HEAD。None はその版に無い）。
-    コミットに入った分を見るときは、両方ともコミットされたもの（HEAD とターンの始まり）を
-    渡すこと。ディスクで答えると、好きな中身でコミットしてからディスクだけ戻す形が外れる。
+    `content` は変更後の中身（渡さなければディスク上の今の中身。None はそのファイルが無い）。
+    コミットに入った分を見るときは、コミットされた中身を渡すこと。ディスクで答えると、
+    好きな中身でコミットしてからディスクだけ戻す形が外れる。
 
     読めるのは次が全部揃ったときだけ。
 
     1. 置き場が、プロジェクトから切った**承認済みの親チケットの**ワークツリー（名前が親の
-       識別子で、そのチケットの `project:` がワークツリーのプロジェクトと同じ）の中。
-       元リポジトリ、子のワークツリー、チケットの無いワークツリー、他のプロジェクトは外さない
-    2. そのパスの途中にシンボリックリンクが無い。リンクで差し替えると、指す先の中身で答えてしまう
-    3. その中身が、共通レイヤーの対応するもの（設定はプロジェクトのレイヤーの形に直したもの、
-       スクリプトはそのまま）と同じ（改行の違いは見ない）
-    4. **その親の**上書きの記録 `config-sync.json` が、
-       その相対パスとその中身のハッシュを名指ししている
-    5. 変更前のコミット済みの中身が、上書きの記録に残した上書き前の中身と同じ。
-       外すのはコピーしてからコミットするまでの間だけで、
-       ユーザが直してコミットしたあとに共通レイヤーの中身へ戻す書き込みは外さない
+       識別子で、そのチケットの `project:` がワークツリーのプロジェクトと同じ）の中の
+       `.ccnavi/common/`。元リポジトリ、子のワークツリー、チケットの無いワークツリー、
+       他のプロジェクトのワークツリーは外さない
+    2. そのパス（解く前）の途中にシンボリックリンクが無い。リンクで差し替えると、指す先の中身で
+       答えてしまう
+    3. その中身が、ワークスペースルートの共通レイヤーの対応するものと同じ（バイト列で比べる。
+       共通レイヤーに無いものは、無いのが同じ）
 
     読めないものは外さない。
     """
-    rel_home = settings.layer_script_home(conf)
-    name = os.path.basename(path)
-    parent_dir = os.path.basename(os.path.dirname(path))
-    is_config = (
-        parent_dir == settings.LAYER_CONFIG_DIR and name in settings.LAYER_FILE_NAMES.values()
-    )
-    if not is_config and f"/{rel_home}" not in path.replace(os.sep, "/"):
-        return False
     where = tree.tree_of(root, _key(path), conf.projects)
     if where is None or not where.project or where.is_main:
+        return False
+    rel = _rel(where.root, path)
+    prefix = f"{_home(conf)}/{COMMON_DIR}/"
+    if not rel.startswith(prefix) or rel == prefix:
         return False
     if _linked(where.root, path):
         return False
     if not _approved_parent(conf, root, where):
         return False
-    rel = _rel(where.root, path)
-    expected = _expected(conf, root, rel)
-    if expected is None:
-        return False
-    now = content if content is not None else _read(path)
-    if now is None or not _same(now, expected):
-        return False
-    home = approval.home_dir(conf, root, where.name, "")
-    mark = approval_marks.read_parent_mark(home, where.name, MARK) or {}
-    entry = next(
-        (
-            f
-            for f in mark.get("files") or []
-            if isinstance(f, dict) and f.get("path") == rel and f.get("sha256") == _digest(now)
-        ),
-        None,
-    )
-    if entry is None:
-        return False
-    if prior is UNSET:
-        prior, readable = gitcmd.blob(where.root, "HEAD", rel)
-        if not readable:
-            return False
-    before = _digest(prior) if isinstance(prior, bytes) else None
-    return entry.get("before_sha256") == before
+    expected = _read(os.path.join(common_dir(conf, root), rel[len(prefix) :].replace("/", os.sep)))
+    now = _read(path) if content is UNSET else content
+    return now == expected
 
 
 def _approved_parent(conf: settings.Settings, root: str, where: tree.Tree) -> bool:
@@ -287,174 +218,39 @@ def _approved_parent(conf: settings.Settings, root: str, where: tree.Tree) -> bo
     return ticket is not None and not ticket.is_child and ticket.project == where.project
 
 
-def pending(approved_dir: str, parent: str) -> dict | None:
-    """まだ知らせていない上書きの記録。無いか知らせ済みなら None。"""
-    mark = approval_marks.read_parent_mark(approved_dir, parent, MARK)
-    if not mark or mark.get("notified") or not mark.get("files"):
-        return None
-    return mark
+def _home(conf: settings.Settings) -> str:
+    return (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
 
 
-def notice(mark: dict) -> str:
-    """最初のレビューの依頼の頭に置く文。"""
-    lines = [
-        "## プロジェクトの設定が変わった",
-        "",
-        "着手のときに、ワークスペースの共通レイヤー（`.ccnavi/common/`）とこのプロジェクトの "
-        "`.ccnavi/` が違っていたので、共通レイヤーで上書きした。この変更もレビューの対象。",
-        "",
-    ]
-    for f in mark.get("files") or []:
-        state = "上書き" if f.get("existed") else "新しく置いた"
-        line = f"- `{f.get('path')}`（{state}）"
-        lost = [str(x) for x in f.get("lost") or []]
-        changed = [str(x) for x in f.get("changed") or []]
-        if lost:
-            line += "。消えた識別子: " + ", ".join(f"`{x}`" for x in lost)
-        if changed:
-            line += "。中身が変わった識別子: " + ", ".join(f"`{x}`" for x in changed)
-        if f.get("unparsed"):
-            line += "。上書き前を読めなかったので、消えた識別子は名指しできていない"
-        lines.append(line)
-    lines += ["", ""]
-    return "\n".join(lines)
+def _script_prefix() -> str:
+    """共通レイヤーのスクリプトの置き場の、`common/` までの先頭。`script:` の値から外す。"""
+    return risk.SCRIPT_HOMES[0].split(f"{COMMON_DIR}/", 1)[0] + f"{COMMON_DIR}/"
 
 
-def mark_prepared(approved_dir: str, parent: str, phase_no: int) -> str:
-    """依頼の本文に知らせを載せた、と上書きの記録に残す。
-    `requested` はこれを見て知らせ済みにする。"""
-    mark = approval_marks.read_parent_mark(approved_dir, parent, MARK)
-    if not mark:
-        return ""
-    mark["prepared"] = phase_no
-    return approval_marks.write_parent_mark(approved_dir, parent, MARK, mark)
-
-
-def prepared_for(approved_dir: str, parent: str, phase_no: int) -> bool:
-    """その番号の依頼の本文に、知らせを載せたか。"""
-    mark = pending(approved_dir, parent)
-    return mark is not None and mark.get("prepared") == phase_no
-
-
-def mark_notified(approved_dir: str, parent: str, where: str) -> str:
-    """知らせたことを上書きの記録に残す。2 回目以降のレビューでは繰り返さない。"""
-    mark = approval_marks.read_parent_mark(approved_dir, parent, MARK)
-    if not mark:
-        return ""
-    mark["notified"] = where
-    return approval_marks.write_parent_mark(approved_dir, parent, MARK, mark)
-
-
-def acknowledge(
-    stdin: TextIO,
-    stdout: TextIO,
-    stderr: TextIO,
-    conf: settings.Settings,
-    root: str,
-    parent: str,
-) -> int:
-    """レビューの無いまま閉じる親で、ユーザが上書きを見たことを残す（`ccnavi --config-synced`）。
-
-    取り込み済みの親子のチケットが決まらない・閉じているなら、ほかの状態の操作と同じく止める
-    （書く先が元ツリーの旧経路に落ちないように）。
-    """
-    st = syncstate.Families(conf, root).standing_any(parent)
-    if st.imported and st.stop:
-        stderr.write(f"ccnavi: {parent}: {st.stop}。この親子のチケットの状態は動かさない\n")
-        for line in syncstate.guidance(root, st):
-            stderr.write(f"  {line}\n")
-        return 1
-    home = approval.home_dir(conf, root, parent, "")
-    mark = pending(home, parent)
-    if mark is None:
-        stdout.write(f"OK: {parent} に知らせていない設定の上書きは無い\n")
-        return 0
-    stdout.write(notice(mark))
-    stdout.write("この上書きを見たものとして残してよいなら y、やめるならそれ以外: ")
-    stdout.flush()
-    if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
-        stderr.write("ccnavi: 残さなかった\n")
-        return 1
-    failed = mark_notified(home, parent, NOTIFIED_TERMINAL)
-    if failed:
-        stderr.write(f"ccnavi: 上書きの記録を書けない: {failed}\n")
-        return 1
-    stdout.write(f"OK: {parent} の設定の上書きを見たものとして残した\n")
-    return 0
-
-
-def _compare(kind: str, tree_root: str, target: str, content: bytes) -> tuple[Copied | None, str]:
-    """コピー先と比べる。同じなら None。コピーできない理由があればそれを返す。"""
-    if not _inside(tree_root, target) or _linked(tree_root, target):
-        return (
-            None,
-            f"{_rel_plain(tree_root, target)} がシンボリックリンクか、その下にある。コピーしない",
-        )
-    before, why = _read_strict(target)
-    if why:
-        return None, f"{_rel(tree_root, target)} を読めない ({why})"
-    if before is not None and _same(before, content):
-        return None, ""
-    copied = Copied(
-        kind=kind, rel=_rel(tree_root, target), target=target, content=content, before=before
-    )
-    if before is not None and kind != KIND_SCRIPT:
-        old, new = _entries(kind, before), _entries(kind, content)
-        if old is None or new is None:
-            copied.unparsed = True
-        else:
-            copied.lost = [x for x in old if x not in new]
-            copied.changed = [x for x in old if x in new and old[x] != new[x]]
-    return copied, ""
-
-
-def _scripts_of(conf: settings.Settings, root: str, raw: bytes) -> list[tuple[str, str]]:
-    """共通レイヤーの配点が指すスクリプト。（共通レイヤーの実体, コピー先のツリーからの相対）。"""
+def _script_values(raw: bytes) -> list[str]:
+    """共通レイヤーの配点が指すスクリプト（`script:` の値。ワークスペースルートからの相対）。"""
+    if not raw:
+        return []
     definition, _ = risk.parse(raw.decode("utf-8", errors="replace"), "(risk)")
     if definition is None:
         return []
-    common_home = risk.SCRIPT_HOMES[0]
-    found = []
+    found: list[str] = []
     for f in definition.factors:
         value = str(f.value)
-        if f.kind != risk.KIND_SCRIPT or not value.startswith(common_home):
-            continue
-        rel = settings.layer_script_home(conf) + value[len(common_home) :]
-        pair = (os.path.join(root, value.replace("/", os.sep)), rel)
-        if pair not in found:
-            found.append(pair)
+        is_common_script = f.kind == risk.KIND_SCRIPT and value.startswith(risk.SCRIPT_HOMES[0])
+        if is_common_script and value not in found:
+            found.append(value)
     return found
 
 
-def _expected(conf: settings.Settings, root: str, rel: str) -> bytes | None:
-    """ツリーからの相対 rel にコピーされるはずの、共通レイヤーの中身。
-    対応するものが無ければ None。"""
-    home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
-    for kind, common in common_files(conf).items():
-        if rel == f"{home}/{settings.LAYER_CONFIG_DIR}/{settings.LAYER_FILE_NAMES[kind]}":
-            raw = _read(common)
-            return projected(conf, kind, raw) if raw is not None else None
-    script_home = settings.layer_script_home(conf)
-    if rel.startswith(script_home):
-        source = os.path.join(root, (risk.SCRIPT_HOMES[0] + rel[len(script_home) :]))
-        return _read(source.replace("/", os.sep))
-    return None
-
-
-def _unreadable_as_layer(conf: settings.Settings, kind: str, content: bytes) -> str:
-    """プロジェクトのレイヤーとして読めないなら、その理由。"""
+def _unreadable_as_common(kind: str, content: bytes) -> str:
+    """ミラーとして（単体 clone では共通レイヤーとして）読めないなら、その理由。"""
     try:
         text = content.decode("utf-8")
     except UnicodeDecodeError:
         return "UTF-8 として読めない"
-    if kind == settings.KIND_PHASES:
-        types, problems = phasetypes.parse(text, "(phases)", refs=False)
-        errors = [p for p in problems if p.severity == rules.SEVERITY_ERROR]
-        if types is None or errors:
-            return "; ".join(p.detail for p in errors) or "フェーズ定義として読めない"
-        return ""
     if kind == settings.KIND_RISK:
-        definition, problems = risk.parse(text, "(risk)", (settings.layer_script_home(conf),))
+        definition, problems = risk.parse(text, "(risk)", risk.SCRIPT_HOMES)
         errors = [p for p in problems if p.severity == rules.SEVERITY_ERROR]
         if definition is None or errors:
             return "; ".join(p.detail for p in errors) or "配点として読めない"
@@ -470,30 +266,44 @@ def _unreadable_as_layer(conf: settings.Settings, kind: str, content: bytes) -> 
     return "; ".join(p.detail for p in errors)
 
 
-def _entries(kind: str, content: bytes) -> dict[str, object] | None:
-    """識別子ごとの定義。読めなければ None。"""
-    try:
-        data = yamlread.safe_load(content.decode("utf-8"))
-    except (ValueError, yaml.YAMLError):
-        return None
-    if not isinstance(data, dict):
-        return None
-    if kind == settings.KIND_PHASES:
-        phases = data.get("phases")
-        return {str(k): v for k, v in phases.items()} if isinstance(phases, dict) else {}
-    if kind == settings.KIND_RISK:
-        items = [("factors", e) for e in data.get("factors") or []]
-    else:
-        items = [
-            (section, e)
-            for section in ("deny", "ask", "allow")
-            if isinstance(data.get(section), list)
-            for e in data.get(section)
-        ]
-    # ルールは、同じ id のまま deny から allow へ移るのも「中身が変わった」に数える。
-    return {
-        str(e["id"]): (section, e) for section, e in items if isinstance(e, dict) and e.get("id")
-    }
+def _scan(base: str) -> tuple[list[str], str]:
+    """ミラーの置き場に今ある通常のファイル（base からの相対、"/" 区切り）。
+
+    シンボリックリンクが 1 本でもあれば止める（理由を返す）。置き場が無ければ空。
+    """
+    found: list[str] = []
+    if not os.path.lexists(base):
+        return found, ""
+    for parent, dirs, names in os.walk(base):
+        for name in [*dirs, *names]:
+            path = os.path.join(parent, name)
+            if os.path.islink(path):
+                shown = _rel_plain(os.path.dirname(base), path)
+                return [], f"{shown} がシンボリックリンク。写さない"
+        for name in names:
+            found.append(os.path.relpath(os.path.join(parent, name), base).replace(os.sep, "/"))
+    return found, ""
+
+
+def _prune_empty(base: str) -> None:
+    """消して空になったディレクトリを、base の下から片付ける。base 自身は残す。失敗は無視する。"""
+    for parent, _, _ in os.walk(base, topdown=False):
+        if parent != base:
+            with contextlib.suppress(OSError):
+                os.rmdir(parent)
+
+
+def _put(path: str, content: bytes | None) -> str:
+    """1 本を書く（None なら消す）。駄目なら理由。
+
+    書くのは一時ファイルからの置き換え。fsio を通す（C1 の記録層が、写したものを「この実行で書いた
+    パス」に数え、`start` の C1 でコミットする）。
+    """
+    if content is None:
+        if not os.path.lexists(path):
+            return ""
+        return fsio.unlink(path)
+    return fsio.replace_bytes(path, content, ".ccnavi-sync")
 
 
 def _linked(tree_root: str, path: str) -> bool:
@@ -530,11 +340,8 @@ def _key(path: str) -> str:
 
 
 def _same(a: bytes, b: bytes) -> bool:
+    """中身が同じか。改行の違いは見ない（Windows のチェックアウトで書き換わるため）。"""
     return a.replace(b"\r\n", b"\n") == b.replace(b"\r\n", b"\n")
-
-
-def _digest(content: bytes) -> str:
-    return hashlib.sha256(content.replace(b"\r\n", b"\n")).hexdigest()
 
 
 def _rel(base: str, path: str) -> str:
@@ -558,21 +365,3 @@ def _read_strict(path: str) -> tuple[bytes | None, str]:
         return None, ""
     except OSError as exc:
         return None, str(exc)
-
-
-def _replace(path: str, content: bytes) -> str:
-    """一時ファイル（`*.ccnavi-sync`）に書いてから置き換える。途中で止まっても半端な中身を残さない。
-
-    fsio を通す（C1 の記録層が、写したレイヤーを「この実行で書いたパス」に数え、`start` の C1 で
-    コミットする）。
-    """
-    return fsio.replace_bytes(path, content, ".ccnavi-sync")
-
-
-def _restore(path: str, previous: bytes | None) -> bool:
-    """コピーした 1 本や上書きの記録を前の中身へ戻す。前が無かったなら消す。戻せたか。"""
-    if previous is None:
-        if not os.path.lexists(path):
-            return True
-        return not fsio.unlink(path) or not os.path.lexists(path)
-    return not _replace(path, previous)

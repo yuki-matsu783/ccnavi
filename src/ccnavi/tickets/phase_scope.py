@@ -122,8 +122,8 @@ def unread_type(
 ) -> str:
     """子の番号の定義が読めないなら、その定義の id。読めた、または読むものが無ければ空。
 
-    `types` は `load_types` が返したもの（None を含む）。phases.yml がどのレイヤーにも無いのは
-    番号だけの挙動で、読めないのではないので何も言わない。ファイルは在るのに定義が
+    `types` は `load_types` が返したもの（None を含む）。親の `project:` が指す phases.yml が
+    無いのは番号だけの挙動で、読めないのではないので何も言わない。ファイルは在るのに定義が
     引けない（壊れた・定義を消した）ときだけ返す。そのとき判定は定義では切り詰めない。
     deny にすると、ユーザが phases.yml を直している間、全部の子のワークツリーで書き込みが止まる。
     """
@@ -132,8 +132,8 @@ def unread_type(
         return ""
     if types is not None:
         return "" if item.type in types else item.type
-    files = (conf.phases, phase.types_path(conf, root, parent.project))
-    return item.type if any(p and os.path.exists(p) for p in files) else ""
+    path = phase.types_path(conf, root, parent.project)
+    return item.type if path and os.path.exists(path) else ""
 
 
 def scope_findings(

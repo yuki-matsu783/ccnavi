@@ -165,7 +165,6 @@ _NOT_WITH_DOCS = (
     "--agree",
     "--reviewed",
     "--close-early",
-    "--config-synced",
     "--yes",
     "--preview",
     "--verify",
@@ -180,6 +179,7 @@ _NOT_WITH_DOCS = (
     "--flow",
     "--project-rules-file",
     "--project-phases-file",
+    "--project-risk-file",
     # 判定・チケット・レビューの経路の設定と、sh が渡すパス。`--docs` は読まない。
     # レイヤーの置き場（`--rules` から `--project-home`）は診断の外では落として先へ進むが、
     # `--docs` で落とすと「そのプロジェクトの置き場で引いた」と読まれるので止める。

@@ -22,6 +22,7 @@ from ..tickets import (
     flow,
     history,
     phase,
+    phasetypes,
     risk,
     ticket_fold,
     ticket_model,
@@ -52,6 +53,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         ],
         "projects": [t.name for t in trees if t.kind == tree.KIND_PROJECT],
         "layers": _layers(conf, root, stderr),
+        "sums": _sums(conf, root, stderr),
         "problems": problems,
         "pending_approval": [],
         "tickets": [],
@@ -202,7 +204,9 @@ def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) ->
     for view in ruleload.survey(said, conf, root):
         phases_path = diagnose_shared.layer_config(conf, root, view.name, settings.KIND_PHASES)
         risk_path = diagnose_shared.layer_config(conf, root, view.name, settings.KIND_RISK)
-        types, phases_unreadable = diagnose_shared.layer_phase_types(phases_path)
+        types, phases_unreadable = diagnose_shared.layer_phase_types(
+            phases_path, common=view.name == ruleload.LAYER_COMMON
+        )
         factors, risk_unreadable = diagnose_shared.layer_risk(conf, view.name, risk_path)
         out.append(
             {
@@ -222,6 +226,65 @@ def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) ->
                     "factors": [_factor_record(view.name, f) for f in factors],
                 },
                 "phases_file": {"path": phases_path, "unreadable": phases_unreadable},
+            }
+        )
+    return out
+
+
+def _sums(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> list[dict]:
+    """ワークスペースとプロジェクトごとの「共通 + 1 レイヤー」の和（設計 11.4、11.9）。
+
+    `layers` はレイヤーごとの宣言で、重ねの途中経過（先のレイヤーと全欄が同じ定義は後ろから落ちる）
+    を含む。拡張はそれを足し直さず、ここの和をそのまま見せる。順は 自身のレイヤー → プロジェクト
+    （名前順）。1 件の形:
+
+        name     "self" か プロジェクトの名前
+        layers   ["common", <name>]
+        rules    path・unreadable・missing と、deny / ask / allow（共通レイヤーに足した和）
+        risk     共通 + そのレイヤーの配点。levels（実際に使う境目の点）・factors・
+                 problems・fallback
+        phases   使う 1 本（足し算はしない）。path・unreadable・order・types
+
+    判定の合成と同じ関数（`ruleload.sum_view` / `risk.layer_definition`）で組む。
+    """
+    said = stderr if stderr is not None else io.StringIO()
+    out = []
+    for layer in ruleload.layers(conf, root):
+        project = "" if layer.name == ruleload.LAYER_SELF else layer.name
+        view = ruleload.sum_view(said, conf, root, layer)
+        definition, notes = risk.layer_definition(conf, root, project)
+        phases_path = diagnose_shared.layer_config(conf, root, layer.name, settings.KIND_PHASES)
+        types, phases_unreadable = diagnose_shared.layer_phase_set(phases_path)
+        out.append(
+            {
+                "name": layer.name,
+                "layers": [ruleload.LAYER_COMMON, layer.name],
+                "rules": {
+                    "path": layer.path,
+                    "unreadable": view.unreadable,
+                    "missing": view.missing,
+                    **{
+                        section: [_rule_record(rule) for rule in view.rule_set.section(section)]
+                        for section in rules.SECTIONS
+                    },
+                },
+                "risk": {
+                    "levels": risk.effective_levels(definition.levels),
+                    "factors": [
+                        _factor_record(f.source or layer.name, f) for f in definition.factors
+                    ],
+                    "fallback": definition.fallback,
+                    "problems": [str(p) for p in notes],
+                },
+                "phases": {
+                    "path": phases_path,
+                    "unreadable": phases_unreadable,
+                    "order": types.order if types is not None else phasetypes.ORDER_SEQUENTIAL,
+                    "types": [
+                        _phase_type_record(layer.name, pt)
+                        for pt in (types.values() if types is not None else [])
+                    ],
+                },
             }
         )
     return out

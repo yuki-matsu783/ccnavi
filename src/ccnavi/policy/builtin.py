@@ -1,4 +1,8 @@
-"""ルールファイルを読めなかったときに使う、組み込みの既定ルール。
+"""組み込みの既定ルール。
+
+deny（取り返しの付かない操作の止め）は、共通レイヤーと config の有無・状態によらず常に当たる土台
+（`load_base`。設計 11.2）。`Read` を通す allow まで含めた既定の全部を使うのは、共通レイヤーと
+config が両方無いときと、共通レイヤーが読めないとき。以下は、読めないときの扱いの理由。
 
 ## なぜ既定が要るか
 
@@ -82,6 +86,31 @@ def rule_data(root: str, conf: settings.Settings) -> dict:
     }
 
 
+def base_data() -> dict:
+    """常に有効な組み込みの deny（土台）。取り返しの付かない操作の止めで、設定に依らない。
+
+    共通レイヤーと config の有無・状態によらず当て、共通レイヤーと config のルールはその上に足す
+    （設計 11.2）。`rule_data` の deny のうち、設定で動かない残り（`_DENY`）と同じもの。
+    `Read` だけ通す allow はここに入れない。あれは組み込みの既定だけで判定するとき
+    （共通レイヤーと config が両方無い・共通レイヤーが壊れている）に限る。
+    """
+    return {"version": rules.VERSION, "deny": _DENY}
+
+
+def load_base() -> tuple[rules.RuleSet, list[rules.Problem]]:
+    """常に有効な組み込みの deny を組み立てる。`load` と同じく、問題はこのビルドの不備。"""
+    built, problems = rules.parse(base_data(), builtin=True)
+    for rule in built.all():
+        rule.base = True
+    return built, problems
+
+
+def read_allow() -> list[rules.Rule]:
+    """組み込みの既定の `Read` を通す allow。共通レイヤーと config が両方無いときに足す。"""
+    built, _ = rules.parse({"version": rules.VERSION, "allow": _ALLOW}, builtin=True)
+    return built.allow
+
+
 CONFIG_VIA_BASH_RULE_ID = "builtin-guard-config-via-bash"
 
 
@@ -135,7 +164,14 @@ _DENY: list[dict] = [
     {
         "id": "builtin-credentials",
         "match": "Bash|Read|Write|Edit",
-        "regex": r"\.env|\.ssh[\\/]|id_rsa|id_ed25519|\.netrc|\.npmrc",
+        # 先頭の境界（行頭・空白・区切り）を付ける。常時有効の土台なので、`jq '.env.X'` のような
+        # フィールド参照や `process.env` を巻き込まない（リポジトリ自身の `credentials` と同じ形）。
+        # `.env` の後ろに続く `.envrc` `.env.local` は止める。
+        "regex": (
+            r"(^|[ \\/\x00])\.(env|netrc|npmrc)"
+            r"|(^|[ \\/\x00])\.ssh[\\/]"
+            r"|\b(id_rsa|id_ed25519)\b"
+        ),
         "message": (
             "This is a place credentials live. Do not read it; ask the user for the value you need."
         ),

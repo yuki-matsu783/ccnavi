@@ -9,6 +9,9 @@
  * 置いたままだと、画面がそこから `yaml` を辿ることになり、バンドルしたものに YAML の解析器が丸ごと入る。
  * 同じ理由で、ここには VS Code の API も DOM も node も入れない。
  *
+ * 編集する 1 本は、共通の設定・ワークスペースの設定・プロジェクトの設定のどれか（画面上部の「設定」の欄で切り替える。
+ * タブは 1 枚）。それとは別に、読み取り専用の足し算（`RiskPage.sums`）を持つ。
+ *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
  * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。**中身（`data`）が届くのは、画面の編集を捨ててよいとき
  * だけ**（ユーザが「更新」を押した、保存や作成が通って中身が入れ替わった）。ファイルが外で
@@ -17,6 +20,8 @@
 import type { AppearanceMessage } from "./appearance.js";
 import type { Lock } from "./lock.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
+import type { RiskSum } from "./sums.js";
+import type { TargetOption } from "./targets.js";
 
 // ---- 配点の形（画面と読み書きで分け合う）
 
@@ -74,10 +79,27 @@ export interface RiskPage {
   readonly root: string;
   /** 配点のファイル（ワークスペースルートからの相対で見せる） */
   readonly riskPath: string;
-  /** ファイルが在るか。無ければ組み込みの配点を見せ、「作る」だけができる */
+  /** ファイルが在るか。無ければ「エディタで開く」が押せない */
   readonly exists: boolean;
+  /**
+   * 組み込みの配点を読み取り専用で見せているか。共通の設定にもワークスペースの設定にも配点のファイルが無いとき
+   * （そのとき効いているのは組み込みの配点）、共通かワークスペースの設定を開くとこうなる。欄は止まり、
+   * 「組み込みの配点でファイルを作る」だけができる。省くと偽。偽でファイルが無いときは、空として出して欄は触れ、
+   * 検証を通った最初の保存でファイルを作る
+   */
+  readonly builtin?: boolean;
   readonly model: RiskModel;
   readonly lock: Lock;
+  /** 上部に出す注意（実行ファイルがこの設定を読めていない、など） */
+  readonly notices?: readonly string[];
+  /** 開いている対象と、切り替えられる対象。無ければ切り替えの欄を出さない */
+  readonly target?: { readonly kind: string; readonly name: string };
+  readonly targets?: readonly TargetOption[];
+  /**
+   * 読み取り専用の足し算（共通の設定 + ワークスペース、共通の設定 + 各プロジェクト）。実行ファイルが出した結果で、
+   * 拡張は合成しない。保存済みの配点の和で、編集中の内容は含まない。ボードを読めなかったときは無い
+   */
+  readonly sums?: readonly RiskSum[];
 }
 
 // ---- やり取り
@@ -88,7 +110,10 @@ export interface RiskPage {
  */
 export type RiskData =
   | { readonly kind: "page"; readonly page: RiskPage }
-  | { readonly kind: "error"; readonly error: string };
+  /** `targets` は読めなかった画面から別の対象へ戻るための欄（共通・ワークスペースと、いま開いていた対象）。ボードを読めていないので、ほかのプロジェクトは載せない */
+  | { readonly kind: "error"; readonly error: string; readonly target?: { readonly kind: string; readonly name: string }; readonly targets?: readonly TargetOption[] }
+  /** 開いているタブの対象を切り替えて、新しい対象を読んでいる間（タブは 1 枚）。`text` は画面に出す一言 */
+  | { readonly kind: "loading"; readonly text: string };
 
 /**
  * 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める（渡すのはそこ）。
@@ -112,11 +137,15 @@ export type RiskMessage =
   /** 画面が組み上がった。拡張ホストはここで中身を渡し直す */
   | { readonly type: "ready" }
   | { readonly type: "reload"; readonly dirty: boolean }
+  /** 未保存の変更の有無が変わった。別の対象へ切り替えるときに聞くかを拡張ホストが決める */
+  | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile" }
   | { readonly type: "create" }
   | { readonly type: "save"; readonly form: RiskForm }
   /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
-  | { readonly type: "tourDone" };
+  | { readonly type: "tourDone" }
+  /** 開いたまま別の設定へ切り替える。未保存の変更があれば、拡張ホストが破棄してよいかを聞く */
+  | { readonly type: "switchTarget"; readonly kind: string; readonly name: string };
 
 /** 最初の中身を埋める `<script type="application/json">` の id。画面はこれを読んで最初の 1 枚を描く */
 export const DATA_ID = "ccnavi-risk-data";

@@ -52,7 +52,6 @@ from . import (
     approval_checks,
     approval_marks,
     approval_ops,
-    configsync,
     ops_close,
     phase,
     phase_forms,
@@ -111,12 +110,6 @@ def prepare(
     # 計画があれば、このレビューが含むフェーズを機械が先頭に書く。延期した分を
     # ユーザが読み落とさないように。
     body = _covered_header(root, conf, parent, ph) + body
-    # 着手のときに共通レイヤーでプロジェクトの設定を上書きしていれば、最初の依頼の頭に載せる
-    # （設計 11.12）。知らせたことは、投稿が済んでから `requested` が上書きの記録に残す。
-    home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
-    synced = configsync.pending(home, parent.ticket)
-    if synced:
-        body = configsync.notice(synced) + body
     # 目印に、本文と親のブランチの先頭から作った鍵を入れる。sh は同じ目印の投稿が MR に
     # 既にあれば投稿し直さない（打ち直し・C1 のやり直しで依頼を二重にしない）。
     # 子を足してやり直した依頼は先頭が違うので、別の鍵になる。
@@ -133,39 +126,9 @@ def prepare(
     if failed:
         stderr.write(f"ccnavi: 本文を書き出せない ({failed})\n")
         return 1
-    if synced:
-        # 本文に載せたことを上書きの記録に残す。`requested` はこれを見て知らせ済みにする。
-        # 載せていない投稿で知らせ済みにすると、ユーザが一度も見ないまま知らせが出なくなる。
-        failed = configsync.mark_prepared(home, parent.ticket, phase_no)
-        if failed:
-            stderr.write(f"ccnavi: 設定の上書きを本文に載せた記録を書けない ({failed})\n")
-            return 1
     # 1 行目が依頼の本文、2 行目がマージリクエストの下書き。sh はこの順で読む。
     stdout.write(path + "\n" + draft + "\n")
     return 0
-
-
-def _note_synced(
-    stderr: TextIO,
-    conf: settings.Settings,
-    root: str,
-    parent: str,
-    where: str,
-    phase_no: int | None,
-) -> None:
-    """設定を上書きしたことを知らせた、と上書きの記録に残す。書けなくても依頼は済んでいるので止めない。
-
-    `phase_no` を渡したら、その番号の依頼の本文に載せたとき（`prepare` が上書きの記録に残した）
-    だけ残す。
-    """
-    home = approval.home_dir(conf, root, parent, "")
-    if configsync.pending(home, parent) is None:
-        return
-    if phase_no is not None and not configsync.prepared_for(home, parent, phase_no):
-        return
-    failed = configsync.mark_notified(home, parent, where)
-    if failed:
-        stderr.write(f"ccnavi: 設定を上書きしたことを知らせた記録を書けない: {failed}\n")
 
 
 def mr_draft(parent: ticket_model.Ticket) -> str:
@@ -258,7 +221,6 @@ def requested(
         fsio.remove(
             os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
         )
-    _note_synced(stderr, conf, root, parent.ticket, result.url, phase_no)
     done = "依頼し直した" if again else "依頼した"
     stdout.write(
         f"OK: レビューを{done}（{result.mr.url or result.url}）。"

@@ -232,15 +232,95 @@ export interface LayerFileJson {
 }
 
 /**
- * レイヤー（layer）1 つ（設計 11.2。共通・ワークスペース・プロジェクトの設定のどれか）。拡張が使うのはルールとフェーズ定義のファイルの場所だけなので、それだけを読む。
- * 宣言の中身と risk は読まない（リスク管理画面はワークスペースとプロジェクトの設定に追従していない、設計 11.11）。
+ * レイヤー（layer）1 つ（設計 11.2。共通・ワークスペース・プロジェクトの設定のどれか）。拡張が使うのはルール・配点・フェーズ定義の
+ * ファイルの場所と、読めなかった理由だけなので、それだけを読む。宣言の中身は読まない（足し算の表示は `sums` から読む）。
  */
 export interface LayerJson {
   /** `common` / `self` / プロジェクトの名前 */
   readonly name: string;
   readonly rules: LayerFileJson;
-  /** フェーズ定義のファイル（`phases_file`）。共通の設定は `.ccnavi/common/phases.yml` 固定 */
+  /** リスクの配点のファイル（`risk` の `path` と `unreadable`） */
+  readonly risk: LayerFileJson;
+  /**
+   * フェーズ定義のファイル（`phases_file`）。共通の設定に phases.yml があるときは、`unreadable` に
+   * 「共通には置けない。使わない」が入る（置けないので判定に使わない）
+   */
   readonly phasesFile: LayerFileJson;
+}
+
+/** 足し算に入ったルール 1 件（`sums[].rules` の `deny` / `ask` / `allow` の要素）。実行ファイルが出した値をそのまま持つ */
+export interface SumRuleJson {
+  /** レイヤー名付きの id（共通は裸、ほかは `<レイヤー>:<id>`） */
+  readonly id: string;
+  readonly section: string;
+  /** どのレイヤーから来たか */
+  readonly source: string;
+  readonly match: string;
+  /** 書いた形式（`glob` / `regex`）と、書いたままの式 */
+  readonly kind: string;
+  readonly written: string;
+  /** 翻訳後の正規表現 */
+  readonly pattern: string;
+  readonly message: string;
+}
+
+/** 足し算に入ったリスクの項目 1 件 */
+export interface SumFactorJson {
+  readonly id: string;
+  readonly source: string;
+  readonly kind: string;
+  /** 加点条件の値。数でも文字列でも文字にして持つ */
+  readonly value: string;
+  readonly points: number | null;
+  readonly message: string;
+}
+
+/** 足し算に入ったフェーズ定義 1 件 */
+export interface SumPhaseJson {
+  readonly id: string;
+  readonly source: string;
+  readonly kind: string;
+  readonly title: string;
+  readonly review: string;
+  readonly scope: readonly string[];
+}
+
+/**
+ * 足し算（`sums[]`）の 1 件。「共通の設定 + そのレイヤー」の読み取り用の結果で、実行ファイルが判定と同じ関数で組む。
+ * 拡張はこれを足し直さず、そのまま見せる。順は ワークスペース（`self`）→ プロジェクト（名前順）。
+ * パスを持たないツール（Bash など）が当てる、全プロジェクトの設定を足した和ではない。
+ */
+export interface SumJson {
+  /** `self` / プロジェクトの名前 */
+  readonly name: string;
+  /** 足したレイヤー。`["common", <name>]` */
+  readonly layers: readonly string[];
+  readonly rules: {
+    /** そのレイヤーのルールファイルの場所 */
+    readonly path: string;
+    /** 読めなかった理由。空なら読めた（無いファイルは空として読めた扱い） */
+    readonly unreadable: string;
+    /** ファイルが無い */
+    readonly missing: boolean;
+    readonly deny: readonly SumRuleJson[];
+    readonly ask: readonly SumRuleJson[];
+    readonly allow: readonly SumRuleJson[];
+  };
+  readonly risk: {
+    /** リスクレベルの境目の点（実際に使う値） */
+    readonly levels: Readonly<Record<"medium" | "high" | "critical", number | null>>;
+    readonly factors: readonly SumFactorJson[];
+    /** 壊れていて空に戻したときの理由。空なら無い */
+    readonly fallback: string;
+    readonly problems: readonly string[];
+  };
+  /** 使う 1 本だけ（足し算はしない） */
+  readonly phases: {
+    readonly path: string;
+    readonly unreadable: string;
+    readonly order: string;
+    readonly types: readonly SumPhaseJson[];
+  };
 }
 
 export interface BoardJson {
@@ -257,6 +337,8 @@ export interface BoardJson {
   readonly trees: readonly TreeJson[];
   /** 順序は 共通の設定 → ワークスペースの設定 → プロジェクトの設定（名前順） */
   readonly layers: readonly LayerJson[];
+  /** 順序は ワークスペースの足し算 → プロジェクトの足し算（名前順）。古い実行ファイルでは空 */
+  readonly sums: readonly SumJson[];
   readonly projects: readonly string[];
   readonly problems: readonly string[];
   readonly pending_approval: readonly string[];
@@ -306,6 +388,7 @@ export function parseBoardJson(text: string): ParseResult {
       },
       trees: list(raw.trees).filter(isRecord).map(tree),
       layers: list(raw.layers).filter(isRecord).map(layer),
+      sums: list(raw.sums).filter(isRecord).map(sum),
       projects: list(raw.projects).map(str),
       problems: list(raw.problems).map(str),
       pending_approval: list(raw.pending_approval).map(str),
@@ -331,7 +414,52 @@ function layer(raw: Record<string, unknown>): LayerJson {
     const record = isRecord(value) ? value : {};
     return { path: str(record.path), unreadable: str(record.unreadable) };
   };
-  return { name: str(raw.name), rules: file(raw.rules), phasesFile: file(raw.phases_file) };
+  return { name: str(raw.name), rules: file(raw.rules), risk: file(raw.risk), phasesFile: file(raw.phases_file) };
+}
+
+function sum(raw: Record<string, unknown>): SumJson {
+  const rules = isRecord(raw.rules) ? raw.rules : {};
+  const risk = isRecord(raw.risk) ? raw.risk : {};
+  const phases = isRecord(raw.phases) ? raw.phases : {};
+  const levels = isRecord(risk.levels) ? risk.levels : {};
+  const rule = (item: Record<string, unknown>): SumRuleJson => ({
+    id: str(item.id),
+    section: str(item.section),
+    source: str(item.source),
+    match: str(item.match),
+    kind: str(item.kind),
+    written: str(item.written),
+    pattern: str(item.pattern),
+    message: str(item.message),
+  });
+  return {
+    name: str(raw.name),
+    layers: list(raw.layers).map(str),
+    rules: {
+      path: str(rules.path),
+      unreadable: str(rules.unreadable),
+      missing: rules.missing === true,
+      deny: list(rules.deny).filter(isRecord).map(rule),
+      ask: list(rules.ask).filter(isRecord).map(rule),
+      allow: list(rules.allow).filter(isRecord).map(rule),
+    },
+    risk: {
+      levels: { medium: num(levels.medium), high: num(levels.high), critical: num(levels.critical) },
+      factors: list(risk.factors)
+        .filter(isRecord)
+        .map((f) => ({ id: str(f.id), source: str(f.source), kind: str(f.kind), value: String(f.value ?? ""), points: num(f.points), message: str(f.message) })),
+      fallback: str(risk.fallback),
+      problems: list(risk.problems).map(str),
+    },
+    phases: {
+      path: str(phases.path),
+      unreadable: str(phases.unreadable),
+      order: str(phases.order),
+      types: list(phases.types)
+        .filter(isRecord)
+        .map((t) => ({ id: str(t.id), source: str(t.source), kind: str(t.kind), title: str(t.title), review: str(t.review), scope: list(t.scope).map(str) })),
+    },
+  };
 }
 
 function ticket(raw: Record<string, unknown>): TicketJson {

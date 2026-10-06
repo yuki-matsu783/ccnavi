@@ -93,6 +93,7 @@ export function sampleBoard(root: string, generatedAt: string): Board {
     settings: { ticket_control: "enable", tickets: "", approved: "", projects: "" },
     trees: [],
     layers: [],
+    sums: [],
     projects: [],
     problems: [],
     pending_approval: ["sample-a"],

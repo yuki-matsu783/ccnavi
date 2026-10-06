@@ -1,5 +1,5 @@
 /**
- * フェーズ管理画面の、拡張ホストと Webview の間の契約。リスク管理（`risk-view.ts`）と同じ作り。
+ * フェーズ管理画面の、拡張ホストと Webview の間の契約。対象はワークスペースの設定とプロジェクトの設定の 2 種だけ（共通の設定には置けない）。リスク管理（`risk-view.ts`）と同じ作り。
  *
  * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。渡すのは「いま何を見せるか」
  * （`PhasesData`）だけで、画面が返すのはユーザが押した操作（`PhasesMessage`）だけ。画面は定義の意味を
@@ -91,26 +91,19 @@ export interface PhasesPage {
   /** 定義のファイル（ワークスペースルートからの相対で見せる） */
   readonly phasesPath: string;
   /**
-   * ファイルが在るか。無ければ空の画面を見せる。共通の設定は画面から作らせず、定義はワークスペースかプロジェクトの設定に置くよう案内する
-   * （共通の設定に雛形を置くと、ワークスペースやプロジェクトの設定の同じ id と中身が食い違い、その設定が空として扱われるため）
+   * ファイルが在るか。無ければ空の画面を見せる（「設定が無い」正常な状態で、帯は出さない）。欄は触れ、
+   * 検証を通った最初の保存でファイルを作る。雛形は置かない
    */
   readonly exists: boolean;
   readonly model: PhasesModel;
   readonly lock: Lock;
-  /**
-   * ワークスペースかプロジェクトの設定の定義か。どちらもファイルが無くても編集でき、最初の保存でファイルを作る
-   */
-  readonly layer?: boolean;
   /** 上部に出す注意（実行ファイルがこの設定を読めていない、など） */
   readonly notices?: readonly string[];
+  /** 上部に error の帯で出す文（共通の設定に phases.yml がある、など）。画面は開いたまま。`--lint` が error を言う間は保存できない（先に消すか config へ移す） */
+  readonly errors?: readonly string[];
   /** 開いている対象と、切り替えられる対象。無ければ切り替えの欄を出さない */
   readonly target?: { readonly kind: string; readonly name: string };
   readonly targets?: readonly TargetOption[];
-}
-
-/** 欄を触れるか。共通の設定はファイルが無ければ触れない（画面からは作らせない）。ワークスペースとプロジェクトの設定は無くても足して保存できる */
-export function editable(page: PhasesPage): boolean {
-  return page.exists || page.layer === true;
 }
 
 // ---- やり取り
@@ -145,8 +138,6 @@ export type PhasesMessage =
   /** 未保存の変更の有無が変わった。別の対象へ切り替えるときに聞くかを拡張ホストが決める */
   | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile" }
-  /** 共通レイヤーのファイルが無いときの案内から、自身のレイヤーを開く（切り替えの欄で「ワークスペース」を選ぶのと同じ経路） */
-  | { readonly type: "openSelf" }
   | { readonly type: "save"; readonly form: PhasesForm }
   /** 案内を閉じた。拡張ホストは見たことを残し、次からは初回の案内を送らない */
   | { readonly type: "tourDone" }

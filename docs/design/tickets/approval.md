@@ -124,7 +124,7 @@ rename するか、バイト単位でコピーして元を消す。欄を書き�
 | 端末の `ccnavi-agree.sh` | 承認が通ったあとに sh から呼ぶ。承認の push に失敗しても承認は 0 で終わる（コミットは残り、打ち直せば送れる） |
 | ボードの承認 | 1 件以上承認したら、`ccnavi-push-approved.sh` を絶対パスで端末に送り、Enter まで送る。sh が無ければ送らず、導入スクリプトで配るよう警告で言う |
 | ボードのフローの保存 | 保存したら `ccnavi-push-approved.sh <親>` を端末に送る |
-| ユーザの判断の入口（`ccnavi-review.sh chat` / `config-synced` / `close-early`） | 実行ファイルが書いた後、取り込み済みの親子のチケットなら `ccnavi-push-approved.sh <親>` を呼ぶ。それ以外の親子のチケットでは承認の push をしない |
+| ユーザの判断の入口（`ccnavi-review.sh chat` / `close-early`） | 実行ファイルが書いた後、取り込み済みの親子のチケットなら `ccnavi-push-approved.sh <親>` を呼ぶ。それ以外の親子のチケットでは承認の push をしない |
 
 取り込み済みの親子のチケットでは、親のワークツリーで C1 と同じく親子のチケットのロックを取り、途中の操作が無いことを
 確かめ、`ccnavi-sync.sh` で取り込んでから置き場（承認済みと、レビュー待ちの `review/` と、消えた `todo/` の提案）を

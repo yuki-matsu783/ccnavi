@@ -275,7 +275,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
                     SEVERITY_ERROR,
                     "(phases)",
                     f"{t.ticket} は計画を持つのにフェーズ定義"
-                    f"（{conf.phases} と {t.project or '自身'} のレイヤー）が読めない",
+                    f"（{t.project or '自身'} のレイヤーの phases.yml）が無いか読めない",
                 )
             )
 

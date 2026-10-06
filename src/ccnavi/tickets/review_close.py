@@ -19,7 +19,6 @@ from . import (
     approval,
     approval_marks,
     archive,
-    configsync,
     ops,
     ops_close,
     phase,
@@ -335,21 +334,10 @@ def close_early(
         return 1
     home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     left = _leftovers(home, parent, phases, result)
-    # 着手で共通レイヤーをコピーしたことをまだ知らせていなければ、早めに閉じる前にここで見せる。
-    # y で閉じたら見たものとして残す。見せないと、
-    # 早めに閉じたあとの finish でもう 1 度端末を求めることになる。
-    synced = configsync.pending(home, parent.ticket)
-    if synced:
-        stdout.write(configsync.notice(synced))
     _show_leftovers(stdout, parent, left)
     if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 早めに閉じなかった\n")
         return 1
-    if synced:
-        failed = configsync.mark_notified(home, parent.ticket, configsync.NOTIFIED_TERMINAL)
-        if failed:
-            stderr.write(f"ccnavi: 設定の上書きを見たと残せない: {failed}\n")
-            return 1
     stamp = approval_marks.now()
     settled = _settle(
         stdout, stderr, root, conf, parent, phases, left, result.mr.number, stamp, reason

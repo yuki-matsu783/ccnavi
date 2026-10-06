@@ -66,23 +66,15 @@ export function duplicateNote(ids: ReadonlySet<string>): string {
  * 確かめ、無ければ error を出す。画面がその手前で「ほかの設定の定義だ」と言うと、保存したときに
  * 実行ファイルが逆のことを言う。ここは「線にしていない」までしか言わない。
  */
-export function graphNotices(graph: PhasesGraph, form: PhasesForm, layer: boolean): readonly string[] {
+export function graphNotices(graph: PhasesGraph, form: PhasesForm): readonly string[] {
   const out: string[] = [];
   // after を 1 つでも書いていれば言う（線にならない、ほかの設定を指す after も使われないのは同じ）
   const hasAfter = form.phases.some((phase) => phase.after.some((id) => id.trim() !== ""));
   if (form.order === "sequential" && hasAfter) {
     out.push("待ち方が sequential なので、after は判定に使われません。全体計画は plan: に並べた順に一つずつ進みます");
   }
-  // ワークスペースとプロジェクトの設定の dag は、合成に入るほかの設定が全部 dag のときだけ有効になる（`phasetypes.py` の `merged_order`）
-  if (layer && form.order === "dag") {
-    out.push("共通の設定が sequential なら、合わせたときの判定は sequential で待ちます（このファイルの after は判定に使われません）");
-  }
   if (graph.dropped > 0) {
-    out.push(
-      layer
-        ? `このファイルに無い定義を指す関係が ${graph.dropped} 件あり、線にしていません（共通の設定の定義を指しているならそのままで構いません。入力ミスなら保存のときの検証で分かります）。共通の設定の定義を待つ定義は、図では根として表示されます`
-        : `このファイルに無い定義を指す関係が ${graph.dropped} 件あり、線にしていません（入力ミスなら保存のときの検証で分かります）`,
-    );
+    out.push(`このファイルに無い定義を指す関係が ${graph.dropped} 件あり、線にしていません（入力ミスなら保存のときの検証で分かります）`);
   }
   if (graph.unnamed > 0) {
     out.push(`id が空の定義は図に出ません（${graph.unnamed} 件）`);
@@ -90,12 +82,10 @@ export function graphNotices(graph: PhasesGraph, form: PhasesForm, layer: boolea
   return out;
 }
 
-/** 定義が 1 つも無いときに一覧へ出す文。ファイルの有無と、触れるかで変わる */
-export function emptyNote(exists: boolean, editable: boolean): string {
+/** 定義が 1 つも無いときに一覧へ出す文。ファイルの有無で変わる */
+export function emptyNote(exists: boolean): string {
   if (exists) {
     return "定義がありません。定義が 1 つも無いファイルは実行ファイルが読めないので、保存する前に足してください";
   }
-  return editable
-    ? "ファイルがありません（無ければこの設定は空で、共通の設定の定義だけが使われます）。定義を足して保存すると、ファイルが作られます"
-    : "ファイルがありません。定義はワークスペースかプロジェクトの設定に置いてください。ワークスペースの設定は上の案内のボタンから、プロジェクトの設定は画面上部の「設定」の欄から開けます";
+  return "ファイルがありません（この設定に定義が無い、という正常な状態です）。定義を足して保存すると、ファイルが作られます";
 }

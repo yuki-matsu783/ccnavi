@@ -56,7 +56,8 @@ test("CB-T110 layers[] からルールファイルの置き場を読み、欠け
   assert.equal(board.layers[1].rules.path, "<root>/.ccnavi/config/rules.yml");
   assert.equal(board.layers[1].rules.unreadable, "");
   assert.equal(board.layers[1].phasesFile.path, "<root>/.ccnavi/config/phases.yml");
-  assert.equal(board.layers[0].phasesFile.path, "<root>/phases.yml");
+  assert.equal(board.layers[1].risk.path, "<root>/.ccnavi/config/risks.yml");
+  assert.equal(board.layers[0].phasesFile.path, "<root>/.ccnavi/common/phases.yml");
   // 実行ファイルは常に layers を出す。欠けていれば（不正な JSON）CB-T04 と同じく既定値の空で補う
   const missing = parseBoardJson(JSON.stringify({ version: BOARD_VERSION }));
   assert.ok(missing.ok);
@@ -64,8 +65,35 @@ test("CB-T110 layers[] からルールファイルの置き場を読み、欠け
   const broken = parseBoardJson(JSON.stringify({ version: BOARD_VERSION, layers: [{ name: "lib" }, "x"] }));
   assert.ok(broken.ok);
   assert.deepEqual(broken.board.layers, [
-    { name: "lib", rules: { path: "", unreadable: "" }, phasesFile: { path: "", unreadable: "" } },
+    { name: "lib", rules: { path: "", unreadable: "" }, risk: { path: "", unreadable: "" }, phasesFile: { path: "", unreadable: "" } },
   ]);
+});
+
+test("CB-T306 sums[] を読む。ワークスペースの足し算（共通 + 自身）が先で、欠けた欄は空で補い、古い実行ファイル（sums が無い）では空", () => {
+  const board = fixture();
+  assert.deepEqual(board.sums.map((s) => s.name), ["self"]);
+  const self = board.sums[0];
+  assert.deepEqual(self.layers, ["common", "self"]);
+  assert.equal(self.rules.path, "<root>/.ccnavi/config/rules.yml");
+  assert.equal(self.rules.missing, true);
+  assert.deepEqual(self.rules.deny.map((r) => [r.id, r.source, r.match, r.kind]), [["guard-approved", "common", "Write|Edit|NotebookEdit", "glob"]]);
+  assert.deepEqual(self.risk.levels, { medium: 20, high: 40, critical: 70 });
+  assert.equal(self.risk.fallback, "");
+  // フェーズ定義は足し算をしない。使う 1 本（自身の設定）だけが載る
+  assert.equal(self.phases.order, "sequential");
+  assert.deepEqual(self.phases.types.map((t) => t.id).slice(0, 2), ["research", "design"]);
+  assert.ok(self.phases.types.every((t) => t.source === "self"));
+  const old = parseBoardJson(JSON.stringify({ version: BOARD_VERSION }));
+  assert.ok(old.ok);
+  assert.deepEqual(old.board.sums, []);
+  const broken = parseBoardJson(JSON.stringify({ version: BOARD_VERSION, sums: [{ name: "lib" }, "x"] }));
+  assert.ok(broken.ok);
+  assert.equal(broken.board.sums.length, 1);
+  assert.deepEqual(broken.board.sums[0].layers, []);
+  assert.deepEqual(broken.board.sums[0].rules.deny, []);
+  assert.equal(broken.board.sums[0].rules.missing, false);
+  assert.deepEqual(broken.board.sums[0].risk.levels, { medium: null, high: null, critical: null });
+  assert.deepEqual(broken.board.sums[0].phases.types, []);
 });
 
 test("CB-T04 欠けた項目は既定値で埋め、全体を捨てない", () => {

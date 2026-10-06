@@ -490,6 +490,13 @@ def decide_before(
         if group:
             verdict = name
             break
+    if verdict == rules.DENY and any(rule.base for rule in group):
+        # 組み込みの deny（土台）は常に当たるが、レイヤーの deny にも当たったなら、
+        # そちらだけを言う。拒否は変わらない。同じ拒否を 2 つの文面で返さないため。
+        kept = [i for i, rule in enumerate(group) if not rule.base]
+        if kept:
+            group = [group[i] for i in kept]
+            via = [via[i] for i in kept]
     # 保護を当てなかったぶん、ルールの deny に当たっていなければ拒否に上げる。権限モードでも
     # CCNAVI_GUARD_UNWATCHED でも分けない（保護の照合を終えていないので、委ねる先が無い）。
     capped = capped and verdict != rules.DENY

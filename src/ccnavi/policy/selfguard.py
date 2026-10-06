@@ -298,10 +298,10 @@ def after(
     written は、この呼び出しが名指しのツール（REPAIR_TOOLS）で書いた先の解決済みの
     パス。組み込みの既定を使っている間の修復だけは戻さない（_left_as_repair）。
 
-    synced は、ワークツリー側の設定の変更が、着手のときに共通レイヤーでプロジェクトのレイヤーを
-    上書きしたものかを答える（`configsync.is_synced_write`）。そう読めるものは戻さない。
-    戻すと着手がコピーした中身が同じ呼び出しの中で消え、最初のレビューで知らせる上書きの記録だけが残る。
-    ワークツリー側の設定に限るのは、上書きするのが親のワークツリーだけだから。
+    synced は、ワークツリー側の設定の変更が、着手のときに共通レイヤーをミラーした書き込みかを
+    答える（`configsync.is_synced_write`。第 2 引数は変更後の中身で、None は消えたこと）。
+    そう読めるものは戻さない。戻すと、着手がミラーした中身が同じ呼び出しの中で消える。
+    ワークツリー側の設定に限るのは、ミラーを書くのが親のワークツリーだけだから。
     """
     if setting == DISABLE or not state_dir:
         return []
@@ -320,7 +320,7 @@ def after(
         if saved is not None and now == saved:
             continue
 
-        if target.copy and now is not None and synced(target.spelled or target.path):
+        if target.copy and synced(target.spelled or target.path, now):
             continue
 
         if _left_as_repair(target, written, saved, now):

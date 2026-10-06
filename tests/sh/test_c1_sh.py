@@ -49,7 +49,7 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT, can_pass_argument, common_path, live_sh_pid, requires_symlink
+from tests import ROOT, can_pass_argument, common_path, config_path, live_sh_pid, requires_symlink
 from tests.ticket.test_phases import PHASES, child_text, parent_text
 from tests.ticket.test_ticket import RULES
 
@@ -153,7 +153,7 @@ class C1Harness(unittest.TestCase):
             git(self.ws, "config", key, value)
         write(os.path.join(self.ws, ".gitignore"), ".claude/worktrees/\nlogs/\n")
         write(common_path(self.ws, "rules"), json.dumps(RULES))
-        write(common_path(self.ws, "phases"), PHASES)
+        write(config_path(self.ws, "phases"), PHASES)
         write(os.path.join(self.ws, "src", "keep.py"), "print(1)\n")
         git(self.ws, "add", "-A")
         git(self.ws, "commit", "-q", "-m", "seed")
@@ -1205,8 +1205,6 @@ case " $* " in
   : >"$list"; put "$m/1.reviewed" '{{"mr": 1, "accepted": [], "at": "t"}}'; exit 0 ;;
 *" review ready "*) : >"$list"; put "$m/ready.json" '{{"mr": 1, "at": "t"}}'; exit 0 ;;
 *" --close-early "*) put "$m/2.skipped" '{{"by": "close-early", "at": "t"}}'; exit 0 ;;
-*" --config-synced "*)
-  put "$m/config-sync.json" '{{"files": [], "notified": "terminal"}}'; exit 0 ;;
 esac
 PYTHONPATH='{root}/src' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
 """
@@ -1299,7 +1297,7 @@ class C1HostHarness(C1Harness):
 
 @unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
 class C1HostTest(C1HostHarness):
-    """ホストに触る副命令（request・confirm・ready・decide・close-early・config-synced）の C1。"""
+    """ホストに触る副命令（request・confirm・ready・decide・close-early）の C1。"""
 
     def test_request_confirm_and_ready_are_carried(self):
         body = write(os.path.join(self._tmp.name, "body.md"), "見てほしい\n")
@@ -1449,13 +1447,10 @@ class C1HostTest(C1HostHarness):
         self.assertNotIn("LOCKED-WHILE-CHOOSING", done.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/1.reviewed")
 
-    def test_close_early_and_config_synced_hand_over_to_the_carrier(self):
+    def test_close_early_hands_over_to_the_carrier(self):
         closed = self.review("close-early", "--reason", "r", "--no-issue")
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/2.skipped")
-        synced = self.review("config-synced", PARENT)
-        self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
-        self.carried(f"{APPROVED}/phases/{PARENT}/config-sync.json")
 
 
 @unittest.skipIf(shutil.which("jq") is None, "jq が要る")

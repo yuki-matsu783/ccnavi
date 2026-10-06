@@ -50,16 +50,23 @@ def _explain_phases(
         (
             v.name,
             *diagnose_shared.layer_phase_types(
-                diagnose_shared.layer_config(conf, root, v.name, settings.KIND_PHASES)
+                diagnose_shared.layer_config(conf, root, v.name, settings.KIND_PHASES),
+                common=v.name == ruleload.LAYER_COMMON,
             ),
         )
         for v in views
     ]
-    counts = "、".join(f"{layer_label(name)} {len(items)} 種" for name, items, _ in tables)
-    stdout.write(f"\n■ phases（{counts}）\n")
+    counts = "、".join(
+        f"{layer_label(name)} {len(items)} 種"
+        for name, items, _ in tables
+        if name != ruleload.LAYER_COMMON
+    )
+    stdout.write(f"\n■ phases（{counts}。使うのは親の project: が指す 1 本）\n")
     stdout.write(f"  {'id':<16}{'レイヤー':<10}{'kind':<8}{'title':<16}{'review':<8}scope\n")
     for name, items, unreadable in tables:
-        if unreadable:
+        if unreadable == diagnose_shared.COMMON_PHASES_NOTE:
+            stdout.write(f"  {layer_label(name)}: {unreadable}（phases.yml は config に置く）\n")
+        elif unreadable:
             stdout.write(
                 f"  {layer_label(name)}: 読めない: {unreadable}。このレイヤーは空として扱う\n"
             )

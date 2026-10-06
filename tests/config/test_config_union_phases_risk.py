@@ -1,13 +1,14 @@
-"""設定 3 本の和の受入テスト。phases と risk の合成（設計 11.4.1、11.4.2）。
+"""設定の受入テスト。phases は config の 1 本、risk は共通 + 1 レイヤーの和（設計 11.4.1、11.4.2）。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。
-共通レイヤーに `design`、自身のレイヤーに `docs`、lib のレイヤーに `build` / `release` がある。
+共通レイヤーは phases を持たない（置けない）。自身のレイヤーに `docs`、lib のレイヤーに
+`design` / `build` / `release` がある。
 risk は共通レイヤーに `big-diff`、lib のレイヤーに `schema` と `levels: {critical: 50}` がある。
 
-どのレイヤーを足すかは親の承認済みチケットの `project:` で決まる。lib 向けの提案は
+使うフェーズ定義と足す配点のレイヤーは、親の承認済みチケットの `project:` で決まる。lib 向けの提案は
 `projects/lib/wip/proposals/` に置き、ワークスペース向けは `wip/proposals/` に置く（設計 11.5）。
 
-実装は入っている。ここが落ちたら、phases / risk の合成が設計 11.4.1 / 11.4.2 と
+実装は入っている。ここが落ちたら、phases / risk の読み方が設計 11.4.1 / 11.4.2 と
 食い違ったということ。
 """
 
@@ -46,19 +47,7 @@ LIB_JUDGE_FACTOR = (
     "  - {id: untested, points: 10, judge: テストの無い変更か, message: テスト無し}\n"
 )
 
-# 同 id で中身が違う（title が違う）design。
-LIB_PHASES_CONFLICT = (
-    LIB_PHASES
-    + """\
-  design:
-    kind: work
-    title: 設計（lib）
-    review: mr
-    scope: ["design/*"]
-"""
-)
-
-# 別の id で title だけ共通レイヤーの design と重なる。
+# 別の id で title だけ自身のレイヤーの design（設計）と重なる。
 LIB_PHASES_TITLE_OVERLAP = """\
 version: 1
 phases:
@@ -69,8 +58,37 @@ phases:
     scope: ["src/*"]
 """
 
-# 共通レイヤーの design と全欄が同じ定義を持つ lib のレイヤー。
-LIB_PHASES_COPIED = LIB_PHASES + COMMON_PHASES.split("phases:\n", 1)[1]
+# 自身のレイヤーの定義と全欄が同じ定義を持つ lib のレイヤー（lib 自身の design を除く）。
+LIB_PHASES_COPIED = COMMON_PHASES
+
+# 自身のレイヤーに置く、lib と同じ `design` の id を別の中身で持つ定義。
+OWN_PHASES_DESIGN = """\
+version: 1
+phases:
+  design:
+    kind: work
+    title: 設計（自身）
+    review: none
+    scope: ["wip/*"]
+"""
+
+# order: dag を書いた lib の定義。
+LIB_PHASES_DAG = """\
+version: 1
+order: dag
+phases:
+  design:
+    kind: work
+    title: 設計
+    review: mr
+    scope: ["wip/design/*"]
+  build:
+    kind: work
+    title: ビルド
+    review: none
+    scope: ["src/*"]
+    after: [design]
+"""
 
 # 閉じるときの点を見るための、範囲の上限が無くレビュー不要の定義。
 LIB_PHASES_WORK = """\
@@ -85,7 +103,7 @@ phases:
 
 
 class PhaseUnionTest(ConfigUnionHarness):
-    """phases の合成（11.4.1）。承認と --lint で見る。"""
+    """phases は config の 1 本（11.4.1）。足し算はしない。承認と --lint で見る。"""
 
     def phase_problems(self, severity, layer=""):
         """phases の Problem。`layer` を渡すと、そのレイヤーのものだけ。
@@ -97,7 +115,7 @@ class PhaseUnionTest(ConfigUnionHarness):
 
     def test_plan_can_name_a_type_from_the_project_layer(self):
         """11.4.1: `plan:` がプロジェクトのレイヤーの定義を指せる。
-        レイヤーから共通レイヤーの定義も指せる。"""
+        同じファイルの中の `requires` も通る。"""
         self.propose(
             "i0001",
             ticket_text("i0001", project="lib", plan=["design", "release"], allow=("src/*",)),
@@ -131,46 +149,108 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertNotEqual(refused.returncode, 0)
         self.assertFalse(os.path.exists(self.approved_copy("i0004")))
 
-    def test_conflicting_id_across_layers_is_an_error_and_empties_the_layer(self):
-        """11.4.1: 同 id で中身が違えば --lint error。そのレイヤーは空として扱い、承認が止まる。"""
-        write_layer(self.lib, phases=LIB_PHASES_CONFLICT)
+    def test_the_same_id_in_two_layers_is_not_a_conflict(self):
+        """11.4.1: レイヤーをまたぐ `id` の衝突は無い。使うのは親の `project:` が指す 1 本だけ。
 
-        errors = self.phase_problems("error", "lib")
-        self.assertTrue(any("design" in p["detail"] for p in errors), errors)
+        自身のレイヤーと lib が同じ `design` を別の中身で持っても、どちらも error にならず、
+        lib 向けの親は lib の `design` を使う。"""
+        write_layer(self.ws, phases=OWN_PHASES_DESIGN)
+        write_layer(self.lib, phases=LIB_PHASES)
 
-        # lib のレイヤーが空なので build も無い。共通レイヤーの design だけで進む。
+        self.assertEqual(self.phase_problems("error"), [])
+        self.assertEqual(self.phase_problems("warn"), [])
         self.propose(
             "i0001",
-            ticket_text("i0001", project="lib", plan=["design", "build"], allow=("src/*",)),
+            ticket_text("i0001", project="lib", plan=["design"], allow=("wip/design/*",)),
             project="lib",
         )
-        refused = self.approve()
-        self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("build", refused.stderr)
-        self.assertFalse(os.path.exists(self.approved_copy("i0001")))
+        self.assertEqual(self.approve().returncode, 0)
+        sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
+        self.assertEqual([t["title"] for t in sums["lib"]["phases"]["types"]][0], "設計")
+        self.assertEqual(sums["self"]["phases"]["types"][0]["title"], "設計（自身）")
 
-    def test_title_overlap_across_layers_is_an_error(self):
-        """11.4.1: `title` の重なりもレイヤーをまたいで error。"""
+    def test_title_overlap_across_layers_is_not_an_error(self):
+        """11.4.1: `title` の重なりのレイヤーまたぎも無い。重なりを見るのは 1 本の中だけ。"""
+        write_layer(self.ws, phases=OWN_PHASES_DESIGN)
         write_layer(self.lib, phases=LIB_PHASES_TITLE_OVERLAP)
+
+        self.assertEqual(self.phase_problems("error"), [])
+
+    def test_title_overlap_inside_one_file_is_an_error(self):
+        """11.4.1: 1 本の中の `title` の重なりは、その読み込みで error。"""
+        write_layer(
+            self.lib,
+            phases=LIB_PHASES_TITLE_OVERLAP
+            + "  other:\n    kind: work\n    title: 設計\n    review: none\n",
+        )
 
         errors = self.phase_problems("error", "lib")
         self.assertTrue(any("設計" in p["detail"] for p in errors), errors)
 
-    def test_identical_type_in_a_later_layer_is_dropped_with_info(self):
-        """11.4.1: 全欄一致は重複とみなして後ろを捨て、info で言う。承認は通る。"""
+    def test_identical_types_in_two_layers_are_both_kept(self):
+        """11.4.1: 全欄一致でも後ろを捨てない（info も出ない）。足し算が無いので重複が起きない。"""
         write_layer(self.lib, phases=LIB_PHASES_COPIED)
 
         self.assertEqual(self.phase_problems("error"), [])
-        infos = self.phase_problems("info", "lib")
-        self.assertTrue(any("design" in p["detail"] for p in infos), infos)
+        self.assertEqual(self.phase_problems("info"), [])
 
+    def test_requires_must_resolve_inside_the_one_file(self):
+        """11.4.1: 他のレイヤーの定義を指す `requires` の特例は無い。1 本の中に無ければ error。"""
+        write_layer(self.ws, phases=OWN_PHASES_DESIGN)
+        write_layer(
+            self.lib,
+            phases=LIB_PHASES.replace("design:", "planning:"),
+        )
+
+        errors = self.phase_problems("error", "lib")
+        self.assertTrue(any("design" in p["detail"] for p in errors), errors)
+
+    def test_a_common_phases_file_is_an_error_and_is_not_used(self):
+        """11.4.1: 共通レイヤーの phases.yml は --lint が error で名指しし、判定では空として扱う。
+
+        記録の `fallback` には残さない。`plan:` が共通レイヤーの定義を指しても承認は止まる。"""
+        write(self.phases, COMMON_PHASES)
+
+        errors = self.phase_problems("error")
+        self.assertTrue(any(self.phases in p["detail"] for p in errors), errors)
+        self.propose(
+            "i0001",
+            ticket_text("i0001", plan=["design"], allow=("wip/design/*",)),
+        )
+        refused = self.approve()
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertFalse(os.path.exists(self.approved_copy("i0001")))
+        explained = self.ccnavi("--explain").stdout
+        self.assertIn("共通には置けない", explained)
+        record = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "src", "a.py"))
+        self.assertNotIn("fallback", self.last_record(), record.stdout)
+
+    def test_a_missing_phases_file_is_normal(self):
+        """11.2: phases.yml が無いのは正常（空）。--lint に出さず、`plan:` だけが読めない。"""
+        os.remove(layer_path(self.ws, "phases"))
+
+        self.assertEqual(self.phase_problems("error"), [])
+        self.assertEqual(self.phase_problems("warn"), [])
+        self.propose("i0001", ticket_text("i0001", plan=["docs"], allow=("docs/*",)))
+        self.assertNotEqual(self.approve().returncode, 0)
+
+    def test_the_order_is_the_one_files_own(self):
+        """9.7: `order: dag` になるのは、その 1 本が dag と書いたときだけ。"""
+        write_layer(self.ws, phases=OWN_PHASES_DESIGN)  # sequential
+        write_layer(self.lib, phases=LIB_PHASES_DAG)
         self.propose(
             "i0001",
             ticket_text("i0001", project="lib", plan=["design", "build"], allow=("src/*",)),
             project="lib",
         )
-        approved = self.approve()
-        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.assertEqual(self.approve().returncode, 0)
+
+        sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
+
+        self.assertEqual(sums["lib"]["phases"]["order"], "dag")
+        self.assertEqual(sums["self"]["phases"]["order"], "sequential")
+        workflow = self.approved_path("phases", "i0001", "workflow.yml", project="lib")
+        self.assertIn("order: dag", read(workflow))
 
     def test_scope_stays_relative_to_the_worktree(self):
         """11.4.1: `scope` はワークツリーのルートからの相対のまま。
@@ -202,7 +282,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertTrue(os.path.exists(self.approved_copy("i0001-01-02")))
 
     def test_broken_project_phases_is_an_error_and_the_layer_is_empty(self):
-        """11.2: 壊れたレイヤーの phases は空 + --lint error。共通レイヤーの定義は使える。"""
+        """11.2: 壊れたレイヤーの phases は空 + --lint error。`plan:` は読めない。"""
         write(layer_path(self.lib, "phases"), "version: 1\nphases: [\n")
 
         self.assertTrue(self.phase_problems("error", "lib"))
@@ -211,8 +291,8 @@ class PhaseUnionTest(ConfigUnionHarness):
             ticket_text("i0001", project="lib", plan=["design"], allow=("wip/*",)),
             project="lib",
         )
-        approved = self.approve()
-        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        refused = self.approve()
+        self.assertNotEqual(refused.returncode, 0)
 
 
 class RiskUnionTest(ConfigUnionHarness):

@@ -107,6 +107,19 @@ def common_path(root: str, kind: str) -> str:
     return os.path.join(root, common_relpath(kind))
 
 
+def config_path(root: str, kind: str) -> str:
+    """ワークスペースルートの config（自身のレイヤー）のファイル（rules / phases / risk）のパス。
+
+    フェーズ定義は config にだけ置ける（共通レイヤーには置けない）。
+    """
+    return os.path.join(
+        root,
+        _settings.DEFAULT_PROJECT_HOME,
+        _settings.LAYER_CONFIG_DIR,
+        _settings.LAYER_FILE_NAMES[kind],
+    )
+
+
 def fixture_workspace(name: str = "rules.yml") -> str:
     """`tests/fixtures/<name>` を共通レイヤーのルールに据えたワークスペースルート。
 

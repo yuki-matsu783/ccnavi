@@ -3,8 +3,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readRisk } from "../../src/core/risk-doc.js";
 import type { RiskForm } from "../../src/core/risk-view.js";
+import { riskSums } from "../../src/core/sums.js";
 import { openPage, openRisk, page, rowSelector } from "../helpers/risk.js";
 import type { DomPage } from "../helpers/dom.js";
+import { sumsBoard } from "../helpers/sums.js";
 import type { HTMLButtonElement, HTMLInputElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
 
 /** 直前に送った保存の中身 */
@@ -86,7 +88,7 @@ test("CB-D12 絞り込みは一致した行だけを数え、開いている行�
 });
 
 test("CB-D13 ファイルが無ければ欄も追加も押せず、「作る」だけ押せる", async () => {
-  const dom = await openRisk({ exists: false });
+  const dom = await openRisk({ exists: false, builtin: true });
   try {
     dom.click(dom.one(`${rowSelector("f1")} .row-head`));
     await dom.settle();
@@ -104,7 +106,7 @@ test("CB-D13 ファイルが無ければ欄も追加も押せず、「作る」�
 });
 
 test("CB-T82 ファイルが無ければ組み込みだと言って作るボタンを出し、あれば出さない", async () => {
-  const missing = await openRisk({ exists: false });
+  const missing = await openRisk({ exists: false, builtin: true });
   try {
     assert.match(missing.one(".banner.missing").textContent, /\.ccnavi\/common\/risks\.yml がありません。実行ファイルは組み込みの配点で数えています/);
     assert.equal(missing.all('button[data-action="create"]').length, 1);
@@ -366,12 +368,115 @@ test("CB-D100 拡張ホストが頼んだらリスク管理の案内を出し、
   } finally {
     await dom.close();
   }
-  const missing = await openRisk({ exists: false });
+  const missing = await openRisk({ exists: false, builtin: true });
   try {
     missing.click(missing.one('[data-action="tour"]'));
     await missing.settle();
     assert.equal(missing.one("#tour-title").textContent, "まずファイルを作る");
   } finally {
     await missing.close();
+  }
+});
+
+test("CB-T313 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が 1 つだけなら出さない。読み込み中と、読めなかった画面にも出る", async () => {
+  const targets = [
+    { kind: "workspace", name: "", label: "共通の設定" },
+    { kind: "self", name: "", label: "ワークスペース" },
+    { kind: "project", name: "lib", label: "プロジェクト lib" },
+  ];
+  const dom = await openRisk({ target: { kind: "workspace", name: "" }, targets });
+  try {
+    const select = dom.one<HTMLSelectElement>("select#target");
+    assert.deepEqual([...select.options].map((o) => o.textContent), ["共通の設定", "ワークスペース", "プロジェクト lib"]);
+    assert.equal(select.value, "workspace:");
+    dom.change(select, "project:lib");
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((m) => m.type === "switchTarget"), [{ type: "switchTarget", kind: "project", name: "lib" }]);
+    // 切り替え先を読んでいる間は、一言だけ出す
+    await dom.send({ type: "data", data: { kind: "loading", text: "lib のリスクを読み込み中…" } });
+    assert.equal(dom.one("#ccnavi-loading").textContent, "lib のリスクを読み込み中…");
+    assert.equal(dom.all("#factors").length, 0);
+  } finally {
+    await dom.close();
+  }
+  const single = await openRisk({ target: { kind: "workspace", name: "" }, targets: targets.slice(0, 1) });
+  try {
+    assert.equal(single.all("select#target").length, 0);
+  } finally {
+    await single.close();
+  }
+  const failed = await openPage({ kind: "error", error: "EACCES", target: { kind: "project", name: "lib" }, targets });
+  try {
+    const select = failed.one<HTMLSelectElement>("select#target");
+    assert.equal(select.value, "project:lib");
+    failed.change(select, "workspace:");
+    await failed.settle();
+    assert.deepEqual(failed.posted.filter((m) => m.type === "switchTarget"), [{ type: "switchTarget", kind: "workspace", name: "" }]);
+  } finally {
+    await failed.close();
+  }
+});
+
+test("CB-T314 未保存の変更の有無が変わったら拡張ホストに伝える（別の対象へ切り替えるときに破棄してよいかを聞くため）", async () => {
+  const dom = await openRisk();
+  try {
+    assert.deepEqual(dom.posted.filter((m) => m.type === "dirty"), []);
+    dom.click(dom.one('button[data-action="add"]'));
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((m) => m.type === "dirty"), [{ type: "dirty", dirty: true }]);
+    await dom.send({ type: "data", data: { kind: "page", page: page() } });
+    assert.deepEqual(dom.posted.filter((m) => m.type === "dirty"), [{ type: "dirty", dirty: true }, { type: "dirty", dirty: false }]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-T315 配点のファイルが無いのは正常。組み込みを見せない設定（プロジェクトなど）は、不備の帯も作るボタンも出さず、空の欄を触れて保存できる", async () => {
+  const empty = readRisk("").model;
+  const dom = await openRisk({ exists: false, builtin: false, model: { ...empty, problems: [] }, target: { kind: "project", name: "lib" } });
+  try {
+    assert.equal(dom.all(".banner.missing").length, 0);
+    assert.equal(dom.all('button[data-action="create"]').length, 0);
+    assert.ok(dom.one<HTMLButtonElement>('button[data-action="open-risk"]').disabled);
+    assert.ok(!dom.one<HTMLButtonElement>('button[data-action="add"]').disabled);
+    assert.ok(!dom.one<HTMLInputElement>("input.f-level").disabled);
+    dom.click(dom.one('button[data-action="add"]'));
+    await dom.settle();
+    assert.ok(!dom.one<HTMLButtonElement>("#save").disabled);
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    assert.equal(savedForm(dom).factors.length, 1);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-T316 足し算は読み取り専用で、境目の点・項目・由来を実行ファイルが出したまま並べる。選び直しても拡張ホストへ何も送らない", async () => {
+  const sums = riskSums(sumsBoard());
+  const dom = await openRisk({ target: { kind: "project", name: "lib" }, sums, notices: ["読めない <理由>"] });
+  try {
+    assert.equal(dom.all(".banner.warn:not(#changed)")[0].textContent, "読めない <理由>");
+    const select = dom.one<HTMLSelectElement>("select#sum-select");
+    assert.equal(select.value, "lib");
+    assert.match(dom.one("#sum .hint").textContent, /パスを持たない判定は、全プロジェクトの設定を足した和ではありません/);
+    assert.match(dom.one("#sum-levels").textContent, /MEDIUM 20.*HIGH 40.*CRITICAL 50/);
+    const rows = () => dom.all("#sum tbody tr").map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
+    assert.deepEqual(rows().map((r) => [r[0], r[2], r[3]]), [["big-diff", "25", "共通の設定"], ["schema", "30", "lib"]]);
+    dom.change(select, "self");
+    await dom.settle();
+    assert.match(dom.one("#sum-levels").textContent, /CRITICAL 70/);
+    assert.deepEqual(rows().map((r) => r[0]), ["big-diff"]);
+    assert.equal(dom.all("#sum button").length, 0);
+    assert.deepEqual(dom.posted.filter((m) => m.type !== "ready"), []);
+    // 編集する 1 本の項目とは混ざらない
+    assert.equal(dom.all("#factors .factor").length, 4);
+  } finally {
+    await dom.close();
+  }
+  const none = await openRisk({ sums: [] });
+  try {
+    assert.equal(none.all("#sum").length, 0);
+  } finally {
+    await none.close();
   }
 });

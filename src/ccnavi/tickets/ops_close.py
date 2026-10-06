@@ -16,7 +16,6 @@ from . import (
     approval_checks,
     approval_marks,
     approval_ops,
-    configsync,
     phase,
     syncstate,
     ticket_model,
@@ -270,18 +269,6 @@ def close_problems(
         return [
             f"{parent_id} には開いている子がある（{', '.join(open_children)}）。"
             "子を先に閉じてください"
-        ]
-    # 着手で共通レイヤーをコピーした親は、それをユーザに知らせるまで閉じず、
-    # Draft も外させない（設計 11.12）。知らせるのは最初のレビュー。レビューの無い親（計画が無い、
-    # 全部 `review: none`、早めに閉じた）はそこを通らないので、ユーザが端末で見たことを残させる。
-    # 早めに閉じた親でも問うので、この下の早い return より前に置く。
-    if configsync.pending(approval.home_dir(conf, root, parent_id, ""), parent_id):
-        return [
-            f"{parent_id} は着手のときに共通レイヤーで設定を上書きしたが、"
-            "まだユーザに知らせていない"
-            "（レビューを通っていない）。閉じる前に、ユーザに端末で "
-            f"'{settings.script_command(root, 'ccnavi-review.sh')} config-synced {parent_id}' を"
-            "打って見てもらってください"
         ]
     if approval_marks.read_parent_mark(
         approval.home_dir(conf, root, parent_id, ""),

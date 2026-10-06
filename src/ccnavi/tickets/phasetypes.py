@@ -1,4 +1,4 @@
-"""フェーズ定義。`.ccnavi/common/phases.yml` を読む（設計 9.7）。
+"""フェーズ定義。親の `project:` が指す config の `phases.yml` を 1 本だけ読む（設計 9.7）。
 
 ## 定義はユーザが持つ
 
@@ -41,7 +41,7 @@ import yaml
 
 from ..infra import fsio, globmatch, settings, tree, yamlread
 from ..policy import rules
-from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
+from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from . import ticket as ticket_mod
 from . import ticket_model
 
@@ -354,96 +354,6 @@ def mark_source(types: dict[str, PhaseType] | None, layer: str) -> None:
         pt.source = layer
 
 
-def merged_order(*layers: PhaseTypes | None) -> str:
-    """レイヤーを合わせた `order`。
-    ファイルを持つレイヤーが全部 `dag` と書いたときだけ `dag`（設計 9.7）。"""
-    present = [t.order for t in layers if t is not None]
-    if present and all(o == ORDER_DAG for o in present):
-        return ORDER_DAG
-    return ORDER_SEQUENTIAL
-
-
-def merge(
-    common: PhaseTypes | None, extra: PhaseTypes | None, layer: str
-) -> tuple[PhaseTypes, list[Problem]]:
-    """共通レイヤーの定義に、行き先のレイヤーの定義を id ごとに足す（設計 11.4.1）。
-
-    足すだけで、後ろのレイヤーが前のレイヤーを上書きすることはない。同 `id` で全欄が一致する
-    ものは重複とみなして後ろを捨て（info）、中身が違えば error。`title` の重なりも
-    レイヤーをまたいで error（ユーザは表示名で見るので、承認画面で見分けられない）。
-
-    error があるとき、そのレイヤーは空として扱い、共通レイヤーの定義だけを返す。衝突した片方を
-    何も言わずに採ると、どちらの `review:` が使われているかをユーザが読めない。止まる側を採る。
-
-    `overlap` / `requires` / `after` が指す先は合成後の集合で確かめる。
-    レイヤーから共通レイヤーの定義を
-    指すのは正しい形なので、レイヤー 1 本の中では確かめられない。
-
-    `order` は、ファイルを持つレイヤーが全部 `dag` と書いたときだけ `dag`（`merged_order`）。
-    食い違いは warn。プロジェクトのレイヤー 1 本で緩む側へ切り替えられないようにする。
-    """
-    order = merged_order(common, extra)
-    base = PhaseTypes(common or {}, order=order)
-    problems: list[Problem] = []
-    titles = {pt.title: ident for ident, pt in base.items()}
-    added: dict[str, PhaseType] = {}
-    for ident, pt in (extra or {}).items():
-        pt.source = layer
-        prior = base.get(ident)
-        if prior is not None:
-            if prior.key() == pt.key():
-                problems.append(
-                    Problem(
-                        SEVERITY_INFO,
-                        ident,
-                        f"`{ident}` は前のレイヤーと全欄が同じなので、{layer} の側を捨てた。"
-                        "判定は前のレイヤーの 1 本で行う",
-                    )
-                )
-            else:
-                problems.append(
-                    Problem(
-                        SEVERITY_ERROR,
-                        ident,
-                        f"`{ident}` は前のレイヤー（{prior.source or 'common'}）"
-                        "と同じ id で中身が違う。"
-                        f"{layer} のレイヤーは空として扱う。どちらの `review:` が効いているかを"
-                        "ユーザが読み取れないので、断りなく片方を採ることはしない",
-                    )
-                )
-            continue
-        if pt.title in titles:
-            problems.append(
-                Problem(
-                    SEVERITY_ERROR,
-                    ident,
-                    f"表示名 `{pt.title}` が `{titles[pt.title]}` と重なる。"
-                    f"{layer} のレイヤーは空として扱う",
-                )
-            )
-            continue
-        titles[pt.title] = ident
-        added[ident] = pt
-    if common is not None and extra is not None and common.order != extra.order:
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                "(phases)",
-                f"`order` がレイヤーで食い違う（共通レイヤー {common.order}、"
-                f"{layer} {extra.order}）。"
-                f"`{ORDER_SEQUENTIAL}` で待たせる",
-            )
-        )
-    merged = PhaseTypes(base, order=order)
-    merged.update(added)
-    problems.extend(reference_problems(added.values(), merged))
-    problems.extend(cycle_problems(merged))
-    problems.extend(conflict_problems(merged))
-    if any(p.severity == SEVERITY_ERROR for p in problems):
-        return base, problems
-    return merged, problems
-
-
 def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
     problems: list[Problem] = []
     pt = PhaseType(id=ident)
@@ -595,47 +505,30 @@ def types_path(conf: settings.Settings, root: str, project: str) -> str:
     return settings.layer_path(conf, home, settings.KIND_PHASES, project or settings.LAYER_SELF)
 
 
-def common_types(
-    conf: settings.Settings,
-) -> tuple[dict[str, PhaseType] | None, list[rules.Problem]]:
-    """共通レイヤーの定義。ファイルが無いか壊れていれば None（番号だけの挙動）。"""
-    if not conf.phases:
-        return None, []
-    types, notes = load(conf.phases)
-    mark_source(types, settings.LAYER_COMMON)
-    return types, list(notes)
-
-
 def layer_types(
     conf: settings.Settings, root: str, project: str = ""
 ) -> tuple[dict[str, PhaseType] | None, list[rules.Problem]]:
-    """共通レイヤー + そのレイヤーの定義と、**そのレイヤーの**苦情（設計 11.4.1）。
+    """使うフェーズ定義（親の `project:` が指す config の 1 本）と、その苦情（設計 11.4.1）。
 
-    どのレイヤーを足すかは親の承認済みチケットの `project:` が決める。
-    空ならワークスペース自身のレイヤー。
-    共通レイヤー自身の苦情は返さない。言う場所は `--lint` の共通レイヤーの項で、そこと二重に
-    言うと、レイヤーの話を読みに来たユーザが同じ文を 2 度読むことになる。
+    足し算はしない。使うのは親の承認済みチケットの `project:` が指すレイヤーの `phases.yml` だけで、
+    空ならワークスペース自身のレイヤー（単体 clone ではそのプロジェクトの `.ccnavi/config/`）。
+    共通レイヤーの `phases.yml` は置けないので、あっても読まない（`--lint` が error で言う）。
 
-    無いレイヤーは空（苦情なし）。壊れたレイヤーも空として扱うが、そちらは error を返す。
-    組み込みには戻さない。共通レイヤーが在るのに戻すと、共通レイヤーの定義が消える。
+    ファイルが無いのは正常（`None`、苦情なし）。壊れていれば空として扱い（`None`）、苦情を返す。
+    `id` の重複・`overlap` / `requires` / `after` の参照先・`title` の重なり・循環は、その 1 本の
+    読み込みで確かめる。
     """
-    common, notes = common_types(conf)
-    if common is None and notes:
-        # 共通レイヤーが壊れている。レイヤーは足さない（設計 11.2）。
-        return None, []
     path = types_path(conf, root, project)
     if not path or not os.path.exists(path):
-        return common, []
-    extra, layer_notes = load(path, refs=False)
-    if extra is None:
-        return common, list(layer_notes)
-    merged, problems = merge(common, extra, project or settings.LAYER_SELF)
-    return merged, list(layer_notes) + problems
+        return None, []
+    types, notes = load(path)
+    mark_source(types, project or settings.LAYER_SELF)
+    return types, list(notes)
 
 
 def load_types(
     conf: settings.Settings, root: str = "", project: str = ""
 ) -> dict[str, PhaseType] | None:
-    """判定が使うフェーズ定義。どのレイヤーにも無ければ None（番号だけの挙動）。"""
+    """判定が使うフェーズ定義。無いか読めなければ None（番号だけの挙動）。"""
     types, _ = layer_types(conf, root, project)
     return types

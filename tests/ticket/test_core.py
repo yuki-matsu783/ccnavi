@@ -41,7 +41,7 @@ from ccnavi.hook import core, core_base
 from ccnavi.infra import fsio, settings
 from ccnavi.infra import tree as tree_mod
 from ccnavi.tickets import approval, approval_ops, history, ticket_model
-from tests import common_path, requires_symlink
+from tests import config_path, requires_symlink
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_phases_dag import DAG, PLAN, SEQUENTIAL
 from tests.ticket.test_ticket import ROOT, git, read_json, to_old_form, with_old_record, write
@@ -1530,7 +1530,7 @@ class WithdrawTest(CoreHarness):
         self.assertTrue(any("続きの子" in p for p in listed["i0001-01-01"]), listed)
 
     def use(self, text):
-        write(common_path(self.root, "phases"), text)
+        write(config_path(self.root, "phases"), text)
 
     def problems(self, prior):
         return core.withdraw(self.snapshot(), ["i0001"], prior).problems

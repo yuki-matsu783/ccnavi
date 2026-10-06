@@ -24,7 +24,7 @@ import tempfile
 import unittest
 
 from ccnavi.tickets import history
-from tests import common_path
+from tests import common_path, config_path
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import ROOT, RULES, git, read_json, write
 
@@ -135,7 +135,7 @@ class PhaseHarness(unittest.TestCase):
         # （`--lint` / `--test` / `--explain`）でだけ有効なので、hook の判定と `--reviewed`
         # には渡せない。差し替えたいテストはこのファイルに書き直す。
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
-        self.phases = write(common_path(self.root, "phases"), PHASES)
+        self.phases = write(config_path(self.root, "phases"), PHASES)
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
         # 承認済みチケットとマーカーは親のツリーに置かれ、親のブランチに乗る（設計 9.2）。

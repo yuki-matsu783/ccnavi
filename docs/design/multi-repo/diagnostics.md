@@ -21,7 +21,7 @@ keywords: [診断, --explain, 記録, レイヤー]
   allow self:worktrees       Write|Edit               */.claude/worktrees/*
 ■ rules lib（projects/lib/.ccnavi/config/rules.yml、deny 2 / ask 0 / allow 1）
   deny  lib:schema           Write|Edit               */schema/*
-■ phases（共通レイヤー 0 種、自身のレイヤー 7 種、lib 3 種）
+■ phases（自身のレイヤー 7 種、lib 3 種。使うのは親の project: が指す 1 本）
   id            レイヤー     kind  title         review  scope
   design        self   work  設計          mr      wip/design/*, docs/*
   build         lib    work  ビルド        mr      src/*
@@ -33,7 +33,7 @@ keywords: [診断, --explain, 記録, レイヤー]
 
 レイヤーごとの表は、判定と同じ順・同じ重ね方で読んだ結果を並べる。
 読めないレイヤーはその位置に「読めない: <理由>」と、空として扱っていることを出す。置いていないレイヤーは「置いていない（無い = 空）」と出す。
-`levels` の行に出るのは共通レイヤーの側の値で、実際に使われる値はチケットのレイヤーで決まる。
+`levels` の行に出るのは共通レイヤーの側の値で、実際に使われる値はチケットのレイヤーで決まる。共通レイヤーに `phases.yml` があれば、`--lint` が error でそのファイルを名指しし、`--explain` の phases では「共通には置けない。使わない」と出す（11.4.1）。ファイルが無いことは、どのレイヤーでも不備として出さない（11.2）。
 
 記録の 1 行は `tree` と `project`（この呼び出しがどのツリーのものと判定されたか）に加えて、出どころのレイヤー
 （`common | self | <名前>`）を持つ。入るのは判定を下したルール（当たったものの先頭）のレイヤーで、当たらなかった行は空。

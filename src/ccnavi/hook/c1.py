@@ -68,11 +68,10 @@ _EVENT_FIELDS = ("at", "ticket", "kind")
 # configsync の `*.ccnavi-sync`）。
 _TEMP = re.compile(r"(^|/)\.[^/]*\.part(\.[^/]*)?$|(^|/)flows/\.[^/]*\.tmp$|\.ccnavi-sync$")
 # ユーザの判断が書くもの。フローの本文、reviewed・close-early のマーカー、
-# 設定を見た上書きの記録、受け入れたスレッド、ユーザの承認で置かれた承認済みチケット、
+# 受け入れたスレッド、ユーザの承認で置かれた承認済みチケット、
 # 承認（`--agree` の新規と改版）が固定した全体計画の待ち方。
 _HUMAN_MARK_NAMES = (
     f"{approval_marks.PARENT_MARK_CLOSE_EARLY}.json",
-    "config-sync.json",
     approval_marks.ACCEPTED_FILE,
     approval_marks.WORKFLOW_FILE,
 )
