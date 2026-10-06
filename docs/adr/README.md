@@ -184,6 +184,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0035](0035-extension-no-judging.md) | VS Code 拡張は判定を自分で出さない |
 | [0084](0084-common-layer-is-distributed-to-projects.md) | 共通レイヤーは配る定義にし、親の着手でプロジェクトのレイヤーを上書きして最初のレビューで知らせる（ADR-0107 が置き換える） |
 | [0107](0107-common-layer-is-mirrored-and-phases-live-in-config.md) | 共通レイヤーはプロジェクトの common へミラーし、フェーズ定義は config だけに置く |
+| [0108](0108-flow-loop-node.md) | 子のフローの反復は loop ノードで書き、loop を通らない巡回は warn で言う |
 | [0038](0038-project-from-location.md) | チケットのプロジェクトは提案を置いた場所で決める |
 | [0064](0064-extension-board-in-react.md) | ボードの画面を React にし、拡張ホストは中身だけを渡す |
 | [0062](0062-retained-screen-host.md) | 保持する画面は、入れ物を入れ直さない段取りで React にする |
