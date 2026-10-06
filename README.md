@@ -1820,8 +1820,9 @@ JSON で渡す（`--result <path>`）。
 **ワークツリーは ccnavi が片付ける。** マージを待たない。
 
 - ワークツリーがあるのは作業中（`doing/`）の子だけ。閉じた子は、完了でも取り消しでもワークツリーを消す
-- 子のワークツリーは、`confirm` が子を `done/` へ動かしたあと（`ccnavi-review.sh confirm`）と、レビュー不要の子の `finish`・子の `cancel` の
-  あとに消す。親の `finish` も、残っている子のワークツリーを消す（取りこぼしを拾う安全網）。レビュー待ちの子のものは指摘を直す場所として残す
+- 子のワークツリーは、`confirm` が子を `done/` へ動かしたあと（`ccnavi-review.sh confirm`。そのフェーズの子）と、`ccnavi-ticket.sh` の
+  `finish`・`cancel` のあと（親でも子でも、その親子の閉じた子を全部。親の `finish` では取りこぼしを拾う安全網）に消す。
+  レビュー待ちの子のものは指摘を直す場所として残す
 - 親のワークツリーは、`ready` が Draft を外したあとの最後に消す。Draft を外す前と、外せなかったときは消さない（`ready` を打ち直せるように）。
   外から `ready --parent <親>` で打てばそのまま消える
 - 消し方は、生成物（`node_modules`・`.venv` など）を消してから `git worktree remove`（`--force` なし）。ブランチは消さない
