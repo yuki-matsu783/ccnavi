@@ -43,7 +43,8 @@ sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>
   <名前>      .claude/worktrees/ の直下の名前。パスは書けない
   --dry-run   消すものを並べるだけで、消さない
   --worktree  生成物を消してから、ワークツリーそのものも消す（git worktree remove。--force なし）。
-              cwd がその中なら消さない。ブランチは残す
+              cwd がその中なら消さない。ブランチは残す。このときの <名前> はチケットの識別子
+              （.claude/worktrees/<識別子>）だけを受ける。識別子の形でない名前は断る
 
 消すもの: node_modules / .venv / __pycache__ / .pytest_cache と、package.json の隣の out
 未コミットの変更があるワークツリーでは、何も消さずに止まる

@@ -140,17 +140,31 @@ exe_cwd="$here"
 ready_parent=""
 ready_from=""
 if [ "$sub" = ready ]; then
+	# `--parent` は 1 度だけ、値は空でないこと。`--parent=`（空）や `--parent X --parent` を黙って
+	# 読み飛ばすと、外から打ったつもりが中から打つ形で進む。
 	rp_prev=""
+	rp_count=0
 	for rp_arg in "$@"; do
+		if [ "$rp_prev" = --parent ]; then
+			ready_parent="$rp_arg"
+			[ -n "$rp_arg" ] || fail ready-parent-missing "ready の --parent には親の識別子が要る。" 2
+			rp_prev=""
+			continue
+		fi
 		case "$rp_arg" in
-		--parent=*) ready_parent="${rp_arg#--parent=}" ;;
-		*) [ "$rp_prev" = --parent ] && ready_parent="$rp_arg" ;;
+		--parent=*)
+			rp_count=$((rp_count + 1))
+			ready_parent="${rp_arg#--parent=}"
+			[ -n "$ready_parent" ] || fail ready-parent-missing "ready の --parent には親の識別子が要る。" 2
+			;;
+		--parent) rp_count=$((rp_count + 1)) ;;
 		esac
 		rp_prev="$rp_arg"
 	done
-	if [ "$rp_prev" = --parent ] && [ -z "$ready_parent" ]; then
+	if [ "$rp_prev" = --parent ]; then
 		fail ready-parent-missing "ready の --parent には親の識別子が要る。" 2
 	fi
+	[ "$rp_count" -le 1 ] || fail ready-parent-twice "ready の --parent は 1 度だけ渡せる。" 2
 	if [ -n "$ready_parent" ]; then
 		ccnavi_is_ident "$ready_parent" ||
 			fail ready-parent-ident "ready の --parent の値（${ready_parent}）は識別子の形ではない。" 2
@@ -1079,8 +1093,17 @@ ready)
 	if [ "$c1_on" != yes ]; then
 		[ -n "$ready_tree" ] || ready_tree=$(git -C "$exe_cwd" rev-parse --show-toplevel 2>/dev/null || :)
 		ready_place="${ccnavi_c1_approved:-.ccnavi/approved}"
+		# wip/ は、実行ファイルが消したと答えたパス（`wip <パス>` の行）をそのまま確かめる。実行ファイルは
+		# 大文字小文字と `\` の区切りを問わずに wip/ と見る（`WIP/…`・`wip\…`）ので、固定の `wip` だけでは
+		# 見落とす。答えない古い実行ファイルのために `wip` も残す。
+		set -- ":(literal)$ready_place" ":(literal)wip"
+		while IFS= read -r ready_wip; do
+			[ -n "$ready_wip" ] && set -- "$@" ":(literal)$ready_wip"
+		done <<EOF_WIP
+$wip_gone
+EOF_WIP
 		if [ -n "$ready_tree" ] &&
-			[ -n "$(git -C "$ready_tree" status --porcelain --untracked-files=no -- ":(literal)$ready_place" ":(literal)wip" 2>/dev/null)" ]; then
+			[ -n "$(git -C "$ready_tree" status --porcelain --untracked-files=no -- "$@" 2>/dev/null)" ]; then
 			fail ready-unsent "${ready_tree} の置き場（${ready_place}）か wip/ に未コミットの変更がある（閉じたチケットを logs/archive/ へ退避した削除や、wip/ の追跡済みのファイルの削除など）。コミットして push してから、もう一度 ready を打ってください（Draft はまだ外していない）。"
 		fi
 	fi

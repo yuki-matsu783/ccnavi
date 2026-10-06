@@ -531,13 +531,15 @@ def _move(
         # 依頼の前に「ユーザのレビューを待つ」と言わない。次に誰が何をするかを、
         # 依頼の有無で言い分ける（phase.review_next）。
         moved = replace(found, completed_at=fields.get("completed_at", ""))
+        # 誰がいつ done/ へ動かすかは review_next の文が言う（重ねて言わない）。
         stdout.write(
             (
                 phase.review_next(root, conf, moved)
-                or "まだレビュー準備中。親がレビューを依頼するまで、ユーザには回らない"
+                or "まだレビュー準備中。親がレビューを依頼するまで、ユーザには回らない。"
+                "依頼の後、ユーザがレビューを終えて confirm / decide / --reviewed を打つと "
+                f"{conf.approved}/{ticket_model.DONE}/ へ動く"
             )
-            + "。レビューが済むとユーザの操作（confirm / decide / --reviewed）で "
-            f"{conf.approved}/{ticket_model.DONE}/ へ動く\n"
+            + "\n"
         )
     return 0
 

@@ -560,8 +560,19 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
     if not os.path.isdir(tree_root):
         return [f"親のワークツリーが無い ({tree_root})"]
     wip = ticket_places.WIP_ROOT
-    if wip_tracked(tree_root) is None:
+    tracked = wip_tracked(tree_root)
+    if tracked is None:
         problems.append(f"`{wip}/` が追跡されているかを読めない")
+    else:
+        # 退避より前に止める（remove_wip も同じ確かめをするが、そこでは退避が済んでいる）。
+        odd = [r for r in tracked if "\n" in r or "\r" in r or _escapes(tree_root, r)]
+        if odd:
+            named = "、".join(repr(r) if ("\n" in r or "\r" in r) else r for r in odd[:10])
+            problems.append(
+                f"`{wip}/` の追跡済みのファイルのうち、途中のディレクトリがリンクで"
+                f"ツリーの外を指すか、名前に改行を含むものがある（{named}）。消すとツリーの外を消しうるので止めた。"
+                "リンクを元のディレクトリに戻すか、ユーザに確かめてから打ち直してください"
+            )
     untracked = _wip_untracked(tree_root)
     if untracked is None:
         problems.append(f"`{wip}/` に未追跡のファイルがあるかを読めない")
@@ -600,6 +611,20 @@ def remove_wip(tree_root: str) -> tuple[list[str], str, str]:
         return [], "", f"`{ticket_places.WIP_ROOT}/` が追跡されているかを読めない"
     if not names:
         return [], "", ""
+    # 消す前に全部を確かめ、1 本でもツリーの外へ出るものがあれば何も消さない。追跡済みのファイルの
+    # 途中のディレクトリがリンク（無視されていると未追跡にも出ない）に置き換わっていると、
+    # そのまま消せばリンクの先（ツリーの外）のファイルを消す。改行を含む名前は、sh へ渡す
+    # 1 行 1 本の答え（`wip <パス>`）を壊すので、これも消さずに止める。
+    outside = [rel for rel in names if "\n" in rel or "\r" in rel or _escapes(tree_root, rel)]
+    if outside:
+        named = "、".join(repr(r) if ("\n" in r or "\r" in r) else r for r in outside[:10])
+        return (
+            [],
+            "",
+            "途中のディレクトリがリンクでツリーの外を指すか、名前に改行を含むので、"
+            f"何も消さなかった（{named}）。"
+            "リンクを元のディレクトリに戻すか、ユーザに確かめてから打ち直してください",
+        )
     rc, head = _git(tree_root, ["rev-parse", "HEAD"])
     head = head.strip() if rc == 0 else ""
     removed: list[str] = []
@@ -618,6 +643,27 @@ def remove_wip(tree_root: str) -> tuple[list[str], str, str]:
     for top in sorted({p.split("/", 1)[0] for p in names}):
         _prune_empty(os.path.join(tree_root, top))
     return removed, head, ""
+
+
+def _escapes(tree_root: str, rel: str) -> bool:
+    """`rel`（git の表記）の途中のディレクトリがリンクか、親ディレクトリを解くとツリーの外か。
+
+    最後の名前そのものがリンクなのは構わない（`os.remove` はリンクだけを消す）。
+    """
+    parts = rel.split("/")
+    here = tree_root
+    for part in parts[:-1]:
+        here = os.path.join(here, part)
+        if os.path.islink(here) or _junction(here):
+            return True
+    top = os.path.normcase(os.path.realpath(tree_root))
+    parent = os.path.normcase(os.path.realpath(os.path.dirname(os.path.join(tree_root, *parts))))
+    return parent != top and not parent.startswith(top + os.sep)
+
+
+def _junction(path: str) -> bool:
+    check = getattr(os.path, "isjunction", None)
+    return bool(check and check(path))
 
 
 def _prune_empty(directory: str) -> None:

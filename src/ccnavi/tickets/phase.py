@@ -688,6 +688,7 @@ def review_next(
             f"{lead}まだ{LABEL_PREPARING}。このフェーズはこのセッションで見る計画（review: chat）。"
             "親が子の成果を合流してユーザに差分を見てもらい、ユーザが親のワークツリーの端末で "
             f"'{review_sh} chat {n}' を打つまで、先へは進まない"
+            f"（打てば {conf.approved}/{ticket_model.DONE}/ へ動く）"
         )
     request = (
         f"'{review_sh} request --phase {n} --body-file <依頼文> --eli5 wip/eli5/phase-{n}.html'"
@@ -699,7 +700,7 @@ def review_next(
                 f"{lead}フェーズ {owner.label} は依頼済みだが、この子は前回の依頼より後に閉じた。"
                 "依頼し直すまで、この子の分はユーザに回らない。親が合流・ELI5 を済ませて push し、"
                 f"{request} で依頼し直す"
-            )
+            ) + _AFTER_REQUEST.format(done=f"{conf.approved}/{ticket_model.DONE}/")
         return (
             f"{lead}フェーズ {owner.label} は依頼済み（{LABEL_WAITING}）。ユーザのレビューを待つ"
             "（ユーザが confirm / decide で done/ へ動かす）"
@@ -720,7 +721,12 @@ def review_next(
             f"。フェーズ {owner.label} は前に依頼したが、続きの子を足したときに依頼の記録が外れた。"
             "前回の依頼より後に閉じた子があるので、依頼し直しが要る"
         )
-    return text
+    return text + _AFTER_REQUEST.format(done=f"{conf.approved}/{ticket_model.DONE}/")
+
+
+# 依頼の前の文の結び。依頼の後に誰が done/ へ動かすか
+# （依頼済み・レビュー済みの文はそれぞれ言っている）。
+_AFTER_REQUEST = "。依頼の後、ユーザがレビューを終えて confirm / decide を打つと {done} へ動く"
 
 
 def _later(a: str, b: str) -> bool:

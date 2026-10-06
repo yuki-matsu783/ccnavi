@@ -2,11 +2,12 @@
 
 `tidy` は `--phase <N>` でそのフェーズの子に絞れる。
 
-閉じた子と、Draft を外した親のワークツリーを ccnavi が消す。ワークツリーがあるのは
-作業中（`doing/`）の子だけにする。`tidy` が拾うのは閉じた（`done/` の）子だけで、
-完了でも取り消しでも消す（`tidy_targets`）。閉じた子の続きは、新しいチケットで
-新しいワークツリーを切る。レビュー待ち（`review/`）の子は拾わない（指摘を直す場所。
-`confirm` が `done/` へ動かした後に消える）。判断の要らない片付けを、エージェントへの
+閉じた子と、Draft を外した親のワークツリーを ccnavi が消す。`tidy` が拾うのは閉じた
+（`done/` の）子だけで、完了でも取り消しでも消す（`tidy_targets`）。閉じた子の続きは、
+新しいチケットで新しいワークツリーを切る。残るのは作業中（`doing/`）の子と、レビュー待ち
+（`review/`）の子（指摘を直す場所。`confirm` が `done/` へ動かした後に消える）のもの。
+`decide`・`chat`・Chrome のレビュー済みで `done/` へ動いた子のものは、その場では消さず、
+次にその親子で `finish` か `cancel` が打たれるまで残る。判断の要らない片付けを、エージェントへの
 案内（`ccnavi-clean.sh` → `worktree remove`）で済ませず、ccnavi の側に寄せる。呼ぶのは sh で、
 状態を書く操作が済んでから呼ぶ。
 
@@ -31,8 +32,8 @@ C1 の中では書いたものが push の失敗で戻ることがあるので�
   外へ出てから打つ 1 本（`ccnavi-clean.sh --worktree <名前>`）を出す
 - 未コミットの変更（未追跡を含む）がある。別のセッションが作業している見込みがあるので、
   変更を名指しする
-- git が無視しているファイル（生成物を除く。下書きや .env など）がある。`worktree remove` は
-  それごと消して戻せないので、名指しする
+- git が無視しているファイル（生成物と、直下の `scratchpad/` を除く。.env など）がある。
+  `worktree remove` はそれごと消して戻せないので、名指しする
 - git のワークツリーとして登録されていない、リンクである、など。任意の場所を消す手段にしない
 
 ネットワークには出ない。git はローカルの操作（`status`・`rev-parse`・`worktree remove`）だけ。
@@ -63,7 +64,7 @@ CWD_INSIDE = "cwd"
 DIRTY = "dirty"
 REFUSED = "refused"
 # git に無視されたファイル（生成物を除く）がある。`git worktree remove` は無視されたファイルごと
-# 消すので、下書き（scratchpad/）や .env を黙って消さないよう止める。
+# 消すので、.env などを黙って消さないよう止める（直下の scratchpad/ の下書きは消えてよい）。
 IGNORED = "ignored"
 
 # 未コミットの変更を名指しする行の上限。
@@ -143,6 +144,11 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
             [f"…ほか {len(ignored) - _SHOWN} 件"] if len(ignored) > _SHOWN else []
         )
         return Dropped(name, IGNORED, path, "\n".join(shown))
+    # `git worktree remove` が通らない形は、生成物を消す前に止める（消したあとで通らないと、
+    # 生成物だけが消えた半端なツリーが残る）。
+    blocked = _remove_blocked(owner, path)
+    if blocked:
+        return Dropped(name, REFUSED, path, blocked)
     failed = _clean_generated(path)
     if failed:
         return Dropped(name, REFUSED, path, failed)
@@ -271,6 +277,9 @@ def _ignored(top: str) -> tuple[list[str], str]:
 
     `--directory` で、丸ごと無視されたディレクトリは 1 行（末尾の `/`）にまとめる。生成物
     （`ccnavi-clean.js` と同じ名前。`out` は package.json の隣だけ）は消してよいので数えない。
+    ワークツリーの直下の `scratchpad/`（下書きと使い捨ての置き場。docs/claude/scratchpad.md）も、
+    ワークツリーごと消えてよい置き場なので数えない。直下でないもの（`docs/scratchpad/`）と、
+    大文字小文字の違うもの（`SCRATCHPAD/`）は数える。
     """
     done = gitcmd.run(
         top,
@@ -280,7 +289,21 @@ def _ignored(top: str) -> tuple[list[str], str]:
     )
     if not done.ok:
         return [], "git が無視しているファイルを読めない。消してよいかを確かめられない"
-    return [p for p in done.out.split("\0") if p and not _is_generated(top, p)], ""
+    return [
+        p for p in done.out.split("\0") if p and not _is_generated(top, p) and not _in_scratchpad(p)
+    ], ""
+
+
+# ワークツリーの直下の下書きの置き場。中身はワークツリーごと消えてよい。
+SCRATCHPAD = "scratchpad"
+
+
+def _in_scratchpad(rel: str) -> bool:
+    """ワークツリーのルートからの相対 `rel` が、直下の `scratchpad/` の下か。
+
+    大文字小文字は区別する（scratchpad.md の照らし合わせの外し方と同じ）。
+    """
+    return rel == SCRATCHPAD + "/" or rel.startswith(SCRATCHPAD + "/")
 
 
 def _is_generated(top: str, rel: str) -> bool:
@@ -294,6 +317,28 @@ def _is_generated(top: str, rel: str) -> bool:
         ):
             return True
     return False
+
+
+def _remove_blocked(owner: str, path: str) -> str:
+    """`git worktree remove`（--force なし）が通らないと分かっている理由。無ければ空。
+
+    ロックされたワークツリーと、submodule を持つワークツリー（git が消さない）。
+    """
+    done = gitcmd.run(owner, ["worktree", "list", "--porcelain"], TIMEOUT_SECONDS, raw_paths=True)
+    if not done.ok:
+        return "git のワークツリーの一覧を読めない。消せるかを確かめられない"
+    want = _canonical(path)
+    for block in done.out.split("\n\n"):
+        lines = block.splitlines()
+        if not lines or not lines[0].startswith("worktree "):
+            continue
+        if _canonical(lines[0][len("worktree ") :]) != want:
+            continue
+        if any(line == "locked" or line.startswith("locked ") for line in lines[1:]):
+            return "ロックされている（git worktree lock）。ロックした人に確かめ、外してから打ち直す"
+    if os.path.lexists(os.path.join(path, ".gitmodules")):
+        return "submodule を持つワークツリーは git worktree remove（--force なし）で消せない"
+    return ""
 
 
 def _owner(path: str) -> tuple[str, str]:
@@ -384,8 +429,20 @@ def _plain_file(e: os.DirEntry) -> bool:
 
 def _clean_generated(top: str) -> str:
     """生成物を消す。消し残しがあれば理由。リンクはリンクそのものだけを消す。"""
-    left = []
+    # 消すものを先に決める（途中で止まって半端に消さない）。生成物の名前でも、追跡されている
+    # もの（コミット済みの out/ など）は消さない。消すと未コミットの削除になり、worktree remove が
+    # 通らない。追跡済みのものは worktree remove が消す。
+    targets = []
     for rel in generated(top):
+        tracked = gitcmd.run(
+            top, ["ls-files", "-z", "--", f":(literal){rel}"], TIMEOUT_SECONDS, raw_paths=True
+        )
+        if not tracked.ok:
+            return f"{rel} が追跡されているかを読めない。何も消していない"
+        if not tracked.out.strip("\0"):
+            targets.append(rel)
+    left = []
+    for rel in targets:
         full = os.path.join(top, *rel.split("/"))
         try:
             if os.path.islink(full):
