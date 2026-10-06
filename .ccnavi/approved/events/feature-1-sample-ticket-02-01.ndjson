@@ -1,4 +1,0 @@
-{"at": "2026-10-05T22:00:02Z", "ticket": "feature-1-sample-ticket-02-01", "kind": "approved", "from": "todo", "to": "doing", "via": "board", "tree": "feature-1-sample-ticket"}
-{"at": "2026-10-05T22:00:52Z", "ticket": "feature-1-sample-ticket-02-01", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "39b749b3d72c2c8b3d8cfd2c3c5a2c6a641cdbe9"}
-{"at": "2026-10-05T22:02:38Z", "ticket": "feature-1-sample-ticket-02-01", "kind": "finished", "from": "doing", "to": "review", "via": "cli"}
-{"at": "2026-10-05T23:03:41Z", "ticket": "feature-1-sample-ticket-02-01", "kind": "settled", "from": "review", "to": "done", "via": "board", "actor": "yuki-matsu783", "phase": 2}
