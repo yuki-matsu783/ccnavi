@@ -504,7 +504,7 @@ def _dirty(tree_root: str, conf: settings.Settings, wip_removals: bool = False) 
     # 入り込むのを避けるため。phase_scope.scope_findings と同じ読み方。
     for entry in status.split("\0"):
         if len(entry) > 3 and entry[2] == " " and not _is_own_place(conf, entry[3:]):
-            if wip_removals and "D" in entry[:2] and _in_wip(entry[3:]):
+            if wip_removals and "D" in entry[:2] and in_wip(entry[3:]):
                 # `ready` が消した（追跡済みの）`wip/` のファイル。C1 がコミットするか、
                 # C1 の外では sh がコミットと push を求めて止める。打ち直しの ready は止めない。
                 continue
@@ -512,7 +512,7 @@ def _dirty(tree_root: str, conf: settings.Settings, wip_removals: bool = False) 
     return False
 
 
-def _in_wip(path: str) -> bool:
+def in_wip(path: str) -> bool:
     """git が出したパスが、途中の作業の置き場（`wip`）の下か。
     大文字小文字と `\\` の区切りを問わない。"""
     folded = path.lower()
@@ -535,7 +535,7 @@ def wip_tracked(tree_root: str) -> list[str] | None:
     rc, tracked = _git(tree_root, ["ls-files", "-z"])
     if rc != 0:
         return None
-    return [p for p in tracked.split("\0") if p and _in_wip(p)]
+    return [p for p in tracked.split("\0") if p and in_wip(p)]
 
 
 def _wip_untracked(tree_root: str) -> list[str] | None:
@@ -543,7 +543,7 @@ def _wip_untracked(tree_root: str) -> list[str] | None:
     rc, out = _git(tree_root, ["ls-files", "-z", "--others", "--exclude-standard"])
     if rc != 0:
         return None
-    return [p for p in out.split("\0") if p and _in_wip(p)]
+    return [p for p in out.split("\0") if p and in_wip(p)]
 
 
 def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[str]:

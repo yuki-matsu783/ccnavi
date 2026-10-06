@@ -194,8 +194,9 @@ scripts in .ccnavi/scripts/, which call
          .claude/worktrees/<name>; keeps the branch; does nothing when --cwd is
          inside it or it has uncommitted changes, and says so)
     ccnavi worktree tidy <parent> [--phase N] [--cwd <dir>]
-        (drops the worktrees of the closed children, of phase N when given; keeps
-         the ones of cancelled children)
+        (drops the worktrees of the closed children - finished or cancelled -, of
+         phase N when given; only children in doing/ keep theirs; a child id
+         stands for its parent, read from the ticket)
     ccnavi sync paths
         (for .ccnavi/scripts/ccnavi-sync.sh: one "<key> <value>" per line - the
          approved and proposal places, the ccnavi directory, and the integration

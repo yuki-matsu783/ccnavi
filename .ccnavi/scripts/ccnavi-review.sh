@@ -123,6 +123,10 @@ root=$(ccnavi_workspace) ||
 ccnavi_log_root="$root"
 here="$(pwd -W 2>/dev/null || pwd)"
 state="$root/logs/state" # 固定
+# このスクリプトの置き場（絶対パス）。`ready --parent` は親のワークツリーへ cd するので、相対の `$0`
+# （`sh .ccnavi/scripts/ccnavi-review.sh`）をその後で解くと、親のワークツリーの中の写しを指すか、見失う。
+# cd の前に解いておき、以降はこれを使う。
+script_dir=$(cd "$(dirname "$0")" && pwd)
 # 実行ファイルに渡す cwd（どの親かを引く場所）。ふつうは打った場所で、`ready --parent <親>` のときだけ
 # 親のワークツリーにする。
 exe_cwd="$here"
@@ -596,7 +600,7 @@ trap 'ccnavi_c1_end; exit 130' INT TERM HUP
 # ---- C1 と、ユーザの判断を送る承認の push
 ccnavi_c1_root="$root"
 ccnavi_c1_label=ccnavi-review
-ccnavi_c1_sh="$(dirname "$0")"
+ccnavi_c1_sh="$script_dir"
 ccnavi_c1_exe() { ccnavi "$@"; }
 c1_on=no
 

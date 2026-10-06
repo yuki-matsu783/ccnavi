@@ -3,15 +3,18 @@
 `tidy` は `--phase <N>` でそのフェーズの子に絞れる。
 
 閉じた子と、Draft を外した親のワークツリーを ccnavi が消す。ワークツリーがあるのは
-作業中（`doing/`）の子だけにする（`keeps_worktree`）。判断の要らない片付けを、エージェントへの
+作業中（`doing/`）の子だけにする。`tidy` が拾うのは閉じた（`done/` の）子だけで、
+完了でも取り消しでも消す（`tidy_targets`）。閉じた子の続きは、新しいチケットで
+新しいワークツリーを切る。レビュー待ち（`review/`）の子は拾わない（指摘を直す場所。
+`confirm` が `done/` へ動かした後に消える）。判断の要らない片付けを、エージェントへの
 案内（`ccnavi-clean.sh` → `worktree remove`）で済ませず、ccnavi の側に寄せる。呼ぶのは sh で、
 状態を書く操作が済んでから呼ぶ。
 
 - `confirm` が子を `done/` へ動かした後（`ccnavi-review.sh confirm`）: そのフェーズの子（延期を
   引き受けた分を含む）のワークツリー
-- `finish`・`cancel` の後（`ccnavi-ticket.sh`）: その親子の閉じた子のワークツリー。
-  レビュー不要の子の finish と子の cancel ならその子のもの、親の finish なら残っているもの全部
-  （取りこぼしを拾う安全網）
+- `finish`・`cancel` の後（`ccnavi-ticket.sh`）: その親子の閉じた（`done/` の）子の
+  ワークツリーを全部。子の finish・cancel でも、その子に限らず同じ親子の閉じた子を
+  まとめて片付ける。親の finish では取りこぼしを拾う安全網になる
 - `ready` が Draft を外した後（`ccnavi-review.sh ready`）: 親のワークツリー。外から
   `ready --parent <親>` で打てば消える
 
@@ -26,8 +29,10 @@ C1 の中では書いたものが push の失敗で戻ることがあるので�
 
 - cwd が消す対象の中にある。消すと呼び手の居場所が無くなり、Windows ではロックにもなる。
   外へ出てから打つ 1 本（`ccnavi-clean.sh --worktree <名前>`）を出す
-- 未コミットの変更（未追跡を含む。無視したファイルは数えない）がある。別のセッションが作業している
-  見込みがあるので、変更を名指しする
+- 未コミットの変更（未追跡を含む）がある。別のセッションが作業している見込みがあるので、
+  変更を名指しする
+- git が無視しているファイル（生成物を除く。下書きや .env など）がある。`worktree remove` は
+  それごと消して戻せないので、名指しする
 - git のワークツリーとして登録されていない、リンクである、など。任意の場所を消す手段にしない
 
 ネットワークには出ない。git はローカルの操作（`status`・`rev-parse`・`worktree remove`）だけ。
@@ -42,7 +47,7 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from ..infra import gitcmd, settings, tree
-from . import approval, approval_checks, phase, ticket_model
+from . import approval, approval_checks, phase, ticket_ids, ticket_model
 
 TIMEOUT_SECONDS = 30.0
 
@@ -57,6 +62,9 @@ ABSENT = "absent"
 CWD_INSIDE = "cwd"
 DIRTY = "dirty"
 REFUSED = "refused"
+# git に無視されたファイル（生成物を除く）がある。`git worktree remove` は無視されたファイルごと
+# 消すので、下書き（scratchpad/）や .env を黙って消さないよう止める。
+IGNORED = "ignored"
 
 # 未コミットの変更を名指しする行の上限。
 _SHOWN = 10
@@ -74,17 +82,6 @@ class Dropped:
     @property
     def removed(self) -> bool:
         return self.status in (REMOVED, ABSENT)
-
-
-def keeps_worktree(t: ticket_model.Ticket) -> bool:
-    """子のワークツリーを残すか。
-
-    ワークツリーがあるのは作業中（`doing/`）の子だけ。閉じた子は、完了でも取り消しでも消す。
-    閉じた子をまた進めるときは、新しいチケットで新しいワークツリーを切る。変えるときはここだけを
-    直す（`tidy` はこの答えに従う）。レビュー待ち（`review/`）の子は `tidy` の候補に入らない
-    （指摘を直す場所として残す。消すのは `confirm` が `done/` へ動かした後）。
-    """
-    return t.state == ticket_model.DOING
 
 
 def classifier_note(root: str, allow: str) -> str:
@@ -138,6 +135,14 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
             [f"…ほか {len(changes) - _SHOWN} 件"] if len(changes) > _SHOWN else []
         )
         return Dropped(name, DIRTY, path, "\n".join(shown))
+    ignored, why = _ignored(path)
+    if why:
+        return Dropped(name, REFUSED, path, why)
+    if ignored:
+        shown = ignored[:_SHOWN] + (
+            [f"…ほか {len(ignored) - _SHOWN} 件"] if len(ignored) > _SHOWN else []
+        )
+        return Dropped(name, IGNORED, path, "\n".join(shown))
     failed = _clean_generated(path)
     if failed:
         return Dropped(name, REFUSED, path, failed)
@@ -174,6 +179,17 @@ def report(stdout: TextIO, root: str, d: Dropped) -> None:
         )
         for line in d.detail.splitlines():
             stdout.write(f"  {line}\n")
+    elif d.status == IGNORED:
+        stdout.write(
+            f"ワークツリー {d.name} に git が無視しているファイルがあるので、何も消さなかった"
+            "（worktree remove は無視されたファイルごと消し、履歴から戻せない）:\n"
+        )
+        for line in d.detail.splitlines():
+            stdout.write(f"  {line}\n")
+        stdout.write(
+            "  残したいならワークツリーの外へ退避し、要らないなら手で消してから、"
+            f"'{retry_command(root, d.name)}' で打ち直す\n"
+        )
     else:
         stdout.write(f"ワークツリー {d.name} を消さなかった: {d.detail}\n")
 
@@ -188,8 +204,8 @@ def run_drop(stdout: TextIO, stderr: TextIO, root: str, name: str, cwd: str) -> 
 def tidy_targets(
     root: str, conf: settings.Settings, family: str, phase_no: int | None = None
 ) -> list[ticket_model.Ticket]:
-    """片付けの候補。閉じた（`done/` の）子のうち、`phase_no` があればそのフェーズ（延期を
-    引き受けた分を含む）の子。残すかどうか（`keeps_worktree`）はまだ見ない。"""
+    """片付けの候補。閉じた（`done/` の。完了も取り消しも）子のうち、`phase_no` があればその
+    フェーズ（延期を引き受けた分を含む）の子。作業中・レビュー待ちの子は入らない。"""
     closed, _ = approval.scan(conf, root, closed=True)
     children = approval_checks.children_of(closed, family)
     if phase_no is not None:
@@ -208,6 +224,22 @@ def tidy_targets(
     return out
 
 
+def family_for(root: str, conf: settings.Settings, ident: str) -> str:
+    """識別子が属する親子の親。
+
+    チケットが見つかれば、その `parent:`（親なら自身）を採る。親の識別子が子の形
+    （`<x>-<2 桁>-<2 桁>`。`rel-2026-10-06` など。lint は warn にとどめる）で終わっていても、
+    名前の形から末尾を剥がして別の親と読み違えないため。見つからないときだけ名前の形で割り出す。
+    """
+    found = approval.scan(conf, root)[0] + approval.scan(conf, root, closed=True)[0]
+    found += approval.scan_review(conf, root)[0]
+    for t in found:
+        if t.ticket == ident:
+            return t.parent or t.ticket
+    matched = ticket_ids.child_pattern().match(ident)
+    return matched.group("parent") if matched else ident
+
+
 def run_tidy(
     stdout: TextIO,
     stderr: TextIO,
@@ -222,17 +254,46 @@ def run_tidy(
     消さなかったもの（cwd・未コミット・登録が無いなど）が 1 本でもあれば 1。何も無ければ黙って 0。
     """
     code = 0
+    family = family_for(root, conf, family)
     for t in tidy_targets(root, conf, family, phase_no):
         path = tree.worktree_path(root, t.ticket)
         if not os.path.lexists(path):
-            continue
-        if keeps_worktree(t):
             continue
         d = drop(root, t.ticket, cwd)
         report(stdout, root, d)
         if not d.removed:
             code = 1
     return code
+
+
+def _ignored(top: str) -> tuple[list[str], str]:
+    """git が無視しているもの（生成物を除く）。2 つめは読めなかった理由。
+
+    `--directory` で、丸ごと無視されたディレクトリは 1 行（末尾の `/`）にまとめる。生成物
+    （`ccnavi-clean.js` と同じ名前。`out` は package.json の隣だけ）は消してよいので数えない。
+    """
+    done = gitcmd.run(
+        top,
+        ["ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory"],
+        TIMEOUT_SECONDS,
+        raw_paths=True,
+    )
+    if not done.ok:
+        return [], "git が無視しているファイルを読めない。消してよいかを確かめられない"
+    return [p for p in done.out.split("\0") if p and not _is_generated(top, p)], ""
+
+
+def _is_generated(top: str, rel: str) -> bool:
+    """ワークツリーのルートからの相対 `rel` が、生成物（とその中）か。"""
+    parts = [p for p in rel.rstrip("/").split("/") if p]
+    for i, part in enumerate(parts):
+        if part in ALWAYS:
+            return True
+        if part in BESIDE_PACKAGE_JSON and os.path.isfile(
+            os.path.join(top, *parts[:i], "package.json")
+        ):
+            return True
+    return False
 
 
 def _owner(path: str) -> tuple[str, str]:
