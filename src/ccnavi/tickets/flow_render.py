@@ -49,9 +49,13 @@ def _summary(node: dict, flows: dict) -> str:
         target = flow_text._line(data.get("evaluationTarget"))
         return (f"{target}: " if target else "") + " | ".join(parts)
     if kind == flow_shape.LOOP:
-        limit = flow_text._line(data.get("maxIterations"))
+        limit = data.get("maxIterations")
         parts = [f"条件: {flow_text._line(data.get('condition'))}"]
-        parts.append(f"最大 {limit} 回" if limit else "最大回数が書かれていない")
+        parts.append(
+            f"最大 {flow_text._text(limit)} 回"
+            if flow_shape.positive_int(limit)
+            else "最大回数が書かれていない（1 以上の整数でない）"
+        )
         return " / ".join(parts)
     if kind == "skill":
         return (

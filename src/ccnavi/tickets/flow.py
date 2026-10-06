@@ -43,7 +43,7 @@ YAML の 1 文書で、最上位はマッピング。ボードのフロー編集
 膨らむ（billion laughs）。手順書に別名は要らないので、量で切らずに別名ごと読まない。
 
 ノードの種類（`type`）のうち、ここが中身を読むのは `start` `end` `prompt` `subAgent`
-`askUserQuestion` `ifElse` `switch` `branch` `skill` `mcp` `subAgentFlow` `codex`
+`askUserQuestion` `ifElse` `switch` `loop` `branch` `skill` `mcp` `subAgentFlow` `codex`
 `branchSession`。知らない種類は落とさず、種類の名前と `name` だけで並べる。
 `group` は図の上の囲み（ボードの枠）で手順ではないので並べない（中のノードは `parentId` が
 あっても、ほかのノードと同じに並べる）。

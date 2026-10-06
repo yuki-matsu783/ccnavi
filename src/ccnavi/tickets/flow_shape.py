@@ -65,8 +65,9 @@ def shape_problem(data) -> str:
 # ---- 線の構造と名前（`--lint --flow` の warn）
 #
 # 読めるか・形（`shape_problem`）の外にある、手順として怪しいところ。読むのは止めない（warn）。
-# `SubagentStart` は見ない（並べ方は `render` のまま）。巡回は `loop` を通るものだけが正しい巡回で、
-# 通らない巡回は warn で言う（`loop` の回数の上限が効かず、終わらなくなりうるため）。
+# `SubagentStart` は見ない（並べ方は `render` のまま）。巡回は `loop` の「繰り返す」側の線を
+# 通るものだけが正しい巡回で、通らない巡回は warn で言う（回数の上限が効かず、終わらなくなりうる
+# ため。「抜ける」側が巡回に戻っても、上限は終わりを決めない）。
 
 # 並べない（手順でない）種類。構造の検査からも外す。
 _NOT_STEP = (GROUP,)
@@ -139,6 +140,7 @@ def _structure_problems(data) -> list[str]:
     out: list[str] = []
     missing: list[str] = []
     edges: dict[str, list[str]] = {}
+    edge_ports: dict[str, list[tuple[str, str]]] = {}
     ports: dict[str, set[str]] = {}
     for index, c in enumerate(flow_text._list(data.get("connections"))):
         if not isinstance(c, dict):
@@ -159,6 +161,7 @@ def _structure_problems(data) -> list[str]:
         if bad or src in groups or dst in groups:
             continue
         edges.setdefault(src, []).append(dst)
+        edge_ports.setdefault(src, []).append((dst, flow_text._text(c.get("fromPort"))))
         if kinds.get(dst) == "start":
             out.append(f"線 {cid} が start（{_named(by_id[dst])}）に入っている")
         if kinds.get(src) == "end":
@@ -207,11 +210,11 @@ def _structure_problems(data) -> list[str]:
             what = {ASK: "問い", LOOP: "繰り返し"}.get(kinds[nid], "分岐")
             shown = ", ".join(flow_text._capped(empty[:ITEM_LIMIT], len(empty)))
             out.append(f"{what} {_named(node)} の出口に線が無い: {shown}")
-    out.extend(_loop_problems(by_id, kinds, edges))
+    out.extend(_loop_problems(by_id, kinds, edge_ports))
     return out
 
 
-def _positive_int(value) -> bool:
+def positive_int(value) -> bool:
     """1 以上の整数か。真偽は数に数えない。整数の値の小数（`3.0`）は整数と読む。"""
     if isinstance(value, bool):
         return False
@@ -221,15 +224,20 @@ def _positive_int(value) -> bool:
 
 
 def _loop_problems(
-    by_id: dict[str, dict], kinds: dict[str, str], edges: dict[str, list[str]]
+    by_id: dict[str, dict], kinds: dict[str, str], edge_ports: dict[str, list[tuple[str, str]]]
 ) -> list[str]:
-    """`loop` の上限の回数と出口、`loop` を通らない巡回（1 件 1 行）。"""
+    """`loop` の条件・上限の回数・出口と、繰り返す側を通らない巡回（1 件 1 行）。"""
     out: list[str] = []
     for nid, node in by_id.items():
         if kinds[nid] != LOOP:
             continue
         info = flow_text._dict(node.get("data"))
-        if not _positive_int(info.get("maxIterations")):
+        if not flow_text._text(info.get("condition")).strip():
+            out.append(
+                f"繰り返し {_named(node)} の condition が空"
+                "（何が成り立つあいだ繰り返すかが決まらない）"
+            )
+        if not positive_int(info.get("maxIterations")):
             out.append(
                 f"繰り返し {_named(node)} の maxIterations が 1 以上の整数ではない"
                 "（回数の上限が無いと、終わりを決める手がかりが無くなる）"
@@ -239,38 +247,95 @@ def _loop_problems(
             out.append(
                 f"繰り返し {_named(node)} の出口（branches）が 2 つではない（繰り返す・抜ける）"
             )
-    out.extend(_cycle_problems(by_id, kinds, edges))
+    out.extend(_cycle_problems(by_id, kinds, edge_ports))
     return out
 
 
-def _cycle_problems(
-    by_id: dict[str, dict], kinds: dict[str, str], edges: dict[str, list[str]]
-) -> list[str]:
-    """`loop` を通らない巡回。`loop` を外した線の中に残る巡回の上のノードを、1 行で言う。
+def _is_body_port(node: dict, port: str) -> bool:
+    """`loop` の出口が「繰り返す」側か。出口が `body`・`branch-0`・1 つ目の項目の `id` のどれか。"""
+    if port == "body" or flow_text._text(port) == "branch-0":
+        return True
+    items = [
+        i
+        for i in flow_text._list(flow_text._dict(node.get("data")).get("branches"))
+        if isinstance(i, dict)
+    ]
+    first = flow_text._text(items[0].get("id")) if items else ""
+    return bool(first) and port == first
 
-    `loop` は巡回の中に在れば上限の回数で止まる手がかりになるので、`loop` を外して巡回を探す。
-    入る線が無いノードと出る線が無いノードを残らなくなるまで外すと、巡回の上（と巡回どうしの間）だけが残る。
+
+def _cycle_problems(
+    by_id: dict[str, dict], kinds: dict[str, str], edge_ports: dict[str, list[tuple[str, str]]]
+) -> list[str]:
+    """繰り返す側（`loop` の `body` の出口）を通らない巡回。巡回の上のノードを 1 行で言う。
+
+    `loop` の「繰り返す」側の線は上限の回数で止まる手がかりなので、その線だけを外して巡回を探す。
+    「抜ける」側の線が巡回に戻っていても、上限は終わりを決めないので巡回として残る。
+    巡回の上にあるのは、強連結成分（Tarjan。手間はノードと線の数に比例）の大きさが 2 以上のものと、
+    自分に戻る線のあるノード。
     """
-    keep = {nid for nid in by_id if kinds[nid] != LOOP}
-    out_edges = {n: [d for d in edges.get(n, []) if d in keep] for n in keep}
-    in_edges: dict[str, list[str]] = {n: [] for n in keep}
-    for src, dsts in out_edges.items():
-        for dst in dsts:
-            in_edges[dst].append(src)
-    alive = set(keep)
-    changed = True
-    while changed:
-        changed = False
-        for n in list(alive):
-            if not any(d in alive for d in out_edges[n]) or not any(
-                s in alive for s in in_edges[n]
-            ):
-                alive.discard(n)
-                changed = True
-    if not alive:
+    graph: dict[str, list[str]] = {n: [] for n in by_id}
+    self_loop: set[str] = set()
+    for src, pairs in edge_ports.items():
+        if src not in graph:
+            continue
+        for dst, port in pairs:
+            if dst not in graph or (kinds[src] == LOOP and _is_body_port(by_id[src], port)):
+                continue
+            graph[src].append(dst)
+            if src == dst:
+                self_loop.add(src)
+    index: dict[str, int] = {}
+    low: dict[str, int] = {}
+    on_stack: set[str] = set()
+    stack: list[str] = []
+    on_cycle: set[str] = set()
+    counter = 0
+    for root in graph:
+        if root in index:
+            continue
+        work: list[tuple[str, int]] = [(root, 0)]
+        while work:
+            node, i = work.pop()
+            if i == 0:
+                index[node] = low[node] = counter
+                counter += 1
+                stack.append(node)
+                on_stack.add(node)
+            advanced = False
+            while i < len(graph[node]):
+                nxt = graph[node][i]
+                i += 1
+                if nxt not in index:
+                    work.append((node, i))
+                    work.append((nxt, 0))
+                    advanced = True
+                    break
+                if nxt in on_stack:
+                    low[node] = min(low[node], index[nxt])
+            if advanced:
+                continue
+            if low[node] == index[node]:
+                members = []
+                while True:
+                    top = stack.pop()
+                    on_stack.discard(top)
+                    members.append(top)
+                    if top == node:
+                        break
+                if len(members) > 1:
+                    on_cycle.update(members)
+            if work:
+                parent = work[-1][0]
+                low[parent] = min(low[parent], low[node])
+    on_cycle |= self_loop
+    if not on_cycle:
         return []
-    names = _names([by_id[n] for n in by_id if n in alive])
-    return [f"loop を通らない巡回がある: {names}（繰り返すなら loop を通し、回数の上限を決める）"]
+    names = _names([by_id[n] for n in by_id if n in on_cycle])
+    return [
+        f"繰り返し（loop の「繰り返す」側）を通らない巡回がある: {names}"
+        "（繰り返すなら loop の「繰り返す」側へ戻し、回数の上限を決める）"
+    ]
 
 
 def _flow_nodes(data) -> list[dict]:

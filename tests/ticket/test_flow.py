@@ -545,11 +545,16 @@ class FlowLoopTest(unittest.TestCase):
         lines, _ = flow_render.render(data)
         self.assertIn("→ 2（繰り返す）, 4（抜ける）", lines[2])
 
-    def test_a_loop_without_a_limit_says_so_instead_of_hiding_it(self):
-        data = yaml.safe_load(yaml.safe_dump(LOOP_NODE_FLOW))
-        del data["nodes"][2]["data"]["maxIterations"]
-        lines, _ = flow_render.render(data)
-        self.assertIn("最大回数が書かれていない", lines[2])
+    def test_a_loop_without_a_valid_limit_says_so_instead_of_printing_it(self):
+        for bad in (None, 0, -1, "abc", True, "", 2.5, [3]):
+            data = yaml.safe_load(yaml.safe_dump(LOOP_NODE_FLOW))
+            if bad is None:
+                del data["nodes"][2]["data"]["maxIterations"]
+            else:
+                data["nodes"][2]["data"]["maxIterations"] = bad
+            lines, _ = flow_render.render(data)
+            self.assertIn("最大回数が書かれていない（1 以上の整数でない）", lines[2], bad)
+            self.assertNotIn("最大 ", lines[2], bad)
 
     def test_the_briefing_tells_how_to_count_and_where_to_go(self):
         child = child_ticket(started=True)

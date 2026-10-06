@@ -19,6 +19,7 @@ import json
 import os
 import shutil
 import tempfile
+import time
 import unittest
 
 from ccnavi.tickets import flow, flow_render, flow_shape
@@ -336,8 +337,8 @@ connections:
         self.assertEqual(
             self.problems(text),
             [
-                "loop を通らない巡回がある: q（方針）, p1（読む）"
-                "（繰り返すなら loop を通し、回数の上限を決める）"
+                "繰り返し（loop の「繰り返す」側）を通らない巡回がある: q（方針）, p1（読む）"
+                "（繰り返すなら loop の「繰り返す」側へ戻し、回数の上限を決める）"
             ],
         )
         # 自分に戻る線も巡回。
@@ -345,6 +346,64 @@ connections:
 
     def test_a_cycle_through_a_loop_node_is_fine(self):
         self.assertEqual(self.problems(LOOP_BASE), [])
+
+    def test_a_cycle_back_through_the_done_exit_is_warned(self):
+        # 「抜ける」側が巡回に戻ると、上限は終わりを決めない。
+        text = LOOP_BASE.replace(
+            "  - {id: c3, from: l, to: p1, fromPort: body}\n"
+            "  - {id: c4, from: l, to: e, fromPort: done}\n",
+            "  - {id: c3, from: l, to: e, fromPort: body}\n"
+            "  - {id: c4, from: l, to: p1, fromPort: done}\n",
+        )
+        said = self.problems(text)
+        self.assertEqual(len(said), 1, said)
+        self.assertIn("p1（直す）", said[0])
+        # 出口は `branch-0` / `branch-1` でも `body` と読む。
+        branch = LOOP_BASE.replace("fromPort: body", "fromPort: branch-0").replace(
+            "fromPort: done", "fromPort: branch-1"
+        )
+        self.assertEqual(self.problems(branch), [])
+
+    def test_only_nodes_on_a_cycle_are_named(self):
+        # a⇄b、b→c→d、d⇄x。c は巡回の上に無い。
+        text = """\
+nodes:
+  - {id: s, type: start}
+  - {id: a, type: prompt}
+  - {id: b, type: prompt}
+  - {id: c, type: prompt}
+  - {id: d, type: prompt}
+  - {id: x, type: prompt}
+  - {id: e, type: end}
+connections:
+  - {id: k0, from: s, to: a}
+  - {id: k1, from: a, to: b}
+  - {id: k2, from: b, to: a}
+  - {id: k3, from: b, to: c}
+  - {id: k4, from: c, to: d}
+  - {id: k5, from: d, to: x}
+  - {id: k6, from: x, to: d}
+  - {id: k7, from: d, to: e}
+"""
+        said = self.problems(text)
+        self.assertEqual(len(said), 1, said)
+        self.assertIn(": a, b, d, x（", said[0])
+
+    def test_a_long_straight_flow_is_checked_fast(self):
+        nodes = "".join(f"  - {{id: n{i}, type: prompt}}\n" for i in range(6000))
+        lines = "".join(f"  - {{from: n{i}, to: n{i + 1}}}\n" for i in range(5999))
+        text = "nodes:\n  - {id: s, type: start}\n  - {id: e, type: end}\n" + nodes
+        text += "connections:\n  - {from: s, to: n0}\n  - {from: n5999, to: e}\n" + lines
+        start = time.monotonic()
+        self.assertEqual(self.problems(text), [])
+        self.assertLess(time.monotonic() - start, 2.0)
+
+    def test_a_loop_with_an_empty_condition_is_warned(self):
+        said = self.problems(LOOP_BASE.replace("condition: テストが落ちる, ", "condition: '', "))
+        self.assertEqual(
+            said,
+            ["繰り返し l（直す） の condition が空（何が成り立つあいだ繰り返すかが決まらない）"],
+        )
 
     def test_a_loop_needs_a_positive_integer_limit(self):
         for bad in (
