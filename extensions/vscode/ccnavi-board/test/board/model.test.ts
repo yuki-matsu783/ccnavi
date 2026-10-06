@@ -69,7 +69,7 @@ test("CB-T110 layers[] からルールファイルの置き場を読み、欠け
   ]);
 });
 
-test("CB-T306 sums[] を読む。ワークスペースの足し算（共通 + 自身）が先で、欠けた欄は空で補い、古い実行ファイル（sums が無い）では空", () => {
+test("CB-T318 sums[] を読む。ワークスペースの足し算（共通 + 自身）が先で、欠けた欄は空で補い、古い実行ファイル（sums が無い）では空", () => {
   const board = fixture();
   assert.deepEqual(board.sums.map((s) => s.name), ["self"]);
   const self = board.sums[0];
