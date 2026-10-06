@@ -1813,16 +1813,20 @@ JSON で渡す（`--result <path>`）。
 親子のチケットが決まらなくなる）と、`wip/` に未追跡のファイルが無く、未コミットが無く、push 済みであることを求める。`wip/` の追跡済みのファイルは
 `ready` が消して、閉じたチケットの退避と同じコミットに含める（消したものと、戻せる版（消す前の HEAD）を出す。未追跡のものは履歴から戻せないので、
 あれば消さずに名指しして止まる）。取り込みは squash（GitLab ではマージリクエストの `squash` を有効にする）。
-順は「親を `finish` で閉じる → push → `ready`」。
+順は「親を `finish` で閉じる → push → `ready`」。`ready` は親のワークツリーの中からも、外から `ready --parent <親>` でも打てる。
+最後のレビューが済んだあと、この順（`wip/` の削除は `ready` に入っている）までは、ユーザがレビュー済みにした時点で合意の範囲に入る。
+エージェントは push と Draft を外す前にユーザへ確認を取り直さない（`confirm` の知らせと親の `finish` の出力がそう言い切る）。
 
 **ワークツリーは ccnavi が片付ける。** マージを待たない。
 
-- 子のワークツリーは、`confirm` が子を `done/` へ動かしたあとに消す（`ccnavi-review.sh confirm`）。親の `finish` も、残っている子の
-  ワークツリーを消す（取りこぼしを拾う安全網）。取り消しなど「完了」以外で閉じた子のワークツリーは残す（暫定の扱い）
-- 親のワークツリーは、`ready` が Draft を外したあとの最後に消す。Draft を外す前と、外せなかったときは消さない（`ready` を打ち直せるように）
+- ワークツリーがあるのは作業中（`doing/`）の子だけ。閉じた子は、完了でも取り消しでもワークツリーを消す
+- 子のワークツリーは、`confirm` が子を `done/` へ動かしたあと（`ccnavi-review.sh confirm`）と、レビュー不要の子の `finish`・子の `cancel` の
+  あとに消す。親の `finish` も、残っている子のワークツリーを消す（取りこぼしを拾う安全網）。レビュー待ちの子のものは指摘を直す場所として残す
+- 親のワークツリーは、`ready` が Draft を外したあとの最後に消す。Draft を外す前と、外せなかったときは消さない（`ready` を打ち直せるように）。
+  外から `ready --parent <親>` で打てばそのまま消える
 - 消し方は、生成物（`node_modules`・`.venv` など）を消してから `git worktree remove`（`--force` なし）。ブランチは消さない
 - cwd が消す対象の中にあるときは消さず、外に出てから打つ 1 本（`sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>`）を出す。
-  `ready` は親のワークツリーの中で打つので、親のワークツリーはふつうこの 1 本で消す。未コミットの変更があれば何も消さずに名指しする
+  `ready` を親のワークツリーの中から `--parent` なしで打ったときは、親のワークツリーをこの 1 本で消す。未コミットの変更があれば何も消さずに名指しする
 - この 1 本が Claude Code の自動モードの分類器に止められたら、ユーザに許可を頼むか、ユーザのホームの `~/.claude/settings.json` の
   `permissions.allow` に操作ごとに絞った許可（例 `Bash(sh <ワークスペース>/.ccnavi/scripts/ccnavi-clean.sh --worktree *)`）を足す。
   分類器はプロジェクトの `.claude/settings.json` を読まない。`ccnavi-git.sh *` のような広い許可は push まで通すので勧めない
@@ -2815,7 +2819,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/scripts/ccnavi-sync.sh` | 親のブランチを取り込む（早送りか merge。衝突したら取りやめてユーザの対応に切り替える）。リモートから消えた親のブランチを閉じた・消えたに分け、親子のチケットの取り込み状態と統合先の取り込み結果を書く |
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
 | `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |
-| `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。`--worktree <名前>` は掃除と `worktree remove` を 1 本で行う（本体は `ccnavi worktree drop`。cwd が中なら消さない）。配らない |
+| `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。`--worktree <名前>` は掃除と `worktree remove` を 1 本で行う（本体は `ccnavi worktree drop`。cwd が中なら消さない）。配る（`scripts/ccnavi-setup.sh` の `DEPLOY_SCRIPTS`） |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tools/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを当てて 1 周する、ユーザが手で回す道具。自動テストは呼ばない |
 | `tests/fixtures/` | テスト用のルール（`rules.yml`、言及の無い呼び出しを見る `rules-undeclared.yml`） |
