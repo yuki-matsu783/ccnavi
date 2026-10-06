@@ -33,10 +33,19 @@
     factors:
       - {id: big-diff,   points: 25, lines_over: 300,   message: 行数が多い}
       - {id: many-files, points: 15, files_over: 10,    message: ファイルが多い}
+      - {id: src-diff,   points: 25, lines_over: 300, include: ["src/**"], exclude: ["*.lock"]}
       - {id: ci,         points: 35, glob: ".github/**", max: 35, message: CI に触った}
       - {id: deletes,    points: 20, deleted_over: 3,   message: 消したファイルが多い}
       - {id: complexity, points: 30, script: .ccnavi/common/scripts/complexity.sh, message: 複雑度}
       - {id: untested,   points: 30, judge: テストの無い振る舞いの変更を含むか, message: テスト無し}
+
+`lines_over` / `files_over` / `deleted_over` には、数えるパスを
+`include` / `exclude`（glob のリスト）で絞れる。どちらも既定は無指定で、無指定なら差分全体を数える。
+`include` があれば当たったパスだけ、`exclude` に当たったパスは `include` に当たっていても
+数えない。`exclude` だけなら、それ以外は全部数える。末尾が `/` の glob はディレクトリ
+（`src/` は `src/**`）。rename / copy は元のパスも見て、`include` は旧新どちらかが当たれば数え、
+`exclude` は旧新の両方が当たったときだけ外す。
+バイナリの変更は行数 0 として数える（ファイル数と削除数には入る）。
 
 ファイルが無ければ組み込みの既定（上の定量 4 項目と同じ値）。壊れていれば組み込みに戻り、
 そのことは --lint と子を閉じるときの出力が言う。
@@ -98,6 +107,12 @@ class Factor:
     # glob の上限。当たるごとに加点するので、無ければ青天井。
     max: int | None = None
     compiled: re.Pattern | None = None
+    # lines_over / files_over / deleted_over だけが持つ、数える対象のパス（glob）。
+    # include が空なら全パスが対象、あれば当たったパスだけ。exclude に当たったパスは常に外す。
+    include: tuple[str, ...] = ()
+    exclude: tuple[str, ...] = ()
+    include_compiled: tuple[re.Pattern, ...] = ()
+    exclude_compiled: tuple[re.Pattern, ...] = ()
     # source はこの項目が書いてあるレイヤーの名前（`common` / `self` / プロジェクト名）。
     # 記録の hit と judge の項目に残す（設計 11.9）。
     source: str = ""
@@ -108,6 +123,20 @@ class Factor:
 
     def matches(self, rel: str) -> bool:
         return self.compiled is not None and self.compiled.match(rel) is not None
+
+    def in_scope(self, change: Change) -> bool:
+        """定量項目（行数・ファイル数・削除数）がこの変更を数えるか。
+
+        rename / copy は元のパスも見る。新しいパスだけで見ると、対象の外へ動かしたファイルの
+        書き換えが数えから消え、リスクが軽い側へ倒れる。include はどちらかが当たれば数え、
+        exclude は両方が当たったときだけ外す。
+        """
+        paths = [change.path] + ([change.old] if change.old else [])
+        if self.include_compiled and not any(
+            p.match(x) for p in self.include_compiled for x in paths
+        ):
+            return False
+        return not all(any(p.match(x) for p in self.exclude_compiled) for x in paths)
 
     def key(self) -> tuple:
         """レイヤーをまたいで「同じ項目か」を比べるための全欄。`source` と `home` は含めない。
@@ -123,7 +152,16 @@ class Factor:
         if self.kind == KIND_SCRIPT:
             rel = str(self.value)
             value = (rel.split("/scripts/", 1)[-1], _file_digest(self.home, rel))
-        return (self.id, self.points, self.message, self.kind, value, self.max)
+        return (
+            self.id,
+            self.points,
+            self.message,
+            self.kind,
+            value,
+            self.max,
+            tuple(sorted(set(self.include))),
+            tuple(sorted(set(self.exclude))),
+        )
 
 
 @dataclass
@@ -360,10 +398,45 @@ def _factors(
             problems.append(Problem(SEVERITY_ERROR, ident, "`max` が 0 以上の整数ではない"))
             continue
         compiled = None
+        scope: dict[str, tuple[tuple[str, ...], tuple[re.Pattern, ...]]] = {}
+        if kind not in (KIND_LINES, KIND_FILES, KIND_DELETED):
+            stray = [k for k in ("include", "exclude") if k in item]
+            if stray:
+                problems.append(
+                    Problem(
+                        SEVERITY_ERROR,
+                        ident,
+                        f"`{stray[0]}` は {KIND_LINES} / {KIND_FILES} / {KIND_DELETED} "
+                        "の項目にだけ書ける",
+                    )
+                )
+                continue
         if kind in (KIND_LINES, KIND_FILES, KIND_DELETED):
             if not isinstance(value, int) or isinstance(value, bool) or value < 0:
                 problems.append(Problem(SEVERITY_ERROR, ident, f"`{kind}` が 0 以上の整数ではない"))
                 continue
+            bad = False
+            for name in ("include", "exclude"):
+                parsed, error = _globs(item.get(name))
+                if error:
+                    problems.append(Problem(SEVERITY_ERROR, ident, f"`{name}` {error}"))
+                    bad = True
+                    break
+                scope[name] = parsed
+            if bad:
+                continue
+            # ワイルドカードの無い include はそのファイル名にしか当たらない。ディレクトリの
+            # つもりで `src` と書くと、何も数えず点が 0 になる（黙って軽い側へ倒れる）。
+            for glob in scope["include"][0]:
+                if not any(ch in glob for ch in "*?["):
+                    problems.append(
+                        Problem(
+                            SEVERITY_WARN,
+                            ident,
+                            f"`include` の `{glob}` はワイルドカードが無いので、その名前の"
+                            f"ファイルにしか当たらない。ディレクトリなら `{glob}/**` か `{glob}/`",
+                        )
+                    )
         elif kind == KIND_GLOB:
             if not isinstance(value, str) or not value.strip():
                 problems.append(Problem(SEVERITY_ERROR, ident, "`glob` が文字列ではない"))
@@ -409,9 +482,37 @@ def _factors(
                 value=value,
                 max=maximum,
                 compiled=compiled,
+                include=scope.get("include", ((), ()))[0],
+                exclude=scope.get("exclude", ((), ()))[0],
+                include_compiled=scope.get("include", ((), ()))[1],
+                exclude_compiled=scope.get("exclude", ((), ()))[1],
             )
         )
     return factors, problems
+
+
+def _globs(raw: object) -> tuple[tuple[tuple[str, ...], tuple[re.Pattern, ...]], str]:
+    """`include` / `exclude` の glob のリストを式にする。書かれていなければ空。
+    戻りの 2 つ目は error の理由で、空文字なら正常。"""
+    empty: tuple[tuple[str, ...], tuple[re.Pattern, ...]] = ((), ())
+    if raw is None:
+        return empty, ""
+    if not isinstance(raw, list) or not all(isinstance(g, str) and g.strip() for g in raw):
+        return empty, "は glob（文字列）のリストで書く"
+    globs: list[str] = []
+    compiled: list[re.Pattern] = []
+    for g in raw:
+        glob = g.strip().replace("\\", "/")
+        # 末尾の `/` はディレクトリ。`src/` を `src/**` として読む（`src` だけでは何も当たらない）。
+        glob = (
+            glob.strip("/") + "/**" if glob.endswith("/") and glob.strip("/") else glob.strip("/")
+        )
+        try:
+            compiled.append(re.compile("^" + globmatch.translate(glob), re.IGNORECASE))
+        except re.error as exc:
+            return empty, f"の `{g}` を式にできない: {exc}"
+        globs.append(glob)
+    return (tuple(globs), tuple(compiled)), ""
 
 
 def mark_layer(definition: Definition, layer: str, home: str) -> None:
@@ -595,6 +696,8 @@ class Change:
     deleted: int = 0
     # A / M / D / R など。git の name-status の 1 文字目。
     status: str = "M"
+    # rename / copy の元のパス。無ければ空。
+    old: str = ""
 
 
 @dataclass
@@ -644,12 +747,14 @@ def measure(worktree: str, base: str, head: str = "HEAD") -> tuple[Diff | None, 
         added = _int(cols[0])
         deleted = _int(cols[1])
         path = cols[2]
+        old = ""
         if path == "" and i + 1 < len(parts):
             # rename: 次の 2 つが旧と新。
+            old = parts[i].replace("\\", "/")
             path = parts[i + 1]
             i += 2
         path = path.replace("\\", "/")
-        changes[path] = Change(path=path, added=added, deleted=deleted)
+        changes[path] = Change(path=path, added=added, deleted=deleted, old=old)
     # 消したファイルの数は name-status から数える。読めなければ測れなかったとして止める
     # （0 件と数えると軽い側へ倒れる）。
     rc, out = _git(worktree, ["diff", "--name-status", "-z", f"{base}..{head}"])
@@ -720,6 +825,14 @@ class Score:
         }
 
 
+def scoped(diff: Diff, factor: Factor) -> Diff:
+    """項目の include / exclude で絞った差分。どちらも無ければ差分そのもの。"""
+    if not factor.include_compiled and not factor.exclude_compiled:
+        return diff
+    kept = [c for c in diff.changes if factor.in_scope(c)]
+    return Diff(changes=kept, base=diff.base, head=diff.head)
+
+
 def evaluate(
     definition: Definition,
     diff: Diff,
@@ -733,22 +846,24 @@ def evaluate(
     for f in definition.factors:
         # 加点した項目には、その定義が書いてあるレイヤーを残す（設計 11.9）。
         where = f.source
+        if f.kind in (KIND_LINES, KIND_FILES, KIND_DELETED):
+            # include / exclude があれば、数える差分をその項目の対象パスに絞る。
+            counted = scoped(diff, f)
         if f.kind == KIND_LINES:
-            if diff.lines > int(f.value):
-                detail = f"{f.message}（{diff.lines} 行 > {f.value}）"
+            if counted.lines > int(f.value):
+                detail = f"{f.message}（{counted.lines} 行 > {f.value}）"
                 score.hits.append(Hit(f.id, f.points, detail, where))
         elif f.kind == KIND_FILES:
-            if diff.files > int(f.value):
-                score.hits.append(
-                    Hit(f.id, f.points, f"{f.message}（{diff.files} ファイル > {f.value}）", where)
-                )
+            if counted.files > int(f.value):
+                detail = f"{f.message}（{counted.files} ファイル > {f.value}）"
+                score.hits.append(Hit(f.id, f.points, detail, where))
         elif f.kind == KIND_DELETED:
-            if diff.deleted_files > int(f.value):
+            if counted.deleted_files > int(f.value):
                 score.hits.append(
                     Hit(
                         f.id,
                         f.points,
-                        f"{f.message}（消した {diff.deleted_files} > {f.value}）",
+                        f"{f.message}（消した {counted.deleted_files} > {f.value}）",
                         where,
                     )
                 )

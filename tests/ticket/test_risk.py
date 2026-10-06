@@ -18,6 +18,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+from ccnavi.policy.rules import SEVERITY_WARN
 from ccnavi.tickets import risk
 from tests import common_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
@@ -72,6 +73,102 @@ class DefinitionTest(unittest.TestCase):
                 definition, problems = risk.parse(text)
                 self.assertIsNone(definition, name)
                 self.assertTrue(problems, name)
+
+    def test_scope_globs_are_validated(self):
+        cases = {
+            "include が文字列": "version: 1\nfactors:\n"
+            "  - {id: a, points: 1, lines_over: 1, include: x}\n",
+            "exclude に空": "version: 1\nfactors:\n"
+            "  - {id: a, points: 1, files_over: 1, exclude: ['']}\n",
+            "glob 項目には書けない": "version: 1\nfactors:\n"
+            "  - {id: a, points: 1, glob: x, include: [y]}\n",
+        }
+        for name, text in cases.items():
+            with self.subTest(case=name):
+                definition, problems = risk.parse(text)
+                self.assertIsNone(definition, name)
+                self.assertTrue(problems, name)
+
+    def test_include_and_exclude_narrow_what_is_counted(self):
+        text = (
+            "version: 1\nfactors:\n"
+            "  - {id: all, points: 1, lines_over: 0}\n"
+            "  - {id: inc, points: 2, files_over: 0, include: ['src/**']}\n"
+            "  - {id: exc, points: 4, lines_over: 3, exclude: ['*.lock', 'docs/**']}\n"
+            "  - {id: both, points: 8, deleted_over: 0,\n"
+            "     include: ['src/**'], exclude: ['src/gen/**']}\n"
+        )
+        definition, problems = risk.parse(text)
+        self.assertEqual([], problems)
+        diff = risk.Diff(
+            changes=[
+                risk.Change("src/a.py", added=2),
+                risk.Change("src/gen/b.py", status="D"),
+                risk.Change("uv.lock", added=100),
+                risk.Change("docs/x.md", added=100),
+            ]
+        )
+        score = risk.evaluate(definition, diff, "", "", {}, {})
+        hit = {h.id: h.points for h in score.hits}
+        self.assertEqual(1, hit["all"])
+        self.assertEqual(2, hit["inc"])
+        # exclude だけなら、それ以外を全部数える。残るのは src/a.py の 2 行で閾値 3 以下。
+        self.assertNotIn("exc", hit)
+        # src/gen は exclude が勝つので、消したファイルは 0。
+        self.assertNotIn("both", hit)
+
+    def test_a_trailing_slash_means_a_directory(self):
+        text = "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 0, include: ['src/']}\n"
+        definition, problems = risk.parse(text)
+        self.assertEqual([], problems)
+        diff = risk.Diff(changes=[risk.Change("src/a/b.py", added=3), risk.Change("x.py", added=9)])
+        score = risk.evaluate(definition, diff, "", "", {}, {})
+        self.assertIn("3 行", score.hits[0].detail)
+
+    def test_include_without_a_wildcard_is_warned_but_still_loads(self):
+        text = "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 0, include: [src]}\n"
+        definition, problems = risk.parse(text)
+        self.assertIsNotNone(definition)
+        self.assertEqual([SEVERITY_WARN], [p.severity for p in problems])
+        self.assertIn("src/**", problems[0].detail)
+        # exclude は、ファイル名そのものを外す使い方がふつうなので言わない。
+        _, quiet = risk.parse(
+            "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 0, exclude: [x]}\n"
+        )
+        self.assertEqual([], quiet)
+        # 末尾 / や ** を書けば言わない。
+        _, ok = risk.parse(
+            "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 0, include: ['src/']}\n"
+        )
+        self.assertEqual([], ok)
+
+    def test_a_rename_is_judged_by_both_old_and_new_paths(self):
+        text = (
+            "version: 1\nfactors:\n"
+            "  - {id: inc, points: 1, lines_over: 0, include: ['src/**']}\n"
+            "  - {id: exc, points: 2, lines_over: 0, exclude: ['vendor/**']}\n"
+        )
+        definition, _ = risk.parse(text)
+        moved = risk.Change("vendor/core.py", added=60, deleted=60, status="R", old="src/core.py")
+        score = risk.evaluate(definition, risk.Diff(changes=[moved]), "", "", {}, {})
+        # 旧パスが include に当たるので数える。exclude は新旧の両方に当たらないと外さない。
+        self.assertEqual({"inc": 1, "exc": 2}, {h.id: h.points for h in score.hits})
+
+    def test_scope_key_ignores_order_and_duplicates(self):
+        a, _ = risk.parse(
+            "version: 1\nfactors:\n  - {id: a, points: 1, files_over: 1, exclude: [x, y]}\n"
+        )
+        b, _ = risk.parse(
+            "version: 1\nfactors:\n  - {id: a, points: 1, files_over: 1, exclude: [y, x, x]}\n"
+        )
+        self.assertEqual(a.factors[0].key(), b.factors[0].key())
+
+    def test_scope_is_part_of_the_layer_dedupe_key(self):
+        a, _ = risk.parse("version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 1}\n")
+        b, _ = risk.parse(
+            "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 1, exclude: ['*.lock']}\n"
+        )
+        self.assertNotEqual(a.factors[0].key(), b.factors[0].key())
 
     def test_levels_have_fixed_names(self):
         definition, problems = risk.parse("version: 1\nlevels: {medium: 5, high: 10, severe: 99}\n")

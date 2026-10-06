@@ -52,7 +52,7 @@ test("CB-D11 加点条件を変えると値は持ち越さず、glob 以外で�
     // 保存に渡る形にも出る。加点条件を変えても id と理由は持ち越す
     dom.click(dom.one("#save"));
     await dom.settle();
-    assert.deepEqual(savedForm(dom).factors[1], { origin: 1, id: "ci", points: "35", kind: "files_over", value: "10", max: "", message: "CI に触った" });
+    assert.deepEqual(savedForm(dom).factors[1], { origin: 1, id: "ci", points: "35", kind: "files_over", value: "10", max: "", include: "", exclude: "", message: "CI に触った" });
   } finally {
     await dom.close();
   }
@@ -166,11 +166,11 @@ test("CB-T126 項目の欄名は日本語で、値の欄は加点条件で名前
     const caps = dom.all(`${rowSelector("f1")} .row-body > .field > .cap`);
     assert.deepEqual(
       caps.map((cap) => cap.textContent),
-      ["id", "点", "加点条件", "基準", "理由"],
+      ["id", "点", "加点条件", "基準", "対象パス", "除外パス", "理由"],
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),
-      ["YAML のキー: id", "YAML のキー: points", "YAML のキー: lines_over / files_over / deleted_over / glob / script / judge", "YAML のキー: lines_over", "YAML のキー: message"],
+      ["YAML のキー: id", "YAML のキー: points", "YAML のキー: lines_over / files_over / deleted_over / glob / script / judge", "YAML のキー: lines_over", "YAML のキー: include", "YAML のキー: exclude", "YAML のキー: message"],
     );
     // 境目の点はリスクレベルの名前を欄名にし、飾りのラベルは出さない
     assert.deepEqual(
