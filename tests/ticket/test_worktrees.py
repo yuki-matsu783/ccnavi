@@ -104,6 +104,20 @@ class ReviewTurnTest(PhaseHarness):
         self.assertNotIn("ユーザのレビューを待つ", again.stdout)
         self.assertIn("依頼し直しが要る", self.next_step("i0001-01-02"))
 
+    def test_status_does_not_say_wait_when_the_phase_is_unknown(self):
+        """子のフェーズが読めない（`review_next` が空）とき、依頼済みかが分からないので
+        「ユーザのレビューを待つ」と言わない。"""
+        from unittest import mock
+
+        from ccnavi.tickets import phase
+
+        self.child("i0001-01-01")
+        with mock.patch.object(phase, "review_next", return_value=""):
+            step = self.next_step("i0001-01-01")
+        self.assertIn("依頼済みかを言えない", step)
+        self.assertIn("request", step)
+        self.assertNotIn("次の一手: ユーザのレビューを待つ", step)
+
     def test_the_last_confirm_tells_the_way_to_ready_and_tidies_the_children(self):
         tree, _ = self.child("i0001-01-01")
         fixture = self.remote()
@@ -167,15 +181,30 @@ class TidyTest(PhaseHarness):
         self.assertFalse(os.path.exists(tree))
         self.assertEqual(git(self.root, "branch", "--list", "i0001-01-01").strip(), "i0001-01-01")
 
-    def test_doing_children_keep_their_worktrees(self):
-        # ワークツリーがあるのは作業中の子だけ。作業中の子のものは消さない
-        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["src/*"]))
+    def test_only_closed_children_are_picked_and_doing_ones_keep_their_worktrees(self):
+        """片付けの候補は閉じた（done/ の）子だけ。作業中の子と取り消した子が並んでいるとき、
+        候補に入るのは取り消した子だけで、作業中の子のワークツリーは残る。"""
+        from ccnavi.infra import settings
+        from ccnavi.tickets import worktrees
+
+        for name in ("i0001-01-01", "i0001-01-02"):
+            self.propose(name, child_text(name, "i0001", 1, ["src/*"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        tree = self.run_child("i0001-01-01")
+        doing = self.run_child("i0001-01-01")
+        gone = self.run_child("i0001-01-02")
+        cancelled = self.ccnavi("ticket", "cancel", "i0001-01-02", "--reason", "やめた")
+        self.assertEqual(cancelled.returncode, 0, cancelled.stderr)
+        conf, _ = settings.load(self.root)
+        conf.approved = ".ccnavi/approved"
+        picked = [t.ticket for t in worktrees.tidy_targets(self.root, conf, "i0001")]
+        self.assertEqual(picked, ["i0001-01-02"])
         tidy = self.tidy()
-        self.assertEqual((tidy.returncode, tidy.stdout), (0, ""))
-        self.assertTrue(os.path.isdir(tree))
+        self.assertEqual(tidy.returncode, 0, tidy.stdout + tidy.stderr)
+        self.assertIn("ワークツリー i0001-01-02 を消した", tidy.stdout)
+        self.assertNotIn("i0001-01-01", tidy.stdout)
+        self.assertTrue(os.path.isdir(doing))
+        self.assertFalse(os.path.exists(gone))
 
     def test_a_closed_child_with_uncommitted_changes_is_named_and_kept(self):
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["src/*"], review=False))
@@ -197,6 +226,32 @@ class TidyTest(PhaseHarness):
         self.assertTrue(os.path.isdir(tree))
         # 外から打てば消える
         self.assertEqual(self.tidy().returncode, 0)
+        self.assertFalse(os.path.exists(tree))
+
+
+class ChildShapedParentTest(PhaseHarness):
+    """親の識別子が子の形（`-<2 桁>-<2 桁>`）で終わっていても、子の識別子から親を読み違えない。"""
+
+    def test_tidy_by_the_parent_id_does_not_strip_its_tail(self):
+        parent = "rel-2026-10-06"
+        child = f"{parent}-01-01"
+        tree_parent = self.worktree(parent, "main")
+        self.parent_tree = tree_parent
+        self.approved = os.path.join(tree_parent, ".ccnavi", "approved")
+        self.propose(parent, parent_without_plan(parent))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.propose(child, child_text(child, parent, 1, ["src/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.start_parent(parent)
+        tree = self.worktree(child, parent)
+        self.assertEqual(self.ccnavi("ticket", "start", child).returncode, 0)
+        self.assertEqual(self.ccnavi("ticket", "cancel", child, "--reason", "やめた").returncode, 0)
+        # 親の finish の後と同じ形（親の識別子で頼む）。名前の形で末尾を剥がすと rel-2026 になる
+        tidy = self.ccnavi("--cwd", self.root, "worktree", "tidy", parent)
+        self.assertEqual(tidy.returncode, 0, tidy.stdout + tidy.stderr)
+        self.assertIn(f"ワークツリー {child} を消した", tidy.stdout)
         self.assertFalse(os.path.exists(tree))
 
 
@@ -226,6 +281,44 @@ class DropTest(PhaseHarness):
         absent = self.drop("i0002")
         self.assertEqual(absent.returncode, 0)
         self.assertIn("無い", absent.stdout)
+
+    def test_keeps_the_worktree_with_ignored_files_other_than_build_outputs(self):
+        """git が無視している下書きや .env は worktree remove が黙って消すので、名指しして止める。
+        生成物（node_modules など）は数えない。"""
+        tree = self.worktree("i0002", "main")
+        write(os.path.join(tree, ".gitignore"), ".env\nscratchpad/\nnode_modules/\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "ignore")
+        write(os.path.join(tree, "node_modules", "x", "index.js"), "")
+        write(os.path.join(tree, ".env"), "TOKEN=x\n")
+        write(os.path.join(tree, "scratchpad", "memo.md"), "メモ\n")
+        dropped = self.drop("i0002")
+        self.assertEqual(dropped.returncode, 1, dropped.stdout + dropped.stderr)
+        self.assertIn("git が無視しているファイルがあるので、何も消さなかった", dropped.stdout)
+        self.assertIn(".env", dropped.stdout)
+        self.assertIn("scratchpad/", dropped.stdout)
+        self.assertNotIn("node_modules", dropped.stdout)
+        self.assertIn("退避", dropped.stdout)
+        self.assertTrue(os.path.exists(os.path.join(tree, ".env")))
+        self.assertTrue(os.path.exists(os.path.join(tree, "node_modules", "x", "index.js")))
+        # 退避して打ち直せば消える
+        os.remove(os.path.join(tree, ".env"))
+        os.remove(os.path.join(tree, "scratchpad", "memo.md"))
+        os.rmdir(os.path.join(tree, "scratchpad"))
+        again = self.drop("i0002")
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertFalse(os.path.exists(tree))
+
+    def test_many_ignored_files_are_cut_short(self):
+        tree = self.worktree("i0002", "main")
+        write(os.path.join(tree, ".gitignore"), "*.log\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "ignore")
+        for i in range(15):
+            write(os.path.join(tree, f"a{i:02d}.log"), "")
+        dropped = self.drop("i0002")
+        self.assertEqual(dropped.returncode, 1)
+        self.assertIn("…ほか 5 件", dropped.stdout)
 
     def test_keeps_the_worktree_when_the_cwd_is_inside(self):
         tree = self.worktree("i0002", "main")

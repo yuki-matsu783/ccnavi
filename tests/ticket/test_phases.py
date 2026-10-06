@@ -953,6 +953,92 @@ class PhaseTest(PhaseHarness):
         again = self.ready(fixture)
         self.assertEqual(again.returncode, 0, again.stderr)
 
+    def ready_recorded(self, fixture):
+        """C1 と同じ形（書いたパスを集める・置き場の外を止める判定つき）で ready を打つ。"""
+        listed = os.path.join(self.root, "logs", "state", "c1", "ready.writes")
+        done = self.ccnavi(
+            "--record-writes",
+            listed,
+            "--record-tree",
+            self.parent_tree,
+            "--cwd",
+            self.parent_tree,
+            "review",
+            "ready",
+            "--result",
+            fixture,
+        )
+        written = []
+        if os.path.exists(listed):
+            with open(listed, encoding="utf-8") as f:
+                written = f.read().splitlines()
+        return done, written
+
+    def closed_family(self):
+        """親を閉じて push し、ready を打てる形にする。返すのは取得した結果の見本。"""
+        self.family(plan=["design"])
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        fixture = self.remote()
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01-01")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        self.assertEqual(self.request(fixture, 1).returncode, 0)
+        self.assertEqual(self.confirm(fixture, 1).returncode, 0)
+        self.start_parent()
+        self.propose("i0001", parent_text("i0001", ["design"], feedback=[]))
+        self.assertEqual(self.approve().returncode, 0)
+        self.assertEqual(self.ccnavi("ticket", "finish", "i0001").returncode, 0)
+        self.commit_parent("状態の移動")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        return fixture
+
+    @unittest.skipIf(os.name == "nt", "大文字違いの並存と名前の \\ は Windows では作れない")
+    def test_c1_lets_ready_remove_wip_in_any_case_but_nothing_else(self):
+        """C1 の置き場の外の検査は、ready が消す wip/ の判定（大文字小文字と \\ を問わない）と
+        同じ判定で、消したものだけを通す。"""
+        fixture = self.closed_family()
+        odd = ["WIP/eli5/a.html", "wip\\eli5\\b.html"]
+        for rel in odd:
+            write(os.path.join(self.parent_tree, *rel.split("/")), "<p>x</p>\n")
+            git(self.parent_tree, "add", "--", rel)
+        git(self.parent_tree, "commit", "--quiet", "-m", "odd wip")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        passed, written = self.ready_recorded(fixture)
+        self.assertEqual(passed.returncode, 0, passed.stderr)
+        for rel in [*odd, "wip/design/plan.md"]:
+            self.assertIn(rel, written)
+            self.assertFalse(os.path.lexists(os.path.join(self.parent_tree, *rel.split("/"))))
+
+    def test_c1_still_stops_writes_outside_the_places_for_ready(self):
+        """wip/ の例外は、今は無い wip/ の下のものだけ。
+
+        在るもの・wip/ の外・ツリーの外（別の親）は通さない。
+        """
+        from ccnavi.entry import cli
+
+        base = os.path.realpath(self.parent_tree)
+        write(os.path.join(base, "wip", "kept.md"), "x\n")
+        write(os.path.join(base, "src", "gone.py"), "x\n")
+        os.remove(os.path.join(base, "src", "gone.py"))
+        cases = {
+            os.path.join(base, "wip", "gone.md"): True,
+            os.path.join(base, "WIP", "eli5", "gone.html"): True,
+            os.path.join(base, "wip", "kept.md"): False,
+            os.path.join(base, "src", "gone.py"): False,
+            os.path.join(base, "wipx", "gone.md"): False,
+            os.path.join(base, "wip"): False,
+            base: False,
+            os.path.join(self.root, "wip", "gone.md"): False,
+            os.path.join(self.root, ".claude", "worktrees", "i0002", "wip", "gone.md"): False,
+        }
+        for path, expected in cases.items():
+            with self.subTest(path=path):
+                self.assertEqual(cli._ready_removed_wip(os.path.realpath(path), base), expected)
+
     def test_close_early_closes_early_and_files_the_rest(self):
         """ユーザが「キリの良いところ」と早めに閉じる。残りは取り消し・省略・受け入れになり、
         issue に書き出される。"""

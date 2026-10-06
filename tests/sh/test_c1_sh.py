@@ -840,9 +840,10 @@ class TidyAfterFinishTest(C1Harness):
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         with open(log, encoding="utf-8") as f:
             called = f.read()
-        # 子の識別子は親の識別子に直して頼む。この子はレビュー待ち（review/）へ動いたので、
-        # 指摘を直す場所としてワークツリーは残る（消すのは confirm が done/ へ動かした後）
-        self.assertIn(f"worktree tidy {PARENT}", called)
+        # 識別子は名前の形で剥がさずにそのまま渡す（親へ割り出すのは実行ファイル）。
+        # この子はレビュー待ち（review/）へ動いたので、指摘を直す場所としてワークツリーは残る
+        # （消すのは confirm が done/ へ動かした後）
+        self.assertIn(f"worktree tidy {CHILD}", called)
         self.assertIn("--cwd", called)
         self.assertTrue(os.path.isdir(tree))
 
@@ -1440,6 +1441,34 @@ class C1HostTest(C1HostHarness):
         # 送ったものはリモートに届いている（ready のマーカー）
         shown = git(self.ws, "show", "--name-only", "--format=", f"{PARENT}").stdout
         self.assertIn(f"{APPROVED}/phases/{PARENT}/ready.json", shown)
+
+    def test_ready_from_outside_by_a_relative_script_path(self):
+        """ワークスペースルートから相対パス（`sh .ccnavi/scripts/ccnavi-review.sh`）で打っても、
+        親のワークツリーへ移った後に C1 の取り込み（ccnavi-sync.sh）を見失わない。
+
+        親のワークツリーにはスクリプトの写しを置かない（相対パスがそこで解かれると、見失うか、
+        ワークツリーの古い写しを使う）。
+        """
+        git(self.tree, "rm", "-r", "-q", ".ccnavi/scripts")
+        git(self.tree, "commit", "-q", "-m", "no scripts here")
+        git(self.tree, "push", "-q", "origin", PARENT)
+        env = self.env(
+            PATH=self.path, GITLAB_TOKEN="t0k", CCNAVI_BIN_PATH=self.half, HALF_TREE=self.tree
+        )
+        ready = subprocess.run(
+            [SHELL, ".ccnavi/scripts/ccnavi-review.sh", "ready", "--parent", PARENT],
+            cwd=self.ws,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            input="",
+        )
+        self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
+        self.assertIn("Draft を外した", ready.stdout)
+        self.assertIn(f"ワークツリー {PARENT} を消した", ready.stdout)
+        self.assertFalse(os.path.exists(self.tree))
 
     def test_ready_parent_refuses_what_is_not_a_parent_worktree(self):
         for args in (("--parent",), ("--parent", "../x"), ("--parent", "i0009")):
