@@ -3,11 +3,11 @@ version: 1
 ticket: feature-262-workflow-edit-tab
 title: 計画の順序を図で直すワークフロー編集タブと、承認画面の読むだけの図
 plan:
-  - acceptance
-  - implement
-  - implement
-  - implement
-  - docs
+  - acceptance                          # 1。何も待たない
+  - {type: implement, after: [1]}       # 2。段 4
+  - {type: implement, after: [2]}       # 3。段 2・5
+  - {type: implement, after: [3]}       # 4。段 6
+  - {type: docs, after: [4]}            # 5。最後の項。ほかの全部を（推移的に）待つ
 rationale: |
   親の計画の順序（項の after）を、VS Code のワークフロー編集タブの図で直せるようにする。承認のオーバーレイには
   同じ図を読むだけで出す。順序の読み書きは実行ファイルの独立したフラグ --plan-order が受け持つ。

@@ -3,13 +3,13 @@ version: 1
 ticket: feature-261-plan-order-core
 title: フェーズの順序を親の計画で決め、待ち方を計画から計算し、使う定義を親に固定する（実行ファイル）
 plan:
-  - design
-  - acceptance
-  - implement
-  - implement
-  - implement
-  - staging
-  - docs
+  - design                              # 1。何も待たない
+  - {type: acceptance, after: [1]}      # 2。実装（3）とは並行する
+  - {type: implement, after: [1]}       # 3。段 0・1・1b
+  - {type: implement, after: [3]}       # 4。段 1c
+  - {type: implement, after: [4]}       # 5。段 3
+  - {type: staging, after: [2, 5]}      # 6。受入テストと実装の両方が済んでから
+  - {type: docs, after: [6]}            # 7。最後の項。ほかの全部を（推移的に）待つ
 rationale: |
   phases.yml から順序の欄（order・after・overlap・requires）をなくし、親の計画の項に after で先行を書く。
   待ち方は承認済みの計画から都度計算し、phases/<親>/workflow.yml を廃止する。親の frontmatter に
@@ -59,7 +59,7 @@ allow:
 
 ## フェーズと設計の段
 
-今の `phases.yml` は一直線（番号順に前を全部待つ）で読むので、計画は番号順に進む。
+項の待ちは `plan:` の `after` で決まる（`after` を書かない項は何も待たない）。上の `plan:` では、2（受入テスト）と 3（実装）がどちらも 1 だけを待つので並行して進められる。実装の 4・5 は前の実装を順に待つ。
 
 | 番号 | フェーズ定義 | 中身（設計の段） |
 |---|---|---|
@@ -71,7 +71,7 @@ allow:
 | 6 | staging | 保護された置き場の完成品を `wip/design/scripts/` に全文で置く: `phases.yml`（関係の欄を消し、`when` を足す）、`ccnavi-common.sh`（`CCNAVI_COMPAT=9`）、`ccnavi-ticket.sh`（使い方の文）、`common-rules.yml`（`skill-review-at-proposal` の案内）。ユーザがコピーする |
 | 7 | docs | `docs/design/tickets/`（phases・proposal-format・approval・state-transitions・hitl）、`docs/requirements/`、`README.md`、`docs/claude/skill-review.md`、`.claude/skills/ccnavi-config/`、ADR（新しい ADR と、置き換える ADR の状態の行、索引） |
 
-- 受入テストと実装は並行してよい（今の定義で `acceptance` は `implement` と並行を許す）
+- 受入テストと実装は並行してよい（2 と 3 が、どちらも 1 だけを待つ）
 - 互換の版は段 3 の子で上げ、`ccnavi-common.sh` は 6 番の staging で渡す。ユーザがコピーするまで、この親のブランチの実行ファイルと sh の版は食い違う（統合先に入れる前にコピーする）
 
 ## 範囲
