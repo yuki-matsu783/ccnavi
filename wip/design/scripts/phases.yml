@@ -1,0 +1,83 @@
+# フェーズ定義（設計 9.7）。ユーザが持つ設定で、エージェントは書き換えない。
+#
+# ここは自身のレイヤー（ワークスペース自身のレイヤー）。`scope` のパスはこのワークスペースの
+# レイアウトに付いているので、共通レイヤー（.ccnavi/common/phases.yml）ではなくこちらに置く。
+# 共通レイヤーに置くと、projects/ の下のプロジェクトにも同じ scope が効いてしまう。
+#
+# 親チケットの `plan:` に、ここに書いたフェーズ定義の名前を並べ、項に `after: [番号]` で先行を
+# 書く（先に閉じてレビューが済んでいるべき項。指せるのは自分より小さい番号だけ）。`after` を
+# 書かない項は何も待たない。最後の項がほかの全部を（推移的に）待つようにする。それが全体計画で、
+# `ccnavi --agree` が通ることが合意になる。レビューを受けたあとは `feedback:` に
+# `kind: feedback` のフェーズ定義を並べて改版を出す（対応が無くても `[]` で出す）。
+# 定義は順序を持たない（前の版の `order`・`after`・`overlap`・`requires` は読まない）。
+#
+# `id`（キー）と `title` はどちらも一意。レイヤーをまたいで重なれば --lint が error で止める。
+# このファイルが無ければ、フェーズは番号だけの挙動に戻る。
+version: 1
+
+phases:
+  research:
+    kind: work
+    title: 調査
+    review: none
+    scope: ["wip/research/*"]
+    deliverables: ["wip/research/summary.md"]
+    when: 既存の振る舞いや依存が分からないとき。分かっているなら飛ばす
+
+  design:
+    kind: work
+    title: 設計
+    review: mr
+    scope: ["wip/design/*", "docs/*"]
+    deliverables: ["wip/design/*.md"]
+    when: 触る場所が 3 か所を超えるか、外から見える振る舞いが変わるとき
+
+  acceptance:
+    kind: work
+    title: 受入テスト作成
+    review: mr
+    scope: ["tests/*"]
+    when: 振る舞いが変わるとき。実装と並行してよい（実装の項の `after` にこの項を書かなければ並行する）
+
+  implement:
+    kind: work
+    title: 実装とテスト
+    review: mr
+    scope: ["src/*", "tests/*", "build.py", "pyproject.toml", "scripts/*", ".ccnavi/*", ".ccnavi/common/phases.yml", "extensions/*"]
+    when: 振る舞いを変えるとき。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
+
+  staging:
+    kind: work
+    title: ユーザがコピーする版の作成
+    review: mr
+    scope: ["wip/design/*", "tests/*"]
+    when: 保護済みファイル（.ccnavi/scripts/、.claude/hooks/、rules.yml）を直すとき。エージェントはそこに書けないので、完成品を wip/design/scripts/ に全文で置き、ユーザがコピーする。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
+
+  docs:
+    kind: work
+    title: 文書
+    review: mr
+    scope: ["README.md", "docs/*", "extensions/vscode/ccnavi-board/docs/*", "extensions/chrome/ccnavi-approval/docs/*", "CLAUDE.md", ".claude/skills/*"]
+
+  design-feedback:
+    kind: feedback
+    title: 設計フィードバック対応
+    review: mr
+    scope: ["wip/design/*", "docs/*"]
+
+  implement-feedback:
+    kind: feedback
+    title: 実装フィードバック対応
+    review: mr
+    scope: inherit
+    when: フィードバック計画の最後に置き、ほかの対応を受ける
+
+  # 作業の振り返りで出たスキルの候補を、ワークスペースの .claude/skills/ に入れる。
+  # 候補の拾い方と置き場は docs/claude/skill-review.md。子は親の範囲の中にしか置けないので、
+  # 親の範囲に .claude/skills/ が無ければこのフェーズ定義は使えず、提案チケットに回る。
+  skill-improve:
+    kind: feedback
+    title: スキル改善
+    review: mr
+    scope: [".claude/skills/*"]
+    when: 振り返りでスキルの候補が出たとき（docs/claude/skill-review.md）。候補が無ければ置かない
