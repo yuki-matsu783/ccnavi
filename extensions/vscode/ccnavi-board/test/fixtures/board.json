@@ -238,7 +238,7 @@
    "phases": {
     "path": "<root>/.ccnavi/config/phases.yml",
     "unreadable": "",
-    "order": "sequential",
+    "order": "dag",
     "types": [
      {
       "id": "research",
@@ -801,7 +801,12 @@
    "stage": "作業中（2（設計））",
    "plan": [
     "research",
-    "design"
+    {
+     "type": "design",
+     "after": [
+      1
+     ]
+    }
    ],
    "feedback": null,
    "close_early": null,

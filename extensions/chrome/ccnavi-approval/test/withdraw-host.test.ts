@@ -40,7 +40,6 @@ function baseRequest(): Record<string, unknown> & { snapshot: { branches: Record
 
 async function judged(scene: WithdrawScene) {
   const doing = `${APPROVED}/doing/${scene.ident}.md`;
-  const workflow = `${APPROVED}/phases/${scene.ident}/workflow.yml`;
   const host = HOSTS.find((h) => h.id === (scene.host === "github" ? "github.com" : "gitlab.com"))!;
   const client = { host, token: TOKEN, fetch: withdrawSceneFetch(scene, doing), counter: { rest: 0, graphql: 0 }, sleep: noWait };
   const mod = scene.host === "github" ? gh : gl;
@@ -50,12 +49,13 @@ async function judged(scene: WithdrawScene) {
   };
   const prior = await findPrior(ask, PLACE, scene.head, scene.ident);
   assert.ok(prior !== null, `${scene.host}/${scene.name}: 承認コミットの親の提案を引けない`);
-  // 親のブランチの先頭の承認済みチケットと待ち方。ボードと同じく、ホストの blob の本文から組む
-  const objs = await mod.pathObjects(client, scene.owner, scene.repo, scene.head, [doing, workflow]);
-  const oids = [doing, workflow].map((p) => objs[p]).filter((o) => o !== null && o !== undefined).map((o) => o!.oid);
+  // 親のブランチの先頭の承認済みチケット。ボードと同じく、ホストの blob の本文から組む。
+  // 待ち方は承認済みチケットの計画から計算するので、ほかのファイルは読まない
+  const objs = await mod.pathObjects(client, scene.owner, scene.repo, scene.head, [doing]);
+  const oids = [doing].map((p) => objs[p]).filter((o) => o !== null && o !== undefined).map((o) => o!.oid);
   const texts = await mod.blobs(client, scene.owner, scene.repo, oids);
   const files: Record<string, string> = {};
-  for (const p of [doing, workflow]) {
+  for (const p of [doing]) {
     const o = objs[p];
     if (o) files[p] = texts[o.oid].text as string;
   }

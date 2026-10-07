@@ -4,11 +4,5 @@
     "encoding": "base64",
     "content": "LS0tCnZlcnNpb246IDEKdGlja2V0OiBpMDAwMQpwbGFuOgogIC0gcmVzZWFyY2gKaHVtYW5fcmV2aWV3OgogIHJlcXVpcmVkOiB0cnVlCiAgcmVhc29uOiB0CnRpdGxlOiDopqoKcmF0aW9uYWxlOiByCmFsbG93OgogIC0gbWF0Y2g6IFdyaXRlfEVkaXQKICAgIGdsb2I6ICJzcmMvKiIKICAtIG1hdGNoOiBXcml0ZXxFZGl0CiAgICBnbG9iOiAid2lwLyoiCiAgLSBtYXRjaDogV3JpdGV8RWRpdAogICAgZ2xvYjogInRlc3RzLyoiCnN0YXJ0ZWRfYXQ6ICIiCmNvbXBsZXRlZF9hdDogIiIKYmFzZV9zaGE6ICIiCi0tLQoK5pys5paHCg==",
     "sha": "c21187351187aea6ece188a35200843923e063b7"
-  },
-  "8b19652fb1c157b748855028d4d81dd2ddab2000": {
-    "size": 47,
-    "encoding": "base64",
-    "content": "b3JkZXI6IHNlcXVlbnRpYWwKd2FpdHM6CiAgMTogW10KcmV2aWV3X2F0OiB7fQo=",
-    "sha": "8b19652fb1c157b748855028d4d81dd2ddab2000"
   }
 }

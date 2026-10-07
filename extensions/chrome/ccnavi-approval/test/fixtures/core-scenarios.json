@@ -24,11 +24,6 @@
       "path": ".ccnavi/approved/events/i0001.ndjson"
      },
      {
-      "content": "order: sequential\nwaits:\n  1: []\n  2:\n  - 1\nreview_at: {}\n",
-      "op": "create",
-      "path": ".ccnavi/approved/phases/i0001/workflow.yml"
-     },
-     {
       "op": "delete",
       "path": "wip/proposals/todo/i0001-01-01.md"
      },
@@ -38,7 +33,7 @@
      }
     ]
    },
-   "digest": "e8ece77a21fdc32e3f5e9a7a79ab84ad32697cbcf006c1c87ee04c369494fee4",
+   "digest": "60115c3c84bfd257bcdf952073b66300abd4495620f8fe351b1118ceed5d1a97",
    "family": "i0001",
    "identifiers": [
     "i0001",
@@ -52,7 +47,7 @@
    "rejected": [],
    "schema": 1,
    "stopped": null,
-   "text": "チケットの承認リクエスト: 2 件\n\n== i0001: 親  親チケット\n■ このチケットで編集可能な範囲\n    下に並ぶ場所にだけ、このチケットで編集できるようになる。allow は無確認で編集できる場所、ask は確認を挟んで編集できる場所、deny はこのチケットでも編集できない場所\n    ルールの allow で許可してある場所も、この範囲の外では止まる。ルールの deny はこの範囲の中でも止まる\n    allow: src/*, wip/*, tests/*\n■ 全体計画\n    承認すると、この順序で進めることに合意したことになる。前のフェーズが閉じるまで、次のフェーズの子は承認できない\n    1. 調査 / research  レビュー不要\n    2. 設計 / design  レビュー要: マージリクエスト\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md\n\n== i0001-01-01: 子 i0001-01-01  親 i0001 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲に無い場所がここで新しく編集できるようになることはない\n    親の範囲: src/*, wip/*, tests/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-01.md"
+   "text": "チケットの承認リクエスト: 2 件\n\n== i0001: 親  親チケット\n■ このチケットで編集可能な範囲\n    下に並ぶ場所にだけ、このチケットで編集できるようになる。allow は無確認で編集できる場所、ask は確認を挟んで編集できる場所、deny はこのチケットでも編集できない場所\n    ルールの allow で許可してある場所も、この範囲の外では止まる。ルールの deny はこの範囲の中でも止まる\n    allow: src/*, wip/*, tests/*\n■ 全体計画\n    承認すると、この順序で進めることに合意したことになる。各フェーズの子は、そのフェーズが待つフェーズ（下の待ち方）が閉じてレビューが済むまで承認できない\n    1. 調査 / research  レビュー不要\n    2. 設計 / design  レビュー要: マージリクエスト\n■ 待ち方（計画の項の after から決まる。後から phases.yml を直しても変わらない）\n    1: research — 何も待たない\n    2: design — 待つ: 1\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md\n\n== i0001-01-01: 子 i0001-01-01  親 i0001 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲に無い場所がここで新しく編集できるようになることはない\n    親の範囲: src/*, wip/*, tests/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-01.md"
   },
   "request": {
    "family": "i0001",
@@ -71,8 +66,8 @@
      "main": {
       "files": {
        ".ccnavi/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
-       ".ccnavi/config/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n    overlap: [implement]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n    requires: [acceptance]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=8\n"
+       ".ccnavi/config/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=9\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -119,7 +114,7 @@
      }
     ]
    },
-   "digest": "a4b20c4f06cc46c05527f2c8f6d9991032fe8d3e5db42ac60f7a632ec555dbdf",
+   "digest": "4d78c9655bdf920de9cc79c1f3a016ff0a44043ab6d8793dfba97effc5a100f8",
    "family": "i0001",
    "identifiers": [
     "i0001-01-02"
@@ -150,7 +145,6 @@
        ".ccnavi/approved/events/i0001.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n",
        ".ccnavi/approved/phases/i0001/1.requested": "{\"at\": \"x\"}",
        ".ccnavi/approved/phases/i0001/1.reviewed": "{\"at\": \"x\"}",
-       ".ccnavi/approved/phases/i0001/workflow.yml": "order: sequential\nwaits:\n  1: []\nreview_at: {}\n",
        "wip/proposals/todo/i0001-01-02.md": "---\nversion: 1\nticket: i0001-01-02\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-02\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n"
       },
       "head": "0000000000000000000000000000000000000000"
@@ -158,8 +152,8 @@
      "main": {
       "files": {
        ".ccnavi/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
-       ".ccnavi/config/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n    overlap: [implement]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n    requires: [acceptance]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=8\n"
+       ".ccnavi/config/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=9\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -178,17 +172,17 @@
    "changes": {
     "i0001": [
      {
-      "content": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"2026-09-29T12:00:00+0900\"\nbase_sha: \"096f58df09ba173bc2ab02418d1a8795393fc57e\"\n---\n\n本文\n",
+      "content": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"2026-09-29T12:00:00+0900\"\nbase_sha: \"aa6fca62f27573c7f41dcf8561ea710f8e053d51\"\n---\n\n本文\n",
       "op": "create",
       "path": ".ccnavi/approved/done/i0001-01-01.md"
      },
      {
-      "content": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"096f58df09ba173bc2ab02418d1a8795393fc57e\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"finished\", \"from\": \"doing\", \"to\": \"review\", \"via\": \"cli\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"settled\", \"from\": \"review\", \"to\": \"done\", \"via\": \"chrome\", \"phase\": 1}\n",
+      "content": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"aa6fca62f27573c7f41dcf8561ea710f8e053d51\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"finished\", \"from\": \"doing\", \"to\": \"review\", \"via\": \"cli\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"settled\", \"from\": \"review\", \"to\": \"done\", \"via\": \"chrome\", \"phase\": 1}\n",
       "op": "update",
       "path": ".ccnavi/approved/events/i0001-01-01.ndjson"
      },
      {
-      "content": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"096f58df09ba173bc2ab02418d1a8795393fc57e\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"requested\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"chrome\", \"phase\": 1, \"mark\": \"reviewed\"}\n",
+      "content": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"aa6fca62f27573c7f41dcf8561ea710f8e053d51\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"requested\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"chrome\", \"phase\": 1, \"mark\": \"reviewed\"}\n",
       "op": "update",
       "path": ".ccnavi/approved/events/i0001.ndjson"
      },
@@ -214,12 +208,12 @@
   },
   "request": {
    "compare": {
-    "base": "cefd857270efd9a44403afbe95cbc86bf3c499c1",
+    "base": "41068c0f4dbf83009ff3bc48ec6d07e5cd14d72e",
     "files": [
      ".ccnavi/approved/events/i0001.ndjson",
      ".ccnavi/approved/phases/i0001/1.requested"
     ],
-    "head": "701111e0f4b91dbecc7fdb269566ee7cd67b1d86"
+    "head": "5d5f44e5a91e6ad3e8d821e56a00867d8a05aca0"
    },
    "family": "i0001",
    "op": "confirm",
@@ -239,32 +233,30 @@
     "branches": {
      "i0001": {
       "files": {
-       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"\"\nbase_sha: \"096f58df09ba173bc2ab02418d1a8795393fc57e\"\n---\n\n本文\n",
-       ".ccnavi/approved/events/i0001-01-01.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"096f58df09ba173bc2ab02418d1a8795393fc57e\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"finished\", \"from\": \"doing\", \"to\": \"review\", \"via\": \"cli\"}\n",
-       ".ccnavi/approved/events/i0001.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"096f58df09ba173bc2ab02418d1a8795393fc57e\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"requested\"}\n",
-       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"cefd857270efd9a44403afbe95cbc86bf3c499c1\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-09-29T12:00:00+0900\"}",
+       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"\"\nbase_sha: \"aa6fca62f27573c7f41dcf8561ea710f8e053d51\"\n---\n\n本文\n",
+       ".ccnavi/approved/events/i0001-01-01.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"aa6fca62f27573c7f41dcf8561ea710f8e053d51\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"finished\", \"from\": \"doing\", \"to\": \"review\", \"via\": \"cli\"}\n",
+       ".ccnavi/approved/events/i0001.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"aa6fca62f27573c7f41dcf8561ea710f8e053d51\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"requested\"}\n",
+       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"41068c0f4dbf83009ff3bc48ec6d07e5cd14d72e\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-09-29T12:00:00+0900\"}",
        ".ccnavi/approved/phases/i0001/i0001-01-01.flow.json": "{\n \"fingerprint\": \"absent\",\n \"path\": \".ccnavi/approved/flows/i0001-01-01.yml\",\n \"at\": \"2026-09-29T12:00:00+0900\"\n}\n",
-       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"545ee00e8682cb767ce79754c68e7562e01b72ca\",\n \"base\": \"096f58df09ba173bc2ab02418d1a8795393fc57e\",\n \"at\": \"2026-09-29T12:00:00+0900\",\n \"summary\": \"1 ファイル、+1 -0 行、消したファイル 0\"\n}",
-       ".ccnavi/approved/phases/i0001/workflow.yml": "order: sequential\nwaits:\n  1: []\nreview_at: {}\n",
-       "wip/proposals/review/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"2026-09-29T12:00:00+0900\"\nbase_sha: \"096f58df09ba173bc2ab02418d1a8795393fc57e\"\n---\n\n本文\n"
+       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"3e7cdd13322a0310c4506bf44fc16b2a64b40f5c\",\n \"base\": \"aa6fca62f27573c7f41dcf8561ea710f8e053d51\",\n \"at\": \"2026-09-29T12:00:00+0900\",\n \"summary\": \"1 ファイル、+1 -0 行、消したファイル 0\"\n}",
+       "wip/proposals/review/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"2026-09-29T12:00:00+0900\"\nbase_sha: \"aa6fca62f27573c7f41dcf8561ea710f8e053d51\"\n---\n\n本文\n"
       },
-      "head": "701111e0f4b91dbecc7fdb269566ee7cd67b1d86"
+      "head": "5d5f44e5a91e6ad3e8d821e56a00867d8a05aca0"
      },
      "i0001-01-01": {
       "files": {
        ".ccnavi/approved/doing/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
        ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
        ".ccnavi/approved/events/i0001-01-01.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n",
-       ".ccnavi/approved/events/i0001.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n",
-       ".ccnavi/approved/phases/i0001/workflow.yml": "order: sequential\nwaits:\n  1: []\nreview_at: {}\n"
+       ".ccnavi/approved/events/i0001.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n"
       },
       "head": "0000000000000000000000000000000000000000"
      },
      "main": {
       "files": {
        ".ccnavi/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
-       ".ccnavi/config/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n    overlap: [implement]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n    requires: [acceptance]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=8\n"
+       ".ccnavi/config/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=9\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -283,12 +275,12 @@
    "changes": {
     "i0001": [
      {
-      "content": "---\nversion: 1\nticket: i0001\nplan:\n- design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n- match: Write|Edit\n  glob: src/*\n- match: Write|Edit\n  glob: wip/*\n- match: Write|Edit\n  glob: tests/*\nstarted_at: 2026-09-29T12:00:00+0900\ncompleted_at: ''\nbase_sha: 096f58df09ba173bc2ab02418d1a8795393fc57e\nfeedback: []\n---\n\n本文\n",
+      "content": "---\nversion: 1\nticket: i0001\nplan:\n- design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n- match: Write|Edit\n  glob: src/*\n- match: Write|Edit\n  glob: wip/*\n- match: Write|Edit\n  glob: tests/*\nstarted_at: 2026-09-29T12:00:00+0900\ncompleted_at: ''\nbase_sha: aa6fca62f27573c7f41dcf8561ea710f8e053d51\nfeedback: []\n---\n\n本文\n",
       "op": "update",
       "path": ".ccnavi/approved/doing/i0001.md"
      },
      {
-      "content": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"096f58df09ba173bc2ab02418d1a8795393fc57e\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"requested\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"reviewed\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"revised\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"chrome\", \"feedback\": true}\n",
+      "content": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"aa6fca62f27573c7f41dcf8561ea710f8e053d51\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"requested\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"reviewed\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"revised\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"chrome\", \"feedback\": true}\n",
       "op": "update",
       "path": ".ccnavi/approved/events/i0001.ndjson"
      },
@@ -298,7 +290,7 @@
      }
     ]
    },
-   "digest": "75251e9d81c800e06aea6ab82568be05585cb78683cf90b36e403badac7d7454",
+   "digest": "66e985dbfad46d722bf4bb87eb78943a46d80737871345a8dea9bfc9f1d54431",
    "family": "i0001",
    "identifiers": [
     "i0001"
@@ -324,15 +316,14 @@
     "branches": {
      "i0001": {
       "files": {
-       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"\"\nbase_sha: \"096f58df09ba173bc2ab02418d1a8795393fc57e\"\n---\n\n本文\n",
-       ".ccnavi/approved/done/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"2026-09-29T12:00:00+0900\"\nbase_sha: \"096f58df09ba173bc2ab02418d1a8795393fc57e\"\n---\n\n本文\n",
-       ".ccnavi/approved/events/i0001-01-01.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"096f58df09ba173bc2ab02418d1a8795393fc57e\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"finished\", \"from\": \"doing\", \"to\": \"review\", \"via\": \"cli\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"settled\", \"from\": \"review\", \"to\": \"done\", \"via\": \"cli\", \"phase\": 1}\n",
-       ".ccnavi/approved/events/i0001.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"096f58df09ba173bc2ab02418d1a8795393fc57e\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"requested\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"reviewed\"}\n",
-       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"cefd857270efd9a44403afbe95cbc86bf3c499c1\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-09-29T12:00:00+0900\"}",
+       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"\"\nbase_sha: \"aa6fca62f27573c7f41dcf8561ea710f8e053d51\"\n---\n\n本文\n",
+       ".ccnavi/approved/done/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"2026-09-29T12:00:00+0900\"\nbase_sha: \"aa6fca62f27573c7f41dcf8561ea710f8e053d51\"\n---\n\n本文\n",
+       ".ccnavi/approved/events/i0001-01-01.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"aa6fca62f27573c7f41dcf8561ea710f8e053d51\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"finished\", \"from\": \"doing\", \"to\": \"review\", \"via\": \"cli\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"settled\", \"from\": \"review\", \"to\": \"done\", \"via\": \"cli\", \"phase\": 1}\n",
+       ".ccnavi/approved/events/i0001.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"aa6fca62f27573c7f41dcf8561ea710f8e053d51\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"requested\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"reviewed\"}\n",
+       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"41068c0f4dbf83009ff3bc48ec6d07e5cd14d72e\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-09-29T12:00:00+0900\"}",
        ".ccnavi/approved/phases/i0001/1.reviewed": "{\"mr\": 7, \"accepted\": [], \"at\": \"2026-09-29T12:00:00+0900\"}",
        ".ccnavi/approved/phases/i0001/i0001-01-01.flow.json": "{\n \"fingerprint\": \"absent\",\n \"path\": \".ccnavi/approved/flows/i0001-01-01.yml\",\n \"at\": \"2026-09-29T12:00:00+0900\"\n}\n",
-       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"545ee00e8682cb767ce79754c68e7562e01b72ca\",\n \"base\": \"096f58df09ba173bc2ab02418d1a8795393fc57e\",\n \"at\": \"2026-09-29T12:00:00+0900\",\n \"summary\": \"1 ファイル、+1 -0 行、消したファイル 0\"\n}",
-       ".ccnavi/approved/phases/i0001/workflow.yml": "order: sequential\nwaits:\n  1: []\nreview_at: {}\n",
+       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"3e7cdd13322a0310c4506bf44fc16b2a64b40f5c\",\n \"base\": \"aa6fca62f27573c7f41dcf8561ea710f8e053d51\",\n \"at\": \"2026-09-29T12:00:00+0900\",\n \"summary\": \"1 ファイル、+1 -0 行、消したファイル 0\"\n}",
        "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - design\nfeedback: []\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n"
       },
       "head": "0000000000000000000000000000000000000000"
@@ -340,8 +331,8 @@
      "main": {
       "files": {
        ".ccnavi/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
-       ".ccnavi/config/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n    overlap: [implement]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n    requires: [acceptance]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=8\n"
+       ".ccnavi/config/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=9\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -375,7 +366,7 @@
      }
     ]
    },
-   "digest": "4c613d158536a18fc2864ac038ebc2dd1577bc270f0d9cb87b2a1c04df90b4e6",
+   "digest": "6fadab530931b80da41fe5da3d8fb1f5da075530e7642243dd346238cb66c6d9",
    "family": "i0003",
    "identifiers": [
     "i0003-01-01"
@@ -430,8 +421,8 @@
      "main": {
       "files": {
        ".ccnavi/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
-       ".ccnavi/config/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n    overlap: [implement]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n    requires: [acceptance]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=8\n"
+       ".ccnavi/config/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=9\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -450,7 +441,7 @@
    "changes": {
     "i0001": [
      {
-      "content": "---\nversion: 1\nticket: i0001\nplan:\n- research\n- design\n- acceptance\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n- match: Write|Edit\n  glob: src/*\n- match: Write|Edit\n  glob: wip/*\n- match: Write|Edit\n  glob: tests/*\nstarted_at: ''\ncompleted_at: ''\nbase_sha: ''\n---\n\n本文\n",
+      "content": "---\nversion: 1\nticket: i0001\nplan:\n- research\n- type: design\n  after:\n  - 1\n- type: acceptance\n  after:\n  - 2\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n- match: Write|Edit\n  glob: src/*\n- match: Write|Edit\n  glob: wip/*\n- match: Write|Edit\n  glob: tests/*\nstarted_at: ''\ncompleted_at: ''\nbase_sha: ''\n---\n\n本文\n",
       "op": "update",
       "path": ".ccnavi/approved/doing/i0001.md"
      },
@@ -460,17 +451,12 @@
       "path": ".ccnavi/approved/events/i0001.ndjson"
      },
      {
-      "content": "order: sequential\nwaits:\n  1: []\n  2:\n  - 1\n  3:\n  - 1\n  - 2\nreview_at: {}\n",
-      "op": "update",
-      "path": ".ccnavi/approved/phases/i0001/workflow.yml"
-     },
-     {
       "op": "delete",
       "path": "wip/proposals/todo/i0001.md"
      }
     ]
    },
-   "digest": "cb99d8c0e5cdac1c8996962afc2ad5e808fb659042736c3813830391cf8bc9d4",
+   "digest": "4195c9b8c244605f1a28b48aeeb02d94870d7f1959b41aca4412cd499adc51de",
    "family": "i0001",
    "identifiers": [
     "i0001"
@@ -484,7 +470,7 @@
    "rejected": [],
    "schema": 1,
    "stopped": null,
-   "text": "チケットの承認リクエスト: 1 件\n\n== i0001: 親  親の改版\n■ 全体計画の変更\n    いま:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー要: マージリクエスト\n    改版:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー要: マージリクエスト\n        3. 受入テスト作成 / acceptance  レビュー要: マージリクエスト\n■ 待ち方の変更\n    いま:\n        一直線（前の番号を全部待つ）\n    改版:\n        一直線（前の番号を全部待つ）\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md"
+   "text": "チケットの承認リクエスト: 1 件\n\n== i0001: 親  親の改版\n■ 全体計画の変更\n    いま:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー要: マージリクエスト\n    改版:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー要: マージリクエスト\n        3. 受入テスト作成 / acceptance  レビュー要: マージリクエスト\n■ 待ち方の変更\n    いま:\n        1: research — 何も待たない\n        2: design — 待つ: 1\n    改版:\n        1: research — 何も待たない\n        2: design — 待つ: 1\n        3: acceptance — 待つ: 1, 2\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md"
   },
   "request": {
    "family": "i0001",
@@ -497,7 +483,6 @@
       "files": {
        ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - research\n  - {type: design, after: [1]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
        ".ccnavi/approved/events/i0001.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n",
-       ".ccnavi/approved/phases/i0001/workflow.yml": "order: sequential\nwaits:\n  1: []\n  2:\n  - 1\nreview_at: {}\n",
        "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - research\n  - {type: design, after: [1]}\n  - {type: acceptance, after: [2]}\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n"
       },
       "head": "0000000000000000000000000000000000000000"
@@ -505,8 +490,8 @@
      "main": {
       "files": {
        ".ccnavi/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
-       ".ccnavi/config/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n    overlap: [implement]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n    requires: [acceptance]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=8\n"
+       ".ccnavi/config/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=9\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }
@@ -532,10 +517,6 @@
       "content": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"withdrawn\", \"from\": \"doing\", \"to\": \"todo\", \"via\": \"chrome\", \"reason\": \"押し間違い\"}\n",
       "op": "update",
       "path": ".ccnavi/approved/events/i0001.ndjson"
-     },
-     {
-      "op": "delete",
-      "path": ".ccnavi/approved/phases/i0001/workflow.yml"
      },
      {
       "content": "---\nversion: 1\nticket: i0001\nplan:\n  - research\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
@@ -569,16 +550,15 @@
      "i0001": {
       "files": {
        ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nplan:\n  - research\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n",
-       ".ccnavi/approved/events/i0001.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n",
-       ".ccnavi/approved/phases/i0001/workflow.yml": "order: sequential\nwaits:\n  1: []\nreview_at: {}\n"
+       ".ccnavi/approved/events/i0001.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n"
       },
       "head": "0000000000000000000000000000000000000000"
      },
      "main": {
       "files": {
        ".ccnavi/common/rules.yml": "{\"version\": 1, \"deny\": [{\"id\": \"guard-approved\", \"match\": \"Write|Edit|NotebookEdit\", \"glob\": \"*/.ccnavi/*\", \"message\": \"\\u30ac\\u30fc\\u30c9\\u306e\\u8a2d\\u5b9a\\u3068\\u627f\\u8a8d\\u6e08\\u307f\\u30c1\\u30b1\\u30c3\\u30c8\\u3067\\u3059\\u3002\\u30e6\\u30fc\\u30b6\\u306b\\u4f9d\\u983c\\u3057\\u3066\\u304f\\u3060\\u3055\\u3044\\u3002\"}]}",
-       ".ccnavi/config/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n    overlap: [implement]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n    requires: [acceptance]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
-       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=8\n"
+       ".ccnavi/config/phases.yml": "\nversion: 1\nphases:\n  research:\n    kind: work\n    title: 調査\n    review: none\n    scope: [\"wip/research/*\"]\n    deliverables: [\"wip/research/summary.md\"]\n    agent: explorer\n    when: 既存の振る舞いが分からないとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: [\"wip/design/*\"]\n  acceptance:\n    kind: work\n    title: 受入テスト作成\n    review: mr\n    scope: [\"tests/*\"]\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: mr\n    scope: [\"src/*\", \"tests/*\"]\n  implement-feedback:\n    kind: feedback\n    title: 実装フィードバック対応\n    review: mr\n    scope: inherit\n  chores:\n    kind: work\n    title: 片付け\n    review: chat\n    scope: [\"src/*\"]\n  chores-feedback:\n    kind: feedback\n    title: 片付けフィードバック対応\n    review: chat\n    scope: inherit\n",
+       ".ccnavi/scripts/ccnavi-common.sh": "#!/bin/sh\nCCNAVI_COMPAT=9\n"
       },
       "head": "0000000000000000000000000000000000000000"
      }

@@ -297,14 +297,17 @@ class WithdrawableTest(ChromeWriteHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        # 承認の記録を持つ古い形には、前の条件（欄を読む）を当てる。
-        to_old_form(self.approved, "i0001")
-        self.commit_parent("old form")
         board = self.answer(self.chrome_request("board", "i0001"))
         self.assertEqual(
             board["withdrawable"],
             [{"ticket": "i0001", "title": board["withdrawable"][0]["title"], "problems": []}],
         )
+        # 承認の記録を持つ古い形の親は、改版されたかを見分けられないので一律に止める。
+        to_old_form(self.approved, "i0001")
+        self.commit_parent("old form")
+        board = self.answer(self.chrome_request("board", "i0001"))
+        problems = board["withdrawable"][0]["problems"]
+        self.assertTrue(any("前の版の形" in p for p in problems), problems)
         self.start_parent()
         self.commit_parent("started")
         board = self.answer(self.chrome_request("board", "i0001"))

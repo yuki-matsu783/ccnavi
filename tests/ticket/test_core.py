@@ -43,7 +43,7 @@ from ccnavi.infra import tree as tree_mod
 from ccnavi.tickets import approval, approval_ops, history, ticket_model
 from tests import config_path, requires_symlink
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
-from tests.ticket.test_phases_dag import DAG, PLAN, SEQUENTIAL
+from tests.ticket.test_phases_dag import DEFS, PLAN
 from tests.ticket.test_ticket import ROOT, git, read_json, to_old_form, with_old_record, write
 
 CHROME = os.path.join(ROOT, "extensions", "chrome", "ccnavi-approval")
@@ -481,8 +481,7 @@ class PlanWriterTest(CoreHarness):
                 ("create", ".ccnavi/approved/doing/i0001.md"),
                 ("create", ".ccnavi/approved/events/i0001-01-01.ndjson"),
                 ("create", ".ccnavi/approved/events/i0001.ndjson"),
-                # 待ち方は承認済みチケットに書き足さず、マーカーの置き場に固定する
-                ("create", ".ccnavi/approved/phases/i0001/workflow.yml"),
+                # 待ち方は書かない（承認済みチケットの計画から都度計算する）
                 ("delete", "wip/proposals/todo/i0001-01-01.md"),
                 ("delete", "wip/proposals/todo/i0001.md"),
             ],
@@ -492,10 +491,6 @@ class PlanWriterTest(CoreHarness):
         self.assertEqual(event["tree"], "i0001")
         # 承認済みチケットは提案のバイト列のまま（承認の記録を書き足さない）
         self.assertEqual(rows[1]["content"], parent_text("i0001", ["research", "design"]).encode())
-        self.assertEqual(
-            rows[4]["content"],
-            approval.workflow_bytes(approval.read_workflow(self.approved, "i0001")[0]),
-        )
 
     def test_revision_and_feedback_plan(self):
         self.family(plan=["design"])
@@ -596,7 +591,7 @@ class DurableWiringTest(CoreHarness):
         with history.session(history.VIA_CHROME, None):
             return core.plan(snapshot, core.judge_approval(snapshot))
 
-    def test_approval_writes_the_ticket_and_the_workflow_durably(self):
+    def test_approval_writes_the_ticket_durably_and_no_workflow(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         changes = self.planned()
@@ -604,7 +599,9 @@ class DurableWiringTest(CoreHarness):
             applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 0, out + err)
         self.assertIn(_norm(os.path.join(self.approved, "doing", "i0001.md")), seen)
-        self.assertIn(_norm(os.path.join(self.approved, "phases", "i0001", "workflow.yml")), seen)
+        held = os.path.join(self.approved, "phases", "i0001", "workflow.yml")
+        self.assertNotIn(_norm(held), seen)
+        self.assertFalse(os.path.exists(held))
 
     def test_a_carried_flow_is_written_durably(self):
         self.family(plan=["design"])
@@ -708,8 +705,8 @@ class WriterFailureTest(CoreHarness):
     def held(self):
         return os.path.join(self.approved, "phases", "i0001", "workflow.yml")
 
-    def test_a_failed_move_does_not_leave_the_workflow_alone(self):
-        """待ち方は提案を動かす前に書く。動かす段で落ちたら待ち方も戻す。"""
+    def test_a_failed_move_leaves_no_copy_and_no_workflow_file(self):
+        """承認は待ち方を書かない。動かす段で落ちても、承認済みチケットも待ち方のファイルも残らない。"""
         doing = os.path.join("doing", "i0001.md")
         todo = os.path.join("todo", "i0001.md")
         for name, when in (
@@ -726,10 +723,11 @@ class WriterFailureTest(CoreHarness):
                 self.assertFalse(os.path.exists(os.path.join(self.approved, doing)))
                 self.assertFalse(os.path.exists(self.held()), err)
 
-    def test_a_failed_revision_puts_the_workflow_back(self):
-        """改版でチケットを書く段で落ちたら、先に書いた待ち方を前の中身へ戻す。"""
+    def test_a_failed_revision_leaves_the_copy_as_it_was(self):
+        """改版でチケットを書く段で落ちたら、承認済みチケットは前のまま。待ち方のファイルは書かない。"""
         self.family(plan=["research", "design"])
-        with open(self.held(), "rb") as f:
+        copy = os.path.join(self.approved, "doing", "i0001.md")
+        with open(copy, "rb") as f:
             before = f.read()
         self.propose("i0001", parent_text("i0001", ["research", "design", "acceptance"]))
         self.commit_parent()
@@ -738,8 +736,9 @@ class WriterFailureTest(CoreHarness):
         with self.failing("write_text_durable", lambda path, *rest: path.endswith(doing)):
             applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 1, out + err)
-        with open(self.held(), "rb") as f:
+        with open(copy, "rb") as f:
             self.assertEqual(f.read(), before)
+        self.assertFalse(os.path.exists(self.held()))
 
     def test_a_revised_proposal_that_cannot_be_removed_is_said_and_goes_on(self):
         self.family(plan=["research", "design"])
@@ -1102,10 +1101,10 @@ class CoreChromeTest(CoreHarness):
         self.propose("i0001", text)
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        # 承認は中身を変えないので、承認済みチケットは提案とバイト単位で同じ。待ち方のファイルも
-        # 一緒に消す。
+        # 承認は中身を変えないので、承認済みチケットは提案とバイト単位で同じ。待ち方のファイルは
+        # 無い（承認済みチケットの計画から都度計算する）。
         held = os.path.join(self.approved, "phases", "i0001", "workflow.yml")
-        self.assertTrue(os.path.exists(held))
+        self.assertFalse(os.path.exists(held))
         request = self.chrome_request(
             "withdraw", "i0001", ids=["i0001"], prior={"i0001": text}, reason="押し間違い"
         )
@@ -1395,9 +1394,9 @@ class WithdrawTest(CoreHarness):
     """取り下げの条件。どれか 1 つでも当たれば何も並べない。
 
     承認は提案を中身を変えずに動かすので、新しい形は「`doing/` の中身が承認コミットの親の提案と
-    バイト単位で同じ」「待ち方のファイルが、その提案と今の phases.yml から計算したものと同じ」で
-    決める。承認の記録（`ccnavi_approved`）を持つ古い形には、前の条件（欄を読む）を当てる
-    （`approved_parent`。`to_old_form` で古い形にする）。
+    バイト単位で同じ」だけで決める。待ち方は `doing/` の計画から決まるので、バイト列が同じなら
+    待ち方も同じ（別に比べる段も、一緒に消すファイルも無い）。承認の記録（`ccnavi_approved`）を
+    持つ古い形の親は一律に止める（`approved_parent`。`to_old_form` で古い形にする）。
     """
 
     def approved_parent(self):
@@ -1419,9 +1418,9 @@ class WithdrawTest(CoreHarness):
     def held(self):
         return os.path.join(self.approved, "phases", "i0001", "workflow.yml")
 
-    def test_a_new_form_parent_is_withdrawn_with_its_workflow(self):
+    def test_a_new_form_parent_is_withdrawn(self):
         text = self.new_parent()
-        self.assertTrue(os.path.exists(self.held()))
+        self.assertFalse(os.path.exists(self.held()))
         listed = core.withdrawable(self.snapshot(), "i0001")
         self.assertEqual([(i, p) for i, _, p in listed], [("i0001", [])])
         checked = core.withdraw(self.snapshot(), ["i0001"], {"i0001": text.encode()})
@@ -1429,7 +1428,6 @@ class WithdrawTest(CoreHarness):
         applied, out, err = self.write_changes(checked.changes)
         self.assertEqual(applied.code, 0, out + err)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
-        self.assertFalse(os.path.exists(self.held()))
         with open(
             os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md"), "rb"
         ) as f:
@@ -1476,47 +1474,51 @@ class WithdrawTest(CoreHarness):
         problems = self.problems({"i0001": folded})
         self.assertTrue(any("中身が変わった" in p for p in problems), problems)
 
-    def test_a_changed_workflow_is_not_withdrawn(self):
+    def test_a_leftover_workflow_file_is_counted_as_a_marker(self):
+        """前の版の待ち方のファイルは読まないので、残っていれば置き場のほかのファイルと同じに止める。"""
         text = self.new_parent()
-        with open(self.held(), encoding="utf-8") as f:
-            held = f.read()
-        write(self.held(), held + "# 手で足した行\n")
+        write(self.held(), "order: dag\nwaits: {1: []}\n")
         problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("待ち方が変わった" in p for p in problems), problems)
+        self.assertTrue(any("マーカー" in p for p in problems), problems)
 
-    def test_a_planned_parent_without_workflow_is_withdrawn(self):
-        """手で動かした計画を持つ親は待ち方のファイルを持たない。改版は必ずファイルを書くので、
-        無いのは待ち方の改版が起きていない形として取り下げられる（中身の一致は今どおり見る）。"""
-        text = self.new_parent()
-        os.remove(self.held())
+    def test_a_planned_parent_is_withdrawn_by_its_bytes_alone(self):
+        """計画を持つ親も、バイト列が同じなら取り下げられる。待ち方は計画から決まる。"""
+        self.use(DEFS)
+        text = self.new_parent(plan=PLAN)
         self.assertEqual(self.problems({"i0001": text.encode()}), [])
         write(os.path.join(self.approved, "doing", "i0001.md"), text + "x")
         problems = self.problems({"i0001": text.encode()})
         self.assertTrue(any("中身が変わった" in p for p in problems), problems)
 
-    def test_phases_yml_changed_after_the_approval_is_not_withdrawn(self):
-        self.use(SEQUENTIAL)
+    def test_phases_yml_changed_after_the_approval_does_not_matter(self):
+        """待ち方は phases.yml を読まないので、承認のあとに直しても取り下げの答えは変わらない。"""
+        self.use(DEFS)
         text = self.new_parent(plan=PLAN)
+        self.use(DEFS.replace("phases:", "order: sequential\nphases:"))
         self.assertEqual(self.problems({"i0001": text.encode()}), [])
-        self.use(DAG)
-        problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("待ち方が変わった" in p for p in problems), problems)
 
-    def test_a_revision_of_the_waits_only_is_not_withdrawn(self):
-        """同じ計画で phases.yml だけを変えた改版。
-
-        承認済みチケットの中身か待ち方が、承認のときと違う。
-        """
-        self.use(SEQUENTIAL)
+    def test_a_revised_plan_is_not_withdrawn(self):
+        """改版は承認済みチケットの計画を書き換えるので、承認コミットの親の提案と同じでない。"""
+        self.use(DEFS)
         text = self.new_parent(plan=PLAN)
-        self.use(DAG)
-        self.propose("i0001", text)
+        revised = list(PLAN[:3]) + [
+            {"type": "extra", "after": [1]},
+            {"type": "docs", "after": [2, 3, 4]},
+        ]
+        self.propose("i0001", parent_text("i0001", revised))
         self.commit_parent("revise")
-        revised = self.approve()
-        self.assertEqual(revised.returncode, 0, revised.stdout + revised.stderr)
-        self.assertIn("待ち方の変更", revised.stdout)
-        self.use(SEQUENTIAL)
-        self.assertTrue(self.problems({"i0001": text.encode()}))
+        done = self.approve()
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        problems = self.problems({"i0001": text.encode()})
+        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
+
+    def test_an_old_form_parent_is_always_refused(self):
+        """古い形の親は、改版されたかを見分ける印が無いので一律に止める。"""
+        text = self.approved_parent()
+        problems = self.problems({"i0001": text.encode()})
+        self.assertTrue(any("前の版の形" in p for p in problems), problems)
+        listed = dict((i, p) for i, _, p in core.withdrawable(self.snapshot(), "i0001"))
+        self.assertTrue(any("前の版の形" in p for p in listed["i0001"]), listed)
 
     def test_a_followup_child_is_named(self):
         self.new_parent()
@@ -1562,10 +1564,10 @@ class WithdrawTest(CoreHarness):
         self.assertTrue(any("戻す先" in p for p in self.problems({"i0001": text.encode()})))
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.assertEqual(self.approve().returncode, 0)
-        # 改版は時刻をチケットに書かなくなった。古い形には無い待ち方のファイルが置かれるので、
-        # 改版したものとして止まる。
+        # 改版は時刻をチケットに書かず、記録の欄も残したまま計画を書き換える。古い形の親は
+        # 改版されたかを見分けられないので、一律に止まる。
         problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("改版した承認" in p for p in problems), problems)
+        self.assertTrue(any("前の版の形" in p for p in problems), problems)
 
     def test_copies_left_in_a_worktree_do_not_change_the_answer(self):
         """承認の前に切ったワークツリーに `todo/` の提案が残っていても、答えは前と同じ。"""
@@ -1574,7 +1576,6 @@ class WithdrawTest(CoreHarness):
         self.commit_parent()
         other = self.worktree("i0001-01-05", "i0001")  # todo/i0001 を持ったまま切る
         self.assertEqual(self.approve().returncode, 0)
-        to_old_form(self.approved, "i0001")
         self.assertEqual(self.problems({"i0001": text.encode()}), [])
         listed = core.withdrawable(self.snapshot(), "i0001")
         self.assertEqual([(i, p) for i, _, p in listed], [("i0001", [])])
@@ -1590,9 +1591,9 @@ class WithdrawTest(CoreHarness):
 
     def test_a_leftover_temporary_file_is_not_a_marker(self):
         """書きかけで落ちて残った一時ファイルだけなら、マーカーとは数えず取り下げられる。"""
-        text = self.approved_parent()
+        text = self.new_parent()
         marks = os.path.join(self.approved, "phases", "i0001")
-        # 実際に残りうる名前。待ち方（write_bytes_atomic）と、受け入れた指摘の記録
+        # 実際に残りうる名前。前の版の待ち方（write_bytes_atomic）と、受け入れた指摘の記録
         # （write_json_atomic）の書きかけ。マーカーは一時ファイルを作らずに書く。
         write(os.path.join(marks, ".workflow.yml.abc12345.part"), "half")
         write(os.path.join(marks, ".accepted.abc12345.part.json"), "half")

@@ -252,7 +252,7 @@ class BoardTest(PhaseHarness):
         self.assertEqual([p["ticket"] for p in board["parents"]], ["i0001"])
         parent = board["parents"][0]
         self.assertFalse(parent["closed"])
-        self.assertEqual(parent["plan"], ["research", "design"])
+        self.assertEqual(parent["plan"], ["research", {"type": "design", "after": [1]}])
         self.assertIn("作業中", parent["stage"])
         phases = {p["number"]: p for p in parent["phases"]}
         self.assertEqual(sorted(phases), [1, 2])

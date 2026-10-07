@@ -91,10 +91,19 @@ class TicketStatusTest(PhaseHarness):
         self.assertNotIn("start へ進んでよい", mine)
         self.assertNotIn("ccnavi-ticket.sh start", mine)
 
-    def test_a_planned_parent_without_a_fixed_workflow_is_read_straight(self):
+    def test_a_hand_moved_planned_parent_is_read_by_its_after(self):
+        """手で動かした計画付きの親も計画の `after` で読む。一直線と読み替える注意は出さない。"""
         self.by_hand(text=parent_text("i0001", ["research", "design"]))
         mine = self.block(self.said(), "i0001")
-        self.assertIn("一直線", mine)
+        self.assertNotIn("一直線", mine)
+        self.assertNotIn("止まっている理由", mine)
+
+    def test_a_hand_moved_parent_with_a_broken_plan_says_why_it_stops(self):
+        """手で動かした親の計画が壊れていれば（終端が 1 つでない）、status が止める理由を言う。"""
+        self.by_hand(text=parent_text("i0001", ["research", {"type": "design", "after": []}]))
+        mine = self.block(self.said(), "i0001")
+        self.assertIn("止まっている理由", mine)
+        self.assertIn("待たない", mine)
 
     def test_fields_written_by_start_are_not_an_approval_to_carry(self):
         self.family(plan=["research"])

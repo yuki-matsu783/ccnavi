@@ -4,7 +4,7 @@
 
 1. フェーズ定義の検証（識別子と表示名の一意、フィードバック対応は mr 固定、参照先の有無）
 2. 全体計画の承認と、計画に合わない子の拒否（kind、無い番号）。範囲の上限の超過は拒まず見せる
-3. 順序は承認で止まる（前が閉じてレビューが済むまで次の番号は承認されない、overlap は例外）
+3. 順序は承認で止まる（待つ番号が閉じてレビューが済むまで承認しない。待たない番号は並行）
 4. 成果物が無ければフェーズの最後の子を閉じられない
 5. 延期したフェーズではレビューで止まらず、次の依頼に含まれる
 6. フィードバック計画は最後のレビューの後に 1 回だけ、空でも証跡になる
@@ -49,13 +49,11 @@ phases:
     title: 受入テスト作成
     review: mr
     scope: ["tests/*"]
-    overlap: [implement]
   implement:
     kind: work
     title: 実装とテスト
     review: mr
     scope: ["src/*", "tests/*"]
-    requires: [acceptance]
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
@@ -401,10 +399,13 @@ class PhaseTest(PhaseHarness):
         )
         self.assertEqual(problems, [])
         self.assertEqual(types["fb"].review, phasetypes.REVIEW_CHAT)
-        _, problems = phasetypes.parse(
+        # 順序の欄（overlap など）は読まずに warn で言う。指す先が無くても error にしない。
+        types, problems = phasetypes.parse(
             "version: 1\nphases:\n  a: {title: A, kind: work, overlap: [nope]}\n"
         )
-        self.assertTrue(any("nope" in p.detail for p in problems), problems)
+        self.assertIsNotNone(types, problems)
+        self.assertEqual([p.severity for p in problems], ["warn"])
+        self.assertIn("読まない", problems[0].detail)
         types, problems = phasetypes.parse(PHASES)
         self.assertEqual(problems, [])
         self.assertEqual(
@@ -419,8 +420,6 @@ class PhaseTest(PhaseHarness):
                 "chores-feedback",
             },
         )
-        self.assertTrue(types["acceptance"].overlaps(types["implement"]))
-        self.assertTrue(types["implement"].overlaps(types["acceptance"]))
 
     def test_lint_reports_a_broken_phases_file(self):
         write(
@@ -449,7 +448,6 @@ class PhaseTest(PhaseHarness):
     def test_plan_that_breaks_the_rules_is_refused(self):
         cases = {
             "kind": ["implement-feedback"],
-            "requires": ["implement"],
             "defer-none": [("research", "defer"), "design"],
             "defer-last": ["design", ("implement", "defer")],
             "unknown": ["nope"],
@@ -527,14 +525,33 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
 
-    def test_overlapping_types_can_be_planned_together(self):
-        self.family(plan=["acceptance", "implement"])
+    def test_items_that_do_not_wait_on_each_other_are_planned_together(self):
+        """`after` で待たない項は並行する（前の版の `overlap` の代わり）。"""
+        plan = [
+            "acceptance",
+            {"type": "implement", "after": []},
+            {"type": "design", "after": [1, 2]},
+        ]
+        self.family(plan=plan)
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["tests/a/*"]))
         self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["src/a/*"]))
         self.commit_parent()
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
+
+    def test_requires_is_no_longer_checked(self):
+        """定義の `requires` は読まない。一緒に置く定義の組は `when` の案内と承認画面で見る。"""
+        write(
+            self.phases,
+            PHASES.replace(
+                "    title: 実装とテスト\n", "    title: 実装とテスト\n    requires: [acceptance]\n"
+            ),
+        )
+        self.propose("i0001", parent_text("i0001", ["implement"]))
+        self.commit_parent()
+        result = self.approve()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_a_batch_does_not_pass_a_later_child_over_one_that_reopens_an_earlier_phase(self):
         """前のフェーズに足す子と次のフェーズの子を一緒に承認しても、次の子は通さない（issue #31）。

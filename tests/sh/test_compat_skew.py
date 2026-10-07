@@ -201,6 +201,17 @@ class CompatAgreesTest(unittest.TestCase):
         """
         self.assertGreaterEqual(version.COMPAT, 8)
 
+    def test_v12_dropping_the_workflow_file_raised_the_compat_to_9(self):
+        """V12 待ち方のファイル（`phases/<親>/workflow.yml`）を無くし、待ち方を承認済みチケットの
+        計画の項の `after` から都度計算するようになった。承認はファイルを書かず、取り下げは
+        チケットのバイト一致だけで決め、ファイルを消さない。なので 9 以上。
+
+        古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）は `after` を知らずに計画を一直線と
+        読み、取り下げでファイルを探すので、食い違いとして知らせる。待ち方の決まりそのものの
+        見張りは、計画と待ち方の見本の表（tests/fixtures/plan-waits.json）のテストが持つ。
+        """
+        self.assertGreaterEqual(version.COMPAT, 9)
+
 
 @unittest.skipIf(not SHELL, "sh も bash も見つからない")
 class TicketStatusPassTest(unittest.TestCase):

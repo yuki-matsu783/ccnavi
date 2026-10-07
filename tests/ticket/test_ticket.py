@@ -96,21 +96,12 @@ def with_old_record(text: str, source_path: str, source_tree: str = "i0001") -> 
 def to_old_form(approved_dir: str, ident: str) -> None:
     """承認済みチケットを、前の版の承認が書いた形に書き換える。
 
-    前の版は承認の記録（`ccnavi_approved`）と待ち方（`workflow:`）をチケットに書き足し、
-    待ち方のファイルは無かった。取り下げは、記録を持つ古い形には前の条件（欄を読む）を当てる。
+    前の版は承認の記録（`ccnavi_approved`）をチケットに書き足していた。取り下げは、記録を持つ
+    古い形の子には前の条件（欄を読む）を当て、古い形の親は一律に止める。
     """
     path = os.path.join(approved_dir, "doing", ident + ".md")
     with open(path, encoding="utf-8") as f:
         text = f.read()
-    held = approval.workflow_path(approved_dir, ident)
-    wf, _ = approval.read_workflow(approved_dir, ident)
-    if wf is not None:
-        os.remove(held)
-        if not os.listdir(os.path.dirname(held)):
-            os.rmdir(os.path.dirname(held))
-        flow = json.dumps(wf.as_raw())
-        head, sep, rest = text.partition("\n---\n")
-        text = head + f"\nworkflow: {flow}" + sep + rest
     write(path, with_old_record(text, f"wip/proposals/todo/{ident}.md"))
 
 

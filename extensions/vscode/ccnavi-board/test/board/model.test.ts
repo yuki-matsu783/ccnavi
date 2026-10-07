@@ -80,7 +80,8 @@ test("CB-T318 sums[] を読む。ワークスペースの足し算（共通 + �
   assert.deepEqual(self.risk.levels, { medium: 20, high: 40, critical: 70 });
   assert.equal(self.risk.fallback, "");
   // フェーズ定義は足し算をしない。使う 1 本（自身の設定）だけが載る
-  assert.equal(self.phases.order, "sequential");
+  // 定義は順序を持たない（順序は親の計画の項の after）。実行ファイルはいつも dag を渡す
+  assert.equal(self.phases.order, "dag");
   assert.deepEqual(self.phases.types.map((t) => t.id).slice(0, 2), ["research", "design"]);
   assert.ok(self.phases.types.every((t) => t.source === "self"));
   const old = parseBoardJson(JSON.stringify({ version: BOARD_VERSION }));

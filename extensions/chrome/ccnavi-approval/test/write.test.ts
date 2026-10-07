@@ -82,13 +82,14 @@ test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足
   assert.equal(call.expected, before);
   assert.equal(call.headline, `ccnavi: i0001 を承認（Chrome 拡張 ${VERSION}）`);
   assert.deepEqual(call.deletions, [{ path: TODO }]);
-  assert.deepEqual(call.additions.map((a) => a.path).sort(), [DOING, EVENTS, WORKFLOW].sort());
-  // 書いた中身: 提案のままの承認済みチケット（欄を書き足さない）、待ち方、状態の履歴（経路・アカウント・拡張の版）
+  // 待ち方のファイルは書かない（承認済みチケットの計画の項の after から都度計算する）
+  assert.deepEqual(call.additions.map((a) => a.path).sort(), [DOING, EVENTS].sort());
+  // 書いた中身: 提案のままの承認済みチケット（欄を書き足さない）、状態の履歴（経路・アカウント・拡張の版）
   const files = mock.files("i0001");
   assert.ok(!(TODO in files));
   assert.equal(files[DOING], proposal);
   assert.doesNotMatch(files[DOING], /^ccnavi_approved:/m);
-  assert.match(files[WORKFLOW], /^order: /m);
+  assert.ok(!(WORKFLOW in files));
   const event = JSON.parse(files[EVENTS].trim().split("\n").pop() as string);
   assert.deepEqual({ kind: event.kind, via: event.via, actor: event.actor, version: event.version }, { kind: "approved", via: "chrome", actor: LOGIN, version: VERSION });
   // 統合先・ほかのブランチには書かない
@@ -177,7 +178,7 @@ test("CX-T105 互換の版が違えば承認も取り下げも書かない（7.3
   assert.equal(dom.window.document.querySelectorAll("button").length, 0);
 });
 
-test("CX-T106 取り下げ: 承認コミットの親の提案をバイト列のまま todo/ に戻し、doing/ と固定した待ち方を消す 1 コミット", async () => {
+test("CX-T106 取り下げ: 承認コミットの親の提案をバイト列のまま todo/ に戻し、doing/ を消す 1 コミット（待ち方のファイルは無い）", async () => {
   const { mock, d } = world(parentOnly());
   const original = mock.files("i0001")[TODO];
   assert.equal((await approveFamily(REPO, "i0001", shownOf(await board(d), "i0001"), d)).kind, "written");
@@ -187,7 +188,7 @@ test("CX-T106 取り下げ: 承認コミットの親の提案をバイト列の�
   assert.equal(out.kind, "written", JSON.stringify(out));
   const call = mock.commitCalls[mock.commitCalls.length - 1];
   assert.equal(call.headline, `ccnavi: i0001 の承認を取り下げ（Chrome 拡張 ${VERSION}）`);
-  assert.deepEqual(call.deletions, [{ path: DOING }, { path: WORKFLOW }]);
+  assert.deepEqual(call.deletions, [{ path: DOING }]);
   const files = mock.files("i0001");
   assert.equal(files[TODO], original);
   assert.ok(!(DOING in files));

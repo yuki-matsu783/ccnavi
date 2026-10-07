@@ -4,11 +4,5 @@
     "isBinary": false,
     "isTruncated": false,
     "byteSize": 301
-  },
-  "8b19652fb1c157b748855028d4d81dd2ddab2000": {
-    "text": "order: sequential\nwaits:\n  1: []\nreview_at: {}\n",
-    "isBinary": false,
-    "isTruncated": false,
-    "byteSize": 47
   }
 }

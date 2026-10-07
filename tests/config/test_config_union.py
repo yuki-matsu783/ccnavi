@@ -141,7 +141,6 @@ phases:
     title: リリース
     review: mr
     scope: ["src/*"]
-    requires: [design]
 """
 
 COMMON_RISK = """\

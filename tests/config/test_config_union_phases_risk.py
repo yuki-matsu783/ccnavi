@@ -72,7 +72,7 @@ phases:
     scope: ["wip/*"]
 """
 
-# order: dag を書いた lib の定義。
+# 前の版の `order: dag` と定義の `after` を書いた lib の定義（どちらも読まない）。
 LIB_PHASES_DAG = """\
 version: 1
 order: dag
@@ -114,8 +114,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         return [p for p in self.problems(severity, where=where) if "phases" in p["where"]]
 
     def test_plan_can_name_a_type_from_the_project_layer(self):
-        """11.4.1: `plan:` がプロジェクトのレイヤーの定義を指せる。
-        同じファイルの中の `requires` も通る。"""
+        """11.4.1: `plan:` がプロジェクトのレイヤーの定義を指せる。"""
         self.propose(
             "i0001",
             ticket_text("i0001", project="lib", plan=["design", "release"], allow=("src/*",)),
@@ -194,16 +193,22 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertEqual(self.phase_problems("error"), [])
         self.assertEqual(self.phase_problems("info"), [])
 
-    def test_requires_must_resolve_inside_the_one_file(self):
-        """11.4.1: 他のレイヤーの定義を指す `requires` の特例は無い。1 本の中に無ければ error。"""
+    def test_old_relation_fields_are_warned_and_not_read(self):
+        """9.7: 定義は順序を持たない。残った `requires` は指す先が無くても error にせず、
+        読まない欄として warn で言う（順序は親の計画の項の `after`）。"""
         write_layer(self.ws, phases=OWN_PHASES_DESIGN)
         write_layer(
             self.lib,
-            phases=LIB_PHASES.replace("design:", "planning:"),
+            phases=LIB_PHASES.replace("design:", "planning:").replace(
+                "    title: リリース\n", "    title: リリース\n    requires: [design]\n"
+            ),
         )
 
-        errors = self.phase_problems("error", "lib")
-        self.assertTrue(any("design" in p["detail"] for p in errors), errors)
+        self.assertEqual(self.phase_problems("error", "lib"), [])
+        warned = self.phase_problems("warn", "lib")
+        self.assertTrue(
+            any("`requires`" in p["detail"] and "読まない" in p["detail"] for p in warned), warned
+        )
 
     def test_a_common_phases_file_is_an_error_and_is_not_used(self):
         """11.4.1: 共通レイヤーの phases.yml は --lint が error で名指しし、判定では空として扱う。
@@ -234,10 +239,15 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.propose("i0001", ticket_text("i0001", plan=["docs"], allow=("docs/*",)))
         self.assertNotEqual(self.approve().returncode, 0)
 
-    def test_the_order_is_the_one_files_own(self):
-        """9.7: `order: dag` になるのは、その 1 本が dag と書いたときだけ。"""
-        write_layer(self.ws, phases=OWN_PHASES_DESIGN)  # sequential
+    def test_the_order_comes_from_the_plan_and_not_from_the_file(self):
+        """9.7: ファイルの `order` と定義の `after` は読まない（warn）。待ち方は計画の項の `after`。
+
+        承認は待ち方のファイルを書かない。ボードの `order` はいつも `dag`。"""
+        write_layer(self.ws, phases=OWN_PHASES_DESIGN)
         write_layer(self.lib, phases=LIB_PHASES_DAG)
+        warned = [p["detail"] for p in self.phase_problems("warn", "lib")]
+        self.assertTrue(any("`order`" in d for d in warned), warned)
+        self.assertTrue(any("`after`" in d for d in warned), warned)
         self.propose(
             "i0001",
             ticket_text("i0001", project="lib", plan=["design", "build"], allow=("src/*",)),
@@ -248,9 +258,9 @@ class PhaseUnionTest(ConfigUnionHarness):
         sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
 
         self.assertEqual(sums["lib"]["phases"]["order"], "dag")
-        self.assertEqual(sums["self"]["phases"]["order"], "sequential")
+        self.assertEqual(sums["self"]["phases"]["order"], "dag")
         workflow = self.approved_path("phases", "i0001", "workflow.yml", project="lib")
-        self.assertIn("order: dag", read(workflow))
+        self.assertFalse(os.path.exists(workflow))
 
     def test_scope_stays_relative_to_the_worktree(self):
         """11.4.1: `scope` はワークツリーのルートからの相対のまま。
