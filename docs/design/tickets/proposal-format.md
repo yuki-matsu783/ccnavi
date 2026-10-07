@@ -27,8 +27,10 @@ predecessors: [feature-50-settings-split-01-01] # 子だけ。先に閉じてい
 human_review:
   required: true         # 既定。省くなら理由を書く
   reason: 設定の読み込み経路を変えるため
-plan: [research, implement]      # 親だけ。全体計画（9.7）
-feedback: [implement-feedback]   # 親だけ。フィードバック計画
+plan:                            # 親だけ。全体計画（9.7）
+  - research                     # 1。何も待たない
+  - {type: implement, after: [1]}  # 2。after は先に済んでいるべき項の番号（自分より小さい番号だけ）
+feedback: [implement-feedback]   # 親だけ。フィードバック計画（番号は全体計画の続き）
 title: 設定画面の分割
 rationale: |
   Settings 配下のコンポーネント分割。
@@ -79,6 +81,10 @@ base_sha: ""
   （9.4、9.6）。レビュー待ち（`review/`）・取り消し済み・どこにも無い・複数の場所にある先行と、
   自分自身・自分の親・辿ると自分に戻る先行は満たさない。止めるのは承認と `start` だけで、判定（書き込みの範囲）と
   `finish` と HITL ポイントは見ない。書き込みの範囲は承認済みチケットの置き場が決める
+- 親の `plan` / `feedback` の項は、フェーズ定義の名前だけか `{type, review, after}`。`after` は先に閉じてレビューが済んでいるべき
+  項の番号で、自分より小さい番号だけを指せる（フィードバック計画の項はフィードバック計画の番号だけ）。`after` を書かない項は
+  何も待たない。最後の項がほかの全部を推移的に待つように書く（終端は 1 つ。`after` を書かない 2 項以上の計画は承認で落ちる）。
+  `--explain` の「待つ: …」を写してもよい。子の `predecessors`（子どうしの先行）とは別のもの（9.7）
 - `started_at` `completed_at` `base_sha` `cancelled_at` `cancel_reason` はスクリプトの欄。スクリプトが
   承認済みチケットの行を書き換える（本文とユーザの書いた行は保つ）
 - フロー（次の節）はチケットの欄では指さない。欄 `flow` は廃止。書いてあっても読まない（warn も出さない）
