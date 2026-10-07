@@ -16,7 +16,6 @@
 ## 書式
 
     version: 1
-    order: dag                # sequential（既定）| dag。全体計画の待ち方
     phases:
       research:
         kind: work            # work | feedback
@@ -24,11 +23,15 @@
         review: none          # none | chat | mr
         scope: ["wip/research/*"]   # 子の範囲の上限。inherit なら親の範囲
         deliverables: ["wip/research/summary.md"]
-        overlap: [design]     # 並行してよい定義（対称）
-        requires: [design]    # 計画に置くなら一緒に要る定義
-        after: [design]       # order: dag のとき、先に閉じてレビューが済んでいるべき定義
         agent: explorer       # 案内にだけ使う
         when: 既存の振る舞いが分からないとき   # 案内にだけ使う
+
+## 順序は定義に書かない
+
+どのフェーズがどれを待つかは、親の計画の項の `after` が決める（`workflow`）。前の版の
+`order`（ファイルの頭）・`after`・`overlap`・`requires`（定義の欄）が残っていれば、読まずに通し、
+warn で言う（`OLD_FIELDS`）。error にしないのは、更新した直後に全部の計画の承認と `--lint` が
+止まらないようにするため。
 """
 
 from __future__ import annotations
@@ -71,31 +74,14 @@ def stricter(a: str, b: str) -> str:
     return a if REVIEW_RANK[a] >= REVIEW_RANK[b] else b
 
 
-# 全体計画の待ち方（設計 9.7）。sequential は一直線、dag は定義の `after` を辺にする。
-ORDER_SEQUENTIAL = "sequential"
-ORDER_DAG = "dag"
-ORDERS = (ORDER_SEQUENTIAL, ORDER_DAG)
+# 前の版の順序の欄。読まずに通し、warn で言う。順序は親の計画の項の `after` で決める。
+OLD_FILE_FIELDS = ("order",)
+OLD_FIELDS = ("after", "overlap", "requires")
+OLD_FIELD_NOTE = "は読まない。順序は親の計画の項の `after` で決める"
 
 
 class PhaseTypes(dict):
-    """定義の集合。id → 定義の辞書に、ファイルの頭の `order` を持たせたもの。"""
-
-    def __init__(self, *args, order: str = ORDER_SEQUENTIAL, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.order = order
-
-    def ancestors(self, ident: str) -> set[str]:
-        """`after` を推移的に辿った祖先の id。自分は含めない。循環していても止まる。"""
-        found: set[str] = set()
-        stack = list(self[ident].after) if ident in self else []
-        while stack:
-            name = stack.pop()
-            if name in found or name not in self:
-                continue
-            found.add(name)
-            stack.extend(self[name].after)
-        found.discard(ident)
-        return found
+    """定義の集合。id → 定義の辞書。"""
 
 
 # 定義の範囲が「親の範囲そのまま」であることを言う表記。
@@ -114,9 +100,6 @@ class PhaseType:
     scope: list[ticket_model.Entry] | None = None
     scope_globs: list[str] = field(default_factory=list)
     deliverables: list[str] = field(default_factory=list)
-    overlap: list[str] = field(default_factory=list)
-    requires: list[str] = field(default_factory=list)
-    after: list[str] = field(default_factory=list)
     agent: str = ""
     when: str = ""
     # source はこの定義が書いてあるレイヤーの名前（`common` / `self` / プロジェクト名）。
@@ -140,9 +123,6 @@ class PhaseType:
             self.review,
             None if self.scope is None else tuple(self.scope_globs),
             tuple(self.deliverables),
-            tuple(self.overlap),
-            tuple(self.requires),
-            tuple(self.after),
             self.agent,
             self.when,
         )
@@ -156,19 +136,9 @@ class PhaseType:
                 return rules.ALLOW
         return ticket_model.OUTSIDE
 
-    def overlaps(self, other: PhaseType) -> bool:
-        """並行してよい組か。どちらかが相手を挙げていれば対称に当てはまる。"""
-        return other.id in self.overlap or self.id in other.overlap
 
-
-def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]]:
-    """定義を読む。ファイルが無ければ None（定義を使わない）。壊れていれば None と苦情。
-
-    `refs` を False にすると `overlap` / `requires` / `after` が指す先の確認を飛ばす。レイヤーの
-    ファイルを単独で読むときに使う。レイヤーは共通レイヤーの定義を指してよく（設計 11.4.1）、
-    その相手はファイルの中に無いので、1 本だけで確かめると必ず落ちる。確かめる
-    のは合成したあと（`merge`）。
-    """
+def load(path: str) -> tuple[PhaseTypes | None, list[Problem]]:
+    """定義を読む。ファイルが無ければ None（定義を使わない）。壊れていれば None と苦情。"""
     try:
         with open(path, encoding="utf-8") as f:
             text = f.read()
@@ -183,12 +153,10 @@ def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]
         return None, [Problem(SEVERITY_ERROR, "(phases)", f"{path} を読めない ({exc})")]
     # 承認のダイジェスト（read_set）に入れる。定義は待ち方と止め方を決める判定の入力。
     fsio.note_read(path, text)
-    return parse(text, path, refs)
+    return parse(text, path)
 
 
-def parse(
-    text: str, where: str = "(phases)", refs: bool = True
-) -> tuple[PhaseTypes | None, list[Problem]]:
+def parse(text: str, where: str = "(phases)") -> tuple[PhaseTypes | None, list[Problem]]:
     problems: list[Problem] = []
     try:
         data = yamlread.safe_load(text)
@@ -207,11 +175,11 @@ def parse(
     raw = data.get("phases")
     if not isinstance(raw, dict) or not raw:
         return None, [Problem(SEVERITY_ERROR, where, "`phases` が無いか空か、辞書ではない")]
-    order = str(data.get("order") or ORDER_SEQUENTIAL).strip()
-    if order not in ORDERS:
-        return None, [Problem(SEVERITY_ERROR, where, f"`order` は {' か '.join(ORDERS)}")]
+    for name in OLD_FILE_FIELDS:
+        if name in data:
+            problems.append(Problem(SEVERITY_WARN, where, f"`{name}` {OLD_FIELD_NOTE}"))
 
-    types = PhaseTypes(order=order)
+    types = PhaseTypes()
     titles: dict[str, str] = {}
     for key, body in raw.items():
         ident = str(key).strip()
@@ -249,103 +217,9 @@ def parse(
         titles[pt.title] = ident
         types[ident] = pt
 
-    if refs:
-        problems.extend(reference_problems(types.values(), types))
-        problems.extend(cycle_problems(types))
-        problems.extend(conflict_problems(types))
     if any(p.severity == SEVERITY_ERROR for p in problems):
         return None, problems
     return types, problems
-
-
-def reference_problems(checked, pool: dict[str, PhaseType]) -> list[Problem]:
-    """`overlap` / `requires` / `after` が指す先が、その集合の中にあるか。
-
-    `after` の先は `kind: work` の定義でなければならない。
-
-    見るのは `checked` の側だけで、あってよい先は `pool` 全部。レイヤーの定義が共通レイヤーの
-    定義を指す形（設計 11.4.1）は、合成した集合を `pool` に渡せばそのまま通る。
-    """
-    problems: list[Problem] = []
-    for pt in checked:
-        for name in pt.overlap + pt.requires:
-            if name not in pool:
-                problems.append(
-                    Problem(
-                        SEVERITY_ERROR, pt.id, f"`{name}` という定義は無い（overlap / requires）"
-                    )
-                )
-        for name in pt.after:
-            target = pool.get(name)
-            if target is None:
-                problems.append(
-                    Problem(SEVERITY_ERROR, pt.id, f"`{name}` という定義は無い（after）")
-                )
-            elif target.kind != KIND_WORK:
-                problems.append(
-                    Problem(
-                        SEVERITY_ERROR,
-                        pt.id,
-                        f"`after` の `{name}` は kind `{target.kind}`。"
-                        f"指せるのは `{KIND_WORK}` だけ",
-                    )
-                )
-    return problems
-
-
-def conflict_problems(pool: dict[str, PhaseType]) -> list[Problem]:
-    """同じ組を `after`（待つ）と `overlap`（並行してよい）の両方に挙げていないか。
-
-    両方あると、待ち方の計算は `overlap` を採って待たず、書いた依存が気づかないうちに消える。
-    どちらのつもりかをユーザに決めさせる。
-    """
-    problems: list[Problem] = []
-    for pt in pool.values():
-        for name in pt.after:
-            other = pool.get(name)
-            if other is not None and pt.overlaps(other):
-                problems.append(
-                    Problem(
-                        SEVERITY_ERROR,
-                        pt.id,
-                        f"`{name}` を after と overlap の両方に挙げている。"
-                        "待つか並行かを 1 つにしてください",
-                    )
-                )
-    return problems
-
-
-def cycle_problems(pool: dict[str, PhaseType]) -> list[Problem]:
-    """`after` の循環。循環のある集合は、祖先が決まらないので読まない。"""
-    problems: list[Problem] = []
-    state: dict[str, int] = {}  # 1 = 辿っている途中、2 = 済み
-    for start in sorted(pool):
-        if state.get(start):
-            continue
-        path: list[str] = []
-        stack: list[tuple[str, int]] = [(start, 0)]
-        while stack:
-            ident, i = stack.pop()
-            if i == 0:
-                state[ident] = 1
-                path.append(ident)
-            after = [a for a in pool[ident].after if a in pool]
-            if i < len(after):
-                stack.append((ident, i + 1))
-                nxt = after[i]
-                if state.get(nxt) == 1:
-                    loop = path[path.index(nxt) :] + [nxt]
-                    problems.append(
-                        Problem(
-                            SEVERITY_ERROR, nxt, f"`after` が循環している（{' → '.join(loop)}）"
-                        )
-                    )
-                elif not state.get(nxt):
-                    stack.append((nxt, 0))
-                continue
-            state[ident] = 2
-            path.pop()
-    return problems
 
 
 def mark_source(types: dict[str, PhaseType] | None, layer: str) -> None:
@@ -395,14 +269,15 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         problems.append(Problem(SEVERITY_ERROR, ident, "`scope` は glob のリストか `inherit`"))
         return None, problems
 
-    for key in ("deliverables", "overlap", "requires", "after"):
-        raw = body.get(key)
-        if raw is None:
-            continue
+    for key in OLD_FIELDS:
+        if key in body:
+            problems.append(Problem(SEVERITY_WARN, ident, f"`{key}` {OLD_FIELD_NOTE}"))
+    raw = body.get("deliverables")
+    if raw is not None:
         if not isinstance(raw, list) or not all(isinstance(x, str) for x in raw):
-            problems.append(Problem(SEVERITY_ERROR, ident, f"`{key}` は文字列のリスト"))
+            problems.append(Problem(SEVERITY_ERROR, ident, "`deliverables` は文字列のリスト"))
             return None, problems
-        setattr(pt, key, [x.strip() for x in raw if x.strip()])
+        pt.deliverables = [x.strip() for x in raw if x.strip()]
     for glob in pt.deliverables:
         if ".." in glob or os.path.isabs(glob):
             problems.append(
@@ -413,14 +288,6 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
                 )
             )
             return None, problems
-    if ident in pt.overlap or ident in pt.requires:
-        problems.append(Problem(SEVERITY_WARN, ident, "自分自身を overlap / requires に挙げている"))
-    if pt.after and kind != KIND_WORK:
-        problems.append(
-            Problem(SEVERITY_ERROR, ident, f"`after` を持てるのは kind `{KIND_WORK}` の定義だけ")
-        )
-        return None, problems
-
     pt.agent = str(body.get("agent") or "").strip()
     pt.when = str(body.get("when") or "").strip()
     return pt, problems
@@ -515,8 +382,7 @@ def layer_types(
     共通レイヤーの `phases.yml` は置けないので、あっても読まない（`--lint` が error で言う）。
 
     ファイルが無いのは正常（`None`、苦情なし）。壊れていれば空として扱い（`None`）、苦情を返す。
-    `id` の重複・`overlap` / `requires` / `after` の参照先・`title` の重なり・循環は、その 1 本の
-    読み込みで確かめる。
+    `id` の重複・`title` の重なりは、その 1 本の読み込みで確かめる。
     """
     path = types_path(conf, root, project)
     if not path or not os.path.exists(path):

@@ -27,12 +27,7 @@ from . import (
 from . import ticket as ticket_mod
 
 
-def admit(
-    approved_dir: str,
-    ticket: ticket_model.Ticket,
-    source_tree: str,
-    wf: ticket_model.Workflow | None = None,
-) -> str:
+def admit(approved_dir: str, ticket: ticket_model.Ticket, source_tree: str) -> str:
     """承認した提案を `doing/` へ動かす。動かせなかった理由を返す。動かせたら空文字。
 
     **中身は変えない。** 提案をバイト列のまま読み（`fsio.read_bytes`）、同じバイト列を `doing/` に
@@ -40,40 +35,28 @@ def admit(
     どれで承認しても承認済みチケットが提案とバイト単位で同じになるように。消せなければ書いた側を
     消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で止まる。
 
-    `wf` は計画を持つ親の待ち方。`phases/<親>/workflow.yml` に固定する（チケットには書かない）。
-    待ち方は提案を動かす前に書き、そのあとの段で落ちたら前の中身へ戻す。承認済みチケットだけが
-    置かれて待ち方が無い形は、手で動かした承認と同じに一直線で読まれ、取り下げの検査も通って
-    しまうので、待ち方だけが残る側（承認済みチケットが無いので効かない）に寄せる。
-    `source_tree` は提案が乗っていたブランチの名前で、状態の履歴に残す。
+    計画を持つ親でも、待ち方は書かない。待ち方は承認済みチケットの計画から都度計算する
+    （`approval.load_copy`）。`source_tree` は提案が乗っていたブランチの名前で、状態の履歴に残す。
     """
     target = approval.copy_path(approved_dir, ticket.ticket)
     content = fsio.read_bytes(ticket.path)
     if content is None:
         return f"提案を読めない ({ticket.path})"
-    restore: tuple[tuple[str, bytes | None], ...] = ()
-    if wf is not None:
-        held = approval.workflow_path(approved_dir, ticket.ticket)
-        restore = ((held, fsio.read_bytes(held)),)
-        failed = approval.write_workflow(approved_dir, ticket.ticket, wf)
-        if failed:
-            return failed
-    with fsio.policy(message="書けない ({reason})", restore=restore):
+    with fsio.policy(message="書けない ({reason})", restore=()):
         failed = fsio.write_bytes_atomic(target, content)
     if failed:
-        fsio.put_back(restore)
         return f"書けない ({failed})"
     # 消せなければ書いた側を消して戻す。承認の plan では落ちたときの枝が走らないので、
     # 同じ戻し方を Writer(FS) へ渡す。置けたと数えるのは消せたとき。
     with fsio.policy(
         message="提案を todo/ から動かせない ({reason})",
         undo=(target,),
-        restore=restore,
+        restore=(),
         places=ticket.ticket,
     ):
         failed = fsio.unlink(ticket.path)
     if failed:
         fsio.remove(target)
-        fsio.put_back(restore)
         return f"提案を todo/ から動かせない ({failed})"
     history.note(
         approved_dir,

@@ -12,7 +12,7 @@ from dataclasses import dataclass, replace
 
 from ..infra import settings, tree
 from ..policy import rules
-from . import approval_marks, archive, syncstate, ticket_ids, ticket_model
+from . import archive, syncstate, ticket_ids, ticket_model, workflow
 
 # 前の版の承認が記録（`ccnavi_approved`）に必ず書いていた欄。続きの子も `source_tree` と
 # `source_path` を空で書いていた。
@@ -666,6 +666,10 @@ def child_problems(
     通さない。1 か所に置くのは、置き場を動かして承認する進め方で判定の側の
     検査だけが古くなると、承認を通ったチケットと通らないチケットで答えが分かれるから。
 
+    親の計画が壊れている（`after` の形・終端・最後の項の延期・延期の引き受け手。
+    `workflow.errors`）ときも子を止める。壊れた計画では子の番号が何を待ち、どのレビューに
+    含まれるかが決まらない。ここに置くので、子の `--agree`・着手・書き込みが同じ答えで止まる。
+
     「フェーズ定義が読めない」はここに入れない。壊れているのは設定で、チケットの形は
     正しい。判定は注記を添えて親の範囲で切り詰める（`judge.ticket_verdict`）。
     """
@@ -690,6 +694,16 @@ def child_problems(
                 f"（計画は {len(parent.numbered())} 番目まで）",
             )
         ]
+    broken = workflow.errors(parent)
+    if broken:
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"親 {parent.ticket} の計画が壊れているので、子も止める（{broken[0].detail}）。"
+                "ユーザが親の承認済みチケットの計画を直してください",
+            )
+        ]
     return []
 
 
@@ -703,7 +717,9 @@ def blocking_problems(
     同じ検査を判定の側でも当てる。当たれば範囲は使われず、その場所は止まる。
 
     ここに入れないもの。
-    - 計画の形（`plan_problems`）。範囲に影響しないので `--lint` が言う
+    - 計画とフェーズ定義の突き合わせ（`plan_problems` の定義の有無・`kind`）。定義は
+      `phases.yml` から読むので、判定で見ると承認のあとに定義を直しただけで進行中の親が止まる。
+      `--lint` が言う
     - フェーズの順序（`phase.order_problems`）。順序が狂っていても、その子の範囲を
       どの親で切り詰めるかは決まる。順序で止めるのは `held_phase`（レビュー待ちの間 `Agent` と
       シェルを止める）で、この検査とは別の仕組み。
@@ -716,9 +732,14 @@ def blocking_problems(
     ここに入れる、中身だけで分かる矛盾。
     - `started_at` が無いのに `base_sha` がある。`start` は 2 つを一緒に書くので道具を通らない形で、
       `base_sha` は範囲外の検査とリスクの基準点に使われる
-    - 前の版の承認の記録を持たないのに `workflow:` 欄がある。待ち方は `--agree` が
-      `phases/<親>/workflow.yml` に書くもので、欄を承認済みの待ち方として効かせない
-    - 待ち方のファイルが読めない。一直線と読むと、ユーザが承認した待ち方と違う順で進む
+    - 前の版の承認の記録を持たないのに `workflow:` 欄がある。待ち方は計画の `after` から計算する
+      もので、欄は読まない。書いてあると効くと読み手に思わせる
+    - 計画の誤り（`after` の形・終端・最後の項の延期・延期の引き受け手。`workflow.errors`）。
+      待ち方は計画から決まり、子がどのフェーズを待ち、どのレビューに含まれるかもそこで決まる。
+      手で動かした承認は `--agree` の検査を通らないので、壊れた計画をここで止める。止めるのは
+      承認済みチケットそのものの形の誤りで、承認のあとに外の何か（`phases.yml` など）が動いて
+      起きるものではない（直せるのはユーザが承認済みチケットを直すときだけ）。読むのは承認済み
+      チケットだけで、`phases.yml` は読まない
     - 親のツリーの未着手のチケットが、手元の退避の閉じたチケットと同じ識別子
       （`archive.drop_archived`）。使い直した識別子か、退避と同じものかを見分けられない
     """
@@ -747,14 +768,12 @@ def content_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 t.ticket,
-                f"`{ticket_model.WORKFLOW_KEY}:` の欄がある。待ち方は --agree が "
-                f"{approval_marks.PHASES_DIR}/<親>/{approval_marks.WORKFLOW_FILE} "
-                "に書くもので、チケットには書かない。"
-                "ユーザが欄を消してください",
+                f"`{ticket_model.WORKFLOW_KEY}:` の欄がある。欄は読まない（待ち方は計画の項の "
+                "`after` から決まる）。ユーザが欄を消してください",
             )
         )
-    if t.workflow_unreadable:
-        problems.append(rules.Problem(rules.SEVERITY_ERROR, t.ticket, t.workflow_unreadable))
+    if not t.is_child:
+        problems.extend(workflow.errors(t))
     if t.archived_clash:
         problems.append(rules.Problem(rules.SEVERITY_ERROR, t.ticket, t.archived_clash))
     return problems

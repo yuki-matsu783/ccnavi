@@ -19,7 +19,7 @@
 - 見せたものから変わっていないかを確かめる（`agree_digest` の `approval_digest`・`read_set`、
   `verify_verdict`）
 - 置き場へ動かす（`plan_batch`）。書き込みは approval の置き場の関数を通す。新規の承認は提案の
-  中身を変えずに動かし、全体計画の待ち方は `phases/<親>/workflow.yml` に固定する
+  中身を変えずに動かすだけで、書き足すものは無い（待ち方は承認済みチケットの計画から都度計算する）
 - 承認の事実をモデルに伝える文を組む（`agree_screen.approved_text`。拡張が `--agree --yes` の
   `prompt` で渡す）
 
@@ -45,7 +45,6 @@ from . import (
     phase,
     ticket_ids,
     ticket_model,
-    workflow,
 )
 
 # 承認の JSON の版。`--agree --preview --json` と `--agree --yes … --json` が出す。
@@ -126,9 +125,7 @@ def gather(
         if approval.revision_elsewhere(t, open_index.get(t.ticket))
     ]
 
-    pending, revisions = waiting(
-        proposals, approved, closed, review, agree_candidates.types_resolver(conf, root, approved)
-    )
+    pending, revisions = waiting(proposals, approved, closed, review)
     broken = any(p.severity == rules.SEVERITY_ERROR for p in problems)
     texts = [str(p) for p in problems] + list(notes)
     note = ""
@@ -393,9 +390,7 @@ def _apply_steps(
                     conf, root, t.ticket, t.parent, t.tree_root, project=t.project
                 )
                 with fsio.policy(places=t.ticket):
-                    failed = agree_digest.revise_copy(
-                        where, cand.current, t, cand.plans_feedback, cand.types
-                    )
+                    failed = agree_digest.revise_copy(where, cand.current, t, cand.plans_feedback)
                 if failed:
                     return t.ticket, failed
                 removing = "改版の提案を todo/ から消せない ({reason})"
@@ -430,9 +425,7 @@ def _apply_steps(
             where = approval.home_dir(
                 conf, root, t.ticket, t.parent, t.tree_root, project=t.project
             )
-            failed = approval_ops.admit(
-                where, t, approval.source_branch(t), agree_digest._workflow_to_write(cand)
-            )
+            failed = approval_ops.admit(where, t, approval.source_branch(t))
             if failed:
                 return t.ticket, failed
             if t.is_child:
@@ -471,16 +464,14 @@ def waiting(
     approved: list[ticket_model.Ticket],
     closed: list[ticket_model.Ticket],
     review: list[ticket_model.Ticket],
-    types_for,
 ) -> tuple[list[ticket_model.Ticket], list[ticket_model.Ticket]]:
     """いま `--agree` で承認の対象に入るもの。新規の承認待ちと、親の改版。
 
     承認待ちは `todo/` に在って、どの置き場（作業中・レビュー待ち・閉じた）にも同じ識別子が
     無いもの。閉じたものは対象外で、再開はユーザが承認済みチケットを戻す。
-    改版は、作業中の親の承認済みチケットがあり、`todo/` の提案の計画がそれと違うもの。
-    計画が同じでも、いまの定義で計算した待ち方が承認済みチケット上の待ち方と違えば改版になる
-    （`phases.yml` を直した結果を進行中の親に反映する経路。設計 9.7）。`types_for` は
-    チケットに使う定義を引く関数（`types_resolver`）。
+    改版は、作業中の親の承認済みチケットがあり、`todo/` の提案の計画がそれと違うもの
+    （`approval.plan_differs`。定義・`review`・推移的な待ちの並びで比べる）。待ち方は計画から
+    決まるので、待ち方だけの改版は無い。
     `--agree` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
     統合先の取り込み結果の `done/` にある識別子（閉じた識別子の再利用）はここでは外さず、
     `candidates` が理由を添えて承認しない側に回す（何も出さずに消すことはしない）。
@@ -495,17 +486,6 @@ def waiting(
         if t.ticket in open_index
         and not t.is_child
         and t.has_plan
-        and (
-            approval.plan_differs(t, open_index[t.ticket])
-            or _workflow_differs(t, open_index[t.ticket], types_for)
-        )
+        and approval.plan_differs(t, open_index[t.ticket])
     ]
     return pending, revisions
-
-
-def _workflow_differs(
-    proposal: ticket_model.Ticket, current: ticket_model.Ticket, types_for
-) -> bool:
-    fresh = workflow.compute(proposal, types_for(proposal)).as_raw()
-    held = current.workflow.as_raw() if current.workflow is not None else None
-    return fresh != held

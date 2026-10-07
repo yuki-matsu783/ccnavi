@@ -13,7 +13,6 @@ from ..infra import settings, tree
 from ..policy import ruleload, rules
 from ..tickets import (
     agree,
-    agree_candidates,
     approval,
     approval_checks,
     approval_marks,
@@ -22,7 +21,6 @@ from ..tickets import (
     flow,
     history,
     phase,
-    phasetypes,
     risk,
     ticket_fold,
     ticket_model,
@@ -98,7 +96,6 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         open_copies,
         closed_copies,
         review_copies,
-        agree_candidates.types_resolver(conf, root, open_copies),
     )
     # 先行を引く対応表。承認と着手が使うのと同じ集め方。
     preds = approval_checks.predecessor_pool_of(
@@ -279,7 +276,9 @@ def _sums(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> l
                 "phases": {
                     "path": phases_path,
                     "unreadable": phases_unreadable,
-                    "order": types.order if types is not None else phasetypes.ORDER_SEQUENTIAL,
+                    # フェーズ定義は順序を持たない（順序は親の計画の項の `after`）。待ち方は
+                    # いつも `dag` として読む。拡張のフェーズ管理画面が読む欄なので残す。
+                    "order": ticket_model.WORKFLOW_DAG,
                     "types": [
                         _phase_type_record(layer.name, pt)
                         for pt in (types.values() if types is not None else [])

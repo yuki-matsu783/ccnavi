@@ -46,8 +46,8 @@ def layer_phase_types(path: str, common: bool = False) -> tuple[list, str]:
 
     合成はしない。フェーズ定義は足し算をせず、使うのは親の `project:` が指す 1 本だけ
     （設計 11.4.1）。
-    ここで出すのは「どのレイヤーに何が書いてあるか」。その 1 本の中の参照先
-    （`overlap` / `requires` / `after`）は、読み込みで確かめる。
+    ここで出すのは「どのレイヤーに何が書いてあるか」。定義は順序を持たない（順序は親の計画の
+    項の `after`）。
 
     `common` は共通レイヤーかどうか。共通レイヤーの phases.yml は置けず、判定に使わないので、
     あれば中身を読まずに理由だけ返す（`--lint` が error で言う）。
@@ -57,7 +57,7 @@ def layer_phase_types(path: str, common: bool = False) -> tuple[list, str]:
 
 
 def layer_phase_set(path: str, common: bool = False) -> tuple[phasetypes.PhaseTypes | None, str]:
-    """`layer_phase_types` と同じ。定義の集合（`order` を持つ）のまま返す。無ければ None。"""
+    """`layer_phase_types` と同じ。定義の集合のまま返す。無ければ None。"""
     if not path or not os.path.isfile(path):
         return None, ""
     if common:

@@ -1,8 +1,20 @@
-"""全体計画の待ち方（設計 9.7）。
+"""計画の待ち方（設計 9.7）。
 
-`--agree` が全体計画を承認するとき（改版を含む）に、ここで待ち方を計算して親の承認済み
-チケットの `workflow:` に書き出す。判定・延期・フィードバック計画の前提はそのコピーだけを読む。
-計算はこの 1 か所に置き、延期の引き受け手を 2 か所で違って言わないようにする。
+待ち方は親の計画（`plan:` / `feedback:`）の項の `after` から都度計算する。ファイルにもチケットの欄
+にも持たない。承認済みチケットの計画は承認済みの置き場にあり、変えられるのは改版（`--agree`）と
+ユーザの手だけなので、計算の元も固定されている。フェーズ定義（`phases.yml`）もチケットの状態も
+計算の入力にならず、提案も承認済みも同じ関数で計算する。
+
+決まりは 2 つだけ。
+
+- 項の待ちは、項の `after` を推移的に辿った全部の番号。`after` を書かない項は何も待たない
+- 延期した項は、それを待つ延期していない項のうち、番号のいちばん小さいものが引き受ける
+
+フィードバック計画は、いまは一直線（全体計画の番号を全部と、前のフィードバックの番号を全部待つ）
+で読む。延期の引き受け手は同じ決まりで、一直線なら次の延期していない番号になる。
+
+計算はこの 1 か所に置き、延期の引き受け手を 2 か所で違って言わないようにする。決まりの見張りは
+計画と待ち方の見本の表（`tests/fixtures/plan-waits.json`）。
 """
 
 from __future__ import annotations
@@ -11,178 +23,182 @@ from ..policy import rules
 from . import phasetypes, ticket_model
 
 
-def _order(parent: ticket_model.Ticket, types: dict | None) -> str:
-    """使う `order`。計画に読めない定義が 1 つでもあれば一直線。
-
-    祖先が分からないものを並行にしない。
-    """
-    if types is None or getattr(types, "order", "") != phasetypes.ORDER_DAG:
-        return ticket_model.WORKFLOW_SEQUENTIAL
-    if any(types.get(item.type) is None for item in parent.plan):
-        return ticket_model.WORKFLOW_SEQUENTIAL
-    return ticket_model.WORKFLOW_DAG
+def _parts(parent: ticket_model.Ticket) -> list[tuple[str, int, list[ticket_model.PlanItem]]]:
+    """計画を (欄の名前, 最初の番号, 項) に分ける。フィードバック計画は全体計画の続きの番号。"""
+    parts = [("plan", 1, list(parent.plan))]
+    if parent.feedback:
+        parts.append(("feedback", len(parent.plan) + 1, list(parent.feedback)))
+    return parts
 
 
-def _depends(types, later: str, earlier: str) -> bool:
-    """`later` の定義が `earlier` の定義を待つか。祖先か同じ定義なら待つ。"""
-    return later == earlier or earlier in types.ancestors(later)
-
-
-def compute(parent: ticket_model.Ticket, types: dict | None) -> ticket_model.Workflow:
-    """親の全体計画の待ち方を計算する。"""
-    order = _order(parent, types)
-    wf = ticket_model.Workflow(order=order)
-    items = list(parent.plan)
-    for n, item in enumerate(items, start=1):
-        mine = (types or {}).get(item.type)
-        waits = []
-        for m, earlier in enumerate(items[: n - 1], start=1):
-            theirs = (types or {}).get(earlier.type)
-            if mine is not None and theirs is not None and mine.overlaps(theirs):
+def compute(parent: ticket_model.Ticket) -> ticket_model.Workflow:
+    """親の計画の待ち方を計算する。形の誤った `after`（`after_errors`）は線として数えない。"""
+    wf = ticket_model.Workflow(order=ticket_model.WORKFLOW_DAG)
+    planned = len(parent.plan)
+    for n, item in enumerate(parent.plan, start=1):
+        found: set[int] = set()
+        stack = [m for m in item.after if 1 <= m < n]
+        while stack:
+            m = stack.pop()
+            if m in found:
                 continue
-            if order == ticket_model.WORKFLOW_DAG and not _depends(types, item.type, earlier.type):
-                continue
-            waits.append(m)
-        wf.waits[n] = waits
-    for n, item in enumerate(items, start=1):
+            found.add(m)
+            stack.extend(x for x in wf.waits.get(m, []) if x not in found)
+        wf.waits[n] = sorted(found)
+    for i, _ in enumerate(parent.feedback or []):
+        n = planned + 1 + i
+        # いまは一直線。前の番号（全体計画とフィードバック計画）を全部待つ。
+        wf.waits[n] = list(range(1, n))
+    numbered = parent.numbered()
+    for n, item in numbered:
         if not item.deferred:
             continue
-        target = _defer_target(wf, parent, types, n)
+        target = _defer_target(wf, numbered, n)
         if target is not None:
             wf.review_at[n] = target
     return wf
 
 
 def _defer_target(
-    wf: ticket_model.Workflow, parent: ticket_model.Ticket, types: dict | None, n: int
+    wf: ticket_model.Workflow, numbered: list[tuple[int, ticket_model.PlanItem]], n: int
 ) -> int | None:
-    """延期した n 番目を引き受ける番号。
+    """延期した n 番目を引き受ける番号。後ろで n を待つ、延期していない最小の番号。
 
-    一直線なら、次の延期していない番号。`dag` なら、
-    後ろで n を待つ（コピーした待ち方の `waits` に n を持つ）、延期していない最小の番号。
     待たない番号が引き受けると、延期した作業が閉じる前にそのレビューが済んでしまう。
     """
-    for m in range(n + 1, len(parent.plan) + 1):
-        if parent.plan[m - 1].deferred:
+    for m, later in numbered:
+        if m <= n or later.deferred:
             continue
-        if wf.order == ticket_model.WORKFLOW_DAG and n not in wf.waits.get(m, []):
-            continue
-        return m
+        if n in wf.waits.get(m, []):
+            return m
     return None
 
 
-def effective(parent: ticket_model.Ticket, types: dict | None) -> ticket_model.Workflow:
-    """判定に使う待ち方。承認済みの親はコピーした待ち方だけを読む。
+def effective(parent: ticket_model.Ticket) -> ticket_model.Workflow:
+    """判定に使う待ち方。入れてあればそれを、無ければその場で計算する。"""
+    return parent.workflow if parent.workflow is not None else compute(parent)
 
-    コピーした待ち方を持たない承認済みの親は一直線で読み、いまの定義からは計算しない。定義から計算するのは、
-    まだ承認されていない提案（同じ承認で通る親と、改版の提案）だけ。
+
+def waits_of(parent: ticket_model.Ticket, number: int, types: dict | None = None) -> list[int]:
+    """N 番目が待つ番号。計画に無い番号は前の番号を全部待つ（止まる側）。
+
+    `types` は前の呼び方の名残りで、読まない（待ち方はフェーズ定義を読まない）。
     """
-    if parent.workflow is not None:
-        return parent.workflow
-    if parent.state == ticket_model.TODO:
-        return compute(parent, types)
-    return compute(parent, None)
+    del types
+    return list(effective(parent).waits.get(number, range(1, number)))
 
 
-def waits_of(parent: ticket_model.Ticket, number: int, types: dict | None) -> list[int]:
-    """N 番目が待つ番号。全体計画はコピーした待ち方で読み、それが無ければ（承認前の提案）
-    その場で計算する。
-
-    フィードバック計画は一直線で、前の番号を全部待つ（`overlap` の組は待たない）。
-    """
-    if parent.in_plan(number):
-        return list(effective(parent, types).waits.get(number, range(1, number)))
-    item = parent.item_at(number)
-    mine = (types or {}).get(item.type) if item is not None else None
-    waits = []
-    for m, earlier in parent.numbered():
-        if m >= number:
-            break
-        theirs = (types or {}).get(earlier.type)
-        if mine is not None and theirs is not None and mine.overlaps(theirs):
+def loose(parent: ticket_model.Ticket, wf: ticket_model.Workflow | None = None) -> list[int]:
+    """最後の項が待たない項の番号（全体計画とフィードバック計画のそれぞれで）。終端の崩れ。"""
+    wf = wf or effective(parent)
+    out: list[int] = []
+    for _, first, items in _parts(parent):
+        if len(items) < 2:
             continue
-        waits.append(m)
-    return waits
+        last = first + len(items) - 1
+        waited = set(wf.waits.get(last, []))
+        out += [m for m in range(first, last) if m not in waited]
+    return out
 
 
-def problems(parent: ticket_model.Ticket, types: dict | None) -> list[rules.Problem]:
-    """全体計画の待ち方が組めるか。順序、終端、延期の引き受け手（設計 9.7）。"""
+def ready(parent: ticket_model.Ticket, wf: ticket_model.Workflow | None = None) -> list[int]:
+    """すぐ始まる項の番号。その計画の中で何も待たない項（フィードバック計画は全体計画を除いて）。"""
+    wf = wf or effective(parent)
+    out: list[int] = []
+    for _, first, items in _parts(parent):
+        out += [
+            n
+            for n in range(first, first + len(items))
+            if not [m for m in wf.waits.get(n, []) if m >= first]
+        ]
+    return out
+
+
+def problems(parent: ticket_model.Ticket, types: dict | None = None) -> list[rules.Problem]:
+    """計画の順序が組めるか。`after` の形、終端、最後の項の延期、延期の引き受け手（設計 9.7）。
+
+    全体計画とフィードバック計画に同じ規則を当てる。`types`（フェーズ定義）を渡したときだけ、
+    引き受け手にレビューがあるかも見る。判定の側（`approval_checks.blocking_problems`）は定義を
+    渡さず、承認済みチケットだけを読んで済む検査を当てる（`phases.yml` を承認のあとに直しても
+    進行中の親が止まらないように）。
+    """
     found: list[rules.Problem] = []
-    if types is None or not parent.has_plan:
+    if not parent.has_plan:
         return found
-    wf = compute(parent, types)
-    items = parent.plan
-    if wf.order == ticket_model.WORKFLOW_DAG:
-        for i, earlier in enumerate(items):
-            for j in range(i + 1, len(items)):
-                later = items[j]
-                if later.type != earlier.type and later.type in types.ancestors(earlier.type):
-                    found.append(
-                        rules.Problem(
-                            rules.SEVERITY_ERROR,
-                            parent.ticket,
-                            f"`plan[{j}]` の `{later.type}` は `plan[{i}]` の `{earlier.type}` より"
-                            "先に要る（after）。後ろに置くと依存が消えて並行に通る",
-                        )
+
+    def error(text: str) -> None:
+        found.append(rules.Problem(rules.SEVERITY_ERROR, parent.ticket, text))
+
+    for key, _first, items in _parts(parent):
+        for i, item in enumerate(items):
+            for value, why in item.after_errors:
+                error(f"`{key}[{i}]` の `after` の {value!r} は読めない（{why}）")
+            if item.after_repeated:
+                found.append(
+                    rules.Problem(
+                        rules.SEVERITY_WARN,
+                        parent.ticket,
+                        f"`{key}[{i}]` の `after` に同じ番号を 2 度挙げている"
+                        f"（{', '.join(map(str, item.after_repeated))}）。1 つにまとめて読む",
                     )
-        # 終端は、実際の待ち（`overlap` で外れた組を除いたもの）で見る。
-        last = items[-1]
-        waited = set(wf.waits.get(len(items), []))
-        loose = [item.type for m, item in enumerate(items[:-1], start=1) if m not in waited]
-        if loose:
-            found.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    parent.ticket,
-                    f"最後の項 `{last.type}` が {', '.join(f'`{t}`' for t in dict.fromkeys(loose))}"
-                    " を待たない。終端は 1 つにしてください（合流の定義を最後に置く）",
                 )
+    wf = compute(parent)
+    gaps = loose(parent, wf)
+    for key, first, items in _parts(parent):
+        last = first + len(items) - 1
+        cut = [m for m in gaps if first <= m < last]
+        if cut:
+            error(
+                f"`{key}` の最後の項（{last}: {items[-1].type}）が "
+                f"{', '.join(map(str, cut))} を待たない。終端は 1 つにしてください"
+                "（最後の項がほかの全部を推移的に待つように `after` を書く。独立した作業は"
+                "最後に 1 項で受けるか、一直線に並べる）"
             )
-    for n, item in enumerate(items, start=1):
-        if not item.deferred:
-            continue
-        target = wf.review_at.get(n)
-        if target is None:
-            found.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    parent.ticket,
-                    f"`plan[{n - 1}]` の延期を引き受ける項が無い"
-                    "（後ろにこれを待つ、延期していない項が要る）",
+        if items and items[-1].deferred:
+            error(f"`{key}` の最後の項は延期できない。誰も見ないまま終わる")
+    numbered = dict(parent.numbered())
+    for key, first, items in _parts(parent):
+        for i, item in enumerate(items):
+            n = first + i
+            if not item.deferred or i == len(items) - 1:
+                continue
+            target = wf.review_at.get(n)
+            if target is None:
+                error(
+                    f"`{key}[{i}]` の延期を引き受ける項が無い"
+                    "（後ろにこれを待つ、延期していない項が要る）"
                 )
-            )
-            continue
-        target_item = items[target - 1]
-        tpt = types.get(target_item.type)
-        if (
-            tpt is not None
-            and tpt.review == phasetypes.REVIEW_NONE
-            and target_item.review != ticket_model.PLAN_REVIEW_MR
-        ):
-            found.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    parent.ticket,
-                    f"`plan[{n - 1}]` を延期した先の `{target_item.type}` にレビューが無い",
-                )
-            )
+                continue
+            target_item = numbered[target]
+            tpt = (types or {}).get(target_item.type)
+            if (
+                tpt is not None
+                and tpt.review == phasetypes.REVIEW_NONE
+                and target_item.review != ticket_model.PLAN_REVIEW_MR
+            ):
+                error(f"`{key}[{i}]` を延期した先の `{target_item.type}` にレビューが無い")
     return found
 
 
+def errors(parent: ticket_model.Ticket) -> list[rules.Problem]:
+    """承認済みチケットだけを読んで済む計画の誤り（判定の側が当てる分）。"""
+    return [p for p in problems(parent) if p.severity == rules.SEVERITY_ERROR]
+
+
 def lines(parent: ticket_model.Ticket, wf: ticket_model.Workflow) -> list[str]:
-    """ユーザ向けの待ちの一覧。承認画面と `--explain` に出す。一直線なら延期の引き受け手だけ。"""
-    if wf.order != ticket_model.WORKFLOW_DAG:
-        defers = [
-            f"{n}: {parent.plan[n - 1].type} — レビューは {at} と一緒に"
-            for n, at in sorted(wf.review_at.items())
-            if parent.in_plan(n)
-        ]
-        return ["一直線（前の番号を全部待つ）", *defers] if defers else []
+    """ユーザ向けの待ちの一覧。承認画面と `--explain` に出す。全部の番号と、すぐ始まる項、
+    最後の項が待たない項。"""
     out = []
-    for n, item in enumerate(parent.plan, start=1):
+    for n, item in parent.numbered():
         waits = wf.waits.get(n, [])
         text = f"待つ: {', '.join(map(str, waits))}" if waits else "何も待たない"
         at = wf.review_at.get(n)
         tail = f"（レビューは {at} と一緒に）" if at is not None else ""
         out.append(f"{n}: {item.type} — {text}{tail}")
+    starting = [n for n in ready(parent, wf) if parent.in_plan(n)]
+    if len(starting) >= 2:
+        out.append(f"すぐ始まる: {', '.join(map(str, starting))}")
+    gaps = loose(parent, wf)
+    if gaps:
+        out.append(f"最後の項が待たない: {', '.join(map(str, gaps))}")
     return out

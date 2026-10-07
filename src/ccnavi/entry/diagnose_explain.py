@@ -242,8 +242,8 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
                 review += f" / {ph.risk_line}"
                 if ph.risk_escalates:
                     review += "（実績でレビュー要）"
-            if phase.is_dag(parent) and parent.in_plan(ph.number):
-                waits = workflow.waits_of(parent, ph.number, None)
+            if ph.planned:
+                waits = workflow.waits_of(parent, ph.number)
                 review += f" / 待つ: {', '.join(map(str, waits))}" if waits else " / 何も待たない"
             stdout.write(
                 f"  {parent.ticket} フェーズ {ph.label}: {state} / {marks} / {hold}{review}\n"

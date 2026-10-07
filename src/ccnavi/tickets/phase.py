@@ -310,9 +310,9 @@ def phases_of(
         # ユーザが承認した値で、
         # 子は親から継ぐので、判定が申告に依存する形にはならない。
         types = load_types(conf, root, owner.project) or {}
-        if owner.workflow is None and owner.state == ticket_model.TODO:
-            # 承認前の提案。延期の引き受け手を、承認でコピーするものと同じ計算で読む。
-            owner = replace(owner, workflow=workflow.compute(owner, types or None))
+        if owner.workflow is None:
+            # 承認前の提案など、待ち方を入れていない親。承認済みと同じ計算（計画の `after`）で読む。
+            owner = replace(owner, workflow=workflow.compute(owner))
         for n, item in owner.numbered():
             by_number[n] = Phase(parent_id, n, item=item, type=types.get(item.type), owner=owner)
         # 延期を引き受けた側に、引き受けた分の「見る場所」を渡す。厳しい側を採るのは
@@ -594,39 +594,22 @@ def _next_hint(parent: ticket_model.Ticket, phases: list[Phase], number: int) ->
                 "`cancelled_at`・`cancel_reason` は空にします。"
             )
         return "計画のフェーズは全部終わりました。親チケットを閉じられます。"
-    if is_dag(parent):
-        # 並行して始められるものを全部挙げる。番号が前でも、まだ子の無い枝は拾う。
-        # 待ちが済んでいない番号は案内しない。
-        ready = [
-            p
-            for p in phases
-            if parent.in_plan(p.number) and not p.tickets and waits_done(parent, phases, p.number)
-        ]
-        if not ready:
-            return "次に始められるフェーズは、待っているフェーズが済むまでありません。"
-        names = "、".join(p.label for p in ready)
-        hints = "".join(
-            f"（{p.label} の案内: {p.type.when}）"
-            for p in ready
-            if p.type is not None and p.type.when
-        )
-        return f"次に始められるのは {names} です。子チケットを提案して承認を受けてください。{hints}"
-    nxt = following[0]
-    return (
-        f"次は {nxt.label} の計画です。そのフェーズの子チケットを提案して承認を受けてください。"
-        + (f"（定義の案内: {nxt.type.when}）" if nxt.type is not None and nxt.type.when else "")
+    # 並行して始められるものを全部挙げる。番号が前でも、まだ子の無い枝は拾う。
+    # 待ちが済んでいない番号は案内しない。
+    ready = [p for p in phases if not p.tickets and waits_done(parent, phases, p.number)]
+    if not ready:
+        return "次に始められるフェーズは、待っているフェーズが済むまでありません。"
+    names = "、".join(p.label for p in ready)
+    hints = "".join(
+        f"（{p.label} の案内: {p.type.when}）" for p in ready if p.type is not None and p.type.when
     )
-
-
-def is_dag(parent: ticket_model.Ticket) -> bool:
-    """親の待ち方のコピーが `dag` か。"""
-    return parent.workflow is not None and parent.workflow.order == ticket_model.WORKFLOW_DAG
+    return f"次に始められるのは {names} です。子チケットを提案して承認を受けてください。{hints}"
 
 
 def waits_done(parent: ticket_model.Ticket, phases: list[Phase], number: int) -> bool:
     """N 番目が待つフェーズが、全部閉じてレビューが済んでいるか。"""
     by_number = {p.number: p for p in phases}
-    for m in workflow.waits_of(parent, number, None):
+    for m in workflow.waits_of(parent, number):
         phase = by_number.get(m)
         if phase is None or not phase.ended or not reviewed_or_skipped(phase):
             return False
@@ -771,7 +754,7 @@ def resumed_review(
     閉じ直したときにレビューが要らないフェーズ（定義が `review: none` で、この子も
     `human_review` を求めていない）と、レビューが要らない引き受け手は、マーカーが残っていても
     止める条件に入らないので言わない。
-    引き受け手 M は、ゲートと同じく計画の待ち方のコピーから引く `review_at`（`N.skipped` の
+    引き受け手 M は、ゲートと同じく計画から計算した待ち方で引く `review_at`（`N.skipped` の
     `deferred_to` ではない。書いたあとに改版で引き受け手が動けば、skipped は古くなる）。
     文には子の識別子を入れない（呼び手が前に付ける）。
     """
@@ -864,8 +847,8 @@ def order_problems(
 ) -> list[rules.Problem]:
     """N 番目の子を承認してよいか。待つフェーズが閉じてレビューが済んでいるか（設計 9.7）。
 
-    待つ番号は親の待ち方のコピー（`workflow`）が決める。一直線なら前の全部、`dag` なら
-    定義の祖先に当たる前の番号。`overlap` の組はコピーを作るときに待ちから外してある。
+    待つ番号は親の待ち方（`workflow`。計画の項の `after` を推移的に辿ったもの）が決める。
+    親の計画が壊れていれば（`workflow.errors`）、壊れた待ちで順序を数えずに落とす。
 
     ここで出す苦情は `rules.KIND_NOT_YET`。承認は落とすが、書いた側に直すものは無く、
     前のフェーズが閉じれば同じ提案がそのまま通る。全体を見る `--lint` はこの定義を見て
@@ -883,7 +866,16 @@ def order_problems(
     mine = parent.item_at(child.phase)
     if mine is None:
         return []
-    waits = set(workflow.waits_of(parent, child.phase, types))
+    broken = workflow.errors(parent)
+    if broken:
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                child.ticket,
+                f"親 {parent.ticket} の計画が壊れているので、順序を数えない（{broken[0].detail}）",
+            )
+        ]
+    waits = set(workflow.waits_of(parent, child.phase))
     reopened: dict[int, list[str]] = {}
     for t in adding or []:
         if t.phase is not None:
@@ -1012,11 +1004,7 @@ def stage(
     if not parent.has_plan:
         return ""
     phases = phases_of(root, conf, parent.ticket, raw=raw)
-    dag = is_dag(parent)
     held_all = [p for p in phases if p.gate_closed]
-    if held_all and not dag:
-        held = held_all[0]
-        return f"{held.review_label}（{held.label}）"
     if held_all:
         # 並行した枝が同時に止まっていることがある。呼び名ごとに番号を並べる。
         groups: dict[str, list[str]] = {}
@@ -1032,7 +1020,7 @@ def stage(
         return "閉じられる（ユーザが早めに閉じた）"
     in_feedback = parent.feedback is not None and len(parent.feedback) > 0
     open_phases = [p for p in phases if not p.ended]
-    if dag and open_phases and open_phases[0].number <= len(parent.plan):
+    if open_phases and open_phases[0].number <= len(parent.plan):
         # 子がまだ無く、待ちが済んでいないフェーズは作業中に数えない。
         working = [
             p

@@ -107,39 +107,58 @@ PLAN_REVIEWS = (PLAN_REVIEW_MR, PLAN_REVIEW_DEFER)
 
 @dataclass
 class PlanItem:
-    """親の計画の 1 項。フェーズ定義の名前と、レビューの指定。"""
+    """親の計画の 1 項。フェーズ定義の名前と、レビューの指定と、先行（`after`）。
+
+    `after` は、この項より先に閉じてレビューが済んでいるべき項の番号（計画の番号。フィードバック
+    計画も全体計画の続きの番号）。読めた正しい番号（1 以上、自分より小さい、その計画の範囲の中）
+    だけを持つ。形の誤りは読み込みで落とさず、`after_errors` に元の値と理由で持つ
+    （`workflow.problems` が error で言い、判定は親を止める）。読み込みで落とすと承認済み
+    チケットが索引に入らず、判定がその親を知らないまま範囲を当てなくなるため。
+    `after_repeated` は同じ番号を 2 度挙げたもの（1 つにまとめ、warn で言う）。
+    """
 
     type: str
     review: str = ""
+    after: list[int] = field(default_factory=list)
+    after_errors: list[tuple[object, str]] = field(default_factory=list)
+    after_repeated: list[int] = field(default_factory=list)
 
     @property
     def deferred(self) -> bool:
         return self.review == PLAN_REVIEW_DEFER
 
     def as_raw(self):
-        return {"type": self.type, "review": self.review} if self.review else self.type
+        if not self.review and not self.after:
+            return self.type
+        raw: dict = {"type": self.type}
+        if self.review:
+            raw["review"] = self.review
+        if self.after:
+            raw["after"] = list(self.after)
+        return raw
 
     def __eq__(self, other) -> bool:
+        # `after` は入れない。改版かどうかは推移的な待ちで比べる（`approval.plan_differs`）。
+        # 「待つ: 1, 2」を写した `after` と、直接の先行だけを書いた `after` は同じ待ちになる。
         return (
             isinstance(other, PlanItem) and self.type == other.type and self.review == other.review
         )
 
 
 WORKFLOW_KEY = "workflow"
-WORKFLOW_SEQUENTIAL = "sequential"
 WORKFLOW_DAG = "dag"
 
 
 @dataclass
 class Workflow:
-    """全体計画の待ち方のコピー。`--agree` が計算して `<承認済みの置き場>/phases/<親>/workflow.yml`
-    に書く（設計 9.7）。前の版は親の承認済みチケットの `workflow:` 欄に書いていた。
+    """計画の待ち方。承認済みチケット（と提案）の計画の項の `after` から、`workflow.compute` が
+    都度計算する（設計 9.7）。ファイルにもチケットの欄にも持たない。
 
-    `waits` は全体計画の番号 → 待つ番号、`review_at` は延期した番号 → 引き受ける番号。
-    判定はこのコピーだけを読み、`phases.yml` を読み直さない。
+    `waits` は番号 → 待つ番号（推移的に辿った全部。番号の小さい順）、`review_at` は延期した
+    番号 → 引き受ける番号。全体計画もフィードバック計画も入る。`order` はいつも `dag`。
     """
 
-    order: str = WORKFLOW_SEQUENTIAL
+    order: str = WORKFLOW_DAG
     waits: dict[int, list[int]] = field(default_factory=dict)
     review_at: dict[int, int] = field(default_factory=dict)
 
@@ -185,7 +204,9 @@ class Ticket:
     # 「見たうえで対応なし」。設計 9.7。
     plan: list[PlanItem] = field(default_factory=list)
     feedback: list[PlanItem] | None = None
-    # workflow は全体計画の待ち方のコピー。親の承認済みチケットだけが持ち、書くのは `--agree`。
+    # workflow は計画の待ち方。計画の項の `after` から `workflow.compute` が計算して入れる
+    # （承認済みは `approval.load_copy`、提案は承認の候補を組むときと `phase.phases_of`）。
+    # チケットの `workflow:` 欄は読まない。
     workflow: Workflow | None = None
     review_required: bool = True
     review_reason: str = ""
@@ -213,14 +234,6 @@ class Ticket:
     approved_at: str = ""
     source_tree: str = ""
     source_path: str = ""
-    # 待ち方のファイル（`phases/<親>/workflow.yml`）が在るのに読めない理由。空なら読めたか無い。
-    # 判定は読めない待ち方を一直線と読まずに止める（`approval_checks.blocking_problems`）。
-    workflow_unreadable: str = ""
-    # 待ち方を古い形の `workflow:` 欄から採ったか（`approval.load_copy`）。採るのは今の phases.yml
-    # から計算した待ち方と同じときだけで、違えば欄を捨てて一直線で読み、
-    # `workflow_record_differs` を立てる（`approval.settle_old_workflows`）。
-    workflow_from_record: bool = False
-    workflow_record_differs: bool = False
     # 親のツリーで見つけた未着手のチケットが、手元の退避（`logs/archive/`）の閉じたチケットと
     # 同じ識別子のときの理由（`archive.drop_archived`）。
     # 判定は止める（`approval_checks.content_problems`）。
@@ -260,23 +273,25 @@ class Ticket:
     def review_at(self, number: int) -> int | None:
         """この番号のフェーズのレビューが行われる番号。延期なら引き受ける番号。
 
-        全体計画の番号はコピーした待ち方（`workflow`）で読む。フィードバック計画は一直線で、次にレビューが
-        ある番号。延期の先が無ければ None（計画が壊れている）。
+        待ち方（`workflow`）があればそれで読む（全体計画もフィードバック計画も）。延期の先が
+        無ければ None（計画が壊れている）。待ち方を入れていない読み方（`workflow` が None）では、
+        後ろで延期していない最初の番号を採る。
         """
         item = self.item_at(number)
-        if self.workflow is not None and self.in_plan(number) and item is not None:
-            if not item.deferred:
-                return number
+        if item is None:
+            return None
+        if not item.deferred:
+            return number
+        if self.workflow is not None:
             return self.workflow.review_at.get(number)
-        items = self.numbered()
-        for n, item in items:
-            if n >= number and not item.deferred:
+        for n, later in self.numbered():
+            if n > number and not later.deferred:
                 return n
         return None
 
     def covered_by(self, number: int) -> list[int]:
         """この番号のレビューが含む、それより前の延期したフェーズの番号。"""
-        if self.workflow is not None and self.in_plan(number):
+        if self.workflow is not None:
             return sorted(n for n, at in self.workflow.review_at.items() if at == number)
         found = []
         for n, item in self.numbered():

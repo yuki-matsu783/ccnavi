@@ -87,8 +87,15 @@ MAX_SCOPE_ENTRIES = 20
 _FORBIDDEN = (("..", "`..`"), ("~", "`~`"), ("$", "`$`"))
 
 
-def _plan(name: str, key: str, raw) -> tuple[list[ticket_model.PlanItem] | None, list[Problem]]:
-    """計画のリストを読む。定義が在るかはここでは見ない（定義を読むのは承認の側）。"""
+def _plan(
+    name: str, key: str, raw, start: int = 1
+) -> tuple[list[ticket_model.PlanItem] | None, list[Problem]]:
+    """計画のリストを読む。定義が在るかはここでは見ない（定義を読むのは承認の側）。
+
+    `start` はこの計画の最初の番号（全体計画は 1、フィードバック計画は全体計画の続き）。
+    項の `after` は `_after` が読む。`after` の形の誤りと最後の項の延期では読み込みを落とさない
+    （`workflow.problems` が error で言い、判定は `blocking_problems` で親を止める）。
+    """
     problems: list[Problem] = []
     if not isinstance(raw, list):
         problems.append(Problem(SEVERITY_ERROR, name, f"`{key}` はリストで書く"))
@@ -115,16 +122,52 @@ def _plan(name: str, key: str, raw) -> tuple[list[ticket_model.PlanItem] | None,
                     )
                 )
                 return None, problems
-            items.append(ticket_model.PlanItem(type=kind, review=review))
+            item = ticket_model.PlanItem(type=kind, review=review)
+            _after(item, entry.get("after"), start, start + i)
+            items.append(item)
             continue
-        problems.append(Problem(SEVERITY_ERROR, name, f"{where} は定義の名前か {{type, review}}"))
-        return None, problems
-    if items and items[-1].deferred:
         problems.append(
-            Problem(SEVERITY_ERROR, name, f"`{key}` の最後の項は延期できない。誰も見ないまま終わる")
+            Problem(SEVERITY_ERROR, name, f"{where} は定義の名前か {{type, review, after}}")
         )
         return None, problems
     return items, problems
+
+
+def _after(item: ticket_model.PlanItem, raw, first: int, number: int) -> None:
+    """項の `after` を読む。正しい番号だけを `after` に、誤りは `after_errors` に入れる。
+
+    正しい番号は、整数（bool は数えない）で、その計画の範囲の中（`first` 以上）で、自分（`number`）
+    より小さいもの。フィードバック計画の項は全体計画の番号を指せない（全体計画はフィードバック
+    計画の前提として全部済んでいる）。どんな値でも例外を出さない。
+    """
+    if raw is None:
+        return
+    if not isinstance(raw, list):
+        item.after_errors.append((raw, "番号のリストで書く"))
+        return
+    for value in raw:
+        if isinstance(value, bool) or not isinstance(value, int):
+            item.after_errors.append((value, "番号（整数）で書く"))
+            continue
+        if value >= number:
+            item.after_errors.append((value, f"自分（{number}）より小さい番号だけを指せる"))
+            continue
+        if value < first:
+            item.after_errors.append(
+                (
+                    value,
+                    "フィードバック計画の項はフィードバック計画の番号だけを指せる"
+                    if first > 1
+                    else "1 以上の番号で書く",
+                )
+            )
+            continue
+        if value in item.after:
+            if value not in item.after_repeated:
+                item.after_repeated.append(value)
+            continue
+        item.after.append(value)
+    item.after.sort()
 
 
 # 別のリポジトリの課題の表記（`owner/repo#12`。GitLab の入れ子のグループ `group/sub/proj#12` も）。
@@ -162,30 +205,6 @@ def _issue_number(raw) -> int | None:
         return None
     number = int(text)
     return number if number > 0 else None
-
-
-def parse_workflow(name: str, raw) -> tuple[ticket_model.Workflow | None, list[Problem]]:
-    bad = [Problem(SEVERITY_ERROR, name, f"`{ticket_model.WORKFLOW_KEY}` の形が読めない")]
-    if not isinstance(raw, dict):
-        return None, bad
-    order = _text(raw.get("order")).strip()
-    waits_raw = raw.get("waits") or {}
-    review_raw = raw.get("review_at") or {}
-    if order not in (ticket_model.WORKFLOW_SEQUENTIAL, ticket_model.WORKFLOW_DAG):
-        return None, bad
-    if not isinstance(waits_raw, dict) or not isinstance(review_raw, dict):
-        return None, bad
-    wf = ticket_model.Workflow(order=order)
-    try:
-        for k, v in waits_raw.items():
-            if not isinstance(v, list):
-                return None, bad
-            wf.waits[int(k)] = sorted(int(x) for x in v)
-        for k, v in review_raw.items():
-            wf.review_at[int(k)] = int(v)
-    except (TypeError, ValueError):
-        return None, bad
-    return wf, []
 
 
 def load(path: str) -> tuple[ticket_model.Ticket | None, list[Problem]]:
@@ -326,7 +345,8 @@ def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Pro
         if ticket.is_child:
             problems.append(Problem(SEVERITY_WARN, name, f"`{key}` は親だけの欄。子では読まない"))
             continue
-        items, bad = _plan(name, key, raw_plan)
+        # フィードバック計画の番号は全体計画の続き。
+        items, bad = _plan(name, key, raw_plan, 1 if key == "plan" else len(ticket.plan) + 1)
         problems.extend(bad)
         if items is None:
             return True
@@ -334,14 +354,8 @@ def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Pro
             ticket.plan = items
         else:
             ticket.feedback = items
-
-    raw_workflow = front.get(ticket_model.WORKFLOW_KEY)
-    if raw_workflow is not None and not ticket.is_child:
-        workflow, bad = parse_workflow(name, raw_workflow)
-        problems.extend(bad)
-        if workflow is None:
-            return True
-        ticket.workflow = workflow
+    # `workflow:` の欄は読まない。待ち方は計画の `after` から計算する（`workflow.compute`）。
+    # 欄があれば `--agree`・`--lint`・判定が error にする（手で書いた欄が効くと読ませない）。
 
     raw_issue = front.get("issue")
     if raw_issue is not None:
@@ -612,8 +626,6 @@ def scan_all(
                     continue
                 ticket.state, ticket.tree, ticket.tree_root = state, t.name, t.root
                 ticket.project = place_project
-                # 待ち方のコピーは `--agree` だけが書く。提案に書かれていても読まない。
-                ticket.workflow = None
                 # `raw` に `project` を差し込まない。承認は提案のバイト列をそのまま動かすので、
                 # 書かない欄をダイジェスト（`agree_digest.approval_digest`）に入れることになる。
                 # 承認済みチケットの `project` は置き場（ツリー）から決まる（`approval.scan_all`）。

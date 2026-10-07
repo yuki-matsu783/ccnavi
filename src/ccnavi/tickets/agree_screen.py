@@ -162,13 +162,14 @@ def screen(
             lines.append("■ 全体計画")
             lines.append(
                 "    承認すると、この順序で進めることに合意したことになる。"
-                "前のフェーズが閉じるまで、次のフェーズの子は承認できない"
+                "各フェーズの子は、そのフェーズが待つフェーズ（下の待ち方）が閉じてレビューが"
+                "済むまで承認できない"
             )
             lines += _plan_lines(t.plan, 1, cand_types)
-            lines += _workflow_lines(t, workflow.compute(t, cand_types))
             if t.feedback is not None:
                 lines.append("■ フィードバック計画")
                 lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or ["    対応なし"]
+            lines += _workflow_lines(t, workflow.compute(t))
         if not t.is_child and t.issue is not None:
             lines.append(f"■ 課題: {ticket_mod.issue_label(t)}")
             lines.append(
@@ -225,12 +226,12 @@ def _plan_lines(items: list[ticket_model.PlanItem], start: int, types: dict | No
 
 
 def _workflow_lines(t: ticket_model.Ticket, wf: ticket_model.Workflow) -> list[str]:
-    """`dag` の計画の待ち。辺の書き漏れをユーザが見つける場所（設計 9.7）。"""
+    """計画の待ち。全部の番号と、すぐ始まる項。線の書き漏れをユーザが見つける場所（設計 9.7）。"""
     found = workflow.lines(t, wf)
     if not found:
         return []
     return [
-        "■ 待ち方（承認すると親にコピーし、後から phases.yml を直しても変わらない）",
+        "■ 待ち方（計画の項の after から決まる。後から phases.yml を直しても変わらない）",
         *("    " + x for x in found),
     ]
 
@@ -239,23 +240,21 @@ def _plan_diff_lines(
     current: ticket_model.Ticket, revised: ticket_model.Ticket, types: dict | None
 ) -> list[str]:
     lines = []
-    if current.plan != revised.plan:
+    if approval.plan_signature(current, "plan") != approval.plan_signature(revised, "plan"):
         lines.append("■ 全体計画の変更")
         lines.append("    いま:")
         lines += ["    " + x for x in _plan_lines(current.plan, 1, types)]
         lines.append("    改版:")
         lines += ["    " + x for x in _plan_lines(revised.plan, 1, types)]
-    fresh = workflow.compute(revised, types)
-    held = current.workflow
-    if held is None or held.as_raw() != fresh.as_raw():
+    held, fresh = workflow.compute(current), workflow.compute(revised)
+    before, after = workflow.lines(current, held), workflow.lines(revised, fresh)
+    if before != after:
         lines.append("■ 待ち方の変更")
-        before = workflow.lines(current, held) if held is not None else []
-        after = workflow.lines(revised, fresh)
         lines.append("    いま:")
-        lines += ["        " + x for x in before] or ["        一直線（前の番号を全部待つ）"]
+        lines += ["        " + x for x in before]
         lines.append("    改版:")
-        lines += ["        " + x for x in after] or ["        一直線（前の番号を全部待つ）"]
-    if current.feedback != revised.feedback:
+        lines += ["        " + x for x in after]
+    if approval.plan_signature(current, "feedback") != approval.plan_signature(revised, "feedback"):
         lines.append("■ フィードバック計画")
         start = len(revised.plan) + 1
         lines += _plan_lines(revised.feedback or [], start, types) or [

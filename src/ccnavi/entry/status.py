@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ..hook import c1
-from ..infra import fsio, gitcmd, settings, tree
+from ..infra import gitcmd, settings, tree
 from ..tickets import (
     approval,
     approval_checks,
@@ -288,25 +288,6 @@ class _Family:
         review_left = phase.resumed_review(self.root, self.conf, t, raw=self.raw)
         if review_left:
             warns.append(review_left)
-        if (
-            not t.is_child
-            and t.has_plan
-            and not approval_checks.has_record(t)
-            and not fsio.lexists(
-                approval.workflow_path(settings.approved_dir(self.conf, t.tree_root), t.ticket)
-            )
-        ):
-            warns.append(
-                "待ち方の固定（phases/<親>/workflow.yml）が無いので、全体計画を一直線"
-                "（前の番号を全部待つ）で読んでいる。並行にしたければ、改版でユーザに"
-                " --agree を通してもらう"
-            )
-        if t.workflow_record_differs:
-            warns.append(
-                "古い形の workflow: 欄の待ち方が今の phases.yml から計算した待ち方と違うので、"
-                "全体計画を一直線（前の番号を全部待つ）で読んでいる。並行にしたければ、改版でユーザに"
-                " --agree を通してもらう"
-            )
         lines = [f"    止まっている理由: {s}" for s in stops]
         lines += [f"    注意: {w}" for w in warns]
         nexts: list[str] = []

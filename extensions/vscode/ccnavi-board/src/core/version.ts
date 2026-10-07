@@ -19,7 +19,7 @@ export const VERSION_SCHEMA = 1;
  * 拡張が頼る実行ファイルの契約の版。src/ccnavi/entry/version.py の COMPAT、ccnavi-common.sh の CCNAVI_COMPAT と揃える
  * （tests/sh/test_compat_skew.py が 3 か所を見比べる）。上げ方は src/ccnavi/entry/version.py の説明のとおり
  */
-export const EXTENSION_COMPAT = 8;
+export const EXTENSION_COMPAT = 9;
 
 export interface VersionInfo {
   readonly schema: number;

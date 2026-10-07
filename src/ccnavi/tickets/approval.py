@@ -31,7 +31,7 @@
 （改行も BOM も変えない）。どの経路で承認しても承認済みチケットは提案とバイト単位で同じになり、
 欄の有無から「承認が途中で止まった」と読み違える形が無くなる。前の版は承認の記録
 （`ccnavi_approved`）・`project:`・`workflow:` を書き足していた。残っている古い承認済みチケットは
-そのまま読む（消さない）。
+そのまま読む（消さない。`workflow:` の欄は読まない）。
 
 ## チケットは 1 本のファイルで、コピーを持たない
 
@@ -51,13 +51,15 @@
 `phases/<親>/<N>.<種類>` に、依頼・レビュー済み・省略・通知済みのマーカーを置く。
 レビューが済むまで止める判定（phase.py）はこれを見る。中身は JSON 1 つで、いつ誰が置いたかが入る。
 
-## 待ち方の固定
+## 待ち方は計画から都度計算する
 
-全体計画の待ち方（`workflow.compute` の結果）は、承認のときに `phases/<親>/workflow.yml` へ
-固定する（`--agree` の新規の承認と改版が書く）。承認のあとに `phases.yml` が変わっても、作業中の
-親の待ち方と延期の引き受け手がユーザの見ていないところで変わらないようにするため。読む側は
-承認済みチケットを読むときにこのファイルを `Ticket.workflow` に入れる（`load_copy`）。
-手で動かした承認にはこのファイルが無く、一直線で読む。
+計画を持つ親の待ち方（`workflow.compute` の結果）は、承認済みチケットを読むたびに計画の項の
+`after` から計算して `Ticket.workflow` に入れる（`load_copy`）。ファイルにもチケットの欄にも
+持たない。承認済みチケットの計画は承認済みの置き場にあり、変えられるのは改版（`--agree`）と
+ユーザの手だけなので、計算の元も固定されている。`phases.yml` は計算の入力にならないので、承認の
+あとに直しても進行中の親の待ち方は変わらない。手で動かした承認も同じに計画の `after` で読む。
+前の版が書いていた待ち方のファイル（`phases/<親>/workflow.yml`）が残っていても読まない
+（`--lint` が warn で言う）。
 """
 
 from __future__ import annotations
@@ -65,14 +67,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-import yaml
-
-from ..infra import fsio, settings, tree, yamlread
+from ..infra import fsio, settings, tree
 from . import (
     approval_checks,
-    approval_marks,
     archive,
-    phasetypes,
     syncstate,
     ticket_fold,
     ticket_model,
@@ -189,12 +187,12 @@ def load_copy(
     組み込みの deny が破れてエージェントが `review/` に書ければ偽れる。2 つめの保護としての強さは
     変わらない。前の版の承認済みチケットも `finish` を通れば `completed_at` を持つので読める。
 
-    `approved_dir` はそのチケットの承認済みの置き場。渡せば、親の待ち方を
-    `phases/<親>/workflow.yml` から読んで `Ticket.workflow` に入れる。
-    チケットの中の `workflow:` 欄は、
-    前の版の承認の記録を持つ古い承認済みチケットのときだけ読む（ファイルが在ればファイルを採る）。
-    それ以外のチケットの `workflow:` 欄は読まず、`blocking_problems` が止める。
+    `approved_dir` は前の版との互換のために受け取るだけで、読まない（待ち方のファイルは読まない）。
+    計画を持つ親には、計画の項の `after` から計算した待ち方（`workflow.compute`）を入れる。
+    チケットの中の `workflow:` 欄は読まない（記録を持たない承認済みチケットにあれば
+    `blocking_problems` が止める）。
     """
+    del approved_dir
     ticket, problems = ticket_mod.load(path)
     if ticket is None:
         detail = problems[0].detail if problems else "チケットとして読めない"
@@ -209,81 +207,12 @@ def load_copy(
         ticket.approved_at = str(meta.get("approved_at") or "")
         ticket.source_tree = str(meta.get("source_tree") or "")
         ticket.source_path = str(meta.get("source_path") or "")
-        # 欄の待ち方を採るかは、今の phases.yml と見比べてから決める（`settle_old_workflows`）。
-        ticket.workflow_from_record = ticket.workflow is not None
-    else:
-        # 新しい形では待ち方は欄に無い。手で書いた `workflow:` を承認済みの待ち方として効かせない。
-        ticket.workflow = None
-    if approved_dir and not ticket.is_child:
-        held, why = read_workflow(approved_dir, ticket.ticket)
-        if why:
-            ticket.workflow = None
-            ticket.workflow_unreadable = why
-            ticket.workflow_from_record = False
-        elif held is not None:
-            ticket.workflow = held
-            ticket.workflow_from_record = False
+    if not ticket.is_child and ticket.has_plan:
+        ticket.workflow = workflow.compute(ticket)
     # tree は「どのツリーで見つけたか」。scan_all が入れ直す。source_tree（どのツリーの
     # 提案をコピーしたか）とは違うもので、子のワークツリーの checkout では食い違う。
     ticket.tree = ticket.source_tree
     return ticket, ""
-
-
-def workflow_path(approved_dir: str, parent: str) -> str:
-    """親の待ち方を固定するファイル（`phases/<親>/workflow.yml`）。"""
-    return os.path.join(
-        approved_dir, approval_marks.PHASES_DIR, parent, approval_marks.WORKFLOW_FILE
-    )
-
-
-def workflow_bytes(wf: ticket_model.Workflow) -> bytes:
-    """待ち方のファイルの中身。改行は LF に固定する。
-
-    Chrome のコミットと手元で同じバイト列にするため。
-    """
-    dumped = yaml.safe_dump(
-        wf.as_raw(), allow_unicode=True, sort_keys=False, default_flow_style=False
-    )
-    return dumped.encode("utf-8")
-
-
-def read_workflow(approved_dir: str, parent: str) -> tuple[ticket_model.Workflow | None, str]:
-    """親の待ち方のファイルを読む。無ければ (None, "")、読めなければ (None, 理由)。
-
-    fsio を通す。承認の plan の中では同じ承認で書いた後の姿を読み、承認のダイジェストの
-    `read_set` にも入る（判定が読んだものとして）。
-    """
-    path = workflow_path(approved_dir, parent)
-    data = fsio.read_bytes(path)
-    if data is None:
-        if fsio.lexists(path):
-            return None, f"待ち方のファイル {path} を読めない"
-        return None, ""
-    try:
-        raw = yamlread.safe_load(data.decode("utf-8"))
-    except (UnicodeDecodeError, yamlread.LoadError, yaml.YAMLError):
-        # 構文の誤りは YAMLError、深すぎる入れ子など組み立ての途中の失敗は LoadError で来る
-        return None, f"待ち方のファイル {path} を YAML として読めない"
-    wf, bad = ticket_mod.parse_workflow(parent, raw)
-    if wf is None:
-        detail = bad[0].detail if bad else "形が読めない"
-        return None, f"待ち方のファイル {path} の{detail}"
-    return wf, ""
-
-
-def write_workflow(approved_dir: str, parent: str, wf: ticket_model.Workflow) -> str:
-    """親の待ち方のファイルを書く。書けなかった理由を返す。書けたら空文字。
-
-    同じ中身が既に在れば書かない（改版で待ち方が変わらないときに、変わらないファイルを
-    書いたことにしない。Chrome はそれを 1 コミットの変更として運ぶ）。
-    """
-    path = workflow_path(approved_dir, parent)
-    content = workflow_bytes(wf)
-    if fsio.read_bytes(path) == content:
-        return ""
-    with fsio.policy(message="待ち方を書けない ({reason})"):
-        failed = fsio.write_bytes_atomic(path, content)
-    return f"待ち方を書けない ({failed})" if failed else ""
 
 
 def trees(conf: settings.Settings, root: str) -> list[tree.Tree]:
@@ -312,33 +241,7 @@ def scan_all(
             c.tree, c.tree_root, c.project = t.name, t.root, t.project
         found.extend(got)
         notes.extend(complaints)
-    settle_old_workflows(conf, root, found)
     return found, notes
-
-
-def settle_old_workflows(
-    conf: settings.Settings, root: str, found: list[ticket_model.Ticket]
-) -> None:
-    """古い形の `workflow:` 欄の待ち方を、今の phases.yml から計算した待ち方と同じときだけ採る。
-
-    古い形とみなすのは記録 `ccnavi_approved` の欄が揃ったものだが、記録は手で書ける。欄の待ち方を
-    そのまま採ると、手で書いた記録と `workflow:` で、ユーザが承認していない待ち方（並行に進める
-    など）を効かせられる。そこで、今の定義から `workflow.compute` で計算した待ち方と同じときだけ
-    欄を採り、違えば欄を使わず一直線（前の番号を全部待つ。いちばん厳しい形）で読む。
-    `Ticket.workflow_record_differs` を立て、`--lint` と status が warn で言う。
-
-    承認のあとに phases.yml を直した本物の古い承認も一直線に倒れる。止まる側で、並行に戻すには
-    改版で `--agree` を通す（待ち方のファイルが書かれ、欄より先に読まれる）。
-    """
-    cache: dict[str, dict | None] = {}
-    for t in found:
-        if not t.workflow_from_record or t.workflow is None:
-            continue
-        if t.project not in cache:
-            cache[t.project] = phasetypes.load_types(conf, root, t.project)
-        if t.workflow.as_raw() != workflow.compute(t, cache[t.project]).as_raw():
-            t.workflow = None
-            t.workflow_record_differs = True
 
 
 def review_all(conf: settings.Settings, root: str) -> tuple[list[ticket_model.Ticket], list[str]]:
@@ -360,7 +263,6 @@ def review_all(conf: settings.Settings, root: str) -> tuple[list[ticket_model.Ti
             c.project = t.project
         found.extend(got)
         notes.extend(complaints)
-    settle_old_workflows(conf, root, found)
     return found, notes
 
 
@@ -538,9 +440,33 @@ def revision_elsewhere(t: ticket_model.Ticket, current: ticket_model.Ticket | No
     return current is not None and not t.is_child and t.has_plan and plan_differs(t, current)
 
 
+def plan_signature(t: ticket_model.Ticket, part: str) -> tuple | None:
+    """計画の比べる形。項ごとの「定義・`review`・推移的に辿った待ち（`workflow.compute`）」の並び。
+
+    `after` の書き方そのもの（`PlanItem.__eq__` も `after` を見ない）は比べない。`after: [2]` と、
+    `--explain` の「待つ: 1, 2」を写した `after: [1, 2]` は同じ待ちなので、違いにしない。
+    `part` は `plan` か `feedback`。フィードバック計画が無い（None）ことと空（`[]`）は分ける。
+    """
+    if part == "feedback" and t.feedback is None:
+        return None
+    wf = workflow.compute(t)
+    start = 1 if part == "plan" else len(t.plan) + 1
+    items = t.plan if part == "plan" else (t.feedback or [])
+    return tuple(
+        (item.type, item.review, tuple(wf.waits.get(n, [])))
+        for n, item in enumerate(items, start=start)
+    )
+
+
 def plan_differs(proposal: ticket_model.Ticket, current: ticket_model.Ticket) -> bool:
-    """提案の計画（全体計画かフィードバック計画）が承認済みチケットと違うか。改版の条件。"""
-    return proposal.plan != current.plan or proposal.feedback != current.feedback
+    """提案の計画（全体計画かフィードバック計画）が承認済みチケットと違うか。改版の条件。
+
+    比べるのは `plan_signature`。待ち方は計画から決まるので、待ち方だけの改版は無い。
+    """
+    return any(
+        plan_signature(proposal, part) != plan_signature(current, part)
+        for part in ("plan", "feedback")
+    )
 
 
 def revision_elsewhere_text(

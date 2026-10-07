@@ -18,7 +18,6 @@ from . import (
     history,
     syncstate,
     ticket_model,
-    workflow,
 )
 from . import ticket as ticket_mod
 
@@ -176,13 +175,12 @@ def _folded(path: str) -> str:
 
 
 def carried(cand: agree_candidates.Candidate) -> bytes:
-    """承認で書き込む中身のバイト列。承認済みチケットと、親なら待ち方のファイル。
+    """承認で書き込む中身のバイト列。承認済みチケットだけ（待ち方は書かない）。
 
     新規は提案のバイト列そのもの（`approval_ops.admit` が動かす中身）。読んだバイト列の
     ダイジェストを判定の読み（`read_set`）にも入れる。読みの記録は改行を揃えた本文でダイジェストを取るので、それだけでは
     改行や BOM だけの書き換えを覆わない。改版は承認済みチケットの frontmatter の計画だけを差し替え、
-    本文は承認済みチケットのものを残す（`revise_copy`）。待ち方は `phases/<親>/workflow.yml` に
-    書く中身（`approval.workflow_bytes`）を後ろに足す。区切りは件数つきのダイジェストの並びで決まる
+    本文は承認済みチケットのものを残す（`revise_copy`）。区切りは件数つきのダイジェストの並びで決まる
     （`approval_digest`）ので、ここでは長さを頭に付けてつなぐ。
     """
     t = cand.ticket
@@ -194,22 +192,7 @@ def carried(cand: agree_candidates.Candidate) -> bytes:
     else:
         ticket_bytes = fsio.read_bytes(t.path) or b""
         fsio.note_exact(t.path, ticket_bytes)
-    wf = _workflow_to_write(cand)
-    workflow_bytes = approval.workflow_bytes(wf) if wf is not None else b""
-    return b"%d\n" % len(ticket_bytes) + ticket_bytes + workflow_bytes
-
-
-def _workflow_to_write(cand: agree_candidates.Candidate) -> ticket_model.Workflow | None:
-    """この承認で `phases/<親>/workflow.yml` に書く待ち方。書かないなら None。
-
-    新規は計画を持つ親だけ。改版はいつも書く（計画か待ち方が変わったから改版になる）。
-    """
-    t = cand.ticket
-    if t.is_child:
-        return None
-    if cand.is_revision or t.has_plan:
-        return workflow.compute(t, cand.types)
-    return None
+    return b"%d\n" % len(ticket_bytes) + ticket_bytes
 
 
 def revise_copy(
@@ -217,28 +200,18 @@ def revise_copy(
     current: ticket_model.Ticket,
     revised: ticket_model.Ticket,
     feedback_planned: bool,
-    types: dict | None = None,
 ) -> str:
-    """承認済みチケットの計画を差し替え、待ち方を `phases/<親>/workflow.yml` に書き直す。
+    """承認済みチケットの計画を差し替える。
 
     範囲と本文はそのまま。改版の時刻はチケットに書かない（状態の履歴の `revised` に残る。
-    フィードバック計画の改版は `feedback: true` を添える）。
-
-    待ち方を先に書き、チケットを書く段で落ちたら待ち方を前の中身へ戻す。片方だけが新しい形
-    （新しい計画に古い待ち方、古い計画に新しい待ち方）を残さないため。
+    フィードバック計画の改版は `feedback: true` を添える）。待ち方は書かない（承認済みチケットの
+    計画から都度計算する）。
     """
-    held = approval.workflow_path(approved_dir, current.ticket)
-    restore = ((held, fsio.read_bytes(held)),)
-    failed = approval.write_workflow(approved_dir, current.ticket, workflow.compute(revised, types))
-    if failed:
-        return failed
     current.raw = revised_front(current, revised)
-    with fsio.policy(restore=restore):
-        failed = approval_marks.write_ticket(
-            approval.copy_path(approved_dir, current.ticket), ticket_mod.render(current)
-        )
+    failed = approval_marks.write_ticket(
+        approval.copy_path(approved_dir, current.ticket), ticket_mod.render(current)
+    )
     if failed:
-        fsio.put_back(restore)
         return failed
     history.note(
         approved_dir,
@@ -255,8 +228,8 @@ def revised_front(current: ticket_model.Ticket, revised: ticket_model.Ticket) ->
     """改版で書く frontmatter。承認済みチケットの frontmatter の計画を差し替えたコピー。
 
     `current` は書き換えない。承認のダイジェスト（`digest`）も同じものから組むので、見せた
-    中身と書く中身が食い違わない。待ち方は書かない（`phases/<親>/workflow.yml` に書く）。
-    前の版の承認済みチケットに残る `workflow:` 欄はそのまま残す（ファイルが在ればファイルを読む）。
+    中身と書く中身が食い違わない。項の `after` も書く（`PlanItem.as_raw`）。前の版の承認済み
+    チケットに残る `workflow:` 欄はそのまま残す（読まない）。
     """
     front = dict(current.raw)
     front["plan"] = [item.as_raw() for item in revised.plan]
