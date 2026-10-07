@@ -37,13 +37,11 @@ def compute(parent: ticket_model.Ticket) -> ticket_model.Workflow:
     planned = len(parent.plan)
     for n, item in enumerate(parent.plan, start=1):
         found: set[int] = set()
-        stack = [m for m in item.after if 1 <= m < n]
-        while stack:
-            m = stack.pop()
-            if m in found:
-                continue
-            found.add(m)
-            stack.extend(x for x in wf.waits.get(m, []) if x not in found)
+        # 前の番号の待ちは推移的に閉じているので、直接の先行ごとに 1 度足せば済む（O(n²)）。
+        for m in item.after:
+            if 1 <= m < n:
+                found.add(m)
+                found.update(wf.waits.get(m, []))
         wf.waits[n] = sorted(found)
     for i, _ in enumerate(parent.feedback or []):
         n = planned + 1 + i
