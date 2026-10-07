@@ -1,0 +1,68 @@
+{
+ "about": "計画（plan / feedback の項）と、そこから計算する待ち方（waits・review_at）の見本の表。待ち方の決まりは「after を推移的に辿る」「延期は、延期した項を待つ、延期していない最小の番号が引き受ける」の 2 つだけ。実行ファイルの答えがこの表と同じことを tests/ticket/test_phases_dag.py が確かめる。決まりを直すときは、この表も一緒に直す",
+ "cases": [
+  {
+   "name": "1 項",
+   "plan": ["design"],
+   "waits": {"1": []},
+   "review_at": {}
+  },
+  {
+   "name": "一直線",
+   "plan": ["research", {"type": "design", "after": [1]}, {"type": "implement", "after": [2]}],
+   "waits": {"1": [], "2": [1], "3": [1, 2]},
+   "review_at": {}
+  },
+  {
+   "name": "並行して合流する",
+   "plan": [
+    "design",
+    {"type": "acceptance", "after": [1]},
+    {"type": "implement", "after": [1]},
+    {"type": "docs", "after": [2, 3]}
+   ],
+   "waits": {"1": [], "2": [1], "3": [1], "4": [1, 2, 3]},
+   "review_at": {}
+  },
+  {
+   "name": "after を書かない項は何も待たない",
+   "plan": ["implement", "implement", {"type": "docs", "after": [1, 2]}],
+   "waits": {"1": [], "2": [], "3": [1, 2]},
+   "review_at": {}
+  },
+  {
+   "name": "推移的に並べて写しても同じ",
+   "plan": ["research", {"type": "design", "after": [1]}, {"type": "implement", "after": [1, 2]}],
+   "waits": {"1": [], "2": [1], "3": [1, 2]},
+   "review_at": {}
+  },
+  {
+   "name": "延期は待つ項のうち最小の番号が引き受ける",
+   "plan": [
+    "design",
+    {"type": "acceptance", "review": "defer", "after": [1]},
+    {"type": "implement", "after": [1]},
+    {"type": "docs", "after": [2, 3]}
+   ],
+   "waits": {"1": [], "2": [1], "3": [1], "4": [1, 2, 3]},
+   "review_at": {"2": 4}
+  },
+  {
+   "name": "延期した項を延期した項が待つ",
+   "plan": [
+    {"type": "design", "review": "defer"},
+    {"type": "acceptance", "review": "defer", "after": [1]},
+    {"type": "docs", "after": [2]}
+   ],
+   "waits": {"1": [], "2": [1], "3": [1, 2]},
+   "review_at": {"1": 3, "2": 3}
+  },
+  {
+   "name": "フィードバック計画は全体計画の番号を全部と、前のフィードバックの番号を待つ",
+   "plan": ["design", {"type": "docs", "after": [1]}],
+   "feedback": [{"type": "fixup", "review": "defer"}, {"type": "fixup", "after": [3]}],
+   "waits": {"1": [], "2": [1], "3": [1, 2], "4": [1, 2, 3]},
+   "review_at": {"3": 4}
+  }
+ ]
+}
