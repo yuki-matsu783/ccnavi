@@ -469,6 +469,40 @@ class LockTest(unittest.TestCase):
         found = self.lock(self.CURRENT, revised, {1, 3})
         self.assertTrue(any("3" in d and "待ち" in d for d in found), found)
 
+    def test_copying_the_transitive_waits_into_a_fixed_number_passes(self):
+        """固定した番号の待ちは推移的な形で比べる。「待つ: 1, 2, 3」を写しても通す。"""
+        revised = [
+            item("design"),
+            item("acceptance", after=[1]),
+            item("implement", after=[1]),
+            item("docs", after=[1, 2, 3]),
+            item("extra", after=[4]),
+        ]
+        self.assertEqual(self.lock(self.CURRENT, revised, {1, 2, 3, 4}), [])
+
+    def test_an_unchanged_direct_after_with_a_changed_transitive_wait_is_refused(self):
+        """直接の `after` が同じでも、推移的な待ちが変われば固定した番号は落とす。"""
+        current = [
+            item("design"),
+            item("acceptance", after=[1]),
+            item("implement", after=[2]),
+            item("docs", after=[3]),
+        ]
+        revised = [
+            item("design"),
+            item("acceptance"),
+            item("implement", after=[2]),
+            item("docs", after=[1, 3]),
+        ]
+        found = self.lock(current, revised, {1, 3})
+        self.assertTrue(
+            any(
+                "3 番目" in d and "待ちを変えられない" in d and "いま待つ: 1, 2、改版: 2" in d
+                for d in found
+            ),
+            found,
+        )
+
     def test_a_fixed_number_waiting_on_an_unfixed_one_compares_the_item(self):
         """子を手で動かした親では、固定した 3 が子の無い 2 を待つことがある。"""
         current = [
