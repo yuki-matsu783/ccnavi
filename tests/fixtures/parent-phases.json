@@ -1,0 +1,92 @@
+{
+ "about": "親の phases:（計画が使うフェーズ定義の写し）を承認（--agree）で確かめる決まりの見本の表。写しの各定義は承認したときの phases.yml の同じ名前の定義と読んだ形で同じでなければ error、使う定義は写しに書く（無ければ error）、写しの名前が phases.yml に無ければ error、phases.yml にあって写しに無い定義は何も言わない、写しにあってどの項も使わない定義は warn。errors と warns は、その重さの苦情の文に含まれる語句（順不同、全部が出る）。空なら、その重さの苦情は 1 つも出ない。tests/ticket/test_parent_phases.py が確かめる。決まりを直すときは、この表も一緒に直す",
+ "phases_yml": {
+  "research": {"kind": "work", "title": "調査", "review": "none", "scope": ["wip/research/*"], "deliverables": ["wip/research/summary.md"]},
+  "design": {"kind": "work", "title": "設計", "review": "mr", "scope": ["wip/design/*"]},
+  "implement": {"kind": "work", "title": "実装", "review": "mr", "scope": "inherit"},
+  "implement-feedback": {"kind": "feedback", "title": "実装フィードバック対応", "review": "mr"}
+ },
+ "cases": [
+  {
+   "name": "写しが phases.yml と同じ",
+   "plan": ["research", {"type": "design", "after": [1]}],
+   "phases": {
+    "research": {"kind": "work", "title": "調査", "review": "none", "scope": ["wip/research/*"], "deliverables": ["wip/research/summary.md"]},
+    "design": {"kind": "work", "title": "設計", "review": "mr", "scope": ["wip/design/*"]}
+   },
+   "errors": [],
+   "warns": []
+  },
+  {
+   "name": "書き方の違い（キーの順・既定値の省略・inherit）は同じとみなす",
+   "plan": ["design", {"type": "implement", "after": [1]}],
+   "phases": {
+    "design": {"scope": ["wip/design/*"], "title": "設計", "kind": "work"},
+    "implement": {"title": "実装", "review": "mr"}
+   },
+   "errors": [],
+   "warns": []
+  },
+  {
+   "name": "値が違う",
+   "plan": ["design"],
+   "phases": {"design": {"kind": "work", "title": "設計", "review": "none", "scope": ["wip/design/*"]}},
+   "errors": ["`design` が phases.yml の定義と違う", "review", "--fill-phases"],
+   "warns": []
+  },
+  {
+   "name": "写しの名前が phases.yml に無い",
+   "plan": ["extra"],
+   "phases": {"extra": {"kind": "work", "title": "余分"}},
+   "errors": ["`extra` は phases.yml に無い"],
+   "warns": []
+  },
+  {
+   "name": "項の定義が写しに無い",
+   "plan": ["research", {"type": "design", "after": [1]}],
+   "phases": {
+    "research": {"kind": "work", "title": "調査", "review": "none", "scope": ["wip/research/*"], "deliverables": ["wip/research/summary.md"]}
+   },
+   "errors": ["`design` が `phases:` に無い"],
+   "warns": []
+  },
+  {
+   "name": "計画があるのに写しが無い",
+   "plan": ["design"],
+   "phases": null,
+   "errors": ["`phases:` が無い"],
+   "warns": []
+  },
+  {
+   "name": "どの項も使わない定義は warn",
+   "plan": ["design"],
+   "phases": {
+    "design": {"kind": "work", "title": "設計", "review": "mr", "scope": ["wip/design/*"]},
+    "implement": {"kind": "work", "title": "実装", "review": "mr"}
+   },
+   "errors": [],
+   "warns": ["`implement` はどの項も使っていない"]
+  },
+  {
+   "name": "kind が置いた計画と合わない",
+   "plan": ["implement-feedback"],
+   "phases": {"implement-feedback": {"kind": "feedback", "title": "実装フィードバック対応", "review": "mr"}},
+   "errors": ["kind `feedback`"],
+   "warns": []
+  },
+  {
+   "name": "写しの定義の形の誤り",
+   "plan": ["design"],
+   "phases": {"design": "設計"},
+   "errors": ["定義の中身が辞書ではない"],
+   "warns": []
+  },
+  {
+   "name": "写しが辞書でない",
+   "plan": ["design"],
+   "phases": ["design"],
+   "errors": ["定義の id をキーにした辞書"],
+   "warns": []
+  }
+ ]
+}

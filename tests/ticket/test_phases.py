@@ -24,7 +24,7 @@ import tempfile
 import unittest
 
 from ccnavi.tickets import history
-from tests import common_path, config_path
+from tests import common_path, config_path, phasecopy
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import ROOT, RULES, git, read_json, write
 
@@ -99,7 +99,20 @@ def plan_item_lines(items, start=1) -> list[str]:
     return lines
 
 
-def parent_text(name, plan, feedback=None, allow=("src/*", "wip/*", "tests/*"), issue=None):
+def parent_text(
+    name, plan, feedback=None, allow=("src/*", "wip/*", "tests/*"), issue=None, copy=PHASES
+):
+    """親の提案の本文。
+
+    `copy` は計画が使う定義を写す元の `phases.yml`（None なら `phases:` を書かない）。
+    計画を持つ親は、計画が使う定義の写し（`phases:`）を持つ。`phases.yml` を書き換えるテストは、
+    同じ本文を `copy` に渡す。
+    """
+    text = _parent_text(name, plan, feedback, allow, issue)
+    return text if copy is None else phasecopy.insert(text, copy)
+
+
+def _parent_text(name, plan, feedback, allow, issue):
     lines = ["---", "version: 1", f"ticket: {name}"]
     if issue is not None:
         lines.append(f"issue: {issue}")

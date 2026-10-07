@@ -20,6 +20,7 @@ import unittest
 
 from ccnavi.entry import version
 from tests import ROOT, SRC
+from tests.inproc import run_ccnavi
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 SCRIPTS = os.path.join(ROOT, ".ccnavi", "scripts")
@@ -211,6 +212,20 @@ class CompatAgreesTest(unittest.TestCase):
         見張りは、計画と待ち方の見本の表（tests/fixtures/plan-waits.json）のテストが持つ。
         """
         self.assertGreaterEqual(version.COMPAT, 9)
+
+    def test_v13_the_parent_copy_of_phase_types_ships_with_compat_9(self):
+        """V13 親チケットが計画の使うフェーズ定義の写し（`phases:`）を持ち、承認のあとの判定は
+        `phases.yml` ではなくその写しを読むようになった。写しを書く
+        `--plan-order <親> --fill-phases` も足した。待ち方のファイルを無くした変更（V12）と
+        同じ出荷にするので、版は 9 のまま。
+
+        古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）は写しを読まずに `phases.yml` で
+        判定するので、9 より前とは食い違いとして知らせる。フラグが在るかは `flags` で分かる。
+        """
+        self.assertGreaterEqual(version.COMPAT, 9)
+        flags = run_ccnavi(["--version"], cwd=ROOT).stdout
+        self.assertIn("--plan-order", flags)
+        self.assertIn("--fill-phases", flags)
 
 
 @unittest.skipIf(not SHELL, "sh も bash も見つからない")
