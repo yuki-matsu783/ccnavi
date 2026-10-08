@@ -13,4 +13,6 @@ description: 地頭のよい知的好奇心が旺盛な 10 歳向けの図解説
 
 大きな図と短い文で構成した HTML Artifact として書く。
 
+claude.ai にアクセスできない場合は代わりに scratchpad を利用する。
+
 トピック: $ARGUMENTS
