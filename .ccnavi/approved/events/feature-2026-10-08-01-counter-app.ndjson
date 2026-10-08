@@ -1,0 +1,3 @@
+{"at": "2026-10-07T21:51:19Z", "ticket": "feature-2026-10-08-01-counter-app", "kind": "approved", "from": "todo", "to": "doing", "via": "board", "tree": "feature-2026-10-08-01-counter-app"}
+{"at": "2026-10-07T21:54:35Z", "ticket": "feature-2026-10-08-01-counter-app", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "236064c9fbc9e07427e550574e4e451d046fbcbc"}
+{"at": "2026-10-08T14:34:40Z", "ticket": "feature-2026-10-08-01-counter-app", "kind": "revised", "from": "doing", "to": "doing", "via": "board"}
