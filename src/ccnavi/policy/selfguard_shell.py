@@ -292,6 +292,7 @@ def shell_write_regex(
     bin_path: str = "",
     *extra_clauses: tuple[str, str, str],
     holders: tuple[tuple[str, str], ...] = (),
+    scratchpad_exclude: str = "",
 ) -> str:
     """設定ファイルへシェルから書き込む形。実行ファイルのパスは設定で動くので、
     ここで組み立てる。
@@ -320,6 +321,8 @@ def shell_write_regex(
     holders は行き先を守るものが入っているディレクトリにした形（holder_regex に渡す組）。
     既定のパスのぶん（_HOLDERS）と実行ファイルのぶん（binary_holders）はここで足すので、
     渡すのは設定で動く場所のぶん（guard_shell_regex）。
+
+    scratchpad_exclude は scratchpad/ 除外用の負の先読みパターン。コピー保護（copy_places）に適用する。
     """
     places = [*_PLACES]
     copy_places = [*_COPY_PLACES]
@@ -333,6 +336,9 @@ def shell_write_regex(
             copy_places.append(copy_clause)
         if target_clause:
             target_places.append(target_clause)
+    # scratchpad 除外をコピー保護に適用
+    if scratchpad_exclude:
+        copy_places = [scratchpad_exclude + cp for cp in copy_places]
     where = _folded("(" + "|".join(places) + ")")
     copy_where = _folded("(" + "|".join(copy_places) + ")")
     target_where = _folded("(" + "|".join(target_places) + ")")
@@ -461,6 +467,21 @@ def binary_holders(bin_path: str) -> tuple[tuple[str, str], ...]:
 # 機械ごとの組み立ての置き場。`bin/` の下に並ぶ。
 _BUILD_DIR = r"(?:" + "|".join(platformtag.SYSTEMS) + r")-[a-z0-9_]+"
 
+# scratchpad/ をコピー保護から除外するためのパターン（ワークスペースルート直下の scratchpad/）
+# 実行時に root から組み立てる
+
+def _scratchpad_exclude(root: str) -> str:
+    """scratchpad/ を除外する負の先読み。root が空なら空文字を返す。"""
+    if not root:
+        return ""
+    # root の絶対パスと相対パスの両方をカバー
+    abs_root = os.path.abspath(root)
+    real_root = os.path.realpath(root)
+    bases = sorted({abs_root, real_root})
+    # scratchpad/ で始まるパスを除外（大文字小文字を区別しない）
+    exclude = "|".join(_spelled(b) + r"[\\/]scratchpad[\\/]" for b in bases)
+    return rf"(?!.*(?:{exclude}))"
+
 
 def guard_shell_regex(
     root: str, bin_path: str = "", project_home: str = "", common_files: tuple[str, ...] = ()
@@ -478,8 +499,9 @@ def guard_shell_regex(
         (common_shell_clause(root, path), common_shell_clause(root, path, copy=True), "")
         for path in common_files
     )
+    scratchpad_exclude = _scratchpad_exclude(root)
     return shell_write_regex(
-        bin_path, *clauses, holders=_moved_holders(root, project_home, common_files)
+        bin_path, *clauses, holders=_moved_holders(root, project_home, common_files), scratchpad_exclude=scratchpad_exclude
     )
 
 
