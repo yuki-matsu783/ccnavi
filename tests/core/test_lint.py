@@ -423,7 +423,7 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("版", result.stdout)
 
-    def test_壊れたルールは1件ずつ名指しでerrorになる(self):
+    def test_不正なルールは1件ずつ名指しでerrorになる(self):
         # 落ちたルールは何も言われずに消える。消えた穴は誰も気づかないので、
         # 1 件ずつ id で名指しする。
         result = lint(

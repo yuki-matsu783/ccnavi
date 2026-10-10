@@ -107,7 +107,7 @@ class ReadTest(_Readable, unittest.TestCase):
     def test_コマンド置換は独立したコマンドを走らせる(self):
         self.assertIn("git push", self.readable("echo $(git push origin main)"))
 
-    def test_算術式は落ちる(self):
+    def test_算術式は取り除かれる(self):
         # 中でコマンドは走らない。落とす理由は別にあって、左シフトの `<<` が
         # ヒアドキュメントの区切り記号と同じ表記だから。残すと本文の始まりに
         # 見えて、閉じない本文としてコマンド全体が読めなくなる。

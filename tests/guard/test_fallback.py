@@ -80,7 +80,7 @@ class FallbackTest(unittest.TestCase):
         self.addCleanup(empty.cleanup)
         self.without_rules = empty.name
 
-    def test_壊れたルールでもセッションは死なない(self):
+    def test_不正なルールでもセッションは動き続ける(self):
         # ここが要件の中心。拒否にすると、壊れたファイルを直すための呼び出しまで
         # 止まって回復できなくなる。既定モードが block なので、ルールを置く前に
         # hook を登録しただけでセッションが何もできなくなる。

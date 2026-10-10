@@ -91,7 +91,7 @@ class VerdictTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, "判定を持たないイベントで止めてはいけない")
         self.assertEqual(result.stdout, "")
 
-    def test_直接起動は黙って成功せず失敗する(self):
+    def test_直接起動は成功とならず失敗する(self):
         result = run(payload="")
 
         self.assertNotEqual(
@@ -174,7 +174,7 @@ class ReasonTest(unittest.TestCase):
                 self.assertIn("[ccnavi] DENY_", part, "理由コードを他の件に預けている")
                 self.assertIn("(rule: ", part, "出所を他の件に預けている")
 
-    def test_読めなかった判定は件ごとにそう名乗る(self):
+    def test_読めなかった判定は件ごとに読めなかったと書く(self):
         # 読めなかったという断りは、1 回だけ先頭に置くと、その下の 1 件だけを
         # 読んだユーザには届かない。届かなかったユーザは、書いた覚えのないコマンドを
         # 実行したと告げられたことになる。
@@ -250,7 +250,7 @@ class ReadingTest(unittest.TestCase):
                 out = verdict(self, run(payload=pre_tool_use("Bash", "command", command)))
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
 
-    def test_読めなかった拒否はそう名乗る(self):
+    def test_読めなかった拒否は読めなかったと書く(self):
         # 文字列をコードとして実行する呼び出しは読めないので、生の文字列に当てる。
         # それを言うことが「禁止されたコマンドを実行した」と
         # 「その語がどこかにある」の違いで、次の一手を残すのは後者だけ。
@@ -262,7 +262,7 @@ class ReadingTest(unittest.TestCase):
 
         plain = verdict(self, run(payload=pre_tool_use("Bash", "command", "git push origin main")))
         self.assertNotIn(
-            "raw text", plain["permissionDecisionReason"], "読めた拒否が読めなかったと名乗った"
+            "raw text", plain["permissionDecisionReason"], "読めた拒否に読めなかったと書かれている"
         )
 
 

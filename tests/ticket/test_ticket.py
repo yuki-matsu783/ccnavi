@@ -3230,7 +3230,7 @@ class ScriptShapeTest(unittest.TestCase):
             "着手の時刻と基準点は ccnavi が書く欄なので、正規化した内容に出てはいけない",
         )
 
-    def test_スクリプトの欄の続きの行も落ちる(self):
+    def test_スクリプトの欄の続きの行も除かれる(self):
         after = self.started("cancel_reason: |\n  複数行の\n  理由\n")
 
         self.assertEqual(ticket_fields.script_shape(after), ticket_fields.script_shape(self.body))
@@ -3248,7 +3248,7 @@ class ScriptShapeTest(unittest.TestCase):
             ticket_fields.script_shape(self.body),
         )
 
-    def test_同じ表記の欄でも字下げされていれば落とさない(self):
+    def test_同じ表記の欄でも字下げされていれば除かない(self):
         # 範囲の中に `started_at:` と書いても、欄ではないので正規化した内容に残る。
         nested = self.body.replace('    glob: "src/*"', '    glob: "src/*"\n    started_at: "x"')
 
@@ -3261,7 +3261,7 @@ class ScriptShapeTest(unittest.TestCase):
         self.assertIsNone(ticket_fields.script_shape('{"phase": 1}\n'))
         self.assertIsNone(ticket_fields.script_shape(""))
 
-    def test_閉じの無い前置きは正規化した内容を持たない(self):
+    def test_閉じていない前置きは正規化した内容を持たない(self):
         self.assertIsNone(ticket_fields.script_shape("---\nid: i0001\n本文\n"))
 
 

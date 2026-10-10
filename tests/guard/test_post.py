@@ -245,7 +245,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(result.returncode, 0, "1 度伝えた変更を呼び出しのたびに繰り返さない")
         self.assertEqual(result.stderr, "")
 
-    def test_同じ場所が別の壊れ方をしたらもう一度言う(self):
+    def test_同じ場所が別の変わり方をしたらもう一度言う(self):
         self.run_hook(command="ls")
         self.dirty()
         self.run_hook(command="python build.py")
@@ -518,7 +518,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(self.records()[-1]["reason"], "tool-cannot-write")
 
-    def test_git_の作業ツリーでなければ黙って通す(self):
+    def test_git_の作業ツリーでなければ何も言わずに通す(self):
         outside = tempfile.mkdtemp(prefix="ccnavi-plain-")
         self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
         self.repo = outside

@@ -102,7 +102,7 @@ def main() -> None:
     print("  入れ子は長さに比例、列挙は 2 乗で伸びる")
 
     print()
-    print("=== 組み立てが落ちる長さ（しきい値 256 の根拠）===")
+    print("=== 組み立てが失敗する長さ（しきい値 256 の根拠）===")
     low, high = 1, 900
     while low < high:
         mid = (low + high + 1) // 2

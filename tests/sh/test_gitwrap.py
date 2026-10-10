@@ -226,7 +226,7 @@ class RejectTest(GitWrapperTest):
             with self.subTest(args=args):
                 result = self.assertRejected(*args)
                 stderr = result.stderr
-                self.assertIn("ccnavi-git.sh", stderr, f"代わりの形を名乗っていない: {stderr}")
+                self.assertIn("ccnavi-git.sh", stderr, f"代わりの形を示していない: {stderr}")
                 for form in ("git stash", "git restore", "git branch", "git worktree"):
                     self.assertNotIn(
                         form, stderr.replace("ccnavi-git.sh", ""), f"生の git を勧めた: {stderr}"

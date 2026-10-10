@@ -689,7 +689,7 @@ class WriterFailureTest(CoreHarness):
         real = getattr(fsio, name)
 
         def fake(*args):
-            return "わざと落とした" if when(*args) else real(*args)
+            return "わざと失敗させた" if when(*args) else real(*args)
 
         return mock.patch.object(fsio, name, fake)
 
@@ -701,7 +701,7 @@ class WriterFailureTest(CoreHarness):
             applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 1)
         self.assertEqual(applied.placed, [])
-        self.assertIn("ccnavi: i0001: 提案を todo/ から動かせない (わざと落とした)", err)
+        self.assertIn("ccnavi: i0001: 提案を todo/ から動かせない (わざと失敗させた)", err)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
         self.assertNotIn("承認した。", out)
 
@@ -749,7 +749,7 @@ class WriterFailureTest(CoreHarness):
         with self.failing("unlink", lambda path: path.endswith(os.path.join("todo", "i0001.md"))):
             applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 0, out + err)
-        self.assertIn("ccnavi: i0001: 改版の提案を todo/ から消せない (わざと落とした)", err)
+        self.assertIn("ccnavi: i0001: 改版の提案を todo/ から消せない (わざと失敗させた)", err)
         self.assertIn("i0001 の全体計画を改版した", out)
 
     def test_an_unwritable_history_is_a_warning(self):
@@ -760,7 +760,7 @@ class WriterFailureTest(CoreHarness):
             applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 0, out + err)
         self.assertIn("ccnavi: 警告: i0001 の履歴（approved）を", err)
-        self.assertIn("（わざと落とした）。状態は動いた", err)
+        self.assertIn("（わざと失敗させた）。状態は動いた", err)
 
     def reopened(self):
         self.family(plan=["design"])
@@ -806,7 +806,7 @@ class WriterFailureTest(CoreHarness):
         with self.failing("unlink", lambda path: path.endswith("1.requested")):
             applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 0, out + err)
-        self.assertIn("消せなかった（わざと落とした）。requested は残っていて効く", err)
+        self.assertIn("消せなかった（わざと失敗させた）。requested は残っていて効く", err)
         self.assertIn("マーカー（reviewed）を消した", out)
         self.assertTrue(os.path.exists(os.path.join(marks, "1.requested")))
         self.assertFalse(os.path.exists(os.path.join(marks, "1.reviewed")))

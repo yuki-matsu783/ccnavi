@@ -98,7 +98,7 @@ class SurvivesTheClearedEnvironmentTest(unittest.TestCase):
         with mock.patch("ccnavi.entry.cli.run", record):
             run_ccnavi(["--help"], env={})
         for name, value in GIT_ENV.items():
-            self.assertEqual(value, seen.get(name), f"{name} が空の環境で落ちている")
+            self.assertEqual(value, seen.get(name), f"{name} が空の環境で失敗している")
 
     def test_the_caller_can_still_override_it(self):
         """締め出し方そのものを試すテストが、締め出しに上書きされない。"""

@@ -768,7 +768,7 @@ class PhaseTest(PhaseHarness):
         refused = self.confirm(fixture, 2)
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("u/7#t0", refused.stderr)
-        self.assertIn("道は 2 つ", refused.stderr)
+        self.assertIn("選べるのは 2 つ", refused.stderr)
         self.assertIn("decide", refused.stderr)
         data = read_json(fixture)
         data["threads"].append({"id": "t1", "resolved": False, "url": "u/7#t1", "body": "まだ"})

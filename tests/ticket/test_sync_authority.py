@@ -403,7 +403,7 @@ class UndecidedTest(AuthorityHarness):
         os.symlink(real, os.path.join(self.state, "sync", "self", "families", "i0001"))
         self.assertEqual("deny", self.decision(self.write_to(self.child_tree, "wip/research/a")))
         finished = self.ccnavi("ticket", "finish", "i0001-01-01")
-        self.assertIn("壊れている", finished.stderr)
+        self.assertIn("取り込み状態が不正", finished.stderr)
 
     def test_closed_family_does_not_move(self):
         self.record("closed")

@@ -134,7 +134,7 @@ def assertGotPastTheRoot(case, result):
     case.assertNotIn(
         "実行ファイルが無い",
         blob,
-        "根の導出で落ちている。この実行は中身を確かめていない",
+        "根の導出に失敗している。この実行は中身を確かめていない",
     )
 
 
@@ -449,7 +449,7 @@ class WorkspaceDiscoveryTest(WorkspaceTest):
         os.makedirs(empty, exist_ok=True)
         p1 = os.path.join(self.ws, "projects", "p1")
         result = self.run_sh("ccnavi-git.sh", "status", cwd=p1, env={"CCNAVI_WORKSPACE": empty})
-        self.assertNotEqual(0, result.returncode, "目印の無い場所を黙って受けた")
+        self.assertNotEqual(0, result.returncode, "目印の無い場所を何も言わずに受け入れた")
 
     def test_outside_any_workspace_it_stops_and_says_how(self):
         stray = os.path.join(self.tmp, "stray")

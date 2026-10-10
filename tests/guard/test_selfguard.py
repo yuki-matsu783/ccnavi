@@ -1147,7 +1147,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(read(path), "MZ fake executable\n")
         self.assertIn("ccnavi.exe", result.stdout)
 
-    def test_セッション開始を通らなければ実行ファイルは黙って通る(self):
+    def test_セッション開始を通らなければ実行ファイルは何も言わずに通る(self):
         # バックアップが無い状態。セッション開始のイベントに登録していないか、
         # 実行ファイルを指していない設定がこれで、異常ではない。
         path = self.binary()
@@ -1343,7 +1343,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(self.store(), ["MZ fake executable\n"])
         self.assertFalse(os.path.exists(os.path.join(self.state, "selfguard", "s1", "bin")))
 
-    def test_古いバックアップはセッション開始で落ちる(self):
+    def test_古いバックアップはセッション開始で消える(self):
         self.run_hook("SessionStart", session="old")
         self.backdate(os.path.join(self.state, "selfguard", "old"))
 
@@ -1369,7 +1369,7 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertIn("s1", self.sessions())
 
-    def test_参照されなくなった実体も落ちる(self):
+    def test_参照されなくなった実体も消える(self):
         path = self.binary()
         self.run_hook("SessionStart", bin=path, session="old")
         self.backdate(

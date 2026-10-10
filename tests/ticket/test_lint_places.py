@@ -376,7 +376,9 @@ class ProjectsCollisionTest(unittest.TestCase):
         try:
             problems = json.loads(result.stdout)["problems"]
         except (ValueError, KeyError) as exc:
-            self.fail(f"--lint が報告を出さずに落ちた: {exc}\n{result.stdout}\n{result.stderr}")
+            self.fail(
+                f"--lint が報告を出さずに異常終了した: {exc}\n{result.stdout}\n{result.stderr}"
+            )
         self.assertEqual([p for p in problems if p["where"] == "(projects)"], [])
 
     def test_projects_on_another_drive_does_not_crash_the_lint(self):
@@ -417,7 +419,9 @@ class ProjectsCollisionTest(unittest.TestCase):
         try:
             problems = json.loads(result.stdout)["problems"]
         except (ValueError, KeyError) as exc:
-            self.fail(f"--lint が報告を出さずに落ちた: {exc}\n{result.stdout}\n{result.stderr}")
+            self.fail(
+                f"--lint が報告を出さずに異常終了した: {exc}\n{result.stdout}\n{result.stderr}"
+            )
         self.assertEqual([p for p in problems if p["where"] == "(projects)"], [])
 
 
