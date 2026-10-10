@@ -2,6 +2,57 @@
 version: 1
 ticket: feature-261-plan-order-core
 title: フェーズの順序を親の計画で決め、待ち方を計画から計算し、使う定義を親に固定する（実行ファイル）
+phases:
+  design:
+    kind: work
+    title: 設計
+    review: mr
+    scope:
+    - wip/design/*
+    - docs/*
+    deliverables:
+    - wip/design/*.md
+    when: 触る場所が 3 か所を超えるか、外から見える振る舞いが変わるとき
+  acceptance:
+    kind: work
+    title: 受入テスト作成
+    review: mr
+    scope:
+    - tests/*
+    when: 振る舞いが変わるとき。実装と並行してよい
+  implement:
+    kind: work
+    title: 実装とテスト
+    review: mr
+    scope:
+    - src/*
+    - tests/*
+    - build.py
+    - pyproject.toml
+    - scripts/*
+    - .ccnavi/*
+    - .ccnavi/common/phases.yml
+    - extensions/*
+  staging:
+    kind: work
+    title: ユーザがコピーする版の作成
+    review: mr
+    scope:
+    - wip/design/*
+    - tests/*
+    when: 保護済みファイル（.ccnavi/scripts/、.claude/hooks/、rules.yml）を直すとき。エージェントはそこに書けないので、完成品を
+      wip/design/scripts/ に全文で置き、ユーザがコピーする
+  docs:
+    kind: work
+    title: 文書
+    review: mr
+    scope:
+    - README.md
+    - docs/*
+    - extensions/vscode/ccnavi-board/docs/*
+    - extensions/chrome/ccnavi-approval/docs/*
+    - CLAUDE.md
+    - .claude/skills/*
 plan:
   - design                              # 1。何も待たない
   - {type: acceptance, after: [1]}      # 2。実装（3）とは並行する

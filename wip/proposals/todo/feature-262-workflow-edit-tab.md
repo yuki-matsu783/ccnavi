@@ -2,6 +2,38 @@
 version: 1
 ticket: feature-262-workflow-edit-tab
 title: 計画の順序を図で直すワークフロー編集タブと、承認画面の読むだけの図
+phases:
+  acceptance:
+    kind: work
+    title: 受入テスト作成
+    review: mr
+    scope:
+    - tests/*
+    when: 振る舞いが変わるとき。実装と並行してよい
+  implement:
+    kind: work
+    title: 実装とテスト
+    review: mr
+    scope:
+    - src/*
+    - tests/*
+    - build.py
+    - pyproject.toml
+    - scripts/*
+    - .ccnavi/*
+    - .ccnavi/common/phases.yml
+    - extensions/*
+  docs:
+    kind: work
+    title: 文書
+    review: mr
+    scope:
+    - README.md
+    - docs/*
+    - extensions/vscode/ccnavi-board/docs/*
+    - extensions/chrome/ccnavi-approval/docs/*
+    - CLAUDE.md
+    - .claude/skills/*
 plan:
   - acceptance                          # 1。何も待たない
   - {type: implement, after: [1]}       # 2。段 4
