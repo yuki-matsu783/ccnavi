@@ -5,13 +5,13 @@
 #   sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...   （ユーザが打つ。親子のチケットの取り込み状態を消す）
 #
 # ユーザが打つ（ボードのボタン、「承認した」と言われたエージェント）。セッションの頭の
-# ccnavi-fetch.sh は早送りしかしないので、分かれた親子のチケットを取り込むのと、親のブランチが
+# ccnavi-fetch.shは早送りしかしないので、分かれた親子のチケットを取り込むのと、親のブランチが
 # リモートから消えたかを確かめるのはここだけ（セッションの頭を待たせず、merge の書きかけも残さないため）。
 #
 # <P> は親の識別子（= .claude/worktrees/<P>）。省けば、.claude/worktrees/ の下の親のワークツリー
 # （親チケットか提案があり、親のブランチをチェックアウトしているもの）を全部。
 #
-# 親のブランチ名は親チケットの `branch:`、無ければ識別子と同じ名前。sh はチケットを読まず、
+# 親のブランチ名は親チケットの `branch:`、無ければ識別子と同じ名前。shはチケットを読まず、
 # 実行ファイルの `c1 family <P>` の `branch` の行で知る。取り込み状態の鍵は識別子のままで、中の
 # `branch` に親のブランチ名を書く（`/` を含む名前を state の置き場のパスに入れない）。実行ファイルが無ければ
 # 識別子をブランチ名とする（前の動き）。在るのに答えなければ、その親子のチケットは取り込まずに止める。
@@ -55,7 +55,7 @@
 # 統合先の取り込み結果を書いた後、present の親子のチケットごとに実行ファイルの `ccnavi sync check <P> <リポジトリ>` で
 # 判定し直す（どのチケットを本物とするかの検査と、承認済みチケットの判定し直し）。error があれば
 # 親子のチケットの取り込み状態を blocked にして、理由を reason に書いて止める。判定（hook・承認・状態の操作）は
-# blocked の親子のチケットを止める。解き方は、理由を直してから同じ P でこの sh をオンラインで打ち直すこと（取り込みで
+# blocked の親子のチケットを止める。解き方は、理由を直してから同じ P でこの shをオンラインで打ち直すこと（取り込みで
 # present に書き直してから検査し直すので、通れば present に戻る）。書く前にロックを取り直し、取り込み状態が
 # まだ present かを確かめる（並行する sync が書いた gone・closed を上書きしない）。ロックが取れない・
 # 書けないときは 3 回まで試し、それでも書けなければ終了コード 3 で終わる（止めるべき親子のチケットが止まって
@@ -84,9 +84,9 @@ sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...
 
   親チケット <P>（識別子。省けば .claude/worktrees/ の下の親のワークツリー全部）の親のブランチ
   （親チケットの branch:、無ければ <P> と同じ名前）をリモートから取り込み、
-  親子のチケットの取り込み状態と統合先の取り込み結果を書く。分かれていれば merge し、衝突したら取りやめてユーザに回す。
+  親子のチケットの取り込み状態と統合先の取り込み結果を書く。分かれていれば mergeし、衝突したら取りやめてユーザに回す。
   リモートから消えた親のブランチは、統合先の done/ を見て「閉じた」か「消えた」かを決める。
-  取り込んだ後、親子のチケットを判定し直し、止める理由があれば取り込み状態を blocked にする。
+  取り込んだ後、親子のチケットを判定し直し、止める理由があれば取り込み状態を blockedにする。
   取り込み状態は親のワークツリーを片付けても消えない（削除せずに残す）。
 
   --forget <P>...  ユーザが打つ。捨てた親子のチケットの取り込み状態を消す（親のワークツリーを片付けた後だけ）。
@@ -126,7 +126,7 @@ for want in ${1+"$@"}; do
 done
 
 root=$(ccnavi_workspace) || {
-	printf 'ccnavi-sync: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
+	printf 'ccnavi-sync: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.shを持つ親を cwdから上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
 }
 ccnavi_log_root="$root"
@@ -152,7 +152,7 @@ scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-sync) || {
 tab=$(printf '\t')
 
 # 後始末。この sh が始めた merge の途中（目印の変数 sync_merging）で切られたら取りやめ、ロックを外す。
-# dash は EXIT の trap を INT・TERM・HUP で走らせないので、そちらにも置く。2 度走っても害は無い。
+# dashは EXIT の trap を INT・TERM・HUP で走らせないので、そちらにも置く。2 度走っても害は無い。
 sync_merging=""
 cleaned=""
 cleanup() {
@@ -342,7 +342,7 @@ default_branch() {
 
 # fetch 1 本。単一ブランチの clone でも origin/<ブランチ> が進むよう、行き先を書いて取る
 # （sh の中の git。ccnavi-git.sh の入口の refspec の拒否とは別の話）。
-# 落ちた理由（git の標準エラー）は $scratch/err に残る。<リポジトリ> <ブランチ>
+# 落ちた理由（gitの標準エラー）は $scratch/err に残る。<リポジトリ> <ブランチ>
 fetch_one() {
 	ccnavi_git_timed "$timeout" "$scratch/err" "$1" \
 		fetch --quiet --no-tags origin "+refs/heads/$2:refs/remotes/origin/$2" >/dev/null
@@ -572,7 +572,7 @@ sync_family() {
 		printf '%s: 親のブランチを承認済みの branch: の %s へ移した後、まだ送っていない（取り込み状態は %s のまま）。親のワークツリーで sh %s/ccnavi-git.sh push -u origin %s を打つと取り込み状態が書き直る。取り込まずに止めた\n' \
 			"$P" "$B" "$P" "$here_sh" "$B"
 		fail_note
-		# 移った後の push を待つだけなので、取り込みの後の検査で blocked にしない。
+		# 移った後の pushを待つだけなので、取り込みの後の検査で blocked にしない。
 		printf '%s\n' "$P" >>"$scratch/unchecked"
 		return 0
 	fi
@@ -603,7 +603,7 @@ sync_family() {
 
 	busy=$(busy_state "$tree")
 	if [ -n "$busy" ]; then
-		printf '%s: 親のワークツリーに途中の操作（%s）がある。済ませるか取りやめてから打ち直してください（この sh は触らない）\n' "$P" "$busy"
+		printf '%s: 親のワークツリーに途中の操作（%s）がある。済ませるか取りやめてから打ち直してください（この shは触らない）\n' "$P" "$busy"
 		fail_note
 	elif has_head "$heads" "$B"; then
 		sync_present
@@ -645,7 +645,7 @@ sync_present() {
 		# 分かれている。非 ff の merge は、重ならないステージ済みの変更があっても拒む（git 2.43）ので、
 		# 先に見て言う。
 		if ! git -C "$tree" diff --cached --quiet 2>/dev/null; then
-			printf '%s: リモートと分かれていて merge が要るが、ステージ済みの変更がある。コミットするか sh %s/ccnavi-git.sh restore --staged <パス> で外してから打ち直してください\n' \
+			printf '%s: リモートと分かれていて mergeが要るが、ステージ済みの変更がある。コミットするか sh %s/ccnavi-git.sh restore --staged <パス> で外してから打ち直してください\n' \
 				"$P" "$here_sh"
 			fail_note
 		else
@@ -653,18 +653,18 @@ sync_present() {
 			sync_merging="$tree"
 			if LC_ALL=C git -C "$tree" merge --no-edit --quiet -m "ccnavi: origin/$B を取り込む" "$remote_sha" \
 				</dev/null >"$scratch/out" 2>"$scratch/err"; then
-				printf '%s: リモートと分かれていたので merge で取り込んだ\n' "$P"
+				printf '%s: リモートと分かれていたので mergeで取り込んだ\n' "$P"
 			else
 				conflicted=$(git -C "$tree" diff --name-only --diff-filter=U 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')
 				if [ -e "$(git_path "$tree" MERGE_HEAD)" ]; then
 					git -C "$tree" merge --abort >/dev/null 2>&1 || :
 				fi
 				if [ -n "$conflicted" ]; then
-					printf '%s: リモートと分かれていて merge が衝突した（%s）。取り込みをやめた（merge --abort）。どちらを採るかはユーザが決める\n' \
+					printf '%s: リモートと分かれていて mergeが衝突した（%s）。取り込みをやめた（merge --abort）。どちらを採るかはユーザが決める\n' \
 						"$P" "$conflicted"
 				else
 					cat "$scratch/out" >>"$scratch/err"
-					printf '%s: リモートと分かれていて merge できなかった。%s\n' "$P" "$(ccnavi_git_refusal "$scratch/err")"
+					printf '%s: リモートと分かれていて mergeできなかった。%s\n' "$P" "$(ccnavi_git_refusal "$scratch/err")"
 				fi
 				fail_note
 			fi
@@ -863,8 +863,8 @@ sync_absent() {
 		printf '%s: リモートに無い（まだ送っていない親子のチケット）。今の手元の動きのまま\n' "$P"
 		return 0
 	fi
-	# ccnavi-review.sh の道具（gh / glab / curl とトークン）で、MR がマージ済みかを先に聞く。答えは
-	# merged <番号> / none（マージされた MR が無い）/ それ以外（道具・トークンが無い、API が落ちた）。
+	# ccnavi-review.sh の道具（gh / glab / curl とトークン）で、MRがマージ済みかを先に聞く。答えは
+	# merged <番号> / none（マージされた MRが無い）/ それ以外（道具・トークンが無い、APIが落ちた）。
 	# 統合先の done/ を待つ確かめ直しは、答えが得られないときだけ行う（統合先には閉じたチケットを
 	# 残さないので、マージ済みと分かれば待つものは無い）。
 	merged_rc=0
@@ -907,7 +907,7 @@ sync_absent() {
 		ccnavi_record_write "$record" remote origin branch "$B" sha "$kept_sha" \
 			fetched_at "$(date +%s)" state gone reason "リモートにも統合先の done/ にも無い" ||
 			printf '%s: 親子のチケットの取り込み状態（%s）を書けなかった\n' "$P" "$record"
-		printf '%s: 親のブランチ %s がリモートに無い。統合先（%s）にも閉じた記録が無いので、この親子のチケットの状態を決められない。親子のチケットを止めた（取り込み状態は gone。このブランチへの push は通らない）\n' "$P" "$B" "$integ"
+		printf '%s: 親のブランチ %s がリモートに無い。統合先（%s）にも閉じた記録が無いので、この親子のチケットの状態を決められない。親子のチケットを止めた（取り込み状態は gone。このブランチへの pushは通らない）\n' "$P" "$B" "$integ"
 	else
 		printf '%s: 親のブランチ %s がリモートに無い。統合先（%s）にも閉じた記録が無いので、この親子のチケットの状態を決められない。送った形跡（origin/%s か追跡の設定）はあるが取り込み状態が無いので、取り込み状態は作らずに止めた\n' "$P" "$B" "$integ" "$B"
 	fi
@@ -921,7 +921,7 @@ sync_absent() {
 
 # ---- 取り込みの後の検査
 
-# present の親子のチケットを判定し直し、error があれば blocked にする。<P> <取り込み状態の名前>
+# present の親子のチケットを判定し直し、error があれば blockedにする。<P> <取り込み状態の名前>
 check_family() {
 	cf_record=$(ccnavi_family_record "$root" "$2" "$1")
 	[ "$(ccnavi_record_get "$cf_record" state)" = present ] || return 0
@@ -995,7 +995,7 @@ while IFS= read -r key <&4; do
 		return 0
 	}
 	if ! git -C "$repo" remote get-url origin >/dev/null 2>&1; then
-		# origin の無いリポジトリは取り込みの対象外（今の手元の動きのまま）。
+		# originの無いリポジトリは取り込みの対象外（今の手元の動きのまま）。
 		if [ "$has_family" = yes ]; then
 			printf '%s: origin が無い。取り込みの対象外（今の手元の動きのまま）\n' "$key"
 		fi

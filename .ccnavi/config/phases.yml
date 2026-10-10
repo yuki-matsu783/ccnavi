@@ -1,14 +1,14 @@
 # フェーズ定義（設計 9.7）。ユーザが持つ設定で、エージェントは書き換えない。
 #
 # ここは自身のレイヤー（ワークスペース自身のレイヤー）。`scope` のパスはこのワークスペースの
-# レイアウトに付いているので、共通レイヤー（.ccnavi/common/phases.yml）ではなくこちらに置く。
-# 共通レイヤーに置くと、projects/ の下のプロジェクトにも同じ scope が効いてしまう。
+# レイアウトに従属しているので、共通レイヤー（.ccnavi/common/phases.yml）ではなくこちらに置く。
+# 共通レイヤーに置くと、projects/ の下のプロジェクトにも同じ scope が適用されてしまう。
 #
 # 親チケットの `plan:` に、ここに書いたフェーズ定義の名前を順に並べる。それが全体計画で、
-# `ccnavi --agree` が通ることが合意になる。レビューを受けたあとは `feedback:` に
+# `ccnavi --agree` が通過することが合意になる。レビューを受けたあとは `feedback:` に
 # `kind: feedback` のフェーズ定義を並べて改版を出す（対応が無くても `[]` で出す）。
 #
-# `id`（キー）と `title` はどちらも一意。レイヤーをまたいで重なれば --lint が error で止める。
+# `id`（キー）と `title` はどちらも一意。レイヤーをまたいで重なれば --lint でエラーにする。
 # このファイルが無ければ、フェーズは番号だけの挙動に戻る。
 version: 1
 
@@ -19,7 +19,7 @@ phases:
     review: none
     scope: ["wip/research/*"]
     deliverables: ["wip/research/summary.md"]
-    when: 既存の振る舞いや依存が分からないとき。分かっているなら飛ばす
+    when: 既存の振る舞いや依存が分からないとき。分かっているなら省略する
 
   design:
     kind: work
@@ -27,7 +27,7 @@ phases:
     review: mr
     scope: ["wip/design/*", "docs/*"]
     deliverables: ["wip/design/*.md"]
-    when: 触る場所が 3 か所を超えるか、外から見える振る舞いが変わるとき
+    when: 変更箇所が 3 か所を超えるか、外から見える振る舞いが変わるとき
 
   acceptance:
     kind: work
@@ -50,7 +50,7 @@ phases:
     review: mr
     scope: ["wip/design/*", "tests/*"]
     requires: [acceptance]
-    when: 保護済みファイル（.ccnavi/scripts/、.claude/hooks/、rules.yml）を直すとき。エージェントはそこに書けないので、完成品を wip/design/scripts/ に全文で置き、ユーザがコピーする
+    when: 保護済みファイル（.ccnavi/scripts/、.claude/hooks/、rules.yml）を修正するとき。エージェントはそこに書けないので、完成品を wip/design/scripts/ に全文で配置し、ユーザがコピーする
 
   docs:
     kind: work
@@ -70,9 +70,9 @@ phases:
     review: mr
     scope: inherit
 
-  # 作業の振り返りで出たスキルの候補を、ワークスペースの .claude/skills/ に入れる。
+  # 作業の振り返りで出たスキルの候補を、ワークスペースの .claude/skills/ に配置する。
   # 候補の拾い方と置き場は docs/claude/skill-review.md。子は親の範囲の中にしか置けないので、
-  # 親の範囲に .claude/skills/ が無ければこのフェーズ定義は使えず、提案チケットに回る。
+  # 親の範囲に .claude/skills/ が無ければこのフェーズ定義は使えず、提案チケットになる。
   skill-improve:
     kind: feedback
     title: スキル改善

@@ -31,7 +31,7 @@
 # ロック → 途中の操作の確認 → hook のマーカーと状態の履歴を先にコミット →
 # 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
 # 通るまで完了にしない。送れなければ書いたものを戻す。record-risk は C1 にしない（その子の finish がコミットして送る）。
-# それ以外の親子のチケットは今のまま（書くだけ。コミットと push はエージェント）。
+# それ以外の親子のチケットは今のまま（書くだけ。コミットと pushはエージェント）。
 #
 # finish・cancel が通ったら、その親子の閉じた子のワークツリーを実行ファイルの `worktree tidy <親>` で
 # 片付ける（C1 なら送り終えた後）。未コミットの変更があるもの・cwd が中にあるものは消さずに名指しする。
@@ -64,7 +64,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <
 
   提案の plan に書くフェーズ定義は phases.yml を見る。置き場は共通レイヤーの
   .ccnavi/common/phases.yml、自身のレイヤーの .ccnavi/config/phases.yml、
-  プロジェクトは projects/<名前>/.ccnavi/config/phases.yml。どのレイヤーにも無ければ
+  プロジェクトは projects/<名前>/.ccnavi/config/phases.yml。どのレイヤーにもなければ
   フェーズは番号だけになる
 USAGE
 }
@@ -102,7 +102,7 @@ esac
 # cwd がプロジェクトの中にあると git はプロジェクトを答える。それは git として
 # 正しい答えで、ここで欲しいもの（道具の置き場）とは違う（設計 11.8）。
 root=$(ccnavi_workspace) || {
-	printf 'ccnavi-ticket: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
+	printf 'ccnavi-ticket: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.shを持つ親を cwdから上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
 }
 

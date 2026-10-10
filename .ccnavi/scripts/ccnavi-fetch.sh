@@ -30,8 +30,8 @@
 #
 # **認証で落ちたときは、そう言う。** 尋ねないので、資格情報が無いか切れていると毎回落ちる。
 # オフラインと同じ 1 行では、ユーザは理由を調べることになる。認証はユーザが端末で打つ git（承認の
-# sh を含む）で一度済ませれば保存され、次のセッションから hook の fetch も通る。見分けは
-# git の文言に頼るので、LC_ALL=C で英語に揃えてから見る。見分けられなければ、ただの
+# shを含む）で一度済ませれば保存され、次のセッションから hook の fetch も通る。見分けは
+# gitの文言に頼るので、LC_ALL=C で英語に揃えてから見る。見分けられなければ、ただの
 # 「取ってこられなかった」に戻るだけ。
 #
 # **取り込み済みの親子のチケットは早送りだけ**。親のワークツリー（`.claude/worktrees/<P>` で、親チケットか
@@ -46,7 +46,7 @@
 # fetch 1 回のタイムアウトも枠の残りより長くしない（hook の上限は 60 秒）。
 #
 # **「リモートにその ref が無い」で落ちた fetch は、その origin を落ちたものに数えない。** 数えると、
-# 同じ origin の統合先の取り込みまで行われなくなる。消えたかどうかはここでは決めず、ccnavi-sync.sh に回す。
+# 同じ originの統合先の取り込みまで行われなくなる。消えたかどうかはここでは決めず、ccnavi-sync.sh に回す。
 #
 # 終了コード: 常に 0。取ってこられないことは失敗ではない（オフラインでも作業は続く）。
 
@@ -81,7 +81,7 @@ ccnavi_log_root="$root"
 # 落ちた origin を書いておく場所。同じ origin には取りに行かない。周はパイプの中（サブシェル）で
 # 回るので、変数では渡らない。
 scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-fetch) || exit 0
-# dash は EXIT の trap を INT・TERM・HUP で走らせないので、そちらにも置く。
+# dashは EXIT の trap を INT・TERM・HUP で走らせないので、そちらにも置く。
 fetch_cleaned=""
 fetch_cleanup() {
 	[ -z "$fetch_cleaned" ] || return 0
@@ -136,7 +136,7 @@ ccnavi_fetch_git() {
 
 # 取りに行く。取れたら 0。<ツリー> <ブランチ> <落ちたときの 1 行> [<リモートに無いときの 1 行>]
 #
-# 落ちたときの 1 行は、その origin で初めて落ちたときだけ出す。同じ origin の 2 件目は
+# 落ちたときの 1 行は、その origin で初めて落ちたときだけ出す。同じ originの 2 件目は
 # 取りに行かず、何も出さない。分け方に要る判定を、報せの `$( )` の外に置くための関数。
 ccnavi_fetch_or_note() {
 	ccnavi_fetch_git "$1" "$2"
@@ -144,7 +144,7 @@ ccnavi_fetch_or_note() {
 	[ "$ccnavi_fn_rc" -eq 0 ] && return 0
 	[ "$ccnavi_fn_rc" -eq 2 ] && return 1
 	if [ "$ccnavi_fn_rc" -eq 5 ]; then
-		printf '%s: 時間の枠（%s 秒）を過ぎたので %s を取りに行かなかった。後で sh %s/.ccnavi/scripts/ccnavi-sync.sh を打つか、もう一度セッションを始めてください\n' \
+		printf '%s: 時間の枠（%s 秒）を過ぎたので %s を取りに行かなかった。後で sh %s/.ccnavi/scripts/ccnavi-sync.shを打つか、もう一度セッションを始めてください\n' \
 			"$(basename "$1")" "$budget" "$2" "$root"
 		return 1
 	fi

@@ -4,7 +4,7 @@
 #   sh .ccnavi/scripts/ccnavi-branches.sh --issue <番号> [--json]
 #   sh .ccnavi/scripts/ccnavi-branches.sh --mr <番号> [--json]
 #
-# issue や MR を指定して作業を頼まれたとき、着手の前にエージェントが打つ（UserPromptSubmit の hook が
+# issue や MRを指定して作業を頼まれたとき、着手の前にエージェントが打つ（UserPromptSubmit の hook が
 # 依頼文の `#152`・`!5` などを見つけて、打つように指示を足す）。候補があれば、エージェントは一覧を
 # ユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞いてから進める。
 #
@@ -12,8 +12,8 @@
 # projects/<名前>/ に cd してから打つ。
 #
 # 役割の分け方（docs/claude/exe-boundary.md）:
-#   - ホスト（GitHub / GitLab）はこの sh が読む。MR 指定なら、その MR の元ブランチ。issue 指定なら、
-#     その issue を参照している開いた MR の元ブランチ。繋ぎ方は ccnavi-common-host.sh の「ホスト（GitHub /
+#   - ホスト（GitHub / GitLab）はこの sh が読む。MR 指定なら、その MRの元ブランチ。issue 指定なら、
+#     その issue を参照している開いた MRの元ブランチ。繋ぎ方は ccnavi-common-host.sh の「ホスト（GitHub /
 #     GitLab）への接続」（ccnavi-review.sh と同じ。gh / glab か、curl と GITHUB_TOKEN / GITLAB_TOKEN）
 #   - 読んだ結果を JSON（形は設計 9.13）に書き、実行ファイルの
 #     `ccnavi branches <issue|mr> <番号> --result <json>` に渡す。手元の候補（名前に番号を含むブランチ・
@@ -21,7 +21,7 @@
 #   - ホストに繋げないときは止めない。理由を JSON に書き、実行ファイルが「ホストは見ていない」と言って
 #     手元の候補だけを出す
 #
-# 終了コード: 0 出した / 1 前提の未充足（git の外・実行ファイルが落ちた）/ 2 引数か環境の誤り
+# 終了コード: 0 出した / 1 前提の未充足（gitの外・実行ファイルが落ちた）/ 2 引数か環境の誤り
 
 set -eu
 
@@ -40,9 +40,9 @@ usage() {
 sh .ccnavi/scripts/ccnavi-branches.sh (--issue <番号> | --mr <番号>) [--json]
 
   issue・MR に紐づくブランチを探して、1 候補 1 行で出す（--json なら JSON）。読むだけ。
-  --issue <番号>  名前に番号を含むブランチ（手元と origin）、その issue を参照している開いた MR の元ブランチ、
+  --issue <番号>  名前に番号を含むブランチ（手元と origin）、その issue を参照している開いた MRの元ブランチ、
                   issue: <番号> を持つチケットと、その親のブランチ
-  --mr <番号>     その MR の元ブランチ
+  --mr <番号>     その MRの元ブランチ
   各候補には、チェックアウトしているワークツリーと結び付くチケットを添える。
   ホストに繋げないときは手元の候補だけを出し、「ホストは見ていない」と書く。
   cwd のリポジトリを見る。プロジェクトの issue・MR は projects/<名前>/ に cd してから打つ。
@@ -85,11 +85,11 @@ esac
 [ "${#number}" -le 9 ] || fail bad-number "番号が長すぎます（${number}）。" 2
 
 root=$(ccnavi_workspace) ||
-	fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
+	fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.shを持つ親を cwdから上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
 ccnavi_log_root="$root"
 here="$(pwd -W 2>/dev/null || pwd)"
 git rev-parse --show-toplevel >/dev/null 2>&1 ||
-	fail not-git "cwd（${here}）が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で打ってください。"
+	fail not-git "cwd（${here}）が gitのリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で打ってください。"
 state="$root/logs/state" # 固定
 mkdir -p "$state" 2>/dev/null || fail no-state "state の置き場（${state}）を作れません。" 2
 result="$state/branches-host-$$.json"
@@ -119,14 +119,14 @@ unchecked() {
 	log_info ホストを見ていない -- "kind=$kind" "reason=$2"
 }
 
-# API が落ちたら、どの呼び出しかを覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。ホストの返事は書き出さない。
+# APIが落ちたら、どの呼び出しかを覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。ホストの返事は書き出さない。
 host_api_failed() {
 	printf '%s %s' "$1" "$2" >"$host_err"
 }
 
 api_failed_reason() {
 	what=$(cat "$host_err" 2>/dev/null || :)
-	printf 'ホストの API が失敗した（%s）。番号が無いか、権限が足りないか、ホストに届かない' "${what:-?}"
+	printf 'ホストの APIが失敗した（%s）。番号が無いか、権限が足りないか、ホストに届かない' "${what:-?}"
 }
 
 # write_checked <mrs の JSON 配列> 見た結果を書く。
@@ -167,7 +167,7 @@ gitlab_mr() {
 		  fork: (.source_project_id != $pid)}]'
 }
 
-# GitLab: その issue に関係する開いた MR（related_merge_requests。本文で参照した MR を含む）。
+# GitLab: その issueに関係する開いた MR（related_merge_requests。本文で参照した MRを含む）。
 gitlab_issue() {
 	pid=$(ccnavi_host_project_id) || return 1
 	got=$(ccnavi_host_pages "projects/$(ccnavi_host_encoded_path)/issues/$number/related_merge_requests") || return "$?"
@@ -185,7 +185,7 @@ look_at_host() {
 	fi
 	origin_shown=$(ccnavi_mask_url "$origin")
 	if ! ccnavi_host_parse "$origin"; then
-		unchecked "origin の URL を読めない（${origin_shown}）" origin-unreadable
+		unchecked "originの URLを読めない（${origin_shown}）" origin-unreadable
 		return 0
 	fi
 	connect_rc=0
@@ -213,7 +213,7 @@ look_at_host() {
 	mrs=$("${ccnavi_h_kind}_$kind") || look_rc=$?
 	case "$look_rc" in
 	0) write_checked "$mrs" ;;
-	2) unchecked "開いた MR が多すぎて読み切れない（2000 本まで）" too-many-pages ;;
+	2) unchecked "開いた MRが多すぎて読み切れない（2000 本まで）" too-many-pages ;;
 	*) unchecked "$(api_failed_reason)" api-failed ;;
 	esac
 	return 0
