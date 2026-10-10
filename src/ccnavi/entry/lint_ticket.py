@@ -262,17 +262,9 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     problems.extend(_copy_problems(root, conf, copies, index, closed, raw))
     problems.extend(_leftover_workflows(conf, root))
 
-    resolve = _types_resolver(conf, root)
-    for t in copies:
-        if not t.is_child and t.has_plan and resolve(t.project) is None:
-            problems.append(
-                Problem(
-                    SEVERITY_ERROR,
-                    "(phases)",
-                    f"{t.ticket} は計画を持つのにフェーズ定義"
-                    f"（{t.project or '自身'} のレイヤーの phases.yml）が無いか読めない",
-                )
-            )
+    # 承認済みの親が phases.yml を読めないことは error にしない。判定は親の写しを読み、
+    # 写しと今の phases.yml の食い違い（読めないことも含む）は `validate` が warn で言う
+    # （`agree_candidates.copy_config_problems`）。提案は承認の検査が error で言う。
 
     # ツリーの名前から、そのツリーがどのリポジトリのものかを引く表。ワークスペースなら空、
     # プロジェクトならその名前で、ワークツリーは元リポジトリのほうに付く（tree.Tree）。

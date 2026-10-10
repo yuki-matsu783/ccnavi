@@ -52,7 +52,23 @@ def fill_phases(
             "無い。--plan-order には承認待ちの親の識別子を渡す\n"
         )
         return EXIT_ERROR
-    if not target.has_plan:
+    # 写す定義を決める計画と、書き換える本文は、同じ 1 回の読みから取る（間に提案が書き換わって、
+    # 古い計画に合わせた `phases:` が新しい本文に入らないように）。
+    raw = fsio.read_bytes(target.path)
+    if raw is None:
+        stderr.write(f"ccnavi: {target.path} を読めない。何も書かない\n")
+        return EXIT_ERROR
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        stderr.write(f"ccnavi: {target.path} を UTF-8 として読めない。何も書かない\n")
+        return EXIT_ERROR
+    read, _ = ticket_mod.parse(text)
+    if read is None or read.ticket != name or read.is_child:
+        stderr.write(f"ccnavi: {target.path} を親の提案として読めない。何も書かない\n")
+        return EXIT_ERROR
+    read.project = target.project
+    if not read.has_plan:
         stderr.write(f"ccnavi: {name} は計画（plan:）を持たないので、差し込む定義が無い\n")
         return EXIT_ERROR
     config = phase.load_types(conf, root, target.project)
@@ -62,10 +78,10 @@ def fill_phases(
             "無いか読めないので、写せない。何も書かない\n"
         )
         return EXIT_ERROR
-    held = _held(conf, root, target)
+    held = _held(conf, root, read)
     copy: dict[str, dict] = {}
     missing: list[str] = []
-    for _, item in target.numbered():
+    for _, item in read.numbered():
         if item.type in copy or item.type in missing:
             continue
         pt = held.get(item.type) or config.get(item.type)
@@ -79,20 +95,11 @@ def fill_phases(
             "計画を直すか、ユーザに phases.yml へ足してもらう。何も書かない\n"
         )
         return EXIT_ERROR
-    raw = fsio.read_bytes(target.path)
-    if raw is None:
-        stderr.write(f"ccnavi: {target.path} を読めない。何も書かない\n")
-        return EXIT_ERROR
-    try:
-        text = raw.decode("utf-8")
-    except UnicodeDecodeError:
-        stderr.write(f"ccnavi: {target.path} を UTF-8 として読めない。何も書かない\n")
-        return EXIT_ERROR
     built, why = _rebuilt(text, copy)
     if why:
         stderr.write(f"ccnavi: {target.path}: {why}。何も書かない\n")
         return EXIT_ERROR
-    before = set(phasetypes.types_of(target)) if phasetypes.has_copy(target) else set()
+    before = set(phasetypes.types_of(read)) if phasetypes.has_copy(read) else set()
     dropped = sorted(before - set(copy))
     if built == text:
         stdout.write(f"{name} の phases: は計画が使う定義と同じ。変えない\n")
@@ -159,6 +166,15 @@ def _rebuilt(text: str, copy: dict[str, dict]) -> tuple[str, str]:
         # 値のあとの空行は値の外に残す。
         while stop - 1 > start and not lines[stop - 1].strip():
             stop -= 1
+        # 値の中に行頭（0 桁目）のコメントがあると、字下げで値の範囲を決められない。
+        after = stop
+        while after < end and (not lines[after].strip() or lines[after].startswith("#")):
+            after += 1
+        if after > stop and after < end and lines[after][0] in " \t":
+            return "", (
+                "`phases:` の値の中に行頭（0 桁目）のコメントがあり、値の範囲が決まらない。"
+                "コメントを字下げするか消してから打ち直す"
+            )
     else:
         plan = [i for i in range(1, end) if _PLAN_LINE.match(lines[i])]
         start = stop = plan[0] if plan else end
