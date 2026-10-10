@@ -174,7 +174,7 @@ class Ticket:
     # 置いた場所で、`ticket.scan` が入れる（プロジェクトの `wip/proposals/` ならその名前、
     # ワークツリーの中ならその元リポジトリ、ワークスペースの `wip/proposals/` なら空）。
     # 親も子も同じ置き場に並ぶので、継ぐ段は無い。判定は行き先のワークツリーの元リポジトリと
-    # 突き合わせる。
+    # 照合する。
     project: str = ""
     # declared_project は frontmatter にユーザが書いた `project:`。宣言ではなく照合に使う。
     # 置き場と違えば承認しない（approval_checks.project_problems）。`ticket.scan` を通さずに
@@ -261,7 +261,7 @@ class Ticket:
         """この番号のフェーズのレビューが行われる番号。延期なら引き受ける番号。
 
         全体計画の番号はコピーした待ち方（`workflow`）で読む。フィードバック計画は一直線で、次にレビューが
-        ある番号。延期の先が無ければ None（計画が壊れている）。
+        ある番号。延期の先が無ければ None（計画が破損している）。
         """
         item = self.item_at(number)
         if self.workflow is not None and self.in_plan(number) and item is not None:

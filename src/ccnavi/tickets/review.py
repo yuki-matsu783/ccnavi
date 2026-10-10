@@ -837,8 +837,8 @@ def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:
 
     ccnavi 自身の置き場だけが手元に残っている形は、届いていると数える。ユーザがレビューで
     見るのはコードで、置き場をコミットして push するのは `ccnavi-push-approved.sh` の仕事
-    （push が落ちてもコミットは残す）。数えると、レビュー待ちの間に落ちた push が次の依頼を止める。
-    `confirm` の側（`_moved_since_request`）と同じ基準。
+    （push が失敗してもコミットは残す）。数えると、レビュー待ちの間に失敗した push が
+    次の依頼を止める。`confirm` の側（`_moved_since_request`）と同じ基準。
 
     `ready` の前提（`_merge_problems`）はこれを使わない。あちらはユーザがリモートを見て
     マージするところで、マーカーも本当に届いていないと他の機械へ渡らない。

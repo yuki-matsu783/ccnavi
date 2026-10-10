@@ -1,4 +1,4 @@
-"""当たったルールがモデルへ渡す文（additionalContext）を組む（REQ-PRE-12）。
+"""該当したルールがモデルへ渡す文（additionalContext）を組む（REQ-PRE-12）。
 
 文（`additionalContext`）と、ファイルの本文（`additionalContextFile`）と、
 1 度だけ渡す文（`additionalContextOnce` / `additionalContextOnceFile`）の 3 つを
@@ -97,10 +97,10 @@ def for_rules(
     unsure_speaks: bool = True,
     counts_path: str = "",
 ) -> str:
-    """当たったルールがモデルへ渡す文。1 件ずつ閉じた文なので空行で区切る。
+    """該当したルールがモデルへ渡す文。1 件ずつ閉じた文なので空行で区切る。
 
-    渡るかどうかは「渡す回」で決まる。`every: N` はその刻みで、当たった回数が N の
-    倍数になった回だけが渡す回になる。`every` を書かなければ刻みは 1 で、当たるたびが
+    渡るかどうかは「渡す回」で決まる。`every: N` はその刻みで、該当した回数が N の
+    倍数になった回だけが渡す回になる。`every` を書かなければ刻みは 1 で、該当するたびが
     渡す回。2 つの文はどちらもその渡す回を基準に読む。
 
     | 欄 | いつ渡るか | `every: 5` のとき |
@@ -232,7 +232,7 @@ def stop_path(state_dir: str, session: str) -> str:
 
 
 def _load_once(stderr: TextIO, path: str) -> dict[str, int] | None:
-    """この文脈で、どのルールが何回当たったか。まだ無ければ空、**読めなければ None**。
+    """この文脈で、どのルールが何回当たったか。まだ無ければ空、読めなければ None。
 
     `given` は「鍵 → 回数」。
 
@@ -257,7 +257,7 @@ def _save_once(stderr: TextIO, path: str, given: dict[str, int]) -> bool:
     """記録を書く。書けたか。"""
     # 取り合いになる記録なので、途中を見せない書き方で置く。素の open(path, "w") だと
     # 書いている最中は空で、そこを別の呼び出しに読まれると「まだ 1 回も当たっていない」に
-    # なる。途中で落ちたときも空のまま残り、次の起動が同じ読み違いをする。
+    # なる。途中で中断されたときも空のまま残り、次の起動が同じ読み違いをする。
     failed = fsio.write_json_atomic(path, {"given": dict(sorted(given.items()))})
     if failed:
         stderr.write(f"ccnavi: 渡した回数の記録を書けない: {failed}\n")
@@ -281,7 +281,7 @@ def forget(state_dir: str, session: str, startup: bool = False) -> None:
     mine = os.path.basename(_once_path(state_dir, session, "")).rsplit("-", 1)[0] + "-"
     cutoff = time.time() - ONCE_KEEP_DAYS * 86400
     for entry in os.listdir(state_dir):
-        # 書きかけで落ちて残った一時ファイル（`.once-….part.json`）も、
+        # 書き込み中に中断されて残った一時ファイル（`.once-….part.json`）も、
         # 先頭の `.` を外して同じ条件で掃く。
         name = fsio.temp_origin(entry)
         if not name.endswith(".json"):

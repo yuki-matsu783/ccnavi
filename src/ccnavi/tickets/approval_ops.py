@@ -35,15 +35,15 @@ def admit(
 ) -> str:
     """承認した提案を `doing/` へ動かす。動かせなかった理由を返す。動かせたら空文字。
 
-    **中身は変えない。** 提案をバイト列のまま読み（`fsio.read_bytes`）、同じバイト列を `doing/` に
+    中身は変えない。 提案をバイト列のまま読み（`fsio.read_bytes`）、同じバイト列を `doing/` に
     書いて元を消す。欄を書き足さず、改行も BOM も変えない。端末・ボード・Chrome・手で動かす、の
     どれで承認しても承認済みチケットが提案とバイト単位で同じになるように。消せなければ書いた側を
     消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で止まる。
 
     `wf` は計画を持つ親の待ち方。`phases/<親>/workflow.yml` に固定する（チケットには書かない）。
-    待ち方は提案を動かす前に書き、そのあとの段で落ちたら前の中身へ戻す。承認済みチケットだけが
+    待ち方は提案を動かす前に書き、そのあとの段で失敗したら前の中身へ戻す。承認済みチケットだけが
     置かれて待ち方が無い形は、手で動かした承認と同じに一直線で読まれ、取り下げの検査も通って
-    しまうので、待ち方だけが残る側（承認済みチケットが無いので効かない）に寄せる。
+    しまうので、待ち方だけが残る側（承認済みチケットが無いので効かない）にしておく。
     `source_tree` は提案が乗っていたブランチの名前で、状態の履歴に残す。
     """
     target = approval.copy_path(approved_dir, ticket.ticket)
@@ -62,7 +62,7 @@ def admit(
     if failed:
         fsio.put_back(restore)
         return f"書けない ({failed})"
-    # 消せなければ書いた側を消して戻す。承認の plan では落ちたときの枝が走らないので、
+    # 消せなければ書いた側を消して戻す。承認の plan では失敗したときの枝が走らないので、
     # 同じ戻し方を Writer(FS) へ渡す。置けたと数えるのは消せたとき。
     with fsio.policy(
         message="提案を todo/ から動かせない ({reason})",
@@ -149,10 +149,10 @@ def carry_flow(
             ]
         fsio.remove(source)
         return []
-    # 落ちたときの行は承認の plan でも同じものを出せるよう、書き込みにつける（`FAIL_LINE`）。
+    # 失敗したときの行は承認の plan でも同じものを出せるよう、書き込みにつける（`FAIL_LINE`）。
     cannot = f"{proposal.ticket} のフローを {target} へ移せない ({{reason}})。{source} に残っている"
     with fsio.policy(message=cannot):
-        # 途中で落ちても書きかけを残さない書き方で置く。在るかを確かめてから置くまでの間に
+        # 途中で中断されても書きかけを残さない書き方で置く。在るかを確かめてから置くまでの間に
         # ボードの保存が割り込むと上書きしうるが、書きかけのフローを残すよりよいと採った。
         failed = fsio.write_new_durable(target, raw)
     if failed:
@@ -261,7 +261,7 @@ def next_child_id(conf: settings.Settings, root: str, parent_id: str, phase_no: 
 def existing_ticket_file(conf: settings.Settings, root: str, ident: str) -> str:
     """この識別子のファイルが、どこかの置き場にすでに在ればそのパス。無ければ空。
 
-    読めないファイル（壊れた frontmatter など）も名前で拾う。大文字小文字は区別しない
+    読めないファイル（不正な frontmatter など）も名前で拾う。大文字小文字は区別しない
     （区別しないファイルシステムでは同じファイルになる）。見るのは全ツリーの承認済みの
     `doing/` `done/` と、提案の `todo/` `review/`。
     """

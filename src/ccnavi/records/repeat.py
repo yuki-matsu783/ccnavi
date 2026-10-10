@@ -6,7 +6,7 @@
 止めた回数をセッションごとに数え、N 回目から拒否の文面に「言い換えずに相談する」
 一文を足す。ターンの終わりにはユーザへの報告にも載せる。
 
-**判定は変えない。** ここが足すのは文面だけで、止めた呼び出しは止めたまま。
+判定は変えない。 ここが足すのは文面だけで、止めた呼び出しは止めたまま。
 数えられなかった（記録を読めない・書けない）ときは何も足さず、何も言わない。数えの失敗が
 判定に影響する経路は作らない。
 
@@ -97,7 +97,7 @@ def count(state_dir: str, record: audit.Record) -> int:
         if fsio.write_json_atomic(path, data):
             return 0
         return n
-    except Exception:  # noqa: BLE001  数えの失敗で判定を落とさない
+    except Exception:  # noqa: BLE001  数えの失敗で判定を止めない
         return 0
 
 
@@ -135,7 +135,7 @@ def at_stop(state_dir: str, session: str, n: int) -> str:
             entry["told"] = got
         if not lines or fsio.write_json_atomic(path, data):
             return ""
-    except Exception:  # noqa: BLE001  報告の失敗でターンの終わりを落とさない
+    except Exception:  # noqa: BLE001  報告の失敗でターンの終わりを止めない
         return ""
     return "\n".join(
         [

@@ -270,7 +270,7 @@ def drop_archived(root: str, tickets: list[ticket_model.Ticket]) -> list[ticket_
       着手より前で、残る写しはふつうこの形
     - 親のツリーで見つけた、欄が 3 つとも空のチケットは落とさない。`ready` は親のツリーから
       閉じた親子を消すので、そこに残る未着手のチケットは古い写しではなく、閉じた識別子を使い直した
-      もの（手元の退避は別の機械には無いので、別の機械で承認し直せる）。黙って落とすと、ユーザの
+      もの（手元の退避は別の機械には無いので、別の機械で承認し直せる）。気づかないうちに落とすと、ユーザの
       承認がどこにも出ずに消える。残して `Ticket.archived_clash` に理由を入れ、判定で止める
       （`approval_checks.content_problems`）
     - 欄があれば、統合先の `done/` の親と同じく `syncstate.same_parent` で比べ、同じと言えるときだけ
@@ -388,7 +388,7 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
     在るもの（前の回が途中で止まった残り。`root` を渡したときだけ）。子は名前の形ではなくチケットの
     `parent:` 欄で親に結ぶ（`rel-01` という親を `rel` の子と取り違えない）。履歴とフローは、
     その親か、`done/`（または退避）に在る子のもの、どこにもチケットの無い子（取り下げた子）のもの。
-    `phases/<親>/` は下を丸ごと。
+    `phases/<親>/` は下をすべて。
     """
     done = _done_copies(approved_dir)
     family = set()
@@ -560,7 +560,7 @@ def archived_bytes(root: str, project: str, rel: str) -> bytes | None:
 # ---- ready が退避したマーカー（どの親のワークツリーから、どのファイルを移したか）
 #
 # C1 の見分けと実行後チェックは、ready の流れで消したものだけを ccnavi の書き込みとして外す。
-# 「退避に同じ中身がある」だけで外すと、ready を経ない削除も黙ってコミットされる。
+# 「退避に同じ中身がある」だけで外すと、ready を経ない削除も気づかないうちにコミットされる。
 # ready のマーカーは退避の置き場の `ready/<親>.json` で、`logs/archive/` は記録の保護が
 # エージェントの書き込みを止める。
 
@@ -608,7 +608,7 @@ def _read_ready(root: str, project: str, name: str) -> dict | None:
 def ready_files(root: str, project: str, tree_root: str, head: str) -> set[str]:
     """その回の ready がそのツリーから移したファイル（承認済みの領域からの相対）。
 
-    ready のマーカーが効くのは、マーカーを書いたときのツリーの先頭（`head`）と、いま比べている版が
+    ready のマーカーが有効なのは、マーカーを書いたときのツリーの先頭（`head`）と、いま比べている版が
     同じ間だけ。
     ready の削除がコミットされてツリーが進めば、マーカーは以後の削除には効かない（ready の外の削除を
     ccnavi の書き込みとしてコミットしない）。`head` が空なら何も返さない。

@@ -12,7 +12,7 @@
 `ccnavi --agree` が呼ぶ手続きの全部。
 
 - 承認の対象を組む（`gather`・`agree_candidates.candidates`）。提案を走査し、
-  承認済みチケットと突き合わせ、載せるものと落とすものに分ける。形の検査（`agree_candidates` の
+  承認済みチケットと照合し、載せるものと落とすものに分ける。形の検査（`agree_candidates` の
   `validate`・`plan_problems`・`revision_problems`）はここで当てる
 - ユーザに見せる（`agree_screen.screen`・`preview_body`）。見せたものと承認するものを
   同じ答えにするため、一覧を組む関数は 1 つ（`gather`）にしてある
@@ -90,7 +90,7 @@ class Gathered:
 def gather(
     stderr: TextIO, conf: settings.Settings, root: str, only: list[str] | None = None
 ) -> Gathered:
-    """承認の対象を組む。提案を走査し、承認済みチケットと突き合わせ、載せるものと落とすものに分ける。
+    """承認の対象を組む。提案を走査し、承認済みチケットと照合し、載せるものと落とすものに分ける。
 
     読めない提案や承認済みチケット、落とした提案の理由は標準エラーにも出す。端末のユーザは
     そこで読み、拡張は JSON の `problems` / `rejected` で読む。
@@ -117,8 +117,9 @@ def gather(
     closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     review, _ = approval.scan_review(conf, root, raw=raw)
     # 本物とするツリーの外に書いた改版（と、改版の前に切ったワークツリーに残った古い版）は承認待ちに
-    # 入れない。黙って外さず、書く場所を名指しする。出すのは呼び手（`core_base.say_elsewhere` と
-    # `verify_verdict` の本文）で、ここでは標準エラーに書かない（同じ名指しを 2 度出さない）。
+    # 入れない。気づかないうちに外さず、書く場所を名指しする。出すのは呼び手
+    # （`core_base.say_elsewhere` と `verify_verdict` の本文）で、ここでは標準エラーに
+    # 書かない（同じ名指しを 2 度出さない）。
     open_index = approval_checks.by_id(approved)
     elsewhere = [
         approval.revision_elsewhere_text(conf, root, t, where)
@@ -209,7 +210,7 @@ class Verdict:
 
 
 def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
-    """`--verify` の答えを組む。判定は `gather` が済ませてあり、ここは読み替えるだけ。"""
+    """`--verify` の答えを組む。判定は `gather` が済ませてあり、ここは言い換えるだけ。"""
     head = "承認の可否（確かめるだけ。承認済みチケットは置かない）\n"
     # 読めなかったものは、落ちた枝でも必ず出す。むしろこの 2 つ（絞りが通らない・承認待ちが
     # 1 件も無い）が「読めないのは自分が書いた 1 本」である見込みのいちばん高い枝で、
@@ -320,7 +321,7 @@ def _batch_entry(cand: agree_candidates.Candidate) -> dict:
 class Applied:
     """承認済みチケットを置いた結果。途中で止まったときに、どこまで置いたかを呼び手へ返す。
 
-    置いたものは戻さない（戻す途中でまた落ちる）。代わりに、どこで止まって何が置かれたかを
+    置いたものは戻さない（戻す途中でまた失敗する）。代わりに、どこで止まって何が置かれたかを
     そのまま返し、拡張がユーザに伝える（README「承認の JSON」の `partial`）。
     """
 
@@ -375,7 +376,7 @@ def _apply_steps(
     """`plan_batch` の中身。書き込みは fsio の書き込みを溜める段に積み、見せる行も同じ順序で積む。
 
     書けなかったときの扱い（止める・言って続ける・行を出す）は `fsio.policy` で添える。
-    書き込みを溜める段では書き込みが落ちないので、その扱いは Writer(FS) が書くときに当てる。
+    書き込みを溜める段では書き込みが失敗しないので、その扱いは Writer(FS) が書くときに当てる。
     """
     for cand in batch:
         t = cand.ticket
@@ -447,7 +448,7 @@ def _apply_steps(
             # ときに、子は 1 枚も増えていないのに済んでいたレビューが巻き戻る
             # （test_a_failed_copy_does_not_clear_the_marks_of_a_reviewed_phase）。
             # Writer(FS) は並べた順に書き、止まったらその先を書かないので、この順が保たれる。
-            # 置いた直後に落ちる（打ち切られる・電源が切れる）と「子は増えたのにマーカーは残る」
+            # 置いた直後に止まる（打ち切られる・電源が切れる）と「子は増えたのにマーカーは残る」
             # ＝見られていない子がいるのに止まらなくなるが、そちらは起きうる間が
             # ファイル 1 つを書く間だけで、頻度がはるかに低い。順番の入れ替えでは直らない
             # （両方を防ぐなら、マーカーの時刻と子の承認時刻を比べて止めるかどうかを決める

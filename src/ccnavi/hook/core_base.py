@@ -5,18 +5,18 @@
 
     Snapshot（入力）→ judge_approval / withdraw / confirm（判定）→ Changes（書くもの）→ Writer
 
-- **Reader**: Snapshot の中身はファイルシステムから読む（Reader(FS)）。手元は
+- Reader: Snapshot の中身はファイルシステムから読む（Reader(FS)）。手元は
   作業ツリー、Chrome は API で読んだ中身を MEMFS に組んだ仮のツリー。
   core はブランチごとの blob の表（取っていないファイルを `NOT_FETCHED` にする形）を持たない
-- **判定**: `judge_approval`（実行前チェックのモジュール `ccnavi.hook.judge` と
+- 判定: `judge_approval`（実行前チェックのモジュール `ccnavi.hook.judge` と
   紛れないように名前を変えた）は承認の対象と画面とダイジェストを返す。通らない理由を返す
   `withdraw` と `confirm` は `core_withdraw` と `core_review` にある
-- **Changes**: 書き込みを値として並べたもの（`plan`）。書くときの落ち方（止める・言って続ける）
+- Changes: 書き込みを値として並べたもの（`plan`）。書くときの落ち方（止める・言って続ける）
   もつけてある。`per_branch` はブランチごとの create / update / delete で、Chrome はこれを
   1 コミットにする
-- **Writer(FS)**: `write_fs` が Changes をディスクに書く。fsio を通るので、C1 の記録層
+- Writer(FS): `write_fs` が Changes をディスクに書く。fsio を通るので、C1 の記録層
   （`fsio.recording`）がそのまま使われる
-- **Clock**: 時刻は `Snapshot.stamp`（空なら今）。plan の間は `fsio.clock` で固定し、承認の
+- Clock: 時刻は `Snapshot.stamp`（空なら今）。plan の間は `fsio.clock` で固定し、承認の
   記録と履歴に同じ時刻を書く
 
 判定そのもの（`agree.gather` / `candidates` / `waiting`、`review` の検査）は今のコードを

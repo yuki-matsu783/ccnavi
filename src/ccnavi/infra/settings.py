@@ -86,7 +86,7 @@ TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
 # INTEGRATION_ENV は統合先の名前。リポジトリには置かず、未設定ならホストのデフォルトブランチ。
 # `done/` とレイヤーと置き場のパスを読むブランチで、親のブランチはここから切る。
-# **ccnavi はこの環境変数を読まない。** 読むのは sh（`ccnavi-sync.sh`）で、sh が環境変数か
+# ccnavi はこの環境変数を読まない。読むのは sh（`ccnavi-sync.sh`）で、sh が環境変数か
 # `.claude/settings.local.json` の `env` から決め、要る所へ `--integration-branch` で渡す。
 # settings.local.json の `env` は Claude Code が起こしたプロセスにしか渡らないので、ユーザが端末で
 # 打つ sh のために、その値だけを `sync paths` が読んで返す（integration_local）。

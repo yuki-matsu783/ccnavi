@@ -24,7 +24,7 @@
   `ccnavi-ticket.sh record-risk` で yes / no を記録する。判定が揃うまで子は閉じられない
 
 測れなかった項目（スクリプトの失敗、読めない出力）は重いほうとして扱い、その項目の点を加える。
-「測れないから 0」にすると、スクリプトが壊れただけでその項目の点が消える。
+「測れないから 0」にすると、スクリプトが動かなくなっただけでその項目の点が消える。
 
 ## 書式
 
@@ -34,7 +34,7 @@
       - {id: big-diff,   points: 25, lines_over: 300,   message: 行数が多い}
       - {id: many-files, points: 15, files_over: 10,    message: ファイルが多い}
       - {id: src-diff,   points: 25, lines_over: 300, include: ["src/**"], exclude: ["*.lock"]}
-      - {id: ci,         points: 35, glob: ".github/**", max: 35, message: CI に触った}
+      - {id: ci,         points: 35, glob: ".github/", max: 35, message: CI に触った}
       - {id: deletes,    points: 20, deleted_over: 3,   message: 消したファイルが多い}
       - {id: complexity, points: 30, script: .ccnavi/common/scripts/complexity.sh, message: 複雑度}
       - {id: untested,   points: 30, judge: テストの無い振る舞いの変更を含むか, message: テスト無し}
@@ -43,11 +43,11 @@
 `include` / `exclude`（glob のリスト）で絞れる。どちらも既定は無指定で、無指定なら差分全体を数える。
 `include` があれば当たったパスだけ、`exclude` に当たったパスは `include` に当たっていても
 数えない。`exclude` だけなら、それ以外は全部数える。末尾が `/` の glob はディレクトリ
-（`src/` は `src/**`）。rename / copy は元のパスも見て、`include` は旧新どちらかが当たれば数え、
+（`src/` は `src/`）。rename / copy は元のパスも見て、`include` は旧新どちらかが当たれば数え、
 `exclude` は旧新の両方が当たったときだけ外す。
 バイナリの変更は行数 0 として数える（ファイル数と削除数には入る）。
 
-ファイルが無ければ組み込みの既定（上の定量 4 項目と同じ値）。壊れていれば組み込みに戻り、
+ファイルが無ければ組み込みの既定（上の定量 4 項目と同じ値）。破損していれば組み込みに戻り、
 そのことは --lint と子を閉じるときの出力が言う。
 """
 
@@ -166,7 +166,7 @@ class Factor:
 
 @dataclass
 class Definition:
-    # levels は**書かれた鍵だけ**。書かれていない鍵は DEFAULT_LEVELS で読む
+    # levels は書かれた鍵だけ。書かれていない鍵は DEFAULT_LEVELS で読む
     # （`level_of`）。既定で埋めて持つと、合成のときに「書いていないレイヤー」が
     # 共通レイヤーの緩めた境目の点を気づかないうちに戻すことになる（設計 11.4.2）。
     levels: dict[str, int] = field(default_factory=dict)
@@ -229,7 +229,7 @@ def builtin() -> Definition:
 
 
 def load(path: str) -> tuple[Definition, list[Problem]]:
-    """共通レイヤーの定義を読む。無ければ組み込み。壊れていれば組み込みに戻り、苦情を返す。"""
+    """共通レイヤーの定義を読む。無ければ組み込み。破損していれば組み込みに戻り、苦情を返す。"""
     if not path:
         return builtin(), []
     try:
@@ -238,7 +238,7 @@ def load(path: str) -> tuple[Definition, list[Problem]]:
     except FileNotFoundError:
         return builtin(), []
     except (OSError, ValueError) as exc:
-        # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、壊れた
+        # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、破損した
         # ファイルとして苦情付きで返す。phasetypes.load と同じ扱い。
         fallen = builtin()
         fallen.fallback = f"{path} を読めない ({exc})"
@@ -252,10 +252,11 @@ def load(path: str) -> tuple[Definition, list[Problem]]:
 
 
 def load_layer(path: str, script_homes: tuple[str, ...]) -> tuple[Definition | None, list[Problem]]:
-    """レイヤーの定義を読む。無ければ None（無いレイヤー = 空）。壊れていても組み込みには戻さない。
+    """レイヤーの定義を読む。無ければ None（無いレイヤー = 空）。
+    破損していても組み込みには戻さない。
 
     共通レイヤーが在るのに組み込みに戻すと、共通レイヤーの配点が消える側になる（設計 11.2）。
-    壊れたレイヤーは空として扱い、苦情だけを返す。
+    破損したレイヤーは空として扱い、苦情だけを返す。
     """
     if not path:
         return None, []
@@ -426,7 +427,7 @@ def _factors(
             if bad:
                 continue
             # ワイルドカードの無い include はそのファイル名にしか当たらない。ディレクトリの
-            # つもりで `src` と書くと、何も数えず点が 0 になる（黙って軽い側へ倒れる）。
+            # つもりで `src` と書くと、何も数えず点が 0 になる（気づかないうちに軽い側へ偏る）。
             for glob in scope["include"][0]:
                 if not any(ch in glob for ch in "*?["):
                     problems.append(
@@ -643,10 +644,10 @@ def definition_path(conf: settings.Settings, root: str, project: str) -> str:
 def layer_definition(
     conf: settings.Settings, root: str = "", project: str = ""
 ) -> tuple[Definition, list[Problem]]:
-    """共通レイヤー + そのレイヤーの配点と、**そのレイヤーの**苦情（設計 11.4.2）。
+    """共通レイヤー + そのレイヤーの配点と、そのレイヤーの苦情（設計 11.4.2）。
 
     共通レイヤー自身の苦情は返さない。言う場所は `--lint` の共通レイヤーの項で、そこと二重に
-    言うと同じ文を 2 度読むことになる。共通レイヤーが壊れていれば組み込みに戻り、
+    言うと同じ文を 2 度読むことになる。共通レイヤーが破損していれば組み込みに戻り、
     そのときはレイヤーを足さない（設計 11.2）。
 
     ファイルが無いのは正常（無い = 空）。共通レイヤーにも config にも `risks.yml` が無ければ

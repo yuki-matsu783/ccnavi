@@ -867,7 +867,7 @@ def order_problems(
     待つ番号は親の待ち方のコピー（`workflow`）が決める。一直線なら前の全部、`dag` なら
     定義の祖先に当たる前の番号。`overlap` の組はコピーを作るときに待ちから外してある。
 
-    ここで出す苦情は `rules.KIND_NOT_YET`。承認は落とすが、書いた側に直すものは無く、
+    ここで出す苦情は `rules.KIND_NOT_YET`。承認は通さないが、書いた側に直すものは無く、
     前のフェーズが閉じれば同じ提案がそのまま通る。全体を見る `--lint` はこの定義を見て
     warn にする（`lint_ticket._approval_problems`）。
 

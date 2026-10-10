@@ -105,7 +105,7 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     # BaseHTTPRequestHandler.handle() と名前がぶつかるので、処理の本体は act に置く。
-    # ぶつけると「本文が届かない」形で静かに壊れる（実測で 30 分溶かした）。
+    # 重なると、気づかないうちに本文が届かなくなる（原因を探すのに 30 分かかった）。
 
     def log_message(self, fmt, *args):
         sys.stderr.write(f"fake-gitlab {self.command} {self.path}\n")
@@ -130,7 +130,7 @@ class Handler(BaseHTTPRequestHandler):
             self._body = json.loads(raw.decode("utf-8"))
         except (ValueError, UnicodeDecodeError) as exc:
             # UTF-8 でない本文はここで落ちる。Windows のコンソール経由で日本語を
-            # 引数に渡すと CP932 になり、静かに空の本文になる。名指しで言う。
+            # 引数に渡すと CP932 になり、気づかないうちに本文が空になる。名指しで言う。
             sys.stderr.write(f"fake-gitlab: 本文を読めない ({exc}) raw={raw[:120]!r}\n")
             self._body = {}
         return self._body

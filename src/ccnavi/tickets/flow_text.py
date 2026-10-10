@@ -72,7 +72,7 @@ def clean(text) -> str:
 
 
 def _text(value) -> str:
-    """文字列か数だけを文にする。リストや辞書は中身を辿らない（深い入れ子で落ちない）。"""
+    """文字列か数だけを文にする。リストや辞書は中身を辿らない（深い入れ子で失敗しない）。"""
     if isinstance(value, bool):
         return ""
     if isinstance(value, float) and value.is_integer() and abs(value) < 1e21:

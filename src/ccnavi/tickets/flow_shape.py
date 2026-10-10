@@ -64,7 +64,8 @@ def shape_problem(data) -> str:
 
 # ---- 線の構造と名前（`--lint --flow` の warn）
 #
-# 読めるか・形（`shape_problem`）の外にある、手順として怪しいところ。読むのは止めない（warn）。
+# 読めるか・形（`shape_problem`）の外にある、手順として問題がありそうなところ。
+# 読むのは止めない（warn）。
 # `SubagentStart` は見ない（並べ方は `render` のまま）。巡回は `loop` の「繰り返す」側の線を
 # 通るものだけが正しい巡回で、通らない巡回は warn で言う（回数の上限が効かず、終わらなくなりうる
 # ため。「抜ける」側が巡回に戻っても、上限は終わりを決めない）。
@@ -109,7 +110,7 @@ def _port_taken(node: dict, index: int, item: dict, ports: set[str]) -> bool:
 
 
 def structure_problems(data) -> list[str]:
-    """線の構造の怪しいところ（1 件 1 行）。無ければ空。例外は外に出さない。
+    """線の構造で問題がありそうなところ（1 件 1 行）。無ければ空。例外は外に出さない。
 
     見るのは、線の `from` / `to` が無いノードを指す、`start` から届かないノード、`start` に入る線、
     `end` から出る線、分岐・問いの出口に線が無い、`end` が無い、`start` が無い、`loop` の上限の
@@ -123,7 +124,7 @@ def structure_problems(data) -> list[str]:
     """
     try:
         return _structure_problems(data)
-    except Exception:  # noqa: BLE001  壊れたデータで lint を落とさない
+    except Exception:  # noqa: BLE001  破損したデータで lint を止めない
         return ["線の構造を確かめられない（中身の型が崩れている）"]
 
 
@@ -358,7 +359,7 @@ def name_problems(data, cat: dict[str, list[dict]]) -> list[str]:
     """
     try:
         return _name_problems(data, cat)
-    except Exception:  # noqa: BLE001  壊れたデータで lint を落とさない
+    except Exception:  # noqa: BLE001  破損したデータで lint を止めない
         return []
 
 

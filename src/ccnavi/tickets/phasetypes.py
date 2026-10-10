@@ -10,7 +10,7 @@
 
 ## 用語
 
-**フェーズ定義**はここに書く名前付きの型。**フェーズ**は親の計画に並ぶ番号付きの
+フェーズ定義はここに書く名前付きの型。フェーズは親の計画に並ぶ番号付きの
 実体で、子が `phase: N` で指す。N 番目が何の定義かは親の計画が言う。
 
 ## 書式
@@ -162,11 +162,11 @@ class PhaseType:
 
 
 def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]]:
-    """定義を読む。ファイルが無ければ None（定義を使わない）。壊れていれば None と苦情。
+    """定義を読む。ファイルが無ければ None（定義を使わない）。破損していれば None と苦情。
 
     `refs` を False にすると `overlap` / `requires` / `after` が指す先の確認を飛ばす。レイヤーの
     ファイルを単独で読むときに使う。レイヤーは共通レイヤーの定義を指してよく（設計 11.4.1）、
-    その相手はファイルの中に無いので、1 本だけで確かめると必ず落ちる。確かめる
+    その相手はファイルの中に無いので、1 本だけで確かめると必ず失敗する。確かめる
     のは合成したあと（`merge`）。
     """
     try:
@@ -176,10 +176,10 @@ def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]
         fsio.note_read(path, None)
         return None, []
     except (OSError, ValueError) as exc:
-        # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、壊れた
+        # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、破損した
         # ファイルとして苦情付きで返す。上げると、判定（実行前・レビューで止めるところ・
-        # 実行後チェック）が例外で落ち、読めない定義を「定義では切り詰めない」として扱う処理まで
-        # 進まない。
+        # 実行後チェック）が例外で異常終了し、読めない定義を「定義では切り詰めない」として
+        # 扱う処理まで進まない。
         return None, [Problem(SEVERITY_ERROR, "(phases)", f"{path} を読めない ({exc})")]
     # 承認のダイジェスト（read_set）に入れる。定義は待ち方と止め方を決める判定の入力。
     fsio.note_read(path, text)
@@ -514,7 +514,7 @@ def layer_types(
     空ならワークスペース自身のレイヤー（単体 clone ではそのプロジェクトの `.ccnavi/config/`）。
     共通レイヤーの `phases.yml` は置けないので、あっても読まない（`--lint` が error で言う）。
 
-    ファイルが無いのは正常（`None`、苦情なし）。壊れていれば空として扱い（`None`）、苦情を返す。
+    ファイルが無いのは正常（`None`、苦情なし）。破損していれば空として扱い（`None`）、苦情を返す。
     `id` の重複・`overlap` / `requires` / `after` の参照先・`title` の重なり・循環は、その 1 本の
     読み込みで確かめる。
     """

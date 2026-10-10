@@ -349,7 +349,7 @@ def _tickets(conf: settings.Settings, root: str, project: str) -> list[ticket_mo
 
 
 def _branch_of_ticket(t: ticket_model.Ticket, approved: bool) -> str:
-    """チケットが名乗るブランチ。
+    """チケットが示すブランチ。
 
     承認前の提案の `branch:` は使わないので識別子。
     """

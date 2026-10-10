@@ -39,7 +39,7 @@ RELATIVE_OVERRIDES = ("tickets", "project_home")
 # `--risk ""` は数える）。
 #
 # 前の 3 本は共通レイヤーの中身（ルール・フェーズ定義・リスクの配点）、後の 2 本は
-# **レイヤーを探す先**。`--projects` はプロジェクトのレイヤーの置き場、`--project-home` は
+# レイヤーを探す先。`--projects` はプロジェクトのレイヤーの置き場、`--project-home` は
 # 各 git プロジェクトルートの下の ccnavi ディレクトリの名前で、どちらも外すと
 # プロジェクトのレイヤーがまるごと消える。実際に試すと `ticket finish <子> --project-home .nothere`
 # で、実績リスク 55 (CRITICAL) の子が 25 (MEDIUM) になり、レビュー待ちを飛ばして

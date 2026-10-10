@@ -38,8 +38,8 @@ def set_fields(text: str, fields: dict[str, str]) -> str:
 def script_fields_set(text: str) -> tuple[str, ...]:
     """その版が既に値を持っている、スクリプトの欄。
 
-    正規化した内容を突き合わせる側が「落としてよい欄」を決めるのに使う（`post_findings._script_writes`）。
-    **落としてよいのは、コミット済みの版がまだ持っていない欄だけ。** 副命令はどれも
+    正規化した内容を照合する側が「落としてよい欄」を決めるのに使う（`post_findings._script_writes`）。
+    落としてよいのは、コミット済みの版がまだ持っていない欄だけ。 副命令はどれも
     1 度しか書かない（`ops.start` は着手済みを拒む）ので、既に値がある欄が変わったのなら、
     それは副命令が書いたものではない。
 
@@ -82,7 +82,7 @@ def script_shape(text: str, drop: tuple[str, ...] = ticket_model.SCRIPT_FIELDS) 
     落とす。揃えないと、スクリプトが書いた直後の内容が「スクリプトが書いていない形」に見える。
 
     frontmatter を持たないもの（マーカー、`.risk.json`、閉じの記録）は None。範囲を
-    宣言しないので、正規の設置と偽の設置を内容からは見分けられない。**そこは外れる。**
+    宣言しないので、正規の設置と偽の設置を内容からは見分けられない。そこは外れる。
     """
     lines = text.splitlines()
     if not lines or lines[0].strip() != ticket_model.FENCE:
