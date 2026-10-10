@@ -165,7 +165,7 @@ async function send(client: Client, url: string, init: Parameters<Fetch>[1], wha
       throw new HostError(limited.text, res.status);
     }
     if (res.status === 403) {
-      throw new HostError(`GitHub が断った（403）: ${what}。PAT の権限（リポジトリ・Contents など）を見直してください`, 403);
+      throw new HostError(`GitHub が拒否した（403）: ${what}。PAT の権限（リポジトリ・Contents など）を見直してください`, 403);
     }
     return res;
   }

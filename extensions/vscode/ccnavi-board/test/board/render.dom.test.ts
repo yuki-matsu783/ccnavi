@@ -630,7 +630,7 @@ test("CB-T15 問題とプロジェクトの絞り込みを出す", async () => {
   }
 });
 
-test("CB-T16 本文の文字列で表示を壊さない", async () => {
+test("CB-T16 本文の文字列で表示が崩れない", async () => {
   const base = fixture();
   const evil = { ...base.tickets[0], title: `<script>alert("x")</script>` };
   const page = await openBoard({ ...base, tickets: [evil, ...base.tickets.slice(1)] });

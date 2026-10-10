@@ -48,10 +48,10 @@ test("CX-T012 他の拡張・ウェブページ・別の拡張のオリジンか
   assert.equal((await dispatch(msg, BOARD, d)).ok, true);
 });
 
-test("CX-T013 操作は名前で限る。知らない操作・焼き込んでいないホスト・形の悪い引数は受けない", async () => {
+test("CX-T013 操作は名前で限る。未対応の操作・焼き込んでいないホスト・形の悪い引数は受けない", async () => {
   const d = deps(mock(), new Map([["github.com", TOKEN]]));
   const call = (m: Record<string, unknown>) => dispatch(m, BOARD, d);
-  assert.match(((await call({ kind: "host", host: "github.com", op: "createCommitOnBranch", args: ["acme", "widgets"] })) as { error: string }).error, /知らない操作/);
+  assert.match(((await call({ kind: "host", host: "github.com", op: "createCommitOnBranch", args: ["acme", "widgets"] })) as { error: string }).error, /未対応の操作/);
   assert.match(((await call({ kind: "host", host: "evil.example.com", op: "repoInfo", args: ["acme", "widgets"] })) as { error: string }).error, /通信先に無い/);
   assert.equal((await call({ kind: "host", host: "github.com", op: "repoInfo", args: ["acme/../x", "widgets"] })).ok, false);
   assert.equal((await call({ kind: "host", host: "github.com", op: "tree", args: ["acme", "widgets", "not-a-sha"] })).ok, false);

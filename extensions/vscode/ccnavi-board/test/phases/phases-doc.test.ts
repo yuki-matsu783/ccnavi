@@ -161,7 +161,7 @@ test("CB-T90 足す・消す・空のリストは欄ごと消す・scope の inh
   );
 });
 
-test("CB-T91 id が重なれば書き戻さない（実行ファイルは後ろで黙って上書きするため）", () => {
+test("CB-T91 id が重なれば書き戻さない（実行ファイルは後ろの定義で気づかないうちに上書きするため）", () => {
   const doc = readPhases(SAMPLE);
   const phases = doc.model.form.phases.map((p) => (p.id === "design" ? { ...p, id: "research" } : p));
   assert.throws(() => doc.apply({ order: "sequential", phases }), /id `research` が 2 つあります/);

@@ -171,7 +171,7 @@ export async function dispatch(message: unknown, sender: Sender, deps: Deps): Pr
       case "host":
         return await hostCall(host, msg.op, msg.args, deps);
       default:
-        return { ok: false, error: "知らない種類の要求" };
+        return { ok: false, error: "未対応の種類の要求" };
     }
   } catch (err) {
     const e = err as { message?: string; status?: number };
@@ -537,7 +537,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       break;
     }
     default:
-      return { ok: false, error: `知らない操作: ${String(op)}` };
+      return { ok: false, error: `未対応の操作:${String(op)}` };
   }
   return { ok: true, value, counter };
 }

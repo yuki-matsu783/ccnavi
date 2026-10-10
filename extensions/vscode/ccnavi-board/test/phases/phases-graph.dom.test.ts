@@ -57,7 +57,7 @@ test("CB-D81 図は点と線を描く（線が 0 本なら、それは描けて�
   }
 });
 
-test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線が落ちた理由は断定しない", async () => {
+test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線にならなかった理由は断定しない", async () => {
   const dom = await openGraph({ model: model(LINKED) });
   try {
     const legend = dom.one(".graph-legend").textContent ?? "";

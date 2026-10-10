@@ -88,7 +88,7 @@ async function send(client: Client, url: string, init: Parameters<Fetch>[1], wha
       throw new HostError(`GitLab のレート制限にかかった（429${seconds !== null ? `、${seconds} 秒待つよう求められた` : ""}）。少し待ってからボードを更新してください`, 429);
     }
     if (res.status === 403) {
-      throw new HostError(`GitLab が断った（403）: ${what}。PAT の権限（api スコープ・プロジェクトのメンバー）を見直してください`, 403);
+      throw new HostError(`GitLab が拒否した（403）: ${what}。PAT の権限（api スコープ・プロジェクトのメンバー）を見直してください`, 403);
     }
     return res;
   }
@@ -548,7 +548,7 @@ export async function createCommit(
   const res = await post(client, `${project(owner, repo)}/repository/commits`, payload);
   if (res.status === 400 || res.status === 409 || res.status === 422) {
     const why = (res.body as { message?: unknown } | null)?.message;
-    throw new HostError(`GitLab が書き込みを断った（${res.status}）: ${typeof why === "string" ? why : "?"}`, HOST_REFUSED);
+    throw new HostError(`GitLab が書き込みを拒否した（${res.status}）: ${typeof why === "string" ? why : "?"}`, HOST_REFUSED);
   }
   if (res.status < 200 || res.status >= 300) throw new HostError(`GitLab が ${res.status} を返した: POST repository/commits`, res.status);
   const c = (res.body ?? {}) as { id?: unknown; parent_ids?: unknown };

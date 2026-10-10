@@ -101,7 +101,7 @@ test("CB-T182 見た目は画面に中身を渡す段取りを通る。組み上
   assert.deepEqual(spy.posted, [{ type: "appearance", value: "claude-dark" }]);
 });
 
-test("CB-T182b 保持する画面は裏でも送る。1 枚目を読み込んでいる間だけ落ちる", () => {
+test("CB-T182b 保持する画面は裏でも送る。1 枚目を読み込んでいる間だけ送れない", () => {
   const spy = surface();
   const host = retainedHost<string>(spy, (data) => data);
 

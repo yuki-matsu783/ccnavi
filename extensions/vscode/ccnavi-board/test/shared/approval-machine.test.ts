@@ -831,7 +831,7 @@ function load(source: string): { readonly approvalStep: Step } {
   return box.exports as unknown as { readonly approvalStep: Step };
 }
 
-test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが落ちる（変異テスト）", () => {
+test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが失敗する（変異テスト）", () => {
   const source = fs.readFileSync(SOURCE, "utf8");
 
   // 組み立て直したものが、読み込んだものと同じに動くこと。ここが成り立たないと、以下は何も見ていない

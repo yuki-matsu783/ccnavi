@@ -205,7 +205,7 @@ export function SuggestResult({ result }: { readonly result: SuggestJson }): JSX
     <div id="suggest-result" className="result">
       <p>
         記録 {result.logs.length} 本・{result.records} 行から、候補 {result.candidates.length} 件
-        （検証を通らず落としたもの {result.dropped} 件）。どれも下書きで、置くのはユーザです。
+        （検証を通らず除いたもの {result.dropped} 件）。どれも下書きで、置くのはユーザです。
       </p>
       {result.candidates.length === 0 ? (
         <p className="empty">候補はありません</p>

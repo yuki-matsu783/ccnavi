@@ -135,7 +135,7 @@ def handle(request: str, root: str = "/ws") -> str:
         op = req.get("op")
         handler = _OPS.get(op) if isinstance(op, str) else None
         if handler is None:
-            raise Refused(f"知らない操作: {op!r}")
+            raise Refused(f"未対応の操作:{op!r}")
         body = handler(req, root)
     except Refused as exc:
         body = {"error": str(exc)}

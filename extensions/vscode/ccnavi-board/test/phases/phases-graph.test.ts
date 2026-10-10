@@ -102,7 +102,7 @@ test("CB-T189 点は id・題・区分・レビューを持ち、前後の空白
   assert.deepEqual(edges(form(phase(" a ", { requires: [" b "] }), phase("b"))), [["requires", "a", "b"]]);
 });
 
-test("CB-T190b id にハイフンが入っていても、線が別の線に潰されない", () => {
+test("CB-T190b id にハイフンが入っていても、線が別の線と混ざらない", () => {
   // id はハイフンを含められる（phasetypes.py の _ID は [A-Za-z0-9._-]）。線の名前を
   // `関係:a--b` と繋げると、この 2 組が同じ文字列になり、片方が気づかないうちに消える
   const graph = graphOf(form(phase("x", { requires: ["y--z"] }), phase("y--z"), phase("x--y", { requires: ["z"] }), phase("z")));

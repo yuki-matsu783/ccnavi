@@ -89,7 +89,7 @@ test("CB-T146 1 度きりのメッセージは、届いたときだけ真を返�
   assert.deepEqual(spy.posted, [{ type: "filter" }]);
 });
 
-test("CB-T147 裏にいる画面からの ready は、捨てられた画面の置き土産として捨てる", () => {
+test("CB-T147 裏にいる画面からの ready は、捨てられた画面が残したものとして捨てる", () => {
   const spy = surface();
   const host = screenHost<string>(spy, (data) => data);
   host.send("あ");

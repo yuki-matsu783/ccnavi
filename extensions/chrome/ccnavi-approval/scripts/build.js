@@ -29,7 +29,7 @@ function arg(name, fallback) {
 export function tsc(project) {
   const bin = path.join(HERE, "node_modules", "typescript", "bin", "tsc");
   const r = spawnSync(process.execPath, [bin, "-p", project], { cwd: HERE, stdio: "inherit" });
-  if (r.status !== 0) throw new Error(`tsc -p ${project} が落ちた`);
+  if (r.status !== 0) throw new Error(`tsc -p ${project} が失敗した`);
 }
 
 function copyPyodide(out) {
