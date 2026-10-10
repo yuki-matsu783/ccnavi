@@ -26,6 +26,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from typing import TextIO
 
@@ -45,7 +46,10 @@ def fill_phases(
     stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str, name: str
 ) -> int:
     """`--plan-order <親> --fill-phases`。書けたか変わらなければ 0、書かなければ 1。"""
-    target = _proposal(conf, root, name)
+    target, ambiguous = _proposal(conf, root, name)
+    if ambiguous:
+        stderr.write(f"ccnavi: {ambiguous}。何も書かない\n")
+        return EXIT_ERROR
     if target is None:
         stderr.write(
             f"ccnavi: {name} の親の提案が承認待ちの置き場（{conf.tickets}/{ticket_model.TODO}/）に"
@@ -118,13 +122,45 @@ def fill_phases(
     return EXIT_OK
 
 
-def _proposal(conf: settings.Settings, root: str, name: str) -> ticket_model.Ticket | None:
-    """承認待ち（`todo/`）の親の提案。承認と同じ集め方で、本物とするツリーの側を採る。"""
+def _proposal(
+    conf: settings.Settings, root: str, name: str
+) -> tuple[ticket_model.Ticket | None, str]:
+    """承認待ち（`todo/`）の親の提案と、決まらない理由。承認と同じ集め方で、本物とするツリーの
+    側を採る。
+
+    同じ識別子の提案が 2 つ以上のツリーに残っていれば（本物とするツリーが決まらない）、打った
+    ツリー（cwd を含むツリー）の側だけを採る。ほかのツリーは別のセッションの作業かもしれないので
+    書かない。cwd がどのツリーにも当たらなければ、何も決めずに理由を返す。
+    """
     proposals, _ = approval.scan_proposals(conf, root)
-    for t in proposals:
-        if t.ticket == name and t.state == ticket_model.TODO and not t.is_child and t.path:
-            return t
-    return None
+    found = [
+        t
+        for t in proposals
+        if t.ticket == name and t.state == ticket_model.TODO and not t.is_child and t.path
+    ]
+    if len(found) == 1:
+        return found[0], ""
+    if not found:
+        return None, ""
+    here = os.path.realpath(os.getcwd())
+    mine = [
+        t
+        for t in found
+        if t.tree_root
+        and (
+            here == os.path.realpath(t.tree_root)
+            or here.startswith(os.path.realpath(t.tree_root) + os.sep)
+        )
+    ]
+    # ワークスペースルートのツリーは、ほかのワークツリーを中に含むので、いちばん深いツリーを採る。
+    mine.sort(key=lambda t: len(os.path.realpath(t.tree_root)), reverse=True)
+    if mine:
+        return mine[0], ""
+    places = ", ".join(f"{t.tree or 'ワークスペースルート'}" for t in found)
+    return None, (
+        f"{name} の提案が複数の場所にある（{places}）。書き換えるツリーの中から打つ"
+        "（ほかのツリーの提案は書かない）"
+    )
 
 
 def _held(
