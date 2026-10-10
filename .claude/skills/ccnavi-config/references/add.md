@@ -111,8 +111,10 @@ Bash は実行される部分に当たる。`$( )` の中や `&&` の先も 1 �
 
 ## phases.yml
 
-フェーズ定義を書く。親チケットの `plan:` にフェーズ定義の名前を順に並べたものが全体計画で、
-子は `phase: N` で番号を指す。フェーズ定義が無ければ番号しか無く、`plan:` は読めない。
+フェーズ定義を書く。親チケットの `plan:` にフェーズ定義の名前を並べ、項に `after: [番号]` で先行を書いたものが
+全体計画で、子は `phase: N` で番号を指す。フェーズ定義は順序を持たない（順序は計画の項の `after` で書く）。
+計画を持つ親は、計画が使う定義の写しを `phases:` に持ち（`ccnavi --plan-order <親> --fill-phases` で差し込む）、
+承認のあとの判定はその写しを読む。phases.yml が無ければ計画を持つ親は承認できない。
 
 ```yaml
 version: 1
@@ -129,18 +131,18 @@ phases:
     title: 実装とテスト
     review: mr
     scope: ["src/*", "tests/*"]
-    requires: [acceptance]      # 計画に置くなら一緒に要るフェーズ定義
+    when: 振る舞いを変えるとき。受入テスト作成を先に置く   # 一緒に置くべき定義の組は when に書く
   acceptance:
     kind: work
     title: 受入テスト作成
     review: mr
     scope: ["tests/*"]
-    overlap: [implement]        # 並行してよい（対称）。前が閉じる前に次を承認できる
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
-    review: mr                  # feedback は mr 固定
+    review: mr                  # feedback に none は書けない（chat か mr）
     scope: inherit
+    when: フィードバック計画の最後に置き、ほかの対応を受ける
 ```
 
 決めるときに考えること:
@@ -151,14 +153,16 @@ phases:
   glob はワークツリーのルートからの相対で、`..` `~` `$` と絶対パスは受け付けない
 - `deliverables` は「在って追跡されている」ことだけ見る。中身は見ない。閉じるときに無ければ
   最後の子を閉じられないので、必ず作れる名前にする
-- `overlap` は対称に効く。`acceptance: overlap: [implement]` と書けば implement 側にも効く。
-  `requires` は計画を承認するときに見る（「implement を置くなら acceptance も要る」）
-- `feedback` のフェーズ定義は必ず `review: mr`
+- 順序の欄（`order`・`after`・`overlap`・`requires`）は書かない。書いても読まれず、`--lint` が warn で言う。
+  並行させたいかは計画ごとに、親の計画の項の `after` で書く（線を引かない項は並行する）。一緒に置くべき定義の組は `when` に書く
+- `scope` と `deliverables` はそれぞれ 20 件まで
+- `feedback` のフェーズ定義に `review: none` は書けない
 - `when` と `agent` は判定に使われない案内。`when` は「次は X の計画です（定義の案内: …）」の
   形でモデルに届くので、そのフェーズ定義を飛ばしてよい条件まで書く
 
-既に承認された親がある間は慎重に。開いている親の `plan:` が指すフェーズ定義を消す・名前を変える
-と、その親の計画が読めなくなる。`--explain` で承認済みの親と計画を見てから変える。
+承認済みの親は、承認したときの定義の写し（`phases:`）で判定されるので、phases.yml を直しても進行中の親には
+届かない（`--lint` が食い違いを warn で言う）。承認待ちの提案は写しが phases.yml と違うと `--agree` で落ちるので、
+直したら提案に `ccnavi --plan-order <親> --fill-phases` を打ち直してもらう。
 
 ## risks.yml
 
