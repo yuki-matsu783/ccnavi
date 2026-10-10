@@ -43,6 +43,7 @@ from . import (
     approval_marks,
     approval_ops,
     phase,
+    plan_order,
     ticket_ids,
     ticket_model,
 )
@@ -74,6 +75,9 @@ class Gathered:
     # 本物とするツリーの外に在る計画の違う版の案内（`approval.revision_elsewhere_text`）。
     # 承認待ちには入れない。書く場所を名指しするためだけに持つ（本文とダイジェストには入れない）。
     elsewhere: list[str] = field(default_factory=list)
+    # 走査した提案の全部（`todo/` と `review/`）。preview の `plans` が、親の `todo/` の子の提案を
+    # まとめたハッシュ（`source_sha`）を作るのに使う。
+    proposals: list = field(default_factory=list)
 
     @property
     def text(self) -> str:
@@ -169,11 +173,30 @@ def gather(
         stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
         for p in complaints:
             stderr.write(f"  {p}\n")
-    return Gathered(batch, rejected, texts, pool, False, broken, "", note, elsewhere=elsewhere)
+    return Gathered(
+        batch,
+        rejected,
+        texts,
+        pool,
+        False,
+        broken,
+        "",
+        note,
+        elsewhere=elsewhere,
+        proposals=proposals,
+    )
 
 
-def preview_body(root: str, gathered: Gathered, digest: str) -> dict:
-    """`--preview --json` が返す本体。`--verify --json` も同じものに答えを足して返す。"""
+def preview_body(conf: settings.Settings, root: str, gathered: Gathered, digest: str) -> dict:
+    """`--preview --json` が返す本体。`--verify --json` も同じものに答えを足して返す。
+
+    `plans` は承認の対象に入った計画を持つ親の図の中身。`--plan-order <親> --json` と同じ関数
+    （`plan_order.plans`）で作り、`--order` は渡さない（承認する提案そのものの順序）。
+    ダイジェストには入れない（本文と書く中身から決まる）。
+    """
+    parents = [
+        (c.ticket, c.current) for c in gathered.batch if not c.ticket.is_child and c.ticket.has_plan
+    ]
     return {
         "version": AGREE_VERSION,
         "root": root,
@@ -186,6 +209,7 @@ def preview_body(root: str, gathered: Gathered, digest: str) -> dict:
             for t, complaints in gathered.rejected
         ],
         "problems": gathered.problems,
+        "plans": plan_order.preview_plans(conf, root, parents, gathered.proposals),
     }
 
 

@@ -52,5 +52,50 @@
    ]
   }
  ],
- "problems": []
+ "problems": [],
+ "plans": [
+  {
+   "ticket": "i0001",
+   "part": "plan",
+   "source_sha": "6a0a7d3a77a152fc39fdc30212ae8280f1f432e6b877dde6c73f30cffe4d4772",
+   "items": [
+    {
+     "number": 1,
+     "from": 1,
+     "type": "research",
+     "title": "調査",
+     "review": "none",
+     "deferred": false,
+     "review_at": null,
+     "locked": false
+    },
+    {
+     "number": 2,
+     "from": 2,
+     "type": "design",
+     "title": "設計",
+     "review": "mr",
+     "deferred": false,
+     "review_at": null,
+     "locked": false
+    }
+   ],
+   "after": {
+    "2": [
+     1
+    ]
+   },
+   "proposed": {
+    "2": [
+     1
+    ]
+   },
+   "current": null,
+   "loose": [],
+   "ready": [
+    1
+   ],
+   "problems": []
+  }
+ ]
 }
