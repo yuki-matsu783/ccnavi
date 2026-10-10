@@ -535,7 +535,7 @@ def predecessor_problems(
                 PRED_SELF: "自分自身を先行に挙げている。自分が閉じるのを待つことはできない",
                 PRED_ANCESTOR: "自分の親を先行に挙げている。親は子が全部閉じてから閉じるので、"
                 "待っても満たさない",
-                PRED_CYCLE: f"先行が輪になっている（{p.where}）。どれも他が閉じるのを待つので、"
+                PRED_CYCLE: f"先行が循環している（{p.where}）。どれも他が閉じるのを待つので、"
                 "待っても満たさない",
             }[p.state]
             problems.append(

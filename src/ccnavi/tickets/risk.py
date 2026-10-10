@@ -246,7 +246,7 @@ def load(path: str) -> tuple[Definition, list[Problem]]:
     definition, problems = parse(text, path)
     if definition is None:
         fallen = builtin()
-        fallen.fallback = f"{path} が壊れている。組み込みの配点で数える"
+        fallen.fallback = f"{path} が不正。組み込みの配点で数える"
         return fallen, problems
     return definition, problems
 
@@ -668,7 +668,7 @@ def layer_definition(
     extra, notes = load_layer(path, (settings.layer_script_home(conf),))
     if extra is None:
         definition.dropped.append(layer)
-        definition.fallback = f"{layer} の配点が壊れている。このレイヤーは空として数える"
+        definition.fallback = f"{layer} の配点が不正。このレイヤーは空として数える"
         return definition, list(notes)
     mark_layer(extra, layer, home)
     merged, problems = merge(definition, extra, layer)

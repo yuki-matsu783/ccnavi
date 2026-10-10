@@ -147,7 +147,7 @@ def main() -> int:
             if code != 0 and failed is None:
                 failed = result
                 stop = True
-            print(f"  {'落' if code else 'ok'}  {spent:6.1f}s  {dotted}")
+            print(f"  {'NG' if code else 'ok'}  {spent:6.1f}s  {dotted}")
 
     wall = time.perf_counter() - started
     print(f"\n{len(results)} モジュール / {wall:.1f} 秒")
@@ -155,11 +155,11 @@ def main() -> int:
     if failed is None:
         return 0
     dotted, _, _, output = failed
-    print(f"\n--- 落ちたのは {dotted} ---", file=sys.stderr)
+    print(f"\n--- 失敗したのは {dotted} ---", file=sys.stderr)
     print(output.strip(), file=sys.stderr)
     skipped = len(planned) - len(results)
     if skipped:
-        print(f"\n（{skipped} モジュールは起こしていません）", file=sys.stderr)
+        print(f"\n（{skipped} モジュールは開始していません）", file=sys.stderr)
     return 1
 
 

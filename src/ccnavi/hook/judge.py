@@ -948,8 +948,8 @@ def ticket_verdict(
             notice = (
                 f"[ccnavi] {ticket.ticket} のフェーズ {ticket.phase} の定義 `{missing}` が"
                 "読めないので、定義の上限では切り詰めていない（親 "
-                f"{parent.ticket} の範囲では切り詰めている）。phases.yml が壊れているか、"
-                "定義が消えている。ユーザに伝えて直してもらってください"
+                f"{parent.ticket} の範囲では切り詰めている）。phases.yml の内容が不正か、"
+                "定義が無くなっている。ユーザに伝えて直してもらってください"
                 "（'ccnavi --lint' が箇所を言う）。"
             )
     found = phase_scope.scope_verdict(ticket, parent, pt, rel)

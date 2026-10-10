@@ -464,7 +464,7 @@ def report(stdout: TextIO, conf: settings.Settings, root: str, as_json: bool) ->
         return 0
     stdout.write(
         f"# 記録 {len(logs)} 本・{body['records']} 行から起こした候補 {len(body['candidates'])} 件"
-        f"（検証を通らず落としたもの {body['dropped']} 件）。\n"
+        f"（検証を通らず除いたもの {body['dropped']} 件）。\n"
         "# どれも下書き。置くのはユーザで、置く前に /ccnavi-config の手順で確かめる。\n"
     )
     for c in body["candidates"]:

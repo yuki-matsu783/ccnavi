@@ -223,7 +223,7 @@ def predecessors_unmet(
         )
     if any(not p.waiting for p in unmet):
         stderr.write(
-            "  取り消した・どこにも無い・自分自身や自分の親・輪になった先行は、待っても満たせない。"
+            "  取り消した・どこにも無い・自分自身や自分の親・循環した先行は、待っても満たせない。"
             "複数の場所にある先行は、先に 1 つに決めてください\n"
         )
     stderr.write(

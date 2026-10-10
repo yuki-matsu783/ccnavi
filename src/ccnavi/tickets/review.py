@@ -193,7 +193,7 @@ def requested(
     # 動いていれば、ユーザが見るものとマーカーが食い違う。
     unmet = _unmet(tree_root, conf, ph)
     if unmet:
-        stderr.write("ccnavi: 投稿の後に前提が崩れた。マーカーは置かない\n")
+        stderr.write("ccnavi: 投稿の後に前提が成り立たなくなった。マーカーは置かない\n")
         for line in unmet:
             stderr.write(f"  - {line}\n")
         return 1
@@ -311,7 +311,7 @@ def review_problems(
         # フィードバック対応の最後のレビュー。新しいフィードバック作業フェーズは
         # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 9.11）。
         lines += [
-            "フィードバック対応の最後のレビューです。道は 2 つ。",
+            "フィードバック対応の最後のレビューです。選べるのは 2 つ。",
             f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）",
             f"  - ユーザが '{review_sh} decide {phase_no}'（ボードの「決める」）で"
             "残りを受け入れるか、別の issue に回す",

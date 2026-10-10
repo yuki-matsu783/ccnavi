@@ -44,7 +44,7 @@
 ## リンクは辿らない
 
 取り込み状態の途中（`sync`・`<リポジトリ>`・`families`・`integration` と、その下の読むファイル）に
-シンボリックリンクがあれば読まず、「取り込み状態が壊れている」とする。sh はコピーするときに
+シンボリックリンクがあれば読まず、「取り込み状態が不正」とする。sh はコピーするときに
 リンクを落としているが、読む側でも辿らない。
 
 ## 入れ替えの一瞬
@@ -691,7 +691,7 @@ class Families:
                 closed=True,
             )
         if record.broken:
-            stop = f"親子のチケット {family_id} の取り込み状態が壊れている（{record.broken}）"
+            stop = f"親子のチケット {family_id} の取り込み状態が不正（{record.broken}）"
         elif record.state == STATE_GONE:
             stop = (
                 f"親のブランチ {record.branch or branch} がリモートに無く、"

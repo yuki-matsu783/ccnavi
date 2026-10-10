@@ -125,7 +125,7 @@ def structure_problems(data) -> list[str]:
     try:
         return _structure_problems(data)
     except Exception:  # noqa: BLE001  破損したデータで lint を止めない
-        return ["線の構造を確かめられない（中身の型が崩れている）"]
+        return ["線の構造を確かめられない（中身の型が正しくない）"]
 
 
 def _structure_problems(data) -> list[str]:

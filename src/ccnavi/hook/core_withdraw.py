@@ -213,7 +213,7 @@ def _withdraw_problems(
         copy.tree_root, conf.tickets.replace("/", os.sep), ticket_model.TODO, ident + ".md"
     )
     if fsio.lexists(todo):
-        found.append("todo/ に同じ識別子の提案がある（戻す先が塞がっている）")
+        found.append("todo/ に同じ識別子の提案がある（戻す先に同じ識別子がすでにある）")
     if ident not in prior_proposals:
         found.append("承認コミットの親に提案が無い（承認コミットを引けない）")
     elif compare and not approval_checks.has_record(copy):
