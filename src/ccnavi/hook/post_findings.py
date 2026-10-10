@@ -210,6 +210,7 @@ def _findings(
     name = where.name
     tree_root = where.root
     script = _script_writes(changes, places, top, where, root)
+    script |= _integrate_writes(changes, top or tree_root)
     found = []
     for change in changes:
         if any(change.full == p or change.full.startswith(p + os.sep) for p in own):
@@ -327,6 +328,87 @@ def _script_writes(
         if len(landed) == 1 and len(leaving) == 1:
             out.add(change.full)
             out.add(landed[0].full)
+    return out
+
+
+def _integrate_writes(changes: list[gitstate.Change], top: str) -> set[str]:
+    """`ccnavi-git.sh integrate` が統合先のツリーに staged で残した変更の実パス。
+
+    統合先のツリーは保護領域なので、外さないと integrate の結果が「保護領域の変更」として報告され、
+    戻す設定では自分で戻される。
+
+    **記録（`<git-path ccnavi-integrate>/<名前>/marker`）は信用せず、git の状態で確かめる。** 記録は
+    `.git` の中にあってエージェントにも書けるので、書かれた内容だけで外すと、任意の staged を通す
+    経路になる。外すのは次の全部が揃ったときだけ。
+
+    * 記録の state が `staged`
+    * ブランチ `branch` が記録の `branch_sha` のまま
+    * HEAD が記録の `base` のまま
+    * いまの index のツリーが記録の `tree` と同じ
+    * そのツリーが `git merge-tree --write-tree HEAD <ブランチ>`（= squash の結果）と同じ
+
+    最後の条件で、記録に何が書かれていても、外れるのは「HEAD にそのブランチを squash した結果」と
+    一字も違わない index だけになる。外す対象は HEAD との staged の差分のパスのうち、作業ツリーで
+    さらに変わっていないもの。ほかの変更、条件が欠けたツリー、git を起こせない・git が古くて
+    `merge-tree --write-tree` が無い場合は外さず、今までどおり報告する。
+    """
+    if not top or not changes:
+        return set()
+    base = gitcmd.run(top, ["rev-parse", "--git-path", "ccnavi-integrate"])
+    if not base.ok or not base.out.strip():
+        return set()
+    gdir = base.out.strip()
+    if not os.path.isabs(gdir):
+        gdir = os.path.join(top, gdir)
+    try:
+        names = sorted(os.listdir(gdir))
+    except OSError:
+        return set()
+    head = gitcmd.run(top, ["rev-parse", "--verify", "HEAD"])
+    if not head.ok:
+        return set()
+    out: set[str] = set()
+    wanted = {c.path: c.full for c in changes if c.path}
+    for name in names:
+        marker = _read_record(os.path.join(gdir, name, "marker"))
+        if marker.get("state") != "staged":
+            continue
+        branch = marker.get("branch", "")
+        if not branch or branch != name or marker.get("base") != head.out.strip():
+            continue
+        tip = gitcmd.run(top, ["rev-parse", "--verify", f"refs/heads/{branch}"])
+        if not tip.ok or tip.out.strip() != marker.get("branch_sha"):
+            continue
+        index = gitcmd.run(top, ["write-tree"])
+        recorded = marker.get("tree", "")
+        if not index.ok or not recorded or index.out.strip() != recorded:
+            continue
+        merged = gitcmd.run(top, ["merge-tree", "--write-tree", "HEAD", f"refs/heads/{branch}"])
+        if not merged.ok or not merged.out.strip():
+            continue
+        if merged.out.split("\n", 1)[0].strip() != recorded:
+            continue
+        staged = gitcmd.run(top, ["diff", "--cached", "--name-only", "-z", "HEAD"], raw_paths=True)
+        loose = gitcmd.run(top, ["diff", "--name-only", "-z"], raw_paths=True)
+        if not staged.ok or not loose.ok:
+            continue
+        moved = {p for p in loose.out.split("\0") if p}
+        for path in (p for p in staged.out.split("\0") if p):
+            if path not in moved and path in wanted:
+                out.add(wanted[path])
+    return out
+
+
+def _read_record(path: str) -> dict[str, str]:
+    """`<鍵> <値>` を 1 行 1 項目で並べた記録を読む（sh の `ccnavi_record_get` と同じ形）。"""
+    text = fsio.read_text(path, errors="replace")
+    if text is None:
+        return {}
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        key, _, value = line.partition(" ")
+        if key and key not in out:
+            out[key] = value
     return out
 
 
