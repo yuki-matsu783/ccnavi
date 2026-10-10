@@ -39,6 +39,8 @@ class FeedbackWaitsTest(unittest.TestCase):
         self.assertEqual(wf.waits[5], [1, 2, 3, 4])
         self.assertEqual(workflow.ready(parent, wf), [1, 3, 4])
         self.assertEqual(self.problems(parent.feedback), [])
+        found = workflow.lines(parent, wf)
+        self.assertIn("すぐ始まる（フィードバック計画）: 3, 4", found)
 
     def test_feedback_items_without_after_have_more_than_one_end(self):
         found = self.problems([item("fixup"), item("fixup")])
@@ -70,8 +72,8 @@ class FeedbackFlowTest(PhaseHarness):
         {"type": "implement-feedback", "after": [2, 3]},
     ]
 
-    def plan_reviewed(self):
-        """全体計画（design 1 項）を閉じてレビューを済ませる。"""
+    def plan_reviewed(self, confirm=True):
+        """全体計画（design 1 項）を閉じてレビューを済ませる（`confirm` が偽なら依頼まで）。"""
         self.family(plan=["design"])
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
@@ -82,7 +84,8 @@ class FeedbackFlowTest(PhaseHarness):
         self.merge("i0001-01-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
-        self.assertEqual(self.confirm(fixture, 1).returncode, 0)
+        if confirm:
+            self.assertEqual(self.confirm(fixture, 1).returncode, 0)
         self.start_parent()
 
     def is_approved(self, name):
@@ -116,6 +119,58 @@ class FeedbackFlowTest(PhaseHarness):
         explained = self.ccnavi("--explain").stdout
         self.assertIn("フェーズ 3（実装フィードバック対応）", explained)
         self.assertIn("待つ: 1", explained)
+
+
+class FeedbackRevisionTest(FeedbackFlowTest):
+    """フィードバック計画を立てる改版と、同じ承認・あとの改版の扱い。"""
+
+    def test_the_join_child_waits_even_when_approved_with_the_feedback_plan(self):
+        """フィードバック計画を立てる改版と子を一緒に出しても、合流の項の子は待つ。"""
+        self.plan_reviewed(confirm=False)
+        self.propose("i0001", parent_text("i0001", ["design"], feedback=self.FB))
+        for n in (2, 3, 4):
+            name = f"i0001-0{n}-0{n}"
+            self.propose(name, child_text(name, "i0001", n, ["src/*"]))
+        self.commit_parent("feedback and children")
+        result = self.approve()
+        self.assertTrue(self.is_approved("i0001-02-02"), result.stdout + result.stderr)
+        self.assertTrue(self.is_approved("i0001-03-03"), result.stdout + result.stderr)
+        self.assertFalse(self.is_approved("i0001-04-04"), result.stdout + result.stderr)
+        self.assertIn("閉じるまで承認しない", result.stderr)
+
+    def test_an_approved_feedback_plan_cannot_change_its_after(self):
+        self.plan_reviewed()
+        self.propose("i0001", parent_text("i0001", ["design"], feedback=self.FB))
+        self.commit_parent("feedback")
+        self.assertEqual(self.approve().returncode, 0)
+        changed = [
+            "implement-feedback",
+            {"type": "implement-feedback", "after": [2]},
+            {"type": "implement-feedback", "after": [3]},
+        ]
+        self.propose("i0001", parent_text("i0001", ["design"], feedback=changed))
+        self.commit_parent("change feedback")
+        refused = self.approve()
+        self.assertNotEqual(refused.returncode, 0, refused.stdout + refused.stderr)
+        self.assertIn("1 回だけ", refused.stderr)
+
+    def test_the_plan_cannot_change_together_with_the_first_feedback_plan(self):
+        self.plan_reviewed()
+        plan = ["design", {"type": "design", "after": [1]}]
+        self.propose("i0001", parent_text("i0001", plan, feedback=["implement-feedback"]))
+        self.commit_parent("plan and feedback")
+        refused = self.approve()
+        self.assertNotEqual(refused.returncode, 0, refused.stdout + refused.stderr)
+        self.assertIn("全体計画を変えられない", refused.stderr)
+
+    def test_the_screen_says_which_feedback_items_start_together(self):
+        self.plan_reviewed()
+        self.propose("i0001", parent_text("i0001", ["design"], feedback=self.FB))
+        self.commit_parent("feedback")
+        result = self.approve()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("すぐ始まる（フィードバック計画）: 2, 3", result.stdout)
+        self.assertIn("フィードバック計画を改版した", result.stdout)
 
 
 class FeedbackHintTest(unittest.TestCase):
