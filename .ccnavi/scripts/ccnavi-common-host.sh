@@ -4,7 +4,7 @@
 
 # ---- ホスト（GitHub / GitLab）への接続（ccnavi-review.sh と ccnavi-branches.sh が使う）
 #
-# origin の URL でホストを見分け、gh / glab（認証は道具に任せる）か curl とトークン
+# originの URL でホストを見分け、gh / glab（認証は道具に任せる）か curl とトークン
 # （GITHUB_TOKEN / GITLAB_TOKEN）でホストの API を読み書きする。結果の組み立てには jq が要る。
 # 道具は ccnavi_host_connect で絶対パスへ解いて固定する。PATH の細工で差し替えられないように。
 #
@@ -14,10 +14,10 @@
 #   ccnavi_host_connect         道具を選ぶ。ccnavi_h_jq・ccnavi_h_cli・ccnavi_h_cli_name・ccnavi_h_curl・
 #                               ccnavi_h_token・ccnavi_h_transport（gh / glab / curl）を決める。
 #                               jq が無ければ 3、curl はあるがトークンが無ければ 4、curl も無ければ 5
-#   ccnavi_host_api <METHOD> <path> [<JSON>]  応答の JSON を標準出力へ。path は ccnavi_h_api_base からの相対
+#   ccnavi_host_api <METHOD> <path> [<JSON>]  応答の JSONを標準出力へ。path は ccnavi_h_api_base からの相対
 #   ccnavi_host_pages <path>    100 件ずつ最後のページまで読んで 1 つの配列にする。20 ページを超えたら 2
-#   ccnavi_host_encoded_path    プロジェクトのパスを URL に入れる表記（GitLab の projects/<ここ>）
-#   ccnavi_host_project_id      GitLab のプロジェクトの数の id。読めなければ 1
+#   ccnavi_host_encoded_path    プロジェクトのパスを URL に入れる表記（GitLabの projects/<ここ>）
+#   ccnavi_host_project_id      GitLabのプロジェクトの数の id。読めなければ 1
 #
 # 失敗したときの文面は呼ぶ側が決める（ここは標準エラーに何も書かない）。ccnavi_host_api が落ちたら、
 # ccnavi_h_on_fail に名前を入れた関数を `<METHOD> <path> <ホストの返事>` で呼んで 1 を返す。

@@ -4,7 +4,7 @@
 
 # ---- 取り込み状態とロック
 #
-# 取り込み状態は 1 行 1 項目の `<鍵> <値>`。sh は `sed -n 's/^<鍵> //p'` で読み、jq を使わない
+# 取り込み状態は 1 行 1 項目の `<鍵> <値>`。shは `sed -n 's/^<鍵> //p'` で読み、jq を使わない
 # （JSON は実行ファイルが読んで、sh には 1 行で返す）。
 # 置き場はワークスペースルートの `logs/state`（固定。ccnavi-review.sh と同じ）。
 #
@@ -66,7 +66,7 @@ ccnavi_family_record_of_branch() {
 
 # 親子のチケット <識別子> の親のブランチ名として <名前> を受けてよいなら 0。<名前> <識別子>
 #
-# 識別子と同じ名前は識別子の検査（ccnavi_is_ident）で見る（前からの識別子は ccnavi_is_branch の予約に
+# 識別子と同じ名前は識別子の検査（ccnavi_is_ident）で見る（前からの識別子は ccnavi_is_branchの予約に
 # 当たることがある）。違う名前は ccnavi_is_branch で見る。
 ccnavi_branch_ok() {
 	if [ "$1" = "$2" ]; then
@@ -79,7 +79,7 @@ ccnavi_branch_ok() {
 # 親子のチケットの親のブランチ名。<ワークスペースルート> <識別子>
 #
 # 実行ファイルの `c1 family <識別子>` の `branch` の行（承認済みの親チケットの `branch:`、無ければ識別子。
-# 提案の `branch:` は使わない）。sh はチケットを読まない（読むのは実行ファイル）。実行ファイルが無ければ 1、
+# 提案の `branch:` は使わない）。shはチケットを読まない（読むのは実行ファイル）。実行ファイルが無ければ 1、
 # 在るのに答えない・`branch` の行が無い（`branch_refused`。使えない名前か統合先の名前）・答えが親のブランチ名の
 # 形でなければ 2 を返す（呼ぶ側は識別子の外へ動かさずに止める）。ソースで動かしている ccnavi の
 # リポジトリでは uv で起こす。
@@ -222,12 +222,12 @@ ccnavi_parent_tree() {
 
 # ---- タイムアウト監視つきの git（取ってくる操作。ccnavi-fetch.sh と ccnavi-sync.sh が使う）
 #
-#   ccnavi_git_timed <秒> <標準エラーの書き先> <リポジトリ> <git の引数>...
+#   ccnavi_git_timed <秒> <標準エラーの書き先> <リポジトリ> <gitの引数>...
 #
-# 認証を尋ねさせず（GIT_TERMINAL_PROMPT=0・GCM_INTERACTIVE=never、ssh は BatchMode）、<秒> で切る。
+# 認証を尋ねさせず（GIT_TERMINAL_PROMPT=0・GCM_INTERACTIVE=never、sshは BatchMode）、<秒> で切る。
 # ssh の BatchMode は、ユーザが GIT_SSH_COMMAND・GIT_SSH・core.sshCommand を持っていればそちらを尊重する。
 # タイムアウト監視の出力は捨てる（つないだままだと、監視の sleep が終わるまで呼ぶ側の `$( )` が閉じない）。
-# 戻り値は git のもの（切ったときは 0 でない）。標準出力は捨てないので、呼ぶ側がリダイレクトする。
+# 戻り値は gitのもの（切ったときは 0 でない）。標準出力は捨てないので、呼ぶ側がリダイレクトする。
 ccnavi_git_timed() {
 	ccnavi_gt_limit="$1"
 	ccnavi_gt_err="$2"
@@ -265,7 +265,7 @@ ccnavi_git_timed() {
 # git が拒んだ理由を 1 行にする（ccnavi-fetch.sh と ccnavi-sync.sh の文面）。<標準エラーを書いたファイル>
 #
 # 書きかけとの重なり（「would be overwritten」の後に git が字下げして並べるパス）、索引のロック、
-# コミットするユーザの名前が無い、署名の失敗、hook、それ以外は git の 1 行目。理由どおりに言い、
+# コミットするユーザの名前が無い、署名の失敗、hook、それ以外は gitの 1 行目。理由どおりに言い、
 # 重なっていないのに「重なる」とは言わない。
 ccnavi_git_refusal() {
 	ccnavi_gr_paths=$(awk '/would be overwritten/ { f = 1; next }
@@ -274,13 +274,13 @@ ccnavi_git_refusal() {
 	if [ -n "$ccnavi_gr_paths" ]; then
 		printf '書きかけの %s と重なる。コミットか退避をしてから打ち直してください' "$ccnavi_gr_paths"
 	elif grep -q 'index\.lock' "$1" 2>/dev/null; then
-		printf '索引のロック（index.lock）が残っている。別の git が動いていないか確かめ、落ちた残りならユーザが消す'
+		printf '索引のロック（index.lock）が残っている。別の gitが動いていないか確かめ、落ちた残りならユーザが消す'
 	elif grep -qi 'tell me who you are\|empty ident\|user\.email\|user\.name' "$1" 2>/dev/null; then
 		printf 'コミットするユーザの名前（user.name・user.email）が決まっていない'
 	elif grep -qi 'gpg\|signing' "$1" 2>/dev/null; then
 		printf 'コミットの署名に失敗した'
 	elif grep -qi 'hook' "$1" 2>/dev/null; then
-		printf 'git の hook が止めた（%s）' "$(head -n 1 "$1")"
+		printf 'gitの hook が止めた（%s）' "$(head -n 1 "$1")"
 	else
 		printf 'git が拒んだ（%s）' "$(head -n 1 "$1" 2>/dev/null)"
 	fi

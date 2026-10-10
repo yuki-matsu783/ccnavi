@@ -31,7 +31,7 @@ FAIL_LINES="${CCNAVI_GIT_FAIL_LINES:-30}"
 # 残す記録の本数。放っておくと増え続けるので世代で切る。
 KEEP_LOGS="${CCNAVI_GIT_KEEP_LOGS:-50}"
 
-# 対話になる経路を全部止める。Bash ツールの stdin は /dev/null だが、git の
+# 対話になる経路を全部止める。Bash ツールの stdin は /dev/null だが、gitの
 # 資格情報プロンプトは /dev/tty を直接開くので stdin だけでは止まらない。
 GIT_TERMINAL_PROMPT=0
 GIT_PAGER=cat
@@ -66,11 +66,11 @@ reject() {
 # 共通部分。ワークスペースルートの探し方と、プロジェクト名の導出はここにある。
 . "$(dirname "$0")/ccnavi-common.sh"
 
-# ワークスペースルート。道具と記録の置き場。git のトップとは違うもので、
+# ワークスペースルート。道具と記録の置き場。gitのトップとは違うもので、
 # モード B（projects/ の下に別リポジトリを clone する形）では一致しない。
 # 上へたどって `.ccnavi/scripts/ccnavi-common.sh` を探す（保護済みスクリプトはワークスペースルートの .ccnavi/scripts/ に置くため）。
 WS=$(ccnavi_workspace) ||
-	reject no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwdから上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
+	reject no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.shを持つ親を cwdから上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
 # 解いたルートを logger に渡し、書くたびに探し直させない。
 ccnavi_log_root="$WS"
 # git が返すパス（リンクを解いたもの）と比べるための、リンクを解いたルート。
@@ -207,7 +207,7 @@ has() {
 #   ow_soptvals="u"               値をまとめた残りの字でだけ取れる短いオプションの字
 #   opt_walk <コールバック> [<引数>...]
 #
-# git の parse-options は長いオプションの略（`--force-c` → `--force-create`）を受けるので、止める
+# gitの parse-options は長いオプションの略（`--force-c` → `--force-create`）を受けるので、止める
 # 名前を並べるやり方では略した表記が通ってしまう。ここは一覧に**そのままの表記**である名前だけを通し、ほかの `--` は
 # 断る（略した表記も断る）。まとめた短いオプション（`-qbnew`）は 1 字ずつ読み、値を取る字が出たら
 # 残りの字をその値として扱う。
@@ -336,7 +336,7 @@ ow_spec() {
 # 置き場を動かすのはユーザと ccnavi のスクリプトで、エージェントが git で戻すと、承認が
 # 無かったことにも、取り下げた承認が戻ったことにもなる。
 #
-# 比べるのは git のトップからのパス。cwd からの相対（`approved/doing/x.md` を `.ccnavi/` の中で打つ）も
+# 比べるのは gitのトップからのパス。cwdからの相対（`approved/doing/x.md` を `.ccnavi/` の中で打つ）も
 # `..` を取り除いてから比べる。置き場の親（`.ccnavi`・`wip`・`.`）も置き場ごと戻すので当たる。
 # `*` `?` `[` と `:` で始まる pathspec は、どこに当たるかをここで決められないので当たるとみなす。
 # 大文字小文字はそろえる（Windows と macOS の既定のファイルシステムは区別しない）。
@@ -528,7 +528,7 @@ worktree)
 		# 行き先を確かめる。git は cwd 基準で解くので、プロジェクトの中で
 		# `.claude/worktrees/x` と打つと projects/<名前>/.claude/worktrees/x が
 		# できる。プロジェクトに .claude/ ができて --lint が error になり、
-		# tree_of の探す場所からも外れる（ワークスペースルートは git のトップとは別で、ツリーの探索基準だから）。
+		# tree_of の探す場所からも外れる（ワークスペースルートは gitのトップとは別で、ツリーの探索基準だから）。
 		#
 		# 書き換えずに止める。打ったパスと起きたことが食い違うと、記録を読んだ
 		# ユーザが追えなくなる。
@@ -626,7 +626,7 @@ worktree)
 		# git は行き先の名前でブランチを切るので揃う。
 		wt_leaf="${wt_abs##*/}"
 		# 親チケットの branch:。行き先の名前（識別子）の承認済みチケットが名乗る
-		# ブランチ名なら、行き先の名前と違うブランチを通す（提案の branch: は使わない）。名前は実行ファイルに聞く（sh は
+		# ブランチ名なら、行き先の名前と違うブランチを通す（提案の branch: は使わない）。名前は実行ファイルに聞く（shは
 		# チケットを読まない）。聞けなければ識別子と同じ名前だけを通す（厳しくする向き）。
 		wt_home=""
 		if { [ -n "$wt_new" ] && [ "$wt_new" != "$wt_leaf" ]; } ||
@@ -933,7 +933,7 @@ checkout | switch)
 	# （語が無い・自分のブランチ・HEAD・checkout <ref> <パス>）のほかは通さない。
 	# 親チケットか提案があるかは ccnavi_parent_tree が見る。ccnavi-sync.sh・ccnavi-fetch.sh・
 	# syncstate.home_tree はそれに加えて、ツリーの名前が識別子で、HEAD が同じ名前のブランチを指すことを求める。
-	# 別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.sh は、リモートでの承認を
+	# 別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.shは、リモートでの承認を
 	# このツリーへ取り込まなくなる。取り込み状態がある親（親のブランチを一度でも origin へ push したか、
 	# ccnavi-sync.sh で取り込んだ親）では、実行ファイル（syncstate.standing）が親のワークツリーを決められず、
 	# 親と子のチケットの承認・状態の操作・実行前の判定を止める。
@@ -942,7 +942,7 @@ checkout | switch)
 	# 承認済みの親チケットが branch: <B> を名乗るときだけ、checkout / switch <B>（-b・--create も同じ）を
 	# 次の 1 操作にする。作業ツリーが綺麗で、途中の操作が無く、取り込み状態が無いか識別子のブランチの
 	# present のときだけ。B が無ければ今の先頭から切る。在れば（手元か origin）B へ移ってから識別子の
-	# ブランチを merge し、承認済みチケットとマーカーを B に乗せる。merge が落ちたら取りやめて識別子の
+	# ブランチを mergeし、承認済みチケットとマーカーを B に乗せる。mergeが落ちたら取りやめて識別子の
 	# ブランチへ戻る。取り込み状態は、移った後に B を push したとき書き直る（push_record_family）。
 	co_carry() {
 		cc_B="$co_home"
@@ -1102,7 +1102,7 @@ push)
 	# レビュー待ちの `wip/proposals/review/<名前>.md`）に `parent:` があるかだけ。
 	# 承認済みチケットの無いツリー（チケットを使わないブランチ）は通す。
 	# ワークツリーはワークスペースの .claude/worktrees/ の下にある。元リポジトリが
-	# プロジェクトでも置き場はワークスペース（ワークツリーは git 管理外の固定の置き場）なので、git の
+	# プロジェクトでも置き場はワークスペース（ワークツリーは git 管理外の固定の置き場）なので、gitの
 	# --git-common-dir から導くと、モード B ではプロジェクトである元リポジトリを指して
 	# 条件が一致せず、承認済みチケットの検査が丸ごと行われない。ガードが「有効な
 	# つもりで有効になっていない」形になるので、ワークスペースルートを基準にする。
@@ -1231,14 +1231,14 @@ esac
 # 対象に入れ、次の取り込みまで Chrome 拡張からだけ見える間を作らない。
 #
 # 送った先が親のブランチ（.claude/worktrees/<P> で、居るブランチが親のブランチ（親チケットの branch:、
-# 無ければディレクトリ名と同じ名前）、親チケットか提案がある）で、送り先が origin のときだけ。取り込み状態の
+# 無ければディレクトリ名と同じ名前）、親チケットか提案がある）で、送り先が originのときだけ。取り込み状態の
 # 鍵は識別子（ディレクトリ名）で、中の branch に親のブランチ名を書く。取り込み状態があれば（present）sha を
 # 書き直すだけで、closed・blocked は触らない。取り込み状態が無く、置き場に未コミットの変更があれば作らずに言う
 # （未送信の状態を持ち込まないため）。取り込み状態があると SessionStart の早送りと ccnavi-sync.sh の消えたかの
 # 確かめの対象になる。
 push_record_family() {
 	# 送り先は git と同じ順で解く: 引数のリモート → branch.<b>.pushRemote → remote.pushDefault →
-	# branch.<b>.remote → origin。origin 以外へ送ったなら取り込み状態を作らない（取り込み状態は origin の P を見る）。
+	# branch.<b>.remote → origin。origin 以外へ送ったなら取り込み状態を作らない（取り込み状態は originの P を見る）。
 	pr_remote="${push_seen_remote:-}"
 	if [ -z "$pr_remote" ]; then
 		pr_remote=$(git config --get "branch.$push_branch.pushRemote" 2>/dev/null ||
@@ -1312,7 +1312,7 @@ root=$(git rev-parse --show-toplevel 2>/dev/null || :)
 log_info 受け付けた -- "sub=$sub" "args=$#"
 log_debug 判定の材料 -- "sub=$sub" "action=${action:-}" "top=$root" "cwd=$PWD" "workspace=$WS"
 
-# 記録はワークスペースの下にまとめる（git のトップとワークスペースルートは別で、モード B では異なるため）。git のトップに書くと、
+# 記録はワークスペースの下にまとめる（gitのトップとワークスペースルートは別で、モード B では異なるため）。gitのトップに書くと、
 # モード B ではプロジェクトのリポジトリの中に出る。ワークスペースの .gitignore の
 # /logs/ はワークスペースルート起点なので当てはまらず、public のリポジトリに運用の痕跡が入る。
 logproject=$(ccnavi_project "$(pwd)" "$WS")
@@ -1339,13 +1339,13 @@ git --no-pager "$sub" ${1+"$@"} >>"$logfile" 2>&1 || status=$?
 # 記録のパス。エージェントがそのまま sed -n で開ける形で返す。
 #
 # 基準はワークスペースルート。モード B ではエージェントの cwd がプロジェクトの中に
-# あるので、git のトップからの相対を返すと届かない。ワークスペースの中に居るときは
-# 短い相対、そうでなければ絶対を返す（git のトップとワークスペースルートは別だから）。
+# あるので、gitのトップからの相対を返すと届かない。ワークスペースの中に居るときは
+# 短い相対、そうでなければ絶対を返す（gitのトップとワークスペースルートは別だから）。
 case "$logfile" in
 "$WS"/*) logrel="${logfile#"$WS"/}" ;;
 *) logrel="$logfile" ;;
 esac
-# cwd から相対で開けないなら、絶対パスをそのまま返す。2 つ並べない。
+# cwdから相対で開けないなら、絶対パスをそのまま返す。2 つ並べない。
 # 並べると、受け取った側がどちらを開くか迷い、パスの切り出しも要る。
 if [ ! -f "$logrel" ]; then
 	logrel="$logfile"
