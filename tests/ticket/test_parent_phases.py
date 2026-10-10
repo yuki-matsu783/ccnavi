@@ -466,6 +466,49 @@ class FillPhasesTest(PhaseHarness):
         self.assertIn("書かない", result.stderr)
         self.assertEqual(self.read(), text)
 
+    def fill_in(self, cwd, name="i0001"):
+        """`--fill-phases` を cwd を変えて打つ（エージェントが自分のワークツリーから打つ形）。"""
+        from tests.inproc import run_ccnavi
+
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment.pop("CLAUDE_PROJECT_DIR", None)
+        return run_ccnavi(
+            [
+                "--root",
+                self.root,
+                "--approved",
+                ".ccnavi/approved",
+                "--state",
+                self.state,
+                "--log",
+                "",
+                "--plan-order",
+                name,
+                "--fill-phases",
+            ],
+            cwd=cwd,
+            env=environment,
+        )
+
+    def test_fill_phases_writes_only_the_copy_in_the_callers_tree(self):
+        """同じ提案が 2 つのツリーにあれば、打ったツリーの側だけを書く。
+
+        どちらのツリーでもないところから打てば、何も書かない。"""
+        text = parent_text("i0001", ["research"], copy=None)
+        self.propose("i0001", text)
+        other = self.worktree("elsewhere", "main")
+        there = os.path.join(other, "wip", "proposals", "todo", "i0001.md")
+        write(there, text)
+        refused = self.fill()
+        self.assertNotEqual(refused.returncode, 0, refused.stdout + refused.stderr)
+        self.assertIn("複数の場所", refused.stderr)
+        self.assertEqual(self.read(), text)
+        done = self.fill_in(self.parent_tree)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("phases:", self.read())
+        with open(there, encoding="utf-8") as f:
+            self.assertEqual(f.read(), text)
+
     def test_fill_phases_names_a_column_zero_comment_inside_the_value(self):
         """`phases:` の値の中に行頭のコメントがあれば、値の範囲が決まらないので書かずにそう言う。"""
         text = parent_text("i0001", ["research"], copy=None).replace(
