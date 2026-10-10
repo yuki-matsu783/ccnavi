@@ -116,9 +116,9 @@ def problems(parent: ticket_model.Ticket, types: dict | None = None) -> list[rul
     """計画の順序が組めるか。`after` の形、終端、最後の項の延期、延期の引き受け手（設計 9.7）。
 
     全体計画とフィードバック計画に同じ規則を当てる。`types`（フェーズ定義）を渡したときだけ、
-    引き受け手にレビューがあるかも見る。判定の側（`approval_checks.blocking_problems`）は定義を
-    渡さず、承認済みチケットだけを読んで済む検査を当てる（`phases.yml` を承認のあとに直しても
-    進行中の親が止まらないように）。
+    引き受け手にレビューがあるかも見る。渡すのは親の写し（`phases:`。`phasetypes.types_of`）で、
+    `phases.yml` ではない。判定の側（`errors`）も写しを渡すので、承認済みチケットだけを読んで済み、
+    `phases.yml` を承認のあとに直しても進行中の親は止まらない。
     """
     found: list[rules.Problem] = []
     if not parent.has_plan:
@@ -179,8 +179,14 @@ def problems(parent: ticket_model.Ticket, types: dict | None = None) -> list[rul
 
 
 def errors(parent: ticket_model.Ticket) -> list[rules.Problem]:
-    """承認済みチケットだけを読んで済む計画の誤り（判定の側が当てる分）。"""
-    return [p for p in problems(parent) if p.severity == rules.SEVERITY_ERROR]
+    """承認済みチケットだけを読んで済む計画と定義の誤り（判定の側が当てる分）。
+
+    計画の順序（`problems`）に、親の写し（`phases:`）の誤り（`phasetypes.copy_problems`。写しが
+    無い、項の定義が写しに無い、定義の形・`kind`）を足す。引き受け手のレビューは写しの定義で見る。
+    読むのはチケットだけで、`phases.yml` は読まない。子に書いた `phases:` もここで言う。
+    """
+    found = phasetypes.copy_problems(parent) + problems(parent, phasetypes.types_of(parent))
+    return [p for p in found if p.severity == rules.SEVERITY_ERROR]
 
 
 def lines(parent: ticket_model.Ticket, wf: ticket_model.Workflow) -> list[str]:

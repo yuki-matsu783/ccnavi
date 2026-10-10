@@ -82,6 +82,9 @@ from . import ticket_fold, ticket_ids, ticket_model
 # ようにし、その中に広い範囲を紛れ込ませる手口を防ぐためのもの。
 MAX_SCOPE_ENTRIES = 20
 
+# 親が計画の使うフェーズ定義の写しを書く欄。
+PHASES_KEY = "phases"
+
 # 範囲のパスに書けない表記。`..` は範囲の外へ出る表記、絶対パスと `~` は
 # プロジェクトの外を指す表記、`$` は展開されるまで行き先が決まらない表記。
 _FORBIDDEN = (("..", "`..`"), ("~", "`~`"), ("$", "`$`"))
@@ -356,6 +359,11 @@ def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Pro
             ticket.feedback = items
     # `workflow:` の欄は読まない。待ち方は計画の `after` から計算する（`workflow.compute`）。
     # 欄があれば `--agree`・`--lint`・判定が error にする（手で書いた欄が効くと読ませない）。
+
+    # 親の `phases:`（計画が使うフェーズ定義の写し）は生の値だけを持つ。定義に読むのは
+    # `phasetypes.types_of`（compose 層）で、形の誤りも子に書いた `phases:` も、ここでは
+    # 落とさず判定の `blocked` の理由にする（`phasetypes.copy_problems`）。
+    ticket.phases_raw = front.get(PHASES_KEY)
 
     raw_issue = front.get("issue")
     if raw_issue is not None:

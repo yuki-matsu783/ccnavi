@@ -904,8 +904,9 @@ def ticket_verdict(
     承認は範囲の超過を警告で通すので、超えた分はここで止まる。止めた上限を `limit:` 行で
     名指しする。ルールの判定と比べて強い側を採るのは呼び手。
 
-    注記は、親が計画を持つのに子の番号の定義が読めないときの 1 文。そのときは定義では
-    切り詰めない（親の範囲では切り詰める）ので、使われていない上限があることを判定につける。
+    注記はいまは付けない（前は、子の番号の定義が `phases.yml` から読めないときに「定義では
+    切り詰めていない」と添えていた。定義は親の写しから引くようになり、写しに無ければ親も子も
+    止まるので、その形は無くなった）。返す形は変えない。
 
     t は full の行き先のツリー（`ruleload.rules_for` が返したもの。cwd で置き換える前）。
     ここで引き直さない。引き直すと、索引を読むかを決めたときのツリーとファイルシステムの
@@ -937,21 +938,11 @@ def ticket_verdict(
     if ticket_places.is_unscoped(rel, conf.tickets, conf.approved):
         return "", "", "", ""
     parent = index.get(ticket.parent) if ticket.is_child else None
-    # 定義を読むのは、親が計画を持ち子の番号が計画に在るときだけ。番号だけの親では
-    # phases.yml を開かない。
-    pt, notice = None, ""
-    if parent is not None and phase_scope.plan_item(ticket, parent) is not None:
-        types = phase.load_types(conf, root, parent.project)
-        pt = phase_scope.type_for(conf, root, ticket, parent, types or {})
-        missing = phase_scope.unread_type(conf, root, ticket, parent, types)
-        if missing:
-            notice = (
-                f"[ccnavi] {ticket.ticket} のフェーズ {ticket.phase} の定義 `{missing}` が"
-                "読めないので、定義の上限では切り詰めていない（親 "
-                f"{parent.ticket} の範囲では切り詰めている）。phases.yml が壊れているか、"
-                "定義が消えている。ユーザに伝えて直してもらってください"
-                "（'ccnavi --lint' が箇所を言う）。"
-            )
+    # 定義は親に固定した写し（`phases:`）から引く。`phases.yml` は開かない（承認のあとに直しても
+    # 進行中の親の子の範囲は変わらない）。写しに定義が無い親は判定の側の検査で止まり、
+    # 子も `blocked` で止まる。
+    notice = ""
+    pt = phase_scope.type_for(ticket, parent)
     found = phase_scope.scope_verdict(ticket, parent, pt, rel)
     if found.verdict == rules.ALLOW:
         return rules.ALLOW, "", notice, ""
@@ -1022,7 +1013,9 @@ def ticket_verdict(
             "This path is inside the ticket's work area but outside what phase type "
             f"{pt.title} ({pt.id}) allows. The ticket was approved with that overflow shown as "
             "a warning; writes there stay blocked. Do the work in a later phase whose type "
-            "covers this path, or ask the user to change phases.yml."
+            "covers this path, or ask the user to change the definition fixed in the parent's "
+            "approved ticket (its `phases:`); editing phases.yml does not reach a parent that "
+            "is already approved."
         )
     elif found.limit == phase_scope.LIMIT_PARENT and parent is not None:
         parent_area = ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK)) or "(空)"

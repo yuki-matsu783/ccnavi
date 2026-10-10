@@ -68,9 +68,11 @@ import os
 from dataclasses import dataclass
 
 from ..infra import fsio, settings, tree
+from ..policy import rules
 from . import (
     approval_checks,
     archive,
+    phasetypes,
     syncstate,
     ticket_fold,
     ticket_model,
@@ -188,7 +190,8 @@ def load_copy(
     変わらない。前の版の承認済みチケットも `finish` を通れば `completed_at` を持つので読める。
 
     `approved_dir` は前の版との互換のために受け取るだけで、読まない（待ち方のファイルは読まない）。
-    計画を持つ親には、計画の項の `after` から計算した待ち方（`workflow.compute`）を入れる。
+    計画を持つ親には、計画の項の `after` から計算した待ち方（`workflow.compute`）と、親に固定した
+    フェーズ定義（`phases:` を読んだもの。`phasetypes.types_of`）を入れる。
     チケットの中の `workflow:` 欄は読まない（記録を持たない承認済みチケットにあれば
     `blocking_problems` が止める）。
     """
@@ -209,6 +212,10 @@ def load_copy(
         ticket.source_path = str(meta.get("source_path") or "")
     if not ticket.is_child and ticket.has_plan:
         ticket.workflow = workflow.compute(ticket)
+    # 親に固定したフェーズ定義（`phases:`）を読んで持たせる。承認のあとの判定はこれを読み、
+    # `phases.yml` を読まない。形の誤りは読めない定義を入れないだけで、ここでは落とさない
+    # （`blocking_problems` が止める）。
+    phasetypes.types_of(ticket)
     # tree は「どのツリーで見つけたか」。scan_all が入れ直す。source_tree（どのツリーの
     # 提案をコピーしたか）とは違うもので、子のワークツリーの checkout では食い違う。
     ticket.tree = ticket.source_tree
@@ -458,12 +465,29 @@ def plan_signature(t: ticket_model.Ticket, part: str) -> tuple | None:
     )
 
 
-def plan_differs(proposal: ticket_model.Ticket, current: ticket_model.Ticket) -> bool:
-    """提案の計画（全体計画かフィードバック計画）が承認済みチケットと違うか。改版の条件。
+def phases_signature(t: ticket_model.Ticket) -> tuple | None:
+    """親の写し（`phases:`）の比べる形。定義を読んだ形（`PhaseType.key()`）を id の順に並べる。
 
-    比べるのは `plan_signature`。待ち方は計画から決まるので、待ち方だけの改版は無い。
+    YAML の書き方・キーの順・既定値を省いた書き方の違いは違いにしない。読めない定義があれば、
+    読んだままの値で比べる（形の誤りを直しただけの提案も違いとして拾う）。写しが無ければ None。
     """
-    return any(
+    if not phasetypes.has_copy(t):
+        return None
+    types, problems = phasetypes.read_copy(t.phases_raw)
+    if any(p.severity == rules.SEVERITY_ERROR for p in problems):
+        return ("unread", repr(t.phases_raw))
+    return tuple(sorted((ident, pt.key()) for ident, pt in types.items()))
+
+
+def plan_differs(proposal: ticket_model.Ticket, current: ticket_model.Ticket) -> bool:
+    """提案の計画（全体計画かフィードバック計画）か、写し（`phases:`）が承認済みチケットと違うか。
+    改版の条件。
+
+    計画は `plan_signature` で比べる。待ち方は計画から決まるので、待ち方だけの改版は無い。
+    写しは `phases_signature` で比べる。計画が同じで写しだけが違う提案も改版の候補にする
+    （`--plan-order <親> --fill-phases` で今の `phases.yml` に揃えた提案を出せるように）。
+    """
+    return phases_signature(proposal) != phases_signature(current) or any(
         plan_signature(proposal, part) != plan_signature(current, part)
         for part in ("plan", "feedback")
     )

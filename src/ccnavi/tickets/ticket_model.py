@@ -208,6 +208,15 @@ class Ticket:
     # （承認済みは `approval.load_copy`、提案は承認の候補を組むときと `phase.phases_of`）。
     # チケットの `workflow:` 欄は読まない。
     workflow: Workflow | None = None
+    # phases_raw は親の `phases:`（計画が使うフェーズ定義の写し）を読んだままの値。欄が無ければ
+    # None。ここは生の値だけを持ち、形は確かめない（読み込みで落とすと承認済みチケットが索引に
+    # 入らず、判定がその親を知らないまま範囲を当てなくなる）。形の誤りは `blocked` の理由になる。
+    phases_raw: object = None
+    # phase_types は `phases_raw` を定義に読んだもの（id → `phasetypes.PhaseType`）。読むのは
+    # compose 層の `phasetypes.types_of` で、入れるのは work 層（承認済みは `approval.load_copy`、
+    # 提案は承認の候補を組むときと `phase.phases_of`）。state 層のここからは compose 層を
+    # 読み込まないので、型は書かない。
+    phase_types: dict | None = None
     review_required: bool = True
     review_reason: str = ""
     title: str = ""

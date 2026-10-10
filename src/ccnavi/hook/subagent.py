@@ -14,7 +14,7 @@ from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import rules
 from ..records import audit
-from ..tickets import approval, approval_checks, flow, phase, phase_scope, ticket_model
+from ..tickets import approval, approval_checks, flow, phase_scope, phasetypes, ticket_model
 from ..tickets import ticket as ticket_mod
 from . import judge, post, post_findings, projskills, reasons
 
@@ -78,7 +78,6 @@ def at_start(
         "[ccnavi] 承認済みで開いている子チケット。"
         "書き込みは行き先のワークツリーのチケットで判定される。"
     ]
-    types = phase.load_types(conf, root, bound.project) or {}
     # フローの文に使える残り（文字）。子が多くても SubagentStart の文が長くなりすぎないように。
     budget = flow.TOTAL_TEXT_LIMIT
     # 手順を並べるのは、cwd がその子のワークツリーで子が 1 本に決まるときだけ（M-4）。
@@ -94,7 +93,8 @@ def at_start(
         hint = ""
         parent = index.get(t.parent)
         item = parent.item_at(t.phase) if parent is not None and t.phase is not None else None
-        pt = types.get(item.type) if item is not None else None
+        # 定義は親に固定した写し（`phases:`）から引く。`phases.yml` は読まない。
+        pt = phasetypes.types_of(parent).get(item.type) if item is not None else None
         if pt is not None:
             label = f"{t.phase}: {pt.title}"
             if pt.agent:

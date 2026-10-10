@@ -14,7 +14,6 @@ from ..policy import rules
 from ..tickets import (
     archive,
     phase_scope,
-    phasetypes,
     ticket_fields,
     ticket_model,
     ticket_places,
@@ -63,9 +62,6 @@ class ScopeGuard:
     # チケットの置き場（ツリーのルートからの相対）。提案と承認済みチケット。
     tickets: str = ""
     approved: str = ""
-    # フェーズ定義。親の `project:` のレイヤーごとに、作るときに 1 度だけ読んだもの。
-    # 変更 1 件ごとに phases.yml を開かない。読めないレイヤーは空。
-    types: dict[str, dict[str, phasetypes.PhaseType]] = field(default_factory=dict)
 
     def finding(self, full: str) -> tuple[rules.Rule, str] | None:
         """この変更が範囲の外なら、報告する文面と出所を返す。中なら None。
@@ -92,12 +88,8 @@ class ScopeGuard:
         if ticket_places.is_eli5_place(rel):
             return None
         parent = self.copies.get(ticket.parent) if ticket.is_child else None
-        item = phase_scope.plan_item(ticket, parent)
-        pt = (
-            self.types.get(parent.project, {}).get(item.type)
-            if item is not None and parent is not None
-            else None
-        )
+        # 定義は親に固定した写し（`phases:`）から引く。`phases.yml` は開かない。
+        pt = phase_scope.type_for(ticket, parent)
         found = phase_scope.scope_verdict(ticket, parent, pt, rel)
         if not found.outside:
             return None
@@ -126,7 +118,9 @@ class ScopeGuard:
                 f"({', '.join(found.type.scope_globs)}). "
                 + overflow
                 + "Send the output to a path that type covers, do the work in a later phase "
-                "whose type covers this path, or ask the user to change phases.yml."
+                "whose type covers this path, or ask the user to change the definition fixed in "
+                "the parent's approved ticket (its `phases:`); editing phases.yml does not reach "
+                "a parent that is already approved."
             )
         elif found.limit == phase_scope.LIMIT_PARENT and parent is not None:
             parent_area = (

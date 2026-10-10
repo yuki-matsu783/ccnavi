@@ -151,6 +151,20 @@ all, or a proposal the approval drops. The reasons are printed per ticket. Exit
 1 stays what it is everywhere else - a usage or settings error, not an answer -
 so a wrong spelling is never read as a proposal to fix.
 
+A parent that has a plan carries a copy of the phase types its plan uses, as
+`phases:` (keyed by type id, same fields as phases.yml). --agree refuses a copy
+that differs from phases.yml as read. The agent writes the copy with
+
+    ccnavi --plan-order <parent> --fill-phases
+
+which replaces the `phases:` value of the pending parent proposal with the
+types its plan and feedback use (taken from phases.yml; on a revision, a type
+used by a number that already has an approved child is taken from the approved
+ticket). Unused types are dropped; no other byte changes, and nothing is
+written when another field would read differently. It is a flag of its own,
+outside --agree, so the agent may run it. After approval, judging reads the
+copy and never phases.yml.
+
 Two things are not a no, because --agree does not drop them either: scope that
 exceeds the parent or the phase type (writes there stay blocked after approval),
 and a proposal that cannot be read (the scan covers every worktree, before the

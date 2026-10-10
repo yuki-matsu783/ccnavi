@@ -17,6 +17,7 @@ from . import (
     approval_marks,
     approval_ops,
     phase,
+    phasetypes,
     syncstate,
     ticket_model,
 )
@@ -316,8 +317,9 @@ def deliverables_missing(
     if parent is None or not parent.has_plan:
         return False
     item = parent.item_at(found.phase)
-    types = phase.load_types(conf, root, parent.project) or {}
-    pt = types.get(item.type) if item is not None else None
+    # 成果物は親に固定した写し（`phases:`）の定義から読む。`phases.yml` は読まない（承認のあとに
+    # 直しても、進行中のフェーズの成果物は変わらない）。
+    pt = phasetypes.types_of(parent).get(item.type) if item is not None else None
     if pt is None or not pt.deliverables:
         return False
     # 同じフェーズに、まだ開いている別の子があれば、成果物はその子が出すかもしれない。

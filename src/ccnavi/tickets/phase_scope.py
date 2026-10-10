@@ -94,46 +94,20 @@ def plan_item(
 
 
 def type_for(
-    conf: settings.Settings,
-    root: str,
-    child: ticket_model.Ticket,
-    parent: ticket_model.Ticket | None,
-    types: dict[str, phasetypes.PhaseType] | None = None,
+    child: ticket_model.Ticket, parent: ticket_model.Ticket | None
 ) -> phasetypes.PhaseType | None:
     """子の番号の定義。親が計画を持たない、番号が無い、定義が引けないなら None。
 
-    `types` を渡せばそこから引き、ファイルは読まない（実行後チェックはレイヤーごとに 1 度だけ
-    読んで持つ）。渡さなければ、親が計画を持つときだけ親の `project:` のレイヤーを読む。
+    定義は親に固定した写し（`phases:`）から引き、`phases.yml` は読まない。承認のあとに
+    `phases.yml` を直しても、進行中の親の子の範囲の上限は変わらない。計画を持つ親の写しに定義が
+    無いときは、親が判定の側の検査（`workflow.errors`）で止まり、子も `child_problems` で止まる
+    （`blocked`）ので、定義で切り詰めずに通る形は残らない。計画を持たない親とその子は今のまま
+    （番号だけ。定義で切り詰めない）。
     """
     item = plan_item(child, parent)
     if item is None or parent is None:
         return None
-    if types is None:
-        types = phase.load_types(conf, root, parent.project)
-    return (types or {}).get(item.type)
-
-
-def unread_type(
-    conf: settings.Settings,
-    root: str,
-    child: ticket_model.Ticket,
-    parent: ticket_model.Ticket | None,
-    types: dict[str, phasetypes.PhaseType] | None,
-) -> str:
-    """子の番号の定義が読めないなら、その定義の id。読めた、または読むものが無ければ空。
-
-    `types` は `load_types` が返したもの（None を含む）。親の `project:` が指す phases.yml が
-    無いのは番号だけの挙動で、読めないのではないので何も言わない。ファイルは在るのに定義が
-    引けない（壊れた・定義を消した）ときだけ返す。そのとき判定は定義では切り詰めない。
-    deny にすると、ユーザが phases.yml を直している間、全部の子のワークツリーで書き込みが止まる。
-    """
-    item = plan_item(child, parent)
-    if item is None or parent is None:
-        return ""
-    if types is not None:
-        return "" if item.type in types else item.type
-    path = phase.types_path(conf, root, parent.project)
-    return item.type if path and os.path.exists(path) else ""
+    return phasetypes.types_of(parent).get(item.type)
 
 
 def scope_findings(
@@ -195,7 +169,7 @@ def scope_findings(
     for entry in out.split("\0"):
         if len(entry) > 3 and entry[2] == " ":
             paths.add(entry[3:])
-    pt = type_for(conf, root, child, parent)
+    pt = type_for(child, parent)
     outside = []
     for rel in sorted(paths):
         # git の `-z` の表記をそのまま使う。git はどの OS でも区切りを `/` で返すので、

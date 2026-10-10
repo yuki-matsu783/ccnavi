@@ -9,6 +9,7 @@ from ..infra import settings
 from ..policy import rules
 from . import (
     agree_candidates,
+    agree_digest,
     approval,
     phasetypes,
     ticket_model,
@@ -86,6 +87,7 @@ def screen(
         if cand.is_revision and cand.current is not None:
             lines += ["", f"== {t.ticket}: {t.title}  親の改版"]
             lines += _plan_diff_lines(cand.current, t, cand_types)
+            lines += _copy_diff_lines(cand.current, t)
             for note in cand.notes:
                 lines.append(f"    {note}")
             lines.append(_origin_line(t))
@@ -170,6 +172,7 @@ def screen(
                 lines.append("■ フィードバック計画")
                 lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or ["    対応なし"]
             lines += _workflow_lines(t, workflow.compute(t))
+            lines += _copy_lines(t, cand_types, cand.config)
         if not t.is_child and t.issue is not None:
             lines.append(f"■ 課題: {ticket_mod.issue_label(t)}")
             lines.append(
@@ -236,6 +239,67 @@ def _workflow_lines(t: ticket_model.Ticket, wf: ticket_model.Workflow) -> list[s
     ]
 
 
+def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None) -> list[str]:
+    """親に固定する定義を 3 つに分けて出す（この親が使う定義・使われていない定義・
+    `phases.yml` にあってこの親では使わない定義）。
+
+    写しの中身は `phases.yml` と同じ（承認が確かめる）ので、ユーザが読むのは「どの定義をこの親に
+    固定し、どれを外したか」。
+    """
+    types = types or {}
+    numbers: dict[str, list[int]] = {}
+    for n, item in t.numbered():
+        numbers.setdefault(item.type, []).append(n)
+    used = [ident for ident in types if ident in numbers]
+    lines: list[str] = []
+    if used:
+        lines.append("■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）")
+        lines.append(
+            "    承認したときの phases.yml と同じ中身を親に写して固定する。"
+            "後から phases.yml を直しても、この親の範囲・見る場所・成果物は変わらない"
+        )
+        for ident in used:
+            pt = types[ident]
+            scope = (
+                "inherit（親の範囲そのまま）" if pt.inherits_scope else ", ".join(pt.scope_globs)
+            )
+            parts = [f"review: {pt.review}", f"scope: {scope}"]
+            if pt.deliverables:
+                parts.append(f"deliverables: {', '.join(pt.deliverables)}")
+            parts.append(f"使う番号: {', '.join(map(str, numbers[ident]))}")
+            lines.append(f"    {pt.title} / {ident}  " + "、".join(parts))
+    unused = [ident for ident in types if ident not in numbers]
+    if unused:
+        lines.append("■ 使われていない定義（phases: にあるが、どの項も使わない。判定は読まない）")
+        lines += [f"    {types[ident].title} / {ident}" for ident in unused]
+    left = [pt for ident, pt in (config or {}).items() if ident not in types]
+    if left:
+        lines.append("■ この親では使わない定義（phases.yml にあるが phases: に無い）")
+        lines.append("    使わない: " + "、".join(f"{pt.title} / {pt.id}" for pt in left))
+    return lines
+
+
+def _copy_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket) -> list[str]:
+    """改版の `phases:` の差分。改版が実際に書く frontmatter（`agree_digest.revised_front` と同じ
+    差し替え。写しは提案の値）と承認済みチケットの写しを比べる。足した・外した・変わった定義。"""
+    before = phasetypes.types_of(current)
+    written = agree_digest.revised_front(current, revised).get(phasetypes.COPY_KEY)
+    after = phasetypes.read_copy(written)[0] if written is not None else {}
+    lines: list[str] = []
+    for ident, pt in after.items():
+        if ident not in before:
+            lines.append(f"    足した: {pt.title} / {ident}")
+        elif not phasetypes.same(pt, before[ident]):
+            fields = ", ".join(phasetypes.differing(before[ident], pt))
+            lines.append(f"    変わった: {pt.title} / {ident}（{fields}）")
+    for ident, pt in before.items():
+        if ident not in after:
+            lines.append(f"    外した: {pt.title} / {ident}")
+    if not lines:
+        return []
+    return ["■ phases: の差分（改版で親に固定する定義）", *lines]
+
+
 def _plan_diff_lines(
     current: ticket_model.Ticket, revised: ticket_model.Ticket, types: dict | None
 ) -> list[str]:
@@ -243,7 +307,7 @@ def _plan_diff_lines(
     if approval.plan_signature(current, "plan") != approval.plan_signature(revised, "plan"):
         lines.append("■ 全体計画の変更")
         lines.append("    いま:")
-        lines += ["    " + x for x in _plan_lines(current.plan, 1, types)]
+        lines += ["    " + x for x in _plan_lines(current.plan, 1, phasetypes.types_of(current))]
         lines.append("    改版:")
         lines += ["    " + x for x in _plan_lines(revised.plan, 1, types)]
     held, fresh = workflow.compute(current), workflow.compute(revised)

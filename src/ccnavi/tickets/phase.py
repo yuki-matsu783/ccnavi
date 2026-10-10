@@ -306,10 +306,10 @@ def phases_of(
     if owner is None and proposed is not None and proposed.ticket == parent_id:
         owner = proposed
     if owner is not None and owner.has_plan:
-        # レイヤーは親の承認済みチケットの `project:` が決める（設計 11.4.1）。
-        # ユーザが承認した値で、
-        # 子は親から継ぐので、判定が申告に依存する形にはならない。
-        types = load_types(conf, root, owner.project) or {}
+        # 定義は親に固定した写し（`phases:`）から引く。`phases.yml` は読まない（承認のあとに
+        # 直しても、進行中の親のフェーズの題・見る場所・案内は変わらない）。提案の親（`proposed`）は
+        # その提案の写しから引く。
+        types = phasetypes.types_of(owner)
         if owner.workflow is None:
             # 承認前の提案など、待ち方を入れていない親。承認済みと同じ計算（計画の `after`）で読む。
             owner = replace(owner, workflow=workflow.compute(owner))

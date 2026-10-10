@@ -26,6 +26,13 @@
         agent: explorer       # 案内にだけ使う
         when: 既存の振る舞いが分からないとき   # 案内にだけ使う
 
+## 承認のあとは親の写しを読む
+
+計画を持つ親は、計画が使う定義だけの写しを frontmatter の `phases:` に持つ（`read_copy`・
+`types_of`・`copy_problems`）。`phases.yml` を読むのは提案の承認の検査・`--plan-order <親>
+--fill-phases`・`--lint` の食い違いの warn だけで、承認のあとの判定は写しを読む。`scope` と
+`deliverables` は 20 件まで（`MAX_ENTRIES`）。
+
 ## 順序は定義に書かない
 
 どのフェーズがどれを待つかは、親の計画の項の `after` が決める（`workflow`）。前の版の
@@ -83,6 +90,11 @@ OLD_FIELD_NOTE = "は読まない。順序は親の計画の項の `after` で�
 class PhaseTypes(dict):
     """定義の集合。id → 定義の辞書。"""
 
+
+# 定義の `scope` と `deliverables` の件数の上限。チケットの範囲と同じ。定義は親の `phases:` に
+# 写すので、ここで縛らないと親の大きさが縛れない。ユーザがレビューしきれない数を並べ、その中に
+# 広い範囲を紛れ込ませる手口も防ぐ。
+MAX_ENTRIES = ticket_mod.MAX_SCOPE_ENTRIES
 
 # 定義の範囲が「親の範囲そのまま」であることを言う表記。
 INHERIT = "inherit"
@@ -179,6 +191,19 @@ def parse(text: str, where: str = "(phases)") -> tuple[PhaseTypes | None, list[P
         if name in data:
             problems.append(Problem(SEVERITY_WARN, where, f"`{name}` {OLD_FIELD_NOTE}"))
 
+    types = _read_defs(raw, problems)
+
+    if any(p.severity == SEVERITY_ERROR for p in problems):
+        return None, problems
+    return types, problems
+
+
+def _read_defs(raw: dict, problems: list[Problem]) -> PhaseTypes:
+    """定義の辞書（id → 欄）を読む。`phases.yml` の `phases` と、親の `phases:` の両方が使う。
+
+    読めない定義は入れずに苦情を足す。表示名も一意にする（ユーザは表示名で見るので、同じ名前が
+    2 つあると承認画面で見分けられない）。
+    """
     types = PhaseTypes()
     titles: dict[str, str] = {}
     for key, body in raw.items():
@@ -217,9 +242,7 @@ def parse(text: str, where: str = "(phases)") -> tuple[PhaseTypes | None, list[P
         titles[pt.title] = ident
         types[ident] = pt
 
-    if any(p.severity == SEVERITY_ERROR for p in problems):
-        return None, problems
-    return types, problems
+    return types
 
 
 def mark_source(types: dict[str, PhaseType] | None, layer: str) -> None:
@@ -259,6 +282,9 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
     if scope == INHERIT or scope is None:
         pt.scope = None
     elif isinstance(scope, list):
+        if len(scope) > MAX_ENTRIES:
+            problems.append(_too_many(ident, "scope", len(scope)))
+            return None, problems
         entries, bad = _globs(ident, "scope", scope)
         problems.extend(bad)
         if bad:
@@ -277,6 +303,9 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         if not isinstance(raw, list) or not all(isinstance(x, str) for x in raw):
             problems.append(Problem(SEVERITY_ERROR, ident, "`deliverables` は文字列のリスト"))
             return None, problems
+        if len(raw) > MAX_ENTRIES:
+            problems.append(_too_many(ident, "deliverables", len(raw)))
+            return None, problems
         pt.deliverables = [x.strip() for x in raw if x.strip()]
     for glob in pt.deliverables:
         if ".." in glob or os.path.isabs(glob):
@@ -291,6 +320,14 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
     pt.agent = str(body.get("agent") or "").strip()
     pt.when = str(body.get("when") or "").strip()
     return pt, problems
+
+
+def _too_many(ident: str, key: str, count: int) -> Problem:
+    return Problem(
+        SEVERITY_ERROR,
+        ident,
+        f"`{key}` が {count} 件ある（上限 {MAX_ENTRIES} 件）。まとめるか、定義を分けてください",
+    )
 
 
 def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_model.Entry], list[Problem]]:
@@ -352,6 +389,152 @@ def scope_problems(child: ticket_model.Ticket, pt: PhaseType) -> list[Problem]:
                 )
             )
     return problems
+
+
+# ---- 親に固定する定義（親の `phases:`）
+#
+# 計画を持つ親は、計画（`plan:` / `feedback:`）が使う定義**だけ**の写しを frontmatter の
+# `phases:` に持つ。欄は `phases.yml` の定義と同じで、定義の id をキーにした辞書。承認したときの
+# 定義が親に固定され、承認のあとの判定は写しを読み、`phases.yml` を読まない（直しても進行中の親の
+# 範囲・見る場所・成果物は変わらない）。写しが `phases.yml` と同じかを確かめるのは承認
+# （`agree_candidates.plan_problems`）で、手で動かした承認ではその検査は働かず写しがそのまま効く
+# （承認を本物とするのは置き場で、置き場へ動かしたユーザが中身を承認したと読む）。
+
+COPY_KEY = ticket_mod.PHASES_KEY
+
+# 写しの欄の名前。`PhaseType.key()` の並びと同じ（`id` を除く）。
+_KEY_FIELDS = ("title", "kind", "review", "scope", "deliverables", "agent", "when")
+
+
+def read_copy(raw) -> tuple[PhaseTypes, list[Problem]]:
+    """親の `phases:` を定義に読む。読めない定義は入れずに苦情を返す。
+
+    読み方は `phases.yml` の定義と同じ関数（`_read_defs`）で、形の誤りも同じ文で言う。苦情の
+    `rule` は定義の id（辞書でないときは `(phases)`）。読み込みでは落とさない（判定の `blocked` の
+    理由にする。`copy_problems`）。
+    """
+    if not isinstance(raw, dict):
+        return PhaseTypes(), [
+            Problem(
+                SEVERITY_ERROR,
+                "(phases)",
+                "`phases:` は定義の id をキーにした辞書で書く（欄は phases.yml の定義と同じ）",
+            )
+        ]
+    problems: list[Problem] = []
+    return _read_defs(raw, problems), problems
+
+
+def types_of(t: ticket_model.Ticket) -> dict[str, PhaseType]:
+    """チケットの写しの定義（id → 定義）。写しが無ければ空。
+
+    読んだものは `t.phase_types` に持たせて使い回す（読み込みの state 層は生の値しか持たない）。
+    """
+    if t.phase_types is None:
+        t.phase_types = read_copy(t.phases_raw)[0] if t.phases_raw is not None else PhaseTypes()
+    return t.phase_types
+
+
+def has_copy(t: ticket_model.Ticket) -> bool:
+    """`phases:` を書いているか（空の値は書いていないとみなす）。"""
+    return t.phases_raw is not None
+
+
+def same(a: PhaseType, b: PhaseType) -> bool:
+    """読んだ形で同じ定義か。YAML の書き方・キーの順・既定値を省いた書き方の違いは同じとみなす。"""
+    return a.key() == b.key()
+
+
+def differing(a: PhaseType, b: PhaseType) -> list[str]:
+    """2 つの定義で値の違う欄の名前。"""
+    pairs = zip(_KEY_FIELDS, a.key()[1:], b.key()[1:], strict=True)
+    return [name for name, x, y in pairs if x != y]
+
+
+def as_copy(pt: PhaseType) -> dict:
+    """写しに書く形。読み直すと同じ定義になる欄に戻す。前の版の順序の欄は書かない。"""
+    out: dict = {
+        "kind": pt.kind,
+        "title": pt.title,
+        "review": pt.review,
+        "scope": INHERIT if pt.scope is None else list(pt.scope_globs),
+    }
+    if pt.deliverables:
+        out["deliverables"] = list(pt.deliverables)
+    if pt.agent:
+        out["agent"] = pt.agent
+    if pt.when:
+        out["when"] = pt.when
+    return out
+
+
+def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
+    """チケットだけを読んで済む、写しの誤り。判定（`approval_checks.blocking_problems`）・承認・
+    `--lint` が同じ答えを引く。`phases.yml` は読まない（承認のあとに直しても進行中の親を止めない）。
+
+    - 子に `phases:` がある（error）。子の `phase:`（番号）と名前が似ていて取り違えやすい
+    - 写しの定義の形の誤り（error。`phases.yml` の定義と同じ検査）
+    - 計画を持つのに `phases:` が無い、項が `phases:` に無い定義名を使う（error）
+    - 定義の `kind` が置いた計画と合わない（error）
+    - `phases:` にあって、どの項も使わない定義（warn。判定はどの項からも引かないので、範囲・
+      見る場所・成果物は変わらない）
+    """
+    found: list[Problem] = []
+    name = t.ticket
+
+    def error(text: str) -> None:
+        found.append(Problem(SEVERITY_ERROR, name, text))
+
+    if t.is_child:
+        if COPY_KEY in t.raw:
+            error(
+                "`phases:` は親だけの欄（計画が使うフェーズ定義の写し）。子は `phase:`（番号）で"
+                "親の計画の項を指す。子の `phases:` は消してください"
+            )
+        return found
+    fill = f"`ccnavi --plan-order {name} --fill-phases`"
+    if has_copy(t):
+        for p in read_copy(t.phases_raw)[1]:
+            detail = p.detail if p.rule == "(phases)" else f"`phases:` の `{p.rule}`: {p.detail}"
+            found.append(Problem(p.severity, name, detail))
+    types = types_of(t)
+    if t.has_plan and not has_copy(t):
+        error(
+            "計画（plan / feedback）があるのに、計画が使うフェーズ定義の写し `phases:` が無い。"
+            f"提案なら {fill} で差し込む。承認済みチケットなら、ユーザが `phases:` を足すか、"
+            "取り消して出し直す"
+        )
+        return found
+    named = {str(k).strip() for k in t.phases_raw} if isinstance(t.phases_raw, dict) else set()
+    used: set[str] = set()
+    for key, items, kind in (
+        ("plan", t.plan, KIND_WORK),
+        ("feedback", t.feedback or [], KIND_FEEDBACK),
+    ):
+        for i, item in enumerate(items):
+            used.add(item.type)
+            pt = types.get(item.type)
+            if pt is None:
+                if item.type not in named:
+                    error(
+                        f"`{key}[{i}]` の定義 `{item.type}` が `phases:` に無い"
+                        f"（計画が使う定義は `phases:` に写して書く。{fill} で差し込める）"
+                    )
+                continue
+            if pt.kind != kind:
+                where = "全体計画" if key == "plan" else "フィードバック計画"
+                error(f"`{key}[{i}]` の `{item.type}` は kind `{pt.kind}`。{where}には置けない")
+    for ident in types:
+        if ident not in used:
+            found.append(
+                Problem(
+                    SEVERITY_WARN,
+                    name,
+                    f"`phases:` の `{ident}` はどの項も使っていない（判定は読まない。"
+                    f"消し忘れなら {fill} で外す）",
+                )
+            )
+    return found
 
 
 # ---- レイヤーごとの定義の読み込み（設計 11.4）

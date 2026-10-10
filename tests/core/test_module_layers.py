@@ -240,6 +240,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "entry.lint_places",
                 "entry.lint_project",
                 "entry.lint_rules",
+                "entry.plan_order",
                 "entry.status",
                 "entry.suggest",
                 "entry.version",

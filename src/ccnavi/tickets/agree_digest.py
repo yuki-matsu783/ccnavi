@@ -179,9 +179,10 @@ def carried(cand: agree_candidates.Candidate) -> bytes:
 
     新規は提案のバイト列そのもの（`approval_ops.admit` が動かす中身）。読んだバイト列の
     ダイジェストを判定の読み（`read_set`）にも入れる。読みの記録は改行を揃えた本文でダイジェストを取るので、それだけでは
-    改行や BOM だけの書き換えを覆わない。改版は承認済みチケットの frontmatter の計画だけを差し替え、
-    本文は承認済みチケットのものを残す（`revise_copy`）。区切りは件数つきのダイジェストの並びで決まる
-    （`approval_digest`）ので、ここでは長さを頭に付けてつなぐ。
+    改行や BOM だけの書き換えを覆わない。改版は承認済みチケットの frontmatter の計画と
+    `phases:` だけを差し替え、本文は承認済みチケットのものを残す（`revise_copy`）。
+    区切りは件数つきのダイジェストの並びで決まる（`approval_digest`）ので、ここでは長さを
+    頭に付けてつなぐ。
     """
     t = cand.ticket
     if cand.is_revision and cand.current is not None:
@@ -203,8 +204,9 @@ def revise_copy(
 ) -> str:
     """承認済みチケットの計画を差し替える。
 
-    範囲と本文はそのまま。改版の時刻はチケットに書かない（状態の履歴の `revised` に残る。
-    フィードバック計画の改版は `feedback: true` を添える）。待ち方は書かない（承認済みチケットの
+    範囲と本文はそのまま（差し替えるのは計画と `phases:`。`revised_front`）。改版の時刻は
+    チケットに書かない（状態の履歴の `revised` に残る。フィードバック計画の改版は
+    `feedback: true` を添える）。待ち方は書かない（承認済みチケットの
     計画から都度計算する）。
     """
     current.raw = revised_front(current, revised)
@@ -225,14 +227,21 @@ def revise_copy(
 
 
 def revised_front(current: ticket_model.Ticket, revised: ticket_model.Ticket) -> dict:
-    """改版で書く frontmatter。承認済みチケットの frontmatter の計画を差し替えたコピー。
+    """改版で書く frontmatter。承認済みチケットの計画と `phases:` を差し替えたもの。
 
-    `current` は書き換えない。承認のダイジェスト（`digest`）も同じものから組むので、見せた
-    中身と書く中身が食い違わない。項の `after` も書く（`PlanItem.as_raw`）。前の版の承認済み
+    `current` は書き換えない。承認のダイジェスト（`digest`）と承認画面の「`phases:` の差分」も
+    同じものから組むので、見せた中身と書く中身が食い違わない。項の `after` も書く
+    （`PlanItem.as_raw`）。`phases:`（計画が使う定義の写し）は提案の値に差し替える。差し替えないと
+    改版で足した項（フィードバック計画の立案は必ず改版）が `phases:` に無い定義名を使うことになり、
+    承認したとたんに親と子が全部止まる。提案に `phases:` が無ければ外す。前の版の承認済み
     チケットに残る `workflow:` 欄はそのまま残す（読まない）。
     """
     front = dict(current.raw)
     front["plan"] = [item.as_raw() for item in revised.plan]
     if revised.feedback is not None:
         front["feedback"] = [item.as_raw() for item in revised.feedback]
+    if ticket_mod.PHASES_KEY in revised.raw:
+        front[ticket_mod.PHASES_KEY] = revised.raw[ticket_mod.PHASES_KEY]
+    else:
+        front.pop(ticket_mod.PHASES_KEY, None)
     return front

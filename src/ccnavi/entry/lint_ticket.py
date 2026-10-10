@@ -49,9 +49,10 @@ def _copy_problems(
     - フェーズの順序は warn。狂っていても範囲の決まり方には影響せず、判定も止めない
       （`approval_checks.blocking_problems`）。承認のときは error だが、承認済みのものに当てるのは
       「その順で始めた」という記録で、いま止める根拠にはならない
-    - 計画の形と、フェーズ定義が読めないことは `validate` が付けた severity のまま（error）。
-      判定は止めないが、承認の画面を通っていれば起きない形なので、置き場を動かして
-      承認した分の不備を CI で止める。範囲の超過だけは `validate` も warn
+    - 計画の形は `validate` が付けた severity のまま（error）。承認の画面を通っていれば起きない
+      形なので、置き場を動かして承認した分の不備を CI で止める。範囲の超過だけは `validate` も warn
+    - 親に固定した定義の写し（`phases:`）が今の `phases.yml` と違う・`phases.yml` に無いことと、
+      写しの使われていない定義は warn。判定は写しを読むので進行中の親には効かず、止めない
     - 再開（`done/` から `doing/` へ手で戻す）で残った閉じるときの欄は warn。ユーザの再開を
       止めないため、判定も止めない
     - 作業中の子のフェーズに reviewed のマーカーが残っている形（再開）も warn。マーカーを
@@ -98,12 +99,15 @@ def _copy_problems(
         if t.blocked:
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
             continue
-        types = resolve(agree_candidates.project_of(t, pool))
-        complaints, overflow = agree_candidates.validate(t, pool, types)
+        config = resolve(agree_candidates.project_of(t, pool))
+        # 承認済みの親の写し（`phases:`）と今の `phases.yml` の食い違いは warn（進行中の親には
+        # 効かない）。子の定義は親の写しから引く。
+        complaints, overflow = agree_candidates.validate(t, pool, config, approved=True)
         for p in complaints + overflow:
             problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
         parent = pool.get(t.parent) if t.is_child else None
         if parent is not None:
+            types = agree_candidates.types_from(t, pool)
             for p in phase.order_problems(root, conf, t, parent, types, raw=raw):
                 # 承認のときは error。承認済みのものに当てるのは「その順で始めた」という
                 # 記録で、いま止める根拠にはならない。

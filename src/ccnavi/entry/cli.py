@@ -30,7 +30,7 @@ from ..tickets import (
     history,
     review,
 )
-from . import cli_args, cli_ops, cli_usage, diagnose, lint, suggest, version
+from . import cli_args, cli_ops, cli_usage, diagnose, lint, plan_order, suggest, version
 
 
 def _json_out_of_test(argv: list[str]) -> list[str]:
@@ -104,6 +104,10 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 承認できる状態かを確かめるだけ（`--preview` と一緒に使う）。承認済みチケットは置かず、
     # 通るかどうかを終了コードで返す。エージェントがユーザに承認を頼む前に打つ。
     parser.add_argument("--verify", action="store_true")
+    # 親の提案の計画を書き換える補助（`--agree` の外の独立したフラグ。エージェントも打ってよい）。
+    # いまは `--fill-phases`（計画が使う定義だけを phases.yml から `phases:` に写す）だけ。
+    parser.add_argument("--plan-order", default=None, metavar="PARENT")
+    parser.add_argument("--fill-phases", action="store_true")
     # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイでユーザが押した承認。端末は要らない。
     parser.add_argument("--yes", default="")
     # 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに書き込む中身のダイジェスト
@@ -550,6 +554,27 @@ def _parsed(
     # 後始末の経路。payload を読まない。セッションの開始でも同じものが走る（events）。
     if args.prune:
         return cli_args._prune(stdin, stdout, stderr, conf, root, args.preview)
+
+    # 親の提案の計画を書き換える補助の経路。`--agree` の端末の確かめ（`_from_terminal`）より
+    # 手前で分ける。書くのは承認待ちの親の提案（エージェントも書ける置き場）だけで、承認は
+    # しない。`--agree` と一緒には受けない（組み込みの止めと経路が食い違わないように）。
+    if args.plan_order is not None or args.fill_phases:
+        if args.agree:
+            stderr.write("ccnavi: --plan-order は --agree と一緒に使えない（承認の外の補助）\n")
+            return EXIT_ERROR
+        if args.plan_order is None:
+            stderr.write("ccnavi: --fill-phases は --plan-order <親> と一緒に使う\n")
+            return EXIT_ERROR
+        if not args.fill_phases:
+            stderr.write(
+                "ccnavi: --plan-order <親> は --fill-phases と一緒に使う"
+                "（計画が使う定義だけを phases.yml から親の提案の phases: に写す）\n"
+            )
+            return EXIT_ERROR
+        if not conf.tickets_enabled:
+            stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
+            return EXIT_ERROR
+        return plan_order.fill_phases(stdout, stderr, conf, root, args.plan_order.strip())
 
     # 承認の経路。ユーザが端末から打つもので、payload を読まないのでここで分かれる。
     # 判定を 1 度も通らないのも分ける理由で、承認はツール呼び出しについての
