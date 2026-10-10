@@ -9,7 +9,7 @@ phases:
     review: mr
     scope:
     - tests/*
-    when: 振る舞いが変わるとき。実装と並行してよい
+    when: 振る舞いが変わるとき。実装と並行してよい（実装の項の `after` にこの項を書かなければ並行する）
   implement:
     kind: work
     title: 実装とテスト
@@ -23,6 +23,7 @@ phases:
     - .ccnavi/*
     - .ccnavi/common/phases.yml
     - extensions/*
+    when: 振る舞いを変えるとき。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
   docs:
     kind: work
     title: 文書

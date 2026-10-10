@@ -19,7 +19,7 @@ phases:
     review: mr
     scope:
     - tests/*
-    when: 振る舞いが変わるとき。実装と並行してよい
+    when: 振る舞いが変わるとき。実装と並行してよい（実装の項の `after` にこの項を書かなければ並行する）
   implement:
     kind: work
     title: 実装とテスト
@@ -33,6 +33,7 @@ phases:
     - .ccnavi/*
     - .ccnavi/common/phases.yml
     - extensions/*
+    when: 振る舞いを変えるとき。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
   staging:
     kind: work
     title: ユーザがコピーする版の作成
@@ -41,7 +42,7 @@ phases:
     - wip/design/*
     - tests/*
     when: 保護済みファイル（.ccnavi/scripts/、.claude/hooks/、rules.yml）を直すとき。エージェントはそこに書けないので、完成品を
-      wip/design/scripts/ に全文で置き、ユーザがコピーする
+      wip/design/scripts/ に全文で置き、ユーザがコピーする。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
   docs:
     kind: work
     title: 文書
