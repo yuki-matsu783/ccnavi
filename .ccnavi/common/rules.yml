@@ -38,7 +38,7 @@ deny:
 
   # チェックアウトしたブランチでは編集しない。`scratchpad` と`.claude/worktrees/` だけが編集可能。
   # `{root}` はワークスペースルートの実パスに置き換わる。
-  - id: main-tree
+  - id: workspace-root
     match: Write|Edit|NotebookEdit
     regex: '^{root}[\\/](?:(?:[^.\\/s][^\\/]*(?:[\\/]|$)|s(?:[^c\\/][^\\/]*(?:[\\/]|$)|$)|sc(?:[^r\\/][^\\/]*(?:[\\/]|$)|$)|scr(?:[^a\\/][^\\/]*(?:[\\/]|$)|$)|scra(?:[^t\\/][^\\/]*(?:[\\/]|$)|$)|scrat(?:[^c\\/][^\\/]*(?:[\\/]|$)|$)|scratc(?:[^h\\/][^\\/]*(?:[\\/]|$)|$)|scratch(?:[^p\\/][^\\/]*(?:[\\/]|$)|$)|scratchp(?:[^a\\/][^\\/]*(?:[\\/]|$)|$)|scratchpa(?:[^d\\/][^\\/]*(?:[\\/]|$)|$)|scratchpad[^\\/].*(?:[\\/]|$))|\\.[^c\\/][^\\/]*|\\.c[^l\\/][^\\/]*|\\.claude[\\/][^w\\/][^\\/]*])'
     message: >-
@@ -115,7 +115,7 @@ deny:
       レビュー待ち（wip/proposals/review/）へ動かしてください。
       範囲を変えたいなら wip/proposals/todo/ に新しい提案を書いて承認を依頼してください。
 
-  # hook の登録と個人の上書き。ワークスペースルートの側は main-tree が先に当たるが、
+  # hook の登録と個人の上書き。ワークスペースルートの側は workspace-root が先に当たるが、
   # ワークツリー側の設定は統合で統合先へ入る道を持つので、そちらも名前で止める。
   - id: guard-settings
     match: Write|Edit|NotebookEdit
@@ -148,7 +148,7 @@ ask:
       あとから辿れます。
 
 allow:
-  # 書き込みを許すのはワークツリーの中だけ。ワークスペースルートの側は deny の main-tree が止める。
+  # 書き込みを許すのはワークツリーの中だけ。ワークスペースルートの側は deny の workspace-root が止める。
   # ワークツリーの中でも hook・スクリプト・settings.json などは deny が先に当たる。
   - id: worktrees
     match: Write|Edit
