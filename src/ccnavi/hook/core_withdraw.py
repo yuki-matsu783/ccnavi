@@ -9,7 +9,9 @@ from __future__ import annotations
 import io
 import os
 
-from ..infra import fsio, settings
+import yaml
+
+from ..infra import fsio, settings, yamlread
 from ..tickets import (
     agree,
     approval,
@@ -225,8 +227,57 @@ def _content_problems(copy: ticket_model.Ticket, prior: bytes) -> list[str]:
     if current is None:
         return ["承認済みチケットを読めない"]
     if current != prior:
-        return [
+        text = (
             "承認のあとに承認済みチケットの中身が変わった（改版か着手）。"
             "承認コミットの親の提案と同じでないものは取り下げられない"
-        ]
+        )
+        if _only_plan_values_differ(copy, current, prior):
+            text += (
+                "。違いは plan: / feedback: / phases:（子なら phase:）の値だけ。承認の前に"
+                "ワークフロー編集タブか --fill-phases で書き換えた提案は取り下げられない"
+                "（書き換えがコミットされないまま承認された）。`ccnavi-ticket.sh cancel "
+                f"{copy.ticket} --reason <理由>` で取り消して、提案を出し直す"
+            )
+        return [text]
     return []
+
+
+# 承認の前に書き換えることのある欄。ワークフロー編集タブ（`--plan-order --write`）は親の
+# `plan:` / `feedback:` と子の `phase:` を、`--fill-phases` は親の `phases:` を書き換える。
+_REWRITTEN_PARENT = ("plan", "feedback", "phases")
+_REWRITTEN_CHILD = ("phase",)
+
+
+def _only_plan_values_differ(copy: ticket_model.Ticket, current: bytes, prior: bytes) -> bool:
+    """`doing/` と承認コミットの親の提案の違いが、承認の前に書き換えることのある欄の値だけか。
+
+    本文と、ほかの欄（読んだ形）が同じで、書き換える欄のどれかが違うときだけ真。読めなければ偽
+    （ほかの違いと同じ文面にする）。
+    """
+    keys = _REWRITTEN_CHILD if copy.is_child else _REWRITTEN_PARENT
+    try:
+        now, before = _split(current.decode("utf-8")), _split(prior.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return False
+    if now is None or before is None or now[1] != before[1]:
+        return False
+    rest_now = {k: v for k, v in now[0].items() if k not in keys}
+    rest_before = {k: v for k, v in before[0].items() if k not in keys}
+    return rest_now == rest_before and any(now[0].get(k) != before[0].get(k) for k in keys)
+
+
+def _split(text: str) -> tuple[dict, str] | None:
+    """frontmatter（読んだ形）と本文。読めなければ None。"""
+    lines = text.splitlines(keepends=True)
+    if not lines or lines[0].strip() != ticket_model.FENCE:
+        return None
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == ticket_model.FENCE), None)
+    if end is None:
+        return None
+    try:
+        front = yamlread.safe_load("".join(lines[1:end]))
+    except (yaml.YAMLError, yamlread.LoadError):
+        return None
+    if not isinstance(front, dict):
+        return None
+    return front, "".join(lines[end + 1 :])
