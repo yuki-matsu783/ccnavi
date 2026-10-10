@@ -63,12 +63,10 @@ rename するか、バイト単位でコピーして元を消す。欄を書き�
 動かす、のどれで承認しても、承認済みチケットは提案とバイト単位で同じになる。欄の有無が承認の経路を表すと、読む側は欄の
 無いもの（手で動かした承認）を壊れた承認と読み違えるため。承認済みチケットのプロジェクトは置き場（ツリー）から決まる。
 前の版の承認が書き足していた `ccnavi_approved: {approved_at, source_tree, source_path}`（改版の `revised_at` /
-`feedback_at`）・`project:`・`workflow:` を持つ承認済みチケットもそのまま読む（移行はしない。`workflow:` の欄を読むのは
-古いものだけ）。古い形とみなすのは、`ccnavi_approved` が前の版の必ず書いた欄（`approved_at`・`source_tree`・`source_path`）を
+`feedback_at`）・`project:`・`workflow:` を持つ承認済みチケットもそのまま読む（移行はしない。`workflow:` の欄はどれも読まない）。古い形とみなすのは、`ccnavi_approved` が前の版の必ず書いた欄（`approved_at`・`source_tree`・`source_path`）を
 揃え、`approved_at` が空でないときだけ。`ccnavi_approved: {}` のような書きかけの記録は古い形とみなさない。ただし欄を
-揃えた記録は手で書けるので、古い形そのものは偽装できる。偽装した `workflow:` で待ち方を緩められないよう、古い形の `workflow:` の
-待ち方は、今の `phases.yml` から計算した待ち方（`workflow.compute`）と同じときだけ採り、違えば欄を使わず一直線（前の番号を
-全部待つ）で読む。`--lint` と status はそのことを warn で言う。古い形なのに
+揃えた記録は手で書けるので、古い形そのものは偽装できる。古い形の `workflow:` の欄も読まない（待ち方は承認済みチケットの
+計画の項の `after` から計算する。9.7）。古い形なのに
 状態の履歴に承認（`approved`、続きの子は `raised`）の行が無ければ、`--lint` が warn にする。承認画面の「提案:」はツリーからの相対パスで出すので、画面の本文とダイジェストは機械に依らない。
 
 承認の時刻は欄に持たない。表示（ボード・`--diagnose`・`ccnavi-ticket.sh status`）は、状態の履歴の `approved`（続きの子は
