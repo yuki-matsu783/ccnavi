@@ -282,7 +282,7 @@ class RiskTest(PhaseHarness):
         self.assertIn(mark["risk"], ("HIGH", "CRITICAL"))
 
     def test_unreadable_name_status_or_head_refuses_to_close(self):
-        """変更の種類か先のコミットを読めなければ、0 件と数えずに閉じない（重いほうに倒す）。"""
+        """変更の種類か先のコミットを読めなければ、0 件と数えずに閉じない（重いほうとして扱う）。"""
         self.one_child()
         real = risk._git
         for failing, said in (
@@ -446,7 +446,7 @@ class RiskTest(PhaseHarness):
         1 本足すと sh が渡した本物を上書きできた。`--root` からは共通レイヤーの 3 本も
         `projects` も `approved` も導かれるので、`--risk` を使わずに同じ差し替えができる。
         実際に確かめると、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子が
-        「リスク 0」で**本物の置き場に**閉じられた。
+        「リスク 0」で本物の置き場に閉じられた。
 
         ここでは偽のルートの中身を作り込まない。2 本目が在ること自体を断るので、
         中身に関わらず同じところで止まる。

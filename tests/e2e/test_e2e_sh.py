@@ -26,7 +26,7 @@ git init と worktree add を何度も行い、実行ファイルをコピーす
 読み返すのは標準出力・標準エラー・終了コードと、ファイルシステムに出たものだけ。
 スクリプトの中の変数も関数も見ない。
 
-**ここで確かめないもの。** `ccnavi-review.sh close-early` のブランチ名にスラッシュがある場合
+ここで確かめないもの。 `ccnavi-review.sh close-early` のブランチ名にスラッシュがある場合
 （`feature/x` で存在しないディレクトリを指す）は、リモートと `gh` が要るのでここには
 入れない。実装とレビューで確かめる。
 """
@@ -47,8 +47,8 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 def walk_up_for(relative, skip_worktrees=True):
     """`ROOT` から上へ歩いて、`relative` を持つディレクトリの中身を返す。
 
-    実装（`ccnavi_workspace`）と同じ規則にしてある。**`.claude/worktrees/` の下は
-    候補にしない。**
+    実装（`ccnavi_workspace`）と同じ規則にしてある。`.claude/worktrees/` の下は
+    候補にしない。
 
     これを外すと、ワークツリーから回したときにワークツリー自身を見つけてしまう。`.ccnavi/scripts/`
     は git で共有されるのでどのワークツリーにもコピーがあるが、実際に使われるのはワークスペース側の

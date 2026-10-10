@@ -67,7 +67,7 @@ class FamilyShTest(unittest.TestCase):
             f.write("")
         family, target = self.family("web-i0012-05-01")
         self.assertEqual(family, "web-i0012")
-        # 記録があるので実行ファイルに聞く。ここでは実行ファイルが無いので止める側に倒れる。
+        # 記録があるので実行ファイルに聞く。ここでは実行ファイルが無いので止める結果になる。
         self.assertNotEqual(target, "no")
 
 

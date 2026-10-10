@@ -154,7 +154,7 @@ class ProjectsTest(unittest.TestCase):
         self.app = self.project("app", APP_RULES)
         self.lib = self.project("lib", LIB_RULES)
         # 承認済みチケットは、そのチケットの親のツリーの `.ccnavi/approved/` に置かれる
-        # （設計 9.2）。ここの土台は親のワークツリーを作らないので、提案があったツリーに置かれる。
+        # （設計 9.2）。ここの環境は親のワークツリーを作らないので、提案があったツリーに置かれる。
         self.approved = os.path.join(self.ws, ".ccnavi", "approved")
         self.state = os.path.join(self.ws, "state")
         self.log = os.path.join(self.ws, "decisions.jsonl")

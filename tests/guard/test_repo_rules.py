@@ -174,7 +174,7 @@ class RepoRulesTest(unittest.TestCase):
     def test_語にくっついた_preview_は承認の免除にならない(self):
         """免除の理由になるのは、単独の語として現れた `--preview` だけ。
 
-        別のフラグの**値**に書いた `--preview` で免除が成立していた。argparse は
+        別のフラグの値に書いた `--preview` で免除が成立していた。argparse は
         `--reason=--preview` を値として読み取るので `--preview` はフラグにならず、実行ファイルは
         本物の `--agree` を走らせる。hook が見る文字列と、実行ファイルが走らせる枝が
         そこで食い違う（端末さえ取れれば、エージェントが自分で承認を置けることになる）。
@@ -515,8 +515,8 @@ class MovedJudgeTest(LauncherJudgeTest):
 
     def test_行き先を読めない_cd_は読みを変えない(self):
         # 縮退させない。縮退すると生の文字列で見るので、コマンドの頭に固定して書かれた
-        # 保護（`(^|\x00)(mv|rm|tee|…)`）が当たらなくなり、**書かれた表記で今は
-        # 止まっている形**が止まらなくなる（敵対的レビュー）。
+        # 保護（`(^|\x00)(mv|rm|tee|…)`）が当たらなくなり、書かれた表記で今は
+        # 止まっている形が止まらなくなる（敵対的レビュー）。
         for subject in [
             'cd "$(pwd)" && rm -f /repo/.ccnavi/common/rules.yml',
             "cd - && cp /tmp/x .ccnavi/common/rules.yml",

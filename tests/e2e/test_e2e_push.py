@@ -30,7 +30,7 @@ tests/sh/test_push_approved_sh.py）は、実行ファイルを in-process で�
 `CCNAVI_GUARD_TICKET_APPROVAL=disable` を渡して y を標準入力から送る。単体のテストが
 `--guard-ticket-approval disable` で切るのと同じ扱いで、壁そのものは段 2 で見る。
 
-**ここで確かめないもの。** モード B（`projects/<名前>/` の下のリポジトリ）と子チケット、
+ここで確かめないもの。 モード B（`projects/<名前>/` の下のリポジトリ）と子チケット、
 保護されたブランチ・push の失敗・detached は tests/sh/test_push_approved_sh.py が見る。
 """
 

@@ -466,7 +466,7 @@ class TombstoneTest(AuthorityHarness):
 
     def test_a_present_record_without_the_parent_tree_is_not_closed(self):
         # 手元に親が無ければ、統合先の done/ に親があっても同じ親だと言えない。
-        # 閉じていない側に倒す。
+        # 閉じていないものとして扱う。
         self.record("present")
         mine = self.parent_fields()
         git(self.root, "worktree", "remove", "--force", self.child_tree)
@@ -664,7 +664,7 @@ class IntegrationDoneTest(AuthorityHarness):
         self.record("present")
         preview = self.preview()
         self.assertNotIn("i0001-01-02", [b["ticket"] for b in preview["batch"]])
-        # 板にも理由つきで出る（何も言わずに消えない）。
+        # ボードにも理由つきで出る（何も言わずに消えない）。
         lint = json.loads(self.ccnavi("--lint", "--json").stdout)
         self.assertTrue(any("i0001-01-02" in p["detail"] for p in lint["problems"]))
 

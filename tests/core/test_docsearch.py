@@ -505,7 +505,7 @@ class CliTest(Repo):
                 self.assertIn(f"--docs は {args[0]} と一緒に使えない", done.stderr)
 
     def test_settings_and_wrapper_flags_stop_docs_too(self):
-        """設定や sh のパスを差し替えるフラグも、黙って無視せずに止める。"""
+        """設定や sh のパスを差し替えるフラグも、何も言わずに無視せず、止める。"""
         self.put("a.md", doc(type="guide"))
         for args in (
             ("--cwd", self.root),

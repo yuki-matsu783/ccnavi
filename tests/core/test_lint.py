@@ -484,7 +484,7 @@ class LintTest(unittest.TestCase):
 
     def test_denyが1件も無いのはerrorになる(self):
         # 何も止めないガードは、入っていないガードと同じでありながら、
-        # 入っているように見える。いちばん見つけにくい壊れ方なので error。
+        # 入っているように見える。いちばん見つけにくい不具合なので error。
         result = lint(self.root, rules_file(self.root))
 
         self.assertEqual(result.returncode, 1)

@@ -117,7 +117,7 @@ class ApprovalToldTest(PhaseHarness):
     def test_one_hook_reads_the_approved_copies_once(self):
         """UserPromptSubmit と PreToolUse（ワークツリーへの書き込み）は、置き場を 1 度だけ読む。
 
-        承認の知らせは外したが、範囲（実行後の側・実行前の判定）は同じ読みを持ち回る。
+        承認の知らせは外したが、範囲（実行後の側・実行前の判定）は同じ読みを使い回す。
         """
         from unittest import mock
 

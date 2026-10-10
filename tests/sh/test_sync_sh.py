@@ -619,7 +619,7 @@ class SyncTest(SyncHarness):
         self.assertEqual("closed", self.closed_after_delete()[0])
 
     def test_nothing_to_compare_is_not_closed(self):
-        # どの欄でも照合できない（空どうし、空文字）なら閉じていない側に倒し、止めて戻し方を出す。
+        # どの欄でも照合できない（空どうし、空文字）なら閉じていない扱いにして止め、戻し方を出す。
         bare = copy_text(base_sha="''", started_at="")
         self.mine(bare)
         self.close_on_main(bare)

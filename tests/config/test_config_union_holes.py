@@ -721,9 +721,9 @@ class ReservedLayerNameTest(ConfigUnionHarness):
 
     `layers` は `projects/self/` を数えないのに、`layer_for` は
     `target.project or LAYER_SELF` をレイヤーの名前で引いていた。`target.project` が `"self"`
-    ならレイヤーの名前と一致するので、ワークスペース自身のレイヤーが返る。**そのプロジェクトへの
+    ならレイヤーの名前と一致するので、ワークスペース自身のレイヤーが返る。そのプロジェクトへの
     Write / Edit が、プロジェクト自身の deny を一度も読まずに、ワークスペースのレイヤーの
-    ルールで判定される。**
+    ルールで判定される。
 
     穴が再現する形に組む。ワークスペース自身のレイヤーに広い `allow`（`self:wide`）と
     deny（`self:generated`）を置き、プロジェクトのレイヤーに deny（`secret`）を置く。
@@ -858,7 +858,7 @@ class ReservedLayerRestoreTest(GuardHarness):
     共通レイヤーの key と完全に一致し、`_places` の重複の排除で先に積んだ共通レイヤーだけが
     残る。プロジェクトが名前を 1 つ選ぶだけで、その 3 本が守られなくなる。
 
-    key が共通レイヤーと重なると、このクラスの最初の 2 つが落ちる（戻らないので中身が壊れたまま）。
+    key が共通レイヤーと重なると、このクラスの最初の 2 つが落ちる（戻らず不正な中身が残る）。
     """
 
     def setUp(self):

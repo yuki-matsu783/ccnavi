@@ -187,7 +187,7 @@ class CompatAgreesTest(unittest.TestCase):
         なった（自分では組み直さない）。なので 7 以上。
 
         欄を足しただけだが、古い実行ファイルの答えでは拡張の「要対応のみ」が空になり、不備も
-        出ない。黙って空になるより食い違いとして知らせる。
+        出ない。知らないうちに空になるより食い違いとして知らせる。
         """
         self.assertGreaterEqual(version.COMPAT, 7)
 

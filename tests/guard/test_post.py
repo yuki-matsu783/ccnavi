@@ -472,7 +472,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
 
     def test_HEADを持たない記録は基準なしとして扱う(self):
         # heads の無い記録は、記録が無いときと同じ。コミットのぶんを数えられない
-        # 基準で報告すると、このターンに入ったコミットを黙って落とす。
+        # 基準で報告すると、このターンに入ったコミットを知らないうちに落とす。
         self.run_hook(event="UserPromptSubmit")
         turn = os.path.join(self.state, "s1.turn.json")
         with open(turn, encoding="utf-8") as f:

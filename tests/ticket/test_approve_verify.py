@@ -211,7 +211,7 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertIn("計画に無い", said)
 
     def test_lint_says_the_order_problem_too(self):
-        """順序で落ちる子。**1 本にそろえる前の `--lint` が何も言わなかったのはここ**
+        """順序で落ちる子。1 本にそろえる前の `--lint` が何も言わなかったのはここ
         （`validate` だけを当てていたので、フェーズの順序を見ていなかった）。
 
         「計画に無い番号」はそろえる前からの error なので、それだけを見るテストでは、
@@ -264,8 +264,8 @@ class ApproveVerifyTest(PhaseHarness):
         表に allow を 1 本足す形も試したが、`todo/` が「ccnavi が言及する場所」になり、
         どのタイプも言及しないときの扱い（judge.undeclared_verdict）を通らなくなる。
         確認できる者が居ないモードの deny も、知らない表記のモードを ask として扱う既定も、
-        そこだけ外れていた。**同じ場所とどのルールも言及しない場所が、
-        どの権限モードでも同じ判定になること**を確かめる。文は届いたままであることも見る。
+        そこだけ外れていた。同じ場所とどのルールも言及しない場所が、
+        どの権限モードでも同じ判定になることを確かめる。文は届いたままであることも見る。
         """
         todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0002.md")
         other = os.path.join(self.parent_tree, "src", "keep.py")

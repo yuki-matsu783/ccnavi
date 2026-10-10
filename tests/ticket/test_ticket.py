@@ -1028,7 +1028,7 @@ class TicketTest(unittest.TestCase):
     def test_a_child_does_not_start_before_its_parent(self):
         """親が未着手のまま子を着手できないこと。案内は親の `start`（REQ-TKT-48）。
 
-        飛ばしても途中では何も壊れず、親を閉じるときだけが通らない。止める場所を
+        飛ばしても途中では何も問題が起きず、親を閉じるときだけが通らない。止める場所を
         最初の子の着手に置けば、親の作業が実際に始まる時点で言える。
         """
         self.family_without_starting()
