@@ -30,7 +30,7 @@ from tests.ticket.test_phases import (
     child_text,
     parent_text,
 )
-from tests.ticket.test_ticket import write
+from tests.ticket.test_ticket import git, write
 
 
 def front_of(text: str) -> dict:
@@ -170,10 +170,11 @@ class CopyJudgeTest(PhaseHarness):
             return ""
         return json.loads(result.stdout).get("hookSpecificOutput", {}).get("permissionDecision", "")
 
-    def approved_child(self):
+    def approved_child(self, review=True):
         self.family(plan=("research", "design"))
         self.propose(
-            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+            "i0001-01-01",
+            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"], review=review),
         )
         self.commit_parent("propose child")
         approved = self.approve()
@@ -195,6 +196,34 @@ class CopyJudgeTest(PhaseHarness):
                 self.assertIn("limit: phase type 調査 (research)", self.reason(beyond))
                 inside = self.write_to(tree, "wip/research/note.md")
                 self.assertNotEqual(self.decision(inside), "deny", self.reason(inside))
+
+    def test_phases_and_their_titles_and_reviews_come_from_the_copy_after_approval(self):
+        """承認のあとに phases.yml の定義を直しても、フェーズの題・見る場所・止め方と
+        SubagentStart の案内は写しのまま。"""
+        tree = self.approved_child(review=False)
+        write(
+            self.phases,
+            PHASES.replace(
+                "    title: 調査\n    review: none\n", "    title: 調べ\n    review: mr\n"
+            ).replace("agent: explorer", "agent: planner"),
+        )
+        board = json.loads(self.ccnavi("--explain", "--json").stdout)
+        owner = next(p for p in board["parents"] if p["ticket"] == "i0001")
+        shown = [(p["number"], p["review_kind"], p["title"]) for p in owner["phases"]]
+        self.assertEqual(shown, [(1, "none", "調査"), (2, "mr", "設計")])
+        said = self.reason(self.hook("SubagentStart", "", tree, agent_id="sub-1"))
+        self.assertIn("1: 調査", said)
+        self.assertIn("explorer", said)
+        self.assertNotIn("調べ", said)
+        self.assertNotIn("planner", said)
+        # 写しの research はレビュー不要。閉じても止めない（phases.yml の mr なら止まる）。
+        write(os.path.join(tree, "wip", "research", "summary.md"), "まとめ\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "summary")
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
+        self.commit_parent("close 01")
+        gate, _, _ = self.board_phase(1)
+        self.assertFalse(gate)
 
     def test_a_child_is_approved_from_the_copy_after_phases_yml_lost_its_definition(self):
         self.family(plan=("research", "design"))
@@ -254,6 +283,15 @@ class CopyJudgeTest(PhaseHarness):
         lint = self.ccnavi("--lint", "--mode", "enable")
         self.assertIn("今の phases.yml と違う", lint.stdout)
         self.assertIn("進行中の親には効かない", lint.stdout)
+
+    def test_lint_says_a_lost_phases_yml_once_as_a_warning_for_an_approved_parent(self):
+        """承認済みの親は写しを読むので、phases.yml が無くなっても --lint は warn だけで言う。"""
+        self.family(plan=("research", "design"))
+        os.remove(self.phases)
+        lint = self.ccnavi("--lint", "--mode", "enable", "--json")
+        found = [p for p in json.loads(lint.stdout)["problems"] if "i0001" in p.get("detail", "")]
+        self.assertTrue(found, lint.stdout)
+        self.assertEqual({p["severity"] for p in found}, {"warn"}, found)
 
     def test_deliverables_come_from_the_copy(self):
         self.family(plan=("research", "design"))
@@ -426,6 +464,17 @@ class FillPhasesTest(PhaseHarness):
         result = self.fill()
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("書かない", result.stderr)
+        self.assertEqual(self.read(), text)
+
+    def test_fill_phases_names_a_column_zero_comment_inside_the_value(self):
+        """`phases:` の値の中に行頭のコメントがあれば、値の範囲が決まらないので書かずにそう言う。"""
+        text = parent_text("i0001", ["research"], copy=None).replace(
+            "plan:", "phases:\n  research:\n# 行頭のコメント\n    kind: work\nplan:", 1
+        )
+        self.propose("i0001", text)
+        result = self.fill()
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("行頭", result.stderr)
         self.assertEqual(self.read(), text)
 
     def test_fill_phases_refuses_a_plan_item_missing_from_phases_yml(self):

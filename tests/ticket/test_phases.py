@@ -1756,6 +1756,10 @@ class ScopeLimitTest(PhaseHarness):
                 self.assertNotIn("定義の上限では切り詰めていない", self.reason(beyond_type))
                 inside = self.write_to(tree, "wip/research/x.md")
                 self.assertNotEqual(self.decision(inside), "deny", self.reason(inside))
+                beyond_parent = self.write_to(tree, "docs/x.md")
+                self.assertEqual(self.decision(beyond_parent), "deny", beyond_parent.stdout)
+                self.assertIn("DENY_TICKET_SCOPE", self.reason(beyond_parent))
+                self.assertIn("limit: parent i0001", self.reason(beyond_parent))
 
     # ---- 判定が落ちない（チケット approve-carry-04 の 6〜8）
 
