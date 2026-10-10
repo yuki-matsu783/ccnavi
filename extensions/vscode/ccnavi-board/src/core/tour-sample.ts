@@ -69,7 +69,8 @@ const SAMPLE_PARENT: ParentJson = {
   ticket: "sample-b",
   closed: false,
   stage: "作業中（2（設計））",
-  plan: ["research", "design", "implement"],
+  // 計画の項は `after` で先行を書く（実行ファイルの `--explain --json` と同じ形）。最後の項がほかの全部を待つ
+  plan: ["research", { type: "design", after: [1] }, { type: "implement", after: [2] }],
   feedback: null,
   close_early: null,
   ready: null,
