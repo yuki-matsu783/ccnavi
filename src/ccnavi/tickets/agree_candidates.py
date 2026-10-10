@@ -457,19 +457,25 @@ def revision_problems(
     problems += lock_problems(revised, current, fixed)
     # フィードバック計画の番号は全体計画の続きなので、フィードバック計画を立てたあとに全体計画を
     # 変えると番号と `after` がずれる。比べるのは定義・`review`・推移的な待ちの並び。
-    if current.feedback is not None and approval.plan_signature(
-        revised, "plan"
-    ) != approval.plan_signature(current, "plan"):
+    # フィードバック計画を立てる改版でも同じ。全体計画の最後のレビューを済んだ扱いにするので、
+    # 一緒に足した全体計画の項までレビュー済みになる。
+    plan_changed = approval.plan_signature(revised, "plan") != approval.plan_signature(
+        current, "plan"
+    )
+    if plan_changed and (current.feedback is not None or revised.feedback is not None):
+        when = "立てたあと" if current.feedback is not None else "立てる改版で"
         problems.append(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 revised.ticket,
-                "フィードバック計画を立てたあとは全体計画を変えられない"
-                "（フィードバック計画の番号は全体計画の続きで、項を足すと番号がずれる）",
+                f"フィードバック計画を{when}は全体計画を変えられない"
+                "（フィードバック計画の番号は全体計画の続きで、項を足すと番号がずれる。"
+                "全体計画を変えるなら、フィードバック計画を出す前に改版する）",
             )
         )
     # フィードバック計画: 無い状態から 1 回だけ、全体計画の最後のレビューが済んでから。
-    if revised.feedback != current.feedback:
+    # 比べるのは定義・`review`・推移的な待ちの並び（`after` だけの違いも違いとして拾う）。
+    if approval.plan_signature(revised, "feedback") != approval.plan_signature(current, "feedback"):
         if current.feedback is not None:
             # 残りの切り出し先は進め方で違う。マージリクエストがあれば issue に切り出せるが、
             # chat で回した親はホストに何も無いので、新しい親チケットの提案にする。

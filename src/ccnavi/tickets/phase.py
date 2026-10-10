@@ -888,11 +888,24 @@ def order_problems(
     # 済む（settle_last_review）。承認の前にマーカーは無いので、ここでは計画の側から読む。
     settled = len(parent.plan) if parent.feedback is not None else 0
     problems: list[rules.Problem] = []
-    for phase in phases_of(root, conf, parent.ticket, parent, raw=raw):
-        if phase.number >= child.phase:
+    # 待つ番号ごとに見る。`phases_of` は承認済みの親があればその計画で並べるので、同じ承認で
+    # 計画を変える改版（フィードバック計画を立てる改版など）を通すと、改版で足した番号が並ばない。
+    # 並ばない番号は子がまだ無いフェーズとして数える（見落とすと、待つべき項の子と一緒に通る）。
+    known = {p.number: p for p in phases_of(root, conf, parent.ticket, parent, raw=raw)}
+    types = phasetypes.types_of(parent)
+    for number in sorted(waits):
+        if number >= child.phase:
             break
-        if phase.number not in waits:
-            continue
+        phase = known.get(number)
+        if phase is None:
+            item = parent.item_at(number)
+            phase = Phase(
+                parent.ticket,
+                number,
+                item=item,
+                type=types.get(item.type) if item is not None else None,
+                owner=parent,
+            )
         ended = phase.ended and phase.number not in reopened
         if phase.number == settled and ended:
             continue

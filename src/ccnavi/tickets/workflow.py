@@ -205,9 +205,13 @@ def lines(parent: ticket_model.Ticket, wf: ticket_model.Workflow) -> list[str]:
         at = wf.review_at.get(n)
         tail = f"（レビューは {at} と一緒に）" if at is not None else ""
         out.append(f"{n}: {item.type} — {text}{tail}")
-    starting = [n for n in ready(parent, wf) if parent.in_plan(n)]
-    if len(starting) >= 2:
-        out.append(f"すぐ始まる: {', '.join(map(str, starting))}")
+    starting = ready(parent, wf)
+    for label, part in (
+        ("", [n for n in starting if parent.in_plan(n)]),
+        ("（フィードバック計画）", [n for n in starting if not parent.in_plan(n)]),
+    ):
+        if len(part) >= 2:
+            out.append(f"すぐ始まる{label}: {', '.join(map(str, part))}")
     gaps = loose(parent, wf)
     if gaps:
         out.append(f"最後の項が待たない: {', '.join(map(str, gaps))}")

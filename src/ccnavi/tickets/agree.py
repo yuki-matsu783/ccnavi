@@ -401,7 +401,14 @@ def _apply_steps(
                         f"ccnavi: {t.ticket}: {removing.replace('{reason}', failed)}",
                         stream=fsio.STREAM_ERR,
                     )
-                what = "フィードバック計画" if cand.plans_feedback else "全体計画"
+                if cand.plans_feedback:
+                    what = "フィードバック計画"
+                elif approval.plan_signature(t, "plan") != approval.plan_signature(
+                    cand.current, "plan"
+                ):
+                    what = "全体計画"
+                else:
+                    what = "固定する定義（phases:）"
                 stage.line(f"  {t.ticket} の{what}を改版した")
                 if cand.plans_feedback:
                     # レビューの結果を見たうえでの計画なので、最後のレビューはここで済む。
