@@ -371,7 +371,7 @@ ccnavi の動作に依存する決まりなので、ワークスペースの `CL
 
 | 行 | 出る条件 |
 |---|---|
-| ワークツリー | ワークスペースのルール（共通レイヤーか自身のレイヤー）の `deny` に id `main-tree` がある |
+| ワークツリー | ワークスペースのルール（共通レイヤーか自身のレイヤー）の `deny` に id `workspace-root` がある |
 | git | 同じく `deny` に id `raw-git` がある |
 | `projects/` | プロジェクトの置き場に `.git` を持つプロジェクトがある |
 | `status` | チケット制御を使っている（`CCNAVI_TICKET_CONTROL` が `disable` でない） |
@@ -842,7 +842,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 文面（`message` / `additionalContext` / `additionalContextOnce`）に書いた `{root}` も、モデルへ渡すときに
 実パス（区切りは `/`）になる。拒否の文面で sh を案内するときは `'sh {root}/.ccnavi/scripts/...'` と書く。
 `--explain` と `--test` は書いた表記のまま `{root}` を出す。このリポジトリのルールでは、
-ワークスペースルート直下の Write / Edit を止める `main-tree` がこれを使っている。
+ワークスペースルート直下の Write / Edit を止める `workspace-root` がこれを使っている。
 
 書けないものは `glob` の代わりに `regex` に正規表現を書く。両方書いたルールは受け付けない。
 先読み・後読み・後方参照は受け付けない（エンジンをまたいで同じ意味に保ち、組み合わせ爆発を避けるため。

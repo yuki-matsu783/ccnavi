@@ -17,7 +17,7 @@ from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 # このリポジトリの rules.yml と同じ形。先読みを使わずに 1 段目で場合分けする。
-MAIN_TREE = (
+WORKSPACE_ROOT_RULE = (
     r"^{root}[\\/](?:[^.\\/][^\\/]*|\.[^c\\/][^\\/]*|\.c[^l\\/][^\\/]*|\.claude[\\/][^w\\/][^\\/]*)"
 )
 
@@ -42,9 +42,9 @@ class RootPlaceholderTest(unittest.TestCase):
                     "version": 1,
                     "deny": [
                         {
-                            "id": "main-tree",
+                            "id": "workspace-root",
                             "match": "Write|Edit",
-                            "regex": MAIN_TREE,
+                            "regex": WORKSPACE_ROOT_RULE,
                             "message": "main では編集しない",
                         },
                         {
@@ -108,7 +108,7 @@ class RootPlaceholderTest(unittest.TestCase):
             with self.subTest(path=path):
                 out = self.judge("Write", path)
                 self.assertEqual(out.get("permissionDecision"), "deny", out)
-                self.assertIn("main-tree", out.get("permissionDecisionReason", ""))
+                self.assertIn("workspace-root", out.get("permissionDecisionReason", ""))
         allowed = [
             os.path.join(self.root, ".claude", "worktrees", "x", "README.md"),
             os.path.join(
@@ -120,7 +120,7 @@ class RootPlaceholderTest(unittest.TestCase):
             with self.subTest(path=path):
                 out = self.judge("Edit", path)
                 self.assertNotEqual(out.get("permissionDecision"), "deny", out)
-                self.assertNotIn("main-tree", out.get("permissionDecisionReason", ""))
+                self.assertNotIn("workspace-root", out.get("permissionDecisionReason", ""))
 
     def test_outside_the_root_is_not_mentioned(self):
         with tempfile.TemporaryDirectory() as elsewhere:
@@ -166,7 +166,7 @@ class RootPlaceholderTest(unittest.TestCase):
         rule_set, problems = rules.load(self.rules, self.root)
         self.assertEqual(problems, [])
         # 書いた表記は残り、置き換わるのは翻訳後の式だけ。
-        self.assertEqual(rule_set.deny[0].regex, MAIN_TREE)
+        self.assertEqual(rule_set.deny[0].regex, WORKSPACE_ROOT_RULE)
         self.assertNotIn("{root}", rule_set.deny[0].compiled.pattern)
 
 
