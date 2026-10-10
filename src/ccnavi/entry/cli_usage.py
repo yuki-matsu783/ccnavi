@@ -165,6 +165,38 @@ written when another field would read differently. It is a flag of its own,
 outside --agree, so the agent may run it. After approval, judging reads the
 copy and never phases.yml.
 
+The order of a pending parent's plan is set with the same flag. The VS Code
+workflow tab runs it; the agent may run it too:
+
+    ccnavi --plan-order <parent> --json [--order <JSON>]
+        (read only; with --order, the plan renumbered from the lines drawn)
+    ccnavi --plan-order <parent> --order <JSON> --expect <sha> --write [--json]
+        (write the renumbered plan back to the proposal)
+
+--order gives each item's direct predecessors by the numbers written in the
+proposal now: {"plan": {"1": [], "2": [3], "3": [1]}, "feedback": {...}}. A part
+that is passed takes every number's predecessors from it (a number left out
+waits for nothing); a part not passed stays as proposed. Items are renumbered in
+topological order, the smallest current number first among those whose
+predecessors are all placed; `after` follows the new numbers and `review: defer`
+moves with its item. On a revision, a number that already has an approved child
+stays where it is and the others fill the free numbers. A line that makes a
+cycle, changes what such a fixed number waits for, or cannot be packed around
+the fixed numbers is refused (`refused`), and nothing is renumbered.
+
+The answer carries `plans` (one per part: items with `number` and `from`,
+`after` in the new numbers, `proposed`, `current`, `loose`, `ready`,
+`problems`), `source_sha` (the parent proposal and its pending children), the
+order `problems`, `loose`, `refused`, `revision_problems` and the pending
+children whose number would move. --write rewrites only the `plan:` and
+`feedback:` values of the parent proposal and nothing else. It writes nothing
+when --expect differs from the current `source_sha`, when a line is refused,
+when the renumbered plan has an order error or breaks the revision lock, when
+another field would read differently, or when a pending child points at a
+number that moves (a child's id carries its phase number, so its `phase:`
+cannot be rewritten alone). It never approves; approving the rewritten
+proposal needs a fresh preview, since the digest changes.
+
 Two things are not a no, because --agree does not drop them either: scope that
 exceeds the parent or the phase type (writes there stay blocked after approval),
 and a proposal that cannot be read (the scan covers every worktree, before the
