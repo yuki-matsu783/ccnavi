@@ -1408,7 +1408,7 @@ class WithdrawTest(CoreHarness):
         return text
 
     def new_parent(self, text=None, plan=("research",)):
-        text = text or parent_text("i0001", list(plan))
+        text = text or parent_text("i0001", list(plan), copy=self.phases_text)
         self.propose("i0001", text)
         self.commit_parent()
         approved = self.approve()
@@ -1505,7 +1505,7 @@ class WithdrawTest(CoreHarness):
             {"type": "extra", "after": [1]},
             {"type": "docs", "after": [2, 3, 4]},
         ]
-        self.propose("i0001", parent_text("i0001", revised))
+        self.propose("i0001", parent_text("i0001", revised, copy=self.phases_text))
         self.commit_parent("revise")
         done = self.approve()
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
@@ -1533,6 +1533,7 @@ class WithdrawTest(CoreHarness):
 
     def use(self, text):
         write(config_path(self.root, "phases"), text)
+        self.phases_text = text
 
     def problems(self, prior):
         return core.withdraw(self.snapshot(), ["i0001"], prior).problems

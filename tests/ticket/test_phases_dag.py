@@ -33,7 +33,8 @@ from ccnavi.tickets import (
 )
 from ccnavi.tickets import ticket as ticket_mod
 from tests import config_path
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness, child_text
+from tests.ticket.test_phases import parent_text as _parent_text
 from tests.ticket.test_ticket import ROOT, write
 
 # 順序の欄を持たない定義。順序は計画の項の `after` が決める。
@@ -47,6 +48,13 @@ phases:
   extra: {title: 追加, review: none, scope: ["wip/*"]}
   fixup: {kind: feedback, title: 対応, review: mr, scope: inherit}
 """
+
+
+def parent_text(*args, **kwargs):
+    """親の提案の本文。`phases:` はこのテストの定義（DEFS）から写す。"""
+    kwargs.setdefault("copy", DEFS)
+    return _parent_text(*args, **kwargs)
+
 
 # 設計 → 受入と実装が並行 → 文書が両方を受ける（終端）。
 PLAN = [
@@ -543,6 +551,8 @@ class LockTest(unittest.TestCase):
 
 
 class DagApprovalTest(PhaseHarness):
+    phases_text = DEFS
+
     def setUp(self):
         super().setUp()
         write(config_path(self.root, "phases"), DEFS)

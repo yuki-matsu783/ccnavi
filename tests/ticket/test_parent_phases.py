@@ -96,7 +96,7 @@ class CopyAgreeTest(PhaseHarness):
     def test_writing_style_does_not_count_as_a_difference(self):
         """読んだ形で比べる。キーの順・書き方・既定値を省いた書き方の違いは同じとみなす。"""
         research = dict(reversed(list(RESEARCH.items())))
-        research["scope"] = ["/wip/research/*"]
+        research["scope"] = ["wip/research/*/"]
         design = {k: v for k, v in DESIGN.items() if k != "review"}  # 既定は mr
         text = with_phases(
             parent_text("i0001", ["research", "design"], copy=None),

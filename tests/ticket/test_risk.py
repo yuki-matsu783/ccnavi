@@ -91,15 +91,15 @@ class RiskTest(PhaseHarness):
         # `ticket` の副命令には届かない。差し替えるテストはこの形に書き直す。
         self.risk = write(common_path(self.root, "risk"), RISK)
         # 範囲の上限が無く、レビュー不要の定義。宣言では「レビュー不要」な作業を実績で上書きする。
-        write(
-            self.phases,
+        self.phases_text = (
             "version: 1\nphases:\n  work:\n    kind: work\n    title: 作業\n"
-            "    review: none\n    scope: inherit\n",
+            "    review: none\n    scope: inherit\n"
         )
+        write(self.phases, self.phases_text)
 
     def one_child(self, review=False):
         scope = ("src/*", "wip/*", ".github/*")
-        self.propose("i0001", parent_text("i0001", ["work"], allow=scope))
+        self.propose("i0001", parent_text("i0001", ["work"], allow=scope, copy=self.phases_text))
         self.propose(
             "i0001-01-01", child_text("i0001-01-01", "i0001", 1, list(scope), review=review)
         )

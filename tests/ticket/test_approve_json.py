@@ -23,7 +23,7 @@ import os
 import unittest
 
 from tests.ticket.test_board import _portable
-from tests.ticket.test_phases import PHASES, PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import ROOT, write
 
 FIXTURES = os.path.join(ROOT, "extensions", "vscode", "ccnavi-board", "test", "fixtures")
@@ -455,21 +455,31 @@ class ApproveJsonTest(PhaseHarness):
         self.assert_refused_after_edit(child, "前\x00後\n", "前後\x00\n", shown)
 
     def test_digest_changes_when_only_the_overflow_changes(self):
-        """3. 提案はそのままで、定義の scope が変わって子の超過が増えると、ダイジェストが変わる。"""
-        self.pending_parent_and_child()
-        before = self.preview()
-        self.assertEqual(before["batch"][1]["overflow"], [])
+        """3. 提案はそのままで、親に固定した定義の scope が変わって子の超過が増えると、
+        ダイジェストが変わる。
 
-        # 定義 research の scope を、子の範囲を覆わない表記に書き換える。
-        narrowed = PHASES.replace('scope: ["wip/research/*"]', 'scope: ["wip/elsewhere/*"]', 1)
-        self.assertNotEqual(narrowed, PHASES)
-        write(self.phases, narrowed)
+        子の定義は親の写し（`phases:`）から引く。承認済みの親の写しをユーザが手で直すと、
+        子の提案は同じでも超過が増える。
+        """
+        self.pending_parent_and_child()
+        parent_only = self.ccnavi("--agree", "i0001", stdin="y\n")
+        self.assertEqual(parent_only.returncode, 0, parent_only.stdout + parent_only.stderr)
+        self.commit_parent("approve parent")
+        before = self.preview()
+        self.assertEqual([b["ticket"] for b in before["batch"]], ["i0001-01-01"])
+        self.assertEqual(before["batch"][0]["overflow"], [])
+
+        # 承認済みの親の写しの research の scope を、子の範囲を覆わない表記に書き換える。
+        copy = os.path.join(self.approved, "doing", "i0001.md")
+        with open(copy, encoding="utf-8") as f:
+            text = f.read()
+        narrowed = text.replace("- wip/research/*", "- wip/elsewhere/*", 1)
+        self.assertNotEqual(narrowed, text)
+        write(copy, narrowed)
 
         after = self.preview()
-        self.assertEqual(
-            [b["ticket"] for b in after["batch"]], [b["ticket"] for b in before["batch"]]
-        )
-        self.assertTrue(after["batch"][1]["overflow"], after["batch"][1])
+        self.assertEqual([b["ticket"] for b in after["batch"]], ["i0001-01-01"])
+        self.assertTrue(after["batch"][0]["overflow"], after["batch"][0])
         self.assertNotEqual(after["digest"], before["digest"])
 
     def test_yes_accepts_the_shown_digest_in_upper_case(self):

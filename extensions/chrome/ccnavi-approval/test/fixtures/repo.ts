@@ -36,6 +36,17 @@ const COMMON_SH = (compat: number) => `#!/bin/sh
 CCNAVI_COMPAT=${compat}
 `;
 
+/** 見本の phases.yml（PHASES）の定義の欄。親の `phases:`（計画が使う定義の写し）に写す */
+const DEFINITIONS: Record<string, string[]> = {
+  research: ["    kind: work", "    title: 調査", "    review: none", '    scope: ["wip/research/*"]'],
+  design: ["    kind: work", "    title: 設計", "    review: mr", '    scope: ["wip/design/*"]'],
+};
+
+/** 親の `phases:` の行。計画が使う定義だけを、PHASES と同じ中身で写す（`--plan-order <親> --fill-phases` と同じ） */
+function phasesLines(plan: string[]): string[] {
+  return ["phases:", ...[...new Set(plan)].flatMap((name) => [`  ${name}:`, ...DEFINITIONS[name]])];
+}
+
 /** 計画の項の行。2 番目からは、すぐ前の項を待つ（`after`）一直線にする。最初の項は何も待たない */
 function planLines(plan: string[]): string[] {
   return plan.map((p, i) => (i === 0 ? `  - ${p}` : `  - {type: ${p}, after: [${i}]}`));
@@ -46,6 +57,7 @@ function parent(id: string, title: string, body: string, plan = ["research", "de
     "---",
     "version: 1",
     `ticket: ${id}`,
+    ...phasesLines(plan),
     "plan:",
     ...planLines(plan),
     "human_review:",
@@ -213,7 +225,9 @@ function approvedCopy(id: string, parentId: string | null, lines: string[], phas
     "---",
     "version: 1",
     `ticket: ${id}`,
-    ...(parentId ? [`parent: ${parentId}`, `phase: ${phase}`] : ["plan:", ...planLines(Array.from({ length: phases }, () => "design"))]),
+    ...(parentId
+      ? [`parent: ${parentId}`, `phase: ${phase}`]
+      : [...phasesLines(["design"]), "plan:", ...planLines(Array.from({ length: phases }, () => "design"))]),
     `title: ${parentId ? `設計の子 ${id}` : `レビューを待つ親 ${id}`}`,
     "human_review:",
     "  required: true",
