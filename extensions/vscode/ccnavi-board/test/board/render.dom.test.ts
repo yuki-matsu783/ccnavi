@@ -1026,3 +1026,17 @@ test("CB-T329 start 後（started_at あり）の承認済みカードに「着�
     await page.close();
   }
 });
+
+test("CB-T330 先行が未達の承認済み・未着手のカードには「先行待ち」だけを出し、「未着手（start 待ち）」は重ねない", async () => {
+  const base = fixture();
+  const unmet = [{ ticket: "i0001-01-09", state: "doing", label: "作業中（doing/）" }];
+  const tickets = base.tickets.map((t) => (t.ticket === "i0001-02-02" ? { ...t, started_at: "", predecessors_unmet: unmet } : t));
+  const page = await openBoard({ ...base, tickets });
+  try {
+    const card = '.card[data-id="i0001-02-02"]';
+    assert.equal(text(page, `${card} .badge.preds`), "先行待ち（i0001-01-09）");
+    assert.equal(page.all(`${card} .badge.unstarted`).length, 0);
+  } finally {
+    await page.close();
+  }
+});

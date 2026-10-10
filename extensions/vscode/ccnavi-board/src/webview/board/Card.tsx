@@ -146,7 +146,8 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
     badges.push(<Badge key="copy" kind="copy copy-none" text={COPY_LABELS.none} />);
   }
   // 承認済みで `start` がまだ。作業中の列にいても、着手の時刻が入るまで範囲は適用されない（issue #267）
-  if (card.copyStatus === "open" && card.startedAt === "") {
+  // 先行が未達なら `start` は拒否される。止めている理由は「先行待ち」が言うので、ここでは重ねない
+  if (card.copyStatus === "open" && card.startedAt === "" && card.predecessorsUnmet.length === 0) {
     badges.push(<Badge key="unstarted" kind="unstarted" text={STARTED_LABELS.unstarted} title={STARTED_TITLES.unstarted} />);
   }
   // 止めている間の 1 枚。依頼の前後で名前が変わるだけで、バッジは増えない。どちらの段かは
