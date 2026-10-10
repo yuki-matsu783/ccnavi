@@ -10,8 +10,9 @@
 - 項の待ちは、項の `after` を推移的に辿った全部の番号。`after` を書かない項は何も待たない
 - 延期した項は、それを待つ延期していない項のうち、番号のいちばん小さいものが引き受ける
 
-フィードバック計画は、いまは一直線（全体計画の番号を全部と、前のフィードバックの番号を全部待つ）
-で読む。延期の引き受け手は同じ決まりで、一直線なら次の延期していない番号になる。
+フィードバック計画も同じ決まりで読む。フィードバック計画の項は、全体計画の番号を全部（全体計画は
+フィードバック計画の前提として全部済んでいる）と、フィードバック計画の中で `after` を推移的に辿った
+番号を待つ。`after` が指せるのはフィードバック計画の番号だけ。
 
 計算はこの 1 か所に置き、延期の引き受け手を 2 か所で違って言わないようにする。決まりの見張りは
 計画と待ち方の見本の表（`tests/fixtures/plan-waits.json`）。
@@ -43,10 +44,15 @@ def compute(parent: ticket_model.Ticket) -> ticket_model.Workflow:
                 found.add(m)
                 found.update(wf.waits.get(m, []))
         wf.waits[n] = sorted(found)
-    for i, _ in enumerate(parent.feedback or []):
+    whole = list(range(1, planned + 1))
+    for i, item in enumerate(parent.feedback or []):
         n = planned + 1 + i
-        # いまは一直線。前の番号（全体計画とフィードバック計画）を全部待つ。
-        wf.waits[n] = list(range(1, n))
+        inside: set[int] = set()
+        for m in item.after:
+            if planned < m < n:
+                inside.add(m)
+                inside.update(w for w in wf.waits.get(m, []) if w > planned)
+        wf.waits[n] = whole + sorted(inside)
     numbered = parent.numbered()
     for n, item in numbered:
         if not item.deferred:
