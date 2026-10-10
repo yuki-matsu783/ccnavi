@@ -491,23 +491,29 @@ class FillPhasesTest(PhaseHarness):
         )
 
     def test_fill_phases_writes_only_the_copy_in_the_callers_tree(self):
-        """同じ提案が 2 つのツリーにあれば、打ったツリーの側だけを書く。
+        """同じ提案が 2 つのツリーにあって本物とするツリーが決まらなければ、打ったツリーの側だけを
+        書く。
 
         どちらのツリーでもないところから打てば、何も書かない。"""
-        text = parent_text("i0001", ["research"], copy=None)
-        self.propose("i0001", text)
-        other = self.worktree("elsewhere", "main")
-        there = os.path.join(other, "wip", "proposals", "todo", "i0001.md")
-        write(there, text)
-        refused = self.fill()
+        text = parent_text("i0002", ["research"], copy=None)
+        paths = []
+        for name in ("tree-a", "tree-b"):
+            tree = self.worktree(name, "main")
+            paths.append(os.path.join(tree, "wip", "proposals", "todo", "i0002.md"))
+            write(paths[-1], text)
+
+        def read(path):
+            with open(path, encoding="utf-8") as f:
+                return f.read()
+
+        refused = self.fill("i0002")
         self.assertNotEqual(refused.returncode, 0, refused.stdout + refused.stderr)
         self.assertIn("複数の場所", refused.stderr)
-        self.assertEqual(self.read(), text)
-        done = self.fill_in(self.parent_tree)
+        self.assertEqual([read(p) for p in paths], [text, text])
+        done = self.fill_in(os.path.dirname(os.path.dirname(os.path.dirname(paths[0]))), "i0002")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn("phases:", self.read())
-        with open(there, encoding="utf-8") as f:
-            self.assertEqual(f.read(), text)
+        self.assertIn("phases:", read(paths[0]))
+        self.assertEqual(read(paths[1]), text)
 
     def test_fill_phases_names_a_column_zero_comment_inside_the_value(self):
         """`phases:` の値の中に行頭のコメントがあれば、値の範囲が決まらないので書かずにそう言う。"""
