@@ -31,7 +31,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, phasecopy
 from tests.inproc import run_ccnavi
 
 # 共通レイヤー。どのツリーにも当てたい deny と、ワークスペースの allow。
@@ -394,6 +394,14 @@ class ConfigUnionHarness(unittest.TestCase):
     def propose(self, name, text, project=""):
         """提案を置く。プロジェクト向けはそのプロジェクトの `wip/proposals/`（設計 11.5）。"""
         base = os.path.join(self.projects, project) if project else self.ws
+        # 計画を持つ親には、そのレイヤーの phases.yml から計画が使う定義の写し（`phases:`）を足す
+        # （`ccnavi --plan-order <親> --fill-phases` と同じ）。phases.yml が無ければ空の写し。
+        try:
+            with open(layer_path(base, "phases"), encoding="utf-8") as f:
+                defs = f.read()
+        except OSError:
+            defs = ""
+        text = phasecopy.insert(text, defs)
         return write(os.path.join(base, "wip", "proposals", "todo", name + ".md"), text)
 
     def approved_dir_of(self, project=""):

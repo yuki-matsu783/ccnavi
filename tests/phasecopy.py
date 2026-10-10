@@ -18,7 +18,12 @@ _OLD_FIELDS = ("order", "after", "overlap", "requires")
 
 def definitions(phases_yml: str) -> dict:
     """`phases.yml` の本文から、定義の id → 欄の辞書（前の版の順序の欄を除く）。"""
-    data = yaml.safe_load(phases_yml) or {}
+    try:
+        data = yaml.safe_load(phases_yml) or {}
+    except yaml.YAMLError:
+        data = {}
+    if not isinstance(data, dict) or not isinstance(data.get("phases"), dict):
+        return {}
     out = {}
     for ident, body in (data.get("phases") or {}).items():
         if isinstance(body, dict):
