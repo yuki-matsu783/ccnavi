@@ -976,3 +976,47 @@ test("CB-T265 先行のバッジの言葉はカードの今で分ける。承認
     await page.close();
   }
 });
+
+test("CB-T328 承認済みで start がまだのカードに「未着手（start 待ち）」のバッジ、着手済みには「着手済み」の属性を出す。レビュー待ち・未承認・閉じたカードには出さない", async () => {
+  const base = fixture();
+  const at = (id: string) => base.tickets.find((t) => t.ticket === id)!;
+  const tickets = base.tickets.map((t) => {
+    if (t.ticket === "i0001-02-02") {
+      return { ...t, started_at: "" }; // 承認済み・未着手
+    }
+    return t;
+  });
+  assert.equal(at("i0001-02-02").copy.status, "open");
+  assert.notEqual(at("i0001-02-02").started_at, ""); // 元の見本では着手済み。上で未着手に直した
+  assert.equal(at("i0001").copy.status, "open");
+  assert.equal(at("i0001").started_at, ""); // 親も、承認済みで start がまだなら未着手
+  const page = await openBoard({ ...base, tickets });
+  try {
+    const card = (id: string) => `.card[data-id="${id}"]`;
+    // agree 直後: 未着手のバッジ（枠付き）。着手済みの属性は出ない
+    assert.equal(text(page, `${card("i0001-02-02")} .badge.unstarted`), "未着手（start 待ち）");
+    assert.match(page.one(`${card("i0001-02-02")} .badge.unstarted`).getAttribute("title") ?? "", /範囲は適用されません/);
+    assert.equal(page.all(`${card("i0001-02-02")} .fact.started`).length, 0);
+    assert.equal(text(page, `${card("i0001")} .badge.unstarted`), "未着手（start 待ち）");
+    // 未承認・レビュー待ち・閉じたカードには、どちらも出ない
+    for (const t of base.tickets.filter((x) => x.copy.status !== "open")) {
+      assert.equal(page.all(`${card(t.ticket)} .badge.unstarted`).length, 0, t.ticket);
+      assert.equal(page.all(`${card(t.ticket)} .fact.started`).length, 0, t.ticket);
+    }
+  } finally {
+    await page.close();
+  }
+});
+
+test("CB-T329 start 後（started_at あり）の承認済みカードに「着手済み」の属性を出し、未着手のバッジは出さない", async () => {
+  const base = fixture();
+  const page = await openBoard(base);
+  try {
+    const card = '.card[data-id="i0001-02-02"]';
+    assert.equal(base.tickets.find((t) => t.ticket === "i0001-02-02")!.copy.status, "open");
+    assert.equal(text(page, `${card} .fact.started`), "着手済み");
+    assert.equal(page.all(`${card} .badge.unstarted`).length, 0);
+  } finally {
+    await page.close();
+  }
+});
