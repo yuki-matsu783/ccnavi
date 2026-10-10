@@ -418,6 +418,7 @@ class PlanOrderWriteTest(PlanOrderHarness):
         old = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
         result = self.write_order(REVERSE)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        written = self.read()
         self.commit_parent("reorder")
         stale = self.ccnavi("--agree", "--yes", "i0001", "--digest", old, "--json")
         self.assertEqual(stale.returncode, 1, stale.stdout + stale.stderr)
@@ -426,7 +427,7 @@ class PlanOrderWriteTest(PlanOrderHarness):
         done = self.ccnavi("--agree", "--yes", "i0001", "--digest", fresh, "--json")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), self.read())
+            self.assertEqual(f.read(), written)
 
     def test_preview_plans_come_from_the_same_function(self):
         self.propose("i0001", parent_text("i0001", PLAN3))
