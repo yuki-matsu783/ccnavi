@@ -75,6 +75,39 @@ def _asks_renamed_approve(argv: list[str]) -> bool:
     return any(word == RENAMED_APPROVE or word.startswith(RENAMED_APPROVE + "=") for word in argv)
 
 
+def _plan_order_usage(args: argparse.Namespace, reordering: bool) -> str:
+    """`--plan-order` の組み合わせの誤り。正しければ空。"""
+    if args.agree:
+        return "--plan-order は --agree と一緒に使えない（承認の外の補助）"
+    if args.plan_order is None:
+        if args.fill_phases:
+            return "--fill-phases は --plan-order <親> と一緒に使う"
+        return "--order・--write・--expect は --plan-order <親> と一緒に使う"
+    if args.fill_phases:
+        if reordering or args.json:
+            return "--fill-phases は --json・--order・--write・--expect と一緒に使えない"
+        return ""
+    if args.write:
+        if args.order is None:
+            return "--write は --order <JSON>（元の番号での直接の先行）と一緒に使う"
+        if args.expect is None:
+            return (
+                "--write は --expect <ハッシュ>（--plan-order <親> --json が返す source_sha）と"
+                "一緒に使う"
+            )
+        return ""
+    if args.expect is not None:
+        return "--expect は --write と一緒に使う"
+    if not args.json:
+        return (
+            "--plan-order <親> は --json（読むだけ。--order で振り直した答え）か、"
+            "--order <JSON> --expect <ハッシュ> --write（書き戻す）か、"
+            "--fill-phases（計画が使う定義だけを phases.yml から親の提案の phases: に写す）と"
+            "一緒に使う"
+        )
+    return ""
+
+
 def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 何も読まず何も動かさずに終える。承認の経路にも判定にも入れない。
     if _asks_renamed_approve(argv):
@@ -105,9 +138,14 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 通るかどうかを終了コードで返す。エージェントがユーザに承認を頼む前に打つ。
     parser.add_argument("--verify", action="store_true")
     # 親の提案の計画を書き換える補助（`--agree` の外の独立したフラグ。エージェントも打ってよい）。
-    # いまは `--fill-phases`（計画が使う定義だけを phases.yml から `phases:` に写す）だけ。
+    # `--json`（読むだけ。`--order` で振り直した答え）、`--order <JSON> --expect <ハッシュ> --write`
+    # （振り直した順序を提案へ書き戻す）、`--fill-phases`（計画が使う定義だけを phases.yml から
+    # `phases:` に写す）。
     parser.add_argument("--plan-order", default=None, metavar="PARENT")
     parser.add_argument("--fill-phases", action="store_true")
+    parser.add_argument("--order", default=None, metavar="JSON")
+    parser.add_argument("--write", action="store_true")
+    parser.add_argument("--expect", default=None, metavar="SHA")
     # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイでユーザが押した承認。端末は要らない。
     parser.add_argument("--yes", default="")
     # 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに書き込む中身のダイジェスト
@@ -558,23 +596,28 @@ def _parsed(
     # 親の提案の計画を書き換える補助の経路。`--agree` の端末の確かめ（`_from_terminal`）より
     # 手前で分ける。書くのは承認待ちの親の提案（エージェントも書ける置き場）だけで、承認は
     # しない。`--agree` と一緒には受けない（組み込みの止めと経路が食い違わないように）。
-    if args.plan_order is not None or args.fill_phases:
-        if args.agree:
-            stderr.write("ccnavi: --plan-order は --agree と一緒に使えない（承認の外の補助）\n")
-            return EXIT_ERROR
-        if args.plan_order is None:
-            stderr.write("ccnavi: --fill-phases は --plan-order <親> と一緒に使う\n")
-            return EXIT_ERROR
-        if not args.fill_phases:
-            stderr.write(
-                "ccnavi: --plan-order <親> は --fill-phases と一緒に使う"
-                "（計画が使う定義だけを phases.yml から親の提案の phases: に写す）\n"
-            )
+    reordering = args.order is not None or args.write or args.expect is not None
+    if args.plan_order is not None or args.fill_phases or reordering:
+        problem = _plan_order_usage(args, reordering)
+        if problem:
+            stderr.write(f"ccnavi: {problem}\n")
             return EXIT_ERROR
         if not conf.tickets_enabled:
             stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
             return EXIT_ERROR
-        return plan_order.fill_phases(stdout, stderr, conf, root, args.plan_order.strip())
+        if args.fill_phases:
+            return plan_order.fill_phases(stdout, stderr, conf, root, args.plan_order.strip())
+        return plan_order.reorder(
+            stdout,
+            stderr,
+            conf,
+            root,
+            args.plan_order.strip(),
+            args.json,
+            args.order,
+            args.write,
+            args.expect or "",
+        )
 
     # 承認の経路。ユーザが端末から打つもので、payload を読まないのでここで分かれる。
     # 判定を 1 度も通らないのも分ける理由で、承認はツール呼び出しについての

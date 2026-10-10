@@ -118,13 +118,17 @@ def ready(parent: ticket_model.Ticket, wf: ticket_model.Workflow | None = None) 
     return out
 
 
-def problems(parent: ticket_model.Ticket, types: dict | None = None) -> list[rules.Problem]:
+def problems(
+    parent: ticket_model.Ticket, types: dict | None = None, part: str = ""
+) -> list[rules.Problem]:
     """計画の順序が組めるか。`after` の形、終端、最後の項の延期、延期の引き受け手（設計 9.7）。
 
-    全体計画とフィードバック計画に同じ規則を当てる。`types`（フェーズ定義）を渡したときだけ、
-    引き受け手にレビューがあるかも見る。渡すのは親の写し（`phases:`。`phasetypes.types_of`）で、
-    `phases.yml` ではない。判定の側（`errors`）も写しを渡すので、承認済みチケットだけを読んで済み、
-    `phases.yml` を承認のあとに直しても進行中の親は止まらない。
+    全体計画とフィードバック計画に同じ規則を当てる。`part`（`plan` か `feedback`）を渡せば、
+    その計画の誤りだけを返す（`--plan-order` が計画ごとの図に分けて返すため）。
+    `types`（フェーズ定義）を渡したときだけ、引き受け手にレビューがあるかも見る。渡すのは親の写し
+    （`phases:`。`phasetypes.types_of`）で、`phases.yml` ではない。判定の側（`errors`）も写しを
+    渡すので、承認済みチケットだけを読んで済み、`phases.yml` を承認のあとに直しても進行中の親は
+    止まらない。
     """
     found: list[rules.Problem] = []
     if not parent.has_plan:
@@ -133,7 +137,8 @@ def problems(parent: ticket_model.Ticket, types: dict | None = None) -> list[rul
     def error(text: str) -> None:
         found.append(rules.Problem(rules.SEVERITY_ERROR, parent.ticket, text))
 
-    for key, _first, items in _parts(parent):
+    parts = [p for p in _parts(parent) if not part or p[0] == part]
+    for key, _first, items in parts:
         for i, item in enumerate(items):
             for value, why in item.after_errors:
                 error(f"`{key}[{i}]` の `after` の {value!r} は読めない（{why}）")
@@ -148,7 +153,7 @@ def problems(parent: ticket_model.Ticket, types: dict | None = None) -> list[rul
                 )
     wf = compute(parent)
     gaps = loose(parent, wf)
-    for key, first, items in _parts(parent):
+    for key, first, items in parts:
         last = first + len(items) - 1
         cut = [m for m in gaps if first <= m < last]
         if cut:
@@ -161,7 +166,7 @@ def problems(parent: ticket_model.Ticket, types: dict | None = None) -> list[rul
         if items and items[-1].deferred:
             error(f"`{key}` の最後の項は延期できない。誰も見ないまま終わる")
     numbered = dict(parent.numbered())
-    for key, first, items in _parts(parent):
+    for key, first, items in parts:
         for i, item in enumerate(items):
             n = first + i
             if not item.deferred or i == len(items) - 1:

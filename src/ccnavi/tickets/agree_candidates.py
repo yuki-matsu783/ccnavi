@@ -518,7 +518,10 @@ def fixed_numbers(conf: settings.Settings, root: str, parent_id: str) -> set[int
 
 
 def lock_problems(
-    revised: ticket_model.Ticket, current: ticket_model.Ticket, fixed: set[int]
+    revised: ticket_model.Ticket,
+    current: ticket_model.Ticket,
+    fixed: set[int],
+    moved: dict[int, int] | None = None,
 ) -> list[rules.Problem]:
     """改版の番号ごとの錠（設計 9.7）。`fixed` は子が承認された番号。
 
@@ -531,6 +534,10 @@ def lock_problems(
     延期の引き受け手は、承認済みか提案の引き受け手が固定した番号のときだけ比べる。まだ始まって
     いない項の間で引き受け手が入れ替わるだけなら、済んだレビューが延期した作業を引き受けたことに
     はならない。
+
+    `moved` は番号を振り直したとき（`--plan-order`）の、元の番号 → 振り直した番号。延期した項は
+    元の項の同一性で比べる（承認済みの n 番の延期を、振り直した先の番号の延期と比べる）。固定した
+    番号は振り直しで動かないので、ほかの比べ方は変わらない。
     """
     problems: list[rules.Problem] = []
 
@@ -568,8 +575,10 @@ def lock_problems(
                     f"{n} 番目は子の無い {m} 番目を待っているので、{m} 番目の項"
                     f"（{was.type if was is not None else '?'}）を入れ替えられない"
                 )
-    for n in sorted(set(held.review_at) | set(fresh.review_at)):
-        before_at, after_at = held.review_at.get(n), fresh.review_at.get(n)
+    moved = moved or {}
+    back = {new: old for old, new in moved.items()}
+    for n in sorted(set(held.review_at) | {back.get(m, m) for m in fresh.review_at}):
+        before_at, after_at = held.review_at.get(n), fresh.review_at.get(moved.get(n, n))
         if before_at == after_at:
             continue
         if before_at in fixed or after_at in fixed:

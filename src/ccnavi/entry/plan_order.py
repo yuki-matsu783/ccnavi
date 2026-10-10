@@ -1,6 +1,13 @@
 """親の提案の計画を書き換える補助のフラグ `ccnavi --plan-order <親> ...`。
 
-いまあるのは `--fill-phases` だけ。計画（`plan:` / `feedback:`）の項が使うフェーズ定義だけを
+形は 2 つ。
+
+- `--json [--order <JSON>]` と `--order <JSON> --expect <ハッシュ> --write`: 計画の番号を振り直して
+  答え、保存では提案の `plan:` / `feedback:` の値を書き換える。VS Code のワークフロー編集タブが
+  打つ。振り直しの決まりと書き戻しの検査は `tickets/plan_order.py`
+- `--fill-phases`: 下に書く
+
+`--fill-phases` は、計画（`plan:` / `feedback:`）の項が使うフェーズ定義だけを
 `phases.yml` から読み、提案の `phases:`（親に固定する定義の写し）の値をその定義の集まりに
 差し替える（無ければ `plan:` の前に足す。項が使わない定義は外す）。写し間違いを無くし、
 `phases.yml` を直したあとに承認待ちの提案を追いつかせるのも同じ 1 本で済ませるため（設計 9.7）。
@@ -26,6 +33,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from typing import TextIO
@@ -35,7 +43,15 @@ import yaml
 from ..infra import fsio, settings, yamlread
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..policy import rules
-from ..tickets import agree_candidates, approval, approval_checks, phase, phasetypes, ticket_model
+from ..tickets import (
+    agree_candidates,
+    approval,
+    approval_checks,
+    phase,
+    phasetypes,
+    ticket_model,
+)
+from ..tickets import plan_order as reorder_mod
 from ..tickets import ticket as ticket_mod
 
 _KEY_LINE = re.compile(rf"^{re.escape(phasetypes.COPY_KEY)}\s*:")
@@ -122,6 +138,113 @@ def fill_phases(
     return EXIT_OK
 
 
+def reorder(
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    name: str,
+    as_json: bool,
+    order_text: str | None,
+    write: bool,
+    expect: str,
+) -> int:
+    """`--plan-order <親> --json [--order <JSON>]` と、保存の `--order --expect --write`。
+
+    読むだけなら答えを出して 0。書くときは、書けたか変わらなければ 0、書かなければ 1（理由は
+    標準エラー。`--json` なら答えの `written` が偽）。`--order` の形の誤りと、親の提案が無い・
+    読めないときは 1（使い方の誤り）。
+    """
+    proposals, _ = approval.scan_proposals(conf, root)
+    target, ambiguous = _pick(proposals, name)
+    if ambiguous:
+        stderr.write(f"ccnavi: {ambiguous}\n")
+        return EXIT_ERROR
+    if target is None:
+        stderr.write(
+            f"ccnavi: {name} の親の提案が承認待ちの置き場（{conf.tickets}/{ticket_model.TODO}/）に"
+            "無い。--plan-order には承認待ちの親の識別子を渡す\n"
+        )
+        return EXIT_ERROR
+    copies, _ = approval.scan(conf, root)
+    current = approval_checks.by_id(copies).get(target.ticket)
+    if current is not None and current.is_child:
+        current = None
+    source, why = reorder_mod.load(conf, root, target, proposals, current)
+    if source is None:
+        stderr.write(f"ccnavi: {why}\n")
+        return EXIT_ERROR
+    order = None
+    if order_text is not None:
+        order, why = reorder_mod.parse_order(order_text, source.parent)
+        if order is None:
+            stderr.write(f"ccnavi: --order: {why}\n")
+            return EXIT_ERROR
+    ans = reorder_mod.answer(source, order)
+    body = reorder_mod.body(ans)
+    if not write:
+        stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
+        return EXIT_OK
+    code, written, sha = _write(stderr, ans, expect)
+    body["written"] = written
+    if written:
+        body["source_sha"] = sha
+        for plan in body["plans"]:
+            plan["source_sha"] = sha
+    if as_json:
+        stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
+    elif written:
+        stdout.write(f"{name} の計画の順序を書き換えた（source_sha: {sha}）\n")
+    elif code == EXIT_OK:
+        stdout.write(f"{name} の計画は振り直しても変わらない。書かない\n")
+    return code
+
+
+def _write(stderr: TextIO, ans: reorder_mod.Answer, expect: str) -> tuple[int, bool, str]:
+    """書き戻す。(終了コード, 書いたか, 書いたあとのハッシュ)。"""
+    if expect != ans.source.sha:
+        stderr.write(
+            "ccnavi: 提案が外で変わった（--expect が親と子の提案の今の中身と違う）。何も書かない。"
+            "--plan-order <親> --json で読み直す\n"
+        )
+        return EXIT_ERROR, False, ""
+    if ans.renumbered.refused:
+        for r in ans.renumbered.refused:
+            stderr.write(f"ccnavi: 引けない線: {r.text}\n")
+        stderr.write("ccnavi: 何も書かない\n")
+        return EXIT_ERROR, False, ""
+    if ans.problems:
+        stderr.write("ccnavi: 振り直した計画の順序の検査に error がある。何も書かない\n")
+        for p in ans.problems:
+            stderr.write(f"  {p}\n")
+        return EXIT_ERROR, False, ""
+    if ans.revision_problems:
+        stderr.write("ccnavi: 改版で通らない形（子が承認された番号の錠）。何も書かない\n")
+        for p in ans.revision_problems:
+            stderr.write(f"  {p}\n")
+        return EXIT_ERROR, False, ""
+    moving = ans.moving_children
+    if moving:
+        names = ", ".join(f"{c.ticket}（phase: {c.phase} → {n}）" for c, n in moving)
+        stderr.write(
+            f"ccnavi: 番号の変わる項を指す子の提案がある（{names}）。子の識別子はフェーズ番号を"
+            "含むので、phase: の値だけを書き換えられない。子の提案の追従はまだ無いので、"
+            "何も書かない\n"
+        )
+        return EXIT_ERROR, False, ""
+    content, why = reorder_mod.rebuilt(ans)
+    if why:
+        stderr.write(f"ccnavi: {ans.source.parent.path}: {why}。何も書かない\n")
+        return EXIT_ERROR, False, ""
+    if content is None:
+        return EXIT_OK, False, ""
+    failed = reorder_mod.write(ans, content)
+    if failed:
+        stderr.write(f"ccnavi: {failed}。何も書かない\n")
+        return EXIT_ERROR, False, ""
+    return EXIT_OK, True, reorder_mod.written_sha(ans, content)
+
+
 def _proposal(
     conf: settings.Settings, root: str, name: str
 ) -> tuple[ticket_model.Ticket | None, str]:
@@ -133,6 +256,13 @@ def _proposal(
     書かない。cwd がどのツリーにも当たらなければ、何も決めずに理由を返す。
     """
     proposals, _ = approval.scan_proposals(conf, root)
+    return _pick(proposals, name)
+
+
+def _pick(
+    proposals: list[ticket_model.Ticket], name: str
+) -> tuple[ticket_model.Ticket | None, str]:
+    """`_proposal` の選び方。走査した提案の中から選ぶ。"""
     found = [
         t
         for t in proposals
