@@ -136,7 +136,7 @@ function History({ entries }: { readonly entries: readonly HistoryEntryJson[] })
 }
 
 /**
- * 枠付きのバッジは、ユーザが動く必要がある状態だけ。未承認、承認済みで未着手（`start` が要る）、
+ * 枠付きのバッジは、ユーザが動く必要がある状態だけ。未承認、
  * レビュー準備中／レビュー待ち、書き込み停止中、先行待ち、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
  * 本物が決まらないチケット。出すバッジが無ければ行ごと出さない。
  */
@@ -144,11 +144,6 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   const badges: JSX.Element[] = [];
   if (card.copyStatus === "none") {
     badges.push(<Badge key="copy" kind="copy copy-none" text={COPY_LABELS.none} />);
-  }
-  // 承認済みで `start` がまだ。作業中の列にいても、着手の時刻が入るまで範囲は適用されない（issue #267）
-  // 先行が未達なら `start` は拒否される。止めている理由は「先行待ち」が言うので、ここでは重ねない
-  if (card.copyStatus === "open" && card.startedAt === "" && card.predecessorsUnmet.length === 0) {
-    badges.push(<Badge key="unstarted" kind="unstarted" text={STARTED_LABELS.unstarted} title={STARTED_TITLES.unstarted} />);
   }
   // 止めている間の 1 枚。依頼の前後で名前が変わるだけで、バッジは増えない。どちらの段かは
   // 判定が JSON の `review_waiting` で言う。ここで marks や reviewed を見て組み直さない。
@@ -192,7 +187,7 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
 }
 
 /**
- * 枠の無い薄い文字で 1 行に並べる属性。承認済／レビュー待ち／クローズ、着手済み（承認済みで `start` 後）、人間レビューの要否、ワークツリー、
+ * 枠の無い薄い文字で 1 行に並べる属性。承認済／レビュー待ち／クローズ、着手済み／未着手（承認済みのカードだけ）、人間レビューの要否、ワークツリー、
  * マーカー（終了と依頼済は出さない）、Draft 解除済、早めに閉じた、リスク（MEDIUM 以下）、base、プロジェクト。
  *
  * 列やバッジと同じことは重ねて書かない。完了・取り消しの列にいる閉じたカードには、クローズと人間レビューの要否を
@@ -211,8 +206,10 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
   if (!closedInColumn) {
     facts.push(<Fact key="review" kind="review" text={`人間レビュー${card.reviewRequired ? "要" : "不要"}`} title={card.reviewReason} />);
   }
-  if (card.copyStatus === "open" && card.startedAt !== "") {
-    facts.push(<Fact key="started" kind="started" text={STARTED_LABELS.started} title={STARTED_TITLES.started} />);
+  // 着手の状態。`start` するのはエージェントなので、ユーザの対応を求めるバッジにはしない（issue #267）
+  if (card.copyStatus === "open") {
+    const state = card.startedAt === "" ? "unstarted" : "started";
+    facts.push(<Fact key="started" kind={state} text={STARTED_LABELS[state]} title={STARTED_TITLES[state]} />);
   }
   if (card.worktreeExists) {
     facts.push(<Fact key="worktree" kind="worktree" text={`ワークツリー ${worktreeName(card.worktreePath)}`} title={card.worktreePath} />);

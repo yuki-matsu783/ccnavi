@@ -977,7 +977,7 @@ test("CB-T265 先行のバッジの言葉はカードの今で分ける。承認
   }
 });
 
-test("CB-T328 承認済みで start がまだのカードに「未着手（start 待ち）」のバッジ、着手済みには「着手済み」の属性を出す。レビュー待ち・未承認・閉じたカードには出さない", async () => {
+test("CB-T328 承認済みのカードに、start がまだなら「未着手」、済みなら「着手済み」を枠の無い属性で出す。バッジにはしない。レビュー待ち・未承認・閉じたカードには出さない", async () => {
   const base = fixture();
   const at = (id: string) => base.tickets.find((t) => t.ticket === id)!;
   const tickets = base.tickets.map((t) => {
@@ -991,29 +991,28 @@ test("CB-T328 承認済みで start がまだのカードに「未着手（start
   });
   assert.equal(at("i0001-02-02").copy.status, "open");
   assert.equal(at("i0001-02-04").copy.status, "review");
-  assert.notEqual(at("i0001-02-02").started_at, ""); // 元の見本では着手済み。上で未着手に直した
   assert.equal(at("i0001").copy.status, "open");
   assert.equal(at("i0001").started_at, ""); // 親も、承認済みで start がまだなら未着手
   const page = await openBoard({ ...base, tickets });
   try {
     const card = (id: string) => `.card[data-id="${id}"]`;
-    // agree 直後: 未着手のバッジ（枠付き）。着手済みの属性は出ない
-    assert.equal(text(page, `${card("i0001-02-02")} .badge.unstarted`), "未着手（start 待ち）");
-    assert.match(page.one(`${card("i0001-02-02")} .badge.unstarted`).getAttribute("title") ?? "", /範囲は適用されません/);
+    assert.equal(text(page, `${card("i0001-02-02")} .fact.unstarted`), "未着手");
+    assert.match(page.one(`${card("i0001-02-02")} .fact.unstarted`).getAttribute("title") ?? "", /範囲は適用されません/);
     assert.equal(page.all(`${card("i0001-02-02")} .fact.started`).length, 0);
-    assert.equal(text(page, `${card("i0001")} .badge.unstarted`), "未着手（start 待ち）");
-    assert.equal(page.all(`${card("i0001-02-04")} .badge.unstarted`).length, 0);
-    // 未承認・レビュー待ち・閉じたカードには、どちらも出ない
+    assert.equal(text(page, `${card("i0001")} .fact.unstarted`), "未着手");
+    for (const t of base.tickets) {
+      assert.equal(page.all(`${card(t.ticket)} .badge.unstarted, ${card(t.ticket)} .badge.started`).length, 0, t.ticket);
+    }
+    // 承認済みでないカードには、どちらも出ない
     for (const t of base.tickets.filter((x) => x.copy.status !== "open")) {
-      assert.equal(page.all(`${card(t.ticket)} .badge.unstarted`).length, 0, t.ticket);
-      assert.equal(page.all(`${card(t.ticket)} .fact.started`).length, 0, t.ticket);
+      assert.equal(page.all(`${card(t.ticket)} .fact.unstarted, ${card(t.ticket)} .fact.started`).length, 0, t.ticket);
     }
   } finally {
     await page.close();
   }
 });
 
-test("CB-T329 start 後（started_at あり）の承認済みカードに「着手済み」の属性を出し、未着手のバッジは出さない", async () => {
+test("CB-T329 start 後（started_at あり）の承認済みカードに「着手済み」の属性を出し、「未着手」は出さない", async () => {
   const base = fixture();
   const page = await openBoard(base);
   try {
@@ -1021,13 +1020,13 @@ test("CB-T329 start 後（started_at あり）の承認済みカードに「着�
     assert.equal(base.tickets.find((t) => t.ticket === "i0001-02-02")!.copy.status, "open");
     assert.equal(text(page, `${card} .fact.started`), "着手済み");
     assert.match(page.one(`${card} .fact.started`).getAttribute("title") ?? "", /範囲が適用されています/);
-    assert.equal(page.all(`${card} .badge.unstarted`).length, 0);
+    assert.equal(page.all(`${card} .fact.unstarted`).length, 0);
   } finally {
     await page.close();
   }
 });
 
-test("CB-T330 先行が未達の承認済み・未着手のカードには「先行待ち」だけを出し、「未着手（start 待ち）」は重ねない", async () => {
+test("CB-T330 先行が未達の承認済み・未着手のカードには、枠付きの「先行待ち」と枠の無い「未着手」が並ぶ", async () => {
   const base = fixture();
   const unmet = [{ ticket: "i0001-01-09", state: "doing", label: "作業中（doing/）" }];
   const tickets = base.tickets.map((t) => (t.ticket === "i0001-02-02" ? { ...t, started_at: "", predecessors_unmet: unmet } : t));
@@ -1035,7 +1034,7 @@ test("CB-T330 先行が未達の承認済み・未着手のカードには「先
   try {
     const card = '.card[data-id="i0001-02-02"]';
     assert.equal(text(page, `${card} .badge.preds`), "先行待ち（i0001-01-09）");
-    assert.equal(page.all(`${card} .badge.unstarted`).length, 0);
+    assert.equal(text(page, `${card} .fact.unstarted`), "未着手");
   } finally {
     await page.close();
   }
