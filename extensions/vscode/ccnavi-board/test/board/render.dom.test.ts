@@ -984,9 +984,13 @@ test("CB-T328 承認済みで start がまだのカードに「未着手（start
     if (t.ticket === "i0001-02-02") {
       return { ...t, started_at: "" }; // 承認済み・未着手
     }
+    if (t.ticket === "i0001-02-04") {
+      return { ...t, started_at: "" }; // レビュー待ちで着手の時刻が空。copyStatus の除外だけで効く形
+    }
     return t;
   });
   assert.equal(at("i0001-02-02").copy.status, "open");
+  assert.equal(at("i0001-02-04").copy.status, "review");
   assert.notEqual(at("i0001-02-02").started_at, ""); // 元の見本では着手済み。上で未着手に直した
   assert.equal(at("i0001").copy.status, "open");
   assert.equal(at("i0001").started_at, ""); // 親も、承認済みで start がまだなら未着手
@@ -998,6 +1002,7 @@ test("CB-T328 承認済みで start がまだのカードに「未着手（start
     assert.match(page.one(`${card("i0001-02-02")} .badge.unstarted`).getAttribute("title") ?? "", /範囲は適用されません/);
     assert.equal(page.all(`${card("i0001-02-02")} .fact.started`).length, 0);
     assert.equal(text(page, `${card("i0001")} .badge.unstarted`), "未着手（start 待ち）");
+    assert.equal(page.all(`${card("i0001-02-04")} .badge.unstarted`).length, 0);
     // 未承認・レビュー待ち・閉じたカードには、どちらも出ない
     for (const t of base.tickets.filter((x) => x.copy.status !== "open")) {
       assert.equal(page.all(`${card(t.ticket)} .badge.unstarted`).length, 0, t.ticket);
@@ -1015,6 +1020,7 @@ test("CB-T329 start 後（started_at あり）の承認済みカードに「着�
     const card = '.card[data-id="i0001-02-02"]';
     assert.equal(base.tickets.find((t) => t.ticket === "i0001-02-02")!.copy.status, "open");
     assert.equal(text(page, `${card} .fact.started`), "着手済み");
+    assert.match(page.one(`${card} .fact.started`).getAttribute("title") ?? "", /範囲が適用されています/);
     assert.equal(page.all(`${card} .badge.unstarted`).length, 0);
   } finally {
     await page.close();
