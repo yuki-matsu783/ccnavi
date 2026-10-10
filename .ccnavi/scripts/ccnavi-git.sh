@@ -46,7 +46,7 @@ export GIT_TERMINAL_PROMPT GIT_PAGER PAGER GIT_EDITOR
 # 番号を数えて消す必要はない。GIT_CONFIG_COUNT を消せば全部読まれない。
 unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJECT_DIRECTORIES 2>/dev/null || true
 
-# 拒否の文面で代わりの形を名乗るときの、自分の呼び方。生の git は PreToolUse で
+# 拒否の文面で代わりの形を示すときの、自分の呼び方。生の git は PreToolUse で
 # 止まるので、案内に `git stash push -u` と書くと、案内された先でもう 1 度拒否される。
 # 代わりの手段が拒否される案内は、案内が無いのとほとんど同じ。
 # $0 は呼ばれたときのパスそのままなので、ワークツリーの中から相対で呼ばれても合う。
@@ -208,7 +208,7 @@ has() {
 #   opt_walk <コールバック> [<引数>...]
 #
 # gitの parse-options は長いオプションの略（`--force-c` → `--force-create`）を受けるので、止める
-# 名前を並べるやり方では略した表記が通ってしまう。ここは一覧に**そのままの表記**である名前だけを通し、ほかの `--` は
+# 名前を並べるやり方では略した表記が通ってしまう。ここは一覧にそのままの表記である名前だけを通し、ほかの `--` は
 # 断る（略した表記も断る）。まとめた短いオプション（`-qbnew`）は 1 字ずつ読み、値を取る字が出たら
 # 残りの字をその値として扱う。
 #

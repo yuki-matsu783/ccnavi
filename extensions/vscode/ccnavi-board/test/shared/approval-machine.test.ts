@@ -1,7 +1,7 @@
 /**
  * 承認のオーバーレイの遷移（`src/core/approval-machine.ts`）。どの状態で何を受け、何を返すか。
  *
- * 後半は**変異テスト**。ガードを 1 つずつ消したソースをその場で組み立てて、
+ * 後半は変異テスト。ガードを 1 つずつ消したソースをその場で組み立てて、
  * 「ガードが有効であること」を確かめる関数が落ちることまで見る。ガードを足したら `GUARDS` にも足す。
  */
 import { test } from "node:test";
@@ -114,7 +114,7 @@ function toApproving(step: Step, tickets: readonly string[] = ["i0001"], only: r
 }
 
 /**
- * 名前で状態を作る。**ガードの確かめは「守る状態を全部」回す。**
+ * 名前で状態を作る。ガードの確かめは「守る状態を全部」回す。
  * 1 つの状態でしか押さないと、ガードから状態を 1 つ抜いた（消すのではなく弱めた）ときに落ちずに通る
  */
 function named(step: Step, kind: string): ApprovalState {
@@ -222,7 +222,7 @@ interface Guard {
   readonly find: string;
   /** 置き換えた後（ガードが有効でなくなる形） */
   readonly into: string;
-  /** 有効であることの確かめ。**ガードを消したらここが落ちる**（または、そこで投げる） */
+  /** 有効であることの確かめ。ガードを消したらここが落ちる（または、そこで投げる） */
   readonly check: (step: Step) => void;
 }
 
@@ -317,7 +317,7 @@ const GUARDS: readonly Guard[] = [
     find: 'if (overlay?.kind !== "decideLoading") {',
     into: "if (false) {",
     check(step) {
-      // 閉じている状態は最後（ガードを外すと、無い持ち物を読んで投げる）
+      // 閉じている状態は最後（ガードを外すと、無いプロパティを読んで投げる）
       const kinds_ = ["decidePreview", "deciding", "preview", "prompt", "error", "closed"];
       assertNamed(step, kinds_);
       for (const kind of kinds_) {
@@ -380,7 +380,7 @@ const GUARDS: readonly Guard[] = [
     find: 'if (kind === "loading" || kind === "preview" || kind === "approving") {',
     into: "if (false) {",
     check(step) {
-      // **3 つとも回す。** 1 つだけ見ると、ガードからその 1 つ以外を抜かれたときに落ちずに通る
+      // 3 つとも回す。 1 つだけ見ると、ガードからその 1 つ以外を抜かれたときに落ちずに通る
       assertNamed(step, ["loading", "preview", "approving"]);
       for (const kind of ["loading", "preview", "approving"]) {
         const state = named(step, kind);
@@ -410,7 +410,7 @@ const GUARDS: readonly Guard[] = [
     find: 'if (overlay?.kind !== "done" && overlay?.kind !== "prompt") {',
     into: "if (false) {",
     check(step) {
-      // **閉じている状態は最後。** ガードを外すと、そこは無い持ち物を読んで投げるので、
+      // 閉じている状態は最後。 ガードを外すと、そこは無いプロパティを読んで投げるので、
       // 先に置くと変異テストが「確かめが落ちた」ではなく「投げた」を見ることになる
       assertNamed(step, ["loading", "preview", "approving", "error", "closed"]);
       for (const kind of ["loading", "preview", "approving", "error", "closed"]) {
@@ -844,7 +844,7 @@ test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが落
     const at = source.split(guard.find).length - 1;
     assert.equal(at, 1, `変異させる 1 行が見つからない（${guard.what}）。ソースを直したら find も直す`);
     const mutated = load(source.replace(guard.find, guard.into));
-    // **`assert.AssertionError` に限る。** 無い持ち物を読んだ `TypeError` で偶然「落ちた」ことに
+    // `assert.AssertionError` に限る。 無いプロパティを読んだ `TypeError` で偶然「落ちた」ことに
     // しない（確かめる状態は、ガードを外しても投げない側を選んである）
     assert.throws(
       () => guard.check(mutated.approvalStep),

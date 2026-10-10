@@ -33,7 +33,7 @@ ccnavi_host_parse() {
 	# scheme は origin から取る。https に決め打ちすると、社内や手元で平文で立てた
 	# GitLab（`http://localhost:8929` のような形）に当たらない。ssh の形式には
 	# scheme が無いので、そこだけ https にする。
-	# host には**ポートを残す**。落とすと `:8929` のような立て方がすべて当たらなくなり、しかも
+	# host にはポートを残す。落とすと `:8929` のような立て方がすべて当たらなくなり、しかも
 	# 落ちたポートがプロジェクトのパスの先頭に入り込む（`8929/demo/greeter`）。
 	case "$ccnavi_hp_origin" in
 	http://*) ccnavi_h_scheme=http ;;

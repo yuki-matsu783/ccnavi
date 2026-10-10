@@ -53,13 +53,13 @@ const CSP = /<meta http-equiv="Content-Security-Policy"[^>]*>/;
 /** 画面を読ませるときの細工。いまは測定の偽物だけ */
 export interface LoadOptions {
   /**
-   * 要素の大きさを測れるようにする（`measure: true`）。**図の画面だけが要る。**
+   * 要素の大きさを測れるようにする（`measure: true`）。図の画面だけが要る。
    *
    * happy-dom は `ResizeObserver` を形だけ持つが `observe()` が何もせず、`offsetWidth` は 0 を返す。
    * React Flow は点の大きさを `ResizeObserver` の報せで知り、測れていない点を `visibility: hidden` の
-   * まま置き、**線を 1 本も描かない**。落ちないので、細工をしないとテストは「空の絵」を見て通る。
+   * まま置き、線を 1 本も描かない。落ちないので、細工をしないとテストは「空の絵」を見て通る。
    *
-   * ここで偽るのは大きさだけで、**置き場所は偽らない**（線の経路の正しさはここでは見られない。
+   * ここで偽るのは大きさだけで、置き場所は偽らない（線の経路の正しさはここでは見られない。
    * 見るのは「点と線がその本数あるか」「押すと何が起きるか」まで）。数字は下の `SIZES`。
    */
   readonly measure?: boolean;
@@ -88,7 +88,7 @@ function sizeOf(element: { matches?: (selector: string) => boolean }): [number, 
 }
 
 /**
- * 大きさを測れるようにする。**画面のスクリプトを走らせる前に入れる**（React Flow は
+ * 大きさを測れるようにする。画面のスクリプトを走らせる前に入れる（React Flow は
  * マウントの最中に `ResizeObserver` を張るので、あとから入れても間に合わない）。
  */
 function fakeMeasure(window: Window): void {

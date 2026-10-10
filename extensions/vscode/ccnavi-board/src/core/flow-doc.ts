@@ -12,16 +12,16 @@
  *     connection = {id, from, to, fromPort, toPort, condition?}
  *
  * グループ（`type: "group"`）は図の上の囲みで、手順ではない。出入口を持たず、線は繋がない。
- * 中のノードは `parentId` にグループの id を持ち、`position` は**グループの左上からの位置**
+ * 中のノードは `parentId` にグループの id を持ち、`position` はグループの左上からの位置
  * （React Flow の決まり）。グループは中のノードより前に並べる（React Flow は親を先に読む）。
  * グループの中にグループは置かない。
  *
- * **知らない欄も知らない種類も落とさない。** 読んだ中身をそのまま持ち、編集はそのコピーの
+ * 知らない欄も知らない種類も落とさない。 読んだ中身をそのまま持ち、編集はそのコピーの
  * 触ったところだけを差し替える（`phases-doc.ts` が YAML の知らない欄を残すのと同じ考え）。
  * 欠けた欄（`position` や `data`）も、読むときに既定で補うだけで、触るまで書き足さない。
  * 書き出しは中身から組み直す（コメントや書き方は残らない。ユーザが保存したときだけ書く）。
  *
- * **判定はしない。** 読めるか・形が正しいかは実行ファイルが `--lint --flow` で言い（`flow-lint.ts`）、
+ * 判定はしない。 読めるか・形が正しいかは実行ファイルが `--lint --flow` で言い（`flow-lint.ts`）、
  * 着手中に書けるかは実行ファイルが `flow.locked` で言う。
  * 入れ子の段の数（`nesting`）は案内で、止めるのは実行ファイルでも画面でもなく、上限に当たった
  * サブエージェントに Agent ツールが渡らないこと（そのノードで止まってメインへ戻る）。
@@ -184,13 +184,13 @@ export function branchItems(node: FlowNode): readonly Readonly<Record<string, un
 // ---- 読む・書く
 
 /**
- * YAML の本文を、画面が描くために読む。**正しいかは決めない。** 読めるか（大きさ・YAML として読めるか・別名）と
+ * YAML の本文を、画面が描くために読む。正しいかは決めない。 読めるか（大きさ・YAML として読めるか・別名）と
  * 形（`nodes` が無い、`id` が無い・重なる など）の答えは実行ファイル（`--lint --flow`、`flow-lint.ts`）が出し、
  * 画面はそれを通ったものだけを開く。読み手はルール管理の画面（`rules-doc.ts`）と同じ `yaml` の既定。
  *
  * ここが断るのは、画面が描けないときだけ。拡張の読み手が読めない（実行ファイルとは読み手が違うので、
  * 実行ファイルが読めても `yaml` が断ることがある。重なったキーなど）か、ノードのリスト（`id` が文字列の
- * マッピング）が取れないとき。**例外は外に出さない。**
+ * マッピング）が取れないとき。例外は外に出さない。
  */
 export function parseFlow(text: string): FlowRead {
   const read = parseFlowValue(text);
@@ -204,7 +204,7 @@ export function parseFlow(text: string): FlowRead {
 /**
  * YAML の本文を `yaml` の既定で読んだ中身（形は確かめない）。実行ファイルが読んだ中身と見比べるのに使う
  * （`flow-match.ts`。描けるかより先に見比べるので、マージキーのような読みの違いも「食い違い」として言える）。
- * 先頭の BOM は 1 つ外す（実行ファイルの `utf-8-sig` と同じ）。**例外は外に出さない。**
+ * 先頭の BOM は 1 つ外す（実行ファイルの `utf-8-sig` と同じ）。例外は外に出さない。
  */
 export function parseFlowValue(text: string): { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: string } {
   try {
@@ -225,7 +225,7 @@ function firstLine(text: string): string {
 
 /**
  * 描ける形か。最上位がマッピングで、`nodes` が「文字列の `id` を持つマッピング」のリスト。
- * 画面から届いた保存の中身もここで受ける（崩れていたら書かない。正しいかは保存の前に実行ファイルが言う）。
+ * 画面から届いた保存の中身もここで受ける（形が不正なら書かない。正しいかは保存の前に実行ファイルが言う）。
  */
 export function asFlowDoc(raw: unknown): FlowDoc | undefined {
   if (!isRecord(raw) || !Array.isArray(raw.nodes)) {
@@ -490,7 +490,7 @@ export function connect(doc: FlowDoc, from: string, fromPort: string, to: string
 }
 
 /**
- * 線を消す。線は**配列の位置で指す**（ユーザが書いたフローの線は id が無いことも重なることもある）。
+ * 線を消す。線は配列の位置で指す（ユーザが書いたフローの線は id が無いことも重なることもある）。
  */
 export function removeConnectionAt(doc: FlowDoc, index: number): FlowDoc {
   return { ...doc, connections: connectionsOf(doc).filter((_, i) => i !== index) };
@@ -902,7 +902,7 @@ export function copyNodes(doc: FlowDoc, ids: readonly string[]): FlowClip | unde
 
 /**
  * コピーしたものを貼る。ノードの id は `freshNodeId`、線の id は `freshConnectionId` で振り直し、線の両端と
- * `parentId` を新しい id に付け替える。出口の表記（`branch-<番号>`）と `data` はそのまま（分岐の出口のリストも
+ * `parentId` を新しい id に書き換える。出口の表記（`branch-<番号>`）と `data` はそのまま（分岐の出口のリストも
  * 一緒にコピーしているので、同じ出口に付く）。
  *
  * 置き場所は、グループの外のノードは `offset` だけずらす。グループの中のノードは、
@@ -1109,7 +1109,7 @@ export function nesting(doc: FlowDoc): Nesting {
 }
 
 /**
- * 図の上に出す注意。**当てはまるときだけ出す。** 良し悪しは決めない（保存は止めない）。
+ * 図の上に出す注意。当てはまるときだけ出す。 良し悪しは決めない（保存は止めない）。
  *
  * 実行ファイル（`--lint --flow`）の warn と並べて出す。`exe` を真にすると、実行ファイルが同じことを言うもの
  * （開始が無い。実行ファイルは「start が無い」と言う）は出さず、実行ファイルの答えにそろえる（二重に出さない）。

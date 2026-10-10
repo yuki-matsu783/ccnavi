@@ -16,7 +16,7 @@ import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
  * 配点の形（`KINDS`・`FactorForm`・`RiskForm` など）は画面との契約（`risk-view.ts`）にある。
- * ここに置くと、画面がそこから `yaml` を辿ってバンドルしたものに解析器が丸ごと入る。
+ * ここに置くと、画面がそこから `yaml` を辿ってバンドルしたものに解析器がすべて入る。
  */
 
 /** 実行ファイルが読む版（risk.VERSION） */
@@ -221,7 +221,7 @@ function applyTo(doc: Document, edited: RiskForm): string {
     return node;
   });
   if (isSeq(existing)) {
-    // 先頭の項目を消したときは、付け替えたコメントをリストの見出しとして戻す。
+    // 先頭の項目を消したときは、移したコメントをリストの見出しとして戻す。
     if (adopted !== undefined && !nodes.includes(adopted) && !existing.commentBefore) {
       existing.commentBefore = adopted.commentBefore ?? null;
     }

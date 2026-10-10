@@ -1,13 +1,13 @@
 /**
  * ルール管理画面が編集中に持つもの。ルールのコピー（`Draft`）と、開いている行・開いているタブ。
  *
- * 契約の `Sections` はタイプごとの配列だけを持つが、画面は**行ごとに動かない鍵**が要る
+ * 契約の `Sections` はタイプごとの配列だけを持つが、画面は行ごとに動かない鍵が要る
  * （足す・消す・タイプを移す・並べ替えの間、React が同じ行を同じ行として描き直せるように）。
  * id はユーザが打つもので、空にも重複にもなるので鍵には使えない。鍵は画面の中だけのもので、
  * 拡張ホストへ渡すのは、ファイルを選ぶとき（`pickFile` → `picked`）に行を名指しするときだけ。
  *
  * 残す先は Webview の state（`{ open: [id, …], tab }`）。
- * **残すのは id** で、鍵は画面を作り直すと変わるため。id が空の行は残せない。
+ * 残すのは id で、鍵は画面を作り直すと変わるため。id が空の行は残せない。
  */
 import { SECTIONS, type RuleForm, type Section, type Sections } from "../../core/rules-view.js";
 import { getState, setState } from "../vscode.js";

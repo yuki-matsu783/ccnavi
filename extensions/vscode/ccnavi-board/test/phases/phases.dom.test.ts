@@ -280,7 +280,7 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
     );
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     assert.equal(dom.all("#ccnavi-loading").length, 0);
-    // 行の鍵は画面の中で数え続けるので、描き直した行は別の鍵になる
+    // 行のキーは画面の中で数え続けるので、描き直した行は別のキーになる
     assert.ok(dom.all(".phase").length > 0);
   } finally {
     await dom.close();

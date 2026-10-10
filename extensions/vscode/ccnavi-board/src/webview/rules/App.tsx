@@ -3,10 +3,10 @@
  *
  * 見せる中身は拡張ホストが渡す（`RulesData`）。画面が持つのは、ユーザが触って決めるもの
  * （編集中のルール、開いている行、折りたたんだタイプ、絞り込み、開いているタブ、直前の操作の一言）だけ。
- * **判定はしない。** 「判定」も「サンプルを一括で判定」も、編集中の内容を拡張ホストへ渡し、
+ * 判定はしない。 「判定」も「サンプルを一括で判定」も、編集中の内容を拡張ホストへ渡し、
  * 実行ファイルが返した結果を出すだけ。
  *
- * **中身（`data`）が届いたら、編集中のルールはその中身で置き換える。** 届くのは編集を捨ててよい
+ * 中身（`data`）が届いたら、編集中のルールはその中身で置き換える。 届くのは編集を捨ててよい
  * ときだけ（ユーザが「再読込」を押した、保存が通った）で、ファイルが外で変わっただけのときは
  * 帯（`changed`）が出るだけ。
  */
@@ -73,8 +73,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const [data, setData] = useState<RulesData>(initial);
   const [editing, setEditing] = useState<Editing>(() => editingOf(initial, nextKey));
   /**
-   * 判定で当たってその場だけ開いた行。**state には入れない**（判定を繰り返しても、ユーザが決めた
-   * 既定の折りたたみが崩れない）。次の判定で入れ替わる。
+   * 判定で当たってその場だけ開いた行。state には入れない（判定を繰り返しても、ユーザが決めた
+   * 既定の折りたたみが変わらない）。次の判定で入れ替わる。
    */
   const [transient, setTransient] = useState<ReadonlySet<string>>(new Set());
   /** 直前の判定で当たったルールの id。折りたたんだままでも分かるように縁を付ける */
@@ -105,8 +105,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const page = pageOf(data);
 
   /**
-   * 案内はタブを切り替えて中を指すので、始める前のタブを覚えておき、閉じたら戻す。**案内の間の切り替えは
-   * state（`saveTab`）に書かない**（途中でタブを閉じたときに、次から別のタブで開く、ということを起こさない）
+   * 案内はタブを切り替えて中を指すので、始める前のタブを覚えておき、閉じたら戻す。案内の間の切り替えは
+   * state（`saveTab`）に書かない（途中でタブを閉じたときに、次から別のタブで開く、ということを起こさない）
    */
   const tabBeforeTour = useRef<TabName | undefined>(undefined);
   const tour = useTour(data.kind === "page", {
@@ -148,8 +148,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     latest.current = editing;
   });
   /**
-   * 受け取る側は一覧そのものに張る。`useEffect` で 1 度だけ張ると、**読み直せなかった画面
-   * （`kind: "error"`）から始まったときは一覧がまだ無く、あとで中身が届いても張られない。**
+   * 受け取る側は一覧そのものに張る。`useEffect` で 1 度だけ張ると、読み直せなかった画面
+   * （`kind: "error"`）から始まったときは一覧がまだ無く、あとで中身が届いても張られない。
    * ref のコールバックなら、一覧が出た時点で張り、消えた時点で外れる。
    */
   const list = useCallback((element: HTMLElement | null): (() => void) | undefined => {
@@ -254,7 +254,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   /**
    * 判定で当たった行を、折りたたんであってもその場だけ開く。見えないところで光っても分からないので、
-   * タイプの折りたたみも外す。**state には入れない**ので、次の判定で元の折りたたみに戻る。
+   * タイプの折りたたみも外す。state には入れないので、次の判定で元の折りたたみに戻る。
    */
   const unfoldHits = (ids: readonly string[]): void => {
     const wanted = new Set(ids);
@@ -298,7 +298,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   };
 
   /**
-   * 読み直しを頼む。**押した時点でボタンを止める。** 拡張ホストは実行ファイルに聞いてから中身を
+   * 読み直しを頼む。押した時点でボタンを止める。 拡張ホストは実行ファイルに聞いてから中身を
    * 返すことがあり（設定ファイルの場所を解く）、その間に押し直せると往復が重なる。ユーザが
    * 「破棄して読み直す？」をやめたときは `cancelled` が返り、ボタンが戻る。
    */

@@ -68,7 +68,7 @@ interface PanelState {
    */
   approval: ApprovalState;
   /**
-   * 前の読み直しから動いたカード。**画面ではなくここが持つ。** 画面は裏に回ると捨てられ、
+   * 前の読み直しから動いたカード。画面ではなくここが持つ。 画面は裏に回ると捨てられ、
    * 表に戻ると作り直されるので（`retainContextWhenHidden` は偽）、そちらに持たせると
    * 承認の文を渡してボードに戻った時点で動いた表示が消える。決めるのは `core/board-moved.ts`
    */
@@ -235,7 +235,7 @@ async function update(): Promise<void> {
     }
     if (!result.ok) {
       // 開いている間の失敗は閉じない。前の表示を消して、何が起きたかを見せる。
-      // 承認のオーバーレイは載せ替えて残す。承認した文は取り返しがつかないので、
+      // 承認のオーバーレイは引き継いで残す。承認した文は取り返しがつかないので、
       // ボードが描けないことを理由に消さない。
       current.board = undefined;
       showError(current, result.error);
@@ -254,7 +254,7 @@ async function update(): Promise<void> {
 /**
  * ボードを見せる。中身を渡すのは `send`。
  *
- * **読めたボードはここを必ず通る**ので、動いたカードもここで数え直す。同じボードを渡し直すだけの
+ * 読めたボードはここを必ず通るので、動いたカードもここで数え直す。同じボードを渡し直すだけの
  * 描き直し（オーバーレイの出し入れ）でも通るが、列が動いていなければ `movedStep` が前の動いた表示を
  * そのまま返すので、承認の文を閉じた拍子に動いた表示が消えることはない。
  */
@@ -446,10 +446,10 @@ function redraw(current: PanelState): void {
 }
 
 /**
- * 承認のオーバーレイに 1 つ入力を入れる。**遷移の規則はここに書かない**
+ * 承認のオーバーレイに 1 つ入力を入れる。遷移の規則はここに書かない
  * （`core/approval-machine.ts`。VS Code に触れないので単体で試せる）。
  *
- * ここがするのは 3 つだけ。返った状態を持ち直す、描き直す、やることを行う。**順を変えない**:
+ * ここがするのは 3 つだけ。返った状態を持ち直す、描き直す、やることを行う。順を変えない。
  * 描き直しが先で、やることが後（逆にすると、文を渡すときに画面が古いまま残る）。
  */
 function dispatch(current: PanelState, input: ApprovalInput): void {
@@ -467,7 +467,7 @@ function dispatch(current: PanelState, input: ApprovalInput): void {
  * 遷移が返した「やること」を行う。外へ出るのはここだけ（実行ファイル・ターミナル・クリップボード・
  * 新しいセッション・通知）。返事が要るもの（一覧と承認の結果）は、返ってきたらまた `dispatch` に入れる。
  *
- * **返事を入れる前に、パネルがまだ同じかを見る。** 開き直された後のパネルに、前のパネルの
+ * 返事を入れる前に、パネルがまだ同じかを見る。 開き直された後のパネルに、前のパネルの
  * 承認の結果を入れない。
  */
 async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<void> {
@@ -582,7 +582,7 @@ async function showTicketPreview(filePath: string): Promise<void> {
 }
 
 /**
- * 形を確かめる操作の一覧。**`BoardMessage` に足したのにここへ足していなければ、型が合わなくなる。**
+ * 形を確かめる操作の一覧。`BoardMessage` に足したのにここへ足していなければ、型が合わなくなる。
  * `handleMessage` の網羅検査（`never`）は処理の書き忘れしか止めないので、入口の側でも同じことをする。
  * 足し忘れると、画面のボタンは押せるのに、届いたものが何も出さずに捨てられる。
  */
@@ -628,7 +628,7 @@ function asMessage(message: unknown): BoardMessage | undefined {
     case "promptOpen":
       return { type: m.type };
     case "approve":
-      // 形が崩れていたら捨てる。「全部承認」として扱うと、検証に失敗したときに承認の範囲が広がってしまう。
+      // 形が不正なら捨てる。「全部承認」として扱うと、検証に失敗したときに承認の範囲が広がってしまう。
       return Array.isArray(m.tickets) &&
         m.tickets.every((t) => typeof t === "string") &&
         typeof m.filtered === "boolean"

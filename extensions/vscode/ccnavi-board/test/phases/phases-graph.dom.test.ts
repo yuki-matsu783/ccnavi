@@ -1,7 +1,7 @@
 /**
  * フェーズ管理画面の図を、バンドルした 1 本のまま動かす。
  *
- * **大きさの偽物が要る**（`openGraph` が渡す `measure`）。happy-dom の `ResizeObserver` は
+ * 大きさの偽物が要る（`openGraph` が渡す `measure`）。happy-dom の `ResizeObserver` は
  * 何もしないので、細工をしないと React Flow は点を隠したまま線を 1 本も描かず、
  * テストは「空の絵」を見て通る。だから最初に「線が本当に描かれていること」を見る。
  *
@@ -143,7 +143,7 @@ test("CB-D77 state に残してある位置で点が置かれ、図を触って�
 });
 
 test("CB-D80 点を掴んで離すと、その位置が state に入る（jsdom）", async () => {
-  // **この 1 本だけ jsdom で走る。** happy-dom では d3-drag の待ちが終わらず固まる
+  // この 1 本だけ jsdom で走る。 happy-dom では d3-drag の待ちが終わらず固まる
   // （`test/helpers/jsdom.ts` の頭）。state に入る経路（onNodeDragStop → withSpot → saveSpots）は
   // ここでしか通らない
   const dom = await loadDrag();

@@ -4,8 +4,8 @@
  * 流し込む。
  *
  * ここで見るのは 3 つ。骨組み（`styles/page.css`）が 5 画面とも 1 か所から来ていること、
- * ハイコントラストのテーマ向けの書き方が残っていること、そして**置いた CSS がバンドルから漏れて
- * いないこと**（`@import` を書き忘れると、見た目だけが気づかないうちに抜ける）。
+ * ハイコントラストのテーマ向けの書き方が残っていること、そして置いた CSS がバンドルから漏れて
+ * いないこと（`@import` を書き忘れると、見た目だけが気づかないうちに抜ける）。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -61,7 +61,7 @@ function cssFiles(dir: string = WEBVIEW_SRC): string[] {
  * ように `.` で始まらないものは node_modules から解く（esbuild がバンドルするときと同じ解き方）。
  *
  * 外から来る CSS を入れているのは図の 1 本だけ（React Flow の CSS）。ここで解けないと、このテストは
- * 落ちるのではなく **`readFileSync` の ENOENT で例外になる**ので、行き先を間違えたのか置き忘れたのかが
+ * 落ちるのではなく `readFileSync` の ENOENT で例外になるので、行き先を間違えたのか置き忘れたのかが
  * 読めなくなる。解けないパスは名指しで落とす。
  */
 function importsOf(file: string): string[] {

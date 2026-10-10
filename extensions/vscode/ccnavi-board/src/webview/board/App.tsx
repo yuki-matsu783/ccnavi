@@ -54,7 +54,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   const requestTour = tour.request;
   /**
    * 案内の間、チケットが 1 枚も無ければ見本のボードを出す（`tour-sample.ts`）。指す先のカードが無いと、
-   * 案内が列とカードを説明できないため。**見本は描くだけ。** 絞り込みの state や承認の件数の元にはしない
+   * 案内が列とカードを説明できないため。見本は描くだけ。 絞り込みの state や承認の件数の元にはしない
    */
   const sample = useMemo(
     () => (tour.touring && board !== undefined && board.totalCount === 0 && !(view.archived && board.archivedCount > 0) ? sampleBoard(board.root, board.generatedAt) : undefined),

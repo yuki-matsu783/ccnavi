@@ -343,7 +343,7 @@ function showError(current: PanelState, error: string): void {
  * いまの状態で描き直す。`send` が `deferred`（作り直し中）を返して捨てられたものは、
  * 画面が組み上がった（`ready`）ところでここから渡し直す。
  *
- * **読み直せなかったことも渡し直す。** ここで渡さないと、入れてある HTML（古い一覧）が出たまま
+ * 読み直せなかったことも渡し直す。 ここで渡さないと、入れてある HTML（古い一覧）が出たまま
  * 失敗がユーザに届かず、`page` が無いので以後のボタンも使えない。
  */
 function redraw(current: PanelState): void {

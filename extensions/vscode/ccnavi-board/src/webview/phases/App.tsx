@@ -4,11 +4,11 @@
  * 見せる中身は拡張ホストが渡す（`PhasesData`）。画面が持つのは、ユーザが触って決めるもの
  * （編集中の定義、開いている行、絞り込み、直前の操作の一言）だけ。定義の意味は判定しない。
  *
- * **中身（`data`）が届いたら、編集中の定義はその中身で置き換える。** 届くのは編集を捨ててよい
+ * 中身（`data`）が届いたら、編集中の定義はその中身で置き換える。 届くのは編集を捨ててよい
  * ときだけ（ユーザが「再読込」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
  * 帯（`changed`）が出るだけ。
  *
- * **id の重なりだけは画面で止める。** 同じ id が 2 つあると実行ファイルは後ろで何も出さずに上書きする。
+ * id の重なりだけは画面で止める。 同じ id が 2 つあると実行ファイルは後ろで何も出さずに上書きする。
  * 止めるのはここだけで、書式の検証は保存のときに実行ファイル（`--lint`）へ渡す。
  */
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
@@ -50,7 +50,7 @@ interface Editing {
   /** 開いている行の鍵 */
   readonly open: ReadonlySet<string>;
   /**
-   * 「ほかの定義との関係・補足」を開いているか。**行ごとに 1 度だけ値の有無で決め、あとはユーザの開閉で動く。**
+   * 「ほかの定義との関係・補足」を開いているか。行ごとに 1 度だけ値の有無で決め、あとはユーザの開閉で動く。
    * 描くたびに値の有無で決め直すと、最後の値を消した時点で、打っている欄ごと折りたたまれる
    */
   readonly more: ReadonlyMap<string, boolean>;
@@ -87,7 +87,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const [helpOpen, setHelpOpen] = useState(false);
   /**
    * 案内を始める前の画面の様子。案内は一覧と図を切り替え、見本の行と関係の欄を開き、絞り込みを外すので、
-   * 閉じたらこれに戻す。**案内の間の一覧と図の切り替えはstate（`saveView`）に書かない**（途中でタブを
+   * 閉じたらこれに戻す。案内の間の一覧と図の切り替えはstate（`saveView`）に書かない（途中でタブを
    * 閉じたときに、次から図で開く、ということを起こさない）。
    */
   const beforeTour = useRef<TourSnapshot | undefined>(undefined);
@@ -141,7 +141,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   }, [focusKey]);
 
   /**
-   * 読み直しを頼む。**押した時点で欄を止める。** 拡張ホストは実行ファイルに聞いてから中身を返す
+   * 読み直しを頼む。押した時点で欄を止める。 拡張ホストは実行ファイルに聞いてから中身を返す
    * ことがあり（設定ファイルの場所を解く）、その間に打った内容は、届いた中身で気づかないうちに消えるため。
    * ユーザが「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
    */
@@ -191,11 +191,11 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   }, [touring, data]);
 
   /**
-   * 図の中身。**メモ化する。** 描くたびに新しい形を作ると、React Flow は `nodes` の参照が
+   * 図の中身。メモ化する。 描くたびに新しい形を作ると、React Flow は `nodes` の参照が
    * 変わったと見て内部の点を作り直す（`adoptUserNodes` の `checkEquality`）。ドラッグしている
    * 最中に絞り込みや「外で変わった」の報せが届くと、掴んだ点が掴む前の位置へ戻る。
    *
-   * **読み込み中とエラーの早めの return より前に置く。** 後ろに置くと、中身から読み込み中・エラーへ
+   * 読み込み中とエラーの早めの return より前に置く。 後ろに置くと、中身から読み込み中・エラーへ
    * 移ったときにフックの数が変わって React が落ちる
    */
   const graph = useMemo(() => graphOf(formOf(draft)), [draft]);
@@ -376,7 +376,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   ];
 
   /**
-   * 定義を足す。**図を見ていても一覧へ移す。** 足した定義は id が空で図に出ないので、図のままだと
+   * 定義を足す。図を見ていても一覧へ移す。 足した定義は id が空で図に出ないので、図のままだと
    * 押しても何も変わらないように見える。絞り込みも外す（id が空の行は絞り込みに当たらず隠れる）。
    */
   const add = (): void => {

@@ -58,7 +58,7 @@ export function staleMessage(section: Section): string {
 }
 
 /**
- * 絞り込みが当てる文字列。当てるのは**書いてある値そのもの**（id・ツール・パターン・文面・
+ * 絞り込みが当てる文字列。当てるのは書いてある値そのもの（id・ツール・パターン・文面・
  * 渡す文）で、要約に出ない全文にも当たる。
  */
 export function findText(rule: RuleForm): string {

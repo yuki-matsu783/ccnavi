@@ -30,7 +30,7 @@
 呼び方は `handle(<要求の JSON>, root)`。`root` は仮のツリーを組む場所で、Pyodide では `/ws`、
 手元の試験では一時ディレクトリ。答えは JSON の文字列。
 
-Snapshot の形（拡張の `src/core/snapshot.ts` と対）:
+Snapshot の形は次のとおり（拡張の `src/core/snapshot.ts` と対）。
 
     {
       "integration": {"name": "main", "source": "setting" | "default", "head": "<sha>"},
@@ -44,7 +44,7 @@ Snapshot の形（拡張の `src/core/snapshot.ts` と対）:
 
 プロジェクトのリポジトリ（手元で `projects/<名前>` に clone されるもの）も読む。Snapshot に
 `project`（プロジェクト名）と `workspace`（ワークスペースのリポジトリの統合先の中身。共通レイヤー・
-自身のレイヤー・`.claude/settings.json`・互換のマーカー）が付く。仮のツリーは手元と同じ形で組む:
+自身のレイヤー・`.claude/settings.json`・互換のマーカー）が付く。仮のツリーは手元と同じ形で組む。
 ワークスペースルートにワークスペースの統合先、`projects/<名前>/` にプロジェクトの統合先
 （`done/` と、プロジェクトの統合先のレイヤーに共通レイヤーをコピーしたレイヤー）、親子のチケットは
 `projects/<名前>` のワークツリーとして `.claude/worktrees/<P>` に置く。取り込み状態は
@@ -666,7 +666,8 @@ def records(
             out[f"{base}/families/{ident}"] = f"remote origin\nbranch {name}\nstate present\n"
         elif name in absent:
             # 読みに行った名前の親子のチケット（閉包の `idents`。無ければその名前を識別子とする）。
-            # 識別子の形でなければ取り込み状態を書けないので、黙って飛ばさず決まらないとして止める。
+            # 識別子の形でなければ取り込み状態を書けない。
+            # 何も言わずに飛ばさず、決まらないとして止める。
             ident = (idents or {}).get(name, name)
             if not ticket_ids.is_valid_id(ident):
                 raise Refused(

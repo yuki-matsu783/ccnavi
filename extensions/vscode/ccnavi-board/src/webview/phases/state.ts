@@ -2,7 +2,7 @@
  * フェーズ管理画面が編集中に持つもの。定義のコピー（`Draft`）と、開いている行。
  * 作りはリスク管理（`webview/risk/state.ts`）と同じで、鍵の表記だけ `p1`、`p2`、… と違う。
  *
- * 契約の `PhasesForm` は配列だけを持つが、画面は**行ごとに動かない鍵**が要る（足す・消す・
+ * 契約の `PhasesForm` は配列だけを持つが、画面は行ごとに動かない鍵が要る（足す・消す・
  * 並べ替えの間、React が同じ行を同じ行として描き直せるように）。id はユーザが打つもので、
  * 空にも重複にもなるので鍵には使えない（この画面は重複を保存前に止める）。
  *
@@ -89,7 +89,7 @@ export function openedFromIds(draft: Draft, ids: ReadonlySet<string>): ReadonlyS
 export type View = "list" | "graph";
 
 /**
- * ユーザがドラッグで動かした点の位置。**`phases.yml` には書かない**（ユーザが持つ設定に座標は入れない）。
+ * ユーザがドラッグで動かした点の位置。`phases.yml` には書かない（ユーザが持つ設定に座標は入れない）。
  * 残す先は Webview の state で、鍵は定義の id。id を打ち替えれば残した位置は捨てられる（`Graph.tsx`）。
  *
  * 形と、形を動かす純関数（`withSpot` / `keepSpots`）は `core/phases-graph.ts` にある。

@@ -2,7 +2,7 @@
  * レビュー済みの読み取り側。
  *
  * 判定（依頼の記録・依頼の後に動いたか・同じ MR か・変更要求・未解決のスレッド）は Python の
- * `confirm`（手元の `ccnavi review confirm` と同じコア）が出す。ここはホストから材料を取ってきて渡すだけ:
+ * `confirm`（手元の `ccnavi review confirm` と同じコア）が出す。ここはホストから材料を取ってきて渡すだけで、材料は次のとおり。
  *
  * - MR のスレッドとレビューを取得した結果（`reviewCopy`。`ccnavi-review.sh fetch` と同じ形）
  * - 依頼の後に親のブランチが動いていれば、Python が求める 2 つ（`need_compare`）の変更の一覧（`compareFiles`）

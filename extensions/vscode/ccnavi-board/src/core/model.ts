@@ -310,7 +310,7 @@ export interface SumJson {
     /** リスクレベルの境目の点（実際に使う値） */
     readonly levels: Readonly<Record<"medium" | "high" | "critical", number | null>>;
     readonly factors: readonly SumFactorJson[];
-    /** 壊れていて空に戻したときの理由。空なら無い */
+    /** 内容が不正で空に戻したときの理由。空なら無い */
     readonly fallback: string;
     readonly problems: readonly string[];
   };

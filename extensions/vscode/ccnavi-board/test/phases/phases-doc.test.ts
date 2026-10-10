@@ -270,7 +270,7 @@ test("CB-T199 知らない order は苦情にし、画面は sequential とし�
   const doc = readPhases(SAMPLE.replace("version: 1\n", "version: 1\norder: graph\n"));
   assert.equal(doc.model.form.order, "sequential");
   assert.ok(doc.model.problems.some((p) => p.includes("order が")), doc.model.problems.join("\n"));
-  // リストで書かれた order は、保存で同じ鍵を 2 つにしない
+  // リストで書かれた order は、保存で同じキーを 2 つにしない
   const listed = readPhases(SAMPLE.replace("version: 1\n", "version: 1\norder: [dag]\n"));
   const out = listed.apply({ ...listed.model.form, order: "dag" });
   assert.equal(out.match(/^order:/gm)?.length, 1);

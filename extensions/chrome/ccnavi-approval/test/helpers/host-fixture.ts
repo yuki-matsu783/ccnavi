@@ -1,7 +1,7 @@
 /**
  * 録ったホストの応答の見本（test/fixtures/host/github/<場面>/）。
  *
- * リポジトリの sh の試験（tests/sh/github_host.py）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える:
+ * リポジトリの sh の試験（tests/sh/github_host.py）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える。
  *
  * - `GET /repos/<o>/<r>/pulls?head=<o>:<branch>` → `branch` が場面のもの（`scene.json`。差し替えられる）なら
  *   `pulls.json`、違えば `[]`
