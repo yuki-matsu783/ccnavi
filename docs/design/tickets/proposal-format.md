@@ -27,6 +27,10 @@ predecessors: [feature-50-settings-split-01-01] # 子だけ。先に閉じてい
 human_review:
   required: true         # 既定。省くなら理由を書く
   reason: 設定の読み込み経路を変えるため
+phases:                          # 親だけ。計画が使うフェーズ定義の写し（9.7）。--fill-phases で作る
+  research: {kind: work, title: 調査, review: none, scope: ["wip/research/*"]}
+  implement: {kind: work, title: 実装, review: mr, scope: ["src/*"]}
+  implement-feedback: {kind: feedback, title: 実装フィードバック対応, review: mr, scope: inherit}
 plan:                            # 親だけ。全体計画（9.7）
   - research                     # 1。何も待たない
   - {type: implement, after: [1]}  # 2。after は先に済んでいるべき項の番号（自分より小さい番号だけ）
@@ -85,6 +89,14 @@ base_sha: ""
   項の番号で、自分より小さい番号だけを指せる（フィードバック計画の項はフィードバック計画の番号だけ）。`after` を書かない項は
   何も待たない。最後の項がほかの全部を推移的に待つように書く（終端は 1 つ。`after` を書かない 2 項以上の計画は承認で落ちる）。
   `--explain` の「待つ: …」を写してもよい。子の `predecessors`（子どうしの先行）とは別のもの（9.7）
+- 計画を持つ親は `phases:` に、計画の項が使うフェーズ定義**だけ**の写しを書く（定義の id をキーにした辞書。欄は
+  `phases.yml` と同じ）。手で写さず `ccnavi --plan-order <親> --fill-phases` で差し込む（項が使う定義を `phases.yml` から
+  写し、使わない定義を外す。ほかのバイトは変えない。エージェントが打ってよい）。`--agree` は写しが承認したときの
+  `phases.yml` の同じ名前の定義と読んだ形で同じかを確かめ、違えば error、項の定義が写しに無ければ error、写しの名前が
+  `phases.yml` に無ければ error、使われていない定義は warn、`phases.yml` にあって写しに無い定義は何も言わない。
+  承認のあとの判定は写しを読み、`phases.yml` を読まない。`phases.yml` を直したら、承認待ちの提案は `--fill-phases` を
+  打ち直す。改版の提案では、子が承認された番号が使う定義は承認済みチケットの値のまま（`--fill-phases` がそう差し込む）。
+  子に `phases:` は書けない（error。子は `phase:` で番号を指す）（9.7）
 - `started_at` `completed_at` `base_sha` `cancelled_at` `cancel_reason` はスクリプトの欄。スクリプトが
   承認済みチケットの行を書き換える（本文とユーザの書いた行は保つ）
 - フロー（次の節）はチケットの欄では指さない。欄 `flow` は廃止。書いてあっても読まない（warn も出さない）
