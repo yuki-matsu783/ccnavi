@@ -77,6 +77,10 @@ keywords: [振り返り, スキル, SKILL.md, references, 候補, 提案, フィ
    - 候補が1つ以上ある
    - `skill-improve` のフェーズ定義がある
    - 親の範囲に、対象のスキルの置き場が入っている
+
+   `feedback:` は最後の項がほかの全部を `after` で待つ形にする（終端は1つ）。後ろに足すだけだと承認で落ちるので、
+   最後の項の `after` に `skill-improve` の番号も足すか、`skill-improve` を最後に置いてほかの全部を待たせる。
+   定義は `ccnavi --plan-order <親> --fill-phases` で親の `phases:` に写す
 3. フィードバック計画が承認されたら、`skill-improve` のフェーズに子チケットを提案して承認を受け、その子でスキルを直してMRで見てもらう
 
 ## 提案チケット
