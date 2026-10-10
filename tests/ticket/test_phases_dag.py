@@ -237,13 +237,16 @@ class ComputeTest(unittest.TestCase):
         self.assertEqual(parent.review_at(2), 4)
         self.assertEqual(parent.covered_by(4), [2])
 
-    def test_feedback_is_read_one_after_another_for_now(self):
-        """フィードバック計画は全体計画の番号を全部と、前のフィードバックの番号を全部待つ。"""
+    def test_feedback_waits_for_the_whole_plan_and_its_own_after(self):
+        """フィードバック計画は全体計画の番号を全部と、フィードバック計画の中の `after` を待つ。"""
         parent = parent_of(
             [item("design"), item("docs", after=[1])], [item("fixup"), item("fixup")]
         )
         wf = workflow.compute(parent)
         self.assertEqual(wf.waits[3], [1, 2])
+        self.assertEqual(wf.waits[4], [1, 2])
+        parent.feedback[1].after = [3]
+        wf = workflow.compute(parent)
         self.assertEqual(wf.waits[4], [1, 2, 3])
         parent.workflow = wf
         self.assertEqual(workflow.waits_of(parent, 4), [1, 2, 3])
@@ -251,7 +254,7 @@ class ComputeTest(unittest.TestCase):
     def test_a_deferred_feedback_item_goes_to_the_next_one(self):
         parent = parent_of(
             [item("design"), item("docs", after=[1])],
-            [item("fixup", "defer"), item("fixup", "defer"), item("fixup")],
+            [item("fixup", "defer"), item("fixup", "defer", [3]), item("fixup", after=[4])],
         )
         parent.workflow = workflow.compute(parent)
         self.assertEqual(parent.workflow.review_at, {3: 5, 4: 5})
@@ -322,8 +325,10 @@ class PlanProblemsTest(unittest.TestCase):
         plan = [item("design"), item("docs", after=[1])]
         self.assertEqual(self.problems(plan, []), [])
         self.assertEqual(self.problems(plan, [item("fixup")]), [])
-        # いまはフィードバック計画を一直線で読むので、2 項でも最後の項が前を全部待つ。
-        self.assertEqual(self.problems(plan, [item("fixup"), item("fixup")]), [])
+        # 2 項なら、最後の項が前の項を `after` で待つ（一直線か合流）。
+        self.assertEqual(self.problems(plan, [item("fixup"), item("fixup", after=[3])]), [])
+        found = self.problems(plan, [item("fixup"), item("fixup")])
+        self.assertTrue(any("`feedback` の最後の項" in d for d in found), found)
 
     def test_the_last_item_of_either_plan_cannot_be_deferred(self):
         found = self.problems([item("design"), item("docs", "defer", [1])])
