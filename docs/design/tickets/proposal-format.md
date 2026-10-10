@@ -34,7 +34,8 @@ phases:                          # 親だけ。計画が使うフェーズ定義
 plan:                            # 親だけ。全体計画（9.7）
   - research                     # 1。何も待たない
   - {type: implement, after: [1]}  # 2。after は先に済んでいるべき項の番号（自分より小さい番号だけ）
-feedback: [implement-feedback]   # 親だけ。フィードバック計画（番号は全体計画の続き）
+feedback:                        # 親だけ。フィードバック計画（番号は全体計画の続き）
+  - implement-feedback           # 3。after はフィードバック計画の番号だけを指せる
 title: 設定画面の分割
 rationale: |
   Settings 配下のコンポーネント分割。
