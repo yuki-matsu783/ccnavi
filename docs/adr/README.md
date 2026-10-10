@@ -139,8 +139,8 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0023](0023-copies-not-ledger.md) | 承認済みの状態はチケットごとのファイルで表し、台帳をやめる |
 | [0024](0024-parallel-tickets.md) | 並行するチケットの骨子：行き先で結ぶ、子は親の部分集合、状態は置き場 |
 | [0025](0025-reference-workflow.md) | 参考にした運用から採ったもの、採らなかったもの |
-| [0026](0026-phase-types.md) | フェーズに種類を与え、親が計画を持つ |
-| [0078](0078-phase-workflow-as-dag.md) | フェーズの種類に依存（`after`）を持たせ、ワークフローを DAG で書く |
+| [0026](0026-phase-types.md) | フェーズに種類を与え、親が計画を持つ（`overlap` を例外とすることと、定義を判定のたびに `phases.yml` から読むことは ADR-0109 が改める） |
+| [0078](0078-phase-workflow-as-dag.md) | フェーズの種類に依存（`after`）を持たせ、ワークフローを DAG で書く（定義の `after` と `order`、待ち方の固定、フィードバック計画の一直線は ADR-0109 が改める） |
 | [0027](0027-risk-by-result.md) | リスクは宣言ではなく実績で測る |
 | [0028](0028-exe-boundary.md) | 実行ファイルの境界は自分のディレクトリの中 |
 | [0029](0029-approval-path.md) | チケットの承認の経路を守る |
@@ -148,12 +148,12 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0031](0031-unresolved-not-by-time.md) | 未解決の指摘は時刻で絞らず、いま残っている全部を数える |
 | [0039](0039-approve-narrowing.md) | 承認の対象は識別子で狭められる（狭めるだけ） |
 | [0040](0040-approve-from-the-board.md) | 承認は端末ではなくボードのオーバーレイで受け、承認したことは hook が伝える（hook が伝えることは ADR-0104 が改める） |
-| [0043](0043-approve-carry.md) | 承認済みチケットは sh がコミットして push し、範囲の超過は判定で止め、ボードの承認はダイジェストで照合する |
+| [0043](0043-approve-carry.md) | 承認済みチケットは sh がコミットして push し、範囲の超過は判定で止め、ボードの承認はダイジェストで照合する（種類の `scope` を読む先は ADR-0109 が改める） |
 | [0065](0065-review-in-chat.md) | レビューはマージリクエストのほかに、このセッションでも受ける |
 | [0053](0053-review-hold-naming.md) | 止めている状態は「ゲート」ではなく「レビュー準備中」「レビュー待ち」と呼ぶ |
 | [0054](0054-proposal-place-name.md) | 提案の置き場の既定を `wip/proposals` にする |
 | [0055](0055-ticket-moves-between-two-homes.md) | チケットは 2 つの置き場を行き来する 1 本のファイルにする |
-| [0058](0058-approval-is-the-place.md) | 承認は置き場を本物とする。記録のキーは必須にせず、承認の検査を判定でも当てる（承認で記録の欄と `project:` を書き足すことは ADR-0104 が改める） |
+| [0058](0058-approval-is-the-place.md) | 承認は置き場を本物とする。記録のキーは必須にせず、承認の検査を判定でも当てる（承認で記録の欄と `project:` を書き足すことは ADR-0104 が、判定で止める範囲は ADR-0109 が改める） |
 | [0059](0059-verify-before-asking-for-approval.md) | 承認できるかはエージェントが先に確かめ、その案内は判定に触れずに渡す |
 | [0060](0060-default-branch-at-session-start.md) | ワークツリーの起点になるデフォルトブランチは、セッションの頭で進める |
 | [0073](0073-origin-tree-is-the-fallback-home.md) | 本物とするツリーが無ければ元ツリーを採る |
@@ -165,7 +165,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0086](0086-state-history-is-an-append-only-aid.md) | 状態の履歴を、チケットごとの追記専用のファイルに残す。状態は今までどおり置き場で決まる（承認の時刻の出どころは ADR-0104 が改める） |
 | [0087](0087-nudge-finish-at-stop.md) | 作業を終えたように見えるのに `finish` されていないチケットは、Stop で 1 回だけ止めて促す |
 | [0088](0088-predecessors-gate-approval-and-start.md) | 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ（続きの子の目印の置き場は ADR-0104 が改める） |
-| [0093](0093-chrome-approval-parent-branch-authority.md) | 承認は Chrome 拡張から API で行い、本物とするチケットは親のブランチ上のものだけに固定する（提案。段階 0 だけ実装。「閉じた」の照合と取り下げの条件は ADR-0104 が、共通レイヤーを写す前提の D28・D34 は ADR-0107 が改める） |
+| [0093](0093-chrome-approval-parent-branch-authority.md) | 承認は Chrome 拡張から API で行い、本物とするチケットは親のブランチ上のものだけに固定する（提案。段階 0 だけ実装。「閉じた」の照合と取り下げの条件は ADR-0104 が、共通レイヤーを写す前提の D28・D34 は ADR-0107 が、運ぶ待ち方のファイルは ADR-0109 が改める） |
 | [0094](0094-review-request-needs-eli5-html.md) | レビューの依頼には ELI5 の HTML を必須で添え、ユーザは crit で見る（置き場と指摘の書き出し方は置き換え（ADR-0095）） |
 | [0095](0095-eli5-on-the-mr-diff-and-crit-push.md) | ELI5 の HTML は wip/ にコミットしてマージリクエストの差分に載せ、指摘はユーザが crit push で送る（範囲と依頼し直しの扱いは置き換え（ADR-0096）） |
 | [0096](0096-eli5-place-is-unscoped-and-does-not-move-the-request.md) | `wip/eli5/` はチケットの範囲を当てず、そこだけを変えたコミットは依頼の後に動いたと数えない（除外のパスの読み方は置き換え（ADR-0097）） |
@@ -174,8 +174,9 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0108](0108-flow-loop-node.md) | 子のフローの反復は loop ノードで書き、繰り返す側を通らない巡回は warn で言う |
 | [0101](0101-child-id-carries-the-phase.md) | 子チケットの識別子にフェーズ番号を入れ、連番はフェーズごとに振る |
 | [0103](0103-issue-mr-branch-lookup.md) | issue・MR を指定された依頼では、UserPromptSubmit が指示を足し、`ccnavi-branches.sh` で紐づくブランチを探してユーザに確かめてから進める（止めない） |
-| [0104](0104-approval-leaves-the-ticket-as-is.md) | 承認はチケットの中身を変えない。状態は status で聞き、承認の知らせは外す |
-| [0105](0105-approved-ticket-written-durably.md) | 承認済みチケットは一時ファイルに書き切って fsync してから差し替える |
+| [0104](0104-approval-leaves-the-ticket-as-is.md) | 承認はチケットの中身を変えない。状態は status で聞き、承認の知らせは外す（待ち方のファイルは ADR-0109 が改める） |
+| [0105](0105-approved-ticket-written-durably.md) | 承認済みチケットは一時ファイルに書き切って fsync してから差し替える（待ち方のファイルの記述は ADR-0109 が改める） |
+| [0109](0109-plan-order-on-plan-items.md) | フェーズの順序は親の計画の項の `after` に書き、待ち方は計画から都度計算し、計画が使う定義は親に写して固定する（提案。実行ファイルの側は実装済み。ワークフロー編集タブと図は未実装） |
 
 ### 複数のリポジトリと VS Code 拡張
 
@@ -184,15 +185,15 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0033](0033-projects.md) | 複数のリポジトリ：道具はワークスペース、設定はプロジェクト、Bash は和 |
 | [0035](0035-extension-no-judging.md) | VS Code 拡張は判定を自分で出さない |
 | [0084](0084-common-layer-is-distributed-to-projects.md) | 共通レイヤーは配る定義にし、親の着手でプロジェクトのレイヤーを上書きして最初のレビューで知らせる（ADR-0107 が置き換える） |
-| [0107](0107-common-layer-is-mirrored-and-phases-live-in-config.md) | 共通レイヤーはプロジェクトの common へミラーし、フェーズ定義は config だけに置く |
+| [0107](0107-common-layer-is-mirrored-and-phases-live-in-config.md) | 共通レイヤーはプロジェクトの common へミラーし、フェーズ定義は config だけに置く（`phases.yml` の効く範囲は ADR-0109 が改める） |
 | [0038](0038-project-from-location.md) | チケットのプロジェクトは提案を置いた場所で決める |
 | [0064](0064-extension-board-in-react.md) | ボードの画面を React にし、拡張ホストは中身だけを渡す |
 | [0062](0062-retained-screen-host.md) | 保持する画面は、入れ物を入れ直さない段取りで React にする |
 | [0066](0066-webview-css-beside-components.md) | 画面の CSS を部品と同じ置き場に移し、バンドルしたものを拡張ホストが流し込む |
 | [0068](0068-approval-overlay-state-machine.md) | 承認のオーバーレイの遷移を 1 か所に集め、単体で試せるようにする |
-| [0070](0070-phase-graph-has-no-direction.md) | フェーズの関係を図にする。線に向きは付けず、置き場所は id だけで決める |
+| [0070](0070-phase-graph-has-no-direction.md) | フェーズの関係を図にする。線に向きは付けず、置き場所は id だけで決める（図は ADR-0109 がなくす。未実装） |
 | [0074](0074-board-shows-what-moved.md) | ボードは「動いた」を表示し、その表示を時間では消さない |
-| [0082](0082-phase-graph-groups-tour.md) | フェーズの図を区分の枠で分け、図の下は凡例と当てはまるときだけの注意にし、細かい案内は初回の吹き出しとヘルプに寄せる |
+| [0082](0082-phase-graph-groups-tour.md) | フェーズの図を区分の枠で分け、図の下は凡例と当てはまるときだけの注意にし、細かい案内は初回の吹き出しとヘルプに寄せる（図は ADR-0109 がなくす。未実装） |
 | [0083](0083-tour-on-every-screen-with-samples.md) | 初回の吹き出しの案内を拡張の 5 画面すべてに出し、中身が空の画面では案内の間だけ見本を出す |
 | [0091](0091-project-skills-in-docs-skills.md) | プロジェクトのスキルは `docs/skills/` に置き、ccnavi は目録だけを渡す |
 
