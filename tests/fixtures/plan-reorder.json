@@ -1,0 +1,143 @@
+{
+ "about": "計画の番号の振り直しの見本の表。入力は提案の計画（plan / feedback の項）と、元の番号での直接の先行（order。--plan-order の --order と同じ形）と、子が承認された番号（fixed）。期待は振り直した計画（after は振り直した番号）と、新しい番号ごとの元の番号（from）か、断る理由（refused: cycle は循環になる線、locked は子が承認された番号へ入る線を変えた、unpackable は固定した番号を動かさずに番号が振れない）。決まりは「先行が全部前に並んだ項のうち、元の番号がいちばん小さいものから順に番号を振る。固定した番号は動かさず、空いた番号に詰める」。実行ファイル（tests/ticket/test_plan_order.py）と VS Code 拡張のワークフロー編集タブの仮の振り直しが同じ表を読む。拡張が仮の番号を出すのは固定した番号の無い計画だけなので、fixed のある見本は実行ファイルだけが読む。決まりを直すときは、この表も一緒に直す",
+ "cases": [
+  {
+   "name": "線を変えても並びが崩れなければ番号は変わらない",
+   "plan": [
+    "design",
+    {"type": "acceptance", "after": [1]},
+    {"type": "implement", "after": [1]},
+    {"type": "docs", "after": [2, 3]}
+   ],
+   "order": {"plan": {"1": [], "2": [1], "3": [1], "4": [2, 3]}},
+   "expect": {
+    "plan": [
+     "design",
+     {"type": "acceptance", "after": [1]},
+     {"type": "implement", "after": [1]},
+     {"type": "docs", "after": [2, 3]}
+    ],
+    "from": [1, 2, 3, 4]
+   }
+  },
+  {
+   "name": "逆向きの線で番号が振り直る",
+   "plan": ["research", {"type": "design", "after": [1]}, {"type": "implement", "after": [2]}],
+   "order": {"plan": {"1": [2], "2": [], "3": [1]}},
+   "expect": {
+    "plan": ["design", {"type": "research", "after": [1]}, {"type": "implement", "after": [2]}],
+    "from": [2, 1, 3]
+   }
+  },
+  {
+   "name": "同じ段の項は元の番号順を保つ",
+   "plan": ["research", "design", "acceptance", {"type": "docs", "after": [1, 2, 3]}],
+   "order": {"plan": {"1": [3], "2": [], "3": [], "4": [1, 2, 3]}},
+   "expect": {
+    "plan": [
+     "design",
+     "acceptance",
+     {"type": "research", "after": [2]},
+     {"type": "docs", "after": [1, 2, 3]}
+    ],
+    "from": [2, 3, 1, 4]
+   }
+  },
+  {
+   "name": "延期は項に付いたまま動く",
+   "plan": [
+    "design",
+    {"type": "acceptance", "review": "defer", "after": [1]},
+    {"type": "implement", "after": [1]},
+    {"type": "docs", "after": [2, 3]}
+   ],
+   "order": {"plan": {"1": [], "2": [1, 3], "3": [1], "4": [2, 3]}},
+   "expect": {
+    "plan": [
+     "design",
+     {"type": "implement", "after": [1]},
+     {"type": "acceptance", "review": "defer", "after": [1, 2]},
+     {"type": "docs", "after": [2, 3]}
+    ],
+    "from": [1, 3, 2, 4]
+   }
+  },
+  {
+   "name": "書いていない番号は何も待たない",
+   "plan": ["research", {"type": "design", "after": [1]}, {"type": "implement", "after": [2]}],
+   "order": {"plan": {"3": [1]}},
+   "expect": {
+    "plan": ["research", "design", {"type": "implement", "after": [1]}],
+    "from": [1, 2, 3]
+   }
+  },
+  {
+   "name": "循環になる線は断る",
+   "plan": ["research", {"type": "design", "after": [1]}, {"type": "implement", "after": [2]}],
+   "order": {"plan": {"1": [3], "2": [1], "3": [2]}},
+   "refused": "cycle"
+  },
+  {
+   "name": "フィードバック計画も同じ決まりで、番号は全体計画の続き",
+   "plan": ["design", {"type": "docs", "after": [1]}],
+   "feedback": ["design-feedback", "skill-improve", {"type": "implement-feedback", "after": [3, 4]}],
+   "order": {"feedback": {"3": [4], "4": [], "5": [3, 4]}},
+   "expect": {
+    "plan": ["design", {"type": "docs", "after": [1]}],
+    "feedback": [
+     "skill-improve",
+     {"type": "design-feedback", "after": [3]},
+     {"type": "implement-feedback", "after": [3, 4]}
+    ],
+    "from": [1, 2, 4, 3, 5]
+   }
+  },
+  {
+   "name": "固定した番号は動かさず、空いた番号に先行の済んだ順で詰める",
+   "plan": [
+    "research",
+    {"type": "design", "after": [1]},
+    {"type": "acceptance", "after": [1]},
+    {"type": "implement", "after": [2, 3, 5]},
+    {"type": "docs", "after": [1]}
+   ],
+   "fixed": [1, 3],
+   "order": {"plan": {"1": [], "2": [1, 5], "3": [1], "4": [2, 3, 5], "5": [1]}},
+   "expect": {
+    "plan": [
+     "research",
+     {"type": "docs", "after": [1]},
+     {"type": "acceptance", "after": [1]},
+     {"type": "design", "after": [1, 2]},
+     {"type": "implement", "after": [2, 3, 4]}
+    ],
+    "from": [1, 5, 3, 2, 4]
+   }
+  },
+  {
+   "name": "子が承認された番号へ入る線は変えられない",
+   "plan": [
+    "research",
+    {"type": "design", "after": [1]},
+    {"type": "acceptance", "after": [1]},
+    {"type": "implement", "after": [2, 3, 5]},
+    {"type": "docs", "after": [1]}
+   ],
+   "fixed": [1, 3],
+   "order": {"plan": {"1": [5], "2": [1], "3": [1], "4": [2, 3, 5], "5": []}},
+   "refused": "locked"
+  },
+  {
+   "name": "固定した番号を動かさずに番号が振れなければ詰められない",
+   "plan": [
+    "research",
+    {"type": "design", "after": [1]},
+    {"type": "acceptance", "after": [1]},
+    {"type": "implement", "after": [2, 3]}
+   ],
+   "fixed": [1, 3],
+   "order": {"plan": {"1": [], "2": [1, 3], "3": [1], "4": [2, 3]}},
+   "refused": "unpackable"
+  }
+ ]
+}

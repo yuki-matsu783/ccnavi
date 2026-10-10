@@ -1512,6 +1512,29 @@ class WithdrawTest(CoreHarness):
         problems = self.problems({"i0001": text.encode()})
         self.assertTrue(any("中身が変わった" in p for p in problems), problems)
 
+    def test_a_parent_reordered_before_approval_is_told_to_cancel(self):
+        """承認の前に順序を書き換えた提案は、承認コミットの親の提案（書き換える前）と違う。
+
+        違いが `plan:` / `feedback:` / `phases:` の値だけなら、取り消して出し直すよう案内する。
+        """
+        self.use(DEFS)
+        before = parent_text("i0001", PLAN, copy=self.phases_text)
+        reordered = parent_text(
+            "i0001",
+            [PLAN[0], PLAN[2], {**PLAN[1], "after": [1]}, {**PLAN[3], "after": [2, 3]}],
+            copy=self.phases_text,
+        )
+        self.new_parent(reordered)
+        problems = self.problems({"i0001": before.encode()})
+        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
+        told = [p for p in problems if "ワークフロー編集タブ" in p]
+        self.assertTrue(told, problems)
+        self.assertIn("--fill-phases", told[0])
+        self.assertIn("cancel", told[0])
+        # 本文も違えば、その案内はしない（ほかの書き換えかもしれない）。
+        problems = self.problems({"i0001": before.replace("本文", "別の本文").encode()})
+        self.assertFalse(any("ワークフロー編集タブ" in p for p in problems), problems)
+
     def test_an_old_form_parent_is_always_refused(self):
         """古い形の親は、改版されたかを見分ける印が無いので一律に止める。"""
         text = self.approved_parent()
