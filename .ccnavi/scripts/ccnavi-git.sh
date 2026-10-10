@@ -648,7 +648,7 @@ ig_integrate() {
 	ig_log_open integrate "$ig_n"
 	ig_rc=0
 	git merge --squash "refs/heads/$ig_n" >>"$ig_log" 2>&1 || ig_rc=$?
-	ig_changed=$(git diff --cached --name-only HEAD 2>/dev/null || :)
+	ig_changed=$(git diff --cached --no-renames --name-only HEAD 2>/dev/null || :)
 	ig_conf=$(git diff --name-only --diff-filter=U 2>/dev/null || :)
 	if [ "$ig_rc" -ne 0 ] && [ -z "$ig_changed" ] && [ -z "$ig_conf" ]; then
 		printf 'fail  git integrate  %s を取り込めなかった（統合先のツリーは変えていない）  log=%s\n' "$ig_n" "$ig_logrel"
@@ -674,6 +674,9 @@ ig_integrate() {
 		tree "$ig_tree" integration "$ig_integ" created "$(date +%s)" ||
 		printf '案内: 取り込みの記録（%s）を書けなかった。integrate-done は記録が無いと進まない。%s integrate --abort %s では戻せないので、%s status で確かめてユーザに伝える\n' "$ig_mark" "$SELF" "$ig_n" "$SELF"
 	if [ -z "$ig_changed" ]; then
+		# 差分が無いと、コミットが SQUASH_MSG を消さずに残る。残ると次の integrate が「途中の操作」で止まり続ける。
+		ig_sq=$(git rev-parse --git-path SQUASH_MSG 2>/dev/null || :)
+		[ -z "$ig_sq" ] || rm -f "$ig_sq" 2>/dev/null || :
 		printf 'ok  git integrate  %s に取り込む差分は無かった（ブランチの中身は統合先に入っている）  log=%s\n' "$ig_n" "$ig_logrel"
 		printf '次: %s integrate-done %s で片付けだけを行う\n' "$SELF" "$ig_n"
 		log_info 取り込む差分が無かった -- "name=$ig_n"
@@ -702,9 +705,14 @@ ig_abort() {
 	if [ "$(git rev-parse --verify HEAD 2>/dev/null || :)" = "$ig_m_base" ]; then
 		[ -f "$ig_paths" ] ||
 			reject integrate-abort-no-paths "取り込みの記録のうち、変えたパスの一覧（${ig_paths}）がありません。どこまでが取り込みの変更か決められないので戻しません。$SELF status で確かめ、ユーザに伝えてください。"
-		ig_extra=$(git diff --cached --name-only HEAD 2>/dev/null | grep -v -x -F -f "$ig_paths" | grep -v '^$' | head -n 10 || :)
+		ig_extra=$(git diff --cached --no-renames --name-only HEAD 2>/dev/null | grep -v -x -F -f "$ig_paths" | grep -v '^$' | head -n 10 || :)
 		if [ -n "$ig_extra" ]; then
 			reject integrate-abort-extra "取り込んだ後に、取り込みと関係の無いパスが staged になっています（$(printf '%s' "$ig_extra" | tr '\n' ' ')）。戻すとその変更も消えるので戻しません。持ち主に確かめ、コミットか退避を済ませてもらってから打ち直してください。"
+		fi
+		# 取り込み直後の index のツリーが分かっているなら、それと違う index は戻さない。取り込み後に別の人が
+		# staged した変更が、取り込んだパスに重なっている場合も含む（上のパスの確認では見分けられない）。戻すとその変更も消える。
+		if [ "$ig_state" = staged ] && [ -n "$ig_m_tree" ] && [ "$(git write-tree 2>/dev/null || :)" != "$ig_m_tree" ]; then
+			reject integrate-abort-changed "取り込んだ後に、staged の内容が取り込み直後と変わっています（別のセッションかユーザの変更が、取り込んだパスに重なっているかもしれません）。戻すとその変更も消えるので戻しません。$SELF status と $SELF diff --staged で確かめ、持ち主に確かめてください。"
 		fi
 		ig_log_open integrate --abort "$ig_n"
 		if ! git reset --merge >>"$ig_log" 2>&1; then
@@ -745,16 +753,29 @@ ig_stop() {
 
 # 中身が統合先に入りきったことを確かめてから、ワークツリー・ブランチ・記録を消す。
 ig_cleanup() {
+	ig_chk=""
 	if [ "$ig_has_branch" = yes ]; then
 		if ! ig_git_new_enough; then
 			ig_stop "git が古く（$(git version 2>/dev/null)）、ブランチの中身が統合先に入りきったかを merge-tree --write-tree（git 2.38 から）で確かめられないので、何も消していない。git を 2.38 以上にしてから打ち直すか、片付けをユーザに頼む" integrate-done-old-git
 		fi
+		# 確かめた先頭を覚えておき、消すときもその先頭が動いていないことを条件にする（確かめた後に積まれたコミットを消さない）。
+		ig_chk=$(git rev-parse --verify "refs/heads/$ig_n" 2>/dev/null || :)
+		[ -n "$ig_chk" ] ||
+			ig_stop "ブランチ $ig_n の先頭を読めないので、何も消していない" integrate-done-no-tip
 		ig_mt_rc=0
-		ig_mt=$(git merge-tree --write-tree HEAD "refs/heads/$ig_n" 2>/dev/null) || ig_mt_rc=$?
+		ig_mt=$(git merge-tree --write-tree HEAD "$ig_chk" 2>/dev/null) || ig_mt_rc=$?
 		ig_mt=$(printf '%s\n' "$ig_mt" | head -n 1)
 		ig_ht=$(git rev-parse --verify "HEAD^{tree}" 2>/dev/null || :)
 		if [ "$ig_mt_rc" -ne 0 ] || [ "$ig_mt" != "$ig_ht" ]; then
 			ig_stop "ブランチ $ig_n の中身が統合先（${ig_integ}）に入りきっていない（統合先とブランチを合わせた結果が統合先の今のツリーと違う。合わせて衝突するときも含む）ので、何も消していない。取り込みをまだコミットしていないか、コミットした中身が取り込んだときと違う。$SELF diff HEAD $ig_n で確かめ、ユーザに伝える" integrate-done-not-contained
+		fi
+	fi
+	# ワークツリーがあるなら、いまそのブランチを開いている必要がある（ブランチが無くても同じ）。別のブランチや
+	# detached HEAD で積んだコミットは、ワークツリーごと消えると、どの ref からも届かなくなる。
+	if [ -e "$ig_wt" ] || [ -L "$ig_wt" ]; then
+		ig_wb=$(ig_wt_branch)
+		if [ "$ig_wb" != "refs/heads/$ig_n" ]; then
+			ig_stop "ワークツリー .claude/worktrees/$ig_n が、いまブランチ $ig_n を開いていない（${ig_wb:-detached HEAD かこのリポジトリの登録に無い}）。ここで積んだコミットは、消すと戻せないので、何も消していない。ワークツリーの中で $ig_n に戻すか、積んだコミットの扱いをユーザに確かめる" integrate-done-worktree-branch
 		fi
 	fi
 	if [ -e "$ig_wt" ] || [ -L "$ig_wt" ]; then
@@ -768,7 +789,10 @@ ig_cleanup() {
 	if git show-ref --verify --quiet "refs/heads/$ig_n"; then
 		ig_bsha_now=$(ig_short "refs/heads/$ig_n")
 		# 直接の git。-D を外から通さない方針は変えない（ここでは中身が入りきったことを確かめた後だけ）。
-		if ! ig_bd=$(git branch -D "$ig_n" 2>&1); then
+		[ -n "$ig_chk" ] ||
+			ig_stop "ブランチ $ig_n が、中身を確かめた後に現れた。確かめていないので、何も消していない" integrate-done-new-branch
+		# 確かめた先頭のままのときだけ消す（update-ref の旧値の指定。確かめた後に積まれたコミットは消さない）。
+		if ! ig_bd=$(git update-ref -d "refs/heads/$ig_n" "$ig_chk" 2>&1); then
 			ig_stop "ブランチ $ig_n を消せなかった（$(printf '%s' "$ig_bd" | head -n 1)）。ワークツリーの登録が残っているなら $SELF worktree prune で外してから打ち直す" integrate-done-branch
 		fi
 		ig_did="${ig_did:+${ig_did}、}ブランチ $ig_n を消した（先頭は ${ig_bsha_now}）"
