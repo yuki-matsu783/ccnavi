@@ -429,9 +429,13 @@ def types_of(t: ticket_model.Ticket) -> dict[str, PhaseType]:
     """チケットの写しの定義（id → 定義）。写しが無ければ空。
 
     読んだものは `t.phase_types` に持たせて使い回す（読み込みの state 層は生の値しか持たない）。
+    子に渡すと、子の写し（子に `phases:` は書けないので普通は空）を返す。
     """
     if t.phase_types is None:
         t.phase_types = read_copy(t.phases_raw)[0] if t.phases_raw is not None else PhaseTypes()
+    # 出どころのレイヤーは、写しの元の `phases.yml`（親の `project:` が指すレイヤー）。記録の
+    # `source` になる。`project` は読んだあとに置き場から入るので、引くたびに付け直す。
+    mark_source(t.phase_types, t.project or settings.LAYER_SELF)
     return t.phase_types
 
 
