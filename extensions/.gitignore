@@ -1,0 +1,2 @@
+# pnpm が workspace の状態を置く（extensions/node_modules/.pnpm-workspace-state-v1.json）
+/node_modules/

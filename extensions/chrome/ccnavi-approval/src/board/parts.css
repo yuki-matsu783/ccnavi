@@ -1,0 +1,14 @@
+/*
+ * ボードの小さな部品（`parts.tsx`）。注意の一言（`p.notice`）と、バッジ。
+ * 一言の色は承認のオーバーレイの `.approval-note`（VS Code 拡張の `Approval.css`）と同じく、`page.css` の文字用の色。
+ * バッジはカードの `.badge`（`Card.css`）と同じ形。
+ */
+main .notice { margin: 4px 0 8px; overflow-wrap: anywhere; }
+main .notice.warn { color: var(--warn-text); }
+main .notice.error { color: var(--error-text); white-space: pre-wrap; }
+main .notice.ok { color: var(--ok-text); }
+.badge {
+  display: inline-block; margin-left: 6px; vertical-align: 1px;
+  font-size: .82em; font-weight: 400; padding: 0 6px; border-radius: .8em;
+  border: 1px solid currentColor; color: var(--vscode-descriptionForeground);
+}

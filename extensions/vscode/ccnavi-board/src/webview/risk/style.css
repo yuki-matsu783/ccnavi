@@ -6,8 +6,10 @@
  * バンドルするのは `scripts/bundle-webview.js`（出口は `out/webview/risk.css`）。拡張ホストはそれを読んで
  * `<style nonce>` に流し込む（`src/core/risk-render.ts`）。
  */
-@import "../styles/page.css";
-@import "../styles/list.css";
+@import "@ccnavi/shared/styles/button.css";
+@import "../styles/appearance.css";
+@import "@ccnavi/shared/styles/page.css";
+@import "@ccnavi/shared/styles/list.css";
 @import "./App.css";
 @import "./Factor.css";
 @import "./Sum.css";

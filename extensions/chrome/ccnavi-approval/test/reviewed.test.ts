@@ -17,7 +17,7 @@ import { JSDOM } from "jsdom";
 
 import * as gh from "../src/core/github.js";
 import type { PyCall } from "../src/core/py.js";
-import { renderRepo } from "../src/core/render.js";
+import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo } from "../src/core/snapshot.js";
@@ -123,7 +123,7 @@ test("CX-T131 ボード: 依頼済みのフェーズにスレッドを出し、�
     assert.deepEqual(panel.children, [`${FAMILY}-01-01`]);
     if (why) assert.match(panel.problems.join("\n"), why, scene);
     else assert.deepEqual(panel.problems, [], scene);
-    const html = renderRepo(dom.window.document, md, board, noop);
+    const html = renderBoard(dom.window.document, md, board, noop);
     const box = html.querySelector(`[data-family="${FAMILY}"] .review[data-phase="1"]`);
     assert.ok(box, scene);
     assert.equal(box.querySelectorAll("button[data-action=review]").length, button, scene);
@@ -191,8 +191,7 @@ test("CX-T135 スレッドの悪意のある本文は描いても実行されず
   assert.equal(panel?.copy?.threads.length, 8);
   const dom = new JSDOM("<!doctype html><body></body>", { runScripts: "outside-only" });
   const md = createRenderer(dom.window as unknown as Window & typeof globalThis);
-  const html = renderRepo(dom.window.document, md, board, { approve: () => undefined, withdraw: () => undefined, review: () => undefined });
-  dom.window.document.body.append(html);
+  const html = renderBoard(dom.window.document, md, board, { approve: () => undefined, withdraw: () => undefined, review: () => undefined });
   const box = dom.window.document.querySelector(`[data-family="${FAMILY}"] .review`) as HTMLElement;
   assert.equal(box.querySelectorAll("script, img, svg, iframe, form, style, details, summary, font").length, 0);
   const attrs = [...box.querySelectorAll("*")].flatMap((e) => [...e.attributes].map((a) => a.name));

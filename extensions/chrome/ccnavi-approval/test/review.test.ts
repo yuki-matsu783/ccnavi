@@ -9,7 +9,7 @@ import { ensureDailyAlarm, PERIOD_MINUTES } from "../src/core/alarm.js";
 import { expiryNotice } from "../src/core/expiry.js";
 import * as gh from "../src/core/github.js";
 import type { PyCall } from "../src/core/py.js";
-import { renderRepo } from "../src/core/render.js";
+import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo } from "../src/core/snapshot.js";
@@ -192,7 +192,7 @@ test("CX-T126 承認の画面: ccnavi の本文を承認のボタンの上に開
   const dom = new JSDOM("<!doctype html><body></body>");
   const doc = dom.window.document;
   const md = createRenderer(dom.window as unknown as Parameters<typeof createRenderer>[0]);
-  doc.body.append(renderRepo(doc, md, b, { approve: () => undefined, withdraw: () => undefined }));
+  renderBoard(doc, md, b, { approve: () => undefined, withdraw: () => undefined });
   const box = doc.querySelector('[data-family="i0001"]') as HTMLElement;
   const screen = box.querySelector("[data-testid=screen]") as HTMLElement;
   assert.ok(screen && !screen.closest("details"));

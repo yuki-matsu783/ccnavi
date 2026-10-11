@@ -1,0 +1,13 @@
+/*
+ * 設定画面の CSS の入口。ビルド（scripts/build.js）が 1 本にまとめて dist/options.css に出す。
+ * `@import` を並べるだけで、部品の CSS は同じ置き場に置く（`App.tsx` なら `App.css`）。
+ *
+ * 共通の部品（ボタン・骨組み・一覧）は VS Code 拡張と同じ `@ccnavi/shared` の CSS で、並べる順も同じ
+ * （ボタン・配色・骨組み）。配色は VS Code の外なので `browser-theme.css`（Claude の配色を `:root` と
+ * `prefers-color-scheme` で定義する）を使う。
+ */
+@import "@ccnavi/shared/styles/button.css";
+@import "@ccnavi/shared/styles/browser-theme.css";
+@import "@ccnavi/shared/styles/page.css";
+@import "@ccnavi/shared/styles/list.css";
+@import "./App.css";
