@@ -22,6 +22,7 @@ import errno
 import io
 import json
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -31,6 +32,7 @@ from unittest import mock
 
 from ccnavi.hook import docsearch, docsearch_index, docsearch_query
 from ccnavi.infra import hookio, settings
+from tests import ROOT
 from tests.inproc import run_ccnavi
 
 
@@ -831,9 +833,30 @@ class FrontmatterHintTest(Repo):
             "wip/scratchpad/draft.md",
             "wip/proposals/todo/i0001.md",
             ".ccnavi/notes.md",
+            "wip/design/scripts/i12.md",
+            ".claude/skills/yomiyasu/a.md",
+            ".claude/skills/yomiyasu/references/b.md",
         ):
             with self.subTest(rel=rel):
                 self.assertEqual(self.hint(rel, "# 見出し\n"), "")
+        # 表に無い置き場には出す。
+        self.assertNotEqual(self.hint("wip/design/notes.md", "# 見出し\n"), "")
+        self.assertNotEqual(self.hint(".claude/skills/x/references/a.md", "# 見出し\n"), "")
+
+    def test_exempt_places_match_the_convention_table(self):
+        """案内を出さない置き場は、決まりの文書の「対象外」の表で付けない・付けなくてよいとするもの。"""
+        with open(os.path.join(ROOT, *docsearch.CONVENTION_DOC.split("/")), encoding="utf-8") as f:
+            text = f.read()
+        table = text.split("## 対象外", 1)[1].split("\n\n", 2)[1]
+        places = set()
+        for row in table.splitlines()[2:]:
+            cells = [c.strip() for c in row.strip("|").split("|")]
+            if cells[1] not in ("付けない", "付けなくてよい"):
+                continue
+            for code in re.findall(r"`([^`]+)`", cells[0]):
+                if "/" in code:
+                    places.add(code if not code.endswith("/") else code + "**")
+        self.assertEqual(places, set(docsearch.NO_FRONTMATTER_PLACES))
 
     def test_ignored_and_non_md_files_are_not_told(self):
         write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\n/out/\n")

@@ -64,7 +64,9 @@ frontmatter は PyYAML の SafeLoader（別名を拒む `flow._Loader`）で読�
 
 from __future__ import annotations
 
+import fnmatch
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from typing import TextIO
@@ -396,6 +398,20 @@ CODE_MISSING_FRONTMATTER = "NOTICE_DOC_FRONTMATTER"
 # エディタが頭から表示し、CLAUDE.md は毎回モデルの文脈に入る）ので、頭の YAML がそのまま
 # 人にもモデルにも見える。決まりの文書（CONVENTION_DOC）の「付けていない」と揃える。
 NO_FRONTMATTER_NAMES = ("README.md", "CLAUDE.md")
+# 決まりの文書（CONVENTION_DOC）の「対象外」の表で、付けない・付けなくてよいとする置き場
+# （ツリーのルートからの glob）。表を直したらここも直す
+# （tests/core/test_docsearch.py が表と比べる）。
+# チケットと下書きの置き場は設定で動くので、設定の値（conf.tickets・下書きの置き場）でも見る。
+NO_FRONTMATTER_PLACES = (
+    "wip/proposals/**",
+    ".ccnavi/approved/**",
+    "wip/design/scripts/i*.md",
+    "wip/scratchpad/**",
+    ".claude/skills/yomiyasu/**",
+)
+_NO_FRONTMATTER = re.compile(
+    "|".join(fnmatch.translate(glob) for glob in NO_FRONTMATTER_PLACES), re.IGNORECASE
+)
 # git に「無視されているか」を聞く時間の上限（秒）。過ぎたら何も言わない。
 CHECK_SECONDS = 2.0
 
@@ -413,9 +429,9 @@ def missing_frontmatter(conf: settings.Settings, root: str, payload: hookio.Inpu
       git で決める。ワークツリーはワークスペースの `.gitignore` では無視されるが、統合した後は
       統合先の索引に入るので、そのワークツリー自身の git に聞く。ccnavi ディレクトリの下と、
       git が無視するものは索引に載らないので出さない
-    - 決まりの文書が「付けない・付けなくてよい」とする md でない。README.md・CLAUDE.md、
-      下書きの置き場（`wip/scratchpad/`。使い捨てで、統合のときに外す）、チケットの置き場
-      （独自の frontmatter を持つ）。下書きは索引には載るが、frontmatter を求めない
+    - 決まりの文書が「付けない・付けなくてよい」とする md でない。README.md・CLAUDE.md と、
+      対象外の表の置き場（NO_FRONTMATTER_PLACES。チケットとチケットの下書き・下書きの置き場・
+      外から取り込んだスキル）。下書きは索引には載るが、frontmatter を求めない
     """
     if payload.tool_name != "Write" or payload.tool_response.get("type") != "create":
         return ""
@@ -432,6 +448,8 @@ def missing_frontmatter(conf: settings.Settings, root: str, payload: hookio.Inpu
         home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).strip("/")
         exempt = tuple(p for p in (home, ticket_places.SCRATCH, conf.tickets.strip("/")) if p)
         if not rel or rel.startswith("../") or docsearch_index._excluded(rel, exempt):
+            return ""
+        if _NO_FRONTMATTER.match(rel):
             return ""
         if rel in docsearch_index._ignored(where.root, [rel], timeout=CHECK_SECONDS):
             return ""
