@@ -74,7 +74,9 @@ esbuild
     // `{ in, out }` の形で渡すと、出口は `outdir` の下の `<out>.js` になる。
     // 分割（splitting）はしない。chunk をファイルとして Webview に読ませることになり、
     // localResourceRoots を空のままにする方針と両立しないため。代わりに React 一式が
-    // 画面ごとに重複する（1 画面あたり 200KB 強）
+    // 画面ごとに重複する（1 画面あたり 200KB 強）。図を描く画面（フロー編集と、承認のオーバーレイに
+    // 計画の図を出すボード）は React Flow も持つので、さらに 180KB ほど重い（ボードは約 300KB から
+    // 約 490KB になった）。図は承認のときにしか出ないが、ボードの 1 本に入る
     entryPoints: found.map((screen) => ({ in: screen.entry, out: screen.name })),
     platform: "browser",
     // Webview は VS Code に入っている Chromium。ES2022 で足りる
