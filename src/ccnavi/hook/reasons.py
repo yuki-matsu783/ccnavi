@@ -131,7 +131,15 @@ def fallen_back(rules_path: str) -> str:
     )
 
 
-def undeclared(tool: str, subject: str, rules_path: str, degraded: str, refused: bool) -> str:
+def undeclared(
+    tool: str,
+    subject: str,
+    source: str,
+    degraded: str,
+    *,
+    verdict: str,
+    fell_back: bool = False,
+) -> str:
     """どのタイプも言及しなかった呼び出しに返す文。
 
     危険だとは言わない。言えないから権限モードに委ねている。根拠は設定の穴で
@@ -142,43 +150,93 @@ def undeclared(tool: str, subject: str, rules_path: str, degraded: str, refused:
     何度も止まるなら、答えるべきなのは呼び出しごとの是非ではなく
     「この場所を allow に書くかどうか」になる。
 
-    refused は、確認できる者が居ないモードで許可としなかったことを示す。
-    そのときは同じ根拠でも受け取った側の次の一手が違う。ユーザに聞けるなら
-    「言えば通るかもしれない」だが、聞けないなら「言っても通らない」ので、
-    先に設定を直すか、ユーザが居るセッションでやり直すしかない。
-    """
-    shown = _shorten(subject)
+    verdict は `judge.undeclared_verdict` の戻り（ask か deny）。次の一手は、その結末と
+    読み切れたかどうか（degraded）の組で決まるので、組ごとの表（`_UNDECLARED_NEXT`）から引く。
+    `refused: bool` のように片方だけを渡すと、読めなかった回の分岐が先に当たり、止めた回にも
+    「聞いている、用途を言えば通る」と返していた。聞ける者が居ないモードで用途を言っても通らない。
+    表に無い結末（渡した回 `(handover)` など）には文を組まず空を返す。渡した回は文面を返さない
+    決まりで、呼び手もその回には呼ばない。
 
+    source は判定の出所（`ruleload.load_rules` が返すもの）。組み込みの既定に退避した回
+    （fell_back）は `builtin.SOURCE` になる。読めなかったルールファイルを根拠として名指しし、
+    そこへ allow を足せと案内すると、同じ応答の退避の文（`fallen_back`）と食い違う。直し方は
+    退避の文が言うので、ここではそれを指すだけにする。
+    """
+    template = _UNDECLARED_NEXT.get((bool(degraded), verdict))
+    if template is None:
+        return ""
     lines = [
-        f"[ccnavi] {CODE_UNCERTAIN if degraded else CODE_UNDECLARED} (source: {rules_path})",
-        f"subject: {shown}",
+        f"[ccnavi] {CODE_UNCERTAIN if degraded else CODE_UNDECLARED} (source: {source})",
+        f"subject: {_shorten(subject)}",
     ]
     if degraded:
-        lines.append(unreadable(degraded))
-        lines.append(
-            "ccnavi is asking rather than deciding because it could not tell what this call "
-            "would actually do. Say what the command is for, or rewrite it in a form that can "
-            "be read: no heredoc, no string handed to something that runs it, no case inside "
-            "$( )."
-        )
-    elif refused:
-        lines.append(
-            f"No rule in {rules_path} mentions this {'command' if tool == 'Bash' else 'path'}, "
-            "and this session has no one to ask: its permission mode answers on its own or not "
-            "at all. An undeclared call is not allowed here. Either do the work with something "
-            f"the allow section of {rules_path} already covers, or tell the user what needs to "
-            "be added there and let them decide."
-        )
+        lines.append(unreadable(degraded, matched=False))
+    if fell_back:
+        where = "the built-in defaults ccnavi fell back to"
+        then = _UNDECLARED_FALLEN_BACK[verdict]
     else:
-        lines.append(
-            f"No rule in {rules_path} mentions this {'command' if tool == 'Bash' else 'path'}, "
-            "so ccnavi has no verdict of its own and leaves the call to Claude Code's permission "
-            "mode, which in this session asks the user. This is not a warning about the call "
-            "itself. If this is ordinary work for this project, say so and ask the user to add "
-            f"it to the allow section of {rules_path}; that is what stops the same question from "
-            "coming back."
-        )
+        where = source
+        then = _UNDECLARED_THEN[verdict].format(where=source)
+    lines.append(
+        template.format(what="command" if tool == "Bash" else "path", where=where, then=then)
+    )
     return "\n".join(lines)
+
+
+# 言及の無い呼び出しの文。鍵は（読み切れなかったか, 結末）。結末は
+# `judge.undeclared_verdict` が返す ask か deny で、渡した回（handover）は文を返さない。
+# 読み切れなかった回は、ルールファイルに何を足しても読めるようにはならないので、
+# 次の一手は書き直しになる（{then} を使わない）。
+_UNDECLARED_NEXT = {
+    (False, rules.ASK): (
+        "No rule in {where} mentions this {what}, so ccnavi has no verdict of its own and "
+        "leaves the call to Claude Code's permission mode, which in this session asks the user. "
+        "This is not a warning about the call itself. {then}"
+    ),
+    (False, rules.DENY): (
+        "No rule in {where} mentions this {what}, and this session has no one to ask: its "
+        "permission mode answers on its own or not at all. An undeclared call is not allowed "
+        "here. {then}"
+    ),
+    (True, rules.ASK): (
+        "ccnavi is asking rather than deciding because it could not tell what this call "
+        "would actually do. Say what the command is for, or rewrite it in a form that can "
+        "be read: no heredoc, no string handed to something that runs it, no case inside "
+        "$( )."
+    ),
+    (True, rules.DENY): (
+        "ccnavi could not tell what this call would actually do, and this session has no one "
+        "to ask: its permission mode answers on its own or not at all. So the call is not run, "
+        "and saying what the command is for will not get it through. Rewrite it in a form that "
+        "can be read: no heredoc, no string handed to something that runs it, no case inside "
+        "$( ). If it cannot be written that way, tell the user what you need it for."
+    ),
+}
+
+# 読み切れた回の締め。ルールファイルを読めている回は、穴を塞ぐ先（allow）を名指しする。
+_UNDECLARED_THEN = {
+    rules.ASK: (
+        "If this is ordinary work for this project, say so and ask the user to add it to the "
+        "allow section of {where}; that is what stops the same question from coming back."
+    ),
+    rules.DENY: (
+        "Either do the work with something the allow section of {where} already covers, "
+        "or tell the user what needs to be added there and let them decide."
+    ),
+}
+
+# 組み込みの既定に退避した回の締め。読めなかったファイルへ allow を足せとは言わない。
+# 直し方は同じ応答の退避の文（`fallen_back`）が言うので、それを指すだけにする。
+_UNDECLARED_FALLEN_BACK = {
+    rules.ASK: (
+        "The project's rule file could not be read (see the note above), so its allow section "
+        "is not in force; ask the user to repair that file rather than to add anything to it."
+    ),
+    rules.DENY: (
+        "The project's rule file could not be read (see the note above), so its allow section "
+        "is not in force; tell the user that file has to be repaired first."
+    ),
+}
 
 
 def reason_for(
@@ -296,12 +354,16 @@ def inside_quotes() -> str:
     )
 
 
-def unreadable(reason: str) -> str:
+def unreadable(reason: str, *, matched: bool = True) -> str:
     """コマンドを読めないまま出した 1 件につける断り。
 
     2 つの違う失敗に同じ文を使わせないために要る。「禁止されたコマンドを実行した」と
     「読めない文字列のどこかにその語がある」では次にやることが違うし、
     後者なのに前者を渡された読み手は、書いた覚えのないコマンドを探しに行く。
+
+    matched は、ルールに当たった 1 件につけるか。言及の無い回（`undeclared`）はどのルールにも
+    当たっていないので、「this rule」と言うと指す先が無い。そのときは読めなかったことだけを言い、
+    次の一手は呼び手が続けて書く。
     """
     what = {
         shellread_scan.REASON_UNTERMINATED: ("a quote or heredoc in this command never closes"),
@@ -310,6 +372,11 @@ def unreadable(reason: str) -> str:
         ),
         shellread_scan.REASON_UNTERMINATED_SUBST: "a $( ) in this command never closes",
     }.get(reason, "this command could not be read")
+    if not matched:
+        return (
+            "note: " + what + ", so ccnavi could only match its rules against the raw text "
+            "of the command, and none of them mentions it."
+        )
     return (
         "note: " + what + ", so this rule was matched against the raw text of the "
         "command instead of against what runs. If these words are only being "

@@ -9,6 +9,7 @@ from __future__ import annotations
 import unittest
 
 from ccnavi.hook import reasons
+from ccnavi.policy import rules
 
 LIMIT = reasons.SUBJECT_LIMIT
 
@@ -38,7 +39,7 @@ class ShortenTest(unittest.TestCase):
 
     def test_宣言の無い呼び出しの文面も畳んだ後の長さで数える(self):
         subject = "z\n" * (LIMIT + 3)
-        text = reasons.undeclared("Bash", subject, "rules.yml", "", False)
+        text = reasons.undeclared("Bash", subject, "rules.yml", "", verdict=rules.ASK)
         folded = " ".join(subject.split())
         self.assertEqual(
             subject_line(text), "subject: " + folded[:LIMIT] + f"…(+{len(folded) - LIMIT})"

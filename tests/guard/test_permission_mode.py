@@ -154,6 +154,54 @@ class NoJudgeTest(unittest.TestCase):
         self.assertNotIn("asks the user", reason)
 
 
+class UndeclaredTextTest(unittest.TestCase):
+    """言及の無い呼び出しの文は、結末（ask / deny）と読み切れたかの組で次の一手を変える。"""
+
+    UNREADABLE = 'eval "$X"'
+
+    def reason(self, permission_mode, command):
+        result, record = run(permission_mode, command=command)
+        out = json.loads(result.stdout)["hookSpecificOutput"]
+        return out["permissionDecision"], out["permissionDecisionReason"], record
+
+    def test_読み切れずに止めた回は用途を言えば通るとは言わない(self):
+        for permission_mode in ("dontAsk", "bypassPermissions"):
+            with self.subTest(permission_mode=permission_mode):
+                decision, reason, record = self.reason(permission_mode, self.UNREADABLE)
+                self.assertEqual("deny", decision)
+                self.assertEqual("PARSE_UNCERTAIN", record["code"])
+                self.assertNotIn("asking rather than deciding", reason)
+                self.assertIn("will not get it through", reason)
+                self.assertIn("Rewrite it in a form that can be read", reason)
+
+    def test_読み切れずに聞く回は用途を言うよう促す(self):
+        decision, reason, _ = self.reason("default", self.UNREADABLE)
+        self.assertEqual("ask", decision)
+        self.assertIn("asking rather than deciding", reason)
+        self.assertNotIn("will not get it through", reason)
+
+    def test_ルールに当たっていない回に_this_rule_と言わない(self):
+        for permission_mode in ("default", "bypassPermissions"):
+            with self.subTest(permission_mode=permission_mode):
+                _, reason, _ = self.reason(permission_mode, self.UNREADABLE)
+                self.assertNotIn("this rule", reason)
+                self.assertIn("none of them mentions it", reason)
+
+    def test_読み切れた回は_allow_に足す道を示す(self):
+        # 知らない権限モードは ask になる（default などの判断できるモードは渡す）。
+        decision, reason, _ = self.reason("", UNDECLARED_COMMAND)
+        self.assertEqual("ask", decision)
+        self.assertIn("asks the user", reason)
+        self.assertIn("allow section of", reason)
+
+    def test_渡す回は文を組まずに記録だけ残す(self):
+        """HANDOVER の回に文の表を引いて落ちない。default で言及の無い読めた呼び出しは渡す。"""
+        result, record = run("default")
+        self.assertIsNone(decision_of(self, result), "判定を返している")
+        self.assertEqual("handover", record["decision"])
+        self.assertEqual("UNDECLARED", record["code"])
+
+
 class RulesStillWinTest(unittest.TestCase):
     """権限モードが判定に使われるのは、ルールが何も言わなかったときだけ。"""
 

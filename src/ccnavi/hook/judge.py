@@ -671,11 +671,22 @@ def decide_before(
         # 結末は Claude Code の権限モードが決める。
         record.code = reasons.CODE_UNCERTAIN if record.degraded else reasons.CODE_UNDECLARED
         verdict = undeclared_verdict(payload.permission_mode, record.degraded, conf.guard_unwatched)
-        texts = [
-            reasons.undeclared(
-                payload.tool_name, subject, conf.rules, record.degraded, verdict == rules.DENY
-            )
-        ]
+        # 渡した回（HANDOVER）は文を返さないので組まない。出所は判定の出所（退避した回は
+        # 組み込みの既定）で、読めなかったルールファイルを名指ししない。
+        texts = (
+            []
+            if verdict == HANDOVER
+            else [
+                reasons.undeclared(
+                    payload.tool_name,
+                    subject,
+                    source,
+                    record.degraded,
+                    verdict=verdict,
+                    fell_back=record.fallback == builtin.FALLBACK,
+                )
+            ]
+        )
 
     if verdict == HANDOVER:
         # 判定は渡した。ここで残せるのは記録だけで、それがこの分担の要点になる。
