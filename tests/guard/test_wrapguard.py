@@ -557,6 +557,10 @@ class CorePathTest(unittest.TestCase):
             ("rm --pathspec-from-fi=list.txt", "ccnavi 自身を守る場所"),
             # 索引の中身に戻す checkout（sh は restore を案内して断る）。文面も restore を案内する。
             ("checkout -- .ccnavi/common/rules.yml", "restore <パス>"),
+            # `--no-dry-run`（省略形も）が後ろにあれば消す形。git は後に書いたほうを採る
+            # （sh は `--no-dry-run` を許可リストで断る）。
+            ("rm --dry-run --no-dry-run .claude/settings.json", "ccnavi 自身を守る場所"),
+            ("rm -n --no-dry .claude/settings.json", "ccnavi 自身を守る場所"),
             # レビュー済みのマーカーを消すのはユーザが端末で打つ手順（sh は通す）。
             ("rm .ccnavi/approved/phases/i0001/1.reviewed", "ユーザに依頼"),
         ):
@@ -572,6 +576,13 @@ class CorePathTest(unittest.TestCase):
         self.assertEqual(decision, "deny", reason)
         self.assertIn("ccnavi-git.sh commit -F <file>", reason)
         self.assertNotIn(" git commit -F", reason)
+
+    def test_dry_run_given_last(self):
+        """`--no-dry-run` の後に `--dry-run` を書けば、何も消さない形として通す。"""
+        decision, reason = self.hook(
+            "sh .ccnavi/scripts/ccnavi-git.sh rm --no-dry-run --dry-run .claude/settings.json"
+        )
+        self.assertEqual(decision, "", reason)
 
     def test_review_place(self):
         """レビュー待ちの置き場（wip/proposals/review/）は、承認済みチケットの置き場と同じく

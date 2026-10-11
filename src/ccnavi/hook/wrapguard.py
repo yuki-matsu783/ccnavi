@@ -278,7 +278,8 @@ def _core_targets(sub: str, args: list[str]) -> tuple[list[str], str, bool]:
     索引の中身に戻す `checkout -- <パス>` か）。
 
     `restore` は `--source` が無ければ何も返さない。`checkout` は `--` より前の最初の語（行き先か
-    起点）を除く。`rm` は `-n` / `--dry-run` があれば何も返さない。長いオプションは、git が受ける
+    起点）を除く。`rm` は `-n` / `--dry-run` があれば（後ろに `--no-dry-run` が無ければ）何も
+    返さない。長いオプションは、git が受ける
     省略形（`--sou=` など）も同じに読む。パスに変数・置換があれば、その語を読めない指定として
     返す。旗を変数で書く形（`restore $O HEAD~1 <パス>`）は見ない（ADR-0121 の限界。sh が止める）。
     """
@@ -310,6 +311,9 @@ def _core_targets(sub: str, args: list[str]) -> tuple[list[str], str, bool]:
                 name = "--source"
             if _long_option(name, "--dry-run", len("--d")):
                 dry = True
+            if _long_option(name, "--no-dry-run", len("--no-d")):
+                # git は後に書いたほうを採る。`--dry-run --no-dry-run` は消す形。
+                dry = False
             if name in longs and not eq:
                 i += 1
             continue
