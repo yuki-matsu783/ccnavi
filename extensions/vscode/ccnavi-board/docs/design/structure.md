@@ -18,7 +18,7 @@ src/
   risk-panel.ts       リスク管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・作成・保存の受け付けと、読み取り専用の足し算（sums[]）の受け渡し（vscode に依存する）
   phases-panel.ts     フェーズ管理画面の Webview パネル（1 枚。対象（ワークスペースの設定・プロジェクトの設定。共通の設定には置けない）を切り替える）。検証・保存の受け付けと、共通の設定に phases.yml があるときの error の帯の受け渡し（vscode に依存する）
   flow-panel.ts       フロー編集画面の Webview パネル（子ごとに 1 枚。ボードのカードから開く）。置き場と錠を実行ファイルに聞き、保存を受け付ける。エージェントの下書きの「提案あり」・取り込み・保存のあとの削除と、依頼の文もここ（vscode に依存する）
-  workflow-panel.ts   ワークフロー編集タブの Webview パネル（親の提案ごとに 1 枚。識別子を渡すコマンドと、承認のオーバーレイの「ワークフローを編集」から開く）。線を変えるたびの --plan-order --json --order と、保存の --plan-order --write --expect を実行ファイルに打たせる（拡張はファイルを書かない）。提案の監視（外で変わった・承認待ちから無くなった）、未保存の「●」と閉じた後の聞き方、初回の案内もここ。未保存と、保存したあとのハッシュ（source_sha）を帳面（core/workflow-tabs.ts）に書く（vscode に依存する）
+  workflow-panel.ts   ワークフロー編集タブの Webview パネル（親の提案ごとに 1 枚。識別子を渡すコマンドと、ボードの親の提案のカードの「ワークフロー」、承認のオーバーレイの「ワークフローを編集」から開く）。線を変えるたびの --plan-order --json --order と、保存の --plan-order --write --expect を実行ファイルに打たせる（拡張はファイルを書かない）。提案の監視（外で変わった・承認待ちから無くなった）、未保存の「●」と閉じた後の聞き方、初回の案内もここ。未保存と、保存したあとのハッシュ（source_sha）を帳面（core/workflow-tabs.ts）に書く（vscode に依存する）
   prompt-handover.ts  Claude Code に文を渡す 2 つの経路（コピー / 新しいセッションで開く）。ボードとフロー編集画面が使う（vscode に依存する）
   projects-panel.ts   プロジェクト管理画面の Webview パネル。clone の送信、.gitignore への追記（vscode に依存する）
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
@@ -34,7 +34,7 @@ src/
     testmodel.ts      試験の JSON の形（--test --json / --test-samples --json）と読み取り
     suggestmodel.ts   候補の JSON の形（--suggest --json）と読み取り。allow の候補は並べない
     lintmodel.ts      lint の JSON の形（--lint --json）と読み取り、プロジェクトごとの苦情とフローの苦情（(flow)）の抜き出し、古い実行ファイルの「知らないオプション」の見分け
-    board.ts          列とカードへの組み立て、操作の有無
+    board.ts          列とカードへの組み立て、操作の有無（親の提案のカードの「ワークフロー」は提案の has_plan から）
     board-moved.ts    前の読み直しから列が変わったカードと、新しく現れたカード（いまの状態 ＋ 読めたボード → 次の状態）。持ち直すのは board-panel。VS Code に触れないので単体で試せる
     board-view.ts     ボードの拡張ホストと画面の契約（見せる中身 BoardData、押した操作 BoardMessage、承認のオーバーレイの状態）
     approval-machine.ts 承認のオーバーレイの遷移（いまの状態 ＋ 入力 → 次の状態 ＋ やること）。外へ出る仕事は返すだけで、行うのは board-panel。未保存のワークフロー編集タブがある親を含む一覧は承認を打たない、「ワークフローを編集」は閉じてからタブを開く、保存したあとに提案が変わった親を覚える、もここ。VS Code に触れないので単体で試せる
@@ -182,7 +182,7 @@ test/
   helpers/plan-order.ts --plan-order の答えの実例（fixtures/plan-order.json）を読む
   helpers/plan-reorder.ts 振り直しの見本の表（リポジトリの tests/fixtures/plan-reorder.json。実行ファイルのテストと共有し、書き換えない）を読み、表の計画を plans の形に並べる
   helpers/jsdom.ts    happy-dom で固まる図の点のドラッグだけを jsdom で動かす（いま使うテストは無い）
-  board/              ボード（board, model, approvemodel と、画面を動かす render.dom / board.dom、承認のオーバーレイの計画の図を動かす approval-graph.dom）
+  board/              ボード（board, model, approvemodel と、画面を動かす render.dom / board.dom、承認のオーバーレイの計画の図を動かす approval-graph.dom、カードの「ワークフロー」を動かす workflow-card.dom）
   rules/              ルール管理（rules-doc, hooks, testmodel と、画面を動かす rules.dom。入れ物は rules-render）
   risk/               リスク管理（risk-doc と、画面を動かす risk.dom。入れ物は risk-render）
   phases/             フェーズ管理（phases-doc, phases-layer と、画面を動かす phases.dom。入れ物は phases-render）
