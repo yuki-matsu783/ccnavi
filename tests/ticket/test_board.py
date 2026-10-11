@@ -22,7 +22,7 @@ import unittest
 
 from ccnavi.entry import diagnose_board
 from ccnavi.tickets import risk
-from tests.ticket.test_phases import PhaseHarness, child_text
+from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import ROOT, write
 
 FIXTURE = os.path.join(
@@ -89,6 +89,23 @@ class BoardTest(PhaseHarness):
         parent = by_id["i0001"]
         self.assertEqual(parent["parent"], "")
         self.assertEqual(parent["copy"]["status"], "open")
+
+    def test_the_proposal_says_whether_it_has_a_plan(self):
+        """提案の `has_plan` は、親の提案が計画（`plan:` か `feedback:`）を持つか。
+
+        ボードは承認待ちの親の提案のカードに、計画の順序を直すタブの入口をこれで出し分ける。
+        承認前の親は `parents[]` に出ないので、提案の側で言う。子の提案と、承認済みだけの
+        チケット（提案が無い）には持たせない。
+        """
+        self.scene()
+        self.propose("i0002", parent_text("i0002", ["research", "design"]))
+        self.propose("i0003", parent_text("i0003", [], copy=None))
+        self.commit_parent()
+        by_id = {t["ticket"]: t for t in self.board()["tickets"]}
+        self.assertTrue(by_id["i0002"]["proposal"]["has_plan"])
+        self.assertFalse(by_id["i0003"]["proposal"]["has_plan"])
+        self.assertFalse(by_id["i0001-02-03"]["proposal"]["has_plan"])
+        self.assertIsNone(by_id["i0001-02-02"]["proposal"])
 
     def test_scattered_is_empty_while_the_home_tree_holds_one_copy(self):
         """複数のツリーにあること自体は普通。本物とするツリーに 1 つあれば散在ではない。"""
