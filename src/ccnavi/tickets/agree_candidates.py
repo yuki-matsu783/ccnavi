@@ -137,7 +137,10 @@ def candidates(
         if not t.is_child and t.has_plan:
             t.workflow = workflow.compute(t)
         types = types_from(t, pool)
-        complaints, overflow = validate(t, pool, config)
+        missing = ""
+        if t.is_child and pool.get(t.parent) is None:
+            missing = parent_elsewhere_text(root, conf, t)
+        complaints, overflow = validate(t, pool, config, missing=missing)
         complaints += _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
         complaints += approval_checks.project_problems(t, pool, conf)
         complaints += approval_checks.family_problems(conf, root, t, fams)
@@ -594,11 +597,45 @@ def _numbers(found: list[int]) -> str:
     return ", ".join(map(str, found)) if found else "何も待たない"
 
 
+def parent_elsewhere_text(
+    root: str,
+    conf: settings.Settings,
+    t: ticket_model.Ticket,
+    everything: list[ticket_model.Ticket] | None = None,
+) -> str:
+    """子の親が承認済みの一覧に無いのに、別のツリーに同じ識別子が在るときの案内。
+
+    親の識別子の承認済みチケットか提案が、子と違うツリーに在る形（親のワークツリーを識別子と
+    違う名前で切った、など）を名指しする。`validate` の `missing` に渡す。無ければ空。
+    判定は変えない（親が無いので error のまま）。
+    `everything` は承認済みチケットの全部（読んであれば渡す。無ければここで読む）。
+    """
+    if not t.is_child or not t.parent:
+        return ""
+    if everything is None:
+        everything = approval.all_tickets(conf, root)
+    found, _ = ticket_mod.scan_all(root, conf.tickets, conf.projects)
+    places: list[str] = []
+    for u in list(everything) + list(found):
+        if u.ticket != t.parent or u.is_child or u.tree == t.tree:
+            continue
+        place = f"{u.tree or '(ワークスペースルート)'} の {u.state or ticket_model.DOING}/"
+        if place not in places:
+            places.append(place)
+    if not places:
+        return ""
+    return (
+        f"親 {t.parent} が承認されていない。親 {t.parent} は {', '.join(places)} に在る。"
+        f"親のワークツリーは {t.parent} と同名にして、その中に承認済みチケットを置く"
+    )
+
+
 def validate(
     t: ticket_model.Ticket,
     pool: dict[str, ticket_model.Ticket],
     config: dict | None = None,
     approved: bool = False,
+    missing: str = "",
 ) -> tuple[list[rules.Problem], list[rules.Problem]]:
     """承認の対象にしてよいかを見る。親子の制約はここでしか見られない。
 
@@ -621,7 +658,7 @@ def validate(
         return plan_problems(t, config, approved=approved), overflow
     problems.extend(phasetypes.copy_problems(t))
     parent = pool.get(t.parent)
-    problems.extend(approval_checks.child_problems(t, parent))
+    problems.extend(approval_checks.child_problems(t, parent, missing))
     if parent is None or parent.is_child:
         return problems, overflow
     overflow.extend(ticket_mod.subset_problems(t, parent))
