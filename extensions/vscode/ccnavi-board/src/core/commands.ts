@@ -74,6 +74,8 @@ export function planOrderWriteArgs(parent: string, order: Readonly<Record<string
 
 /** レビューの sh の、ワークスペースルートからのパス */
 export const REVIEW_SCRIPT = ".ccnavi/scripts/ccnavi-review.sh";
+/** 子のワークツリーを承認の後に作る sh（`worktree add` を通す）。承認の文面と失敗の案内も同じ呼び方を使う */
+export const GIT_SCRIPT = ".ccnavi/scripts/ccnavi-git.sh";
 
 /**
  * `ccnavi-review.sh decide <N> --preview`。残った指摘とダイジェストを JSON で見る（何も置かない）。
@@ -159,6 +161,11 @@ export function reviewedPrompt(
       "マーカーが置かれて止まらなくなったら、次のフェーズへ進む。",
   );
   return lines.join("\n");
+}
+
+/** `ccnavi-git.sh` を sh で呼ぶ前置き（ワークスペースルートの絶対パス。空白があれば引用する） */
+export function gitScriptCommand(root: string): string {
+  return `sh ${shellQuote(path.posix.join(toPosixPath(root), GIT_SCRIPT))}`;
 }
 
 /**

@@ -128,6 +128,8 @@ DEPLOY_SCRIPTS = (
     # 依頼文の issue・MR の指定に応じて hook が案内する sh
     "ccnavi-branches.sh",
     "ccnavi-start.sh",
+    "ccnavi-stage.sh",
+    "ccnavi-worktree.sh",
 )
 RULES_PARTS = (".ccnavi", "common", "rules.yml")
 # --deploy が配る残りの設定 2 本。リスクの配点は共通レイヤー、

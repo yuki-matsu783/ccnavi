@@ -546,3 +546,59 @@ def _writable_and_retry(func, path, _exc) -> None:
     """読み取り専用のファイル（Windows）を書けるようにしてやり直す。駄目なら投げる。"""
     os.chmod(path, stat.S_IWRITE)
     func(path)
+
+
+# 承認した子のワークツリーの状態（`child_worktrees` の `state`）。拡張は `create` だけを実行する。
+CHILD_CREATE = "create"  # 親のワークツリーが在り、子のワークツリーはまだ無い。承認の後に作る
+CHILD_EXISTS = "exists"  # 子のワークツリーが既に在る。何もしない
+CHILD_NO_PARENT = "no-parent"  # 親のワークツリーが無い（親を先に用意する）。作れない
+CHILD_PROJECT = "project"  # プロジェクトの子。置き場の決まりが別なので、承認の後には作らない
+
+
+def child_worktrees(root: str, tickets: list[ticket_mod.Ticket]) -> list[dict[str, str]]:
+    """承認した子それぞれの、ワークツリーの計画（承認のJSON `worktrees` に載せる）。
+
+    `create` の子は、拡張が `ccnavi-git.sh worktree add <path> -b <子> <base>` で作る。
+    base は親のワークツリーが今チェックアウトしているブランチ。親の `branch:` を読まずに済み、
+    親が `feature/123-login` のように `/` を含むときも、そのブランチから切れる。
+    ワークツリーの作成は git の局所の操作だけで、ネットワークには出ない（exe-boundary）。
+    """
+    out = []
+    for t in tickets:
+        if not t.is_child:
+            continue
+        entry = {
+            "ticket": t.ticket,
+            "parent": t.parent,
+            "path": _rel(t.ticket),
+            "branch": t.ticket,
+            "base": "",
+            "state": "",
+        }
+        if t.project:
+            entry["state"] = CHILD_PROJECT
+        elif os.path.exists(tree.worktree_path(root, t.ticket)):
+            entry["state"] = CHILD_EXISTS
+        else:
+            base = _checked_out(root, tree.worktree_path(root, t.parent))
+            if base:
+                entry["base"] = base
+                entry["state"] = CHILD_CREATE
+            else:
+                entry["state"] = CHILD_NO_PARENT
+        out.append(entry)
+    return out
+
+
+def _rel(name: str) -> str:
+    """ワークスペースルートからの相対のパス。区切りは `/`（文面と JSON で揃える）。"""
+    return (tree.WORKTREES_DIR + os.sep + name).replace(os.sep, "/")
+
+
+def _checked_out(root: str, path: str) -> str:
+    """親のワークツリー（`path`）が今チェックアウトしているブランチ名。無い・読めないなら空。"""
+    if not os.path.isdir(path) or not tree.is_worktree_of(root, path):
+        return ""
+    rc, out = gitcmd.output(path, ["rev-parse", "--abbrev-ref", "HEAD"], TIMEOUT_SECONDS)
+    name = out.strip()
+    return "" if rc != 0 or name in ("", "HEAD") else name
