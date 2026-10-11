@@ -17,7 +17,7 @@
  */
 import type { PathObject, RecentRef, TreeEntry, BlobText } from "./github.js";
 import { BLOB_BATCH, LINK_MODE, type ApprovalCommit } from "./github.js";
-import { py, type BoardResult, type Branch, type Compat, type Family, type Placement, type PyCall, type Snapshot, type Workspace } from "./py.js";
+import { py, tagged, WITHDRAW_NO_PRIOR, type BoardResult, type Branch, type Compat, type Family, type Placement, type PyCall, type Snapshot, type Workspace } from "./py.js";
 import { reviewPanels, type ReviewPanel } from "./reviewed.js";
 import type { RepoConfig } from "./settings.js";
 
@@ -366,7 +366,9 @@ async function withdrawableHere(board: BoardResult, reader: Reader, place: Place
       continue;
     }
     const prior = await findPrior((op, args) => reader.call(op, ...args), place, head, w.ticket);
-    out.push(prior === null ? { ...w, problems: ["承認コミット（親のブランチの first-parent の履歴で、この承認済みチケットを足したコミット）が見つからないか、そのコミットの親に提案が無い"] } : w);
+    // Python の `withdraw` が同じ場合に返す理由と同じコードを載せる（押した後の答えと表記をそろえる）
+    const why = "承認コミット（親のブランチの first-parent の履歴で、この承認済みチケットを足したコミット）が見つからないか、そのコミットの親に提案が無い";
+    out.push(prior === null ? { ...w, problems: [tagged(WITHDRAW_NO_PRIOR, why)] } : w);
   }
   return { ...board, withdrawable: out };
 }
