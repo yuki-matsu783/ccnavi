@@ -208,6 +208,11 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--phase", type=int, default=None)
     parser.add_argument("--body-file", default="")
     parser.add_argument("--reason", default="")
+    # ticket new
+    parser.add_argument("--title", default="")
+    parser.add_argument("--plan", default="")
+    parser.add_argument("--issue", type=int, default=None)
+    parser.add_argument("--allow", action="append", default=None)
     parser.add_argument("--reviewed", type=int, default=None)
     parser.add_argument("--accept-unresolved", action="store_true")
     parser.add_argument("--chat", action="store_true")

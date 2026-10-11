@@ -240,6 +240,13 @@ scripts in .ccnavi/scripts/, which call
         (reads only: place, approval time, started or not, uncommitted / unpushed
          by the local remote-tracking ref, why it is stopped, and the next step;
          a subagent may run it too)
+    ccnavi ticket new <prefix> <slug> --title <title> --plan <type,type,...>
+                      [--issue <n>] [--allow <glob>]...
+        (writes a parent proposal into wip/proposals/todo/ of the worktree you are in:
+         a straight-line plan, the phase definitions it uses in phases:, and allow:
+         built from their scopes with duplicates removed; --allow adds globs, and is
+         required when every definition is scope: inherit; the number is the issue's
+         with --issue, else the next serial number; refuses to overwrite)
     ccnavi ticket next-id [<prefix> <slug>]
         (reads only: the next serial number for a parent that has no issue, or
          the identifier <prefix>-<number>-<slug> built from it; a subagent may

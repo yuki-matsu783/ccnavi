@@ -18,6 +18,7 @@ from ..tickets import (
     c1,
     core,
     history,
+    new_ticket,
     next_id,
     ops,
     phase,
@@ -143,6 +144,20 @@ def operate(
     elif kind == "ticket" and verb == "next-id":
         # ticket next-id [<先頭の語> <slug>]。読むだけ。issue の無い親の識別子の番号を答える。
         code = next_id.run(stdout, stderr, root, conf, words[2:])
+    elif kind == "ticket" and verb == "new":
+        # ticket new <先頭の語> <slug> --title <題> --plan <定義,…> [--issue N] [--allow <glob>]…
+        code = new_ticket.run(
+            stdout,
+            stderr,
+            root,
+            conf,
+            cwd,
+            words[2:],
+            title=args.title,
+            plan=args.plan,
+            issue=args.issue,
+            extra_allow=list(args.allow or []),
+        )
     elif kind == "ticket" and verb in ("start", "finish", "cancel") and target:
         if verb == "start":
             code = ops.start(stdout, stderr, root, conf, target)
