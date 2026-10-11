@@ -29,9 +29,7 @@
 
 承認はチケットの中身を変えない。 提案のバイト列をそのまま `doing/` へ動かし、欄を書き足さない
 （改行も BOM も変えない）。どの経路で承認しても承認済みチケットは提案とバイト単位で同じになり、
-欄の有無から「承認が途中で止まった」と読み違える形が無くなる。前の版は承認の記録
-（`ccnavi_approved`）・`project:`・`workflow:` を書き足していた。残っている古い承認済みチケットは
-そのまま読む（消さない。`workflow:` の欄は読まない）。
+欄の有無から「承認が途中で止まった」と読み違える形が無くなる。
 
 ## チケットは 1 本のファイルで、コピーを持たない
 
@@ -58,8 +56,6 @@
 持たない。承認済みチケットの計画は承認済みの置き場にあり、変えられるのは改版（`--agree`）と
 ユーザの手だけなので、計算の元も固定されている。`phases.yml` は計算の入力にならないので、承認の
 あとに直しても進行中の親の待ち方は変わらない。手で動かした承認も同じに計画の `after` で読む。
-前の版が書いていた待ち方のファイル（`phases/<親>/workflow.yml`）が残っていても読まない
-（`--lint` が warn で言う）。
 """
 
 from __future__ import annotations
@@ -83,7 +79,7 @@ from . import ticket as ticket_mod
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
 DOING_DIR = ticket_model.DOING
 DONE_DIR = ticket_model.DONE
-# 続きの子の目印（トップレベルの欄）。前の版は承認の記録（`ccnavi_approved`）の中に書いていた。
+# 続きの子の目印（トップレベルの欄）。
 FOLLOWUP_KEY = "followup_of"
 
 
@@ -109,18 +105,18 @@ def copies(approved_dir: str, closed: bool = False) -> tuple[list[ticket_model.T
     `state` を添える。閉じたものは取り消しの欄で `done` と `cancelled` に分ける。
     """
     directory = os.path.join(approved_dir, DONE_DIR if closed else DOING_DIR)
-    return _load_dir(directory, approved_dir=approved_dir)
+    return _load_dir(directory)
 
 
 def _load_dir(
-    directory: str, require_record: bool = False, approved_dir: str = ""
+    directory: str, require_record: bool = False
 ) -> tuple[list[ticket_model.Ticket], list[str]]:
-    found, unread = _load_dir_detail(directory, require_record, approved_dir)
+    found, unread = _load_dir_detail(directory, require_record)
     return found, [message for _, message in unread]
 
 
 def _load_dir_detail(
-    directory: str, require_record: bool = False, approved_dir: str = ""
+    directory: str, require_record: bool = False
 ) -> tuple[list[ticket_model.Ticket], list[tuple[str, str]]]:
     """`_load_dir` の中身。読めなかったものを (パス, 説明) で返す（置き場ごとならパスは置き場）。"""
     try:
@@ -137,7 +133,7 @@ def _load_dir_detail(
         if not name.endswith(".md"):
             continue
         path = os.path.join(directory, name)
-        ticket, reason = load_copy(path, require_record, approved_dir)
+        ticket, reason = load_copy(path, require_record)
         if ticket is None:
             unread.append((path, f"承認済みチケット {path} を読めない（{reason}）"))
             continue
@@ -160,7 +156,7 @@ def unreadable_copies(conf: settings.Settings, tree_root: str) -> list[tuple[str
         (os.path.join(approved, DONE_DIR), False),
         (os.path.join(tree_root, conf.tickets.replace("/", os.sep), ticket_model.REVIEW), True),
     ):
-        out.extend(_load_dir_detail(directory, require, approved)[1])
+        out.extend(_load_dir_detail(directory, require)[1])
     return out
 
 
@@ -172,9 +168,7 @@ def state_of(directory: str, ticket: ticket_model.Ticket) -> str:
     return name
 
 
-def load_copy(
-    path: str, require_record: bool = False, approved_dir: str = ""
-) -> tuple[ticket_model.Ticket | None, str]:
+def load_copy(path: str, require_record: bool = False) -> tuple[ticket_model.Ticket | None, str]:
     """承認済みチケットを 1 本読む。2 つめは読めなかった理由。
 
     理由を返すのは、読めない承認済みチケットを `--lint` が名指しするため。
@@ -185,40 +179,27 @@ def load_copy(
     `wip/proposals/review/` はエージェントが書ける側にあるので、そこは `finish` が書く
     `completed_at` を 2 つめの保護として求める（`review_all`）。保護が 1 つしか無い置き場で
     欄まで外すと、組み込みの deny に止められずに置かれたファイルが承認済みとして読まれる。
-    前は承認の記録 `ccnavi_approved` を求めていた。欄が `completed_at` に替わるだけで、どちらも
-    組み込みの deny が破れてエージェントが `review/` に書ければ偽れる。2 つめの保護としての強さは
-    変わらない。前の版の承認済みチケットも `finish` を通れば `completed_at` を持つので読める。
 
-    `approved_dir` は前の版との互換のために受け取るだけで、読まない（待ち方のファイルは読まない）。
     計画を持つ親には、計画の項の `after` から計算した待ち方（`workflow.compute`）と、親に固定した
     フェーズ定義（`phases:` を読んだもの。`phasetypes.types_of`）を入れる。
-    チケットの中の `workflow:` 欄は読まない（記録を持たない承認済みチケットにあれば
-    `blocking_problems` が止める）。
+    チケットの中の `workflow:` 欄は読まない（あれば `blocking_problems` が止める）。
     """
-    del approved_dir
     ticket, problems = ticket_mod.load(path)
     if ticket is None:
         detail = problems[0].detail if problems else "チケットとして読めない"
         return None, detail
-    # 前の版の承認が書いた記録（`ccnavi_approved`）。いまの承認は書かない。承認を正とするのは
-    # 置き場で、`.ccnavi/approved/` は組み込みの保護がエージェントの書き込みを止める。
-    # 欄が無いぶんの検査（親子・計画・置き場）は `blocking_problems` が判定の側で当てる。
+    # 承認を正とするのは置き場で、`.ccnavi/approved/` は組み込みの保護がエージェントの書き込みを
+    # 止める。欄は無いので、親子・計画・置き場の検査は `blocking_problems` が判定の側で当てる。
     if require_record and not ticket.completed_at:
         return None, "`completed_at` が無い。`finish` を通っていない"
-    meta = ticket.raw.get(ticket_model.APPROVAL_KEY)
-    if approval_checks.has_record(ticket):
-        ticket.approved_at = str(meta.get("approved_at") or "")
-        ticket.source_tree = str(meta.get("source_tree") or "")
-        ticket.source_path = str(meta.get("source_path") or "")
     if not ticket.is_child and ticket.has_plan:
         ticket.workflow = workflow.compute(ticket)
     # 親に固定したフェーズ定義（`phases:`）を読んで持たせる。承認のあとの判定はこれを読み、
     # `phases.yml` を読まない。形の誤りは読めない定義を入れないだけで、ここでは落とさない
     # （`blocking_problems` が止める）。
     phasetypes.types_of(ticket)
-    # tree は「どのツリーで見つけたか」。scan_all が入れ直す。source_tree（どのツリーの
-    # 提案をコピーしたか）とは違うもので、子のワークツリーの checkout では食い違う。
-    ticket.tree = ticket.source_tree
+    # tree は「どのツリーで見つけたか」。scan_all が入れ直す。
+    ticket.tree = ""
     return ticket, ""
 
 
@@ -262,9 +243,7 @@ def review_all(conf: settings.Settings, root: str) -> tuple[list[ticket_model.Ti
     notes: list[str] = []
     for t in trees(conf, root):
         directory = os.path.join(t.root, conf.tickets.replace("/", os.sep), ticket_model.REVIEW)
-        got, complaints = _load_dir(
-            directory, require_record=True, approved_dir=settings.approved_dir(conf, t.root)
-        )
+        got, complaints = _load_dir(directory, require_record=True)
         for c in got:
             c.tree, c.tree_root, c.state = t.name, t.root, ticket_model.REVIEW
             c.project = t.project

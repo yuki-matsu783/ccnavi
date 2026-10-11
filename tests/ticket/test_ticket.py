@@ -80,31 +80,6 @@ def write(path, text):
     return path
 
 
-def with_old_record(text: str, source_path: str, source_tree: str = "i0001") -> str:
-    """前の版の承認が書き足した形（`ccnavi_approved` を frontmatter の末尾に持つ）にする。"""
-    record = (
-        "ccnavi_approved:\n"
-        "  approved_at: '2026-01-01T00:00:00+09:00'\n"
-        f"  source_tree: {source_tree}\n"
-        f"  source_path: {json.dumps(source_path)}\n"
-    )
-    head, sep, rest = text.partition("\n---\n")
-    assert sep, text
-    return head + "\n" + record.rstrip("\n") + sep + rest
-
-
-def to_old_form(approved_dir: str, ident: str) -> None:
-    """承認済みチケットを、前の版の承認が書いた形に書き換える。
-
-    前の版は承認の記録（`ccnavi_approved`）をチケットに書き足していた。取り下げは、記録を持つ
-    古い形の子には前の条件（欄を読む）を当て、古い形の親は一律に止める。
-    """
-    path = os.path.join(approved_dir, "doing", ident + ".md")
-    with open(path, encoding="utf-8") as f:
-        text = f.read()
-    write(path, with_old_record(text, f"wip/proposals/todo/{ident}.md"))
-
-
 def ticket_text(
     name,
     *,
@@ -667,10 +642,9 @@ class TicketTest(unittest.TestCase):
         self.assertIn("だけが書く欄", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
 
-    def test_a_proposal_with_an_approval_record_is_not_approved(self):
-        # 承認の記録と続きの子の目印は、ユーザの判断だけが残す。
-        # 提案に書けば古い形や続きの子を装える。
-        for field in ("ccnavi_approved: {}", "followup_of: [i0001-01-01]"):
+    def test_a_proposal_with_a_followup_mark_is_not_approved(self):
+        # 続きの子の目印は、ユーザの判断だけが残す。提案に書けば続きの子を装える。
+        for field in ("followup_of: [i0001-01-01]",):
             with self.subTest(field=field):
                 self.propose("i0001", allow=("src/*",))
                 source = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
@@ -681,7 +655,7 @@ class TicketTest(unittest.TestCase):
                 found = [
                     p
                     for p in json.loads(lint.stdout)["problems"]
-                    if "は承認の記録で" in p["detail"]
+                    if "続きの子を起こすレビューの行き先" in p["detail"]
                 ]
                 self.assertEqual([p["severity"] for p in found], ["error"], found)
                 result = self.approve()
@@ -691,12 +665,12 @@ class TicketTest(unittest.TestCase):
                 os.remove(source)
 
     def test_a_forged_record_moved_by_hand_is_blocked(self):
-        # `ccnavi_approved: {}` で古い形を装い、手で書いた `workflow:` を効かせようとする形。
+        # 手で書いた `workflow:` を効かせようとする形。
         self.propose("i0001", allow=("src/*",))
         source = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
         with open(source, encoding="utf-8") as f:
             text = f.read()
-        forged = "ccnavi_approved: {}\nworkflow: {order: dag, waits: {}, review_at: {}}"
+        forged = "workflow: {order: dag, waits: {}, review_at: {}}"
         self.hand_move("i0001", text.replace("\n---\n", "\n" + forged + "\n---\n", 1))
         result = self.hook(
             "PreToolUse",
@@ -709,20 +683,6 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(lint.returncode, 0)
         self.assertIn("workflow", lint.stdout)
 
-    def test_lint_warns_about_an_old_form_without_an_approval_row(self):
-        self.propose("i0001", allow=("src/*",))
-        source = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
-        with open(source, encoding="utf-8") as f:
-            text = f.read()
-        self.hand_move("i0001", with_old_record(text, "wip/proposals/todo/i0001.md"))
-        lint = self.ccnavi("--lint", "--json")
-        found = [
-            p
-            for p in json.loads(lint.stdout)["problems"]
-            if "状態の履歴に承認" in p["detail"] and "i0001" in p["detail"]
-        ]
-        self.assertEqual([p["severity"] for p in found], ["warn"], found)
-
     def test_review_reads_only_what_finish_moved(self):
         # review/ はエージェントが書ける側。`finish` が書く `completed_at` が無いものは読まない。
         self.family()
@@ -734,21 +694,14 @@ class TicketTest(unittest.TestCase):
             finished.replace("i0001-01-01", "i0001-01-05"), {"completed_at": ""}
         )
         write(os.path.join(review, "i0001-01-05.md"), stray)
-        # 前の版の承認が書いた記録を持つものも、`completed_at` があれば読む。
-        write(
-            os.path.join(review, "i0001-01-06.md"),
-            with_old_record(finished.replace("i0001-01-01", "i0001-01-06"), "p"),
-        )
         details = [
             p["detail"] for p in json.loads(self.ccnavi("--lint", "--json").stdout)["problems"]
         ]
         self.assertTrue(
             any("i0001-01-05" in d and "`completed_at` が無い" in d for d in details), details
         )
-        self.assertFalse([d for d in details if "i0001-01-06.md" in d and "読めない" in d], details)
-        for name in ("i0001-01-01", "i0001-01-06"):
-            held, why = approval.load_copy(os.path.join(review, name + ".md"), require_record=True)
-            self.assertIsNotNone(held, why)
+        held, why = approval.load_copy(os.path.join(review, "i0001-01-01.md"), require_record=True)
+        self.assertIsNotNone(held, why)
         held, why = approval.load_copy(os.path.join(review, "i0001-01-05.md"), require_record=True)
         self.assertIsNone(held)
 
@@ -1942,13 +1895,12 @@ class TicketTest(unittest.TestCase):
         lint = self.ccnavi("--lint", "--mode", "enable")
         self.assertIn("i0001-01-02 が複数の場所にある", lint.stdout)
 
-    # 閉じた承認済みチケット 1 枚。`ccnavi_approved` が無いと承認済みチケットとして読まれない。
+    # 閉じた承認済みチケット 1 枚。
     CLOSED = (
         "---\n"
         "version: 1\n"
         "ticket: i0002\n"
         "title: t\n"
-        'ccnavi_approved: {approved_at: "2026-01-01T00:00:00Z", source_tree: "", source_path: p}\n'
         "allow:\n"
         '- {glob: "src/*", match: "Write|Edit"}\n'
         "---\n"

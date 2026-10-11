@@ -35,10 +35,8 @@
 
 ## 順序は定義に書かない
 
-どのフェーズがどれを待つかは、親の計画の項の `after` が決める（`workflow`）。前の版の
-`order`（ファイルの頭）・`after`・`overlap`・`requires`（定義の欄）が残っていれば、読まずに通し、
-warn で言う（`OLD_FIELDS`）。error にしないのは、更新した直後に全部の計画の承認と `--lint` が
-止まらないようにするため。
+どのフェーズがどれを待つかは、親の計画の項の `after` が決める（`workflow`）。定義には順序の欄を
+持たない。
 """
 
 from __future__ import annotations
@@ -79,12 +77,6 @@ def stricter(a: str, b: str) -> str:
     if a not in REVIEW_RANK or b not in REVIEW_RANK:
         return REVIEW_MR
     return a if REVIEW_RANK[a] >= REVIEW_RANK[b] else b
-
-
-# 前の版の順序の欄。読まずに通し、warn で言う。順序は親の計画の項の `after` で決める。
-OLD_FILE_FIELDS = ("order",)
-OLD_FIELDS = ("after", "overlap", "requires")
-OLD_FIELD_NOTE = "は読まない。順序は親の計画の項の `after` で決める"
 
 
 class PhaseTypes(dict):
@@ -187,9 +179,6 @@ def parse(text: str, where: str = "(phases)") -> tuple[PhaseTypes | None, list[P
     raw = data.get("phases")
     if not isinstance(raw, dict) or not raw:
         return None, [Problem(SEVERITY_ERROR, where, "`phases` が無いか空か、辞書ではない")]
-    for name in OLD_FILE_FIELDS:
-        if name in data:
-            problems.append(Problem(SEVERITY_WARN, where, f"`{name}` {OLD_FIELD_NOTE}"))
 
     types = _read_defs(raw, problems)
 
@@ -295,9 +284,6 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         problems.append(Problem(SEVERITY_ERROR, ident, "`scope` は glob のリストか `inherit`"))
         return None, problems
 
-    for key in OLD_FIELDS:
-        if key in body:
-            problems.append(Problem(SEVERITY_WARN, ident, f"`{key}` {OLD_FIELD_NOTE}"))
     raw = body.get("deliverables")
     if raw is not None:
         if not isinstance(raw, list) or not all(isinstance(x, str) for x in raw):
@@ -456,7 +442,7 @@ def differing(a: PhaseType, b: PhaseType) -> list[str]:
 
 
 def as_copy(pt: PhaseType) -> dict:
-    """写しに書く形。読み直すと同じ定義になる欄に戻す。前の版の順序の欄は書かない。"""
+    """写しに書く形。読み直すと同じ定義になる欄に戻す。"""
     out: dict = {
         "kind": pt.kind,
         "title": pt.title,

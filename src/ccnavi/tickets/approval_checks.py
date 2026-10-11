@@ -14,25 +14,6 @@ from ..infra import settings, tree
 from ..policy import rules
 from . import archive, syncstate, ticket_ids, ticket_model, workflow
 
-# 前の版の承認が記録（`ccnavi_approved`）に必ず書いていた欄。続きの子も `source_tree` と
-# `source_path` を空で書いていた。
-_RECORD_KEYS = ("approved_at", "source_tree", "source_path")
-
-
-def has_record(t: ticket_model.Ticket) -> bool:
-    """前の版の承認が書いた記録（`ccnavi_approved`）を持つ古い承認済みチケットか。
-
-    古い形として扱うと、取り下げは中身の一致を見ずに記録の欄で決まり、`workflow:` の欄も
-    待ち方として読まれる。`ccnavi_approved: {}` のような書きかけの記録で古い形を装えないよう、
-    前の版が必ず書いた欄が揃い、`approved_at` が空でないときだけ古い形とみなす。提案に
-    記録の欄があれば `--agree` と `--lint` が error にする
-    （`agree_candidates.record_field_problems`）。
-    """
-    meta = t.raw.get(ticket_model.APPROVAL_KEY)
-    if not isinstance(meta, dict) or not all(k in meta for k in _RECORD_KEYS):
-        return False
-    return bool(str(meta.get("approved_at") or "").strip())
-
 
 def mark_imported(
     conf: settings.Settings,
@@ -733,7 +714,7 @@ def blocking_problems(
     ここに入れる、中身だけで分かる矛盾。
     - `started_at` が無いのに `base_sha` がある。`start` は 2 つを一緒に書くので道具を通らない形で、
       `base_sha` は範囲外の検査とリスクの基準点に使われる
-    - 前の版の承認の記録を持たないのに `workflow:` 欄がある。待ち方は計画の `after` から計算する
+    - `workflow:` 欄がある。待ち方は計画の `after` から計算する
       もので、欄は読まない。書いてあると効くと読み手に思わせる
     - 計画と、親に固定した定義（`phases:`）の誤り（`after` の形・終端・最後の項の延期・延期の
       引き受け手、計画を持つのに写しが無い・項の定義が写しに無い・定義の形と `kind`・引き受け手の
@@ -767,7 +748,7 @@ def content_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
                 "ユーザが承認済みチケットを確かめて直してください",
             )
         )
-    if ticket_model.WORKFLOW_KEY in t.raw and not has_record(t):
+    if ticket_model.WORKFLOW_KEY in t.raw:
         problems.append(
             rules.Problem(
                 rules.SEVERITY_ERROR,

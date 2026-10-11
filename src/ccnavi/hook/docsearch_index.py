@@ -27,8 +27,6 @@ from ..infra import gitcmd
 from ..tickets import flow
 
 INDEX_NAME = "ccnavi-index.jsonl"
-# 以前の名前。ccnavi が書いた形のものだけ、新しい名前に移る時に消す。
-LEGACY_INDEX_NAME = "index.jsonl"
 # 無視の設定が無いツリーのルートの .gitignore に足す 1 行。
 IGNORE_LINE = "**/ccnavi-index.jsonl"
 # frontmatter を探すのは頭のこの長さだけ。本文は読まない。
@@ -70,8 +68,6 @@ class Built:
     # 書いた・消した ccnavi-index.jsonl（ツリーのルートからの相対）。
     written: list[str] = field(default_factory=list)
     removed: list[str] = field(default_factory=list)
-    # 新しい名前に移る時に消した、ccnavi が書いた形の旧 index.jsonl。
-    migrated: list[str] = field(default_factory=list)
     # 無視の行を足したツリーの .gitignore（ツリーのルートからの相対）。足していなければ空。
     ignore_added: str = ""
     # ccnavi が書いた形でないので触らなかった ccnavi-index.jsonl（ツリーのルートからの相対）。
@@ -379,7 +375,7 @@ def _sweep_beside(parent: str) -> None:
     """作業ツリーの側に残った古い一時ディレクトリを消す。
 
     消すのは名前が LOCAL_TMP_PREFIX で始まり、リンクでないディレクトリで、古く、中身が
-    ふつうのファイルの `ccnavi-index.jsonl`（か旧名の `index.jsonl`）だけ（か空）のものに限る。
+    ふつうのファイルの `ccnavi-index.jsonl` だけ（か空）のものに限る。
     ほかのものは他人のものとして残す。
     """
     try:
@@ -396,7 +392,7 @@ def _sweep_beside(parent: str) -> None:
             if not stat.S_ISDIR(info.st_mode) or now - info.st_mtime <= TMP_STALE_SECONDS:
                 continue
             inside = os.listdir(holder)
-            if any(entry not in (INDEX_NAME, LEGACY_INDEX_NAME) for entry in inside):
+            if any(entry != INDEX_NAME for entry in inside):
                 continue
             for entry in inside:
                 left = os.path.join(holder, entry)
@@ -506,8 +502,7 @@ def build(
     など）なら、そのツリーは索引の対象外（`unignored`）で、行を返さない。足すのは refresh が真の
     ときだけ。一部だけ無視されていないディレクトリと、ccnavi のものでない索引があるディレクトリは、
     行を組むが書かない。refresh が偽なら mtime を見ずに既存の行をそのまま使い、何も書かない
-    （行の無い md は parse が真なら読む）。新しい名前に書くとき、そのディレクトリに ccnavi が
-    書いた形の旧 `index.jsonl` があれば消す（`migrated`）。
+    （行の無い md は parse が真なら読む）。
 
     順は 3 段。まず全部のディレクトリで既存の行を使い回せるかを見（lstat だけ）、次に
     読み直しの要る md を、待つ数の少ないディレクトリから読み、最後にディレクトリごとに書く。
@@ -531,7 +526,6 @@ def build(
     if not writable:
         result.unignored = True
         return result
-    legacy = _legacy_candidates(base, by_dir, deadline) if refresh else {}
     result.indexable = True
     tmp_dir = _git_dir(base) if refresh else ""
     if refresh and not tmp_dir:
@@ -567,7 +561,7 @@ def build(
         _parse_pending(base, dirs, deadline, result)
     for one in dirs:
         try:
-            _settle(one, refresh, writer, result, legacy)
+            _settle(one, refresh, writer, result)
         except Exception as exc:  # noqa: BLE001 - 1 つのディレクトリの破損で全体を止めない
             result.problems.append(f"{one.directory or ROOT_DIRECTORY}/ を読めない: {exc!r}")
     result.rows.sort(key=lambda r: str(r.get("concept_id", "")))
@@ -653,7 +647,6 @@ def _settle(
     refresh: bool,
     writer: _Writer | None,
     result: Built,
-    legacy: dict[str, str] | None = None,
 ) -> None:
     """1 つのディレクトリの行を決め、書けるなら書く（打ち切ったディレクトリも読めた分まで）。"""
     waiting = {concept_id for _, concept_id, _ in one.pending}
@@ -679,7 +672,6 @@ def _settle(
         if text != one.old_text:
             writer.write(one.index_path, one.index_rel, text)
             result.written.append(one.index_rel)
-        _migrate(one, legacy or {}, result)
     except OSError as exc:
         result.problems.append(f"{one.index_rel} を書けない: {exc}")
 
@@ -725,44 +717,6 @@ def _add_ignore(base: str) -> bool:
     except OSError:
         return False
     return True
-
-
-def _legacy_candidates(
-    base: str, by_dir: dict[str, list[str]], deadline: float | None
-) -> dict[str, str]:
-    """md を持つディレクトリにある、消してよい旧 `index.jsonl`（ディレクトリ → ツリーからの相対）。
-
-    ふつうのファイルで、ccnavi が書いた形（空でない行が全部 4 つの鍵を持つ）で、git が追跡して
-    いないものだけ。ほかの道具のものと、ユーザが追跡しているものは候補にしない。
-    """
-    found: dict[str, str] = {}
-    for directory in by_dir:
-        rel = f"{directory}/{LEGACY_INDEX_NAME}" if directory else LEGACY_INDEX_NAME
-        path = os.path.join(base, *rel.split("/"))
-        if not os.path.lexists(path):
-            continue
-        rows, _, owner = _read_index(path)
-        if owner == OURS and rows:
-            found[directory] = rel
-    if not found:
-        return {}
-    done = gitcmd.run(
-        base, ["ls-files", "-z", "--cached"], timeout=_left(deadline), plain_pathspecs=True
-    )
-    if not done.ok:
-        return {}
-    tracked = {p for p in done.out.split("\0") if p}
-    return {d: rel for d, rel in found.items() if rel not in tracked}
-
-
-def _migrate(one: _Dir, legacy: dict[str, str], result: Built) -> None:
-    """新しい名前の索引が揃ったディレクトリの旧 index.jsonl を消す（消せなければ残す）。"""
-    rel = legacy.get(one.directory)
-    if rel is None:
-        return
-    with contextlib.suppress(OSError):
-        os.remove(os.path.join(os.path.dirname(one.index_path), LEGACY_INDEX_NAME))
-        result.migrated.append(rel)
 
 
 def _left(deadline: float | None) -> float:

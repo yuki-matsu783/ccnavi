@@ -9,9 +9,7 @@
  * 実行ファイル（phasetypes.py）の仕事で、書式の検証も `--lint --phases <一時ファイル>` に聞く。
  * 画面の欄は文字のまま持ち、リストの欄（scope / deliverables）は文字の配列で持つ。
  *
- * **順序の欄（ファイルの頭の `order`、定義の `after` / `overlap` / `requires`）は読まず、書かない。**
- * 実行ファイルはもう読まず、順序は親チケットの計画の項の `after` で決める。ファイルに残っていれば
- * 「読まない欄」として名指しするだけで（`unread`）、書き戻しでも手を付けずに残す（消すのはユーザがエディタで）。
+ * 順序は親チケットの計画の項の `after` で決めるので、定義は順序の欄を持たない。
  *
  * 組み込みの既定は持たない（実行ファイルも持たない。既定を組み込むと、意図せずレビューの
  * 要否が決まる）。雛形も持たない（共通レイヤーに雛形を置くと、レイヤーの同じ id と中身が食い違い、そのレイヤーが
@@ -19,7 +17,7 @@
  */
 import { isMap, isNode, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Pair } from "yaml";
 
-import { PHASE_KINDS, REVIEWS, UNREAD_FILE_KEYS, UNREAD_PHASE_KEYS, type PhaseForm, type PhaseKind, type PhasesForm, type PhasesModel, type Review, type UnreadField } from "./phases-view.js";
+import { PHASE_KINDS, REVIEWS, type PhaseForm, type PhaseKind, type PhasesForm, type PhasesModel, type Review } from "./phases-view.js";
 import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
@@ -62,16 +60,6 @@ export function readPhases(text: string): PhasesDocument {
     problems.push(`version ${String(version)} は実行ファイルが読めません（読むのは ${PHASES_VERSION}）。フェーズは番号だけの挙動になります`);
   }
 
-  // 読まない欄。値の形は問わない（読まないので、崩れていても苦情にしない）
-  const unread: UnreadField[] = [];
-  if (isMap(doc.contents)) {
-    for (const key of UNREAD_FILE_KEYS) {
-      if (doc.contents.has(key)) {
-        unread.push({ phase: null, key });
-      }
-    }
-  }
-
   const phases: PhaseForm[] = [];
   const raw = doc.get("phases", true);
   if (raw === undefined || raw === null) {
@@ -86,12 +74,6 @@ export function readPhases(text: string): PhasesDocument {
         return;
       }
       phases.push(formOf(index, id, pair.value, problems));
-      for (const item of pair.value.items) {
-        const key = item.key instanceof Scalar ? String(item.key.value) : String(item.key);
-        if ((UNREAD_PHASE_KEYS as readonly string[]).includes(key)) {
-          unread.push({ phase: id, key });
-        }
-      }
     });
     if (phases.length === 0 && problems.length === 0) {
       problems.push("定義が 1 つもありません。実行ファイルは「`phases` が無いか空か、辞書ではない」と報告します");
@@ -103,7 +85,6 @@ export function readPhases(text: string): PhasesDocument {
       version: typeof version === "number" ? version : null,
       form: { phases },
       problems,
-      unread,
     },
     // 書き出すたびに読み直す。元のノードに値を書き込むので、同じ文書を使い回すと
     // 2 回目の `origin` が 1 回目の並び替えの後を指してしまう。

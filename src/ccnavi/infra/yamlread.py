@@ -128,6 +128,9 @@ _SPLIT = re.compile(
     r"|\\[uU]"  # `\u`・`\U` のエスケープ（サロゲートを含みうる）
 )
 
+# 文書の区切り（行頭の `---`・`...`）。無ければ文書は 1 つ。
+_DOC_MARK = re.compile(r"^(?:---|\.\.\.)(?=\s|\Z)", re.MULTILINE)
+
 # 値を組み立てる途中に PyYAML が素のまま上げる例外。`LoadError` に包む。
 # UnicodeError（UnicodeEncodeError の親）は ValueError の子なので ValueError で拾える。
 _WRAPPED = (
@@ -177,6 +180,23 @@ def _c_ok(text: str, loader: type, on_alias: type[Exception] | None = None) -> b
     return True
 
 
+def _refuse_aliases(text: str, loader: type, on_alias: type[Exception]) -> None:
+    """別名（`*名前`）のイベントが出たら `on_alias` を上げる。
+
+    入れ子が `DEPTH_LIMIT` 段を超えたら流すのをやめる（組み立てる段が深すぎるとして断る）。
+    """
+    depth = 0
+    for event in yaml.parse(text, Loader=loader):  # noqa: S506  イベントを流すだけで値は作らない
+        if isinstance(event, yaml.AliasEvent):
+            raise on_alias("別名")
+        if isinstance(event, _OPEN):
+            depth += 1
+            if depth > DEPTH_LIMIT:
+                return
+        elif isinstance(event, _CLOSE):
+            depth -= 1
+
+
 class LoadError(yaml.YAMLError):
     """値を組み立てる途中の失敗（`ValueError`・`RecursionError` など）を包んだもの。"""
 
@@ -217,6 +237,11 @@ def safe_load(
     loader = loader or LOADER
     if loader is yaml.SafeLoader:
         loader = pure
+        if on_alias is not None and _DOC_MARK.search(text):
+            # 純 Python の読み手は最初の文書しか組み立てないので、後ろの文書の別名は、組み立てる前に
+            # イベントを流して断る（C の読み手に回る経路の `_c_ok` と同じ答えにする）。文書の区切り
+            # （`---`・`...`）が無ければ文書は 1 つなので、二重に読まない。
+            _refuse_aliases(text, yaml.SafeLoader, on_alias)
     else:
         try:
             if _SPLIT.search(text) or not _c_ok(text, loader, on_alias):

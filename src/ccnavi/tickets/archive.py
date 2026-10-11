@@ -262,8 +262,8 @@ def drop_archived(root: str, tickets: list[ticket_model.Ticket]) -> list[ticket_
     識別子は、その古いチケットが権威として読まれ、作業中に戻ってしまう。閉じて退避したものは閉じた
     ものとして扱う（判定の scan から外す）。
 
-    同じチケットかは、承認の時刻ではなく着手と取り消しの欄で決める（承認はチケットの中身を
-    変えないので、承認の時刻の欄は古い形にしか無い）。
+    同じチケットかは、着手と取り消しの欄で決める（承認はチケットの中身を変えないので、
+    承認の時刻の欄は無い）。
 
     - 着手も取り消しもしていない写し（欄が 3 つとも空）は、子のワークツリー（親のツリーではない
       ツリー）で見つけたものに限り、退避より前の写しとして除く。子のワークツリーを切ったのは
@@ -275,8 +275,6 @@ def drop_archived(root: str, tickets: list[ticket_model.Ticket]) -> list[ticket_
       （`approval_checks.content_problems`）
     - 欄があれば、統合先の `done/` の親と同じく `syncstate.same_parent` で比べ、同じと言えるときだけ
       除く。違えば同じ識別子の別のチケットとみなして残す
-    - 両方に古い形の承認の時刻があれば、違えばどちらでも残し、同じなら欄が空でも除く（前の版と
-      同じ見方）
     """
     if not root or not tickets:
         return tickets
@@ -316,11 +314,6 @@ def _same_ticket(
     mine: syncstate.DoneCopy, archived: syncstate.DoneCopy, in_parent_tree: bool
 ) -> str:
     # 退避の写しと同じチケットか（drop_archived の説明のとおり）。
-    if mine.approved_at and archived.approved_at:
-        if mine.approved_at != archived.approved_at:
-            return _OTHER
-        if not any(getattr(mine, name) for name in syncstate.MATCH_FIELDS):
-            return _SAME
     if not any(getattr(mine, name) for name in syncstate.MATCH_FIELDS):
         return _REUSED if in_parent_tree else _SAME
     return _SAME if syncstate.same_parent(mine, archived) else _OTHER
@@ -334,7 +327,6 @@ def _mine(t: ticket_model.Ticket) -> syncstate.DoneCopy:
         base_sha=t.base_sha,
         started_at=t.started_at,
         cancelled_at=t.cancelled_at,
-        approved_at=t.approved_at,
     )
 
 

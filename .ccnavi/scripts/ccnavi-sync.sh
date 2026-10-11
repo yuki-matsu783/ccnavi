@@ -717,62 +717,11 @@ front_field() {
 	'
 }
 
-# 承認の時刻（`approved_at`）。承認で欄を書いていた頃の古い形だけが持つ。拾うのは frontmatter の行頭の
-# `ccnavi_approved:` の中だけで、Python（syncstate._copy_fields）と同じ範囲にする。本文や block scalar
-# （`rationale: |` の下の行など）に同じ語を書いた行は拾わない。中の形はブロックの形（次の行から字下げした
-# `  approved_at: X`。字下げがいちばん浅い行だけを見る）と流れの形（`{approved_at: "X", ...}`）。
-# `ccnavi_approved: |` のように対応表でない値なら何も出さない。標準入力は frontmatter_of の出力。
-approved_at_of() {
-	awk -v q="'" '
-		function value(v) {
-			sub(/^[ \t]+/, "", v)
-			c = substr(v, 1, 1)
-			if (c == "\"" || c == q) v = substr(v, 2)
-			n = match(v, "[\"" q ",} \t]")
-			if (n > 0) v = substr(v, 1, n - 1)
-			print v
-			exit
-		}
-		state == "" {
-			if (index($0, "ccnavi_approved:") != 1) next
-			rest = substr($0, length("ccnavi_approved:") + 1)
-			sub(/^[ \t]+/, "", rest)
-			if (substr(rest, 1, 1) == "#") rest = ""
-			if (rest == "") { state = "block"; next }
-			if (substr(rest, 1, 1) != "{") exit
-			state = "flow"
-			if (match(rest, /[{,][ \t]*approved_at:/)) {
-				rest = substr(rest, RSTART + RLENGTH)
-				value(rest)
-			}
-			if (index(rest, "}") > 0) exit
-			next
-		}
-		/^[ \t]*(#.*)?$/ { next }
-		$0 !~ /^[ \t]/ { exit }
-		state == "flow" {
-			line = $0
-			if (match(line, /(^|[{,])[ \t]*approved_at:/)) value(substr(line, RSTART + RLENGTH))
-			if (index(line, "}") > 0) exit
-			next
-		}
-		{
-			match($0, /^[ \t]*/)
-			if (depth == "") depth = RLENGTH
-			if (RLENGTH != depth) next
-			line = substr($0, RLENGTH + 1)
-			if (index(line, "approved_at:") == 1) value(substr(line, length("approved_at:") + 1))
-		}
-	'
-}
-
 # 2 つの frontmatter（$1 が親のワークツリーの親チケット、$2 が統合先か退避の親チケット）が同じ親か。
 # スクリプトだけが書く欄を base_sha → started_at → cancelled_at の順に見て、最初に両方が値を持つ
 # 欄が同じかで決める。空どうしは一致としない。どの欄でも照合できないときは同じとしない。
-# 承認で欄を書いていた頃の古い形どうし（両方に 3 つとも無い）だけは、両方にある approved_at で比べる。
 # Python の syncstate.same_parent と同じ見方。
 same_parent() {
-	sp_seen=""
 	for sp_key in base_sha started_at cancelled_at; do
 		sp_a=$(printf '%s\n' "$1" | front_field "$sp_key")
 		sp_b=$(printf '%s\n' "$2" | front_field "$sp_key")
@@ -780,12 +729,8 @@ same_parent() {
 			[ "$sp_a" = "$sp_b" ]
 			return
 		fi
-		[ -z "$sp_a$sp_b" ] || sp_seen=yes
 	done
-	[ -z "$sp_seen" ] || return 1
-	sp_a=$(printf '%s\n' "$1" | approved_at_of)
-	[ -n "$sp_a" ] || return 1
-	[ "$(printf '%s\n' "$2" | approved_at_of)" = "$sp_a" ]
+	return 1
 }
 
 # 統合先の done/ に、この親子のチケットの親チケットがあるか。統合先は取ってきた後の refs/remotes/origin/<統合先>。
@@ -795,7 +740,6 @@ same_parent() {
 # 同じ親かは、スクリプトだけが書く欄を base_sha → started_at → cancelled_at の順に見て、最初に両方が値を持つ
 # 欄が同じかで決める。空どうしは一致としない。どの欄でも照合できないとき、親のワークツリーに承認済みの
 # 親チケットが無いときは閉じていない側に倒す（止めて戻し方を出す）。
-# 承認で欄を書いていた頃の古い形どうし（両方に 3 つとも無い）だけは、両方にある approved_at で比べる。
 closed_in_integration() {
 	ci_body=$(git -C "$repo" show "refs/remotes/origin/$integ:$approved/done/$P.md" 2>/dev/null) || return 1
 	ci_theirs=$(printf '%s\n' "$ci_body" | frontmatter_of)
