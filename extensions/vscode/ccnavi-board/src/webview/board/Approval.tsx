@@ -2,12 +2,17 @@
  * 承認のオーバーレイ。一覧の識別子の表、承認画面の本文（`<pre>`）、対象外の提案と読めない提案、
  * 「この N 件を承認する」「やめる」。本文は実行ファイルが組んだものをそのまま出し、項目には分けない。
  *
+ * 計画を持つ親が一覧にあれば、本文の上にその計画の図を読むだけで出す（`PlanGraph`。中身は preview の
+ * `plans` で、承認する提案そのものの順序）。図は判定をせず、実行ファイルの答えを描くだけ。順序を直す
+ * ワークフロー編集タブへの入口は、タブができるまで置かない。
+ *
  * 状態は拡張ホストが持っていて、ここは渡されたものを見せるだけ。ボタンを押したら拡張ホストへ返す。
  */
 import { Fragment, useEffect, useRef, type JSX } from "react";
 
 import type { ApprovePreview } from "../../core/approvemodel.js";
 import type { ApprovalOverlay } from "../../core/board-view.js";
+import { PlanGraph } from "../shared/PlanGraph.js";
 import { DecideBody } from "./Decide.js";
 import { post } from "./post.js";
 import { approvalBody } from "./text.js";
@@ -141,6 +146,13 @@ function Body({
           </tbody>
         </table>
       )}
+      {preview.plans.length > 0 ? (
+        <div className="plan-graphs">
+          {preview.plans.map((plan) => (
+            <PlanGraph key={`${plan.ticket}-${plan.part}`} plan={plan} />
+          ))}
+        </div>
+      ) : null}
       <BodyText text={preview.text} />
       {preview.rejected.length > 0 ? (
         <>

@@ -1,0 +1,77 @@
+/*
+ * 計画の図（`PlanGraph.tsx`）。フロー編集の図（`flow/Canvas.css`）と同じく、React Flow の色の変数
+ * （`--xy-*`）を VS Code のテーマ変数に置き換える。`!important` は要らない。
+ *
+ * 意味の色（注意の色）は、枠と線にだけ使う。文字の色には使わない（読みにくいテーマがあるため）。
+ */
+.plan-graph { margin: 8px 0 10px; }
+.plan-graph h3 { margin: 0 0 4px; }
+.plan-graph-canvas {
+  height: 240px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.plan-graph .react-flow {
+  --xy-background-color-default: var(--vscode-editor-background);
+  --xy-background-pattern-dots-color-default: var(--vscode-panel-border);
+  --xy-edge-stroke-default: var(--vscode-descriptionForeground);
+  --xy-edge-stroke-selected-default: var(--vscode-focusBorder);
+  --xy-edge-stroke-width-default: 2;
+  --xy-controls-button-background-color-default: var(--vscode-button-secondaryBackground, var(--vscode-editorWidget-background));
+  --xy-controls-button-background-color-hover-default: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
+  --xy-controls-button-color-default: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  --xy-controls-button-color-hover-default: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  --xy-controls-button-border-color-default: var(--vscode-panel-border);
+  --xy-controls-box-shadow-default: none;
+  --xy-node-background-color-default: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  --xy-node-color-default: var(--vscode-foreground);
+  --xy-node-border-default: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border));
+  --xy-node-border-radius-default: 3px;
+  --xy-node-boxshadow-hover-default: none;
+  --xy-node-boxshadow-selected-default: 0 0 0 2px var(--vscode-focusBorder);
+  --xy-handle-background-color-default: var(--vscode-descriptionForeground);
+  --xy-handle-border-color-default: var(--vscode-editor-background);
+  --xy-attribution-background-color-default: transparent;
+}
+/* 点の大きさ。`core/plan-graph.ts` の COLUMN（列の間隔）に収まる幅 */
+.plan-graph .react-flow__node-planItem { width: 160px; font-size: var(--vscode-font-size); }
+.plan-graph .react-flow__node-planEnd { font-size: .85em; }
+.plan-node {
+  display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 6px;
+  padding: 5px 8px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border));
+  border-left: 4px solid var(--vscode-focusBorder);
+  border-radius: 3px;
+  color: var(--vscode-foreground);
+  text-align: left;
+}
+.plan-node-number { font-weight: 600; font-family: var(--vscode-editor-font-family); }
+.plan-node-title { font-weight: 600; overflow-wrap: anywhere; }
+.plan-node-tags { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 2px 6px; font-size: .8em; color: var(--vscode-descriptionForeground); }
+.plan-node-tags .tag { border: 1px solid var(--vscode-panel-border); border-radius: 2px; padding: 0 3px; }
+/* 見る場所が none の項は、縁を細くして「ユーザが見ない」を示す */
+.plan-node:has(.tag[data-review="none"]) { border-left-color: var(--vscode-descriptionForeground); border-left-style: dashed; }
+/* 終端に当たらない項（実行ファイルの loose）。縁を注意の色にする。文字は普通の色のまま */
+.plan-node[data-loose="1"] { border-color: var(--vscode-editorWarning-foreground); border-left-color: var(--vscode-editorWarning-foreground); }
+/* 子が承認された番号（固定した番号）。薄くして、動かせないことを示す */
+.plan-node[data-locked="1"] { opacity: .7; border-style: dotted; }
+.plan-node-tags .tag.locked { border-style: dotted; }
+/* start と end の仮の点。名前だけの小さな丸い札 */
+.plan-end {
+  padding: 3px 10px; border-radius: 999px;
+  border: 1px dashed var(--vscode-descriptionForeground);
+  background: var(--vscode-editor-background);
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+}
+/* start と end への線は図が引くもの。破線にして、計画の after の線と分ける */
+.plan-graph .react-flow__edge.plan-start path, .plan-graph .react-flow__edge.plan-end path { stroke-dasharray: 4 3; }
+/* 終端に当たらない項から end への線。注意の色 */
+.plan-graph .react-flow__edge.loose path { stroke: var(--vscode-editorWarning-foreground); }
+.plan-graph .react-flow__handle { width: 6px; height: 6px; }
+/* 図の下の一言。注意の行は左に注意の色の縁を付ける（文字の色は変えない） */
+.plan-graph-notes { margin: 4px 0 0; padding: 0; list-style: none; font-size: .9em; }
+.plan-graph-note { padding: 1px 0 1px 8px; border-left: 3px solid transparent; overflow-wrap: anywhere; }
+.plan-graph-note.warn { border-left-color: var(--vscode-editorWarning-foreground); }
