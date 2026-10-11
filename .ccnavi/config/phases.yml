@@ -20,6 +20,15 @@
 version: 1
 
 phases:
+  # 小さい作業を親 1 子 1 で回すための定義。計画は `plan: [quick]` の 1 項にする。
+  # 範囲は親の範囲そのまま。親の提案に書いた範囲が、そのまま作業の上限になる。
+  quick:
+    kind: work
+    title: 小さい作業
+    review: mr
+    scope: inherit
+    when: 変更が 1〜2 ファイルに収まり、設計判断や並行作業が要らないとき
+
   research:
     kind: work
     title: 調査
@@ -86,13 +95,3 @@ phases:
     review: mr
     scope: [".claude/skills/*", "docs/wiki/*"]
     when: 振り返りでスキルの候補が出たとき（docs/claude/skill-review.md）。候補が無ければ置かない
-
-  # 小さい作業を親 1 子 1 で回すための定義。計画は `plan: [quick]` の 1 項にする。
-  # 子はこのセッションでユーザが見る（`ccnavi-review.sh chat <N>`）。マージリクエストは作らない。
-  # 範囲は親の範囲そのまま。親の提案に書いた範囲が、そのまま作業の上限になる。
-  quick:
-    kind: work
-    title: 小さい作業
-    review: chat
-    scope: inherit
-    when: 変更が 1〜2 ファイルに収まり、設計判断や並行作業が要らないとき
