@@ -121,3 +121,15 @@ keywords: [拡張, テスト, ターン終わり, グループ, Stop, hook, 効�
 - **`tsc` もグループごとに絞る。** `tsconfig.test.json` は `src/` と `test/` を全部見るので、
   絞るには入口の一覧を組み立てることになる。型の検査が「テストが読むぶんだけ」に狭まり、
   拡張ホスト側の型の誤りが落ちなくなる
+
+## 追記（2026-10-11）
+
+- 拡張の置き場は、いまは `vscode-extension/ccnavi-board` ではなく `extensions/vscode/ccnavi-board`。
+  入口は `extensions/vscode/ccnavi-board/scripts/test-groups.js`。グループに `workflow` が加わった
+- 対象に Chrome 拡張（`extensions/chrome/ccnavi-approval`）を足した。`mark-ext.sh` は VS Code と同じ
+  `<セッション>.ext-files` に書き、`test-ext.sh` は触ったときだけ `node scripts/test.js` を回す。
+  Chrome 拡張はグループに分けていないので、拡張全体を 1 つのグループとして回す。拡張を読み込んだ
+  Chromium での試験（`--e2e`）は Chromium が要るので回さない。読み物（`*.md`・`docs/`）だけのターンは
+  回さず、`node_modules` が無ければ VS Code の終了コード 3 と同じく差し戻さずにユーザへ伝える
+- `test-ext.sh` は、先頭に `/` の無い相対パス（`extensions/...`）も拡張のファイルとして拾い、
+  ワークスペースルートからのパスとして読む。`mark-ext.sh` は受け取ったとおりに書くため
