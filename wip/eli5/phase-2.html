@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>フェーズ 2: 画面側も「期待する判定」に言い換える</title>
+<style>
+  body { font-family: sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.8; color: #222; background: #fff; }
+  h1 { font-size: 1.3rem; }
+  h2 { font-size: 1.05rem; margin-top: 2rem; border-bottom: 1px solid #ccc; }
+  .box { background: #f3f6fa; padding: 0.8rem 1rem; border-radius: 6px; }
+  @media (prefers-color-scheme: dark) {
+    body { color: #ddd; background: #1b1b1b; }
+    h2 { border-color: #555; }
+    .box { background: #262c33; }
+  }
+</style>
+</head>
+<body>
+<h1>フェーズ 2: 画面側も「期待する判定」に言い換える</h1>
+
+<h2>なにを変えるのか</h2>
+<p>フェーズ 1 で、プログラム本体が「見本」を「期待する判定」と呼ぶようになりました。
+このフェーズでは、VS Code の画面（ルールを管理するボード）を、同じ呼び方に合わせます。
+本体と画面で言葉や項目名が食い違うと、画面が本体の答えを読めなくなるためです。</p>
+
+<h2>このフェーズでやること</h2>
+<div class="box">
+<ul>
+  <li>画面が本体から受け取る結果の項目名を、新しい名前に合わせました。</li>
+  <li>画面に出る文言を「見本・サンプル」から「期待する判定」に変えました。たとえばボタンは「期待する判定を一括で確かめる」になります。</li>
+  <li>設定の名前が <code>samplesPath</code> から <code>expectationsPath</code> に変わります。古い設定名は読みません。</li>
+  <li>画面のテストで使う試験用のデータと、説明書（README）も新しい呼び方にしました。</li>
+</ul>
+</div>
+
+<h2>これで直ること</h2>
+<p>フェーズ 1 の終わりに、画面側のデータが古い名前のままで落ちていたテスト 2 本が、通るようになりました。</p>
+
+<h2>まだやらないこと</h2>
+<ul>
+  <li>一覧のファイルそのものの名前（<code>rule-samples.yml</code>）は、フェーズ 3 で変えます。それまでは古い名前を指したままです。</li>
+  <li>拡張の設計書など、文書の言い回しはフェーズ 4 で直します。</li>
+  <li>ボードの案内用のダミーの「sample」や、一般的な意味の「見本」は、別の意味なので直していません。</li>
+</ul>
+
+<h2>気をつけてほしいこと</h2>
+<ul>
+  <li>設定の名前が変わるので、古い設定を書いていた人は書き直しが要ります。まだ配っていないアプリなので、引き継ぎの処理は入れていません。</li>
+  <li>本体側のテストが 1 本、前から落ちています。このフェーズの変更とは関係ありません（変更前のツリーでも同じです）。</li>
+</ul>
+
+<h2>どれくらい危ないか</h2>
+<p>名前と文言を変えただけで、判定の中身は変えていません。ファイル数が多いので、念のため人が見ます。</p>
+</body>
+</html>
