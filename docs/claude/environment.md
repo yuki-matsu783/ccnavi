@@ -15,6 +15,7 @@ keywords: [実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, ワーク
   `$( )`の中には`case`を書かない。この2点は`tests/core/test_sh_portability.py`が検査する
 - shでもPythonでも、ヒアドキュメント（`<<`）でファイルや入力を作らない。複数行のPythonによる書き換えや追記は、
   Writeでスクリプトをファイルに置いてから、そのファイルを実行する（`python3 <パス>`）。
+  空のファイルを作るだけのときも同じで、Writeで作る。
   ヒアドキュメントで書いたファイルは、Write / Editに掛かる権限の宣言も、編集後の検査も通らないため
 - 使える道具は`jq` 1.6、Node 22（pnpm 10）、Python 3.12（uv）、goだけ。これ以外の道具がある前提で書かない
 - Claude Code on the webには`.ccnavi/bin`が無い。ccnaviのhookを動かすには、
