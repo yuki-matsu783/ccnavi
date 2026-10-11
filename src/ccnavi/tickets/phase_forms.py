@@ -244,20 +244,32 @@ def guard_off_message(found: str) -> str:
 
 # ユーザが端末で打つ入口のうち、引数を読み切れない形。human_path_form と組み込みの script 節は
 # 文字として並んだ表記で見るので、引数を変数・置換・glob で組み立てると外れる（ADR-0121）。
-# 次の 3 つは 2 段目（実行ファイルの端末要求）が無く、hook が唯一の保護なので、読めなければ止める。
+# 次の 3 つは 2 段目（実行ファイルの端末要求）が無く、hook が唯一の保護なので、止める操作を
+# 組み立てうるなら止める。組み立てられない形（読むだけの形）は通す。
 #
-# - `ccnavi-sync.sh`: `--forget` は実行ファイルを起動せず、sh が取り込み状態を消す
-# - `ccnavi-review.sh decide`: `--choices` はボードの経路で、端末を求めない
+# - `ccnavi-sync.sh`: `--forget` は実行ファイルを起動せず、sh が取り込み状態を消す。sh は
+#   1 つ目の引数だけを `--forget` として読むので、1 つ目（空に展開しうる語は飛ばす）が
+#   `--forget` になりうるときに止める。`--preview` のような文字どおりの語が先頭なら通す
+# - `ccnavi-review.sh decide`: `--choices` はボードの経路で、端末を求めない。`--choices` に
+#   なりうる語があれば止める。文字どおりの `--preview` があれば通す
+#   （sh が `--choices` と一緒に断る）
 # - 実行ファイル（launcher を含む）の `--agree` / `--reviewed` と `--yes`: 端末を求めない。
-#   ほかの副命令は端末を求めないものも多いので、展開を含む語があり、承認の旗（`--agree` /
-#   `--approve` / `--reviewed`）と `--yes` がどちらも文字か展開でそろいうるときに止める。
-#   端末要求を切る `--guard-ticket-approval` になりうる語も止める
+#   承認の旗と `--yes` がどちらも文字か展開でそろいうるときと、端末要求を切る
+#   `--guard-ticket-approval` になりうる語があるときに止める。展開を含む語より前に、診断の旗
+#   （`--docs`・`--test` など）か実行ファイルの知らない旗があれば通す（承認の経路に進まない）。
+#   文字どおりの `--agree --preview` も通す（`--yes` が来ても実行ファイルが断る）
+#
+# 展開と glob は、引用されていない部分と二重引用符の中（glob は引用されていない部分）だけで
+# 数える。単引用符の中はシェルが展開しないので文字どおりに読む。リダイレクトの行き先は
+# 入口に渡る引数ではないので数えない。
 #
 # 語はコマンドの位置から見る（`shellread.placed` と、実行役を外した層）。前に置けるのは
 # シェル・busybox・`.`・シェルの選択肢・リダイレクト・代入だけ。`sh -x` や `sh < /dev/null` を
 # 挟んでも外れず、`git log --grep ccnavi-sync.sh` のように文字列として出るだけの形には当たらない。
-# 引数を外から流し込む形（`xargs`、標準入力から読むシェル、入口を `<` で読ませる形）は、
-# 入口の名前が出た時点で止める。走査が止まる形（バッククォート）は生の文字列の語で見る。
+# 引数を外から流し込む形（`xargs`、入口を `<` で読ませる形）は、入口の名前が出た時点で止める。
+# 標準入力から読むシェル（パイプの先の `sh`・`bash`、`sh -s`、ヒアドキュメント・ヒアストリング）が
+# あれば、コマンド行の文字列のどこかに入口の名前があるだけで止める（流し込む文字列の中の語は
+# 語として読めない）。走査が止まる形（バッククォート）は生の文字列の語で見る。
 _ENTRY_SYNC = "ccnavi-sync.sh"
 _ENTRY_REVIEW = "ccnavi-review.sh"
 _ENTRY_EXE = frozenset({"ccnavi", "ccnavi.exe", "ccnavi.__main__", "ccnavi-launcher.sh"})
@@ -275,6 +287,47 @@ _OPEN_PART = re.compile(
 _APPROVAL_FLAGS = ("--agree", "--approve", "--reviewed")
 _YES_FLAGS = ("--yes",)
 _GUARD_FLAGS = ("--guard-ticket-approval",)
+_FORGET_FLAGS = ("--forget",)
+_CHOICES_FLAGS = ("--choices",)
+# 実行ファイルの診断の旗。どれも承認の経路（`--agree` / `--reviewed` / `--close-early`）より前に
+# 分かれて、承認を行わない（cli._parsed の振り分けの順）。
+_EXE_DIAGNOSES = frozenset(
+    {
+        "--docs",
+        "--lint",
+        "--test",
+        "--test-expectations",
+        "--explain",
+        "--suggest",
+        "--version",
+        "--help",
+        "-h",
+    }
+)
+# 実行ファイルが受ける旗（`ccnavi --version --json` の flags と、短い形の `-h` `-r`）。
+# ここに無い旗（`--list` など）は実行ファイルが使い方の誤りとして断り、何も動かさない。
+# 旗を足したらここにも足す（tests/ticket/test_ticket.py が flags と比べる）。
+EXE_OPTIONS = frozenset(
+    {
+        "--accept-unresolved", "--actor", "--agent-id", "--agree", "--approved", "--body-file",
+        "--chat", "--choose-out", "--close-early", "--cwd", "--digest", "--docs", "--expect",
+        "--explain", "--fill-phases", "--flow", "--format", "--guard-core-files",
+        "--guard-ticket-approval", "--help", "--integration-branch", "--json", "--keyword",
+        "--limit", "--lint", "--log", "--mode", "--no-refresh", "--order", "--path",
+        "--permission-mode", "--phase", "--phases", "--plan-order", "--preview", "--project-home",
+        "--project-phases-file", "--project-risk-file", "--project-rules-file", "--projects",
+        "--prune", "--reason", "--record-tree", "--record-writes", "--restore-if-deny",
+        "--result", "--reverse", "--reviewed", "--risk", "--root", "--rules", "--since", "--sort",
+        "--state", "--suggest", "--tag", "--test", "--test-expectations", "--text",
+        "--ticket-control", "--tickets", "--type", "--until", "--verify", "--version", "--via",
+        "--write", "--yes", "-h", "-r",
+    }
+)  # fmt: skip
+# 単引用符の中と、glob を引用した文字。文字どおりの値として読むため、
+# 走査の前に印の文字へ置き換える。
+_LITERAL_MARKS = {"$": "\ue024", "`": "\ue060", "*": "\ue02a", "?": "\ue03f", "[": "\ue05b"}
+_GLOB_MARKS = ("*", "?", "[")
+_UNMARK = str.maketrans({mark: ch for ch, mark in _LITERAL_MARKS.items()})
 
 
 def _base_name(word: str) -> str:
@@ -298,6 +351,65 @@ def _could_be(word: str, flags: tuple[str, ...]) -> bool:
     pattern.append(re.escape(word[last:]))
     rx = re.compile("".join(pattern), re.IGNORECASE | re.DOTALL)
     return any(rx.fullmatch(f) or rx.fullmatch(f + "=x") for f in flags)
+
+
+def _vanishes(word: str) -> bool:
+    """語が展開で空になりうるか（展開と glob を除くと何も残らない）。"""
+    return _is_open(word) and not _OPEN_PART.sub("", word)
+
+
+def _drop_redirects(args: list[str]) -> list[str]:
+    """リダイレクト（演算子と行き先）を除いた引数。行き先は入口に渡らない。"""
+    kept: list[str] = []
+    k = 0
+    while k < len(args):
+        width = shellread_words._redirect_width(args, k)
+        if width:
+            k += width
+            continue
+        kept.append(args[k])
+        k += 1
+    return kept
+
+
+def _literal_quoted(subject: str) -> str:
+    """単引用符の中の展開と glob、二重引用符の中と `\\` の後の glob を、文字どおりの印に置き換える。
+
+    置き換えた語は展開を含む語として数えない。読み切れない形（置換・ヒアドキュメント・
+    `$'…'`・閉じない引用符）は置き換えず、そのまま返す（止める側に倒す）。
+    """
+    if "$(" in subject or "`" in subject or "<<" in subject or "$'" in subject:
+        return subject
+    out: list[str] = []
+    quote = ""
+    i = 0
+    while i < len(subject):
+        ch = subject[i]
+        if quote == "'":
+            if ch == "'":
+                quote = ""
+                out.append(ch)
+            else:
+                out.append(_LITERAL_MARKS.get(ch, ch))
+        elif ch == "\\" and i + 1 < len(subject):
+            following = subject[i + 1]
+            literal = following in _GLOB_MARKS or following in "$`"
+            out.append(ch + (_LITERAL_MARKS[following] if literal else following))
+            i += 2
+            continue
+        elif quote == '"':
+            if ch == '"':
+                quote = ""
+            out.append(_LITERAL_MARKS[ch] if ch in _GLOB_MARKS else ch)
+        else:
+            if ch in "'\"":
+                quote = ch
+            out.append(ch)
+        i += 1
+    return subject if quote else "".join(out)
+
+
+_STDIN_SCRIPTS = frozenset({"-", "/dev/stdin", "/dev/fd/0", "/proc/self/fd/0"})
 
 
 def _entry_kind(word: str, bin_base: str) -> str:
@@ -349,8 +461,12 @@ def _reads_stdin(words: list[str]) -> bool:
             k += width
             continue
         word = rest[k]
+        if word in _STDIN_SCRIPTS:
+            return True
         if not word.startswith(("-", "+")) or word.startswith("--"):
-            return word == "--" and k + 1 == len(rest)
+            if word == "--":
+                return k + 1 == len(rest) or rest[k + 1] in _STDIN_SCRIPTS
+            return False
         if "c" in word[1:]:
             return False
         if "s" in word[1:]:
@@ -365,16 +481,36 @@ def _hidden_args(kind: str, args: list[str]) -> str:
     文字として並んだ `--choices` と `--digest` の組は human_path_form が先に止める。文字として
     並んだ `--forget` はここでも返す（`busybox sh` や `sh < x` を前に置くと script 節から外れる）。
     """
-    opened = [a for a in args if _is_open(a)]
+    args = _drop_redirects(args)
     if kind == _ENTRY_SYNC:
-        return opened[0] if opened else ("--forget" if "--forget" in args else "")
+        # sh は 1 つ目の引数だけを `--forget` として読む。空になりうる語は飛ばして次を見る。
+        for arg in args:
+            if _could_be(arg, _FORGET_FLAGS):
+                return arg
+            if not _vanishes(arg):
+                return ""
+        return ""
     if kind == _ENTRY_REVIEW:
         sub = args[0] if args else ""
         if "decide" in [a.lower() for a in args] or (_is_open(sub) and _could_be(sub, ("decide",))):
-            return opened[0] if opened else ""
+            if "--preview" in args or not any(_is_open(a) for a in args):
+                return ""
+            return next((a for a in args if _is_open(a) and _could_be(a, _CHOICES_FLAGS)), "")
         return ""
-    if not opened:
+    if not any(_is_open(a) for a in args):
         return ""
+    # 展開を含む語より前の、文字どおりの旗（`--` の後は旗ではない）。
+    head: list[str] = []
+    for arg in args:
+        if _is_open(arg) or arg == "--":
+            break
+        head.append(arg)
+    flags = {a.partition("=")[0] for a in head if a.startswith("-") and a != "-"}
+    if flags & _EXE_DIAGNOSES or flags - EXE_OPTIONS:
+        return ""
+    if {"--agree", "--preview"} <= flags:
+        return ""
+    opened = [a for a in args if _is_open(a)]
     guard = [a for a in opened if _could_be(a, _GUARD_FLAGS)]
     if guard:
         return guard[0]
@@ -392,7 +528,7 @@ def _entry_commands(
 
     読めなければ生の文字列の語で、位置は見ない（読めなければ止める側に倒す）。
     """
-    placed = [("", words) for words, _ in shellread.placed(subject)]
+    placed = [("", words) for words, _ in shellread.placed(_literal_quoted(subject))]
     if placed:
         layered = [
             (runner, [w.replace(shellread.WORD_SEP, " ") for w in layer.split(" ") if w])
@@ -419,7 +555,8 @@ def hidden_user_entry(
     同じルールの文面で止まるように空を返す。
     """
     inner = list(inner or [])
-    found = _hidden_entry(subject, inner, bin_path)
+    entry, word = _hidden_entry(subject, inner, bin_path)
+    found = (entry, word.translate(_UNMARK))
     if found[1] == "--forget":
         script = re.compile(_SCRIPT_FORMS, re.IGNORECASE)
         if any(script.search(c) for c in commands(subject) + [layer for _, layer in inner]):
@@ -453,9 +590,50 @@ def _hidden_entry(subject: str, inner: list[tuple[str, str]], bin_path: str) -> 
             found = _hidden_args(kind, words[i + 1 :])
             if found:
                 return kind, found
+    if stdin_shell:
+        named = named or _named_in_text(subject, bin_base)
     if stdin_shell and named:
-        return named, "標準入力から読むシェル"
+        return named, STDIN_SHELL
     return "", ""
+
+
+STDIN_SHELL = "標準入力から読むシェル"
+_NAMED_SCRIPT = re.compile(r"ccnavi-(sync|review|launcher)\.sh", re.IGNORECASE)
+_NAMED_EXE = re.compile(r"(?<![\w.-])ccnavi(\.exe)?(?![\w/-]|\.(?!exe))", re.IGNORECASE)
+
+
+def _named_in_text(subject: str, bin_base: str) -> str:
+    """コマンド行の文字列のどこかに入口の名前があれば、その入口。
+
+    標準入力から読むシェルへ流し込む文字列（`echo "…" | sh`・ヒアドキュメント・ヒアストリング）の
+    中は語として読めないので、文字列で探す。
+    """
+    script = _NAMED_SCRIPT.search(subject)
+    if script:
+        name = script.group(0).lower()
+        return "ccnavi" if name == "ccnavi-launcher.sh" else name
+    if _NAMED_EXE.search(subject) or (bin_base and bin_base in subject.lower()):
+        return "ccnavi"
+    return ""
+
+
+# 止めた語が、実行の時点で何になりうるか（入口ごと）と、通る形の案内。
+_ENTRY_REASONS = {
+    _ENTRY_SYNC: (
+        "1 つ目の引数として --forget（取り込み状態を消す操作）になりうる",
+        "取り込むだけなら、親の識別子をそのまま書けば通ります。",
+    ),
+    _ENTRY_REVIEW: (
+        "decide の --choices（ボードで押した選択を置く操作）になりうる",
+        "一覧を見るだけなら decide <N> --preview は通ります。",
+    ),
+    "ccnavi": (
+        "承認の旗（--agree / --reviewed）と --yes、または端末要求を切る "
+        "--guard-ticket-approval になりうる",
+        "診断（--docs・--test・--lint・--explain など）は、その旗を展開を含む語より前に書けば"
+        "通ります。承認待ちを見るだけなら --agree --preview も通ります。",
+    ),
+}
 
 
 def hidden_entry_message(entry: str, found: str) -> str:
@@ -465,11 +643,24 @@ def hidden_entry_message(entry: str, found: str) -> str:
             f"{entry} の --forget（取り込み状態を消す操作）は、ユーザが端末で打ちます。"
             "要るなら、理由を添えてユーザに依頼してください。"
         )
+    tail = "承認・残った指摘の対応方針・取り込み状態を消す操作は、ユーザが端末で打ちます。"
+    if found == STDIN_SHELL:
+        return (
+            f"標準入力から読むシェルに流し込む文字列に、ユーザが端末で打つ入口（{entry}）の名前が"
+            "あります。流し込んだ文字列の中は語として読めないので、何を打つかを確かめられません。"
+            "入口はコマンド行にそのまま書いてください。" + tail
+        )
+    if found in _FEEDERS or found.startswith("< "):
+        return (
+            f"ユーザが端末で打つ入口（{entry}）に、引数か中身を外から流し込む形（{found}）が"
+            "あります。何が渡るかを確かめられないので止めました。"
+            "引数はコマンド行にそのまま書いてください。" + tail
+        )
+    reason, way = _ENTRY_REASONS.get(entry, ("止める操作になりうる", ""))
     return (
-        f"ユーザが端末で打つ入口（{entry}）に、何が渡るかを読み切れない形（{found}）があります。"
+        f"ユーザが端末で打つ入口（{entry}）に渡る語（{found}）が、実行の時点で、{reason}ので止めました。"
         "値は変数や glob で組み立てず、そのまま書いてください"
-        "（値が要るなら先に読み、次の手に書きます）。"
-        "承認・残った指摘の対応方針・取り込み状態を消す操作は、ユーザが端末で打ちます。"
+        "（値が要るなら先に読み、次の手に書きます）。" + way + tail
     )
 
 

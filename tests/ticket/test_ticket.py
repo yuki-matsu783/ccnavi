@@ -29,6 +29,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+from ccnavi.entry import cli
 from ccnavi.hook.subagent import CANDIDATE_NOTE
 from ccnavi.infra import settings, shellread
 from ccnavi.tickets import approval, phase_forms, phase_scope, review, ticket_fields
@@ -2377,6 +2378,94 @@ class TicketTest(unittest.TestCase):
             "PreToolUse", "Bash", self.parent_tree, command=f"sh {sync} --for${{X}}get P1"
         )
         self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
+
+    def test_user_entries_stop_only_forms_that_can_build_the_operation(self):
+        """ユーザの入口は、止める操作を組み立てうるときだけ止める（ADR-0121）。
+
+        読むだけの形（`--preview`、診断の旗が展開より前にある形）・リダイレクトの行き先・
+        単引用符の中の文字どおりの値は通す。標準入力から読むシェルへ流し込む文字列に
+        入口の名前があれば止める。
+        """
+        self.family()
+        sync = ".ccnavi/scripts/ccnavi-sync.sh"
+        review = ".ccnavi/scripts/ccnavi-review.sh"
+        launcher = ".ccnavi/scripts/ccnavi-launcher.sh"
+        for command in (
+            f"sh {sync} --preview $X",
+            f"sh {review} decide --preview $X",
+            f"sh {review} decide 1 --preview $X",
+            "ccnavi --agree --preview $X",
+            "python3 -m ccnavi --agree --preview $X",
+            f"sh {sync} 2>$LOG",
+            f"sh {sync} > out-$$.txt",
+            f"sh {sync} feature-1-x 2>$LOG",
+            f"sh {review} decide 1 2>$LOG",
+            'python3 -m ccnavi --docs "$Q"',
+            'python3 -m ccnavi --test Bash "$C"',
+            "python3 -m ccnavi --list $X",
+            "ccnavi --json --docs $X",
+            f"sh {launcher} --docs --text '*'",
+            f"sh {launcher} --test Bash '$X'",
+            f"sh {launcher} --test Read '*'",
+            "echo hi | sh",
+        ):
+            result = self.hook(
+                "PreToolUse",
+                "Bash",
+                self.parent_tree,
+                command=command,
+                guard_ticket_approval="enable",
+            )
+            self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
+        for command in (
+            f'echo "sh {sync} --forget i1" | sh',
+            f"printf 'sh {review} decide 3 --choices x' | bash",
+            f'echo "sh {sync} --forget P" | sh -s',
+            f"cat {sync} | sh /dev/stdin --forget P",
+            'echo "ccnavi --agree --yes i1 --digest d" | sh',
+            f"sh <<EOF\nsh {sync} --forget i1\nEOF",
+            f'sh <<< "sh {sync} --forget i1"',
+            "bash <<< 'ccnavi --agree --yes i1'",
+            "ccnavi --preview $X",
+            "ccnavi $X --docs",
+            "ccnavi -- --docs $X",
+            "ccnavi $X --agree --preview",
+            f"sh {sync} $E --forget P",
+            f"sh {review} decide 1 $X",
+        ):
+            result = self.hook(
+                "PreToolUse",
+                "Bash",
+                self.parent_tree,
+                command=command,
+                guard_ticket_approval="enable",
+            )
+            self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
+        # 文面は、止めた語が何になりうるかを言う。
+        result = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command="ccnavi --preview $X",
+            guard_ticket_approval="enable",
+        )
+        self.assertIn("--guard-ticket-approval になりうる", self.reason(result))
+        self.assertIn("展開を含む語より前に書けば", self.reason(result))
+        result = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command=f'echo "sh {sync} --forget i1" | sh',
+            guard_ticket_approval="enable",
+        )
+        self.assertIn("標準入力から読むシェル", self.reason(result))
+
+    def test_executable_options_list_matches_the_parser(self):
+        """入口の止めが知っている実行ファイルの旗は、実行ファイルが受ける旗と同じ。"""
+        out = io.StringIO()
+        cli.run(io.StringIO(), out, io.StringIO(), ["--version", "--json"])
+        flags = set(json.loads(out.getvalue())["flags"]) | {"-h", "-r"}
+        self.assertEqual(flags, set(phase_forms.EXE_OPTIONS))
 
     def test_turning_off_the_terminal_requirement_is_denied(self):
         """端末要求を切る形は、実行ファイルをどう呼んでいても止める。
