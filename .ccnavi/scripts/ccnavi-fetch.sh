@@ -354,8 +354,11 @@ report=$(
 		[ "$behind" = "0" ] && continue
 		ahead=$(git -C "$repo" rev-list --count "$ref..refs/heads/$default" 2>/dev/null || echo 0)
 		if [ "$ahead" != "0" ]; then
-			printf '%s: ワークツリーの起点になる %s がリモートと分岐している。ユーザに合流させてもらってください\n' \
-				"$name" "$default"
+			# 進められない理由（本当の分岐か、浅い clone で履歴が足りないだけか）は見分けない。
+			# 見るのは、手元の版がリモートの最新と一致しているかどうかだけ。
+			printf '%s: ワークツリーの起点になる %s がリモートの最新と一致しない（手元 %s、リモート %s）。分岐しているか、clone が浅くて履歴が足りない。ユーザに更新してもらってください（浅いなら git fetch --unshallow）\n' \
+				"$name" "$default" "$(git -C "$repo" rev-parse --short "refs/heads/$default")" \
+				"$(git -C "$repo" rev-parse --short "$ref")"
 			continue
 		fi
 

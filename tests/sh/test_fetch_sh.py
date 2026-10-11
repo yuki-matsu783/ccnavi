@@ -194,6 +194,25 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(mine, self.sha(self.ws, "refs/heads/main"))
         self.assertIn("分岐", done.stdout)
 
+    def test_default_branch_in_a_shallow_clone_is_reported_as_not_matching(self):
+        # 浅い clone で履歴が切れると、手元の版が丸ごと「リモートに無いコミット」に見える。
+        # 原因は見分けず、リモートの最新と一致しないことと両方の sha を言う。
+        # 手元の ref には触らない。
+        for _ in range(3):
+            self.advance(self.remote)
+        git(self.ws, "pull", "-q", "--ff-only", "origin", "main")
+        git(self.ws, "update-ref", "refs/heads/main", self.sha(self.ws, "HEAD") + "~2")
+        self.leave_main()
+        git(self.ws, "fetch", "-q", "--depth", "1", "origin", "main")
+        before = self.sha(self.ws, "refs/heads/main")
+        unrelated = git(self.ws, "merge-base", "main", "origin/main", check=False)
+        self.assertNotEqual(0, unrelated.returncode)
+        done = self.fetch()
+        self.assertEqual(before, self.sha(self.ws, "refs/heads/main"))
+        self.assertIn("一致しない", done.stdout)
+        self.assertIn(before[:7], done.stdout)
+        self.assertIn(self.sha(self.ws, "origin/main")[:7], done.stdout)
+
     def test_default_branch_is_left_alone_when_its_tree_is_dirty(self):
         # チェックアウトしているツリーに書きかけがあれば触らない（他セッションのもの）。
         tree = os.path.join(self.ws, ".claude", "worktrees", "main-tree")
