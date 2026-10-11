@@ -312,6 +312,7 @@ class BoardTest(PhaseHarness):
             sorted(fixture["parents"][0]["phases"][0]),
             sorted(board["parents"][0]["phases"][0]),
         )
+        self.assertEqual(sorted(fixture["sums"][0]["phases"]), sorted(board["sums"][0]["phases"]))
 
 
 def _ticket(ticket_id: str, parent: str = "", phase_number: int | None = None, **fields) -> dict:

@@ -257,8 +257,9 @@ class PhaseUnionTest(ConfigUnionHarness):
 
         sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
 
-        self.assertEqual(sums["lib"]["phases"]["order"], "dag")
-        self.assertEqual(sums["self"]["phases"]["order"], "dag")
+        # 定義は順序を持たないので、待ち方の欄（order）は渡さない
+        self.assertNotIn("order", sums["lib"]["phases"])
+        self.assertNotIn("order", sums["self"]["phases"])
         workflow = self.approved_path("phases", "i0001", "workflow.yml", project="lib")
         self.assertFalse(os.path.exists(workflow))
 
