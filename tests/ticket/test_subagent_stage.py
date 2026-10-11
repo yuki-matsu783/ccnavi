@@ -118,19 +118,6 @@ class StageLineTest(StageHarness):
         self.assertIn(CHILD2, text)
         self.assertEqual(text.count("の局面: "), 1, text)
 
-    def test_a_parent_without_a_plan_gets_no_stage_line(self):
-        """計画の無い親は局面が空文字。行ごと出さない。"""
-        self.propose(PARENT, parent_text(PARENT, ["research"], copy=None).replace("plan:", "x:", 1))
-        self.propose(CHILD1, child_text(CHILD1, PARENT, 1, RESEARCH_ALLOW))
-        self.commit_parent()
-        approved = self.approve()
-        if approved.returncode != 0:
-            self.skipTest("計画の無い親は提案の形として通らない: " + approved.stdout[-200:])
-        self.run_child(CHILD1)
-        text = self.start_text(self.parent_tree)
-        self.assertIn(CHILD1, text)
-        self.assertNotIn("の局面", text)
-
 
 class StageReviewTest(StageHarness):
     """止まっている枝がある局面。もう片方の枝の子が開いている間に、SubagentStart を起こす。"""

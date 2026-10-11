@@ -2,7 +2,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { APPROVE_VERSION, parseApprovePreview, parseApproveResult, partialMessage } from "../../src/core/approvemodel.js";
+import {
+  APPROVE_VERSION,
+  childWorktreeFailureText,
+  failureReason,
+  parseApprovePreview,
+  parseApproveResult,
+  partialMessage,
+  type ApproveWorktree,
+} from "../../src/core/approvemodel.js";
 
 /** Python 側のテスト（tests/ticket/test_approve_json.py）が書き出した、実行ファイルの出力そのもの */
 function fixtureText(name: string): string {
@@ -205,4 +213,55 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
   // 継ぎ目だけを見る。識別子があれば「が」のあとに空白ちょうど 1 つ、無ければ「が」の直後に「止まりました」
   assert.match(stopped, /--yes が [^\s]/, stopped);
   assert.match(unknown, /--yes が止まりました/, unknown);
+});
+
+test("CB-T398 承認した子のワークツリーの計画を読む（古い実行ファイルの答えには無く、空として読む）", () => {
+  const done = parseApproveResult(fixtureText("approve-yes.json"));
+  assert.ok(done.ok);
+  if (done.ok) {
+    assert.deepEqual(done.value.worktrees, [
+      {
+        ticket: "i0001-01-01",
+        parent: "i0001",
+        path: ".claude/worktrees/i0001-01-01",
+        branch: "i0001-01-01",
+        base: "i0001",
+        state: "create",
+      },
+    ]);
+  }
+  const old = parseApproveResult('{"version":1,"approved":["i0001"],"copies":[],"lines":[],"prompt":"x"}');
+  assert.ok(old.ok);
+  if (old.ok) {
+    assert.deepEqual(old.value.worktrees, []);
+  }
+});
+
+test("CB-T399 作れなかった子のワークツリーは、名前と手で打つコマンドを付けて知らせる", () => {
+  const w: ApproveWorktree = {
+    ticket: "i0001-01-01",
+    parent: "i0001",
+    path: ".claude/worktrees/i0001-01-01",
+    branch: "i0001-01-01",
+    base: "i0001",
+    state: "create",
+  };
+  const text = childWorktreeFailureText(
+    [{ worktree: w, reason: "fatal: already exists" }],
+    "sh '/ws/.ccnavi/scripts/ccnavi-git.sh'",
+  );
+  assert.equal(
+    text,
+    "子 i0001-01-01 のワークツリー .claude/worktrees/i0001-01-01 を作れなかった（fatal: already exists）。" +
+      "手で作るなら: sh '/ws/.ccnavi/scripts/ccnavi-git.sh' worktree add .claude/worktrees/i0001-01-01 -b i0001-01-01 i0001。" +
+      "ブランチ i0001-01-01 が既にあるなら: sh '/ws/.ccnavi/scripts/ccnavi-git.sh' worktree add .claude/worktrees/i0001-01-01 i0001-01-01",
+  );
+  assert.equal(childWorktreeFailureText([], "sh x"), "");
+});
+
+test("CB-T400 失敗の理由は fatal / error の行を優先し、標準出力だけのときは 1 行目（ログの場所を含む）を取る", () => {
+  assert.equal(failureReason("", "fail git worktree exit=255  log=logs/git-1.log\nfatal: a branch named 'Z1' already exists\n"), "fatal: a branch named 'Z1' already exists");
+  assert.equal(failureReason("error: x\n", "fail git worktree"), "error: x");
+  assert.equal(failureReason("", "fail git worktree exit=255  log=logs/git-1.log\n"), "fail git worktree exit=255  log=logs/git-1.log");
+  assert.equal(failureReason("", ""), "");
 });

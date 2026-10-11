@@ -121,10 +121,14 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-branches.sh は issue・MR に紐づくブランチを探す sh。UserPromptSubmit の hook が依頼文の
 # issue・MR の指定を見つけるとこの表記を案内するので、配らないと案内どおりに実行しても動かない。
 # ccnavi-start.sh は issue・MR の指定を受けた着手の入口で、hook がこの表記を案内する。中で ccnavi-branches.sh を呼ぶ。
+# ccnavi-stage.sh は、書き込みを止められている保護対象のファイルを下書きの置き場で直すための支度をする sh。
+# CLAUDE.md の決まり（wip/scratchpad/ に cp して編集し、ユーザが差し替える）の手順を 1 本にしたもの。
+# ccnavi-worktree.sh は作業用のワークツリーを統合先から切る sh（fetch・遅れの確認・起点の選択・worktree add を
+# 1 本にしたもの）。docs/claude/worktree.md の「ワークツリーの作り方」の手順を打つ。
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # git で追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順番も最後にする。途中で失敗したときに、
 # hook が起動する sh だけがあって、代わりに通る sh が無い状態を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-c1.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-agree.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-start.sh ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-state.sh ccnavi-common-lock.sh ccnavi-common-c1.sh ccnavi-common-host.sh ccnavi-common-log.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-agree.sh ccnavi-fetch.sh ccnavi-sync.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-branches.sh ccnavi-start.sh ccnavi-stage.sh ccnavi-worktree.sh ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 
 mode="$DEFAULT_MODE"
@@ -1343,7 +1347,7 @@ if [ ! -f "$root/$DEPLOY_RISK" ]; then
 	note_missing "${DEPLOY_RISK}（リスクの配点。無いと組み込みの配点で測る）"
 fi
 if [ ! -f "$root/$DEPLOY_PHASES" ]; then
-	note_missing "${DEPLOY_PHASES}（フェーズ定義。無いと番号だけの挙動になる）"
+	note_missing "${DEPLOY_PHASES}（フェーズ定義。無いと plan を持つ親を承認できず、plan の無い親は start が止まる）"
 fi
 # 配るものの一覧（DEPLOY_SCRIPTS）を使って確かめる。ここで名前を決め打ちすると、配る sh を
 # 足したときに、その sh が無いことをこの一覧だけが報告しなくなる。
@@ -1367,6 +1371,12 @@ for name in $DEPLOY_SCRIPTS; do
 			;;
 		ccnavi-clean.sh | ccnavi-clean.js)
 			why="ワークツリーを片付ける前に生成物を消す"
+			;;
+		ccnavi-stage.sh)
+			why="保護対象のファイルを下書きの置き場で直すための支度"
+			;;
+		ccnavi-worktree.sh)
+			why="作業用のワークツリーを統合先から切る"
 			;;
 		ccnavi-common-*.sh)
 			why="代わりに通る sh が起動して最初に読む共通部の部品"

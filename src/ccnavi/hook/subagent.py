@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import time
 from typing import TextIO
 
 from ..infra import fsio, hookio, modes, settings, tree
@@ -48,6 +49,7 @@ def at_start(
     子の範囲を案内し、調査役がどこで作業すればよいか分からなくなる（SubagentStop と同じ絞り方）。
     """
     record.decision, record.enforced = audit.ALLOW, True
+    _note_running(stderr, conf, payload)
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を頭に置く（本文は要るときに
     # 自分で開く）。
     # 子チケットの一覧が無い起動（チケット制御が無い、チケットの無いツリー）でも渡す。
@@ -186,6 +188,30 @@ def at_stop(
     payload: hookio.Input,
     record: audit.Record,
 ) -> int:
+    """サブエージェントが終わろうとしたとき。実行中の記録を外し、範囲外の変更の差し戻しを判定する。
+
+    差し戻した（`EXIT_BLOCK`）ときは、サブエージェントが続けるので記録を残す。それ以外は、
+    判定の途中で例外が出ても外す（終わるのは変わらない。残すと促しを期限まで止める）。
+    """
+    blocked = False
+    try:
+        rc = _judge_stop(stdout, stderr, mode, conf, root, payload, record)
+        blocked = rc == EXIT_BLOCK
+        return rc
+    finally:
+        if not blocked:
+            _forget_running(conf, payload)
+
+
+def _judge_stop(
+    stdout: TextIO,
+    stderr: TextIO,
+    mode: str,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+) -> int:
     """サブエージェントが終わろうとしたとき。範囲外の変更が残っていれば 1 回だけ差し戻す。
 
     見るのは、cwd が子のワークツリーならその子、親のワークツリーならその親の開いている
@@ -255,6 +281,130 @@ def at_stop(
     record.enforced = False
     hookio.write_context(stdout, hookio.SUBAGENT_STOP, text, system="\n".join(changed))
     return EXIT_OK
+
+
+# 実行中のサブエージェントの印。メインの Stop が、委任して待つ回を「レビュー依頼までの道」の
+# 促しで止めないために使う（`running`）。
+#
+# - SubagentStart が `subagent-<セッション>-<agent_id>.running` を置き、SubagentStop が外す。
+#   差し戻して続けさせた回は外さない。1 体 1 ファイルなので、並行して始まる・終わる体が
+#   同じファイルを書き換えて取り合うことは無い
+# - 中身は 1 行目に `session <セッション>`、2 行目に開始時刻（エポック秒）。
+#   セッションの識別子は名前に入れるとき字を置き換えるので、別のセッションの名前と前置きが
+#   重なりうる。どのセッションの印かは 1 行目の完全一致で決める（`_read_mark` と同じ）
+# - `agent_id` が payload に無い始まり・終わりは、鍵が決まらないので印を置かず、外しもしない。
+#   その体は「実行中」と数えられず、委任して待つ回でも促しが出うる
+# - 入れ子の体（孫）も、同じセッションで自分の `agent_id` の印を持つ。1 体でも残っていれば実行中
+# - SubagentStop が来ないまま残った印（中断・クラッシュ・ccnavi の内部エラー）は、開始から
+#   `RUNNING_MAX_SECONDS` を過ぎたら数えない。さらにセッションの起動（`startup`）と再開
+#   （`resume`）で捨てる（`forget_running`）。どちらも新しいプロセスで、前の体は生きていない。
+#   compact・clear では捨てない。同じプロセスで、実行中の体が残りうるため
+# - 数える対象はサブエージェントだけ。チームメイトと背景のシェルは数えない
+RUNNING_SUFFIX = ".running"
+
+# 印を「実行中」と数える長さの上限（秒）。4 時間。hook の timeout（10 秒）とは関係なく、
+# 背景の体が現実に走る長さ（数分から 1 時間ほど）に十分な余裕を足した値。長すぎる分の害は、
+# 取りこぼした印が促しを止める時間が伸びるだけ（促しが 1 回出ないだけで、他は壊れない）。
+# 短すぎると、長く走る体を待つ回で誤って止める。迷ったら止めない側に倒す。
+RUNNING_MAX_SECONDS = 4 * 3600
+
+
+def _running_path(state_dir: str, session: str, who: str) -> str:
+    """実行中の印の置き場。鍵の決め方は差し戻しの記録（_bounce_path）と同じ。"""
+    return _bounce_path(state_dir, session, who)[: -len(".bounced")] + RUNNING_SUFFIX
+
+
+def _note_running(stderr: TextIO, conf: settings.Settings, payload: hookio.Input) -> None:
+    """SubagentStart で、この体が実行中だと印を置く。置けなくても始まりは止めない。
+
+    チケット制御が無ければ、促しも無いので置かない。
+    """
+    if not conf.tickets_enabled or not conf.state or not payload.agent_id:
+        return
+    text = _mark_text(payload.session_id, [str(int(time.time()))])
+    failed = fsio.write_text(_running_path(conf.state, payload.session_id, payload.agent_id), text)
+    if failed:
+        stderr.write(f"ccnavi: 実行中のサブエージェントの印を書けない: {failed}\n")
+
+
+def _forget_running(conf: settings.Settings, payload: hookio.Input) -> None:
+    """SubagentStop で、この体の実行中の印を外す。無くても、外せなくても何も出さない。"""
+    if conf.state and payload.agent_id:
+        fsio.remove(_running_path(conf.state, payload.session_id, payload.agent_id))
+
+
+def forget_running(state_dir: str, session: str) -> None:
+    """このセッションの実行中の印を全部捨てる。起動（`startup`）と再開（`resume`）の後始末。"""
+    if not state_dir:
+        return
+    for _, path in _session_marks(state_dir, session, RUNNING_SUFFIX) or []:
+        # 名前の前置きが重なる別のセッションの印は消さない（`running` と同じく 1 行目で確かめる）。
+        # 1 行目を読めない印（壊れている・空）は、期限と prune に任せず、ここで捨てる。
+        text = fsio.read_text(path, errors="replace")
+        lines = text.splitlines() if text is not None else []
+        if lines and lines[0] != _MARK_SESSION + _one_line(session):
+            continue
+        fsio.remove(path)
+
+
+def running(state_dir: str, session: str, now: float | None = None) -> bool:
+    """このセッションに、実行中のサブエージェントが居るか。読めないときも真（促さない側）。
+
+    印が壊れていて開始時刻を読めないときは、ファイルの更新時刻で期限を見る。
+    置き場が無いなら偽、あっても一覧できないときは真。印を読めないまま促すと、委任して待つ回のたびに止めてしまう。
+    """
+    if not state_dir:
+        return False
+    marks = _session_marks(state_dir, session, RUNNING_SUFFIX)
+    if marks is None:
+        return True
+    when = time.time() if now is None else now
+    for _, path in marks:
+        text = fsio.read_text(path, errors="replace")
+        lines = text.splitlines() if text is not None else []
+        if text is not None and lines and lines[0] != _MARK_SESSION + _one_line(session):
+            continue
+        started = _started_at(lines)
+        if started is None:
+            try:
+                started = os.path.getmtime(path)
+            except OSError:
+                return True
+        if when - started <= RUNNING_MAX_SECONDS:
+            return True
+    return False
+
+
+def _started_at(lines: list[str]) -> float | None:
+    """印の開始時刻。読めなければ None。"""
+    try:
+        return float(lines[1])
+    except (IndexError, ValueError):
+        return None
+
+
+def _one_line(session: str) -> str:
+    return session.replace("\r", " ").replace("\n", " ")
+
+
+def _session_marks(state_dir: str, session: str, suffix: str) -> list[tuple[str, str]] | None:
+    """このセッションの名前の前置きに当たる印。相手の鍵とパスの組。一覧できなければ None。
+
+    名前は前置きで候補を絞るだけで、セッションは読むときに 1 行目で確かめる。
+    """
+    head = os.path.basename(_bounce_path(state_dir, session, "x"))[: -len("x.bounced")]
+    try:
+        names = sorted(os.listdir(state_dir))
+    except FileNotFoundError:
+        # 置き場がまだ無い。印を置いた者が居ない。
+        return []
+    except OSError:
+        return None
+    return [
+        (name[len(head) : -len(suffix)], os.path.join(state_dir, name))
+        for name in names
+        if name.startswith(head) and name.endswith(suffix) and len(name) > len(head) + len(suffix)
+    ]
 
 
 def _limit_note(child: ticket_model.Ticket, found: phase_scope.ScopeVerdict) -> str:

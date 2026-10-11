@@ -8,12 +8,13 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { loadBoard, runApprovePreview, runApproveYes, runDecidePreview, runDecideYes } from "./ccnavi.js";
+import { loadBoard, runApprovePreview, runApproveYes, runChildWorktreeAdd, runDecidePreview, runDecideYes } from "./ccnavi.js";
 import { buildBoard, flowCardOf, isKnownPath, parentTreeOf, phaseChipOf, todoParentsOf, workflowCardOf, type Board } from "./core/board.js";
 import { flowTicketOf } from "./core/flow-view.js";
 import { screens } from "./core/screens.js";
 import { movedStep, NOTHING_MOVED, type MovedState } from "./core/board-moved.js";
 import {
+  gitScriptCommand,
   PUSH_APPROVED_SCRIPT,
   pushApprovedCommand,
   type Launcher,
@@ -35,7 +36,7 @@ import { ticketControlOf } from "./core/ticket-control.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { isTicketId } from "./core/ticket-id.js";
 import { forgetSaved, onWorkflowTabs, staleSaved, workflowTabs } from "./core/workflow-tabs.js";
-import { unsavedText } from "./core/approvemodel.js";
+import { childWorktreeFailureText, unsavedText, type ApproveWorktree, type ChildWorktreeFailure } from "./core/approvemodel.js";
 import { runInTerminal, scriptShell } from "./terminal.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -84,6 +85,26 @@ let state: PanelState | undefined;
 
 function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
+}
+
+/**
+ * 承認した子のワークツリーを作る（計画の `create` の子だけ）。作れなかったものは、名前と手で打つ
+ * コマンドを付けて知らせる。親のワークツリーが無い子は計画に入らないので、ここでは作らない。
+ */
+async function createChildWorktrees(root: string, worktrees: readonly ApproveWorktree[]): Promise<void> {
+  const failed: ChildWorktreeFailure[] = [];
+  for (const w of worktrees.filter((x) => x.state === "create")) {
+    const reason = await runChildWorktreeAdd(scriptShell(), root, w);
+    diaglog.get("ccnavi-board", root).info("子のワークツリーの作成結果", { ticket: w.ticket, ok: reason === "" });
+    if (reason !== "") {
+      failed.push({ worktree: w, reason });
+    }
+  }
+  if (failed.length > 0) {
+    void vscode.window.showWarningMessage(
+      `承認した子のワークツリーを作れませんでした。\n${childWorktreeFailureText(failed, gitScriptCommand(root))}`,
+    );
+  }
 }
 
 /**
@@ -527,6 +548,8 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
       if (outcome.ok) {
         // 承認した親は承認待ちから無くなる。あとで出す改版の提案を、前の保存と比べない
         forgetSaved(outcome.value.approved);
+        // 承認した子のワークツリーを作る。待たずに、作れなかったものだけ後で名指しで知らせる
+        void createChildWorktrees(root, outcome.value.worktrees);
       }
       if (state === current) {
         // 承認の push の sh があるかは、承認が返ったこの時点で見る

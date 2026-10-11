@@ -18,11 +18,13 @@ from ..tickets import (
     c1,
     core,
     history,
+    next_id,
     ops,
     phase,
     review,
     review_close,
     review_decide,
+    scaffold,
     ticket_ids,
     worktrees,
 )
@@ -39,7 +41,8 @@ def operate(
 ) -> int:
     """チケットの状態とレビューの操作を振り分ける。
 
-    `ticket start|finish|cancel <識別子>` と `review prepare|requested|confirm`、それに
+    `ticket start|finish|cancel <識別子>`、`ticket new <識別子> ...`（親の提案の雛形）、
+    `review prepare|requested|confirm`、それに
     ユーザが打つ `--reviewed` と `--close-early`。どれも payload を読まず、判定も記録もしない。
     リモートから取得した結果は `--result <json>` で受け取る。exe はネットワークに出ない。
     """
@@ -139,6 +142,9 @@ def operate(
             stderr.write("ccnavi: ticket status に渡せる親は 1 つだけ\n")
         else:
             code = status.run(stdout, stderr, root, conf, c1.family_of(target) if target else "")
+    elif kind == "ticket" and verb == "next-id":
+        # ticket next-id [<先頭の語> <slug>]。読むだけ。issue の無い親の識別子の番号を答える。
+        code = next_id.run(stdout, stderr, root, conf, words[2:])
     elif kind == "ticket" and verb in ("start", "finish", "cancel") and target:
         if verb == "start":
             code = ops.start(stdout, stderr, root, conf, target)
@@ -146,6 +152,17 @@ def operate(
             code = ops.finish(stdout, stderr, root, conf, target)
         else:
             code = ops.cancel(stdout, stderr, root, conf, target, args.reason)
+    elif kind == "ticket" and verb == "new":
+        # ticket new <識別子> --title <題> --plan <型,型,...> [--issue N]。親の提案の雛形を作る。
+        if len(words) != 3:
+            stderr.write(
+                "ccnavi: ticket new <識別子> --title <題> --plan <型,型,...> [--issue N]\n"
+            )
+        else:
+            where = cwd[-1] if isinstance(cwd, list) and cwd else cwd
+            code = scaffold.run(
+                stdout, stderr, conf, root, where, target, args.title, args.plan, args.issue
+            )
     elif kind == "ticket" and verb == "record-risk":
         # ticket record-risk <子> <項目> yes|no --reason <根拠>
         if len(words) < 5:

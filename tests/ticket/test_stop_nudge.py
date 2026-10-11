@@ -70,6 +70,16 @@ class StopNudgeTest(TicketTest):
         self.assertNotIn("decision", body)
         self.assertNotIn(CODE, result.stdout)
 
+    def assert_no_finish_nudge(self, result):
+        """`finish` を促していない。
+
+        作業中の子が残る形では、依頼までの道の促し（NUDGE_TICKET_REQUEST。
+        test_stop_request_nudge.py が固定する）が別に止めうるので、
+        ここでは `finish` の促しだけを見る。
+        """
+        self.body(result)
+        self.assertNotIn(CODE, result.stdout)
+
     # ---- 促す
 
     def test_a_clean_child_with_commits_is_asked_to_finish_once(self):
@@ -108,13 +118,13 @@ class StopNudgeTest(TicketTest):
         tree = self.child_tree()
         self.commit_work(tree)
         write(os.path.join(tree, "src", "a", "draft.py"), "y\n")  # 追跡していないファイルも数える
-        self.assert_quiet(self.stop(tree))
+        self.assert_no_finish_nudge(self.stop(tree))
         git(tree, "add", "-A")  # 索引にあるだけでも未コミット
         self.assert_quiet(self.stop(tree))
 
     def test_no_commit_beyond_the_base_point_means_nothing_was_done(self):
         self.family()
-        self.assert_quiet(self.stop(self.child_tree()))
+        self.assert_no_finish_nudge(self.stop(self.child_tree()))
 
     def test_a_ticket_that_is_not_started_is_not_asked(self):
         tree = self.family_without_starting()
@@ -125,20 +135,20 @@ class StopNudgeTest(TicketTest):
         """親は `finish` が通る形（close_problems が空）のときだけ。開いた子があれば促さない。"""
         self.family()
         self.commit_work(self.parent_tree, rel="src/parent.py")
-        self.assert_quiet(self.stop(self.parent_tree))
+        self.assert_no_finish_nudge(self.stop(self.parent_tree))
 
     def test_a_parent_held_for_review_is_not_asked(self):
         """レビュー準備中の親は、既存の Stop の案内（ユーザを待つ）と食い違わないよう促さない。"""
-        self.family(review=(True, True))
+        self.family(review=(True, True), plan=["work-mr"])
         for child in ("i0001-01-01", "i0001-01-02"):
             self.assertEqual(self.ccnavi("ticket", "finish", child).returncode, 0)
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "done")
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn("フェーズ 1 が終わりました", self.reason(said))
+        self.assertIn("フェーズ 1（MR作業） が終わりました", self.reason(said))
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "marks")
-        self.assert_quiet(self.stop(self.parent_tree))
+        self.assert_no_finish_nudge(self.stop(self.parent_tree))
 
     def test_the_workspace_root_and_a_worktree_without_a_ticket_are_not_asked(self):
         self.family()
@@ -218,7 +228,7 @@ class StopNudgeTest(TicketTest):
         tree = self.child_tree()
         self.commit_work(self.parent_tree, rel="src/parent.py")
         git(tree, "merge", "--quiet", "--ff-only", "i0001")
-        self.assert_quiet(self.stop(tree))
+        self.assert_no_finish_nudge(self.stop(tree))
 
     def test_merging_the_parent_branch_with_a_merge_commit_alone_is_not_work(self):
         self.family()
@@ -229,7 +239,7 @@ class StopNudgeTest(TicketTest):
         other = self.child_tree("i0001-01-02")
         self.commit_work(self.parent_tree, rel="src/parent.py")
         git(other, "merge", "--quiet", "--no-ff", "--no-edit", "i0001")
-        self.assert_quiet(self.stop(other))
+        self.assert_no_finish_nudge(self.stop(other))
         # 自分のコミットを足せば、それだけを数えて促す。
         self.commit_work(other, rel="src/b/work.py")
         body = self.body(self.stop(other))
@@ -242,9 +252,9 @@ class StopNudgeTest(TicketTest):
         tree = self.child_tree()
         self.commit_work(tree)
         git(self.parent_tree, "branch", "-m", "i0001", "renamed")
-        self.assert_quiet(self.stop(tree))
+        self.assert_no_finish_nudge(self.stop(tree))
 
-    # ---- `match: Stop` のルールと重なったとき（1 回の Stop で止める理由は 1 つにする）
+    # ---- `match: Stop` のルールと重なったとき（1 回の Stop フック呼び出しでは理由を 1 つだけ出す）
 
     def test_the_finish_nudge_goes_first_and_the_stop_rule_is_not_counted(self):
         """同じ Stop で両方が止めたいとき、`finish` の促しだけを出し、ルールの数えは進めない。"""
@@ -259,7 +269,8 @@ class StopNudgeTest(TicketTest):
         first = self.body(self.stop(tree))
         self.assertIn(CODE, first.get("reason", ""))
         self.assertNotIn("NUDGE_STOP_RULE", first.get("reason", ""))
-        # finish の促しは同じ HEAD では 1 回だけ。ここからルールを数える（1 回目は止めない）。
+        # finish の促しは同じ HEAD では 1 回だけ。同じ状態を依頼までの道の促しがもう 1 回止める
+        # ことも無い。ここからルールを数える（1 回目は止めない）。
         self.assert_quiet(self.stop(tree))
         third = self.body(self.stop(tree))
         self.assertEqual(third.get("decision"), "block")
