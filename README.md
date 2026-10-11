@@ -84,7 +84,7 @@ jq -r 'select(.event=="PreToolUse" and .decision=="allow")|[((.rules//[])|join("
 ```sh
 ccnavi --lint                              # 防御を無効化しうる記述が無いか
 ccnavi --test Bash "cd /repo && git push"  # 1 件が何に当たるか
-uv run python tools/check_rules.py         # 見本をまとめて回す
+uv run python scripts/check_rules.py       # 見本をまとめて回す
 ```
 
 ルールを 1 件足したら見本も 1 行足す（「見本で確かめる」の節）。止めたくないものも必ず一緒に置く。
@@ -113,6 +113,7 @@ Python 3.12 以降。実行時の依存は PyYAML 1 本だけ。
 ```sh
 uv run python -m unittest discover -s tests -t .   # テスト
 uv run python -m unittest discover -s tests/core -t .  # 1 グループ（core guard config ticket sh e2e）
+uv run python -m tests                             # 全件を別プロセスで同時に回す（中身は discover と同じ）
 uv run --with ruff ruff check .                    # 静的検査
 uv run --with ruff ruff format .                   # 整形
 uv run --with ruff ruff format --check .           # 整形の確認だけ
@@ -242,7 +243,7 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 | 変更要求（`POST .../request_changes`）は EE 限定 | 当てられない。CE の `reviewers` の `state` は `unreviewed` / `reviewed` / `approved` だけ |
 | URL にトークンを埋めた origin はそのままでは `origin` の出力に出る | sh はユーザの情報を除いて伏せる。実行ファイルの `remote_kind` も読み飛ばす |
 | ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を引き継がないので、環境変数で credential helper を差し替えても反映されない | 認証は git の設定側に置く（probe はリポジトリの `credential.helper` を空にしてから足す） |
-| トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流して作れる（`tools/gitlab/make_gitlab_tokens.rb`） | root と reviewer の 2 人分を作る |
+| トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流して作れる（`tests/manual/gitlab/make_gitlab_tokens.rb`） | root と reviewer の 2 人分を作る |
 | 起動直後は API の `PUT` が 30 秒を超えることがある | probe は 120 秒で 3 回まで待つ |
 
 `dist/`、`build/`、`logs/` は git 管理外。記録には絶対パスとコマンド全文が入るのでコミットしない。
@@ -393,6 +394,10 @@ ccnavi の動作に依存する決まりなので、ワークスペースの `CL
 | 承認済みチケットとフェーズのマーカー | `.ccnavi/approved/`（各ツリーのルートの直下。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く） |
 | 判定の記録 | `logs/decisions.jsonl`（ワークスペースルートの下） |
 | state | `logs/state/`（ワークスペースルートの下。実行後チェックの記録） |
+
+`projects/` のプロジェクトの作業も、ワークスペースルートで Claude Code を起動して `cd` で入る。プロジェクトの中で起動すると
+`CLAUDE_PROJECT_DIR` がプロジェクトになり、ワークスペースの `.claude/settings.json` が読まれず、ccnavi の hook が動かない
+（実測は `docs/design/multi-repo/to-measure.md`）。
 
 別の場所を指せるのはフラグ（`--log` / `--state` / `--approved` / `--tickets` / `--projects` /
 `--project-home`）だけで、hook からは渡らない。共通レイヤーの置き場（`.ccnavi/common/`）は `--project-home` で
@@ -1848,7 +1853,7 @@ JSON で渡す（`--result <path>`）。
   URL に埋めた資格情報は読み飛ばし、出力では伏せる
 - push の認証は git の設定側（Git Credential Manager か `credential.helper`）に置く。git のラッパースクリプトは `GIT_CONFIG_COUNT` を外し
   `GIT_TERMINAL_PROMPT=0` で動くので、環境変数での差し替えも認証画面も使えない。GitLab の実物で分かった注意点は [実測で分かった落とし穴](#実測で分かった落とし穴)、
-  確かめ直すための道具は `tools/gitlab/probe_gitlab.py`
+  確かめ直すための道具は `tests/manual/gitlab/probe_gitlab.py`
 - `--result` を実行ファイルに直接渡せるのはユーザの手だけ（`CCNAVI_GUARD_TICKET_APPROVAL`）。エージェントはスクリプト 2 本を通す
 
 **Draft を外すのは親、マージはユーザ。** `ready` は、親を閉じられる状態（全フェーズが終わり、フィードバック計画が承認され、レビューが済んでいる）
@@ -1985,12 +1990,13 @@ curl と `GITHUB_TOKEN` / `GITLAB_TOKEN` で読む）、名前に番号を含む
 ### プロジェクトのスキル
 
 プロジェクトは `.claude/` を持たない（hook やスキルなどの道具はワークスペースが持つ）ので、プロジェクト向けのスキルの形の手順書は
-`projects/<名前>/docs/skills/<スキル>/SKILL.md` に置く（頭の frontmatter に `name` と `description`）。
+`projects/<名前>/skills/<スキル>/SKILL.md` に置く（頭の frontmatter に `name` と `description`）。
 Claude Code はそこを読まないので、ccnavi が `SessionStart` と `SubagentStart` で、cwd がそのプロジェクトの中にあるときだけ目録
 （名前・説明・場所）を渡す。ワークスペースルートで始めて `cd` で入ったセッションには、cwd がそのプロジェクトの中にある最初の
 `PreToolUse` で 1 度だけ添える。本文はエージェントが要るときに参考に開く（CLAUDE.md・ccnavi の知らせ・ガードと食い違えばそちらに従う）。
 ディレクトリ名は `^[A-Za-z0-9._-]+$` のものだけを読む。上限は 30 本・4000 文字。専用の保護は無く、ほかのファイルと同じ判定になる
 （直すのは承認したチケットの範囲の中。`.ccnavi/` の外に置いたのは、組み込みの保護を緩めずに書けるようにするため）。
+ワークスペースの `.claude/skills/` で `concept: true` を持つ概念スキルは、親の `ticket start` がプロジェクトの `skills/<概念>/`（`SKILL.md` と `references/common/` の `.md`）へ写し、共通側から無くなった `.md` は写し先からも消す。`references/` の最上段は `common/`（写す）と `project/`（そのリポジトリ固有。写さない）に分けるので、プロジェクト固有の reference は上書きも削除もされない（設計 11.13）。
 
 ### 参考にした運用
 
@@ -2114,7 +2120,7 @@ response:
 
 ```sh
 ccnavi --test-samples .ccnavi/common/rule-samples.yml
-uv run python tools/check_rules.py     # 同じことを、state と記録を外して回す
+uv run python scripts/check_rules.py   # 同じことを、state と記録を外して回す
 ```
 
 見本をすべて判定に掛け、期待と食い違ったものを名指しする（1 件でもあれば終了コード 1）。見本は `deny` `ask` `allow` のタイプに置き、
@@ -2869,12 +2875,13 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。`--worktree <名前>` は掃除と `worktree remove` を 1 本で行う（本体は `ccnavi worktree drop`。cwd が中なら消さない）。配る（`scripts/ccnavi-setup.sh` の `DEPLOY_SCRIPTS`） |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
-| `tools/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを当てて 1 周する、ユーザが手で回す道具。自動テストは呼ばない |
+| `tests/__main__.py` | `python -m tests`。テストをモジュールごとに別プロセスで同時に回す。回す中身は discover と同じ |
+| `tests/manual/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを当てて 1 周する、ユーザが手で回す道具。自動テストは呼ばない |
 | `tests/fixtures/` | テスト用のルール（`rules.yml`、言及の無い呼び出しを見る `rules-undeclared.yml`） |
 | `.ccnavi/common/rules.yml` / `risks.yml` | このリポジトリ自身の共通レイヤーの設定（共通レイヤーに `phases.yml` は置かない） |
 | `.ccnavi/config/phases.yml` | このリポジトリ自身のレイヤーのフェーズ定義 |
 | `.ccnavi/common/rule-samples.yml` | ルールが何を止めて何を通すかの見本 |
-| `tools/check_rules.py` | 見本をぜんぶ判定に掛ける |
+| `scripts/check_rules.py` | 見本をぜんぶ判定に掛ける |
 | `extensions/vscode/ccnavi-board/` | VS Code 拡張。ボード・ルール管理・リスク管理・プロジェクト管理の画面 |
 | `docs/adr/` | 設計判断の記録 |
 

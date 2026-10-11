@@ -127,7 +127,7 @@ from __future__ import annotations
 
 import os
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 
 import yaml
@@ -522,6 +522,11 @@ class Rule:
     degraded_message: str = ""
 
     compiled: re.Pattern | None = None
+    # exempt は、式を当てる前に対象から外すものを決める関数。組み込みの保護だけが持ち、
+    # ルールファイルからは書けない。式は先読みを使えないので、「この形の中でも、これだけは
+    # 通す」は式の外で決める（selfguard_shell.scratchpad_copy_exempt）。返すのは式を当てる
+    # 対象で、外すものが無ければ受け取ったまま返す。
+    exempt: Callable[[str], str] | None = field(default=None, repr=False, compare=False)
 
     # excepts は `except:` の各パターン。本体（compiled）に当たっても、どれかに当たれば
     # このルールは当たらない。当てる文字列は本体と同じ（Bash ならコマンド列の全体）。
@@ -586,6 +591,8 @@ class Rule:
         if not self.built() or not subject:
             return False
         if tool_matches(self.match, tool):
+            if self.exempt is not None:
+                subject = self.exempt(subject)
             return self.hits(subject)
         return False
 

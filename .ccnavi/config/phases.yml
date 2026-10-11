@@ -71,11 +71,22 @@ phases:
     scope: inherit
 
   # 作業の振り返りで出たスキルの候補を、ワークスペースの .claude/skills/ に配置する。
+  # 候補の根拠を溜める docs/wiki/ も同じ子で直す（wiki 層。docs/claude/skill-wiki.md）。
   # 候補の拾い方と置き場は docs/claude/skill-review.md。子は親の範囲の中にしか置けないので、
-  # 親の範囲に .claude/skills/ が無ければこのフェーズ定義は使えず、提案チケットになる。
+  # 親の範囲に .claude/skills/ と docs/wiki/ が無ければこのフェーズ定義は使えず、提案チケットになる。
   skill-improve:
     kind: feedback
     title: スキル改善
     review: mr
-    scope: [".claude/skills/*"]
+    scope: [".claude/skills/*", "docs/wiki/*"]
     when: 振り返りでスキルの候補が出たとき（docs/claude/skill-review.md）。候補が無ければ置かない
+
+  # 小さい作業を親 1 子 1 で回すための定義。計画は `plan: [quick]` の 1 項にする。
+  # 子はこのセッションでユーザが見る（`ccnavi-review.sh chat <N>`）。マージリクエストは作らない。
+  # 範囲は親の範囲そのまま。親の提案に書いた範囲が、そのまま作業の上限になる。
+  quick:
+    kind: work
+    title: 小さい作業
+    review: chat
+    scope: inherit
+    when: 変更が 1〜2 ファイルに収まり、設計判断や並行作業が要らないとき

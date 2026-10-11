@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Callable
 
 from ..infra import platformtag, settings, shellread, tree
 from ..records import diaglog
@@ -292,7 +293,6 @@ def shell_write_regex(
     bin_path: str = "",
     *extra_clauses: tuple[str, str, str],
     holders: tuple[tuple[str, str], ...] = (),
-    scratchpad_exclude: str = "",
 ) -> str:
     """設定ファイルへシェルから書き込む形。実行ファイルのパスは設定で動くので、
     ここで組み立てる。
@@ -321,9 +321,6 @@ def shell_write_regex(
     holders は行き先を守るものが入っているディレクトリにした形（holder_regex に渡す組）。
     既定のパスのぶん（_HOLDERS）と実行ファイルのぶん（binary_holders）はここで足すので、
     渡すのは設定で動く場所のぶん（guard_shell_regex）。
-
-    scratchpad_exclude は wip/scratchpad/ 除外用の負の先読みパターン。
-    コピー保護（copy_places）に適用する。
     """
     places = [*_PLACES]
     copy_places = [*_COPY_PLACES]
@@ -337,9 +334,6 @@ def shell_write_regex(
             copy_places.append(copy_clause)
         if target_clause:
             target_places.append(target_clause)
-    # scratchpad 除外をコピー保護に適用
-    if scratchpad_exclude:
-        copy_places = [scratchpad_exclude + cp for cp in copy_places]
     where = _folded("(" + "|".join(places) + ")")
     copy_where = _folded("(" + "|".join(copy_places) + ")")
     target_where = _folded("(" + "|".join(target_places) + ")")
@@ -468,21 +462,99 @@ def binary_holders(bin_path: str) -> tuple[tuple[str, str], ...]:
 # 機械ごとの組み立ての置き場。`bin/` の下に並ぶ。
 _BUILD_DIR = r"(?:" + "|".join(platformtag.SYSTEMS) + r")-[a-z0-9_]+"
 
-# wip/scratchpad/ をコピー保護から除外するためのパターン
-# （ワークスペースルート直下の wip/scratchpad/）。実行時に root から組み立てる
+# 守る場所を写して直すための下書きの置き場（docs/claude/scratchpad.md）。
+# ワークスペースルートからの相対。
+SCRATCHPAD = ("wip", "scratchpad")
+# 行き先の下書きの置き場へ写すときに通すコマンド。`ln` は外す。置き場にリンクを作れると、
+# 次の 1 本でリンクの先（守る場所）へ書ける。
+_SCRATCHPAD_COPIERS = ("cp", "install")
+# 1 語の中にあると、行き先を表記どおりに読めない文字。変数・置換・グロブ・ブレース・引用・
+# リダイレクト・ホームの展開（`~`）と、shellread の目印。どれかがあれば例外にしない
+# （止める側に倒す）。
+_SCRATCHPAD_UNREAD = set("$`*?[]{}()<>|;&'\"\n~") | {shellread.SEP, shellread.WORD_SEP}
+# 例外にしてよい選択肢の文字。これだけを並べた短い選択肢（`-f` `-pv` など）と `--` のほかは、
+# `-` で始まる語が 1 つでもあれば例外にしない。止めるものを並べる形にすると、GNU の長い選択肢の
+# 省略（`--target` は `--target-directory`、`--sym` は `--symbolic-link`）や知らない選択肢に負ける。
+# `-t` は行き先を最後の語から動かし、`-s` `-l` はリンクを作り、`-P` `-d` `-a` `-r` はリンクを
+# リンクのまま写す。どれも許す側に入れない。
+_SCRATCHPAD_SHORT_ALLOWED = set("fpvnu")
 
 
-def _scratchpad_exclude(root: str) -> str:
-    """wip/scratchpad/ を除外する負の先読み。root が空なら空文字を返す。"""
+def scratchpad_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | None:
+    """シェルから書き込む形の保護から、下書きの置き場（`wip/scratchpad/`）へ写す cp を外す関数。
+
+    守る場所のファイルを直したいときは、置き場へ写して写しを直す（docs/claude/scratchpad.md）。
+    保護の式は行き先の最後の語に守る名前があれば当たるので、`cp .ccnavi/scripts/ccnavi-git.sh
+    wip/scratchpad/ccnavi-git.sh` のように同じ名前で写すと止まる。その 1 本を通す。
+
+    式の中では決めない。式は先読みを使えず（rules._UNSUPPORTED）、使えたとしても `.*` の先読みは
+    後ろに続く別のコマンドの表記で外れる。ここでは行き先を実際のパスに解き、置き場の中に
+    落ちるかを確かめる。外すのは次をすべて満たすときだけで、1 つでも外れれば対象をそのまま返す。
+
+    - 対象がコマンド 1 本だけ。つないだ形は外さない。前のコマンドが置き場にリンクを作る・`cd` で
+      移る、を同じ呼び出しの中で読み切れないため
+    - コマンドが `cp` か `install` で、選択肢は許すもの（_SCRATCHPAD_SHORT_ALLOWED）と `--` だけ
+    - どの語にも、表記どおりに読めない文字（変数・グロブ・引用・リダイレクト・`~` など）が無い
+    - 行き先（最後の語）に `..` の段が無く、cwd から解いた実パス（リンクを解いた先）が
+      置き場そのものかその下。行き先がディレクトリなら、元の名前を足した先も同じく確かめる
+    - 行き先に既にあるファイルが、ハードリンクでほかの名前とつながっていない
+
+    cwd が空なら、相対の行き先は外さない。root が空か、置き場そのものがリンクなら何も外さない。
+    """
     if not root:
+        return None
+    spelled = os.path.join(os.path.realpath(root), *SCRATCHPAD)
+    # 置き場（`wip/` か `scratchpad/`）そのものがリンクなら、例外を使わない。リンクの先が
+    # 守る場所なら、置き場の中へ写すことが守る場所へ書くことになる。
+    if os.path.realpath(spelled) != spelled:
+        return None
+    pad = os.path.normcase(spelled)
+
+    def inside(path: str) -> bool:
+        real = os.path.normcase(os.path.realpath(path))
+        if not (real == pad or real.startswith(pad + os.sep)):
+            return False
+        # 既にあるファイルがほかの名前とつながっている（ハードリンク）なら、上書きはつながった先も
+        # 書き換える。つながった先が守る場所かは名前から分からないので、外さない。
+        try:
+            return not (os.path.isfile(real) and os.stat(real).st_nlink > 1)
+        except OSError:
+            return False
+
+    def exempt(subject: str) -> str:
+        if shellread.SEP in subject.strip(shellread.SEP):
+            return subject
+        words = subject.strip(shellread.SEP).split()
+        if len(words) < 3 or words[0] not in _SCRATCHPAD_COPIERS:
+            return subject
+        if any(ch in _SCRATCHPAD_UNREAD for word in words for ch in word):
+            return subject
+        *sources, dest = [w for w in words[1:] if w != "--"]
+        if not sources or dest.startswith("-"):
+            return subject
+        for word in words[1:]:
+            if word == "--" or not word.startswith("-"):
+                continue
+            if word.startswith("--") or not set(word[1:]) <= _SCRATCHPAD_SHORT_ALLOWED:
+                return subject
+        if ".." in re.split(r"[\\/]", dest):
+            return subject
+        if not os.path.isabs(dest):
+            if not cwd:
+                return subject
+            dest = os.path.join(cwd, dest)
+        if not inside(dest):
+            return subject
+        if os.path.isdir(dest):
+            for source in sources:
+                if source.startswith("-"):
+                    continue
+                name = os.path.basename(source.rstrip("/"))
+                if not name or not inside(os.path.join(dest, name)):
+                    return subject
         return ""
-    # root の絶対パスと相対パスの両方をカバー
-    abs_root = os.path.abspath(root)
-    real_root = os.path.realpath(root)
-    bases = sorted({abs_root, real_root})
-    # wip/scratchpad/ の下のパスを除外（大文字小文字を区別しない）
-    exclude = "|".join(_spelled(b) + r"[\\/]wip[\\/]scratchpad[\\/]" for b in bases)
-    return rf"(?!.*(?:{exclude}))"
+
+    return exempt
 
 
 def guard_shell_regex(
@@ -501,12 +573,8 @@ def guard_shell_regex(
         (common_shell_clause(root, path), common_shell_clause(root, path, copy=True), "")
         for path in common_files
     )
-    scratchpad_exclude = _scratchpad_exclude(root)
     return shell_write_regex(
-        bin_path,
-        *clauses,
-        holders=_moved_holders(root, project_home, common_files),
-        scratchpad_exclude=scratchpad_exclude,
+        bin_path, *clauses, holders=_moved_holders(root, project_home, common_files)
     )
 
 
@@ -759,6 +827,7 @@ def add_rules(
     common_files: tuple[str, ...] = (),
     records: tuple[str, str] = ("", ""),
     tool: str | None = None,
+    cwd: str = "",
 ) -> None:
     """ガード自身を守るルールを、判定に足す。
 
@@ -800,6 +869,7 @@ def add_rules(
                 "message": SHELL_MESSAGE,
             },
             root,
+            exempt=scratchpad_copy_exempt(root, cwd),
         )
     clause = binary_clause(bin_path)
     if clause:
@@ -855,7 +925,9 @@ def add_rules(
         )
 
 
-def _insert(rule_set: rules.RuleSet, raw: dict, root: str) -> None:
+def _insert(
+    rule_set: rules.RuleSet, raw: dict, root: str, exempt: Callable[[str], str] | None = None
+) -> None:
     built, problems = rules.parse({"version": rules.VERSION, "deny": [raw]}, builtin=True)
     if problems or not built.deny:
         # 組み立てられないのは、このファイルの書き損じ。判定を止める理由には
@@ -866,4 +938,5 @@ def _insert(rule_set: rules.RuleSet, raw: dict, root: str) -> None:
             "組み込みの保護を組み立てられず外した", rule=raw.get("id", ""), problems=len(problems)
         )
         return
+    built.deny[0].exempt = exempt
     rule_set.deny.insert(0, built.deny[0])

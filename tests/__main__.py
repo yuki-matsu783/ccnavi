@@ -1,9 +1,9 @@
 """テストをモジュールごとに別プロセスで、同時に何本か回す。
 
-    uv run python tools/run_tests.py                  全件
-    uv run python tools/run_tests.py tests/ticket     グループを名指し
-    uv run python tools/run_tests.py --jobs 2         同時に回す本数を決める
-    uv run python tools/run_tests.py --plan           何をどの順で回すか出すだけ
+    uv run python -m tests                   全件
+    uv run python -m tests tests/ticket      グループを名指し
+    uv run python -m tests --jobs 2          同時に回す本数を決める
+    uv run python -m tests --plan            何をどの順で回すか出すだけ
 
 `python -m unittest discover -s tests -t .` の代わりに使う。回す中身は同じで、
 分け方と並べ方だけが違う。1 プロセスで直列に回すと、この機械で 3 分ほどかかる。
