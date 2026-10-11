@@ -1,9 +1,9 @@
 ---
 type: skill-reference
 title: 確かめる
-description: 設定ファイルが意図どおりに動作するか検証する手順。lint、見本テスト、運用ルール確認
+description: 設定ファイルが意図どおりに動作するか検証する手順。lint、期待する判定のテスト、運用ルール確認
 tags: [rules, testing, config]
-keywords: [lint, 見本, テスト, deny, allow, ask, 検証, check_rules.py]
+keywords: [lint, 期待する判定, テスト, deny, allow, ask, 検証, check_rules.py]
 ---
 
 # 確かめる
@@ -30,11 +30,11 @@ ccnavi --lint --log "" --state ""
 下書きを見るときは `--rules` `--phases` `--risk` で差し替える。1 本だけ差し替えると、本物の残り 2 本と
 組み合わせたときの答えになる。
 
-## 2. rules: 見本を回す
+## 2. rules: 期待する判定を回す
 
 ```sh
 uv run python scripts/check_rules.py            # このリポジトリ。承認済みチケットと記録を外して回す
-ccnavi --test-samples .ccnavi/common/rule-samples.yml --log "" --state "" --approved ""
+ccnavi --test-expectations .ccnavi/common/rule-expectations.yml --log "" --state "" --approved ""
 ```
 
 出力は 3 つに分かれる。
@@ -50,13 +50,13 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --log "" --state "" --appr
 - glob が全体に当たる書き方になっていない。 `git push *` は `cd /repo && git push` に
   当たらない。`*git push*` なら当たる
 - 語の切れ目が無い。 `*sed*` が `sedate` に当たる。右は `*sed *`、左は regex
-- タイプの順で強い側が先に当たっている。 allow に置いた見本が deny の `raw-git` に当たる、
-  など。この形なら見本の置き場かルールの広さのどちらかが間違っている
+- タイプの順で強い側が先に当たっている。 allow に置いた期待が deny の `raw-git` に当たる、
+  など。この形なら期待の置き場かルールの広さのどちらかが間違っている
 
 `--json` を付けると翻訳後の正規表現（`pattern`）と返る文面（`response`）まで出る。
 
-守られているかも見本で見る。rules.yml・phases.yml・risks.yml、承認済みチケットの置き場、
-settings.json への Write / Edit を deny の見本に置いて回す。ワークスペースルート直下と、実在するワークツリーの
+守られているかも期待する判定で見る。rules.yml・phases.yml・risks.yml、承認済みチケットの置き場、
+settings.json への Write / Edit を deny の期待に置いて回す。ワークスペースルート直下と、実在するワークツリーの
 名前での設定の両方（このリポジトリでは `guard-ccnavi-config` と `guard-settings` が止める）。出るのはルールの判定だけで、
 組み込みの保護（実行後に戻す働き）は出ない。allow に見えたものは「ルールでは止めていない」として報告する。
 
@@ -109,6 +109,6 @@ AskUserQuestion。聞くのは「この設定をどうするか」で、「こ�
 
 ## 報告
 
-書くのは 5 つ。lint の error / warn の中身、見本の件数と食い違いの原因、phases の噛み合わせ、
+書くのは 5 つ。lint の error / warn の中身、期待の件数と食い違いの原因、phases の噛み合わせ、
 risk の見積もり、ユーザに確認した結果。直す必要があるなら、どのファイルのどこをどう直すかまで
 書いて、[add.md](add.md) の「ユーザに渡す形」で依頼する。直すのはユーザ。

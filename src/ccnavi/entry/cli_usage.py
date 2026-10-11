@@ -35,7 +35,7 @@ or a warning, and exits non-zero when it reports an error. --json prints the
 shape documented in README.md ("lint の JSON"); the VS Code extension reads it.
 
 To try or lint one project's rules before saving them, hand the edited file in
-by the project's name (this flag is for --test, --test-samples, --lint and
+by the project's name (this flag is for --test, --test-expectations, --lint and
 --explain only; anything else - a hook invocation, a ticket or review
 subcommand - drops it and says so on stderr):
 
@@ -100,11 +100,11 @@ in a machine-readable form (the VS Code board extension reads this), run
 It reads no payload and never reaches the remote. The shape is documented
 in README.md ("ボードの JSON").
 
-To try one call against the rules without running it, or to run every sample
+To try one call against the rules without running it, or to run every expectation
 in a file against them, run
 
     ccnavi --test Bash "git push" [--json]
-    ccnavi --test-samples .ccnavi/common/rule-samples.yml [--json]
+    ccnavi --test-expectations .ccnavi/common/rule-expectations.yml [--json]
 
 Both go through the same decision as the hook. --json prints the shape
 documented in README.md ("試験の JSON"); the VS Code extension reads it.
@@ -123,7 +123,7 @@ decisions.*.jsonl), run
 
 It lists deny/ask drafts only: calls no rule mentioned that kept being handed
 over, and denies that kept stopping the same call (review their message).
-Each draft passed the same checks as --lint and --test-samples; the rest are
+Each draft passed the same checks as --lint and --test-expectations; the rest are
 counted and dropped. Nothing is written. --json prints the shape documented in
 README.md ("候補の JSON"); the VS Code extension reads it.
 

@@ -5,7 +5,7 @@ description: 承認記録の古い形・待ち方ファイルの名残り・旧�
 tags: [approval, ticket, records, compat]
 keywords: [移行, 古い形, ccnavi_approved, approved_at, source_tree, workflow.yml, i<番号>, index.jsonl, approved-, COMPAT, 互換の版]
 ---
-# ADR-0114: 公開前なので、移行のための読み取りと掃除をすべて外す
+# ADR-0115: 公開前なので、移行のための読み取りと掃除をすべて外す
 
 状態: 採用（ADR-0104 の「既存の承認済みチケットに残る欄は消さない。移行はしない」「古い形も読む」、ADR-0109 の「前の版が書いた待ち方のファイルは読まない（`--lint` が warn で言う）」を改める）
 

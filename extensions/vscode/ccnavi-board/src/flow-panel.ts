@@ -952,7 +952,7 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
   // 取り込んだ下書きは、保存が成功したこの時点で消す（取り込んだときと同じ中身のときだけ）
   const drafted = removeImported(current, target, imported);
   await reload(current);
-  // 取り込み済みの親子のチケット（C1 の対象）だけ、承認の push を送る。フローはユーザが書いたものなので C1 ではコミットせず、
+  // 取り込み済みの親子のチケット（C1 の対象）だけ、承認の push を送る。フローはユーザが保存したものなので C1 ではコミットせず、
   // ユーザの操作の最後に送る。ターミナルは対話中のことがあるので、勝手に打ち込まず、ユーザがボタンを押したときだけ送る。
   // それ以外の親子のチケットは今どおりユーザがコミットする。
   const root = current.folder.uri.fsPath;

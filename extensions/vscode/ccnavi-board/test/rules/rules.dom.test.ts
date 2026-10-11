@@ -1,7 +1,7 @@
 /**
  * ルール管理画面（React）を happy-dom で動かす。描くものも、押したときの動きもここで見る。
  *
- * 判定は実行ファイルの仕事なので、その結果（`judged` / `sampled`）は拡張ホストから届いたものとして送る。
+ * 判定は実行ファイルの仕事なので、その結果（`judged` / `expectationsChecked`）は拡張ホストから届いたものとして送る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -311,7 +311,7 @@ test("CB-D124 「記録から候補を出す」は suggest を送り、届いた
       summary: "ルールを足す候補",
       layer: "common",
       rules_path: "/ws/.ccnavi/common/rules.yml",
-      samples: [],
+      expectations: [],
       yaml: "# ルールを足す候補\nrules:\n  ask: []\n",
     };
     await dom.send({

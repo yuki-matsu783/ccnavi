@@ -5,16 +5,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { HTMLButtonElement } from "happy-dom" with { "resolution-mode": "import" };
-import { addNode, patchData, templateFlow, type FlowDoc } from "../../src/core/flow-doc.js";
+import { addNode, patchData, type FlowDoc } from "../../src/core/flow-doc.js";
 import { lockedReason } from "../../src/core/flow-view.js";
-import { openFlow, savedDoc } from "../helpers/flow.js";
+import { openFlow, savedDoc, bareFlow } from "../helpers/flow.js";
 
 const HASH = "0123456789abcdef".repeat(4);
 const OFFER = { draftPath: ".claude/worktrees/i0001/wip/proposals/flows/i0001-01-01.yml" };
 
 /** 雛形にプロンプトを 1 つ足した下書き */
 function drafted(): FlowDoc {
-  const added = addNode(templateFlow("i0001-01-01", "調査"), "prompt", { x: 200, y: 300 });
+  const added = addNode(bareFlow("i0001-01-01", "調査"), "prompt", { x: 200, y: 300 });
   return patchData(added.doc, added.id, { prompt: "既存の振る舞いを読む\nそのあと要点をまとめる" });
 }
 
@@ -174,7 +174,7 @@ test("CB-D143 並び順だけ違う下書きはそう言って取り込め、値
   try {
     dom.click(dom.one('[data-action="open-proposal"]'));
     await dom.settle();
-    const base = templateFlow("i0001-01-01", "調査");
+    const base = bareFlow("i0001-01-01", "調査");
     const reordered = { ...base, nodes: [...base.nodes].reverse() } as FlowDoc;
     await dom.send({ type: "proposal", proposal: { doc: reordered, hash: HASH, draftPath: OFFER.draftPath } });
     assert.equal(dom.all("#proposal-problem").length, 0);

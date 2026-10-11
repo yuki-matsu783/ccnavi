@@ -1,7 +1,7 @@
-"""判定を実行せずに試す。`--test` と `--test-samples`。
+"""判定を実行せずに試す。`--test` と `--test-expectations`。
 
 判定と同じ経路（`judge.decide_before`）を通して、応答と記録を読んでユーザに見せる。
-モードは常に enable で動かす。見本の読み込みと回し方もここにある。
+モードは常に enable で動かす。期待する判定の読み込みと回し方もここにある。
 """
 
 from __future__ import annotations
@@ -24,13 +24,13 @@ from . import diagnose_shared
 KNOWN_TOOLS = (*judge.SUBJECT_FIELDS, rules.STOP_MATCH)
 
 
-# `--test --json` と `--test-samples --json` の形の版。読み手は VS Code 拡張の
+# `--test --json` と `--test-expectations --json` の形の版。読み手は VS Code 拡張の
 # ルール管理画面。形を変えたら上げる。
 TEST_VERSION = 1
 
-# 見本のパスに書く合言葉。走らせた場所に読み替える。見本を絶対パスで
+# 期待する判定のパスに書く合言葉。走らせた場所に読み替える。期待する判定を絶対パスで
 # 書かせておかないと、判定が解いた先が走らせた場所によって変わる。
-SAMPLE_PLACEHOLDER = "/repo"
+EXPECTATION_PLACEHOLDER = "/repo"
 
 
 def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subject: str) -> dict:
@@ -299,8 +299,8 @@ def _response_text(written: str) -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def load_samples(path: str, root: str) -> list[dict]:
-    """見本を読んで、タイプの順に平らなリストにする。
+def load_expectations(path: str, root: str) -> list[dict]:
+    """期待する判定を読んで、タイプの順に平らなリストにする。
 
     タイプの名前が期待する判定になる。`deny` なら止まるはず、`allow` なら通るはず。
     `subject` の合言葉 `/repo` は走らせた場所に読み替える。
@@ -308,53 +308,55 @@ def load_samples(path: str, root: str) -> list[dict]:
     with open(path, encoding="utf-8") as f:
         raw = yamlread.safe_load(f.read())
     if not isinstance(raw, dict):
-        raise ValueError(f"見本の形が違う。最上位はタイプの対応表のはず: {path}")
-    samples = []
+        raise ValueError(f"期待する判定の形が違う。最上位はタイプの対応表のはず: {path}")
+    expectations = []
     for want in rules.SECTIONS:
         for case in raw.get(want) or []:
             if not isinstance(case, dict):
-                raise ValueError(f"見本の形が違う。タイプ {want} の 1 件が対応表ではない: {path}")
+                raise ValueError(
+                    f"期待する判定の形が違う。タイプ {want} の 1 件が対応表ではない: {path}"
+                )
             written = str(case.get("subject") or "")
-            samples.append(
+            expectations.append(
                 {
                     "expected": want,
                     "tool": str(case.get("tool") or ""),
                     "subject": written,
-                    "resolved_subject": written.replace(SAMPLE_PLACEHOLDER, root),
+                    "resolved_subject": written.replace(EXPECTATION_PLACEHOLDER, root),
                     "why": str(case.get("why") or ""),
                 }
             )
-    return samples
+    return expectations
 
 
-def run_samples(stderr: TextIO, conf: settings.Settings, root: str, path: str) -> dict:
-    """見本をぜんぶ判定に掛けて、期待と突き合わせた結果を 1 つの辞書にする。
+def run_expectations(stderr: TextIO, conf: settings.Settings, root: str, path: str) -> dict:
+    """期待する判定をぜんぶ判定に掛けて、期待と突き合わせた結果を 1 つの辞書にする。
 
     判定は `judge` を通す。ここで判定を作り直さないのが肝で、別の経路で確かめると、
-    見本が通ったのに実運用で失敗する、という一番まずい形になる。
+    期待する判定が通ったのに実運用で失敗する、という一番まずい形になる。
 
-    `ok` は期待どおりか。`skipped` は allow の見本が判定に入らずに通ったもので、
+    `ok` は期待どおりか。`skipped` は allow の期待が判定に入らずに通ったもので、
     呼び出しは通るので期待は満たしているが、通した理由が「allow に当たった」では
     ない。ルールを書いても当たらない場所なので、食い違いとは別に数えて必ず見せる。
     """
-    # 見本ごとに判定するので、共通レイヤーの苦情は見本の数だけ書かれる。
-    # 行き先で読むレイヤーは見本ごとに
+    # 期待ごとに判定するので、共通レイヤーの苦情は期待の数だけ書かれる。
+    # 行き先で読むレイヤーは期待ごとに
     # 違うので、まとめて捨てずに、まだ書いていない行だけを書く。
     said: set[str] = set()
     results = []
-    for sample in load_samples(path, root):
+    for expectation in load_expectations(path, root):
         heard = io.StringIO()
-        out = try_one(heard, conf, root, sample["tool"], sample["resolved_subject"])
+        out = try_one(heard, conf, root, expectation["tool"], expectation["resolved_subject"])
         for line in heard.getvalue().splitlines(keepends=True):
             if line not in said:
                 said.add(line)
                 stderr.write(line)
-        want = sample["expected"]
+        want = expectation["expected"]
         got = out["verdict"] if out["known"] else audit.SKIP
         skipped = want == rules.ALLOW and got == audit.SKIP
         results.append(
             {
-                **sample,
+                **expectation,
                 "known": out["known"],
                 "verdict": got,
                 "code": out["code"],
@@ -375,15 +377,15 @@ def run_samples(stderr: TextIO, conf: settings.Settings, root: str, path: str) -
         "version": TEST_VERSION,
         "root": root,
         "rules_path": conf.rules,
-        "samples_path": path,
+        "expectations_path": path,
         "counts": counts,
         "mismatches": sum(1 for r in results if not r["ok"]),
         "skipped": sum(1 for r in results if r["skipped"]),
-        "samples": results,
+        "expectations": results,
     }
 
 
-def test_samples(
+def test_expectations(
     stdout: TextIO,
     stderr: TextIO,
     conf: settings.Settings,
@@ -391,7 +393,7 @@ def test_samples(
     path: str,
     as_json: bool,
 ) -> int:
-    """`--test-samples`。見本をぜんぶ回して、食い違いを並べる。
+    """`--test-expectations`。期待する判定をぜんぶ回して、食い違いを並べる。
 
     文字で出すときの終了コードは、食い違いが 1 件でもあれば 1。`/ccnavi-config`
     スキルと `scripts/check_rules.py` がそれを見る。JSON で出すときは常に 0 で、
@@ -399,9 +401,9 @@ def test_samples(
     「試験そのものが失敗した」を終了コードで見分けられるように。
     """
     try:
-        body = run_samples(stderr, conf, root, path)
+        body = run_expectations(stderr, conf, root, path)
     except (OSError, ValueError) as exc:
-        stderr.write(f"ccnavi: 見本を読めない: {exc}\n")
+        stderr.write(f"ccnavi: 期待する判定を読めない: {exc}\n")
         return 1
 
     if as_json:
@@ -409,7 +411,7 @@ def test_samples(
         stdout.write("\n")
         return 0
 
-    for r in body["samples"]:
+    for r in body["expectations"]:
         if r["ok"]:
             continue
         stdout.write(f"食い違い: {r['expected']} のはずが {r['verdict']}\n")
@@ -419,7 +421,7 @@ def test_samples(
         if hit:
             stdout.write(f"  ヒットしたルール: {hit}\n")
         stdout.write("\n")
-    for r in body["samples"]:
+    for r in body["expectations"]:
         if not r["skipped"]:
             continue
         stdout.write(f"判定に入らずに通った（allow ではない）: {r['tool']}  {r['subject']}\n")
