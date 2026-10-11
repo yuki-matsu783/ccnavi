@@ -83,9 +83,10 @@ prefix か主題が別なら別コミットに分ける。要件（`docs/require
 `git add` の対象から自動的に除外する（確認は要らない）。
 
 - クレデンシャル（必ず除外）: `.env` / `.env.*` / `*.pem` / `*.key` / `*.p12` / `*.pfx` / `*.ppk` / `credentials.json` / `service-account*.json` / `id_rsa` / `id_ed25519` / `id_ecdsa` / `.aws/credentials` / `.netrc` / `secrets.yml` / `secrets.yaml`
-- 開発環境の副産物: `.DS_Store` / `Thumbs.db` / `desktop.ini` / `*.swp` / `*.swo` / `*~` / `*.log` / `scratchpad/` / `tmp/` / `*.tmp` / `*.tmp.*` / `*.bak` / `*.orig` / `*.stackdump` / `.claude/settings.local.json`
+- 開発環境の副産物: `.DS_Store` / `Thumbs.db` / `desktop.ini` / `*.swp` / `*.swo` / `*~` / `*.log` / `tmp/` / `*.tmp` / `*.tmp.*` / `*.bak` / `*.orig` / `*.stackdump` / `.claude/settings.local.json`
 - このリポジトリの生成物: `dist/` / `build/` / `__pycache__/` / `*.pyc` / `.venv/` / `.ruff_cache/` / `*.jsonl` / `logs/`（判定記録。絶対パスとコマンド全文が入る） / `knowledge/`（参照専用の外部資料）
 
+`wip/scratchpad/`（下書きの置き場）は追跡してpushする置き場なので、除外しない。統合時に `ccnavi-git.sh integrate` が外す。
 `.gitignore` に無い新種の副産物を見つけたら、この一覧と `.gitignore` の両方に足す。
 削除されたファイル（`git status` の `D`）は除外対象ではなく、他と同じく `git add --` に並べてよい。
 除外したファイルがあれば、コミット前にチャットへ列挙する。
