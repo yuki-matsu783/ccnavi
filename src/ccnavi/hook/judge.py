@@ -864,8 +864,8 @@ def flow_lock(
         child = flow.lock_hit(copies, found[1], found[0])
         if child is not None:
             return flow.locked_message(conf, child, path), copies
-    # ハードリンクはパスに置き場が出ない（M-1）。書き込み先が在って名前が 2 つ以上あるときだけ、
-    # 着手中の子のフローと同じ中身（inode）かを見る。
+    # ハードリンクはパスに置き場が出ないので `locate` では当たらない。書き込み先が在って
+    # 名前が 2 つ以上あるときだけ、着手中の子のフローと同じ中身（inode）かを見る。
     target = full or spelled
     if target and flow.hard_linked(target):
         if copies is None:
