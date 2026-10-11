@@ -22,8 +22,9 @@ import unittest
 
 from ccnavi.entry import diagnose_board
 from ccnavi.tickets import risk
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write
+from tests.ticketsample import child_text, parent_text
 
 FIXTURE = os.path.join(
     ROOT, "extensions", "vscode", "ccnavi-board", "test", "fixtures", "board.json"

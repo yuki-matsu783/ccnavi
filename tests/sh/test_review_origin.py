@@ -1,5 +1,8 @@
 """origin の URL の読み方。exe の `remote_kind` と、sh の `origin` の両方を見る。
 
+両方の読み手を同じファイルに置くのは、同じ URL を両方が同じに読むことを並べて確かめるため。
+sh を起動するので sh のグループに置く。
+
 URL にトークンを埋めた形（`https://oauth2:<token>@host/g/p.git`）は普通にある。
 ホストにユーザ情報が入り込むと API の URL が不正になり、`origin` の出力にトークンが漏れる。
 実物の GitLab で実際に起きた穴なので、両方の読み手で固定する。
@@ -82,7 +85,8 @@ class OriginSubcommandTest(unittest.TestCase):
             check=True,
         )
 
-    def origin(self, url: str, extra_env=None) -> subprocess.CompletedProcess:
+    def origin(self, url: str, extra_env=None, sub="origin") -> subprocess.CompletedProcess:
+        subprocess.run(["git", "remote", "remove", "origin"], cwd=self.dir, capture_output=True)
         subprocess.run(["git", "remote", "add", "origin", url], cwd=self.dir, check=True)
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         env.update(extra_env or {})
@@ -91,7 +95,7 @@ class OriginSubcommandTest(unittest.TestCase):
         env["GITLAB_TOKEN"] = "x"
         env["GITHUB_TOKEN"] = "x"
         return subprocess.run(
-            [SHELL, SCRIPT, "origin"],
+            [SHELL, SCRIPT, sub],
             cwd=self.dir,
             capture_output=True,
             text=True,
@@ -110,6 +114,53 @@ class OriginSubcommandTest(unittest.TestCase):
         self.assertIn("api_base=http://127.0.0.1:9/api/v4\n", result.stdout)
         self.assertNotIn("glpat-secret", result.stdout + result.stderr)
         self.assertIn("origin=http://<伏せた>@127.0.0.1:9/root/p.git", result.stdout)
+
+    def test_keeps_the_port_and_scheme(self):
+        """origin の URL から、ホスト・ポート・scheme を欠かさずに API の URL を組むこと。
+
+        host を `[^/:]+` で切るとポートが欠け、欠けたポートがプロジェクトのパスの先頭に
+        入り込む（`8929/demo/greeter`）。scheme を https に決め打ちすると、手元や社内に
+        平文で立てた GitLab（`http://localhost:8929`）に届かない。
+        """
+        cases = [
+            (
+                "http://localhost:8929/demo/greeter.git",
+                "gitlab",
+                "http",
+                "localhost:8929",
+                "demo/greeter",
+            ),
+            (
+                "https://gitlab.example.com:8443/g/p.git",
+                "gitlab",
+                "https",
+                "gitlab.example.com:8443",
+                "g/p",
+            ),
+            ("git@gitlab.example.com:g/p.git", "gitlab", "https", "gitlab.example.com", "g/p"),
+            ("https://github.com/o/r.git", "github", "https", "github.com", "o/r"),
+        ]
+        for url, kind, scheme, host, path in cases:
+            with self.subTest(url=url):
+                read = self.origin(url)
+                self.assertEqual(read.returncode, 0, read.stdout + read.stderr)
+                got = dict(line.split("=", 1) for line in read.stdout.splitlines() if "=" in line)
+                self.assertEqual(got.get("kind"), kind)
+                self.assertEqual(got.get("scheme"), scheme)
+                self.assertEqual(got.get("host"), host)
+                self.assertEqual(got.get("path"), path)
+                expected = (
+                    "https://api.github.com" if kind == "github" else f"{scheme}://{host}/api/v4"
+                )
+                self.assertEqual(got.get("api_base"), expected)
+
+    def test_an_unreadable_origin_stops(self):
+        """sh の前半（場所と道具の解決）が Windows でも通ること。origin が読めなければ止まる。"""
+        bare = os.path.join(self.dir, "origin.git")
+        subprocess.run(["git", "init", "-q", "--bare", bare], check=True)
+        done = self.origin(bare, sub="fetch")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("origin の URL を読めない", done.stderr)
 
     def test_the_state_variable_is_not_read(self):
         """`CCNAVI_STATE=/x` を入れても、sh は控えを `logs/state/` に置く（置き場は固定。A9）。

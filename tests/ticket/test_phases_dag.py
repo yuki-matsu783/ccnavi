@@ -33,9 +33,10 @@ from ccnavi.tickets import (
 )
 from ccnavi.tickets import ticket as ticket_mod
 from tests import config_path
-from tests.ticket.test_phases import PhaseHarness, child_text
-from tests.ticket.test_phases import parent_text as _parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write
+from tests.ticketsample import child_text
+from tests.ticketsample import parent_text as _parent_text
 
 # 順序の欄を持たない定義。順序は計画の項の `after` が決める。
 DEFS = """

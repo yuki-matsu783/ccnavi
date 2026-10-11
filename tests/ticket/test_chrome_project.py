@@ -25,8 +25,8 @@ import tempfile
 import unittest
 
 from ccnavi.entry import lint, version
-from tests.ticket.test_core import STAMP, _chrome
-from tests.ticket.test_phases import PHASES, child_text, parent_text
+from tests.ticket.test_swap_points import STAMP
+from tests.ticketsample import PHASES, child_text, load_chrome, parent_text
 
 HEAD = "0" * 40
 COMPAT = lint.SH_COMPAT_FILE.replace(os.sep, "/")
@@ -84,7 +84,7 @@ class ChromeProjectTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="ccnavi-chrome-project-")
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        self.chrome = _chrome()
+        self.chrome = load_chrome()
 
     def ask(self, op, family="web-i0012", branches=None, project="web", ws=None, **extra):
         snapshot = {
@@ -250,7 +250,7 @@ class StartTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="ccnavi-chrome-start-")
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        self.chrome = _chrome()
+        self.chrome = load_chrome()
 
     def start(
         self,

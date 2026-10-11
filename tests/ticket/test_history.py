@@ -21,8 +21,9 @@ import re
 import unittest
 
 from ccnavi.tickets import history
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import TicketTest, git, read_json, write
+from tests.ticketsample import child_text, parent_text
 
 ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 

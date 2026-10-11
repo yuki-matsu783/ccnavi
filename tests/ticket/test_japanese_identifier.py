@@ -22,7 +22,8 @@ import unittest
 
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
-from tests.ticket.test_ticket import RULES, git, ticket_text, write
+from tests.ticket.test_ticket import git, ticket_text, write
+from tests.ticketsample import RULES
 
 PARENT = "feature-64-統合先の解決"
 CHILD = PARENT + "-01-01"

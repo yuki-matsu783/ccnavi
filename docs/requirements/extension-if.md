@@ -117,7 +117,7 @@ Chrome 拡張が呼ぶ名前。引数と戻り値は今の実装のとおり。
 
 REQ-EXT-27 の規則は、Chrome 拡張の入口（`py/ccnavi_chrome.py`）が名前を直に引くため。改名すると、同梱の版を組み立て直すまで
 Chrome 拡張だけが動かなくなる。上げた互換の版は統合先の `CCNAVI_COMPAT` に載り、古い Chrome 拡張は書く操作を出さなくなる（REQ-CHR-03）。
-`tests/ticket/test_core.py` は、手元の承認・取り下げ・レビュー済みが書いたバイト列と、同じ入力で Chrome の入口が返す書くものとを突き合わせる。
+`tests/ticket/test_swap_points.py` は、手元の承認・取り下げ・レビュー済みが書いたバイト列と、同じ入力で Chrome の入口が返す書くものとを突き合わせる。
 
 REQ-EXT-29 のダイジェストが覆うものは README「[承認の JSON](../../README.md#承認の-json)」と同じ（承認画面の本文・判定が読んだ中身・
 書き出す中身）。書いてよいのは、`batch` があり、`gathered.refused` も `mismatch` も無いときだけで、Chrome 拡張の入口は

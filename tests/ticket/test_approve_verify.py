@@ -21,8 +21,9 @@ import json
 import os
 import tempfile
 
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import write
+from tests.ticketsample import child_text, parent_text
 
 APPROVE_VERSION = 1
 

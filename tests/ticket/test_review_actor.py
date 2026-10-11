@@ -21,9 +21,9 @@ import shutil
 from ccnavi.entry import lint, version
 from ccnavi.infra import settings
 from ccnavi.tickets import history, review, review_host
-from tests.ticket.test_core import STAMP, CoreHarness
-from tests.ticket.test_phases import child_text
+from tests.ticket.test_swap_points import STAMP, CoreHarness
 from tests.ticket.test_ticket import git, read_json, write
+from tests.ticketsample import child_text
 
 RESULT = {"host": "fixture", "mr": {"number": 7, "url": "u/7"}, "threads": [], "reviews": []}
 

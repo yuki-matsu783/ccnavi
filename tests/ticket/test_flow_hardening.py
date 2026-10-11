@@ -35,8 +35,9 @@ from tests.ticket.test_flow import (
     child_ticket,
     conf_with,
 )
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import write
+from tests.ticketsample import child_text, parent_text
 
 HAS_FIFO = hasattr(os, "mkfifo")
 CHANGED = "着手後にフローが書き換わった"

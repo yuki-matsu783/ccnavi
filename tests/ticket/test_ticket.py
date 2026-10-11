@@ -25,7 +25,6 @@ import os
 import shutil
 import stat
 import subprocess
-import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -33,20 +32,9 @@ from unittest import mock
 from ccnavi.hook.subagent import CANDIDATE_NOTE
 from ccnavi.infra import settings, shellread
 from ccnavi.tickets import approval, phase_forms, phase_scope, review, ticket_fields
-from tests import ROOT, common_path, common_sh
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
-
-RULES = {
-    "version": 1,
-    "deny": [
-        {
-            "id": "guard-approved",
-            "match": "Write|Edit|NotebookEdit",
-            "glob": "*/.ccnavi/*",
-            "message": "ガードの設定と承認済みチケットです。ユーザに依頼してください。",
-        }
-    ],
-}
+from tests.ticketsample import RULES
 
 
 def git(cwd, *args):
@@ -3065,97 +3053,6 @@ class TicketTest(unittest.TestCase):
         )
         self.assertNotEqual(check.returncode, 0)
         self.assertIn("違う", check.stderr)
-
-    def test_review_script_keeps_the_port_and_scheme_of_origin(self):
-        """origin の URL から、ホスト・ポート・scheme を欠かさずに API の URL を組むこと。
-
-        host を `[^/:]+` で切るとポートが欠け、欠けたポートがプロジェクトのパスの先頭に
-        入り込む（`8929/demo/greeter`）。scheme を https に決め打ちすると、手元や社内に
-        平文で立てた GitLab（`http://localhost:8929`）に届かない。
-        """
-        script = self.script()
-        cases = [
-            (
-                "http://localhost:8929/demo/greeter.git",
-                "gitlab",
-                "http",
-                "localhost:8929",
-                "demo/greeter",
-            ),
-            (
-                "https://gitlab.example.com:8443/g/p.git",
-                "gitlab",
-                "https",
-                "gitlab.example.com:8443",
-                "g/p",
-            ),
-            ("git@gitlab.example.com:g/p.git", "gitlab", "https", "gitlab.example.com", "g/p"),
-            ("https://github.com/o/r.git", "github", "https", "github.com", "o/r"),
-        ]
-        git(self.parent_tree, "remote", "add", "origin", "https://example.invalid/x/y.git")
-        for url, kind, scheme, host, path in cases:
-            git(self.parent_tree, "remote", "set-url", "origin", url)
-            read = self.run_script(script, "origin")
-            self.assertEqual(read.returncode, 0, read.stdout + read.stderr)
-            got = dict(line.split("=", 1) for line in read.stdout.splitlines() if "=" in line)
-            self.assertEqual(got.get("kind"), kind, url)
-            self.assertEqual(got.get("scheme"), scheme, url)
-            self.assertEqual(got.get("host"), host, url)
-            self.assertEqual(got.get("path"), path, url)
-            expected = "https://api.github.com" if kind == "github" else f"{scheme}://{host}/api/v4"
-            self.assertEqual(got.get("api_base"), expected, url)
-
-    def script(self):
-        """このリポジトリの ccnavi-review.sh を、テスト用の木へ置く。
-
-        共通部（ccnavi-common*.sh）も一緒に置く。sh は起動して最初に隣の共通部を読むので、
-        片方だけだと判定の前に「読めない」で失敗する。
-        """
-        where = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-review.sh")
-        os.makedirs(os.path.dirname(where), exist_ok=True)
-        for name in ("ccnavi-review.sh", *common_sh()):
-            shutil.copy(
-                os.path.join(ROOT, ".ccnavi", "scripts", name),
-                os.path.join(os.path.dirname(where), name),
-            )
-        return where
-
-    def run_script(self, script, *args, env=None):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-        environment.pop("CLAUDE_PROJECT_DIR", None)
-        # curl 経路を選ばせる。gh / glab が入っていても、このホストには認証が無い。
-        environment["GITLAB_TOKEN"] = "t"
-        environment["GITHUB_TOKEN"] = "t"
-        environment["CCNAVI_BIN_PATH"] = sys.executable
-        environment.update(env or {})
-        return subprocess.run(
-            ["sh", script, *args],
-            cwd=self.parent_tree,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=environment,
-        )
-
-    def test_review_script_refuses_an_unreadable_origin(self):
-        """sh の前半（場所と道具の解決）が Windows でも通ること。origin が読めなければ止まる。"""
-        self.family()
-        self.remote()
-        script = self.script()
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-        environment["CCNAVI_BIN_PATH"] = sys.executable
-        done = subprocess.run(
-            ["sh", script, "fetch"],
-            cwd=self.parent_tree,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=environment,
-        )
-        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-        self.assertIn("origin の URL を読めない", done.stderr)
 
     # ---- 10. 差し戻しを無視した終了
 
