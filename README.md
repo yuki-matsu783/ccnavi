@@ -1777,6 +1777,13 @@ feedback:                              # フィードバック計画。レビュ
   （「すぐ始まる: 1, 3」）で確かめる。延期は、延期した項を待つ延期していない最小の番号が引き受ける
 - **待ち方は持たない。** 承認済みチケットの計画から読むたびに計算する。手で `doing/` へ動かした親も計画の `after` で読み、
   壊れた計画（`after` の形・終端・延期の引き受け手）の親は判定で止まり、子も止まる
+- **提案の雛形は `ccnavi ticket new` で作る。** 識別子と同名のワークツリーの中で
+  `ccnavi ticket new <識別子> --title <題> --plan "design,acceptance,implement" [--issue N]` と打つと、
+  `wip/proposals/todo/<識別子>.md` に、選んだフェーズの `scope` を `phases.yml` から集めた `allow`（重複なし）、
+  各項が前の項を待つ一直線の `plan`、`phases:` の写しを持つ親の提案を書く。対象は親だけ。`phases.yml` が無いとき、
+  `inherit` の型だけで `allow` が空になるとき、既に同じ識別子の提案があるときは、何も書かずに理由を言う。
+  `ccnavi-ticket.sh` には通さず、実行ファイルを直接打つ（`--fill-phases` と同じ）。書いたあとは rationale と本文を埋め、
+  `--lint` で確かめてから承認を頼む
 - **計画が使う定義は親に固定する（`phases:`）。** 承認は写しが承認したときの `phases.yml` と同じかを確かめる。承認のあとの判定・
   フェーズの題と見る場所・成果物・子の範囲の上限は写しを読み、`phases.yml` を読まない（あとで直しても進行中の親は変わらない）。
   写しは `ccnavi --plan-order <親> --fill-phases` で差し込む（エージェントが打ってよい）。計画を持つのに写しの無い親は止まる
@@ -2852,6 +2859,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/review_close.py` | 親を閉じる（`review ready` と `close-early`） |
 | `src/ccnavi/tickets/plan_order.py` | 計画の番号の振り直しと、提案への書き戻し（`--plan-order <親>`）。書き換えた全文を読み直す検査はここにまとめる |
 | `src/ccnavi/tickets/plan_phases.py` | 計画が使うフェーズ定義を、親の提案の `phases:` に写す（`--plan-order <親> --fill-phases`） |
+| `src/ccnavi/tickets/scaffold.py` | 親の提案の雛形を作る（`ticket new`）。選んだフェーズの `scope` を集めて `allow` に書き、一直線の `plan` と `phases:` の写しを入れる |
 | `src/ccnavi/tickets/ops.py` | チケットの状態を動かす `ticket start / finish / cancel / record-risk`。閉じるときに実績のリスクを数える |
 | `src/ccnavi/tickets/ops_close.py` | チケットを引いて動かしてよいかの検査。置き場の引き当て、取り込み済みの親子の停止、着手の前（親・先行）と終了の前（親を閉じられる・成果物）の検査 |
 | `src/ccnavi/tickets/ops_stop.py` | Stop で `finish` の打ち忘れを促す判定と、基準点の確認（git の読み取り） |
