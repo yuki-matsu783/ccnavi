@@ -1942,12 +1942,13 @@ curl と `GITHUB_TOKEN` / `GITLAB_TOKEN` で読む）、名前に番号を含む
 ### プロジェクトのスキル
 
 プロジェクトは `.claude/` を持たない（hook やスキルなどの道具はワークスペースが持つ）ので、プロジェクト向けのスキルの形の手順書は
-`projects/<名前>/docs/skills/<スキル>/SKILL.md` に置く（頭の frontmatter に `name` と `description`）。
+`projects/<名前>/skills/<スキル>/SKILL.md` に置く（頭の frontmatter に `name` と `description`）。
 Claude Code はそこを読まないので、ccnavi が `SessionStart` と `SubagentStart` で、cwd がそのプロジェクトの中にあるときだけ目録
 （名前・説明・場所）を渡す。ワークスペースルートで始めて `cd` で入ったセッションには、cwd がそのプロジェクトの中にある最初の
 `PreToolUse` で 1 度だけ添える。本文はエージェントが要るときに参考に開く（CLAUDE.md・ccnavi の知らせ・ガードと食い違えばそちらに従う）。
 ディレクトリ名は `^[A-Za-z0-9._-]+$` のものだけを読む。上限は 30 本・4000 文字。専用の保護は無く、ほかのファイルと同じ判定になる
 （直すのは承認したチケットの範囲の中。`.ccnavi/` の外に置いたのは、組み込みの保護を緩めずに書けるようにするため）。
+ワークスペースの `.claude/skills/` で `concept: true` を持つ概念スキルは、親の `ticket start` がプロジェクトの `skills/<概念>/`（`SKILL.md` と `references/` の `.md`）へ上書きと追加だけで写す。消さないので、同じ場所にあるプロジェクト固有の reference は残る（設計 11.13）。
 
 ### 参考にした運用
 

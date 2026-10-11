@@ -26,9 +26,9 @@ from ..policy import selfguard
 from ..records import audit, diaglog
 from ..tickets import (
     branchfind,
-    configsync,
     history,
     review,
+    skillsync,
 )
 from . import cli_args, cli_ops, cli_usage, diagnose, lint, suggest, version
 
@@ -175,7 +175,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--record-writes", default="")
     # 一覧の基点（C1 の親のワークツリー）。渡すと一覧はこのツリーからの相対になり、
     # 置き場の外に書いたら error
-    # （例外は `start` の中で configsync が写したミラーだけ）。
+    # （例外は `start` の中で configsync が写したミラーと、skillsync が写した概念スキルだけ）。
     parser.add_argument("--record-tree", default="")
     # 対話の decide の前半。選択とダイジェストをこのファイルに書くだけで、
     # 何も置かない（state の置き場の
@@ -325,7 +325,8 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
     C1 がコミットするのは状態だけ。
 
     例外は 2 つ。`ticket start` の中で configsync がミラーしたプロジェクトの
-    `.ccnavi/common/`（`configsync.is_synced_write` が内容で読めるもの）と、`review ready` が
+    `.ccnavi/common/`と skillsync が写した概念スキルの `skills/<概念>/`
+    （どちらも `skillsync.is_synced_write` が内容で読めるもの）と、`review ready` が
     消した途中の作業の置き場（`wip/`）のファイル（消したもの、つまり今は無いものだけ。
     `review.remove_wip` が追跡済みのものだけを消す）。
     """
@@ -347,7 +348,7 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
         if (
             starting
             and cli_args._inside(real, base)
-            and configsync.is_synced_write(conf, root, real)
+            and skillsync.is_synced_write(conf, root, real)
         ):
             continue
         found.append(real)

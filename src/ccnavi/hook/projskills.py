@@ -2,7 +2,7 @@
 
 プロジェクトは `.claude/` を持たない。Claude Code がそこのスキルを読み、
 ワークスペースルートの決め方も最初の `.claude/` で止まるため。そこで、プロジェクト向けの
-スキルの形をした手順書はプロジェクトの `docs/skills/<名前>/SKILL.md` に置き、ccnavi は
+スキルの形をした手順書はプロジェクトの `skills/<名前>/SKILL.md` に置き、ccnavi は
 目録だけを渡す。本文はエージェントが要るときに自分で開く。置き場は ccnavi ディレクトリ
 （`.ccnavi/`）の外で、ふつうのファイルと同じくチケットの範囲の中でだけ書ける（保護は変えない）。
 
@@ -29,7 +29,7 @@ from ..tickets import flow, flow_text
 
 # プロジェクトのルートからの相対。ccnavi ディレクトリの外に置く（中は組み込みの保護が丸ごと
 # 止めるので、承認したチケットの中でもエージェントが書けない）。
-SKILLS_DIR = "docs/skills"
+SKILLS_DIR = "skills"
 SKILL_FILE = "SKILL.md"
 # 目録に載せる数の上限。超えた分は数だけ言う。
 ITEM_LIMIT = 30
