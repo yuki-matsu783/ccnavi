@@ -7,8 +7,11 @@
  *
  * ここは定義の意味（どの子がどこまで書けるか、レビューが要るか）には触れない。判定は
  * 実行ファイル（phasetypes.py）の仕事で、書式の検証も `--lint --phases <一時ファイル>` に聞く。
- * 画面の欄は文字のまま持ち、リストの欄（scope / deliverables / overlap / requires / after）は
- * 文字の配列で持つ。
+ * 画面の欄は文字のまま持ち、リストの欄（scope / deliverables）は文字の配列で持つ。
+ *
+ * **順序の欄（ファイルの頭の `order`、定義の `after` / `overlap` / `requires`）は読まず、書かない。**
+ * 実行ファイルはもう読まず、順序は親チケットの計画の項の `after` で決める。ファイルに残っていれば
+ * 「読まない欄」として名指しするだけで（`unread`）、書き戻しでも手を付けずに残す（消すのはユーザがエディタで）。
  *
  * 組み込みの既定は持たない（実行ファイルも持たない。既定を組み込むと、意図せずレビューの
  * 要否が決まる）。雛形も持たない（共通レイヤーに雛形を置くと、レイヤーの同じ id と中身が食い違い、そのレイヤーが
@@ -16,7 +19,7 @@
  */
 import { isMap, isNode, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Pair } from "yaml";
 
-import { ORDERS, PHASE_KINDS, REVIEWS, type PhaseForm, type PhaseKind, type PhaseOrder, type PhasesForm, type PhasesModel, type Review } from "./phases-view.js";
+import { PHASE_KINDS, REVIEWS, UNREAD_FILE_KEYS, UNREAD_PHASE_KEYS, type PhaseForm, type PhaseKind, type PhasesForm, type PhasesModel, type Review, type UnreadField } from "./phases-view.js";
 import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
@@ -31,11 +34,11 @@ export const PHASES_VERSION = 1;
 export const INHERIT = "inherit";
 
 /** リストで持つ欄。書く順もこの順 */
-export const LIST_KEYS = ["deliverables", "overlap", "requires", "after"] as const;
+export const LIST_KEYS = ["deliverables"] as const;
 export type ListKey = (typeof LIST_KEYS)[number];
 
 /** 定義の中の欄を書く順。無い欄はこの順の直前の欄の後ろに入る */
-const KEY_ORDER = ["kind", "title", "review", "scope", "deliverables", "overlap", "requires", "after", "agent", "when"] as const;
+const KEY_ORDER = ["kind", "title", "review", "scope", "deliverables", "agent", "when"] as const;
 
 export interface PhasesDocument {
   readonly model: PhasesModel;
@@ -59,15 +62,13 @@ export function readPhases(text: string): PhasesDocument {
     problems.push(`version ${String(version)} は実行ファイルが読めません（読むのは ${PHASES_VERSION}）。フェーズは番号だけの挙動になります`);
   }
 
-  // 実行ファイルは前後の空白を落として読む（phasetypes.parse）。同じ読み方にする
-  const orderNode = doc.get("order", true);
-  let order: PhaseOrder = "sequential";
-  if (orderNode !== undefined && orderNode !== null) {
-    const orderText = orderNode instanceof Scalar ? String(orderNode.value ?? "").trim() : "";
-    if ((ORDERS as readonly string[]).includes(orderText)) {
-      order = orderText as PhaseOrder;
-    } else {
-      problems.push(`order が ${ORDERS.join(" か ")} ではありません。実行ファイルは読めません。画面は sequential として出し、保存すると書き直します`);
+  // 読まない欄。値の形は問わない（読まないので、崩れていても苦情にしない）
+  const unread: UnreadField[] = [];
+  if (isMap(doc.contents)) {
+    for (const key of UNREAD_FILE_KEYS) {
+      if (doc.contents.has(key)) {
+        unread.push({ phase: null, key });
+      }
     }
   }
 
@@ -85,6 +86,12 @@ export function readPhases(text: string): PhasesDocument {
         return;
       }
       phases.push(formOf(index, id, pair.value, problems));
+      for (const item of pair.value.items) {
+        const key = item.key instanceof Scalar ? String(item.key.value) : String(item.key);
+        if ((UNREAD_PHASE_KEYS as readonly string[]).includes(key)) {
+          unread.push({ phase: id, key });
+        }
+      }
     });
     if (phases.length === 0 && problems.length === 0) {
       problems.push("定義が 1 つもありません。実行ファイルは「`phases` が無いか空か、辞書ではない」と報告します");
@@ -94,8 +101,9 @@ export function readPhases(text: string): PhasesDocument {
   return {
     model: {
       version: typeof version === "number" ? version : null,
-      form: { order, phases },
+      form: { phases },
       problems,
+      unread,
     },
     // 書き出すたびに読み直す。元のノードに値を書き込むので、同じ文書を使い回すと
     // 2 回目の `origin` が 1 回目の並び替えの後を指してしまう。
@@ -162,9 +170,6 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
     inherit,
     scope,
     deliverables: lists.deliverables,
-    overlap: lists.overlap,
-    requires: lists.requires,
-    after: lists.after,
     agent: scalarText(map, "agent"),
     when: scalarText(map, "when"),
   };
@@ -220,21 +225,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     top.items.unshift(doc.createPair("version", PHASES_VERSION));
   }
 
-  // order。sequential は既定なので、元から欄が無ければ書かない。dag は version の直後に置く。
-  if (edited.order === "dag" || top.has("order")) {
-    const current = top.get("order", true);
-    if (current instanceof Scalar) {
-      if (String(current.value ?? "").trim() !== edited.order) {
-        current.value = edited.order;
-      }
-    } else if (current !== undefined && current !== null) {
-      // リストや対応表で書かれた欄は、同じ鍵を 2 つにせず、その場で置き換える
-      top.set("order", edited.order);
-    } else {
-      const at = top.items.findIndex((p) => isNode(p.key) && (p.key as Scalar).value === "version");
-      top.items.splice(at + 1, 0, doc.createPair("order", edited.order));
-    }
-  }
+  // ファイルの頭の order は読まない欄。書き足しも書き換えもしない（あればそのまま残る）。
 
   // phases。元の組を先に全部拾っておき、編集したリストへ移す。
   // `origin` は読み込んだときの生の位置。中身が対応表でない組は画面に載らず、保存で消える（苦情で言ってある）。
@@ -344,11 +335,8 @@ function writePhase(doc: Document, node: YAMLMap, form: PhaseForm, isNew: boolea
     setList(doc, node, "scope", form.scope, Scalar.QUOTE_DOUBLE, true);
   }
 
-  // deliverables は glob なので引用符付き。overlap / requires / after は定義の id なので裸のまま。
+  // deliverables は glob なので引用符付き。読まない欄（after / overlap / requires）には手を付けない。
   setList(doc, node, "deliverables", form.deliverables, Scalar.QUOTE_DOUBLE, false);
-  setList(doc, node, "overlap", form.overlap, Scalar.PLAIN, false);
-  setList(doc, node, "requires", form.requires, Scalar.PLAIN, false);
-  setList(doc, node, "after", form.after, Scalar.PLAIN, false);
 
   setOrDelete(doc, node, "agent", form.agent.trim(), Scalar.PLAIN);
   setOrDelete(doc, node, "when", form.when.trim(), Scalar.PLAIN);
@@ -457,10 +445,8 @@ export function asPhasesForm(raw: unknown): PhasesForm | undefined {
     return undefined;
   }
   const r = raw as Record<string, unknown>;
+  // 順序の欄（order）は画面が送らない。混ざっていても受け取らない（読まない欄は書き戻さない）
   if (!Array.isArray(r.phases)) {
-    return undefined;
-  }
-  if (typeof r.order !== "string" || !(ORDERS as readonly string[]).includes(r.order)) {
     return undefined;
   }
   const phases: PhaseForm[] = [];
@@ -471,7 +457,7 @@ export function asPhasesForm(raw: unknown): PhasesForm | undefined {
     }
     phases.push(form);
   }
-  return { order: r.order as PhaseOrder, phases };
+  return { phases };
 }
 
 function asPhase(raw: unknown): PhaseForm | undefined {
@@ -492,7 +478,8 @@ function asPhase(raw: unknown): PhaseForm | undefined {
   if (typeof r.review !== "string" || !(REVIEWS as readonly string[]).includes(r.review)) {
     return undefined;
   }
-  const lists = [r.scope, r.deliverables, r.overlap, r.requires, r.after].map(texts);
+  // 順序の欄（after / overlap / requires）は受け取らない（読まない欄は書き戻さない）
+  const lists = [r.scope, r.deliverables].map(texts);
   if (lists.some((l) => l === undefined)) {
     return undefined;
   }
@@ -505,9 +492,6 @@ function asPhase(raw: unknown): PhaseForm | undefined {
     inherit: r.inherit === true,
     scope: lists[0] as string[],
     deliverables: lists[1] as string[],
-    overlap: lists[2] as string[],
-    requires: lists[3] as string[],
-    after: lists[4] as string[],
     agent: text(r.agent),
     when: text(r.when),
   };

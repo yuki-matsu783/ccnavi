@@ -8,7 +8,7 @@
  *
  * 開いている行は Webview の state（`{ open: [id, …] }`）に残す。
  */
-import type { PhaseForm, PhaseOrder, PhasesForm } from "../../core/phases-view.js";
+import type { PhaseForm, PhasesForm } from "../../core/phases-view.js";
 import { getState, setState } from "../vscode.js";
 
 /** 行 1 つ。`key` は画面の中だけの鍵で、拡張ホストへは渡さない */
@@ -18,7 +18,6 @@ export interface Row {
 }
 
 export interface Draft {
-  readonly order: PhaseOrder;
   readonly rows: readonly Row[];
 }
 
@@ -32,12 +31,12 @@ export function keyer(): () => string {
 }
 
 export function draftOf(form: PhasesForm, nextKey: () => string): Draft {
-  return { order: form.order, rows: form.phases.map((phase) => ({ key: nextKey(), phase })) };
+  return { rows: form.phases.map((phase) => ({ key: nextKey(), phase })) };
 }
 
 /** 拡張ホストへ返す形に戻す。鍵は落とす */
 export function formOf(draft: Draft): PhasesForm {
-  return { order: draft.order, phases: draft.rows.map((row) => row.phase) };
+  return { phases: draft.rows.map((row) => row.phase) };
 }
 
 /**
@@ -45,7 +44,7 @@ export function formOf(draft: Draft): PhasesForm {
  * レビューは mr（足した定義が気づかないうちにレビュー無しにならないように）。
  */
 export function emptyPhase(): PhaseForm {
-  return { origin: null, id: "", title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], overlap: [], requires: [], after: [], agent: "", when: "" };
+  return { origin: null, id: "", title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], agent: "", when: "" };
 }
 
 /**
@@ -82,47 +81,3 @@ export function saveOpen(draft: Draft, open: ReadonlySet<string>): void {
 export function openedFromIds(draft: Draft, ids: ReadonlySet<string>): ReadonlySet<string> {
   return new Set(draft.rows.filter((row) => row.phase.id !== "" && ids.has(row.phase.id)).map((row) => row.key));
 }
-
-// ---- 図（`Graph.tsx`）が state に残すもの
-
-/** 一覧と図の、いま見ているほう */
-export type View = "list" | "graph";
-
-/**
- * ユーザがドラッグで動かした点の位置。**`phases.yml` には書かない**（ユーザが持つ設定に座標は入れない）。
- * 残す先は Webview の state で、鍵は定義の id。id を打ち替えれば残した位置は捨てられる（`Graph.tsx`）。
- *
- * 形と、形を動かす純関数（`withSpot` / `keepSpots`）は `core/phases-graph.ts` にある。
- * ここ（`state.ts`）は `acquireVsCodeApi` を読むので、node のテストからは import できない。
- */
-export type { Spots } from "../../core/phases-graph.js";
-import type { Spots } from "../../core/phases-graph.js";
-
-/** いま見ているほう。state に無いか、表記が違えば一覧 */
-export function loadView(): View {
-  const saved = (getState() ?? {}) as { view?: unknown };
-  return saved.view === "graph" ? "graph" : "list";
-}
-
-export function saveView(view: View): void {
-  setState({ ...((getState() ?? {}) as object), view });
-}
-
-/** state に残してある点の位置。Webview の state は型を持たず、値はそのまま SVG の座標になるので、数でない値はここで落とす */
-export function loadSpots(): Spots {
-  const saved = (getState() ?? {}) as { spots?: unknown };
-  const raw = typeof saved.spots === "object" && saved.spots !== null ? (saved.spots as Record<string, unknown>) : {};
-  const spots: Spots = {};
-  for (const [id, value] of Object.entries(raw)) {
-    const spot = value as { x?: unknown; y?: unknown };
-    if (typeof spot?.x === "number" && typeof spot?.y === "number" && Number.isFinite(spot.x) && Number.isFinite(spot.y)) {
-      spots[id] = { x: spot.x, y: spot.y };
-    }
-  }
-  return spots;
-}
-
-export function saveSpots(spots: Spots): void {
-  setState({ ...((getState() ?? {}) as object), spots });
-}
-
