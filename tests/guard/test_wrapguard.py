@@ -419,5 +419,201 @@ class ShAgreesTest(unittest.TestCase):
         self.assertTrue(stopped, result.stderr)
 
 
+# （ラッパーに渡す引数, 止まるか）。居場所はワークスペースルート。
+# ワークスペースには .ccnavi/scripts/ccnavi-git.sh・.ccnavi/common/rules.yml・src/a.py・
+# projects/p/.ccnavi/config/rules.yml・.claude/settings.json がある（CorePathTest.FILES）。
+CORE_CASES = (
+    # 消す。ラッパー自身を消すと、生の git の組み込みの止め（ラッパーがあるときだけ）も外れる。
+    ("rm .ccnavi/scripts/ccnavi-git.sh", True),
+    ("rm -r .ccnavi/scripts", True),
+    ("rm --cached .ccnavi/common/rules.yml", True),
+    ("rm .claude/settings.json", True),
+    ("rm -r projects", True),
+    ("rm *.sh", True),
+    ("rm :/.ccnavi", True),
+    ("rm --pathspec-from-file=list.txt", True),
+    ("rm src/a.py", False),
+    ("rm src/*.py", False),
+    # 別のコミットの中身に戻す。
+    ("restore --source=HEAD~5 -- .ccnavi", True),
+    ("restore -s HEAD .ccnavi/common/rules.yml", True),
+    ("restore -sHEAD .claude/settings.json", True),
+    ("restore .ccnavi/common/rules.yml --source HEAD", True),
+    ("restore --source=HEAD -- ./", True),
+    ("restore --source=HEAD --pathspec-from-file=list.txt", True),
+    ("restore --source=HEAD -- src/a.py", False),
+    ("checkout HEAD .ccnavi/common/rules.yml", True),
+    ("checkout HEAD src/a.py", False),
+    # 索引の中身に戻す形と、衝突の解決は通す。
+    ("restore .ccnavi/common/rules.yml", False),
+    ("restore --staged .ccnavi/common/rules.yml", False),
+    ("restore --ours -- .ccnavi/common/rules.yml", False),
+    ("restore --theirs .ccnavi/common/rules.yml", False),
+    ("checkout main", False),
+    ("checkout -b x main", False),
+    ("add .ccnavi/common/rules.yml", False),
+)
+
+
+class CorePathTest(unittest.TestCase):
+    """ラッパーで自己防衛の対象を消す・別のコミットの中身に戻す形（hook の側）。"""
+
+    FILES = (
+        ".ccnavi/scripts/ccnavi-git.sh",
+        ".ccnavi/common/rules.yml",
+        "src/a.py",
+        "projects/p/.ccnavi/config/rules.yml",
+        ".claude/settings.json",
+    )
+    # 同じコマンドを通す allow を置く。ルールが先に当たるなら通ってしまう。
+    RULES = {
+        "version": 1,
+        "allow": [{"id": "wrap", "match": "Bash", "regex": r"ccnavi-git\.sh"}],
+    }
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp(prefix="ccnavi-wrapguard-core-")
+        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        for name in self.FILES:
+            write(os.path.join(self.root, name), "x\n")
+        write(common_path(self.root, "rules"), json.dumps(self.RULES))
+
+    def hook(self, command, cwd="", **extra_env):
+        payload = {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "cwd": cwd or self.root,
+            "session_id": "s1",
+            "permission_mode": "default",
+            "tool_input": {"command": command},
+        }
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env.pop("CLAUDE_PROJECT_DIR", None)
+        env.update(extra_env)
+        result = run_ccnavi(
+            ["--root", self.root, "--log", "", "--state", os.path.join(self.root, "state")]
+            + ["--mode", "enable"],
+            input=json.dumps(payload),
+            cwd=ROOT,
+            env=env,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        if not result.stdout.strip():
+            return "", ""
+        out = json.loads(result.stdout).get("hookSpecificOutput", {})
+        return out.get("permissionDecision", ""), out.get("permissionDecisionReason") or ""
+
+    def test_table(self):
+        for args, stops in CORE_CASES:
+            with self.subTest(args=args):
+                decision, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh " + args)
+                if stops:
+                    self.assertEqual(decision, "deny", reason)
+                    self.assertIn(wrapguard.CODE_CORE_PATH, reason)
+                else:
+                    self.assertEqual(decision, "", reason)
+
+    def test_refusal_names_the_way_out(self):
+        _, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh rm .ccnavi/scripts/ccnavi-git.sh")
+        self.assertIn(
+            f"[ccnavi] {wrapguard.CODE_CORE_PATH} (builtin rule: {wrapguard.CORE_PATH_RULE_ID})",
+            reason,
+        )
+        # 代わりの手段（ユーザに依頼）と、通る衝突の解決を名指しする。実パスで書く。
+        self.assertIn("ユーザに依頼", reason)
+        self.assertIn(f"{os.path.realpath(self.root)}/.ccnavi/scripts/ccnavi-git.sh", reason)
+        self.assertIn("restore --ours", reason)
+
+    def test_follows_cd(self):
+        # 居場所から解いたパスで見る。
+        for command, stops in (
+            ("cd .ccnavi && sh scripts/ccnavi-git.sh rm scripts/ccnavi-git.sh", True),
+            ("cd src && sh ../.ccnavi/scripts/ccnavi-git.sh restore --source=HEAD -- ..", True),
+            ("cd src && sh ../.ccnavi/scripts/ccnavi-git.sh rm ../.claude/settings.json", True),
+            ("cd src && sh ../.ccnavi/scripts/ccnavi-git.sh rm a.py", False),
+            # 居場所が読めない。上へ出る語は当たる先を決められない。
+            ('cd "$X" && sh /x/.ccnavi/scripts/ccnavi-git.sh rm ../a.py', True),
+        ):
+            with self.subTest(command=command):
+                decision, _ = self.hook(command)
+                self.assertEqual(decision == "deny", stops, command)
+
+    def test_restore_from_a_list_without_source(self):
+        # 索引の中身に戻すだけなら、パスをファイルから読む形もここでは止めない。
+        decision, reason = self.hook(
+            "sh .ccnavi/scripts/ccnavi-git.sh restore --pathspec-from-file=list.txt"
+        )
+        self.assertNotIn(wrapguard.CODE_CORE_PATH, reason)
+
+    def test_absolute_path(self):
+        target = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-git.sh")
+        decision, _ = self.hook(f"sh .ccnavi/scripts/ccnavi-git.sh rm {target}")
+        self.assertEqual(decision, "deny")
+
+    def test_turned_off_with_the_core_files_guard(self):
+        decision, reason = self.hook(
+            "sh .ccnavi/scripts/ccnavi-git.sh rm .ccnavi/scripts/ccnavi-git.sh",
+            CCNAVI_GUARD_CORE_FILES="disable",
+        )
+        self.assertNotIn(wrapguard.CODE_CORE_PATH, reason)
+
+
+@unittest.skipIf(shutil.which("git") is None, "git が無い")
+class CorePathShAgreesTest(unittest.TestCase):
+    """同じ見本を sh にも渡し、2 重目として同じく止めることを確かめる。"""
+
+    SH_DIR = ShAgreesTest.SH_DIR
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp(prefix="ccnavi-wrapguard-core-sh-")
+        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        scripts = os.path.join(self.root, ".ccnavi", "scripts")
+        os.makedirs(scripts)
+        common_dir = (
+            self.SH_DIR
+            if os.path.isfile(os.path.join(self.SH_DIR, "ccnavi-common.sh"))
+            else SH_SCRIPTS
+        )
+        for name in ("ccnavi-git.sh", *common_sh(common_dir)):
+            source = os.path.join(self.SH_DIR, name)
+            if not os.path.isfile(source):
+                source = os.path.join(ROOT, ".ccnavi", "scripts", name)
+            shutil.copy(source, scripts)
+        for name in CorePathTest.FILES:
+            if not os.path.exists(os.path.join(self.root, name)):
+                write(os.path.join(self.root, name), "x\n")
+        write(os.path.join(self.root, ".gitignore"), "logs/\n")
+        git = ["git", "-c", "user.email=t@example.com", "-c", "user.name=t"]
+        for args in (["init", "--quiet", "-b", "main"], ["add", "-A"], ["commit", "-qm", "i"]):
+            subprocess.run(git + args, cwd=self.root, check=True, capture_output=True)
+
+    def run_sh(self, args):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env.pop("CLAUDE_PROJECT_DIR", None)
+        env.update(GIT_ENV)
+        env["PWD"] = self.root
+        script = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-git.sh")
+        # rm は --dry-run で試す（消さずに、通るかだけを見る）。
+        words = args.split()
+        if words[0] == "rm":
+            words.insert(1, "--dry-run")
+        return subprocess.run(
+            ["sh", script, *words], cwd=self.root, env=env, capture_output=True, text=True
+        )
+
+    def test_sh_agrees(self):
+        for args, stops in CORE_CASES:
+            with self.subTest(args=args):
+                result = self.run_sh(args)
+                if stops:
+                    # ツリー全体（`./`）と承認済みチケットの置き場を含む指定は、sh の前からある
+                    # 拒否（restore-whole-tree・restore-store-source）が先に当たる。
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    said = ("ccnavi 自身を守る場所", "ツリー全体", "承認済みチケットの置き場")
+                    self.assertTrue(any(s in result.stderr for s in said), result.stderr)
+                else:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
