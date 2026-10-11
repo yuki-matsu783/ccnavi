@@ -68,7 +68,7 @@ from __future__ import annotations
 
 import os
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 
 import yaml
@@ -370,6 +370,11 @@ class Rule:
     degraded_message: str = ""
 
     compiled: re.Pattern | None = None
+    # exempt は、式を当てる前に対象から外すものを決める関数。組み込みの保護だけが持ち、
+    # ルールファイルからは書けない。式は先読みを使えないので、「この形の中でも、これだけは
+    # 通す」は式の外で決める（selfguard_shell.scratchpad_copy_exempt）。返すのは式を当てる
+    # 対象で、外すものが無ければ受け取ったまま返す。
+    exempt: Callable[[str], str] | None = field(default=None, repr=False, compare=False)
 
     def spoken_message(self) -> str:
         """モデルへ渡す文面。`{root}` をワークスペースルートの実パスにしたもの。
@@ -409,6 +414,8 @@ class Rule:
         if self.compiled is None or not subject:
             return False
         if tool_matches(self.match, tool):
+            if self.exempt is not None:
+                subject = self.exempt(subject)
             return self.compiled.search(subject) is not None
         return False
 
