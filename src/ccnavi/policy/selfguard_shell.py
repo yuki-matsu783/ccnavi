@@ -322,7 +322,7 @@ def shell_write_regex(
     既定のパスのぶん（_HOLDERS）と実行ファイルのぶん（binary_holders）はここで足すので、
     渡すのは設定で動く場所のぶん（guard_shell_regex）。
 
-    scratchpad_exclude は scratchpad/ 除外用の負の先読みパターン。
+    scratchpad_exclude は wip/scratchpad/ 除外用の負の先読みパターン。
     コピー保護（copy_places）に適用する。
     """
     places = [*_PLACES]
@@ -468,20 +468,20 @@ def binary_holders(bin_path: str) -> tuple[tuple[str, str], ...]:
 # 機械ごとの組み立ての置き場。`bin/` の下に並ぶ。
 _BUILD_DIR = r"(?:" + "|".join(platformtag.SYSTEMS) + r")-[a-z0-9_]+"
 
-# scratchpad/ をコピー保護から除外するためのパターン（ワークスペースルート直下の scratchpad/）
-# 実行時に root から組み立てる
+# wip/scratchpad/ をコピー保護から除外するためのパターン
+# （ワークスペースルート直下の wip/scratchpad/）。実行時に root から組み立てる
 
 
 def _scratchpad_exclude(root: str) -> str:
-    """scratchpad/ を除外する負の先読み。root が空なら空文字を返す。"""
+    """wip/scratchpad/ を除外する負の先読み。root が空なら空文字を返す。"""
     if not root:
         return ""
     # root の絶対パスと相対パスの両方をカバー
     abs_root = os.path.abspath(root)
     real_root = os.path.realpath(root)
     bases = sorted({abs_root, real_root})
-    # scratchpad/ で始まるパスを除外（大文字小文字を区別しない）
-    exclude = "|".join(_spelled(b) + r"[\\/]scratchpad[\\/]" for b in bases)
+    # wip/scratchpad/ の下のパスを除外（大文字小文字を区別しない）
+    exclude = "|".join(_spelled(b) + r"[\\/]wip[\\/]scratchpad[\\/]" for b in bases)
     return rf"(?!.*(?:{exclude}))"
 
 

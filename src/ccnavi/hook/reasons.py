@@ -434,7 +434,7 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
 
 # 作業の決まりのうち、ワークツリーと git の行を支える deny の id（書かれたままの表記）。
 # この id のルールがワークスペースに無ければ、その行は出さない。
-RULE_MAIN_TREE = "main-tree"
+RULE_WORKSPACE_ROOT = "workspace-root"
 RULE_RAW_GIT = "raw-git"
 
 
@@ -456,7 +456,7 @@ def conventions(
     それ以外の詳しい決まりは `--docs`（ワークスペースの文書の frontmatter の索引）。
 
     - ワークツリーの行は、ワークスペースのルール（共通レイヤーと自身のレイヤー）に
-      `main-tree` の deny があるときだけ、git の行は `raw-git` の deny があるときだけ出す。
+      `workspace-root` の deny があるときだけ、git の行は `raw-git` の deny があるときだけ出す。
       決まりを支えるのはそのルールで、ルールが無いワークスペースでは文と判定が食い違う。
       ルールの有無は `deny_ids`（判定と同じ読み方）で見る
     - `projects` の行は、プロジェクトの置き場にプロジェクトがあるときだけ出す
@@ -466,7 +466,7 @@ def conventions(
     """
     declared = deny_ids if deny_ids is not None else set()
     lines = ["[ccnavi] ccnavi が前提にしている作業の決まり。"]
-    if RULE_MAIN_TREE in declared:
+    if RULE_WORKSPACE_ROOT in declared:
         worktrees = tree.WORKTREES_DIR.replace("\\", "/")
         lines.append(
             f"- 編集する前にワークツリー（{worktrees}/<名前>）を切り、その中で編集する。"

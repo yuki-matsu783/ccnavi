@@ -210,6 +210,9 @@ def _findings(
     name = where.name
     tree_root = where.root
     script = _script_writes(changes, places, top, where, root)
+    # `top` が空の経路（コミット済みの差分を見るターン終わりの検査）では外さない。
+    # コミット済みの変更は integrate の staged ではなく、外すとその網から保護領域の変更が抜ける。
+    script |= _integrate_writes(changes, top)
     found = []
     for change in changes:
         if any(change.full == p or change.full.startswith(p + os.sep) for p in own):
@@ -327,6 +330,135 @@ def _script_writes(
         if len(landed) == 1 and len(leaving) == 1:
             out.add(change.full)
             out.add(landed[0].full)
+    return out
+
+
+def _integrate_writes(changes: list[gitstate.Change], top: str) -> set[str]:
+    """`ccnavi-git.sh integrate` が統合先のツリーに staged で残した変更の実パス。
+
+    統合先のツリーは保護領域なので、外さないと integrate の結果が「保護領域の変更」として報告され、
+    戻す設定では自分で戻される。
+
+    **記録（`<git-path ccnavi-integrate>/<名前>/marker`）は信用せず、git の状態で確かめる。** 記録は
+    `.git` の中にあってエージェントにも書けるので、書かれた内容だけで外すと、任意の staged を通す
+    経路になる。外すのは次の全部が揃ったときだけ。
+
+    * 記録の state が `staged`
+    * ブランチ `branch` が記録の `branch_sha` のまま
+    * HEAD が記録の `base` のまま
+    * いまの index のツリーが記録の `tree` と同じ
+    * そのツリーが `git merge-tree --write-tree HEAD <ブランチ>`（= squash の結果）と同じ
+
+    最後の条件で、記録に何が書かれていても、外れるのは「HEAD にそのブランチを squash した結果」と
+    一字も違わない index だけになる。外す対象は HEAD との staged の差分のパスのうち、作業ツリーで
+    さらに変わっていないもの。ほかの変更、条件が欠けたツリー、git を起こせない・git が古くて
+    `merge-tree --write-tree` が無い場合は外さず、今までどおり報告する。
+    """
+    changes = [c for c in changes if c.staged]
+    if not top or not changes:
+        return set()
+    base = gitcmd.run(top, ["rev-parse", "--git-path", "ccnavi-integrate"])
+    if not base.ok or not base.out.strip():
+        return set()
+    gdir = base.out.strip()
+    if not os.path.isabs(gdir):
+        gdir = os.path.join(top, gdir)
+    try:
+        names = sorted(os.listdir(gdir))
+    except OSError:
+        return set()
+    head = gitcmd.run(top, ["rev-parse", "--verify", "HEAD"])
+    if not head.ok:
+        return set()
+    out: set[str] = set()
+    wanted = {c.path: c.full for c in changes if c.path}
+    for name in names:
+        marker = _read_record(os.path.join(gdir, name, "marker"))
+        if marker.get("state") != "staged":
+            continue
+        branch = marker.get("branch", "")
+        if not branch or branch != name or marker.get("base") != head.out.strip():
+            continue
+        tip = gitcmd.run(top, ["rev-parse", "--verify", f"refs/heads/{branch}"])
+        if not tip.ok or tip.out.strip() != marker.get("branch_sha"):
+            continue
+        if not _is_worktree_at(top, branch, tip.out.strip()):
+            continue
+        if _ticket_bound(top, branch):
+            continue
+        index = gitcmd.run(top, ["write-tree"])
+        recorded = marker.get("tree", "")
+        if not index.ok or not recorded or index.out.strip() != recorded:
+            continue
+        merged = gitcmd.run(top, ["merge-tree", "--write-tree", "HEAD", f"refs/heads/{branch}"])
+        if not merged.ok or not merged.out.strip():
+            continue
+        if merged.out.split("\n", 1)[0].strip() != recorded:
+            continue
+        # 改名の検出は切る（gitstate.read と同じ。移動元の削除も 1 件として数える）。
+        staged = gitcmd.run(
+            top, ["diff", "--cached", "--no-renames", "--name-only", "-z", "HEAD"], raw_paths=True
+        )
+        loose = gitcmd.run(top, ["diff", "--no-renames", "--name-only", "-z"], raw_paths=True)
+        if not staged.ok or not loose.ok:
+            continue
+        moved = {p for p in loose.out.split("\0") if p}
+        for path in (p for p in staged.out.split("\0") if p):
+            if path not in moved and path in wanted:
+                out.add(wanted[path])
+    return out
+
+
+def _ticket_bound(top: str, name: str) -> bool:
+    """その名前のチケットが承認済みか提案として在るか（チケット作業は integrate の対象外）。
+
+    sh の `ig_bound` の見方のうち、このツリーとワークツリーの置き場にある同名のチケットだけを見る。
+    チケットに結び付くブランチの squash を、記録を偽造して外させないため。
+    """
+    for place in (
+        ".ccnavi/approved/doing",
+        ".ccnavi/approved/done",
+        "wip/proposals/todo",
+        "wip/proposals/review",
+    ):
+        for base in (top, os.path.join(top, ".claude", "worktrees", name)):
+            if os.path.lexists(os.path.join(base, place, name + ".md")):
+                return True
+    return False
+
+
+def _is_worktree_at(top: str, branch: str, sha: str) -> bool:
+    """`.claude/worktrees/<ブランチ>` が、そのブランチを sha で開いている登録済みのワークツリーか。
+
+    ワークツリーの中の書き込みは、そのツリーの実行後チェックが見ている。ワークツリーを持たない
+    ブランチの squash を外すと、そこを通っていない中身（保護領域への書き込み）が入るので外さない。
+    """
+    listed = gitcmd.run(top, ["worktree", "list", "--porcelain"], raw_paths=True)
+    if not listed.ok:
+        return False
+    suffix = "/" + "/".join((".claude", "worktrees", branch))
+    for block in listed.out.split("\n\n"):
+        fields = dict(line.partition(" ")[::2] for line in block.splitlines() if " " in line)
+        path = fields.get("worktree", "").replace("\\", "/")
+        if (
+            path.endswith(suffix)
+            and fields.get("branch") == f"refs/heads/{branch}"
+            and fields.get("HEAD") == sha
+        ):
+            return True
+    return False
+
+
+def _read_record(path: str) -> dict[str, str]:
+    """`<鍵> <値>` を 1 行 1 項目で並べた記録を読む（sh の `ccnavi_record_get` と同じ形）。"""
+    text = fsio.read_text(path, errors="replace")
+    if text is None:
+        return {}
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        key, _, value = line.partition(" ")
+        if key and key not in out:
+            out[key] = value
     return out
 
 

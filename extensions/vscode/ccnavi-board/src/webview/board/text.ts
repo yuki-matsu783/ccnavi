@@ -8,6 +8,13 @@ import type { HistoryEntryJson } from "../../core/model.js";
 
 export const COPY_LABELS = { none: "未承認", open: "承認済み", review: "レビュー待ち", closed: "クローズ", archived: "アーカイブ済み" } as const;
 
+/** 承認済みチケットの着手の状態。`start` で `started_at` が入るまで、範囲は適用されない */
+export const STARTED_LABELS = { unstarted: "未着手", started: "着手済み" } as const;
+export const STARTED_TITLES = {
+  unstarted: "承認済みですが、まだ start していません。着手の時刻（started_at）が入るまで、チケットの範囲は適用されません",
+  started: "start 済みです。チケットの範囲が適用されています",
+} as const;
+
 /** ツールバーの絞り込みのチェックボックスの言葉 */
 export const FILTER_LABELS = {
   attention: "要対応のみ",

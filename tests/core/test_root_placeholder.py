@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 import unittest
 
@@ -17,7 +18,7 @@ from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 # このリポジトリの rules.yml と同じ形。先読みを使わずに 1 段目で場合分けする。
-MAIN_TREE = (
+WORKSPACE_ROOT_RULE = (
     r"^{root}[\\/](?:[^.\\/][^\\/]*|\.[^c\\/][^\\/]*|\.c[^l\\/][^\\/]*|\.claude[\\/][^w\\/][^\\/]*)"
 )
 
@@ -27,6 +28,42 @@ def write(path: str, text: str) -> str:
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
     return path
+
+
+class WorkspaceRootRealRuleTest(unittest.TestCase):
+    """このリポジトリの rules.yml の workspace-root が、wip/scratchpad/ だけを通すこと。"""
+
+    def setUp(self):
+        import yaml
+
+        with open(os.path.join(ROOT, ".ccnavi", "common", "rules.yml"), encoding="utf-8") as f:
+            rule = next(r for r in yaml.safe_load(f)["deny"] if r["id"] == "workspace-root")
+        self.regex = re.compile(rule["regex"].replace("{root}", re.escape("/r")))
+
+    def test_wip_scratchpadだけが通る(self):
+        for path in [
+            "/r/wip/scratchpad/a.md",
+            "/r/wip/scratchpad/x/y.sh",
+            r"/r\wip\scratchpad\a",
+            "/r/.claude/worktrees/x/a.md",
+        ]:
+            with self.subTest(path=path):
+                self.assertIsNone(self.regex.search(path))
+
+    def test_それ以外は止まる(self):
+        for path in [
+            "/r/scratchpad/a.md",
+            "/r/wip/proposals/todo/a.md",
+            "/r/wip/a.md",
+            "/r/wip",
+            "/r/wipx/a.md",
+            "/r/wip/scratchpadx/a.md",
+            "/r/wip/Scratchpad/a.md",
+            "/r/README.md",
+            "/r/.claude/settings.json",
+        ]:
+            with self.subTest(path=path):
+                self.assertIsNotNone(self.regex.search(path))
 
 
 class RootPlaceholderTest(unittest.TestCase):
@@ -42,9 +79,9 @@ class RootPlaceholderTest(unittest.TestCase):
                     "version": 1,
                     "deny": [
                         {
-                            "id": "main-tree",
+                            "id": "workspace-root",
                             "match": "Write|Edit",
-                            "regex": MAIN_TREE,
+                            "regex": WORKSPACE_ROOT_RULE,
                             "message": "main では編集しない",
                         },
                         {
@@ -108,7 +145,7 @@ class RootPlaceholderTest(unittest.TestCase):
             with self.subTest(path=path):
                 out = self.judge("Write", path)
                 self.assertEqual(out.get("permissionDecision"), "deny", out)
-                self.assertIn("main-tree", out.get("permissionDecisionReason", ""))
+                self.assertIn("workspace-root", out.get("permissionDecisionReason", ""))
         allowed = [
             os.path.join(self.root, ".claude", "worktrees", "x", "README.md"),
             os.path.join(
@@ -120,7 +157,7 @@ class RootPlaceholderTest(unittest.TestCase):
             with self.subTest(path=path):
                 out = self.judge("Edit", path)
                 self.assertNotEqual(out.get("permissionDecision"), "deny", out)
-                self.assertNotIn("main-tree", out.get("permissionDecisionReason", ""))
+                self.assertNotIn("workspace-root", out.get("permissionDecisionReason", ""))
 
     def test_outside_the_root_is_not_mentioned(self):
         with tempfile.TemporaryDirectory() as elsewhere:
@@ -166,7 +203,7 @@ class RootPlaceholderTest(unittest.TestCase):
         rule_set, problems = rules.load(self.rules, self.root)
         self.assertEqual(problems, [])
         # 書いた表記は残り、置き換わるのは翻訳後の式だけ。
-        self.assertEqual(rule_set.deny[0].regex, MAIN_TREE)
+        self.assertEqual(rule_set.deny[0].regex, WORKSPACE_ROOT_RULE)
         self.assertNotIn("{root}", rule_set.deny[0].compiled.pattern)
 
 
