@@ -285,6 +285,7 @@ def decide_before(
                     )
                 ],
                 conf=conf,
+                root=root,
             )
 
     # 記録と state を消す `ccnavi --prune`（`--preview` の無い形）は、チケット制御に依らず止める
@@ -371,6 +372,7 @@ def decide_before(
                     )
                 ],
                 conf=conf,
+                root=root,
             )
 
     # 子チケットのワークツリーからの `ccnavi-git.sh push` は、誰が打っても止める。sh も同じ検査を
