@@ -21,6 +21,7 @@ keywords: [移行, 古い形, ccnavi_approved, approved_at, source_tree, workflo
   `load_copy` が互換のためだけに受けていた `approved_dir`、`waits_of` の読まない `types`
 - 前の形の識別子 `i<番号>`・`<名前>-i<番号>`（通し番号の数えと lint の文面）
 - 旧い索引名 `index.jsonl` を新しい名前に移るときに消す処理
+- フェーズ定義の旧欄 `order`・`after`・`overlap`・`requires` の警告と、VS Code 拡張のフェーズ画面の「読まない欄」の帯
 - hook が承認を伝えていた頃の記録 `approved-<セッション>-<エージェント>.json` の掃除
 
 ## 決定
