@@ -5,13 +5,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard, flowCardOf } from "../../src/core/board.js";
-import { templateFlow } from "../../src/core/flow-doc.js";
+import { bareFlow } from "../helpers/flow.js";
 import { asFlowMessage, flowButtonLabel, flowRequestPrompt, flowTargetOf, flowTicketOf, lockFromFailure, requestLabel } from "../../src/core/flow-view.js";
 import { parseBoardJson, type BoardJson } from "../../src/core/model.js";
 import { fixture, fixtureText } from "../helpers/fixture.js";
 
 test("CB-T225 画面から届くメッセージは形を確かめ、崩れたもの（読めない保存の中身など）は捨てる", () => {
-  const doc = templateFlow("i0001-01-01", "調査");
+  const doc = bareFlow("i0001-01-01", "調査");
   assert.deepEqual(asFlowMessage({ type: "ready" }), { type: "ready" });
   assert.deepEqual(asFlowMessage({ type: "openFile", extra: 1 }), { type: "openFile" });
   assert.deepEqual(asFlowMessage({ type: "tourDone" }), { type: "tourDone" });
@@ -244,7 +244,7 @@ test("CB-T296 画面からの依頼・提案の操作と、保存に添える取
   for (const type of ["openProposal", "request", "requestCopy", "requestOpen"]) {
     assert.deepEqual(asFlowMessage({ type }), { type });
   }
-  const doc = templateFlow("i0001-01-01", "調査");
+  const doc = bareFlow("i0001-01-01", "調査");
   const hash = "a".repeat(64);
   assert.deepEqual(asFlowMessage({ type: "save", doc, imported: hash }), { type: "save", doc, imported: hash });
   // ハッシュの形でなければ、取り込みは無かったものとして受ける（下書きを消さない側）
