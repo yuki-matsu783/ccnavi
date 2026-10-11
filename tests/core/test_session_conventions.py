@@ -57,7 +57,7 @@ class SessionConventionsTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         result = run_ccnavi(
-            ["--root", self.root, "--rules", self.rules, "--state", "", "--log", "", *extra],
+            ["--root", self.root, "--rules", self.rules, *extra],
             input=json.dumps(payload),
             cwd=ROOT,
             env=environment,

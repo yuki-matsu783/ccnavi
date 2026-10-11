@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
 import unittest
 
 from ccnavi.records import audit, repeat
-from tests import fixture_workspace
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 FIXTURE = "rules-undeclared.yml"
@@ -28,19 +29,29 @@ def _env(**extra: str) -> dict[str, str]:
     return environment
 
 
-def _run(state: str, payload: dict, mode: str = "enable", **env: str):
-    ws = fixture_workspace(FIXTURE)
+def _workspace(ws: str) -> str:
+    """見本のルールを共通レイヤーに据えたワークスペース。拒否の数えは state の既定の置き場
+    （`<ws>/logs/state`）に残るので、テストごとに別のワークスペースを使う。"""
+    target = common_path(ws, "rules")
+    if not os.path.exists(target):
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copyfile(os.path.join(ROOT, "tests", "fixtures", FIXTURE), target)
+    return ws
+
+
+def _run(ws: str, payload: dict, mode: str = "enable", **env: str):
+    _workspace(ws)
     return run_ccnavi(
-        ["--root", ws, "--mode", mode, "--log", "", "--state", state],
+        ["--root", ws, "--mode", mode],
         input=json.dumps({"session_id": "s1", "permission_mode": "auto", **payload}),
         env=_env(**env),
         cwd=ws,
     )
 
 
-def _bash(state: str, command: str, mode: str = "enable", **env: str):
+def _bash(ws: str, command: str, mode: str = "enable", **env: str):
     return _run(
-        state,
+        ws,
         {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": command}},
         mode,
         **env,
@@ -57,7 +68,8 @@ def _verdict(result) -> tuple[str, str]:
 class DenyMessageTest(unittest.TestCase):
     def setUp(self):
         self._dir = tempfile.TemporaryDirectory(prefix="ccnavi-repeat-")
-        self.state = self._dir.name
+        self.ws = self._dir.name
+        self.state = os.path.join(self.ws, "logs", "state")
 
     def tearDown(self):
         self._dir.cleanup()
@@ -70,52 +82,54 @@ class DenyMessageTest(unittest.TestCase):
             "git  push 'origin' main",
             'git push "origin" main',
         ):
-            decision, reason = _verdict(_bash(self.state, command))
+            decision, reason = _verdict(_bash(self.ws, command))
             self.assertEqual("deny", decision)
             said.append(NOTE in reason)
         self.assertEqual([False, False, True], said)
-        _, reason = _verdict(_bash(self.state, "git push origin main"))
+        _, reason = _verdict(_bash(self.ws, "git push origin main"))
         self.assertIn("4 回止めました", reason)
 
     def test_threshold_follows_the_environment(self):
         """CCNAVI_DENY_REPEAT で N を動かせる。"""
-        _bash(self.state, "git push origin main", CCNAVI_DENY_REPEAT="2")
-        _, reason = _verdict(_bash(self.state, "git push origin main", CCNAVI_DENY_REPEAT="2"))
+        _bash(self.ws, "git push origin main", CCNAVI_DENY_REPEAT="2")
+        _, reason = _verdict(_bash(self.ws, "git push origin main", CCNAVI_DENY_REPEAT="2"))
         self.assertIn(NOTE, reason)
 
     def test_other_calls_are_counted_apart(self):
         """別の対象は別に数える。同じルールでも、違う呼び出しの拒否をまとめない。"""
         for target in ("a", "b", "c"):
-            _, reason = _verdict(_bash(self.state, f"git push origin {target}"))
+            _, reason = _verdict(_bash(self.ws, f"git push origin {target}"))
             self.assertNotIn(NOTE, reason)
 
     def test_dry_run_does_not_count(self):
         """dry-run は止めていないので数えない。記録も作らない。"""
         for _ in range(3):
-            result = _bash(self.state, "git push origin main", mode="dry-run")
+            result = _bash(self.ws, "git push origin main", mode="dry-run")
             self.assertNotIn(NOTE, result.stdout)
-        self.assertEqual([], [f for f in os.listdir(self.state) if f.startswith("denied-")])
+        names = os.listdir(self.state) if os.path.isdir(self.state) else []
+        self.assertEqual([], [f for f in names if f.startswith("denied-")])
 
     def test_unwritable_state_still_denies(self):
         """記録を書けなくても拒否は拒否のまま。一文が付かないだけ。"""
-        blocked = os.path.join(self.state, "file")
-        with open(blocked, "w", encoding="utf-8") as f:
+        # state の置き場をファイルで塞ぐ（置き場を動かす `--state` は診断でだけ効く）。
+        os.makedirs(os.path.dirname(self.state), exist_ok=True)
+        with open(self.state, "w", encoding="utf-8") as f:
             f.write("x")
         for _ in range(3):
-            decision, reason = _verdict(_bash(blocked, "git push origin main"))
+            decision, reason = _verdict(_bash(self.ws, "git push origin main"))
             self.assertEqual("deny", decision)
             self.assertNotIn(NOTE, reason)
 
     def test_turn_end_reports_once(self):
         """ターンの終わりにユーザへ 1 度言う。同じ回数のまま次のターンでは繰り返さない。"""
         for _ in range(3):
-            _bash(self.state, "git push origin main")
+            _bash(self.ws, "git push origin main")
         stop = {"hook_event_name": "Stop"}
-        first = _run(self.state, stop)
+        first = _run(self.ws, stop)
         self.assertEqual(0, first.returncode, first.stderr)
         message = json.loads(first.stdout)["systemMessage"]
         self.assertIn("git-push（Bash）: 3 回", message)
-        second = _run(self.state, stop)
+        second = _run(self.ws, stop)
         self.assertNotIn("git-push", second.stdout)
 
 

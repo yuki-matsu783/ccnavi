@@ -199,20 +199,14 @@ class StopNudgeTest(TicketTest):
         # 別のセッションは自分の記録を持つ。
         self.assertEqual(self.body(self.stop(tree, session="s2")).get("decision"), "block")
 
-    def test_without_a_place_to_remember_it_does_not_ask(self):
-        """state の置き場が無ければ、覚えられないので促さない（毎回止めない側）。"""
-        self.family()
-        tree = self.child_tree()
-        self.commit_work(tree)
-        self.assert_quiet(self.stop(tree, extra=("--state", "")))
-
     def test_the_nudge_is_recorded_apart_from_deny(self):
         """監査の記録では deny と数えない。種類は nudge。"""
         self.family()
         tree = self.child_tree()
         self.commit_work(tree)
-        log = os.path.join(self.root, "decisions.jsonl")
-        self.stop(tree, extra=("--log", log))
+        # 記録はワークスペースルートの既定の置き場に残る（`--log` は診断でだけ効く）。
+        log = os.path.join(self.root, "logs", "decisions.jsonl")
+        self.stop(tree)
         with open(log, encoding="utf-8") as f:
             line = json.loads(f.read().splitlines()[-1])
         self.assertEqual((line["decision"], line["code"]), ("nudge", CODE))

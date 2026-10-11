@@ -31,7 +31,7 @@ class TicketControlTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.update(env or {})
         return run_ccnavi(
-            ["--root", self.root, "--rules", self.rules, "--state", "", "--log", "", *extra],
+            ["--root", self.root, "--rules", self.rules, *extra],
             input=payload,
             cwd=ROOT,
             env=environment,

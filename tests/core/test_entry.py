@@ -28,7 +28,7 @@ def spawn(*args, payload=""):
     environment.pop("PYTHONUTF8", None)
     environment["PYTHONPATH"] = SRC
     return subprocess.run(
-        [sys.executable, "-m", "ccnavi", "--root", fixture_workspace(), "--log", "", *args],
+        [sys.executable, "-m", "ccnavi", "--root", fixture_workspace(), *args],
         input=payload.encode("utf-8"),
         capture_output=True,
         cwd=ROOT,

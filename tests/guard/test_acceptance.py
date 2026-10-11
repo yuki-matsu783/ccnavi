@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 import unittest
 
 from ccnavi.infra import shellread_scan
@@ -17,7 +16,7 @@ from tests import ROOT, common_path, fixture_workspace
 from tests.inproc import run_ccnavi
 
 
-def run(mode="enable", payload="", log=""):
+def run(mode="enable", payload=""):
     """道具を 1 回動かし、呼び手から見えるものだけを返す。
 
     モードは環境ではなくフラグで固定する。このリポジトリは ccnavi を自分自身に
@@ -30,10 +29,19 @@ def run(mode="enable", payload="", log=""):
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
 
+    # 記録はワークスペースルートの既定の置き場（logs/decisions.jsonl）に残る。置き場を動かす
+    # `--log` は診断でだけ効く。
     args = ["--root", fixture_workspace(), "--mode", mode]
-    args += ["--log", log] if log else ["--log", ""]
 
     return run_ccnavi(args, input=payload, cwd=ROOT, env=environment)
+
+
+def records_in(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return [json.loads(line) for line in f if line.strip()]
+    except FileNotFoundError:
+        return []
 
 
 def pre_tool_use(tool, field, value):
@@ -113,7 +121,7 @@ class VerdictTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment["CCNAVI_MODE"] = "disable"
         result = run_ccnavi(
-            ["--root", fixture_workspace(), "--log", ""],
+            ["--root", fixture_workspace()],
             input=pre_tool_use("Bash", "command", "git push origin main"),
             cwd=ROOT,
             env=environment,
@@ -342,13 +350,12 @@ class PathTest(unittest.TestCase):
 
 class RecordTest(unittest.TestCase):
     def logged(self, mode, *payloads):
-        """複数の payload を 1 つの記録ファイルに通して読み返す。"""
-        with tempfile.TemporaryDirectory() as directory:
-            path = os.path.join(directory, "decisions.jsonl")
-            for payload in payloads:
-                run(mode=mode, payload=payload, log=path)
-            with open(path, encoding="utf-8") as f:
-                return [json.loads(line) for line in f if line.strip()]
+        """複数の payload を通し、その間に既定の記録の置き場へ足された行を読み返す。"""
+        path = os.path.join(fixture_workspace(), "logs", "decisions.jsonl")
+        before = len(records_in(path))
+        for payload in payloads:
+            run(mode=mode, payload=payload)
+        return records_in(path)[before:]
 
     def test_通した呼び出しも含めてすべて記録される(self):
         got = self.logged(

@@ -483,7 +483,7 @@ def clean_env(**extra: str) -> dict[str, str]:
 class CliTest(Repo):
     def ccnavi(self, *args: str, cwd: str | None = None):
         return run_ccnavi(
-            ["--root", self.root, "--log", "", "--state", "", *args],
+            ["--root", self.root, *args],
             cwd=cwd or self.root,
             env=clean_env(),
         )
@@ -518,9 +518,7 @@ class CliTest(Repo):
         with tempfile.TemporaryDirectory() as bare:
             bare = os.path.realpath(bare)
             write(os.path.join(bare, "a.md"), doc(type="guide"))
-            done = run_ccnavi(
-                ["--root", bare, "--log", "", "--docs", "--format", "count"], env=clean_env()
-            )
+            done = run_ccnavi(["--root", bare, "--docs", "--format", "count"], env=clean_env())
         self.assertEqual((done.returncode, done.stdout), (0, "matched=0 total=0\n"))
 
     def test_bad_values_are_one(self):
@@ -597,7 +595,7 @@ class CliTest(Repo):
 
     def test_root_log_and_state_are_accepted(self):
         self.put("a.md", doc(type="guide"))
-        done = self.ccnavi("--docs", "--state", "", "--format", "path")
+        done = self.ccnavi("--docs", "--format", "path")
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual(done.stdout, "a\n")
 
@@ -634,7 +632,7 @@ class ProjectsTest(Repo):
 
     def ccnavi(self, *args: str):
         return run_ccnavi(
-            ["--root", self.root, "--log", "", "--state", "", "--docs", *args],
+            ["--root", self.root, "--docs", *args],
             cwd=self.root,
             env=clean_env(),
         )
@@ -700,7 +698,7 @@ class SessionStartTest(Repo):
     def context(self, root: str, **extra) -> str:
         payload = {"hook_event_name": "SessionStart", "session_id": "s1", "cwd": root, **extra}
         done = run_ccnavi(
-            ["--root", root, "--log", "", "--state", "", "--approved", "", "--mode", "enable"],
+            ["--root", root, "--mode", "enable"],
             input=json.dumps(payload),
             cwd=root,
             env=clean_env(CCNAVI_BIN_PATH=".ccnavi/scripts/ccnavi-launcher.sh"),
@@ -819,9 +817,7 @@ class ForeignIndexTest(Repo):
     def test_cli_and_session_start_name_it(self):
         self.put("a.md", doc(type="guide"))
         write(self.index_of(""), "x\n")
-        done = run_ccnavi(
-            ["--root", self.root, "--log", "", "--docs", "--format", "count"], env=clean_env()
-        )
+        done = run_ccnavi(["--root", self.root, "--docs", "--format", "count"], env=clean_env())
         self.assertIn("ccnavi-index.jsonl は ccnavi の索引ではないので書き換えない", done.stderr)
         conf = settings.load(self.root)[0]
         self.assertIn("書き換えなかった: ccnavi-index.jsonl", docsearch.at_start(conf, self.root))
@@ -984,7 +980,7 @@ class RobustTest(Repo):
         for fmt in ("table", "json"):
             with self.subTest(fmt=fmt):
                 done = run_ccnavi(
-                    ["--root", self.root, "--log", "", "--docs", "--no-refresh", "--format", fmt],
+                    ["--root", self.root, "--docs", "--no-refresh", "--format", fmt],
                     env=clean_env(),
                 )
                 self.assertEqual(done.returncode, 0, done.stderr)
@@ -1136,7 +1132,7 @@ class GitFailureTest(Repo):
     def test_cli_says_the_query_failed(self):
         self.put("a.md", doc(type="guide"))
         with self.failing("ls-files"):
-            done = run_ccnavi(["--root", self.root, "--log", "", "--docs"], env=clean_env())
+            done = run_ccnavi(["--root", self.root, "--docs"], env=clean_env())
         self.assertEqual(done.returncode, 0)
         self.assertIn("git への問い合わせに失敗したので引かない", done.stderr)
 
@@ -1205,7 +1201,7 @@ class DedupeAndProjectsTest(Repo):
     def test_a_project_without_git_is_named_by_the_cli(self):
         self.put("a.md", doc(type="guide"))
         self.put("projects/plain/x.md", doc(type="guide"))
-        done = run_ccnavi(["--root", self.root, "--log", "", "--docs"], env=clean_env())
+        done = run_ccnavi(["--root", self.root, "--docs"], env=clean_env())
         self.assertIn("プロジェクト plain は .git を持たないので引かない", done.stderr)
         conf = settings.load(self.root)[0]
         self.assertNotIn("plain", docsearch.at_start(conf, self.root))
@@ -1346,9 +1342,7 @@ class JsonOutputTest(Repo):
     def test_deep_front_matter_is_null_and_json_output_works(self):
         nested = "[" * 40 + "]" * 40
         self.put("a.md", f"---\ntype: guide\nn: {nested}\n---\n")
-        done = run_ccnavi(
-            ["--root", self.root, "--log", "", "--docs", "--format", "json"], env=clean_env()
-        )
+        done = run_ccnavi(["--root", self.root, "--docs", "--format", "json"], env=clean_env())
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIsNone(json.loads(done.stdout)[0]["frontmatter"])
 
@@ -1359,7 +1353,7 @@ class JsonOutputTest(Repo):
                 front = f'"frontmatter":{{"n":{bad}}}'
                 text = f'{{"concept_id":"a","directory":".",{front},"mtime":"x"}}\n'
                 write(self.index_of(""), text)
-                args = ["--root", self.root, "--log", "", "--docs", "--no-refresh"]
+                args = ["--root", self.root, "--docs", "--no-refresh"]
                 done = run_ccnavi([*args, "--format", "json"], env=clean_env())
                 self.assertEqual(done.returncode, 0, done.stderr)
 

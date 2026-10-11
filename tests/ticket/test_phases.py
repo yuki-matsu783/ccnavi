@@ -172,7 +172,7 @@ class PhaseHarness(unittest.TestCase):
         # には渡せない。差し替えたいテストはこのファイルに書き直す。
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
         self.phases = write(config_path(self.root, "phases"), PHASES)
-        self.state = os.path.join(self.root, "state")
+        self.state = os.path.join(self.root, "logs", "state")
         self.parent_tree = self.worktree("i0001", "main")
         # 承認済みチケットとマーカーは親のツリーに置かれ、親のブランチに乗る。
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "approved")
@@ -191,12 +191,6 @@ class PhaseHarness(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--approved",
-                ".ccnavi/approved",
-                "--state",
-                self.state,
-                "--log",
-                "",
                 "--guard-core-files",
                 "disable",
                 "--restore-if-deny",
@@ -844,25 +838,6 @@ class PhaseTest(PhaseHarness):
         preview = json.loads(shown.stdout)
         self.assertTrue(preview["can_issue"])
         choices = json.dumps({"u/7#t0": "keep", "u/7#t1": "issue"})
-        # state の置き場が無ければ、issue に回す下書きを置けないので、何も置く前に断る
-        homeless = self.ccnavi(
-            "--cwd",
-            self.parent_tree,
-            "--state",
-            "",
-            "--reviewed",
-            "2",
-            "--accept-unresolved",
-            "--yes",
-            choices,
-            "--digest",
-            preview["digest"],
-            "--json",
-            "--result",
-            fixture,
-        )
-        self.assertNotEqual(homeless.returncode, 0)
-        self.assertIn("state の置き場が空", homeless.stderr)
         self.assertNotEqual(self.confirm(fixture, 2).returncode, 0)
         done = self.ccnavi(
             "--cwd",

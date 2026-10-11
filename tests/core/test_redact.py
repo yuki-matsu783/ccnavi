@@ -272,7 +272,8 @@ class RecordTest(unittest.TestCase):
 
     def setUp(self):
         self.dir = tempfile.mkdtemp(prefix="ccnavi-redact-")
-        self.log = os.path.join(self.dir, "decisions.jsonl")
+        # 記録の既定の置き場（`--log` は診断でだけ効く）。
+        self.log = os.path.join(self.dir, "logs", "decisions.jsonl")
 
     def _lines(self) -> list[dict]:
         with open(self.log, encoding="utf-8") as f:
@@ -321,7 +322,7 @@ class RecordTest(unittest.TestCase):
             "tool_input": {"command": f"curl -H 'Authorization: Bearer {LONG}' x"},
         }
         proc = run_ccnavi(
-            ["--log", self.log, "--state", "", "--ticket-control", "disable"],
+            ["--ticket-control", "disable"],
             input=json.dumps(payload),
             env={"CLAUDE_PROJECT_DIR": self.dir, "CCNAVI_MODE": "enable"},
             cwd=self.dir,
@@ -370,7 +371,7 @@ class RecordTest(unittest.TestCase):
         }
         with mock.patch.object(redact, "redact", side_effect=RuntimeError("boom")):
             proc = run_ccnavi(
-                ["--log", self.log, "--state", "", "--ticket-control", "disable"],
+                ["--ticket-control", "disable"],
                 input=json.dumps(payload),
                 env={"CLAUDE_PROJECT_DIR": self.dir, "CCNAVI_MODE": "enable"},
                 cwd=self.dir,

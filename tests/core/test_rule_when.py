@@ -311,12 +311,6 @@ class JudgeTest(unittest.TestCase):
                 self.root,
                 "--mode",
                 "enable",
-                "--log",
-                "",
-                "--state",
-                "",
-                "--approved",
-                "",
                 "--guard-core-files",
                 "disable",
             ],
@@ -644,7 +638,7 @@ class CommandLineTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         done = run_ccnavi(
-            ["--root", self.root, "--log", "", "--state", "", "--approved", "", *args],
+            ["--root", self.root, *args],
             cwd=ROOT,
             env=environment,
         )

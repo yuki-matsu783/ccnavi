@@ -150,7 +150,7 @@ class BranchFieldApprovalTest(unittest.TestCase):
         git(self.root, "commit", "--quiet", "-m", "init")
         write(common_path(self.root, "rules"), json.dumps(RULES))
         write(config_path(self.root, "phases"), PHASES)
-        self.state = os.path.join(self.root, "state")
+        self.state = os.path.join(self.root, "logs", "state")
         self.tree = os.path.join(self.root, ".claude", "worktrees", PARENT)
 
     def ccnavi(self, *args, stdin=""):
@@ -160,12 +160,6 @@ class BranchFieldApprovalTest(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--approved",
-                ".ccnavi/approved",
-                "--state",
-                self.state,
-                "--log",
-                "",
                 "--guard-core-files",
                 "disable",
                 "--restore-if-deny",

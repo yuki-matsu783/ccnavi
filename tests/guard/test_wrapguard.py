@@ -168,10 +168,6 @@ class ChildPushTest(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--log",
-                "",
-                "--state",
-                os.path.join(self.root, "state"),
                 "--mode",
                 "enable",
             ],

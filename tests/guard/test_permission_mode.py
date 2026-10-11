@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 import unittest
 
 from tests import ROOT, fixture_workspace
@@ -40,16 +39,18 @@ def run(permission_mode, command=UNDECLARED_COMMAND, mode="enable", guard_unwatc
         }
     )
 
-    with tempfile.TemporaryDirectory(prefix="ccnavi-mode-") as directory:
-        log = os.path.join(directory, "decisions.jsonl")
-        result = run_ccnavi(
-            ["--root", fixture_workspace(FIXTURE), "--mode", mode, "--log", log],
-            input=payload,
-            cwd=ROOT,
-            env=environment,
-        )
-        with open(log, encoding="utf-8") as handle:
-            record = json.loads(handle.read().splitlines()[-1])
+    # 記録はワークスペースルートの既定の置き場に残る（`--log` は診断でだけ効く）。
+    # 最後の 1 行がこの回。
+    ws = fixture_workspace(FIXTURE)
+    log = os.path.join(ws, "logs", "decisions.jsonl")
+    result = run_ccnavi(
+        ["--root", ws, "--mode", mode],
+        input=payload,
+        cwd=ROOT,
+        env=environment,
+    )
+    with open(log, encoding="utf-8") as handle:
+        record = json.loads(handle.read().splitlines()[-1])
 
     return result, record
 

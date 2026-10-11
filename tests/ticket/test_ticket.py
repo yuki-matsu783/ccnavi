@@ -154,7 +154,7 @@ class TicketTest(unittest.TestCase):
 
         # 共通レイヤーは既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない。
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
-        self.state = os.path.join(self.root, "state")
+        self.state = os.path.join(self.root, "logs", "state")
         self.parent_tree = self.worktree("i0001", "main")
         # 承認済みチケットとマーカーは親のツリーに置かれ、親のブランチに乗る。
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "approved")
@@ -174,12 +174,6 @@ class TicketTest(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--approved",
-                ".ccnavi/approved",
-                "--state",
-                self.state,
-                "--log",
-                "",
                 "--guard-core-files",
                 "disable",
                 "--restore-if-deny",
