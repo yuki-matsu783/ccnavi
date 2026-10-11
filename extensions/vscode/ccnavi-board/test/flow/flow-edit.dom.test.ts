@@ -8,10 +8,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { HTMLButtonElement, HTMLInputElement, HTMLTextAreaElement } from "happy-dom" with { "resolution-mode": "import" };
-import { addNode, removeNode, renameNode, templateFlow, type FlowDoc } from "../../src/core/flow-doc.js";
+import { addNode, removeNode, renameNode, type FlowDoc } from "../../src/core/flow-doc.js";
 import { lockedReason, type FlowChecks } from "../../src/core/flow-view.js";
 import type { DomPage } from "../helpers/dom.js";
-import { openFlow, savedDoc } from "../helpers/flow.js";
+import { openFlow, savedDoc, bareFlow } from "../helpers/flow.js";
 
 const CTRL = { ctrlKey: true } as const;
 const CTRL_SHIFT = { ctrlKey: true, shiftKey: true } as const;
@@ -36,7 +36,7 @@ function nodeIds(dom: DomPage): (string | null)[] {
 
 /** 開始 → プロンプト → 終了 */
 function three(): FlowDoc {
-  let doc = templateFlow("i0001-01-01", "調査");
+  let doc = bareFlow("i0001-01-01", "調査");
   doc = addNode(doc, "prompt", { x: 260, y: 300 }).doc;
   return { ...doc, connections: [
     { id: "c1", from: "start", to: "prompt-1", fromPort: "output", toPort: "input" },

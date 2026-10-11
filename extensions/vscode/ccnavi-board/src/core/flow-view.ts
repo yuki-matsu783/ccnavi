@@ -211,7 +211,7 @@ export interface FlowPage {
   readonly flowPath: string;
   /** ツリーのルートからの相対（承認済みの領域の固定の置き場） */
   readonly flowRel: string;
-  /** ファイルが在るか。無ければ雛形（開始 → 終了）を見せ、保存でファイルを作る */
+  /** ファイルが在るか。無ければ雛形（開始 → チケットを読む → 終了）を見せ、保存でファイルを作る */
   readonly exists: boolean;
   readonly doc: FlowDoc;
   readonly lock: FlowLock;

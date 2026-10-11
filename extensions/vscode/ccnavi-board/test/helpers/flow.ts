@@ -7,7 +7,7 @@
  * 図を描くので、大きさの偽物（`measure`）を入れて読ませる。入れないと React Flow は点を隠したまま
  * 線を 1 本も描かない（`test/helpers/dom.ts` の頭）。
  */
-import { templateFlow, type FlowDoc } from "../../src/core/flow-doc.js";
+import { INPUT_PORT, OUTPUT_PORT, templateFlow, type FlowDoc } from "../../src/core/flow-doc.js";
 import { renderFlowPage, type RenderOptions } from "../../src/core/flow-render.js";
 import { OPEN_LOCK, type FlowData, type FlowPage } from "../../src/core/flow-view.js";
 import { screenScript, screenStyle } from "./bundle.js";
@@ -15,11 +15,24 @@ import { loadPage, type DomPage } from "./dom.js";
 
 export const NONCE = "TEST-NONCE-123";
 
+/**
+ * 開始 → 終了 だけの土台。編集の操作を調べるテストが、雛形の中身（チケットを読むノード）に
+ * 頼らず数えられるようにする。雛形そのものを調べるテストだけ `templateFlow` を使う。
+ */
+export function bareFlow(ticket: string, title: string): FlowDoc {
+  const base = templateFlow(ticket, title);
+  return {
+    ...base,
+    nodes: base.nodes.filter((node) => node.id !== "read-ticket"),
+    connections: [{ id: "c-start-end", from: "start", to: "end", fromPort: OUTPUT_PORT, toPort: INPUT_PORT }],
+  };
+}
+
 export function flowHtml(data: FlowData, options: Partial<RenderOptions> = {}): string {
   return renderFlowPage(data, { nonce: NONCE, script: screenScript("flow"), style: screenStyle("flow"), ...options });
 }
 
-/** 見本の中身（雛形の 開始 → 終了）。差し替えたいところだけ渡す */
+/** 見本の中身（開始 → 終了）。差し替えたいところだけ渡す */
 export function page(overrides: Partial<FlowPage> = {}): FlowPage {
   return {
     root: "/ws",
@@ -29,7 +42,7 @@ export function page(overrides: Partial<FlowPage> = {}): FlowPage {
     flowPath: ".claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01-01.yml",
     flowRel: ".ccnavi/approved/flows/i0001-01-01.yml",
     exists: true,
-    doc: templateFlow("i0001-01-01", "調査"),
+    doc: bareFlow("i0001-01-01", "調査"),
     lock: OPEN_LOCK,
     ...overrides,
   };
