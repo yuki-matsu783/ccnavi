@@ -388,7 +388,9 @@ def locked_message(conf: settings.Settings, child: ticket_model.Ticket, path: st
             f"子チケット {ticket} は着手中なので、そのフロー"
             f"（`{flow_rel(conf, child.ticket)}`）は書き換えられません。"
             "担当のサブエージェントが読んでいる手順が作業の途中で変わるのを防ぐためです。"
-            "承認済みの領域のフローは、ユーザが取り込んで保存したものだけが効きます。エージェントが書けるのは効力の無い下書き（`wip/proposals/flows/<子>.yml`）だけです。",
+            "承認済みの領域のフローは、ユーザが取り込んで保存したものだけが効きます。"
+            "エージェントが書けるのは効力の無い下書き"
+            f"（`{draft_rel(conf, child.ticket)}`）だけです。",
             f"ロックは {ticket} が `ccnavi-ticket.sh finish` で終わるか "
             "`cancel` で取り消されると外れます。手順を直したいなら、終わってから"
             "ユーザに書き換えてもらうか、次の子チケットのフローに書いてもらってください。",

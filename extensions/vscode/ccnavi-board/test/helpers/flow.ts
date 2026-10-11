@@ -21,10 +21,11 @@ export const NONCE = "TEST-NONCE-123";
  */
 export function bareFlow(ticket: string, title: string): FlowDoc {
   const base = templateFlow(ticket, title);
+  const [start, , end] = base.nodes;
   return {
     ...base,
-    nodes: base.nodes.filter((node) => node.id !== "read-ticket"),
-    connections: [{ id: "c-start-end", from: "start", to: "end", fromPort: OUTPUT_PORT, toPort: INPUT_PORT }],
+    nodes: [start, end],
+    connections: [{ id: "c-start-end", from: start.id, to: end.id, fromPort: OUTPUT_PORT, toPort: INPUT_PORT }],
   };
 }
 
