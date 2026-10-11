@@ -95,6 +95,25 @@ deny:
   - tool: Bash
     subject: "cat /repo/.env.production"
     why: 環境名が付いた形も同じ場所
+  - tool: Read
+    subject: "/repo/.env"
+    why: 認証情報。Read でも同じ
+  - tool: Read
+    subject: "C:\\repo\\.env.local"
+    why: Windows の区切りでも同じ。環境名付きも .env のうち
+  - tool: Bash
+    subject: "cat /repo/.env.example.bak"
+    why: 見本の名前で終わらない形は除かない（見本を写した中身かもしれない）
+  - tool: Read
+    subject: "/repo/.env.example"
+    why: >-
+      値を持たない見本の .env。共通の credentials は not で除くが、常に有効な組み込みの
+      builtin-credentials（実行ファイルの土台）が .env の後ろに続く名前ごと止める
+  - tool: Bash
+    subject: "cat /repo/.env; cat /repo/.env.example"
+    why: >-
+      共通の credentials はコマンド列の全体に当てるので、見本の名前で終わらせると外れる。
+      .env はいまは組み込みの builtin-credentials が止める
   - tool: Bash
     subject: "cat /repo/certs/server.pem"
     why: 同上

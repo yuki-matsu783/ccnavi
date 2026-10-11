@@ -623,3 +623,55 @@ class CommandLineTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CommonCredentialsTest(unittest.TestCase):
+    """共通の rules.yml の credentials（when で書いた木）が当てるもの・除くもの。"""
+
+    def setUp(self):
+        with open(common_path(ROOT, "rules"), encoding="utf-8") as f:
+            rule_set, problems = rules.parse(yaml.safe_load(f), "/repo")
+        self.assertEqual(errors(problems), [])
+        self.rule = next(r for r in rule_set.deny if r.id == "credentials")
+        self.assertIsNotNone(self.rule.when)
+
+    def test_止めるもの(self):
+        for subject in (
+            "/repo/.env",
+            "/repo/.env.local",
+            "C:\\repo\\.env",
+            "/repo/.env.example.bak",
+            "/repo/.dev.vars",
+            "/home/u/.netrc",
+            "/home/u/.aws/credentials",
+            "/home/u/.ssh/config",
+            "/repo/certs/server.pem",
+            "/repo/secrets/token.txt",
+            "/repo/credentials.json",
+            "cat id_ed25519",
+            "cat .env",
+        ):
+            self.assertTrue(self.rule.hits(subject), subject)
+
+    def test_通すもの(self):
+        for subject in (
+            "/repo/.env.example",
+            "/repo/app/.env.sample",
+            "C:\\repo\\.env.template",
+            "cat .env.example",
+            "cat /repo/.env.sample | head",
+            "/repo/x.env",
+            # 書き直す前の regex と同じく `.envrc` は当てない（組み込みが止める）
+            "/repo/.envrc",
+            "/repo/README.md",
+            "jq -r '.env.CCNAVI_BIN_PATH' .claude/settings.json",
+        ):
+            self.assertFalse(self.rule.hits(subject), subject)
+
+    def test_コマンド列の全体に当てるので見本の名前を足すと外れる(self):
+        # 穴の記録。`.env` を読むコマンドでも、見本の名前を並べると共通の credentials は外れる
+        # （.env は組み込みの builtin-credentials が別に止める）。
+        # lint は Bash の when の not として言う
+        self.assertFalse(self.rule.hits("cat .env; cat .env.example"))
+        self.assertFalse(self.rule.hits("cat /repo/secrets/a /repo/.env.example"))
+        self.assertFalse(self.rule.hits("cat .env.example | tee .env.local"))

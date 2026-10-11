@@ -14,10 +14,7 @@
 #
 # 「A か B」「A かつ B」は glob / regex の代わりに when: で条件の木として書く。ノードは
 # `glob: '...'` / `regex: '...'`（葉）・`all: [...]`・`any: [...]`・`not: {...}` のどれか 1 つ。
-#   when:
-#     any:
-#       - glob: '*.pem'
-#       - all: [{glob: '*/secrets/*'}, {not: {glob: '*.md'}}]
+# credentials がこの形で、`all: [any: [認証情報の場所…], not: {any: [見本の .env]}]`。
 # 除くだけなら except のほうが読みやすいので、workspace-root は except のままにしてある。
 version: 1
 
@@ -91,10 +88,38 @@ deny:
 
   # settings.json の permissions.deny と同じ場所を並べてある。
   # `.pem` と `.key` は拡張子として書かれた形だけに絞ってある。
+  # 見本の .env（.env.example / .env.sample / .env.template）は値を持たないので除く。
+  # 除くほうは名前で終わる形だけ（`.env.example.bak` は除かない）。Bash はコマンド列の全体に
+  # 当てるので、`cat .env; cat .env.example` のように見本の名前で終わらせると外れる。
   - id: credentials
     match: Bash|Read|Write|Edit|NotebookEdit
-    regex: '(^|[ \\/])\.(env|dev\.vars|netrc|npmrc|pypirc)\b|(^|[ \\/])\.(aws|ssh)[\\/]|[\w\-\\/]\.(pem|key)\b|[\\/]secrets[\\/]|[\\/]credentials([\\/]|\.json\b)|\b(id_rsa|id_ed25519)\b'
-    message: 認証情報を含む場所です。中身を読まず、必要な値をユーザに尋ねてください。
+    when:
+      all:
+        - any:
+            # .env と、.env.local / .env.production のような環境名付き
+            - regex: '(^|[ \\/])\.env\b'
+            # Cloudflare Workers の手元の秘密
+            - regex: '(^|[ \\/])\.dev\.vars\b'
+            # パッケージの取得・公開の認証
+            - regex: '(^|[ \\/])\.netrc\b'
+            - regex: '(^|[ \\/])\.npmrc\b'
+            - regex: '(^|[ \\/])\.pypirc\b'
+            # クラウドと SSH の鍵の置き場
+            - regex: '(^|[ \\/])\.aws[\\/]'
+            - regex: '(^|[ \\/])\.ssh[\\/]'
+            # 鍵のファイル（拡張子として書かれた形）
+            - regex: '[\w\-\\/]\.(pem|key)\b'
+            - regex: '[\\/]secrets[\\/]'
+            - regex: '[\\/]credentials([\\/]|\.json\b)'
+            - regex: '\b(id_rsa|id_ed25519)\b'
+        - not:
+            any:
+              - regex: '(^|[ \\/])\.env\.example($|[\s;|&<>)])'
+              - regex: '(^|[ \\/])\.env\.sample($|[\s;|&<>)])'
+              - regex: '(^|[ \\/])\.env\.template($|[\s;|&<>)])'
+    message: >-
+      認証情報を含む場所です。中身を読まず、必要な値をユーザに尋ねてください。
+      値を持たない見本（.env.example / .env.sample / .env.template）は読めます。
 
   # 再帰的な強制削除は止める。
   - id: recursive-delete
