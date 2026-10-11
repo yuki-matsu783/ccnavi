@@ -153,9 +153,9 @@ export function reviewedPrompt(
   const tree = toPosixPath(parentTree);
   lines.push(
     `親（メインエージェント）が、親のワークツリー ${tree} で '${scriptCommand(root, "ccnavi-review.sh")} confirm --phase ${phase}' を打ち、` +
-      "レビュー済みのマーカーを置く。レビューで止まっている間はこの形の 1 本だけが通るので、cd や他のコマンドと連結せず、" +
+      "レビュー済みのマーカーを置く。レビューで止まっている間はこのコマンドだけが通るので、cd や他のコマンドと連結せず、" +
       `単体の Bash で打つ（cwd が ${tree} でなければ、先に cd だけを別の Bash で打つ）。サブエージェントには渡さない。` +
-      "未解決の指摘が残っていれば confirm が一覧と次の道を返すので、それに従う。" +
+      "未解決の指摘が残っていれば confirm が一覧と次の手順を返すので、それに従う。" +
       "マーカーが置かれて止まらなくなったら、次のフェーズへ進む。",
   );
   return lines.join("\n");

@@ -457,7 +457,7 @@ async function writeLoop(repo: RepoConfig, family: string, deps: WriteDeps, what
       if (settled.kind === "kept") return await finish(deps, repo, done.oid, planned.rows, round, planned.lines);
       if (settled.kind === "stop") return settled.outcome;
     }
-    return { kind: "conflict", message: `書いている間に ${family} の先頭が ${MAX_ROUNDS} 回動いた。少し待ってからボードを更新して${what}` };
+    return { kind: "conflict", message: `書いている間に ${family} の先頭が ${MAX_ROUNDS} 回更新された。少し待ってからボードを更新して${what}` };
   } catch (err) {
     return { kind: err instanceof PyError ? "refused" : "failed", message: (err as Error).message ?? String(err) };
   }

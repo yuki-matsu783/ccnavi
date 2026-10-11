@@ -85,7 +85,7 @@ export async function reviewPanels(
   for (const r of reviewable) {
     const panel = { phase: r.phase, mr: r.mr, host: r.host, children: r.children };
     if (r.host !== "github" && r.host !== "gitlab") {
-      out.push({ ...panel, copy: null, problems: [], error: `レビューを依頼したホストが ${r.host || "（記録なし）"}。Chrome 拡張からレビュー済みにできるのは GitHub と GitLab だけ` });
+      out.push({ ...panel, copy: null, problems: [], error: `レビューを依頼したホストは ${r.host || "（記録なし）"}。Chrome 拡張からレビュー済みにできるのは GitHub と GitLab だけ` });
       continue;
     }
     if (copy === null) {

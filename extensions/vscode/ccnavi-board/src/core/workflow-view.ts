@@ -375,7 +375,7 @@ export function saveBlocker(answer: PlanOrderAnswer, state: SaveState): string {
     return "子の提案を付け替えられないため、保存できません";
   }
   if (answer.revision_problems.length > 0) {
-    return "改版で通らない形（子が承認された番号の錠）のため、保存できません";
+    return "改版で通らない形（子が承認された番号を固定しているので、その番号の項は変えられない）のため、保存できません";
   }
   return "順序の検査に error があるため、保存できません";
 }
