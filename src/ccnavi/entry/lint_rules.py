@@ -195,6 +195,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
     problems.extend(_every_problems(rule, name))
     problems.extend(_except_problems(rule, name))
     problems.extend(_when_problems(rule, name))
+    problems.extend(_catch_all_deny_problems(rule, name))
 
     # once の文は文脈ごとに 1 度しか積まれず、every > 1 は刻んだ回にしか積まれないので、
     # どちらも広さを報告しない。読めない every は 1（毎回渡る）になっているので、この式は
@@ -349,6 +350,35 @@ def _constant(node: rules.Condition) -> str:
     if _ALWAYS in values:
         return _ALWAYS
     return _NEVER if all(v == _NEVER for v in values) else _UNKNOWN
+
+
+def _catch_all_deny_problems(rule: rules.Rule, name: str) -> list[Problem]:
+    """glob / regex 1 つの deny の本体が、何にでも当たる。
+
+    regex `''` や `.*` のような本体は、match のツールを丸ごと止める。狭く書いたつもりの式が
+    当てる語を持たずに当たっている形なので warn で言う。ツールを丸ごと止めると決めた書き方は
+    `glob: "*"` ちょうどで書く（no-powershell のように）。それは言わない。
+
+    木（when）の全体が何にでも当たる形は _when_problems が言う。`{!root}` を組み立てられずに
+    止める側へ倒した deny は、書いた式ではなく倒した式を持つので見ない（読み込みが別に言う）。
+    ask と allow は見ない（allow の広さは _broad が言う）。
+    """
+    if rule.decision != rules.DENY or rule.when is not None or rule.degraded_message:
+        return []
+    if rule.glob == "*" and not rule.regex:
+        return []
+    compiled = rule.compiled
+    if compiled is None or not all(compiled.search(p) for p in _ANYTHING_PROBES):
+        return []
+    return [
+        Problem(
+            SEVERITY_WARN,
+            name,
+            f"本体の {'glob' if rule.glob else 'regex'} は何にでも当たる。match のツールを"
+            '丸ごと止める。ツールごと止めるつもりなら `glob: "*"` と書き、そうでなければ'
+            "当てる語を書いてください",
+        )
+    ]
 
 
 def _when_problems(rule: rules.Rule, name: str) -> list[Problem]:

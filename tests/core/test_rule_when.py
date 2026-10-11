@@ -455,6 +455,32 @@ class LintTest(unittest.TestCase):
             any(d.startswith("all 広い allow") and "何にでもヒットする" in d for d in found), found
         )
 
+    def test_何にでも当たる単体の_deny(self):
+        def deny(rid: str, **body) -> dict:
+            return {"id": rid, "match": "Bash", "message": "m", **body}
+
+        found = self.warns(
+            self.lint(
+                [
+                    deny("dot-star", regex=".*"),
+                    deny("caret", regex="^"),
+                    deny("stars", glob="**"),
+                    deny("tool", glob="*"),
+                    deny("narrow", glob="*git push*"),
+                ]
+            )
+        )
+        said = [d.split(" ")[0] for d in found if "本体の" in d and "何にでも当たる" in d]
+        self.assertEqual(sorted(said), ["caret", "dot-star", "stars"], found)
+        # ask と allow には言わない
+        found = self.warns(self.lint([SECRETS], [{"id": "any", "match": "Bash", "regex": ".*"}]))
+        self.assertFalse(any("本体の" in d for d in found), found)
+
+    def test_共通の_rules_yml_の_no_powershell_は言わない(self):
+        problems = lint_rules._rules(common_path(ROOT, "rules"), ROOT)
+        found = self.warns(problems)
+        self.assertFalse(any("本体の" in d and "何にでも当たる" in d for d in found), found)
+
     def test_id_の無いルールは木で名指しする(self):
         raw = {k: v for k, v in SECRETS.items() if k != "id"}
         found = self.warns(self.lint([raw]))

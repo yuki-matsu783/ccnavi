@@ -2238,6 +2238,7 @@ error 2 件、warn 2 件、info 0 件
 | warn | `allow` が空（言及の無い呼び出しが全部、権限モードへ渡る） |
 | warn | `id` の無いルール、`id` が重複するルール |
 | warn | 判定が対象を取り出せないツールを `match` に書いたルール |
+| warn | 本体（`glob` / `regex` 1 つ）が何にでも当たる `deny`（`.*` など。`match` のツールを丸ごと止める。ツールごと止めると決めた `glob: "*"` ちょうどは言わない） |
 | warn | 何にでも当たる、または選択肢が 3 つ以上ある `allow` に `additionalContext`（か `additionalContextFile`）を書いたルール（当たるたびに同じ文が積まれる。`additionalContextOnce` は文脈ごとに 1 度なので指摘しない） |
 | warn | `additionalContextFile` / `additionalContextOnceFile` が指すファイルが無い（作るまで何も足さない）、または先頭 4000 文字を超える（先頭だけが届き、切ったことを添える） |
 
