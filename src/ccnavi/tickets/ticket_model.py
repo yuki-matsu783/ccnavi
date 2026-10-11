@@ -47,10 +47,6 @@ WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 # `--agree` と `--lint` が error にする（`agree_candidates.script_field_problems`）。
 SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "cancel_reason")
 
-# 前の版の承認が承認済みチケットに書き足していた記録の欄。いまの承認は中身を変えないので
-# 書かない。残っている古い承認済みチケットを読むためだけに名前を持つ。
-APPROVAL_KEY = "ccnavi_approved"
-
 # glob のワイルドカード。これより前が字義どおりの前置。
 _WILDCARDS = "*?["
 
@@ -237,12 +233,6 @@ class Ticket:
     tree: str = ""
     tree_root: str = ""
     path: str = ""
-    # 前の版の承認が書いた記録（`ccnavi_approved`）を持つ古い承認済みチケットにだけある。
-    # いまの承認は書かないので、新しい承認済みチケットでは空。
-    # 承認を正とするのは置き場。
-    approved_at: str = ""
-    source_tree: str = ""
-    source_path: str = ""
     # 親のツリーで見つけた未着手のチケットが、手元の退避（`logs/archive/`）の閉じたチケットと
     # 同じ識別子のときの理由（`archive.drop_archived`）。
     # 判定は止める（`approval_checks.content_problems`）。

@@ -480,8 +480,8 @@ class FlowRenderTest(unittest.TestCase):
         plain = write(os.path.join(flows, "c.yml"), WORKFLOW_YAML)
         self.assertIsNotNone(flow.load(plain, root)[0])
 
-    def test_briefing_says_the_lock_comes_with_the_start(self):
-        """着手の前は「着手すると書き換えられなくなる」と言う（L2）。"""
+    def test_briefing_does_not_mention_the_lock(self):
+        """ロックは書き込みを止めるときの理由で言う。サブエージェントへの案内には入れない。"""
         root = tempfile.mkdtemp(prefix="ccnavi-flow-")
         self.addCleanup(__import__("shutil").rmtree, root, True)
         conf = conf_with()
@@ -489,13 +489,14 @@ class FlowRenderTest(unittest.TestCase):
         idle.tree_root = root
         write(flow.flow_file(conf, root, CHILD), WORKFLOW_YAML)
         text = "\n".join(flow.briefing(conf, root, idle, "wip/research/*"))
-        self.assertIn("着手すると、終わるまで書き換えられなくなる", text)
-        self.assertNotIn("着手中なので", text)
+        self.assertNotIn("ロック", text)
+        self.assertNotIn("着手", text)
         running = child_ticket(started=True)
         running.tree_root = root
         text = "\n".join(flow.briefing(conf, root, running, "wip/research/*"))
-        self.assertIn("着手中なので、終わるまで書き換えられない", text)
-        # 手順はユーザが書いたデータとして囲って渡す。
+        self.assertNotIn("ロック", text)
+        self.assertNotIn("書き換わったら", text)
+        # 手順は合意済みのフローの本文（データ）として囲って渡す。
         self.assertIn(flow.FENCE_OPEN, text)
         self.assertIn(flow.FENCE_CLOSE, text)
         # 文の上限を使い切っていたら並べない。
@@ -636,9 +637,10 @@ class FlowInfoTest(unittest.TestCase):
                 self.assertFalse(shown["exists"])
                 self.assertEqual(shown["locked"], started)
 
-    def test_children_waiting_for_review_keep_the_field_and_are_not_locked(self):
-        # レビュー待ちは閉じた扱いにしない（今の仕様）。フローが無くても欄を返し、
-        # 着手のあとでも錠は掛けない（錠は `doing` の間だけ）。
+    def test_children_waiting_for_review_keep_the_field_and_are_locked(self):
+        # レビュー準備中・レビュー待ち（`review/`）は閉じた扱いにしない。
+        # フローが無くても欄を返すが、着手の有無によらず閲覧だけにする
+        # （書き換えは `doing` の着手中と `review/` で止める）。
         for started in (False, True):
             with self.subTest(started=started):
                 shown = flow.info(
@@ -646,12 +648,12 @@ class FlowInfoTest(unittest.TestCase):
                 )
                 self.assertIsNotNone(shown)
                 self.assertFalse(shown["exists"])
-                self.assertFalse(shown["locked"])
+                self.assertTrue(shown["locked"])
                 self.assertEqual(shown["rel"], f".ccnavi/approved/flows/{CHILD}.yml")
         write(flow.flow_file(self.conf, self.root, CHILD), WORKFLOW_YAML)
         shown = flow.info(self.conf, self.root, self.child(ticket_model.REVIEW, started=True))
         self.assertTrue(shown["exists"])
-        self.assertFalse(shown["locked"])
+        self.assertTrue(shown["locked"])
 
     def test_the_draft_sits_in_the_same_tree_under_the_proposal_place(self):
         """下書きの置き場は提案の置き場の `flows/<子>.yml`。置くツリーはフローと同じ。"""
@@ -883,7 +885,8 @@ class FlowLockTest(FlowHarness):
         finished = self.close_child(CHILD)
         self.assertEqual(finished.returncode, 0, finished.stdout + finished.stderr)
         self.assert_not_locked(self.write_to(self.flow_path))
-        self.assertFalse(self.board_flow(CHILD)["locked"])
+        # finish でレビュー待ちに入った子は、ボードでは閲覧だけ（閉じるまで編集させない）。
+        self.assertTrue(self.board_flow(CHILD)["locked"])
 
     def test_a_closed_child_shows_the_flow_only_when_it_exists(self):
         """取り消して閉じた子でも、フローが在れば欄を出す（見返せる）。無ければ出さない。"""
@@ -901,8 +904,8 @@ class FlowLockTest(FlowHarness):
         result = self.hook("SubagentStart", "", child_tree, agent_id="sub-1")
         text = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
         self.assertIn(os.path.normcase(self.flow_path), os.path.normcase(text))
-        self.assertIn("読み直して", text)
-        self.assertIn("着手中なので", text)
+        self.assertIn("作業の前に読み、その順に進めてください", text)
+        self.assertNotIn("ロック", text)
         self.assertIn(flow.FENCE_OPEN, text)
         self.assertIn("3. [askUserQuestion] 方針", text)
         self.assertIn("[fancyNewNode] 未来の種類", text)

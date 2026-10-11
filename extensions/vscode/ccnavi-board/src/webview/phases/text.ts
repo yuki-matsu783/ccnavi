@@ -3,7 +3,7 @@
  *
  * 定義の意味は判定しない。ここが作るのは並べて読めるようにした文だけ。
  */
-import type { PhaseForm, UnreadField } from "../../core/phases-view.js";
+import type { PhaseForm } from "../../core/phases-view.js";
 
 /** 補足（agent / when）に何か入っているか */
 export function hasMore(phase: PhaseForm): boolean {
@@ -13,39 +13,6 @@ export function hasMore(phase: PhaseForm): boolean {
 /** 「補足」の見出しにつける一言 */
 export function moreNote(phase: PhaseForm): string {
   return hasMore(phase) ? "（設定あり）" : "（未設定）。案内するエージェント・使う場面";
-}
-
-/**
- * ファイルに残っている読まない欄の知らせ。どの欄かを名指しし、順序をどこで決めるかと、保存しても欄が
- * 残ることを言う。読まないことの答えは実行ファイル（`--lint` の warn）と同じで、画面は名指しするだけ。
- * 残っていなければ空。
- */
-export function unreadNote(unread: readonly UnreadField[]): string {
-  if (unread.length === 0) {
-    return "";
-  }
-  const names: string[] = [];
-  const byPhase = new Map<string, string[]>();
-  for (const field of unread) {
-    if (field.phase === null) {
-      names.push(`${field.key}（ファイルの頭）`);
-      continue;
-    }
-    const keys = byPhase.get(field.phase);
-    if (keys === undefined) {
-      byPhase.set(field.phase, [field.key]);
-    } else {
-      keys.push(field.key);
-    }
-  }
-  for (const [phase, keys] of byPhase) {
-    names.push(`${phase} の ${keys.join("・")}`);
-  }
-  return (
-    `読まない欄があります: ${names.join("、")}。実行ファイルはこれらの欄を読みません。` +
-    "順序は親チケットの計画の項の after で決めます。" +
-    "画面はこれらの欄を出さず、保存しても欄はそのまま残ります（消すときはエディタで消してください）"
-  );
 }
 
 /** 要約に出す範囲。inherit ならその表記、glob が無ければ未設定と言う */

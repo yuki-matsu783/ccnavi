@@ -1,7 +1,7 @@
 """記録からルールの候補を起こすこと（`ccnavi --suggest`、issue #149 の 4）。
 
 記録を手で書いたワークスペースに対して道具を動かし、出た候補を読む。候補は
-`--lint` と `--test-samples` と同じ検査を通ったものだけで、allow は出さない。
+`--lint` と `--test-expectations` と同じ検査を通ったものだけで、allow は出さない。
 """
 
 from __future__ import annotations
@@ -101,7 +101,7 @@ class SuggestTest(unittest.TestCase):
         (found,) = body["candidates"]
         self.assertEqual(("rule", "ask", 6), (found["kind"], found["section"], found["count"]))
         self.assertEqual("suggest-npm-install", found["rule"]["id"])
-        self.assertEqual({"ask"}, set(yaml.safe_load(found["yaml"])["samples"]))
+        self.assertEqual({"ask"}, set(yaml.safe_load(found["yaml"])["expectations"]))
 
     def test_few_handovers_are_not_candidates(self):
         """数回だけなら候補にしない。"""
@@ -109,16 +109,16 @@ class SuggestTest(unittest.TestCase):
         self.assertEqual([], self._json()["candidates"])
 
     def test_paths_are_written_from_root(self):
-        """パスのツールはディレクトリの下を `{root}` から書き、見本は `/repo` で書く。"""
+        """パスのツールはディレクトリの下を `{root}` から書き、期待する判定は `/repo` で書く。"""
         where = os.path.realpath(self.ws)
         self._write(
             "decisions.jsonl", [_handover("Write", f"{where}/docs/n{i}.md") for i in range(5)]
         )
         (found,) = self._json()["candidates"]
         self.assertEqual("{root}/docs/*", found["rule"]["glob"])
-        self.assertTrue(all(s["subject"].startswith("/repo/docs/") for s in found["samples"]))
+        self.assertTrue(all(s["subject"].startswith("/repo/docs/") for s in found["expectations"]))
 
-    def test_candidates_that_fail_the_samples_are_dropped(self):
+    def test_candidates_that_fail_the_expectations_are_dropped(self):
         """いまのルールで ask にならない形（deny に当たる）は、検証で除いて数だけ言う。"""
         self._write("decisions.jsonl", [_handover("Bash", "git push --force") for _ in range(5)])
         body = self._json()
@@ -139,7 +139,7 @@ class SuggestTest(unittest.TestCase):
             ("message", "deny", "git-push"), (found["kind"], found["section"], found["id"])
         )
         self.assertEqual("push しません。ユーザに頼んでください。", found["rule"]["message"])
-        self.assertEqual(["git push origin main"], [s["subject"] for s in found["samples"]])
+        self.assertEqual(["git push origin main"], [s["subject"] for s in found["expectations"]])
 
     def test_denies_from_outside_the_rules_are_not_candidates(self):
         """ルールファイルに無い根拠の拒否は、直す文面が無いので候補にしない。"""
@@ -181,7 +181,7 @@ class SuggestTest(unittest.TestCase):
         self.assertEqual(example["version"], body["version"])
         for got, want in zip(body["candidates"], example["candidates"], strict=True):
             self.assertEqual(sorted(got), sorted(want))
-            self.assertEqual(sorted(got["samples"][0]), sorted(want["samples"][0]))
+            self.assertEqual(sorted(got["expectations"][0]), sorted(want["expectations"][0]))
 
     def test_no_log(self):
         """記録が無ければそう言って 0 で終わる。"""

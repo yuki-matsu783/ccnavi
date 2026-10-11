@@ -177,6 +177,8 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0111](0111-concept-skills-and-references.md) | スキルは標準概念ごとの入口に絞り、細かい挙動は references に溜めて ccnavi --docs で引く |
 | [0112](0112-ccnavi-index-jsonl-added-to-project-gitignore.md) | 索引を ccnavi-index.jsonl にし、無視の行が無いツリーには .gitignore に足して索引の対象にする |
 | [0113](0113-stop-nudges-block-in-dry-run.md) | Stop の促し（finish・match: Stop）は dry-run でも止める |
+| [0114](0114-rule-expectations-rename.md) | ルールの「見本」を「期待する判定」と呼び、名前を rule-expectations に改める |
+| [0115](0115-drop-all-migration-reads.md) | 公開前なので、移行のための読み取りと掃除をすべて外す |
 | [0101](0101-child-id-carries-the-phase.md) | 子チケットの識別子にフェーズ番号を入れ、連番はフェーズごとに振る |
 | [0103](0103-issue-mr-branch-lookup.md) | issue・MR を指定された依頼では、UserPromptSubmit が指示を足し、`ccnavi-branches.sh` で紐づくブランチを探してユーザに確かめてから進める（止めない） |
 | [0104](0104-approval-leaves-the-ticket-as-is.md) | 承認はチケットの中身を変えない。状態は status で聞き、承認の知らせは外す（待ち方のファイルは ADR-0109 が改める） |

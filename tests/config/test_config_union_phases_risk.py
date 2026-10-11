@@ -193,23 +193,6 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertEqual(self.phase_problems("error"), [])
         self.assertEqual(self.phase_problems("info"), [])
 
-    def test_old_relation_fields_are_warned_and_not_read(self):
-        """9.7: 定義は順序を持たない。残った `requires` は指す先が無くても error にせず、
-        読まない欄として warn で言う（順序は親の計画の項の `after`）。"""
-        write_layer(self.ws, phases=OWN_PHASES_DESIGN)
-        write_layer(
-            self.lib,
-            phases=LIB_PHASES.replace("design:", "planning:").replace(
-                "    title: リリース\n", "    title: リリース\n    requires: [design]\n"
-            ),
-        )
-
-        self.assertEqual(self.phase_problems("error", "lib"), [])
-        warned = self.phase_problems("warn", "lib")
-        self.assertTrue(
-            any("`requires`" in p["detail"] and "読まない" in p["detail"] for p in warned), warned
-        )
-
     def test_a_common_phases_file_is_an_error_and_is_not_used(self):
         """共通レイヤーの phases.yml は --lint が error で名指しし、判定では空として扱う。
 
@@ -240,14 +223,11 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertNotEqual(self.approve().returncode, 0)
 
     def test_the_order_comes_from_the_plan_and_not_from_the_file(self):
-        """9.7: ファイルの `order` と定義の `after` は読まない（warn）。待ち方は計画の項の `after`。
+        """9.7: ファイルの `order` と定義の `after` は読まない。待ち方は計画の項の `after`。
 
         承認は待ち方のファイルを書かない。ボードの `order` はいつも `dag`。"""
         write_layer(self.ws, phases=OWN_PHASES_DESIGN)
         write_layer(self.lib, phases=LIB_PHASES_DAG)
-        warned = [p["detail"] for p in self.phase_problems("warn", "lib")]
-        self.assertTrue(any("`order`" in d for d in warned), warned)
-        self.assertTrue(any("`after`" in d for d in warned), warned)
         self.propose(
             "i0001",
             ticket_text("i0001", project="lib", plan=["design", "build"], allow=("src/*",)),

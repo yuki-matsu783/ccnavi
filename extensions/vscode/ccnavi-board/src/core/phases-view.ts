@@ -27,21 +27,6 @@ export type PhaseKind = (typeof PHASE_KINDS)[number];
 export const REVIEWS = ["none", "mr"] as const;
 export type Review = (typeof REVIEWS)[number];
 
-/**
- * 実行ファイルが読まなくなった順序の欄（phasetypes.OLD_FILE_FIELDS と OLD_FIELDS）。順序（どのフェーズが
- * どれを待つか）は、フェーズ定義ではなく親チケットの計画の項の `after` で決める。
- * 画面はこれらの欄を出さず、書き戻しでも手を付けない（ファイルに残っていればそのまま残る）。
- * 残っていれば「読まない欄」として名指しする（`--lint` も warn で同じことを言う）
- */
-export const UNREAD_FILE_KEYS = ["order"] as const;
-export const UNREAD_PHASE_KEYS = ["after", "overlap", "requires"] as const;
-
-/** ファイルに残っている読まない欄 1 つ。`phase` が null ならファイルの頭の欄 */
-export interface UnreadField {
-  readonly phase: string | null;
-  readonly key: string;
-}
-
 /** 画面で編集する定義 1 件。`origin` は読み込んだときの位置で、新しい定義は null */
 export interface PhaseForm {
   readonly origin: number | null;
@@ -70,8 +55,6 @@ export interface PhasesModel {
   readonly form: PhasesForm;
   /** 読み込み時の苦情。形が読めなかった場所。あっても他は出す */
   readonly problems: readonly string[];
-  /** ファイルに残っている読まない欄（ファイルの頭、定義の順）。苦情ではない（保存は止めず、欄はそのまま残る） */
-  readonly unread: readonly UnreadField[];
 }
 
 /** 区分の説明。select のラベル */

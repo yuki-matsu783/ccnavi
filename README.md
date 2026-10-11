@@ -84,10 +84,10 @@ jq -r 'select(.event=="PreToolUse" and .decision=="allow")|[((.rules//[])|join("
 ```sh
 ccnavi --lint                              # 防御を無効化しうる記述が無いか
 ccnavi --test Bash "cd /repo && git push"  # 1 件が何に当たるか
-uv run python scripts/check_rules.py       # 見本をまとめて回す
+uv run python scripts/check_rules.py       # 期待する判定をまとめて回す
 ```
 
-ルールを 1 件足したら見本も 1 行足す（「見本で確かめる」の節）。止めたくないものも必ず一緒に置く。
+ルールを 1 件足したら期待する判定も 1 行足す（「期待する判定で確かめる」の節）。止めたくないものも必ず一緒に置く。
 `/ccnavi-config` スキルがこの流れをまとめて回す。記録を数えて `deny` / `ask` の下書きを起こすのは `ccnavi --suggest`
 （「記録から候補を起こす」の節）。
 
@@ -403,7 +403,7 @@ ccnavi の動作に依存する決まりなので、ワークスペースの `CL
 `--project-home`）だけで、hook からは渡らない。共通レイヤーの置き場（`.ccnavi/common/`）は `--project-home` で
 ccnavi ディレクトリを動かしても動かず、別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけ。
 レイヤーの置き場を動かすこれらのフラグ（`--projects` / `--project-home` を含む）は診断（`--lint` / `--test` /
-`--test-samples` / `--explain`）に限り、hook からの判定と `ticket` / `review` の副命令に渡すと無視し、標準エラーに出す。
+`--test-expectations` / `--explain`）に限り、hook からの判定と `ticket` / `review` の副命令に渡すと無視し、標準エラーに出す。
 
 以前は 6 つの環境変数（`CCNAVI_PROJECTS`・`CCNAVI_PROJECT_HOME`・`CCNAVI_TICKETS_PROPOSAL`・
 `CCNAVI_TICKETS_APPROVED`・`CCNAVI_LOG`・`CCNAVI_STATE`）で置き場を動かせたが、廃止した。
@@ -568,7 +568,7 @@ allow:
 - `id` にコロンは書けない（レイヤーの名前を添えた `self:id` / `<プロジェクト名>:id` と見分けが付かないため）。
   `--lint` が error にし、その 1 件は読み込まれない。ルール・フェーズ定義・リスクの配点の 3 本とも同じ
 - `glob` も `regex` も、どの機械でも大文字小文字を区別せずに当てる。`*/.ccnavi/*` は `.Ccnavi/` にも当たる。
-  `allow` も表記違いにまで当たるので、既存のルールを持ち込むときは `--test-samples` で、通したくないものが
+  `allow` も表記違いにまで当たるので、既存のルールを持ち込むときは `--test-expectations` で、通したくないものが
   通っていないことを確かめる
 - 区別が要る `regex` は、区別したい部分だけを `(?-i:...)` で囲む。`[\\/](?-i:strict)[\\/]` は
   `/strict/` にだけ当たる。否定の文字クラスは要注意で、`\.[^c\\/]` は `.C` まで除外して除外の側が広がる。
@@ -720,7 +720,7 @@ allow:
 - `stop_hook_active` が真の回、サブエージェント、記録を置けない・読めない・書けないときは止めない（止め続けないため）。
   サブエージェントには、代わりに `SubagentStart` で「気づいたスキル候補は最後の報告に節を足して返す」の 1 行を渡す
 - `dry-run` でも止める（止めないと文がモデルに届かないため。ADR-0113）。記録の `decision` は `nudge`、`rules` は渡したルールだけ
-- `--test Stop "(stop)"` と見本の `tool: Stop` で、使われるルールを確かめられる
+- `--test Stop "(stop)"` と期待の `tool: Stop` で、使われるルールを確かめられる
 - `deny` / `ask` に書いたもの（`Bash|Stop` なら `Stop` の部分）、プロジェクトのレイヤーに書いたもの、`(stop)` に当たらない表記、`every` の無いものは `--lint` が warn で知らせる
 
 ### ファイルの本文を渡す
@@ -934,7 +934,7 @@ VS Code を使わないときは `--no-vscode` を付ける。
 出力の形は下の「ボードの JSON」。
 
 同じ拡張の「ルール管理画面」で、ルールファイルを画面で直し、保存する前に判定を試せる。編集する 1 本（共通・ワークスペース・プロジェクト）は切り替えられ、共通+ワークスペース、共通+プロジェクトの足し算は読み取りで見られる。
-判定は `ccnavi --test --json` と `--test-samples --json` を通る（形は「試験の JSON」）。
+判定は `ccnavi --test --json` と `--test-expectations --json` を通る（形は「試験の JSON」）。
 hook の一覧は `.claude/settings.json` と `settings.local.json` を読むだけで書き換えない。作業中のチケット
 （承認済みチケットが `doing`）がある間は保存できない（セッションの途中で判定が変わるのを避けるため）。
 
@@ -1369,7 +1369,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 - `builtin-guard-project-home`: ccnavi ディレクトリの下（`*/.ccnavi/*`）と、`CCNAVI_BIN_PATH` のパスおよび実行ファイルの置き場
   （名前が `ccnavi-launcher.sh` なら 1 つ上の `bin/<os>-<arch>/`、それ以外なら隣の `<os>-<arch>/`）
 - `builtin-guard-common-layer`: 共通レイヤーの 3 本。ワークツリーの中の同じファイルも止まる
-- 見本 `.ccnavi/common/rule-samples.yml` も `builtin-guard-project-home` が止める。見本の下書きはワークツリーの `wip/scratchpad/` に置き、
+- 期待する判定のファイル `.ccnavi/common/rule-expectations.yml` も `builtin-guard-project-home` が止める。その下書きはワークツリーの `wip/scratchpad/` に置き、
   ルールの下書きと一緒にユーザに渡す
 
 止めるのは書き込みの形と場所の組で、場所の名前が出ただけでは止めない（`cat .ccnavi/common/rules.yml` や `git add <パス>` は通る）。
@@ -1726,7 +1726,7 @@ phases:
     when: フィードバック計画の最後に置き、ほかの対応を受ける
 ```
 
-フェーズ定義は順序を持たない。前の版の `order`・`after`・`overlap`・`requires` が残っていれば読まずに通し、`--lint` が warn で言う。
+フェーズ定義は順序を持たない。順序は親の計画の項の `after` が決める。
 
 ```yaml
 # 親チケット
@@ -1777,8 +1777,7 @@ feedback:                              # フィードバック計画。レビュ
   場所と書く置き場を名指しする
 - **改版の提案では、承認済みチケットを写したときに入る `started_at`・`completed_at`・`base_sha`・`cancelled_at`・`cancel_reason` を空にする。**
   承認はチケットの中身を変えないので、提案にスクリプトだけが書く欄の値があると `--agree` と `--lint` が error にする。
-  改版は承認済みチケットの側の値を残し、計画と `phases:` だけを差し替える。前の版の承認が書いた記録 `ccnavi_approved` と、続きの子の目印
-  `followup_of` も提案に書けば error になるので消す
+  改版は承認済みチケットの側の値を残し、計画と `phases:` だけを差し替える。続きの子の目印 `followup_of` も提案に書けば error になるので消す
 - レビュー待ちで止めるのは親ごとなので、どれかの枝がレビューを待つ間は別の枝にも子を起こせない
 
 `--explain` と `SubagentStart` はフェーズを「3: 実装とテスト」のように示す。親の局面（作業中・レビュー待ち・フィードバック計画待ち・
@@ -2116,19 +2115,19 @@ response:
 読めないレイヤーは「読めない: <理由>。このレイヤーは空として扱う」、置いていないレイヤーは「このレイヤーは置いていない（無い = 空）」と出る。
 `levels` の行は共通レイヤーの値。レイヤーで `levels` を書くとキーごとに小さいほうが採られるので、チケットに適用される値はその `project:` のレイヤーで変わる。
 
-### 見本で確かめる
+### 期待する判定で確かめる
 
 ```sh
-ccnavi --test-samples .ccnavi/common/rule-samples.yml
+ccnavi --test-expectations .ccnavi/common/rule-expectations.yml
 uv run python scripts/check_rules.py   # 同じことを、state と記録を外して回す
 ```
 
-見本をすべて判定に掛け、期待と食い違ったものを名指しする（1 件でもあれば終了コード 1）。見本は `deny` `ask` `allow` のタイプに置き、
+期待する判定をすべて判定に掛け、期待と食い違ったものを名指しする（1 件でもあれば終了コード 1）。期待は `deny` `ask` `allow` のタイプに置き、
 タイプの名前が期待する判定になる。`subject` の `/repo` は走らせたワークスペースルートに読み替えられる。
 `tool: Stop`（`subject: "(stop)"`）は、ターンの終わりに使われるルールがあるかを見る（あれば `allow`）。
-ルールを 1 件足したら見本も 1 行足し、**止めたくないものも必ず一緒に置く**。
+ルールを 1 件足したら期待も 1 行足し、**止めたくないものも必ず一緒に置く**。
 
-見本はエージェントが直接書けない（「コアファイルを守る」）。下書きはワークツリーの `wip/scratchpad/` に置き、ルールの下書きと一緒にユーザに渡す。
+期待のファイルはエージェントが直接書けない（「コアファイルを守る」）。下書きはワークツリーの `wip/scratchpad/` に置き、ルールの下書きと一緒にユーザに渡す。
 `/ccnavi-config` スキルがこの流れを回し、フェーズ定義とリスクの配点も見る。
 
 ### 記録から候補を起こす
@@ -2144,9 +2143,9 @@ ccnavi --suggest [--json]
 | ルールを足す（`rule`） | どのルールも言及せず（`UNDECLARED`）権限モードに渡った呼び出しが、同じ形で 5 回以上 | `ask` のルール。形は Bash なら先頭のコマンドとサブコマンド（`npm install`）、パスのツールならディレクトリの下（`{root}/docs/*`）、WebFetch ならホストの下 |
 | 文面を見直す（`message`） | 同じルールが同じ呼び出し（「同じ呼び出しを繰り返し止めたとき」の均し方）を `CCNAVI_DENY_REPEAT` 回以上止めた | いまの `deny` のルールそのまま。直すのは `message` |
 
-どちらも `rules.yml` の 1 タイプぶん（`rules:`）と、`rule-samples.yml` の 1 タイプぶん（`samples:`。記録の呼び出しを 3 件まで、ルートは `/repo`）の組で、
+どちらも `rules.yml` の 1 タイプぶん（`rules:`）と、`rule-expectations.yml` の 1 タイプぶん（`expectations:`。記録の呼び出しを 3 件まで、ルートは `/repo`）の組で、
 候補ごとに YAML の文書を 1 つずつ並べる。出すのは `deny` と `ask` だけで、`allow` は出さない（記録から通す側を勧めると、判定を緩める変更を機械が勧めることになる）。
-候補はどれも、`--lint` と同じ読みでそのルールに error が無く、見本が `--test-samples` と同じ判定で期待したタイプになり、そのルールに当たったものだけ。
+候補はどれも、`--lint` と同じ読みでそのルールに error が無く、期待が `--test-expectations` と同じ判定で期待したタイプになり、そのルールに当たったものだけ。
 ルールを足す候補は、共通レイヤーのルールファイルのコピーに 1 件足した一時ファイルで試す。通らなかったもの（いまのルールでは別の判定になる形、
 ルールファイルの外から来た根拠の拒否）は数だけを出す。読み切れなかった呼び出し（`degraded`）と、上限で切れた `subject` は数えない。
 置くのはユーザで、`/ccnavi-config` の手順で確かめてから置く。
@@ -2160,19 +2159,19 @@ ccnavi --suggest [--json]
 | `version` | 形の版。整数。いま 1 |
 | `root` / `rules_path` | ワークスペースルートと、共通レイヤーのルールファイル |
 | `logs` / `records` | 読んだ記録の場所と、読めた行の数 |
-| `candidates[]` | 候補 1 件ごと。`{kind, section, id, tool, count, summary, layer, rules_path, rule, samples, yaml}`。`kind` は `rule` か `message`、`section` は `ask` か `deny`、`layer` と `rules_path` は置くレイヤーとそのファイル、`rule` は書いたままの形の 1 件、`samples` は `{tool, subject, why}` の配列、`yaml` は文字で出すときと同じ下書き |
+| `candidates[]` | 候補 1 件ごと。`{kind, section, id, tool, count, summary, layer, rules_path, rule, expectations, yaml}`。`kind` は `rule` か `message`、`section` は `ask` か `deny`、`layer` と `rules_path` は置くレイヤーとそのファイル、`rule` は書いたままの形の 1 件、`expectations` は `{tool, subject, why}` の配列、`yaml` は文字で出すときと同じ下書き |
 | `dropped` | 検証を通らずに除いた候補の数 |
 
 ### 試験の JSON
 
 ```sh
 ccnavi --test Bash "cd /repo && git push" --json
-ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
+ccnavi --test-expectations .ccnavi/common/rule-expectations.yml --json
 ```
 
-`--test` と `--test-samples` の結果を JSON で出す。読み手は VS Code 拡張のルール管理画面。判定は文字で出すときと同じ関数を通る
+`--test` と `--test-expectations` の結果を JSON で出す。読み手は VS Code 拡張のルール管理画面。判定は文字で出すときと同じ関数を通る
 （REQ-DIA-03）。`--json` のときは終了コードが常に 0 で、食い違いの数は `mismatches` で読む。
-実例は `extensions/vscode/ccnavi-board/test/fixtures/test.json` と `samples.json`。`tests/core/test_test_json.py` が同じ例で形を確かめる
+実例は `extensions/vscode/ccnavi-board/test/fixtures/test.json` と `expectations.json`。`tests/core/test_test_json.py` が同じ例で形を確かめる
 （形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてそのテストを走らせ、例を書き直す）。
 
 `--test --json` の最上位。
@@ -2191,14 +2190,14 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
 | `response` | エージェントに返る文面そのもの。無ければ空 |
 | `quoted` | 当たったルールのうち、引用の中から切り出したコマンドにだけ当たったものの id。そういうルールがあるときだけ出る |
 
-`--test-samples --json` の最上位。
+`--test-expectations --json` の最上位。
 
 | 鍵 | 何 |
 |---|---|
-| `version` / `root` / `rules_path` / `samples_path` | 上と同じ。加えて見本の場所 |
+| `version` / `root` / `rules_path` / `expectations_path` | 上と同じ。加えて期待する判定の場所 |
 | `counts` | タイプごとの `{ok, total}` |
-| `mismatches` / `skipped` | 食い違いの数と、allow の見本が判定に入らずに通った数 |
-| `samples[]` | 見本 1 件ごと。`{expected, tool, subject, resolved_subject, why, known, verdict, code, reason, rules, ok, skipped}`。`expected` は置いたタイプ、`resolved_subject` は `/repo` を読み替えた後、`ok` は期待どおりか、`skipped` は判定に入らずに通ったか |
+| `mismatches` / `skipped` | 食い違いの数と、allow の期待が判定に入らずに通った数 |
+| `expectations[]` | 期待 1 件ごと。`{expected, tool, subject, resolved_subject, why, known, verdict, code, reason, rules, ok, skipped}`。`expected` は置いたタイプ、`resolved_subject` は `/repo` を読み替えた後、`ok` は期待どおりか、`skipped` は判定に入らずに通ったか |
 
 ## 設定の検証
 
@@ -2272,7 +2271,6 @@ error 2 件、warn 2 件、info 0 件
 | warn | ルールの同じ `id` がレイヤーをまたいで中身違いで在る（両方とも適用されている） |
 | error | 共通レイヤーに `phases.yml` がある（判定に使わず空として扱っている。フェーズ定義は config にだけ置く） |
 | error | フェーズ定義の 1 本の中で、同じ `id` が重複する、表示名が重なる、`scope` か `deliverables` が 20 件を超える（そのレイヤーを空として扱っている） |
-| warn | フェーズ定義に前の版の順序の欄（`order`・`after`・`overlap`・`requires`）がある（読まない。順序は親の計画の項の `after`） |
 | warn | 配点の同じ `id` で中身が違う（両方数え、後ろのレイヤーは `<レイヤー>:<id>`） |
 | error | 合成後の `levels` が `medium <= high <= critical` になっていない（そのレイヤーを空として扱っている） |
 | error | 配点の `script:` がレイヤーの外を指す（共通レイヤーから `.ccnavi/scripts/`、自身のレイヤーやプロジェクトのレイヤーから `.ccnavi/common/scripts/`）、または指す先が git プロジェクトルートに無い |
@@ -2401,7 +2399,7 @@ ccnavi --lint --json --flow /tmp/flow.yml
 フロー編集画面は、開くときに自分の読み手（`yaml`、YAML 1.2）で読んだ中身とこれを見比べ、食い違えば開かない。
 保存の前には、書き出す本文をこれに掛けて、画面が書こうとした中身と同じに読まれるときだけ書く。値の意味を
 拡張が自分で決めないため。
-読むのは `--lint` だけで、診断の外では無視し、`--test` / `--test-samples` / `--explain` でも「`--lint` でだけ読む」と
+読むのは `--lint` だけで、診断の外では無視し、`--test` / `--test-expectations` / `--explain` でも「`--lint` でだけ読む」と
 出して無視する。フローは判定の材料にならないので、レイヤーの置き場を動かすフラグ（下）とは別に数える。
 
 ### 1 つのプロジェクトのルールを保存せずに試す
@@ -2418,7 +2416,7 @@ ccnavi --lint --json --project-risk-file lib=/tmp/risks.yml
 - `--project-rules-file <名前>=<パス>` は、その名前のプロジェクトのルールファイルの代わりに `<パス>` を読む
 - `--project-phases-file <名前>=<パス>` は、その名前のレイヤー（`self` は自身のレイヤー）のフェーズ定義の代わりに `<パス>` を読み、その 1 本として確かめる（足し算はしない）。配点（risk）のレイヤーには次の `--project-risk-file` がある
 - `--project-risk-file <名前>=<パス>` は、その名前のレイヤー（`self` は自身のレイヤー）の配点の代わりに `<パス>` を読む。phases と違って足し算なので、共通レイヤーの配点と合わせて確かめる（境目の `levels` が合成後に逆転していないか、同 `id` で中身が違う衝突の warn、`script:` が指す先がそのレイヤーの git プロジェクトルートの `.ccnavi/scripts/` に在るか）。共通レイヤーの配点は今までどおり `--risk`。ファイルの無いレイヤーに渡しても、そのレイヤーの配点として合成する
-- レイヤーの置き場を動かすフラグ 8 本（`--rules` / `--phases` / `--risk` / `--projects` / `--project-home` と上の 3 本）は、`--test` / `--test-samples` /
+- レイヤーの置き場を動かすフラグ 8 本（`--rules` / `--phases` / `--risk` / `--projects` / `--project-home` と上の 3 本）は、`--test` / `--test-expectations` /
   `--lint` / `--explain` でだけ有効になる。診断の外（hook からの判定、`ticket` / `review` の副命令）に渡すと無視し、標準エラーにその旨を出す。
   守る対象（コアファイル）も差し替えを見ない
 - `--root` と `--cwd` は 1 度しか渡せない（2 本目が在れば止める）。sh が自分のぶんを先に置くので、後勝ちの上書きを防ぐため
@@ -2456,7 +2454,7 @@ ccnavi --explain --json
 | `ticket` / `parent` / `phase` / `title` / `project` / `issue` / `predecessors` / `human_review` | 提案（無ければ承認済みチケット）の frontmatter から |
 | `predecessors_unmet[]` | 満たしていない先行。`{ticket, state, label}`。`state` は `todo` / `doing` / `review`（先行が閉じれば満たす）と `cancelled` / `missing` / `scattered` / `self` / `ancestor` / `cycle`（待っても満たさない）、`label` はユーザ向けの言葉（「作業中（doing/）」など）。空でなければ承認と着手（`start`）が止まる（書き込みと `finish` は止まらない）。先行が無い子・親・閉じたチケットは空。ボードはこれで「先行待ち」のバッジを出し、自分では数えない |
 | `proposal` | `{state, tree, tree_root, path, has_plan}`。正とする側のツリー（親のツリー。無ければ元ツリー）の提案の置き場で見つけたもの。`state` は `todo`（承認待ち）/ `review`（レビュー待ち）。`has_plan` は親の提案が全体計画（`plan:`）を持つか（`feedback:` だけの親と子は `false`。計画の順序を直すタブ（`--plan-order`）は `plan:` の無い親を開けないため）。承認前の親は `parents[]` に出ないので、ボードはこれで計画の順序を直すタブの入口を出し分ける。足しただけの欄で、読まない拡張はそのまま動く。`doing/` `done/` に在るときは `null`。承認済みの識別子では、正とする側のツリーを、承認済みチケットがどのツリーにあるかで決める。そのツリーの外に残った古い提案（承認の前に切ったワークツリーの `todo/` など）は出さない（`seen_in` には出る） |
-| `copy` | `{status, approved_at, approved_from, source_tree, path}`。`status` は `none`（未承認）/ `open`（`doing/`）/ `review`（`wip/proposals/review/`）/ `closed`（`done/`）。`approved_at` は承認の時刻で、承認済みチケットの欄ではなく、状態の履歴の `approved`（続きの子は `raised`）か、無ければ前の版の承認が書いた記録（古い形の `ccnavi_approved.approved_at`）、それも無ければ `doing/<識別子>.md` を足したコミットから引く。`approved_from` はどこから引いたか（`history` / `record` / `commit` / `uncommitted`（履歴もコミットも無い。手で置いてまだコミットしていない）/ 空（分からない））。`uncommitted` と空のとき `approved_at` は空。`source_tree` は前の版の承認が書いた欄で、新しい承認済みチケットでは空 |
+| `copy` | `{status, approved_at, approved_from, path}`。`status` は `none`（未承認）/ `open`（`doing/`）/ `review`（`wip/proposals/review/`）/ `closed`（`done/`）。`approved_at` は承認の時刻で、承認済みチケットの欄ではなく、状態の履歴の `approved`（続きの子は `raised`）か、無ければ `doing/<識別子>.md` を足したコミットから引く。`approved_from` はどこから引いたか（`history` / `commit` / `uncommitted`（履歴もコミットも無い。手で置いてまだコミットしていない）/ 空（分からない））。`uncommitted` と空のとき `approved_at` は空。 |
 | `blocked` | 空でなければ「読めるが信じられない」理由。判定はこのチケットのワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`status` は `open` のままなので、止まっていることはこの欄でしか分からない |
 | `worktree` | `{exists, path, project}`。`.claude/worktrees/<識別子>` が実際のワークツリーか（設計 9.5 の相互参照） |
 | `started_at` / `completed_at` / `base_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄 |
@@ -2849,7 +2847,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/entry/lint_ticket.py` | lint のうち、承認済みチケット・承認・提案と、親子の運用に要る hook の検査 |
 | `src/ccnavi/entry/lint_branch.py` | lint のうち、チケットのブランチ名・連番・既存ブランチ・ワークツリーの検査 |
 | `src/ccnavi/entry/diagnose.py` | 判定を実行せずに試す `--test` と `--explain`。名前を引き受けるだけで、中身は下の 4 つに分けてある |
-| `src/ccnavi/entry/diagnose_try.py` | diagnose のうち、`--test` と `--test-samples`。判定と同じ経路で 1 件と見本を試す |
+| `src/ccnavi/entry/diagnose_try.py` | diagnose のうち、`--test` と `--test-expectations`。判定と同じ経路で 1 件と期待を試す |
 | `src/ccnavi/entry/diagnose_explain.py` | diagnose のうち、`--explain` の本文 |
 | `src/ccnavi/entry/diagnose_board.py` | diagnose のうち、ボードの中身（`--explain --json`） |
 | `src/ccnavi/entry/diagnose_shared.py` | diagnose のうち、explain・board・try が共有するレイヤーの読み出しとルールの書き方 |
@@ -2880,8 +2878,8 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `tests/fixtures/` | テスト用のルール（`rules.yml`、言及の無い呼び出しを見る `rules-undeclared.yml`） |
 | `.ccnavi/common/rules.yml` / `risks.yml` | このリポジトリ自身の共通レイヤーの設定（共通レイヤーに `phases.yml` は置かない） |
 | `.ccnavi/config/phases.yml` | このリポジトリ自身のレイヤーのフェーズ定義 |
-| `.ccnavi/common/rule-samples.yml` | ルールが何を止めて何を通すかの見本 |
-| `scripts/check_rules.py` | 見本をぜんぶ判定に掛ける |
+| `.ccnavi/common/rule-expectations.yml` | ルールが何を止めて何を通すかの期待する判定 |
+| `scripts/check_rules.py` | 期待する判定をぜんぶ判定に掛ける |
 | `extensions/vscode/ccnavi-board/` | VS Code 拡張。ボード・ルール管理・リスク管理・プロジェクト管理の画面 |
 | `docs/adr/` | 設計判断の記録 |
 

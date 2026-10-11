@@ -97,8 +97,8 @@ class TypesTest(unittest.TestCase):
         self.assertFalse(hasattr(types, "order"))
         self.assertFalse(hasattr(types["docs"], "after"))
 
-    def test_old_relation_fields_are_left_unread_with_a_warning(self):
-        """古い欄は error にしない。更新した直後に全部の承認と `--lint` が止まらないように。"""
+    def test_relation_fields_in_a_definition_are_not_read(self):
+        """定義の順序の欄は読まない（warn も error も出さない）。"""
         text = (
             "version: 1\norder: dag\nphases:\n"
             "  design: {title: 設計, review: none, overlap: [docs]}\n"
@@ -106,11 +106,7 @@ class TypesTest(unittest.TestCase):
         )
         types, problems = phasetypes.parse(text)
         self.assertIsNotNone(types, problems)
-        warned = [p.detail for p in problems if p.severity == "warn"]
-        for name in ("order", "after", "overlap", "requires"):
-            self.assertTrue(any(f"`{name}`" in d and "読まない" in d for d in warned), warned)
-        self.assertTrue(all("after" in d for d in warned if "順序" in d), warned)
-        self.assertEqual([p for p in problems if p.severity == "error"], [])
+        self.assertEqual(problems, [])
 
     def test_old_after_pointing_nowhere_is_not_an_error(self):
         types, problems = phasetypes.parse(
@@ -564,7 +560,7 @@ class DagApprovalTest(PhaseHarness):
 
     def copy(self, name="i0001"):
         path = os.path.join(self.approved, "doing", name + ".md")
-        t, why = approval.load_copy(path, approved_dir=self.approved)
+        t, why = approval.load_copy(path)
         self.assertIsNotNone(t, why)
         return t
 
@@ -659,15 +655,12 @@ class DagApprovalTest(PhaseHarness):
         )
         self.assertEqual(self.scanned().workflow.waits[4], [1, 2, 3])
 
-    def test_a_leftover_workflow_file_is_not_read_and_lint_says_so(self):
+    def test_a_leftover_workflow_file_is_not_read(self):
         self.family(plan=PLAN)
         held = os.path.join(self.approved, "phases", "i0001", "workflow.yml")
         write(held, "order: sequential\nwaits: {1: [], 2: [1], 3: [1, 2], 4: [1, 2, 3]}\n")
         self.commit_parent("leftover")
         self.assertEqual(self.scanned().workflow.waits[3], [1])
-        linted = self.ccnavi("--lint")
-        self.assertIn(".ccnavi/approved/phases/i0001/workflow.yml", linted.stdout)
-        self.assertIn("読まない", linted.stdout)
 
     def test_a_workflow_written_in_a_proposal_is_refused(self):
         text = parent_text("i0001", PLAN).replace(

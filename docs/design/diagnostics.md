@@ -11,19 +11,19 @@ keywords: [診断, --explain, --test, --lint, --json, 機械可読]
 ## 10. 診断と機械可読な出力
 
 診断（この章のオプション）だけは hook から呼ばれない。ユーザが端末から打ち、VS Code 拡張が読む。判定は hook と同じ関数を
-通る（REQ-DIA-03）。記録は診断の経路では書かない。試験（`--test` / `--test-samples`）は
+通る（REQ-DIA-03）。記録は診断の経路では書かない。試験（`--test` / `--test-expectations`）は
 state も内部で外す。拡張と `scripts/check_rules.py` は念のため `--log ""` と `--state ""` も渡す。
 
 | オプション | 出すもの | 終了コード |
 |---|---|---|
-| `--test <ツール> <対象> [--json]` | 判定・根拠コード・当たったルール（タイプ、書いた式、翻訳後の正規表現、`file` か `outside`）・行き着く先・縮退したか既定を使ったか・当たった中で実行されるコマンド（`unwrapped`、6.3.1）・返る文面。モードは常に `enable`。`--test Stop "(stop)"` はターンの終わりに使われるルール（6.6）を並べ、あれば `allow`、無ければ `skip`。見本の `tool: Stop` も同じ | 常に 0 |
-| `--test-samples <見本> [--json]` | 見本をすべて判定に掛け、期待と食い違ったものを名指し | 文字の出力は食い違いがあれば 1、JSON は常に 0、見本が読めなければ 1 |
+| `--test <ツール> <対象> [--json]` | 判定・根拠コード・当たったルール（タイプ、書いた式、翻訳後の正規表現、`file` か `outside`）・行き着く先・縮退したか既定を使ったか・当たった中で実行されるコマンド（`unwrapped`、6.3.1）・返る文面。モードは常に `enable`。`--test Stop "(stop)"` はターンの終わりに使われるルール（6.6）を並べ、あれば `allow`、無ければ `skip`。期待の `tool: Stop` も同じ | 常に 0 |
+| `--test-expectations <期待> [--json]` | 期待する判定をすべて判定に掛け、期待と食い違ったものを名指し | 文字の出力は食い違いがあれば 1、JSON は常に 0、期待のファイルが読めなければ 1 |
 | `--explain [--json]` | タイプごとのルール、プロジェクトの一覧とルールの可否、権限モードの扱い、チケット制御の値、承認済みチケットの一覧、親の局面、フェーズごとの状態・マーカー・止まっているか・リスク。判定は行わない | 0 |
 | `--lint [--json]` | 判定を行わず、防御を無効化しうる記述を error と warn に分けて報告。ルール・フェーズ定義・配点・settings.json の登録・チケット・プロジェクトを見る | error があれば 1 |
-| `--suggest [--json]` | 記録（`decisions.jsonl` と、同じ置き場で回した `decisions.*.jsonl`）から、ルールの候補を `rules.yml` と `rule-samples.yml` の形の下書きで出す。どのルールも言及せず何度も渡った形は `ask` のルールの候補、同じ呼び出しを N 回以上止めた `deny` は `message` を見直す候補。候補ごとに `--lint` と同じ読みと `--test-samples` と同じ判定で確かめ、通ったものだけを出す（ルールを足す候補は共通レイヤーのコピーに足した一時ファイルで試す）。`allow` は出さない。何も書かない | 常に 0 |
+| `--suggest [--json]` | 記録（`decisions.jsonl` と、同じ置き場で回した `decisions.*.jsonl`）から、ルールの候補を `rules.yml` と `rule-expectations.yml` の形の下書きで出す。どのルールも言及せず何度も渡った形は `ask` のルールの候補、同じ呼び出しを N 回以上止めた `deny` は `message` を見直す候補。候補ごとに `--lint` と同じ読みと `--test-expectations` と同じ判定で確かめ、通ったものだけを出す（ルールを足す候補は共通レイヤーのコピーに足した一時ファイルで試す）。`allow` は出さない。何も書かない | 常に 0 |
 | `--version [--json]` | 版・組み立ての元のコミット（`build.py` が埋める。ソースでは `unknown`）・互換の版・受け付けるフラグ（引数の定義から引く）・読む書式の版。設定もワークスペースも読まない（README「版の JSON」） | 0 |
 | `--lint [--json] --flow <パス>` | 上に加えて、子のフロー 1 本（9.3.1）を `SubagentStart` と同じ読み手・同じ検査で読み、読めなければ場所 `(flow)` の error で言う。読めたフローの構造と名前の怪しいところは warn。`--json` なら読めた中身を `flow.data`、渡る手順の行を `flow.rendered` に載せ（読めなければどちらも `null`）、選べる名前を `flow.candidates` に載せる。パスは起動した場所からの相対でよい | error があれば 1 |
-| `--docs [絞り込み] [--sort …] [-r] [--limit N] [--format table\|path\|detail\|json\|jsonl\|count]` | ワークスペースと、プロジェクトの置き場の直下の各プロジェクト（別の git）の md（それぞれの `git ls-files --cached --others --exclude-standard`、ccnavi ディレクトリの下は除く）を、頭の frontmatter の索引で横断して引く（`docsearch`）。パスはワークスペースルートから。md が直下にあるディレクトリごとの `ccnavi-index.jsonl` を差分で新しくしてから引く。書くのは git がそこの `ccnavi-index.jsonl` を無視しているときだけで、どのディレクトリでも無視していないツリーは、書く前にそのツリーの `.gitignore` に `**/ccnavi-index.jsonl` を 1 行だけ足して（ワークスペースもプロジェクトも同じ。足したことは標準エラーと SessionStart の案内で名指しする。未コミットの差分が残る）確かめ直す。`!` で否定する行がある（ユーザが追跡している）・足せない・足しても無視されないツリーだけが対象外になり、名指しされる。ccnavi の形でない `ccnavi-index.jsonl` は上書きも削除もせず、実体がツリーの外に出るディレクトリは読まない。新しい名前に書くとき、ccnavi の形で git が追跡していない旧名 `index.jsonl` を消す（ほかのツールのものは触らない）。一時ファイルは `.git/` の中に作る（`.git` が別のファイルシステムなら、そのディレクトリの下の git に無視される `.ccnavi-tmp-*/ccnavi-index.jsonl`）。git への問い合わせの失敗は対象外と分けて言う。形は README「ドキュメントの索引」 | 引ければ 0（0 件でも）。使い方の誤りは 1 |
+| `--docs [絞り込み] [--sort …] [-r] [--limit N] [--format table\|path\|detail\|json\|jsonl\|count]` | ワークスペースと、プロジェクトの置き場の直下の各プロジェクト（別の git）の md（それぞれの `git ls-files --cached --others --exclude-standard`、ccnavi ディレクトリの下は除く）を、頭の frontmatter の索引で横断して引く（`docsearch`）。パスはワークスペースルートから。md が直下にあるディレクトリごとの `ccnavi-index.jsonl` を差分で新しくしてから引く。書くのは git がそこの `ccnavi-index.jsonl` を無視しているときだけで、どのディレクトリでも無視していないツリーは、書く前にそのツリーの `.gitignore` に `**/ccnavi-index.jsonl` を 1 行だけ足して（ワークスペースもプロジェクトも同じ。足したことは標準エラーと SessionStart の案内で名指しする。未コミットの差分が残る）確かめ直す。`!` で否定する行がある（ユーザが追跡している）・足せない・足しても無視されないツリーだけが対象外になり、名指しされる。ccnavi の形でない `ccnavi-index.jsonl` は上書きも削除もせず、実体がツリーの外に出るディレクトリは読まない。一時ファイルは `.git/` の中に作る（`.git` が別のファイルシステムなら、そのディレクトリの下の git に無視される `.ccnavi-tmp-*/ccnavi-index.jsonl`）。git への問い合わせの失敗は対象外と分けて言う。形は README「ドキュメントの索引」 | 引ければ 0（0 件でも）。使い方の誤りは 1 |
 
 **レイヤーの置き場を動かすフラグは 8 本あり、どれも診断でだけ有効になる**。共通レイヤーの中身は
 `--rules` / `--phases` / `--risk`、レイヤーを探す先は `--projects`（プロジェクトのレイヤーの置き場）と
@@ -42,7 +42,7 @@ state も内部で外す。拡張と `scripts/check_rules.py` は念のため `-
 なく `flags` を見る。`--version` を知らない実行ファイルは古いとして扱う。レイヤーは頭の `version:` が書式の版を示す。
 読めない版は読む側が error にするので、レイヤーには別の版を足さない。
 
-`--flow <パス>` も診断でだけ有効で、読むのは `--lint` だけ。`--test` / `--test-samples` / `--explain` に渡すと
+`--flow <パス>` も診断でだけ有効で、読むのは `--lint` だけ。`--test` / `--test-expectations` / `--explain` に渡すと
 「`--lint` でだけ読む」と言って無視する。判定にも採点にも使われない（9.3.1）。
 
 JSON の形は README の「試験の JSON」「lint の JSON」「ボードの JSON」「候補の JSON」に定める。拡張はこれを並べるだけで、
@@ -83,7 +83,7 @@ error がある間は配点もフェーズ定義も保存できない。
 **拡張との取り決め**（REQ-EXT）のうち、作りに関わるもの。
 
 - 文字コード: 入口（`__main__` の `hookio.rebind_streams`）が標準入出力を UTF-8・改行 LF に張り直す。診断の JSON
-  （`--explain` / `--test` / `--test-samples` / `--lint` / `--suggest` / `--version`）は `ensure_ascii=True` で ASCII に変換し、
+  （`--explain` / `--test` / `--test-expectations` / `--lint` / `--suggest` / `--version`）は `ensure_ascii=True` で ASCII に変換し、
   承認の JSON と残った指摘の JSON は `ensure_ascii=False` で書く
 - 古い実行ファイルの見分け: argparse の苦情（`unrecognized arguments: --version`）を拡張が読む。
   `parse_args` の `SystemExit` は捕まえて終了コード 1 にする

@@ -40,7 +40,7 @@ import {
 } from "../../src/core/flow-doc.js";
 import { parse } from "yaml";
 
-import { SAMPLE, sampleData } from "../helpers/flow.js";
+import { SAMPLE, sampleData, bareFlow } from "../helpers/flow.js";
 
 function sample(): FlowDoc {
   const read = parseFlow(SAMPLE);
@@ -133,15 +133,23 @@ test("CB-T219 編集は触ったところだけを差し替え、ほかの欄（
   assert.equal("condition" in cleared.connections[0], false);
 });
 
-test("CB-T220 雛形は 開始 → 終了 の 2 ノードと線 1 本で、そのまま読み直せて注意が出ない", () => {
+test("CB-T220 雛形は 開始 → チケットを読む → 終了 の 3 ノードと線 2 本で、そのまま読み直せて注意が出ない", () => {
   const doc = templateFlow("i0001-01-01", "調査");
   assert.deepEqual(
     doc.nodes.map((node) => node.type),
-    ["start", "end"],
+    ["start", "prompt", "end"],
   );
   assert.equal(doc.id, "i0001-01-01-flow");
   assert.equal(doc.name, "i0001-01-01 調査");
-  assert.deepEqual(connectionsOf(doc), [{ id: "c-start-end", from: "start", to: "end", fromPort: "output", toPort: "input" }]);
+  // 子の識別子を埋めない固定文（別の子へ写しても食い違わない）
+  assert.deepEqual(doc.nodes[1].data, { prompt: "担当の子チケットを読み、その内容に沿って作業を進める" });
+  assert.deepEqual(
+    connectionsOf(doc).map((c) => [c.from, c.to]),
+    [
+      ["start", "read-ticket"],
+      ["read-ticket", "end"],
+    ],
+  );
   const read = parseFlow(serializeFlow(doc));
   assert.ok(read.ok);
   assert.deepEqual(read.doc, doc);
@@ -221,7 +229,7 @@ test("CB-T222 ノードを消すと線も消え、出口を消すと後ろの出
   assert.ok(bare.ok);
   assert.equal(connectionsOf(connect(bare.doc, "a", "output", "b", "input")).length, 1);
   // 足したノードは使われていない id と既定の中身を持つ
-  const added = addNode(templateFlow("x", ""), "askUserQuestion", { x: 1, y: 2 });
+  const added = addNode(bareFlow("x", ""), "askUserQuestion", { x: 1, y: 2 });
   assert.equal(added.id, "askUserQuestion-1");
   assert.deepEqual(added.doc.nodes[2].position, { x: 1, y: 2 });
   assert.deepEqual(added.doc.nodes[2].data, { questionText: "", multiSelect: false, options: [{ label: "はい", description: "" }, { label: "いいえ", description: "" }] });
@@ -246,7 +254,7 @@ function nested(depth: number, cyclic = false): FlowDoc {
 }
 
 test("CB-T223 入れ子の段は subAgent と subAgentFlow で 1 段ずつ数え、子の下 2 段を超えたときだけ言う", () => {
-  const single = patchData(addNode(templateFlow("x", ""), "subAgent", { x: 0, y: 0 }).doc, "subAgent-1", {});
+  const single = patchData(addNode(bareFlow("x", ""), "subAgent", { x: 0, y: 0 }).doc, "subAgent-1", {});
   assert.deepEqual(nesting(single), { depth: 1, cyclic: false });
   assert.deepEqual(flowNotices(single), []);
   // サブフロー（1 段）の中の subAgent（2 段）。子の下 2 段で、まだ上限の中
@@ -464,7 +472,7 @@ test("CB-T258 グループの大きさを変える。左や上の辺を動かし
 });
 
 function loopFlow(): FlowDoc {
-  const base = templateFlow("i0001-01-01", "調査");
+  const base = bareFlow("i0001-01-01", "調査");
   const added = addNode(base, "loop", { x: 200, y: 100 });
   return {
     ...added.doc,
@@ -478,7 +486,7 @@ function loopFlow(): FlowDoc {
 
 test("CB-T322 繰り返し（loop）は部品箱の 8 番目で、足すと出口 2 つ（繰り返す / 抜ける）と上限 3 の既定で作る", () => {
   assert.deepEqual([...PALETTE], ["start", "end", "prompt", "subAgent", "askUserQuestion", "ifElse", "switch", "loop", "skill"]);
-  const added = addNode(templateFlow("i0001-01-01", "調査"), "loop", { x: 1, y: 2 });
+  const added = addNode(bareFlow("i0001-01-01", "調査"), "loop", { x: 1, y: 2 });
   assert.equal(added.id, "loop-1");
   const node = added.doc.nodes.find((n) => n.id === "loop-1");
   assert.ok(node !== undefined);

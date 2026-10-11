@@ -204,7 +204,7 @@ test("CX-T107 取り下げ: 承認が merge で入った（親が 2 つのコミ
   const f = parentOnly();
   const side = { ...f.i0001.files };
   delete side[TODO];
-  side[DOING] = f.i0001.files[TODO].replace("---\nversion: 1\n", "---\nversion: 1\n").replace('base_sha: ""', 'base_sha: ""\nccnavi_approved:\n  approved_at: 2026-09-28T09:00:00+0900\n  source_path: wip/proposals/todo/i0001.md\n  source_tree: side');
+  side[DOING] = f.i0001.files[TODO];
   f.side = { committedDate: "2026-09-01T00:00:00Z", files: side };
   const { mock, d } = world(f);
   mock.merge("i0001", "side");

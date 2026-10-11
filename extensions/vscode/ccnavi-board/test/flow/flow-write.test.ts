@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { connectionLabel, connectionsOf, templateFlow, type FlowDoc } from "../../src/core/flow-doc.js";
+import { connectionLabel, connectionsOf, type FlowDoc } from "../../src/core/flow-doc.js";
+import { bareFlow } from "../helpers/flow.js";
 import { spawnSync } from "node:child_process";
 import { decodeFlowBytes, FLOW_FILE_LIMIT, linkedSegment, readFlowFile, removeDraftFile, writeFlowFile } from "../../src/core/flow-write.js";
 import * as crypto from "node:crypto";
@@ -103,7 +104,7 @@ test("CB-T233 読み込んでから外で作られた・変わったファイル
 });
 
 test("CB-T234 線の言葉は、出口が項目の id とちょうど同じか branch-<番号> のときだけ（実行ファイルと同じ読み方）", () => {
-  const base = templateFlow("i0001-01-01", "調査");
+  const base = bareFlow("i0001-01-01", "調査");
   const doc: FlowDoc = {
     ...base,
     nodes: [
@@ -173,7 +174,7 @@ test("CB-T237 256KB を超えるフローは読まないし書かない。書け
 });
 
 test("CB-T238 線の言葉は真偽値を空として読み、整数の値は表記で比べる（実行ファイルの flow_text._text と同じ）", () => {
-  const base = templateFlow("i0001-01-01", "調査");
+  const base = bareFlow("i0001-01-01", "調査");
   const doc: FlowDoc = {
     ...base,
     nodes: [

@@ -1,9 +1,9 @@
 ---
 type: skill-reference
 title: 確かめる
-description: 設定ファイルが意図どおりに動作するか検証する手順。lint、見本テスト、運用ルール確認
+description: 設定ファイルが意図どおりに動作するか検証する手順。lint、期待する判定のテスト、運用ルール確認
 tags: [rules, testing, config]
-keywords: [lint, 見本, テスト, deny, allow, ask, 検証, check_rules.py]
+keywords: [lint, 期待する判定, テスト, deny, allow, ask, 検証, check_rules.py]
 ---
 
 # 確かめる
@@ -23,18 +23,18 @@ ccnavi --lint --log "" --state ""
 | 出どころ | error（防御が消える・全部止まる） | warn（判定は動くが意図とずれる） |
 |---|---|---|
 | `(rules)` / ルール id | 読めない、版が違う、`deny` が空、文面・match・glob を欠く、glob と regex の両方、`except` の形（空・要素が glob / regex の 1 つでない・知らないキー）、`when` の形（glob / regex と並べた・知らないキー・キーが 1 つでないノード・空のリスト・型違い・8 段 / 64 個の上限超え）、`ask` `allow` に `message`、組めない正規表現、`additionalContextFile` が上に出る | `allow` が空、id 無し・重複、当てる対象の無いツール、広い allow に文、指すファイルが無い・長い、何にでも当たる単体の `deny`（`glob: "*"` ちょうどは除く）、何にでも当たる `except`、Bash / PowerShell の deny / ask の `except`、何にでも当たる・何にも当たらない `when` のノード、Bash / PowerShell の deny / ask の `when` の `not` |
-| `(phases)` | 読めない、版が違う、`phases` が無い、kind / review の値、feedback が none、id / title の重複、scope が外に出る、scope / deliverables が 20 件を超える | 前の版の順序の欄（order・after・overlap・requires。読まない） |
+| `(phases)` | 読めない、版が違う、`phases` が無い、kind / review の値、feedback が none、id / title の重複、scope が外に出る、scope / deliverables が 20 件を超える | ―（順序の欄は読まず、警告も出さない） |
 | `(risk)` | 読めない、版が違う、levels の順、id の重複・形、points が負、加点条件が 0 か 2 つ、script の置き場が外、glob が組めない | 知らないリスクレベル名 |
 | `(ticket)` `(project)` `(mode)` | 承認済みチケットの置き場が守られていない、計画を持つ親に定義の写し（phases:）が無いか壊れている | dry-run、登録の欠け、ワークツリーとチケットの食い違い |
 
 下書きを見るときは `--rules` `--phases` `--risk` で差し替える。1 本だけ差し替えると、本物の残り 2 本と
 組み合わせたときの答えになる。
 
-## 2. rules: 見本を回す
+## 2. rules: 期待する判定を回す
 
 ```sh
 uv run python scripts/check_rules.py            # このリポジトリ。承認済みチケットと記録を外して回す
-ccnavi --test-samples .ccnavi/common/rule-samples.yml --log "" --state "" --approved ""
+ccnavi --test-expectations .ccnavi/common/rule-expectations.yml --log "" --state "" --approved ""
 ```
 
 出力は 3 つに分かれる。
@@ -50,13 +50,13 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --log "" --state "" --appr
 - glob が全体に当たる書き方になっていない。 `git push *` は `cd /repo && git push` に
   当たらない。`*git push*` なら当たる
 - 語の切れ目が無い。 `*sed*` が `sedate` に当たる。右は `*sed *`、左は regex
-- タイプの順で強い側が先に当たっている。 allow に置いた見本が deny の `raw-git` に当たる、
-  など。この形なら見本の置き場かルールの広さのどちらかが間違っている
+- タイプの順で強い側が先に当たっている。 allow に置いた期待が deny の `raw-git` に当たる、
+  など。この形なら期待の置き場かルールの広さのどちらかが間違っている
 
 `--json` を付けると翻訳後の正規表現（`pattern`）と返る文面（`response`）まで出る。
 
-守られているかも見本で見る。rules.yml・phases.yml・risks.yml、承認済みチケットの置き場、
-settings.json への Write / Edit を deny の見本に置いて回す。ワークスペースルート直下と、実在するワークツリーの
+守られているかも期待する判定で見る。rules.yml・phases.yml・risks.yml、承認済みチケットの置き場、
+settings.json への Write / Edit を deny の期待に置いて回す。ワークスペースルート直下と、実在するワークツリーの
 名前での設定の両方（このリポジトリでは `guard-ccnavi-config` と `guard-settings` が止める）。出るのはルールの判定だけで、
 組み込みの保護（実行後に戻す働き）は出ない。allow に見えたものは「ルールでは止めていない」として報告する。
 
@@ -109,6 +109,6 @@ AskUserQuestion。聞くのは「この設定をどうするか」で、「こ�
 
 ## 報告
 
-書くのは 5 つ。lint の error / warn の中身、見本の件数と食い違いの原因、phases の噛み合わせ、
+書くのは 5 つ。lint の error / warn の中身、期待の件数と食い違いの原因、phases の噛み合わせ、
 risk の見積もり、ユーザに確認した結果。直す必要があるなら、どのファイルのどこをどう直すかまで
 書いて、[add.md](add.md) の「ユーザに渡す形」で依頼する。直すのはユーザ。

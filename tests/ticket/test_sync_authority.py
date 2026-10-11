@@ -30,7 +30,7 @@ from ccnavi.tickets import (
 )
 from tests import requires_symlink
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
-from tests.ticket.test_ticket import git, to_old_form, write
+from tests.ticket.test_ticket import git, write
 
 
 def record_text(name, state, reason="", sha="0" * 40):
@@ -521,27 +521,10 @@ class TombstoneTest(AuthorityHarness):
         self.assertFalse(syncstate.same_parent(mine, copy("i0001", "", cancelled_at="c2")))
         self.assertFalse(syncstate.same_parent(None, unstarted))
         self.assertFalse(syncstate.same_parent(copy("i0001", ""), copy("i0001", "")))
-        # 古い approved_at は、両方に 3 つとも無く、両方にあるときだけ。
-        old = copy("i0001", "", approved_at="a1")
-        self.assertTrue(syncstate.same_parent(old, copy("i0001", "", approved_at="a1")))
-        self.assertFalse(syncstate.same_parent(old, copy("i0001", "", approved_at="a2")))
-        self.assertFalse(syncstate.same_parent(old, copy("i0001", "")))
-        self.assertFalse(
-            syncstate.same_parent(old, copy("i0001", "", approved_at="a1", started_at="t1"))
-        )
 
     def test_frontmatter_values_are_read_without_the_body(self):
         copy = syncstate._copy_fields("---\nticket: i0001\nbase_sha: ''\n---\nbase_sha: abc\n")
         self.assertEqual("", copy.base_sha)
-
-    def test_an_old_family_with_the_same_id_is_not_read_as_closed(self):
-        # 承認の記録を持つ古い形どうしで、着手の欄が無い統合先の親は承認の時刻で比べる。
-        self.record("present")
-        to_old_form(self.approved, "i0001")
-        self.integration_done_parent("ccnavi_approved:\n  approved_at: 2000-01-01T00:00:00+0900\n")
-        st = syncstate.standing(self.conf(), self.root, "i0001")
-        self.assertFalse(st.closed)
-        self.assertEqual("", st.stop)
 
     def test_the_forget_command_is_for_people(self):
         result = self.ccnavi(

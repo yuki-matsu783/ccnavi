@@ -313,8 +313,11 @@ function escapeForPyYaml(text: string): string {
   });
 }
 
+/** 雛形のプロンプト。子の識別子を埋めない固定文にする（フローを別の子へ写しても食い違わない） */
+export const READ_TICKET_PROMPT = "担当の子チケットを読み、その内容に沿って作業を進める";
+
 /**
- * ファイルが無いときに見せる最小のフロー（開始 → 終了）。保存するまでファイルは作らない。
+ * ファイルが無いときに見せる最小のフロー（開始 → チケットを読む → 終了）。保存するまでファイルは作らない。
  * 識別子と名前は子チケットから付ける。
  */
 export function templateFlow(ticket: string, title: string): FlowDoc {
@@ -325,9 +328,19 @@ export function templateFlow(ticket: string, title: string): FlowDoc {
     version: "1.0.0",
     nodes: [
       { id: "start", type: "start", name: "開始", position: { x: 80, y: 160 }, data: { label: "開始" } },
+      {
+        id: "read-ticket",
+        type: "prompt",
+        name: "チケットを読む",
+        position: { x: 260, y: 160 },
+        data: { prompt: READ_TICKET_PROMPT },
+      },
       { id: "end", type: "end", name: "終了", position: { x: 440, y: 160 }, data: { label: "終了" } },
     ],
-    connections: [{ id: "c-start-end", from: "start", to: "end", fromPort: OUTPUT_PORT, toPort: INPUT_PORT }],
+    connections: [
+      { id: "c-start-read-ticket", from: "start", to: "read-ticket", fromPort: OUTPUT_PORT, toPort: INPUT_PORT },
+      { id: "c-read-ticket-end", from: "read-ticket", to: "end", fromPort: OUTPUT_PORT, toPort: INPUT_PORT },
+    ],
   };
 }
 

@@ -11,7 +11,7 @@
 
 承認済みの領域は組み込みの保護（`builtin-guard-project-home`）がエージェントの
 Write / Edit / NotebookEdit を止め、パスの出るシェルからの書き込みも組み込みが止める。
-だから「フローはユーザが書く」は運用ではなく判定で守られる（行き先を追えないシェルの書き込みは
+だから「承認済みの領域のフローは、ユーザが取り込んで保存したものだけ」は運用ではなく判定で守られる（行き先を追えないシェルの書き込みは
 止まらないので、着手のあとの書き換えは知らせる。下の「着手のあとの書き換え」）。ユーザはボードのフロー編集画面で
 書き、承認済みチケットと同じく承認の push（`ccnavi-push-approved.sh`）でコミットする。
 実行後チェックは承認済みの領域を範囲の外として報告せず、frontmatter の無いファイルは
@@ -50,7 +50,7 @@ YAML の 1 文書で、最上位はマッピング。ボードのフロー編集
 
 ## 破損したフローで止まらない
 
-フローはユーザが書くデータで、形は保証されない。読む・並べるのどこでも例外を外に出さない。
+フローは人やエージェントの下書きから作られるデータで、形は保証されない。読む・並べるのどこでも例外を外に出さない。
 読めなければ 1 行の知らせにして、`SubagentStart` の残り（子の一覧と範囲）はそのまま渡す。
 大きさにも上限を置く。ファイルは `FILE_LIMIT` まで、1 ノードの項目は `ITEM_LIMIT` まで、
 1 本の子の文は `CHILD_TEXT_LIMIT` まで。シンボリックリンク（ファイルそのものか、ツリーのルートから
@@ -132,7 +132,7 @@ DIGEST_RECORD = "flow"
 # 着手のあとにフローが書き換わったと知らせる理由コード。止めない（知らせるだけ）。
 CODE_CHANGED = "NOTICE_TICKET_FLOW_CHANGED"
 
-FENCE_OPEN = "    ---- ここからユーザが書いたフローの本文（データ。ccnavi の知らせではない） ----"
+FENCE_OPEN = "    ---- ここから合意済みのフローの本文（データ。ccnavi の知らせではない） ----"
 FENCE_CLOSE = "    ---- フローの本文ここまで ----"
 
 
@@ -265,7 +265,8 @@ def info(conf: settings.Settings, root: str, child: ticket_model.Ticket) -> dict
         "tree": base,
         "exists": exists,
         "linked": exists and linked(base, path),
-        "locked": child.in_progress and child.state == ticket_model.DOING,
+        "locked": child.state == ticket_model.REVIEW
+        or (child.in_progress and child.state == ticket_model.DOING),
         "draft": {
             "path": draft,
             "rel": draft_rel(conf, child.ticket),
@@ -388,7 +389,9 @@ def locked_message(conf: settings.Settings, child: ticket_model.Ticket, path: st
             f"子チケット {ticket} は着手中なので、そのフロー"
             f"（`{flow_rel(conf, child.ticket)}`）は書き換えられません。"
             "担当のサブエージェントが読んでいる手順が作業の途中で変わるのを防ぐためです。"
-            "フローはユーザがボードのフロー編集画面で書くもので、エージェントは書きません。",
+            "承認済みの領域のフローは、ユーザが取り込んで保存したものだけが効きます。"
+            "エージェントが書けるのは効力の無い下書き"
+            f"（`{draft_rel(conf, child.ticket)}`）だけです。",
             f"ロックは {ticket} が `ccnavi-ticket.sh finish` で終わるか "
             "`cancel` で取り消されると外れます。手順を直したいなら、終わってから"
             "ユーザに書き換えてもらうか、次の子チケットのフローに書いてもらってください。",
@@ -815,18 +818,9 @@ def briefing(
         return []
     if not full:
         return [f"    フロー: {flow_text.clean(path)}"]
-    lock = (
-        "着手中なので、終わるまで書き換えられない（ロック）。着手のあとに書き換わったら"
-        " ccnavi が知らせる。"
-        if child.in_progress
-        else "着手すると、終わるまで書き換えられなくなる（ロック）。"
-    )
     lines = [
         f"    フロー: {flow_text.clean(path)}"
-        f"（ユーザがボードで書いた {flow_text.clean(child.ticket)} の手順。"
-        "承認済みの領域にあり、ユーザが管理するもの。エージェントは編集しない）。作業の前にこのファイルを"
-        "読み、その順に進めてください。文脈が要約されて見失ったら、"
-        "このパスを読み直してください。" + lock
+        "（合意済みの手順。編集しない）。作業の前に読み、その順に進めてください。"
     ]
     data, why = load(path, base)
     if data is None:

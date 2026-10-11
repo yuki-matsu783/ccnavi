@@ -42,7 +42,6 @@ CONFIG = (
 )
 PARENT = "i0001"
 COPY = f".ccnavi/approved/doing/{PARENT}.md"
-APPROVED_AT = "2026-09-01T00:00:00+0900"
 BASE_SHA = "1" * 40
 STARTED_AT = "2026-09-02T00:00:00+09:00"
 
@@ -58,12 +57,6 @@ def copy_text(name=PARENT, base_sha=BASE_SHA, started_at=STARTED_AT, extra="", b
     fields = f"base_sha: {base_sha}\n" if base_sha else ""
     fields += f"started_at: '{started_at}'\n" if started_at else ""
     return f"{head}{fields}{extra}---\n{body}"
-
-
-def old_copy_text(name=PARENT, approved_at=APPROVED_AT, body=""):
-    """承認で欄を書いていた頃の、未着手の親の承認済みチケット（ブロックの形の ccnavi_approved）。"""
-    head = f"---\nversion: 1\nticket: {name}\n{ALLOW}"
-    return f"{head}ccnavi_approved:\n  approved_at: {approved_at}\n---\n{body}"
 
 
 def child_copy_text(name=f"{PARENT}-01-01", parent=PARENT):
@@ -144,51 +137,6 @@ class FrontFieldTest(unittest.TestCase):
                 front, _, _ = ticket_mod._frontmatter(f"---\nticket: x\nbase_sha: {value}\n---\n")
                 expected = syncstate._text(front.get("base_sha"))
                 self.assertEqual(self.sh_value(f"base_sha: {value}"), expected)
-
-
-@unittest.skipIf(SHELL is None, "sh が無い")
-class ApprovedAtOfTest(unittest.TestCase):
-    """sh の `approved_at_of` が、Python の `syncstate._copy_fields` と同じ範囲
-    （frontmatter の `ccnavi_approved` の中）だけから承認の時刻を拾う。
-
-    本文や block scalar（`rationale: |` の下の行）に同じ語を書いた行を拾うと、古い形どうしの
-    照合で別の値を比べる。
-    """
-
-    FRONTS = (
-        "ccnavi_approved: {approved_at: '2026-01-01T00:00:00+09:00', source_tree: main}",
-        "ccnavi_approved:\n  approved_at: 'X1'\n  source_tree: m",
-        'ccnavi_approved:\n\n  source_tree: m\n  approved_at: "X2"',
-        "rationale: |\n  approved_at: BAD\nccnavi_approved: {source_tree: m}",
-        "rationale: |\n  approved_at: BAD\nccnavi_approved:\n  approved_at: 'X3'",
-        "ccnavi_approved: |\n  approved_at: BAD",
-        "ccnavi_approved:\n  nested:\n    approved_at: BAD\n  approved_at: 'X4'\ntitle: t",
-        "ccnavi_approved: {source_tree: m,\n  approved_at: 'X5'}",
-        "title: 'approved_at: BAD'",
-        "note:\n  approved_at: BAD",
-    )
-
-    def sh_value(self, front):
-        with open(os.path.join(SH_DIR, "ccnavi-sync.sh"), encoding="utf-8") as f:
-            text = f.read()
-        script = ""
-        for name in ("frontmatter_of", "approved_at_of"):
-            start = text.index(f"{name}() {{")
-            script += text[start : text.index("\n}\n", start) + 3]
-        script += 'printf "%s\\n" "$1" | frontmatter_of | approved_at_of\n'
-        document = f"---\nticket: x\n{front}\n---\napproved_at: BODY\n"
-        done = subprocess.run(
-            [SHELL, "-c", script, "sh", document], capture_output=True, text=True, encoding="utf-8"
-        )
-        return done.stdout.rstrip("\n")
-
-    def test_the_same_range_as_python(self):
-        from ccnavi.tickets import syncstate
-
-        for front in self.FRONTS:
-            with self.subTest(front=front):
-                expected = syncstate._copy_fields(f"---\nticket: x\n{front}\n---\n").approved_at
-                self.assertEqual(self.sh_value(front), expected)
 
 
 @unittest.skipIf(SHELL is None or GIT is None, "sh か git が無い")
@@ -633,42 +581,9 @@ class SyncTest(SyncHarness):
         self.close_on_main(copy_text(base_sha="", body="base_sha: bbbb\n"))
         self.assertEqual("closed", self.closed_after_delete()[0])
 
-    def test_an_approval_time_in_the_body_is_not_read(self):
-        # 承認の時刻は frontmatter の ccnavi_approved の中だけから拾う。本文の同じ語の行で
-        # 閉じたと読まない（Python と同じく、照合できる欄が無いので閉じていない）。
-        bare = copy_text(base_sha="", started_at="", body=f"approved_at: {APPROVED_AT}\n")
-        self.mine(bare)
-        self.close_on_main(bare)
-        self.assertEqual("gone", self.closed_after_delete()[0])
-
-    def test_an_approval_time_in_a_block_scalar_is_not_read(self):
-        # `rationale: |` の下の行は欄ではない。古い形どうしは ccnavi_approved の中の値で比べる。
-        noisy = old_copy_text().replace(
-            "ccnavi_approved:", "rationale: |\n  approved_at: 1999-01-01\nccnavi_approved:"
-        )
-        self.mine(noisy)
-        self.close_on_main(old_copy_text())
-        self.assertEqual("closed", self.closed_after_delete()[0])
-
     def test_a_crlf_done_copy_is_read(self):
         self.close_on_main(copy_text().replace("\n", "\r\n"))
         self.assertEqual("closed", self.closed_after_delete()[0])
-
-    def test_old_copies_on_both_sides_compare_the_approval_time(self):
-        # 承認で欄を書いていた頃の形どうしは、移行の間だけ approved_at で比べる。
-        self.mine(old_copy_text())
-        self.close_on_main(old_copy_text())
-        self.assertEqual("closed", self.closed_after_delete()[0])
-
-    def test_old_copies_with_another_approval_time_are_not_closed(self):
-        self.mine(old_copy_text())
-        self.close_on_main(old_copy_text(approved_at="2020-01-01T00:00:00+0900"))
-        self.assertEqual("gone", self.closed_after_delete()[0])
-
-    def test_an_old_done_copy_is_not_matched_with_a_new_one(self):
-        # 片方に着手の欄があれば approved_at では比べない。
-        self.close_on_main(old_copy_text())
-        self.assertEqual("gone", self.closed_after_delete()[0])
 
     def test_a_parent_missing_in_the_parent_tree_is_not_closed(self):
         # 承認前の提案だけが残る親のワークツリー（この親子のチケットは閉じようがない）。

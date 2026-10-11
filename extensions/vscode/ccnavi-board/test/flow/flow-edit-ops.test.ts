@@ -23,13 +23,12 @@ import {
   removeNode,
   renameNode,
   setConditionAt,
-  templateFlow,
   type FlowDoc,
   type FlowNode,
 } from "../../src/core/flow-doc.js";
 import { asFlowMessage } from "../../src/core/flow-view.js";
 import { canRedo, canUndo, emptyHistory, HISTORY_LIMIT, MERGE_MS, record, redo, seal, undo } from "../../src/core/flow-history.js";
-import { SAMPLE } from "../helpers/flow.js";
+import { SAMPLE, bareFlow } from "../helpers/flow.js";
 
 function sample(): FlowDoc {
   const read = parseFlow(SAMPLE);
@@ -86,7 +85,7 @@ test("CB-T271 開始へ入る線・終了から出る線・グループ・自分
   assert.ok(group !== undefined);
   assert.ok(!canConnect(grouped, "start", group.id));
   // 開始から終了への線は雛形に既にある
-  assert.equal(connectionsOf(connect(templateFlow("x", ""), "start", "output", "end", "input")).length, 1, "同じ線は足さない");
+  assert.equal(connectionsOf(connect(bareFlow("x", ""), "start", "output", "end", "input")).length, 1, "同じ線は足さない");
 });
 
 test("CB-T272 コピーして貼ると id を振り直し、選んだノード同士の線だけ新しい id に書き換える。出口の表記と知らない欄は元のまま", () => {
@@ -163,7 +162,7 @@ test("CB-T273 開始はコピーしない。グループをコピーすると中
 });
 
 test("CB-T274 履歴は直す前のコピーを積み、戻す・やり直すで行き来する。戻してから直すとやり直しは消える。上限を超えたら古いほうから捨てる", () => {
-  const a = templateFlow("x", "");
+  const a = bareFlow("x", "");
   const b = addNode(a, "prompt", { x: 0, y: 0 }).doc;
   const c = renameNode(b, "prompt-1", "書く");
   let history = record(emptyHistory(), a);
@@ -195,7 +194,7 @@ test("CB-T274 履歴は直す前のコピーを積み、戻す・やり直すで
 });
 
 test("CB-T275 同じ欄に続けて打った字は 1 件にまとめる。間が空く・別の欄・区切り（フォーカスが外れた）・別の操作なら別の 1 件", () => {
-  const a = templateFlow("x", "");
+  const a = bareFlow("x", "");
   const typed = (text: string): FlowDoc => patchData(a, "start", { label: text });
   let history = record(emptyHistory(), a, { key: "node:start:label", now: 1000 });
   history = record(history, typed("a"), { key: "node:start:label", now: 1200 });
@@ -362,7 +361,7 @@ test("CB-T299 欄の表記を真似たキーで本当の変更を隠せない。
 });
 
 test("CB-T277 画面から届く未保存のコピーと、保存前の確かめの設定は形を確かめてから受ける", () => {
-  const doc = templateFlow("i0001-01-01", "調査");
+  const doc = bareFlow("i0001-01-01", "調査");
   assert.deepEqual(asFlowMessage({ type: "draft", doc }), { type: "draft", doc });
   assert.deepEqual(asFlowMessage({ type: "draft", doc: null }), { type: "draft", doc: null });
   assert.equal(asFlowMessage({ type: "draft", doc: { nodes: "x" } }), undefined);
@@ -372,7 +371,7 @@ test("CB-T277 画面から届く未保存のコピーと、保存前の確かめ
 });
 
 test("CB-T279 確かめ直しの頼みは番号と読めるコピーがあるときだけ受ける。実行ファイルの答えがあれば、開始が無いという画面の注意は出さない", () => {
-  const doc = templateFlow("i0001-01-01", "調査");
+  const doc = bareFlow("i0001-01-01", "調査");
   assert.deepEqual(asFlowMessage({ type: "check", seq: 3, doc }), { type: "check", seq: 3, doc });
   assert.equal(asFlowMessage({ type: "check", seq: "3", doc }), undefined);
   assert.equal(asFlowMessage({ type: "check", seq: Number.NaN, doc }), undefined);

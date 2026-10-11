@@ -303,30 +303,6 @@ test("CB-D85 関係の欄（overlap・requires・after）と、その id を選�
   }
 });
 
-test("CB-D87 古い順序の欄が残ったファイルは、読まない欄として定義ごとに名指しし、順序は計画の after で決めると言う。保存しても欄は残ると言う", async () => {
-  const dom = await openPhases({ model: readPhases(SAMPLE_PHASES_TEXT.replace("version: 1\n", "version: 1\norder: dag\n").replace('    scope: ["src/*", "tests/*"]\n', '    scope: ["src/*", "tests/*"]\n    requires: [acceptance]\n    after: [acceptance]\n')).model });
-  try {
-    const note = dom.one("#unread").textContent ?? "";
-    assert.match(note, /order（ファイルの頭）/);
-    assert.match(note, /implement の requires・after/);
-    assert.match(note, /順序は親チケットの計画の項の after で決めます/);
-    assert.match(note, /保存しても欄はそのまま残ります/);
-    // 読まない欄は一覧の欄としては出さない
-    dom.click(dom.one(`${rowSelector("p4")} .row-head`));
-    await dom.settle();
-    assert.equal(dom.all(`${rowSelector("p4")} .f-requires, ${rowSelector("p4")} .f-after`).length, 0);
-  } finally {
-    await dom.close();
-  }
-  // 古い欄が無ければ出さない
-  const plain = await openPhases();
-  try {
-    assert.equal(plain.all("#unread").length, 0);
-  } finally {
-    await plain.close();
-  }
-});
-
 test("CB-D86 図・一覧と図の切り替え・全体計画の待ち方の選択は出ない。state に前の図の表示や点の位置が残っていても一覧で開き、定義を足せば足した行が見える", async () => {
   const dom = await openPhases({}, { view: "graph", spots: { design: { x: 40, y: 80 } } });
   try {

@@ -6,7 +6,7 @@
 プロジェクトの `.ccnavi/config/` には触れない。
 
 - 共通レイヤーが無い、または空なら、何も配らず、ミラーも消さない（着手は止めない）
-- 写すのは `rules.yml`・`risks.yml`・`rule-samples.yml` と、配点の `script:` が指す
+- 写すのは `rules.yml`・`risks.yml`・`rule-expectations.yml` と、配点の `script:` が指す
   `.ccnavi/common/scripts/` の下。中身の違うものだけ上書きし、共通レイヤーから無くなった
   ファイルはミラーからも消す。ミラーは共通レイヤーの写しで誰も編集しないので、失うものは無い
 - `script:` の値は書き換えない。ミラーの置き場も `.ccnavi/common/scripts/` で、共通レイヤーと
@@ -34,8 +34,8 @@ from ..policy import rules
 from . import approval, approval_checks, risk
 
 COMMON_DIR = settings.COMMON_DIR
-# 共通レイヤーの見本のファイル名。
-SAMPLES_NAME = "rule-samples.yml"
+# 共通レイヤーの期待する判定のファイル名。
+EXPECTATIONS_NAME = "rule-expectations.yml"
 # `is_synced_write` の `content` を渡さなかった目印。None は「そのファイルが無い」の意味で使う。
 UNSET = object()
 
@@ -85,7 +85,7 @@ def sources(conf: settings.Settings, root: str) -> tuple[dict[str, bytes], str]:
     for name in (
         settings.LAYER_FILE_NAMES[settings.KIND_RULES],
         settings.LAYER_FILE_NAMES[settings.KIND_RISK],
-        SAMPLES_NAME,
+        EXPECTATIONS_NAME,
     ):
         raw, why = _read_strict(os.path.join(base, name))
         if why:

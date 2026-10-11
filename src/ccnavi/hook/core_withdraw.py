@@ -114,9 +114,8 @@ def withdrawable(snapshot: core_base.Snapshot, family: str) -> list[tuple[str, s
     Chrome のボードが「取り下げ」を出すかを決めるのに使う。条件は `withdraw` と同じで、
     承認コミットの親の提案（`prior_proposals`）だけは引ける前提で見る（引くのはホストを読む側。
     引けなければ `withdraw` がその理由で止める）。一覧は承認コミットを引く前に組むので、
-    中身の一致（`_content_problems`）は見ない。承認の記録の無い新しい形か、古い形で記録の
-    条件を満たすものを出す（粗く出しても、押したときに `withdraw` が新しい Snapshot で
-    全部を見直して止める。判定は緩めない）。
+    中身の一致（`_content_problems`）は見ない（粗く出しても、押したときに `withdraw` が
+    新しい Snapshot で全部を見直して止める。判定は緩めない）。
     """
     conf, root = snapshot.conf, snapshot.root
     raw = approval.read_raw(conf, root)
@@ -157,24 +156,7 @@ def _withdraw_problems(
         # 親子のチケットが決まらない・親のブランチの外のチケットなど。
         # 状態の操作と同じく止める
         found.append(copy.blocked)
-    if approval_checks.has_record(copy):
-        # 承認で記録（`ccnavi_approved`）を書いていた頃の古い形。承認で欄が足されているので
-        # 承認コミットの親の提案とは一致しない。子は記録の欄で決める（前の条件のまま）。
-        meta = copy.raw[ticket_model.APPROVAL_KEY]
-        if not copy.is_child:
-            # 親は一律に止める。改版は記録の欄を残したまま計画を書き換えるので、古い形の親が
-            # 改版されたかを見分ける印が無い（前は待ち方のファイルの有無で見分けていた）。
-            found.append(
-                "前の版の形（承認の記録 ccnavi_approved を持つ）の親は取り下げられない"
-                "（改版されたかを見分けられない）。取り消して出し直してください"
-            )
-        elif meta.get("revised_at") or meta.get("feedback_at"):
-            found.append("改版した承認は取り下げられない（改版で動いたものを戻せない）")
-        if meta.get("followup_of") or not meta.get("source_path"):
-            found.append(
-                "続きの子（followup）か、承認の記録の無い承認済みチケットは取り下げられない"
-            )
-    elif copy.raw.get(approval.FOLLOWUP_KEY):
+    if copy.raw.get(approval.FOLLOWUP_KEY):
         found.append(
             "続きの子（followup）は提案を経ずに作ったチケットなので、戻す提案が無い。"
             "取り下げられない"
@@ -210,13 +192,13 @@ def _withdraw_problems(
         found.append("todo/ に同じ識別子の提案がある（戻す先に同じ識別子がすでにある）")
     if ident not in prior_proposals:
         found.append("承認コミットの親に提案が無い（承認コミットを引けない）")
-    elif compare and not approval_checks.has_record(copy):
+    elif compare:
         found += _content_problems(copy, prior_proposals[ident])
     return found
 
 
 def _content_problems(copy: ticket_model.Ticket, prior: bytes) -> list[str]:
-    """新しい形の承認済みチケットが、承認したときのままか。
+    """承認済みチケットが、承認したときのままか。
 
     承認は提案を中身を変えずに動かすので、`doing/` の中身が承認コミットの親の提案（`prior`）と
     バイト単位で同じなら、改版も着手もされていない。改行を揃えて読む `fsio.read_text` は使わない
