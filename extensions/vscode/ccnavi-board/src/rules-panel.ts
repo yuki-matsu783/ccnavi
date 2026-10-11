@@ -49,7 +49,7 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_RULES = ".ccnavi/common/rules.yml";
-const DEFAULT_EXPECTATIONS =".ccnavi/common/rule-samples.yml";
+const DEFAULT_EXPECTATIONS =".ccnavi/common/rule-expectations.yml";
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "rules";
 /** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */

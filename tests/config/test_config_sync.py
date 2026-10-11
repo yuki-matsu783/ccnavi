@@ -84,14 +84,14 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
     def test_parent_start_mirrors_the_common_layer_and_leaves_config_alone(self):
         """1: 共通レイヤーの中身を親のワークツリーの `.ccnavi/common/` へ写す。config は触らない"""
-        write(os.path.join(self.ws, ".ccnavi", "common", "rule-samples.yml"), EXPECTATIONS)
+        write(os.path.join(self.ws, ".ccnavi", "common", "rule-expectations.yml"), EXPECTATIONS)
         config_before = {k: read(config_of(self.lib, k)) for k in ("rules", "phases", "risk")}
 
         tree, started = self.start_parent()
 
         self.assertEqual(json.loads(read(mirror_of(tree, "rules.yml"))), COMMON_RULES)
         self.assertEqual(read(mirror_of(tree, "risks.yml")), COMMON_RISK)
-        self.assertEqual(read(mirror_of(tree, "rule-samples.yml")), EXPECTATIONS)
+        self.assertEqual(read(mirror_of(tree, "rule-expectations.yml")), EXPECTATIONS)
         for kind, text in config_before.items():
             self.assertEqual(read(config_of(tree, kind)), text, kind)
             self.assertEqual(read(config_of(self.lib, kind)), text, kind)
@@ -166,14 +166,14 @@ class ConfigMirrorTest(ConfigUnionHarness):
         """1: 共通レイヤーから無くなったファイルは、ミラーからも消す。config は消さない。"""
         old = mirror_of(self.lib, "scripts/old.sh")
         write(old, "old\n")
-        write(mirror_of(self.lib, "rule-samples.yml"), EXPECTATIONS)
+        write(mirror_of(self.lib, "rule-expectations.yml"), EXPECTATIONS)
         git(self.lib, "add", "-A")
         git(self.lib, "commit", "--quiet", "-m", "old mirror")
 
         tree, started = self.start_parent()
 
         self.assertFalse(os.path.exists(mirror_of(tree, "scripts/old.sh")))
-        self.assertFalse(os.path.exists(mirror_of(tree, "rule-samples.yml")))
+        self.assertFalse(os.path.exists(mirror_of(tree, "rule-expectations.yml")))
         self.assertFalse(os.path.isdir(mirror_of(tree, "scripts")))
         self.assertIn("消した", started.stdout)
         self.assertTrue(os.path.isfile(config_of(tree, "phases")))

@@ -104,7 +104,7 @@ To try one call against the rules without running it, or to run every expectatio
 in a file against them, run
 
     ccnavi --test Bash "git push" [--json]
-    ccnavi --test-expectations .ccnavi/common/rule-samples.yml [--json]
+    ccnavi --test-expectations .ccnavi/common/rule-expectations.yml [--json]
 
 Both go through the same decision as the hook. --json prints the shape
 documented in README.md ("試験の JSON"); the VS Code extension reads it.

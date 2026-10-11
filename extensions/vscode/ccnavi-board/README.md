@@ -21,7 +21,7 @@ ccnavi のチケットが、どのワークツリーでどこまで進んでい�
 |---|---|
 | `ccnaviBoard.binPath` | 実行ファイルの場所。空なら上の順で探す。相対ならワークスペースルートから |
 | `ccnaviBoard.bashPath` | Windows で使うシェル。空なら Git Bash |
-| `ccnaviBoard.expectationsPath` | ルール管理画面が一括で確かめる期待する判定のファイル。既定は `.ccnavi/common/rule-samples.yml`。相対ならワークスペースルートから |
+| `ccnaviBoard.expectationsPath` | ルール管理画面が一括で確かめる期待する判定のファイル。既定は `.ccnavi/common/rule-expectations.yml`。相対ならワークスペースルートから |
 | `ccnaviBoard.flowSaveReview` | フロー編集画面で保存の前に変更の一覧を出すか。既定は出す |
 
 ルールファイルの場所は `.ccnavi/common/rules.yml` 固定。

@@ -17,7 +17,7 @@
 タイプにならなかったものは除く（除いた数は出す）。ルールを足す候補は、共通レイヤーの
 ルールファイルのコピーに 1 件足した一時ファイルで試す。実際のファイルには書かない。
 
-形は `rules.yml` の 1 タイプぶんと、`rule-samples.yml` の 1 タイプぶんの組。置くのはユーザ
+形は `rules.yml` の 1 タイプぶんと、`rule-expectations.yml` の 1 タイプぶんの組。置くのはユーザ
 （`/ccnavi-config` の手順）。
 
 実行ファイルはネットワークに出ない。読むのは記録と設定だけ。
@@ -108,7 +108,7 @@ class Candidate:
     rule: dict
     layer: str
     rules_path: str
-    # rule-samples.yml の 1 件ずつ（tool / subject / why）。subject のルートは `/repo`。
+    # rule-expectations.yml の 1 件ずつ（tool / subject / why）。subject のルートは `/repo`。
     expectations: list[dict]
 
     def as_yaml(self) -> str:
@@ -474,6 +474,8 @@ def report(stdout: TextIO, conf: settings.Settings, root: str, as_json: bool) ->
     )
     for c in body["candidates"]:
         stdout.write("---\n")
-        stdout.write(f"# 置き場: {c['rules_path']}（rules）と rule-samples.yml（expectations）\n")
+        stdout.write(
+            f"# 置き場: {c['rules_path']}（rules）と rule-expectations.yml（expectations）\n"
+        )
         stdout.write(c["yaml"])
     return 0
