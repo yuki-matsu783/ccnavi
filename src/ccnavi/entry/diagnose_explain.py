@@ -173,6 +173,12 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     else:
         stdout.write("    dontAsk / bypassPermissions   確認できる者が居ないので通さない\n")
 
+    projectless = tree.worktrees_without_project(root, conf.projects)
+    if projectless:
+        stdout.write("\n■ 元のプロジェクトが無いワークツリー\n")
+        for w in projectless:
+            stdout.write(f"  {w.said()}\n")
+
     stdout.write("\n■ チケットの作業範囲（承認済みチケット）\n")
     stdout.write(
         "  ワークツリーに結び付いたチケットの範囲は、ルールの allow / ask より優先される。"

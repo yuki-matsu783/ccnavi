@@ -116,6 +116,76 @@ def worktrees(root: str, projects_dir: str = "") -> list[Tree]:
     return found
 
 
+@dataclass
+class ProjectlessWorktree:
+    """元のプロジェクトを失ったワークツリー。診断が名指しするためのもの。
+
+    gitdir は `.git` ファイルに書かれたとおりの先（読めた分）、gitdir_exists はその先が在るか。
+    """
+
+    name: str
+    path: str
+    gitdir: str
+    gitdir_exists: bool
+
+    def said(self) -> str:
+        """`--lint` と `--explain` で共通の文面。"""
+        if self.gitdir_exists:
+            why = f"{self.gitdir} は在るが、そこからこのワークツリーへ戻る参照が成り立たない"
+        else:
+            why = f"{self.gitdir} の先が見つからない"
+        return (
+            f"ワークツリー {self.name} は元のプロジェクトが無い（{why}）。"
+            "このパスはワークスペースルートとして判定され、そのプロジェクトの deny が効いていない。"
+            "ワークツリーを消すか、プロジェクトを戻してください"
+        )
+
+
+def worktrees_without_project(root: str, projects_dir: str = "") -> list[ProjectlessWorktree]:
+    """`.claude/worktrees/` の下で、ワークツリーの形（`.git` が `gitdir:` で始まるファイル）なのに
+    元のプロジェクトを見つけられないもの。
+
+    `worktrees()` は数えないので、中のパスはワークスペースルートの扱いになる。その穴を診断で
+    名指しするための一覧で、判定には使わない。読むのはファイルシステムだけで、git は起こさない。
+    実行前チェックの経路からは呼ばない（走査が期限を圧迫する）。
+    """
+    base = os.path.join(root, WORKTREES_DIR)
+    try:
+        names = sorted(os.listdir(base))
+    except OSError:
+        return []
+    owners = [main_tree(root), *projects(projects_dir)]
+    found = []
+    for name in names:
+        candidate = os.path.join(base, name)
+        if not os.path.isdir(candidate) or owner_of(candidate, owners) is not None:
+            continue
+        written = _written_gitdir(candidate)
+        if written is None:
+            continue
+        target = written if os.path.isabs(written) else os.path.join(candidate, written)
+        found.append(ProjectlessWorktree(nfc(name), candidate, written, os.path.exists(target)))
+    return found
+
+
+def _written_gitdir(candidate: str) -> str | None:
+    """`.git` ファイルの `gitdir:` に書かれた先（書かれたとおり）。
+
+    ファイルでない・読めない・形が違えば None。
+    """
+    gitfile = os.path.join(candidate, ".git")
+    if not os.path.isfile(gitfile):
+        return None
+    try:
+        with open(gitfile, encoding="utf-8") as f:
+            line = f.read().strip()
+    except (OSError, ValueError):
+        return None
+    if not line.startswith("gitdir:"):
+        return None
+    return line[len("gitdir:") :].strip()
+
+
 def owner_of(candidate: str, owners: list[Tree]) -> Tree | None:
     """このワークツリーの元リポジトリ。ワークスペースかプロジェクトのどれかで、相互参照が成り立つもの。"""
     for owner in owners:
