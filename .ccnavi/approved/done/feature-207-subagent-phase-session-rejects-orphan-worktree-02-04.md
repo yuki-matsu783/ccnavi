@@ -18,6 +18,9 @@ allow:
     glob: "tests/core/*"
   - match: Write|Edit
     glob: "tests/ticket/*"
+started_at: "2026-10-12T04:53:46+0900"
+base_sha: "1ae9858ffff4b6af8edf83ffe230e326a8af0aea"
+completed_at: "2026-10-12T05:31:58+0900"
 ---
 ## やること
 
