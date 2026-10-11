@@ -49,7 +49,7 @@ config のどちらにも置け、判定には、共通レイヤーにその判�
 
 ## 絶対ルール
 
-- 3 本のファイルを書き換えない。下書きはワークツリーの `scratchpad/`（無ければセッションのスクラッチパッド。docs/claude/scratchpad.md）に置き、検証を通してから
+- 3 本のファイルを書き換えない。下書きはワークツリーの `wip/scratchpad/`（docs/claude/scratchpad.md）に置き、検証を通してから
   「何をなぜ変えるか」と一緒にユーザに渡す。置くのはユーザ。`dry-run` で警告だけで通っても同じ
 - 判定を目で真似しない。当たるかどうかは必ず `ccnavi --test-samples` か `--lint` に聞く
 - 見本を期待に合わせて書き換えない。食い違いが出たら、ルールと見本のどちらを直すかはユーザが決める
@@ -77,4 +77,4 @@ ccnavi --explain --log "" --state ""
 - `--rules` / `--phases` / `--risk` で下書きを差し替えられる
 
 `--test` に禁止語を書かない（`ccnavi --test Bash "git push"` はその Bash 自体が `raw-git` に当たる）。
-単発で試したいものも見本ファイルを `scratchpad/` に書いて `--test-samples` で回す。見本の形は `.ccnavi/common/rule-samples.yml` の先頭のコメントにある。
+単発で試したいものも見本ファイルを `wip/scratchpad/` に書いて `--test-samples` で回す。見本の形は `.ccnavi/common/rule-samples.yml` の先頭のコメントにある。
