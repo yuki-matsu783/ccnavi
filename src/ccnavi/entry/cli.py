@@ -55,6 +55,26 @@ def _json_out_of_test(argv: list[str]) -> list[str]:
     return [*argv[: at + 1], *kept, *argv[at + 3 :], "--json"]
 
 
+def _take_test_words(argv: list[str]) -> tuple[list[str], list[str] | None]:
+    """`--test` と続く 2 語を argparse に渡す前に抜き出す。
+
+    返すのは残りの語と、抜いた 2 語（無ければ None）。
+
+    `nargs=2` は版で扱いが違い、3.12 は 2 語の中の旗の名前（`--test Bash --permission-mode auto
+    ls`）を語として取らずに argparse の誤りで抜けてしまい、`_test_usage` の案内まで届かない。
+    続く 2 語をそのまま取れば、版に依らず同じ形で `_test_usage` が読める。2 語に満たないときと
+    `--` の後ろにあるときは、そのまま argparse に任せる。
+    """
+    end = argv.index("--") if "--" in argv else len(argv)
+    if "--test" not in argv[:end]:
+        return argv, None
+    at = argv.index("--test")
+    words = argv[at + 1 : at + 3]
+    if len(words) < 2:
+        return argv, None
+    return [*argv[:at], *argv[at + 3 :]], words
+
+
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。
 
@@ -275,9 +295,12 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # マーカーも履歴も前と同じ中身にするため。
     parser.add_argument("--via", default="")
     try:
-        args = parser.parse_args(_json_out_of_test(argv))
+        rest, test_words = _take_test_words(_json_out_of_test(argv))
+        args = parser.parse_args(rest)
     except SystemExit:
         return EXIT_ERROR
+    if test_words is not None and args.test is None:
+        args.test = test_words
     if args.help:
         stderr.write(cli_usage.USAGE)
         return EXIT_ERROR
