@@ -54,6 +54,8 @@ class LinearTest(unittest.TestCase):
             ("sed s/a/b/ -i .ccnavi/x", True),
             ("sed --i s/a/b/ .ccnavi/x", True),
             ("sed -i s/a/b/ other", False),
+            # `where` が `-i` の語の途中から始まる形も、これまでどおり当たる。
+            ("sed -i.ccnavi/x f", True),
             ("sed s/a/b/ .ccnavi/x", False),
             ("sed -i s/a/b/\x00cat .ccnavi/x", False),
         ):
