@@ -15,7 +15,7 @@ from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import rules
 from ..records import audit
-from ..tickets import approval, approval_checks, flow, phase_scope, phasetypes, ticket_model
+from ..tickets import approval, approval_checks, flow, phase, phase_scope, phasetypes, ticket_model
 from ..tickets import ticket as ticket_mod
 from . import judge, post, post_findings, projskills, reasons
 
@@ -127,6 +127,7 @@ def at_start(
         notice = flow.changed_notice(conf, root, t)
         if notice:
             changed.append(notice)
+    lines.extend(_stage_lines(conf, root, index, children))
     if listed and not full:
         lines.append(
             "  フロー: 自分の担当の子チケットのフローだけを読んで従ってください。"
@@ -138,6 +139,35 @@ def at_start(
         text = f"{skills}\n\n{text}"
     hookio.write_context(stdout, hookio.SUBAGENT_START, text, system="\n".join(changed))
     return EXIT_OK
+
+
+def _stage_lines(
+    conf: settings.Settings,
+    root: str,
+    index: dict[str, ticket_model.Ticket],
+    children: list[ticket_model.Ticket],
+) -> list[str]:
+    """子の親ごとに、親の局面を 1 行ずつ返す（局面の名前は `phase.stage` のまま）。
+
+    局面は案内であって判定ではない。局面を組めない（置き場を読めないなど）ときや、
+    計画の無い親（空文字）には何も出さず、SubagentStart は失敗させない。
+    """
+    parents: list[ticket_model.Ticket] = []
+    for child in sorted(children, key=lambda x: x.ticket):
+        parent = index.get(child.parent)
+        if parent is not None and parent not in parents:
+            parents.append(parent)
+    lines: list[str] = []
+    try:
+        # 承認済みチケットの置き場は 1 度だけ読む。
+        raw = approval.read_raw(conf, root)
+        for parent in parents:
+            text = phase.stage(root, conf, parent, raw)
+            if text:
+                lines.append(f"  親 {parent.ticket} の局面: {text}")
+    except Exception:  # noqa: BLE001  局面を組めなくても SubagentStart を失敗させない
+        return []
+    return lines
 
 
 def _say(stdout: TextIO, text: str) -> int:
