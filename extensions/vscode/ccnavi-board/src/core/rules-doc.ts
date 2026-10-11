@@ -131,6 +131,11 @@ export function condOfYaml(value: unknown, depth = 1): CondNode {
       if (!isScalar(inner) || typeof inner.value !== "string") {
         return invalid(value, `${key} の値は文字列です`);
       }
+      // 引用符の無い `yes` `on` `0755` などは、実行ファイル（PyYAML、YAML 1.1）が文字列以外に読み、
+      // 読み込みが error にする。ここ（YAML 1.2）では文字列に見えるので、誤りとして揃えて挙げる
+      if (inner.type === Scalar.PLAIN && yaml11Ambiguous(inner.value)) {
+        return invalid(value, `${key} の値 ${inner.value} は引用符で囲んでください（実行ファイルは文字列として読みません）`);
+      }
       return { op: key, pattern: inner.value };
     case "all":
     case "any":
@@ -416,8 +421,14 @@ function patchCond(doc: Document, existing: unknown, tree: CondNode): Node {
         if (key !== tree.op) {
           (pair.key as Scalar).value = tree.op;
         }
-        if (pair.value.value !== tree.pattern) {
-          pair.value.value = tree.pattern;
+        const scalar = pair.value;
+        if (scalar.value !== tree.pattern) {
+          scalar.value = tree.pattern;
+        }
+        // 書き方は元のまま。ただし引用符の無い `on` `yes` などは実行ファイル（PyYAML）が真偽値に
+        // 読むので囲む（setText と同じ。読み込みはこれを誤りに挙げている）
+        if ((scalar.type === Scalar.PLAIN || scalar.type === undefined) && yaml11Ambiguous(tree.pattern)) {
+          scalar.type = Scalar.QUOTE_SINGLE;
         }
         return existing as Node;
       }

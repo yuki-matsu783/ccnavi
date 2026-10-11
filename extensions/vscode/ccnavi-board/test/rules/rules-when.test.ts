@@ -254,3 +254,61 @@ test("CB-T339 画面が送り返した木は形を確かめて受け取り、形
   raw.deny[0].when = { op: "all", children: "x" };
   assert.equal(asSections(raw), undefined);
 });
+
+test("CB-T340 葉の値を PyYAML が文字列以外に読む語へ差し替えると、引用符の無い葉でも引用符で囲む", () => {
+  const text = `version: 1
+deny:
+  - id: plain-leaf
+    match: Bash
+    when:
+      any:
+        - glob: foo # 行末
+        - regex: bar
+    message: m
+`;
+  const doc = readRules(text);
+  const tree = doc.model.sections.deny[0].when;
+  assert.ok(tree);
+  const out = doc.apply(withWhen(doc.model.sections, setPattern(setPattern(tree, [0], "on"), [1], "baz")));
+  assert.ok(out.includes("        - glob: 'on' # 行末\n"), out);
+  // 別の型に読まれない語は元の書き方（引用符なし）のまま
+  assert.ok(out.includes("        - regex: baz\n"), out);
+  assert.deepEqual(readRules(out).model.sections.deny[0].when, group("any", [leaf("glob", "on"), leaf("regex", "baz")]));
+  // 読めない（引用符の無い yes）葉を置き換えても、PyYAML が真偽値に読む形では書かない
+  const bad = readRules(text.replace("glob: foo", "glob: yes"));
+  const badTree = bad.model.sections.deny[0].when;
+  assert.ok(badTree);
+  const fixed = bad.apply(withWhen(bad.model.sections, setPattern(replaceLeaf(badTree), [0], "yes")));
+  assert.ok(fixed.includes("- glob: 'yes'"), fixed);
+});
+
+/** 先頭の子（読めない葉）を空の glob に置き換える（画面の「glob に置き換える」と同じ） */
+function replaceLeaf(tree: CondNode): CondNode {
+  return tree.op === "any" ? group("any", [leaf("glob"), ...tree.children.slice(1)]) : tree;
+}
+
+test("CB-T341 引用符の無い葉の値が YAML 1.1 で文字列以外になる語なら、読めないノードとして誤りに挙げる（except も）", () => {
+  const text = `version: 1
+deny:
+  - id: ambiguous
+    match: Bash
+    when:
+      any:
+        - glob: yes
+        - regex: '0755'
+        - glob: "on"
+    except:
+      - glob: off
+    message: m
+`;
+  const rule = readRules(text).model.sections.deny[0];
+  assert.ok(rule.when);
+  const problems = condProblems(rule.when);
+  assert.equal(problems.length, 1, JSON.stringify(problems));
+  assert.deepEqual(problems[0].path, [0]);
+  assert.match(problems[0].message, /glob の値 yes は引用符で囲んでください/);
+  assert.equal(rule.exceptNodes?.[0].op, "invalid");
+  // 読めないノードは読んだ値のまま書き戻す
+  const doc = readRules(text);
+  assert.equal(doc.apply(doc.model.sections), text);
+});
