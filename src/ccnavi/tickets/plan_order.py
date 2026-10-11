@@ -38,14 +38,25 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import os
 import re
 from dataclasses import dataclass, field
 
 import yaml
 
-from ..infra import fsio, settings, yamlread
+from ..infra import fsio, settings, tree, yamlread
 from ..policy import rules
-from . import agree_candidates, approval, phasetypes, ticket_model, workflow
+from . import (
+    agree_candidates,
+    approval,
+    approval_marks,
+    flow,
+    history,
+    phasetypes,
+    ticket_ids,
+    ticket_model,
+    workflow,
+)
 from . import ticket as ticket_mod
 
 # `--plan-order <親> --json` の答えの版。欄を足すだけなら上げない。
@@ -254,10 +265,17 @@ class Source:
     children: list[tuple[ticket_model.Ticket, bytes]]
     current: ticket_model.Ticket | None
     fixed: set[int]
+    # ほかの親の子の提案（`todo/`）のうち、`predecessors` がこの親の `todo/` の子を指すもの。
+    # 子の識別子を付け替えると、この参照も直す。
+    referrers: list[tuple[ticket_model.Ticket, bytes]] = field(default_factory=list)
+    # 走査した提案の全部（付け替え先の識別子の衝突を見るため）。
+    proposals: list[ticket_model.Ticket] = field(default_factory=list)
+    conf: settings.Settings | None = None
+    root: str = ""
 
     @property
     def sha(self) -> str:
-        return digest([(self.parent, self.raw)] + self.children)
+        return digest([(self.parent, self.raw)] + self.children + self.referrers)
 
 
 def digest(files: list[tuple[ticket_model.Ticket, bytes]]) -> str:
@@ -299,8 +317,22 @@ def load(
             return None, f"子の提案 {t.path} を読めない"
         child = _parse(data, t) or t
         children.append((child, data))
+    own = {c.ticket for c, _ in children}
+    referrers: list[tuple[ticket_model.Ticket, bytes]] = []
+    for t in proposals:
+        if t.parent == parent.ticket or t.state != ticket_model.TODO or not t.path:
+            continue
+        if not own.intersection(t.predecessors):
+            continue
+        data = fsio.read_bytes(t.path)
+        if data is None:
+            return None, f"提案 {t.path} を読めない"
+        referrers.append((_parse(data, t) or t, data))
     fixed = agree_candidates.fixed_numbers(conf, root, parent.ticket)
-    return Source(parent, raw, children, current, fixed), ""
+    return (
+        Source(parent, raw, children, current, fixed, referrers, list(proposals), conf, root),
+        "",
+    )
 
 
 def _parse(raw: bytes, found: ticket_model.Ticket) -> ticket_model.Ticket | None:
@@ -325,20 +357,188 @@ class Answer:
     revised: ticket_model.Ticket
     problems: list[rules.Problem]
     revision_problems: list[rules.Problem]
+    # 付け替える子の提案（番号の変わる項を指す子と、その子を `predecessors` で指す子）。
+    changes: list[ChildChange] = field(default_factory=list)
+    # 付け替えられない理由（付け替え先の衝突、承認済みの側の参照）。
+    child_problems: list[str] = field(default_factory=list)
 
     @property
     def writable(self) -> bool:
-        return not (self.renumbered.refused or self.problems or self.revision_problems)
+        return not (
+            self.renumbered.refused
+            or self.problems
+            or self.revision_problems
+            or self.child_problems
+        )
+
+
+@dataclass
+class ChildChange:
+    """子の提案 1 本の付け替え。識別子・`phase:`・`predecessors` の新しい値。"""
+
+    ticket: ticket_model.Ticket
+    raw: bytes
+    new_ticket: str
+    new_phase: int | None
+    new_predecessors: list[str]
 
     @property
-    def moving_children(self) -> list[tuple[ticket_model.Ticket, int]]:
-        """番号が変わる項を指す子の提案と、その新しい番号。"""
-        moved = self.renumbered.moved
-        out = []
-        for child, _ in self.source.children:
-            if child.phase is not None and moved.get(child.phase, child.phase) != child.phase:
-                out.append((child, moved[child.phase]))
-        return out
+    def renamed(self) -> bool:
+        return self.new_ticket != self.ticket.ticket
+
+    @property
+    def new_path(self) -> str:
+        if not self.renamed:
+            return self.ticket.path
+        return os.path.join(os.path.dirname(self.ticket.path), self.new_ticket + ".md")
+
+    def as_json(self) -> dict:
+        return {
+            "ticket": self.ticket.ticket,
+            "new_ticket": self.new_ticket,
+            "path": self.ticket.path,
+            "new_path": self.new_path,
+            "phase": self.ticket.phase,
+            "new_phase": self.new_phase,
+            "predecessors": list(self.ticket.predecessors),
+            "new_predecessors": list(self.new_predecessors),
+        }
+
+
+def retarget(parent_id: str, moved: dict[int, int], children: list[dict]) -> list[dict]:
+    """子の付け替えの決まり。`children` は `{ticket, phase, predecessors}` の並び。
+
+    この親の子（識別子が `<親>-<2 桁>-<2 桁>`）で、`phase` が番号の変わる項を指すものは、識別子の
+    2 桁と `phase` を新しい番号にする（連番は変えない）。どの子も、`predecessors` が付け替えた
+    識別子を指していれば新しい識別子に直す。変わる子だけを、渡した順で返す。
+    """
+    rename: dict[str, str] = {}
+    for c in children:
+        m = ticket_ids._CHILD.match(c["ticket"])
+        phase = c.get("phase")
+        if m is None or m.group("parent") != parent_id or phase not in moved:
+            continue
+        if moved[phase] != phase:
+            rename[c["ticket"]] = ticket_ids.child_id(parent_id, moved[phase], int(m.group("seq")))
+    out = []
+    for c in children:
+        new_ticket = rename.get(c["ticket"], c["ticket"])
+        phase = c.get("phase")
+        new_phase = moved[phase] if c["ticket"] in rename else phase
+        preds = list(c.get("predecessors") or [])
+        new_preds = [rename.get(p, p) for p in preds]
+        if new_ticket != c["ticket"] or new_preds != preds:
+            out.append(
+                {
+                    "ticket": c["ticket"],
+                    "new_ticket": new_ticket,
+                    "phase": phase,
+                    "new_phase": new_phase,
+                    "predecessors": preds,
+                    "new_predecessors": new_preds,
+                }
+            )
+    return out
+
+
+def _changes(source: Source, moved: dict[int, int]) -> list[ChildChange]:
+    files = source.children + source.referrers
+    rows = [
+        {"ticket": t.ticket, "phase": t.phase, "predecessors": list(t.predecessors)}
+        for t, _ in files
+    ]
+    by_id = {t.ticket: (t, raw) for t, raw in files}
+    out = []
+    for row in retarget(source.parent.ticket, moved, rows):
+        t, raw = by_id[row["ticket"]]
+        out.append(
+            ChildChange(t, raw, row["new_ticket"], row["new_phase"], row["new_predecessors"])
+        )
+    return out
+
+
+def _child_problems(source: Source, changes: list[ChildChange]) -> list[str]:
+    """付け替えられない理由。付け替え先の衝突と、承認済みの側に付け替える識別子への参照。
+
+    承認済みの側（承認済みチケット・記録・マーカー・フロー・ワークツリー）はエージェントが
+    直せないので、見つけたら書かない。直すのはユーザ（手で直すか、取り消して出し直す）。
+    """
+    renamed = [c for c in changes if c.renamed]
+    if not renamed:
+        return []
+    conf, root = source.conf, source.root
+    leaving = {c.ticket.ticket for c in renamed}
+    leaving_paths = {os.path.realpath(c.ticket.path) for c in renamed}
+    found: list[str] = []
+    for c in renamed:
+        new = c.new_ticket
+        if new not in leaving:
+            if fsio.lexists(c.new_path) and os.path.realpath(c.new_path) not in leaving_paths:
+                found.append(
+                    f"{c.ticket.ticket} の付け替え先 {new} のファイルが既にある（{c.new_path}）"
+                )
+            elif any(t.ticket == new for t in source.proposals):
+                found.append(f"{c.ticket.ticket} の付け替え先 {new} の提案が既にある")
+    names = leaving | {c.new_ticket for c in renamed}
+    for t in source.proposals:
+        if t.state == ticket_model.TODO:
+            continue
+        if t.ticket in names or leaving.intersection(t.predecessors):
+            found.append(f"{t.state}/ の提案 {t.ticket} が付け替える識別子を指す（{t.path}）")
+    if conf is not None:
+        for c in renamed:
+            draft = flow.draft_file(conf, c.ticket.tree_root or root, c.new_ticket)
+            if c.new_ticket not in leaving and fsio.lexists(draft):
+                found.append(f"{c.ticket.ticket} の付け替え先のフローの下書きが既にある（{draft}）")
+    if conf is None:
+        return found
+    for t in approval.all_tickets(conf, root):
+        if t.ticket in names:
+            found.append(f"承認済みチケット {t.ticket} が付け替える識別子と同じ（{t.path}）")
+        hit = sorted(leaving.intersection(t.predecessors))
+        if hit:
+            found.append(
+                f"承認済みチケット {t.ticket} の predecessors が付け替える {', '.join(hit)} を指す"
+            )
+    parent = source.parent.ticket
+    for tr in tree.all_trees(root, conf.projects):
+        if tr.name and tr.name in names:
+            found.append(f"ワークツリー {tr.name} が付け替える識別子と同じ名前（{tr.root}）")
+        place = settings.approved_dir(conf, tr.root)
+        marks = os.path.join(place, approval_marks.PHASES_DIR, parent)
+        try:
+            listed = fsio.listdir(marks)
+        except OSError:
+            listed = []
+        for ident in sorted(names):
+            paths = [
+                os.path.join(place, flow.FLOWS_DIR, ident + flow.SUFFIX),
+                history.path(place, ident),
+            ] + [os.path.join(marks, n) for n in listed if n.startswith(ident + ".")]
+            for path in paths:
+                if path and fsio.lexists(path):
+                    rel = os.path.relpath(path, tr.root)
+                    where = tr.name or "ワークスペースルート"
+                    found.append(f"承認済みの側に {ident} の記録がある（{where}: {rel}）")
+    return sorted(dict.fromkeys(found))
+
+
+def mismatched(source: Source) -> list[dict]:
+    """`todo/` の子の提案のうち、`phase:` が親の計画の番号に無いもの（親と子の食い違い）。"""
+    count = len(source.parent.numbered())
+    out = []
+    for child, _ in source.children:
+        if child.phase is None or 1 <= child.phase <= count:
+            continue
+        out.append(
+            {
+                "ticket": child.ticket,
+                "path": child.path,
+                "phase": child.phase,
+                "text": f"{child.ticket} の phase: {child.phase} は親の計画（1〜{count} 番）に無い",
+            }
+        )
+    return out
 
 
 def answer(source: Source, order: Order | None) -> Answer:
@@ -352,7 +552,8 @@ def answer(source: Source, order: Order | None) -> Answer:
     lock: list[rules.Problem] = []
     if source.current is not None and not got.refused:
         lock = agree_candidates.lock_problems(revised, source.current, source.fixed, got.moved)
-    return Answer(source, got, revised, problems, lock)
+    changes = _changes(source, got.moved) if not got.refused else []
+    return Answer(source, got, revised, problems, lock, changes, _child_problems(source, changes))
 
 
 def plans(ans: Answer) -> list[dict]:
@@ -447,10 +648,9 @@ def body(ans: Answer) -> dict:
         "loose": loose,
         "refused": [r.as_json() for r in ans.renumbered.refused],
         "revision_problems": [str(p) for p in ans.revision_problems],
-        "children": [
-            {"ticket": c.ticket, "path": c.path, "phase": c.phase, "new_phase": new}
-            for c, new in ans.moving_children
-        ],
+        "children": [c.as_json() for c in ans.changes],
+        "child_problems": list(ans.child_problems),
+        "mismatched": mismatched(ans.source),
         "writable": ans.writable,
     }
 
@@ -523,6 +723,15 @@ def _item_text(item: ticket_model.PlanItem) -> str:
 
 def _replace_value(text: str, key: str, items: list[ticket_model.PlanItem]) -> tuple[str, str]:
     """frontmatter の `key:` の値を項の並びに差し替える。ほかの行は変えない。"""
+    if items:
+        return _replace_block(text, key, [f"{key}:"] + [f"  - {_item_text(i)}" for i in items])
+    return _replace_block(text, key, [f"{key}: []"])
+
+
+def _replace_block(text: str, key: str, block_lines: list[str]) -> tuple[str, str]:
+    """frontmatter の `key:` の行と値を `block_lines`（改行なし）に差し替える。
+
+    ほかの行は変えない。"""
     lines = text.splitlines(keepends=True)
     if not lines or lines[0].strip() != _FENCE:
         return text, "frontmatter が読めない"
@@ -553,11 +762,55 @@ def _replace_value(text: str, key: str, items: list[ticket_model.PlanItem]) -> t
             f"`{key}:` の値の中に行頭（0 桁目）のコメントがあり、値の範囲が決まらない。"
             "コメントを字下げするか消してから打ち直す"
         )
-    if items:
-        block = [f"{key}:{newline}"] + [f"  - {_item_text(i)}{newline}" for i in items]
-    else:
-        block = [f"{key}: []{newline}"]
+    block = [line + newline for line in block_lines]
     return "".join(lines[:start] + block + lines[stop:]), ""
+
+
+_CHILD_KEYS = ("ticket", "phase", "predecessors")
+
+
+def child_rebuilt(change: ChildChange) -> tuple[bytes | None, str]:
+    """子の提案の `ticket:`・`phase:`・`predecessors:` の値だけを付け替えたバイト列。"""
+    try:
+        text = change.raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return None, "UTF-8 として読めない"
+    t = change.ticket
+    built = text
+    edits: list[tuple[str, str]] = []
+    if change.renamed:
+        edits.append(("ticket", f"ticket: {change.new_ticket}"))
+    if change.new_phase != t.phase:
+        edits.append(("phase", f"phase: {change.new_phase}"))
+    if change.new_predecessors != list(t.predecessors):
+        dumped = yaml.safe_dump(
+            change.new_predecessors, default_flow_style=True, allow_unicode=True, width=1 << 30
+        ).strip()
+        edits.append(("predecessors", f"predecessors: {dumped}"))
+    for key, line in edits:
+        built, why = _replace_block(built, key, [line])
+        if why:
+            return None, why
+    try:
+        before, after = _front(text), _front(built)
+    except (yaml.YAMLError, ValueError) as exc:
+        return None, f"組んだ全文を読み直せない（{exc}）"
+    if before is None or after is None:
+        return None, "組んだ全文の frontmatter が読めない"
+    rest = [{k: v for k, v in f.items() if k not in _CHILD_KEYS} for f in (before, after)]
+    if rest[0] != rest[1]:
+        return None, "差し替えると ticket・phase・predecessors のほかの欄が変わるので書かない"
+    if text.split(_FENCE, 2)[2:] != built.split(_FENCE, 2)[2:]:
+        return None, "差し替えると本文が変わるので書かない"
+    read, _ = ticket_mod.parse(built)
+    if (
+        read is None
+        or read.ticket != change.new_ticket
+        or read.phase != change.new_phase
+        or list(read.predecessors) != list(change.new_predecessors)
+    ):
+        return None, "組んだ全文が付け替えた子の提案として読めないので書かない"
+    return built.encode("utf-8"), ""
 
 
 def _front(text: str) -> dict | None:
@@ -609,21 +862,55 @@ def _changed_elsewhere(old: str, new: str, revised: ticket_model.Ticket) -> str:
     return ""
 
 
-def write(ans: Answer, content: bytes) -> str:
-    """親の提案を書き換える。読んだときから中身が変わっていれば書かない。書けなければ理由。"""
-    path = ans.source.parent.path
-    now = fsio.read_bytes(path)
-    if now != ans.source.raw:
-        return "提案が外で変わった（読んでから書くまでの間）"
-    for child, raw in ans.source.children:
-        if fsio.read_bytes(child.path) != raw:
-            return f"子の提案 {child.ticket} が外で変わった（読んでから書くまでの間）"
-    failed = fsio.write_bytes_atomic(path, content)
-    if failed:
-        return f"{path} に書けない（{failed}）"
+def write(ans: Answer, content: bytes | None) -> str:
+    """子の提案を付け替え、親の提案を書き換える。書けなければ理由（何も残さない）。
+
+    読んだときから親か子の中身が変わっていれば書かない。書く順は子が先、親が最後。付け替える
+    子は新しい名前に書いてから古い名前を消す（入れ替わる 2 本は、読んだ中身を持っているので
+    上書きしてよい）。フローの下書き（提案の置き場の `flows/<子>.yml`）も一緒に付け替える。
+    途中で落ちたら、触ったパスを全部、書く前の中身へ戻す（無かったものは消す）。
+    """
+    source = ans.source
+    for t, raw in [(source.parent, source.raw)] + source.children + source.referrers:
+        if fsio.read_bytes(t.path) != raw:
+            return f"提案 {t.ticket} が外で変わった（読んでから書くまでの間）"
+    final: dict[str, bytes] = {}
+    leaving: list[str] = []
+    for change in ans.changes:
+        built, why = child_rebuilt(change)
+        if built is None:
+            return f"{change.ticket.path}: {why}"
+        final[change.new_path] = built
+        if change.renamed:
+            leaving.append(change.ticket.path)
+            conf = source.conf
+            if conf is not None:
+                root = change.ticket.tree_root or source.root
+                old_draft = flow.draft_file(conf, root, change.ticket.ticket)
+                draft = fsio.read_bytes(old_draft) if fsio.lexists(old_draft) else None
+                if draft is not None:
+                    final[flow.draft_file(conf, root, change.new_ticket)] = draft
+                    leaving.append(old_draft)
+    leaving = [p for p in leaving if p not in final]
+    touched = list(final) + leaving + ([source.parent.path] if content is not None else [])
+    before = tuple((p, fsio.read_bytes(p) if fsio.lexists(p) else None) for p in touched)
+    done = ""
+    for path, data in final.items():
+        failed = fsio.write_bytes_atomic(path, data)
+        if failed:
+            done = f"{path} に書けない（{failed}）"
+            break
+    if not done:
+        for path in leaving:
+            failed = fsio.unlink(path)
+            if failed:
+                done = f"{path} を消せない（{failed}）"
+                break
+    if not done and content is not None:
+        failed = fsio.write_bytes_atomic(source.parent.path, content)
+        if failed:
+            done = f"{source.parent.path} に書けない（{failed}）"
+    if done:
+        fsio.put_back(before)
+        return done + "。書いたものは戻した"
     return ""
-
-
-def written_sha(ans: Answer, content: bytes) -> str:
-    """書いたあとのハッシュ（親の提案を書いた中身にしたもの）。"""
-    return digest([(ans.source.parent, content)] + ans.source.children)

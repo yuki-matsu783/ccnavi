@@ -188,6 +188,11 @@ def reorder(
     code, written, sha = _write(stderr, ans, expect)
     body["written"] = written
     if written:
+        # 書いたあとに読み直したハッシュを返す（付け替えた子は新しい名前で読む）。
+        again, _ = approval.scan_proposals(conf, root)
+        found, _ = _pick(again, name)
+        reread = reorder_mod.load(conf, root, found, again, current)[0] if found else None
+        sha = reread.sha if reread is not None else ""
         body["source_sha"] = sha
         for plan in body["plans"]:
             plan["source_sha"] = sha
@@ -223,26 +228,28 @@ def _write(stderr: TextIO, ans: reorder_mod.Answer, expect: str) -> tuple[int, b
         for p in ans.revision_problems:
             stderr.write(f"  {p}\n")
         return EXIT_ERROR, False, ""
-    moving = ans.moving_children
-    if moving:
-        names = ", ".join(f"{c.ticket}（phase: {c.phase} → {n}）" for c, n in moving)
-        stderr.write(
-            f"ccnavi: 番号の変わる項を指す子の提案がある（{names}）。子の識別子はフェーズ番号を"
-            "含むので、phase: の値だけを書き換えられない。子の提案の追従はまだ無いので、"
-            "何も書かない\n"
-        )
+    if ans.child_problems:
+        stderr.write("ccnavi: 子の提案を付け替えられない。何も書かない\n")
+        for p in ans.child_problems:
+            stderr.write(f"  {p}\n")
         return EXIT_ERROR, False, ""
     content, why = reorder_mod.rebuilt(ans)
     if why:
         stderr.write(f"ccnavi: {ans.source.parent.path}: {why}。何も書かない\n")
         return EXIT_ERROR, False, ""
-    if content is None:
+    if content is None and not ans.changes:
         return EXIT_OK, False, ""
     failed = reorder_mod.write(ans, content)
     if failed:
-        stderr.write(f"ccnavi: {failed}。何も書かない\n")
+        stderr.write(f"ccnavi: {failed}\n")
         return EXIT_ERROR, False, ""
-    return EXIT_OK, True, reorder_mod.written_sha(ans, content)
+    for change in ans.changes:
+        if change.renamed:
+            stderr.write(
+                f"ccnavi: 子の提案 {change.ticket.ticket} を {change.new_ticket} に付け替えた"
+                f"（phase: {change.ticket.phase} → {change.new_phase}）\n"
+            )
+    return EXIT_OK, True, ""
 
 
 def _proposal(
