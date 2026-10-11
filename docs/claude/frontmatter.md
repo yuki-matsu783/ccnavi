@@ -94,8 +94,6 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 
 - `ccnavi-index.jsonl`はmdのあるディレクトリごとにccnaviが書く生成物。手で直さない。ccnaviの形でないファイルを同じ名前で
   置かれている場合、ccnaviはそのファイルを上書きせず、案内にそのパスを出す
-- 以前の名前は`index.jsonl`だった。新しい名前の索引を書くとき、同じディレクトリにccnaviが書いた形の`index.jsonl`があれば消す。
-  ほかのツールの`index.jsonl`と、gitで追跡しているものは触らない
 - 初回の実行（`--docs`かSessionStart）ではmdをすべて読むので、mdが数千本あると数秒かかる。SessionStartでは短い制限時間で
   打ち切り、読めた分だけを索引に書いて、残りは次回に回す。2回目からは、更新日時が変わったmdだけを読む
 - mdを消しても`ccnavi-index.jsonl`が残ることがある。gitで追跡していないmdしか無いディレクトリや、ディレクトリごと消したときなどである。
