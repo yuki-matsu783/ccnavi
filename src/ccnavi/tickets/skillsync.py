@@ -22,7 +22,7 @@ import os
 
 import yaml
 
-from ..infra import settings, yamlread
+from ..infra import yamlread
 from . import configsync, flow
 
 CONCEPT_KEY = "concept"
@@ -45,7 +45,9 @@ def concepts(root: str) -> list[str]:
     found: list[str] = []
     for name in names:
         path = os.path.join(base, name, SKILL_FILE)
-        if os.path.islink(path) or not os.path.isfile(path):
+        if os.path.islink(os.path.join(base, name)) or os.path.islink(path):
+            continue
+        if not os.path.isfile(path):
             continue
         raw, _ = configsync._read_strict(path)
         if raw is not None and _concept_flag(raw):
@@ -119,7 +121,7 @@ def apply(changes: list[configsync.Change]) -> str:
     return configsync.apply(changes)
 
 
-def describe(conf: settings.Settings, project: str, worktree: str, changes) -> list[str]:
+def describe(project: str, changes: list[configsync.Change]) -> list[str]:
     """着手の出力に足す行。"""
     lines = [
         f"共通の概念スキルとプロジェクト {project} の skills/ が違っていたので、"

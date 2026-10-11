@@ -190,7 +190,7 @@ def _sync_skills(
         stderr.write(f"ccnavi: {found.ticket} の概念スキルを写せない: {failed}\n")
         return None
     git_sh = settings.script_command(root, "ccnavi-git.sh")
-    lines = skillsync.describe(conf, found.project, worktree, changes)
+    lines = skillsync.describe(found.project, changes)
     lines.append(
         f"  作業を始める前に、{worktree} で {', '.join(c.rel for c in changes)} を"
         f" '{git_sh} add' してコミットしてください"

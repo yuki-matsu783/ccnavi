@@ -95,3 +95,24 @@ class SkillSyncTest(ConfigUnionHarness):
         second = self.ccnavi("ticket", "start", "i0002")
         self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
         self.assertNotIn("概念スキル", second.stdout)
+
+    def test_symlinked_concept_dir_is_not_a_concept(self):
+        """2: 概念スキルのディレクトリ自体がシンボリックリンクなら、概念スキルに数えない"""
+        from ccnavi.tickets import skillsync
+
+        write(self.source("testing", "SKILL.md"), concept_skill("testing"))
+        os.symlink(self.source("testing"), self.source("evil"))
+        self.assertEqual(skillsync.concepts(self.ws), ["testing"])
+
+    def test_symlink_under_a_concept_stops_the_copy(self):
+        """2: 概念スキルの下にシンボリックリンクがあれば、何も写さず理由を返す"""
+        from ccnavi.tickets import skillsync
+
+        write(self.source("testing", "SKILL.md"), concept_skill("testing"))
+        outside = os.path.join(self.ws, "outside.md")
+        write(outside, "外\n")
+        os.makedirs(self.source("testing", "references"), exist_ok=True)
+        os.symlink(outside, self.source("testing", "references", "leak.md"))
+        sources, why = skillsync.sources(self.ws)
+        self.assertEqual(sources, {})
+        self.assertIn("シンボリックリンク", why)
