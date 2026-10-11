@@ -18,9 +18,8 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi.hook import c1
 from ccnavi.infra import settings
-from ccnavi.tickets import approval_ops, ticket_ids, ticket_model
+from ccnavi.tickets import approval_ops, c1, ticket_ids, ticket_model
 from ccnavi.tickets import ticket as ticket_mod
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

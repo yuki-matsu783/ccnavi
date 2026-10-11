@@ -710,6 +710,28 @@ def _entries(front: dict, name: str) -> tuple[list[ticket_model.Entry], list[Pro
     return entries, problems
 
 
+def _closing_fence(lines: list[str]) -> int | None:
+    """閉じの `---` の行の番号。先頭の行（開きの `---`）は数えない。無ければ None。"""
+    return next((i for i in range(1, len(lines)) if lines[i].strip() == ticket_model.FENCE), None)
+
+
+def front_mapping(text: str) -> dict | None:
+    """frontmatter を読んだマッピング。`parse` と同じ切り方で、問題の文は組まない。
+
+    frontmatter の形でない・閉じていない・マッピングでないときは None。YAML として読めなければ
+    `yaml.YAMLError` をそのまま投げる（理由の文は呼び手が組む）。提案の欄を書き換えた全文を
+    読み直して、書き換えた欄のほかが元と同じかを比べるのに使う。
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != ticket_model.FENCE:
+        return None
+    end = _closing_fence(lines)
+    if end is None:
+        return None
+    front = yamlread.safe_load("\n".join(lines[1:end]))
+    return front if isinstance(front, dict) else None
+
+
 def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
     lines = text.splitlines()
     if not lines or lines[0].strip() != ticket_model.FENCE:
@@ -724,12 +746,8 @@ def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
         else:
             detail = f"先頭が `{ticket_model.FENCE}` で始まっていない"
         return None, "", [Problem(SEVERITY_ERROR, "(file)", detail)]
-    for i in range(1, len(lines)):
-        if lines[i].strip() == ticket_model.FENCE:
-            head = "\n".join(lines[1:i])
-            body = "\n".join(lines[i + 1 :])
-            break
-    else:
+    end = _closing_fence(lines)
+    if end is None:
         return (
             None,
             "",
@@ -741,6 +759,8 @@ def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
                 )
             ],
         )
+    head = "\n".join(lines[1:end])
+    body = "\n".join(lines[end + 1 :])
     try:
         # safe_load に限る。任意の Python の型を組み立てる load は、
         # エージェントが書けるファイルに向けては使えない（yamlread は safe な読み手だけを使う）。

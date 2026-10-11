@@ -23,12 +23,12 @@ import os
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from ..hook import c1
 from ..infra import gitcmd, settings, tree
 from ..tickets import (
     approval,
     approval_checks,
     approval_times,
+    c1,
     history,
     ops_stop,
     phase,

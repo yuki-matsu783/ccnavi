@@ -19,18 +19,20 @@ import tempfile
 import time
 from typing import TextIO
 
-from ..hook import c1, core, events, judge
+from ..hook import events, judge
 from ..infra import fsio, hookio, modes, settings
 from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, diaglog
 from ..tickets import (
     branchfind,
+    c1,
+    core,
     history,
     review,
     skillsync,
 )
-from . import cli_args, cli_ops, cli_usage, diagnose, lint, plan_order, suggest, version
+from . import cli_args, cli_ops, cli_plan, cli_usage, diagnose, lint, suggest, version
 
 
 def _json_out_of_test(argv: list[str]) -> list[str]:
@@ -608,8 +610,8 @@ def _parsed(
             stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
             return EXIT_ERROR
         if args.fill_phases:
-            return plan_order.fill_phases(stdout, stderr, conf, root, args.plan_order.strip())
-        return plan_order.reorder(
+            return cli_plan.fill_phases(stdout, stderr, conf, root, args.plan_order.strip())
+        return cli_plan.reorder(
             stdout,
             stderr,
             conf,

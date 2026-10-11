@@ -37,10 +37,9 @@ import unittest
 from unittest import mock
 
 from ccnavi.entry import lint, version
-from ccnavi.hook import core, core_base
 from ccnavi.infra import fsio, settings
 from ccnavi.infra import tree as tree_mod
-from ccnavi.tickets import approval, approval_ops, history, ticket_model
+from ccnavi.tickets import approval, approval_ops, core, core_base, history, ticket_model
 from tests import config_path, requires_symlink
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_phases_dag import DEFS, PLAN
@@ -1839,7 +1838,7 @@ class RecordWritesTest(CoreHarness):
             ("gitstate", "shutil.move(source, target)"),
         }
         names = ("tickets.approval", "tickets.agree", "tickets.history", "tickets.configsync")
-        names += ("tickets.ops", "tickets.flow", "tickets.risk", "hook.core", "tickets.review")
+        names += ("tickets.ops", "tickets.flow", "tickets.risk", "tickets.core", "tickets.review")
         names += ("tickets.phase", "tickets.ticket", "infra.gitstate")
         names += ("tickets.approval_marks", "tickets.approval_checks", "tickets.approval_times")
         names += ("tickets.review_host", "tickets.review_decide", "tickets.review_close")
@@ -1849,7 +1848,12 @@ class RecordWritesTest(CoreHarness):
         names += ("tickets.phase_forms", "tickets.phase_scope")
         names += ("tickets.flow_text", "tickets.flow_shape", "tickets.flow_render")
         names += ("tickets.approval_ops", "tickets.ops_close", "tickets.ops_stop")
-        names += ("hook.core_base", "hook.core_approve", "hook.core_review", "hook.core_withdraw")
+        names += (
+            "tickets.core_base",
+            "tickets.core_approve",
+            "tickets.core_review",
+            "tickets.core_withdraw",
+        )
         for dotted in names:
             package, name = dotted.split(".")
             path = os.path.join(ROOT, "src", "ccnavi", package, name + ".py")

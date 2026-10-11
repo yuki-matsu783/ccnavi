@@ -13,12 +13,12 @@ from ..infra import fsio, gitcmd, gitstate, tree
 from ..policy import rules
 from ..tickets import (
     archive,
+    c1,
     phase_scope,
     ticket_fields,
     ticket_model,
     ticket_places,
 )
-from . import c1
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
 # そのルールは「この場所に書かせない」を言っている。

@@ -12,15 +12,15 @@ import os
 import yaml
 
 from ..infra import fsio, settings, yamlread
-from ..tickets import (
+from . import (
     agree,
     approval,
     approval_checks,
     approval_marks,
+    core_base,
     history,
     ticket_model,
 )
-from . import core_base
 
 # ---- 承認の取り下げ ----------------------------------------------------------------------------
 

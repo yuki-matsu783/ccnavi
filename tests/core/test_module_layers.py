@@ -72,7 +72,8 @@ PACKAGES: tuple[tuple[str, str], ...] = (
     ("policy", "ルール。読み込み・照合・組み込み・レイヤーの合成・自己防衛・文脈ファイル"),
     (
         "tickets",
-        "チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、フェーズ、操作",
+        "チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、"
+        "承認・取り下げ・レビュー済みの判定のコア（core）、C1 の見分け、フェーズ、操作",
     ),
     ("hook", "hook の判定と、その文面・実行後の監視・イベント"),
     ("entry", "入口。CLI・診断・lint・提案・版"),
@@ -192,6 +193,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.phase_forms",
                 "tickets.phase_scope",
                 "tickets.plan_order",
+                "tickets.plan_phases",
             }
         ),
     ),
@@ -200,12 +202,12 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         "判定と、チケット・レビューを動かす操作",
         frozenset(
             {
-                "hook.c1",
-                "hook.core",
-                "hook.core_approve",
-                "hook.core_base",
-                "hook.core_review",
-                "hook.core_withdraw",
+                "tickets.c1",
+                "tickets.core",
+                "tickets.core_approve",
+                "tickets.core_base",
+                "tickets.core_review",
+                "tickets.core_withdraw",
                 "hook.judge",
                 "tickets.ops",
                 "tickets.ops_close",
@@ -242,7 +244,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "entry.lint_places",
                 "entry.lint_project",
                 "entry.lint_rules",
-                "entry.plan_order",
+                "entry.cli_plan",
                 "entry.status",
                 "entry.suggest",
                 "entry.version",
