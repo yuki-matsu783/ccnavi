@@ -9,7 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { ApprovePlan } from "../../src/core/approvemodel.js";
-import { canConnect, COLUMN, planGraphOf, type PlanGraph } from "../../src/core/plan-graph.js";
+import { canConnect, canDisconnect, COLUMN, layoutOf, planGraphOf, withLayout, type PlanGraph } from "../../src/core/plan-graph.js";
 import { plansOf, reorderCases, type RawItem } from "../helpers/plan-reorder.js";
 
 function plan(items: readonly RawItem[], extra: Partial<ApprovePlan> = {}, feedback?: readonly RawItem[]): ApprovePlan {
@@ -172,4 +172,44 @@ test("CB-T335 引ける線は項から項へだけ。自分へ・start と end �
   assert.equal(canConnect(graph, "n2", "n3"), false, "固定した番号へ入る");
   assert.equal(canConnect(graph, "n4", "n1"), false, "循環（1 から 4 へ辿れる）");
   assert.equal(canConnect(graph, "n9", "n1"), false, "無い点");
+});
+
+test("CB-T337 線を消せるのは項どうしの線（after）だけ。start と end の仮の線と、固定した番号へ入る線は消せない", () => {
+  const base = plan(DIAMOND);
+  const graph = planGraphOf({ ...base, items: base.items.map((item) => (item.number === 3 ? { ...item, locked: true } : item)) });
+  assert.equal(canDisconnect(graph, "n1", "n2"), true);
+  assert.equal(canDisconnect(graph, "n2", "n4"), true);
+  assert.equal(canDisconnect(graph, "n1", "n3"), false, "固定した番号へ入る線");
+  assert.equal(canDisconnect(graph, "start", "n1"), false, "start からの線は図が引く");
+  assert.equal(canDisconnect(graph, "n4", "end"), false, "end への線は図が引く");
+  assert.equal(canDisconnect(graph, "n1", "n4"), false, "無い線");
+});
+
+test("CB-T338 点は振り直す前の番号（from）を持つ。置き場所は from で覚え、番号が振り直っても同じ項は同じ場所に置く。end は右端の項の次の列", () => {
+  const before = plan(DIAMOND);
+  const layout = layoutOf(planGraphOf(before));
+  assert.deepEqual(Object.keys(layout).sort(), ["1", "2", "3", "4"]);
+  // 2 と 3 が入れ替わった答え（3 番だった項が 2 番に、2 番だった項が 3 番に）。線は 2 → 3（元の 3 → 2）
+  const after = {
+    ...before,
+    items: [before.items[0], { ...before.items[2], number: 2, from: 3 }, { ...before.items[1], number: 3, from: 2 }, before.items[3]],
+    after: { "2": [1], "3": [1, 2], "4": [3] },
+  };
+  const moved = withLayout(planGraphOf(after), layout);
+  const at = (from: number) => moved.nodes.find((node) => node.from === from);
+  assert.equal(at(3)?.number, 2);
+  assert.equal(at(2)?.number, 3);
+  assert.deepEqual([at(3)?.x, at(3)?.y], [layout["3"].x, layout["3"].y], "振り直しても置き場所は動かない");
+  assert.deepEqual([at(2)?.x, at(2)?.y], [layout["2"].x, layout["2"].y]);
+  const end = moved.nodes.find((node) => node.kind === "end");
+  assert.equal(end?.x, Math.max(...Object.values(layout).map((p) => p.x)) + COLUMN);
+  assert.equal(moved.nodes.find((node) => node.kind === "start")?.x, 0);
+  // 覚えていない項（無いはずだが）は組んだ場所のまま
+  const fresh = withLayout(planGraphOf(after), {});
+  assert.deepEqual(
+    fresh.nodes.map((node) => [node.id, node.x, node.y]),
+    planGraphOf(after).nodes.map((node) => [node.id, node.x, node.y]),
+  );
+  // start と end は from を持たない
+  assert.equal(planGraphOf(before).nodes[0].from, null);
 });
