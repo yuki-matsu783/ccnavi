@@ -202,17 +202,11 @@ def scope_findings(
         # `\` を `/` に直す必要は無い。直すと Linux / macOS で `wip\eli5\x.py` や `src\x.py` という
         # 名前のファイル 1 個が、置き場の中や範囲の中のパスと判定され、範囲外として報告されない
         # （実行前チェックも直さない）。
-        # 外すのはチケットの置き場だけ。下書きの置き場（`scratchpad/`）はここでは外さない。
-        # 見ているのは `base_sha..HEAD` の差分（追跡ファイルだけ）と `git status`
-        # （`--ignored` を付けない）で、追跡から外れている `scratchpad/` はどちらにも現れない。
-        # 現れたということはそのツリーの git が `scratchpad/` を追跡しているということで、
-        # 外してよい根拠（追跡されないので統合先へ乗らない）が崩れている。範囲外のものが
-        # コミットに乗って統合先へ入る経路を見ているのはここだけなので、そこは除外して報告を
-        # 消すことはしない。
         if ticket_places.is_ticket_place(rel, conf.tickets, conf.approved):
             continue
-        # ELI5 の置き場は追跡されるので、ここでも外す（実行前チェックと揃える）。
-        if ticket_places.is_eli5_place(rel):
+        # 下書きの置き場（`wip/scratchpad/`）と ELI5 の置き場は追跡されるので、ここでも外す
+        # （実行前チェックと揃える）。下書きは `integrate` が外し、`ready` が `wip/` ごと消す。
+        if ticket_places.is_scratch_place(rel) or ticket_places.is_eli5_place(rel):
             continue
         found = scope_verdict(child, parent, pt, rel)
         if found.outside:

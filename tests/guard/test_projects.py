@@ -635,22 +635,13 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("■ rules lib", explained.stdout)
         self.assertIn("読めない", explained.stdout)
 
-    def test_lint_wants_the_scratch_place_ignored(self):
-        # チケットの範囲は `scratchpad/` に当たらない。外してよい根拠は「git が
-        # 追跡しないので統合先へ乗らない」ことの 1 つだけなので、`.gitignore` にその行が
-        # 無いリポジトリでは根拠が成り立たない。ワークスペースの 1 行はプロジェクトの
-        # git に届かないので、どちらも見る。
-        said = "`scratchpad/` がこのリポジトリの git で無視されていない"
-        before = self.ccnavi("--lint")
-        text = before.stdout + before.stderr
-        # ワークスペースと app と lib の 3 本。
-        self.assertEqual(text.count(said), 3, text)
-        self.assertIn("(scratch)", text)
-
-        for where in (self.ws, self.app, self.lib):
-            write(os.path.join(where, ".gitignore"), "/projects/\n/.claude/\n/scratchpad/\n")
-        after = self.ccnavi("--lint")
-        self.assertNotIn(said, after.stdout + after.stderr)
+    def test_lint_no_longer_asks_for_a_scratchpad_ignore_line(self):
+        # 下書きの置き場は `wip/scratchpad/`（追跡する）に一本化した。ワークツリー直下の
+        # `scratchpad/` を無視しているかの警告は出さない。
+        result = self.ccnavi("--lint")
+        text = result.stdout + result.stderr
+        self.assertNotIn("(scratch", text)
+        self.assertNotIn("無視されていない。実行前チェック", text)
 
     # ---- 7. projects/ を数えない設定では前と同じ
 

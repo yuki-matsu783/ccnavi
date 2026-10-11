@@ -81,15 +81,11 @@ class ScopeGuard:
         if ticket is None:
             return None
         rel = tree.relative(t, full)
-        # 外すのはチケットの置き場だけ。下書きの置き場（`scratchpad/`）はここでは外さない。
-        # 見ているのは `git status`（`--ignored` を付けない）が挙げた変更なので、
-        # 追跡から外れている `scratchpad/` はそもそもこの経路に現れない。現れたということは
-        # そのツリーの git が `scratchpad/` を追跡しているということで、外してよい根拠
-        # （追跡されないので統合先へ乗らない）が崩れている。そこは報告から外さずに言う。
         if ticket_places.is_ticket_place(rel, self.tickets, self.approved):
             return None
-        # ELI5 の置き場は追跡されるので、ここでも外す（実行前チェックと揃える）。
-        if ticket_places.is_eli5_place(rel):
+        # 下書きの置き場（`wip/scratchpad/`）と ELI5 の置き場は追跡されるので、ここでも外す
+        # （実行前チェックと揃える）。
+        if ticket_places.is_scratch_place(rel) or ticket_places.is_eli5_place(rel):
             return None
         parent = self.copies.get(ticket.parent) if ticket.is_child else None
         item = phase_scope.plan_item(ticket, parent)
@@ -347,11 +343,13 @@ def _integrate_writes(changes: list[gitstate.Change], top: str) -> set[str]:
     * ブランチ `branch` が記録の `branch_sha` のまま
     * HEAD が記録の `base` のまま
     * いまの index のツリーが記録の `tree` と同じ
-    * そのツリーが `git merge-tree --write-tree HEAD <ブランチ>`（= squash の結果）と同じ
+    * そのツリーが `git merge-tree --write-tree HEAD <ブランチ>`（= squash の結果）と同じ。
+      ただし `wip/scratchpad/` の下の差は数えない（`integrate` が下書きを外すため）
 
     最後の条件で、記録に何が書かれていても、外れるのは「HEAD にそのブランチを squash した結果」と
-    一字も違わない index だけになる。外す対象は HEAD との staged の差分のパスのうち、作業ツリーで
-    さらに変わっていないもの。ほかの変更、条件が欠けたツリー、git を起こせない・git が古くて
+    `wip/scratchpad/` の下以外は一字も違わない index だけになる。
+    外す対象は HEAD との staged の差分のパスのうち、作業ツリーでさらに変わっていないもの。
+    ほかの変更、条件が欠けたツリー、git を起こせない・git が古くて
     `merge-tree --write-tree` が無い場合は外さず、今までどおり報告する。
     """
     changes = [c for c in changes if c.staged]
@@ -393,7 +391,7 @@ def _integrate_writes(changes: list[gitstate.Change], top: str) -> set[str]:
         merged = gitcmd.run(top, ["merge-tree", "--write-tree", "HEAD", f"refs/heads/{branch}"])
         if not merged.ok or not merged.out.strip():
             continue
-        if merged.out.split("\n", 1)[0].strip() != recorded:
+        if not _same_but_scratch(top, merged.out.split("\n", 1)[0].strip(), recorded):
             continue
         # 改名の検出は切る（gitstate.read と同じ。移動元の削除も 1 件として数える）。
         staged = gitcmd.run(
@@ -407,6 +405,26 @@ def _integrate_writes(changes: list[gitstate.Change], top: str) -> set[str]:
             if path not in moved and path in wanted:
                 out.add(wanted[path])
     return out
+
+
+def _same_but_scratch(top: str, left: str, right: str) -> bool:
+    """2 つのツリーの差が、下書きの置き場（`wip/scratchpad/`）の下だけ（差が無いのも含む）か。
+
+    `integrate` は squash のあとで、ブランチが持ち込んだ `wip/scratchpad/` の分を index から外す。
+    なので index のツリーは `merge-tree --write-tree` の結果と、その分だけ違う。`wip/` のそれ以外
+    （`wip/proposals/` など）の差は数える。ツリーが読めないときは False。
+    """
+    if not left or not right:
+        return False
+    if left == right:
+        return True
+    diff = gitcmd.run(
+        top, ["diff-tree", "-r", "--no-renames", "--name-only", "-z", left, right], raw_paths=True
+    )
+    if not diff.ok:
+        return False
+    prefix = ticket_places.SCRATCH + "/"
+    return all(p.startswith(prefix) for p in diff.out.split("\0") if p)
 
 
 def _ticket_bound(top: str, name: str) -> bool:

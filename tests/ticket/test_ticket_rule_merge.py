@@ -600,24 +600,26 @@ class TicketPlacesElsewhere(TicketPlaces):
 
 
 class ScratchPlace(Workspace):
-    """下書きの置き場（`scratchpad/`）を、実行前チェックだけが範囲の外でも報告しない。
+    """下書きの置き場（`wip/scratchpad/`）は、チケットの範囲を当てない。
 
-    外してよい根拠は「そのツリーの git が追跡しないので統合先へ乗らない」ことの 1 つだけ。
-    だから外すのは実行前の 1 か所に限り、実行後チェックとサブエージェント終了時チェックは
-    外さない。あの 2 つの入力（`git status` と `base_sha..HEAD` の差分）に `scratchpad/` が
-    現れるのは追跡されているときだけで、それは根拠が成り立たない証拠になる。
+    追跡される置き場なので、実行前チェックだけでなく、実行後チェックと
+    サブエージェント終了時チェックも外す。外すのは `wip/scratchpad/` の下だけで、`wip/` の
+    ほかの場所と紛らわしい名前は今までどおり範囲の外として止まる。ワークツリー直下の
+    `scratchpad/`（廃止した置き場）も特別扱いしない。
 
     ルールはワークツリーを allow で開ける。
     """
 
-    # (相対パス, 外すか, なぜ)。素の `scratchpad` は別の 1 本で見る。1 つのツリーに
+    # (相対パス, 外すか, なぜ)。素の `wip/scratchpad` は別の 1 本で見る。1 つのツリーに
     # ディレクトリとファイルの両方は置けないので、この表には入れられない。
     CASES = (
-        ("scratchpad/draft.yml", True, "下書きの置き場そのもの"),
-        ("scratchpad/staging/rules.yml", True, "その下も置き場"),
-        ("scratchpadX/a.md", False, "前置に続けただけの場所は置き場ではない"),
-        ("docs/scratchpad/a.md", False, "ルートの直下 1 段だけ。`.gitignore` も外さない"),
-        ("SCRATCHPAD/a.md", False, "表記は区別する。Linux の `SCRATCHPAD/` は追跡される"),
+        ("wip/scratchpad/draft.yml", True, "下書きの置き場そのもの"),
+        ("wip/scratchpad/staging/rules.yml", True, "その下も置き場"),
+        ("wip/scratchpadX/a.md", False, "前置に続けただけの場所は置き場ではない"),
+        ("wip/design/a.md", False, "wip/ のほかの場所には広げない"),
+        ("docs/wip/scratchpad/a.md", False, "ルートの直下の wip/ だけ"),
+        ("scratchpad/a.md", False, "廃止した置き場。普通の作業対象"),
+        ("WIP/scratchpad/a.md", False, "表記は区別する"),
     )
 
     def setUp(self):
@@ -628,62 +630,51 @@ class ScratchPlace(Workspace):
     def test_pre_tool_use_exempts_the_scratch_place_only(self):
         for rel, exempt, why in self.CASES:
             with self.subTest(path=rel, why=why):
+                if CASE_INSENSITIVE_FS and rel != rel.lower():
+                    self.skipTest(
+                        "大文字小文字を区別しないファイルシステムでは、表記違いが同じ場所になる"
+                    )
                 result = self.write_hook(self.child, rel)
                 want = "allow" if exempt else "deny"
                 code = "" if exempt else "DENY_TICKET_SCOPE"
                 self.assertEqual(self.decision(result), want, self.reason(result))
                 self.assertEqual(self.last_record().get("code", ""), code, self.reason(result))
 
-    def test_a_file_named_scratchpad_is_not_the_place(self):
-        # `.gitignore` の `/scratchpad/` は末尾の `/` でディレクトリにしか当たらない。
-        # 同じ名前のファイルは追跡されるので、範囲も当てる。
-        result = self.write_hook(self.child, "scratchpad")
+    def test_a_file_named_like_the_place_is_not_the_place(self):
+        result = self.write_hook(self.child, "wip/scratchpad")
         self.assertEqual(self.decision(result), "deny", self.reason(result))
         self.assertEqual(self.last_record().get("code", ""), "DENY_TICKET_SCOPE")
 
-    def test_post_tool_use_reports_a_tracked_scratch_place(self):
-        """実行後チェックは下書きの置き場を外さない。
+    def test_post_tool_use_does_not_report_the_scratch_place(self):
+        exempt = self.after_shell(self.child, "wip/scratchpad/draft.yml", session="s-in")
+        self.assertNotIn("POST_TICKET_SCOPE", exempt.stderr, exempt.stderr)
+        other = self.after_shell(self.child, "wip/scratchpadX/draft.yml", session="s-out")
+        self.assertIn("POST_TICKET_SCOPE", other.stderr)
+        self.assertIn("wip/scratchpadX/draft.yml", other.stderr)
+        old = self.after_shell(self.child, "scratchpad/draft.yml", session="s-old")
+        self.assertIn("POST_TICKET_SCOPE", old.stderr)
 
-        この土台の `.gitignore` は `scratchpad/` を無視しないので、ここに置いたものは
-        追跡される。追跡されるということは、外してよい根拠（統合先へ乗らない）が
-        成り立たないということなので、省かずに言う。追跡から外れているリポジトリでは
-        そもそも `git status` に現れないので、この報告は出ない。
-        """
-        result = self.after_shell(self.child, "scratchpad/draft.yml", session="s-tracked")
-        self.assertIn("POST_TICKET_SCOPE", result.stderr)
-        self.assertIn("scratchpad/draft.yml", result.stderr)
-
-    def test_post_tool_use_says_nothing_when_the_scratch_place_is_ignored(self):
-        """追跡から外れていれば、下書きは 1 件も報告されない。機能が成り立つ側。"""
-        write(os.path.join(self.child, ".gitignore"), "/scratchpad/\n")
-        result = self.after_shell(self.child, "scratchpad/draft.yml", session="s-ignored")
-        self.assertNotIn("POST_TICKET_SCOPE", result.stderr, result.stderr)
-
-    def test_subagent_stop_reports_a_tracked_scratch_place(self):
-        rel = "scratchpad/draft.yml"
+    def test_subagent_stop_leaves_the_scratch_place_alone(self):
+        rel = "wip/scratchpad/draft.yml"
         write(os.path.join(self.child, *rel.split("/")), "x\n")
         result = self.hook("SubagentStop", "", self.child, agent_id="sub-3")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("POST_TICKET_SCOPE", result.stderr)
+
+    def test_subagent_stop_bounces_the_old_scratchpad_and_lookalikes(self):
+        for rel in ("scratchpad/draft.yml", "wip/scratchpadX/draft.yml"):
+            write(os.path.join(self.child, *rel.split("/")), "x\n")
+        result = self.hook("SubagentStop", "", self.child, agent_id="sub-4")
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("POST_TICKET_SCOPE", result.stderr)
-        self.assertIn(rel, result.stderr)
-
-    def test_subagent_stop_says_nothing_about_an_ignored_scratch_place(self):
-        """追跡から外れていれば、下書きは検査の入力にそもそも現れない。
-
-        `.gitignore` 自体はこの子の範囲（`src/*`）の外なので、それは報告に出る。
-        見るのは `scratchpad/` が出ないことのほう。
-        """
-        write(os.path.join(self.child, ".gitignore"), "/scratchpad/\n")
-        write(os.path.join(self.child, "scratchpad", "draft.yml"), "x\n")
-        result = self.hook("SubagentStop", "", self.child, agent_id="sub-4")
-        self.assertNotIn("scratchpad/draft.yml", result.stderr, result.stderr)
-        self.assertIn(".gitignore", result.stderr)
+        self.assertIn("scratchpad/draft.yml", result.stderr)
+        self.assertIn("wip/scratchpadX/draft.yml", result.stderr)
 
 
 class Eli5Place(Workspace):
     """ELI5 の HTML の置き場（`wip/eli5/`）は、チケットの範囲を当てない。
 
-    `scratchpad/` と違って追跡される置き場なので、実行前チェックだけでなく、実行後チェックと
+    追跡される置き場なので、実行前チェックだけでなく、実行後チェックと
     サブエージェント終了時チェックも外す。外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所と
     紛らわしい名前は今までどおり範囲の外として止まる。親のツリーでも子のツリーでも同じ。
 
