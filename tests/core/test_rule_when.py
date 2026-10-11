@@ -2,7 +2,7 @@
 
 読み込み（書式・苦情・上限）、判定（all / any / not の組み合わせ、except との併用、
 `{!root}` を組み立てられないとき、hook の判定と入れ子のコマンド）、lint、レイヤーのマージ、
-提案が書き戻す形、`--explain` と見本（`--test-samples`）を見る。
+提案が書き戻す形、`--explain` と期待する判定（`--test-expectations`）を見る。
 """
 
 from __future__ import annotations
@@ -622,7 +622,7 @@ class WrittenTest(unittest.TestCase):
 
 
 class CommandLineTest(unittest.TestCase):
-    """`--explain` が組み合わせ条件を出し、`--test-samples` が when のルールを見本で確かめる。"""
+    """`--explain` が組み合わせ条件を出し、`--test-expectations` が when のルールを確かめる。"""
 
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
@@ -655,9 +655,9 @@ class CommandLineTest(unittest.TestCase):
         self.assertIn("when: any(glob '*.pem', all(glob '*/secrets/*', not(glob '*.md')))", out)
         self.assertIn("        any\n          glob '*.pem'\n", out)
 
-    def test_samples(self):
-        samples = os.path.join(self.root, "samples.yml")
-        with open(samples, "w", encoding="utf-8") as f:
+    def test_expectations(self):
+        expectations = os.path.join(self.root, "expectations.yml")
+        with open(expectations, "w", encoding="utf-8") as f:
             json.dump(
                 {
                     "deny": [
@@ -670,9 +670,9 @@ class CommandLineTest(unittest.TestCase):
                 },
                 f,
             )
-        body = json.loads(self.run_cli("--test-samples", samples, "--json"))
+        body = json.loads(self.run_cli("--test-expectations", expectations, "--json"))
         self.assertEqual(body["mismatches"], 0, body)
-        hit = body["samples"][0]["rules"][0]
+        hit = body["expectations"][0]["rules"][0]
         self.assertEqual(hit["id"], "secrets")
         self.assertEqual(hit["kind"], "when")
 

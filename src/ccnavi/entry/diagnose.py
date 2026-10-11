@@ -23,7 +23,7 @@
 このモジュールは名前を引き受けるだけで、中身は持たない。呼び出し側（cli・suggest）は
 `diagnose.test` のように引き続きここから呼ぶ。
 
-* `diagnose_try`: `--test` と `--test-samples`。1 件の試験と見本の回し方
+* `diagnose_try`: `--test` と `--test-expectations`。1 件の試験と期待する判定の回し方
 * `diagnose_explain`: `--explain` の本文
 * `diagnose_board`: ボードの中身（`--explain --json`）
 * `diagnose_shared`: explain・board・try が共有するレイヤーの読み出しとルールの書き方
@@ -44,11 +44,11 @@ explain = diagnose_explain.explain
 explain_json = diagnose_explain.explain_json
 
 KNOWN_TOOLS = diagnose_try.KNOWN_TOOLS
-SAMPLE_PLACEHOLDER = diagnose_try.SAMPLE_PLACEHOLDER
+EXPECTATION_PLACEHOLDER = diagnose_try.EXPECTATION_PLACEHOLDER
 TEST_VERSION = diagnose_try.TEST_VERSION
-load_samples = diagnose_try.load_samples
-run_samples = diagnose_try.run_samples
+load_expectations = diagnose_try.load_expectations
+run_expectations = diagnose_try.run_expectations
 test = diagnose_try.test
 test_json = diagnose_try.test_json
-test_samples = diagnose_try.test_samples
+test_expectations = diagnose_try.test_expectations
 try_one = diagnose_try.try_one

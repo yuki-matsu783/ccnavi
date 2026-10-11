@@ -7,17 +7,17 @@
   handover の数で分かる（audit.HANDOVER の説明）が、数えるのはユーザの手では手間が大きい
 - 文面を見直す候補。同じルールが、同じ呼び出しを繰り返し止めているもの。止められた側が
   文面から次の一手を読めず、言い換えて打ち直している疑いがある（repeat と同じ数え方）。
-  いまのルールをそのまま、繰り返し止めた呼び出しを見本につけて出す。直すのは `message`
+  いまのルールをそのまま、繰り返し止めた呼び出しを期待する判定につけて出す。直すのは `message`
 
 出すのは `deny` と `ask` の候補だけで、`allow` は出さない。記録から通す側の候補を起こすと、
 「よく来るから通す」になり、判定を緩める変更を機械が勧めることになる。
 
 出すのは検証を通ったものだけ。候補ごとに、`--lint` と同じ読み（lint_rules._rules）で
-ルールを確かめ、`--test-samples` と同じ判定（diagnose.try_one）で見本を回し、期待した
+ルールを確かめ、`--test-expectations` と同じ判定（diagnose.try_one）で期待する判定を回し、期待した
 タイプにならなかったものは除く（除いた数は出す）。ルールを足す候補は、共通レイヤーの
 ルールファイルのコピーに 1 件足した一時ファイルで試す。実際のファイルには書かない。
 
-形は `rules.yml` の 1 タイプぶんと、`rule-samples.yml` の 1 タイプぶんの組。置くのはユーザ
+形は `rules.yml` の 1 タイプぶんと、`rule-expectations.yml` の 1 タイプぶんの組。置くのはユーザ
 （`/ccnavi-config` の手順）。
 
 実行ファイルはネットワークに出ない。読むのは記録と設定だけ。
@@ -53,13 +53,13 @@ KIND_MESSAGE = "message"
 
 # ルールを足す候補にする、渡った回数の下限。数回ならルールを書くよりユーザが見たほうが早い。
 HANDOVER_MIN = 5
-# 種類ごとに出す候補の上限と、候補 1 件につける見本の上限。
+# 種類ごとに出す候補の上限と、候補 1 件につける期待する判定の上限。
 CANDIDATE_LIMIT = 10
-SAMPLE_LIMIT = 3
+EXPECTATION_LIMIT = 3
 # 候補の id の前置き。ユーザが名前を付け直す前提の仮の名前であることを表記で言う。
 ID_PREFIX = "suggest-"
 
-# 記録の subject が上限で切られた目印（audit._limited）。切れた文字列は見本にできない。
+# 記録の subject が上限で切られた目印（audit._limited）。切れた文字列は期待する判定にできない。
 _CUT = re.compile(r"…\(\+\d+\)$")
 _ENV_ASSIGN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=\S*")
 _COMMAND = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*")
@@ -108,13 +108,13 @@ class Candidate:
     rule: dict
     layer: str
     rules_path: str
-    # rule-samples.yml の 1 件ずつ（tool / subject / why）。subject のルートは `/repo`。
-    samples: list[dict]
+    # rule-expectations.yml の 1 件ずつ（tool / subject / why）。subject のルートは `/repo`。
+    expectations: list[dict]
 
     def as_yaml(self) -> str:
         body = {
             "rules": {self.section: [self.rule]},
-            "samples": {self.section: self.samples},
+            "expectations": {self.section: self.expectations},
         }
         dumped = yaml.safe_dump(body, allow_unicode=True, sort_keys=False, width=100)
         return f"# {self.summary}\n{dumped}"
@@ -130,16 +130,16 @@ class Candidate:
             "layer": self.layer,
             "rules_path": self.rules_path,
             "rule": self.rule,
-            "samples": self.samples,
+            "expectations": self.expectations,
             "yaml": self.as_yaml(),
         }
 
 
 def _placeholder(subject: str, root: str) -> str:
-    """見本に書く文字列。ルートを `/repo` にする（diagnose.SAMPLE_PLACEHOLDER）。"""
+    """期待する判定に書く文字列。ルートを `/repo` にする（diagnose.EXPECTATION_PLACEHOLDER）。"""
     for spelled in {os.path.realpath(root), root}:
         if spelled and spelled != "/":
-            subject = subject.replace(spelled, diagnose.SAMPLE_PLACEHOLDER)
+            subject = subject.replace(spelled, diagnose.EXPECTATION_PLACEHOLDER)
     return subject
 
 
@@ -292,13 +292,13 @@ def _lint_errors(path: str, root: str, rule_id: str, layer: bool) -> bool:
     )
 
 
-def _samples_pass(
-    conf: settings.Settings, root: str, samples: list[dict], want: str, rule_id: str
+def _expectations_pass(
+    conf: settings.Settings, root: str, expectations: list[dict], want: str, rule_id: str
 ) -> bool:
-    """見本がぜんぶ期待したタイプになり、候補のルールに当たるか（`--test-samples` と同じ判定）。"""
-    for sample in samples:
-        subject = sample["subject"].replace(diagnose.SAMPLE_PLACEHOLDER, root)
-        out = diagnose.try_one(io.StringIO(), conf, root, sample["tool"], subject)
+    """期待がぜんぶ期待したタイプになり、候補に当たるか（`--test-expectations` と同じ）。"""
+    for expectation in expectations:
+        subject = expectation["subject"].replace(diagnose.EXPECTATION_PLACEHOLDER, root)
+        out = diagnose.try_one(io.StringIO(), conf, root, expectation["tool"], subject)
         if out["verdict"] != want or rule_id not in [h["id"] for h in out["rules"]]:
             return False
     return True
@@ -335,13 +335,13 @@ def _rule_candidates(
                 rule_id += "-2"
             taken.add(rule_id)
             rule = {"id": rule_id, "match": tool, **form}
-            samples = [
+            expectations = [
                 {
                     "tool": tool,
                     "subject": _placeholder(s, root),
                     "why": f"記録で、どのルールにも当たらず権限モードへ渡った形（{spelled}）",
                 }
-                for s in subjects[:SAMPLE_LIMIT]
+                for s in subjects[:EXPECTATION_LIMIT]
             ]
             data = dict(base)
             data[rules.ASK] = [*(base.get(rules.ASK) or []), rule]
@@ -349,8 +349,8 @@ def _rule_candidates(
             with open(path, "w", encoding="utf-8") as f:
                 yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
             trial = dataclasses.replace(conf, rules=path)
-            if _lint_errors(path, root, rule_id, False) or not _samples_pass(
-                trial, root, samples, rules.ASK, rule_id
+            if _lint_errors(path, root, rule_id, False) or not _expectations_pass(
+                trial, root, expectations, rules.ASK, rule_id
             ):
                 dropped += 1
                 continue
@@ -368,7 +368,7 @@ def _rule_candidates(
                     rule=rule,
                     layer=ruleload.LAYER_COMMON,
                     rules_path=conf.rules,
-                    samples=samples,
+                    expectations=expectations,
                 )
             )
     return found, dropped
@@ -402,17 +402,17 @@ def _message_candidates(
             continue
         view, rule = hit
         written = _written_rule(rule)
-        samples = [
+        expectations = [
             {
                 "tool": tool,
                 "subject": _placeholder(s, root),
                 "why": f"記録で、{rule_id} が同じ呼び出しを {n} 回以上止めた形",
             }
-            for s in subjects[:SAMPLE_LIMIT]
+            for s in subjects[:EXPECTATION_LIMIT]
         ]
         layer = view.name != ruleload.LAYER_COMMON
-        if _lint_errors(view.path, root, written["id"], layer) or not _samples_pass(
-            conf, root, samples, rules.DENY, rule_id
+        if _lint_errors(view.path, root, written["id"], layer) or not _expectations_pass(
+            conf, root, expectations, rules.DENY, rule_id
         ):
             dropped += 1
             continue
@@ -430,7 +430,7 @@ def _message_candidates(
                 rule=written,
                 layer=view.name,
                 rules_path=view.path,
-                samples=samples,
+                expectations=expectations,
             )
         )
     return found, dropped
@@ -474,6 +474,8 @@ def report(stdout: TextIO, conf: settings.Settings, root: str, as_json: bool) ->
     )
     for c in body["candidates"]:
         stdout.write("---\n")
-        stdout.write(f"# 置き場: {c['rules_path']}（rules）と rule-samples.yml（samples）\n")
+        stdout.write(
+            f"# 置き場: {c['rules_path']}（rules）と rule-expectations.yml（expectations）\n"
+        )
         stdout.write(c["yaml"])
     return 0
