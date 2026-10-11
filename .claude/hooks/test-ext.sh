@@ -80,11 +80,16 @@ CHROME="extensions/chrome/ccnavi-approval"
 # 何も実行せずに通ってしまう。同じ理由で、絞り込みは sed の正規表現ではなく case の
 # 文字列比較で行う（パスに `#` や `[` が入ると sed が構文エラーになる）。ループの中で
 # 起こすテストは標準入力を /dev/null にする。一覧を読んでいる標準入力を読まれると、残りが飛ぶ
+#
+# 共通の部品（extensions/shared/）を編集したときは、同じツリーの VS Code 拡張を実行する。
+# shared を読む画面のグループは test-groups.js が import（@ccnavi/shared/...）を辿って決める
 sed -n \
 	-e "s#^\(.*/$VSCODE\)/.*#vscode \1#p" \
 	-e "s#^\($VSCODE\)/.*#vscode \1#p" \
 	-e "s#^\(.*/$CHROME\)/.*#chrome \1#p" \
 	-e "s#^\($CHROME\)/.*#chrome \1#p" \
+	-e "s#^\(.*\)/extensions/shared/.*#vscode \1/$VSCODE#p" \
+	-e "s#^extensions/shared/.*#vscode $VSCODE#p" \
 	"$files.sorted" | sort -u >"$files.roots"
 
 failed=""
@@ -105,10 +110,27 @@ while IFS= read -r line; do
 	fi
 	# そのツリーのファイルだけを渡す。2 つのワークツリーを編集したターンでは、
 	# それぞれのツリーで 1 回ずつ実行する
+	# VS Code 拡張には、同じツリーの共通の部品（extensions/shared/）のファイルも渡す。
+	# ルートが相対（extensions/vscode/...）のときは、ツリーの接頭辞は空になる
+	shared=""
+	if [ "$kind" = vscode ]; then
+		if [ "$root" = "$VSCODE" ]; then
+			shared="extensions/shared/"
+		else
+			shared="${root%"/$VSCODE"}/extensions/shared/"
+		fi
+	fi
 	set --
 	while IFS= read -r one; do
 		case "$one" in
 		"$root"/*) set -- "$@" "$one" ;;
+		*)
+			if [ -n "$shared" ]; then
+				case "$one" in
+				"$shared"*) set -- "$@" "$one" ;;
+				esac
+			fi
+			;;
 		esac
 	done <"$files.sorted"
 	[ "$#" -gt 0 ] || continue
