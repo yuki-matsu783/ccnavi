@@ -214,3 +214,24 @@ test("CB-T303 archived は実行ファイルの退避の欄を写す。欄が無
     assert.deepEqual(parsedOlder.board.archived, []);
   }
 });
+
+test("CB-T359 提案の has_plan（計画を持つか）を読む。無い・真偽でない値は偽（古い実行ファイルの答え）", () => {
+  const parsed = parseBoardJson(
+    JSON.stringify({
+      version: BOARD_VERSION,
+      tickets: [
+        { ticket: "a", copy: { status: "none" }, proposal: { state: "todo", has_plan: true } },
+        { ticket: "b", copy: { status: "none" }, proposal: { state: "todo" } },
+        { ticket: "c", copy: { status: "none" }, proposal: { state: "todo", has_plan: "yes" } },
+      ],
+      parents: [],
+    }),
+  );
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.deepEqual(
+      parsed.board.tickets.map((t) => t.proposal?.has_plan),
+      [true, false, false],
+    );
+  }
+});
