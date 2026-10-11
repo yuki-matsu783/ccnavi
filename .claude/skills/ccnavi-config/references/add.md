@@ -52,6 +52,9 @@ allow:
 
 どこにも当たらない呼び出しは Claude Code の権限モードの判断になる（`UNDECLARED`）。`allow` は deny の穴を開ける道具ではない。
 
+コマンド名の位置に変数を書く形（`sh $L ...`、`$CMD push`）は、組み込みの shellread の `command-name-expansion` が
+`DENY_COMMAND_NAME_EXPANSION` で止める。ルールに掛かる前に止まるので、ask を書く前に確かめる（効かない ask を書かないため）。
+
 当て方。`glob` か `regex` のどちらか 1 つ。必ず引用符で囲む（`*` `&` `!` `<<` は YAML が先に読む）。
 
 - `glob` は fnmatch と同じで文字列全体に当たる。部分一致は前後に `*` を自分で書く。

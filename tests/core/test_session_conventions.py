@@ -5,7 +5,8 @@
 1. 起動のたびに、ワークツリー・git の入口・下書きの置き場・サブエージェント・合意の要る変更が
    1 行ずつ届く。git の入口は打てる絶対パスで、詳しいことは --help と拒否の案内に聞く形
 2. ワークツリーの行は `workspace-root`、git の行は `raw-git` の deny がワークスペースのルール
-   （共通レイヤーか自身のレイヤー）にあるときだけ載る。ルールが読めず既定に戻ったときは載らない
+   （共通レイヤーか自身のレイヤー）にあるときだけ載る。ルールが読めず既定に戻ったときは載らない。
+   ただし git の行は、生の git を組み込みで止めるとき（チケット制御が有効でラッパーがある）も載る
 3. チケット制御が有効なときだけ、承認済みチケットの状態の確かめ方（`status`）が載る
 4. プロジェクトの置き場にプロジェクトがあるときだけ、cd してから作業する行が載る
 5. md の索引の案内が出る回だけ、詳しい決まりを --docs で引く行が載る
@@ -57,7 +58,7 @@ class SessionConventionsTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         result = run_ccnavi(
-            ["--root", self.root, "--rules", self.rules, "--state", "", "--log", "", *extra],
+            ["--root", self.root, "--rules", self.rules, *extra],
             input=json.dumps(payload),
             cwd=ROOT,
             env=environment,
@@ -132,6 +133,22 @@ class SessionConventionsTest(unittest.TestCase):
 
         self.assertNotIn(WORKTREE_LINE, text)
         self.assertNotIn(GIT_LINE, text)
+
+    def test_生のgitを組み込みで止めるならraw_gitが無くてもgitの行は出る(self):
+        # チケット制御が有効で git のラッパーがあれば、組み込みが生の git を止める。
+        # 判定と文を揃える。ルールが読めず既定に戻っても組み込みは止めるので、行も出る。
+        script = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-git.sh")
+        os.makedirs(os.path.dirname(script), exist_ok=True)
+        with open(script, "w", encoding="utf-8") as f:
+            f.write("exit 0\n")
+        rules_file(self.root, SOUND)
+        self.assertIn(GIT_LINE, block(self.start("--mode", "enable")))
+        self.assertNotIn(
+            GIT_LINE, block(self.start("--mode", "enable", "--ticket-control", "disable"))
+        )
+        with open(self.rules, "w", encoding="utf-8") as f:
+            f.write("version: [壊れている\n")
+        self.assertIn(GIT_LINE, block(self.start("--mode", "enable")))
 
     def test_チケット制御が有効ならstatusの確かめ方が載る(self):
         text = block(self.start("--mode", "enable"))

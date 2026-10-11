@@ -409,7 +409,7 @@ class EntryTest(_Base):
     def session_start(self, session: str = S_ME):
         payload = {"hook_event_name": "SessionStart", "session_id": session, "source": "startup"}
         return run_ccnavi(
-            ["--log", self.log, "--state", self.state],
+            [],
             input=json.dumps(payload),
             env=self.env(),
             cwd=self.root,
@@ -455,7 +455,7 @@ class HookTest(_Base):
             "tool_input": {"command": command},
         }
         return run_ccnavi(
-            ["--log", self.log, "--state", self.state],
+            [],
             input=json.dumps(payload),
             env={
                 "CLAUDE_PROJECT_DIR": self.root,

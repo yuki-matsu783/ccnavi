@@ -423,6 +423,76 @@ store_hit() {
 	return 0
 }
 
+# ---- worktree add の起点が古くないか（P14。hook は git もネットワークも起こさない決まりなので、判定はこの sh の中）
+#
+# 新しいブランチを統合先（名前そのもの、または origin/<統合先>）から切るとき、次を確かめる。
+#   (i)  最後の fetch が 10 分より前、または FETCH_HEAD が無い（共通の git ディレクトリの FETCH_HEAD の更新時刻）
+#   (ii) 起点が手元の統合先で、origin/<統合先> より遅れている（origin/<統合先> が起点なら対象外）
+# 満たさなければ拒否して手順を案内する。ここで fetch は打たない（副作用が増えるため）。
+# fetch を試して失敗した記録（このスクリプトの fetch が失敗したときに共通の git ディレクトリへ置く印）が
+# 10 分以内にあるときは、(i) は止めずに警告だけにする（オフラインで詰まないため）。
+# 起点を省いたときは今のブランチ（HEAD）が起点になるので、それが統合先なら同じ判定をする。
+# 既にあるブランチを出す形は新しく切らないので対象外。
+wt_fresh_dir() {
+	wt_fd=$(git rev-parse --git-common-dir 2>/dev/null) || return 1
+	(cd "$wt_fd" 2>/dev/null && pwd)
+}
+wt_fresh_warn=""
+wt_fresh() {
+	if [ -n "$wt_new" ]; then
+		:
+	elif [ -z "$wt_base" ] && ! git show-ref --verify --quiet "refs/heads/$wt_leaf"; then
+		:
+	else
+		return 0
+	fi
+	wt_f_top=$(ccnavi_phys "$(git rev-parse --show-toplevel 2>/dev/null || :)")
+	[ -n "$wt_f_top" ] || return 0
+	wt_f_integ=$(ccnavi_integration "$wt_f_top" "$WS") || return 0
+	[ -n "$wt_f_integ" ] || return 0
+	wt_f_from="$wt_base"
+	case "$wt_f_from" in
+	'' | HEAD) wt_f_from=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || :) ;;
+	esac
+	wt_f_origin=no
+	case "$wt_f_from" in
+	"$wt_f_integ") ;;
+	"origin/$wt_f_integ") wt_f_origin=yes ;;
+	*) return 0 ;;
+	esac
+	git show-ref --verify --quiet "refs/remotes/origin/$wt_f_integ" || return 0
+	wt_f_dir=$(wt_fresh_dir) || return 0
+
+	wt_f_behind=0
+	if [ "$wt_f_origin" = no ]; then
+		git show-ref --verify --quiet "refs/heads/$wt_f_integ" || return 0
+		wt_f_behind=$(git rev-list --count "$wt_f_integ..origin/$wt_f_integ" 2>/dev/null || echo 0)
+	fi
+
+	# 失敗した fetch も FETCH_HEAD を触る（開いて空にする）ので、失敗の印を先に見る。
+	wt_f_stale=no
+	wt_f_offline=no
+	if [ -f "$wt_f_dir/ccnavi-fetch-failed" ] &&
+		[ -z "$(find "$wt_f_dir/ccnavi-fetch-failed" -mmin +10 2>/dev/null)" ]; then
+		wt_f_offline=yes
+		wt_f_stale=yes
+	elif [ ! -f "$wt_f_dir/FETCH_HEAD" ]; then
+		wt_f_stale=yes
+	elif [ -n "$(find "$wt_f_dir/FETCH_HEAD" -mmin +10 2>/dev/null)" ]; then
+		wt_f_stale=yes
+	fi
+
+	if [ "$wt_f_behind" -ne 0 ]; then
+		reject worktree-base-behind "ワークツリーの基点 $wt_f_integ が origin/$wt_f_integ より ${wt_f_behind} 件遅れています。古い統合先から切ると、取り込み済みの変更を知らないブランチになります。$SELF fetch origin ${wt_f_integ} のあと、統合先のワークツリーで $SELF merge --ff-only origin/${wt_f_integ} を打つか、基点を origin/${wt_f_integ} にして切り直してください（$SELF worktree add $wt_dest -b ${wt_leaf} origin/${wt_f_integ}）。"
+	fi
+	if [ "$wt_f_stale" = yes ] && [ "$wt_f_offline" = no ]; then
+		reject worktree-fetch-stale "ワークツリーの基点 $wt_f_from の元になる origin/${wt_f_integ} が古いかもしれません（最後の fetch が 10 分より前、または fetch の記録がありません）。まず $SELF fetch origin ${wt_f_integ} を打ち、$SELF log --oneline ${wt_f_integ}..origin/${wt_f_integ} で遅れを確かめてから、打ち直してください。遅れていれば統合先のワークツリーで $SELF merge --ff-only origin/${wt_f_integ} を打つか、基点を origin/${wt_f_integ} にして切り直します。"
+	fi
+	if [ "$wt_f_stale" = yes ]; then
+		wt_fresh_warn="fetch を試して失敗した記録があるため、origin/${wt_f_integ} が古いかもしれないまま ${wt_f_from} から切りました（オフラインの可能性）。つながったら $SELF fetch origin ${wt_f_integ} で遅れを確かめてください。"
+	fi
+}
+
 # ---- 直接作業の取り込み（integrate / integrate --abort / integrate-done）
 #
 # チケットを起こさない直接作業のワークツリー（.claude/worktrees/<名前>。ブランチも同じ名前）を、
@@ -532,10 +602,19 @@ ig_wt_branch() {
 # 親子のチケットの取り込み状態があっても当たる。広めに当てて断る向き。
 ig_bound() {
 	ig_why=""
-	if ccnavi_parent_tree "$ig_wt" "$1"; then
+	ig_pt_rc=0
+	ccnavi_parent_tree "$ig_wt" "$1" || ig_pt_rc=$?
+	case "$ig_pt_rc" in
+	0)
 		ig_why="親チケットか提案のあるワークツリー"
 		return 0
-	fi
+		;;
+	2)
+		# 決められないときは、断る向きに倒す。
+		ig_why="親チケットか提案があるかを実行ファイルに確かめられないワークツリー"
+		return 0
+		;;
+	esac
 	for ig_tree in "$WS" "$WS/$ig_projects"/* "$WS"/.claude/worktrees/*; do
 		[ -d "$ig_tree" ] || continue
 		for ig_f in "$ig_tree/$ig_approved/doing/$1.md" "$ig_tree/$ig_approved/done/$1.md" \
@@ -667,7 +746,7 @@ ig_integrate() {
 	if [ "$ig_rc" -ne 0 ] && [ -z "$ig_changed" ] && [ -z "$ig_conf" ]; then
 		printf 'fail  git integrate  %s を取り込めなかった（統合先のツリーは変えていない）  log=%s\n' "$ig_n" "$ig_logrel"
 		ig_log_tail
-		log_info 取り込めなかった -- "name=$ig_n" "reason=integrate-merge-failed" "exit=$ig_rc"
+		log_error 取り込めなかった -- "name=$ig_n" "reason=integrate-merge-failed" "exit=$ig_rc"
 		exit 1
 	fi
 	mkdir -p "$ig_gdir/$ig_n"
@@ -680,7 +759,7 @@ ig_integrate() {
 		printf '%s\n' "$ig_conf" | head -n "$MAX_LINES" | sed 's/^/  /'
 		printf '案内: 統合先のツリーでは衝突を解かない。%s integrate --abort %s で取り込む前に戻し（squash の衝突には merge --abort が効かない）、ワークツリー（.claude/worktrees/%s）の中で %s merge %s を打って衝突を解いてコミットしてから、%s integrate %s を打ち直す\n' \
 			"$SELF" "$ig_n" "$ig_n" "$SELF" "$ig_integ" "$SELF" "$ig_n"
-		log_info 取り込みが衝突した -- "name=$ig_n" "exit=$ig_rc"
+		log_error 取り込みが衝突した -- "name=$ig_n" "exit=$ig_rc"
 		exit 1
 	fi
 	# 下書きの置き場（wip/scratchpad/）の追跡済みファイルは取り込まない。ブランチが持ち込んだパスだけを、
@@ -711,7 +790,7 @@ EOF
 			tree "" integration "$ig_integ" created "$(date +%s)" || :
 		printf 'fail  git integrate  %s の下書き（wip/scratchpad/）を外せなかった（%s。コミットはしていない）  log=%s\n' "$ig_n" "$ig_scr_fail" "$ig_logrel"
 		printf '案内: %s integrate --abort %s で取り込む前に戻してから、原因を確かめて打ち直す\n' "$SELF" "$ig_n"
-		log_info 下書きを外せなかった -- "name=$ig_n" "path=$ig_scr_fail"
+		log_error 下書きを外せなかった -- "name=$ig_n" "path=$ig_scr_fail"
 		exit 1
 	fi
 	if [ "$ig_scr_n" -gt 0 ]; then
@@ -773,7 +852,7 @@ ig_abort() {
 			printf 'fail  git integrate  %s の取り込みを戻せなかった（記録は残した）  log=%s\n' "$ig_n" "$ig_logrel"
 			ig_log_tail
 			printf '案内: 取り込んだパスに staged にしていない変更が重なっていると戻せない。%s status で確かめ、持ち主に確かめてから打ち直す\n' "$SELF"
-			log_info 取り込みを戻せなかった -- "name=$ig_n"
+			log_error 取り込みを戻せなかった -- "name=$ig_n"
 			exit 1
 		fi
 		ig_how="取り込む前（$(ig_short "$ig_m_base")）の状態に戻した"
@@ -939,7 +1018,7 @@ ig_done() {
 			printf 'fail  git integrate-done  %s をコミットできなかった（%s）。staged と取り込みの記録はそのまま、何も片付けていない  log=%s\n' "$ig_n" "$ig_why" "$ig_logrel"
 			ig_log_tail
 			printf '案内: 原因を直してから %s integrate-done %s -m <メッセージ> を打ち直す\n' "$SELF" "$ig_n"
-			log_info コミットできなかった -- "name=$ig_n" "exit=$ig_crc"
+			log_error コミットできなかった -- "name=$ig_n" "exit=$ig_crc"
 			exit 1
 		fi
 		rm -f "$ig_out"
@@ -1192,6 +1271,8 @@ worktree)
 		elif [ -n "$wt_base" ] && [ "$wt_base" != "$wt_leaf" ]; then
 			reject worktree-name "worktree add $wt_dest $wt_base は、$wt_base を名前の違う行き先（${wt_leaf}）に出すか、ブランチの外（detached HEAD）に作ります。ワークツリーの名前はブランチ名と同じにします。新しく切るなら $SELF worktree add $wt_dest -b $wt_leaf ${wt_base}、既にあるブランチ $wt_base を出すなら行き先を .claude/worktrees/$wt_base にしてください。既にあるブランチを識別子の名前のワークツリーで使うなら、親チケット（${wt_leaf}）に branch: $wt_base を書いて承認を受けてから打ってください。"
 		fi
+		# 統合先から切るなら、起点が古くないか確かめる（名前の検査を通ったあと）。
+		wt_fresh
 		;;
 	list | prune | remove)
 		# 許可リスト。remove の --force（略した --forc も）は止める。
@@ -1468,7 +1549,7 @@ checkout | switch)
 	opt_walk checkout_cb ${1+"$@"}
 	# 親のワークツリー（.claude/worktrees/<P> で、親チケットか提案があるもの）では、許す形
 	# （語が無い・自分のブランチ・HEAD・checkout <ref> <パス>）のほかは通さない。
-	# 親チケットか提案があるかは ccnavi_parent_tree が見る。ccnavi-sync.sh・ccnavi-fetch.sh・
+	# 親チケットか提案があるかは ccnavi_parent_tree が実行ファイルに聞く。ccnavi-sync.sh・ccnavi-fetch.sh・
 	# syncstate.home_tree はそれに加えて、ツリーの名前が識別子で、HEAD が同じ名前のブランチを指すことを求める。
 	# 別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.sh は、リモートでの承認を
 	# このツリーへ取り込まなくなる。取り込み状態がある親（親のブランチを一度でも origin へ push したか、
@@ -1522,7 +1603,7 @@ checkout | switch)
 				printf 'fail  git %s  %s の承認済みチケットを %s へ取り込めなかった（merge を取りやめて %s に戻った）。どちらを採るかはユーザに伝えてください\n' "$sub" "$cc_X" "$cc_B" "$cc_X"
 				tail -n "$FAIL_LINES" "$cc_out"
 				rm -f "$cc_out"
-				log_info 親のブランチへ移れなかった -- "reason=carry-merge"
+				log_error 親のブランチへ移れなかった -- "reason=carry-merge"
 				exit 1
 			fi
 			cc_how="既存のブランチ $cc_B へ移り、$cc_X を merge して承認済みチケットとマーカーを取り込んだ"
@@ -1546,7 +1627,10 @@ checkout | switch)
 	"$WS_P"/.claude/worktrees/*)
 		co_name="${co_top#"$WS_P"/.claude/worktrees/}"
 		co_name="${co_name%%/*}"
-		if ccnavi_parent_tree "$co_top" "$co_name"; then
+		# 親チケットか提案があるかを決められない（2）ときも、親のワークツリーとして狭める。
+		co_parent=0
+		ccnavi_parent_tree "$co_top" "$co_name" || co_parent=$?
+		if [ "$co_parent" -ne 1 ]; then
 			co_to=""
 			if [ -n "$co_new" ]; then
 				co_to="$co_new"
@@ -1884,6 +1968,19 @@ logfile="$logdir/git-$(date '+%Y%m%d-%H%M%S')-$$.log"
 status=0
 git --no-pager "$sub" ${1+"$@"} >>"$logfile" 2>&1 || status=$?
 
+# fetch を試して失敗した印（worktree add の起点の確認が、オフラインで詰まらないように使う）。
+# 成功すれば消す。FETCH_HEAD の更新時刻は成功した fetch でしか進まない。
+if [ "$sub" = fetch ]; then
+	fetch_common=$(wt_fresh_dir) || fetch_common=""
+	if [ -n "$fetch_common" ]; then
+		if [ "$status" -eq 0 ]; then
+			rm -f "$fetch_common/ccnavi-fetch-failed"
+		else
+			: >"$fetch_common/ccnavi-fetch-failed" 2>/dev/null || :
+		fi
+	fi
+fi
+
 # 記録のパス。エージェントがそのまま sed -n で開ける形で返す。
 #
 # 基準はワークスペースルート。モード B ではエージェントの cwd がプロジェクトの中に
@@ -1934,6 +2031,9 @@ if [ "$status" -eq 0 ]; then
 	fi
 	if [ "$sub" = push ]; then
 		push_record_family
+	fi
+	if [ "$sub" = worktree ] && [ -n "$wt_fresh_warn" ]; then
+		printf '警告: %s\n' "$wt_fresh_warn"
 	fi
 else
 	printf 'fail  git %s  exit=%d  log=%s\n' "$sub" "$status" "$logrel"

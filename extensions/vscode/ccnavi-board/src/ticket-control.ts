@@ -1,14 +1,13 @@
 /**
- * チケット制御の値をワークスペースから読み、VS Code の context key に反映する。
+ * チケット制御の値を実行ファイルに聞き、VS Code の context key に反映する。
  * サイドパネルの「チケット管理」「リスク管理」「フェーズ管理」の有無と、コマンドパレットの
  * `when` がこの鍵を見る。画面を開く側は `requireTickets` でもう一度見る。
- * VS Code の API に触れるので単体テストの対象外。読み方は core/ticket-control.ts。
+ * VS Code の API と子プロセスに触れるので単体テストの対象外。読み方は core/ticket-control.ts。
  */
-import * as fs from "node:fs";
-import * as path from "node:path";
 import * as vscode from "vscode";
 
-import { TICKET_CONTROL_ENV, ticketControlFrom, type TicketControl } from "./core/ticket-control.js";
+import { loadBoard } from "./ccnavi.js";
+import { TICKET_CONTROL_ENV, ticketControlOf, type TicketControl } from "./core/ticket-control.js";
 
 /** package.json の `when` と揃える */
 export const CONTEXT_KEY = "ccnaviBoard.ticketControl";
@@ -43,47 +42,46 @@ export function requireTickets(what: string): boolean {
   return false;
 }
 
-/** ワークスペースの設定ファイルから読み直す。ファイルが無ければ enable */
-export function readTicketControl(root: string): TicketControl {
-  return ticketControlFrom({
-    settings: readText(path.join(root, ".claude", "settings.json")),
-    local: readText(path.join(root, ".claude", "settings.local.json")),
-  });
+function binSetting(): string {
+  return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-/** 起動時に 1 度読み、設定ファイルの変化で読み直す */
+/**
+ * 実行ファイルの答え（ボードの JSON）を受け取って反映する。ボードを読み直した画面もここへ渡す。
+ * 値が変わったときだけ context key と聞き手に知らせる
+ */
+export function noteTicketControl(value: TicketControl): void {
+  if (value === current) {
+    return;
+  }
+  current = value;
+  void vscode.commands.executeCommand("setContext", CONTEXT_KEY, value);
+  for (const listener of listeners) {
+    listener(value);
+  }
+}
+
+/** 実行ファイルに聞き直す。読めなければ enable（入口を消さない） */
+async function refresh(root: string): Promise<void> {
+  const result = await loadBoard(root, binSetting());
+  noteTicketControl(ticketControlOf(result.ok ? result.board : undefined));
+}
+
+/** 起動時に 1 度聞き、設定ファイルの変化で聞き直す */
 export function watchTicketControl(context: vscode.ExtensionContext): void {
   const folder = vscode.workspace.workspaceFolders?.[0];
-  const refresh = () => {
-    const value = folder === undefined ? "enable" : readTicketControl(folder.uri.fsPath);
-    if (value === current) {
-      return;
-    }
-    current = value;
-    void vscode.commands.executeCommand("setContext", CONTEXT_KEY, value);
-    for (const listener of listeners) {
-      listener(value);
-    }
-  };
-  // 最初の 1 回は値が同じでも context key を設定する。既定の enable を VS Code 側は知らない。
-  current = folder === undefined ? "enable" : readTicketControl(folder.uri.fsPath);
+  // 最初は既定の enable を VS Code 側に知らせておき、答えが来たら差し替える。起動を待たせない
   void vscode.commands.executeCommand("setContext", CONTEXT_KEY, current);
   if (folder === undefined) {
     return;
   }
+  const again = () => void refresh(folder.uri.fsPath);
+  again();
   for (const pattern of SETTINGS_FILES) {
     const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
-    watcher.onDidCreate(refresh);
-    watcher.onDidChange(refresh);
-    watcher.onDidDelete(refresh);
+    watcher.onDidCreate(again);
+    watcher.onDidChange(again);
+    watcher.onDidDelete(again);
     context.subscriptions.push(watcher);
-  }
-}
-
-function readText(filePath: string): string | undefined {
-  try {
-    return fs.readFileSync(filePath, "utf8");
-  } catch {
-    return undefined;
   }
 }

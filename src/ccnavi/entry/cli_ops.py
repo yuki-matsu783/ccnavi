@@ -12,10 +12,11 @@ import os
 import re
 from typing import TextIO
 
-from ..hook import c1, core
 from ..infra import fsio, settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..tickets import (
+    c1,
+    core,
     history,
     ops,
     phase,
@@ -194,8 +195,11 @@ def _worktree(
     消させない）。
     """
     verb = words[1] if len(words) > 1 else ""
-    if verb not in ("drop", "tidy") or len(words) != 3:
-        stderr.write("ccnavi: worktree drop <名前> か worktree tidy <親> [--phase <N>]\n")
+    if verb not in ("drop", "tidy", "remaining") or len(words) != 3:
+        stderr.write(
+            "ccnavi: worktree drop <名前> か worktree tidy <親> [--phase <N>]"
+            " か worktree remaining <親>\n"
+        )
         return EXIT_ERROR
     target = words[2]
     if not ticket_ids.is_valid_id(target):
@@ -206,6 +210,8 @@ def _worktree(
     elif not conf.tickets_enabled:
         stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
         return EXIT_ERROR
+    elif verb == "remaining":
+        code = worktrees.run_remaining(stdout, root, conf, target, cwd)
     else:
         code = worktrees.run_tidy(stdout, stderr, root, conf, target, args.phase, cwd)
     return EXIT_OK if code == 0 else EXIT_ERROR

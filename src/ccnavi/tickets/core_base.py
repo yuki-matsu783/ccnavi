@@ -37,7 +37,7 @@ from dataclasses import dataclass, field
 from typing import TextIO
 
 from ..infra import fsio, settings, tree
-from ..tickets import (
+from . import (
     agree,
     agree_candidates,
     agree_digest,

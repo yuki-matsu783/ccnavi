@@ -16,21 +16,21 @@ import json
 import os
 import unittest
 
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
+from tests.ticketsample import child_text, parent_text
 
 
 class ApprovalToldTest(PhaseHarness):
     # ---- 道具
 
-    def event(self, event, session="s1", agent_id="", tool="", state=None, **tool_input):
+    def event(self, event, session="s1", agent_id="", tool="", **tool_input):
         payload = {"hook_event_name": event, "cwd": self.parent_tree, "session_id": session}
         if tool:
             payload["tool_name"] = tool
             payload["tool_input"] = tool_input
         if agent_id:
             payload["agent_id"] = agent_id
-        extra = ["--state", state] if state is not None else []
-        result = self.ccnavi("--mode", "enable", *extra, stdin=json.dumps(payload))
+        result = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result
 

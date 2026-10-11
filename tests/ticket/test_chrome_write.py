@@ -22,9 +22,9 @@ import os
 from ccnavi.entry import lint, version
 from ccnavi.infra import settings
 from ccnavi.tickets import history
-from tests.ticket.test_core import CoreHarness, _chrome
-from tests.ticket.test_phases import child_text, parent_text
+from tests.ticket.test_swap_points import CoreHarness
 from tests.ticket.test_ticket import git, write
+from tests.ticketsample import child_text, load_chrome, parent_text
 
 ACTOR = {"account": "alice", "version": "9.9.9"}
 
@@ -42,7 +42,9 @@ class ChromeWriteHarness(CoreHarness):
 
     def answer(self, request):
         """Chrome の入口の答え（error も含めてそのまま）。"""
-        return json.loads(_chrome().handle(json.dumps(request), os.path.join(self.root, "memfs")))
+        return json.loads(
+            load_chrome().handle(json.dumps(request), os.path.join(self.root, "memfs"))
+        )
 
     def preview(self, family="i0001"):
         body = self.answer(self.chrome_request("plan", family))
@@ -92,7 +94,7 @@ class RecordsTest(ChromeWriteHarness):
         self.commit_parent()
         request = self.chrome_request("plan", "i0001")
         request["snapshot"]["absent"] = ["i0009"]
-        self.mirror_records(_chrome(), request)
+        self.mirror_records(load_chrome(), request)
         body = self.answer(request)
         self.assertNotIn("error", body, body)
         self.assertEqual(body["identifiers"], [])
@@ -100,7 +102,9 @@ class RecordsTest(ChromeWriteHarness):
         self.assertTrue(
             any("i0009" in p and "gone" in p for p in rejected["i0001-01-01"]), rejected
         )
-        records = _chrome().records(request["snapshot"], _chrome()._placement(), ["i0001", "i0009"])
+        records = load_chrome().records(
+            request["snapshot"], load_chrome()._placement(), ["i0001", "i0009"]
+        )
         self.assertIn("state gone", records["sync/self/families/i0009"])
         self.assertIn("state present", records["sync/self/families/i0001"])
         # 先頭の sha は取り込み状態に書かない（ダイジェストが関係の無い push で変わらないように。
@@ -153,7 +157,7 @@ class WriteGuardTest(ChromeWriteHarness):
         self.assertIsNone(body["changes"])
 
     def test_writes_only_to_the_parent_branch(self):
-        chrome = _chrome()
+        chrome = load_chrome()
         chrome._one_branch({"changes": {"i0001": []}}, "i0001")
         with self.assertRaises(chrome.Refused):
             chrome._one_branch({"changes": {"i0001": [], "i0003": []}}, "i0001")
@@ -161,7 +165,7 @@ class WriteGuardTest(ChromeWriteHarness):
             chrome._one_branch({"changes": {"main": []}}, "i0001")
 
     def test_reserved_names_and_the_integration_are_not_written(self):
-        chrome = _chrome()
+        chrome = load_chrome()
         compat = f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n"
         snap = {
             "integration": {"name": "trunk", "source": "setting", "head": "0" * 40},
@@ -249,7 +253,7 @@ class WrittenCopyTest(ChromeWriteHarness):
 
 class EntryDetailTest(ChromeWriteHarness):
     def test_relative_folds_only_at_the_head_of_a_path(self):
-        chrome = _chrome()
+        chrome = load_chrome()
         root = os.path.join(os.sep, "ws")
         sep = os.sep
         self.assertEqual(chrome._relative(root, "wip/ws/todo/i0001.md"), "wip/ws/todo/i0001.md")
@@ -263,7 +267,7 @@ class EntryDetailTest(ChromeWriteHarness):
 
     def test_host_paths_that_leave_the_tree_are_refused(self):
         """ホストから来たパスは、根から始まるもの・区切りが `\\` のもの・`..` を含むものを断る。"""
-        chrome = _chrome()
+        chrome = load_chrome()
         self.assertEqual(
             chrome._check_rel("wip/proposals/todo/i0001.md"), "wip/proposals/todo/i0001.md"
         )
@@ -272,7 +276,7 @@ class EntryDetailTest(ChromeWriteHarness):
                 chrome._check_rel(path)
 
     def test_a_history_that_cannot_be_written_stops_the_plan(self):
-        chrome = _chrome()
+        chrome = load_chrome()
         root = os.path.join(os.sep, "ws")
         chrome._unwritten(root, "")
         with self.assertRaises(chrome.Refused) as caught:

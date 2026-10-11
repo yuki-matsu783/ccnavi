@@ -88,7 +88,7 @@ function themeDiff(expected: Map<string, string>, actual: Map<string, string>, a
   return diffs;
 }
 
-test("CB-T391 browser-theme.css（Chrome 拡張）の配色は appearance.css の Claude の配色と、ライト・ダークとも同じ名前・同じ値", () => {
+test("CB-T393 browser-theme.css（Chrome 拡張）の配色は appearance.css の Claude の配色と、ライト・ダークとも同じ名前・同じ値", () => {
   // browser-theme.css だけが持ってよいのは字体の 3 変数（VS Code の Webview では VS Code が渡す値）
   const fontVariables = new Set(["--vscode-font-family", "--vscode-font-size", "--vscode-editor-font-family"]);
   const [beforeDark, afterDark] = BROWSER_THEME.split("@media (prefers-color-scheme: dark)");

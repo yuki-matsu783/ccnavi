@@ -57,7 +57,7 @@ test("CX-T005 組織ごとのビルド: GHES の一覧なら通信先はその�
   assert.match(csp(hosts), /connect-src 'self' https:\/\/ghe\.example\.com$/);
 });
 
-test("CX-T157 セルフホストの GitLab を足したビルド: 通信先はそのホストだけで、既定の gitlab.com は入らない（D24。段階 5）", () => {
+test("CX-T157 セルフホストの GitLab を足したビルド: 通信先はそのホストだけで、既定の gitlab.com は入らない（通信先は組み立てのときに埋め込んだホストの一覧だけで決まる）", () => {
   const hosts = parseHosts(
     JSON.stringify({
       hosts: [

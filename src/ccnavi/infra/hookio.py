@@ -29,6 +29,25 @@ ASK = "ask"
 DENY = "deny"
 
 
+# tool_input のうち、判定が文字列として読む欄（judge.SUBJECT_FIELDS と、書き込みの中身の欄）。
+# ここが文字列でない payload は、欄が無いものとして読まずに止める。空として読むと、
+# `{"command": ["git", "push"]}` が「当たるルールが無い」で通る。
+TOOL_INPUT_TEXT_FIELDS = (
+    "command",
+    "file_path",
+    "path",
+    "notebook_path",
+    "skill",
+    "description",
+    "url",
+    "prompt",
+    "pattern",
+    "content",
+    "old_string",
+    "new_string",
+)
+
+
 class NoPayload(Exception):
     """標準入力が空だった。hook ではなくユーザが直接打っている。
 
@@ -94,10 +113,24 @@ def decode(stream: TextIO) -> Input:
         raise Unusable("payload がオブジェクトではない")
 
     event = data.get("hook_event_name") or ""
+    if not isinstance(event, str):
+        raise Unusable("payload の hook_event_name が文字列ではない")
     if not event:
         raise Unusable("payload に hook_event_name が無い")
+    # 判定の鍵になる欄が文字列でないなら、欄が無い payload として読まずに止める。
+    # 無いものとして読むと、ツールの名前が分からないまま「当たるルールが無い」で通る。
+    for name in ("tool_name", "session_id", "cwd", "permission_mode", "tool_use_id"):
+        value = data.get(name)
+        if value is not None and not isinstance(value, str):
+            raise Unusable(f"payload の {name} が文字列ではない")
 
     tool_input = data.get("tool_input")
+    if tool_input is not None and not isinstance(tool_input, dict):
+        raise Unusable("payload の tool_input がオブジェクトではない")
+    for name in TOOL_INPUT_TEXT_FIELDS:
+        value = (tool_input or {}).get(name)
+        if value is not None and not isinstance(value, str):
+            raise Unusable(f"payload の tool_input.{name} が文字列ではない")
     tool_response = data.get("tool_response")
     return Input(
         tool_response=tool_response if isinstance(tool_response, dict) else {},

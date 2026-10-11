@@ -129,26 +129,187 @@ def _config_via_bash(regex: str) -> dict:
             "Put new content there with the Write or Edit tool, so the repair "
             "goes through a path that is checked and recorded. Resolving a merge "
             "conflict is not blocked: 'git add' and 'git restore --ours' put back "
-            "a version that is already committed instead of writing new content."
+            "a version that is already committed instead of writing new content "
+            "(run them through .ccnavi/scripts/ccnavi-git.sh when raw git is blocked)."
         ),
     }
 
+
+# 表記違いに外れないように、止める形は glob の文字列一致ではなく regex で書く。
+# glob（`*git push*` `*rm -rf *`）だと、`git -C . push`・`git --no-pager push`・`rm -fr`・
+# `rm -r -f`・`rm --recursive --force` が外れる。どの式も先読みを使わない（ルールファイルの
+# regex と同じ制約。rules.parse を通す）。
+#
+# どの式も、照合にかかる時間が入力の長さにほぼ比例する形で書く。判定の期限を確かめるのは
+# ルールの合間だけなので、1 本の照合が後戻りで長引くと、期限に気づかないまま hook の timeout に
+# 達し、呼び出しは止められずに通る。そのために次の 3 つを守る。
+#
+# - 語を読む繰り返しは所有的（`*+`）にし、どの語をどの枠で読むかが 1 通りに決まる形にする
+# - 照合の始まりが多い入力（`rm rm rm …`）で、始まりごとに残りを読み直さない。読み直すのは、
+#   ある始まりで当たるなら、もっと前の始まりでも当たる式のとき（rm と reset）。そのときは
+#   コマンドの切れ目から最初の始まりまでを 1 度だけ探し、そこに決める（アトミックグループ）
+# - パスの前置き（`/usr/bin/git` の `/usr/bin/`）は読まない。`/` も前の切れ目の字なので、
+#   名前の直前の `/` で当たる
+
+# 名前の前の切れ目。`legit` のような語や、誘導先の `ccnavi-git.sh` には当たらない。
+_BEFORE = r"(?:^|[^\w.-])"
+# 名前の後ろの切れ目。`push.default` や `git-pushx` のような続きの語には当たらない。
+_AFTER = r"(?:[^\w.-]|$)"
+# 語の終わり。`\x00` はコマンドの切れ目なので、次のコマンドへまたがない。
+_WORD_END = r"(?:[\s\x00]|$)"
+# コマンドの切れ目から、名前の前の切れ目までを読む。最初の始まりに決めるときに使う。
+# `??` で、切れ目の直後に名前がある形を先に見る。
+_FIRST = r"(?:^|\x00)(?>(?:[^\x00]*?[^\w.\x00-])??"
+
+# 語の中の、名前の前の切れ目までを読む。語の頭か、切れ目の字の直後に名前があることを表す。
+_IN_WORD = r"(?:[^\s\x00]*?[^\w\s\x00.-])??"
+
+# ---- git
+#
+# 語の中の字を、名前の前の切れ目になる字（`_ANCHOR`）とそれ以外（`_PLAIN`）に分ける。
+_PLAIN = r"[\w.-]"
+_ANCHOR = r"[^\w\s\x00.-]"
+
+
+def _plain_but(c: str) -> str:
+    """`_PLAIN` のうち、文字 c（大文字小文字を問わない）を除いたもの。"""
+    return rf"(?:[^\W{c}]|[.-])"
+
+
+# 最後の切れ目の後ろが `git` / `git.exe` でない語の、その後ろの部分（空でない）。
+# 選択肢は長いほうから並べる。短いほう（`g`）を先に置くと、`gitx` の頭の `g` だけで当たったことに
+# なり、所有的な繰り返しが読み直さないので、値の残り（`itx`）で読みが止まる。
+_TAIL = (
+    r"(?:"
+    rf"git\.exe{_PLAIN}++"
+    rf"|git\.ex(?:{_plain_but('e')}{_PLAIN}*+)?"
+    rf"|git\.e(?:{_plain_but('x')}{_PLAIN}*+)?"
+    rf"|git\.(?:{_plain_but('e')}{_PLAIN}*+)?"
+    rf"|git[\w-]{_PLAIN}*+"
+    rf"|gi(?:{_plain_but('t')}{_PLAIN}*+)?"
+    rf"|g(?:{_plain_but('i')}{_PLAIN}*+)?"
+    rf"|{_plain_but('g')}{_PLAIN}*+"
+    r")"
+)
+_UPTO_ANCHOR = rf"(?:{_PLAIN}*+{_ANCHOR})++"
+# 中に git の始まり（`git` / `/usr/bin/git`）を持たない語。git のオプションとその値は、この語だけを
+# 読む。始まりを持つ語で読むのをやめても、その始まりから読み直せば同じ続きで当たるので、当たる形は
+# 変わらない。1 つの始まりから読む長さが次の始まりまでになり、`git -c git -c …` でも
+# 読み直しが積もらない。
+_GIT_FREE = rf"(?:{_UPTO_ANCHOR}{_TAIL}?|{_TAIL})"
+_GIT_FREE_OPTION = rf"-{_PLAIN}*+(?:{_UPTO_ANCHOR}{_TAIL}?)?"
+# サブコマンドの前に挟める git のグローバルオプション。値を空白で区切って取るもの
+# （`-C <path>` `-c <k=v>` `--git-dir <dir>` など）は値まで読み、それ以外は `-` で始まる語を
+# 1 つ読む（`--no-pager` `--git-dir=.git` `-C.`）。オプションでない語で読むのをやめるので、
+# `git commit -m push` の `push` は値の位置で、サブコマンドには読まない。値まで読んだ語を
+# 読み直さない（所有的）ので、`git -c push.default=current status` の値の `push` も
+# サブコマンドには読まない。
+#
+# 値とのあいだの空白は 1 字だけ読む。読み（shellread）は語を空白 1 字でつなぎ、空の語
+# （`git -C '' push` の `''`）は空のまま残すので、空白が 2 字続くところは空の値になる。
+# 空白をまとめて読むと、空の値の次の `push` を値として読んで外れる。
+_GIT_OPTIONS = (
+    r"(?:\s++(?:(?:-c|--(?:git-dir|work-tree|namespace|config-env|super-prefix"
+    rf"|attr-source))\s{_GIT_FREE}?|{_GIT_FREE_OPTION}))*+"
+)
+
+
+def _git_sub(sub: str) -> str:
+    """`git <オプション> <sub>` と、ハイフンでつないだ `git-<sub>`。
+
+    `git-<sub>` は `/usr/lib/git-core/git-push` のように、git のサブコマンドを直接起こす形。
+    """
+    return rf"(?:git(?:\.exe)?{_GIT_OPTIONS}\s++{sub}|git-{sub}(?:\.exe)?)"
+
+
+GIT_PUSH_REGEX = rf"{_BEFORE}{_git_sub('push')}{_AFTER}"
+# `--hard` は reset の後ろのどこにあってもよい（`git reset -q --hard`）。git は長いオプションの
+# 略（`--har`）も受け付ける。後ろの語はどれでも読み飛ばせるので、コマンドの中で最初の reset に
+# 決める。後の reset で当たるなら、その `--hard` は最初の reset の後ろにもある。
+# reset の後ろの語のうち、`--`（ここから後ろはパス）と `--ha` `--har` `--hard` でないもの。
+_RESET_OTHER = (
+    r"(?:(?:[^\s\x00-]|-[^\s\x00-]|--[^\s\x00h]|--h[^\s\x00a]|--ha[^\s\x00r]"
+    r"|--har[^\s\x00d]|--hard[^\s\x00])[^\s\x00]*+|--h|-)"
+)
+# `--` から後ろはパスで、`--hard` には読まない（`git reset -- --hard`）。そのあと同じコマンドの中で
+# 次に reset の始まりが来たら、そこから読み直す（rm の `_RM_RESTART` と同じ考え方）。
+_RESET_RESTART = (
+    rf"(?:(?:{_RESET_OTHER}\s++)*?--(?:\s++[^\s\x00]++)*?\s++{_IN_WORD}{_git_sub('reset')}"
+    r"\s\s*+)*+"
+)
+GIT_RESET_HARD_REGEX = (
+    rf"{_FIRST}{_git_sub('reset')}\s)\s*+{_RESET_RESTART}"
+    rf"(?:{_RESET_OTHER}\s++)*?--ha(?:rd?)?{_WORD_END}"
+)
+
+# ---- rm
+#
+# rm の再帰と強制。短い形はまとめても（`-rf` `-fr` `-Rf` `-rfv`）分けても（`-r -f`）、
+# 長い形（`--recursive` `--force`。略した `--rec` `--for` も rm は受け付ける）でもよく、
+# 順序もオペランドとの前後も問わない。片方だけ（`rm -r` `rm -f`）は当てない。
+#
+# 後ろの語はどれでも読み飛ばせるので、コマンドの中で最初の rm に決める（後の rm で当たるなら、
+# その選択肢は最初の rm の後ろにもある）。そこから語を 1 つずつ読み、最初の選択肢の語で
+# 「両方」なら当たり、「再帰」なら後ろに「強制」を、「強制」なら後ろに「再帰」を探す。
+# 選択肢でない語の読み飛ばしは、選択肢の語を読み飛ばさない形（`_rm_other`）で書く。
+_RM_START = rf"{_FIRST}rm(?:\.exe)?\s)"
+_RM_NEITHER = "[a-eg-qs-z]"
+_RM_BOTH = rf"-{_RM_NEITHER}*+(?:r[a-eg-z]*+f|f[a-qs-z]*+r)[a-z]*+"
+_RM_RECURSIVE = r"(?:-[a-qs-z]*+r[a-z]*+|--r[a-z]*+)"
+_RM_FORCE = r"(?:-[a-eg-z]*+f[a-z]*+|--f[a-z]*+)"
+
+
+def _rm_other(flags: str) -> str:
+    """`flags` のどの字の選択肢でもない語。`-` の後ろが英字だけで `flags` の字を含む語と、
+    `--` の後ろが `flags` の字で始まる英字だけの語、それに `--` そのもの（ここから後ろは
+    オペランド）を除いたもの。"""
+    rest = "".join(c for c in "abcdefghijklmnopqrstuvwxyz" if c not in flags)
+    letters = f"[{rest}]"
+    other = r"[^\s\x00a-z]"
+    return (
+        r"(?:[^\s\x00-][^\s\x00]*+"
+        rf"|-(?:{letters}++(?:{other}[^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)"
+        rf"|-{letters}*+[{flags}][a-z]*+{other}[^\s\x00]*+"
+        rf"|--(?:[^\s\x00{flags}][^\s\x00]*+|[{flags}][a-z]*+{other}[^\s\x00]*+)"
+        r")"
+    )
+
+
+# 片方だけの選択肢。`--` の手前で読みを切り替えるときに使う（両方を持つ語はそこで当たりにする）。
+_RM_RECURSIVE_ONLY = r"(?:-[a-eg-qs-z]*+r[a-eg-z]*+|--r[a-z]*+)"
+_RM_FORCE_ONLY = r"(?:-[a-eg-qs-z]*+f[a-qs-z]*+|--f[a-z]*+)"
+# `--` から後ろはオペランドで、選択肢には読まない（`rm -f -- -r`）。そのあと同じコマンドの中で
+# 次に rm の始まり（読み切れずに生の文字列に当てる回の `; rm …`）が来たら、そこから読み直す。
+# `--` までに当たりが決まる並び（両方の語、再帰と強制の両方）は、ここを通らずに下で当たる。
+_RM_RESTART = (
+    rf"(?:(?:{_rm_other('rf')}\s++)*+"
+    rf"(?:{_RM_RECURSIVE_ONLY}\s++(?:{_rm_other('f')}\s++)*+"
+    rf"|{_RM_FORCE_ONLY}\s++(?:{_rm_other('r')}\s++)*+)?"
+    rf"--(?:\s++[^\s\x00]++)*?\s++{_IN_WORD}rm(?:\.exe)?\s++)*+"
+)
+RECURSIVE_DELETE_REGEX = (
+    rf"{_RM_START}\s*+{_RM_RESTART}(?:{_rm_other('rf')}\s++)*+"
+    rf"(?:{_RM_BOTH}{_WORD_END}"
+    rf"|{_RM_RECURSIVE}\s++(?:{_rm_other('f')}\s++)*+{_RM_FORCE}{_WORD_END}"
+    rf"|{_RM_FORCE}\s++(?:{_rm_other('r')}\s++)*+{_RM_RECURSIVE}{_WORD_END})"
+)
 
 # 設定で動かない残り。
 _DENY: list[dict] = [
     {
         "id": "builtin-recursive-delete",
         "match": "Bash",
-        "glob": "*rm -rf *",
+        "regex": RECURSIVE_DELETE_REGEX,
         "message": (
             "A recursive forced delete cannot be undone. Name what to remove "
-            "one at a time, or use 'git rm' when the files are tracked."
+            "one at a time, or use 'git rm' when the files are tracked "
+            "(run it through .ccnavi/scripts/ccnavi-git.sh when raw git is blocked)."
         ),
     },
     {
         "id": "builtin-git-push",
         "match": "Bash",
-        "glob": "*git push*",
+        "regex": GIT_PUSH_REGEX,
         "message": (
             "git push is not run by the agent. Leave the branch as it is and ask the user to push."
         ),
@@ -156,10 +317,11 @@ _DENY: list[dict] = [
     {
         "id": "builtin-git-reset-hard",
         "match": "Bash",
-        "glob": "*git reset --hard*",
+        "regex": GIT_RESET_HARD_REGEX,
         "message": (
             "Work in progress would be lost. Use 'git stash' to set it aside, "
-            "or name the files and use 'git restore'."
+            "or name the files and use 'git restore' "
+            "(run them through .ccnavi/scripts/ccnavi-git.sh when raw git is blocked)."
         ),
     },
     {

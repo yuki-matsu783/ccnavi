@@ -11,10 +11,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import time
 import unittest
 
-from ccnavi.infra import settings
-from ccnavi.tickets import risk
+from ccnavi.infra import settings, shellread, yamlread
+from ccnavi.policy import builtin
+from ccnavi.tickets import risk, ticket_guard
+from tests import ROOT
 from tests.config.test_config_union import (
     BROKEN,
     COMMON_RISK,
@@ -173,6 +177,274 @@ class AbsentRulesTest(ConfigUnionHarness):
 
         self.assertIn("このレイヤーは置いていない", out)
         self.assertNotIn("読めない: ", out.split("■ rules 自身のレイヤー")[0])
+
+
+GIT = "git"
+# 組み込みの deny が表記違いでも止める形と、止めない形。
+BUILTIN_DENIED = (
+    (f"{GIT} -C . push", "builtin-git-push"),
+    (f"{GIT} --no-pager push", "builtin-git-push"),
+    (f"{GIT} --git-dir=.git push", "builtin-git-push"),
+    (f"{GIT} --git-dir .git push origin main", "builtin-git-push"),
+    (f"{GIT} -c x=y reset --hard", "builtin-git-reset-hard"),
+    (f"{GIT} reset -q --hard HEAD~1", "builtin-git-reset-hard"),
+    ("rm -fr x", "builtin-recursive-delete"),
+    ("rm -r -f x", "builtin-recursive-delete"),
+    ("rm -f -r x", "builtin-recursive-delete"),
+    ("rm --recursive --force x", "builtin-recursive-delete"),
+    ("rm -Rfv x", "builtin-recursive-delete"),
+    ("rm -r x -f", "builtin-recursive-delete"),
+    # 後ろに別の rm を引数として挟んでも、最初の rm の選択肢として読む。
+    ("rm -r rm -f", "builtin-recursive-delete"),
+    ("ls; rm a rm -rf b", "builtin-recursive-delete"),
+    # 値を取るオプションの値まで読んだ後のサブコマンド。
+    (f"{GIT} -c push.default=current push", "builtin-git-push"),
+    (f"{GIT} -C push push", "builtin-git-push"),
+    (f"/usr/bin/{GIT} push", "builtin-git-push"),
+    (f"{GIT}.exe push", "builtin-git-push"),
+    (f"{GIT} push;", "builtin-git-push"),
+    # サブコマンドを直接起こす形（パス付き・.exe 付き）。
+    (f"/usr/lib/{GIT}-core/{GIT}-push origin HEAD", "builtin-git-push"),
+    (f"{GIT}-push.exe origin", "builtin-git-push"),
+    (f"/usr/lib/{GIT}-core/{GIT}-reset --hard", "builtin-git-reset-hard"),
+    (f"{GIT}-reset.exe -q --hard HEAD", "builtin-git-reset-hard"),
+    (f"{GIT} -C x reset --hard", "builtin-git-reset-hard"),
+    (f"{GIT} status; {GIT} reset --hard", "builtin-git-reset-hard"),
+    # 値が g・gi・git… で始まっても、値として最後まで読む。
+    (f"{GIT} -C gitx push", "builtin-git-push"),
+    (f"{GIT} -c remote.origin.url=github.com push", "builtin-git-push"),
+    (f"{GIT} -C gitlab reset --hard", "builtin-git-reset-hard"),
+    (f"{GIT} -C gi push", "builtin-git-push"),
+    # `--` の後ろはオペランド。その前に揃っていれば当たる。
+    ("rm -rf -- x", "builtin-recursive-delete"),
+    ("rm -r -f -- x", "builtin-recursive-delete"),
+    (f"{GIT} reset --hard -- x", "builtin-git-reset-hard"),
+    # 空の値（読みでは空白が 2 字続く）の後ろのサブコマンド。
+    (f"{GIT} -C '' push", "builtin-git-push"),
+    (f'{GIT} -C "" reset --hard', "builtin-git-reset-hard"),
+    (f"{GIT} --work-tree '' push", "builtin-git-push"),
+    (f"{GIT} -C '' -c '' push", "builtin-git-push"),
+    # `\` の無い `$'…'` は単一引用と同じに読む。
+    (f"{GIT} $'push'", "builtin-git-push"),
+    ("rm $'-rf' x", "builtin-recursive-delete"),
+)
+BUILTIN_PASSED = (
+    "legit push",
+    "rm -r x",
+    "rm -f x",
+    "rm -f file-r",
+    f"{GIT} commit -m push",
+    f"{GIT} reset --soft HEAD~1",
+    # `-c` の値の中の push・reset はサブコマンドではない。
+    f"{GIT} -c push.default=current status",
+    f"{GIT} -C push status",
+    f"{GIT} -c reset.x=1 status --hard",
+    f"{GIT} pushx",
+    f"{GIT}-pushx origin",
+    # `--` の後ろはオペランドで、選択肢には読まない。
+    "rm -f -- -r",
+    "rm -r -- -f x",
+    f"{GIT} reset -- --hard",
+    f"{GIT} -c x=push status",
+)
+
+# 照合の後戻りが長引く形だった入力。どれも当たらない。
+SLOW_BEFORE = (
+    "rm " * 8000,
+    "git -c " * 8000,
+    "rm -r a " * 3200,
+    "git -C " * 8000,
+    "rm -f a " * 3200,
+    "git reset " * 2400,
+    "/" * 24000,
+    "a/" * 12000,
+    "git --x/git " * 2000,
+)
+# 共通ルールの照合が長引く形だった入力（パスの前置きを読み直す形）。
+COMMON_SLOW_BEFORE = (
+    "/" * 30000,
+    "echo " + "/" * 30000 + "; git push",
+    "\x00a" * 15000,
+    "\x00/" * 15000,
+)
+COMMON_LIMIT = 0.1
+# 照合 1 本にかけてよい時間。手元では 0.01 秒ほどで、負荷で揺れても届かない余裕を持たせてある。
+SLOW_LIMIT = 0.5
+TICKET_CONTROL = "CCNAVI_TICKET_CONTROL"
+
+
+class BuiltinSpeedTest(unittest.TestCase):
+    """組み込みの deny の照合は、入力の長さにほぼ比例する時間で終わる。
+
+    判定の期限はルールの合間でしか確かめないので、1 本の照合が後戻りで長引くと、hook の timeout に
+    達して呼び出しが止められずに通る。
+    """
+
+    def common_rule(self, rule_id):
+        with open(os.path.join(ROOT, ".ccnavi", "common", "rules.yml"), encoding="utf-8") as f:
+            data = yamlread.safe_load(f.read())
+        found = [r for r in data["deny"] if r["id"] == rule_id]
+        self.assertEqual(len(found), 1)
+        return found[0]["regex"]
+
+    def test_common_recursive_delete_is_the_builtin_one(self):
+        self.assertEqual(self.common_rule("recursive-delete"), builtin.RECURSIVE_DELETE_REGEX)
+
+    def test_common_regexes_return_quickly(self):
+        """共通ルールの regex（組み合わせ条件と except の中も）も、長い入力ですぐ返る。"""
+        with open(os.path.join(ROOT, ".ccnavi", "common", "rules.yml"), encoding="utf-8") as f:
+            data = yamlread.safe_load(f.read())
+        found = []
+
+        def walk(node):
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    if key == "regex" and isinstance(value, str):
+                        found.append(value.replace("{root}", "/ws").replace("{!root}", ""))
+                    else:
+                        walk(value)
+            elif isinstance(node, list):
+                for item in node:
+                    walk(item)
+
+        walk(data)
+        self.assertGreater(len(found), 10)
+        for text in (*COMMON_SLOW_BEFORE, *SLOW_BEFORE):
+            for expression in found:
+                regex = re.compile(expression, re.IGNORECASE)
+                with self.subTest(text=text[:16], regex=expression[:24]):
+                    start = time.monotonic()
+                    regex.search(text)
+                    self.assertLess(time.monotonic() - start, COMMON_LIMIT)
+
+    def test_long_inputs_return_quickly(self):
+        built, problems = builtin.load_base()
+        self.assertEqual(problems, [])
+        regexes = [rule.compiled for rule in built.deny if rule.match == "Bash"]
+        regexes.append(re.compile(ticket_guard.RAW_GIT_REGEX, re.IGNORECASE))
+        for text in SLOW_BEFORE:
+            subject = shellread.read(text).text or text
+            for regex in regexes:
+                with self.subTest(text=text[:16], regex=regex.pattern[:24]):
+                    start = time.monotonic()
+                    regex.search(subject)
+                    regex.search(text)
+                    self.assertLess(time.monotonic() - start, SLOW_LIMIT)
+
+
+RAW_GIT_BUILTIN = "builtin-ticket-raw-git"
+
+
+class BuiltinFormsTest(ConfigUnionHarness):
+    """組み込みの deny（土台）は、glob の文字列一致で外れていた表記違いも止める。
+
+    git のグローバルオプションを挟んだ形、rm の再帰と強制の組み合わせ・順序・長い形。
+    片方だけの rm や、`git` を含む別の語は止めない。共通レイヤーが無いときと、壊れて組み込みの
+    既定に戻ったときの両方で見る（hook と同じ経路）。
+    """
+
+    def check(self):
+        for command, rule in BUILTIN_DENIED:
+            with self.subTest(command=command):
+                self.assert_denied(self.hook("Bash", self.ws, command=command), rule)
+        for command in BUILTIN_PASSED:
+            with self.subTest(command=command):
+                result = self.hook("Bash", self.ws, command=command)
+                self.assertNotEqual(self.decision(result), "deny", result.stdout)
+
+    def test_without_the_common_layer(self):
+        os.remove(self.rules)
+        self.check()
+
+    def test_with_a_broken_common_layer(self):
+        write(self.rules, BROKEN)
+        self.check()
+
+    def test_next_step_names_the_git_wrapper(self):
+        """次の一手に挙げる git の操作は、生の git が止まる間はラッパーで打つことも添える。"""
+        os.remove(self.rules)
+        for command, rule in (
+            (f"{GIT} reset --hard", "builtin-git-reset-hard"),
+            ("rm -rf x", "builtin-recursive-delete"),
+        ):
+            with self.subTest(command=command):
+                denied = self.hook("Bash", self.ws, command=command)
+                self.assert_denied(denied, rule)
+                self.assertIn(".ccnavi/scripts/ccnavi-git.sh", self.reason(denied))
+
+
+class BuiltinRawGitTest(ConfigUnionHarness):
+    """チケット制御が有効で git のラッパーがあれば、生の git を組み込みで止め、ラッパーへ誘導する。
+
+    共通レイヤーの有無にも、壊れて組み込みの既定に戻ったときにも依らない。チケット制御が無効なときと、
+    ラッパーが無いワークスペースでは足さない。
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh")
+        write(self.script, "exit 0\n")
+
+    def assert_raw_git_denied(self, **options):
+        result = self.hook("Bash", self.ws, command=f"{GIT} status", **options)
+        self.assert_denied(result, RAW_GIT_BUILTIN)
+        self.assertIn(".ccnavi/scripts/ccnavi-git.sh", self.reason(result))
+        self.assertIn("<サブコマンド>", self.reason(result))
+        # 誘導先のラッパーは止めない。
+        wrapper = self.hook("Bash", self.ws, command=f"sh {self.script} status", **options)
+        self.assertNotIn(RAW_GIT_BUILTIN, self.last_record().get("rules", []), wrapper.stdout)
+        legit = self.hook("Bash", self.ws, command="legit push", **options)
+        self.assertNotEqual(self.decision(legit), "deny", legit.stdout)
+
+    def test_without_the_common_layer(self):
+        os.remove(self.rules)
+        self.assert_raw_git_denied()
+
+    def test_with_a_broken_common_layer(self):
+        """ルールファイルが読めない間も止める。直す道はラッパーの add / restore --ours が残す。"""
+        write(self.rules, BROKEN)
+        self.assert_raw_git_denied()
+        self.assertEqual(self.last_record()["fallback"], "builtin-rules")
+
+    def test_only_git_at_the_command_position(self):
+        """`git` がコマンドの位置にある形だけを止める。引数の語の `git` は止めない。"""
+        os.remove(self.rules)
+        for command in (
+            f"ls && {GIT} log",
+            f"sudo {GIT} status",
+            f"env A=1 {GIT} status",
+            f"command {GIT} status",
+            f"ls | xargs {GIT} status",
+            f"nohup {GIT} status",
+            f"time {GIT} status",
+            f"/usr/bin/{GIT} status",
+            f"{GIT}.exe status",
+            f"echo $({GIT} status)",
+            f"if true; then {GIT} status; fi",
+            f"C:\\Git\\{GIT}.exe status",
+            f'"C:\\Git\\{GIT}.exe" status',
+        ):
+            with self.subTest(command=command):
+                self.assert_denied(self.hook("Bash", self.ws, command=command), RAW_GIT_BUILTIN)
+        for command in (
+            f"grep {GIT} README.md",
+            f"echo hello {GIT} world",
+            f"echo to do {GIT} stuff",
+        ):
+            with self.subTest(command=command):
+                self.hook("Bash", self.ws, command=command)
+                self.assertNotIn(RAW_GIT_BUILTIN, self.last_record().get("rules", []))
+
+    def test_not_added_when_ticket_control_is_disabled(self):
+        os.remove(self.rules)
+        self.hook("Bash", self.ws, command=f"{GIT} status", env={TICKET_CONTROL: "disable"})
+        self.assertNotIn(RAW_GIT_BUILTIN, self.last_record().get("rules", []))
+
+    def test_not_added_without_the_wrapper(self):
+        os.remove(self.rules)
+        os.remove(self.script)
+        self.hook("Bash", self.ws, command=f"{GIT} status")
+        self.assertNotIn(RAW_GIT_BUILTIN, self.last_record().get("rules", []))
 
 
 class AbsentRiskTest(ConfigUnionHarness):

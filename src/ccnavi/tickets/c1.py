@@ -44,7 +44,7 @@ import re
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings
-from ..tickets import approval_marks, archive, history, phase, syncstate, ticket_ids, ticket_model
+from . import approval_marks, archive, history, phase, syncstate, ticket_ids, ticket_model
 
 # 答えの頭の行。sh はこれが無ければ「実行ファイルが C1 を知らない（古い）」と読んで止める。
 HEAD = "c1 1"

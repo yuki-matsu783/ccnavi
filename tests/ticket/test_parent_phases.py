@@ -476,12 +476,6 @@ class FillPhasesTest(PhaseHarness):
             [
                 "--root",
                 self.root,
-                "--approved",
-                ".ccnavi/approved",
-                "--state",
-                self.state,
-                "--log",
-                "",
                 "--plan-order",
                 name,
                 "--fill-phases",

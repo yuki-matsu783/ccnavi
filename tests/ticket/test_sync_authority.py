@@ -18,19 +18,20 @@ import threading
 import time
 import unittest
 
-from ccnavi.hook import core
 from ccnavi.infra import fsio, settings
 from ccnavi.tickets import (
     agree_digest,
     approval,
     approval_checks,
     approval_ops,
+    core,
     syncstate,
     ticket_model,
 )
 from tests import requires_symlink
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
+from tests.ticketsample import child_text, parent_text
 
 
 def record_text(name, state, reason="", sha="0" * 40):

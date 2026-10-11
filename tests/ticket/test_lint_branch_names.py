@@ -318,12 +318,6 @@ class LintBranchNamesTest(unittest.TestCase):
                 self.ws,
                 "--rules",
                 self.rules,
-                "--approved",
-                ".ccnavi/approved",
-                "--state",
-                os.path.join(self.ws, "state"),
-                "--log",
-                "",
                 "--lint",
                 "--mode",
                 "enable",
@@ -410,7 +404,7 @@ class LintBranchNamesTest(unittest.TestCase):
         # ccnavi-sync.sh が取り込み結果に書いた名前を読む。
         self.propose("trunk")
         write(
-            os.path.join(self.ws, "state", "sync", "self", "integration", "head"),
+            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
             "remote origin\nbranch trunk\nsource default\nsha x\nfetched_at 1\n",
         )
         lines = [line for line in self.lint() if "統合先" in line]
@@ -423,7 +417,7 @@ class LintBranchNamesTest(unittest.TestCase):
     def test_a_linked_record_is_not_followed(self):
         self.propose("trunk")
         real = write(os.path.join(self.ws, "elsewhere", "head"), "branch trunk\n")
-        place = os.path.join(self.ws, "state", "sync", "self", "integration")
+        place = os.path.join(self.ws, "logs", "state", "sync", "self", "integration")
         os.makedirs(place)
         try:
             os.symlink(real, os.path.join(place, "head"))

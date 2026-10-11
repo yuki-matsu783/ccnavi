@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
-import { KNOWN_TOOLS, SECTIONS, SECTION_LABELS, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
+import { KNOWN_TOOLS, SECTIONS, SECTION_LABELS, modeBanner, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
 import type { SuggestJson } from "../../core/suggestmodel.js";
 import type { ExpectationsJson } from "../../core/testmodel.js";
 import { applyAppearance } from "../appearance.js";
@@ -410,10 +410,10 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   return (
     <>
-      {page !== undefined && page.mode !== "enable" && page.mode !== "" && (
-        // 未設定は実行ファイルが enable として扱う（src/ccnavi/infra/modes.py「どこにも値が無ければ enable」）ので帯は出さない
+      {page !== undefined && modeBanner(page.mode) !== "" && (
+        // モードは実行ファイルの答え。enable と、答えが取れないときは帯を出さない
         <div className="banner warn">
-          現在の <code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>（判定と記録のみ。deny や ask にヒットしても実行は止まりません）
+          現在の <code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>（{modeBanner(page.mode)}）
         </div>
       )}
       {(page?.notices ?? []).map((notice, index) => (

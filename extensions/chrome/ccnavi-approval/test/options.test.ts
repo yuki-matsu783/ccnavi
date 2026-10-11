@@ -158,7 +158,7 @@ const text = (selector: string) => $(selector).textContent ?? "";
 const storedRepos = () => (storage.repos ?? []) as RepoConfig[];
 const TOKEN = "github_pat_options_test_0123456789";
 
-test("CX-T214 設定画面: 実機の試験とボードが読む欄の ID が描画に残り、状態欄は何も言っていない間も role=status で置いてある", async () => {
+test("CX-T233 設定画面: 実機の試験とボードが読む欄の ID が描画に残り、状態欄は何も言っていない間も role=status で置いてある", async () => {
   await mount();
   for (const id of [
     "repo-form",
@@ -206,7 +206,7 @@ test("CX-T214 設定画面: 実機の試験とボードが読む欄の ID が描
   );
 });
 
-test("CX-T215 設定画面のリポジトリ: 登録すると一覧に出し、プロジェクトはワークスペースを選んでから登録する。外すと一覧と storage から消える", async () => {
+test("CX-T234 設定画面のリポジトリ: 登録すると一覧に出し、プロジェクトはワークスペースを選んでから登録する。外すと一覧と storage から消える", async () => {
   await mount();
   fill({ owner: "acme", repo: "widgets" });
   await submitRepo();

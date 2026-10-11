@@ -24,132 +24,10 @@ import tempfile
 import unittest
 
 from ccnavi.tickets import history
-from tests import common_path, config_path, phasecopy
+from tests import can_case_sensitive, common_path, config_path
 from tests.inproc import run_ccnavi
-from tests.ticket.test_ticket import ROOT, RULES, git, read_json, write
-
-PHASES = """
-version: 1
-phases:
-  research:
-    kind: work
-    title: 調査
-    review: none
-    scope: ["wip/research/*"]
-    deliverables: ["wip/research/summary.md"]
-    agent: explorer
-    when: 既存の振る舞いが分からないとき
-  design:
-    kind: work
-    title: 設計
-    review: mr
-    scope: ["wip/design/*"]
-  acceptance:
-    kind: work
-    title: 受入テスト作成
-    review: mr
-    scope: ["tests/*"]
-  implement:
-    kind: work
-    title: 実装とテスト
-    review: mr
-    scope: ["src/*", "tests/*"]
-  implement-feedback:
-    kind: feedback
-    title: 実装フィードバック対応
-    review: mr
-    scope: inherit
-  chores:
-    kind: work
-    title: 片付け
-    review: chat
-    scope: ["src/*"]
-  chores-feedback:
-    kind: feedback
-    title: 片付けフィードバック対応
-    review: chat
-    scope: inherit
-"""
-
-
-def plan_item_lines(items, start=1) -> list[str]:
-    """計画の項を YAML の行にする。`start` はその計画の最初の番号（フィードバック計画は続き）。
-
-    項は定義の名前、`(名前, review)`、`{"type": …, "review": …, "after": […]}` のどれか。
-    `after` を書かない項は、すぐ前の項を待つ（一直線）。最初の項は何も待たない。
-    並行にしたい見本は辞書で `after` を明記する（`[]` なら何も待たない）。
-    """
-    lines = []
-    for i, item in enumerate(items):
-        if isinstance(item, dict):
-            kind, review = item["type"], item.get("review", "")
-            after = item.get("after")
-        elif isinstance(item, tuple):
-            kind, review, after = item[0], item[1], None
-        else:
-            kind, review, after = item, "", None
-        if after is None:
-            after = [start + i - 1] if i > 0 else []
-        fields = [f"type: {kind}"]
-        if review:
-            fields.append(f"review: {review}")
-        if after:
-            fields.append(f"after: [{', '.join(str(n) for n in after)}]")
-        lines.append(f"  - {kind}" if len(fields) == 1 else f"  - {{{', '.join(fields)}}}")
-    return lines
-
-
-def parent_text(
-    name, plan, feedback=None, allow=("src/*", "wip/*", "tests/*"), issue=None, copy=PHASES
-):
-    """親の提案の本文。
-
-    `copy` は計画が使う定義を写す元の `phases.yml`（None なら `phases:` を書かない）。
-    計画を持つ親は、計画が使う定義の写し（`phases:`）を持つ。`phases.yml` を書き換えるテストは、
-    同じ本文を `copy` に渡す。
-    """
-    text = _parent_text(name, plan, feedback, allow, issue)
-    return text if copy is None else phasecopy.insert(text, copy)
-
-
-def _parent_text(name, plan, feedback, allow, issue):
-    lines = ["---", "version: 1", f"ticket: {name}"]
-    if issue is not None:
-        lines.append(f"issue: {issue}")
-    lines.append("plan:")
-    lines += plan_item_lines(plan)
-    if feedback is not None:
-        if feedback:
-            lines.append("feedback:")
-            lines += plan_item_lines(feedback, start=len(plan) + 1)
-        else:
-            lines.append("feedback: []")
-    lines += ["human_review:", "  required: true", "  reason: t", "title: 親", "rationale: r"]
-    lines.append("allow:")
-    for g in allow:
-        lines += ["  - match: Write|Edit", f'    glob: "{g}"']
-    lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
-    return "\n".join(lines) + "\n"
-
-
-def child_text(name, parent, phase, allow, review=True):
-    lines = [
-        "---",
-        "version: 1",
-        f"ticket: {name}",
-        f"parent: {parent}",
-        f"phase: {phase}",
-        "human_review:",
-        f"  required: {'true' if review else 'false'}",
-        "  reason: t",
-        f"title: 子 {name}",
-        "rationale: r",
-        "allow:",
-    ]
-    for g in allow:
-        lines += ["  - match: Write|Edit", f'    glob: "{g}"']
-    lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
-    return "\n".join(lines) + "\n"
+from tests.ticket.test_ticket import ROOT, git, read_json, write
+from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
 
 class PhaseHarness(unittest.TestCase):
@@ -172,7 +50,7 @@ class PhaseHarness(unittest.TestCase):
         # には渡せない。差し替えたいテストはこのファイルに書き直す。
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
         self.phases = write(config_path(self.root, "phases"), PHASES)
-        self.state = os.path.join(self.root, "state")
+        self.state = os.path.join(self.root, "logs", "state")
         self.parent_tree = self.worktree("i0001", "main")
         # 承認済みチケットとマーカーは親のツリーに置かれ、親のブランチに乗る。
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "approved")
@@ -184,19 +62,14 @@ class PhaseHarness(unittest.TestCase):
         git(self.root, "worktree", "add", "--quiet", path, "-b", name, base)
         return path
 
-    def ccnavi(self, *args, stdin=""):
+    def ccnavi(self, *args, stdin="", env=None):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
+        environment.update(env or {})
         return run_ccnavi(
             [
                 "--root",
                 self.root,
-                "--approved",
-                ".ccnavi/approved",
-                "--state",
-                self.state,
-                "--log",
-                "",
                 "--guard-core-files",
                 "disable",
                 "--restore-if-deny",
@@ -843,25 +716,6 @@ class PhaseTest(PhaseHarness):
         preview = json.loads(shown.stdout)
         self.assertTrue(preview["can_issue"])
         choices = json.dumps({"u/7#t0": "keep", "u/7#t1": "issue"})
-        # state の置き場が無ければ、issue に回す下書きを置けないので、何も置く前に断る
-        homeless = self.ccnavi(
-            "--cwd",
-            self.parent_tree,
-            "--state",
-            "",
-            "--reviewed",
-            "2",
-            "--accept-unresolved",
-            "--yes",
-            choices,
-            "--digest",
-            preview["digest"],
-            "--json",
-            "--result",
-            fixture,
-        )
-        self.assertNotEqual(homeless.returncode, 0)
-        self.assertIn("state の置き場が空", homeless.stderr)
         self.assertNotEqual(self.confirm(fixture, 2).returncode, 0)
         done = self.ccnavi(
             "--cwd",
@@ -1054,6 +908,8 @@ class PhaseTest(PhaseHarness):
     def test_c1_lets_ready_remove_wip_in_any_case_but_nothing_else(self):
         """C1 の置き場の外の検査は、ready が消す wip/ の判定（大文字小文字と \\ を問わない）と
         同じ判定で、消したものだけを通す。"""
+        if not can_case_sensitive():
+            self.skipTest("大文字小文字を区別しないファイルシステムでは大文字違いを並べられない")
         fixture = self.closed_family()
         odd = ["WIP/eli5/a.html", "wip\\eli5\\b.html"]
         for rel in odd:

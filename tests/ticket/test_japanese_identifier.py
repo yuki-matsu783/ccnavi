@@ -22,7 +22,8 @@ import unittest
 
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
-from tests.ticket.test_ticket import RULES, git, ticket_text, write
+from tests.ticket.test_ticket import git, ticket_text, write
+from tests.ticketsample import RULES
 
 PARENT = "feature-64-統合先の解決"
 CHILD = PARENT + "-01-01"
@@ -39,7 +40,7 @@ class JapaneseIdentifierTest(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
         write(common_path(self.root, "rules"), json.dumps(RULES))
-        self.state = os.path.join(self.root, "state")
+        self.state = os.path.join(self.root, "logs", "state")
         self.parent_tree = self.worktree(PARENT, "main")
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "approved")
 
@@ -55,12 +56,6 @@ class JapaneseIdentifierTest(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--approved",
-                ".ccnavi/approved",
-                "--state",
-                self.state,
-                "--log",
-                "",
                 "--guard-core-files",
                 "disable",
                 "--restore-if-deny",

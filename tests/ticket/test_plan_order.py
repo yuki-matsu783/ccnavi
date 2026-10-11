@@ -27,8 +27,9 @@ import yaml
 from ccnavi.tickets import agree_candidates, agree_screen, phase_forms, plan_order, ticket_model
 from ccnavi.tickets import ticket as ticket_mod
 from tests.ticket.test_board import _portable
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write
+from tests.ticketsample import child_text, parent_text
 
 PLAN_REORDER = os.path.join(ROOT, "tests", "fixtures", "plan-reorder.json")
 # VS Code 拡張のワークフロー編集タブが読む `--plan-order` の答えの実例。

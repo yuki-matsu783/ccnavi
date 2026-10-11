@@ -21,7 +21,7 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 
 | `--result` の JSON | 形 |
 |---|---|
-| `confirm` / `decide` が受け取るもの | `{host: github\|gitlab, mr: {number, url}, threads: [{id, resolved, url, path, line, body, created_at}], reviews: [{state, url, submitted_at, author}], fetched_at}` |
+| `confirm` / `decide` が受け取るもの | `{host: github\|gitlab, mr: {number, url}, threads: [{id, resolved, url, path, line, body, created_at, author}], reviews: [{state, url, submitted_at, author}], fetched_at}` |
 | `request` の投稿の結果 | `{host, mr, url, created_at}` |
 
 | sh の呼び方 | 実行ファイルの段 |
@@ -53,7 +53,10 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 3. sh が依頼を投稿する。マージリクエストが無ければ、先に下書きで作る。投稿する本文の末尾には
    「ELI5 は差分の `<相対パス>`。ルートで `crit review <相対パス>` を開いてソースの行に指摘を付け、`crit push <番号>` で送る」
    という 1 行を足す。HTML の中身は載せない。
-4. `review requested` が HEAD が動いていないことを確かめ、`{head, mr, url, host, since}` をマーカーに置く。
+4. `review requested` が HEAD が動いていないことを確かめ、`{head, mr, url, host, since}` をマーカーに置く。続けて、親の
+   承認済みチケットの `mr:` が空なら、この MR の番号を書き足す（`approval_ops.note_mr`。書いたパスは C1 のコミットに入る）。
+   同じ番号が既にあれば何もせず、違う値があれば上書きせず「`mr:` に別の値が既にある」と警告する（依頼は通る）。
+   実行後チェックはこの書き足しだけを ccnavi の書き込みと見なす（post-check.md の `mr:` の例外）。
 5. 終わったら、sh はユーザが打つ `cd '<ツリーのルート>'`・`crit review <相対パス>`・`crit push <番号>` を標準出力に出す。
    ツリーのルートはいつも `'…'` で包み、中の `'` は `'\''` に置き換える。sh は crit を起動しない。
    crit・gh・glab が PATH に無くても止めない。
@@ -178,7 +181,9 @@ GitLab）、`gh` / `glab` がそのホストで認証されていれば（起動
 どちらも無ければ止まり、MCP などでリモートを読む形を提案する。結果の組み立てに `jq` が要る。
 道具は起動時に絶対パスへ解いて固定する。origin はホストのポートと scheme をそのまま使い、
 URL に埋めた資格情報は読み飛ばして出力では伏せる。実行ファイルの側も同じ規則で origin を読み、
-`--lint` がホストに合うトークンの有無を言う。
+`--lint` が sh の道具が揃っているかを warn で言う。見るのは有無だけで、PATH に `jq` があるか、`gh` / `glab` か `curl` があるか、
+`curl` を使う形ならホストに合うトークンの環境変数が空でないか。ホストへは通信しないので、認証が通るかやトークンが有効かは
+確かめない（実行ファイルはネットワークに出ない）。
 
 push は親だけが行う。hook は子チケットのワークツリーからの `ccnavi-git.sh push` を、誰が打っても拒み
 （`DENY_CHILD_PUSH`）、サブエージェントからの `ccnavi-git.sh push` はどこからでも拒む。リモートに置く枝は

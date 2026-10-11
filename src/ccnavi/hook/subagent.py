@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 from typing import TextIO
 
@@ -80,7 +81,7 @@ def at_start(
     ]
     # フローの文に使える残り（文字）。子が多くても SubagentStart の文が長くなりすぎないように。
     budget = flow.TOTAL_TEXT_LIMIT
-    # 手順を並べるのは、cwd がその子のワークツリーで子が 1 本に決まるときだけ（M-4）。
+    # 手順を並べるのは、cwd がその子のワークツリーで子が 1 本に決まるときだけ。
     # 親のツリーからの起動（入れ子の孫も）では、どの子の担当かが hook から決められない。
     full = bound.is_child
     listed = False
@@ -173,14 +174,30 @@ def at_stop(
     if bound is not None:
         targets = [bound] if bound.is_child else [c for c in copies if c.parent == bound.ticket]
     findings = []
+    unchecked: list[str] = []
     for child in targets:
         outside, unreadable = phase_scope.scope_findings(root, conf, child, index.get(child.parent))
         if unreadable:
             stderr.write(f"ccnavi: {child.ticket} のワークツリーを読めない: {unreadable}\n")
+            unchecked.append(child.ticket)
             continue
         for rel, found in outside:
             findings.append((child, rel, found))
-    # 着手のあとにフローが書き換わっていれば知らせる（止めない。M-2）。
+    # 相手を見分ける鍵。`agent_id` が無い payload では、cwd のワークツリーの名前を使う。
+    who = payload.agent_id or (t.name if t is not None else "")
+    if unchecked:
+        # 範囲を確かめられなかった子がある。通した回と記録で見分けられるよう、範囲外が他に
+        # 見つからなければ判定に至らなかった回にし、どの子かを detail に残す。止めはしない。
+        # 読めないのは子の作業のせいとは限らず、差し戻しても子には直せないことがある。
+        # この出力は親に届かないので、親の `Agent` の PostToolUse で 1 行言うための印を置く。
+        record.detail = "unchecked: " + ", ".join(unchecked)
+        if not findings:
+            record.decision, record.reason = audit.SKIP, post.REASON_WORKTREE_UNREADABLE
+            record.enforced = False
+        path = _unchecked_path(conf.state, payload.session_id, who)
+        _remember(stderr, path, payload.session_id, unchecked)
+    # 着手のあとにフローが書き換わっていれば知らせる。行き先を追えないシェルの書き込みは
+    # 止められないので、止めずに知らせる。
     changed = [n for n in (flow.changed_notice(conf, root, c) for c in targets) if n]
     if not findings:
         if changed:
@@ -199,8 +216,6 @@ def at_stop(
         lines.append(f"  {child.ticket}: {rel}{_limit_note(child, found)}  範囲は {area}")
     text = "\n".join(lines + changed)
 
-    # 相手を見分ける鍵。`agent_id` が無い payload では、cwd のワークツリーの名前を使う。
-    who = payload.agent_id or (t.name if t is not None else "")
     already = _bounced(conf.state, payload.session_id, who)
     if mode == modes.ENABLE and not already:
         _remember_bounce(stderr, conf.state, payload.session_id, who)
@@ -240,6 +255,139 @@ def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
         "差し戻されたまま終わっています。合流する前に、その子のワークツリーの範囲外の"
         "変更を確かめてください。"
     )
+
+
+def unchecked_scope(state_dir: str, payload: hookio.Input) -> str:
+    """終わったサブエージェントの子の範囲を、SubagentStop で確かめられなかったなら、その旨。
+
+    印は読んだら消す。読むのは次の 2 か所。
+
+    - 親の `Agent` の PostToolUse。そのサブエージェント（`agentId`）の印を読む
+    - 親（payload に `agent_id` が無いメインのセッション）のどのツールの PostToolUse と
+      UserPromptSubmit。このセッションに残った印をぜんぶ読む。バックグラウンドで動かした
+      サブエージェントは、`Agent` の PostToolUse が SubagentStop より先に来るので、
+      `Agent` の PostToolUse だけで読むと印が残ったまま知らせが落ちる。サブエージェントの
+      中の呼び出しでは読まない。その子が親でない印を消すと、親に届かなくなるため
+    """
+    if not state_dir:
+        return ""
+    paths: list[tuple[str, str]] = []
+    if payload.tool_name == judge.AGENT_TOOL:
+        agent_id = str(payload.tool_response.get("agentId") or "")
+        if agent_id:
+            paths.append((agent_id, _unchecked_path(state_dir, payload.session_id, agent_id)))
+    if not payload.agent_id:
+        paths.extend(_session_unchecked(state_dir, payload.session_id))
+    said: list[str] = []
+    seen: set[str] = set()
+    for who, path in paths:
+        if path in seen:
+            continue
+        seen.add(path)
+        found = _read_mark(path, payload.session_id)
+        if found is None:
+            continue
+        fsio.remove(path)
+        tickets = ", ".join(found)
+        if not tickets:
+            # SubagentStop の処理が ccnavi の内部エラーで終わった回。どの子を見るはずだったかも
+            # 分からない。
+            said.append(
+                f"[ccnavi] {post.REASON_WORKTREE_UNREADABLE}: サブエージェント {who} の終わりに"
+                "ccnavi が内部エラーで止まり、子チケットの範囲外の変更を確かめていません。"
+                "合流する前に、その子のワークツリーを確かめてください。"
+            )
+            continue
+        said.append(
+            f"[ccnavi] {post.REASON_WORKTREE_UNREADABLE}: サブエージェント {who} の終わりに"
+            f"子チケット {tickets} のワークツリーを読めず、範囲外の変更を確かめていません。"
+            "合流する前に、そのワークツリーを確かめてください。"
+        )
+    return "\n\n".join(said)
+
+
+def _session_unchecked(state_dir: str, session: str) -> list[tuple[str, str]]:
+    """このセッションに残った、範囲を確かめられなかった印。相手の鍵とパスの組。
+
+    ファイルの名前は前置きで候補を絞るだけ。セッションの識別子は名前に入れるときに字を
+    置き換えるうえ、`-` で区切るので別のセッションの名前も前置きに当たりうる。どのセッションの
+    印かは、読むときに中身の 1 行目（`_read_mark`）と完全一致で比べる。
+    """
+    head = os.path.basename(_unchecked_path(state_dir, session, "x"))[: -len("x.unchecked")]
+    try:
+        names = sorted(os.listdir(state_dir))
+    except OSError:
+        return []
+    return [
+        (name[len(head) : -len(".unchecked")], os.path.join(state_dir, name))
+        for name in names
+        if name.startswith(head) and name.endswith(".unchecked") and len(name) > len(head) + 10
+    ]
+
+
+def unchecked_after_error(
+    stderr: TextIO, conf: settings.Settings, root: str, payload: hookio.Input
+) -> None:
+    """SubagentStop の処理が ccnavi の内部エラーで終わったとき、範囲を確かめられなかった印を置く。
+
+    内部エラーの知らせ（`systemMessage`）はユーザにしか見えず、親には届かない。読めない子が
+    あった回と同じ印を置いて、親の PostToolUse か UserPromptSubmit で言わせる。どの子を
+    見るはずだったかは分からないので、中身は空にする。ここでの失敗は捨てる（受け皿の中で
+    例外を重ねない）。
+    """
+    if not conf.state:
+        return
+    with contextlib.suppress(Exception):
+        if not conf.tickets_enabled:
+            return
+        who = payload.agent_id
+        if not who:
+            t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
+            who = t.name if t is not None else ""
+        path = _unchecked_path(conf.state, payload.session_id, who)
+        if os.path.exists(path):
+            # 例外の前に読めない子を書き終えていれば、そちらのほうが詳しい。
+            return
+        failed = fsio.write_text(path, _mark_text(payload.session_id, []))
+        if failed:
+            stderr.write(f"ccnavi: 範囲を確かめられなかった印を書けない: {failed}\n")
+
+
+def _unchecked_path(state_dir: str, session: str, who: str) -> str:
+    """範囲を確かめられなかった印の置き場。鍵の決め方は差し戻しの記録（_bounce_path）と同じ。"""
+    return _bounce_path(state_dir, session, who)[: -len(".bounced")] + ".unchecked"
+
+
+_MARK_SESSION = "session "
+
+
+def _mark_text(session: str, tickets: list[str]) -> str:
+    """印の中身。1 行目にセッションの識別子をそのまま書き、続けて子の識別子を 1 行に 1 つ。
+
+    子の識別子が無い（中身がセッションの行だけの）印は、SubagentStop が内部エラーで終わった回。
+    """
+    one_line = session.replace("\r", " ").replace("\n", " ")
+    return "".join(f"{line}\n" for line in [_MARK_SESSION + one_line, *tickets])
+
+
+def _read_mark(path: str, session: str) -> list[str] | None:
+    """このセッションの印なら子の識別子のリスト（内部エラーの回は空）。違う・無いなら None。"""
+    text = fsio.read_text(path, errors="replace")
+    if text is None:
+        return None
+    lines = text.splitlines()
+    one_line = session.replace("\r", " ").replace("\n", " ")
+    if not lines or lines[0] != _MARK_SESSION + one_line:
+        return None
+    return [line for line in lines[1:] if line]
+
+
+def _remember(stderr: TextIO, path: str, session: str, tickets: list[str]) -> None:
+    if not os.path.dirname(path):
+        return
+    failed = fsio.write_text(path, _mark_text(session, tickets))
+    if failed:
+        stderr.write(f"ccnavi: 範囲を確かめられなかった印を書けない: {failed}\n")
 
 
 def _bounce_path(state_dir: str, session: str, who: str) -> str:

@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import atexit
 import os
 import shutil
 import subprocess
@@ -22,6 +23,27 @@ import unittest
 from tests import ROOT
 
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+
+
+def with_exe(environment):
+    """ソースの実行ファイルを起こすものを CCNAVI_BIN_PATH に渡す。走らせた機械の値は使わない。
+
+    sh は親のワークツリーかをチケットを読まずに実行ファイル（`tree parent`）に聞く。
+    テストのワークスペースには組み立てた実行ファイルもソースも無いので、ここで渡す。
+    """
+    if not _EXE:
+        base = tempfile.mkdtemp(prefix="ccnavi-gitwrap-exe-")
+        atexit.register(shutil.rmtree, base, ignore_errors=True)
+        path = os.path.join(base, "ccnavi")
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(f'#!/bin/sh\nPYTHONPATH="{ROOT}/src" exec "{sys.executable}" -m ccnavi "$@"\n')
+        os.chmod(path, 0o755)
+        _EXE.append(path)
+    environment["CCNAVI_BIN_PATH"] = _EXE[0]
+    return environment
+
+
+_EXE: list[str] = []
 SCRIPT = os.path.join(SH_DIR, "ccnavi-git.sh")
 SHELL = shutil.which("sh") or shutil.which("bash")
 
@@ -77,7 +99,7 @@ class GitWrapperTest(unittest.TestCase):
         make_repo(self.dir)
 
     def run_wrapper(self, *args, env=None):
-        environment = dict(os.environ)
+        environment = with_exe(dict(os.environ))
         environment.update(env or {})
         return subprocess.run(
             [SHELL, SCRIPT, *args],
@@ -323,7 +345,7 @@ class PassTest(GitWrapperTest):
             trees[name] = path
 
         def push_from(name):
-            environment = dict(os.environ)
+            environment = with_exe(dict(os.environ))
             return subprocess.run(
                 [SHELL, SCRIPT, "push", "-u", "origin", name],
                 cwd=trees[name],
@@ -945,6 +967,7 @@ def run_in(cwd, *args):
         text=True,
         encoding="utf-8",
         errors="replace",
+        env=with_exe(dict(os.environ)),
     )
 
 
@@ -1311,6 +1334,125 @@ class WorktreeDetachTest(GitWrapperTest):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
+class WorktreeFreshBaseTest(GitWrapperTest):
+    """統合先から切る worktree add は、fetch が新しく、手元の統合先が遅れていないときだけ通す。
+
+    hook は git もネットワークも起こさないので、この 2 重目の確認は sh の中にある。
+    fetch は打たない。拒否のあと案内どおりに fetch すれば（FETCH_HEAD が新しくなって）通る。
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.integ = git_out(self.dir, "branch", "--show-current")
+        self.bare = self.make_bare()
+        git(self.dir, "remote", "add", "origin", self.bare)
+        git(self.dir, "push", "-q", "-u", "origin", self.integ)
+        git(self.dir, "fetch", "-q", "origin")
+        self.fetch_head = os.path.join(self.dir, ".git", "FETCH_HEAD")
+
+    def tree(self, name):
+        return os.path.join(self.dir, ".claude", "worktrees", name)
+
+    def age_fetch_head(self, minutes=20):
+        old = os.path.getmtime(self.fetch_head) - minutes * 60
+        os.utime(self.fetch_head, (old, old))
+
+    def push_from_elsewhere(self):
+        """別の clone から origin の統合先を 1 つ進める。手元はまだ知らない。"""
+        other = tempfile.mkdtemp(prefix="ccnavi-gitwrap-other-")
+        self.addCleanup(shutil.rmtree, other, ignore_errors=True)
+        git(other, "clone", "-q", self.bare, "c")
+        clone = os.path.join(other, "c")
+        git(clone, "config", "user.email", "t@example.invalid")
+        git(clone, "config", "user.name", "t")
+        write_text(os.path.join(clone, "new.txt"), "n\n")
+        git(clone, "add", "new.txt")
+        git(clone, "commit", "-q", "-m", "ahead")
+        git(clone, "push", "-q", "origin", f"HEAD:{self.integ}")
+
+    def assertCreated(self, name, *args):
+        result = self.run_wrapper("worktree", "add", f".claude/worktrees/{name}", *args)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(name, git_out(self.tree(name), "branch", "--show-current"))
+        return result
+
+    def test_up_to_date_passes_with_or_without_the_base(self):
+        self.assertCreated("a", "-b", "a")
+        self.assertCreated("b", "-b", "b", self.integ)
+        self.assertCreated("c", "-b", "c", f"origin/{self.integ}")
+
+    def test_behind_is_rejected_and_passes_after_fast_forward(self):
+        self.push_from_elsewhere()
+        git(self.dir, "fetch", "-q", "origin")
+        for args in (("-b", "a"), ("-b", "a", self.integ)):
+            with self.subTest(args=args):
+                result = self.assertRejected("worktree", "add", ".claude/worktrees/a", *args)
+                want = f"基点 {self.integ} が origin/{self.integ} より 1 件遅れて"
+                self.assertIn(want, result.stderr)
+                self.assertIn(f"merge --ff-only origin/{self.integ}", result.stderr)
+        git(self.dir, "merge", "-q", "--ff-only", f"origin/{self.integ}")
+        self.assertCreated("a", "-b", "a")
+
+    def test_origin_as_the_base_skips_the_behind_check(self):
+        self.push_from_elsewhere()
+        git(self.dir, "fetch", "-q", "origin")
+        self.assertCreated("a", "-b", "a", f"origin/{self.integ}")
+
+    def test_old_fetch_head_is_rejected_and_passes_after_fetch(self):
+        self.age_fetch_head()
+        for args in (("-b", "a"), ("-b", "a", self.integ), ("-b", "a", f"origin/{self.integ}")):
+            with self.subTest(args=args):
+                result = self.assertRejected("worktree", "add", ".claude/worktrees/a", *args)
+                self.assertIn(f"fetch origin {self.integ}", result.stderr)
+        fetched = self.run_wrapper("fetch", "origin", self.integ)
+        self.assertEqual(0, fetched.returncode, fetched.stdout + fetched.stderr)
+        self.assertCreated("a", "-b", "a")
+
+    def test_missing_fetch_head_is_rejected(self):
+        os.remove(self.fetch_head)
+        self.assertRejected("worktree", "add", ".claude/worktrees/a", "-b", "a")
+
+    def test_other_bases_and_existing_branches_are_not_checked(self):
+        git(self.dir, "branch", "other")
+        git(self.dir, "branch", "existing")
+        self.age_fetch_head()
+        self.assertCreated("a", "-b", "a", "other")
+        self.assertCreated("existing", "existing")
+
+    def test_a_failed_fetch_downgrades_the_rejection_to_a_warning(self):
+        gone = os.path.join(os.path.dirname(self.bare), "gone.git")
+        git(self.dir, "remote", "set-url", "origin", gone)
+        self.age_fetch_head()
+        self.assertRejected("worktree", "add", ".claude/worktrees/a", "-b", "a")
+        fetched = self.run_wrapper("fetch", "origin", self.integ)
+        self.assertEqual(1, fetched.returncode, fetched.stdout + fetched.stderr)
+        result = self.assertCreated("a", "-b", "a")
+        self.assertIn("警告", result.stdout)
+        self.assertIn("オフライン", result.stdout)
+
+    def test_offline_does_not_hide_a_known_lag(self):
+        self.push_from_elsewhere()
+        git(self.dir, "fetch", "-q", "origin")
+        gone = os.path.join(os.path.dirname(self.bare), "gone.git")
+        git(self.dir, "remote", "set-url", "origin", gone)
+        self.age_fetch_head()
+        self.run_wrapper("fetch", "origin", self.integ)
+        result = self.run_wrapper("worktree", "add", ".claude/worktrees/a", "-b", "a")
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("1 件遅れて", result.stderr)
+
+    def test_a_later_good_fetch_clears_the_failure_mark(self):
+        mark = os.path.join(self.dir, ".git", "ccnavi-fetch-failed")
+        real = self.bare
+        git(self.dir, "remote", "set-url", "origin", real + ".gone")
+        self.run_wrapper("fetch", "origin", self.integ)
+        self.assertTrue(os.path.exists(mark))
+        git(self.dir, "remote", "set-url", "origin", real)
+        fetched = self.run_wrapper("fetch", "origin", self.integ)
+        self.assertEqual(0, fetched.returncode, fetched.stdout + fetched.stderr)
+        self.assertFalse(os.path.exists(mark))
+
+
 class SymlinkedWorkspaceTest(GitWrapperTest):
     """リンクを経た作業場でも組み込みの保護が有効
     （git のパスとワークスペースのパスを揃える。中 12）。"""
@@ -1384,6 +1526,7 @@ class IntegrationPushTest(GitWrapperTest):
 
     def push(self, cwd=None, branch=None, **env):
         environment = {k: v for k, v in os.environ.items() if k != "CCNAVI_INTEGRATION_BRANCH"}
+        with_exe(environment)
         environment.update(env)
         return subprocess.run(
             [SHELL, SCRIPT, "push", "-u", "origin", branch or self.BRANCH],

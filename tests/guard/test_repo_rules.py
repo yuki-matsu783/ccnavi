@@ -63,12 +63,6 @@ def judge(tool: str, subject: str, bin_path: str = "") -> dict:
             ROOT,
             "--rules",
             RULES,
-            "--approved",
-            "",
-            "--state",
-            "",
-            "--log",
-            "",
             "--test",
             tool,
             subject.replace(PLACEHOLDER, ROOT.replace("\\", "/")),
@@ -121,6 +115,23 @@ class RepoRulesTest(unittest.TestCase):
         ]:
             with self.subTest(subject=subject):
                 self.assert_verdict(subject, "allow", "prefer-read-grep")
+
+    def test_worktree_add_は通して_fetch_の案内を添える(self):
+        # 止めない。遅れの判定で止めるのは ccnavi-git.sh の中（hook はネットワークに出ない）。
+        body = self.assert_verdict(
+            "sh /repo/.ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/y -b y main",
+            "allow",
+            "ccnavi-git-worktree-add",
+        )
+        self.assertIn("fetch origin", body["response"])
+        self.assertIn("ワークツリーの作り方", body["response"])
+        # ほかのサブコマンドには添えない。
+        self.assertNotIn(
+            "ccnavi-git-worktree-add",
+            hit(
+                judge("Bash", "sh /repo/.ccnavi/scripts/ccnavi-git.sh worktree list"),
+            ),
+        )
 
     def test_引用付きの_find_は_allow_に当たる(self):
         self.assert_verdict('find /repo -name "a b"', "allow", "prefer-glob")
@@ -834,6 +845,18 @@ class SubstRepoRulesTest(unittest.TestCase):
         self.assertIn("$( )", body["response"])
         self.assertIn("--body-file", body["response"])
 
+    def test_ANSI_Cの引用は中身を確定できるときだけ読む(self):
+        # エスケープ（`\`）の無い `$'…'` は単一引用と同じ文字列なので、そう読んでルールに当てる。
+        # エスケープがあれば展開しないと中身が決まらないので、確定できない読みとして止める側へ渡す。
+        self.check(
+            [
+                ("$'git' push origin main", "deny", "raw-git", ""),
+                ("git $'push' origin main", "deny", "raw-git", ""),
+                ("rm $'-rf' /tmp/x", "deny", "recursive-delete", ""),
+                ("echo $'a\\ngit push'", "ask", "", "PARSE_UNCERTAIN"),
+            ]
+        )
+
     def test_実行するときに決まるコマンド名は一律に止める(self):
         # どれもどのルールにも当たらず、auto では権限モードに渡っていた。
         code = "DENY_COMMAND_NAME_EXPANSION"
@@ -844,7 +867,6 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ("/usr/bin/gi? push origin main", "deny", NAME, code),
                 ("git${IFS}push origin main", "deny", NAME, code),
                 ("/bin/r? -rf /tmp/x", "deny", NAME, code),
-                ("$'git' push origin main", "deny", NAME, code),
                 ("FOO=1 $c status", "deny", NAME, code),
                 (">/dev/null $c status", "deny", NAME, code),
                 ("2>&1 $c status", "deny", NAME, code),

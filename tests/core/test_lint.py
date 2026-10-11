@@ -597,7 +597,7 @@ class LintTest(unittest.TestCase):
             }
         )
         decided = run_ccnavi(
-            ["--root", self.root, "--mode", "enable", "--log", ""],
+            ["--root", self.root, "--mode", "enable"],
             input=payload,
             cwd=ROOT,
             env={k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},

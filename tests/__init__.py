@@ -20,6 +20,12 @@ if SRC not in _sys.path:
 
 from ccnavi.infra import settings as _settings  # noqa: E402
 
+# 使い捨ての置き場は、シンボリックリンクを解いた実パスにそろえる。macOS の一時置き場は
+# `/var/...` だが実体は `/private/var/...` で、git や realpath は後者を返す。置き場の
+# 文字列をそのまま比べるテストが、機械の違いだけで食い違う。
+# 他の OS では実パスと同じで、何も変わらない。
+_tempfile.tempdir = os.path.realpath(_tempfile.gettempdir())
+
 # 共通レイヤーの 3 本の既定のパス。ハーネスはここへ設定を置き、`--rules` / `--phases` /
 # `--risk` は渡さない。3 つは診断（`--lint` / `--test` / `--explain`）でだけ有効なので、
 # hook の判定とチケット・レビューの副命令には届かない。
@@ -154,6 +160,22 @@ def can_symlink() -> bool:
         except (OSError, NotImplementedError):
             return False
     return True
+
+
+def can_case_sensitive() -> bool:
+    """大文字小文字だけが違う名前を、別のファイルとして並べて作れるか。
+
+    macOS（既定）と Windows のファイルシステムは区別しないので、`a` と `A` が同じ 1 本になる。
+    OS の名前では決めず、使い捨ての置き場で実際に 2 本作って確かめる。
+    """
+    with _tempfile.TemporaryDirectory(prefix="ccnavi-case-probe-") as tmp:
+        try:
+            for name in ("a", "A"):
+                with open(os.path.join(tmp, name), "w", encoding="utf-8") as f:
+                    f.write(name)
+            return len(os.listdir(tmp)) == 2
+        except OSError:
+            return False
 
 
 def can_pass_argument(size: int) -> bool:

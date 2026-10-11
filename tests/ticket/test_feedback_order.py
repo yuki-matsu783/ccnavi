@@ -17,8 +17,9 @@ import os
 import unittest
 
 from ccnavi.tickets import phase, ticket_model, workflow
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_phases_dag import item, parent_of
+from tests.ticketsample import child_text, parent_text
 
 PLAN = [item("design"), item("docs", after=[1])]
 

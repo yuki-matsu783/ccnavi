@@ -56,12 +56,6 @@ class ProjectSkillsTest(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--log",
-                "",
-                "--state",
-                state,
-                "--approved",
-                "",
                 "--mode",
                 "enable",
             ],
@@ -200,7 +194,7 @@ class ProjectSkillsTest(unittest.TestCase):
 
     def test_the_index_comes_once_on_the_first_call_inside_the_project(self):
         self.put("deploy", skill("deploy", "本番へ出す手順"))
-        state = os.path.join(self.root, "state")
+        state = os.path.join(self.root, "logs", "state")
         # ワークスペースルートで始まったセッション。開始には載らない。
         self.assertNotIn("deploy", self.context("SessionStart", self.root, state=state))
         self.assertNotIn("deploy", self.read_in(self.root, state))
@@ -212,13 +206,9 @@ class ProjectSkillsTest(unittest.TestCase):
 
     def test_the_index_is_not_repeated_after_session_start_inside_the_project(self):
         self.put("deploy", skill("deploy", "本番へ出す手順"))
-        state = os.path.join(self.root, "state")
+        state = os.path.join(self.root, "logs", "state")
         self.assertIn("- deploy:", self.context("SessionStart", self.lib, state=state))
         self.assertNotIn("deploy", self.read_in(self.lib, state))
-
-    def test_without_state_calls_do_not_repeat_the_index(self):
-        self.put("deploy", skill("deploy", "本番へ出す手順"))
-        self.assertNotIn("deploy", self.read_in(self.lib, ""))
 
 
 if __name__ == "__main__":

@@ -254,6 +254,10 @@ scripts in .ccnavi/scripts/, which call
         (drops the worktrees of the closed children - finished or cancelled -, of
          phase N when given; only children in doing/ keep theirs; a child id
          stands for its parent, read from the ticket)
+    ccnavi worktree remaining <parent> [--cwd <dir>]
+        (lists, and never removes, the worktrees of the family that are still
+         there: one named differently from the parent that holds its tickets, and
+         a closed child's that has unsaved drafts; prints nothing when none)
     ccnavi sync paths
         (for .ccnavi/scripts/ccnavi-sync.sh: one "<key> <value>" per line - the
          approved and proposal places, the ccnavi directory, and the integration
@@ -263,6 +267,14 @@ scripts in .ccnavi/scripts/, which call
         (for ccnavi-sync.sh after it took in <parent>: re-judges the family's
          approved tickets and its authority; a "check 1" line, then one
          "<severity> <detail>" per line; exit 1 when an error stops the family)
+    ccnavi sync closed <parent> <repo> <integration> <tree>
+        (for ccnavi-sync.sh: a "closed 1" line, then "integration yes|no" - the
+         integration branch's done/ holds the same parent - and "archive yes|no" -
+         the local archive holds it; reads only, git show is local)
+    ccnavi tree parent <tree> <name>
+        (for the scripts: a "tree 1" line, then "parent yes|no|unreadable" - the
+         tree holds the parent ticket or proposal <name>; the scripts read no
+         ticket YAML themselves)
 
 ccnavi never reaches the remote itself. The script fetches the merge request,
 its threads and reviews, and hands them over as --result <json>.

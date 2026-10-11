@@ -30,7 +30,7 @@ import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runExpectations, runLint, runSuggest, runTest, type RulesOverride } from "./ccnavi.js";
-import { envFromSettingsJson, hooksFor, parseHooks, type HookEntry } from "./core/hooks.js";
+import { hooksFor, parseHooks, type HookEntry } from "./core/hooks.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
@@ -258,12 +258,14 @@ async function switchTarget(current: PanelState, target: RulesTarget): Promise<v
 async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   const settingsText = readText(path.join(root, ".claude", "settings.json"));
   const localText = readText(path.join(root, ".claude", "settings.local.json"));
-  const env = (name: string) => (settingsText !== undefined && envFromSettingsJson(settingsText, name)) || "";
   let rulesPath: string;
   let rulesRel: string;
   const notices: string[] = [];
   // 切り替えの一覧のために、共通の設定でも実行ファイルに聞く。読めなくても共通の設定は開けるので、一覧が縮むだけ
   const board = await loadBoard(root, binSetting());
+  if (!board.ok) {
+    notices.push(`実行ファイルから動作モードを取得できないため、判定が実行を止めるかを表示していません: ${board.error}`);
+  }
   const targets = targetOptions(board.ok ? board.board : undefined, "workspace", { kind: target.kind, name: target.kind === "project" ? target.name : "" });
   if (target.kind === "workspace") {
     // 共通の設定の場所は `.ccnavi/common/` 固定。env（`CCNAVI_RULES` など）では動かせないので、設定ファイルは読まない。
@@ -324,7 +326,9 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     sums: rulesSums(board.ok ? board.board : undefined),
     hooks,
     hookFiles: { settings: settingsText !== undefined, settingsLocal: localText !== undefined },
-    mode: env("CCNAVI_MODE"),
+    // 動作モードは実行ファイルに聞く。設定ファイルの env から自分で読むと、settings.local.json・環境・
+    // 読めない値の扱いが判定と食い違う
+    mode: board.ok ? board.board.settings.mode : "",
     expectationsPath: resolveIn(root, expectationsRel),
     expectationsRel,
   };

@@ -100,6 +100,7 @@ import stat
 import yaml
 
 from ..infra import fsio, settings, tree, yamlread
+from ..records import diaglog
 from . import flow_render, flow_shape, flow_text, ticket_model
 
 # ロックで止めたときの理由コードと、記録のルール名。
@@ -140,7 +141,7 @@ def _fold(path: str) -> str:
     """区切りを "/" に揃え、大文字小文字をそろえる。長さは変えない。
 
     1 字ずつ小文字にし、小文字にすると長さの変わる字（`İ` など）はそのまま残す。全体の
-    `lower()` は長さが変わりうるので、位置で切り出す `locate` の読みが食い違う（L-c）。
+    `lower()` は長さが変わりうるので、位置で切り出す `locate` の読みが食い違う。
     """
     return "".join(low if len(low := ch.lower()) == 1 else ch for ch in path.replace("\\", "/"))
 
@@ -166,7 +167,7 @@ def _place_rel(raw: str) -> str:
 def approved_rel(conf: settings.Settings) -> str:
     """承認済みチケットの置き場のパス（"/" 区切り、前後の区切りなし）。絶対なら絶対のまま。
 
-    `./`・`//`・`x/..` は整える（L-b）。整えないと、判定が整えたパスに当てたときに
+    `./`・`//`・`x/..` は整える。整えないと、判定が整えたパスに当てたときに
     置き場のパスと食い違い、ロックが外れる。
     """
     return _place_rel(conf.approved or settings.DEFAULT_APPROVED)
@@ -230,7 +231,7 @@ def resolve(
 
     読むのは正とするツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの版は
     読まない。子のワークツリーはエージェントが作業する場所で、そこにある版はシェルの書き込み
-    （行き先を追えない形）で書き換えられうる（M-2）。
+    （行き先を追えない形）で書き換えられうる。
     リンクでも「在る」とする（読むかどうかは `load` が決める。気づかないうちに別の版へ移ることは
     しない）。
     """
@@ -354,7 +355,7 @@ def inode_hit(
 ) -> ticket_model.Ticket | None:
     """書き込み先が、着手中の子のフローとハードリンクで同じ中身なら、その子。無ければ None。
 
-    ハードリンクはパスに置き場が出ないので `locate` では当たらない（M-1）。書き込み先が
+    ハードリンクはパスに置き場が出ないので `locate` では当たらない。書き込み先が
     在って、名前が 2 つ以上あるときだけ、着手中の子のフロー（どのツリー上のチケットの置き場も）と
     (デバイス, inode) を比べる。止める向きだけ。ふつうのファイル（名前が 1 つ）には何も読まない。
     """
@@ -406,8 +407,8 @@ def read_bytes(path: str, tree_root: str = "") -> tuple[bytes | None, str]:
     """フローのファイルの中身（バイト）。読まないなら (None, 理由)。例外は外に出さない。
 
     読むのはふつうのファイル（`S_ISREG`）で、名前が 1 つ（ハードリンクでない）ものだけ。
-    名前付きパイプを開くと書き手が来るまで戻らず、SubagentStart が応答しなくなる（H-1）。
-    ハードリンクは承認済みの領域の外の名前から書き換えられる（M-1）。
+    名前付きパイプを開くと書き手が来るまで戻らず、SubagentStart が応答しなくなる。
+    ハードリンクは承認済みの領域の外の名前から書き換えられる。
     `lstat` で確かめてから `O_NONBLOCK | O_NOFOLLOW` で開き、開いたものを `fstat` で
     もう一度確かめる（ふつうのファイルで、`lstat` と同じ inode）。確かめてから開くまでに
     差し替えられても、開いたものが違えば読まない。Windows には `O_NONBLOCK` も
@@ -766,8 +767,12 @@ def changed_notice(conf: settings.Settings, root: str, child: ticket_model.Ticke
     """着手中の子のフローが、着手のときに記録したハッシュから変わっていれば、その知らせ。無ければ空。
 
     知らせるだけで止めない（厳しくする向き）。ロックと承認済みの領域の保護は Write / Edit と、
-    パスの出るシェルの書き込みを止めるが、行き先を追えないシェルの書き込みは止まらない
-    （M-2）。記録が無い（この仕組みより前に着手した）子には何も言わない。例外は外に出さない。
+    パスの出るシェルの書き込みを止めるが、行き先を追えないシェルの書き込みは止まらない。
+    記録が無い（この仕組みより前に着手した）子には何も言わない。例外は外に出さない。
+
+    例外で確かめられなかった回は、診断ログに残し、確かめられなかったことを 1 行で言う。
+    何も言わないと「書き換わっていない」と同じ見え方になり、知らせの役目を果たせない。
+    SubagentStart で読めないフローを 1 行で言うのと同じ扱い。
     """
     try:
         if not (child.is_child and child.in_progress):
@@ -789,8 +794,16 @@ def changed_notice(conf: settings.Settings, root: str, child: ticket_model.Ticke
             "（ロックが止めるのは Write / Edit だけで、"
             "シェルで書き込み先を追えない書き方をすると止められない）"
         )
-    except Exception:  # noqa: BLE001  知らせのために hook を止めない
-        return ""
+    except Exception as exc:  # noqa: BLE001  知らせのために hook を止めない
+        kind = type(exc).__name__
+        diaglog.get("ccnavi", root).warn(
+            "フローの書き換えを確かめられない", ticket=child.ticket, error=kind
+        )
+        return (
+            f"[ccnavi] {CODE_CHANGED}: 子チケット {flow_text.clean(child.ticket)} のフローが着手の"
+            f"あとに書き換わったかを、ccnavi の内部エラー（{kind}）で確かめられなかった。"
+            "ユーザが確かめてください"
+        )
 
 
 def briefing(
@@ -808,7 +821,7 @@ def briefing(
 
     `full` が偽なら、ファイルの 1 行だけを返す。起動の cwd が親のツリーで子を何本も並べるとき
     （入れ子の孫の起動もこれ）は、どの子の担当かが hook から決められない。そこで全部の子の
-    手順を並べると、別の子の手順に従いうる（M-4）。手順を並べるのは cwd がその子の
+    手順を並べると、別の子の手順に従いうる。手順を並べるのは cwd がその子の
     ワークツリーのときだけにする。
     """
     if not child.is_child:

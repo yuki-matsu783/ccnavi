@@ -1,5 +1,5 @@
 #!/bin/sh
-# PostToolUse (Write|Edit): 拡張のファイルを編集したことを記録する
+# PostToolUse (Write|Edit): 拡張（VS Code・Chrome）のファイルを編集したことを記録する
 #
 # NotebookEdit は対象外。あのツールが渡すのは `notebook_path` で `file_path` ではなく、
 # 拡張にノートブックはないため、入れても一度も該当しない
@@ -30,14 +30,13 @@ file=$(printf '%s' "$payload" |
 # パスの表記を見て判断するため、ここで `/` に統一する
 file=$(printf '%s' "$file" | tr '\\' '/' | tr -s '/')
 
-# 拡張の外は対象外。ただし共通の部品（extensions/shared/）は、VS Code 拡張の画面の CSS が
-# @import で読むため、対象に入れる（どの画面が読むかは test-groups.js が決める）
+# 拡張（VS Code の ccnavi-board と Chrome の ccnavi-approval）の外は対象外。
 # ワークツリーで作業していてもパスの途中にこの文字列が現れるため、
 # 置き場の決まり（.claude/worktrees/）をハードコードせずに拾える
 # 相対パスで来た形（先頭に `/` がない）も受け付ける
 case "$file" in
 */extensions/vscode/ccnavi-board/* | extensions/vscode/ccnavi-board/*) ;;
-*/extensions/shared/* | extensions/shared/*) ;;
+*/extensions/chrome/ccnavi-approval/* | extensions/chrome/ccnavi-approval/*) ;;
 *) exit 0 ;;
 esac
 

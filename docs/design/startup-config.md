@@ -20,7 +20,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 | hook から（payload あり） | イベントごとの手順（4.2）。終了コード 0 は通す、2 は止める・差し戻す |
 | hook の入力なし | 使い方を標準エラーに出して終了コード 1 |
 | 診断用のオプション（`--lint` `--test` `--test-expectations` `--explain`） | payload を読まない。ユーザと VS Code 拡張が使う（10 章） |
-| `--agree` / `--reviewed` / `ticket …` / `review …` | チケット制御の操作。ユーザが端末で打つか、保護済みスクリプトが呼ぶ（9 章） |
+| `--agree` / `--reviewed` / `ticket …` / `review …` | チケット制御の操作。ユーザが端末で打つか、ボードの子プロセスか保護済みスクリプトが呼ぶ（9 章） |
 
 ワークスペースルートは `--root` → 環境変数 `CLAUDE_PROJECT_DIR` → 作業ディレクトリから上へ辿って
 `.claude/` を持つ最初のディレクトリ、の順で決める。
@@ -32,7 +32,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 
 | イベント | すること | 応答 |
 |---|---|---|
-| `SessionStart` | コアファイルのバックアップを取る（実行ファイルはここだけ）。`additionalContextOnce` の記憶を捨てる（`source=startup` なら `match: Stop` の数えも。6.6）。サブエージェントでなければ、ccnavi が前提にしている作業の決まり（ワークツリー・`ccnavi-git.sh`・`wip/scratchpad/`・プロジェクトへの `cd`・サブエージェント・合意の要る変更。チケット制御が有効なら `ccnavi-ticket.sh status` も）を 1 行ずつ渡し（ワークツリーと git の行は、共通レイヤーと自身のレイヤーの deny に `workspace-root`・`raw-git` があるときだけ）、索引の案内を出す回は `--docs` で詳しく引くよう添える（REQ-SES-06）。チケット制御が有効なら、直接作業とチケット作業の使い分けをモデルに渡す（9.1）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を渡す（11.13）。サブエージェントでなければ、ワークスペースとプロジェクトの md の frontmatter の索引を差分で新しくし（3 秒と hook の判定の期限の残りの小さいほうまで）、`--docs` での引き方と、無視の行を足したツリー（その `.gitignore` に未コミットの差分が残る）と、索引の対象外にしたツリーと、書き換えなかった ccnavi-index.jsonl を渡す（10） | `additionalContext` |
+| `SessionStart` | コアファイルのバックアップを取る（実行ファイルはここだけ）。`additionalContextOnce` の記憶を捨てる（`source=startup` なら `match: Stop` の数えも。6.6）。サブエージェントでなければ、ccnavi が前提にしている作業の決まり（ワークツリー・`ccnavi-git.sh`・`wip/scratchpad/`・プロジェクトへの `cd`・サブエージェント・合意の要る変更。チケット制御が有効なら `ccnavi-ticket.sh status` も）を 1 行ずつ渡し（ワークツリーと git の行は、共通レイヤーと自身のレイヤーの deny に `workspace-root`・`raw-git` があるときだけ。git の行は生の git を組み込みで止めるとき（9.1）も）、索引の案内を出す回は `--docs` で詳しく引くよう添える（REQ-SES-06）。チケット制御が有効なら、直接作業とチケット作業の使い分けをモデルに渡す（9.1）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を渡す（11.13）。サブエージェントでなければ、ワークスペースとプロジェクトの md の frontmatter の索引を差分で新しくし（3 秒と hook の判定の期限の残りの小さいほうまで）、`--docs` での引き方と、無視の行を足したツリー（その `.gitignore` に未コミットの差分が残る）と、索引の対象外にしたツリーと、書き換えなかった ccnavi-index.jsonl を渡す（10） | `additionalContext` |
 | `UserPromptSubmit` | 保護領域にいまある変更を記録し、ターンの基準にする（7.4）。このセッションがまだ知らない承認を 1 度伝える（9.4）。依頼文に issue・MR の指定があれば、紐づくブランチを探してユーザに確かめる指示を渡す（9.13） | 無し。伝えることがあれば `additionalContext` |
 | `PreToolUse` | 呼び出しを判定する（6 章）。コアファイルをバックアップする（8 章）。cwd がプロジェクトの中に入った最初の回に、そのスキルの目録を添える（11.13） | `permissionDecision` と `additionalContext` |
 | `PostToolUse` | コアファイルをバックアップと突き合わせて戻す。作業ツリーを git で読み、保護領域の変更を報告し、設定に従って戻す（7 章）。チケットの状態を承認済みチケットへ書き出し、フェーズの終わりを告げる（9.8）。サブエージェントが差し戻しを無視して終わったことを親に言う | 終了コード 2 と標準エラー、または `additionalContext` |
@@ -85,8 +85,27 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 終了コード 2、`dry-run` は 0（REQ-CMN-08）。この block は理由を返せないので、生の文字列に `>` が 50 個を超えて並ぶ入力は、シェルから書き込む形の組み込みの保護だけを当てずに、ほかのルールの `deny` と `ask` を当てたあとで、`deny` に当たっていなければ `DENY_REDIRECT_LIMIT` に上げて理由と書き直し方を返す（付録 A）。この保護の照合は `>` の個数 × その後ろの空白の無い語の長さで伸びるので、上限で `>` の個数を抑える。上限の下でも尾が長い入力（400KB 程度）は期限に届きうる。外側で打ち切られた場合には手が出ない。`PostToolUse` に期限は無く、
 git の読み取りが 2 秒で打ち切られる。
 
-payload が JSON でない・オブジェクトでない・`hook_event_name` が無いときは `payload-unusable` で
-同じ結果になる。記録を書けないときは標準エラーに出して捨て、判定は変えない。
+payload が JSON でない・オブジェクトでない・`hook_event_name` が無いとき、`hook_event_name`・`tool_name`・
+`session_id`・`cwd`・`permission_mode`・`tool_use_id` のどれかが文字列でないとき、`tool_input` がオブジェクトでないとき、
+その中の判定が読む欄（`command`・`file_path` など。`hookio.TOOL_INPUT_TEXT_FIELDS`）が文字列でないときは `payload-unusable` で
+同じ結果になる。記録を書けないときは標準エラーに出して捨て、判定は変えない。UTF-8 にできない字（JSON の
+`"\ud800"` のような孤立したサロゲート）は、記録では `\ud800` の 6 字にして書く。期限切れと `payload-unusable` の文は、
+先頭に `[ccnavi] <理由>` を置き、次の一手（期限切れはコマンドを分ける・長い文はファイルで渡す、`payload-unusable` は
+書き直しでは直らないので hook の登録と版をユーザに確かめてもらう）を添える。
+
+**内部エラー。** hook として起動された回の処理（設定の読み込み、モードの解決、payload の読み取り、イベントの処理、記録、
+診断ログ）が ccnavi 自身の想定外の例外で終わったら、その回は `internal-error` で判定に
+至らなかった回として記録し（`detail` に例外の型と場所）、診断ログに error で 1 行残す。記録を書く途中で
+落ちた回は、記録を重ねて試さない。例外を抜けさせると
+Python は終了コード 1 で終わり、Claude Code は 0 と 2 以外を止める扱いにしないので、`PreToolUse` の呼び出しが
+記録も無く通ってしまう。途中まで書いた標準出力は捨て、イベントごとに次のように終える。文には `[ccnavi] internal-error`、
+例外の型、診断ログ（`logs/diag/ccnavi.log`）の場所を載せ、モデル宛ての文には「繰り返さずユーザに伝える」を添える。
+
+| イベント | 終え方 |
+|---|---|
+| `PreToolUse`、payload を読む前（イベントが分からない） | 標準エラーに文、`enable` は終了コード 2 で止める。`dry-run` は 0（判定に達せなかった回の既定と同じ） |
+| `PostToolUse` | ツールはもう走っていて止めるものは無い。`enable` は終了コード 2 と標準エラーで、実行後の検査をしていないことをモデルに言う。`dry-run` は 0 |
+| それ以外（`SessionStart`・`UserPromptSubmit`・`Stop`・`SubagentStart`・`SubagentStop`・未知のイベント） | 終了コード 0 で、ユーザに `systemMessage` で知らせる。終了コード 2 で終えると、`Stop` と `SubagentStop` は終われずに続けさせられ、`UserPromptSubmit` は依頼文を消す。ccnavi の不具合が作業そのものを止めないようにする。`SubagentStop` は、子の範囲を確かめられなかった回と同じ印を置き、親に届ける（9.12） |
 
 ### 4.6 導入と配布
 
@@ -99,7 +118,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 | `.claude/settings.json` の `hooks` | 7 つのイベントに実行ファイルを登録する。既に別の表記で登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true`。`--no-vscode` で触らない |
 | 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,agree,fetch,sync,clean,branches,start,launcher}.sh`、共通部の部品 `ccnavi-common-{state,lock,c1,host,log}.sh` と `ccnavi-clean.js`。取り込み（`ccnavi-fetch.sh`）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは触らず、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも外れていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない） |
-| 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行と、`--docs` の索引の `**/ccnavi-index.jsonl` の 1 行。索引の行は別の見出しの下に入り、`ccnavi-index.jsonl` の行が既にあれば足さない（旧名 `index.jsonl` の行は数えない）。`ccnavi-index.jsonl` を否定する行があればユーザの除外として足さない。どちらも配布先が git のリポジトリで、配るときだけ。振り分けの sh は追跡する側に置く。導入スクリプトは `projects/` の下のプロジェクトには足さない（そこは `--docs` が索引を書く前に、そのプロジェクトの `.gitignore` に足す。10 と ADR-0112） |
+| 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行と、`--docs` の索引の `**/ccnavi-index.jsonl` の 1 行。索引の行は別の見出しの下に入り、`ccnavi-index.jsonl` の行が既にあれば足さない（旧名 `index.jsonl` の行は数えない）。`ccnavi-index.jsonl` を否定する行があればユーザの除外として足さない。どちらも配布先が git のリポジトリで、配るときだけ。振り分けの sh は追跡する側に置く。導入スクリプトは `projects/` の下のプロジェクトには足さない（そこは `--docs` が索引を書く前に、そのプロジェクトの `.gitignore` に足す。10） |
 
 置き場は 2 つに分けて固定する。
 

@@ -22,7 +22,11 @@ cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
 # JSON パーサなしで取り出す。値は識別子なので引用符の中だけ見れば足りる
 session=$(printf '%s' "$payload" |
 	sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-[ -z "$session" ] && session=unknown
+# 記録のファイル名になるため、区切り文字が入っていたら使わない（payload の値をそのまま
+# パスに継ぐと、logs/session/ の外を指せる。mark-ext.sh・test-ext.sh と同じ直し方）
+case "$session" in
+'' | */* | *\\*) session=unknown ;;
+esac
 
 state="logs/session"
 counter="$state/$session.retries"
@@ -37,7 +41,11 @@ trees="$state/$session.trees"
 #
 # 保持期間を 1 時間にしてあるのは、連鎖の長さより十分に長く、放置の長さより十分に
 # 短いから。走っている連鎖のファイルは書くたびに新しくなるため巻き込まれない
-find "$state" -type f -mmin +60 -delete 2>/dev/null
+#
+# 自分のセッションのファイルは除外する（test-ext.sh と同じ）。1 つのターンは 1 時間を
+# 超えることがあり、lint-py.sh が最初の編集で書いた .trees を読む前に消すと、
+# 「Python を編集していないターン」に見えて、直したツリーが実行されなくなる
+find "$state" -type f -mmin +60 ! -name "$session.*" -delete 2>/dev/null
 
 # stop_hook_active が false なら、このフックが差し戻した結果ではなく、
 # モデルが自分の判断で止まろうとしている。そこが数え始めの位置
@@ -51,31 +59,39 @@ esac
 # 直したツリーが検査されないまま通ってしまう。逆に、あるツリーを全部テストすると、
 # 編集していない他セッションの書きかけでこちらが差し戻される
 # どこを編集したかは PostToolUse の lint-py.sh が記録している
+#
+# ツリーは 1 行に 1 つで、1 行ずつ読む。`for target in $targets` と書くと、空白の入ったパス
+# （Windows の `C:/Users/First Last/`）が単語に割れ、どの単語も tests/ を持たないため
+# 何も実行せずに通ってしまう。ループの中のテストは標準入力を /dev/null にする。
+# 一覧を読んでいる標準入力をテストが読むと、残りのツリーが飛ばされる
+mkdir -p "$state"
 if [ -s "$trees" ]; then
-	targets=$(sort -u "$trees")
+	sort -u "$trees" >"$trees.sorted" || exit 0
 else
 	# Python を 1 つも編集していないターン。ルールファイルやテストの固定データの変更でも
 	# 失敗するため、既定のツリーで 1 回は実行する
-	targets=$(pwd)
+	pwd >"$trees.sorted" || exit 0
 fi
 
 # --failfast で最初の 1 件で止める。全件の失敗を並べても、直す順番は結局
 # 1 件ずつなので、読む量だけが増える
 failed=""
 output=""
-for target in $targets; do
+while IFS= read -r target; do
+	[ -n "$target" ] || continue
 	# tests/ を持たないツリーは飛ばす。ツリーの有無だけを見ると、`unittest
 	# discover -s tests` が "Start directory is not importable" で失敗し、ターンが
 	# 止まる。モード B では projects/ のプロジェクトが Python とは限らないため、
 	# プロジェクトを 1 つ置いた時点で起きる
 	[ -d "$target/tests" ] || continue
-	if out=$(cd "$target" && uv run --python 3.12 python -m unittest discover -s tests -t . --failfast 2>&1); then
+	if out=$(cd "$target" && uv run --python 3.12 python -m unittest discover -s tests -t . --failfast </dev/null 2>&1); then
 		continue
 	fi
 	failed=$target
 	output=$out
 	break
-done
+done <"$trees.sorted"
+rm -f "$trees.sorted"
 
 if [ -z "$failed" ]; then
 	rm -f "$counter" "$trees"

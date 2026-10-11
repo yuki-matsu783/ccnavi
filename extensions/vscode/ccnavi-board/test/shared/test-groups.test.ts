@@ -19,7 +19,7 @@ function plan(...paths: string[]): { groups: string[]; compile: boolean; webview
   return { groups: match[1] === "" ? [] : match[1].split(","), compile: match[2] === "yes", webview: match[3] === "yes" };
 }
 
-test("CB-T392 shared の CSS を直すと、@ccnavi/shared を @import する画面のグループとコンパイル・画面の型の検査が回る", () => {
+test("CB-T394 shared の CSS を直すと、@ccnavi/shared を @import する画面のグループとコンパイル・画面の型の検査が回る", () => {
   const page = plan(path.join(SHARED, "page.css"));
   assert.deepEqual(page.groups, ["board", "flow", "phases", "projects", "risk", "rules", "shared", "workflow"]);
   assert.ok(page.compile && page.webview);

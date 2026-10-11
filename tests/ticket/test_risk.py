@@ -21,8 +21,9 @@ from unittest import mock
 from ccnavi.policy.rules import SEVERITY_WARN
 from ccnavi.tickets import risk
 from tests import common_path
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, read_json, write
+from tests.ticketsample import child_text, parent_text
 
 RISK = """
 version: 1

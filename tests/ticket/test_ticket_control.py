@@ -15,8 +15,30 @@ import os
 import tempfile
 import unittest
 
-from tests.core.test_lint import ROOT, SOUND, rules_file
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
+
+# 不備の無いルールのファイル。ルールの中身はここの主題ではない。
+RULES = {
+    "version": 1,
+    "deny": [
+        {
+            "id": "git-push",
+            "match": "Bash",
+            "glob": "*git push*",
+            "message": "git push is not run by the agent. Ask the user to push.",
+        }
+    ],
+    "allow": [{"id": "anything", "match": "Read", "regex": "."}],
+}
+
+
+def rules_file(root: str) -> str:
+    path = common_path(root, "rules")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(RULES, f, indent=2)
+    return path
 
 
 class TicketControlTest(unittest.TestCase):
@@ -24,14 +46,14 @@ class TicketControlTest(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.root = directory.name
-        self.rules = rules_file(self.root, SOUND)
+        self.rules = rules_file(self.root)
 
     def start(self, *extra, env=None):
         payload = json.dumps({"hook_event_name": "SessionStart", "session_id": "s1"})
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.update(env or {})
         return run_ccnavi(
-            ["--root", self.root, "--rules", self.rules, "--state", "", "--log", "", *extra],
+            ["--root", self.root, "--rules", self.rules, *extra],
             input=payload,
             cwd=ROOT,
             env=environment,

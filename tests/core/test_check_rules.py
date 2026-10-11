@@ -15,6 +15,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import tempfile
 import unittest
 
 from tests import ROOT
@@ -52,7 +53,17 @@ class RepoExpectationsTest(unittest.TestCase):
         environment = tool.environment()
         environment.pop("CLAUDE_PROJECT_DIR", None)
         # --root の区切りを `/` に揃えるのは arguments() の側（Windows の `\` を期待に残さない）。
-        done = run_ccnavi([*tool.arguments(), "--json"], cwd=ROOT, env=environment)
+        #
+        # 期待の `/repo` は --root に読み替わる。ルートがこのリポジトリのままだと、ワークツリー
+        # （`.claude/worktrees/<名前>` の下）で回したときに `Write /repo/wip/...` が
+        # allow:worktrees に当たり、本流と答えが割れる。ルートだけを、ワークツリーの下にならない
+        # 使い捨ての置き場に替える。ルールと期待は arguments() のとおりこのリポジトリのものを読む。
+        with tempfile.TemporaryDirectory(prefix="ccnavi-expectations-root-") as scratch_root:
+            arguments = tool.arguments()
+            arguments[arguments.index("--root") + 1] = os.path.realpath(scratch_root).replace(
+                "\\", "/"
+            )
+            done = run_ccnavi([*arguments, "--json"], cwd=ROOT, env=environment)
         self.assertEqual(done.returncode, 0, done.stderr)
         body = json.loads(done.stdout)
         self.assertGreater(len(body["expectations"]), 0, "期待する判定が 1 件も読めていない")

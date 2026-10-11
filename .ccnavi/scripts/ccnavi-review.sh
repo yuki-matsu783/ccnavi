@@ -255,7 +255,7 @@ if [ "$needs_host" = yes ]; then
 		case "$?" in
 		3) fail no-jq "jq が無い。結果の JSON を組み立てられない。" 2 ;;
 		4) fail no-transport-token "$ccnavi_h_cli_name が $host で使えず（未導入か未認証）、curl に付ける $token_name も無い。$token_name を置くか、$ccnavi_h_cli_name を $host に認証してください。" 2 ;;
-		*) fail no-transport "$ccnavi_h_cli_name が $host で使えず、curl も無い。どちらかを用意するか、MCP などでリモートを読める道具でスレッドとレビューを JSON にして、'ccnavi review confirm --result <json>' をユーザが打つ形にしてください。" 2 ;;
+		*) fail no-transport "$ccnavi_h_cli_name が $host で使えず、curl も無い。どちらかを用意するか、スレッドとレビューの JSON を実行ファイルへ直接渡せるのはユーザだけなので、エージェントは JSON を作らずに止まり、ユーザに頼んでください（ユーザが MCP などでリモートを読める道具でスレッドとレビューを JSON にし、端末で 'ccnavi review confirm --phase <N> --result <json>' を打つ）。" 2 ;;
 		esac
 	}
 	JQ="$ccnavi_h_jq"
@@ -300,7 +300,7 @@ api_failed() {
 	case "$2" in
 	graphql)
 		printf 'ccnavi-review: %s\n' \
-			"GraphQL を使えない環境では confirm / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。MCP などリモートを読める道具でスレッドとレビューを JSON にして 'ccnavi review confirm --phase <N> --result <json>' を打ってください。渡す JSON の形は fetch_all と同じ {host, mr, threads, reviews, fetched_at} です。Draft 外しはその道具の側で直接行ってください。" >&2
+			"GraphQL を使えない環境では confirm / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。スレッドとレビューの JSON を実行ファイルへ直接渡せるのはユーザだけです。エージェントは JSON を作らず、打たずに止まり、ユーザに次を頼んでください: MCP などリモートを読める道具でスレッドとレビューを fetch_all と同じ形 {host, mr, threads, reviews, fetched_at} の JSON にし、端末で 'ccnavi review confirm --phase <N> --result <json>' を打つ。Draft 外しもユーザにその道具の側で行ってもらってください。" >&2
 		;;
 	esac
 }
@@ -455,6 +455,12 @@ find_posted() {
 
 # ---- Draft を外す。GitHub は GraphQL でしか外せない。GitLab は題の "Draft: " を除く。
 
+# 題の頭の Draft の印（`Draft:`・`[Draft]`・`WIP:` など。大文字小文字は問わない）を除く。標準入力の 1 行。
+# sed の大文字小文字を区別しない指定（`I`）は GNU だけで、BSD の sed（macOS）では失敗するので、字ごとに書く。
+strip_draft() {
+	sed -E 's/^[[:space:]]*(\[?([Dd][Rr][Aa][Ff][Tt]|[Ww][Ii][Pp])\]?:?[[:space:]]*)+//'
+}
+
 undraft() {
 	mr_number="$1"
 	if [ "$kind" = github ]; then
@@ -463,7 +469,7 @@ undraft() {
 		[ -n "$node" ] || fail no-node-id "マージリクエスト #$mr_number の node_id を読めない。"
 		# 題の "Draft: " は GitLab の流儀で付けたもの。GitHub は Draft をフラグで持つので、フラグを外すときに題からも除く。
 		title=$(printf '%s' "$pr" | "$JQ" -r '.title // empty')
-		stripped=$(printf '%s' "$title" | sed -E 's/^[[:space:]]*(\[?(Draft|WIP)\]?:?[[:space:]]*)+//I')
+		stripped=$(printf '%s' "$title" | strip_draft) || stripped=""
 		if [ -n "$stripped" ] && [ "$stripped" != "$title" ]; then
 			api PATCH "repos/$path/pulls/$mr_number" "$("$JQ" -n --arg t "$stripped" '{title: $t}')" >/dev/null
 		fi
@@ -474,11 +480,15 @@ undraft() {
 	else
 		title=$(api GET "projects/$(encoded_path)/merge_requests/$mr_number" | "$JQ" -r '.title // empty')
 		[ -n "$title" ] || fail no-mr-title "マージリクエスト !$mr_number の題を読めない。"
-		stripped=$(printf '%s' "$title" | sed -E 's/^[[:space:]]*(\[?(Draft|WIP)\]?:?[[:space:]]*)+//I')
+		stripped=$(printf '%s' "$title" | strip_draft) ||
+			fail undraft-title "マージリクエスト !$mr_number の題から Draft を除けなかった。題は変えていない。"
 		if [ "$stripped" = "$title" ]; then
 			printf 'false\n'
 			return 0
 		fi
+		# 除いた結果が空なら、空の題で更新しない。
+		[ -n "$stripped" ] ||
+			fail undraft-empty-title "マージリクエスト !$mr_number の題から Draft を除くと空になる。題は変えていない。題を付けてから打ち直してください。"
 		# squash も有効にする。途中のコミットを既定のブランチに残さない。GitHub は MR ごとに持てない
 		# （マージのときにユーザが選ぶ）ので、コメントに書くだけ。
 		payload=$("$JQ" -n --arg t "$stripped" '{title: $t, squash: true}')
@@ -1104,7 +1114,14 @@ $wip_gone
 EOF_WIP
 		if [ -n "$ready_tree" ] &&
 			[ -n "$(git -C "$ready_tree" status --porcelain --untracked-files=no -- "$@" 2>/dev/null)" ]; then
-			fail ready-unsent "${ready_tree} の置き場（${ready_place}）か wip/ に未コミットの変更がある（閉じたチケットを logs/archive/ へ退避した削除や、wip/ の追跡済みのファイルの削除など）。コミットして push してから、もう一度 ready を打ってください（Draft はまだ外していない）。"
+			ready_git="sh ${root}/.ccnavi/scripts/ccnavi-git.sh"
+			fail ready-unsent "${ready_tree} の置き場（${ready_place}）か wip/ に未コミットの変更がある（閉じたチケットを logs/archive/ へ退避した削除や、wip/ の追跡済みのファイルの削除など）。Draft はまだ外していない。
+原因: 親が取り込み済みでないため、退避と wip/ の削除を ready が自動でコミットできない（C1 が動かない）。親のワークツリーの名前が親の識別子と違うことが多い。承認済みチケットがどのツリーに在るかを確かめる（ここで見たのは ${ready_tree}）。
+次の順に打つ（${ready_tree} の中で）:
+  1) cd ${ready_tree} && ${ready_git} add -u -- ${ready_place} wip
+  2) ${ready_git} commit -m '<退避と wip/ の削除を説明する 1 行>'
+  3) ${ready_git} push
+  4) ready --parent ${family} を打ち直す"
 		fi
 	fi
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
@@ -1123,6 +1140,9 @@ EOF_WIP
 	fi
 	exe_cwd="$here"
 	ccnavi worktree drop "$family" || :
+	# 親と名前が違うワークツリーや、下書きがあって消されなかった子のワークツリーは、drop では消えない。
+	# 一覧を出すだけで消さない（消すかどうかはユーザが決める）。残りが無ければ何も出ない。
+	ccnavi worktree remaining "$family" || :
 	;;
 close-early)
 	# ユーザが端末で打つ。exe が残りを見せて y/N を取り、マーカーを置いて下書きを書く。

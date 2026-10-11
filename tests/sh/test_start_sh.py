@@ -257,6 +257,8 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(body["title"], "Add login")
         self.assertEqual(body["body"], "Closes #152")
         self.assertTrue(body["draft"])
+        # 提案に MR の番号を書く案内（チケットの `mr:` で、この MR の番号がチケットに結び付く）
+        self.assertIn("案内: 提案の frontmatter に mr: 7 を書く", done.stdout)
 
     def test_second_run_continues_without_duplicates(self):
         self.github_new()
@@ -265,6 +267,8 @@ class StartShTest(unittest.TestCase):
         before = self.posts()
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        # 既存の MR で続ける枝にも同じ案内
+        self.assertIn("案内: 提案の frontmatter に mr: 7 を書く", done.stdout)
         self.assertEqual(self.fields(done.stdout)["ブランチ"], BRANCH)
         self.assertEqual(self.fields(done.stdout)["MR"], "https://github.com/acme/widgets/pull/7")
         self.assertEqual(self.posts(), before)

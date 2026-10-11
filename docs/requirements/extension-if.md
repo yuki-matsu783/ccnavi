@@ -67,7 +67,8 @@ sh は `<ワークスペースルート>/.ccnavi/scripts/` のものを絶対パ
 | REQ-EXT-20 | 事象 | `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-push-approved.sh [<親>...]` をユーザが打ったとき、ccnavi は、承認済みチケットの置き場の変更をコミットし、保護されたブランチでなければ push すること。親を並べたときは、その親子のチケットのうち取り込み済みのものだけを送ること（REQ-APV-10） |
 | REQ-EXT-21 | 状態 | フェーズをレビューで止めている間も、ccnavi は、親のワークツリーで単体で打った `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-review.sh confirm --phase <N>` を通すこと。sh のパスは realpath で解いたワークスペースルートから `/` 区切りで書き、空白やシェルの記号を含むときだけ引用する形（`settings.script_command`）を通すこと |
 | REQ-EXT-22 | 常時 | ccnavi は、VS Code 拡張が直接読み書きするファイルを次の場所に置くこと。提案はワークスペース・プロジェクト・ワークツリーの `wip/proposals/`、承認済みチケットとマーカーは同じツリーの `.ccnavi/approved/`、閉じたチケットの退避は `logs/archive/`、共通レイヤーは `.ccnavi/common/` の `rules.yml`・`risks.yml`・`phases.yml`・`rule-expectations.yml`。自身のレイヤーとプロジェクトのレイヤーのパスは `--explain --json` の `layers[]` で示すこと |
-| REQ-EXT-23 | 常時 | ccnavi は、チケット制御の宣言 `CCNAVI_TICKET_CONTROL`（`.claude/settings.json` か `.claude/settings.local.json` の env に書き、Claude Code がプロセスに渡すもの）を `enable` と `disable` の 2 値で読み、読めない値は `enable` として扱うこと。`--explain --json` の `settings.ticket_control` には、解決した値を必ず `enable` か `disable` で載せること（REQ-DIA-07） |
+| REQ-EXT-23 | 常時 | ccnavi は、チケット制御の宣言 `CCNAVI_TICKET_CONTROL`（`.claude/settings.json` か `.claude/settings.local.json` の env に書き、Claude Code がプロセスに渡すもの）を `enable` と `disable` の 2 値で読み、読めない値は `enable` として扱うこと。`--explain --json` の `settings.ticket_control` には、解決した値を必ず `enable` か `disable` で載せること（REQ-DIA-07）。そのとき値は、プロセスの環境の上にワークスペースルートの `.claude/settings.json`・`.claude/settings.local.json` の env をこの順で重ねて解決し、ボードの中身も同じ値で組むこと |
+| REQ-EXT-33 | 常時 | `--explain --json` を求められたとき、ccnavi は、`settings.mode` に hook がいま使うはずの動作モードを `enable`・`dry-run`・`disable` のどれかで載せること。値は REQ-EXT-23 と同じ重ね方で集め、判定と同じ解決（読めない値は `enable`、`--mode` が勝つ）を通すこと。ホームの設定は読まないこと。hook の判定はこの重ね方を使わず、プロセスに渡った環境だけを読むこと |
 | REQ-EXT-24 | 常時 | ccnavi は、レイヤーのファイル（`rules.yml`・`risks.yml`・`phases.yml`）を YAML 1.1（PyYAML の safe な読み手）で読み、頭の `version:` が読める書式の版（`--version --json` の `formats`）でなければ error にすること。拡張が書いたファイルも、hook と同じ読み手で読むこと |
 | REQ-EXT-25 | 常時 | ccnavi は、子のフローを正とする側のツリーの `.ccnavi/approved/flows/<子>.yml`（YAML、256 KiB まで）から読み、ファイルかツリーのルートからそこまでの途中がシンボリックリンクなら読まないこと。下書き `wip/proposals/flows/<子>.yml` には効力を持たせないこと。`ccnavi-push-approved.sh` は `flows/` の下の `.*.tmp` をコミットしないこと |
 
@@ -102,7 +103,7 @@ Chrome 拡張が呼ぶ名前。引数と戻り値は今の実装のとおり。
 
 | モジュール | 名前 |
 |---|---|
-| `ccnavi.hook.core` | `Snapshot`・`Actor`・`Changes`（`per_branch()`・`lines`・`planned.stopped`）・`read_fs(conf, root, stamp="", actor=None)`・`judge_approval(snapshot, only=None, shown_ids=None, shown_digest=None)`（戻り値の `gathered.refused`・`batch`・`mismatch`・`identifiers`・`screen_text`・`digest`・`rejected`）・`plan(snapshot, verdict)`・`withdraw(snapshot, ids, prior_proposals, reason="")`・`withdrawable(snapshot, family)`・`confirm(snapshot, parent_id, phase_no, result, changed_since_request)`（`withdraw` と `confirm` の戻り値の `problems`・`changes`）・`reviewable(snapshot, parent_id)`・`requested_head(snapshot, parent_id, phase_no)`・`moved_on_host(snapshot, parent_id, phase_no, head, changed)` |
+| `ccnavi.tickets.core` | `Snapshot`・`Actor`・`Changes`（`per_branch()`・`lines`・`planned.stopped`）・`read_fs(conf, root, stamp="", actor=None)`・`judge_approval(snapshot, only=None, shown_ids=None, shown_digest=None)`（戻り値の `gathered.refused`・`batch`・`mismatch`・`identifiers`・`screen_text`・`digest`・`rejected`）・`plan(snapshot, verdict)`・`withdraw(snapshot, ids, prior_proposals, reason="")`・`withdrawable(snapshot, family)`・`confirm(snapshot, parent_id, phase_no, result, changed_since_request)`（`withdraw` と `confirm` の戻り値の `problems`・`changes`）・`reviewable(snapshot, parent_id)`・`requested_head(snapshot, parent_id, phase_no)`・`moved_on_host(snapshot, parent_id, phase_no, head, changed)` |
 | `ccnavi.entry.cli` | `run(stdin, stdout, stderr, argv)` |
 | `ccnavi.entry.lint` | `SH_COMPAT_FILE`・`_SH_COMPAT`（`CCNAVI_COMPAT` の行を読む正規表現） |
 | `ccnavi.entry.version` | `VERSION`・`COMPAT` |
@@ -116,7 +117,7 @@ Chrome 拡張が呼ぶ名前。引数と戻り値は今の実装のとおり。
 
 REQ-EXT-27 の規則は、Chrome 拡張の入口（`py/ccnavi_chrome.py`）が名前を直に引くため。改名すると、同梱の版を組み立て直すまで
 Chrome 拡張だけが動かなくなる。上げた互換の版は統合先の `CCNAVI_COMPAT` に載り、古い Chrome 拡張は書く操作を出さなくなる（REQ-CHR-03）。
-`tests/ticket/test_core.py` は、手元の承認・取り下げ・レビュー済みが書いたバイト列と、同じ入力で Chrome の入口が返す書くものとを突き合わせる。
+`tests/ticket/test_swap_points.py` は、手元の承認・取り下げ・レビュー済みが書いたバイト列と、同じ入力で Chrome の入口が返す書くものとを突き合わせる。
 
 REQ-EXT-29 のダイジェストが覆うものは README「[承認の JSON](../../README.md#承認の-json)」と同じ（承認画面の本文・判定が読んだ中身・
 書き出す中身）。書いてよいのは、`batch` があり、`gathered.refused` も `mismatch` も無いときだけで、Chrome 拡張の入口は

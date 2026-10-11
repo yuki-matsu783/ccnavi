@@ -38,8 +38,7 @@ import tempfile
 import unittest
 
 from tests import ROOT, SRC, common_path, config_path
-from tests.ticket.test_phases import PHASES, child_text, parent_text
-from tests.ticket.test_ticket import RULES
+from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
@@ -126,6 +125,8 @@ class BranchFieldTest(unittest.TestCase):
         self.tree = os.path.join(self.ws, ".claude", "worktrees", PARENT)
         # ユーザが既に作って送ってあるブランチ（`/` を含む）。
         self.remote_commit("src/login.py", "print('login')\n", branch=BRANCH, start="main")
+        # worktree add は、統合先から切るとき最後の fetch が新しいことを求める。
+        git(self.ws, "fetch", "-q", "origin")
 
     # ---- 道具
 

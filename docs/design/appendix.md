@@ -38,7 +38,12 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `POST_VIOLATION` / `POST_PREEXISTING` / `POST_TICKET_SCOPE` | 実行後チェック。保護領域の変更 / 前から在った変更 / チケットの範囲外 |
 
 記録の `skip` の理由: `mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、
-`payload-unusable`、`deadline-exceeded`、`tool-cannot-write`、`worktree-unreadable`、`no-turn-baseline`。
+`payload-unusable`、`deadline-exceeded`、`internal-error`（ccnavi 自身の例外。4.5）、`tool-cannot-write`、
+`worktree-unreadable`（実行後チェックと、`SubagentStop` で子のワークツリーを読めず範囲を確かめられなかった回。9.12）、
+`no-turn-baseline`。
+
+組み込みの判定で止めた文は、先頭の行に理由コードと記録の `rules` と同じ識別子を
+`[ccnavi] <コード> (builtin rule: <識別子>)` の形で並べる（`builtin-script-env` など）。
 
 ## 付録 B. 記録の 1 行
 

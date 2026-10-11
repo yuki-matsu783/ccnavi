@@ -13,12 +13,12 @@ from ..infra import fsio, gitcmd, gitstate, tree
 from ..policy import rules
 from ..tickets import (
     archive,
+    c1,
     phase_scope,
     ticket_fields,
     ticket_model,
     ticket_places,
 )
-from . import c1
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
 # そのルールは「この場所に書かせない」を言っている。
@@ -245,8 +245,12 @@ def _script_writes(
     git に入らないので、承認とマーカーが親のブランチに乗って届いた先（別の機械の clone）では
     1 件も残っていない。台帳で見ると、その機械でだけ報告が出る。内容で見れば同じ答えになる。
 
-    外すのは 3 つ。
+    外すのは 3 つ（と、`mr:` の書き足し 1 つ）。
 
+    * `review request` が親の承認済みチケットに足す `mr:`。コミット済みの版で `mr:` が空
+      （欄なし・値なし）、いまの版が `mr: 12` の 1 行だけの正の整数で、ほかの欄・本文が
+      1 文字も変わっていないものだけ（`_mr_filled`）。`mr:` の値の変更（整数から別の整数・
+      整数から空）やほかの欄の書き換えは、今までどおり報告する
     * どちらの版も範囲を宣言していないもの（マーカー、`.risk.json`、閉じの記録）
     * スクリプトだけが書く欄（`ticket_model.SCRIPT_FIELDS`）以外が 1 文字も変わっていないチケット
     * `finish` と `cancel` の移動。正規化した内容が同じチケットが `doing/` から消えて、
@@ -292,7 +296,10 @@ def _script_writes(
         # 1 度しか書かないので、既に値がある欄が変わったのなら副命令が書いたものではない
         # （`ticket_fields.script_fields_set`）。
         drop = _droppable(before)
-        if _shape(before, drop) == _shape(now, drop):
+        # `mr:` が空から整数になっただけの変更も、ccnavi の書き足しとして省いて比べる
+        # （`_mr_filled`）。最初の比べだけで、移動の組（下の gone / arrived）には使わない。
+        same = drop + _mr_filled(before, now)
+        if _shape(before, same) == _shape(now, same):
             # 正規化した内容が同じ。どちらも範囲を宣言していない（マーカー・記録）か、
             # まだ無かったスクリプトの欄が足されただけか。
             out.add(change.full)
@@ -509,6 +516,27 @@ def _droppable(before: str | None) -> tuple[str, ...]:
     """正規化するときに省いてよいスクリプトの欄。コミット済みの版がまだ持っていない欄だけ。"""
     held = ticket_fields.script_fields_set(before) if before is not None else ()
     return tuple(f for f in ticket_model.SCRIPT_FIELDS if f not in held)
+
+
+def _mr_filled(before: str | None, now: str | None) -> tuple[str, ...]:
+    """`review request` が親の承認済みチケットに書き足す `mr:` を、比べるときだけ省く欄。
+
+    ccnavi 自身の書き込みと見なす例外で、判定が緩む向きなので条件を狭くしている。
+    コミット済みの版に frontmatter があって `mr:` が空（欄なし・値なし）で、いまの版の
+    `mr:` が `mr: 12` の 1 行だけの正の整数のときだけ省く。省いたうえで、ほかの欄・本文が
+    1 文字も変わっていなければ外れる。ほかが変わっていれば `_shape` が食い違うので報告する。
+    `mr:` の値の変更（整数から別の整数・整数から空）や、コミット済みの版が無い新規のチケットは、
+    ここに当たらず今までどおり報告する。
+    """
+    if before is None or now is None:
+        return ()
+    if ticket_fields.script_shape(before, ()) is None:
+        return ()
+    if not ticket_fields.mr_is_empty(before):
+        return ()
+    if ticket_fields.plain_int_field(now, ticket_fields.MR_KEY) is None:
+        return ()
+    return (ticket_fields.MR_KEY,)
 
 
 def _shape(text: str | None, drop: tuple[str, ...]) -> str | None:

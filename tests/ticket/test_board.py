@@ -22,8 +22,9 @@ import unittest
 
 from ccnavi.entry import diagnose_board
 from ccnavi.tickets import risk
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write
+from tests.ticketsample import child_text, parent_text
 
 FIXTURE = os.path.join(
     ROOT, "extensions", "vscode", "ccnavi-board", "test", "fixtures", "board.json"
@@ -70,6 +71,7 @@ class BoardTest(PhaseHarness):
         self.assertEqual(closed["copy"]["status"], "closed")
         self.assertTrue(closed["worktree"]["exists"])
         self.assertTrue(closed["completed_at"])
+        self.assertFalse(closed["in_progress"])
 
         doing = by_id["i0001-02-02"]
         self.assertIsNone(doing["proposal"])
@@ -78,17 +80,22 @@ class BoardTest(PhaseHarness):
         self.assertTrue(doing["worktree"]["path"].endswith("i0001-02-02"))
         self.assertEqual(doing["parent"], "i0001")
         self.assertEqual(doing["phase"], 2)
+        # 着手していて終わっていない承認済みチケットだけが作業中。拡張はこれで保存を止める
+        self.assertTrue(doing["in_progress"])
 
         waiting = by_id["i0001-02-03"]
         self.assertEqual(waiting["proposal"]["state"], "todo")
         self.assertEqual(waiting["proposal"]["tree"], "i0001")
         self.assertEqual(waiting["copy"], {"status": "none"})
+        self.assertFalse(waiting["in_progress"])
         self.assertFalse(waiting["worktree"]["exists"])
         self.assertEqual(sorted(s["tree"] for s in waiting["seen_in"]), ["i0001", "i0001-02-02"])
 
         parent = by_id["i0001"]
         self.assertEqual(parent["parent"], "")
         self.assertEqual(parent["copy"]["status"], "open")
+        # 親も着手していて閉じていなければ作業中
+        self.assertTrue(parent["in_progress"])
 
     def test_the_proposal_says_whether_it_has_a_plan(self):
         """提案の `has_plan` は、親の提案が全体計画（`plan:`）を持つか。
@@ -193,6 +200,8 @@ class BoardTest(PhaseHarness):
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         waiting = by_id["i0001-02-02"]
         self.assertEqual(waiting["copy"]["status"], "review")
+        # 閉じてレビューを待つものは、`started_at` があっても作業中に数えない
+        self.assertFalse(waiting["in_progress"])
         self.assertEqual(waiting["scattered"], [])
         # 同じファイルを 2 つの走査が拾っても、チケットは 1 ツリーに 1 つ。
         self.assertEqual(
@@ -302,6 +311,66 @@ class BoardTest(PhaseHarness):
         board = self.board("--approved", "")
         self.assertEqual(board["settings"]["ticket_control"], "enable")
         self.assertTrue(board["settings"]["approved"].endswith("approved"))
+
+    def hook_settings(self, settings_env=None, local_env=None, env=None, *extra):
+        """`.claude/settings.json` と `settings.local.json` の env を置いて、settings を読む。"""
+        for name, values in (("settings.json", settings_env), ("settings.local.json", local_env)):
+            if values is not None:
+                write(os.path.join(self.root, ".claude", name), json.dumps({"env": values}))
+        result = self.ccnavi("--explain", "--json", *extra, env=env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return json.loads(result.stdout)["settings"], result.stderr
+
+    def test_mode_is_enable_when_nothing_says_otherwise(self):
+        self.assertEqual(self.hook_settings()[0]["mode"], "enable")
+
+    def test_mode_follows_the_settings_files_as_claude_code_layers_them(self):
+        """拡張が起こした実行ファイルにも、hook が受け取るはずの値を答える。
+
+        local が settings.json より強い。"""
+        got, _ = self.hook_settings({"CCNAVI_MODE": "dry-run"})
+        self.assertEqual(got["mode"], "dry-run")
+        got, _ = self.hook_settings({"CCNAVI_MODE": "dry-run"}, {"CCNAVI_MODE": "enable"})
+        self.assertEqual(got["mode"], "enable")
+
+    def test_settings_files_win_over_the_process_environment(self):
+        got, _ = self.hook_settings(env={"CCNAVI_MODE": "dry-run"})
+        self.assertEqual(got["mode"], "dry-run")
+        got, _ = self.hook_settings({"CCNAVI_MODE": "enable"}, env={"CCNAVI_MODE": "dry-run"})
+        self.assertEqual(got["mode"], "enable")
+
+    def test_disable_in_the_settings_env_is_what_the_hook_gets(self):
+        """settings の env は Claude Code が環境として渡すので、hook は disable で動く。
+
+        ボードも同じに答える。"""
+        got, _ = self.hook_settings({"CCNAVI_MODE": "disable"})
+        self.assertEqual(got["mode"], "disable")
+
+    def test_an_unreadable_mode_is_enable_and_says_so(self):
+        got, stderr = self.hook_settings({"CCNAVI_MODE": "off"})
+        self.assertEqual(got["mode"], "enable")
+        self.assertIn("is not a mode", stderr)
+
+    def test_ticket_control_follows_the_settings_files(self):
+        got, _ = self.hook_settings({"CCNAVI_TICKET_CONTROL": "disable"})
+        self.assertEqual(got["ticket_control"], "disable")
+        got, _ = self.hook_settings(
+            {"CCNAVI_TICKET_CONTROL": "disable"}, {"CCNAVI_TICKET_CONTROL": "enable"}
+        )
+        self.assertEqual(got["ticket_control"], "enable")
+        got, _ = self.hook_settings({"CCNAVI_TICKET_CONTROL": "nope"}, {})
+        self.assertEqual(got["ticket_control"], "enable")
+
+    def test_ticket_control_from_the_settings_files_empties_the_board(self):
+        """settings に出す値と、ボードの中身を組むときの値を食い違わせない。"""
+        self.scene()
+        write(
+            os.path.join(self.root, ".claude", "settings.json"),
+            json.dumps({"env": {"CCNAVI_TICKET_CONTROL": "disable"}}),
+        )
+        board = self.board()
+        self.assertEqual(board["settings"]["ticket_control"], "disable")
+        self.assertEqual(board["tickets"], [])
 
     def test_attention_and_issues_follow_the_scene(self):
         """承認待ちの子だけが要対応。順調な場面では不備は無い。レビュー準備中になれば子も親も要対応。"""

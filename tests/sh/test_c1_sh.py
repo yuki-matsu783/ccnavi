@@ -21,7 +21,8 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
    1 回だけやり直す
 6. 届いていた push（応答だけが失われた）は ls-remote で確かめて成功にする
 7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error（着手で configsync が
-   プロジェクトのレイヤーへ写したものは例外。tests/ticket/test_core.py と tests/config/ が見る）
+   プロジェクトのレイヤーへ写したものは例外。tests/ticket/test_swap_points.py と
+   tests/config/ が見る）
 8. hook の書きかけ（pending・skipped・状態の履歴の追記）はコミットし、
    ユーザの判断（c）と知らない変更（d）は止める
 9. ユーザの判断の入口（ccnavi-review.sh chat など）は、取り込み済みの親子のチケットなら
@@ -50,8 +51,7 @@ import time
 import unittest
 
 from tests import ROOT, can_pass_argument, common_path, config_path, live_sh_pid, requires_symlink
-from tests.ticket.test_phases import PHASES, child_text, parent_text
-from tests.ticket.test_ticket import RULES
+from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
@@ -1382,7 +1382,12 @@ class C1HostTest(C1HostHarness):
         self.carried(f"{APPROVED}/phases/{PARENT}/ready.json")
         # 最後に親のワークツリーを消そうとするが、cwd が中にあるので消さず、外から打つ 1 本を出す
         with open(log, encoding="utf-8") as f:
-            self.assertIn(f"worktree drop {PARENT}", f.read())
+            logged = f.read()
+        self.assertIn(f"worktree drop {PARENT}", logged)
+        # drop の後に、残っているワークツリーの一覧を頼む（出すだけで消さない）
+        self.assertLess(
+            logged.index(f"worktree drop {PARENT}"), logged.index(f"worktree remaining {PARENT}")
+        )
         self.assertIn(f"cwd がワークツリー {PARENT} の中にあるので消さなかった", ready.stdout)
         self.assertIn(f"ccnavi-clean.sh --worktree {PARENT}", ready.stdout)
         self.assertLess(
@@ -1734,9 +1739,9 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
     def chrome_request(self, scene=None):
         """拡張が組むのと同じ要求（統合先 main、親 i0001、録った見本、
         依頼の後の変更の一覧）。"""
-        from tests.ticket.test_core import _chrome
+        from tests.ticketsample import load_chrome
 
-        chrome = _chrome()
+        chrome = load_chrome()
         place = chrome._placement()
         keep = tuple(p + "/" for p in place["integration_paths"])
         main = {
@@ -1915,6 +1920,24 @@ class C1HostNotImportedTest(C1HostHarness):
         self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.assertIn("wip/ に未コミットの変更がある", ready.stderr)
         self.assertNotIn("Draft を外した", ready.stdout)
+
+    def test_ready_unsent_tells_the_cause_and_the_commands_to_type(self):
+        """止まるとき、原因（親が取り込み済みでない）と、次に打つ 4 手をパス入りで案内する。"""
+        self.eli5()
+        os.remove(os.path.join(self.tree, *ELI5.split("/")))
+        ready = self.review(
+            "ready", CCNAVI_BIN_PATH=self.mover(f"printf 'tree %s\\n' '{self.tree}'")
+        )
+        self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
+        err = ready.stderr
+        self.assertIn("親が取り込み済みでないため", err)
+        self.assertIn("承認済みチケットがどのツリーに在るかを確かめる", err)
+        git_sh = f"sh {os.path.realpath(self.ws)}/.ccnavi/scripts/ccnavi-git.sh"
+        self.assertIn(f"{git_sh} add -u -- {APPROVED} wip", err)
+        self.assertIn(f"1) cd {self.tree} && sh ", err)
+        self.assertIn(f"2) {git_sh} commit -m", err)
+        self.assertIn(f"3) {git_sh} push", err)
+        self.assertIn(f"4) ready --parent {PARENT} を打ち直す", err)
 
     @unittest.skipIf(os.name == "nt", "大文字違いの並存と名前の \\ は Windows では作れない")
     def test_ready_stops_when_wip_removals_in_any_case_are_not_sent(self):

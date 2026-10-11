@@ -1,4 +1,4 @@
-"""配る sh が macOS の bash 3.2 でも読めることの検査。
+r"""配る sh が macOS の bash 3.2 でも読めることの検査。
 
 macOS の `sh` は bash 3.2 で、Linux や Git Bash の bash では通る書き方のうち 2 つで失敗する。
 どちらもロケールでは避けられない（片方は UTF-8 で、もう片方は C で失敗する）ので、書き方で避ける。
@@ -7,6 +7,13 @@ macOS の `sh` は bash 3.2 で、Linux や Git Bash の bash では通る書き
    名前に読み、`set -u` の下で「unbound variable」で失敗する。`${bin}（` と括る
 2. `$( )` の中に `case` を書く。C のロケールでは `)` を読み違え、ファイルを読む段で構文エラーに
    なる。`case` 文で変数に入れる
+
+macOS の `sed` と `grep` は BSD 版で、GNU だけの書き方が 2 つ通らない。
+
+3. `sed` の置き換えの大文字小文字を区別しない指定（`s/…/…/I`）。BSD の sed は知らない指定として
+   失敗する。字ごとに `[Dd]` と書く
+4. `grep` の基本の正規表現の中の `\|`（どれか）。BSD の grep は `|` の字そのものとして読み、
+   当たらなくなる。`grep -E 'a|b'` と書く
 
 走らせて確かめるのではなく、書かれた文面を読む。bash 3.2 の無い機械でも同じ報告になるように。
 """
@@ -30,6 +37,11 @@ CASE_IN_SUBSHELL = re.compile(r"\$\(\s*case\b")
 OPENS_SUBSHELL = re.compile(r"\$\(\s*$")
 CLOSES_SUBSHELL = re.compile(r"^\s*\)")
 CASE_LINE = re.compile(r"^\s*case\b")
+# `s/<探す>/<置く>/` の後ろの指定に `I` を含む sed（`s/a/b/I`・`s/a/b/gI`）。
+# 区切りは `/` だけを見る。
+SED_IGNORE_CASE = re.compile(r"\bsed\b[^|;]*\bs/(?:[^/\\]|\\.)*/(?:[^/\\]|\\.)*/[a-zA-Z0-9]*I")
+# `-E` を付けない grep の、引用符の中の `\|`。
+GREP_BRE_ALTERNATION = re.compile(r"\bgrep\b(?![^'\"]*\s-[a-zA-Z]*E)[^'\"|]*['\"][^'\"]*\\\|")
 
 
 def shell_scripts():
@@ -91,6 +103,39 @@ class ShPortabilityTest(unittest.TestCase):
                 elif CASE_LINE.search(line):
                     hits.append(f"{rel}:{number}: {line.strip()}")
         self.assertEqual([], hits, "case は $( ) の外の関数に移してください")
+
+    def test_sed_does_not_ignore_case_with_the_gnu_flag(self):
+        self.assertEqual(
+            [], self.found(SED_IGNORE_CASE), "大文字小文字は [Dd] のように字ごとに書いてください"
+        )
+
+    def test_grep_does_not_use_the_gnu_alternation(self):
+        self.assertEqual([], self.found(GREP_BRE_ALTERNATION), "grep -E 'a|b' と書いてください")
+
+    def test_the_gnu_forms_are_caught(self):
+        # 検査の正規表現が、直したい形を見つけ、直した形を見逃すこと。
+        for line in (
+            "x=$(printf '%s' \"$t\" | sed -E 's/^(Draft|WIP)://I')",
+            "printf x | sed 's/a/b/gI'",
+        ):
+            self.assertTrue(SED_IGNORE_CASE.search(line), line)
+        for line in (
+            "sed -E 's/^([Dd]raft)://'",
+            "sed -n 's/^Item //p'",
+            "sed 's|a|b|'",
+        ):
+            self.assertFalse(SED_IGNORE_CASE.search(line), line)
+        for line in (
+            "elif grep -qi 'gpg\\|signing' \"$1\"; then",
+            "grep 'a\\|b' f",
+        ):
+            self.assertTrue(GREP_BRE_ALTERNATION.search(line), line)
+        for line in (
+            "elif grep -Eqi 'gpg|signing' \"$1\"; then",
+            "grep -E 'a\\|b' f",
+            "grep -q 'index\\.lock' f",
+        ):
+            self.assertFalse(GREP_BRE_ALTERNATION.search(line), line)
 
     def test_sh_files_are_checked_out_with_lf(self):
         # Windows で core.autocrlf=true だと、取り出すときに CRLF になり、シバンが

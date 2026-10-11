@@ -59,7 +59,7 @@ class StopRulesTest(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         self.root = os.path.realpath(self.dir.name)
-        self.state = os.path.join(self.root, "state")
+        self.state = os.path.join(self.root, "logs", "state")
         self.addCleanup(self.dir.cleanup)
 
     def env(self) -> dict:
@@ -94,12 +94,6 @@ class StopRulesTest(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--log",
-                log,
-                "--state",
-                self.state if state is None else state,
-                "--approved",
-                "",
                 *(["--mode", mode] if mode else []),
             ],
             input=json.dumps(payload),
@@ -118,7 +112,7 @@ class StopRulesTest(unittest.TestCase):
 
     def lint(self) -> str:
         done = run_ccnavi(
-            ["--root", self.root, "--log", "", "--state", "", "--approved", "", "--lint"],
+            ["--root", self.root, "--lint"],
             cwd=ROOT,
             env=self.env(),
         )
@@ -168,7 +162,9 @@ class StopRulesTest(unittest.TestCase):
 
     def test_no_state_means_no_block(self):
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
-        self.assertEqual([self.blocked(self.stop(state="")) for _ in range(4)], [""] * 4)
+        # 置き場を外すフラグ（`--state ""`）は診断でだけ効くので、置き場にファイルを置いて塞ぐ。
+        write(self.state, "塞ぐ\n")
+        self.assertEqual([self.blocked(self.stop()) for _ in range(4)], [""] * 4)
 
     def test_unreadable_count_means_no_block(self):
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
@@ -219,7 +215,7 @@ class StopRulesTest(unittest.TestCase):
                 stop_rule("three", additionalContext="三", every=3),
             )
         )
-        log = os.path.join(self.root, "decisions.jsonl")
+        log = os.path.join(self.root, "logs", "decisions.jsonl")
         for _ in range(2):
             self.stop(log=log)
         with open(log, encoding="utf-8") as f:
@@ -237,7 +233,7 @@ class StopRulesTest(unittest.TestCase):
             "source": source,
         }
         done = run_ccnavi(
-            ["--root", self.root, "--log", "", "--state", self.state, "--approved", ""],
+            ["--root", self.root],
             input=json.dumps(payload),
             cwd=ROOT,
             env=self.env(),
@@ -383,7 +379,7 @@ class StopRulesTest(unittest.TestCase):
 
     def diagnose(self, *args: str) -> str:
         done = run_ccnavi(
-            ["--root", self.root, "--log", "", "--state", "", "--approved", "", *args],
+            ["--root", self.root, *args],
             cwd=ROOT,
             env=self.env(),
         )

@@ -4,7 +4,9 @@
 
 from __future__ import annotations
 
-from ..infra import settings, tree
+import os
+
+from ..infra import gitcmd, settings, tree
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from ..tickets import agree_candidates, ticket_ids, ticket_model
 
@@ -206,3 +208,144 @@ def _worktree_problems(
                 )
             )
     return problems
+
+
+def _place_problems(
+    root: str,
+    proposals: list,
+    copies: list,
+    closed: list,
+    review: list,
+    repo_of: dict[str, str],
+    integration: str = "",
+) -> list[Problem]:
+    """未承認の親の提案の置き場所と中身の形（warn）。
+
+    - 親の提案が、親の識別子と同名でないワークツリーに在る。子の提案が、親の識別子と同名の
+      ワークツリーに無い。親が取り込み済みにならず、承認済みチケットの自動コミットが動かない。
+      ワークスペースルートとプロジェクトの元ツリーの提案、`branch:` で既存のブランチを名乗る
+      親は言わない
+    - 計画（plan）も子も持たない親。単体の親は正当ではない
+    """
+    settled = {t.ticket for t in list(copies) + list(closed) + list(review)}
+    everyone = list(copies) + list(closed) + list(review) + list(proposals)
+    with_children = {t.parent for t in everyone if t.is_child}
+    cut = (
+        f"sh {root or '<ルート>'}/.ccnavi/scripts/ccnavi-git.sh worktree add "
+        f".claude/worktrees/%s -b %s {integration or '<統合先>'}"
+    )
+    problems: list[Problem] = []
+    said: set[tuple[str, str]] = set()
+    for t in proposals:
+        if t.state != ticket_model.TODO:
+            continue
+        at = t.tree or ""
+        if at and repo_of.get(at) == at:
+            at = ""  # プロジェクトの元ツリー
+        if t.is_child:
+            if not at or at == t.parent or t.parent in settled or not t.parent:
+                continue
+            key = (t.ticket, at)
+            if key in said:
+                continue
+            said.add(key)
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"{t.ticket}: 子の提案を {at} に書いている。親 {t.parent} のワークツリーは"
+                    f"識別子と同じ名前にし、子の提案はそこに置く。ワークツリーが無ければ "
+                    f"`{cut % (t.parent, t.parent)}` で切り、提案を移して元を消す。"
+                    "このままだと親が取り込み済みにならない",
+                )
+            )
+            continue
+        if t.ticket in settled:
+            continue
+        if at and at != t.ticket and not t.branch:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"{t.ticket}: 提案 {t.ticket} を {at} に書いている。親のワークツリーは"
+                    f"識別子と同じ名前にする。`{cut % (t.ticket, t.ticket)}` で切り、"
+                    "提案を移して元を消す。このままだと親が取り込み済みにならない",
+                )
+            )
+        if not t.has_plan and t.ticket not in with_children:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"{t.ticket}: 親 {t.ticket} に計画も子も無い。"
+                    "`ccnavi-launcher.sh --docs` で proposal-format と phases を引き、"
+                    "plan か子の提案を足す",
+                )
+            )
+    return problems
+
+
+def _unregistered_worktree_problems(root: str, worktrees: list) -> list[Problem]:
+    """`.claude/worktrees/` 直下の、どこにも登録の無いディレクトリ（warn）。
+
+    ワークツリーの一覧（`tree.worktrees`）はファイルシステムだけで決める（実行前チェックは
+    git を起こさない）。ここは `--lint` の中だけなので `git worktree list` にも聞く。
+    他のリポジトリ（プロジェクトなど）の `.git/worktrees` に登録されたものは、ここでは数えない
+    ので言わない。git に聞けなければ何も言わない。
+    """
+    base = os.path.join(root, tree.WORKTREES_DIR)
+    try:
+        names = sorted(os.listdir(base))
+    except OSError:
+        return []
+    known = {t.name for t in worktrees}
+    pending = [
+        n
+        for n in names
+        if tree.nfc(n) not in known
+        and os.path.isdir(os.path.join(base, n))
+        and not n.startswith(".")
+    ]
+    if not pending:
+        return []
+    rc, out = gitcmd.output(root, ["worktree", "list", "--porcelain"], 10)
+    if rc != 0:
+        return []
+    listed = {
+        os.path.realpath(line[len("worktree ") :].strip())
+        for line in out.splitlines()
+        if line.startswith("worktree ")
+    }
+    registry = os.path.realpath(os.path.join(root, ".git", "worktrees"))
+    problems: list[Problem] = []
+    for name in pending:
+        path = os.path.join(base, name)
+        if os.path.realpath(path) in listed or _registered_elsewhere(path, registry):
+            continue
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f".claude/worktrees/{name} は git に登録が無い。中身を確かめ、要らなければ"
+                f"ユーザに確かめてから ccnavi-clean.sh {name}",
+            )
+        )
+    return problems
+
+
+def _registered_elsewhere(path: str, registry: str) -> bool:
+    """`.git` が、ワークスペースのものではない `.git/worktrees/` を指しているか。"""
+    try:
+        with open(os.path.join(path, ".git"), encoding="utf-8") as f:
+            line = f.read().strip()
+    except OSError:
+        return False
+    if not line.startswith("gitdir:"):
+        return False
+    gitdir = line[len("gitdir:") :].strip().replace("\\", "/")
+    if not os.path.isabs(gitdir):
+        gitdir = os.path.join(path, gitdir)
+    gitdir = os.path.realpath(gitdir)
+    return "/.git/worktrees/" in gitdir.replace("\\", "/") and not gitdir.startswith(
+        registry + os.sep
+    )

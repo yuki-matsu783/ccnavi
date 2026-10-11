@@ -15,8 +15,9 @@ from unittest import mock
 
 from ccnavi.infra import gitcmd, settings
 from ccnavi.tickets import approval, approval_times, history
-from tests.ticket.test_phases import PhaseHarness, child_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
+from tests.ticketsample import child_text
 
 
 class ApprovedTimeTest(PhaseHarness):

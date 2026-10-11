@@ -76,12 +76,6 @@ class CommonLayerPlaceHarness(ConfigUnionHarness):
             [
                 "--root",
                 self.ws,
-                "--approved",
-                ".ccnavi/tickets",
-                "--state",
-                self.state,
-                "--log",
-                self.log,
                 "--guard-core-files",
                 guard,
                 "--restore-if-deny",
