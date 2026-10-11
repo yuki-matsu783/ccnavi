@@ -225,11 +225,9 @@ def _place_problems(
       ワークツリーに無い。親が取り込み済みにならず、承認済みチケットの自動コミットが動かない。
       ワークスペースルートとプロジェクトの元ツリーの提案、`branch:` で既存のブランチを名乗る
       親は言わない
-    - 計画（plan）も子も持たない親。単体の親は正当ではない
+    - 計画（plan）を持たない親。`ticket start` が止まる（子や子の提案があっても同じ）
     """
     settled = {t.ticket for t in list(copies) + list(closed) + list(review)}
-    everyone = list(copies) + list(closed) + list(review) + list(proposals)
-    with_children = {t.parent for t in everyone if t.is_child}
     cut = (
         f"sh {root or '<ルート>'}/.ccnavi/scripts/ccnavi-git.sh worktree add "
         f".claude/worktrees/%s -b %s {integration or '<統合先>'}"
@@ -272,14 +270,15 @@ def _place_problems(
                     "提案を移して元を消す。このままだと親が取り込み済みにならない",
                 )
             )
-        if not t.has_plan and t.ticket not in with_children:
+        if not t.has_plan:
             problems.append(
                 Problem(
                     SEVERITY_WARN,
                     "(ticket)",
-                    f"{t.ticket}: 親 {t.ticket} に計画も子も無い。"
+                    f"{t.ticket}: 親 {t.ticket} に plan が無い。"
+                    "plan の無い親は `ticket start` が止まる（子や子の提案があっても同じ）。"
                     "`ccnavi-launcher.sh --docs` で proposal-format と phases を引き、"
-                    "plan か子の提案を足す",
+                    "phases.yml の定義を使う plan を足す",
                 )
             )
     return problems

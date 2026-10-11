@@ -4,7 +4,7 @@
 
 1. 親の提案が識別子と違う名前のワークツリーに在る、子の提案が親と同名でない所に在る（warn）
 2. 子の親が承認済みの一覧に無く、別のツリーに在る（error のまま、文面に置き場所を添える）
-3. 計画も子も無い親（warn）
+3. 計画の無い親（warn。`ticket start` も止まる）
 4. `.claude/worktrees/` の下で git に登録が無いディレクトリ（warn）
 """
 
@@ -93,15 +93,15 @@ class LintOpsTest(PhaseHarness):
 
         return settings.Settings(tickets="wip/proposals")
 
-    # ---- 3. 計画も子も無い親
+    # ---- 3. 計画の無い親
 
-    def test_a_parent_with_neither_plan_nor_children_is_warned(self):
+    def test_a_parent_without_a_plan_is_warned(self):
         self.propose("i0001", bare_parent_text("i0001"))
         self.commit_parent()
-        lines = self.lint_lines("i0001", "計画も子も無い")
+        lines = self.lint_lines("i0001", "plan が無い")
         self.assertTrue(
             any(
-                "親 i0001 に計画も子も無い" in line and "proposal-format と phases を引き" in line
+                "親 i0001 に plan が無い" in line and "proposal-format と phases を引き" in line
                 for line in lines
             ),
             lines,
@@ -110,7 +110,7 @@ class LintOpsTest(PhaseHarness):
     def test_a_parent_with_a_plan_is_not_warned(self):
         self.propose("i0001", parent_text("i0001", ["design"], copy=self.phases_text))
         self.commit_parent()
-        self.assertEqual(self.lint_lines("計画も子も無い"), [])
+        self.assertEqual(self.lint_lines("plan が無い"), [])
 
     # ---- 4. 登録の無いディレクトリ
 

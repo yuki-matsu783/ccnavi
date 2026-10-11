@@ -33,6 +33,7 @@ import unittest
 
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
+from tests.ticketsample import plain_parent, write_plain_phases
 
 
 def _case_insensitive_fs() -> bool:
@@ -133,7 +134,7 @@ def ticket_text(name, *, parent="", phase=None, allow=(), ask=(), deny=()):
             for g in globs:
                 lines += ["  - match: Write|Edit", f'    glob: "{g}"']
     lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
-    return "\n".join(lines) + "\n"
+    return plain_parent("\n".join(lines) + "\n")
 
 
 def section_of(text: str, head: str) -> str:
@@ -166,6 +167,7 @@ class Workspace(unittest.TestCase):
 
         # 共通レイヤーは既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない。
         self.rules = write(common_path(self.root, "rules"), json.dumps(SILENT))
+        write_plain_phases(self.root)
         self.state = os.path.join(self.root, "logs", "state")
         self.log = os.path.join(self.root, "logs", "decisions.jsonl")
         self.parent_tree = self.worktree("i0001", "main")

@@ -19,34 +19,12 @@ import os
 
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
-from tests.ticketsample import child_text
+from tests.ticketsample import PLAIN_PHASES, child_text, parent_text
 
 
-def parent_without_plan(name):
-    """全体計画の無い親。子の `human_review` でレビューの要否が決まる。
-
-    フィードバック計画も要らない。
-    """
-    lines = [
-        "---",
-        "version: 1",
-        f"ticket: {name}",
-        "human_review:",
-        "  required: true",
-        "  reason: t",
-        "title: 親",
-        "rationale: r",
-        "allow:",
-        "  - match: Write|Edit",
-        '    glob: "src/*"',
-        'started_at: ""',
-        'completed_at: ""',
-        'base_sha: ""',
-        "---",
-        "",
-        "本文",
-    ]
-    return "\n".join(lines) + "\n"
+def plain_parent_text(name, plan=("work",)):
+    """計画が `work` だけの親（定義は `PLAIN_PHASES`）。レビューの要否は定義と子の宣言で決まる。"""
+    return parent_text(name, list(plan), feedback=[], allow=("src/*",), copy=PLAIN_PHASES)
 
 
 class ReviewTurnTest(PhaseHarness):
@@ -54,7 +32,10 @@ class ReviewTurnTest(PhaseHarness):
 
     def setUp(self):
         super().setUp()
-        self.propose("i0001", parent_without_plan("i0001"))
+        write(self.phases, PLAIN_PHASES)
+        # 子の宣言を問わずユーザが見る計画（`mr`）。後のフェーズが残る場面だけ 2 項にする。
+        plan = ("work-mr", "work-mr") if "not_the_last" in self._testMethodName else ("work-mr",)
+        self.propose("i0001", plain_parent_text("i0001", plan))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
 
@@ -152,12 +133,9 @@ class ReviewTurnTest(PhaseHarness):
 
     def test_a_confirm_that_is_not_the_last_says_nothing_more(self):
         self.child("i0001-01-01")
-        # 2 番目のフェーズの子が開いている（承認済み・未着手）
-        self.propose("i0001-02-01", child_text("i0001-02-01", "i0001", 2, ["src/*"]))
-        self.commit_parent("propose 02")
+        # 計画の 2 番目のフェーズが残っている（子は 1 番目のレビューが済むまで承認できない）
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
-        self.assertEqual(self.approve().returncode, 0)
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         confirmed = self.confirm(fixture, 1)
         self.assertEqual(confirmed.returncode, 0, confirmed.stderr)
@@ -169,7 +147,8 @@ class TidyTest(PhaseHarness):
 
     def setUp(self):
         super().setUp()
-        self.propose("i0001", parent_without_plan("i0001"))
+        write(self.phases, PLAIN_PHASES)
+        self.propose("i0001", plain_parent_text("i0001"))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
 
@@ -246,7 +225,8 @@ class ChildShapedParentTest(PhaseHarness):
         tree_parent = self.worktree(parent, "main")
         self.parent_tree = tree_parent
         self.approved = os.path.join(tree_parent, ".ccnavi", "approved")
-        self.propose(parent, parent_without_plan(parent))
+        write(self.phases, PLAIN_PHASES)
+        self.propose(parent, plain_parent_text(parent))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
         self.propose(child, child_text(child, parent, 1, ["src/*"]))
@@ -400,7 +380,8 @@ class RemainingTest(PhaseHarness):
 
     def setUp(self):
         super().setUp()
-        self.propose("i0001", parent_without_plan("i0001"))
+        write(self.phases, PLAIN_PHASES)
+        self.propose("i0001", plain_parent_text("i0001"))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
 

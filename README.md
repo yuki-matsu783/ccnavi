@@ -1718,7 +1718,7 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 
 `phases.yml` に**フェーズ定義**を書き、親が `plan:` にその並びと順序（項の `after`）を書くと、フェーズに意味が付く。
 置き場は親の `project:` が指すレイヤーの `.ccnavi/config/phases.yml` の 1 本（共通レイヤーには置けない）。
-フェーズ定義はユーザが持つ設定で、エージェントは書き換えない。計画の無い親は番号だけの挙動のまま。設計は [9.7](docs/design/tickets/phases.md)。
+フェーズ定義はユーザが持つ設定で、エージェントは書き換えない。親は `plan:` を持つことが必須で、計画の無い親は `ticket start` が止まる（子や子の提案があっても同じ。`phases.yml` に最小の定義を書き、親に `plan:` を足す）。設計は [9.7](docs/design/tickets/phases.md)。
 
 ```yaml
 # .ccnavi/config/phases.yml
