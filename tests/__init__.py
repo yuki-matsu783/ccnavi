@@ -162,6 +162,22 @@ def can_symlink() -> bool:
     return True
 
 
+def can_case_sensitive() -> bool:
+    """大文字小文字だけが違う名前を、別のファイルとして並べて作れるか。
+
+    macOS（既定）と Windows のファイルシステムは区別しないので、`a` と `A` が同じ 1 本になる。
+    OS の名前では決めず、使い捨ての置き場で実際に 2 本作って確かめる。
+    """
+    with _tempfile.TemporaryDirectory(prefix="ccnavi-case-probe-") as tmp:
+        try:
+            for name in ("a", "A"):
+                with open(os.path.join(tmp, name), "w", encoding="utf-8") as f:
+                    f.write(name)
+            return len(os.listdir(tmp)) == 2
+        except OSError:
+            return False
+
+
 def can_pass_argument(size: int) -> bool:
     """sh から jq へ、`size` 字の引数を渡せるか。実際に渡して確かめる。
 

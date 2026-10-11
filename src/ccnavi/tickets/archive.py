@@ -247,7 +247,9 @@ def archived_fields(root: str, project: str, ident: str) -> syncstate.DoneCopy |
             return None
         name = folded[0]
     copy = _fields(archived_bytes(root, project, f"{ticket_model.DONE}/{name}.md"))
-    return copy if copy is not None and copy.ticket == name else None
+    # 区別しないファイルシステムでは、`I0001.md` で `i0001.md` が直に読める（folded を通らない）。
+    # 区別するファイルシステムと同じ答えにするため、ここも大文字小文字を問わず突き合わせる。
+    return copy if copy is not None and same_id(copy.ticket, name) else None
 
 
 def same_id(a: str, b: str) -> bool:
