@@ -68,8 +68,13 @@ sort -u "$files" >"$files.sorted" || exit 0
 # （Windows の `C:/Users/First Last/`）が単語に割れ、どの単語も test-groups.js を持たないため
 # 何も実行せずに通ってしまう。同じ理由で、絞り込みは sed の正規表現ではなく case の
 # 文字列比較で行う（パスに `#` や `[` が入ると sed が構文エラーになる）
-sed -n 's#^\(.*/extensions/vscode/ccnavi-board\)/.*#\1#p' "$files.sorted" |
-	sort -u >"$files.roots"
+#
+# 共通の部品（extensions/shared/）を編集したときは、同じツリーの VS Code 拡張を実行する。
+# shared を読む画面のグループは test-groups.js が import（@ccnavi/shared/...）を辿って決める
+{
+	sed -n 's#^\(.*/extensions/vscode/ccnavi-board\)/.*#\1#p' "$files.sorted"
+	sed -n 's#^\(.*\)/extensions/shared/.*#\1/extensions/vscode/ccnavi-board#p' "$files.sorted"
+} | sort -u >"$files.roots"
 
 failed=""
 output=""
@@ -83,10 +88,11 @@ while IFS= read -r root; do
 	fi
 	# そのツリーのファイルだけを渡す。2 つのワークツリーを編集したターンでは、
 	# それぞれのツリーで 1 回ずつ実行する
+	tree=${root%/extensions/vscode/ccnavi-board}
 	set --
 	while IFS= read -r one; do
 		case "$one" in
-		"$root"/*) set -- "$@" "$one" ;;
+		"$root"/* | "$tree"/extensions/shared/*) set -- "$@" "$one" ;;
 		esac
 	done <"$files.sorted"
 	[ "$#" -gt 0 ] || continue
