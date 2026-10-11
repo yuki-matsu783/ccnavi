@@ -5,7 +5,7 @@ description: ccnavi-git.sh の rm・restore --source・checkout <ref> <パス> �
 tags: [judging, selfguard, sh-scripts, hook]
 keywords: [ccnavi-git.sh, rm, restore, checkout, 自己防衛, builtin-guard-wrapper-paths, DENY_WRAPPER_CORE_PATH, core_hit, 衝突の解決]
 ---
-# ADR-0120: git のラッパーでも、自己防衛の対象を消す・別のコミットの中身に戻す形は hook が止める
+# ADR-0121: git のラッパーでも、自己防衛の対象を消す・別のコミットの中身に戻す形は hook が止める
 
 状態: 採用
 

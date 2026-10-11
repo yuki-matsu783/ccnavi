@@ -32,14 +32,14 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 
 | イベント | すること | 応答 |
 |---|---|---|
-| `SessionStart` | コアファイルのバックアップを取る（実行ファイルはここだけ）。`additionalContextOnce` の記憶を捨てる（`source=startup` なら `match: Stop` の数えも。6.6）。サブエージェントでなければ、ccnavi が前提にしている作業の決まり（ワークツリー・`ccnavi-git.sh`・`wip/scratchpad/`・プロジェクトへの `cd`・サブエージェント・合意の要る変更。チケット制御が有効なら `ccnavi-ticket.sh status` も）を 1 行ずつ渡し（ワークツリーと git の行は、共通レイヤーと自身のレイヤーの deny に `workspace-root`・`raw-git` があるときだけ。git の行は生の git を組み込みで止めるとき（9.1）も）、索引の案内を出す回は `--docs` で詳しく引くよう添える（REQ-SES-06）。チケット制御が有効なら、直接作業とチケット作業の使い分けをモデルに渡す（9.1）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を渡す（11.13）。サブエージェントでなければ、ワークスペースとプロジェクトの md の frontmatter の索引を差分で新しくし（3 秒と hook の判定の期限の残りの小さいほうまで）、`--docs` での引き方の 1 行（オプションの一覧と frontmatter の書き方は渡さない。書き方は frontmatter の無い md を作った時点で `PostToolUse` が案内し、決まりの文書があれば `--docs --keyword frontmatter` で引くよう添える）と、無視の行を足したツリー（その `.gitignore` に未コミットの差分が残る）と、索引の対象外にしたツリーと、書き換えなかった ccnavi-index.jsonl を渡す（10） | `additionalContext` |
+| `SessionStart` | コアファイルのバックアップを取る（実行ファイルはここだけ）。`additionalContextOnce` の記憶を捨てる（`source=startup` なら `match: Stop` の数えも。6.6）。`source=startup` と `resume` では、そのセッションの実行中のサブエージェントの印も捨てる（新しいプロセスで前の体は生きていない。compact と clear では捨てない。9.12）。サブエージェントでなければ、ccnavi が前提にしている作業の決まり（ワークツリー・`ccnavi-git.sh`・`wip/scratchpad/`・プロジェクトへの `cd`・サブエージェント・合意の要る変更。チケット制御が有効なら `ccnavi-ticket.sh status` も）を 1 行ずつ渡し（ワークツリーと git の行は、共通レイヤーと自身のレイヤーの deny に `workspace-root`・`raw-git` があるときだけ。git の行は生の git を組み込みで止めるとき（9.1）も）、索引の案内を出す回は `--docs` で詳しく引くよう添える（REQ-SES-06）。チケット制御が有効なら、直接作業とチケット作業の使い分けをモデルに渡す（9.1）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を渡す（11.13）。サブエージェントでなければ、ワークスペースとプロジェクトの md の frontmatter の索引を差分で新しくし（3 秒と hook の判定の期限の残りの小さいほうまで）、`--docs` での引き方の 1 行（オプションの一覧と frontmatter の書き方は渡さない。書き方は frontmatter の無い md を作った時点で `PostToolUse` が案内し、決まりの文書があれば `--docs --keyword frontmatter` で引くよう添える）と、無視の行を足したツリー（その `.gitignore` に未コミットの差分が残る）と、索引の対象外にしたツリーと、書き換えなかった ccnavi-index.jsonl を渡す（10） | `additionalContext` |
 | `UserPromptSubmit` | 保護領域にいまある変更を記録し、ターンの基準にする（7.4）。このセッションがまだ知らない承認を 1 度伝える（9.4）。依頼文に issue・MR の指定があれば、紐づくブランチを探してユーザに確かめる指示を渡す（9.13） | 無し。伝えることがあれば `additionalContext` |
 | `PreToolUse` | 呼び出しを判定する（6 章）。コアファイルをバックアップする（8 章）。cwd がプロジェクトの中に入った最初の回に、そのスキルの目録を添える（11.13） | `permissionDecision` と `additionalContext` |
 | `PostToolUse` | コアファイルをバックアップと突き合わせて戻す。作業ツリーを git で読み、保護領域の変更を報告し、設定に従って戻す（7 章）。チケットの状態を承認済みチケットへ書き出し、フェーズの終わりを告げる（9.8）。サブエージェントが差し戻しを無視して終わったことを親に言う。Write で新しく作った md に frontmatter か `type` が無ければ、書き方を 1 度だけ案内する（止めない。`NOTICE_DOC_FRONTMATTER`。10） | 終了コード 2 と標準エラー、または `additionalContext` |
 | `PostToolUseFailure` | ツール自体の失敗を数える（`failstreak`）。ユーザの中断（`is_interrupt`）は数えない。連続が `CCNAVI_FAIL_STREAK_COUNT` 回（既定 3、0 なら使わない）に達した回に、資料の索引（`--docs`）を引く案内を返す。判定は持たず、止められないイベント。成功（`PostToolUse`）で連続を 0 に戻し、案内は連続の中で 1 回だけ。`PreToolUse` の `deny`（`dry-run` でも）も同じ連続に数え、案内は拒否の文面の末尾に付く。記録は `state/failstreak-<セッション>-<main\|エージェント>.json` | `additionalContext` |
-| `Stop` | このターンで変わった保護領域をユーザへ報告する（7.4）。メインエージェントの cwd のワークツリーのチケットが、作業を終えたように見えるのに `finish` されていなければ、1 回だけ止めて促す（9.6）。促さなかった回は、`match: Stop` のルールが渡す回なら止めてその文を渡す（6.6） | `systemMessage`。止めるときは `decision: block` と `reason` も |
-| `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す（9.12）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を頭に置く（11.13）。気づいたスキル候補は最後の報告に節を足して返すよう 1 行渡す（6.6） | `additionalContext` |
-| `SubagentStop` | 子のワークツリーに範囲外の変更が残っていれば 1 回だけ差し戻す（9.12） | 終了コード 2 と標準エラー |
+| `Stop` | このターンで変わった保護領域をユーザへ報告する（7.4）。メインエージェントの cwd のワークツリーのチケットが、作業を終えたように見えるのに `finish` されていなければ、1 回だけ止めて促す（9.6）。促さなかった回は、レビューの依頼までの道の途中（承認済みの親に作業中の子が残っている、または子が全部閉じたのに依頼のマーカーが無い）なら、1 回だけ止めて次の一手を促す（`NUDGE_TICKET_REQUEST`。実行中のサブエージェントが居る間は止めない。9.6・9.12）。どちらも促さなかった回は、`match: Stop` のルールが渡す回なら止めてその文を渡す（6.6） | `systemMessage`。止めるときは `decision: block` と `reason` も |
+| `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す（9.12）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を頭に置く（11.13）。気づいたスキル候補は最後の報告に節を足して返すよう 1 行渡す（6.6）。チケット制御が有効で `agent_id` があれば、実行中の印を置く（9.12） | `additionalContext` |
+| `SubagentStop` | 子のワークツリーに範囲外の変更が残っていれば 1 回だけ差し戻す。実行中の印を外す（差し戻して続けさせる回は外さない。9.12） | 終了コード 2 と標準エラー |
 | その他 | 何もせず通す。記録に `event-not-checked` | 無し |
 
 `matcher` は絞らない（絞ると書かなかったツールで hook が起動しない）。同じイベントの他の hook は並行して順不同で走るので、
@@ -79,7 +79,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 | `enable` の deny / ask | `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny\|ask", "permissionDecisionReason": "…", "additionalContext": "…"}}`。`additionalContext` はルールが文を持つときだけ |
 | `enable` の allow、委ねた回 | 判定は出さない。通知（既定を使った、コアファイルを戻した、ルールの文）があれば `additionalContext` だけ |
 | `dry-run` の deny / ask | `additionalContext` に「enable なら止めていた / 聞いていた」と理由を並べる。終了コード 0 |
-| `Stop` | `{"systemMessage": "…"}`。`finish` を促すとき（`enable`）は `{"decision": "block", "reason": "…", "systemMessage": "…"}`。`dry-run` なら促しの文を `systemMessage` に載せて止めない |
+| `Stop` | `{"systemMessage": "…"}`。`finish` かレビュー依頼までの道を促すときは、モードによらず（`dry-run` でも）`{"decision": "block", "reason": "…", "systemMessage": "…"}`。Stop でモデルに文を届ける経路は止めることしか無いため |
 | `PostToolUse` / `SubagentStop` の差し戻し | 標準エラーに文、終了コード 2。`dry-run` なら `additionalContext` で 0 |
 
 期限は `PreToolUse` で 3 秒。ルール照合の途中で超えたら `deadline-exceeded` として、`enable` は
@@ -163,8 +163,8 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 
 - rename 2 回の間（数 ms）に来た hook は sh が 127 で終わり、その 1 回は判定が走らない
 - ワークツリーで組み立てるとコピー先はそのワークツリーの `.ccnavi/bin/` なので、走っている hook（ワークスペースルートの sh）は変わらない
-- 組み立て直すと、セッション開始で取った実行ファイルのバックアップ（8.3）と食い違う。開き直すまで、`enable` なら次のツール呼び出しのあと
-  バックアップした実行ファイルを置き直し（`selfguard._check_heavy`）、`dry-run` なら「戻すはずだった」と言う
+- 組み立て直すと、セッション開始で取った実行ファイルのバックアップ（8.3）と食い違う。ツール呼び出しの外で変わった版は、`enable` なら次のツール呼び出しの前に基準へ取り込む（`selfguard._rebase_if_changed`）。そのあとは、
+  ツール呼び出しの中で変わった版だけを、呼び出しの直前の版に戻す（`selfguard._check_heavy`）。戻す前に、書かれていた版は `state/aside/` に退避する。`dry-run` は取り込まず、「このツール呼び出しで変わった」と言う
 
 既定でないパス: 導入スクリプトは、`.claude/settings.json` にいま書かれている `CCNAVI_BIN_PATH` で動きを決める。
 
@@ -188,7 +188,7 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 記録だけで、判定は伏せる前の文字列で下す。記録が 10 MB を超えたら `decisions.<日時>.jsonl` へローテートし、ローテートした
 記録と終わったセッションの記録（`logs/state/`）は 14 日で消す。走るのはセッション開始と `ccnavi --prune` だけで、
 実行前チェックでは走らない。記録はセッションごとにまとめて、どれかが保持日数のうちに書かれていれば全部残す
-（`src/ccnavi/records/prune.py`）。`<セッション>.json` と読むのは UUID の形の名前だけで、知らない名前のファイルと、
+（`src/ccnavi/records/prune.py`）。`<セッション>.json`（改名前の記録）と `<セッション>.reported.json` と読むのは UUID の形の名前だけで、知らない名前のファイルと、
 リンクになった置き場（`logs/state` そのものと `selfguard/`）には触らない。しきい値は 0 のほか 1 MB・1 日より
 小さい値と有限でない値を受けず、既定で動く。ローテート先は `O_EXCL` で先に押さえてから名前を変える。
 伏せる前にも 4000 字（上限の 4 倍）で切り、伏せる手間が実行前チェックの期限に届かないようにする。「記録が無ければ動かなかった」は、ローテートした分と合わせて読む。

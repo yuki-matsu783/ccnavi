@@ -95,7 +95,7 @@ function toPlanPreview(step: Step, parents: Readonly<Record<string, string>> = {
 }
 
 function resultOf(approved: readonly string[], prompt = "承認の文"): ApproveResult {
-  return { version: 1, approved, copies: [], lines: [], prompt };
+  return { version: 1, approved, copies: [], lines: [], worktrees: [], prompt };
 }
 
 function mismatchOf(expected: readonly string[], current: readonly string[]): ApproveMismatch {

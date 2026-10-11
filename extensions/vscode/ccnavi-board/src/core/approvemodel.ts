@@ -129,11 +129,56 @@ export interface ApproveResult {
   readonly copies: readonly string[];
   /** ターミナルなら標準出力に出ていた行 */
   readonly lines: readonly string[];
+  /** 承認した子のワークツリーの計画。`state` が `create` のものを拡張が承認の後に作る（`ccnavi-git.sh worktree add`） */
+  readonly worktrees: readonly ApproveWorktree[];
   /**
    * Claude Code に渡す文（承認された識別子と後工程の進め方）。hook は承認を知らせないので、
    * 拡張がこの文を渡す
    */
   readonly prompt: string;
+}
+
+/** 承認した子のワークツリーの計画 1 本（実行ファイルの `worktrees`。状態は `create` `exists` `no-parent` `project`） */
+export interface ApproveWorktree {
+  readonly ticket: string;
+  readonly parent: string;
+  /** ワークスペースルートからの相対（`/` 区切り） */
+  readonly path: string;
+  readonly branch: string;
+  /** 親のワークツリーが今いるブランチ。`create` のときだけ入る */
+  readonly base: string;
+  readonly state: string;
+}
+
+/** 作れなかった子のワークツリーと、その理由（作る sh の標準エラーの 1 行目など） */
+export interface ChildWorktreeFailure {
+  readonly worktree: ApproveWorktree;
+  readonly reason: string;
+}
+
+/**
+ * `ccnavi-git.sh` の失敗から理由を 1 行で取る。sh は結果を標準出力に出し標準エラーは空のことがあるので、
+ * `fatal:` / `error:` の行を優先し、無ければ標準出力の 1 行目（ログの場所を含む）を返す。
+ */
+export function failureReason(stderr: string, stdout: string): string {
+  const lines = `${stderr}\n${stdout}`.split("\n").map((l) => l.trim()).filter((l) => l !== "");
+  const cause = lines.find((l) => /^(fatal|error):/.test(l));
+  return cause ?? lines[0] ?? "";
+}
+
+/**
+ * 作れなかった子のワークツリーを、名前と手で打つコマンドで知らせる文（1 本 1 行）。
+ * 同名のブランチが既にあって失敗したときは `-b` の形が再び失敗するので、既存のブランチを出す形も添える。
+ * `gitCommand` は `ccnavi-git.sh` を呼ぶ sh の前置き（`commands.ts` の `gitScriptCommand`）。
+ */
+export function childWorktreeFailureText(failed: readonly ChildWorktreeFailure[], gitCommand: string): string {
+  return failed
+    .map(({ worktree: w, reason }) =>
+      `子 ${w.ticket} のワークツリー ${w.path} を作れなかった（${reason}）。` +
+      `手で作るなら: ${gitCommand} worktree add ${w.path} -b ${w.branch} ${w.base}。` +
+      `ブランチ ${w.branch} が既にあるなら: ${gitCommand} worktree add ${w.path} ${w.branch}`,
+    )
+    .join("\n");
 }
 
 export interface ApproveMismatch {
@@ -256,6 +301,14 @@ export function parseApproveResult(text: string): ResultParse {
       approved: list(raw.approved).map(str),
       copies: list(raw.copies).map(str),
       lines: list(raw.lines).map(str),
+      worktrees: list(raw.worktrees).filter(isRecord).map((w) => ({
+        ticket: str(w.ticket),
+        parent: str(w.parent),
+        path: str(w.path),
+        branch: str(w.branch),
+        base: str(w.base),
+        state: str(w.state),
+      })),
       prompt: str(raw.prompt),
     },
   };

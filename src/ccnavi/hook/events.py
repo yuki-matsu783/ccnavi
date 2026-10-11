@@ -16,7 +16,15 @@ from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import builtin, ctxfile, ruleload, rules, selfguard, selfguard_targets
 from ..records import audit, failstreak, prune, repeat
-from ..tickets import approval, approval_checks, branchfind, ops_stop, phase, skillsync
+from ..tickets import (
+    approval,
+    approval_checks,
+    branchfind,
+    ops_stop,
+    ops_stop_request,
+    phase,
+    skillsync,
+)
 from . import docsearch, judge, post, post_findings, projskills, reasons, subagent
 
 # `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
@@ -230,7 +238,11 @@ def decide_at_stop(
     経路は止めて `reason` に書くことしか無く、止めないと促しがモデルに届かないため。
     止めるときも報告は同じ応答の `systemMessage` で返す。
 
-    `finish` を促さなかった回に限り、`match: Stop` のルールが渡す回ならそこで止める
+    `finish` を促さなかった回に限り、レビューの依頼（`request`）までの道の途中なら止めて、次の一手を
+    促す（`_request_nudge`）。承認済みの親に作業中の子が残っているか、子が全部閉じたのに
+    依頼のマーカーが無いとき。止め方とモードの扱いは `finish` の促しと同じ。
+
+    どちらも促さなかった回に限り、`match: Stop` のルールが渡す回ならそこで止める
     （`stop_rules_nudge`）。止め方とモードの扱いは `finish` の促しと同じ。
 
     承認済みチケットの置き場は、ここで 1 度だけ読んで範囲（`scope_guard`）と `finish` の促し
@@ -258,7 +270,10 @@ def decide_at_stop(
         report = f"{report}\n\n{repeated}" if report else repeated
     nudge = _finish_nudge(stderr, conf, root, payload, record, raw)
     if not nudge:
-        # finish の促しで止める回は、ルールの促しを数えもしない。1 回の Stop で
+        # finish の促しで止める回は、依頼までの道の促しを出しも数えもしない。
+        nudge = _request_nudge(stderr, conf, root, payload, record, raw)
+    if not nudge:
+        # 上の促しで止める回は、ルールの促しを数えもしない。1 回の Stop で
         # 止める理由は 1 つだけにし、数えを進めて届かない回を作らない。
         nudge = stop_rules_nudge(stderr, conf, root, payload, record)
     if nudge:
@@ -375,6 +390,46 @@ def _finish_nudge(
     return ops_stop.finish_nudge(root, found)
 
 
+def _request_nudge(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+    raw: approval.Raw | None = None,
+) -> str:
+    """レビューの依頼までの道の途中で終えようとしたとき、次の一手を促す文。促さないなら空文字。
+
+    最後の発言は読まない。「進めてよいですか」で終わった回も、そうでない回も、状態だけで決める。
+    文は `STOP_PREFACE` と同じ考え方で、決まった道の途中でユーザの許可は要らないこと、
+    本当にユーザの判断が要る問いならその問いを最後に書き直して終えることを言う。
+
+    止めない回と止め方は `_finish_nudge` と同じ（`stop_hook_active`・サブエージェント・
+    state の置き場・チケット制御を見て、モードは見ない。`dry-run` でも止める）。
+    加えて、このセッションに実行中のサブエージェントが居る間（`subagent.running`。記録を読めない
+    ときも）は止めず、「1 回だけ」の記録も進めない。終わったあとの Stop でまた促せる。
+    同じ状態（親・フェーズ・残っている子・HEAD）では 1 回だけで、記録は
+    `nudged-<セッション>.json`。進めばまた止める。判定は `ops_stop_request.pending_at_stop`。
+    """
+    if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
+        return ""
+    # 実行中のサブエージェントが居る間は、委任して待つ回なので止めない。記録を読めないときも
+    # 止めない。ここで返すので「1 回だけ」の記録は進まず、終わったあとの Stop でまた促せる。
+    if subagent.running(conf.state, payload.session_id):
+        return ""
+    found = ops_stop_request.pending_at_stop(root, conf, payload.cwd, raw)
+    if found is None or ops_stop_request.nudged_before(conf.state, payload.session_id, found):
+        return ""
+    failed = ops_stop_request.remember_nudge(conf.state, payload.session_id, found)
+    if failed:
+        stderr.write(f"ccnavi: 依頼までの道を促した記録を残せないので、促さない: {failed}\n")
+        return ""
+    record.decision, record.code = audit.NUDGE, ops_stop_request.CODE_REQUEST_NUDGE
+    record.enforced = True
+    record.tree = found.parent.ticket
+    return ops_stop_request.request_nudge(root, found)
+
+
 def decide_at_start(
     stdout: TextIO,
     stderr: TextIO,
@@ -415,7 +470,16 @@ def decide_at_start(
     # 来るので、モデルの文脈が新しくなるたびに「1 度だけ渡す文」は改めて届き、`every` の
     # 刻みも 0 から数え直しになる。
     ctxfile.forget(conf.state, payload.session_id, startup=payload.source == "startup")
-    record.detail = _prune_at_start(stderr, conf, root, payload.session_id)
+    # 実行中のサブエージェントの印は、起動（startup）と再開（resume）で捨てる。どちらも新しい
+    # プロセスで、前のプロセスのサブエージェントは生きていない。compact と clear は同じ
+    # プロセスなので、実行中の体が残りうる。Stop の数え（上）は起動だけで捨てる。
+    if payload.source in ("startup", "resume"):
+        subagent.forget_running(conf.state, payload.session_id)
+    if payload.source == "startup":
+        _seen_baseline(stderr, conf, root, payload, record)
+    # 基準を取った時の注記（読めなかったツリーなど）を消さないよう、足す。
+    pruned = _prune_at_start(stderr, conf, root, payload.session_id)
+    record.detail = "; ".join(part for part in (record.detail, pruned) if part)
     record.decision, record.enforced = audit.ALLOW, True
     texts = []
     if outcomes:
@@ -449,6 +513,35 @@ def decide_at_start(
     if texts:
         hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts))
     return EXIT_OK
+
+
+def _seen_baseline(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+) -> None:
+    """起動時に在る保護領域の変更を、実行後チェックの基準として記録する。
+
+    全部のツリーを見る（`watched_for` の payload 無し）。実行後チェックと同じ式で数えるので、
+    あとで同じ変更が見つかっても、新しい変更には数えない。
+    """
+    if not conf.state:
+        return
+    raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
+    post.capture_baseline(
+        stderr,
+        conf.state,
+        payload.session_id,
+        watched_for(stderr, conf, root, record, None),
+        scope_guard(conf, root, raw),
+        record,
+        mine=(conf.state, conf.log),
+        places=(conf.tickets, conf.approved),
+        synced=functools.partial(skillsync.is_synced_write, conf, root),
+        root=root,
+    )
 
 
 def _prune_at_start(stderr: TextIO, conf: settings.Settings, root: str, session: str) -> str:

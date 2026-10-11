@@ -111,7 +111,7 @@ def _own_commits(worktree: str, t: ticket_model.Ticket, parent_branch: str = "")
     return int(out.strip())
 
 
-def _nudge_path(state_dir: str, session: str) -> str:
+def nudge_path(state_dir: str, session: str) -> str:
     """促した (チケット, HEAD) の記録。セッションごとに置く（差し戻しの記録と同じ）。"""
     where = fsio.safe_name(session) or "unknown"
     return os.path.join(state_dir, f"nudged-{where}.json")
@@ -119,14 +119,14 @@ def _nudge_path(state_dir: str, session: str) -> str:
 
 def nudged_before(state_dir: str, session: str, found: Unfinished) -> bool:
     """このセッションで、同じチケットを同じ HEAD のまま促したことがあるか。促すのは 1 回だけ。"""
-    data = fsio.read_dict(_nudge_path(state_dir, session)) or {}
+    data = fsio.read_dict(nudge_path(state_dir, session)) or {}
     return data.get(found.ticket.ticket) == found.head
 
 
 def remember_nudge(state_dir: str, session: str, found: Unfinished) -> str:
     """促した (チケット, HEAD) を記録する。書けなければ理由。
     git で共有する履歴（history）には入れない。"""
-    path = _nudge_path(state_dir, session)
+    path = nudge_path(state_dir, session)
     data = fsio.read_dict(path) or {}
     data[found.ticket.ticket] = found.head
     return fsio.write_json_atomic(path, dict(sorted(data.items())))

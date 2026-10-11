@@ -202,6 +202,7 @@ class StatePruneTest(_Base):
             _write(os.path.join(self.state, f"once-{s}-main.json"), age_days=age),
             _write(os.path.join(self.state, f"failstreak-{s}-main.json"), age_days=age),
             _write(os.path.join(self.state, f"subagent-{s}-guard-records.bounced"), age_days=age),
+            _write(os.path.join(self.state, f"subagent-{s}-agent-1.running"), age_days=age),
         ]
         guard = os.path.join(self.state, "selfguard", s)
         _write(os.path.join(guard, "rules_common"), age_days=age)
@@ -428,7 +429,9 @@ class EntryTest(_Base):
         with open(self.log, encoding="utf-8") as f:
             (line,) = [json.loads(x) for x in f]
         self.assertEqual(line["event"], "SessionStart")
-        self.assertEqual(line["detail"], "pruned rotated=0 logs=1 state=1")
+        # 読めなかったツリーの注記（この一時リポジトリは git の作業ツリーではない）は残し、
+        # 後始末の結果はそのあとに続く。
+        self.assertTrue(line["detail"].endswith("pruned rotated=0 logs=1 state=1"))
 
     def test_session_start_survives_a_failing_prune(self):
         with mock.patch.object(prune, "run", side_effect=RuntimeError("boom")):
@@ -438,7 +441,7 @@ class EntryTest(_Base):
         with open(self.log, encoding="utf-8") as f:
             (line,) = [json.loads(x) for x in f]
         self.assertEqual(line["decision"], "allow")
-        self.assertNotIn("detail", line)
+        self.assertNotIn("pruned", line.get("detail", ""), "後始末に失敗したら、その結果は書かない")
 
 
 class HookTest(_Base):

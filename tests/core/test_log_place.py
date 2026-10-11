@@ -68,7 +68,7 @@ class EmptyEnvStillWritesTheRecordTest(unittest.TestCase):
         self.hook("PreToolUse", "Bash", env)
         self.hook("PostToolUse", "Bash", env)
 
-        self.assertTrue(os.path.isfile(os.path.join(self.ws, "logs", "state", "s1.json")))
+        self.assertTrue(os.path.isfile(os.path.join(self.ws, "logs", "state", "s1.reported.json")))
 
 
 if __name__ == "__main__":

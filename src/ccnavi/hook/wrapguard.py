@@ -280,7 +280,7 @@ def _core_targets(sub: str, args: list[str]) -> tuple[list[str], str, bool]:
     `restore` は `--source` が無ければ何も返さない。`checkout` は `--` より前の最初の語（行き先か
     起点）を除く。`rm` は `-n` / `--dry-run` があれば何も返さない。長いオプションは、git が受ける
     省略形（`--sou=` など）も同じに読む。パスに変数・置換があれば、その語を読めない指定として
-    返す。旗を変数で書く形（`restore $O HEAD~1 <パス>`）は見ない（ADR-0120 の限界。sh が止める）。
+    返す。旗を変数で書く形（`restore $O HEAD~1 <パス>`）は見ない（ADR-0121 の限界。sh が止める）。
     """
     longs, shorts = _VALUE_LONGS[sub], _VALUE_SHORTS[sub]
     positional: list[str] = []

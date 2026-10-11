@@ -19,6 +19,7 @@ from . import (
     agree_screen,
     approval,
     core_base,
+    worktrees,
 )
 
 # ボードの承認（`--agree --yes`）が通らなかった根拠の種別。付録 A の `CORE_APPROVE_*`。
@@ -328,7 +329,9 @@ def approve_yes(
         return applied.code
     tickets = [c.ticket for c in gathered.batch]
     revisions = {c.ticket.ticket for c in gathered.batch if c.is_revision}
-    prompt = agree_screen.approved_text(tickets, revisions, root)
+    # 子のワークツリーの計画。拡張が `create` の子を承認の後に作る（作れなければ案内に名指しで出る）
+    plan = worktrees.child_worktrees(root, tickets)
+    prompt = agree_screen.approved_text(tickets, revisions, root, plan)
     if not as_json:
         stdout.write(lines.getvalue())
         return 0
@@ -343,6 +346,7 @@ def approve_yes(
             for t in tickets
         ],
         "lines": [line for line in lines.getvalue().splitlines() if line.strip()],
+        "worktrees": plan,
         "prompt": prompt,
     }
     stdout.write(json.dumps(body, ensure_ascii=False) + "\n")

@@ -18,6 +18,7 @@ from ..tickets import (
     c1,
     core,
     history,
+    next_id,
     ops,
     phase,
     review,
@@ -139,6 +140,9 @@ def operate(
             stderr.write("ccnavi: ticket status に渡せる親は 1 つだけ\n")
         else:
             code = status.run(stdout, stderr, root, conf, c1.family_of(target) if target else "")
+    elif kind == "ticket" and verb == "next-id":
+        # ticket next-id [<先頭の語> <slug>]。読むだけ。issue の無い親の識別子の番号を答える。
+        code = next_id.run(stdout, stderr, root, conf, words[2:])
     elif kind == "ticket" and verb in ("start", "finish", "cancel") and target:
         if verb == "start":
             code = ops.start(stdout, stderr, root, conf, target)

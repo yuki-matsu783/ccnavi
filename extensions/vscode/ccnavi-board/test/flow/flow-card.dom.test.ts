@@ -8,13 +8,24 @@ import type { BoardJson } from "../../src/core/model.js";
 import { openBoard } from "../helpers/board.js";
 import { fixture } from "../helpers/fixture.js";
 
-function withFlow(ticket: string, change: { exists?: boolean; locked?: boolean }): BoardJson {
+function withFlow(ticket: string, change: { exists?: boolean; locked?: boolean; lock_kind?: "doing" | "review" | null }): BoardJson {
   const board = fixture();
   return {
     ...board,
     tickets: board.tickets.map((t) => (t.ticket === ticket && t.flow !== null ? { ...t, flow: { ...t.flow, ...change } } : t)),
   };
 }
+
+test("CB-D115 レビュー中の子のカードの「フロー」ボタンは、着手中と別の言葉で「閲覧（レビュー中）」", async () => {
+  const dom = await openBoard(withFlow("i0001-02-04", { locked: true, lock_kind: "review" }));
+  try {
+    const button = dom.one('[data-action="flow"][data-ticket="i0001-02-04"]');
+    assert.equal(button.textContent, "フロー: 閲覧（レビュー中）");
+    assert.equal(button.getAttribute("data-flow"), "locked");
+  } finally {
+    await dom.close();
+  }
+});
 
 test("CB-D113 子のカードに「フロー」ボタン。言葉は 作成 / 編集 / 閲覧（着手中・終了済み）で、親のカードには無い", async () => {
   const dom = await openBoard(withFlow("i0001-02-03", { exists: true }));
@@ -23,7 +34,7 @@ test("CB-D113 子のカードに「フロー」ボタン。言葉は 作成 / �
     assert.equal(label("i0001-02-04"), "フロー: 作成");
     // 完了の子でもファイルが在れば中身を見られる。終わった手順を「編集」とは言わない
     assert.equal(label("i0001-01-01"), "フロー: 閲覧（終了済み）");
-    assert.equal(label("i0001-02-02"), "フロー: 閲覧（着手中・レビュー中）");
+    assert.equal(label("i0001-02-02"), "フロー: 閲覧（着手中）");
     assert.equal(label("i0001-02-03"), "フロー: 編集");
     assert.equal(dom.one('[data-action="flow"][data-ticket="i0001-02-02"]').getAttribute("data-flow"), "locked");
     // 親のカードには出ない

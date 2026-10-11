@@ -637,6 +637,7 @@ class FlowInfoTest(unittest.TestCase):
                 self.assertIsNotNone(shown)
                 self.assertFalse(shown["exists"])
                 self.assertEqual(shown["locked"], started)
+                self.assertEqual(shown["lock_kind"], ticket_model.DOING if started else None)
 
     def test_children_waiting_for_review_keep_the_field_and_are_locked(self):
         # レビュー準備中・レビュー待ち（`review/`）は閉じた扱いにしない。
@@ -650,11 +651,13 @@ class FlowInfoTest(unittest.TestCase):
                 self.assertIsNotNone(shown)
                 self.assertFalse(shown["exists"])
                 self.assertTrue(shown["locked"])
+                self.assertEqual(shown["lock_kind"], ticket_model.REVIEW)
                 self.assertEqual(shown["rel"], f".ccnavi/approved/flows/{CHILD}.yml")
         write(flow.flow_file(self.conf, self.root, CHILD), WORKFLOW_YAML)
         shown = flow.info(self.conf, self.root, self.child(ticket_model.REVIEW, started=True))
         self.assertTrue(shown["exists"])
         self.assertTrue(shown["locked"])
+        self.assertEqual(shown["lock_kind"], ticket_model.REVIEW)
 
     def test_the_draft_sits_in_the_same_tree_under_the_proposal_place(self):
         """下書きの置き場は提案の置き場の `flows/<子>.yml`。置くツリーはフローと同じ。"""

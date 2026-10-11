@@ -2287,7 +2287,7 @@ class TicketTest(unittest.TestCase):
             self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
 
     def test_user_entries_with_unreadable_arguments_are_denied(self):
-        """2 段目の無いユーザの入口は、引数を読み切れなければ止める（ADR-0121）。
+        """2 段目の無いユーザの入口は、引数を読み切れなければ止める（ADR-0122）。
 
         `ccnavi-sync.sh`（`--forget`）・`ccnavi-review.sh decide`（`--choices`）・実行ファイルの
         `--yes` は端末を求めない。引数を変数・置換・glob で組み立てると表記の検査から外れる。
@@ -2380,7 +2380,7 @@ class TicketTest(unittest.TestCase):
         self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
 
     def test_user_entries_stop_only_forms_that_can_build_the_operation(self):
-        """ユーザの入口は、止める操作を組み立てうるときだけ止める（ADR-0121）。
+        """ユーザの入口は、止める操作を組み立てうるときだけ止める（ADR-0122）。
 
         読むだけの形（`--preview`、診断の旗が展開より前にある形）・リダイレクトの行き先・
         単引用符の中の文字どおりの値は通す。標準入力から読むシェルへ流し込む文字列に
