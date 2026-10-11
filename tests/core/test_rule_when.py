@@ -1,0 +1,573 @@
+"""ルールの `when:`（条件の木）のテスト。
+
+読み込み（書式・苦情・上限）、判定（all / any / not の組み合わせ、except との併用、
+`{!root}` を組み立てられないとき、hook の判定と入れ子のコマンド）、lint、レイヤーのマージ、
+提案が書き戻す形、`--explain` と見本（`--test-samples`）を見る。
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import tempfile
+import unittest
+
+import yaml
+
+from ccnavi.entry import diagnose_shared, lint_rules, suggest
+from ccnavi.policy import ruleload, rules
+from tests import ROOT, common_path
+from tests.inproc import run_ccnavi
+
+# 「*.pem か、secrets/ の下で .md でないもの」。
+SECRETS = {
+    "id": "secrets",
+    "match": "Write|Edit",
+    "when": {
+        "any": [
+            {"glob": "*.pem"},
+            {"all": [{"glob": "*/secrets/*"}, {"not": {"glob": "*.md"}}]},
+        ]
+    },
+    "message": "鍵は書かない",
+}
+
+
+def build(raw: dict, section: str = rules.DENY, root: str = "/r") -> tuple:
+    """ルール 1 件を読み込む。返すのは (ルール or None, 苦情のリスト)。"""
+    rule_set, problems = rules.parse({"version": 1, section: [raw]}, root)
+    found = rule_set.section(section)
+    return (found[0] if found else None), problems
+
+
+def errors(problems: list) -> list[str]:
+    return [p.detail for p in problems if p.severity == rules.SEVERITY_ERROR]
+
+
+def nested(depth: int) -> dict:
+    """`not` を depth 段重ねた木。葉を含めた段数は depth + 1。"""
+    node: dict = {"glob": "*.pem"}
+    for _ in range(depth):
+        node = {"not": node}
+    return node
+
+
+class ParseTest(unittest.TestCase):
+    def test_木を読む(self):
+        rule, problems = build(SECRETS)
+        self.assertEqual(problems, [])
+        self.assertEqual(rule.glob, "")
+        self.assertEqual(rule.regex, "")
+        self.assertIsNone(rule.compiled)
+        self.assertEqual(rule.when.written(), SECRETS["when"])
+        self.assertEqual(
+            rule.written_body(),
+            "when: any(glob '*.pem', all(glob '*/secrets/*', not(glob '*.md')))",
+        )
+        leaves = [n.where for n in rule.when.walk() if n.is_leaf()]
+        self.assertEqual(
+            leaves, ["when.any[0].glob", "when.any[1].all[0].glob", "when.any[1].all[1].not.glob"]
+        )
+
+    def test_葉だけの木(self):
+        rule, problems = build(
+            {"id": "x", "match": "Write", "when": {"regex": r"\.pem$"}}, section=rules.ALLOW
+        )
+        self.assertEqual(errors(problems), [])
+        self.assertTrue(rule.matches("Write", "/a/K.PEM"))
+        self.assertFalse(rule.matches("Write", "/a/k.pem.txt"))
+
+    def test_root_を置き換える(self):
+        rule, problems = build(
+            {"id": "x", "match": "Write", "when": {"all": [{"glob": "{root}/*"}]}, "message": "m"},
+            root="/work",
+        )
+        self.assertEqual(problems, [])
+        self.assertTrue(rule.matches("Write", "/work/a"))
+        self.assertTrue(rule.matches("Write", r"\work\a"))
+        self.assertFalse(rule.matches("Write", "/other/a"))
+
+    def test_not_root_を展開する(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = os.path.realpath(d)
+            rule, problems = build(
+                {
+                    "id": "x",
+                    "match": "Write",
+                    "when": {"all": [{"regex": "^{!root}.*"}, {"not": {"glob": "*/tmp/*"}}]},
+                    "message": "m",
+                },
+                root=root,
+            )
+            self.assertEqual(problems, [])
+            self.assertTrue(rule.matches("Write", "/elsewhere/a"))
+            self.assertFalse(rule.matches("Write", "/elsewhere/tmp/a"))
+            self.assertFalse(rule.matches("Write", os.path.join(root, "a")))
+
+
+class ErrorTest(unittest.TestCase):
+    def check(self, when: object, *words: str, root: str = "/r", **extra) -> None:
+        rule, problems = build(
+            {"id": "x", "match": "Write", "when": when, "message": "m", **extra}, root=root
+        )
+        self.assertIsNone(rule, problems)
+        found = errors(problems)
+        self.assertEqual(len(found), 1, problems)
+        for word in words:
+            self.assertIn(word, found[0])
+        self.assertTrue(all(p.rule == "deny:x" for p in problems))
+
+    def test_本体はちょうど_1_つ(self):
+        self.check({"glob": "*"}, "glob と when の両方", glob="*")
+        self.check({"glob": "*"}, "regex と when の両方", regex="x")
+        self.check({"glob": "*"}, "glob と regex と when", glob="*", regex="x")
+        rule, problems = build({"id": "x", "match": "Write", "message": "m"})
+        self.assertIsNone(rule)
+        self.assertIn("glob も regex も when も無い", errors(problems)[0])
+
+    def test_ノードの形(self):
+        self.check(None, "when", "マッピングではない")
+        self.check("*.pem", "when", "マッピングではない")
+        self.check(["*.pem"], "マッピングではない")
+        self.check({}, "when", "キーが無い")
+        self.check({"glob": "*", "regex": "x"}, "キーが 2 つ")
+        self.check({"glob": "*", "why": "x"}, "知らないキー", "why")
+        self.check({"none": [{"glob": "*"}]}, "知らないキー", "none")
+        self.check({"all": [{"glob": "*"}, {"match": "Write"}]}, "when.all[1]", "知らないキー")
+
+    def test_型と空(self):
+        self.check({"all": []}, "when の all が空")
+        self.check({"any": []}, "when の any が空")
+        self.check({"all": {"glob": "*"}}, "when の all", "リストではない")
+        self.check({"any": "*.pem"}, "リストではない")
+        self.check({"not": [{"glob": "*"}]}, "when.not", "マッピングではない")
+        self.check({"not": None}, "when.not", "マッピングではない")
+        self.check({"glob": ""}, "when の glob", "空か、文字列ではない")
+        self.check({"regex": 3}, "when の regex", "空か、文字列ではない")
+        self.check({"all": [{"glob": None}]}, "when.all[0] の glob")
+
+    def test_上限(self):
+        # 深さは葉を含めて 8 段まで
+        rule, problems = build({"id": "x", "match": "Write", "when": nested(7), "message": "m"})
+        self.assertEqual(errors(problems), [])
+        self.assertIsNotNone(rule)
+        self.check(nested(8), "8 段を超える")
+        # ノードは 64 個まで（any の 1 個 + 葉 63 個 = 64）
+        leaves = [{"glob": f"*.{i}"} for i in range(rules.MAX_WHEN_NODES - 1)]
+        rule, problems = build(
+            {"id": "x", "match": "Write", "when": {"any": leaves}, "message": "m"}
+        )
+        self.assertEqual(errors(problems), [])
+        self.assertIsNotNone(rule)
+        self.check({"any": [*leaves, {"glob": "*.x"}]}, "64 個を超える")
+
+    def test_葉には本体と同じ制約(self):
+        self.check({"regex": "a(?=b)"}, "when.regex の ", "先読み")
+        self.check({"all": [{"regex": r"(a)\1"}]}, "when.all[0].regex の ", "後方参照")
+        self.check({"not": {"regex": "a("}}, "when.not.regex の ", "正規表現として組み立てられない")
+        self.check({"glob": "{root}/x"}, "{root}", root="")
+        self.check({"glob": "{!root}/x"}, "when.glob の ", "`glob` には書けない")
+        self.check({"regex": "x{!root}"}, "^")
+
+    def test_except_の誤りもルールごと捨てる(self):
+        self.check({"glob": "*"}, "except", "空", **{"except": []})
+
+
+class EvaluateTest(unittest.TestCase):
+    def test_any_all_not(self):
+        rule, _ = build(SECRETS)
+        cases = {
+            "/a/k.pem": True,
+            "/a/secrets/token": True,
+            "/a/secrets/README.MD": False,
+            "/a/secrets/k.pem": True,  # .md でなく、.pem でもある
+            "/a/public/token": False,
+            "/a/secrets.md": False,
+        }
+        for subject, want in cases.items():
+            with self.subTest(subject=subject):
+                self.assertEqual(rule.matches("Write", subject), want)
+        self.assertFalse(rule.matches("Read", "/a/k.pem"))  # match の見方は変わらない
+
+    def test_not_の入れ子(self):
+        rule, _ = build({"id": "x", "match": "Write", "when": nested(2), "message": "m"})
+        self.assertTrue(rule.matches("Write", "/a/k.pem"))
+        rule, _ = build({"id": "x", "match": "Write", "when": nested(3), "message": "m"})
+        self.assertFalse(rule.matches("Write", "/a/k.pem"))
+        self.assertTrue(rule.matches("Write", "/a/k.txt"))
+
+    def test_all_は全部(self):
+        rule, _ = build(
+            {
+                "id": "x",
+                "match": "Bash",
+                "when": {"all": [{"glob": "*git *"}, {"glob": "*--force*"}, {"glob": "*push*"}]},
+                "message": "m",
+            }
+        )
+        self.assertTrue(rule.matches("Bash", "git push --force"))
+        self.assertFalse(rule.matches("Bash", "git push"))
+        self.assertFalse(rule.matches("Bash", "git fetch --force"))
+
+    def test_except_との併用(self):
+        rule, problems = build({**SECRETS, "except": [{"glob": "*/fixtures/*"}]})
+        self.assertEqual(problems, [])
+        self.assertTrue(rule.matches("Write", "/a/k.pem"))
+        self.assertFalse(rule.matches("Write", "/a/fixtures/k.pem"))
+        self.assertFalse(rule.matches("Write", "/a/fixtures/secrets/token"))
+        self.assertEqual(len(rule.excepts), 1)
+
+
+class NotRootRefusedTest(unittest.TestCase):
+    """葉の `{!root}` を組み立てられないとき。deny / ask は全部止め、allow は使わない。"""
+
+    LONG_ROOT = "/" + "a" * rules.MAX_ROOT_LEN
+
+    def raw(self, when: dict, **extra) -> dict:
+        return {"id": "x", "match": "Write", "when": when, **extra}
+
+    def test_deny_と_ask_は全部止める(self):
+        for section in (rules.DENY, rules.ASK):
+            for when in (
+                {"all": [{"regex": "^{!root}.*"}, {"glob": "*.py"}]},
+                # not の下の葉でも、外すだけの形にはしない
+                {"all": [{"glob": "*.py"}, {"not": {"regex": "^{!root}.*"}}]},
+            ):
+                with self.subTest(section=section, when=when):
+                    rule, problems = build(
+                        self.raw(when, message="m", **{"except": [{"glob": "*.md"}]}),
+                        section=section,
+                        root=self.LONG_ROOT,
+                    )
+                    self.assertIsNotNone(rule)
+                    self.assertTrue(any("when." in d and "長すぎ" in d for d in errors(problems)))
+                    self.assertTrue(rule.matches("Write", "/anything/a.txt"))
+                    # 全部止める形に except の穴を空けない
+                    self.assertEqual(rule.excepts, [])
+                    self.assertTrue(rule.matches("Write", "/anything/a.md"))
+                    self.assertIn("止めています", rule.spoken_message())
+                    # 書いた木は残す（--explain と書き戻しのため）
+                    self.assertEqual(rule.when.written(), when)
+
+    def test_allow_は使わない(self):
+        rule, problems = build(
+            self.raw({"any": [{"glob": "*.py"}, {"regex": "^{!root}.*"}]}),
+            section=rules.ALLOW,
+            root=self.LONG_ROOT,
+        )
+        self.assertIsNone(rule)
+        self.assertTrue(errors(problems))
+
+
+class JudgeTest(unittest.TestCase):
+    """hook の判定で when が効く。Bash はコマンド列の全体に当て、入れ子のコマンドにも当たる。"""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.root = os.path.realpath(self.dir.name)
+        self.addCleanup(self.dir.cleanup)
+        path = common_path(self.root, "rules")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "version": 1,
+                    "deny": [
+                        SECRETS,
+                        {
+                            "id": "publish",
+                            "match": "Bash",
+                            "when": {
+                                "all": [
+                                    {"regex": r"(^|\x00)npm publish\b"},
+                                    {"not": {"regex": r"--dry-run\b"}},
+                                ]
+                            },
+                            "message": "公開しない",
+                        },
+                    ],
+                    "allow": [{"id": "all", "match": "Read", "glob": "*"}],
+                },
+                f,
+            )
+
+    def judge(self, tool: str, tool_input: dict) -> dict:
+        payload = json.dumps(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": tool,
+                "cwd": self.root,
+                "tool_input": tool_input,
+            }
+        )
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        done = run_ccnavi(
+            [
+                "--root",
+                self.root,
+                "--mode",
+                "enable",
+                "--log",
+                "",
+                "--state",
+                "",
+                "--approved",
+                "",
+                "--guard-core-files",
+                "disable",
+            ],
+            input=payload,
+            cwd=ROOT,
+            env=environment,
+        )
+        if not done.stdout.strip():
+            return {}
+        return json.loads(done.stdout)["hookSpecificOutput"]
+
+    def says(self, command: str) -> tuple[str, bool]:
+        out = self.judge("Bash", {"command": command})
+        reason = out.get("permissionDecisionReason", "")
+        return out.get("permissionDecision", ""), "(rule: publish)" in reason
+
+    def test_パス(self):
+        decision = self.judge("Write", {"file_path": os.path.join(self.root, "k.pem")})
+        self.assertEqual(decision.get("permissionDecision"), "deny")
+        md = os.path.join(self.root, "secrets", "a.md")
+        self.assertNotEqual(
+            self.judge("Write", {"file_path": md}).get("permissionDecision"), "deny"
+        )
+
+    def test_コマンドと入れ子のコマンド(self):
+        self.assertEqual(self.says("npm publish"), ("deny", True))
+        self.assertEqual(self.says("npm publish --dry-run"), ("ask", False))
+        self.assertEqual(self.says("sudo npm publish"), ("deny", True))
+        self.assertEqual(self.says("sudo npm publish --dry-run"), ("ask", False))
+        # コマンド列の全体に当てる（lint が warn で言う形）
+        self.assertEqual(self.says("npm publish; echo --dry-run"), ("ask", False))
+
+
+class LintTest(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.root = os.path.realpath(self.dir.name)
+        self.addCleanup(self.dir.cleanup)
+
+    def lint(self, deny: list, allow: list | None = None) -> list:
+        path = os.path.join(self.root, "rules.yml")
+        with open(path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(
+                {
+                    "version": 1,
+                    "deny": deny,
+                    "allow": allow or [{"id": "r", "match": "Read", "glob": "*"}],
+                },
+                f,
+                allow_unicode=True,
+            )
+        return lint_rules._rules(path, self.root)
+
+    def warns(self, problems: list) -> list[str]:
+        return [f"{p.rule} {p.detail}" for p in problems if p.severity == rules.SEVERITY_WARN]
+
+    def deny(self, when: dict, match: str = "Write") -> dict:
+        return {"id": "x", "match": match, "when": when, "message": "m"}
+
+    def test_正しい形は何も言わない(self):
+        problems = self.lint([SECRETS])
+        self.assertEqual([p for p in problems if p.severity != rules.SEVERITY_INFO], [])
+
+    def test_書式の誤りは_error(self):
+        problems = self.lint([self.deny({"all": []})])
+        found = [f"{p.rule} {p.detail}" for p in problems if p.severity == rules.SEVERITY_ERROR]
+        self.assertTrue(any("deny:x" in d and "when の all が空" in d for d in found), found)
+
+    def test_not_の下が何にでも当たる(self):
+        found = self.warns(
+            self.lint([self.deny({"all": [{"glob": "*.py"}, {"not": {"glob": "*"}}]})])
+        )
+        self.assertTrue(
+            any("when の all は何にも当たらない。このルールは" in d for d in found), found
+        )
+
+    def test_any_の中に何にでも当たる葉(self):
+        found = self.warns(self.lint([self.deny({"any": [{"glob": "*.py"}, {"regex": "^"}]})]))
+        self.assertTrue(any("when の any は何にでも当たる" in d for d in found), found)
+
+    def test_中のノードは条件を絞っていないと言う(self):
+        when = {"all": [{"glob": "*.py"}, {"any": [{"glob": "*.md"}, {"glob": "*"}]}]}
+        found = self.warns(self.lint([self.deny(when)]))
+        self.assertTrue(
+            any("when.all[1] の any は何にでも当たる。条件を" in d for d in found), found
+        )
+        when = {"any": [{"glob": "*.py"}, {"not": {"regex": ".*"}}]}
+        found = self.warns(self.lint([self.deny(when)]))
+        self.assertTrue(any("when.any[1] の not は何にも当たらない" in d for d in found), found)
+
+    def test_コマンドの_not(self):
+        when = {"all": [{"glob": "*git push*"}, {"not": {"glob": "*--dry-run*"}}]}
+        found = self.warns(self.lint([self.deny(when, "Bash|Write")]))
+        self.assertTrue(any("Bash の when の not" in d for d in found), found)
+        found = self.warns(self.lint([self.deny(when, "PowerShell")]))
+        self.assertTrue(any("PowerShell の when の not" in d for d in found), found)
+        # not が無ければ言わない
+        found = self.warns(self.lint([self.deny({"any": [{"glob": "*git push*"}]}, "Bash")]))
+        self.assertFalse(any("when の not" in d for d in found), found)
+        # allow は外れても止める側に寄るだけなので言わない
+        allow = {"id": "a", "match": "Bash", "when": when}
+        found = self.warns(self.lint([SECRETS], [allow]))
+        self.assertFalse(any("when の not" in d for d in found), found)
+
+    def test_stop_に当たらない木(self):
+        stop = {
+            "id": "nudge",
+            "match": "Stop",
+            "when": {"not": {"glob": "(stop)"}},
+            "every": 5,
+            "additionalContext": "x",
+        }
+        found = self.warns(self.lint([SECRETS], [stop]))
+        self.assertTrue(any("(stop)" in d and "when" in d for d in found), found)
+        ok = {**stop, "when": {"any": [{"glob": "*"}]}}
+        found = self.warns(self.lint([SECRETS], [ok]))
+        self.assertFalse(any("(stop)" in d and "当たらないので" in d for d in found), found)
+
+    def test_id_の無いルールは木で名指しする(self):
+        raw = {k: v for k, v in SECRETS.items() if k != "id"}
+        found = self.warns(self.lint([raw]))
+        self.assertTrue(any("when: any(glob '*.pem'" in d for d in found), found)
+
+
+class MergeTest(unittest.TestCase):
+    def rule_set(self, raw: dict) -> rules.RuleSet:
+        rule_set, problems = rules.parse({"version": 1, "deny": [raw]}, "/r")
+        self.assertEqual(errors(problems), [])
+        return rule_set
+
+    def test_when_はマージで落ちない(self):
+        base = self.rule_set({"id": "a", "match": "Write", "glob": "*", "message": "m"})
+        extra = self.rule_set({**SECRETS, "id": "b"})
+        ruleload.prefix_ids(extra, "lib")
+        ruleload.merge_rules(base, extra, "lib")
+        merged = base.deny[1]
+        self.assertEqual(merged.id, "lib:b")
+        self.assertEqual(merged.when.written(), SECRETS["when"])
+        self.assertTrue(merged.matches("Write", "/a/k.pem"))
+        self.assertFalse(merged.matches("Write", "/a/secrets/a.md"))
+
+    def test_木だけが違えば別の定義(self):
+        base = self.rule_set(SECRETS)
+        other = {**SECRETS, "when": {"any": [{"glob": "*.pem"}, {"glob": "*/secrets/*"}]}}
+        problems = ruleload.merge_rules(base, self.rule_set(other), "lib")
+        self.assertEqual(len(base.deny), 2)
+        self.assertEqual([p.severity for p in problems], [rules.SEVERITY_WARN])
+        # 組み方だけが違う（all と any）2 本も別
+        swapped = {**SECRETS, "when": {"all": [{"glob": "*.pem"}, {"glob": "*/secrets/*"}]}}
+        problems = ruleload.merge_rules(base, self.rule_set(swapped), "lib")
+        self.assertEqual(len(base.deny), 3)
+        # 全欄が同じなら後ろを捨てる
+        problems = ruleload.merge_rules(base, self.rule_set(SECRETS), "lib")
+        self.assertEqual(len(base.deny), 3)
+        self.assertEqual([p.severity for p in problems], [rules.SEVERITY_INFO])
+
+    def test_glob_と同じ葉だけの木も別の定義(self):
+        base = self.rule_set({"id": "a", "match": "Write", "glob": "*.pem", "message": "m"})
+        tree = self.rule_set(
+            {"id": "a", "match": "Write", "when": {"glob": "*.pem"}, "message": "m"}
+        )
+        ruleload.merge_rules(base, tree, "lib")
+        self.assertEqual(len(base.deny), 2)
+
+
+class WrittenTest(unittest.TestCase):
+    def test_提案が書き戻す形に_when_が残る(self):
+        raw = {**SECRETS, "except": [{"glob": "*/fixtures/*"}]}
+        rule, _ = build(raw)
+        written = suggest._written_rule(rule)
+        self.assertEqual(written["when"], SECRETS["when"])
+        self.assertEqual(written["except"], raw["except"])
+        self.assertNotIn("glob", written)
+        self.assertNotIn("regex", written)
+        again, problems = build(written)
+        self.assertEqual(errors(problems), [])
+        self.assertEqual(again.key(), rule.key())
+
+    def test_rule_form(self):
+        rule, _ = build(SECRETS)
+        form = diagnose_shared.rule_form(rule)
+        self.assertEqual(form["kind"], "when")
+        self.assertEqual(form["when"], SECRETS["when"])
+        self.assertTrue(form["written"].startswith("when: any("))
+
+    def test_字下げの形(self):
+        rule, _ = build(SECRETS)
+        self.assertEqual(
+            rule.when.lines(),
+            [
+                "any",
+                "  glob '*.pem'",
+                "  all",
+                "    glob '*/secrets/*'",
+                "    not",
+                "      glob '*.md'",
+            ],
+        )
+
+
+class CommandLineTest(unittest.TestCase):
+    """`--explain` が木を出し、`--test-samples` が when のルールを見本で確かめられる。"""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.root = os.path.realpath(self.dir.name)
+        self.addCleanup(self.dir.cleanup)
+        path = common_path(self.root, "rules")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "version": 1,
+                    "deny": [SECRETS],
+                    "allow": [{"id": "all", "match": "Read", "glob": "*"}],
+                },
+                f,
+            )
+
+    def run_cli(self, *args: str) -> str:
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment.pop("CLAUDE_PROJECT_DIR", None)
+        done = run_ccnavi(
+            ["--root", self.root, "--log", "", "--state", "", "--approved", "", *args],
+            cwd=ROOT,
+            env=environment,
+        )
+        return done.stdout
+
+    def test_explain(self):
+        out = self.run_cli("--explain")
+        self.assertIn("when: any(glob '*.pem', all(glob '*/secrets/*', not(glob '*.md')))", out)
+        self.assertIn("        any\n          glob '*.pem'\n", out)
+
+    def test_samples(self):
+        samples = os.path.join(self.root, "samples.yml")
+        with open(samples, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "deny": [
+                        {"tool": "Write", "subject": "/repo/k.pem", "why": "鍵"},
+                        {"tool": "Write", "subject": "/repo/secrets/token", "why": "秘密"},
+                    ],
+                    "ask": [
+                        {"tool": "Write", "subject": "/repo/secrets/README.md", "why": "説明"},
+                    ],
+                },
+                f,
+            )
+        body = json.loads(self.run_cli("--test-samples", samples, "--json"))
+        self.assertEqual(body["mismatches"], 0, body)
+        hit = body["samples"][0]["rules"][0]
+        self.assertEqual(hit["id"], "secrets")
+        self.assertEqual(hit["kind"], "when")
+
+
+if __name__ == "__main__":
+    unittest.main()
