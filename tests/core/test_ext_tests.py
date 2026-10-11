@@ -397,14 +397,14 @@ class TestExtHookTest(unittest.TestCase):
         workspace, _, marker = self.workspace()
         result, _ = self.stop(workspace, rc=1)
         self.assertEqual(2, result.returncode)
-        self.assertIn("落ちたテストを直して", result.stderr)
+        self.assertIn("失敗したテストを直して", result.stderr)
         self.assertEqual("1", self.retries(workspace))
         # マーカーは残す。直したあと同じグループを回し直すため。
         self.assertTrue(os.path.exists(marker))
 
     def test_a_missing_environment_is_not_counted_as_a_failing_test(self):
         # 終了コード 3 は「node_modules が無い」など環境が足りない側。テストは
-        # 落ちていないので、「落ちたテストを直して」と差し戻すのは嘘になる。
+        # 落ちていないので、「失敗したテストを直して」と差し戻すのは嘘になる。
         workspace, _, _ = self.workspace()
         result, _ = self.stop(workspace, rc=3)
         self.assertEqual(0, result.returncode)
@@ -448,7 +448,7 @@ class TestExtHookTest(unittest.TestCase):
         result, args = self.stop(workspace)
         self.assertEqual(0, result.returncode)
         self.assertIsNone(args)
-        self.assertIn("テストの入口が無い", result.stderr)
+        self.assertIn("テストの入口がない", result.stderr)
 
 
 if __name__ == "__main__":
