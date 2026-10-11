@@ -135,7 +135,10 @@ export interface RulesPage {
    * （欄は触れ、保存でファイルが作られる）
    */
   readonly exists?: boolean;
-  /** `.claude/settings.json` の env.CCNAVI_MODE。空なら未設定 */
+  /**
+   * 動作モード。実行ファイルが `--explain --json` の `settings.mode` で答えた、hook がいま使うはずの値
+   * （enable / dry-run / disable。読めない値は enable になっている）。答えが取れなければ空
+   */
   readonly mode: string;
   readonly model: RulesModel;
   readonly hooks: readonly HookEntry[];
@@ -224,4 +227,18 @@ export const DATA_ID = "ccnavi-rules-data";
 /** 最初の中身を HTML に埋める形にする。埋め方は `screen-host.ts` が持つ（React の画面で同じ） */
 export function embedData(data: RulesData): string {
   return embedJson(data);
+}
+
+/**
+ * 動作モードの帯に出す説明。実行ファイルが答えたモードをそのまま言い換えるだけで、設定ファイルは読まない。
+ * enable と空（答えが取れない）は帯を出さないので空を返す
+ */
+export function modeBanner(mode: string): string {
+  if (mode === "dry-run") {
+    return "判定と記録だけをします。deny や ask にヒットしても、ツールの実行は止まりません";
+  }
+  if (mode === "disable") {
+    return "判定しません。ルールは使われず、deny や ask に当たる操作も止まりません";
+  }
+  return "";
 }

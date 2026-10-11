@@ -95,7 +95,7 @@ export function sampleBoard(root: string, generatedAt: string): Board {
     version: 1,
     root,
     generated_at: generatedAt,
-    settings: { ticket_control: "enable", tickets: "", approved: "", projects: "" },
+    settings: { mode: "enable", ticket_control: "enable", tickets: "", approved: "", projects: "" },
     trees: [],
     layers: [],
     sums: [],

@@ -337,6 +337,11 @@ export interface BoardJson {
   readonly root: string;
   readonly generated_at: string;
   readonly settings: {
+    /**
+     * 動作モード。hook がいま使うはずの値を実行ファイルが解決したもの（enable / dry-run / disable）。
+     * 読めない値は enable になっている。この欄を出さない古い実行ファイルでは空
+     */
+    readonly mode: string;
     /** チケット制御を使うか。実行ファイルが解決した値（enable / disable） */
     readonly ticket_control: string;
     readonly tickets: string;
@@ -390,6 +395,7 @@ export function parseBoardJson(text: string): ParseResult {
       root: str(raw.root),
       generated_at: str(raw.generated_at),
       settings: {
+        mode: str(settings.mode),
         ticket_control: str(settings.ticket_control),
         tickets: str(settings.tickets),
         approved: str(settings.approved),

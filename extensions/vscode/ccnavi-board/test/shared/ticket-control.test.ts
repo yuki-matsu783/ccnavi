@@ -1,39 +1,22 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ticketControlFrom, ticketControlMismatch } from "../../src/core/ticket-control.js";
+import { ticketControlOf } from "../../src/core/ticket-control.js";
+import { fixture } from "../helpers/fixture.js";
 
-function env(value: string | undefined): string {
-  return JSON.stringify({ env: value === undefined ? {} : { CCNAVI_TICKET_CONTROL: value } });
+function withValue(value: string) {
+  const board = fixture();
+  return { ...board, settings: { ...board.settings, ticket_control: value } };
 }
 
-test("CB-T55 書いていなければ enable", () => {
-  assert.equal(ticketControlFrom({ settings: undefined, local: undefined }), "enable");
-  assert.equal(ticketControlFrom({ settings: env(undefined), local: undefined }), "enable");
-  assert.equal(ticketControlFrom({ settings: "{}", local: undefined }), "enable");
-  assert.equal(ticketControlFrom({ settings: "broken", local: undefined }), "enable");
+test("CB-T55 実行ファイルが enable と答えれば enable", () => {
+  assert.equal(ticketControlOf(withValue("enable")), "enable");
 });
 
-test("CB-T56 settings.json の disable で切れる。大文字と前後の空白は許す", () => {
-  assert.equal(ticketControlFrom({ settings: env("disable"), local: undefined }), "disable");
-  assert.equal(ticketControlFrom({ settings: env(" Disable "), local: undefined }), "disable");
-  assert.equal(ticketControlFrom({ settings: env("enable"), local: undefined }), "enable");
+test("CB-T56 実行ファイルが disable と答えたときだけ disable", () => {
+  assert.equal(ticketControlOf(withValue("disable")), "disable");
 });
 
-test("CB-T57 読めない値は enable として扱う（ccnavi の解決と同じ向き）", () => {
-  assert.equal(ticketControlFrom({ settings: env("off"), local: undefined }), "enable");
-  assert.equal(ticketControlFrom({ settings: env(""), local: undefined }), "enable");
-});
-
-test("CB-T58 settings.local.json が settings.json に勝つ。local が空なら settings を見る", () => {
-  assert.equal(ticketControlFrom({ settings: env("disable"), local: env("enable") }), "enable");
-  assert.equal(ticketControlFrom({ settings: env("enable"), local: env("disable") }), "disable");
-  assert.equal(ticketControlFrom({ settings: env("disable"), local: env(undefined) }), "disable");
-  assert.equal(ticketControlFrom({ settings: env("disable"), local: env("off") }), "disable");
-});
-
-test("CB-T59 実行ファイルの答えと食い違えば言う", () => {
-  assert.equal(ticketControlMismatch("enable", "enable"), "");
-  assert.equal(ticketControlMismatch("disable", " Disable "), "");
-  assert.match(ticketControlMismatch("enable", "disable"), /設定ファイル: enable、実行ファイル: disable/);
-  assert.match(ticketControlMismatch("disable", "enable"), /CCNAVI_TICKET_CONTROL/);
+test("CB-T57 ボードが読めない・答えが空なら enable（入口を消さない）", () => {
+  assert.equal(ticketControlOf(undefined), "enable");
+  assert.equal(ticketControlOf(withValue("")), "enable");
 });
