@@ -129,17 +129,69 @@ def _config_via_bash(regex: str) -> dict:
             "Put new content there with the Write or Edit tool, so the repair "
             "goes through a path that is checked and recorded. Resolving a merge "
             "conflict is not blocked: 'git add' and 'git restore --ours' put back "
-            "a version that is already committed instead of writing new content."
+            "a version that is already committed instead of writing new content "
+            "(run them through .ccnavi/scripts/ccnavi-git.sh when raw git is blocked)."
         ),
     }
 
+
+# 表記違いに外れないように、止める形は glob の文字列一致ではなく regex で書く。
+# glob（`*git push*` `*rm -rf *`）だと、`git -C . push`・`git --no-pager push`・`rm -fr`・
+# `rm -r -f`・`rm --recursive --force` が外れる。どの式も先読みを使わない（ルールファイルの
+# regex と同じ制約。rules.parse を通す）。
+#
+# `git` がコマンドの位置に立つ形。前の切れ目は共通レイヤーの見本の `raw-git` と同じで、
+# `legit` のような語や、誘導先の `ccnavi-git.sh` には当たらない。
+_GIT = r"(^|[^\w.-])(\S*[\\/])?git(\.exe)?"
+# サブコマンドの前に挟める git のグローバルオプション。値を空白で区切って取るもの
+# （`-C <path>` `-c <k=v>` `--git-dir <dir>` など）は値まで読み、それ以外は `-` で始まる語を
+# 1 つ読む（`--no-pager` `--git-dir=.git` `-C.`）。オプションでない語で読むのをやめるので、
+# `git commit -m push` の `push` は値の位置で、サブコマンドには読まない。
+_GIT_OPTIONS = (
+    r"(\s+(-c|--(git-dir|work-tree|namespace|config-env|super-prefix|exec-path|attr-source"
+    r"|list-cmds))\s+[^\s\x00]+|\s+-[^\s\x00]*)*"
+)
+# コマンドの中の語。`\x00` はコマンドの切れ目なので、次のコマンドへまたがない。
+_WORD = r"\s+[^\s\x00]+"
+_WORD_END = r"([\s\x00]|$)"
+# rm の再帰と強制。短い形はまとめても（`-rf` `-fr` `-Rf` `-rfv`）分けても（`-r -f`）、
+# 長い形（`--recursive` `--force`。略した `--rec` `--for` も rm は受け付ける）でもよく、
+# 順序もオペランドとの前後も問わない。片方だけ（`rm -r` `rm -f`）は当てない。
+#
+# 先読みが使えないので、語を「再帰でも強制でもない語」「強制でない語」「再帰でない語」に
+# 分けて読む。どの語を読み飛ばせるかが最初の 1 字で決まるので、当たらない長いコマンドでも
+# 後戻りが語の数に比例する範囲で済む（どの語でも読み飛ばせる形にすると、語の数の 3 乗で遅くなる）。
+_RM_BOTH = r"-[a-z]*(r[a-z]*f|f[a-z]*r)[a-z]*"
+_RM_RECURSIVE = r"(-[a-z]*r[a-z]*|--r[a-z]*)"
+_RM_FORCE = r"(-[a-z]*f[a-z]*|--f[a-z]*)"
+
+
+def _rm_skip(letters: str) -> str:
+    """`letters` のどの字も選択肢として持たない語。オペランドと、`-` の後にその字が無い語。"""
+    return (
+        rf"\s+([^\s\x00-][^\s\x00]*|-([^\s\x00{letters}-][^\s\x00{letters}]*)?"
+        rf"|--([^\s\x00{letters}][^\s\x00]*)?)"
+    )
+
+
+RECURSIVE_DELETE_REGEX = (
+    rf"(^|[^\w.-])(\S*[\\/])?rm(\.exe)?({_rm_skip('rf')})*\s+"
+    rf"({_RM_BOTH}"
+    rf"|{_RM_RECURSIVE}({_rm_skip('f')})*\s+{_RM_FORCE}"
+    rf"|{_RM_FORCE}({_rm_skip('r')})*\s+{_RM_RECURSIVE})"
+    rf"{_WORD_END}"
+)
+GIT_PUSH_REGEX = rf"{_GIT}{_GIT_OPTIONS}\s+push\b"
+# `--hard` は reset の後ろのどこにあってもよい（`git reset -q --hard`）。git は長いオプションの
+# 略（`--har`）も受け付ける。
+GIT_RESET_HARD_REGEX = rf"{_GIT}{_GIT_OPTIONS}\s+reset({_WORD})*\s+--ha(rd?)?{_WORD_END}"
 
 # 設定で動かない残り。
 _DENY: list[dict] = [
     {
         "id": "builtin-recursive-delete",
         "match": "Bash",
-        "glob": "*rm -rf *",
+        "regex": RECURSIVE_DELETE_REGEX,
         "message": (
             "A recursive forced delete cannot be undone. Name what to remove "
             "one at a time, or use 'git rm' when the files are tracked."
@@ -148,7 +200,7 @@ _DENY: list[dict] = [
     {
         "id": "builtin-git-push",
         "match": "Bash",
-        "glob": "*git push*",
+        "regex": GIT_PUSH_REGEX,
         "message": (
             "git push is not run by the agent. Leave the branch as it is and ask the user to push."
         ),
@@ -156,7 +208,7 @@ _DENY: list[dict] = [
     {
         "id": "builtin-git-reset-hard",
         "match": "Bash",
-        "glob": "*git reset --hard*",
+        "regex": GIT_RESET_HARD_REGEX,
         "message": (
             "Work in progress would be lost. Use 'git stash' to set it aside, "
             "or name the files and use 'git restore'."
