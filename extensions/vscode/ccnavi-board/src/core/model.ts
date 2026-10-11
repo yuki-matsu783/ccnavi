@@ -69,7 +69,7 @@ export interface SeenInJson {
 
 /**
  * 子チケットのフロー。親は null。
- * `locked` は判定がいまそのファイルへの書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）。
+ * `locked` は判定がいまそのファイルへの書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中・レビュー中）。
  * 拡張はそのまま受け取るだけで、`started_at` などから組み直さない。
  */
 export interface FlowJson {

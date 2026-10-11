@@ -486,8 +486,8 @@ def _ticket_record(
         "cancelled_at": source.cancelled_at,
         "cancel_reason": source.cancel_reason,
         # 作業中か。承認済みチケットが `doing/` にあり、着手していて、終わってもいないし
-        # 取り消されてもいない。フローの `locked`（着手中は書き込みを止める）と同じ読み方で、
-        # 拡張は保存を止めるかをこれで決め、`started_at` などから組み直さない。
+        # 取り消されてもいない。フローの `locked`（着手中・レビュー中は書き込みを止める）とは
+        # 別の欄で、拡張は保存を止めるかをこれで決め、`started_at` などから組み直さない。
         "in_progress": (
             ticket_id in open_index
             and open_index[ticket_id].state == ticket_model.DOING
