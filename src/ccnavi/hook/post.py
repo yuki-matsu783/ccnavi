@@ -34,9 +34,11 @@
 
 作業ツリーは、セッションが始まる前から汚れていることがある。他のセッションの
 書きかけ、ユーザが直している最中のもの。それを「直前の実行が壊した」として
-差し戻すと、エージェントは他人の作業を戻しにいく。だから初回に見えたものは
-その場で記録を取り、以降は新しく現れたものだけを原因付きで報告する。
-記録した側も 1 度は伝えるが、文面を分けて、戻すなと明示する。
+差し戻すと、エージェントは他人の作業を戻しにいく。だから、セッションの開始の
+時点（SessionStart）に在ったものを基準として記録する（`capture_baseline`）。基準が
+取れなかったセッションでは、初回の実行後チェックが同じ記録を取る。以降は、基準に
+無い新しい汚れだけを原因付きで報告する。記録した側も 1 度は伝えるが、文面を分けて、
+戻すなと明示する。
 """
 
 from __future__ import annotations
@@ -76,7 +78,9 @@ REASON_NO_TURN_BASELINE = "no-turn-baseline"
 # 全部を並べると本文が流れて 1 件も読まれない。
 REPORT_LIMIT = 12
 
-# 記録に残す件数の上限。セッションが長引いても記録が膨らまないように。
+# ターンの基準（`_save_turn`）を切る件数の上限。セッションが長引いても膨らまないように。
+# 報告済みの記録（seen）は切らない。切ると、切った先の汚れが次の呼び出しで新しい変更になり、
+# 戻されてしまうため（`_save_seen`）。
 SEEN_LIMIT = 500
 
 
@@ -140,7 +144,9 @@ def check(
         # 汚れが全部「前から在ったもの」になってしまい、誰も差し戻されなくなる。
         # 起動時の基準が在っても、そこに在ったものを伝えたことにするのは、ここで
         # 何も無いことを確かめたあとに限る。
-        if not baseline or not announced:
+        # 読めなかったツリーが在るなら、その汚れは見えていない。記録を空にすると、
+        # 読めるようになったあとに起動時の汚れが新しい変更として戻されるので、書かない。
+        if (not baseline or not announced) and len(read) == len(watched):
             _save_seen(stderr, state_dir, payload.session_id, set())
         record.decision, record.enforced = audit.ALLOW, True
         return "", False
@@ -229,7 +235,8 @@ def check(
         )
         for f in fresh
     ]
-    blocks += [post_report._preexisting(f) for f in carried[:REPORT_LIMIT]]
+    # 件数の上限は下の `shown` で切る。ここで切ると、落とした件数が「ほか N 件」に入らない。
+    blocks += [post_report._preexisting(f) for f in carried]
     if not blocks:
         return "", tried
 

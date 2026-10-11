@@ -1159,6 +1159,19 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(read(path), "MZ fake executable\n")
         self.assertIn("restored", result.stdout)
 
+    def test_戻す前に書かれていた版を_aside_へ退避する(self):
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path)
+        self.run_hook("PreToolUse", bin=path)
+        write(path, "MZ replaced\n")
+
+        self.run_hook("PostToolUse", bin=path)
+
+        kept = []
+        for root, _, names in os.walk(os.path.join(self.state, "aside")):
+            kept.extend(read(os.path.join(root, name)) for name in names)
+        self.assertIn("MZ replaced\n", kept, "この呼び出しで書かれた版を消さない")
+
     def test_ツール呼び出しの外で変わった実行ファイルは受け入れる(self):
         # 再ビルドや別プロセスの書き込みは、次の実行前の照合で新しい版として基準に入る。
         path = self.binary()

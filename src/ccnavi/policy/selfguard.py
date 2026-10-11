@@ -123,6 +123,7 @@ import hashlib
 import os
 import shutil
 import time
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TextIO
@@ -582,15 +583,29 @@ def _save_heavy(state_dir: str, session: str, target: selfguard_targets.Target) 
         shape = os.stat(target.path)
     except OSError as exc:
         return f"{exc}"
-    digest = _digest(target.path)
+    # 先にコピーして、その中身の digest で名前を付ける。ハッシュを読んでからコピーすると、
+    # その間に書き換えられた版が、読んだハッシュの名前で入ってしまう。
+    scratch = _store_path(state_dir, "scratch-" + uuid.uuid4().hex)
+    failed = _copy(target.path, scratch + _PART_SUFFIX)
+    if failed:
+        return failed
+    digest = _digest(scratch + _PART_SUFFIX)
     if not digest:
+        with contextlib.suppress(OSError):
+            os.remove(scratch + _PART_SUFFIX)
         return f"読めない: {target.path}"
 
     entry = _store_path(state_dir, digest)
-    if not os.path.exists(entry):
-        failed = _place(target.path, entry)
-        if failed:
-            return failed
+    if os.path.exists(entry):
+        with contextlib.suppress(OSError):
+            os.remove(scratch + _PART_SUFFIX)
+    else:
+        try:
+            os.replace(scratch + _PART_SUFFIX, entry)
+        except OSError as exc:
+            with contextlib.suppress(OSError):
+                os.remove(scratch + _PART_SUFFIX)
+            return f"{exc}"
     # 最後に使った時刻にする。掃除はこれを見て、使われなくなった実体を削除する。
     with contextlib.suppress(OSError):
         os.utime(entry, None)
@@ -650,6 +665,17 @@ def _restore_heavy(
             "ccnavi を作り直して、セッションを開き直してください",
         )
     existed = os.path.exists(target.path)
+    kept = ""
+    if existed:
+        # 戻すと、この呼び出しで書かれた版は消える。消す前に退避する。退避できなければ戻さない。
+        kept = os.path.join(
+            state_dir,
+            "aside",
+            f"{time.strftime('%Y%m%d-%H%M%S')}-{os.path.basename(target.path)}",
+        )
+        failed = _copy(target.path, kept)
+        if failed:
+            return Outcome(target, ACTION_FAILED, f"退避できないので戻さない: {failed}")
     failed = _place(entry, target.path)
     if failed:
         return Outcome(target, ACTION_FAILED, f"戻せない: {failed}")
@@ -658,7 +684,7 @@ def _restore_heavy(
     with contextlib.suppress(OSError):
         os.utime(target.path, (mtime, mtime))
     if existed:
-        detail = "このツール呼び出しで変わったので、直前の版に戻した"
+        detail = f"このツール呼び出しで変わったので、直前の版に戻した（書かれていた版は {kept}）"
     else:
         detail = "このツール呼び出しで消えたので、直前の版に戻した"
     return Outcome(target, ACTION_RESTORED, detail)
