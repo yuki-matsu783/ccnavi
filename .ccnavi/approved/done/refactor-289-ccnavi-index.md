@@ -18,9 +18,9 @@ allow:
     glob: "scripts/ccnavi-setup.sh"
   - match: Write|Edit
     glob: ".gitignore"
-started_at: ""
-completed_at: ""
-base_sha: ""
+started_at: "2026-10-11T15:38:36+0900"
+completed_at: "2026-10-11T16:05:50+0900"
+base_sha: "cc1dd82fbb5a235cc2ac539e281580c2ad831b25"
 ---
 ## 背景
 

@@ -1,1 +1,4 @@
 {"at": "2026-10-11T03:35:58Z", "ticket": "refactor-289-ccnavi-index", "kind": "approved", "from": "todo", "to": "doing", "via": "board", "tree": "refactor-288-wip-scratchpad"}
+{"at": "2026-10-11T06:38:36Z", "ticket": "refactor-289-ccnavi-index", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "cc1dd82fbb5a235cc2ac539e281580c2ad831b25"}
+{"at": "2026-10-11T07:05:50Z", "ticket": "refactor-289-ccnavi-index", "kind": "finished", "from": "doing", "to": "done", "via": "cli"}
+{"at": "2026-10-11T07:05:51Z", "ticket": "refactor-289-ccnavi-index", "kind": "parent-mark", "from": null, "to": null, "via": "cli", "mark": "closed"}
