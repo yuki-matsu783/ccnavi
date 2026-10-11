@@ -880,6 +880,25 @@ class TicketPlaceTest(Harness, unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, self.said(result))
 
+    def test_空の欄を持つチケットを閉じて動かしても言わない(self):
+        # 承認は `started_at: ""` の形で欄を置く（approval_ops）。`""` を値と数えると、
+        # `finish` が書いた時刻を既にある値の書き換えと読み、正規の移動を報告していた。
+        placed = TICKET.replace(
+            "---\nbody", 'started_at: ""\ncompleted_at: ""\nbase_sha: ""\n---\nbody'
+        )
+        self.use(ticket_repo(text=placed))
+        os.remove(self.path(DOING))
+        write(
+            self.path("wip/proposals/review/i0001.md"),
+            placed.replace('started_at: ""', 'started_at: "2026-09-22T00:00:00Z"')
+            .replace('completed_at: ""', 'completed_at: "2026-09-22T01:00:00Z"')
+            .replace('base_sha: ""', 'base_sha: "1111111111111111"'),
+        )
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 0, self.said(result))
+
     def test_基準点の書き換えは言う(self):
         # `base_sha` はサブエージェント終了時チェックと実績リスクの基準点。書き換えられると
         # コミット済みの範囲外の変更が検査から消えるので、正規化で除いてはいけない。

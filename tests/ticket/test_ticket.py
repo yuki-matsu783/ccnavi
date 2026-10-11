@@ -3262,6 +3262,18 @@ class ScriptShapeTest(unittest.TestCase):
     def test_閉じていない前置きは正規化した内容を持たない(self):
         self.assertIsNone(ticket_fields.script_shape("---\nid: i0001\n本文\n"))
 
+    def test_空の欄は値を持たないと数える(self):
+        # 承認は `started_at: ""` の形で欄を置く。`""` を値と数えると、`finish` が書いた
+        # 完了の時刻を「既にある値の書き換え」と読み、正規の移動を報告する。
+        placed = self.started("started_at: \"\"\ncompleted_at: ''\nbase_sha: ~\ncancel_reason:\n")
+
+        self.assertEqual(ticket_fields.script_fields_set(placed), ())
+
+    def test_値のある欄は値を持つと数える(self):
+        placed = self.started('started_at: "2026-09-22T00:00:00Z"\nbase_sha: abc\n')
+
+        self.assertEqual(ticket_fields.script_fields_set(placed), ("started_at", "base_sha"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -59,9 +59,26 @@ def script_fields_set(text: str) -> tuple[str, ...]:
         if line.startswith((" ", "\t")) or ":" not in line:
             continue
         key, value = line.split(":", 1)
-        if key.strip() in ticket_model.SCRIPT_FIELDS and value.strip():
+        if key.strip() in ticket_model.SCRIPT_FIELDS and _has_value(value):
             held.append(key.strip())
     return tuple(held)
+
+
+def _has_value(raw: str) -> bool:
+    """欄の値の表記が、空でない値を持つか。
+
+    承認（`approval_ops`）は欄を `started_at: ""` の形で置く。表記の字面で見ると `""` が
+    値に見え、まだ書かれていない欄を「既に値がある」と数えて、`finish` の移動まで報告する。
+    YAML として読んで、空文字と null を値なしとする。読めない表記は値ありとする（除く欄が
+    減る側。報告は増えるが、外れすぎない）。
+    """
+    if not raw.strip():
+        return False
+    try:
+        value = yaml.safe_load(raw)
+    except yaml.YAMLError:
+        return True
+    return value is not None and value != ""
 
 
 def script_shape(text: str, drop: tuple[str, ...] = ticket_model.SCRIPT_FIELDS) -> str | None:
