@@ -36,6 +36,11 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `DENY_CHILD_PUSH` | 子チケットのワークツリーから `ccnavi-git.sh push` を打った。`cd` の行き先が読めない push を含む（9.10） |
 | `DENY_SCRIPT_ENV_OVERRIDE` | 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼んだ（8.2） |
 | `POST_VIOLATION` / `POST_PREEXISTING` / `POST_TICKET_SCOPE` | 実行後チェック。保護領域の変更 / 前から在った変更 / チケットの範囲外 |
+| `CORE_CONFIRM_NO_PARENT` / `CORE_CONFIRM_NO_PHASE` / `CORE_CONFIRM_ALREADY_REVIEWED` / `CORE_CONFIRM_NOT_REQUESTED` | レビュー済み（`review confirm` と Chrome の「レビュー済み」）が通らなかった。親の承認済みチケットが作業中に無い / そのフェーズの子が無い / もうレビュー済み / 依頼の記録が無い |
+| `CORE_CONFIRM_MOVED` / `CORE_CONFIRM_RESULT_MISMATCH` / `CORE_CONFIRM_REVIEW_OPEN` | レビュー済みが通らなかった。依頼の後にユーザが見るものが動いた / 取得した結果が依頼したマージリクエストと照合できない / 変更要求のレビューか未解決のスレッドが残っている |
+| `CORE_WITHDRAW_NO_IDS` / `CORE_WITHDRAW_NOT_OPEN` / `CORE_WITHDRAW_OTHER_BRANCH` / `CORE_WITHDRAW_BLOCKED` / `CORE_WITHDRAW_FOLLOWUP` / `CORE_WITHDRAW_STARTED` | 承認の取り下げが通らなかった。識別子が無い / 作業中（`doing/`）に無い / 親のブランチの `doing/` に無い / 承認済みチケット自体が信頼できない / 続きの子で戻す提案が無い / 着手済み |
+| `CORE_WITHDRAW_HAS_CHILDREN` / `CORE_WITHDRAW_MARKERS` / `CORE_WITHDRAW_TODO_EXISTS` / `CORE_WITHDRAW_NO_PRIOR` / `CORE_WITHDRAW_CHANGED` | 承認の取り下げが通らなかった。子の承認済みチケットか子の提案がある / フェーズのマーカーがある（読めないときも） / 戻す先に同じ識別子の提案がある / 承認コミットの親に提案が無い / 承認のあとに中身が変わった |
+| `CORE_HISTORY_UNWRITABLE` | レビュー済みか取り下げで、書く前に履歴を残せないと分かったので書かなかった |
 
 記録の `skip` の理由: `mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、
 `payload-unusable`、`deadline-exceeded`、`internal-error`（ccnavi 自身の例外。4.5）、`tool-cannot-write`、
@@ -44,6 +49,10 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 
 組み込みの判定で止めた文は、先頭の行に理由コードと記録の `rules` と同じ識別子を
 `[ccnavi] <コード> (builtin rule: <識別子>)` の形で並べる（`builtin-script-env` など）。
+
+ユーザの操作（レビュー済み・承認の取り下げ）が通らなかった答えは、`CORE_*` のコードを答えの `code` に持ち、
+文面の行にも `[<コード>]` の形で載せる（`ccnavi: ` で始まる行はその後ろ）。取り下げで理由が幾つもあるときは、
+行ごとに自分のコードを載せ、答えの `code` は最初の理由のものにする。
 
 ## 付録 B. 記録の 1 行
 
