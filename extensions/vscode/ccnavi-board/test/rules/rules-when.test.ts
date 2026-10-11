@@ -573,3 +573,16 @@ deny:
   const back = asSections(JSON.parse(JSON.stringify(doc.model.sections)));
   assert.equal(back?.deny[0].bothPatterns, true);
 });
+
+test("CB-T352 値が空の glob と regex の組は、実行ファイルと同じく併記の誤りにしない", () => {
+  const doc = readRules(`version: 1
+deny:
+  - id: empty-glob
+    match: Write
+    glob: ''
+    regex: 'x'
+    message: m
+`);
+  assert.ok(!doc.model.problems.some((p) => p.includes("glob と regex を両方")), doc.model.problems.join("\n"));
+  assert.equal(doc.model.sections.deny[0].bothPatterns, undefined);
+});

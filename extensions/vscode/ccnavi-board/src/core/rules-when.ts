@@ -402,11 +402,6 @@ export function comparePaths(a: CondPath, b: CondPath): number {
 }
 
 /**
- * 「条件の木に変換」できない理由。`except:` の各要素が glob / regex 1 つの葉でなければ、木の中へ
- * そのまま移せない（読めない要素を木に入れると、元の誤りの形が変わって見つけにくくなる）。
- * 移せるなら undefined
- */
-/**
  * 「条件の木に変換」できない理由。`glob` と `regex` を両方書いたルールは、変換すると片方が
  * 黙って消えるので押させない。except の形は exceptBlocker が見る。押せるなら undefined
  */
@@ -417,6 +412,11 @@ export function toWhenBlocker(rule: { readonly bothPatterns?: boolean; readonly 
   return exceptBlocker(rule.exceptNodes);
 }
 
+/**
+ * 「条件の木に変換」できない理由。`except:` の各要素が glob / regex 1 つの葉でなければ、木の中へ
+ * そのまま移せない（読めない要素を木に入れると、元の誤りの形が変わって見つけにくくなる）。
+ * 移せるなら undefined
+ */
 export function exceptBlocker(excepts: readonly CondNode[] | undefined): string | undefined {
   if (excepts === undefined) {
     return undefined;

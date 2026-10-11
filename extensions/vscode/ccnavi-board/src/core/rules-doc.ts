@@ -90,7 +90,8 @@ function formOf(section: Section, index: number, map: YAMLMap): RuleForm {
     every: scalarText(map, "every"),
     ...exceptsOf(map),
     ...(map.has("when") ? { when: condOfYaml(map.get("when", true)) } : {}),
-    ...(!map.has("when") && map.has("glob") && map.has("regex") ? { bothPatterns: true } : {}),
+    // 実行ファイルと同じく、when が無いときは値の空でない glob / regex だけを数える（`glob: ''` は書いていない扱い）
+    ...(!map.has("when") && scalarText(map, "glob") !== "" && scalarText(map, "regex") !== "" ? { bothPatterns: true } : {}),
   };
 }
 
