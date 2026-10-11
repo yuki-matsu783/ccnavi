@@ -216,6 +216,15 @@ deny:
     subject: "cd /repo/.claude/worktrees/x && echo x > ../../scripts/ccnavi-git.sh"
     why: .claude を通らないパス。Bash の対象は解かれないので名前で捕まえる
 
+  - tool: Bash
+    subject: "sh $L status"
+    why: >-
+      コマンド名の位置の変数は、ルールではなく組み込みの検査（shellread の command-name-expansion、
+      DENY_COMMAND_NAME_EXPANSION）が止める。何が走るか表記に無く、raw-git などのルールが当たらないため
+  - tool: Bash
+    subject: "cd /repo && $CMD push origin main"
+    why: 同上。コマンド列の途中でも止まる
+
 ask:
   - tool: Write
     subject: "/repo/wip/scratchpad/a.md"
@@ -302,6 +311,9 @@ ask:
   - tool: Read
     subject: "/repo/.ccnavi/common/phases.yml"
     why: guard-ccnavi-config は Write / Edit だけ。読むのは止めない
+  - tool: Bash
+    subject: 'echo "$HOME" "$L"'
+    why: 変数が引数にあるだけで、コマンド名の位置ではない。どのルールにも当たらず権限モードへ渡る
 
 allow:
   - tool: Bash

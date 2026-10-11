@@ -86,8 +86,9 @@ deny:
     regex: '(^|[^\w.-])(\S*[\\/])?git(\.exe)?\s'
     message: >-
       生の git は実行しません。'sh {root}/.ccnavi/scripts/ccnavi-git.sh <サブコマンド> ...'
-      を使ってください。通る形は同じスクリプトの --help 参照。返るのは要約と
-      先頭 40 行だけで、全量は logs/ に残ります。
+      を使ってください（コマンド名を変数に入れず、パスをそのまま書く）。diff も同じ入口です
+      （'sh {root}/.ccnavi/scripts/ccnavi-git.sh diff ...'）。通る形は同じスクリプトの
+      --help 参照。返るのは要約と先頭 40 行だけで、全量は logs/ に残ります。
 
   # settings.json の permissions.deny と同じ場所を並べてある。
   # `.pem` と `.key` は拡張子として書かれた形だけに絞ってある。
@@ -156,7 +157,7 @@ deny:
     message: >-
       ヒアドキュメントは使いません。ファイルの中身は Write / Edit ツールで書いてください。
       プログラムに読ませる入力も、まず Write でスクリプトをファイルに置いて、そのファイルを
-      渡してください。ヒアドキュメントで書いたファイルは、Write / Edit に掛かる権限の宣言も、
+      渡してください（例: Write で下書きの置き場に x.py を書き、'python3 <x.py のパス>' で実行）。ヒアドキュメントで書いたファイルは、Write / Edit に掛かる権限の宣言も、
       編集後に走る検査も、どちらも通りません。
 
   # 承認済みチケットへの書き込みを禁止
@@ -235,6 +236,9 @@ allow:
   - id: ccnavi-git
     match: Bash
     glob: "*ccnavi-git.sh*"
+    additionalContextOnce: >-
+      git の入口は 'sh {root}/.ccnavi/scripts/ccnavi-git.sh <サブコマンド> ...' の形です。
+      パスをそのまま書き、コマンド名を変数に入れないでください。diff も同じ入口です。
 
   # ファイルを読むだけの cat と grep。止めずに通して、Read / Grep ツールのほうを
   # 一度だけ勧める。読む手段を取り上げるのが目的ではないので deny でも ask でもない。

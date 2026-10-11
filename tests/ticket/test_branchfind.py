@@ -26,11 +26,11 @@ def with_branch(text, branch):
 
 
 class PromptHintTest(PhaseHarness):
-    def prompt(self, text, *extra):
+    def prompt(self, text, *extra, session="s1"):
         payload = {
             "hook_event_name": "UserPromptSubmit",
             "cwd": self.parent_tree,
-            "session_id": "s1",
+            "session_id": session,
             "prompt": text,
         }
         result = self.ccnavi("--mode", "enable", *extra, stdin=json.dumps(payload))
@@ -59,6 +59,65 @@ class PromptHintTest(PhaseHarness):
         self.assertIn("MCP で代行し、同じコマンドを打ち直す", said)
         self.assertIn("終了コード 1・2 なら、出力の理由をユーザに伝える", said)
         self.assertNotIn("ccnavi-branches.sh", said)
+
+    def test_a_ccnavi_notice_is_not_a_reference(self):
+        notice = "[ccnavi] 取り込み済み: https://example.com/acme/widgets/pull/296 を閉じた\n"
+        self.assertEqual(self.prompt(notice), "")
+        # 通知の外にも指定があるときは、外の分だけ拾う
+        said = self.prompt(notice + "\n#10 を直して", session="s2")
+        sh = settings.script_command(self.root, "ccnavi-start.sh")
+        self.assertIn(f"'{sh} --issue 10'", said)
+        self.assertNotIn("296", said)
+
+    def test_pasted_content_and_other_session_messages_are_not_references(self):
+        self.assertEqual(self.prompt("<pasted_content>ログ #10 と MR !7</pasted_content>"), "")
+        self.assertEqual(self.prompt("<system-reminder>issue 11</system-reminder>"), "")
+        self.assertEqual(
+            self.prompt("Another Claude session sent a message:\nPR #12 を出した", session="s3"),
+            "",
+        )
+        said = self.prompt("<pasted_content>#10</pasted_content> と !7", session="s4")
+        self.assertIn("--mr 7", said)
+        self.assertNotIn("--issue 10", said)
+
+    def test_a_number_tied_to_a_ticket_does_not_say_start(self):
+        text = with_branch(parent_text("feature-152-login", ["research"], issue=152), "topic/x")
+        self.propose("feature-152-login", text)
+        self.commit_parent("propose")
+        self.approve()
+        said = self.prompt("#152 を直して")
+        self.assertIn("すでに feature-152-login(doing)", said)
+        self.assertIn("結び付いている", said)
+        self.assertIn("ワークツリー", said)
+        self.assertIn("言い直してもらう", said)
+        self.assertNotIn("ccnavi-start.sh --issue", said)
+        # 結び付かない番号は今までどおり
+        self.assertIn("--issue 9", self.prompt("#9 を直して", session="s5"))
+
+    def test_a_branch_name_with_the_number_is_not_a_mr_binding(self):
+        text = with_branch(parent_text("fix-12-foo", ["research"], issue=3), "fix-12-foo")
+        self.propose("fix-12-foo", text)
+        self.commit_parent("propose")
+        self.approve()
+        said = self.prompt("MR !12 を見て")
+        self.assertIn("--mr 12", said)
+        self.assertNotIn("結び付いている", said)
+
+    def test_a_mr_branch_of_a_ticket_says_continue(self):
+        text = with_branch(parent_text("feature-3-foo", ["research"], issue=3), "mr-12")
+        self.propose("feature-3-foo", text)
+        self.commit_parent("propose")
+        self.approve()
+        said = self.prompt("MR !12 を見て")
+        self.assertIn("すでに feature-3-foo(doing)", said)
+        self.assertNotIn("--mr 12", said)
+
+    def test_the_same_number_is_said_once_per_session(self):
+        self.assertIn("--issue 152", self.prompt("#152 を直して"))
+        self.assertEqual(self.prompt("#152 の続き"), "")
+        # 別の番号は言う。別のセッションは別に数える
+        self.assertIn("--issue 153", self.prompt("#152 と #153"))
+        self.assertIn("--issue 152", self.prompt("#152 を直して", session="other"))
 
     def test_no_reference_no_instruction(self):
         self.assertEqual(self.prompt("README の見出し # 概要 を直して。色は #fff"), "")

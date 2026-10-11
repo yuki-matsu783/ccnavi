@@ -840,6 +840,25 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
         self.assertIn(DOING, result.stderr.replace(os.sep, "/"))
 
+    def test_承認済みの置き場の報告には_ccnavi_自身の書き込みの可能性を添える(self):
+        write(self.path(DOING), TICKET.replace('glob: "src/*"', 'glob: "*"'))
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("ccnavi itself most likely wrote this", result.stderr)
+        self.assertIn("Do not run undo:", result.stderr)
+        # 判定は変えない。報告も undo も出る。
+        self.assertIn("undo:", result.stderr)
+
+    def test_承認済みの置き場の外の報告には添えない(self):
+        from ccnavi.hook import post_report
+
+        self.assertTrue(post_report._in_approved_area(".ccnavi/approved/doing/a.md"))
+        self.assertTrue(post_report._in_approved_area("projects/x/.ccnavi/approved/done/a.md"))
+        self.assertFalse(post_report._in_approved_area("wip/proposals/todo/a.md"))
+        self.assertFalse(post_report._in_approved_area("src/.ccnavi/approvedX/a.md"))
+
     def test_承認済みチケットを消すだけなら言う(self):
         # 承認済みチケットの無いワークツリーは範囲を持たない。消すことは範囲を外すこと。
         os.remove(self.path(DOING))
