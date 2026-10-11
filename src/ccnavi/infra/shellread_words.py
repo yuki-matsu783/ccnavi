@@ -278,3 +278,46 @@ def _is_operator(token: str) -> bool:
     """演算子のトークンかどうか。punctuation_chars が返す塊は
     この文字だけでできている。"""
     return bool(token) and all(c in _PUNCTUATION for c in token)
+
+
+# 標準入力からスクリプトを読むシェルの名前と、標準入力を指すスクリプトのパス。
+_STDIN_SHELLS = frozenset({"sh", "bash", "dash", "zsh", "ksh", "ash"})
+_STDIN_SCRIPTS = frozenset({"-", "/dev/stdin", "/dev/fd/0", "/proc/self/fd/0"})
+
+
+def _stdin_base(word: str) -> str:
+    return word.replace("\\", "/").rsplit("/", 1)[-1].lower()
+
+
+def reads_stdin(words: list[str]) -> bool:
+    """標準入力からスクリプトを読むシェルか。
+
+    `sh`・`sh -s …`・`sh < x`・`busybox sh`・`sh /dev/stdin`。
+
+    ユーザの入口の止め（phase_forms）と、ラッパーの自己防衛（wrapguard）が使う。
+    """
+    rest = list(words)
+    if rest and _stdin_base(rest[0]) == "busybox":
+        rest = rest[1:]
+    if not rest or _stdin_base(rest[0]) not in _STDIN_SHELLS:
+        return False
+    rest = rest[1:]
+    k = 0
+    while k < len(rest):
+        width = _redirect_width(rest, k)
+        if width:
+            k += width
+            continue
+        word = rest[k]
+        if word in _STDIN_SCRIPTS:
+            return True
+        if not word.startswith(("-", "+")) or word.startswith("--"):
+            if word == "--":
+                return k + 1 == len(rest) or rest[k + 1] in _STDIN_SCRIPTS
+            return False
+        if "c" in word[1:]:
+            return False
+        if "s" in word[1:]:
+            return True
+        k += 1
+    return True

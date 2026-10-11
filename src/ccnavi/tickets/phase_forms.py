@@ -277,6 +277,9 @@ _ENTRY_EXE = frozenset({"ccnavi", "ccnavi.exe", "ccnavi.__main__", "ccnavi-launc
 _ENTRY_PREFIX = frozenset(
     {"sh", "bash", "dash", "zsh", "ksh", "ash", "busybox", ".", "source", "exec", "command"}
 )
+# 後ろの語を実行する、Python のツールの実行役（`uv run`・`uvx`・`pipx run`）。間に置いた
+# 選択肢と値は読み分けず、後ろに入口の名前があればコマンドの位置とみなす。
+_TOOL_RUNNERS = frozenset({"uv", "uvx", "pipx"})
 _STDIN_SHELLS = frozenset({"sh", "bash", "dash", "zsh", "ksh", "ash"})
 _FEEDERS = frozenset({"xargs", "parallel"})
 # 展開・置換・glob・find -exec の置き場。どれもシェルか実行役が実行の時点で値を決める。
@@ -409,9 +412,6 @@ def _literal_quoted(subject: str) -> str:
     return subject if quote else "".join(out)
 
 
-_STDIN_SCRIPTS = frozenset({"-", "/dev/stdin", "/dev/fd/0", "/proc/self/fd/0"})
-
-
 def _entry_kind(word: str, bin_base: str) -> str:
     base = _base_name(word)
     if base in (_ENTRY_SYNC, _ENTRY_REVIEW):
@@ -432,6 +432,8 @@ def _at_command_position(words: list[str], i: int) -> bool:
             j += width
             continue
         word = words[j]
+        if _base_name(word) in _TOOL_RUNNERS:
+            return True
         if word in ("-o", "+o"):
             j += 2
             continue
@@ -444,35 +446,6 @@ def _at_command_position(words: list[str], i: int) -> bool:
             continue
         return False
     return j == i
-
-
-def _reads_stdin(words: list[str]) -> bool:
-    """標準入力からスクリプトを読むシェルか（`sh`・`sh -s …`・`sh < x`・`busybox sh`）。"""
-    rest = list(words)
-    if rest and _base_name(rest[0]) == "busybox":
-        rest = rest[1:]
-    if not rest or _base_name(rest[0]) not in _STDIN_SHELLS:
-        return False
-    rest = rest[1:]
-    k = 0
-    while k < len(rest):
-        width = shellread_words._redirect_width(rest, k)
-        if width:
-            k += width
-            continue
-        word = rest[k]
-        if word in _STDIN_SCRIPTS:
-            return True
-        if not word.startswith(("-", "+")) or word.startswith("--"):
-            if word == "--":
-                return k + 1 == len(rest) or rest[k + 1] in _STDIN_SCRIPTS
-            return False
-        if "c" in word[1:]:
-            return False
-        if "s" in word[1:]:
-            return True
-        k += 1
-    return True
 
 
 def _hidden_args(kind: str, args: list[str]) -> str:
@@ -570,12 +543,21 @@ def _hidden_entry(subject: str, inner: list[tuple[str, str]], bin_path: str) -> 
     stdin_shell = False
     named = ""
     for runner, words in commands_:
-        stdin_shell = stdin_shell or (positional and _reads_stdin(words))
+        stdin_shell = stdin_shell or (positional and shellread_words.reads_stdin(words))
         for i, word in enumerate(words):
             kind = _entry_kind(word, bin_base)
             if not kind:
                 continue
-            named = named or kind
+            # 標準入力から読むシェルと並べて数える名前。sh の入口はファイルとして渡すだけで中身が
+            # 流れ込む（`cat …ccnavi-sync.sh | sh -s`）。実行ファイルの名前は、実行される語として
+            # 立つときだけ数える（`cd /home/user/ccnavi`・`sh -s -- ccnavi` は数えない）。
+            if (
+                kind != "ccnavi"
+                or _base_name(word) == "ccnavi-launcher.sh"
+                or not positional
+                or _executed_entry(words[: i + 1], bin_base)
+            ):
+                named = named or kind
             # 入口のファイルを標準入力から読ませる
             if i and words[i - 1].endswith("<"):
                 return kind, "< " + word
@@ -598,21 +580,61 @@ def _hidden_entry(subject: str, inner: list[tuple[str, str]], bin_path: str) -> 
 
 
 STDIN_SHELL = "標準入力から読むシェル"
-_NAMED_SCRIPT = re.compile(r"ccnavi-(sync|review|launcher)\.sh", re.IGNORECASE)
-_NAMED_EXE = re.compile(r"(?<![\w.-])ccnavi(\.exe)?(?![\w/-]|\.(?!exe))", re.IGNORECASE)
+_NAMED_SCRIPTS = frozenset({_ENTRY_SYNC, _ENTRY_REVIEW, "ccnavi-launcher.sh"})
+# 流し込む文字列を、コマンドの切れ目と引用符で切る。引用した文字列は 1 本のコマンド行として読む。
+_STRING_SEGMENT = re.compile(r"[;&|\n()`'\"]+")
+# 実行される語の前に置けるもの（入口の前置きのほか、後ろの語を実行するコマンド）。
+_EXEC_PREFIX = _ENTRY_PREFIX | {"env", "nice", "nohup", "time", "sudo", "timeout"}
 
 
 def _named_in_text(subject: str, bin_base: str) -> str:
-    """コマンド行の文字列のどこかに入口の名前があれば、その入口。
+    """コマンド行の文字列の中で、入口の名前が実行される語として現れれば、その入口。
 
     標準入力から読むシェルへ流し込む文字列（`echo "…" | sh`・ヒアドキュメント・ヒアストリング）の
-    中は語として読めないので、文字列で探す。
+    中は語として読めないので、文字列をコマンドの切れ目と引用符で切り、それぞれの頭の語を見る。
+    頭の前置き（シェル・`env`・`uv run` など）と代入と選択肢は飛ばす。パスの一部（`cd /x/ccnavi`）・
+    コメント・引数（`sh -s -- ccnavi`）として出るだけの名前は数えない。
     """
-    script = _NAMED_SCRIPT.search(subject)
-    if script:
-        name = script.group(0).lower()
-        return "ccnavi" if name == "ccnavi-launcher.sh" else name
-    if _NAMED_EXE.search(subject) or (bin_base and bin_base in subject.lower()):
+    for segment in _STRING_SEGMENT.split(subject.replace(shellread.SEP, "\n")):
+        found = _executed_entry(segment.split(), bin_base)
+        if found:
+            return found
+    return ""
+
+
+def _executed_entry(words: list[str], bin_base: str) -> str:
+    """語の並びの頭（前置きを飛ばした先）が入口なら、その入口。"""
+    shell = False
+    k = 0
+    while k < len(words):
+        word = words[k]
+        base = _base_name(word)
+        if shellread_words._ASSIGNMENT_WORD.match(word):
+            k += 1
+            continue
+        if base in _TOOL_RUNNERS or (base == "run" and k and _base_name(words[k - 1]) == "pipx"):
+            k += 1
+            continue
+        if base in _STDIN_SHELLS:
+            shell = True
+            k += 1
+            continue
+        if base in _EXEC_PREFIX or base == "-m" or base.startswith("python"):
+            k += 1
+            continue
+        if word[:1] in ("-", "+"):
+            # シェルの選択肢。`-s` / `-c` の後ろは引数か文字列で、実行される語ではない。
+            if shell and not word.startswith("--") and set(word[1:]) & {"s", "c"}:
+                return ""
+            k += 1
+            continue
+        break
+    if k >= len(words):
+        return ""
+    base = _base_name(words[k])
+    if base in _NAMED_SCRIPTS:
+        return "ccnavi" if base == "ccnavi-launcher.sh" else base
+    if not shell and (base in _ENTRY_EXE or (bin_base and base == bin_base)):
         return "ccnavi"
     return ""
 

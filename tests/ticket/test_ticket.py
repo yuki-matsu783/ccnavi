@@ -2408,6 +2408,12 @@ class TicketTest(unittest.TestCase):
             f"sh {launcher} --test Bash '$X'",
             f"sh {launcher} --test Read '*'",
             "echo hi | sh",
+            # パス・コメント・引数として出るだけの名前は、実行される語ではない。
+            "cd /home/user/ccnavi && echo ls | sh",
+            "ls /home/user/ccnavi | sh",
+            "echo hi | bash # ccnavi",
+            "printf 'ls\\n' | sh -s -- ccnavi",
+            "uv run ccnavi --docs $X",
         ):
             result = self.hook(
                 "PreToolUse",
@@ -2432,6 +2438,10 @@ class TicketTest(unittest.TestCase):
             "ccnavi $X --agree --preview",
             f"sh {sync} $E --forget P",
             f"sh {review} decide 1 $X",
+            # Python のツールの実行役（uv run・uvx）越しも入口として読む。
+            "uv run ccnavi --agree 3 $Y",
+            "uvx ccnavi --agree 3 $Y",
+            f"uv run sh {sync} --forget P",
         ):
             result = self.hook(
                 "PreToolUse",
