@@ -194,6 +194,25 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(mine, self.sha(self.ws, "refs/heads/main"))
         self.assertIn("分岐", done.stdout)
 
+    def test_default_branch_in_a_shallow_clone_is_reported_as_not_matching(self):
+        # 浅い clone で履歴が切れると、手元の版が丸ごと「リモートに無いコミット」に見える。
+        # 原因は見分けず、リモートの最新と一致しないことと両方の sha を言う。
+        # 手元の ref には触らない。
+        for _ in range(3):
+            self.advance(self.remote)
+        git(self.ws, "pull", "-q", "--ff-only", "origin", "main")
+        git(self.ws, "update-ref", "refs/heads/main", self.sha(self.ws, "HEAD") + "~2")
+        self.leave_main()
+        git(self.ws, "fetch", "-q", "--depth", "1", "origin", "main")
+        before = self.sha(self.ws, "refs/heads/main")
+        unrelated = git(self.ws, "merge-base", "main", "origin/main", check=False)
+        self.assertNotEqual(0, unrelated.returncode)
+        done = self.fetch()
+        self.assertEqual(before, self.sha(self.ws, "refs/heads/main"))
+        self.assertIn("一致しない", done.stdout)
+        self.assertIn(before[:7], done.stdout)
+        self.assertIn(self.sha(self.ws, "origin/main")[:7], done.stdout)
+
     def test_default_branch_is_left_alone_when_its_tree_is_dirty(self):
         # チェックアウトしているツリーに書きかけがあれば触らない（他セッションのもの）。
         tree = os.path.join(self.ws, ".claude", "worktrees", "main-tree")
@@ -237,6 +256,21 @@ class FetchTest(unittest.TestCase):
         done = self.fetch()
         self.assertEqual(head, self.sha(self.ws, "HEAD"))
         self.assertIn("承認済みチケットとマーカー", done.stdout)
+
+    def test_checked_out_branch_that_does_not_match_is_named_not_merged(self):
+        # 進められない理由（分岐か、浅い clone か）は見分けず、一致しないことと両方の sha を言う。
+        self.leave_main()
+        git(self.ws, "push", "-q", "-u", "origin", "claude/x")
+        remote = self.advance(self.remote, "claude/x")
+        write(os.path.join(self.ws, "mine.txt"), "mine\n")
+        git(self.ws, "add", "--", "mine.txt")
+        git(self.ws, "commit", "-q", "-m", "mine")
+        mine = self.sha(self.ws, "HEAD")
+        done = self.fetch()
+        self.assertEqual(mine, self.sha(self.ws, "HEAD"))
+        self.assertIn("一致しない", done.stdout)
+        self.assertIn(mine[:7], done.stdout)
+        self.assertIn(remote[:7], done.stdout)
 
     def test_default_branch_is_not_reported_twice(self):
         # ルートが main に居るなら第 1 周で済む。第 2 周は同じことを言わない。
@@ -358,7 +392,9 @@ class FetchTest(unittest.TestCase):
         mine = self.sha(tree, "HEAD")
         done = self.fetch()
         self.assertEqual(mine, self.sha(tree, "HEAD"))
+        self.assertIn("一致しない", done.stdout)
         self.assertIn("取り込みが要る", done.stdout)
+        self.assertIn(mine[:7], done.stdout)
         self.assertIn("ccnavi-sync.sh i0001", done.stdout)
 
     def test_a_family_under_a_lock_is_skipped(self):
