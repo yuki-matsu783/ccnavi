@@ -840,6 +840,25 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
         self.assertIn(DOING, result.stderr.replace(os.sep, "/"))
 
+    def test_承認済みの置き場の報告には_ccnavi_自身の書き込みの可能性を添える(self):
+        write(self.path(DOING), TICKET.replace('glob: "src/*"', 'glob: "*"'))
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("ccnavi itself most likely wrote this", result.stderr)
+        self.assertIn("Do not run undo:", result.stderr)
+        # 判定は変えない。報告も undo も出る。
+        self.assertIn("undo:", result.stderr)
+
+    def test_承認済みの置き場の外の報告には添えない(self):
+        from ccnavi.hook import post_report
+
+        self.assertTrue(post_report._in_approved_area(".ccnavi/approved/doing/a.md"))
+        self.assertTrue(post_report._in_approved_area("projects/x/.ccnavi/approved/done/a.md"))
+        self.assertFalse(post_report._in_approved_area("wip/proposals/todo/a.md"))
+        self.assertFalse(post_report._in_approved_area("src/.ccnavi/approvedX/a.md"))
+
     def test_承認済みチケットを消すだけなら言う(self):
         # 承認済みチケットの無いワークツリーは範囲を持たない。消すことは範囲を外すこと。
         os.remove(self.path(DOING))
@@ -928,6 +947,63 @@ class TicketPlaceTest(Harness, unittest.TestCase):
 
         self.assertEqual(result.returncode, 2)
         self.assertIn("POST_VIOLATION", result.stderr)
+
+    def test_mrが空から整数になっただけなら言わない(self):
+        # `review request` が MR を作った後に、承認済みチケットの空の `mr:` へ番号を書き足す。
+        # 欄が無い版・値なしの版のどちらからでも、ほかが 1 文字も変わらなければ ccnavi の書き込み。
+        for before in (TICKET, TICKET.replace("---\nbody", 'mr: ""\n---\nbody')):
+            with self.subTest(before=before):
+                self.use(ticket_repo(text=before))
+                write(self.path(DOING), TICKET.replace("---\nbody", "mr: 12\n---\nbody"))
+
+                result = self.ran_script()
+
+                self.assertEqual(result.returncode, 0, self.said(result))
+
+    def test_mrの整数が別の整数や空になるのは言う(self):
+        held = TICKET.replace("---\nbody", "mr: 12\n---\nbody")
+        for now in (
+            TICKET.replace("---\nbody", "mr: 13\n---\nbody"),
+            TICKET.replace("---\nbody", 'mr: ""\n---\nbody'),
+            TICKET,
+        ):
+            with self.subTest(now=now):
+                self.use(ticket_repo(text=held))
+                write(self.path(DOING), now)
+
+                result = self.ran_script()
+
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("POST_VIOLATION", result.stderr)
+
+    def test_mrを足すと同時にほかが変わっていれば言う(self):
+        self.use(ticket_repo(text=TICKET))
+        changed = TICKET.replace("---\nbody", "mr: 12\n---\nbody").replace("src/*", "*")
+        write(self.path(DOING), changed)
+        self.assertEqual(self.ran_script().returncode, 2)
+
+        self.use(ticket_repo(text=TICKET))
+        write(self.path(DOING), TICKET.replace("---\nbody", "mr: 12\n---\nbody2"))
+        self.assertEqual(self.ran_script().returncode, 2)
+
+    def test_mrが整数以外の書き方なら言う(self):
+        for raw in ('"12"', "12 # c", "[12]", "0", "-1", "x"):
+            with self.subTest(raw=raw):
+                self.use(ticket_repo(text=TICKET))
+                write(self.path(DOING), TICKET.replace("---\nbody", f"mr: {raw}\n---\nbody"))
+
+                result = self.ran_script()
+
+                self.assertEqual(result.returncode, 2, raw)
+
+    def test_mrの足し込みと基準点の書き換えが一緒なら言う(self):
+        self.use(ticket_repo(text=STARTED))
+        now = STARTED.replace("1111111111111111", "2222222222222222").replace(
+            "---\nbody", "mr: 12\n---\nbody"
+        )
+        write(self.path(DOING), now)
+
+        self.assertEqual(self.ran_script().returncode, 2)
 
     def test_続きの行に置いた基準点の書き換えは言う(self):
         # 1 行目だけを読むと空に見える書き方（`base_sha: |` の次の行に値）。値なしと読むと、

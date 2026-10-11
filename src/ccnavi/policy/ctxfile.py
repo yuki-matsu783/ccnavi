@@ -220,6 +220,26 @@ def _path_of(state_dir: str, payload: hookio.Input) -> str:
     return _once_path(state_dir, payload.session_id, payload.agent_id)
 
 
+def told_refs(stderr: TextIO, state_dir: str, session: str) -> set[str] | None:
+    """このセッションで案内した issue・MR の指定（`<種類>:<番号>`）。読めなければ None。
+
+    置くのは `once-*` と同じ場所・同じ掃き方（起動と古さで消える）。セッションを閉じれば消える
+    一時的な記録で、承認済みの領域にも `logs/` にも書かない。置き場が無い（`--state ""`）
+    ときは None（覚えられない）。呼ぶ側は None を「案内する」側に倒す。
+    """
+    if not state_dir or not session:
+        return None
+    given = _load_once(stderr, _once_path(state_dir, session, "refs"))
+    return None if given is None else set(given)
+
+
+def remember_refs(stderr: TextIO, state_dir: str, session: str, told: set[str]) -> bool:
+    """案内した指定を記録に残す。書けたか。"""
+    if not state_dir or not session:
+        return False
+    return _save_once(stderr, _once_path(state_dir, session, "refs"), dict.fromkeys(told, 1))
+
+
 def stop_path(state_dir: str, session: str) -> str:
     """Stop の促し（ターンの終わり N 回に 1 度）の数えの記録。
 

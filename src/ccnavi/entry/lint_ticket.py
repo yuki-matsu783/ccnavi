@@ -98,7 +98,14 @@ def _copy_problems(
         config = resolve(agree_candidates.project_of(t, pool))
         # 承認済みの親の写し（`phases:`）と今の `phases.yml` の食い違いは warn（進行中の親には
         # 効かない）。子の定義は親の写しから引く。
-        complaints, overflow = agree_candidates.validate(t, pool, config, approved=True)
+        missing = ""
+        if t.is_child and pool.get(t.parent) is None:
+            missing = agree_candidates.parent_elsewhere_text(
+                root, conf, t, raw.everything if raw is not None else None
+            )
+        complaints, overflow = agree_candidates.validate(
+            t, pool, config, approved=True, missing=missing
+        )
         for p in complaints + overflow:
             problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
         parent = pool.get(t.parent) if t.is_child else None
@@ -220,13 +227,17 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     problems.extend(
         _proposal_problems(proposals, copies, index, closed, done, repo_of, preds, root=root)
     )
+    integration = conf.integration_branch or settings.integration_recorded(conf.state)
+    problems.extend(
+        lint_branch._place_problems(root, proposals, copies, closed, review, repo_of, integration)
+    )
     problems.extend(
         lint_branch._branch_name_problems(
             proposals,
             copies,
             closed,
             review,
-            conf.integration_branch or settings.integration_recorded(conf.state),
+            integration,
             conf.branch_prefixes,
         )
     )
@@ -238,6 +249,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
 
     worktrees = tree.worktrees(root, conf.projects)
     problems.extend(lint_branch._worktree_problems(root, conf, worktrees, index, copies))
+    problems.extend(lint_branch._unregistered_worktree_problems(root, worktrees))
     names = {t.name for t in worktrees}
     if any(not t.is_child for t in copies):
         problems.extend(_review_token(root))

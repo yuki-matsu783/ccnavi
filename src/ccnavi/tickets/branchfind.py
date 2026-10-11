@@ -20,10 +20,12 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from dataclasses import dataclass, field
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings, tree
+from ..policy import ctxfile
 from . import approval, ticket_ids, ticket_model
 from . import ticket as ticket_mod
 
@@ -87,7 +89,7 @@ def prompt_refs(text: str) -> list[Ref]:
     """依頼文の中の issue・MR の指定。見つけた順に、同じ種類と番号は 1 つにまとめる。"""
     if not isinstance(text, str) or not text:
         return []
-    body = _FENCE.sub(" ", text[:MAX_PROMPT])
+    body = _drop_noise(_FENCE.sub(" ", text[:MAX_PROMPT]))
     found: list[tuple[int, Ref]] = []
     for pattern, kind in ((_URL_ISSUE, ISSUE), (_URL_MR, MR)):
         for m in pattern.finditer(body):
@@ -121,6 +123,21 @@ def prompt_refs(text: str) -> list[Ref]:
     return refs[:MAX_REFS]
 
 
+# ユーザの指定ではない文。貼り付けた内容・system-reminder・サブエージェントの報告の枠は閉じタグまで
+# （閉じが無ければ末尾まで）。`[ccnavi]` で始まる通知は、次の空行までの 1 段落。
+# 他のセッションからの通知（"Another Claude session sent a message"）は、以降の末尾まで。
+_NOISE_TAG = re.compile(
+    r"<(pasted_content|system-reminder|agent-message)\b[^>]*>.*?(?:</\1\s*>|\Z)", re.S | re.I
+)
+_NOTICE = re.compile(r"^[ \t]*\[ccnavi\].*?(?:\n[ \t]*\n|\Z)", re.S | re.M)
+_OTHER_SESSION = re.compile(r"Another Claude session sent a message.*\Z", re.S | re.I)
+
+
+def _drop_noise(text: str) -> str:
+    """ユーザの指定ではない部分を空白にする。通知の外にある指定は残る。"""
+    return _blank(text, _NOISE_TAG, _OTHER_SESSION, _NOTICE)
+
+
 def _blank(text: str, *patterns: re.Pattern) -> str:
     """当たった範囲を同じ長さの空白に置き換える（位置は変えない）。"""
     for pattern in patterns:
@@ -128,16 +145,133 @@ def _blank(text: str, *patterns: re.Pattern) -> str:
     return text
 
 
-def prompt_context(conf: settings.Settings, root: str, text: str) -> str:
+@dataclass
+class Bound:
+    """指定がすでに結び付いている先。"""
+
+    branch: str
+    tickets: list[str]
+    worktrees: list[str]
+
+
+# MR の元ブランチの慣習名（`mr-12`・`pull/12`・`merge-requests/12`）。`branch:` がこの形で
+# 全体に一致するときだけ、MR の番号に結び付ける。`fix-12-foo` は番号を含むだけで MR 12 ではない。
+_MR_BRANCH = re.compile(r"(?:mr|pr|pull|merge[-_]requests?)[-_/]([1-9][0-9]{0,8})", re.I)
+
+
+def _repo_of(conf: settings.Settings, root: str, cwd: str) -> tuple[tree.Tree | None, str, str]:
+    """cwd のリポジトリ（元のツリー）・プロジェクト名・読めない理由。"""
+    repo_tree = tree.tree_of(root, cwd, conf.projects) if cwd else None
+    if repo_tree is None:
+        return None, "", f"{cwd} はワークスペースの外"
+    project = repo_tree.project
+    if project:
+        repo = next((t for t in tree.projects(conf.projects) if t.project == project), None)
+    else:
+        repo = tree.main_tree(root)
+    if repo is None:
+        return None, project, f"プロジェクト {project} が見つからない"
+    return repo, project, ""
+
+
+def _bound(conf: settings.Settings, root: str, cwd: str, ref: Ref) -> Bound | None:
+    """指定がすでに結び付いている先。手元の候補（`collect` と同じ集め方）だけを見る。
+
+    照合は厳密にする。issue はチケットの `issue:` の一致。MR は (1) チケットの `mr:` の一致
+    （提案も承認済みも）、(2) 承認済みチケットの `branch:` が MR の慣習名（`_MR_BRANCH`）で番号が
+    一致するとき、の順で見る。名前に番号を含むだけのブランチ
+    （`fix-12-foo`）は結び付きとして数えない。読めないときは None（案内する側に倒す）。
+    URL で別のリポジトリが示されているときも None（番号が同じだけの別物かもしれない）。
+    """
+    if ref.repo:
+        return None
+    try:
+        # issue はチケットの `issue:`、MR はチケットの `mr:` の一致（どちらも提案も承認済みも対象）
+        data, failed = collect(conf, root, cwd, ref.kind, ref.number, Host())
+        if failed and ref.kind == ISSUE:
+            return None
+        for c in data.get("candidates", []):
+            if "ticket" in c["sources"] and c["tickets"]:
+                links = [f"{t['ticket']}({t['state']})" for t in c["tickets"]]
+                return Bound(c["branch"], links, c["worktrees"])
+        if ref.kind == ISSUE:
+            return None
+        # MR は、`mr:` に続けて慣習名（承認済みの親の `branch:` が mr-N など）も見る
+        repo, project, failed = _repo_of(conf, root, cwd)
+        if repo is None or failed:
+            return None
+        checked_out = _checked_out(conf, root, repo)
+        for t in _tickets(conf, root, project):
+            m = _MR_BRANCH.fullmatch(t.branch or "")
+            if t.is_child or t.state == ticket_model.TODO or not m:
+                continue
+            if int(m.group(1)) == ref.number:
+                return Bound(
+                    t.branch, [f"{t.ticket}({t.state})"], sorted(checked_out.get(t.branch, []))
+                )
+    except OSError:
+        return None
+    return None
+
+
+def _mark(ref: Ref) -> str:
+    return f"{ref.kind}:{ref.number}"
+
+
+def prompt_context(
+    conf: settings.Settings,
+    root: str,
+    text: str,
+    cwd: str = "",
+    session: str = "",
+    stderr: TextIO | None = None,
+) -> str:
     """依頼文に issue・MR の指定があれば、`ccnavi-start.sh` で着手させる指示。無ければ空。
 
     チケット制御が disable なら出さない（指示の中身が親の識別子と `branch:` の承認に寄るため）。
+
+    同じ番号の案内は同じセッションで 1 回だけ。案内した番号は、セッション単位の一時的な
+    記録（`ctxfile.told_refs`）に残す。記録を読めない・書けないときは案内する側に倒す。
+    すでにチケットに結び付く番号は `ccnavi-start.sh` を勧めず、そのチケットのワークツリーで
+    続けるよう案内する（`_bound`）。
     """
     if not conf.tickets_enabled:
         return ""
     refs = prompt_refs(text)
     if not refs:
         return ""
+    err = stderr if stderr is not None else sys.stderr
+    told = ctxfile.told_refs(err, conf.state, session)
+    if told is not None:
+        refs = [r for r in refs if _mark(r) not in told]
+        if not refs:
+            return ""
+    bound = [(r, b) for r in refs for b in [_bound(conf, root, cwd, r)] if b is not None]
+    refs = [r for r in refs if all(r is not x for x, _ in bound)]
+    lines = [_bound_line(r, b) for r, b in bound]
+    if refs:
+        lines += ([""] if lines else []) + _start_lines(root, refs)
+    if told is not None:
+        told |= {_mark(r) for r, _ in bound} | {_mark(r) for r in refs}
+        ctxfile.remember_refs(err, conf.state, session, told)
+    return "\n".join(lines)
+
+
+def _bound_line(ref: Ref, b: Bound) -> str:
+    where = (
+        f"そのチケットのワークツリー（{'・'.join(b.worktrees)}）で続ける"
+        if b.worktrees
+        else "そのチケットのワークツリーで続ける（ワークツリーはまだ無い。"
+        "ccnavi-ticket.sh status でチケットの状態を確かめる）"
+    )
+    return (
+        f"[ccnavi] 依頼の {ref.label()} は、すでに {'・'.join(b.tickets)}（ブランチ {b.branch}）に"
+        f"結び付いている。ccnavi-start.sh は打たず、{where}。"
+        "別の MR/issue を指す依頼なら、番号を言い直してもらう。"
+    )
+
+
+def _start_lines(root: str, refs: list[Ref]) -> list[str]:
     sh = settings.script_command(root, "ccnavi-start.sh")
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     labels = "・".join(r.label() for r in refs)
@@ -162,7 +296,7 @@ def prompt_context(conf: settings.Settings, root: str, text: str) -> str:
         "終了コード 1・2 なら、出力の理由をユーザに伝える。",
         "このセッションで同じ番号を既に処理してユーザの返事を得ていれば、繰り返さなくてよい。",
     ]
-    return "\n".join(lines)
+    return lines
 
 
 # ---- 副命令 `ccnavi branches <issue|mr> <番号> --result <json>`
@@ -362,16 +496,9 @@ def collect(
     conf: settings.Settings, root: str, cwd: str, kind: str, number: int, host: Host
 ) -> tuple[dict, str]:
     """候補を集める。返すのは JSON の形の辞書と、止める理由（あれば）。"""
-    repo_tree = tree.tree_of(root, cwd, conf.projects)
-    if repo_tree is None:
-        return {}, f"{cwd} はワークスペースの外"
-    project = repo_tree.project
-    if project:
-        repo = next((t for t in tree.projects(conf.projects) if t.project == project), None)
-    else:
-        repo = tree.main_tree(root)
+    repo, project, failed = _repo_of(conf, root, cwd)
     if repo is None:
-        return {}, f"プロジェクト {project} が見つからない"
+        return {}, failed
     local, origin, failed = _refs(repo.root)
     if failed:
         return {}, f"ブランチを読めない: {failed}"
@@ -405,6 +532,15 @@ def collect(
         for name in sorted(local | origin):
             if names_number(name, number):
                 candidate(name).add_source("name")
+    elif kind == MR:
+        # 2'. MR 指定なら `mr: <番号>` を持つ親（提案も承認済みも。`mr:` は同じリポジトリだけ）。
+        for t in tickets:
+            if t.is_child or t.mr != number:
+                continue
+            approved = t.state != ticket_model.TODO
+            link = TicketLink(t.ticket, t.state, approved, t.title, t.issue)
+            issue_tickets.append(link)
+            candidate(_branch_of_ticket(t, approved)).add_source("ticket")
     # どの候補にも、ワークツリーと結び付くチケットを添える。
     for branch, c in found.items():
         c.worktrees = sorted(checked_out.get(branch, []))

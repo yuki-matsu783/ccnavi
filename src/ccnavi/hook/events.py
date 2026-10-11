@@ -186,7 +186,9 @@ def decide_at_prompt(
         functools.partial(skillsync.is_synced_write, conf, root),
         root,
     )
-    hint = branchfind.prompt_context(conf, root, payload.prompt)
+    hint = branchfind.prompt_context(
+        conf, root, payload.prompt, payload.cwd, payload.session_id, stderr
+    )
     if hint:
         hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, hint)
     return EXIT_OK
