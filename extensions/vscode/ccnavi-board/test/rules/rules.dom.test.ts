@@ -1014,3 +1014,49 @@ deny:
     await dom.close();
   }
 });
+
+test("CB-D159 根が葉の木は、all / any で包んで子を足せる。根の削除ボタンは包む道を案内する", async () => {
+  const text = `version: 1
+deny:
+  - id: leaf-root
+    match: Write
+    when:
+      glob: '*.pem'
+    message: m
+`;
+  const dom = await openRules({ model: readRules(text).model }, undefined, { measure: true });
+  try {
+    const row = rowSelector("leaf-root");
+    dom.click(dom.one(`${row} .row-head`));
+    await dom.settle();
+    const remove = dom.one<HTMLButtonElement>(`${row} .cond-inspector [data-op-action="remove"]`);
+    assert.equal(remove.disabled, true);
+    assert.match(remove.title, /all \/ any \/ not で包んで/);
+    assert.equal(dom.all(`${row} .cond-inspector button[data-add]`).length, 0, "葉には子を足せない");
+    dom.click(dom.one(`${row} .cond-inspector [data-op-action="wrap-any"]`));
+    await dom.settle();
+    assert.equal(dom.one(`${row} .cond-node[data-key="r"]`).getAttribute("data-op"), "any");
+    assert.equal(dom.one(`${row} .cond-node[data-key="r.0"]`).getAttribute("data-op"), "glob");
+    assert.equal(dom.one(`${row} .cond-inspector`).getAttribute("data-key"), "r", "包んだまとめが選ばれる");
+    dom.click(dom.one(`${row} .cond-inspector button[data-add="glob"]`));
+    await dom.settle();
+    dom.type(dom.one(`${row} .cond-inspector .f-cond-pattern`), "*.key");
+    await dom.settle();
+    // 子を all で包むこともできる
+    await pickCond(dom, "leaf-root", "r.0");
+    dom.click(dom.one(`${row} .cond-inspector [data-op-action="wrap-all"]`));
+    await dom.settle();
+    assert.equal(dom.one(`${row} .cond-node[data-key="r.0"]`).getAttribute("data-op"), "all");
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    assert.deepEqual(savedSections(dom).deny[0].when, {
+      op: "any",
+      children: [
+        { op: "all", children: [{ op: "glob", pattern: "*.pem" }] },
+        { op: "glob", pattern: "*.key" },
+      ],
+    });
+  } finally {
+    await dom.close();
+  }
+});

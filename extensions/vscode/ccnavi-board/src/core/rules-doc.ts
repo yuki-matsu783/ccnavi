@@ -455,6 +455,13 @@ function quoted(doc: Document, text: string): Scalar {
   return scalar;
 }
 
+/** 元のノードが 1 キーのマップなら、そのペアとキー */
+function soleOf(existing: unknown): { readonly pair: Pair | undefined; readonly key: string | undefined } {
+  const pair = isMap(existing) && existing.items.length === 1 ? (existing.items[0] as Pair) : undefined;
+  const key = pair !== undefined && isScalar(pair.key) ? String(pair.key.value) : undefined;
+  return { pair, key };
+}
+
 function patchCond(doc: Document, existing: unknown, tree: CondNode): Node {
   if (tree.op === "invalid") {
     // 読めなかったノードは、読んだ値のまま返す（画面では直せないので、壊さないことだけをする）
@@ -463,8 +470,12 @@ function patchCond(doc: Document, existing: unknown, tree: CondNode): Node {
     }
     return doc.createNode(tree.raw);
   }
-  const pair = isMap(existing) && existing.items.length === 1 ? existing.items[0] : undefined;
-  const key = pair !== undefined && isScalar(pair.key) ? String(pair.key.value) : undefined;
+  let { pair, key } = soleOf(existing);
+  if (key === "not" && tree.op !== "not" && pair !== undefined && isNode(pair.value)) {
+    // not を外した: 中身のノードを使い回す（中身に付いたコメントを残す）
+    existing = pair.value;
+    ({ pair, key } = soleOf(existing));
+  }
   switch (tree.op) {
     case "glob":
     case "regex": {
@@ -498,8 +509,9 @@ function patchCond(doc: Document, existing: unknown, tree: CondNode): Node {
         }
         return existing as Node;
       }
+      // まとめで包んだ: 元のノードを子の候補にする（包む前のノードのコメントを残す）
       const seq = new YAMLSeq();
-      seq.items = tree.children.map((child) => patchCond(doc, undefined, child));
+      seq.items = patchChildren(doc, existing === undefined || existing === null ? [] : [existing], tree.children);
       seq.flow = seq.items.length === 0;
       return mapOf(doc, tree.op, seq);
     }
@@ -508,7 +520,12 @@ function patchCond(doc: Document, existing: unknown, tree: CondNode): Node {
         pair.value = tree.child === null ? null : patchCond(doc, pair.value ?? undefined, tree.child);
         return existing as Node;
       }
-      return mapOf(doc, "not", tree.child === null ? null : patchCond(doc, undefined, tree.child));
+      // not で包んだ: 元のノードが中身と同じ種類なら中身に当てる
+      if (tree.child === null) {
+        return mapOf(doc, "not", null);
+      }
+      const inner = isNode(existing) && likeness(condOfYaml(existing), tree.child) > 0 ? existing : undefined;
+      return mapOf(doc, "not", patchCond(doc, inner, tree.child));
     }
   }
 }

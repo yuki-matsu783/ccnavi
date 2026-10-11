@@ -166,6 +166,11 @@ export function wrapNot(root: CondNode, path: CondPath): CondNode {
   return updateAt(root, path, (node) => not(node));
 }
 
+/** ノードを all / any で包む（根が葉や not のときに、組み合わせへ広げる入口） */
+export function wrapGroup(root: CondNode, path: CondPath, op: CondGroupOp): CondNode {
+  return updateAt(root, path, (node) => group(op, [node]));
+}
+
 /** `not` を外して中身を残す。中が空の `not` は外せない（外すと何も残らない） */
 export function unwrapNot(root: CondNode, path: CondPath): CondNode {
   return updateAt(root, path, (node) => (node.op === "not" && node.child !== null ? node.child : node));

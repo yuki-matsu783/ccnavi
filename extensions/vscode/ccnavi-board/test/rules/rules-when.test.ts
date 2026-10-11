@@ -19,6 +19,7 @@ import {
   exceptBlocker,
   treeOfPattern,
   unwrapNot,
+  wrapGroup,
   wrapNot,
   COND_COLUMN,
   type CondNode,
@@ -389,6 +390,34 @@ test("CB-T344 子が 10 個以上でも、図の点は木の順（番号の数�
   assert.ok(comparePaths([2], [10]) < 0);
   assert.ok(comparePaths([1], [1, 0]) < 0);
   assert.equal(comparePaths([1, 2], [1, 2]), 0);
+});
+
+test("CB-T345 葉や not の根を all / any で包んで組み合わせへ広げられ、包んだノードのコメントは残る", () => {
+  const text = `version: 1
+deny:
+  - id: leaf-root
+    match: Write
+    when:
+      # 葉の理由
+      glob: '*.pem' # 行末
+    message: m
+`;
+  const doc = readRules(text);
+  const tree = doc.model.sections.deny[0].when;
+  assert.deepEqual(tree, leaf("glob", "*.pem"));
+  assert.ok(tree);
+  const wrapped = wrapGroup(tree, [], "any");
+  assert.deepEqual(wrapped, group("any", [leaf("glob", "*.pem")]));
+  assert.deepEqual(wrapGroup(not(leaf("glob", "a")), [0], "all"), not(group("all", [leaf("glob", "a")])));
+  const widened = addChild(wrapped, [], leaf("glob", "*.key"));
+  const out = doc.apply(withWhen(doc.model.sections, widened));
+  assert.ok(out.includes("# 葉の理由"), out);
+  assert.ok(out.includes("glob: '*.pem' # 行末"), out);
+  assert.deepEqual(readRules(out).model.sections.deny[0].when, widened);
+  // not を外しても、中身のコメントは残る
+  const negated = readRules(text.replace("      # 葉の理由\n      glob: '*.pem' # 行末", "      not:\n        # 葉の理由\n        glob: '*.pem' # 行末"));
+  const unwrapped = negated.apply(withWhen(negated.model.sections, leaf("glob", "*.pem")));
+  assert.ok(unwrapped.includes("glob: '*.pem' # 行末"), unwrapped);
 });
 
 test("CB-T346 子を消してから別の子を直しても、消した子のコメントは直した子に付かない", () => {

@@ -3,7 +3,7 @@
  *
  * 図は React Flow で、根を左に置いて右へ伸ばす（置き場所は `layoutCond` が木の形だけで決める）。
  * 点を押すと選ばれ、下の操作の欄がその点に効く。操作は、子を足す・消す・種別を替える（all ⇄ any、
- * glob ⇄ regex）・葉の文字を直す・not で包む・not を外す。直すたびに木ぜんたいを `onChange` で返し、
+ * glob ⇄ regex）・葉の文字を直す・all / any / not で包む・not を外す。直すたびに木ぜんたいを `onChange` で返し、
  * 書き戻し（`rules-doc.ts`）が `when:` の YAML に直す。保存と保存前の `--lint` は他の欄と同じ流れ。
  *
  * 誤り（空のまとめ、中が空の not、空の葉、読めなかったノード、深さとノード数の上限）は図の下に並べ、
@@ -27,6 +27,7 @@ import {
   replaceAt,
   setPattern,
   unwrapNot,
+  wrapGroup,
   wrapNot,
   type CondNode,
   type CondPath,
@@ -254,6 +255,12 @@ function Inspector({
         </span>
       )}
       <span className="buttons">
+        <button type="button" className="action small" data-op-action="wrap-all" title="このノードを all で包む。隣に子を足して組み合わせにできる" onClick={() => edit(wrapGroup(tree, path, "all"), path)}>
+          all で包む
+        </button>
+        <button type="button" className="action small" data-op-action="wrap-any" title="このノードを any で包む。隣に子を足して組み合わせにできる" onClick={() => edit(wrapGroup(tree, path, "any"), path)}>
+          any で包む
+        </button>
         <button type="button" className="action small" data-op-action="wrap" onClick={() => edit(wrapNot(tree, path), path)}>
           not で包む
         </button>
@@ -262,7 +269,7 @@ function Inspector({
           className="action small"
           data-op-action="remove"
           disabled={isRoot}
-          title={isRoot ? "根は消せません（not で包むか、種別を替えてください）" : "このノードを消す"}
+          title={isRoot ? "根は消せません（all / any / not で包んでから中を直すか、葉なら文字を直してください）" : "このノードを消す"}
           onClick={() => edit(removeAt(tree, path), path.slice(0, -1))}
         >
           ノードを削除
