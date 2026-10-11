@@ -2,11 +2,15 @@
 version: 1
 ticket: refactor-296-rule-expectations
 title: ルールの見本を「期待する判定」に改名する（rule-samples.yml を rule-expectations.yml へ）
-rationale: |
-  ルールが何を止めて何を通すかを書いたファイルを `rule-samples.yml`、中身を「見本」「sample」と呼んでいる。
+rationale: 'ルールが何を止めて何を通すかを書いたファイルを `rule-samples.yml`、中身を「見本」「sample」と呼んでいる。
+
   実際は「この呼び出しはこの判定になるはず」という期待する判定で、見本（手本）とは意味がずれる。
+
   また「見本」は Chrome 拡張のホスト応答の fixtures やボードの案内用ダミーにも使われ、語が衝突している。
+
   ファイル名・CLI・YAML のキー・拡張の設定・関数名・文書の言い回しを、1 つの語に揃えて改める。
+
+  '
 human_review:
   required: true
   reason: CLI の旗・YAML のキー・拡張の設定名・ファイル名という外に見える名前を変えるため
@@ -36,33 +40,52 @@ phases:
     - extensions/chrome/ccnavi-approval/docs/*
     - CLAUDE.md
     - .claude/skills/*
+  skill-improve:
+    kind: feedback
+    title: スキル改善
+    review: mr
+    scope:
+    - .claude/skills/*
+    - docs/wiki/*
+    when: 振り返りでスキルの候補が出たとき（docs/claude/skill-review.md）。候補が無ければ置かない
 plan:
-  - implement                      # 1。src・scripts・tests（フェーズ 1）
-  - {type: implement, after: [1]}  # 2。VS Code 拡張（フェーズ 2）
-  - {type: implement, after: [1, 2]}  # 3。ファイル名の切り替え（フェーズ 3）
-  - {type: docs, after: [1, 2, 3]}    # 4。文書・スキル・ADR（フェーズ 4。終端）
+- implement
+- type: implement
+  after:
+  - 1
+- type: implement
+  after:
+  - 1
+  - 2
+- type: docs
+  after:
+  - 1
+  - 2
+  - 3
 allow:
-  - match: Write|Edit
-    glob: "src/*"
-  - match: Write|Edit
-    glob: "tests/*"
-  - match: Write|Edit
-    glob: "scripts/*"
-  - match: Write|Edit
-    glob: "extensions/*"
-  - match: Write|Edit
-    glob: "docs/*"
-  - match: Write|Edit
-    glob: "README.md"
-  - match: Write|Edit
-    glob: ".claude/skills/ccnavi-config/*"
-  - match: Write|Edit
-    glob: ".claude/skills/commit/references/*"
-  - match: Write|Edit
-    glob: "wip/*"
-started_at: "2026-10-11T17:12:25+0900"
-completed_at: ""
-base_sha: "a52c008e2f8e80782331afbba4a7c335886a67e7"
+- match: Write|Edit
+  glob: src/*
+- match: Write|Edit
+  glob: tests/*
+- match: Write|Edit
+  glob: scripts/*
+- match: Write|Edit
+  glob: extensions/*
+- match: Write|Edit
+  glob: docs/*
+- match: Write|Edit
+  glob: README.md
+- match: Write|Edit
+  glob: .claude/skills/ccnavi-config/*
+- match: Write|Edit
+  glob: .claude/skills/commit/references/*
+- match: Write|Edit
+  glob: wip/*
+started_at: 2026-10-11T17:12:25+0900
+completed_at: ''
+base_sha: a52c008e2f8e80782331afbba4a7c335886a67e7
+feedback:
+- skill-improve
 ---
 ## 結論
 

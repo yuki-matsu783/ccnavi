@@ -9,3 +9,7 @@
 {"at": "2026-10-11T09:20:47Z", "ticket": "refactor-296-rule-expectations", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 3, "mark": "pending"}
 {"at": "2026-10-11T09:21:26Z", "ticket": "refactor-296-rule-expectations", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 3, "mark": "requested"}
 {"at": "2026-10-11T09:26:55Z", "ticket": "refactor-296-rule-expectations", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "actor": "yuki-matsu783", "phase": 3, "mark": "reviewed"}
+{"at": "2026-10-11T09:36:18Z", "ticket": "refactor-296-rule-expectations", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 4, "mark": "pending"}
+{"at": "2026-10-11T09:36:55Z", "ticket": "refactor-296-rule-expectations", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 4, "mark": "requested"}
+{"at": "2026-10-11T09:41:32Z", "ticket": "refactor-296-rule-expectations", "kind": "phase-mark", "from": null, "to": null, "via": "board", "actor": "yuki-matsu783", "phase": 4, "mark": "reviewed"}
+{"at": "2026-10-11T09:44:58Z", "ticket": "refactor-296-rule-expectations", "kind": "revised", "from": "doing", "to": "doing", "via": "board", "feedback": true}
