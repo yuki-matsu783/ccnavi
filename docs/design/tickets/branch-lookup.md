@@ -34,7 +34,13 @@ dry-run でも渡す。判定は返さない。
 2. 結果を `logs/state/branches-host-<pid>.json` に書き、実行ファイルの `ccnavi branches <issue|mr> <N> --result <json>` に渡す
 3. 実行ファイルが手元を読む（git の ref、ツリーの HEAD、チケット）。issue 指定なら、名前に番号を含むブランチ（手元と origin。
    番号の前後が数字でない）と、`issue: <N>` を持つ親の親のブランチ（承認済みは `branch:`、提案は識別子）を足す。どの候補にも、
-   チェックアウトしているツリーと結び付くチケットを添えて、1 候補 1 行か JSON で出す
+   チェックアウトしているツリーと結び付くチケットを添えて、1 候補 1 行か JSON で出す。MR 指定なら、`mr: <N>` を持つ親
+   （提案も承認済みも）の親のブランチを「チケット」の由来で足す
+
+UserPromptSubmit の「すでにチケットに結び付く」判定（`branchfind._bound`）は、issue はチケットの `issue:` の一致。
+MR は (1) チケットの `mr:` の一致（`not is_child`、提案も承認済みも）、(2) 承認済みの親の `branch:` が慣習名
+（`mr-N`・`pr-N`・`pull/N`・`merge-requests/N`）で番号が一致、の順で見る。名前に番号を含むだけのブランチは結び付けない。
+番号が別なら結び付けず、`ccnavi-start.sh` を勧める。
 
 ```text
 ccnavi-branches: issue #152 に紐づくブランチ（ワークスペース: .）

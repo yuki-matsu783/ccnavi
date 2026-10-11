@@ -35,6 +35,100 @@ def set_fields(text: str, fields: dict[str, str]) -> str:
     return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
 
 
+MR_KEY = "mr"
+
+# `set_mr` の結果。
+MR_SET = "set"  # 空だったので書いた
+MR_SAME = "same"  # 同じ番号が既にあった（何もしない）
+MR_DIFFERS = "differs"  # 違う値が既にあった（書かない）
+MR_UNREADABLE = "unreadable"  # frontmatter が無い・閉じていない
+
+
+def _front_end(lines: list[str]) -> int | None:
+    if not lines or lines[0].strip() != ticket_model.FENCE:
+        return None
+    return next((i for i in range(1, len(lines)) if lines[i].strip() == ticket_model.FENCE), None)
+
+
+def _field_line(lines: list[str], end: int, key: str) -> int | None:
+    for i in range(1, end):
+        line = lines[i]
+        if not line.startswith((" ", "\t")) and line.split(":", 1)[0].strip() == key:
+            return i
+    return None
+
+
+def plain_int_field(text: str | None, key: str) -> int | None:
+    """欄が `key: 12` の 1 行だけの正の整数ならその値。それ以外は None。
+
+    無い・空・引用符つき・`!12`・続きの行・注釈つきは None（ccnavi が書く形だけを読む）。
+    """
+    if text is None:
+        return None
+    lines = text.splitlines()
+    end = _front_end(lines)
+    if end is None:
+        return None
+    i = _field_line(lines, end, key)
+    if i is None or (i + 1 < end and lines[i + 1].startswith((" ", "\t"))):
+        return None
+    value = lines[i].split(":", 1)[1].strip()
+    return int(value) if value.isascii() and value.isdigit() and int(value) > 0 else None
+
+
+def mr_is_empty(text: str | None, key: str = MR_KEY) -> bool:
+    """欄が無いか、値なしか。続きの行があれば値ありとする（`script_fields_set` と同じ読み方）。"""
+    if text is None:
+        return False
+    lines = text.splitlines()
+    end = _front_end(lines)
+    if end is None:
+        return False
+    i = _field_line(lines, end, key)
+    if i is None:
+        return True
+    if i + 1 < end and lines[i + 1].startswith((" ", "\t")):
+        return False
+    return not _has_value(lines[i].split(":", 1)[1])
+
+
+def _held_number(raw: str) -> int | None:
+    """欄の値の表記が表す MR の番号（`12`・`"!12"`・`#12`）。読めなければ None。"""
+    if len(raw) > _VALUE_PARSE_LIMIT:
+        return None
+    try:
+        value = yaml.safe_load(raw)
+    except (yaml.YAMLError, RecursionError, ValueError):
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str):
+        value = value.strip().lstrip("!#").strip()
+    text = str(value)
+    return int(text) if text.isascii() and text.isdigit() else None
+
+
+def set_mr(text: str, number: int) -> tuple[str, str]:
+    """`mr:` が空のときだけ番号を書く。答えは (書き直した全文, MR_* の結果)。
+
+    同じ番号が既にあれば何もしない（MR_SAME）。違う値があれば書かない（MR_DIFFERS）。
+    行単位で書き、ユーザの書いたコメントや本文は触らない（`set_fields` と同じ）。
+    `!12`・`#12` と書かれた欄も、番号が同じなら MR_SAME。
+    """
+    lines = text.splitlines()
+    end = _front_end(lines)
+    if end is None:
+        return text, MR_UNREADABLE
+    i = _field_line(lines, end, MR_KEY)
+    if i is not None and not mr_is_empty(text):
+        return text, (MR_SAME if _held_number(lines[i].split(":", 1)[1]) == number else MR_DIFFERS)
+    if i is not None:
+        lines[i] = f"{MR_KEY}: {number}"
+    else:
+        lines.insert(end, f"{MR_KEY}: {number}")
+    return "\n".join(lines) + ("\n" if text.endswith("\n") else ""), MR_SET
+
+
 def script_fields_set(text: str) -> tuple[str, ...]:
     """その版が既に値を持っている、スクリプトの欄。
 

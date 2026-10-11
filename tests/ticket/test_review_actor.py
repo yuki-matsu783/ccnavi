@@ -292,6 +292,67 @@ class ReviewRuleTest(ActorHarness):
         self.assertIsNone(chrome["changes"])
 
     def test_the_request_records_the_poster_when_known(self):
+        done = self.request_posted()
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(read_json(self.mark_path("requested"))["poster"], "ccnavi-bot")
+
+    def doing_text(self):
+        with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
+            return f.read()
+
+    def test_the_request_writes_mr_into_an_empty_field_only(self):
+        # 承認済みチケットの `mr:` は無いか空。依頼で MR の番号を書き足す
+        done = self.request_posted(before=lambda: self.assertNotIn("mr:", self.doing_text()))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("mr: 7\n", self.doing_text())
+        self.assertIn("`mr:` に MR !7 を書き足した", done.stderr)
+        # 欄の行のほかは変わっていない
+        self.assertEqual(1, self.doing_text().count("mr: 7"))
+
+    def test_the_mr_write_is_in_the_c1_write_list(self):
+        # C1 は書いたパスの一覧のパスだけをコミットする。`mr:` の書き足しも一覧に入る
+        state = os.path.join(self.root, "logs", "state", "c1", "demo")
+        os.makedirs(state, exist_ok=True)
+        listing = os.path.join(state, "writes.txt")
+        done = self.request_posted(extra=("--record-writes", listing))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        with open(listing, encoding="utf-8") as f:
+            listed = [os.path.normpath(line.strip()) for line in f if line.strip()]
+        rel = os.path.join(".ccnavi", "approved", "doing", "i0001.md")
+        self.assertTrue(any(p.endswith(rel) for p in listed), listed)
+
+    def test_the_request_with_the_same_mr_does_nothing(self):
+        def put():
+            self.set_doing_mr("7")
+            self.held = self.doing_text()
+
+        done = self.request_posted(before=put)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(self.held, self.doing_text())
+        self.assertNotIn("書き足した", done.stderr)
+        self.assertNotIn("警告", done.stderr)
+
+    def test_the_request_with_another_mr_warns_and_keeps_the_value(self):
+        def put():
+            self.set_doing_mr("9")
+            self.held = self.doing_text()
+
+        done = self.request_posted(before=put)
+        # 依頼そのものは通る（マーカーは置けている）。値は上書きしない
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(self.held, self.doing_text())
+        self.assertIn("警告", done.stderr)
+        self.assertIn("別の値が既にある", done.stderr)
+        self.assertIn("!7", done.stderr)
+
+    def set_doing_mr(self, value):
+        path = os.path.join(self.approved, "doing", "i0001.md")
+        text = self.doing_text().replace("\n---\n", f"\nmr: {value}\n---\n", 1)
+        write(path, text)
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "mr")
+
+    def request_posted(self, before=None, extra=()):
         self.family(plan=["design"])
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
@@ -318,11 +379,19 @@ class ReviewRuleTest(ActorHarness):
                 }
             ),
         )
-        done = self.ccnavi(
-            "--cwd", self.parent_tree, "--phase", "1", "review", "requested", "--result", posted
+        if before is not None:
+            before()
+        return self.ccnavi(
+            *extra,
+            "--cwd",
+            self.parent_tree,
+            "--phase",
+            "1",
+            "review",
+            "requested",
+            "--result",
+            posted,
         )
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(read_json(self.mark_path("requested"))["poster"], "ccnavi-bot")
 
 
 class DecideActorTest(ActorHarness):

@@ -447,6 +447,16 @@ def revision_problems(
                 "題か課題番号が承認済みチケットと違う",
             )
         )
+    # `mr:` は承認のあとに ccnavi が書き足すことがある（`review request`）。改版の提案は
+    # 書き足す前の写しかもしれないので、片方が空なら比べない。両方に値があって違えば error。
+    if revised.mr is not None and current.mr is not None and revised.mr != current.mr:
+        problems.append(
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                revised.ticket,
+                "改版で変えられるのは plan・feedback・phases だけ。`mr:` が承認済みチケットと違う",
+            )
+        )
     if revised.branch != current.branch:
         problems.append(
             rules.Problem(
