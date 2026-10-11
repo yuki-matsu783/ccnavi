@@ -38,8 +38,10 @@
 # 提案があり、親子のチケットの取り込み状態があり、取り込み状態の `branch`（親のブランチ名。親チケットの
 # `branch:`、無ければ識別子）をチェックアウトしている）は、ロックを 1 回だけ試し
 # （取れなければ早送りしない。待たない）、`origin/<親のブランチ>` の祖先なら `merge --ff-only` する。
-# 親のブランチ名は取り込み状態から読む（セッションの頭で待たせないよう、実行ファイルは起こさない。
-# 取り込み状態の `branch` は取り込み・push・C1 が実行ファイルの答えから書いたもの）。書きかけとの重なりは
+# 親のブランチ名は取り込み状態から読む（セッションの頭で待たせないよう、ブランチ名のためには実行ファイルを
+# 起こさない。取り込み状態の `branch` は取り込み・push・C1 が実行ファイルの答えから書いたもの）。親チケットか
+# 提案があるかだけは実行ファイル（`tree parent`）に聞く。聞くのは取り込み状態があって親のブランチに居る
+# ツリーだけで、答えが得られなければ（実行ファイルが無い・入れ替え中）早送りしない。書きかけとの重なりは
 # git に任せ、拒まれたら重なったパスを言う。分かれていれば merge はせず「取り込みが要る」と 1 行言う。
 # 取り込み（merge）・消えたかの確かめ・取り込み状態の書き出しは手で打つ ccnavi-sync.sh の仕事で、ここはしない。
 # 開始から CCNAVI_FETCH_BUDGET 秒（既定 45）を過ぎたら、残りの fetch と早送りはせずに名指しする。
@@ -214,12 +216,14 @@ ccnavi_fetch_family() {
 	*) return 1 ;;
 	esac
 	[ -L "$1" ] && return 1
-	ccnavi_parent_tree "$1" "$2" || return 1
 	ccnavi_ff_key=$(ccnavi_repo_key "$1" "$root")
 	ccnavi_ff_record=$(ccnavi_family_record "$root" "$ccnavi_ff_key" "$2")
 	[ -f "$ccnavi_ff_record" ] || return 1
 	ccnavi_ff_branch=$(ccnavi_record_get "$ccnavi_ff_record" branch)
 	[ "$3" = "${ccnavi_ff_branch:-$2}" ] || return 1
+	# 親チケットか提案があるかは実行ファイルに聞く（sh はチケットを読まない）。起こすのは、取り込み状態が
+	# あって親のブランチに居るツリーだけ。決められない（実行ファイルが無い・入れ替え中など）ときは早送りしない。
+	ccnavi_parent_tree "$1" "$2" || return 1
 	return 0
 }
 

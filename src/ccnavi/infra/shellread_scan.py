@@ -21,6 +21,8 @@ REASON_UNTERMINATED_SUBST = "unterminated-substitution"
 REASON_AMBIGUOUS_SUBST = "ambiguous-substitution"
 # バッククォート。中のエスケープの規則を持たず、見つけたところで読むのをやめる。
 REASON_BACKQUOTE = "backquote"
+# エスケープ（`\\`）を含む `$'…'`。展開の規則を持たないので、中身を確定できない。
+REASON_ANSI_C = "ansi-c-escape"
 
 # シェルによって読みが分かれる形の表記。文面に並べる。
 _CASE_IN_SUBST = "case inside $( )"
@@ -283,15 +285,20 @@ class _Scanner:
         self.i = j + 1
 
     def ansi_c(self, collect: bool) -> None:
-        """`$'…'`。中は文字だが、`\\'` で引用が閉じない。"""
+        """`$'…'`。中は文字だが、`\\'` で引用が閉じない。
+
+        中に `\\` が無ければ、単一引用（`'…'`）と同じ文字列になるので、そう書き換えて読む。
+        `$` を残したまま shlex に渡すと、`git $'push'` が `git $push` と読まれ、どのルールにも
+        当たらない。`\\` があれば、`\\n`・`\\x41`・`\\cA` などのエスケープを展開しないと
+        中身が決まらないので、確定できない読みとして止める（REASON_ANSI_C）。
+        """
         s = self.s
         j = self.i + 2
         while j < len(s):
             if s[j] == "\\":
-                j += 2
-                continue
+                raise _Unreadable(REASON_ANSI_C)
             if s[j] == "'":
-                self.emit(s[self.i : j + 1], collect)
+                self.emit("'" + s[self.i + 2 : j + 1], collect)
                 self.i = j + 1
                 return
             j += 1

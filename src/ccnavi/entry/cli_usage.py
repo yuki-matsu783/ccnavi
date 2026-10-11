@@ -267,6 +267,14 @@ scripts in .ccnavi/scripts/, which call
         (for ccnavi-sync.sh after it took in <parent>: re-judges the family's
          approved tickets and its authority; a "check 1" line, then one
          "<severity> <detail>" per line; exit 1 when an error stops the family)
+    ccnavi sync closed <parent> <repo> <integration> <tree>
+        (for ccnavi-sync.sh: a "closed 1" line, then "integration yes|no" - the
+         integration branch's done/ holds the same parent - and "archive yes|no" -
+         the local archive holds it; reads only, git show is local)
+    ccnavi tree parent <tree> <name>
+        (for the scripts: a "tree 1" line, then "parent yes|no|unreadable" - the
+         tree holds the parent ticket or proposal <name>; the scripts read no
+         ticket YAML themselves)
 
 ccnavi never reaches the remote itself. The script fetches the merge request,
 its threads and reviews, and hands them over as --result <json>.

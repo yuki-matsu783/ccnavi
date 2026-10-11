@@ -19,8 +19,9 @@ from dataclasses import replace
 
 from ccnavi.infra import settings
 from ccnavi.tickets import approval, phase
-from tests.ticket.test_phases import PhaseHarness, child_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import write
+from tests.ticketsample import child_text
 
 MARKER_WORDS = "reviewed マーカーが残っています"
 

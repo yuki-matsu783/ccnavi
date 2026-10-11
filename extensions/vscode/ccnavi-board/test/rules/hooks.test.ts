@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { envFromSettingsJson, hooksFor, matcherHits, parseHooks } from "../../src/core/hooks.js";
+import { hooksFor, matcherHits, parseHooks } from "../../src/core/hooks.js";
 
 const SETTINGS = JSON.stringify({
   env: { CCNAVI_MODE: "dry-run" },
@@ -59,10 +59,3 @@ test("CB-T32 ツール名で走る hook を絞る。ツール名の無いイベ�
   );
 });
 
-test("CB-T33 env の値を読む。無ければ空", () => {
-  assert.equal(envFromSettingsJson(SETTINGS, "CCNAVI_MODE"), "dry-run");
-  // env の欄はあるが、その語は無い形。`{}` の場合と分けて見る。
-  assert.equal(envFromSettingsJson(SETTINGS, "CCNAVI_BIN_PATH"), "");
-  assert.equal(envFromSettingsJson("{}", "CCNAVI_MODE"), "");
-  assert.equal(envFromSettingsJson("broken", "CCNAVI_MODE"), "");
-});

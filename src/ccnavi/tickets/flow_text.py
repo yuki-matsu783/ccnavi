@@ -119,7 +119,7 @@ def _skeleton(text: str) -> tuple[str, list[int]]:
 
 
 def _neutral(text: str) -> str:
-    """フローの文が ccnavi の知らせや案内の区切りに見えないようにする（L-a）。
+    """フローの文が ccnavi の知らせや案内の区切りに見えないようにする。
 
     - `[` / `［`（互換文字も）の直後が `ccnavi` で始まる括弧は、開きと、その先の最初の閉じ
       （`]` / `］`）を `〔` `〕` に置き換える。`[ccnavi dry-run]`・`[CCNAVI]`・幅の無い字や

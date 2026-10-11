@@ -1,5 +1,5 @@
 #!/bin/sh
-# Stop: 拡張のファイルを編集したターンの終わりに、関わるグループのテストだけ実行する
+# Stop: 拡張（VS Code・Chrome）のファイルを編集したターンの終わりに、関わるグループのテストだけ実行する
 #
 # 編集していないターンは何もしない（exit 0）。文書だけを直したターンや Python だけの
 # ターンでは 1 秒も伸びない。編集したターンで伸びるのは 3〜8 秒で、中身は
@@ -60,24 +60,46 @@ fi
 
 sort -u "$files" >"$files.sorted" || exit 0
 
-# 編集したファイルのパスから、それが属する拡張のディレクトリを切り出す。ワークツリーで
-# 作業していても CLAUDE_PROJECT_DIR は元のディレクトリを指したままのため、そこを
-# 実行すると、直したツリーが検査されないまま通ってしまう
+# 拡張は 2 つある。VS Code の拡張はテストをグループに分けてあり、入口
+# （`scripts/test-groups.js --for <ファイル>...`）が触ったファイルに関わるグループだけを回す
+# Chrome の拡張はグループに分けていないので、触ったら 1 つのグループとして全部を回す
+# （`scripts/test.js`。拡張を読み込んだ Chromium での試験 `--e2e` は回さない。Chromium が要るため）
+VSCODE="extensions/vscode/ccnavi-board"
+CHROME="extensions/chrome/ccnavi-approval"
+
+# 編集したファイルのパスから、それが属する拡張のディレクトリを切り出し、`<種類> <ルート>` の
+# 1 行にする。ワークツリーで作業していても CLAUDE_PROJECT_DIR は元のディレクトリを指したままのため、
+# そこを実行すると、直したツリーが検査されないまま通ってしまう
+#
+# 先頭に `/` の無い相対パス（`extensions/...` で始まる形）も拾う。mark-ext.sh は受け取った
+# とおりに書き残すので、相対パスで来たものを落とすと、拡張を直したのに何も回らない。
+# 相対パスは、上で移ったワークスペースルートからのパスとして読む
 #
 # パスは 1 行ずつ読む。`for root in $roots` と書くと、空白の入ったパス
-# （Windows の `C:/Users/First Last/`）が単語に割れ、どの単語も test-groups.js を持たないため
+# （Windows の `C:/Users/First Last/`）が単語に割れ、どの単語も入口を持たないため
 # 何も実行せずに通ってしまう。同じ理由で、絞り込みは sed の正規表現ではなく case の
-# 文字列比較で行う（パスに `#` や `[` が入ると sed が構文エラーになる）
-sed -n 's#^\(.*/extensions/vscode/ccnavi-board\)/.*#\1#p' "$files.sorted" |
-	sort -u >"$files.roots"
+# 文字列比較で行う（パスに `#` や `[` が入ると sed が構文エラーになる）。ループの中で
+# 起こすテストは標準入力を /dev/null にする。一覧を読んでいる標準入力を読まれると、残りが飛ぶ
+sed -n \
+	-e "s#^\(.*/$VSCODE\)/.*#vscode \1#p" \
+	-e "s#^\($VSCODE\)/.*#vscode \1#p" \
+	-e "s#^\(.*/$CHROME\)/.*#chrome \1#p" \
+	-e "s#^\($CHROME\)/.*#chrome \1#p" \
+	"$files.sorted" | sort -u >"$files.roots"
 
 failed=""
 output=""
 ran=0
 notready=""
-while IFS= read -r root; do
-	[ -n "$root" ] || continue
-	if [ ! -f "$root/scripts/test-groups.js" ]; then
+while IFS= read -r line; do
+	[ -n "$line" ] || continue
+	kind=${line%% *}
+	root=${line#* }
+	case "$kind" in
+	chrome) entry="$root/scripts/test.js" ;;
+	*) entry="$root/scripts/test-groups.js" ;;
+	esac
+	if [ ! -f "$entry" ]; then
 		printf 'ccnavi: %s にテストの入口がないため実行していません。\n' "$root" >&2
 		continue
 	fi
@@ -91,8 +113,29 @@ while IFS= read -r root; do
 	done <"$files.sorted"
 	[ "$#" -gt 0 ] || continue
 	ran=1
-	out=$(node "$root/scripts/test-groups.js" --for "$@" 2>&1)
-	status=$?
+	if [ "$kind" = chrome ]; then
+		# 読み物（*.md・docs/）と生成物の置き場だけを触ったなら回さない。VS Code の入口が
+		# 読み物だけのときに何も回さないのと揃える
+		code=""
+		for one in "$@"; do
+			case "${one#"$root"/}" in
+			*.md | docs/* | out/* | dist/* | dist-e2e/* | node_modules/*) ;;
+			*) code=yes ;;
+			esac
+		done
+		[ -n "$code" ] || continue
+		# node_modules が無ければ組み立てられない。モデルが直せることではないので、
+		# VS Code の入口の終了コード 3 と同じく差し戻さずにユーザへ伝える
+		if [ ! -d "$root/node_modules" ]; then
+			notready="ccnavi: $root に node_modules がないため Chrome 拡張のテストを実行していません。$root で 'pnpm install --frozen-lockfile' を通してください。"
+			continue
+		fi
+		out=$(cd "$root" && node scripts/test.js </dev/null 2>&1)
+		status=$?
+	else
+		out=$(node "$entry" --for "$@" </dev/null 2>&1)
+		status=$?
+	fi
 	[ "$status" = 0 ] && continue
 	# 3 は「node_modules がない」など環境が足りない側。テストは失敗していないため、
 	# 差し戻して「失敗したテストを直せ」と言うのは誤りになる。ユーザへ回す

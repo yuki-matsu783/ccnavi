@@ -25,7 +25,8 @@ from unittest import mock
 from ccnavi.hook import post
 from ccnavi.records import audit
 from ccnavi.tickets import approval
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
+from tests.ticketsample import child_text, parent_text
 
 
 class Reads:

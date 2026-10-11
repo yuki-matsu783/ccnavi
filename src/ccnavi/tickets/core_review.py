@@ -13,11 +13,12 @@ import io
 from typing import TextIO
 
 from ..infra import fsio, settings, tree
-from ..tickets import (
+from . import (
     agree,
     approval,
     approval_checks,
     approval_marks,
+    core_base,
     history,
     ops,
     ops_close,
@@ -26,7 +27,6 @@ from ..tickets import (
     ticket_model,
     ticket_places,
 )
-from . import core_base
 
 
 def confirm(

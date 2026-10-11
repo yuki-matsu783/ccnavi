@@ -17,7 +17,8 @@ import json
 import os
 
 from ccnavi.infra import settings
-from tests.ticket.test_phases import PhaseHarness, git, parent_text, write
+from tests.ticket.test_phases import PhaseHarness, git, write
+from tests.ticketsample import parent_text
 
 
 def with_branch(text, branch):

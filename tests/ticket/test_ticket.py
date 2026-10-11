@@ -25,27 +25,16 @@ import os
 import shutil
 import stat
 import subprocess
-import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from ccnavi.hook.subagent import CANDIDATE_NOTE
 from ccnavi.infra import settings, shellread
-from ccnavi.tickets import approval, phase_forms, review, ticket_fields
-from tests import ROOT, common_path, common_sh
+from ccnavi.tickets import approval, phase_forms, phase_scope, review, ticket_fields
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
-
-RULES = {
-    "version": 1,
-    "deny": [
-        {
-            "id": "guard-approved",
-            "match": "Write|Edit|NotebookEdit",
-            "glob": "*/.ccnavi/*",
-            "message": "ガードの設定と承認済みチケットです。ユーザに依頼してください。",
-        }
-    ],
-}
+from tests.ticketsample import RULES
 
 
 def git(cwd, *args):
@@ -129,7 +118,7 @@ class TicketTest(unittest.TestCase):
 
         # 共通レイヤーは既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない。
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
-        self.state = os.path.join(self.root, "state")
+        self.state = os.path.join(self.root, "logs", "state")
         self.parent_tree = self.worktree("i0001", "main")
         # 承認済みチケットとマーカーは親のツリーに置かれ、親のブランチに乗る。
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "approved")
@@ -149,12 +138,6 @@ class TicketTest(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--approved",
-                ".ccnavi/approved",
-                "--state",
-                self.state,
-                "--log",
-                "",
                 "--guard-core-files",
                 "disable",
                 "--restore-if-deny",
@@ -3023,97 +3006,6 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(check.returncode, 0)
         self.assertIn("違う", check.stderr)
 
-    def test_review_script_keeps_the_port_and_scheme_of_origin(self):
-        """origin の URL から、ホスト・ポート・scheme を欠かさずに API の URL を組むこと。
-
-        host を `[^/:]+` で切るとポートが欠け、欠けたポートがプロジェクトのパスの先頭に
-        入り込む（`8929/demo/greeter`）。scheme を https に決め打ちすると、手元や社内に
-        平文で立てた GitLab（`http://localhost:8929`）に届かない。
-        """
-        script = self.script()
-        cases = [
-            (
-                "http://localhost:8929/demo/greeter.git",
-                "gitlab",
-                "http",
-                "localhost:8929",
-                "demo/greeter",
-            ),
-            (
-                "https://gitlab.example.com:8443/g/p.git",
-                "gitlab",
-                "https",
-                "gitlab.example.com:8443",
-                "g/p",
-            ),
-            ("git@gitlab.example.com:g/p.git", "gitlab", "https", "gitlab.example.com", "g/p"),
-            ("https://github.com/o/r.git", "github", "https", "github.com", "o/r"),
-        ]
-        git(self.parent_tree, "remote", "add", "origin", "https://example.invalid/x/y.git")
-        for url, kind, scheme, host, path in cases:
-            git(self.parent_tree, "remote", "set-url", "origin", url)
-            read = self.run_script(script, "origin")
-            self.assertEqual(read.returncode, 0, read.stdout + read.stderr)
-            got = dict(line.split("=", 1) for line in read.stdout.splitlines() if "=" in line)
-            self.assertEqual(got.get("kind"), kind, url)
-            self.assertEqual(got.get("scheme"), scheme, url)
-            self.assertEqual(got.get("host"), host, url)
-            self.assertEqual(got.get("path"), path, url)
-            expected = "https://api.github.com" if kind == "github" else f"{scheme}://{host}/api/v4"
-            self.assertEqual(got.get("api_base"), expected, url)
-
-    def script(self):
-        """このリポジトリの ccnavi-review.sh を、テスト用の木へ置く。
-
-        共通部（ccnavi-common*.sh）も一緒に置く。sh は起動して最初に隣の共通部を読むので、
-        片方だけだと判定の前に「読めない」で失敗する。
-        """
-        where = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-review.sh")
-        os.makedirs(os.path.dirname(where), exist_ok=True)
-        for name in ("ccnavi-review.sh", *common_sh()):
-            shutil.copy(
-                os.path.join(ROOT, ".ccnavi", "scripts", name),
-                os.path.join(os.path.dirname(where), name),
-            )
-        return where
-
-    def run_script(self, script, *args, env=None):
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-        environment.pop("CLAUDE_PROJECT_DIR", None)
-        # curl 経路を選ばせる。gh / glab が入っていても、このホストには認証が無い。
-        environment["GITLAB_TOKEN"] = "t"
-        environment["GITHUB_TOKEN"] = "t"
-        environment["CCNAVI_BIN_PATH"] = sys.executable
-        environment.update(env or {})
-        return subprocess.run(
-            ["sh", script, *args],
-            cwd=self.parent_tree,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=environment,
-        )
-
-    def test_review_script_refuses_an_unreadable_origin(self):
-        """sh の前半（場所と道具の解決）が Windows でも通ること。origin が読めなければ止まる。"""
-        self.family()
-        self.remote()
-        script = self.script()
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-        environment["CCNAVI_BIN_PATH"] = sys.executable
-        done = subprocess.run(
-            ["sh", script, "fetch"],
-            cwd=self.parent_tree,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=environment,
-        )
-        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-        self.assertIn("origin の URL を読めない", done.stderr)
-
     # ---- 10. 差し戻しを無視した終了
 
     def test_parent_hears_about_an_ignored_bounce(self):
@@ -3133,6 +3025,125 @@ class TicketTest(unittest.TestCase):
         }
         result = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
         self.assertIn("差し戻されたまま", self.reason(result))
+
+    def test_parent_hears_when_the_scope_could_not_be_checked(self):
+        """SubagentStop で子のワークツリーを読めなかった回は、止めずに記録で許可と分け、
+        親に 1 行言う。"""
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
+        log = os.path.join(self.root, "logs", "decisions.jsonl")
+        stop = {
+            "hook_event_name": "SubagentStop",
+            "cwd": child,
+            "session_id": "s1",
+            "agent_id": "sub-7",
+        }
+        with mock.patch.object(phase_scope, "scope_findings", return_value=([], "読めない")):
+            done = self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        with open(log, encoding="utf-8") as f:
+            row = json.loads(f.read().splitlines()[-1])
+        self.assertEqual(row["decision"], "skip")
+        self.assertEqual(row["reason"], "worktree-unreadable")
+        self.assertIn("i0001-01-01", row["detail"])
+        payload = {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Agent",
+            "cwd": self.parent_tree,
+            "session_id": "s1",
+            "tool_input": {"description": "子"},
+            "tool_response": {"agentId": "sub-7"},
+        }
+        result = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+        said = self.reason(result)
+        self.assertIn("worktree-unreadable", said)
+        self.assertIn("i0001-01-01", said)
+        # 印は読んだら消す。2 度目は言わない。
+        again = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+        self.assertNotIn("worktree-unreadable", self.reason(again))
+
+    def unreadable_stop(self, agent_id, session="s1"):
+        """子のワークツリーを読めないまま、サブエージェントを終わらせる。"""
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
+        stop = {
+            "hook_event_name": "SubagentStop",
+            "cwd": child,
+            "session_id": session,
+            "agent_id": agent_id,
+        }
+        with mock.patch.object(phase_scope, "scope_findings", return_value=([], "読めない")):
+            done = self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_parent_hears_on_its_next_tool_after_a_background_subagent(self):
+        """バックグラウンドのサブエージェントは、親の `Agent` の PostToolUse が終わりより先に来る。
+        印は親の次のどのツールの PostToolUse でも読み、読んだら消す。"""
+        self.family()
+        self.unreadable_stop("sub-bg")
+        # サブエージェントの中の呼び出しでは読まない。親に届かなくなる。
+        inside = self.hook("PostToolUse", "Bash", self.parent_tree, agent_id="sub-x", command="ls")
+        self.assertNotIn("worktree-unreadable", self.reason(inside))
+        result = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        said = self.reason(result)
+        self.assertIn("worktree-unreadable", said)
+        self.assertIn("sub-bg", said)
+        self.assertIn("i0001-01-01", said)
+        again = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertNotIn("worktree-unreadable", self.reason(again))
+
+    def test_marks_of_another_session_are_left_alone(self):
+        """印の名前の前置きが重なる別のセッション（`s1` と `s1-x`）の印は、読まずに残す。"""
+        self.family()
+        self.unreadable_stop("sub-bg", session="s1-x")
+        mine = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertNotIn("worktree-unreadable", self.reason(mine))
+        theirs = self.hook("PostToolUse", "Bash", self.parent_tree, session="s1-x", command="ls")
+        self.assertIn("worktree-unreadable", self.reason(theirs))
+
+    def test_parent_hears_at_the_next_prompt(self):
+        """親がツールを使わずにターンを終えたなら、次の依頼（UserPromptSubmit）で言う。"""
+        self.family()
+        self.unreadable_stop("sub-bg")
+        prompt = {
+            "hook_event_name": "UserPromptSubmit",
+            "cwd": self.parent_tree,
+            "session_id": "s1",
+            "prompt": "続けて",
+        }
+        result = self.ccnavi("--mode", "enable", stdin=json.dumps(prompt))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        said = self.reason(result)
+        self.assertIn("worktree-unreadable", said)
+        self.assertIn("sub-bg", said)
+        again = self.ccnavi("--mode", "enable", stdin=json.dumps(prompt))
+        self.assertNotIn("worktree-unreadable", self.reason(again))
+
+    def test_internal_error_at_subagent_stop_leaves_the_mark(self):
+        """SubagentStop の処理が内部エラーで終わっても、範囲を確かめなかったことが親に届く。"""
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
+        stop = {
+            "hook_event_name": "SubagentStop",
+            "cwd": child,
+            "session_id": "s1",
+            "agent_id": "sub-err",
+        }
+        with mock.patch.object(phase_scope, "scope_findings", side_effect=RuntimeError("x")):
+            done = self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("internal-error", json.loads(done.stdout)["systemMessage"])
+        payload = {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Agent",
+            "cwd": self.parent_tree,
+            "session_id": "s1",
+            "tool_input": {"description": "子"},
+            "tool_response": {"agentId": "sub-err"},
+        }
+        said = self.reason(self.ccnavi("--mode", "enable", stdin=json.dumps(payload)))
+        self.assertIn("worktree-unreadable", said)
+        self.assertIn("sub-err", said)
+        self.assertIn("内部エラー", said)
 
     # ---- 診断
 

@@ -2,14 +2,14 @@
 
 見るのは次のとおり。
 
-1. H-1 名前付きパイプ（FIFO）を読まない。SubagentStart が固まらない
-2. M-1 ハードリンクのフローを読まない。ハードリンクの別名への書き込みもロックで止める
-3. M-2 フローは正とするツリーの版だけを読む。着手のときにハッシュを記録し、
+1. 名前付きパイプ（FIFO）を読まない。SubagentStart が固まらない
+2. ハードリンクのフローを読まない。ハードリンクの別名への書き込みもロックで止める
+3. フローは正とするツリーの版だけを読む。着手のときにハッシュを記録し、
    着手のあとに書き換わったら
    SubagentStart と SubagentStop が知らせる（止めない）。案内は「書けない」と言わない
-4. M-4 親のツリーからの起動では手順を並べず、各子のフローのパスと「自分の担当だけ」を言う
-5. M-3 承認の前に提案のツリーへ保存したフローを、承認で承認済みチケットのツリーへ動かす
-6. L-a〜L-c 接頭辞の真似・置き場のパス・大文字小文字のそろえ方
+4. 親のツリーからの起動では手順を並べず、各子のフローのパスと「自分の担当だけ」を言う
+5. 承認の前に提案のツリーへ保存したフローを、承認で承認済みチケットのツリーへ動かす
+6. 接頭辞の真似・置き場のパス・大文字小文字のそろえ方
 7. lint は承認済みの領域のファイルを「ワークツリーにしかない」と言わない（ユーザの決定）
 """
 
@@ -21,6 +21,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
 import yaml
 
@@ -34,8 +35,9 @@ from tests.ticket.test_flow import (
     child_ticket,
     conf_with,
 )
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import write
+from tests.ticketsample import child_text, parent_text
 
 HAS_FIFO = hasattr(os, "mkfifo")
 CHANGED = "着手後にフローが書き換わった"
@@ -80,7 +82,7 @@ class Watchdog:
 
 
 class FlowFileKindTest(unittest.TestCase):
-    """ふつうのファイルで、名前が 1 つのものだけを読む（H-1・M-1）。"""
+    """ふつうのファイルで、名前が 1 つのものだけを読む。"""
 
     @unittest.skipUnless(HAS_FIFO, "mkfifo が無い")
     def test_a_fifo_is_not_read_and_does_not_hang(self):
@@ -116,10 +118,10 @@ class FlowFileKindTest(unittest.TestCase):
 
 
 class FlowSpellingTest(unittest.TestCase):
-    """置き場のパスを整え、大文字小文字を長さを変えずにそろえる（L-b・L-c）。"""
+    """置き場のパスを整え、大文字小文字を長さを変えずにそろえる。"""
 
     def test_the_approved_place_is_normalized(self):
-        """`./`・`//`・`x/..`・末尾の `/.` を取り除いた置き場で、整えたパスに当てる（L-b）。"""
+        """`./`・`//`・`x/..`・末尾の `/.` を取り除いた置き場で、整えたパスに当てる。"""
         root = scratch(self)
         for approved in (
             ".ccnavi/approved",
@@ -161,7 +163,7 @@ class FlowSpellingTest(unittest.TestCase):
                 self.assertIsNotNone(flow.lock_hit([child_ticket(True)], "", found[0]))
 
     def test_case_folding_keeps_offsets_with_dotted_capital_i(self):
-        """全体の `lower()` で長さが変わる字（`İ`）が途中にあっても、ロックを外さない（L-c）。"""
+        """全体の `lower()` で長さが変わる字（`İ`）が途中にあっても、ロックを外さない。"""
         conf = conf_with()
         running = child_ticket(started=True)
         for path in (
@@ -178,7 +180,7 @@ class FlowSpellingTest(unittest.TestCase):
 
 
 class FlowNeutralTest(unittest.TestCase):
-    """フローの文が ccnavi の知らせや案内の区切りに見えない（L-a）。"""
+    """フローの文が ccnavi の知らせや案内の区切りに見えない。"""
 
     NAMES = (
         "[ccnavi dry-run] enable would have stopped this call",
@@ -311,6 +313,17 @@ class FlowDigestTest(FlowHarness):
             self.assertIn(flow.CODE_CHANGED, out["systemMessage"])
             self.assertIn(CHILD, out["systemMessage"])
 
+    def test_a_check_that_fails_is_reported_not_kept_silent(self):
+        """比べる途中の例外は、黙らずに「確かめられなかった」を言う。止めない。"""
+        child_tree = self.run_child(CHILD)
+        with mock.patch.object(flow, "fingerprint", side_effect=OSError("x")):
+            start, stop = self.start_and_stop(child_tree)
+        for result in (start, stop):
+            self.assertEqual(result.returncode, 0, result.stderr)
+            out = json.loads(result.stdout)
+            self.assertIn("確かめられなかった", out["systemMessage"])
+            self.assertIn("OSError", out["systemMessage"])
+
     def test_a_removed_or_replaced_flow_is_reported(self):
         child_tree = self.run_child(CHILD)
         os.remove(self.flow_path)
@@ -338,7 +351,7 @@ class FlowDigestTest(FlowHarness):
 
     @unittest.skipUnless(HAS_FIFO, "mkfifo が無い")
     def test_a_fifo_swapped_in_after_the_start_does_not_hang_subagent_start(self):
-        """着手のあとにフローを名前付きパイプに差し替えても、SubagentStart は固まらない（H-1）。"""
+        """着手のあとにフローを名前付きパイプに差し替えても、SubagentStart は固まらない。"""
         child_tree = self.run_child(CHILD)
         os.remove(self.flow_path)
         os.mkfifo(self.flow_path)
@@ -352,7 +365,7 @@ class FlowDigestTest(FlowHarness):
 
 
 class FlowHardLinkLockTest(FlowHarness):
-    """ハードリンクの別名への書き込みもロックが止める（M-1）。"""
+    """ハードリンクの別名への書き込みもロックが止める。"""
 
     def test_a_hard_link_alias_is_locked_while_in_progress(self):
         alias = os.path.join(self.parent_tree, "wip", "notes.yml")
@@ -373,7 +386,7 @@ class FlowHardLinkLockTest(FlowHarness):
 
 
 class FlowParentBriefingTest(PhaseHarness):
-    """親のツリーからの起動では、手順を並べずパスだけを言う（M-4）。"""
+    """親のツリーからの起動では、手順を並べずパスだけを言う。"""
 
     def test_parent_cwd_lists_paths_only_and_the_child_cwd_gets_the_steps(self):
         self.propose("i0001", parent_text("i0001", ["research"], allow=("src/*", "wip/*")))
@@ -404,7 +417,7 @@ class FlowParentBriefingTest(PhaseHarness):
 
 
 class FlowCarriedOnApprovalTest(PhaseHarness):
-    """承認の前に提案のツリーへ保存したフローを、承認で承認済みチケットのツリーへ動かす（M-3）。"""
+    """承認の前に提案のツリーへ保存したフローを、承認で承認済みチケットのツリーへ動かす。"""
 
     def setUp(self):
         super().setUp()

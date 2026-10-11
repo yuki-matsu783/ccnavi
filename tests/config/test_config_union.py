@@ -17,8 +17,8 @@ lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無いレイヤ
 再現できる。
 
 実装は入っている。ここが失敗したら、rules の合成が設計と食い違ったということ。
-phases / risk の合成は test_config_union_phases_risk.py、selfguard と導入スクリプトは
-test_config_union_guard.py。
+phases / risk の合成は test_config_union_phases_risk.py、selfguard は
+test_config_union_guard.py、導入スクリプトが配る先は tests/sh/test_setup_layers.py。
 """
 
 from __future__ import annotations
@@ -451,12 +451,6 @@ class ConfigUnionHarness(unittest.TestCase):
             [
                 "--root",
                 self.ws,
-                "--approved",
-                ".ccnavi/approved",
-                "--state",
-                self.state,
-                "--log",
-                self.log,
                 "--guard-core-files",
                 guard,
                 "--restore-if-deny",

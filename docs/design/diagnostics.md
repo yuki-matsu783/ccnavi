@@ -35,6 +35,12 @@ state も内部で外す。拡張と `scripts/check_rules.py` は念のため `-
 診断の外（hook からの判定、`ticket` / `review` の副命令）に渡すと外し、外したことを標準エラーに
 出す。守る対象も本来の場所のまま（守る側は差し替えを見ない `layer_real_path` を引く）。
 
+**記録・state・承認済みチケット・提案の置き場を動かす `--log` / `--state` / `--approved` / `--tickets` も、診断でだけ有効になる。**
+診断の外に渡すと、レイヤーの置き場のフラグと同じく外し、同じ文面を標準エラーに出す。`.ccnavi/scripts/` の sh
+（`ccnavi-ticket.sh` / `ccnavi-review.sh`）は受け取った引数を `"$@"` で実行ファイルへそのまま渡すので、診断の外で効くと、
+エージェントが記録を止めた形（`--log ""`）や、承認済みチケット・提案の置き場を差し替えた形で副命令を動かせる（P2・P6）。
+C1 の書いたパスの一覧（`--record-writes`）も、診断の外では `--state` を見ずに既定の state の置き場だけを一覧から外す。
+
 **互換の版**（`src/ccnavi/entry/version.py` の `COMPAT`）は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh の `CCNAVI_COMPAT`、拡張の
 `EXTENSION_COMPAT`）の契約の版で、3 か所に同じ値を書く。sh は実行ファイルを起動する前に、拡張は起動のときに `--version` を読んで
 比べ、`--lint` は sh の値と比べる（`(version)` の warn）。食い違えば、どれも直し方（ccnavi のリポジトリなら組み立て直し、配布先なら
@@ -49,6 +55,18 @@ JSON の形は README の「試験の JSON」「lint の JSON」「ボードの 
 提案もマーカーも自分で解釈せず、glob も regex も自分で当てず、点も数えない。止まっているか・
 承認待ち・ワークツリーの有無は、判定と承認が使う関数をそのまま呼んで載せる。チケットには状態の履歴（9.6）の
 新しい側も `history` で載せる。カードはそれを折りたためる「履歴」に並べるだけで、列やバッジは履歴から決めない。
+
+**`--explain --json` の `settings.mode` と `settings.ticket_control` は、hook がいま受け取るはずの値で答える。**
+拡張が起動した実行ファイルには、Claude Code が hook に渡す `.claude/settings*.json` の `env` が届かない。
+そこで `--explain --json` だけは、プロセスの環境の上に、ワークスペースルートの `.claude/settings.json`、
+`.claude/settings.local.json` の `env` をこの順で重ねる（Claude Code と同じ順。`settings.hook_view`）。ccnavi 自身の
+ソースツリーでは上書き設定ファイル（`ccnavi.settings.local.json`）が環境より強いのも `load` と同じ。重ねた値は、判定と同じ
+`modes.resolve_mode` と `selfguard.resolve` で解く。読めない値は `enable`、設定から来た `disable` のモードは
+「環境からだけ受ける」の規則のまま（`env` は Claude Code が環境として渡すので受ける）。フラグ（`--mode`・`--ticket-control`）が
+あればそれが勝つ。ボードの中身（チケットを出すか）も同じ値で組み、`settings` の値と食い違わせない。
+ホームの設定（`~/.claude/settings.json`）と managed の設定は読まない。実行ファイルはワークスペースの外を見ない。
+そのため、そこに書いた値はボードに出ない。hook の判定の経路（`load`）はこれを使わず、プロセスに渡った環境だけを読む。
+拡張はこの 2 つの値をそのまま表示と入口の出し分けに使い、設定ファイルの `env` を自分では読まない。
 
 承認は拡張の中で完結する（9.4）。オーバーレイが `--agree --preview --json` で一覧を見せ、ユーザが押したら
 `--agree --yes` を子プロセスで打つ。承認できたら、渡す文を見せる。そのあとボードを読み直し、列が変わったカードに動いた表示を
@@ -91,5 +109,5 @@ error がある間は配点もフェーズ定義も保存できない。
   フローを保存した後に承認の push を送るかを、これで決める
 - 診断ログ（`logs/diag/`）の行の形・置き場・レベルは、sh・Python・拡張の 3 つの logger で揃える（`docs/claude/logging.md`）。
   `tests/core/test_diaglog.py` が 3 つの行を突き合わせる
-- Chrome 拡張は実行ファイルを起動せず、`src/ccnavi/` を Pyodide で import して、判定のコア（`hook/core.py`（実体は `core_base`・`core_approve`・`core_review`・`core_withdraw`）の
+- Chrome 拡張は実行ファイルを起動せず、`src/ccnavi/` を Pyodide で import して、判定のコア（`tickets/core.py`（実体は `core_base`・`core_approve`・`core_review`・`core_withdraw`）の
   Snapshot → 判定 → Changes）と `cli.run` を直に呼ぶ。呼ぶ名前の一覧は REQ-EXT-27 の表にある

@@ -21,7 +21,8 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
    1 回だけやり直す
 6. 届いていた push（応答だけが失われた）は ls-remote で確かめて成功にする
 7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error（着手で configsync が
-   プロジェクトのレイヤーへ写したものは例外。tests/ticket/test_core.py と tests/config/ が見る）
+   プロジェクトのレイヤーへ写したものは例外。tests/ticket/test_swap_points.py と
+   tests/config/ が見る）
 8. hook の書きかけ（pending・skipped・状態の履歴の追記）はコミットし、
    ユーザの判断（c）と知らない変更（d）は止める
 9. ユーザの判断の入口（ccnavi-review.sh chat など）は、取り込み済みの親子のチケットなら
@@ -50,8 +51,7 @@ import time
 import unittest
 
 from tests import ROOT, can_pass_argument, common_path, config_path, live_sh_pid, requires_symlink
-from tests.ticket.test_phases import PHASES, child_text, parent_text
-from tests.ticket.test_ticket import RULES
+from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
@@ -1739,9 +1739,9 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
     def chrome_request(self, scene=None):
         """拡張が組むのと同じ要求（統合先 main、親 i0001、録った見本、
         依頼の後の変更の一覧）。"""
-        from tests.ticket.test_core import _chrome
+        from tests.ticketsample import load_chrome
 
-        chrome = _chrome()
+        chrome = load_chrome()
         place = chrome._placement()
         keep = tuple(p + "/" for p in place["integration_paths"])
         main = {

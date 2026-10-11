@@ -5,7 +5,9 @@
 1. `extensions/vscode/ccnavi-board/scripts/test-groups.js --plan` が、触ったファイルから
    回すグループを決める。中の関数は呼ばず、出る 1 行だけを見る（`groups=... compile=...
    webview=...`）。この行が sh（`.claude/hooks/test-ext.sh`）との契約
-2. `.claude/hooks/mark-ext.sh` が、拡張のファイルを触ったときだけ書き残す
+2. `.claude/hooks/mark-ext.sh` が、拡張（VS Code・Chrome）のファイルを触ったときだけ書き残す
+3. `.claude/hooks/test-ext.sh` が、書き残したファイルから拡張の入口を呼び、終了コードを読む
+   （VS Code は触ったファイルを渡してグループを絞り、Chrome は全部を回す）
 
 `--plan` は node_modules が無くても動く（読むのはソースのパスだけ）。組み立ても
 テストもしないので、このグループの時間の中に収まる。
@@ -297,6 +299,18 @@ class MarkExtHookTest(unittest.TestCase):
                 self.mark(ws, given),
             )
 
+    def test_a_relative_path_is_written_down(self):
+        with tempfile.TemporaryDirectory() as ws:
+            path = "extensions/vscode/ccnavi-board/src/core/board.ts"
+            self.assertEqual([path], self.mark(ws, path))
+
+    def test_a_chrome_extension_file_is_written_down(self):
+        with tempfile.TemporaryDirectory() as ws:
+            path = "/repo/extensions/chrome/ccnavi-approval/src/board.ts"
+            self.assertEqual([path], self.mark(ws, path))
+            relative = "extensions/chrome/ccnavi-approval/py/ccnavi_chrome.py"
+            self.assertEqual([path, relative], self.mark(ws, relative))
+
     def test_files_outside_the_extension_are_not_written_down(self):
         with tempfile.TemporaryDirectory() as ws:
             self.assertEqual([], self.mark(ws, "/repo/src/ccnavi/main.py"))
@@ -393,6 +407,21 @@ class TestExtHookTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual(["--for", slashed(os.path.join(board, "src", "core", "board.ts"))], args)
 
+    def test_a_relative_path_runs_the_tree_under_the_workspace(self):
+        # mark-ext.sh は受け取ったとおりに書く。相対パスはワークスペースルートからのパスとして読む。
+        workspace, _, marker = self.workspace()
+        board = os.path.join(workspace, "extensions", "vscode", "ccnavi-board")
+        os.makedirs(os.path.join(board, "scripts"))
+        with open(os.path.join(board, "scripts", "test-groups.js"), "w", encoding="utf-8") as f:
+            f.write(self.STUB)
+        touched = "extensions/vscode/ccnavi-board/src/core/board.ts"
+        with open(marker, "w", encoding="utf-8", newline="\n") as f:
+            f.write(f"{touched}\n")
+        result, args = self.stop(workspace)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(["--for", touched], args)
+        self.assertFalse(os.path.exists(marker))
+
     def test_a_failing_run_is_pushed_back_and_counted(self):
         workspace, _, marker = self.workspace()
         result, _ = self.stop(workspace, rc=1)
@@ -449,6 +478,84 @@ class TestExtHookTest(unittest.TestCase):
         self.assertEqual(0, result.returncode)
         self.assertIsNone(args)
         self.assertIn("テストの入口がない", result.stderr)
+
+
+@unittest.skipIf(SH is None or NODE is None, "sh か node が無い")
+class TestExtChromeHookTest(unittest.TestCase):
+    """Chrome の拡張を触ったターン。グループに分けていないので、入口（`scripts/test.js`）を
+    引数なしで 1 回呼ぶ。入口は代わりのものを置き、呼ばれた居場所を書き出させる。"""
+
+    STUB = (
+        "require('node:fs').writeFileSync(process.env.STUB_LOG, process.cwd());\n"
+        "process.exit(Number(process.env.STUB_RC || 0));\n"
+    )
+
+    def workspace(self, touched=("src/board.ts",), modules=True, tree="tree"):
+        base = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base, True)
+        workspace = os.path.join(base, "ws")
+        chrome = os.path.join(base, tree, "extensions", "chrome", "ccnavi-approval")
+        os.makedirs(os.path.join(chrome, "scripts"))
+        if modules:
+            os.makedirs(os.path.join(chrome, "node_modules"))
+        os.makedirs(os.path.join(workspace, "logs", "session"))
+        write(os.path.join(chrome, "scripts", "test.js"), self.STUB)
+        marker = os.path.join(workspace, "logs", "session", "s1.ext-files")
+        with open(marker, "w", encoding="utf-8", newline="\n") as f:
+            for rel in touched:
+                f.write(slashed(os.path.join(chrome, *rel.split("/"))) + "\n")
+        return workspace, chrome, marker
+
+    def stop(self, workspace, rc=0):
+        payload = '{"session_id":"s1","hook_event_name":"Stop","stop_hook_active":false}'
+        log = os.path.join(workspace, "stub.log")
+        env = {**os.environ, "CLAUDE_PROJECT_DIR": workspace, "STUB_LOG": log, "STUB_RC": str(rc)}
+        result = subprocess.run(
+            [SH, TEST_EXT], input=payload, capture_output=True, text=True, cwd=workspace, env=env
+        )
+        ran_in = None
+        if os.path.exists(log):
+            with open(log, encoding="utf-8") as f:
+                ran_in = f.read()
+        return result, ran_in
+
+    def test_the_whole_extension_runs_in_its_own_directory(self):
+        workspace, chrome, marker = self.workspace()
+        result, ran_in = self.stop(workspace)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(os.path.realpath(chrome), os.path.realpath(ran_in))
+        self.assertFalse(os.path.exists(marker))
+
+    def test_a_path_with_spaces_still_runs(self):
+        workspace, chrome, _ = self.workspace(tree="my dir")
+        result, ran_in = self.stop(workspace)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(os.path.realpath(chrome), os.path.realpath(ran_in))
+
+    def test_a_failing_run_is_pushed_back(self):
+        workspace, _, marker = self.workspace()
+        result, _ = self.stop(workspace, rc=1)
+        self.assertEqual(2, result.returncode)
+        self.assertIn("失敗したテストを直して", result.stderr)
+        self.assertTrue(os.path.exists(marker))
+
+    def test_documents_only_run_nothing(self):
+        workspace, _, _ = self.workspace(touched=("README.md", "docs/design.md"))
+        result, ran_in = self.stop(workspace)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIsNone(ran_in)
+        self.assertEqual("", result.stderr)
+
+    def test_missing_node_modules_is_told_not_pushed_back(self):
+        # 組み立てられないのはテストの失敗ではない。差し戻さずにユーザへ言う。
+        workspace, _, _ = self.workspace(modules=False)
+        result, ran_in = self.stop(workspace)
+        self.assertEqual(0, result.returncode)
+        self.assertIsNone(ran_in)
+        self.assertIn("pnpm install", result.stderr)
+        self.assertFalse(
+            os.path.exists(os.path.join(workspace, "logs", "session", "s1.ext-retries"))
+        )
 
 
 if __name__ == "__main__":

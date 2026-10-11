@@ -435,7 +435,7 @@ test("CB-D72 読み直せなかった画面から中身が届いたあとも、i
   }
 });
 
-test("CB-T50 dry-run のときは止めないことを言い、enable と未設定（実行ファイルは enable と扱う）なら言わない", async () => {
+test("CB-T50 実行ファイルが答えたモードで帯を出す。dry-run と disable は止めないことを言い、enable と答えが無いときは言わない", async () => {
   const banners = async (mode: string): Promise<string[]> => {
     const dom = await openRules({ mode });
     try {
@@ -444,7 +444,14 @@ test("CB-T50 dry-run のときは止めないことを言い、enable と未設�
       await dom.close();
     }
   };
-  assert.match((await banners("dry-run")).join("\n"), /CCNAVI_MODE.*dry-run/);
+  const dryRun = (await banners("dry-run")).join("\n");
+  assert.match(dryRun, /CCNAVI_MODE.*dry-run/);
+  assert.match(dryRun, /判定と記録だけ/);
+  const disable = (await banners("disable")).join("\n");
+  assert.match(disable, /CCNAVI_MODE.*disable/);
+  // disable は判定しない。dry-run と同じ「判定と記録」の文面にしない
+  assert.match(disable, /判定しません/);
+  assert.doesNotMatch(disable, /記録/);
   assert.deepEqual(await banners(""), []);
   assert.deepEqual(await banners("enable"), []);
 });

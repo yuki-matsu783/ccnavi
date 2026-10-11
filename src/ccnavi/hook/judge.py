@@ -202,6 +202,11 @@ def decide_before(
     # 誰がやっても止める。チケット制御が有効なときだけ足す。
     if conf.tickets_enabled:
         rule_set.deny.extend(ticket_guard.guard_rules(conf.tickets, root))
+        # 生の git を止め、入口を git のラッパー 1 本に寄せる。チケット制御の可否の一部は
+        # ラッパーの中にあり、外から打てれば外れる。ルールファイルが読めない間も足す
+        # （`ticket_guard.raw_git_rule`）。
+        if ticket_guard.raw_git_applies(conf, root):
+            rule_set.deny.append(ticket_guard.raw_git_rule(root))
         # ユーザの判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:
@@ -248,7 +253,10 @@ def decide_before(
                 notices
                 + [
                     reasons.builtin_refusal(
-                        wrapguard.CODE_ENV, subject, wrapguard.env_message(script, names)
+                        wrapguard.CODE_ENV,
+                        wrapguard.ENV_RULE_ID,
+                        subject,
+                        wrapguard.env_message(script, names),
                     )
                 ],
                 conf=conf,
@@ -273,7 +281,10 @@ def decide_before(
                 notices
                 + [
                     reasons.builtin_refusal(
-                        phase_forms.CODE_RECORDS_PRUNE, subject, phase_forms.prune_message()
+                        phase_forms.CODE_RECORDS_PRUNE,
+                        phase_forms.RECORDS_PRUNE_RULE_ID,
+                        subject,
+                        phase_forms.prune_message(),
                     )
                 ],
                 conf=conf,
@@ -300,6 +311,7 @@ def decide_before(
                 + [
                     reasons.builtin_refusal(
                         phase_forms.CODE_TICKET_APPROVAL,
+                        phase_forms.TICKET_APPROVAL_RULE_ID,
                         subject,
                         phase_forms.guard_off_message(found)
                         if kind == "guard-off"
@@ -326,6 +338,7 @@ def decide_before(
                 + [
                     reasons.builtin_refusal(
                         wrapguard.CODE_CHILD_PUSH,
+                        wrapguard.CHILD_PUSH_RULE_ID,
                         subject,
                         wrapguard.child_push_message(name, parent),
                     )
@@ -475,7 +488,10 @@ def decide_before(
         layers = sorted(inner, key=lambda x: x[2]) if name != rules.ALLOW else []
         for rule in rule_set.section(name):
             if time.monotonic() > deadline:
-                stderr.write("ccnavi: 判定を終える前に期限に達した\n")
+                stderr.write(
+                    reasons.deadline_exceeded(audit.REASON_DEADLINE_EXCEEDED, DEADLINE_SECONDS)
+                    + "\n"
+                )
                 record.decision, record.reason = audit.SKIP, audit.REASON_DEADLINE_EXCEEDED
                 return modes.fail_closed(mode)
             raw_skipped = capped and rule.id in SHELL_GUARD_RULE_IDS
@@ -590,7 +606,10 @@ def decide_before(
         # `>` の上限で止めた。当たった ask のルールがあれば、その文も後ろに並べる。
         texts = [
             reasons.builtin_refusal(
-                reasons.CODE_REDIRECT_LIMIT_DENY, subject, selfguard_shell.REDIRECT_LIMIT_MESSAGE
+                reasons.CODE_REDIRECT_LIMIT_DENY,
+                reasons.REDIRECT_LIMIT_RULE,
+                subject,
+                selfguard_shell.REDIRECT_LIMIT_MESSAGE,
             ),
             *(
                 reasons.reason_for(
@@ -864,8 +883,8 @@ def flow_lock(
         child = flow.lock_hit(copies, found[1], found[0])
         if child is not None:
             return flow.locked_message(conf, child, path), copies
-    # ハードリンクはパスに置き場が出ない（M-1）。書き込み先が在って名前が 2 つ以上あるときだけ、
-    # 着手中の子のフローと同じ中身（inode）かを見る。
+    # ハードリンクはパスに置き場が出ないので `locate` では当たらない。書き込み先が在って
+    # 名前が 2 つ以上あるときだけ、着手中の子のフローと同じ中身（inode）かを見る。
     target = full or spelled
     if target and flow.hard_linked(target):
         if copies is None:

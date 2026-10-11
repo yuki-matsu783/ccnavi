@@ -33,7 +33,7 @@ class ShortenTest(unittest.TestCase):
         self.assertEqual(subject_line(text), "subject: " + "x" * LIMIT + "…(+5)")
 
     def test_組み込みの判定の文面も切った目印を付ける(self):
-        text = reasons.builtin_refusal("CODE", "y" * (LIMIT + 7), "text")
+        text = reasons.builtin_refusal("CODE", "rule-id", "y" * (LIMIT + 7), "text")
         self.assertEqual(subject_line(text), "subject: " + "y" * LIMIT + "…(+7)")
 
     def test_宣言の無い呼び出しの文面も畳んだ後の長さで数える(self):

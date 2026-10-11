@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import atexit
 import os
 import shutil
 import subprocess
@@ -22,6 +23,27 @@ import unittest
 from tests import ROOT
 
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+
+
+def with_exe(environment):
+    """ソースの実行ファイルを起こすものを CCNAVI_BIN_PATH に渡す。走らせた機械の値は使わない。
+
+    sh は親のワークツリーかをチケットを読まずに実行ファイル（`tree parent`）に聞く。
+    テストのワークスペースには組み立てた実行ファイルもソースも無いので、ここで渡す。
+    """
+    if not _EXE:
+        base = tempfile.mkdtemp(prefix="ccnavi-gitwrap-exe-")
+        atexit.register(shutil.rmtree, base, ignore_errors=True)
+        path = os.path.join(base, "ccnavi")
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(f'#!/bin/sh\nPYTHONPATH="{ROOT}/src" exec "{sys.executable}" -m ccnavi "$@"\n')
+        os.chmod(path, 0o755)
+        _EXE.append(path)
+    environment["CCNAVI_BIN_PATH"] = _EXE[0]
+    return environment
+
+
+_EXE: list[str] = []
 SCRIPT = os.path.join(SH_DIR, "ccnavi-git.sh")
 SHELL = shutil.which("sh") or shutil.which("bash")
 
@@ -77,7 +99,7 @@ class GitWrapperTest(unittest.TestCase):
         make_repo(self.dir)
 
     def run_wrapper(self, *args, env=None):
-        environment = dict(os.environ)
+        environment = with_exe(dict(os.environ))
         environment.update(env or {})
         return subprocess.run(
             [SHELL, SCRIPT, *args],
@@ -323,7 +345,7 @@ class PassTest(GitWrapperTest):
             trees[name] = path
 
         def push_from(name):
-            environment = dict(os.environ)
+            environment = with_exe(dict(os.environ))
             return subprocess.run(
                 [SHELL, SCRIPT, "push", "-u", "origin", name],
                 cwd=trees[name],
@@ -945,6 +967,7 @@ def run_in(cwd, *args):
         text=True,
         encoding="utf-8",
         errors="replace",
+        env=with_exe(dict(os.environ)),
     )
 
 
@@ -1503,6 +1526,7 @@ class IntegrationPushTest(GitWrapperTest):
 
     def push(self, cwd=None, branch=None, **env):
         environment = {k: v for k, v in os.environ.items() if k != "CCNAVI_INTEGRATION_BRANCH"}
+        with_exe(environment)
         environment.update(env)
         return subprocess.run(
             [SHELL, SCRIPT, "push", "-u", "origin", branch or self.BRANCH],

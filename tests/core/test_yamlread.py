@@ -312,7 +312,7 @@ class BrokenTicketHookTest(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         env.pop("CLAUDE_PROJECT_DIR", None)
         env.update(CCNAVI_GUARD_CORE_FILES="disable", PYTHONPATH=SRC)
-        args = ["--root", root, "--log", "", "--state", self.state, "--mode", "enable"]
+        args = ["--root", root, "--mode", "enable"]
         done = subprocess.run(
             [sys.executable, "-c", _HOOK, mode, *args],
             input=json.dumps(payload).encode(),

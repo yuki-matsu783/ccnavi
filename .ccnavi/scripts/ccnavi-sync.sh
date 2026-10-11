@@ -63,7 +63,8 @@
 # 答えの頭に `check 1` が無い）ときは、親子のチケットを止めずに警告だけ出す（検査の error とは分ける）。
 #
 # 実行ファイルはネットワークに出ない（docs/claude/exe-boundary.md）。ここが git で取ってくる。
-# 置き場のパスと settings.local.json の読みだけを実行ファイル（`ccnavi sync paths`）に聞く。
+# 置き場のパスと settings.local.json の読みは実行ファイル（`ccnavi sync paths`）に、閉じたかの見分け（チケットの
+# YAML）は `ccnavi sync closed` に、親のワークツリーかは `ccnavi tree parent` に聞く（sh はチケットを読まない）。
 # 実行ファイルが無ければ、ほかの sh と同じく既定のパス（固定）を使う。在るのに
 # 答えなかったときは、統合先を取り違えないよう止める。
 #
@@ -511,11 +512,20 @@ if [ "$#" -gt 0 ]; then
 			fail_note
 			continue
 		fi
-		if ! ccnavi_parent_tree "$tree" "$want"; then
+		pt_rc=0
+		ccnavi_parent_tree "$tree" "$want" || pt_rc=$?
+		case "$pt_rc" in
+		1)
 			printf '%s: .claude/worktrees/%s に親チケットも提案も無い。親のワークツリーではないので取り込まない\n' "$want" "$want"
 			fail_note
 			continue
-		fi
+			;;
+		2)
+			printf '%s: .claude/worktrees/%s に親チケットか提案があるかを実行ファイルに確かめられなかった（実行ファイルが無い・古い、またはチケットの frontmatter を読めない）。取り込まない\n' "$want" "$want"
+			fail_note
+			continue
+			;;
+		esac
 		add_family "$want" "$tree" "$want_branch"
 	done
 else
@@ -677,107 +687,32 @@ sync_present() {
 	return 0
 }
 
-# frontmatter の行だけ（1 行目の `---` から次の `---` の手前まで）。行末の CR は除く。標準入力から。
-# 1 行目が `---` でなければ何も出さない。本文に同じ語を書いた行を欄と読まないために、欄はここから拾う。
-frontmatter_of() {
-	awk '
-		{ sub(/\r$/, "") }
-		NR == 1 { if ($0 !~ /^---[ \t]*$/) exit; next }
-		/^---[ \t]*$/ { exit }
-		{ print }
-	'
-}
-
-# frontmatter の行頭にある欄 <名前> の値（最初の 1 つ）。前後の空白と、値を囲む引用符を外す。
-# 値の無い欄・空文字（`""`・`''`）は空を出す。YAML と同じく、引用符の外の ` #` から後ろは注記として除き、
-# 引用符の無い `null`・`Null`・`NULL`・`~` は値が無いとみなす（Python の syncstate._text と同じ結果にする）。
-# 標準入力は frontmatter_of の出力。
-front_field() {
-	awk -v key="$1" -v q="'" '
-		index($0, key ":") == 1 {
-			v = substr($0, length(key) + 2)
-			sub(/^[ \t]+/, "", v)
-			c = substr(v, 1, 1)
-			if (c == "\"" || c == q) {
-				rest = substr(v, 2)
-				end = index(rest, c)
-				v = end > 0 ? substr(rest, 1, end - 1) : rest
-			} else {
-				if (c == "#") v = ""
-				p = match(v, /[ \t]#/)
-				if (p > 0) v = substr(v, 1, p - 1)
-				sub(/[ \t]+$/, "", v)
-				if (v == "null" || v == "Null" || v == "NULL" || v == "~") v = ""
-			}
-			sub(/^[ \t]+/, "", v)
-			sub(/[ \t]+$/, "", v)
-			print v
-			exit
-		}
-	'
-}
-
-# 2 つの frontmatter（$1 が親のワークツリーの親チケット、$2 が統合先か退避の親チケット）が同じ親か。
-# スクリプトだけが書く欄を base_sha → started_at → cancelled_at の順に見て、最初に両方が値を持つ
-# 欄が同じかで決める。空どうしは一致としない。どの欄でも照合できないときは同じとしない。
-# Python の syncstate.same_parent と同じ見方。
-same_parent() {
-	for sp_key in base_sha started_at cancelled_at; do
-		sp_a=$(printf '%s\n' "$1" | front_field "$sp_key")
-		sp_b=$(printf '%s\n' "$2" | front_field "$sp_key")
-		if [ -n "$sp_a" ] && [ -n "$sp_b" ]; then
-			[ "$sp_a" = "$sp_b" ]
-			return
-		fi
-	done
-	return 1
-}
-
-# 統合先の done/ に、この親子のチケットの親チケットがあるか。統合先は取ってきた後の refs/remotes/origin/<統合先>。
+# 親子のチケット P が閉じたと言えるかを実行ファイル（`sync closed`）に聞く。<integration|archive>
 #
-# 在るだけでは見ない。識別子（`ticket:`）が P で、子（`parent:`）でなく、親のワークツリーの親チケットと
-# 同じ親だと言えるときだけ「閉じた」とする（同じ識別子の古い親子のチケットを、今のものと読まない）。
+# sh はチケットの YAML を読まない。読むのは実行ファイルで、答えは 1 行 1 項目。
+#   integration  統合先の done/ に、識別子が P で子（`parent:`）でなく、親のワークツリーの親チケットと
+#                同じ親と言える親チケットがある。統合先は取ってきた後の refs/remotes/origin/<統合先>
+#   archive      手元の退避（ready が閉じた親子のチケットを移した先。logs/archive/<リポジトリ>/done/<P>.md）に
+#                識別子が P で子でない親チケットがあり、親のワークツリーに承認済みの親チケットが残っていれば
+#                同じ親とも言える。退避は手元にしか無いので、別の機械では見えない（そのときは ccnavi-review.sh merged に聞く）
 # 同じ親かは、スクリプトだけが書く欄を base_sha → started_at → cancelled_at の順に見て、最初に両方が値を持つ
-# 欄が同じかで決める。空どうしは一致としない。どの欄でも照合できないとき、親のワークツリーに承認済みの
-# 親チケットが無いときは閉じていない側に倒す（止めて戻し方を出す）。
-closed_in_integration() {
-	ci_body=$(git -C "$repo" show "refs/remotes/origin/$integ:$approved/done/$P.md" 2>/dev/null) || return 1
-	ci_theirs=$(printf '%s\n' "$ci_body" | frontmatter_of)
-	ci_id=$(printf '%s\n' "$ci_theirs" | front_field ticket)
-	[ "$ci_id" = "$P" ] || return 1
-	printf '%s\n' "$ci_theirs" | grep -q '^parent:' && return 1
-	ci_file=""
-	for ci_try in "$tree/$approved/doing/$P.md" "$tree/$approved/done/$P.md"; do
-		[ -f "$ci_try" ] || continue
-		ci_file="$ci_try"
-		break
-	done
-	[ -n "$ci_file" ] || return 1
-	same_parent "$(frontmatter_of <"$ci_file")" "$ci_theirs"
+# 欄が同じかで決める（同じ識別子の古い親子のチケットを、今のものと読まない）。
+# 実行ファイルが無い・答えない（古くて副命令を知らない）ときは閉じていない側に倒す（止めて戻し方を出す）。
+closed_by() {
+	[ -n "$info_from" ] || return 1
+	cb_out=$(run_ccnavi sync closed "$P" "$key" "$integ" "$tree" 2>/dev/null | tr -d '\r') || cb_out=""
+	[ "$(printf '%s\n' "$cb_out" | head -n 1)" = "closed 1" ] || return 1
+	[ "$(printf '%s\n' "$cb_out" | sed -n "s/^$1 //p" | head -n 1)" = yes ]
 }
 
-# 手元の退避（ready が閉じた親子のチケットを移した先）に、この親子のチケットの親があるか。
-# 識別子（`ticket:`）が P で、子（`parent:`）でないときだけ。退避は手元にしか無いので、別の機械では
-# 見えない（そのときは ccnavi-review.sh merged に聞く）。途中のリンクは辿らない。
+# 統合先の done/ に、この親子のチケットの親チケットがあるか。
+closed_in_integration() {
+	closed_by integration
+}
+
+# 手元の退避に、この親子のチケットの親があるか。
 archived_locally() {
-	al_dir="$root/logs/archive/$key/done"
-	for al_part in "$root/logs" "$root/logs/archive" "$root/logs/archive/$key" "$al_dir" "$al_dir/$P.md"; do
-		[ -L "$al_part" ] && return 1
-	done
-	[ -f "$al_dir/$P.md" ] || return 1
-	# 欄は frontmatter の行頭から拾う（closed_in_integration と同じ。本文や block scalar の行は読まない）。
-	al_front=$(frontmatter_of <"$al_dir/$P.md")
-	al_id=$(printf '%s\n' "$al_front" | front_field ticket)
-	[ "$al_id" = "$P" ] || return 1
-	[ -z "$(printf '%s\n' "$al_front" | front_field parent)" ] || return 1
-	# 親のワークツリーに同じ識別子の承認済みチケットが残っていれば、着手と取り消しの欄でも同じ親と
-	# 言えるときだけ（same_parent。同じ識別子の別の親子のチケットの退避を、今のものと読まない）。
-	for al_file in "$tree/$approved/doing/$P.md" "$tree/$approved/done/$P.md"; do
-		[ -f "$al_file" ] || continue
-		same_parent "$(frontmatter_of <"$al_file")" "$al_front"
-		return
-	done
-	return 0
+	closed_by archive
 }
 
 # 統合先の done/ に閉じた記録があった。取り込み状態を closed にして言う。

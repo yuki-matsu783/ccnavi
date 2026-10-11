@@ -21,7 +21,7 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 
 | `--result` の JSON | 形 |
 |---|---|
-| `confirm` / `decide` が受け取るもの | `{host: github\|gitlab, mr: {number, url}, threads: [{id, resolved, url, path, line, body, created_at}], reviews: [{state, url, submitted_at, author}], fetched_at}` |
+| `confirm` / `decide` が受け取るもの | `{host: github\|gitlab, mr: {number, url}, threads: [{id, resolved, url, path, line, body, created_at, author}], reviews: [{state, url, submitted_at, author}], fetched_at}` |
 | `request` の投稿の結果 | `{host, mr, url, created_at}` |
 
 | sh の呼び方 | 実行ファイルの段 |
@@ -181,7 +181,9 @@ GitLab）、`gh` / `glab` がそのホストで認証されていれば（起動
 どちらも無ければ止まり、MCP などでリモートを読む形を提案する。結果の組み立てに `jq` が要る。
 道具は起動時に絶対パスへ解いて固定する。origin はホストのポートと scheme をそのまま使い、
 URL に埋めた資格情報は読み飛ばして出力では伏せる。実行ファイルの側も同じ規則で origin を読み、
-`--lint` がホストに合うトークンの有無を言う。
+`--lint` が sh の道具が揃っているかを warn で言う。見るのは有無だけで、PATH に `jq` があるか、`gh` / `glab` か `curl` があるか、
+`curl` を使う形ならホストに合うトークンの環境変数が空でないか。ホストへは通信しないので、認証が通るかやトークンが有効かは
+確かめない（実行ファイルはネットワークに出ない）。
 
 push は親だけが行う。hook は子チケットのワークツリーからの `ccnavi-git.sh push` を、誰が打っても拒み
 （`DENY_CHILD_PUSH`）、サブエージェントからの `ccnavi-git.sh push` はどこからでも拒む。リモートに置く枝は

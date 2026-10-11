@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import ast
 import contextlib
-import importlib.util
 import io
 import json
 import os
@@ -37,28 +36,18 @@ import unittest
 from unittest import mock
 
 from ccnavi.entry import lint, version
-from ccnavi.hook import core, core_base
 from ccnavi.infra import fsio, settings
 from ccnavi.infra import tree as tree_mod
-from ccnavi.tickets import approval, approval_ops, history, ticket_model
+from ccnavi.tickets import approval, approval_ops, core, core_base, history, ticket_model
 from tests import config_path, requires_symlink
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_phases_dag import DEFS, PLAN
 from tests.ticket.test_ticket import ROOT, git, read_json, write
+from tests.ticketsample import CHROME, child_text, load_chrome, parent_text
 
-CHROME = os.path.join(ROOT, "extensions", "chrome", "ccnavi-approval")
 SCENARIOS = os.path.join(CHROME, "test", "fixtures", "core-scenarios.json")
 STAMP = "2026-09-29T12:00:00+0900"
 PLACES = (".ccnavi", "wip")
-
-
-def _chrome():
-    spec = importlib.util.spec_from_file_location(
-        "ccnavi_chrome", os.path.join(CHROME, "py", "ccnavi_chrome.py")
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def _place_of(chrome):
@@ -169,7 +158,7 @@ class CoreHarness(PhaseHarness):
         `heads` で名前ごとに実際の先頭を渡せる（レビュー済みは
         依頼時の先頭と比べるので、親のブランチの実際の先頭が要る）。
         """
-        chrome = _chrome()
+        chrome = load_chrome()
         place = _place_of(chrome)
         branches = {}
         for name, path in self.trees().items():
@@ -226,7 +215,7 @@ class CoreHarness(PhaseHarness):
 
     def ask_chrome(self, request):
         root = os.path.join(self.root, "memfs")
-        answer = json.loads(_chrome().handle(json.dumps(request), root))
+        answer = json.loads(load_chrome().handle(json.dumps(request), root))
         self.assertNotIn("error", answer, answer)
         return answer
 
@@ -880,7 +869,7 @@ class CoreChromeTest(CoreHarness):
             held[name],
             json.loads(json.dumps({"request": request, "answer": answer})),
             f"{SCENARIOS} の {name} が古い。"
-            "CCNAVI_CHROME_FIXTURE=1 を付けて tests.ticket.test_core を回す",
+            "CCNAVI_CHROME_FIXTURE=1 を付けて tests.ticket.test_swap_points を回す",
         )
 
     def test_the_fixture_has_every_scenario(self):
@@ -1136,7 +1125,7 @@ class CoreChromeTest(CoreHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         request = {**self.chrome_request("plan", "i0001"), "stamp": "2026-09-29 12:00"}
-        answer = json.loads(_chrome().handle(json.dumps(request), os.path.join(self.root, "m")))
+        answer = json.loads(load_chrome().handle(json.dumps(request), os.path.join(self.root, "m")))
         self.assertIn("時刻の形が違う", answer["error"])
 
 
@@ -1205,7 +1194,7 @@ class ChromePlacementTest(CoreHarness):
     """
 
     def ask_placement(self, chrome=None, **extra):
-        chrome = chrome or _chrome()
+        chrome = chrome or load_chrome()
         request = {"schema": chrome.SCHEMA, "op": "placement", **extra}
         answer = json.loads(chrome.handle(json.dumps(request), os.path.join(self.root, "memfs")))
         self.assertNotIn("error", answer, answer)
@@ -1226,7 +1215,7 @@ class ChromePlacementTest(CoreHarness):
         )
         self.commit_parent()
         request = self.chrome_request("board", "i0001")
-        plain = json.loads(_chrome().handle(json.dumps(request), os.path.join(self.root, "m1")))
+        plain = json.loads(load_chrome().handle(json.dumps(request), os.path.join(self.root, "m1")))
         self.assertNotIn("error", plain, plain)
         self.assertEqual([e["ticket"] for e in plain["batch"]], ["i0001", "i0001-01-01"], plain)
         return request, plain
@@ -1258,7 +1247,9 @@ class ChromePlacementTest(CoreHarness):
             "CCNAVI_PROJECT_HOME": "moved/home",
         }
         with_env = {**request, "settings": _settings_text(moved)}
-        answer = json.loads(_chrome().handle(json.dumps(with_env), os.path.join(self.root, "m2")))
+        answer = json.loads(
+            load_chrome().handle(json.dumps(with_env), os.path.join(self.root, "m2"))
+        )
         self.assertEqual(answer, plain)
 
     def test_the_module_does_not_refer_to_the_env_names(self):
@@ -1291,7 +1282,7 @@ class ChromePlacementTest(CoreHarness):
         for name in saved:
             delattr(settings, name)
         try:
-            chrome = _chrome()
+            chrome = load_chrome()
         except (AttributeError, ImportError) as exc:
             loaded = exc
         else:
@@ -1314,7 +1305,7 @@ class ChromePlacementTest(CoreHarness):
         request, plain = self.board_request()
         with mock.patch.dict(os.environ, moved):
             answer = json.loads(
-                _chrome().handle(json.dumps(request), os.path.join(self.root, "m2"))
+                load_chrome().handle(json.dumps(request), os.path.join(self.root, "m2"))
             )
         self.assertEqual(answer, plain)
 
@@ -1597,8 +1588,7 @@ class RecordWritesTest(CoreHarness):
 
     def record(self, *args, stdin="", target=None):
         target = target or os.path.join(self.place(), "self", "i0001.t.writes")
-        state = os.path.join(self.root, "logs", "state")
-        result = self.ccnavi("--state", state, "--record-writes", target, *args, stdin=stdin)
+        result = self.ccnavi("--record-writes", target, *args, stdin=stdin)
         listed = []
         if os.path.isfile(target):
             with open(target, encoding="utf-8") as f:
@@ -1714,10 +1704,6 @@ class RecordWritesTest(CoreHarness):
             [
                 "--root",
                 linked,
-                "--state",
-                os.path.join(linked, "logs", "state"),
-                "--log",
-                "",
                 "--guard-core-files",
                 "disable",
                 "--restore-if-deny",
@@ -1757,7 +1743,7 @@ class RecordWritesTest(CoreHarness):
             ("gitstate", "shutil.move(source, target)"),
         }
         names = ("tickets.approval", "tickets.agree", "tickets.history", "tickets.configsync")
-        names += ("tickets.ops", "tickets.flow", "tickets.risk", "hook.core", "tickets.review")
+        names += ("tickets.ops", "tickets.flow", "tickets.risk", "tickets.core", "tickets.review")
         names += ("tickets.phase", "tickets.ticket", "infra.gitstate")
         names += ("tickets.approval_marks", "tickets.approval_checks", "tickets.approval_times")
         names += ("tickets.review_host", "tickets.review_decide", "tickets.review_close")
@@ -1767,7 +1753,12 @@ class RecordWritesTest(CoreHarness):
         names += ("tickets.phase_forms", "tickets.phase_scope")
         names += ("tickets.flow_text", "tickets.flow_shape", "tickets.flow_render")
         names += ("tickets.approval_ops", "tickets.ops_close", "tickets.ops_stop")
-        names += ("hook.core_base", "hook.core_approve", "hook.core_review", "hook.core_withdraw")
+        names += (
+            "tickets.core_base",
+            "tickets.core_approve",
+            "tickets.core_review",
+            "tickets.core_withdraw",
+        )
         for dotted in names:
             package, name = dotted.split(".")
             path = os.path.join(ROOT, "src", "ccnavi", package, name + ".py")

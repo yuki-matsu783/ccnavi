@@ -95,6 +95,76 @@ class EnvTest(unittest.TestCase):
         self.assertFalse(wrapguard.blocked("PATH"))
 
 
+class EnvHookTest(unittest.TestCase):
+    """環境変数の代入を hook の入口から通す。上の EnvTest は読みの部品を直接呼ぶので、
+    判定の中で「ccnavi 自身を守る設定」で切れることと、ルールより先に止めることは見ない。"""
+
+    COMMAND = "CCNAVI_WORKSPACE=/x sh .ccnavi/scripts/ccnavi-git.sh push"
+
+    # 同じコマンドを通す allow を置く。ルールが先に当たるなら通ってしまう。
+    RULES = {
+        "version": 1,
+        "allow": [{"id": "wrap", "match": "Bash", "regex": r"ccnavi-git\.sh"}],
+    }
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp(prefix="ccnavi-wrapguard-env-")
+        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        os.makedirs(os.path.join(self.root, ".claude"))
+        write(common_path(self.root, "rules"), json.dumps(self.RULES))
+
+    def hook(self, command, **extra_env):
+        payload = {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "cwd": self.root,
+            "session_id": "s1",
+            "permission_mode": "default",
+            "tool_input": {"command": command},
+        }
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env.pop("CLAUDE_PROJECT_DIR", None)
+        env.update(extra_env)
+        result = run_ccnavi(
+            [
+                "--root",
+                self.root,
+                "--log",
+                "",
+                "--state",
+                os.path.join(self.root, "state"),
+                "--mode",
+                "enable",
+            ],
+            input=json.dumps(payload),
+            cwd=ROOT,
+            env=env,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        if not result.stdout.strip():
+            return "", ""
+        out = json.loads(result.stdout).get("hookSpecificOutput", {})
+        return out.get("permissionDecision", ""), out.get("permissionDecisionReason") or ""
+
+    def test_stops_before_an_allow_rule(self):
+        decision, reason = self.hook(self.COMMAND)
+        self.assertEqual(decision, "deny")
+        self.assertIn(wrapguard.CODE_ENV, reason)
+        self.assertIn("CCNAVI_WORKSPACE", reason)
+
+    def test_the_same_call_without_the_assignment_reaches_the_rule(self):
+        decision, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh push")
+        # allow が当たって通る呼び出しは何も出さない。
+        self.assertEqual(decision, "")
+        self.assertNotIn(wrapguard.CODE_ENV, reason)
+
+    def test_turned_off_with_the_core_files_guard(self):
+        # ccnavi 自身を守る設定を切ると、この止め方も切れ、allow が当たる。
+        decision, reason = self.hook(self.COMMAND, CCNAVI_GUARD_CORE_FILES="disable")
+        self.assertEqual(decision, "")
+        self.assertNotIn(wrapguard.CODE_ENV, reason)
+
+
 # （cwd の置き場, コマンド, チケットをどこに置くか, 止まるか）
 # 置き場: "parent" = 親のワークツリー、"child" = 子のワークツリー、"root" = ワークスペース。
 # チケットの置き場: "parent-doing" = 親のツリーの doing/、"root-done" = ワークスペースの done/、
@@ -168,10 +238,6 @@ class ChildPushTest(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--log",
-                "",
-                "--state",
-                os.path.join(self.root, "state"),
                 "--mode",
                 "enable",
             ],
@@ -217,6 +283,14 @@ class ChildPushTest(unittest.TestCase):
     def test_unreadable_cd_stops(self):
         reason = self.hook(self.root, 'cd "$X" && ' + " ".join(GIT + ["push"]))
         self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+
+    def test_refusal_names_the_builtin_rule(self):
+        # 文面の先頭に、記録の `rules` と同じ識別子を出す。
+        reason = self.hook(self.root, 'cd "$X" && ' + " ".join(GIT + ["push"]))
+        self.assertIn(
+            f"[ccnavi] {wrapguard.CODE_CHILD_PUSH} (builtin rule: {wrapguard.CHILD_PUSH_RULE_ID})",
+            reason,
+        )
 
     def test_symlinked_workspace(self):
         # 論理のパスと実際のパスを混ぜると外れる。cwd が symlink 越しでも止める。

@@ -167,8 +167,10 @@ def decide_at_prompt(
     ほかの経路の承認は、エージェントが `ccnavi-ticket.sh status` で聞く。hook が起点を取って
     増えた承認を数える形は、セッションの開始時の取り込みで届いた承認を起点に含めて取りこぼした。
 
-    例外は 1 つ。依頼文に issue・MR の指定（`#152`・`!5` など）があるとき。着手の前に紐づく
-    ブランチを探してユーザに確かめる指示を足す。文を足すだけで、作業は止めない。
+    例外は 2 つ。依頼文に issue・MR の指定（`#152`・`!5` など）があるとき。着手の前に紐づく
+    ブランチを探してユーザに確かめる指示を足す。もう 1 つは、終わったサブエージェントの子の
+    範囲を確かめられなかった印が残っているとき（`subagent.unchecked_scope`）。どちらも文を
+    足すだけで、作業は止めない。
 
     承認済みチケットの置き場は、ここで 1 度だけ読んで範囲（`scope_guard`）に渡す。
     """
@@ -189,6 +191,10 @@ def decide_at_prompt(
     hint = branchfind.prompt_context(
         conf, root, payload.prompt, payload.cwd, payload.session_id, stderr
     )
+    # バックグラウンドのサブエージェントが範囲を確かめられないまま終わり、そのあと親が
+    # ツールを使わずにターンを終えたなら、印はここまで残っている。次の依頼の前に言う。
+    unchecked = subagent.unchecked_scope(conf.state, payload) if conf.tickets_enabled else ""
+    hint = "\n\n".join(p for p in (hint, unchecked) if p)
     if hint:
         hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, hint)
     return EXIT_OK
@@ -524,6 +530,9 @@ def decide_after(
         # サブエージェントが差し戻しを無視して終わったなら、親にそれを言う。
         # 差し戻しは 1 回きりなので、2 度目の終了は何も言われずに通っている。
         bounced = subagent.ignored_bounce(conf.state, payload)
+        # 範囲を確かめられないまま終わったことも、同じ経路で親に言う。
+        unchecked = subagent.unchecked_scope(conf.state, payload)
+        bounced = "\n\n".join(p for p in (bounced, unchecked) if p)
         if bounced:
             text = f"{text}\n\n{bounced}" if text else bounced
     if not text:

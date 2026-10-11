@@ -1,0 +1,163 @@
+"""チケットの見本（ルール・フェーズ定義・親と子の提案の本文）と、Chrome の入口を読む道具。
+
+`tests/ticket/` と `tests/sh/` の両方が同じ見本で親と子を組み立てる。テストモジュールどうしで
+import し合うと、片方のグループだけを回したときにも他方のモジュールが読み込まれ、グループの
+境目が崩れる。共有するものはグループに属さないここに置く。
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import os
+
+from tests import ROOT, phasecopy
+
+RULES = {
+    "version": 1,
+    "deny": [
+        {
+            "id": "guard-approved",
+            "match": "Write|Edit|NotebookEdit",
+            "glob": "*/.ccnavi/*",
+            "message": "ガードの設定と承認済みチケットです。ユーザに依頼してください。",
+        }
+    ],
+}
+
+
+PHASES = """
+version: 1
+phases:
+  research:
+    kind: work
+    title: 調査
+    review: none
+    scope: ["wip/research/*"]
+    deliverables: ["wip/research/summary.md"]
+    agent: explorer
+    when: 既存の振る舞いが分からないとき
+  design:
+    kind: work
+    title: 設計
+    review: mr
+    scope: ["wip/design/*"]
+  acceptance:
+    kind: work
+    title: 受入テスト作成
+    review: mr
+    scope: ["tests/*"]
+  implement:
+    kind: work
+    title: 実装とテスト
+    review: mr
+    scope: ["src/*", "tests/*"]
+  implement-feedback:
+    kind: feedback
+    title: 実装フィードバック対応
+    review: mr
+    scope: inherit
+  chores:
+    kind: work
+    title: 片付け
+    review: chat
+    scope: ["src/*"]
+  chores-feedback:
+    kind: feedback
+    title: 片付けフィードバック対応
+    review: chat
+    scope: inherit
+"""
+
+
+def plan_item_lines(items, start=1) -> list[str]:
+    """計画の項を YAML の行にする。`start` はその計画の最初の番号（フィードバック計画は続き）。
+
+    項は定義の名前、`(名前, review)`、`{"type": …, "review": …, "after": […]}` のどれか。
+    `after` を書かない項は、すぐ前の項を待つ（一直線）。最初の項は何も待たない。
+    並行にしたい見本は辞書で `after` を明記する（`[]` なら何も待たない）。
+    """
+    lines = []
+    for i, item in enumerate(items):
+        if isinstance(item, dict):
+            kind, review = item["type"], item.get("review", "")
+            after = item.get("after")
+        elif isinstance(item, tuple):
+            kind, review, after = item[0], item[1], None
+        else:
+            kind, review, after = item, "", None
+        if after is None:
+            after = [start + i - 1] if i > 0 else []
+        fields = [f"type: {kind}"]
+        if review:
+            fields.append(f"review: {review}")
+        if after:
+            fields.append(f"after: [{', '.join(str(n) for n in after)}]")
+        lines.append(f"  - {kind}" if len(fields) == 1 else f"  - {{{', '.join(fields)}}}")
+    return lines
+
+
+def parent_text(
+    name, plan, feedback=None, allow=("src/*", "wip/*", "tests/*"), issue=None, copy=PHASES
+):
+    """親の提案の本文。
+
+    `copy` は計画が使う定義を写す元の `phases.yml`（None なら `phases:` を書かない）。
+    計画を持つ親は、計画が使う定義の写し（`phases:`）を持つ。`phases.yml` を書き換えるテストは、
+    同じ本文を `copy` に渡す。
+    """
+    text = _parent_text(name, plan, feedback, allow, issue)
+    return text if copy is None else phasecopy.insert(text, copy)
+
+
+def _parent_text(name, plan, feedback, allow, issue):
+    lines = ["---", "version: 1", f"ticket: {name}"]
+    if issue is not None:
+        lines.append(f"issue: {issue}")
+    lines.append("plan:")
+    lines += plan_item_lines(plan)
+    if feedback is not None:
+        if feedback:
+            lines.append("feedback:")
+            lines += plan_item_lines(feedback, start=len(plan) + 1)
+        else:
+            lines.append("feedback: []")
+    lines += ["human_review:", "  required: true", "  reason: t", "title: 親", "rationale: r"]
+    lines.append("allow:")
+    for g in allow:
+        lines += ["  - match: Write|Edit", f'    glob: "{g}"']
+    lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
+    return "\n".join(lines) + "\n"
+
+
+def child_text(name, parent, phase, allow, review=True):
+    lines = [
+        "---",
+        "version: 1",
+        f"ticket: {name}",
+        f"parent: {parent}",
+        f"phase: {phase}",
+        "human_review:",
+        f"  required: {'true' if review else 'false'}",
+        "  reason: t",
+        f"title: 子 {name}",
+        "rationale: r",
+        "allow:",
+    ]
+    for g in allow:
+        lines += ["  - match: Write|Edit", f'    glob: "{g}"']
+    lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
+    return "\n".join(lines) + "\n"
+
+
+# Chrome 拡張（承認の画面）の置き場。Python の入口 `py/ccnavi_chrome.py` を持つ。
+CHROME = os.path.join(ROOT, "extensions", "chrome", "ccnavi-approval")
+
+
+def load_chrome():
+    """Chrome の入口（`ccnavi_chrome.py`）をモジュールとして読み込む。"""
+    spec = importlib.util.spec_from_file_location(
+        "ccnavi_chrome", os.path.join(CHROME, "py", "ccnavi_chrome.py")
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module

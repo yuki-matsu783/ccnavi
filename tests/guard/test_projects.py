@@ -156,8 +156,8 @@ class ProjectsTest(unittest.TestCase):
         # 承認済みチケットは、そのチケットの親のツリーの `.ccnavi/approved/` に置かれる。
         # ここの環境は親のワークツリーを作らないので、提案があったツリーに置かれる。
         self.approved = os.path.join(self.ws, ".ccnavi", "approved")
-        self.state = os.path.join(self.ws, "state")
-        self.log = os.path.join(self.ws, "decisions.jsonl")
+        self.state = os.path.join(self.ws, "logs", "state")
+        self.log = os.path.join(self.ws, "logs", "decisions.jsonl")
 
     def approved_path(self, *parts):
         """承認済みチケットの置き場の下のパス。どのツリーに置かれたかを探す。"""
@@ -200,12 +200,6 @@ class ProjectsTest(unittest.TestCase):
             [
                 "--root",
                 self.ws,
-                "--approved",
-                ".ccnavi/approved",
-                "--state",
-                self.state,
-                "--log",
-                self.log,
                 "--guard-core-files",
                 "disable",
                 "--restore-if-deny",

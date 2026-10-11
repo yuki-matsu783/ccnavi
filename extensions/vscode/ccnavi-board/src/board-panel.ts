@@ -31,7 +31,7 @@ import { renderBoardPage } from "./core/render.js";
 import { showLoading } from "./loading.js";
 import { copyPrompt, openPromptInSession } from "./prompt-handover.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
-import { ticketControlMismatch } from "./core/ticket-control.js";
+import { ticketControlOf } from "./core/ticket-control.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { isTicketId } from "./core/ticket-id.js";
 import { forgetSaved, onWorkflowTabs, staleSaved, workflowTabs } from "./core/workflow-tabs.js";
@@ -39,7 +39,8 @@ import { unsavedText } from "./core/approvemodel.js";
 import { runInTerminal, scriptShell } from "./terminal.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
-import { requireTickets, ticketControl } from "./ticket-control.js";
+import { noteTicketControl, requireTickets } from "./ticket-control.js";
+import * as diaglog from "./log.js";
 
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "board";
@@ -62,8 +63,6 @@ interface PanelState {
   loading: boolean;
   again: boolean;
   wasVisible: boolean;
-  /** 設定ファイルの読みと実行ファイルの答えの食い違いを確かめたか。確かめるのは最初に読めた 1 度だけ */
-  checked: boolean;
   /** 次に描いたときに選ぶ絞り込み。1 度使ったら消す（以後は Webview の state が覚える） */
   filter?: string;
   /**
@@ -135,7 +134,6 @@ export async function openBoard(project?: string): Promise<void> {
     loading: false,
     again: false,
     wasVisible: panel.visible,
-    checked: false,
     filter: project,
     approval: CLOSED,
     moved: NOTHING_MOVED,
@@ -239,13 +237,9 @@ async function update(): Promise<void> {
       return;
     }
     current.launcher = result.launcher;
-    if (result.ok && !current.checked) {
-      current.checked = true;
-      // 設定ファイルの読みと実行ファイルの答えが食い違えば言う。判定は実行ファイルの側で動いている。
-      const mismatch = ticketControlMismatch(ticketControl(), result.board.settings.ticket_control);
-      if (mismatch) {
-        vscode.window.showWarningMessage(`チケット管理: ${mismatch}`);
-      }
+    if (result.ok) {
+      // 読み直した答えでサイドパネルの入口もそろえる。答えるのは実行ファイルだけ
+      noteTicketControl(ticketControlOf(result.board));
     }
     if (!result.ok) {
       // 開いている間の失敗は閉じない。前の表示を消して、何が起きたかを見せる。
@@ -524,6 +518,12 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
       // 見せたダイジェスト（承認画面の本文・判定が読んだ中身・承認済みチケットに書き込まれる中身）も渡す。識別子が同じでも、
       // 見せたあとに提案や判定が読んだ承認済みチケット・マーカーの中身が変われば承認しない
       const outcome = await runApproveYes(root, binSetting(), effect.tickets, effect.digest, effect.only);
+      // 承認済みチケットを置くのは取り返しがつかないので、受け付けたことと結果を 1 行残す
+      diaglog.get("ccnavi-board", root).info("承認を打った", {
+        result: outcome.ok ? "approved" : "mismatch" in outcome ? "mismatch" : "error",
+        requested: effect.tickets.length,
+        approved: outcome.ok ? outcome.value.approved.length : 0,
+      });
       if (outcome.ok) {
         // 承認した親は承認待ちから無くなる。あとで出す改版の提案を、前の保存と比べない
         forgetSaved(outcome.value.approved);
@@ -567,6 +567,11 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
         effect.choices,
         effect.digest,
       );
+      // 行き先を置くのは取り返しがつかない（続きの子が起きる）ので、受け付けたことと結果を 1 行残す
+      diaglog.get("ccnavi-board", root).info("残った指摘の行き先を置いた", {
+        result: outcome.ok ? "decided" : "mismatch" in outcome ? "mismatch" : "error",
+        phase: effect.phase,
+      });
       if (state === current) {
         dispatch(current, { kind: "decided", outcome });
       }

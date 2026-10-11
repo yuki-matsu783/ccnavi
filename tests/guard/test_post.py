@@ -132,10 +132,6 @@ class Harness:
             [
                 "--root",
                 self.repo,
-                "--state",
-                self.state,
-                "--log",
-                self.log,
                 "--restore-if-deny",
                 restore,
                 # ここで見るのはルール由来の保護だけ。ccnavi 自身の設定ファイルを
@@ -168,8 +164,8 @@ class PostToolUseTest(Harness, unittest.TestCase):
         # 共通レイヤーは既定の置き場へ。`--rules` は診断でだけ有効。
         self.rules = common_path(self.repo, "rules")
         write(self.rules, json.dumps(RULES))
-        self.state = os.path.join(self.repo, "state")
-        self.log = os.path.join(self.repo, "decisions.jsonl")
+        self.state = os.path.join(self.repo, "logs", "state")
+        self.log = os.path.join(self.repo, "logs", "decisions.jsonl")
 
     def dirty(self, text="changed by a build\n"):
         write(os.path.join(self.repo, "protected", "keep.txt"), text)
@@ -523,8 +519,8 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
         self.repo = outside
         self.rules = write(common_path(outside, "rules"), json.dumps(RULES))
-        self.state = os.path.join(outside, "state")
-        self.log = os.path.join(outside, "decisions.jsonl")
+        self.state = os.path.join(outside, "logs", "state")
+        self.log = os.path.join(outside, "logs", "decisions.jsonl")
 
         result = self.run_hook(command="ls")
 
@@ -536,10 +532,19 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(line["detail"], "not-a-git-worktree")
 
     def test_自分が書く場所は自分の違反にしない(self):
-        # 記録と state を保護領域の中に置く。置き場を設定でルールが守る場所の中へ
-        # 指したときの形。
-        self.state = os.path.join(self.repo, "protected", "state")
-        self.log = os.path.join(self.repo, "protected", "decisions.jsonl")
+        # 記録と state の置き場（既定の `logs/`）をルールが守る形。置き場を動かすフラグは
+        # 診断でだけ効くので、ルールの側で既定の置き場を保護領域に入れる。
+        rules = dict(RULES)
+        rules["deny"] = [
+            *RULES["deny"],
+            {
+                "id": "records",
+                "match": "Write|Edit",
+                "glob": "*/logs/*",
+                "message": "records are written by ccnavi.",
+            },
+        ]
+        write(self.rules, json.dumps(rules))
 
         self.run_hook(command="ls")
         result = self.run_hook(command="ls -la")
@@ -771,8 +776,8 @@ class TicketPlaceTest(Harness, unittest.TestCase):
     def setUp(self):
         self.repo = ticket_repo()
         self.addCleanup(shutil.rmtree, self.repo, ignore_errors=True)
-        self.state = os.path.join(self.repo, "state")
-        self.log = os.path.join(self.repo, "decisions.jsonl")
+        self.state = os.path.join(self.repo, "logs", "state")
+        self.log = os.path.join(self.repo, "logs", "decisions.jsonl")
         # 基準を取る。以降に現れたものが、この呼び出しの結果として見られる。
         self.run_hook(command="ls")
 
@@ -780,8 +785,8 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         """別のリポジトリに差し替えて、そこで基準を取り直す。"""
         self.repo = repo
         self.addCleanup(shutil.rmtree, repo, ignore_errors=True)
-        self.state = os.path.join(repo, "state")
-        self.log = os.path.join(repo, "decisions.jsonl")
+        self.state = os.path.join(repo, "logs", "state")
+        self.log = os.path.join(repo, "logs", "decisions.jsonl")
         self.run_hook(command="ls")
 
     def path(self, rel):

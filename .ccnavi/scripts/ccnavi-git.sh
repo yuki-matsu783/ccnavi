@@ -602,10 +602,19 @@ ig_wt_branch() {
 # 親子のチケットの取り込み状態があっても当たる。広めに当てて断る向き。
 ig_bound() {
 	ig_why=""
-	if ccnavi_parent_tree "$ig_wt" "$1"; then
+	ig_pt_rc=0
+	ccnavi_parent_tree "$ig_wt" "$1" || ig_pt_rc=$?
+	case "$ig_pt_rc" in
+	0)
 		ig_why="親チケットか提案のあるワークツリー"
 		return 0
-	fi
+		;;
+	2)
+		# 決められないときは、断る向きに倒す。
+		ig_why="親チケットか提案があるかを実行ファイルに確かめられないワークツリー"
+		return 0
+		;;
+	esac
 	for ig_tree in "$WS" "$WS/$ig_projects"/* "$WS"/.claude/worktrees/*; do
 		[ -d "$ig_tree" ] || continue
 		for ig_f in "$ig_tree/$ig_approved/doing/$1.md" "$ig_tree/$ig_approved/done/$1.md" \
@@ -737,7 +746,7 @@ ig_integrate() {
 	if [ "$ig_rc" -ne 0 ] && [ -z "$ig_changed" ] && [ -z "$ig_conf" ]; then
 		printf 'fail  git integrate  %s を取り込めなかった（統合先のツリーは変えていない）  log=%s\n' "$ig_n" "$ig_logrel"
 		ig_log_tail
-		log_info 取り込めなかった -- "name=$ig_n" "reason=integrate-merge-failed" "exit=$ig_rc"
+		log_error 取り込めなかった -- "name=$ig_n" "reason=integrate-merge-failed" "exit=$ig_rc"
 		exit 1
 	fi
 	mkdir -p "$ig_gdir/$ig_n"
@@ -750,7 +759,7 @@ ig_integrate() {
 		printf '%s\n' "$ig_conf" | head -n "$MAX_LINES" | sed 's/^/  /'
 		printf '案内: 統合先のツリーでは衝突を解かない。%s integrate --abort %s で取り込む前に戻し（squash の衝突には merge --abort が効かない）、ワークツリー（.claude/worktrees/%s）の中で %s merge %s を打って衝突を解いてコミットしてから、%s integrate %s を打ち直す\n' \
 			"$SELF" "$ig_n" "$ig_n" "$SELF" "$ig_integ" "$SELF" "$ig_n"
-		log_info 取り込みが衝突した -- "name=$ig_n" "exit=$ig_rc"
+		log_error 取り込みが衝突した -- "name=$ig_n" "exit=$ig_rc"
 		exit 1
 	fi
 	# 下書きの置き場（wip/scratchpad/）の追跡済みファイルは取り込まない。ブランチが持ち込んだパスだけを、
@@ -781,7 +790,7 @@ EOF
 			tree "" integration "$ig_integ" created "$(date +%s)" || :
 		printf 'fail  git integrate  %s の下書き（wip/scratchpad/）を外せなかった（%s。コミットはしていない）  log=%s\n' "$ig_n" "$ig_scr_fail" "$ig_logrel"
 		printf '案内: %s integrate --abort %s で取り込む前に戻してから、原因を確かめて打ち直す\n' "$SELF" "$ig_n"
-		log_info 下書きを外せなかった -- "name=$ig_n" "path=$ig_scr_fail"
+		log_error 下書きを外せなかった -- "name=$ig_n" "path=$ig_scr_fail"
 		exit 1
 	fi
 	if [ "$ig_scr_n" -gt 0 ]; then
@@ -843,7 +852,7 @@ ig_abort() {
 			printf 'fail  git integrate  %s の取り込みを戻せなかった（記録は残した）  log=%s\n' "$ig_n" "$ig_logrel"
 			ig_log_tail
 			printf '案内: 取り込んだパスに staged にしていない変更が重なっていると戻せない。%s status で確かめ、持ち主に確かめてから打ち直す\n' "$SELF"
-			log_info 取り込みを戻せなかった -- "name=$ig_n"
+			log_error 取り込みを戻せなかった -- "name=$ig_n"
 			exit 1
 		fi
 		ig_how="取り込む前（$(ig_short "$ig_m_base")）の状態に戻した"
@@ -1009,7 +1018,7 @@ ig_done() {
 			printf 'fail  git integrate-done  %s をコミットできなかった（%s）。staged と取り込みの記録はそのまま、何も片付けていない  log=%s\n' "$ig_n" "$ig_why" "$ig_logrel"
 			ig_log_tail
 			printf '案内: 原因を直してから %s integrate-done %s -m <メッセージ> を打ち直す\n' "$SELF" "$ig_n"
-			log_info コミットできなかった -- "name=$ig_n" "exit=$ig_crc"
+			log_error コミットできなかった -- "name=$ig_n" "exit=$ig_crc"
 			exit 1
 		fi
 		rm -f "$ig_out"
@@ -1540,7 +1549,7 @@ checkout | switch)
 	opt_walk checkout_cb ${1+"$@"}
 	# 親のワークツリー（.claude/worktrees/<P> で、親チケットか提案があるもの）では、許す形
 	# （語が無い・自分のブランチ・HEAD・checkout <ref> <パス>）のほかは通さない。
-	# 親チケットか提案があるかは ccnavi_parent_tree が見る。ccnavi-sync.sh・ccnavi-fetch.sh・
+	# 親チケットか提案があるかは ccnavi_parent_tree が実行ファイルに聞く。ccnavi-sync.sh・ccnavi-fetch.sh・
 	# syncstate.home_tree はそれに加えて、ツリーの名前が識別子で、HEAD が同じ名前のブランチを指すことを求める。
 	# 別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.sh は、リモートでの承認を
 	# このツリーへ取り込まなくなる。取り込み状態がある親（親のブランチを一度でも origin へ push したか、
@@ -1594,7 +1603,7 @@ checkout | switch)
 				printf 'fail  git %s  %s の承認済みチケットを %s へ取り込めなかった（merge を取りやめて %s に戻った）。どちらを採るかはユーザに伝えてください\n' "$sub" "$cc_X" "$cc_B" "$cc_X"
 				tail -n "$FAIL_LINES" "$cc_out"
 				rm -f "$cc_out"
-				log_info 親のブランチへ移れなかった -- "reason=carry-merge"
+				log_error 親のブランチへ移れなかった -- "reason=carry-merge"
 				exit 1
 			fi
 			cc_how="既存のブランチ $cc_B へ移り、$cc_X を merge して承認済みチケットとマーカーを取り込んだ"
@@ -1618,7 +1627,10 @@ checkout | switch)
 	"$WS_P"/.claude/worktrees/*)
 		co_name="${co_top#"$WS_P"/.claude/worktrees/}"
 		co_name="${co_name%%/*}"
-		if ccnavi_parent_tree "$co_top" "$co_name"; then
+		# 親チケットか提案があるかを決められない（2）ときも、親のワークツリーとして狭める。
+		co_parent=0
+		ccnavi_parent_tree "$co_top" "$co_name" || co_parent=$?
+		if [ "$co_parent" -ne 1 ]; then
 			co_to=""
 			if [ -n "$co_new" ]; then
 				co_to="$co_new"

@@ -17,7 +17,10 @@ keywords: [実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, ワーク
   Writeでスクリプトをファイルに置いてから、そのファイルを実行する（`python3 <パス>`）。
   空のファイルを作るだけのときも同じで、Writeで作る。
   ヒアドキュメントで書いたファイルは、Write / Editに掛かる権限の宣言も、編集後の検査も通らないため
-- 使える道具は`jq` 1.6、Node 22（pnpm 10）、Python 3.12（uv）、goだけ。これ以外の道具がある前提で書かない
+- 使える道具は`jq` 1.6、Node 22（pnpm 10）、Python 3.12（uv）、goだけ。これ以外の道具がある前提で書かない。
+  例外は、ホスト（GitHub・GitLab）と話すsh（`ccnavi-review.sh`・`ccnavi-branches.sh`・`ccnavi-start.sh`など）で、
+  `gh`・`glab`・`curl`を使う。無ければ何を用意すればよいかを案内して止まる。ソースで動かしているccnaviのリポジトリでは、
+  shが実行ファイルの代わりに`uv run python -m ccnavi`で起こすことがある（`uv`が無ければその道は使わない）
 - Claude Code on the webには`.ccnavi/bin`が無い。ccnaviのhookを動かすには、
   `uv run --with pyinstaller python build.py`でビルドする。ビルドしていないとランチャーが終了コード127で終わり、
   hookは何もしない

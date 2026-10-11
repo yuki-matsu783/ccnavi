@@ -63,7 +63,7 @@ test("CX-T041 先行の閉包の親子のチケット（直近の外）を読み
   assert.equal(f?.result?.batch?.[0].path, "i0001:wip/proposals/todo/i0001.md");
 });
 
-test("CX-T042 判定の入力は統合先・P・閉包だけ。表示用のブランチを増やしても答えは変わらない（D2）", async () => {
+test("CX-T042 判定の入力は統合先・P・閉包だけ。表示用のブランチを増やしても答えは変わらない（直近の日数や指定のブランチは表示のためだけに使う）", async () => {
   const narrow = await run();
   const boards = narrow.requests.filter((r) => r.op === "board" && r.family === "i0001");
   assert.equal(boards.length, 1);

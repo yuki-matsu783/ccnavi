@@ -158,12 +158,33 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 
 | 操作 | 既定での扱い |
 |---|---|
-| `rm -rf`、`git push`、`git reset --hard` | 止める |
+| `rm -rf`、`git push`、`git reset --hard` | 止める。表記違いも止める（下） |
+| 生の git（チケット制御が有効で、ワークスペースルートに `ccnavi-git.sh` があるとき） | 止める（`builtin-ticket-raw-git`。9.1） |
 | 認証情報の置き場（`.env`、`.ssh/`、`id_rsa`、`.netrc`、`.npmrc` など）への `Bash` `Read` `Write` `Edit` | 止める |
 | シェルから `.claude/hooks/` `.claude/settings*.json`、ccnavi ディレクトリ `.ccnavi`、`logs/decisions.jsonl` `logs/state` `logs/archive`、`ccnavi-git.sh` へ書き込む形 | 止める（書き込みの形と場所の組で見る。8.2） |
 | `Read`（認証情報の置き場を除く。強いタイプが先に当たる） | 通す |
 | `Write` / `Edit` でルールファイルを直す | 既定では止めない。権限モードに委ねる |
 | それ以外 | 権限モードに委ねる |
+
+取り返しの付かない操作の 3 本（`builtin-recursive-delete`・`builtin-git-push`・`builtin-git-reset-hard`）は、既定のときに限らず
+常に当たる土台の deny で、glob の文字列一致ではなく regex で書く。glob（`*rm -rf *`・`*git push*`）は表記違いに外れるため。
+
+- git は、サブコマンドの前に挟むグローバルオプション（`-C <path>`・`-c <k=v>`・`--git-dir[=]<dir>`・`--work-tree[=]<dir>`・`--no-pager` など）を
+  読み飛ばしてから `push` / `reset` を見る。値を取るオプションは値を最後まで読むので（`git -C gitx push` の `gitx` も 1 つの値。読みで空白が 2 字続く空の値 `git -C '' push` は空の値として読む）、`git -c push.default=current status` の値の `push` は
+  サブコマンドに読まない。`push` の後ろは空白・区切り・末尾だけを見る。`reset` は後ろのどこかに `--hard`（略した `--har` も）があれば止める。`--` の後ろはパスなので見ない（`git reset -- --hard`）。
+  サブコマンドを直接起こす `git-push` / `git-reset`（パス付きの `/usr/lib/git-core/git-push`、`.exe` 付き）も同じ 1 本で止める。
+  `legit push` のような語と、`git commit -m push` のように値の位置にある語は当てない
+- rm は、再帰（`-r` `-R` `--recursive`）と強制（`-f` `--force`）の組を、まとめた形（`-rf` `-fr` `-Rfv`）・分けた形（`-r -f`）・順序・
+  長い形（略した形も）を問わずに止める。片方だけ（`rm -r`・`rm -f`）は当てない。`--` の後ろはオペランドなので選択肢に読まない（`rm -f -- -r`）。共通レイヤーの見本の `recursive-delete` も同じ式
+- どの式も、照合の時間が入力の長さにほぼ比例する形で書く（所有的な繰り返しとアトミックグループ。先読みは使わない）。判定の期限は
+  ルールの合間でしか確かめないので、1 本の照合が後戻りで長引くと hook の timeout に達し、呼び出しは止められずに通る。
+  rm と reset は、後の始まりで当たるなら最初の始まりでも当たるので、コマンドの中で最初の `rm` / `reset` に決めて 1 度だけ読む。
+  git のオプションは、中に git の始まりを持たない語だけを読み、`git -c git -c …` のような並びで読み直しを積もらせない
+
+生の git の 1 本（`builtin-ticket-raw-git`）は、`git` がコマンドの位置にある形だけに当てる（行頭とコマンドの切れ目の後ろ、
+`env`・`sudo`・`xargs` などの前置きは外した中のコマンドの層で、パス付き（`C:\Git\git.exe` も）と `git.exe` も。`then`・`do` などの予約語は
+区切りの直後のものだけ読み飛ばす）。`grep git README.md`・`echo to do git` の引数の `git` には当てない。共通レイヤーの見本の `raw-git` は位置を問わずに当てるまま。ルールファイルが読めずに既定を使っている間も足す。ラッパーはルールファイルを読まずに動き、
+衝突の解決に要る `add`・`restore --ours` / `--theirs`・`merge-file -p` を通すので、直す道は残る（REQ-PRE-06）。
 
 既定にはプロジェクトの `allow` が無いので、読み取り以外はほぼ確認になる。
 自身のレイヤーかプロジェクトのレイヤーが読めないときは、既定を使わない。そのレイヤーを空として扱い、Bash の和からも

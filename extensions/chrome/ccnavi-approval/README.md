@@ -24,7 +24,7 @@ node scripts/build.js --hosts <一覧の JSON> # 組織ごとのビルド（GHES
 
 ```sh
 pnpm test       # 単体・Node の上の Pyodide での組み立て・手元の CPython との突き合わせ（uv を使う）。
-                # 判定のコアの見本 test/fixtures/core-scenarios.json は、リポジトリの tests/ticket/test_core.py が
+                # 判定のコアの見本 test/fixtures/core-scenarios.json は、リポジトリの tests/ticket/test_swap_points.py が
                 # 書き出す（CCNAVI_CHROME_FIXTURE=1）
 pnpm test:e2e   # 拡張を読み込んだ Chromium（Playwright、PLAYWRIGHT_BROWSERS_PATH）と模擬の GitHub・GitLab で実機の試験
                 # （承認・取り下げ・レビュー済み・「始める」を含む。GitLab はセルフホストとして通信先に足したビルドで回す）

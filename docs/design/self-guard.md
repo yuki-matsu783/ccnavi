@@ -92,6 +92,10 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 `builtin-guard-project-home` より先にこちらが当たる。期待する判定（`rule-expectations.yml`）は 3 本に入らず、既定の置き場なら
 `builtin-guard-project-home` が止める。
 
+生の git（`builtin-ticket-raw-git`）: チケット制御が有効でワークスペースルートに `ccnavi-git.sh` がある間は、生の git を組み込みで止める（9.1）。
+ラッパーの中のチケット制御の可否を、ラッパーの外から打つ git で外させないためで、ガード自身を守る組み込みに数える（P4）。
+`CCNAVI_GUARD_CORE_FILES` では切れず、チケット制御（`CCNAVI_TICKET_CONTROL`）を切ると外れる。
+
 保護済みの sh の前に置く環境変数（`DENY_SCRIPT_ENV_OVERRIDE`）: 保護済みの sh（`ccnavi-*.sh`）は、
 ワークスペースルート・承認済みチケットの置き場・実行ファイルを環境変数から読む。そのため、`CCNAVI_GUARD_CORE_FILES` が有効な間は、保護済みの sh を呼ぶ
 コマンド行で `CCNAVI_` で始まる変数と `CLAUDE_PROJECT_DIR` を置く・外す形を、ルールより先に止める。数えるのは前置きの代入、

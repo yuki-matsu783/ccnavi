@@ -5,7 +5,7 @@
 # ---- 取り込み状態とロック
 #
 # 取り込み状態は 1 行 1 項目の `<鍵> <値>`。sh は `sed -n 's/^<鍵> //p'` で読み、jq を使わない
-# （JSON は実行ファイルが読んで、sh には 1 行で返す）。
+# （JSON とチケットの YAML は実行ファイルが読んで、sh には 1 行で返す）。
 # 置き場はワークスペースルートの `logs/state`（固定。ccnavi-review.sh と同じ）。
 #
 #   sync/<リポジトリ>/families/<P>   親子のチケットの取り込み状態（remote branch sha fetched_at state reason）
@@ -74,6 +74,24 @@ ccnavi_branch_ok() {
 	else
 		ccnavi_is_branch "$1"
 	fi
+}
+
+# 実行ファイルに聞く。答え（標準出力）を、Windows の実行ファイルの CR を除いて出す。<ワークスペースルート> <引数>...
+#
+# 実行ファイルが無ければ 1（ソースで動かしている ccnavi のリポジトリでは uv で起こす）。実行ファイルが
+# 断った・答えなかったときは空を出して 0。答えの頭の行を確かめるのは呼ぶ側。
+ccnavi_ask() {
+	ccnavi_ak_root="$1"
+	shift
+	if ccnavi_ak_bin=$(ccnavi_bin "$ccnavi_ak_root"); then
+		ccnavi_ak_out=$("$ccnavi_ak_bin" --root "$ccnavi_ak_root" "$@" 2>/dev/null </dev/null) || ccnavi_ak_out=""
+	elif [ -f "$ccnavi_ak_root/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
+		ccnavi_ak_out=$(cd "$ccnavi_ak_root" && uv run --quiet python -m ccnavi --root "$ccnavi_ak_root" "$@" 2>/dev/null </dev/null) ||
+			ccnavi_ak_out=""
+	else
+		return 1
+	fi
+	printf '%s\n' "$ccnavi_ak_out" | tr -d '\r'
 }
 
 # 親子のチケットの親のブランチ名。<ワークスペースルート> <識別子>
@@ -177,47 +195,27 @@ ccnavi_integration() {
 #
 # 置き場（承認済みの doing/・done/、提案の todo/・review/）に `ticket: <名前>` の親チケットか提案が
 # あれば 0（SessionStart で早送りする対象の条件の 1 つ）。ready が退避した後は、手元の退避の親チケットも見る。
-# 子チケット（`parent:` を持つ）は数えない。置き場のパスが絶対パス（リポジトリの外）なら親子のチケットとして
-# 扱わない（ブランチに乗らないので、親のブランチで共有できない）。
+# 子チケット（`parent:` を持つ）は数えない。
+#
+# sh はチケットを読まない。読むのは実行ファイル（`tree parent <ツリー> <名前>`）で、sh は答えの 1 行を見る。
+# 親でなければ 1。ツリーが無ければ聞かずに 1。決められなければ 2（実行ファイルが無い・答えない・古くて
+# 副命令を知らない、置き場に名前のファイルが在るのに frontmatter を読めない）。2 をどちらに倒すかは
+# 呼ぶ側が決める。止める側の検査は親として扱い、ツリーを動かす側は親でないとして扱う。
+# 実行ファイルの --root に渡すワークスペースルートは `.claude/worktrees/<名前>` の 2 つ上。
 ccnavi_parent_tree() {
-	ccnavi_pt_approved=.ccnavi/approved # 固定
-	ccnavi_pt_proposals=wip/proposals   # 固定
-	case "$ccnavi_pt_approved$ccnavi_pt_proposals" in
-	/* | [A-Za-z]:*) return 1 ;;
-	esac
-	case "$ccnavi_pt_proposals" in
-	/* | [A-Za-z]:*) return 1 ;;
-	esac
-	ccnavi_pt_approved="${ccnavi_pt_approved%/}"
-	ccnavi_pt_proposals="${ccnavi_pt_proposals%/}"
-	for ccnavi_pt_file in "$1/$ccnavi_pt_approved/doing/$2.md" "$1/$ccnavi_pt_approved/done/$2.md" \
-		"$1/$ccnavi_pt_proposals/todo/$2.md" "$1/$ccnavi_pt_proposals/review/$2.md"; do
-		[ -f "$ccnavi_pt_file" ] || continue
-		grep -q '^parent:' "$ccnavi_pt_file" 2>/dev/null && continue
-		ccnavi_pt_id=$(sed -n 's/^ticket:[[:space:]]*//p' "$ccnavi_pt_file" 2>/dev/null | head -n 1 |
-			sed -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//')
-		[ "$ccnavi_pt_id" = "$2" ] && return 0
-	done
-	# ready の後は、親子のチケットは手元の退避（<ワークスペース>/logs/archive/<リポジトリ>/done/）へ
-	# 移り、ツリーには残らない。そこに親（`parent:` を持たない）が在れば、まだ親のワークツリーとして扱う
-	# （Draft を外し損ねた ready の打ち直し・取り込み・早送りのため）。ワークスペースは
-	# `.claude/worktrees/<名前>` の 2 つ上。途中にリンクがあれば信じない。
+	[ -d "$1" ] || return 1
 	case "$1" in
 	*/.claude/worktrees/*) ccnavi_pt_ws="${1%/.claude/worktrees/*}" ;;
-	*) return 1 ;;
+	*) ccnavi_pt_ws=$(ccnavi_workspace) || return 2 ;;
 	esac
-	ccnavi_pt_key=$(ccnavi_repo_key "$1" "$ccnavi_pt_ws")
-	ccnavi_pt_file="$ccnavi_pt_ws/logs"
-	for ccnavi_pt_part in archive "$ccnavi_pt_key" done "$2.md"; do
-		[ -L "$ccnavi_pt_file" ] && return 1
-		ccnavi_pt_file="$ccnavi_pt_file/$ccnavi_pt_part"
-	done
-	[ -L "$ccnavi_pt_file" ] && return 1
-	[ -f "$ccnavi_pt_file" ] || return 1
-	grep -q '^parent:' "$ccnavi_pt_file" 2>/dev/null && return 1
-	ccnavi_pt_id=$(sed -n 's/^ticket:[[:space:]]*//p' "$ccnavi_pt_file" 2>/dev/null | head -n 1 |
-		sed -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//')
-	[ "$ccnavi_pt_id" = "$2" ]
+	ccnavi_pt_out=$(ccnavi_ask "$ccnavi_pt_ws" tree parent "$1" "$2") || return 2
+	[ "$(printf '%s\n' "$ccnavi_pt_out" | head -n 1)" = "tree 1" ] || return 2
+	ccnavi_pt_ans=$(printf '%s\n' "$ccnavi_pt_out" | sed -n 's/^parent //p' | head -n 1)
+	case "$ccnavi_pt_ans" in
+	yes) return 0 ;;
+	no) return 1 ;;
+	esac
+	return 2
 }
 
 # ---- タイムアウト監視つきの git（取ってくる操作。ccnavi-fetch.sh と ccnavi-sync.sh が使う）
@@ -275,9 +273,9 @@ ccnavi_git_refusal() {
 		printf '書きかけの %s と重なる。コミットか退避をしてから打ち直してください' "$ccnavi_gr_paths"
 	elif grep -q 'index\.lock' "$1" 2>/dev/null; then
 		printf '索引のロック（index.lock）が残っている。別の git が動いていないか確かめ、異常終了して残ったものならユーザが消す'
-	elif grep -qi 'tell me who you are\|empty ident\|user\.email\|user\.name' "$1" 2>/dev/null; then
+	elif grep -Eqi 'tell me who you are|empty ident|user\.email|user\.name' "$1" 2>/dev/null; then
 		printf 'コミットするユーザの名前（user.name・user.email）が決まっていない'
-	elif grep -qi 'gpg\|signing' "$1" 2>/dev/null; then
+	elif grep -Eqi 'gpg|signing' "$1" 2>/dev/null; then
 		printf 'コミットの署名に失敗した'
 	elif grep -qi 'hook' "$1" 2>/dev/null; then
 		printf 'git の hook が止めた（%s）' "$(head -n 1 "$1")"

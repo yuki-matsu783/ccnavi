@@ -54,12 +54,6 @@ class AdditionalContextTest(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--log",
-                "",
-                "--state",
-                "",
-                "--approved",
-                "",
                 *args,
             ],
             input=payload,
@@ -165,7 +159,7 @@ class AdditionalContextTest(unittest.TestCase):
         self.assertTrue(any("many" in w and "選択肢が 3 つ以上" in w for w in warned), warned)
 
     def test_once_delivers_the_text_only_the_first_time_per_context(self):
-        state = os.path.join(self.root, "state")
+        state = os.path.join(self.root, "logs", "state")
         self.rules(
             deny=[rule("push", "Bash", glob="*git push*")],
             allow=[rule("src", "Write", "", glob="*/src/*", additionalContextOnce=NOTE)],
@@ -183,7 +177,7 @@ class AdditionalContextTest(unittest.TestCase):
                     "tool_input": {"file_path": target},
                 }
             )
-            done = self.run_ccnavi("--mode", "enable", "--state", state, payload=payload)
+            done = self.run_ccnavi("--mode", "enable", payload=payload)
             self.assertEqual(done.returncode, 0, done.stderr)
             if not done.stdout.strip():
                 return {}
@@ -199,15 +193,11 @@ class AdditionalContextTest(unittest.TestCase):
         # セッションの開始（compact の後も含む）で忘れる。
         hit("s1", event="SessionStart")
         self.assertEqual(hit("s1").get("additionalContext"), NOTE)
-        # 記録の置き場が無ければ毎回届く。
-        self.assertEqual(self.judge("Write", target).get("additionalContext"), NOTE)
-        self.assertEqual(self.judge("Write", target).get("additionalContext"), NOTE)
         # 試験は記録を消費しない。
         self.run_ccnavi("--state", state, "--test", "Write", target)
         self.assertEqual(hit("s3").get("additionalContext"), NOTE)
 
     def test_both_texts_join_the_first_time_and_only_the_short_one_after(self):
-        state = os.path.join(self.root, "state")
         always = "src は自由に直してよい。"
         self.rules(
             deny=[rule("push", "Bash", glob="*git push*")],
@@ -234,7 +224,7 @@ class AdditionalContextTest(unittest.TestCase):
         )
 
         def hit() -> str:
-            done = self.run_ccnavi("--mode", "enable", "--state", state, payload=payload)
+            done = self.run_ccnavi("--mode", "enable", payload=payload)
             return json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"]
 
         self.assertEqual(hit(), f"{always}\n\n{NOTE}")
@@ -312,7 +302,6 @@ class AdditionalContextTest(unittest.TestCase):
     def test_once_file_is_delivered_once_and_lint_checks_the_path(self):
         from ccnavi.policy import ctxfile
 
-        state = os.path.join(self.root, "state")
         write(os.path.join(self.root, "docs", "once.md"), "最初に 1 度だけ")
         write(os.path.join(self.root, "docs", "long.md"), "い" * (ctxfile.MAX_CHARS + 1))
         self.rules(
@@ -335,9 +324,9 @@ class AdditionalContextTest(unittest.TestCase):
                 "tool_input": {"file_path": target},
             }
         )
-        first = self.run_ccnavi("--mode", "enable", "--state", state, payload=payload)
+        first = self.run_ccnavi("--mode", "enable", payload=payload)
         self.assertIn("最初に 1 度だけ", first.stdout)
-        second = self.run_ccnavi("--mode", "enable", "--state", state, payload=payload)
+        second = self.run_ccnavi("--mode", "enable", payload=payload)
         self.assertEqual(second.stdout.strip(), "")
 
         lint = self.run_ccnavi("--lint")

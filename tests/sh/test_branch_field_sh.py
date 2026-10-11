@@ -38,8 +38,7 @@ import tempfile
 import unittest
 
 from tests import ROOT, SRC, common_path, config_path
-from tests.ticket.test_phases import PHASES, child_text, parent_text
-from tests.ticket.test_ticket import RULES
+from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")

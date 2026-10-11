@@ -93,50 +93,27 @@ def os_name():
     return subprocess.run(["uname", "-s"], capture_output=True, text=True).stdout.strip()
 
 
-@unittest.skipIf(SHELL is None, "sh が無い")
-class FrontFieldTest(unittest.TestCase):
-    """sh の `front_field` が、Python の `syncstate._text`（YAML で読んだ値）と同じ値を出す。
+class NoTicketYamlInShTest(unittest.TestCase):
+    """sh はチケットの YAML を自分で読まない。閉じたかの見分けは `ccnavi sync closed`、
+    親のワークツリーかは `ccnavi tree parent` に聞く（答えの約束は tests/core/test_sh_ask.py）。
 
-    `null`・`~`・引用符の外の注記を sh だけが値として読むと、閉じたかの照合が Python と食い違う。
+    前は sh が frontmatter を awk で読み、Python と同じ値になることを見本で確かめていた。
+    読み方を 2 か所に持つと、ずれに気づけない。
     """
 
-    VALUES = (
-        "abc",
-        '"abc # x"',
-        "'a b'",
-        "abc # c",
-        "null",
-        "Null",
-        "NULL",
-        "~",
-        "",
-        '""',
-        "#x",
-        "a#b",
-        '"q" # c',
-        "' sp '",
-    )
-
-    def sh_value(self, line):
-        with open(os.path.join(SH_DIR, "ccnavi-sync.sh"), encoding="utf-8") as f:
-            text = f.read()
-        start = text.index("front_field() {")
-        body = text[start : text.index("\n}\n", start) + 3]
-        script = body + 'printf "%s\\n" "$1" | front_field base_sha\n'
-        done = subprocess.run(
-            [SHELL, "-c", script, "sh", line], capture_output=True, text=True, encoding="utf-8"
-        )
-        return done.stdout.rstrip("\n")
-
-    def test_the_same_values_as_python(self):
-        from ccnavi.tickets import syncstate
-        from ccnavi.tickets import ticket as ticket_mod
-
-        for value in self.VALUES:
-            with self.subTest(value=value):
-                front, _, _ = ticket_mod._frontmatter(f"---\nticket: x\nbase_sha: {value}\n---\n")
-                expected = syncstate._text(front.get("base_sha"))
-                self.assertEqual(self.sh_value(f"base_sha: {value}"), expected)
+    def test_sync_and_common_state_do_not_parse_frontmatter(self):
+        for name in ("ccnavi-sync.sh", "ccnavi-common-state.sh"):
+            with open(os.path.join(SH_DIR, name), encoding="utf-8") as f:
+                code = [line for line in f if not line.lstrip().startswith("#")]
+            with self.subTest(name=name):
+                for word in (
+                    "frontmatter_of",
+                    "front_field",
+                    "approved_at_of",
+                    "^ticket:",
+                    "^parent:",
+                ):
+                    self.assertFalse(any(word in line for line in code), word)
 
 
 @unittest.skipIf(SHELL is None or GIT is None, "sh か git が無い")
@@ -224,6 +201,10 @@ class SyncHarness(unittest.TestCase):
     def env(self, **extra):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         env.update({"CCNAVI_SYNC_RETRIES": "0", "CCNAVI_SYNC_RETRY_WAIT": "0"})
+        # sh はチケットを読まず実行ファイルに聞く（親のワークツリーか、閉じたか）ので、
+        # ソースの実行ファイルを既定で渡す。実行ファイルの無い形を見るテストは自分で上書きする。
+        if "CCNAVI_BIN_PATH" not in extra:
+            env["CCNAVI_BIN_PATH"] = self.source_exe()
         env.update(extra)
         return env
 
@@ -274,6 +255,14 @@ class SyncHarness(unittest.TestCase):
         )
         return done.stdout.strip()
 
+    def source_exe(self):
+        """ソースの実行ファイルを起こすもの。`launcher` とは別の置き場（上書きし合わない）。"""
+        path = os.path.join(self._tmp.name, "source-bin", "ccnavi")
+        if not os.path.exists(path):
+            write(path, f'#!/bin/sh\nPYTHONPATH="{SRC}" exec "{sys.executable}" -m ccnavi "$@"\n')
+            os.chmod(path, 0o755)
+        return path
+
     def launcher(self, body=None):
         path = write(
             os.path.join(self._tmp.name, "bin", "ccnavi"),
@@ -288,7 +277,7 @@ class SyncTest(SyncHarness):
     # ---- 取り込み（P がリモートにある）
 
     def test_fast_forward_and_records(self):
-        head = self.remote_commit(PARENT, ".ccnavi/approved/doing/i0001-01-01.md", "child\n")
+        head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual(head, self.sha(self.tree, "HEAD"))
@@ -386,8 +375,10 @@ class SyncTest(SyncHarness):
         done = self.sync(PARENT, PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual(1, done.stdout.count(f"{PARENT}: リモートと同じ"), done.stdout)
-        # 取り込みの後の検査も 1 度だけ（ここは実行ファイルが無いので、しなかったと 1 度言う）。
-        self.assertEqual(1, done.stdout.count(f"{PARENT}: 実行ファイルが無い"), done.stdout)
+        # 実行ファイルが無ければ、親のワークツリーかを確かめられないので取り込まない。
+        done = self.sync(PARENT, CCNAVI_BIN_PATH=os.path.join(self._tmp.name, "nowhere"))
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertIn("実行ファイルに確かめられなかった", done.stdout)
 
     # ---- 取り込みの後の検査（`--lint` の該当分と判定し直し）
 

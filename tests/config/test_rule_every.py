@@ -53,7 +53,7 @@ class EveryTest(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         self.root = self.dir.name
-        self.state = os.path.join(self.root, "state")
+        self.state = os.path.join(self.root, "logs", "state")
         self.last: subprocess.CompletedProcess | None = None
         self.addCleanup(self.dir.cleanup)
 
@@ -84,12 +84,6 @@ class EveryTest(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--log",
-                "",
-                "--state",
-                self.state if state is None else state,
-                "--approved",
-                "",
                 *args,
             ],
             input=payload,
@@ -208,11 +202,6 @@ class EveryTest(unittest.TestCase):
         self.assertEqual(self.hits(3, session="s1", agent="a1"), ["", "", ONCE])
         # 子の 3 回は親の数えを進めていない（親の 4 回目は渡す回ではない）。
         self.assertEqual(self.hit(session="s1"), "")
-
-    def test_no_state_dir_delivers_every_time(self):
-        """`--state ""` のときは数えを覚えられないので、渡す回を刻まず毎回渡す。"""
-        self.rules(rule("src", additionalContext=EVERY, additionalContextOnce=ONCE, every=5))
-        self.assertEqual(self.hits(3, state=""), [f"{EVERY}\n\n{ONCE}"] * 3)
 
     def test_rules_with_neither_every_nor_once_leave_no_count(self):
         """`every` も `Once` も持たないルールは、記録に数えを書かない。"""

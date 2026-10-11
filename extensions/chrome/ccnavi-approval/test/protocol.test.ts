@@ -59,7 +59,7 @@ test("CX-T013 操作は名前で限る。未対応の操作・焼き込んでい
   assert.equal((await call({ kind: "host", host: "github.com", op: "branchHead", args: ["acme", "widgets", "a..b"] })).ok, false);
 });
 
-test("CX-T014 PAT が無ければ呼ばない（GitHub も GitLab も。段階 5 から GitLab も読む）", async () => {
+test("CX-T014 PAT が無ければ呼ばない（GitHub も GitLab も）", async () => {
   const m = mock();
   const d = deps(m, new Map());
   for (const host of ["github.com", "gitlab.com"]) {

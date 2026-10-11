@@ -14,23 +14,28 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import dataclasses
+import io
 import os
 import tempfile
 import time
+import traceback
 from typing import TextIO
 
-from ..hook import c1, core, events, judge
+from ..hook import events, judge, reasons, subagent
 from ..infra import fsio, hookio, modes, settings
 from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, diaglog
 from ..tickets import (
     branchfind,
+    c1,
+    core,
     history,
     review,
     skillsync,
 )
-from . import cli_args, cli_ops, cli_usage, diagnose, lint, plan_order, suggest, version
+from . import cli_args, cli_ops, cli_plan, cli_usage, diagnose, lint, sh_ask, suggest, version
 
 
 def _json_out_of_test(argv: list[str]) -> list[str]:
@@ -321,10 +326,14 @@ def _recorded_run(
         return EXIT_ERROR
     base = cli_args._real(os.path.abspath(args.record_tree)) if args.record_tree else real_root
     # 上書きした state の置き場（`--state`）も、リポジトリに入らない書き込み
-    # （レビューの下書きなど）の置き場なので一覧から外す。
-    conf_for_state, _ = settings.load(root)
-    cli_args._override(conf_for_state, args)
-    moved_state = cli_args._real(conf_for_state.state) if conf_for_state.state else state
+    # （レビューの下書きなど）の置き場なので一覧から外す。`--state` が効くのは診断の経路だけで、
+    # それ以外では無視されるので、ここでも見ない（見ると、一覧から外したい場所を指せてしまう）。
+    moved_state = state
+    if cli_args._diagnosing(args):
+        conf_for_state, _ = settings.load(root)
+        cli_args._override(conf_for_state, args)
+        if conf_for_state.state:
+            moved_state = cli_args._real(conf_for_state.state)
     with fsio.recording() as written:
         code = _parsed(stdin, stdout, stderr, parser, args)
     lines = []
@@ -471,21 +480,24 @@ def _parsed(
             return EXIT_ERROR
 
     root = args.root if args.root is not None else default_root()
-    conf, problems = settings.load(root)
+    try:
+        conf, problems = settings.load(root)
+    except Exception as exc:  # noqa: BLE001 hook の経路では、終了コード 1 で通る形にしない
+        # 設定を読めずに落ちたら、hook の経路だけは受け皿で終える。payload はまだ読んでいないので
+        # イベントが分からず、PreToolUse と同じく止める。ほかの経路は、打った人が見られるので
+        # 例外のまま伝える。
+        if not _hook_route(args):
+            raise
+        return _hook_crashed(stdout, stderr, _unloaded(root), root, _HookSoFar(), exc)
 
-    # レイヤーの置き場（中身の 3 本と、レイヤーを探す先の 2 本）
-    # の差し替えは診断の経路でだけ使われる。
+    # レイヤーの置き場（中身の 3 本と、レイヤーを探す先の 2 本）と、記録・state・
+    # 承認済みチケット・提案の置き場（`--log` / `--state` / `--approved` / `--tickets`）の
+    # 差し替えは診断の経路でだけ使われる。
     # hook からの判定にも、チケットとレビューの副命令にも差し替えの手段を残すと、
     # 設定を保存せずに緩める経路になるので、そこでは無視する。
     # 診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を
     # 指しても実運用に漏れない。
-    diagnosing = (
-        args.lint
-        or args.test is not None
-        or bool(args.test_expectations)
-        or args.explain
-        or args.suggest
-    )
+    diagnosing = cli_args._diagnosing(args)
     if not diagnosing:
         cli_args._drop_outside_diagnosis(stderr, args)
 
@@ -589,7 +601,7 @@ def _parsed(
     if args.suggest:
         return suggest.report(stdout, conf, root, args.json)
     if args.explain and args.json:
-        return diagnose.explain_json(stdout, stderr, conf, root)
+        return diagnose.explain_json(stdout, stderr, conf, root, args.mode, args.ticket_control)
     if args.explain:
         return diagnose.explain(stdout, stderr, conf, root)
 
@@ -610,8 +622,8 @@ def _parsed(
             stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
             return EXIT_ERROR
         if args.fill_phases:
-            return plan_order.fill_phases(stdout, stderr, conf, root, args.plan_order.strip())
-        return plan_order.reorder(
+            return cli_plan.fill_phases(stdout, stderr, conf, root, args.plan_order.strip())
+        return cli_plan.reorder(
             stdout,
             stderr,
             conf,
@@ -683,6 +695,14 @@ def _parsed(
         repo = args.command[3] if len(args.command) == 4 else None
         code = cli_ops.sync_check(stdout, stderr, root, conf, args.command[2], repo)
         return EXIT_OK if code == 0 else EXIT_ERROR
+    # sh がチケットについて聞くこと（sh はチケットの YAML を読まない）。読むだけで、何も書かない。
+    # 答えはチケット制御の有無に依らない（sh の前の見方がそうだった）。
+    if len(args.command) == 4 and list(args.command[:2]) == ["tree", "parent"]:
+        code = sh_ask.parent_tree(stdout, stderr, root, conf, args.command[2], args.command[3])
+        return EXIT_OK if code == 0 else EXIT_ERROR
+    if len(args.command) == 6 and list(args.command[:2]) == ["sync", "closed"]:
+        code = sh_ask.sync_closed(stdout, stderr, root, conf, *args.command[2:])
+        return EXIT_OK if code == 0 else EXIT_ERROR
     # C1（取り込み済みの親子のチケットの状態の操作を、取り込み・書く・コミット・push の 1 操作に
     # する sh）が聞くこと。読むだけで、何も書かない。
     if len(args.command) == 3 and list(args.command[:2]) == ["c1", "family"]:
@@ -732,10 +752,91 @@ def _parsed(
             return EXIT_ERROR
         return cli_ops.operate(stdin, stdout, stderr, conf, root, args)
 
+    return _hook(stdin, stdout, stderr, conf, problems, root, args)
+
+
+@dataclasses.dataclass
+class _HookSoFar:
+    """hook の 1 回で、例外までにどこまで進んだか。受け皿（`_hook_crashed`）が読む。
+
+    モードを解く前に落ちたら enable として止める側に倒す。記録は 1 度しか試さない。
+    記録そのものが例外で終わった回に、受け皿でもう 1 度書こうとして同じ例外を重ねないため。
+    """
+
+    mode: str = modes.ENABLE
+    payload: hookio.Input | None = None
+    record: audit.Record | None = None
+    log: audit.Log | None = None
+    recorded: bool = False
+
+
+def _hook_route(args: argparse.Namespace) -> bool:
+    """この起動が hook の経路（`_parsed` の最後の `_hook`）に進むか。
+
+    設定を読む前に分ける必要があるときに使う。`_parsed` の振り分けで、payload を読まない経路の
+    どれにも当たらないもの。経路を足したら、ここにも足す。
+    """
+    return not (
+        args.docs
+        or cli_args._diagnosing(args)
+        or args.prune
+        or args.plan_order is not None
+        or args.fill_phases
+        or args.order is not None
+        or args.write
+        or args.expect is not None
+        or args.agree
+        or args.command
+        or args.reviewed is not None
+        or args.close_early
+    )
+
+
+def _unloaded(root: str) -> settings.Settings:
+    """設定を読めなかった回の、記録と state の既定の置き場だけを持つ設定。"""
+    return settings.Settings(
+        log=os.path.join(root, settings.DEFAULT_LOG),
+        state=os.path.join(root, settings.DEFAULT_STATE),
+    )
+
+
+def _hook(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    problems: list[str],
+    root: str,
+    args: argparse.Namespace,
+) -> int:
+    """hook として起動された 1 回。途中のどこで例外が出ても、終了コード 1 で抜けさせない。
+
+    例外を抜けさせると Python は終了コード 1 で終わり、Claude Code は PreToolUse の呼び出しを
+    そのまま通す。判定の本体だけでなく、モードの解決・payload の読み取り・記録・診断ログの
+    どこで落ちても、内部エラーとして終える。
+    """
+    so_far = _HookSoFar()
+    try:
+        return _hook_steps(stdin, stdout, stderr, conf, problems, root, args, so_far)
+    except Exception as exc:  # noqa: BLE001 想定外の例外を、終了コード 1 で通る形にしない
+        return _hook_crashed(stdout, stderr, conf, root, so_far, exc)
+
+
+def _hook_steps(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    problems: list[str],
+    root: str,
+    args: argparse.Namespace,
+    so_far: _HookSoFar,
+) -> int:
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
 
     mode = modes.resolve_mode(stderr, args.mode, conf)
+    so_far.mode = mode
     conf.restore_if_deny = selfguard.resolve(
         stderr, args.restore_if_deny, conf.restore_if_deny, settings.RESTORE_IF_DENY_ENV
     )
@@ -755,6 +856,7 @@ def _parsed(
         selfguard.GATE_SETTINGS,
     )
     log = audit.Log(conf.log)
+    so_far.log = log
     deadline = time.monotonic() + judge.DEADLINE_SECONDS
 
     try:
@@ -764,8 +866,9 @@ def _parsed(
         stderr.write(cli_usage.USAGE)
         return EXIT_ERROR
     except hookio.Unusable as exc:
-        stderr.write(f"ccnavi: {exc}\n")
+        stderr.write(reasons.payload_unusable(audit.REASON_PAYLOAD_UNUSABLE, str(exc)) + "\n")
         diaglog.get("ccnavi", root).warn("hook の payload を読めない", mode=mode)
+        so_far.recorded = True
         cli_args._record(
             stderr,
             log,
@@ -777,17 +880,27 @@ def _parsed(
         )
         return modes.fail_closed(mode)
 
-    history.set_via(history.VIA_HOOK)
+    so_far.payload = payload
     record = audit.Record(
         mode=mode,
         permission_mode=payload.permission_mode,
         event=payload.event,
         tool=payload.tool_name,
-        subject=judge.subject_of(payload),
         session=payload.session_id,
     )
+    so_far.record = record
 
-    code = events.decide(stdout, stderr, mode, conf, root, payload, record, deadline)
+    # 出力は手元に溜め、記録と診断ログを終えてから出す。例外で終えられなかった回に、途中まで
+    # 書いた JSON と内部エラーの応答が混ざって、どちらも読まれなくなるのを避けるため。
+    buffered = io.StringIO()
+    try:
+        history.set_via(history.VIA_HOOK)
+        record.subject = judge.subject_of(payload)
+        code = events.decide(buffered, stderr, mode, conf, root, payload, record, deadline)
+    except Exception as exc:  # noqa: BLE001 想定外の例外を、終了コード 1 で通る形にしない
+        buffered = io.StringIO()
+        code = _internal_error(buffered, stderr, mode, conf, root, payload, record, exc)
+    so_far.recorded = True
     cli_args._record(stderr, log, record)
     # 診断ログ。受け付けたイベントと最終判定だけ。subject（コマンドの全文）は書かない。
     # 呼び出しごとに走るので DEBUG に置き、既定の INFO では行を増やさない。
@@ -800,7 +913,98 @@ def _parsed(
         code=record.code,
         exit=code,
     )
+    stdout.write(buffered.getvalue())
     return code
+
+
+def _hook_crashed(
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    so_far: _HookSoFar,
+    exc: Exception,
+) -> int:
+    """判定の本体の外（モードの解決・payload の読み取り・記録など）で落ちた回の受け皿。
+
+    payload を読む前に落ちたら、何のイベントか分からないので PreToolUse と同じく止める。
+    記録はまだ試していないときだけ書く。
+    """
+    payload = so_far.payload or hookio.Input()
+    record = so_far.record or audit.Record(
+        mode=so_far.mode,
+        event=payload.event,
+        tool=payload.tool_name,
+        session=payload.session_id,
+    )
+    out = io.StringIO()
+    code = _internal_error(out, stderr, so_far.mode, conf, root, payload, record, exc)
+    if not so_far.recorded:
+        so_far.recorded = True
+        try:
+            cli_args._record(stderr, so_far.log or audit.Log(conf.log), record)
+        except Exception as again:  # noqa: BLE001 受け皿の中では例外を重ねない
+            stderr.write(f"ccnavi: 記録を書けない: {type(again).__name__}\n")
+    stdout.write(out.getvalue())
+    return code
+
+
+def _internal_error(
+    stdout: TextIO,
+    stderr: TextIO,
+    mode: str,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+    exc: Exception,
+) -> int:
+    """イベントの処理が想定外の例外で終わったときの応答と記録。
+
+    例外を抜けさせると Python は終了コード 1 で終わる。Claude Code は 0 と 2 以外を止める扱いに
+    しないので、PreToolUse の呼び出しがそのまま通り、記録も残らない。ここで受けて、判定に
+    達せなかった回として終える。
+
+    - PreToolUse: 呼び出しを止める（dry-run は通す）。標準エラーの文がモデルに届く
+    - PostToolUse: ツールはもう走っているので止めるものは無い。enable は終了コード 2 と
+      標準エラーで、実行後の検査をしていないことをモデルに言う（dry-run は 0）
+    - payload を読む前に落ちた（イベントが分からない）: PreToolUse と同じく止める
+    - それ以外: 終了コード 0 で、ユーザに `systemMessage` で知らせる。2 で終えると、Stop と
+      SubagentStop は終われなくなり、UserPromptSubmit は依頼文を消すので、ccnavi の不具合が
+      作業そのものを止める。SubagentStop は子の範囲を確かめられなかった回と同じ印を置き、
+      親に届くようにする（`systemMessage` はユーザにしか見えない）
+    """
+    kind = type(exc).__name__
+    frames = traceback.extract_tb(exc.__traceback__)
+    where = f"{os.path.basename(frames[-1].filename)}:{frames[-1].lineno}" if frames else ""
+    log_path = os.path.join(root, diaglog.DIAG_DIR, "ccnavi.log")
+    # 例外の文は書かない。コマンドやパスの断片が混ざることがある。型と場所があれば辿れる。
+    # 例外の出どころが診断ログそのものでも、ここでは重ねない。
+    with contextlib.suppress(Exception):
+        diaglog.get("ccnavi", root).error(
+            "hook の処理が例外で終わった",
+            event=payload.event,
+            tool=payload.tool_name,
+            mode=mode,
+            error=kind,
+            at=where,
+        )
+    record.decision, record.reason = audit.SKIP, audit.REASON_INTERNAL_ERROR
+    record.code, record.rules = "", []
+    record.detail = f"{kind} at {where}" if where else kind
+    if payload.event in ("", hookio.PRE_TOOL_USE, hookio.POST_TOOL_USE):
+        stderr.write(
+            reasons.internal_error(audit.REASON_INTERNAL_ERROR, payload.event, kind, log_path)
+            + "\n"
+        )
+        return modes.fail_closed(mode)
+    if payload.event == hookio.SUBAGENT_STOP:
+        subagent.unchecked_after_error(stderr, conf, root, payload)
+    hookio.write_system_message(
+        stdout,
+        reasons.internal_error_notice(audit.REASON_INTERNAL_ERROR, payload.event, kind, log_path),
+    )
+    return EXIT_OK
 
 
 def default_root() -> str:
