@@ -449,7 +449,7 @@ def _read_scope(ticket: ticket_model.Ticket, front: dict, problems: list[Problem
                 Problem(
                     SEVERITY_WARN,
                     name,
-                    f"`{key}` はこの版の判定が使わない。書いても効かない。"
+                    f"`{key}` はこの版の判定が使わない。書いても反映されない。"
                     "範囲は deny / ask / allow のタイプに `match: Write|Edit` で書く",
                 )
             )
@@ -466,7 +466,7 @@ def _read_scope(ticket: ticket_model.Ticket, front: dict, problems: list[Problem
             Problem(
                 SEVERITY_ERROR,
                 name,
-                "allow にも ask にも、効く範囲の項が 1 件も無い。このチケットは承認しても"
+                "allow にも ask にも、有効な範囲の項が 1 件も無い。このチケットは承認しても"
                 "何も書けない",
             )
         )
@@ -540,7 +540,7 @@ def regex_overflow_detail(regex: str) -> str:
     """
     return (
         f"子の範囲に regex `{regex}` は書けない。"
-        "親と定義の上限に収まるかは、判定のときに当てて確かめる"
+        "親と定義の上限に収まるかは、判定のときに照合して確かめる"
     )
 
 
@@ -664,7 +664,7 @@ def _entries(front: dict, name: str) -> tuple[list[ticket_model.Entry], list[Pro
                         SEVERITY_WARN,
                         name,
                         f"{where} の match `{match}` は書き込みのツールを含まない。"
-                        "この版の判定はパスの範囲しか見ないので効かない",
+                        "この版の判定はパスの範囲しか見ないので反映されない",
                     )
                 )
                 continue

@@ -225,7 +225,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
                 SEVERITY_WARN,
                 "(ticket)",
                 f"{settings.TICKET_CONTROL_ENV}=disable。チケットの範囲・フェーズの HITL ポイント・"
-                "サブエージェントの制限は効かない",
+                "サブエージェントの制限は有効にならない",
             )
         )
         return problems
@@ -484,7 +484,7 @@ def _proposal_problems(
                 SEVERITY_WARN,
                 "(ticket)",
                 f"{t.ticket} は承認待ち（{t.tree or '(ワークスペースルート)'} の todo/）。"
-                "'ccnavi --agree' を通すまで範囲は効かない",
+                "'ccnavi --agree' を通すまで範囲は有効にならない",
             )
         )
     for t in index.values():

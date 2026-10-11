@@ -161,7 +161,7 @@ def branch_problems(
                 rules.Problem(
                     rules.SEVERITY_ERROR,
                     t.ticket,
-                    f"`branch: {t.branch}` は統合先の名前（{', '.join(hits)}）に当たる。"
+                    f"`branch: {t.branch}` は統合先の名前（{', '.join(hits)}）と同じ。"
                     "統合先を親のブランチにしない",
                 )
             )
@@ -241,7 +241,7 @@ def integration_problems(
                 rules.SEVERITY_ERROR,
                 t.ticket,
                 f"統合先の取り込み結果（sync/{repo}/integration）を読めない（{why}）。閉じた識別子の"
-                "再利用を確かめられないので決まらない。承認しない。オンラインで"
+                "再利用を確かめられない。承認しない。オンラインで"
                 f" '{sync}' を打って統合先を取り込み直してください",
             )
         ]
@@ -534,9 +534,9 @@ def predecessor_problems(
             why = {
                 PRED_SELF: "自分自身を先行に挙げている。自分が閉じるのを待つことはできない",
                 PRED_ANCESTOR: "自分の親を先行に挙げている。親は子が全部閉じてから閉じるので、"
-                "待っても満たさない",
+                "待っても満たされない",
                 PRED_CYCLE: f"先行が循環している（{p.where}）。どれも他が閉じるのを待つので、"
-                "待っても満たさない",
+                "待っても満たされない",
             }[p.state]
             problems.append(
                 rules.Problem(
@@ -702,7 +702,7 @@ def child_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 t.ticket,
-                f"親 {parent.ticket} の計画が壊れているので、子も止める（{broken[0].detail}）。"
+                f"親 {parent.ticket} の計画が不正なので、子も止める（{broken[0].detail}）。"
                 "ユーザが親の承認済みチケットの計画か、固定した定義（phases:）を直してください",
             )
         ]
@@ -763,7 +763,8 @@ def content_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
                 rules.SEVERITY_ERROR,
                 t.ticket,
                 "`started_at` が無いのに `base_sha` がある。2 つは着手（`start`）が一緒に書く欄で、"
-                "片方だけの形は道具を通っていない。ユーザが承認済みチケットを確かめて直してください",
+                "片方だけの状態は `start` を通して書かれたものではない。"
+                "ユーザが承認済みチケットを確かめて直してください",
             )
         )
     if ticket_model.WORKFLOW_KEY in t.raw and not has_record(t):

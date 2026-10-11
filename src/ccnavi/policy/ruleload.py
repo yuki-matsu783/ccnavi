@@ -301,7 +301,8 @@ def merge_rules(base: rules.RuleSet, extra: rules.RuleSet, layer: str) -> list[P
                     Problem(
                         SEVERITY_WARN,
                         rule.id,
-                        f"`{rule.bare_id}` は前のレイヤーと同じ id で中身が違う。両方が判定に効く。"
+                        f"`{rule.bare_id}` は前のレイヤーと同じ id で中身が違う。"
+                        "両方が判定に使われる。"
                         "同じ名前で違うものを指していると、記録を読んだユーザがどちらの話か決められない",
                     )
                 )

@@ -241,7 +241,7 @@ def _loop_problems(
         if not positive_int(info.get("maxIterations")):
             out.append(
                 f"繰り返し {_named(node)} の maxIterations が 1 以上の整数ではない"
-                "（回数の上限が無いと、終わりを決める手がかりが無くなる）"
+                "（回数の上限が無いと、いつ終えるかを判断できなくなる）"
             )
         items = [i for i in flow_text._list(info.get("branches")) if isinstance(i, dict)]
         if len(items) != 2:

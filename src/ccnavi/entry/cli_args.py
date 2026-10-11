@@ -52,7 +52,7 @@ LAYER_OVERRIDES = (
     ("--project-home", "project_home", ""),
 )
 # 無視したときの文面。5 本のフラグで同じものを使う。制限が 2 つあるように読ませない。
-DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）でだけ効く\n"
+DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）でだけ使える\n"
 # `.ccnavi/scripts/` の sh が自分で計算して渡すパスと、渡されなかったときの値。
 # どちらも「いまどこで動いているか」で、エージェントが申告するものではない。
 #

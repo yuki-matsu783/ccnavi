@@ -215,7 +215,7 @@ def _write(stderr: TextIO, ans: reorder_mod.Answer, expect: str) -> tuple[int, b
         return EXIT_ERROR, False, ""
     if ans.renumbered.refused:
         for r in ans.renumbered.refused:
-            stderr.write(f"ccnavi: 引けない線: {r.text}\n")
+            stderr.write(f"ccnavi: 先行の線を引けない: {r.text}\n")
         stderr.write("ccnavi: 何も書かない\n")
         return EXIT_ERROR, False, ""
     if ans.problems:
@@ -224,7 +224,10 @@ def _write(stderr: TextIO, ans: reorder_mod.Answer, expect: str) -> tuple[int, b
             stderr.write(f"  {p}\n")
         return EXIT_ERROR, False, ""
     if ans.revision_problems:
-        stderr.write("ccnavi: 改版で通らない形（子が承認された番号の錠）。何も書かない\n")
+        stderr.write(
+            "ccnavi: 改版で通らない形（子が承認された番号を固定しているので、"
+            "その番号の項は変えられない）。何も書かない\n"
+        )
         for p in ans.revision_problems:
             stderr.write(f"  {p}\n")
         return EXIT_ERROR, False, ""

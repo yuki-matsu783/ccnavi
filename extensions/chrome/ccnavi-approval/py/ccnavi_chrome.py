@@ -344,7 +344,7 @@ def _rival_problem(snap: dict, place: dict, name: str, ident: str) -> str:
     if not others:
         return ""
     return (
-        f"親子のチケット {ident} を宣言するブランチが 1 本でない"
+        f"親子のチケット {ident} の親のブランチとして宣言されているブランチが 1 本でない"
         f"（{', '.join([name, *others])}。どれもその上の親チケットが自分のブランチだと"
         "宣言している）。どれを正とするか決まらないので、この親子のチケットは判定しない"
         ""
@@ -356,8 +356,8 @@ def _ambiguous_problem(closure: dict) -> str:
     if not closure.get("ambiguous"):
         return ""
     return (
-        f"先行の親子のチケット（{', '.join(closure['ambiguous'])}）を"
-        "宣言するブランチが 1 本でない。"
+        f"先行の親子のチケット（{', '.join(closure['ambiguous'])}）の"
+        "親のブランチとして宣言されているブランチが 1 本でない。"
         "どれを正とするか決まらないので、この親子のチケットは判定しない"
     )
 

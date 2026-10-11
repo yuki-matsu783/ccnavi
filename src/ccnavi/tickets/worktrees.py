@@ -89,7 +89,7 @@ def classifier_note(root: str, allow: str) -> str:
     """自動モードの分類器に止められたときの道。`allow` は許可に足す 1 本の例。"""
     return (
         "Claude Code の自動モードの分類器に止められたら、迂回せずにユーザに許可を頼む。"
-        "続けて許すなら、ユーザがホームの ~/.claude/settings.json の permissions.allow に、"
+        "以後も許可するなら、ユーザがホームの ~/.claude/settings.json の permissions.allow に、"
         f"この操作だけに絞った許可（例 `Bash({allow})`）を足す"
         "（分類器はプロジェクトの .claude/settings.json を読まない。"
         f"`{settings.script_command(root, 'ccnavi-git.sh')} *` のような広い許可は push まで"
@@ -159,7 +159,7 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
             name,
             REFUSED,
             path,
-            f"git worktree remove が通らない（{said[0] if said else '理由不明'}）",
+            f"git worktree remove が失敗した（{said[0] if said else '理由不明'}）",
         )
     return Dropped(name, REMOVED, path)
 
@@ -337,7 +337,7 @@ def _owner(path: str) -> tuple[str, str]:
     done = gitcmd.run(path, ["rev-parse", "--git-common-dir"], TIMEOUT_SECONDS)
     common = done.out.strip() if done.ok else ""
     if not common:
-        return "", "元のリポジトリを読めない（git rev-parse --git-common-dir が通らない）"
+        return "", "元のリポジトリを読めない（git rev-parse --git-common-dir が失敗した）"
     if not os.path.isabs(common):
         common = os.path.join(path, common)
     common = os.path.normpath(common)

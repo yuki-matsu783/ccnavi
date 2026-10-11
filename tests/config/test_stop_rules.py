@@ -362,7 +362,8 @@ class StopRulesTest(unittest.TestCase):
         said = self.said(self.lint(), "both")
         self.assertTrue(
             any(
-                "Stop の部分は何も起きない" in s and "Bash の部分はふつうに効く" in s for s in said
+                "Stop の部分は何も起きない" in s and "Bash の部分はふつうに判定される" in s
+                for s in said
             ),
             said,
         )

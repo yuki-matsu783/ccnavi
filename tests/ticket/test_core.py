@@ -805,7 +805,7 @@ class WriterFailureTest(CoreHarness):
         with self.failing("unlink", lambda path: path.endswith("1.requested")):
             applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 0, out + err)
-        self.assertIn("消せなかった（わざと失敗させた）。requested は残っていて効く", err)
+        self.assertIn("消せなかった（わざと失敗させた）。requested は残っていて有効なまま", err)
         self.assertIn("マーカー（reviewed）を消した", out)
         self.assertTrue(os.path.exists(os.path.join(marks, "1.requested")))
         self.assertFalse(os.path.exists(os.path.join(marks, "1.reviewed")))

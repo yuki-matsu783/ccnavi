@@ -282,7 +282,7 @@ class CopyJudgeTest(PhaseHarness):
         self.assertIn("limit: phase type", self.reason(beyond))
         lint = self.ccnavi("--lint", "--mode", "enable")
         self.assertIn("今の phases.yml と違う", lint.stdout)
-        self.assertIn("進行中の親には効かない", lint.stdout)
+        self.assertIn("進行中の親には反映されない", lint.stdout)
 
     def test_lint_says_a_lost_phases_yml_once_as_a_warning_for_an_approved_parent(self):
         """承認済みの親は写しを読むので、phases.yml が無くなっても --lint は warn だけで言う。"""

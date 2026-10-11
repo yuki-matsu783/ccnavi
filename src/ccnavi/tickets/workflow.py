@@ -174,7 +174,7 @@ def problems(
             if target is None:
                 error(
                     f"`{key}[{i}]` の延期を引き受ける項が無い"
-                    "（後ろにこれを待つ、延期していない項が要る）"
+                    "（この項を待つ、延期していない後ろの項が要る）"
                 )
                 continue
             target_item = numbered[target]

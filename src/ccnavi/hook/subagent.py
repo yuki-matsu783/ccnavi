@@ -87,7 +87,11 @@ def at_start(
     changed: list[str] = []
     for t in sorted(children, key=lambda x: x.ticket):
         where = tree.worktree_path(root, t.ticket)
-        state = "ワークツリーあり" if os.path.isdir(where) else "ワークツリー無し（効かない）"
+        state = (
+            "ワークツリーあり"
+            if os.path.isdir(where)
+            else "ワークツリー無し（範囲は有効にならない）"
+        )
         waiting = [f"{p.ticket}（{p.label}）" for p in approval_checks.unmet_predecessors(t, preds)]
         label = str(t.phase)
         hint = ""
