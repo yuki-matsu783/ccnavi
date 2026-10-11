@@ -1,5 +1,5 @@
 /*
- * フローの図（`Canvas.tsx`）。フェーズ管理の図（`phases/Graph.css`）と同じく、React Flow の色の変数
+ * フローの図（`Canvas.tsx`）。React Flow の色の変数
  * （`--xy-*`）を VS Code のテーマ変数に置き換える。`!important` は要らない。
  */
 .flow-graph {
