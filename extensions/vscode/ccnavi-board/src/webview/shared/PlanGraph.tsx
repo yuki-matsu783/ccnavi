@@ -14,11 +14,11 @@
  *
  * 見た目は `PlanGraph.css`。React Flow の CSS は `--xy-*` の変数で出来ているので、そこを `--vscode-*` で上書きする。
  */
-import { useCallback, useMemo, type JSX } from "react";
-import { Background, Controls, Handle, MarkerType, Position, ReactFlow, type Connection, type Edge, type Node, type NodeProps, type NodeTypes } from "@xyflow/react";
+import { useCallback, useEffect, useMemo, useRef, type JSX } from "react";
+import { Background, Controls, Handle, MarkerType, Position, ReactFlow, useNodesInitialized, useReactFlow, type Connection, type Edge, type Node, type NodeProps, type NodeTypes } from "@xyflow/react";
 
 import type { ApprovePlan } from "../../core/approvemodel.js";
-import { canConnect, planGraphOf, type PlanGraph as Graph, type PlanGraphNode } from "../../core/plan-graph.js";
+import { canConnect, PLAN_FIT_MAX_ZOOM, PLAN_FIT_MIN_ZOOM, planGraphOf, type PlanGraph as Graph, type PlanGraphNode } from "../../core/plan-graph.js";
 
 interface ItemData extends Record<string, unknown> {
   readonly node: PlanGraphNode;
@@ -29,12 +29,27 @@ type ItemNode = Node<ItemData, "planItem">;
 type EndNode = Node<ItemData, "planEnd">;
 type PlanNode = ItemNode | EndNode;
 
-/** 見る場所の言葉。知らない表記はそのまま出す */
+/**
+ * 見る場所の言葉。同じオーバーレイの本文（承認画面。`agree_screen.py`）の「レビュー不要」
+ * 「レビュー要: マージリクエスト」「レビュー要: このセッションで」を、点の幅に収まる短さにしたもの。
+ * 知らない表記はそのまま出す
+ */
 function reviewText(review: string): string {
-  if (review === "none") {
-    return "レビューなし";
+  switch (review) {
+    case "none":
+      return "レビュー不要";
+    case "mr":
+      return "レビュー要（MR）";
+    case "chat":
+      return "レビュー要（このセッション）";
+    default:
+      return `レビュー: ${review === "" ? "?" : review}`;
   }
-  return review === "" ? "レビュー ?" : `レビュー ${review}`;
+}
+
+/** 延期した項の言葉。本文の待ちの一覧（「レビューは 4 と一緒に」）と同じ言い方 */
+function deferText(reviewAt: number | null): string {
+  return reviewAt === null ? "レビューを引き受ける項が無い" : `レビューは ${reviewAt} と一緒に`;
 }
 
 /** 項の点。番号・定義の題・見る場所と、延期・固定・終端に当たらない印 */
@@ -42,7 +57,7 @@ function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
   const { node, editable } = data;
   const title = [
     node.type,
-    node.loose ? "最後の項がこの項を待っていない（終端に当たらない）" : "",
+    node.loose ? "最後の項が待たない（終端に当たらない）" : "",
     node.locked ? "子が承認された番号です。入る線は変えられません" : "",
   ]
     .filter((part) => part !== "")
@@ -60,10 +75,14 @@ function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
       <span className="plan-node-number">{node.number}</span>
       <span className="plan-node-title">{node.label}</span>
       <span className="plan-node-tags">
-        <span className="tag" data-review={node.review}>
-          {reviewText(node.review)}
-        </span>
-        {node.deferred && <span className="tag deferred">{node.reviewAt === null ? "延期（引き受け手なし）" : `延期 → ${node.reviewAt}`}</span>}
+        {/* 延期した項は見る場所を出さず、引き受け手を言う（本文も延期した項に見る場所を書かない） */}
+        {node.deferred ? (
+          <span className="tag deferred">{deferText(node.reviewAt)}</span>
+        ) : (
+          <span className="tag" data-review={node.review}>
+            {reviewText(node.review)}
+          </span>
+        )}
         {node.locked && <span className="tag locked">子が承認済み</span>}
       </span>
       <Handle type="source" position={Position.Right} isConnectable={editable} />
@@ -120,6 +139,35 @@ function edgesOf(graph: Graph): Edge[] {
   });
 }
 
+/** 下限で止めたときに、開始の左に空ける幅（px） */
+const START_PAD = 16;
+
+/**
+ * 開いたときの見え方。点の大きさが測れたら、全体を枠に収める（`PLAN_FIT_MIN_ZOOM` より縮めず、
+ * `PLAN_FIT_MAX_ZOOM` より拡げない）。下限で止まって収まらないときは、開始（左端の列）が見えるように
+ * 左へ寄せる（真ん中に合わせると、開始も終了も枠の外になる）。計画が替わったら合わせ直す。
+ * React Flow の `fitView` の属性は使わない（下限で止めたあとに寄せる段を挟めないため）
+ */
+function FitOnOpen({ graph }: { readonly graph: Graph }): null {
+  const initialized = useNodesInitialized();
+  const flow = useReactFlow();
+  const done = useRef<Graph | undefined>(undefined);
+  useEffect(() => {
+    if (!initialized || done.current === graph) {
+      return;
+    }
+    done.current = graph;
+    void Promise.resolve(flow.fitView({ minZoom: PLAN_FIT_MIN_ZOOM, maxZoom: PLAN_FIT_MAX_ZOOM, padding: 0.1 })).then(() => {
+      const view = flow.getViewport();
+      if (view.zoom <= PLAN_FIT_MIN_ZOOM + 1e-6) {
+        const left = Math.min(...flow.getNodes().map((node) => node.position.x));
+        void flow.setViewport({ x: START_PAD - left * view.zoom, y: view.y, zoom: view.zoom });
+      }
+    });
+  }, [initialized, graph, flow]);
+  return null;
+}
+
 /** 計画の見出し */
 function headingOf(plan: ApprovePlan): string {
   return `${plan.ticket} の${plan.part === "feedback" ? "フィードバック計画（feedback:）" : "全体計画（plan:）"}`;
@@ -127,16 +175,17 @@ function headingOf(plan: ApprovePlan): string {
 
 /** 図の下の一言。実行ファイルの値を並べるだけ */
 function Notes({ plan }: { readonly plan: ApprovePlan }): JSX.Element | null {
-  const deferred = plan.items.filter((item) => item.deferred).map((item) => `${item.number} → ${item.review_at ?? "なし"}`);
+  const deferred = plan.items.filter((item) => item.deferred).map((item) => (item.review_at === null ? `${item.number} は引き受ける項が無い` : `${item.number} は ${item.review_at} と一緒に`));
   const lines: { readonly text: string; readonly warn: boolean }[] = [];
   if (plan.ready.length > 0) {
     lines.push({ text: `すぐ始まる: ${plan.ready.join(", ")}`, warn: false });
   }
   if (deferred.length > 0) {
-    lines.push({ text: `延期: ${deferred.join("、")}（レビューを引き受ける番号）`, warn: false });
+    lines.push({ text: `延期したレビュー: ${deferred.join("、")}`, warn: false });
   }
   if (plan.loose.length > 0) {
-    lines.push({ text: `最後の項がこの項を待っていない: ${plan.loose.join(", ")}。最後の項へ線を引くか、合流の項を置く`, warn: true });
+    // 本文の待ちの一覧（「最後の項が待たない: …」）と同じ言い方に、直し方を添える
+    lines.push({ text: `最後の項が待たない: ${plan.loose.join(", ")}。最後の項へ線を引くか、合流の項を置く`, warn: true });
   }
   for (const problem of plan.problems) {
     lines.push({ text: problem, warn: true });
@@ -192,7 +241,6 @@ export function PlanGraph({ plan, editable = false, onConnect }: { readonly plan
           elementsSelectable={false}
           isValidConnection={isValidConnection}
           onConnect={handleConnect}
-          fitView
           ariaLabelConfig={{ "controls.zoomIn.ariaLabel": "拡大", "controls.zoomOut.ariaLabel": "縮小", "controls.fitView.ariaLabel": "全体を表示" }}
           minZoom={0.2}
           maxZoom={1.6}
@@ -201,6 +249,7 @@ export function PlanGraph({ plan, editable = false, onConnect }: { readonly plan
         >
           <Background />
           <Controls showInteractive={false} />
+          <FitOnOpen graph={graph} />
         </ReactFlow>
       </div>
       <Notes plan={plan} />

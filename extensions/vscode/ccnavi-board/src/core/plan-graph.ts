@@ -68,6 +68,17 @@ export interface PlanGraph {
   readonly edges: readonly PlanGraphEdge[];
 }
 
+/**
+ * 開いたときに図を合わせる倍率の下限。全体を枠に収める（fitView）と、項の多い計画や狭い枠では文字が
+ * 数 px まで縮んで読めない。ここで止め、はみ出す分はパンで見せる（開始の側から見せる）。
+ * 0.7 で点の文字（13px）が 9px 前後になり、読める下限に近い。ワークフロー編集タブの広い枠では
+ * 下限に当たるのは大きな計画だけなので、同じ値でよい（線を引くには文字が読める大きさが要る）。
+ * 拡大・縮小のボタンと「全体を表示」は、この下限より小さくもできる
+ */
+export const PLAN_FIT_MIN_ZOOM = 0.7;
+/** 開いたときに図を合わせる倍率の上限。小さな計画を等倍より大きくしない */
+export const PLAN_FIT_MAX_ZOOM = 1;
+
 /** 列の間隔と行の間隔。CSS の `.react-flow__node-planItem` の大きさと合わせる */
 export const COLUMN = 210;
 export const ROW = 96;
