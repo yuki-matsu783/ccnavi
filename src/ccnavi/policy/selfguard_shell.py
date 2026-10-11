@@ -504,7 +504,7 @@ def scratchpad_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | N
     if not root:
         return None
     spelled = os.path.join(os.path.realpath(root), *SCRATCHPAD)
-    # 置き場（`wip/` か `scratchpad/`）そのものがリンクなら、例外を使わない。リンクの先が
+    # 置き場（`wip/` か `wip/scratchpad/`）そのものがリンクなら、例外を使わない。リンクの先が
     # 守る場所なら、置き場の中へ写すことが守る場所へ書くことになる。
     if os.path.realpath(spelled) != spelled:
         return None

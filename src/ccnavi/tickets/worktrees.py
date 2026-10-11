@@ -32,7 +32,7 @@ C1 の中では書いたものが push の失敗で戻ることがあるので�
   外へ出てから打つ 1 本（`ccnavi-clean.sh --worktree <名前>`）を出す
 - 未コミットの変更（未追跡を含む）がある。別のセッションが作業している見込みがあるので、
   変更を名指しする
-- git が無視しているファイル（生成物と、直下の `scratchpad/` を除く。.env など）がある。
+- git が無視しているファイル（生成物を除く。.env など）がある。
   `worktree remove` はそれごと消して戻せないので、名指しする
 - git のワークツリーとして登録されていない、リンクである、など。任意の場所を消す手段にしない
 
@@ -64,7 +64,7 @@ CWD_INSIDE = "cwd"
 DIRTY = "dirty"
 REFUSED = "refused"
 # git に無視されたファイル（生成物を除く）がある。`git worktree remove` は無視されたファイルごと
-# 消すので、.env などを知らないうちに消さないよう止める（直下の scratchpad/ の下書きは消えてよい）。
+# 消すので、.env などを知らないうちに消さないよう止める。
 IGNORED = "ignored"
 
 # 未コミットの変更を名指しする行の上限。
@@ -277,9 +277,8 @@ def _ignored(top: str) -> tuple[list[str], str]:
 
     `--directory` で、全体が無視されたディレクトリは 1 行（末尾の `/`）にまとめる。生成物
     （`ccnavi-clean.js` と同じ名前。`out` は package.json の隣だけ）は消してよいので数えない。
-    ワークツリーの直下の `scratchpad/`（下書きと使い捨ての置き場。docs/claude/scratchpad.md）も、
-    ワークツリーごと消えてよい置き場なので数えない。直下でないもの（`docs/scratchpad/`）と、
-    大文字小文字の違うもの（`SCRATCHPAD/`）は数える。
+    下書きの置き場（`wip/scratchpad/`）は追跡されるファイルで、gitが無視するものではないので、
+    ここには現れない。
     """
     done = gitcmd.run(
         top,
@@ -289,21 +288,7 @@ def _ignored(top: str) -> tuple[list[str], str]:
     )
     if not done.ok:
         return [], "git が無視しているファイルを読めない。消してよいかを確かめられない"
-    return [
-        p for p in done.out.split("\0") if p and not _is_generated(top, p) and not _in_scratchpad(p)
-    ], ""
-
-
-# ワークツリーの直下の下書きの置き場。中身はワークツリーごと消えてよい。
-SCRATCHPAD = "scratchpad"
-
-
-def _in_scratchpad(rel: str) -> bool:
-    """ワークツリーのルートからの相対 `rel` が、直下の `scratchpad/` の下か。
-
-    大文字小文字は区別する（scratchpad.md の照らし合わせの外し方と同じ）。
-    """
-    return rel == SCRATCHPAD + "/" or rel.startswith(SCRATCHPAD + "/")
+    return [p for p in done.out.split("\0") if p and not _is_generated(top, p)], ""
 
 
 def _is_generated(top: str, rel: str) -> bool:

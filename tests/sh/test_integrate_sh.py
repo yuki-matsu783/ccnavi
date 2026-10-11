@@ -81,7 +81,7 @@ class IntegrateTest(unittest.TestCase):
         git(self.ws, "config", "user.name", "t")
         write(
             os.path.join(self.ws, ".gitignore"),
-            "/.ccnavi/\n/.claude/worktrees/\n/logs/\n/scratchpad/\n*.local\n",
+            "/.ccnavi/\n/.claude/worktrees/\n/logs/\n*.local\n",
         )
         write(os.path.join(self.ws, "keep.txt"), "1\n2\n3\n")
         write(os.path.join(self.ws, "gone.txt"), "bye\n")
@@ -392,6 +392,114 @@ class IntegrateTest(unittest.TestCase):
         self.assertIn("変わっています", r.stderr)
         self.assertIn("other session", read(os.path.join(self.ws, "new.txt")))
         self.assertTrue(os.path.isfile(self.marker()))
+
+    # ---- 下書き（wip/scratchpad/）
+
+    def commit_in_branch(self, files):
+        for rel, text in files.items():
+            write(os.path.join(self.wt, rel), text)
+        git(self.wt, "add", ".")
+        git(self.wt, "commit", "-q", "-m", "w")
+
+    def test_integrate_drops_only_wip_scratchpad(self):
+        self.commit_in_branch(
+            {
+                "keep.txt": "1\n2\nthree\n",
+                "wip/scratchpad/a.txt": "draft\n",
+                "wip/scratchpad/sub/b.txt": "draft b\n",
+                "wip/proposals/todo/p.md": "proposal\n",
+                "wip/design/d.md": "design\n",
+                "wip/scratchpadX/x.txt": "not the scratchpad\n",
+            }
+        )
+        r = self.run_git_sh("integrate", "wt")
+        self.assertOk(r)
+        self.assertIn("staged で取り込んだ（4 ファイル", r.stdout)
+        self.assertIn("下書き（wip/scratchpad/）の 2 ファイルは取り込まず、外した", r.stdout)
+        self.assertEqual(
+            sorted(self.status().splitlines()),
+            [
+                "A  wip/design/d.md",
+                "A  wip/proposals/todo/p.md",
+                "A  wip/scratchpadX/x.txt",
+                "M  keep.txt",
+            ],
+        )
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip", "scratchpad")))
+        self.assertEqual("proposal\n", read(os.path.join(self.ws, "wip/proposals/todo/p.md")))
+
+        done = self.run_git_sh("integrate-done", "wt", "-m", "feat: 下書きを外す")
+        self.assertOk(done)
+        self.assertEqual("", self.status())
+        tracked = git(self.ws, "ls-files", "wip").split()
+        self.assertEqual(
+            ["wip/design/d.md", "wip/proposals/todo/p.md", "wip/scratchpadX/x.txt"], tracked
+        )
+        self.assertFalse(self.has_branch())
+        self.assertFalse(os.path.exists(self.wt))
+
+    def test_only_scratchpad_changes_leave_nothing_staged_and_still_clean(self):
+        self.commit_in_branch({"wip/scratchpad/a.txt": "draft\n"})
+        r = self.run_git_sh("integrate", "wt")
+        self.assertOk(r)
+        self.assertIn("差分は無かった", r.stdout)
+        self.assertIn("下書き（wip/scratchpad/）の 1 ファイルは取り込まず、外した", r.stdout)
+        self.assertEqual("", self.status())
+        self.assertFalse(os.path.exists(os.path.join(self.ws, ".git", "SQUASH_MSG")))
+        done = self.run_git_sh("integrate-done", "wt")
+        self.assertOk(done)
+        self.assertFalse(self.has_branch())
+        self.assertFalse(os.path.exists(self.wt))
+
+    def test_done_still_refuses_when_other_wip_paths_are_missing(self):
+        self.commit_in_branch(
+            {"wip/scratchpad/a.txt": "draft\n", "wip/proposals/todo/p.md": "proposal\n"}
+        )
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        # staged から wip/proposals/ を外してコミットすると、ブランチの中身が入りきっていない。
+        git(self.ws, "reset", "-q", "--", "wip/proposals/todo/p.md")
+        os.remove(os.path.join(self.ws, "wip/proposals/todo/p.md"))
+        git(self.ws, "commit", "-q", "--allow-empty", "-m", "by hand")
+        r = self.run_git_sh("integrate-done", "wt")
+        self.assertOk(r, 1)
+        self.assertIn("入りきっていない", r.stdout)
+        self.assertTrue(self.has_branch())
+        self.assertTrue(os.path.exists(self.wt))
+
+    def test_scratchpad_already_on_main_is_not_touched(self):
+        write(os.path.join(self.ws, "wip/scratchpad/old.txt"), "from main\n")
+        write(os.path.join(self.ws, "wip/scratchpad/shared.txt"), "main version\n")
+        git(self.ws, "add", "-f", "wip")
+        git(self.ws, "commit", "-q", "-m", "scratchpad on main")
+        git(self.wt, "merge", "-q", "main")
+        self.commit_in_branch(
+            {
+                "wip/scratchpad/shared.txt": "branch version\n",
+                "wip/scratchpad/new.txt": "new draft\n",
+                "keep.txt": "1\n2\nthree\n",
+            }
+        )
+        r = self.run_git_sh("integrate", "wt")
+        self.assertOk(r)
+        self.assertEqual(["M  keep.txt"], self.status().splitlines())
+        self.assertEqual("main version\n", read(os.path.join(self.ws, "wip/scratchpad/shared.txt")))
+        self.assertEqual("from main\n", read(os.path.join(self.ws, "wip/scratchpad/old.txt")))
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip/scratchpad/new.txt")))
+        self.assertOk(self.run_git_sh("integrate-done", "wt", "-m", "feat: x"))
+        self.assertEqual("main version\n", read(os.path.join(self.ws, "wip/scratchpad/shared.txt")))
+        self.assertFalse(self.has_branch())
+
+    def test_abort_after_dropping_scratchpad_restores(self):
+        self.commit_in_branch(
+            {"wip/scratchpad/a.txt": "draft\n", "wip/proposals/todo/p.md": "proposal\n"}
+        )
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        r = self.run_git_sh("integrate", "--abort", "wt")
+        self.assertOk(r)
+        self.assertEqual("", self.status())
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip")))
+        self.assertFalse(os.path.exists(self.marker()))
+        self.assertTrue(self.has_branch())
 
     # ---- 片付けの途中で止まる・打ち直す
 

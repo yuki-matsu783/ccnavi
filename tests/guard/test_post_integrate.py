@@ -209,5 +209,70 @@ class IntegrateWritesTest(unittest.TestCase):
         self.assertEqual(got, self.full("a.txt", "new.txt", "gone.txt"))
 
 
+@unittest.skipUnless(merge_tree_available(), "git merge-tree --write-tree (git 2.38+) is needed")
+class IntegrateDropsScratchpadTest(unittest.TestCase):
+    """`integrate` が `wip/scratchpad/` を外した index は、squash との差がそこだけなら外す。"""
+
+    def setUp(self):
+        self.repo = os.path.realpath(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.repo, True)
+        git(self.repo, "init", "-q", "-b", "main")
+        write(self.repo, "a.txt", "a\n")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-q", "-m", "init")
+        git(self.repo, "switch", "-q", "-c", "feat")
+        write(self.repo, "a.txt", "a2\n")
+        write(self.repo, "wip/scratchpad/draft.txt", "draft\n")
+        write(self.repo, "wip/proposals/todo/p.md", "p\n")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-q", "-m", "work")
+        self.tip = git(self.repo, "rev-parse", "HEAD")
+        git(self.repo, "switch", "-q", "main")
+        self.base = git(self.repo, "rev-parse", "HEAD")
+        git(self.repo, "worktree", "add", "-q", ".claude/worktrees/feat", "feat")
+        git(self.repo, "merge", "-q", "--squash", "feat")
+        self.changes = [change(self.repo, p) for p in ("a.txt", "wip/proposals/todo/p.md")]
+
+    def mark(self):
+        self.tree = git(self.repo, "write-tree")
+        gdir = os.path.join(self.repo, ".git", "ccnavi-integrate", "feat")
+        os.makedirs(gdir, exist_ok=True)
+        fields = {
+            "state": "staged",
+            "branch": "feat",
+            "branch_sha": self.tip,
+            "base": self.base,
+            "tree": self.tree,
+        }
+        with open(os.path.join(gdir, "marker"), "w", encoding="utf-8") as f:
+            f.writelines(f"{k} {v}\n" for k, v in fields.items())
+
+    def full(self, *rels):
+        return {os.path.realpath(os.path.join(self.repo, r)) for r in rels}
+
+    def test_index_without_the_scratchpad_is_dropped(self):
+        git(self.repo, "rm", "-q", "-f", "--", "wip/scratchpad/draft.txt")
+        self.mark()
+        got = post_findings._integrate_writes(self.changes, self.repo)
+        self.assertEqual(got, self.full("a.txt", "wip/proposals/todo/p.md"))
+
+    def test_index_missing_other_wip_paths_is_reported(self):
+        git(self.repo, "rm", "-q", "-f", "--", "wip/scratchpad/draft.txt")
+        git(self.repo, "rm", "-q", "-f", "--", "wip/proposals/todo/p.md")
+        self.mark()
+        self.assertEqual(post_findings._integrate_writes(self.changes[:1], self.repo), set())
+
+    def test_same_but_scratch_only_ignores_the_scratchpad(self):
+        left = git(self.repo, "write-tree")
+        git(self.repo, "rm", "-q", "-f", "--", "wip/scratchpad/draft.txt")
+        only_scratch = git(self.repo, "write-tree")
+        self.assertTrue(post_findings._same_but_scratch(self.repo, left, only_scratch))
+        git(self.repo, "rm", "-q", "-f", "--", "wip/proposals/todo/p.md")
+        also_proposal = git(self.repo, "write-tree")
+        self.assertFalse(post_findings._same_but_scratch(self.repo, left, also_proposal))
+        self.assertFalse(post_findings._same_but_scratch(self.repo, left, "0" * 40))
+        self.assertFalse(post_findings._same_but_scratch(self.repo, left, ""))
+
+
 if __name__ == "__main__":
     unittest.main()
