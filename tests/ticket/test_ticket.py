@@ -2285,6 +2285,99 @@ class TicketTest(unittest.TestCase):
             )
             self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
 
+    def test_user_entries_with_unreadable_arguments_are_denied(self):
+        """2 段目の無いユーザの入口は、引数を読み切れなければ止める（ADR-0120）。
+
+        `ccnavi-sync.sh`（`--forget`）・`ccnavi-review.sh decide`（`--choices`）・実行ファイルの
+        `--yes` は端末を求めない。引数を変数・置換・glob で組み立てると表記の検査から外れる。
+        """
+        self.family()
+        sync = ".ccnavi/scripts/ccnavi-sync.sh"
+        review = ".ccnavi/scripts/ccnavi-review.sh"
+        launcher = ".ccnavi/scripts/ccnavi-launcher.sh"
+        for command in (
+            # decide --choices を変数・glob で組み立てる
+            f"C=--cho; sh {review} decide 1 ${{C}}ices j --digest d",
+            f"sh {review} decide 1 --cho${{X}}ices j --digest d",
+            f"sh {review} decide 1 --cho* j --digest d",
+            f"sh {review} decide 1 --ch[o]ices j --dig[e]st d",
+            f"sh -x {review} decide 1 --cho${{X}}ices j --digest d",
+            f"sh {review} decide 1 --cho`echo i`ces j --digest d",
+            f'sh -c "sh {review} decide 1 --cho\\${{X}}ices j --digest d"',
+            f"xargs -a args.txt sh {review} decide 1",
+            # --forget を変数・glob で組み立てる、前に置いたもので位置の表記から外す
+            f"F=--for; sh {sync} ${{F}}get P1",
+            f"sh {sync} --for${{X}}get P1",
+            f"sh {sync} --f* P1",
+            f"sh {sync} --?orget P1",
+            f"sh -x -e {sync} --for${{X}}get P1",
+            f"bash -c 'sh {sync} --for${{X}}get P1'",
+            f"env sh {sync} --for$(echo g)et P1",
+            f"printf '%s\\n' --forget P1 | xargs sh {sync}",
+            f"sh < /dev/null {sync} --forget P1",
+            f"busybox sh {sync} --forget P1",
+            f"sh -s --forget P1 < {sync}",
+            f"cat {sync} | sh -s --forget P1",
+            f"find . -name x -exec sh {sync} {{}} \\;",
+            # 実行ファイルの --agree / --reviewed と --yes を組み立てる
+            "ccnavi --agr${X}ee --y${X}es i1 --digest d",
+            "ccnavi --agr*ee --y* i1 --digest d",
+            "ccnavi --ag[r]ee --y[e]s i1 --digest d",
+            "ccnavi --rev${X}iewed 1 --accept-unresolved --y${X}es j --digest d",
+            f"{launcher} --rev${{X}}iewed 1 --accept-unresolved --y${{X}}es j --digest d",
+            f"busybox sh {launcher} --agr${{X}}ee --yes i1 --digest d",
+            f"sh < /dev/null {launcher} --agr${{X}}ee --yes i1 --digest d",
+            f"xargs -a a.txt {launcher}",
+            "xargs -a a.txt ccnavi",
+            "ccnavi --guard-ticket-appr*val disable --agree",
+        ):
+            result = self.hook(
+                "PreToolUse",
+                "Bash",
+                self.parent_tree,
+                command=command,
+                guard_ticket_approval="enable",
+            )
+            self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
+        # 値をそのまま書く形と、読むだけ・文字列として出るだけの形は止めない。
+        for command in (
+            f"sh {sync} feature-1-x",
+            f"sh {review} decide 1",
+            f"sh {review} decide 1 --preview --json",
+            f'sh {review} request 1 --eli5 "$F"',
+            f"grep -n -- '--forget' {sync}",
+            f"echo sh {sync} --for${{X}}get",
+            "sh .ccnavi/scripts/ccnavi-git.sh log --grep 'ccnavi-sync.sh --forget'",
+            "sh .ccnavi/scripts/ccnavi-git.sh log --grep ccnavi-sync.sh --oneline",
+            "ccnavi --agree --preview --json",
+            f"{launcher} --docs worktree",
+            "ls /home/user | xargs grep -l ccnavi",
+            f'sh .ccnavi/scripts/ccnavi-git.sh commit -m "fix: {sync} --for${{X}}get"',
+        ):
+            result = self.hook(
+                "PreToolUse",
+                "Bash",
+                self.parent_tree,
+                command=command,
+                guard_ticket_approval="enable",
+            )
+            self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
+        # 値を変数で渡す形は止まり、文面がそのまま書く道を案内する。
+        result = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command=f'sh {sync} "$P"',
+            guard_ticket_approval="enable",
+        )
+        self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
+        self.assertIn("そのまま書いて", self.reason(result))
+        # 保護そのものを切っていれば当てない。
+        result = self.hook(
+            "PreToolUse", "Bash", self.parent_tree, command=f"sh {sync} --for${{X}}get P1"
+        )
+        self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
+
     def test_turning_off_the_terminal_requirement_is_denied(self):
         """端末要求を切る形は、実行ファイルをどう呼んでいても止める。
 
