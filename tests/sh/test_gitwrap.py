@@ -985,7 +985,7 @@ class WorktreeNameTest(GitWrapperTest):
         self.assertIn("worktree add .claude/worktrees/b -b b", stderr)
         # 名前を変えると何が止まるのかを、ADR の番号に頼らず中身で言う。
         self.assertIn("同じ名前のブランチをチェックアウトしているものとして探します", stderr)
-        self.assertIn("一度でも push したか ccnavi-sync.sh で取り込んだことがある", stderr)
+        self.assertIn("一度でもpushしたか ccnavi-sync.sh で取り込んだことがある", stderr)
         self.assertNotIn("ADR", stderr)
 
     def test_matching_forms_pass(self):
@@ -1045,7 +1045,7 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
                 self.assertIn("親のワークツリー", result.stderr)
                 self.assertIn("ccnavi-sync.sh", result.stderr)
                 self.assertIn(
-                    "一度でも push したか ccnavi-sync.sh で取り込んだことがある", result.stderr
+                    "一度でもpushしたか ccnavi-sync.sh で取り込んだことがある", result.stderr
                 )
                 self.assertNotIn("ADR", result.stderr)
         self.assertEqual(before, git_out(self.parent, "rev-parse", "--abbrev-ref", "HEAD"))

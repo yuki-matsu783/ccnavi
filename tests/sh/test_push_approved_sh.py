@@ -3,7 +3,7 @@
 設計 wip/design/approve-carry.md 1 と 6.3。確かめるのは次のとおり。
 
 17. 置き場（`.ccnavi/approved`）の変更だけをコミットし、同じツリーの他の未コミットはコミットしない
-18. コミットするものが無ければ 0 で `コミットして push する承認済みチケットは無い。`
+18. コミットするものが無ければ 0 で `コミットして pushする承認済みチケットは無い。`
 19. `main` の上のツリーはコミットして push しない（0、標準エラーにブランチ名）
 20. push が落ちると 1、コミットは残る
 21. detached のツリーは飛ばす
@@ -38,7 +38,7 @@ PUSH_SCRIPTS = ("ccnavi-push-approved.sh", *common_sh(SH_DIR))
 APPROVE_SCRIPTS = (*PUSH_SCRIPTS, "ccnavi-agree.sh")
 APPROVED = ".ccnavi/approved/doing"
 MESSAGE = "ccnavi: 承認済みチケットを更新"
-NOTHING = "コミットして push する承認済みチケットは無い。"
+NOTHING = "コミットして pushする承認済みチケットは無い。"
 
 # 承認の代わり。STUB_ARGS があれば受けた引数を 1 行ずつ書き、STUB_EXIT が 0 でなければ落ち、
 # STUB_TREE があればそこに承認済みチケットを置く。
@@ -628,7 +628,7 @@ class PushApprovedTest(Workspace):
     def test_only_a_detached_tree_is_skipped_without_saying_nothing(self):
         """14. detached のツリーにしか変更が無いときは 0 で終わる。
 
-        「コミットして push する承認済みチケットは無い。」とは言わず、
+        「コミットして pushする承認済みチケットは無い。」とは言わず、
         飛ばしたことを標準エラーに言う。
         """
         loose = self.worktree("loose", detach=True)

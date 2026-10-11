@@ -101,7 +101,7 @@ class CompatSkewTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("ticket start x", result.stdout)
         self.assertIn(f"互換 {other}", result.stderr)
-        self.assertIn(f"sh は互換 {sh_compat()}", result.stderr)
+        self.assertIn(f"shは互換 {sh_compat()}", result.stderr)
         self.assertIn("scripts/ccnavi-setup.sh", result.stderr)
         self.assertNotIn("組み立て直して", result.stderr)
 

@@ -3162,7 +3162,7 @@ class TicketTest(unittest.TestCase):
             env=environment,
         )
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-        self.assertIn("origin の URL を読めない", done.stderr)
+        self.assertIn("originの URLを読めない", done.stderr)
 
     # ---- 10. 差し戻しを無視した終了
 

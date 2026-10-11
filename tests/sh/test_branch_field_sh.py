@@ -534,7 +534,7 @@ class BranchFieldTest(unittest.TestCase):
         refused = self.refused(
             self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree)
         )
-        self.assertIn(f"親子のチケット {PARENT} の取り込み状態が gone", refused.stderr)
+        self.assertIn(f"親子のチケット {PARENT} の取り込み状態がgone", refused.stderr)
         self.assertIn(f"ccnavi-sync.sh {PARENT}", refused.stderr)
 
     def test_two_records_on_one_branch_stop_the_push(self):

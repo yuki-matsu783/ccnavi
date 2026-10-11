@@ -372,7 +372,7 @@ class C1TicketTest(C1Harness):
             self.subjects(2),
             [
                 f"ccnavi: {PARENT} に着手",
-                f"ccnavi: {PARENT} の hook のマーカーと状態の履歴をコミットする",
+                f"ccnavi: {PARENT} の hookのマーカーと状態の履歴をコミットする",
             ],
         )
         self.assertEqual(
@@ -398,7 +398,7 @@ class C1TicketTest(C1Harness):
         # 形は hook のマーカーでも、変更前が在る（書き換え）なら hook のものとは読まない。
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("ccnavi の知らない変更", result.stderr)
+        self.assertIn("ccnaviの知らない変更", result.stderr)
         self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
 
     def test_a_forged_mark_with_other_fields_is_not_carried(self):
@@ -709,7 +709,7 @@ class C1TicketTest(C1Harness):
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(
-            f"ccnavi: {PARENT} の hook のマーカーと状態の履歴をコミットする", self.subjects(2)
+            f"ccnavi: {PARENT} の hookのマーカーと状態の履歴をコミットする", self.subjects(2)
         )
 
     def test_a_forged_event_line_stops(self):
@@ -1192,7 +1192,7 @@ class C1ReviewTest(C1Harness):
         rel = f"{APPROVED}/phases/{PARENT}/1.reviewed"
         self.assertEqual(self.committed(), [rel])
         self.assertEqual(
-            self.subjects(1), [f"ccnavi: {PARENT} のフェーズ 1 の指摘の行き先を決めた"]
+            self.subjects(1), [f"ccnavi: {PARENT}のフェーズ 1 の指摘の行き先を決めた"]
         )
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         # 決めた内容のコメントは、送った後に投稿する。
@@ -1385,7 +1385,7 @@ class C1HostTest(C1HostHarness):
         self.assertIn(f"cwd がワークツリー {PARENT} の中にあるので消さなかった", ready.stdout)
         self.assertIn(f"ccnavi-clean.sh --worktree {PARENT}", ready.stdout)
         self.assertLess(
-            ready.stdout.index("Draft を外した"), ready.stdout.index("cwd がワークツリー")
+            ready.stdout.index("Draftを外した"), ready.stdout.index("cwd がワークツリー")
         )
         self.assertTrue(os.path.isdir(self.tree))
 
@@ -1413,7 +1413,7 @@ class C1HostTest(C1HostHarness):
         )
         ready = self.review("ready", CCNAVI_BIN_PATH=mover)
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
-        self.assertIn("Draft を外した", ready.stdout)
+        self.assertIn("Draftを外した", ready.stdout)
         self.carried(old)
         self.assertFalse(os.path.exists(os.path.join(self.tree, *old.split("/"))))
         self.assertEqual(git(self.tree, "ls-tree", "HEAD", "--", old).stdout, "")
@@ -1433,10 +1433,10 @@ class C1HostTest(C1HostHarness):
             HALF_TREE=self.tree,
         )
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
-        self.assertIn("Draft を外した", ready.stdout)
+        self.assertIn("Draftを外した", ready.stdout)
         self.assertIn(f"ワークツリー {PARENT} を消した", ready.stdout)
         self.assertLess(
-            ready.stdout.index("Draft を外した"),
+            ready.stdout.index("Draftを外した"),
             ready.stdout.index(f"ワークツリー {PARENT} を消した"),
         )
         self.assertFalse(os.path.exists(self.tree))
@@ -1463,7 +1463,7 @@ class C1HostTest(C1HostHarness):
             HALF_TREE=self.tree,
         )
         self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
-        self.assertIn("Draft を外せなかった", ready.stderr)
+        self.assertIn("Draftを外せなかった", ready.stderr)
         self.assertNotIn("を消した", ready.stdout)
         self.assertTrue(os.path.isdir(self.tree))
 
@@ -1491,7 +1491,7 @@ class C1HostTest(C1HostHarness):
             input="",
         )
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
-        self.assertIn("Draft を外した", ready.stdout)
+        self.assertIn("Draftを外した", ready.stdout)
         self.assertIn(f"ワークツリー {PARENT} を消した", ready.stdout)
         self.assertFalse(os.path.exists(self.tree))
 
@@ -1517,7 +1517,7 @@ class C1HostTest(C1HostHarness):
                     HALF_TREE=self.tree,
                 )
                 self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
-                self.assertNotIn("Draft を外した", refused.stdout)
+                self.assertNotIn("Draftを外した", refused.stdout)
         self.assertTrue(os.path.isdir(self.tree))
 
     def test_ready_commits_the_wip_removals_and_names_them(self):
@@ -1597,7 +1597,7 @@ class C1HostTest(C1HostHarness):
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.assertTrue(os.path.exists(once))
         self.assertIn("push が通らなかった", ready.stderr)
-        self.assertIn("Draft を外した", ready.stdout)
+        self.assertIn("Draftを外した", ready.stdout)
         self.carried(f"{APPROVED}/done/old.md")
         for rel in ("done/old.md", "phases/old/closed.json", "events/old.ndjson"):
             self.assertEqual(
@@ -1902,7 +1902,7 @@ class C1HostNotImportedTest(C1HostHarness):
         ready = self.review("ready", CCNAVI_BIN_PATH=self.mover(f"printf 'tree %s\\n' '{other}'"))
         self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.assertIn("未コミットの変更がある", ready.stderr)
-        self.assertNotIn("Draft を外した", ready.stdout)
+        self.assertNotIn("Draftを外した", ready.stdout)
 
     def test_ready_stops_when_wip_removals_are_not_sent(self):
         # ready が消した wip/ の追跡済みのファイル（未コミット）。送るまで Draft を外さない。
@@ -1913,7 +1913,7 @@ class C1HostNotImportedTest(C1HostHarness):
         )
         self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
         self.assertIn("wip/ に未コミットの変更がある", ready.stderr)
-        self.assertNotIn("Draft を外した", ready.stdout)
+        self.assertNotIn("Draftを外した", ready.stdout)
 
     @unittest.skipIf(os.name == "nt", "大文字違いの並存と名前の \\ は Windows では作れない")
     def test_ready_stops_when_wip_removals_in_any_case_are_not_sent(self):
@@ -1938,7 +1938,7 @@ class C1HostNotImportedTest(C1HostHarness):
                 )
                 self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
                 self.assertIn("未コミットの変更がある", ready.stderr)
-                self.assertNotIn("Draft を外した", ready.stdout)
+                self.assertNotIn("Draftを外した", ready.stdout)
                 git(self.tree, "rm", "-q", "--cached", "--", rel)
                 git(self.tree, "commit", "-q", "-m", f"rm {rel}")
                 git(self.tree, "push", "-q", "origin", PARENT)
@@ -1948,7 +1948,7 @@ class C1HostNotImportedTest(C1HostHarness):
             "ready", CCNAVI_BIN_PATH=self.mover(f"printf 'tree %s\\n' '{self.tree}'")
         )
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
-        self.assertIn("Draft を外した", ready.stdout)
+        self.assertIn("Draftを外した", ready.stdout)
 
 
 if __name__ == "__main__":

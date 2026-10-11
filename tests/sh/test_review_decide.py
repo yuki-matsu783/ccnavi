@@ -248,7 +248,7 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertEqual(GitLab.posted[0][1]["title"], "issue の題")
         note = GitLab.posted[1][1]["body"]
         self.assertTrue(note.startswith("<!-- ccnavi:decide -->"))
-        self.assertIn("issue に回した分: #1", note)
+        self.assertIn("issueに回した分: #1", note)
         self.assertEqual(os.listdir(self.state), [])
 
     def test_a_failed_comment_keeps_the_draft_and_warns(self):

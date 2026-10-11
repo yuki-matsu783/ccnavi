@@ -270,7 +270,7 @@ class BranchesShTest(unittest.TestCase):
         self.origin("https://github.com/acme/widgets.git")
         text = self.ok("--mr", "6", GITHUB_TOKEN="t0k")
         self.assertIn(
-            "ホストは見ていない（ホストの API が失敗した（GET repos/acme/widgets/pulls/6）", text
+            "ホストは見ていない（ホストの APIが失敗した（GET repos/acme/widgets/pulls/6）", text
         )
         self.assertIn("候補なし", text)
         # トークンは出力に出さない
@@ -316,7 +316,7 @@ class BranchesShTest(unittest.TestCase):
         bare = tempfile.mkdtemp(dir=self._tmp.name)
         done = self.run_sh("--issue", "1", cwd=bare, CCNAVI_WORKSPACE=self.ws)
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-        self.assertIn("git のリポジトリの中ではありません", done.stderr)
+        self.assertIn("gitのリポジトリの中ではありません", done.stderr)
 
 
 if __name__ == "__main__":
