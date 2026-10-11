@@ -73,10 +73,13 @@ _REDIRECT = (
     rf"(?:^|[^>|&])[|&]*>[>|&]* ?"
     rf"(?:[^ {_NOT_A_WORD}>|&](?:[^ \x00]*[^ {_NOT_A_WORD}])?)?"
 )
+# `sed` の枝は、最初の `-i` で決め打ちする（`(?>...)`）。後ろの `[^\x00]*` が 2 つ目以降の
+# `-i` の手前まで飲み込めるので、決め打ちしても当たる集合は変わらない。決め打ちしないと
+# `-i` が出るたびに末尾まで読み直し、長さの 2 乗で遅くなる（#241）。
 _WRITE_VERBS = (
     rf"({_REDIRECT}"
     r"|(^|\x00)(mv|rm|tee|dd|truncate|patch|shred)\b[^\x00]*"
-    r"|(^|\x00)sed\b[^\x00]*[ \x01](-[A-Za-z]*i|--i)[^\x00]*)"
+    r"|(^|\x00)sed\b(?>[^\x00]*?[ \x01](-[A-Za-z]*i|--i))[^\x00]*)"
 )
 _COPY_VERBS = r"(^|\x00)(cp|ln|install)\b[^\x00]*"
 _COPY_NAME = r"(^|\x00)(cp|ln|install)\b"
@@ -767,16 +770,24 @@ SHELL_MESSAGE = (
 # そろえてあり、引用の中の `>` に当たらないので、この遅さは出ない。
 REDIRECT_LIMIT = 50
 
+# 生の文字列の長さの上限。`>` が 1 個でもあれば、その後ろの空白の無い尾を読むので、`>` を上限の
+# 下の 49 個並べても、尾の長さの約 50 倍の手数になる（400KB で約 3.3 秒、100KB で約 0.9 秒）。
+# 個数の上限だけでは尾の長さを止められないので、`>` を含む生の文字列の長さにも上限を置き、
+# 超えたら同じ拒否にする（#241）。`>` の無い生の文字列には掛けない。
+RAW_LENGTH_LIMIT = 100_000
+
 REDIRECT_LIMIT_MESSAGE = (
-    f"コマンドに '>' が {REDIRECT_LIMIT} 個を超えて含まれていて、"
+    f"コマンドに '>' が {REDIRECT_LIMIT} 個を超えて含まれているか、'>' を含む長さが "
+    f"{RAW_LENGTH_LIMIT} 字を超えていて、"
     "保護の照合を安全に終えられないため、止めました。"
     "長い内容は Write / Edit ツールでファイルに書くか、コマンドを分けて実行してください。"
 )
 
 
 def too_many_redirects(subject: str) -> bool:
-    """生の文字列の `>` が REDIRECT_LIMIT を超えるか。"""
-    return subject.count(">") > REDIRECT_LIMIT
+    """生の文字列の `>` が REDIRECT_LIMIT を超えるか、`>` を含んで RAW_LENGTH_LIMIT を超えるか。"""
+    count = subject.count(">")
+    return count > REDIRECT_LIMIT or (count > 0 and len(subject) > RAW_LENGTH_LIMIT)
 
 
 # 実行ファイルを名指しのツールから守るルールの id。Bash 側とは別に持つ。
