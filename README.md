@@ -1283,7 +1283,7 @@ ripgrep の既定の挙動で、ccnavi の側では変えられない。
 [ccnavi] POST_VIOLATION (rule: guard-config)
 path: .ccnavi/common/probe.json (?? / new)
 after: Bash(npm run build)
-undo: git clean -f -- ".ccnavi/common/probe.json"
+undo: rm -- ".ccnavi/common/probe.json"
 ガード自身のルールです。エージェントの判断で書き換えず、変更が要る理由を伝えてユーザに依頼してください。
 ```
 
@@ -1292,9 +1292,13 @@ undo: git clean -f -- ".ccnavi/common/probe.json"
 
 | 変更の種類 | 戻し方 |
 |---|---|
-| 中身が変わった・消えた | `git restore --staged --worktree -- <path>` |
-| 追跡されていないものが現れた | `git clean -f -- <path>` |
-| 索引に足された状態で現れた | `git rm -f -- <path>` |
+| 中身が変わった・消えた | `<git> restore --staged --worktree -- <path>` |
+| 追跡されていないものが現れた | `rm -- <path>` |
+| 索引に足された状態で現れた | `<git> restore --staged -- <path> && rm -- <path>` |
+
+`<git>` は、ワークスペースルートに git のラッパー（`.ccnavi/scripts/ccnavi-git.sh`）があればその実パス（`sh <ルート>/.ccnavi/scripts/ccnavi-git.sh`）、
+無ければ `git`。ラッパーがあるワークスペースでは生の git が止まることがあり、止まる形を案内しないため。ラッパーは `rm -f` と
+`clean` を通さないので、現れたものは索引から外してシェルの `rm` で消す形にする。
 
 ### 前から在った変更は原因にしない
 
@@ -2014,7 +2018,7 @@ Claude Code はそこを読まないので、ccnavi が `SessionStart` と `Suba
 |---|---|---|
 | `Write` / `Edit` でルールファイルを直す | 通す | ここを止めると直す手段が 1 つも残らない |
 | シェルからルールファイルへ書き込む | 止める | ルールファイルを壊して緩い既定を使わせる手口を作らない |
-| `git add` / `git restore --ours` でマージの衝突を解く | 通す | 戻すのは既にコミットされている内容で、新しい文面は書かない |
+| `add` / `restore --ours` でマージの衝突を解く（ラッパーがあれば `sh .ccnavi/scripts/ccnavi-git.sh add` などで打つ。チケット制御が有効でラッパーがある間は、生の `git` は既定の間も止まる） | 通す | 戻すのは既にコミットされている内容で、新しい文面は書かない |
 
 止めるのは書き込みの形だけで、場所の名前が出ただけでは止めない。既定を使ったことは、止めた回だけでなく通した回にも伝える。
 
