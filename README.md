@@ -360,7 +360,7 @@ ccnavi の動作に依存する決まりなので、ワークスペースの `CL
 [ccnavi] ccnavi が前提にしている作業の決まり。
 - 編集する前にワークツリー（.claude/worktrees/<名前>）を切り、その中で編集する。切り方は ccnavi-git.sh の --help（worktree add）。
 - git は直接呼ばず sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-git.sh を通す。止められたら迂回せず、出力の案内に従う。
-- 下書きと使い捨てのファイルはワークツリーの scratchpad/ に置く（追跡されず、範囲外の変更としても報告されない）。
+- 下書きと使い捨てのファイルはワークツリーの wip/scratchpad/ に置く（追跡されてpushされるが、範囲外の変更としては報告されない）。
 - projects/<名前>/ を直すときは、そこへ cd してから作業する（git の操作は cwd のリポジトリに向く）。
 - 実装・調査・テストはサブエージェントにバックグラウンドで任せる。メインはユーザとの相談・判断・報告を受け持つ。
 - 判定が緩む・ユーザとのやり取りの形が変わる・元に戻せない・影響範囲を読み切れない変更は、実装する前にユーザと合意する。
@@ -1369,7 +1369,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 - `builtin-guard-project-home`: ccnavi ディレクトリの下（`*/.ccnavi/*`）と、`CCNAVI_BIN_PATH` のパスおよび実行ファイルの置き場
   （名前が `ccnavi-launcher.sh` なら 1 つ上の `bin/<os>-<arch>/`、それ以外なら隣の `<os>-<arch>/`）
 - `builtin-guard-common-layer`: 共通レイヤーの 3 本。ワークツリーの中の同じファイルも止まる
-- 見本 `.ccnavi/common/rule-samples.yml` も `builtin-guard-project-home` が止める。見本の下書きはワークツリーの `scratchpad/` に置き、
+- 見本 `.ccnavi/common/rule-samples.yml` も `builtin-guard-project-home` が止める。見本の下書きはワークツリーの `wip/scratchpad/` に置き、
   ルールの下書きと一緒にユーザに渡す
 
 止めるのは書き込みの形と場所の組で、場所の名前が出ただけでは止めない（`cat .ccnavi/common/rules.yml` や `git add <パス>` は通る）。
@@ -1647,9 +1647,8 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 範囲の外として扱わない場所。
 
 - 提案の置き場（`wip/proposals/`）と承認済みチケットの置き場（`.ccnavi/approved/`）。`review/` と承認済みチケットは組み込みの deny が止める
-- 下書きの置き場。ワークツリーのルートの直下 1 段にある `scratchpad/` で、大文字小文字を区別する。外すのは**実行前チェックだけ**で、
-  実行後チェックとサブエージェント終了時チェックは外さない。この 2 つに `scratchpad/` の変更が現れるのは `scratchpad/` が
-  追跡されているときなので、範囲外として報告する
+- 下書きの置き場。ツリーのルート直下の `wip/scratchpad/` の下で、大文字小文字を区別する。追跡される置き場なので、
+  実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/scratchpadX/` や `scratchpad/` は外さない
 - ELI5 の HTML の置き場。ワークツリーのルートからの `wip/eli5/` の下で、大文字小文字を区別する。追跡される置き場なので、
   実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/` のほかの場所や `wip/eli5x/` は外さない。
   チケットの `deny` と全面停止（`LIMIT_BLOCKED`）より先に適用される
@@ -1876,7 +1875,7 @@ JSON で渡す（`--result <path>`）。
   外から `ready --parent <親>` で打てばそのまま消える
 - 消し方は、生成物（`node_modules`・`.venv` など）を消してから `git worktree remove`（`--force` なし）。ブランチは消さない
 - git が無視しているファイル（`.env` など）があるワークツリーは、何も消さずに名指しする（`worktree remove` はそれごと消して戻せない）。
-  数えないのは生成物と、ワークツリー直下の `scratchpad/`（下書きの置き場。中身はワークツリーごと消える）だけ
+  数えないのは生成物だけ（下書きの置き場 `wip/scratchpad/` は追跡されるので、ここには現れない）
 - cwd が消す対象の中にあるときは消さず、外に出てから打つ 1 本（`sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>`）を出す。
   `ready` を親のワークツリーの中から `--parent` なしで打ったときは、親のワークツリーをこの 1 本で消す。未コミットの変更があれば何も消さずに名指しする
 - この 1 本が Claude Code の自動モードの分類器に止められたら、ユーザに許可を頼むか、ユーザのホームの `~/.claude/settings.json` の
@@ -2128,7 +2127,7 @@ uv run python scripts/check_rules.py   # 同じことを、state と記録を外
 `tool: Stop`（`subject: "(stop)"`）は、ターンの終わりに使われるルールがあるかを見る（あれば `allow`）。
 ルールを 1 件足したら見本も 1 行足し、**止めたくないものも必ず一緒に置く**。
 
-見本はエージェントが直接書けない（「コアファイルを守る」）。下書きはワークツリーの `scratchpad/` に置き、ルールの下書きと一緒にユーザに渡す。
+見本はエージェントが直接書けない（「コアファイルを守る」）。下書きはワークツリーの `wip/scratchpad/` に置き、ルールの下書きと一緒にユーザに渡す。
 `/ccnavi-config` スキルがこの流れを回し、フェーズ定義とリスクの配点も見る。
 
 ### 記録から候補を起こす
@@ -2309,9 +2308,6 @@ error 2 件、warn 2 件、info 0 件
 | warn | 承認済みチケットはあるがワークツリーが無い（範囲が適用されない） |
 | warn | リモートの種類に合うトークン（`GITHUB_TOKEN` / `GITLAB_TOKEN`）が無い、`origin` が無い |
 | warn | ワークツリーでもワークスペースルートでもないのに `.claude/` を持つディレクトリがある |
-| warn | 下書きの置き場（`scratchpad/`）に追跡されているファイルがある、または `scratchpad/` が git で無視されていない。ワークスペースと各プロジェクトをそれぞれ見る |
-
-`scratchpad/` が追跡されていると、実行後チェックが下書きを範囲外として報告しはじめる。
 
 **取り込みと正とする側**。取り込み状態 `logs/state/sync/` があるときだけ見る。ただし 1 行目と 2 行目は取り込み状態が無くても見る。
 
