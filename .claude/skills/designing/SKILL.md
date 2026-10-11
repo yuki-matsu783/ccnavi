@@ -1,5 +1,6 @@
 ---
 name: designing
+concept: true
 description: >-
   設計の標準的な考え方への入口。設計・方式の検討、変更の影響範囲の見積もり、設計書や設計判断の記録を書く作業で使う。細かい手順は references にあり、ccnavi --docs で共通とプロジェクトの両方から引く。
 ---

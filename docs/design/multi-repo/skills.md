@@ -1,9 +1,9 @@
 ---
 type: design
 title: 11.13 プロジェクトのスキル
-description: プロジェクトの docs/skills に置くスキルの形をした手順書と目録
+description: プロジェクトの skills/ に置くスキルの形をした手順書と目録
 tags: [design-doc, projects, skills]
-keywords: [スキル, SKILL.md, docs/skills, 目録]
+keywords: [スキル, SKILL.md, skills, 概念スキル, 目録, 写し]
 ---
 
 [設計書の入口](../../design.md) > [11. 複数のリポジトリ](../multi-repo.md)
@@ -11,7 +11,7 @@ keywords: [スキル, SKILL.md, docs/skills, 目録]
 ### 11.13 プロジェクトのスキル
 
 プロジェクトは `.claude/` を持たない（11.1）。プロジェクト向けのスキルの形をした手順書は、プロジェクトの
-`docs/skills/<名前>/SKILL.md` に置く（パスは固定）。形は Claude Code のスキルと同じで、頭の
+`skills/<名前>/SKILL.md` に置く（パスは固定）。形は Claude Code のスキルと同じで、頭の
 frontmatter に `name` と `description`、必要なら同じディレクトリに `references/`。Claude Code はこれを読まないので、ccnavi が目録を渡す。
 
 | いつ | どう |
@@ -28,11 +28,22 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 - 上限は 30 本・4000 文字。超えた分は数だけ言う
 - 予約名のプロジェクト（11.4）は見ない
 
-書き込みに専用の保護は無い。`docs/skills/` は ccnavi ディレクトリ（`.ccnavi/`）の外のふつうの場所で、ほかのファイルと同じ判定になる。
+書き込みに専用の保護は無い。`skills/` は ccnavi ディレクトリ（`.ccnavi/`）の外のふつうの場所で、ほかのファイルと同じ判定になる。
 元リポジトリ（ワークスペースルートの下）は `workspace-root` が止め、承認済みチケットに結び付いたワークツリーでは範囲の中だけ書け（9.5）、
 チケットの無いワークツリー（直接作業）ではほかのファイルと同じく書ける。スキルを直すのは `skill-improve`（scope `docs/skills/*`）の子か、
-範囲に `docs/skills/<名前>/*` を書いた提案チケットで、マージリクエストでユーザが見る。`.ccnavi/skills/` に置かなかったのは、そこを書かせるには
+範囲に `skills/<名前>/*` を書いた提案チケットで、マージリクエストでユーザが見る。`.ccnavi/skills/` に置かなかったのは、そこを書かせるには
 `builtin-guard-project-home` などの組み込みの保護を緩める必要があるため。
 
 フロー編集画面の候補（`flow.candidates`、9.3.1）は、ワークスペースの `.claude/skills` だけを並べ、プロジェクトのスキルは載せない。
 フローの `skill` に書けるのは Claude Code が起動できるスキルの名前で、プロジェクトのスキルはそれに当たらないため。
+
+#### 共通の概念スキルの写し
+
+ワークスペースの `.claude/skills/<概念>/SKILL.md` の頭の frontmatter に `concept: true` があるスキルを、概念スキルと呼ぶ。プロジェクトだけを clone しても同じ入口と reference が使えるよう、
+親チケットの `ticket start`（`tickets/skillsync.py`）が、親のワークツリーにあるプロジェクトの `skills/<概念>/` へ `SKILL.md` と `references/` の下の `.md` を写す。
+
+- 上書きと追加だけで、消さない。写し先はプロジェクト固有の reference と同じディレクトリなので、共通側から無くなったファイルも写し先に残す（共通レイヤーのミラー 11.12 とは逆。あちらは誰も編集しないので消す）
+- 同じパスのファイルは共通の中身で上書きする。プロジェクト固有の reference は共通と違うパスに置く
+- 中身が同じなら書かず、知らせない。違うものを書いたときは、着手の出力に一覧とコミットの案内を出す
+- 写し先かその途中がシンボリックリンクなら、何も写さず着手しない
+- 子の着手とワークスペース自身の作業では写さない

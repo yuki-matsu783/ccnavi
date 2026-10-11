@@ -1,5 +1,6 @@
 ---
 name: testing
+concept: true
 description: >-
   テストの標準的な考え方への入口。テストを書く・回す・直す作業、失敗したテストの切り分けで使う。細かい手順は references にあり、ccnavi --docs で共通とプロジェクトの両方から引く。
 ---

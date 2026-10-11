@@ -7,7 +7,7 @@ keywords: [スキル, プロジェクト, docs/skills, 目録, SKILL.md, 振り�
 ---
 # ADR-0091: プロジェクトのスキルは `docs/skills/` に置き、ccnavi は目録だけを渡す
 
-状態: 採用
+状態: 採用（置き場だけ ADR-0109 が `skills/` に改めた）
 
 ## 状況
 

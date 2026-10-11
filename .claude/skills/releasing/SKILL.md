@@ -1,5 +1,6 @@
 ---
 name: releasing
+concept: true
 description: >-
   リリースの標準的な考え方への入口。統合先への取り込み、版の切り出し、配布物の作成、公開前の確認で使う。細かい手順は references にあり、ccnavi --docs で共通とプロジェクトの両方から引く。
 ---

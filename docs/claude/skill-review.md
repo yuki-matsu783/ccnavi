@@ -19,7 +19,7 @@ keywords: [概念スキル, reference, 振り返り, スキル, SKILL.md, refere
 
 ## スキルを直接書き換えない
 
-振り返りでは、`.claude/skills/` もプロジェクトの `docs/skills/` も書き換えない。出すのは候補か提案だけにする。
+振り返りでは、`.claude/skills/` もプロジェクトの `skills/` も書き換えない。出すのは候補か提案だけにする。
 スキルは、ユーザが承認したフェーズかチケットの中で直す。
 
 ## 拾うもの
@@ -57,7 +57,7 @@ keywords: [概念スキル, reference, 振り返り, スキル, SKILL.md, refere
 - 直す前に、対象の SKILL.md と、手を入れる references/ を読み直す。会話中の引用で済ませない
 - 1つの事実は1か所に書く。同じ規則がすでにあるなら、新しく足さずにその文を強めるか言い直す
 - 手順の流れに沿って書き、落とし穴は該当する手順に「規則 + なぜ（1 句）」で添える。日付・番号・ユーザの言葉の引用を中身にしない
-- yomiyasuスキルを `docs/claude/`・`CLAUDE.md`・`.claude/skills/`・プロジェクトの `docs/skills/`・`rules.yml` の `message` に当てるのは、ユーザが明示的に頼んだときだけにする。その場合も、表・箇条書き・「規則 + なぜ」の形は崩さない。yomiyasuはこれらの形を平文に崩すため
+- yomiyasuスキルを `docs/claude/`・`CLAUDE.md`・`.claude/skills/`・プロジェクトの `skills/`・`rules.yml` の `message` に当てるのは、ユーザが明示的に頼んだときだけにする。その場合も、表・箇条書き・「規則 + なぜ」の形は崩さない。yomiyasuはこれらの形を平文に崩すため
 - 誤りを見つけたら、間違った文そのものを直す
 
 ## 対象のスキル
@@ -65,7 +65,7 @@ keywords: [概念スキル, reference, 振り返り, スキル, SKILL.md, refere
 | 振り返る作業 | 対象 |
 |---|---|
 | ワークスペース自身 | `.claude/skills/<名前>/` |
-| `projects/<名前>/` の作業 | `projects/<名前>/docs/skills/<名前>/`。Claude Codeのスキルと同じ形で、ccnaviが目録を渡す。概念スキルの reference は `projects/<名前>/docs/skills/<概念>/references/` |
+| `projects/<名前>/` の作業 | `projects/<名前>/skills/<名前>/`。Claude Codeのスキルと同じ形で、ccnaviが目録を渡す。概念スキルの reference は `projects/<名前>/skills/<概念>/references/` |
 
 候補は、その中身を次に使う作業の側のスキルに書く。ワークスペースとプロジェクトの両方に関わるときも、2か所には書かず、手順を実行する側の1か所にだけ書く。
 
@@ -116,5 +116,5 @@ allow:
 `allow` には `docs/wiki/*` も足す。
 ```
 
-プロジェクトのスキルについての提案は、そのプロジェクトの提案として書き、`allow` に `docs/skills/<スキル>/*` を書く。
+プロジェクトのスキルについての提案は、そのプロジェクトの提案として書き、`allow` に `skills/<スキル>/*` を書く。
 パスはプロジェクトのルートからの相対で書く。
