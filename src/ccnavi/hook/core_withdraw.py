@@ -233,8 +233,8 @@ def _content_problems(copy: ticket_model.Ticket, prior: bytes) -> list[str]:
         )
         if _only_plan_values_differ(copy, current, prior):
             text += (
-                "。違いは plan: / feedback: / phases:（子なら phase:）の値だけ。承認の前に"
-                "ワークフロー編集タブか --fill-phases で書き換えた提案は取り下げられない"
+                "。違いは plan: / feedback: / phases:（子なら phase: か predecessors:）の値だけ。"
+                "承認の前にワークフロー編集タブか --fill-phases で書き換えた提案は取り下げられない"
                 "（書き換えがコミットされないまま承認された）。`ccnavi-ticket.sh cancel "
                 f"{copy.ticket} --reason <理由>` で取り消して、提案を出し直す"
             )
@@ -243,7 +243,9 @@ def _content_problems(copy: ticket_model.Ticket, prior: bytes) -> list[str]:
 
 
 # 承認の前に書き換えることのある欄。ワークフロー編集タブ（`--plan-order --write`）は親の
-# `plan:` / `feedback:` と子の `phase:` を、`--fill-phases` は親の `phases:` を書き換える。
+# `plan:` / `feedback:` と、子の識別子・`phase:`・`predecessors:` を、`--fill-phases` は親の
+# `phases:` を書き換える。識別子を付け替えた子は、承認コミットの親に同じ識別子の提案が無いので
+# ここまで来ない（「提案が無い」で止まる）。`predecessors:` だけを直した子にはここで案内する。
 _REWRITTEN_PARENT = ("plan", "feedback", "phases")
 _REWRITTEN_CHILD = ("phase", "predecessors")
 
