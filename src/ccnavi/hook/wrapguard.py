@@ -155,8 +155,11 @@ CORE_UNREAD = "unread"
 CORE_INDEX = "index"
 # 引数の中で、シェルが実行の時点で値を決める書き方（変数・置換）。
 _EXPANDS = re.compile(r"[$`]")
-# ラッパーを通る副命令を、走査が読み切れなかったときに生の文字列で探す。
-_DEGRADED_CORE = re.compile(r"ccnavi-git\.sh['\"]?\s+(rm|mv|restore|checkout)\b", re.IGNORECASE)
+# 副命令の語に現れてはいけない文字（展開・置換・glob）。
+_OPEN_SUB = re.compile(r"[$`*?\[]")
+# 走査が読み切れなかったときに、生の文字列でラッパーの名前の後ろの副命令を読む。
+_DEGRADED_NAME = re.compile(r"ccnavi-git\.sh['\"]?", re.IGNORECASE)
+_DEGRADED_SUB = re.compile(r"[ \t]+([A-Za-z][\w-]*)(?=[\s'\";&|)]|$)")
 
 
 def check_core_paths(
@@ -187,17 +190,23 @@ def check_core_paths(
     何も消さない `rm -n` / `--dry-run`。消える・過去の中身になるのでないものは、ルールと
     ラッパーの許可リストに任せる。
     """
-    if degraded:
-        found = _DEGRADED_CORE.search(subject)
-        if found:
-            return found.group(1).lower(), "読み切れないコマンド行", CORE_UNREAD
+    if _GIT_SCRIPT not in subject.lower():
         return "", "", ""
+    if degraded:
+        return _degraded_core(subject)
+    places = shellread.placed(subject)
+    found = _fed_to_stdin(places)
+    if found:
+        return found
     compiled = None
-    for words, here in shellread.placed(subject):
+    for words, here in places:
         call = _script_call(words)
         if not call or os.path.basename(call[0].replace("\\", "/")) != _GIT_SCRIPT:
             continue
         args = call[1]
+        if args and _OPEN_SUB.search(args[0]):
+            # 副命令が文字どおりの語でない（変数・置換・glob）。どの副命令が走るかを読めない。
+            return args[0], args[0], CORE_UNREAD
         if not args or args[0] not in _CORE_SUBS:
             continue
         sub = args[0]
@@ -222,6 +231,37 @@ def check_core_paths(
     return "", "", ""
 
 
+def _degraded_core(subject: str) -> tuple[str, str, str]:
+    """走査が読み切れないコマンド行。ラッパーの名前の後ろに文字どおりの副命令が無いか、
+    消す・戻す副命令があれば当たる（`… | xargs sh …ccnavi-git.sh`・`sh -c '… rm …'`）。"""
+    for name in _DEGRADED_NAME.finditer(subject):
+        sub = _DEGRADED_SUB.match(subject, name.end())
+        if not sub:
+            return "?", "読み切れないコマンド行", CORE_UNREAD
+        if sub.group(1).lower() in _CORE_SUBS:
+            return sub.group(1).lower(), "読み切れないコマンド行", CORE_UNREAD
+    return "", "", ""
+
+
+def _fed_to_stdin(places: list) -> tuple[str, str, str] | None:
+    """標準入力から読むシェルがあり、呼び出しの語でない語にラッパーの名前があれば当たる
+    （`echo '…ccnavi-git.sh rm …' | sh`）。流し込む文字列の中は、副命令も対象も読めない。"""
+    mention = ""
+    stdin = False
+    for words, _ in places:
+        call = _script_call(words)
+        script = call[0] if call else None
+        mention = mention or next(
+            (w for w in words if w is not script and _GIT_SCRIPT in w.lower()), ""
+        )
+        head = _strip_heads(words)
+        k = shellread_words._name_index(head)
+        stdin = stdin or shellread_words.reads_stdin(head[k:])
+    if mention and stdin:
+        return "?", mention[:80], CORE_UNREAD
+    return None
+
+
 def _long_option(arg: str, full: str, least: int) -> bool:
     """`--名前`（`=値` を除く）が full か、git が受ける full の省略形
     （least 字以上の前方一致）か。"""
@@ -235,7 +275,7 @@ def _core_targets(sub: str, args: list[str]) -> tuple[list[str], str, bool]:
     `restore` は `--source` が無ければ何も返さない。`checkout` は `--` より前の最初の語（行き先か
     起点）を除く。`rm` は `-n` / `--dry-run` があれば何も返さない。長いオプションは、git が受ける
     省略形（`--sou=` など）も同じに読む。パスに変数・置換があれば、その語を読めない指定として
-    返す。
+    返す。旗を変数で書く形（`restore $O HEAD~1 <パス>`）は見ない（ADR-0120 の限界。sh が止める）。
     """
     longs, shorts = _VALUE_LONGS[sub], _VALUE_SHORTS[sub]
     positional: list[str] = []
@@ -400,12 +440,15 @@ def core_path_message(root: str, sub: str, word: str, kind: str = CORE_HIT) -> s
             "何をなぜ戻したいのかを伝えてユーザに依頼してください。"
         )
     if kind == CORE_UNREAD:
+        call = f"{_GIT_SCRIPT} の呼び出し" if sub == "?" else f"{_GIT_SCRIPT} {sub}"
         return (
-            f"{_GIT_SCRIPT} {sub} の対象（{word}）を読み切れません。変数・置換で組み立てた値と、"
-            "居場所を読めない cd / pushd の後の相対パスは、ccnavi 自身を守る場所"
-            "（hook の登録・ルールとフェーズの設定・保護済みのスクリプト・実行ファイル・"
-            "判定の記録）に当たるかを確かめられないので止めました。消す・戻すファイルを、値を先に読んでから"
-            f"パスのまま 1 つずつ名指しし、'{git_sh} {sub} <パス>' の形で打ってください。"
+            f"{call}（{word}）を読み切れません。副命令や対象を変数・置換・glob で書いた形、"
+            "標準入力から読むシェルや xargs に渡した文字列の中の呼び出し、"
+            '居場所を読めない cd（cd "$D"・pushd）の後の相対パスは、'
+            "ccnavi 自身を守る場所（hook の登録・ルールとフェーズの設定・"
+            "保護済みのスクリプト・実行ファイル・判定の記録）と承認済みチケットの置き場に"
+            "当たるかを確かめられないので止めました。ラッパーは副命令と対象をそのまま書いて、"
+            f"直接呼んでください（'{git_sh} <副命令> <パス>'。値は先に読んでから書きます）。"
         )
     return (
         f"{_GIT_SCRIPT} {sub} が、ccnavi 自身を守る場所（{word}）を消すか、別のコミットの中身に"

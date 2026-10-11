@@ -573,10 +573,25 @@ class CorePathTest(unittest.TestCase):
             ('cd "$D" && sh /x/.ccnavi/scripts/ccnavi-git.sh rm a.py', True),
             ("sh .ccnavi/scripts/ccnavi-git.sh restore --source=HEAD -- $P", True),
             ("sh .ccnavi/scripts/ccnavi-git.sh checkout $B .ccnavi/common/rules.yml", True),
-            # 起点だけを変数で渡す形と、索引に戻す形は対象が読めるので通す。
+            # 起点だけを変数で渡す形と、索引に戻す形は、対象が読めるので通す。
             ("sh .ccnavi/scripts/ccnavi-git.sh restore --source $R src/a.py", False),
             ("sh .ccnavi/scripts/ccnavi-git.sh checkout $B", False),
             ("sh .ccnavi/scripts/ccnavi-git.sh restore $P", False),
+            # 副命令が文字どおりの語でない（変数・置換・glob）。
+            ("S=rm; sh .ccnavi/scripts/ccnavi-git.sh $S .ccnavi/approved/t/r", True),
+            ("sh .ccnavi/scripts/ccnavi-git.sh ${S:-rm} .ccnavi/approved/t/r", True),
+            ("sh .ccnavi/scripts/ccnavi-git.sh $(echo rm) .ccnavi/approved/t/r", True),
+            ("sh .ccnavi/scripts/ccnavi-git.sh r? .ccnavi/approved/t/r", True),
+            # 標準入力から読むシェルに流す文字列の中の呼び出し。
+            ("echo 'sh .ccnavi/scripts/ccnavi-git.sh rm .ccnavi/approved/t/r' | sh", True),
+            ("echo 'sh .ccnavi/scripts/ccnavi-git.sh status; rm -rf .ccnavi' | sh", True),
+            # 走査が読み切れず、ラッパーの名前の後ろに文字どおりの副命令が無い。
+            ("echo rm .ccnavi/approved/t/r | xargs sh .ccnavi/scripts/ccnavi-git.sh", True),
+            ("xargs -a f sh .ccnavi/scripts/ccnavi-git.sh", True),
+            # 直接の呼び出しは通す。
+            ('sh .ccnavi/scripts/ccnavi-git.sh commit -m "fix: $X"', False),
+            ("sh .ccnavi/scripts/ccnavi-git.sh diff $F", False),
+            ("sh .ccnavi/scripts/ccnavi-git.sh status", False),
         ):
             with self.subTest(command=command):
                 decision, reason = self.hook(command)
