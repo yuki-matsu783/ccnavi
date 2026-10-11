@@ -1343,7 +1343,9 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 レビュー準備中／レビュー待ち・フィードバック計画待ち・終わっていないフェーズ）、git を読めないとき、`SubagentStop` では促さない。
 `dry-run` でも止める（止めないと文がモデルに届かないため）。
 
-`finish` を促さなかった回は、`match: Stop` のルールが渡す回ならそこで止める（「ターンの終わりに止めて渡す」）。
+`finish` を促さなかった回は、レビューの依頼までの道の途中なら（承認済みの親に作業中の子が残っているか、子が全部閉じたのに依頼のマーカーが無い）、決まった道の途中でユーザの許可は要らないことと次のコマンド（`finish`・合流・ELI5・`request`）を渡して止める（理由コード `NUDGE_TICKET_REQUEST`）。最後の発言は読まず、同じ状態では 1 回だけで、`dry-run` でも止める。バックグラウンドのサブエージェントに任せて終える回は見分けられず、作業中の子が残っていれば止まる。
+
+どちらも促さなかった回は、`match: Stop` のルールが渡す回ならそこで止める（「ターンの終わりに止めて渡す」）。
 
 同じ `Stop` で、このセッションで同じ理由の拒否が `CCNAVI_DENY_REPEAT` 回に達した呼び出しを、ルールの id と回数で 1 回だけ並べる
 （「同じ呼び出しを繰り返し止めたとき」）。回数が増えればまた並べる。
@@ -2856,6 +2858,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/ops.py` | チケットの状態を動かす `ticket start / finish / cancel / record-risk`。閉じるときに実績のリスクを数える |
 | `src/ccnavi/tickets/ops_close.py` | チケットを引いて動かしてよいかの検査。置き場の引き当て、取り込み済みの親子の停止、着手の前（親・先行）と終了の前（親を閉じられる・成果物）の検査 |
 | `src/ccnavi/tickets/ops_stop.py` | Stop で `finish` の打ち忘れを促す判定と、基準点の確認（git の読み取り） |
+| `src/ccnavi/tickets/ops_stop_request.py` | Stop でレビュー依頼までの道（`finish`・合流・ELI5・`request`）の途中を見つけ、次の一手を促す判定 |
 | `src/ccnavi/tickets/core.py` | 承認・取り下げ・レビュー済みの判定のコアの入口。名前を束ね直すだけで、`entry/cli.py` と Chrome 拡張（Pyodide）はここを引く |
 | `src/ccnavi/tickets/core_base.py` | 判定のコアの共通部分。入力（`Snapshot`）・承認の判定（`judge_approval`）・書くもの（`Changes`）・ディスクへの書き込み |
 | `src/ccnavi/tickets/core_approve.py` | 判定のコアを通す手元の承認の入口（`--agree` の 4 つの枝） |
