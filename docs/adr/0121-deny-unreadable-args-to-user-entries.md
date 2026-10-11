@@ -6,7 +6,7 @@ tags: [rules, approval, selfguard]
 keywords: [端末, 入口, 変数, glob, xargs, busybox, forget, decide, choices, yes, deny, 読めなければ拒否]
 ---
 
-# ADR-0120: 2 段目の無いユーザの入口は、引数を読み切れなければ止める
+# ADR-0121: 2 段目の無いユーザの入口は、引数を読み切れなければ止める
 
 状態: 採用
 

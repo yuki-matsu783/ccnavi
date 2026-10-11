@@ -349,7 +349,7 @@ def decide_before(
             )
         # 2 段目の無いユーザの入口（`ccnavi-sync.sh`・`ccnavi-review.sh decide`・実行ファイルの
         # `--yes`）は、引数を変数・置換・glob で組み立てると表記の検査から外れる。読めなければ止める
-        # （phase_forms.hidden_user_entry、ADR-0120）。
+        # （phase_forms.hidden_user_entry、ADR-0121）。
         entry, found = phase_forms.hidden_user_entry(
             record.subject, [(r, x) for r, x, _ in inner], conf.bin
         )
