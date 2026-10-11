@@ -40,6 +40,7 @@ keywords: [要件, ルール管理, ルール, rules.yml, 判定を試す, サ�
 | ツール | `match` |
 | タイプ | `deny` / `ask` / `allow` のどのリストに入れるか |
 | パターン | `glob` / `regex`（左の選択が形式、右が値） |
+| 除外 | `except`（見せるだけで編集しない。畳んだ行には「除外 N」、開いた行には各パターンを出す。書き戻しは元のまま残し、欄を変えてもタイプを移しても消えない。直すのはルールファイルで） |
 | メッセージ | `message` |
 | every | `every`（空なら当たるたびに渡す。`5` なら 5 回に 1 度で、`additionalContextOnce` はその最初の 1 回＝ 5 回目に届く） |
 | additionalContext | `additionalContext` |

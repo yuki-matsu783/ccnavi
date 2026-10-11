@@ -21,6 +21,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, 記法]
 | `match` | ツール名を `\|` でつないだもの。`Bash` `PowerShell` `Read` `Edit` `Write` `NotebookEdit` `Grep` `Glob` `Skill` `Agent` `WebFetch`。ツールでない名前として `Stop`（メインエージェントのターンの終わり）。`Stop` を書けるのは `allow` だけ（6.6） |
 | `glob` | `fnmatch` の記法。文字列全体に当たる |
 | `regex` | Python の正規表現。`re.search`。先読み・後読み・後方参照は受け付けない |
+| `except` | 省略できる。`glob` か `regex` の片方だけを持つマッピングのリスト。本体に当たっても、どれかに当たれば当たらない扱い（5.3） |
 | `message` | `deny` だけ。必須。止められたモデルに届く「なぜ止めたか、代わりに何をするか」 |
 | `additionalContext` / `additionalContextOnce` | 当たるたび / 文脈で最初に当たったときだけ、モデルへ渡す文（6.6） |
 | `additionalContextFile` / `additionalContextOnceFile` | 文に続けて本文を渡すファイル。探す起点からの相対（順は 6.6） |
@@ -68,6 +69,29 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, 記法]
 ルートの長さが 256 字以上だと展開しない（入れ子が 493 字で `re.compile` が `RecursionError` になる）。
 組み立てられなかったルールは強い側を採る。`deny` と `ask` は `match` の全部に当たる式を持たせて止め、`allow` はどれにも
 当てない（REQ-RUL-10）。書いた文面は残し、止められた側へ返す説明は別の欄に持つ。
+
+`except` は「本体に当たっても除くもの」のリスト（REQ-RUL-11）。先読みを受け付けないので、「A だが B は除く」を
+1 本の regex で書くと 1 文字ずつの場合分けになる。それを本体と除くものの 2 つに分けて書くための欄である。
+
+```yaml
+  - id: workspace-root
+    match: Write|Edit|NotebookEdit
+    regex: '^{root}[\\/]'
+    except:
+      - regex: '^{root}[\\/]wip[\\/]scratchpad(?:[\\/]|$)'
+      - regex: '^{root}[\\/]\.claude[\\/]worktrees(?:[\\/]|$)'
+```
+
+| 決まり | |
+|---|---|
+| 要素の形 | `glob` か `regex` のどちらか 1 つだけを持つマッピング。後で条件の組み合わせを足すときの葉と同じ形 |
+| 読み方 | 本体と同じ（`{root}`、`{!root}`、大文字小文字の無視、先読み・後方参照の禁止、glob の翻訳） |
+| 当てる文字列 | 本体と同じ。`Bash` ならコマンド列の全体（実行役のコマンドの中のコマンドは、その層ごと）。除く語をコマンドのどこかに足すだけで外れるので、`Bash` / `PowerShell` の `deny` / `ask` に付けると `--lint` が warn |
+| `match` | 見方は変わらない。除くのは対象の文字列だけ |
+| 書式の誤り | 空のリスト、`null`、マッピングでない要素、`glob` と `regex` の両方・どちらも無い要素、知らないキー。ルールごと読み込まずに error |
+| 何にでも当たる要素 | `--lint` が warn。ルールがどの呼び出しにも当たらなくなる |
+| `{!root}` を組み立てられない要素 | error。`deny` / `ask` はその要素を外して使う（当たる範囲が広がり、止める側に外れる）。`allow` はルールごと使わない。本体を組み立てられなかった `deny` / `ask` は `except` を付けずに全部止める |
+| レイヤーの重複 | `except` も比べる。除くものだけが違う 2 本は別の定義として両方使う |
 
 ### 5.4 対象の取り出し
 
