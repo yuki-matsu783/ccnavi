@@ -283,12 +283,18 @@ class ReviewRuleTest(ActorHarness):
         before = read_json(self.mark_path())
         again = self.confirm_as(fixture, "--actor", "someone")
         self.assertEqual(again.returncode, 1)
-        self.assertEqual(again.stderr.splitlines(), ["ccnavi: フェーズ 1 はレビュー済み"])
+        self.assertEqual(
+            again.stderr.splitlines(),
+            ["ccnavi: [CORE_CONFIRM_ALREADY_REVIEWED] フェーズ 1 はレビュー済み"],
+        )
         self.assertEqual(read_json(self.mark_path()), before)
         self.commit_parent("reviewed")
         compare = {**compare, "head": git(self.parent_tree, "rev-parse", "HEAD").strip()}
         chrome = self.chrome_confirm(compare)
-        self.assertEqual(chrome["problems"], ["ccnavi: フェーズ 1 はレビュー済み"])
+        self.assertEqual(
+            chrome["problems"],
+            ["ccnavi: [CORE_CONFIRM_ALREADY_REVIEWED] フェーズ 1 はレビュー済み"],
+        )
         self.assertIsNone(chrome["changes"])
 
     def test_the_request_records_the_poster_when_known(self):

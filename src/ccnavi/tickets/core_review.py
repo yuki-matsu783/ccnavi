@@ -28,6 +28,22 @@ from . import (
     ticket_places,
 )
 
+# レビュー済み（`confirm`）が通らなかった根拠の種別。付録 A の `CORE_CONFIRM_*`。
+# 親の承認済みチケットが作業中に無い。
+CODE_CONFIRM_NO_PARENT = "CORE_CONFIRM_NO_PARENT"
+# 親にそのフェーズの子が無い。
+CODE_CONFIRM_NO_PHASE = "CORE_CONFIRM_NO_PHASE"
+# そのフェーズはもうレビュー済み。
+CODE_CONFIRM_ALREADY_REVIEWED = "CORE_CONFIRM_ALREADY_REVIEWED"
+# 依頼の記録が無い。
+CODE_CONFIRM_NOT_REQUESTED = "CORE_CONFIRM_NOT_REQUESTED"
+# 依頼の後に、ユーザが見るものが動いた。
+CODE_CONFIRM_MOVED = "CORE_CONFIRM_MOVED"
+# 取得した結果が、依頼したマージリクエストのものと照合できない。
+CODE_CONFIRM_RESULT_MISMATCH = "CORE_CONFIRM_RESULT_MISMATCH"
+# 変更要求のレビューか、未解決のスレッドが残っている。
+CODE_CONFIRM_REVIEW_OPEN = "CORE_CONFIRM_REVIEW_OPEN"
+
 
 def confirm(
     snapshot: core_base.Snapshot,
@@ -47,34 +63,42 @@ def confirm(
     conf, root = snapshot.conf, snapshot.root
     parent = _open_parent(root, conf, parent_id)
     if parent is None:
-        return core_base.Checked([f"ccnavi: 親 {parent_id} の承認済みチケットが作業中に無い"], None)
+        return core_base.refused(
+            CODE_CONFIRM_NO_PARENT,
+            [f"ccnavi: 親 {parent_id} の承認済みチケットが作業中に無い"],
+        )
     # フェーズの引き方と「依頼し直す」案内の文面は review の非公開の関数を使う（手元の
     # confirm と同じ文面にするため。review の中だけの約束なので公開名にはしない）。
     ph = review._phase(root, conf, parent, phase_no)
     if ph is None:
-        return core_base.Checked(
-            [f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子が無い"], None
+        return core_base.refused(
+            CODE_CONFIRM_NO_PHASE,
+            [f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子が無い"],
         )
     if approval_marks.MARK_REVIEWED in ph.marks:
         # 重ね打ちでマーカーと履歴を書き直さない（`_already_requested` と同じ文面の形）
-        return core_base.Checked([f"ccnavi: フェーズ {phase_no} はレビュー済み"], None)
+        return core_base.refused(
+            CODE_CONFIRM_ALREADY_REVIEWED, [f"ccnavi: フェーズ {phase_no} はレビュー済み"]
+        )
     requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
     if requested_mark is None:
-        return core_base.Checked(["ccnavi: 依頼の記録が無い。先に request してください"], None)
+        return core_base.refused(
+            CODE_CONFIRM_NOT_REQUESTED, ["ccnavi: 依頼の記録が無い。先に request してください"]
+        )
     if changed_since_request:
-        return core_base.Checked(
+        return core_base.refused(
+            CODE_CONFIRM_MOVED,
             [
                 f"ccnavi: {changed_since_request}。ユーザが見たものと今の HEAD が違う。"
                 f"{review._redo_request(root, phase_no)}"
             ],
-            None,
         )
     problems = review.matching_problems(result, requested_mark)
     if problems:
-        return core_base.Checked(problems, None)
+        return core_base.refused(CODE_CONFIRM_RESULT_MISMATCH, problems)
     problems = review.review_problems(root, conf, parent, phase_no, result)
     if problems:
-        return core_base.Checked(problems, None)
+        return core_base.refused(CODE_CONFIRM_REVIEW_OPEN, problems)
     stamp = snapshot.stamp or fsio.stamp()
     notes = io.StringIO()
     # 履歴の経路は Snapshot の経路（Chrome なら chrome）。取り下げと同じ形。アカウントと
@@ -94,7 +118,9 @@ def confirm(
             core_base.reviewed_mark(result.mr.number, [], snapshot.actor),
         )
     if notes.getvalue():
-        return core_base.Checked(core_base.unwritten(notes.getvalue()), None)
+        return core_base.refused(
+            core_base.CODE_HISTORY_UNWRITABLE, core_base.unwritten(notes.getvalue())
+        )
     return core_base.Checked([], core_base.Changes(agree.Planned(stage, stopped), root, conf))
 
 

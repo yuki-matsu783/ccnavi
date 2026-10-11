@@ -1870,7 +1870,9 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
 
         # レビュー済みに重ねて打てば、手元も Chrome も同じ文面で止め、何も送らない
         again = self.same_refusal(self.SCENE)
-        self.assertEqual(again["problems"], ["ccnavi: フェーズ 1 はレビュー済み"])
+        self.assertEqual(
+            again["problems"], ["ccnavi: [CORE_CONFIRM_ALREADY_REVIEWED] フェーズ 1 はレビュー済み"]
+        )
 
 
 @unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
