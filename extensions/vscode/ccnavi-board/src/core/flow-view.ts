@@ -101,6 +101,13 @@ export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult
 /** カードの「フロー」ボタンの言葉。在るか・着手中かで変わる（どちらも実行ファイルの答えのまま） */
 export function flowButtonLabel(flow: FlowJson, closed = false): string {
   if (flow.locked) {
+    if (flow.lock_kind === "doing") {
+      return "フロー: 閲覧（着手中）";
+    }
+    if (flow.lock_kind === "review") {
+      return "フロー: 閲覧（レビュー中）";
+    }
+    // 種類を返さない古い実行ファイル
     return "フロー: 閲覧（着手中・レビュー中）";
   }
   if (closed) {

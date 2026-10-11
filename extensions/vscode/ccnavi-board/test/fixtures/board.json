@@ -531,6 +531,7 @@
     "exists": false,
     "linked": false,
     "locked": true,
+    "lock_kind": "doing",
     "draft": {
      "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-02-02.yml",
      "rel": "wip/proposals/flows/i0001-02-02.yml",
