@@ -464,6 +464,29 @@ class PlanOrderWriteTest(PlanOrderHarness):
         with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
             self.assertEqual(f.read(), written)
 
+    def test_an_agent_rewriting_the_order_after_the_save_changes_the_preview_sha(self):
+        """保存したあとにエージェントが `after` を書き戻すと、preview の `source_sha` が変わる。
+
+        拡張は保存で返った `source_sha` を覚え、承認のオーバーレイを開くときに preview の
+        `plans` の `source_sha` と比べて、違えば「保存したあとに提案が変わった」と出す。
+        その比べ方が成り立つ前提（書き換えなければ同じ・書き戻せば違う、図は書き戻した順序）を見る。
+        """
+        text = parent_text("i0001", PLAN3)
+        self.propose("i0001", text)
+        self.commit_parent()
+        result = self.write_order(REVERSE)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        saved = json.loads(result.stdout)["source_sha"]
+        self.commit_parent("reorder")
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
+        self.assertEqual([p["source_sha"] for p in preview["plans"]], [saved])
+        # エージェントが提案を書いた順序へ黙って戻す。
+        self.propose("i0001", text)
+        self.commit_parent("revert")
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
+        self.assertNotEqual(preview["plans"][0]["source_sha"], saved)
+        self.assertEqual(preview["plans"][0]["after"], {"2": [1], "3": [2]})
+
     def test_preview_plans_come_from_the_same_function(self):
         self.propose("i0001", parent_text("i0001", PLAN3))
         self.propose(
