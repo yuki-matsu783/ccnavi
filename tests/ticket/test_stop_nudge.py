@@ -139,13 +139,13 @@ class StopNudgeTest(TicketTest):
 
     def test_a_parent_held_for_review_is_not_asked(self):
         """レビュー準備中の親は、既存の Stop の案内（ユーザを待つ）と食い違わないよう促さない。"""
-        self.family(review=(True, True))
+        self.family(review=(True, True), plan=["work-mr"])
         for child in ("i0001-01-01", "i0001-01-02"):
             self.assertEqual(self.ccnavi("ticket", "finish", child).returncode, 0)
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "done")
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn("フェーズ 1 が終わりました", self.reason(said))
+        self.assertIn("フェーズ 1（MR作業） が終わりました", self.reason(said))
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "marks")
         self.assert_no_finish_nudge(self.stop(self.parent_tree))

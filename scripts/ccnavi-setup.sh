@@ -1347,7 +1347,7 @@ if [ ! -f "$root/$DEPLOY_RISK" ]; then
 	note_missing "${DEPLOY_RISK}（リスクの配点。無いと組み込みの配点で測る）"
 fi
 if [ ! -f "$root/$DEPLOY_PHASES" ]; then
-	note_missing "${DEPLOY_PHASES}（フェーズ定義。無いと番号だけの挙動になる）"
+	note_missing "${DEPLOY_PHASES}（フェーズ定義。無いと plan を持つ親を承認できず、plan の無い親は start が止まる）"
 fi
 # 配るものの一覧（DEPLOY_SCRIPTS）を使って確かめる。ここで名前を決め打ちすると、配る sh を
 # 足したときに、その sh が無いことをこの一覧だけが報告しなくなる。

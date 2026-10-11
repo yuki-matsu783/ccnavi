@@ -10,7 +10,7 @@ from __future__ import annotations
 import importlib.util
 import os
 
-from tests import ROOT, phasecopy
+from tests import ROOT, config_path, phasecopy
 
 RULES = {
     "version": 1,
@@ -161,3 +161,56 @@ def load_chrome():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+# `plan` を持たない親は `ticket start` が止まるので、計画の中身を問わないテストの親は
+# この最小の計画（`work` の項を並べただけ。項は互いに待たない）を持つ。
+PLAIN_PHASES = """
+version: 1
+phases:
+  work:
+    kind: work
+    title: 作業
+    review: none
+    scope: inherit
+  work-mr:
+    kind: work
+    title: MR作業
+    review: mr
+    scope: inherit
+"""
+
+
+def plain_plan_lines(plan=1) -> list[str]:
+    """`plan:` の行。`plan` は `work` の項の数か定義名の並び。最後の項だけが前の全部を待つ。"""
+    names = ["work"] * plan if isinstance(plan, int) else list(plan)
+    # 終端は 1 つ（最後の項がほかの全部を待つ）にしないと承認が通らない。
+    last = len(names)
+    return ["plan:"] + [
+        f"  - {{type: {n}, after: [{', '.join(str(k) for k in range(1, last))}]}}"
+        if i == last
+        else f"  - {{type: {n}, after: []}}"
+        for i, n in enumerate(names, 1)
+    ]
+
+
+def plain_parent(text: str, plan=1) -> str:
+    """計画を持たない親の本文に、最小の計画（`work` を `plan` 個、または定義名の並び）と写しを足す。
+
+    `plan` が 0 か空なら、子（`parent:` を持つ）と、すでに `plan:` がある本文と同じくそのまま返す。
+    """
+    if not plan or "\nparent:" in text or "\nplan:" in text:
+        return text
+    lines = text.split("\n")
+    at = next(i for i, line in enumerate(lines) if line.startswith("human_review:"))
+    lines[at:at] = plain_plan_lines(plan)
+    return phasecopy.insert("\n".join(lines), PLAIN_PHASES)
+
+
+def write_plain_phases(root: str) -> str:
+    """`PLAIN_PHASES` をそのルートの config の `phases.yml` に書く（親の承認が写しを確かめる）。"""
+    path = config_path(root, "phases")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(PLAIN_PHASES)
+    return path

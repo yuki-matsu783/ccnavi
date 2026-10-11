@@ -106,7 +106,7 @@ class RequestNudgeTest(base.StopNudgeTest):
     # ---- 子が全部閉じた。依頼まで 1 手ずつ
 
     def test_closed_children_are_asked_to_merge_then_eli5_then_request(self):
-        self.family()
+        self.family(plan=["work-mr"])
         self.close_children()
         review_sh = settings.script_command(self.root, "ccnavi-review.sh")
         git_sh = settings.script_command(self.root, "ccnavi-git.sh")
@@ -136,7 +136,7 @@ class RequestNudgeTest(base.StopNudgeTest):
 
     def test_the_request_step_reminds_to_commit_and_push_first(self):
         """ELI5 が在っても未コミットかもしれない。`request` は HEAD の普通のファイルが前提。"""
-        self.family()
+        self.family(plan=["work-mr"])
         self.close_children(work=False)
         write(os.path.join(self.parent_tree, "wip", "eli5", "phase-1.html"), "<p>x</p>\n")
         reason = self.asked(self.stop(self.parent_tree))
@@ -191,7 +191,7 @@ class RequestNudgeTest(base.StopNudgeTest):
 
     def test_the_marker_dropped_by_a_new_child_is_asked_again(self):
         """子を足すと依頼のマーカーが外れる。足した子を閉じたあとの、依頼し直しの前も止める。"""
-        self.family()
+        self.family(plan=["work-mr"])
         self.close_children(work=False)
         self.mark_requested()
         self.assert_not_asked(self.stop(self.parent_tree))
