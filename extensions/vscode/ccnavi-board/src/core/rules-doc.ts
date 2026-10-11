@@ -371,7 +371,7 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
  *
  * 変えたときは `glob` / `regex` を消し、木を書く。元のノードは使い回す。子は、同じ中身のノードを先に
  * 拾い（消した・並べ替えた子のコメントが別の子へ付け替わらないように）、残りを似たノードに当てて
- * 値だけを書き換える。新しい葉は単引用符で囲む。
+ * 値だけを書き換える（patchChildren）。包む・not を外すときも元のノードを中で使い回す。新しい葉は単引用符で囲む。
  *
  * まだ `when:` が無い（「条件の木に変換」した）ときは、元の `glob` / `regex` と、移す `except:` の
  * 各要素を、変換した形（`all: [本体, not: {any: 除くもの}]`）に組んで元のノードとして当てる。
@@ -471,9 +471,14 @@ function patchCond(doc: Document, existing: unknown, tree: CondNode): Node {
     return doc.createNode(tree.raw);
   }
   let { pair, key } = soleOf(existing);
-  if (key === "not" && tree.op !== "not" && pair !== undefined && isNode(pair.value)) {
-    // not を外した: 中身のノードを使い回す（中身に付いたコメントを残す）
+  // all / any で包んだ（not を包んだときも含む）なら、元のノードは新しいまとめの子になる
+  const wrapped = isNode(existing) && wrapsInGroup(condOfYaml(existing), tree);
+  if (key === "not" && tree.op !== "not" && !wrapped && pair !== undefined && isNode(pair.value)) {
+    // not を外した: 中身のノードを使い回す（中身に付いたコメントを残す）。not に付いていた
+    // 前置きのコメントは中身へ移す（not ごと消すと、そのノードに書いた理由が消える）
+    const outer = existing as Node;
     existing = pair.value;
+    carryComment(outer, existing as Node);
     ({ pair, key } = soleOf(existing));
   }
   switch (tree.op) {
@@ -498,11 +503,18 @@ function patchCond(doc: Document, existing: unknown, tree: CondNode): Node {
     }
     case "all":
     case "any": {
-      if (pair !== undefined && (key === "all" || key === "any") && isSeq(pair.value)) {
+      if (!wrapped && pair !== undefined && (key === "all" || key === "any") && isSeq(pair.value)) {
         if (key !== tree.op) {
           (pair.key as Scalar).value = tree.op;
         }
         const seq = pair.value;
+        // 先頭の子の前のコメントは、読み込みではリストのほうに付く。子へ移しておけば、
+        // 先頭の子を消したときにコメントも一緒に消え、新しい先頭に残らない（convertedFrom と同じ扱い）
+        const first = seq.items[0];
+        if (seq.commentBefore && isNode(first) && !first.commentBefore) {
+          first.commentBefore = seq.commentBefore;
+          seq.commentBefore = undefined;
+        }
         seq.items = patchChildren(doc, seq.items, tree.children);
         if (seq.items.length === 0) {
           seq.flow = true;
@@ -520,23 +532,50 @@ function patchCond(doc: Document, existing: unknown, tree: CondNode): Node {
         pair.value = tree.child === null ? null : patchCond(doc, pair.value ?? undefined, tree.child);
         return existing as Node;
       }
-      // not で包んだ: 元のノードが中身と同じ種類なら中身に当てる
+      // not で包んだ: 元のノードが中身に似ていれば中身に当てる
       if (tree.child === null) {
         return mapOf(doc, "not", null);
       }
-      const inner = isNode(existing) && likeness(condOfYaml(existing), tree.child) > 0 ? existing : undefined;
+      const inner = isNode(existing) && likeness(condOfYaml(existing), tree.child, false) > 0 ? existing : undefined;
       return mapOf(doc, "not", patchCond(doc, inner, tree.child));
     }
   }
 }
 
+/** 外したノードの前置きのコメントを、残すノードの前置きへ足す */
+function carryComment(from: Node, to: Node): void {
+  if (!from.commentBefore) {
+    return;
+  }
+  to.commentBefore = to.commentBefore ? `${from.commentBefore}\n${to.commentBefore}` : from.commentBefore;
+  to.spaceBefore = to.spaceBefore || from.spaceBefore;
+}
+
+/**
+ * 新しいノードが、元のノードを all / any で包んだ形か。子のどれかが元のノードと同じか、
+ * 元のノードとして直したと見るより、子のどれかのほうが元のノードに近いとき
+ */
+function wrapsInGroup(old: CondNode, next: CondNode): boolean {
+  if (!isGroup(next) || sameCond(old, next)) {
+    return false;
+  }
+  if (next.children.some((child) => sameCond(child, old))) {
+    return true;
+  }
+  const direct = isGroup(old) ? groupLikeness(old, next, true) : 0;
+  return next.children.some((child) => likeness(old, child, true) > direct);
+}
+
 /**
  * まとめの子を書く。同じ中身の元のノードを先に当てる（並べ替え・消しただけなら、これで全部決まる）。
  *
- * 残りの子（中身を直した・足した子）と残りの元のノード（直された・消された子）は、数が同じなら順に
- * 当てる（直しただけ。種類が違えば当てずに新しいノードにする）。数が違うと、どれを消してどれを直したのかが位置では決まらない。位置で当てると
- * 消した子のコメントが別の子に付くので、似ているもの（種類が同じで、葉なら文字が近い）どうしを当て、
- * 似たものが無い子は新しいノードにする。
+ * 残りの子（中身を直した・足した・包んだ子）は、前後で当たった子に挟まれた元のノードに当てる
+ * （消されていない子は元の相対順のまま並ぶので、挟まれた範囲の外へは当てない）。挟まれた範囲で
+ * 数が同じなら順に当てる（直しただけ。種類が違えば当てずに新しいノードにする。not や all / any で
+ * 包んだ・外したものは同じ種類に数える）。数が違うと、どれを消してどれを直したのかが位置では
+ * 決まらない。位置で当てると消した子のコメントが別の子に付くので、似ているもの（葉なら文字が
+ * 重なる）どうしだけを当て、似たものが無い子は新しいノードにする。最後に、範囲の外に残ったもの
+ * （並べ替えてから直した子）も、似ているものどうしだけを当てる。
  */
 function patchChildren(doc: Document, olds: readonly unknown[], children: readonly CondNode[]): Node[] {
   const read = olds.map((item) => condOfYaml(item));
@@ -549,22 +588,16 @@ function patchChildren(doc: Document, olds: readonly unknown[], children: readon
     }
     return undefined;
   });
-  const restChildren = children.flatMap((_, i) => (chosen[i] === undefined ? [i] : []));
-  const restOlds = olds.flatMap((_, k) => (used.has(k) ? [] : [k]));
-  if (restChildren.length === restOlds.length) {
-    restChildren.forEach((i, n) => {
-      const k = restOlds[n];
-      if (likeness(read[k], children[i]) > 0) {
-        chosen[i] = k;
-        used.add(k);
-      }
-    });
-  } else {
-    // 似ている組から順に当てる。同じ似かたなら位置の近い組
+  const assign = (i: number, k: number): void => {
+    chosen[i] = k;
+    used.add(k);
+  };
+  // 似ている組から順に当てる。同じ似かたなら位置の近い組
+  const pairUp = (rest: readonly number[], candidates: readonly number[]): void => {
     const pairs: { i: number; k: number; score: number }[] = [];
-    for (const i of restChildren) {
-      for (const k of restOlds) {
-        const score = likeness(read[k], children[i]);
+    for (const i of rest) {
+      for (const k of candidates) {
+        const score = likeness(read[k], children[i], true);
         if (score > 0) {
           pairs.push({ i, k, score });
         }
@@ -573,34 +606,111 @@ function patchChildren(doc: Document, olds: readonly unknown[], children: readon
     pairs.sort((a, b) => b.score - a.score || Math.abs(a.i - a.k) - Math.abs(b.i - b.k));
     for (const { i, k } of pairs) {
       if (chosen[i] === undefined && !used.has(k)) {
-        chosen[i] = k;
-        used.add(k);
+        assign(i, k);
       }
     }
+  };
+  // 同じ中身で当たった子のあいだに続く、当たっていない子の並び
+  const runs: number[][] = [];
+  let run: number[] = [];
+  children.forEach((_, i) => {
+    if (chosen[i] === undefined) {
+      run.push(i);
+      return;
+    }
+    if (run.length > 0) {
+      runs.push(run);
+    }
+    run = [];
+  });
+  if (run.length > 0) {
+    runs.push(run);
   }
+  for (const r of runs) {
+    const before = r[0] - 1;
+    const after = r[r.length - 1] + 1;
+    const lo = before >= 0 ? (chosen[before] as number) : -1;
+    const hi = after < children.length ? (chosen[after] as number) : olds.length;
+    const gap = olds.flatMap((_, k) => (k > lo && k < hi && !used.has(k) ? [k] : []));
+    if (gap.length === r.length) {
+      r.forEach((i, n) => {
+        if (likeness(read[gap[n]], children[i], false) > 0) {
+          assign(i, gap[n]);
+        }
+      });
+    } else {
+      pairUp(r, gap);
+    }
+  }
+  pairUp(
+    children.flatMap((_, i) => (chosen[i] === undefined ? [i] : [])),
+    olds.flatMap((_, k) => (used.has(k) ? [] : [k])),
+  );
   return children.map((child, i) => {
     const j = chosen[i];
     return patchCond(doc, j === undefined ? undefined : olds[j], child);
   });
 }
 
-/** 元のノードと新しいノードがどれだけ似ているか。0 は別物（種類が違う）。1 から 2 の間で大きいほど近い */
-function likeness(old: CondNode, next: CondNode): number {
-  const family = (node: CondNode): string => (node.op === "glob" || node.op === "regex" ? "leaf" : node.op === "all" || node.op === "any" ? "group" : node.op);
-  if (family(old) !== family(next)) {
-    return 0;
+/**
+ * 元のノードと新しいノードがどれだけ似ているか。0 は別物。同じ種類なら 1 から 2 の間で大きいほど近い。
+ * not や all / any で包んだ・外した組は、中身の似かたの半分（0 から 1）。
+ *
+ * `strict` のときは、種類が同じでも中身が重ならなければ 0 にする（葉なら文字が前か後ろで 1 字も
+ * 揃わない、まとめなら似た子が 1 つも無い）。位置で決まらない組を当てるときに使う。
+ */
+function likeness(old: CondNode, next: CondNode, strict: boolean): number {
+  if (isLeaf(old) && isLeaf(next)) {
+    const text = textLikeness(old.pattern, next.pattern);
+    return strict && text === 0 ? 0 : 1 + text;
   }
-  if ((old.op === "glob" || old.op === "regex") && (next.op === "glob" || next.op === "regex")) {
-    return 1 + textLikeness(old.pattern, next.pattern);
-  }
-  if ((old.op === "all" || old.op === "any") && (next.op === "all" || next.op === "any")) {
-    const shared = next.children.filter((child) => old.children.some((o) => sameCond(o, child))).length;
-    return 1 + shared / Math.max(1, old.children.length, next.children.length);
+  if (isGroup(old) && isGroup(next)) {
+    // 同じまとめとして直したか、まとめをまとめで包んだかの、近いほう
+    return Math.max(groupLikeness(old, next, strict), ...next.children.map((child) => (isGroup(child) ? groupLikeness(old, child, strict) / 2 : 0)));
   }
   if (old.op === "not" && next.op === "not") {
-    return old.child === null || next.child === null ? 1 : 1 + likeness(old.child, next.child) / 2;
+    if (old.child === null || next.child === null) {
+      return 1;
+    }
+    const inner = likeness(old.child, next.child, strict);
+    return strict && inner === 0 ? 0 : 1 + inner / 2;
   }
-  return 1;
+  let score = 0;
+  // 包んだ: not の中身か、まとめの子のどれかが元のノードに似ている
+  if (next.op === "not" && next.child !== null) {
+    score = Math.max(score, likeness(old, next.child, strict) / 2);
+  }
+  if (isGroup(next)) {
+    score = Math.max(score, ...next.children.map((child) => likeness(old, child, strict) / 2));
+  }
+  // 外した: 元の not の中身が新しいノードに似ている
+  if (old.op === "not" && old.child !== null) {
+    score = Math.max(score, likeness(old.child, next, strict) / 2);
+  }
+  return score;
+}
+
+type CondLeaf = Extract<CondNode, { op: "glob" | "regex" }>;
+type CondGroup = Extract<CondNode, { op: "all" | "any" }>;
+
+function isLeaf(node: CondNode): node is CondLeaf {
+  return node.op === "glob" || node.op === "regex";
+}
+
+function isGroup(node: CondNode): node is CondGroup {
+  return node.op === "all" || node.op === "any";
+}
+
+/** まとめどうしの似かた。同じ中身の子の割合で 1 から 2。`strict` なら、似た子が 1 つも無いと 0 */
+function groupLikeness(old: CondGroup, next: CondGroup, strict: boolean): number {
+  const shared = next.children.filter((child) => old.children.some((o) => sameCond(o, child))).length;
+  if (strict && shared === 0 && (old.children.length > 0 || next.children.length > 0)) {
+    const near = next.children.some((child) => old.children.some((o) => likeness(o, child, true) > 0));
+    if (!near) {
+      return 0;
+    }
+  }
+  return 1 + shared / Math.max(1, old.children.length, next.children.length);
 }
 
 /** 2 つの文字の近さ（前と後ろで揃っている文字数の割合）。0 から 1 */

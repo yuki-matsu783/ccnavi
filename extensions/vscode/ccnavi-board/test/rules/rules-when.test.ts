@@ -453,3 +453,98 @@ deny:
   const renamed = doc.apply(withWhen(doc.model.sections, setPattern(tree, [1], "*/vault/*")));
   assert.ok(renamed.includes("        # B の理由\n        - glob: '*/vault/*'\n"), renamed);
 });
+
+test("CB-T347 子を消して似ていない文字へ別の子を直しても、消した子のコメントは他の子へ移らない", () => {
+  const text = `version: 1
+deny:
+  - id: three
+    match: Write
+    when:
+      any:
+        - glob: 'A' # A
+        - glob: 'B' # B
+        - glob: 'C' # C
+    message: m
+`;
+  const doc = readRules(text);
+  const tree = doc.model.sections.deny[0].when;
+  assert.ok(tree);
+  // A を消して、B を zzz に直す
+  const out = doc.apply(withWhen(doc.model.sections, setPattern(removeAt(tree, [0]), [0], "zzz")));
+  assert.ok(!out.includes("# A"), out);
+  assert.ok(out.includes("glob: 'C' # C"), out);
+  // A を消して、C を直す（消されていない子は元の相対順で対応する）
+  const out2 = doc.apply(withWhen(doc.model.sections, setPattern(removeAt(tree, [0]), [1], "zzz")));
+  assert.ok(!out2.includes("# A"), out2);
+  assert.ok(out2.includes("glob: 'B' # B"), out2);
+  assert.ok(out2.includes("glob: 'zzz' # C"), out2);
+  // A を消して末尾に足しても、足した子に A のコメントは付かない
+  const out3 = doc.apply(withWhen(doc.model.sections, addChild(removeAt(tree, [0]), [], leaf("glob", "D"))));
+  assert.ok(!out3.includes("# A"), out3);
+});
+
+test("CB-T348 先頭の子を消すと、その子の前置きコメントも消える（新しい先頭に残らない）", () => {
+  const text = `version: 1
+deny:
+  - id: three
+    match: Write
+    when:
+      any:
+        # A の理由
+        - glob: 'A'
+        - glob: 'B'
+    message: m
+`;
+  const doc = readRules(text);
+  const tree = doc.model.sections.deny[0].when;
+  assert.ok(tree);
+  const out = doc.apply(withWhen(doc.model.sections, removeAt(tree, [0])));
+  assert.ok(!out.includes("A の理由"), out);
+  assert.deepEqual(readRules(out).model.sections.deny[0].when, group("any", [leaf("glob", "B")]));
+  // 先頭を残して 2 番目を消したときは、先頭の前置きコメントは残る
+  const kept = doc.apply(withWhen(doc.model.sections, removeAt(tree, [1])));
+  assert.ok(kept.includes("# A の理由\n        - glob: 'A'"), kept);
+});
+
+test("CB-T349 根でないノードを not / all / any で包む・not を外すとき、そのノードと中の子のコメントは残る", () => {
+  const text = `version: 1
+deny:
+  - id: nested
+    match: Write
+    when:
+      all:
+        - glob: 'A' # A
+        # B の理由
+        - glob: 'B' # B
+        # G の理由
+        - any:
+            - glob: 'x' # x
+            - glob: 'y' # y
+        # N の理由
+        - not:
+            glob: 'n' # n
+    message: m
+`;
+  const doc = readRules(text);
+  const tree = doc.model.sections.deny[0].when;
+  assert.ok(tree);
+  const check = (next: CondNode, keep: readonly string[]): void => {
+    const out = doc.apply(withWhen(doc.model.sections, next));
+    for (const c of keep) {
+      assert.ok(out.includes(c), `${c}\n${out}`);
+    }
+    assert.deepEqual(readRules(out).model.sections.deny[0].when, next);
+  };
+  const all = ["# A", "# B", "B の理由", "G の理由", "# x", "# y", "N の理由", "# n"];
+  check(wrapNot(tree, [1]), all);
+  check(wrapGroup(tree, [1], "any"), all);
+  check(wrapGroup(tree, [2], "all"), all);
+  check(wrapGroup(tree, [2], "any"), all);
+  check(wrapNot(tree, [2]), all);
+  check(unwrapNot(tree, [3]), all);
+  check(wrapGroup(tree, [3], "any"), all);
+  // 根の all / any を包んでも残る
+  check(wrapGroup(tree, [], "any"), all);
+  check(wrapGroup(tree, [], "all"), all);
+  check(wrapNot(tree, []), all);
+});
