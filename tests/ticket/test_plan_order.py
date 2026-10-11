@@ -26,10 +26,15 @@ import yaml
 
 from ccnavi.tickets import agree_candidates, agree_screen, phase_forms, plan_order, ticket_model
 from ccnavi.tickets import ticket as ticket_mod
+from tests.ticket.test_board import _portable
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
-from tests.ticket.test_ticket import ROOT
+from tests.ticket.test_ticket import ROOT, write
 
 PLAN_REORDER = os.path.join(ROOT, "tests", "fixtures", "plan-reorder.json")
+# VS Code 拡張のワークフロー編集タブが読む `--plan-order` の答えの実例。
+PLAN_ORDER_FIXTURE = os.path.join(
+    ROOT, "extensions", "vscode", "ccnavi-board", "test", "fixtures", "plan-order.json"
+)
 
 # 3 項の一直線。research → design → implement。
 PLAN3 = ["research", {"type": "design", "after": [1]}, {"type": "implement", "after": [2]}]
@@ -833,6 +838,86 @@ class PlanOrderApprovedChildTest(PlanOrderHarness):
         self.assertFalse(os.path.exists(self.todo("i0001-02-01")))
         with open(approved, "rb") as f:
             self.assertEqual(f.read(), held)
+
+
+class PlanOrderFixtureTest(PlanOrderHarness):
+    """拡張のフィクスチャ（extensions/vscode/ccnavi-board/test/fixtures/plan-order.json）と同じ形。
+
+    ワークフロー編集タブが読む答えを並べる。開いたとき（`open`）、逆向きの線で番号と子が
+    動くとき（`reverse`）、循環で断るとき（`cycle`）、終端の検査で書けないとき（`loose`）、
+    改版で子が承認された番号があるとき（`revision`）、書いたとき（`written`）。形を変えたら
+    `CCNAVI_BOARD_FIXTURE=1` を付けてこのテストを走らせ、フィクスチャを書き直す。
+    """
+
+    PLAN = [
+        "research",
+        {"type": "design", "after": [1]},
+        {"type": "implement", "after": [1]},
+        {"type": "docs", "after": [2, 3]},
+    ]
+    FEEDBACK = ["design-feedback", {"type": "implement-feedback", "after": [5]}]
+    REVERSE = {"plan": {"1": [], "2": [1, 3], "3": [1], "4": [2]}}
+    # 走らせるたびに変わる値（一時ディレクトリのパスを含むハッシュ）。形だけ確かめて置き換える。
+    SHA = "<sha>"
+
+    def mask(self, body, root):
+        def walk(value):
+            if isinstance(value, dict):
+                return {
+                    k: (self.masked_sha(v) if k == "source_sha" else walk(v))
+                    for k, v in value.items()
+                }
+            if isinstance(value, list):
+                return [walk(v) for v in value]
+            return value
+
+        return walk(_portable(body, root))
+
+    def masked_sha(self, value):
+        self.assertRegex(value, r"^[0-9a-f]{64}$")
+        return self.SHA
+
+    def test_shapes_match_the_extension_fixture(self):
+        self.propose("i0001", parent_text("i0001", self.PLAN, feedback=self.FEEDBACK))
+        self.propose("i0001-02-01", child_text("i0001-02-01", "i0001", 2, ["wip/design/*"]))
+        self.propose("i0001-03-01", child_text("i0001-03-01", "i0001", 3, ["src/*"]))
+        bodies = {
+            "open": self.body(),
+            "reverse": self.body("--order", json.dumps(self.REVERSE)),
+            "cycle": self.body(
+                "--order", json.dumps({"plan": {"1": [4], "2": [1], "3": [1], "4": [2, 3]}})
+            ),
+            "loose": self.body("--order", json.dumps({"plan": {"2": [1], "3": [1], "4": [2]}})),
+        }
+        self.assertTrue(bodies["reverse"]["children"])
+        self.assertEqual([r["kind"] for r in bodies["cycle"]["refused"]], ["cycle"])
+        self.assertFalse(bodies["loose"]["writable"])
+        result = self.write_order(self.REVERSE)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        bodies["written"] = json.loads(result.stdout)
+        self.assertTrue(bodies["written"]["written"])
+        portable = {name: self.mask(body, self.root) for name, body in bodies.items()}
+        portable["revision"] = self.revision()
+        if os.environ.get("CCNAVI_BOARD_FIXTURE"):
+            write(PLAN_ORDER_FIXTURE, json.dumps(portable, ensure_ascii=False, indent=1) + "\n")
+        with open(PLAN_ORDER_FIXTURE, encoding="utf-8") as f:
+            fixture = json.load(f)
+        self.assertEqual(sorted(fixture), sorted(portable))
+        for name in sorted(portable):
+            self.assertEqual(fixture[name], portable[name], name)
+
+    def revision(self):
+        """改版の答え（1 番に子が承認されている＝固定した番号）。改版の道具を別に組んで読む。"""
+
+        class Revision(PlanOrderRevisionTest):
+            def runTest(self):
+                pass
+
+        harness = Revision()
+        harness.setUp()
+        self.addCleanup(harness.doCleanups)
+        order = {"plan": {"1": [], "2": [1, 4], "3": [1], "4": [1], "5": [2, 3, 4]}}
+        return self.mask(harness.body("--order", json.dumps(order)), harness.root)
 
 
 if __name__ == "__main__":
