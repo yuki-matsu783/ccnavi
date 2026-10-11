@@ -230,7 +230,7 @@ def check_core_paths(
         if here is not None and cwd:
             base = here if os.path.isabs(here) else os.path.join(cwd, here)
         for path in paths:
-            kind = _core_hit(conf, root, compiled, path, base)
+            kind = _core_hit(conf, root, compiled, path, base, sub)
             if kind:
                 return sub, path, CORE_INDEX if index and kind == CORE_HIT else kind
     return "", "", ""
@@ -348,7 +348,12 @@ def _core_targets(sub: str, args: list[str]) -> tuple[list[str], str, bool]:
 
 
 def _core_hit(
-    conf: settings.Settings, root: str, compiled: re.Pattern, path: str, base: str | None
+    conf: settings.Settings,
+    root: str,
+    compiled: re.Pattern,
+    path: str,
+    base: str | None,
+    sub: str = "rm",
 ) -> str:
     """パスの語 1 つが自己防衛の対象に当たるなら、理由の種類。
 
@@ -370,7 +375,7 @@ def _core_hit(
     full = os.path.normpath(os.path.join(base, word)) if base is not None else None
     if _in_store(conf, word, full):
         return CORE_STORE
-    if _in_review(conf, word, full):
+    if _in_review(conf, word, full, sub):
         return CORE_REVIEW
     if compiled.search("rm " + word):
         return CORE_HIT
@@ -396,13 +401,17 @@ def _in_store(conf: settings.Settings, word: str, full: str | None) -> bool:
     return False
 
 
-def _in_review(conf: settings.Settings, word: str, full: str | None) -> bool:
-    """レビュー待ちの置き場（とその下）を指すか、置き場に何かがあるときの置き場の親か。
+def _in_review(conf: settings.Settings, word: str, full: str | None, sub: str = "rm") -> bool:
+    """レビュー待ちの置き場（とその下）を指すか、置き場の親か。
 
     置き場はツリーごとにあり、どのツリーのものかは問わない（承認済みチケットの置き場と同じ）。
     親（`wip/`・`wip/proposals/`）を丸ごと消すと置き場ごと消える。空なら消えるものが無いので通す。
     チケットを閉じた後の案内（`ccnavi-git.sh rm -r wip`。ops._close_parent）がこの形で、そのとき
     レビュー待ちの子は残っていない（残っていれば親を閉じられない）。
+
+    空の親を通すのは `rm` だけ。`restore --source <ref>`・`checkout <ref> --` で親を戻すと、
+    いまは空でも、過去のコミットにあったレビュー待ちの提案が置き場に戻りうるので、中身に
+    依らず当てる。
     """
     tickets = (conf.tickets or settings.DEFAULT_TICKETS).replace("\\", "/").strip("/")
     review = f"{tickets}/{ticket_model.REVIEW}".lower()
@@ -419,7 +428,7 @@ def _in_review(conf: settings.Settings, word: str, full: str | None) -> bool:
         place = full if full is not None else (word if os.path.isabs(word) else None)
         for parent in parents:
             if text.endswith("/" + parent + "/"):
-                if place is None:
+                if place is None or sub != "rm":
                     return True
                 return _has_entries(os.path.join(place, *review[len(parent) + 1 :].split("/")))
     return False

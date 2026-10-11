@@ -616,6 +616,22 @@ class CorePathTest(unittest.TestCase):
         decision, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh rm -r wip")
         self.assertEqual(decision, "", reason)
 
+    def test_restoring_the_parent_of_an_empty_review_place(self):
+        """空の親を通すのは rm だけ。過去のコミットに戻すと、レビュー待ちの提案が戻りうる。"""
+        os.remove(os.path.join(self.root, "wip", "proposals", "review", "i0002.md"))
+        for args in (
+            "restore --source HEAD~1 wip",
+            "restore -s HEAD~1 wip/proposals",
+            "checkout HEAD~1 -- wip",
+            "checkout HEAD~1 wip/proposals",
+        ):
+            with self.subTest(args=args):
+                decision, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh " + args)
+                self.assertEqual(decision, "deny", reason)
+                self.assertIn("レビュー待ち", reason)
+        decision, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh restore --staged wip")
+        self.assertEqual(decision, "", reason)
+
     def test_unreadable_targets_stop(self):
         """対象を読み切れない形は、共通ルールの allow に落とさずに止める。"""
         for command, stops in (
