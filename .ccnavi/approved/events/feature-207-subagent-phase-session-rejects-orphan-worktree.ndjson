@@ -3,3 +3,6 @@
 {"at": "2026-10-11T18:47:02Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 1, "mark": "pending"}
 {"at": "2026-10-11T18:48:07Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 1, "mark": "requested"}
 {"at": "2026-10-11T18:50:43Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "actor": "yuki-matsu783", "phase": 1, "mark": "reviewed"}
+{"at": "2026-10-11T19:42:00Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 2, "mark": "pending"}
+{"at": "2026-10-11T19:43:06Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 2, "mark": "requested"}
+{"at": "2026-10-11T19:53:08Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "phase-reopened", "from": null, "to": null, "via": "board", "phase": 2, "cleared": ["requested", "pending"]}
