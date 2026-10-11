@@ -18,7 +18,7 @@ description: >-
 
 ## reference の置き場
 
-- 共通: `.claude/skills/reviewing/references/`
-- プロジェクト固有: `projects/<名前>/skills/reviewing/references/`
+- 共通: `.claude/skills/reviewing/references/common/`（プロジェクトの `skills/reviewing/references/common/` へ写される。プロジェクトの中では直さない）
+- そのリポジトリ固有: `references/project/`（ワークスペースは `.claude/skills/reviewing/references/project/`、プロジェクトは `projects/<名前>/skills/reviewing/references/project/`。写されない）
 
 中のディレクトリ構造は任意。足し方と書き方は `docs/claude/skill-concepts.md`。
