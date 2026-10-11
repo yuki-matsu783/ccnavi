@@ -565,6 +565,8 @@ def _read_local(root: str) -> tuple[dict | None, list[str]]:
         conf = json.loads(raw)
     except ValueError as exc:
         return None, [f"{LOCAL_FILE} が JSON として読めないので無視した ({exc})"]
+    except RecursionError:
+        return None, [f"{LOCAL_FILE} の入れ子が深すぎて読めないので無視した"]
     if not isinstance(conf, dict):
         return None, [f"{LOCAL_FILE} がオブジェクトではないので無視した"]
     return conf, []
@@ -611,7 +613,7 @@ def integration_local(root: str) -> str:
     try:
         with open(os.path.join(root, LOCAL_CLAUDE_SETTINGS), encoding="utf-8") as f:
             data = json.load(f)
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):
         return ""
     env = data.get("env") if isinstance(data, dict) else None
     value = env.get(INTEGRATION_ENV) if isinstance(env, dict) else None
@@ -674,7 +676,8 @@ def hook_view(root: str) -> HookView:
         try:
             with open(os.path.join(root, rel), encoding="utf-8") as f:
                 data = json.load(f)
-        except (OSError, ValueError):
+        except (OSError, ValueError, RecursionError):
+            # RecursionError は深い入れ子の JSON。読めないファイルと同じく飛ばす。
             continue
         env = data.get("env") if isinstance(data, dict) else None
         if not isinstance(env, dict):
@@ -724,7 +727,8 @@ def branch_prefixes(root: str) -> tuple[tuple, tuple]:
         try:
             with open(os.path.join(root, rel), encoding="utf-8") as f:
                 data = json.load(f)
-        except (OSError, ValueError):
+        except (OSError, ValueError, RecursionError):
+            # RecursionError は深い入れ子の JSON。読めないファイルと同じく飛ばす。
             continue
         env = data.get("env") if isinstance(data, dict) else None
         value = env.get(BRANCH_PREFIXES_ENV) if isinstance(env, dict) else None

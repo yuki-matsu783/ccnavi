@@ -189,7 +189,8 @@ def at_stop(
         if not findings:
             record.decision, record.reason = audit.SKIP, post.REASON_WORKTREE_UNREADABLE
             record.enforced = False
-        _remember(stderr, _unchecked_path(conf.state, payload.session_id, who), unchecked)
+        path = _unchecked_path(conf.state, payload.session_id, who)
+        _remember(stderr, path, payload.session_id, unchecked)
     # 着手のあとにフローが書き換わっていれば知らせる。行き先を追えないシェルの書き込みは
     # 止められないので、止めずに知らせる。
     changed = [n for n in (flow.changed_notice(conf, root, c) for c in targets) if n]
@@ -278,11 +279,11 @@ def unchecked_scope(state_dir: str, payload: hookio.Input) -> str:
         if path in seen:
             continue
         seen.add(path)
-        text = fsio.read_text(path, errors="replace")
-        if text is None:
+        found = _read_mark(path, payload.session_id)
+        if found is None:
             continue
         fsio.remove(path)
-        tickets = ", ".join(line for line in text.splitlines() if line)
+        tickets = ", ".join(found)
         if not tickets:
             # SubagentStop の処理が ccnavi の内部エラーで終わった回。どの子を見るはずだったかも
             # 分からない。
@@ -301,7 +302,12 @@ def unchecked_scope(state_dir: str, payload: hookio.Input) -> str:
 
 
 def _session_unchecked(state_dir: str, session: str) -> list[tuple[str, str]]:
-    """このセッションに残った、範囲を確かめられなかった印。相手の鍵とパスの組。"""
+    """このセッションに残った、範囲を確かめられなかった印。相手の鍵とパスの組。
+
+    ファイルの名前は前置きで候補を絞るだけ。セッションの識別子は名前に入れるときに字を
+    置き換えるうえ、`-` で区切るので別のセッションの名前も前置きに当たりうる。どのセッションの
+    印かは、読むときに中身の 1 行目（`_read_mark`）と完全一致で比べる。
+    """
     head = os.path.basename(_unchecked_path(state_dir, session, "x"))[: -len("x.unchecked")]
     try:
         names = sorted(os.listdir(state_dir))
@@ -337,7 +343,7 @@ def unchecked_after_error(
         if os.path.exists(path):
             # 例外の前に読めない子を書き終えていれば、そちらのほうが詳しい。
             return
-        failed = fsio.write_text(path, "")
+        failed = fsio.write_text(path, _mark_text(payload.session_id, []))
         if failed:
             stderr.write(f"ccnavi: 範囲を確かめられなかった印を書けない: {failed}\n")
 
@@ -347,10 +353,34 @@ def _unchecked_path(state_dir: str, session: str, who: str) -> str:
     return _bounce_path(state_dir, session, who)[: -len(".bounced")] + ".unchecked"
 
 
-def _remember(stderr: TextIO, path: str, tickets: list[str]) -> None:
+_MARK_SESSION = "session "
+
+
+def _mark_text(session: str, tickets: list[str]) -> str:
+    """印の中身。1 行目にセッションの識別子をそのまま書き、続けて子の識別子を 1 行に 1 つ。
+
+    子の識別子が無い（中身がセッションの行だけの）印は、SubagentStop が内部エラーで終わった回。
+    """
+    one_line = session.replace("\r", " ").replace("\n", " ")
+    return "".join(f"{line}\n" for line in [_MARK_SESSION + one_line, *tickets])
+
+
+def _read_mark(path: str, session: str) -> list[str] | None:
+    """このセッションの印なら子の識別子のリスト（内部エラーの回は空）。違う・無いなら None。"""
+    text = fsio.read_text(path, errors="replace")
+    if text is None:
+        return None
+    lines = text.splitlines()
+    one_line = session.replace("\r", " ").replace("\n", " ")
+    if not lines or lines[0] != _MARK_SESSION + one_line:
+        return None
+    return [line for line in lines[1:] if line]
+
+
+def _remember(stderr: TextIO, path: str, session: str, tickets: list[str]) -> None:
     if not os.path.dirname(path):
         return
-    failed = fsio.write_text(path, "\n".join(tickets) + "\n")
+    failed = fsio.write_text(path, _mark_text(session, tickets))
     if failed:
         stderr.write(f"ccnavi: 範囲を確かめられなかった印を書けない: {failed}\n")
 
