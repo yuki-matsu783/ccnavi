@@ -291,47 +291,38 @@ class DropTest(PhaseHarness):
 
     def test_keeps_the_worktree_with_ignored_files_other_than_build_outputs(self):
         """git が無視している .env などは worktree remove が黙って消すので、名指しして止める。
-        生成物（node_modules など）と直下の scratchpad/ は数えない。"""
+        生成物（node_modules など）は数えない。"""
         tree = self.worktree("i0002", "main")
-        write(os.path.join(tree, ".gitignore"), ".env\nscratchpad/\nnode_modules/\n")
+        write(os.path.join(tree, ".gitignore"), ".env\nnode_modules/\n")
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "ignore")
         write(os.path.join(tree, "node_modules", "x", "index.js"), "")
         write(os.path.join(tree, ".env"), "TOKEN=x\n")
-        write(os.path.join(tree, "scratchpad", "memo.md"), "メモ\n")
         dropped = self.drop("i0002")
         self.assertEqual(dropped.returncode, 1, dropped.stdout + dropped.stderr)
         self.assertIn("git が無視しているファイルがあるので、何も消さなかった", dropped.stdout)
         self.assertIn(".env", dropped.stdout)
-        self.assertNotIn("scratchpad", dropped.stdout)
         self.assertNotIn("node_modules", dropped.stdout)
         self.assertIn("退避", dropped.stdout)
         self.assertTrue(os.path.exists(os.path.join(tree, ".env")))
-        self.assertTrue(os.path.exists(os.path.join(tree, "scratchpad", "memo.md")))
         self.assertTrue(os.path.exists(os.path.join(tree, "node_modules", "x", "index.js")))
-        # .env を退避して打ち直せば、scratchpad/ の下書きごと消える
+        # .env を退避して打ち直せば消える
         os.remove(os.path.join(tree, ".env"))
         again = self.drop("i0002")
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertFalse(os.path.exists(tree))
 
-    def test_only_the_top_scratchpad_may_go_with_the_worktree(self):
-        """直下の scratchpad/ だけなら消える。入れ子の scratchpad/ は数えて止める。"""
+    def test_a_scratchpad_dir_is_counted_like_any_ignored_file(self):
+        """直下の scratchpad/ も、無視されていれば数えて止める（特別扱いは廃止した）。"""
         tree = self.worktree("i0002", "main")
         write(os.path.join(tree, ".gitignore"), "scratchpad/\n")
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "ignore")
-        write(os.path.join(tree, "docs", "scratchpad", "deep.md"), "x\n")
-        nested = self.drop("i0002")
-        self.assertEqual(nested.returncode, 1, nested.stdout + nested.stderr)
-        self.assertIn("docs/scratchpad/", nested.stdout)
-        os.remove(os.path.join(tree, "docs", "scratchpad", "deep.md"))
-        os.rmdir(os.path.join(tree, "docs", "scratchpad"))
-        os.rmdir(os.path.join(tree, "docs"))
         write(os.path.join(tree, "scratchpad", "memo.md"), "メモ\n")
-        dropped = self.drop("i0002")
-        self.assertEqual(dropped.returncode, 0, dropped.stdout + dropped.stderr)
-        self.assertFalse(os.path.exists(tree))
+        stopped = self.drop("i0002")
+        self.assertEqual(stopped.returncode, 1, stopped.stdout + stopped.stderr)
+        self.assertIn("scratchpad/", stopped.stdout)
+        self.assertTrue(os.path.exists(os.path.join(tree, "scratchpad", "memo.md")))
 
     def test_tracked_build_output_names_are_not_cleaned(self):
         """生成物の名前でも追跡されているもの（package.json の隣のコミット済みの out/ など）は

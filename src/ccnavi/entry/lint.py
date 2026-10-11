@@ -332,7 +332,6 @@ def check(
     problems.extend(_phases(conf))
     problems.extend(_risk(conf, root))
     problems.extend(lint_ticket._ticket(conf, root))
-    problems.extend(lint_places._scratch(conf, root))
     problems.extend(lint_places._projects(conf, root))
     # レイヤーの読み込みは判定と同じ経路（ruleload.survey）を通る。読めないレイヤーの苦情は
     # そこが書く標準エラーにも出るので、受け皿で受け取って二重に言わない。

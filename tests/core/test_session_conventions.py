@@ -75,7 +75,9 @@ class SessionConventionsTest(unittest.TestCase):
         git_sh = f"sh {self.root}/.ccnavi/scripts/ccnavi-git.sh"
         self.assertIn(git_sh, text)
         self.assertIn("迂回せず", text)
-        self.assertIn("scratchpad/", text)
+        self.assertIn("wip/scratchpad/", text)
+        self.assertIn("integrate が外す", text)
+        self.assertNotIn("追跡されず", text)
         self.assertIn("サブエージェントにバックグラウンドで任せる", text)
         self.assertIn("実装する前にユーザと合意する", text)
 
@@ -87,7 +89,7 @@ class SessionConventionsTest(unittest.TestCase):
         self.assertNotIn(GIT_LINE, text)
         self.assertNotIn("ccnavi-git.sh", text)
         # ほかの行は残る。
-        self.assertIn("scratchpad/", text)
+        self.assertIn("wip/scratchpad/", text)
         self.assertIn("実装する前にユーザと合意する", text)
 
     def test_行ごとに支えるdenyを見る(self):

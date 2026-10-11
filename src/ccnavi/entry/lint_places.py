@@ -1,5 +1,5 @@
-"""`--lint` のうち、置き場の検査。下書きの置き場が git に追跡されていないか、
-プロジェクトの置き場が正しい形か、走査されないチケットの置き場が残っていないかを見る。
+"""`--lint` のうち、置き場の検査。プロジェクトの置き場が正しい形か、
+走査されないチケットの置き場が残っていないかを見る。
 """
 
 from __future__ import annotations
@@ -8,85 +8,6 @@ import os
 
 from ..infra import gitcmd, gitstate, settings, tree
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
-from ..tickets import ticket_places
-
-
-def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
-    """下書きの置き場が、そのリポジトリの git に追跡されていないか。
-
-    実行前チェックはチケットの範囲を `scratchpad/` に当てない
-    （`ticket_places.is_scratch_place`）。外してよい根拠は「git が追跡しないので
-    統合先のブランチに乗らない」ことの 1 つだけ。
-
-    この警告で穴が無くなるわけではない。根拠が崩れた場合は、実行後チェックと
-    サブエージェント終了時チェックが `scratchpad/` の変更を範囲外として報告する（`is_unscoped` の
-    説明）。ここが言うのは、その報告が出はじめる前にユーザが気づけるようにするため。
-
-    問うのは 2 つ。追跡されているファイルが既にあるか（`git ls-files`）と、これから
-    書くものが追跡されるか（`git check-ignore`）。前者だけでは、まだ何も置いていない
-    リポジトリで見逃す。後者だけでは、`/{SCRATCH}/` を足す前から追跡されていたファイルを
-    見逃す（`.gitignore` は既に追跡されているファイルを対象にしない）。
-
-    見るのはワークスペースと各プロジェクトのそれぞれの git。プロジェクトは自分の
-    `.gitignore` を持つので、ワークスペース側の 1 行はそこまで及ばない。ワークツリーは見ない。
-    あちらはブランチごとに中身が変わるうえ、実行時に実行後チェックとサブエージェント
-    終了時チェックが拾うので、ここで数え上げると同じことを 2 度言うことになる。
-
-    チケット制御が切れているときは言わない。そのとき範囲の判定自体が動かない。
-
-    git が無ければ何も言わない。無いものを「入っていない」と報告すると、正しい設定に
-    苦情を出すことになる。
-    """
-    if not conf.tickets_enabled:
-        return []
-    problems: list[Problem] = []
-    # 前置きは `(scratch)` にする。プロジェクトのぶんも `(projects/<名前>)` は前置きにしない。
-    # あちらはそのレイヤーの設定についての苦情で、ここは追跡の話。同じ前置きにすると、
-    # 「レイヤーについて何も言わない」ことを見ているテストや読み手に、別の話が入り込む。
-    where = [("(scratch)", root)]
-    where += [
-        (f"(scratch/{p.name})", tree.project_root(conf.projects, p.name))
-        for p in tree.projects(conf.projects)
-    ]
-    place = ticket_places.SCRATCH
-    for name, home in where:
-        tracked = _tracked(home, place)
-        ignored = _ignored(home, place + "/")
-        if tracked:
-            why = f"`{place}/` に追跡されているファイルがある（{tracked}）"
-        elif ignored is False:
-            why = f"`{place}/` がこのリポジトリの git で無視されていない"
-        else:
-            continue
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                name,
-                f"{why}。実行前チェックはチケットの範囲をここに当てないので、追跡されて"
-                "いると、承認した範囲の外のファイルがコミットに入りうる。入ったぶんは"
-                "実行後チェックとサブエージェント終了時チェックが範囲外として報告するので、"
-                "下書きのたびに範囲外と報告される。"
-                f"このリポジトリの `.gitignore` に `/{place}/` を足して追跡から外すか"
-                "（プロジェクトのリポジトリに運用の痕跡を残したくないなら"
-                f" `.git/info/exclude` でもよい）、`{place}/` を使わずにチケットの範囲の"
-                "中で作業してください",
-            )
-        )
-    return problems
-
-
-def _tracked(root: str, rel: str) -> str:
-    """その置き場の下で git が追跡しているファイル 1 本。無ければ空。
-
-    `.gitignore` は既に追跡されているファイルを対象にしないので、無視の設定だけを見ても
-    「追跡されていない」は言えない。索引に何が入っているかを直接問う。
-    """
-    rc, out = gitcmd.output(root, ["ls-files", "--", rel + "/"], gitstate.TIMEOUT_SECONDS)
-    if rc != 0:
-        return ""
-    first = out.strip().splitlines()
-    return first[0] if first else ""
-
 
 # `projects/` がワークスペースの git の索引に載っているときの `(projects)` の warn の先頭の句。
 # ぶつかり（通常のファイル）と載せ忘れ（gitlink だけ）で共通にする。VS Code 拡張
@@ -198,9 +119,8 @@ def _index_under(root: str, rel: str) -> tuple[str, list[str]] | None:
     `ls-files -s -z` で読む。各行は `<mode> <oid> <stage>\\t<path>` で、`-z` なので
     パスの引用（`core.quotepath`）に左右されない。mode `160000` が gitlink で、それ以外
     （`100644`・`100755`・`120000`）は通常のファイル。衝突中の段で同じパスが並ぶのは 1 本に畳む。
-    git が無い・失敗したときは None（`_tracked` と同じく何も言わない）。
+    git が無い・失敗したときは None（何も言わない）。
 
-    `_tracked`（`_scratch` も使う）とは別に置く。あちらは 1 本目の名前だけを返し、mode を見ない。
     """
     rc, out = gitcmd.output(
         root, ["ls-files", "-s", "-z", "--", rel + "/"], gitstate.TIMEOUT_SECONDS

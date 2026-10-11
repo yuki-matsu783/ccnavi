@@ -478,8 +478,9 @@ def conventions(
             f"- git は直接呼ばず {git_sh} を通す。止められたら迂回せず、出力の案内に従う。"
         )
     lines.append(
-        f"- 下書きと使い捨てのファイルはワークツリーの {ticket_places.SCRATCH}/ に置く"
-        "（追跡されず、範囲外の変更としても報告されない）。"
+        f"- 下書きと使い捨てのファイルは、ワークツリーの中でも {ticket_places.SCRATCH}/ に置く"
+        "（追跡され、チケットの範囲では報告されない。統合のときに integrate が外す）。"
+        "コミットしたくないものはセッションのスクラッチパッドに置く。"
     )
     if tree.projects(conf.projects):
         home = os.path.relpath(conf.projects, root).replace("\\", "/")
