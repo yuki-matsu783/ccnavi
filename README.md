@@ -394,6 +394,10 @@ ccnavi の動作に依存する決まりなので、ワークスペースの `CL
 | 判定の記録 | `logs/decisions.jsonl`（ワークスペースルートの下） |
 | state | `logs/state/`（ワークスペースルートの下。実行後チェックの記録） |
 
+`projects/` のプロジェクトの作業も、ワークスペースルートで Claude Code を起動して `cd` で入る。プロジェクトの中で起動すると
+`CLAUDE_PROJECT_DIR` がプロジェクトになり、ワークスペースの `.claude/settings.json` が読まれず、ccnavi の hook が動かない
+（実測は `docs/design/multi-repo/to-measure.md`）。
+
 別の場所を指せるのはフラグ（`--log` / `--state` / `--approved` / `--tickets` / `--projects` /
 `--project-home`）だけで、hook からは渡らない。共通レイヤーの置き場（`.ccnavi/common/`）は `--project-home` で
 ccnavi ディレクトリを動かしても動かず、別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけ。
