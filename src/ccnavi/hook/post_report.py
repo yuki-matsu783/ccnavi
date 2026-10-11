@@ -23,6 +23,7 @@ def _violation(
     moved: str | None,
     would_restore: bool = False,
     not_restored: bool = False,
+    git: str = "git",
 ) -> str:
     """1 件を、それだけで読んで成立する差し戻しの文に組む。
 
@@ -47,7 +48,7 @@ def _violation(
         f"after: {_call(payload)}",
     ]
     if moved is None:
-        lines.append(f"undo: {gitstate.undo(change)}")
+        lines.append(f"undo: {gitstate.undo(change, git)}")
         if not_restored:
             lines.append(
                 "not-restored: "

@@ -285,11 +285,15 @@ def _full(top: str, path: str) -> str:
     return fsio.full_path(path, top)
 
 
-def undo(change: Change) -> str:
+def undo(change: Change, git: str = "git") -> str:
     """この 1 件を元に戻すコマンド。ユーザとエージェントが読む側。
 
     1 件に 1 つだけ返す。数えられる手順でないと、受け取った側は自分で
     組み立て直すことになり、そこで対象が増えたり減ったりする。
+
+    git は git の打ち方（`settings.git_command`）。git のラッパーがあるワークスペースでは
+    生の git が止まることがあるので、ラッパーで打てる形だけを書く。ラッパーは `rm -f` と
+    `clean` を通さないので、現れたファイルは索引から外す `restore --staged` とシェルの `rm` で消す。
     """
     if change.kind == KIND_COMMITTED:
         # コミット済みには 1 つに決まる手順が無い。空を返し、呼ぶ側が
@@ -298,10 +302,10 @@ def undo(change: Change) -> str:
         return ""
     quoted = f'"{change.path}"'
     if change.kind != KIND_NEW:
-        return f"git restore --staged --worktree -- {quoted}"
+        return f"{git} restore --staged --worktree -- {quoted}"
     if change.staged:
-        return f"git rm -f -- {quoted}"
-    return f"git clean -f -- {quoted}"
+        return f"{git} restore --staged -- {quoted} && rm -- {quoted}"
+    return f"rm -- {quoted}"
 
 
 def restore(top: str, change: Change, aside: str, timeout: float = WRITE_TIMEOUT_SECONDS) -> str:
