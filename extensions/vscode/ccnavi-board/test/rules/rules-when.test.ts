@@ -312,3 +312,37 @@ deny:
   const doc = readRules(text);
   assert.equal(doc.apply(doc.model.sections), text);
 });
+
+test("CB-T346 子を消してから別の子を直しても、消した子のコメントは直した子に付かない", () => {
+  const text = `version: 1
+deny:
+  - id: three
+    match: Write
+    when:
+      any:
+        # A の理由
+        - glob: '*.pem'
+        # B の理由
+        - glob: '*/secrets/*'
+        # C の理由
+        - glob: '*.key'
+    message: m
+`;
+  const doc = readRules(text);
+  const tree = doc.model.sections.deny[0].when;
+  assert.ok(tree);
+  // B を消して、C の文字を直す
+  const next = setPattern(removeAt(tree, [1]), [1], "*.keys");
+  const out = doc.apply(withWhen(doc.model.sections, next));
+  assert.ok(!out.includes("B の理由"), out);
+  assert.ok(out.includes("        # C の理由\n        - glob: '*.keys'\n"), out);
+  assert.ok(out.includes("        # A の理由\n        - glob: '*.pem'\n"), out);
+  // 消した子と別の種類の子を足したときも、消した子のノードを使い回さない
+  const swapped = addChild(removeAt(tree, [1]), [], group("all", [leaf("glob", "x")]));
+  const out2 = doc.apply(withWhen(doc.model.sections, removeAt(swapped, [1])));
+  assert.ok(!out2.includes("B の理由"), out2);
+  assert.ok(!out2.includes("C の理由"), out2);
+  // 直しただけ（数が同じ）なら、位置のとおりに当てる
+  const renamed = doc.apply(withWhen(doc.model.sections, setPattern(tree, [1], "*/vault/*")));
+  assert.ok(renamed.includes("        # B の理由\n        - glob: '*/vault/*'\n"), renamed);
+});

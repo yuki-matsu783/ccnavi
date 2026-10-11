@@ -370,7 +370,7 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
  * 両方書いてしまった `glob` も、そのまま残す。報告するのは lint）。
  *
  * 変えたときは `glob` / `regex` を消し、木を書く。元のノードは使い回す。子は、同じ中身のノードを先に
- * 拾い（消した・並べ替えた子のコメントが別の子へ付け替わらないように）、残りを同じ位置のノードに当てて
+ * 拾い（消した・並べ替えた子のコメントが別の子へ付け替わらないように）、残りを似たノードに当てて
  * 値だけを書き換える。新しい葉は単引用符で囲む。
  */
 function writeWhen(doc: Document, node: YAMLMap, tree: CondNode): void {
@@ -462,7 +462,14 @@ function patchCond(doc: Document, existing: unknown, tree: CondNode): Node {
   }
 }
 
-/** まとめの子を書く。同じ中身の元のノードを先に当て、残りは同じ位置（無ければ空いているもの）を使い回す */
+/**
+ * まとめの子を書く。同じ中身の元のノードを先に当てる（並べ替え・消しただけなら、これで全部決まる）。
+ *
+ * 残りの子（中身を直した・足した子）と残りの元のノード（直された・消された子）は、数が同じなら順に
+ * 当てる（直しただけ。種類が違えば当てずに新しいノードにする）。数が違うと、どれを消してどれを直したのかが位置では決まらない。位置で当てると
+ * 消した子のコメントが別の子に付くので、似ているもの（種類が同じで、葉なら文字が近い）どうしを当て、
+ * 似たものが無い子は新しいノードにする。
+ */
 function patchChildren(doc: Document, olds: readonly unknown[], children: readonly CondNode[]): Node[] {
   const read = olds.map((item) => condOfYaml(item));
   const used = new Set<number>();
@@ -474,21 +481,75 @@ function patchChildren(doc: Document, olds: readonly unknown[], children: readon
     }
     return undefined;
   });
-  return children.map((child, i) => {
-    let j = chosen[i];
-    if (j === undefined) {
-      if (i < olds.length && !used.has(i)) {
-        j = i;
-      } else {
-        const free = olds.findIndex((_, k) => !used.has(k));
-        j = free >= 0 ? free : undefined;
+  const restChildren = children.flatMap((_, i) => (chosen[i] === undefined ? [i] : []));
+  const restOlds = olds.flatMap((_, k) => (used.has(k) ? [] : [k]));
+  if (restChildren.length === restOlds.length) {
+    restChildren.forEach((i, n) => {
+      const k = restOlds[n];
+      if (likeness(read[k], children[i]) > 0) {
+        chosen[i] = k;
+        used.add(k);
       }
-      if (j !== undefined) {
-        used.add(j);
+    });
+  } else {
+    // 似ている組から順に当てる。同じ似かたなら位置の近い組
+    const pairs: { i: number; k: number; score: number }[] = [];
+    for (const i of restChildren) {
+      for (const k of restOlds) {
+        const score = likeness(read[k], children[i]);
+        if (score > 0) {
+          pairs.push({ i, k, score });
+        }
       }
     }
+    pairs.sort((a, b) => b.score - a.score || Math.abs(a.i - a.k) - Math.abs(b.i - b.k));
+    for (const { i, k } of pairs) {
+      if (chosen[i] === undefined && !used.has(k)) {
+        chosen[i] = k;
+        used.add(k);
+      }
+    }
+  }
+  return children.map((child, i) => {
+    const j = chosen[i];
     return patchCond(doc, j === undefined ? undefined : olds[j], child);
   });
+}
+
+/** 元のノードと新しいノードがどれだけ似ているか。0 は別物（種類が違う）。1 から 2 の間で大きいほど近い */
+function likeness(old: CondNode, next: CondNode): number {
+  const family = (node: CondNode): string => (node.op === "glob" || node.op === "regex" ? "leaf" : node.op === "all" || node.op === "any" ? "group" : node.op);
+  if (family(old) !== family(next)) {
+    return 0;
+  }
+  if ((old.op === "glob" || old.op === "regex") && (next.op === "glob" || next.op === "regex")) {
+    return 1 + textLikeness(old.pattern, next.pattern);
+  }
+  if ((old.op === "all" || old.op === "any") && (next.op === "all" || next.op === "any")) {
+    const shared = next.children.filter((child) => old.children.some((o) => sameCond(o, child))).length;
+    return 1 + shared / Math.max(1, old.children.length, next.children.length);
+  }
+  if (old.op === "not" && next.op === "not") {
+    return old.child === null || next.child === null ? 1 : 1 + likeness(old.child, next.child) / 2;
+  }
+  return 1;
+}
+
+/** 2 つの文字の近さ（前と後ろで揃っている文字数の割合）。0 から 1 */
+function textLikeness(a: string, b: string): number {
+  const longest = Math.max(a.length, b.length);
+  if (longest === 0) {
+    return 1;
+  }
+  let head = 0;
+  while (head < a.length && head < b.length && a[head] === b[head]) {
+    head += 1;
+  }
+  let tail = 0;
+  while (tail < a.length - head && tail < b.length - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) {
+    tail += 1;
+  }
+  return (head + tail) / longest;
 }
 
 /**
