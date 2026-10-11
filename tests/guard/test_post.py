@@ -929,6 +929,18 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("POST_VIOLATION", result.stderr)
 
+    def test_続きの行に置いた基準点の書き換えは言う(self):
+        # 1 行目だけを読むと空に見える書き方（`base_sha: |` の次の行に値）。値なしと読むと、
+        # 欄ごと比較から落ちて書き換えが報告されない。
+        block = TICKET.replace("---\nbody", "base_sha: |\n  1111111111111111\n---\nbody")
+        self.use(ticket_repo(text=block))
+        write(self.path(DOING), block.replace("1111111111111111", "2222222222222222"))
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+
     def test_着手の時刻の書き換えは言う(self):
         self.use(ticket_repo(text=STARTED))
         write(self.path(DOING), STARTED.replace("2026-09-21", "2026-09-20"))

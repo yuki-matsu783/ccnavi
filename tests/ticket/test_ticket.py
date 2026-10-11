@@ -3274,6 +3274,22 @@ class ScriptShapeTest(unittest.TestCase):
 
         self.assertEqual(ticket_fields.script_fields_set(placed), ("started_at", "base_sha"))
 
+    def test_続きの行に値がある欄は値を持つと数える(self):
+        # 1 行目だけを読むと空に見える書き方。値ありと数えないと、`base_sha` の書き換えが
+        # 正規化した内容から消える（続きの行は `script_shape` が欄と一緒に落とす）。
+        for first in ("|", ">-", "# c", "&a", "!!str", ""):
+            with self.subTest(first=first):
+                placed = self.started(f"base_sha: {first}\n  1111111111111111\n")
+
+                self.assertEqual(ticket_fields.script_fields_set(placed), ("base_sha",))
+
+    def test_読めない値は値を持つと数える(self):
+        for value in ("[" * 2000, '"' + "a" * 5000 + '"'):
+            with self.subTest(size=len(value)):
+                placed = self.started(f"base_sha: {value}\n")
+
+                self.assertEqual(ticket_fields.script_fields_set(placed), ("base_sha",))
+
 
 if __name__ == "__main__":
     unittest.main()

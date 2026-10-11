@@ -55,28 +55,39 @@ def script_fields_set(text: str) -> tuple[str, ...]:
     if end is None:
         return ()
     held = []
-    for line in lines[1:end]:
+    for i in range(1, end):
+        line = lines[i]
         if line.startswith((" ", "\t")) or ":" not in line:
             continue
         key, value = line.split(":", 1)
-        if key.strip() in ticket_model.SCRIPT_FIELDS and _has_value(value):
+        # 続きの字下げ行は `script_shape` が欄と一緒に落とす。続きがあれば値は 2 行目以降に
+        # あるかもしれない（`|` や `# c` の次の行など）ので、1 行目だけで値なしと読まない。
+        continued = i + 1 < end and lines[i + 1].startswith((" ", "\t"))
+        if key.strip() in ticket_model.SCRIPT_FIELDS and (continued or _has_value(value)):
             held.append(key.strip())
     return tuple(held)
 
 
+# 値なしかを YAML で読む表記の長さの上限。承認が置く空の欄は数文字なので、これを超えるものは
+# 読まずに値ありとする。巨大な表記を YAML に掛けると実行後チェックが止まる。
+_VALUE_PARSE_LIMIT = 1024
+
+
 def _has_value(raw: str) -> bool:
-    """欄の値の表記が、空でない値を持つか。
+    """欄の 1 行目の値の表記が、空でない値を持つか。
 
     承認（`approval_ops`）は欄を `started_at: ""` の形で置く。表記の字面で見ると `""` が
     値に見え、まだ書かれていない欄を「既に値がある」と数えて、`finish` の移動まで報告する。
-    YAML として読んで、空文字と null を値なしとする。読めない表記は値ありとする（除く欄が
-    減る側。報告は増えるが、外れすぎない）。
+    YAML として読んで、空文字と null を値なしとする。読めない表記・長すぎる表記は値ありとする
+    （除く欄が減る側。報告は増えるが、外れすぎない）。
     """
     if not raw.strip():
         return False
+    if len(raw) > _VALUE_PARSE_LIMIT:
+        return True
     try:
         value = yaml.safe_load(raw)
-    except yaml.YAMLError:
+    except (yaml.YAMLError, RecursionError, ValueError):
         return True
     return value is not None and value != ""
 
