@@ -412,10 +412,14 @@ class FlowRenderTest(unittest.TestCase):
         """別名は、C の読み手・純 Python の読み手・C から純 Python に回る文書のどれでも読まない。"""
         text = "base: &b {type: prompt}\nnodes:\n  - {<<: *b, id: s}\n"
         tabbed = 'x: "a\tb"\n' + text  # タブがあると C から純 Python に回る
+        deep = "a: " + "[" * 150 + "]" * 150 + "\n" + text  # DEPTH_LIMIT を超えて純 Python に回る
         for label, loader, doc in (
             ("default", yamlread.LOADER, text),
             ("pure", yaml.SafeLoader, text),
             ("falls back", yamlread.LOADER, tabbed),
+            ("deep", yamlread.LOADER, deep),
+            ("flow", yamlread.LOADER, "nodes: [*x]\n"),
+            ("later document", yamlread.LOADER, "a: 1\n---\nb: *x\n"),
         ):
             with self.subTest(label), mock.patch.object(yamlread, "LOADER", loader):
                 data, why = flow.parse(doc.encode("utf-8"))
