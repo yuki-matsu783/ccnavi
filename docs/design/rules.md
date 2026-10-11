@@ -3,7 +3,7 @@ type: design
 title: 5. ルール
 description: ルールファイルの書式、タイプの強さ、記法、対象の取り出し、どのルールファイルを引くか、読めないとき
 tags: [design-doc, rules]
-keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, 記法]
+keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, 記法]
 ---
 
 [設計書の入口に戻る](../design.md)
@@ -13,7 +13,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, 記法]
 ### 5.1 書式
 
 ルールファイルは YAML で、`version: 1` と `deny` / `ask` / `allow` の 3 つのリストを持つ。
-1 件は当てるツール（`match`）・探すもの（`glob` か `regex` の片方）・見つけたときに返す文を 1 組で持つ。
+1 件は当てるツール（`match`）・探すもの（`glob` `regex` `when` のどれか 1 つ）・見つけたときに返す文を 1 組で持つ。
 
 | 欄 | 意味 |
 |---|---|
@@ -21,6 +21,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, 記法]
 | `match` | ツール名を `\|` でつないだもの。`Bash` `PowerShell` `Read` `Edit` `Write` `NotebookEdit` `Grep` `Glob` `Skill` `Agent` `WebFetch`。ツールでない名前として `Stop`（メインエージェントのターンの終わり）。`Stop` を書けるのは `allow` だけ（6.6） |
 | `glob` | `fnmatch` の記法。文字列全体に当たる |
 | `regex` | Python の正規表現。`re.search`。先読み・後読み・後方参照は受け付けない |
+| `when` | 条件の木。`glob` / `regex` の葉を `all` / `any` / `not` で組む（5.3） |
 | `except` | 省略できる。`glob` か `regex` の片方だけを持つマッピングのリスト。本体に当たっても、どれかに当たれば当たらない扱い（5.3） |
 | `message` | `deny` だけ。必須。止められたモデルに届く「なぜ止めたか、代わりに何をするか」 |
 | `additionalContext` / `additionalContextOnce` | 当たるたび / 文脈で最初に当たったときだけ、モデルへ渡す文（6.6） |
@@ -84,7 +85,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, 記法]
 
 | 決まり | |
 |---|---|
-| 要素の形 | `glob` か `regex` のどちらか 1 つだけを持つマッピング。後で条件の組み合わせを足すときの葉と同じ形 |
+| 要素の形 | `glob` か `regex` のどちらか 1 つだけを持つマッピング。`when` の葉と同じ形 |
 | 読み方 | 本体と同じ（`{root}`、`{!root}`、大文字小文字の無視、先読み・後方参照の禁止、glob の翻訳） |
 | 当てる文字列 | 本体と同じ。`Bash` ならコマンド列の全体（実行役のコマンドの中のコマンドは、その層ごと）。除く語をコマンドのどこかに足すだけで外れるので、`Bash` / `PowerShell` の `deny` / `ask` に付けると `--lint` が warn |
 | `match` | 見方は変わらない。除くのは対象の文字列だけ |
@@ -92,6 +93,37 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, 記法]
 | 何にでも当たる要素 | `--lint` が warn。ルールがどの呼び出しにも当たらなくなる |
 | `{!root}` を組み立てられない要素 | error。`deny` / `ask` はその要素を外して使う（当たる範囲が広がり、止める側に外れる）。`allow` はルールごと使わない。本体を組み立てられなかった `deny` / `ask` は `except` を付けずに全部止める |
 | レイヤーの重複 | `except` も比べる。除くものだけが違う 2 本は別の定義として両方使う |
+
+`when` は本体を条件の木で書く欄（REQ-RUL-12）。ルールは `glob` / `regex` / `when` のちょうど 1 つを持つ。
+`except` は「A だが B は除く」しか書けず、「A か B」「A かつ B」は 1 本の式に詰めることになる。木はそれを葉に分けて書く。
+
+```yaml
+  - id: secrets
+    match: Write|Edit
+    when:
+      any:
+        - glob: '*.pem'
+        - all:
+            - glob: '*/secrets/*'
+            - not: {glob: '*.md'}
+    message: ...
+```
+
+| 決まり | |
+|---|---|
+| ノードの形 | 次のどれか 1 つのキーだけを持つマッピング。`glob: '…'` / `regex: '…'`（葉）、`all: [ノード, …]`、`any: [ノード, …]`（1 個以上）、`not: ノード` |
+| 葉の読み方 | 本体と同じ（`{root}`、`{!root}`、大文字小文字の無視、先読み・後方参照の禁止、glob の翻訳） |
+| 当てる文字列 | 葉はどれも本体と同じ文字列に `search` する。`Bash` / `PowerShell` ならコマンド列の全体で、実行役のコマンドの中のコマンドはその層ごと |
+| `except` との併用 | 書ける。意味は `all: [when, not: {any: except}]` |
+| 上限 | 入れ子 8 段（根が 1 段目）、ノード 64 個。判定は呼び出しのたびに木をたどるので、重くならないように頭打ちにする |
+| 書式の誤り | 知らないキー、キーが 0 個・2 個以上のノード、空のリスト、型の違う値（葉が空・文字列でない、`all` / `any` がリストでない、`not` がマッピングでない）、上限を超えた木、`glob` / `regex` と並べた `when`。ルールごと読み込まずに error で、位置を `when.any[1].not` の形で名指しする |
+| `{!root}` を組み立てられない葉 | error。`deny` / `ask` はルール全体を `match` の全部に当てて止め（`except` も付けない）、`allow` はルールごと使わない。葉だけ外す形は、`not` の下か上かで当たる範囲が広がるか狭まるかが変わり、向きが定まらないので採らない |
+| `--lint` | 何にでも当たる・何にも当たらないノード（`not` の下が何にでも当たる葉だけ、`any` の中に何にでも当たる葉など）を warn。`Bash` / `PowerShell` の `deny` / `ask` で `not` を含む木を warn（除く語をコマンドのどこかに足すだけで外れる） |
+| レイヤーの重複 | 葉の式と組み方の両方を比べる。`glob` で書いた 1 本と、同じ葉 1 つだけの `when` の 1 本は別の定義として扱う |
+| 一覧と記録 | `--explain` は 1 行（`when: any(glob '*.pem', …)`）で出し、葉が 3 つ以上なら続けて字下げで出す。`--test --json` などのルールの欄は `kind: when` と、書いた形の `when` を持つ |
+
+`except` と `when` の使い分け。「本体に当たっても、ここは除く」だけなら `except` で書く。並んだ除外を読むだけで
+意味が取れるからである。「A か B」「A かつ B」、除外の中にさらに例外がある形のように、組み合わせが要るときに `when` を使う。
 
 ### 5.4 対象の取り出し
 
