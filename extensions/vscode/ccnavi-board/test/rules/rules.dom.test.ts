@@ -788,3 +788,187 @@ deny:
     await dom.close();
   }
 });
+
+const WHEN_RULES = `version: 1
+deny:
+  - id: workspace-root
+    match: Write|Edit
+    when:
+      all:
+        - regex: '^{root}[\\\\/]'
+        - not:
+            any:
+              - regex: '^{root}[\\\\/]wip'
+              - glob: '{root}/.claude/worktrees/**'
+    message: main では編集しない
+  - id: except-rule
+    match: Write
+    regex: '^{root}[\\\\/]src'
+    except:
+      - glob: '{root}/src/gen/**'
+    message: 生成物以外は直さない
+`;
+
+/** 中が空の any を持つ木（誤りの見本） */
+const BROKEN_WHEN = `version: 1
+deny:
+  - id: workspace-root
+    match: Write|Edit
+    when:
+      all:
+        - regex: '^{root}[\\\\/]'
+        - not:
+            any: []
+    message: main では編集しない
+`;
+
+/** 条件の木の点を押して選ぶ */
+async function pickCond(dom: DomPage, id: string, key: string): Promise<void> {
+  dom.click(dom.one(`${rowSelector(id)} .cond-node[data-key="${key}"]`));
+  await dom.settle();
+}
+
+test("CB-D155 条件の木のルールは、畳んだ行に木の要約、開いた行に左から右へ伸びる図を出す。誤りは件数と一覧で言う", async () => {
+  const dom = await openRules({ model: readRules(WHEN_RULES).model }, undefined, { measure: true });
+  try {
+    const row = rowSelector("workspace-root");
+    assert.equal(dom.one(`${row} .sum-when`).textContent, "all(regex ^{root}[\\\\/], not(any(2)))");
+    assert.equal(dom.all(`${row} .sum-when-error`).length, 0);
+    assert.equal(dom.all(`${row} .cond-node`).length, 0, "畳んだ行には図を置かない");
+    dom.click(dom.one(`${row} .row-head`));
+    await dom.settle();
+    assert.deepEqual(
+      dom.all(`${row} .cond-node`).map((node) => `${node.getAttribute("data-key")} ${node.getAttribute("data-op")}`),
+      ["r all", "r.0 regex", "r.1 not", "r.1.0 any", "r.1.0.0 regex", "r.1.0.1 glob"],
+    );
+    assert.equal(dom.all(`${row} .react-flow__edge`).length, 5);
+    // 最初は根が選ばれていて、根は消せない
+    assert.equal(dom.one(`${row} .cond-inspector`).getAttribute("data-key"), "r");
+    assert.ok(dom.one<HTMLButtonElement>(`${row} .cond-inspector [data-op-action="remove"]`).disabled);
+    assert.equal(dom.all(`${row} .cond-problems li`).length, 0);
+    // パターンの欄と「条件の木に変換」は出さない
+    assert.equal(dom.all(`${row} .f-pattern`).length, 0);
+    assert.equal(dom.all(`${row} button[data-action="to-when"]`).length, 0);
+  } finally {
+    await dom.close();
+  }
+  const bad = await openRules({ model: readRules(BROKEN_WHEN).model }, undefined, { measure: true });
+  try {
+    const row = rowSelector("workspace-root");
+    assert.equal(bad.one(`${row} .sum-when-error`).textContent, "木に誤り 1");
+    bad.click(bad.one(`${row} .row-head`));
+    await bad.settle();
+    assert.deepEqual(bad.all(`${row} .cond-problems li`).map((li) => li.textContent), ["any の中が空です（1 個以上）"]);
+    assert.ok(bad.one(`${row} .cond-node[data-key="r.1.0"]`).classList.contains("broken"));
+    // 誤りを押すとその点が選ばれ、子を足せば誤りが入れ替わる
+    bad.click(bad.one(`${row} .cond-problems button`));
+    await bad.settle();
+    assert.equal(bad.one(`${row} .cond-inspector`).getAttribute("data-key"), "r.1.0");
+    bad.click(bad.one(`${row} .cond-inspector button[data-add="glob"]`));
+    await bad.settle();
+    assert.deepEqual(bad.all(`${row} .cond-problems li`).map((li) => li.textContent), ["glob が空です"]);
+    assert.equal(bad.one(`${row} .cond-inspector`).getAttribute("data-key"), "r.1.0.0", "足した子が選ばれる");
+  } finally {
+    await bad.close();
+  }
+});
+
+test("CB-D156 図で木を直して保存する（葉の文字・glob ⇄ regex・all ⇄ any・子の追加・not で包む・削除）", async () => {
+  const dom = await openRules({ model: readRules(WHEN_RULES).model }, undefined, { measure: true });
+  try {
+    const row = rowSelector("workspace-root");
+    dom.click(dom.one(`${row} .row-head`));
+    await dom.settle();
+    // 葉の文字を変え、glob → regex
+    await pickCond(dom, "workspace-root", "r.1.0.1");
+    dom.type(dom.one(`${row} .cond-inspector .f-cond-pattern`), "{root}/.git/**");
+    await dom.settle();
+    dom.change(dom.one(`${row} .cond-inspector select.f-cond-op`), "regex");
+    await dom.settle();
+    assert.equal(dom.one(`${row} .cond-node[data-key="r.1.0.1"]`).getAttribute("data-op"), "regex");
+    // any → all にして、子（glob）を足して文字を入れる
+    await pickCond(dom, "workspace-root", "r.1.0");
+    dom.change(dom.one(`${row} .cond-inspector select.f-cond-op`), "all");
+    await dom.settle();
+    dom.click(dom.one(`${row} .cond-inspector button[data-add="glob"]`));
+    await dom.settle();
+    dom.type(dom.one(`${row} .cond-inspector .f-cond-pattern`), "*.md");
+    await dom.settle();
+    // 本体を not で包む
+    await pickCond(dom, "workspace-root", "r.0");
+    dom.click(dom.one(`${row} .cond-inspector [data-op-action="wrap"]`));
+    await dom.settle();
+    assert.equal(dom.one(`${row} .cond-node[data-key="r.0"]`).getAttribute("data-op"), "not");
+    assert.equal(dom.one(`${row} .cond-node[data-key="r.0.0"]`).getAttribute("data-op"), "regex");
+    // 子を消す
+    await pickCond(dom, "workspace-root", "r.1.0.0");
+    dom.click(dom.one(`${row} .cond-inspector [data-op-action="remove"]`));
+    await dom.settle();
+    assert.equal(dom.one(`${row} .cond-inspector`).getAttribute("data-key"), "r.1.0", "消したら親が選ばれる");
+    assert.equal(dom.one(`${row} .sum-when`).textContent, "all(not(regex ^{root}[\\\\/]), not(all(2)))");
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    assert.deepEqual(savedSections(dom).deny[0].when, {
+      op: "all",
+      children: [
+        { op: "not", child: { op: "regex", pattern: "^{root}[\\\\/]" } },
+        {
+          op: "not",
+          child: {
+            op: "all",
+            children: [
+              { op: "regex", pattern: "{root}/.git/**" },
+              { op: "glob", pattern: "*.md" },
+            ],
+          },
+        },
+      ],
+    });
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D157 glob / regex と除外のルールは「条件の木に変換」で木になり、除外は木の中へ移る。判定を試すも木のまま送る", async () => {
+  const dom = await openRules({ model: readRules(WHEN_RULES).model }, undefined, { measure: true });
+  try {
+    const row = rowSelector("except-rule");
+    dom.click(dom.one(`${row} .row-head`));
+    await dom.settle();
+    assert.equal(dom.all(`${row} .f-except code`).length, 1);
+    dom.click(dom.one(`${row} button[data-action="to-when"]`));
+    await dom.settle();
+    assert.equal(dom.all(`${row} .f-pattern`).length, 0);
+    assert.equal(dom.all(`${row} .f-except`).length, 0, "除外は木の中へ移ったので欄を出さない");
+    assert.deepEqual(
+      dom.all(`${row} .cond-node`).map((node) => `${node.getAttribute("data-key")} ${node.getAttribute("data-op")}`),
+      ["r all", "r.0 regex", "r.1 not", "r.1.0 any", "r.1.0.0 glob"],
+    );
+    assert.equal(dom.one(`${row} .sum-when`).textContent, "all(regex ^{root}[\\\\/]src, not(any(1)))");
+    assert.ok(!dom.one<HTMLButtonElement>("#save").disabled);
+    dom.click(dom.one("#tab-judge"));
+    await dom.settle();
+    dom.type(dom.one("#subject"), "/ws/src/a.ts");
+    await dom.settle();
+    dom.click(dom.one('button[data-action="judge"]'));
+    await dom.settle();
+    const judge = dom.posted.filter((m) => m.type === "judge").pop();
+    assert.ok(judge);
+    const sent = (judge.sections as Sections).deny[1];
+    assert.equal(sent.dropExcept, true);
+    assert.equal(sent.excepts, undefined);
+    assert.deepEqual(sent.when, {
+      op: "all",
+      children: [
+        { op: "regex", pattern: "^{root}[\\\\/]src" },
+        { op: "not", child: { op: "any", children: [{ op: "glob", pattern: "{root}/src/gen/**" }] } },
+      ],
+    });
+    // 書き戻すと except が消え、when が入る（拡張ホストは送られた形をそのまま書く）
+    const text = readRules(WHEN_RULES).apply(judge.sections as Sections);
+    assert.ok(!text.includes("except:"), text);
+    assert.deepEqual(readRules(text).model.sections.deny[1].when, sent.when);
+  } finally {
+    await dom.close();
+  }
+});
