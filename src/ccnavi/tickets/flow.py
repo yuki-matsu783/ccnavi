@@ -100,6 +100,7 @@ import stat
 import yaml
 
 from ..infra import fsio, settings, tree, yamlread
+from ..records import diaglog
 from . import flow_render, flow_shape, flow_text, ticket_model
 
 # ロックで止めたときの理由コードと、記録のルール名。
@@ -765,6 +766,10 @@ def changed_notice(conf: settings.Settings, root: str, child: ticket_model.Ticke
     知らせるだけで止めない（厳しくする向き）。ロックと承認済みの領域の保護は Write / Edit と、
     パスの出るシェルの書き込みを止めるが、行き先を追えないシェルの書き込みは止まらない
     （M-2）。記録が無い（この仕組みより前に着手した）子には何も言わない。例外は外に出さない。
+
+    例外で確かめられなかった回は、診断ログに残し、確かめられなかったことを 1 行で言う。
+    何も言わないと「書き換わっていない」と同じ見え方になり、知らせの役目を果たせない。
+    SubagentStart で読めないフローを 1 行で言うのと同じ扱い。
     """
     try:
         if not (child.is_child and child.in_progress):
@@ -785,8 +790,16 @@ def changed_notice(conf: settings.Settings, root: str, child: ticket_model.Ticke
             "手順が食い違っているかもしれない。誰が書き換えたかをユーザが確かめてください"
             "（ロックは Write / Edit を止めるが、シェルから行き先を追えない形で書くと止まらない）"
         )
-    except Exception:  # noqa: BLE001  知らせのために hook を止めない
-        return ""
+    except Exception as exc:  # noqa: BLE001  知らせのために hook を止めない
+        kind = type(exc).__name__
+        diaglog.get("ccnavi", root).warn(
+            "フローの書き換えを確かめられない", ticket=child.ticket, error=kind
+        )
+        return (
+            f"[ccnavi] {CODE_CHANGED}: 子チケット {flow_text.clean(child.ticket)} のフローが着手の"
+            f"あとに書き換わったかを、ccnavi の内部エラー（{kind}）で確かめられなかった。"
+            "ユーザが確かめてください"
+        )
 
 
 def briefing(

@@ -28,10 +28,11 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from ccnavi.hook.subagent import CANDIDATE_NOTE
 from ccnavi.infra import settings, shellread
-from ccnavi.tickets import approval, phase_forms, review, ticket_fields
+from ccnavi.tickets import approval, phase_forms, phase_scope, review, ticket_fields
 from tests import ROOT, common_path, common_sh
 from tests.inproc import run_ccnavi
 
@@ -3181,6 +3182,42 @@ class TicketTest(unittest.TestCase):
         }
         result = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
         self.assertIn("差し戻されたまま", self.reason(result))
+
+    def test_parent_hears_when_the_scope_could_not_be_checked(self):
+        """SubagentStop で子のワークツリーを読めなかった回は、止めずに記録で許可と分け、
+        親に 1 行言う。"""
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
+        log = os.path.join(self.root, "decisions.jsonl")
+        stop = {
+            "hook_event_name": "SubagentStop",
+            "cwd": child,
+            "session_id": "s1",
+            "agent_id": "sub-7",
+        }
+        with mock.patch.object(phase_scope, "scope_findings", return_value=([], "読めない")):
+            done = self.ccnavi("--mode", "enable", "--log", log, stdin=json.dumps(stop))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        with open(log, encoding="utf-8") as f:
+            row = json.loads(f.read().splitlines()[-1])
+        self.assertEqual(row["decision"], "skip")
+        self.assertEqual(row["reason"], "worktree-unreadable")
+        self.assertIn("i0001-01-01", row["detail"])
+        payload = {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Agent",
+            "cwd": self.parent_tree,
+            "session_id": "s1",
+            "tool_input": {"description": "子"},
+            "tool_response": {"agentId": "sub-7"},
+        }
+        result = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+        said = self.reason(result)
+        self.assertIn("worktree-unreadable", said)
+        self.assertIn("i0001-01-01", said)
+        # 印は読んだら消す。2 度目は言わない。
+        again = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+        self.assertNotIn("worktree-unreadable", self.reason(again))
 
     # ---- 診断
 

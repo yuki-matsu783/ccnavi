@@ -21,6 +21,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
 import yaml
 
@@ -310,6 +311,17 @@ class FlowDigestTest(FlowHarness):
             self.assertIn(CHANGED, out["systemMessage"])
             self.assertIn(flow.CODE_CHANGED, out["systemMessage"])
             self.assertIn(CHILD, out["systemMessage"])
+
+    def test_a_check_that_fails_is_reported_not_kept_silent(self):
+        """比べる途中の例外は、黙らずに「確かめられなかった」を言う。止めない。"""
+        child_tree = self.run_child(CHILD)
+        with mock.patch.object(flow, "fingerprint", side_effect=OSError("x")):
+            start, stop = self.start_and_stop(child_tree)
+        for result in (start, stop):
+            self.assertEqual(result.returncode, 0, result.stderr)
+            out = json.loads(result.stdout)
+            self.assertIn("確かめられなかった", out["systemMessage"])
+            self.assertIn("OSError", out["systemMessage"])
 
     def test_a_removed_or_replaced_flow_is_reported(self):
         child_tree = self.run_child(CHILD)

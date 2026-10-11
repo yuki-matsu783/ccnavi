@@ -84,6 +84,7 @@ _SESSION_AND_KEY = (
     ("once-", ".json"),  # ctxfile._once_path
     ("approved-", ".json"),  # 承認を伝えた記録（今は書かない。残ったものを掃く）
     ("subagent-", ".bounced"),  # subagent._bounce_path
+    ("subagent-", ".unchecked"),  # subagent._unchecked_path
 )
 # `<セッション>.json`（post._seen_path）。Claude Code のセッションは UUID なので、その形に
 # 限る。`.+` で読むと、置き場に置かれた別のファイル（`package.json`、レビューの結果の

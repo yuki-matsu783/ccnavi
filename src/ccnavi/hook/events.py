@@ -522,6 +522,9 @@ def decide_after(
         # サブエージェントが差し戻しを無視して終わったなら、親にそれを言う。
         # 差し戻しは 1 回きりなので、2 度目の終了は何も言われずに通っている。
         bounced = subagent.ignored_bounce(conf.state, payload)
+        # 範囲を確かめられないまま終わったことも、同じ経路で親に言う。
+        unchecked = subagent.unchecked_scope(conf.state, payload)
+        bounced = "\n\n".join(p for p in (bounced, unchecked) if p)
         if bounced:
             text = f"{text}\n\n{bounced}" if text else bounced
     if not text:

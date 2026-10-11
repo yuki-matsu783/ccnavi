@@ -218,6 +218,14 @@ class ChildPushTest(unittest.TestCase):
         reason = self.hook(self.root, 'cd "$X" && ' + " ".join(GIT + ["push"]))
         self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
 
+    def test_refusal_names_the_builtin_rule(self):
+        # 文面の先頭に、記録の `rules` と同じ識別子を出す。
+        reason = self.hook(self.root, 'cd "$X" && ' + " ".join(GIT + ["push"]))
+        self.assertIn(
+            f"[ccnavi] {wrapguard.CODE_CHILD_PUSH} (builtin rule: {wrapguard.CHILD_PUSH_RULE_ID})",
+            reason,
+        )
+
     def test_symlinked_workspace(self):
         # 論理のパスと実際のパスを混ぜると外れる。cwd が symlink 越しでも止める。
         self.place("parent-doing")
