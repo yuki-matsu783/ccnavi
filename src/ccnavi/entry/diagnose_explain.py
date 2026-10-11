@@ -122,7 +122,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     """
     views = ruleload.survey(stderr, conf, root)
     source = builtin.SOURCE if views[0].unreadable else conf.rules
-    stdout.write(f"ccnavi: いま効いている宣言（出所 {source}）\n")
+    stdout.write(f"ccnavi: いま有効な宣言（出所 {source}）\n")
     stdout.write(
         "  パスを持つツールは共通レイヤー + 行き先のレイヤー、"
         "持たないツールは全部のレイヤーの和で判定する"

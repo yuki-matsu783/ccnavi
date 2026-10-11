@@ -588,7 +588,7 @@ class SecondReviewTest(ReadyHarness):
         self.commit_parent("退避")
         git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
         linted = self.ccnavi("--lint")
-        self.assertIn("i0001 のワークツリーが elsewhere の上に居る", linted.stdout + linted.stderr)
+        self.assertIn("i0001 のワークツリーが elsewhere の上にある", linted.stdout + linted.stderr)
 
 
 class SecondReviewModuleTest(ArchiveTreeHarness):

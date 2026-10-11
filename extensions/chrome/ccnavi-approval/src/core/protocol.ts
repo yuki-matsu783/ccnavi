@@ -521,7 +521,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       }
       const head = await x.branchHead(client, o, r, integ);
       if (head === null) return refuse(`統合先 ${integ} がリモートに無い`);
-      if (github.checkOid(b) !== head) return refuse(`統合先 ${integ} の先頭が、ボードで読んだときから動いている。ボードを更新してから始め直してください`);
+      if (github.checkOid(b) !== head) return refuse(`統合先 ${integ} の先頭が、ボードで読んだときから更新されている。ボードを更新してから始め直してください`);
       // 統合先の今の先頭で確かめ直す（Python の答えを信頼しない）: 大文字小文字をそろえた重なり・閉じた識別子・互換の版
       const folded = fold(name);
       const same = (await x.branchNames(client, o, r)).filter((n) => fold(n) === folded);

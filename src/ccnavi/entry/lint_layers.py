@@ -46,7 +46,7 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
                     where,
                     f"{view.path} を読めない ({view.unreadable})。"
                     "このレイヤーは空として扱っている。"
-                    "共通レイヤーだけで判定しているので、ここに書いた宣言は 1 件も効いていない",
+                    "共通レイヤーだけで判定しているので、ここに書いた宣言は 1 件も使われていない",
                 )
             )
             continue
@@ -139,7 +139,7 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
                     f"({tree.WORKTREES_DIR.replace(os.sep, '/')}/{work.name})",
                     f"{conf.project_home}/{rel} はワークツリーにしかない。判定が読むのは"
                     "元リポジトリの版なので、このファイルは統合されるまで"
-                    "効かない",
+                    "有効にならない",
                 )
             )
     return problems
@@ -219,7 +219,7 @@ def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem
             Problem(
                 SEVERITY_WARN,
                 f"({tree.WORKTREES_DIR.replace(os.sep, '/')}/{work.name})",
-                f"親 {work.name} のワークツリーが {branch or '（ブランチの外）'} の上に居る。"
+                f"親 {work.name} のワークツリーが {branch or '（ブランチの外）'} の上にある。"
                 f"{named}で、取り込み（ccnavi-sync.sh）と"
                 "正とする側の検査はそのブランチだけを見る。"
                 "親が閉じるのを待ってから、ブランチを切り替えてください",

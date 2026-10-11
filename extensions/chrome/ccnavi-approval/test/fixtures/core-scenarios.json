@@ -33,7 +33,7 @@
      }
     ]
    },
-   "digest": "729cc5d185777e27da908678ce501fe841ee854ebf53d2a9b1eb683c7f1b54d3",
+   "digest": "be319adc478965c4fbf6772cdb7b91ece1ac9f0c8d48a51e096665f7a07d7d7d",
    "family": "i0001",
    "identifiers": [
     "i0001",
@@ -47,7 +47,7 @@
    "rejected": [],
    "schema": 1,
    "stopped": null,
-   "text": "チケットの承認リクエスト: 2 件\n\n== i0001: 親  親チケット\n■ このチケットで編集可能な範囲\n    下に並ぶ場所にだけ、このチケットで編集できるようになる。allow は無確認で編集できる場所、ask は確認を挟んで編集できる場所、deny はこのチケットでも編集できない場所\n    ルールの allow で許可してある場所も、この範囲の外では止まる。ルールの deny はこの範囲の中でも止まる\n    allow: src/*, wip/*, tests/*\n■ 全体計画\n    承認すると、この順序で進めることに合意したことになる。各フェーズの子は、そのフェーズが待つフェーズ（下の待ち方）が閉じてレビューが済むまで承認できない\n    1. 調査 / research  レビュー不要\n    2. 設計 / design  レビュー要: マージリクエスト\n■ 待ち方（計画の項の after から決まる。後から phases.yml を直しても変わらない）\n    1: research — 何も待たない\n    2: design — 待つ: 1\n■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）\n    承認したときの phases.yml と同じ中身を親に写して固定する。後から phases.yml を直しても、この親の範囲・見る場所・成果物は変わらない\n    調査 / research  review: none、scope: wip/research/*、deliverables: wip/research/summary.md、使う番号: 1\n    設計 / design  review: mr、scope: wip/design/*、使う番号: 2\n■ この親では使わない定義（phases.yml にあるが phases: に無い）\n    使わない: 受入テスト作成 / acceptance、実装とテスト / implement、実装フィードバック対応 / implement-feedback、片付け / chores、片付けフィードバック対応 / chores-feedback\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md\n\n== i0001-01-01: 子 i0001-01-01  親 i0001 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲に無い場所がここで新しく編集できるようになることはない\n    親の範囲: src/*, wip/*, tests/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-01.md"
+   "text": "チケットの承認リクエスト: 2 件\n\n== i0001: 親  親チケット\n■ このチケットで編集可能な範囲\n    下に並ぶ場所にだけ、このチケットで編集できるようになる。allow は無確認で編集できる場所、ask は確認を挟んで編集できる場所、deny はこのチケットでも編集できない場所\n    ルールの allow で許可してある場所でも、この範囲の外では止まる。ルールの deny はこの範囲の中でも止まる\n    allow: src/*, wip/*, tests/*\n■ 全体計画\n    承認すると、この順序で進めることに合意したことになる。各フェーズの子は、そのフェーズが待つフェーズ（下の待ち方）が閉じてレビューが済むまで承認できない\n    1. 調査 / research  レビュー不要\n    2. 設計 / design  レビュー要: マージリクエスト\n■ 待ち方（計画の項の after から決まる。後から phases.yml を直しても変わらない）\n    1: research — 何も待たない\n    2: design — 待つ: 1\n■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）\n    承認したときの phases.yml と同じ中身を親に写して固定する。後から phases.yml を直しても、この親の範囲・見る場所・成果物は変わらない\n    調査 / research  review: none、scope: wip/research/*、deliverables: wip/research/summary.md、使う番号: 1\n    設計 / design  review: mr、scope: wip/design/*、使う番号: 2\n■ この親では使わない定義（phases.yml にあるが phases: に無い）\n    使わない: 受入テスト作成 / acceptance、実装とテスト / implement、実装フィードバック対応 / implement-feedback、片付け / chores、片付けフィードバック対応 / chores-feedback\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md\n\n== i0001-01-01: 子 i0001-01-01  親 i0001 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲に無い場所がここで新しく編集できるようになることはない\n    親の範囲: src/*, wip/*, tests/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-01.md"
   },
   "request": {
    "family": "i0001",
@@ -297,7 +297,7 @@
    ],
    "lines": [
     "  i0001 のフィードバック計画を改版した",
-    "  全体計画の最後のレビューを済んだ扱いにした。残った指摘はフィードバック作業フェーズの confirm が数える",
+    "  全体計画の最後のレビューを済ませた扱いにした。残った指摘はフィードバック作業フェーズの confirm が数える",
     "\n承認した。.ccnavi/approved/doing/ へ動かした。"
    ],
    "mismatch": null,

@@ -281,7 +281,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   // 共通の設定に phases.yml があれば、実行ファイルは使わず空として扱い、--lint が error で言う。画面は開いたまま帯で知らせる。
   const common = commonLayer(board.board);
   if (common !== undefined && common.phasesFile.unreadable !== "") {
-    errors.push(`共通の設定に phases.yml があります（${common.phasesFile.path}）。共通の設定には置けない。使われない。エディタで消すか、ワークスペースかプロジェクトの設定（config）へ移してください`);
+    errors.push(`共通の設定に phases.yml があります（${common.phasesFile.path}）。共通の設定には置けず、使われません。エディタで消すか、ワークスペースかプロジェクトの設定（config）へ移してください`);
   }
   let text: string;
   let mtimeMs: number;

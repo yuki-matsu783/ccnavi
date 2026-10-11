@@ -127,7 +127,7 @@ export class Reader {
   async read(name: string, head: string, paths: readonly string[]): Promise<Branch> {
     const branch = this.branches[name] ?? { head, files: {}, binary: [], links: [] };
     if (branch.head !== head) {
-      throw new MovedError(`${name} の先頭が読んでいる間に動いた。読み直す`);
+      throw new MovedError(`${name} の先頭が、読んでいる間に更新された。読み直す`);
     }
     const objects = await this.call<Record<string, PathObject | null>>("pathObjects", head, paths);
     const wanted: { path: string; sha: string }[] = [];

@@ -783,7 +783,8 @@ def changed_notice(conf: settings.Settings, root: str, child: ticket_model.Ticke
             f"着手のとき（{_describe(before)}）と"
             f"違う（いま {_describe(now)}）。担当のサブエージェントが読んだ手順と、ユーザが渡した"
             "手順が食い違っているかもしれない。誰が書き換えたかをユーザが確かめてください"
-            "（ロックは Write / Edit を止めるが、シェルから行き先を追えない形で書くと止まらない）"
+            "（ロックが止めるのは Write / Edit だけで、"
+            "シェルで書き込み先を追えない書き方をすると止められない）"
         )
     except Exception:  # noqa: BLE001  知らせのために hook を止めない
         return ""
@@ -823,7 +824,7 @@ def briefing(
     lines = [
         f"    フロー: {flow_text.clean(path)}"
         f"（ユーザがボードで書いた {flow_text.clean(child.ticket)} の手順。"
-        "承認済みの領域にあり、ユーザが持つもの。エージェントは編集しない）。作業の前にこのファイルを"
+        "承認済みの領域にあり、ユーザが管理するもの。エージェントは編集しない）。作業の前にこのファイルを"
         "読み、その順に進めてください。文脈が要約されて見失ったら、"
         "このパスを読み直してください。" + lock
     ]

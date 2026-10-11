@@ -869,7 +869,7 @@ function request(current: PanelState): void {
   const loaded = current.loaded;
   const draft = loaded?.target.flow.draft ?? null;
   if (loaded === undefined || draft === null || requestOf(current, loaded) === undefined) {
-    fail(current, "いまはエージェントにフローを頼めません（着手の前の子だけで頼めます）");
+    fail(current, "いまはエージェントにフローを頼めません（頼めるのは着手前の子チケットだけです）");
     return;
   }
   const root = current.folder.uri.fsPath;

@@ -630,7 +630,7 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
       effects.unshift({ kind: "warn", text: value.warning });
     }
     const note = value.followup
-      ? `直す指摘を載せた続きの子チケット ${value.followup} を起こしました。フェーズを開き直しました。`
+      ? `直す指摘を含む続きの子チケット ${value.followup} を起票しました。フェーズを開き直しました。`
       : "フェーズはレビュー済みになりました。";
     const issued = value.issue_url ? ` issue に回した分: ${value.issue_url}` : "";
     return move(

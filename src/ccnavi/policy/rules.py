@@ -710,7 +710,8 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
                 SEVERITY_ERROR,
                 "",
                 f"ルール書式の版 {rule_set.version} は扱えない（このビルドが読むのは {VERSION}）。"
-                f"書式は `{'` `'.join(SECTIONS)}` の 3 タイプで、探すものは `glob` か `regex`。"
+                f"書式は `{'` `'.join(SECTIONS)}` の 3 タイプで、"
+                "照合に使えるのは `glob` か `regex`。"
                 "`glob` は fnmatch の glob で、文字列全体と一致したときだけヒットするので、"
                 "部分一致が要るなら前後に `*` を書く",
             )
@@ -802,7 +803,7 @@ def _build(
             Problem(
                 SEVERITY_ERROR,
                 name,
-                "文面が無い。ルールは代わりに何をすべきかを言わなければならない",
+                "message が無い。ルールには、代わりに何をすべきかを書く必要がある",
             )
         ]
     if not rule.match:
@@ -1177,7 +1178,7 @@ def _not_root_suffix(expression: str) -> str:
         return ""
     return (
         f"`{NOT_ROOT_PLACEHOLDER}` の直後に `{rest[:16]}` が続いている。"
-        "展開結果が読み終える位置はパスの区切りとは限らないので、区切りを前提にした"
+        "展開した式がマッチし終える位置はパスの区切りとは限らないので、区切りを前提にした"
         "表記は意図どおりに動かない。任意の位置から続けるなら `.*` で受けてください"
     )
 

@@ -375,7 +375,7 @@ def copy_config_problems(
                     rules.Problem(
                         severity,
                         t.ticket,
-                        f"`phases:` の `{ident}` が{what}。進行中の親には効かない（判定は"
+                        f"`phases:` の `{ident}` が{what}。進行中の親には反映されない（判定は"
                         "承認済みチケットの写しを読む）。反映するには、子の無い番号の定義なら"
                         f" {fill} を打った改版を出す（計画が同じでも改版になる）。子が承認された"
                         "番号の定義なら、ユーザが承認済みチケットの `phases:` を直す",
@@ -682,7 +682,7 @@ def existing_branch_warnings(
         if hits:
             found.append(
                 f"{t.ticket}: 親のブランチ名と同じブランチ（{', '.join(hits)}）が既にある。"
-                "承認すると、そのブランチを親のブランチとして取り込み・送る。"
+                "承認すると、そのブランチを親のブランチとして取り込み、push する。"
                 "別の作業なら識別子を変える"
             )
     return found

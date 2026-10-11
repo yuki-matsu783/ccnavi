@@ -150,7 +150,7 @@ def _clear_policy(path: str, phase: int, kind: str) -> dict:
         "prefix": "",
         "message": (
             f"フェーズ {phase} のマーカー {path} を消せなかった（{{reason}}）。"
-            f"{kind} は残っていて効く"
+            f"{kind} は残っていて有効なまま"
         ),
     }
 

@@ -68,7 +68,7 @@ def _followup_from_choice(
     stdout.write(
         f"続きの子チケット {ident} を {conf.approved}/{ticket_model.DOING}/ に起こした"
         f"（フェーズ {ph.number}、範囲は見た子の和、本文に指摘 {len(items)} 件）。"
-        "フェーズは開き直り、マーカーは消えた。\n"
+        "フェーズは再び開かれ、マーカーは消えた。\n"
         f"次は{_followup_next(root, parent, ident)}\n"
     )
     return ident
@@ -294,7 +294,7 @@ def _ask_choices(
     keys = "k / f / i" if d.can_issue else "k / f"
     stdout.write(
         "未解決（Unresolved）の指摘の対応方針を 1 件ずつ選びます。"
-        "それ以外を打つと、何もせずにやめます。\n"
+        "選択肢以外を入力すると、何もせずにやめます。\n"
     )
     for letter, choice in _CHOICE_KEYS.items():
         if choice == CHOICE_ISSUE and not d.can_issue:
@@ -427,7 +427,7 @@ def apply_decision(
 
     - 対応しない・issue に回す: 受け入れの記録（`accepted.json`）に足す。次の confirm は数えない
     - このフェーズで直す: 続きの子を同じ番号で `doing/` に起こす。受け入れないので、次の
-      confirm がまた数える。1 件でもあればフェーズは開き直り、レビュー済みのマーカーは置かない
+      confirm がまた数える。1 件でもあればフェーズは再び開かれ、レビュー済みのマーカーは置かない
     - どれも直さないなら、レビュー済みのマーカーを置く
 
     MR に書き込むコメントと issue の下書きは state の置き場に書き、sh が投稿する。

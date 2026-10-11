@@ -188,7 +188,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
                     SEVERITY_WARN,
                     name,
                     f"{key} の {rel} は {ctxfile.MAX_CHARS} 文字を超える。"
-                    "先頭だけが渡り、切り詰めたことを末尾に書き足す",
+                    "先頭だけを渡し、切り詰めたことを末尾に書き足す",
                 )
             )
 
@@ -235,7 +235,7 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
         return []
     others = [w for w in wants if w != rules.STOP_MATCH]
     if rule.decision != rules.ALLOW:
-        rest = f"（{'|'.join(others)} の部分はふつうに効く）" if others else ""
+        rest = f"（{'|'.join(others)} の部分はふつうに判定される）" if others else ""
         return [
             Problem(
                 SEVERITY_WARN,

@@ -435,7 +435,7 @@ def _factors(
                             SEVERITY_WARN,
                             ident,
                             f"`include` の `{glob}` はワイルドカードが無いので、その名前の"
-                            f"ファイルにしか当たらない。ディレクトリなら `{glob}/**` か `{glob}/`",
+                            f"ファイルにしか一致しない。ディレクトリなら `{glob}/**` か `{glob}/`",
                         )
                     )
         elif kind == KIND_GLOB:

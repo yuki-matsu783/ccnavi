@@ -636,7 +636,7 @@ class Families:
             return f"親のブランチ {branch} は使えない（{why}）"
         hits = [n for n in self.integration_names(project) if n.casefold() == branch.casefold()]
         if hits:
-            return f"親のブランチ {branch} は統合先の名前（{', '.join(hits)}）に当たる"
+            return f"親のブランチ {branch} は統合先の名前（{', '.join(hits)}）と同じ"
         return ""
 
     def _all_trees(self) -> list[tree.Tree]:
@@ -748,7 +748,8 @@ class Families:
         else:
             rivals = [b for b in self.claims(family_id, project) if b != branch]
             stop = (
-                f"親子のチケット {family_id} を宣言するブランチが 1 本でない"
+                f"親子のチケット {family_id} の親のブランチとして"
+                "宣言されているブランチが 1 本でない"
                 f"（{', '.join([branch, *rivals])}。どれもその上の親チケットが自分のブランチだと"
                 "宣言している）。どのチケットを正とするかが決まらない"
                 if rivals
@@ -937,7 +938,7 @@ def guidance(root: str, st: Standing) -> list[str]:
     if "まだ送っていない（取り込み状態は" in st.stop:
         return [
             f"親のワークツリー（.claude/worktrees/{name}）で '{git} push -u origin {branch}' "
-            f"を打つと、取り込み状態が {branch} に書き直り、止めが外れる"
+            f"を打つと、取り込み状態が {branch} に書き直され、停止が解除される"
         ]
     if "検査を通らないので" in st.stop:
         return [

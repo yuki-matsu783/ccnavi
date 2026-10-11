@@ -137,7 +137,7 @@ class ReviewTurnTest(PhaseHarness):
         self.assertIn("`wip/` の追跡済みのファイル", confirmed.stdout)
         self.assertIn("ready --parent i0001", confirmed.stdout)
         # push と Draft 解除はレビュー済みの合意の範囲に入ると言い切る
-        self.assertIn("合意の範囲に入る", confirmed.stdout)
+        self.assertIn("合意した範囲に入る", confirmed.stdout)
         self.assertIn("確認を取り直さずに進める", confirmed.stdout)
         # confirm の後に sh が打つ片付け。done/ に動いた子のワークツリーを消し、ブランチは残す
         tidy = self.ccnavi("--cwd", self.root, "worktree", "tidy", "i0001", "--phase", "1")

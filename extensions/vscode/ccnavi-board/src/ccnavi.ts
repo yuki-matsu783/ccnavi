@@ -108,7 +108,7 @@ const DIAGNOSE_TIMEOUT_MS = 60_000;
 
 /** 期限で打ち切ったときの文面。標準エラーには何も残らないので、呼び手の代わりにここで組む */
 function cutOff(what: string, ms: number): string {
-  return `${what} を ${ms / 1000} 秒で打ち切りました`;
+  return `${what} を ${ms / 1000} 秒で中断しました`;
 }
 
 const NOT_FOUND =
@@ -214,7 +214,7 @@ export async function loadBoard(root: string, setting: string): Promise<LoadResu
   const ran = await run(launcher, root, ["--explain", "--json"], EXPLAIN_TIMEOUT_MS);
   if (ran.code !== 0) {
     const why = ran.killed
-      ? `${EXPLAIN_TIMEOUT_MS / 1000} 秒たっても応答が無いため打ち切りました`
+      ? `${EXPLAIN_TIMEOUT_MS / 1000} 秒たっても応答が無いため中断しました`
       : ran.stderr;
     return { ok: false, launcher, error: `ccnavi --explain --json が失敗しました: ${why}` };
   }

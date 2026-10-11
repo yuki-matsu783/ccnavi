@@ -688,7 +688,7 @@ class IntegrationDoneTest(AuthorityHarness):
         self.record("present")
         preview = self.preview()
         self.assertNotIn("i0001-01-02", [b["ticket"] for b in preview["batch"]])
-        self.assertTrue(self.rejected_with(preview, "i0001-01-02", "決まらない"), preview)
+        self.assertTrue(self.rejected_with(preview, "i0001-01-02", "確かめられない"), preview)
         # head の無い取り込み状態（入れ替えが終わらない）。
         os.makedirs(os.path.join(base, "integration"))
         os.makedirs(os.path.join(base, "integration.old.9"))
@@ -699,7 +699,7 @@ class IntegrationDoneTest(AuthorityHarness):
         real = write(os.path.join(self.root, "elsewhere-head"), "branch main\n")
         os.symlink(real, os.path.join(base, "integration", "head"))
         preview = self.preview()
-        self.assertTrue(self.rejected_with(preview, "i0001-01-02", "決まらない"), preview)
+        self.assertTrue(self.rejected_with(preview, "i0001-01-02", "確かめられない"), preview)
         # 直せば通る。
         os.remove(os.path.join(base, "integration", "head"))
         write(os.path.join(base, "integration", "head"), "branch main\nsha abc\n")

@@ -136,7 +136,7 @@ def _prefix_setting_problems(conf: settings.Settings) -> list[Problem]:
             SEVERITY_WARN,
             "(settings)",
             f"{settings.BRANCH_PREFIXES_ENV} の {', '.join(conf.branch_prefixes_rejected)} は"
-            "先頭の語に使えないので読まない（英小文字で始まる英小文字と数字。main・master・"
+            "先頭の語に使えないので読まない（英小文字で始まり、英小文字と数字だけでできた語。main・master・"
             "develop・release は使えない）。"
             f"使うリストは {', '.join(conf.branch_prefixes)}（親のブランチ名の規則）",
         )
@@ -201,7 +201,7 @@ def _worktree_problems(
                     "(ticket)",
                     f"{t.ticket} は承認済みだがワークツリー "
                     f"{tree.worktree_path(root, t.ticket)} が無い。"
-                    "ワークツリーを作るまで範囲は効かない",
+                    "ワークツリーを作るまで範囲は有効にならない",
                 )
             )
     return problems

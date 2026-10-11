@@ -327,8 +327,8 @@ def review_problems(
         ]
     else:
         lines.append(
-            "解決してもらって再実行するか、ユーザが端末で "
-            f"'{review_sh} decide {phase_no}'（ボードの「決める」）で、指摘ごとに"
+            "ユーザに解決してもらって再実行する。または、ユーザが端末で "
+            f"'{review_sh} decide {phase_no}'（ボードの「決める」）を使い、指摘ごとに"
             "受け入れて進むか、続きの子チケットで直すかを選ぶ"
         )
     return lines
@@ -578,7 +578,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
             named = "、".join(repr(r) if ("\n" in r or "\r" in r) else r for r in odd[:10])
             problems.append(
                 f"`{wip}/` の追跡済みのファイルのうち、途中のディレクトリがリンクで"
-                f"ツリーの外を指すか、名前に改行を含むものがある（{named}）。消すとツリーの外を消しうるので止めた。"
+                f"ツリーの外を指すか、名前に改行を含むものがある（{named}）。消すとツリーの外のファイルまで消すおそれがあるので止めた。"
                 "リンクを元のディレクトリに戻すか、ユーザに確かめてから打ち直してください"
             )
     untracked = _wip_untracked(tree_root)

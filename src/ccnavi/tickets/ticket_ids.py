@@ -264,11 +264,11 @@ def branch_problem(name: str) -> str:
         return (
             f"先頭の階層 `{name.split('/')[0]}` は git の ref の名前"
             "（refs・heads・remotes・tags）か"
-            "リモートの名前（origin・upstream）と紛れる。"
+            "リモートの名前（origin・upstream）と紛らわしい。"
             "`origin/main` のような名前は親のブランチにしない"
         )
     if any(p == "head" or p.endswith("_head") for p in parts):
-        return "`HEAD`・`FETCH_HEAD` のような階層は git の特別な名前と紛れる"
+        return "`HEAD`・`FETCH_HEAD` のような階層は git の特別な名前と紛らわしい"
     if (
         folded in RESERVED_BRANCH_IDS
         or parts[0] in RESERVED_BRANCH_IDS
@@ -327,11 +327,11 @@ def branch_name_problems(
     if folded in RESERVED_BRANCH_IDS or folded.startswith("release-"):
         found.append(
             "識別子が統合先や保護されたブランチの名前（main・master・develop・release・release-*）"
-            "に当たる。親のブランチ名が統合先と同じになる"
+            "と同じ。親のブランチ名が統合先と同じになる"
         )
     elif integration and folded == integration.casefold():
         found.append(
-            f"識別子が統合先の名前（{integration}）に当たる。親のブランチ名が統合先と同じになる"
+            f"識別子が統合先の名前（{integration}）と同じ。親のブランチ名が統合先と同じになる"
         )
     found.extend(_form_problems(t, serial, prefixes))
     return found

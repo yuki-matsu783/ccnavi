@@ -194,7 +194,7 @@ def _local_settings(root: str) -> list[Problem]:
         Problem(
             SEVERITY_ERROR,
             "(project)",
-            f"{LOCAL_SETTINGS} の env に {name} がある。承認と判定に効く値は手元だけの"
+            f"{LOCAL_SETTINGS} の env に {name} がある。承認と判定に使われる値は手元だけの"
             "ファイルに置かない（Chrome と端末の sh には使われないので、"
             "同じ親子のチケットに"
             "プロセスごとに別の保護が掛かることになる）。"

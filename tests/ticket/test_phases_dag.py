@@ -727,13 +727,13 @@ class DagApprovalTest(PhaseHarness):
         self.commit_parent()
         refused = self.approve()
         self.assertFalse(self.approved_child("i0001-01-01"))
-        self.assertIn("計画が壊れている", refused.stderr)
+        self.assertIn("計画が不正", refused.stderr)
         # 子を手で動かしても、判定と着手で止まる。
         self.move_by_hand(
             child_text("i0001-01-01", "i0001", 1, ["wip/a/*"], review=False), "i0001-01-01"
         )
         child = self.scanned("i0001-01-01")
-        self.assertIn("計画が壊れている", child.blocked)
+        self.assertIn("計画が不正", child.blocked)
         self.start_parent_quietly()
         started = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertNotEqual(started.returncode, 0)

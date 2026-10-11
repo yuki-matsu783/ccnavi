@@ -527,7 +527,7 @@ export async function createCommit(
 ): Promise<Written> {
   const name = checkBranch(branch);
   const now = await branchHead(client, owner, repo, name);
-  if (now !== checkOid(expected)) throw new HostError(`親のブランチ ${name} の先頭が読んだものと違う（書く前に動いた）`, HOST_MOVED);
+  if (now !== checkOid(expected)) throw new HostError(`親のブランチ ${name} の先頭が、読んだ時点から変わっている（書く前に更新された）`, HOST_MOVED);
   // update・delete には、そのファイルを最後に変えたコミットを付ける。呼び手が知っていればそれ（元に戻すコミットでは自分の
   // コミット）、無ければ読んだ先頭の上の値。その後に他人が変えていれば GitLab が断る（400。ここでは 409 にする）
   const out: Record<string, unknown>[] = [];

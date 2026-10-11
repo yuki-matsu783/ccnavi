@@ -465,10 +465,10 @@ def report(stdout: TextIO, conf: settings.Settings, root: str, as_json: bool) ->
         return 0
     logs = body["logs"]
     if not logs:
-        stdout.write(f"ccnavi: 記録が無い（{conf.log or '記録先が空'}）。候補は起こせない\n")
+        stdout.write(f"ccnavi: 記録が無い（{conf.log or '記録先が空'}）。候補を作れない\n")
         return 0
     stdout.write(
-        f"# 記録 {len(logs)} 本・{body['records']} 行から起こした候補 {len(body['candidates'])} 件"
+        f"# 記録 {len(logs)} 本・{body['records']} 行から作った候補 {len(body['candidates'])} 件"
         f"（検証を通らず除いたもの {body['dropped']} 件）。\n"
         "# どれも下書き。置くのはユーザで、置く前に /ccnavi-config の手順で確かめる。\n"
     )

@@ -563,7 +563,7 @@ function rulesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<RulesDa
   if (panel.options.retainContextWhenHidden !== true) {
     // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、裏に回った画面へ
     // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/claude/logging.md）
-    diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "rules", retainContextWhenHidden: false });
+    diaglog.get("ccnavi-board", root).error("画面の前提が成り立っていない", { screen: "rules", retainContextWhenHidden: false });
   }
   return retainedHost<RulesData>(
     {
