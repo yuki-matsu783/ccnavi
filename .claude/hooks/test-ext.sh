@@ -81,16 +81,26 @@ CHROME="extensions/chrome/ccnavi-approval"
 # 文字列比較で行う（パスに `#` や `[` が入ると sed が構文エラーになる）。ループの中で
 # 起こすテストは標準入力を /dev/null にする。一覧を読んでいる標準入力を読まれると、残りが飛ぶ
 #
-# 共通の部品（extensions/shared/）を編集したときは、同じツリーの VS Code 拡張を実行する。
-# shared を読む画面のグループは test-groups.js が import（@ccnavi/shared/...）を辿って決める
-sed -n \
-	-e "s#^\(.*/$VSCODE\)/.*#vscode \1#p" \
-	-e "s#^\($VSCODE\)/.*#vscode \1#p" \
-	-e "s#^\(.*/$CHROME\)/.*#chrome \1#p" \
-	-e "s#^\($CHROME\)/.*#chrome \1#p" \
-	-e "s#^\(.*\)/extensions/shared/.*#vscode \1/$VSCODE#p" \
-	-e "s#^extensions/shared/.*#vscode $VSCODE#p" \
-	"$files.sorted" | sort -u >"$files.roots"
+# 共通の部品（extensions/shared/）を編集したときは、同じツリーの VS Code 拡張と Chrome 拡張の両方を実行する。
+# VS Code 拡張は、shared を読む画面のグループを test-groups.js が import（@ccnavi/shared/...）を辿って決める。
+# Chrome 拡張は、設定画面とボードの style.css が @ccnavi/shared/styles/*.css を @import し、
+# scripts/build.js がバンドルするので、ファイル名の変更や削除でビルドが壊れる
+# sed は 1 行に s を続けて当てると、前の s が書き換えた行を次の s が読む。shared は 2 つの拡張へ振るので、
+# 元の行を 2 度読む。sed を 2 回に分ける
+{
+	sed -n \
+		-e "s#^\(.*/$VSCODE\)/.*#vscode \1#p" \
+		-e "s#^\($VSCODE\)/.*#vscode \1#p" \
+		-e "s#^\(.*/$CHROME\)/.*#chrome \1#p" \
+		-e "s#^\($CHROME\)/.*#chrome \1#p" \
+		-e "s#^\(.*\)/extensions/shared/.*#vscode \1/$VSCODE#p" \
+		-e "s#^extensions/shared/.*#vscode $VSCODE#p" \
+		"$files.sorted"
+	sed -n \
+		-e "s#^\(.*\)/extensions/shared/.*#chrome \1/$CHROME#p" \
+		-e "s#^extensions/shared/.*#chrome $CHROME#p" \
+		"$files.sorted"
+} | sort -u >"$files.roots"
 
 failed=""
 output=""
@@ -110,36 +120,37 @@ while IFS= read -r line; do
 	fi
 	# そのツリーのファイルだけを渡す。2 つのワークツリーを編集したターンでは、
 	# それぞれのツリーで 1 回ずつ実行する
-	# VS Code 拡張には、同じツリーの共通の部品（extensions/shared/）のファイルも渡す。
-	# ルートが相対（extensions/vscode/...）のときは、ツリーの接頭辞は空になる
-	shared=""
-	if [ "$kind" = vscode ]; then
-		if [ "$root" = "$VSCODE" ]; then
-			shared="extensions/shared/"
-		else
-			shared="${root%"/$VSCODE"}/extensions/shared/"
-		fi
+	# どちらの拡張にも、同じツリーの共通の部品（extensions/shared/）のファイルも渡す。
+	# ルートが相対（extensions/...）のときは、ツリーの接頭辞は空になる
+	case "$kind" in
+	chrome) base=$CHROME ;;
+	*) base=$VSCODE ;;
+	esac
+	if [ "$root" = "$base" ]; then
+		shared="extensions/shared/"
+	else
+		shared="${root%"/$base"}/extensions/shared/"
 	fi
 	set --
 	while IFS= read -r one; do
 		case "$one" in
 		"$root"/*) set -- "$@" "$one" ;;
-		*)
-			if [ -n "$shared" ]; then
-				case "$one" in
-				"$shared"*) set -- "$@" "$one" ;;
-				esac
-			fi
-			;;
+		"$shared"*) set -- "$@" "$one" ;;
 		esac
 	done <"$files.sorted"
 	[ "$#" -gt 0 ] || continue
 	ran=1
 	if [ "$kind" = chrome ]; then
 		# 読み物（*.md・docs/）と生成物の置き場だけを触ったなら回さない。VS Code の入口が
-		# 読み物だけのときに何も回さないのと揃える
+		# 読み物だけのときに何も回さないのと揃える。共通の部品（CSS）はコードとして扱い、回す
 		code=""
 		for one in "$@"; do
+			case "$one" in
+			"$shared"*)
+				code=yes
+				continue
+				;;
+			esac
 			case "${one#"$root"/}" in
 			*.md | docs/* | out/* | dist/* | dist-e2e/* | node_modules/*) ;;
 			*) code=yes ;;
