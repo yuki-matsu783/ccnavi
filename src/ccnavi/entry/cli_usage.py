@@ -186,16 +186,26 @@ the fixed numbers is refused (`refused`), and nothing is renumbered.
 
 The answer carries `plans` (one per part: items with `number` and `from`,
 `after` in the new numbers, `proposed`, `current`, `loose`, `ready`,
-`problems`), `source_sha` (the parent proposal and its pending children), the
-order `problems`, `loose`, `refused`, `revision_problems` and the pending
-children whose number would move. --write rewrites only the `plan:` and
-`feedback:` values of the parent proposal and nothing else. It writes nothing
-when --expect differs from the current `source_sha`, when a line is refused,
-when the renumbered plan has an order error or breaks the revision lock, when
-another field would read differently, or when a pending child points at a
-number that moves (a child's id carries its phase number, so its `phase:`
-cannot be rewritten alone). It never approves; approving the rewritten
-proposal needs a fresh preview, since the digest changes.
+`problems`), `source_sha` (the parent proposal, its pending children and the
+pending children whose `predecessors` name them), the order `problems`,
+`loose`, `refused`, `revision_problems`, `children` (the pending children to
+retarget: `ticket` -> `new_ticket`, `phase` -> `new_phase`, `predecessors` ->
+`new_predecessors`), `child_problems` and `mismatched` (pending children whose
+`phase:` is not in the plan).
+
+--write rewrites the `plan:` and `feedback:` values of the parent proposal.
+A pending child (todo/) that points at a number that moves gets the new number
+in its id (`<parent>-<phase>-<seq>`; the sequence stays), its file name,
+`ticket:` and `phase:`, and pending children that name it in `predecessors`
+are fixed too. Approved children are never touched. Children are written
+first and the parent last; on a failure everything written is put back. It
+writes nothing when --expect differs from the current `source_sha`, when a
+line is refused, when the renumbered plan has an order error or breaks the
+revision lock, when another field would read differently, when a new child id
+clashes with a file or ticket that stays, or when the approved side (approved
+tickets, records, markers, flows, worktrees) refers to an id that would
+change. It never approves; approving the rewritten proposal needs a fresh
+preview, since the digest changes.
 
 Two things are not a no, because --agree does not drop them either: scope that
 exceeds the parent or the phase type (writes there stay blocked after approval),
