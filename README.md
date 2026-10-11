@@ -2029,7 +2029,8 @@ Claude Code はそこを読まないので、ccnavi が `SessionStart` と `Suba
 |---|---|
 | `decision` | `allow` `ask` `deny` `handover` `skip`。`handover` は権限モードに委ねた回 |
 | `enforced` | 実際に適用したか。`dry-run` は `false` |
-| `code` | 判定の根拠の種別。一覧は [設計 付録 A](docs/design/appendix.md)。よく出るのは `DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE` |
+| `code` | 判定の根拠の種別。一覧は [設計 付録 A](docs/design/appendix.md)。よく出るのは `DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE`。実行後チェックの行は `POST_VIOLATION` などで、件が混ざった回は強いほう 1 つ |
+| `rules` | 当たったルールの id。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`(ticket-scope)`、`(phase-review)` など。判定ごとに分かれる。一覧は付録 A） |
 | `reason` | `skip` の理由。`mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、`payload-unusable`、`deadline-exceeded`、`tool-cannot-write`、`worktree-unreadable`（`detail` に理由）、`no-turn-baseline` の 9 つ |
 | `tree` / `project` | 呼び出しの行き先が属するツリーとプロジェクト |
 | `permission_mode` | Claude Code から来たモード。`handover` の行と合わせて読む |

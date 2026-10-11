@@ -45,6 +45,19 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 組み込みの判定で止めた文は、先頭の行に理由コードと記録の `rules` と同じ識別子を
 `[ccnavi] <コード> (builtin rule: <識別子>)` の形で並べる（`builtin-script-env` など）。
 
+ルールファイルの外の決めごとで止めた回は、記録の `rules` の先頭に括弧付きの名前を置く。判定ごとに名前を分け、
+別の判定の名前を使い回さない（同じ理由の繰り返し（6.4）の鍵と文面が、止めた理由の名前になるように）。
+
+| 名前 | 理由コード |
+|---|---|
+| `(ticket-scope)` | `DENY_TICKET_SCOPE` / `TICKET_ASK`、実行後チェックと `SubagentStop` の `POST_TICKET_SCOPE` |
+| `(ticket-blocked)` | `DENY_TICKET_BLOCKED` |
+| `(ticket-project)` | `DENY_TICKET_PROJECT_MISMATCH` |
+| `(ticket-flow-lock)` | `DENY_TICKET_FLOW_LOCKED` |
+| `(phase-review)` | `DENY_PHASE_REVIEW` |
+| `(subagent-ticket-op)` | `DENY_SUBAGENT_TICKET_OP` |
+| `(redirect-limit)` | `DENY_REDIRECT_LIMIT` |
+
 ## 付録 B. 記録の 1 行
 
 `ts`（ISO 8601、ローカルのオフセット付き）、`mode`、`permission_mode`、`event`、`tool`、`subject`

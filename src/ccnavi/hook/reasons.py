@@ -78,6 +78,15 @@ CODE_TICKET_BLOCKED = "DENY_TICKET_BLOCKED"
 # 無いので、括弧付きにして、ファイルの中を探しても見つからないことを見た目で示す。
 TICKET_RULE = "(ticket-scope)"
 
+# 範囲を当てる前に止めた組み込みの判定の、記録のルール名。範囲の外に書いたのではないので
+# TICKET_RULE を使い回さない。使い回すと、記録の `rules` で範囲外の件数に混ざり、繰り返しの
+# 文面（repeat.note）も「同じ理由（(ticket-scope)）」と、止めた理由と違う名前を言う。形は
+# フローのロック（flow.LOCK_RULE）・`>` の上限（REDIRECT_LIMIT_RULE）と同じ括弧付き。
+SUBAGENT_TICKET_OP_RULE = "(subagent-ticket-op)"  # DENY_SUBAGENT_TICKET_OP
+PHASE_REVIEW_RULE = "(phase-review)"  # DENY_PHASE_REVIEW
+TICKET_PROJECT_RULE = "(ticket-project)"  # DENY_TICKET_PROJECT_MISMATCH
+TICKET_BLOCKED_RULE = "(ticket-blocked)"  # DENY_TICKET_BLOCKED
+
 # 書き直しを求める形（shellread の FORM_*）ごとの理由コード。ルールに当たったのではなく読みの
 # 決めごとで止めたので、記録のルール名は TICKET_RULE と同じく括弧付きの形の名前にする
 # （rewrite_rule）。
