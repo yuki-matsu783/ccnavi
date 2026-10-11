@@ -3110,13 +3110,13 @@ class TicketTest(unittest.TestCase):
         again = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
         self.assertNotIn("worktree-unreadable", self.reason(again))
 
-    def unreadable_stop(self, agent_id):
+    def unreadable_stop(self, agent_id, session="s1"):
         """子のワークツリーを読めないまま、サブエージェントを終わらせる。"""
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         stop = {
             "hook_event_name": "SubagentStop",
             "cwd": child,
-            "session_id": "s1",
+            "session_id": session,
             "agent_id": agent_id,
         }
         with mock.patch.object(phase_scope, "scope_findings", return_value=([], "読めない")):
@@ -3138,6 +3138,15 @@ class TicketTest(unittest.TestCase):
         self.assertIn("i0001-01-01", said)
         again = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertNotIn("worktree-unreadable", self.reason(again))
+
+    def test_marks_of_another_session_are_left_alone(self):
+        """印の名前の前置きが重なる別のセッション（`s1` と `s1-x`）の印は、読まずに残す。"""
+        self.family()
+        self.unreadable_stop("sub-bg", session="s1-x")
+        mine = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertNotIn("worktree-unreadable", self.reason(mine))
+        theirs = self.hook("PostToolUse", "Bash", self.parent_tree, session="s1-x", command="ls")
+        self.assertIn("worktree-unreadable", self.reason(theirs))
 
     def test_parent_hears_at_the_next_prompt(self):
         """親がツールを使わずにターンを終えたなら、次の依頼（UserPromptSubmit）で言う。"""
