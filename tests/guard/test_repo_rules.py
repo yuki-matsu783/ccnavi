@@ -828,6 +828,18 @@ class SubstRepoRulesTest(unittest.TestCase):
         self.assertIn("$( )", body["response"])
         self.assertIn("--body-file", body["response"])
 
+    def test_ANSI_Cの引用は中身を確定できるときだけ読む(self):
+        # エスケープ（`\`）の無い `$'…'` は単一引用と同じ文字列なので、そう読んでルールに当てる。
+        # エスケープがあれば展開しないと中身が決まらないので、確定できない読みとして止める側へ渡す。
+        self.check(
+            [
+                ("$'git' push origin main", "deny", "raw-git", ""),
+                ("git $'push' origin main", "deny", "raw-git", ""),
+                ("rm $'-rf' /tmp/x", "deny", "recursive-delete", ""),
+                ("echo $'a\\ngit push'", "ask", "", "PARSE_UNCERTAIN"),
+            ]
+        )
+
     def test_実行するときに決まるコマンド名は一律に止める(self):
         # どれもどのルールにも当たらず、auto では権限モードに渡っていた。
         code = "DENY_COMMAND_NAME_EXPANSION"
@@ -838,7 +850,6 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ("/usr/bin/gi? push origin main", "deny", NAME, code),
                 ("git${IFS}push origin main", "deny", NAME, code),
                 ("/bin/r? -rf /tmp/x", "deny", NAME, code),
-                ("$'git' push origin main", "deny", NAME, code),
                 ("FOO=1 $c status", "deny", NAME, code),
                 (">/dev/null $c status", "deny", NAME, code),
                 ("2>&1 $c status", "deny", NAME, code),

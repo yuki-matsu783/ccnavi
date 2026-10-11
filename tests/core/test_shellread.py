@@ -863,6 +863,32 @@ class SubstTest(unittest.TestCase):
         self.assertTrue(phase_forms.forbidden(inner.text), show(inner.text))
 
 
+class AnsiCTest(unittest.TestCase):
+    """`$'…'`（ANSI-C の引用）。エスケープが無ければ単一引用と同じに読む。"""
+
+    def test_without_escapes_it_reads_as_a_single_quote(self):
+        for source, text in (
+            ("git $'push'", "git push"),
+            ("rm $'-rf' x", "rm -rf x"),
+            ("$'git' status", "git status"),
+        ):
+            with self.subTest(source=source):
+                result = shellread.read(source)
+                self.assertFalse(result.degraded)
+                self.assertEqual(result.text, text)
+
+    def test_escapes_make_it_uncertain(self):
+        for source in ("echo $'a\\nb'", "git $'\\x70ush'", "printf $'\\''"):
+            with self.subTest(source=source):
+                result = shellread.read(source)
+                self.assertTrue(result.degraded)
+                self.assertEqual(result.reason, shellread_scan.REASON_ANSI_C)
+
+    def test_inside_double_quotes_it_is_text(self):
+        result = shellread.read("echo \"$'x'\"")
+        self.assertFalse(result.degraded)
+
+
 class BraceTest(unittest.TestCase):
     """引用の外のブレース展開を並べる。展開はしない。判定は並んでいれば一律に止める。
 
