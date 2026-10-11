@@ -47,7 +47,7 @@ ccnavi-branches: issue #152 に紐づくブランチ（ワークスペース: .�
 ```
 
 ホストを見ていなければ 2 行目が `ホストは見ていない（<理由>）。手元の候補だけを出す` になる。チケット制御が disable なら
-チケットは見ず、そう書く。終了コードは 0（出した）・1（git の外・実行ファイルが落ちた）・2（引数の誤り）。
+チケットは見ず、そう書く。終了コードは 0（出した）・1（git の外・実行ファイルが異常終了した）・2（引数の誤り）。
 
 sh と実行ファイルの間の JSON（`--result`）:
 
@@ -55,7 +55,7 @@ sh と実行ファイルの間の JSON（`--result`）:
 |---|---|
 | `checked` | ホストを見たら `true`。`false` なら `reason` に理由（origin が無い・道具もトークンも無い・API が失敗した（どの呼び出しか）など）だけ |
 | `host` / `repo` | ホスト名（ポートを含む）とプロジェクトのパス |
-| `mrs` | `{number, branch, state, url, title, fork}` の配列。MR 指定なら 0 か 1 件。実行ファイルは番号が整数でない・元ブランチが空の要素を落とし、制御文字を空白に置き換える |
+| `mrs` | `{number, branch, state, url, title, fork}` の配列。MR 指定なら 0 か 1 件。実行ファイルは番号が整数でない・元ブランチが空の要素を除き、制御文字を空白に置き換える |
 
 `--json` の形は `{kind, number, repo: {project, root}, host: {checked, reason, name, repo}, tickets_checked,
 candidates: [{branch, local, origin, sources, mrs, worktrees, tickets: [{ticket, state, approved, title, issue}]}], issue_tickets}`。

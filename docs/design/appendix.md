@@ -45,7 +45,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 `ts`（ISO 8601、ローカルのオフセット付き）、`mode`、`permission_mode`、`event`、`tool`、`subject`
 （秘密の形を伏せ（4.7）、1000 字で切り `…(+N)`）、`decision`、`enforced`、`code`、`reason`、`degraded`、`unwrapped`（当たった中で実行されるコマンド。
 `\x00` でつなぎ、1000 字で切る。6.3.1）、`fallback`、`detail`、
-`tree`、`project`、`source`、`rules[]`、`quoted[]`、`paths[]`、`guarded[]`、`session`、`ms` の 23 欄。空欄は落とす。
+`tree`、`project`、`source`、`rules[]`、`quoted[]`、`paths[]`、`guarded[]`、`session`、`ms` の 23 欄。空欄は省く。
 `ts` / `mode` / `decision` / `enforced` / `ms` は常に出る。`O_APPEND` で 1 行を 1 回の write で書く。
 
 ## 付録 C. 実測で確かめた前提
