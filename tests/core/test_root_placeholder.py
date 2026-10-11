@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 import unittest
 
@@ -27,6 +28,42 @@ def write(path: str, text: str) -> str:
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
     return path
+
+
+class WorkspaceRootRealRuleTest(unittest.TestCase):
+    """このリポジトリの rules.yml の workspace-root が、wip/scratchpad/ だけを通すこと。"""
+
+    def setUp(self):
+        import yaml
+
+        with open(os.path.join(ROOT, ".ccnavi", "common", "rules.yml"), encoding="utf-8") as f:
+            rule = next(r for r in yaml.safe_load(f)["deny"] if r["id"] == "workspace-root")
+        self.regex = re.compile(rule["regex"].replace("{root}", re.escape("/r")))
+
+    def test_wip_scratchpadだけが通る(self):
+        for path in [
+            "/r/wip/scratchpad/a.md",
+            "/r/wip/scratchpad/x/y.sh",
+            r"/r\wip\scratchpad\a",
+            "/r/.claude/worktrees/x/a.md",
+        ]:
+            with self.subTest(path=path):
+                self.assertIsNone(self.regex.search(path))
+
+    def test_それ以外は止まる(self):
+        for path in [
+            "/r/scratchpad/a.md",
+            "/r/wip/proposals/todo/a.md",
+            "/r/wip/a.md",
+            "/r/wip",
+            "/r/wipx/a.md",
+            "/r/wip/scratchpadx/a.md",
+            "/r/wip/Scratchpad/a.md",
+            "/r/README.md",
+            "/r/.claude/settings.json",
+        ]:
+            with self.subTest(path=path):
+                self.assertIsNotNone(self.regex.search(path))
 
 
 class RootPlaceholderTest(unittest.TestCase):
