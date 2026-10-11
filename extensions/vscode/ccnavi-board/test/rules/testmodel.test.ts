@@ -70,3 +70,21 @@ test("CB-T40 欠けた項目は既定値で埋め、全体を捨てない", () =
     assert.equal(parsed.value.response, "");
   }
 });
+
+test("CB-T396 当たったルールの source は file だけを file と読み、ほかは outside に倒す", () => {
+  const rules = [
+    { id: "a", source: "file" },
+    { id: "builtin-ticket-state", source: "outside", section: "deny", kind: "regex", written: "x…（全 999 字）" },
+    { id: "b", source: "builtin" },
+    { id: "c" },
+  ];
+  const parsed = parseTestJson(JSON.stringify({ version: TEST_VERSION, known: true, rules }));
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.deepEqual(
+      parsed.value.rules.map((r) => [r.id, r.source]),
+      [["a", "file"], ["builtin-ticket-state", "outside"], ["b", "outside"], ["c", "outside"]],
+    );
+    assert.equal(parsed.value.rules[1].section, "deny");
+  }
+});
