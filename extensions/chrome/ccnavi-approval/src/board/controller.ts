@@ -138,6 +138,8 @@ export interface BoardController {
    */
   refresh(clearResult?: boolean, fromTimer?: boolean): Promise<void>;
   openOptions(): void;
+  /** 境界の外で描画が落ちたとき、`#status` に言って `data-state` を error にする（`main.tsx` が React の `onUncaughtError` から呼ぶ） */
+  reportRenderError(err: unknown): void;
   /** 最初の読み込みと自動の読み直しを始める */
   start(): void;
 }
@@ -410,7 +412,25 @@ export function createBoardController(env: BoardEnv): BoardController {
     },
   };
 
+  /**
+   * 読み直す。失敗は投げずに `#status` へ出す（`state` は error。自動のときは文面だけ）。
+   * 手動の読み直しは始めに欄を空にするので、失敗したときは、始める前に描いていた欄を戻す（読めた分は新しいまま）。
+   */
   async function refresh(clearResult = true, fromTimer = false): Promise<void> {
+    const before = snap.sections;
+    try {
+      await refreshOnce(clearResult, fromTimer);
+    } catch (err) {
+      const why = (err as Error).message ?? String(err);
+      if (fromTimer) {
+        set({ status: { ...snap.status, text: `自動の読み直しに失敗した: ${why}` } });
+      } else {
+        set({ sections: new Map([...before, ...snap.sections]), status: { ...snap.status, text: `ボードを読み込めなかった: ${why}` }, state: "error" });
+      }
+    }
+  }
+
+  async function refreshOnce(clearResult: boolean, fromTimer: boolean): Promise<void> {
     while (inflight) {
       if (fromTimer) return;
       await inflight.catch(() => undefined);
@@ -479,18 +499,12 @@ export function createBoardController(env: BoardEnv): BoardController {
       auto = startAutoRefresh({
         ...env.timers,
         busy: skipAuto,
-        run: async () => {
-          try {
-            await refresh(false, true);
-          } catch (err) {
-            set({ status: { ...snap.status, text: `自動の読み直しに失敗した: ${(err as Error).message ?? String(err)}` } });
-            throw err;
-          }
-        },
+        run: () => refresh(false, true),
       });
-      refresh().catch((err) => {
-        set({ status: { ...snap.status, text: `ボードを読み込めなかった: ${(err as Error).message ?? String(err)}` }, state: "error" });
-      });
+      void refresh();
+    },
+    reportRenderError(err) {
+      set({ status: { ...snap.status, text: `ボードを描画できなかった: ${(err as Error)?.message ?? String(err)}` }, state: "error" });
     },
   };
 }

@@ -89,6 +89,7 @@ function harness(opts: { confirm?: boolean; prompt?: string | null; ops?: Partia
   const c = createBoardController(env);
   return {
     c,
+    env,
     log,
     store,
     timers,
@@ -295,4 +296,54 @@ test("CX-T224 自動の読み直し: 入力欄を触っている間と書く操�
   release(WRITTEN);
   await until(() => h.c.snapshot().state === "done" && !h.c.snapshot().busy, "書いた後の読み直し");
   assert.equal(h.log.collect, now + 1);
+});
+
+test("CX-T231 読み直しの失敗: 手動の読み直しでも、書いた後の読み直しでも、state=error と文面を出し、描いた欄は残す。投げ捨てない", async () => {
+  const unhandled: unknown[] = [];
+  const onUnhandled = (e: unknown) => void unhandled.push(e);
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    const h = harness({ ops: { approveFamily: async () => WRITTEN } });
+    let broken = false;
+    const get = h.env.storage.get;
+    (h.env.storage as { get: typeof get }).get = async (k) => {
+      if (broken && String(k) === "repos") throw new Error("storage 壊れた");
+      return get(k);
+    };
+    await h.c.refresh();
+    assert.equal(h.c.snapshot().state, "done");
+    assert.deepEqual([...h.c.snapshot().sections.keys()], [KEY]);
+    broken = true;
+    // main.tsx の「更新」と同じ呼び方（void controller.refresh()）
+    void h.c.refresh();
+    await until(() => h.c.snapshot().state === "error", "手動の読み直しの失敗");
+    assert.equal(h.c.snapshot().status.text, "ボードを読み込めなかった: storage 壊れた");
+    assert.deepEqual([...h.c.snapshot().sections.keys()], [KEY]);
+    // 書いた後の読み直しの失敗
+    broken = false;
+    await h.c.refresh();
+    assert.equal(h.c.snapshot().state, "done");
+    const b = h.c.snapshot().boards.get(KEY) as RepoBoard;
+    broken = true;
+    h.c.actions.approve(b, family());
+    await until(() => h.log.confirm.length === 1 && !h.c.snapshot().busy && h.c.snapshot().state === "error", "書いた後の読み直しの失敗");
+    assert.equal(h.c.snapshot().status.text, "ボードを読み込めなかった: storage 壊れた");
+    assert.equal(h.c.snapshot().result.kind, "written");
+    assert.deepEqual([...h.c.snapshot().sections.keys()], [KEY]);
+    // 次の読み直しで戻る
+    broken = false;
+    await h.c.refresh();
+    assert.equal(h.c.snapshot().state, "done");
+    await new Promise((r) => setImmediate(r));
+    assert.deepEqual(unhandled, []);
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+  }
+});
+
+test("CX-T232 境界の外で描画が落ちたら、controller が #status に言って state を error にする", () => {
+  const h = harness();
+  h.c.reportRenderError(new Error("描けない"));
+  assert.equal(h.c.snapshot().state, "error");
+  assert.equal(h.c.snapshot().status.text, "ボードを描画できなかった: 描けない");
 });

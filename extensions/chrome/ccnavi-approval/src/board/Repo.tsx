@@ -92,7 +92,8 @@ function RepoBody({ board, actions, attention, issues }: RepoProps & { attention
 
 /**
  * 直近の日数の入力欄（リポジトリごと。設定画面と同じ値）。値は入力欄が持つ（uncontrolled）ので、自動の読み直しで
- * 欄を描き直しても入力中の値は消えない。送ると入力欄の文字列のまま渡す（検査と保存は呼び手）。
+ * 欄を描き直しても入力中の値は消えない。保存されている値が変わったとき（設定画面で変えたあとの読み直し）だけ、
+ * `key` で入力欄を作り直して新しい値を出す。送ると入力欄の文字列のまま渡す（検査と保存は呼び手）。
  * 送る（submit）は捕捉の段で受ける（泡立たない submit でも受けるため。入れ子の form は無い）。
  */
 function RecentDays({ board, set }: { board: RepoBoard; set: (repo: RepoBoard, value: string) => void }): JSX.Element {
@@ -108,7 +109,7 @@ function RecentDays({ board, set }: { board: RepoBoard; set: (repo: RepoBoard, v
     >
       <label>
         {"直近の日数（表示用） "}
-        <input ref={input} type="number" name="recentDays" min="0" max={String(MAX_RECENT_DAYS)} step="1" defaultValue={String(board.repo.recentDays)} />
+        <input key={board.repo.recentDays} ref={input} type="number" name="recentDays" min="0" max={String(MAX_RECENT_DAYS)} step="1" defaultValue={String(board.repo.recentDays)} />
       </label>
       <ActionButton type="submit" action="recent-days">
         変える

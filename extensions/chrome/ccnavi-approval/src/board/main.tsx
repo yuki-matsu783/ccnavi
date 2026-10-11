@@ -51,7 +51,14 @@ const controller = createBoardController({
   },
 });
 
-createRoot(main).render(<App controller={controller} md={md} frame={frame} />);
+createRoot(main, {
+  // 欄の境界の外で落ちたら、ルートが外れて何も描かれなくなる。壊れたのか承認待ちが無いのか見分けられるよう、言う
+  onUncaughtError: (err) => {
+    console.error(err);
+    controller.reportRenderError(err);
+  },
+  onCaughtError: (err) => console.error(err),
+}).render(<App controller={controller} md={md} frame={frame} />);
 document.getElementById("refresh")?.addEventListener("click", () => void controller.refresh());
 document.getElementById("options")?.addEventListener("click", () => controller.openOptions());
 controller.start();

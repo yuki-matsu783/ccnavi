@@ -7,6 +7,7 @@
  *
  * 書く操作の最中（controller の `busy` と、書いた後の読み直しが始まるまで）は、`BusyContext` で `button.action` を
  * すべて押せなくする。見出しの 2 つのボタンは `action` を持たないので巻き込まない。
+ * 欄は 1 つずつ `RepoBoundary` で囲み、描く途中で投げた欄だけをエラー表示にする（ほかの欄は残す）。
  */
 import { useLayoutEffect, useSyncExternalStore, type JSX } from "react";
 import { createPortal } from "react-dom";
@@ -15,6 +16,7 @@ import type { Renderer } from "../core/sanitize.js";
 import type { BoardController } from "./controller.js";
 import { BusyContext, MarkdownContext } from "./parts.js";
 import { Repo } from "./Repo.js";
+import { RepoBoundary } from "./RepoBoundary.js";
 
 /** board.html に置いてある枠 */
 export interface Frame {
@@ -61,7 +63,9 @@ export function App({ controller, md, frame }: AppProps): JSX.Element {
     <MarkdownContext value={md}>
       <BusyContext value={busy}>
         {[...s.sections].map(([key, section]) => (
-          <Repo key={key} board={section.board} actions={controller.actions} attention={section.attention} issues={section.issues} />
+          <RepoBoundary key={key} name={`${section.board.repo.owner}/${section.board.repo.repo}`} repoKey={key} section={section}>
+            <Repo board={section.board} actions={controller.actions} attention={section.attention} issues={section.issues} />
+          </RepoBoundary>
         ))}
       </BusyContext>
       {createPortal(

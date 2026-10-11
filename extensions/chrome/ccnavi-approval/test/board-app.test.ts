@@ -3,22 +3,24 @@
  * ここでは状態がどう画面に出るか（書く操作の最中に押せなくするボタン、入力中の値、ページの決まった枠）だけを見る。
  * 状態の移り変わりは test/board-controller.test.ts、欄の中身（DOM）は Pyodide で組んだボードを描く各試験が見る。
  */
+import fs from "node:fs";
+import path from "node:path";
 import { after, afterEach, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-import type { Actions, BoardController, BoardSnapshot, Section } from "../src/board/controller.js";
+import { createBoardController, type Actions, type BoardController, type BoardEnv, type BoardOps, type BoardSnapshot, type Section } from "../src/board/controller.js";
 import type { App as AppType } from "../src/board/App.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { FamilyBoard, RepoBoard } from "../src/core/snapshot.js";
 import type { RepoConfig } from "../src/core/settings.js";
+import type { Outcome } from "../src/core/write.js";
+import { HERE } from "./helpers/python.js";
 
-const PAGE = `<!doctype html><html><body data-state="loading">
-<header class="top"><h1>ccnavi 承認ボード</h1><button type="button" id="refresh">更新</button><button type="button" id="options">設定</button></header>
-<p id="status" role="status">読み込み中…</p><div id="banner"></div><p id="result" role="status" aria-live="polite"></p><main id="boards"></main>
-</body></html>`;
+// 本物のページ（static/board.html）。見出しの 2 つのボタンや枠の ID は写しではなく実物で確かめる（scripts は動かさない）
+const PAGE = fs.readFileSync(path.join(HERE, "static", "board.html"), "utf8");
 const dom = new JSDOM(PAGE);
 const g = globalThis as unknown as Record<string, unknown>;
 const saved = new Map<string, PropertyDescriptor | undefined>();
@@ -149,12 +151,16 @@ function sections(...list: Section[]): Map<string, Section> {
 
 async function mount(initial: Partial<BoardSnapshot> = {}) {
   const f = fake(initial);
+  await mountOn(f.controller);
+  return f;
+}
+
+async function mountOn(controller: Pick<BoardController, "snapshot" | "subscribe" | "actions">) {
   const frame = { body: doc.body, status: $("#status"), banner: $("#banner"), result: $("#result") };
   const md = createRenderer(dom.window as unknown as Parameters<typeof createRenderer>[0]);
   const r = createRoot($("#boards"));
   root = r;
-  await act(async () => r.render(createElement(App, { controller: f.controller, md, frame })));
-  return f;
+  await act(async () => r.render(createElement(App, { controller, md, frame })));
 }
 
 const actionButtons = () => [...doc.querySelectorAll<HTMLButtonElement>("main button.action")];
@@ -185,6 +191,7 @@ test("CX-T226 書く操作の最中は、欄のボタン（button.action）を�
   await f.set({ state: "loading" });
   assert.ok(actionButtons().every((b) => !b.disabled));
   assert.ok(!$<HTMLButtonElement>("#refresh").disabled && !$<HTMLButtonElement>("#options").disabled);
+  assert.equal(doc.querySelectorAll("header.top button").length, 2);
   assert.equal(doc.querySelectorAll("header.top button.action").length, 0);
   // 押せば渡した操作を呼ぶ
   for (const b of actionButtons()) await act(async () => b.click());
@@ -205,28 +212,138 @@ test("CX-T227 直近の日数の入力欄は、自動の読み直しで欄を描
   assert.deepEqual(pressed, ["days 12"]);
 });
 
-test("CX-T228 ページの決まった枠: #status の文字と data 属性、PAT の期限の帯、#result の data-kind と見た目、body の data-state", async () => {
-  const f = await mount();
+test("CX-T228 ページの決まった枠: 本物の controller が出す状態を App が描く（#status の文字と data 属性、PAT の期限の帯、#result の data-kind と見た目、body の data-state）", async () => {
+  let outcome: Outcome | Error = { kind: "written", oid: "0123456789abcdef", rounds: 1, lines: [] };
+  const ops: Partial<BoardOps> = {
+    collectRepo: async () => board(),
+    approveFamily: async () => {
+      if (outcome instanceof Error) throw outcome;
+      return outcome;
+    },
+  };
+  const c = createBoardController(stubEnv({ ops }));
+  await mountOn(c);
+  // 読み込み前
   assert.equal(doc.body.dataset.state, "loading");
   assert.equal($("#status").textContent, "読み込み中…");
   assert.equal($("#banner").children.length, 0);
   assert.equal($("#result").getAttribute("class"), null);
-  await f.set({
-    status: { text: "Pyodide 0.test: 起動 10 ms・読み込み 20 ms", bootMs: 10, importMs: 20, violations: 0 },
-    banner: [{ level: "soon", className: "notice warn", text: "あと 3 日で切れる" }],
-    result: { kind: "written", className: "notice ok", text: "承認を書いた" },
-    state: "done",
-  });
+  await act(async () => c.refresh());
   assert.equal(doc.body.dataset.state, "done");
   assert.equal($("#status").outerHTML, '<p id="status" role="status" data-boot-ms="10" data-import-ms="20" data-violations="0">Pyodide 0.test: 起動 10 ms・読み込み 20 ms</p>');
   assert.equal($("#banner").innerHTML, '<p class="notice warn" data-level="soon">あと 3 日で切れる</p>');
-  assert.equal($("#result").outerHTML, '<p id="result" role="status" aria-live="polite" data-kind="written" class="notice ok">承認を書いた</p>');
+  assert.equal($("#result").getAttribute("class"), null);
+  const press = async () => {
+    await act(async () => $<HTMLButtonElement>("button[data-action=approve]").click());
+    for (let i = 0; i < 200 && (c.snapshot().busy || c.snapshot().state !== "done"); i++) await act(async () => new Promise((r) => setImmediate(r)));
+    assert.equal(c.snapshot().state, "done");
+  };
+  // 書けた: 緑
+  await press();
+  assert.equal($("#result").outerHTML, '<p id="result" role="status" aria-live="polite" data-kind="written" class="notice ok">承認を書いた（0123456）。書いた後の中身も確かめた</p>');
   // 書く途中で投げた: 赤で言う
-  await f.set({ result: { kind: "failed", className: "notice error", text: "書けなかった: 壊れた" } });
+  outcome = new Error("壊れた");
+  await press();
   assert.equal($("#result").dataset.kind, "failed");
   assert.equal($("#result").className, "notice error");
+  assert.equal($("#result").textContent, "書けなかった: 壊れた");
   // 読み直しで一言を消す: data-kind を外し、見た目は前のまま
-  await f.set({ result: { kind: undefined, className: "notice error", text: "" }, banner: [] });
+  await act(async () => c.refresh());
   assert.equal($("#result").outerHTML, '<p id="result" role="status" aria-live="polite" class="notice error"></p>');
-  assert.equal($("#banner").children.length, 0);
+  // 次に書けたら緑に戻る
+  outcome = { kind: "written", oid: "fedcba9876543210", rounds: 1, lines: [] };
+  await press();
+  assert.equal($("#result").dataset.kind, "written");
+  assert.equal($("#result").className, "notice ok");
+  assert.match($("#result").textContent ?? "", /^承認を書いた（fedcba9）/);
+});
+
+/** 差し替えた外界で、本物の controller を動かす（board-controller.test.ts の harness の要約） */
+function stubEnv(over: { ops?: Partial<BoardOps> } = {}): BoardEnv {
+  const store: Record<string, unknown> = { repos: [REPO] };
+  return {
+    hosts: [{ id: "github.com", kind: "github", api: "https://api.github.com", graphql: "https://api.github.com/graphql", web: "https://github.com", label: "GitHub" }] as unknown as BoardEnv["hosts"],
+    version: "0.0.0-test",
+    send: async (message) => {
+      const m = message as { kind: string; op?: string };
+      if (m.kind === "token.status") return { ok: true, value: { set: true, notice: { level: "soon", text: "あと 3 日で切れる" } } };
+      if (m.op === "pullApprovals") return { ok: true, value: [] };
+      return { ok: false, error: `想定外の依頼: ${JSON.stringify(message)}` };
+    },
+    storage: {
+      get: async (k) => {
+        const key = String(k);
+        return key in store ? { [key]: structuredClone(store[key]) } : {};
+      },
+      set: async (items) => void Object.assign(store, structuredClone(items)),
+    },
+    openOptions: () => undefined,
+    confirm: () => true,
+    prompt: () => "理由",
+    startWorker: () => ({ call: async () => ({}), init: async () => ({ boot_ms: 10, import_ms: 20, total_ms: 30, pyodide: "0.test", violations: [] }) }),
+    blobCache: async () => ({ get: async () => undefined, put: async () => undefined }),
+    now: () => new Date("2026-01-01T00:00:00Z"),
+    editing: () => false,
+    timers: { doc: { visibilityState: "visible", addEventListener: () => undefined }, now: () => 0, setTimeout: () => 0, clearTimeout: () => undefined },
+    ops: over.ops,
+  };
+}
+
+/** `owner/repo` を指定した欄の材料。`bad` は描く途中で投げる（batch の overflow が無い） */
+function sectionOf(repo: string, bad = false): Section {
+  const b = board();
+  const fam = writable("i0001");
+  if (bad) (fam.result as unknown as { batch: unknown[] }).batch = [{ ticket: "x", title: "", revision: false, phase: null, path: "p", body: "b" }];
+  return { board: { ...b, repo: { ...REPO, repo }, families: [fam] } as RepoBoard, attention: {}, issues: undefined };
+}
+
+test("CX-T229 欄を描く途中で投げても、その欄だけがエラー表示になり、ほかの欄は残る。次の状態で正しければ欄が戻る", async () => {
+  const errors: string[] = [];
+  const orig = console.error;
+  console.error = (...a: unknown[]) => void errors.push(String(a[0]));
+  try {
+    const f = await mount({ sections: sections(sectionOf("a")), state: "done" });
+    assert.equal(doc.querySelectorAll("section.repo").length, 1);
+    await f.set({ sections: sections(sectionOf("a"), sectionOf("b", true)) });
+    const repos = [...doc.querySelectorAll<HTMLElement>("section.repo")];
+    assert.deepEqual(repos.map((r) => r.dataset.repo), ["github.com/acme/a", "github.com/acme/b"]);
+    assert.ok(repos[0].querySelector("article.family"), "壊れていない欄は残る");
+    const alert = repos[1].querySelector<HTMLElement>("p.notice.error[role=alert]");
+    assert.ok(alert, "壊れた欄にエラー表示");
+    assert.match(alert.textContent ?? "", /acme\/b の欄を描けなかった/);
+    assert.equal(repos[1].querySelector("article.family"), null);
+    // 壊れた欄があっても、ほかの状態変化は描く（購読は残る）
+    await f.set({ status: { text: "続き" }, state: "done" });
+    assert.equal($("#status").textContent, "続き");
+    // 同じ材料のまま状態だけ変わっても、描き直しは試さない（投げ続けない）
+    const before = errors.length;
+    await f.set({ busy: true });
+    await f.set({ busy: false });
+    assert.equal(errors.length, before);
+    // 次に流した snapshot が正しければ、欄が戻る
+    await f.set({ sections: sections(sectionOf("a"), sectionOf("b")) });
+    const back = [...doc.querySelectorAll<HTMLElement>("section.repo")];
+    assert.equal(back.length, 2);
+    assert.ok(back[1].querySelector("article.family"));
+    assert.equal(doc.querySelectorAll("p.notice.error").length, 0);
+  } finally {
+    console.error = orig;
+  }
+});
+
+test("CX-T230 直近の日数の入力欄は、保存されている値が変わった読み直しでは新しい値を出し、同じ値なら入力中の値と要素を保つ", async () => {
+  const f = await mount({ sections: sections({ board: board(7), attention: {}, issues: undefined }), state: "done" });
+  const input = $<HTMLInputElement>("form.recent-days input[name=recentDays]");
+  assert.equal(input.value, "7");
+  input.value = "12";
+  // 同じ値（7）: 入力中の文字も要素も保つ
+  await f.set({ sections: sections({ board: board(7), attention: {}, issues: undefined }) });
+  assert.equal($<HTMLInputElement>("form.recent-days input[name=recentDays]"), input);
+  assert.equal(input.value, "12");
+  // 設定画面で 30 に変えた後の読み直し: 欄は 30
+  await f.set({ sections: sections({ board: board(30), attention: {}, issues: undefined }) });
+  assert.equal($<HTMLInputElement>("form.recent-days input[name=recentDays]").value, "30");
+  pressed.length = 0;
+  await act(async () => $<HTMLButtonElement>("form.recent-days button[type=submit]").click());
+  assert.deepEqual(pressed, ["days 30"]);
 });
