@@ -18,9 +18,9 @@ allow:
     glob: "docs/CONTEXT.md"
   - match: Write|Edit
     glob: "README.md"
-started_at: ""
-completed_at: ""
-base_sha: ""
+started_at: "2026-10-12T05:49:33+0900"
+completed_at: "2026-10-12T05:53:49+0900"
+base_sha: "77812f6c59ff7c572bcfb571ff7064518fc6c674"
 ---
 ## 直す文書
 
