@@ -157,14 +157,26 @@ export interface ChildWorktreeFailure {
 }
 
 /**
+ * `ccnavi-git.sh` の失敗から理由を 1 行で取る。sh は結果を標準出力に出し標準エラーは空のことがあるので、
+ * `fatal:` / `error:` の行を優先し、無ければ標準出力の 1 行目（ログの場所を含む）を返す。
+ */
+export function failureReason(stderr: string, stdout: string): string {
+  const lines = `${stderr}\n${stdout}`.split("\n").map((l) => l.trim()).filter((l) => l !== "");
+  const cause = lines.find((l) => /^(fatal|error):/.test(l));
+  return cause ?? lines[0] ?? "";
+}
+
+/**
  * 作れなかった子のワークツリーを、名前と手で打つコマンドで知らせる文（1 本 1 行）。
+ * 同名のブランチが既にあって失敗したときは `-b` の形が再び失敗するので、既存のブランチを出す形も添える。
  * `gitCommand` は `ccnavi-git.sh` を呼ぶ sh の前置き（`commands.ts` の `gitScriptCommand`）。
  */
 export function childWorktreeFailureText(failed: readonly ChildWorktreeFailure[], gitCommand: string): string {
   return failed
     .map(({ worktree: w, reason }) =>
       `子 ${w.ticket} のワークツリー ${w.path} を作れなかった（${reason}）。` +
-      `手で作るなら: ${gitCommand} worktree add ${w.path} -b ${w.branch} ${w.base}`,
+      `手で作るなら: ${gitCommand} worktree add ${w.path} -b ${w.branch} ${w.base}。` +
+      `ブランチ ${w.branch} が既にあるなら: ${gitCommand} worktree add ${w.path} ${w.branch}`,
     )
     .join("\n");
 }

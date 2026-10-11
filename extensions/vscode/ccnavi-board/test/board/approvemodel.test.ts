@@ -5,6 +5,7 @@ import * as path from "node:path";
 import {
   APPROVE_VERSION,
   childWorktreeFailureText,
+  failureReason,
   parseApprovePreview,
   parseApproveResult,
   partialMessage,
@@ -252,7 +253,15 @@ test("CB-T399 作れなかった子のワークツリーは、名前と手で打
   assert.equal(
     text,
     "子 i0001-01-01 のワークツリー .claude/worktrees/i0001-01-01 を作れなかった（fatal: already exists）。" +
-      "手で作るなら: sh '/ws/.ccnavi/scripts/ccnavi-git.sh' worktree add .claude/worktrees/i0001-01-01 -b i0001-01-01 i0001",
+      "手で作るなら: sh '/ws/.ccnavi/scripts/ccnavi-git.sh' worktree add .claude/worktrees/i0001-01-01 -b i0001-01-01 i0001。" +
+      "ブランチ i0001-01-01 が既にあるなら: sh '/ws/.ccnavi/scripts/ccnavi-git.sh' worktree add .claude/worktrees/i0001-01-01 i0001-01-01",
   );
   assert.equal(childWorktreeFailureText([], "sh x"), "");
+});
+
+test("CB-T400 失敗の理由は fatal / error の行を優先し、標準出力だけのときは 1 行目（ログの場所を含む）を取る", () => {
+  assert.equal(failureReason("", "fail git worktree exit=255  log=logs/git-1.log\nfatal: a branch named 'Z1' already exists\n"), "fatal: a branch named 'Z1' already exists");
+  assert.equal(failureReason("error: x\n", "fail git worktree"), "error: x");
+  assert.equal(failureReason("", "fail git worktree exit=255  log=logs/git-1.log\n"), "fail git worktree exit=255  log=logs/git-1.log");
+  assert.equal(failureReason("", ""), "");
 });

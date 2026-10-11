@@ -32,6 +32,7 @@ import {
   type ApprovePreview,
   type ApproveResult,
   type ApproveWorktree,
+  failureReason,
 } from "./core/approvemodel.js";
 import {
   approveArgs,
@@ -378,7 +379,7 @@ export async function runChildWorktreeAdd(shell: string, root: string, w: Approv
   if (ran.code === 0) {
     return "";
   }
-  return firstLine(ran.stderr) || firstLine(ran.stdout) || `終了コード ${ran.code}`;
+  return failureReason(ran.stderr, ran.stdout) || `終了コード ${ran.code}`;
 }
 
 /**

@@ -95,7 +95,7 @@ async function createChildWorktrees(root: string, worktrees: readonly ApproveWor
   const failed: ChildWorktreeFailure[] = [];
   for (const w of worktrees.filter((x) => x.state === "create")) {
     const reason = await runChildWorktreeAdd(scriptShell(), root, w);
-    diaglog.get("ccnavi-board", root).info("子のワークツリーを作った", { ticket: w.ticket, ok: reason === "" });
+    diaglog.get("ccnavi-board", root).info("子のワークツリーの作成結果", { ticket: w.ticket, ok: reason === "" });
     if (reason !== "") {
       failed.push({ worktree: w, reason });
     }

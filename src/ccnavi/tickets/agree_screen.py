@@ -94,7 +94,7 @@ def _child_worktree_lines(
             base = w["base"]
             lines.append(
                 f"子 {tid} のワークツリー {path} は、親のブランチ {base} から"
-                "承認の時点で作成を試みた。"
+                "承認の後に作られる予定（作れなければ案内の警告に理由が出る）。"
                 f"無ければ '{git_sh} worktree add {path} -b {tid} {base}' で作る"
             )
         elif w["state"] == "exists":
