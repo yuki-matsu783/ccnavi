@@ -121,6 +121,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "policy.rules",
                 "records.audit",
                 "records.diaglog",
+                "records.failstreak",
                 "records.prune",
                 "records.repeat",
             }

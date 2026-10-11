@@ -33,7 +33,7 @@
 # ここに要る。
 #
 # 配布元は、既定ではこのスクリプト自身の置き場から決める。設定だけが書かれて実行ファイルが
-# 無いと、hook が 7 つ登録されているのに何も起動しない。これが一番分かりにくい不具合の
+# 無いと、hook が 8 つ登録されているのに何も起動しない。これが一番分かりにくい不具合の
 # 出方になる。既定で配布物まで置けば、実行したユーザが `--deploy` を知っているかどうかで結果が
 # 変わらない。よそから配りたいときだけ、`--deploy` で配布元を指定する。
 #
@@ -72,9 +72,9 @@ VSCODE_KEYS='{"git.detectWorktrees": true}'
 # イベント名を見て ccnavi 自身が選ぶ。
 HOOK_COMMAND='"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
 HOOK_TIMEOUT=10
-# 7 つのイベントすべてに登録する。1 つでも欠けると、そのイベントでしかできない処理が、
+# 8 つのイベントすべてに登録する。1 つでも欠けると、そのイベントでしかできない処理が、
 # 気づかないうちに行われなくなる。何が行われなくなるかは README「設定」の表にある。
-EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse Stop SubagentStart SubagentStop"
+EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse PostToolUseFailure Stop SubagentStart SubagentStop"
 # セッションの開始時に、承認済みチケットとマーカー（親ブランチに含まれて届く）と、ワークツリーの
 # 起点になるデフォルトブランチを取得する sh。本体とは別の 1 行として SessionStart に登録する。
 # 取得しないと、別の機械で承認したものが反映されず、古い main からブランチを切ることになる。

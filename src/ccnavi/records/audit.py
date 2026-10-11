@@ -122,6 +122,9 @@ class Record:
     # 「戻した」が何回あったかは、ここを数えないと分からない。
     guarded: list[str] = field(default_factory=list)
     session: str = ""
+    # agent は呼び出したサブエージェントの id（メインなら空）。記録の行には書かない。
+    # 失敗・拒否の連続（failstreak）を、サブエージェントごとに別に数えるために持つ。
+    agent: str = ""
     # tree と project は、この呼び出しがどのツリーのものと判定されたか。
     # パスを持つツールは行き先、Bash は cwd のツリー。project はプロジェクトの名前で、
     # ワークスペースなら空。dry-run でまず分布を見て、和で増えた確認を数えるための欄。

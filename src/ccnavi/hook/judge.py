@@ -21,7 +21,7 @@ from ..policy import (
     selfguard_shell,
     selfguard_targets,
 )
-from ..records import audit, repeat
+from ..records import audit, failstreak, repeat
 from ..tickets import (
     approval,
     approval_checks,
@@ -33,7 +33,7 @@ from ..tickets import (
     ticket_model,
     ticket_places,
 )
-from . import projskills, reasons, wrapguard
+from . import docsearch, projskills, reasons, wrapguard
 
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
 # それより先に自前の判定を出し終えることが、遅い判定が何も返さないまま許可として扱われて
@@ -260,6 +260,7 @@ def decide_before(
                     )
                 ],
                 conf=conf,
+                root=root,
             )
 
     # 記録と state を消す `ccnavi --prune`（`--preview` の無い形）は、チケット制御に依らず止める
@@ -288,6 +289,7 @@ def decide_before(
                     )
                 ],
                 conf=conf,
+                root=root,
             )
 
     # ユーザの判断の経路のうち、hook のほかに保護が無い形（端末要求を切る形、ボードの経路の形）は
@@ -319,6 +321,7 @@ def decide_before(
                     )
                 ],
                 conf=conf,
+                root=root,
             )
 
     # 子チケットのワークツリーからの `ccnavi-git.sh push` は、誰が打っても止める。sh も同じ検査を
@@ -344,6 +347,7 @@ def decide_before(
                     )
                 ],
                 conf=conf,
+                root=root,
             )
 
     # サブエージェントには、状態を動かすスクリプトもレビューのスクリプトも打たせない。
@@ -369,6 +373,7 @@ def decide_before(
             rules.DENY,
             notices + [reasons.subagent_forbidden(subject, runner, layer)],
             conf=conf,
+            root=root,
         )
 
     # 承認済みチケットの置き場（`approval.read_raw`）。1 回の判定で読むのは 1 度だけにし、
@@ -387,7 +392,9 @@ def decide_before(
         if held is not None and not exempt:
             record.code, record.rules = phase.CODE_REVIEW, [reasons.TICKET_RULE]
             reason = phase.hold_reason(held, payload.tool_name, root)
-            return refuse(stdout, mode, record, rules.DENY, notices + [reason], conf=conf)
+            return refuse(
+                stdout, mode, record, rules.DENY, notices + [reason], conf=conf, root=root
+            )
 
     # 承認済みチケットの索引。ワークツリーへの書き込みでは、プロジェクトの食い違いの点検と
     # チケットの範囲の判定の両方が引く。走査は 1 回で数百ミリ秒かかるので、1 回の判定で
@@ -413,7 +420,9 @@ def decide_before(
         mismatch = project_mismatch(conf, root, target, record.subject, index)
         if mismatch:
             record.code, record.rules = reasons.CODE_TICKET_PROJECT, [reasons.TICKET_RULE]
-            return refuse(stdout, mode, record, rules.DENY, notices + [mismatch], conf=conf)
+            return refuse(
+                stdout, mode, record, rules.DENY, notices + [mismatch], conf=conf, root=root
+            )
 
     # 着手中の子のフローは書き換えさせない。ルールより先に見る。
     # 置き場は承認済みの領域で、エージェントの書き込みは組み込みの保護でも止まる。ロックは
@@ -424,7 +433,9 @@ def decide_before(
             index = approval_checks.by_id(scanned)
         if locked:
             record.code, record.rules = flow.CODE_LOCKED, [flow.LOCK_RULE]
-            return refuse(stdout, mode, record, rules.DENY, notices + [locked], conf=conf)
+            return refuse(
+                stdout, mode, record, rules.DENY, notices + [locked], conf=conf, root=root
+            )
 
     # 書き直しを求める形は、ルールより先に止める（読み分けずに止めて書き直しを案内する）。
     # ブレース展開と、実行するときに決まるコマンド名は、ルールを当てる読みと実行されるものが
@@ -441,7 +452,7 @@ def decide_before(
             reasons.rewrite(record.subject, form, [text for f, text in rewrites if f == form])
             for form in forms
         ]
-        return refuse(stdout, mode, record, rules.DENY, notices + parts, conf=conf)
+        return refuse(stdout, mode, record, rules.DENY, notices + parts, conf=conf, root=root)
 
     # 生の文字列（読み切れなかった Bash と、読まない PowerShell）に `>` が多すぎると、シェルから
     # 書き込む形の保護の照合が `>` の個数 × 尾の長さで遅くなる（selfguard_shell.REDIRECT_LIMIT）。
@@ -684,7 +695,7 @@ def decide_before(
             )
         return EXIT_OK
 
-    return refuse(stdout, mode, record, verdict, notices + texts, context, conf=conf)
+    return refuse(stdout, mode, record, verdict, notices + texts, context, conf=conf, root=root)
 
 
 def refuse(
@@ -695,6 +706,7 @@ def refuse(
     parts: list[str],
     context: str = "",
     conf: settings.Settings | None = None,
+    root: str = "",
 ) -> int:
     """拒否か確認を返す。dry-run なら返す代わりに、返していたはずだと言う。
 
@@ -705,15 +717,23 @@ def refuse(
     conf があれば、止めた回を数える（repeat）。同じ理由で同じ呼び出しを N 回止めたら、
     文面の末尾に「言い換えずに相談する」一文を足す。判定は変えない。数えるのは実際に
     止めた回（enable の deny）だけで、dry-run と確認は数えない。
+
+    拒否は、失敗の連続（failstreak）にも数える。こちらは dry-run の deny も数える（dry-run は
+    判定を変えないので、案内を出してよい）。連続が閾値に達した回は、文面の末尾に資料を引く案内を足す。
     """
     # 空行で区切るのは、1 件ずつが閉じた文であることを見た目でも保つため。
     reason = "\n\n".join(parts)
     decision = audit.DENY if verdict == rules.DENY else audit.ASK
+    streak = ""
+    if conf is not None and verdict == rules.DENY:
+        streak = fail_streak_hint(conf, root, record)
 
     if mode == modes.DRY_RUN:
         record.decision, record.enforced = decision, False
         would = "stopped" if verdict == rules.DENY else "asked the user about"
         text = f"[ccnavi dry-run] {modes.ENABLE} would have {would} this call:\n" + reason
+        if streak:
+            text += "\n\n" + streak
         if context:
             text += "\n\n" + context
         hookio.write_context(stdout, hookio.PRE_TOOL_USE, text)
@@ -724,10 +744,25 @@ def refuse(
         n = repeat.count(conf.state, record)
         if n >= repeat.threshold(conf.deny_repeat):
             reason += "\n\n" + repeat.note(repeat.rule_of(record), n)
+        if streak:
+            reason += "\n\n" + streak
     hookio.write_verdict(
         stdout, hookio.DENY if verdict == rules.DENY else hookio.ASK, reason, context
     )
     return EXIT_OK
+
+
+def fail_streak_hint(conf: settings.Settings, root: str, record: audit.Record) -> str:
+    """拒否を失敗の連続に 1 回数え、案内を出す回ならその文を返す。出さない回と数えられない回は空。
+
+    数えの失敗や案内を組む失敗で、判定を止めない。
+    """
+    n = failstreak.threshold(conf.fail_streak_count)
+    try:
+        got = failstreak.fail(conf.state, record.session, record.agent, n)
+        return docsearch.fail_streak_note(conf, root, got) if got else ""
+    except Exception:  # noqa: BLE001  案内の失敗で判定を止めない
+        return ""
 
 
 def subject_of(payload: hookio.Input) -> str:

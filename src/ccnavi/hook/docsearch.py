@@ -343,9 +343,19 @@ def notice(conf: settings.Settings, root: str, found: Collected) -> str:
         guide = _has_md(root)
     if not guide:
         return "\n".join(f"[ccnavi] md の索引（--docs）: {e}" for e in extra)
+    lines = guide_lines(conf, root, f"{GUIDE_HEAD}、grep・Glob より先に")
+    lines.extend(f"  {e}" for e in extra)
+    return "\n".join(lines)
+
+
+def guide_lines(conf: settings.Settings, root: str, lead: str) -> list[str]:
+    """索引の引き方の案内。`lead` の後ろに `--docs` の呼び方が続く 1 行目と、補足の行。
+
+    SessionStart の案内（notice）と、失敗が続いたときの案内（fail_streak_note）が同じ文面を使う。
+    """
     command = _command(conf, root)
     lines = [
-        f"{GUIDE_HEAD}、grep・Glob より先に '{command} --docs' で"
+        f"{lead} '{command} --docs' で"
         " frontmatter の索引を引いてください（ワークスペースとプロジェクトを横断。パスは"
         "ワークスペースルートから）。grep は本文中の文字列を探すときか、0 件だったときに"
         "使ってください。",
@@ -359,5 +369,19 @@ def notice(conf: settings.Settings, root: str, found: Collected) -> str:
     ]
     if os.path.isfile(os.path.join(root, *CONVENTION_DOC.split("/"))):
         lines[-1] += f"type の値と詳しい決まりは {CONVENTION_DOC}"
-    lines.extend(f"  {e}" for e in extra)
-    return "\n".join(lines)
+    return lines
+
+
+def fail_streak_note(conf: settings.Settings, root: str, n: int) -> str:
+    """失敗か拒否が n 回続いたときの案内。資料の索引を引くよう促す。
+
+    止められた呼び出しを迂回する案内にはしない。止まった理由と決まった手順を確かめるために
+    引かせ、見つからなければユーザに相談させる。
+    """
+    lead = (
+        f"[ccnavi] ツール呼び出しの失敗か拒否が {n} 回続いています。"
+        "同じ操作を言い換えて打ち直したり、止められた操作の迂回を探したりせず、"
+        "止まった理由と決まった手順を資料で確かめてください。確かめても分からなければ、"
+        "ユーザに相談してください。資料は"
+    )
+    return "\n".join(guide_lines(conf, root, lead))

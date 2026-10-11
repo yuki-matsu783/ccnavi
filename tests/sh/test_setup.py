@@ -63,12 +63,13 @@ ANOTHER_MACHINE = "haiku-riscv64"
 SHELL = shutil.which("sh") or shutil.which("bash")
 HAS_JQ = shutil.which("jq") is not None
 
-# 登録されていることを確かめる 7 つ。README「設定」の表と対になる。
+# 登録されていることを確かめる 8 つ。README「設定」の表と対になる。
 EVENTS = (
     "SessionStart",
     "UserPromptSubmit",
     "PreToolUse",
     "PostToolUse",
+    "PostToolUseFailure",
     "Stop",
     "SubagentStart",
     "SubagentStop",
@@ -269,7 +270,7 @@ class SetupTest(unittest.TestCase):
 
 class WritesTheExpectedShape(SetupTest):
     def test_writes_env_and_all_seven_hooks(self):
-        """設定ファイルが無いところに、env と 7 つの hook を作る。"""
+        """設定ファイルが無いところに、env と 8 つの hook を作る。"""
         result = self.run_setup()
         self.assertEqual(result.returncode, 0, result.stderr)
 
@@ -1297,7 +1298,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     def test_copies_without_being_told_where_from(self):
         """配布元を名指ししなくても配る。既定はスクリプト自身の置き場の 1 つ上。
 
-        設定だけ書かれて実行ファイルが無い形は、hook が 7 つ登録されているのに
+        設定だけ書かれて実行ファイルが無い形は、hook が 8 つ登録されているのに
         何も起動しない、という一番分かりにくい不具合になる。そこが、打ったユーザが
         `--deploy` を知っているかどうかで分かれない。
         """

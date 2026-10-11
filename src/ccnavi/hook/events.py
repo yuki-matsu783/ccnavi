@@ -15,7 +15,7 @@ from typing import TextIO
 from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import builtin, ctxfile, ruleload, rules, selfguard, selfguard_targets
-from ..records import audit, prune, repeat
+from ..records import audit, failstreak, prune, repeat
 from ..tickets import approval, approval_checks, branchfind, ops_stop, phase, skillsync
 from . import docsearch, judge, post, post_findings, projskills, reasons, subagent
 
@@ -52,6 +52,8 @@ def decide(
         return judge.decide_before(stdout, stderr, mode, conf, root, payload, record, deadline)
     if payload.event == hookio.POST_TOOL_USE:
         return decide_after(stdout, stderr, mode, conf, root, payload, record)
+    if payload.event == hookio.POST_TOOL_USE_FAILURE:
+        return decide_after_failure(stdout, conf, root, payload, record)
     if payload.event == hookio.SESSION_START:
         return decide_at_start(stdout, stderr, mode, conf, root, payload, record, deadline)
     if payload.event == hookio.USER_PROMPT_SUBMIT:
@@ -454,6 +456,36 @@ def _written(payload: hookio.Input, record: audit.Record) -> str:
     return fsio.full_path(record.subject, payload.cwd)
 
 
+def decide_after_failure(
+    stdout: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+) -> int:
+    """ツール自体が失敗した。失敗の連続（failstreak）に数え、閾値に達した回に資料を引く案内を返す。
+
+    止められるイベントではないので、返せるのは文だけ。判定は持たない。中断（is_interrupt）は
+    ユーザが止めたもので、ツールの誤りではないので数えない。数えの失敗や案内を組む失敗で、
+    ツールの結果は変わらない。
+    """
+    record.decision, record.reason = audit.SKIP, audit.REASON_EVENT_NOT_CHECKED
+    if payload.is_interrupt:
+        return EXIT_OK
+    n = failstreak.threshold(conf.fail_streak_count)
+    try:
+        got = failstreak.fail(conf.state, payload.session_id, payload.agent_id, n)
+        if got:
+            hookio.write_context(
+                stdout,
+                hookio.POST_TOOL_USE_FAILURE,
+                docsearch.fail_streak_note(conf, root, got),
+            )
+    except Exception:  # noqa: BLE001  案内の失敗でツールの結果を変えない
+        return EXIT_OK
+    return EXIT_OK
+
+
 def decide_after(
     stdout: TextIO,
     stderr: TextIO,
@@ -470,6 +502,13 @@ def decide_after(
     何も止めていないので、遅れは待ち時間にしかならない。作業ツリーを読む側は
     自前の短い時間を持っていて、そこに達したら何も言わずに終わる。
     """
+    # 成功が入ったので、失敗の連続（failstreak）を 0 に戻す。
+    failstreak.reset(
+        conf.state,
+        payload.session_id,
+        payload.agent_id,
+        failstreak.threshold(conf.fail_streak_count),
+    )
     # 設定ファイルを先に戻す。ルールを読むより前でなければならない。あとから
     # 戻すと、この呼び出しが書き換えたルールファイルをそのまま読んで保護領域を
     # 決めることになり、`deny` を空にされた版で「守るものは無い」と判断する。

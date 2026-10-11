@@ -22,7 +22,7 @@ export interface HookEntry {
 }
 
 /** ツール名を持つイベント。これ以外は matcher に関係なく常に走る */
-export const TOOL_EVENTS = ["PreToolUse", "PostToolUse"] as const;
+export const TOOL_EVENTS = ["PreToolUse", "PostToolUse", "PostToolUseFailure"] as const;
 
 export function parseHooks(text: string, source: HookSource): HookEntry[] {
   let raw: unknown;
