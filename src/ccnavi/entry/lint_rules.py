@@ -454,11 +454,17 @@ def _broad(rule: rules.Rule) -> str:
     機械的に言えるものに限る。当たる頻度は記録を見ないと分からないので、
     ここでは扱わない。
 
-    1. 何にでも当たる。翻訳後の式が、当てる語を含まない文字列にも当たる
+    1. 何にでも当たる。翻訳後の式が、当てる語を含まない文字列にも当たる。
+       条件の木（when）は、木の書き方から何にでも当たると言えるとき（_constant）
     2. 選択肢が 3 つ以上。`(ls|cat|sed)` のような書き方は、それだけ多くの
        コマンドに同じ文を添えることになる
     """
-    if rule.built() and rule.body_hits("x"):
+    if rule.when is not None and rule.compiled is None:
+        # 木は 1 つの文字列で試すと、`not: {regex: '^rm'}` のように "x" には当たるが
+        # 何にでも当たるわけではない形を取り違える。書き方から見積もる（_constant）。
+        if _constant(rule.when) == _ALWAYS:
+            return "何にでもヒットする"
+    elif rule.built() and rule.body_hits("x"):
         return "何にでもヒットする"
     if _alternatives(rule.regex) >= 3:
         return "選択肢が 3 つ以上"

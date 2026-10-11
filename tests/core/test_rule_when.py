@@ -435,6 +435,26 @@ class LintTest(unittest.TestCase):
         found = self.warns(self.lint([SECRETS], [ok]))
         self.assertFalse(any("(stop)" in d and "当たらないので" in d for d in found), found)
 
+    def test_広い_allow_は木の書き方から見積もる(self):
+        # `not: {regex: '^rm'}` は "x" に当たるが、何にでも当たるわけではない
+        narrow = {
+            "id": "not-rm",
+            "match": "Bash",
+            "when": {"not": {"regex": "^rm"}},
+            "additionalContext": "x",
+        }
+        broad = {
+            "id": "all",
+            "match": "Bash",
+            "when": {"any": [{"glob": "*.py"}, {"glob": "*"}]},
+            "additionalContext": "x",
+        }
+        found = self.warns(self.lint([SECRETS], [narrow, broad]))
+        self.assertFalse(any(d.startswith("not-rm ") and "広い allow" in d for d in found), found)
+        self.assertTrue(
+            any(d.startswith("all 広い allow") and "何にでもヒットする" in d for d in found), found
+        )
+
     def test_id_の無いルールは木で名指しする(self):
         raw = {k: v for k, v in SECRETS.items() if k != "id"}
         found = self.warns(self.lint([raw]))
