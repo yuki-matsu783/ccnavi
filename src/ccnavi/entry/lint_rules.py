@@ -292,7 +292,7 @@ _ANYTHING_PROBES = ("", "\x02")
 # パスにもコマンドにも出ない制御文字、記号 1 字、英字 1 字。判定は空の対象を見ないので、
 # deny の本体はこれで見る（`.` も拾う）。英字を入れるのは、`[^\w./ -]` のような
 # 記号だけに当たる式を「何にでも当たる」と言わないため。
-# except と when の葉は空の文字列も見る _ANYTHING_PROBES のまま。
+# except と when の個別条件は空の文字列も見る _ANYTHING_PROBES のまま。
 _NONEMPTY_PROBES = ("\x02", "~", "a")
 
 
@@ -335,8 +335,9 @@ def _except_problems(rule: rules.Rule, name: str) -> list[Problem]:
     return problems
 
 
-# 木のノードを書き方だけから見積もった値。葉は「何にでも当たる」と言えるときだけ ALWAYS で、
-# それ以外は分からない（UNKNOWN）。何にも当たらない葉は書き方からは言えないので作らない。
+# 組み合わせ条件のノードを書き方だけから見積もった値。
+# 個別条件は「何にでも当たる」と言えるときだけ ALWAYS で、
+# それ以外は分からない（UNKNOWN）。何にも当たらない個別条件は書き方からは言えないので作らない。
 _ALWAYS, _NEVER, _UNKNOWN = "always", "never", "unknown"
 
 
@@ -370,8 +371,9 @@ def _catch_all_deny_problems(rule: rules.Rule, name: str) -> list[Problem]:
     本体も同じ（_NONEMPTY_PROBES）。except を持つ deny は、本体が何にでも当たっても except で
     除いたものは止めないので、「丸ごと止める」とは言わず、除いたもの以外を止めると言う。
 
-    木（when）の全体が何にでも当たる形は _when_problems が言う。`{!root}` を組み立てられずに
-    止める側へ倒した deny は、書いた式ではなく倒した式を持つので見ない（読み込みが別に言う）。
+    組み合わせ条件（when）の全体が何にでも当たる形は _when_problems が言う。
+    `{!root}` を組み立てられずに止める側へ倒した deny は、書いた式ではなく
+    倒した式を持つので見ない（読み込みが別に言う）。
     ask と allow は見ない（allow の広さは _broad が言う）。
     """
     if rule.decision != rules.DENY or rule.when is not None or rule.degraded_message:
@@ -397,15 +399,15 @@ def _catch_all_deny_problems(rule: rules.Rule, name: str) -> list[Problem]:
 
 
 def _when_problems(rule: rules.Rule, name: str) -> list[Problem]:
-    """`when:`（条件の木）の書き方。
+    """`when:`（組み合わせ条件）の書き方。
 
     書式の誤り（知らないキー・空のリスト・上限）は読み込み（rules._when）が error にするので、
     ここは意味の側を見る。どれも判定は書いたとおりに動いているので warn。
 
-    1. 何にでも当たる・何にも当たらないノード。`not` の下が何にでも当たる葉だけ、`any` の中に
-       何にでも当たる葉、のような形で、そのノードは書いても条件を絞らない。いちばん外側の
-       1 つだけを言う（中を言っても直す場所は同じ）。木の全体なら、ルールがどの呼び出しにも
-       当たる・当たらないことになる
+    1. 何にでも当たる・何にも当たらないノード。`not` の下が何にでも当たる個別条件だけ、
+       `any` の中に何にでも当たる個別条件、のような形で、そのノードは書いても条件を絞らない。
+       いちばん外側の 1 つだけを言う（中を言っても直す場所は同じ）。
+       組み合わせ条件の全体なら、ルールがどの呼び出しにも当たる・当たらないことになる
     2. Bash / PowerShell を見る deny / ask の `not`。当てるのはコマンド列の全体なので、
        除く語をコマンドのどこかに足すだけで外れる（except と同じ理由）
     """
@@ -436,6 +438,31 @@ def _when_problems(rule: rules.Rule, name: str) -> list[Problem]:
         )
 
     look(tree)
+
+    def operands(node: rules.Condition) -> list[rules.Condition]:
+        """同じ演算子の入れ子（`all` の中の `all`）を 1 つに開いた子。"""
+        out: list[rules.Condition] = []
+        for c in node.children:
+            out.extend(operands(c) if c.kind == node.kind else [c])
+        return out
+
+    for node in tree.walk():
+        if node.kind not in (rules.WHEN_ALL, rules.WHEN_ANY):
+            continue
+        items = operands(node)
+        plain = {c.key() for c in items if c.kind != rules.WHEN_NOT}
+        negated = {c.children[0].key() for c in items if c.kind == rules.WHEN_NOT}
+        if not plain & negated:
+            continue
+        result = "何にも当たらない" if node.kind == rules.WHEN_ALL else "何にでも当たる"
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"{node.where} の {node.kind} に、同じ個別条件が肯定と否定で並んでいる。"
+                f"互いに打ち消し合うので、この {node.kind} は{result}",
+            )
+        )
 
     tools = [want.strip() for want in rule.match.split("|")]
     shells = [t for t in _COMMAND_TOOLS if t in tools]
@@ -500,12 +527,12 @@ def _broad(rule: rules.Rule) -> str:
     ここでは扱わない。
 
     1. 何にでも当たる。翻訳後の式が、当てる語を含まない文字列にも当たる。
-       条件の木（when）は、木の書き方から何にでも当たると言えるとき（_constant）
+       組み合わせ条件（when）は、書き方から何にでも当たると言えるとき（_constant）
     2. 選択肢が 3 つ以上。`(ls|cat|sed)` のような書き方は、それだけ多くの
        コマンドに同じ文を添えることになる
     """
     if rule.when is not None and rule.compiled is None:
-        # 木は 1 つの文字列で試すと、`not: {regex: '^rm'}` のように "x" には当たるが
+        # 組み合わせ条件は 1 つの文字列で試すと、`not: {regex: '^rm'}` のように "x" には当たるが
         # 何にでも当たるわけではない形を取り違える。書き方から見積もる（_constant）。
         if _constant(rule.when) == _ALWAYS:
             return "何にでもヒットする"

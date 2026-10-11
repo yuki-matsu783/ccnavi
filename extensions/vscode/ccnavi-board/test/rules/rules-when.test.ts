@@ -59,7 +59,7 @@ function withWhen(sections: Sections, when: CondNode): Sections {
   return { ...sections, deny: [{ ...sections.deny[0], when }, ...sections.deny.slice(1)] };
 }
 
-test("CB-T333 when を条件の木として読み、畳んだ行の要約にする。木を持たないルールには欄が無い", () => {
+test("CB-T333 when を組み合わせ条件として読み、畳んだ行の要約にする。組み合わせ条件を持たないルールには欄が無い", () => {
   const { model } = readRules(WHEN_TEXT);
   assert.deepEqual(model.problems, []);
   assert.deepEqual(model.sections.deny[0].when, EXPECTED);
@@ -69,22 +69,22 @@ test("CB-T333 when を条件の木として読み、畳んだ行の要約にす�
   assert.equal(condSummary(leaf("glob", "")), "glob （空）");
 });
 
-test("CB-T334 木を変えなければ、when はコメントも書き方もそのまま戻る（画面を往復しても）", () => {
+test("CB-T334 組み合わせ条件を変えなければ、when はコメントも書き方もそのまま戻る（画面を往復しても）", () => {
   const doc = readRules(WHEN_TEXT);
   assert.equal(doc.apply(doc.model.sections), WHEN_TEXT);
   const sent = asSections(JSON.parse(JSON.stringify(doc.model.sections)));
   assert.ok(sent);
   assert.deepEqual(sent.deny[0].when, EXPECTED);
   assert.equal(doc.apply(sent), WHEN_TEXT);
-  // 他の欄だけ変えても、木には触らない
+  // 他の欄だけ変えても、組み合わせ条件には触らない
   const edited = doc.apply({ ...doc.model.sections, deny: [{ ...doc.model.sections.deny[0], id: "root-guard" }] });
   assert.equal(edited, WHEN_TEXT.replace("id: workspace-root", "id: root-guard"));
 });
 
-test("CB-T335 木を直すと when を書き直し、変えていないノードのコメントと他のキーは残る", () => {
+test("CB-T335 組み合わせ条件を直すと when を書き直し、変えていないノードのコメントと他のキーは残る", () => {
   const doc = readRules(WHEN_TEXT);
   const s = doc.model.sections;
-  // 葉の文字を変える: その葉だけが変わり、引用符は元のまま
+  // 個別条件の文字を変える: その個別条件だけが変わり、引用符は元のまま
   const renamed = doc.apply(withWhen(s, setPattern(EXPECTED, [1, 0, 1], "{root}/.git/**")));
   assert.equal(renamed, WHEN_TEXT.replace("'{root}/.claude/worktrees/**'", "'{root}/.git/**'"));
   // all → any と glob → regex は、キーだけが替わる
@@ -95,13 +95,13 @@ test("CB-T335 木を直すと when を書き直し、変えていないノード
   assert.ok(removed.includes("              # ワークツリー\n              - glob: '{root}/.claude/worktrees/**'"), removed);
   assert.ok(!removed.includes("scratchpad"), removed);
   assert.deepEqual(readRules(removed).model.sections.deny[0].when, removeAt(EXPECTED, [1, 0, 0]));
-  // 足した葉は単引用符。message の折り返しも元のまま
+  // 足した個別条件は単引用符。message の折り返しも元のまま
   const added = doc.apply(withWhen(s, addChild(EXPECTED, [], leaf("glob", "*.md"))));
   assert.ok(added.includes("        - glob: '*.md'\n"), added);
   assert.ok(added.includes("    message: >-\n      main では編集しない。\n      ワークツリーで直す。\n"), added);
   assert.ok(added.startsWith("version: 1\ndeny:\n  # ルート直下は止め、置き場だけ除く\n"), added);
   assert.deepEqual(readRules(added).model.sections.deny[0].when, addChild(EXPECTED, [], leaf("glob", "*.md")));
-  // not で包んだ・外した木も読み直せる。PyYAML と同じ形（YAML として読めること）も見る
+  // not で包んだ・外した組み合わせ条件も読み直せる。PyYAML と同じ形（YAML として読めること）も見る
   const wrapped = wrapNot(EXPECTED, [0]);
   const text = doc.apply(withWhen(s, wrapped));
   assert.deepEqual(parseDocument(text).errors, []);
@@ -136,7 +136,7 @@ deny:
   assert.match(messages[2], /^2 知らないキー nope です/);
   assert.match(messages[3], /^3 not の中が空です/);
   assert.match(messages[4], /^4 ノードはマップ/);
-  // 読めなかったノードは、木の他を直しても読んだ値のまま書き戻る
+  // 読めなかったノードは、組み合わせ条件の他を直しても読んだ値のまま書き戻る
   const doc = readRules(text);
   const fixed = doc.apply(withWhen(doc.model.sections, removeAt(tree, [1])));
   const again = readRules(fixed).model.sections.deny[0].when;
@@ -156,7 +156,7 @@ deny:
   assert.deepEqual(condProblems(group("any", Array.from({ length: 63 }, () => leaf("glob", "x")))), []);
 });
 
-test("CB-T337 glob / regex と except のルールを条件の木に変換する。except は木の中へ移り、ファイルから消える", () => {
+test("CB-T337 glob / regex と except のルールを組み合わせ条件に変換する。except は組み合わせ条件の中へ移り、ファイルから消える", () => {
   const text = `version: 1
 deny:
   # 理由のコメント
@@ -206,22 +206,22 @@ deny:
   assert.deepEqual(again.problems, []);
   assert.deepEqual(again.sections.deny[0].when, tree);
   assert.equal(again.sections.deny[0].excepts, undefined);
-  // dropExcept が無ければ except は消さない（木と併用できる）
+  // dropExcept が無ければ except は消さない（組み合わせ条件と併用できる）
   const kept = doc.apply({ ...doc.model.sections, deny: [{ ...rule, when: group("all", [leaf("regex", "^{root}[\\\\/]")]) }, plain] });
   assert.ok(kept.includes("    except:\n      - regex: '^{root}[\\\\/]wip'"), kept);
 });
 
-test("CB-T338 木の操作（子の追加・削除・種別の変更・not で包む／外す）と、左から右へ伸びる置き方", () => {
+test("CB-T338 組み合わせ条件の操作（子の追加・削除・種別の変更・not で包む／外す）と、左から右へ伸びる置き方", () => {
   // not の中を消すと空になり、子を足すと埋まる。中が空の not は外せない
   const emptied = removeAt(not(leaf("glob", "a")), [0]);
   assert.deepEqual(emptied, not(null));
   assert.deepEqual(unwrapNot(emptied, []), not(null));
   assert.deepEqual(addChild(emptied, [], leaf("regex", "b")), not(leaf("regex", "b")));
-  // 根は消せない。葉に子は足せない。all ⇄ any と glob ⇄ regex 以外の変更は効かない
+  // 最上位のノードは消せない。個別条件に子は足せない。all ⇄ any と glob ⇄ regex 以外の変更は効かない
   assert.deepEqual(removeAt(EXPECTED, []), EXPECTED);
   assert.deepEqual(addChild(leaf("glob", "a"), [], leaf("glob", "b")), leaf("glob", "a"));
   assert.deepEqual(changeOp(leaf("glob", "a"), [], "all"), leaf("glob", "a"));
-  // 置き方: 根が左、段ごとに右へ。まとめは子の真ん中の高さ。中が空の not には穴の点
+  // 置き方: 最上位のノードが左、段ごとに右へ。演算子は子の真ん中の高さ。中が空の not には穴の点
   const layout = layoutCond(EXPECTED);
   const at = new Map(layout.places.map((p) => [p.key, p]));
   assert.deepEqual(
@@ -248,7 +248,7 @@ test("CB-T338 木の操作（子の追加・削除・種別の変更・not で�
   );
 });
 
-test("CB-T339 画面が送り返した木は形を確かめて受け取り、形の違う木を持つルールは受け取らない", () => {
+test("CB-T339 画面が送り返した組み合わせ条件は形を確かめて受け取り、形の違う組み合わせ条件を持つルールは受け取らない", () => {
   assert.deepEqual(asCond(JSON.parse(JSON.stringify(EXPECTED))), EXPECTED);
   assert.deepEqual(asCond({ op: "not", child: null }), not(null));
   assert.equal(asCond({ op: "all", children: [{ op: "glob" }] }), undefined);
@@ -259,7 +259,7 @@ test("CB-T339 画面が送り返した木は形を確かめて受け取り、形
   assert.equal(asSections(raw), undefined);
 });
 
-test("CB-T340 葉の値を PyYAML が文字列以外に読む語へ差し替えると、引用符の無い葉でも引用符で囲む", () => {
+test("CB-T340 個別条件の値を PyYAML が文字列以外に読む語へ差し替えると、引用符の無い個別条件でも引用符で囲む", () => {
   const text = `version: 1
 deny:
   - id: plain-leaf
@@ -278,7 +278,7 @@ deny:
   // 別の型に読まれない語は元の書き方（引用符なし）のまま
   assert.ok(out.includes("        - regex: baz\n"), out);
   assert.deepEqual(readRules(out).model.sections.deny[0].when, group("any", [leaf("glob", "on"), leaf("regex", "baz")]));
-  // 読めない（引用符の無い yes）葉を置き換えても、PyYAML が真偽値に読む形では書かない
+  // 読めない（引用符の無い yes）個別条件を置き換えても、PyYAML が真偽値に読む形では書かない
   const bad = readRules(text.replace("glob: foo", "glob: yes"));
   const badTree = bad.model.sections.deny[0].when;
   assert.ok(badTree);
@@ -286,12 +286,12 @@ deny:
   assert.ok(fixed.includes("- glob: 'yes'"), fixed);
 });
 
-/** 先頭の子（読めない葉）を空の glob に置き換える（画面の「glob に置き換える」と同じ） */
+/** 先頭の子（読めない個別条件）を空の glob に置き換える（画面の「glob に置き換える」と同じ） */
 function replaceLeaf(tree: CondNode): CondNode {
   return tree.op === "any" ? group("any", [leaf("glob"), ...tree.children.slice(1)]) : tree;
 }
 
-test("CB-T341 引用符の無い葉の値が YAML 1.1 で文字列以外になる語なら、読めないノードとして誤りに挙げる（except も）", () => {
+test("CB-T341 引用符の無い個別条件の値が YAML 1.1 で文字列以外になる語なら、読めないノードとして誤りに挙げる（except も）", () => {
   const text = `version: 1
 deny:
   - id: ambiguous
@@ -317,7 +317,7 @@ deny:
   assert.equal(doc.apply(doc.model.sections), text);
 });
 
-test("CB-T342 「条件の木に変換」で、元のパターンと except の各要素のコメント（前置き・行末）が対応する葉に残る", () => {
+test("CB-T342 「組み合わせ条件に変換」で、元のパターンと except の各要素のコメント（前置き・行末）が対応する個別条件に残る", () => {
   const text = `version: 1
 deny:
   - id: commented
@@ -357,12 +357,12 @@ deny:
 `,
   );
   assert.deepEqual(readRules(out).model.sections.deny[0].when, converted.when);
-  // 変換したあとに葉を直しても、コメントはその葉に付いたまま
+  // 変換したあとに個別条件を直しても、コメントはその個別条件に付いたまま
   const edited = doc.apply({ ...doc.model.sections, deny: [{ ...converted, when: setPattern(converted.when ?? leaf("glob"), [0], "^{root}") }] });
   assert.ok(edited.includes("        # 本体の理由\n        - regex: '^{root}' # 本体の行末\n"), edited);
 });
 
-test("CB-T343 except がリストでない・要素が glob / regex 1 つでない・空なら「条件の木に変換」できない理由を返す", () => {
+test("CB-T343 except がリストでない・要素が glob / regex 1 つでない・空なら「組み合わせ条件に変換」できない理由を返す", () => {
   const rulesOf = (except: string) =>
     readRules(`version: 1
 deny:
@@ -382,7 +382,7 @@ ${except}
   assert.match(exceptBlocker(rulesOf("    except:\n      - glob: ''").exceptNodes) ?? "", /glob が空/);
 });
 
-test("CB-T344 子が 10 個以上でも、図の点は木の順（番号の数の順）に並ぶ", () => {
+test("CB-T344 子が 10 個以上でも、図の点は組み合わせ条件の順（番号の数の順）に並ぶ", () => {
   const wide = group("any", Array.from({ length: 12 }, (_, i) => leaf("glob", String(i))));
   assert.deepEqual(
     layoutCond(wide).places.map((p) => p.key),
@@ -393,13 +393,13 @@ test("CB-T344 子が 10 個以上でも、図の点は木の順（番号の数�
   assert.equal(comparePaths([1, 2], [1, 2]), 0);
 });
 
-test("CB-T345 葉や not の根を all / any で包んで組み合わせへ広げられ、包んだノードのコメントは残る", () => {
+test("CB-T345 個別条件や not の最上位のノードを all / any で包んで組み合わせへ広げられ、包んだノードのコメントは残る", () => {
   const text = `version: 1
 deny:
   - id: leaf-root
     match: Write
     when:
-      # 葉の理由
+      # 個別条件の理由
       glob: '*.pem' # 行末
     message: m
 `;
@@ -412,11 +412,11 @@ deny:
   assert.deepEqual(wrapGroup(not(leaf("glob", "a")), [0], "all"), not(group("all", [leaf("glob", "a")])));
   const widened = addChild(wrapped, [], leaf("glob", "*.key"));
   const out = doc.apply(withWhen(doc.model.sections, widened));
-  assert.ok(out.includes("# 葉の理由"), out);
+  assert.ok(out.includes("# 個別条件の理由"), out);
   assert.ok(out.includes("glob: '*.pem' # 行末"), out);
   assert.deepEqual(readRules(out).model.sections.deny[0].when, widened);
   // not を外しても、中身のコメントは残る
-  const negated = readRules(text.replace("      # 葉の理由\n      glob: '*.pem' # 行末", "      not:\n        # 葉の理由\n        glob: '*.pem' # 行末"));
+  const negated = readRules(text.replace("      # 個別条件の理由\n      glob: '*.pem' # 行末", "      not:\n        # 個別条件の理由\n        glob: '*.pem' # 行末"));
   const unwrapped = negated.apply(withWhen(negated.model.sections, leaf("glob", "*.pem")));
   assert.ok(unwrapped.includes("glob: '*.pem' # 行末"), unwrapped);
 });
@@ -507,7 +507,7 @@ deny:
   assert.ok(kept.includes("# A の理由\n        - glob: 'A'"), kept);
 });
 
-test("CB-T349 根でないノードを not / all / any で包む・not を外すとき、そのノードと中の子のコメントは残る", () => {
+test("CB-T349 最上位でないノードを not / all / any で包む・not を外すとき、そのノードと中の子のコメントは残る", () => {
   const text = `version: 1
 deny:
   - id: nested
@@ -544,13 +544,13 @@ deny:
   check(wrapNot(tree, [2]), all);
   check(unwrapNot(tree, [3]), all);
   check(wrapGroup(tree, [3], "any"), all);
-  // 根の all / any を包んでも残る
+  // 最上位のノードの all / any を包んでも残る
   check(wrapGroup(tree, [], "any"), all);
   check(wrapGroup(tree, [], "all"), all);
   check(wrapNot(tree, []), all);
 });
 
-test("CB-T351 glob と regex を両方書いたルールは読み込みの誤りに挙げ、「条件の木に変換」させない（regex を黙って落とさない）", () => {
+test("CB-T351 glob と regex を両方書いたルールは読み込みの誤りに挙げ、「組み合わせ条件に変換」させない（regex を黙って落とさない）", () => {
   const doc = readRules(`version: 1
 deny:
   - id: both

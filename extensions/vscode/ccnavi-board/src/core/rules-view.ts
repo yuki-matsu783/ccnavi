@@ -90,24 +90,24 @@ export interface RuleForm {
    */
   readonly excepts?: readonly string[];
   /**
-   * `except:` の各パターンを木のノードにしたもの（`excepts` と同じ並び）。「条件の木に変換」が
+   * `except:` の各パターンを組み合わせ条件のノードにしたもの（`excepts` と同じ並び）。「組み合わせ条件に変換」が
    * `not: {any: …}` に入れるために持つ。書いていなければ省く
    */
   readonly exceptNodes?: readonly CondNode[];
   /**
-   * 条件の木（`when:`）。在れば `kind` と `pattern` は使わない（`glob` / `regex` の代わりに木で当てる）。
-   * 書き戻しは、木が読み込んだときと同じなら元のノードに触らない。変えたら木を書き、`glob` / `regex` を消す。
+   * 組み合わせ条件（`when:`）。在れば `kind` と `pattern` は使わない（`glob` / `regex` の代わりに組み合わせ条件で当てる）。
+   * 書き戻しは、組み合わせ条件が読み込んだときと同じなら元のノードに触らない。変えたら組み合わせ条件を書き、`glob` / `regex` を消す。
    * 書いていなければ省く
    */
   readonly when?: CondNode;
   /**
-   * 「条件の木に変換」で `except:` を木の中へ移した。書き戻しで `except:` を消す。
+   * 「組み合わせ条件に変換」で `except:` を組み合わせ条件の中へ移した。書き戻しで `except:` を消す。
    * 画面が明示したときだけ消す（欄が届かなかっただけで消さないため）
    */
   readonly dropExcept?: boolean;
   /**
    * `glob` と `regex` を両方書いてある（`when:` は無い）。画面はどちらか一方しか持てないので、
-   * 「条件の木に変換」させない（変換すると片方が黙って消える）。書いていなければ省く
+   * 「組み合わせ条件に変換」させない（変換すると片方が黙って消える）。書いていなければ省く
    */
   readonly bothPatterns?: boolean;
 }

@@ -1,5 +1,5 @@
 /*
- * 条件の木の図（`When.tsx`）。React Flow の色は `--xy-*` の変数で持っているので、`--vscode-*` に置き換える
+ * 組み合わせ条件の図（`When.tsx`）。React Flow の色は `--xy-*` の変数で持っているので、`--vscode-*` に置き換える
  * （フェーズの図 `phases/Graph.css` と同じ書き方。打ち消さず、変数を置き換える）。
  */
 .cond { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
@@ -39,7 +39,7 @@
 .cond-node:hover { background: var(--vscode-list-hoverBackground); outline: 1px dashed var(--vscode-contrastActiveBorder, transparent); }
 /* 選んだ点は縁を太く。色だけに頼らない */
 .cond-node.selected { border: 2px solid var(--vscode-focusBorder); }
-/* まとめ（all / any / not）と葉は縁の形で見分ける */
+/* 演算子（all / any / not）と個別条件は縁の形で見分ける */
 .cond-node[data-op="not"] { border-style: dashed; }
 .cond-node[data-op="empty"] { border-style: dotted; color: var(--vscode-descriptionForeground); }
 .cond-node.broken { border-color: var(--vscode-editorError-foreground, var(--vscode-errorForeground)); }

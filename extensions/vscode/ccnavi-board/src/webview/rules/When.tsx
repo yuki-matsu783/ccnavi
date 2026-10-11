@@ -1,12 +1,12 @@
 /**
- * 条件の木（`when:`）を図で見せて直す欄。ルールの行を開いたときに、パターンの欄の代わりに出る。
+ * 組み合わせ条件（`when:`）を図で見せて直す欄。ルールの行を開いたときに、パターンの欄の代わりに出る。
  *
- * 図は React Flow で、根を左に置いて右へ伸ばす（置き場所は `layoutCond` が木の形だけで決める）。
+ * 図は React Flow で、最上位のノードを左に置いて右へ伸ばす（置き場所は `layoutCond` が組み合わせ条件の形だけで決める）。
  * 点を押すと選ばれ、下の操作の欄がその点に効く。操作は、子を足す・消す・種別を替える（all ⇄ any、
- * glob ⇄ regex）・葉の文字を直す・all / any / not で包む・not を外す。直すたびに木ぜんたいを `onChange` で返し、
+ * glob ⇄ regex）・個別条件の文字を直す・all / any / not で包む・not を外す。直すたびに組み合わせ条件ぜんたいを `onChange` で返し、
  * 書き戻し（`rules-doc.ts`）が `when:` の YAML に直す。保存と保存前の `--lint` は他の欄と同じ流れ。
  *
- * 誤り（空のまとめ、中が空の not、空の葉、読めなかったノード、深さとノード数の上限）は図の下に並べ、
+ * 誤り（空の演算子、中が空の not、空の個別条件、読めなかったノード、深さとノード数の上限）は図の下に並べ、
  * 押すとその点を選ぶ。止めるのは保存前の `--lint` で、ここは見せるだけ。
  */
 import { useMemo, useState, type JSX } from "react";
@@ -103,7 +103,7 @@ export function When({ tree, onChange }: WhenProps): JSX.Element {
   const layout = useMemo(() => layoutCond(tree), [tree]);
   const problems = useMemo(() => condProblems(tree), [tree]);
   const brokenKeys = useMemo(() => new Set(problems.map((p) => pathKey(p.path))), [problems]);
-  // 選んだ点が無くなったら（消した、種別が変わって子が減った）根に戻す
+  // 選んだ点が無くなったら（消した、種別が変わって子が減った）最上位のノードに戻す
   const target = targetOf(tree, picked) ?? { path: [], node: tree };
   const selectedKey = pathKey(target.path);
 
@@ -131,7 +131,7 @@ export function When({ tree, onChange }: WhenProps): JSX.Element {
     <div className="cond" data-nodes={layout.places.length}>
       <div className="cond-canvas">
         <ReactFlow<CondFlowNode, Edge>
-          // 木の形が変わったら置き直して全体を映す（点の数で見分ける）
+          // 組み合わせ条件の形が変わったら置き直して全体を映す（点の数で見分ける）
           key={layout.places.length}
           nodes={nodes}
           edges={edges}
@@ -269,7 +269,7 @@ function Inspector({
           className="action small"
           data-op-action="remove"
           disabled={isRoot}
-          title={isRoot ? "根は消せません（all / any / not で包んでから中を直すか、葉なら文字を直してください）" : "このノードを消す"}
+          title={isRoot ? "最上位のノードは消せません（all / any / not で包んでから中を直すか、個別条件なら文字を直してください）" : "このノードを消す"}
           onClick={() => edit(removeAt(tree, path), path.slice(0, -1))}
         >
           ノードを削除

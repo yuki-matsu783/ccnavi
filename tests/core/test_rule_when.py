@@ -1,4 +1,4 @@
-"""ルールの `when:`（条件の木）のテスト。
+"""ルールの `when:`（組み合わせ条件）のテスト。
 
 読み込み（書式・苦情・上限）、判定（all / any / not の組み合わせ、except との併用、
 `{!root}` を組み立てられないとき、hook の判定と入れ子のコマンド）、lint、レイヤーのマージ、
@@ -45,7 +45,7 @@ def errors(problems: list) -> list[str]:
 
 
 def nested(depth: int) -> dict:
-    """`not` を depth 段重ねた木。葉を含めた段数は depth + 1。"""
+    """`not` を depth 段重ねた組み合わせ条件。個別条件を含めた段数は depth + 1。"""
     node: dict = {"glob": "*.pem"}
     for _ in range(depth):
         node = {"not": node}
@@ -53,7 +53,7 @@ def nested(depth: int) -> dict:
 
 
 class ParseTest(unittest.TestCase):
-    def test_木を読む(self):
+    def test_組み合わせ条件を読む(self):
         rule, problems = build(SECRETS)
         self.assertEqual(problems, [])
         self.assertEqual(rule.glob, "")
@@ -69,7 +69,7 @@ class ParseTest(unittest.TestCase):
             leaves, ["when.any[0].glob", "when.any[1].all[0].glob", "when.any[1].all[1].not.glob"]
         )
 
-    def test_葉だけの木(self):
+    def test_個別条件だけの組み合わせ条件(self):
         rule, problems = build(
             {"id": "x", "match": "Write", "when": {"regex": r"\.pem$"}}, section=rules.ALLOW
         )
@@ -151,12 +151,12 @@ class ErrorTest(unittest.TestCase):
         self.check({"all": [{"glob": None}]}, "when.all[0] の glob")
 
     def test_上限(self):
-        # 深さは葉を含めて 8 段まで
+        # 深さは個別条件を含めて 8 段まで
         rule, problems = build({"id": "x", "match": "Write", "when": nested(7), "message": "m"})
         self.assertEqual(errors(problems), [])
         self.assertIsNotNone(rule)
         self.check(nested(8), "8 段を超える")
-        # ノードは 64 個まで（any の 1 個 + 葉 63 個 = 64）
+        # ノードは 64 個まで（any の 1 個 + 個別条件 63 個 = 64）
         leaves = [{"glob": f"*.{i}"} for i in range(rules.MAX_WHEN_NODES - 1)]
         rule, problems = build(
             {"id": "x", "match": "Write", "when": {"any": leaves}, "message": "m"}
@@ -165,7 +165,7 @@ class ErrorTest(unittest.TestCase):
         self.assertIsNotNone(rule)
         self.check({"any": [*leaves, {"glob": "*.x"}]}, "64 個を超える")
 
-    def test_葉には本体と同じ制約(self):
+    def test_個別条件には本体と同じ制約(self):
         self.check({"regex": "a(?=b)"}, "when.regex の ", "先読み")
         self.check({"all": [{"regex": r"(a)\1"}]}, "when.all[0].regex の ", "後方参照")
         self.check({"not": {"regex": "a("}}, "when.not.regex の ", "正規表現として組み立てられない")
@@ -223,7 +223,7 @@ class EvaluateTest(unittest.TestCase):
 
 
 class NotRootRefusedTest(unittest.TestCase):
-    """葉の `{!root}` を組み立てられないとき。deny / ask は全部止め、allow は使わない。"""
+    """個別条件の `{!root}` を組み立てられないとき。deny / ask は全部止め、allow は使わない。"""
 
     LONG_ROOT = "/" + "a" * rules.MAX_ROOT_LEN
 
@@ -234,7 +234,7 @@ class NotRootRefusedTest(unittest.TestCase):
         for section in (rules.DENY, rules.ASK):
             for when in (
                 {"all": [{"regex": "^{!root}.*"}, {"glob": "*.py"}]},
-                # not の下の葉でも、外すだけの形にはしない
+                # not の下の個別条件でも、外すだけの形にはしない
                 {"all": [{"glob": "*.py"}, {"not": {"regex": "^{!root}.*"}}]},
             ):
                 with self.subTest(section=section, when=when):
@@ -250,7 +250,7 @@ class NotRootRefusedTest(unittest.TestCase):
                     self.assertEqual(rule.excepts, [])
                     self.assertTrue(rule.matches("Write", "/anything/a.md"))
                     self.assertIn("止めています", rule.spoken_message())
-                    # 書いた木は残す（--explain と書き戻しのため）
+                    # 書いた組み合わせ条件は残す（--explain と書き戻しのため）
                     self.assertEqual(rule.when.written(), when)
 
     def test_allow_は使わない(self):
@@ -393,7 +393,7 @@ class LintTest(unittest.TestCase):
             any("when の all は何にも当たらない。このルールは" in d for d in found), found
         )
 
-    def test_any_の中に何にでも当たる葉(self):
+    def test_any_の中に何にでも当たる個別条件(self):
         found = self.warns(self.lint([self.deny({"any": [{"glob": "*.py"}, {"regex": "^"}]})]))
         self.assertTrue(any("when の any は何にでも当たる" in d for d in found), found)
 
@@ -406,6 +406,22 @@ class LintTest(unittest.TestCase):
         when = {"any": [{"glob": "*.py"}, {"not": {"regex": ".*"}}]}
         found = self.warns(self.lint([self.deny(when)]))
         self.assertTrue(any("when.any[1] の not は何にも当たらない" in d for d in found), found)
+
+    def test_同じ個別条件が肯定と否定で並ぶと打ち消し合うと言う(self):
+        when = {"all": [{"glob": "*.py"}, {"not": {"glob": "*.py"}}]}
+        found = self.warns(self.lint([self.deny(when)]))
+        self.assertTrue(
+            any("when の all に、同じ個別条件が肯定と否定で並んでいる" in d for d in found), found
+        )
+        self.assertTrue(any("この all は何にも当たらない" in d for d in found), found)
+        # any なら何にでも当たる。同じ演算子の入れ子は開いて見る
+        when = {"any": [{"glob": "*.md"}, {"any": [{"regex": "^a"}, {"not": {"regex": "^a"}}]}]}
+        found = self.warns(self.lint([self.deny(when)]))
+        self.assertTrue(any("when の any に、同じ個別条件が" in d for d in found), found)
+        # 別々の個別条件なら言わない
+        when = {"all": [{"glob": "*.py"}, {"not": {"glob": "*.md"}}]}
+        found = self.warns(self.lint([self.deny(when)]))
+        self.assertFalse(any("打ち消し合う" in d for d in found), found)
 
     def test_コマンドの_not(self):
         when = {"all": [{"glob": "*git push*"}, {"not": {"glob": "*--dry-run*"}}]}
@@ -421,7 +437,7 @@ class LintTest(unittest.TestCase):
         found = self.warns(self.lint([SECRETS], [allow]))
         self.assertFalse(any("when の not" in d for d in found), found)
 
-    def test_stop_に当たらない木(self):
+    def test_stop_に当たらない組み合わせ条件(self):
         stop = {
             "id": "nudge",
             "match": "Stop",
@@ -435,7 +451,7 @@ class LintTest(unittest.TestCase):
         found = self.warns(self.lint([SECRETS], [ok]))
         self.assertFalse(any("(stop)" in d and "当たらないので" in d for d in found), found)
 
-    def test_広い_allow_は木の書き方から見積もる(self):
+    def test_広い_allow_は組み合わせ条件の書き方から見積もる(self):
         # `not: {regex: '^rm'}` は "x" に当たるが、何にでも当たるわけではない
         narrow = {
             "id": "not-rm",
@@ -521,7 +537,7 @@ class LintTest(unittest.TestCase):
         found = self.warns(problems)
         self.assertFalse(any("本体の" in d and "何にでも当たる" in d for d in found), found)
 
-    def test_id_の無いルールは木で名指しする(self):
+    def test_id_の無いルールは組み合わせ条件で名指しする(self):
         raw = {k: v for k, v in SECRETS.items() if k != "id"}
         found = self.warns(self.lint([raw]))
         self.assertTrue(any("when: any(glob '*.pem'" in d for d in found), found)
@@ -544,7 +560,7 @@ class MergeTest(unittest.TestCase):
         self.assertTrue(merged.matches("Write", "/a/k.pem"))
         self.assertFalse(merged.matches("Write", "/a/secrets/a.md"))
 
-    def test_木だけが違えば別の定義(self):
+    def test_組み合わせ条件だけが違えば別の定義(self):
         base = self.rule_set(SECRETS)
         other = {**SECRETS, "when": {"any": [{"glob": "*.pem"}, {"glob": "*/secrets/*"}]}}
         problems = ruleload.merge_rules(base, self.rule_set(other), "lib")
@@ -559,7 +575,7 @@ class MergeTest(unittest.TestCase):
         self.assertEqual(len(base.deny), 3)
         self.assertEqual([p.severity for p in problems], [rules.SEVERITY_INFO])
 
-    def test_glob_と同じ葉だけの木も別の定義(self):
+    def test_glob_と同じ個別条件だけの組み合わせ条件も別の定義(self):
         base = self.rule_set({"id": "a", "match": "Write", "glob": "*.pem", "message": "m"})
         tree = self.rule_set(
             {"id": "a", "match": "Write", "when": {"glob": "*.pem"}, "message": "m"}
@@ -606,7 +622,7 @@ class WrittenTest(unittest.TestCase):
 
 
 class CommandLineTest(unittest.TestCase):
-    """`--explain` が木を出し、`--test-samples` が when のルールを見本で確かめられる。"""
+    """`--explain` が組み合わせ条件を出し、`--test-samples` が when のルールを見本で確かめる。"""
 
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
@@ -666,7 +682,7 @@ if __name__ == "__main__":
 
 
 class CommonCredentialsTest(unittest.TestCase):
-    """共通の rules.yml の credentials-files（when で書いた木）と credentials（Bash）。"""
+    """共通の rules.yml の credentials-files（when で書いた）と credentials（Bash）。"""
 
     def setUp(self):
         with open(common_path(ROOT, "rules"), encoding="utf-8") as f:
@@ -690,7 +706,7 @@ class CommonCredentialsTest(unittest.TestCase):
             "/repo/secrets/token.txt",
             "/repo/credentials.json",
             "/home/u/.ssh/id_ed25519",
-            # 見本の名前で終わっても、.env 以外の枝に当たるものは除かない
+            # 見本の名前で終わっても、.env 以外の個別条件に当たるものは除かない
             "/repo/secrets/.env.example",
             "/home/u/.aws/.env.example",
             "/repo/a.pem/.env.example",

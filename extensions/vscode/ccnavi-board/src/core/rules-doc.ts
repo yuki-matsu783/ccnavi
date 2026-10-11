@@ -95,7 +95,7 @@ function formOf(section: Section, index: number, map: YAMLMap): RuleForm {
   };
 }
 
-/** 木のノードの深さをここまでで打ち切る（読めない入れ子で止まらないため。上限の 8 を言うのは画面と lint） */
+/** 組み合わせ条件のノードの深さをここまでで打ち切る（読めない入れ子で止まらないため。上限の 8 を言うのは画面と lint） */
 const READ_DEPTH = 64;
 
 /** YAML の値を、そのまま JSON にできる形にする（読めなかったノードを書き戻すため） */
@@ -113,8 +113,8 @@ function invalid(value: unknown, reason: string): CondNode {
 }
 
 /**
- * `when:` のノード（と `except:` の各要素）を木にする。形が違うところは `invalid` にして残し、
- * 他のノードは読む（1 か所の誤りで木ぜんたいを見せなくしない）。
+ * `when:` のノード（と `except:` の各要素）を組み合わせ条件にする。形が違うところは `invalid` にして残し、
+ * 他のノードは読む（1 か所の誤りで組み合わせ条件ぜんたいを見せなくしない）。
  */
 export function condOfYaml(value: unknown, depth = 1): CondNode {
   if (depth > READ_DEPTH) {
@@ -343,7 +343,7 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
     }
     setText(doc, node, form.kind, form.pattern, Scalar.QUOTE_SINGLE, node.has(form.kind) ? undefined : "match");
   }
-  // 「条件の木に変換」で except を木へ移したときだけ消す
+  // 「組み合わせ条件に変換」で except を組み合わせ条件へ移したときだけ消す
   if (form.dropExcept === true) {
     node.delete("except");
   }
@@ -370,16 +370,16 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
 }
 
 /**
- * 条件の木（`when:`）を書く。読み込んだときと同じ木なら何もしない（コメントも書き方も、
+ * 組み合わせ条件（`when:`）を書く。読み込んだときと同じ組み合わせ条件なら何もしない（コメントも書き方も、
  * 両方書いてしまった `glob` も、そのまま残す。報告するのは lint）。
  *
- * 変えたときは `glob` / `regex` を消し、木を書く。元のノードは使い回す。子は、同じ中身のノードを先に
+ * 変えたときは `glob` / `regex` を消し、組み合わせ条件を書く。元のノードは使い回す。子は、同じ中身のノードを先に
  * 拾い（消した・並べ替えた子のコメントが別の子へ付け替わらないように）、残りを似たノードに当てて
- * 値だけを書き換える（patchChildren）。包む・not を外すときも元のノードを中で使い回す。新しい葉は単引用符で囲む。
+ * 値だけを書き換える（patchChildren）。包む・not を外すときも元のノードを中で使い回す。新しい個別条件は単引用符で囲む。
  *
- * まだ `when:` が無い（「条件の木に変換」した）ときは、元の `glob` / `regex` と、移す `except:` の
+ * まだ `when:` が無い（「組み合わせ条件に変換」した）ときは、元の `glob` / `regex` と、移す `except:` の
  * 各要素を、変換した形（`all: [本体, not: {any: 除くもの}]`）に組んで元のノードとして当てる。
- * 書いてあったコメント（前置き・行末）が、対応する葉に付いたまま残る。
+ * 書いてあったコメント（前置き・行末）が、対応する個別条件に付いたまま残る。
  */
 function writeWhen(doc: Document, node: YAMLMap, tree: CondNode, movingExcept: boolean): void {
   const current = node.get("when", true);
@@ -402,8 +402,8 @@ function writeWhen(doc: Document, node: YAMLMap, tree: CondNode, movingExcept: b
 }
 
 /**
- * glob / regex 1 つ（と `except:`）のルールの元のノードを、「条件の木に変換」した形に組む。
- * 葉は元のペアの値（行末のコメント付き）をそのまま持ち、キーの前のコメントは葉の前へ移す。
+ * glob / regex 1 つ（と `except:`）のルールの元のノードを、「組み合わせ条件に変換」した形に組む。
+ * 個別条件は元のペアの値（行末のコメント付き）をそのまま持ち、キーの前のコメントは個別条件の前へ移す。
  * `except:` の各要素はノードごと移す（`movingExcept` のときだけ。消さない except は動かさない）
  */
 function convertedFrom(node: YAMLMap, movingExcept: boolean): YAMLMap | undefined {
@@ -475,7 +475,7 @@ function patchCond(doc: Document, existing: unknown, tree: CondNode): Node {
     return doc.createNode(tree.raw);
   }
   let { pair, key } = soleOf(existing);
-  // all / any で包んだ（not を包んだときも含む）なら、元のノードは新しいまとめの子になる
+  // all / any で包んだ（not を包んだときも含む）なら、元のノードは新しい演算子の子になる
   const wrapped = isNode(existing) && wrapsInGroup(condOfYaml(existing), tree);
   if (key === "not" && tree.op !== "not" && !wrapped && pair !== undefined && isNode(pair.value)) {
     // not を外した: 中身のノードを使い回す（中身に付いたコメントを残す）。not に付いていた
@@ -525,7 +525,7 @@ function patchCond(doc: Document, existing: unknown, tree: CondNode): Node {
         }
         return existing as Node;
       }
-      // まとめで包んだ: 元のノードを子の候補にする（包む前のノードのコメントを残す）
+      // 演算子で包んだ: 元のノードを子の候補にする（包む前のノードのコメントを残す）
       const seq = new YAMLSeq();
       seq.items = patchChildren(doc, existing === undefined || existing === null ? [] : [existing], tree.children);
       seq.flow = seq.items.length === 0;
@@ -571,13 +571,13 @@ function wrapsInGroup(old: CondNode, next: CondNode): boolean {
 }
 
 /**
- * まとめの子を書く。同じ中身の元のノードを先に当てる（並べ替え・消しただけなら、これで全部決まる）。
+ * 演算子の子を書く。同じ中身の元のノードを先に当てる（並べ替え・消しただけなら、これで全部決まる）。
  *
  * 残りの子（中身を直した・足した・包んだ子）は、前後で当たった子に挟まれた元のノードに当てる
  * （消されていない子は元の相対順のまま並ぶので、挟まれた範囲の外へは当てない）。挟まれた範囲で
  * 数が同じなら順に当てる（直しただけ。種類が違えば当てずに新しいノードにする。not や all / any で
  * 包んだ・外したものは同じ種類に数える）。数が違うと、どれを消してどれを直したのかが位置では
- * 決まらない。位置で当てると消した子のコメントが別の子に付くので、似ているもの（葉なら文字が
+ * 決まらない。位置で当てると消した子のコメントが別の子に付くので、似ているもの（個別条件なら文字が
  * 重なる）どうしだけを当て、似たものが無い子は新しいノードにする。最後に、範囲の外に残ったもの
  * （並べ替えてから直した子）も、似ているものどうしだけを当てる。
  */
@@ -660,8 +660,8 @@ function patchChildren(doc: Document, olds: readonly unknown[], children: readon
  * 元のノードと新しいノードがどれだけ似ているか。0 は別物。同じ種類なら 1 から 2 の間で大きいほど近い。
  * not や all / any で包んだ・外した組は、中身の似かたの半分（0 から 1）。
  *
- * `strict` のときは、種類が同じでも中身が重ならなければ 0 にする（葉なら文字が前か後ろで 1 字も
- * 揃わない、まとめなら似た子が 1 つも無い）。位置で決まらない組を当てるときに使う。
+ * `strict` のときは、種類が同じでも中身が重ならなければ 0 にする（個別条件なら文字が前か後ろで 1 字も
+ * 揃わない、演算子なら似た子が 1 つも無い）。位置で決まらない組を当てるときに使う。
  */
 function likeness(old: CondNode, next: CondNode, strict: boolean): number {
   if (isLeaf(old) && isLeaf(next)) {
@@ -669,7 +669,7 @@ function likeness(old: CondNode, next: CondNode, strict: boolean): number {
     return strict && text === 0 ? 0 : 1 + text;
   }
   if (isGroup(old) && isGroup(next)) {
-    // 同じまとめとして直したか、まとめをまとめで包んだかの、近いほう
+    // 同じ演算子として直したか、演算子を演算子で包んだかの、近いほう
     return Math.max(groupLikeness(old, next, strict), ...next.children.map((child) => (isGroup(child) ? groupLikeness(old, child, strict) / 2 : 0)));
   }
   if (old.op === "not" && next.op === "not") {
@@ -680,7 +680,7 @@ function likeness(old: CondNode, next: CondNode, strict: boolean): number {
     return strict && inner === 0 ? 0 : 1 + inner / 2;
   }
   let score = 0;
-  // 包んだ: not の中身か、まとめの子のどれかが元のノードに似ている
+  // 包んだ: not の中身か、演算子の子のどれかが元のノードに似ている
   if (next.op === "not" && next.child !== null) {
     score = Math.max(score, likeness(old, next.child, strict) / 2);
   }
@@ -705,7 +705,7 @@ function isGroup(node: CondNode): node is CondGroup {
   return node.op === "all" || node.op === "any";
 }
 
-/** まとめどうしの似かた。同じ中身の子の割合で 1 から 2。`strict` なら、似た子が 1 つも無いと 0 */
+/** 演算子どうしの似かた。同じ中身の子の割合で 1 から 2。`strict` なら、似た子が 1 つも無いと 0 */
 function groupLikeness(old: CondGroup, next: CondGroup, strict: boolean): number {
   const shared = next.children.filter((child) => old.children.some((o) => sameCond(o, child))).length;
   if (strict && shared === 0 && (old.children.length > 0 || next.children.length > 0)) {

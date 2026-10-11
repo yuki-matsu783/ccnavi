@@ -60,7 +60,7 @@ export function staleMessage(section: Section): string {
 
 /**
  * 絞り込みが当てる文字列。当てるのは書いてある値そのもの（id・ツール・パターン・文面・
- * 渡す文）で、要約に出ない全文にも当たる。条件の木のルールは、木の葉の文字すべてに当たる。
+ * 渡す文）で、要約に出ない全文にも当たる。組み合わせ条件のルールは、個別条件の文字すべてに当たる。
  */
 export function findText(rule: RuleForm): string {
   const patterns = rule.when === undefined ? rule.pattern : condPatterns(rule.when).join(" ");
