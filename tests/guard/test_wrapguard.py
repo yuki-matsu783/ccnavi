@@ -470,6 +470,8 @@ class CorePathTest(unittest.TestCase):
         ".claude/settings.json",
         "tests/logs/a.txt",
         ".ccnavi/approved/phases/i0001/1.reviewed",
+        "wip/proposals/review/i0002.md",
+        "wip/scratchpad/a.md",
     )
     # 同じコマンドを通す allow を置く。ルールが先に当たるなら通ってしまう。
     RULES = {
@@ -563,6 +565,56 @@ class CorePathTest(unittest.TestCase):
                 self.assertEqual(decision, "deny", reason)
                 self.assertIn(wrapguard.CODE_CORE_PATH, reason)
                 self.assertIn(kind_text, reason)
+
+    def test_review_place(self):
+        """レビュー待ちの置き場（wip/proposals/review/）は、承認済みチケットの置き場と同じく
+        エージェントのラッパーの呼び出しを止める。置き場の親を丸ごと消す形も当たる。"""
+        target = os.path.join(self.root, "wip", "proposals", "review", "i0002.md")
+        for command, stops in (
+            ("sh .ccnavi/scripts/ccnavi-git.sh rm wip/proposals/review/i0002.md", True),
+            ("sh .ccnavi/scripts/ccnavi-git.sh rm -r wip/proposals/review", True),
+            ("sh .ccnavi/scripts/ccnavi-git.sh rm --cached wip/proposals/review/i0002.md", True),
+            ("sh .ccnavi/scripts/ccnavi-git.sh rm -r wip", True),
+            ("sh .ccnavi/scripts/ccnavi-git.sh rm -r wip/proposals/", True),
+            ("sh .ccnavi/scripts/ccnavi-git.sh rm 'wip/*'", True),
+            ("sh .ccnavi/scripts/ccnavi-git.sh rm WIP/Proposals/Review/i0002.md", True),
+            ("sh .ccnavi/scripts/ccnavi-git.sh mv wip/proposals/review/i0002.md wip/x.md", True),
+            ("sh .ccnavi/scripts/ccnavi-git.sh restore --source=HEAD~1 wip/proposals/review", True),
+            (
+                "sh .ccnavi/scripts/ccnavi-git.sh checkout HEAD~1 wip/proposals/review/i0002.md",
+                True,
+            ),
+            ("cd wip/proposals && sh ../../.ccnavi/scripts/ccnavi-git.sh rm review/i0002.md", True),
+            ("cd wip && sh ../.ccnavi/scripts/ccnavi-git.sh rm -r proposals", True),
+            (f"sh .ccnavi/scripts/ccnavi-git.sh rm {target}", True),
+            # 下書きの置き場と、何も消さない・索引に戻す形は通す。
+            ("sh .ccnavi/scripts/ccnavi-git.sh rm -r wip/scratchpad", False),
+            ("sh .ccnavi/scripts/ccnavi-git.sh rm wip/scratchpad/a.md", False),
+            ("sh .ccnavi/scripts/ccnavi-git.sh rm -n wip/proposals/review/i0002.md", False),
+            (
+                "sh .ccnavi/scripts/ccnavi-git.sh restore --staged wip/proposals/review/i0002.md",
+                False,
+            ),
+            ("sh .ccnavi/scripts/ccnavi-git.sh add wip/proposals/review/i0002.md", False),
+        ):
+            with self.subTest(command=command):
+                decision, reason = self.hook(command)
+                self.assertEqual(decision == "deny", stops, reason)
+                if stops:
+                    self.assertIn(wrapguard.CODE_CORE_PATH, reason)
+                    self.assertIn("レビュー待ち", reason)
+                    self.assertIn("ユーザに依頼", reason)
+
+    def test_parent_of_an_empty_review_place(self):
+        """親を閉じた後の案内（ops._close_parent の `rm -r wip`）は、レビュー待ちが空なら通す。"""
+        os.remove(os.path.join(self.root, "wip", "proposals", "review", "i0002.md"))
+        for args in ("rm -r wip", "rm -r wip/proposals"):
+            with self.subTest(args=args):
+                decision, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh " + args)
+                self.assertEqual(decision, "", reason)
+        shutil.rmtree(os.path.join(self.root, "wip", "proposals"))
+        decision, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh rm -r wip")
+        self.assertEqual(decision, "", reason)
 
     def test_unreadable_targets_stop(self):
         """対象を読み切れない形は、共通ルールの allow に落とさずに止める。"""
@@ -685,6 +737,21 @@ class CorePathShAgreesTest(unittest.TestCase):
         """レビュー済みのマーカーを消す手順（phase._erase_steps）は、sh が通す。"""
         result = self.run_sh("rm .ccnavi/approved/phases/i0001/1.reviewed")
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_review_place_is_left_to_the_user(self):
+        """レビュー待ちの置き場の `rm` は sh では止めない（ユーザが端末で打つ手順を塞がない）。
+        過去の中身に戻す形は、前からの置き場の検査（store_hit）が止める。"""
+        for args in ("rm wip/proposals/review/i0002.md", "rm -r wip"):
+            with self.subTest(args=args):
+                result = self.run_sh(args)
+                self.assertEqual(result.returncode, 0, result.stderr)
+        for args in (
+            "restore --source=HEAD wip/proposals/review/i0002.md",
+            "checkout HEAD wip/proposals/review/i0002.md",
+        ):
+            with self.subTest(args=args):
+                result = self.run_sh(args)
+                self.assertEqual(result.returncode, 2, result.stderr)
 
     def test_records_of_the_workspace_only(self):
         """記録の置き場はワークスペースルートの logs だけ。ほかの階層の logs は守る場所ではない。"""
