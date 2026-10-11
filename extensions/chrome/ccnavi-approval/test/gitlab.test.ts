@@ -290,7 +290,7 @@ test("CX-T151 service worker の「始める」の保護: ボードからだけ�
     [["acme", "widgets", "feature-12-ＡＢ", head], BOARD, /issue から作る/],
     [["acme", "widgets", "feature-12-か\u3099", head], BOARD, /issue から作る/],
     [["acme", "widgets", `feature-12-${"a".repeat(60)}`, head], BOARD, /issue から作る/],
-    [["acme", "widgets", "feature-12-x", "f".repeat(40)], BOARD, /先頭が、ボードで読んだときから動いている/],
+    [["acme", "widgets", "feature-12-x", "f".repeat(40)], BOARD, /先頭が、ボードで読んだときから更新されている/],
   ];
   for (const [args, sender, why] of refused) {
     const res = await ask(args, sender);
