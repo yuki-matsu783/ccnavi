@@ -427,7 +427,8 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     if mode == DRY_RUN:
         lines.append(
             f"（現状: {settings.MODE_ENV}={DRY_RUN}。deny にヒットしても止まらない。"
-            "通ったことを許可と読まず、表示された案内に次からは従う）"
+            "通ったことを許可と読まず、表示された案内に次からは従う。"
+            "ターンの終わりの促し（Stop の block）は、このモードでも実際に止める）"
         )
     return "\n".join(lines)
 

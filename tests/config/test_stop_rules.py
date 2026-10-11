@@ -80,6 +80,7 @@ class StopRulesTest(unittest.TestCase):
         mode: str = "enable",
         state: str | None = None,
         log: str = "",
+        env: dict | None = None,
     ) -> dict:
         payload = {
             "hook_event_name": "Stop",
@@ -99,12 +100,11 @@ class StopRulesTest(unittest.TestCase):
                 self.state if state is None else state,
                 "--approved",
                 "",
-                "--mode",
-                mode,
+                *(["--mode", mode] if mode else []),
             ],
             input=json.dumps(payload),
             cwd=ROOT,
-            env=self.env(),
+            env={**self.env(), **(env or {})},
         )
         self.assertEqual(done.returncode, 0, done.stderr)
         return json.loads(done.stdout) if done.stdout.strip() else {}
@@ -193,6 +193,12 @@ class StopRulesTest(unittest.TestCase):
         self.assertEqual(body.get("decision"), "block")
         self.assertIn(NUDGE, body["reason"])
         self.assertNotIn("would have blocked", body.get("systemMessage", ""))
+
+    def test_mode_disable_never_blocks(self):
+        self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
+        # disable を言えるのは起動した環境だけ（フラグの disable は enable になる）。
+        off = {"CCNAVI_MODE": "disable"}
+        self.assertEqual([self.blocked(self.stop(mode="", env=off)) for _ in range(4)], [""] * 4)
 
     # --- 5b. 止めた回の頭の文と記録 ------------------------------------------------
 
