@@ -11,6 +11,14 @@
 #
 # 「A だが B は除く」は except: に `- glob: '...'` か `- regex: '...'` を並べて書く。
 # 本体に当たっても、どれかに当たればそのルールは当たらない（workspace-root がこの形）。
+#
+# 「A か B」「A かつ B」は glob / regex の代わりに when: で条件の木として書く。ノードは
+# `glob: '...'` / `regex: '...'`（葉）・`all: [...]`・`any: [...]`・`not: {...}` のどれか 1 つ。
+#   when:
+#     any:
+#       - glob: '*.pem'
+#       - all: [{glob: '*/secrets/*'}, {not: {glob: '*.md'}}]
+# 除くだけなら except のほうが読みやすいので、workspace-root は except のままにしてある。
 version: 1
 
 deny:
