@@ -15,25 +15,31 @@ import tempfile
 import unittest
 from unittest import mock
 
+from ccnavi.entry import cli_args
 from ccnavi.hook import events, judge
+from ccnavi.infra import modes
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
 
 def run(root, payload, mode="enable"):
+    result = run_raw(root, json.dumps(payload), mode)
+    return result, rows(root)[-1]
+
+
+def run_raw(root, text, mode="enable"):
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
     environment.pop("CLAUDE_PROJECT_DIR", None)
+    return run_ccnavi(["--root", root, "--mode", mode], input=text, cwd=ROOT, env=environment)
+
+
+def rows(root):
     log = os.path.join(root, "logs", "decisions.jsonl")
-    result = run_ccnavi(
-        ["--root", root, "--mode", mode],
-        input=json.dumps(payload),
-        cwd=ROOT,
-        env=environment,
-    )
+    if not os.path.exists(log):
+        return []
     with open(log, encoding="utf-8") as f:
-        row = json.loads(f.read().splitlines()[-1])
-    return result, row
+        return [json.loads(line) for line in f.read().splitlines()]
 
 
 def boom(*_args, **_kwargs):
@@ -101,6 +107,69 @@ class InternalErrorTest(unittest.TestCase):
         self.assertIn("internal-error", said)
         self.assertIn("Nothing was stopped", said)
         self.assertEqual(row["reason"], "internal-error")
+
+    def test_lone_surrogate_in_the_command_is_judged_and_recorded(self):
+        """JSON の "\\ud800"（UTF-8 にできない字）がコマンドに入っても、判定は効き、記録も残る。"""
+        text = (
+            '{"hook_event_name":"PreToolUse","session_id":"s1","tool_name":"Bash",'
+            '"tool_input":{"command":"rm -rf /tmp/x \\ud800"}}'
+        )
+        result = run_raw(self.root, text)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        verdict = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual(verdict["permissionDecision"], "deny")
+        row = rows(self.root)[-1]
+        self.assertEqual(row["decision"], "deny")
+        self.assertIn("\ud800", row["subject"])
+
+    def test_failure_while_recording_stops_the_call(self):
+        """判定の後の記録で落ちても、終了コード 1 で通さない。記録は重ねて試さない。"""
+        calls = []
+
+        def broken(*_args, **_kwargs):
+            calls.append(1)
+            raise ValueError("想定外")
+
+        with mock.patch.object(cli_args, "_record", side_effect=broken):
+            result = run_raw(self.root, json.dumps(PRE))
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("[ccnavi] internal-error", result.stderr)
+        self.assertIn("ValueError", result.stderr)
+        self.assertEqual(len(calls), 1)
+
+    def test_failure_before_the_payload_is_read_stops_the_call(self):
+        """payload を読む前に落ちたら、イベントが分からないので止めて記録する。"""
+        with mock.patch.object(modes, "resolve_mode", side_effect=RuntimeError("想定外")):
+            result = run_raw(self.root, json.dumps(PRE))
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("[ccnavi] internal-error", result.stderr)
+        row = rows(self.root)[-1]
+        self.assertEqual(row["reason"], "internal-error")
+        self.assertIn("RuntimeError", row["detail"])
+
+    def test_failure_after_the_payload_is_read_follows_the_event(self):
+        """payload を読んだ後なら、イベントごとに決めた形で終える。Stop は止めない。"""
+        with mock.patch.object(judge, "subject_of", side_effect=RuntimeError("想定外")):
+            result, row = run(self.root, {"hook_event_name": "Stop"})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("internal-error", json.loads(result.stdout)["systemMessage"])
+        self.assertEqual(row["reason"], "internal-error")
+        self.assertEqual(row["event"], "Stop")
+
+    def test_event_name_of_the_wrong_type_is_an_unusable_payload(self):
+        """`hook_event_name` が文字列でない payload は、読めない payload として止めて記録する。"""
+        for payload in (
+            {**PRE, "hook_event_name": ["PreToolUse"]},
+            {**PRE, "tool_name": ["Bash"]},
+        ):
+            with self.subTest(payload=payload):
+                result = run_raw(self.root, json.dumps(payload))
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("[ccnavi] payload-unusable", result.stderr)
+                row = rows(self.root)[-1]
+                self.assertEqual(row["reason"], "payload-unusable")
+                self.assertEqual(row["decision"], "skip")
 
     def test_unusable_payload_says_what_to_do(self):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
