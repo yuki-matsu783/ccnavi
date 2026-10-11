@@ -14,3 +14,10 @@
 {"at": "2026-10-11T20:57:31Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "phase-mark", "from": null, "to": null, "via": "board", "actor": "yuki-matsu783", "phase": 3, "mark": "reviewed"}
 {"at": "2026-10-11T20:57:44Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "phase-reopened", "from": null, "to": null, "via": "board", "phase": 3, "cleared": ["requested", "reviewed", "pending"]}
 {"at": "2026-10-11T21:00:06Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "phase-reopened", "from": null, "to": null, "via": "board", "phase": 2, "cleared": ["requested", "reviewed", "pending"]}
+{"at": "2026-10-11T21:19:01Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 2, "mark": "pending"}
+{"at": "2026-10-11T21:19:01Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 3, "mark": "pending"}
+{"at": "2026-10-11T21:19:50Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 2, "mark": "requested"}
+{"at": "2026-10-11T21:20:00Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 3, "mark": "requested"}
+{"at": "2026-10-11T21:22:09Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "actor": "yuki-matsu783", "phase": 2, "mark": "reviewed"}
+{"at": "2026-10-11T21:22:21Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "actor": "yuki-matsu783", "phase": 3, "mark": "reviewed"}
+{"at": "2026-10-11T21:29:11Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree", "kind": "revised", "from": "doing", "to": "doing", "via": "board", "feedback": true}

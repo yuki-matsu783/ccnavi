@@ -12,6 +12,9 @@ human_review:
 allow:
   - match: Write|Edit
     glob: "tests/ticket/test_lint_ops.py"
+started_at: "2026-10-12T06:00:38+0900"
+base_sha: "84faa9b802fd58d102b9f424e5a1409364e500ec"
+completed_at: "2026-10-12T06:18:52+0900"
 ---
 ## 何が起きているか
 

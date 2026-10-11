@@ -4,9 +4,11 @@ ticket: feature-207-subagent-phase-session-rejects-orphan-worktree
 issue: 207
 mr: 313
 title: SubagentStart の局面・元のプロジェクトが無いワークツリーの名指し・セッション開始の却下提示・期限の実測
-rationale: |
-  HANDOVER.md の「未実装」「未了」から移した 4 件の課題(#203 #205 #207 #210)を 1 本の MR でまとめて直す。
+rationale: 'HANDOVER.md の「未実装」「未了」から移した 4 件の課題(#203 #205 #207 #210)を 1 本の MR でまとめて直す。
+
   どれも判定は変えず、案内と診断の文面を足すか、これまで無かった測定を足す。
+
+  '
 human_review:
   required: true
   reason: SessionStart の出力と --lint / --explain の文面が変わる(ユーザとのやり取りの形)ため
@@ -43,22 +45,36 @@ phases:
     - extensions/chrome/ccnavi-approval/docs/*
     - CLAUDE.md
     - .claude/skills/*
+  skill-improve:
+    kind: feedback
+    title: スキル改善
+    review: mr
+    scope:
+    - .claude/skills/*
+    - docs/wiki/*
+    when: 振り返りでスキルの候補が出たとき（docs/claude/skill-review.md）。候補が無ければ置かない
 plan:
-  - acceptance
-  - {type: implement, after: [1]}
-  - {type: docs, after: [2]}
+- acceptance
+- type: implement
+  after:
+  - 1
+- type: docs
+  after:
+  - 2
 allow:
-  - match: Write|Edit
-    glob: "src/ccnavi/*"
-  - match: Write|Edit
-    glob: "tests/*"
-  - match: Write|Edit
-    glob: "docs/*"
-  - match: Write|Edit
-    glob: "README.md"
-started_at: "2026-10-12T03:09:43+0900"
-completed_at: ""
-base_sha: "8548fc14bfe6a07a792443d35f8c15550610d23f"
+- match: Write|Edit
+  glob: src/ccnavi/*
+- match: Write|Edit
+  glob: tests/*
+- match: Write|Edit
+  glob: docs/*
+- match: Write|Edit
+  glob: README.md
+started_at: 2026-10-12T03:09:43+0900
+completed_at: ''
+base_sha: 8548fc14bfe6a07a792443d35f8c15550610d23f
+feedback:
+- skill-improve
 ---
 Closes #203
 Closes #205
