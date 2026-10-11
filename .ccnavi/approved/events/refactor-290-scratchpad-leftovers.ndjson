@@ -1,1 +1,4 @@
 {"at": "2026-10-11T05:30:28Z", "ticket": "refactor-290-scratchpad-leftovers", "kind": "approved", "from": "todo", "to": "doing", "via": "board", "tree": "refactor-288-wip-scratchpad"}
+{"at": "2026-10-11T06:34:17Z", "ticket": "refactor-290-scratchpad-leftovers", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "cc1dd82fbb5a235cc2ac539e281580c2ad831b25"}
+{"at": "2026-10-11T06:39:53Z", "ticket": "refactor-290-scratchpad-leftovers", "kind": "finished", "from": "doing", "to": "done", "via": "cli"}
+{"at": "2026-10-11T06:39:53Z", "ticket": "refactor-290-scratchpad-leftovers", "kind": "parent-mark", "from": null, "to": null, "via": "cli", "mark": "closed"}
