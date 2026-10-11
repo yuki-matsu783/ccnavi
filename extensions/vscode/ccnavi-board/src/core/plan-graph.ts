@@ -15,6 +15,11 @@
  * - **引けない線（`canConnect`）。** 項から項へだけ引ける。自分へ・start と end に触れる線・固定した番号
  *   （子が承認された番号）へ入る線・循環になる線を断る。線と点だけで決まる形の検査で、計画の良し悪しの判定ではない
  *
+ * - **置き場所を覚える（`layoutOf` / `withLayout`）。** ワークフロー編集タブで線を変えて番号が振り直っても、
+ *   点の名札の番号だけが変わり、置き場所は動かさない。置き場所は振り直す前の番号（`from`）で覚え、「並べ直す」で
+ *   組み直す。覚えるのは画面の状態だけで、保存しない
+ * - **消せる線（`canDisconnect`）。** 項どうしの線だけ。start と end の仮の線と、固定した番号へ入る線は消せない
+ *
  * `after` が計画に無い番号を指していても、何も言わずに線にしないだけ（なぜ無いのかを言うのは実行ファイル）。
  *
  * VS Code の API も DOM も node も読まない（画面のバンドルに入る）。
@@ -30,6 +35,11 @@ export interface PlanGraphNode {
   readonly kind: PlanNodeKind;
   /** 項の番号。start と end は null */
   readonly number: number | null;
+  /**
+   * 振り直す前の番号（実行ファイルの `from`。いま提案に書いてある番号）。ワークフロー編集タブで番号が振り直っても
+   * 同じ項を指すので、置き場所はこれで覚える。start と end は null
+   */
+  readonly from: number | null;
   /** 項なら定義の題、start と end なら名前 */
   readonly label: string;
   /** 定義の名前。start と end は空 */
@@ -117,7 +127,7 @@ export function planGraphOf(plan: ApprovePlan): PlanGraph {
 
   const ends = ENDS[plan.part === "feedback" ? "feedback" : "plan"];
   const loose = new Set(plan.loose);
-  const blank = { type: "", review: "", deferred: false, reviewAt: null, locked: false, loose: false } as const;
+  const blank = { from: null, type: "", review: "", deferred: false, reviewAt: null, locked: false, loose: false } as const;
   const nodes: PlanGraphNode[] = [{ id: "start", kind: "start", number: null, label: ends.start, ...blank, column: 0, x: 0, y: yOf(0, 1) }];
   for (const item of plan.items) {
     const column = depth.get(item.number) ?? 1;
@@ -126,6 +136,7 @@ export function planGraphOf(plan: ApprovePlan): PlanGraph {
       id: nodeId(item.number),
       kind: "item",
       number: item.number,
+      from: item.from,
       label: item.title === "" ? item.type : item.title,
       type: item.type,
       review: item.review,
@@ -220,4 +231,53 @@ function reaches(graph: PlanGraph, from: string, to: string): boolean {
     stack.push(...(next.get(now) ?? []));
   }
   return false;
+}
+
+/** 項の置き場所。振り直す前の番号（`from`）の文字列 → 図の上の位置 */
+export type PlanLayout = Readonly<Record<string, { readonly x: number; readonly y: number }>>;
+
+/** 図の項の置き場所を、振り直す前の番号で覚える */
+export function layoutOf(graph: PlanGraph): PlanLayout {
+  const out: Record<string, { x: number; y: number }> = {};
+  for (const node of graph.nodes) {
+    if (node.kind === "item" && node.from !== null) {
+      out[String(node.from)] = { x: node.x, y: node.y };
+    }
+  }
+  return out;
+}
+
+/**
+ * 覚えた置き場所に項を置き直す。覚えていない項は組んだ場所のまま。start は先頭の列、end は右端の項の次の列に置く
+ * （線を変えて段数が変わっても、end が項に重ならないように）。覚えた場所が 1 つも当たらなければ組んだ図のまま
+ */
+export function withLayout(graph: PlanGraph, layout: PlanLayout): PlanGraph {
+  const placed = (node: PlanGraphNode): PlanGraphNode => {
+    const at = node.kind === "item" && node.from !== null ? layout[String(node.from)] : undefined;
+    return at === undefined ? node : { ...node, x: at.x, y: at.y };
+  };
+  const items = graph.nodes.filter((node) => node.kind === "item").map(placed);
+  if (items.every((node, index) => node === graph.nodes.filter((n) => n.kind === "item")[index])) {
+    return graph;
+  }
+  const right = Math.max(0, ...items.map((node) => node.x));
+  const nodes = graph.nodes.map((node) => {
+    if (node.kind === "item") {
+      return placed(node);
+    }
+    return node.kind === "start" ? { ...node, x: 0 } : { ...node, x: right + COLUMN };
+  });
+  return { ...graph, nodes };
+}
+
+/**
+ * `source` から `target` への線を消せるか（`target` が `source` を待たなくなる）。消せるのは項どうしの線（after）だけで、
+ * start と end の仮の線（図が引く）と、固定した番号へ入る線は消せない
+ */
+export function canDisconnect(graph: PlanGraph, source: string, target: string): boolean {
+  const to = graph.nodes.find((node) => node.id === target);
+  if (to === undefined || to.kind !== "item" || to.locked) {
+    return false;
+  }
+  return graph.edges.some((edge) => edge.kind === "after" && edge.source === source && edge.target === target);
 }

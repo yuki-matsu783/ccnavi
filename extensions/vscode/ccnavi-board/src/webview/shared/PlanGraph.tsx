@@ -10,15 +10,49 @@
  * 同じ）。拡大・縮小と全体表示はできる。`editable` が真なら、項から項へ線を引ける（ワークフロー編集タブ）。
  * 引いている最中に、引けない線（自分へ・start と end に触れる・固定した番号へ入る・循環になる）を
  * `canConnect` で断る（放しても線はできない）。引けた線は `onConnect` で呼び手に返すだけで、図は描き直さない
- * （呼び手が計画を作り直して渡し直す。番号の振り直しの正は実行ファイル）。
+ * （呼び手が計画を作り直して渡し直す。番号の振り直しの正は実行ファイル）。`onDisconnect` を渡せば、消せる線
+ * （項どうしの線で、固定した番号へ入らないもの。`canDisconnect`）の真ん中に × を出し、押したら呼び手に返す。
+ *
+ * **置き場所。** `layout` を渡せば、項をその場所に置く（振り直す前の番号 `from` で覚えた場所。`core/plan-graph.ts` の
+ * `withLayout`）。ワークフロー編集タブは、番号が振り直っても点を動かさないためにこれを使う。開いたときの見え方
+ * （全体を枠に収める）は `fitKey` が変わったときだけ合わせ直す（渡さなければ計画が替わるたび）。
  *
  * 見た目は `PlanGraph.css`。React Flow の CSS は `--xy-*` の変数で出来ているので、そこを `--vscode-*` で上書きする。
  */
-import { useCallback, useEffect, useMemo, useRef, type JSX } from "react";
-import { Background, Controls, Handle, MarkerType, Position, ReactFlow, useNodesInitialized, useReactFlow, type Connection, type Edge, type Node, type NodeProps, type NodeTypes } from "@xyflow/react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type JSX, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  Background,
+  BaseEdge,
+  Controls,
+  EdgeLabelRenderer,
+  getBezierPath,
+  Handle,
+  MarkerType,
+  Position,
+  ReactFlow,
+  useNodesInitialized,
+  useReactFlow,
+  type Connection,
+  type Edge,
+  type EdgeProps,
+  type EdgeTypes,
+  type Node,
+  type NodeProps,
+  type NodeTypes,
+} from "@xyflow/react";
 
 import type { ApprovePlan } from "../../core/approvemodel.js";
-import { canConnect, PLAN_FIT_MAX_ZOOM, PLAN_FIT_MIN_ZOOM, planGraphOf, type PlanGraph as Graph, type PlanGraphNode } from "../../core/plan-graph.js";
+import {
+  canConnect,
+  canDisconnect,
+  PLAN_FIT_MAX_ZOOM,
+  PLAN_FIT_MIN_ZOOM,
+  planGraphOf,
+  withLayout,
+  type PlanGraph as Graph,
+  type PlanGraphNode,
+  type PlanLayout,
+} from "../../core/plan-graph.js";
 
 interface ItemData extends Record<string, unknown> {
   readonly node: PlanGraphNode;
@@ -111,8 +145,47 @@ function EndView({ data }: NodeProps<EndNode>): JSX.Element {
 const END_IN = "in";
 const END_LOOSE = "loose";
 
+/** 消せる線の × を押したときに呼ぶもの。線の id を渡す。図の部品ごとに 1 つ */
+const RemoveEdge = createContext<(id: string) => void>(() => undefined);
+
+/**
+ * 消せる線。矢印は既定の線と同じに描き、真ん中に × を置く（いつも出す。線を選ばせないので、載せたときだけ出す形に
+ * すると、どの線が消せるかが分からない）。押しても図を動かさない（`nodrag` `nopan`）
+ */
+function RemovableEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, style, interactionWidth }: EdgeProps): JSX.Element {
+  const remove = useContext(RemoveEdge);
+  const [path, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+  const stop = (event: ReactMouseEvent): void => event.stopPropagation();
+  return (
+    <>
+      <BaseEdge path={path} markerEnd={markerEnd} style={style} interactionWidth={interactionWidth} />
+      <EdgeLabelRenderer>
+        <div className="plan-edge-tools nodrag nopan" style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}>
+          <button
+            type="button"
+            className="plan-remove nodrag nopan"
+            data-action="plan-remove-edge"
+            data-edge={id}
+            aria-label="この線を消す（待たなくする）"
+            title="この線を消す（待たなくする）"
+            onMouseDown={stop}
+            onPointerDown={stop}
+            onClick={(event) => {
+              event.stopPropagation();
+              remove(id);
+            }}
+          >
+            ×
+          </button>
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
 // 描くたびに作り直すと React Flow が「点の種類が変わった」と言って組み直す。1 度だけ作る
 const NODE_TYPES: NodeTypes = { planItem: ItemView, planEnd: EndView };
+const EDGE_TYPES: EdgeTypes = { planRemovable: RemovableEdge };
 
 function nodesOf(graph: Graph, editable: boolean): PlanNode[] {
   return graph.nodes.map((node) => ({
@@ -123,7 +196,7 @@ function nodesOf(graph: Graph, editable: boolean): PlanNode[] {
   }));
 }
 
-function edgesOf(graph: Graph): Edge[] {
+function edgesOf(graph: Graph, removable: boolean): Edge[] {
   return graph.edges.map((edge) => {
     const color = edge.loose ? "var(--vscode-editorWarning-foreground)" : "var(--vscode-descriptionForeground)";
     return {
@@ -131,6 +204,7 @@ function edgesOf(graph: Graph): Edge[] {
       source: edge.source,
       target: edge.target,
       ...(edge.kind === "end" ? { targetHandle: edge.loose ? END_LOOSE : END_IN } : {}),
+      ...(removable && canDisconnect(graph, edge.source, edge.target) ? { type: "planRemovable" } : {}),
       className: ["plan-edge", `plan-${edge.kind}`, edge.loose ? "loose" : ""].filter((name) => name !== "").join(" "),
       markerEnd: { type: MarkerType.ArrowClosed, color },
       // start と end への線は図が引くもので、消せない
@@ -148,15 +222,15 @@ const START_PAD = 16;
  * 左へ寄せる（真ん中に合わせると、開始も終了も枠の外になる）。計画が替わったら合わせ直す。
  * React Flow の `fitView` の属性は使わない（下限で止めたあとに寄せる段を挟めないため）
  */
-function FitOnOpen({ graph }: { readonly graph: Graph }): null {
+function FitOnOpen({ fitKey }: { readonly fitKey: unknown }): null {
   const initialized = useNodesInitialized();
   const flow = useReactFlow();
-  const done = useRef<Graph | undefined>(undefined);
+  const done = useRef<{ readonly key: unknown } | undefined>(undefined);
   useEffect(() => {
-    if (!initialized || done.current === graph) {
+    if (!initialized || (done.current !== undefined && done.current.key === fitKey)) {
       return;
     }
-    done.current = graph;
+    done.current = { key: fitKey };
     void Promise.resolve(flow.fitView({ minZoom: PLAN_FIT_MIN_ZOOM, maxZoom: PLAN_FIT_MAX_ZOOM, padding: 0.1 })).then(() => {
       const view = flow.getViewport();
       if (view.zoom <= PLAN_FIT_MIN_ZOOM + 1e-6) {
@@ -164,7 +238,7 @@ function FitOnOpen({ graph }: { readonly graph: Graph }): null {
         void flow.setViewport({ x: START_PAD - left * view.zoom, y: view.y, zoom: view.zoom });
       }
     });
-  }, [initialized, graph, flow]);
+  }, [initialized, fitKey, flow]);
   return null;
 }
 
@@ -207,10 +281,23 @@ function Notes({ plan }: { readonly plan: ApprovePlan }): JSX.Element | null {
 /** 線が引けたときに呼び手へ返すもの。`from` を `to` が待つ（番号） */
 export type PlanConnect = (from: number, to: number) => void;
 
-export function PlanGraph({ plan, editable = false, onConnect }: { readonly plan: ApprovePlan; readonly editable?: boolean; readonly onConnect?: PlanConnect }): JSX.Element {
-  const graph = useMemo(() => planGraphOf(plan), [plan]);
+export interface PlanGraphProps {
+  readonly plan: ApprovePlan;
+  readonly editable?: boolean;
+  readonly onConnect?: PlanConnect;
+  /** 線を消したときに呼ぶ。`from` を `to` が待たなくなる（番号）。渡したときだけ × を出す */
+  readonly onDisconnect?: PlanConnect;
+  /** 項の置き場所（振り直す前の番号で覚えたもの）。無ければ `planGraphOf` が組んだ場所 */
+  readonly layout?: PlanLayout;
+  /** 開いたときの見え方を合わせ直す合図。変わったときだけ全体を枠に収める。無ければ計画が替わるたび */
+  readonly fitKey?: unknown;
+}
+
+export function PlanGraph({ plan, editable = false, onConnect, onDisconnect, layout, fitKey }: PlanGraphProps): JSX.Element {
+  const graph = useMemo(() => (layout === undefined ? planGraphOf(plan) : withLayout(planGraphOf(plan), layout)), [plan, layout]);
+  const removable = editable && onDisconnect !== undefined;
   const nodes = useMemo(() => nodesOf(graph, editable), [graph, editable]);
-  const edges = useMemo(() => edgesOf(graph), [graph]);
+  const edges = useMemo(() => edgesOf(graph, removable), [graph, removable]);
   const numberOf = useCallback((id: string): number | undefined => graph.nodes.find((node) => node.id === id)?.number ?? undefined, [graph]);
 
   // 引いている最中に断る。読むだけなら何も引けない
@@ -226,7 +313,20 @@ export function PlanGraph({ plan, editable = false, onConnect }: { readonly plan
     [editable, graph, numberOf, onConnect],
   );
 
+  const removeEdge = useCallback(
+    (id: string) => {
+      const edge = graph.edges.find((e) => e.id === id);
+      const from = edge === undefined ? undefined : numberOf(edge.source);
+      const to = edge === undefined ? undefined : numberOf(edge.target);
+      if (removable && edge !== undefined && from !== undefined && to !== undefined && canDisconnect(graph, edge.source, edge.target)) {
+        onDisconnect?.(from, to);
+      }
+    },
+    [graph, numberOf, onDisconnect, removable],
+  );
+
   return (
+    <RemoveEdge.Provider value={removeEdge}>
     <section className="plan-graph" data-part={plan.part} data-ticket={plan.ticket} data-editable={editable ? "1" : "0"}>
       <h3>{headingOf(plan)}</h3>
       <div className="graph plan-graph-canvas" data-nodes={graph.nodes.length} data-edges={graph.edges.length}>
@@ -234,6 +334,7 @@ export function PlanGraph({ plan, editable = false, onConnect }: { readonly plan
           nodes={nodes}
           edges={edges}
           nodeTypes={NODE_TYPES}
+          edgeTypes={EDGE_TYPES}
           nodesDraggable={false}
           nodesConnectable={editable}
           nodesFocusable={false}
@@ -249,10 +350,11 @@ export function PlanGraph({ plan, editable = false, onConnect }: { readonly plan
         >
           <Background />
           <Controls showInteractive={false} />
-          <FitOnOpen graph={graph} />
+          <FitOnOpen fitKey={fitKey === undefined ? plan : fitKey} />
         </ReactFlow>
       </div>
       <Notes plan={plan} />
     </section>
+    </RemoveEdge.Provider>
   );
 }

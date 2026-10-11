@@ -185,7 +185,7 @@ export function parseApprovePreview(text: string): PreviewParse {
         .filter(isRecord)
         .map((r) => ({ ticket: str(r.ticket), problems: list(r.problems).map(str) })),
       problems: list(raw.problems).map(str),
-      plans: list(raw.plans).filter(isRecord).map(plan),
+      plans: readPlans(raw.plans),
     },
   };
 }
@@ -286,6 +286,14 @@ function numbersBy(value: unknown): Record<string, number[]> {
     }
   }
   return out;
+}
+
+/**
+ * `plans` の欄を読む。`--plan-order <親> --json` の答え（`planordermodel.ts`）も同じ形なので、同じ読み方を使う。
+ * オブジェクトでない項は落とし、番号の無い項目も落とす
+ */
+export function readPlans(value: unknown): ApprovePlan[] {
+  return list(value).filter(isRecord).map(plan);
 }
 
 function plan(raw: Record<string, unknown>): ApprovePlan {

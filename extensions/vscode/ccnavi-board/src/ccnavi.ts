@@ -7,7 +7,9 @@
  * 機械可読で。プロジェクト管理画面が読む）、`--lint --json --flow <パス>`（子のフロー 1 本を
  * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--agree --preview --json`（承認待ちの一覧を見る）、
  * `--agree --yes … --json`（見せた一覧を承認する。ユーザがオーバーレイで押したときだけ）、
- * `--suggest --json`（記録からルールの候補を起こす。ルール管理画面が読む。記録を読むので `--log ""` は付けない）。
+ * `--suggest --json`（記録からルールの候補を起こす。ルール管理画面が読む。記録を読むので `--log ""` は付けない）、
+ * `--plan-order <親> --json [--order <JSON>]`（親の提案の計画の順序を振り直した答え。ワークフロー編集タブが読む）と
+ * `--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`（その保存。提案を書き換えるのは実行ファイル）。
  * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
  * 判定と検証はルールファイルを差し替えられる。
  * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
@@ -36,6 +38,8 @@ import {
   decideArgs,
   decidePreviewArgs,
   overrideArgs,
+  planOrderArgs,
+  planOrderWriteArgs,
   previewArgs,
   REVIEW_SCRIPT,
   toPosixPath,
@@ -53,6 +57,7 @@ import {
 import { parseLintJson, unknownOption, type LintJson } from "./core/lintmodel.js";
 import { binFromSettingsJson, hostTarget, locate } from "./core/locate.js";
 import { parseBoardJson, type BoardJson } from "./core/model.js";
+import { parsePlanOrder, type PlanOrder, type PlanOrderAnswer, type PlanOrderWrite } from "./core/planordermodel.js";
 import { parseSuggestJson, type SuggestJson } from "./core/suggestmodel.js";
 import {
   parseSamplesJson,
@@ -570,4 +575,80 @@ export async function runC1Target(root: string, setting: string, parent: string)
   }
   const ran = await run(launcher, root, ["c1", "family", parent], EXPLAIN_TIMEOUT_MS);
   return ran.code === 0 ? c1TargetOf(ran.stdout) : "";
+}
+
+/** ワークフロー編集タブの 2 本が求めるフラグ。知らない古い実行ファイルは、確かめられないとして失敗にする */
+const PLAN_ORDER_FLAGS = ["--plan-order", "--order", "--expect", "--write"] as const;
+
+/**
+ * 実行ファイルが `--plan-order` を知っているかを聞く（`--version --json`）。知っていれば undefined、知らなければ理由。
+ * ワークフロー編集タブは読み込むたびに 1 回聞く（線を変えるたびには聞かない。往復が倍になるため）
+ */
+export async function checkPlanOrder(root: string, setting: string, what = "ワークフロー編集タブ"): Promise<string | undefined> {
+  const probe = await probeVersion(root, setting);
+  if (probe === undefined) {
+    return NOT_FOUND;
+  }
+  return missingFlags(probe, PLAN_ORDER_FLAGS, what, hasSource(root));
+}
+
+/**
+ * 親の提案の計画を、振り直した答えで読む（`--plan-order <親> --json [--order <JSON>]`）。何も書かない。
+ * `order` は元の番号での直接の先行で、空なら提案のまま。番号の振り直しと検査は実行ファイルが答える。
+ * `--plan-order` は `--agree` の外の独立したフラグなので、組み込みの止めにも端末の確かめにも当たらない。
+ * 失敗（実行ファイルが無い・非 0 終了・JSON でない）は理由の文にして返し、画面は壊さない。古い実行ファイルかは
+ * 呼び手が先に `checkPlanOrder` で聞く
+ */
+export async function runPlanOrder(root: string, setting: string, parent: string, order: PlanOrder = {}): Promise<RunResult<PlanOrderAnswer>> {
+  const what = "ccnavi --plan-order --json";
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, planOrderArgs(parent, order), DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+  }
+  if (ran.code !== 0) {
+    return { ok: false, error: `${what} が失敗しました: ${ran.stderr.trim() || firstLine(ran.stdout)}` };
+  }
+  const parsed = parsePlanOrder(ran.stdout);
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what} の出力を読めません（${parsed.error}）` };
+}
+
+/**
+ * ワークフロー編集タブの保存（`--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`）。
+ * 書くのは実行ファイルで、拡張はファイルを書かない。`expect` は開いたときの `source_sha` で、親か子の提案が外で
+ * 変わっていれば実行ファイルは何も書かない（答えの `source_sha` が今の値になるので `changed` にする）。
+ * 書かなかった理由は実行ファイルの標準エラーの文のまま返す
+ */
+export async function runPlanOrderWrite(root: string, setting: string, parent: string, order: PlanOrder, expect: string): Promise<PlanOrderWrite> {
+  const what = "ccnavi --plan-order --write";
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { kind: "error", error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, planOrderWriteArgs(parent, order, expect), DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return {
+      kind: "error",
+      error: `${cutOff(what, DIAGNOSE_TIMEOUT_MS)}。提案を書き換えたかは分かりません。再読込して確かめてください`,
+    };
+  }
+  const parsed = parsePlanOrder(ran.stdout);
+  if (!parsed.ok) {
+    const said = ran.stderr.trim() || firstLine(ran.stdout);
+    return { kind: "error", error: `${what} が失敗しました: ${said === "" ? parsed.error : said}` };
+  }
+  const answer = parsed.value;
+  if (answer.written === true && ran.code === 0) {
+    return { kind: "written", answer };
+  }
+  if (answer.source_sha !== expect) {
+    return { kind: "changed", answer };
+  }
+  if (ran.code === 0) {
+    return { kind: "unchanged", answer };
+  }
+  return { kind: "refused", answer, reason: ran.stderr.trim() || "ccnavi が書き換えませんでした" };
 }

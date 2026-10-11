@@ -53,6 +53,25 @@ export function approveArgs(
   return ["--agree", "--yes", tickets.join(","), "--digest", digest, "--json", ...only];
 }
 
+/**
+ * `--plan-order <親> --json [--order <JSON>]`。ワークフロー編集タブが計画の図を読む（何も書かない）。
+ * `order` は元の番号（いま提案に書いてある番号）での直接の先行で、線を変えたときだけ付ける（空なら提案のまま）。
+ * 番号の振り直しと順序の検査は実行ファイルが答える
+ */
+export function planOrderArgs(parent: string, order?: Readonly<Record<string, unknown>>): readonly string[] {
+  const base = ["--plan-order", parent, "--json"];
+  return order === undefined || Object.keys(order).length === 0 ? base : [...base, "--order", JSON.stringify(order)];
+}
+
+/**
+ * `--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`。ワークフロー編集タブの保存。
+ * `expect` は開いたときの `source_sha`。親か子の提案が外で変わっていれば、実行ファイルは何も書かない。
+ * `--write` は `--order` を求めるので、空でも付ける
+ */
+export function planOrderWriteArgs(parent: string, order: Readonly<Record<string, unknown>>, expect: string): readonly string[] {
+  return ["--plan-order", parent, "--order", JSON.stringify(order), "--expect", expect, "--write", "--json"];
+}
+
 /** レビューの sh の、ワークスペースルートからのパス */
 export const REVIEW_SCRIPT = ".ccnavi/scripts/ccnavi-review.sh";
 
