@@ -395,7 +395,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(self.last_record()["code"], "DENY_TICKET_PROJECT_MISMATCH")
 
     def test_project_skills_are_written_only_under_the_ticket_rules(self):
-        """docs/skills/ は保護の外のふつうの場所。チケットの範囲の中でだけ書ける。
+        """skills/ は保護の外のふつうの場所。チケットの範囲の中でだけ書ける。
 
         置き場を ccnavi ディレクトリの外にしたのは、組み込みの保護を緩めずに済ませるため。
         範囲に入れた子のワークツリーでは通り、範囲の外とチケットの無いワークツリーでは、
@@ -403,22 +403,22 @@ class ProjectsTest(unittest.TestCase):
         """
         write(
             os.path.join(self.lib, "wip", "proposals", "todo", "i0009.md"),
-            ticket_text("i0009", allow=("docs/skills/deploy/*",)),
+            ticket_text("i0009", allow=("skills/deploy/*",)),
         )
         approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         tree = self.worktree(self.lib, "i0009")
-        skill = os.path.join(tree, "docs", "skills", "deploy", "SKILL.md")
+        skill = os.path.join(tree, "skills", "deploy", "SKILL.md")
         allowed = self.hook("Write", self.ws, file_path=skill)
         self.assertNotEqual(self.decision(allowed), "deny", allowed.stdout + allowed.stderr)
         self.assertNotIn("DENY", self.reason(allowed))
-        other = os.path.join(tree, "docs", "skills", "other", "SKILL.md")
+        other = os.path.join(tree, "skills", "other", "SKILL.md")
         self.assertIn(
             "DENY_TICKET_SCOPE", self.reason(self.hook("Write", self.ws, file_path=other))
         )
 
         loose = self.worktree(self.lib, "loose")
-        for rel in (("docs", "skills", "deploy", "SKILL.md"), ("docs", "notes.md")):
+        for rel in (("skills", "deploy", "SKILL.md"), ("docs", "notes.md")):
             done = self.hook("Write", self.ws, file_path=os.path.join(loose, *rel))
             self.assertEqual(done.returncode, 0, done.stderr)
             self.assertEqual(self.decision(done), "ask", done.stdout)

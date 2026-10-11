@@ -2,7 +2,7 @@
 
 道具はワークスペース、設定はプロジェクトに置く分け方で、プロジェクトは `.claude/` を
 持たない。そのため、スキルの形の手順書は
-`projects/<名前>/docs/skills/<スキル>/SKILL.md` に置く。ccnavi は SessionStart と
+`projects/<名前>/skills/<スキル>/SKILL.md` に置く。ccnavi は SessionStart と
 SubagentStart で、cwd がそのプロジェクトの中にあるときだけ、名前・説明・場所の目録を渡す。
 見るのは次のとおり。
 
@@ -46,7 +46,7 @@ class ProjectSkillsTest(unittest.TestCase):
         os.makedirs(os.path.join(self.lib, ".git"))
 
     def put(self, name: str, text: str) -> str:
-        return write(os.path.join(self.lib, "docs", "skills", name, "SKILL.md"), text)
+        return write(os.path.join(self.lib, "skills", name, "SKILL.md"), text)
 
     def context(self, event: str, cwd: str, state: str = "", **extra) -> str:
         payload = {"hook_event_name": event, "session_id": "s1", "cwd": cwd, **extra}
@@ -80,7 +80,7 @@ class ProjectSkillsTest(unittest.TestCase):
         self.put("deploy", skill("deploy", "本番へ出す手順"))
         said = self.context("SessionStart", self.lib)
         self.assertIn("プロジェクト lib のスキル", said)
-        self.assertIn("- deploy: 本番へ出す手順（docs/skills/deploy/SKILL.md）", said)
+        self.assertIn("- deploy: 本番へ出す手順（skills/deploy/SKILL.md）", said)
 
     def test_subagent_start_inside_the_project_lists_the_skills(self):
         self.put("deploy", skill("deploy", "本番へ出す手順"))
@@ -99,9 +99,9 @@ class ProjectSkillsTest(unittest.TestCase):
     # --- 2. frontmatter ---------------------------------------------------------------
 
     def test_the_ccnavi_directory_is_no_longer_read(self):
-        """置き場は docs/skills/。.ccnavi/skills/ に置いたものは目録に載らない。
+        """置き場は skills/。.ccnavi/skills/ に置いたものは目録に載らない。
 
-        docs/skills/ は組み込みの保護の外のふつうの場所で、承認したチケットの範囲の中で書ける。
+        skills/ は組み込みの保護の外のふつうの場所で、承認したチケットの範囲の中で書ける。
         """
         write(
             os.path.join(self.lib, ".ccnavi", "skills", "old", "SKILL.md"),

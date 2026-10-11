@@ -35,6 +35,7 @@ from . import (
     ops_stop,
     phase,
     risk,
+    skillsync,
     ticket_ids,
     ticket_model,
     ticket_places,
@@ -161,6 +162,50 @@ def _sync_config(
     """
     if found.is_child or not found.project:
         return []
+    lines = _sync_common(stderr, root, conf, found, worktree)
+    if lines is None:
+        return None
+    more = _sync_skills(stderr, root, conf, found, worktree)
+    if more is None:
+        return None
+    return lines + more
+
+
+def _sync_skills(
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    found: ticket_model.Ticket,
+    worktree: str,
+) -> list[str] | None:
+    """共通の概念スキルをプロジェクトの `skills/` へ写す（設計 11.13）。消さない。"""
+    changes, why = skillsync.plan(root, worktree)
+    if why:
+        stderr.write(f"ccnavi: {found.ticket} の概念スキルを写せない: {why}\n")
+        return None
+    if not changes:
+        return []
+    failed = skillsync.apply(changes)
+    if failed:
+        stderr.write(f"ccnavi: {found.ticket} の概念スキルを写せない: {failed}\n")
+        return None
+    git_sh = settings.script_command(root, "ccnavi-git.sh")
+    lines = skillsync.describe(conf, found.project, worktree, changes)
+    lines.append(
+        f"  作業を始める前に、{worktree} で {', '.join(c.rel for c in changes)} を"
+        f" '{git_sh} add' してコミットしてください"
+    )
+    return lines
+
+
+def _sync_common(
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    found: ticket_model.Ticket,
+    worktree: str,
+) -> list[str] | None:
+    """共通レイヤーのミラー。ミラーできなければ None。"""
     changes, why = configsync.plan(conf, root, worktree)
     if why:
         stderr.write(f"ccnavi: {found.ticket} の共通レイヤーをミラーできない: {why}\n")
