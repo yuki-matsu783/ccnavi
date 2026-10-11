@@ -9,7 +9,7 @@ import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runApprovePreview, runApproveYes, runDecidePreview, runDecideYes } from "./ccnavi.js";
-import { buildBoard, flowCardOf, isKnownPath, parentTreeOf, phaseChipOf, type Board } from "./core/board.js";
+import { buildBoard, flowCardOf, isKnownPath, parentTreeOf, phaseChipOf, workflowCardOf, type Board } from "./core/board.js";
 import { flowTicketOf } from "./core/flow-view.js";
 import { screens } from "./core/screens.js";
 import { movedStep, NOTHING_MOVED, type MovedState } from "./core/board-moved.js";
@@ -423,6 +423,13 @@ function handleMessage(message: BoardMessage | undefined): void {
         void screens().flow(message.ticket);
       }
       return;
+    case "workflow":
+      // 画面が言った識別子をそのまま信頼せず、いまのボードで入口を出しているカード（計画を持つ承認待ちの親の
+      // 提案）だけを開く。開くのはコマンド ccnaviBoard.openWorkflow と同じ入口
+      if (current.board !== undefined && workflowCardOf(current.board, message.ticket) !== undefined) {
+        void vscode.commands.executeCommand("ccnaviBoard.openWorkflow", message.ticket);
+      }
+      return;
     case "editWorkflow":
       // 閉じてよいか・一覧の図にある親かは遷移が決める。開くのは遷移が返す openWorkflow
       dispatch(current, { kind: "editWorkflow", ticket: message.ticket });
@@ -628,6 +635,7 @@ const KNOWN: Readonly<Record<BoardMessage["type"], true>> = {
   reviewed: true,
   flow: true,
   editWorkflow: true,
+  workflow: true,
   tourDone: true,
 };
 
@@ -687,7 +695,8 @@ function asMessage(message: unknown): BoardMessage | undefined {
       return ticket === undefined ? undefined : { type: "flow", ticket };
     }
     case "editWorkflow":
-      return isTicketId(m.ticket) ? { type: "editWorkflow", ticket: m.ticket } : undefined;
+    case "workflow":
+      return isTicketId(m.ticket) ? { type: m.type, ticket: m.ticket } : undefined;
     default:
       return undefined;
   }

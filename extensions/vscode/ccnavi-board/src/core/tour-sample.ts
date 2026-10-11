@@ -105,7 +105,7 @@ export function sampleBoard(root: string, generatedAt: string): Board {
       ticket({
         ticket: "sample-a",
         title: "（見本）ログイン画面にパスワードの再設定を足す",
-        proposal: { state: "todo", tree: "", tree_root: "", path: "" },
+        proposal: { state: "todo", tree: "", tree_root: "", path: "", has_plan: true },
         copy: { status: "none" },
         worktree: { exists: false, path: "" },
         started_at: "",

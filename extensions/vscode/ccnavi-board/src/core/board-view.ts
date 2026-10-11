@@ -132,6 +132,11 @@ export type BoardMessage =
    */
   | { readonly type: "flow"; readonly ticket: string }
   /**
+   * 親の提案のカードの「ワークフロー」を押した。拡張ホストはいまのボードでそのカードが入口を出していることを
+   * 確かめてから、その親のワークフロー編集タブを開く（`ccnaviBoard.openWorkflow` と同じ入口）
+   */
+  | { readonly type: "workflow"; readonly ticket: string }
+  /**
    * 承認のオーバーレイの「ワークフローを編集」を押した。拡張ホストはオーバーレイを閉じてから、その親の
    * ワークフロー編集タブを開く（一覧の図にある親だけ。決めるのは承認の遷移）
    */

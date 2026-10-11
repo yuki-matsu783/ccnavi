@@ -37,6 +37,11 @@ export interface ProposalJson {
   readonly tree: string;
   readonly tree_root: string;
   readonly path: string;
+  /**
+   * 親の提案が計画（`plan:` か `feedback:`）を持つか。子は偽。ボードは計画を読まず、これで親の提案のカードの
+   * 「ワークフロー」を出し分ける。欄の無い答え（古い実行ファイル）は偽
+   */
+  readonly has_plan: boolean;
 }
 
 export interface CopyJson {
@@ -575,7 +580,7 @@ function proposal(raw: Record<string, unknown>): ProposalJson | null {
   if (state !== "todo" && state !== "review") {
     return null;
   }
-  return { state, tree: str(raw.tree), tree_root: str(raw.tree_root), path: str(raw.path) };
+  return { state, tree: str(raw.tree), tree_root: str(raw.tree_root), path: str(raw.path), has_plan: raw.has_plan === true };
 }
 
 function parent(raw: Record<string, unknown>): ParentJson {

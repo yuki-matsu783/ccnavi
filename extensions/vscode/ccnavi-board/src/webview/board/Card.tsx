@@ -97,12 +97,13 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
           ))}
         </ul>
       ) : null}
-      {card.actions.length > 0 || card.flow !== null ? (
+      {card.actions.length > 0 || card.flow !== null || card.workflow ? (
         <div className="card-actions">
           {card.actions.map((action, i) => (
             <ActionButton key={i} action={action} id={card.id} />
           ))}
           {card.flow !== null ? <FlowButton flow={card.flow} id={card.id} closed={card.column === "done" || card.column === "cancelled"} /> : null}
+          {card.workflow ? <WorkflowButton id={card.id} /> : null}
         </div>
       ) : null}
     </li>
@@ -336,6 +337,25 @@ function FlowButton({ flow, id, closed }: { readonly flow: FlowJson; readonly id
       onClick={() => post({ type: "flow", ticket: id })}
     >
       {flowButtonLabel(flow, closed)}
+    </button>
+  );
+}
+
+/**
+ * 親の提案の計画の順序を直すワークフロー編集タブを開くボタン。出すかは組み立て（`card.workflow`）が決め、
+ * 押したら拡張ホストへ返すだけ
+ */
+function WorkflowButton({ id }: { readonly id: string }): JSX.Element {
+  return (
+    <button
+      type="button"
+      className="action"
+      data-action="workflow"
+      data-ticket={id}
+      title="計画の項どうしの順序（どの項がどの項を待つか）を図で直すワークフロー編集タブを開きます。保存すると提案が書き換わるので、承認はそのあとに開き直してください"
+      onClick={() => post({ type: "workflow", ticket: id })}
+    >
+      ワークフロー
     </button>
   );
 }
