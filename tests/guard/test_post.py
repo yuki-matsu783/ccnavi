@@ -107,16 +107,19 @@ class Harness:
         session="s1",
         tool="Bash",
         event="PostToolUse",
+        source=None,
         **tool_input,
     ):
-        payload = json.dumps(
-            {
-                "hook_event_name": event,
-                "tool_name": tool,
-                "tool_input": tool_input,
-                "session_id": session,
-            }
-        )
+        body = {
+            "hook_event_name": event,
+            "tool_name": tool,
+            "tool_input": tool_input,
+            "session_id": session,
+        }
+        # SessionStart だけが source を持つ（startup・resume・clear・compact）。
+        if source is not None:
+            body["source"] = source
+        payload = json.dumps(body)
         # モードは環境ではなくフラグで固定する。このリポジトリは ccnavi を
         # 自分自身に仕掛けているので、テストを走らせるセッションが既に
         # モードを持っている。それを読むテストは、コードではなく走った
@@ -278,6 +281,29 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertNotIn("POST_VIOLATION", text)
         # この呼び出しは何も汚していない。判定は呼び出しについてのもの。
         self.assertEqual(self.records()[-1]["decision"], "allow")
+
+    def test_起動時に在った変更は初回の呼び出しで1度だけ伝え戻さない(self):
+        self.dirty()
+        self.run_hook(event="SessionStart", source="startup")
+
+        first = self.run_hook(command="ls", restore="enable")
+        second = self.run_hook(command="ls -la", restore="enable")
+
+        self.assertEqual(first.returncode, 0, "起動時の変更は直前の実行の結果ではない")
+        self.assertIn("POST_PREEXISTING", self.context(first))
+        self.assertEqual(second.stdout, "", "1 度伝えたものは繰り返さない")
+        with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "changed by a build\n", "他人の書きかけを戻してはいけない")
+
+    def test_起動後に現れた変更は起動時の基準に関わらず差し戻す(self):
+        self.run_hook(event="SessionStart", source="startup")
+        self.dirty()
+
+        result = self.run_hook(command="python build.py")
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+        self.assertIn("protected/keep.txt", result.stderr)
 
     def test_前から在った変更は自動復元でも触らない(self):
         self.dirty()

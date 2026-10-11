@@ -396,6 +396,8 @@ def decide_at_start(
     # 来るので、モデルの文脈が新しくなるたびに「1 度だけ渡す文」は改めて届き、`every` の
     # 刻みも 0 から数え直しになる。
     ctxfile.forget(conf.state, payload.session_id, startup=payload.source == "startup")
+    if payload.source == "startup":
+        _seen_baseline(stderr, conf, root, payload, record)
     record.detail = _prune_at_start(stderr, conf, root, payload.session_id)
     record.decision, record.enforced = audit.ALLOW, True
     texts = []
@@ -430,6 +432,35 @@ def decide_at_start(
     if texts:
         hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts))
     return EXIT_OK
+
+
+def _seen_baseline(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+) -> None:
+    """起動時に在る保護領域の変更を、実行後チェックの基準として記録する。
+
+    全部のツリーを見る（`watched_for` の payload 無し）。実行後チェックと同じ式で数えるので、
+    あとで同じ変更が見つかっても、新しい変更には数えない。
+    """
+    if not conf.state:
+        return
+    raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
+    post.capture_baseline(
+        stderr,
+        conf.state,
+        payload.session_id,
+        watched_for(stderr, conf, root, record, None),
+        scope_guard(conf, root, raw),
+        record,
+        mine=(conf.state, conf.log),
+        places=(conf.tickets, conf.approved),
+        synced=functools.partial(skillsync.is_synced_write, conf, root),
+        root=root,
+    )
 
 
 def _prune_at_start(stderr: TextIO, conf: settings.Settings, root: str, session: str) -> str:
