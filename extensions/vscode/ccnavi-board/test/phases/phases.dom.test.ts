@@ -5,7 +5,7 @@ import { readPhases } from "../../src/core/phases-doc.js";
 import type { PhasesForm } from "../../src/core/phases-view.js";
 import { openPage, openPhases, page, rowSelector, SAMPLE_PHASES_TEXT } from "../helpers/phases.js";
 import type { DomPage } from "../helpers/dom.js";
-import type { HTMLButtonElement, HTMLInputElement, HTMLOptionElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
+import type { HTMLButtonElement, HTMLInputElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
 
 /** 直前に送った保存の中身 */
 function savedForm(dom: DomPage): PhasesForm {
@@ -14,15 +14,7 @@ function savedForm(dom: DomPage): PhasesForm {
   return saves[saves.length - 1].form as PhasesForm;
 }
 
-/** 関係の欄の選択肢を押す（mousedown。押すたびに 1 件ずつ付け外しする） */
-function pick(dom: DomPage, field: string, id: string): void {
-  const option = dom.one(`${field} select.id-select option[value="${id}"]`);
-  const view = option.ownerDocument.defaultView;
-  assert.ok(view !== null);
-  option.dispatchEvent(new view.MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-}
-
-test("CB-D20 既定は畳み、行を押すと開いて state に id が入る。ほかの定義との関係・補足は値がある定義だけ開く", async () => {
+test("CB-D20 既定は畳み、行を押すと開いて state に id が入る。補足は値がある定義だけ開く", async () => {
   const dom = await openPhases();
   try {
     assert.equal(dom.all(".phase").length, 5);
@@ -31,9 +23,9 @@ test("CB-D20 既定は畳み、行を押すと開いて state に id が入る�
     await dom.settle();
     assert.ok(dom.one(rowSelector("p2")).classList.contains("open"));
     assert.deepEqual((dom.state() as { open: string[] }).open, ["design"]);
-    // 見本の design は when を持つので開く。implement-feedback は関係も案内も無いので閉じる
+    // 見本の design は when を持つので開く。implement は agent も when も無いので閉じる
     assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"));
-    assert.ok(!dom.one(`${rowSelector("p5")} details.more`).hasAttribute("open"));
+    assert.ok(!dom.one(`${rowSelector("p4")} details.more`).hasAttribute("open"));
   } finally {
     await dom.close();
   }
@@ -120,11 +112,11 @@ test("CB-T125 件の欄名は日本語で、YAML のキー名は欄名の title 
     const caps = dom.all(`${rowSelector("p1")} .row-body .field > .cap`);
     assert.deepEqual(
       caps.map((cap) => cap.textContent),
-      ["id", "タイトル", "区分", "レビュー", "範囲", "成果物", "並行できる定義", "一緒に必要な定義", "先に済ませる定義", "案内するエージェント", "使う場面"],
+      ["id", "タイトル", "区分", "レビュー", "範囲", "成果物", "案内するエージェント", "使う場面"],
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),
-      ["id", "title", "kind", "review", "scope", "deliverables", "overlap", "requires", "after", "agent", "when"].map((key) => `YAML のキー: ${key}`),
+      ["id", "title", "kind", "review", "scope", "deliverables", "agent", "when"].map((key) => `YAML のキー: ${key}`),
     );
   } finally {
     await dom.close();
@@ -217,7 +209,7 @@ test("CB-D63 定義が無いファイルは、保存する前に足すと言う�
   }
 });
 
-test("CB-D67 ほかの定義との関係・補足は、最後の値を消しても畳まれない（打っている欄が消えない）", async () => {
+test("CB-D67 補足は、最後の値を消しても畳まれない（打っている欄が消えない）", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
@@ -227,7 +219,7 @@ test("CB-D67 ほかの定義との関係・補足は、最後の値を消して�
     dom.type(dom.one(`${rowSelector("p1")} input.f-when`), "");
     await dom.settle();
     assert.ok(dom.one(`${rowSelector("p1")} details.more`).hasAttribute("open"), "値を消した拍子に、打っている欄ごと畳まない");
-    assert.match(dom.one(`${rowSelector("p1")} details.more > summary`).textContent, /ほかの定義との関係・補足（未設定）/);
+    assert.match(dom.one(`${rowSelector("p1")} details.more > summary`).textContent, /^補足（未設定）/);
   } finally {
     await dom.close();
   }
@@ -287,169 +279,93 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
   }
 });
 
-test("CB-D85 関係の欄はほかの定義の id を複数選択で選べ、自分の id は候補に出ない。順序はファイルの順に揃う", async () => {
+test("CB-D85 関係の欄（overlap・requires・after）と、その id を選ぶ複数選択は、work の定義にも feedback の定義にも出ない。保存に順序の欄は載らない", async () => {
   const dom = await openPhases();
   try {
-    dom.click(dom.one(`${rowSelector("p4")} .row-head`));
-    await dom.settle();
-    const values = (field: string, only?: "checked"): string[] =>
-      dom
-        .all<HTMLOptionElement>(`${rowSelector("p4")} ${field} select.id-select option`)
-        .filter((option) => only === undefined || option.selected)
-        .map((option) => option.value);
-    // 見本の implement。自分（implement）は候補に出ない
-    assert.deepEqual(values(".f-requires"), ["research", "design", "acceptance", "implement-feedback"]);
-    assert.deepEqual(values(".f-requires", "checked"), ["acceptance"]);
-    // after の候補は work の定義だけ。feedback の定義は待つ先にできない
-    assert.deepEqual(values(".f-after"), ["research", "design", "acceptance"]);
-    assert.deepEqual(values(".f-after", "checked"), ["acceptance"]);
-    // 後から付けても、順序はファイルの順に揃う（YAML に余計な差分を出さない）
-    pick(dom, `${rowSelector("p4")} .f-after`, "design");
-    await dom.settle();
-    assert.deepEqual(values(".f-after", "checked"), ["design", "acceptance"]);
-    pick(dom, `${rowSelector("p4")} .f-requires`, "research");
-    await dom.settle();
-    // after に挙げた id は overlap で選べない（両方に挙げると検証が止める）
-    assert.ok(dom.one<HTMLOptionElement>(`${rowSelector("p4")} .f-overlap option[value="design"]`).disabled);
-    assert.ok(!dom.one<HTMLOptionElement>(`${rowSelector("p4")} .f-overlap option[value="implement-feedback"]`).disabled);
-    // フェーズ定義は足し算をしないので、ほかの設定の定義は指せない。id を打つ欄は出さない
-    assert.equal(dom.all(`${rowSelector("p4")} input.id-extra`).length, 0);
-    dom.click(dom.one("#save"));
-    await dom.settle();
-    const saved = savedForm(dom).phases[3];
-    assert.deepEqual(saved.after, ["design", "acceptance"]);
-    assert.deepEqual(saved.requires, ["research", "acceptance"]);
-  } finally {
-    await dom.close();
-  }
-});
-
-test("CB-D94 関係の欄は矢印でフォーカスだけを動かし、Space で付け外しする。change で届いた選択はそのまま受ける", async () => {
-  const dom = await openPhases();
-  try {
-    dom.click(dom.one(`${rowSelector("p4")} .row-head`));
-    await dom.settle();
-    const select = `${rowSelector("p4")} .f-requires select.id-select`;
-    const selected = (): string[] =>
-      dom
-        .all<HTMLOptionElement>(`${select} option`)
-        .filter((option) => option.selected)
-        .map((option) => option.value);
-    const active = (): string | null => dom.one(`${select} option.active`).getAttribute("value");
-    assert.deepEqual(selected(), ["acceptance"]);
-    assert.equal(active(), "research");
-    // 矢印はフォーカスを動かすだけで、選択を 1 件に縮めない
-    dom.key("ArrowDown", dom.one(select));
-    await dom.settle();
-    dom.key("ArrowDown", dom.one(select));
-    await dom.settle();
-    assert.equal(active(), "acceptance");
-    assert.deepEqual(selected(), ["acceptance"]);
-    dom.key("ArrowUp", dom.one(select));
-    await dom.settle();
-    dom.key(" ", dom.one(select));
-    await dom.settle();
-    assert.deepEqual(selected(), ["design", "acceptance"]);
-    dom.key("End", dom.one(select));
-    await dom.settle();
-    assert.equal(active(), "implement-feedback");
-    assert.equal(dom.one(select).getAttribute("aria-activedescendant"), dom.one(`${select} option.active`).id);
-    // 止めきれずに change が届いたときは、届いた選択をリストの順で受ける
-    for (const option of dom.all<HTMLOptionElement>(`${select} option`)) {
-      option.selected = option.value === "implement-feedback" || option.value === "research";
+    for (const key of ["p1", "p2", "p3", "p4", "p5"]) {
+      dom.click(dom.one(`${rowSelector(key)} .row-head`));
+      await dom.settle();
+      assert.equal(dom.all(`${rowSelector(key)} .f-overlap, ${rowSelector(key)} .f-requires, ${rowSelector(key)} .f-after, ${rowSelector(key)} select.id-select`).length, 0, key);
+      assert.doesNotMatch(dom.one(`${rowSelector(key)} details.more > summary`).textContent ?? "", /並行できる|一緒に必要|先に済ませる/, key);
     }
-    dom.change(dom.one(select));
+    dom.type(dom.one(`${rowSelector("p4")} input.f-when`), "受入テスト作成を先に置く");
     await dom.settle();
     dom.click(dom.one("#save"));
     await dom.settle();
-    assert.deepEqual(savedForm(dom).phases[3].requires, ["research", "implement-feedback"]);
+    const saved = savedForm(dom);
+    assert.deepEqual(Object.keys(saved), ["phases"]);
+    for (const phase of saved.phases) {
+      assert.ok(!("after" in phase) && !("overlap" in phase) && !("requires" in phase), JSON.stringify(phase));
+    }
+    assert.equal(saved.phases[3].when, "受入テスト作成を先に置く");
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D87 関係の欄は、前後の空白と空を落として読み、無い id と自分自身は目印を付けて出す。id を打つ欄は無い", async () => {
-  const base = readPhases(SAMPLE_PHASES_TEXT).model;
-  const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: [" design ", "", "acceptance", "外の種類"] } : p));
-  const dom = await openPhases({ model: { ...base, form: { ...base.form, phases } } });
+test("CB-D87 古い順序の欄が残ったファイルは、読まない欄として定義ごとに名指しし、順序は計画の after で決めると言う。保存しても欄は残ると言う", async () => {
+  const dom = await openPhases({ model: readPhases(SAMPLE_PHASES_TEXT.replace("version: 1\n", "version: 1\norder: dag\n").replace('    scope: ["src/*", "tests/*"]\n', '    scope: ["src/*", "tests/*"]\n    requires: [acceptance]\n    after: [acceptance]\n')).model });
   try {
-    dom.click(dom.one(`${rowSelector("p3")} .row-head`));
+    const note = dom.one("#unread").textContent ?? "";
+    assert.match(note, /order（ファイルの頭）/);
+    assert.match(note, /implement の requires・after/);
+    assert.match(note, /順序は親チケットの計画の項の after で決めます/);
+    assert.match(note, /保存しても欄はそのまま残ります/);
+    // 読まない欄は一覧の欄としては出さない
+    dom.click(dom.one(`${rowSelector("p4")} .row-head`));
     await dom.settle();
-    // 前後の空白は落として読み、空は出さない。自分自身とこのファイルに無い id は外せるように目印を付けて出す
-    const checked = dom.all<HTMLOptionElement>(`${rowSelector("p3")} .f-overlap option`).filter((option) => option.selected);
-    assert.deepEqual(checked.map((option) => option.value), ["design", "acceptance", "外の種類"]);
-    const foreign = dom.all(`${rowSelector("p3")} .f-overlap .id-option.foreign`).map((option) => option.textContent);
-    assert.ok(foreign.some((text) => text?.includes("acceptance")));
-    assert.ok(foreign.some((text) => text?.includes("外の種類")));
-    // 共通の設定の定義を打って足す欄は無い（足し算をしない）。このファイルに無い id は入力ミスとだけ言う
-    assert.equal(dom.all("input.id-extra").length, 0);
-    const title = dom.one(`${rowSelector("p3")} .f-overlap option[value="外の種類"]`).getAttribute("title") ?? "";
-    assert.match(title, /このファイルに無い id です（入力ミス）/);
-    assert.ok(!title.includes("共通の設定"), title);
-    // 目印の付いた id は外せば消える
-    pick(dom, `${rowSelector("p3")} .f-overlap`, "acceptance");
-    await dom.settle();
-    pick(dom, `${rowSelector("p3")} .f-overlap`, "外の種類");
-    await dom.settle();
-    dom.click(dom.one("#save"));
-    await dom.settle();
-    assert.deepEqual(savedForm(dom).phases[2].overlap, ["design"]);
+    assert.equal(dom.all(`${rowSelector("p4")} .f-requires, ${rowSelector("p4")} .f-after`).length, 0);
   } finally {
     await dom.close();
   }
-});
-
-test("CB-D88 feedback の定義は先に済ませる定義を持てないと言い、欄を出さない", async () => {
-  const dom = await openPhases();
+  // 古い欄が無ければ出さない
+  const plain = await openPhases();
   try {
-    dom.click(dom.one(`${rowSelector("p5")} .row-head`));
-    await dom.settle();
-    assert.equal(dom.all(`${rowSelector("p5")} .f-after .id-option`).length, 0);
-    assert.match(dom.one(`${rowSelector("p5")} .f-after`).textContent ?? "", /feedback の定義には設定できません/);
+    assert.equal(plain.all("#unread").length, 0);
   } finally {
-    await dom.close();
+    await plain.close();
   }
 });
 
-test("CB-D86 図を見ているときに定義を足すと、一覧へ移って足した行が見える", async () => {
-  const dom = await openPhases({}, { view: "graph" });
+test("CB-D86 図・一覧と図の切り替え・全体計画の待ち方の選択は出ない。state に前の図の表示や点の位置が残っていても一覧で開き、定義を足せば足した行が見える", async () => {
+  const dom = await openPhases({}, { view: "graph", spots: { design: { x: 40, y: 80 } } });
   try {
-    assert.ok(dom.one("#phases").classList.contains("hidden"));
+    assert.equal(dom.all("#phase-graph, .react-flow, .graph, .graph-legend, .graph-note").length, 0, "図が残っている");
+    assert.equal(dom.all('[data-action="show-graph"], [data-action="show-list"], .tabs').length, 0, "一覧と図の切り替えが残っている");
+    assert.equal(dom.all('#f-order, [data-yaml-key="order"], label.order').length, 0, "待ち方の選択が残っている");
+    assert.ok(!dom.one("#phases").classList.contains("hidden"), "一覧が隠れている");
     dom.click(dom.one('button[data-action="add"]'));
     await dom.settle();
-    assert.ok(!dom.one("#phases").classList.contains("hidden"), "一覧へ移っていない");
     const rows = dom.all(".phase");
     const added = rows[rows.length - 1];
     assert.ok(added.classList.contains("open"));
-    assert.ok(!added.classList.contains("hidden-by-find"));
     assert.equal(dom.document.activeElement, added.querySelector("input.f-id"));
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最後まで進めると閉じて tourDone を返す。案内の前の様子（図・絞り込み・開いた行）に戻り、途中の切り替えは state に書かない", async () => {
-  const dom = await openPhases({}, { view: "graph" });
+test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最後まで進めると閉じて tourDone を返す。案内の前の様子（開いた行）に戻る。図・関係の欄・待ち方の段は無い", async () => {
+  const dom = await openPhases();
   try {
-    assert.ok(dom.one("#phases").classList.contains("hidden"), "図で始まっていない");
     assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
     await dom.send({ type: "tour" });
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, "フェーズ定義");
-    assert.ok(!dom.one("#phases").classList.contains("hidden"), "1 段目で一覧に切り替わっていない");
+    // 1 段目で、順序は親チケットの計画で決めることを言う
+    assert.match(dom.one(".tour-bubble").textContent ?? "", /順序（どのフェーズがどれを待つか）は、親チケットの計画の項の after で決めます/);
     const titles = [dom.one("#tour-title").textContent];
-    for (let i = 0; i < 6; i += 1) {
+    for (let i = 0; i < 4; i += 1) {
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
       titles.push(dom.one("#tour-title").textContent);
       if (i === 0) {
-        // 関係の段で、関係を持つ行（design）と、その関係の欄が開いている
-        assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"));
+        // 補足の段で、値を持つ行（research）と、その補足が開いている
+        assert.ok(dom.one(`${rowSelector("p1")} details.more`).hasAttribute("open"));
+        assert.ok(dom.one(rowSelector("p1")).classList.contains("open"));
       }
     }
-    assert.deepEqual(titles, ["フェーズ定義", "ほかの定義との関係", "全体計画の待ち方", "図", "保存", "ヘルプ", "案内"]);
-    // 途中の一覧と図の切り替えは state に書かない（途中でタブを閉じても、次は元の図で開く）
-    assert.equal((dom.state() as { view?: string }).view, "graph");
+    assert.deepEqual(titles, ["フェーズ定義", "補足", "保存", "ヘルプ", "案内"]);
     // 最後の段は「完了」。やめる × はどの段でも右上に出す
     assert.equal(dom.one('[data-action="tour-next"]').textContent, "完了");
     assert.equal(dom.one('.tour-bubble > [data-action="tour-skip"]').textContent?.trim(), "×");
@@ -457,7 +373,6 @@ test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最�
     await dom.settle();
     assert.equal(dom.all(".tour").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
-    assert.ok(dom.one("#phases").classList.contains("hidden"), "案内の前の図に戻っていない");
     // 案内が開いた見本の行も閉じる
     assert.equal(dom.all(".phase.open").length, 0);
   } finally {
@@ -521,7 +436,7 @@ test("CB-D147 案内は → で次の段へ、← で前の段へ動く。端の
     assert.equal(dom.one("#tour-title").textContent, "フェーズ定義");
     dom.key("ArrowRight");
     await dom.settle();
-    assert.equal(dom.one("#tour-title").textContent, "ほかの定義との関係");
+    assert.equal(dom.one("#tour-title").textContent, "補足");
     dom.key("ArrowLeft");
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, "フェーズ定義");
@@ -546,7 +461,7 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッ�
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
     dom.click(dom.one('[data-action="help"]'));
     await dom.settle();
-    assert.match(dom.one("#help").textContent ?? "", /判定が使う待ち方は、設定を合わせたうえで親チケットの承認のときに決まります/);
+    assert.match(dom.one("#help").textContent ?? "", /順序（どのフェーズがどれを待つか）はこのファイルには書きません。親チケットの計画の項に after で先行を書きます/);
     dom.click(dom.one('[data-action="tour"]'));
     await dom.settle();
     assert.equal(dom.all("#help").length, 0, "案内を始めたらヘルプは閉じる");

@@ -1,36 +1,12 @@
 /**
- * 図の下の注意（`src/webview/phases/text.ts` の `graphNotices`）と、吹き出しの置き場所
- * （`src/core/tour-place.ts`）。どちらも DOM に触れないので単体で試す。
+ * 吹き出しの置き場所（`src/core/tour-place.ts`）。DOM に触れないので単体で試す。
+ *
+ * 前はフェーズ管理画面の図の下の注意（`graphNotices`）もここで見ていた。図と待ち方の選択を
+ * 画面から外したので、その注意も無い（図が無いことは `phases.dom.test.ts` が見張る）。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { graphOf } from "../../src/core/phases-graph.js";
-import type { PhaseForm, PhasesForm } from "../../src/core/phases-view.js";
 import { placeBubble } from "../../src/core/tour-place.js";
-import { graphNotices } from "../../src/webview/phases/text.js";
-
-function phase(id: string, overrides: Partial<PhaseForm> = {}): PhaseForm {
-  return { origin: null, id, title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], overlap: [], requires: [], after: [], agent: "", when: "", ...overrides };
-}
-
-function notices(f: PhasesForm): readonly string[] {
-  return graphNotices(graphOf(f), f);
-}
-
-test("CB-T212 注意は当てはまるときだけ。sequential の after は、線にならない（このファイルに無い定義を指す）ものでも言う", () => {
-  assert.deepEqual(notices({ order: "dag", phases: [phase("a"), phase("b", { after: ["a"] })] }), []);
-  // 行き先がこのファイルに無い after だけでも、sequential では判定に使われないと言う
-  const seq = notices({ order: "sequential", phases: [phase("a", { after: ["外の種類"] })] });
-  assert.ok(seq.some((line) => /sequential なので、after は判定に使われません/.test(line)));
-  assert.ok(seq.some((line) => /このファイルに無い定義を指す関係が 1 件あり、線にしていません/.test(line)));
-  // フェーズ定義は足し算をしないので、共通の設定の定義かもしれないとは言わない
-  assert.ok(!seq.some((line) => /共通の設定/.test(line)));
-});
-
-test("CB-T213 フェーズ定義は足し算をしないので、dag を選んでいても、共通の設定が sequential ならという注意は出さない", () => {
-  const f: PhasesForm = { order: "dag", phases: [phase("a"), phase("b", { after: ["a"] })] };
-  assert.deepEqual(notices(f), []);
-});
 
 test("CB-T214 吹き出しは画面の外に出ない。下に収まらなければ上、どちらにも収まらなければ画面の下端に寄せる", () => {
   const view = { width: 800, height: 600 };

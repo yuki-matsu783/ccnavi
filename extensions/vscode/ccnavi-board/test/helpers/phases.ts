@@ -12,7 +12,6 @@ import { renderPhasesPage, type RenderOptions } from "../../src/core/phases-rend
 import type { PhasesData, PhasesPage } from "../../src/core/phases-view.js";
 import { screenScript, screenStyle } from "./bundle.js";
 import { loadPage, type DomPage, type LoadOptions } from "./dom.js";
-import { loadPageJsdom, type JsdomPage } from "./jsdom.js";
 
 export const NONCE = "TEST-NONCE-123";
 
@@ -21,24 +20,25 @@ export const NONCE = "TEST-NONCE-123";
  * 拡張がファイルを作るときの雛形だったが、共通レイヤーに雛形を置くとレイヤーの同じ id と中身が食い違うので、
  * 画面から作る方法ごと無くし、テストの見本としてだけ残す。
  *
- * **待ち方は dag で、流れを `after` で書く**（調査 → 設計と受入テスト作成 → 実装とテスト）。
- * feedback の定義は `after` を持てない（`phasetypes.py`）ので、レビュー後の対応として別に置く。
+ * **順序の欄（ファイルの頭の `order`、定義の `after`・`overlap`・`requires`）は書かない。** 実行ファイルは
+ * もう読まず、順序は親チケットの計画の項の `after` で決める。古い欄が残ったファイルの扱いは
+ * `phases-doc.test.ts` が別の見本で見る。feedback の定義の `when` には、フィードバック計画の最後に置いて
+ * ほかの対応を受ける（合流する）ことを書く。
  */
 export const SAMPLE_PHASES_TEXT = `# フェーズ定義（設計 9.7）。ユーザが持つ設定で、エージェントは書き換えない。
 #
-# 親チケットの \`plan:\` に、ここで定義したものの名前を順に並べる。それが全体計画で、
+# 親チケットの \`plan:\` に、ここで定義したものの名前を並べる。それが全体計画で、
 # \`ccnavi --agree\` が通ることが合意になる。レビューを受けたあとは \`feedback:\` に
 # \`kind: feedback\` の定義を並べて改版を出す（対応が無くても \`[]\` で出す）。
+#
+# 順序（どのフェーズがどれを待つか）はここには書かない。計画の項に \`after\` で先行を書き、
+# 最後の項がほかの全部を待つようにする。
 #
 # \`id\`（キー）と \`title\` はどちらも一意。重なれば --lint が error で止める。
 # このファイルが無ければ、フェーズは番号だけの挙動に戻る。
 #
-# \`order: dag\` なので、各項は \`after\` に挙げた定義（の祖先）だけを待ち、辺で繋がっていない
-# 定義は並行して進む。辺の書き漏れは並行として通るので、画面の図で確かめる。
-#
 # 下は雛形。scope のパスはこのプロジェクトの置き場に合わせて直す。
 version: 1
-order: dag
 
 phases:
   research:
@@ -55,7 +55,6 @@ phases:
     review: mr
     scope: ["wip/design/*", "docs/*"]
     deliverables: ["wip/design/*.md"]
-    after: [research]
     when: 触る場所が 3 か所を超えるか、外から見える振る舞いが変わるとき
 
   acceptance:
@@ -63,7 +62,6 @@ phases:
     title: 受入テスト作成
     review: mr
     scope: ["tests/*"]
-    after: [design]
     when: 振る舞いが変わるとき。設計のあと、実装より先に書く
 
   implement:
@@ -71,14 +69,13 @@ phases:
     title: 実装とテスト
     review: mr
     scope: ["src/*", "tests/*"]
-    requires: [acceptance]
-    after: [acceptance]
 
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
     review: mr
     scope: inherit
+    when: フィードバック計画の最後に置き、ほかの対応を受ける
 `;
 
 /** 画面の HTML。CSS や nonce のように、文字列のまま見たいものはこれを見る */
@@ -110,25 +107,8 @@ export async function openPhases(overrides: Partial<PhasesPage> = {}, initialSta
   return openPage({ kind: "page", page: page(overrides) }, initialState);
 }
 
-/**
- * 図を出した状態で開く。**大きさを測れるようにして読ませる**（`measure`）。
- * これをしないと React Flow は点を隠したまま線を 1 本も描かず、テストは空の絵で通る。
- */
-export async function openGraph(overrides: Partial<PhasesPage> = {}, initialState: unknown = {}): Promise<DomPage> {
-  const dom = await openPage({ kind: "page", page: page(overrides) }, { ...(initialState as object), view: "graph" }, { measure: true });
-  await dom.settle();
-  return dom;
-}
-
 /** 定義 1 行の中の要素。`li.phase[data-key=…]` の下だけを見る */
 export function rowSelector(key: string): string {
   return `.phase[data-key="${key}"]`;
 }
 
-/**
- * 図を出した状態で、**jsdom で**開く。ドラッグだけがここを通る
- * （happy-dom では d3-drag の待ちが終わらず固まる。`test/helpers/jsdom.ts` の頭）。
- */
-export async function openGraphJsdom(overrides: Partial<PhasesPage> = {}, initialState: unknown = {}): Promise<JsdomPage> {
-  return loadPageJsdom(phasesHtml({ kind: "page", page: page(overrides) }), { ...(initialState as object), view: "graph" });
-}

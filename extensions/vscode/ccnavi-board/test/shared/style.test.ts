@@ -264,5 +264,6 @@ test("CB-T291 狭い幅（520px 以下）では一覧の欄を 1 列にして行
   assert.match(risk, /\.block h2 \{ display: flex; flex-wrap: wrap;/);
   const phases = flatStyle(phasesHtml({ kind: "page", page: phasesPage() }));
   assert.match(phases, /\.phase \.sum > \.clip\.mono \{ grid-row: 3; grid-column: 2 \/ -1; \}/);
-  assert.match(phases, /\.order select \{ max-width: 100%; \}/);
+  // 全体計画の待ち方の選択は外したので、その欄の規則も無い
+  assert.doesNotMatch(phases, /\.order select/);
 });

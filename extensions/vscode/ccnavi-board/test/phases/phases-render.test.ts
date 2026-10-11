@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NONCE, page, phasesHtml } from "../helpers/phases.js";
-import { screenScript } from "../helpers/bundle.js";
+import { screenScript, screenStyle } from "../helpers/bundle.js";
 
 /** バンドルした画面を除いた入れ物。外を読んでいないことは、拡張が書いたところだけを見て確かめる */
 function shell(rendered: string): string {
@@ -39,4 +39,11 @@ test("CB-T156 読み直せなかったときは定義の代わりに理由を渡
   const rendered = phasesHtml({ kind: "error", error: "定義のファイルを読めない" });
   assert.match(rendered, /"kind":"error"/);
   assert.match(rendered, /定義のファイルを読めない/);
+});
+
+test("CB-T327 フェーズ管理画面は図を持たない。バンドルした画面にも CSS にも React Flow が入っていない", () => {
+  // 図を外したので、React Flow の部品（点・線の class）も、その CSS（`@xyflow/react` の style.css）も入らない。
+  // 入っていれば、どこかで図の部品を読み込み直している（バンドルが約 180KB 重くなる）
+  assert.ok(!screenScript("phases").includes("react-flow__"), "phases.js に React Flow が入っている");
+  assert.ok(!screenStyle("phases").includes(".react-flow"), "phases.css に React Flow の CSS が入っている");
 });
