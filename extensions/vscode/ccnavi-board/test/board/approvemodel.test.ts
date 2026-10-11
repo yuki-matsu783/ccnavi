@@ -42,6 +42,72 @@ test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・
   assert.deepEqual(preview.problems, []);
 });
 
+test("CB-T328 承認の preview の plans を読む（計画を持つ親の図の中身。実行ファイルが組んだ番号・先行・終端に当たらない項・すぐ始まる項・延期の引き受け手をそのまま）", () => {
+  const parsed = parseApprovePreview(fixtureText("approve-preview.json"));
+  assert.ok(parsed.ok);
+  if (!parsed.ok) {
+    return;
+  }
+  const plans = parsed.value.plans;
+  assert.equal(plans.length, 1);
+  const plan = plans[0];
+  assert.equal(plan.ticket, "i0001");
+  assert.equal(plan.part, "plan");
+  assert.match(plan.source_sha, /^[0-9a-f]{64}$/);
+  assert.deepEqual(
+    plan.items.map((item) => [item.number, item.from, item.type, item.title, item.review, item.deferred, item.review_at, item.locked]),
+    [
+      [1, 1, "research", "調査", "none", false, null, false],
+      [2, 2, "design", "設計", "mr", false, null, false],
+    ],
+  );
+  assert.deepEqual(plan.after, { "2": [1] });
+  assert.deepEqual(plan.proposed, { "2": [1] });
+  assert.equal(plan.current, null);
+  assert.deepEqual(plan.loose, []);
+  assert.deepEqual(plan.ready, [1]);
+  assert.deepEqual(plan.problems, []);
+
+  // 欄が無い（前の版の実行ファイル）なら空。画面は図を出さない
+  const raw = JSON.parse(fixtureText("approve-preview.json")) as Record<string, unknown>;
+  delete raw.plans;
+  const old = parseApprovePreview(JSON.stringify(raw));
+  assert.ok(old.ok && old.value.plans.length === 0);
+
+  // 形の崩れた項目は読み飛ばし、数でない番号と文字でない理由は落とす（図を描くのに要るものが無ければ描かない）
+  const broken = parseApprovePreview(
+    JSON.stringify({
+      ...raw,
+      plans: [
+        "x",
+        {
+          ticket: "i0002",
+          part: "feedback",
+          items: [{ number: 3, title: "設計の見直し", deferred: true, review_at: 4 }, { number: "4" }, null],
+          after: { "4": [3, "x"], "5": "3" },
+          current: { "4": [3] },
+          loose: [3, "4"],
+          ready: [3],
+          problems: ["最後の項がほかの項を待っていない", 5],
+        },
+      ],
+    }),
+  );
+  assert.ok(broken.ok);
+  if (!broken.ok) {
+    return;
+  }
+  assert.equal(broken.value.plans.length, 1);
+  const fb = broken.value.plans[0];
+  assert.equal(fb.part, "feedback");
+  assert.deepEqual(fb.items.map((item) => [item.number, item.from, item.title, item.deferred, item.review_at, item.locked]), [[3, 3, "設計の見直し", true, 4, false]]);
+  assert.deepEqual(fb.after, { "4": [3] });
+  assert.deepEqual(fb.proposed, {});
+  assert.deepEqual(fb.current, { "4": [3] });
+  assert.deepEqual(fb.loose, [3]);
+  assert.deepEqual(fb.problems, ["最後の項がほかの項を待っていない"]);
+});
+
 test("CB-T104b 超過の欄が無い古い答えは、空の配列として読む", () => {
   const parsed = parseApprovePreview(
     JSON.stringify({
