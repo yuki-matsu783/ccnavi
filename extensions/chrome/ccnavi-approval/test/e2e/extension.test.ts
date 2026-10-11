@@ -188,7 +188,7 @@ test("CX-T075 ボードで承認すると、親のブランチへ 1 コミット
   const call = mock.commitCalls[0];
   assert.deepEqual([call.branch, call.expected, call.result], ["i0001", before, "written"]);
   assert.match(call.headline, /^ccnavi: i0001 を承認（Chrome 拡張 /);
-  assert.match(mock.files("i0001")[".ccnavi/approved/doing/i0001.md"], /^ccnavi_approved:/m);
+  assert.ok(mock.files("i0001")[".ccnavi/approved/doing/i0001.md"]);
   // 描き直したボード: i0001 は承認待ちから消え、作業中の承認済みチケットに出る
   assert.equal(await page.locator('[data-family="i0001"] .entry').count(), 0);
   assert.equal(await page.locator('[data-family="i0001"] .approved-item[data-ticket="i0001"]').count(), 1);
@@ -327,7 +327,7 @@ test("CX-T159 セルフホストの GitLab（足した通信先）: 登録して
   assert.match(said, /^written: 承認を書いた/);
   assert.equal(lab.glCommits.length, 1);
   assert.deepEqual([lab.glCommits[0].branch, lab.glCommits[0].parent, lab.glCommits[0].result], ["i0001", before, "written"]);
-  assert.match(lab.files("i0001")[".ccnavi/approved/doing/i0001.md"], /^ccnavi_approved:/m);
+  assert.ok(lab.files("i0001")[".ccnavi/approved/doing/i0001.md"]);
   assert.ok(lab.calls.some((c) => c.endsWith("/personal_access_tokens/self")));
   assert.ok(!(await page.content()).includes(TOKEN));
   await page.close();

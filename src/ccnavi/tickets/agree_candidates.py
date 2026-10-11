@@ -219,23 +219,21 @@ def script_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
 
 
 def record_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
-    """提案に承認の記録（`ccnavi_approved`）か続きの子の目印（`followup_of`）があれば拒む。
+    """提案に続きの子の目印（`followup_of`）があれば拒む。
 
-    承認は中身を変えないので、提案に書いた欄はそのまま承認済みチケットに入る。前の版の承認の
-    記録を持つ古い形は取り下げを特別に扱う（子は記録の欄で決め、親は取り下げない）。続きの子の
-    目印は取り下げを止める。どちらもユーザの判断（承認・レビューの行き先）だけが残すもので、
-    提案に書かせると古い形や続きの子を装える。
+    承認は中身を変えないので、提案に書いた欄はそのまま承認済みチケットに入る。続きの子の
+    目印は取り下げを止める。ユーザの判断（レビューの行き先）だけが残すもので、
+    提案に書かせると続きの子を装える。
     """
-    found = [name for name in (ticket_model.APPROVAL_KEY, approval.FOLLOWUP_KEY) if name in t.raw]
-    if not found:
+    if approval.FOLLOWUP_KEY not in t.raw:
         return []
-    names = ", ".join(f"`{name}`" for name in found)
+    names = f"`{approval.FOLLOWUP_KEY}`"
     return [
         rules.Problem(
             rules.SEVERITY_ERROR,
             t.ticket,
-            f"{names} は承認の記録で、ユーザの承認（と続きの子を起こすレビューの行き先）だけが"
-            "残すもの。提案には書かない（改版の提案で承認済みチケットを写したときも消す）",
+            f"{names} は続きの子を起こすレビューの行き先だけが残すもの。"
+            "提案には書かない（改版の提案で承認済みチケットを写したときも消す）",
         )
     ]
 

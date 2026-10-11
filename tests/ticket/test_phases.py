@@ -415,13 +415,12 @@ class PhaseTest(PhaseHarness):
         )
         self.assertEqual(problems, [])
         self.assertEqual(types["fb"].review, phasetypes.REVIEW_CHAT)
-        # 順序の欄（overlap など）は読まずに warn で言う。指す先が無くても error にしない。
+        # 順序の欄（overlap など）は読まない。指す先が無くても問題にしない。
         types, problems = phasetypes.parse(
             "version: 1\nphases:\n  a: {title: A, kind: work, overlap: [nope]}\n"
         )
         self.assertIsNotNone(types, problems)
-        self.assertEqual([p.severity for p in problems], ["warn"])
-        self.assertIn("読まない", problems[0].detail)
+        self.assertEqual(problems, [])
         types, problems = phasetypes.parse(PHASES)
         self.assertEqual(problems, [])
         self.assertEqual(

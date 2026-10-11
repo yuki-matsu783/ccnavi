@@ -286,14 +286,11 @@ def forget(state_dir: str, session: str, startup: bool = False) -> None:
         name = fsio.temp_origin(entry)
         if not name.endswith(".json"):
             continue
-        # 承認を伝えた記録（`approved-<セッション>-<エージェント>.json`）は、hook が承認を
-        # 伝えていた頃に同じ場所に置いていた。今は書かない。残ったものを古いものだけ一緒に掃く。
-        stale = name.startswith("approved-")
-        if not stale and not name.startswith("once-"):
+        if not name.startswith("once-"):
             continue
         path = os.path.join(state_dir, entry)
         try:
-            if (not stale and name.startswith(mine)) or os.path.getmtime(path) < cutoff:
+            if name.startswith(mine) or os.path.getmtime(path) < cutoff:
                 os.remove(path)
         except OSError:
             # 消せなくても次の開始でまた試す。ここで止めるほどのものではない。

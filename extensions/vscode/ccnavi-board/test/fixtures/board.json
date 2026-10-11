@@ -338,7 +338,6 @@
     "status": "open",
     "approved_at": "2026-09-13T13:50:21+0000",
     "approved_from": "history",
-    "source_tree": "i0001",
     "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/doing/i0001.md"
    },
    "worktree": {
@@ -409,7 +408,6 @@
     "status": "closed",
     "approved_at": "2026-09-13T13:50:22+0000",
     "approved_from": "history",
-    "source_tree": "i0001",
     "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/done/i0001-01-01.md"
    },
    "worktree": {
@@ -508,7 +506,6 @@
     "status": "open",
     "approved_at": "2026-09-13T13:50:22+0000",
     "approved_from": "history",
-    "source_tree": "i0001",
     "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/doing/i0001-02-02.md"
    },
    "worktree": {
@@ -653,7 +650,6 @@
     "status": "review",
     "approved_at": "2026-09-13T13:50:22+0000",
     "approved_from": "history",
-    "source_tree": "i0001",
     "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-02-04.md"
    },
    "worktree": {
@@ -754,7 +750,6 @@
     "status": "closed",
     "approved_at": "2026-09-13T13:50:22+0000",
     "approved_from": "history",
-    "source_tree": "i0001",
     "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/done/i0001-02-05.md"
    },
    "worktree": {

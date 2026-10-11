@@ -43,8 +43,6 @@
 - ccnavi が書いた形でない ccnavi-index.jsonl は、上書きも削除もしない。空か、空でない行が
   全部この 4 つの鍵を持つ行として読めるときだけを ccnavi のものとみなす。よその道具が
   同じ名前で置いたファイルを壊さない
-- 旧名 `index.jsonl`: 新しい名前の索引を書けるディレクトリで、ccnavi が書いた形（空でない行が
-  全部 4 つの鍵を持つ）で、git が追跡していないものだけを消す。ほかの道具のものは触らない
 - md が全部消えたディレクトリ（追跡はされているが実体が無い）の `ccnavi-index.jsonl` は、上の条件で
   消す。それ以外の経路で残った古い `ccnavi-index.jsonl` は読まない
 - git への問い合わせの失敗（git が無い・期限切れ・破損したリポジトリ）は「git の外」とも
@@ -165,8 +163,6 @@ class Collected:
     foreign: list[str] = field(default_factory=list)
     # 無視の行を足したツリーの .gitignore（ワークスペースルートから）。未コミットの差分が残る。
     ignore_added: list[str] = field(default_factory=list)
-    # 新しい名前に移る時に消した、ccnavi が書いた形の旧 index.jsonl（ワークスペースルートから）。
-    migrated: list[str] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
     # どれかのツリーが md を持ち、索引の対象だった。
     indexable: bool = False
@@ -209,7 +205,6 @@ def collect(
             return f"{place.prefix}/{rel}" if place.prefix else rel
 
         result.foreign.extend(at(p) for p in built.foreign)
-        result.migrated.extend(at(p) for p in built.migrated)
         if built.ignore_added:
             result.ignore_added.append(at(built.ignore_added))
         result.problems.extend(at(p) for p in built.problems)

@@ -54,11 +54,6 @@ _FORM = re.compile(
 )
 # issue から始めるときの既定の先頭の語。
 DEFAULT_ISSUE_PREFIX = "feature"
-# 前の形（`i<番号>`・`<プロジェクト名>-i<番号>`）。読むのと、通し番号を数えるのにだけ使う。
-_LEGACY_ISSUE_ID = re.compile(r"^i(?P<num>[0-9]+)\Z", re.IGNORECASE)
-_LEGACY_PROJECT_ISSUE_ID = re.compile(
-    r"^(?P<project>[A-Za-z0-9][A-Za-z0-9._-]*)-i(?P<num>[0-9]+)\Z", re.IGNORECASE
-)
 # issue のタイトルから slug を作るときに残さない字（残すのは英数字と日本語の字だけ）。
 _SLUG_DROP = re.compile(rf"[^A-Za-z0-9{JA_CHARS}]+")
 # タイトルから何も残らなかったときの slug。
@@ -131,18 +126,9 @@ def has_form(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> bool:
 
 
 def identifier_number(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> int | None:
-    """親の識別子に含まれる番号。
-
-    読むのは `<先頭の語>-<番号>-<slug>` と前の形（`i<番号>`・`<名前>-i<番号>`）だけ。
-    """
+    """親の識別子に含まれる番号。読むのは `<先頭の語>-<番号>-<slug>` だけ。"""
     matched = form_of(name, prefixes)
-    if matched:
-        return int(matched.group("num"))
-    for pattern in (_LEGACY_ISSUE_ID, _LEGACY_PROJECT_ISSUE_ID):
-        matched = pattern.match(name or "")
-        if matched:
-            return int(matched.group("num"))
-    return None
+    return int(matched.group("num")) if matched else None
 
 
 def next_serial(names, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> int:
@@ -342,8 +328,7 @@ def _form_problems(
 ) -> list[str]:
     """新しい親の識別子が `<先頭の語>-<番号>-<slug>` の形と `issue:` に合っているか。
 
-    - 形（先頭の語は `prefixes` のどれか）に合わなければ言う。前の形（`i<番号>`・
-      `<プロジェクト名>-i<番号>`）は使わないと添える
+    - 形（先頭の語は `prefixes` のどれか）に合わなければ言う
     - `issue:`（同じリポジトリの課題）があれば、番号が issue と同じか。プロジェクトの issue なら
       slug の頭が `<プロジェクト名>-` か
     - 別のリポジトリの課題（`owner/repo#N`）は番号を比べない（その番号はこのリポジトリの issue と
@@ -354,20 +339,13 @@ def _form_problems(
     matched = form_of(name, prefixes)
     own_issue = t.issue is not None and not t.issue_repo
     if matched is None:
-        legacy = bool(_LEGACY_ISSUE_ID.match(name) or _LEGACY_PROJECT_ISSUE_ID.match(name))
-        head = "`i<番号>` の形はもう使わない。" if legacy else ""
         word = "・".join(prefixes)
         shape = f"`<先頭の語>-<番号>-<slug>` の形（先頭の語は {word} のどれか）"
         if own_issue:
             want = f"feature-{t.issue}-" + (f"{t.project}-" if t.project else "") + "<slug>"
-            return [
-                f"{head}親の識別子は {shape} にする。"
-                f"`issue: {t.issue}` から始めるなら `{want}` など"
-            ]
+            return [f"親の識別子は {shape} にする。`issue: {t.issue}` から始めるなら `{want}` など"]
         hint = f"次の通し番号は {serial}" if serial else "番号は既にある識別子の番号の続き"
-        return [
-            f"{head}親の識別子は {shape} にする。issue が無ければ ccnavi の通し番号を使う（{hint}）"
-        ]
+        return [f"親の識別子は {shape} にする。issue が無ければ ccnavi の通し番号を使う（{hint}）"]
     found: list[str] = []
     number = int(matched.group("num"))
     prefix = matched.group("prefix")

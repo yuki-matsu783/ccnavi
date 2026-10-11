@@ -16,7 +16,6 @@ from ..tickets import (
     agree_candidates,
     approval,
     approval_checks,
-    approval_marks,
     history,
     ops_stop,
     phase,
@@ -37,7 +36,7 @@ def _copy_problems(
 ) -> list[Problem]:
     """作業中の承認済みチケットを検査する。
 
-    承認は置き場で決まり、チケットの中の欄（`ccnavi_approved` など）では決まらない。
+    承認は置き場で決まり、チケットの中の欄では決まらない。
 
     置き場を動かして承認する進め方では `--agree` を通らないので、承認のときにしか
     当たらなかった検査が誰にも当たらない。判定は `blocked` の分だけを止めるが、
@@ -85,9 +84,6 @@ def _copy_problems(
         review_left = phase.resumed_review(root, conf, t, raw)
         if review_left:
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {review_left}"))
-        unrecorded = _record_unrecorded(conf, t)
-        if unrecorded:
-            problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {unrecorded}"))
         unrecorded = _start_unrecorded(conf, t)
         if unrecorded:
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {unrecorded}"))
@@ -113,62 +109,6 @@ def _copy_problems(
                 # 記録で、いま止める根拠にはならない。
                 problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {p.detail}"))
     return problems
-
-
-# 前の版の `--agree` が書いていた待ち方のファイル（`phases/<親>/workflow.yml`）の名前。
-# いまは読まない。残っていれば `--lint` が warn で言う。
-OLD_WORKFLOW_FILE = "workflow.yml"
-
-
-def _leftover_workflows(conf: settings.Settings, root: str) -> list[Problem]:
-    """前の版が書いた待ち方のファイル（`phases/<親>/workflow.yml`）が残っていれば warn で言う。
-
-    待ち方は承認済みチケットの計画の項の `after` から都度計算するので、ファイルは読まない。
-    承認済みの置き場はエージェントが書けないので、ユーザに消してもらう。判定には入れない。
-    """
-    problems: list[Problem] = []
-    for t in approval.trees(conf, root):
-        phases_dir = os.path.join(settings.approved_dir(conf, t.root), approval_marks.PHASES_DIR)
-        try:
-            names = sorted(os.listdir(phases_dir))
-        except OSError:
-            continue
-        for name in names:
-            held = os.path.join(phases_dir, name, OLD_WORKFLOW_FILE)
-            if not os.path.lexists(held):
-                continue
-            shown = os.path.relpath(held, root).replace(os.sep, "/")
-            problems.append(
-                Problem(
-                    SEVERITY_WARN,
-                    "(ticket)",
-                    f"{shown}: 前の版が書いた待ち方のファイル。いまは読まない（待ち方は親の計画の"
-                    "項の `after` から計算する）。ユーザが消してください",
-                )
-            )
-    return problems
-
-
-def _record_unrecorded(conf: settings.Settings, t) -> str:
-    """古い形（承認の記録 `ccnavi_approved` を持つ）なのに、状態の履歴に承認の行が無いときの文。
-
-    古い形の子は取り下げを記録の欄で決める。今の承認は記録を
-    書かないので、新しく置かれた古い形は手で書かれた記録かもしれない。承認の行は `approved`
-    （続きの子は `raised`）。履歴は ccnavi の外で動かした分と、履歴を書く前の版の承認を持たない
-    ので、無いことだけでは止めない（warn）。
-    """
-    if not approval_checks.has_record(t) or not t.tree_root:
-        return ""
-    where = settings.approved_dir(conf, t.tree_root)
-    entries, why = history.read(where, t.ticket, limit=0)
-    kinds = (history.KIND_APPROVED, history.KIND_RAISED)
-    if why or any(e.get("kind") in kinds for e in entries):
-        return ""
-    return (
-        "承認の記録（ccnavi_approved）を持つ古い形なのに、状態の履歴に承認（approved / raised）の"
-        "行が無い。今の承認は記録を書かないので、手で書かれた記録かもしれない。"
-        "ユーザに承認済みチケットを確かめてもらってください（履歴を書く前の版で承認したものなら問題ない）"
-    )
 
 
 def _start_unrecorded(conf: settings.Settings, t) -> str:
@@ -260,7 +200,6 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     problems.extend(_stale_problems(root, conf, stale, index, done))
 
     problems.extend(_copy_problems(root, conf, copies, index, closed, raw))
-    problems.extend(_leftover_workflows(conf, root))
 
     # 承認済みの親が phases.yml を読めないことは error にしない。判定は親の写しを読み、
     # 写しと今の phases.yml の食い違い（読めないことも含む）は `validate` が warn で言う
