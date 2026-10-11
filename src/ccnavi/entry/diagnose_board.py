@@ -240,7 +240,8 @@ def _sums(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> l
         rules    path・unreadable・missing と、deny / ask / allow（共通レイヤーに足した和）
         risk     共通 + そのレイヤーの配点。levels（実際に使う境目の点）・factors・
                  problems・fallback
-        phases   使う 1 本（足し算はしない）。path・unreadable・order・types
+        phases   使う 1 本（足し算はしない）。path・unreadable・types（定義は順序を持たないので、
+                 待ち方の欄は無い。順序は親の計画の項の `after`）
 
     判定の合成と同じ関数（`ruleload.sum_view` / `risk.layer_definition`）で組む。
     """
@@ -276,9 +277,6 @@ def _sums(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> l
                 "phases": {
                     "path": phases_path,
                     "unreadable": phases_unreadable,
-                    # フェーズ定義は順序を持たない（順序は親の計画の項の `after`）。待ち方は
-                    # いつも `dag` として読む。拡張のフェーズ管理画面が読む欄なので残す。
-                    "order": ticket_model.WORKFLOW_DAG,
                     "types": [
                         _phase_type_record(layer.name, pt)
                         for pt in (types.values() if types is not None else [])

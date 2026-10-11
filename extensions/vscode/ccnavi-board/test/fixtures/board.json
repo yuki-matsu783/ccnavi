@@ -238,7 +238,6 @@
    "phases": {
     "path": "<root>/.ccnavi/config/phases.yml",
     "unreadable": "",
-    "order": "dag",
     "types": [
      {
       "id": "research",

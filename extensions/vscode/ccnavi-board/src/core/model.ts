@@ -318,7 +318,6 @@ export interface SumJson {
   readonly phases: {
     readonly path: string;
     readonly unreadable: string;
-    readonly order: string;
     readonly types: readonly SumPhaseJson[];
   };
 }
@@ -454,7 +453,6 @@ function sum(raw: Record<string, unknown>): SumJson {
     phases: {
       path: str(phases.path),
       unreadable: str(phases.unreadable),
-      order: str(phases.order),
       types: list(phases.types)
         .filter(isRecord)
         .map((t) => ({ id: str(t.id), source: str(t.source), kind: str(t.kind), title: str(t.title), review: str(t.review), scope: list(t.scope).map(str) })),
