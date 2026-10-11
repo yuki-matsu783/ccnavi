@@ -32,6 +32,9 @@ import { copyPrompt, openPromptInSession } from "./prompt-handover.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { ticketControlMismatch } from "./core/ticket-control.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
+import { isTicketId } from "./core/ticket-id.js";
+import { forgetSaved, onWorkflowTabs, workflowTabs } from "./core/workflow-tabs.js";
+import { unsavedText } from "./core/approvemodel.js";
 import { runInTerminal, scriptShell } from "./terminal.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -73,6 +76,8 @@ interface PanelState {
    * 承認の文を渡してボードに戻った時点で動いた表示が消える。決めるのは `core/board-moved.ts`
    */
   moved: MovedState;
+  /** ワークフロー編集タブの帳面（`core/workflow-tabs.ts`）を見るのをやめる */
+  stopTabs?: () => void;
 }
 
 let state: PanelState | undefined;
@@ -169,7 +174,15 @@ function registerPanelHandlers(current: PanelState): void {
     }
   });
 
+  // ワークフロー編集タブが未保存になった・未保存でなくなったら描き直す（承認のボタンを押せる・押せない）
+  current.stopTabs = onWorkflowTabs(() => {
+    if (state === current) {
+      redraw(current);
+    }
+  });
+
   panel.onDidDispose(() => {
+    current.stopTabs?.();
     if (current.timer !== undefined) {
       clearTimeout(current.timer);
       current.timer = undefined;
@@ -262,13 +275,13 @@ function show(current: PanelState, board: Board): void {
   current.moved = movedStep(current.moved, board);
   current.board = board;
   current.error = undefined;
-  send(current, { kind: "board", board, approval: current.approval.overlay, moved: current.moved.moved });
+  send(current, { kind: "board", board, approval: current.approval.overlay, moved: current.moved.moved, unsaved: workflowTabs().unsaved });
 }
 
 /** 読み直せなかったことを見せる。承認のオーバーレイがあれば、ボードのときと同じように被せる */
 function showError(current: PanelState, error: string): void {
   current.error = error;
-  send(current, { kind: "error", error, approval: current.approval.overlay });
+  send(current, { kind: "error", error, approval: current.approval.overlay, unsaved: workflowTabs().unsaved });
 }
 
 /**
@@ -367,7 +380,8 @@ function handleMessage(message: BoardMessage | undefined): void {
       });
       return;
     case "approveConfirm":
-      dispatch(current, { kind: "confirm", tickets: message.tickets });
+      // 押した時点のワークフロー編集タブの様子を添える。未保存のタブがある親を含む一覧は遷移が打たない
+      dispatch(current, { kind: "confirm", tickets: message.tickets, unsaved: workflowTabs().unsaved });
       return;
     case "approveCancel":
       dispatch(current, { kind: "cancel" });
@@ -408,6 +422,10 @@ function handleMessage(message: BoardMessage | undefined): void {
       if (current.board !== undefined && flowCardOf(current.board, message.ticket) !== undefined) {
         void screens().flow(message.ticket);
       }
+      return;
+    case "editWorkflow":
+      // 閉じてよいか・一覧の図にある親かは遷移が決める。開くのは遷移が返す openWorkflow
+      dispatch(current, { kind: "editWorkflow", ticket: message.ticket });
       return;
     default: {
       // `BoardMessage` に操作を足したのに、ここに処理を書いていなければ型が合わなくなる。
@@ -476,15 +494,28 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
     case "loadPreview": {
       const result = await runApprovePreview(root, binSetting(), effect.only);
       if (state === current) {
-        dispatch(current, { kind: "previewed", result });
+        // ワークフロー編集タブが保存したときのハッシュは、一覧が返ったこの時点のものと比べる
+        dispatch(current, { kind: "previewed", result, saved: workflowTabs().saved });
       }
       return;
     }
     case "approve": {
+      // 打つ直前にもう 1 度、ワークフロー編集タブに未保存の変更がある親を含まないかを見る（遷移が見たあとに
+      // 未保存になっていれば打たない）。一覧の親の識別子と、帳面の親の識別子を突き合わせる
+      const unsaved = new Set(workflowTabs().unsaved);
+      const blocked = effect.tickets.filter((ticket) => unsaved.has(ticket));
+      if (blocked.length > 0) {
+        dispatch(current, { kind: "approved", outcome: { ok: false, error: unsavedText(blocked) }, carrier: false });
+        return;
+      }
       // 見せたときと同じ絞りを渡す。渡さないと、実行ファイルは絞らないときの対象と比べて食い違いにする。
       // 見せたダイジェスト（承認画面の本文・判定が読んだ中身・承認済みチケットに書き込まれる中身）も渡す。識別子が同じでも、
       // 見せたあとに提案や判定が読んだ承認済みチケット・マーカーの中身が変われば承認しない
       const outcome = await runApproveYes(root, binSetting(), effect.tickets, effect.digest, effect.only);
+      if (outcome.ok) {
+        // 承認した親は承認待ちから無くなる。あとで出す改版の提案を、前の保存と比べない
+        forgetSaved(outcome.value.approved);
+      }
       if (state === current) {
         // 承認の push の sh があるかは、承認が返ったこの時点で見る
         dispatch(current, { kind: "approved", outcome, carrier: isFile(path.join(root, PUSH_APPROVED_SCRIPT)) });
@@ -522,6 +553,10 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
       }
       return;
     }
+    case "openWorkflow":
+      // オーバーレイは閉じて描き直してある（描き直しが先、やることが後）
+      void screens().workflow(effect.ticket);
+      return;
     case "warn":
       vscode.window.showWarningMessage(effect.text);
       return;
@@ -592,6 +627,7 @@ const KNOWN: Readonly<Record<BoardMessage["type"], true>> = {
   decideConfirm: true,
   reviewed: true,
   flow: true,
+  editWorkflow: true,
   tourDone: true,
 };
 
@@ -650,6 +686,8 @@ function asMessage(message: unknown): BoardMessage | undefined {
       const ticket = flowTicketOf(m);
       return ticket === undefined ? undefined : { type: "flow", ticket };
     }
+    case "editWorkflow":
+      return isTicketId(m.ticket) ? { type: "editWorkflow", ticket: m.ticket } : undefined;
     default:
       return undefined;
   }

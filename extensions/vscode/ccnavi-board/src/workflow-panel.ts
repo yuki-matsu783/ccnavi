@@ -29,6 +29,11 @@
  * 「破棄する」を聞く。戻すのは、提案のハッシュが閉じた時点から変わっていないときだけ（変わっていれば戻せないと言う）。
  * 直すのは順序だけなので、フロー編集の「YAML で開く」は持たない。
  *
+ * **ボードの承認との結び付き。** タブの未保存と、最後に保存したときのハッシュ（`source_sha`）を帳面
+ * （`core/workflow-tabs.ts`）に書く。ボードは、未保存のタブがある親を含む一覧の承認を打たず、承認の一覧の
+ * `source_sha` が保存したときと違えば「保存したあとに提案が変わった」と出す。未保存は、タブが閉じた・破棄した
+ * （読み直した・取り込んだ）・保存したときに外れる。
+ *
  * 残る隙間（TOCTOU）: 実行ファイルがハッシュを確かめてから書くまでの間にエージェントが提案を書くと、どちらかが
  * 失われうる。間は実行ファイル 1 回の起動の中で、防ぐには提案の置き場に錠が要るので、ここでは狭めるだけにする
  * （書いたあとの監視で食い違いに気づけば「外で変わった」を出す）。
@@ -42,6 +47,7 @@ import { loadingText } from "./core/loading-render.js";
 import type { PlanOrder, PlanOrderAnswer } from "./core/planordermodel.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
+import { markUnsaved, rememberSaved } from "./core/workflow-tabs.js";
 import { renderWorkflowPage } from "./core/workflow-render.js";
 import { asWorkflowMessage, workflowTicketOf, workflowTitle, type ToWorkflow, type WorkflowData, type WorkflowMessage } from "./core/workflow-view.js";
 import { showLoading } from "./loading.js";
@@ -180,6 +186,10 @@ function registerPanelHandlers(current: PanelState): void {
   });
   panel.onDidDispose(() => {
     askRestore(current);
+    // 閉じたタブの未保存は、ボードの承認を止めない（戻すかを聞くのは閉じた後で、戻せば開き直したタブがまた書く）
+    if (alive(current)) {
+      markUnsaved(current.ticket, false);
+    }
     if (current.timer !== undefined) {
       clearTimeout(current.timer);
     }
@@ -398,6 +408,7 @@ async function handleMessage(current: PanelState, message: WorkflowMessage | und
   switch (message.type) {
     case "dirty":
       current.dirty = message.dirty;
+      markUnsaved(current.ticket, message.dirty);
       current.panel.title = workflowTitle(current.ticket, message.dirty);
       if (!message.dirty) {
         current.draft = undefined;
@@ -408,6 +419,7 @@ async function handleMessage(current: PanelState, message: WorkflowMessage | und
       return;
     case "ready":
       current.dirty = false;
+      markUnsaved(current.ticket, false);
       current.draft = undefined;
       current.panel.title = workflowTitle(current.ticket);
       current.host.ready();
@@ -484,6 +496,8 @@ async function save(current: PanelState, order: PlanOrder, expect: string): Prom
   }
   switch (result.kind) {
     case "written": {
+      // 書いたあとに読み直したハッシュを覚える。承認の一覧を開くときに比べ、保存したあとに提案が変わったかを見る
+      rememberSaved(current.ticket, result.answer.source_sha);
       const moved = result.answer.children.filter((child) => child.ticket !== child.new_ticket).length;
       await reload(current);
       vscode.window.showInformationMessage(

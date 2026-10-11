@@ -94,6 +94,35 @@ export interface ApprovePreview {
   readonly plans: readonly ApprovePlan[];
 }
 
+/**
+ * 一覧のうち、ワークフロー編集タブに未保存の変更がある親（識別子の順）。親は一覧の親（`parent` が null。改版も）と、
+ * 図のある親。子の識別子は親のタブと取り違えない。**空でなければ承認を打たない**（承認の遷移のガードと、画面のボタン）
+ */
+export function unsavedParents(preview: ApprovePreview, unsaved: readonly string[]): string[] {
+  const parents = new Set([...preview.batch.filter((b) => b.parent === null).map((b) => b.ticket), ...preview.plans.map((p) => p.ticket)]);
+  return [...new Set(unsaved)].filter((ticket) => parents.has(ticket)).sort();
+}
+
+/** 未保存のタブがあるので承認できない理由 */
+export function unsavedText(parents: readonly string[]): string {
+  return `親 ${parents.join(", ")} のワークフロー編集タブに未保存の変更があります。保存するか破棄してから承認してください`;
+}
+
+/**
+ * タブで保存したあとに提案が変わった親（識別子の順）。タブが最後に保存したときの `source_sha`（`saved`）と、一覧の
+ * 計画の `source_sha` が違う親。保存していない親は見ない。承認は止めない（図は今の提案をそのまま出している）
+ */
+export function changedSinceSave(preview: ApprovePreview, saved: Readonly<Record<string, string>>): string[] {
+  const out = new Set<string>();
+  for (const plan of preview.plans) {
+    const sha = saved[plan.ticket];
+    if (sha !== undefined && sha !== plan.source_sha) {
+      out.add(plan.ticket);
+    }
+  }
+  return [...out].sort();
+}
+
 export interface ApproveResult {
   readonly version: number;
   readonly approved: readonly string[];

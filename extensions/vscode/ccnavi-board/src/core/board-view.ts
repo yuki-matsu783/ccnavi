@@ -21,7 +21,11 @@ import { embedJson, type DataMessage } from "./screen-host.js";
  */
 export type ApprovalOverlay =
   | { readonly kind: "loading" }
-  | { readonly kind: "preview"; readonly preview: ApprovePreview; readonly notice?: string }
+  /**
+   * `changedSinceSave` は、ワークフロー編集タブで保存したあとに提案が変わった親（一覧を開いた時点で拡張ホストが比べた）。
+   * 図の上に注意を出すだけで、承認は止めない
+   */
+  | { readonly kind: "preview"; readonly preview: ApprovePreview; readonly notice?: string; readonly changedSinceSave?: readonly string[] }
   | { readonly kind: "approving"; readonly preview: ApprovePreview }
   | { readonly kind: "error"; readonly error: string }
   /**
@@ -79,6 +83,11 @@ export type BoardData =
        */
       readonly moved?: readonly Moved[];
       /**
+       * ワークフロー編集タブに未保存の変更がある親（`core/workflow-tabs.ts`）。その親を含む承認の一覧は、
+       * 承認のボタンを押せなくして理由を出す。拡張ホストはタブの様子が変わるたびに描き直す
+       */
+      readonly unsaved?: readonly string[];
+      /**
        * 開いた直後に選ぶプロジェクトの絞り込み（いまは呼び出し元が無い）。
        * 入るのは 1 枚目の HTML に埋めるときだけで、`ToBoard` の `data` では渡さない
        * （画面が組み上がった後は `filter` のメッセージで渡す）
@@ -89,6 +98,7 @@ export type BoardData =
       readonly kind: "error";
       readonly error: string;
       readonly approval?: ApprovalOverlay;
+      readonly unsaved?: readonly string[];
       readonly filter?: string;
     };
 
@@ -121,6 +131,11 @@ export type BoardMessage =
    * フロー編集画面を開く（置き場と錠はその画面が実行ファイルに聞き直す）
    */
   | { readonly type: "flow"; readonly ticket: string }
+  /**
+   * 承認のオーバーレイの「ワークフローを編集」を押した。拡張ホストはオーバーレイを閉じてから、その親の
+   * ワークフロー編集タブを開く（一覧の図にある親だけ。決めるのは承認の遷移）
+   */
+  | { readonly type: "editWorkflow"; readonly ticket: string }
   /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
   | { readonly type: "tourDone" };
 

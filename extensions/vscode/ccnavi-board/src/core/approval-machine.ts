@@ -50,12 +50,15 @@
  * | 一覧を受けるのは、それを頼んだ状態のときだけ（残った指摘も同じ） | 閉じたあとに返ってきた一覧が、勝手にオーバーレイを開く |
  * | 承認と残った指摘は互いの途中に被さらない | 見せている一覧が、別の一覧になってしまう |
  * | 決めた結果の文の上に、連絡も次の「決める」も被せない | 続きの子の識別子と次の 2 手を渡す前に、文が消える |
+ * | ワークフロー編集タブに未保存の変更がある親を含む一覧は、承認を打たない | 未保存の順序のまま承認され、直したつもりの順序と違うものが通る |
+ * | 「ワークフローを編集」でタブを開くのは、一覧を見せているとき（preview）だけ | 承認を打っている最中に閉じられ、結果を受ける場所が消える |
+ * | 「ワークフローを編集」で開くのは、一覧の図にある親だけ | 古い画面から届いた識別子で、承認と関係の無いタブが開く |
  *
  * これらは `test/shared/approval-machine.test.ts` が見る。**同じファイルの変異テストが、
  * ガードを 1 つ消したらテストが落ちることまで見る**ので、ガードを足したらそちらにも足す。
  */
 import type { ApprovalOverlay } from "./board-view.js";
-import type { ApproveOutcome, PreviewParse } from "./approvemodel.js";
+import { changedSinceSave, unsavedParents, unsavedText, type ApproveOutcome, type ApprovePreview, type PreviewParse } from "./approvemodel.js";
 import { choicesProblem, type DecideOutcome, type DecidePreviewParse } from "./decidemodel.js";
 import type { PhaseChip } from "./board.js";
 import { PUSH_APPROVED_SCRIPT, reviewedPrompt } from "./commands.js";
@@ -104,10 +107,18 @@ export type ApprovalInput =
       readonly filtered: boolean;
       readonly pending: readonly string[];
     }
-  /** 一覧（`--agree --preview --json`）が返った */
-  | { readonly kind: "previewed"; readonly result: PreviewParse }
-  /** 「この N 件を承認する」を押した */
-  | { readonly kind: "confirm"; readonly tickets: readonly string[] }
+  /**
+   * 一覧（`--agree --preview --json`）が返った。`saved` はワークフロー編集タブが最後に保存したときの
+   * `source_sha`（親ごと。`core/workflow-tabs.ts`）。一覧の計画と比べて、保存したあとに変わった親を覚える
+   */
+  | { readonly kind: "previewed"; readonly result: PreviewParse; readonly saved: Readonly<Record<string, string>> }
+  /**
+   * 「この N 件を承認する」を押した。`unsaved` は**押した時点の**、ワークフロー編集タブに未保存の変更がある親
+   * （呼ぶ側が帳面から引いて渡す）
+   */
+  | { readonly kind: "confirm"; readonly tickets: readonly string[]; readonly unsaved: readonly string[] }
+  /** 一覧の図の「ワークフローを編集」を押した。オーバーレイを閉じてから、その親のタブを開く */
+  | { readonly kind: "editWorkflow"; readonly ticket: string }
   /**
    * 承認（`--agree --yes`）の結果が返った。食い違い（`mismatch`）もここに入る。
    * `carrier` は承認の push の sh が置いてあるか（呼ぶ側が見て渡す）
@@ -173,6 +184,8 @@ export type ApprovalEffect =
   | { readonly kind: "copy"; readonly prompt: string; readonly what: string }
   /** 文を埋めて新しいセッションで開く */
   | { readonly kind: "openSession"; readonly prompt: string }
+  /** 親のワークフロー編集タブを開く（`screens().workflow`） */
+  | { readonly kind: "openWorkflow"; readonly ticket: string }
   /** ユーザに言う（警告） */
   | { readonly kind: "warn"; readonly text: string }
   /** ボードを読み直す */
@@ -201,9 +214,11 @@ export function approvalStep(state: ApprovalState, input: ApprovalInput): Approv
     case "approve":
       return opened(state, input);
     case "previewed":
-      return previewed(state, input.result);
+      return previewed(state, input.result, input.saved);
     case "confirm":
-      return confirmed(state, input.tickets);
+      return confirmed(state, input.tickets, input.unsaved);
+    case "editWorkflow":
+      return editWorkflow(state, input.ticket);
     case "approved":
       return answered(state, input.outcome, input.carrier);
     case "cancel":
@@ -260,7 +275,7 @@ function opened(
 }
 
 /** 一覧が返った。頼んだのが「開く」なのか「食い違いの読み直し」なのかで行き先が変わる */
-function previewed(state: ApprovalState, result: PreviewParse): ApprovalStep {
+function previewed(state: ApprovalState, result: PreviewParse, saved: Readonly<Record<string, string>>): ApprovalStep {
   const recheck = state.recheck;
   if (recheck !== undefined) {
     // 絞りが通らない（その識別子がもう承認待ちに無い、親の改版が承認待ちに入った）ときだけ絞りを
@@ -274,7 +289,7 @@ function previewed(state: ApprovalState, result: PreviewParse): ApprovalStep {
     }
     return move(state, {
       overlay: result.ok
-        ? { kind: "preview", preview: result.value, notice: recheck.notice }
+        ? { kind: "preview", preview: result.value, notice: recheck.notice, ...changedOf(result.value, saved) }
         : { kind: "error", error: result.error },
       only: state.only,
     });
@@ -284,21 +299,32 @@ function previewed(state: ApprovalState, result: PreviewParse): ApprovalStep {
     return stay(state);
   }
   return move(state, {
-    overlay: result.ok ? { kind: "preview", preview: result.value } : { kind: "error", error: result.error },
+    overlay: result.ok ? { kind: "preview", preview: result.value, ...changedOf(result.value, saved) } : { kind: "error", error: result.error },
     only: state.only,
   });
+}
+
+/** 保存したあとに提案が変わった親。無ければ欄を持たない */
+function changedOf(preview: ApprovePreview, saved: Readonly<Record<string, string>>): { readonly changedSinceSave?: readonly string[] } {
+  const changed = changedSinceSave(preview, saved);
+  return changed.length === 0 ? {} : { changedSinceSave: changed };
 }
 
 /**
  * 「この N 件を承認する」。見せた識別子とダイジェストをそのまま渡す。実行ファイルが一覧と本文の一致を
  * 確かめ、違えば何も置かずに `mismatch` を返す
  */
-function confirmed(state: ApprovalState, tickets: readonly string[]): ApprovalStep {
+function confirmed(state: ApprovalState, tickets: readonly string[], unsaved: readonly string[]): ApprovalStep {
   // 承認を打てるのは、一覧を見せているときだけ。承認中に押し直しても 2 本目は出ない
   if (state.overlay?.kind !== "preview" || tickets.length === 0) {
     return stay(state);
   }
   const preview = state.overlay.preview;
+  // ワークフロー編集タブに未保存の変更がある親を含む一覧は打たない（画面のボタンも押せないが、ここでも止める）
+  const blocked = unsavedParents(preview, unsaved);
+  if (blocked.length > 0) {
+    return stay(state, { kind: "warn", text: unsavedText(blocked) });
+  }
   return move(
     state,
     { overlay: { kind: "approving", preview }, only: state.only },
@@ -432,6 +458,21 @@ function handedOver(state: ApprovalState, how: "promptCopy" | "promptOpen"): App
     CLOSED,
     how === "promptCopy" ? { kind: "copy", prompt, what } : { kind: "openSession", prompt },
   );
+}
+
+/**
+ * 「ワークフローを編集」。オーバーレイを**閉じてから**タブを開く（開いたままにしない）。タブで保存すると提案が
+ * 書き換わり、この一覧はダイジェストが変わってもう承認できないので、承認はタブを保存したあとに開き直す
+ */
+function editWorkflow(state: ApprovalState, ticket: string): ApprovalStep {
+  const overlay = state.overlay;
+  if (overlay?.kind !== "preview") {
+    return stay(state);
+  }
+  if (!overlay.preview.plans.some((plan) => plan.ticket === ticket)) {
+    return stay(state);
+  }
+  return move(state, CLOSED, { kind: "openWorkflow", ticket });
 }
 
 /** 閉じてよいか。承認を打っている最中と、行き先を置いている最中は閉じない */
