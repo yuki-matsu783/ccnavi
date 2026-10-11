@@ -143,8 +143,10 @@ C1 の書いたパスの一覧の検査は、`review ready` が消した `wip/` 
    ターンを終える。sh は crit を起動しない（crit は閉じるまで戻らない）
 4. ユーザはツリーのルート（か、同じブランチのチェックアウトのルート）で `crit review <相対パス>` を開き、HTML のソースの行に指摘を付けて、
    `crit push <番号>` で送る。`crit <相対パス>` だけだと描画のプレビューになり、そこで付けたピンは `crit push` で送られない（crit v0.21.0 で確認）。crit push は GitHub では `gh`、GitLab では `glab` を使い、マージリクエストの差分にあるファイルの行にだけ送れる。
-   **確かめていないこと:** GitLab（`glab`）での crit push（偽の `gh` で GitHub の送り方だけを見た）、実際のホストが受け付けるか、
-   差分の外の行に付けた指摘がホストに拒まれるか。また、ユーザの手元のチェックアウトがマージリクエストの先頭より古いと、crit が送る行の番号が
+   **実測したこと（GitHub、2026-10-12）:** crit が送るのと同じ形の `POST pulls/<番号>/reviews`（`event: COMMENT` と `comments[]` の
+   `path`・`line`・`side`）は実物が受け付け、行のスレッドになって sh の `fetch` / `confirm` が未解決として数える。差分に無い行・ファイルへの
+   指摘は 422（`Line could not be resolved` / `Path could not be resolved`）で拒まれ、レビューごと作られない。手順は `tests/manual/github/probe_github.py`。
+   **確かめていないこと:** GitLab（`glab`）での crit push（偽の `gh` で GitHub の送り方だけを見た）、実際の crit が `gh` で送った場合の通し。また、ユーザの手元のチェックアウトがマージリクエストの先頭より古いと、crit が送る行の番号が
    ずれる。`crit review` を開く前に、手元をマージリクエストの先頭に合わせる
 5. 送られた指摘はユーザのスレッドで、本文が目印で始まらないので、`confirm` は未解決として数えて止め、`decide` は 1 件ずつ行き先を選ばせる
    （`review_host._unresolved`。依頼者と同じアカウントが送っても数える）。`crit push --event request-changes` は変更要求のレビューになり、
