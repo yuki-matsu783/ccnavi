@@ -21,10 +21,10 @@ export const NONCE = "TEST-NONCE-123";
  * 拡張がファイルを作るときの雛形だったが、共通レイヤーに雛形を置くとレイヤーの同じ id と中身が食い違うので、
  * 画面から作る方法ごと無くし、テストの見本としてだけ残す。
  *
- * **待ち方は dag で、流れを `after` で書く**（調査 → 設計と受入テスト作成 → 実装とテスト）。
+ * 待ち方は dag で、流れを `after` で書く（調査 → 設計と受入テスト作成 → 実装とテスト）。
  * feedback の定義は `after` を持てない（`phasetypes.py`）ので、レビュー後の対応として別に置く。
  */
-export const SAMPLE_PHASES_TEXT = `# フェーズ定義（設計 9.7）。ユーザが持つ設定で、エージェントは書き換えない。
+export const SAMPLE_PHASES_TEXT = `# フェーズ定義。ユーザが持つ設定で、エージェントは書き換えない。
 #
 # 親チケットの \`plan:\` に、ここで定義したものの名前を順に並べる。それが全体計画で、
 # \`ccnavi --agree\` が通ることが合意になる。レビューを受けたあとは \`feedback:\` に
@@ -111,7 +111,7 @@ export async function openPhases(overrides: Partial<PhasesPage> = {}, initialSta
 }
 
 /**
- * 図を出した状態で開く。**大きさを測れるようにして読ませる**（`measure`）。
+ * 図を出した状態で開く。大きさを測れるようにして読ませる（`measure`）。
  * これをしないと React Flow は点を隠したまま線を 1 本も描かず、テストは空の絵で通る。
  */
 export async function openGraph(overrides: Partial<PhasesPage> = {}, initialState: unknown = {}): Promise<DomPage> {
@@ -126,7 +126,7 @@ export function rowSelector(key: string): string {
 }
 
 /**
- * 図を出した状態で、**jsdom で**開く。ドラッグだけがここを通る
+ * 図を出した状態で、jsdom で開く。ドラッグだけがここを通る
  * （happy-dom では d3-drag の待ちが終わらず固まる。`test/helpers/jsdom.ts` の頭）。
  */
 export async function openGraphJsdom(overrides: Partial<PhasesPage> = {}, initialState: unknown = {}): Promise<JsdomPage> {

@@ -4,22 +4,22 @@
  * 見せる中身は拡張ホストが渡す（`FlowData`）。画面が持つのは、ユーザが触って決めるもの（編集中のフロー、
  * 選んでいるもの、直前の操作の一言、元に戻す履歴、コピーしたノード）だけ。
  *
- * **着手中かは画面が決めない。** 錠（`FlowLock`）は実行ファイルの答え（`flow.locked`）をそのまま反映したもので、
+ * 着手中かは画面が決めない。 錠（`FlowLock`）は実行ファイルの答え（`flow.locked`）をそのまま反映したもので、
  * 拡張ホストが渡す。錠が掛かっている間は読むだけ（欄・部品箱・保存・元に戻す・貼り付け が止まる）。
  * 保存を押したときも、拡張ホストが実行ファイルに聞き直してから書く。
  *
- * **中身（`data`）が届いたら、編集中のフローはその中身で置き換える。** 届くのは編集を捨ててよいとき
+ * 中身（`data`）が届いたら、編集中のフローはその中身で置き換える。 届くのは編集を捨ててよいとき
  * だけ（再読込・保存が通った）。履歴もそこで空にする。
  *
- * **コピーを替えるのは `edit()` だけ。** 直す前のコピーを履歴（`core/flow-history.ts`）に積んでから替える。
+ * コピーを替えるのは `edit()` だけ。 直す前のコピーを履歴（`core/flow-history.ts`）に積んでから替える。
  * 「未保存」は、読み込んだ中身（`base`）と見比べて決める（`core/flow-diff.ts` の `sameFlow`）ので、
  * 元に戻して読み込んだときと同じ中身になれば消える。
  *
- * **実行ファイルが言ったこと（`FlowChecks`）は画面で作らない。** 開くときの答えは中身と一緒に届き、編集したら
+ * 実行ファイルが言ったこと（`FlowChecks`）は画面で作らない。 開くときの答えは中身と一緒に届き、編集したら
  * 止まってから（`CHECK_MS`）拡張ホストに確かめ直しを頼む（`check` → `checked`。書きはしない）。答えの
  * warn は画面の注意と並べて出し、渡る手順は右の列のプレビュー、候補の名前は右の欄の選択肢に使う。
  *
- * **エージェントの下書き。** 拡張ホストが「提案あり」（`offer`）を渡したら帯を出す。開くと拡張ホストが
+ * エージェントの下書き。 拡張ホストが「提案あり」（`offer`）を渡したら帯を出す。開くと拡張ホストが
  * 実行ファイルに確かめさせた中身が届き（`proposal`）、文の前後まで見せる差分（`Proposal.tsx`）から「取り込む」で
  * 編集中の内容に入れる（`edit()` を通すので元に戻せる）。保存のときに取り込んだ下書きのハッシュを添え、拡張ホストは
  * 保存が通ったあと、同じ中身の下書きだけを消す。依頼のボタン（`request`）は着手の前だけ拡張ホストが言葉を渡す。
@@ -99,7 +99,7 @@ function rememberMinimap(shown: boolean): void {
 
 /**
  * 足したノードを置く場所。いちばん下の縁（図の上の位置で読む。グループはその枠の下の縁）のさらに下。
- * グループの枠の中に落ちないよう、グループの下に置く（足したノードはどのグループにも入らない）
+ * グループの枠の中に入らないよう、グループの下に置く（足したノードはどのグループにも入らない）
  */
 function nextSpot(doc: FlowDoc): { x: number; y: number } {
   if (doc.nodes.length === 0) {
@@ -199,7 +199,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [offer, setOffer] = useState<FlowOffer | undefined>(() => pageOf(initial)?.offer);
   const [proposal, setProposal] = useState<ProposalView | undefined>(undefined);
   const [requestText, setRequestText] = useState<string | undefined>(undefined);
-  // 取り込んだ下書きのハッシュと中身。編集中の中身が取り込んだ中身と同じ間だけ持ち、保存に添える（違えば下書きを消させない）
+  // 取り込んだ下書きのハッシュと中身。編集中の中身が取り込んだ中身と同じ間だけ持ち、保存に付ける（違えば下書きを消させない）
   const imported = useRef<{ readonly hash: string; readonly doc: FlowDoc } | undefined>(undefined);
   const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
   const requestTour = tour.request;
@@ -320,7 +320,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     return () => clearTimeout(timer);
   }, [doc, dirty]);
 
-  // 図で選んでいるノードが変わった。**毎回同じ関数を渡す**（React Flow は onSelectionChange が替わるたびに
+  // 図で選んでいるノードが変わった。毎回同じ関数を渡す（React Flow は onSelectionChange が替わるたびに
   // その時の選択で呼び直すので、描くたびに作り直すと、押した直後の古い選択で呼ばれる）
   const pick = useCallback((ids: readonly string[]): void => {
     setPicked((now) => (sameIds(now, ids) ? now : ids));

@@ -44,16 +44,16 @@ def mark_imported(
 
     取り込み済みの親子のチケットとは、取り込み状態のある親子のチケットのこと。
 
-    本物とするのは親のブランチ `P`（手元では `.claude/worktrees/<P>` で HEAD が `P` を指すツリー）の
+    正とするのは親のブランチ `P`（手元では `.claude/worktrees/<P>` で HEAD が `P` を指すツリー）の
     上のチケットだけ。次のチケットは読むが信頼しない（`blocked`。判定は範囲を使わずに止める）。
 
-    - 親子のチケットが決まらない（取り込み状態が `gone`・`blocked`・壊れている、
+    - 親子のチケットが決まらない（取り込み状態が `gone`・`blocked`・破損している、
       `present` なのに親のワークツリーが無い）
-    - 親子のチケットが閉じている（統合先の `done/` を本物とする）
+    - 親子のチケットが閉じている（統合先の `done/` を正とする）
     - 親のワークツリーの外にしか無いチケット（元ツリーに未コミットで残ったチケットなど）
 
-    **チケットのリストは変えない（落とさない）。
-    ** 落とすと「在る」ことで止まっていたもの（承認待ちの
+    **チケットのリストは変えない（外さない）。
+    ** 外すと「在る」ことで止まっていたもの（承認待ちの
     重複、開いた子のある親を閉じない）が通るようになる。理由を足すだけなので、取り込み状態の無い親子のチケットと、
     取り込み状態があってもチケットが親のワークツリーにだけある親子のチケットでは、答えは前と同じ。すでに理由（`mark_blocked`）が
     あれば、理由を連ねる（前の理由を消さない）。
@@ -77,7 +77,7 @@ def outside_reason(st: syncstate.Standing, t: ticket_model.Ticket) -> str:
     return (
         f"親のブランチ {st.branch_name} のワークツリーの外"
         f"（{t.tree or 'ワークスペースルート'}）にしか無いチケット。"
-        "取り込み済みの親子のチケットでは、親のブランチ上のチケットだけが本物。ユーザがそのチケットを親のワークツリー"
+        "取り込み済みの親子のチケットでは、親のブランチ上のチケットだけが正。ユーザがそのチケットを親のワークツリー"
         f"（.claude/worktrees/{st.family}）の同じ置き場へ移してコミットと push をし、"
         "元のチケットを消す"
     )
@@ -145,7 +145,7 @@ def branch_problems(
       `Families.integration_names`（環境変数・`.claude/settings.local.json`・統合先の取り込み結果・
       `origin/HEAD`・`origin/main`・`origin/master`）。固定のリストと字の検査は
       `ticket_ids.branch_problem` が読むときに済ませている
-    - 2 つの親子のチケットが同じブランチを名乗る（この親のブランチ名が、同じリポジトリの開いた別の
+    - 2 つの親子のチケットが同じブランチを宣言する（この親のブランチ名が、同じリポジトリの開いた別の
       チケットの親のブランチ名か識別子と同じ。大文字小文字は区別しない）なら承認しない。`others` は
       比べるチケット（承認済みと承認待ち）
     """
@@ -183,8 +183,8 @@ def branch_problems(
                 t.ticket,
                 f"親のブランチ {ticket_ids.branch_name(t)} を別の親子のチケット"
                 f"（{', '.join(clash)}）も親のブランチか識別子として使っている。"
-                "2 つの親子のチケットが同じブランチを名乗ると、"
-                "どちらのチケットを本物とするか決まらないので承認しない",
+                "2 つの親子のチケットが同じブランチを宣言すると、"
+                "どちらのチケットを正とするか決まらないので承認しない",
             )
         )
     return found
@@ -208,7 +208,7 @@ def integration_problems(
     閉じた識別子の再利用が新規の承認として通らないように。統合先の `done/` は取り込み結果（最後に
     取り込んだ `origin/<統合先>` から書き出したもの）から、親子のチケットの取り込み状態の有無に
     依らず、取り込んだことのあるリポジトリ（`sync/<リポジトリ>/`）の全提案に当てる。
-    取り込み結果が壊れている・読めない・入れ替えが終わらないときは、確かめられないので「決まらない」として
+    取り込み結果が破損している・読めない・入れ替えが終わらないときは、確かめられないので「決まらない」として
     承認しない（何も出さずに通すことはしない）。一度も取り込んでいないリポジトリは何も言わない
     （今のまま）。
 
@@ -348,11 +348,11 @@ def predecessor_pool_of(
     proposals: list[ticket_model.Ticket],
     root: str = "",
 ) -> dict[str, list[ticket_model.Ticket]]:
-    """先行を引く対応表。識別子 → 本物とする側のチケットの全部（`ops_close._places` と同じ集め方）。
+    """先行を引く対応表。識別子 → 正とする側のチケットの全部（`ops_close._places` と同じ集め方）。
 
     承認済みチケット（作業中・レビュー待ち・閉じた）はどれも数える。`todo/` の提案は、同じ識別子の
     承認済みチケットがどこにも無いときだけ数える（在れば改版の候補か書き損じ）。チケットが 2 つ以上
-    残れば、どれが本物か決まらない。
+    残れば、どれが正か決まらない。
 
     `root`（ワークスペースルート）を渡せば、どの置き場にも無い先行を手元の退避（`logs/archive/`）の
     `done/` から引く。`ready` が閉じた親子のチケットを退避した後も、先行を閉じたものとして読むため。
@@ -382,9 +382,9 @@ def align_imported(
     """取り込み済みの親子のチケットの先行を、その親のブランチ上のチケットで読み直す。
 
     Chrome は先行を、参照の閉包にある親子のチケット `P` から引く。手元もそれに揃える。
-    ただし**通る向きには読み替えない**（厳しくする向きだけ）。
+    ただし通る向きには読み替えない（厳しくする向きだけ）。
 
-    - 親子のチケットが決まらない（取り込み状態が `gone`・`blocked`・壊れている、
+    - 親子のチケットが決まらない（取り込み状態が `gone`・`blocked`・破損している、
       親のワークツリーが無い）:「親子のチケットが決まらない」にする（切り直しを案内する）
     - 親のワークツリーにその識別子のチケットが無い: 同じく「親子のチケットが決まらない」
       （親のブランチの外にしか無い）
@@ -498,7 +498,7 @@ def unmet_predecessors(
 def predecessor_problems(
     t: ticket_model.Ticket, pool: dict[str, list[ticket_model.Ticket]], approved_rel: str
 ) -> list[rules.Problem]:
-    """承認で落とす先行の苦情。
+    """承認を通さない先行の苦情。
 
     満たしたとみなすのは `done/` に在って取り消しでないものだけ。
 
@@ -535,7 +535,7 @@ def predecessor_problems(
                 PRED_SELF: "自分自身を先行に挙げている。自分が閉じるのを待つことはできない",
                 PRED_ANCESTOR: "自分の親を先行に挙げている。親は子が全部閉じてから閉じるので、"
                 "待っても満たさない",
-                PRED_CYCLE: f"先行が輪になっている（{p.where}）。どれも他が閉じるのを待つので、"
+                PRED_CYCLE: f"先行が循環している（{p.where}）。どれも他が閉じるのを待つので、"
                 "待っても満たさない",
             }[p.state]
             problems.append(
@@ -572,7 +572,7 @@ def predecessor_problems(
                     rules.SEVERITY_ERROR,
                     t.ticket,
                     f"先行 {p.ticket} が{p.label}。"
-                    "どれが本物か決まらないので満たしたとみなさない。"
+                    "どれが正か決まらないので満たしたとみなさない。"
                     "先に 1 つに決めてください"
                     "（先へ進んだ側を合流させるか、残ったワークツリーを片付ける）",
                 )
@@ -585,7 +585,7 @@ def children_of(tickets: list[ticket_model.Ticket], parent_id: str) -> list[tick
 
 
 def _reserved_project(t: ticket_model.Ticket) -> list[rules.Problem]:
-    """`project:` がレイヤーの名前に予約してある表記なら error（設計 11.4）。"""
+    """`project:` がレイヤーの名前に予約してある表記なら error。"""
     if not t.project or not settings.is_reserved_layer_name(t.project):
         return []
     reserved = " と ".join(f"`{name}`" for name in settings.RESERVED_LAYER_NAMES)
@@ -604,9 +604,9 @@ def _reserved_project(t: ticket_model.Ticket) -> list[rules.Problem]:
 def project_problems(
     t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket], conf: settings.Settings
 ) -> list[rules.Problem]:
-    """`project` が置き場と合っているか（REQ-MLT-11）。
+    """`project` が置き場と合っているか。
 
-    プロジェクトを決めるのは提案を置いた場所（設計 11.5）。frontmatter の `project:` は
+    プロジェクトを決めるのは提案を置いた場所。frontmatter の `project:` は
     宣言ではなく照合で、置き場と違えば承認しない。親と子は同じ置き場に並ぶので、継ぐ段は
     無い。承認の画面が置き場から引いた値を出し、それが承認済みチケットに残る。
 
@@ -642,7 +642,7 @@ def project_problems(
             )
         ]
     # 予約名は `known` から外す。置き場に `projects/self/` が在っても、それはレイヤーでは
-    # ないので、指せてはいけない。素の一覧で見ると通ってしまう。
+    # ないので、指せてはいけない。元の一覧で見ると通ってしまう。
     known = {
         p.name for p in tree.projects(conf.projects) if not settings.is_reserved_layer_name(p.name)
     }
@@ -666,7 +666,7 @@ def child_problems(
     通さない。1 か所に置くのは、置き場を動かして承認する進め方で判定の側の
     検査だけが古くなると、承認を通ったチケットと通らないチケットで答えが分かれるから。
 
-    「フェーズ定義が読めない」はここに入れない。壊れているのは設定で、チケットの形は
+    「フェーズ定義が読めない」はここに入れない。破損しているのは設定で、チケットの形は
     正しい。判定は注記を添えて親の範囲で切り詰める（`judge.ticket_verdict`）。
     """
     if parent is None:
@@ -781,7 +781,7 @@ def mark_blocked(conf: settings.Settings, kept: list[ticket_model.Ticket]) -> No
     終了時チェックの 3 か所が同じ答えを引く。1 か所で付けるのは、3 か所が別々に検査を
     呼ぶと、同じ書き込みが実行前は通って実行後に範囲外と報告されるから。
 
-    **親を引く対応表は `kept` そのもの**（`by_id`）で、判定が `parent` を引く索引と同じ。
+    親を引く対応表は `kept` そのもの（`by_id`）で、判定が `parent` を引く索引と同じ。
     別の対応表で引くと、ここでは親が見つかって理由が付かないのに、判定の側では見つからず
     `parent=None` のまま子の宣言だけで範囲が決まる（閉じた親やレビュー待ちの親まで
     引ける対応表にすると、この形になる）。親の範囲で切り詰められないのに通る形は、

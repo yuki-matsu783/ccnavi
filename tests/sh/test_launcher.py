@@ -94,7 +94,7 @@ class LaunchedFromScriptsTest(unittest.TestCase):
         self.bin = os.path.join(self.dir, ".ccnavi", "bin")
 
     def launcher_name(self):
-        """`platformtag.LAUNCHER_NAME`。無ければこのテストで落とす。"""
+        """`platformtag.LAUNCHER_NAME`。無ければこのテストを失敗させる。"""
         name = getattr(platformtag, "LAUNCHER_NAME", None)
         if name is None:
             self.fail("platformtag.LAUNCHER_NAME が無い")

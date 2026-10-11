@@ -272,7 +272,7 @@ test("CB-D56 読み直せなかったら理由を出し、配点は出さない"
   }
 });
 
-test("CB-D57 見た目の切り替えは body のクラスだけを付け替え、編集の途中は消えない", async () => {
+test("CB-D57 見た目の切り替えは body のクラスだけを書き換え、編集の途中は消えない", async () => {
   const dom = await openRisk();
   try {
     dom.type(dom.one(`${rowSelector("f1")} input.f-points`), "30");

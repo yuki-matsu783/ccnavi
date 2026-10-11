@@ -258,7 +258,7 @@ function watchProjects(current: PanelState, projectsRel: string, selfRulesRel: s
   }
   const { folder } = current;
   // clone の完了（`.git` の出現）、ワークスペースとプロジェクトの設定のルールファイルの出入り、origin の変化、ワークツリーの登録、`.gitignore`。
-  // 設定のパス（ccnavi ディレクトリの下の `config/`）はワークスペースの設定のパスから取る。プロジェクトの設定も同じ形（設計 11.2）。
+  // 設定のパス（ccnavi ディレクトリの下の `config/`）はワークスペースの設定のパスから取る。プロジェクトの設定も同じ形。
   // ワークスペースの設定のパスが取れない（JSON として読めない）なら、設定のルールファイルの監視は張らない。
   const rel = projectsRel;
   const layerDir = selfRulesRel === "" ? "" : path.posix.dirname(selfRulesRel);
@@ -343,7 +343,7 @@ function showError(current: PanelState, error: string): void {
  * いまの状態で描き直す。`send` が `deferred`（作り直し中）を返して捨てられたものは、
  * 画面が組み上がった（`ready`）ところでここから渡し直す。
  *
- * **読み直せなかったことも渡し直す。** ここで渡さないと、入れてある HTML（古い一覧）が出たまま
+ * 読み直せなかったことも渡し直す。 ここで渡さないと、入れてある HTML（古い一覧）が出たまま
  * 失敗がユーザに届かず、`page` が無いので以後のボタンも使えない。
  */
 function redraw(current: PanelState): void {

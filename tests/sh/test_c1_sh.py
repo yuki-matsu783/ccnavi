@@ -6,7 +6,7 @@ Chrome が未 push の古い状態で判定しないようにする。
 
 使い捨てのワークスペースと bare のリモートを組み、sh（ccnavi-ticket.sh・ccnavi-review.sh・
 ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリーのソースを `python -m ccnavi` で
-起こす（本物の判定・見分け・書いたパスの一覧を通す）。リモートを動かすのは別に clone した押し手で、
+起こす（実際の判定・見分け・書いたパスの一覧を通す）。リモートを動かすのは別に clone した押し手で、
 ワークスペースからは「他の機械（Chrome）が push した」ように見える。
 
 見るのは次のとおり。
@@ -19,7 +19,7 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 4. 途中の操作（merge など）があれば始めない
 5. 戻し: push が通らなければ、自分のコミットを比較つきで戻し、書いたパスの中身も戻して
    1 回だけやり直す
-6. 届いていた push（応答だけ落ちた）は ls-remote で確かめて成功にする
+6. 届いていた push（応答だけが失われた）は ls-remote で確かめて成功にする
 7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error（着手で configsync が
    プロジェクトのレイヤーへ写したものは例外。tests/ticket/test_core.py と tests/config/ が見る）
 8. hook の書きかけ（pending・skipped・状態の履歴の追記）はコミットし、
@@ -28,7 +28,7 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
    承認の push を自動で呼ぶ
 10. 取り込み状態の無い親子のチケット・origin の無いリポジトリ・chat だけの親子のチケットは今のまま
     （コミットも push もしない）
-11. 承認の push（ccnavi-push-approved.sh <親>）は取り込んでから送り、落ちてもコミットを残す
+11. 承認の push（ccnavi-push-approved.sh <親>）は取り込んでから送り、失敗してもコミットを残す
 12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、C1 の confirm が
     書いて送ったものが、経路・時刻・拡張の版のほかは同じ
 
@@ -72,7 +72,7 @@ EXE = """#!/bin/sh
 PYTHONPATH='{root}/src' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
 """
 
-# git の代わり。push だけ、本物の push を済ませてから落ちたふりをする（応答だけが落ちた形）。
+# git の代わり。push だけ、実際の push を済ませてから失敗したふりをする（応答だけが失われた形）。
 LOST_REPLY = """#!/bin/sh
 for a in "$@"; do
   if [ "$a" = push ]; then
@@ -408,7 +408,7 @@ class C1TicketTest(C1Harness):
         self.assertIn("ユーザの判断が未送信", result.stderr)
 
     def test_an_unsent_commit_in_the_place_stops(self):
-        """未送信の置き場のコミットが (b) でなければ止める（REQ-APV-11 の補足）。"""
+        """未送信の置き場のコミットが (b) でなければ止める。"""
         rel = f"{APPROVED}/doing/{CHILD}.md"
         with open(os.path.join(self.tree, rel), "a", encoding="utf-8") as f:
             f.write("tampered\n")
@@ -614,7 +614,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(fields(self.record)["sha"], self.sha(self.tree, "HEAD"))
 
     def test_a_delivered_push_whose_check_also_failed_is_not_written_twice(self):
-        """push の応答も ls-remote も落ちたが届いていた。
+        """push の応答も ls-remote も失敗したが届いていた。
 
         戻して取り込み直すと自分のコミットが戻るので、書き直さずに成功で終える。
         """
@@ -643,10 +643,10 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         self.assertEqual(self.dirty(), "")
 
-    # ---- コミット（`--no-verify` とタイムアウト監視の時間）と、落ちたときの索引
+    # ---- コミット（`--no-verify` とタイムアウト監視の時間）と、失敗したときの索引
 
     def test_a_failed_commit_leaves_nothing_staged(self):
-        """署名に落ちてコミットできなければ、add した新しいファイルも索引から外す（レビュー 1）。"""
+        """署名に失敗してコミットできなければ、add した新しいファイルも索引から外す。"""
         git(self.ws, "config", "commit.gpgsign", "true")
         git(self.ws, "config", "gpg.program", "false")
         self.assertEqual(self.ticket("start", PARENT).returncode, 1)
@@ -863,7 +863,7 @@ class TidyAfterFinishTest(C1Harness):
 class PlacesAreNotReadTest(C1Harness):
     """控えの置き場を動かす環境変数は読まない（置き場は固定。A9）。
 
-    `.ccnavi/scripts/` が写す版（i0064-10）になる前は落ちる。写す前の sh（`ccnavi-common.sh` の
+    `.ccnavi/scripts/` が写す版（i0064-10）になる前は失敗する。写す前の sh（`ccnavi-common.sh` の
     `ccnavi_state`）は `CCNAVI_STATE` を読み、ロックと控えを env が指す場所に置くため。
     """
 
@@ -1066,7 +1066,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         write(os.path.join(self.tree, untracked), "nodes: []\n")
         result = self.sh("ccnavi-push-approved.sh", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        # 同じ中身なので、名前の付け替えとして読まずに 2 つのパスで見る。
+        # 同じ中身なので、改名として読まずに 2 つのパスで見る。
         out = git(self.tree, "show", "--name-only", "--no-renames", "--format=", "HEAD").stdout
         self.assertEqual(sorted(out.split()), sorted([flow_rel, taken]))
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
@@ -1109,7 +1109,7 @@ class C1NotImportedHumanTest(PhaseOne, C1Harness):
 # 実行ファイルの半分の代役。残った指摘の行き先（`--reviewed ... --yes`）だけを代わりに書き
 # （親のワークツリーにレビュー済みマーカーを置き、書いたパスの一覧を出し、
 # 答えの JSON と下書きを書く）、
-# 残り（`c1 family`・`c1 sort`・`sync paths` など）は本物に渡す。
+# 残り（`c1 family`・`c1 sort`・`sync paths` など）は実際のものに渡す。
 HALF = """#!/bin/sh
 case " $* " in
 *" --reviewed "*" --yes "*)
@@ -1134,7 +1134,7 @@ esac
 PYTHONPATH='{root}/src' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
 """
 
-# git の代役。`remote get-url origin` だけをホストの代役の URL で答え、残りは本物に渡す
+# git の代役。`remote get-url origin` だけをホストの代役の URL で答え、残りは実際のものに渡す
 # （取り込みと push は bare のリモート、ホストの API は代役へ）。
 URL_GIT = """#!/bin/sh
 case " $* " in
@@ -1216,8 +1216,9 @@ class C1ReviewTest(C1Harness):
 
 
 # 実行ファイルの代役（ホストに触る副命令の試験用）。状態を書く副命令だけを代わりに書き
-# （親のワークツリーにマーカーを置き、書いたパスの一覧を出す）、`c1`・`sync` などは本物に渡す。
-# HALF_FAIL にファイル名があれば、`review requested` を最初の 1 回だけ落とす（打ち直しの試験）。
+# （親のワークツリーにマーカーを置き、書いたパスの一覧を出す）、`c1`・`sync` などは
+# 実際のものに渡す。
+# HALF_FAIL にファイル名があれば、`review requested` を最初の 1 回だけ失敗させる（打ち直しの試験）。
 HOST_HALF = """#!/bin/sh
 list=""; tree="${{HALF_TREE:-}}"; root=""
 for a in "$@"; do :; done
@@ -1554,7 +1555,7 @@ class C1HostTest(C1HostHarness):
         self.assertEqual(git(self.tree, "ls-tree", "HEAD", "--", ELI5).stdout, "")
 
     def test_the_real_ready_moves_the_rest_again_after_a_failed_push(self):
-        """本物の実行ファイルの ready（退避を始めた後の打ち直し）を C1 の中で通す。
+        """実際の実行ファイルの ready（退避を始めた後の打ち直し）を C1 の中で通す。
 
         1 回目の push をリモートが断る → C1 が戻す → 取り込みからやり直して残りを移し、送ってから
         Draft を外す。
@@ -1608,7 +1609,7 @@ class C1HostTest(C1HostHarness):
             self.assertEqual(f.read().count('"archived"'), 1)
 
     def test_a_request_is_not_posted_twice_across_runs(self):
-        """投稿の後に落ちた依頼を打ち直しても、同じ目印の依頼は投稿し直さない。"""
+        """投稿の後に失敗した依頼を打ち直しても、同じ目印の依頼は投稿し直さない。"""
         body = write(os.path.join(self._tmp.name, "body.md"), "見てほしい\n")
         once = os.path.join(self._tmp.name, "failed-once")
         html = self.eli5()
@@ -1780,7 +1781,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
 
     @staticmethod
     def normalized(path, text):
-        """経路・時刻・拡張の版を落とす（違ってよいもの）。"""
+        """経路・時刻・拡張の版を除く（違ってよいもの）。"""
         drop = ("via", "at", "version")
         if path.endswith(".ndjson"):
             rows = [json.loads(line) for line in text.splitlines() if line.strip()]

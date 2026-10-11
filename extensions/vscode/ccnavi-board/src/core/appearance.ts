@@ -7,7 +7,7 @@
  * Claude の配色を選んでもそのまま反映される。
  *
  * 配色そのもの（変数の上書き）は画面の側の `src/webview/styles/appearance.css` にあり、ここが持つのは
- * 設定の値・body に付けるクラス・送るメッセージの形だけ。付け替えるのは `src/webview/appearance.ts`。
+ * 設定の値・body に付けるクラス・送るメッセージの形だけ。切り替えるのは `src/webview/appearance.ts`。
  */
 
 export const APPEARANCES = ["vscode", "claude-light", "claude-dark"] as const;
@@ -48,12 +48,12 @@ export interface AppearanceMessage {
  * `ScreenHost<D>` はそのまま渡せる（`post` は `unknown` を取り、`boolean` を返す）。
  */
 export interface AppearanceSink {
-  /** 生きている画面にだけ届く。届いたら真、落ちるので送らなかったら偽 */
+  /** 生きている画面にだけ届く。届いたら真、失われるので送らなかったら偽 */
   post(message: AppearanceMessage): boolean;
 }
 
 /**
- * 見た目を画面へ送る。**段取りを通す**ので、組み上がっていない画面と捨てられた画面には送らない
+ * 見た目を画面へ送る。段取りを通すので、組み上がっていない画面と捨てられた画面には送らない
  * （偽が返る）。届かなかったぶんを後で送り直す必要は無い。どちらの経路でも、後からいまの値が渡るため。
  *
  * - 入れ物ごと入れ直す経路（`rebuilt`）では、組む側が `appearance` を HTML に埋める（`bodyTag`）

@@ -124,7 +124,7 @@ test("CB-T45 新しいルールは引用符付きの glob と折り返しの mes
   assert.deepEqual(again.allow, []);
 });
 
-test("CB-T46 壊れたタイプは苦情にして、他のタイプは出す", () => {
+test("CB-T46 不正なタイプは苦情にして、他のタイプは出す", () => {
   const { model } = readRules("version: 1\ndeny: nope\nallow:\n  - id: a\n    match: Read\n    glob: '*'\n    message: m\n");
   assert.equal(model.problems.length, 1);
   assert.match(model.problems[0], /deny/);

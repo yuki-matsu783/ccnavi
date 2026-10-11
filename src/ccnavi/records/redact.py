@@ -8,8 +8,8 @@
 `git clone https://oauth2:<トークン>@…` を 1 回打てば、その値が平文でディスクに残り、
 ローテートした記録（prune）と一緒に何日も残る。
 
-伏せ方は長さで 2 通り。短い値（SHORT 字未満）は全部を `***` にする。長い値は頭の
-KEEP_HEAD 字と尻の KEEP_TAIL 字を残し、あいだを `***` にする。残すのは、同じ値が繰り返し
+伏せ方は長さで 2 通り。短い値（SHORT 字未満）は全部を `*` にする。長い値は頭の
+KEEP_HEAD 字と尻の KEEP_TAIL 字を残し、あいだを `*` にする。残すのは、同じ値が繰り返し
 出ているか、どの種類のトークンかを記録から見分けられるようにするため。短い値で残すと、
 残した字だけで値の大半が読める。
 
@@ -37,7 +37,7 @@ _VALUE = r"(?:'(?P<sq>[^'\n]*)'|\"(?P<dq>[^\"\n]*)\"|(?P<bare>" + _BARE_VALUE + 
 # 名前が秘密を指す `名前=値` / `名前: 値`。名前はこれで終わるもの（`GITHUB_TOKEN`、
 # `db_password`、`x-api-key`、`aws_secret_access_key`、`SECRET_KEY`、`MYSQL_PWD`、`_authToken`、
 # `SESSION_COOKIE`）。途中に含むだけの名前（`tokenizer`、`secretName`）は読まない。
-# `pwd` は前に `_` か `-` が付いた形だけ。素の `PWD` はいまの場所で、秘密ではない。
+# `pwd` は前に `_` か `-` が付いた形だけ。単体の `PWD` はいまの場所で、秘密ではない。
 _KEY_WORDS = (
     r"token|password|passwd|[_-]pwd|secret|secret[_-]?key|api[_-]?key|apikey|access[_-]?key|"
     r"private[_-]?key|client[_-]?secret|auth[_-]?token|credentials?|cookie"

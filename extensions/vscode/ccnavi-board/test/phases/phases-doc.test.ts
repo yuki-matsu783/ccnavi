@@ -161,7 +161,7 @@ test("CB-T90 足す・消す・空のリストは欄ごと消す・scope の inh
   );
 });
 
-test("CB-T91 id が重なれば書き戻さない（実行ファイルは後ろで黙って上書きするため）", () => {
+test("CB-T91 id が重なれば書き戻さない（実行ファイルは後ろの定義で気づかないうちに上書きするため）", () => {
   const doc = readPhases(SAMPLE);
   const phases = doc.model.form.phases.map((p) => (p.id === "design" ? { ...p, id: "research" } : p));
   assert.throws(() => doc.apply({ order: "sequential", phases }), /id `research` が 2 つあります/);
@@ -270,11 +270,11 @@ test("CB-T199 知らない order は苦情にし、画面は sequential とし�
   const doc = readPhases(SAMPLE.replace("version: 1\n", "version: 1\norder: graph\n"));
   assert.equal(doc.model.form.order, "sequential");
   assert.ok(doc.model.problems.some((p) => p.includes("order が")), doc.model.problems.join("\n"));
-  // リストで書かれた order は、保存で同じ鍵を 2 つにしない
+  // リストで書かれた order は、保存で同じキーを 2 つにしない
   const listed = readPhases(SAMPLE.replace("version: 1\n", "version: 1\norder: [dag]\n"));
   const out = listed.apply({ ...listed.model.form, order: "dag" });
   assert.equal(out.match(/^order:/gm)?.length, 1);
   assert.match(out, /^order: dag$/m);
-  // 前後の空白は実行ファイルと同じに落として読む
+  // 前後の空白は実行ファイルと同じに除いて読む
   assert.equal(readPhases(SAMPLE.replace("version: 1\n", 'version: 1\norder: " dag "\n')).model.form.order, "dag");
 });

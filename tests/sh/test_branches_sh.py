@@ -3,14 +3,14 @@
 使い捨てのワークスペースを組み、sh を外から呼ぶ。実行ファイルはこのツリーのソースを
 `python -m ccnavi` で起こす（tests/sh/test_branch_field_sh.py と同じ形）。ホストは PATH の
 先頭に置いた `curl` の代役が答える（tests/sh/test_review_host_fixture.py と同じ作り方。
-gh / glab は使えない代役にして、curl とトークンの経路に落とす）。代役は、要求の表記
+gh / glab は使えない代役にして、curl とトークンの経路に切り替える）。代役は、要求の表記
 （`<METHOD> <URL>`）ごとに決めた答えを返し、決めていない要求は 404 にする。
 
 見るのは次のとおり。
 
 1. MR 指定: その MR の元ブランチ（GitHub・GitLab。GitLab のフォークから出た MR は目印を付ける）
 2. issue 指定: その issue を参照している開いた MR の元ブランチと、名前に番号を含む手元のブランチ
-3. ホストに繋げない（トークンが無い・origin が無い・API が落ちた）ときは止めず、手元の候補だけを
+3. ホストに繋げない（トークンが無い・origin が無い・API が失敗した）ときは止めず、手元の候補だけを
    出して「ホストは見ていない」と理由を書く
 4. projects/<名前>/ の中から打てば、そのリポジトリを見る
 5. --json と、引数の誤り
@@ -136,7 +136,7 @@ class BranchesShTest(unittest.TestCase):
         write(os.path.join(self.bin, "fake_curl.py"), CURL)
         for name, text in (
             ("curl", f"#!/bin/sh\nexec '{sys.executable}' '{self.bin}/fake_curl.py' \"$@\"\n"),
-            # gh / glab があっても使わせない（疎通の試しで落ちて curl に切り替わる）
+            # gh / glab があっても使わせない（疎通の試しで失敗して curl に切り替わる）
             ("gh", "#!/bin/sh\nexit 1\n"),
             ("glab", "#!/bin/sh\nexit 1\n"),
         ):

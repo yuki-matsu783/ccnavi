@@ -46,7 +46,7 @@ class Input:
     """payload のうち判定が読む部分。
 
     知らないフィールドは無視する。上流にフィールドが 1 つ増えただけで
-    判定が壊れないようにするため。
+    判定が動かなくならないようにするため。
     """
 
     event: str = ""
@@ -196,7 +196,7 @@ def rebind_streams() -> None:
 
     Windows は既定のインストールだと UTF-8 ではないコードページを
     Python のプロセスに渡す。日本語のルール文面が入った payload が、
-    判定に入る前に壊れる。
+    判定に入る前に中身が正しく読めなくなる。
     """
     for stream in (sys.stdin, sys.stdout, sys.stderr):
         if stream is None:

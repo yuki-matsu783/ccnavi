@@ -1,4 +1,4 @@
-"""着手の前に、共通の概念スキルをプロジェクトの `skills/` へ写す（設計 11.13）。
+"""着手の前に、共通の概念スキルをプロジェクトの `skills/` へ写す。
 
 概念スキルは、ワークスペースの `.claude/skills/<概念>/` にある、頭の frontmatter に
 `concept: true` を持つスキルで、`SKILL.md` と `references/` の下の `.md` が中身になる。

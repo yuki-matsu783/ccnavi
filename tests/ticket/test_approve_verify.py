@@ -1,7 +1,7 @@
 """`--agree --preview --verify`（承認を頼む前の確認）の受入テスト。
 
-エージェントが提案を書いたあと、ユーザに承認を依頼する前に自分で確かめる枝
-（REQ-APV-13）と、書いた回にそれを伝える組み込みの案内（REQ-APV-14）。
+エージェントが提案を書いたあと、ユーザに承認を依頼する前に自分で確かめる枝と、
+書いた回にそれを伝える組み込みの案内。
 見るのは 8 つ。
 
 1. 承認できる状態なら 0（はい）で返り、識別子ごとに「通る」と出る。置かない
@@ -66,7 +66,7 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertIn("i0001", result.stdout)
         self.assertIn("通る", result.stdout)
         self.assertIn("承認を依頼してよい", result.stdout)
-        self.assertNotIn("落ちる", result.stdout)
+        self.assertNotIn("外れる", result.stdout)
         # 確かめただけ。承認済みチケットは置かれていない。
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
@@ -80,7 +80,7 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("指定の 1 件", result.stdout)
 
-    # ---- 2. 落ちる提案がある
+    # ---- 2. 外れる提案がある
 
     def test_a_rejected_proposal_fails_the_check_with_its_reason(self):
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
@@ -91,7 +91,7 @@ class ApproveVerifyTest(PhaseHarness):
         result = self.verify()
         self.assertEqual(result.returncode, ANSWER_NO, result.stdout + result.stderr)
         self.assertIn("i0001-05-05", result.stdout)
-        self.assertIn("落ちる", result.stdout)
+        self.assertIn("外れる", result.stdout)
         self.assertIn("計画に無い", result.stdout)
         self.assertIn("直してから", result.stdout)
         # 通るほうも同じ画面に出る。直す相手が分かるように。
@@ -115,7 +115,7 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertEqual(result.returncode, ANSWER_NO, result.stdout + result.stderr)
         self.assertIn("承認待ちに無い", result.stdout)
 
-    # ---- 5. 範囲の超過は落とさない
+    # ---- 5. 範囲の超過は外さない
 
     def test_scope_overflow_passes_but_is_shown(self):
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
@@ -143,7 +143,7 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertEqual(body["verify"], {"ok": True, "reason": "ok"})
 
     def test_json_says_why_it_failed(self):
-        """読めない提案しか無ければ、承認待ちが 1 件も無いのと同じ（そこで落ちる）。"""
+        """読めない提案しか無ければ、承認待ちが 1 件も無いのと同じ（そこで失敗する）。"""
         write(os.path.join(self.parent_tree, "wip", "proposals", "todo", "broken.md"), "---\n: :\n")
         self.commit_parent()
 
@@ -154,9 +154,9 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertTrue(any("broken.md" in p for p in body["problems"]))
 
     def test_a_broken_proposal_elsewhere_does_not_fail_a_sound_one(self):
-        """読めない提案は終了コードを動かさない。`--agree` もそこでは落ちないから。
+        """読めない提案は終了コードを動かさない。`--agree` もそこでは失敗しないから。
 
-        走査は絞る前の全ツリーを見るので、ここで落とすと、他のセッションの書きかけ 1 本で
+        走査は絞る前の全ツリーを見るので、ここで失敗させると、他のセッションの書きかけ 1 本で
         「確かめは『いいえ』なのに承認は通る」になる。言わずに済ませもしない
         （自分が書いた 1 本かもしれない）。
         """
@@ -169,7 +169,7 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertIn("読めなかったファイル", result.stdout)
         self.assertIn("broken.md", result.stdout)
         self.assertIn("承認を依頼してよい", result.stdout)
-        # 同じ状態で本物の承認も通る。確かめと承認の答えが分かれないことが要点。
+        # 同じ状態で実際の承認も通る。確かめと承認の答えが分かれないことが要点。
         approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
@@ -188,12 +188,12 @@ class ApproveVerifyTest(PhaseHarness):
     # ---- 8. --lint が同じことを言う
 
     def test_lint_says_what_the_verify_says(self):
-        """承認で落ちるものを数える経路は 1 本（`agree_candidates.candidates`）。
+        """承認で外れるものを数える経路は 1 本（`agree_candidates.candidates`）。
 
-        以前は `--lint` だけが `agree_candidates.validate` を当てていて、順序で落ちる子・計画に
+        以前は `--lint` だけが `agree_candidates.validate` を当てていて、順序で外れる子・計画に
         無い番号・`project:` の食い違い・改版の検査について何も言わなかった。同じ事実を数える経路が
         2 本あると、片方が気づかないうちに弱くなる。`--lint` は severity の体系で終わるので、
-        承認で落ちる提案（error）があれば非ゼロで終わる。
+        承認で外れる提案（error）があれば非ゼロで終わる。
         """
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         # 計画に無い番号の子。承認の対象にしない側に載る。
@@ -211,12 +211,12 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertIn("計画に無い", said)
 
     def test_lint_says_the_order_problem_too(self):
-        """順序で落ちる子。**1 本にそろえる前の `--lint` が何も言わなかったのはここ**
+        """順序で外れる子。1 本にそろえる前の `--lint` が何も言わなかったのはここ
         （`validate` だけを当てていたので、フェーズの順序を見ていなかった）。
 
         「計画に無い番号」はそろえる前からの error なので、それだけを見るテストでは、
         配線を旧に戻しても気づけない。この枝が新しく言えるようになった 1 件で確かめる。
-        重さは warn（`rules.KIND_NOT_YET`）で、承認の側は落としたままであることも見る。
+        重さは warn（`rules.KIND_NOT_YET`）で、承認の側は外したままであることも見る。
         """
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.propose(
@@ -264,8 +264,8 @@ class ApproveVerifyTest(PhaseHarness):
         表に allow を 1 本足す形も試したが、`todo/` が「ccnavi が言及する場所」になり、
         どのタイプも言及しないときの扱い（judge.undeclared_verdict）を通らなくなる。
         確認できる者が居ないモードの deny も、知らない表記のモードを ask として扱う既定も、
-        そこだけ外れていた。**同じ場所とどのルールも言及しない場所が、
-        どの権限モードでも同じ判定になること**を確かめる。文は届いたままであることも見る。
+        そこだけ外れていた。同じ場所とどのルールも言及しない場所が、
+        どの権限モードでも同じ判定になることを確かめる。文は届いたままであることも見る。
         """
         todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0002.md")
         other = os.path.join(self.parent_tree, "src", "keep.py")

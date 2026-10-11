@@ -6,7 +6,7 @@
  * `<script nonce>` に文字列として流し込み、ファイルとしては読ませない（`localResourceRoots` は空のまま）。
  * 最初に見せる中身は `<script type="application/json">` に埋める。
  *
- * **この入れ物は 1 度しか入らない**（`retainedHost`）。画面は編集の途中を持つので、
+ * この入れ物は 1 度しか入らない（`retainedHost`）。画面は編集の途中を持つので、
  * 入れ直すと打ちかけの内容が消える。2 枚目からは拡張ホストが `postMessage` で渡す（rules-panel）。
  *
  * CSS も画面の側の持ち物で、部品と同じ置き場にある（`src/webview/rules/*.css`。5 画面共通のぶんは

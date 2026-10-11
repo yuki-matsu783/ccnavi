@@ -12,10 +12,10 @@
 # - owner は `<ホスト名> <pid> <開始時刻（date +%s）> <持ち主の情報> <OS>`、持ち主の情報は `<pid>-<開始時刻>`。
 #   書けなかった・書いた中身が読み返せないときは取れていないとして手放す
 # - 古い: ホスト名と OS（`uname -s`）が同じで、置き場が /mnt/ の下で
-#   なければ pid で見る。`kill -0` が落ちれば古く、持ち主が生きていれば 10 分を過ぎても強制取得しない
-#   （長い操作からロックを取り上げて二重に書かせない。待ちで取れなければ「長い」と言って落とす）。pid を確かめ
+#   なければ pid で見る。`kill -0` が失敗すれば古く、持ち主が生きていれば 10 分を過ぎても強制取得しない
+#   （長い操作からロックを取り上げて二重に書かせない。待ちで取れなければ「長い」と言って失敗にする）。pid を確かめ
 #   られない（別のホスト・別の OS・/mnt/ の下・pid が読めない）ときだけ、10 分を過ぎたら時刻で古い
-#   とする（WSL と Git Bashは同じホスト名で pid が通じない）。owner が読めなければ `find -mmin +10`
+#   とする（WSL と Git Bash は同じホスト名で pid が通じない）。owner が読めなければ `find -mmin +10`
 # - 強制取得の仕方: 強制取得の操作を `<ロック>.steal`（`mkdir`、10 分で古い）で 1 つにし、古いと判断したときに読んだ
 #   owner の行と今の owner の行が同じなら `mv` で退避して、退避した中の owner がまだ同じなら消して取り直す。
 #   違えば（その間に持ち主が替わった）、元の名前が空いていれば戻して待ちに戻り、空いていなければ 2
@@ -101,7 +101,7 @@ ccnavi_lock_owner() {
 	head -n 1 "$1/owner" 2>/dev/null || :
 }
 
-# 10 進の数に揃える（先頭の 0 を落とす。`$(( ))` が 8 進に読まないように）。数でなければ空。
+# 10 進の数に揃える（先頭の 0 を除く。`$(( ))` が 8 進に読まないように）。数でなければ空。
 ccnavi_lock_num() {
 	case "${1:-}" in
 	'' | *[!0-9]*) return 0 ;;
@@ -153,7 +153,7 @@ ccnavi_lock_long() {
 }
 
 # 長いロックの持ち主と止め方を 1 文で出す（文面だけ。判定には使わない）。<ロック>
-# 開始時刻は GNU の `date -d @N` か BSD の `date -r N` で読める形にし、落ちれば数のまま。
+# 開始時刻は GNU の `date -d @N` か BSD の `date -r N` で読める形にし、失敗すれば数のまま。
 ccnavi_lock_describe() {
 	ccnavi_lds_line=$(ccnavi_lock_owner "$1")
 	ccnavi_lds_host=$(printf '%s\n' "$ccnavi_lds_line" | awk '{ print $1 }')
@@ -178,7 +178,7 @@ ccnavi_lock_describe() {
 ccnavi_lock_steal() {
 	ccnavi_st_gate="$1.steal"
 	if ! mkdir "$ccnavi_st_gate" 2>/dev/null; then
-		# 別の誰かが強制取得している最中。10 分を過ぎた取得用のロック（.steal）は、途中で落ちた取得の残りなので外す。
+		# 別の誰かが強制取得している最中。10 分を過ぎた取得用のロック（.steal）は、途中で失敗した取得の残りなので外す。
 		if [ -n "$(find "$ccnavi_st_gate" -maxdepth 0 -mmin +10 2>/dev/null)" ]; then
 			rmdir "$ccnavi_st_gate" 2>/dev/null || :
 		fi

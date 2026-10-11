@@ -26,7 +26,7 @@ from . import c1
 WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
 # 返す文に載せる理由コード。cli.py の表と同じ体系から借りている。
-# 設計 7.2 が監査に残す事象名がそのまま POST_VIOLATION。
+# 監査に残す事象名がそのまま POST_VIOLATION。
 CODE_VIOLATION = "POST_VIOLATION"
 # 承認されたチケットの作業範囲の外が変わった。実行前チェックが同じことを
 # DENY_TICKET_SCOPE で止めるが、そちらは Write / Edit の引数しか見ない。
@@ -58,7 +58,7 @@ class ScopeGuard:
 
     root: str
     copies: dict[str, ticket_model.Ticket] = field(default_factory=dict)
-    # プロジェクトの置き場。ワークツリーの元リポジトリをプロジェクトまで広げる（設計 11.3）。
+    # プロジェクトの置き場。ワークツリーの元リポジトリをプロジェクトまで広げる。
     projects: str = ""
     # チケットの置き場（ツリーのルートからの相対）。提案と承認済みチケット。
     tickets: str = ""
@@ -190,11 +190,11 @@ def _findings(
 ) -> list[Finding]:
     """変更のうち、報告すべきものを返す。
 
-    ccnavi 自身が書く場所は先に落とす。落とさないと、記録を 1 行足すたびに
+    ccnavi 自身が書く場所は先に除く。除かないと、記録を 1 行足すたびに
     自分がその記録を違反として報告し、その報告がまた記録を 1 行増やす。
 
     チケットの置き場に現れた変更も、ccnavi の副命令が書いたと内容から読めるぶんだけ
-    落とす（`_script_writes`）。落とさないと、`ticket start` が着手の時刻を書くたび、
+    除く（`_script_writes`）。除かないと、`ticket start` が着手の時刻を書くたび、
     `review request` がマーカーを置くたびに、ccnavi 自身の書き込みが
     「エージェントによる書き換え」として報告され、戻す設定では戻されて手順が進まない。
 
@@ -203,7 +203,7 @@ def _findings(
     「範囲を広げれば済む」と読ませて、済まないことを 1 往復あとに知らせる。
 
     ルールの allow に当たる変更も、チケットの範囲は当てる。実行前チェックがルールと
-    チケットの厳しい側を採るのと同じ（設計 5）。allow を理由に飛ばすと、実行前に
+    チケットの厳しい側を採るのと同じ。allow を理由に飛ばすと、実行前に
     止まる書き込みがシェルから入ったときに誰も言わない。
     """
     own = tuple(os.path.realpath(p) for p in mine if p)
@@ -251,7 +251,7 @@ def _script_writes(
     承認済みチケットとマーカーを書く。書いた先は `deny` と宣言された場所なので、外さないと
     自分の手順を自分で違反として報告し、戻す設定では自分で戻す。
 
-    **誰が書いたかは記録せず、何が変わったかで答える。** 台帳はワークスペース側にあって
+    誰が書いたかは記録せず、何が変わったかで答える。台帳はワークスペース側にあって
     git に入らないので、承認とマーカーが親のブランチに乗って届いた先（別の機械の clone）では
     1 件も残っていない。台帳で見ると、その機械でだけ報告が出る。内容で見れば同じ答えになる。
 
@@ -298,7 +298,7 @@ def _script_writes(
             # 読めないものは外さない。読めないことは「変わっていない」ではない。
             continue
         now = fsio.read_text(change.full, errors="replace")
-        # 落としてよいのは、コミット済みの版がまだ持っていない欄だけ。副命令はどれも
+        # 省いてよいのは、コミット済みの版がまだ持っていない欄だけ。副命令はどれも
         # 1 度しか書かないので、既に値がある欄が変わったのなら副命令が書いたものではない
         # （`ticket_fields.script_fields_set`）。
         drop = _droppable(before)
@@ -317,12 +317,12 @@ def _script_writes(
             arrived.append((change, now))
     out |= _archived_removals(here, approved_rel, top, where, root)
     for change, before, drop in gone:
-        # 行き先の正規化した内容は、消えた側の落とす欄で見る。`finish` が足す `completed_at` は
-        # 消えた側がまだ持っていないので落ち、着手の時刻と基準点は両側に残る。
+        # 行き先の正規化した内容は、消えた側の省く欄で見る。`finish` が足す `completed_at` は
+        # 消えた側がまだ持っていないので省かれ、着手の時刻と基準点は両側に残る。
         shape = _shape(before, drop)
         landed = [c for c, now in arrived if _shape(now, drop) == shape]
         leaving = [c for c, other, _ in gone if _shape(other, drop) == shape]
-        # **組は 1 対 1 のときだけ外す。** どちらかの側に同じ内容が 2 つ以上あると、
+        # 組は 1 対 1 のときだけ外す。どちらかの側に同じ内容が 2 つ以上あると、
         # どれがどれの行き先なのかを内容からは決められない。正規の移動 1 件に、
         # 同じ内容のチケットのただの削除や、行き先に直接置いた偽物も一緒に外れる。
         # 同じ内容ということは識別子まで同じということなので、揃うのは普通の手順では
@@ -494,7 +494,7 @@ def _archived_removals(
 
 
 def _droppable(before: str | None) -> tuple[str, ...]:
-    """正規化するときに落としてよいスクリプトの欄。コミット済みの版がまだ持っていない欄だけ。"""
+    """正規化するときに省いてよいスクリプトの欄。コミット済みの版がまだ持っていない欄だけ。"""
     held = ticket_fields.script_fields_set(before) if before is not None else ()
     return tuple(f for f in ticket_model.SCRIPT_FIELDS if f not in held)
 

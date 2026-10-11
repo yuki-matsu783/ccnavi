@@ -272,7 +272,7 @@ class WriteBytesAtomicTest(unittest.TestCase):
         self.assertEqual(self._names(), ["i0001.md"])
 
     def test_failed_sync_keeps_the_previous_content_and_no_temporary_file(self):
-        """fsync で落ちたら差し替えない。中身が届いたか分からないものを本番にしない。"""
+        """fsync で失敗したら差し替えない。中身が届いたか分からないものを本番にしない。"""
         self.assertEqual(fsio.write_bytes_atomic(self.path, b"before"), "")
         with mock.patch.object(fsio, "_sync_file", side_effect=OSError(errno.EIO, "io")):
             failed = fsio.write_bytes_atomic(self.path, b"after")
@@ -282,7 +282,10 @@ class WriteBytesAtomicTest(unittest.TestCase):
 
     @unittest.skipIf(os.name == "nt", "fcntl は POSIX だけ")
     def test_failed_os_fsync_is_a_failed_write(self):
-        """`_sync_file` を差し替えずに os.fsync を落とす。握りつぶさず、書けなかったことにする。"""
+        """`_sync_file` を差し替えずに os.fsync を失敗させる。
+
+        握りつぶさず、書けなかったことにする。
+        """
         import fcntl
 
         self.assertEqual(fsio.write_bytes_atomic(self.path, b"before"), "")
@@ -298,7 +301,7 @@ class WriteBytesAtomicTest(unittest.TestCase):
 
     @unittest.skipIf(os.name == "nt", "fcntl は POSIX だけ")
     def test_full_fsync_is_tried_first_and_falls_back_to_fsync(self):
-        """F_FULLFSYNC（macOS）を先に試し、受け付けなければ os.fsync に落とす。"""
+        """F_FULLFSYNC（macOS）を先に試し、受け付けなければ os.fsync に切り替える。"""
         import fcntl
 
         full = getattr(fcntl, "F_FULLFSYNC", None) or 51
@@ -331,7 +334,7 @@ class WriteBytesAtomicTest(unittest.TestCase):
             self.assertEqual(fsio.write_bytes_atomic(self.path, b"y"), "")
         self.assertEqual(synced, [])
 
-        # 両方落ちれば書けなかったことにし、前の中身を残す。
+        # 両方失敗すれば書けなかったことにし、前の中身を残す。
         with (
             mock.patch.object(fcntl, "F_FULLFSYNC", full, create=True),
             mock.patch.object(fcntl, "fcntl", refuse),
@@ -413,7 +416,7 @@ class WriteBytesAtomicTest(unittest.TestCase):
         self.assertEqual(self._names(), ["i0001.md"])
 
     def test_put_back_restores_durably(self):
-        """戻すのも承認済みチケットと同じ書き方。素の書き方に戻されると落ちる。"""
+        """戻すのも承認済みチケットと同じ書き方。素の書き方に戻されると失敗する。"""
         self.assertEqual(fsio.write_bytes_atomic(self.path, b"new"), "")
         seen: list[str] = []
         real = fsio._replace_durably

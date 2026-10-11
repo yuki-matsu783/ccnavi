@@ -86,7 +86,7 @@ class NotARepository(Exception):
 
 
 class GitFailed(Exception):
-    """git への問い合わせに失敗した（git が無い・期限切れ・壊れたリポジトリ）。"""
+    """git への問い合わせに失敗した（git が無い・期限切れ・破損したリポジトリ）。"""
 
 
 class _TimeUp(Exception):
@@ -230,7 +230,7 @@ def front_matter(raw: bytes) -> dict | None:
         data = _jsonable(data)
         _check_json(data)  # 書けるかを試す（桁の多すぎる整数・深すぎる入れ子など）
         return data
-    except Exception:  # noqa: BLE001 - 壊れた frontmatter は null にして索引づくりを止めない
+    except Exception:  # noqa: BLE001 - 不正な frontmatter は null にして索引づくりを止めない
         return None
 
 
@@ -400,7 +400,7 @@ def _sweep_beside(parent: str) -> None:
 class _Writer:
     """index.jsonl を置き換える。一時ファイルはふだん git のディレクトリに作る。
 
-    `.git` が作業ツリーと別のファイルシステムにあると `os.replace` が EXDEV で落ちるので、
+    `.git` が作業ツリーと別のファイルシステムにあると `os.replace` が EXDEV で失敗するので、
     そのときは作業ツリーの同じディレクトリの下に `.ccnavi-tmp-*/index.jsonl` を作って置き換える。
     そのパスが git に無視されることを先に確かめ、`git status` を汚さない。
     """
@@ -438,7 +438,7 @@ class _Writer:
         if not ignored:
             raise OSError(f"一時ファイルの置き場 {probe} が git に無視されないので書かない")
         holder = os.path.join(parent, name)
-        os.mkdir(holder, 0o700)  # 在れば落ちる（排他）
+        os.mkdir(holder, 0o700)  # 在れば失敗する（排他）
         try:
             _write_atomic(index_path, text, os.path.join(holder, INDEX_NAME))
         finally:
@@ -537,7 +537,7 @@ def build(
                 deadline,
                 result,
             )
-        except Exception as exc:  # noqa: BLE001 - 1 つのディレクトリの壊れで全体を止めない
+        except Exception as exc:  # noqa: BLE001 - 1 つのディレクトリの破損で全体を止めない
             result.problems.append(f"{directory or ROOT_DIRECTORY}/ を読めない: {exc!r}")
             continue
         if scanned is not None:
@@ -547,7 +547,7 @@ def build(
     for one in dirs:
         try:
             _settle(one, refresh, writer, result)
-        except Exception as exc:  # noqa: BLE001 - 1 つのディレクトリの壊れで全体を止めない
+        except Exception as exc:  # noqa: BLE001 - 1 つのディレクトリの破損で全体を止めない
             result.problems.append(f"{one.directory or ROOT_DIRECTORY}/ を読めない: {exc!r}")
     result.rows.sort(key=lambda r: str(r.get("concept_id", "")))
     return result

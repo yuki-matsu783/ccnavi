@@ -19,8 +19,8 @@ subprocess.run と同じ形（引数のリスト、input、env、cwd）を受け
 - 判定の中で例外が出たら、そのまま伝える。プロセスなら終了コード 1 と traceback に
   なるところだが、テストでは例外として見えたほうが原因に近い
 
-`python -m ccnavi` の入口（標準入出力の付け替え、パッケージとしての起動）は
-test_entry.py が本物のプロセスで確かめる。
+`python -m ccnavi` の入口（標準入出力の切り替え、パッケージとしての起動）は
+test_entry.py が実際のプロセスで確かめる。
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ def run_ccnavi(
         if env is not None:
             # 走った機械の git の設定を締め出す分（tests.GIT_ENV）は、環境を空にしても
             # 残す。ccnavi は判定の中で git を起こす（src/ccnavi/infra/gitcmd.py）ので、ここで
-            # 落とすと、この経路だけがホストの `~/.gitconfig` を読み直す。
+            # 消すと、この経路だけがホストの `~/.gitconfig` を読み直す。
             # 呼び手が同じ名前を渡したときは呼び手を優先する。締め出し方そのものを
             # 試すテストが、ここでの締め出しに上書きされないようにするため。
             stack.enter_context(mock.patch.dict(os.environ, {**GIT_ENV, **env}, clear=True))

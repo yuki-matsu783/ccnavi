@@ -3,7 +3,7 @@
  * 拡張の `src/webview-asset.ts` が配るときに読むのと同じものを、テストからも読む。
  *
  * バンドルするのは `pnpm test` の中の `scripts/bundle-webview.js`。テストだけ先に走らせたときは
- * 「何を通せばよいか」を言って落ちる（バンドルが無いまま HTML を組むと、白い画面を見て悩むことになる）。
+ * 「何を通せばよいか」を言って失敗する（バンドルが無いまま HTML を組むと、白い画面を見て悩むことになる）。
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -58,7 +58,7 @@ export function flatStyle(html: string): string {
 
 /**
  * 画面の名前。`src/webview/<名前>/main.tsx` があるものが画面で、`scripts/bundle-webview.js` と
- * `scripts/test-groups.js` が同じ見つけ方をする。**テストも表で持たない**（表にすると、
+ * `scripts/test-groups.js` が同じ見つけ方をする。テストも表で持たない（表にすると、
  * 画面を足したときに気づかないうちに検査から漏れる）。
  */
 export function screenNames(): string[] {

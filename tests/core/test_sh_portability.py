@@ -1,10 +1,10 @@
 """配る sh が macOS の bash 3.2 でも読めることの検査。
 
-macOS の `sh` は bash 3.2 で、Linux や Git Bash の bash では通る書き方のうち 2 つで落ちる。
-どちらもロケールでは避けられない（片方は UTF-8 で、もう片方は C で落ちる）ので、書き方で避ける。
+macOS の `sh` は bash 3.2 で、Linux や Git Bash の bash では通る書き方のうち 2 つで失敗する。
+どちらもロケールでは避けられない（片方は UTF-8 で、もう片方は C で失敗する）ので、書き方で避ける。
 
 1. 変数のすぐ後ろに全角文字を続ける（`$bin（`）。UTF-8 のロケールでは全角の先頭バイトまで
-   名前に読み、`set -u` の下で「unbound variable」で落ちる。`${bin}（` と括る
+   名前に読み、`set -u` の下で「unbound variable」で失敗する。`${bin}（` と括る
 2. `$( )` の中に `case` を書く。C のロケールでは `)` を読み違え、ファイルを読む段で構文エラーに
    なる。`case` 文で変数に入れる
 
@@ -59,7 +59,7 @@ class ShPortabilityTest(unittest.TestCase):
         return hits
 
     def test_sh_files_are_found(self):
-        # 探し方が壊れて 1 本も見ないまま通る、を防ぐ。
+        # 探し方が誤っていて 1 本も見ないまま通る、を防ぐ。
         names = {os.path.basename(p) for p in shell_scripts()}
         self.assertIn("ccnavi-setup.sh", names)
         self.assertIn("ccnavi-git.sh", names)

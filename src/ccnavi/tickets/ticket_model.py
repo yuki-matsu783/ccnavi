@@ -133,7 +133,7 @@ WORKFLOW_DAG = "dag"
 @dataclass
 class Workflow:
     """全体計画の待ち方のコピー。`--agree` が計算して `<承認済みの置き場>/phases/<親>/workflow.yml`
-    に書く（設計 9.7）。前の版は親の承認済みチケットの `workflow:` 欄に書いていた。
+    に書く。前の版は親の承認済みチケットの `workflow:` 欄に書いていた。
 
     `waits` は全体計画の番号 → 待つ番号、`review_at` は延期した番号 → 引き受ける番号。
     判定はこのコピーだけを読み、`phases.yml` を読み直さない。
@@ -170,11 +170,11 @@ class Ticket:
     # のような既存のブランチで作業するために使う。承認画面に出し、承認のダイジェストに入る
     # （チケットの全文が入る）。
     branch: str = ""
-    # project は作業のプロジェクト（`projects/` の名前、設計 11.5）。決めるのは提案を
+    # project は作業のプロジェクト（`projects/` の名前）。決めるのは提案を
     # 置いた場所で、`ticket.scan` が入れる（プロジェクトの `wip/proposals/` ならその名前、
     # ワークツリーの中ならその元リポジトリ、ワークスペースの `wip/proposals/` なら空）。
     # 親も子も同じ置き場に並ぶので、継ぐ段は無い。判定は行き先のワークツリーの元リポジトリと
-    # 突き合わせる。
+    # 照合する。
     project: str = ""
     # declared_project は frontmatter にユーザが書いた `project:`。宣言ではなく照合に使う。
     # 置き場と違えば承認しない（approval_checks.project_problems）。`ticket.scan` を通さずに
@@ -182,7 +182,7 @@ class Ticket:
     declared_project: str = ""
     # plan は全体計画（作業のフェーズ定義のリスト）、feedback はフィードバック計画。
     # 親だけが持つ。feedback が None なのは「まだ計画していない」、[] は
-    # 「見たうえで対応なし」。設計 9.7。
+    # 「見たうえで対応なし」。
     plan: list[PlanItem] = field(default_factory=list)
     feedback: list[PlanItem] | None = None
     # workflow は全体計画の待ち方のコピー。親の承認済みチケットだけが持ち、書くのは `--agree`。
@@ -209,7 +209,7 @@ class Ticket:
     path: str = ""
     # 前の版の承認が書いた記録（`ccnavi_approved`）を持つ古い承認済みチケットにだけある。
     # いまの承認は書かないので、新しい承認済みチケットでは空。
-    # 承認を本物とするのは置き場（設計 9.2）。
+    # 承認を正とするのは置き場。
     approved_at: str = ""
     source_tree: str = ""
     source_path: str = ""
@@ -261,7 +261,7 @@ class Ticket:
         """この番号のフェーズのレビューが行われる番号。延期なら引き受ける番号。
 
         全体計画の番号はコピーした待ち方（`workflow`）で読む。フィードバック計画は一直線で、次にレビューが
-        ある番号。延期の先が無ければ None（計画が壊れている）。
+        ある番号。延期の先が無ければ None（計画が破損している）。
         """
         item = self.item_at(number)
         if self.workflow is not None and self.in_plan(number) and item is not None:

@@ -296,7 +296,7 @@ test("CX-T142 レビュー済みのフェーズに Chrome から重ねて書か�
   assert.equal(mock.commitCalls.length, 1);
 });
 
-test("CX-T143 見本の代役は、問い合わせが見本の欄を落としていれば答えない（欄を削っても試験が通らないように）", () => {
+test("CX-T143 見本の代役は、問い合わせが見本の欄を省いていれば答えない（欄を削っても試験が通らないように）", () => {
   const scene = loadScene("resolved");
   const full = "query { repository { pullRequest { reviewThreads { pageInfo { hasNextPage endCursor } nodes { id isResolved comments { nodes { url path line body createdAt } } } } } } }";
   const ask = (q: string) => sceneAnswer(scene, "POST", new URL("https://api.github.com/graphql"), JSON.stringify({ query: q, variables: { number: 42, after: null } }));

@@ -1,13 +1,13 @@
 /**
  * フェーズ定義の関係を図で見せる。点が定義、線が `requires` と `overlap` と `after`。
  *
- * **矢印を付けるのは `after` だけ。** `requires` は「一緒に置くべき」で、順序ではない（`phases-graph.ts` の頭）。
+ * 矢印を付けるのは `after` だけ。 `requires` は「一緒に置くべき」で、順序ではない（`phases-graph.ts` の頭）。
  * 見る場所が `none` でない定義は、点の縁を強めて「ユーザが見る」を示す（定義の宣言。計画の延期や
  * 実績のリスクで変わることは図の下の一言が言う）。
  * 図が判定をしないのも同じところに書いてある。ここは `graphOf` が組んだものを描くだけで、
  * 何が正しいかは言わない。
  *
- * **編集はしない。** 点をドラッグで動かせるが、動かした先は画面の state（`state.ts` の spots）に入るだけで、
+ * 編集はしない。 点をドラッグで動かせるが、動かした先は画面の state（`state.ts` の spots）に入るだけで、
  * `phases.yml` には書かない。ユーザが持つ設定に座標は入れない。関係そのものを直すのは一覧のほう。
  *
  * 点を押すと一覧へ戻り、その定義の行が開く（`onPick`）。
@@ -41,7 +41,7 @@ const SIDES: readonly { readonly side: Side; readonly position: Position }[] = [
 
 /**
  * 点の見た目。`Handle` は線の端を留めるためだけに置き、目には見せない（`Graph.css`）。
- * React Flow が端を要るから置くのであって、**上下左右に意味は無い**。どの辺を使うかは
+ * React Flow が端を要るから置くのであって、上下左右に意味は無い。どの辺を使うかは
  * 相手の点との位置で決める（`routeOf`）。4 辺それぞれに、出る端と入る端を置いておく。
  */
 function PhaseNodeView({ id, data }: NodeProps<PhaseNode>): JSX.Element {
@@ -145,7 +145,7 @@ function boxesKey(state: { nodeLookup: Map<string, { internals: { positionAbsolu
 }
 
 /**
- * work と feedback の枠と、その間の「レビュー後」の矢印。**点の上に重ねて描く**（`ViewportPortal`
+ * work と feedback の枠と、その間の「レビュー後」の矢印。点の上に重ねて描く（`ViewportPortal`
  * は点より手前に来る）ので、枠は縁だけにして中を塗らず、押す操作も受けない（`Graph.css`）。
  *
  * 矢印は定義どうしの関係ではなく、区分の順（全体計画を終えてレビューを受けたあとに feedback の
@@ -221,7 +221,7 @@ function nodesOf(graph: PhasesGraph, spots: Spots): PhaseNode[] {
  *
  * `after` は向きを持つ（待たれる側 a → 待つ側 b）。引き方の都合で出る点が b になったときは、
  * 矢印を始点の側に付ける（React Flow のマーカーは始点では向きが反転するので、b を指す）。
- * 向きの無い線には端のマーカーを付けない。**線にラベルも付けない**（同じ組の 2 本はラベルどうしが
+ * 向きの無い線には端のマーカーを付けない。線にラベルも付けない（同じ組の 2 本はラベルどうしが
  * 重なって片方が読めなくなる）。線の読み方は図の下の凡例（`Legend`）が言う。
  */
 function edgesOf(graph: PhasesGraph, at: ReadonlyMap<string, { x: number; y: number }>): RelationEdge[] {
@@ -245,7 +245,7 @@ function edgesOf(graph: PhasesGraph, at: ReadonlyMap<string, { x: number; y: num
 }
 
 /**
- * 図の下の凡例。線の見本を並べる。**文で読み方を説明しない**（前は 6 文の一言で、要る注意が埋もれていた）。
+ * 図の下の凡例。線の見本を並べる。文で読み方を説明しない（前は 6 文の一言で、要る注意が埋もれていた）。
  * 色と線の形は `Graph.css` の `.rel-*` と同じものを使う。
  */
 export function Legend(): JSX.Element {
@@ -284,7 +284,7 @@ export function Graph({ graph, onPick }: { readonly graph: PhasesGraph; readonly
   const edges = useMemo(() => edgesOf(graph, new Map(nodes.map((node) => [node.id, node.position]))), [graph, nodes]);
 
   /**
-   * 位置の記録の書き込みは、**state を更新する関数の中でやらない**。更新関数は呼ばれる回数を
+   * 位置の記録の書き込みは、state を更新する関数の中でやらない。更新関数は呼ばれる回数を
    * 約束しない（StrictMode や並行描画で 2 度呼ばれる）ので、そこに外への書き込みを置くと
    * 二重に書く。`spots` が変わったあとに 1 度だけ書く。
    */
@@ -298,7 +298,7 @@ export function Graph({ graph, onPick }: { readonly graph: PhasesGraph; readonly
     saveSpots(spots);
   }, [spots]);
 
-  // 図に出なくなった定義の位置は state から落とす（id を打ち替えるたびに溜まるため）
+  // 図に出なくなった定義の位置は state から除く（id を打ち替えるたびに溜まるため）
   const known = useRef<string>("");
   useEffect(() => {
     const ids = graph.nodes.map((node) => node.id).join("\u0000");

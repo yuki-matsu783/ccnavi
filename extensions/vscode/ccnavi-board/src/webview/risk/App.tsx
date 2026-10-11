@@ -4,7 +4,7 @@
  * 見せる中身は拡張ホストが渡す（`RiskData`）。画面が持つのは、ユーザが触って決めるもの
  * （編集中の配点、開いている行、絞り込み、直前の操作の一言）だけ。点は数えず、ファイルも書かない。
  *
- * **中身（`data`）が届いたら、編集中の配点はその中身で置き換える。** 届くのは編集を捨ててよい
+ * 中身（`data`）が届いたら、編集中の配点はその中身で置き換える。 届くのは編集を捨ててよい
  * ときだけ（ユーザが「再読込」を押した、保存や作成が通った）で、ファイルが外で変わっただけのときは
  * 帯（`changed`）が出るだけ。
  */
@@ -22,7 +22,7 @@ import { post } from "./post.js";
 import { countText, findText } from "./text.js";
 import { draftOf, emptyFactor, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
-/** 中身が読めなかったときの錠。画面は保存させない（押せる形で出して落とさない） */
+/** 中身が読めなかったときの錠。画面は保存させない（押せる形で出して異常終了させない） */
 const NO_LOCK: Lock = { locked: true, reason: "", doing: [] };
 
 const EMPTY_DRAFT: Draft = { levels: { medium: "", high: "", critical: "" }, rows: [] };
@@ -132,7 +132,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   }, [focusKey]);
 
   /**
-   * 読み直しを頼む。**押した時点で欄を止める。** 拡張ホストは実行ファイルに聞いてから中身を返す
+   * 読み直しを頼む。押した時点で欄を止める。 拡張ホストは実行ファイルに聞いてから中身を返す
    * ことがあり（設定ファイルの場所を解く）、その間に打った内容は、届いた中身で気づかないうちに消えるため。
    * ユーザが「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
    */

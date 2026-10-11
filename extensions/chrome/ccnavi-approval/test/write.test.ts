@@ -214,7 +214,7 @@ test("CX-T107 取り下げ: 承認が merge で入った（親が 2 つのコミ
   assert.equal(mock.commitCalls.length, 0);
 });
 
-test("CX-T108 書けたのに応答だけが落ちたら、先頭が書いたとおりか確かめて書けたとする（2 度書かない）", async () => {
+test("CX-T108 書けたのに応答だけが返らなかったら、先頭が書いたとおりか確かめて書けたとする（2 度書かない）", async () => {
   const { mock, d } = world();
   mock.loseCommitResponse = true;
   const out = await approveFamily(REPO, "i0001", shownOf(await board(d), "i0001"), d);

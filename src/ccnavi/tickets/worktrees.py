@@ -8,14 +8,14 @@
 （`review/`）の子（指摘を直す場所。`confirm` が `done/` へ動かした後に消える）のもの。
 `decide`・`chat`・Chrome のレビュー済みで `done/` へ動いた子のものは、その場では消さず、
 次にその親子で `finish` か `cancel` が打たれるまで残る。判断の要らない片付けを、エージェントへの
-案内（`ccnavi-clean.sh` → `worktree remove`）で済ませず、ccnavi の側に寄せる。呼ぶのは sh で、
+案内（`ccnavi-clean.sh` → `worktree remove`）で済ませず、ccnavi の側に移す。呼ぶのは sh で、
 状態を書く操作が済んでから呼ぶ。
 
 - `confirm` が子を `done/` へ動かした後（`ccnavi-review.sh confirm`）: そのフェーズの子（延期を
   引き受けた分を含む）のワークツリー
 - `finish`・`cancel` の後（`ccnavi-ticket.sh`）: その親子の閉じた（`done/` の）子の
   ワークツリーを全部。子の finish・cancel でも、その子に限らず同じ親子の閉じた子を
-  まとめて片付ける。親の finish では取りこぼしを拾う安全網になる
+  まとめて片付ける。親の finish では取りこぼしを拾う備えになる
 - `ready` が Draft を外した後（`ccnavi-review.sh ready`）: 親のワークツリー。外から
   `ready --parent <親>` で打てば消える
 
@@ -64,7 +64,7 @@ CWD_INSIDE = "cwd"
 DIRTY = "dirty"
 REFUSED = "refused"
 # git に無視されたファイル（生成物を除く）がある。`git worktree remove` は無視されたファイルごと
-# 消すので、.env などを黙って消さないよう止める（直下の scratchpad/ の下書きは消えてよい）。
+# 消すので、.env などを知らないうちに消さないよう止める（直下の scratchpad/ の下書きは消えてよい）。
 IGNORED = "ignored"
 
 # 未コミットの変更を名指しする行の上限。
@@ -275,7 +275,7 @@ def run_tidy(
 def _ignored(top: str) -> tuple[list[str], str]:
     """git が無視しているもの（生成物を除く）。2 つめは読めなかった理由。
 
-    `--directory` で、丸ごと無視されたディレクトリは 1 行（末尾の `/`）にまとめる。生成物
+    `--directory` で、全体が無視されたディレクトリは 1 行（末尾の `/`）にまとめる。生成物
     （`ccnavi-clean.js` と同じ名前。`out` は package.json の隣だけ）は消してよいので数えない。
     ワークツリーの直下の `scratchpad/`（下書きと使い捨ての置き場。docs/claude/scratchpad.md）も、
     ワークツリーごと消えてよい置き場なので数えない。直下でないもの（`docs/scratchpad/`）と、

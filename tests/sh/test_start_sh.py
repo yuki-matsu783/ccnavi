@@ -5,14 +5,14 @@ origin の URL は GitHub / GitLab の形のままにする。PATH の先頭に�
 fetch / push のときだけ bare リポジトリへ向ける
 （`git remote get-url` が書き換えた URL を返すと、ホストを見分けられないため）。
 ホストは PATH の先頭の `curl` の代役が答える（tests/sh/test_branches_sh.py と同じ作り）。
-gh / glab は使えない代役にして、curl とトークンの経路に落とす。代役は POST の本文も記録する。
+gh / glab は使えない代役にして、curl とトークンの経路に切り替える。代役は POST の本文も記録する。
 
 見るのは次のとおり。
 
 1. 候補 0 件（新規作成）・1 件（続ける）・複数（一覧を出して終了コード 3）
 2. ホストを見られないとき（GitHub は MCP の案内と終了コード 4、手元の候補が 1 件なら続ける）
 3. フォークの MR、`/` を含むブランチ、--dry-run
-4. 途中で落ちて打ち直したときに、重複を作らず続きから進むこと
+4. 途中で失敗して打ち直したときに、重複を作らず続きから進むこと
 5. GitLab の経路
 """
 
@@ -332,7 +332,7 @@ class StartShTest(unittest.TestCase):
         self.assertTrue(os.path.isdir(self.wt("fix-152-other")))
 
     def test_title_unreadable_prints_issue_read_guidance(self):
-        # API が落ちた（500）。ホストには届いていないので MCP の案内と終了コード 4
+        # API が失敗した（500）。ホストには届いていないので MCP の案内と終了コード 4
         self.route({PULLS: [200, []], f"GET {GITHUB}/issues/152": [500, {"message": "boom"}]})
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
@@ -390,7 +390,7 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertEqual(self.fields(again.stdout)["MR"], "https://github.com/acme/widgets/pull/7")
         self.assertEqual(git(self.ws, "rev-list", "--count", f"origin/main..{BRANCH}"), "1")
-        # POST は落ちた 1 回と、打ち直しの 1 回だけ（重複して作っていない）
+        # POST は失敗した 1 回と、打ち直しの 1 回だけ（重複して作っていない）
         self.assertEqual(len(self.posts()), 2)
 
     def guided_args(self, out, marker):

@@ -68,7 +68,7 @@ function moveTo(board: ReturnType<typeof buildBoard>, ticket: string, to: string
   };
 }
 
-/** 見本のボードから `ticket` を 1 枚落とした形 */
+/** 見本のボードから `ticket` を 1 枚除いた形 */
 function without(board: ReturnType<typeof buildBoard>, ticket: string): ReturnType<typeof buildBoard> {
   return {
     ...board,
@@ -92,7 +92,7 @@ test("CB-T192c 1 枚目は動いた表示を付けず、列が動かない読み
   assert.deepEqual(approved.moved, [{ id: "i0001-02-03", from: "todo", to: "doing" }]);
 
   // 同じ列のまま渡し直された（承認のオーバーレイの出し入れ、何も変わらなかった「更新」）。
-  // **ここで作り直すと、承認の文を閉じた時点で動いた表示が消える**
+  // ここで作り直すと、承認の文を閉じた時点で動いた表示が消える
   const again = movedStep(approved, moveTo(board, "i0001-02-03", "doing"));
   assert.equal(again, approved, "何も変わらないなら、同じ状態をそのまま返す");
   assert.deepEqual(again.moved, [{ id: "i0001-02-03", from: "todo", to: "doing" }]);
@@ -110,7 +110,7 @@ test("CB-T192d カードが消えただけの読み直しも「変わった」�
   const board = buildBoard(fixture());
   const first = movedStep(NOTHING_MOVED, board);
 
-  // 消えたカードには動いた表示を付けられないので `moved` は空。**それでも置き場所は更新する**。
+  // 消えたカードには動いた表示を付けられないので `moved` は空。それでも置き場所は更新する。
   // ここを「動いた分が 0 件なら据え置き」にすると、戻ってきたカードが「新規起票」にならない
   const gone = movedStep(first, without(board, "i0001-02-03"));
   assert.deepEqual(gone.moved, []);

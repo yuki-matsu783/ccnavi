@@ -368,7 +368,7 @@ class ReadyArchivesTest(ReadyHarness):
 
 
 class ReviewFindingsTest(ReadyHarness):
-    """レビューで挙がった指摘の再現（直す前は落ちる）。"""
+    """レビューで挙がった指摘の再現（直す前は失敗する）。"""
 
     def test_1_a_stale_doing_copy_in_a_child_tree_does_not_come_back(self):
         fixture = self.closable()
@@ -530,7 +530,7 @@ class ArchivedStandingTest(ChecksHarness):
 
 
 class SecondReviewTest(ReadyHarness):
-    """2 回目のレビューの指摘の再現（直す前は落ちる）。"""
+    """2 回目のレビューの指摘の再現（直す前は失敗する）。"""
 
     def test_2_a_mark_of_a_finished_ready_does_not_carry_a_later_removal(self):
         fixture = self.closable()
@@ -663,7 +663,7 @@ class SecondReviewChecksTest(ChecksHarness):
 class ReusedIdentifierTest(ChecksHarness):
     """退避と同じ識別子の未着手のチケット。
 
-    子のワークツリーの写しは落とし、親のツリーのものは残して止める。
+    子のワークツリーの写しは除き、親のツリーのものは残して止める。
     """
 
     def found(self, text, tree):

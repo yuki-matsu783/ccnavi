@@ -69,7 +69,7 @@ class ApproveJsonTest(PhaseHarness):
         # 定義の範囲を超える子。超過は承認を拒まないので一覧に載り、overflow[] を持つ
         # （設計 approve-carry 3.3）。
         self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ("wip/design/*",)))
-        # 計画に無い番号の子。形が壊れているので、承認の対象にしない側に載る。
+        # 計画に無い番号の子。形が不正なので、承認の対象にしない側に載る。
         self.propose("i0001-05-05", child_text("i0001-05-05", "i0001", 5, ("wip/research/*",)))
         # frontmatter の読めない提案。読めない提案の側に載る。
         write(os.path.join(self.parent_tree, "wip", "proposals", "todo", "broken.md"), "---\n: :\n")
@@ -101,7 +101,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertIn("== i0001-01-01", body["text"])
         self.assertIn("== i0001-01-02", body["text"])
         self.assertIn("編集対象としているが", body["text"])
-        # rejected[] に残るのは形の壊れた子だけ。
+        # rejected[] に残るのは形の不正な子だけ。
         self.assertEqual([r["ticket"] for r in body["rejected"]], ["i0001-05-05"])
         self.assertTrue(any("計画に無い" in p for p in body["rejected"][0]["problems"]))
         self.assertTrue(any("broken.md" in p for p in body["problems"]))

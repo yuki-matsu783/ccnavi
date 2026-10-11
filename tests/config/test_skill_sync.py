@@ -1,4 +1,4 @@
-"""着手の前に共通の概念スキルをプロジェクトの `skills/` へ写す（設計 11.13）。
+"""着手の前に共通の概念スキルをプロジェクトの `skills/` へ写す。
 
 fixture は tests/config/test_config_sync.py と同じ ConfigUnionHarness を使う。ワークスペースの
 `.claude/skills/` に概念スキル（`concept: true`）と、そうでないスキルを置く。
