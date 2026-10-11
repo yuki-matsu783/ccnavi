@@ -202,6 +202,11 @@ def decide_before(
     # 誰がやっても止める。チケット制御が有効なときだけ足す。
     if conf.tickets_enabled:
         rule_set.deny.extend(ticket_guard.guard_rules(conf.tickets, root))
+        # 生の git を止め、入口を git のラッパー 1 本に寄せる。チケット制御の可否の一部は
+        # ラッパーの中にあり、外から打てれば外れる。ルールファイルが読めない間も足す
+        # （`ticket_guard.raw_git_rule`）。
+        if ticket_guard.raw_git_applies(conf, root):
+            rule_set.deny.append(ticket_guard.raw_git_rule(root))
         # ユーザの判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:

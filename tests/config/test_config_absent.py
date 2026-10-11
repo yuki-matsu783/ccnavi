@@ -175,6 +175,105 @@ class AbsentRulesTest(ConfigUnionHarness):
         self.assertNotIn("読めない: ", out.split("■ rules 自身のレイヤー")[0])
 
 
+GIT = "git"
+# 組み込みの deny が表記違いでも止める形と、止めない形。
+BUILTIN_DENIED = (
+    (f"{GIT} -C . push", "builtin-git-push"),
+    (f"{GIT} --no-pager push", "builtin-git-push"),
+    (f"{GIT} --git-dir=.git push", "builtin-git-push"),
+    (f"{GIT} --git-dir .git push origin main", "builtin-git-push"),
+    (f"{GIT} -c x=y reset --hard", "builtin-git-reset-hard"),
+    (f"{GIT} reset -q --hard HEAD~1", "builtin-git-reset-hard"),
+    ("rm -fr x", "builtin-recursive-delete"),
+    ("rm -r -f x", "builtin-recursive-delete"),
+    ("rm -f -r x", "builtin-recursive-delete"),
+    ("rm --recursive --force x", "builtin-recursive-delete"),
+    ("rm -Rfv x", "builtin-recursive-delete"),
+    ("rm -r x -f", "builtin-recursive-delete"),
+)
+BUILTIN_PASSED = (
+    "legit push",
+    "rm -r x",
+    "rm -f x",
+    "rm -f file-r",
+    f"{GIT} commit -m push",
+    f"{GIT} reset --soft HEAD~1",
+)
+TICKET_CONTROL = "CCNAVI_TICKET_CONTROL"
+RAW_GIT_BUILTIN = "builtin-ticket-raw-git"
+
+
+class BuiltinFormsTest(ConfigUnionHarness):
+    """組み込みの deny（土台）は、glob の文字列一致で外れていた表記違いも止める。
+
+    git のグローバルオプションを挟んだ形、rm の再帰と強制の組み合わせ・順序・長い形。
+    片方だけの rm や、`git` を含む別の語は止めない。共通レイヤーが無いときと、壊れて組み込みの
+    既定に戻ったときの両方で見る（hook と同じ経路）。
+    """
+
+    def check(self):
+        for command, rule in BUILTIN_DENIED:
+            with self.subTest(command=command):
+                self.assert_denied(self.hook("Bash", self.ws, command=command), rule)
+        for command in BUILTIN_PASSED:
+            with self.subTest(command=command):
+                result = self.hook("Bash", self.ws, command=command)
+                self.assertNotEqual(self.decision(result), "deny", result.stdout)
+
+    def test_without_the_common_layer(self):
+        os.remove(self.rules)
+        self.check()
+
+    def test_with_a_broken_common_layer(self):
+        write(self.rules, BROKEN)
+        self.check()
+
+
+class BuiltinRawGitTest(ConfigUnionHarness):
+    """チケット制御が有効で git のラッパーがあれば、生の git を組み込みで止め、ラッパーへ誘導する。
+
+    共通レイヤーの有無にも、壊れて組み込みの既定に戻ったときにも依らない。チケット制御が無効なときと、
+    ラッパーが無いワークスペースでは足さない。
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh")
+        write(self.script, "exit 0\n")
+
+    def assert_raw_git_denied(self, **options):
+        result = self.hook("Bash", self.ws, command=f"{GIT} status", **options)
+        self.assert_denied(result, RAW_GIT_BUILTIN)
+        self.assertIn(".ccnavi/scripts/ccnavi-git.sh", self.reason(result))
+        self.assertIn("<サブコマンド>", self.reason(result))
+        # 誘導先のラッパーは止めない。
+        wrapper = self.hook("Bash", self.ws, command=f"sh {self.script} status", **options)
+        self.assertNotIn(RAW_GIT_BUILTIN, self.last_record().get("rules", []), wrapper.stdout)
+        legit = self.hook("Bash", self.ws, command="legit push", **options)
+        self.assertNotEqual(self.decision(legit), "deny", legit.stdout)
+
+    def test_without_the_common_layer(self):
+        os.remove(self.rules)
+        self.assert_raw_git_denied()
+
+    def test_with_a_broken_common_layer(self):
+        """ルールファイルが読めない間も止める。直す道はラッパーの add / restore --ours が残す。"""
+        write(self.rules, BROKEN)
+        self.assert_raw_git_denied()
+        self.assertEqual(self.last_record()["fallback"], "builtin-rules")
+
+    def test_not_added_when_ticket_control_is_disabled(self):
+        os.remove(self.rules)
+        self.hook("Bash", self.ws, command=f"{GIT} status", env={TICKET_CONTROL: "disable"})
+        self.assertNotIn(RAW_GIT_BUILTIN, self.last_record().get("rules", []))
+
+    def test_not_added_without_the_wrapper(self):
+        os.remove(self.rules)
+        os.remove(self.script)
+        self.hook("Bash", self.ws, command=f"{GIT} status")
+        self.assertNotIn(RAW_GIT_BUILTIN, self.last_record().get("rules", []))
+
+
 class AbsentRiskTest(ConfigUnionHarness):
     def definition(self, project="lib"):
         conf, _ = settings.load(self.ws)
