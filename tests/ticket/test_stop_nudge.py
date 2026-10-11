@@ -65,9 +65,13 @@ class StopNudgeTest(TicketTest):
         git(tree, "commit", "--quiet", "-m", "work")
 
     def assert_quiet(self, result):
-        """促していない。止める鍵も、促しの文も無い。"""
-        body = self.body(result)
-        self.assertNotIn("decision", body)
+        """`finish` を促していない。
+
+        作業中の子が残る形では、依頼までの道の促し（NUDGE_TICKET_REQUEST。
+        test_stop_request_nudge.py が固定する）が別に止めうるので、
+        ここでは `finish` の促しだけを見る。
+        """
+        self.body(result)
         self.assertNotIn(CODE, result.stdout)
 
     # ---- 促す
@@ -259,7 +263,12 @@ class StopNudgeTest(TicketTest):
         first = self.body(self.stop(tree))
         self.assertIn(CODE, first.get("reason", ""))
         self.assertNotIn("NUDGE_STOP_RULE", first.get("reason", ""))
-        # finish の促しは同じ HEAD では 1 回だけ。ここからルールを数える（1 回目は止めない）。
+        # finish の促しは同じ HEAD では 1 回だけ。作業中の子が残るので、次の回は依頼までの道の
+        # 促しが 1 回止める（これもルールを数えない）。
+        second = self.body(self.stop(tree))
+        self.assertIn("NUDGE_TICKET_REQUEST", second.get("reason", ""))
+        self.assertNotIn("NUDGE_STOP_RULE", second.get("reason", ""))
+        # ここからルールを数える（1 回目は止めない）。
         self.assert_quiet(self.stop(tree))
         third = self.body(self.stop(tree))
         self.assertEqual(third.get("decision"), "block")
