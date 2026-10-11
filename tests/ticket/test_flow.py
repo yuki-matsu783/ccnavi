@@ -29,7 +29,7 @@ from unittest import mock
 
 import yaml
 
-from ccnavi.infra import settings
+from ccnavi.infra import settings, yamlread
 from ccnavi.tickets import flow, flow_render, flow_shape, flow_text, ticket, ticket_model
 from tests import requires_symlink
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
@@ -407,6 +407,19 @@ class FlowRenderTest(unittest.TestCase):
         data, why = flow.load(self.file("nodes: &n\n  - {id: s, type: start}\n"))
         self.assertEqual(why, "")
         self.assertEqual(data["nodes"], [{"id": "s", "type": "start"}])
+
+    def test_aliases_are_refused_on_every_reader_path(self):
+        """別名は、C の読み手・純 Python の読み手・C から純 Python に回る文書のどれでも読まない。"""
+        text = "base: &b {type: prompt}\nnodes:\n  - {<<: *b, id: s}\n"
+        tabbed = 'x: "a\tb"\n' + text  # タブがあると C から純 Python に回る
+        for label, loader, doc in (
+            ("default", yamlread.LOADER, text),
+            ("pure", yaml.SafeLoader, text),
+            ("falls back", yamlread.LOADER, tabbed),
+        ):
+            with self.subTest(label), mock.patch.object(yamlread, "LOADER", loader):
+                data, why = flow.parse(doc.encode("utf-8"))
+                self.assertEqual((data, why), (None, flow.ALIASED))
 
     def test_broken_yaml_is_one_line_with_the_place(self):
         for text in ("nodes:\n  - id: s\n    type: [start\n", "nodes: [\n", "a: b: c\n", "x\x00y"):

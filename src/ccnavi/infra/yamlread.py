@@ -144,8 +144,11 @@ _OPEN = (yaml.SequenceStartEvent, yaml.MappingStartEvent)
 _CLOSE = (yaml.SequenceEndEvent, yaml.MappingEndEvent)
 
 
-def _c_ok(text: str, loader: type) -> bool:
+def _c_ok(text: str, loader: type, on_alias: type[Exception] | None = None) -> bool:
     """C の読み手で組み立ててよいか。構文の誤りはここで `yaml.YAMLError` として上がる。
+
+    `on_alias` を渡すと、別名（`*名前`）のイベントが出た時点でその例外を上げる
+    （組み立てる前に断る）。
 
     入れ子が `DEPTH_LIMIT` 段を超えるか、フローのコレクションの中にクォートしない値で `?` を
     含むものがあれば偽（純 Python に回す）。クォートしない値の style は、C のパーサでは `''`、
@@ -154,6 +157,8 @@ def _c_ok(text: str, loader: type) -> bool:
     flows: list[bool] = []  # 開いているコレクションごとに、フローか
     in_flow = 0
     for event in yaml.parse(text, Loader=loader):  # noqa: S506  イベントを流すだけで値は作らない
+        if on_alias is not None and isinstance(event, yaml.AliasEvent):
+            raise on_alias("別名")
         if isinstance(event, _OPEN):
             flow = bool(event.flow_style)
             flows.append(flow)
@@ -192,17 +197,30 @@ def load(text: str, loader: type) -> object:
         raise LoadError(f"値を組み立てられない ({type(exc).__name__}: {exc})") from exc
 
 
-def safe_load(text: str, loader: type | None = None) -> object:
+def safe_load(
+    text: str,
+    loader: type | None = None,
+    *,
+    pure: type = yaml.SafeLoader,
+    on_alias: type[Exception] | None = None,
+) -> object:
     """`yaml.safe_load(text)` と同じものを返す。読み手は `LOADER`（C があれば C）。
 
     読めない文書は、構文の誤りも組み立ての途中の失敗も `yaml.YAMLError`（の子）で上げる。
     `loader` はテストが読み手を差し替えるためのもの。渡すのは `CSafeLoader` か `SafeLoader` に限る。
+
+    `pure` は純 Python に回すときの読み手（既定は `SafeLoader`）。別名を拒む子を渡せる。
+    C の読み手は組み立てに割り込めないので、別名は `on_alias`（`yaml.YAMLError` の子）を渡すと、
+    イベントを流す段（`_c_ok`）で断る。`pure` が別名を拒むなら、C で読む経路と純 Python で読む
+    経路のどちらでも別名は読まれない。
     """
     loader = loader or LOADER
-    if loader is not yaml.SafeLoader:
+    if loader is yaml.SafeLoader:
+        loader = pure
+    else:
         try:
-            if _SPLIT.search(text) or not _c_ok(text, loader):
-                loader = yaml.SafeLoader
+            if _SPLIT.search(text) or not _c_ok(text, loader, on_alias):
+                loader = pure
         except yaml.YAMLError:
             raise
         except _WRAPPED as exc:  # 孤立したサロゲートで C のパーサが UnicodeEncodeError を出すなど
