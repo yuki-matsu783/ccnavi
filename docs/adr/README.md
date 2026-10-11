@@ -131,6 +131,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0072](0072-turn-report-sees-commits.md) | コミットに入った変更を見るのは、ターンの終わりの報告だけ |
 | [0075](0075-post-monitor-tells-its-own-writes-by-shape.md) | 実行後チェックは、自分の副命令の書き込みを正規化した内容で見分ける |
 | [0077](0077-judging-lives-in-the-hook-not-the-sh.md) | 止める・通すの判定は hook が持ち、sh の検査は 2 重目にする |
+| [0115](0115-detect-and-guide-over-front-loading.md) | 決まりを先に詰め込まず、危険と失敗を起きた時点で検知して案内する |
 
 ### チケット制御
 
