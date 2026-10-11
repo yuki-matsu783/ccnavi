@@ -314,6 +314,11 @@ allow:
     subject: "cd /repo && sh .ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/x -b x"
     why: このプロジェクトの作業手順。コマンド列の途中でも通る
   - tool: Bash
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/y -b y main"
+    why: >-
+      通す。ccnavi-git-worktree-add が、先に fetch して遅れを確かめる案内をセッションに一度だけ添える
+      （止めない。遅れの判定で止めるのは ccnavi-git.sh の中。hook は git もネットワークも起こさない）
+  - tool: Bash
     subject: "grep -n TODO src/ccnavi/cli.py"
     why: 読むだけ。prefer-read-grep が当てて通す
   - tool: Bash

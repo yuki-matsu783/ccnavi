@@ -36,6 +36,10 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
   階層は1段だけにして、その下にさらに階層を作らない
 - `ccnavi-git.sh worktree add <行き先> -b <名前> <統合先>`で作る。末尾の`<統合先>`を省くと今いるブランチが起点になるため、
   `<統合先>`が`main`のときも省かずに書く
+- 切る前に`ccnavi-git.sh fetch origin <統合先>`し、`ccnavi-git.sh log --oneline <統合先>..origin/<統合先>`で遅れを確かめる。
+  遅れていれば、統合先のワークツリーで`ccnavi-git.sh merge --ff-only origin/<統合先>`してから切る（基点を`origin/<統合先>`にしてもよい）。
+  基点が`<統合先>`か`origin/<統合先>`のとき、`worktree add`は最後のfetchが10分より前、または手元の統合先がoriginより遅れていると拒否する。
+  fetchを試して失敗した記録が10分以内にあるとき（オフライン）は、警告だけで通す
 - `<行き先>`はcwdからの相対パスとして解釈される。ワークスペースルートからなら`.claude/worktrees/<名前>`、
   `projects/<名前>`の中からなら`../../.claude/worktrees/<名前>`と書く。間違えるとコマンドは拒否され、cwdに合わせた正しいパスが表示される
 - `worktree add`に渡せるオプションは決まっている（`-b` `--reason` `--track`など）。

@@ -236,6 +236,17 @@ allow:
     match: Bash
     glob: "*ccnavi-git.sh*"
 
+  # ワークツリーを切る前に、統合先が古くないかを確かめさせる。止めない案内で、止める 2 重目の確認は
+  # ccnavi-git.sh の worktree add の中にある（hook は git もネットワークも起こさないので、遅れの判定はそこ）。
+  - id: ccnavi-git-worktree-add
+    match: Bash
+    regex: 'ccnavi-git\.sh\s+worktree\s+add(\s|$)'
+    additionalContextOnce: >-
+      ワークツリーを切る前に、先に 'sh {root}/.ccnavi/scripts/ccnavi-git.sh fetch origin <統合先>' を打ち、
+      'sh {root}/.ccnavi/scripts/ccnavi-git.sh log --oneline <統合先>..origin/<統合先>' で遅れを確かめてください。
+      遅れていれば、手元の統合先を進めてから（統合先のワークツリーで 'merge --ff-only origin/<統合先>'）切ります。
+      手順は docs/claude/worktree.md の「ワークツリーの作り方」にあります。
+
   # ファイルを読むだけの cat と grep。止めずに通して、Read / Grep ツールのほうを
   # 一度だけ勧める。読む手段を取り上げるのが目的ではないので deny でも ask でもない。
   # コマンドの名前も区別しない（大文字小文字だけが違う名前には同じ判定を返す）。区別しない機械では
