@@ -1,4 +1,4 @@
-"""保護済みの sh（`.ccnavi/scripts/ccnavi-*.sh`）を呼ぶ形のうち、実行前に止めるもの 2 つ。
+"""保護済みの sh（`.ccnavi/scripts/ccnavi-*.sh`）を呼ぶ形のうち、実行前に止めるもの 3 つ。
 
 1. sh の検査の材料を変える環境変数を、同じコマンド行で置く形。sh はワークスペースルート・
    実行ファイルを環境変数から読む（`ccnavi-common.sh` とその部品の
@@ -12,8 +12,14 @@
    チケットの探し方を sh の中にコピーして持つので、
    コピーが食い違うと気づかないうちに外れる（#120）。止める場所を hook に置き、
    sh の検査は 2 重目として残す。
+3. `ccnavi-git.sh` の `rm`・`mv`・`restore --source`・`checkout <ref> <パス>` で、自己防衛の対象
+   （hook の登録・設定・保護済みのスクリプト・実行ファイル・記録）を消す・別のコミットの
+   中身に戻す形。
+   シェルの `rm` と Write / Edit は自己防衛の組み込みが止めるが、ラッパーを通すと `git rm` が
+   同じファイルを消せた。ラッパー自身を消すと、生の git の組み込みの止め（ラッパーがあるときだけ
+   足す）も外れる。sh も同じ場所の検査を 2 重目として持つ。
 
-どちらも組み込み。ルールを空にされても消えないように、保護の根拠を守られる対象の外に置く。
+どれも組み込み。ルールを空にされても消えないように、保護の根拠を守られる対象の外に置く。
 
 止める広さは sh の検査に合わせる。登録されていない `.claude/worktrees/<名前>` も、閉じた子
 （`done/`）も、レビュー待ちの子（`review/`）も、YAML として読めない承認済みチケットも、
@@ -27,12 +33,15 @@ import os
 import re
 
 from ..infra import settings, shellread, shellread_words, tree
+from ..policy import selfguard_shell
 from ..tickets import ticket_model
 
 CODE_ENV = "DENY_SCRIPT_ENV_OVERRIDE"
 CODE_CHILD_PUSH = "DENY_CHILD_PUSH"
+CODE_CORE_PATH = "DENY_WRAPPER_CORE_PATH"
 ENV_RULE_ID = "builtin-script-env"
 CHILD_PUSH_RULE_ID = "builtin-child-push"
+CORE_PATH_RULE_ID = "builtin-guard-wrapper-paths"
 
 # 保護済みの sh の名前。置き場は `.ccnavi/scripts/` に固定だが、呼び出しの綴りは
 # 絶対パス・相対パス・ワークツリーの中の写しとまちまちなので、パスではなく名前で見る。
@@ -116,6 +125,205 @@ def check_child_push(
         if parent:
             return name, parent, found
     return "", "", ""
+
+
+# ラッパーの副命令のうち、行き先のファイルを消す・別のコミットの中身に戻すもの。
+# `restore` は `--source` を付けた形だけ（付けない形は索引の中身に戻すだけで、衝突を解く
+# `--ours` / `--theirs` もこちら）。`checkout` は 2 つ目からの語がパス（`checkout <ref> <パス>`）。
+# `mv` はラッパーが通さないが、通すようになっても同じ場所を守るよう数えておく。
+_CORE_SUBS = frozenset({"rm", "mv", "restore", "checkout"})
+# 値を次の語で取るオプション（`=` でつないだ形は 1 語で済む）。値をパスと読み違えないため。
+_VALUE_LONGS = {
+    "restore": frozenset({"--source", "--conflict", "--pathspec-from-file"}),
+    "checkout": frozenset({"--orphan", "--conflict", "--pathspec-from-file"}),
+    "rm": frozenset({"--pathspec-from-file"}),
+    "mv": frozenset(),
+}
+_VALUE_SHORTS = {"restore": "s", "checkout": "bB", "rm": "", "mv": ""}
+# どこに当たるかを読みで決められない pathspec。グロブは `/` もまたぐ（git の pathspec）ので、
+# 文字の前の固定の部分（ディレクトリ）より下のどこにでも当たりうる。
+_GLOB = re.compile(r"[*?\[]")
+# ディレクトリがこの名前を直に持つなら、守る場所を中に含む
+# （ツリーの頂上・ccnavi ディレクトリの親）。
+_MARKERS = (settings.DEFAULT_PROJECT_HOME, ".claude", ".git")
+
+
+def check_core_paths(
+    conf: settings.Settings, root: str, cwd: str, subject: str, degraded: str
+) -> tuple[str, str]:
+    """`ccnavi-git.sh` で自己防衛の対象を消す・別のコミットの中身に戻す形なら
+    （副命令, 当たった語）。
+
+    当たるとみなすのは次のどれか。
+
+    - シェルから書き込む形の組み込み（`builtin-guard-setting-files`）と同じ場所の式に、
+      書いたとおりのパスか、居場所から解いた絶対パスが当たる（`.ccnavi/`・
+      `.claude/settings*.json`・`.claude/hooks/`・`ccnavi-git.sh`・記録と state・
+      実行ファイル・動かした共通レイヤー）
+    - そのパスが守る場所を中に含むディレクトリ（ツリーの頂上・`.ccnavi` や `.claude` を持つ
+      ディレクトリとその 1 つ上・実行ファイルや共通レイヤーの上・プロジェクトの置き場の上）
+    - 当たる先を読みで決められない指定（`:` で始まる pathspec、固定の部分の無いグロブ、
+      `--pathspec-from-file`、居場所の読めない `..`）
+
+    通すのは、索引の中身に戻す `restore`（`--staged` も、衝突を解く `--ours` / `--theirs` も）。
+    消える・過去の中身になるのでないものは、ルールとラッパーの許可リストに任せる。
+    読み切れない形は、allow が当たらずに確認になるので、ここでは見ない。
+    """
+    if degraded:
+        return "", ""
+    pattern = ""
+    for words, here in shellread.placed(subject):
+        call = _script_call(words)
+        if not call or os.path.basename(call[0].replace("\\", "/")) != _GIT_SCRIPT:
+            continue
+        args = call[1]
+        if not args or args[0] not in _CORE_SUBS:
+            continue
+        sub = args[0]
+        paths, unknown = _core_targets(sub, args[1:])
+        if unknown:
+            return sub, unknown
+        if not paths:
+            continue
+        if not pattern:
+            pattern = selfguard_shell.guard_shell_regex(
+                root, conf.bin, conf.project_home, selfguard_shell.common_layer_files(conf)
+            )
+            compiled = re.compile(pattern, re.IGNORECASE)
+        base = None
+        if here is not None and cwd:
+            base = here if os.path.isabs(here) else os.path.join(cwd, here)
+        for path in paths:
+            if _core_hit(conf, root, compiled, path, base):
+                return sub, path
+    return "", ""
+
+
+def _core_targets(sub: str, args: list[str]) -> tuple[list[str], str]:
+    """副命令の引数から、消す・戻す先のパスの語（, 読めない指定があればその語）。
+
+    `restore` は `--source` が無ければ何も返さない。`checkout` は最初の語（行き先か起点）を除く。
+    """
+    longs, shorts = _VALUE_LONGS[sub], _VALUE_SHORTS[sub]
+    positional: list[str] = []
+    source = False
+    after_dashes = False
+    from_file = ""
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        i += 1
+        if after_dashes or arg == "-" or not arg.startswith("-"):
+            positional.append(arg)
+            continue
+        if arg == "--":
+            after_dashes = True
+            continue
+        if arg.startswith("--"):
+            name, eq, _ = arg.partition("=")
+            if name == "--pathspec-from-file":
+                from_file = arg
+            if name == "--source":
+                source = True
+            if name in longs and not eq:
+                i += 1
+            continue
+        # まとめた短いオプション。値を取る字が出たら、残りの字か次の語が値。
+        rest = arg[1:]
+        while rest:
+            ch, rest = rest[0], rest[1:]
+            if sub == "restore" and ch == "s":
+                source = True
+            if ch in shorts:
+                if not rest:
+                    i += 1
+                break
+    if sub == "restore":
+        if not source:
+            return [], ""
+        return positional, from_file
+    if from_file:
+        # パスをファイルから読む形。どこに当たるかを読みで決められない。
+        return [], from_file
+    if sub == "checkout":
+        return positional[1:] if not after_dashes else positional, ""
+    return positional, ""
+
+
+def _core_hit(
+    conf: settings.Settings, root: str, compiled: re.Pattern, path: str, base: str | None
+) -> bool:
+    """パスの語 1 つが、自己防衛の対象に当たるか（当たるかを決められない語も当たる側）。"""
+    word = path.replace("\\", "/")
+    if word.startswith(":"):
+        return True
+    glob = _GLOB.search(word)
+    if glob:
+        # グロブの前の固定の部分（最後の `/` まで）のディレクトリとして見る。
+        head = word[: glob.start()]
+        word = head[: head.rfind("/") + 1] if "/" in head else ""
+        if not word.strip("/."):
+            return True
+    if compiled.search("rm " + word):
+        return True
+    if base is None:
+        # 居場所が読めない。ツリーの頂上かもしれない語と、上へ出る語は決められない。
+        return os.path.isabs(word) is False and (
+            word.strip("/") in ("", ".") or ".." in word.split("/")
+        )
+    full = os.path.normpath(os.path.join(base, word))
+    if compiled.search("rm " + full.replace("\\", "/")):
+        return True
+    return _holds_core(conf, root, full)
+
+
+def _holds_core(conf: settings.Settings, root: str, full: str) -> bool:
+    """full が守る場所を中に含むディレクトリか。"""
+    anchors = [
+        root,
+        conf.bin,
+        conf.projects,
+        conf.log,
+        conf.state,
+        *selfguard_shell.common_layer_files(conf),
+    ]
+    forms = {os.path.normcase(os.path.abspath(full)), os.path.normcase(os.path.realpath(full))}
+    for anchor in anchors:
+        if not anchor:
+            continue
+        for a in {os.path.abspath(anchor), os.path.realpath(anchor)}:
+            a = os.path.normcase(a).lower()
+            for f in forms:
+                f = f.lower().rstrip(os.sep) or os.sep
+                if a == f or a.startswith(f.rstrip(os.sep) + os.sep):
+                    return True
+    if not os.path.isdir(full):
+        return False
+    try:
+        children = [full, *(os.path.join(full, n) for n in os.listdir(full))]
+    except OSError:
+        return True
+    return any(
+        os.path.isdir(child) and any(os.path.lexists(os.path.join(child, m)) for m in _MARKERS)
+        for child in children
+    )
+
+
+def core_path_message(root: str, sub: str, word: str) -> str:
+    """自己防衛の対象をラッパーで消す・戻す形を止めた文。"""
+    git_sh = settings.script_command(root, _GIT_SCRIPT)
+    return (
+        f"{_GIT_SCRIPT} {sub} が、ccnavi 自身を守る場所（{word}）を消すか、別のコミットの中身に"
+        "戻す形になっています。ここには hook の登録・ルールとフェーズの設定・保護済みのスクリプト・"
+        "実行ファイル・判定の記録があり、消したり古い中身に戻したりすると ccnavi の止めが外れます。"
+        "シェルの rm や Write / Edit でも拒否される場所です。変更が要るなら、何をなぜ変えたいのかを"
+        "伝えてユーザに依頼してください。"
+        f"衝突を解くときの '{git_sh} restore --ours -- <パス>'（--theirs も）と、索引だけを戻す "
+        f"'{git_sh} restore --staged <パス>' は通ります。"
+        "グロブ（* ? [）・: で始まる指定・--pathspec-from-file は、守る場所に当たるかを"
+        "決められないので、"
+        "消す・戻すファイルを 1 つずつ名指ししてください。"
+    )
 
 
 def worktree_name(root: str, place: str) -> str:

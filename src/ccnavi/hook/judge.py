@@ -261,6 +261,30 @@ def decide_before(
                 ],
                 conf=conf,
             )
+        # git のラッパーの `rm`・`restore --source`・`checkout <ref> <パス>` で、自己防衛の対象を
+        # 消す・別のコミットの中身に戻す形。シェルの rm と同じ場所を、ラッパー越しにも止める。
+        # ラッパー自身が消えると、生の git の組み込みの止め（ラッパーがあるときだけ足す）も外れる。
+        sub, word = wrapguard.check_core_paths(
+            conf, root, payload.cwd, record.subject, record.degraded
+        )
+        if sub:
+            record.code, record.rules = wrapguard.CODE_CORE_PATH, [wrapguard.CORE_PATH_RULE_ID]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices
+                + [
+                    reasons.builtin_refusal(
+                        wrapguard.CODE_CORE_PATH,
+                        wrapguard.CORE_PATH_RULE_ID,
+                        subject,
+                        wrapguard.core_path_message(root, sub, word),
+                    )
+                ],
+                conf=conf,
+            )
 
     # 記録と state を消す `ccnavi --prune`（`--preview` の無い形）は、チケット制御に依らず止める
     # （phase_forms.prune_form）。実行ファイルの端末要求は擬似端末を使えば通れる。記録と state の
