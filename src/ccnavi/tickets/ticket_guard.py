@@ -26,9 +26,21 @@ RAW_GIT_RULE_ID = "builtin-ticket-raw-git"
 # スクリプトはワークスペースにしか無い（`settings.script_command`）ので、ルートの下だけを見る。
 GIT_SCRIPT = os.path.join(settings.DEFAULT_PROJECT_HOME, "scripts", "ccnavi-git.sh")
 
-# `git` がコマンドの位置に立つ形。共通レイヤーの見本の `raw-git` と同じ式。glob の `*git*` だと
-# 誘導先の `ccnavi-git.sh` にも当たって出口ごと塞がるので、前後の切れ目を見る。
-RAW_GIT_REGEX = r"(^|[^\w.-])(\S*[\\/])?git(\.exe)?\s"
+# `git` がコマンドの位置に立つ形。glob の `*git*` だと誘導先の `ccnavi-git.sh` にも当たって
+# 出口ごと塞がるので、前後の切れ目を見る。
+#
+# 当てるのは、引用とコメントを外してコマンドの切れ目に `\x00` を置いた読み（shellread）なので、
+# コマンドの位置は行頭か `\x00` の直後になる。`env` `sudo` `command` `xargs` `nohup` `time` などの
+# 前置きは、読みが外した中のコマンド（`git status`）の層に当てて止める。`grep git README.md` の
+# ような引数の `git` には当てない。読み切れずに生の文字列に当てる回のために、シェルの区切り
+# （改行 `;` `&` `|` `(` `{` `` ` `` `!`）と、`then` `do` などの予約語の後ろも位置に数える。
+# パス付き（`/usr/bin/git`）と `git.exe` も同じ。パスの途中の字に区切りを入れないのは、区切りの
+# 字ごとに残りを読み直さないため（区切りの後ろからは、その区切りで当たる）。
+# 共通レイヤーの見本の `raw-git` は位置を問わずに当てる。そちらは緩める向きになるので変えていない。
+RAW_GIT_REGEX = (
+    r"(?:^|[\x00\n;&|({`!]|\b(?:then|do|else|elif|if|while|until)\s)\s*+"
+    r"(?:[^\s\x00\\/;&|({`!]*+[\\/])*+git(?:\.exe)?\s"
+)
 
 
 def _place(tickets_rel: str) -> str:
