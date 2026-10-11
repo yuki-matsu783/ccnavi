@@ -107,13 +107,16 @@ deny:
   - tool: Read
     subject: "/repo/.env.example"
     why: >-
-      値を持たない見本の .env。共通の credentials は not で除くが、常に有効な組み込みの
+      値を持たない見本の .env。共通の credentials-files は not で除くが、常に有効な組み込みの
       builtin-credentials（実行ファイルの土台）が .env の後ろに続く名前ごと止める
   - tool: Bash
     subject: "cat /repo/.env; cat /repo/.env.example"
     why: >-
-      共通の credentials はコマンド列の全体に当てるので、見本の名前で終わらせると外れる。
-      .env はいまは組み込みの builtin-credentials が止める
+      Bash の credentials には例外を付けていないので、見本の名前を足しても外れない
+  - tool: Bash
+    subject: "cat /repo/secrets/token; cat /repo/.env.example"
+    why: >-
+      同上。.aws・secrets・*.pem は組み込みが止めないので、ここで外れると素通りする
   - tool: Bash
     subject: "cat /repo/certs/server.pem"
     why: 同上
