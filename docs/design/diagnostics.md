@@ -12,7 +12,7 @@ keywords: [診断, --explain, --test, --lint, --json, 機械可読]
 
 診断（この章のオプション）だけは hook から呼ばれない。ユーザが端末から打ち、VS Code 拡張が読む。判定は hook と同じ関数を
 通る（REQ-DIA-03）。記録は診断の経路では書かない。試験（`--test` / `--test-samples`）は
-state も内部で外す。拡張と `tools/check_rules.py` は念のため `--log ""` と `--state ""` も渡す。
+state も内部で外す。拡張と `scripts/check_rules.py` は念のため `--log ""` と `--state ""` も渡す。
 
 | オプション | 出すもの | 終了コード |
 |---|---|---|
