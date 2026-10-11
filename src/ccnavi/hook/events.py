@@ -23,6 +23,7 @@ from ..tickets import (
     ops_stop,
     ops_stop_request,
     phase,
+    session_rejects,
     skillsync,
 )
 from . import docsearch, judge, post, post_findings, projskills, reasons, subagent
@@ -485,6 +486,13 @@ def decide_at_start(
     if outcomes:
         record.guarded = [f"{o.target.key}:{o.action}" for o in outcomes]
         texts.append(selfguard.report(outcomes))
+    # 承認済みチケットの要求のうち、上位（ルールの deny・親の範囲・フェーズ定義の上限）に
+    # 却下されて効かないもの（REQ-SES-02）。モデルにもユーザにも出す。サブエージェントには
+    # 出さない。索引（docsearch）より先に組むのは、こちらが短い予算で済み、索引に期限の
+    # 残りを渡すため。
+    rejects = ""
+    if conf.tickets_enabled and not payload.agent_id:
+        rejects = session_rejects.notice(conf, root, payload.cwd, deadline)
     # md の frontmatter の索引を差分で新しくし、引き方を案内する（`ccnavi --docs`）。
     # サブエージェントには出さない。失敗しても何も出さない
     # （docsearch.at_start が例外を外に出さない）。先に組むのは、作業の決まりの
@@ -504,6 +512,8 @@ def decide_at_start(
         )
     if conf.tickets_enabled:
         texts.append(reasons.ways_of_working(conf, root, mode))
+    if rejects:
+        texts.append(rejects)
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。
     skills = projskills.notice(stderr, conf, root, payload, at_start=True)
     if skills:
@@ -511,7 +521,7 @@ def decide_at_start(
     if docs:
         texts.append(docs)
     if texts:
-        hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts))
+        hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts), system=rejects)
     return EXIT_OK
 
 

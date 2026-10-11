@@ -19,7 +19,15 @@ from __future__ import annotations
 
 import os
 
-from tests.config.test_config_union import ConfigUnionHarness, git, read, ticket_text, write
+from tests import phasecopy
+from tests.config.test_config_union import (
+    LIB_PHASES,
+    ConfigUnionHarness,
+    git,
+    read,
+    ticket_text,
+    write,
+)
 
 SCOPE = ("src/*",)
 
@@ -37,7 +45,9 @@ class SkillSyncTest(ConfigUnionHarness):
         return os.path.join(self.ws, ".claude", "skills", *parts)
 
     def start_parent(self, name="i0001"):
-        self.propose(name, ticket_text(name, project="lib", allow=SCOPE), project="lib")
+        self.propose(
+            name, ticket_text(name, project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         tree = self.worktree(self.lib, name)
@@ -99,7 +109,9 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertIn("概念スキル", first.stdout)
         tree = self.worktree(self.lib, "i0002")
         write(os.path.join(tree, "skills", "testing", "SKILL.md"), concept_skill("testing"))
-        self.propose("i0002", ticket_text("i0002", project="lib", allow=SCOPE), project="lib")
+        self.propose(
+            "i0002", ticket_text("i0002", project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
         self.assertEqual(self.approve().returncode, 0)
         second = self.ccnavi("ticket", "start", "i0002")
         self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
@@ -133,7 +145,9 @@ class SkillSyncTest(ConfigUnionHarness):
         tree = self.worktree(os.path.join(self.projects, "lib"), "i0001")
         write(
             os.path.join(tree, "wip", "proposals", "todo", "i0001.md"),
-            ticket_text("i0001", project="lib", allow=SCOPE),
+            phasecopy.insert(
+                ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), LIB_PHASES
+            ),
         )
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
@@ -259,7 +273,9 @@ class SkillSyncTest(ConfigUnionHarness):
         tree = self.worktree(os.path.join(self.projects, "lib"), "i0001")
         write(
             os.path.join(tree, "wip", "proposals", "todo", "i0001.md"),
-            ticket_text("i0001", project="lib", allow=SCOPE),
+            phasecopy.insert(
+                ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), LIB_PHASES
+            ),
         )
         self.assertEqual(self.approve().returncode, 0)
         write(

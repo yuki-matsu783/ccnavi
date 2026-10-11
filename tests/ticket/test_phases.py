@@ -1055,22 +1055,29 @@ class PhaseTest(PhaseHarness):
             denied = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
             self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(denied), command)
 
-    # ---- 8. 計画の無い親は今までどおり
+    # ---- 8. 計画の無い親は承認できるが、着手は止まる
 
-    def test_parent_without_plan_keeps_the_old_behaviour(self):
+    def test_parent_without_plan_is_approved_but_cannot_start(self):
         from tests.ticket.test_ticket import ticket_text
 
-        self.propose("i0001", ticket_text("i0001", allow=("src/*", "wip/*")))
+        self.propose("i0001", ticket_text("i0001", allow=("src/*", "wip/*"), plan=0))
         self.propose(
-            "i0001-01-01", ticket_text("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
-        )
-        self.propose(
-            "i0001-02-02", ticket_text("i0001-02-02", parent="i0001", phase=2, allow=("src/b/*",))
+            "i0001-01-01",
+            ticket_text("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",)),
         )
         self.commit_parent()
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
+        started = self.ccnavi("ticket", "start", "i0001")
+        self.assertEqual(started.returncode, 1, started.stdout)
+        self.assertIn("に plan が無いので着手できない", started.stderr)
+        self.assertIn("子や子の提案があっても同じ", started.stderr)
+        self.assertIn("phases.yml", started.stderr)
+        # 子の着手は親が着手済みであることが条件のまま。親が止まれば子も着手できない。
+        self.worktree("i0001-01-01", "i0001")
+        child = self.ccnavi("ticket", "start", "i0001-01-01")
+        self.assertEqual(child.returncode, 1, child.stdout)
 
 
 def scoped_child_text(name, parent, phase, allow=(), ask=(), regex=()):
@@ -1570,26 +1577,19 @@ class ScopeLimitTest(PhaseHarness):
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(result))
         self.assertNotIn("limit:", self.reason(result))
 
-    def test_no_phases_file_anywhere_does_not_cut_by_type(self):
-        """11. どのレイヤーにも phases.yml が無ければ定義では切り詰めない（番号だけの挙動）。"""
+    def test_no_phases_file_anywhere_stops_a_parent_without_plan(self):
+        """11. どのレイヤーにも phases.yml が無いと plan を持てず、計画の無い親は着手が止まる。"""
         from tests.ticket.test_ticket import ticket_text
 
         os.remove(self.phases)
-        self.propose("i0001", ticket_text("i0001", allow=("src/*", "wip/*")))
-        self.propose(
-            "i0001-01-01", ticket_text("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
-        )
+        self.propose("i0001", ticket_text("i0001", allow=("src/*", "wip/*"), plan=0))
         self.commit_parent()
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        tree = self.run_child("i0001-01-01")
-        inside = self.write_to(tree, "src/a/x.py")
-        self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
-        self.assertNotIn("読めない", self.reason(inside))
-        # 子自身の範囲の外は今までどおり止まり、`limit:` 行は足さない。
-        outside = self.write_to(tree, "src/b/x.py")
-        self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
-        self.assertNotIn("limit:", self.reason(outside))
+        started = self.ccnavi("ticket", "start", "i0001")
+        self.assertEqual(started.returncode, 1, started.stdout)
+        self.assertIn("phases.yml に最小のフェーズ定義", started.stderr)
+        self.assertIn("書くのはユーザ", started.stderr)
 
     def test_editing_phases_yml_does_not_change_the_cut_of_an_approved_child(self):
         """12. 承認のあとの判定は親に固定した写し（`phases:`）の定義で切り詰める。

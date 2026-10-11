@@ -247,6 +247,12 @@ scripts in .ccnavi/scripts/, which call
          it to wip/proposals/review/ when the phase is reviewed, else to
          .ccnavi/approved/done/; cancel moves it to .ccnavi/approved/done/)
     ccnavi ticket record-risk <child> <factor> yes|no --reason <why>   (qualitative risk)
+    ccnavi ticket new <id> --title <title> --plan <type,type,...> [--issue N]
+        (writes the scaffold of a parent proposal to wip/proposals/todo/<id>.md of
+         the worktree named <id>; run it inside that worktree. Collects the scope
+         of the chosen phases from phases.yml into allow, chains the plan in a
+         straight line and fills phases:. Stops without phases.yml, for a child
+         id, or when allow would be empty. Typed directly, not via ccnavi-ticket.sh)
     ccnavi ticket status [<parent>]
         (reads only: place, approval time, started or not, uncommitted / unpushed
          by the local remote-tracking ref, why it is stopped, and the next step;

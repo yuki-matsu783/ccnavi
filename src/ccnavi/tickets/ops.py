@@ -32,6 +32,7 @@ from . import (
     flow,
     history,
     ops_close,
+    ops_plan,
     ops_stop,
     phase,
     risk,
@@ -82,6 +83,8 @@ def start(
         return 1
     if found.started_at:
         stderr.write(f"ccnavi: {ticket_id} は着手済み（{found.started_at}）\n")
+        return 1
+    if ops_plan.plan_missing(stderr, found):
         return 1
     if ops_close.parent_not_started(stderr, root, conf, found):
         return 1
@@ -143,6 +146,8 @@ def start(
                 "承認済みチケットと同じくユーザがコミットする\n"
             )
     for line in synced:
+        stdout.write(line + "\n")
+    for line in ops_plan.childless_notice(root, conf, found):
         stdout.write(line + "\n")
     return 0
 
