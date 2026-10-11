@@ -63,6 +63,17 @@ export function forgetSaved(tickets: readonly string[]): void {
   }
 }
 
+/**
+ * 忘れてよい保存のハッシュ（識別子の順）。承認待ちの親の提案（`todoParents`）に無い親のぶん。承認された・
+ * 取り下げられた親を、あとで出す改版の提案と比べない。ボードを読み直したときに呼ぶ
+ */
+export function staleSaved(saved: Readonly<Record<string, string>>, todoParents: readonly string[]): string[] {
+  const todo = new Set(todoParents);
+  return Object.keys(saved)
+    .filter((ticket) => !todo.has(ticket))
+    .sort();
+}
+
 /** 今の帳面の写し */
 export function workflowTabs(): WorkflowTabs {
   return { unsaved: [...unsaved].sort(), saved: Object.fromEntries(saved) };

@@ -471,6 +471,11 @@ export function flowCardOf(board: Board, ticket: string): Card | undefined {
   return undefined;
 }
 
+/** 承認待ち（`todo/`）の提案がある親の識別子（新規と改版） */
+export function todoParentsOf(board: Board): string[] {
+  return board.columns.flatMap((column) => column.cards.filter((card) => card.isParent && card.proposalState === "todo").map((card) => card.id));
+}
+
 /** 親の識別子から、「ワークフロー」を出しているカード（計画を持つ承認待ちの親の提案）。無ければ undefined */
 export function workflowCardOf(board: Board, ticket: string): Card | undefined {
   const card = parentCardOf(board, ticket);

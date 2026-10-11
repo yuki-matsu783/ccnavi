@@ -9,7 +9,7 @@ import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runApprovePreview, runApproveYes, runDecidePreview, runDecideYes } from "./ccnavi.js";
-import { buildBoard, flowCardOf, isKnownPath, parentTreeOf, phaseChipOf, workflowCardOf, type Board } from "./core/board.js";
+import { buildBoard, flowCardOf, isKnownPath, parentTreeOf, phaseChipOf, todoParentsOf, workflowCardOf, type Board } from "./core/board.js";
 import { flowTicketOf } from "./core/flow-view.js";
 import { screens } from "./core/screens.js";
 import { movedStep, NOTHING_MOVED, type MovedState } from "./core/board-moved.js";
@@ -20,6 +20,7 @@ import {
 } from "./core/commands.js";
 import {
   approvalStep,
+  blockedBeforeApprove,
   CLOSED,
   type ApprovalEffect,
   type ApprovalInput,
@@ -33,7 +34,7 @@ import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { ticketControlMismatch } from "./core/ticket-control.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { isTicketId } from "./core/ticket-id.js";
-import { forgetSaved, onWorkflowTabs, workflowTabs } from "./core/workflow-tabs.js";
+import { forgetSaved, onWorkflowTabs, staleSaved, workflowTabs } from "./core/workflow-tabs.js";
 import { unsavedText } from "./core/approvemodel.js";
 import { runInTerminal, scriptShell } from "./terminal.js";
 import { markTourSeen, tourSeen } from "./tour.js";
@@ -254,7 +255,12 @@ async function update(): Promise<void> {
       showError(current, result.error);
       return;
     }
-    show(current, buildBoard(result.board));
+    const board = buildBoard(result.board);
+    current.board = board;
+    // 承認待ちの親の提案に無い親の、ワークフロー編集タブの保存のハッシュを忘れる。端末や Chrome 拡張で承認した・
+    // 取り下げた親を、あとで出す改版の提案と比べない（ボードから承認したときは承認の結果でも忘れる）
+    forgetSaved(staleSaved(workflowTabs().saved, todoParentsOf(board)));
+    show(current, board);
   } finally {
     current.loading = false;
     if (current.again) {
@@ -509,8 +515,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
     case "approve": {
       // 打つ直前にもう 1 度、ワークフロー編集タブに未保存の変更がある親を含まないかを見る（遷移が見たあとに
       // 未保存になっていれば打たない）。一覧の親の識別子と、帳面の親の識別子を突き合わせる
-      const unsaved = new Set(workflowTabs().unsaved);
-      const blocked = effect.tickets.filter((ticket) => unsaved.has(ticket));
+      const blocked = blockedBeforeApprove(effect.tickets, workflowTabs().unsaved);
       if (blocked.length > 0) {
         dispatch(current, { kind: "approved", outcome: { ok: false, error: unsavedText(blocked) }, carrier: false });
         return;

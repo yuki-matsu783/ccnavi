@@ -51,6 +51,7 @@
  * | 承認と残った指摘は互いの途中に被さらない | 見せている一覧が、別の一覧になってしまう |
  * | 決めた結果の文の上に、連絡も次の「決める」も被せない | 続きの子の識別子と次の 2 手を渡す前に、文が消える |
  * | ワークフロー編集タブに未保存の変更がある親を含む一覧は、承認を打たない | 未保存の順序のまま承認され、直したつもりの順序と違うものが通る |
+ * | 承認を打つ直前にも、未保存のタブがある親が打つ識別子に入っていないかを見る（`blockedBeforeApprove`） | 押したあとにタブで線を変えた一覧が、そのまま承認される |
  * | 「ワークフローを編集」でタブを開くのは、一覧を見せているとき（preview）だけ | 承認を打っている最中に閉じられ、結果を受ける場所が消える |
  * | 「ワークフローを編集」で開くのは、一覧の図にある親だけ | 古い画面から届いた識別子で、承認と関係の無いタブが開く |
  *
@@ -473,6 +474,16 @@ function editWorkflow(state: ApprovalState, ticket: string): ApprovalStep {
     return stay(state);
   }
   return move(state, CLOSED, { kind: "openWorkflow", ticket });
+}
+
+/**
+ * 承認を打つ直前の確かめ（`board-panel.ts` が `approve` のやることを行う前に呼ぶ）。打つ識別子のうち、
+ * ワークフロー編集タブに未保存の変更がある親（識別子の順）。空でなければ打たない。遷移が「押した時点」で見た
+ * あとに未保存になったものを、ここで拾う。子の識別子は親のタブと取り違えない（識別子が違う）
+ */
+export function blockedBeforeApprove(tickets: readonly string[], unsaved: readonly string[]): string[] {
+  const held = new Set(unsaved);
+  return tickets.filter((ticket) => held.has(ticket)).sort();
 }
 
 /** 閉じてよいか。承認を打っている最中と、行き先を置いている最中は閉じない */
