@@ -266,8 +266,9 @@ def _judge_stop(
 #   その体は「実行中」と数えられず、委任して待つ回でも促しが出うる
 # - 入れ子の体（孫）も、同じセッションで自分の `agent_id` の印を持つ。1 体でも残っていれば実行中
 # - SubagentStop が来ないまま残った印（中断・クラッシュ・ccnavi の内部エラー）は、開始から
-#   `RUNNING_MAX_SECONDS` を過ぎたら数えない。さらにセッションの起動（`startup`）で捨てる
-#   （`forget_running`）。compact・再開・clear では捨てない。実行中の体が残りうるため
+#   `RUNNING_MAX_SECONDS` を過ぎたら数えない。さらにセッションの起動（`startup`）と再開
+#   （`resume`）で捨てる（`forget_running`）。どちらも新しいプロセスで、前の体は生きていない。
+#   compact・clear では捨てない。同じプロセスで、実行中の体が残りうるため
 # - 数える対象はサブエージェントだけ。チームメイトと背景のシェルは数えない
 RUNNING_SUFFIX = ".running"
 
@@ -303,7 +304,7 @@ def _forget_running(conf: settings.Settings, payload: hookio.Input) -> None:
 
 
 def forget_running(state_dir: str, session: str) -> None:
-    """このセッションの実行中の印を全部捨てる。セッションの起動（`startup`）の後始末。"""
+    """このセッションの実行中の印を全部捨てる。起動（`startup`）と再開（`resume`）の後始末。"""
     if not state_dir:
         return
     for _, path in _session_marks(state_dir, session, RUNNING_SUFFIX) or []:

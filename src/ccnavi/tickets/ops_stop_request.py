@@ -232,7 +232,10 @@ def request_nudge(root: str, found: Pending) -> str:
         todo = f"ELI5 の HTML を {eli5} に書いてコミットして push し、{request} で依頼します。"
     else:
         where = f"{p.ticket} の{phase_name}は、レビューの依頼（request）がまだです。"
-        todo = f"親ブランチを push してから、{request} で依頼します。"
+        todo = (
+            f"未コミットの変更があれば先にコミットして push してから（`request` は HEAD の"
+            f"普通のファイルを前提にする）、{request} で依頼します。"
+        )
     return "\n".join(
         [
             f"[ccnavi] {CODE_REQUEST_NUDGE} (parent: {p.ticket}, phase: {n})",

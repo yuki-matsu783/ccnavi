@@ -451,10 +451,12 @@ def decide_at_start(
     # 来るので、モデルの文脈が新しくなるたびに「1 度だけ渡す文」は改めて届き、`every` の
     # 刻みも 0 から数え直しになる。
     ctxfile.forget(conf.state, payload.session_id, startup=payload.source == "startup")
-    # 実行中のサブエージェントの印も起動のときだけ捨てる。
-    # compact・再開・clear では実行中の体が残りうる。
-    if payload.source == "startup":
+    # 実行中のサブエージェントの印は、起動（startup）と再開（resume）で捨てる。どちらも新しい
+    # プロセスで、前のプロセスのサブエージェントは生きていない。compact と clear は同じ
+    # プロセスなので、実行中の体が残りうる。Stop の数え（上）は起動だけで捨てる。
+    if payload.source in ("startup", "resume"):
         subagent.forget_running(conf.state, payload.session_id)
+    if payload.source == "startup":
         _seen_baseline(stderr, conf, root, payload, record)
     # 基準を取った時の注記（読めなかったツリーなど）を消さないよう、足す。
     pruned = _prune_at_start(stderr, conf, root, payload.session_id)
