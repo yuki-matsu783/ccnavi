@@ -2,6 +2,7 @@
 # ccnavi-ticket チケットの状態を動かす（親（メインエージェント）だけが呼ぶ）。状態を聞く（誰でも呼べる）。
 #
 #   sh .ccnavi/scripts/ccnavi-ticket.sh status      [<親>]
+#   sh .ccnavi/scripts/ccnavi-ticket.sh next-id     [<先頭の語> <slug>]
 #   sh .ccnavi/scripts/ccnavi-ticket.sh start       <識別子>
 #   sh .ccnavi/scripts/ccnavi-ticket.sh finish      <識別子>
 #   sh .ccnavi/scripts/ccnavi-ticket.sh cancel      <識別子> --reason <理由>
@@ -13,6 +14,10 @@
 # status は読むだけ。承認済みチケットの置き場・承認の時刻・着手・未コミットか未 push か・止まっている理由・
 # 次の一手を ccnavi が判断して出す。ネットワークには出ない（push 済みかは手元のリモート追跡の ref で見る）。
 # サブエージェントも呼べる。状態を動かすコマンドを出す行には「親（メインエージェント）だけが実行する」と書く。
+#
+# next-id も読むだけ。issue の無い親の提案に使う次の通し番号（引数なし）か、識別子
+# `<先頭の語>-<番号>-<slug>`（先頭の語と slug を渡す）を 1 行で出す。形に合わなければ理由を言って止まる。
+# `--lint` の warn を出させて番号を知る回り道の代わり。サブエージェントも呼べる。
 #
 # 状態は置き場で表し、チケットは 1 本のファイルが置き場を動く。承認待ちは wip/proposals/todo/、承認済みの作業中は
 # .ccnavi/approved/doing/、レビュー待ちは wip/proposals/review/、閉じたものは
@@ -46,11 +51,16 @@ set -eu
 usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-ticket.sh status [<親>]
+sh .ccnavi/scripts/ccnavi-ticket.sh next-id [<先頭の語> <slug>]
 sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel> <識別子> [--reason <理由>]
 sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>
 
   status       承認済みチケットの状態を聞く（読むだけ。サブエージェントも打てる）。親を省けば
                作業中・レビュー待ち・承認待ちのチケットがある親子を全部。ファイルを読んで推測せず、これを打つ
+
+  next-id      issue の無い親の提案に使う識別子を決める（読むだけ。サブエージェントも打てる）。引数なしなら
+               次の通し番号、<先頭の語> <slug> を渡せば <先頭の語>-<番号>-<slug> を 1 行で出す。
+               末尾が -<2 桁> になる slug や、勧める長さを超える slug は理由を言って止まる
 
   start        .ccnavi/approved/doing/ の承認済みチケットに着手の時刻と基準点を書く。
                ワークツリー .claude/worktrees/<識別子> が要る。承認済みチケットは置き場を移らない
@@ -81,9 +91,9 @@ case "${1:-}" in
 	;;
 esac
 
-# status だけは親を省ける（引数 1 個で通す）。
+# status と next-id は引数を省ける（引数 1 個で通す）。
 case "${1:-}" in
-status) ;;
+status | next-id) ;;
 *)
 	[ "$#" -ge 2 ] || {
 		usage
@@ -92,9 +102,9 @@ status) ;;
 	;;
 esac
 case "$1" in
-status | start | finish | cancel | record-risk) ;;
+status | next-id | start | finish | cancel | record-risk) ;;
 *)
-	printf 'ccnavi-ticket: %s は通しません。使えるのは status / start / finish / cancel / record-risk です。\n' "$1" >&2
+	printf 'ccnavi-ticket: %s は通しません。使えるのは status / next-id / start / finish / cancel / record-risk です。\n' "$1" >&2
 	exit 2
 	;;
 esac
