@@ -374,7 +374,7 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.assertEqual(second.returncode, 0, second.stderr)
         self.assertFalse(os.path.exists(self.running_file("sub-1")))
 
-    # ---- Stop フックが 1 回の応答で引き止める理由は 1 つだけ
+    # ---- 1 回の Stop フック呼び出しで、引き止める理由は 1 つだけ
 
     def test_the_finish_nudge_goes_first_and_the_same_state_is_not_asked_again(self):
         """finish の促しで止めた状態は、この促しも止めない。同じ状態を 2 つの促しが止めないため。"""
