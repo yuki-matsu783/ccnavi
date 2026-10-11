@@ -31,7 +31,7 @@ test("CB-D20 既定は畳み、行を押すと開いて state に id が入る�
   }
 });
 
-test("CB-D21 範囲を inherit に変えると glob の欄が消え、行は開いたまま。id が重なると保存できない", async () => {
+test("CB-D21 編集可能範囲を inherit に変えると glob の欄が消え、行は開いたまま。id が重なると保存できない", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p2")} .row-head`));
@@ -112,7 +112,7 @@ test("CB-T125 件の欄名は日本語で、YAML のキー名は欄名の title 
     const caps = dom.all(`${rowSelector("p1")} .row-body .field > .cap`);
     assert.deepEqual(
       caps.map((cap) => cap.textContent),
-      ["id", "タイトル", "区分", "レビュー", "範囲", "成果物", "案内するエージェント", "使う場面"],
+      ["id", "タイトル", "区分", "レビュー", "編集可能範囲", "必須成果物", "案内するエージェント", "使う場面"],
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),

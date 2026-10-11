@@ -49,7 +49,7 @@ const ENTRIES: readonly Entry[] = [
   },
   {
     label: "フェーズ管理",
-    description: "フェーズ定義（計画に並べる型、範囲の上限、レビューの既定）の編集と保存",
+    description: "フェーズ定義（計画に並べる型、編集可能範囲の上限、レビューの既定）の編集と保存",
     command: "ccnaviBoard.openPhases",
     icon: "milestone",
     needsTickets: true,
