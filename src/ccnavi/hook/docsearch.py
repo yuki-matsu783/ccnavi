@@ -69,7 +69,8 @@ import time
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from ..infra import settings, tree
+from ..infra import fsio, hookio, settings, tree
+from ..tickets import ticket_places
 from . import docsearch_index, docsearch_query
 
 # 規約の詳しい文書。ワークスペースに在るときだけ案内に名前を出す。
@@ -349,27 +350,23 @@ def notice(conf: settings.Settings, root: str, found: Collected) -> str:
 
 
 def guide_lines(conf: settings.Settings, root: str, lead: str) -> list[str]:
-    """索引の引き方の案内。`lead` の後ろに `--docs` の呼び方が続く 1 行目と、補足の行。
+    """索引の引き方の案内。`lead` の後ろに `--docs` の呼び方が続く 1 行。
 
     SessionStart の案内（notice）と、失敗が続いたときの案内（fail_streak_note）が同じ文面を使う。
+    起動・再開・compact・clear のたびに届く常駐の文脈なので、引き方の要点の 1 行だけにする。
+    オプションの一覧と frontmatter の書き方は先に渡さない。書き方は frontmatter の無い md を
+    作った時点で案内し（`missing_frontmatter`）、詳しいことは決まりの文書を --docs で引かせる。
     """
     command = _command(conf, root)
-    lines = [
-        f"{lead} '{command} --docs' で"
-        " frontmatter の索引を引いてください（ワークスペースとプロジェクトを横断。パスは"
-        "ワークスペースルートから）。grep は本文中の文字列を探すときか、0 件だったときに"
-        "使ってください。",
-        "  絞り込み: --type / --tag / --keyword <値>（完全一致）、--path <部分>（パス）、"
-        "--text <部分>（パス・更新日時・frontmatter の値）、--since / --until <YYYY-MM-DD>。"
-        "同じものの繰り返しは OR、違うものどうしは AND。大文字小文字は区別しない",
-        "  並べ方と形: --sort path|mtime|type|title、-r（逆順）、--limit <N>、"
-        "--format table|path|detail|json|jsonl|count",
-        "  md を書くときは頭に frontmatter を付けてください。type は必須、title・description・"
-        "tags（kebab-case で 2〜4 個）・keywords は推奨。",
-    ]
-    if os.path.isfile(os.path.join(root, *CONVENTION_DOC.split("/"))):
-        lines[-1] += f"type の値と詳しい決まりは {CONVENTION_DOC}"
-    return lines
+    line = (
+        f"{lead} '{command} --docs --keyword <語>' で"
+        " frontmatter の索引を引いてください（--type・--tag・--path でも絞れる。"
+        "ワークスペースとプロジェクトを横断し、パスはワークスペースルートから）。"
+        "grep は本文中の文字列を探すときか、0 件だったときに使ってください。"
+    )
+    if _has_convention(root):
+        line += f"書き方の決まりは '{command} --docs --keyword frontmatter' で引けます。"
+    return [line]
 
 
 def fail_streak_note(conf: settings.Settings, root: str, n: int) -> str:
@@ -385,3 +382,88 @@ def fail_streak_note(conf: settings.Settings, root: str, n: int) -> str:
         "ユーザに相談してください。資料は"
     )
     return "\n".join(guide_lines(conf, root, lead))
+
+
+def _has_convention(root: str) -> bool:
+    return os.path.isfile(os.path.join(root, *CONVENTION_DOC.split("/")))
+
+
+# --- 書いた時点の案内（PostToolUse） --------------------------------------------------
+
+# frontmatter の無い md を新しく作ったときの案内の理由コード（設計 付録 A）。
+CODE_MISSING_FRONTMATTER = "NOTICE_DOC_FRONTMATTER"
+# frontmatter を付けない決まりの md の名前。中身がそのまま使われる（README はホストや
+# エディタが頭から表示し、CLAUDE.md は毎回モデルの文脈に入る）ので、頭の YAML がそのまま
+# 人にもモデルにも見える。決まりの文書（CONVENTION_DOC）の「付けていない」と揃える。
+NO_FRONTMATTER_NAMES = ("README.md", "CLAUDE.md")
+# git に「無視されているか」を聞く時間の上限（秒）。過ぎたら何も言わない。
+CHECK_SECONDS = 2.0
+
+
+def missing_frontmatter(conf: settings.Settings, root: str, payload: hookio.Input) -> str:
+    """Write で新しく作った md に frontmatter か `type` が無ければ、1 度だけ案内を返す。
+
+    判定は変えない（止めない・差し戻さない）。案内を出すのは次をすべて満たすときだけ。
+
+    - Write で新しく作った（`tool_response.type` が `create`）。既にある md の Edit・上書きでは
+      出さない。意図して frontmatter を持たない md（README.md・CLAUDE.md、取り込んだ資料）を
+      直すたびに促すと、付けに行かせることになる。作るのは 1 本につき 1 度なので、セッションを
+      またいで覚える必要も無い
+    - 索引の対象に入る md。書いた先のツリー（ワークスペース・プロジェクト・ワークツリー）の
+      git で決める。ワークツリーはワークスペースの `.gitignore` では無視されるが、統合した後は
+      統合先の索引に入るので、そのワークツリー自身の git に聞く。ccnavi ディレクトリの下と、
+      git が無視するものは索引に載らないので出さない
+    - 決まりの文書が「付けない・付けなくてよい」とする md でない。README.md・CLAUDE.md、
+      下書きの置き場（`wip/scratchpad/`。使い捨てで、統合のときに外す）、チケットの置き場
+      （独自の frontmatter を持つ）。下書きは索引には載るが、frontmatter を求めない
+    """
+    if payload.tool_name != "Write" or payload.tool_response.get("type") != "create":
+        return ""
+    raw = str(payload.tool_input.get("file_path") or "")
+    name = raw.replace("\\", "/").rsplit("/", 1)[-1]
+    if not raw.endswith(".md") or name.casefold() in (n.casefold() for n in NO_FRONTMATTER_NAMES):
+        return ""
+    try:
+        written = os.path.abspath(os.path.join(payload.cwd or root, raw))
+        where = tree.tree_of(root, fsio.full_path(raw, payload.cwd or root), conf.projects)
+        if where is None or not os.path.exists(os.path.join(where.root, ".git")):
+            return ""
+        rel = tree.relative(where, written)
+        home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).strip("/")
+        exempt = tuple(p for p in (home, ticket_places.SCRATCH, conf.tickets.strip("/")) if p)
+        if not rel or rel.startswith("../") or docsearch_index._excluded(rel, exempt):
+            return ""
+        if rel in docsearch_index._ignored(where.root, [rel], timeout=CHECK_SECONDS):
+            return ""
+        head = docsearch_index._read_head(written)
+    except Exception:  # noqa: BLE001 - 案内の足しなので、何が起きても実行後チェックを止めない
+        return ""
+    if head is None:
+        return ""
+    front = docsearch_index.front_matter(head)
+    if front is not None and str(front.get("type") or "").strip():
+        return ""
+    return _frontmatter_hint(conf, root, _rel(written, root) or rel, front is not None)
+
+
+def _frontmatter_hint(conf: settings.Settings, root: str, shown: str, has_front: bool) -> str:
+    command = _command(conf, root)
+    if has_front:
+        lack = "frontmatter に type が無い"
+        todo = "既にあるキーの値と順序は変えず、type を足してください。"
+    else:
+        lack = "frontmatter が無いか読めない"
+        todo = (
+            "頭を --- で囲んだ frontmatter にし、type（必須）・title・description・tags・"
+            "keywords を書いてください。"
+        )
+    line = (
+        f"[ccnavi] {CODE_MISSING_FRONTMATTER} ({shown}) {lack}ので、'{command} --docs' の"
+        f" --type・--tag・--keyword では見つかりません。{todo}"
+    )
+    if _has_convention(root):
+        line += (
+            f"type の値と決まりは {CONVENTION_DOC}"
+            f"（'{command} --docs --keyword frontmatter' でも引けます）。"
+        )
+    return line

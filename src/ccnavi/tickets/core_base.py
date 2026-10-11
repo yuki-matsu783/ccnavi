@@ -347,11 +347,35 @@ def reviewed_mark(
 class Checked:
     """`confirm` と `withdraw` の答え。`problems` は標準エラーに出す文面（行のリスト）。
 
-    通らなければ `changes` は None。
+    通らなければ `changes` は None で、`code` に通らなかった根拠の種別（`CORE_*`）が入る。
+    端末と Chrome の画面と試験が、文の言い回しではなく同じ材料で分岐できるようにするため。
+    文面にも同じコードを `[<コード>]` の形で載せる（`tagged`）。理由が幾つもあるときは、
+    `code` は最初の理由のもので、文面は理由ごとに自分のコードを持つ。
     """
 
     problems: list[str]
     changes: Changes | None
+    code: str = ""
+
+
+# 通らなかった根拠の種別。付録 A の `CORE_*`。
+# 書く段で履歴を残せないと分かった（`unwritten`）。確認と取り下げで共通。
+CODE_HISTORY_UNWRITABLE = "CORE_HISTORY_UNWRITABLE"
+
+
+def tagged(code: str, line: str) -> str:
+    """文面の 1 行にコードを載せる。`ccnavi: ` で始まる行はその後ろに、ほかは頭に置く。"""
+    head = "ccnavi: "
+    if line.startswith(head):
+        return f"{head}[{code}] {line[len(head) :]}"
+    return f"[{code}] {line}"
+
+
+def refused(code: str, problems: list[str]) -> Checked:
+    """通らなかった答え。文面の最初の行にコードを載せる（続きの行は最初の行の補足）。"""
+    lines = list(problems) or [f"ccnavi: {code}"]
+    lines[0] = tagged(code, lines[0])
+    return Checked(lines, None, code)
 
 
 def unwritten(text: str) -> list[str]:

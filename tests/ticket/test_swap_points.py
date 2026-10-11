@@ -1373,6 +1373,45 @@ class WithdrawTest(CoreHarness):
         checked = core.withdraw(self.snapshot(), ["i0001-01-01"], {"i0001-01-01": child.encode()})
         self.assertEqual(checked.problems, [])
 
+    def test_each_refusal_carries_its_reason_code(self):
+        """通らなかった答えは理由コードを持ち、文面の行にも同じコードが載る。
+
+        理由が幾つもあるときは、行ごとに自分のコードを持ち、答えの `code` は最初の理由のもの。
+        """
+        text = self.new_parent()
+        write(os.path.join(self.approved, "doing", "i0001.md"), text + "書き足した\n")
+        checked = core.withdraw(self.snapshot(), ["i0001", "i0009"], {"i0001": text.encode()})
+        self.assertIsNone(checked.changes)
+        self.assertEqual(checked.code, "CORE_WITHDRAW_CHANGED")
+        self.assertTrue(checked.problems[0].startswith("[CORE_WITHDRAW_CHANGED] i0001: "))
+        self.assertIn(
+            "[CORE_WITHDRAW_NOT_OPEN] i0009: 承認済みチケットが作業中（doing/）に無い",
+            checked.problems,
+        )
+        nothing = core.withdraw(self.snapshot(), [], {})
+        self.assertEqual(nothing.code, "CORE_WITHDRAW_NO_IDS")
+        self.assertEqual(nothing.problems, ["[CORE_WITHDRAW_NO_IDS] 取り下げる識別子が無い"])
+        # 一覧（Chrome のボード）は今までどおり文面だけを返す
+        listed = core.withdrawable(self.snapshot(), "i0001")
+        self.assertFalse(any(p.startswith("[") for _, _, ps in listed for p in ps), listed)
+        # 通った答えはコードを持たない
+        write(os.path.join(self.approved, "doing", "i0001.md"), text)
+        self.assertEqual(
+            core.withdraw(self.snapshot(), ["i0001"], {"i0001": text.encode()}).code, ""
+        )
+
+    def test_a_confirm_refusal_carries_its_reason_code(self):
+        self.new_parent()
+        checked = core.confirm(self.snapshot(), "i0009", 1, None, "")
+        self.assertEqual(checked.code, "CORE_CONFIRM_NO_PARENT")
+        self.assertEqual(
+            checked.problems,
+            ["ccnavi: [CORE_CONFIRM_NO_PARENT] 親 i0009 の承認済みチケットが作業中に無い"],
+        )
+        checked = core.confirm(self.snapshot(), "i0001", 1, None, "")
+        self.assertEqual(checked.code, "CORE_CONFIRM_NOT_REQUESTED")
+        self.assertTrue(checked.problems[0].startswith("ccnavi: [CORE_CONFIRM_NOT_REQUESTED] "))
+
     def test_a_changed_copy_is_not_withdrawn(self):
         text = self.new_parent()
         path = os.path.join(self.approved, "doing", "i0001.md")

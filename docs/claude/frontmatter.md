@@ -109,3 +109,5 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 | `.claude/skills/yomiyasu/**` | 付けない | 外部から取り込んだもの（`UPSTREAM.md`を参照）。中身を書き換えないのでfrontmatterも足さない |
 
 既にあるmdにfrontmatterを足すときは、既存のキーの値と順序を変えず、足りないキーだけを後ろに足す。
+
+Writeで新しく作ったmdにfrontmatterか`type`が無いと、ccnaviが`NOTICE_DOC_FRONTMATTER`で1度だけ案内する。上の表で「付けない」「付けなくてよい」としたもののうち、`README.md`・`CLAUDE.md`・`wip/scratchpad/`・チケットの置き場には出さない。

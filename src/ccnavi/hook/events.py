@@ -574,7 +574,10 @@ def decide_after(
         bounced = "\n\n".join(p for p in (bounced, unchecked) if p)
         if bounced:
             text = f"{text}\n\n{bounced}" if text else bounced
-    if not text:
+    # frontmatter の無い md を新しく作ったなら、書いた時点で 1 度だけ書き方を案内する。
+    # 判定には加えない（差し戻しの有無は上の実行後チェックだけで決まる）。
+    hint = docsearch.missing_frontmatter(conf, root, payload)
+    if not text and not hint:
         return EXIT_OK
 
     # 差し戻すのは、直前の実行が汚したと言える分があるときだけ。セッションが
@@ -585,7 +588,7 @@ def decide_after(
     if pushback and mode == modes.ENABLE:
         # このイベントで差し戻す経路は exit 2 と標準エラーだけ。ツールは
         # すでに走っているので取り消せず、渡せるのは「次に何をするか」になる。
-        stderr.write(text + "\n")
+        stderr.write("\n\n".join(p for p in (text, hint) if p) + "\n")
         return EXIT_BLOCK
 
     if pushback:
@@ -595,6 +598,7 @@ def decide_after(
         text = (
             f"[ccnavi dry-run] {modes.ENABLE} would have sent this back as a correction:\n" + text
         )
+    text = "\n\n".join(p for p in (text, hint) if p)
     # 起動したのがサブエージェント（入れ子）なら、差し戻しを無視した知らせはその子にしか
     # 届かない。ユーザにも見えるよう `systemMessage` に同じ文を載せる。
     # 上の exit 2 の経路では標準出力の JSON が読まれないので、載せられない。

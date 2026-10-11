@@ -24,6 +24,30 @@ from . import (
 
 # ---- 承認の取り下げ ----------------------------------------------------------------------------
 
+# 取り下げが通らなかった根拠の種別。付録 A の `CORE_WITHDRAW_*`。
+# 取り下げる識別子が渡されなかった。
+CODE_WITHDRAW_NO_IDS = "CORE_WITHDRAW_NO_IDS"
+# 承認済みチケットが作業中（doing/）に無い。
+CODE_WITHDRAW_NOT_OPEN = "CORE_WITHDRAW_NOT_OPEN"
+# 親のブランチの doing/ に無い（別のツリーにある）。
+CODE_WITHDRAW_OTHER_BRANCH = "CORE_WITHDRAW_OTHER_BRANCH"
+# 承認済みチケット自体が信頼できない（親子が決まらない など）。
+CODE_WITHDRAW_BLOCKED = "CORE_WITHDRAW_BLOCKED"
+# 続きの子（followup）で、戻す提案が無い。
+CODE_WITHDRAW_FOLLOWUP = "CORE_WITHDRAW_FOLLOWUP"
+# 着手済み。
+CODE_WITHDRAW_STARTED = "CORE_WITHDRAW_STARTED"
+# 親に子の承認済みチケットか、todo/ の子の提案がある。
+CODE_WITHDRAW_HAS_CHILDREN = "CORE_WITHDRAW_HAS_CHILDREN"
+# 親にフェーズのマーカーがある（読めないときも）。
+CODE_WITHDRAW_MARKERS = "CORE_WITHDRAW_MARKERS"
+# 戻す先の todo/ に同じ識別子の提案がある。
+CODE_WITHDRAW_TODO_EXISTS = "CORE_WITHDRAW_TODO_EXISTS"
+# 承認コミットの親に提案が無い（承認コミットを引けない）。
+CODE_WITHDRAW_NO_PRIOR = "CORE_WITHDRAW_NO_PRIOR"
+# 承認のあとに承認済みチケットの中身が変わった（読めないときも）。
+CODE_WITHDRAW_CHANGED = "CORE_WITHDRAW_CHANGED"
+
 
 def withdraw(
     snapshot: core_base.Snapshot,
@@ -48,14 +72,14 @@ def withdraw(
     review_waiting, _ = approval.scan_review(conf, root, raw=raw)
     proposals, _ = approval.scan_proposals(conf, root, raw.everything)
     open_index = approval_checks.by_id(approved)
-    problems: list[str] = []
+    reasons: list[tuple[str, str]] = []
     wanted = [i for i in dict.fromkeys(ids) if i]
     if not wanted:
-        problems.append("取り下げる識別子が無い")
+        reasons.append((CODE_WITHDRAW_NO_IDS, "取り下げる識別子が無い"))
     for ident in wanted:
-        problems += [
-            f"{ident}: {p}"
-            for p in _withdraw_problems(
+        reasons += [
+            (code, f"{ident}: {p}")
+            for code, p in _withdraw_reasons(
                 conf,
                 root,
                 ident,
@@ -66,8 +90,11 @@ def withdraw(
                 compare=True,
             )
         ]
-    if problems:
-        return core_base.Checked(problems, None)
+    if reasons:
+        # 理由ごとに自分のコードを文面に載せる。答えの `code` は最初の理由のもの。
+        return core_base.Checked(
+            [core_base.tagged(code, text) for code, text in reasons], None, reasons[0][0]
+        )
     stamp = snapshot.stamp or fsio.stamp()
     actor = snapshot.actor
     notes = io.StringIO()
@@ -104,7 +131,9 @@ def withdraw(
             )
             stage.line(f"  {ident} の承認を取り下げた（doing/ → todo/）")
     if notes.getvalue():
-        return core_base.Checked(core_base.unwritten(notes.getvalue()), None)
+        return core_base.refused(
+            core_base.CODE_HISTORY_UNWRITABLE, core_base.unwritten(notes.getvalue())
+        )
     return core_base.Checked([], core_base.Changes(agree.Planned(stage, stopped), root, conf))
 
 
@@ -145,33 +174,59 @@ def _withdraw_problems(
     prior_proposals: dict[str, bytes],
     compare: bool = False,
 ) -> list[str]:
-    """取り下げられない理由。`compare` なら中身の一致（`_content_problems`）も見る（書く側）。"""
+    """取り下げられない理由（文面）。`compare` なら中身の一致も見る（書く側）。"""
+    return [
+        text
+        for _, text in _withdraw_reasons(
+            conf, root, ident, copy, everything, proposals, prior_proposals, compare
+        )
+    ]
+
+
+def _withdraw_reasons(
+    conf: settings.Settings,
+    root: str,
+    ident: str,
+    copy: ticket_model.Ticket | None,
+    everything: list[ticket_model.Ticket],
+    proposals: list[ticket_model.Ticket],
+    prior_proposals: dict[str, bytes],
+    compare: bool = False,
+) -> list[tuple[str, str]]:
+    """取り下げられない理由を (コード, 文面) で。`compare` なら中身の一致も見る。"""
     if copy is None:
-        return ["承認済みチケットが作業中（doing/）に無い"]
+        return [(CODE_WITHDRAW_NOT_OPEN, "承認済みチケットが作業中（doing/）に無い")]
     home = copy.parent or copy.ticket
     if copy.tree != home:
-        return [f"親のブランチ {home} の doing/ に無い（{copy.tree or 'ワークスペースルート'}）"]
-    found: list[str] = []
+        where = copy.tree or "ワークスペースルート"
+        return [(CODE_WITHDRAW_OTHER_BRANCH, f"親のブランチ {home} の doing/ に無い（{where}）")]
+    found: list[tuple[str, str]] = []
     if copy.blocked:
         # 親子のチケットが決まらない・親のブランチの外のチケットなど。
         # 状態の操作と同じく止める
-        found.append(copy.blocked)
+        found.append((CODE_WITHDRAW_BLOCKED, copy.blocked))
     if copy.raw.get(approval.FOLLOWUP_KEY):
         found.append(
-            "続きの子（followup）は提案を経ずに作ったチケットなので、戻す提案が無い。"
-            "取り下げられない"
+            (
+                CODE_WITHDRAW_FOLLOWUP,
+                "続きの子（followup）は提案を経ずに作ったチケットなので、戻す提案が無い。"
+                "取り下げられない",
+            )
         )
     if copy.started_at:
         found.append(
-            "着手済み。取りやめるなら "
-            f"`ccnavi-ticket.sh cancel {ident} --reason <理由>` をエージェントに頼んでください"
-            "（done/ に取り消しの記録が残る）"
+            (
+                CODE_WITHDRAW_STARTED,
+                "着手済み。取りやめるなら "
+                f"`ccnavi-ticket.sh cancel {ident} --reason <理由>` をエージェントに頼んでください"
+                "（done/ に取り消しの記録が残る）",
+            )
         )
     if not copy.is_child:
         if any(t.parent == ident for t in everything):
-            found.append("子の承認済みチケットがある")
+            found.append((CODE_WITHDRAW_HAS_CHILDREN, "子の承認済みチケットがある"))
         if any(t.parent == ident and t.state == ticket_model.TODO for t in proposals):
-            found.append("todo/ に子の提案がある")
+            found.append((CODE_WITHDRAW_HAS_CHILDREN, "todo/ に子の提案がある"))
         marks_dir = os.path.join(
             settings.approved_dir(conf, copy.tree_root), approval_marks.PHASES_DIR, ident
         )
@@ -179,21 +234,37 @@ def _withdraw_problems(
             # 書きかけで異常終了して残った一時ファイル（`.<名前>.<一意>.part`）はマーカーではない。
             names = fsio.listdir(marks_dir)
             if [n for n in names if not fsio.is_temp_name(n)]:
-                found.append(f"{approval_marks.PHASES_DIR}/{ident}/ にマーカーがある")
+                found.append(
+                    (
+                        CODE_WITHDRAW_MARKERS,
+                        f"{approval_marks.PHASES_DIR}/{ident}/ にマーカーがある",
+                    )
+                )
         except FileNotFoundError:
             pass
         except OSError as exc:
             # 読めないなら、無いとは言えない（取り下げを緩めない）。
-            found.append(f"{approval_marks.PHASES_DIR}/{ident}/ を読めない ({exc})")
+            found.append(
+                (CODE_WITHDRAW_MARKERS, f"{approval_marks.PHASES_DIR}/{ident}/ を読めない ({exc})")
+            )
     todo = os.path.join(
         copy.tree_root, conf.tickets.replace("/", os.sep), ticket_model.TODO, ident + ".md"
     )
     if fsio.lexists(todo):
-        found.append("todo/ に同じ識別子の提案がある（戻す先に同じ識別子がすでにある）")
+        found.append(
+            (
+                CODE_WITHDRAW_TODO_EXISTS,
+                "todo/ に同じ識別子の提案がある（戻す先に同じ識別子がすでにある）",
+            )
+        )
     if ident not in prior_proposals:
-        found.append("承認コミットの親に提案が無い（承認コミットを引けない）")
+        found.append(
+            (CODE_WITHDRAW_NO_PRIOR, "承認コミットの親に提案が無い（承認コミットを引けない）")
+        )
     elif compare:
-        found += _content_problems(copy, prior_proposals[ident])
+        found += [
+            (CODE_WITHDRAW_CHANGED, p) for p in _content_problems(copy, prior_proposals[ident])
+        ]
     return found
 
 
