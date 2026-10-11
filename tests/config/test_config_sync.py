@@ -29,16 +29,20 @@ from unittest import mock
 
 from ccnavi.infra import settings
 from ccnavi.tickets import configsync, risk
+from tests import phasecopy
 from tests.config.test_config_union import (
     COMMON_PHASES,
     COMMON_RISK,
     COMMON_RULES,
+    LIB_PHASES,
     ConfigUnionHarness,
     git,
+    layer_path,
     read,
     ticket_text,
     write,
 )
+from tests.ticketsample import PLAIN_PHASES
 
 SCOPE = ("src/*",)
 
@@ -62,9 +66,14 @@ class ConfigMirrorTest(ConfigUnionHarness):
     def start_parent(self, project="lib", name="i0001"):
         """project 向けの親を承認し、そのプロジェクトからワークツリーを切って着手する。"""
         owner = os.path.join(self.projects, project) if project else self.ws
+        # 計画の無い親は着手できない。レイヤーに定義のあるプロジェクトはその定義を使い、
+        # 定義の無いプロジェクト（app）には最小の定義を置く。
+        plan = {"lib": "build", "": "docs"}.get(project, "work")
+        if not os.path.exists(layer_path(owner, "phases")):
+            write(layer_path(owner, "phases"), PLAIN_PHASES)
         self.propose(
             name,
-            ticket_text(name, project=project, allow=SCOPE),
+            ticket_text(name, project=project, plan=[plan], allow=SCOPE),
             project=project,
         )
         approved = self.approve()
@@ -107,8 +116,11 @@ class ConfigMirrorTest(ConfigUnionHarness):
         """C1 の書いたパスの一覧（基点は親のワークツリー）で、ミラーの書き込みは外でも通す。"""
         self.add_script()
         tree = self.worktree(os.path.join(self.projects, "lib"), "i0001")
-        text = ticket_text("i0001", project="lib", allow=SCOPE)
-        write(os.path.join(tree, "wip", "proposals", "todo", "i0001.md"), text)
+        text = ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE)
+        write(
+            os.path.join(tree, "wip", "proposals", "todo", "i0001.md"),
+            phasecopy.insert(text, LIB_PHASES),
+        )
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         write(
@@ -152,7 +164,9 @@ class ConfigMirrorTest(ConfigUnionHarness):
             + "  - {id: again, points: 2, script: .ccnavi/common/scripts/count.sh,"
             " message: もう一度}\n",
         )
-        self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
+        self.propose(
+            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree(self.lib, "i0001")
 
@@ -248,7 +262,9 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
     def test_uncommitted_edits_in_the_mirror_are_overwritten(self):
         """3: ミラーは誰も編集しないので、未コミットの変更があっても止めない。"""
-        self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
+        self.propose(
+            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree(self.lib, "i0001")
         write(mirror_of(tree, "rules.yml"), "# 書きかけ\n")
@@ -259,19 +275,26 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertEqual(json.loads(read(mirror_of(tree, "rules.yml"))), COMMON_RULES)
 
     def test_no_notice_and_no_gate_at_close(self):
-        """3: 上書きの知らせも、閉じるのを止める処理も無い。着手の直後に閉じられる。"""
+        """3: 上書きの知らせも、閉じるのを止める処理も無い。"""
         self.start_parent()
 
+        # 計画のある親は `finish` が全フェーズの終了を求めるので、閉じられはしない。
+        # 止める理由に、ミラーの上書きは出ない（計画の理由だけ）。
         closed = self.ccnavi("ticket", "finish", "i0001")
 
-        self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
+        self.assertEqual(closed.returncode, 1, closed.stdout)
+        self.assertIn("終わっていないフェーズがある", closed.stderr)
+        for word in ("ミラー", "上書き", "config-synced"):
+            self.assertNotIn(word, closed.stdout + closed.stderr)
         refused = self.ccnavi("--config-synced", "i0001", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
 
     def test_a_common_layer_the_mirror_cannot_hold_stops_the_start(self):
         """3: ミラーとして読めない共通レイヤーは写さず、着手しない。"""
         write(self.risk, "version: 1\nfactors: [\n")
-        self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
+        self.propose(
+            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree(self.lib, "i0001")
 
@@ -284,7 +307,9 @@ class ConfigMirrorTest(ConfigUnionHarness):
     def test_a_common_phases_file_stops_the_start(self):
         """3: 共通レイヤーに phases.yml があれば error で、何も配らず着手しない。"""
         write(self.phases, COMMON_PHASES)
-        self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
+        self.propose(
+            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree(self.lib, "i0001")
 
@@ -297,7 +322,9 @@ class ConfigMirrorTest(ConfigUnionHarness):
     def test_a_script_the_risk_points_at_that_is_missing_stops_the_start(self):
         """3: 配点が指すスクリプトが無ければ、配らずに止める。"""
         write(self.risk, COMMON_SCRIPT_RISK)
-        self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
+        self.propose(
+            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree(self.lib, "i0001")
 
@@ -311,7 +338,9 @@ class ConfigMirrorTest(ConfigUnionHarness):
         """3: 読む前に消えた共通レイヤーのスクリプトは、空として写さずに止める。"""
         conf = self.settings()
         self.add_script()
-        self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
+        self.propose(
+            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree(self.lib, "i0001")
         real = configsync._read_strict
@@ -339,7 +368,9 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
     def test_a_symlinked_target_stops_the_start(self):
         """3: コピー先がシンボリックリンクなら、写さずに着手を止める。"""
-        self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
+        self.propose(
+            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree(self.lib, "i0001")
         target = mirror_of(tree, "rules.yml")
@@ -354,7 +385,9 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
     def test_a_symlinked_mirror_directory_stops_the_start(self):
         """3: ミラーの置き場そのものがリンクでも止める。リンク先には何も書かない。"""
-        self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
+        self.propose(
+            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree(self.lib, "i0001")
         elsewhere = os.path.join(os.path.dirname(tree), "elsewhere")
@@ -373,7 +406,9 @@ class ConfigMirrorTest(ConfigUnionHarness):
         write(mirror_of(self.lib, "scripts/old.sh"), "old\n")
         git(self.lib, "add", "-A")
         git(self.lib, "commit", "--quiet", "-m", "old mirror")
-        self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
+        self.propose(
+            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree(self.lib, "i0001")
         changes, why = configsync.plan(conf, self.ws, tree)
@@ -501,7 +536,9 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
     def test_core_file_guard_keeps_the_mirror(self):
         """4: バックアップと復元は、ミラーした分を戻さない。ミラーの後の書き換えは戻す。"""
-        self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
+        self.propose(
+            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         tree = self.worktree(self.lib, "i0001")
@@ -525,7 +562,9 @@ class ConfigMirrorTest(ConfigUnionHarness):
         write(mirror_of(self.lib, "phases.yml"), COMMON_PHASES)
         git(self.lib, "add", "-A")
         git(self.lib, "commit", "--quiet", "-m", "old mirror")
-        self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
+        self.propose(
+            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
         self.assertEqual(self.approve().returncode, 0)
         tree = self.worktree(self.lib, "i0001")
         command = "sh .ccnavi/scripts/ccnavi-ticket.sh start i0001"

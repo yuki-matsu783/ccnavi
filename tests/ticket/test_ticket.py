@@ -34,7 +34,7 @@ from ccnavi.infra import settings, shellread
 from ccnavi.tickets import approval, phase_forms, phase_scope, review, ticket_fields
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
-from tests.ticketsample import RULES
+from tests.ticketsample import RULES, plain_parent, write_plain_phases
 
 
 def git(cwd, *args):
@@ -80,6 +80,7 @@ def ticket_text(
     predecessors=(),
     title="作業",
     issue=None,
+    plan=1,
 ):
     lines = ["---", "version: 1", f"ticket: {name}"]
     if issue is not None:
@@ -102,7 +103,7 @@ def ticket_text(
             for g in globs:
                 lines += ["  - match: Write|Edit", f'    glob: "{g}"']
     lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
-    return "\n".join(lines) + "\n"
+    return plain_parent("\n".join(lines) + "\n", plan)
 
 
 class TicketTest(unittest.TestCase):
@@ -118,6 +119,7 @@ class TicketTest(unittest.TestCase):
 
         # 共通レイヤーは既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない。
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
+        write_plain_phases(self.root)
         self.state = os.path.join(self.root, "logs", "state")
         self.parent_tree = self.worktree("i0001", "main")
         # 承認済みチケットとマーカーは親のツリーに置かれ、親のブランチに乗る。
@@ -210,9 +212,9 @@ class TicketTest(unittest.TestCase):
         if started.returncode != 0:
             self.assertIn("着手済み", started.stderr, started.stdout + started.stderr)
 
-    def family(self, review=(True, False)):
+    def family(self, review=(True, False), plan=1):
         """親 1 本と子 2 本をフェーズ 1 で提案し、承認して、子のワークツリーを作って着手する。"""
-        self.propose("i0001", allow=("src/*", "wip/*"))
+        self.propose("i0001", allow=("src/*", "wip/*"), plan=plan)
         self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",), review=review[0])
         self.propose("i0001-01-02", parent="i0001", phase=1, allow=("src/b/*",), review=review[1])
         git(self.parent_tree, "add", "-A")
@@ -1039,10 +1041,10 @@ class TicketTest(unittest.TestCase):
         git(self.parent_tree, "commit", "--quiet", "-m", "done")
 
     def test_phase_end_announces_and_gate_closes(self):
-        self.family()
+        self.family(plan=["work-mr"])
         self.close_phase()
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn("フェーズ 1 が終わりました", self.reason(said))
+        self.assertIn("フェーズ 1（MR作業） が終わりました", self.reason(said))
         self.assertIn("request", self.reason(said))
         # ELI5 の置き場を名指しする
         self.assertIn("--eli5 wip/eli5/phase-1.html", self.reason(said))
@@ -1076,7 +1078,7 @@ class TicketTest(unittest.TestCase):
         `.ccnavi/scripts/` はワークスペースにしか無い。プロジェクトから切ったワークツリーでは
         相対の `sh .ccnavi/scripts/...` が届かないので、案内は絶対パスで出す。
         """
-        self.family()
+        self.family(plan=["work-mr"])
         self.close_phase()
         review_sh = settings.script_command(self.root, "ccnavi-review.sh")
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
@@ -3161,7 +3163,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("SubagentStop", result.stdout)
         self.assertIn("origin が無い", result.stdout)
         # 超えている子を、承認の前に名指しする。
-        self.propose("i0001-02-03", parent="i0001", phase=2, allow=("docs/*",))
+        self.propose("i0001-01-03", parent="i0001", phase=1, allow=("docs/*",))
         result = self.ccnavi("--lint", "--mode", "enable")
         self.assertIn("超えている", result.stdout)
 

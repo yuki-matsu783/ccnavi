@@ -32,6 +32,7 @@ from unittest import mock
 from ccnavi.infra import tree
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
+from tests.ticketsample import plain_parent, write_plain_phases
 
 WS_RULES = {
     "version": 1,
@@ -115,7 +116,7 @@ def layer_rules(root):
     return os.path.join(root, LAYER, "rules.yml")
 
 
-def ticket_text(name, *, parent="", project="", allow=()):
+def ticket_text(name, *, parent="", project="", allow=(), plan=0):
     lines = ["---", "version: 1", f"ticket: {name}"]
     if parent:
         lines += [f"parent: {parent}", "phase: 1"]
@@ -134,7 +135,7 @@ def ticket_text(name, *, parent="", project="", allow=()):
         for g in allow:
             lines += ["  - match: Write|Edit", f'    glob: "{g}"']
     lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
-    return "\n".join(lines) + "\n"
+    return plain_parent("\n".join(lines) + "\n", plan)
 
 
 class ProjectsTest(unittest.TestCase):
@@ -481,9 +482,11 @@ class ProjectsTest(unittest.TestCase):
         # 置き場はワークツリーの元リポジトリで決まり、承認済みチケットは記録したパスから
         # 引くので閉じられる。
         tree = self.worktree(self.lib, "i0010")
+        # 計画のある親だけが着手できる。定義はプロジェクトのレイヤー（config）に置く。
+        write_plain_phases(self.lib)
         write(
             os.path.join(tree, "wip", "proposals", "todo", "i0010.md"),
-            ticket_text("i0010", allow=("src/*",)),
+            ticket_text("i0010", allow=("src/*",), plan=1),
         )
         approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
@@ -494,11 +497,11 @@ class ProjectsTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(tree, "wip", "proposals", "todo", "i0010.md")))
         started = self.ccnavi("ticket", "start", "i0010")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        # 着手で共通レイヤーをミラーしても、知らせも閉じるのを止める処理も無い。
-        done = self.ccnavi("ticket", "finish", "i0010")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        closed = os.path.join(tree, ".ccnavi", "approved", "done", "i0010.md")
-        self.assertTrue(os.path.exists(closed), closed)
+        # 着手の欄は、そのツリーの置き場の承認済みチケットに書かれる。
+        doing = os.path.join(tree, ".ccnavi", "approved", "doing", "i0010.md")
+        self.assertTrue(os.path.exists(doing), doing)
+        with open(doing, encoding="utf-8") as f:
+            self.assertNotIn('started_at: ""', f.read())
 
     def test_lint_names_a_ticket_place_that_is_not_scanned(self):
         write(
