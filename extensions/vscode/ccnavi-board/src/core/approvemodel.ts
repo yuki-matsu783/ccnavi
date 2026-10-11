@@ -129,11 +129,44 @@ export interface ApproveResult {
   readonly copies: readonly string[];
   /** ターミナルなら標準出力に出ていた行 */
   readonly lines: readonly string[];
+  /** 承認した子のワークツリーの計画。`state` が `create` のものを拡張が承認の後に作る（`ccnavi-git.sh worktree add`） */
+  readonly worktrees: readonly ApproveWorktree[];
   /**
    * Claude Code に渡す文（承認された識別子と後工程の進め方）。hook は承認を知らせないので、
    * 拡張がこの文を渡す
    */
   readonly prompt: string;
+}
+
+/** 承認した子のワークツリーの計画 1 本（実行ファイルの `worktrees`。状態は `create` `exists` `no-parent` `project`） */
+export interface ApproveWorktree {
+  readonly ticket: string;
+  readonly parent: string;
+  /** ワークスペースルートからの相対（`/` 区切り） */
+  readonly path: string;
+  readonly branch: string;
+  /** 親のワークツリーが今いるブランチ。`create` のときだけ入る */
+  readonly base: string;
+  readonly state: string;
+}
+
+/** 作れなかった子のワークツリーと、その理由（作る sh の標準エラーの 1 行目など） */
+export interface ChildWorktreeFailure {
+  readonly worktree: ApproveWorktree;
+  readonly reason: string;
+}
+
+/**
+ * 作れなかった子のワークツリーを、名前と手で打つコマンドで知らせる文（1 本 1 行）。
+ * `gitCommand` は `ccnavi-git.sh` を呼ぶ sh の前置き（`commands.ts` の `gitScriptCommand`）。
+ */
+export function childWorktreeFailureText(failed: readonly ChildWorktreeFailure[], gitCommand: string): string {
+  return failed
+    .map(({ worktree: w, reason }) =>
+      `子 ${w.ticket} のワークツリー ${w.path} を作れなかった（${reason}）。` +
+      `手で作るなら: ${gitCommand} worktree add ${w.path} -b ${w.branch} ${w.base}`,
+    )
+    .join("\n");
 }
 
 export interface ApproveMismatch {
@@ -256,6 +289,14 @@ export function parseApproveResult(text: string): ResultParse {
       approved: list(raw.approved).map(str),
       copies: list(raw.copies).map(str),
       lines: list(raw.lines).map(str),
+      worktrees: list(raw.worktrees).filter(isRecord).map((w) => ({
+        ticket: str(w.ticket),
+        parent: str(w.parent),
+        path: str(w.path),
+        branch: str(w.branch),
+        base: str(w.base),
+        state: str(w.state),
+      })),
       prompt: str(raw.prompt),
     },
   };

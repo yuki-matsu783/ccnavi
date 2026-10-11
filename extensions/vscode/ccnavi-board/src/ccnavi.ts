@@ -31,12 +31,14 @@ import {
   type ApproveOutcome,
   type ApprovePreview,
   type ApproveResult,
+  type ApproveWorktree,
 } from "./core/approvemodel.js";
 import {
   approveArgs,
   c1TargetOf,
   decideArgs,
   decidePreviewArgs,
+  GIT_SCRIPT,
   overrideArgs,
   planOrderArgs,
   planOrderWriteArgs,
@@ -90,6 +92,9 @@ const MAX_OUTPUT = 32 * 1024 * 1024;
  * 走査は数百ミリ秒で終わるが、遅い機械と大きなリポジトリを見て 60 秒。
  */
 const APPROVE_TIMEOUT_MS = 60_000;
+
+/** 子のワークツリー 1 本を作る（`git worktree add` の局所の操作だけ。ネットワークには出ない） */
+const WORKTREE_TIMEOUT_MS = 60_000;
 
 /**
  * ボードの読み直し（`--explain --json`）に付ける期限（ミリ秒）。返らないと画面の「更新」が
@@ -358,6 +363,22 @@ export async function runDecideYes(
   }
   const said = firstLine(ran.stderr) || firstLine(ran.stdout);
   return { ok: false, error: said === "" ? `ccnavi-review.sh decide の出力を読み取れません（${parsed.error}）` : said };
+}
+
+/**
+ * 承認した子のワークツリーを 1 本作る（`ccnavi-git.sh worktree add <path> -b <子> <base>`）。
+ * 作れたら空文字、作れなければ理由（標準エラーの 1 行目など）を返す。ワークスペースルートから打つ。
+ */
+export async function runChildWorktreeAdd(shell: string, root: string, w: ApproveWorktree): Promise<string> {
+  const args = ["worktree", "add", w.path, "-b", w.branch, w.base];
+  const ran = await spawn(shell, [toPosixPath(path.join(root, GIT_SCRIPT)), ...args], root, WORKTREE_TIMEOUT_MS);
+  if (ran.killed) {
+    return "時間内に終わらなかった";
+  }
+  if (ran.code === 0) {
+    return "";
+  }
+  return firstLine(ran.stderr) || firstLine(ran.stdout) || `終了コード ${ran.code}`;
 }
 
 /**
