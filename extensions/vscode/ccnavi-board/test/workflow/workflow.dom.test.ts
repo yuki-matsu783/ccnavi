@@ -302,3 +302,67 @@ test("CB-D173 並べ直すと、今の線で置き場所を組み直す（番号
     await dom.close();
   }
 });
+
+/** 吹き出しの案内を最後まで進め、段の題と、指す先が見つかったか（中ほどに出す文だけの吹き出しでないか）を順に返す */
+async function walkTour(dom: DomPage): Promise<string[]> {
+  const titles: string[] = [];
+  for (let i = 0; i < 20 && dom.all(".tour").length > 0; i += 1) {
+    const centered = dom.one(".tour-bubble").classList.contains("center");
+    titles.push(`${dom.one("#tour-title").textContent ?? ""}${centered ? "（指す先なし）" : ""}`);
+    dom.click(dom.one('[data-action="tour-next"]'));
+    await dom.settle();
+  }
+  return titles;
+}
+
+test("CB-D177 拡張ホストが頼んだらタブの案内を出し、最後まで進めると閉じて tourDone を返す。ヘッダ右上の ? からもう一度出せる", async () => {
+  const dom = await openWorkflow();
+  try {
+    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
+    assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    // 計画のあるタブでは見本を出さない
+    assert.equal(dom.all(".tour-sample").length, 0);
+    assert.deepEqual(await walkTour(dom), ["図", "直す手段", "この順序に決める", "承認との関係", "案内"]);
+    assert.equal(dom.all(".tour").length, 0);
+    assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    assert.equal(dom.one("#tour-title").textContent, "図");
+    dom.key("Escape");
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0);
+    assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 2);
+    // 案内は何も送らない（線を変える頼みも保存も）
+    assert.equal(dom.posted.filter((message) => message.type === "order" || message.type === "save").length, 0);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D178 図を出せない答え（計画が空）では、案内の間だけ見本の計画（実行ファイルの答えの実例）を読むだけで出し、閉じたら消す", async () => {
+  const empty = { ...planOrderSample("open"), plans: [] };
+  const dom = await openWorkflow({ answer: empty });
+  try {
+    assert.equal(dom.all(".plan-graph").length, 0);
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    assert.equal(dom.all(".tour-sample").length, 1, "見本だと分かる帯が無い");
+    assert.deepEqual(
+      dom.all(".plan-graph").map((graph) => [graph.getAttribute("data-part"), graph.getAttribute("data-editable")]),
+      [
+        ["plan", "0"],
+        ["feedback", "0"],
+      ],
+    );
+    assert.equal(dom.one("#tour-title").textContent, "図");
+    assert.ok(!dom.one(".tour-bubble").classList.contains("center"), "見本の図を指していない");
+    dom.key("Escape");
+    await dom.settle();
+    assert.equal(dom.all(".plan-graph, .tour-sample").length, 0, "閉じたのに見本が残った");
+    assert.equal(dom.posted.filter((message) => message.type === "order" || message.type === "save" || message.type === "dirty").length, 0);
+  } finally {
+    await dom.close();
+  }
+});

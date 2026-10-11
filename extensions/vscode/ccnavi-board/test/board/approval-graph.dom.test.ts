@@ -17,6 +17,8 @@ import { screenStyle } from "../helpers/bundle.js";
 import { plansOf, reorderCases, type RawItem } from "../helpers/plan-reorder.js";
 import { PLAN_FIT_MIN_ZOOM } from "../../src/core/plan-graph.js";
 import type { DomPage } from "../helpers/dom.js";
+import type { HTMLButtonElement } from "happy-dom" with { "resolution-mode": "import" };
+import { buildBoard } from "../../src/core/board.js";
 
 const DIAMOND: readonly RawItem[] = ["research", { type: "design", after: [1] }, { type: "acceptance", after: [1] }, { type: "implement", after: [2, 3] }];
 const FEEDBACK: readonly RawItem[] = ["design-feedback", "skill-improve", { type: "implement-feedback", after: [5] }];
@@ -190,13 +192,85 @@ test("CB-D158 振り直しの見本の表の計画（振り直す前と後）を
   }
 });
 
-test("CB-D159 ワークフロー編集タブへの入口（「ワークフローを編集」）は、タブができるまで出さない", async () => {
+test("CB-D159 図のある親ごとに「ワークフローを編集」を出す。押すと親の識別子を送る（閉じてタブを開くのは拡張ホスト）。承認中は出さない", async () => {
   const dom = await openOverlay(samplePlans());
   try {
-    assert.equal(dom.all('[data-action="edit-workflow"]').length, 0);
-    assert.doesNotMatch(dom.one(".approval").textContent ?? "", /ワークフローを編集/);
+    // 親 1 つに全体計画とフィードバック計画の 2 つの図。入口は親ごとに 1 つ、その親の図の前
+    const buttons = dom.all('.approval [data-action="edit-workflow"]');
+    assert.deepEqual(
+      buttons.map((b) => [b.getAttribute("data-ticket"), b.textContent]),
+      [["i0001", "ワークフローを編集"]],
+    );
+    const family = dom.one('.approval .plan-family[data-ticket="i0001"]');
+    assert.deepEqual(
+      Array.from(family.querySelectorAll('[data-action="edit-workflow"], .plan-graph')).map((el) => el.getAttribute("data-action") ?? el.getAttribute("data-part")),
+      ["edit-workflow", "plan", "feedback"],
+    );
+    dom.click(buttons[0]);
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((m) => m.type === "editWorkflow"), [{ type: "editWorkflow", ticket: "i0001" }]);
   } finally {
     await dom.close();
+  }
+  const approving = await openBoard(fixture(), { approval: { kind: "approving", preview: preview(samplePlans()) }, measure: true });
+  try {
+    await approving.settle();
+    assert.equal(approving.all(".plan-graph").length, 2, "承認中も図は出す");
+    assert.equal(approving.all('[data-action="edit-workflow"]').length, 0);
+  } finally {
+    await approving.close();
+  }
+});
+
+test("CB-D175 ワークフロー編集タブに未保存の変更がある親を含む一覧は、その親の図の上に理由を出し、承認のボタンを押せなくする。外れたら押せる", async () => {
+  const dom = await openBoard(fixture(), { approval: { kind: "preview", preview: preview(samplePlans()) }, measure: true, unsaved: ["i0001"] });
+  try {
+    await dom.settle();
+    const note = dom.one('.approval .plan-family[data-ticket="i0001"] .plan-unsaved');
+    assert.equal(note.textContent, "ワークフロー編集タブに保存していない変更があります。保存するか破棄するまで、この一覧は承認できません。");
+    const confirm = dom.one<HTMLButtonElement>('[data-action="approve-confirm"]');
+    assert.equal(confirm.disabled, true);
+    assert.equal(dom.one("#approval-blocked").textContent, "親 i0001 のワークフロー編集タブに未保存の変更があります。保存するか破棄してから承認してください");
+    assert.equal(confirm.getAttribute("title"), dom.one("#approval-blocked").textContent);
+    // 未保存のままでも、タブへの入口は押せる（保存しに行く）
+    assert.equal(dom.one<HTMLButtonElement>('[data-action="edit-workflow"]').disabled, false);
+    // タブを閉じた・破棄した・保存した。拡張ホストがボードを描き直す
+    await dom.send({ type: "data", data: { kind: "board", board: buildBoard(fixture()), approval: { kind: "preview", preview: preview(samplePlans()) }, unsaved: [] } });
+    await dom.settle();
+    assert.equal(dom.all(".plan-unsaved, #approval-blocked").length, 0);
+    assert.equal(dom.one<HTMLButtonElement>('[data-action="approve-confirm"]').disabled, false);
+  } finally {
+    await dom.close();
+  }
+  // 別の親のタブだけが未保存なら、この一覧は押せる
+  const other = await openBoard(fixture(), { approval: { kind: "preview", preview: preview(samplePlans()) }, measure: true, unsaved: ["i0002"] });
+  try {
+    await other.settle();
+    assert.equal(other.one<HTMLButtonElement>('[data-action="approve-confirm"]').disabled, false);
+    assert.equal(other.all(".plan-unsaved").length, 0);
+  } finally {
+    await other.close();
+  }
+});
+
+test("CB-D176 タブで保存したあとに提案が変わった親（拡張ホストが見つけた）は、その親の図の上に注意を出す。承認は止めない", async () => {
+  const dom = await openBoard(fixture(), { approval: { kind: "preview", preview: preview(samplePlans()), changedSinceSave: ["i0001"] }, measure: true });
+  try {
+    await dom.settle();
+    const note = dom.one('.approval .plan-family[data-ticket="i0001"] .plan-changed');
+    assert.equal(
+      note.textContent,
+      "ワークフロー編集タブで保存したあとに、提案が変わっています（エージェントが書き換えた可能性があります）。図を確かめてから承認してください。",
+    );
+    assert.equal(dom.one<HTMLButtonElement>('[data-action="approve-confirm"]').disabled, false);
+  } finally {
+    await dom.close();
+  }
+  const plain = await openOverlay(samplePlans());
+  try {
+    assert.equal(plain.all(".plan-changed, .plan-unsaved, #approval-blocked").length, 0);
+  } finally {
+    await plain.close();
   }
 });
 
