@@ -3,3 +3,6 @@
 {"at": "2026-10-11T08:27:55Z", "ticket": "refactor-296-rule-expectations", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 1, "mark": "pending"}
 {"at": "2026-10-11T08:28:29Z", "ticket": "refactor-296-rule-expectations", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 1, "mark": "requested"}
 {"at": "2026-10-11T08:31:56Z", "ticket": "refactor-296-rule-expectations", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "actor": "yuki-matsu783", "phase": 1, "mark": "reviewed"}
+{"at": "2026-10-11T08:45:16Z", "ticket": "refactor-296-rule-expectations", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 2, "mark": "pending"}
+{"at": "2026-10-11T08:45:53Z", "ticket": "refactor-296-rule-expectations", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 2, "mark": "requested"}
+{"at": "2026-10-11T08:51:14Z", "ticket": "refactor-296-rule-expectations", "kind": "phase-mark", "from": null, "to": null, "via": "board", "actor": "yuki-matsu783", "phase": 2, "mark": "reviewed"}
