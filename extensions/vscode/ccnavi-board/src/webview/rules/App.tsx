@@ -3,7 +3,7 @@
  *
  * 見せる中身は拡張ホストが渡す（`RulesData`）。画面が持つのは、ユーザが触って決めるもの
  * （編集中のルール、開いている行、折りたたんだタイプ、絞り込み、開いているタブ、直前の操作の一言）だけ。
- * 判定はしない。 「判定」も「サンプルを一括で判定」も、編集中の内容を拡張ホストへ渡し、
+ * 判定はしない。 「判定」も「期待する判定を一括で確かめる」も、編集中の内容を拡張ホストへ渡し、
  * 実行ファイルが返した結果を出すだけ。
  *
  * 中身（`data`）が届いたら、編集中のルールはその中身で置き換える。 届くのは編集を捨ててよい
@@ -15,11 +15,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } f
 import type { Lock } from "../../core/lock.js";
 import { KNOWN_TOOLS, SECTIONS, SECTION_LABELS, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
 import type { SuggestJson } from "../../core/suggestmodel.js";
-import type { SamplesJson } from "../../core/testmodel.js";
+import type { ExpectationsJson } from "../../core/testmodel.js";
 import { applyAppearance } from "../appearance.js";
 import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
 import { Hooks } from "./Hooks.js";
-import { JudgeResult, SamplesResult, SuggestResult, type Judged } from "./Judge.js";
+import { ExpectationsResult, JudgeResult, SuggestResult, type Judged } from "./Judge.js";
 import { TargetSelect } from "../TargetSelect.js";
 import { defaultSum } from "../../core/sums.js";
 import { Sum } from "./Sum.js";
@@ -83,7 +83,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const [moreOpen, setMoreOpen] = useState<ReadonlyMap<string, boolean>>(new Map());
   const [folded, setFolded] = useState<ReadonlySet<Section>>(new Set());
   const [dirty, setDirty] = useState(false);
-  /** 実行ファイルへの往復の間。判定・サンプル・再読込・保存のボタンを止める */
+  /** 実行ファイルへの往復の間。判定・期待する判定の確認・再読込・保存のボタンを止める */
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status | undefined>(undefined);
   const [lock, setLock] = useState<Lock>(() => pageOf(initial)?.lock ?? NO_LOCK);
@@ -92,7 +92,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const [find, setFind] = useState("");
   const [tab, setTab] = useState<TabName>(() => loadTab());
   const [judged, setJudged] = useState<Judged | undefined>(undefined);
-  const [sampled, setSampled] = useState<SamplesJson | undefined>(undefined);
+  const [checked, setChecked] = useState<ExpectationsJson | undefined>(undefined);
   const [suggested, setSuggested] = useState<SuggestJson | undefined>(undefined);
   const [tool, setTool] = useState<string>(KNOWN_TOOLS[0]);
   const [subject, setSubject] = useState("");
@@ -184,7 +184,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         if (next.kind === "loading") {
           // 別の対象へ切り替わった。前の対象のルールで出した判定を、いまのルールの結果として残さない
           setJudged(undefined);
-          setSampled(undefined);
+          setChecked(undefined);
           setSuggested(undefined);
         }
       } else if (message.type === "judged") {
@@ -194,10 +194,10 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         setJudged({ result, hooks: (message.hooks ?? []) as Judged["hooks"] });
         unfoldHits(result.rules.map((rule) => rule.id));
         showTab("judge");
-      } else if (message.type === "sampled") {
+      } else if (message.type === "expectationsChecked") {
         setBusy(false);
         setStatus(undefined);
-        setSampled(message.result as SamplesJson);
+        setChecked(message.result as ExpectationsJson);
         showTab("judge");
       } else if (message.type === "suggested") {
         setBusy(false);
@@ -589,27 +589,27 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           </button>
         </div>
         {judged !== undefined && <JudgeResult judged={judged} />}
-        <div className="samples-head">
+        <div className="expectations-head">
           <button
             type="button"
             className="action"
-            data-action="samples"
+            data-action="expectations"
             disabled={busy}
             onClick={() => {
               setBusy(true);
-              setStatus({ text: "サンプルを判定中…", error: false });
-              post({ type: "samples", sections: sectionsOf(draft) });
+              setStatus({ text: "期待する判定を確かめ中…", error: false });
+              post({ type: "expectations", sections: sectionsOf(draft) });
             }}
           >
-            サンプルを一括で判定
+            期待する判定を一括で確かめる
           </button>
-          <span className="path">{page?.samplesPath ?? ""}</span>
-          <button type="button" className="action" data-action="open-samples" onClick={() => post({ type: "openFile", which: "samples" })}>
+          <span className="path">{page?.expectationsPath ?? ""}</span>
+          <button type="button" className="action" data-action="open-expectations" onClick={() => post({ type: "openFile", which: "expectations" })}>
             エディタで開く
           </button>
         </div>
-        {sampled !== undefined && <SamplesResult result={sampled} />}
-        <div className="samples-head">
+        {checked !== undefined && <ExpectationsResult result={checked} />}
+        <div className="expectations-head">
           <button
             type="button"
             className="action"
@@ -666,7 +666,7 @@ function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonl
     {
       target: "#tab-judge .judge-form",
       title: "判定を試す",
-      body: "ツールと対象（コマンドやパス）を入れて「判定」を押すと、編集中の内容でどのルールに当たるかを実行ファイルが返します。保存は要りません。「サンプルを一括で判定」は、サンプルのファイルに並べた例をまとめて確かめます。",
+      body: "ツールと対象（コマンドやパス）を入れて「判定」を押すと、編集中の内容でどのルールに当たるかを実行ファイルが返します。保存は要りません。「期待する判定を一括で確かめる」は、期待する判定のファイルに並べた例をまとめて確かめます。",
       before: () => peek("judge"),
     },
     {

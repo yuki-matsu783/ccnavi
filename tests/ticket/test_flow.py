@@ -637,9 +637,10 @@ class FlowInfoTest(unittest.TestCase):
                 self.assertFalse(shown["exists"])
                 self.assertEqual(shown["locked"], started)
 
-    def test_children_waiting_for_review_keep_the_field_and_are_not_locked(self):
-        # レビュー待ちは閉じた扱いにしない（今の仕様）。フローが無くても欄を返し、
-        # 着手のあとでも錠は掛けない（錠は `doing` の間だけ）。
+    def test_children_waiting_for_review_keep_the_field_and_are_locked(self):
+        # レビュー準備中・レビュー待ち（`review/`）は閉じた扱いにしない。
+        # フローが無くても欄を返すが、着手の有無によらず閲覧だけにする
+        # （書き換えは `doing` の着手中と `review/` で止める）。
         for started in (False, True):
             with self.subTest(started=started):
                 shown = flow.info(
@@ -647,12 +648,12 @@ class FlowInfoTest(unittest.TestCase):
                 )
                 self.assertIsNotNone(shown)
                 self.assertFalse(shown["exists"])
-                self.assertFalse(shown["locked"])
+                self.assertTrue(shown["locked"])
                 self.assertEqual(shown["rel"], f".ccnavi/approved/flows/{CHILD}.yml")
         write(flow.flow_file(self.conf, self.root, CHILD), WORKFLOW_YAML)
         shown = flow.info(self.conf, self.root, self.child(ticket_model.REVIEW, started=True))
         self.assertTrue(shown["exists"])
-        self.assertFalse(shown["locked"])
+        self.assertTrue(shown["locked"])
 
     def test_the_draft_sits_in_the_same_tree_under_the_proposal_place(self):
         """下書きの置き場は提案の置き場の `flows/<子>.yml`。置くツリーはフローと同じ。"""
@@ -884,7 +885,8 @@ class FlowLockTest(FlowHarness):
         finished = self.close_child(CHILD)
         self.assertEqual(finished.returncode, 0, finished.stdout + finished.stderr)
         self.assert_not_locked(self.write_to(self.flow_path))
-        self.assertFalse(self.board_flow(CHILD)["locked"])
+        # finish でレビュー待ちに入った子は、ボードでは閲覧だけ（閉じるまで編集させない）。
+        self.assertTrue(self.board_flow(CHILD)["locked"])
 
     def test_a_closed_child_shows_the_flow_only_when_it_exists(self):
         """取り消して閉じた子でも、フローが在れば欄を出す（見返せる）。無ければ出さない。"""

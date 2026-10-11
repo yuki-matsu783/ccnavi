@@ -93,7 +93,7 @@ test("CB-D109 錠が掛かっていれば読むだけ。理由の帯を出し、
   const dom = await openFlow({ ticket: "i0001-02-02", doc: marked(), lock, exists: false });
   try {
     const banner = dom.one("#lock").textContent ?? "";
-    assert.match(banner, /着手中のため、フローを書き換えられません/);
+    assert.match(banner, /着手中かレビュー中のため、フローを書き換えられません/);
     assert.match(banner, /finish で終わるか cancel で取り消されると外れます/);
     for (const button of dom.all<HTMLButtonElement>('[data-action="add-node"]')) {
       assert.ok(button.disabled);
