@@ -887,6 +887,7 @@ def _hook_steps(
         event=payload.event,
         tool=payload.tool_name,
         session=payload.session_id,
+        agent=payload.agent_id,
     )
     so_far.record = record
 

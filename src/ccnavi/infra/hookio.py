@@ -16,6 +16,8 @@ from typing import Any, TextIO
 # 気づかないうちに別の判定が走ることはない。
 PRE_TOOL_USE = "PreToolUse"
 POST_TOOL_USE = "PostToolUse"
+# ツール自体が失敗した後に来る。止められないイベントで、返せるのは文だけ。
+POST_TOOL_USE_FAILURE = "PostToolUseFailure"
 SESSION_START = "SessionStart"
 USER_PROMPT_SUBMIT = "UserPromptSubmit"
 STOP = "Stop"
@@ -82,6 +84,10 @@ class Input:
     agent_type: str = ""
     # tool_response は PostToolUse にだけ来る。Agent の起動の後には agentId が入る。
     tool_response: dict[str, Any] = field(default_factory=dict)
+    # error と is_interrupt は PostToolUseFailure にだけ来る。error は失敗の文（形はツール次第）、
+    # is_interrupt は中断による失敗。error の中身は判定に使わず、記録にも診断ログにも書かない。
+    error: str = ""
+    is_interrupt: bool = False
     # stop_hook_active は Stop / SubagentStop にだけ来る。真なら、この終わり方は Stop の hook が
     # 続けさせた結果（連鎖の 2 回目以降）。促しを 1 回に留めるために読む。
     stop_hook_active: bool = False
@@ -143,6 +149,8 @@ def decode(stream: TextIO) -> Input:
         tool_use_id=data.get("tool_use_id") or "",
         agent_id=str(data.get("agent_id") or ""),
         agent_type=str(data.get("agent_type") or ""),
+        error=data.get("error") if isinstance(data.get("error"), str) else "",
+        is_interrupt=data.get("is_interrupt") is True,
         stop_hook_active=data.get("stop_hook_active") is True,
         source=str(data.get("source") or ""),
         prompt=data.get("prompt") if isinstance(data.get("prompt"), str) else "",

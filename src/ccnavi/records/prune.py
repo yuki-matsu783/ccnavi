@@ -82,6 +82,7 @@ _SESSION_ONLY = (
 # 名前だけでは切れ目が決まらない。既に分かっているセッションの表記に当てて決める。
 _SESSION_AND_KEY = (
     ("once-", ".json"),  # ctxfile._once_path
+    ("failstreak-", ".json"),  # failstreak._path
     ("subagent-", ".bounced"),  # subagent._bounce_path
     ("subagent-", ".unchecked"),  # subagent._unchecked_path
 )

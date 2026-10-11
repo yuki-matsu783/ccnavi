@@ -84,6 +84,10 @@ TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # DENY_REPEAT_ENV は、同じ理由で同じ呼び出しを何回止めたら「言い換えずに相談せよ」と
 # つけるか（repeat）。既定は 3。判定は変わらず、文面とユーザへの報告が変わるだけ。
 DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
+# FAIL_STREAK_COUNT_ENV は、ツール呼び出しの失敗か ccnavi の拒否が何回続けて起きたら
+# 「資料を検索する」案内を出すか（failstreak）。既定は 3。0 なら数えも案内もしない。
+# 読めない値と負数は既定に戻る。判定は変わらない。
+FAIL_STREAK_COUNT_ENV = "CCNAVI_FAIL_STREAK_COUNT"
 # INTEGRATION_ENV は統合先の名前。リポジトリには置かず、未設定ならホストのデフォルトブランチ。
 # `done/` とレイヤーと置き場のパスを読むブランチで、親のブランチはここから切る。
 # ccnavi はこの環境変数を読まない。読むのは sh（`ccnavi-sync.sh`）で、sh が環境変数か
@@ -320,6 +324,9 @@ class Settings:
     state: str = ""
     # 同じ理由の拒否を何回目から名指しするか。書かれたままの値で、読むのは repeat.threshold。
     deny_repeat: str = ""
+    # 失敗・拒否が何回続いたら資料を引く案内を出すか。
+    # 書かれたままの値で、読むのは failstreak.threshold。
+    fail_streak_count: str = ""
     # 戻す働きの 2 つ。どちらも mode と同じ enable / dry-run / disable を取る。
     #
     # restore_if_deny は、ルールが `deny` と宣言した場所が副作用で変わったときに
@@ -435,6 +442,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         guard_ticket_approval_declared=os.environ.get(GUARD_TICKET_APPROVAL_ENV, ""),
         guard_unwatched=os.environ.get(GUARD_UNWATCHED_ENV, ""),
         deny_repeat=os.environ.get(DENY_REPEAT_ENV, ""),
+        fail_streak_count=os.environ.get(FAIL_STREAK_COUNT_ENV, ""),
         ticket_control=os.environ.get(TICKET_CONTROL_ENV, ""),
         ticket_control_declared=os.environ.get(TICKET_CONTROL_ENV, ""),
         tickets=DEFAULT_TICKETS,
