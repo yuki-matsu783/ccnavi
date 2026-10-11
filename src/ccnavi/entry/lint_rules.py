@@ -439,6 +439,31 @@ def _when_problems(rule: rules.Rule, name: str) -> list[Problem]:
 
     look(tree)
 
+    def operands(node: rules.Condition) -> list[rules.Condition]:
+        """同じ演算子の入れ子（`all` の中の `all`）を 1 つに開いた子。"""
+        out: list[rules.Condition] = []
+        for c in node.children:
+            out.extend(operands(c) if c.kind == node.kind else [c])
+        return out
+
+    for node in tree.walk():
+        if node.kind not in (rules.WHEN_ALL, rules.WHEN_ANY):
+            continue
+        items = operands(node)
+        plain = {c.key() for c in items if c.kind != rules.WHEN_NOT}
+        negated = {c.children[0].key() for c in items if c.kind == rules.WHEN_NOT}
+        if not plain & negated:
+            continue
+        result = "何にも当たらない" if node.kind == rules.WHEN_ALL else "何にでも当たる"
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"{node.where} の {node.kind} に、同じ個別条件が肯定と否定で並んでいる。"
+                f"互いに打ち消し合うので、この {node.kind} は{result}",
+            )
+        )
+
     tools = [want.strip() for want in rule.match.split("|")]
     shells = [t for t in _COMMAND_TOOLS if t in tools]
     has_not = any(n.kind == rules.WHEN_NOT for n in tree.walk())

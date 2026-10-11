@@ -407,6 +407,22 @@ class LintTest(unittest.TestCase):
         found = self.warns(self.lint([self.deny(when)]))
         self.assertTrue(any("when.any[1] の not は何にも当たらない" in d for d in found), found)
 
+    def test_同じ個別条件が肯定と否定で並ぶと打ち消し合うと言う(self):
+        when = {"all": [{"glob": "*.py"}, {"not": {"glob": "*.py"}}]}
+        found = self.warns(self.lint([self.deny(when)]))
+        self.assertTrue(
+            any("when の all に、同じ個別条件が肯定と否定で並んでいる" in d for d in found), found
+        )
+        self.assertTrue(any("この all は何にも当たらない" in d for d in found), found)
+        # any なら何にでも当たる。同じ演算子の入れ子は開いて見る
+        when = {"any": [{"glob": "*.md"}, {"any": [{"regex": "^a"}, {"not": {"regex": "^a"}}]}]}
+        found = self.warns(self.lint([self.deny(when)]))
+        self.assertTrue(any("when の any に、同じ個別条件が" in d for d in found), found)
+        # 別々の個別条件なら言わない
+        when = {"all": [{"glob": "*.py"}, {"not": {"glob": "*.md"}}]}
+        found = self.warns(self.lint([self.deny(when)]))
+        self.assertFalse(any("打ち消し合う" in d for d in found), found)
+
     def test_コマンドの_not(self):
         when = {"all": [{"glob": "*git push*"}, {"not": {"glob": "*--dry-run*"}}]}
         found = self.warns(self.lint([self.deny(when, "Bash|Write")]))
