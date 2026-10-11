@@ -541,21 +541,199 @@ class PlanOrderUnpackableTest(PlanOrderHarness):
         self.assertIn("詰められない", got.refused[0].text)
 
 
-class PlanOrderChildrenTest(PlanOrderHarness):
-    """子の提案の一覧（書き換える子は、番号の変わる項を指す `todo/` の子）。"""
+def with_predecessors(text: str, preds: list[str]) -> str:
+    """子の本文に `predecessors:` を足す。"""
+    return text.replace("human_review:", f"predecessors: [{', '.join(preds)}]\nhuman_review:", 1)
 
-    def test_children_whose_number_moves_are_listed(self):
+
+class ChildRetargetTableTest(unittest.TestCase):
+    """子の付け替えの決まり（見本の表の `children` のある例）。"""
+
+    def test_the_table(self):
+        with open(PLAN_REORDER, encoding="utf-8") as f:
+            cases = [c for c in json.load(f)["cases"] if "children" in c]
+        self.assertTrue(cases)
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                t = parsed(case["plan"], case.get("feedback"))
+                order, _ = plan_order.parse_order(json.dumps(case["order"]), t)
+                got = plan_order.renumber(t, order, set(case.get("fixed", [])))
+                self.assertEqual(
+                    plan_order.retarget("i0001", got.moved, case["children"]),
+                    case["expect"]["children"],
+                )
+
+
+class PlanOrderChildrenTest(PlanOrderHarness):
+    """子の提案の追従。番号の変わる項を指す `todo/` の子は、識別子・ファイル名・`ticket:`・
+    `phase:` を付け替え、それを指すほかの子の `predecessors` も直す。承認済みの側には触れない。"""
+
+    def setUp(self):
+        super().setUp()
         self.propose("i0001", parent_text("i0001", PLAN3))
+        self.a = child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], False)
+        self.b = child_text("i0001-02-01", "i0001", 2, ["wip/design/*"])
+        self.c = with_predecessors(
+            child_text("i0001-03-01", "i0001", 3, ["src/*"]), ["i0001-01-01", "i0001-02-01"]
+        )
+        self.propose("i0001-01-01", self.a)
+        self.propose("i0001-02-01", self.b)
+        self.propose("i0001-03-01", self.c)
+
+    def names(self):
+        return sorted(os.listdir(os.path.dirname(self.todo("i0001"))))
+
+    def snapshot(self):
+        here = os.path.dirname(self.todo("i0001"))
+        out = {}
+        for name in os.listdir(here):
+            with open(os.path.join(here, name), "rb") as f:
+                out[name] = f.read()
+        return out
+
+    def test_children_are_listed_before_saving(self):
+        body = self.body("--order", json.dumps(REVERSE))
+        listed = {c["ticket"]: c for c in body["children"]}
+        self.assertEqual(sorted(listed), ["i0001-01-01", "i0001-02-01", "i0001-03-01"])
+        a = listed["i0001-01-01"]
+        self.assertEqual((a["new_ticket"], a["phase"], a["new_phase"]), ("i0001-02-01", 1, 2))
+        self.assertTrue(a["path"].endswith("i0001-01-01.md"))
+        self.assertTrue(a["new_path"].endswith("i0001-02-01.md"))
+        b = listed["i0001-02-01"]
+        self.assertEqual((b["new_ticket"], b["phase"], b["new_phase"]), ("i0001-01-01", 2, 1))
+        c = listed["i0001-03-01"]
+        self.assertEqual((c["new_ticket"], c["phase"], c["new_phase"]), ("i0001-03-01", 3, 3))
+        self.assertEqual(c["predecessors"], ["i0001-01-01", "i0001-02-01"])
+        self.assertEqual(c["new_predecessors"], ["i0001-02-01", "i0001-01-01"])
+        self.assertEqual(body["child_problems"], [])
+        self.assertTrue(body["writable"])
+
+    def test_write_retargets_children_and_their_predecessors(self):
+        result = self.write_order(REVERSE)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            self.names(), ["i0001-01-01.md", "i0001-02-01.md", "i0001-03-01.md", "i0001.md"]
+        )
+        moved_a = self.read("i0001-02-01")
+        self.assertEqual(front_of(moved_a)["ticket"], "i0001-02-01")
+        self.assertEqual(front_of(moved_a)["phase"], 2)
+        # ほかの欄と本文は元のまま（題は自由な文なので変えない）。
+        rest = {k: v for k, v in front_of(moved_a).items() if k not in ("ticket", "phase")}
+        self.assertEqual(
+            rest, {k: v for k, v in front_of(self.a).items() if k not in ("ticket", "phase")}
+        )
+        self.assertEqual(moved_a.split("---\n", 2)[2], self.a.split("---\n", 2)[2])
+        moved_b = self.read("i0001-01-01")
+        self.assertEqual(
+            (front_of(moved_b)["ticket"], front_of(moved_b)["phase"]), ("i0001-01-01", 1)
+        )
+        self.assertEqual(front_of(moved_b)["allow"], front_of(self.b)["allow"])
+        self.assertEqual(
+            front_of(self.read("i0001-03-01"))["predecessors"], ["i0001-02-01", "i0001-01-01"]
+        )
+        # 書いたあとに読み直せば、もう動かす子は無い。どの提案も読める。
+        again = self.body()
+        self.assertEqual(again["children"], [])
+        self.assertEqual(again["mismatched"], [])
+        self.assertEqual(json.loads(result.stdout)["source_sha"], again["source_sha"])
+
+    def test_predecessors_of_another_parent_are_retargeted_and_hashed(self):
+        before = self.body()["source_sha"]
+        other = with_predecessors(child_text("i0002-01-01", "i0002", 1, ["src/*"]), ["i0001-01-01"])
+        self.propose("i0002-01-01", other)
+        self.assertNotEqual(self.body()["source_sha"], before)
+        result = self.write_order(REVERSE)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(front_of(self.read("i0002-01-01"))["predecessors"], ["i0001-02-01"])
+
+    def test_a_clash_with_a_file_that_is_not_moved_writes_nothing(self):
+        """付け替え先の名前に、動かす子に数えないファイル（読めない提案）があれば書かない。"""
+        os.remove(self.todo("i0001-02-01"))
+        with open(self.todo("i0001-02-01"), "w", encoding="utf-8") as f:
+            f.write("---\n: :\n")
+        before = self.snapshot()
+        body = self.body("--order", json.dumps(REVERSE))
+        self.assertTrue(any("i0001-02-01" in p for p in body["child_problems"]), body)
+        self.assertFalse(body["writable"])
+        result = self.write_order(REVERSE)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_a_reference_on_the_approved_side_writes_nothing(self):
+        before = self.snapshot()
+        flows = os.path.join(self.approved, "flows")
+        os.makedirs(flows)
+        with open(os.path.join(flows, "i0001-01-01.yml"), "w", encoding="utf-8") as f:
+            f.write("nodes: []\n")
+        body = self.body("--order", json.dumps(REVERSE))
+        self.assertTrue(any("flows" in p for p in body["child_problems"]), body)
+        self.assertFalse(body["writable"])
+        self.assertEqual(self.write_order(REVERSE).returncode, 1)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_a_worktree_named_after_a_moved_child_writes_nothing(self):
+        before = self.snapshot()
+        self.worktree("i0001-02-01", "main")
+        body = self.body("--order", json.dumps(REVERSE))
+        self.assertTrue(any("ワークツリー" in p for p in body["child_problems"]), body)
+        self.assertEqual(self.write_order(REVERSE).returncode, 1)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_a_failure_part_way_puts_everything_back(self):
+        from unittest import mock
+
+        from ccnavi.infra import fsio
+
+        before = self.snapshot()
+        real = fsio.write_bytes_atomic
+        parent = os.path.realpath(self.todo("i0001"))
+
+        def failing(path, content):
+            if os.path.realpath(path) == parent and content != before["i0001.md"]:
+                return "書けない（テスト）"
+            return real(path, content)
+
+        with mock.patch.object(fsio, "write_bytes_atomic", failing):
+            result = self.write_order(REVERSE)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_a_child_pointing_outside_the_plan_is_reported(self):
+        self.propose("i0001-05-01", child_text("i0001-05-01", "i0001", 5, ["src/*"]))
+        body = self.body()
+        self.assertEqual([m["ticket"] for m in body["mismatched"]], ["i0001-05-01"])
+        self.assertEqual(body["mismatched"][0]["phase"], 5)
+        self.assertTrue(body["mismatched"][0]["text"])
+
+
+class PlanOrderApprovedChildTest(PlanOrderHarness):
+    """承認済みの子には触れない。動くのは承認前の子の提案だけ。"""
+
+    def test_an_approved_child_stays_and_a_pending_one_moves(self):
+        self.family(plan=PlanOrderRevisionTest.PLAN)
         self.propose(
             "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], False)
         )
-        self.propose("i0001-03-01", child_text("i0001-03-01", "i0001", 3, ["src/*"]))
-        body = self.body("--order", json.dumps(REVERSE))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        approved = os.path.join(self.approved, "doing", "i0001-01-01.md")
+        with open(approved, "rb") as f:
+            held = f.read()
+        self.propose("i0001", parent_text("i0001", PlanOrderRevisionTest.REVISED))
+        self.propose("i0001-02-01", child_text("i0001-02-01", "i0001", 2, ["wip/design/*"]))
+        self.commit_parent("revise")
+        order = {"plan": {"1": [], "2": [1, 5], "3": [1], "4": [2, 3, 5], "5": [1]}}
+        body = self.body("--order", json.dumps(order))
         self.assertEqual(
-            [(c["ticket"], c["phase"], c["new_phase"]) for c in body["children"]],
-            [("i0001-01-01", 1, 2)],
+            [(c["ticket"], c["new_ticket"]) for c in body["children"]],
+            [("i0001-02-01", "i0001-04-01")],
         )
-        self.assertTrue(body["children"][0]["path"].endswith("i0001-01-01.md"))
+        result = self.write_order(order)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(front_of(self.read("i0001-04-01"))["phase"], 4)
+        self.assertFalse(os.path.exists(self.todo("i0001-02-01")))
+        with open(approved, "rb") as f:
+            self.assertEqual(f.read(), held)
 
 
 if __name__ == "__main__":
