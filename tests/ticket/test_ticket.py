@@ -2444,6 +2444,22 @@ class TicketTest(unittest.TestCase):
             "uv run ccnavi --agree 3 $Y",
             "uvx ccnavi --agree 3 $Y",
             f"uv run sh {sync} --forget P",
+            # 長い旗・値を取る旗を前に置いたシェルと、`env`・`command` 越しのシェルも
+            # 標準入力から読む。
+            *(
+                f'echo "sh {sync} --forget i1" | {sh}'
+                for sh in (
+                    "bash --norc",
+                    "bash --posix",
+                    "bash --noprofile",
+                    "bash --rcfile x",
+                    "bash -o pipefail",
+                    "bash -O extglob",
+                    "bash -euo pipefail",
+                    "env sh",
+                    "command sh",
+                )
+            ),
             # 実行ファイルが受ける旗（main の `ticket new` が足した旗を含む）の後ろの展開。
             "ccnavi --title t $A",
             "ccnavi --plan p $A",

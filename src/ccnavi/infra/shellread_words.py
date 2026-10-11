@@ -291,6 +291,12 @@ def _is_operator(token: str) -> bool:
 # 標準入力からスクリプトを読むシェルの名前と、標準入力を指すスクリプトのパス。
 _STDIN_SHELLS = frozenset({"sh", "bash", "dash", "zsh", "ksh", "ash"})
 _STDIN_SCRIPTS = frozenset({"-", "/dev/stdin", "/dev/fd/0", "/proc/self/fd/0"})
+# 標準入力から読むシェルの前に置ける語（`… | env sh`・`… | command bash`）。
+_STDIN_HEADS = frozenset({"busybox", "env", "command", "exec"})
+# その前置きの旗で、次の語を値に取るもの。
+_STDIN_HEAD_VALUES = frozenset({"-u", "--unset", "-C", "--chdir", "-a"})
+# シェルの長い旗で、次の語を値に取るもの。
+_STDIN_SHELL_LONG_VALUES = frozenset({"--rcfile", "--init-file"})
 
 
 def _stdin_base(word: str) -> str:
@@ -300,13 +306,14 @@ def _stdin_base(word: str) -> str:
 def reads_stdin(words: list[str]) -> bool:
     """標準入力からスクリプトを読むシェルか。
 
-    `sh`・`sh -s …`・`sh < x`・`busybox sh`・`sh /dev/stdin`。
+    `sh`・`sh -s …`・`sh < x`・`busybox sh`・`sh /dev/stdin`。前に置いた `env`・`command`・
+    `exec`（と代入・それらの旗）は外して見る。シェルの旗は、`--norc` のような長い旗、
+    値を取る旗（`--rcfile <値>`・`-o pipefail`・`-O extglob`・`-euo pipefail`）を読み飛ばす。
+    `-c` は文字列を実行するので読まない。
 
     ユーザの入口の止め（phase_forms）と、ラッパーの自己防衛（wrapguard）が使う。
     """
-    rest = list(words)
-    if rest and _stdin_base(rest[0]) == "busybox":
-        rest = rest[1:]
+    rest = _stdin_heads(list(words))
     if not rest or _stdin_base(rest[0]) not in _STDIN_SHELLS:
         return False
     rest = rest[1:]
@@ -319,13 +326,34 @@ def reads_stdin(words: list[str]) -> bool:
         word = rest[k]
         if word in _STDIN_SCRIPTS:
             return True
-        if not word.startswith(("-", "+")) or word.startswith("--"):
-            if word == "--":
-                return k + 1 == len(rest) or rest[k + 1] in _STDIN_SCRIPTS
+        if word == "--":
+            return k + 1 == len(rest) or rest[k + 1] in _STDIN_SCRIPTS
+        if word.startswith("--"):
+            k += 2 if word in _STDIN_SHELL_LONG_VALUES else 1
+            continue
+        if not word.startswith(("-", "+")):
             return False
         if "c" in word[1:]:
             return False
         if "s" in word[1:]:
             return True
-        k += 1
+        # `-o pipefail`・`-O extglob`・`-euo pipefail` は次の語が値。
+        k += 2 if ("o" in word[1:] or "O" in word[1:]) else 1
     return True
+
+
+def _stdin_heads(rest: list[str]) -> list[str]:
+    """シェルの前に置いた `busybox`・`env`・`command`・`exec` と、その旗・代入を外した残り。"""
+    while rest:
+        name = _stdin_base(rest[0])
+        if name not in _STDIN_HEADS:
+            return rest
+        rest = rest[1:]
+        while rest and (_ASSIGNMENT_WORD.match(rest[0]) or rest[0].startswith("-")):
+            word, rest = rest[0], rest[1:]
+            if word == "--":
+                break
+            # `env -u NAME`・`env -C dir`・`exec -a name` は次の語が値。
+            if word in _STDIN_HEAD_VALUES and rest:
+                rest = rest[1:]
+    return rest

@@ -637,6 +637,26 @@ class CorePathTest(unittest.TestCase):
             # 標準入力から読むシェルに流す文字列の中の呼び出し。
             ("echo 'sh .ccnavi/scripts/ccnavi-git.sh rm .ccnavi/approved/t/r' | sh", True),
             ("echo 'sh .ccnavi/scripts/ccnavi-git.sh status; rm -rf .ccnavi' | sh", True),
+            # 長い旗・値を取る旗を前に置いたシェルと、`env`・`command` 越しのシェルも読む。
+            *(
+                (
+                    f"echo 'sh .ccnavi/scripts/ccnavi-git.sh rm wip/proposals/review/i0002.md'"
+                    f" | {sh}",
+                    True,
+                )
+                for sh in (
+                    "bash --norc",
+                    "bash --posix",
+                    "bash --noprofile",
+                    "bash --rcfile x",
+                    "bash -o pipefail",
+                    "bash -O extglob",
+                    "bash -euo pipefail",
+                    "env sh",
+                    "env -i FOO=1 bash",
+                    "command sh",
+                )
+            ),
             # 走査が読み切れず、ラッパーの名前の後ろに文字どおりの副命令が無い。
             ("echo rm .ccnavi/approved/t/r | xargs sh .ccnavi/scripts/ccnavi-git.sh", True),
             ("xargs -a f sh .ccnavi/scripts/ccnavi-git.sh", True),
