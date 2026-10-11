@@ -6,7 +6,7 @@
 プロジェクトの `.ccnavi/config/` には触れない。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。共通レイヤーは
-rules / risks の 2 本（と、見本とスクリプト）を持ち、lib の config は 3 本とも別の中身を持つ。
+rules / risks の 2 本（と、期待とスクリプト）を持ち、lib の config は 3 本とも別の中身を持つ。
 app は `.ccnavi/` を持たない。
 
 見るのは 5 つ。
@@ -47,7 +47,7 @@ COMMON_SCRIPT_RISK = (
     + "  - {id: counted, points: 5, script: .ccnavi/common/scripts/count.sh, message: 数えた}\n"
 )
 COUNT_SH = "printf '{\"points\": 1}'\n"
-SAMPLES = "version: 1\nsamples: []\n"
+EXPECTATIONS = "version: 1\nexpectations: []\n"
 
 
 def mirror_of(tree_root, name):
@@ -84,14 +84,14 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
     def test_parent_start_mirrors_the_common_layer_and_leaves_config_alone(self):
         """1: 共通レイヤーの中身を親のワークツリーの `.ccnavi/common/` へ写す。config は触らない"""
-        write(os.path.join(self.ws, ".ccnavi", "common", "rule-samples.yml"), SAMPLES)
+        write(os.path.join(self.ws, ".ccnavi", "common", "rule-samples.yml"), EXPECTATIONS)
         config_before = {k: read(config_of(self.lib, k)) for k in ("rules", "phases", "risk")}
 
         tree, started = self.start_parent()
 
         self.assertEqual(json.loads(read(mirror_of(tree, "rules.yml"))), COMMON_RULES)
         self.assertEqual(read(mirror_of(tree, "risks.yml")), COMMON_RISK)
-        self.assertEqual(read(mirror_of(tree, "rule-samples.yml")), SAMPLES)
+        self.assertEqual(read(mirror_of(tree, "rule-samples.yml")), EXPECTATIONS)
         for kind, text in config_before.items():
             self.assertEqual(read(config_of(tree, kind)), text, kind)
             self.assertEqual(read(config_of(self.lib, kind)), text, kind)
@@ -166,7 +166,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         """1: 共通レイヤーから無くなったファイルは、ミラーからも消す。config は消さない。"""
         old = mirror_of(self.lib, "scripts/old.sh")
         write(old, "old\n")
-        write(mirror_of(self.lib, "rule-samples.yml"), SAMPLES)
+        write(mirror_of(self.lib, "rule-samples.yml"), EXPECTATIONS)
         git(self.lib, "add", "-A")
         git(self.lib, "commit", "--quiet", "-m", "old mirror")
 

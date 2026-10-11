@@ -152,8 +152,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # （preview の `digest`）。`--yes` と一緒に渡す。
     parser.add_argument("--digest", default="")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
-    # 見本をぜんぶ判定に掛ける。scripts/check_rules.py と VS Code 拡張が呼ぶ。
-    parser.add_argument("--test-samples", metavar="FILE", default="")
+    # 期待する判定をぜんぶ判定に掛ける。scripts/check_rules.py と VS Code 拡張が呼ぶ。
+    parser.add_argument("--test-expectations", metavar="FILE", default="")
     parser.add_argument("--explain", action="store_true")
     # 記録のローテートと、古い記録・終わったセッションの記録の削除（prune）。ユーザが端末から打つ。
     parser.add_argument("--prune", action="store_true")
@@ -482,7 +482,7 @@ def _parsed(
     diagnosing = (
         args.lint
         or args.test is not None
-        or bool(args.test_samples)
+        or bool(args.test_expectations)
         or args.explain
         or args.suggest
     )
@@ -582,8 +582,10 @@ def _parsed(
         if args.json:
             return diagnose.test_json(stdout, stderr, conf, root, args.test[0], args.test[1])
         return diagnose.test(stdout, stderr, conf, root, args.test[0], args.test[1])
-    if args.test_samples:
-        return diagnose.test_samples(stdout, stderr, conf, root, args.test_samples, args.json)
+    if args.test_expectations:
+        return diagnose.test_expectations(
+            stdout, stderr, conf, root, args.test_expectations, args.json
+        )
     if args.suggest:
         return suggest.report(stdout, conf, root, args.json)
     if args.explain and args.json:

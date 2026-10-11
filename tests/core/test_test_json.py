@@ -1,11 +1,11 @@
-"""`--test --json` と `--test-samples`（試験の JSON）の受入テスト。
+"""`--test --json` と `--test-expectations`（試験の JSON）の受入テスト。
 
 VS Code 拡張のルール管理画面が読む形を、`--test` と同じ判定で組んでいることを
 確かめる。内部の関数は呼ばず、標準出力と終了コードだけを見る。見るのは 4 つ。
 
 1. `--test --json` が判定・根拠・当たったルール・返る文面を 1 つの JSON で出す
 2. 判定が対象を取り出せないツールは `known` が偽で出る
-3. `--test-samples` が見本をタイプの期待と突き合わせ、食い違いを数える。
+3. `--test-expectations` が期待する判定をタイプの期待と突き合わせ、食い違いを数える。
    文字で出すときは食い違いがあれば終了コード 1、JSON では常に 0
 4. 拡張側のフィクスチャ（extensions/vscode/ccnavi-board/test/fixtures/test.json と
    samples.json）と同じ形である
@@ -49,7 +49,7 @@ RULES = {
     ],
 }
 
-SAMPLES = """\
+EXPECTATIONS = """\
 deny:
   - tool: Bash
     subject: "cd /repo && git push"
@@ -64,7 +64,7 @@ allow:
     why: 見るだけ
   - tool: Bash
     subject: "git push --force"
-    why: 食い違いの見本。deny に当たるので allow の期待とずれる
+    why: 食い違いの期待する判定。deny に当たるので allow の期待とずれる
   - tool: Bash
     subject: "# comment only"
     why: 何も走らないので判定に入らない
@@ -124,7 +124,7 @@ class TestJsonTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = self.tmp.name.replace("\\", "/")
         self.rules_path = write(self.tmp.name, "rules.yml", json.dumps(RULES))
-        self.samples_path = write(self.tmp.name, "samples.yml", SAMPLES)
+        self.expectations_path = write(self.tmp.name, "expectations.yml", EXPECTATIONS)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -142,7 +142,7 @@ class TestJsonTest(unittest.TestCase):
                 self.assertEqual(body["verdict"], "deny", done.stdout + done.stderr)
 
     def test_rule_problems_are_said_once(self):
-        # 試験は判定と当たったルールの一覧で共通レイヤーを 2 度読み、見本は 1 件ずつ判定する。
+        # 試験は判定と当たったルールの一覧で共通レイヤーを 2 度読み、期待は 1 件ずつ判定する。
         # どちらでも、同じ苦情を 2 度出さない。
         silent = {"id": "silent", "match": "Bash", "glob": "*nothing matches*"}
         body = {**RULES, "deny": [*RULES["deny"], silent]}
@@ -150,8 +150,8 @@ class TestJsonTest(unittest.TestCase):
         for args in (
             ("--test", "Bash", "cd /repo && git push"),
             ("--test", "Bash", "cd /repo && git push", "--json"),
-            ("--test-samples", self.samples_path),
-            ("--test-samples", self.samples_path, "--json"),
+            ("--test-expectations", self.expectations_path),
+            ("--test-expectations", self.expectations_path, "--json"),
         ):
             with self.subTest(args=args):
                 done = ccnavi(self.root, rules_path, *args)
@@ -251,8 +251,10 @@ class TestJsonTest(unittest.TestCase):
                 self.assertEqual(body["verdict"], "deny")
                 self.assertEqual([hit["id"] for hit in body["rules"]], [rule_id])
 
-    def test_samples_count_mismatches_and_skips(self):
-        done = ccnavi(self.root, self.rules_path, "--test-samples", self.samples_path, "--json")
+    def test_expectations_count_mismatches_and_skips(self):
+        done = ccnavi(
+            self.root, self.rules_path, "--test-expectations", self.expectations_path, "--json"
+        )
         self.assertEqual(done.returncode, 0, done.stderr)
         body = json.loads(done.stdout)
         self.assertEqual(body["version"], 1)
@@ -266,7 +268,7 @@ class TestJsonTest(unittest.TestCase):
         )
         self.assertEqual(body["mismatches"], 1)
         self.assertEqual(body["skipped"], 1)
-        by_subject = {s["subject"]: s for s in body["samples"]}
+        by_subject = {s["subject"]: s for s in body["expectations"]}
         wrong = by_subject["git push --force"]
         self.assertFalse(wrong["ok"])
         self.assertEqual((wrong["expected"], wrong["verdict"]), ("allow", "deny"))
@@ -280,19 +282,22 @@ class TestJsonTest(unittest.TestCase):
         )
 
         # 文字で出すときは、食い違いがあれば終了コード 1。
-        plain = ccnavi(self.root, self.rules_path, "--test-samples", self.samples_path)
+        plain = ccnavi(self.root, self.rules_path, "--test-expectations", self.expectations_path)
         self.assertEqual(plain.returncode, 1, plain.stdout)
         self.assertIn("食い違い: allow のはずが deny", plain.stdout)
         self.assertIn("食い違い 1 件、判定に入らなかったもの 1 件", plain.stdout)
 
         self._check_fixture("samples.json", body)
 
-    def test_unreadable_samples_fail_loudly(self):
+    def test_unreadable_expectations_fail_loudly(self):
         done = ccnavi(
-            self.root, self.rules_path, "--test-samples", os.path.join(self.root, "missing.yml")
+            self.root,
+            self.rules_path,
+            "--test-expectations",
+            os.path.join(self.root, "missing.yml"),
         )
         self.assertEqual(done.returncode, 1)
-        self.assertIn("見本を読めない", done.stderr)
+        self.assertIn("期待する判定を読めない", done.stderr)
 
     def _check_fixture(self, name: str, body: dict) -> None:
         path = os.path.join(FIXTURES, name)
@@ -305,9 +310,11 @@ class TestJsonTest(unittest.TestCase):
         with open(path, encoding="utf-8") as f:
             fixture = json.load(f)
         _same_keys(self, fixture, body)
-        if "samples" in body:
-            _same_keys(self, fixture["samples"][0], body["samples"][0])
-            _same_keys(self, fixture["samples"][0]["rules"][0], body["samples"][0]["rules"][0])
+        if "expectations" in body:
+            _same_keys(self, fixture["expectations"][0], body["expectations"][0])
+            _same_keys(
+                self, fixture["expectations"][0]["rules"][0], body["expectations"][0]["rules"][0]
+            )
         else:
             _same_keys(self, fixture["rules"][0], body["rules"][0])
 

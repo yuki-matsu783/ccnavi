@@ -1,13 +1,13 @@
-"""見本をぜんぶ判定に掛けて、期待と食い違ったものを並べる。
+"""期待する判定をぜんぶ判定に掛けて、期待と食い違ったものを並べる。
 
 `/ccnavi-config` スキルが呼ぶ。ユーザが直接打ってもよい。
 
     uv run python scripts/check_rules.py [ルールファイル]
 
-中身は `ccnavi --test-samples` を呼ぶだけの薄いラッパースクリプト。見本の読み方も
+中身は `ccnavi --test-expectations` を呼ぶだけの薄いラッパースクリプト。期待する判定の読み方も
 突き合わせも実行ファイルの側にあり、ここは引数を足して渡すだけ。VS Code 拡張の
 ルール管理画面も同じコマンドを `--json` 付きで使う。判定を 2 か所で作らないのが肝で、
-別の道で確かめると、見本が通ったのに実運用で失敗する、という一番まずい形になる。
+別の道で確かめると、期待する判定が通ったのに実運用で失敗する、という一番まずい形になる。
 
 終了コードは実行ファイルのものをそのまま返す。食い違いが 1 件でもあれば 1。無ければ 0。
 """
@@ -19,9 +19,9 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# 共通レイヤーのルールと見本の置き場。
+# 共通レイヤーのルールと期待する判定の置き場。
 RULES = os.path.join(ROOT, ".ccnavi", "common", "rules.yml")
-SAMPLES = os.path.join(ROOT, ".ccnavi", "common", "rule-samples.yml")
+EXPECTATIONS = os.path.join(ROOT, ".ccnavi", "common", "rule-samples.yml")
 
 
 def arguments(rules_path: str = RULES) -> list[str]:
@@ -29,8 +29,8 @@ def arguments(rules_path: str = RULES) -> list[str]:
 
     全件テスト（tests/core/test_check_rules.py）も同じものを使う。
 
-    `--root` は区切りを `/` に揃えて渡す。見本の `/repo` は `--root` のパスにそのまま
-    置き換わるので、Windows の `\\` が残ると Bash の見本でエスケープとして読まれる。
+    `--root` は区切りを `/` に揃えて渡す。期待する判定の `/repo` は `--root` のパスにそのまま
+    置き換わるので、Windows の `\\` が残ると Bash の期待する判定でエスケープとして読まれる。
     ccnavi の側はルートを realpath と normcase で解いてから使うので、`C:/...` でも同じ場所になる。
     """
     return [
@@ -45,8 +45,8 @@ def arguments(rules_path: str = RULES) -> list[str]:
         "",
         "--log",
         "",
-        "--test-samples",
-        SAMPLES,
+        "--test-expectations",
+        EXPECTATIONS,
     ]
 
 

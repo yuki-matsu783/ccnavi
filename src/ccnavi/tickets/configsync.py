@@ -34,8 +34,8 @@ from ..policy import rules
 from . import approval, approval_checks, risk
 
 COMMON_DIR = settings.COMMON_DIR
-# 共通レイヤーの見本のファイル名。
-SAMPLES_NAME = "rule-samples.yml"
+# 共通レイヤーの期待する判定のファイル名。
+EXPECTATIONS_NAME = "rule-samples.yml"
 # `is_synced_write` の `content` を渡さなかった目印。None は「そのファイルが無い」の意味で使う。
 UNSET = object()
 
@@ -85,7 +85,7 @@ def sources(conf: settings.Settings, root: str) -> tuple[dict[str, bytes], str]:
     for name in (
         settings.LAYER_FILE_NAMES[settings.KIND_RULES],
         settings.LAYER_FILE_NAMES[settings.KIND_RISK],
-        SAMPLES_NAME,
+        EXPECTATIONS_NAME,
     ):
         raw, why = _read_strict(os.path.join(base, name))
         if why:

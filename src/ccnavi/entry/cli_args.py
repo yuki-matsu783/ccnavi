@@ -158,7 +158,7 @@ DOCS_ONLY = "ccnavi: {flag} は --docs でだけ使える\n"
 _NOT_WITH_DOCS = (
     "--lint",
     "--test",
-    "--test-samples",
+    "--test-expectations",
     "--explain",
     "--suggest",
     "--prune",

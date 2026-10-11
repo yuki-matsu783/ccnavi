@@ -378,7 +378,7 @@ class StopRulesTest(unittest.TestCase):
             any("使われない" in line and "outer" in line for line in out.splitlines()), out
         )
 
-    # --- 8. --test と見本 -----------------------------------------------------------
+    # --- 8. --test と期待する判定 -----------------------------------------------------------
 
     def diagnose(self, *args: str) -> str:
         done = run_ccnavi(
@@ -407,10 +407,10 @@ class StopRulesTest(unittest.TestCase):
         self.assertIn("verdict: skip", out)
         self.assertIn("止めない", out)
 
-    def test_samples_can_check_stop(self):
+    def test_expectations_can_check_stop(self):
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=10)))
-        samples = write(
-            os.path.join(self.root, "samples.yml"),
+        expectations = write(
+            os.path.join(self.root, "expectations.yml"),
             json.dumps(
                 {
                     "deny": [],
@@ -418,10 +418,10 @@ class StopRulesTest(unittest.TestCase):
                 }
             ),
         )
-        body = json.loads(self.diagnose("--test-samples", samples, "--json"))
+        body = json.loads(self.diagnose("--test-expectations", expectations, "--json"))
         self.assertEqual(body["mismatches"], 0, body)
         self.assertEqual(body["skipped"], 0, body)
-        self.assertEqual([h["id"] for h in body["samples"][0]["rules"]], ["skill-review"])
+        self.assertEqual([h["id"] for h in body["expectations"][0]["rules"]], ["skill-review"])
 
 
 if __name__ == "__main__":

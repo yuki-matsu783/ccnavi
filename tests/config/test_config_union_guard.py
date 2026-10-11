@@ -388,7 +388,7 @@ class DenyTest(GuardHarness):
         読むだけなので通る。
 
         写す側は行き先（最後の引数か `-t` の値）だけを見る。元の側で当たると、
-        バックアップを取るだけの `cp` まで止まる（rule-samples.yml の見本）。
+        バックアップを取るだけの `cp` まで止まる（rule-samples.yml の期待する判定）。
         """
         absolute = os.path.dirname(self.rules).replace(os.sep, "/")
         for name in ("rules.yml", "phases.yml", "risks.yml"):
