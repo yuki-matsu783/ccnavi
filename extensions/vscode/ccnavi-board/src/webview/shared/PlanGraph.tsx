@@ -71,17 +71,26 @@ function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
   );
 }
 
-/** start と end の仮の点。名前だけ。線は図が引くので、取っ手から線は引けない */
+/**
+ * start と end の仮の点。名前だけ。線は図が引くので、取っ手から線は引けない。
+ * end は、終端に当たらない項からの線を下の取っ手で受ける。左の取っ手で受けると、最後の項からの線と
+ * end の手前で重なり、どちらが注意の線か見分けられない
+ */
 function EndView({ data }: NodeProps<EndNode>): JSX.Element {
   const { node } = data;
   return (
     <div className="plan-end" data-kind={node.kind}>
-      {node.kind === "end" && <Handle type="target" position={Position.Left} isConnectable={false} />}
+      {node.kind === "end" && <Handle id={END_IN} type="target" position={Position.Left} isConnectable={false} />}
+      {node.kind === "end" && <Handle id={END_LOOSE} type="target" position={Position.Bottom} isConnectable={false} />}
       {node.label}
       {node.kind === "start" && <Handle type="source" position={Position.Right} isConnectable={false} />}
     </div>
   );
 }
+
+/** end の取っ手。ふつうの線は左、終端に当たらない項からの線は下 */
+const END_IN = "in";
+const END_LOOSE = "loose";
 
 // 描くたびに作り直すと React Flow が「点の種類が変わった」と言って組み直す。1 度だけ作る
 const NODE_TYPES: NodeTypes = { planItem: ItemView, planEnd: EndView };
@@ -102,6 +111,7 @@ function edgesOf(graph: Graph): Edge[] {
       id: edge.id,
       source: edge.source,
       target: edge.target,
+      ...(edge.kind === "end" ? { targetHandle: edge.loose ? END_LOOSE : END_IN } : {}),
       className: ["plan-edge", `plan-${edge.kind}`, edge.loose ? "loose" : ""].filter((name) => name !== "").join(" "),
       markerEnd: { type: MarkerType.ArrowClosed, color },
       // start と end への線は図が引くもので、消せない
