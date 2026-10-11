@@ -33,13 +33,19 @@ GIT_SCRIPT = os.path.join(settings.DEFAULT_PROJECT_HOME, "scripts", "ccnavi-git.
 # コマンドの位置は行頭か `\x00` の直後になる。`env` `sudo` `command` `xargs` `nohup` `time` などの
 # 前置きは、読みが外した中のコマンド（`git status`）の層に当てて止める。`grep git README.md` の
 # ような引数の `git` には当てない。読み切れずに生の文字列に当てる回のために、シェルの区切り
-# （改行 `;` `&` `|` `(` `{` `` ` `` `!`）と、`then` `do` などの予約語の後ろも位置に数える。
-# パス付き（`/usr/bin/git`）と `git.exe` も同じ。パスの途中の字に区切りを入れないのは、区切りの
-# 字ごとに残りを読み直さないため（区切りの後ろからは、その区切りで当たる）。
+# （改行 `;` `&` `|` `(` `{` `` ` `` `!`）の後ろも位置に数え、その直後に続く `then` `do` などの
+# 予約語も読み飛ばす（`echo to do git` の `do` は区切りの直後ではないので数えない）。
+# パス付き（`/usr/bin/git`・`C:\Git\git.exe`）と `git.exe` も同じ。パスの途中の字に区切りを
+# 入れないのは、区切りの字ごとに残りを読み直さないため（区切りの後ろからは、その区切りで当たる）。
+# 引用しない `C:\Git\git.exe` はシェルが `\` を外して `C:Gitgit.exe` と読むので、ドライブ名
+# （`C:`）で始まり `git` / `git.exe` で終わる語も止める（実際には走らない形だが、止める側に倒す）。
 # 共通レイヤーの見本の `raw-git` は位置を問わずに当てる。そちらは緩める向きになるので変えていない。
+_SEPARATOR = r"[\x00\n;&|({`!]"
+_KEYWORD = r"(?:then|do|else|elif|if|while|until|time)\s++"
+_PATH_CHAR = r"[^\s\x00\\/;&|({`!]"
 RAW_GIT_REGEX = (
-    r"(?:^|[\x00\n;&|({`!]|\b(?:then|do|else|elif|if|while|until)\s)\s*+"
-    r"(?:[^\s\x00\\/;&|({`!]*+[\\/])*+git(?:\.exe)?\s"
+    rf"(?:^|{_SEPARATOR})\s*+(?:{_KEYWORD})*+"
+    rf"(?:(?:{_PATH_CHAR}*+[\\/])*+|[a-z]:{_PATH_CHAR}*?)git(?:\.exe)?\s"
 )
 
 

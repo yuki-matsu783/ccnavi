@@ -17,7 +17,7 @@ from unittest import mock
 
 from ccnavi.entry import cli_args
 from ccnavi.hook import events, judge
-from ccnavi.infra import modes
+from ccnavi.infra import hookio, modes, settings
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -170,6 +170,50 @@ class InternalErrorTest(unittest.TestCase):
                 row = rows(self.root)[-1]
                 self.assertEqual(row["reason"], "payload-unusable")
                 self.assertEqual(row["decision"], "skip")
+
+    def test_failure_while_loading_settings_stops_the_call(self):
+        """hook の経路で設定の読み込みが落ちても、終了コード 1 で通さない。読む前なので止める。"""
+        with mock.patch.object(settings, "load", side_effect=RecursionError("深い")):
+            result = run_raw(self.root, json.dumps(PRE))
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("[ccnavi] internal-error", result.stderr)
+        self.assertEqual(rows(self.root)[-1]["reason"], "internal-error")
+
+    def test_failure_while_loading_settings_outside_the_hook_is_raised(self):
+        """hook でない経路（打った人が見られる経路）は、例外のまま伝える。"""
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        with (
+            mock.patch.object(settings, "load", side_effect=RecursionError("深い")),
+            self.assertRaises(RecursionError),
+        ):
+            run_ccnavi(["--root", self.root, "--explain"], cwd=ROOT, env=environment)
+
+    def test_deeply_nested_claude_settings_are_skipped(self):
+        """入れ子の深すぎる settings.local.json は読めないファイルとして飛ばし、判定は続ける。"""
+        path = os.path.join(self.root, ".claude", "settings.local.json")
+        os.makedirs(os.path.dirname(path))
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("[" * 200000)
+        rm = {**PRE, "tool_input": {"command": "rm -rf /tmp/x"}}
+        result = run_raw(self.root, json.dumps(rm))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        verdict = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual(verdict["permissionDecision"], "deny")
+
+    def test_tool_input_of_the_wrong_type_is_an_unusable_payload(self):
+        """tool_input がオブジェクトでない・読む欄が文字列でない payload は、空として通さない。"""
+        for tool_input in (["git", "push"], {"command": ["git", "push"]}, {"file_path": 1}):
+            payload = {**PRE, "tool_input": tool_input}
+            with self.subTest(tool_input=tool_input):
+                result = run_raw(self.root, json.dumps(payload))
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("[ccnavi] payload-unusable", result.stderr)
+                self.assertEqual(rows(self.root)[-1]["reason"], "payload-unusable")
+
+    def test_every_subject_field_is_checked_for_its_type(self):
+        """判定が文字列として読む欄は、どれも型を確かめる欄の一覧に入っている。"""
+        missing = set(judge.SUBJECT_FIELDS.values()) - set(hookio.TOOL_INPUT_TEXT_FIELDS)
+        self.assertEqual(missing, set())
 
     def test_unusable_payload_says_what_to_do(self):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}

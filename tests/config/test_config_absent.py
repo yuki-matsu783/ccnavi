@@ -210,6 +210,15 @@ BUILTIN_DENIED = (
     (f"{GIT}-reset.exe -q --hard HEAD", "builtin-git-reset-hard"),
     (f"{GIT} -C x reset --hard", "builtin-git-reset-hard"),
     (f"{GIT} status; {GIT} reset --hard", "builtin-git-reset-hard"),
+    # 値が g・gi・git… で始まっても、値として最後まで読む。
+    (f"{GIT} -C gitx push", "builtin-git-push"),
+    (f"{GIT} -c remote.origin.url=github.com push", "builtin-git-push"),
+    (f"{GIT} -C gitlab reset --hard", "builtin-git-reset-hard"),
+    (f"{GIT} -C gi push", "builtin-git-push"),
+    # `--` の後ろはオペランド。その前に揃っていれば当たる。
+    ("rm -rf -- x", "builtin-recursive-delete"),
+    ("rm -r -f -- x", "builtin-recursive-delete"),
+    (f"{GIT} reset --hard -- x", "builtin-git-reset-hard"),
 )
 BUILTIN_PASSED = (
     "legit push",
@@ -224,6 +233,10 @@ BUILTIN_PASSED = (
     f"{GIT} -c reset.x=1 status --hard",
     f"{GIT} pushx",
     f"{GIT}-pushx origin",
+    # `--` の後ろはオペランドで、選択肢には読まない。
+    "rm -f -- -r",
+    "rm -r -- -f x",
+    f"{GIT} reset -- --hard",
 )
 
 # 照合の後戻りが長引く形だった入力。どれも当たらない。
@@ -238,6 +251,14 @@ SLOW_BEFORE = (
     "a/" * 12000,
     "git --x/git " * 2000,
 )
+# 共通ルールの照合が長引く形だった入力（パスの前置きを読み直す形）。
+COMMON_SLOW_BEFORE = (
+    "/" * 30000,
+    "echo " + "/" * 30000 + "; git push",
+    "\x00a" * 15000,
+    "\x00/" * 15000,
+)
+COMMON_LIMIT = 0.1
 # 照合 1 本にかけてよい時間。手元では 0.01 秒ほどで、負荷で揺れても届かない余裕を持たせてある。
 SLOW_LIMIT = 0.5
 TICKET_CONTROL = "CCNAVI_TICKET_CONTROL"
@@ -259,6 +280,33 @@ class BuiltinSpeedTest(unittest.TestCase):
 
     def test_common_recursive_delete_is_the_builtin_one(self):
         self.assertEqual(self.common_rule("recursive-delete"), builtin.RECURSIVE_DELETE_REGEX)
+
+    def test_common_regexes_return_quickly(self):
+        """共通ルールの regex（組み合わせ条件と except の中も）も、長い入力ですぐ返る。"""
+        with open(os.path.join(ROOT, ".ccnavi", "common", "rules.yml"), encoding="utf-8") as f:
+            data = yamlread.safe_load(f.read())
+        found = []
+
+        def walk(node):
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    if key == "regex" and isinstance(value, str):
+                        found.append(value.replace("{root}", "/ws").replace("{!root}", ""))
+                    else:
+                        walk(value)
+            elif isinstance(node, list):
+                for item in node:
+                    walk(item)
+
+        walk(data)
+        self.assertGreater(len(found), 10)
+        for text in (*COMMON_SLOW_BEFORE, *SLOW_BEFORE):
+            for expression in found:
+                regex = re.compile(expression, re.IGNORECASE)
+                with self.subTest(text=text[:16], regex=expression[:24]):
+                    start = time.monotonic()
+                    regex.search(text)
+                    self.assertLess(time.monotonic() - start, COMMON_LIMIT)
 
     def test_long_inputs_return_quickly(self):
         built, problems = builtin.load_base()
@@ -302,6 +350,18 @@ class BuiltinFormsTest(ConfigUnionHarness):
     def test_with_a_broken_common_layer(self):
         write(self.rules, BROKEN)
         self.check()
+
+    def test_next_step_names_the_git_wrapper(self):
+        """次の一手に挙げる git の操作は、生の git が止まる間はラッパーで打つことも添える。"""
+        os.remove(self.rules)
+        for command, rule in (
+            (f"{GIT} reset --hard", "builtin-git-reset-hard"),
+            ("rm -rf x", "builtin-recursive-delete"),
+        ):
+            with self.subTest(command=command):
+                denied = self.hook("Bash", self.ws, command=command)
+                self.assert_denied(denied, rule)
+                self.assertIn(".ccnavi/scripts/ccnavi-git.sh", self.reason(denied))
 
 
 class BuiltinRawGitTest(ConfigUnionHarness):
@@ -352,10 +412,16 @@ class BuiltinRawGitTest(ConfigUnionHarness):
             f"{GIT}.exe status",
             f"echo $({GIT} status)",
             f"if true; then {GIT} status; fi",
+            f"C:\\Git\\{GIT}.exe status",
+            f'"C:\\Git\\{GIT}.exe" status',
         ):
             with self.subTest(command=command):
                 self.assert_denied(self.hook("Bash", self.ws, command=command), RAW_GIT_BUILTIN)
-        for command in (f"grep {GIT} README.md", f"echo hello {GIT} world"):
+        for command in (
+            f"grep {GIT} README.md",
+            f"echo hello {GIT} world",
+            f"echo to do {GIT} stuff",
+        ):
             with self.subTest(command=command):
                 self.hook("Bash", self.ws, command=command)
                 self.assertNotIn(RAW_GIT_BUILTIN, self.last_record().get("rules", []))

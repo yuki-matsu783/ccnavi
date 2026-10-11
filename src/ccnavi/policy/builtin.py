@@ -161,6 +161,9 @@ _WORD_END = r"(?:[\s\x00]|$)"
 # `??` で、切れ目の直後に名前がある形を先に見る。
 _FIRST = r"(?:^|\x00)(?>(?:[^\x00]*?[^\w.\x00-])??"
 
+# 語の中の、名前の前の切れ目までを読む。語の頭か、切れ目の字の直後に名前があることを表す。
+_IN_WORD = r"(?:[^\s\x00]*?[^\w\s\x00.-])??"
+
 # ---- git
 #
 # 語の中の字を、名前の前の切れ目になる字（`_ANCHOR`）とそれ以外（`_PLAIN`）に分ける。
@@ -174,16 +177,18 @@ def _plain_but(c: str) -> str:
 
 
 # 最後の切れ目の後ろが `git` / `git.exe` でない語の、その後ろの部分（空でない）。
+# 選択肢は長いほうから並べる。短いほう（`g`）を先に置くと、`gitx` の頭の `g` だけで当たったことに
+# なり、所有的な繰り返しが読み直さないので、値の残り（`itx`）で読みが止まる。
 _TAIL = (
     r"(?:"
-    rf"{_plain_but('g')}{_PLAIN}*+"
-    rf"|g(?:{_plain_but('i')}{_PLAIN}*+)?"
-    rf"|gi(?:{_plain_but('t')}{_PLAIN}*+)?"
-    rf"|git[\w-]{_PLAIN}*+"
-    rf"|git\.(?:{_plain_but('e')}{_PLAIN}*+)?"
-    rf"|git\.e(?:{_plain_but('x')}{_PLAIN}*+)?"
+    rf"git\.exe{_PLAIN}++"
     rf"|git\.ex(?:{_plain_but('e')}{_PLAIN}*+)?"
-    rf"|git\.exe{_PLAIN}++"
+    rf"|git\.e(?:{_plain_but('x')}{_PLAIN}*+)?"
+    rf"|git\.(?:{_plain_but('e')}{_PLAIN}*+)?"
+    rf"|git[\w-]{_PLAIN}*+"
+    rf"|gi(?:{_plain_but('t')}{_PLAIN}*+)?"
+    rf"|g(?:{_plain_but('i')}{_PLAIN}*+)?"
+    rf"|{_plain_but('g')}{_PLAIN}*+"
     r")"
 )
 _UPTO_ANCHOR = rf"(?:{_PLAIN}*+{_ANCHOR})++"
@@ -217,8 +222,20 @@ GIT_PUSH_REGEX = rf"{_BEFORE}{_git_sub('push')}{_AFTER}"
 # `--hard` は reset の後ろのどこにあってもよい（`git reset -q --hard`）。git は長いオプションの
 # 略（`--har`）も受け付ける。後ろの語はどれでも読み飛ばせるので、コマンドの中で最初の reset に
 # 決める。後の reset で当たるなら、その `--hard` は最初の reset の後ろにもある。
+# reset の後ろの語のうち、`--`（ここから後ろはパス）と `--ha` `--har` `--hard` でないもの。
+_RESET_OTHER = (
+    r"(?:(?:[^\s\x00-]|-[^\s\x00-]|--[^\s\x00h]|--h[^\s\x00a]|--ha[^\s\x00r]"
+    r"|--har[^\s\x00d]|--hard[^\s\x00])[^\s\x00]*+|--h|-)"
+)
+# `--` から後ろはパスで、`--hard` には読まない（`git reset -- --hard`）。そのあと同じコマンドの中で
+# 次に reset の始まりが来たら、そこから読み直す（rm の `_RM_RESTART` と同じ考え方）。
+_RESET_RESTART = (
+    rf"(?:(?:{_RESET_OTHER}\s++)*?--(?:\s++[^\s\x00]++)*?\s++{_IN_WORD}{_git_sub('reset')}"
+    r"\s\s*+)*+"
+)
 GIT_RESET_HARD_REGEX = (
-    rf"{_FIRST}{_git_sub('reset')}\s)(?:\s*+[^\s\x00]++)*?\s*+--ha(?:rd?)?{_WORD_END}"
+    rf"{_FIRST}{_git_sub('reset')}\s)\s*+{_RESET_RESTART}"
+    rf"(?:{_RESET_OTHER}\s++)*?--ha(?:rd?)?{_WORD_END}"
 )
 
 # ---- rm
@@ -240,7 +257,8 @@ _RM_FORCE = r"(?:-[a-eg-z]*+f[a-z]*+|--f[a-z]*+)"
 
 def _rm_other(flags: str) -> str:
     """`flags` のどの字の選択肢でもない語。`-` の後ろが英字だけで `flags` の字を含む語と、
-    `--` の後ろが `flags` の字で始まる英字だけの語を除いたもの。"""
+    `--` の後ろが `flags` の字で始まる英字だけの語、それに `--` そのもの（ここから後ろは
+    オペランド）を除いたもの。"""
     rest = "".join(c for c in "abcdefghijklmnopqrstuvwxyz" if c not in flags)
     letters = f"[{rest}]"
     other = r"[^\s\x00a-z]"
@@ -248,13 +266,25 @@ def _rm_other(flags: str) -> str:
         r"(?:[^\s\x00-][^\s\x00]*+"
         rf"|-(?:{letters}++(?:{other}[^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)"
         rf"|-{letters}*+[{flags}][a-z]*+{other}[^\s\x00]*+"
-        rf"|--(?:[^\s\x00{flags}][^\s\x00]*+|[{flags}][a-z]*+{other}[^\s\x00]*+|)"
+        rf"|--(?:[^\s\x00{flags}][^\s\x00]*+|[{flags}][a-z]*+{other}[^\s\x00]*+)"
         r")"
     )
 
 
+# 片方だけの選択肢。`--` の手前で読みを切り替えるときに使う（両方を持つ語はそこで当たりにする）。
+_RM_RECURSIVE_ONLY = r"(?:-[a-eg-qs-z]*+r[a-eg-z]*+|--r[a-z]*+)"
+_RM_FORCE_ONLY = r"(?:-[a-eg-qs-z]*+f[a-qs-z]*+|--f[a-z]*+)"
+# `--` から後ろはオペランドで、選択肢には読まない（`rm -f -- -r`）。そのあと同じコマンドの中で
+# 次に rm の始まり（読み切れずに生の文字列に当てる回の `; rm …`）が来たら、そこから読み直す。
+# `--` までに当たりが決まる並び（両方の語、再帰と強制の両方）は、ここを通らずに下で当たる。
+_RM_RESTART = (
+    rf"(?:(?:{_rm_other('rf')}\s++)*+"
+    rf"(?:{_RM_RECURSIVE_ONLY}\s++(?:{_rm_other('f')}\s++)*+"
+    rf"|{_RM_FORCE_ONLY}\s++(?:{_rm_other('r')}\s++)*+)?"
+    rf"--(?:\s++[^\s\x00]++)*?\s++{_IN_WORD}rm(?:\.exe)?\s++)*+"
+)
 RECURSIVE_DELETE_REGEX = (
-    rf"{_RM_START}\s*+(?:{_rm_other('rf')}\s++)*+"
+    rf"{_RM_START}\s*+{_RM_RESTART}(?:{_rm_other('rf')}\s++)*+"
     rf"(?:{_RM_BOTH}{_WORD_END}"
     rf"|{_RM_RECURSIVE}\s++(?:{_rm_other('f')}\s++)*+{_RM_FORCE}{_WORD_END}"
     rf"|{_RM_FORCE}\s++(?:{_rm_other('r')}\s++)*+{_RM_RECURSIVE}{_WORD_END})"
@@ -268,7 +298,8 @@ _DENY: list[dict] = [
         "regex": RECURSIVE_DELETE_REGEX,
         "message": (
             "A recursive forced delete cannot be undone. Name what to remove "
-            "one at a time, or use 'git rm' when the files are tracked."
+            "one at a time, or use 'git rm' when the files are tracked "
+            "(run it through .ccnavi/scripts/ccnavi-git.sh when raw git is blocked)."
         ),
     },
     {
@@ -285,7 +316,8 @@ _DENY: list[dict] = [
         "regex": GIT_RESET_HARD_REGEX,
         "message": (
             "Work in progress would be lost. Use 'git stash' to set it aside, "
-            "or name the files and use 'git restore'."
+            "or name the files and use 'git restore' "
+            "(run them through .ccnavi/scripts/ccnavi-git.sh when raw git is blocked)."
         ),
     },
     {

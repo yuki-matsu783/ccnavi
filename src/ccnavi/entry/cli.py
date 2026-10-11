@@ -480,7 +480,15 @@ def _parsed(
             return EXIT_ERROR
 
     root = args.root if args.root is not None else default_root()
-    conf, problems = settings.load(root)
+    try:
+        conf, problems = settings.load(root)
+    except Exception as exc:  # noqa: BLE001 hook の経路では、終了コード 1 で通る形にしない
+        # 設定を読めずに落ちたら、hook の経路だけは受け皿で終える。payload はまだ読んでいないので
+        # イベントが分からず、PreToolUse と同じく止める。ほかの経路は、打った人が見られるので
+        # 例外のまま伝える。
+        if not _hook_route(args):
+            raise
+        return _hook_crashed(stdout, stderr, _unloaded(root), root, _HookSoFar(), exc)
 
     # レイヤーの置き場（中身の 3 本と、レイヤーを探す先の 2 本）と、記録・state・
     # 承認済みチケット・提案の置き場（`--log` / `--state` / `--approved` / `--tickets`）の
@@ -758,6 +766,36 @@ class _HookSoFar:
     record: audit.Record | None = None
     log: audit.Log | None = None
     recorded: bool = False
+
+
+def _hook_route(args: argparse.Namespace) -> bool:
+    """この起動が hook の経路（`_parsed` の最後の `_hook`）に進むか。
+
+    設定を読む前に分ける必要があるときに使う。`_parsed` の振り分けで、payload を読まない経路の
+    どれにも当たらないもの。経路を足したら、ここにも足す。
+    """
+    return not (
+        args.docs
+        or cli_args._diagnosing(args)
+        or args.prune
+        or args.plan_order is not None
+        or args.fill_phases
+        or args.order is not None
+        or args.write
+        or args.expect is not None
+        or args.agree
+        or args.command
+        or args.reviewed is not None
+        or args.close_early
+    )
+
+
+def _unloaded(root: str) -> settings.Settings:
+    """設定を読めなかった回の、記録と state の既定の置き場だけを持つ設定。"""
+    return settings.Settings(
+        log=os.path.join(root, settings.DEFAULT_LOG),
+        state=os.path.join(root, settings.DEFAULT_STATE),
+    )
 
 
 def _hook(

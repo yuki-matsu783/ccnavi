@@ -86,13 +86,14 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 git の読み取りが 2 秒で打ち切られる。
 
 payload が JSON でない・オブジェクトでない・`hook_event_name` が無いとき、`hook_event_name`・`tool_name`・
-`session_id`・`cwd`・`permission_mode`・`tool_use_id` のどれかが文字列でないときは `payload-unusable` で
+`session_id`・`cwd`・`permission_mode`・`tool_use_id` のどれかが文字列でないとき、`tool_input` がオブジェクトでないとき、
+その中の判定が読む欄（`command`・`file_path` など。`hookio.TOOL_INPUT_TEXT_FIELDS`）が文字列でないときは `payload-unusable` で
 同じ結果になる。記録を書けないときは標準エラーに出して捨て、判定は変えない。UTF-8 にできない字（JSON の
 `"\ud800"` のような孤立したサロゲート）は、記録では `\ud800` の 6 字にして書く。期限切れと `payload-unusable` の文は、
 先頭に `[ccnavi] <理由>` を置き、次の一手（期限切れはコマンドを分ける・長い文はファイルで渡す、`payload-unusable` は
 書き直しでは直らないので hook の登録と版をユーザに確かめてもらう）を添える。
 
-**内部エラー。** hook として起動された回の処理（モードの解決、payload の読み取り、イベントの処理、記録、
+**内部エラー。** hook として起動された回の処理（設定の読み込み、モードの解決、payload の読み取り、イベントの処理、記録、
 診断ログ）が ccnavi 自身の想定外の例外で終わったら、その回は `internal-error` で判定に
 至らなかった回として記録し（`detail` に例外の型と場所）、診断ログに error で 1 行残す。記録を書く途中で
 落ちた回は、記録を重ねて試さない。例外を抜けさせると
