@@ -6,7 +6,7 @@ tags: [judging, sh-scripts, exe-boundary]
 keywords: [判定, sh, ccnavi-git.sh, integrate, integrate-done, push, carry, 例外, P13, 許可リスト]
 ---
 
-# ADR-0115: 入口を 1 本に寄せたラッパーの中の可否の判定は、止める・通すの原則の例外にする
+# ADR-0118: 入口を 1 本に寄せたラッパーの中の可否の判定は、止める・通すの原則の例外にする
 
 状態: 採用
 

@@ -5,7 +5,7 @@ description: rule-samples.yml・samples:・--test-samples を rule-expectations.
 tags: [rules, naming, diagnostics]
 keywords: [見本, sample, rule-samples, rule-expectations, expectations, --test-samples, --test-expectations, expectationsPath, 改名]
 ---
-# ADR-0114: ルールの「見本」を「期待する判定」と呼び、名前を `rule-expectations` に改める
+# ADR-0116: ルールの「見本」を「期待する判定」と呼び、名前を `rule-expectations` に改める
 
 状態: 採用
 
