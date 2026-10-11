@@ -86,7 +86,21 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 git の読み取りが 2 秒で打ち切られる。
 
 payload が JSON でない・オブジェクトでない・`hook_event_name` が無いときは `payload-unusable` で
-同じ結果になる。記録を書けないときは標準エラーに出して捨て、判定は変えない。
+同じ結果になる。記録を書けないときは標準エラーに出して捨て、判定は変えない。期限切れと `payload-unusable` の文は、
+先頭に `[ccnavi] <理由>` を置き、次の一手（期限切れはコマンドを分ける・長い文はファイルで渡す、`payload-unusable` は
+書き直しでは直らないので hook の登録と版をユーザに確かめてもらう）を添える。
+
+**内部エラー。** イベントの処理が ccnavi 自身の想定外の例外で終わったら、その回は `internal-error` で判定に
+至らなかった回として記録し（`detail` に例外の型と場所）、診断ログに error で 1 行残す。例外を抜けさせると
+Python は終了コード 1 で終わり、Claude Code は 0 と 2 以外を止める扱いにしないので、`PreToolUse` の呼び出しが
+記録も無く通ってしまう。途中まで書いた標準出力は捨て、イベントごとに次のように終える。文には `[ccnavi] internal-error`、
+例外の型、診断ログ（`logs/diag/ccnavi.log`）の場所を載せ、モデル宛ての文には「繰り返さずユーザに伝える」を添える。
+
+| イベント | 終え方 |
+|---|---|
+| `PreToolUse` | 標準エラーに文、`enable` は終了コード 2 で止める。`dry-run` は 0（判定に達せなかった回の既定と同じ） |
+| `PostToolUse` | ツールはもう走っていて止めるものは無い。`enable` は終了コード 2 と標準エラーで、実行後の検査をしていないことをモデルに言う。`dry-run` は 0 |
+| それ以外（`SessionStart`・`UserPromptSubmit`・`Stop`・`SubagentStart`・`SubagentStop`・未知のイベント） | 終了コード 0 で、ユーザに `systemMessage` で知らせる。終了コード 2 で終えると、`Stop` と `SubagentStop` は終われずに続けさせられ、`UserPromptSubmit` は依頼文を消す。ccnavi の不具合が作業そのものを止めないようにする |
 
 ### 4.6 導入と配布
 
