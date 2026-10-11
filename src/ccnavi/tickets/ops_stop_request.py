@@ -171,7 +171,15 @@ def _next_step(worktree: str, ph: phase.Phase) -> tuple[str, list[str]]:
 def nudged_before(state_dir: str, session: str, found: Pending) -> bool:
     """このセッションで、同じ状態のまま促したことがあるか。促すのは 1 回だけ。"""
     data = fsio.read_dict(ops_stop.nudge_path(state_dir, session)) or {}
-    return data.get(found.key) == found.digest
+    if data.get(found.key) == found.digest:
+        return True
+    # 子のツリーで `finish` の促し（`ops_stop.nudged_before`。鍵は子の識別子、値は HEAD）を出した
+    # のと同じ状態は、こちらでは促さない。同じ状態を 2 つの促しが 1 回ずつ止めないため。
+    return (
+        found.step == STEP_FINISH
+        and len(found.children) == 1
+        and data.get(found.children[0]) == found.head
+    )
 
 
 def remember_nudge(state_dir: str, session: str, found: Pending) -> str:

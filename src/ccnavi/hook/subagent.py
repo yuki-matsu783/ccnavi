@@ -307,6 +307,12 @@ def forget_running(state_dir: str, session: str) -> None:
     if not state_dir:
         return
     for _, path in _session_marks(state_dir, session, RUNNING_SUFFIX) or []:
+        # 名前の前置きが重なる別のセッションの印は消さない（`running` と同じく 1 行目で確かめる）。
+        # 1 行目を読めない印（壊れている・空）は、期限と prune に任せず、ここで捨てる。
+        text = fsio.read_text(path, errors="replace")
+        lines = text.splitlines() if text is not None else []
+        if lines and lines[0] != _MARK_SESSION + _one_line(session):
+            continue
         fsio.remove(path)
 
 
