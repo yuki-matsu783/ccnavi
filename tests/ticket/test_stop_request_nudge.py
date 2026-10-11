@@ -338,6 +338,30 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.assert_quiet(self.stop(tree))
         self.assert_not_asked(self.stop(tree))
 
+    def test_this_nudge_goes_before_the_stop_rule_and_the_rule_is_not_counted(self):
+        with open(self.rules, encoding="utf-8") as f:
+            body = json.load(f)
+        rule = {"id": "review", "match": "Stop", "glob": "*", "every": 2}
+        body["allow"] = [*body.get("allow", []), {**rule, "additionalContext": "振り返る"}]
+        write(self.rules, json.dumps(body))
+        self.family()
+        first = self.body(self.stop(self.parent_tree))
+        self.assertIn(CODE, first["reason"])
+        self.assertNotIn("NUDGE_STOP_RULE", first["reason"])
+        # ここからルールを数える（1 回目は止めない、2 回目で渡す）。
+        self.assert_not_asked(self.stop(self.parent_tree))
+        second = self.body(self.stop(self.parent_tree))
+        self.assertTrue(second["reason"].startswith("NUDGE_STOP_RULE: "), second)
+        self.assertNotIn(CODE, second["reason"])
+
+    def test_the_nudge_is_recorded_apart_from_deny(self):
+        self.family()
+        self.stop(self.parent_tree)
+        log = os.path.join(self.root, "logs", "decisions.jsonl")
+        with open(log, encoding="utf-8") as f:
+            line = json.loads(f.read().splitlines()[-1])
+        self.assertEqual((line["decision"], line["code"], line["enforced"]), ("nudge", CODE, True))
+
 
 if __name__ == "__main__":
     unittest.main()
