@@ -1,9 +1,9 @@
 /**
- * 条件の木（`when:`）を図で見せて直す欄。ルールの行を開いたときに、パターンの欄の代わりに出る。
+ * 条件式（`when:`）を図で見せて直す欄。ルールの行を開いたときに、パターンの欄の代わりに出る。
  *
- * 図は React Flow で、根を左に置いて右へ伸ばす（置き場所は `layoutCond` が木の形だけで決める）。
+ * 図は React Flow で、根を左に置いて右へ伸ばす（置き場所は `layoutCond` が条件式の形だけで決める）。
  * 点を押すと選ばれ、下の操作の欄がその点に効く。操作は、子を足す・消す・種別を替える（all ⇄ any、
- * glob ⇄ regex）・葉の文字を直す・all / any / not で包む・not を外す。直すたびに木ぜんたいを `onChange` で返し、
+ * glob ⇄ regex）・葉の文字を直す・all / any / not で包む・not を外す。直すたびに条件式ぜんたいを `onChange` で返し、
  * 書き戻し（`rules-doc.ts`）が `when:` の YAML に直す。保存と保存前の `--lint` は他の欄と同じ流れ。
  *
  * 誤り（空のまとめ、中が空の not、空の葉、読めなかったノード、深さとノード数の上限）は図の下に並べ、
@@ -131,7 +131,7 @@ export function When({ tree, onChange }: WhenProps): JSX.Element {
     <div className="cond" data-nodes={layout.places.length}>
       <div className="cond-canvas">
         <ReactFlow<CondFlowNode, Edge>
-          // 木の形が変わったら置き直して全体を映す（点の数で見分ける）
+          // 条件式の形が変わったら置き直して全体を映す（点の数で見分ける）
           key={layout.places.length}
           nodes={nodes}
           edges={edges}

@@ -33,6 +33,6 @@ select.f-section { max-width: 120px; }
 .rule .stale { grid-column: 1 / -1; margin: 0; font-size: .9em; color: var(--error-text); overflow-wrap: anywhere; }
 .rule .stale code { margin: 0 6px; }
 .rule .pattern { font-family: var(--vscode-editor-font-family); }
-/* 条件の木を 1 行に縮めたもの。誤りがあれば件数を添える（色だけに頼らず文で言う） */
+/* 条件式を 1 行に縮めたもの。誤りがあれば件数を添える（色だけに頼らず文で言う） */
 .sum .sum-when { font-family: var(--vscode-editor-font-family); }
 .sum .sum-when-error { color: var(--error-text); }

@@ -335,7 +335,7 @@ def _except_problems(rule: rules.Rule, name: str) -> list[Problem]:
     return problems
 
 
-# 木のノードを書き方だけから見積もった値。葉は「何にでも当たる」と言えるときだけ ALWAYS で、
+# 条件式のノードを書き方だけから見積もった値。葉は「何にでも当たる」と言えるときだけ ALWAYS で、
 # それ以外は分からない（UNKNOWN）。何にも当たらない葉は書き方からは言えないので作らない。
 _ALWAYS, _NEVER, _UNKNOWN = "always", "never", "unknown"
 
@@ -370,7 +370,7 @@ def _catch_all_deny_problems(rule: rules.Rule, name: str) -> list[Problem]:
     本体も同じ（_NONEMPTY_PROBES）。except を持つ deny は、本体が何にでも当たっても except で
     除いたものは止めないので、「丸ごと止める」とは言わず、除いたもの以外を止めると言う。
 
-    木（when）の全体が何にでも当たる形は _when_problems が言う。`{!root}` を組み立てられずに
+    条件式（when）の全体が何にでも当たる形は _when_problems が言う。`{!root}` を組み立てられずに
     止める側へ倒した deny は、書いた式ではなく倒した式を持つので見ない（読み込みが別に言う）。
     ask と allow は見ない（allow の広さは _broad が言う）。
     """
@@ -397,14 +397,14 @@ def _catch_all_deny_problems(rule: rules.Rule, name: str) -> list[Problem]:
 
 
 def _when_problems(rule: rules.Rule, name: str) -> list[Problem]:
-    """`when:`（条件の木）の書き方。
+    """`when:`（条件式）の書き方。
 
     書式の誤り（知らないキー・空のリスト・上限）は読み込み（rules._when）が error にするので、
     ここは意味の側を見る。どれも判定は書いたとおりに動いているので warn。
 
     1. 何にでも当たる・何にも当たらないノード。`not` の下が何にでも当たる葉だけ、`any` の中に
        何にでも当たる葉、のような形で、そのノードは書いても条件を絞らない。いちばん外側の
-       1 つだけを言う（中を言っても直す場所は同じ）。木の全体なら、ルールがどの呼び出しにも
+       1 つだけを言う（中を言っても直す場所は同じ）。条件式の全体なら、ルールがどの呼び出しにも
        当たる・当たらないことになる
     2. Bash / PowerShell を見る deny / ask の `not`。当てるのはコマンド列の全体なので、
        除く語をコマンドのどこかに足すだけで外れる（except と同じ理由）
@@ -500,12 +500,12 @@ def _broad(rule: rules.Rule) -> str:
     ここでは扱わない。
 
     1. 何にでも当たる。翻訳後の式が、当てる語を含まない文字列にも当たる。
-       条件の木（when）は、木の書き方から何にでも当たると言えるとき（_constant）
+       条件式（when）は、書き方から何にでも当たると言えるとき（_constant）
     2. 選択肢が 3 つ以上。`(ls|cat|sed)` のような書き方は、それだけ多くの
        コマンドに同じ文を添えることになる
     """
     if rule.when is not None and rule.compiled is None:
-        # 木は 1 つの文字列で試すと、`not: {regex: '^rm'}` のように "x" には当たるが
+        # 条件式は 1 つの文字列で試すと、`not: {regex: '^rm'}` のように "x" には当たるが
         # 何にでも当たるわけではない形を取り違える。書き方から見積もる（_constant）。
         if _constant(rule.when) == _ALWAYS:
             return "何にでもヒットする"

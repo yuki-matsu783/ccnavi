@@ -95,7 +95,7 @@ function formOf(section: Section, index: number, map: YAMLMap): RuleForm {
   };
 }
 
-/** 木のノードの深さをここまでで打ち切る（読めない入れ子で止まらないため。上限の 8 を言うのは画面と lint） */
+/** 条件式のノードの深さをここまでで打ち切る（読めない入れ子で止まらないため。上限の 8 を言うのは画面と lint） */
 const READ_DEPTH = 64;
 
 /** YAML の値を、そのまま JSON にできる形にする（読めなかったノードを書き戻すため） */
@@ -113,8 +113,8 @@ function invalid(value: unknown, reason: string): CondNode {
 }
 
 /**
- * `when:` のノード（と `except:` の各要素）を木にする。形が違うところは `invalid` にして残し、
- * 他のノードは読む（1 か所の誤りで木ぜんたいを見せなくしない）。
+ * `when:` のノード（と `except:` の各要素）を条件式にする。形が違うところは `invalid` にして残し、
+ * 他のノードは読む（1 か所の誤りで条件式ぜんたいを見せなくしない）。
  */
 export function condOfYaml(value: unknown, depth = 1): CondNode {
   if (depth > READ_DEPTH) {
@@ -343,7 +343,7 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
     }
     setText(doc, node, form.kind, form.pattern, Scalar.QUOTE_SINGLE, node.has(form.kind) ? undefined : "match");
   }
-  // 「条件の木に変換」で except を木へ移したときだけ消す
+  // 「条件式に変換」で except を条件式へ移したときだけ消す
   if (form.dropExcept === true) {
     node.delete("except");
   }
@@ -370,14 +370,14 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
 }
 
 /**
- * 条件の木（`when:`）を書く。読み込んだときと同じ木なら何もしない（コメントも書き方も、
+ * 条件式（`when:`）を書く。読み込んだときと同じ条件式なら何もしない（コメントも書き方も、
  * 両方書いてしまった `glob` も、そのまま残す。報告するのは lint）。
  *
- * 変えたときは `glob` / `regex` を消し、木を書く。元のノードは使い回す。子は、同じ中身のノードを先に
+ * 変えたときは `glob` / `regex` を消し、条件式を書く。元のノードは使い回す。子は、同じ中身のノードを先に
  * 拾い（消した・並べ替えた子のコメントが別の子へ付け替わらないように）、残りを似たノードに当てて
  * 値だけを書き換える（patchChildren）。包む・not を外すときも元のノードを中で使い回す。新しい葉は単引用符で囲む。
  *
- * まだ `when:` が無い（「条件の木に変換」した）ときは、元の `glob` / `regex` と、移す `except:` の
+ * まだ `when:` が無い（「条件式に変換」した）ときは、元の `glob` / `regex` と、移す `except:` の
  * 各要素を、変換した形（`all: [本体, not: {any: 除くもの}]`）に組んで元のノードとして当てる。
  * 書いてあったコメント（前置き・行末）が、対応する葉に付いたまま残る。
  */
@@ -402,7 +402,7 @@ function writeWhen(doc: Document, node: YAMLMap, tree: CondNode, movingExcept: b
 }
 
 /**
- * glob / regex 1 つ（と `except:`）のルールの元のノードを、「条件の木に変換」した形に組む。
+ * glob / regex 1 つ（と `except:`）のルールの元のノードを、「条件式に変換」した形に組む。
  * 葉は元のペアの値（行末のコメント付き）をそのまま持ち、キーの前のコメントは葉の前へ移す。
  * `except:` の各要素はノードごと移す（`movingExcept` のときだけ。消さない except は動かさない）
  */

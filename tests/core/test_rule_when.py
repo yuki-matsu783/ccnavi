@@ -1,4 +1,4 @@
-"""ルールの `when:`（条件の木）のテスト。
+"""ルールの `when:`（条件式）のテスト。
 
 読み込み（書式・苦情・上限）、判定（all / any / not の組み合わせ、except との併用、
 `{!root}` を組み立てられないとき、hook の判定と入れ子のコマンド）、lint、レイヤーのマージ、
@@ -45,7 +45,7 @@ def errors(problems: list) -> list[str]:
 
 
 def nested(depth: int) -> dict:
-    """`not` を depth 段重ねた木。葉を含めた段数は depth + 1。"""
+    """`not` を depth 段重ねた条件式。葉を含めた段数は depth + 1。"""
     node: dict = {"glob": "*.pem"}
     for _ in range(depth):
         node = {"not": node}
@@ -53,7 +53,7 @@ def nested(depth: int) -> dict:
 
 
 class ParseTest(unittest.TestCase):
-    def test_木を読む(self):
+    def test_条件式を読む(self):
         rule, problems = build(SECRETS)
         self.assertEqual(problems, [])
         self.assertEqual(rule.glob, "")
@@ -69,7 +69,7 @@ class ParseTest(unittest.TestCase):
             leaves, ["when.any[0].glob", "when.any[1].all[0].glob", "when.any[1].all[1].not.glob"]
         )
 
-    def test_葉だけの木(self):
+    def test_葉だけの条件式(self):
         rule, problems = build(
             {"id": "x", "match": "Write", "when": {"regex": r"\.pem$"}}, section=rules.ALLOW
         )
@@ -250,7 +250,7 @@ class NotRootRefusedTest(unittest.TestCase):
                     self.assertEqual(rule.excepts, [])
                     self.assertTrue(rule.matches("Write", "/anything/a.md"))
                     self.assertIn("止めています", rule.spoken_message())
-                    # 書いた木は残す（--explain と書き戻しのため）
+                    # 書いた条件式は残す（--explain と書き戻しのため）
                     self.assertEqual(rule.when.written(), when)
 
     def test_allow_は使わない(self):
@@ -421,7 +421,7 @@ class LintTest(unittest.TestCase):
         found = self.warns(self.lint([SECRETS], [allow]))
         self.assertFalse(any("when の not" in d for d in found), found)
 
-    def test_stop_に当たらない木(self):
+    def test_stop_に当たらない条件式(self):
         stop = {
             "id": "nudge",
             "match": "Stop",
@@ -435,7 +435,7 @@ class LintTest(unittest.TestCase):
         found = self.warns(self.lint([SECRETS], [ok]))
         self.assertFalse(any("(stop)" in d and "当たらないので" in d for d in found), found)
 
-    def test_広い_allow_は木の書き方から見積もる(self):
+    def test_広い_allow_は条件式の書き方から見積もる(self):
         # `not: {regex: '^rm'}` は "x" に当たるが、何にでも当たるわけではない
         narrow = {
             "id": "not-rm",
@@ -521,7 +521,7 @@ class LintTest(unittest.TestCase):
         found = self.warns(problems)
         self.assertFalse(any("本体の" in d and "何にでも当たる" in d for d in found), found)
 
-    def test_id_の無いルールは木で名指しする(self):
+    def test_id_の無いルールは条件式で名指しする(self):
         raw = {k: v for k, v in SECRETS.items() if k != "id"}
         found = self.warns(self.lint([raw]))
         self.assertTrue(any("when: any(glob '*.pem'" in d for d in found), found)
@@ -544,7 +544,7 @@ class MergeTest(unittest.TestCase):
         self.assertTrue(merged.matches("Write", "/a/k.pem"))
         self.assertFalse(merged.matches("Write", "/a/secrets/a.md"))
 
-    def test_木だけが違えば別の定義(self):
+    def test_条件式だけが違えば別の定義(self):
         base = self.rule_set(SECRETS)
         other = {**SECRETS, "when": {"any": [{"glob": "*.pem"}, {"glob": "*/secrets/*"}]}}
         problems = ruleload.merge_rules(base, self.rule_set(other), "lib")
@@ -559,7 +559,7 @@ class MergeTest(unittest.TestCase):
         self.assertEqual(len(base.deny), 3)
         self.assertEqual([p.severity for p in problems], [rules.SEVERITY_INFO])
 
-    def test_glob_と同じ葉だけの木も別の定義(self):
+    def test_glob_と同じ葉だけの条件式も別の定義(self):
         base = self.rule_set({"id": "a", "match": "Write", "glob": "*.pem", "message": "m"})
         tree = self.rule_set(
             {"id": "a", "match": "Write", "when": {"glob": "*.pem"}, "message": "m"}
@@ -606,7 +606,7 @@ class WrittenTest(unittest.TestCase):
 
 
 class CommandLineTest(unittest.TestCase):
-    """`--explain` が木を出し、`--test-samples` が when のルールを見本で確かめられる。"""
+    """`--explain` が条件式を出し、`--test-samples` が when のルールを見本で確かめられる。"""
 
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
@@ -666,7 +666,7 @@ if __name__ == "__main__":
 
 
 class CommonCredentialsTest(unittest.TestCase):
-    """共通の rules.yml の credentials-files（when で書いた木）と credentials（Bash）。"""
+    """共通の rules.yml の credentials-files（when で書いた条件式）と credentials（Bash）。"""
 
     def setUp(self):
         with open(common_path(ROOT, "rules"), encoding="utf-8") as f:

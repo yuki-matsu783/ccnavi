@@ -1,5 +1,5 @@
 /*
- * 条件の木の図（`When.tsx`）。React Flow の色は `--xy-*` の変数で持っているので、`--vscode-*` に置き換える
+ * 条件式の図（`When.tsx`）。React Flow の色は `--xy-*` の変数で持っているので、`--vscode-*` に置き換える
  * （フェーズの図 `phases/Graph.css` と同じ書き方。打ち消さず、変数を置き換える）。
  */
 .cond { display: flex; flex-direction: column; gap: 6px; min-width: 0; }

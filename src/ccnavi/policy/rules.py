@@ -88,7 +88,7 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
 空のリスト、マッピングでない要素、`glob` と `regex` の両方がある・どちらも無い要素、
 知らないキーを持つ要素は、ルールごと読み込まずに error で名指しする。
 
-## 条件の木（when）
+## 条件式（when）
 
 本体は `glob` / `regex` の代わりに `when:` でも書ける。ルールが持つのは 3 つのうち
 ちょうど 1 つ。`when` の値はノードで、ノードは次のどれか 1 つのキーだけを持つマッピング。
@@ -223,14 +223,14 @@ _SKIPS_ANYWHERE = re.compile(r"(?:\.[*+]|\[\\s\\S\][*+])")
 EXCEPT_KEY = "except"
 EXCEPT_FIELDS = ("glob", "regex")
 
-# 条件の木を書くキーと、ノードに書けるキー。葉は except の要素と同じ形（`glob` / `regex`）。
+# 条件式を書くキーと、ノードに書けるキー。葉は except の要素と同じ形（`glob` / `regex`）。
 WHEN_KEY = "when"
 WHEN_LEAVES = EXCEPT_FIELDS
 WHEN_ALL = "all"
 WHEN_ANY = "any"
 WHEN_NOT = "not"
 WHEN_KINDS = (*WHEN_LEAVES, WHEN_ALL, WHEN_ANY, WHEN_NOT)
-# 入れ子の段数とノードの数の上限。判定は呼び出しのたびに木をたどるので、書き方しだいで
+# 入れ子の段数とノードの数の上限。判定は呼び出しのたびに条件式をたどるので、書き方しだいで
 # 重くならないように頭打ちにする。根が 1 段目。
 MAX_WHEN_DEPTH = 8
 MAX_WHEN_NODES = 64
@@ -532,9 +532,9 @@ class Rule:
     # このルールは当たらない。当てる文字列は本体と同じ（Bash ならコマンド列の全体）。
     excepts: list[Exclusion] = field(default_factory=list)
 
-    # when は `when:` で書いた本体（条件の木）。glob / regex で書いたルールでは None。
+    # when は `when:` で書いた本体（条件式）。glob / regex で書いたルールでは None。
     # `when` のルールの compiled はふつう None で、葉を組み立てられずに止める側へ倒した
-    # deny / ask だけが、何にでも当たる式を compiled に持つ（そちらを先に見る）。木は
+    # deny / ask だけが、何にでも当たる式を compiled に持つ（そちらを先に見る）。条件式は
     # 書いた表記を出すために残す。
     when: Condition | None = None
 
@@ -543,7 +543,7 @@ class Rule:
         return self.compiled is not None or self.when is not None
 
     def written_body(self) -> str:
-        """本体を書いた表記で 1 行に。`when` は木を 1 行にした形。"""
+        """本体を書いた表記で 1 行に。`when` は条件式を 1 行にした形。"""
         if self.when is not None:
             return f"{WHEN_KEY}: {self.when.describe()}"
         return self.glob or self.regex
@@ -568,7 +568,7 @@ class Rule:
             self.bare_id,
             self.match,
             self.compiled.pattern if self.compiled else "",
-            # 条件の木。葉の式と組み方の両方を比べる。
+            # 条件式。葉の式と組み方の両方を比べる。
             self.when.key() if self.when is not None else (),
             # 除くものが違えば別の定義。比べないと、except だけが違う後ろのレイヤーの 1 本を
             # 重複として捨て、前のレイヤーの except で通るはずのないものが通ってしまう。
@@ -807,7 +807,7 @@ def _build(
     if not rule.match:
         return None, [Problem(SEVERITY_ERROR, name, "match が無い。どのツールにもヒットしない")]
     # `when` と並べたかどうかはキーの有無で見る。値の真偽で見ると `glob: ''` や `glob: 0` を
-    # 添えた木が通り、書いた人の意図（どちらで判定するのか）が決まらないまま読み込まれる。
+    # 添えた条件式が通り、書いた人の意図（どちらで判定するのか）が決まらないまま読み込まれる。
     # 拡張の画面（rules-doc.ts の readRules）もキーの有無で見ている。
     has_when = WHEN_KEY in raw
     bodies = [
@@ -867,7 +867,7 @@ def _build(
             leaf.compiled = part.compiled
         rule.when = tree
         if refused:
-            # 葉を 1 つでも組み立てられなければ、木の意味が決まらない。`not` の下の葉なら
+            # 葉を 1 つでも組み立てられなければ、条件式の意味が決まらない。`not` の下の葉なら
             # 外すと当たる範囲が狭まり、上なら広がるので、葉だけ外す形は向きが定まらない。
             # 本体を組み立てられなかったときと同じく、deny / ask は全部止め、allow は使わない。
             degraded, refused_problem = _ungeneratable(rule, section, name, refused)
@@ -1070,11 +1070,11 @@ def _excepts(raw: dict, name: str) -> tuple[list[tuple[str, str]], Problem | Non
 
 
 class _WhenError(Exception):
-    """`when:` の書式の誤り。木をたどる途中から一気に抜けるために使う。"""
+    """`when:` の書式の誤り。条件式をたどる途中から一気に抜けるために使う。"""
 
 
 def _when(written: object, name: str) -> tuple[Condition | None, Problem | None]:
-    """`when:` を読んで木にする。葉の式はまだ組み立てない（_build が組み立てる）。
+    """`when:` を読んで条件式にする。葉の式はまだ組み立てない（_build が組み立てる）。
 
     書式の誤りは最初の 1 件を返す。書いたユーザは条件を書いたつもりでいるので、
     読めないノードを黙って外すと、当たる範囲が書いたものと気づかないうちに食い違う。

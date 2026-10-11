@@ -809,7 +809,7 @@ deny:
     message: 生成物以外は直さない
 `;
 
-/** 中が空の any を持つ木（誤りの見本） */
+/** 中が空の any を持つ条件式（誤りの見本） */
 const BROKEN_WHEN = `version: 1
 deny:
   - id: workspace-root
@@ -822,13 +822,13 @@ deny:
     message: main では編集しない
 `;
 
-/** 条件の木の点を押して選ぶ */
+/** 条件式の点を押して選ぶ */
 async function pickCond(dom: DomPage, id: string, key: string): Promise<void> {
   dom.click(dom.one(`${rowSelector(id)} .cond-node[data-key="${key}"]`));
   await dom.settle();
 }
 
-test("CB-D155 条件の木のルールは、畳んだ行に木の要約、開いた行に左から右へ伸びる図を出す。誤りは件数と一覧で言う", async () => {
+test("CB-D155 条件式のルールは、畳んだ行に条件式の要約、開いた行に左から右へ伸びる図を出す。誤りは件数と一覧で言う", async () => {
   const dom = await openRules({ model: readRules(WHEN_RULES).model }, undefined, { measure: true });
   try {
     const row = rowSelector("workspace-root");
@@ -846,7 +846,7 @@ test("CB-D155 条件の木のルールは、畳んだ行に木の要約、開い
     assert.equal(dom.one(`${row} .cond-inspector`).getAttribute("data-key"), "r");
     assert.ok(dom.one<HTMLButtonElement>(`${row} .cond-inspector [data-op-action="remove"]`).disabled);
     assert.equal(dom.all(`${row} .cond-problems li`).length, 0);
-    // パターンの欄と「条件の木に変換」は出さない
+    // パターンの欄と「条件式に変換」は出さない
     assert.equal(dom.all(`${row} .f-pattern`).length, 0);
     assert.equal(dom.all(`${row} button[data-action="to-when"]`).length, 0);
   } finally {
@@ -855,7 +855,7 @@ test("CB-D155 条件の木のルールは、畳んだ行に木の要約、開い
   const bad = await openRules({ model: readRules(BROKEN_WHEN).model }, undefined, { measure: true });
   try {
     const row = rowSelector("workspace-root");
-    assert.equal(bad.one(`${row} .sum-when-error`).textContent, "木に誤り 1");
+    assert.equal(bad.one(`${row} .sum-when-error`).textContent, "条件式に誤り 1");
     bad.click(bad.one(`${row} .row-head`));
     await bad.settle();
     assert.deepEqual(bad.all(`${row} .cond-problems li`).map((li) => li.textContent), ["any の中が空です（1 個以上）"]);
@@ -873,7 +873,7 @@ test("CB-D155 条件の木のルールは、畳んだ行に木の要約、開い
   }
 });
 
-test("CB-D156 図で木を直して保存する（葉の文字・glob ⇄ regex・all ⇄ any・子の追加・not で包む・削除）", async () => {
+test("CB-D156 図で条件式を直して保存する（葉の文字・glob ⇄ regex・all ⇄ any・子の追加・not で包む・削除）", async () => {
   const dom = await openRules({ model: readRules(WHEN_RULES).model }, undefined, { measure: true });
   try {
     const row = rowSelector("workspace-root");
@@ -929,7 +929,7 @@ test("CB-D156 図で木を直して保存する（葉の文字・glob ⇄ regex�
   }
 });
 
-test("CB-D157 glob / regex と除外のルールは「条件の木に変換」で木になり、除外は木の中へ移る。判定を試すも木のまま送る", async () => {
+test("CB-D157 glob / regex と除外のルールは「条件式に変換」で条件式になり、除外は条件式の中へ移る。判定を試すも条件式のまま送る", async () => {
   const dom = await openRules({ model: readRules(WHEN_RULES).model }, undefined, { measure: true });
   try {
     const row = rowSelector("except-rule");
@@ -939,7 +939,7 @@ test("CB-D157 glob / regex と除外のルールは「条件の木に変換」�
     dom.click(dom.one(`${row} button[data-action="to-when"]`));
     await dom.settle();
     assert.equal(dom.all(`${row} .f-pattern`).length, 0);
-    assert.equal(dom.all(`${row} .f-except`).length, 0, "除外は木の中へ移ったので欄を出さない");
+    assert.equal(dom.all(`${row} .f-except`).length, 0, "除外は条件式の中へ移ったので欄を出さない");
     assert.deepEqual(
       dom.all(`${row} .cond-node`).map((node) => `${node.getAttribute("data-key")} ${node.getAttribute("data-op")}`),
       ["r all", "r.0 regex", "r.1 not", "r.1.0 any", "r.1.0.0 glob"],
@@ -973,7 +973,7 @@ test("CB-D157 glob / regex と除外のルールは「条件の木に変換」�
   }
 });
 
-test("CB-D158 except が木へそのまま移せない形なら、「条件の木に変換」を押せず、理由をボタンの説明に出す", async () => {
+test("CB-D158 except が条件式へそのまま移せない形なら、「条件式に変換」を押せず、理由をボタンの説明に出す", async () => {
   const text = `version: 1
 deny:
   - id: bad-except
@@ -1021,7 +1021,7 @@ deny:
   }
 });
 
-test("CB-D159 根が葉の木は、all / any で包んで子を足せる。根の削除ボタンは包む道を案内する", async () => {
+test("CB-D159 根が葉の条件式は、all / any で包んで子を足せる。根の削除ボタンは包む道を案内する", async () => {
   const text = `version: 1
 deny:
   - id: leaf-root

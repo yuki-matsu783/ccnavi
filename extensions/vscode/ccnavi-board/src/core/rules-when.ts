@@ -1,7 +1,7 @@
 /**
- * ルールの条件の木（`when:`）の形と、その木に対する操作。読み書き（`rules-doc.ts`）と画面（`When.tsx`）で分け合う。
+ * ルールの条件式（`when:`）の形と、その条件式に対する操作。読み書き（`rules-doc.ts`）と画面（`When.tsx`）で分け合う。
  *
- * `when:` はノードの木で、各ノードはキーをちょうど 1 つ持つ。
+ * `when:` はノードを入れ子にした式で、各ノードはキーをちょうど 1 つ持つ。
  *
  *   葉        `{glob: '…'}` / `{regex: '…'}`
  *   まとめ    `{all: [ノード, …]}` / `{any: [ノード, …]}`（1 個以上）
@@ -9,7 +9,7 @@
  *
  * 上限は深さ 8、ノード数 64（実行ファイルの `--lint` と同じ数え方: 根の深さを 1、ノードは葉も数える）。
  *
- * ここは木の形と編集だけを持ち、当たる・当たらないには触れない（判定は実行ファイルの仕事）。
+ * ここは条件式の形と編集だけを持ち、当たる・当たらないには触れない（判定は実行ファイルの仕事）。
  * 画面がこのファイルを読むので、`yaml` も node も VS Code の API も入れない。
  */
 
@@ -30,7 +30,7 @@ export type CondNode =
   /** `child` が null なのは、画面で中を消した途中（保存前の `--lint` と画面の注意が止める） */
   | { readonly op: "not"; readonly child: CondNode | null }
   /**
-   * 木として読めなかったノード。`raw` は読んだ値そのもの（JSON にできる形）で、書き戻しはこれをそのまま書く。
+   * 条件式として読めなかったノード。`raw` は読んだ値そのもの（JSON にできる形）で、書き戻しはこれをそのまま書く。
    * 画面は `text` と `reason` を見せ、消すか置き換えるまで注意を出す
    */
   | { readonly op: "invalid"; readonly text: string; readonly reason: string; readonly raw: unknown };
@@ -89,7 +89,7 @@ export function nodeAt(root: CondNode, path: CondPath): CondNode | undefined {
   return node;
 }
 
-/** `path` のノードを `fn` の結果に替えた木。`fn` が null を返すと親から外す（根は外せないので元のまま） */
+/** `path` のノードを `fn` の結果に替えた条件式。`fn` が null を返すと親から外す（根は外せないので元のまま） */
 function updateAt(root: CondNode, path: CondPath, fn: (node: CondNode) => CondNode | null): CondNode {
   if (path.length === 0) {
     return fn(root) ?? root;
@@ -182,7 +182,7 @@ export function replaceAt(root: CondNode, path: CondPath, next: CondNode): CondN
 }
 
 /**
- * glob / regex 1 つ（と `except:`）のルールを、同じ意味の木にする。
+ * glob / regex 1 つ（と `except:`）のルールを、同じ意味の条件式にする。
  * 除くものがあれば `all: [本体, not: {any: 除くもの}]`、無ければ `all: [本体]`（あとから子を足せるようにまとめで包む）。
  */
 export function treeOfPattern(kind: CondLeafOp, pattern: string, excepts: readonly CondNode[] = []): CondNode {
@@ -193,7 +193,7 @@ export function treeOfPattern(kind: CondLeafOp, pattern: string, excepts: readon
   return group("all", [body, not(group("any", excepts))]);
 }
 
-/** 2 つの木が同じか。書き戻しで「変えていない木」に触らないために使う */
+/** 2 つの条件式が同じか。書き戻しで「変えていない条件式」に触らないために使う */
 export function sameCond(a: CondNode | null, b: CondNode | null): boolean {
   if (a === null || b === null) {
     return a === b;
@@ -217,13 +217,13 @@ export function sameCond(a: CondNode | null, b: CondNode | null): boolean {
   }
 }
 
-/** 書式の誤り 1 件。`path` はどのノードか（木ぜんたいの上限は根） */
+/** 書式の誤り 1 件。`path` はどのノードか（条件式ぜんたいの上限は根） */
 export interface CondProblem {
   readonly path: CondPath;
   readonly message: string;
 }
 
-/** 木の深さ（根が 1）とノード数 */
+/** 条件式の深さ（根が 1）とノード数 */
 export function condSize(root: CondNode): { readonly depth: number; readonly nodes: number } {
   let nodes = 0;
   const walk = (node: CondNode): number => {
@@ -285,7 +285,7 @@ function excerpt(text: string, max: number): string {
 }
 
 /**
- * 木を 1 行に縮める（畳んだ行に出す）。根のまとめは中身を並べ、その下のまとめは子の数だけ言う。
+ * 条件式を 1 行に縮める（畳んだ行に出す）。根のまとめは中身を並べ、その下のまとめは子の数だけ言う。
  * `not` は段に数えない。例: `all(regex ^{root}[\/], not(any(2)))`
  */
 export function condSummary(root: CondNode): string {
@@ -306,7 +306,7 @@ export function condSummary(root: CondNode): string {
   return walk(root, 0);
 }
 
-/** 木の中の葉の文字（絞り込みが当てる） */
+/** 条件式の中の葉の文字（絞り込みが当てる） */
 export function condPatterns(root: CondNode): string[] {
   if (root.op === "glob" || root.op === "regex") {
     return [root.pattern];
@@ -314,7 +314,7 @@ export function condPatterns(root: CondNode): string[] {
   return childrenOf(root).flatMap(condPatterns);
 }
 
-// ---- 図に置く形（左から右へ伸びる木）
+// ---- 図に置く形（左から右へ伸びる図）
 
 /** 図の点 1 つ。`empty` は中が空の `not` の穴（押すと中に入れるものを選べる） */
 export interface CondPlace {
@@ -352,8 +352,8 @@ function labelOf(node: CondNode): string {
 }
 
 /**
- * 木を置く。根を左に置き、段ごとに右へ。葉は上から順に 1 行ずつ、まとめは子の真ん中の高さに置く。
- * 置き場所は木の形だけで決まる（ドラッグで動かした位置は持たない。木を直すたびに置き直す）。
+ * 条件式を置く。根を左に置き、段ごとに右へ。葉は上から順に 1 行ずつ、まとめは子の真ん中の高さに置く。
+ * 置き場所は条件式の形だけで決まる（ドラッグで動かした位置は持たない。条件式を直すたびに置き直す）。
  */
 export function layoutCond(root: CondNode): CondLayout {
   const places: CondPlace[] = [];
@@ -384,13 +384,13 @@ export function layoutCond(root: CondNode): CondLayout {
     return y;
   };
   walk(root, [], 0);
-  // 根から順に並べ直す（点の順が木の順になる。テストと読み上げで追いやすい）。
+  // 根から順に並べ直す（点の順が条件式の順になる。テストと読み上げで追いやすい）。
   // 文字で比べると `r.10` が `r.2` より前に来るので、場所の数の並びで比べる
   places.sort((a, b) => comparePaths(a.path, b.path));
   return { places, edges };
 }
 
-/** 場所を木の順（根から、子は番号の順）に比べる */
+/** 場所を条件式の順（根から、子は番号の順）に比べる */
 export function comparePaths(a: CondPath, b: CondPath): number {
   const n = Math.min(a.length, b.length);
   for (let i = 0; i < n; i += 1) {
@@ -402,7 +402,7 @@ export function comparePaths(a: CondPath, b: CondPath): number {
 }
 
 /**
- * 「条件の木に変換」できない理由。`glob` と `regex` を両方書いたルールは、変換すると片方が
+ * 「条件式に変換」できない理由。`glob` と `regex` を両方書いたルールは、変換すると片方が
  * 黙って消えるので押させない。except の形は exceptBlocker が見る。押せるなら undefined
  */
 export function toWhenBlocker(rule: { readonly bothPatterns?: boolean; readonly exceptNodes?: readonly CondNode[] }): string | undefined {
@@ -413,8 +413,8 @@ export function toWhenBlocker(rule: { readonly bothPatterns?: boolean; readonly 
 }
 
 /**
- * 「条件の木に変換」できない理由。`except:` の各要素が glob / regex 1 つの葉でなければ、木の中へ
- * そのまま移せない（読めない要素を木に入れると、元の誤りの形が変わって見つけにくくなる）。
+ * 「条件式に変換」できない理由。`except:` の各要素が glob / regex 1 つの葉でなければ、条件式の中へ
+ * そのまま移せない（読めない要素を条件式に入れると、元の誤りの形が変わって見つけにくくなる）。
  * 移せるなら undefined
  */
 export function exceptBlocker(excepts: readonly CondNode[] | undefined): string | undefined {
@@ -438,7 +438,7 @@ export function exceptBlocker(excepts: readonly CondNode[] | undefined): string 
   return undefined;
 }
 
-/** 画面が送ってきた木を、形だけ確かめて受け取る。形が違えば undefined */
+/** 画面が送ってきた条件式を、形だけ確かめて受け取る。形が違えば undefined */
 export function asCond(raw: unknown, depth = 0): CondNode | undefined {
   if (typeof raw !== "object" || raw === null || depth > 200) {
     return undefined;
