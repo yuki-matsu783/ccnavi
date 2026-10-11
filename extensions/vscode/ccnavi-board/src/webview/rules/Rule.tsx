@@ -12,7 +12,7 @@
 import type { JSX, ReactNode } from "react";
 
 import { KNOWN_TOOLS, SECTIONS, type FileField, type PatternKind, type RuleForm, type Section } from "../../core/rules-view.js";
-import { condProblems, condSummary, exceptBlocker, treeOfPattern } from "../../core/rules-when.js";
+import { condProblems, condSummary, toWhenBlocker, treeOfPattern } from "../../core/rules-when.js";
 import { contextSummary, hasContext, staleMessage, summaryId, summaryMatch, summaryNote } from "./text.js";
 import { When } from "./When.js";
 
@@ -48,8 +48,8 @@ export interface RuleProps {
 
 export function Rule(props: RuleProps): JSX.Element {
   const { rule, section } = props;
-  // except が木へそのまま移せない形なら、「条件の木に変換」を押させずに理由を出す
-  const blocker = exceptBlocker(rule.exceptNodes);
+  // glob と regex の併記や、except が木へそのまま移せない形なら、「条件の木に変換」を押させずに理由を出す
+  const blocker = toWhenBlocker(rule);
 
   const text = (name: TextKey, className: string, placeholder: string): JSX.Element => (
     <input

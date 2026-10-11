@@ -53,6 +53,8 @@ export function readRules(text: string): RulesDocument {
       const form = formOf(section, index, item);
       if (form.when !== undefined && (item.has("glob") || item.has("regex"))) {
         problems.push(`タイプ ${section} の ${index + 1} 件目（${form.id || "id 未設定"}）は when と glob / regex を両方書いています。どちらか 1 つにしてください`);
+      } else if (form.bothPatterns === true) {
+        problems.push(`タイプ ${section} の ${index + 1} 件目（${form.id || "id 未設定"}）は glob と regex を両方書いています。どちらか 1 つにしてください`);
       }
       sections[section].push(form);
     });
@@ -88,6 +90,7 @@ function formOf(section: Section, index: number, map: YAMLMap): RuleForm {
     every: scalarText(map, "every"),
     ...exceptsOf(map),
     ...(map.has("when") ? { when: condOfYaml(map.get("when", true)) } : {}),
+    ...(!map.has("when") && map.has("glob") && map.has("regex") ? { bothPatterns: true } : {}),
   };
 }
 
@@ -873,5 +876,6 @@ function asForm(raw: unknown): RuleForm | undefined {
     ...(exceptNodes === undefined ? {} : { exceptNodes }),
     ...(when === undefined ? {} : { when }),
     ...(r.dropExcept === true ? { dropExcept: true } : {}),
+    ...(r.bothPatterns === true ? { bothPatterns: true } : {}),
   };
 }

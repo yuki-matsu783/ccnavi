@@ -406,6 +406,17 @@ export function comparePaths(a: CondPath, b: CondPath): number {
  * そのまま移せない（読めない要素を木に入れると、元の誤りの形が変わって見つけにくくなる）。
  * 移せるなら undefined
  */
+/**
+ * 「条件の木に変換」できない理由。`glob` と `regex` を両方書いたルールは、変換すると片方が
+ * 黙って消えるので押させない。except の形は exceptBlocker が見る。押せるなら undefined
+ */
+export function toWhenBlocker(rule: { readonly bothPatterns?: boolean; readonly exceptNodes?: readonly CondNode[] }): string | undefined {
+  if (rule.bothPatterns === true) {
+    return "glob と regex を両方書いています。ルールファイルでどちらか 1 つにしてから変換してください";
+  }
+  return exceptBlocker(rule.exceptNodes);
+}
+
 export function exceptBlocker(excepts: readonly CondNode[] | undefined): string | undefined {
   if (excepts === undefined) {
     return undefined;

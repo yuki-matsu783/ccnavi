@@ -105,6 +105,11 @@ export interface RuleForm {
    * 画面が明示したときだけ消す（欄が届かなかっただけで消さないため）
    */
   readonly dropExcept?: boolean;
+  /**
+   * `glob` と `regex` を両方書いてある（`when:` は無い）。画面はどちらか一方しか持てないので、
+   * 「条件の木に変換」させない（変換すると片方が黙って消える）。書いていなければ省く
+   */
+  readonly bothPatterns?: boolean;
 }
 
 /** ファイル選択ダイアログで埋める欄 */

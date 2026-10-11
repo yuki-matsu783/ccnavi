@@ -17,6 +17,7 @@ import {
   setPattern,
   comparePaths,
   exceptBlocker,
+  toWhenBlocker,
   treeOfPattern,
   unwrapNot,
   wrapGroup,
@@ -547,4 +548,28 @@ deny:
   check(wrapGroup(tree, [], "any"), all);
   check(wrapGroup(tree, [], "all"), all);
   check(wrapNot(tree, []), all);
+});
+
+test("CB-T351 glob と regex を両方書いたルールは読み込みの誤りに挙げ、「条件の木に変換」させない（regex を黙って落とさない）", () => {
+  const doc = readRules(`version: 1
+deny:
+  - id: both
+    match: Write
+    glob: '*.md'
+    regex: 'x'
+    message: m
+  - id: one
+    match: Write
+    glob: '*.md'
+    message: m
+`);
+  assert.ok(doc.model.problems.some((p) => p.includes("both") && p.includes("glob と regex を両方")), doc.model.problems.join("\n"));
+  const [both, one] = doc.model.sections.deny;
+  assert.equal(both.bothPatterns, true);
+  assert.equal(one.bothPatterns, undefined);
+  assert.match(toWhenBlocker(both) ?? "", /glob と regex を両方書いています/);
+  assert.equal(toWhenBlocker(one), undefined);
+  // 画面を往復しても印は残る
+  const back = asSections(JSON.parse(JSON.stringify(doc.model.sections)));
+  assert.equal(back?.deny[0].bothPatterns, true);
 });

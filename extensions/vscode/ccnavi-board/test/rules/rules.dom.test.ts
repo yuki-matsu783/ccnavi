@@ -987,12 +987,18 @@ deny:
     except:
       - any: [{glob: a}]
     message: m
+  - id: both-patterns
+    match: Write
+    glob: '*.md'
+    regex: 'x'
+    message: m
 `;
   const dom = await openRules({ model: readRules(text).model }, undefined, { measure: true });
   try {
     for (const [id, why] of [
       ["bad-except", "except の 1 件目が読めません（except の値はリストです）"],
       ["group-except", "except の 1 件目が glob / regex 1 つのマップではありません"],
+      ["both-patterns", "glob と regex を両方書いています"],
     ]) {
       const row = rowSelector(id);
       dom.click(dom.one(`${row} .row-head`));
