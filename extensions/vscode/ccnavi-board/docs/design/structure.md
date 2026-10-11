@@ -126,7 +126,7 @@ src/
     phases/App.tsx    注意の帯・ツールバー・定義の一覧と、拡張ホストからのメッセージの受け
     phases/Phase.tsx  定義 1 件の行（要約と、開いたときの欄。scope と成果物は , 区切り。順序の欄は持たない）
     phases/state.ts   編集中の定義（行ごとの鍵）・開いている行（id で保持する）・id の重なり
-    phases/text.ts    要約の文・絞り込みが当てる文字列・空のときの言葉・読まない欄の知らせ
+    phases/text.ts    要約の文・絞り込みが当てる文字列・空のときの言葉
     flow/style.css    フロー編集画面の CSS の入口（先頭で React Flow の CSS を @import する）
     flow/App.css      App.tsx の CSS（部品箱・図・欄の配置と目印）
     flow/Canvas.css   Canvas.tsx の CSS（図・ノード・出口）

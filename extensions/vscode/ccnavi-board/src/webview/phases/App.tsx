@@ -12,8 +12,7 @@
  * 止めるのはここだけで、書式の検証は保存のときに実行ファイル（`--lint`）へ渡す。
  *
  * **図と、全体計画の待ち方（`order`）の選択は持たない。** 順序（どのフェーズがどれを待つか）はフェーズ定義では
- * なく親チケットの計画の項の `after` で決め、実行ファイルも定義の順序の欄を読まない。ファイルに残った
- * 古い欄は、上の知らせ（`unreadNote`）が名指しするだけで、保存しても手を付けない。
+ * なく親チケットの計画の項の `after` で決める。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
 
@@ -24,7 +23,7 @@ import { Phase } from "./Phase.js";
 import { Tour, TourButton, type TourStep } from "../Tour.js";
 import { TargetSelect } from "../TargetSelect.js";
 import { post } from "./post.js";
-import { countText, duplicateNote, emptyNote, findText, hasMore, unreadNote } from "./text.js";
+import { countText, duplicateNote, emptyNote, findText, hasMore } from "./text.js";
 import { draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
@@ -328,7 +327,6 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   };
 
   const dup = duplicates(draft);
-  const unread = page === undefined ? "" : unreadNote(page.model.unread);
   const query = find.trim().toLowerCase();
   const rows = draft.rows.map((row) => {
     const text = findText(row.phase);
@@ -350,11 +348,6 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           {notice}
         </div>
       ))}
-      {unread !== "" && (
-        <div className="banner warn" id="unread">
-          {unread}
-        </div>
-      )}
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
         <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
@@ -444,7 +437,6 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             </p>
             <p className="hint">
               順序（どのフェーズがどれを待つか）はこのファイルには書きません。親チケットの計画の項に <code>after</code> で先行を書きます（最後の項がほかの全部を待つようにします）。
-              前の版の <code>order</code>・<code>after</code>・<code>overlap</code>・<code>requires</code> は実行ファイルが読まないので、この画面にも出しません。ファイルに残っていれば上に名指しし、保存しても欄はそのまま残ります。
               親チケットは承認のときに使う定義の写し（<code>phases:</code>）を持つので、あとでここを直しても進行中の親には反映されません。
             </p>
           </div>
