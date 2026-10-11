@@ -193,6 +193,9 @@ class WordSepTest(_Readable, unittest.TestCase):
             # 引用符だけで書かれた `>` は文字として読む（走査が身代わりに置き換えてから渡す）。
             'grep -n ">" f': "grep -n " + WORD_SEP + ">" + WORD_SEP + " f",
             "grep -n '>' f": "grep -n " + WORD_SEP + ">" + WORD_SEP + " f",
+            # `<` も同じく文字として読む。`<<` は縮退させるので、ここでは置き換えない。
+            'grep -n "<" f': "grep -n " + WORD_SEP + "<" + WORD_SEP + " f",
+            'grep -n "<>" f': f"grep -n {WORD_SEP}<{WORD_SEP}{WORD_SEP}>{WORD_SEP} f",
             # 引用の中の `>` と、語の中の `>` は同じ形に読む。
             'grep -n "a>b" f': "grep -n a" + WORD_SEP + ">" + WORD_SEP + "b f",
             # 素の演算子は空白付きで残る。

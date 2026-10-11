@@ -51,9 +51,13 @@ _BEFORE_WORD = " \t\r;&|()<>"
 _PLACEHOLDER = "$"
 
 
-def _fold_gt(text: str) -> str:
-    """引用の中の `>` を身代わりの文字にする。shlex が演算子として返さないように。"""
-    return text.replace(">", shellread_words.QUOTED_GT)
+def _fold(text: str) -> str:
+    """引用の中の `>` と、`<<` の一部でない `<` を身代わりの文字にする。
+
+    shlex が演算子として返さないように。`<<` は置き換えない（ヒアドキュメントに見えて縮退させる）。
+    """
+    text = text.replace(">", shellread_words.QUOTED_GT)
+    return re.sub(r"(?<!<)<(?!<)", shellread_words.QUOTED_LT, text)
 
 
 # 走査が止まって調べる文字。それ以外は正規表現でまとめて飛ばす。1 文字ずつ見ると、
@@ -289,7 +293,7 @@ class _Scanner:
         j = self.s.find("'", self.i + 1)
         if j < 0:
             raise _Unreadable(REASON_UNTERMINATED)
-        self.emit(_fold_gt(self.s[self.i : j + 1]), collect)
+        self.emit(_fold(self.s[self.i : j + 1]), collect)
         self.i = j + 1
 
     def ansi_c(self, collect: bool) -> None:
@@ -306,7 +310,7 @@ class _Scanner:
             if s[j] == "\\":
                 raise _Unreadable(REASON_ANSI_C)
             if s[j] == "'":
-                self.emit(_fold_gt("'" + s[self.i + 2 : j + 1]), collect)
+                self.emit(_fold("'" + s[self.i + 2 : j + 1]), collect)
                 self.i = j + 1
                 return
             j += 1
@@ -329,7 +333,7 @@ class _Scanner:
             end = m.start() if m else len(s)
             if end > self.i:
                 text = s[self.i : end]
-                self.emit(_fold_gt(text) if terminator else text, collect)
+                self.emit(_fold(text) if terminator else text, collect)
                 self.i = end
                 continue
             c = s[self.i]
@@ -345,7 +349,7 @@ class _Scanner:
                 self.backquote()
             if c == "$" and self.dollar(collect, quoted=True):
                 continue
-            self.emit(_fold_gt(c) if terminator else c, collect)
+            self.emit(_fold(c) if terminator else c, collect)
             self.i += 1
         if terminator:
             raise _Unreadable(REASON_UNTERMINATED)
