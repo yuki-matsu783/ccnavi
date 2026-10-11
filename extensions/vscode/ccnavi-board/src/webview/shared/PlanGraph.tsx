@@ -30,8 +30,8 @@ import {
   MarkerType,
   Position,
   ReactFlow,
-  useNodesInitialized,
   useReactFlow,
+  useStore,
   type Connection,
   type Edge,
   type EdgeProps,
@@ -222,8 +222,17 @@ const START_PAD = 16;
  * 左へ寄せる（真ん中に合わせると、開始も終了も枠の外になる）。計画が替わったら合わせ直す。
  * React Flow の `fitView` の属性は使わない（下限で止めたあとに寄せる段を挟めないため）
  */
+/**
+ * 点がすべて測れたか。React Flow の `useNodesInitialized` は使わない。あれは呼び手が渡した点（`nodes`）に
+ * 測った大きさが書き戻されて初めて真になり、点を読むだけで返さない（`onNodesChange` を持たない）この図では、
+ * 実際の Chromium でいつまでも偽のまま（全体を枠に収める段が走らない）。React Flow が測って持つ内側の点を見る
+ */
+function useMeasured(): boolean {
+  return useStore((s) => s.nodeLookup.size > 0 && [...s.nodeLookup.values()].every((node) => (node.measured?.width ?? 0) > 0 && (node.measured?.height ?? 0) > 0));
+}
+
 function FitOnOpen({ fitKey }: { readonly fitKey: unknown }): null {
-  const initialized = useNodesInitialized();
+  const initialized = useMeasured();
   const flow = useReactFlow();
   const done = useRef<{ readonly key: unknown } | undefined>(undefined);
   useEffect(() => {
