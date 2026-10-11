@@ -245,7 +245,7 @@ def _content_problems(copy: ticket_model.Ticket, prior: bytes) -> list[str]:
 # 承認の前に書き換えることのある欄。ワークフロー編集タブ（`--plan-order --write`）は親の
 # `plan:` / `feedback:` と子の `phase:` を、`--fill-phases` は親の `phases:` を書き換える。
 _REWRITTEN_PARENT = ("plan", "feedback", "phases")
-_REWRITTEN_CHILD = ("phase",)
+_REWRITTEN_CHILD = ("phase", "predecessors")
 
 
 def _only_plan_values_differ(copy: ticket_model.Ticket, current: bytes, prior: bytes) -> bool:
