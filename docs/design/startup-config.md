@@ -85,22 +85,26 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 終了コード 2、`dry-run` は 0（REQ-CMN-08）。この block は理由を返せないので、生の文字列に `>` が 50 個を超えて並ぶ入力は、シェルから書き込む形の組み込みの保護だけを当てずに、ほかのルールの `deny` と `ask` を当てたあとで、`deny` に当たっていなければ `DENY_REDIRECT_LIMIT` に上げて理由と書き直し方を返す（付録 A）。この保護の照合は `>` の個数 × その後ろの空白の無い語の長さで伸びるので、上限で `>` の個数を抑える。上限の下でも尾が長い入力（400KB 程度）は期限に届きうる。外側で打ち切られた場合には手が出ない。`PostToolUse` に期限は無く、
 git の読み取りが 2 秒で打ち切られる。
 
-payload が JSON でない・オブジェクトでない・`hook_event_name` が無いときは `payload-unusable` で
-同じ結果になる。記録を書けないときは標準エラーに出して捨て、判定は変えない。期限切れと `payload-unusable` の文は、
+payload が JSON でない・オブジェクトでない・`hook_event_name` が無いとき、`hook_event_name`・`tool_name`・
+`session_id`・`cwd`・`permission_mode`・`tool_use_id` のどれかが文字列でないときは `payload-unusable` で
+同じ結果になる。記録を書けないときは標準エラーに出して捨て、判定は変えない。UTF-8 にできない字（JSON の
+`"\ud800"` のような孤立したサロゲート）は、記録では `\ud800` の 6 字にして書く。期限切れと `payload-unusable` の文は、
 先頭に `[ccnavi] <理由>` を置き、次の一手（期限切れはコマンドを分ける・長い文はファイルで渡す、`payload-unusable` は
 書き直しでは直らないので hook の登録と版をユーザに確かめてもらう）を添える。
 
-**内部エラー。** イベントの処理が ccnavi 自身の想定外の例外で終わったら、その回は `internal-error` で判定に
-至らなかった回として記録し（`detail` に例外の型と場所）、診断ログに error で 1 行残す。例外を抜けさせると
+**内部エラー。** hook として起動された回の処理（モードの解決、payload の読み取り、イベントの処理、記録、
+診断ログ）が ccnavi 自身の想定外の例外で終わったら、その回は `internal-error` で判定に
+至らなかった回として記録し（`detail` に例外の型と場所）、診断ログに error で 1 行残す。記録を書く途中で
+落ちた回は、記録を重ねて試さない。例外を抜けさせると
 Python は終了コード 1 で終わり、Claude Code は 0 と 2 以外を止める扱いにしないので、`PreToolUse` の呼び出しが
 記録も無く通ってしまう。途中まで書いた標準出力は捨て、イベントごとに次のように終える。文には `[ccnavi] internal-error`、
 例外の型、診断ログ（`logs/diag/ccnavi.log`）の場所を載せ、モデル宛ての文には「繰り返さずユーザに伝える」を添える。
 
 | イベント | 終え方 |
 |---|---|
-| `PreToolUse` | 標準エラーに文、`enable` は終了コード 2 で止める。`dry-run` は 0（判定に達せなかった回の既定と同じ） |
+| `PreToolUse`、payload を読む前（イベントが分からない） | 標準エラーに文、`enable` は終了コード 2 で止める。`dry-run` は 0（判定に達せなかった回の既定と同じ） |
 | `PostToolUse` | ツールはもう走っていて止めるものは無い。`enable` は終了コード 2 と標準エラーで、実行後の検査をしていないことをモデルに言う。`dry-run` は 0 |
-| それ以外（`SessionStart`・`UserPromptSubmit`・`Stop`・`SubagentStart`・`SubagentStop`・未知のイベント） | 終了コード 0 で、ユーザに `systemMessage` で知らせる。終了コード 2 で終えると、`Stop` と `SubagentStop` は終われずに続けさせられ、`UserPromptSubmit` は依頼文を消す。ccnavi の不具合が作業そのものを止めないようにする |
+| それ以外（`SessionStart`・`UserPromptSubmit`・`Stop`・`SubagentStart`・`SubagentStop`・未知のイベント） | 終了コード 0 で、ユーザに `systemMessage` で知らせる。終了コード 2 で終えると、`Stop` と `SubagentStop` は終われずに続けさせられ、`UserPromptSubmit` は依頼文を消す。ccnavi の不具合が作業そのものを止めないようにする。`SubagentStop` は、子の範囲を確かめられなかった回と同じ印を置き、親に届ける（9.12） |
 
 ### 4.6 導入と配布
 

@@ -3110,6 +3110,80 @@ class TicketTest(unittest.TestCase):
         again = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
         self.assertNotIn("worktree-unreadable", self.reason(again))
 
+    def unreadable_stop(self, agent_id):
+        """子のワークツリーを読めないまま、サブエージェントを終わらせる。"""
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
+        stop = {
+            "hook_event_name": "SubagentStop",
+            "cwd": child,
+            "session_id": "s1",
+            "agent_id": agent_id,
+        }
+        with mock.patch.object(phase_scope, "scope_findings", return_value=([], "読めない")):
+            done = self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_parent_hears_on_its_next_tool_after_a_background_subagent(self):
+        """バックグラウンドのサブエージェントは、親の `Agent` の PostToolUse が終わりより先に来る。
+        印は親の次のどのツールの PostToolUse でも読み、読んだら消す。"""
+        self.family()
+        self.unreadable_stop("sub-bg")
+        # サブエージェントの中の呼び出しでは読まない。親に届かなくなる。
+        inside = self.hook("PostToolUse", "Bash", self.parent_tree, agent_id="sub-x", command="ls")
+        self.assertNotIn("worktree-unreadable", self.reason(inside))
+        result = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        said = self.reason(result)
+        self.assertIn("worktree-unreadable", said)
+        self.assertIn("sub-bg", said)
+        self.assertIn("i0001-01-01", said)
+        again = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertNotIn("worktree-unreadable", self.reason(again))
+
+    def test_parent_hears_at_the_next_prompt(self):
+        """親がツールを使わずにターンを終えたなら、次の依頼（UserPromptSubmit）で言う。"""
+        self.family()
+        self.unreadable_stop("sub-bg")
+        prompt = {
+            "hook_event_name": "UserPromptSubmit",
+            "cwd": self.parent_tree,
+            "session_id": "s1",
+            "prompt": "続けて",
+        }
+        result = self.ccnavi("--mode", "enable", stdin=json.dumps(prompt))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        said = self.reason(result)
+        self.assertIn("worktree-unreadable", said)
+        self.assertIn("sub-bg", said)
+        again = self.ccnavi("--mode", "enable", stdin=json.dumps(prompt))
+        self.assertNotIn("worktree-unreadable", self.reason(again))
+
+    def test_internal_error_at_subagent_stop_leaves_the_mark(self):
+        """SubagentStop の処理が内部エラーで終わっても、範囲を確かめなかったことが親に届く。"""
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
+        stop = {
+            "hook_event_name": "SubagentStop",
+            "cwd": child,
+            "session_id": "s1",
+            "agent_id": "sub-err",
+        }
+        with mock.patch.object(phase_scope, "scope_findings", side_effect=RuntimeError("x")):
+            done = self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("internal-error", json.loads(done.stdout)["systemMessage"])
+        payload = {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Agent",
+            "cwd": self.parent_tree,
+            "session_id": "s1",
+            "tool_input": {"description": "子"},
+            "tool_response": {"agentId": "sub-err"},
+        }
+        said = self.reason(self.ccnavi("--mode", "enable", stdin=json.dumps(payload)))
+        self.assertIn("worktree-unreadable", said)
+        self.assertIn("sub-err", said)
+        self.assertIn("内部エラー", said)
+
     # ---- 診断
 
     def test_lint_names_the_gaps(self):

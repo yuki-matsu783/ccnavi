@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 from typing import TextIO
 
@@ -253,24 +254,92 @@ def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
 def unchecked_scope(state_dir: str, payload: hookio.Input) -> str:
     """終わったサブエージェントの子の範囲を、SubagentStop で確かめられなかったなら、その旨。
 
-    親の `Agent` の PostToolUse で読む。印は読んだら消す。
+    印は読んだら消す。読むのは次の 2 か所。
+
+    - 親の `Agent` の PostToolUse。そのサブエージェント（`agentId`）の印を読む
+    - 親（payload に `agent_id` が無いメインのセッション）のどのツールの PostToolUse と
+      UserPromptSubmit。このセッションに残った印をぜんぶ読む。バックグラウンドで動かした
+      サブエージェントは、`Agent` の PostToolUse が SubagentStop より先に来るので、
+      `Agent` の PostToolUse だけで読むと印が残ったまま知らせが落ちる。サブエージェントの
+      中の呼び出しでは読まない。その子が親でない印を消すと、親に届かなくなるため
     """
-    if payload.tool_name != judge.AGENT_TOOL:
+    if not state_dir:
         return ""
-    agent_id = str(payload.tool_response.get("agentId") or "")
-    if not agent_id or not state_dir:
-        return ""
-    path = _unchecked_path(state_dir, payload.session_id, agent_id)
-    text = fsio.read_text(path, errors="replace")
-    if text is None:
-        return ""
-    fsio.remove(path)
-    tickets = ", ".join(line for line in text.splitlines() if line) or "?"
-    return (
-        f"[ccnavi] {post.REASON_WORKTREE_UNREADABLE}: サブエージェント {agent_id} の終わりに"
-        f"子チケット {tickets} のワークツリーを読めず、範囲外の変更を確かめていません。"
-        "合流する前に、そのワークツリーを確かめてください。"
-    )
+    paths: list[tuple[str, str]] = []
+    if payload.tool_name == judge.AGENT_TOOL:
+        agent_id = str(payload.tool_response.get("agentId") or "")
+        if agent_id:
+            paths.append((agent_id, _unchecked_path(state_dir, payload.session_id, agent_id)))
+    if not payload.agent_id:
+        paths.extend(_session_unchecked(state_dir, payload.session_id))
+    said: list[str] = []
+    seen: set[str] = set()
+    for who, path in paths:
+        if path in seen:
+            continue
+        seen.add(path)
+        text = fsio.read_text(path, errors="replace")
+        if text is None:
+            continue
+        fsio.remove(path)
+        tickets = ", ".join(line for line in text.splitlines() if line)
+        if not tickets:
+            # SubagentStop の処理が ccnavi の内部エラーで終わった回。どの子を見るはずだったかも
+            # 分からない。
+            said.append(
+                f"[ccnavi] {post.REASON_WORKTREE_UNREADABLE}: サブエージェント {who} の終わりに"
+                "ccnavi が内部エラーで止まり、子チケットの範囲外の変更を確かめていません。"
+                "合流する前に、その子のワークツリーを確かめてください。"
+            )
+            continue
+        said.append(
+            f"[ccnavi] {post.REASON_WORKTREE_UNREADABLE}: サブエージェント {who} の終わりに"
+            f"子チケット {tickets} のワークツリーを読めず、範囲外の変更を確かめていません。"
+            "合流する前に、そのワークツリーを確かめてください。"
+        )
+    return "\n\n".join(said)
+
+
+def _session_unchecked(state_dir: str, session: str) -> list[tuple[str, str]]:
+    """このセッションに残った、範囲を確かめられなかった印。相手の鍵とパスの組。"""
+    head = os.path.basename(_unchecked_path(state_dir, session, "x"))[: -len("x.unchecked")]
+    try:
+        names = sorted(os.listdir(state_dir))
+    except OSError:
+        return []
+    return [
+        (name[len(head) : -len(".unchecked")], os.path.join(state_dir, name))
+        for name in names
+        if name.startswith(head) and name.endswith(".unchecked") and len(name) > len(head) + 10
+    ]
+
+
+def unchecked_after_error(
+    stderr: TextIO, conf: settings.Settings, root: str, payload: hookio.Input
+) -> None:
+    """SubagentStop の処理が ccnavi の内部エラーで終わったとき、範囲を確かめられなかった印を置く。
+
+    内部エラーの知らせ（`systemMessage`）はユーザにしか見えず、親には届かない。読めない子が
+    あった回と同じ印を置いて、親の PostToolUse か UserPromptSubmit で言わせる。どの子を
+    見るはずだったかは分からないので、中身は空にする。ここでの失敗は捨てる（受け皿の中で
+    例外を重ねない）。
+    """
+    if not conf.state:
+        return
+    with contextlib.suppress(Exception):
+        if not conf.tickets_enabled:
+            return
+        who = payload.agent_id
+        if not who:
+            t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
+            who = t.name if t is not None else ""
+        path = _unchecked_path(conf.state, payload.session_id, who)
+        if os.path.exists(path):
+            # 例外の前に読めない子を書き終えていれば、そちらのほうが詳しい。
+            return
+        failed = fsio.write_text(path, "")
+        if failed:
+            stderr.write(f"ccnavi: 範囲を確かめられなかった印を書けない: {failed}\n")
 
 
 def _unchecked_path(state_dir: str, session: str, who: str) -> str:

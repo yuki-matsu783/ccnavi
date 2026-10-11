@@ -15,6 +15,7 @@
 
 import ast
 import os
+import tempfile
 import unittest
 
 from tests import ROOT
@@ -60,29 +61,64 @@ class LayoutTest(unittest.TestCase):
                             crossing.append(f"{rel} -> tests.{target}")
         self.assertEqual(crossing, [], f"共有する部品は tests/ 直下の補助モジュールへ出す。{GUIDE}")
 
+    def test_relative_imports_are_resolved(self):
+        """相対 import（`from ..guard import x`）も、たどった先のグループで数える。"""
+        with tempfile.TemporaryDirectory() as root:
+            path = os.path.join(root, "tests", "core", "test_probe.py")
+            os.makedirs(os.path.dirname(path))
+            for source, want in (
+                ("from ..guard import x\n", ["guard"]),
+                ("from .. import guard\n", ["guard"]),
+                ("from . import test_other\n", ["core"]),
+                ("from ..inproc import run_ccnavi\n", []),
+                ("from tests.guard.x import y\n", ["guard"]),
+                ("from tests import guard\n", ["guard"]),
+            ):
+                with self.subTest(source=source):
+                    with open(path, "w", encoding="utf-8") as f:
+                        f.write(source)
+                    self.assertEqual(imported_groups(path, ["core", "guard"], root), want)
 
-def imported_groups(path, groups):
+
+def imported_groups(path, groups, root=ROOT):
     """`path` が import する `tests.<グループ>` のグループ名。
 
-    `from tests import <グループ>` の形も数える。
+    `from tests import <グループ>` の形と、相対 import（`from ..core import x`・
+    `from .. import core`）も数える。相対 import は、`path` の置き場からたどった
+    絶対の名前にして見る。
     """
     with open(path, encoding="utf-8") as f:
         tree = ast.parse(f.read(), filename=path)
+    package = package_of(path, root)
     found = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             names = [alias.name for alias in node.names]
-        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-            names = [node.module]
-            if node.module == "tests":
-                names += [f"tests.{alias.name}" for alias in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            if node.level == 0:
+                base = node.module or ""
+            else:
+                # level 1 は自分のパッケージ、2 はその 1 つ上。
+                up = package[: len(package) - node.level + 1]
+                base = ".".join([*up, *([node.module] if node.module else [])])
+            if not base:
+                continue
+            names = [base]
+            # `from <パッケージ> import <名前>` の名前は、下のモジュールのことがある。
+            names += [f"{base}.{alias.name}" for alias in node.names]
         else:
             continue
         for name in names:
             parts = name.split(".")
             if len(parts) >= 2 and parts[0] == "tests" and parts[1] in groups:
                 found.append(parts[1])
-    return found
+    return sorted(set(found))
+
+
+def package_of(path, root=ROOT):
+    """`path` のモジュールが属するパッケージの名前を、部分のリストで返す（`["tests", "core"]`）。"""
+    rel = os.path.relpath(os.path.dirname(path), root)
+    return [part for part in rel.split(os.sep) if part and part != "."]
 
 
 if __name__ == "__main__":

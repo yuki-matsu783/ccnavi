@@ -94,8 +94,16 @@ def decode(stream: TextIO) -> Input:
         raise Unusable("payload がオブジェクトではない")
 
     event = data.get("hook_event_name") or ""
+    if not isinstance(event, str):
+        raise Unusable("payload の hook_event_name が文字列ではない")
     if not event:
         raise Unusable("payload に hook_event_name が無い")
+    # 判定の鍵になる欄が文字列でないなら、欄が無い payload として読まずに止める。
+    # 無いものとして読むと、ツールの名前が分からないまま「当たるルールが無い」で通る。
+    for name in ("tool_name", "session_id", "cwd", "permission_mode", "tool_use_id"):
+        value = data.get(name)
+        if value is not None and not isinstance(value, str):
+            raise Unusable(f"payload の {name} が文字列ではない")
 
     tool_input = data.get("tool_input")
     tool_response = data.get("tool_response")

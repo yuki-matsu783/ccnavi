@@ -11,10 +11,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import time
 import unittest
 
-from ccnavi.infra import settings
-from ccnavi.tickets import risk
+from ccnavi.infra import settings, shellread, yamlread
+from ccnavi.policy import builtin
+from ccnavi.tickets import risk, ticket_guard
+from tests import ROOT
 from tests.config.test_config_union import (
     BROKEN,
     COMMON_RISK,
@@ -190,6 +194,22 @@ BUILTIN_DENIED = (
     ("rm --recursive --force x", "builtin-recursive-delete"),
     ("rm -Rfv x", "builtin-recursive-delete"),
     ("rm -r x -f", "builtin-recursive-delete"),
+    # 後ろに別の rm を引数として挟んでも、最初の rm の選択肢として読む。
+    ("rm -r rm -f", "builtin-recursive-delete"),
+    ("ls; rm a rm -rf b", "builtin-recursive-delete"),
+    # 値を取るオプションの値まで読んだ後のサブコマンド。
+    (f"{GIT} -c push.default=current push", "builtin-git-push"),
+    (f"{GIT} -C push push", "builtin-git-push"),
+    (f"/usr/bin/{GIT} push", "builtin-git-push"),
+    (f"{GIT}.exe push", "builtin-git-push"),
+    (f"{GIT} push;", "builtin-git-push"),
+    # サブコマンドを直接起こす形（パス付き・.exe 付き）。
+    (f"/usr/lib/{GIT}-core/{GIT}-push origin HEAD", "builtin-git-push"),
+    (f"{GIT}-push.exe origin", "builtin-git-push"),
+    (f"/usr/lib/{GIT}-core/{GIT}-reset --hard", "builtin-git-reset-hard"),
+    (f"{GIT}-reset.exe -q --hard HEAD", "builtin-git-reset-hard"),
+    (f"{GIT} -C x reset --hard", "builtin-git-reset-hard"),
+    (f"{GIT} status; {GIT} reset --hard", "builtin-git-reset-hard"),
 )
 BUILTIN_PASSED = (
     "legit push",
@@ -198,8 +218,63 @@ BUILTIN_PASSED = (
     "rm -f file-r",
     f"{GIT} commit -m push",
     f"{GIT} reset --soft HEAD~1",
+    # `-c` の値の中の push・reset はサブコマンドではない。
+    f"{GIT} -c push.default=current status",
+    f"{GIT} -C push status",
+    f"{GIT} -c reset.x=1 status --hard",
+    f"{GIT} pushx",
+    f"{GIT}-pushx origin",
 )
+
+# 照合の後戻りが長引く形だった入力。どれも当たらない。
+SLOW_BEFORE = (
+    "rm " * 8000,
+    "git -c " * 8000,
+    "rm -r a " * 3200,
+    "git -C " * 8000,
+    "rm -f a " * 3200,
+    "git reset " * 2400,
+    "/" * 24000,
+    "a/" * 12000,
+    "git --x/git " * 2000,
+)
+# 照合 1 本にかけてよい時間。手元では 0.01 秒ほどで、負荷で揺れても届かない余裕を持たせてある。
+SLOW_LIMIT = 0.5
 TICKET_CONTROL = "CCNAVI_TICKET_CONTROL"
+
+
+class BuiltinSpeedTest(unittest.TestCase):
+    """組み込みの deny の照合は、入力の長さにほぼ比例する時間で終わる。
+
+    判定の期限はルールの合間でしか確かめないので、1 本の照合が後戻りで長引くと、hook の timeout に
+    達して呼び出しが止められずに通る。
+    """
+
+    def common_rule(self, rule_id):
+        with open(os.path.join(ROOT, ".ccnavi", "common", "rules.yml"), encoding="utf-8") as f:
+            data = yamlread.safe_load(f.read())
+        found = [r for r in data["deny"] if r["id"] == rule_id]
+        self.assertEqual(len(found), 1)
+        return found[0]["regex"]
+
+    def test_common_recursive_delete_is_the_builtin_one(self):
+        self.assertEqual(self.common_rule("recursive-delete"), builtin.RECURSIVE_DELETE_REGEX)
+
+    def test_long_inputs_return_quickly(self):
+        built, problems = builtin.load_base()
+        self.assertEqual(problems, [])
+        regexes = [rule.compiled for rule in built.deny if rule.match == "Bash"]
+        regexes.append(re.compile(ticket_guard.RAW_GIT_REGEX, re.IGNORECASE))
+        for text in SLOW_BEFORE:
+            subject = shellread.read(text).text or text
+            for regex in regexes:
+                with self.subTest(text=text[:16], regex=regex.pattern[:24]):
+                    start = time.monotonic()
+                    regex.search(subject)
+                    regex.search(text)
+                    self.assertLess(time.monotonic() - start, SLOW_LIMIT)
+
+
 RAW_GIT_BUILTIN = "builtin-ticket-raw-git"
 
 
@@ -261,6 +336,29 @@ class BuiltinRawGitTest(ConfigUnionHarness):
         write(self.rules, BROKEN)
         self.assert_raw_git_denied()
         self.assertEqual(self.last_record()["fallback"], "builtin-rules")
+
+    def test_only_git_at_the_command_position(self):
+        """`git` がコマンドの位置にある形だけを止める。引数の語の `git` は止めない。"""
+        os.remove(self.rules)
+        for command in (
+            f"ls && {GIT} log",
+            f"sudo {GIT} status",
+            f"env A=1 {GIT} status",
+            f"command {GIT} status",
+            f"ls | xargs {GIT} status",
+            f"nohup {GIT} status",
+            f"time {GIT} status",
+            f"/usr/bin/{GIT} status",
+            f"{GIT}.exe status",
+            f"echo $({GIT} status)",
+            f"if true; then {GIT} status; fi",
+        ):
+            with self.subTest(command=command):
+                self.assert_denied(self.hook("Bash", self.ws, command=command), RAW_GIT_BUILTIN)
+        for command in (f"grep {GIT} README.md", f"echo hello {GIT} world"):
+            with self.subTest(command=command):
+                self.hook("Bash", self.ws, command=command)
+                self.assertNotIn(RAW_GIT_BUILTIN, self.last_record().get("rules", []))
 
     def test_not_added_when_ticket_control_is_disabled(self):
         os.remove(self.rules)
