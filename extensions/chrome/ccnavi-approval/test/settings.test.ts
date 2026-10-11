@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 
-import { renderBoard } from "./helpers/board-dom.js";
+import { renderBoard, renderBoards } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import { DEFAULT_RECENT_DAYS, MAX_RECENT_DAYS, normalizeRepo, readRepos, saveRecentDays, type RepoConfig, type StorageArea } from "../src/core/settings.js";
 import type { RepoBoard } from "../src/core/snapshot.js";
@@ -55,10 +55,12 @@ test("CX-T212 ボードの入力欄: リポジトリごとに出し、変える�
     ({ repo: { host: "github.com", owner: "acme", repo, integration: "", recentDays, extraBranches: [], project: "", workspace: "" }, error: "取れなかった", families: [], candidates: [], missingExtras: [] }) as unknown as RepoBoard;
   const got: [string, string][] = [];
   const actions = { approve() {}, withdraw() {}, setRecentDays: (b: RepoBoard, v: string) => void got.push([b.repo.repo, v]) };
-  const a = renderBoard(doc, md, mk("a", 7), actions);
-  const b = renderBoard(doc, md, mk("b", 30), actions);
+  // 2 つの欄は 1 回の描画で同じ文書に並べる（renderBoard を続けて呼ぶと前の欄は文書から外れる）
+  const [a, b] = renderBoards(doc, md, [mk("a", 7), mk("b", 30)], actions);
+  assert.equal(doc.querySelectorAll("form.recent-days input").length, 2);
   const inputA = a.querySelector<HTMLInputElement>("form.recent-days input")!;
   const inputB = b.querySelector<HTMLInputElement>("form.recent-days input")!;
+  assert.ok(doc.body.contains(inputA) && doc.body.contains(inputB));
   assert.equal(inputA.value, "7");
   assert.equal(inputB.value, "30");
   assert.equal(inputB.max, "90");

@@ -6,6 +6,9 @@
  *
  * 同じ文書に続けて呼ぶと、前に描いた root を外し、文書の中を空にしてから描く（前の欄が文書に残らない）。
  * 返した要素は、次に呼ぶまでが有効。
+ *
+ * 複数のリポジトリの欄を同じ文書に並べて確かめるときは `renderBoards`（1 回の描画に全部を入れる）。
+ * `renderBoard` を続けて呼ぶと前の欄は文書から外れる。
  */
 import { createElement } from "react";
 import { flushSync } from "react-dom";
@@ -26,6 +29,11 @@ export interface Extras {
 const live = new WeakMap<Document, Root>();
 
 export function renderBoard(doc: Document, md: Renderer, board: RepoBoard, actions?: Actions, extras: Extras = {}): HTMLElement {
+  return renderBoards(doc, md, [board], actions, extras)[0];
+}
+
+/** 複数のリポジトリの欄を 1 回の描画で並べ、`section.repo` を渡した順に返す。 */
+export function renderBoards(doc: Document, md: Renderer, boards: readonly RepoBoard[], actions?: Actions, extras: Extras = {}): HTMLElement[] {
   const previous = live.get(doc);
   if (previous) {
     (globalThis as { window?: unknown }).window = doc.defaultView;
@@ -41,8 +49,8 @@ export function renderBoard(doc: Document, md: Renderer, board: RepoBoard, actio
   // 漏れない。同じプロセスで別の文書を使う試験と混ぜるときは、呼び手が戻す。
   // （Pyodide は Node かを process で見分けるので、window があっても変わらない）
   (globalThis as { window?: unknown }).window = doc.defaultView;
-  flushSync(() => root.render(createElement(MarkdownContext, { value: md }, createElement(Repo, { board, actions, attention: extras.attention, issues: extras.issues }))));
-  const section = container.firstElementChild;
-  if (!(section instanceof doc.defaultView!.HTMLElement)) throw new Error("section.repo を描けなかった");
-  return section;
+  flushSync(() => root.render(createElement(MarkdownContext, { value: md }, ...boards.map((board) => createElement(Repo, { key: `${board.repo.host}/${board.repo.owner}/${board.repo.repo}`, board, actions, attention: extras.attention, issues: extras.issues })))));
+  const sections = [...container.children];
+  if (sections.length !== boards.length || !sections.every((section): section is HTMLElement => section instanceof doc.defaultView!.HTMLElement)) throw new Error("section.repo を描けなかった");
+  return sections;
 }

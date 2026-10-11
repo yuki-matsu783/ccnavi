@@ -287,12 +287,20 @@ test("CX-T216 設定画面のリポジトリ: 直近の日数は 0〜90。外れ
   await mount();
   const days = $<HTMLInputElement>("#repo-form [name=recentDays]");
   assert.deepEqual([days.type, days.min, days.max, days.value], ["number", "0", "90", "7"]);
+  // 欄の制約で止まる（submit が 1 度も起きない）。画面の検査（#repo-msg）まで届いて止まったのではない
+  let submits = 0;
+  const form = $<HTMLFormElement>("#repo-form");
+  const count = (): void => void (submits += 1);
+  form.addEventListener("submit", count);
   for (const value of ["91", "-1", "1.5"]) {
     fill({ owner: "acme", repo: "widgets", recentDays: value });
     assert.equal(days.checkValidity(), false, value);
     await submitRepo();
+    assert.equal(submits, 0, value);
+    assert.equal(text("#repo-msg"), "", value);
     assert.equal(storage.repos, undefined, value);
   }
+  form.removeEventListener("submit", count);
   // ブラウザの検査を通らずに送られても（novalidate）、画面の検査で止める
   $<HTMLFormElement>("#repo-form").noValidate = true;
   for (const value of ["91", "-1", "1.5"]) {
