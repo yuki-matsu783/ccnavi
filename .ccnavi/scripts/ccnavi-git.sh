@@ -532,10 +532,19 @@ ig_wt_branch() {
 # 親子のチケットの取り込み状態があっても当たる。広めに当てて断る向き。
 ig_bound() {
 	ig_why=""
-	if ccnavi_parent_tree "$ig_wt" "$1"; then
+	ig_pt_rc=0
+	ccnavi_parent_tree "$ig_wt" "$1" || ig_pt_rc=$?
+	case "$ig_pt_rc" in
+	0)
 		ig_why="親チケットか提案のあるワークツリー"
 		return 0
-	fi
+		;;
+	2)
+		# 決められないときは、断る向きに倒す。
+		ig_why="親チケットか提案があるかを実行ファイルに確かめられないワークツリー"
+		return 0
+		;;
+	esac
 	for ig_tree in "$WS" "$WS/$ig_projects"/* "$WS"/.claude/worktrees/*; do
 		[ -d "$ig_tree" ] || continue
 		for ig_f in "$ig_tree/$ig_approved/doing/$1.md" "$ig_tree/$ig_approved/done/$1.md" \
@@ -1468,7 +1477,7 @@ checkout | switch)
 	opt_walk checkout_cb ${1+"$@"}
 	# 親のワークツリー（.claude/worktrees/<P> で、親チケットか提案があるもの）では、許す形
 	# （語が無い・自分のブランチ・HEAD・checkout <ref> <パス>）のほかは通さない。
-	# 親チケットか提案があるかは ccnavi_parent_tree が見る。ccnavi-sync.sh・ccnavi-fetch.sh・
+	# 親チケットか提案があるかは ccnavi_parent_tree が実行ファイルに聞く。ccnavi-sync.sh・ccnavi-fetch.sh・
 	# syncstate.home_tree はそれに加えて、ツリーの名前が識別子で、HEAD が同じ名前のブランチを指すことを求める。
 	# 別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.sh は、リモートでの承認を
 	# このツリーへ取り込まなくなる。取り込み状態がある親（親のブランチを一度でも origin へ push したか、
@@ -1546,7 +1555,10 @@ checkout | switch)
 	"$WS_P"/.claude/worktrees/*)
 		co_name="${co_top#"$WS_P"/.claude/worktrees/}"
 		co_name="${co_name%%/*}"
-		if ccnavi_parent_tree "$co_top" "$co_name"; then
+		# 親チケットか提案があるかを決められない（2）ときも、親のワークツリーとして狭める。
+		co_parent=0
+		ccnavi_parent_tree "$co_top" "$co_name" || co_parent=$?
+		if [ "$co_parent" -ne 1 ]; then
 			co_to=""
 			if [ -n "$co_new" ]; then
 				co_to="$co_new"
