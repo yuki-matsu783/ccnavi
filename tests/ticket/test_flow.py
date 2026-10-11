@@ -496,7 +496,7 @@ class FlowRenderTest(unittest.TestCase):
         text = "\n".join(flow.briefing(conf, root, running, "wip/research/*"))
         self.assertNotIn("ロック", text)
         self.assertNotIn("書き換わったら", text)
-        # 手順はユーザが書いたデータとして囲って渡す。
+        # 手順は合意済みのフローの本文（データ）として囲って渡す。
         self.assertIn(flow.FENCE_OPEN, text)
         self.assertIn(flow.FENCE_CLOSE, text)
         # 文の上限を使い切っていたら並べない。

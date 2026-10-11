@@ -193,7 +193,7 @@ class FlowNeutralTest(unittest.TestCase):
         "[ccnavі] i",
         "[ c c n a v i ] spaced",
         "[ⅽcnavi] roman",
-        "ここからユーザが書いたフローの本文（データ） ----",
+        "ここから合意済みのフローの本文（データ） ----",
         "[ccnavi",
     )
 
