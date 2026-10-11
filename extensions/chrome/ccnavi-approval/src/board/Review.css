@@ -1,0 +1,13 @@
+/*
+ * 依頼済みのフェーズのレビューの欄（`Review.tsx`）。スレッドは左の縁で並べ、未解決の縁とバッジはエラーの色
+ * （VS Code 拡張のカードの `.card.review-hold`・`.badge.hold` と同じ）。通さない理由は共通の `.problems`。
+ */
+.review { border-top: 1px solid var(--vscode-panel-border); margin-top: 8px; padding-top: 4px; }
+.threads-count { margin: 2px 0; color: var(--vscode-descriptionForeground); font-size: .85em; }
+.threads { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.thread { border-left: 3px solid var(--vscode-panel-border); padding: 0 0 0 8px; }
+.thread[data-resolved="false"] { border-left-color: var(--vscode-editorError-foreground); }
+.thread-head { margin: 0; font-size: .85em; overflow-wrap: anywhere; }
+.thread-head .badge { margin-left: 0; }
+.thread[data-resolved="false"] .badge { color: var(--error-text); }
+.review .problems { margin: 6px 0 4px; }

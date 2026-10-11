@@ -1,13 +1,21 @@
 /*
  * ボードの CSS の入口。ビルド（scripts/build.js）が 1 本にまとめて dist/board.css に出す。
- * `@import` を並べるだけで、ボードの部品の CSS は同じ置き場に置く（`Board.css`）。
+ * `@import` を並べるだけで、ボードの部品の CSS は同じ置き場に置く（部品 1 つに CSS 1 本。`Repo.tsx` なら `Repo.css`）。
+ * 部品を足したら、同じ名前の CSS を足してここに 1 行足す。
  *
  * 共通の部品（ボタン・骨組み）は VS Code 拡張と同じ `@ccnavi/shared` の CSS で、並べる順も設定画面と同じ
  * （ボタン・配色・骨組み）。配色は VS Code の外なので `browser-theme.css`（Claude の配色を `:root` と
- * `prefers-color-scheme` で定義する）を使う。ボードの部品は共通の骨組みの後に読み、同じクラス名
- * （`.path`・`.empty`・`.problems`・`h2` など）はボードの側で上書きする。
+ * `prefers-color-scheme` で定義する）を使う。見た目は共通の骨組み（`page.css`）のクラス（`.toolbar`・`.problems`・
+ * `.empty`・`.path` など）をそのまま使い、ボードの部品の CSS は共通のクラスで表せない部分だけを足す。
  */
 @import "@ccnavi/shared/styles/button.css";
 @import "@ccnavi/shared/styles/browser-theme.css";
 @import "@ccnavi/shared/styles/page.css";
-@import "./Board.css";
+@import "./App.css";
+@import "./parts.css";
+@import "./Markdown.css";
+@import "./Repo.css";
+@import "./Family.css";
+@import "./Review.css";
+@import "./Start.css";
+@import "./Attention.css";
