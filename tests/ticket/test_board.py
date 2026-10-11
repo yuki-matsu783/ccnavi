@@ -70,6 +70,7 @@ class BoardTest(PhaseHarness):
         self.assertEqual(closed["copy"]["status"], "closed")
         self.assertTrue(closed["worktree"]["exists"])
         self.assertTrue(closed["completed_at"])
+        self.assertFalse(closed["in_progress"])
 
         doing = by_id["i0001-02-02"]
         self.assertIsNone(doing["proposal"])
@@ -78,17 +79,22 @@ class BoardTest(PhaseHarness):
         self.assertTrue(doing["worktree"]["path"].endswith("i0001-02-02"))
         self.assertEqual(doing["parent"], "i0001")
         self.assertEqual(doing["phase"], 2)
+        # 着手していて終わっていない承認済みチケットだけが作業中。拡張はこれで保存を止める
+        self.assertTrue(doing["in_progress"])
 
         waiting = by_id["i0001-02-03"]
         self.assertEqual(waiting["proposal"]["state"], "todo")
         self.assertEqual(waiting["proposal"]["tree"], "i0001")
         self.assertEqual(waiting["copy"], {"status": "none"})
+        self.assertFalse(waiting["in_progress"])
         self.assertFalse(waiting["worktree"]["exists"])
         self.assertEqual(sorted(s["tree"] for s in waiting["seen_in"]), ["i0001", "i0001-02-02"])
 
         parent = by_id["i0001"]
         self.assertEqual(parent["parent"], "")
         self.assertEqual(parent["copy"]["status"], "open")
+        # 親も着手していて閉じていなければ作業中
+        self.assertTrue(parent["in_progress"])
 
     def test_the_proposal_says_whether_it_has_a_plan(self):
         """提案の `has_plan` は、親の提案が全体計画（`plan:`）を持つか。
@@ -193,6 +199,8 @@ class BoardTest(PhaseHarness):
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         waiting = by_id["i0001-02-02"]
         self.assertEqual(waiting["copy"]["status"], "review")
+        # 閉じてレビューを待つものは、`started_at` があっても作業中に数えない
+        self.assertFalse(waiting["in_progress"])
         self.assertEqual(waiting["scattered"], [])
         # 同じファイルを 2 つの走査が拾っても、チケットは 1 ツリーに 1 つ。
         self.assertEqual(

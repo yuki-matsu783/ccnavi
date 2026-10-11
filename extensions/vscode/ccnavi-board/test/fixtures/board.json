@@ -351,6 +351,7 @@
    "base_sha": "",
    "cancelled_at": "",
    "cancel_reason": "",
+   "in_progress": false,
    "seen_in": [],
    "scattered": [],
    "flow": null,
@@ -422,6 +423,7 @@
    "base_sha": "e5b468badbc7004f744ee323f41c24cb3d36baf8",
    "cancelled_at": "",
    "cancel_reason": "",
+   "in_progress": false,
    "seen_in": [],
    "scattered": [],
    "flow": {
@@ -521,6 +523,7 @@
    "base_sha": "7b48d1c301419efae9ea26026e061fb329be1b0e",
    "cancelled_at": "",
    "cancel_reason": "",
+   "in_progress": true,
    "seen_in": [],
    "scattered": [],
    "flow": {
@@ -595,6 +598,7 @@
    "base_sha": "",
    "cancelled_at": "",
    "cancel_reason": "",
+   "in_progress": false,
    "seen_in": [
     {
      "tree": "i0001",
@@ -666,6 +670,7 @@
    "base_sha": "7b48d1c301419efae9ea26026e061fb329be1b0e",
    "cancelled_at": "",
    "cancel_reason": "",
+   "in_progress": false,
    "seen_in": [
     {
      "tree": "i0001",
@@ -766,6 +771,7 @@
    "base_sha": "",
    "cancelled_at": "2026-09-13T13:50:24+0000",
    "cancel_reason": "やめた",
+   "in_progress": false,
    "seen_in": [],
    "scattered": [],
    "flow": null,
