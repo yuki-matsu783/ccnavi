@@ -2,7 +2,7 @@
 
 `/ccnavi-config` スキルが呼ぶ。ユーザが直接打ってもよい。
 
-    uv run python tools/check_rules.py [ルールファイル]
+    uv run python scripts/check_rules.py [ルールファイル]
 
 中身は `ccnavi --test-samples` を呼ぶだけの薄いラッパースクリプト。見本の読み方も
 突き合わせも実行ファイルの側にあり、ここは引数を足して渡すだけ。VS Code 拡張の

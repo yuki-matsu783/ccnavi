@@ -9,12 +9,14 @@ sh と同じ道具を使わないほうが、片方の壊れがもう片方に�
 ## 用意するもの
 
 - 動いている GitLab（既定 `http://localhost:8929`。`CCNAVI_PROBE_GITLAB` で変える）
-- トークン 2 本。`docker exec -i gitlab gitlab-rails runner - < tools/gitlab/make_gitlab_tokens.rb`
-  が `GITLAB_TOKEN`（root、エージェント役）と `CCNAVI_PROBE_REVIEWER_TOKEN`（人間役）を出す
+- トークン 2 本。
+  `docker exec -i gitlab gitlab-rails runner - < tests/manual/gitlab/make_gitlab_tokens.rb` が
+  `GITLAB_TOKEN`（root、エージェント役）と `CCNAVI_PROBE_REVIEWER_TOKEN`（人間役）を出す
 - 組み立て済みの exe（`dist/ccnavi/ccnavi`）。`CCNAVI_BIN_PATH` で差し替えられる
 - jq と curl（sh が使う）
 
-    GITLAB_TOKEN=... CCNAVI_PROBE_REVIEWER_TOKEN=... uv run python tools/gitlab/probe_gitlab.py
+    GITLAB_TOKEN=... CCNAVI_PROBE_REVIEWER_TOKEN=... \
+        uv run python tests/manual/gitlab/probe_gitlab.py
 
 ## 認証画面を出さない
 
@@ -41,7 +43,9 @@ import time
 import urllib.error
 import urllib.request
 
-ROOT_OF_CCNAVI = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT_OF_CCNAVI = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 REVIEW_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-review.sh")
 GIT_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-git.sh")
 TICKET_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-ticket.sh")
@@ -53,7 +57,7 @@ REVIEWER_TOKEN = os.environ.get("CCNAVI_PROBE_REVIEWER_TOKEN", "")
 if not ROOT_TOKEN or not REVIEWER_TOKEN:
     sys.exit(
         "GITLAB_TOKEN と CCNAVI_PROBE_REVIEWER_TOKEN が要る。"
-        "tools/gitlab/make_gitlab_tokens.rb で作る"
+        "tests/manual/gitlab/make_gitlab_tokens.rb で作る"
     )
 
 

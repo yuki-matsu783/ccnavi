@@ -1,4 +1,4 @@
-"""tools/check_rules.py が既定で指す置き場。
+"""scripts/check_rules.py が既定で指す置き場。
 
 既定のパスが `.ccnavi/common/` の実物と食い違うと、引数なしで打ったときに
 見本を読めずに落ちる。ツールを最後まで回すと、見本の食い違いの有無で終了コードが変わるので、
@@ -6,7 +6,7 @@
 
 後半は、リポジトリの見本（`.ccnavi/common/rule-samples.yml`）をいまのルールで判定し、
 食い違いが 0 件であることを見る。CI が無いので、ここで見ないと `/ccnavi-config` か
-`tools/check_rules.py` を手で打つまで食い違いに気づけない。引数はツールと同じもの
+`scripts/check_rules.py` を手で打つまで食い違いに気づけない。引数はツールと同じもの
 （`arguments()`）を使い、判定は `--test-samples` そのものに任せる。
 """
 
@@ -22,9 +22,9 @@ from tests.inproc import run_ccnavi
 
 
 def _load_check_rules():
-    """tools/ はパッケージではないので、名前でなく場所で読む。"""
+    """scripts/ はパッケージではないので、名前でなく場所で読む。"""
     spec = importlib.util.spec_from_file_location(
-        "ccnavi_check_rules", os.path.join(ROOT, "tools", "check_rules.py")
+        "ccnavi_check_rules", os.path.join(ROOT, "scripts", "check_rules.py")
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
