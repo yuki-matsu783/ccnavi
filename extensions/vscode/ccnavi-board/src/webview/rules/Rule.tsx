@@ -5,9 +5,9 @@
  * ツールの欄（`match`）は押すと選択肢が出る。`message` は deny だけの欄で、ask と allow に
  * 残っていれば「どこにも届かない」と言って消すボタンだけ出す。
  *
- * 条件式（`when:`）を持つルールは、パターンの欄の代わりに条件式の図（`When.tsx`）を出し、畳んだ行には
- * 条件式を 1 行に縮めたもの（`all(regex …, not(any(2)))`）を出す。glob / regex 1 つのルールは
- * 「条件式に変換」で同じ意味の条件式にできる（除くものは `not: {any: …}` に入れ、`except:` は消す）。
+ * 組み合わせ条件（`when:`）を持つルールは、パターンの欄の代わりに組み合わせ条件の図（`When.tsx`）を出し、畳んだ行には
+ * 組み合わせ条件を 1 行に縮めたもの（`all(regex …, not(any(2)))`）を出す。glob / regex 1 つのルールは
+ * 「組み合わせ条件に変換」で同じ意味の組み合わせ条件にできる（除くものは `not: {any: …}` に入れ、`except:` は消す）。
  */
 import type { JSX, ReactNode } from "react";
 
@@ -48,7 +48,7 @@ export interface RuleProps {
 
 export function Rule(props: RuleProps): JSX.Element {
   const { rule, section } = props;
-  // glob と regex の併記や、except が条件式へそのまま移せない形なら、「条件式に変換」を押させずに理由を出す
+  // glob と regex の併記や、except が組み合わせ条件へそのまま移せない形なら、「組み合わせ条件に変換」を押させずに理由を出す
   const blocker = toWhenBlocker(rule);
 
   const text = (name: TextKey, className: string, placeholder: string): JSX.Element => (
@@ -114,7 +114,7 @@ export function Rule(props: RuleProps): JSX.Element {
             {rule.when !== undefined ? (
               <>
                 <code className="sum-when">{condSummary(rule.when)}</code>
-                {condProblems(rule.when).length > 0 && <span className="sum-note sum-when-error">条件式に誤り {condProblems(rule.when).length}</span>}
+                {condProblems(rule.when).length > 0 && <span className="sum-note sum-when-error">組み合わせ条件に誤り {condProblems(rule.when).length}</span>}
               </>
             ) : rule.pattern === "" ? (
               <span className="dim">（{rule.kind} 未設定）</span>
@@ -158,7 +158,7 @@ export function Rule(props: RuleProps): JSX.Element {
           </select>
         </Captioned>
         {rule.when !== undefined ? (
-          <Captioned name="条件式" yamlKey="when">
+          <Captioned name="組み合わせ条件" yamlKey="when">
             {/* 開いた行にだけ図を置く（畳んだ行の分まで React Flow を立ち上げない） */}
             {props.open ? <When tree={rule.when} onChange={(when) => props.onChange({ ...rule, when })} /> : <span />}
           </Captioned>
@@ -175,10 +175,10 @@ export function Rule(props: RuleProps): JSX.Element {
                 className="action small"
                 data-action="to-when"
                 disabled={blocker !== undefined}
-                title={blocker ?? "このパターン（と除外）を、同じ意味の条件式（when）に書き直す。除外は not の中へ移る"}
+                title={blocker ?? "このパターン（と除外）を、同じ意味の組み合わせ条件（when）に書き直す。除外は not の中へ移る"}
                 onClick={() => props.onChange(toWhen(rule))}
               >
-                条件式に変換
+                組み合わせ条件に変換
               </button>
             </div>
           </Captioned>
@@ -193,8 +193,8 @@ export function Rule(props: RuleProps): JSX.Element {
                 </div>
               ))}
               <span className="dim">
-                {rule.when !== undefined ? "条件式に当たっても" : "パターンに当たっても"}、これに当たれば当たらない扱い。画面では編集しません。ルールファイルで直すか、
-                {rule.when !== undefined ? "条件式の not に移してください" : "「条件式に変換」で条件式の中へ移してください"}
+                {rule.when !== undefined ? "組み合わせ条件に当たっても" : "パターンに当たっても"}、これに当たれば当たらない扱い。画面では編集しません。ルールファイルで直すか、
+                {rule.when !== undefined ? "組み合わせ条件の not に移してください" : "「組み合わせ条件に変換」で組み合わせ条件の中へ移してください"}
               </span>
             </div>
           </Captioned>
@@ -254,8 +254,8 @@ export function Rule(props: RuleProps): JSX.Element {
 }
 
 /**
- * glob / regex 1 つのルールを、同じ意味の条件式にする。除くもの（`except:`）は条件式の中へ移し、
- * 書き戻しで `except:` を消す（`dropExcept`）。条件式から glob / regex 1 つへは戻さない
+ * glob / regex 1 つのルールを、同じ意味の組み合わせ条件にする。除くもの（`except:`）は組み合わせ条件の中へ移し、
+ * 書き戻しで `except:` を消す（`dropExcept`）。組み合わせ条件から glob / regex 1 つへは戻さない
  */
 function toWhen(rule: RuleForm): RuleForm {
   const { excepts, exceptNodes, ...rest } = rule;

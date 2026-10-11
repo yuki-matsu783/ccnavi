@@ -145,7 +145,8 @@ class ErrorTest(unittest.TestCase):
         self.check([{"match": "Write"}], "except[0]", "知らないキー")
 
     def test_文字列でない値は誤り(self):
-        # 引用符の無い `on` は真偽値に読まれる。黙って 'True' として当てない（when の葉と同じ）
+        # 引用符の無い `on` は真偽値に読まれる。黙って 'True' として当てない
+        # （when の個別条件と同じ）
         for item in ({"glob": True}, {"regex": 5}, {"glob": ["*.md"]}, {"glob": None, "regex": 0}):
             self.check([item], "except[0]", "文字列ではない")
         self.check(yaml.safe_load("- glob: on"), "except[0]", "文字列ではない")

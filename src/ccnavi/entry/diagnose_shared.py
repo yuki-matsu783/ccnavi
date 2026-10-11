@@ -89,7 +89,7 @@ def rule_form(rule: rules.Rule) -> dict:
     """ルールの書き方。書いた表記と、翻訳後の式。"""
     if rule.when is not None:
         # when には翻訳後の式が 1 本に定まらない。書いた形（`when` のマッピング）を添える。
-        # `written` は条件式を 1 行にした形だけにする。`kind` が `when` を言うので、
+        # `written` は組み合わせ条件を 1 行にした形だけにする。`kind` が `when` を言うので、
         # `written_body` の先頭の `when: ` を残すと、`kind` と並べて出す画面で
         # 「when when: …」と二重になる。
         return {

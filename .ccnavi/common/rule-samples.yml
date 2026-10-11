@@ -113,7 +113,7 @@ deny:
   - tool: NotebookEdit
     subject: "/repo/.claude/worktrees/x/secrets/.env.example"
     why: >-
-      見本の名前で終わっても、secrets/ の下なので除かない。例外は .env の枝にだけ掛かる。
+      見本の名前で終わっても、secrets/ の下なので除かない。例外は .env の個別条件にだけ掛かる。
       組み込みの builtin-credentials は NotebookEdit を見ないので、ここで外れると素通りする
   - tool: NotebookEdit
     subject: "/repo/.claude/worktrees/x/.env.local"

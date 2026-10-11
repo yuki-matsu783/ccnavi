@@ -58,7 +58,7 @@ export function page(overrides: Partial<RulesPage> = {}): RulesPage {
 }
 
 /**
- * HTML を happy-dom に読ませ、React がマウントし終わるまで待つ。条件式の図を見るテストは
+ * HTML を happy-dom に読ませ、React がマウントし終わるまで待つ。組み合わせ条件の図を見るテストは
  * `{ measure: true }` を渡す（渡さないと React Flow は点を隠したまま線を描かない。`dom.ts` の `measure`）
  */
 export async function openPage(data: RulesData, initialState?: unknown, options: LoadOptions = {}): Promise<DomPage> {

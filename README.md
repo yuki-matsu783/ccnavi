@@ -871,9 +871,9 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 `Bash` の `deny` / `ask` には付けないか、語の位置まで狭く書く（`--lint` が warn で言う）。
 空のリスト、`glob` と `regex` の両方がある要素、知らないキーを持つ要素は、ルールごと読み込まずに `--lint` が error にする。
 
-「A か B」「A かつ B」のような組み合わせは、`glob` / `regex` の代わりに `when:` で条件式として書く。
+「A か B」「A かつ B」のような組み合わせは、`glob` / `regex` の代わりに `when:` で組み合わせ条件として書く。
 ルールが持てるのは `glob` / `regex` / `when` のどれか 1 つ。ノードは次のどれか 1 つのキーだけを持つマッピングで、
-`glob: '…'` と `regex: '…'` が葉（本体と同じ読み方）、`all: [ノード, …]` は全部に、`any: [ノード, …]` はどれかに
+`glob: '…'` と `regex: '…'` が個別条件（本体と同じ読み方）、`all: [ノード, …]` は全部に、`any: [ノード, …]` はどれかに
 当たれば当たり、`not: ノード` は当たらなければ当たる。
 
 ```yaml
@@ -888,10 +888,10 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
     message: ...
 ```
 
-葉が当てる文字列は本体と同じで、`Bash` ならコマンド列の全体。`except:` も併せて書け、条件式に当たっても除くものに
+葉が当てる文字列は本体と同じで、`Bash` ならコマンド列の全体。`except:` も併せて書け、組み合わせ条件に当たっても除くものに
 当たれば当たらない。入れ子は 8 段、ノードは 64 個まで。知らないキー、キーが 0 個・2 個以上のノード、空のリスト、
 型の違う値はルールごと読み込まずに `--lint` が error にする。何にでも当たる・何にも当たらないノードと、
-`Bash` / `PowerShell` の `deny` / `ask` で `not` を使った条件式は warn になる。
+`Bash` / `PowerShell` の `deny` / `ask` で `not` を使った組み合わせ条件は warn になる。
 
 `except` と `when` の使い分け。「ここは除く」だけなら `except` のほうが読みやすい（このリポジトリの
 `workspace-root` がこの形）。組み合わせが要るとき、除外の中にさらに例外があるときに `when` を使う。
@@ -2187,7 +2187,7 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
 | `verdict` / `code` | 判定（`deny` / `ask` / `allow` / `skip`）と根拠コード |
 | `reason` / `degraded` / `fallback` | `skip` の理由、生の文字列に当てたかどうか、組み込みの既定で判定したかどうか。無ければ空 |
 | `unwrapped` | 実行役のコマンドが中で実行するコマンド、または `cd` で移った先から見たパスでルールに当たったときの、そのコマンド。複数なら `\x00` でつなぐ。元の形で当たったとき・当たらなかったときは空 |
-| `rules[]` | 当たったルール。`{id, source, section, kind, written, pattern}`。`source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように外から来た根拠）。`kind` は `glob`・`regex`・`when` のどれか、`written` は書いたまま（`when` は条件式を 1 行にした形で、`when: ` は付けない）、`pattern` は翻訳後の正規表現（`when` はふつう空）。`when` のルールだけ、書いた条件式そのものを `when` に持つ |
+| `rules[]` | 当たったルール。`{id, source, section, kind, written, pattern}`。`source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように外から来た根拠）。`kind` は `glob`・`regex`・`when` のどれか、`written` は書いたまま（`when` は組み合わせ条件を 1 行にした形で、`when: ` は付けない）、`pattern` は翻訳後の正規表現（`when` はふつう空）。`when` のルールだけ、書いた組み合わせ条件そのものを `when` に持つ |
 | `response` | エージェントに返る文面そのもの。無ければ空 |
 | `quoted` | 当たったルールのうち、引用の中から切り出したコマンドにだけ当たったものの id。そういうルールがあるときだけ出る |
 

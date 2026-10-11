@@ -809,7 +809,7 @@ deny:
     message: 生成物以外は直さない
 `;
 
-/** 中が空の any を持つ条件式（誤りの見本） */
+/** 中が空の any を持つ組み合わせ条件（誤りの見本） */
 const BROKEN_WHEN = `version: 1
 deny:
   - id: workspace-root
@@ -822,13 +822,13 @@ deny:
     message: main では編集しない
 `;
 
-/** 条件式の点を押して選ぶ */
+/** 組み合わせ条件の点を押して選ぶ */
 async function pickCond(dom: DomPage, id: string, key: string): Promise<void> {
   dom.click(dom.one(`${rowSelector(id)} .cond-node[data-key="${key}"]`));
   await dom.settle();
 }
 
-test("CB-D155 条件式のルールは、畳んだ行に条件式の要約、開いた行に左から右へ伸びる図を出す。誤りは件数と一覧で言う", async () => {
+test("CB-D155 組み合わせ条件のルールは、畳んだ行に組み合わせ条件の要約、開いた行に左から右へ伸びる図を出す。誤りは件数と一覧で言う", async () => {
   const dom = await openRules({ model: readRules(WHEN_RULES).model }, undefined, { measure: true });
   try {
     const row = rowSelector("workspace-root");
@@ -842,11 +842,11 @@ test("CB-D155 条件式のルールは、畳んだ行に条件式の要約、開
       ["r all", "r.0 regex", "r.1 not", "r.1.0 any", "r.1.0.0 regex", "r.1.0.1 glob"],
     );
     assert.equal(dom.all(`${row} .react-flow__edge`).length, 5);
-    // 最初は根が選ばれていて、根は消せない
+    // 最初は最上位のノードが選ばれていて、最上位のノードは消せない
     assert.equal(dom.one(`${row} .cond-inspector`).getAttribute("data-key"), "r");
     assert.ok(dom.one<HTMLButtonElement>(`${row} .cond-inspector [data-op-action="remove"]`).disabled);
     assert.equal(dom.all(`${row} .cond-problems li`).length, 0);
-    // パターンの欄と「条件式に変換」は出さない
+    // パターンの欄と「組み合わせ条件に変換」は出さない
     assert.equal(dom.all(`${row} .f-pattern`).length, 0);
     assert.equal(dom.all(`${row} button[data-action="to-when"]`).length, 0);
   } finally {
@@ -855,7 +855,7 @@ test("CB-D155 条件式のルールは、畳んだ行に条件式の要約、開
   const bad = await openRules({ model: readRules(BROKEN_WHEN).model }, undefined, { measure: true });
   try {
     const row = rowSelector("workspace-root");
-    assert.equal(bad.one(`${row} .sum-when-error`).textContent, "条件式に誤り 1");
+    assert.equal(bad.one(`${row} .sum-when-error`).textContent, "組み合わせ条件に誤り 1");
     bad.click(bad.one(`${row} .row-head`));
     await bad.settle();
     assert.deepEqual(bad.all(`${row} .cond-problems li`).map((li) => li.textContent), ["any の中が空です（1 個以上）"]);
@@ -873,13 +873,13 @@ test("CB-D155 条件式のルールは、畳んだ行に条件式の要約、開
   }
 });
 
-test("CB-D156 図で条件式を直して保存する（葉の文字・glob ⇄ regex・all ⇄ any・子の追加・not で包む・削除）", async () => {
+test("CB-D156 図で組み合わせ条件を直して保存する（個別条件の文字・glob ⇄ regex・all ⇄ any・子の追加・not で包む・削除）", async () => {
   const dom = await openRules({ model: readRules(WHEN_RULES).model }, undefined, { measure: true });
   try {
     const row = rowSelector("workspace-root");
     dom.click(dom.one(`${row} .row-head`));
     await dom.settle();
-    // 葉の文字を変え、glob → regex
+    // 個別条件の文字を変え、glob → regex
     await pickCond(dom, "workspace-root", "r.1.0.1");
     dom.type(dom.one(`${row} .cond-inspector .f-cond-pattern`), "{root}/.git/**");
     await dom.settle();
@@ -929,7 +929,7 @@ test("CB-D156 図で条件式を直して保存する（葉の文字・glob ⇄ 
   }
 });
 
-test("CB-D157 glob / regex と除外のルールは「条件式に変換」で条件式になり、除外は条件式の中へ移る。判定を試すも条件式のまま送る", async () => {
+test("CB-D157 glob / regex と除外のルールは「組み合わせ条件に変換」で組み合わせ条件になり、除外は組み合わせ条件の中へ移る。判定を試すも組み合わせ条件のまま送る", async () => {
   const dom = await openRules({ model: readRules(WHEN_RULES).model }, undefined, { measure: true });
   try {
     const row = rowSelector("except-rule");
@@ -939,7 +939,7 @@ test("CB-D157 glob / regex と除外のルールは「条件式に変換」で�
     dom.click(dom.one(`${row} button[data-action="to-when"]`));
     await dom.settle();
     assert.equal(dom.all(`${row} .f-pattern`).length, 0);
-    assert.equal(dom.all(`${row} .f-except`).length, 0, "除外は条件式の中へ移ったので欄を出さない");
+    assert.equal(dom.all(`${row} .f-except`).length, 0, "除外は組み合わせ条件の中へ移ったので欄を出さない");
     assert.deepEqual(
       dom.all(`${row} .cond-node`).map((node) => `${node.getAttribute("data-key")} ${node.getAttribute("data-op")}`),
       ["r all", "r.0 regex", "r.1 not", "r.1.0 any", "r.1.0.0 glob"],
@@ -973,7 +973,7 @@ test("CB-D157 glob / regex と除外のルールは「条件式に変換」で�
   }
 });
 
-test("CB-D158 except が条件式へそのまま移せない形なら、「条件式に変換」を押せず、理由をボタンの説明に出す", async () => {
+test("CB-D158 except が組み合わせ条件へそのまま移せない形なら、「組み合わせ条件に変換」を押せず、理由をボタンの説明に出す", async () => {
   const text = `version: 1
 deny:
   - id: bad-except
@@ -1021,7 +1021,7 @@ deny:
   }
 });
 
-test("CB-D159 根が葉の条件式は、all / any で包んで子を足せる。根の削除ボタンは包む道を案内する", async () => {
+test("CB-D159 最上位のノードが個別条件の組み合わせ条件は、all / any で包んで子を足せる。最上位のノードの削除ボタンは包む道を案内する", async () => {
   const text = `version: 1
 deny:
   - id: leaf-root
@@ -1038,12 +1038,12 @@ deny:
     const remove = dom.one<HTMLButtonElement>(`${row} .cond-inspector [data-op-action="remove"]`);
     assert.equal(remove.disabled, true);
     assert.match(remove.title, /all \/ any \/ not で包んで/);
-    assert.equal(dom.all(`${row} .cond-inspector button[data-add]`).length, 0, "葉には子を足せない");
+    assert.equal(dom.all(`${row} .cond-inspector button[data-add]`).length, 0, "個別条件には子を足せない");
     dom.click(dom.one(`${row} .cond-inspector [data-op-action="wrap-any"]`));
     await dom.settle();
     assert.equal(dom.one(`${row} .cond-node[data-key="r"]`).getAttribute("data-op"), "any");
     assert.equal(dom.one(`${row} .cond-node[data-key="r.0"]`).getAttribute("data-op"), "glob");
-    assert.equal(dom.one(`${row} .cond-inspector`).getAttribute("data-key"), "r", "包んだまとめが選ばれる");
+    assert.equal(dom.one(`${row} .cond-inspector`).getAttribute("data-key"), "r", "包んだ演算子が選ばれる");
     dom.click(dom.one(`${row} .cond-inspector button[data-add="glob"]`));
     await dom.settle();
     dom.type(dom.one(`${row} .cond-inspector .f-cond-pattern`), "*.key");

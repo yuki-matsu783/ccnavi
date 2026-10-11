@@ -47,7 +47,7 @@ config のどちらにも置け、判定には、共通レイヤーにその判�
 足したあとは必ず確かめる側も通る。どちらか決まらないときだけユーザに聞く。
 
 条件の組み合わせは 1 本の regex に詰めない。「ここは除く」だけなら `except:`、「A か B」「A かつ B」のような
-組み合わせなら `when:`（条件式）で書く。書き方と使い分けは [references/add.md](references/add.md) の rules.yml の節。
+組み合わせなら `when:` で書く。書き方と使い分けは [references/add.md](references/add.md) の rules.yml の節。
 
 ## 絶対ルール
 

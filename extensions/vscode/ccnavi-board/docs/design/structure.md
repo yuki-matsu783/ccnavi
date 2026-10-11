@@ -43,8 +43,8 @@ src/
     render.ts         ボードの入れ物の HTML（外部資源なし、テーマ変数だけ）。中身は画面（React）が作る
     rules-view.ts     ルール管理の拡張ホストと画面の契約（ルールの形 SECTIONS / RuleForm / RulesModel、見せる形 RulesPage / RulesData、押した操作 RulesMessage）
     rules-render.ts   ルール管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
-    rules-doc.ts      rules.yml の読み書き（yaml の Document でコメントを残す。条件式 when は元のノードを使い回して書き直す）
-    rules-when.ts     条件式（when）の形 CondNode と、条件式の操作・書式の誤り・1 行の要約・図の置き方（yaml も DOM も入れない。画面と読み書きで分け合う）
+    rules-doc.ts      rules.yml の読み書き（yaml の Document でコメントを残す。組み合わせ条件 when は元のノードを使い回して書き直す）
+    rules-when.ts     組み合わせ条件（when）の形 CondNode と、組み合わせ条件の操作・書式の誤り・1 行の要約・図の置き方（yaml も DOM も入れない。画面と読み書きで分け合う）
     risk-view.ts      リスク管理の拡張ホストと画面の契約（配点の形 RiskForm、見せる形 RiskPage / RiskData、押した操作 RiskMessage）
     risk-render.ts    リスク管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     risk-doc.ts       risks.yml の読み書き（同じくコメントを残す）と、組み込みの配点の本文
@@ -154,13 +154,13 @@ src/
     rules/style.css   ルール管理画面の CSS の入口
     rules/App.css     App.tsx の CSS（タブ・節・判定の欄・判定を試す・hook の 2 つのタブが共有する表）
     rules/Rule.css    Rule.tsx の CSS（ルール 1 件の行・ツールの選択肢）
-    rules/When.css    When.tsx の CSS（条件式の図。React Flow の色を --vscode-* に置き換える）
+    rules/When.css    When.tsx の CSS（組み合わせ条件の図。React Flow の色を --vscode-* に置き換える）
     rules/Judge.css   Judge.tsx の CSS（判定の結果）
     rules/post.ts     ルール管理の送り口。契約に無いものは型で止まる
     rules/main.tsx    ルール管理画面の入口。埋め込みの JSON を読んでマウントする
     rules/App.tsx     帯・ツールバー・3 つのタブ（ルール・判定を試す・hook）と、拡張ホストからのメッセージの受け
-    rules/Rule.tsx    ルール 1 件の行（要約と、開いたときの欄。ツールの選択肢と、ファイルを選ぶ欄。「条件式に変換」）
-    rules/When.tsx    条件式（when）の図（React Flow）と、選んだノードの操作の欄・誤りの一覧
+    rules/Rule.tsx    ルール 1 件の行（要約と、開いたときの欄。ツールの選択肢と、ファイルを選ぶ欄。「組み合わせ条件に変換」）
+    rules/When.tsx    組み合わせ条件（when）の図（React Flow）と、選んだノードの操作の欄・誤りの一覧
     rules/Judge.tsx   判定の結果とサンプルの一括判定の表。ここは判定せず、実行ファイルが返した判定を読むだけ
     rules/Hooks.tsx   hook の一覧（表示するだけで書き換えない）
     rules/state.ts    編集中のルール（行ごとの鍵）・開いている行（id で保持する）・開いているタブ

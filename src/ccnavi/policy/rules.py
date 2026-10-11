@@ -88,13 +88,13 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
 空のリスト、マッピングでない要素、`glob` と `regex` の両方がある・どちらも無い要素、
 知らないキーを持つ要素は、ルールごと読み込まずに error で名指しする。
 
-## 条件式（when）
+## 組み合わせ条件（when）
 
 本体は `glob` / `regex` の代わりに `when:` でも書ける。ルールが持つのは 3 つのうち
 ちょうど 1 つ。`when` の値はノードで、ノードは次のどれか 1 つのキーだけを持つマッピング。
 
-    glob: '<glob>'          葉。本体の glob と同じ読み方
-    regex: '<regex>'        葉。本体の regex と同じ読み方
+    glob: '<glob>'          個別条件。本体の glob と同じ読み方
+    regex: '<regex>'        個別条件。本体の regex と同じ読み方
     all: [ノード, ...]       全部に当たれば当たる（1 個以上）
     any: [ノード, ...]       どれかに当たれば当たる（1 個以上）
     not: ノード              当たらなければ当たる
@@ -110,13 +110,13 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
                 - not: {glob: '*.md'}
         message: ...
 
-葉には本体と同じ読み方（`{root}`、`{!root}`、大文字小文字の無視、先読み・後方参照の禁止、
+個別条件には本体と同じ読み方（`{root}`、`{!root}`、大文字小文字の無視、先読み・後方参照の禁止、
 glob の翻訳）を当て、当てる文字列も本体と同じ（Bash ならコマンド列の全体）。`except:` と
 併せて書けて、意味は `all: [when, not: {any: except}]`。
 
 判定が重くならないように、入れ子は 8 段、ノードは 64 個まで。知らないキー、キーが 0 個・
 2 個以上のノード、空のリスト、型の違う値と合わせて、ルールごと読み込まずに error で名指しする。
-葉の `{!root}` を組み立てられないときは、本体と同じく `deny` / `ask` は `match` の全部に当てて
+個別条件の `{!root}` を組み立てられないときは、本体と同じく `deny` / `ask` は `match` の全部に当てて
 止め、`allow` はルールごと使わない。
 
 「除く」だけなら `except` のほうが読みやすい。`when` は「A か B」「A かつ B」のように、
@@ -218,20 +218,21 @@ _GENERATED_QUANTIFIER = re.compile(r"(?<!\\)[*+]|(?<!\\)\{\d")
 _SKIPS_ANYWHERE = re.compile(r"(?:\.[*+]|\[\\s\\S\][*+])")
 
 # ルールの本体に当たっても、ここに並べたどれかに当たれば当たらない扱いにするキー。
-# 各要素は `glob` か `regex` のどちらか 1 つだけを持つマッピングで、`when:` の葉と同じ形。
-# 書き方を 1 つにしておけば、except から when へ書き換えるときに葉を写すだけで済む。
+# 各要素は `glob` か `regex` のどちらか 1 つだけを持つマッピングで、`when:` の個別条件と同じ形。
+# 書き方を 1 つにしておけば、except から when へ書き換えるときに個別条件を写すだけで済む。
 EXCEPT_KEY = "except"
 EXCEPT_FIELDS = ("glob", "regex")
 
-# 条件式を書くキーと、ノードに書けるキー。葉は except の要素と同じ形（`glob` / `regex`）。
+# 組み合わせ条件を書くキーと、ノードに書けるキー。
+# 個別条件は except の要素と同じ形（`glob` / `regex`）。
 WHEN_KEY = "when"
 WHEN_LEAVES = EXCEPT_FIELDS
 WHEN_ALL = "all"
 WHEN_ANY = "any"
 WHEN_NOT = "not"
 WHEN_KINDS = (*WHEN_LEAVES, WHEN_ALL, WHEN_ANY, WHEN_NOT)
-# 入れ子の段数とノードの数の上限。判定は呼び出しのたびに条件式をたどるので、書き方しだいで
-# 重くならないように頭打ちにする。根が 1 段目。
+# 入れ子の段数とノードの数の上限。判定は呼び出しのたびに組み合わせ条件をたどるので、書き方しだいで
+# 重くならないように頭打ちにする。最上位のノードが 1 段目。
 MAX_WHEN_DEPTH = 8
 MAX_WHEN_NODES = 64
 
@@ -390,9 +391,9 @@ class Exclusion:
 
 @dataclass
 class Condition:
-    """`when:` のノード 1 つ。葉（glob / regex）か、all / any / not。
+    """`when:` のノード 1 つ。個別条件（glob / regex）か、all / any / not。
 
-    葉は本体と同じ読み方で組み立てた式を持つ。`where` は苦情と lint で名指しするための
+    個別条件は本体と同じ読み方で組み立てた式を持つ。`where` は苦情と lint で名指しするための
     位置（`when.any[1].not` のような形）で、比較（key）と書き戻し（written）には入れない。
     """
 
@@ -423,7 +424,7 @@ class Condition:
         return {self.kind: [c.written() for c in self.children]}
 
     def key(self) -> tuple:
-        """比べるための形。葉は `{root}` を置き換えたあとの式で比べる（Rule.key と同じ理由）。"""
+        """比べるための形。個別条件は `{root}` を置き換えたあとの式で比べる（Rule.key と同じ）。"""
         if self.is_leaf():
             return (self.kind, self.compiled.pattern if self.compiled else self.text)
         return (self.kind, tuple(c.key() for c in self.children))
@@ -444,7 +445,7 @@ class Condition:
         return out
 
     def walk(self) -> Iterator[Condition]:
-        """自分と、その下のノードを根から順に。"""
+        """自分と、その下のノードを最上位のノードから順に。"""
         yield self
         for c in self.children:
             yield from c.walk()
@@ -532,9 +533,9 @@ class Rule:
     # このルールは当たらない。当てる文字列は本体と同じ（Bash ならコマンド列の全体）。
     excepts: list[Exclusion] = field(default_factory=list)
 
-    # when は `when:` で書いた本体（条件式）。glob / regex で書いたルールでは None。
-    # `when` のルールの compiled はふつう None で、葉を組み立てられずに止める側へ倒した
-    # deny / ask だけが、何にでも当たる式を compiled に持つ（そちらを先に見る）。条件式は
+    # when は `when:` で書いた本体（組み合わせ条件）。glob / regex で書いたルールでは None。
+    # `when` のルールの compiled はふつう None で、個別条件を組み立てられずに止める側へ倒した
+    # deny / ask だけが、何にでも当たる式を compiled に持つ（そちらを先に見る）。組み合わせ条件は
     # 書いた表記を出すために残す。
     when: Condition | None = None
 
@@ -543,7 +544,7 @@ class Rule:
         return self.compiled is not None or self.when is not None
 
     def written_body(self) -> str:
-        """本体を書いた表記で 1 行に。`when` は条件式を 1 行にした形。"""
+        """本体を書いた表記で 1 行に。`when` は組み合わせ条件を 1 行にした形。"""
         if self.when is not None:
             return f"{WHEN_KEY}: {self.when.describe()}"
         return self.glob or self.regex
@@ -568,7 +569,7 @@ class Rule:
             self.bare_id,
             self.match,
             self.compiled.pattern if self.compiled else "",
-            # 条件式。葉の式と組み方の両方を比べる。
+            # 組み合わせ条件。個別条件の式と組み方の両方を比べる。
             self.when.key() if self.when is not None else (),
             # 除くものが違えば別の定義。比べないと、except だけが違う後ろのレイヤーの 1 本を
             # 重複として捨て、前のレイヤーの except で通るはずのないものが通ってしまう。
@@ -807,7 +808,8 @@ def _build(
     if not rule.match:
         return None, [Problem(SEVERITY_ERROR, name, "match が無い。どのツールにもヒットしない")]
     # `when` と並べたかどうかはキーの有無で見る。値の真偽で見ると `glob: ''` や `glob: 0` を
-    # 添えた条件式が通り、書いた人の意図（どちらで判定するのか）が決まらないまま読み込まれる。
+    # 添えた組み合わせ条件が通り、書いた人の意図（どちらで判定するのか）が
+    # 決まらないまま読み込まれる。
     # 拡張の画面（rules-doc.ts の readRules）もキーの有無で見ている。
     has_when = WHEN_KEY in raw
     bodies = [
@@ -867,8 +869,9 @@ def _build(
             leaf.compiled = part.compiled
         rule.when = tree
         if refused:
-            # 葉を 1 つでも組み立てられなければ、条件式の意味が決まらない。`not` の下の葉なら
-            # 外すと当たる範囲が狭まり、上なら広がるので、葉だけ外す形は向きが定まらない。
+            # 個別条件を 1 つでも組み立てられなければ、組み合わせ条件の意味が決まらない。
+            # `not` の下の個別条件なら外すと当たる範囲が狭まり、上なら広がるので、
+            # 個別条件だけ外す形は向きが定まらない。
             # 本体を組み立てられなかったときと同じく、deny / ask は全部止め、allow は使わない。
             degraded, refused_problem = _ungeneratable(rule, section, name, refused)
             return degraded, problems + [refused_problem]
@@ -1047,7 +1050,7 @@ def _excepts(raw: dict, name: str) -> tuple[list[tuple[str, str]], Problem | Non
                 f"書けるのは `{'` か `'.join(EXCEPT_FIELDS)}` の 1 つだけ",
             )
         # 書いた値は文字列だけを受け取る。引用符の無い `on` は PyYAML が真偽値に読むので、
-        # 文字にすると 'True' に当てる except になってしまう（when の葉と同じ扱い）
+        # 文字にすると 'True' に当てる except になってしまう（when の個別条件と同じ扱い）
         for key in EXCEPT_FIELDS:
             if key in item and not isinstance(item[key], str):
                 return [], Problem(
@@ -1070,11 +1073,11 @@ def _excepts(raw: dict, name: str) -> tuple[list[tuple[str, str]], Problem | Non
 
 
 class _WhenError(Exception):
-    """`when:` の書式の誤り。条件式をたどる途中から一気に抜けるために使う。"""
+    """`when:` の書式の誤り。組み合わせ条件をたどる途中から一気に抜けるために使う。"""
 
 
 def _when(written: object, name: str) -> tuple[Condition | None, Problem | None]:
-    """`when:` を読んで条件式にする。葉の式はまだ組み立てない（_build が組み立てる）。
+    """`when:` を読んで組み合わせ条件にする。個別条件の式はまだ組み立てない（_build が組み立てる）。
 
     書式の誤りは最初の 1 件を返す。書いたユーザは条件を書いたつもりでいるので、
     読めないノードを黙って外すと、当たる範囲が書いたものと気づかないうちに食い違う。
