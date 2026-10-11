@@ -2416,6 +2416,14 @@ class TicketTest(unittest.TestCase):
             "echo hi | bash # ccnavi",
             "printf 'ls\\n' | sh -s -- ccnavi",
             "uv run ccnavi --docs $X",
+            # sh で起動する入口に単引用で渡した値は、文字どおりの値（実行役を外した層でも）。
+            f"sh {sync} '$X'",
+            f"sh {sync} '*'",
+            f"sh {sync} '$X' P1",
+            f"sh {review} decide 3 '$C'",
+            f"sh {review} decide '$N'",
+            f"sh {review} decide 1 --note '$X'",
+            f"env sh {sync} '$X'",
         ):
             result = self.hook(
                 "PreToolUse",
@@ -2444,6 +2452,10 @@ class TicketTest(unittest.TestCase):
             "uv run ccnavi --agree 3 $Y",
             "uvx ccnavi --agree 3 $Y",
             f"uv run sh {sync} --forget P",
+            # 二重引用と引用なしの展開は、sh 越しでも止める。
+            f'sh {sync} "$X"',
+            f'sh {review} decide 3 "$C"',
+            f"sh -c 'sh {sync} $X'",
             # 長い旗・値を取る旗を前に置いたシェルと、`env`・`command` 越しのシェルも
             # 標準入力から読む。
             *(

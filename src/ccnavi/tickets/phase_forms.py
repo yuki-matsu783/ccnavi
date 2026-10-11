@@ -494,6 +494,20 @@ def _hidden_args(kind: str, args: list[str]) -> str:
     return ""
 
 
+def _marked_suffix(words: list[str], placed: list[tuple[str, list[str]]]) -> list[str]:
+    """層の語が外側のコマンドの後ろ側と同じなら、単引用の印の残った外側の語を返す。
+
+    実行役を外した層（`sh <入口> '$X'` の `<入口> $X`）は引用を外して組み直してあるので、
+    単引用の中の `$X` も展開に見える。外側のコマンドの語には印が残っているので、そちらを使う。
+    `sh -c '…'` の文字列を読み直した層は外側の語と並びが合わないので、そのまま（止める側）。
+    """
+    for _, outer in placed:
+        tail = outer[len(outer) - len(words) :]
+        if len(outer) > len(words) and [w.translate(_UNMARK) for w in tail] == words:
+            return tail
+    return words
+
+
 def _entry_commands(
     subject: str, inner: list[tuple[str, str]]
 ) -> tuple[list[tuple[str, list[str]]], bool]:
@@ -504,7 +518,12 @@ def _entry_commands(
     placed = [("", words) for words, _ in shellread.placed(_literal_quoted(subject))]
     if placed:
         layered = [
-            (runner, [w.replace(shellread.WORD_SEP, " ") for w in layer.split(" ") if w])
+            (
+                runner,
+                _marked_suffix(
+                    [w.replace(shellread.WORD_SEP, " ") for w in layer.split(" ") if w], placed
+                ),
+            )
             for runner, layer in inner
             if layer
         ]
