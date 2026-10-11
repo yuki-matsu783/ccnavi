@@ -22,6 +22,7 @@ import type { RulesSum } from "./sums.js";
 import type { TargetOption } from "./targets.js";
 import type { SuggestJson } from "./suggestmodel.js";
 import type { SamplesJson, TestJson } from "./testmodel.js";
+import type { CondNode } from "./rules-when.js";
 
 // ---- ルールの形（画面と読み書きで分け合う）
 
@@ -88,6 +89,22 @@ export interface RuleForm {
    * 書いていなければ省く。
    */
   readonly excepts?: readonly string[];
+  /**
+   * `except:` の各パターンを木のノードにしたもの（`excepts` と同じ並び）。「条件の木に変換」が
+   * `not: {any: …}` に入れるために持つ。書いていなければ省く
+   */
+  readonly exceptNodes?: readonly CondNode[];
+  /**
+   * 条件の木（`when:`）。在れば `kind` と `pattern` は使わない（`glob` / `regex` の代わりに木で当てる）。
+   * 書き戻しは、木が読み込んだときと同じなら元のノードに触らない。変えたら木を書き、`glob` / `regex` を消す。
+   * 書いていなければ省く
+   */
+  readonly when?: CondNode;
+  /**
+   * 「条件の木に変換」で `except:` を木の中へ移した。書き戻しで `except:` を消す。
+   * 画面が明示したときだけ消す（欄が届かなかっただけで消さないため）
+   */
+  readonly dropExcept?: boolean;
 }
 
 /** ファイル選択ダイアログで埋める欄 */

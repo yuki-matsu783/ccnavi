@@ -5,6 +5,7 @@
  * 「このルールは何を止めるか」を折りたたんだままでも読める形に縮めた文だけ。
  */
 import type { RuleForm, Section } from "../../core/rules-view.js";
+import { condPatterns } from "../../core/rules-when.js";
 
 /** 1 行に縮める。空白をまとめて、長ければ後ろを省く */
 function excerpt(text: string, max: number): string {
@@ -59,10 +60,11 @@ export function staleMessage(section: Section): string {
 
 /**
  * 絞り込みが当てる文字列。当てるのは書いてある値そのもの（id・ツール・パターン・文面・
- * 渡す文）で、要約に出ない全文にも当たる。
+ * 渡す文）で、要約に出ない全文にも当たる。条件の木のルールは、木の葉の文字すべてに当たる。
  */
 export function findText(rule: RuleForm): string {
-  return `${rule.id} ${rule.match} ${rule.pattern} ${rule.message} ${rule.additionalContext} ${rule.additionalContextOnce}`.toLowerCase();
+  const patterns = rule.when === undefined ? rule.pattern : condPatterns(rule.when).join(" ");
+  return `${rule.id} ${rule.match} ${patterns} ${rule.message} ${rule.additionalContext} ${rule.additionalContextOnce}`.toLowerCase();
 }
 
 /**
