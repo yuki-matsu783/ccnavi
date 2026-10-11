@@ -186,6 +186,11 @@ function screenFiles(screen) {
   return files;
 }
 
+/** どれかの画面のバンドルに入るファイルか。 */
+function readByScreen(absolute) {
+  return screens().some((screen) => screenFiles(screen).has(absolute));
+}
+
 /** グループのテストが辿り着くファイル全部（テスト自身も含む）。 */
 function closureOf(group) {
   // 下の段（`test/<グループ>/<何か>/x.test.ts`）も見る。tsc は `test/**/*.ts` を
@@ -247,18 +252,22 @@ function groupsFor(wanted, map) {
  */
 function relativeToExtension(given) {
   const slashed = given.replace(/\\/g, "/");
-  // 共通の部品（`extensions/shared/`）は拡張の外だが、画面の CSS が読むので触ったと数える。
-  // 拡張のルートからの相対（`../shared/...`）で返し、`path.join(ROOT, rel)` で実体に戻れるようにする
-  const sharedMarker = "extensions/shared/";
-  const sharedAt = slashed.lastIndexOf(sharedMarker);
-  if (sharedAt >= 0) {
-    const inShared = path.posix.normalize(slashed.slice(sharedAt + sharedMarker.length));
-    return inShared.startsWith("../") ? null : "../shared/" + inShared;
-  }
+  // 拡張の目印を先に見る。パスの祖先に `extensions/shared/` という並びがあっても（クローンの置き場の名前など）、
+  // 拡張の下のファイルは拡張のファイルとして扱う。目印が複数あるときは最後の出現を採る
+  // （ワークツリーの置き場 `.claude/worktrees/` の下でも、その下の木の目印に当たる）
   const marker = "extensions/vscode/ccnavi-board/";
   const at = slashed.lastIndexOf(marker);
+  if (at < 0) {
+    // 共通の部品（`extensions/shared/`）は拡張の外だが、画面の CSS が読むので触ったと数える。
+    // 拡張のルートからの相対（`../../shared/...`）で返し、`path.join(ROOT, rel)` で実体に戻れるようにする
+    const sharedMarker = "extensions/shared/";
+    const sharedAt = slashed.lastIndexOf(sharedMarker);
+    if (sharedAt >= 0) {
+      const inShared = path.posix.normalize(slashed.slice(sharedAt + sharedMarker.length));
+      return inShared.startsWith("../") ? null : "../../shared/" + inShared;
+    }
+  }
   const inside = at >= 0 ? slashed.slice(at + marker.length) : slashed;
-  if (at < 0 && path.isAbsolute(slashed)) return null;
   // `./src/x.ts` や `src/../src/x.ts` を `src/x.ts` に直す。直さないまま
   // `startsWith("src/webview/")` のようなパスの比較に渡すと、`./` が付いただけで
   // 別のファイルとして扱われ、回すものが減る側に判断がずれる。
@@ -309,8 +318,14 @@ function callFor(rel, map) {
   // 画面のファイルは `tsconfig.json` が exclude するので、`tsconfig.test.json` では型を見ない。
   // esbuild も型を見ない。回すグループが 0 本でも、画面の型の検査だけは必ず通す
   // （通さないと「型の検査だけ通しました」と出るのに何も見ていないターンができる）
-  // 共通の部品（`../shared/`）も同じ扱い。閉包に入るのは、それを `@import` する画面のバンドルだけ
-  if (rel.startsWith("src/webview/") || rel.startsWith("../shared/")) {
+  // 共通の部品（`../../shared/`）も同じ扱い。閉包に入るのは、それを `@import` する画面のバンドルだけ
+  if (rel.startsWith("../../shared/") && fs.existsSync(absolute) && !readByScreen(absolute)) {
+    // どの画面も読まない共通の部品（Chrome 拡張だけが読む `browser-theme.css`）。画面のグループは回さない。
+    // `shared` グループは `appearance.css` との一致（CB-T393）を見るので、直したら必ず回す。画面の型の検査が要るかは、グループが画面のバンドルを読むか（finish）で決まる。
+    // 無くなったファイル（消した・名前を変えた）は、どの画面が読んでいたか辿れないので下の道（全グループ）に任せる
+    return { groups: [...new Set([...groups, ...(map.has("shared") ? ["shared"] : [])])].sort(), compile: true, webview: false };
+  }
+  if (rel.startsWith("src/webview/") || rel.startsWith("../../shared/")) {
     return { groups: [...new Set([...groups, ...webviewGroups(map, rel)])].sort(), compile: true, webview: true };
   }
 
