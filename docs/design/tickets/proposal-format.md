@@ -54,6 +54,7 @@ base_sha: ""
 ```
 
 - ファイル名（拡張子を除く）と `ticket:` は一致すること
+- 親の雛形は `ccnavi ticket new <先頭の語> <slug> --title <題> --plan <定義,…> [--issue N] [--allow <glob>]…` で作れる。識別子は `ticket next-id` と同じ決まり（`--issue` があればその番号）で決め、`plan:` は並べた順の一直線、`phases:` は計画が使う定義の写し、`allow:` は各定義の `scope` を重複なく集めたもの（`wip/design/*` など）。`scope: inherit` の定義だけなら `--allow` が要る。判定側は `wip/` を最初から許可しない（承認していない範囲が黙って広がるため）。書き出し先はいるワークツリーの `wip/proposals/todo/`で、既にあれば上書きしない。`--plan` に置けるのは `work` の定義だけ
 - 識別子は、親が 1 語、子が `<親>-<2 桁のフェーズ番号>-<2 桁のフェーズ内の連番>`
   （親 feature-50-settings-split のフェーズ 2 の 1 枚目は `feature-50-settings-split-02-01`）。フェーズ番号は `phase:` と
   同じ値で、食い違えば error。親の識別子が名前空間になり、別の親の子と衝突しない。識別子だけから親を割り出すときは、
