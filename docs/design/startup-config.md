@@ -19,7 +19,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 |---|---|
 | hook から（payload あり） | イベントごとの手順（4.2）。終了コード 0 は通す、2 は止める・差し戻す |
 | hook の入力なし | 使い方を標準エラーに出して終了コード 1 |
-| 診断用のオプション（`--lint` `--test` `--test-samples` `--explain`） | payload を読まない。ユーザと VS Code 拡張が使う（10 章） |
+| 診断用のオプション（`--lint` `--test` `--test-expectations` `--explain`） | payload を読まない。ユーザと VS Code 拡張が使う（10 章） |
 | `--agree` / `--reviewed` / `ticket …` / `review …` | チケット制御の操作。ユーザが端末で打つか、保護済みスクリプトが呼ぶ（9 章） |
 
 ワークスペースルートは `--root` → 環境変数 `CLAUDE_PROJECT_DIR` → 作業ディレクトリから上へ辿って

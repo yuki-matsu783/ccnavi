@@ -15,7 +15,7 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config,
 | hook の登録、実行ファイル、保護済みスクリプト、スキル、CLAUDE.md | ワークスペースルート | ワークスペース |
 | 共通レイヤーのルール / リスクの配点 | `.ccnavi/common/{rules,risks}.yml`（置き場は固定） | ワークスペース |
 | 共通レイヤーのフェーズ定義 | 置けない。`.ccnavi/common/phases.yml` があれば error（11.4.1） | |
-| ルールの見本 | `.ccnavi/common/rule-samples.yml` | ワークスペース |
+| ルールの期待する判定 | `.ccnavi/common/rule-expectations.yml` | ワークスペース |
 | 共通レイヤーのミラー | `projects/<名前>/.ccnavi/common/`（親の着手でワークスペースルートの `.ccnavi/common/` から配る。11.12。誰も編集しない） | プロジェクト |
 | ワークスペース自身のレイヤーの 3 本 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risks}.yml` | ワークスペース |
 | プロジェクトのレイヤーの 3 本 | `projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml` | プロジェクト |
@@ -31,9 +31,9 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config,
 
 レイヤーは 3 種で、形は同じ。共通レイヤーはどのツリーにも適用され、ワークスペースルートの `.ccnavi/common/` に置く。
 ユーザが持つ設定は ccnavi ディレクトリの下、記録と state は `logs/`、`.claude/` には Claude Code 自身のものだけを置く。
-共通レイヤーのファイルと見本も、名指しのツールからは組み込みの deny（`*/.ccnavi/*`）が止める。
+共通レイヤーのファイルと期待する判定も、名指しのツールからは組み込みの deny（`*/.ccnavi/*`）が止める。
 共通レイヤーの置き場は固定。別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけで、
-それも診断（`--lint` / `--test` / `--test-samples` / `--explain`）に限る。レイヤーを探す先を動かす `--projects` / `--project-home` も同じ。
+それも診断（`--lint` / `--test` / `--test-expectations` / `--explain`）に限る。レイヤーを探す先を動かす `--projects` / `--project-home` も同じ。
 自身のレイヤーとプロジェクトのレイヤーはそのツリーにだけ適用され、どちらも git プロジェクトルートの下の `.ccnavi/config/` に置く。
 ワークスペース自身にレイヤーを分けるのは、ワークスペースのフェーズ定義（`scope: ["src/*", ...]`）がそのレイアウトにしか合わないから。
 

@@ -89,7 +89,7 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 
 共通レイヤーの 3 本は、置き場がどこでも `builtin-guard-common-layer` が `Write` / `Edit` から止める。当てるのはワークスペースルートと、
 そこから切ったワークツリーの下の同じ相対（ワークスペースルートの外に置いたなら、そのパス）。既定の置き場（`.ccnavi/common/`）では
-`builtin-guard-project-home` より先にこちらが当たる。見本（`rule-samples.yml`）は 3 本に入らず、既定の置き場なら
+`builtin-guard-project-home` より先にこちらが当たる。期待する判定（`rule-expectations.yml`）は 3 本に入らず、既定の置き場なら
 `builtin-guard-project-home` が止める。
 
 保護済みの sh の前に置く環境変数（`DENY_SCRIPT_ENV_OVERRIDE`）: 保護済みの sh（`ccnavi-*.sh`）は、
