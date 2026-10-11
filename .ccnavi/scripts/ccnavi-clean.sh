@@ -32,7 +32,7 @@
 
 set -eu
 
-# 共通部分。ワークスペースルートの探し方はここにある（設計 11.8）。
+# 共通部分。ワークスペースルートの探し方はここにある。
 . "$(dirname "$0")/ccnavi-common.sh"
 
 usage() {
@@ -93,7 +93,7 @@ case "$name" in
 esac
 
 root=$(ccnavi_workspace) || {
-	printf 'ccnavi-clean: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.shを持つ親を cwdから上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
+	printf 'ccnavi-clean: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
 }
 
@@ -137,7 +137,7 @@ if [ -e "$target/.git" ]; then
 			exit 1
 		fi
 	else
-		printf 'ccnavi-clean: %s は gitの登録が残っていないので、消しきれなかったディレクトリとして扱います（未コミットの変更は確かめていません）。\n' "$name" >&2
+		printf 'ccnavi-clean: %s は git の登録が残っていないので、消しきれなかったディレクトリとして扱います（未コミットの変更は確かめていません）。\n' "$name" >&2
 	fi
 fi
 

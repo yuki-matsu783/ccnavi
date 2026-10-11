@@ -1,13 +1,13 @@
 /**
- * 承認のオーバーレイの遷移。**「いまの状態 ＋ 入力 → 次の状態 ＋ やること」だけ**をここに置く。
+ * 承認のオーバーレイの遷移。「いまの状態 ＋ 入力 → 次の状態 ＋ やること」だけをここに置く。
  *
  * 承認は取り返しがつかない（承認済みチケットが置かれ、コミットと push がターミナルに送られる）。
  * 連打・承認中の再入・古いボードからの承認は現実に起きるので、「この状態ではこれを受けない」を
- * 書き落とさないことが要る。**散らばっていると書き落とす**ので、ガードをこの 1 ファイルに集めた。
+ * 書き落とさないことが要る。散らばっていると書き落とすので、ガードをこの 1 ファイルに集めた。
  *
  * VS Code の API には触れない。外へ出る仕事（実行ファイルを呼ぶ・ターミナルに送る・クリップボードに
- * 入れる・新しいセッションで開く・ユーザに言う）は `ApprovalEffect` として返すだけで、**実際に行うのは
- * 呼ぶ側**（`board-panel.ts`）。`core/screen-host.ts` の `Surface` と同じ形で、単体で試せる。
+ * 入れる・新しいセッションで開く・ユーザに言う）は `ApprovalEffect` として返すだけで、実際に行うのは
+ * 呼ぶ側（`board-panel.ts`）。`core/screen-host.ts` の `Surface` と同じ形で、単体で試せる。
  *
  * 呼ぶ側の段取りは 3 行で、順を変えない。
  *
@@ -15,7 +15,7 @@
  * 2. 返った `state` を持ち直し、`redraw` が真なら画面へ送り直す
  * 3. 返った `effects` を順に行う（返事が要るもの＝一覧と承認の結果は、返ってきたらまた 1 へ）
  *
- * **描き直しが先、やることが後。** 逆にすると、承認の文を渡すときに画面が古いまま残る。
+ * 描き直しが先、やることが後。 逆にすると、承認の文を渡すときに画面が古いまま残る。
  *
  * ## 状態（7 つ）
  *
@@ -24,14 +24,14 @@
  * | 無し（`overlay` が `undefined`） | 閉じている |
  * | `loading` | 承認待ちの一覧を読んでいる |
  * | `preview` | 一覧と本文を見せた。押されるまで何も置かない |
- * | `approving` | 承認を打っている。**ここでは閉じない**（Esc も受け付けない。画面の側も同じ） |
+ * | `approving` | 承認を打っている。ここでは閉じない（Esc も受け付けない。画面の側も同じ） |
  * | `done` | 承認した。渡す文がある |
  * | `error` | 読めなかった |
  * | `prompt` | 承認以外で渡す文（レビュー済みの連絡、残った指摘を決めた結果） |
  * | `reviewedLoading` | レビュー済み連絡の文のために、残った指摘を読んでいる |
  * | `decideLoading` | 残った指摘を読んでいる |
  * | `decidePreview` | 残った指摘を見せた。押されるまで何も置かない |
- * | `deciding` | 選んだ行き先を置いている。**ここでは閉じない** |
+ * | `deciding` | 選んだ行き先を置いている。ここでは閉じない |
  *
  * ## ガード（消すと承認が正しく動かなくなる順）
  *
@@ -52,8 +52,8 @@
  * | 承認と残った指摘は互いの途中に被さらない | 見せている一覧が、別の一覧になってしまう |
  * | 決めた結果の文の上に、連絡も次の「決める」も被せない | 続きの子の識別子と次の 2 手を渡す前に、文が消える |
  *
- * これらは `test/shared/approval-machine.test.ts` が見る。**同じファイルの変異テストが、
- * ガードを 1 つ消したらテストが落ちることまで見る**ので、ガードを足したらそちらにも足す。
+ * これらは `test/shared/approval-machine.test.ts` が見る。同じファイルの変異テストが、
+ * ガードを 1 つ消したらテストが失敗することまで見るので、ガードを足したらそちらにも足す。
  */
 import type { ApprovalOverlay } from "./board-view.js";
 import type { ApproveOutcome, PreviewParse } from "./approvemodel.js";
@@ -72,8 +72,8 @@ export interface ApprovalState {
   readonly overlay?: ApprovalOverlay;
   /**
    * そのオーバーレイが見せている一覧の絞り（ボードの絞り込みで見えている識別子）。空なら全部。
-   * 読み直しにも承認にも同じ絞りを通す。**忘れると、絞って見せたつもりのオーバーレイが
-   * 承認待ち全部になってしまう**
+   * 読み直しにも承認にも同じ絞りを通す。忘れると、絞って見せたつもりのオーバーレイが
+   * 承認待ち全部になってしまう
    */
   readonly only: readonly string[];
   /**
@@ -81,9 +81,9 @@ export interface ApprovalState {
    * 返ってきた一覧にこの `notice` をつけて `preview` に切り替える。
    * `dropped` は、絞りが通らなかったので絞りを外して読み直したか（外したあとは、もう外さない）。
    *
-   * **不変条件: これがあるとき `overlay` は必ず `approving`。** 置くのは `answered` の食い違いの枝
+   * 不変条件: これがあるとき `overlay` は必ず `approving`。 置くのは `answered` の食い違いの枝
    * 1 か所だけで、そこは `overlay` を持ち越す。`approving` の間は閉じられないので、外れるのは
-   * 一覧が返って `preview` か `error` に差し替わるときだけ。**型では持っていない**ので、
+   * 一覧が返って `preview` か `error` に差し替わるときだけ。型では持っていないので、
    * `recheck` を置く枝を増やすならここを読み直すこと
    */
   readonly recheck?: { readonly notice: string; readonly dropped: boolean };
@@ -97,7 +97,7 @@ export type ApprovalInput =
   /**
    * 「承認」を押した。`filtered` はボードが絞り込まれているか、`tickets` はそのとき見えている
    * 承認待ち（カードの「この 1 件を承認」は、そのカードの識別子だけが入る）。
-   * `pending` は**いまのボードの**承認待ち。送られてきた識別子と突き合わせる
+   * `pending` はいまのボードの承認待ち。送られてきた識別子と突き合わせる
    */
   | {
       readonly kind: "approve";
@@ -149,7 +149,7 @@ export type ApprovalInput =
   /** 行き先を置いた結果が返った。食い違い（`mismatch`）もここに入る */
   | { readonly kind: "decided"; readonly outcome: DecideOutcome };
 
-/** 外へ出る仕事。**行うのは呼ぶ側**（`board-panel.ts`） */
+/** 外へ出る仕事。行うのは呼ぶ側（`board-panel.ts`） */
 export type ApprovalEffect =
   /** 承認待ちの一覧を読む（`--agree --preview --json`）。返ったら `previewed` で戻す */
   | { readonly kind: "loadPreview"; readonly only: readonly string[] }
@@ -190,7 +190,7 @@ export interface ApprovalStep {
   readonly effects: readonly ApprovalEffect[];
 }
 
-/** 状態も画面もそのまま。受けない入力のほか、**画面を変えずに済ませる**（`warn` / `refresh`）ときも使う */
+/** 状態も画面もそのまま。受けない入力のほか、画面を変えずに済ませる（`warn` / `refresh`）ときも使う */
 function stay(state: ApprovalState, ...effects: ApprovalEffect[]): ApprovalStep {
   return { state, redraw: false, effects };
 }
@@ -200,7 +200,7 @@ function move(state: ApprovalState, next: ApprovalState, ...effects: ApprovalEff
   return { state: next, redraw: next.overlay !== state.overlay, effects };
 }
 
-/** いまの状態と入力から、次の状態とやることを決める。**外には出ない** */
+/** いまの状態と入力から、次の状態とやることを決める。外には出ない */
 export function approvalStep(state: ApprovalState, input: ApprovalInput): ApprovalStep {
   switch (input.kind) {
     case "approve":
@@ -241,7 +241,7 @@ function opened(
     if (input.tickets.length === 0) {
       return stay(state, { kind: "warn", text: "絞り込みで見えている承認待ちがありません" });
     }
-    // 1 つでもいまのボードで承認待ちでなければ、ボードが古い。落として送ると「見せた 2 件の
+    // 1 つでもいまのボードで承認待ちでなければ、ボードが古い。外して送ると「見せた 2 件の
     // つもりが 1 件」になるので、削らずに止める
     const pending = new Set(input.pending);
     if (!input.tickets.every((id) => pending.has(id))) {
@@ -271,7 +271,7 @@ function previewed(state: ApprovalState, result: PreviewParse): ApprovalStep {
   const recheck = state.recheck;
   if (recheck !== undefined) {
     // 絞りが通らない（その識別子がもう承認待ちに無い、親の改版が承認待ちに入った）ときだけ絞りを
-    // 外し、いま何が承認待ちなのかを全部見せる。**外すのは 1 度だけ**
+    // 外し、いま何が承認待ちなのかを全部見せる。外すのは 1 度だけ
     if (!result.ok && state.only.length > 0 && !recheck.dropped) {
       return move(
         state,
@@ -314,7 +314,7 @@ function confirmed(state: ApprovalState, tickets: readonly string[]): ApprovalSt
 }
 
 /**
- * 承認の結果。**ここには「この状態でなければ受けない」を置かない。**
+ * 承認の結果。ここには「この状態でなければ受けない」を置かない。
  * 承認済みチケットは既に置かれていることがあり、受けずに捨てるとユーザに届かない
  */
 function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolean): ApprovalStep {
@@ -322,12 +322,12 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
     const count = outcome.value.approved.length;
     // 承認の push の 1 行は、文を渡すのを待たずにターミナルへ出す。承認と同じ時点で出しておく
     const carried = count > 0 && carrier;
-    // 承認できたら読み直す。**監視（`core/watch.ts`）だけに頼らない。** 承認は承認済みチケットを
+    // 承認できたら読み直す。監視（`core/watch.ts`）だけに頼らない。 承認は承認済みチケットを
     // `.ccnavi/approved/doing/` に書いてから提案を消すので、ふつうはその置き場の監視が拾って
     // 読み直る。拾えないのは、`files.watcherExclude` でそこを外したとき、監視が使えない
     // ファイルシステムのとき（置き場は既定に固定で、監視するパス `core/watch.ts` とずれない）。
     // 読み直しの途中でもう 1 回頼まれた分は呼ぶ側が 1 回にまとめる（`board-panel.ts` の `again`）ので、
-    // 監視と重なっても画面はちらつかない。**1 件も置かれていないなら読み直さない**（何も動いていない）。
+    // 監視と重なっても画面はちらつかない。1 件も置かれていないなら読み直さない（何も動いていない）。
     //
     // 承認の push の sh が無ければ送らずに言う。送って `No such file` を見せるより、何をすればよいかが先に分かる
     const effects: ApprovalEffect[] =
@@ -567,7 +567,7 @@ function decideConfirmed(state: ApprovalState, choices: Readonly<Record<string, 
 }
 
 /**
- * 置いた結果。**承認の結果と同じく「この状態でなければ受けない」を置かない。** 置かれたものは
+ * 置いた結果。承認の結果と同じく「この状態でなければ受けない」を置かない。 置かれたものは
  * 戻らないので、受けずに捨てるとユーザに届かない
  */
 function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {

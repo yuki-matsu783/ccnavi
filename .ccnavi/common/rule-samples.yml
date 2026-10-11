@@ -31,8 +31,8 @@ deny:
     subject: "/repo/.claude/skills/commit/SKILL.md"
     why: .claude/ の下も worktrees/ 以外は main では触らない
   - tool: Write
-    subject: "/repo/projects/lib/docs/skills/deploy/SKILL.md"
-    why: プロジェクトのスキル（docs/skills/ に置く）も元ツリーでは触らない。プロジェクトから切ったワークツリーで直す
+    subject: "/repo/projects/lib/skills/deploy/SKILL.md"
+    why: プロジェクトのスキル（skills/ に置く）も元ツリーでは触らない。プロジェクトから切ったワークツリーで直す
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.claude/settings.json"
     why: ワークツリーの中でも hook の登録は触らない（guard-settings）。統合で main の登録になる
@@ -352,7 +352,7 @@ allow:
       ターンの終わり。skill-review-every-10 が使われ、10 回に 1 度止めて振り返りの手順を渡す
       every が無い・プロジェクトのレイヤーにしか無いルールでは判定に入らない
   - tool: Write
-    subject: "/repo/.claude/worktrees/lib1/docs/skills/deploy/SKILL.md"
+    subject: "/repo/.claude/worktrees/lib1/skills/deploy/SKILL.md"
     why: >-
-      プロジェクトから切ったワークツリーの docs/skills/（プロジェクトのスキルの置き場）。組み込みの保護の外のふつうの場所で、
+      プロジェクトから切ったワークツリーの skills/（プロジェクトのスキルの置き場）。組み込みの保護の外のふつうの場所で、
       worktrees の allow に当たる。チケットがあればその範囲でさらに絞られる

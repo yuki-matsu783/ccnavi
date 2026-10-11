@@ -90,7 +90,7 @@ def write_buildinfo(stamp: str, commit: str) -> str:
     """組み立ての元のコミットを書いた部品を `stamp` に置き、そのパスを返す。
 
     パッケージ（`src/ccnavi/`）の外に置く。中に置くと、ソースで動かしたときに前の組み立ての
-    コミットを名乗る。
+    コミットを示す。
     """
     os.makedirs(stamp, exist_ok=True)
     path = os.path.join(stamp, version.BUILDINFO_MODULE + ".py")
@@ -129,7 +129,7 @@ def build() -> int:
         version.BUILDINFO_MODULE,
         # libyaml の C 拡張。YAML は C の読み手で読む（src/ccnavi/infra/yamlread.py）。PyYAML は
         # 拡張を try の中で読むので、取りこぼすと何も言わずに純 Python の読み手（約 10 倍遅い）に
-        # 戻る。PyInstaller はいまも拾うが、拾い方が変わっても落ちないよう名指しする。
+        # 戻る。PyInstaller はいまも拾うが、拾い方が変わっても失敗しないよう名指しする。
         "--hidden-import",
         "yaml._yaml",
         os.path.join(ROOT, "main.py"),
@@ -172,7 +172,7 @@ def install(dist_dir: str, root: str, target: str) -> str:
     混ざるので、隣の `<target>.new` にコピーし切ってから `_swap` で入れ替える。前の版にだけ
     あったファイルは、入れ替えで退避した側ごと消える。
 
-    落ちたら OSError をそのまま投げる。置き場は前のままで、コピーしかけの `<target>.new` は消す。
+    失敗したら OSError をそのまま投げる。置き場は前のままで、コピーしかけの `<target>.new` は消す。
     コピーした先のパスを返す。
     """
     live = os.path.join(root, BIN_ROOT, target)

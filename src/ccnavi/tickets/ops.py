@@ -35,6 +35,7 @@ from . import (
     ops_stop,
     phase,
     risk,
+    skillsync,
     ticket_ids,
     ticket_model,
     ticket_places,
@@ -87,7 +88,7 @@ def start(
     if ops_close.predecessors_unmet(stderr, root, conf, found):
         return 1
     # ワークツリーは承認済みチケットの `project` が指すリポジトリから
-    # 切られていること（REQ-MLT-13）。
+    # 切られていること。
     # 元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと食い違う。
     owner = tree.project_root(conf.projects, found.project) or root
     worktree = tree.worktree_path(root, ticket_id)
@@ -128,7 +129,7 @@ def start(
     )
     if found.is_child:
         # 着手のときのフローのハッシュを記録する。SubagentStart / SubagentStop が、着手のあとに
-        # 書き換わったら知らせる（設計 9.3.1。止めない）。
+        # 書き換わったら知らせる（止めない）。
         started = replace(found, started_at=fields["started_at"])
         where, failed = flow.record_digest(conf, root, started)
         if failed:
@@ -153,14 +154,58 @@ def _sync_config(
     found: ticket_model.Ticket,
     worktree: str,
 ) -> list[str] | None:
-    """親の着手の前に、共通レイヤーをプロジェクトの `.ccnavi/common/` へミラーする（設計 11.12）。
+    """親の着手の前に、共通レイヤーをプロジェクトの `.ccnavi/common/` へミラーする。
 
     返すのは着手の出力に足す行。ミラーできなければ None（着手しない）。子は親のブランチに
-    乗るので配らない。ワークスペース自身の作業は、共通レイヤーと同じリポジトリにあるので配らない。
+    含まれるので配らない。ワークスペース自身の作業は、共通レイヤーと同じリポジトリにあるので配らない。
     プロジェクトの `.ccnavi/config/` には触れない。
     """
     if found.is_child or not found.project:
         return []
+    lines = _sync_common(stderr, root, conf, found, worktree)
+    if lines is None:
+        return None
+    more = _sync_skills(stderr, root, conf, found, worktree)
+    if more is None:
+        return None
+    return lines + more
+
+
+def _sync_skills(
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    found: ticket_model.Ticket,
+    worktree: str,
+) -> list[str] | None:
+    """共通の概念スキルをプロジェクトの `skills/` へ写す。消さない。"""
+    changes, why = skillsync.plan(root, worktree)
+    if why:
+        stderr.write(f"ccnavi: {found.ticket} の概念スキルを写せない: {why}\n")
+        return None
+    if not changes:
+        return []
+    failed = skillsync.apply(changes)
+    if failed:
+        stderr.write(f"ccnavi: {found.ticket} の概念スキルを写せない: {failed}\n")
+        return None
+    git_sh = settings.script_command(root, "ccnavi-git.sh")
+    lines = skillsync.describe(found.project, changes)
+    lines.append(
+        f"  作業を始める前に、{worktree} で {', '.join(c.rel for c in changes)} を"
+        f" '{git_sh} add' してコミットしてください"
+    )
+    return lines
+
+
+def _sync_common(
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    found: ticket_model.Ticket,
+    worktree: str,
+) -> list[str] | None:
+    """共通レイヤーのミラー。ミラーできなければ None。"""
     changes, why = configsync.plan(conf, root, worktree)
     if why:
         stderr.write(f"ccnavi: {found.ticket} の共通レイヤーをミラーできない: {why}\n")
@@ -223,7 +268,7 @@ def finish(
 
 
 def _needs_review(root: str, conf: settings.Settings, found: ticket_model.Ticket) -> bool:
-    """この子を閉じたとき、ユーザが見る対象になるか（設計 9.8）。親は見ない。
+    """この子を閉じたとき、ユーザが見る対象になるか。親は見ない。
 
     フェーズの「見る場所」を、この子を閉じたものとして数え直す。延期したフェーズの子も
     レビュー待ちに置く。見るのは次にレビューがあるフェーズの番だが、ユーザが見るまでは
@@ -247,7 +292,7 @@ def _close_parent(
 
     記録（`closed.json`）は、どのフェーズをどこで見たかを親のブランチに残す。提案は
     統合先に取り込む前に `wip/` ごと消えるので、マージリクエストを作らない進め方では
-    閉じた事実の残る先がここしか無い（設計 9.8）。
+    閉じた事実の残る先がここしか無い。
 
     案内は進め方で分かれる。マージリクエストがあるなら Draft を外す合図まで、
     無いなら統合先に取り込むところまで。ccnavi はどちらでもマージしない。
@@ -381,7 +426,7 @@ def record_risk(
         "reason": reason.strip(),
         "head": head,
         "at": approval_marks.now(),
-        # その項目がどのレイヤーに書いてあるか（設計 11.9）。
+        # その項目がどのレイヤーに書いてあるか。
         "source": factor.source,
     }
     failed = approval_marks.write_child_record(
@@ -398,9 +443,9 @@ def record_risk(
 
 
 def _project_of(conf: settings.Settings, root: str, found: ticket_model.Ticket) -> str:
-    """このチケットのレイヤーを決める `project:`（設計 11.4.1、11.4.2）。
+    """このチケットのレイヤーを決める `project:`。
 
-    本物とするのは承認済みチケットの側。子は親から継ぐので、親の承認済みチケットを引く。提案の側に
+    正とするのは承認済みチケットの側。子は親から継ぐので、親の承認済みチケットを引く。提案の側に
     書いてある値はユーザが承認していないので、判定の根拠にしない。
     """
     if not found.is_child:
@@ -476,7 +521,7 @@ def _score_child(
     record.update({"head": diff.head, "base": diff.base, "at": approval_marks.now()})
     record["summary"] = diff.summary()
     if definition.dropped:
-        # 空として扱ったレイヤーの名前を残す（設計 11.2）。共通レイヤーだけで測ったことが、
+        # 空として扱ったレイヤーの名前を残す。共通レイヤーだけで測ったことが、
         # あとから記録を読んだユーザに分かる。
         record["fallback"] = ",".join(definition.dropped)
     failed = approval_marks.write_child_record(

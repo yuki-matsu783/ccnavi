@@ -89,7 +89,7 @@ test("CB-T146 1 度きりのメッセージは、届いたときだけ真を返�
   assert.deepEqual(spy.posted, [{ type: "filter" }]);
 });
 
-test("CB-T147 裏にいる画面からの ready は、捨てられた画面の置き土産として捨てる", () => {
+test("CB-T147 裏にいる画面からの ready は、捨てられた画面が残したものとして捨てる", () => {
   const spy = surface();
   const host = screenHost<string>(spy, (data) => data);
   host.send("あ");
@@ -101,8 +101,8 @@ test("CB-T147 裏にいる画面からの ready は、捨てられた画面の�
   assert.equal(host.live, false);
   assert.equal(host.send("い"), "deferred");
   assert.deepEqual(spy.posted, []);
-  assert.equal(host.post({ type: "filter" }), false, "1 度きりの指示を、落ちる先へ送って消さない");
-  // 本物の ready で届くようになる
+  assert.equal(host.post({ type: "filter" }), false, "1 度きりの指示を、失われる先へ送って消さない");
+  // 実際の ready で届くようになる
   host.ready();
   assert.equal(host.send("い"), "posted");
   assert.equal(host.post({ type: "filter" }), true);
@@ -193,7 +193,7 @@ test("CB-T153 保持する画面でも、1 枚目が組み上がるまでは 1 �
   const host = retainedHost<string>(spy, (data) => data);
   assert.equal(host.post({ type: "lock" }), false, "まだ 1 枚も入れていない");
   host.send("あ");
-  assert.equal(host.post({ type: "lock" }), false, "読み込んでいる最中。送っても落ちる");
+  assert.equal(host.post({ type: "lock" }), false, "読み込んでいる最中。送っても失われる");
   host.ready();
   assert.equal(host.post({ type: "lock" }), true);
   assert.deepEqual(spy.posted, [{ type: "lock" }]);

@@ -31,7 +31,7 @@ def _places(
 ) -> tuple[list[ticket_model.Ticket], list[str], list[ticket_mod.Problem]]:
     """この識別子のチケットが在る置き場を全部引く。読めなかった理由と提案の不備も返す。
 
-    本物とするツリーの側だけを読む（approval.scan / ticket.scan のまとめ方）。
+    正とするツリーの側だけを読む（approval.scan / ticket.scan のまとめ方）。
     """
     hits: list[ticket_model.Ticket] = []
     copies, notes = approval.scan(conf, root)
@@ -60,11 +60,11 @@ def _undecided(
     root: str = "",
     conf: settings.Settings | None = None,
 ) -> None:
-    """どれが本物か決まらないときの文面。次にすることまで書く。
+    """どれが正か決まらないときの文面。次にすることまで書く。
 
     「1 つにしてから」だけだと、どのツリー上のチケットも追跡されたファイルなので、受け取った側に
-    できることが読めない。本物とする側の決まり方（親のツリー → 元ツリー）と、この場面で
-    それが決まらない理由を名指しする。取り込み済みの親子のチケットでは、本物とする側が親のブランチに決まって
+    できることが読めない。正とする側の決まり方（親のツリー → 元ツリー）と、この場面で
+    それが決まらない理由を名指しする。取り込み済みの親子のチケットでは、正とする側が親のブランチに決まって
     いるので、取り込み状態から引いた解き方（`syncstate.guidance`）を出す。
     """
     home = hits[0].parent or hits[0].ticket
@@ -72,7 +72,7 @@ def _undecided(
     st = approval_checks.family_standing(conf, root, hits[0]) if conf is not None else None
     if st is not None and st.imported:
         stderr.write(
-            f"  本物は、親のブランチ {home} のワークツリー（.claude/worktrees/{home}）"
+            f"  正は、親のブランチ {home} のワークツリー（.claude/worktrees/{home}）"
             "上のチケットだけ"
             "（取り込み済みの親子のチケット）。ほかのツリー上のチケットは読まない\n"
         )
@@ -85,11 +85,11 @@ def _undecided(
             )
         return
     stderr.write(
-        f"  本物は、親 {home} のワークツリー上のチケット。無ければ元ツリー"
+        f"  正は、親 {home} のワークツリー上のチケット。無ければ元ツリー"
         "（ワークスペースルート、プロジェクトのチケットならそのプロジェクト）上のチケット\n"
     )
     stderr.write(
-        "  どちらにも無いか、元ツリーより先の置き場に在るチケットがあると、どれが本物か決まらない。"
+        "  どちらにも無いか、元ツリーより先の置き場に在るチケットがあると、どれが正か決まらない。"
         "先に進んだ側を合流させるか、残ったワークツリーを片付けてから打ち直してください\n"
     )
 
@@ -99,7 +99,7 @@ def find(
 ) -> ticket_model.Ticket | None:
     """この識別子のチケットを、どの置き場に在っても 1 つ引く。`state` に置き場が入る。
 
-    2 つ以上残れば、どれが本物か決まらないので止める。
+    2 つ以上残れば、どれが正か決まらないので止める。
     """
     hits, notes, problems = _places(root, conf, ticket_id)
     if not hits:
@@ -141,7 +141,7 @@ def family_stopped(
         stderr.write(
             f"ccnavi: {found.ticket}: チケットが親のブランチ {st.family} のワークツリーの外"
             f"（{found.tree or 'ワークスペースルート'}）にしか無い。"
-            "取り込み済みの親子のチケットでは親のブランチ上のチケットだけが本物なので、このチケットは動かさない\n"
+            "取り込み済みの親子のチケットでは親のブランチ上のチケットだけが正なので、このチケットは動かさない\n"
             f"  ユーザがそのチケットを親のワークツリー（.claude/worktrees/{st.family}）へ移して"
             "コミットと push をしてから打ち直す\n"
         )
@@ -152,9 +152,9 @@ def family_stopped(
 def parent_not_started(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
-    """子に着手してよいか。親が作業中で着手済みでなければ止める（設計 9.6、REQ-TKT-48）。
+    """子に着手してよいか。親が作業中で着手済みでなければ止める。
 
-    親の `start` を飛ばしても途中では何も壊れず、親を閉じるときだけが通らない。壊れない
+    親の `start` を飛ばしても途中では何も失敗せず、親を閉じるときだけが通らない。失敗しない
     ので気付けず、気付くのがいちばん遅い場所になる。親の作業が実際に始まる時点
     （最初の子の着手）で止めれば、いちばん早い場所で言える。
 
@@ -184,7 +184,7 @@ def parent_not_started(
         )
         return True
     if parent.state != ticket_model.DOING:
-        # 置き場だけを言う。`review/` に親があるのは壊れたデータのときだけだが、そこで
+        # 置き場だけを言う。`review/` に親があるのは不整合なデータのときだけだが、そこで
         # 「閉じた」と言うと、文面が事実と違う。
         stderr.write(head + f"は作業中ではない（いまは {parent.state}/）。子を足す相手ではない\n")
         return True
@@ -223,7 +223,7 @@ def predecessors_unmet(
         )
     if any(not p.waiting for p in unmet):
         stderr.write(
-            "  取り消した・どこにも無い・自分自身や自分の親・輪になった先行は、待っても満たせない。"
+            "  取り消した・どこにも無い・自分自身や自分の親・循環した先行は、待っても満たせない。"
             "複数の場所にある先行は、先に 1 つに決めてください\n"
         )
     stderr.write(
@@ -304,7 +304,7 @@ def close_problems(
 def deliverables_missing(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
-    """フェーズの最後の子を閉じる前に、定義の成果物が揃っているか（設計 9.8）。
+    """フェーズの最後の子を閉じる前に、定義の成果物が揃っているか。
 
     在って追跡されていることだけを見る。中身は見ない。空でも在ることは分かるので、
     「調査したことにする」は防げる。

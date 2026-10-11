@@ -128,7 +128,7 @@ test("CB-D0a 絞り込み中にタイプを畳んでも矢印は開いた向き�
   }
 });
 
-test("CB-D0b 見た目のメッセージで body のクラスが付け替わり、開いている行と入力は消えない", async () => {
+test("CB-D0b 見た目のメッセージで body のクラスが書き換わり、開いている行と入力は消えない", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
@@ -321,7 +321,7 @@ test("CB-D124 「記録から候補を出す」は suggest を送り、届いた
     assert.ok(dom.one("#tab-judge").classList.contains("active"));
     assert.ok(!(dom.one('button[data-action="suggest"]') as unknown as HTMLButtonElement).disabled);
     assert.equal(dom.all("#suggest-result .candidate").length, 1);
-    assert.match(dom.one("#suggest-result").textContent ?? "", /落としたもの 2 件/);
+    assert.match(dom.one("#suggest-result").textContent ?? "", /除いたもの 2 件/);
     assert.match(dom.one('#suggest-result .candidate[data-id="suggest-npm-install"] pre').textContent ?? "", /^# ルールを足す候補/);
     // 候補はルールに足さない（下書きを見せるだけ）
     assert.equal(dom.all('.rule[data-id="suggest-npm-install"]').length, 0);

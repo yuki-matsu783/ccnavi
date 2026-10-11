@@ -1,6 +1,6 @@
 /*
  * Claude の配色。VS Code のテーマ変数を body のクラスの下で上書きする。切り替えは画面の側
- * （`src/webview/appearance.ts` が body のクラスを付け替える）で、ここはその見た目。
+ * （`src/webview/appearance.ts` が body のクラスを切り替える）で、ここはその見た目。
  *
  * 意味の色（error / warning / charts の緑と黄）は、地の色に合わせてライトとダークの両方で置き換える。
  * ライトのテーマからダークを選んだとき（またはその逆）にテーマの意味の色が地と合わなくなるため。

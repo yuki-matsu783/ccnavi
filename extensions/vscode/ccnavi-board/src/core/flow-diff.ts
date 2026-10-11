@@ -11,7 +11,7 @@
  *   下書きを取り込む前に見せる。フローの文は担当のサブエージェントへの案内文になるので、ユーザが
  *   中身を読めるように、足したもの・消したものは全部の欄を、変えたものは変わった欄の前と後を出す
  *
- * **良し悪しは言わない。** 保存を止めるかは拡張ホストと実行ファイルが決める。
+ * 良し悪しは言わない。 保存を止めるかは拡張ホストと実行ファイルが決める。
  *
  * ここには VS Code の API も DOM も node も入れない。
  */
@@ -225,7 +225,7 @@ export function diffFlows(before: FlowDoc, after: FlowDoc): FlowDiff {
 
 // ---- 値の前後まで見せる差分（下書きの取り込み）
 
-/** 値の種類（画面が前後に添える）。`1` と `"1"`、`true` と `"true"`、`null` と `"null"` を見分けるため */
+/** 値の種類（画面が前後に付ける）。`1` と `"1"`、`true` と `"true"`、`null` と `"null"` を見分けるため */
 export type ValueKind = "文字列" | "数" | "真偽" | "null" | "辞書" | "配列" | "その他";
 
 /** 欄 1 つの前後。足した欄は `before` が無く、消した欄は `after` が無い */
@@ -274,7 +274,7 @@ function kindOf(value: unknown): ValueKind {
   return isRecord(value) ? "辞書" : "その他";
 }
 
-/** 値を見せる文。文字列はそのまま（改行も残す）、ほかは JSON の表記。種類は `kindOf` で別に添える */
+/** 値を見せる文。文字列はそのまま（改行も残す）、ほかは JSON の表記。種類は `kindOf` で別に付ける */
 function shown(value: unknown): string {
   if (typeof value === "string") {
     return value;

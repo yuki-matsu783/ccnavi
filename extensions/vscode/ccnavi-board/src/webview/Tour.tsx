@@ -1,7 +1,7 @@
 /**
  * 吹き出しで画面の部品を順に指す案内（ツアー）。5 つの画面が共通で使う。
  *
- * **出すのは画面ごとに初回だけ。** 見たかどうかは拡張ホストが `globalState` に持つ（`src/tour.ts`）。
+ * 出すのは画面ごとに初回だけ。 見たかどうかは拡張ホストが `globalState` に持つ（`src/tour.ts`）。
  * 画面が組み上がったとき、見ていなければ拡張ホストが `tour` を送り、画面はここを出す。閉じたら
  * （最後まで見ても、途中でやめても）`tourDone` を返し、次からは出ない。ヘッダ右上の「?」（`TourButton`）
  * からはいつでも出せる。
@@ -29,7 +29,7 @@ type Spot = Rect;
 const BUBBLE_WIDTH = 340;
 
 /**
- * 案内を出し直すボタン。**5 画面ともツールバーの最後の子に置く**と、`Tour.css` がヘッダの右上の同じ位置に
+ * 案内を出し直すボタン。5 画面ともツールバーの最後の子に置くと、`Tour.css` がヘッダの右上の同じ位置に
  * 小さく固定する（画面ごとにボタンの列へ混ぜると、置き場所がばらつき、ボードでは操作の邪魔になった）
  */
 export function TourButton({ onClick }: { readonly onClick: () => void }): JSX.Element {
@@ -43,7 +43,7 @@ export function TourButton({ onClick }: { readonly onClick: () => void }): JSX.E
 /**
  * 案内を出すかどうかの持ち物。画面の `App` が 1 つ持つ。
  *
- * - `request`: 拡張ホストの `tour`（初回）を受けたときに呼ぶ。**指す先が出る（`ready`）まで待って始める。**
+ * - `request`: 拡張ホストの `tour`（初回）を受けたときに呼ぶ。指す先が出る（`ready`）まで待って始める。
  *   読み込み中やエラーの画面には指す先が無い
  * - `start`: 「?」を押したとき。指す先が出ていればすぐ始め、出ていなければ（ボードの承認のオーバーレイの
  *   最中など）`request` と同じく出るまで待つ。押した経路だけ待たないと、オーバーレイの上に案内が被さる
@@ -173,7 +173,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
   }, [spot, index]);
 
   // 焦点は「次へ」に置く（Enter で進める）。閉じたら、案内の前に焦点があった場所へ戻す。
-  // **戻す先は最初に描くときに覚える。** effect で覚えると、先に走る「次へ」への移動のあとを読んでしまい、
+  // 戻す先は最初に描くときに覚える。 effect で覚えると、先に走る「次へ」への移動のあとを読んでしまい、
   // 閉じたときに消えた「次へ」へ戻そうとして焦点が body に移ってしまう
   const [focusBefore] = useState(() => document.activeElement as HTMLElement | null);
   useEffect(() => {

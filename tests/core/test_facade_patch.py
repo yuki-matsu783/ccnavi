@@ -3,7 +3,7 @@
 `core.py` と `diagnose.py` は、実体のモジュール（`core_approve`・`diagnose_try` など）の名前を
 束ね直す薄いファサード。`mock.patch.object(core, "x")` は `core` の属性を差し替えるだけで、
 実体のモジュールの中の呼び出し（`core_base.x(...)`）には効かない。効いたつもりで通るテストは、
-差し替えたはずの処理を本物のまま走らせる。
+差し替えたはずの処理を実物のまま走らせる。
 
 `tests/` を `ast` で走査し、次の形を見つける。許可リスト（`ALLOWED`）にない patch は失敗にする。
 

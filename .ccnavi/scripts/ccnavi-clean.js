@@ -2,12 +2,12 @@
 //
 //   node ccnavi-clean.js <ワークツリーの絶対パス> [--dry-run]
 //
-// 名前の検査と未コミットの変更の確認は shが済ませている。ここがするのは、決まった
+// 名前の検査と未コミットの変更の確認は sh が済ませている。ここがするのは、決まった
 // 名前の生成物を探して消すことだけ
 //
-// Node で消すのは extensions/vscode/ccnavi-board/scripts/clean.js と同じ理由。pnpmの
-// node_modules は深く（Windows の 260 文字を超える）、junctionも含む。fs.rmSync は
-// 長いパスを扱え、symlinkとjunctionはたどらずにリンクそのものだけを消す
+// Node で消すのは extensions/vscode/ccnavi-board/scripts/clean.js と同じ理由。pnpm の
+// node_modules は深く（Windows の 260 文字を超える）、junction も含む。fs.rmSync は
+// 長いパスを扱え、symlink と junction はたどらずにリンクそのものだけを消す
 "use strict";
 
 const fs = require("node:fs");
@@ -27,7 +27,7 @@ function isWorktree(top) {
 	return path.basename(parent) === "worktrees" && path.basename(path.dirname(parent)) === ".claude";
 }
 
-// リンクか。Windowsのjunctionもlstat ではリンクに見える
+// リンクか。Windows の junction も lstat ではリンクに見える
 function isLink(p) {
 	try {
 		return fs.lstatSync(p).isSymbolicLink();
@@ -51,7 +51,7 @@ function findTargets(top) {
 		for (const e of entries) {
 			const full = path.join(dir, e.name);
 			if (ALWAYS.has(e.name) || (hasPackageJson && BESIDE_PACKAGE_JSON.has(e.name))) {
-				// リンクならrmSyncはリンクだけを消す。先は残る
+				// リンクなら rmSync はリンクだけを消す。先は残る
 				if (e.isDirectory() || e.isSymbolicLink()) {
 					found.push(full);
 				}
@@ -97,8 +97,8 @@ function main(argv) {
 
 	if (failed.length > 0) {
 		console.error(
-			"ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uvの.venvの.pyd）は" +
-				"どのワークツリーからも消せません。テストが終わるのを待って打ち直すか、ディレクトリごとmvで" +
+			"ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）は" +
+				"どのワークツリーからも消せません。テストが終わるのを待って打ち直すか、ディレクトリごと mv で" +
 				" .claude/worktrees/ の外へ出してください（README.md の「実測で分かった落とし穴」）。",
 		);
 		return 1;

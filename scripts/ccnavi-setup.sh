@@ -101,7 +101,7 @@ DEPLOY_RULES=".ccnavi/common/rules.yml"
 # 設定 3 本のひな形。rules と risk は汎用なので共通レイヤー（.ccnavi/common/）へ配る。
 # phases はワークスペースのレイアウト（scope のパス）に依存するので、自身のレイヤー
 # （.ccnavi/config/）へ配る。共通レイヤーに phases を置くと、その scope が
-# projects/ の下のプロジェクトにも適用されてしまう（設計 11.2）。
+# projects/ の下のプロジェクトにも適用されてしまう。
 DEPLOY_RISK=".ccnavi/common/risks.yml"
 DEPLOY_PHASES=".ccnavi/config/phases.yml"
 DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
@@ -663,7 +663,7 @@ if [ "$force" = yes ]; then
 fi
 forced_json=$(printf '%s\n' $forced | jq -R -s 'split("\n") | map(select(length > 0))')
 
-# 登録済みかどうかの見方。ccnavi の設定lint（lint_project.py の _registered）は、command に
+# 登録済みかどうかの見方。ccnavi の設定 lint（lint_project.py の _registered）は、command に
 # "ccnavi" が含まれるかどうかだけを見る。それだけだと、無関係な hook のパスに名前が
 # 入っているプロジェクトでは、そのイベントが「登録済み」に見えたまま、いつまでも登録されない。
 #
@@ -1048,7 +1048,7 @@ projects_notice_of() {
 		text="${text}ccnavi はワークスペース直下の \`projects/\` をプロジェクトの置き場として使い、名前は変えられない。"
 		text="${text}このままだと \`projects/\` の下で \`.git\` を持つディレクトリ（サブモジュールを含む）がプロジェクトとして数えられ、その中の設定が判定に使われる。"
 		text="${text}直すには、ワークスペースの \`projects/\` を別の名前に移す（例: \`git mv projects apps\`）。"
-		text="${text}ccnavi でプロジェクトを置かないなら、このままでも動く。そのときは \`projects/\` の下に\`.git\` を持つものを置かない"
+		text="${text}ccnavi でプロジェクトを置かないなら、このままでも動く。そのときは \`projects/\` の下に \`.git\` を持つものを置かない"
 		if [ "$link_count" -gt 0 ]; then
 			text="${text}。索引には入れ子のリポジトリ（${links_code}）も載っている。"
 			text="${text}ccnavi のプロジェクトとして使うなら、改名の前に \`git rm --cached ${links_args}\` で索引から外し、改名のあとで \`projects/\` の下へ戻す"

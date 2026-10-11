@@ -236,7 +236,7 @@ test("CB-T117 散在は実行ファイルの答えをそのまま載せ、ほか
   const base = fixture();
   const cards = cardsOf(buildBoard(base));
   // 正常な場面。提案の側にあるもの（承認待ち・レビュー待ち）が親と兄弟のワークツリー上にもあっても、
-  // 実行ファイルが「本物は決まっている」と言うので散在ではない。承認済みチケットの側にあるものは提案が無いのでほかのツリー上のチケットも無い
+  // 実行ファイルが「正は決まっている」と言うので散在ではない。承認済みチケットの側にあるものは提案が無いのでほかのツリー上のチケットも無い
   for (const id of ["i0001", "i0001-01-01", "i0001-02-02", "i0001-02-03", "i0001-02-04", "i0001-02-05"]) {
     assert.deepEqual(cards.get(id)!.scattered, [], id);
   }
@@ -294,7 +294,7 @@ test("CB-T131 レビュー待ちのフェーズに「レビュー済み連絡」
   const cards = cardsOf(buildBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5")));
   const card = cards.get("i0001")!;
   assert.deepEqual(card.phases[1].actions, [{ kind: "review", parent: "i0001", phase: 2 }]);
-  // フェーズ行は依頼の投稿を指す。親カードは断片を落としてマージリクエスト自体を指す。子カードには持たせない
+  // フェーズ行は依頼の投稿を指す。親カードは断片を除いてマージリクエスト自体を指す。子カードには持たせない
   assert.equal(card.phases[1].mrUrl, "https://example.com/o/r/pull/18#issuecomment-5");
   assert.equal(card.phases[1].mrNumber, 18);
   assert.equal(card.phases[0].mrUrl, "");
@@ -457,7 +457,7 @@ test("CB-T301 退避のチケットはアーカイブの列に並び、操作も
   assert.ok(!isKnownPath(buildBoard(base), "/ws/logs/archive/self/done/old.md"));
 });
 
-test("CB-T302 置き場に同じ識別子があれば、退避のカードは出さない（置き場の側が本物）", () => {
+test("CB-T302 置き場に同じ識別子があれば、退避のカードは出さない（置き場の側が正）", () => {
   const base = fixture();
   const board = buildBoard({ ...base, archived: [archivedJson("i0001-01-01", "i0001")] });
   const ids = board.columns.flatMap((c) => c.cards).filter((card) => card.id === "i0001-01-01");

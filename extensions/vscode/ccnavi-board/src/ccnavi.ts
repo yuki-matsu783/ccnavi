@@ -180,7 +180,7 @@ function spawn(file: string, argv: readonly string[], cwd: string, timeout?: num
         maxBuffer: MAX_OUTPUT,
         windowsHide: true,
         ...(timeout === undefined ? {} : { timeout }),
-        // 標準出力は ASCII に落としてあるが、標準エラーの日本語が化けないように。
+        // 標準出力は ASCII だけにしてあるが、標準エラーの日本語が化けないように。
         env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" },
       },
       (error, stdout, stderr) => {

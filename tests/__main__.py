@@ -9,12 +9,12 @@
 分け方と並べ方だけが違う。1 プロセスで直列に回すと、この機械で 3 分ほどかかる。
 
 **ターンの終わりの hook（`.claude/hooks/test-py.sh`）はこれを使わない。**
-あちらは `--failfast` で「最初に落ちた 1 件」を返す作りで、落ちた 1 件が毎回同じに
+あちらは `--failfast` で「最初に失敗した 1 件」を返す作りで、失敗した 1 件が毎回同じに
 なることに寄りかかっている。同時に回すと「最初」が走るたびに変わるので、差し戻しの
 文面が回ごとにぶれる。ここはユーザが全件を打つ場面（統合先に取り込む前、MR に出す前）のための
 道具で、hook の経路は直列のまま置く。
 
-落ちたら、そこで新しいプロセスを起こすのをやめ、落ちた 1 本の出力だけを出す。全部の
+失敗したら、そこで新しいプロセスを起こすのをやめ、失敗した 1 本の出力だけを出す。全部の
 失敗を並べても、直す順番は結局 1 件ずつなので読む量だけが増える（`test-py.sh` と同じ考え）。
 走り始めていたぶんは終わるまで待つ。途中で殺すと、そのプロセスが作った一時ディレクトリが
 残る。
@@ -27,7 +27,7 @@
 1 モジュールの時間なので縮まない。
 
 **同じワークツリーの中で走らせること。** ワークツリーを何本も並行させると、Windows では
-`.venv` の中の PyYAML の `.pyd` を掴んだまま `worktree remove` が落ちる（pyproject.toml の
+`.venv` の中の PyYAML の `.pyd` を掴んだまま `worktree remove` が失敗する（pyproject.toml の
 `link-mode` のコメント）。1 本のツリーの中で何プロセス起こしても、掴むのは同じ実体なので
 その問題は起きない。
 """
@@ -54,7 +54,7 @@ def groups() -> list[str]:
             continue
         # `__init__.py` が無いディレクトリは discover が飛ばすので、グループではない
         # （`tests/fixtures/` がこれ。固定データの置き場で、テストは入っていない）。
-        # `__pycache__` もここで落ちる。
+        # `__pycache__` もここで失敗する。
         if not os.path.isfile(os.path.join(directory, "__init__.py")):
             continue
         if any(n.startswith("test_") and n.endswith(".py") for n in os.listdir(directory)):
@@ -133,7 +133,7 @@ def main() -> int:
     stop = False
 
     def guarded(dotted: str) -> tuple[str, float, int, str] | None:
-        # 落ちたあとに順番が回ってきたぶんは起こさない。走り出したぶんは最後まで待つ。
+        # 失敗したあとに順番が回ってきたぶんは起こさない。走り出したぶんは最後まで待つ。
         if stop:
             return None
         return run_one(dotted)
@@ -147,7 +147,7 @@ def main() -> int:
             if code != 0 and failed is None:
                 failed = result
                 stop = True
-            print(f"  {'落' if code else 'ok'}  {spent:6.1f}s  {dotted}")
+            print(f"  {'NG' if code else 'ok'}  {spent:6.1f}s  {dotted}")
 
     wall = time.perf_counter() - started
     print(f"\n{len(results)} モジュール / {wall:.1f} 秒")
@@ -155,11 +155,11 @@ def main() -> int:
     if failed is None:
         return 0
     dotted, _, _, output = failed
-    print(f"\n--- 落ちたのは {dotted} ---", file=sys.stderr)
+    print(f"\n--- 失敗したのは {dotted} ---", file=sys.stderr)
     print(output.strip(), file=sys.stderr)
     skipped = len(planned) - len(results)
     if skipped:
-        print(f"\n（{skipped} モジュールは起こしていません）", file=sys.stderr)
+        print(f"\n（{skipped} モジュールは開始していません）", file=sys.stderr)
     return 1
 
 

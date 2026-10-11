@@ -89,7 +89,7 @@ test("CB-T271 開始へ入る線・終了から出る線・グループ・自分
   assert.equal(connectionsOf(connect(templateFlow("x", ""), "start", "output", "end", "input")).length, 1, "同じ線は足さない");
 });
 
-test("CB-T272 コピーして貼ると id を振り直し、選んだノード同士の線だけ新しい id に付け替える。出口の表記と知らない欄は元のまま", () => {
+test("CB-T272 コピーして貼ると id を振り直し、選んだノード同士の線だけ新しい id に書き換える。出口の表記と知らない欄は元のまま", () => {
   const doc = branched();
   const clip = copyNodes(doc, ["if-1", "p-1", "end"]);
   assert.ok(clip !== undefined);

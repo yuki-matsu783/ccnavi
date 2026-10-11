@@ -137,7 +137,7 @@ def render(
     """
     try:
         return _render(data, limit, text_limit)
-    except Exception:  # noqa: BLE001  壊れたデータで SubagentStart を落とさない
+    except Exception:  # noqa: BLE001  破損したデータで SubagentStart を止めない
         return ["（フローを並べられない。ファイルを直接読んで判断してください）"], set()
 
 

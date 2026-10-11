@@ -35,7 +35,7 @@ BOARD_VERSION = 1
 
 
 def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> dict:
-    """ボードの中身。形は設計 10 と README「ボードの JSON」に書いてある。"""
+    """ボードの中身。形は README「ボードの JSON」に書いてある。"""
     problems: list[str] = []
     trees = tree.all_trees(root, conf.projects)
     payload: dict = {
@@ -71,8 +71,8 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
 
     everything, scan_problems = ticket_mod.scan_all(root, conf.tickets, conf.projects)
     problems.extend(str(p) for p in scan_problems)
-    # 承認済みの識別子の提案は、承認済みチケットと合わせて本物とするツリーを決める
-    # （`approval.scan_proposals` と同じまとめ方）。本物とするツリーの外に残った古い提案を
+    # 承認済みの識別子の提案は、承認済みチケットと合わせて正とするツリーを決める
+    # （`approval.scan_proposals` と同じまとめ方）。正とするツリーの外に残った古い提案を
     # 承認待ちや作業中として出さないため。
     # 承認済みチケットの置き場はここで 1 度だけ読み、親ごとの局面とフェーズ
     # （`_parent_record`）まで持ち回る。親ごとに読み直すと、読む回数が親の数とツリーの数の
@@ -115,9 +115,9 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     proposal_index = approval_checks.by_id(proposals)
     open_index = approval_checks.by_id(open_copies + review_copies)
     closed_index = approval_checks.by_id(closed_copies)
-    # 同じ識別子があるツリーの全部。本物とする側は proposal に、残りは seen_in に出す。
+    # 同じ識別子があるツリーの全部。正とする側は proposal に、残りは seen_in に出す。
     # 複数のツリーにあること自体は普通（子のワークツリーは親のブランチから切る）なので、数は
-    # 食い違いを意味しない。どれが本物か決まらないぶんだけを scattered に出す。数え方は
+    # 食い違いを意味しない。どれが正か決まらないぶんだけを scattered に出す。数え方は
     # `ticket_fold.collisions` に置いてあり、--lint と同じ関数を通る
     # （同じ答えを 2 か所で出さない）。
     grouped = ticket_fold.by_ticket(everything)
@@ -192,7 +192,7 @@ def _archived_records(root: str, skip: set[tuple[str, str]], problems: list[str]
 
 
 def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> list[dict]:
-    """レイヤーごとの宣言（設計 11.9）。
+    """レイヤーごとの宣言。
     順序は 共通レイヤー → 自身のレイヤー → プロジェクト（名前順）。
 
     rules は重複を捨てたあとの、そのレイヤーから実際に判定へ入ったぶん。phases と risk は
@@ -232,9 +232,9 @@ def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) ->
 
 
 def _sums(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> list[dict]:
-    """ワークスペースとプロジェクトごとの「共通 + 1 レイヤー」の和（設計 11.4、11.9）。
+    """ワークスペースとプロジェクトごとの「共通 + 1 レイヤー」の和。
 
-    `layers` はレイヤーごとの宣言で、重ねの途中経過（先のレイヤーと全欄が同じ定義は後ろから落ちる）
+    `layers` はレイヤーごとの宣言で、重ねの途中経過（先のレイヤーと全欄が同じ定義は後ろから外れる）
     を含む。拡張はそれを足し直さず、ここの和をそのまま見せる。順は 自身のレイヤー → プロジェクト
     （名前順）。1 件の形:
 
@@ -303,7 +303,7 @@ def _rule_record(rule: rules.Rule) -> dict:
 
 
 def _phase_type_record(layer: str, pt) -> dict:
-    """フェーズ定義 1 つ。id は裸のまま、レイヤーは欄で出す（設計 11.4.1）。"""
+    """フェーズ定義 1 つ。id は裸のまま、レイヤーは欄で出す。"""
     return {
         "id": pt.id,
         "source": layer,
@@ -441,7 +441,7 @@ def _ticket_record(
         "cancel_reason": source.cancel_reason,
         "seen_in": seen_in,
         "scattered": scattered,
-        # 子のフロー（設計 9.3.1。着手中は書き換えを止める）。
+        # 子のフロー（着手中は書き換えを止める）。
         # `{path, rel, tree, exists, linked, locked, draft}`。draft はエージェントの下書きの
         # `{path, rel, exists, linked}`（効力は無い）。親は null。
         # locked は判定がそのフローへの書き込みを止めているか（着手中）。読むのは承認済み
@@ -485,7 +485,7 @@ def _mark_attention(payload: dict) -> None:
     - 子で、自分のフェーズが `review_waiting`
     - 未着手・作業中の列（提案が無く `closed` のもの以外）なのに、ワークツリーが無い
     - 自分の実績のリスクが HIGH 以上（`risk.ESCALATE_FROM`）
-    - `scattered` が空でない（どれが本物か決まらない）
+    - `scattered` が空でない（どれが正か決まらない）
     - `issues` が空でない
     - 親で、フェーズのどれかが `gate_closed` / `review_waiting` / `risk_escalates`
     """

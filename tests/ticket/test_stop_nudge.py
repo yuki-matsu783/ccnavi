@@ -42,7 +42,7 @@ class StopNudgeTest(TicketTest):
         if agent_id:
             payload["agent_id"] = agent_id
         if mode == "disable":
-            # disable を言えるのは起動した環境だけ（フラグの disable は enable に落ちる）。
+            # disable を言えるのは起動した環境だけ（フラグの disable は enable になる）。
             return self.ccnavi(
                 *extra, stdin=json.dumps(payload), env={settings.MODE_ENV: "disable"}
             )

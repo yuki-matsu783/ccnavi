@@ -100,7 +100,7 @@ test("CB-T19b 承認の push の sh は、ワークスペースルートから�
   );
 });
 
-test("CB-T287 C1 の対象かは c1 family の target で読む。頭の c1 1 が無ければ空、CR は落とす", () => {
+test("CB-T287 C1 の対象かは c1 family の target で読む。頭の c1 1 が無ければ空、CR は除く", () => {
   assert.equal(c1TargetOf("c1 1\nfamily i0001\ntarget yes\ntree /ws/x y\n"), "yes");
   assert.equal(c1TargetOf("c1 1\r\nfamily i0001\r\ntarget no\r\n"), "no");
   assert.equal(c1TargetOf("usage: ccnavi ...\n"), "");
@@ -123,7 +123,7 @@ test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリ
     ),
     text,
   );
-  // 止めている間の例外は sh …ccnavi-review.sh の形を単体で打ったときだけ（設計 9.8）。cd と連結する形へ誘導しない。
+  // 止めている間の例外は sh …ccnavi-review.sh の形を単体で打ったときだけ。cd と連結する形へ誘導しない。
   // サブエージェントには常に禁止（9.12）
   assert.ok(text.includes("cd や他のコマンドと連結せず、単体の Bash で打つ（cwd が /ws/.claude/worktrees/i0001 でなければ、先に cd だけを別の Bash で打つ）"));
   assert.ok(text.includes("サブエージェントには渡さない"));

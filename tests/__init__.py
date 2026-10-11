@@ -41,7 +41,7 @@ def _block_host_git_config() -> dict[str, str]:
     機械ごとに違うので、締め出さないとテストの結果が「誰の機械で走らせたか」で
     変わる。2 つとも実際に問題が起きている。
 
-    - `init.defaultBranch = main` を持つ機械では `tests/guard/test_post.py` が落ちる。
+    - `init.defaultBranch = main` を持つ機械では `tests/guard/test_post.py` が失敗する。
       あのテストは `git init`（`-b` 無し）が `master` を作る前提で `checkout master`
       する。既定を動かしている機械では `master` が無い
     - `commit.gpgsign = true` を持つ機械では commit 1 回が 8 ミリ秒から 90 ミリ秒に
@@ -57,9 +57,10 @@ def _block_host_git_config() -> dict[str, str]:
     書いておかないと git を上げた日にテストの前提が気づかないうちに変わる。値は、今の
     テストが前提にしている `master` に固定する。
 
-    `/dev/null` を指さないのは Windows に無いため。本物の空ファイルなら 4 環境で同じ。
+    `/dev/null` を指さないのは Windows に無いため。実際の空ファイルなら 4 環境で同じ。
     `GIT_CONFIG_GLOBAL` / `GIT_CONFIG_SYSTEM` は git 2.32 以降。読めているかは
-    `tests/core/test_git_env.py` が確かめるので、古い git では気づかれないまま通ることはなく落ちる。
+    `tests/core/test_git_env.py` が確かめるので、古い git では
+    気づかれないまま通ることはなく失敗する。
     """
     home = _tempfile.mkdtemp(prefix="ccnavi-gitconfig-")
     _atexit.register(_shutil.rmtree, home, ignore_errors=True)
@@ -210,7 +211,7 @@ def common_sh(scripts_dir: str = SH_SCRIPTS) -> tuple[str, ...]:
 
     入口の `ccnavi-common.sh` と、入口が同じディレクトリから読む部品（`ccnavi-common-*.sh`）。
     sh を使い捨ての木へ写すテストは、名前を並べずにこれで全部を一緒に写す。
-    部品は入口が `$0` のディレクトリから読むので、1 本でも欠けると sh は起動の段で落ちる。
+    部品は入口が `$0` のディレクトリから読むので、1 本でも欠けると sh は起動の段で失敗する。
     共通部が 1 本のままでも、部品に分かれていても同じ書き方で済む。
     """
     names = tuple(

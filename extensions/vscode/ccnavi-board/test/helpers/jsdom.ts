@@ -1,18 +1,18 @@
 /**
- * happy-dom で動かないものを走らせる別の手段（`dom.ts` の方針）。**いま回しているのは 1 つだけ**で、
+ * happy-dom で動かないものを走らせる別の手段（`dom.ts` の方針）。いま回しているのは 1 つだけで、
  * 図の点のドラッグ（`onNodeDragStop`）だけ。
  *
- * happy-dom では、d3-drag が張る待ちが終わらず**テストが固まる**（実際に確かめた。90 秒で打ち切り）。
- * jsdom では同じ操作がそのまま通る。逆に jsdom は起動が重いので、**ここへ来るのは happy-dom で
- * 走らないものだけ**にする。普段の画面のテストは `dom.ts` のまま。
+ * happy-dom では、d3-drag が張る待ちが終わらずテストが固まる（実際に確かめた。90 秒で打ち切り）。
+ * jsdom では同じ操作がそのまま通る。逆に jsdom は起動が重いので、ここへ来るのは happy-dom で
+ * 走らないものだけにする。普段の画面のテストは `dom.ts` のまま。
  *
  * jsdom にも無いものが 2 つあるので、ここで埋める。
  *
  * - `ResizeObserver`（`dom.ts` の `measure` と同じ理由。点の大きさが測れないと線が 1 本も出ない）
  * - `DOMMatrixReadOnly`（React Flow が点の transform を読むのに使う。無いと例外で止まる）
  *
- * どちらも**大きさと行列を偽るだけ**で、本物の配置はしない。だから、ここで見てよいのは
- * 「動かしたら state に入るか」までで、**動いた先の座標そのものは見ない**（図の倍率で決まる）。
+ * どちらも大きさと行列を偽るだけで、実際の配置はしない。だから、ここで見てよいのは
+ * 「動かしたら state に入るか」までで、動いた先の座標そのものは見ない（図の倍率で決まる）。
  */
 import type { JSDOM as JSDOMType } from "jsdom" with { "resolution-mode": "import" };
 
@@ -34,14 +34,14 @@ export interface JsdomPage {
   state(): unknown;
   /** 画面が vscode.postMessage で送ったもの（古い順） */
   readonly posted: { readonly type: string }[];
-  /** セレクタで 1 つ取る。無ければ落とす */
+  /** セレクタで 1 つ取る。無ければ失敗させる */
   one(selector: string): Element;
   /** セレクタで全部取る */
   all(selector: string): Element[];
   /**
    * 要素をドラッグする（`dx`・`dy` は画面の px）。d3-drag は mousedown を要素で、
    * mousemove と mouseup を window で受けるので、そのとおりに流す。
-   * **動いた先の座標は約束しない**（図の倍率で決まる）
+   * 動いた先の座標は約束しない（図の倍率で決まる）
    */
   drag(element: Element, dx: number, dy: number): Promise<void>;
   /** 描き直しとタイマーが片付くまで待つ */

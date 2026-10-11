@@ -1,4 +1,4 @@
-"""フェーズ定義。親の `project:` が指す config の `phases.yml` を 1 本だけ読む（設計 9.7）。
+"""フェーズ定義。親の `project:` が指す config の `phases.yml` を 1 本だけ読む。
 
 ## 定義はユーザが持つ
 
@@ -10,7 +10,7 @@
 
 ## 用語
 
-**フェーズ定義**はここに書く名前付きの型。**フェーズ**は親の計画に並ぶ番号付きの
+フェーズ定義はここに書く名前付きの型。フェーズは親の計画に並ぶ番号付きの
 実体で、子が `phase: N` で指す。N 番目が何の定義かは親の計画が言う。
 
 ## 書式
@@ -55,7 +55,7 @@ REVIEW_NONE = "none"
 # chat は、このセッションでユーザが差分を見る。ホストへは出ない。先へ進めるのは
 # 端末から打つ `ccnavi-review.sh chat <N>`（中身は `ccnavi --reviewed <N> --chat`）で、
 # エージェントには打てない
-# （DENY_TICKET_APPROVAL_CLI）。mr はホストのマージリクエストで見る（設計 9.8）。
+# （DENY_TICKET_APPROVAL_CLI）。mr はホストのマージリクエストで見る。
 REVIEW_CHAT = "chat"
 REVIEW_MR = "mr"
 REVIEWS = (REVIEW_NONE, REVIEW_CHAT, REVIEW_MR)
@@ -71,7 +71,7 @@ def stricter(a: str, b: str) -> str:
     return a if REVIEW_RANK[a] >= REVIEW_RANK[b] else b
 
 
-# 全体計画の待ち方（設計 9.7）。sequential は一直線、dag は定義の `after` を辺にする。
+# 全体計画の待ち方。sequential は一直線、dag は定義の `after` を辺にする。
 ORDER_SEQUENTIAL = "sequential"
 ORDER_DAG = "dag"
 ORDERS = (ORDER_SEQUENTIAL, ORDER_DAG)
@@ -120,7 +120,7 @@ class PhaseType:
     agent: str = ""
     when: str = ""
     # source はこの定義が書いてあるレイヤーの名前（`common` / `self` / プロジェクト名）。
-    # id は裸のままで、レイヤーは記録と `--explain` の欄に出す（設計 11.4.1）。
+    # id は裸のままで、レイヤーは記録と `--explain` の欄に出す。
     source: str = ""
 
     @property
@@ -162,11 +162,11 @@ class PhaseType:
 
 
 def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]]:
-    """定義を読む。ファイルが無ければ None（定義を使わない）。壊れていれば None と苦情。
+    """定義を読む。ファイルが無ければ None（定義を使わない）。破損していれば None と苦情。
 
     `refs` を False にすると `overlap` / `requires` / `after` が指す先の確認を飛ばす。レイヤーの
-    ファイルを単独で読むときに使う。レイヤーは共通レイヤーの定義を指してよく（設計 11.4.1）、
-    その相手はファイルの中に無いので、1 本だけで確かめると必ず落ちる。確かめる
+    ファイルを単独で読むときに使う。レイヤーは共通レイヤーの定義を指してよく、
+    その相手はファイルの中に無いので、1 本だけで確かめると必ず失敗する。確かめる
     のは合成したあと（`merge`）。
     """
     try:
@@ -176,10 +176,10 @@ def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]
         fsio.note_read(path, None)
         return None, []
     except (OSError, ValueError) as exc:
-        # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、壊れた
+        # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、破損した
         # ファイルとして苦情付きで返す。上げると、判定（実行前・レビューで止めるところ・
-        # 実行後チェック）が例外で落ち、読めない定義を「定義では切り詰めない」として扱う処理まで
-        # 進まない。
+        # 実行後チェック）が例外で異常終了し、読めない定義を「定義では切り詰めない」として
+        # 扱う処理まで進まない。
         return None, [Problem(SEVERITY_ERROR, "(phases)", f"{path} を読めない ({exc})")]
     # 承認のダイジェスト（read_set）に入れる。定義は待ち方と止め方を決める判定の入力。
     fsio.note_read(path, text)
@@ -264,7 +264,7 @@ def reference_problems(checked, pool: dict[str, PhaseType]) -> list[Problem]:
     `after` の先は `kind: work` の定義でなければならない。
 
     見るのは `checked` の側だけで、あってよい先は `pool` 全部。レイヤーの定義が共通レイヤーの
-    定義を指す形（設計 11.4.1）は、合成した集合を `pool` に渡せばそのまま通る。
+    定義を指す形は、合成した集合を `pool` に渡せばそのまま通る。
     """
     problems: list[Problem] = []
     for pt in checked:
@@ -487,14 +487,14 @@ def scope_problems(child: ticket_model.Ticket, pt: PhaseType) -> list[Problem]:
     return problems
 
 
-# ---- レイヤーごとの定義の読み込み（設計 11.4）
+# ---- レイヤーごとの定義の読み込み
 
 
 def types_path(conf: settings.Settings, root: str, project: str) -> str:
     """そのプロジェクトのレイヤーの phases.yml。空の `project` はワークスペース自身のレイヤー。
 
-    予約名（`common` / `self`）のプロジェクトはレイヤーとして数えないので、パスを持たない
-    （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身のレイヤーの
+    予約名（`common` / `self`）のプロジェクトはレイヤーとして数えないので、パスを持たない。
+    名前で引くと `project or LAYER_SELF` がワークスペース自身のレイヤーの
     名前と一致し、そのプロジェクトの phases がワークスペースのレイヤーとして合成される。
     """
     if settings.is_reserved_layer_name(project):
@@ -508,13 +508,13 @@ def types_path(conf: settings.Settings, root: str, project: str) -> str:
 def layer_types(
     conf: settings.Settings, root: str, project: str = ""
 ) -> tuple[dict[str, PhaseType] | None, list[rules.Problem]]:
-    """使うフェーズ定義（親の `project:` が指す config の 1 本）と、その苦情（設計 11.4.1）。
+    """使うフェーズ定義（親の `project:` が指す config の 1 本）と、その苦情。
 
     足し算はしない。使うのは親の承認済みチケットの `project:` が指すレイヤーの `phases.yml` だけで、
     空ならワークスペース自身のレイヤー（単体 clone ではそのプロジェクトの `.ccnavi/config/`）。
     共通レイヤーの `phases.yml` は置けないので、あっても読まない（`--lint` が error で言う）。
 
-    ファイルが無いのは正常（`None`、苦情なし）。壊れていれば空として扱い（`None`）、苦情を返す。
+    ファイルが無いのは正常（`None`、苦情なし）。破損していれば空として扱い（`None`）、苦情を返す。
     `id` の重複・`overlap` / `requires` / `after` の参照先・`title` の重なり・循環は、その 1 本の
     読み込みで確かめる。
     """

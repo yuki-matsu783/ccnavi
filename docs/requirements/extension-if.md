@@ -26,7 +26,7 @@ JSON の欄の細かい形は README の各 JSON の節と [設計 10](../design
 |---|---|---|
 | REQ-EXT-01 | 常時 | ccnavi は、振り分けの sh の名前を `ccnavi-launcher.sh` とし、その名前の sh が起動する実行ファイルを、sh の置き場の親の `bin/<os>-<arch>/ccnavi`（Windows は `ccnavi.exe`）に置くこと。`<os>` は `darwin`・`linux`・`windows`、`<arch>` は `x86_64`・`arm64` とすること。arm64 の macOS と Windows では、自分向けが無いときだけ `x86_64` の実行ファイルを起動すること。配布先では sh を `.ccnavi/scripts/ccnavi-launcher.sh` に置き、`.claude/settings.json` の env `CCNAVI_BIN_PATH` にそのパスを書くこと |
 | REQ-EXT-02 | 事象 | `--root <パス>` を受けたとき、ccnavi は、そのパスをワークスペースルートとして読むこと。`--root` が 2 度渡されたときは、標準エラーに理由を出して何もしないこと。ただし `--version` は `--root` を読まずに版を返すこと（REQ-EXT-04） |
-| REQ-EXT-03 | 常時 | ccnavi は、標準出力と標準エラーを、コンソールの文字コードによらず UTF-8・改行 LF で書くこと。`--explain --json`・`--test --json`・`--test-samples --json`・`--lint --json`・`--suggest --json`・`--version --json` の JSON は ASCII に落として（ASCII でない字は `\u` で）書き、承認の JSON（`--agree … --json`）と残った指摘の JSON は UTF-8 の字のまま書くこと |
+| REQ-EXT-03 | 常時 | ccnavi は、標準出力と標準エラーを、コンソールの文字コードによらず UTF-8・改行 LF で書くこと。`--explain --json`・`--test --json`・`--test-samples --json`・`--lint --json`・`--suggest --json`・`--version --json` の JSON は ASCII に変換して（ASCII でない字は `\u` で）書き、承認の JSON（`--agree … --json`）と残った指摘の JSON は UTF-8 の字のまま書くこと |
 | REQ-EXT-04 | 事象 | `--version --json` を求められたとき、ccnavi は、設定もワークスペースも読まず、`schema`・`version`・`commit`・`built`・`compat`・`flags`・`formats` を返して 0 で終わること。`flags` は引数の定義から引き、足したフラグがそのまま並ぶこと |
 | REQ-EXT-05 | 常時 | ccnavi は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh、VS Code 拡張、Chrome 拡張）の契約の版（互換の版）を持ち、実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）・sh（`.ccnavi/scripts/ccnavi-common.sh` の `CCNAVI_COMPAT`）・VS Code 拡張（`src/core/version.ts` の `EXTENSION_COMPAT`）に同じ値を書くこと。呼ぶ側が頼るフラグや出力の形を、呼ぶ側を直さないと動かない形に変えたとき、データの形（承認済みの置き場に置くものの並び、待ち方の置き場、取り下げの条件など）を変えたとき、sh が古い実行ファイルの知らない副命令を呼ぶようになったときに 1 上げること。フラグや欄を足すだけでデータの形も変わらないなら上げないこと |
 | REQ-EXT-06 | 常時 | ccnavi は、互換の版を、`src/ccnavi/entry/version.py` では行頭から行末までの 1 行 `COMPAT = <整数>`（`^COMPAT = N$`）で、`.ccnavi/scripts/ccnavi-common.sh` では行頭から始まる 1 行 `CCNAVI_COMPAT=<整数>`（`^CCNAVI_COMPAT=N$`）で書くこと。Chrome 拡張の組み立ては前者を、Chrome 拡張は統合先の後者を、それぞれ正規表現で読む |
@@ -69,7 +69,7 @@ sh は `<ワークスペースルート>/.ccnavi/scripts/` のものを絶対パ
 | REQ-EXT-22 | 常時 | ccnavi は、VS Code 拡張が直接読み書きするファイルを次の場所に置くこと。提案はワークスペース・プロジェクト・ワークツリーの `wip/proposals/`、承認済みチケットとマーカーは同じツリーの `.ccnavi/approved/`、閉じたチケットの退避は `logs/archive/`、共通レイヤーは `.ccnavi/common/` の `rules.yml`・`risks.yml`・`phases.yml`・`rule-samples.yml`。自身のレイヤーとプロジェクトのレイヤーのパスは `--explain --json` の `layers[]` で示すこと |
 | REQ-EXT-23 | 常時 | ccnavi は、チケット制御の宣言 `CCNAVI_TICKET_CONTROL`（`.claude/settings.json` か `.claude/settings.local.json` の env に書き、Claude Code がプロセスに渡すもの）を `enable` と `disable` の 2 値で読み、読めない値は `enable` として扱うこと。`--explain --json` の `settings.ticket_control` には、解決した値を必ず `enable` か `disable` で載せること（REQ-DIA-07） |
 | REQ-EXT-24 | 常時 | ccnavi は、レイヤーのファイル（`rules.yml`・`risks.yml`・`phases.yml`）を YAML 1.1（PyYAML の safe な読み手）で読み、頭の `version:` が読める書式の版（`--version --json` の `formats`）でなければ error にすること。拡張が書いたファイルも、hook と同じ読み手で読むこと |
-| REQ-EXT-25 | 常時 | ccnavi は、子のフローを本物とする側のツリーの `.ccnavi/approved/flows/<子>.yml`（YAML、256 KiB まで）から読み、ファイルかツリーのルートからそこまでの途中がシンボリックリンクなら読まないこと。下書き `wip/proposals/flows/<子>.yml` には効力を持たせないこと。`ccnavi-push-approved.sh` は `flows/` の下の `.*.tmp` をコミットしないこと |
+| REQ-EXT-25 | 常時 | ccnavi は、子のフローを正とする側のツリーの `.ccnavi/approved/flows/<子>.yml`（YAML、256 KiB まで）から読み、ファイルかツリーのルートからそこまでの途中がシンボリックリンクなら読まないこと。下書き `wip/proposals/flows/<子>.yml` には効力を持たせないこと。`ccnavi-push-approved.sh` は `flows/` の下の `.*.tmp` をコミットしないこと |
 
 JSON の欄の形は README の「[ボードの JSON](../../README.md#ボードの-json)」「[承認の JSON](../../README.md#承認の-json)」
 「[残った指摘の JSON](../../README.md#残った指摘の-json)」「[試験の JSON](../../README.md#試験の-json)」
@@ -115,7 +115,7 @@ Chrome 拡張が呼ぶ名前。引数と戻り値は今の実装のとおり。
 | `ccnavi.tickets.ticket` | `TODO`・`DOING`・`DONE`・`STATES`・`ID_CHARS`・`RESERVED_BRANCH_IDS`・`DEFAULT_ISSUE_PREFIX`・`Ticket`（`ticket`・`title`・`body`・`is_child`・`predecessors`）・`parse(text)`・`load(path)`・`is_valid_id(text)`・`is_valid_name(text)`・`child_pattern()`・`branch_name(t)`・`branch_name_problems(t, integration="", serial=0, prefixes=…)`・`branch_problem(name)`・`issue_identifier(number, title="", project="", prefix="feature")` |
 
 REQ-EXT-27 の規則は、Chrome 拡張の入口（`py/ccnavi_chrome.py`）が名前を直に引くため。改名すると、同梱の版を組み立て直すまで
-Chrome 拡張だけが壊れる。上げた互換の版は統合先の `CCNAVI_COMPAT` に載り、古い Chrome 拡張は書く操作を出さなくなる（REQ-CHR-03）。
+Chrome 拡張だけが動かなくなる。上げた互換の版は統合先の `CCNAVI_COMPAT` に載り、古い Chrome 拡張は書く操作を出さなくなる（REQ-CHR-03）。
 `tests/ticket/test_core.py` は、手元の承認・取り下げ・レビュー済みが書いたバイト列と、同じ入力で Chrome の入口が返す書くものとを突き合わせる。
 
 REQ-EXT-29 のダイジェストが覆うものは README「[承認の JSON](../../README.md#承認の-json)」と同じ（承認画面の本文・判定が読んだ中身・

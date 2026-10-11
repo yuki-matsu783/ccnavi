@@ -226,7 +226,7 @@ class FollowupRefusesTest(NextChildIdTest):
 
     def test_an_existing_file_is_not_overwritten_even_if_unreadable(self):
         self.put(".ccnavi/approved/done", "i0001-02-01", "i0001", 2)
-        # 読めないファイル（frontmatter が壊れている）は採番に数えられないが、名前で拾って止まる
+        # 読めないファイル（frontmatter が不正）は採番に数えられないが、名前で拾って止まる
         for where in (".ccnavi/approved/doing", "wip/proposals/review", "wip/proposals/todo"):
             with self.subTest(where=where):
                 path = os.path.join(self.ws, *where.split("/"), "I0001-02-02.md")

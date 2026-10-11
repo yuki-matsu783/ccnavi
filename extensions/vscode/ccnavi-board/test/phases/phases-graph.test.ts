@@ -1,10 +1,10 @@
 /**
  * フェーズ管理画面の図を組む純関数（`src/core/phases-graph.ts`）。
  *
- * 見るところは 4 つ。**線に向きが無いこと**（`requires` は一緒に置く条件で、順序ではない）、
- * **判定をしないこと**（循環も到達不能も見つけない）、**置き場所が id だけで
- * 決まること**（保存のたびに中身が届き直すので、関係を直すたびに点の配置が変わると使いものにならない）、
- * そして**線が気づかないうちに消えないこと**（id にハイフンが使えるので、名前の作り方を誤ると別の線と同じ名前になる）。
+ * 見るところは 4 つ。線に向きが無いこと（`requires` は一緒に置く条件で、順序ではない）、
+ * 判定をしないこと（循環も到達不能も見つけない）、置き場所が id だけで
+ * 決まること（保存のたびに中身が届き直すので、関係を直すたびに点の配置が変わると使いものにならない）、
+ * そして線が気づかないうちに消えないこと（id にハイフンが使えるので、名前の作り方を誤ると別の線と同じ名前になる）。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -68,7 +68,7 @@ test("CB-T187 置き場所は id だけで決まる。関係を直しても、�
   // 並べ替えても同じ
   assert.deepEqual(spots(form(...base.slice().reverse())), before, "ファイルの中の順序が変わると絵が変わっている");
 
-  // **関係を 1 本足しても、どの点も動かない。** 保存が通るたびに中身は丸ごと届き直すので、
+  // 関係を 1 本足しても、どの点も動かない。 保存が通るたびに中身は丸ごと届き直すので、
   // 関係を直しながら確かめる間に絵が組み替わると、この画面の用を成さない
   const linked = base.map((p) => (p.id === "docs" ? { ...p, requires: ["design"] } : p));
   assert.deepEqual(spots(form(...linked)), before, "関係を足したら点が動いた");
@@ -95,14 +95,14 @@ test("CB-T188 id が空の定義は図に出ず、数だけ返る。同じ id �
   assert.deepEqual(edges(form(phase("a"), phase("a", { requires: ["b"] }), phase("b"))), []);
 });
 
-test("CB-T189 点は id・題・区分・レビューを持ち、前後の空白は落とす", () => {
+test("CB-T189 点は id・題・区分・レビューを持ち、前後の空白は除く", () => {
   const graph = graphOf(form(phase(" a ", { title: " 調査 ", kind: "feedback", review: "none", requires: [" b "] }), phase("b")));
   assert.deepEqual(graph.nodes[0], { id: "a", title: "調査", kind: "feedback", review: "none", x: graph.nodes[0].x, y: graph.nodes[0].y });
-  // 参照の側の空白も落として突き合わせる（落とさないと線にならない）
+  // 参照の側の空白も除いて突き合わせる（除かないと線にならない）
   assert.deepEqual(edges(form(phase(" a ", { requires: [" b "] }), phase("b"))), [["requires", "a", "b"]]);
 });
 
-test("CB-T190b id にハイフンが入っていても、線が別の線に潰されない", () => {
+test("CB-T190b id にハイフンが入っていても、線が別の線と混ざらない", () => {
   // id はハイフンを含められる（phasetypes.py の _ID は [A-Za-z0-9._-]）。線の名前を
   // `関係:a--b` と繋げると、この 2 組が同じ文字列になり、片方が気づかないうちに消える
   const graph = graphOf(form(phase("x", { requires: ["y--z"] }), phase("y--z"), phase("x--y", { requires: ["z"] }), phase("z")));
@@ -118,7 +118,7 @@ test("CB-T190b id にハイフンが入っていても、線が別の線に潰�
   assert.equal(new Set(graph.edges.map((edge) => edge.id)).size, 2);
 });
 
-test("CB-T191 位置の記録は、動かした点を丸めて入れ、図から消えた定義を落とす", () => {
+test("CB-T191 位置の記録は、動かした点を丸めて入れ、図から消えた定義を除く", () => {
   // ドラッグそのものは jsdom で見る（CB-D80）。ここで見るのは、それが呼ぶ中身
   assert.deepEqual(withSpot({}, "a", 10.4, 20.6), { a: { x: 10, y: 21 } });
   assert.deepEqual(withSpot({ a: { x: 1, y: 2 } }, "b", 3, 4), { a: { x: 1, y: 2 }, b: { x: 3, y: 4 } });

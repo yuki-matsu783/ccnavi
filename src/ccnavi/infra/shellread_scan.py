@@ -379,7 +379,7 @@ class _Scanner:
     def arithmetic(self, collect: bool, quoted: bool) -> None:
         """`$(( ))`。算術そのものではコマンドは走らないが、中の置換は走る。
 
-        算術の文字は残して shlex に渡し、_drop_arithmetic が落とす。
+        算術の文字は残して shlex に渡し、_drop_arithmetic が除く。
         """
         s = self.s
         self.emit("$((", collect)
@@ -489,12 +489,12 @@ class _Scanner:
             self.pending.append(("".join(delim), quoted))
 
     def heredoc_bodies(self, collect: bool) -> None:
-        """改行の直後。待っているヒアドキュメントの本文と終端の行を、順に読んで落とす。
+        """改行の直後。待っているヒアドキュメントの本文と終端の行を、順に読んで除く。
 
         本文はプログラムに渡される文字であって、コマンドが走る場所ではない。
         そこを実行位置として数えると、禁止語を引用した文書を書けなくなる。
 
-        終端の行は前後の空白を落として比べる。シェルは完全一致で比べるので、
+        終端の行は前後の空白を除いて比べる。シェルは完全一致で比べるので、
         シェルより早く閉じることはあっても遅く閉じることはない。早く閉じれば本文の
         残りをコマンドとして読む（厳しい側）。遅く閉じると、本文の後ろのコマンドを
         本文として捨てる（止まらずに通る側）。CRLF の行でも閉じるのはこのおかげ。
@@ -548,17 +548,17 @@ def _tokenize(src: str) -> list[str]:
     """
     lexer = shlex.shlex(src, posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
-    # コメントは走査が落としてある。shlex に `#` を扱わせると、語の途中の `#` からも
+    # コメントは走査が除いてある。shlex に `#` を扱わせると、語の途中の `#` からも
     # コメントにして後ろのコマンドを捨てる。
     lexer.commenters = ""
     return _drop_arithmetic(list(lexer))
 
 
 def _drop_arithmetic(tokens: list[str]) -> list[str]:
-    """算術式 $(( )) を落とす。
+    """算術式 $(( )) を除く。
 
     中でコマンドは走らないので、判定に足すものが何も無い（中の置換は走査が
-    切り出してある）。落とす理由は別にあって、左シフトの `<<` がヒアドキュメントの
+    切り出してある）。除く理由は別にあって、左シフトの `<<` がヒアドキュメントの
     区切り記号と同じ表記だから。`echo $((1 << 2))` の `<<` を残すと、走査が
     ヒアドキュメントと読まなかった `<<` として縮退する。
     """
