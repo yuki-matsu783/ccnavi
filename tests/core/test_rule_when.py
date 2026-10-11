@@ -476,6 +476,37 @@ class LintTest(unittest.TestCase):
         found = self.warns(self.lint([SECRETS], [{"id": "any", "match": "Bash", "regex": ".*"}]))
         self.assertFalse(any("本体の" in d for d in found), found)
 
+    def test_空文字以外のすべてに当たる本体も言う(self):
+        # 判定は空の対象を見ない（Rule.matches）ので、`.` は何にでも当たるのと同じ
+        found = self.warns(
+            self.lint([{"id": "dot", "match": "Bash", "regex": ".", "message": "m"}])
+        )
+        self.assertTrue(
+            any(d.startswith("dot ") and "本体の regex は何にでも当たる" in d for d in found),
+            found,
+        )
+        found = self.warns(self.lint([{"id": "x", "match": "Bash", "regex": "x", "message": "m"}]))
+        self.assertFalse(any("本体の" in d for d in found), found)
+
+    def test_except_を持つ_deny_には丸ごと止めると言わない(self):
+        found = self.warns(
+            self.lint(
+                [
+                    {
+                        "id": "all-but",
+                        "match": "Write",
+                        "regex": ".*",
+                        "except": [{"glob": "*/wip/*"}],
+                        "message": "m",
+                    }
+                ]
+            )
+        )
+        said = [d for d in found if d.startswith("all-but ") and "本体の" in d]
+        self.assertTrue(said, found)
+        self.assertFalse(any("丸ごと止める" in d for d in said), said)
+        self.assertTrue(any("except" in d for d in said), said)
+
     def test_共通の_rules_yml_の_no_powershell_は言わない(self):
         problems = lint_rules._rules(common_path(ROOT, "rules"), ROOT)
         found = self.warns(problems)

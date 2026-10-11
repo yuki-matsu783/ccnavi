@@ -288,6 +288,11 @@ _COMMAND_TOOLS = ("Bash", "PowerShell")
 # どちらにも当たる式は、当てる語を持たずに先頭で当たっている。
 _ANYTHING_PROBES = ("", "\x02")
 
+# 「空でない文字列のどれにでも当たる」を見る文字列。共通の文字を持たない 2 つで、
+# パスにもコマンドにも出ない制御文字と、記号 1 字。判定は空の対象を見ないので、deny の本体は
+# これで見る（`.` も拾う）。except と when の葉は空の文字列も見る _ANYTHING_PROBES のまま。
+_NONEMPTY_PROBES = ("\x02", "~")
+
 
 def _except_problems(rule: rules.Rule, name: str) -> list[Problem]:
     """`except:` の書き方。
@@ -359,6 +364,10 @@ def _catch_all_deny_problems(rule: rules.Rule, name: str) -> list[Problem]:
     当てる語を持たずに当たっている形なので warn で言う。ツールを丸ごと止めると決めた書き方は
     `glob: "*"` ちょうどで書く（no-powershell のように）。それは言わない。
 
+    判定は空の対象を見ない（Rule.matches）ので、`.` のように空でない文字列のどれにでも当たる
+    本体も同じ（_NONEMPTY_PROBES）。except を持つ deny は、本体が何にでも当たっても except で
+    除いたものは止めないので、「丸ごと止める」とは言わず、除いたもの以外を止めると言う。
+
     木（when）の全体が何にでも当たる形は _when_problems が言う。`{!root}` を組み立てられずに
     止める側へ倒した deny は、書いた式ではなく倒した式を持つので見ない（読み込みが別に言う）。
     ask と allow は見ない（allow の広さは _broad が言う）。
@@ -368,15 +377,19 @@ def _catch_all_deny_problems(rule: rules.Rule, name: str) -> list[Problem]:
     if rule.glob == "*" and not rule.regex:
         return []
     compiled = rule.compiled
-    if compiled is None or not all(compiled.search(p) for p in _ANYTHING_PROBES):
+    if compiled is None or not all(compiled.search(p) for p in _NONEMPTY_PROBES):
         return []
+    kind = "glob" if rule.glob else "regex"
+    if rule.excepts:
+        what = "except で除いたもの以外は、match のツールの呼び出しをすべて止める"
+    else:
+        what = "match のツールを丸ごと止める"
     return [
         Problem(
             SEVERITY_WARN,
             name,
-            f"本体の {'glob' if rule.glob else 'regex'} は何にでも当たる。match のツールを"
-            '丸ごと止める。ツールごと止めるつもりなら `glob: "*"` と書き、そうでなければ'
-            "当てる語を書いてください",
+            f"本体の {kind} は何にでも当たる。{what}。ツールごと止めるつもりなら "
+            '`glob: "*"` と書き、そうでなければ当てる語を書いてください',
         )
     ]
 
