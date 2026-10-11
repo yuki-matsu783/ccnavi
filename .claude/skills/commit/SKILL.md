@@ -13,23 +13,35 @@ description: >-
 変更を分析して Conventional Commits の prefix + 日本語 1 行のメッセージを作り、確認を挟まずコミットまで進める。
 ユーザが `/commit` と打った場合も、エージェントが作業の締めに自分でコミットする場合も、この手順に従う。
 
+## git の入口
+
+git は直接呼ばず、`ccnavi-git.sh` 経由で打つ（生の git は止められるため）。以下の例はワークスペースルートの形で書く。
+ワークツリーの中では先頭を `sh ../../../.ccnavi/scripts/ccnavi-git.sh` にする。cwd ごとの呼び方は `docs/claude/worktree.md` の「基本」を見る。
+
 ## 絶対ルール
 
 - フッターを付けない。`Co-Authored-By` も `Generated with` も書かない。メッセージは 1 行だけ（このリポジトリの決定。ハーネス既定の帰属指示より優先する）
-- `git add .` / `git add -A` を使わない。必ずパスを個別指定する
+- `add .` / `add -A` を使わない（`ccnavi-git.sh add`）。必ずパスを個別指定する
 - `--no-verify` を使わない。pre-commit が落ちたら原因を直す
-- `git commit --amend` を使わない。常に新規コミット
-- 失敗しても `git reset` などで自動的に巻き戻さない。状況を報告して判断を仰ぐ
+- `commit --amend` を使わない。常に新規コミット
+- 失敗しても `reset` などで自動的に巻き戻さない。状況を報告して判断を仰ぐ
 - TodoWrite と Agent ツールを使わない
 
 ## 手順
 
 ### 1. 現状を把握する
 
-並列で実行する: `git status`（`-uall` は付けない）、`git diff` と `git diff --cached`、`git log --oneline -10`。
+並列で実行する。`-uall` は付けない。
+
+```sh
+sh .ccnavi/scripts/ccnavi-git.sh status
+sh .ccnavi/scripts/ccnavi-git.sh diff
+sh .ccnavi/scripts/ccnavi-git.sh diff --cached
+sh .ccnavi/scripts/ccnavi-git.sh log --oneline -10
+```
 
 - 既にステージ済みの変更があるとき → それが対象。追加でステージせず、unstaged / untracked は聞かずに対象外にする
-- 何もステージされていないとき → 作業ツリーの変更（unstaged + untracked）を手順 4 のフィルタに通してから個別に `git add` する
+- 何もステージされていないとき → 作業ツリーの変更（unstaged + untracked）を手順 4 のフィルタに通してから個別に `add` する
 - どちらも空のとき → 「コミットする変更がありません」と伝えて終了する
 
 ### 2. 検査を通す
@@ -80,7 +92,7 @@ prefix か主題が別なら別コミットに分ける。要件（`docs/require
 
 ### 4. ファイルをフィルタする
 
-`git add` の対象から自動的に除外する（確認は要らない）。
+`add` の対象から自動的に除外する（確認は要らない）。
 
 - クレデンシャル（必ず除外）: `.env` / `.env.*` / `*.pem` / `*.key` / `*.p12` / `*.pfx` / `*.ppk` / `credentials.json` / `service-account*.json` / `id_rsa` / `id_ed25519` / `id_ecdsa` / `.aws/credentials` / `.netrc` / `secrets.yml` / `secrets.yaml`
 - 開発環境の副産物: `.DS_Store` / `Thumbs.db` / `desktop.ini` / `*.swp` / `*.swo` / `*~` / `*.log` / `tmp/` / `*.tmp` / `*.tmp.*` / `*.bak` / `*.orig` / `*.stackdump` / `.claude/settings.local.json`
@@ -88,7 +100,7 @@ prefix か主題が別なら別コミットに分ける。要件（`docs/require
 
 `wip/scratchpad/`（下書きの置き場）は追跡してpushする置き場なので、除外しない。統合時に `ccnavi-git.sh integrate` が外す。
 `.gitignore` に無い新種の副産物を見つけたら、この一覧と `.gitignore` の両方に足す。
-削除されたファイル（`git status` の `D`）は除外対象ではなく、他と同じく `git add --` に並べてよい。
+削除されたファイル（`status` の `D`）は除外対象ではなく、他と同じく `add --` に並べてよい。
 除外したファイルがあれば、コミット前にチャットへ列挙する。
 
 ### 5. コミットする
@@ -96,8 +108,8 @@ prefix か主題が別なら別コミットに分ける。要件（`docs/require
 承認待ちをしない（AskUserQuestion を挟まない）。実行前に、メッセージ（複数なら分割案）と除外したファイルをチャット本文に書く。
 
 ```sh
-git add -- <file1> <file2>
-git commit -m "<prefix>: <日本語の説明>"
+sh .ccnavi/scripts/ccnavi-git.sh add -- <file1> <file2>
+sh .ccnavi/scripts/ccnavi-git.sh commit -m "<prefix>: <日本語の説明>"
 ```
 
 複数コミットに分けるときは、この 2 コマンドを組ごとに繰り返す。分割案の書き方:
@@ -112,12 +124,12 @@ git commit -m "<prefix>: <日本語の説明>"
 
 ## このリポジトリでの注意
 
-- ccnavi 自身が PreToolUse に登録されていて、`git push` や `git reset --hard` を含むコマンドは自分の hook に止められうる。止められても迂回しない。別の道具に切り替えるか、原因を直す
+- ccnavi 自身が PreToolUse に登録されていて、生の git や `push`・`reset --hard` は自分の hook に止められうる。止められても迂回せず、出力の案内（`ccnavi-git.sh` 経由）に従うか、原因を直す
 - 禁止語を含む文字列を Bash のコマンドに書くと、それだけで判定に当たる（部分一致）。ルールの動作確認は payload をファイルに書いてから読み込ませる
 - `.claude/` 配下への書き込みには ccnavi のルールで警告が出る。意図した変更なら気にしなくてよい
 
 ## 失敗したとき
 
 - pre-commit が落ちた → 出力をそのまま見せ、原因を直してから新規コミットを作る
-- 複数コミットの途中で落ちた → そこで停止し、`git status` を出してどこまで完了したかを報告する
+- 複数コミットの途中で落ちた → そこで停止し、`status` を出してどこまで完了したかを報告する
 - ccnavi の hook に止められた → 迂回せず、何に当たったかを報告する。`logs/decisions.jsonl` の判定の行に当たったルールの id がある
