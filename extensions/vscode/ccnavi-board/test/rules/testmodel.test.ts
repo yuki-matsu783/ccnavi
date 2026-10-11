@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { TEST_VERSION, parseSamplesJson, parseTestJson } from "../../src/core/testmodel.js";
+import { TEST_VERSION, parseExpectationsJson, parseTestJson } from "../../src/core/testmodel.js";
 
 const FIXTURES = path.join(__dirname, "..", "..", "..", "test", "fixtures");
 
@@ -30,8 +30,8 @@ test("CB-T37 --test --json のフィクスチャ（実行ファイルの出力�
   assert.match(t.response, /push/);
 });
 
-test("CB-T38 --test-samples --json のフィクスチャを読める", () => {
-  const parsed = parseSamplesJson(read("samples.json"));
+test("CB-T38 --test-expectations --json のフィクスチャを読める", () => {
+  const parsed = parseExpectationsJson(read("expectations.json"));
   assert.equal(parsed.ok, true);
   if (!parsed.ok) {
     return;
@@ -40,10 +40,10 @@ test("CB-T38 --test-samples --json のフィクスチャを読める", () => {
   assert.equal(s.mismatches, 1);
   assert.equal(s.skipped, 1);
   assert.deepEqual(s.counts.allow, { ok: 2, total: 3 });
-  const wrong = s.samples.find((x) => !x.ok);
+  const wrong = s.expectations.find((x) => !x.ok);
   assert.ok(wrong);
   assert.deepEqual([wrong.expected, wrong.verdict, wrong.rules[0].id], ["allow", "deny", "git-push"]);
-  const skipped = s.samples.find((x) => x.skipped);
+  const skipped = s.expectations.find((x) => x.skipped);
   assert.ok(skipped);
   assert.equal(skipped.ok, true);
 });
@@ -55,7 +55,7 @@ test("CB-T39 版が違う・JSON でない・オブジェクトでないとき�
   if (!parsed.ok) {
     assert.match(parsed.error, /版が違います/);
   }
-  const broken = parseSamplesJson("nope");
+  const broken = parseExpectationsJson("nope");
   assert.equal(broken.ok, false);
   const notObject = parseTestJson("[]");
   assert.equal(notObject.ok, false);
