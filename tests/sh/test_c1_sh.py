@@ -1191,9 +1191,7 @@ class C1ReviewTest(C1Harness):
         self.assertEqual(len(done.stdout.strip().splitlines()), 1, done.stdout)
         rel = f"{APPROVED}/phases/{PARENT}/1.reviewed"
         self.assertEqual(self.committed(), [rel])
-        self.assertEqual(
-            self.subjects(1), [f"ccnavi: {PARENT}のフェーズ 1 の指摘の行き先を決めた"]
-        )
+        self.assertEqual(self.subjects(1), [f"ccnavi: {PARENT}のフェーズ 1 の指摘の行き先を決めた"])
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
         # 決めた内容のコメントは、送った後に投稿する。
         self.assertEqual([kind for kind, _ in self.posted], ["note"])
