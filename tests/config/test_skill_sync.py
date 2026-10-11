@@ -116,3 +116,59 @@ class SkillSyncTest(ConfigUnionHarness):
         sources, why = skillsync.sources(self.ws)
         self.assertEqual(sources, {})
         self.assertIn("シンボリックリンク", why)
+
+    def test_the_start_c1_carries_the_copied_skills(self):
+        """1: 書いたパスの一覧(基点は親のワークツリー)で、写した概念スキルは外でも通す"""
+        write(self.source("testing", "SKILL.md"), concept_skill("testing"))
+        write(self.source("testing", "references", "unit", "basics.md"), "# 基本\n")
+        tree = self.worktree(os.path.join(self.projects, "lib"), "i0001")
+        write(
+            os.path.join(tree, "wip", "proposals", "todo", "i0001.md"),
+            ticket_text("i0001", project="lib", allow=SCOPE),
+        )
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        write(
+            os.path.join(self.state, "sync", "lib", "families", "i0001"),
+            "remote origin\nbranch i0001\nsha 0\nfetched_at 1\nstate present\nreason \n",
+        )
+        target = os.path.join(self.ws, "logs", "state", "c1", "lib", "i0001.t.writes")
+        started = self.ccnavi(
+            "--record-writes", target, "--record-tree", tree, "ticket", "start", "i0001"
+        )
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        listed = read(target).splitlines()
+        self.assertIn("skills/testing/SKILL.md", listed)
+        self.assertIn("skills/testing/references/unit/basics.md", listed)
+        self.assertNotIn("置き場の外", started.stderr)
+
+    def test_only_an_exact_copy_in_an_approved_parent_reads_as_synced(self):
+        """1: 中身が違う、元リポジトリ、概念でないスキル、消す変更は写しと読まない"""
+        from ccnavi.infra import settings
+        from ccnavi.tickets import skillsync
+
+        write(self.source("testing", "SKILL.md"), concept_skill("testing"))
+        write(self.source("commit", "SKILL.md"), plain_skill("commit"))
+        tree, _ = self.start_parent()
+        conf, _ = settings.load(self.ws)
+        copied = os.path.join(tree, "skills", "testing", "SKILL.md")
+        self.assertTrue(skillsync.is_synced_write(conf, self.ws, copied))
+        # 手で書き換えた中身は外す。
+        write(copied, "書き換えた\n")
+        self.assertFalse(skillsync.is_synced_write(conf, self.ws, copied))
+        self.assertTrue(
+            skillsync.is_synced_write(conf, self.ws, copied, concept_skill("testing").encode())
+        )
+        # 消す変更は写しではない。
+        self.assertFalse(skillsync.is_synced_write(conf, self.ws, copied, None))
+        # 概念スキルでないものと、概念スキルの外のファイルは外す。
+        other = os.path.join(tree, "skills", "commit", "SKILL.md")
+        write(other, plain_skill("commit"))
+        self.assertFalse(skillsync.is_synced_write(conf, self.ws, other))
+        loose = os.path.join(tree, "skills", "testing", "notes.txt")
+        write(loose, concept_skill("testing"))
+        self.assertFalse(skillsync.is_synced_write(conf, self.ws, loose))
+        # 元リポジトリのファイルは外す。
+        main_copy = os.path.join(self.lib, "skills", "testing", "SKILL.md")
+        write(main_copy, concept_skill("testing"))
+        self.assertFalse(skillsync.is_synced_write(conf, self.ws, main_copy))

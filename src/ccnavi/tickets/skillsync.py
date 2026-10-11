@@ -22,7 +22,7 @@ import os
 
 import yaml
 
-from ..infra import yamlread
+from ..infra import settings, tree, yamlread
 from . import configsync, flow
 
 CONCEPT_KEY = "concept"
@@ -130,3 +130,54 @@ def describe(project: str, changes: list[configsync.Change]) -> list[str]:
     for c in changes:
         lines.append(f"  - {c.rel}（{'上書き' if c.before is not None else '新しく置いた'}）")
     return lines
+
+
+def is_synced_write(
+    conf: settings.Settings,
+    root: str,
+    path: str,
+    content: bytes | None | object = configsync.UNSET,
+) -> bool:
+    """その変更が、親の着手がミラーか概念スキルの写しとして配った書き込みだと読めるか。
+
+    `configsync.is_synced_write`（共通レイヤーのミラー）に、概念スキルの写しを足した答え。
+    C1 の置き場の検査と、実行後チェック、バックアップの復元が使う。
+    """
+    if configsync.is_synced_write(conf, root, path, content):
+        return True
+    return _is_copied_skill(conf, root, path, content)
+
+
+def _is_copied_skill(
+    conf: settings.Settings, root: str, path: str, content: bytes | None | object
+) -> bool:
+    """概念スキルの写しとして読めるか。次が全部揃ったときだけ。
+
+    1. 置き場が、プロジェクトから切った承認済みの親チケットのワークツリーの
+       `skills/<概念>/<ファイル>.md`（`<概念>` は共通の概念スキル。元リポジトリ、子、
+       チケットの無いワークツリー、他のプロジェクトは外さない）
+    2. そのパスの途中にシンボリックリンクが無い
+    3. 中身が、ワークスペースの `.claude/skills/<概念>/` の同じファイルと同じ（改行は見ない）。
+       変更後の中身が無い（消した）ものは通さない。写しは消さないので、消す変更は写しではない
+
+    読めないものは外さない。
+    """
+    where = tree.tree_of(root, configsync._key(path), conf.projects)
+    if where is None or not where.project or where.is_main:
+        return False
+    rel = configsync._rel(where.root, path)
+    parts = rel.split("/")
+    if len(parts) < 3 or parts[0] != SKILLS_DIR or parts[1] not in concepts(root):
+        return False
+    if not parts[-1].endswith(".md") or any(p in ("", ".", "..") for p in parts):
+        return False
+    if configsync._linked(where.root, path) or not configsync._approved_parent(conf, root, where):
+        return False
+    source = os.path.join(root, *SOURCE_DIR.split("/"), *parts[1:])
+    if configsync._linked(root, source):
+        return False
+    expected = configsync._read(source)
+    now = configsync._read(path) if content is configsync.UNSET else content
+    if expected is None or not isinstance(now, bytes):
+        return False
+    return configsync._same(now, expected)
