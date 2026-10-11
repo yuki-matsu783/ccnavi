@@ -94,7 +94,7 @@ def _rules(
     seen: set[str] = set()
     for rule in rule_set.all():
         # id を欠いたルールは名指しできないので、当たった中身で呼ぶ。
-        name = rule.id or f"(id 無し: {rule.decision} {rule.match} {rule.glob or rule.regex})"
+        name = rule.id or f"(id 無し: {rule.decision} {rule.match} {rule.written_body()})"
         if not rule.id:
             problems.append(
                 Problem(SEVERITY_WARN, name, "id が無い。記録や報告でこのルールを名指しできない")
@@ -194,6 +194,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
 
     problems.extend(_every_problems(rule, name))
     problems.extend(_except_problems(rule, name))
+    problems.extend(_when_problems(rule, name))
 
     # once の文は文脈ごとに 1 度しか積まれず、every > 1 は刻んだ回にしか積まれないので、
     # どちらも広さを報告しない。読めない every は 1（毎回渡る）になっているので、この式は
@@ -254,14 +255,14 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
             )
         ]
     problems: list[Problem] = []
-    if rule.compiled is not None and not rule.hits(rules.STOP_SUBJECT):
+    if rule.built() and not rule.hits(rules.STOP_SUBJECT):
         problems.append(
             Problem(
                 SEVERITY_WARN,
                 name,
                 f"{rules.STOP_MATCH} のルールは呼び出しの文字列ではなく、"
                 f"固定の {rules.STOP_SUBJECT} に当てる。"
-                "この glob / regex はそれに当たらないので何も起きない。"
+                "この glob / regex / when はそれに当たらないので何も起きない。"
                 'glob: "*" と書いてください',
             )
         )
@@ -326,6 +327,87 @@ def _except_problems(rule: rules.Rule, name: str) -> list[Problem]:
     return problems
 
 
+# 木のノードを書き方だけから見積もった値。葉は「何にでも当たる」と言えるときだけ ALWAYS で、
+# それ以外は分からない（UNKNOWN）。何にも当たらない葉は書き方からは言えないので作らない。
+_ALWAYS, _NEVER, _UNKNOWN = "always", "never", "unknown"
+
+
+def _constant(node: rules.Condition) -> str:
+    """そのノードが、どの文字列にも当たる（ALWAYS）・どれにも当たらない（NEVER）と言えるか。"""
+    if node.is_leaf():
+        compiled = node.compiled
+        if compiled is not None and all(compiled.search(p) for p in _ANYTHING_PROBES):
+            return _ALWAYS
+        return _UNKNOWN
+    values = [_constant(c) for c in node.children]
+    if node.kind == rules.WHEN_NOT:
+        return {_ALWAYS: _NEVER, _NEVER: _ALWAYS}.get(values[0], _UNKNOWN)
+    if node.kind == rules.WHEN_ALL:
+        if _NEVER in values:
+            return _NEVER
+        return _ALWAYS if all(v == _ALWAYS for v in values) else _UNKNOWN
+    if _ALWAYS in values:
+        return _ALWAYS
+    return _NEVER if all(v == _NEVER for v in values) else _UNKNOWN
+
+
+def _when_problems(rule: rules.Rule, name: str) -> list[Problem]:
+    """`when:`（条件の木）の書き方。
+
+    書式の誤り（知らないキー・空のリスト・上限）は読み込み（rules._when）が error にするので、
+    ここは意味の側を見る。どれも判定は書いたとおりに動いているので warn。
+
+    1. 何にでも当たる・何にも当たらないノード。`not` の下が何にでも当たる葉だけ、`any` の中に
+       何にでも当たる葉、のような形で、そのノードは書いても条件を絞らない。いちばん外側の
+       1 つだけを言う（中を言っても直す場所は同じ）。木の全体なら、ルールがどの呼び出しにも
+       当たる・当たらないことになる
+    2. Bash / PowerShell を見る deny / ask の `not`。当てるのはコマンド列の全体なので、
+       除く語をコマンドのどこかに足すだけで外れる（except と同じ理由）
+    """
+    tree = rule.when
+    if tree is None:
+        return []
+    problems: list[Problem] = []
+
+    def look(node: rules.Condition) -> None:
+        value = _constant(node)
+        if value == _UNKNOWN:
+            for c in node.children:
+                look(c)
+            return
+        where = node.where if node.is_leaf() else f"{node.where} の {node.kind}"
+        said = "何にでも当たる" if value == _ALWAYS else "何にも当たらない"
+        whole = (
+            "。このルールはどの呼び出しにも当たる"
+            if value == _ALWAYS
+            else "。このルールはどの呼び出しにも当たらない"
+        )
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"{where} は{said}{whole if node is tree else '。条件を絞っていない'}",
+            )
+        )
+
+    look(tree)
+
+    tools = [want.strip() for want in rule.match.split("|")]
+    shells = [t for t in _COMMAND_TOOLS if t in tools]
+    has_not = any(n.kind == rules.WHEN_NOT for n in tree.walk())
+    if shells and has_not and rule.decision in (rules.DENY, rules.ASK):
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"{'|'.join(shells)} の when の not はコマンド列の全体に当たる。コマンドのどこかに"
+                "除く語を足すだけでこのルールが外れるので、not の下は語の位置まで狭く書くか、"
+                "ルールを分けてください",
+            )
+        )
+    return problems
+
+
 def _every_problems(rule: rules.Rule, name: str) -> list[Problem]:
     """`every`（渡す回の刻み）の値と、刻んだ先に渡すものがあるか。
 
@@ -376,7 +458,7 @@ def _broad(rule: rules.Rule) -> str:
     2. 選択肢が 3 つ以上。`(ls|cat|sed)` のような書き方は、それだけ多くの
        コマンドに同じ文を添えることになる
     """
-    if rule.compiled is not None and rule.compiled.search("x"):
+    if rule.built() and rule.body_hits("x"):
         return "何にでもヒットする"
     if _alternatives(rule.regex) >= 3:
         return "選択肢が 3 つ以上"

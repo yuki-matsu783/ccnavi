@@ -140,13 +140,17 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             continue
         for name in rules.SECTIONS:
             for rule in view.rule_set.section(name):
-                written = rule.glob or rule.regex
+                written = rule.written_body()
                 if rule.excepts:
                     excepts = ", ".join(e.glob or e.regex for e in rule.excepts)
                     written = f"{written}  except: {excepts}"
                 stdout.write(
                     f"  {name:<5} {rule.id or '(id 無し)':<28} {rule.match:<34} {written}\n"
                 )
+                # 木は 1 行だと入れ子が読みにくいので、葉が 3 つ以上なら続けて字下げで出す。
+                if rule.when is not None and sum(n.is_leaf() for n in rule.when.walk()) >= 3:
+                    for line in rule.when.lines():
+                        stdout.write(f"        {line}\n")
 
     _explain_phases(stdout, conf, root, views)
     _explain_risk(stdout, conf, root, views)
