@@ -62,7 +62,7 @@ from . import rules, selfguard_targets
 #
 # 実行前チェックはルールの regex で当てる（rules._build を通る、組み込みのルールの 1 本）。
 # 語のリストを Python で解くと、ルールの外に判定の経路がもう 1 本できて、組み込みの既定
-# （builtin）と `--lint` の見本（check_rules）から見えなくなる。shellread が語を空白で、
+# （builtin）と `--lint` の期待する判定（check_rules）から見えなくなる。shellread が語を空白で、
 # コマンドを `\x00` で、引用がつないだ空白を WORD_SEP で区切って渡すので、語の並びは
 # regex でも読める。2 つの枝は「または」で並ぶので、読み違えて両方を見る形は止まる側に倒れる。
 # 読み違えて両方を見落とす形が無いように、語の分け方を _COPY_TARGET と _COPY_LAST で揃える。

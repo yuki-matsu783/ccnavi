@@ -1,7 +1,7 @@
 /**
- * `ccnavi --test --json` と `--test-samples --json`（試験の JSON）が出す形。
+ * `ccnavi --test --json` と `--test-expectations --json`（試験の JSON）が出す形。
  * 実行ファイルと拡張の契約で、拡張はこれ以外を読まない。形の定義は ccnavi の README「試験の JSON」。
- * 同じ例が test/fixtures/test.json と samples.json にあり、Python 側のテスト
+ * 同じ例が test/fixtures/test.json と expectations.json にあり、Python 側のテスト
  * （tests/core/test_test_json.py）が同じ例で形を確かめる。
  */
 
@@ -34,7 +34,7 @@ export interface TestJson {
   readonly response: string;
 }
 
-export interface SampleJson {
+export interface ExpectationJson {
   readonly expected: string;
   readonly tool: string;
   readonly subject: string;
@@ -49,15 +49,15 @@ export interface SampleJson {
   readonly skipped: boolean;
 }
 
-export interface SamplesJson {
+export interface ExpectationsJson {
   readonly version: number;
   readonly root: string;
   readonly rules_path: string;
-  readonly samples_path: string;
+  readonly expectations_path: string;
   readonly counts: Readonly<Record<string, { readonly ok: number; readonly total: number }>>;
   readonly mismatches: number;
   readonly skipped: number;
-  readonly samples: readonly SampleJson[];
+  readonly expectations: readonly ExpectationJson[];
 }
 
 export type Parsed<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: string };
@@ -89,7 +89,7 @@ export function parseTestJson(text: string): Parsed<TestJson> {
   };
 }
 
-export function parseSamplesJson(text: string): Parsed<SamplesJson> {
+export function parseExpectationsJson(text: string): Parsed<ExpectationsJson> {
   const raw = readObject(text);
   if (!raw.ok) {
     return raw;
@@ -109,11 +109,11 @@ export function parseSamplesJson(text: string): Parsed<SamplesJson> {
       version: TEST_VERSION,
       root: str(r.root),
       rules_path: str(r.rules_path),
-      samples_path: str(r.samples_path),
+      expectations_path: str(r.expectations_path),
       counts,
       mismatches: num(r.mismatches),
       skipped: num(r.skipped),
-      samples: list(r.samples)
+      expectations: list(r.expectations)
         .filter(isRecord)
         .map((s) => ({
           expected: str(s.expected),

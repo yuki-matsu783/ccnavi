@@ -4,7 +4,7 @@ description: >-
   ccnavi の設定 3 本（rules.yml・risks.yml は .ccnavi/common/ と config/、phases.yml は config/）を書く・足す・直す・
   確かめる。ルールを足したい、フェーズ定義やリスクの配点を変えたい、書いた設定が
   意図どおりに効いているか疑わしい、`/ccnavi-config` と打たれた、のどれでも使う。
-  足すときは下書きを検証してからユーザに渡し、確かめるときは lint と見本を回して
+  足すときは下書きを検証してからユーザに渡し、確かめるときは lint と期待する判定を回して
   食い違いを名指しする。settings.json の hook の登録や env はここでは扱わない。
 ---
 
@@ -42,7 +42,7 @@ config のどちらにも置け、判定には、共通レイヤーにその判�
 | 言われたこと | 読むもの |
 |---|---|
 | 足す・直す・新しく書く（「ルールを足して」「フェーズに調査を入れたい」「配点を変えたい」） | [references/add.md](references/add.md) |
-| 確かめる・疑う（「効いているか見て」「lint して」「見本を回して」） | [references/check.md](references/check.md) |
+| 確かめる・疑う（「効いているか見て」「lint して」「期待する判定を回して」） | [references/check.md](references/check.md) |
 
 足したあとは必ず確かめる側も通る。どちらか決まらないときだけユーザに聞く。
 
@@ -53,8 +53,8 @@ config のどちらにも置け、判定には、共通レイヤーにその判�
 
 - 3 本のファイルを書き換えない。下書きはワークツリーの `wip/scratchpad/`（docs/claude/scratchpad.md）に置き、検証を通してから
   「何をなぜ変えるか」と一緒にユーザに渡す。置くのはユーザ。`dry-run` で警告だけで通っても同じ
-- 判定を目で真似しない。当たるかどうかは必ず `ccnavi --test-samples` か `--lint` に聞く
-- 見本を期待に合わせて書き換えない。食い違いが出たら、ルールと見本のどちらを直すかはユーザが決める
+- 判定を目で真似しない。当たるかどうかは必ず `ccnavi --test-expectations` か `--lint` に聞く
+- 期待する判定を実際の判定に合わせて書き換えない。食い違いが出たら、ルールと期待のどちらを直すかはユーザが決める
 - TodoWrite と Agent ツールを使わない
 
 ## ccnavi の打ち方
@@ -67,16 +67,16 @@ config のどちらにも置け、判定には、共通レイヤーにその判�
 ```sh
 ccnavi --lint --log "" --state ""
 ccnavi --lint --log "" --state "" --rules <下書き> --phases <下書き> --risk <下書き>
-ccnavi --test-samples <見本.yml> --log "" --state "" --approved "" [--rules <下書き>]
+ccnavi --test-expectations <期待.yml> --log "" --state "" --approved "" [--rules <下書き>]
 ccnavi --explain --log "" --state ""
 ```
 
 - `--lint` は判定をせず、防御を消す・全部止める記述を error、意図した防御が効いていない
   記述を warn で名指しする。3 本まとめて見る。error があれば終了コード 1
-- `--test-samples` は見本をぜんぶ判定に掛け、置いたタイプ（`deny` / `ask` / `allow`）と
+- `--test-expectations` は期待する判定をぜんぶ判定に掛け、置いたタイプ（`deny` / `ask` / `allow`）と
   違う判定になったものを並べる
 - `--explain` はいま効いているルールと承認済みのチケットの範囲を並べる。判定はしない
 - `--rules` / `--phases` / `--risk` で下書きを差し替えられる
 
 `--test` に禁止語を書かない（`ccnavi --test Bash "git push"` はその Bash 自体が `raw-git` に当たる）。
-単発で試したいものも見本ファイルを `wip/scratchpad/` に書いて `--test-samples` で回す。見本の形は `.ccnavi/common/rule-samples.yml` の先頭のコメントにある。
+単発で試したいものも期待のファイルを `wip/scratchpad/` に書いて `--test-expectations` で回す。その形は `.ccnavi/common/rule-expectations.yml` の先頭のコメントにある。

@@ -2,14 +2,14 @@
  * `ccnavi --suggest --json`（候補の JSON）が出す形。実行ファイルと拡張の契約で、形の定義は
  * ccnavi の README「候補の JSON」。
  *
- * 候補は実行ファイルが記録から起こし、`--lint` と `--test-samples` と同じ検査を通したものだけ。
+ * 候補は実行ファイルが記録から起こし、`--lint` と `--test-expectations` と同じ検査を通したものだけ。
  * 拡張はそれを並べるだけで、候補を自分で起こさず、ルールにも足さない（置くのはユーザ）。
  */
 
 /** 拡張が読める版。実行ファイルが違う版を出したら、解釈せずに版の違いを伝える */
 export const SUGGEST_VERSION = 1;
 
-export interface SuggestSampleJson {
+export interface SuggestExpectationJson {
   readonly tool: string;
   readonly subject: string;
   readonly why: string;
@@ -26,8 +26,8 @@ export interface SuggestCandidateJson {
   readonly summary: string;
   readonly layer: string;
   readonly rules_path: string;
-  readonly samples: readonly SuggestSampleJson[];
-  /** 文字で出すときと同じ下書き（`rules:` と `samples:` の組） */
+  readonly expectations: readonly SuggestExpectationJson[];
+  /** 文字で出すときと同じ下書き（`rules:` と `expectations:` の組） */
   readonly yaml: string;
 }
 
@@ -80,7 +80,7 @@ export function parseSuggestJson(text: string): Parsed<SuggestJson> {
           summary: str(c.summary),
           layer: str(c.layer),
           rules_path: str(c.rules_path),
-          samples: list(c.samples)
+          expectations: list(c.expectations)
             .filter(isRecord)
             .map((s) => ({ tool: str(s.tool), subject: str(s.subject), why: str(s.why) })),
           yaml: str(c.yaml),
