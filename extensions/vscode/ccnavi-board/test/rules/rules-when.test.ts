@@ -15,6 +15,7 @@ import {
   not,
   removeAt,
   setPattern,
+  comparePaths,
   exceptBlocker,
   treeOfPattern,
   unwrapNot,
@@ -377,6 +378,17 @@ ${except}
   assert.match(exceptBlocker(rulesOf("    except:\n      - '*.md'").exceptNodes) ?? "", /1 件目が読めません/);
   assert.match(exceptBlocker(rulesOf("    except: []").exceptNodes) ?? "", /空のリスト/);
   assert.match(exceptBlocker(rulesOf("    except:\n      - glob: ''").exceptNodes) ?? "", /glob が空/);
+});
+
+test("CB-T344 子が 10 個以上でも、図の点は木の順（番号の数の順）に並ぶ", () => {
+  const wide = group("any", Array.from({ length: 12 }, (_, i) => leaf("glob", String(i))));
+  assert.deepEqual(
+    layoutCond(wide).places.map((p) => p.key),
+    ["r", ...Array.from({ length: 12 }, (_, i) => `r.${i}`)],
+  );
+  assert.ok(comparePaths([2], [10]) < 0);
+  assert.ok(comparePaths([1], [1, 0]) < 0);
+  assert.equal(comparePaths([1, 2], [1, 2]), 0);
 });
 
 test("CB-T346 子を消してから別の子を直しても、消した子のコメントは直した子に付かない", () => {

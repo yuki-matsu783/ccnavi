@@ -379,9 +379,21 @@ export function layoutCond(root: CondNode): CondLayout {
     return y;
   };
   walk(root, [], 0);
-  // 根から順に並べ直す（点の順が木の順になる。テストと読み上げで追いやすい）
-  places.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  // 根から順に並べ直す（点の順が木の順になる。テストと読み上げで追いやすい）。
+  // 文字で比べると `r.10` が `r.2` より前に来るので、場所の数の並びで比べる
+  places.sort((a, b) => comparePaths(a.path, b.path));
   return { places, edges };
+}
+
+/** 場所を木の順（根から、子は番号の順）に比べる */
+export function comparePaths(a: CondPath, b: CondPath): number {
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i += 1) {
+    if (a[i] !== b[i]) {
+      return a[i] - b[i];
+    }
+  }
+  return a.length - b.length;
 }
 
 /**
