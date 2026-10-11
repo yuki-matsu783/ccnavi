@@ -815,18 +815,9 @@ def briefing(
         return []
     if not full:
         return [f"    フロー: {flow_text.clean(path)}"]
-    lock = (
-        "着手中なので、終わるまで書き換えられない（ロック）。着手のあとに書き換わったら"
-        " ccnavi が知らせる。"
-        if child.in_progress
-        else "着手すると、終わるまで書き換えられなくなる（ロック）。"
-    )
     lines = [
         f"    フロー: {flow_text.clean(path)}"
-        f"（ユーザがボードで書いた {flow_text.clean(child.ticket)} の手順。"
-        "承認済みの領域にあり、ユーザが管理するもの。エージェントは編集しない）。作業の前にこのファイルを"
-        "読み、その順に進めてください。文脈が要約されて見失ったら、"
-        "このパスを読み直してください。" + lock
+        "（ユーザが書いた手順。編集しない）。作業の前に読み、その順に進めてください。"
     ]
     data, why = load(path, base)
     if data is None:

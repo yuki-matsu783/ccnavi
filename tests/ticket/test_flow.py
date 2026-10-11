@@ -480,8 +480,8 @@ class FlowRenderTest(unittest.TestCase):
         plain = write(os.path.join(flows, "c.yml"), WORKFLOW_YAML)
         self.assertIsNotNone(flow.load(plain, root)[0])
 
-    def test_briefing_says_the_lock_comes_with_the_start(self):
-        """着手の前は「着手すると書き換えられなくなる」と言う（L2）。"""
+    def test_briefing_does_not_mention_the_lock(self):
+        """ロックは書き込みを止めるときの理由で言う。サブエージェントへの案内には入れない。"""
         root = tempfile.mkdtemp(prefix="ccnavi-flow-")
         self.addCleanup(__import__("shutil").rmtree, root, True)
         conf = conf_with()
@@ -489,12 +489,13 @@ class FlowRenderTest(unittest.TestCase):
         idle.tree_root = root
         write(flow.flow_file(conf, root, CHILD), WORKFLOW_YAML)
         text = "\n".join(flow.briefing(conf, root, idle, "wip/research/*"))
-        self.assertIn("着手すると、終わるまで書き換えられなくなる", text)
-        self.assertNotIn("着手中なので", text)
+        self.assertNotIn("ロック", text)
+        self.assertNotIn("着手", text)
         running = child_ticket(started=True)
         running.tree_root = root
         text = "\n".join(flow.briefing(conf, root, running, "wip/research/*"))
-        self.assertIn("着手中なので、終わるまで書き換えられない", text)
+        self.assertNotIn("ロック", text)
+        self.assertNotIn("書き換わったら", text)
         # 手順はユーザが書いたデータとして囲って渡す。
         self.assertIn(flow.FENCE_OPEN, text)
         self.assertIn(flow.FENCE_CLOSE, text)
@@ -901,8 +902,8 @@ class FlowLockTest(FlowHarness):
         result = self.hook("SubagentStart", "", child_tree, agent_id="sub-1")
         text = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
         self.assertIn(os.path.normcase(self.flow_path), os.path.normcase(text))
-        self.assertIn("読み直して", text)
-        self.assertIn("着手中なので", text)
+        self.assertIn("作業の前に読み、その順に進めてください", text)
+        self.assertNotIn("ロック", text)
         self.assertIn(flow.FENCE_OPEN, text)
         self.assertIn("3. [askUserQuestion] 方針", text)
         self.assertIn("[fancyNewNode] 未来の種類", text)
