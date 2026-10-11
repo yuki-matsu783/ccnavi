@@ -515,6 +515,12 @@ class Rule:
     # 置き換える先（spoken_message）。書いた文面（message）は置き換えずに持つ。
     # 報告と --explain は書いた表記を出す（glob / regex と同じ扱い）。
     root: str = ""
+    # from_file は、ルールファイル（共通レイヤー・自身のレイヤー・プロジェクトのレイヤー）から
+    # 読んだルールであること。組み込み（土台・退避した既定・設定ファイルの保護・チケットの保護）は
+    # 偽。`--test` が当たったルールを「ルールファイルの中」と「外から来た根拠」に分けるのに読む。
+    # id の前置きでは分けられない（`builtin-ticket-*` のように `builtin-guard-` で始まらない
+    # 組み込みがある）し、`source` でも分けられない（退避した既定は共通レイヤーの名前を持つ）。
+    from_file: bool = field(default=False, compare=False)
 
     # degraded_message は、ルールが書かれたとおりに組み立てられず、保護を消さないために
     # 別の形で判定に使っているときに、止められた側へ返す文面。`{!root}` を展開できなかった
@@ -773,6 +779,7 @@ def _build(
         every_written=raw.get("every"),
         decision=section,
         root=root,
+        from_file=not builtin,
     )
     name = f"{section}:{rule.id}" if rule.id else where
 

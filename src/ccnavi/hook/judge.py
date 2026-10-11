@@ -521,6 +521,8 @@ def decide_before(
         verdict = rules.DENY
 
     record.rules = [rule.id or f"({verdict})" for rule in group]
+    # 当てたルールそのもの。診断（`--test`）が根拠を見せるのに読む。記録には書かない。
+    record.hits = list(group)
     record.unwrapped = shellread.SEP.join(dict.fromkeys(layer for _, layer, _ in via if layer))
     # 判定を下したのは最初に当たったルール。そのレイヤーを 1 欄で残す。
     # id の前置きからも読めるが、欄にしておくと記録をレイヤーで数えられる。ルールファイルの
