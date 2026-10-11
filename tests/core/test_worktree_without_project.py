@@ -231,6 +231,15 @@ class WorktreeWithoutProjectTest(unittest.TestCase):
         ):
             tree.worktrees(self.root, self.projects)
             tree.tree_of(self.root, os.path.join(self.gone_path, "a"), self.projects)
+            tree.worktrees_without_project(self.root, self.projects)
+
+    def test_名指しの一覧は先の有無を区別し_ふつうのディレクトリを数えない(self):
+        found = {w.name: w for w in tree.worktrees_without_project(self.root, self.projects)}
+
+        self.assertEqual(set(found), {GONE, BROKEN})
+        self.assertFalse(found[GONE].gitdir_exists)
+        self.assertTrue(found[BROKEN].gitdir_exists)
+        self.assertEqual(found[GONE].gitdir, self.gone_gitdir)
 
 
 if __name__ == "__main__":
