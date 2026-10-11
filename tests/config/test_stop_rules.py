@@ -9,7 +9,7 @@
 2. `every: N` で N 回に 1 度止める。本文のファイルも載る。数えはセッションごと
 3. `stop_hook_active` が真の回は止めず、数えも進めない。サブエージェント（`agent_id`）も同じ
 4. 数えを覚えられない（`--state ""`）ときは止めない
-5. `dry-run` は止めず、止めたはずの文を `systemMessage` に載せる
+5. `dry-run` でも同じ回に止める（止めないと文がモデルに届かない）
 6. cwd がプロジェクトの中でも同じルールが当たる。プロジェクトのレイヤーのルールも当たる
 7. `--lint` は `deny` / `ask` に置いたもの、`(stop)` に当たらない表記、`every` の無いものを
    warn で言う
@@ -186,13 +186,13 @@ class StopRulesTest(unittest.TestCase):
 
     # --- 5. dry-run --------------------------------------------------------------
 
-    def test_dry_run_reports_instead_of_blocking(self):
+    def test_dry_run_blocks_like_enable(self):
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
         self.assertNotIn("decision", self.stop(mode="dry-run"))
         body = self.stop(mode="dry-run")
-        self.assertNotIn("decision", body)
-        self.assertIn("would have blocked this stop", body.get("systemMessage", ""))
-        self.assertIn(NUDGE, body.get("systemMessage", ""))
+        self.assertEqual(body.get("decision"), "block")
+        self.assertIn(NUDGE, body["reason"])
+        self.assertNotIn("would have blocked", body.get("systemMessage", ""))
 
     # --- 5b. 止めた回の頭の文と記録 ------------------------------------------------
 
