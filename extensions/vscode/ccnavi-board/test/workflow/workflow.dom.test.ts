@@ -83,7 +83,7 @@ test("CB-D163 答えが届いたら、実行ファイルが振り直した番号
     // 元の 3（実装とテスト）は 2 番になったが、置き場所は前の 3 番の場所のまま
     assert.equal(dom.one('.react-flow__node[data-id="n2"]').getAttribute("style"), placed);
     assert.ok(!dom.one("#dirty").classList.contains("hidden"));
-    assert.deepEqual(lastPosted(dom, "dirty"), { type: "dirty", dirty: true });
+    assert.deepEqual(lastPosted(dom, "dirty"), { type: "dirty", dirty: true, checking: false });
     assert.match(dom.one("#workflow-renumbered").textContent ?? "", /設計.*2 → 3/);
     assert.equal(saveButton(dom).disabled, false);
     assert.equal(dom.one<HTMLButtonElement>('[data-action="revert"]').disabled, false);
@@ -200,7 +200,7 @@ test("CB-D167 案に戻すと、往復せずに開いたときの答えに戻る
     await dom.settle();
     assert.deepEqual(numbers(dom, "plan"), ["1:調査", "2:設計", "3:実装とテスト", "4:docs"]);
     assert.ok(dom.one("#dirty").classList.contains("hidden"));
-    assert.deepEqual(lastPosted(dom, "dirty"), { type: "dirty", dirty: false });
+    assert.deepEqual(lastPosted(dom, "dirty"), { type: "dirty", dirty: false, checking: false });
     assert.equal(dom.posted.filter((m) => m.type === "order").length, asked);
   } finally {
     await dom.close();
@@ -362,6 +362,27 @@ test("CB-D178 図を出せない答え（計画が空）では、案内の間だ
     await dom.settle();
     assert.equal(dom.all(".plan-graph, .tour-sample").length, 0, "閉じたのに見本が残った");
     assert.equal(dom.posted.filter((message) => message.type === "order" || message.type === "save" || message.type === "dirty").length, 0);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D181 線を変えたら、答えを待つ間も拡張ホストに「確かめている」を知らせる（承認を止める）。答えが届けば、答えの未保存だけになる", async () => {
+  const dom = await openWorkflow();
+  try {
+    const { seq } = removeEdge(dom, "after-1-3");
+    await dom.settle();
+    assert.deepEqual(lastPosted(dom, "dirty"), { type: "dirty", dirty: false, checking: true });
+    // 題の「●」と「未保存」は答えから決める（待つ間はまだ出さない）
+    assert.ok(dom.one("#dirty").classList.contains("hidden"));
+    // 断られた線は引く前のまま。未保存でも確かめ中でもなくなる
+    await dom.send({ type: "answer", seq, answer: planOrderSample("cycle") });
+    await dom.settle();
+    assert.deepEqual(lastPosted(dom, "dirty"), { type: "dirty", dirty: false, checking: false });
+    const again = removeEdge(dom, "after-1-3");
+    await dom.send({ type: "answer", seq: again.seq, answer: planOrderSample("reverse") });
+    await dom.settle();
+    assert.deepEqual(lastPosted(dom, "dirty"), { type: "dirty", dirty: true, checking: false });
   } finally {
     await dom.close();
   }

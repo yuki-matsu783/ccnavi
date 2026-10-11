@@ -15,6 +15,9 @@ import {
   planDiff,
   renumbered,
   saveBlocker,
+  goneReasonOf,
+  restoreAsked,
+  savedShaOf,
   workflowTicketOf,
   workflowTitle,
 } from "../../src/core/workflow-view.js";
@@ -104,7 +107,7 @@ test("CB-T350 画面から届いたものを確かめる。形が崩れていれ
   assert.deepEqual(asWorkflowMessage({ type: "ready" }), { type: "ready" });
   assert.deepEqual(asWorkflowMessage({ type: "adopt" }), { type: "adopt" });
   assert.deepEqual(asWorkflowMessage({ type: "reload", dirty: true }), { type: "reload", dirty: true });
-  assert.deepEqual(asWorkflowMessage({ type: "dirty", dirty: false }), { type: "dirty", dirty: false });
+  assert.deepEqual(asWorkflowMessage({ type: "dirty", dirty: false }), { type: "dirty", dirty: false, checking: false });
   assert.equal(asWorkflowMessage({ type: "dirty", dirty: "no" }), undefined);
   assert.deepEqual(asWorkflowMessage({ type: "order", seq: 3, order }), { type: "order", seq: 3, order });
   assert.equal(asWorkflowMessage({ type: "order", seq: "3", order }), undefined);
@@ -144,4 +147,41 @@ test("CB-T357 案内の見本の計画は、実行ファイルの答えの実例
     "見本が実例とずれた。plan-order.json を書き出し直したら tour-sample.ts の見本も写し直す",
   );
   assert.deepEqual({ ...sample, ticket: real.ticket, source_sha: real.source_sha, plans: real.plans }, real);
+});
+
+test("CB-T360 未保存の知らせは、線の答えを待っている（checking）ことも運ぶ。真偽でなければ偽", () => {
+  assert.deepEqual(asWorkflowMessage({ type: "dirty", dirty: false, checking: true }), { type: "dirty", dirty: false, checking: true });
+  assert.deepEqual(asWorkflowMessage({ type: "dirty", dirty: true, checking: "yes" }), { type: "dirty", dirty: true, checking: false });
+});
+
+test("CB-T361 提案が承認待ちから無くなった理由。新規の親は承認済みか取り下げかを分け、改版は分けられないので言い切らない。まだ承認待ちか、ボードに無い・確かめられないときは何も言わない", () => {
+  assert.equal(goneReasonOf("i0001", false, { proposal: "todo", approved: false }), undefined);
+  assert.equal(goneReasonOf("i0001", true, { proposal: "todo", approved: true }), undefined);
+  assert.match(goneReasonOf("i0001", false, { proposal: null, approved: true }) ?? "", /^i0001 は承認済みです/);
+  assert.match(goneReasonOf("i0001", false, undefined) ?? "", /取り下げ・削除/);
+  assert.match(goneReasonOf("i0001", false, { proposal: null, approved: false }) ?? "", /取り下げ・削除/);
+  // 改版は承認済みの親に対して出すので、承認済みチケットがあっても承認されたとは限らない
+  const revision = goneReasonOf("i0001", true, { proposal: null, approved: true }) ?? "";
+  assert.match(revision, /改版の提案が承認待ちから無くなりました（承認されたか、取り下げ・削除されました）/);
+  assert.doesNotMatch(revision, /承認済みです/);
+  assert.match(goneReasonOf("i0001", true, { proposal: "review", approved: true }) ?? "", /承認されたか/);
+});
+
+test("CB-T362 閉じた後に戻すかを聞くのは、未保存で写しがあり、読み込めていて、保存の途中でないときだけ", () => {
+  const base = { dirty: true, draft: true, loaded: true, saving: false };
+  assert.equal(restoreAsked(base), true);
+  assert.equal(restoreAsked({ ...base, saving: true }), false, "保存を押してすぐ閉じた（書き込みは通る）");
+  assert.equal(restoreAsked({ ...base, dirty: false }), false);
+  assert.equal(restoreAsked({ ...base, draft: false }), false);
+  assert.equal(restoreAsked({ ...base, loaded: false }), false);
+});
+
+test("CB-T363 保存で覚えるハッシュは、書けたときの答え（書いたあとに読み直したもの）だけ", () => {
+  const written = planOrderSample("written", "after-write");
+  assert.equal(savedShaOf({ kind: "written", answer: written }), "after-write");
+  for (const kind of ["unchanged", "changed"] as const) {
+    assert.equal(savedShaOf({ kind, answer: written }), undefined, kind);
+  }
+  assert.equal(savedShaOf({ kind: "refused", answer: written, reason: "r" }), undefined);
+  assert.equal(savedShaOf({ kind: "error", error: "e" }), undefined);
 });

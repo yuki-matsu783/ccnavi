@@ -13,6 +13,7 @@ import * as ts from "typescript";
 
 import {
   approvalStep,
+  blockedBeforeApprove,
   CLOSED,
   type ApprovalEffect,
   type ApprovalState,
@@ -24,6 +25,12 @@ import type { PhaseChip } from "../../src/core/board.js";
 import type { DecidePreview } from "../../src/core/decidemodel.js";
 
 type Step = (state: ApprovalState, input: ApprovalInput) => ApprovalStep;
+/** 遷移のファイルが出すもののうち、ガードの確かめが使うもの（変異させたものも同じ形） */
+interface Machine {
+  readonly approvalStep: Step;
+  readonly blockedBeforeApprove: (tickets: readonly string[], unsaved: readonly string[]) => string[];
+}
+const MACHINE: Machine = { approvalStep, blockedBeforeApprove };
 
 /** 出た効果の配列。中身まで見ない確かめは、この形で比べる */
 function kinds(effects: readonly ApprovalEffect[]): string[] {
@@ -253,7 +260,7 @@ interface Guard {
   /** 置き換えた後（ガードが有効でなくなる形） */
   readonly into: string;
   /** 有効であることの確かめ。**ガードを消したらここが落ちる**（または、そこで投げる） */
-  readonly check: (step: Step) => void;
+  readonly check: (step: Step, machine: Machine) => void;
 }
 
 const GUARDS: readonly Guard[] = [
@@ -532,6 +539,15 @@ const GUARDS: readonly Guard[] = [
         assert.equal(after.state, shown, unsaved.join(","));
         assert.deepEqual(kinds(after.effects), ["warn"], unsaved.join(","));
       }
+    },
+  },
+  {
+    what: "承認を打つ直前に、未保存のワークフロー編集タブがある親が打つ識別子に入っていないかを見る",
+    find: "return tickets.filter((ticket) => held.has(ticket)).sort();",
+    into: "return [];",
+    check(_step, machine) {
+      assert.deepEqual(machine.blockedBeforeApprove(["i0002", "i0001", "i0001-01-01"], ["i0001", "i0002", "i0009"]), ["i0001", "i0002"]);
+      assert.deepEqual(machine.blockedBeforeApprove(["i0001-01-01"], ["i0001"]), [], "子の識別子は親のタブと取り違えない");
     },
   },
   {
@@ -906,9 +922,9 @@ test("CB-T354 一覧を開くとき、タブで保存したときのハッシュ
 
 test("CB-T180 ガードは全部効いている（表の 1 行ずつ）", () => {
   for (const guard of GUARDS) {
-    guard.check(approvalStep);
+    guard.check(approvalStep, MACHINE);
   }
-  assert.equal(GUARDS.length, 19, "ガードを足したら GUARDS にも足す");
+  assert.equal(GUARDS.length, 20, "ガードを足したら GUARDS にも足す");
 });
 
 // --- 変異テスト ---
@@ -922,7 +938,7 @@ const CORE_OUT = path.join(__dirname, "..", "..", "src", "core");
  * TypeScript の文字列を、その場で組み立てて読み込む。型は見ない（`transpileModule`）ので、
  * ガードを消して届かなくなった行が残っていても通る。
  */
-function load(source: string): { readonly approvalStep: Step } {
+function load(source: string): Machine {
   const js = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
     fileName: SOURCE,
@@ -930,7 +946,7 @@ function load(source: string): { readonly approvalStep: Step } {
   const box: { exports: Record<string, unknown> } = { exports: {} };
   const wrapper = vm.runInThisContext(`(function (exports, require, module) {${js}\n})`, { filename: SOURCE });
   wrapper(box.exports, (spec: string) => require(spec.startsWith(".") ? path.join(CORE_OUT, spec) : spec), box);
-  return box.exports as unknown as { readonly approvalStep: Step };
+  return box.exports as unknown as Machine;
 }
 
 test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが落ちる（変異テスト）", () => {
@@ -939,7 +955,7 @@ test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが落
   // 組み立て直したものが、読み込んだものと同じに動くこと。ここが成り立たないと、以下は何も見ていない
   const same = load(source);
   for (const guard of GUARDS) {
-    guard.check(same.approvalStep);
+    guard.check(same.approvalStep, same);
   }
 
   for (const guard of GUARDS) {
@@ -949,7 +965,7 @@ test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが落
     // **`assert.AssertionError` に限る。** 無い持ち物を読んだ `TypeError` で偶然「落ちた」ことに
     // しない（確かめる状態は、ガードを外しても投げない側を選んである）
     assert.throws(
-      () => guard.check(mutated.approvalStep),
+      () => guard.check(mutated.approvalStep, mutated),
       assert.AssertionError,
       `ガードを消しても確かめが通った（か、確かめの外で投げた）: ${guard.what}`,
     );
