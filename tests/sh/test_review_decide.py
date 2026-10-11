@@ -2,7 +2,7 @@
 
 sh を外から呼び、GitLab の代役と実行ファイルの代役で 1 周させる。
 
-見るのは sh の仕事だけ（設計 9.10）。
+見るのは sh の仕事だけ。
 
 1. `--preview` は実行ファイルの答えをそのまま返し、何も投稿しない
 2. `--choices … --digest …` は実行ファイルが書いた下書きから issue を作り、決めた内容をコメントに
@@ -62,7 +62,7 @@ def put_tool(found: str, link: str) -> None:
 
     POSIX ではシンボリックリンク。Windows ではリンクを張る権限が無いことが多く、コピーや
     ハードリンクにすると mingw64 の git / curl が隣の DLL を見つけられず起動しない。
-    だから `exec` で本物へ渡す sh を置く。名前が PATH で引ける、という役目は同じ。
+    だから `exec` で実物へ渡す sh を置く。名前が PATH で引ける、という役目は同じ。
     """
     if not WINDOWS:
         os.symlink(found, link)

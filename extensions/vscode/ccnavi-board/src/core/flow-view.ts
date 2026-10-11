@@ -4,7 +4,7 @@
  * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。渡すのは「いま何を見せるか」
  * （`FlowData`）だけで、画面が返すのはユーザが押した操作（`FlowMessage`）だけ。
  *
- * **着手中かどうかを画面は決めない**。錠は実行ファイルの `--explain --json` の
+ * 着手中かどうかを画面は決めない。錠は実行ファイルの `--explain --json` の
  * `tickets[].flow.locked` をそのまま使う（`flowTargetOf`）。画面はそれを見て欄を止めるだけで、
  * `started_at` などから組み直さない。保存の直前にも拡張ホストが実行ファイルに聞き直す。
  *
@@ -280,7 +280,7 @@ export type FlowMessage =
   | { readonly type: "requestOpen" };
 
 /**
- * 画面から届いたものを確かめる。**形が崩れていたら捨てる**（保存の中身が読めないものを書かない）。
+ * 画面から届いたものを確かめる。形が不正なら捨てる（保存の中身が読めないものを書かない）。
  */
 export function asFlowMessage(message: unknown): FlowMessage | undefined {
   if (typeof message !== "object" || message === null) {

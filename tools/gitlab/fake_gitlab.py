@@ -4,13 +4,13 @@
 
 ## なぜ要るか
 
-本物の GitLab CE は 4GB 要る。手元の機械に無いことが普通にあり、無いままだと
+実際の GitLab CE は 4GB 要る。手元の機械に無いことが普通にあり、無いままだと
 sh の HTTP 経路（curl / gh / glab、jq での組み立て、ページング、投稿、認証）が
 1 行も走らない。そこがいちばん実測できていない場所なので、GitLab と同じ形の JSON を
 返すサーバを立てて、sh の側だけを実際に走らせる。
 
-**これで分かるのは sh が動くことだけ。** 返す形が本物と同じかどうかは分からない。
-本物で確かめる代わりにはならない。
+**これで分かるのは sh が動くことだけ。** 返す形が実物と同じかどうかは分からない。
+実物で確かめる代わりにはならない。
 
 ## 使い方
 
@@ -25,11 +25,11 @@ push だけ手元の bare リポジトリへ向ける（`git remote set-url --pu
 `GITLAB_TOKEN` に下の TOKEN を置くと、sh は curl 経路でここを呼ぶ。
 
 人間役（issue を立てる、スレッドを立てる、解決する、変更要求を出す、マージする）は
-curl で直に呼ぶ。sh と同じ道具を使わないほうが、片方の壊れがもう片方に隠れない。
+curl で直に呼ぶ。sh と同じ道具を使わないほうが、片方の不具合がもう片方に隠れない。
 
 ## 時計をずらしてある
 
-本物のホストと手元の時計は揃わない。揃っている前提の実装がすぐ壊れるので、
+実際のホストと手元の時計は揃わない。揃っている前提の実装がすぐ動かなくなるので、
 既定で 3 分進めてある（SKEW）。
 """
 
@@ -105,7 +105,7 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     # BaseHTTPRequestHandler.handle() と名前がぶつかるので、処理の本体は act に置く。
-    # ぶつけると「本文が届かない」形で静かに壊れる（実測で 30 分溶かした）。
+    # 重なると、気づかないうちに本文が届かなくなる（原因を探すのに 30 分かかった）。
 
     def log_message(self, fmt, *args):
         sys.stderr.write(f"fake-gitlab {self.command} {self.path}\n")
@@ -129,8 +129,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             self._body = json.loads(raw.decode("utf-8"))
         except (ValueError, UnicodeDecodeError) as exc:
-            # UTF-8 でない本文はここで落ちる。Windows のコンソール経由で日本語を
-            # 引数に渡すと CP932 になり、静かに空の本文になる。名指しで言う。
+            # UTF-8 でない本文はここで失敗する。Windows のコンソール経由で日本語を
+            # 引数に渡すと CP932 になり、気づかないうちに本文が空になる。名指しで言う。
             sys.stderr.write(f"fake-gitlab: 本文を読めない ({exc}) raw={raw[:120]!r}\n")
             self._body = {}
         return self._body

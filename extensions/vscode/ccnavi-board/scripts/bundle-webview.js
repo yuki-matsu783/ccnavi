@@ -5,12 +5,12 @@
 // ファイルとして読ませないので、Webview の localResourceRoots は空のままでよく、CSP も nonce だけで済む。
 // tsc は型を見るだけ（tsconfig.webview.json は noEmit）で、JS を出すのは esbuild のほう。
 //
-// **画面の一覧は表で持たない。** `src/webview/<名前>/main.tsx` があるものが画面で、出口は
+// 画面の一覧は表で持たない。 `src/webview/<名前>/main.tsx` があるものが画面で、出口は
 // `out/webview/<名前>.js`。CSS は同じ置き場の `style.css` が入口で、出口は `out/webview/<名前>.css`。
 // 表にすると、画面を足したときに気づかないうちに古くなる
 // （`scripts/test-groups.js` も同じ見つけ方をする。片方だけ直してしまわないように揃えてある）。
 //
-// 読む側（`src/webview-asset.ts` の `webviewScript` / `webviewStyle`）に渡すのは**画面の名前**
+// 読む側（`src/webview-asset.ts` の `webviewScript` / `webviewStyle`）に渡すのは画面の名前
 // （`board-panel.ts` は `webviewScript("board")` と書く）で、拡張子は読む側が付ける。
 // 読む側は名前で引くので、画面が増えても直すところは無い。
 //
@@ -19,7 +19,7 @@
 // 付ける `/* src/webview/board/Card.css */` の行で、どの部品の CSS かがその場で分かる。
 //
 // 古いバンドルを消すのはここではなく scripts/clean-out.js。あちらが out/webview ごと消してから
-// ここが作り直す順で、バンドルする前に消す形にはしない（esbuild が落ちたときに、動いていた画面まで
+// ここが作り直す順で、バンドルする前に消す形にはしない（esbuild が失敗したときに、動いていた画面まで
 // 消えたまま残るため）。
 "use strict";
 

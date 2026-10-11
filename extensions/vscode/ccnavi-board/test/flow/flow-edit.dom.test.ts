@@ -16,7 +16,7 @@ import { openFlow, savedDoc } from "../helpers/flow.js";
 const CTRL = { ctrlKey: true } as const;
 const CTRL_SHIFT = { ctrlKey: true, shiftKey: true } as const;
 
-/** 鍵を放す（keyup）。放さないと React Flow は押したままと読み、Shift での選び足しができない */
+/** キーを離す（keyup）。離さないと React Flow は押したままと読み、Shift での選び足しができない */
 function release(dom: DomPage, name: string): void {
   const Keyboard = (dom.window as unknown as { KeyboardEvent: new (type: string, init: unknown) => unknown }).KeyboardEvent;
   (dom.document as unknown as { dispatchEvent: (event: unknown) => boolean }).dispatchEvent(new Keyboard("keyup", { key: name, bubbles: true }));

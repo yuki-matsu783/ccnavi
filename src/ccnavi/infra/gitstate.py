@@ -204,7 +204,7 @@ def committed(top: str, base: str, timeout: float = TIMEOUT_SECONDS) -> tuple[li
     汚してからコミットすると `git status` から消えるので、`read` だけでは
     「何も起きなかった」と同じ見た目になる。
 
-    数えるのは**このツリーが積んだコミットだけ**（`--first-parent --no-merges`）。
+    数えるのはこのツリーが積んだコミットだけ（`--first-parent --no-merges`）。
     二点の差分（`base..HEAD`）にすると、統合先を取り込んだマージが持ち込んだ
     コミットまで「このターンでコミットに入った」ことになる。ワークツリーを切って
     作業し、`merge <統合先>` を打ってから統合先へ取り込むのがこのリポジトリの手順なので、
@@ -293,7 +293,7 @@ def undo(change: Change) -> str:
     """
     if change.kind == KIND_COMMITTED:
         # コミット済みには 1 つに決まる手順が無い。空を返し、呼ぶ側が
-        # 「戻す手順」の行そのものを落とす。間違った手順を 1 行書くより、
+        # 「戻す手順」の行そのものを省く。間違った手順を 1 行書くより、
         # 書かないほうがよい（revert も reset もラッパースクリプトが拒む）。
         return ""
     quoted = f'"{change.path}"'
@@ -317,7 +317,7 @@ def restore(top: str, change: Change, aside: str, timeout: float = WRITE_TIMEOUT
         return _git(top, ["restore", "--staged", "--worktree", "--", change.path], timeout)
 
     if change.staged:
-        # 索引から落としてから動かす。先に動かすと索引に消えたファイルへの
+        # 索引から外してから動かす。先に動かすと索引に消えたファイルへの
         # 追加が残り、次の status が「消えた」を新しい変更として持ち出す。
         failed = _git(top, ["rm", "--cached", "--", change.path], timeout)
         if failed:
@@ -355,7 +355,7 @@ def committed_text(
     読めた答えなので、読めなかったことにしない。git を起こせない・期限に達した・
     HEAD そのものが無いときは `(None, False)`。
 
-    **呼ぶ側は「読めなかった」を「変わっていない」として扱ってはいけない。** そう扱うと、
+    呼ぶ側は「読めなかった」を「変わっていない」として扱ってはいけない。そう扱うと、
     git を 2 秒止めるだけで、突き合わせを前提にした除外が全部通る。
 
     無いことの確かめに `ls-tree` をもう 1 回起こすのは、`show` の失敗が「HEAD に無い」

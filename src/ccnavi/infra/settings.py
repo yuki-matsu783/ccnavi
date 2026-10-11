@@ -86,7 +86,7 @@ TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
 # INTEGRATION_ENV は統合先の名前。リポジトリには置かず、未設定ならホストのデフォルトブランチ。
 # `done/` とレイヤーと置き場のパスを読むブランチで、親のブランチはここから切る。
-# **ccnavi はこの環境変数を読まない。** 読むのは sh（`ccnavi-sync.sh`）で、sh が環境変数か
+# ccnavi はこの環境変数を読まない。読むのは sh（`ccnavi-sync.sh`）で、sh が環境変数か
 # `.claude/settings.local.json` の `env` から決め、要る所へ `--integration-branch` で渡す。
 # settings.local.json の `env` は Claude Code が起こしたプロセスにしか渡らないので、ユーザが端末で
 # 打つ sh のために、その値だけを `sync paths` が読んで返す（integration_local）。
@@ -136,7 +136,7 @@ DEFAULT_TICKETS = "wip/proposals"
 # 承認済みチケットは ccnavi ディレクトリ（`.ccnavi/`）の下。そこは組み込みが丸ごと止めているので、
 # 別の保護を足さずに済む。ワークスペースの 1 か所ではなくツリーごとに置くのは、
 # 承認をプロジェクトの git で共有するため。承認したユーザの機械にだけ在る形だと、A が承認して
-# B の機械で作業する流れが成り立たない（設計 9.2）。区切りは "/" で持ち、ツリーの
+# B の機械で作業する流れが成り立たない。区切りは "/" で持ち、ツリーの
 # ルートに継ぎ足すときに os の区切りへ直す。
 # 下に `doing/`（作業中）と `done/`（閉じた）と `phases/`（マーカー）が並ぶ。
 DEFAULT_APPROVED = ".ccnavi/approved"
@@ -152,8 +152,7 @@ DEFAULT_PROJECTS = "projects"
 # 置かない（プロジェクトに `.claude/` があると Claude Code がそこのスキルを読み、
 # `--lint` が「ワークツリーでもワークスペースルートでもないのに `.claude/` を持つ」と
 # 警告する）。`config/` でもなく `.ccnavi/` にするのは、3 本とスクリプトを 1 つの
-# ディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で済ませるため
-# （設計 11.2）。
+# ディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で済ませるため。
 DEFAULT_PROJECT_HOME = ".ccnavi"
 # 引用せずにシェルへ渡せるパス。空白とシェルの記号を含まない。
 _BARE_PATH = re.compile(r"[^\s'\"\\$`!*?\[\]{}()<>|&;#~]+")
@@ -216,7 +215,7 @@ LAYER_KINDS = (KIND_RULES, KIND_PHASES, KIND_RISK)
 # レイヤーの設定のファイル名。kind は記録と `--explain --json` の鍵の表記なので、
 # ファイル名とは別に持つ。
 LAYER_FILE_NAMES = {KIND_RULES: "rules.yml", KIND_PHASES: "phases.yml", KIND_RISK: "risks.yml"}
-# レイヤーの名前。記録の `source` と id の前置きに使う表記（設計 11.4）。ruleload が
+# レイヤーの名前。記録の `source` と id の前置きに使う表記。ruleload が
 # 別名で持っているが、実体はここに置く。phases と risk の合成は phase / risk が
 # 行い、そこは ruleload を import できない（ruleload が phase を import する）。
 LAYER_COMMON = "common"
@@ -229,7 +228,7 @@ PROJECT_KEY_HOME = "projects/"
 # ミラーのバックアップの key につける前置き（`rules:mirror/lib`）。
 MIRROR_KEY_HOME = "mirror/"
 
-# レイヤーの種別。そのレイヤーがどこから来たかを、名札の表記とは別に持つ（設計 11.4）。
+# レイヤーの種別。そのレイヤーがどこから来たかを、名札の表記とは別に持つ。
 #
 # 名札の表記では種別を決められない。`projects/common/` の名札は `common` だが
 # 共通レイヤーではないし、`projects/self/` の名札は `self` だがワークスペース自身のレイヤー
@@ -238,7 +237,7 @@ MIRROR_KEY_HOME = "mirror/"
 ORIGIN_COMMON = "common-layer"
 ORIGIN_SELF = "self-layer"
 ORIGIN_PROJECT = "project-layer"
-# プロジェクトの `.ccnavi/common/`（共通レイヤーのミラー。設計 11.12）。ワークスペースの中では
+# プロジェクトの `.ccnavi/common/`（共通レイヤーのミラー）。ワークスペースの中では
 # 判定に読まれないが、守る対象には入る。
 ORIGIN_MIRROR = "mirror-layer"
 
@@ -258,7 +257,7 @@ class LayerFile(NamedTuple):
 
 
 def is_reserved_layer_name(name: str) -> bool:
-    """その名前がレイヤーの名前に予約してあるか（`common` / `self`、設計 11.4）。
+    """その名前がレイヤーの名前に予約してあるか（`common` / `self`）。
 
     予約の判断はここ 1 か所だけで持つ。ruleload（レイヤーを数える・行き先のレイヤーを引く）、
     lint（名指しする）、approval（`project:` を承認しない）、phase / risk
@@ -278,14 +277,14 @@ def approved_dir(conf: Settings, tree_root: str) -> str:
     """このツリーの承認済みチケットの置き場（絶対）。
 
     承認済みチケットとマーカーはそのツリーの git が追跡し、
-    親チケットのブランチに乗って他の機械へ届く（設計 9.2）。
+    親チケットのブランチに乗って他の機械へ届く。
     だから置き場はワークスペースの 1 か所ではなく、ツリーごとに解く。
     """
     return os.path.join(tree_root, (conf.approved or DEFAULT_APPROVED).replace("/", os.sep))
 
 
 def layer_script_home(conf: Settings) -> str:
-    """自身のレイヤーとプロジェクトのレイヤーの `script:` に書ける唯一のパス（設計 11.4.2）。
+    """自身のレイヤーとプロジェクトのレイヤーの `script:` に書ける唯一のパス。
 
     形は `<ccnavi ディレクトリ>/scripts/` で、"/" 区切り。
     解く基準はそのレイヤーの git プロジェクトルート。
@@ -488,7 +487,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
 
 
 def layer_path(conf: Settings, home_root: str, kind: str, layer: str = "") -> str:
-    """レイヤーの設定ファイルの絶対パス。判定と診断が読む先（設計 11.2）。
+    """レイヤーの設定ファイルの絶対パス。判定と診断が読む先。
 
     `home_root` はそのレイヤーの git プロジェクトルート。自身のレイヤーならワークスペースルート、
     プロジェクトのレイヤーならその git プロジェクトルートを渡す。3 種とも同じ形なので、
@@ -549,7 +548,7 @@ def own_source_tree(root: str) -> bool:
 def _read_local(root: str) -> tuple[dict | None, list[str]]:
     """上書き設定を読む。
 
-    壊れたファイルは報告して読み飛ばす。設定ファイルが壊れていることを理由に
+    不正なファイルは報告して読み飛ばす。設定ファイルが不正であることを理由に
     判定を拒むと、書き損じたカンマ 1 つでガードが消えることになる。
     """
     path = os.path.join(root, LOCAL_FILE)
@@ -606,7 +605,7 @@ def integration_local(root: str) -> str:
 
     環境変数は読まない。sh が環境変数を先に見て、空のときにこれを使う。ユーザが端末で打つ sh には
     settings.local.json の `env` が渡らないので、JSON を読む役をここが持つ（sh は jq を使わない）。
-    ファイルが無い・読めない・値が文字列でないときは空を返す（既定の統合先に落ちる）。
+    ファイルが無い・読めない・値が文字列でないときは空を返す（既定の統合先になる）。
     """
     try:
         with open(os.path.join(root, LOCAL_CLAUDE_SETTINGS), encoding="utf-8") as f:
@@ -617,7 +616,7 @@ def integration_local(root: str) -> str:
     value = env.get(INTEGRATION_ENV) if isinstance(env, dict) else None
     if not isinstance(value, str):
         return ""
-    # 1 行で返す契約（sh は jq を使わず 1 行 1 項目で読む）。改行を含む値は使えないので空に落とす。
+    # 1 行で返す契約（sh は jq を使わず 1 行 1 項目で読む）。改行を含む値は使えないので空にする。
     return "" if ("\n" in value or "\r" in value) else value.strip()
 
 
@@ -626,7 +625,7 @@ def integration_recorded(state: str) -> str:
 
     `<state の置き場>/sync/self/integration/head` の `branch` の行（1 行 1 項目）。
     取り込み結果が無い・読めない・途中にシンボリックリンクがあるときは空（既定の予約だけになる）。
-    環境変数は読まない。取り込み結果の中のリンクは辿らない（コピーするときに落としてあり、
+    環境変数は読まない。取り込み結果の中のリンクは辿らない（コピーするときに除いてあり、
     読む側でも辿らない決まり）。
     """
     if not state:

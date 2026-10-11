@@ -10,7 +10,7 @@ keywords: [設計, 画面, approval-machine, 見た目, ScreenHost, screenHost, 
 
 ## 承認のオーバーレイ
 
-この画面の遷移は `core/approval-machine.ts` の 1 か所にまとめてある。散らばっていると必要なガード条件を書き落とすため。「この状態ではこれを受けない」というガード条件は、そのファイルの先頭の表にある。`board-panel.ts` は入力を渡し、返ってきた「やること」を実行するだけ。単体テストは CB-T169〜181（CB-T181 は、ガード条件を 1 つ消すとテストが落ちることを確かめる変異テスト）。
+この画面の遷移は `core/approval-machine.ts` の 1 か所にまとめてある。散らばっていると必要なガード条件を書き漏らすため。「この状態ではこれを受けない」というガード条件は、そのファイルの先頭の表にある。`board-panel.ts` は入力を渡し、返ってきた「やること」を実行するだけ。単体テストは CB-T169〜181（CB-T181 は、ガード条件を 1 つ消すとテストが失敗することを確かめる変異テスト）。
 
 ## 見た目
 
@@ -38,7 +38,7 @@ keywords: [設計, 画面, approval-machine, 見た目, ScreenHost, screenHost, 
 |---|---|
 | バンドルと回り方 | **どちらも直さない。** パスの付け方の約束で決まる。画面は `src/webview/<名前>/main.tsx`、バンドルした出口は `out/webview/<名前>.js`、CSS は `src/webview/<名前>/style.css` → `out/webview/<名前>.css`、テストの入口は `test/helpers/<名前>.ts`、グループは `test/<名前>/`。`bundle-webview.js` と `test-groups.js` が同じ見つけ方でディスクから拾う |
 | 回すものの決まり方 | 触ったファイルがどの画面のバンドルに入るかを閉包で見る（スクリプトは `main.tsx` から `import`、CSS は `style.css` から `@import`。置き場のパスでは決めない）。どの画面にも入らないもの（`webview/vscode.ts`・`webview/styles/` など）は全画面に関わると見る。画面と同じ名前のグループは、`test/helpers/<名前>.ts` を作り忘れても必ず回る |
-| 契約に置く型 | 画面に渡す形（`ProjectsPage` のような）は契約の側（`*-view.ts`）に置く（`core/` の判定のファイルに置くと、`node:path` を読むファイルを辿って画面の型検査が落ちる） |
+| 契約に置く型 | 画面に渡す形（`ProjectsPage` のような）は契約の側（`*-view.ts`）に置く（`core/` の判定のファイルに置くと、`node:path` を読むファイルを辿って画面の型検査が失敗する） |
 
 **段取りは 2 系統ある。パネルの `retainContextWhenHidden` と対で選ぶ**。
 

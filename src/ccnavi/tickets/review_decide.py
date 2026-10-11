@@ -1,6 +1,6 @@
 """残った指摘の行き先を決める。`ccnavi --reviewed` の決め方と `ccnavi review decide`。
 
-レビューで残った指摘を、ユーザが指摘ごとに「このまま・直す・issue に回す」から選ぶ（設計 9.10）。
+レビューで残った指摘を、ユーザが指摘ごとに「このまま・直す・issue に回す」から選ぶ。
 選んだ結果の下書き（コメントと issue）を state の置き場に書き、sh がそれを投稿する。
 下書きのファイル名・目印・`--json` の形は sh とボードとの契約で、値と形を変えない。
 review から分けた。review を読む末端で、review からは読まれない。
@@ -34,7 +34,7 @@ DECIDE_FILE = "review-decide-{parent}-{phase}.md"
 DECIDE_ISSUE_FILE = "review-issue-{parent}-{phase}.md"
 
 
-# 残った指摘の行き先。ユーザが指摘ごとに選ぶ（設計 9.10）。
+# 残った指摘の行き先。ユーザが指摘ごとに選ぶ。
 CHOICE_KEEP = "keep"
 CHOICE_FIX = "fix"
 CHOICE_ISSUE = "issue"
@@ -93,7 +93,7 @@ class Decision:
     ph: phase.Phase
     result: review_host.Result
     unresolved: list[review_host.Thread]
-    # issue に回せるか。回せるのはフィードバック計画が承認されたあと（設計 9.11）。
+    # issue に回せるか。回せるのはフィードバック計画が承認されたあと。
     can_issue: bool
 
 
@@ -613,7 +613,7 @@ def _reviewed_in_chat(
     ph: phase.Phase,
     accept_unresolved: bool,
 ) -> int:
-    """このセッションで見たフェーズを、ユーザが端末で通す（設計 9.8）。
+    """このセッションで見たフェーズを、ユーザが端末で通す。
 
     ホストへ出ないので取得した結果も依頼の記録も無い。代わりに見るのは 3 つ。宣言が `chat` で
     あること（`mr` と宣言したフェーズを手軽な経路で通させない）と、フェーズが終わって

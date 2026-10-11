@@ -28,7 +28,7 @@ def layer_where(name: str) -> str:
 
 
 def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]:
-    """レイヤーに食い違いが無いか（設計 11.9、REQ-MLT-16）。
+    """レイヤーに食い違いが無いか。
 
     見るのは 2 つ。レイヤーのファイルが読めることと、レイヤーをまたいだ重複と同名の衝突。
     `.ccnavi/config/` が無いことは言わない。
@@ -72,7 +72,7 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
 
 
 def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
-    """各レイヤーの phases / risk が、共通レイヤーと合成できるか（設計 11.4.1、11.4.2）。
+    """各レイヤーの phases / risk が、共通レイヤーと合成できるか。
 
     見るのは合成したあとの内容。同 `id` で中身が違う、`title` がレイヤーをまたいで重なる、
     `levels` が逆転する、`script:` がレイヤーの外を指すか指す先が無い、を error で言い、
@@ -99,9 +99,9 @@ def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
-    """ワークツリーの ccnavi ディレクトリに、元リポジトリに無いファイルがあるか（設計 11.6）。
+    """ワークツリーの ccnavi ディレクトリに、元リポジトリに無いファイルがあるか。
 
-    判定が読むのは元リポジトリに checkout されている版だけ（REQ-MLT-04）。
+    判定が読むのは元リポジトリに checkout されている版だけ。
     ワークツリーの `.ccnavi/` に足したファイルは、そのブランチが統合されるまで使われない。
     使われないものを書いたユーザは、書いたとおりに使われていると思ったまま進む。統合の前に
     気づけるように、ここで名前を挙げる。
@@ -113,8 +113,8 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
     差分が拾う。ここが拾うのは、元リポジトリに無くて差分にも出ない新しいパスのほう。
 
     承認済みの領域（承認済みチケット・マーカー・子の記録・フロー）は数えない（ユーザの決定）。
-    承認済みチケットは親のワークツリーに置かれ、判定もフローの案内もそのツリーの版を読む
-    （設計 9.2・9.3.1）。「統合されるまで使われない」は当てはまらず、言えば誤った案内になる。
+    承認済みチケットは親のワークツリーに置かれ、判定もフローの案内もそのツリーの版を読む。
+    「統合されるまで使われない」は当てはまらず、言えば誤った案内になる。
     """
     problems: list[Problem] = []
     home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("/", os.sep)
@@ -126,7 +126,7 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
                 continue
             if work.project and rel.startswith(f"{settings.COMMON_DIR}/"):
                 # プロジェクトのワークツリーの `.ccnavi/common/` は、親の着手がミラーした
-                # 共通レイヤー（設計 11.12）。ワークスペースの中では読まれないので、言わない。
+                # 共通レイヤー。ワークスペースの中では読まれないので、言わない。
                 continue
             where = os.path.normcase(
                 os.path.normpath(os.path.join(work.root, home, rel.replace("/", os.sep)))
@@ -146,15 +146,15 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _sync(conf: settings.Settings, root: str) -> list[Problem]:
-    """取り込み状態と、取り込み済みの親子のチケットで本物とする側（親のブランチ上のチケットだけを本物とする）。
+    """取り込み状態と、取り込み済みの親子のチケットで正とする側（親のブランチ上のチケットだけを正とする）。
 
     - 親のワークツリー（名前が親の識別子）なのに HEAD が別のブランチ: warn（移行の検査）
-    - 親子のチケットの取り込み状態が壊れている・gone・blocked、
+    - 親子のチケットの取り込み状態が不正である・gone・blocked、
       `present` なのに親のワークツリーが無い: error（その親子のチケットは決まらないので、
       承認も状態の操作も止まる）。閉じた親子のチケットは、
       親のワークツリーが残っていれば info（片付けてよい）、
       片付いていれば何も言わない（削除せずに残す取り込み状態）
-    - 統合先の取り込み結果が壊れている・無い・読めない: error（識別子の再利用を確かめられない）
+    - 統合先の取り込み結果が不正である・無い・読めない: error（識別子の再利用を確かめられない）
     - 作業ツリーのレイヤーと統合先の取り込み結果のレイヤーが違う: warn
 
     親のワークツリーの外にしか無いチケット（移行の検査）は、チケットの `blocked` として
@@ -221,7 +221,7 @@ def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem
                 f"({tree.WORKTREES_DIR.replace(os.sep, '/')}/{work.name})",
                 f"親 {work.name} のワークツリーが {branch or '（ブランチの外）'} の上に居る。"
                 f"{named}で、取り込み（ccnavi-sync.sh）と"
-                "本物とする側の検査はそのブランチだけを見る。"
+                "正とする側の検査はそのブランチだけを見る。"
                 "親が閉じるのを待ってから、ブランチを切り替えてください",
             )
         )

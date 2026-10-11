@@ -175,7 +175,7 @@ def install(bin_dir: str, python: str) -> None:
     os.makedirs(bin_dir, exist_ok=True)
     for name, text in (
         ("curl", f"#!/bin/sh\nexec '{python}' '{os.path.abspath(__file__)}' curl \"$@\"\n"),
-        # glab があっても使わせない（認証の無い glab は疎通の試しで落ちて curl に切り替わる）
+        # glab があっても使わせない（認証の無い glab は疎通の試しで失敗して curl に切り替わる）
         ("glab", "#!/bin/sh\nexit 1\n"),
     ):
         path = os.path.join(bin_dir, name)

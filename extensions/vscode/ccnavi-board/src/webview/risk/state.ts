@@ -1,11 +1,11 @@
 /**
  * リスク管理画面が編集中に持つもの。配点のコピー（`Draft`）と、開いている項目。
  *
- * 契約の `RiskForm` は配列だけを持つが、画面は**行ごとに動かない鍵**が要る（足す・消す・
+ * 契約の `RiskForm` は配列だけを持つが、画面は行ごとに動かない鍵が要る（足す・消す・
  * 並べ替えの間、React が同じ行を同じ行として描き直せるように）。id はユーザが打つもので、
  * 空にも重複にもなるので鍵には使えない。鍵は画面の中だけのもので、拡張ホストへは渡さない。
  *
- * 開いている項目は Webview の state（`{ open: [id, …] }`）に残す。**残すのは id** で、
+ * 開いている項目は Webview の state（`{ open: [id, …] }`）に残す。残すのは id で、
  * 鍵は画面を作り直すと変わるため。id が空の行は残せない。
  */
 import type { FactorForm, LevelName, RiskForm } from "../../core/risk-view.js";
@@ -36,7 +36,7 @@ export function draftOf(form: RiskForm, nextKey: () => string): Draft {
   return { levels: form.levels, rows: form.factors.map((factor) => ({ key: nextKey(), factor })) };
 }
 
-/** 拡張ホストへ返す形に戻す。鍵は落とす */
+/** 拡張ホストへ返す形に戻す。鍵は除く */
 export function formOf(draft: Draft): RiskForm {
   return { levels: draft.levels, factors: draft.rows.map((row) => row.factor) };
 }

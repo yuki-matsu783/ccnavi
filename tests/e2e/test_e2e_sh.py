@@ -1,7 +1,7 @@
-"""モード B の受入テスト。本物のワークスペースを組み立てて sh を外から呼ぶ。
+"""モード B の受入テスト。実際のワークスペースを組み立てて sh を外から呼ぶ。
 
 モード B は、道具を持つワークスペースの下の `projects/<名前>/` に別々のリポジトリを
-clone する形（設計 11）。ここで確かめるのは、保護済み sh が「自分の根」を
+clone する形。ここで確かめるのは、保護済み sh が「自分の根」を
 ワークスペースルートとして正しく取れること、その結果として記録・実行ファイル・
 状態の置き場がワークスペース側に揃うこと、そしてモード A（`projects/` が無い形）が
 退行しないこと。
@@ -26,7 +26,7 @@ git init と worktree add を何度も行い、実行ファイルをコピーす
 読み返すのは標準出力・標準エラー・終了コードと、ファイルシステムに出たものだけ。
 スクリプトの中の変数も関数も見ない。
 
-**ここで確かめないもの。** `ccnavi-review.sh close-early` のブランチ名にスラッシュがある場合
+ここで確かめないもの。 `ccnavi-review.sh close-early` のブランチ名にスラッシュがある場合
 （`feature/x` で存在しないディレクトリを指す）は、リモートと `gh` が要るのでここには
 入れない。実装とレビューで確かめる。
 """
@@ -47,12 +47,12 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 def walk_up_for(relative, skip_worktrees=True):
     """`ROOT` から上へ歩いて、`relative` を持つディレクトリの中身を返す。
 
-    実装（`ccnavi_workspace`）と同じ規則にしてある。**`.claude/worktrees/` の下は
-    候補にしない。**
+    実装（`ccnavi_workspace`）と同じ規則にしてある。`.claude/worktrees/` の下は
+    候補にしない。
 
     これを外すと、ワークツリーから回したときにワークツリー自身を見つけてしまう。`.ccnavi/scripts/`
     は git で共有されるのでどのワークツリーにもコピーがあるが、実際に使われるのはワークスペース側の
-    1 本だけ。コピーしたあとにワークツリーから回すと、コピーする前の版を測って落ちる（実際に
+    1 本だけ。コピーしたあとにワークツリーから回すと、コピーする前の版を測って失敗する（実際に
     起きた）。`dist/` は追跡外なのでワークツリーには無く、こちらは上へ歩くだけでよい。
 
     見つからなければ `ROOT` 直下のパスを返す。呼ぶ側の skip 判定がそれを見る。
@@ -127,14 +127,14 @@ def assertGotPastTheRoot(case, result):
     """根の導出より先へ進んだこと。
 
     確かめられないまま合格するのを防ぐ。根の導出が誤っていると、スクリプトは実行ファイルを
-    プロジェクトの中に探して落ちる。その手前で終わった実行を「漏れなかった」
+    プロジェクトの中に探して失敗する。その手前で終わった実行を「漏れなかった」
     「作らなかった」と数えると、テストの結果が実際と食い違う。
     """
     blob = (result.stdout or "") + (result.stderr or "")
     case.assertNotIn(
         "実行ファイルが無い",
         blob,
-        "根の導出で落ちている。この実行は中身を確かめていない",
+        "根の導出に失敗している。この実行は中身を確かめていない",
     )
 
 
@@ -163,8 +163,8 @@ class WorkspaceTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # どこを測ったかを出す。通るか落ちるかが「コピーしたかどうか」と食い違ったとき、
-        # 最初に見る情報がこれ。出していなかったせいで、コピー済みなのに落ちた
+        # どこを測ったかを出す。通るか失敗するかが「コピーしたかどうか」と食い違ったとき、
+        # 最初に見る情報がこれ。出していなかったせいで、コピー済みなのに失敗した
         # 原因（ワークツリーの古いコピーを見ていた）を突き止めるのに 1 往復かかった。
         print(f"\n  sh = {SH_DIR}\n  exe = {DIST}", flush=True)
         cls.tmp = tempfile.mkdtemp(prefix="ccnavi-e2e-")
@@ -254,7 +254,7 @@ class WorkspaceTest(unittest.TestCase):
 
 
 class LogPlacementTest(WorkspaceTest):
-    """記録はワークスペースの logs/<プロジェクト>/ に出る（REQ-MLT-14、設計 4.1）。"""
+    """記録はワークスペースの logs/<プロジェクト>/ に出る。"""
 
     def test_inside_a_project(self):
         p1 = os.path.join(self.ws, "projects", "p1")
@@ -281,7 +281,7 @@ class LogPlacementTest(WorkspaceTest):
         self.assertLogsIn("logs", result)
 
     def test_the_returned_path_can_be_opened_from_anywhere(self):
-        """返すパスは、cwd がプロジェクトでも開ける形であること（設計 4.1）。"""
+        """返すパスは、cwd がプロジェクトでも開ける形であること。"""
         p1 = os.path.join(self.ws, "projects", "p1")
         result = self.run_sh("ccnavi-git.sh", "status", cwd=p1)
         shown = result.stdout
@@ -292,7 +292,7 @@ class LogPlacementTest(WorkspaceTest):
         opened = False
         for piece in shown.replace("\n", " ").split():
             candidate = piece.strip("()")
-            # ラッパースクリプトは `log=<パス>` の形で返す。接頭辞を落としてから開く。
+            # ラッパースクリプトは `log=<パス>` の形で返す。接頭辞を取り除いてから開く。
             if "=" in candidate:
                 candidate = candidate.split("=", 1)[1]
             if not candidate.endswith(".log"):
@@ -305,7 +305,7 @@ class LogPlacementTest(WorkspaceTest):
 
 
 class BinaryDiscoveryTest(WorkspaceTest):
-    """実行ファイルはワークスペースの dist/ にある（設計 4.2、4.3）。"""
+    """実行ファイルはワークスペースの dist/ にある。"""
 
     def test_ticket_script_finds_the_binary_from_inside_a_project(self):
         p1 = os.path.join(self.ws, "projects", "p1")
@@ -323,7 +323,7 @@ class BinaryDiscoveryTest(WorkspaceTest):
 
 
 class PushGuardTest(WorkspaceTest):
-    """子チケットのワークツリーからは送らない（設計 4.1）。"""
+    """子チケットのワークツリーからは送らない。"""
 
     def test_a_child_worktree_cut_from_a_project_cannot_push(self):
         ticket = os.path.join(self.ws, ".ccnavi", "approved", "doing", "wp1.md")
@@ -339,7 +339,7 @@ class PushGuardTest(WorkspaceTest):
 
 
 class WorktreeAddTest(WorkspaceTest):
-    """ワークツリーはワークスペースの .claude/worktrees/ の下に切る（設計 4.1）。"""
+    """ワークツリーはワークスペースの .claude/worktrees/ の下に切る。"""
 
     def cleanup_worktree(self, name):
         path = os.path.join(self.ws, ".claude", "worktrees", name)
@@ -391,7 +391,7 @@ class WorktreeAddTest(WorkspaceTest):
 
 
 class CredentialTest(WorkspaceTest):
-    """origin に埋まった資格情報は、どの出口でも出さない（設計 4.3）。"""
+    """origin に埋まった資格情報は、どの出口でも出さない。"""
 
     def set_origin(self, url):
         p1 = os.path.join(self.ws, "projects", "p1")
@@ -408,7 +408,7 @@ class CredentialTest(WorkspaceTest):
         """伏せた結果を目で比べない。元のトークンの断片で探す。
 
         「消えているつもりで残っている」形は、パスを見比べると見落とす。
-        origin を読む処理まで届いたことも確かめる。届く前に落ちた実行を
+        origin を読む処理まで届いたことも確かめる。届く前に失敗した実行を
         「漏れなかった」と数えると、穴が開いたままテストが通る。
         """
         assertGotPastTheRoot(self, result)
@@ -432,7 +432,7 @@ class CredentialTest(WorkspaceTest):
 
 
 class WorkspaceDiscoveryTest(WorkspaceTest):
-    """ワークスペースルートの探し方（設計 2）。"""
+    """ワークスペースルートの探し方。"""
 
     def test_the_override_is_honoured(self):
         other = os.path.join(self.tmp, "ws2")
@@ -449,7 +449,7 @@ class WorkspaceDiscoveryTest(WorkspaceTest):
         os.makedirs(empty, exist_ok=True)
         p1 = os.path.join(self.ws, "projects", "p1")
         result = self.run_sh("ccnavi-git.sh", "status", cwd=p1, env={"CCNAVI_WORKSPACE": empty})
-        self.assertNotEqual(0, result.returncode, "目印の無い場所を黙って受けた")
+        self.assertNotEqual(0, result.returncode, "目印の無い場所を何も言わずに受け入れた")
 
     def test_outside_any_workspace_it_stops_and_says_how(self):
         stray = os.path.join(self.tmp, "stray")
@@ -461,7 +461,7 @@ class WorkspaceDiscoveryTest(WorkspaceTest):
 
 
 class HookTest(WorkspaceTest):
-    """tests/ を持たないツリーでターンを止めない（設計 4.4）。"""
+    """tests/ を持たないツリーでターンを止めない。"""
 
     def test_a_tree_without_tests_is_skipped(self):
         p1 = os.path.join(self.ws, "projects", "p1")
@@ -487,7 +487,7 @@ class HookTest(WorkspaceTest):
 
 @unittest.skipIf(SKIP, SKIP)
 class ModeATest(unittest.TestCase):
-    """projects/ が無いワークスペースで、11 の前と同じに動くこと（REQ-MLT-15）。"""
+    """projects/ が無いワークスペースで、モード B が入る前と同じに動くこと。"""
 
     @classmethod
     def setUpClass(cls):

@@ -91,7 +91,7 @@ class VerdictTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, "判定を持たないイベントで止めてはいけない")
         self.assertEqual(result.stdout, "")
 
-    def test_直接起動は黙って成功せず失敗する(self):
+    def test_直接起動は成功とならず失敗する(self):
         result = run(payload="")
 
         self.assertNotEqual(
@@ -174,7 +174,7 @@ class ReasonTest(unittest.TestCase):
                 self.assertIn("[ccnavi] DENY_", part, "理由コードを他の件に預けている")
                 self.assertIn("(rule: ", part, "出所を他の件に預けている")
 
-    def test_読めなかった判定は件ごとにそう名乗る(self):
+    def test_読めなかった判定は件ごとに読めなかったと書く(self):
         # 読めなかったという断りは、1 回だけ先頭に置くと、その下の 1 件だけを
         # 読んだユーザには届かない。届かなかったユーザは、書いた覚えのないコマンドを
         # 実行したと告げられたことになる。
@@ -204,7 +204,7 @@ class ReadingTest(unittest.TestCase):
     def test_コマンドについて書くことは実行ではない(self):
         # ルールはコマンドについて書かれたものであって文字列についてではない。
         # 生の文字列を探すと、そのコマンドに言及した文書・検索・メッセージが
-        # すべてコマンドに見え、返る拒否は本物と見分けが付かない。
+        # すべてコマンドに見え、返る拒否は実物と見分けが付かない。
         # どれも実際に出た拒否。
         for command in [
             'grep -n "git push" README.md',
@@ -250,7 +250,7 @@ class ReadingTest(unittest.TestCase):
                 out = verdict(self, run(payload=pre_tool_use("Bash", "command", command)))
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
 
-    def test_読めなかった拒否はそう名乗る(self):
+    def test_読めなかった拒否は読めなかったと書く(self):
         # 文字列をコードとして実行する呼び出しは読めないので、生の文字列に当てる。
         # それを言うことが「禁止されたコマンドを実行した」と
         # 「その語がどこかにある」の違いで、次の一手を残すのは後者だけ。
@@ -262,14 +262,14 @@ class ReadingTest(unittest.TestCase):
 
         plain = verdict(self, run(payload=pre_tool_use("Bash", "command", "git push origin main")))
         self.assertNotIn(
-            "raw text", plain["permissionDecisionReason"], "読めた拒否が読めなかったと名乗った"
+            "raw text", plain["permissionDecisionReason"], "読めた拒否に読めなかったと書かれている"
         )
 
 
 class HeredocTest(unittest.TestCase):
     def test_ヒアドキュメントは止まる(self):
         # ヒアドキュメントで書いたファイルは、Write / Edit に掛かる権限の宣言も
-        # 編集後の検査も通らない。中身をファイルに落とす経路がそこだけ止められずに
+        # 編集後の検査も通らない。中身をファイルに書き出す経路がそこだけ止められずに
         # 通るので、書き出す形も、プログラムへ渡す形も同じように止める。
         for command in [
             "cat <<'EOF' > notes.md\nhello\nEOF",
@@ -307,9 +307,9 @@ class HeredocTest(unittest.TestCase):
         # 走査は引用の中の << をヒアドキュメントと読まないが、その先の shlex は
         # 引用された << と素の << を同じトークンで返す。走査が読まなかった << が
         # トークンに出たら、閉じない本文として縮退させ、ヒアドキュメントに見えて止まる。
-        # 直す対象ではなく、許容すると決めた誤検知として設計に書いてある
-        # （設計 6.3、12.2）。このテストは、次に来た人が
-        # 何も言わずに直して別のところを壊さないように、決めた側を固定する。
+        # 直す対象ではなく、許容すると決めた誤検知として設計に書いてある。
+        # このテストは、次に来た人が何も言わずに直して別のところを壊さないように、
+        # 決めた側を固定する。
         out = verdict(self, run(payload=pre_tool_use("Bash", "command", 'grep -n "<<" README.md')))
 
         self.assertEqual(out.get("permissionDecision"), "deny")
@@ -368,7 +368,7 @@ class RecordTest(unittest.TestCase):
             # セッション開始は判定を持つイベントになった。大きい対象のバックアップを
             # ここで 1 度だけ取る。
             ("allow", None),
-            # 判定を持たないイベントは、誤りではなく、そのまま通す（REQ-HKS-03）。
+            # 判定を持たないイベントは、誤りではなく、そのまま通す。
             ("skip", "event-not-checked"),
         ]
         for i, (decision, reason) in enumerate(want):

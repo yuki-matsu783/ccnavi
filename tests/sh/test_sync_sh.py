@@ -619,7 +619,7 @@ class SyncTest(SyncHarness):
         self.assertEqual("closed", self.closed_after_delete()[0])
 
     def test_nothing_to_compare_is_not_closed(self):
-        # どの欄でも照合できない（空どうし、空文字）なら閉じていない側に倒し、止めて戻し方を出す。
+        # どの欄でも照合できない（空どうし、空文字）なら閉じていない扱いにして止め、戻し方を出す。
         bare = copy_text(base_sha="''", started_at="")
         self.mine(bare)
         self.close_on_main(bare)
@@ -719,7 +719,7 @@ class SyncTest(SyncHarness):
         self.assertFalse(os.path.exists(self.record))
 
     def test_an_unknown_merge_answer_does_not_write_gone(self):
-        # API が落ちた・道具が無い。none のときだけ gone を書く。
+        # API が失敗した・道具が無い。none のときだけ gone を書く。
         for text, code in (("unknown", 3), ("", 2), ("", 0), ("merged?", 0)):
             with self.subTest(text=text, code=code):
                 self.review_says(text, code)
@@ -1027,7 +1027,7 @@ class SyncTest(SyncHarness):
         self.assertFalse(os.path.exists(self.record))
 
     def test_a_project_without_families_does_not_fail_the_run(self):
-        # 引数を省いた回で、親子のチケットの無いプロジェクトの ls-remote が落ちても 1 にしない。
+        # 引数を省いた回で、親子のチケットの無いプロジェクトの ls-remote が失敗しても 1 にしない。
         project = os.path.join(self.ws, "projects", "p")
         git(self._tmp.name, "init", "-q", "-b", "main", project)
         git(project, "remote", "add", "origin", os.path.join(self._tmp.name, "nowhere.git"))
@@ -1089,7 +1089,7 @@ class SyncTest(SyncHarness):
         self.assertTrue(os.path.isdir(lock))
 
     def test_an_old_lock_with_leading_zeros_is_taken_over(self):
-        # 先頭の 0 を 8 進に読んで落ちない。pid を確かめられない（別の OS）ので時刻で古いと見る。
+        # 先頭の 0 を 8 進に読んで失敗しない。pid を確かめられない（別の OS）ので時刻で古いと見る。
         lock = self.own_lock("0123", "0000000001", os_part="OtherOS")
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
@@ -1171,7 +1171,7 @@ class SyncTest(SyncHarness):
 class PlacesAreNotReadTest(SyncHarness):
     """置き場を動かす環境変数は読まない（置き場は固定。A9）。
 
-    `.ccnavi/scripts/` が写す版（i0064-10）になる前は落ちる。写す前の sh は、
+    `.ccnavi/scripts/` が写す版（i0064-10）になる前は失敗する。写す前の sh は、
     `ccnavi-common.sh` の `ccnavi_state` が `CCNAVI_STATE` を、`ccnavi_parent_tree` が
     `CCNAVI_TICKETS_APPROVED`・`CCNAVI_TICKETS_PROPOSAL` を読み、`ccnavi-sync.sh` の予備が
     `CCNAVI_TICKETS_*`・`CCNAVI_PROJECT_HOME` を、`projects` が `CCNAVI_PROJECTS` を読むため。
@@ -1234,7 +1234,7 @@ class PlacesAreNotReadTest(SyncHarness):
     def test_the_fallback_without_an_answer_uses_the_defaults(self):
         """実行ファイルが `sync paths` に空で答える道（予備）。sh が既定の綴りを直に使う。
 
-        `sync paths` だけを空で返し、ほか（`c1 family` の `branch` の行）は本物に答えさせる。
+        `sync paths` だけを空で返し、ほか（`c1 family` の `branch` の行）は実際のものに答えさせる。
         `c1 family` まで空だと、sh は親のブランチ名を知らずに取り込みを止める。
         """
         self.arrange()

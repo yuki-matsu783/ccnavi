@@ -280,7 +280,7 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
     );
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     assert.equal(dom.all("#ccnavi-loading").length, 0);
-    // 行の鍵は画面の中で数え続けるので、描き直した行は別の鍵になる
+    // 行のキーは画面の中で数え続けるので、描き直した行は別のキーになる
     assert.ok(dom.all(".phase").length > 0);
   } finally {
     await dom.close();
@@ -368,14 +368,14 @@ test("CB-D94 関係の欄は矢印でフォーカスだけを動かし、Space �
   }
 });
 
-test("CB-D87 関係の欄は、前後の空白と空を落として読み、無い id と自分自身は目印を付けて出す。id を打つ欄は無い", async () => {
+test("CB-D87 関係の欄は、前後の空白と空を除いて読み、無い id と自分自身は目印を付けて出す。id を打つ欄は無い", async () => {
   const base = readPhases(SAMPLE_PHASES_TEXT).model;
   const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: [" design ", "", "acceptance", "外の種類"] } : p));
   const dom = await openPhases({ model: { ...base, form: { ...base.form, phases } } });
   try {
     dom.click(dom.one(`${rowSelector("p3")} .row-head`));
     await dom.settle();
-    // 前後の空白は落として読み、空は出さない。自分自身とこのファイルに無い id は外せるように目印を付けて出す
+    // 前後の空白は除いて読み、空は出さない。自分自身とこのファイルに無い id は外せるように目印を付けて出す
     const checked = dom.all<HTMLOptionElement>(`${rowSelector("p3")} .f-overlap option`).filter((option) => option.selected);
     assert.deepEqual(checked.map((option) => option.value), ["design", "acceptance", "外の種類"]);
     const foreign = dom.all(`${rowSelector("p3")} .f-overlap .id-option.foreign`).map((option) => option.textContent);

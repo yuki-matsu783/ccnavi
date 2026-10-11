@@ -1,8 +1,8 @@
 /**
- * ホストの応答の見本（test/fixtures/host/gitlab/<場面>/）を返す GitLab の代役。見本は本物の形に合わせて
+ * ホストの応答の見本（test/fixtures/host/gitlab/<場面>/）を返す GitLab の代役。見本は実際の形に合わせて
  * 手で組んだもの。
  *
- * リポジトリの sh の試験（tests/sh/gitlab_host.py）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える:
+ * リポジトリの sh の試験（tests/sh/gitlab_host.py）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える。
  *
  * - `GET /api/v4/projects/<namespace と project をまとめて符号化>` → `{"id": 42}`（入れ子のグループも同じ表記）
  * - `GET .../merge_requests?state=opened&source_branch=<b>` → `b` が場面のもの（`scene.json`。差し替えられる）なら

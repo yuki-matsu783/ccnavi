@@ -148,7 +148,7 @@ test("CB-T246 一時ファイルは呼ぶたびに別の名前で書き、終わ
       assert.deepEqual(fs.readFileSync(file), bytes);
       return { ok: true, value: answer([]) };
     });
-    // 落ちても消す
+    // 失敗しても消す
     await assert.rejects(lintFlowText("x", dir, SHOWN, async () => {
       throw new Error("boom");
     }));
@@ -169,7 +169,7 @@ test("CB-T247 答えに読んだ中身（flow）が無ければ通さない（�
     // lint の JSON の読み手は flow を持ち越す。無ければ欄ごと無い
     assert.deepEqual(answer([], { path: "/p", data: { a: 1 } }).flow, { path: "/p", data: { a: 1 } });
     assert.equal(answer([], ABSENT).flow, undefined);
-    // 渡る手順（rendered）と候補（candidates）も持ち越す。形の違う項目は落とす
+    // 渡る手順（rendered）と候補（candidates）も持ち越す。形の違う項目は除く
     const extras = answer([], {
       path: "/p",
       data: {},

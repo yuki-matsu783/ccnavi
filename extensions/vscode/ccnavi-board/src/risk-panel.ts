@@ -4,13 +4,13 @@
  *
  * 画面は React（`src/webview/risk/`）で、ここが渡すのは「いま何を見せるか」（`RiskData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
- * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
+ * `retainContextWhenHidden` が真で、入れ物（HTML）は 1 度しか入らない。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存や作成が通った）。
  * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかはユーザが決める。
  *
- * 対象は 3 種（設計 11.2、11.4.2）。共通の設定の配点（`.ccnavi/common/risks.yml`。場所は固定）、
+ * 対象は 3 種。共通の設定の配点（`.ccnavi/common/risks.yml`。場所は固定）、
  * ワークスペースの設定の配点（既定 `.ccnavi/config/risks.yml`）、プロジェクト 1 つの設定の配点
- * （既定 `projects/<名前>/.ccnavi/config/risks.yml`）。**タブは 1 枚だけ**で、別の対象を開くとそのタブの
+ * （既定 `projects/<名前>/.ccnavi/config/risks.yml`）。タブは 1 枚だけで、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[].risk`）を使い、拡張は組まない。
  * 判定は共通の設定と、親の `project:` が指す設定の和で行う。編集する 1 本とは別に、読み取り専用の足し算
@@ -280,7 +280,7 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
     other = self === undefined || self.risk.path === "" ? undefined : resolveIn(root, self.risk.path);
   } else {
     // 設定ファイルの場所は実行ファイルに聞く。`.ccnavi` から自分で組むと、組み方が実行ファイルと
-    // 食い違ったときに、この画面で保存した配点が判定に使われなくなる。答えは元リポジトリの版（設計 11.2）。
+    // 食い違ったときに、この画面で保存した配点が判定に使われなくなる。答えは元リポジトリの版。
     if (!board.ok) {
       throw new Error(`設定ファイルの場所を実行ファイルから取得できません: ${board.error}`);
     }
@@ -317,7 +317,7 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
     mtimeMs = 0;
     exists = false;
   }
-  // 共通の設定にもワークスペースの設定にも無ければ、効いているのは組み込みの配点。共通かワークスペースの設定を開いたときだけ、
+  // 共通の設定にもワークスペースの設定にも無ければ、適用されているのは組み込みの配点。共通かワークスペースの設定を開いたときだけ、
   // それを読み取り専用で見せ、「作る」で同じ値のファイルを書き出させる。もう一方が分からないとき（ボードを読めない）も組み込みを見せる。
   const builtin = !exists && (target.kind === "workspace" || target.kind === "self") && (other === undefined || !fs.existsSync(other));
   if (builtin) {
@@ -475,7 +475,7 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 }
 
 /**
- * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのはユーザが「更新」を押した
+ * いま見せるものを渡す。画面の編集はここで捨てられるので、呼ぶのはユーザが「更新」を押した
  * ときと、保存・作成が通って中身が入れ替わったときだけ。
  */
 function show(current: PanelState): void {
@@ -552,7 +552,7 @@ function redraw(current: PanelState): void {
 
 /**
  * リスク管理の画面に渡す手段。VS Code のパネルを `retainedHost` の形に合わせる。
- * **入れ物は 1 度しか入らない**ので、表裏は渡さない（保持する画面は裏でも生きている）。
+ * 入れ物は 1 度しか入らないので、表裏は渡さない（保持する画面は裏でも生きている）。
  * パネルの `retainContextWhenHidden` を偽に変えると、送った先が捨てられていても気づけなくなる。
  * 型では止まらないので、ここで見て言う。
  */
@@ -585,8 +585,8 @@ function riskHost(panel: vscode.WebviewPanel, root: string): ScreenHost<RiskData
  * 保存を始めたときに読んでいたものが、往復の間に入れ替わっていないか。
  *
  * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間にユーザが「更新」を押せば、
- * 画面の編集は捨てられ、新しい中身が出ている。**そこへ古い編集を書くと、捨てたはずのものが
- * ファイルに入る。** 読み直されていたら、この保存はもう無かったことにする。
+ * 画面の編集は捨てられ、新しい中身が出ている。そこへ古い編集を書くと、捨てたはずのものが
+ * ファイルに入る。 読み直されていたら、この保存はもう無かったことにする。
  */
 function stale(current: PanelState, loaded: Loaded): boolean {
   if (current.loaded === loaded) {
@@ -708,7 +708,7 @@ async function create(current: PanelState): Promise<void> {
     current.wroteAt = Date.now();
     fs.writeFileSync(loaded.riskPath, BUILTIN_RISK_TEXT, { encoding: "utf8", flag: "wx" });
   } catch (error) {
-    // 書けなかったのに猶予を残したままだと、その間の本物の外部変更が知らされない。
+    // 書けなかったのに猶予を残したままだと、その間の実際の外部変更が知らされない。
     current.wroteAt = 0;
     fail(current, `${loaded.riskRel} に書けません: ${(error as Error).message}`);
     return;

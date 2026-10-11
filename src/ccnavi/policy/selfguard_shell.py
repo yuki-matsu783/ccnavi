@@ -17,7 +17,7 @@ from . import rules, selfguard_targets
 # 戻せるだけでは足りない。実行後に戻すまでの間、書き換わった設定がそのまま
 # 反映されている時間がある。hook の登録は同じセッションのうちに反映されるので、その間に
 # 実行後のイベントごと消されると、戻す機会が来ない。だから同じ場所を実行前にも
-# 止める。止めるほうが本筋で、戻すほうは止めきれなかったぶんの受け皿になる。
+# 止める。止めるのが基本で、戻すのは止めきれなかったぶんの備えになる。
 #
 # 前半の括弧が書き込みの形で、後ろに続く場所と組で当たる。場所の名前が出ただけでは
 # 止めない。`cat .ccnavi/common/rules.yml` も `git add <パス>` も、中身を書かない。
@@ -44,7 +44,7 @@ from . import rules, selfguard_targets
 #   2. 名指ししたところを必ず書き換えるコマンド。`\x00` はコマンドの切れ目に
 #      shellread が置く目印で、`(^|\x00)` はコマンドの先頭を意味する。
 #      語の中の切れ目（引用がつないだ空白、語の中の演算子の両側）は別の目印
-#      `shellread.WORD_SEP` なので、`[^\x00]*` は同じコマンドの中を丸ごと指す。
+#      `shellread.WORD_SEP` なので、`[^\x00]*` は同じコマンドの中の全体を指す。
 #   3. sed だけは `-i` が付いた形に絞る。`sed -n 1,20p` はただの読み。`-i` は独立したオプションの語
 #      （`-i` `-i.bak` `-ni` `--in-place`。GNU sed は長いオプションの省略形 `--in` `--i` も
 #      受けるので `--i` で始まる語は全部）だけを数える。`feature-id` のように語の途中に
@@ -186,7 +186,7 @@ _COPY_END = r"(?:[\\/]" + _COPY_TAIL + r"|" + _COPY_TERM + r")"
 # 増えないように、最初に見つかった元の語で決め打ちする（`(?>...)`、後戻りしない括り）。
 # 後ろの語で当たるなら、前の語から読んでも同じ並びを通って当たるので、決め打ちで外す形は無い。
 # 元の語の終わり（空白）も括りの中に入れる。入れないと `decisions.jsonl.bak` の頭だけで決め打ちし、
-# 後ろに並べた本物の名前を見落とす。
+# 後ろに並べた実際の名前を見落とす。
 _HOLD_NAME = r"(^|\x00)(cp|ln|install|mv)\b"
 _ARG = rf"(?:{_VALUED} {_DIR_WORD}|{_NOT_DIR})"
 _TARGET_FLAG = rf"(?:-(?-i:{_FLAGS}*t)|--(?-i:t)[a-z-]*)[= ]?"
@@ -244,7 +244,7 @@ def copy_last_place(clause: str) -> str:
     return _IN_WORD + clause + _COPY_END
 
 
-# `.ccnavi/` は ccnavi ディレクトリの既定のパス（設計 11.2）。その下には各レイヤーの設定 3 本と、
+# `.ccnavi/` は ccnavi ディレクトリの既定のパス。その下には各レイヤーの設定 3 本と、
 # 配点が呼ぶスクリプトが入る。どちらも判定の中身そのものなので、ccnavi ディレクトリごと止める。
 # 既定のパスをここに書いておくのは、ccnavi ディレクトリの名前を動かしていないワークスペースが、
 # 設定の受け渡しに依らずに守られるようにするため。動かしてある場合は project_home_clause が足す。
@@ -281,7 +281,7 @@ _COPY_PLACES = (
 # ここには無い。
 #
 # ROOT_NAMES はワークスペースルートの直下に置く、守るものを含む名前。`cp -r /tmp/.ccnavi .` は
-# ccnavi ディレクトリを丸ごと置き換える。行き先はルートを指す表記（`.` と、ルートの絶対パス）
+# ccnavi ディレクトリの全体を置き換える。行き先はルートを指す表記（`.` と、ルートの絶対パス）
 # だけで見る（_moved_holders がルートの表記と組む）。`.` は居場所がルートでなくても当たるが、
 # そこへ `.ccnavi` や `.claude` を写す用事は無い。
 _HOLDERS = ((under(r"logs"), r"decisions(?:\.[^\s\\/\x00]*)?\.jsonl|state|archive"),)
@@ -322,7 +322,8 @@ def shell_write_regex(
     既定のパスのぶん（_HOLDERS）と実行ファイルのぶん（binary_holders）はここで足すので、
     渡すのは設定で動く場所のぶん（guard_shell_regex）。
 
-    scratchpad_exclude は wip/scratchpad/ 除外用の負の先読みパターン。コピー保護（copy_places）に適用する。
+    scratchpad_exclude は wip/scratchpad/ 除外用の負の先読みパターン。
+    コピー保護（copy_places）に適用する。
     """
     places = [*_PLACES]
     copy_places = [*_COPY_PLACES]
@@ -351,7 +352,7 @@ def _folded(clause: str) -> str:
     """場所のパスを、大文字小文字を区別しない形にする。どの機械でも同じ。
 
     大文字小文字を区別しない機械では `.Ccnavi/scripts/count.sh` は
-    `.ccnavi/scripts/count.sh` そのもので、消せば本物が消える。区別すると、表記を
+    `.ccnavi/scripts/count.sh` そのもので、消せば実際のファイルも消える。区別すると、表記を
     1 文字変えるだけで ccnavi ディレクトリの中が書ける。
     区別する機械でも区別せずに当てる。ルールの glob とチケットの範囲はどの機械でも
     区別しないので、
@@ -367,9 +368,9 @@ def _folded(clause: str) -> str:
 
 
 def project_home_clause(project_home: str, *, copy: bool = False) -> str:
-    """ccnavi ディレクトリのパスを、シェルの書き込みに当てる形に直す（設計 11.6）。
+    """ccnavi ディレクトリのパスを、シェルの書き込みに当てる形に直す。
 
-    ccnavi ディレクトリの下は丸ごと守る。レイヤーの設定 3 本も、配点が呼ぶスクリプトも、そこに入る。
+    ccnavi ディレクトリの下はすべて守る。レイヤーの設定 3 本も、配点が呼ぶスクリプトも、そこに入る。
     既定の名前（`.ccnavi`）は _PLACES が持っているので、ここが返すのは動かして
     ある場合のパス。区切りはどちらの表記にも当て、名前がそこで終わる形（ccnavi ディレクトリごと
     消す・退かす）にも当てる。
@@ -396,7 +397,7 @@ def project_home_glob(project_home: str) -> str:
 def _home_name(project_home: str) -> str:
     """ccnavi ディレクトリの名前。
 
-    前後の区切りは落とし、区切りを含むパスはそのまま 1 つの節にする。
+    前後の区切りは取り除き、区切りを含むパスはそのまま 1 つの節にする。
     """
     return (project_home or "").replace("\\", "/").strip("/")
 
@@ -467,8 +468,9 @@ def binary_holders(bin_path: str) -> tuple[tuple[str, str], ...]:
 # 機械ごとの組み立ての置き場。`bin/` の下に並ぶ。
 _BUILD_DIR = r"(?:" + "|".join(platformtag.SYSTEMS) + r")-[a-z0-9_]+"
 
-# wip/scratchpad/ をコピー保護から除外するためのパターン（ワークスペースルート直下の wip/scratchpad/）
-# 実行時に root から組み立てる
+# wip/scratchpad/ をコピー保護から除外するためのパターン
+# （ワークスペースルート直下の wip/scratchpad/）。実行時に root から組み立てる
+
 
 def _scratchpad_exclude(root: str) -> str:
     """wip/scratchpad/ を除外する負の先読み。root が空なら空文字を返す。"""
@@ -490,7 +492,7 @@ def guard_shell_regex(
 
     実行前チェック（add_rules）と組み込みの既定（builtin）の両方がここから取る。既定の
     側だけモジュールを読んだ時点の空の設定で組むと、ccnavi ディレクトリや実行ファイルを
-    動かしたワークスペースでは、ルールファイルが壊れたときだけ動かした先への書き込みが
+    動かしたワークスペースでは、ルールファイルが破損したときだけ動かした先への書き込みが
     止まらなくなる。2 か所で組むと、片方だけが弱い側になる。
     """
     home = project_home_clause(project_home)
@@ -501,7 +503,10 @@ def guard_shell_regex(
     )
     scratchpad_exclude = _scratchpad_exclude(root)
     return shell_write_regex(
-        bin_path, *clauses, holders=_moved_holders(root, project_home, common_files), scratchpad_exclude=scratchpad_exclude
+        bin_path,
+        *clauses,
+        holders=_moved_holders(root, project_home, common_files),
+        scratchpad_exclude=scratchpad_exclude,
     )
 
 
@@ -596,7 +601,7 @@ def common_shell_clause(root: str, path: str, *, copy: bool = False) -> str:
 
 
 def common_layer_regex(root: str, common_files: tuple[str, ...]) -> str:
-    """共通レイヤーの 3 本を、名指しのツールに当てる形に直す（設計 11.6）。
+    """共通レイヤーの 3 本を、名指しのツールに当てる形に直す。
 
     当てる先は解決済みの絶対パス。ワークスペースルートの下に在るなら、ワークスペースと、
     そこから切ったワークツリー（`.claude/worktrees/<名前>/`）の同じ相対に当てる。ワークツリー側の
@@ -627,7 +632,7 @@ _RECORDS_PLACES = r"[\\/]logs[\\/](?:decisions(?:\.[^\\/]*)?\.jsonl$|(?:state|ar
 
 
 def records_regex(log_path: str = "", state_dir: str = "") -> str:
-    """記録と state の置き場を、名指しのツールに当てる形（設計 11.6）。
+    """記録と state の置き場を、名指しのツールに当てる形。
 
     シェルの書き込みの側（`_PLACES`）と同じ `logs/decisions*.jsonl` と `logs/state/` のパスに
     加えて、診断のフラグで動かした置き場（`--log` / `--state`。env では動かない）にも
@@ -766,12 +771,12 @@ def add_rules(
     守るぶんはワークスペースのルールに任せる。そこは `deny` に 1 行書けば済み、書いたことが
     読める場所に残る。実行ファイルと ccnavi ディレクトリは置き場が設定で動くので、
     ルールファイルにパスを固定できない。レイヤーの設定は行き先の判定に使うので、そのレイヤーの
-    ルール自身に任せると、書けた時点で緩められる（REQ-MLT-08）。
+    ルール自身に任せると、書けた時点で緩められる。
 
     共通レイヤーの 3 本も同じ理由で組み込みに持つ。既定の置き場が ccnavi ディレクトリの下に
     あることに頼り、動かしたときはルールの 1 行に任せる形にすると、その 1 行は守られる
     ファイルそのものの中にあるので、消した・書き換えたルールファイルのもとでは通る。
-    既定の置き場なら ccnavi ディレクトリを守る 1 本とも重なるが、共通レイヤーを名乗る
+    既定の置き場なら ccnavi ディレクトリを守る 1 本とも重なるが、共通レイヤーを示す
     こちらを先に出す。
 
     ルールファイルに何が書いてあっても足す。組み込みの名前（rules.RESERVED_ID_PREFIX）は
@@ -816,9 +821,10 @@ def add_rules(
             {
                 "id": PROJECT_HOME_RULE_ID,
                 "match": "Write|Edit|NotebookEdit",
-                # ccnavi ディレクトリの下は丸ごと。レイヤーの設定 3 本だけを名指しすると、配点が呼ぶ
-                # スクリプトが外れる。当てる先は解決済みの絶対パスなので、どの ccnavi ディレクトリ
-                # （ワークスペース、プロジェクト、ワークツリー）にも同じ 1 本が当たる。
+                # ccnavi ディレクトリの下はすべて守る。レイヤーの設定 3 本だけを名指しすると、
+                # 配点が呼ぶスクリプトが外れる。当てる先は解決済みの絶対パスなので、
+                # どの ccnavi ディレクトリ（ワークスペース、プロジェクト、ワークツリー）にも
+                # 同じ 1 本が当たる。
                 "glob": home_glob,
                 "message": PROJECT_HOME_MESSAGE,
             },
@@ -853,7 +859,7 @@ def _insert(rule_set: rules.RuleSet, raw: dict, root: str) -> None:
     built, problems = rules.parse({"version": rules.VERSION, "deny": [raw]}, builtin=True)
     if problems or not built.deny:
         # 組み立てられないのは、このファイルの書き損じ。判定を止める理由には
-        # しない。止まると、直すための呼び出しごと止まる。ただ黙って外すと、保護が
+        # しない。止まると、直すための呼び出しごと止まる。ただ何も知らせずに外すと、保護が
         # 1 本欠けたことに誰も気づけないので、診断ログに残す。書くのは組み込みの id と
         # 問題の件数だけ（式には守る先のパスが入る）。root が無ければ CLAUDE_PROJECT_DIR。
         diaglog.get("ccnavi", root or None).warn(

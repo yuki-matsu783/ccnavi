@@ -2,7 +2,7 @@
 
 見るのは 3 つ。error があれば非ゼロで終わること、error と warn が分かれていること、
 そして検証が判定と同じ読み込みを使っていること。3 つ目が成り立たないと、検証が通ったのに
-実運用で落ちるという、検証があるぶんかえって危ない形になる。
+実運用で失敗するという、検証があるぶんかえって危ない形になる。
 """
 
 from __future__ import annotations
@@ -127,7 +127,7 @@ class LintTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(counts(result.stdout), (0, 0))
-        # どのファイルを見た結果なのかを名乗らない報告は、別の設定についての
+        # どのファイルを見た結果なのかを示さない報告は、別の設定についての
         # 報告と見分けが付かない。
         self.assertIn("rules.yml", result.stdout)
 
@@ -388,7 +388,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("BOM (U+FEFF)", result.stdout)
 
     def test_承認の記録が無くても承認済みの置き場なら読む(self):
-        # 承認を本物とするのは置き場。`.ccnavi/approved/` は組み込みの保護が
+        # 承認の正とするのは置き場。`.ccnavi/approved/` は組み込みの保護が
         # エージェントの書き込みを止めるので、`ccnavi_approved` が無くても承認済みとして
         # 読む。端末もボードも無いユーザが、置き場を動かすだけで承認できる方法。
         write(
@@ -423,8 +423,8 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("版", result.stdout)
 
-    def test_壊れたルールは1件ずつ名指しでerrorになる(self):
-        # 落ちたルールは何も言われずに消える。消えた穴は誰も気づかないので、
+    def test_不正なルールは1件ずつ名指しでerrorになる(self):
+        # 除かれたルールは何も言われずに消える。消えた穴は誰も気づかないので、
         # 1 件ずつ id で名指しする。
         result = lint(
             self.root,
@@ -455,7 +455,7 @@ class LintTest(unittest.TestCase):
     def test_askとallowのmessageはerrorになりルールは効いたまま(self):
         # ask の文面はユーザの確認ダイアログにしか出ず、allow の文面はどこにも出ない
         # （実際に確かめた）。書いたユーザは「モデルに届く」と思って書くので、届かない欄を残さない。
-        # ただしルールごと落とすと、文面を書いただけで ask が外れて通るので、読み込みは通す。
+        # ただしルールごと除くと、文面を書いただけで ask が外れて通るので、読み込みは通す。
         body = {
             "version": 1,
             "deny": [SOUND],
@@ -484,7 +484,7 @@ class LintTest(unittest.TestCase):
 
     def test_denyが1件も無いのはerrorになる(self):
         # 何も止めないガードは、入っていないガードと同じでありながら、
-        # 入っているように見える。いちばん見つけにくい壊れ方なので error。
+        # 入っているように見える。いちばん見つけにくい不具合なので error。
         result = lint(self.root, rules_file(self.root))
 
         self.assertEqual(result.returncode, 1)
@@ -500,7 +500,7 @@ class LintTest(unittest.TestCase):
 
     def test_判定は動くが効かない記述はwarnで0のまま(self):
         # ここが error と warn を分ける意味そのもの。ガードは動いているので
-        # CI を落とす必要は無く、しかし守っているつもりの穴は開いている。
+        # CI を失敗させる必要は無く、しかし守っているつもりの穴は開いている。
         result = lint(
             self.root,
             rules_file(
@@ -583,7 +583,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("disable", result.stdout)
 
     def test_検証は判定と同じ読み込みを使う(self):
-        # 別の読み方をすると、検証は通ったのに実運用で落ちる。同じ壊れたルールに
+        # 別の読み方をすると、検証は通ったのに実運用で失敗する。同じ不正なルールに
         # ついて、検証が名指しするものと、判定が走るときに苦情を言うものが
         # 一致することで確かめる。
         path = rules_file(self.root, SOUND, dict(SOUND, id="組み立て不能", glob="", regex="("))

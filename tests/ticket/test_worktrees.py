@@ -335,7 +335,7 @@ class DropTest(PhaseHarness):
 
     def test_tracked_build_output_names_are_not_cleaned(self):
         """生成物の名前でも追跡されているもの（package.json の隣のコミット済みの out/ など）は
-        消さない。消すと worktree remove が通らず、壊れたツリーが残る。"""
+        消さない。消すと worktree remove が通らず、破損したツリーが残る。"""
         tree = self.worktree("i0002", "main")
         write(os.path.join(tree, "ext", "package.json"), "{}")
         write(os.path.join(tree, "ext", "out", "kept.js"), "x\n")

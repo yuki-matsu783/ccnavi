@@ -58,7 +58,7 @@ def at_start(
     t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
         return _say(stdout, skills)
-    # 本物とする側（親のツリー）のチケットを読む。着手で書かれる基準点は親のツリーの
+    # 正とする側（親のツリー）のチケットを読む。着手で書かれる基準点は親のツリーの
     # チケットにだけ入るので、子のツリーに checkout されている版では足りない。
     copies, _ = approval.scan(conf, root)
     index = approval_checks.by_id(copies)
@@ -108,12 +108,12 @@ def at_start(
             paths = t.paths(name)
             if paths:
                 lines.append(f"    {name}: " + ", ".join(paths))
-        # 子のフロー（設計 9.12）。在ればファイルを名指しし、手順を並べる。
-        # フローはユーザが書くデータで、壊れていても 1 行の知らせにして、残りの子と範囲は渡す。
+        # 子のフロー。在ればファイルを名指しし、手順を並べる。
+        # フローはユーザが書くデータで、不正でも 1 行の知らせにして、残りの子と範囲は渡す。
         scope = ", ".join(t.paths(rules.ALLOW) + t.paths(rules.ASK))
         try:
             brief = flow.briefing(conf, root, t, scope, budget, full=full)
-        except Exception as exc:  # noqa: BLE001  壊れたフローで SubagentStart を落とさない
+        except Exception as exc:  # noqa: BLE001  不正なフローで SubagentStart を失敗させない
             brief = [f"    フローを読めない（{type(exc).__name__}）。ユーザが確かめてください"]
         budget -= sum(len(line) for line in brief)
         listed = listed or bool(brief)

@@ -1,14 +1,14 @@
 /**
  * 取り下げの見本（test/fixtures/host/<github|gitlab>/<場面>/。`scene.json` の `kind` が `withdraw`）。
- * 承認コミットを引いて提案を読むまでのホストの応答を、本物の形に合わせて手で組んだもの。
+ * 承認コミットを引いて提案を読むまでのホストの応答を、実際の形に合わせて手で組んだもの。
  *
- * GitHub の見本:
+ * GitHub の見本は次のとおり。
  * - `commits.json`: `GET /repos/<o>/<r>/commits?sha=<先頭>&path=<doing/>` の答え
  * - `objects.json`: GraphQL の `object(expression: "<コミット>:<パス>")` の答え（`{__typename, oid}` か null）
  * - `history.json`: GraphQL の first-parent の履歴（`history(first: …)`）の答え全体
  * - `blobs.json`: GraphQL の `object(oid:) { ... on Blob }` の答え（oid ごと）
  *
- * GitLab の見本:
+ * GitLab の見本は次のとおり。
  * - `commits.json`: `GET .../repository/commits?ref_name=<先頭>&path=<doing/>` の答え
  * - `first_parent.json`: `GET .../repository/commits?ref_name=<先頭>&first_parent=true` の答え
  * - `trees.json`: `GET .../repository/tree?ref=<コミット>&path=<ディレクトリ>` の答え（`<コミット>:<ディレクトリ>` ごと。null は 404）

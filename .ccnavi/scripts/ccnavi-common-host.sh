@@ -4,7 +4,7 @@
 
 # ---- ホスト（GitHub / GitLab）への接続（ccnavi-review.sh と ccnavi-branches.sh が使う）
 #
-# originの URL でホストを見分け、gh / glab（認証は道具に任せる）か curl とトークン
+# origin の URL でホストを見分け、gh / glab（認証は道具に任せる）か curl とトークン
 # （GITHUB_TOKEN / GITLAB_TOKEN）でホストの API を読み書きする。結果の組み立てには jq が要る。
 # 道具は ccnavi_host_connect で絶対パスへ解いて固定する。PATH の細工で差し替えられないように。
 #
@@ -14,12 +14,12 @@
 #   ccnavi_host_connect         道具を選ぶ。ccnavi_h_jq・ccnavi_h_cli・ccnavi_h_cli_name・ccnavi_h_curl・
 #                               ccnavi_h_token・ccnavi_h_transport（gh / glab / curl）を決める。
 #                               jq が無ければ 3、curl はあるがトークンが無ければ 4、curl も無ければ 5
-#   ccnavi_host_api <METHOD> <path> [<JSON>]  応答の JSONを標準出力へ。path は ccnavi_h_api_base からの相対
+#   ccnavi_host_api <METHOD> <path> [<JSON>]  応答の JSON を標準出力へ。path は ccnavi_h_api_base からの相対
 #   ccnavi_host_pages <path>    100 件ずつ最後のページまで読んで 1 つの配列にする。20 ページを超えたら 2
-#   ccnavi_host_encoded_path    プロジェクトのパスを URL に入れる表記（GitLabの projects/<ここ>）
-#   ccnavi_host_project_id      GitLabのプロジェクトの数の id。読めなければ 1
+#   ccnavi_host_encoded_path    プロジェクトのパスを URL に入れる表記（GitLab の projects/<ここ>）
+#   ccnavi_host_project_id      GitLab のプロジェクトの数の id。読めなければ 1
 #
-# 失敗したときの文面は呼ぶ側が決める（ここは標準エラーに何も書かない）。ccnavi_host_api が落ちたら、
+# 失敗したときの文面は呼ぶ側が決める（ここは標準エラーに何も書かない）。ccnavi_host_api が失敗したら、
 # ccnavi_h_on_fail に名前を入れた関数を `<METHOD> <path> <ホストの返事>` で呼んで 1 を返す。
 # ccnavi_h_tmp は gh / glab の標準エラーを一時に受ける置き場（無ければ TMPDIR）、ccnavi_h_max_time は
 # curl の 1 回の時間の上限（秒。応答しないホストで止まり続けないように。gh / glab は道具に任せる）。
@@ -33,16 +33,16 @@ ccnavi_host_parse() {
 	# scheme は origin から取る。https に決め打ちすると、社内や手元で平文で立てた
 	# GitLab（`http://localhost:8929` のような形）に当たらない。ssh の形式には
 	# scheme が無いので、そこだけ https にする。
-	# host には**ポートを残す**。落とすと `:8929` のような立て方がすべて当たらなくなり、しかも
-	# 落ちたポートがプロジェクトのパスの先頭に入り込む（`8929/demo/greeter`）。
+	# host にはポートを残す。省くと `:8929` のような立て方がすべて当たらなくなり、しかも
+	# 省かれたポートがプロジェクトのパスの先頭に入り込む（`8929/demo/greeter`）。
 	case "$ccnavi_hp_origin" in
 	http://*) ccnavi_h_scheme=http ;;
 	*) ccnavi_h_scheme=https ;;
 	esac
 	ccnavi_hp_rest=$(printf '%s' "$ccnavi_hp_origin" | sed -E 's#^(https?://|git@|ssh://git@)##')
 	[ "$ccnavi_hp_rest" = "$ccnavi_hp_origin" ] && return 1
-	# `user:token@host` の形はユーザ情報を落とす。URL にトークンを埋める使い方は普通にあり、
-	# 落とさないと host にトークンが入り込み、API の URL にも `origin` の出力にも漏れる（実際に確かめた）。
+	# `user:token@host` の形はユーザ情報を除く。URL にトークンを埋める使い方は普通にあり、
+	# 除かないと host にトークンが入り込み、API の URL にも `origin` の出力にも漏れる（実際に確かめた）。
 	# 認証は gh / glab か GITLAB_TOKEN / GITHUB_TOKEN で行い、URL 側の資格情報は使わない。
 	ccnavi_hp_authority="${ccnavi_hp_rest%%/*}"
 	case "$ccnavi_hp_authority" in
@@ -50,7 +50,7 @@ ccnavi_host_parse() {
 	esac
 	ccnavi_h_host="${ccnavi_hp_rest%%/*}"
 	# ssh の `git@host:group/proj` は `:` の後ろがパス。数字だけならポート、
-	# そうでなければパスの先頭なので落とす。
+	# そうでなければパスの先頭なので除く。
 	case "$ccnavi_h_host" in
 	*:*)
 		case "${ccnavi_h_host##*:}" in
@@ -126,7 +126,7 @@ ccnavi_host_api() {
 	ccnavi_ha_body="${3:-}"
 	case "$ccnavi_h_transport" in
 	gh | glab)
-		# 標準エラー（更新の知らせなど）は応答に混ぜない。落ちたときだけ本文と一緒に渡す
+		# 標準エラー（更新の知らせなど）は応答に混ぜない。失敗したときだけ本文と一緒に渡す
 		ccnavi_ha_err="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-host-err-$$"
 		if [ -n "$ccnavi_ha_body" ]; then
 			ccnavi_ha_out=$(printf '%s' "$ccnavi_ha_body" | "$ccnavi_h_cli" api --hostname "$ccnavi_h_host" --method "$ccnavi_ha_method" --input - "$ccnavi_ha_rel" 2>"$ccnavi_ha_err") || {
@@ -180,7 +180,7 @@ ccnavi_host_pages() {
 	esac
 	ccnavi_hg_all='[]'
 	while :; do
-		# 呼び手が `|| ...` で受けると set -e が有効にならないので、落ちたらここで 1 を返す（配列でない答えも）
+		# 呼び手が `|| ...` で受けると set -e が有効にならないので、失敗したらここで 1 を返す（配列でない答えも）
 		ccnavi_hg_chunk=$(ccnavi_host_api GET "$ccnavi_hg_rel${ccnavi_hg_sep}per_page=100&page=$ccnavi_hg_page") || return 1
 		ccnavi_hg_n=$(printf '%s' "$ccnavi_hg_chunk" | "$ccnavi_h_jq" 'if type == "array" then length else error("not an array") end' 2>/dev/null) || return 1
 		ccnavi_hg_all=$(printf '%s\n%s' "$ccnavi_hg_all" "$ccnavi_hg_chunk" | "$ccnavi_h_jq" -s '.[0] + .[1]')

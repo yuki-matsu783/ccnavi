@@ -157,7 +157,7 @@ class ExtTestPlanTest(unittest.TestCase):
 
     def test_a_webview_file_always_gets_its_types_checked(self):
         # 画面のファイルは tsconfig.json が exclude するので、tsconfig.test.json では型を見ない。
-        # esbuild も型を見ない。ここで webview が落ちると、「型の検査だけ通しました」と出るのに
+        # esbuild も型を見ない。ここで webview が失敗すると、「型の検査だけ通しました」と出るのに
         # 何も見ていないターンができる。画面の約束を満たさない置き方でも必ず見る。
         with copied_board() as root:
             parts = os.path.join(root, "src", "webview", "parts")
@@ -312,9 +312,9 @@ class MarkExtHookTest(unittest.TestCase):
 
 @unittest.skipIf(SH is None or NODE is None, "sh か node が無い")
 class TestExtHookTest(unittest.TestCase):
-    """Stop の hook が、回すべきときに回し、落ちたときだけ差し戻すこと。
+    """Stop の hook が、回すべきときに回し、失敗したときだけ差し戻すこと。
 
-    本物のテストは回さない。触ったファイルから組み立てたパスで入口（`scripts/test-groups.js`）を
+    実際のテストは回さない。触ったファイルから組み立てたパスで入口（`scripts/test-groups.js`）を
     呼べているか、終了コードをどう読むかを見るので、入口は代わりのものを置いて渡された引数を書き出す。
     sh の代わりに取得した結果を渡すのと同じ考え方で、拡張の node_modules にも依存しない。
     """
@@ -397,21 +397,21 @@ class TestExtHookTest(unittest.TestCase):
         workspace, _, marker = self.workspace()
         result, _ = self.stop(workspace, rc=1)
         self.assertEqual(2, result.returncode)
-        self.assertIn("落ちたテストを直して", result.stderr)
+        self.assertIn("失敗したテストを直して", result.stderr)
         self.assertEqual("1", self.retries(workspace))
         # マーカーは残す。直したあと同じグループを回し直すため。
         self.assertTrue(os.path.exists(marker))
 
     def test_a_missing_environment_is_not_counted_as_a_failing_test(self):
         # 終了コード 3 は「node_modules が無い」など環境が足りない側。テストは
-        # 落ちていないので、「落ちたテストを直して」と差し戻すのは嘘になる。
+        # 失敗していないので、「失敗したテストを直して」と差し戻すのは嘘になる。
         workspace, _, _ = self.workspace()
         result, _ = self.stop(workspace, rc=3)
         self.assertEqual(0, result.returncode)
         self.assertIsNone(self.retries(workspace))
 
     def test_pushing_back_stops_at_three(self):
-        # 同じセッションで続けて落ちる形。マーカーは差し戻しても残るので、同じ workspace で回す。
+        # 同じセッションで続けて失敗する形。マーカーは差し戻しても残るので、同じ workspace で回す。
         workspace, _, _ = self.workspace()
         for expected in ("1", "2", "3"):
             result, _ = self.stop(workspace, rc=1, active=True)
@@ -448,7 +448,7 @@ class TestExtHookTest(unittest.TestCase):
         result, args = self.stop(workspace)
         self.assertEqual(0, result.returncode)
         self.assertIsNone(args)
-        self.assertIn("テストの入口が無い", result.stderr)
+        self.assertIn("テストの入口がない", result.stderr)
 
 
 if __name__ == "__main__":

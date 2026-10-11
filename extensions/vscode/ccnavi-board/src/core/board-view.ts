@@ -26,7 +26,7 @@ export type ApprovalOverlay =
   | { readonly kind: "error"; readonly error: string }
   /**
    * 承認できた。Claude Code に渡す文と、コピー / 新しいセッションで開く を出す。
-   * `carried` は承認済みチケットをコミットして push する sh をターミナルに**送ることにしたか**（その sh が置いてあるか）。
+   * `carried` は承認済みチケットをコミットして push する sh をターミナルに送ることにしたか（その sh が置いてあるか）。
    * 送るのは拡張ホストで、送れたかまでは見ていない。真のときだけ、そう言う
    */
   | { readonly kind: "done"; readonly count: number; readonly prompt: string; readonly carried?: boolean }
@@ -73,13 +73,13 @@ export type ApprovalOverlay =
     }
   /** 残った指摘を見せた。行き先を指摘ごとに選ぶ。押されるまで何も置かない */
   | { readonly kind: "decidePreview"; readonly preview: DecidePreview; readonly tree: string; readonly notice?: string }
-  /** 選んだ行き先を置いている。**ここでは閉じない** */
+  /** 選んだ行き先を置いている。ここでは閉じない */
   | { readonly kind: "deciding"; readonly preview: DecidePreview; readonly tree: string };
 
 /**
  * 画面に見せる中身。読み直せなかったときはボードの代わりに文面を渡す（`kind: "error"`）。
- * どちらにも承認のオーバーレイが載る。承認した文は取り返しがつかないので、ボードが描けないことを
- * 理由に消さない（設計 10）。
+ * どちらにも承認のオーバーレイが重なる。承認した文は取り返しがつかないので、ボードが描けないことを
+ * 理由に消さない。
  */
 export type BoardData =
   | {
@@ -87,7 +87,7 @@ export type BoardData =
       readonly board: Board;
       readonly approval?: ApprovalOverlay;
       /**
-       * 前の読み直しから動いたカード（`board-moved.ts`）。**決めるのも覚えるのも拡張ホスト**で、
+       * 前の読み直しから動いたカード（`board-moved.ts`）。決めるのも覚えるのも拡張ホストで、
        * オーバーレイと同じ理由（画面は裏に回ると捨てられる）。画面は渡された分に動いた表示を出すだけ
        */
       readonly moved?: readonly Moved[];

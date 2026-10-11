@@ -1,10 +1,10 @@
-"""子チケットのフロー（作業の手順のグラフ）。設計 9.3.1・9.12。着手中は書き換えを止める。
+"""子チケットのフロー（作業の手順のグラフ）。着手中は書き換えを止める。
 
 書かれた文字列の整え方は `flow_text`、形の検査は `flow_shape`、文への描き方は `flow_render` に
 分けてある。どれも flow を読まない。
 
 子チケット 1 本につき 1 本、担当のサブエージェントが作業中に読む手順書を置ける。
-置き場は**承認済みの領域**の `<承認済みチケットの置き場>/flows/<子>.yml`
+置き場は承認済みの領域の `<承認済みチケットの置き場>/flows/<子>.yml`
 （既定 `.ccnavi/approved/flows/<子>.yml`）に固定で、チケットの欄では指さない。
 置き場を持つツリーはチケットと同じ（承認済みチケットが在るツリー。プロジェクトの
 チケットならそのプロジェクトのツリー）で、チケットと同じ git に乗る。
@@ -44,18 +44,18 @@ YAML の 1 文書で、最上位はマッピング。ボードのフロー編集
 
 ノードの種類（`type`）のうち、ここが中身を読むのは `start` `end` `prompt` `subAgent`
 `askUserQuestion` `ifElse` `switch` `loop` `branch` `skill` `mcp` `subAgentFlow` `codex`
-`branchSession`。知らない種類は落とさず、種類の名前と `name` だけで並べる。
+`branchSession`。知らない種類は省かず、種類の名前と `name` だけで並べる。
 `group` は図の上の囲み（ボードの枠）で手順ではないので並べない（中のノードは `parentId` が
 あっても、ほかのノードと同じに並べる）。
 
-## 壊れたフローで止まらない
+## 破損したフローで止まらない
 
 フローはユーザが書くデータで、形は保証されない。読む・並べるのどこでも例外を外に出さない。
 読めなければ 1 行の知らせにして、`SubagentStart` の残り（子の一覧と範囲）はそのまま渡す。
 大きさにも上限を置く。ファイルは `FILE_LIMIT` まで、1 ノードの項目は `ITEM_LIMIT` まで、
 1 本の子の文は `CHILD_TEXT_LIMIT` まで。シンボリックリンク（ファイルそのものか、ツリーのルートから
 そこまでの途中）は読まない。承認済みの領域の外を指していれば、エージェントが書ける中身を
-ユーザの手順書として渡すことになる。ふつうのファイルでないもの（名前付きパイプは開くと固まる）と
+ユーザの手順書として渡すことになる。ふつうのファイルでないもの（名前付きパイプは開くと応答しなくなる）と
 ハードリンク（外の名前から書き換えられる）も読まない（`read_bytes`）。
 
 形の誤り（最上位がマッピングでない、`nodes` が無い、ノードに `id` が無い・重なる、
@@ -68,7 +68,7 @@ error で言う。ボードのフロー編集画面は、開くときと保存�
 読めたフローの線の構造（`flow_shape.structure_problems`）と名前の表記
 （`flow_shape.name_problems`）は warn で足し、読むのは止めない。
 
-読むのは本物とするツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリー上の版は読まない。
+読むのは正とするツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリー上の版は読まない。
 
 ## 着手のあとの書き換え
 
@@ -190,8 +190,8 @@ def draft_rel(conf: settings.Settings, ticket_id: str) -> str:
     承認済みの領域で `flows/` が `doing/` `done/` と並ぶのに揃え、提案の置き場でも
     `todo/` `review/` と並べる。提案の置き場は丸ごとチケットの範囲の外で、`flows/` は守る状態の
     置き場でも走査の対象でもないので、エージェントは判定を変えずに書ける。下書きに効力は無い
-    （`briefing` も着手のハッシュも読まない）。効くのはユーザが取り込んで `flow_rel` に保存した
-    ものだけ。
+    （`briefing` も着手のハッシュも読まない）。有効になるのはユーザが取り込んで
+    `flow_rel` に保存したものだけ。
     """
     return f"{_place_rel(conf.tickets or settings.DEFAULT_TICKETS)}/{FLOWS_DIR}/{ticket_id}{SUFFIX}"
 
@@ -228,7 +228,7 @@ def resolve(
 ) -> tuple[str, str, bool]:
     """フローのファイルの絶対パスと、それを持つツリーのルートと、在るかどうか。
 
-    読むのは本物とするツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの版は
+    読むのは正とするツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの版は
     読まない。子のワークツリーはエージェントが作業する場所で、そこにある版はシェルの書き込み
     （行き先を追えない形）で書き換えられうる（M-2）。
     リンクでも「在る」とする（読むかどうかは `load` が決める。気づかないうちに別の版へ移ることは
@@ -286,7 +286,7 @@ def locate(conf: settings.Settings, root: str, path: str) -> tuple[str, str | No
     ものでもよい。大文字小文字は範囲の照合と同じく区別しない。
 
     名前は Windows で同じファイルを指す表記をまとめる。末尾の `.` と空白、`:` から後ろ
-    （`::$DATA` などの代替データストリーム）を落とす（止める向きだけ）。8.3 形式の短い
+    （`::$DATA` などの代替データストリーム）を除く（止める向きだけ）。8.3 形式の短い
     名前（子の名前が 8 字を超えるときの `I0001-~1.YML` など）はまとめられない。解いたパス
     （`full`）が長い名前に戻すのに任せる。
     """
@@ -299,7 +299,7 @@ def locate(conf: settings.Settings, root: str, path: str) -> tuple[str, str | No
     shared = absolute
     if not absolute and (rel == ".." or rel.startswith("../")):
         # ツリーの外（`../shared/approved`）を指す置き場。ツリーをまたいで 1 か所になりうるので、
-        # `..` を落とした残りのパスで当て、どのプロジェクトの子でも止める（止める向き）。
+        # `..` を除いた残りのパスで当て、どのプロジェクトの子でも止める（止める向き）。
         rel = "/".join(p for p in rel.split("/") if p != "..")
         shared = True
     marker = _fold(rel if absolute else f"/{rel}" if rel else "") + f"/{FLOWS_DIR}/"
@@ -403,7 +403,7 @@ def read_bytes(path: str, tree_root: str = "") -> tuple[bytes | None, str]:
     """フローのファイルの中身（バイト）。読まないなら (None, 理由)。例外は外に出さない。
 
     読むのはふつうのファイル（`S_ISREG`）で、名前が 1 つ（ハードリンクでない）ものだけ。
-    名前付きパイプを開くと書き手が来るまで戻らず、SubagentStart が固まる（H-1）。
+    名前付きパイプを開くと書き手が来るまで戻らず、SubagentStart が応答しなくなる（H-1）。
     ハードリンクは承認済みの領域の外の名前から書き換えられる（M-1）。
     `lstat` で確かめてから `O_NONBLOCK | O_NOFOLLOW` で開き、開いたものを `fstat` で
     もう一度確かめる（ふつうのファイルで、`lstat` と同じ inode）。確かめてから開くまでに
@@ -443,7 +443,7 @@ def read_bytes(path: str, tree_root: str = "") -> tuple[bytes | None, str]:
         return raw, ""
     except OSError as exc:
         return None, f"読めない ({flow_text.clean(exc.strerror or type(exc).__name__)})"
-    except Exception as exc:  # noqa: BLE001  壊れたデータで SubagentStart を落とさない
+    except Exception as exc:  # noqa: BLE001  破損したデータで SubagentStart を止めない
         return None, f"読めない ({type(exc).__name__})"
 
 
@@ -498,8 +498,8 @@ def load(path: str, tree_root: str = "") -> tuple[dict | None, str]:
 def parse(raw: bytes) -> tuple[dict | None, str]:
     """フローの中身（バイト）を読む。(中身, 読めない理由)。例外は外に出さない。
 
-    文字は UTF-8（先頭の BOM は 1 つ外す。`utf-8-sig`）。UTF-8 として壊れていれば読まない
-    （置き換え文字で埋めて読むと、壊れた部分を落とした手順が渡る）。
+    文字は UTF-8（先頭の BOM は 1 つ外す。`utf-8-sig`）。UTF-8 として不正であれば読まない
+    （置き換え文字で埋めて読むと、不正な部分を省いた手順が渡る）。
     """
     try:
         text = raw.decode("utf-8-sig")
@@ -518,7 +518,7 @@ def parse(raw: bytes) -> tuple[dict | None, str]:
         return None, f"YAML として読めない ({flow_text._line(_yaml_problem(exc))})"
     except (ValueError, TypeError) as exc:
         return None, f"YAML として読めない ({flow_text._line(exc)})"
-    except Exception as exc:  # noqa: BLE001  壊れたデータで SubagentStart を落とさない
+    except Exception as exc:  # noqa: BLE001  破損したデータで SubagentStart を止めない
         return None, f"読めない ({type(exc).__name__})"
     why = flow_shape.shape_problem(data)
     if why:
@@ -784,7 +784,7 @@ def changed_notice(conf: settings.Settings, root: str, child: ticket_model.Ticke
             "手順が食い違っているかもしれない。誰が書き換えたかをユーザが確かめてください"
             "（ロックは Write / Edit を止めるが、シェルから行き先を追えない形で書くと止まらない）"
         )
-    except Exception:  # noqa: BLE001  知らせのために hook を落とさない
+    except Exception:  # noqa: BLE001  知らせのために hook を止めない
         return ""
 
 

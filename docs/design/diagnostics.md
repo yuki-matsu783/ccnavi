@@ -32,7 +32,7 @@ state も内部で外す。拡張と `tools/check_rules.py` は念のため `--l
 `--project-phases-file <名前>=<パス>`（その名前のレイヤー。`self` は自身のレイヤーのフェーズ定義の代わり）と
 `--project-risk-file <名前>=<パス>`（同じく配点の代わり。足し算なので共通レイヤーと合わせて検証する。境目の逆転、同 `id` の衝突、
 `script:` の存在確認はそのレイヤーの git プロジェクトルートが基準）。
-診断の外（hook からの判定、`ticket` / `review` の副命令）に渡すと落とし、落としたことを標準エラーに
+診断の外（hook からの判定、`ticket` / `review` の副命令）に渡すと外し、外したことを標準エラーに
 出す。守る対象も本来の場所のまま（守る側は差し替えを見ない `layer_real_path` を引く）。
 
 **互換の版**（`src/ccnavi/entry/version.py` の `COMPAT`）は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh の `CCNAVI_COMPAT`、拡張の
@@ -43,7 +43,7 @@ state も内部で外す。拡張と `tools/check_rules.py` は念のため `--l
 読めない版は読む側が error にするので、レイヤーには別の版を足さない。
 
 `--flow <パス>` も診断でだけ有効で、読むのは `--lint` だけ。`--test` / `--test-samples` / `--explain` に渡すと
-「`--lint` でだけ読む」と言って落とす。判定にも採点にも使われない（9.3.1）。
+「`--lint` でだけ読む」と言って無視する。判定にも採点にも使われない（9.3.1）。
 
 JSON の形は README の「試験の JSON」「lint の JSON」「ボードの JSON」「候補の JSON」に定める。拡張はこれを並べるだけで、
 提案もマーカーも自分で解釈せず、glob も regex も自分で当てず、点も数えない。止まっているか・
@@ -83,7 +83,7 @@ error がある間は配点もフェーズ定義も保存できない。
 **拡張との取り決め**（REQ-EXT）のうち、作りに関わるもの。
 
 - 文字コード: 入口（`__main__` の `hookio.rebind_streams`）が標準入出力を UTF-8・改行 LF に張り直す。診断の JSON
-  （`--explain` / `--test` / `--test-samples` / `--lint` / `--suggest` / `--version`）は `ensure_ascii=True` で ASCII に落とし、
+  （`--explain` / `--test` / `--test-samples` / `--lint` / `--suggest` / `--version`）は `ensure_ascii=True` で ASCII に変換し、
   承認の JSON と残った指摘の JSON は `ensure_ascii=False` で書く
 - 古い実行ファイルの見分け: argparse の苦情（`unrecognized arguments: --version`）を拡張が読む。
   `parse_args` の `SystemExit` は捕まえて終了コード 1 にする

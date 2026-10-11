@@ -2,7 +2,7 @@
  * 「判定を試す」の結果。1 件の判定（`judged`）と、サンプルの一括判定（`sampled`）、記録から起こした
  * ルールの候補（`suggested`）。
  *
- * **ここは判定しない。** 出すのは実行ファイル（`--test --json` / `--test-samples --json` /
+ * ここは判定しない。 出すのは実行ファイル（`--test --json` / `--test-samples --json` /
  * `--suggest --json`）が返した形をそのまま読んだものだけで、当たる・当たらないの理屈は持たない。
  * 候補もルールに足さない。下書きを見せるだけで、置くのはユーザ。
  */
@@ -205,7 +205,7 @@ export function SuggestResult({ result }: { readonly result: SuggestJson }): JSX
     <div id="suggest-result" className="result">
       <p>
         記録 {result.logs.length} 本・{result.records} 行から、候補 {result.candidates.length} 件
-        （検証を通らず落としたもの {result.dropped} 件）。どれも下書きで、置くのはユーザです。
+        （検証を通らず除いたもの {result.dropped} 件）。どれも下書きで、置くのはユーザです。
       </p>
       {result.candidates.length === 0 ? (
         <p className="empty">候補はありません</p>

@@ -1,7 +1,7 @@
 """origin の URL の読み方。exe の `remote_kind` と、sh の `origin` の両方を見る。
 
 URL にトークンを埋めた形（`https://oauth2:<token>@host/g/p.git`）は普通にある。
-ホストにユーザ情報が入り込むと API の URLが壊れ、`origin` の出力にトークンが漏れる。
+ホストにユーザ情報が入り込むと API の URL が不正になり、`origin` の出力にトークンが漏れる。
 実物の GitLab で実際に起きた穴なので、両方の読み手で固定する。
 
 `CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。既定はこのツリーの
@@ -102,7 +102,7 @@ class OriginSubcommandTest(unittest.TestCase):
         )
 
     def test_userinfo_is_dropped_and_hidden(self):
-        # 閉じたポート。glab の疎通の試みがすぐ失敗して curl に落ちる。
+        # 閉じたポート。glab の疎通の試みがすぐ失敗して curl に切り替わる。
         result = self.origin("http://oauth2:glpat-secret@127.0.0.1:9/root/p.git")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("host=127.0.0.1:9\n", result.stdout)
@@ -116,7 +116,7 @@ class OriginSubcommandTest(unittest.TestCase):
 
         sh は起動のたびに控えの置き場を作る（`mkdir -p "$state"`）。以前は `$root/` に
         `CCNAVI_STATE` を継ぎ足すので、絶対パスを入れると存在しない置き場を見ていた。
-        `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は落ちる。
+        `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は失敗する。
         写す前の sh（`ccnavi-review.sh`）は `CCNAVI_STATE` を読むため。
         """
         result = self.origin("http://127.0.0.1:9/root/p.git", extra_env={"CCNAVI_STATE": "/x"})

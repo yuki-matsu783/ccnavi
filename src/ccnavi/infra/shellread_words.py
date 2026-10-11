@@ -14,7 +14,7 @@ import re
 # 引用符だけで書かれた 1 語（`echo ">"`）は演算子と区別が付かない。shlex は
 # 引用されていたかどうかを返さないので、ここでは演算子として扱う。走査は引用の
 # 範囲を知っているので直せるが、それは止まっていたものが通る向きの変更になるので
-# 別に決める（設計 6）。
+# 別に決める。
 _PUNCTUATION = "();<>|&"
 REASON_TAKEN_AS_CODE = "command-taken-as-code"
 
@@ -196,7 +196,7 @@ def _has_flag(tokens: list[str], flags: tuple[str, ...]) -> bool:
 
 
 def _base(name: str) -> str:
-    """どのプログラムを指すかを変えない部分を落とす。
+    """どのプログラムを指すかを変えない部分を除く。
     git について書いたルールが /usr/bin/git と git.exe にも当たるように。"""
     for separator in ("/", "\\"):
         name = name.rsplit(separator, 1)[-1]

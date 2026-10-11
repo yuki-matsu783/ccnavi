@@ -5,7 +5,7 @@
 状態の置き場を守るルールと提案の文は `ticket_guard`、スクリプトが書く欄の書き換えは
 `ticket_fields` に分けてある。どれも ticket を読まない。
 
-## チケットは提案であって本物ではない
+## チケットは提案であって正ではない
 
 チケットはエージェントが書く。だからチケットの中身をそのまま判定に使うと、
 範囲の外で止められたエージェントが、チケットに 1 行足して自分の範囲を広げられる。
@@ -18,7 +18,7 @@
 ## 絞ることしかできない
 
 チケットが宣言できるのは「ここだけ書く」であって「ここも書ける」ではない。
-判定はルールの判定とチケットの判定の厳しい側を採る（設計 1）。チケットが足すのは
+判定はルールの判定とチケットの判定の厳しい側を採る。チケットが足すのは
 「宣言した範囲の外は止める」「deny と書いた場所は止める」「ask と書いた場所は聞く」だけで、
 ルールの allow を狭めることはあっても、ルールの deny や ask を緩めることは無い。
 例外は 2 つ（`ticket_places.is_unscoped`）。チケットの置き場は、次の提案を書けるようにしておくために
@@ -29,7 +29,7 @@
 
 ## 書式
 
-`wip/proposals/<状態>/<識別子>.md` の先頭の frontmatter。設計 9.3。
+`wip/proposals/<状態>/<識別子>.md` の先頭の frontmatter。
 タイプは rules.yml と同じ `deny` / `ask` / `allow` で、今判定に使われるのは Write / Edit 系の
 パスの項だけ。`match` に Bash を書いた項は「効かない」と名指しで警告する。
 
@@ -78,7 +78,7 @@ from ..policy import rules
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from . import ticket_fold, ticket_ids, ticket_model
 
-# 範囲の件数の上限。設計 9.3。大量に並べてユーザがレビューしきれない
+# 範囲の件数の上限。大量に並べてユーザがレビューしきれない
 # ようにし、その中に広い範囲を紛れ込ませる手口を防ぐためのもの。
 MAX_SCOPE_ENTRIES = 20
 
@@ -308,7 +308,7 @@ def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Pro
     """プロジェクト、先行、計画、課題の番号。読めなければ True。"""
     name = ticket.ticket
     # frontmatter の `project:` は照合用の宣言。本当のプロジェクトは提案を置いた場所で、
-    # `scan` が上書きする（設計 11.5）。`scan` を通さない経路ではこの値が残る。
+    # `scan` が上書きする。`scan` を通さない経路ではこの値が残る。
     ticket.declared_project = _text(front.get("project")).strip()
     ticket.project = ticket.declared_project
 
@@ -496,7 +496,7 @@ def subset_problems(child: ticket_model.Ticket, parent: ticket_model.Ticket) -> 
             )
             continue
         # ワイルドカードがあれば、前置に 1 文字足したパスを親に当てる。`src/b/*` なら
-        # `src/b/x`。無ければパスそのもの。前置の末尾の `/` を落として当てると、
+        # `src/b/x`。無ければパスそのもの。前置の末尾の `/` を除いて当てると、
         # 親の `src/b/*` が `src/b` に当たらず、正当な子を「超えている」と読む。
         probe = entry.prefix() + "x" if entry.glob != entry.prefix() else entry.glob
         verdict = parent.decide(probe)
@@ -539,14 +539,14 @@ def scan(
     集めるのは `todo/`（承認待ち）と `review/`（レビュー待ち）。`review/` に在るものは
     承認済みチケットが `finish` で動いてきたもので、`completed_at` を持つ（approval.scan_review）。
     置き場はどのツリーでも同じ相対（`wip/proposals/`）で、プロジェクト向けの提案はその
-    プロジェクトのツリー（か、そこから切ったワークツリー）にある（設計 11.5、REQ-MLT-14）。
+    プロジェクトのツリー（か、そこから切ったワークツリー）にある。
     ワークスペースの `wip/<名前>/proposals/` は読まない。
-    同じ識別子が複数のツリーにあれば、本物とするツリーの側だけを残す。
+    同じ識別子が複数のツリーにあれば、正とするツリーの側だけを残す。
 
     `approved` は、まとめる前の承認済みチケット（作業中・レビュー待ち・閉じた）の全部。
-    渡せば、承認済みの識別子の提案は、承認済みチケットで決めた本物とするツリーの側だけを残す
+    渡せば、承認済みの識別子の提案は、承認済みチケットで決めた正とするツリーの側だけを残す
     （`ticket_fold.dedupe`）。組むのは `approval.scan_proposals`（承認済みチケットはそちらが読む）。
-    渡さないと、本物とするツリーの外に残った古い提案も残る。
+    渡さないと、正とするツリーの外に残った古い提案も残る。
     """
     found, problems = scan_all(root, tickets_rel, projects_dir)
     return ticket_fold.dedupe(found, approved), problems
@@ -563,9 +563,9 @@ def scan_all(
     found: list[ticket_model.Ticket] = []
     problems: list[Problem] = []
     ws = tree.main_tree(root)
-    # 置き場がプロジェクトを決める（設計 11.5）。提案はどのツリーでも同じ相対の置き場に
+    # 置き場がプロジェクトを決める。提案はどのツリーでも同じ相対の置き場に
     # あり、プロジェクト向けの提案はそのプロジェクトの git が持つ。承認をプロジェクトの
-    # git で共有するので、提案も同じブランチに乗せる（設計 9.2、REQ-MLT-14）。
+    # git で共有するので、提案も同じブランチに乗せる。
     # frontmatter の `project:` は照合に使うだけ。
     places = [
         (t, tickets_rel, t.project)

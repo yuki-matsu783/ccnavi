@@ -123,7 +123,7 @@ test("CB-T77 新しい glob は引用符で囲み、空の境目の点は書か�
   assert.equal(doc.apply({ levels: { medium: "", high: "", critical: "" }, factors: [] }), "version: 1\nfactors: []\n");
 });
 
-test("CB-T78 version が無ければ苦情にして、保存で先頭に足す。壊れた形は苦情にして他は出す", () => {
+test("CB-T78 version が無ければ苦情にして、保存で先頭に足す。不正な形は苦情にして他は出す", () => {
   const missing = readRisk("levels:\n  high: 40\n");
   assert.equal(missing.model.version, null);
   assert.match(missing.model.problems[0], /version がありません/);

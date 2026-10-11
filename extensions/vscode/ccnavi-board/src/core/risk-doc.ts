@@ -16,7 +16,7 @@ import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
  * 配点の形（`KINDS`・`FactorForm`・`RiskForm` など）は画面との契約（`risk-view.ts`）にある。
- * ここに置くと、画面がそこから `yaml` を辿ってバンドルしたものに解析器が丸ごと入る。
+ * ここに置くと、画面がそこから `yaml` を辿ってバンドルしたものに解析器がすべて入る。
  */
 
 /** 実行ファイルが読む版（risk.VERSION） */
@@ -39,7 +39,7 @@ export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を�
 #                      'sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>' で記録する。
 #                      判定が揃うまで子は閉じられない。子の HEAD が動けば取り直し
 #
-# このファイルが無ければ組み込み（下の定量 4 項目と同じ値）。壊れていれば組み込みを使い、--lint が言う。
+# このファイルが無ければ組み込み（下の定量 4 項目と同じ値）。不正なら組み込みを使い、--lint が言う。
 version: 1
 levels:
   medium: 20
@@ -221,7 +221,7 @@ function applyTo(doc: Document, edited: RiskForm): string {
     return node;
   });
   if (isSeq(existing)) {
-    // 先頭の項目を消したときは、付け替えたコメントをリストの見出しとして戻す。
+    // 先頭の項目を消したときは、移したコメントをリストの見出しとして戻す。
     if (adopted !== undefined && !nodes.includes(adopted) && !existing.commentBefore) {
       existing.commentBefore = adopted.commentBefore ?? null;
     }

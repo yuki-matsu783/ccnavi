@@ -90,7 +90,7 @@ export function readRepos(value: unknown, hosts: readonly Host[]): RepoConfig[] 
         out.push(r);
       }
     } catch {
-      // 読めない行は落とす
+      // 読めない行は省く
     }
   }
   return out;

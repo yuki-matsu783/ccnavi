@@ -45,7 +45,7 @@ def _shown(root: str, path: str) -> str:
 def _explain_phases(
     stdout: TextIO, conf: settings.Settings, root: str, views: list[ruleload.LayerView]
 ) -> None:
-    """レイヤーごとのフェーズ定義（設計 11.9）。id は裸のまま、レイヤーは欄で出す。"""
+    """レイヤーごとのフェーズ定義。id は裸のまま、レイヤーは欄で出す。"""
     tables = [
         (
             v.name,
@@ -81,7 +81,7 @@ def _explain_phases(
 def _explain_risk(
     stdout: TextIO, conf: settings.Settings, root: str, views: list[ruleload.LayerView]
 ) -> None:
-    """レイヤーごとのリスクの配点（設計 11.9）。境目の点は共通レイヤーのものを出す。"""
+    """レイヤーごとのリスクの配点。境目の点は共通レイヤーのものを出す。"""
     tables = [
         (
             v.name,
@@ -94,7 +94,7 @@ def _explain_risk(
     common, _ = risk.load(conf.risk)
     # 共通レイヤーの境目の点。
     # レイヤーの `levels` はキーごとに小さいほうを採るので、実際に使われる値は
-    # チケットのレイヤーで決まる（設計 11.4.2）。ここに出すのは共通レイヤーの側の既定。
+    # チケットのレイヤーで決まる。ここに出すのは共通レイヤーの側の既定。
     effective = risk.effective_levels(common.levels)
     levels = " / ".join(f"{k} {effective[k]}" for k in ("medium", "high", "critical"))
     stdout.write(f"\n■ risk（levels: {levels}）\n")
@@ -113,7 +113,7 @@ def _explain_risk(
 
 
 def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) -> int:
-    """いま有効な宣言を、判定を行わずに一覧する（REQ-DIA-01）。
+    """いま有効な宣言を、判定を行わずに一覧する。
 
     どこが守られているかではなく、何がどう宣言されているかを見せる。
     実効権限をパスごとに数え上げるには、宣言済み領域という概念が要る。
@@ -126,7 +126,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     stdout.write(
         "  パスを持つツールは共通レイヤー + 行き先のレイヤー、"
         "持たないツールは全部のレイヤーの和で判定する"
-        "（設計 11.4）\n"
+        "\n"
     )
 
     for view in views:
@@ -257,7 +257,7 @@ def explain_json(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: 
     読み手は VS Code のボード拡張。拡張は提案・承認済みチケット・マーカーを自分で解釈せず、ここが
     出した形をそのまま並べる。「レビューで止まっているか」「承認待ちは何か」の答えを
     2 か所で出さないためのもので、判定と同じ関数（phase / approval）で組む。
-    ネットワークには出ない。見るのはワークスペースの中のファイルだけ（設計 3 P11）。
+    ネットワークには出ない。見るのはワークスペースの中のファイルだけ。
     """
     stdout.write(json.dumps(diagnose_board.board(conf, root, stderr), ensure_ascii=True, indent=1))
     stdout.write("\n")

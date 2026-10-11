@@ -91,7 +91,7 @@ class BoardTest(PhaseHarness):
         self.assertEqual(parent["copy"]["status"], "open")
 
     def test_scattered_is_empty_while_the_home_tree_holds_one_copy(self):
-        """複数のツリーにあること自体は普通。本物とするツリーに 1 つあれば散在ではない。"""
+        """複数のツリーにあること自体は普通。正とするツリーに 1 つあれば散在ではない。"""
         self.scene()
         for t in self.board()["tickets"]:
             self.assertEqual(t["scattered"], [], t["ticket"])
@@ -105,7 +105,7 @@ class BoardTest(PhaseHarness):
         )
 
     def move(self, ticket_id, source_tree, target_tree, state="todo"):
-        """提案を 1 つ、ツリーからツリーへ手で動かす。本物とするツリーを作り変えるため。"""
+        """提案を 1 つ、ツリーからツリーへ手で動かす。正とするツリーを作り変えるため。"""
         source = os.path.join(source_tree, "wip", "proposals", state, ticket_id + ".md")
         with open(source, encoding="utf-8") as f:
             text = f.read()
@@ -113,7 +113,7 @@ class BoardTest(PhaseHarness):
         return write(os.path.join(target_tree, "wip", "proposals", state, ticket_id + ".md"), text)
 
     def test_scattered_is_empty_when_the_home_tree_is_gone_but_the_origin_holds_one(self):
-        """親のツリーが無ければ元ツリーを本物とする。片付けただけの形を散在に数えない。
+        """親のツリーが無ければ元ツリーを正とする。片付けただけの形を散在に数えない。
 
         親のワークツリーは合流したら片付ける。そこを行き先の無いまま数えると、片付けた
         親子のチケットのカードが全部「複数の場所にある」になり、状態の操作も止まる。
@@ -130,7 +130,7 @@ class BoardTest(PhaseHarness):
         )
 
     def test_scattered_lists_every_copy_when_no_authoritative_tree_holds_one(self):
-        """親のツリーにも元ツリーにも無ければ、どれが本物か決まらない。候補を全部出す。"""
+        """親のツリーにも元ツリーにも無ければ、どれが正か決まらない。候補を全部出す。"""
         self.scene()
         elsewhere = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         self.move("i0001-02-03", self.parent_tree, elsewhere)
@@ -144,7 +144,7 @@ class BoardTest(PhaseHarness):
         self.assertEqual(by_id["i0001-02-02"]["scattered"], [])
 
     def test_scattered_says_the_same_tree_holding_two_places(self):
-        """動かす途中で止まった形跡は、本物とするツリーの中でも言う（`--lint` と同じ数え方）。"""
+        """動かす途中で止まった形跡は、正とするツリーの中でも言う（`--lint` と同じ数え方）。"""
         self.scene()
         doing = os.path.join(self.approved, "doing", "i0001-02-02.md")
         with open(doing, encoding="utf-8") as f:
@@ -180,7 +180,7 @@ class BoardTest(PhaseHarness):
         """場面 A。承認の前に切ったワークツリーの `todo/` の提案は、承認のあとは提案に出さない。
 
         親のツリーで承認すると、親のツリーの `todo/` は消えて承認済みチケットになる。切った
-        ワークツリーには `todo/` が残る。提案だけでまとめると、本物とするツリーに提案が無いので
+        ワークツリーには `todo/` が残る。提案だけでまとめると、正とするツリーに提案が無いので
         残りの古い提案が提案に見え、ボードで「未着手」に戻る。
         """
         self.scene()
@@ -225,7 +225,7 @@ class BoardTest(PhaseHarness):
         self.assertNotIn("i0001-01-09/wip/proposals/review/i0001-02-02.md", lint.stdout)
 
     def test_a_review_copy_in_a_worktree_matching_the_home_tree_is_not_named(self):
-        """本物とするツリーと同じ置き場のチケットは、子のワークツリーに入っているだけ。名指ししない。"""
+        """正とするツリーと同じ置き場のチケットは、子のワークツリーに入っているだけ。名指ししない。"""
         self.scene()
         self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
         self.commit_parent()

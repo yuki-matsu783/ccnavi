@@ -39,8 +39,9 @@ SCENES = os.path.join(
 API = "https://api.github.com"
 
 
-# 見本の応答が持つ欄。問い合わせがどれかを落とせば、本物は答えにその欄を入れないので、代役も答えない
-# （欄の名前を見ずに見本を返すと、問い合わせの欄を削っても試験が通ってしまう）。拡張の代役と同じ
+# 見本の応答が持つ欄。問い合わせからどれかを外せば、実際のホストは答えにその欄を入れないので、
+# 代役も答えない（欄の名前を見ずに見本を返すと、問い合わせの欄を削っても試験が通ってしまう）。
+# 拡張の代役と同じ
 THREAD_FIELDS = (
     "reviewThreads",
     "pageInfo",
@@ -245,7 +246,7 @@ def install(bin_dir: str, python: str) -> None:
     os.makedirs(bin_dir, exist_ok=True)
     for name, text in (
         ("curl", f"#!/bin/sh\nexec '{python}' '{os.path.abspath(__file__)}' curl \"$@\"\n"),
-        # gh があっても使わせない（認証の無い gh は疎通の試しで落ちて curl に切り替わる）
+        # gh があっても使わせない（認証の無い gh は疎通の試しで失敗して curl に切り替わる）
         ("gh", "#!/bin/sh\nexit 1\n"),
     ):
         path = os.path.join(bin_dir, name)

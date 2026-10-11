@@ -21,7 +21,7 @@ import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
  * 定義の形（`PHASE_KINDS`・`PhaseForm`・`PhasesForm` など）は画面との契約（`phases-view.ts`）にある。
- * ここに置くと、画面がそこから `yaml` を辿ってバンドルしたものに解析器が丸ごと入る。
+ * ここに置くと、画面がそこから `yaml` を辿ってバンドルしたものに解析器がすべて入る。
  */
 
 /** 実行ファイルが読む版（phasetypes.VERSION） */
@@ -59,7 +59,7 @@ export function readPhases(text: string): PhasesDocument {
     problems.push(`version ${String(version)} は実行ファイルが読めません（読むのは ${PHASES_VERSION}）。フェーズは番号だけの挙動になります`);
   }
 
-  // 実行ファイルは前後の空白を落として読む（phasetypes.parse）。同じ読み方にする
+  // 実行ファイルは前後の空白を除いて読む（phasetypes.parse）。同じ読み方にする
   const orderNode = doc.get("order", true);
   let order: PhaseOrder = "sequential";
   if (orderNode !== undefined && orderNode !== null) {
@@ -264,7 +264,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     return pair;
   });
   if (isMap(existing) && !existing.flow) {
-    // 先頭の定義を消したときは、付け替えたコメントを対応表の見出しとして戻す。
+    // 先頭の定義を消したときは、移したコメントを対応表の見出しとして戻す。
     if (adopted !== undefined && !pairs.includes(adopted) && !existing.commentBefore) {
       existing.commentBefore = (adopted.key as Scalar).commentBefore ?? null;
     }

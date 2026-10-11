@@ -37,7 +37,7 @@ def approved_text(tickets: list[ticket_model.Ticket], revisions: set[str], root:
         title = f": {t.title}" if t.title else ""
         lines.append(f"- {t.ticket}{title}（{where}）")
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-    # 子の着手は親の着手を前提にする（設計 9.6、REQ-TKT-48）。順をここで言わないと、
+    # 子の着手は親の着手を前提にする。順をここで言わないと、
     # 最初の子の着手で止まってから読むことになる。ただし勧めるのは、この回に承認された
     # 親が居るときだけ。改版と子だけの回で `start <親>` を勧めると、親は着手済みなので
     # 案内どおりに打つと「着手済み」で終わる。
@@ -54,7 +54,7 @@ def approved_text(tickets: list[ticket_model.Ticket], revisions: set[str], root:
 
 
 def _origin_line(t: ticket_model.Ticket) -> str:
-    """どのプロジェクトの、どのツリーの、どの提案か（REQ-MLT-11）。
+    """どのプロジェクトの、どのツリーの、どの提案か。
 
     プロジェクトは提案を置いた場所で決まる。ユーザはここで、書き込みが向かうリポジトリを
     見て承認する。提案はそのツリーからの相対パスで見せる。絶対パスは
@@ -74,7 +74,7 @@ def screen(
 
     frontmatter の全文は見せない。ユーザに見せるのは「何が新たに書けるようになるか」
     「子が編集可能な範囲（親をどこまで絞ったか）」「人間レビューの要否」「リスク」「計画」。
-    新たに書けるようになる領域を最初に置く（REQ-APV-01）。
+    新たに書けるようになる領域を最初に置く。
 
     定義は候補が持っているものを使う。承認の対象の中でもチケットごとにレイヤーが違いうるので、
     画面の側で 1 つに決めない。
@@ -124,7 +124,7 @@ def screen(
                 "allow は無確認で編集できる場所、ask は確認を挟んで編集できる場所、"
                 "deny はこのチケットでも編集できない場所"
             )
-            # チケットの範囲はルールの allow より強い（設計 7）。承認するユーザは「ルールで
+            # チケットの範囲はルールの allow より強い。承認するユーザは「ルールで
             # 開けてあるから範囲の外でも書ける」と読み違えやすいので、承認の前に言う。
             lines.append(
                 "    ルールの allow で許可してある場所も、この範囲の外では止まる。"
@@ -137,7 +137,7 @@ def screen(
         if cand.overflow:
             # 範囲のすぐ下に置く。承認は止めないが、判定では止まる。判定に影響しない記述の
             # 注意と混ぜると、承認すれば書けると読み違える。
-            # **「編集対象」と「書き込めない」は意図して分けてある。** 前半はチケットが宣言した側、
+            # 「編集対象」と「書き込めない」は意図して分けてある。 前半はチケットが宣言した側、
             # 後半は実際の書き込みが止まる側の話で、どちらか一方の語に揃えると、宣言と実行の
             # どちらを指しているのかが読めなくなる。ほかの見出しが「編集」で揃っているのを見て、
             # ここも揃えたくなるが、揃えない。
@@ -225,7 +225,7 @@ def _plan_lines(items: list[ticket_model.PlanItem], start: int, types: dict | No
 
 
 def _workflow_lines(t: ticket_model.Ticket, wf: ticket_model.Workflow) -> list[str]:
-    """`dag` の計画の待ち。辺の書き漏れをユーザが見つける場所（設計 9.7）。"""
+    """`dag` の計画の待ち。辺の書き漏れをユーザが見つける場所。"""
     found = workflow.lines(t, wf)
     if not found:
         return []

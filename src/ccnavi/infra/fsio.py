@@ -211,12 +211,12 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
 
     `write_text` の `open(path, "w")` は、開いた時点で中身を捨てる。書き終える
     までのあいだファイルは空で、そこを誰かに読まれれば「空だった」ことになるし、
-    途中で落ちれば空のまま残る。取り合いになる記録と、途中で落ちたものを次の
+    途中で異常終了すれば空のまま残る。取り合いになる記録と、途中で異常終了したものを次の
     起動に拾わせたくない記録は、こちらで書く。
 
     同じ場所に一時ファイルを作って書き切り、`os.replace` で差し替える。読む側が
-    見るのは差し替えの前の中身か後の中身のどちらかだけになる。**差し替えが一瞬で
-    終わるのは同じファイルシステムの中だけ**なので、一時ファイルは行き先と同じ
+    見るのは差し替えの前の中身か後の中身のどちらかだけになる。差し替えが一瞬で
+    終わるのは同じファイルシステムの中だけなので、一時ファイルは行き先と同じ
     ディレクトリに作る。他所（`/tmp` など）に作るとコピーになってしまい、この型が
     成り立たなくなる。
 
@@ -224,17 +224,17 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
     （`a.json` なら `.a.<一意>.part.json`）。固定の名前にすると、同時に書く 2 つが同じ
     一時ファイルを取り合い、片方の書きかけをもう片方が差し替えることになる。直そうとした
     問題が形を変えて戻るので、ここは一意でなければならない。先頭の `.` と `.part` は、
-    承認済みの置き場に落ちて残ったものを `ccnavi-push-approved.sh` と C1 のコミットが
+    承認済みの置き場に異常終了して残ったものを `ccnavi-push-approved.sh` と C1 のコミットが
     運ばないため（どちらも `.<名前>.part*` の形を除く）。元の名前と拡張子を残すのは、
-    落ちて残った一時ファイルを、本番と同じ名前の条件（`ctxfile.forget` と `prune` は
+    異常終了して残った一時ファイルを、本番と同じ名前の条件（`ctxfile.forget` と `prune` は
     先頭の `.` を外してから当てる。`temp_origin`）で掃除できるようにするため。
 
-    **守るのは「同時に読む側」までで、電源断は守らない。** 差し替えの前に
+    守るのは「同時に読む側」までで、電源断は守らない。差し替えの前に
     `fsync` をしていないので、ディスクへ実際に届く順はファイルシステム任せ。
     電源断の直後に「新しいほうに差し替わっているが中身が古い／空」になる
     余地は残る。記録は失っても取り直せるものなので、そこまでの手間はかけない。
 
-    **名前が伸びる。** 一時ファイルの名前は元より 20 文字ほど長い。Windows の
+    名前が伸びる。一時ファイルの名前は元より 20 文字ほど長い。Windows の
     260 文字の上限ぎりぎりの行き先では、`write_text` なら書けたものがここでは
     書けないことがある。
     """
@@ -257,7 +257,7 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
             try:
                 stream = os.fdopen(handle, "w", encoding="utf-8", newline=newline)
             except BaseException:
-                # fdopen が持ち主になる前に落ちたら、生の記述子は誰も閉じない。
+                # fdopen が持ち主になる前に失敗したら、生の記述子は誰も閉じない。
                 # Windows では開いたままの一時ファイルを消せず、残骸にもなる。
                 os.close(handle)
                 raise
@@ -274,7 +274,7 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
     return _recorded(path, _write_with_retry(write))
 
 
-# `write_text_atomic` が落ちて残した一時ファイルの名前。
+# `write_text_atomic` が異常終了して残した一時ファイルの名前。
 # `.<元の名前の拡張子の前>.<一意>.part<拡張子>` の形。
 _ATOMIC_TEMP = re.compile(r"^\.(?P<stem>.+)\.[^.]+\.part(?P<suffix>\.[^.]*)?$")
 
@@ -289,7 +289,7 @@ def temp_origin(name: str) -> str:
 
 
 def is_temp_name(name: str) -> bool:
-    """途中を見せない書き方が落ちて残した一時ファイルの名前か。
+    """途中を見せない書き方が異常終了して残した一時ファイルの名前か。
 
     `write_bytes_atomic` などの `.<名前>.<一意>.part` と、`write_text_atomic` の
     `.<名前>.<一意>.part<拡張子>` の形。先頭が `.` でない名前は当たらない。
@@ -328,21 +328,21 @@ def write_bytes_atomic(path: str, content: bytes) -> str:
     """中身をそのまま、途中を見せず電源断にも耐える形で書く。書けたら空文字、駄目なら理由。
 
     承認済みチケット（`doing/<識別子>.md`）と、それと組になる待ち方・戻す提案を書く。
-    `write_bytes` の `open(path, "wb")` は開いた時点で中身を捨てるので、途中で落ちると
+    `write_bytes` の `open(path, "wb")` は開いた時点で中身を捨てるので、途中で異常終了すると
     空か書きかけのチケットが残る。承認済みチケットは判定が範囲を読む元で、承認は提案と
-    バイト単位で同じことが条件なので、壊れたものが残ると取り返しが付かない。
+    バイト単位で同じことが条件なので、破損したものが残ると取り返しが付かない。
 
     書き方は `write_text_atomic` と同じく、同じディレクトリの一時ファイルに書き切って
     `os.replace` で差し替える。違うのは 2 つ。
 
-    - **差し替えの前に一時ファイルを `fsync` し、差し替えの後に親ディレクトリも `fsync` する。**
+    - 差し替えの前に一時ファイルを `fsync` し、差し替えの後に親ディレクトリも `fsync` する。
       記録と違って取り直せないので、電源断の直後に「差し替わっているが中身が空」を残さない。
       macOS の `fsync` はディスクの書き込みキャッシュまでは届かないので、`F_FULLFSYNC` が
       使えればそちらを使う。親ディレクトリの `fsync` は POSIX だけで、開けない（Windows）・
-      できないファイルシステムでは黙って飛ばす。差し替えはもう済んでいるので、ここで落ちたことには
-      しない
-    - **一時ファイルの名前は `.<元の名前>.<一意>.part`。** 先頭の `.` と末尾の `.part` は、
-      落ちて残ったものを `ccnavi-push-approved.sh` がコミットせず、承認済みチケットの読み手
+      できないファイルシステムでは何も言わずに飛ばす。差し替えはもう済んでいるので、
+      ここで失敗したことにはしない
+    - 一時ファイルの名前は `.<元の名前>.<一意>.part`。先頭の `.` と末尾の `.part` は、
+      異常終了して残ったものを `ccnavi-push-approved.sh` がコミットせず、承認済みチケットの読み手
       （`.md` だけを読む）が拾わないため。元の拡張子で終わらせると、`doing/` の残骸が
       識別子とファイル名の違うチケットとして読まれる
 
@@ -372,8 +372,8 @@ def write_new_durable(path: str, content: bytes) -> str:
     """まだ無いファイルとして、`write_bytes_atomic` と同じ書き方で書く。在れば書かずに理由を返す。
 
     承認した子のフローを承認済みのツリーへ移すところが使う。在るかを確かめてから一時ファイルに
-    書き切り、`os.replace` で置く。**確かめてから置くまでの間に別の誰か（ボードの保存など）が
-    同じ名前に置くと、それを上書きする。** `write_new`（`O_EXCL`）はそこを塞ぐが、途中で落ちると
+    書き切り、`os.replace` で置く。確かめてから置くまでの間に別の誰か（ボードの保存など）が
+    同じ名前に置くと、それを上書きする。`write_new`（`O_EXCL`）はそこを塞ぐが、途中で異常終了すると
     書きかけを残す。どちらを取るかは書く側が決める。
     """
     if _STAGE["current"] is not None:
@@ -444,7 +444,7 @@ def _sync_file(fd: int) -> None:
             fcntl.fcntl(fd, full)
             return
         except OSError:
-            # 対応しないファイルシステム（ネットワークのものなど）では os.fsync に落とす。
+            # 対応しないファイルシステム（ネットワークのものなど）では os.fsync に切り替える。
             pass
     os.fsync(fd)
 
@@ -466,8 +466,8 @@ def _sync_directory(directory: str) -> None:
 def read_json(path: str) -> tuple[Any, Exception | None]:
     """JSON を読む。読めなければ (None, 例外)。
 
-    例外を返すのは、呼ぶ側が「無い」と「壊れている」を分けるため。無いのは
-    普通の状態で何も言わなくてよいが、壊れているのは言わないと直らない。
+    例外を返すのは、呼ぶ側が「無い」と「破損している」を分けるため。無いのは
+    普通の状態で何も言わなくてよいが、破損しているのは言わないと直らない。
 
     一時的に開けないだけなら数回打ち直す。`write_text_atomic` の差し替えは
     中身を壊さないが、Windows ではその一瞬に開こうとした側が共有違反
@@ -570,7 +570,7 @@ def move(source: str, target: str) -> str:
 
     同じファイルシステムの中なら rename 1 回で済む。またぐとき（EXDEV）だけコピーして消し、
     消せなければコピーした側を消して戻す（両方に残さない）。コピーして消す処理に回すのは EXDEV に
-    限る。rename が他の理由で落ちたときまで回すと、その間に別のプロセスが置いた行き先を消す。
+    限る。rename が他の理由で失敗したときまで回すと、その間に別のプロセスが置いた行き先を消す。
     """
     if _STAGE["current"] is not None:
         staged, content = _staged(source)
@@ -660,7 +660,7 @@ def replace_bytes(path: str, content: bytes, temp_suffix: str) -> str:
     """一時ファイル（`<path><temp_suffix>`）に書いてから置き換える。駄目なら理由。
 
     途中で止まっても半端な中身を残さない。一時ファイルの名前が決まっているのは、
-    落ちて残ったものを呼び手が名前で見分けるため（configsync の `*.ccnavi-sync`）。
+    異常終了して残ったものを呼び手が名前で見分けるため（configsync の `*.ccnavi-sync`）。
     """
     if _STAGE["current"] is not None:
         return _stage_put(Op(OP_REPLACE, path, bytes(content), temp_suffix=temp_suffix))
@@ -697,7 +697,7 @@ def lexists(path: str) -> bool:
 def listdir(directory: str) -> list[str]:
     """ディレクトリの名前の一覧（順序は決めない）。無ければ `os.listdir` と同じ例外。
 
-    溜める段があれば、そこで足した名前を足し、消した名前を落とす。
+    溜める段があれば、そこで足した名前を足し、消した名前を除く。
     """
     stage = _STAGE["current"]
     if stage is None:
@@ -879,7 +879,7 @@ def _recorded(path: str, failed: str) -> str:
 # ディスクに書き、Chrome は同じ値を 1 コミットにする。
 #
 # 書けなかったときの扱いは、書く側のコードが `policy` でつける（溜める段では書き込みが
-# 落ちないので、落ちたときの枝のコードは走らない）。
+# 失敗しないので、失敗したときの枝のコードは走らない）。
 
 OP_TEXT = "text"  # write_text
 OP_TEXT_ATOMIC = "text-atomic"  # write_text_atomic / write_json_atomic
@@ -906,11 +906,11 @@ FAIL_HISTORY = "history"  # 履歴の書けなかった知らせに溜めて続�
 class Policy:
     """書けなかったときの扱い。`message` の `{reason}` に理由が入る。
 
-    `undo` は落ちたときに消すパス（書いた側を戻して、両方に残さない）。`restore` は落ちたときに
+    `undo` は失敗したときに消すパス（書いた側を戻して、両方に残さない）。`restore` は失敗したときに
     前の中身へ戻すパスと中身の組（中身が None なら消す）。先に書いた別のファイルを、片方だけ新しく
     なった形で残さないために使う。`places` は、
     書けたらその識別子を「置いた」と数える。`group` が同じ行と書き込みは 1 つの組で、
-    `FAIL_LINE` で落ちたら残りを飛ばす。`ticket` は知らせの頭に付ける識別子。
+    `FAIL_LINE` で失敗したら残りを飛ばす。`ticket` は知らせの頭に付ける識別子。
     `prefix` は `message` の前に付ける語（呼び手の用件。「マーカーを置けない: 」など）。
     `tag` は書けたときに組ごとに記録する名札で、`Call` が「実際に書けたもの」を知るのに使う。
     """
@@ -968,7 +968,7 @@ STREAM_ERR = "stderr"
 
 @dataclass
 class Line:
-    """ユーザに見せる 1 行。書き込みと同じリストに置き、同じ組が落ちたら出さない。"""
+    """ユーザに見せる 1 行。書き込みと同じリストに置き、同じ組が失敗したら出さない。"""
 
     text: str
     group: int = 0

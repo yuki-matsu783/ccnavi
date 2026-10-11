@@ -93,7 +93,7 @@ test("CB-T282 レベルは CCNAVI_LOG_LEVEL で絞る。大文字小文字を問
   }
 });
 
-test("CB-T283 書けないときは黙って捨て、console にも何も出さない。root が空なら書かない", () => {
+test("CB-T283 書けないときはエラーにせず捨て、console にも何も出さない。root が空なら書かない", () => {
   const root = workspace();
   const spoken: unknown[] = [];
   const saved = { log: console.log, error: console.error, warn: console.warn };

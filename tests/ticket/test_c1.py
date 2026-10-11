@@ -359,9 +359,9 @@ class HumanEntryGuardTest(AuthorityHarness):
 
 
 class RecordTreeReviewTest(PhaseHarness):
-    """本物の実行ファイルで、`--record-tree` 付きの依頼・行き先・Draft 外しが置き場だけを書く。
+    """実際の実行ファイルで、`--record-tree` 付きの依頼・行き先・Draft 外しが置き場だけを書く。
 
-    PhaseHarness はstate の置き場を `--state` で動かしている（上書きした置き場）。下書きはそこへ
+    PhaseHarness は state の置き場を `--state` で動かしている（上書きした置き場）。下書きはそこへ
     書かれ、一覧にも置き場の外にも数えない。
     """
 

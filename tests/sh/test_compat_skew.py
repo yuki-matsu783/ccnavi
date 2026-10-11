@@ -168,7 +168,7 @@ class CompatAgreesTest(unittest.TestCase):
     def test_v8_renaming_the_approve_flag_to_agree_raised_the_compat_to_3(self):
         """V8 `--approve` を `--agree` に改名したので 3 以上。
 
-        改名の前の sh（互換 2）は `--approve` を渡して落ちるので、食い違いとして知らせる。
+        改名の前の sh（互換 2）は `--approve` を渡して失敗するので、食い違いとして知らせる。
         """
         self.assertGreaterEqual(version.COMPAT, 3)
 
@@ -187,7 +187,7 @@ class CompatAgreesTest(unittest.TestCase):
         なった（自分では組み直さない）。なので 7 以上。
 
         欄を足しただけだが、古い実行ファイルの答えでは拡張の「要対応のみ」が空になり、不備も
-        出ない。黙って空になるより食い違いとして知らせる。
+        出ない。知らないうちに空になるより食い違いとして知らせる。
         """
         self.assertGreaterEqual(version.COMPAT, 7)
 

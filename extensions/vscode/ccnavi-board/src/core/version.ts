@@ -4,9 +4,9 @@
  *
  * 見るのは 2 つ。
  *
- * - **互換の版（`compat`）**。実行ファイルと、それを呼ぶ側（拡張と `.ccnavi/scripts/` の sh）の契約の版。
+ * - 互換の版（`compat`）。実行ファイルと、それを呼ぶ側（拡張と `.ccnavi/scripts/` の sh）の契約の版。
  *   拡張は起動のときに自分の `EXTENSION_COMPAT` と比べ、違えばどちらを新しくするかを名指しする
- * - **受け付けるフラグ（`flags`）**。新しいフラグ（`--flow` など）を使う前に、実行ファイルが知っているかを見る。
+ * - 受け付けるフラグ（`flags`）。新しいフラグ（`--flow` など）を使う前に、実行ファイルが知っているかを見る。
  *   前は渡してみて argparse の「知らないオプション」の苦情で見分けていた（フラグごとに渡してみる形）
  *
  * `--version` を知らない実行ファイルは、この仕組みより前の古い版として扱う。
@@ -94,7 +94,7 @@ function named(info: VersionInfo): string {
 
 /**
  * 起動のときに言う食い違い。揃っていれば undefined。聞けなかった（`failed`）ときも言わない
- * （起動の知らせは食い違いだけにする。実行ファイルが無い・壊れているは画面を開いたときに言う）
+ * （起動の知らせは食い違いだけにする。実行ファイルが無い・破損しているは画面を開いたときに言う）
  */
 export function skewMessage(probe: VersionProbe, fromSource: boolean): string | undefined {
   if (probe.kind === "old") {

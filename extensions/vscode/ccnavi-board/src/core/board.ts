@@ -28,7 +28,7 @@ export interface ColumnDef {
   readonly label: string;
 }
 
-/** 列の順序。該当が 0 件でも落とさない */
+/** 列の順序。該当が 0 件でも省かない */
 export const COLUMNS: readonly ColumnDef[] = [
   { state: "todo", label: "未着手" },
   { state: "doing", label: "作業中" },
@@ -100,7 +100,7 @@ export interface Card {
   readonly riskLevel: string;
   readonly riskPoints: number | null;
   readonly seenIn: readonly SeenInJson[];
-  /** どれが本物か決まらないチケットの全部。決まっていれば空。判定と同じ答えを実行ファイルが出す */
+  /** どれが正か決まらないチケットの全部。決まっていれば空。判定と同じ答えを実行ファイルが出す */
   readonly scattered: readonly SeenInJson[];
   /** 子なら自分のフェーズのマーカー、親なら空 */
   readonly marks: readonly string[];
@@ -182,7 +182,7 @@ export function buildBoard(json: BoardJson): Board {
   const parents = new Map<string, ParentJson>(json.parents.map((p) => [p.ticket, p]));
   const pending = new Set(json.pending_approval);
   const live = json.tickets.map((t) => toCard(t, parents, pending));
-  // 退避のカードは置き場のカードと識別子が重ならないものだけ（重なれば置き場の側が本物）
+  // 退避のカードは置き場のカードと識別子が重ならないものだけ（重なれば置き場の側が正）
   // 鍵はプロジェクトと識別子。ワークスペースとプロジェクトで同じ識別子を使っていても取り違えない
   const liveKeys = new Set(json.tickets.map((t) => `${t.project}\u0000${t.ticket}`));
   const archived = (json.archived ?? []).filter((a) => !liveKeys.has(`${a.project}\u0000${a.ticket}`)).map(toArchivedCard);
@@ -363,7 +363,7 @@ function flowOf(flow: FlowJson | null, column: ProposalState): FlowJson | null {
 
 /**
  * 親カードに出すマージリクエスト。依頼のマーカーの URL は依頼の投稿（`#issuecomment-…`）を指すので、
- * 断片を落としてマージリクエスト自体にする。マージリクエストは親ブランチに 1 本なので、
+ * 断片を除いてマージリクエスト自体にする。マージリクエストは親ブランチに 1 本なので、
  * 番号の大きいフェーズの依頼を採る（同じ番号のはず。違えば新しいほうを採る）。
  */
 function mrOf(phases: readonly PhaseChip[]): { url: string; number: number | null } {
@@ -403,7 +403,7 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
   if (p.review_waiting) {
     actions.push({ kind: "review", parent: parent.ticket, phase: p.number });
   }
-  // 依頼のマーカー `{head, mr, url, host, since}`（設計 9.10）。URL は依頼の投稿を指す。中身を解釈せずそのまま渡すだけ。
+  // 依頼のマーカー `{head, mr, url, host, since}`。URL は依頼の投稿を指す。中身を解釈せずそのまま渡すだけ。
   // 依頼のマーカーは mr と url を必ず一緒に持ち、リンクは url があるときだけ出すので、他のマーカーの mr は読まない
   const requested = p.marks.requested ?? {};
   return {

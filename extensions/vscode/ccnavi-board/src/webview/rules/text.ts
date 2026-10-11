@@ -6,7 +6,7 @@
  */
 import type { RuleForm, Section } from "../../core/rules-view.js";
 
-/** 1 行に縮める。空白をまとめて、長ければ後ろを落とす */
+/** 1 行に縮める。空白をまとめて、長ければ後ろを省く */
 function excerpt(text: string, max: number): string {
   const one = text.replace(/\s+/g, " ").trim();
   return one.length > max ? `${one.slice(0, max)}…` : one;
@@ -58,7 +58,7 @@ export function staleMessage(section: Section): string {
 }
 
 /**
- * 絞り込みが当てる文字列。当てるのは**書いてある値そのもの**（id・ツール・パターン・文面・
+ * 絞り込みが当てる文字列。当てるのは書いてある値そのもの（id・ツール・パターン・文面・
  * 渡す文）で、要約に出ない全文にも当たる。
  */
 export function findText(rule: RuleForm): string {

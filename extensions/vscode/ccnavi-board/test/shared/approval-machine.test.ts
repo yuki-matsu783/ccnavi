@@ -1,8 +1,8 @@
 /**
  * 承認のオーバーレイの遷移（`src/core/approval-machine.ts`）。どの状態で何を受け、何を返すか。
  *
- * 後半は**変異テスト**。ガードを 1 つずつ消したソースをその場で組み立てて、
- * 「ガードが有効であること」を確かめる関数が落ちることまで見る。ガードを足したら `GUARDS` にも足す。
+ * 後半は変異テスト。ガードを 1 つずつ消したソースをその場で組み立てて、
+ * 「ガードが有効であること」を確かめる関数が失敗することまで見る。ガードを足したら `GUARDS` にも足す。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -114,8 +114,8 @@ function toApproving(step: Step, tickets: readonly string[] = ["i0001"], only: r
 }
 
 /**
- * 名前で状態を作る。**ガードの確かめは「守る状態を全部」回す。**
- * 1 つの状態でしか押さないと、ガードから状態を 1 つ抜いた（消すのではなく弱めた）ときに落ちずに通る
+ * 名前で状態を作る。ガードの確かめは「守る状態を全部」回す。
+ * 1 つの状態でしか押さないと、ガードから状態を 1 つ抜いた（消すのではなく弱めた）ときに失敗せずに通る
  */
 function named(step: Step, kind: string): ApprovalState {
   switch (kind) {
@@ -222,7 +222,7 @@ interface Guard {
   readonly find: string;
   /** 置き換えた後（ガードが有効でなくなる形） */
   readonly into: string;
-  /** 有効であることの確かめ。**ガードを消したらここが落ちる**（または、そこで投げる） */
+  /** 有効であることの確かめ。ガードを消したらここが失敗する（または、そこで投げる） */
   readonly check: (step: Step) => void;
 }
 
@@ -317,7 +317,7 @@ const GUARDS: readonly Guard[] = [
     find: 'if (overlay?.kind !== "decideLoading") {',
     into: "if (false) {",
     check(step) {
-      // 閉じている状態は最後（ガードを外すと、無い持ち物を読んで投げる）
+      // 閉じている状態は最後（ガードを外すと、無いプロパティを読んで投げる）
       const kinds_ = ["decidePreview", "deciding", "preview", "prompt", "error", "closed"];
       assertNamed(step, kinds_);
       for (const kind of kinds_) {
@@ -362,12 +362,12 @@ const GUARDS: readonly Guard[] = [
     into: "if (tickets.length === 0) {",
     check(step) {
       // `approving` は `preview` を持っているので、ガードを弱めても投げずに 2 本目が出る。
-      // そのぶん、落ちるのが確かめのほうになる
+      // そのぶん、失敗するのが確かめのほうになる
       const approving = toApproving(step);
       const after = step(approving, { kind: "confirm", tickets: ["i0001"] });
       assert.equal(after.state, approving, "承認中に押し直しても、打つのは 1 本きり");
       assert.deepEqual(kinds(after.effects), []);
-      // 残りの状態も全部。1 つだけ見ると、そこ以外をガードから抜かれたときに落ちずに通る
+      // 残りの状態も全部。1 つだけ見ると、そこ以外をガードから抜かれたときに失敗せずに通る
       assertNamed(step, ["closed", "loading", "done", "error", "prompt"]);
       for (const kind of ["closed", "loading", "done", "error", "prompt"]) {
         const state = named(step, kind);
@@ -380,7 +380,7 @@ const GUARDS: readonly Guard[] = [
     find: 'if (kind === "loading" || kind === "preview" || kind === "approving") {',
     into: "if (false) {",
     check(step) {
-      // **3 つとも回す。** 1 つだけ見ると、ガードからその 1 つ以外を抜かれたときに落ちずに通る
+      // 3 つとも回す。 1 つだけ見ると、ガードからその 1 つ以外を抜かれたときに失敗せずに通る
       assertNamed(step, ["loading", "preview", "approving"]);
       for (const kind of ["loading", "preview", "approving"]) {
         const state = named(step, kind);
@@ -410,8 +410,8 @@ const GUARDS: readonly Guard[] = [
     find: 'if (overlay?.kind !== "done" && overlay?.kind !== "prompt") {',
     into: "if (false) {",
     check(step) {
-      // **閉じている状態は最後。** ガードを外すと、そこは無い持ち物を読んで投げるので、
-      // 先に置くと変異テストが「確かめが落ちた」ではなく「投げた」を見ることになる
+      // 閉じている状態は最後。 ガードを外すと、そこは無いプロパティを読んで投げるので、
+      // 先に置くと変異テストが「確かめが失敗した」ではなく「投げた」を見ることになる
       assertNamed(step, ["loading", "preview", "approving", "error", "closed"]);
       for (const kind of ["loading", "preview", "approving", "error", "closed"]) {
         const state = named(step, kind);
@@ -831,7 +831,7 @@ function load(source: string): { readonly approvalStep: Step } {
   return box.exports as unknown as { readonly approvalStep: Step };
 }
 
-test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが落ちる（変異テスト）", () => {
+test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが失敗する（変異テスト）", () => {
   const source = fs.readFileSync(SOURCE, "utf8");
 
   // 組み立て直したものが、読み込んだものと同じに動くこと。ここが成り立たないと、以下は何も見ていない
@@ -844,7 +844,7 @@ test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが落
     const at = source.split(guard.find).length - 1;
     assert.equal(at, 1, `変異させる 1 行が見つからない（${guard.what}）。ソースを直したら find も直す`);
     const mutated = load(source.replace(guard.find, guard.into));
-    // **`assert.AssertionError` に限る。** 無い持ち物を読んだ `TypeError` で偶然「落ちた」ことに
+    // `assert.AssertionError` に限る。 無いプロパティを読んだ `TypeError` で偶然「失敗した」ことに
     // しない（確かめる状態は、ガードを外しても投げない側を選んである）
     assert.throws(
       () => guard.check(mutated.approvalStep),

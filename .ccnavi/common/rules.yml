@@ -36,7 +36,7 @@ deny:
       書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えてユーザに依頼してください
       （/ccnavi-config）
 
-  # チェックアウトしたブランチでは編集しない。`wip/scratchpad/` と`.claude/worktrees/` だけが編集可能。
+  # チェックアウトしたブランチでは編集しない。`wip/scratchpad/` と `.claude/worktrees/` だけが編集可能。
   # `wip/scratchpad/` は追跡して push する下書きの置き場（統合時に wip/ ごと消す）。
   # `{root}` はワークスペースルートの実パスに置き換わる。
   - id: workspace-root

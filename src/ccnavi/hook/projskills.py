@@ -72,7 +72,7 @@ def _front(raw: bytes) -> dict:
 
 
 def entries(conf: settings.Settings, project_root: str) -> tuple[list[tuple[str, str, str]], int]:
-    """(名前, 説明, 相対パス) のリストと、上限で落とした数。名前の順。"""
+    """(名前, 説明, 相対パス) のリストと、上限で除いた数。名前の順。"""
     base = skills_dir(project_root)
     try:
         names = sorted(os.listdir(base))

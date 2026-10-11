@@ -63,10 +63,10 @@ HELD_TOOLS = ("Agent", *SHELL_TOOLS)
 # 語の中の目印（引用がつないだ空白）もまたがない。またぐと、引数の値に書いた
 # `ccnavi --agree x "a --preview"` の `--preview` が免除の理由になる。
 #
-# **免除の理由になるのは、単独の語として現れた `--preview` だけ。** 前は生の空白（`--agree` の
-# 後ろに必ず 1 つある）、後ろは空白か区切りか行末。これを見ないと、別のフラグの**値**に書いた
+# 免除の理由になるのは、単独の語として現れた `--preview` だけ。 前は生の空白（`--agree` の
+# 後ろに必ず 1 つある）、後ろは空白か区切りか行末。これを見ないと、別のフラグの値に書いた
 # `--preview` で免除が成立する。`ccnavi --agree --reason=--preview` は、argparse が
-# `--reason` の値として受け取るので `--preview` は単独の語にならず、実行ファイルは本物の
+# `--reason` の値として受け取るので `--preview` は単独の語にならず、実行ファイルは実際の
 # `--agree` を走らせる。hook が見る文字列と、実行ファイルが走らせる枝がそこで食い違う。
 # `=` を挟む形だけでなく、`--preview=x` や `x--preview` のように語にくっついた形も免除しない。
 # 語の切れ目は生の空白だけで数える。語の中の目印（引用がつないだ空白）は数えない。
@@ -117,7 +117,7 @@ def forbidden(subject: str, unwrapped: str = "") -> bool:
 #
 # 実行ファイルを呼ぶ表記は追い切れない（`uv run -m ccnavi`、名前を変えたコピー、
 # `awk` の `system()`、`python -c` に引数のリストで渡す形）。だからコマンドの位置は見ず、
-# **コマンド行の生の文字列の全体**から、引用符と `\` を落としてから文字列を探す
+# コマンド行の生の文字列の全体から、引用符と `\` を除いてから文字列を探す
 # （`--y""es`・`"--yes"`・`--x\=y` を同じに読む）。外すのは、並んだコマンドが全部、
 # 表示・検索・閲覧の道具（名前の完全一致）のときだけ。外す道具を並べ損ねても、止める側になるだけ。
 _GUARD_NAME = "CCNAVI_GUARD_TICKET_APPROVAL"
@@ -149,7 +149,7 @@ _ASSIGNMENT_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\+?=")
 
 
 def _dequoted(subject: str) -> str:
-    """引用符とバックスラッシュを落とした文字列。分け書き（`--y""es`）と引用を同じに読む。"""
+    """引用符とバックスラッシュを除いた文字列。分け書き（`--y""es`）と引用を同じに読む。"""
     return re.sub(
         r"['\"`\\]", "", subject.replace(shellread.SEP, "\n").replace(shellread.WORD_SEP, " ")
     )
@@ -248,7 +248,7 @@ def guard_off_message(found: str) -> str:
 # 端末要求を切る変数を前に並べても抜けられる。しきい値の環境変数を 0 に近づけて並べれば、
 # 自分の呼び出しの記録を消せる。
 #
-# 見るのは human_path_form と同じく、引用符と `\` を落としたコマンド行の生の文字列。実行役の
+# 見るのは human_path_form と同じく、引用符と `\` を除いたコマンド行の生の文字列。実行役の
 # コマンド越し（`script -qc`・`bash -c`・`env`）でも同じ文字列が残る。コマンドの切れ目
 # （`;` `&` `|` 改行）の中に ccnavi の名前と、単独の語の `--prune` が並べば止める。
 # `git fetch --prune` や `ccnavi-git.sh fetch --prune` は ccnavi の名前（`ccnavi` と
@@ -267,7 +267,7 @@ RECORDS_PRUNE_RULE_ID = "builtin-guard-records-prune"
 
 
 def _unquoted_marks(subject: str) -> tuple[str, set[int]]:
-    """引用符とバックスラッシュを落とした文字列と、落とした場所（落とした後の位置）の組。"""
+    """引用符とバックスラッシュを除いた文字列と、除いた場所（除いた後の位置）の組。"""
     text = subject.replace(shellread.SEP, "\n").replace(shellread.WORD_SEP, " ")
     out: list[str] = []
     cuts: set[int] = set()

@@ -43,7 +43,7 @@ def _rules(
     """ルールファイルを、判定が読むのと同じ読み方で読んで検証する。
 
     rules.load をそのまま呼ぶ。別の読み方をすると、検証は通ったのに実運用で
-    落ちるという、検証があるぶんかえって危ない形になる。
+    失敗するという、検証があるぶんかえって危ない形になる。
 
     `home` は、ルールが指すファイル（additionalContextFile）を探す起点。レイヤーの
     ルールならそのレイヤーの git プロジェクトルート。省けばワークスペースルート、
@@ -125,7 +125,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
     if rule.message and rule.decision != rules.DENY:
         # ask の文面はユーザの確認ダイアログにしか出ず、allow の文面はどこにも出ない。
         # 書いたユーザは「モデルに届く」と思って書くので、届かない欄を残さない。
-        # ルールは働いているので判定は変わらない。直すまで CI が落ちるだけ。
+        # ルールは働いているので判定は変わらない。直すまで CI が失敗するだけ。
         where = (
             "ユーザの確認ダイアログにしか出ない"
             if rule.decision == rules.ASK

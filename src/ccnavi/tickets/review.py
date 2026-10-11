@@ -193,7 +193,7 @@ def requested(
     # 動いていれば、ユーザが見るものとマーカーが食い違う。
     unmet = _unmet(tree_root, conf, ph)
     if unmet:
-        stderr.write("ccnavi: 投稿の後に前提が崩れた。マーカーは置かない\n")
+        stderr.write("ccnavi: 投稿の後に前提が成り立たなくなった。マーカーは置かない\n")
         for line in unmet:
             stderr.write(f"  - {line}\n")
         return 1
@@ -309,9 +309,9 @@ def review_problems(
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     if _is_last_feedback_review(parent, phase_no):
         # フィードバック対応の最後のレビュー。新しいフィードバック作業フェーズは
-        # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 9.11）。
+        # 足せない。同じフェーズでやり直すか、別の issue に切り出すか。
         lines += [
-            "フィードバック対応の最後のレビューです。道は 2 つ。",
+            "フィードバック対応の最後のレビューです。選べるのは 2 つ。",
             f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）",
             f"  - ユーザが '{review_sh} decide {phase_no}'（ボードの「決める」）で"
             "残りを受け入れるか、別の issue に回す",
@@ -440,7 +440,7 @@ _SHA = re.compile(r"^[0-9a-f]{7,64}$")
 def _is_sha(value: str) -> bool:
     """マーカーの `head` が sha の形をしているか。
 
-    マーカーは親のブランチに乗って他の機械から届くファイル（設計 9.2）なので、中身を
+    マーカーは親のブランチに乗って他の機械から届くファイルなので、中身を
     git の revision としてそのまま渡さない。`HEAD` や `@` のような「今」を指す値は
     `head..HEAD` を空差分にして「変更が無い」と判定させ、`-` で始まる値は git のオプションに
     なってしまう。
@@ -460,7 +460,7 @@ def _outside_approved(
     `--ignore-submodules=none` は、`.gitmodules` の `ignore = all` で submodule の
     進みが差分にまったく出なくなるのを防ぐ（`.gitmodules` は追跡されるので、外から届く）。
 
-    `-z` が返すパスはもう正規化されているので、こちらでは何も直さない。空白を落としたり
+    `-z` が返すパスはもう正規化されているので、こちらでは何も直さない。空白を除いたり
     `\\` を `/` に直したりすると、`.ccnavi\\tickets\\x.py` という名前のファイル 1 個が
     置き場の中のパスになってしまい、除外の側に入る。
 
@@ -487,10 +487,10 @@ def _diff_paths(tree_root: str, ref: str) -> tuple[list[str], str]:
 def _dirty(tree_root: str, conf: settings.Settings, wip_removals: bool = False) -> bool:
     """ワークツリーに未コミットの変更があるか。ccnavi 自身の置き場は数えない。
 
-    承認済みチケットとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する（設計 9.2）。
+    承認済みチケットとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する。
     マーカーはフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
     マーカーをコミットしろ」と言い続けることになる。
-    マーカーと承認済みチケットをコミットして push するのは`ccnavi-review.sh` と
+    マーカーと承認済みチケットをコミットして push するのは `ccnavi-review.sh` と
     `ccnavi-agree.sh` の仕事で、ユーザの作業による未コミットの変更とは別に扱う。
     """
     rc, status = _git(
@@ -837,8 +837,8 @@ def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:
 
     ccnavi 自身の置き場だけが手元に残っている形は、届いていると数える。ユーザがレビューで
     見るのはコードで、置き場をコミットして push するのは `ccnavi-push-approved.sh` の仕事
-    （push が落ちてもコミットは残す）。数えると、レビュー待ちの間に落ちた push が次の依頼を止める。
-    `confirm` の側（`_moved_since_request`）と同じ基準。
+    （push が失敗してもコミットは残す）。数えると、レビュー待ちの間に失敗した push が
+    次の依頼を止める。`confirm` の側（`_moved_since_request`）と同じ基準。
 
     `ready` の前提（`_merge_problems`）はこれを使わない。あちらはユーザがリモートを見て
     マージするところで、マーカーも本当に届いていないと他の機械へ渡らない。
@@ -894,7 +894,7 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
 
     ただし ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを変えた
     コミットは、動いたと数えない。
-    依頼のマーカーはそこに置かれ、親のブランチにコミットして他の PC に届ける前提のもの（設計 9.2）。
+    依頼のマーカーはそこに置かれ、親のブランチにコミットして他の PC に届ける前提のもの。
     数えると「依頼 → マーカー → コミット」の順のせいで、依頼の直後に必ず自分のマーカーの
     コミットで「動いた」と判定され、
     承認の push（`ccnavi-push-approved.sh`）が置き場をまとめてコミットするので、レビューを

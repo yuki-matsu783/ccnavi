@@ -4,7 +4,7 @@
  *
  * バンドルした画面のスクリプトと CSS は `<script nonce>` / `<style nonce>` に文字列として流し込み、
  * ファイルとしては読ませない（`localResourceRoots` は空のまま）。
- * **この入れ物は 1 度しか入らない**（`retainedHost`）。画面は編集の途中を持つので、入れ直すと打ちかけの内容が消える。
+ * この入れ物は 1 度しか入らない（`retainedHost`）。画面は編集の途中を持つので、入れ直すと打ちかけの内容が消える。
  */
 import { type Appearance, bodyTag } from "./appearance.js";
 import { DATA_ID, embedData, type FlowData } from "./flow-view.js";

@@ -104,8 +104,8 @@ export function scriptCommand(root: string, name: string): string {
  * 承認の文と同じ 2 ボタン（コピー / 新しいセッションで開く）で渡す。判定は動かさず、マーカーも置かない。
  * `confirm` を打ってマーカーを置くのは、この文を受けた親（メインエージェント）で、親のワークツリーで打つ。
  * そこは止まっているので、通るのは `sh …ccnavi-review.sh …` の形を連結せずに単体で打ったときだけ
- * （設計 9.8。`cd … && sh …` は止まる）。サブエージェントには同じ形が常に禁止される（9.12）。文はその 2 つを言う。
- * 未解決の指摘の有無は、ボードが押したときに `decide <N> --preview` で読んで文に書く（`unresolved`。読めなければ `undefined`で、有無は言わない）。
+ * （`cd … && sh …` は止まる）。サブエージェントには同じ形が常に禁止される。文はその 2 つを言う。
+ * 未解決の指摘の有無は、ボードが押したときに `decide <N> --preview` で読んで文に書く（`unresolved`。読めなければ `undefined` で、有無は言わない）。
  * 判定は `confirm` が持ち、文はエージェントへの手がかりでしかない。
  * 未解決が残っていれば `confirm` が一覧と次の方法（解決してもらう・同じフェーズに子を足す・ユーザが decide で決める）を
  * 返すので、文はそれに従うことだけを言い、方法を先取りしない。
@@ -155,7 +155,7 @@ export function pushApprovedCommand(root: string, parents: readonly string[] = [
 
 /**
  * `ccnavi c1 family <親>` の答えから `target`（`yes` / `no` / `stop`）を読む。頭の `c1 1` が無ければ
- * 空文字（古い実行ファイル）。行末の CR は落とす
+ * 空文字（古い実行ファイル）。行末の CR は除く
  */
 export function c1TargetOf(stdout: string): string {
   const lines = stdout.split("\n").map((line) => line.replace(/\r$/, ""));

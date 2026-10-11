@@ -93,7 +93,7 @@ def watched_for(
     record: audit.Record,
     payload: hookio.Input | None = None,
 ) -> list[post.Watched]:
-    """実行後に見るツリーと、それぞれに当てるルール（設計 11.7）。
+    """実行後に見るツリーと、それぞれに当てるルール。
 
     payload が無ければ全部のツリー（ターンの区切り）。あればワークスペースルートと、
     この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。
@@ -377,7 +377,7 @@ def decide_at_start(
 
     判定は返さない。何も起きていない時点なので、言うことは 3 つだけ。バックアップを
     取れなかったこと（あれば）と、チケット制御が有効なときの作業の進め方と、ccnavi が
-    前提にしている作業の決まり（REQ-SES-06）。
+    前提にしている作業の決まり。
     後の 2 つは起動・再開・compact・clear のどの回にも出す。文脈が新しくなるたびに
     改めて届かないと、compact のあとのモデルは進め方を知らないまま続ける。
     サブエージェントには出さない（SubagentStart は別の手順で、チケットを起こす
@@ -404,7 +404,7 @@ def decide_at_start(
         record.guarded = [f"{o.target.key}:{o.action}" for o in outcomes]
         texts.append(selfguard.report(outcomes))
     # md の frontmatter の索引を差分で新しくし、引き方を案内する（`ccnavi --docs`）。
-    # サブエージェントには出さない。壊れても何も出さない
+    # サブエージェントには出さない。失敗しても何も出さない
     # （docsearch.at_start が例外を外に出さない）。先に組むのは、作業の決まりの
     # 「詳しくは --docs で引く」を、索引の案内を出す回にだけ添えるため。
     docs = "" if payload.agent_id else docsearch.at_start(conf, root, deadline)
@@ -480,8 +480,8 @@ def decide_after(
     # 書いた先を渡すのは、組み込みの既定を使っている間の修復を戻さないため
     # （selfguard._left_as_repair）。
     # 着手のときに共通レイヤーをプロジェクトの `.ccnavi/common/` へミラーした分は、
-    # 置き場・パスの途中のリンク・内容で見分けて外す
-    # （設計 11.12）。戻す側と、報告する側の両方で同じ答えを使う。
+    # 置き場・パスの途中のリンク・内容で見分けて外す。
+    # 戻す側と、報告する側の両方で同じ答えを使う。
     synced = functools.partial(configsync.is_synced_write, conf, root)
     restore = functools.partial(selfguard.after, written=_written(payload, record), synced=synced)
     guard = judge.guard_setting_files(mode, conf, root, payload, record, restore)

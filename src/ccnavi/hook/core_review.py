@@ -249,7 +249,7 @@ def moved_on_host(
 
 
 def _open_parent(root: str, conf: settings.Settings, parent_id: str) -> ticket_model.Ticket | None:
-    """作業中の親の承認済みチケット（本物とする側）。`phase.parent_for_cwd` と同じ引き方。"""
+    """作業中の親の承認済みチケット（正とする側）。`phase.parent_for_cwd` と同じ引き方。"""
     open_copies, _ = approval.scan(conf, root)
     found = tree.lookup(approval_checks.by_id(open_copies), parent_id)
     if found is None or found.is_child:

@@ -126,7 +126,7 @@ test("CB-T04 欠けた項目は既定値で埋め、全体を捨てない", () =
   }
 });
 
-test("CB-T140 blocked は欄が無ければ空。古い実行ファイルの出力でも落ちない", () => {
+test("CB-T140 blocked は欄が無ければ空。古い実行ファイルの出力でも失敗しない", () => {
   // 欄が無いのは、この欄より前の実行ファイルの出力。空なら止まっていないと読む。
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
@@ -142,7 +142,7 @@ test("CB-T140 blocked は欄が無ければ空。古い実行ファイルの出�
   assert.equal(parsed.board.tickets[1].blocked, "");
 });
 
-test("CB-T259 history は実行ファイルの履歴をそのまま使う。欄が無ければ空、オブジェクトでない行は落とし、欠けた欄は既定値で埋める", () => {
+test("CB-T259 history は実行ファイルの履歴をそのまま使う。欄が無ければ空、オブジェクトでない行は除き、欠けた欄は既定値で埋める", () => {
   // 欄が無いのは、この欄より前の実行ファイルの出力。空なら履歴を出さない。
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
@@ -183,7 +183,7 @@ test("CB-T262 predecessors_unmet は実行ファイルの答えをそのまま�
   assert.deepEqual(parsed.board.tickets[1].predecessors_unmet, []);
 });
 
-test("CB-T303 archived は実行ファイルの退避の欄を写す。欄が無ければ空、オブジェクトでない行は落とし、欠けた欄は既定値で埋める", () => {
+test("CB-T303 archived は実行ファイルの退避の欄を写す。欄が無ければ空、オブジェクトでない行は除き、欠けた欄は既定値で埋める", () => {
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const parsed = parseBoardJson(
     JSON.stringify({

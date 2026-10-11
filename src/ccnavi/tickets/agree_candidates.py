@@ -40,7 +40,7 @@ class Candidate:
     overflow: list[rules.Problem] = field(default_factory=list)
     # 改版なら、いま使われている承認済みチケット。
     current: ticket_model.Ticket | None = None
-    # このチケットに使うフェーズ定義（共通レイヤー + `project:` が指すレイヤー、設計 11.4.1）。
+    # このチケットに使うフェーズ定義（共通レイヤー + `project:` が指すレイヤー）。
     # 承認の対象の中でもチケットごとに違いうるので、候補が引いたものを持っておく。
     types: dict | None = None
     # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
@@ -70,14 +70,14 @@ def candidates(
     revisions: list[ticket_model.Ticket],
     approved: list[ticket_model.Ticket],
 ) -> tuple[list[Candidate], list[tuple[ticket_model.Ticket, list[rules.Problem]]], dict]:
-    """承認の対象に入れるものと、落とすものに分ける。3 つめは親子を引くための対応表。
+    """承認の対象に入れるものと、外すものに分ける。3 つめは親子を引くための対応表。
 
     承認（`agree`）・見せる（`preview`）・確かめる（`verify`）に加えて、`--lint` も
-    ここを通る。承認で落ちるものを数える経路が 2 本あると、片方が気づかないうちに弱くなる
-    （実際に `--lint` は `validate` だけを当てていて、順序で落ちる子に何も言わなかった）。
+    ここを通る。承認で外れるものを数える経路が 2 本あると、片方が気づかないうちに弱くなる
+    （実際に `--lint` は `validate` だけを当てていて、順序で外れる子に何も言わなかった）。
     """
     open_index = approval_checks.by_id(approved)
-    # 親子を引く対応表は、承認済みチケットと、今回の承認で通ったものだけ。落ちた親を対応表に残すと、
+    # 親子を引く対応表は、承認済みチケットと、今回の承認で通ったものだけ。外れた親を対応表に残すと、
     # 承認されない親の範囲で子が検証され、親の承認を経ずに子の承認済みチケットができる。
     # pending は親が子より前に並ぶ（並べ替えの鍵が親の識別子）ので、子が引くときには
     # 親の通過が決まっている。
@@ -112,7 +112,7 @@ def candidates(
         if cand.plans_feedback:
             cand.notes = feedback_notes(root, conf, t)
         batch.append(cand)
-        # 通った改版だけ、一緒に承認する子から見える親にする。落ちた改版の計画で子を
+        # 通った改版だけ、一緒に承認する子から見える親にする。外れた改版の計画で子を
         # 通すと、承認されない番号の子が承認済みチケットになる。
         pool[t.ticket] = t
 
@@ -228,10 +228,10 @@ def record_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
 
 
 def project_of(t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket]) -> str:
-    """このチケットのレイヤーを決める `project:`（設計 11.4.1）。
+    """このチケットのレイヤーを決める `project:`。
 
     子は親と同じ置き場に並ぶので、定義を引くには親のプロジェクトを使う。食い違えば
-    `project_problems` が落とす。親が対応表に居ないときだけ、子の置き場の値をそのまま読む。
+    `project_problems` が外す。親が対応表に居ないときだけ、子の置き場の値をそのまま読む。
     """
     if t.is_child:
         parent = pool.get(t.parent)
@@ -268,7 +268,7 @@ def feedback_notes(root: str, conf: settings.Settings, parent: ticket_model.Tick
 
 
 def plan_problems(t: ticket_model.Ticket, types: dict | None) -> list[rules.Problem]:
-    """親の計画がフェーズ定義と合っているか（設計 9.7）。"""
+    """親の計画がフェーズ定義と合っているか。"""
     problems: list[rules.Problem] = []
     if not t.has_plan:
         return problems
@@ -352,7 +352,7 @@ def revision_problems(
     current: ticket_model.Ticket,
     types: dict | None,
 ) -> list[rules.Problem]:
-    """親の改版を受けてよいか（設計 9.7）。"""
+    """親の改版を受けてよいか。"""
     problems = plan_problems(revised, types)
     if any(p.severity == rules.SEVERITY_ERROR for p in problems):
         return problems
@@ -474,10 +474,10 @@ def validate(
     2 つめは範囲の超過（親の範囲・定義の上限を超えた項、regex の項）で、承認は止めない。
     判定が親と定義の上限で切り詰めるので、承認で止める理由が無い。
 
-    形の検査を error に残すのは、**まとめて 1 度で見せて直させるため**。判定の側も同じ
+    形の検査を error に残すのは、まとめて 1 度で見せて直させるため。判定の側も同じ
     検査を当てる（`blocking_problems`）ので「判定では補えない」わけではないが、
     判定に任せると、承認の画面では通って、あとで書き込みが止まってから気づくことになる。
-    承認はユーザがまとめて見て決める場所なので、そこで落ちるものはそこで言う。
+    承認はユーザがまとめて見て決める場所なので、そこで外れるものはそこで言う。
     """
     problems: list[rules.Problem] = []
     overflow: list[rules.Problem] = []

@@ -1,4 +1,4 @@
-"""親チケットの `branch:`の読み方・承認・lint・Chrome の入口。
+"""親チケットの `branch:` の読み方・承認・lint・Chrome の入口。
 
 一時ディレクトリの git で、識別子 `feature-12-login` の親に `branch: feature/12-login` を書く。
 見るのは次のとおり（sh を通す主な経路は tests/sh/test_branch_field_sh.py が見る）。
@@ -9,11 +9,11 @@
    `branch`・`existing_branch`。既にあるブランチとのぶつかりの warn は出さない
 4. 改版で `branch:` を変えさせない。統合先の名前に当たる `branch:` は承認しない
 5. lint: 親のワークツリーが親のブランチ（`branch:` の値）の上に居なければ warn
-6. Chrome の入口: 親子のチケットはそのブランチを名乗る承認済みの親チケットで決まり
-   （承認前の提案は識別子で名乗る）、書くものはそのブランチだけ。同じ親子のチケットを名乗る
+6. Chrome の入口: 親子のチケットはそのブランチを宣言する承認済みの親チケットで決まり
+   （承認前の提案は識別子で宣言する）、書くものはそのブランチだけ。同じ親子のチケットを宣言する
    ブランチが 2 本あれば、先行の親子のチケットでも決めない
 7. 承認前の提案の `branch:` は c1 family も lint も使わない。統合先（origin/HEAD を含む）と、
-   2 つの親子のチケットが同じブランチを名乗る形は承認しない
+   2 つの親子のチケットが同じブランチを宣言する形は承認しない
 """
 
 from __future__ import annotations
@@ -367,7 +367,8 @@ class ChromeBranchFieldTest(unittest.TestCase):
                     else {BRANCH: {"head": HEAD, "files": _family_files()}}
                 ),
             },
-            # 識別子と同じ名前のブランチ（同じ親子のチケットを名乗るかを確かめに読む）はホストに無い
+            # 識別子と同じ名前のブランチ（同じ親子のチケットを宣言するかを確かめに読む）は
+            # ホストに無い
             "absent": [PARENT] if absent is None else absent,
         }
         request = {
@@ -390,7 +391,7 @@ class ChromeBranchFieldTest(unittest.TestCase):
         )
 
     def test_a_proposal_claims_only_its_identifier(self):
-        """承認前の提案の branch: では名乗らない（識別子のブランチの親子のチケットとして読む）。"""
+        """承認前の提案の branch: では宣言しない（識別子のブランチの親子のチケットとして読む）。"""
         proposal = {
             f"wip/proposals/todo/{PARENT}.md": with_branch(
                 parent_text(PARENT, ["research"], allow=("src/*",)), BRANCH
@@ -458,7 +459,7 @@ class ChromeBranchFieldTest(unittest.TestCase):
         self.assertEqual(closure["ambiguous"], [other])
         board = self.ask("board", branches=branches)
         self.assertIn(
-            "先行の親子のチケット（feature-20-dep）を名乗るブランチが 1 本でない",
+            "先行の親子のチケット（feature-20-dep）を宣言するブランチが 1 本でない",
             board["undecided"],
         )
 

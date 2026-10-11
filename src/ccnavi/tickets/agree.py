@@ -12,7 +12,7 @@
 `ccnavi --agree` が呼ぶ手続きの全部。
 
 - 承認の対象を組む（`gather`・`agree_candidates.candidates`）。提案を走査し、
-  承認済みチケットと突き合わせ、載せるものと落とすものに分ける。形の検査（`agree_candidates` の
+  承認済みチケットと照合し、載せるものと外すものに分ける。形の検査（`agree_candidates` の
   `validate`・`plan_problems`・`revision_problems`）はここで当てる
 - ユーザに見せる（`agree_screen.screen`・`preview_body`）。見せたものと承認するものを
   同じ答えにするため、一覧を組む関数は 1 つ（`gather`）にしてある
@@ -23,7 +23,7 @@
 - 承認の事実をモデルに伝える文を組む（`agree_screen.approved_text`。拡張が `--agree --yes` の
   `prompt` で渡す）
 
-判定は承認済みチケットだけを読み、ここを通ったかどうかは見ない（承認で本物とするのは置き場）。置き場を手で
+判定は承認済みチケットだけを読み、ここを通ったかどうかは見ない（承認で正とするのは置き場）。置き場を手で
 動かす進め方もあるので、判定の側で要る構造の検査は approval の `blocking_problems` に置いてある。
 """
 
@@ -72,7 +72,7 @@ class Gathered:
     refused: str = ""
     # 端末に出す 1 行（「承認待ち N 件のうち、指定の M 件だけを承認の対象にする」）。
     note: str = ""
-    # 本物とするツリーの外に在る計画の違う版の案内（`approval.revision_elsewhere_text`）。
+    # 正とするツリーの外に在る計画の違う版の案内（`approval.revision_elsewhere_text`）。
     # 承認待ちには入れない。書く場所を名指しするためだけに持つ（本文とダイジェストには入れない）。
     elsewhere: list[str] = field(default_factory=list)
 
@@ -90,20 +90,20 @@ class Gathered:
 def gather(
     stderr: TextIO, conf: settings.Settings, root: str, only: list[str] | None = None
 ) -> Gathered:
-    """承認の対象を組む。提案を走査し、承認済みチケットと突き合わせ、載せるものと落とすものに分ける。
+    """承認の対象を組む。提案を走査し、承認済みチケットと照合し、載せるものと外すものに分ける。
 
-    読めない提案や承認済みチケット、落とした提案の理由は標準エラーにも出す。端末のユーザは
+    読めない提案や承認済みチケット、外した提案の理由は標準エラーにも出す。端末のユーザは
     そこで読み、拡張は JSON の `problems` / `rejected` で読む。
 
     `only` は承認の対象を識別子で絞る（`ccnavi --agree <識別子>...`、拡張のオーバーレイ）。
     ボードが絞り込みで見えている分だけを渡す。絞りは対象を狭めるだけで、絞らないときに
-    落ちるものを通してはいけない。だから、承認待ちに無い識別子が入っていたら何も
+    外れるものを通してはいけない。だから、承認待ちに無い識別子が入っていたら何も
     承認しない（ボードが古いときに、見せた以外のものを通さないため）。親の改版が
     承認待ちなのに対象から外した子も何も承認しない（外すと旧計画で検証される）。
     通らなかった理由は `refused` に入れて返す。呼び手はそれを見て何もしない。
 
     フェーズ定義は承認の対象全体で 1 つに決まらない。どのレイヤーの定義を使うかは各チケットの
-    `project:` が決める（設計 11.4.1）ので、候補を組むところで 1 件ずつ引き、
+    `project:` が決めるので、候補を組むところで 1 件ずつ引き、
     引いたものを `Candidate` に持たせる。画面は候補が持つ定義を使う。
     """
     raw = approval.read_raw(conf, root)
@@ -116,9 +116,10 @@ def gather(
         stderr.write(f"ccnavi: {note}\n")
     closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     review, _ = approval.scan_review(conf, root, raw=raw)
-    # 本物とするツリーの外に書いた改版（と、改版の前に切ったワークツリーに残った古い版）は承認待ちに
-    # 入れない。黙って外さず、書く場所を名指しする。出すのは呼び手（`core_base.say_elsewhere` と
-    # `verify_verdict` の本文）で、ここでは標準エラーに書かない（同じ名指しを 2 度出さない）。
+    # 正とするツリーの外に書いた改版（と、改版の前に切ったワークツリーに残った古い版）は承認待ちに
+    # 入れない。気づかないうちに外さず、書く場所を名指しする。出すのは呼び手
+    # （`core_base.say_elsewhere` と `verify_verdict` の本文）で、ここでは標準エラーに
+    # 書かない（同じ名指しを 2 度出さない）。
     open_index = approval_checks.by_id(approved)
     elsewhere = [
         approval.revision_elsewhere_text(conf, root, t, where)
@@ -148,7 +149,7 @@ def gather(
                 stderr.write(f"ccnavi: {line}\n")
             return Gathered([], [], texts, {}, False, broken, "\n".join(lines), elsewhere=elsewhere)
         # 親の改版を外して子だけ通すと、子は承認済みチケット（旧計画）で検証される。絞らなければ
-        # 改版後の計画で落ちるものが通ることになるので、親も並べるまで何も承認しない。
+        # 改版後の計画で外れるものが通ることになるので、親も並べるまで何も承認しない。
         skipped = {t.ticket for t in revisions if t.ticket not in wanted}
         blocked = [t for t in pending if t.ticket in wanted and t.is_child and t.parent in skipped]
         if blocked:
@@ -209,9 +210,9 @@ class Verdict:
 
 
 def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
-    """`--verify` の答えを組む。判定は `gather` が済ませてあり、ここは読み替えるだけ。"""
+    """`--verify` の答えを組む。判定は `gather` が済ませてあり、ここは言い換えるだけ。"""
     head = "承認の可否（確かめるだけ。承認済みチケットは置かない）\n"
-    # 読めなかったものは、落ちた枝でも必ず出す。むしろこの 2 つ（絞りが通らない・承認待ちが
+    # 読めなかったものは、承認されない枝でも必ず出す。むしろこの 2 つ（絞りが通らない・承認待ちが
     # 1 件も無い）が「読めないのは自分が書いた 1 本」である見込みのいちばん高い枝で、
     # そこで出さないと、置いたばかりのユーザに「todo/ に置け」とだけ言うことになる。
     unreadable = _unreadable(gathered)
@@ -235,14 +236,14 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
     names = [c.ticket.ticket for c in gathered.batch] + [t.ticket for t, _ in gathered.rejected]
     width = max((len(name) for name in names), default=0)
     rows: list[tuple[str, str, list[str]]] = []
-    # 苦情の文面から識別子を落とす（`Problem.__str__` は名指しのために持つが、行の頭に
+    # 苦情の文面から識別子を省く（`Problem.__str__` は名指しのために持つが、行の頭に
     # 同じものが出ている）。残すのは重さと中身。
     for cand in gathered.batch:
         notes = [f"{p.severity}: {p.detail}" for p in cand.complaints]
         notes += [f"承認しても書けない: {p.detail}" for p in cand.overflow]
         rows.append((cand.ticket.ticket, "通る", notes))
     for t, complaints in gathered.rejected:
-        rows.append((t.ticket, "落ちる", [f"{p.severity}: {p.detail}" for p in complaints]))
+        rows.append((t.ticket, "外れる", [f"{p.severity}: {p.detail}" for p in complaints]))
     lines.append("\n")
     for name, mark, notes in sorted(rows):
         lines.append(f"  {name.ljust(width)}  {mark}\n")
@@ -265,19 +266,19 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
 
 
 def _elsewhere(gathered: Gathered) -> str:
-    """本物とするツリーの外に在る計画の違う版（承認待ちに入らない）を名指しする段。"""
+    """正とするツリーの外に在る計画の違う版（承認待ちに入らない）を名指しする段。"""
     if not gathered.elsewhere:
         return ""
-    lines = ["\n承認待ちに入らない改版がある（本物とするツリーの外）。\n"]
+    lines = ["\n承認待ちに入らない改版がある（正とするツリーの外）。\n"]
     lines += [_note_line(line) for line in gathered.elsewhere]
     return "".join(lines)
 
 
 def _unreadable(gathered: Gathered) -> str:
-    """読めなかったものを名指しする段。落ちた枝でも通った枝でも同じものを出す。
+    """読めなかったものを名指しする段。承認されない枝でも通った枝でも同じものを出す。
 
     終了コードは動かさない。`--agree` も、承認待ちが 1 件も無いとき以外はこれで
-    止まらないので、ここで落とすと「確かめは『いいえ』なのに承認は通る」になる。走査は絞る前の
+    止まらないので、ここで省くと「確かめは『いいえ』なのに承認は通る」になる。走査は絞る前の
     全ツリーを見るから、他のセッションの書きかけ 1 本で自分の提案が止まることにもなる。
     出さずに済ませることもしない。自分が書いた 1 本かもしれないので、件数と文面を本文に出す。
     """
@@ -320,7 +321,7 @@ def _batch_entry(cand: agree_candidates.Candidate) -> dict:
 class Applied:
     """承認済みチケットを置いた結果。途中で止まったときに、どこまで置いたかを呼び手へ返す。
 
-    置いたものは戻さない（戻す途中でまた落ちる）。代わりに、どこで止まって何が置かれたかを
+    置いたものは戻さない（戻す途中でまた失敗する）。代わりに、どこで止まって何が置かれたかを
     そのまま返し、拡張がユーザに伝える（README「承認の JSON」の `partial`）。
     """
 
@@ -375,7 +376,7 @@ def _apply_steps(
     """`plan_batch` の中身。書き込みは fsio の書き込みを溜める段に積み、見せる行も同じ順序で積む。
 
     書けなかったときの扱い（止める・言って続ける・行を出す）は `fsio.policy` で添える。
-    書き込みを溜める段では書き込みが落ちないので、その扱いは Writer(FS) が書くときに当てる。
+    書き込みを溜める段では書き込みが失敗しないので、その扱いは Writer(FS) が書くときに当てる。
     """
     for cand in batch:
         t = cand.ticket
@@ -442,12 +443,12 @@ def _apply_steps(
                 for line in carried:
                     stage.line(f"  {line}", group=group)
             # 終わったフェーズに子を足したら、そのフェーズのマーカーは消す。マーカーは
-            # 「その時点の子が全部見られた」以上の意味を持たない（REQ-TKT-21）。
+            # 「その時点の子が全部見られた」以上の意味を持たない。
             # 消すのは置けたあと。先に消すと、書けずに終わった（置き場が塞がっている、権限が無い）
             # ときに、子は 1 枚も増えていないのに済んでいたレビューが巻き戻る
             # （test_a_failed_copy_does_not_clear_the_marks_of_a_reviewed_phase）。
             # Writer(FS) は並べた順に書き、止まったらその先を書かないので、この順が保たれる。
-            # 置いた直後に落ちる（打ち切られる・電源が切れる）と「子は増えたのにマーカーは残る」
+            # 置いた直後に止まる（打ち切られる・電源が切れる）と「子は増えたのにマーカーは残る」
             # ＝見られていない子がいるのに止まらなくなるが、そちらは起きうる間が
             # ファイル 1 つを書く間だけで、頻度がはるかに低い。順番の入れ替えでは直らない
             # （両方を防ぐなら、マーカーの時刻と子の承認時刻を比べて止めるかどうかを決める
@@ -479,7 +480,7 @@ def waiting(
     無いもの。閉じたものは対象外で、再開はユーザが承認済みチケットを戻す。
     改版は、作業中の親の承認済みチケットがあり、`todo/` の提案の計画がそれと違うもの。
     計画が同じでも、いまの定義で計算した待ち方が承認済みチケット上の待ち方と違えば改版になる
-    （`phases.yml` を直した結果を進行中の親に反映する経路。設計 9.7）。`types_for` は
+    （`phases.yml` を直した結果を進行中の親に反映する経路）。`types_for` は
     チケットに使う定義を引く関数（`types_resolver`）。
     `--agree` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
     統合先の取り込み結果の `done/` にある識別子（閉じた識別子の再利用）はここでは外さず、

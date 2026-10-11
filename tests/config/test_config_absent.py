@@ -1,7 +1,7 @@
-"""共通レイヤーと config が無いとき・壊れているときの受入テスト（設計 11.2、REQ-MLT-40）。
+"""共通レイヤーと config が無いとき・不正なときの受入テスト。
 
 ファイルが無いのは「設定が無い」正常で、ルール・リスクの配点・フェーズ定義のすべてで空として扱う。
-記録の `fallback` にも `--lint` にも出さない。壊れているときだけ `fallback` を残す。
+記録の `fallback` にも `--lint` にも出さない。不正なときだけ `fallback` を残す。
 組み込みの deny は、共通レイヤーと config の有無・状態によらず常に当たる。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。
@@ -71,7 +71,7 @@ class AbsentRulesTest(ConfigUnionHarness):
                 self.assertNotIn("fallback", self.last_record())
 
     def test_the_builtin_credentials_deny_has_a_leading_boundary(self):
-        """土台の認証情報の止めは、本物の `.env`・`.ssh/` を止め、フィールド参照は巻き込まない。"""
+        """土台の認証情報の止めは、実際の `.env`・`.ssh/` を止め、フィールド参照は巻き込まない。"""
         self.remove_common_rules()
         for tool, field, value in (
             ("Bash", "command", "cat .env"),
@@ -119,7 +119,7 @@ class AbsentRulesTest(ConfigUnionHarness):
         self.assertNotIn("builtin-read-anything", self.last_record().get("rules", []))
 
     def test_a_broken_common_layer_falls_back_to_the_builtin_defaults_only(self):
-        """共通レイヤーのルールが壊れたら、組み込みの既定だけで判定する。`fallback` を残す。"""
+        """共通レイヤーのルールが不正なら、組み込みの既定だけで判定する。`fallback` を残す。"""
         write(self.rules, BROKEN)
 
         generated = self.hook(
@@ -133,7 +133,7 @@ class AbsentRulesTest(ConfigUnionHarness):
         self.assert_denied(self.hook("Bash", self.ws, command=RM_RF))
 
     def test_a_broken_layer_is_empty_and_is_named_in_the_fallback(self):
-        """config のレイヤーが壊れたら空。共通レイヤーは効き、`fallback` に名前を残す。"""
+        """config のレイヤーが不正なら空。共通レイヤーは効き、`fallback` に名前を残す。"""
         write(layer_path(self.lib, "rules"), BROKEN)
 
         denied = self.hook("Write", self.lib, file_path=os.path.join(self.lib, ".env"))
@@ -158,7 +158,7 @@ class AbsentRulesTest(ConfigUnionHarness):
         self.assertEqual(warns, [])
 
     def test_lint_still_says_a_broken_common_layer(self):
-        """壊れた共通レイヤーは error。"""
+        """不正な共通レイヤーは error。"""
         write(self.rules, BROKEN)
 
         errors = self.problems("error", where="(rules)")
@@ -214,7 +214,7 @@ class AbsentRiskTest(ConfigUnionHarness):
         self.assertEqual(definition.fallback, "")
 
     def test_a_broken_config_is_empty_and_named(self):
-        """壊れた config のレイヤーは空。共通レイヤーの項目だけを数え、`fallback` に名前を残す。"""
+        """不正な config のレイヤーは空。共通レイヤーの項目だけを数え、`fallback` に名前を残す。"""
         write(layer_path(self.lib, "risk"), "version: 1\nfactors: [\n")
 
         definition, _ = self.definition()
@@ -224,7 +224,7 @@ class AbsentRiskTest(ConfigUnionHarness):
         self.assertTrue(definition.fallback)
 
     def test_a_broken_common_layer_falls_back_to_the_builtin_items(self):
-        """壊れた共通レイヤーは組み込みの配点に戻り、レイヤーは足さない。"""
+        """不正な共通レイヤーは組み込みの配点に戻り、レイヤーは足さない。"""
         write(self.risk, "version: 1\nfactors: [\n")
 
         definition, _ = self.definition()
@@ -274,7 +274,7 @@ class MirrorIsNotReadInTheWorkspaceTest(ConfigUnionHarness):
         self.assertNotIn("mirror-only", ids)
 
     def test_the_mirror_risk_and_phases_are_not_read_either(self):
-        """配点とフェーズ定義も同じ。壊れたミラーの phases.yml があっても何も言わない。"""
+        """配点とフェーズ定義も同じ。不正なミラーの phases.yml があっても何も言わない。"""
         self.place_mirror()
         conf, _ = settings.load(self.ws)
 
@@ -286,7 +286,7 @@ class MirrorIsNotReadInTheWorkspaceTest(ConfigUnionHarness):
 
 
 class StandaloneCloneTest(ConfigUnionHarness):
-    """プロジェクトを単体で clone したとき（REQ-MLT-41）。
+    """プロジェクトを単体で clone したとき。
 
     そのプロジェクトがルートになる。`.ccnavi/common/`（ミラー）が共通レイヤー、`.ccnavi/config/` が
     自身のレイヤーとして読まれ、ワークスペースの中と同じ「共通 + 1 レイヤー」の和で判定される。
@@ -363,7 +363,7 @@ class StandaloneCloneTest(ConfigUnionHarness):
         )
 
     def test_lint_reads_the_mirror_as_the_common_layer(self):
-        """`--lint` もミラーを共通レイヤーとして読む。ミラーが壊れていれば error で名指しする。"""
+        """`--lint` もミラーを共通レイヤーとして読む。ミラーが不正なら error で名指しする。"""
         write(os.path.join(self.mirror, "rules.yml"), BROKEN)
 
         errors = self.problems("error", where="(rules)")
@@ -395,8 +395,8 @@ class ExplainSumsTest(ConfigUnionHarness):
                 self.assertEqual([r["id"] for r in sums[name]["rules"]["deny"]], expected)
 
     def test_a_sum_keeps_what_the_layers_overview_drops(self):
-        """`layers[]` は重ねの途中経過なので、先のレイヤーと全欄が同じ定義は後ろから落ちる。
-        `sums[]` は「共通 + そのレイヤー」だけで重ねるので、落ちない。"""
+        """`layers[]` は重ねの途中経過なので、先のレイヤーと全欄が同じ定義は後ろから外れる。
+        `sums[]` は「共通 + そのレイヤー」だけで重ねるので、外れない。"""
         same = {"version": 1, "deny": [COMMON_RULES["deny"][0]]}
         write(layer_path(self.ws, "rules"), json.dumps(same))
         write(layer_path(self.lib, "rules"), json.dumps(same))

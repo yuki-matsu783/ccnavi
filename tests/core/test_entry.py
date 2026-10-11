@@ -1,7 +1,7 @@
-"""`python -m ccnavi` の入口のスモークテスト。ここだけは本物のプロセスを起こす。
+"""`python -m ccnavi` の入口のスモークテスト。ここだけは実際のプロセスを起こす。
 
 他のテストは tests/inproc.py で cli.run を同じプロセスの中で呼ぶ。速いが、
-パッケージとして起動できること、標準入出力が UTF-8 に付け替わること、
+パッケージとして起動できること、標準入出力が UTF-8 に切り替わること、
 終了コードがプロセスの終了コードになることは、プロセスを起こさないと分からない。
 その 3 つをここで 1 回ずつ見る。
 """
@@ -55,7 +55,7 @@ class EntryTest(unittest.TestCase):
 
     def test_japanese_in_the_payload_survives_the_round_trip(self):
         # 判定の理由は対象を名指しする。日本語を含む対象がそのまま返ることで、
-        # 入口の付け替えが有効なことが分かる。
+        # 入口の切り替えが有効なことが分かる。
         command = "git push origin 統合先"
         payload = json.dumps(
             {

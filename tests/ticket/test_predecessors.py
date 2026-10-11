@@ -4,7 +4,7 @@
 
 1. 承認は、先行が全部 `done/` に在って取り消しでないときだけ。待てば通るもの（承認待ち・作業中・
    レビュー待ち）と、待っても通らないもの（取り消し・どこにも無い・複数の場所）を文面で分ける
-2. ボードの承認のプレビューと `--verify` に、落ちた理由が出る。`--lint` は待てば通るものを warn、
+2. ボードの承認のプレビューと `--verify` に、外れた理由が出る。`--lint` は待てば通るものを warn、
    待っても通らないものを error で言う
 3. 着手（`ticket start`）も同じ検査で止まる。置き場を手で動かして承認した子と、承認のあとで先行が
    戻された子
@@ -178,7 +178,7 @@ class PredecessorTest(TicketTest):
         )
         verified = self.ccnavi("--agree", "--preview", "--verify")
         self.assertEqual(verified.returncode, modes.EXIT_ANSWER_NO, verified.stdout)
-        self.assertIn("落ちる", verified.stdout)
+        self.assertIn("外れる", verified.stdout)
         self.assertIn("先行 i0001-01-01", verified.stdout)
 
     def test_lint_warns_on_waiting_and_errs_on_what_waiting_cannot_fix(self):
@@ -199,7 +199,7 @@ class PredecessorTest(TicketTest):
     def test_start_refuses_a_hand_moved_child_whose_predecessor_is_open(self):
         """置き場を手で動かして承認した子は承認の検査を通らない。着手が同じ検査で止める。
 
-        承認で本物とするのは置き場なので、`doing/` へ手で動かしただけでも承認済みになる。
+        承認として扱うのは置き場なので、`doing/` へ手で動かしただけでも承認済みになる。
         """
         self.family(review=(False, False))
         self.propose(

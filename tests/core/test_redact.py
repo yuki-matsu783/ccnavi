@@ -19,7 +19,7 @@ from unittest import mock
 from ccnavi.records import audit, redact
 from tests.inproc import run_ccnavi
 
-# 形だけを持つ見本。本物のトークンではない。
+# 形だけを持つ見本。実際のトークンではない。
 GHP = "ghp_" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"
 GLPAT = "glpat-" + "abcdefghij0123456789"
 AKIA = "AKIA" + "ABCDEFGHIJKLMNOP"
@@ -333,7 +333,7 @@ class RecordTest(unittest.TestCase):
         self.assertNotIn(LONG, line["subject"])
 
     def test_redact_failure_writes_no_plain_text(self):
-        # 伏せる処理が落ちても記録は書け、その欄には平文の代わりに決まった文が入る。
+        # 伏せる処理が失敗しても記録は書け、その欄には平文の代わりに決まった文が入る。
         record = audit.Record(
             decision=audit.ALLOW,
             subject=f"curl -H 'Authorization: Bearer {LONG}' x",
@@ -350,7 +350,7 @@ class RecordTest(unittest.TestCase):
         self.assertEqual(line["detail"], audit.REDACT_FAILED)
 
     def test_redact_failure_keeps_the_deny(self):
-        # 伏せる処理が落ちても hook は 0 で終わり、出した deny が残る。
+        # 伏せる処理が失敗しても hook は 0 で終わり、出した deny が残る。
         rules = os.path.join(self.dir, ".ccnavi", "common", "rules.yml")
         os.makedirs(os.path.dirname(rules))
         with open(rules, "w", encoding="utf-8") as f:

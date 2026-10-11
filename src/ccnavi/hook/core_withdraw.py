@@ -32,7 +32,7 @@ def withdraw(
     prior_proposals: dict[str, bytes],
     reason: str = "",
 ) -> core_base.Checked:
-    """承認を未承認（`todo/`）に戻す。条件は 8.8。通れば書くものを並べる。
+    """承認を未承認（`todo/`）に戻す。条件は以下に書く。通れば書くものを並べる。
 
     `prior_proposals` は識別子ごとの「承認コミットの親にあった `todo/<識別子>.md` のバイト列」。
     承認コミットを引くのはホストの API を読む側（Chrome）で、引けなかった識別子は渡さない。
@@ -200,7 +200,7 @@ def _withdraw_problems(
         )
         try:
             # 待ち方のファイルはマーカーではない（承認で置く）。中身は `_content_problems` が見る。
-            # 書きかけで落ちて残った一時ファイル（`.<名前>.<一意>.part`）もマーカーではない。
+            # 書きかけで異常終了して残った一時ファイル（`.<名前>.<一意>.part`）もマーカーではない。
             names = fsio.listdir(marks_dir)
             if [n for n in names if n != approval_marks.WORKFLOW_FILE and not fsio.is_temp_name(n)]:
                 found.append(f"{approval_marks.PHASES_DIR}/{ident}/ にマーカーがある")
@@ -213,7 +213,7 @@ def _withdraw_problems(
         copy.tree_root, conf.tickets.replace("/", os.sep), ticket_model.TODO, ident + ".md"
     )
     if fsio.lexists(todo):
-        found.append("todo/ に同じ識別子の提案がある（戻す先が塞がっている）")
+        found.append("todo/ に同じ識別子の提案がある（戻す先に同じ識別子がすでにある）")
     if ident not in prior_proposals:
         found.append("承認コミットの親に提案が無い（承認コミットを引けない）")
     elif compare and not approval_checks.has_record(copy):
@@ -234,7 +234,7 @@ def _content_problems(
     待ち方（`workflow.compute`）と同じであることを求める。待ち方だけの改版は `doing/` を変えない
     ので、ここで見る。ファイルが無いなら通す。改版は必ずこのファイルを書くので、無いのは
     待ち方を書かない承認（計画の無い親か、手で動かした承認）で、待ち方の改版は起きていない。
-    承認のあとに `phases.yml` が変わっていれば計算が変わって一致せず、止める側に倒れる。
+    承認のあとに `phases.yml` が変わっていれば計算が変わって一致せず、結果として止める側になる。
     """
     current = fsio.read_bytes(copy.path)
     if current is None:

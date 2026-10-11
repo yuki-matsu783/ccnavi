@@ -94,7 +94,7 @@ def _linked(root: str, parts: tuple[str, ...]) -> bool | None:
 
 
 def _repo_names(root: str) -> list[str]:
-    """退避のあるリポジトリの名前（`self` とプロジェクトの名前）。リンクは落とす。"""
+    """退避のあるリポジトリの名前（`self` とプロジェクトの名前）。リンクは除く。"""
     if not root or _linked(root, tuple(ARCHIVE_DIR.split(os.sep))) is not False:
         return []
     try:
@@ -133,7 +133,7 @@ def ids(root: str, project: str | None = None) -> set[str]:
 
 
 def find(root: str, ident: str, project: str | None = None) -> list[ticket_model.Ticket]:
-    """退避の `done/<識別子>.md` を読む。読めないものは落とす。
+    """退避の `done/<識別子>.md` を読む。読めないものは除く。
 
     `project` を渡せばそのリポジトリ（ワークスペース自身なら空文字）だけ、None なら全リポジトリ。
     状態は `done`（取り消しの欄があれば `cancelled`）。ツリーは持たない。
@@ -209,7 +209,7 @@ def _regular(path: str) -> bool:
 
 
 def _regular_md(directory: str) -> list[str]:
-    """ディレクトリの `*.md` のふつうのファイルの識別子（拡張子を落とした名前）。リンクは落とす。"""
+    """ディレクトリの `*.md` のふつうのファイルの識別子（拡張子を除いた名前）。リンクは除く。"""
     try:
         names = sorted(os.listdir(directory))
     except OSError:
@@ -256,7 +256,7 @@ def same_id(a: str, b: str) -> bool:
 
 
 def drop_archived(root: str, tickets: list[ticket_model.Ticket]) -> list[ticket_model.Ticket]:
-    """手元の退避に、同じリポジトリで同じチケットと言えるコピーがあるチケットを落とす。
+    """手元の退避に、同じリポジトリで同じチケットと言えるコピーがあるチケットを除く。
 
     `ready` の後も子のワークツリーには切ったときの `doing/` のチケットが残る。親のツリーから消えた
     識別子は、その古いチケットが権威として読まれ、作業中に戻ってしまう。閉じて退避したものは閉じた
@@ -266,16 +266,16 @@ def drop_archived(root: str, tickets: list[ticket_model.Ticket]) -> list[ticket_
     変えないので、承認の時刻の欄は古い形にしか無い）。
 
     - 着手も取り消しもしていない写し（欄が 3 つとも空）は、子のワークツリー（親のツリーではない
-      ツリー）で見つけたものに限り、退避より前の写しとして落とす。子のワークツリーを切ったのは
+      ツリー）で見つけたものに限り、退避より前の写しとして除く。子のワークツリーを切ったのは
       着手より前で、残る写しはふつうこの形
-    - 親のツリーで見つけた、欄が 3 つとも空のチケットは落とさない。`ready` は親のツリーから
+    - 親のツリーで見つけた、欄が 3 つとも空のチケットは除かない。`ready` は親のツリーから
       閉じた親子を消すので、そこに残る未着手のチケットは古い写しではなく、閉じた識別子を使い直した
-      もの（手元の退避は別の機械には無いので、別の機械で承認し直せる）。黙って落とすと、ユーザの
+      もの（手元の退避は別の機械には無いので、別の機械で承認し直せる）。気づかないうちに除くと、ユーザの
       承認がどこにも出ずに消える。残して `Ticket.archived_clash` に理由を入れ、判定で止める
       （`approval_checks.content_problems`）
     - 欄があれば、統合先の `done/` の親と同じく `syncstate.same_parent` で比べ、同じと言えるときだけ
-      落とす。違えば同じ識別子の別のチケットとみなして残す
-    - 両方に古い形の承認の時刻があれば、違えばどちらでも残し、同じなら欄が空でも落とす（前の版と
+      除く。違えば同じ識別子の別のチケットとみなして残す
+    - 両方に古い形の承認の時刻があれば、違えばどちらでも残し、同じなら欄が空でも除く（前の版と
       同じ見方）
     """
     if not root or not tickets:
@@ -296,7 +296,7 @@ def drop_archived(root: str, tickets: list[ticket_model.Ticket]) -> list[ticket_
 
 
 # 退避の写しとの見比べの答え。
-_SAME = "same"  # 同じチケット（落とす）
+_SAME = "same"  # 同じチケット（除く）
 _OTHER = "other"  # 別のチケット（残す）
 _REUSED = "reused"  # 親のツリーの未着手のチケットで、退避と同じ識別子（残して止める）
 
@@ -355,7 +355,7 @@ class Plan:
 
 
 def _done_copies(approved_dir: str) -> dict[str, syncstate.DoneCopy]:
-    """`done/` のふつうのファイルの、識別子 → 欄。読めない・名前と違うものは落とす。"""
+    """`done/` のふつうのファイルの、識別子 → 欄。読めない・名前と違うものは除く。"""
     directory = os.path.join(approved_dir, ticket_model.DONE)
     out = {}
     for ident in _regular_md(directory):
@@ -388,7 +388,7 @@ def plan(approved_dir: str, parents: list[str], root: str = "", project: str = "
     在るもの（前の回が途中で止まった残り。`root` を渡したときだけ）。子は名前の形ではなくチケットの
     `parent:` 欄で親に結ぶ（`rel-01` という親を `rel` の子と取り違えない）。履歴とフローは、
     その親か、`done/`（または退避）に在る子のもの、どこにもチケットの無い子（取り下げた子）のもの。
-    `phases/<親>/` は下を丸ごと。
+    `phases/<親>/` は下をすべて。
     """
     done = _done_copies(approved_dir)
     family = set()
@@ -444,7 +444,7 @@ def _lexists(*parts: str) -> bool:
 
 
 def _names(directory: str) -> list[str]:
-    """ディレクトリのふつうのファイルの名前（リンクは落とす）。"""
+    """ディレクトリのふつうのファイルの名前（リンクは除く）。"""
     try:
         names = sorted(os.listdir(directory))
     except OSError:
@@ -481,7 +481,7 @@ def same_bytes(a: bytes | None, b: bytes | None) -> bool:
 
 
 def _lines(data: bytes) -> list[bytes] | None:
-    """改行を LF に揃えた行のリスト（末尾の空行は落とす）。"""
+    """改行を LF に揃えた行のリスト（末尾の空行は除く）。"""
     body = data.replace(b"\r\n", b"\n")
     lines = body.split(b"\n")
     if lines and lines[-1] == b"":
@@ -560,7 +560,7 @@ def archived_bytes(root: str, project: str, rel: str) -> bytes | None:
 # ---- ready が退避したマーカー（どの親のワークツリーから、どのファイルを移したか）
 #
 # C1 の見分けと実行後チェックは、ready の流れで消したものだけを ccnavi の書き込みとして外す。
-# 「退避に同じ中身がある」だけで外すと、ready を経ない削除も黙ってコミットされる。
+# 「退避に同じ中身がある」だけで外すと、ready を経ない削除も気づかないうちにコミットされる。
 # ready のマーカーは退避の置き場の `ready/<親>.json` で、`logs/archive/` は記録の保護が
 # エージェントの書き込みを止める。
 
@@ -608,7 +608,7 @@ def _read_ready(root: str, project: str, name: str) -> dict | None:
 def ready_files(root: str, project: str, tree_root: str, head: str) -> set[str]:
     """その回の ready がそのツリーから移したファイル（承認済みの領域からの相対）。
 
-    ready のマーカーが効くのは、マーカーを書いたときのツリーの先頭（`head`）と、いま比べている版が
+    ready のマーカーが有効なのは、マーカーを書いたときのツリーの先頭（`head`）と、いま比べている版が
     同じ間だけ。
     ready の削除がコミットされてツリーが進めば、マーカーは以後の削除には効かない（ready の外の削除を
     ccnavi の書き込みとしてコミットしない）。`head` が空なら何も返さない。
