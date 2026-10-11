@@ -82,21 +82,6 @@ export function hooksFor(entries: readonly HookEntry[], tool: string): HookEntry
   );
 }
 
-/** `.claude/settings.json` の env の 1 つ。無ければ空 */
-export function envFromSettingsJson(text: string, key: string): string {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    return "";
-  }
-  if (!isRecord(raw) || !isRecord(raw.env)) {
-    return "";
-  }
-  const value = raw.env[key];
-  return typeof value === "string" ? value : "";
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -19,14 +19,15 @@ export interface Lock {
 /**
  * 共通の設定とワークスペースの設定のルール（`project` を渡さない）は、どのツリーの doing でも保存を止める（Bash の和に影響するため）。
  * プロジェクトのルール（`project` を渡す）は、そのプロジェクトの doing だけを見る。
- * 作業中は「承認済みチケットが開いていて（`copy.status` が `open`）、着手済み（`started_at` がある）」。
- * 承認しただけで着手していないものは、まだセッションが動いていないので数えない。
+ * 作業中かは実行ファイルが答える（チケットの `in_progress`）。承認しただけで着手していないもの・レビュー待ち・閉じたものは
+ * 実行ファイルが作業中に数えない。この欄を出さない古い実行ファイルの答えでは確かめられないので、保存できない扱いにする。
  */
 export function lockFromBoard(board: BoardJson, project?: string): Lock {
-  const doing = board.tickets
-    .filter((t) => t.copy.status === "open" && t.started_at !== "")
-    .filter((t) => project === undefined || t.project === project)
-    .map((t) => t.ticket);
+  const mine = board.tickets.filter((t) => project === undefined || t.project === project);
+  if (mine.some((t) => t.in_progress === null)) {
+    return lockFromError("実行ファイルが作業中かを答えません。実行ファイルを組み立て直すか配り直してください");
+  }
+  const doing = mine.filter((t) => t.in_progress === true).map((t) => t.ticket);
   if (doing.length === 0) {
     return { locked: false, reason: "", doing };
   }

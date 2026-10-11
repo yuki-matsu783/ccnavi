@@ -41,6 +41,12 @@ keywords: [拡張機能, VS Code, 判定, cli, ステートレス]
 「プロジェクトになっていない `.git`」だけ。`git clone` / `fetch` / `pull` はターミナルへ送る。
 プロジェクトを外す操作は入れない。
 
+自分で当てない glob と regex は、ccnavi のルールのもの。例外が 1 つあり、ルール管理画面が `.claude/settings.json` と
+`.claude/settings.local.json` の hook の登録を見せるときは、Claude Code の matcher（空か `*` なら全部、それ以外は
+ツール名に当てる正規表現）を拡張が自分で当て、そのツール名で走る hook を並べる。これは Claude Code がどの hook を
+起こすかを見せる表示で、ccnavi の判定を出し直すものではない。実行ファイルは Claude Code の matcher を読まないので、
+答えを聞く先が無い。表示が Claude Code の解釈とずれても、止めるか通すかの答えは変わらない（2026-10-11 追記）。
+
 ## 理由
 
 判定の答え（HITL ポイントで止めているか、承認待ち、ルールの当たり方、何点か）を拡張が自前で出し直すと

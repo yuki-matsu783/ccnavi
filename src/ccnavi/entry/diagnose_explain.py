@@ -259,7 +259,14 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     return 0
 
 
-def explain_json(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) -> int:
+def explain_json(
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    mode_flag: str = "",
+    ticket_control_flag: str = "",
+) -> int:
     """`--explain` が言うことのうち、チケットに関わる部分を機械可読で出す。
 
     読み手は VS Code のボード拡張。拡張は提案・承認済みチケット・マーカーを自分で解釈せず、ここが
@@ -267,6 +274,7 @@ def explain_json(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: 
     2 か所で出さないためのもので、判定と同じ関数（phase / approval）で組む。
     ネットワークには出ない。見るのはワークスペースの中のファイルだけ。
     """
-    stdout.write(json.dumps(diagnose_board.board(conf, root, stderr), ensure_ascii=True, indent=1))
+    payload = diagnose_board.board(conf, root, stderr, mode_flag, ticket_control_flag)
+    stdout.write(json.dumps(payload, ensure_ascii=True, indent=1))
     stdout.write("\n")
     return 0

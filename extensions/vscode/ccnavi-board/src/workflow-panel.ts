@@ -504,7 +504,7 @@ async function save(current: PanelState, order: PlanOrder, expect: string): Prom
   const result = await runPlanOrderWrite(root(current), binSetting(), current.ticket, order, expect);
   current.saving = false;
   current.wroteAt = Date.now();
-  log.info("ワークフローの保存", { screen: SCREEN, result: result.kind });
+  log.info("ワークフローの保存", { screen: SCREEN, ticket: current.ticket, result: result.kind });
   // 書けたら、タブを閉じていても書いたあとのハッシュを覚える（保存を押してすぐ閉じても、承認の注意が効く）
   const sha = savedShaOf(result);
   if (sha !== undefined) {

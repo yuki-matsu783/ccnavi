@@ -56,6 +56,18 @@ JSON の形は README の「試験の JSON」「lint の JSON」「ボードの 
 承認待ち・ワークツリーの有無は、判定と承認が使う関数をそのまま呼んで載せる。チケットには状態の履歴（9.6）の
 新しい側も `history` で載せる。カードはそれを折りたためる「履歴」に並べるだけで、列やバッジは履歴から決めない。
 
+**`--explain --json` の `settings.mode` と `settings.ticket_control` は、hook がいま受け取るはずの値で答える。**
+拡張が起動した実行ファイルには、Claude Code が hook に渡す `.claude/settings*.json` の `env` が届かない。
+そこで `--explain --json` だけは、プロセスの環境の上に、ワークスペースルートの `.claude/settings.json`、
+`.claude/settings.local.json` の `env` をこの順で重ねる（Claude Code と同じ順。`settings.hook_view`）。ccnavi 自身の
+ソースツリーでは上書き設定ファイル（`ccnavi.settings.local.json`）が環境より強いのも `load` と同じ。重ねた値は、判定と同じ
+`modes.resolve_mode` と `selfguard.resolve` で解く。読めない値は `enable`、設定から来た `disable` のモードは
+「環境からだけ受ける」の規則のまま（`env` は Claude Code が環境として渡すので受ける）。フラグ（`--mode`・`--ticket-control`）が
+あればそれが勝つ。ボードの中身（チケットを出すか）も同じ値で組み、`settings` の値と食い違わせない。
+ホームの設定（`~/.claude/settings.json`）と managed の設定は読まない。実行ファイルはワークスペースの外を見ない。
+そのため、そこに書いた値はボードに出ない。hook の判定の経路（`load`）はこれを使わず、プロセスに渡った環境だけを読む。
+拡張はこの 2 つの値をそのまま表示と入口の出し分けに使い、設定ファイルの `env` を自分では読まない。
+
 承認は拡張の中で完結する（9.4）。オーバーレイが `--agree --preview --json` で一覧を見せ、ユーザが押したら
 `--agree --yes` を子プロセスで打つ。承認できたら、渡す文を見せる。そのあとボードを読み直し、列が変わったカードに動いた表示を
 出す。動いた表示は次に何かが動くまで残す。それを覚えているのは拡張ホスト。

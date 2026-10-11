@@ -2439,7 +2439,7 @@ ccnavi --explain --json
 |---|---|
 | `version` | 形の版。整数 |
 | `root` / `generated_at` | ワークスペースルートと、出した時刻 |
-| `settings` | `ticket_control`（チケット制御を使うか）/ `tickets`（提案の置き場、相対）/ `approved`（承認済みチケットの置き場）/ `projects`（プロジェクトの置き場） |
+| `settings` | `mode`（動作モード。`enable` / `dry-run` / `disable`）/ `ticket_control`（チケット制御を使うか）/ `tickets`（提案の置き場、相対）/ `approved`（承認済みチケットの置き場）/ `projects`（プロジェクトの置き場）。`mode` と `ticket_control` は hook がいま受け取るはずの値で、プロセスの環境の上にワークスペースルートの `.claude/settings.json`・`.claude/settings.local.json` の env をこの順で重ね、判定と同じ解決（読めない値は `enable`）を通したもの。ホームの設定は読まない。ボードの中身も同じ `ticket_control` で組む。`mode` を持たない古い実行ファイルの答えでは、拡張はモードの帯を出さない |
 | `trees[]` | ワークスペースルート・プロジェクト・ワークツリー。`{name, root, project, kind}`。`kind` は `main` / `project` / `worktree` |
 | `layers[]` | レイヤーごとの宣言。順序は 共通レイヤー → 自身のレイヤー → プロジェクト（名前順）。`{name, rules, phases, risk, phases_file}`。`name` は `common` / `self` / プロジェクトの名前。`rules` は `{path, unreadable, deny, ask, allow}` で、各タイプはそのレイヤーから実際に判定へ入ったルール `{id, section, source, match, kind, written, pattern, message}`（重複で捨てたものは入らない）。`phases` はそのレイヤーのファイルに書いてあるフェーズ定義 `{id, source, kind, title, review, scope}`、`risk` は `{path, unreadable, factors}`、`phases_file` は `{path, unreadable}`。phases と risk は合成前の、そのレイヤーのぶんだけ |
 | `sums[]` | ワークスペースとプロジェクトごとの「共通 + 1 レイヤー」の和（判定と同じ合成。拡張は足し直さずこれを見せる）。順序は 自身のレイヤー → プロジェクト（名前順）。`{name, layers, rules, risk, phases}`。`name` は `self` / プロジェクトの名前、`layers` は `["common", <name>]`。`rules` は `{path, unreadable, missing, deny, ask, allow}` で、各タイプは共通レイヤーに足した和（`layers[]` と違い、他のレイヤーの定義で欠けない）。`risk` は `{levels, factors, fallback, problems}`（`levels` は実際に使う境目の点）、`phases` は使う 1 本 `{path, unreadable, types}`（足し算はしない。定義は順序を持たないので待ち方の欄は無い） |
@@ -2461,6 +2461,7 @@ ccnavi --explain --json
 | `blocked` | 空でなければ「読めるが信じられない」理由。判定はこのチケットのワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`status` は `open` のままなので、止まっていることはこの欄でしか分からない |
 | `worktree` | `{exists, path, project}`。`.claude/worktrees/<識別子>` が実際のワークツリーか（設計 9.5 の相互参照） |
 | `started_at` / `completed_at` / `base_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄 |
+| `in_progress` | 作業中か。承認済みチケットが `doing/` にあり、着手していて、終わってもいないし取り消されてもいないとき真。`flow.locked` と同じ読み方。承認しただけで着手していないもの・レビュー待ち・閉じたものは偽。ボードはルール・配点・フェーズ定義の保存を止めるかをこれで決め、`started_at` などから組み直さない。足しただけの欄で、この欄を持たない古い実行ファイルの答えでは、ボードは作業中かを確かめられないとして保存しない |
 | `seen_in[]` | 同じ識別子のチケットがある場所の全部。`{tree, state, path}`。子のワークツリーは親のブランチから切るので、子のワークツリーにも親の提案があるのが普通 |
 | `scattered[]` | どれが正か決まらない、チケットがある場所の全部。`{tree, state, path}`。決まっていれば空。正とする側のツリー（親のツリー → 元ツリーの順）で絞り込んでも 2 つ以上残り、その残りが 2 つの置き場にまたがるか同じ置き場に重なるときに入る。状態の操作が「複数の場所にある」で止まる条件と、`--lint` が ERROR を出す条件と同じ。`seen_in` の数は食い違いを意味しない |
 | `flow` | 子のフロー（設計 9.3.1）。親と、フローが無い閉じた子（終わった・取り消した）は `null`（ボードはこのとき「フローを作る」を出さない）。`{path, rel, tree, exists, linked, locked, draft}`。`path` は読む先の絶対パス、`rel` はツリーのルートからの相対、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）、`draft` はエージェントが書く下書き（効力は無い）の `{path, rel, exists, linked}`。`path` が指すのは正とする側のツリー＝承認済みチケットが在るツリーの版だけで、子のワークツリー上のフローは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く。`rel` は承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.yml` で、中身は YAML。`draft` の置き場はフローと同じツリーの `wip/proposals/flows/<子>.yml` で、ボードはパスを組まずにこれを読み、いまのフローと違えば「提案あり」を出す。読むのは承認済みチケット（無ければ提案）の欄。ボードは `locked` をそのまま写し、自分で組み直さない |

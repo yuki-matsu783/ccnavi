@@ -14,7 +14,7 @@ keywords: [要件, サイドパネル, アクティビティバー, コマンド
 
 | ID | 区分 | 要件 |
 |---|---|---|
-| REQ-VSC-04 | 状態 | `.claude/settings.json`（`settings.local.json` が優先）の env `CCNAVI_TICKET_CONTROL` が `disable` の間、VS Code 拡張は、「チケット管理」「リスク管理」「フェーズ管理」の入口（サイドパネルとコマンドパレット）を出さず、「プロジェクト管理」「ルール管理」の入口だけを出すこと。書いていない値と読めない値は `enable` として扱うこと。ボードを開いたとき、実行ファイルの `settings.ticket_control` と食い違えば通知で知らせること（REQ-DIA-07） |
+| REQ-VSC-04 | 状態 | 実行ファイルの `--explain --json` が `settings.ticket_control` を `disable` と答えている間、VS Code 拡張は、「チケット管理」「リスク管理」「フェーズ管理」の入口（サイドパネルとコマンドパレット）を出さず、「プロジェクト管理」「ルール管理」の入口だけを出すこと。値は起動したときと `.claude/settings.json`・`.claude/settings.local.json` が変わったとき、ボードを読み直したときに実行ファイルに聞き、設定ファイルの env を自分では読まないこと。実行ファイルから答えが取れないときは入口を出すこと（REQ-DIA-07） |
 
 ## できること
 

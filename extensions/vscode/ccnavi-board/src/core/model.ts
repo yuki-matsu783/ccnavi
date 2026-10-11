@@ -160,6 +160,11 @@ export interface TicketJson {
   readonly base_sha: string;
   readonly cancelled_at: string;
   readonly cancel_reason: string;
+  /**
+   * 作業中か（承認済みチケットが `doing/` にあり、着手していて、終わってもいないし取り消されてもいない）。
+   * 実行ファイルが決め、拡張は `started_at` などから組み直さない。この欄を出さない古い実行ファイルでは null
+   */
+  readonly in_progress: boolean | null;
   readonly seen_in: readonly SeenInJson[];
   /** どれが正か決まらないチケットの全部。決まっていれば空 */
   readonly scattered: readonly SeenInJson[];
@@ -332,6 +337,11 @@ export interface BoardJson {
   readonly root: string;
   readonly generated_at: string;
   readonly settings: {
+    /**
+     * 動作モード。hook がいま使うはずの値を実行ファイルが解決したもの（enable / dry-run / disable）。
+     * 読めない値は enable になっている。この欄を出さない古い実行ファイルでは空
+     */
+    readonly mode: string;
     /** チケット制御を使うか。実行ファイルが解決した値（enable / disable） */
     readonly ticket_control: string;
     readonly tickets: string;
@@ -385,6 +395,7 @@ export function parseBoardJson(text: string): ParseResult {
       root: str(raw.root),
       generated_at: str(raw.generated_at),
       settings: {
+        mode: str(settings.mode),
         ticket_control: str(settings.ticket_control),
         tickets: str(settings.tickets),
         approved: str(settings.approved),
@@ -501,6 +512,7 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     base_sha: str(raw.base_sha),
     cancelled_at: str(raw.cancelled_at),
     cancel_reason: str(raw.cancel_reason),
+    in_progress: typeof raw.in_progress === "boolean" ? raw.in_progress : null,
     seen_in: seenIn(raw.seen_in),
     scattered: seenIn(raw.scattered),
     risk: isRecord(raw.risk) ? raw.risk : null,

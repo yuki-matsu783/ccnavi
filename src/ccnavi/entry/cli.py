@@ -590,7 +590,7 @@ def _parsed(
     if args.suggest:
         return suggest.report(stdout, conf, root, args.json)
     if args.explain and args.json:
-        return diagnose.explain_json(stdout, stderr, conf, root)
+        return diagnose.explain_json(stdout, stderr, conf, root, args.mode, args.ticket_control)
     if args.explain:
         return diagnose.explain(stdout, stderr, conf, root)
 
