@@ -36,3 +36,4 @@
 | sh・Python・TS でログを書く、logger を直す | `docs/claude/logging.md` |
 | フィードバックメッセージが届いた、`.claude/skills/` を直したくなった、フィードバック計画を書く | `docs/claude/skill-review.md` |
 | スキルの振り返りで知識を `docs/wiki/` に溜める、wiki のパターンや提案の採否を読む・書く | `docs/claude/skill-wiki.md` |
+| 概念スキル（designing・testing・debugging・reviewing・releasing）の reference を引く・足す、スキルを新しく作りたくなった | `docs/claude/skill-concepts.md` |

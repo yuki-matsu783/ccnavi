@@ -66,7 +66,7 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 | `glossary` | 用語集。`docs/CONTEXT.md` | 付いている |
 | `adr` | 設計判断の記録。`docs/adr/NNNN-*.md` | 付いている |
 | `skill` | スキル本体。`.claude/skills/*/SKILL.md`、プロジェクトの`docs/skills/*/SKILL.md` | 付けていない（理由は表の下）。`name`・`description`だけを持つ。`--type skill`では何も出ない |
-| `skill-reference` | スキルから切り出した資料。`.claude/skills/*/references/*.md` | 付いている |
+| `skill-reference` | スキルから切り出した資料。`.claude/skills/*/references/**/*.md`、プロジェクトの`docs/skills/*/references/**/*.md`。中のディレクトリ構造は任意。概念スキルの reference は`tags`にスキル名を入れる（`docs/claude/skill-concepts.md`） | 付いている |
 | `skill-wiki` | スキルの振り返りで溜める知識。`docs/wiki/**`、`projects/<名前>/docs/wiki/**`（`docs/claude/skill-wiki.md`） | 書いたときに付ける |
 | `report` | 調査結果や作業報告。`wip/`の下など、置き場はその都度決める | 書いたときに付ける |
 
