@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { BOARD_VERSION, parseBoardJson } from "../../src/core/model.js";
 import { fixture, fixtureText } from "../helpers/fixture.js";
 
-test("CB-T01 フィクスチャ（実行ファイルの出力）を読める", () => {
+test("CB-T1 フィクスチャ（実行ファイルの出力）を読める", () => {
   const board = fixture();
   assert.equal(board.version, BOARD_VERSION);
   assert.deepEqual(
@@ -31,7 +31,7 @@ test("CB-T01 フィクスチャ（実行ファイルの出力）を読める", (
   assert.equal(board.parents[0].phases.length, 2);
 });
 
-test("CB-T02 版が違えば読まない", () => {
+test("CB-T2 版が違えば読まない", () => {
   const text = fixtureText().replace(`"version": ${BOARD_VERSION}`, `"version": ${BOARD_VERSION + 1}`);
   const parsed = parseBoardJson(text);
   assert.equal(parsed.ok, false);
@@ -40,7 +40,7 @@ test("CB-T02 版が違えば読まない", () => {
   }
 });
 
-test("CB-T03 JSON でなければ理由を返す", () => {
+test("CB-T3 JSON でなければ理由を返す", () => {
   const parsed = parseBoardJson("not json");
   assert.equal(parsed.ok, false);
   if (!parsed.ok) {
@@ -58,7 +58,7 @@ test("CB-T110 layers[] からルールファイルの置き場を読み、欠け
   assert.equal(board.layers[1].phasesFile.path, "<root>/.ccnavi/config/phases.yml");
   assert.equal(board.layers[1].risk.path, "<root>/.ccnavi/config/risks.yml");
   assert.equal(board.layers[0].phasesFile.path, "<root>/.ccnavi/common/phases.yml");
-  // 実行ファイルは常に layers を出す。欠けていれば（不正な JSON）CB-T04 と同じく既定値の空で補う
+  // 実行ファイルは常に layers を出す。欠けていれば（不正な JSON）CB-T4 と同じく既定値の空で補う
   const missing = parseBoardJson(JSON.stringify({ version: BOARD_VERSION }));
   assert.ok(missing.ok);
   assert.deepEqual(missing.board.layers, []);
@@ -80,7 +80,8 @@ test("CB-T318 sums[] を読む。ワークスペースの足し算（共通 + �
   assert.deepEqual(self.risk.levels, { medium: 20, high: 40, critical: 70 });
   assert.equal(self.risk.fallback, "");
   // フェーズ定義は足し算をしない。使う 1 本（自身の設定）だけが載る
-  assert.equal(self.phases.order, "sequential");
+  // 定義は順序を持たない（順序は親の計画の項の after）。待ち方（order）の欄は実行ファイルも渡さず、拡張も読まない
+  assert.ok(!("order" in self.phases), JSON.stringify(self.phases));
   assert.deepEqual(self.phases.types.map((t) => t.id).slice(0, 2), ["research", "design"]);
   assert.ok(self.phases.types.every((t) => t.source === "self"));
   const old = parseBoardJson(JSON.stringify({ version: BOARD_VERSION }));
@@ -96,7 +97,7 @@ test("CB-T318 sums[] を読む。ワークスペースの足し算（共通 + �
   assert.deepEqual(broken.board.sums[0].phases.types, []);
 });
 
-test("CB-T04 欠けた項目は既定値で埋め、全体を捨てない", () => {
+test("CB-T4 欠けた項目は既定値で埋め、全体を捨てない", () => {
   const parsed = parseBoardJson(
     JSON.stringify({
       version: BOARD_VERSION,
@@ -211,5 +212,26 @@ test("CB-T303 archived は実行ファイルの退避の欄を写す。欄が無
   assert.equal(parsedOlder.ok, true);
   if (parsedOlder.ok) {
     assert.deepEqual(parsedOlder.board.archived, []);
+  }
+});
+
+test("CB-T385 提案の has_plan（計画を持つか）を読む。無い・真偽でない値は偽（古い実行ファイルの答え）", () => {
+  const parsed = parseBoardJson(
+    JSON.stringify({
+      version: BOARD_VERSION,
+      tickets: [
+        { ticket: "a", copy: { status: "none" }, proposal: { state: "todo", has_plan: true } },
+        { ticket: "b", copy: { status: "none" }, proposal: { state: "todo" } },
+        { ticket: "c", copy: { status: "none" }, proposal: { state: "todo", has_plan: "yes" } },
+      ],
+      parents: [],
+    }),
+  );
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.deepEqual(
+      parsed.board.tickets.map((t) => t.proposal?.has_plan),
+      [true, false, false],
+    );
   }
 });

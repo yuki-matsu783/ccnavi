@@ -19,7 +19,7 @@
 - 見せたものから変わっていないかを確かめる（`agree_digest` の `approval_digest`・`read_set`、
   `verify_verdict`）
 - 置き場へ動かす（`plan_batch`）。書き込みは approval の置き場の関数を通す。新規の承認は提案の
-  中身を変えずに動かし、全体計画の待ち方は `phases/<親>/workflow.yml` に固定する
+  中身を変えずに動かすだけで、書き足すものは無い（待ち方は承認済みチケットの計画から都度計算する）
 - 承認の事実をモデルに伝える文を組む（`agree_screen.approved_text`。拡張が `--agree --yes` の
   `prompt` で渡す）
 
@@ -43,9 +43,9 @@ from . import (
     approval_marks,
     approval_ops,
     phase,
+    plan_order,
     ticket_ids,
     ticket_model,
-    workflow,
 )
 
 # 承認の JSON の版。`--agree --preview --json` と `--agree --yes … --json` が出す。
@@ -75,6 +75,9 @@ class Gathered:
     # 正とするツリーの外に在る計画の違う版の案内（`approval.revision_elsewhere_text`）。
     # 承認待ちには入れない。書く場所を名指しするためだけに持つ（本文とダイジェストには入れない）。
     elsewhere: list[str] = field(default_factory=list)
+    # 走査した提案の全部（`todo/` と `review/`）。preview の `plans` が、親の `todo/` の子の提案を
+    # まとめたハッシュ（`source_sha`）を作るのに使う。
+    proposals: list = field(default_factory=list)
 
     @property
     def text(self) -> str:
@@ -102,9 +105,9 @@ def gather(
     承認待ちなのに対象から外した子も何も承認しない（外すと旧計画で検証される）。
     通らなかった理由は `refused` に入れて返す。呼び手はそれを見て何もしない。
 
-    フェーズ定義は承認の対象全体で 1 つに決まらない。どのレイヤーの定義を使うかは各チケットの
-    `project:` が決めるので、候補を組むところで 1 件ずつ引き、
-    引いたものを `Candidate` に持たせる。画面は候補が持つ定義を使う。
+    フェーズ定義は承認の対象全体で 1 つに決まらない。使う定義は親の写し（`phases:`）で、写しを
+    確かめる `phases.yml` は各チケットの `project:` が決めるので、候補を組むところで
+    1 件ずつ引き、引いたものを `Candidate` に持たせる。画面は候補が持つ定義を使う。
     """
     raw = approval.read_raw(conf, root)
     proposals, problems, stale = approval.read_proposals(conf, root, raw.everything)
@@ -127,9 +130,7 @@ def gather(
         if approval.revision_elsewhere(t, open_index.get(t.ticket))
     ]
 
-    pending, revisions = waiting(
-        proposals, approved, closed, review, agree_candidates.types_resolver(conf, root, approved)
-    )
+    pending, revisions = waiting(proposals, approved, closed, review)
     broken = any(p.severity == rules.SEVERITY_ERROR for p in problems)
     texts = [str(p) for p in problems] + list(notes)
     note = ""
@@ -173,11 +174,30 @@ def gather(
         stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
         for p in complaints:
             stderr.write(f"  {p}\n")
-    return Gathered(batch, rejected, texts, pool, False, broken, "", note, elsewhere=elsewhere)
+    return Gathered(
+        batch,
+        rejected,
+        texts,
+        pool,
+        False,
+        broken,
+        "",
+        note,
+        elsewhere=elsewhere,
+        proposals=proposals,
+    )
 
 
-def preview_body(root: str, gathered: Gathered, digest: str) -> dict:
-    """`--preview --json` が返す本体。`--verify --json` も同じものに答えを足して返す。"""
+def preview_body(conf: settings.Settings, root: str, gathered: Gathered, digest: str) -> dict:
+    """`--preview --json` が返す本体。`--verify --json` も同じものに答えを足して返す。
+
+    `plans` は承認の対象に入った計画を持つ親の図の中身。`--plan-order <親> --json` と同じ関数
+    （`plan_order.plans`）で作り、`--order` は渡さない（承認する提案そのものの順序）。
+    ダイジェストには入れない（本文と書く中身から決まる）。
+    """
+    parents = [
+        (c.ticket, c.current) for c in gathered.batch if not c.ticket.is_child and c.ticket.has_plan
+    ]
     return {
         "version": AGREE_VERSION,
         "root": root,
@@ -190,6 +210,7 @@ def preview_body(root: str, gathered: Gathered, digest: str) -> dict:
             for t, complaints in gathered.rejected
         ],
         "problems": gathered.problems,
+        "plans": plan_order.preview_plans(conf, root, parents, gathered.proposals),
     }
 
 
@@ -394,9 +415,7 @@ def _apply_steps(
                     conf, root, t.ticket, t.parent, t.tree_root, project=t.project
                 )
                 with fsio.policy(places=t.ticket):
-                    failed = agree_digest.revise_copy(
-                        where, cand.current, t, cand.plans_feedback, cand.types
-                    )
+                    failed = agree_digest.revise_copy(where, cand.current, t, cand.plans_feedback)
                 if failed:
                     return t.ticket, failed
                 removing = "改版の提案を todo/ から消せない ({reason})"
@@ -407,7 +426,14 @@ def _apply_steps(
                         f"ccnavi: {t.ticket}: {removing.replace('{reason}', failed)}",
                         stream=fsio.STREAM_ERR,
                     )
-                what = "フィードバック計画" if cand.plans_feedback else "全体計画"
+                if cand.plans_feedback:
+                    what = "フィードバック計画"
+                elif approval.plan_signature(t, "plan") != approval.plan_signature(
+                    cand.current, "plan"
+                ):
+                    what = "全体計画"
+                else:
+                    what = "固定する定義（phases:）"
                 stage.line(f"  {t.ticket} の{what}を改版した")
                 if cand.plans_feedback:
                     # レビューの結果を見たうえでの計画なので、最後のレビューはここで済む。
@@ -431,9 +457,7 @@ def _apply_steps(
             where = approval.home_dir(
                 conf, root, t.ticket, t.parent, t.tree_root, project=t.project
             )
-            failed = approval_ops.admit(
-                where, t, approval.source_branch(t), agree_digest._workflow_to_write(cand)
-            )
+            failed = approval_ops.admit(where, t, approval.source_branch(t))
             if failed:
                 return t.ticket, failed
             if t.is_child:
@@ -472,16 +496,15 @@ def waiting(
     approved: list[ticket_model.Ticket],
     closed: list[ticket_model.Ticket],
     review: list[ticket_model.Ticket],
-    types_for,
 ) -> tuple[list[ticket_model.Ticket], list[ticket_model.Ticket]]:
     """いま `--agree` で承認の対象に入るもの。新規の承認待ちと、親の改版。
 
     承認待ちは `todo/` に在って、どの置き場（作業中・レビュー待ち・閉じた）にも同じ識別子が
     無いもの。閉じたものは対象外で、再開はユーザが承認済みチケットを戻す。
-    改版は、作業中の親の承認済みチケットがあり、`todo/` の提案の計画がそれと違うもの。
-    計画が同じでも、いまの定義で計算した待ち方が承認済みチケット上の待ち方と違えば改版になる
-    （`phases.yml` を直した結果を進行中の親に反映する経路）。`types_for` は
-    チケットに使う定義を引く関数（`types_resolver`）。
+    改版は、作業中の親の承認済みチケットがあり、`todo/` の提案の計画か写し（`phases:`）がそれと
+    違うもの（`approval.plan_differs`。計画は定義・`review`・推移的な待ちの並びで、写しは定義を
+    読んだ形で比べる）。待ち方は計画から
+    決まるので、待ち方だけの改版は無い。
     `--agree` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
     統合先の取り込み結果の `done/` にある識別子（閉じた識別子の再利用）はここでは外さず、
     `candidates` が理由を添えて承認しない側に回す（何も出さずに消すことはしない）。
@@ -496,17 +519,6 @@ def waiting(
         if t.ticket in open_index
         and not t.is_child
         and t.has_plan
-        and (
-            approval.plan_differs(t, open_index[t.ticket])
-            or _workflow_differs(t, open_index[t.ticket], types_for)
-        )
+        and approval.plan_differs(t, open_index[t.ticket])
     ]
     return pending, revisions
-
-
-def _workflow_differs(
-    proposal: ticket_model.Ticket, current: ticket_model.Ticket, types_for
-) -> bool:
-    fresh = workflow.compute(proposal, types_for(proposal)).as_raw()
-    held = current.workflow.as_raw() if current.workflow is not None else None
-    return fresh != held

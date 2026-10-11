@@ -135,6 +135,11 @@ export interface Card {
    */
   readonly flow: FlowJson | null;
   /**
+   * 親の提案のカードの「ワークフロー」（計画の順序を直すタブの入口）を出すか。計画を持つ（実行ファイルの
+   * `proposal.has_plan`）承認待ち（`todo/`）の親の提案だけ真。新規の親も改版も。承認済みだけの親と子は偽
+   */
+  readonly workflow: boolean;
+  /**
    * 状態の履歴の新しい側（古い順）。補助の記録で、列やバッジはここから組まない。
    * カードの折りたためる「履歴」に並べるだけ
    */
@@ -291,6 +296,7 @@ function toCard(
     mrNumber: mr.number,
     attention: t.attention,
     flow: isParent ? null : flowOf(t.flow, column),
+    workflow: isParent && t.proposal?.state === "todo" && t.proposal.has_plan === true,
     history: t.history,
     predecessorsUnmet: t.predecessors_unmet,
   };
@@ -344,6 +350,7 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     mrNumber: null,
     attention: false,
     flow: null,
+    workflow: false,
     history: a.history,
     predecessorsUnmet: [],
   };
@@ -464,6 +471,17 @@ export function flowCardOf(board: Board, ticket: string): Card | undefined {
     }
   }
   return undefined;
+}
+
+/** 承認待ち（`todo/`）の提案がある親の識別子（新規と改版） */
+export function todoParentsOf(board: Board): string[] {
+  return board.columns.flatMap((column) => column.cards.filter((card) => card.isParent && card.proposalState === "todo").map((card) => card.id));
+}
+
+/** 親の識別子から、「ワークフロー」を出しているカード（計画を持つ承認待ちの親の提案）。無ければ undefined */
+export function workflowCardOf(board: Board, ticket: string): Card | undefined {
+  const card = parentCardOf(board, ticket);
+  return card?.workflow === true ? card : undefined;
 }
 
 /** 親の識別子とフェーズの番号から、そのフェーズ行。無ければ undefined */

@@ -118,7 +118,8 @@ def preview(
         stdout.write(gathered.text + "\n")
         return 0
     stdout.write(
-        json.dumps(agree.preview_body(root, gathered, verdict.digest), ensure_ascii=False) + "\n"
+        json.dumps(agree.preview_body(conf, root, gathered, verdict.digest), ensure_ascii=False)
+        + "\n"
     )
     return 0
 
@@ -174,7 +175,7 @@ def verify(
     fresh = [c.ticket for c in gathered.batch if not c.is_revision and not c.ticket.is_child]
     branches = agree_candidates.existing_branch_warnings(root, conf, fresh, [], [], [])
     if as_json:
-        body = agree.preview_body(root, gathered, judged.digest)
+        body = agree.preview_body(conf, root, gathered, judged.digest)
         body["verify"] = {"ok": verdict.ok, "reason": verdict.reason}
         body["branch_warnings"] = branches
         stdout.write(json.dumps(body, ensure_ascii=False) + "\n")

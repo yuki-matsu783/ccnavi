@@ -27,7 +27,7 @@ function sum(name: string, rules: unknown[], extra: Record<string, unknown> = {}
       fallback: "",
       problems: [],
     },
-    phases: { path: "", unreadable: "", order: "sequential", types: [] },
+    phases: { path: "", unreadable: "", types: [] },
     ...extra,
   };
 }

@@ -2,17 +2,26 @@
  * 承認のオーバーレイ。一覧の識別子の表、承認画面の本文（`<pre>`）、対象外の提案と読めない提案、
  * 「この N 件を承認する」「やめる」。本文は実行ファイルが組んだものをそのまま出し、項目には分けない。
  *
+ * 計画を持つ親が一覧にあれば、本文の上にその計画の図を読むだけで出す（`PlanGraph`。中身は preview の
+ * `plans` で、承認する提案そのものの順序）。図は判定をせず、実行ファイルの答えを描くだけ。図は親ごとにまとめ、
+ * その前に順序を直すワークフロー編集タブへの入口（「ワークフローを編集」）を置く。押すと拡張ホストがオーバーレイを
+ * 閉じてからタブを開く（タブで保存すると、この一覧はもう承認できないため）。
+ *
+ * 親のタブに未保存の変更があれば、その親の図の上に理由を出し、承認のボタンを押せなくする（`unsaved`。拡張ホストが
+ * タブの様子が変わるたびに渡し直す）。タブで保存したあとに提案が変わった親（`changedSinceSave`）には注意を出す。
+ *
  * 状態は拡張ホストが持っていて、ここは渡されたものを見せるだけ。ボタンを押したら拡張ホストへ返す。
  */
 import { Fragment, useEffect, useRef, type JSX } from "react";
 
-import type { ApprovePreview } from "../../core/approvemodel.js";
+import { unsavedParents, unsavedText, type ApprovePlan, type ApprovePreview } from "../../core/approvemodel.js";
 import type { ApprovalOverlay } from "../../core/board-view.js";
+import { PlanGraph } from "../shared/PlanGraph.js";
 import { DecideBody } from "./Decide.js";
 import { post } from "./post.js";
 import { approvalBody } from "./text.js";
 
-export function Approval({ overlay }: { readonly overlay: ApprovalOverlay }): JSX.Element {
+export function Approval({ overlay, unsaved = [] }: { readonly overlay: ApprovalOverlay; readonly unsaved?: readonly string[] }): JSX.Element {
   const box = useRef<HTMLElement>(null);
   // 開いたら「やめる」に焦点を置く（承認したあとは「コピー」）。押せないボタンには置かない
   useEffect(() => {
@@ -39,13 +48,13 @@ export function Approval({ overlay }: { readonly overlay: ApprovalOverlay }): JS
   return (
     <div className="approval-backdrop" data-approval={overlay.kind}>
       <section className="approval" role="dialog" aria-modal="true" aria-labelledby="approval-title" ref={box}>
-        <Inner overlay={overlay} />
+        <Inner overlay={overlay} unsaved={unsaved} />
       </section>
     </div>
   );
 }
 
-function Inner({ overlay }: { readonly overlay: ApprovalOverlay }): JSX.Element {
+function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readonly unsaved: readonly string[] }): JSX.Element {
   switch (overlay.kind) {
     case "loading":
       return (
@@ -66,9 +75,9 @@ function Inner({ overlay }: { readonly overlay: ApprovalOverlay }): JSX.Element 
         </>
       );
     case "preview":
-      return <Body preview={overlay.preview} approving={false} notice={overlay.notice} />;
+      return <Body preview={overlay.preview} approving={false} notice={overlay.notice} unsaved={unsaved} changed={overlay.changedSinceSave ?? []} />;
     case "approving":
-      return <Body preview={overlay.preview} approving={true} notice={undefined} />;
+      return <Body preview={overlay.preview} approving={true} notice={undefined} unsaved={unsaved} changed={[]} />;
     case "done":
       return (
         <>
@@ -119,13 +128,19 @@ function Body({
   preview,
   approving,
   notice,
+  unsaved,
+  changed,
 }: {
   readonly preview: ApprovePreview;
   readonly approving: boolean;
   readonly notice: string | undefined;
+  readonly unsaved: readonly string[];
+  readonly changed: readonly string[];
 }): JSX.Element {
   const count = preview.batch.length;
   const tickets = preview.batch.map((b) => b.ticket);
+  const blocked = unsavedParents(preview, unsaved);
+  const blockedText = blocked.length === 0 ? "" : unsavedText(blocked);
   return (
     <>
       <h2 id="approval-title">{count === 0 ? "承認待ちのチケットなし" : `承認待ちのチケット ${count} 件`}</h2>
@@ -150,6 +165,39 @@ function Body({
           </tbody>
         </table>
       )}
+      {preview.plans.length > 0 ? (
+        <div className="plan-graphs">
+          {families(preview.plans).map(([ticket, plans]) => (
+            <div key={ticket} className="plan-family" data-ticket={ticket}>
+              {unsaved.includes(ticket) ? (
+                <p className="approval-note warn plan-unsaved">ワークフロー編集タブに保存していない変更があります。保存するか破棄するまで、この一覧は承認できません。</p>
+              ) : null}
+              {changed.includes(ticket) ? (
+                <p className="approval-note warn plan-changed">
+                  ワークフロー編集タブで保存したあとに、提案が変わっています（エージェントが書き換えた可能性があります）。図を確かめてから承認してください。
+                </p>
+              ) : null}
+              {approving ? null : (
+                <div className="plan-family-actions">
+                  <button
+                    type="button"
+                    className="action"
+                    data-action="edit-workflow"
+                    data-ticket={ticket}
+                    title={`このオーバーレイを閉じて、${ticket} の計画の順序を直すワークフロー編集タブを開きます。保存すると提案が書き換わるので、承認は開き直してください`}
+                    onClick={() => post({ type: "editWorkflow", ticket })}
+                  >
+                    ワークフローを編集
+                  </button>
+                </div>
+              )}
+              {plans.map((plan) => (
+                <PlanGraph key={`${plan.ticket}-${plan.part}`} plan={plan} />
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : null}
       <BodyText text={preview.text} />
       {preview.rejected.length > 0 ? (
         <>
@@ -176,6 +224,11 @@ function Body({
           </ul>
         </>
       ) : null}
+      {blockedText === "" || approving ? null : (
+        <p className="approval-note warn" id="approval-blocked">
+          {blockedText}
+        </p>
+      )}
       <div className="approval-actions">
         {count === 0 ? null : (
           <button
@@ -183,7 +236,8 @@ function Body({
             className="action primary"
             data-action="approve-confirm"
             data-tickets={tickets.join(",")}
-            disabled={approving}
+            disabled={approving || blockedText !== ""}
+            title={blockedText === "" ? undefined : blockedText}
             onClick={() => post({ type: "approveConfirm", tickets })}
           >
             {approving ? "承認中…" : `この ${count} 件を承認する`}
@@ -193,6 +247,15 @@ function Body({
       </div>
     </>
   );
+}
+
+/** 計画の図を親ごとにまとめる（全体計画とフィードバック計画は同じ親の 2 つの図）。並びは届いた順 */
+function families(plans: readonly ApprovePlan[]): [string, ApprovePlan[]][] {
+  const out = new Map<string, ApprovePlan[]>();
+  for (const plan of plans) {
+    out.set(plan.ticket, [...(out.get(plan.ticket) ?? []), plan]);
+  }
+  return [...out];
 }
 
 /**

@@ -1,7 +1,6 @@
 {
   "d67a823722af28c6620b3a8f87d75adca8c1f878:.ccnavi/approved/doing": null,
   "d67a823722af28c6620b3a8f87d75adca8c1f878:wip/proposals/todo": null,
-  "d67a823722af28c6620b3a8f87d75adca8c1f878:.ccnavi/approved/phases/i0001": null,
   "b31bbf4a1878ce9528e1ead5ee3aa76c41de310d:.ccnavi/approved/doing": null,
   "b31bbf4a1878ce9528e1ead5ee3aa76c41de310d:wip/proposals/todo": [
     {
@@ -12,7 +11,6 @@
       "mode": "100644"
     }
   ],
-  "b31bbf4a1878ce9528e1ead5ee3aa76c41de310d:.ccnavi/approved/phases/i0001": null,
   "e58173f11e7cd5af72afc83589c8ebe8689bd2fe:.ccnavi/approved/doing": [
     {
       "id": "c21187351187aea6ece188a35200843923e063b7",
@@ -23,15 +21,6 @@
     }
   ],
   "e58173f11e7cd5af72afc83589c8ebe8689bd2fe:wip/proposals/todo": null,
-  "e58173f11e7cd5af72afc83589c8ebe8689bd2fe:.ccnavi/approved/phases/i0001": [
-    {
-      "id": "8b19652fb1c157b748855028d4d81dd2ddab2000",
-      "name": "workflow.yml",
-      "type": "blob",
-      "path": ".ccnavi/approved/phases/i0001/workflow.yml",
-      "mode": "100644"
-    }
-  ],
   "96b345d3020672a9eebe7a14eee33a21189d939c:.ccnavi/approved/doing": [
     {
       "id": "c21187351187aea6ece188a35200843923e063b7",
@@ -41,14 +30,5 @@
       "mode": "100644"
     }
   ],
-  "96b345d3020672a9eebe7a14eee33a21189d939c:wip/proposals/todo": null,
-  "96b345d3020672a9eebe7a14eee33a21189d939c:.ccnavi/approved/phases/i0001": [
-    {
-      "id": "8b19652fb1c157b748855028d4d81dd2ddab2000",
-      "name": "workflow.yml",
-      "type": "blob",
-      "path": ".ccnavi/approved/phases/i0001/workflow.yml",
-      "mode": "100644"
-    }
-  ]
+  "96b345d3020672a9eebe7a14eee33a21189d939c:wip/proposals/todo": null
 }

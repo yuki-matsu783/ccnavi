@@ -279,7 +279,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
           <Footer board={shown} />
         </>
       )}
-      {data.approval !== undefined ? <Approval overlay={data.approval} /> : null}
+      {data.approval !== undefined ? <Approval overlay={data.approval} unsaved={data.unsaved ?? []} /> : null}
       {tour.touring && board !== undefined ? <Tour steps={TOUR_STEPS} onClose={tour.end} /> : null}
     </>
   );

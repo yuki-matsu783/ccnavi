@@ -19,10 +19,11 @@ VS Code 拡張「ccnavi ボード」が外から見てどうふるまうかを�
 | サイドパネルの入口、コマンドパレットのコマンド、タブの出方、見た目（配色）の切り替え | [requirements/commands.md](requirements/commands.md) |
 | チケット管理画面（ボード）。列・カード・バッジ・履歴・絞り込み・承認とレビューのオーバーレイ・自動の読み直し | [requirements/board.md](requirements/board.md) |
 | フロー編集画面（子チケットのフローを図で書く） | [requirements/flow.md](requirements/flow.md) |
+| ワークフロー編集タブ（親の提案の計画の順序を図で引き直す） | [requirements/workflow.md](requirements/workflow.md) |
 | プロジェクト管理画面（`projects/` の一覧と clone・設定の雛形） | [requirements/projects.md](requirements/projects.md) |
 | ルール管理画面（`rules.yml` の編集・判定を試す・hook の一覧） | [requirements/rules.md](requirements/rules.md) |
 | リスク管理画面（`risks.yml` の配点の編集） | [requirements/risk.md](requirements/risk.md) |
-| フェーズ管理画面（`phases.yml` の定義の編集と図） | [requirements/phases.md](requirements/phases.md) |
+| フェーズ管理画面（`phases.yml` の定義の編集） | [requirements/phases.md](requirements/phases.md) |
 
 ## 用語と参照
 

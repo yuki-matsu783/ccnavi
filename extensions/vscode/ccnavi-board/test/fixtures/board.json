@@ -238,7 +238,6 @@
    "phases": {
     "path": "<root>/.ccnavi/config/phases.yml",
     "unreadable": "",
-    "order": "sequential",
     "types": [
      {
       "id": "research",
@@ -580,7 +579,8 @@
     "state": "todo",
     "tree": "i0001",
     "tree_root": "<root>/.claude/worktrees/i0001",
-    "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-02-03.md"
+    "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-02-03.md",
+    "has_plan": false
    },
    "blocked": "",
    "copy": {
@@ -645,7 +645,8 @@
     "state": "review",
     "tree": "i0001",
     "tree_root": "<root>/.claude/worktrees/i0001",
-    "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-02-04.md"
+    "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-02-04.md",
+    "has_plan": false
    },
    "blocked": "",
    "copy": {
@@ -801,7 +802,12 @@
    "stage": "作業中（2（設計））",
    "plan": [
     "research",
-    "design"
+    {
+     "type": "design",
+     "after": [
+      1
+     ]
+    }
    ],
    "feedback": null,
    "close_early": null,

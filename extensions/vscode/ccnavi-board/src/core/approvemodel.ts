@@ -27,6 +27,55 @@ export interface ApproveRejected {
   readonly problems: readonly string[];
 }
 
+/**
+ * 計画の図の項 1 つ（`plans[].items[]`）。値は実行ファイルが組んだもの。図は印を付けて描くだけで、
+ * 見る場所・延期の引き受け手・固定したかを自分で決めない
+ */
+export interface ApprovePlanItem {
+  /** 番号（承認の preview では提案に書いてある番号のまま） */
+  readonly number: number;
+  /** 振り直す前の番号。振り直していなければ `number` と同じ */
+  readonly from: number;
+  /** 定義の名前 */
+  readonly type: string;
+  /** 定義の題（親の `phases:` から） */
+  readonly title: string;
+  /** 見る場所（`none` / `mr`。項の `review: mr` は `mr`） */
+  readonly review: string;
+  /** 項の `review: defer`（レビューを後ろの項へ延ばす） */
+  readonly deferred: boolean;
+  /** 延期したレビューを引き受ける番号。延期していなければ null */
+  readonly review_at: number | null;
+  /** 子が承認された番号（固定した番号。改版で動かせない） */
+  readonly locked: boolean;
+}
+
+/**
+ * 計画を持つ親の、計画 1 つぶん（全体計画かフィードバック計画）の図の中身。`--agree --preview --json` の
+ * `plans` と `--plan-order <親> --json` の `plans` は実行ファイルの同じ関数が組む（README「承認の JSON」）。
+ * 先行（`after`）は番号の文字列 → 直接の先行の番号のリスト
+ */
+export interface ApprovePlan {
+  readonly ticket: string;
+  /** `plan`（全体計画）か `feedback`（フィードバック計画） */
+  readonly part: string;
+  /** 親の提案とその子の提案をまとめたハッシュ（ワークフロー編集タブの保存で `--expect` に返す） */
+  readonly source_sha: string;
+  readonly items: readonly ApprovePlanItem[];
+  /** 直接の先行（番号は `number`） */
+  readonly after: Readonly<Record<string, readonly number[]>>;
+  /** 提案に書いてある直接の先行 */
+  readonly proposed: Readonly<Record<string, readonly number[]>>;
+  /** 改版のとき、承認済みの待ち方から戻した直接の先行。改版でなければ null */
+  readonly current: Readonly<Record<string, readonly number[]>> | null;
+  /** 最後の項が待っていない項（終端に当たらない項） */
+  readonly loose: readonly number[];
+  /** 何も待たずにすぐ始まる項 */
+  readonly ready: readonly number[];
+  /** 順序の検査の error（実行ファイルの文面そのまま） */
+  readonly problems: readonly string[];
+}
+
 export interface ApprovePreview {
   readonly version: number;
   readonly root: string;
@@ -41,6 +90,37 @@ export interface ApprovePreview {
   readonly rejected: readonly ApproveRejected[];
   /** 読めない提案や承認済みチケットの説明 */
   readonly problems: readonly string[];
+  /** 承認の対象に入った計画を持つ親の図の中身（計画ごとに 1 件）。欄が無ければ空で、画面は図を出さない */
+  readonly plans: readonly ApprovePlan[];
+}
+
+/**
+ * 一覧のうち、ワークフロー編集タブに未保存の変更がある親（識別子の順）。親は一覧の親（`parent` が null。改版も）と、
+ * 図のある親。子の識別子は親のタブと取り違えない。**空でなければ承認を打たない**（承認の遷移のガードと、画面のボタン）
+ */
+export function unsavedParents(preview: ApprovePreview, unsaved: readonly string[]): string[] {
+  const parents = new Set([...preview.batch.filter((b) => b.parent === null).map((b) => b.ticket), ...preview.plans.map((p) => p.ticket)]);
+  return [...new Set(unsaved)].filter((ticket) => parents.has(ticket)).sort();
+}
+
+/** 未保存のタブがあるので承認できない理由 */
+export function unsavedText(parents: readonly string[]): string {
+  return `親 ${parents.join(", ")} のワークフロー編集タブに未保存の変更があります。保存するか破棄してから承認してください`;
+}
+
+/**
+ * タブで保存したあとに提案が変わった親（識別子の順）。タブが最後に保存したときの `source_sha`（`saved`）と、一覧の
+ * 計画の `source_sha` が違う親。保存していない親は見ない。承認は止めない（図は今の提案をそのまま出している）
+ */
+export function changedSinceSave(preview: ApprovePreview, saved: Readonly<Record<string, string>>): string[] {
+  const out = new Set<string>();
+  for (const plan of preview.plans) {
+    const sha = saved[plan.ticket];
+    if (sha !== undefined && sha !== plan.source_sha) {
+      out.add(plan.ticket);
+    }
+  }
+  return [...out].sort();
 }
 
 export interface ApproveResult {
@@ -134,6 +214,7 @@ export function parseApprovePreview(text: string): PreviewParse {
         .filter(isRecord)
         .map((r) => ({ ticket: str(r.ticket), problems: list(r.problems).map(str) })),
       problems: list(raw.problems).map(str),
+      plans: readPlans(raw.plans),
     },
   };
 }
@@ -214,6 +295,60 @@ function entry(raw: Record<string, unknown>): ApproveBatchEntry {
     tree: str(raw.tree),
     path: str(raw.path),
     overflow: list(raw.overflow).map(str),
+  };
+}
+
+/** 1 以上の整数か */
+function isNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1;
+}
+
+/** 番号 → 番号のリスト。リストでない値と、数でない番号は落とす */
+function numbersBy(value: unknown): Record<string, number[]> {
+  const out: Record<string, number[]> = {};
+  if (!isRecord(value)) {
+    return out;
+  }
+  for (const [key, numbers] of Object.entries(value)) {
+    if (Array.isArray(numbers)) {
+      out[key] = numbers.filter(isNumber);
+    }
+  }
+  return out;
+}
+
+/**
+ * `plans` の欄を読む。`--plan-order <親> --json` の答え（`planordermodel.ts`）も同じ形なので、同じ読み方を使う。
+ * オブジェクトでない項は落とし、番号の無い項目も落とす
+ */
+export function readPlans(value: unknown): ApprovePlan[] {
+  return list(value).filter(isRecord).map(plan);
+}
+
+function plan(raw: Record<string, unknown>): ApprovePlan {
+  return {
+    ticket: str(raw.ticket),
+    part: str(raw.part),
+    source_sha: str(raw.source_sha),
+    items: list(raw.items)
+      .filter(isRecord)
+      .filter((item) => isNumber(item.number))
+      .map((item) => ({
+        number: item.number as number,
+        from: isNumber(item.from) ? item.from : (item.number as number),
+        type: str(item.type),
+        title: str(item.title),
+        review: str(item.review),
+        deferred: item.deferred === true,
+        review_at: isNumber(item.review_at) ? item.review_at : null,
+        locked: item.locked === true,
+      })),
+    after: numbersBy(raw.after),
+    proposed: numbersBy(raw.proposed),
+    current: isRecord(raw.current) ? numbersBy(raw.current) : null,
+    loose: list(raw.loose).filter(isNumber),
+    ready: list(raw.ready).filter(isNumber),
+    problems: list(raw.problems).filter((p): p is string => typeof p === "string"),
   };
 }
 

@@ -26,8 +26,6 @@ MARK_SKIPPED = "skipped"
 # pending は「終わったと 1 度伝えた」のマーカー。同じ文を呼び出しごとに繰り返さないため。
 MARK_PENDING = "pending"
 MARKS = (MARK_REQUESTED, MARK_REVIEWED, MARK_SKIPPED, MARK_PENDING)
-# 全体計画の待ち方を固定するファイル（`phases/<親>/workflow.yml`）。
-WORKFLOW_FILE = "workflow.yml"
 
 
 def mark_path(approved_dir: str, parent: str, phase: int, kind: str) -> str:
@@ -244,7 +242,7 @@ def accepted_threads(
     """この親で、ユーザが「未解決のまま進める」と受け入れたスレッドの識別。
 
     `phase` を渡すと、その番号のレビューで受け入れ済みと数えてよいものだけを返す。
-    受け入れはそのフェーズと、それを待つ番号（コピーした待ち方の `waits`）にだけ当てはまる（設計
+    受け入れはそのフェーズと、それを待つ番号（待ち方の `waits`）にだけ当てはまる（設計
     9.8）。並行した別の枝のレビューには当てはまらない。番号を持たない受け入れ（`close-early`）は
     親全体に当てはまる。
     """
@@ -255,7 +253,7 @@ def accepted_threads(
     if phase is None or owner is None:
         return threads
     at = data.get("phases") if isinstance(data.get("phases"), dict) else {}
-    reach = {phase, *workflow.waits_of(owner, phase, None)}
+    reach = {phase, *workflow.waits_of(owner, phase)}
     kept = set()
     for thread in threads:
         where = at.get(thread)

@@ -138,18 +138,14 @@ def scope_guard(
     if not conf.tickets_enabled:
         return None
     copies, _ = approval.scan(conf, root, raw=raw)
-    # 定義の上限はレイヤー（計画を持つ親の `project:`）ごとに、ここで 1 度だけ読む。
-    types: dict[str, dict] = {}
-    for copy in copies:
-        if copy.has_plan and copy.project not in types:
-            types[copy.project] = phase.load_types(conf, root, copy.project) or {}
+    # 定義の上限は親に固定した写し（`phases:`）から引く（`phase_scope.type_for`）。
+    # `phases.yml` は読まない。
     return post_findings.ScopeGuard(
         root=root,
         copies=approval_checks.by_id(copies),
         projects=conf.projects,
         tickets=conf.tickets,
         approved=conf.approved,
-        types=types,
     )
 
 

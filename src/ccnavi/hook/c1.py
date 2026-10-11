@@ -68,12 +68,10 @@ _EVENT_FIELDS = ("at", "ticket", "kind")
 # configsync の `*.ccnavi-sync`）。
 _TEMP = re.compile(r"(^|/)\.[^/]*\.part(\.[^/]*)?$|(^|/)flows/\.[^/]*\.tmp$|\.ccnavi-sync$")
 # ユーザの判断が書くもの。フローの本文、reviewed・close-early のマーカー、
-# 受け入れたスレッド、ユーザの承認で置かれた承認済みチケット、
-# 承認（`--agree` の新規と改版）が固定した全体計画の待ち方。
+# 受け入れたスレッド、ユーザの承認で置かれた承認済みチケット。
 _HUMAN_MARK_NAMES = (
     f"{approval_marks.PARENT_MARK_CLOSE_EARLY}.json",
     approval_marks.ACCEPTED_FILE,
-    approval_marks.WORKFLOW_FILE,
 )
 _TIMEOUT = 20.0
 
@@ -433,8 +431,7 @@ def _judge_record(parts: list[str]) -> bool:
 def _human(parts, now, before, approved_rel, review_rel, added, removed) -> bool:
     """ユーザの判断が書くものの形。形だけで見る（(c) も (d) も C1 は止める）。
 
-    フローの本文、ユーザの承認で置かれた承認済みチケットと、その承認が固定した待ち方
-    （`phases/<親>/workflow.yml`）、
+    フローの本文、ユーザの承認で置かれた承認済みチケット、
     reviewed・(b) でない skipped・close-early・設定を見た上書きの記録・受け入れたスレッド、
     ユーザの判断が消したマーカー、ユーザの判断が一緒に書く移動（review/ から done/、
     doing/ から done/）、履歴の追記（読める行だけ）。

@@ -9,18 +9,17 @@ from __future__ import annotations
 import io
 import os
 
-from ..infra import fsio, settings
+import yaml
+
+from ..infra import fsio, settings, yamlread
 from ..tickets import (
     agree,
     approval,
     approval_checks,
     approval_marks,
     history,
-    phase,
     ticket_model,
-    workflow,
 )
-from ..tickets import ticket as ticket_mod
 from . import core_base
 
 # ---- 承認の取り下げ ----------------------------------------------------------------------------
@@ -39,8 +38,8 @@ def withdraw(
     判定は緩めない。どれか 1 つでも条件に当たらなければ何も並べない。
 
     承認は中身を変えないので、`doing/` の中身が承認コミットの親の提案とバイト単位で同じなら、
-    改版も着手もされていない（`_content_problems`）。親は、固定した待ち方
-    （`phases/<親>/workflow.yml`）も一緒に消す。
+    改版も着手もされていない（`_content_problems`）。待ち方は `doing/` の計画から決まるので、
+    バイト列が同じなら待ち方も同じ。別に比べる段も、一緒に消すファイルも無い。
     """
     conf, root = snapshot.conf, snapshot.root
     raw = approval.read_raw(conf, root)
@@ -93,10 +92,6 @@ def withdraw(
                     message="承認済みチケットを doing/ から消せない ({reason})", undo=(todo,)
                 ):
                     fsio.unlink(approval.copy_path(where, ident))
-                held = approval.workflow_path(where, ident)
-                if not copy.is_child and fsio.lexists(held):
-                    with fsio.policy(message="待ち方のファイルを消せない ({reason})"):
-                        fsio.unlink(held)
             history.note(
                 where,
                 ident,
@@ -164,16 +159,16 @@ def _withdraw_problems(
         found.append(copy.blocked)
     if approval_checks.has_record(copy):
         # 承認で記録（`ccnavi_approved`）を書いていた頃の古い形。承認で欄が足されているので
-        # 承認コミットの親の提案とは一致しない。記録の欄で決める（前の条件のまま）。
+        # 承認コミットの親の提案とは一致しない。子は記録の欄で決める（前の条件のまま）。
         meta = copy.raw[ticket_model.APPROVAL_KEY]
-        # 今の改版は時刻を書かないが、待ち方のファイルを必ず書く。古い形の承認は待ち方を
-        # 欄に持ち、ファイルを持たないので、ファイルがあれば改版したものとして止める。
-        held = approval.workflow_path(settings.approved_dir(conf, copy.tree_root), ident)
-        if (
-            meta.get("revised_at")
-            or meta.get("feedback_at")
-            or (not copy.is_child and fsio.lexists(held))
-        ):
+        if not copy.is_child:
+            # 親は一律に止める。改版は記録の欄を残したまま計画を書き換えるので、古い形の親が
+            # 改版されたかを見分ける印が無い（前は待ち方のファイルの有無で見分けていた）。
+            found.append(
+                "前の版の形（承認の記録 ccnavi_approved を持つ）の親は取り下げられない"
+                "（改版されたかを見分けられない）。取り消して出し直してください"
+            )
+        elif meta.get("revised_at") or meta.get("feedback_at"):
             found.append("改版した承認は取り下げられない（改版で動いたものを戻せない）")
         if meta.get("followup_of") or not meta.get("source_path"):
             found.append(
@@ -199,10 +194,9 @@ def _withdraw_problems(
             settings.approved_dir(conf, copy.tree_root), approval_marks.PHASES_DIR, ident
         )
         try:
-            # 待ち方のファイルはマーカーではない（承認で置く）。中身は `_content_problems` が見る。
-            # 書きかけで異常終了して残った一時ファイル（`.<名前>.<一意>.part`）もマーカーではない。
+            # 書きかけで異常終了して残った一時ファイル（`.<名前>.<一意>.part`）はマーカーではない。
             names = fsio.listdir(marks_dir)
-            if [n for n in names if n != approval_marks.WORKFLOW_FILE and not fsio.is_temp_name(n)]:
+            if [n for n in names if not fsio.is_temp_name(n)]:
                 found.append(f"{approval_marks.PHASES_DIR}/{ident}/ にマーカーがある")
         except FileNotFoundError:
             pass
@@ -217,56 +211,75 @@ def _withdraw_problems(
     if ident not in prior_proposals:
         found.append("承認コミットの親に提案が無い（承認コミットを引けない）")
     elif compare and not approval_checks.has_record(copy):
-        found += _content_problems(conf, root, copy, prior_proposals[ident])
+        found += _content_problems(copy, prior_proposals[ident])
     return found
 
 
-def _content_problems(
-    conf: settings.Settings, root: str, copy: ticket_model.Ticket, prior: bytes
-) -> list[str]:
+def _content_problems(copy: ticket_model.Ticket, prior: bytes) -> list[str]:
     """新しい形の承認済みチケットが、承認したときのままか。
 
     承認は提案を中身を変えずに動かすので、`doing/` の中身が承認コミットの親の提案（`prior`）と
     バイト単位で同じなら、改版も着手もされていない。改行を揃えて読む `fsio.read_text` は使わない
-    （CRLF と LF の違いも、承認の後の書き換えとして数える）。
-
-    親は加えて、`phases/<親>/workflow.yml` の中身が、`prior` と今の `phases.yml` から計算した
-    待ち方（`workflow.compute`）と同じであることを求める。待ち方だけの改版は `doing/` を変えない
-    ので、ここで見る。ファイルが無いなら通す。改版は必ずこのファイルを書くので、無いのは
-    待ち方を書かない承認（計画の無い親か、手で動かした承認）で、待ち方の改版は起きていない。
-    承認のあとに `phases.yml` が変わっていれば計算が変わって一致せず、結果として止める側になる。
+    （CRLF と LF の違いも、承認の後の書き換えとして数える）。待ち方は `doing/` の計画から決まる
+    ので、バイト列が同じなら待ち方も同じ（別に比べない）。
     """
     current = fsio.read_bytes(copy.path)
     if current is None:
         return ["承認済みチケットを読めない"]
     if current != prior:
-        return [
+        text = (
             "承認のあとに承認済みチケットの中身が変わった（改版か着手）。"
             "承認コミットの親の提案と同じでないものは取り下げられない"
-        ]
-    if copy.is_child:
-        return []
-    where = settings.approved_dir(conf, copy.tree_root)
-    path = approval.workflow_path(where, copy.ticket)
-    held = fsio.read_bytes(path)
-    if held is None and fsio.lexists(path):
-        return [
-            f"{approval_marks.PHASES_DIR}/{copy.ticket}/{approval_marks.WORKFLOW_FILE} を読めない"
-        ]
-    if held is None:
-        # 手で動かした承認（計画を持つ親でも待ち方のファイルを書かない）か、計画の無い親。
-        # 改版は必ず待ち方のファイルを書くので、無ければ待ち方の改版は起きていない。
-        return []
-    try:
-        proposed, _ = ticket_mod.parse(prior.decode("utf-8"))
-    except UnicodeDecodeError:
-        proposed = None
-    if proposed is None:
-        return ["承認コミットの親の提案をチケットとして読めないので、待ち方を確かめられない"]
-    types = phase.load_types(conf, root, copy.project)
-    if held != approval.workflow_bytes(workflow.compute(proposed, types)):
-        return [
-            "承認のあとに待ち方が変わった（待ち方の改版か、phases.yml の変更）。"
-            "承認したときの待ち方と同じでないものは取り下げられない"
-        ]
+        )
+        if _only_plan_values_differ(copy, current, prior):
+            text += (
+                "。違いは plan: / feedback: / phases:（子なら phase: か predecessors:）の値だけ。"
+                "承認の前にワークフロー編集タブか --fill-phases で書き換えた提案は取り下げられない"
+                "（書き換えがコミットされないまま承認された）。`ccnavi-ticket.sh cancel "
+                f"{copy.ticket} --reason <理由>` で取り消して、提案を出し直す"
+            )
+        return [text]
     return []
+
+
+# 承認の前に書き換えることのある欄。ワークフロー編集タブ（`--plan-order --write`）は親の
+# `plan:` / `feedback:` と、子の識別子・`phase:`・`predecessors:` を、`--fill-phases` は親の
+# `phases:` を書き換える。識別子を付け替えた子は、承認コミットの親に同じ識別子の提案が無いので
+# ここまで来ない（「提案が無い」で止まる）。`predecessors:` だけを直した子にはここで案内する。
+_REWRITTEN_PARENT = ("plan", "feedback", "phases")
+_REWRITTEN_CHILD = ("phase", "predecessors")
+
+
+def _only_plan_values_differ(copy: ticket_model.Ticket, current: bytes, prior: bytes) -> bool:
+    """`doing/` と承認コミットの親の提案の違いが、承認の前に書き換えることのある欄の値だけか。
+
+    本文と、ほかの欄（読んだ形）が同じで、書き換える欄のどれかが違うときだけ真。読めなければ偽
+    （ほかの違いと同じ文面にする）。
+    """
+    keys = _REWRITTEN_CHILD if copy.is_child else _REWRITTEN_PARENT
+    try:
+        now, before = _split(current.decode("utf-8")), _split(prior.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return False
+    if now is None or before is None or now[1] != before[1]:
+        return False
+    rest_now = {k: v for k, v in now[0].items() if k not in keys}
+    rest_before = {k: v for k, v in before[0].items() if k not in keys}
+    return rest_now == rest_before and any(now[0].get(k) != before[0].get(k) for k in keys)
+
+
+def _split(text: str) -> tuple[dict, str] | None:
+    """frontmatter（読んだ形）と本文。読めなければ None。"""
+    lines = text.splitlines(keepends=True)
+    if not lines or lines[0].strip() != ticket_model.FENCE:
+        return None
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == ticket_model.FENCE), None)
+    if end is None:
+        return None
+    try:
+        front = yamlread.safe_load("".join(lines[1:end]))
+    except (yaml.YAMLError, yamlread.LoadError):
+        return None
+    if not isinstance(front, dict):
+        return None
+    return front, "".join(lines[end + 1 :])

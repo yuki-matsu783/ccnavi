@@ -36,9 +36,22 @@ export async function openPage(data: BoardData, initialState?: unknown, options:
 /** 見本（`test/fixtures/board.json`）のボードを開く。差し替えたいところだけ渡す */
 export async function openBoard(
   json: BoardJson = fixture(),
-  extra: { readonly approval?: ApprovalOverlay; readonly filter?: string; readonly state?: unknown; readonly prepare?: LoadOptions["prepare"] } = {},
+  extra: {
+    readonly approval?: ApprovalOverlay;
+    readonly filter?: string;
+    readonly state?: unknown;
+    readonly prepare?: LoadOptions["prepare"];
+    /** 図（承認のオーバーレイの計画の図）を描かせるときは真。大きさを測れるようにする（`dom.ts` の `measure`） */
+    readonly measure?: boolean;
+    /** ワークフロー編集タブに未保存の変更がある親（拡張ホストが渡す） */
+    readonly unsaved?: readonly string[];
+  } = {},
 ): Promise<DomPage> {
-  return openPage({ kind: "board", board: buildBoard(json), approval: extra.approval, filter: extra.filter }, extra.state, { prepare: extra.prepare });
+  return openPage(
+    { kind: "board", board: buildBoard(json), approval: extra.approval, filter: extra.filter, ...(extra.unsaved === undefined ? {} : { unsaved: extra.unsaved }) },
+    extra.state,
+    { prepare: extra.prepare, measure: extra.measure },
+  );
 }
 
 /** 承認画面の見本（`--agree --preview --json` の出力そのもの）。Python 側の tests/ticket/test_approve_json.py が書き出す */

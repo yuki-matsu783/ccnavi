@@ -232,13 +232,13 @@ class SortTest(AuthorityHarness):
         found = dict((path, kind) for kind, path in self.sort())
         self.assertEqual(found, {flow: "c", copy: "c", other: "d", review: "d"})
 
-    def test_the_workflow_fixed_by_an_approval_is_c(self):
-        """承認（`--agree` の新規と改版）が固定する待ち方 `phases/<親>/workflow.yml` は
-        ユーザが運ぶもの。"""
+    def test_a_workflow_file_is_no_longer_a_user_decision(self):
+        """待ち方は承認済みチケットの計画から都度計算するので、承認は `phases/<親>/workflow.yml`
+        を書かない。置き場に現れたら、ユーザの判断が書くものではなく見分けられないもの（d）。"""
         held = f"{APPROVED}/phases/i0001/workflow.yml"
         self.put(held, "order: dag\nwaits:\n  1: []\nreview_at: {}\n")
         found = dict((path, kind) for kind, path in self.sort())
-        self.assertEqual(found, {held: "c"})
+        self.assertEqual(found, {held: "d"})
 
     def test_judge_records_are_kept_and_temp_files_skipped(self):
         judge = f"{APPROVED}/phases/i0001/i0001-01-01.judge.json"
