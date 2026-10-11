@@ -105,8 +105,11 @@ class OrderShapeTest(unittest.TestCase):
             ('{"plan": {"2": 1}}', "リスト"),
             ('{"feedback": {"4": [1]}}', "1"),
             ('{"feedback": {"3": []}}', "3"),
+            ('{"plan": {"\u00b2": []}}', "\u00b2"),
+            ('{"plan": {"\uff10": []}}', "\uff10"),
+            ("[" * 100000 + "]" * 100000, "JSON"),
         ):
-            with self.subTest(order=text):
+            with self.subTest(order=text[:40]):
                 order, why = plan_order.parse_order(text, t)
                 self.assertIsNone(order)
                 self.assertIn(word, why)
@@ -337,6 +340,33 @@ class PlanOrderJsonTest(PlanOrderHarness):
             with self.subTest(command=command):
                 self.assertIsNone(rule.compiled.search(command))
                 self.assertEqual(phase_forms.human_path_form(command), ("", ""))
+
+
+class PlanOrderAfterErrorsTest(PlanOrderHarness):
+    """提案に元からある `after` の形の誤りは、振り直しても検査から消えない。"""
+
+    def test_after_errors_in_the_proposal_are_kept(self):
+        plan = [PLAN3[0], PLAN3[1], {"type": "implement", "after": [2, "x", 7]}]
+        self.propose("i0001", parent_text("i0001", plan))
+        body = self.body()
+        self.assertTrue(body["problems"], body)
+        self.assertTrue(body["plans"][0]["problems"], body)
+        self.assertFalse(body["writable"])
+        reordered = self.body("--order", json.dumps(REVERSE))
+        self.assertTrue(reordered["problems"], reordered)
+        self.assertFalse(reordered["writable"])
+
+    def test_a_part_not_passed_keeps_its_after_errors(self):
+        text = parent_text(
+            "i0001", PLAN3, feedback=[{"type": "implement-feedback", "after": ["zz"]}]
+        )
+        self.propose("i0001", text)
+        body = self.body("--order", json.dumps(REVERSE))
+        self.assertTrue(any("zz" in p for p in body["problems"]), body["problems"])
+        self.assertFalse(body["writable"])
+        result = self.write_order(REVERSE)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(self.read(), text)
 
 
 class PlanOrderWriteTest(PlanOrderHarness):
@@ -695,6 +725,75 @@ class PlanOrderChildrenTest(PlanOrderHarness):
 
         with mock.patch.object(fsio, "write_bytes_atomic", failing):
             result = self.write_order(REVERSE)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_an_approved_ticket_pointing_at_a_moved_child_writes_nothing(self):
+        before = self.snapshot()
+        held = with_predecessors(child_text("i0002-01-01", "i0002", 1, ["src/*"]), ["i0001-01-01"])
+        path = os.path.join(self.approved, "doing", "i0002-01-01.md")
+        os.makedirs(os.path.dirname(path))
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(held)
+        body = self.body("--order", json.dumps(REVERSE))
+        self.assertTrue(any("承認済みチケット" in p for p in body["child_problems"]), body)
+        self.assertEqual(self.write_order(REVERSE).returncode, 1)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_a_review_proposal_pointing_at_a_moved_child_writes_nothing(self):
+        before = self.snapshot()
+        review = os.path.join(os.path.dirname(os.path.dirname(self.todo("i0001"))), "review")
+        os.makedirs(review)
+        with open(os.path.join(review, "i0002-01-01.md"), "w", encoding="utf-8") as f:
+            f.write(
+                with_predecessors(child_text("i0002-01-01", "i0002", 1, ["src/*"]), ["i0001-01-01"])
+            )
+        body = self.body("--order", json.dumps(REVERSE))
+        self.assertTrue(any("review/" in p for p in body["child_problems"]), body)
+        self.assertEqual(self.write_order(REVERSE).returncode, 1)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_a_proposal_changed_while_writing_writes_nothing(self):
+        from unittest import mock
+
+        expect = self.body()["source_sha"]
+        real = plan_order.rebuilt
+        changed = self.c.replace("本文", "別の本文")
+
+        def racing(ans):
+            out = real(ans)
+            with open(self.todo("i0001-03-01"), "w", encoding="utf-8") as f:
+                f.write(changed)
+            return out
+
+        before = self.snapshot()
+        with mock.patch.object(plan_order, "rebuilt", racing):
+            result = self.write_order(REVERSE, expect)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("外で変わった", result.stderr)
+        after = self.snapshot()
+        self.assertEqual(after["i0001-03-01.md"], changed.encode())
+        del before["i0001-03-01.md"], after["i0001-03-01.md"]
+        self.assertEqual(after, before)
+
+    def test_a_flow_draft_moves_with_its_child(self):
+        drafts = os.path.join(os.path.dirname(os.path.dirname(self.todo("i0001"))), "flows")
+        os.makedirs(drafts)
+        with open(os.path.join(drafts, "i0001-01-01.yml"), "w", encoding="utf-8") as f:
+            f.write("nodes: [a]\n")
+        result = self.write_order(REVERSE)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(os.listdir(drafts), ["i0001-02-01.yml"])
+        with open(os.path.join(drafts, "i0001-02-01.yml"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "nodes: [a]\n")
+
+    def test_a_child_whose_other_fields_would_change_writes_nothing(self):
+        """`phase:` の値のアンカーを、ほかの欄が別名で指していれば書かない。"""
+        anchored = self.a.replace("phase: 1\n", "phase: &p 1\nextra_b: *p\n", 1)
+        self.propose("i0001-01-01", anchored)
+        self.assertEqual(front_of(anchored)["extra_b"], 1)
+        before = self.snapshot()
+        result = self.write_order(REVERSE)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertEqual(self.snapshot(), before)
 

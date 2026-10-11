@@ -1534,6 +1534,35 @@ class WithdrawTest(CoreHarness):
         # 本文も違えば、その案内はしない（ほかの書き換えかもしれない）。
         problems = self.problems({"i0001": before.replace("本文", "別の本文").encode()})
         self.assertFalse(any("ワークフロー編集タブ" in p for p in problems), problems)
+        # 計画のほかの欄も違えば、その案内はしない。
+        problems = self.problems({"i0001": before.replace("title: 親", "title: 別の題").encode()})
+        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
+        self.assertFalse(any("ワークフロー編集タブ" in p for p in problems), problems)
+
+    def test_a_child_whose_predecessors_were_retargeted_is_told_to_cancel(self):
+        """ワークフロー編集タブで `predecessors` だけを直した子（識別子は同じ）にも案内する。"""
+        self.new_parent()
+        self.start_parent()
+        prior = child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False).replace(
+            "human_review:", "predecessors: [i0002-02-01]\nhuman_review:", 1
+        )
+        now = prior.replace("[i0002-02-01]", "[i0002-01-01]")
+        write(os.path.join(self.approved, "doing", "i0001-01-01.md"), now)
+        self.commit_parent("moved by hand")
+        problems = core.withdraw(
+            self.snapshot(), ["i0001-01-01"], {"i0001-01-01": prior.encode()}
+        ).problems
+        self.assertTrue(any("ワークフロー編集タブ" in p for p in problems), problems)
+
+    def test_a_child_with_a_retargeted_id_has_no_prior_proposal(self):
+        """識別子を付け替えた子は、承認コミットの親に同じ名前の提案が無いので止まる（案内は出ない）。"""
+        self.new_parent(plan=("research", "design"))
+        child = child_text("i0001-02-01", "i0001", 2, ("wip/design/*",), False)
+        write(os.path.join(self.approved, "doing", "i0001-02-01.md"), child)
+        self.commit_parent("moved by hand")
+        problems = core.withdraw(self.snapshot(), ["i0001-02-01"], {}).problems
+        self.assertTrue(any("提案が無い" in p for p in problems), problems)
+        self.assertFalse(any("ワークフロー編集タブ" in p for p in problems), problems)
 
     def test_an_old_form_parent_is_always_refused(self):
         """古い形の親は、改版されたかを見分ける印が無いので一律に止める。"""
