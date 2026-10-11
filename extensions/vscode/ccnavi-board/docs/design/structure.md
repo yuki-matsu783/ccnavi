@@ -84,7 +84,7 @@ src/
     Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。案内のある画面（ボード・ルール管理・リスク管理・フェーズ管理・フロー編集・ワークフロー編集）で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。どの画面も同じ位置）で出る
     TargetSelect.tsx  ルール管理とフェーズ管理の、設定の対象を切り替える欄
     Tour.css          Tour.tsx の CSS（吹き出しの案内と見本の帯）。各画面の style.css が @import する
-    styles/appearance.css Claude の配色（body のクラスの下でテーマ変数を上書きする）。共通の骨組み（page.css）・ボタン（button.css）・設定 3 画面の一覧（list.css）は Chrome 拡張と共有する extensions/shared/styles/ にあり、画面の style.css が @ccnavi/shared/styles/ から button.css・appearance.css・page.css の順に @import する
+    styles/appearance.css Claude の配色（body のクラスの下でテーマ変数を上書きする）。共通の骨組み（page.css）・ボタン（button.css）・設定 3 画面の一覧（list.css）は Chrome 拡張と共有する extensions/shared/styles/ にあり、画面の style.css が button.css（@ccnavi/shared/styles/）・appearance.css（この置き場）・page.css（@ccnavi/shared/styles/）の順に @import する
     board/style.css   ボード画面の CSS の入口。部品の CSS を @import で並べるだけ（計画の図のために React Flow の CSS と shared/PlanGraph.css も読む）
     board/App.css     App.tsx の CSS（列・取っ手・畳んだ列）
     board/Card.css    Card.tsx の CSS（カード 1 枚）
