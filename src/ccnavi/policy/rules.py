@@ -80,11 +80,11 @@ from ..infra.globmatch import translate
 # `glob`（fnmatch の glob）か `regex`。
 VERSION = 1
 
-# 深刻度。ガードを壊すものと、弱めるだけのものを分ける。
+# 深刻度。ガードを無効にするものと、弱めるだけのものを分ける。
 SEVERITY_ERROR = "error"
 SEVERITY_WARN = "warn"
 # info は「そう書いてあるとおりに判定に使われているが、書いたユーザが知りたいはずのこと」。
-# レイヤーをまたいで同じ定義が重複していて後ろを捨てた、がこれにあたる（設計 11.4）。
+# レイヤーをまたいで同じ定義が重複していて後ろを捨てた、がこれにあたる。
 # warn と分けるのは、重複は普通の形（見本から始めたプロジェクト）で、これを warn に
 # 混ぜると本当に緩んでいる warn が見落とされるため。
 SEVERITY_INFO = "info"
@@ -103,7 +103,7 @@ STOP_MATCH = "Stop"
 STOP_SUBJECT = "(stop)"
 
 # 文面が要るタイプ。deny だけ。ask の文面はユーザの確認ダイアログにしか出ず、allow は
-# 通すだけで届く先が無い（どちらも実際に動かして確かめた、設計 付録 C）。モデルに渡す文は
+# 通すだけで届く先が無い（どちらも実際に動かして確かめた）。モデルに渡す文は
 # additionalContext に書く。ask と allow に書いた文面は lint が error にするが、
 # ここで捨てるとその文面のせいでルールごと外れて通ってしまうので、読み込みは通す。
 _NEEDS_MESSAGE = (DENY,)
@@ -124,7 +124,7 @@ _BACKREFERENCE = re.compile(r"\\[1-9]")
 ROOT_PLACEHOLDER = "{root}"
 
 # 「ワークスペースルートの外」を指す合言葉。`regex` にだけ書け、`^` の直後に 1 回だけ。
-# 読み込み時に、先読みを使わない入れ子の式へ展開する（not_root_pattern、設計 i0061 2）。
+# 読み込み時に、先読みを使わない入れ子の式へ展開する（not_root_pattern）。
 NOT_ROOT_PLACEHOLDER = "{!root}"
 
 # 展開の最内と、各段の「ここで文字列が終わる」に置く表記。`$` ではなく `\Z` なのは、
@@ -138,16 +138,16 @@ _NOT_ROOT_END = r"\Z"
 # Windows の MAX_PATH は 260 なので、256 字のルートはその時点で実用にならない。
 #
 # 組み立てが失敗する長さは、展開の形で変わる。 1 文字あたりの入れ子の段数を変えたら、
-# bench_not_root.py を回して測り直すこと（設計 i0061 4.1）。
+# bench_not_root.py を回して測り直すこと。
 MAX_ROOT_LEN = 256
 
 # 生成できなかった `deny` / `ask` に持たせる式。どの文字列にも当たるので、そのルールが
 # 見るツールの呼び出しは全部止まる。保護が消えるより止まるほうがよい、という向きを
-# 採るために使う（設計 i0061 4.3）。
+# 採るために使う。
 _MATCH_EVERYTHING = "^"
 
 # 生成した式に現れてはいけない書き方。`_unsupported` は繰り返しを見ないので、そこへ
-# 掛け直すだけでは「繰り返しを含まない」ことを確かめられない（設計 i0061 2.5）。
+# 掛け直すだけでは「繰り返しを含まない」ことを確かめられない。
 #
 # `?` は入れていない。生成した式は捕獲しないグループ `(?:` を使うので、`?` を量化子と
 # 数えると式自身の構造に当たってしまう。ルートの文字は `re.escape` を通るため、
@@ -155,13 +155,12 @@ _MATCH_EVERYTHING = "^"
 _GENERATED_QUANTIFIER = re.compile(r"(?<!\\)[*+]|(?<!\\)\{\d")
 
 # `{!root}` の直後に続けてよい書き始め。生成した式が読み終える位置はパスの区切りとは
-# 限らないので、任意の位置まで進む書き方で受けていないものは warn で伝える
-# （設計 i0061 3.3）。
+# 限らないので、任意の位置まで進む書き方で受けていないものは warn で伝える。
 _SKIPS_ANYWHERE = re.compile(r"(?:\.[*+]|\[\\s\\S\][*+])")
 
 # レイヤーの名前と id の間に入る文字（`self:docs` / `lib:source`、ruleload.prefix_ids）。
 # 書かれたままの id にこれが入っていると、レイヤーをつけた形と見分けが付かない。
-# 名前の表記に 1 文字を予約するほうが、前置きの表記を別にするより安い（設計 11.4）。
+# 名前の表記に 1 文字を予約するほうが、前置きの表記を別にするより安い。
 ID_SEPARATOR = ":"
 
 # 苦情の出どころ（`Problem.kind`）。「いまは通らないが、書いた側に直すものは無い」もの。
@@ -198,10 +197,10 @@ def root_glob(root: str) -> str:
 def real_root(root: str) -> str:
     """ルートを、展開に使える形に正規化する。
 
-    `os.path.realpath` で解き、末尾の区切りを落とす。落とさないと、最後の区切りを
+    `os.path.realpath` で解き、末尾の区切りを除く。除かないと、最後の区切りを
     「同じ」の側で消費した直後に最内の段へ進み、ルート直下の普通のファイル名が「外」に
     なってしまう。Windows では `os.path.realpath('/')` が `C:\\` を返すので、ドライブ直下を
-    ワークスペースにした環境は必ずこの場合になる（設計 i0061 2.0）。
+    ワークスペースにした環境は必ずこの場合になる。
 
     `root_pattern` / `root_glob` も同じ 2 つの処理をしている。`{!root}` だけ違う扱いにしない。
     """
@@ -228,12 +227,12 @@ def not_root_pattern(root: str) -> str:
         ^(?:\\Z|[^c]|c(?:\\Z|[^:]|:(?:\\Z|[^\\\\/]|[\\\\/](?:…))))
 
     繰り返しを 1 つも含まない。 各段の選択肢は最初の 1 文字でほぼ排他なので、
-    戻る余地がほとんど無い（設計 i0061 2.5）。判定は 1 回 3.5 マイクロ秒で、
+    戻る余地がほとんど無い。判定は 1 回 3.5 マイクロ秒で、
     ルートの長さに比例して伸びるだけ。
 
     列挙型（前置きを 1 文字ずつ伸ばして並べる形）を採らないのは、式の長さが
     ルートの長さの 2 乗で伸びるため。436 字のルートで 141,365 字・組み立て 481 ms に
-    なり、判定の期限（3 秒）に達してしまう（設計 i0061 2.7）。
+    なり、判定の期限（3 秒）に達してしまう。
 
     引数には `real_root` で正規化したパスを渡す。`^` は呼ぶ側が書く。
     """
@@ -307,12 +306,12 @@ class Rule:
     # レイヤーの和では `lib:schema` のようにレイヤーの名前が前に付く（ruleload.prefix_ids）。
     id: str = ""
     # bare_id は書かれたままの id。レイヤーの名前をつける前の表記で、レイヤーをまたいで
-    # 同じルールかどうかを見るときの鍵になる（設計 11.4「重複は後ろを捨てる」）。
+    # 同じルールかどうかを見るときの鍵になる。
     # id から前置きを取り除いて求める形にすると、`:` を含む id を書いたユーザの定義が
     # 取り除かれる側になるので、書いたときの表記をそのまま持つ。
     bare_id: str = ""
     # source はこのルールが来たレイヤー（common / self / プロジェクトの名前）。記録の
-    # `source` 欄と `--explain` がこれを読む（設計 11.9）。
+    # `source` 欄と `--explain` がこれを読む。
     source: str = ""
     # match は対象のツール名を "|" で並べたもの。"Write|Edit" など。
     match: str = ""
@@ -381,7 +380,7 @@ class Rule:
         return fill_root(self.degraded_message or self.message, self.root)
 
     def key(self) -> tuple:
-        """レイヤーをまたいで「同じ定義」と言えるかどうかの鍵（設計 11.4、11.8）。
+        """レイヤーをまたいで「同じ定義」と言えるかどうかの鍵。
 
         比べるのは書いた表記ではなく、`{root}` を置き換えたあとの式。共通レイヤーと
         プロジェクトのレイヤーに同じ `{root}/...` を書いた定義は、置き換え先が同じ
@@ -459,7 +458,7 @@ def load(path: str, root: str = "") -> tuple[RuleSet, list[Problem]]:
     YAML の解析の失敗は ValueError に変換して投げ直す。呼び手はここが投げるものを
     OSError と ValueError の 2 つで受けていて、受けられずに抜ける例外が 1 つでもあると、
     ルールファイルの書き損じがそのまま hook の異常終了になる。既定に戻る
-    経路（REQ-PRE-06）を通らずに異常終了するので、破損したファイルを直す呼び出しも
+    経路を通らずに異常終了するので、破損したファイルを直す呼び出しも
     止まる。読み手を替えるたびに、変換の側も一緒に見ること。
     """
     with open(path, encoding="utf-8") as f:
@@ -527,7 +526,7 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
         for i, raw in enumerate(raw_section):
             rule, problem = _build(raw, name, i, root, builtin)
             # 苦情とルールは同時に返りうる。`{!root}` を組み立てられなかった deny / ask が
-            # これで、「報告する」と「保護を消さない」を両立させる唯一の方法（設計 i0061 4.4）。
+            # これで、「報告する」と「保護を消さない」を両立させる唯一の方法。
             # 捨てるだけにすると、生成に失敗した deny が気づかないうちに消えて、
             # 止められずに通るようになる。
             if problem is not None:
@@ -546,11 +545,10 @@ def _build(
     3 通りある。
 
     - `(rule, None)`   組み立てられた
-    - `(None, problem)` 受け付けられない。判定に使わない（REQ-RUL-08）
+    - `(None, problem)` 受け付けられない。判定に使わない
     - `(rule, problem)` 苦情はあるが判定には使う。`{!root}` を組み立てられなかった
       `deny` / `ask` がこれで、`match` の全部に当たる式を持って止める側になる。
       捨てると「ワークスペースの外の全部」が止められずに通るので、報告だけでは足りない
-      （REQ-RUL-10、設計 i0061 4.3）
     """
     where = f"{section}[{index}]"
     if not isinstance(raw, dict):
@@ -615,7 +613,7 @@ def _build(
         )
 
     # `{!root}` は `regex` 専用。`glob` は fnmatch に翻訳されるので、入れ子の選択肢を持つ
-    # 展開結果を埋める場所が無い（設計 i0061 3.1）。
+    # 展開結果を埋める場所が無い。
     if NOT_ROOT_PLACEHOLDER in rule.glob:
         return None, Problem(
             SEVERITY_ERROR,
@@ -671,7 +669,7 @@ def _build(
         return None, Problem(SEVERITY_ERROR, name, f"正規表現として組み立てられない: {exc}")
     except RecursionError:
         # `re` の組み立ては入れ子を再帰で読む。捕捉しないとプロセスごと異常終了し、
-        # hook の異常終了は呼び出しを止めずに通してしまう（設計 i0061 4.2）。
+        # hook の異常終了は呼び出しを止めずに通してしまう。
         # shellread が同じ形で `RecursionError` を安全側にしているのに倣う。
         if uses_not_root:
             return _ungeneratable(rule, section, name, "入れ子が深すぎて組み立てられない")
@@ -685,7 +683,7 @@ def _not_root_placement(expression: str) -> str:
 
     置けるのは `^` の直後だけで、1 つの式に 1 回。展開されるのは
     「先頭から、外だと確定するところまで」を読み進める式なので、前に何かを置いても
-    意味を持たない（設計 i0061 3.2）。
+    意味を持たない。
     """
     if expression.count(NOT_ROOT_PLACEHOLDER) > 1:
         return f"`{NOT_ROOT_PLACEHOLDER}` は 1 つの式に 1 回だけ書ける"
@@ -714,7 +712,7 @@ def _not_root_suffix(expression: str) -> str:
     続けてよいかどうかは意味の問題で、機械には判定できない。展開結果が読み終える
     位置がパスの区切りである保証は無いので、区切りを前提にした表記
     （`^{!root}[\\\\/]foo`）は不正ではないが、まず書いたユーザの勘違い。
-    止めるほどではないので warn（設計 i0061 3.3）。
+    止めるほどではないので warn。
     """
     rest = expression[len("^" + NOT_ROOT_PLACEHOLDER) :]
     if not rest or _SKIPS_ANYWHERE.match(rest):
@@ -739,7 +737,7 @@ def _expand_not_root(expression: str, root: str) -> tuple[str, str]:
     generated = not_root_pattern(real)
     # 生成した部分が契約（繰り返しも先読みも含まない）を守っているかを自分で見る。
     # 見るのは `not_root_pattern` が作った部分だけで、書いたユーザが後ろに続けた式は含めない。
-    # `.*` のような繰り返しをそこに書くのは許している（設計 3.3）ので、
+    # `.*` のような繰り返しをそこに書くのは許しているので、
     # 全体に掛けると正しい書き方まで弾く。
     #
     # いまの `not_root_pattern` は `re.escape` で組み立てるので、この検査は通常は発火しない。
@@ -751,23 +749,23 @@ def _expand_not_root(expression: str, root: str) -> tuple[str, str]:
 
 
 def _ungeneratable(rule: Rule, section: str, name: str, detail: str) -> tuple[Rule | None, Problem]:
-    """`{!root}` を組み立てられなかったときの扱い（設計 i0061 4.3）。
+    """`{!root}` を組み立てられなかったときの扱い。
 
     強い側を採る。`deny` と `ask` は `match` の全部に当てて止め、`allow` は
     どれにも当てない。`allow` を当たる扱いにすると ccnavi が判定を返さない範囲が広がるので、
     そこだけ逆になる。
 
     これは `{!root}` の生成失敗に限った扱い。 正規表現の書き損じなど既存の
-    失敗の扱いは今までどおり REQ-RUL-08 の「報告して捨てる」のまま。ここだけ特別なのは、
+    失敗の扱いは今までどおり「報告して捨てる」のまま。ここだけ特別なのは、
     守られなくなる範囲が「ワークスペースの外の全部」に広がるから。
 
     ## 設計から変えた 2 点（実装フェーズの判断。文書に反映すること）
 
-    - 記録に `root-too-long` の欄は足さない（設計 4.6 を取り消す）。`audit` の
+    - 記録に `root-too-long` の欄は足さない。`audit` の
       `REASON_*` は「判定に至らなかった理由」で、ここは判定に至っている（deny する）。
       記録には `deny` と当たったルールの id が既に残り、なぜ止めたかはこの文面が言う。
       新しい名前を足すと、判定に至らなかったものと同じ欄に別の意味が混ざる
-    - SessionStart では何も言わない（設計 6.1 を「何もしない」に決めた）。
+    - SessionStart では何も言わない。
       256 字のルートは Windows の MAX_PATH の外で実用にならず、当てはまるユーザはまずいない。
       当てはまったときはこの文面が理由と直し方を言う。めったに起きないことのために
       SessionStart を毎回重くしない

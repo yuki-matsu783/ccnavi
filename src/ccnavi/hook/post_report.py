@@ -31,7 +31,7 @@ def _violation(
     受け取った側がそこから次にすることが分かること。
 
     would_restore は、戻しが予行のとき。戻す手順はそのまま載せる。今回は
-    誰も戻していないので、手順を落とすと戻す手立てが 1 つも書かれていない
+    誰も戻していないので、手順を省くと戻す手立てが 1 つも書かれていない
     報告になる。そのうえで、本番なら ccnavi が戻していたことも書く。
 
     not_restored は、戻す働きは有効なのに、この 1 件が戻す対象ではない
@@ -99,9 +99,9 @@ def _preexisting(finding: post_findings.Finding) -> str:
 def _source(source: str, group: list[rules.Rule]) -> str:
     """どの設定がこの場所を守ると言っているかを名指しする。
 
-    実行前の理由（reasons.reason_for）と同じで、名乗るのはルールの id。プロジェクトの
+    実行前の理由（reasons.reason_for）と同じで、示すのはルールの id。プロジェクトの
     ルールの id にはプロジェクトの名前が付くので、id だけで直しに行く先が決まる。
-    id を持たないルールだけ、代わりにファイルを名乗る。
+    id を持たないルールだけ、代わりにファイルを示す。
     """
     named = [rule.id for rule in group if rule.id]
     return f"rule: {','.join(named)}" if named else f"rules: {source}"

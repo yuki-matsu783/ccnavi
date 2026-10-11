@@ -309,7 +309,7 @@ def review_problems(
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     if _is_last_feedback_review(parent, phase_no):
         # フィードバック対応の最後のレビュー。新しいフィードバック作業フェーズは
-        # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 9.11）。
+        # 足せない。同じフェーズでやり直すか、別の issue に切り出すか。
         lines += [
             "フィードバック対応の最後のレビューです。選べるのは 2 つ。",
             f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）",
@@ -440,7 +440,7 @@ _SHA = re.compile(r"^[0-9a-f]{7,64}$")
 def _is_sha(value: str) -> bool:
     """マーカーの `head` が sha の形をしているか。
 
-    マーカーは親のブランチに乗って他の機械から届くファイル（設計 9.2）なので、中身を
+    マーカーは親のブランチに乗って他の機械から届くファイルなので、中身を
     git の revision としてそのまま渡さない。`HEAD` や `@` のような「今」を指す値は
     `head..HEAD` を空差分にして「変更が無い」と判定させ、`-` で始まる値は git のオプションに
     なってしまう。
@@ -460,7 +460,7 @@ def _outside_approved(
     `--ignore-submodules=none` は、`.gitmodules` の `ignore = all` で submodule の
     進みが差分にまったく出なくなるのを防ぐ（`.gitmodules` は追跡されるので、外から届く）。
 
-    `-z` が返すパスはもう正規化されているので、こちらでは何も直さない。空白を落としたり
+    `-z` が返すパスはもう正規化されているので、こちらでは何も直さない。空白を除いたり
     `\\` を `/` に直したりすると、`.ccnavi\\tickets\\x.py` という名前のファイル 1 個が
     置き場の中のパスになってしまい、除外の側に入る。
 
@@ -487,10 +487,10 @@ def _diff_paths(tree_root: str, ref: str) -> tuple[list[str], str]:
 def _dirty(tree_root: str, conf: settings.Settings, wip_removals: bool = False) -> bool:
     """ワークツリーに未コミットの変更があるか。ccnavi 自身の置き場は数えない。
 
-    承認済みチケットとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する（設計 9.2）。
+    承認済みチケットとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する。
     マーカーはフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
     マーカーをコミットしろ」と言い続けることになる。
-    マーカーと承認済みチケットをコミットして push するのは`ccnavi-review.sh` と
+    マーカーと承認済みチケットをコミットして push するのは `ccnavi-review.sh` と
     `ccnavi-agree.sh` の仕事で、ユーザの作業による未コミットの変更とは別に扱う。
     """
     rc, status = _git(
@@ -894,7 +894,7 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
 
     ただし ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを変えた
     コミットは、動いたと数えない。
-    依頼のマーカーはそこに置かれ、親のブランチにコミットして他の PC に届ける前提のもの（設計 9.2）。
+    依頼のマーカーはそこに置かれ、親のブランチにコミットして他の PC に届ける前提のもの。
     数えると「依頼 → マーカー → コミット」の順のせいで、依頼の直後に必ず自分のマーカーの
     コミットで「動いた」と判定され、
     承認の push（`ccnavi-push-approved.sh`）が置き場をまとめてコミットするので、レビューを

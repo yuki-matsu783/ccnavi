@@ -114,11 +114,11 @@ class Factor:
     include_compiled: tuple[re.Pattern, ...] = ()
     exclude_compiled: tuple[re.Pattern, ...] = ()
     # source はこの項目が書いてあるレイヤーの名前（`common` / `self` / プロジェクト名）。
-    # 記録の hit と judge の項目に残す（設計 11.9）。
+    # 記録の hit と judge の項目に残す。
     source: str = ""
     # home は `script:` を解く基準ディレクトリ。共通レイヤーと自身のレイヤーはワークスペース
-    # ルート、プロジェクトのレイヤーはそのプロジェクトの git プロジェクトルート
-    # （設計 11.4.2）。定義を読んだ側が埋める。
+    # ルート、プロジェクトのレイヤーはそのプロジェクトの git プロジェクトルート。
+    # 定義を読んだ側が埋める。
     home: str = ""
 
     def matches(self, rel: str) -> bool:
@@ -144,7 +144,7 @@ class Factor:
         `script:` は書かれたパスではなく、そのレイヤーのスクリプトの置き場からの相対と、
         指す先の中身で比べる。共通レイヤーは `.ccnavi/common/scripts/`、
         各レイヤーは `<ccnavi ディレクトリ>/scripts/` を指すので、
-        着手で共通レイヤーをコピーした配点（設計 11.12）はパスが違う。パスで比べると同じ項目を
+        着手で共通レイヤーをコピーした配点はパスが違う。パスで比べると同じ項目を
         `<レイヤー>:<id>` として 2 重に数える。中身まで見るのは、
         名前だけ同じ別のスクリプトを同じ項目として捨てないため。
         """
@@ -168,14 +168,14 @@ class Factor:
 class Definition:
     # levels は書かれた鍵だけ。書かれていない鍵は DEFAULT_LEVELS で読む
     # （`level_of`）。既定で埋めて持つと、合成のときに「書いていないレイヤー」が
-    # 共通レイヤーの緩めた境目の点を気づかないうちに戻すことになる（設計 11.4.2）。
+    # 共通レイヤーの緩めた境目の点を気づかないうちに戻すことになる。
     levels: dict[str, int] = field(default_factory=dict)
     factors: list[Factor] = field(default_factory=list)
     # どこから読んだか。組み込みなら BUILTIN。
     source: str = BUILTIN
     # 読めなかった理由（組み込みに戻ったとき、か、レイヤーを空として扱ったとき）。
     fallback: str = ""
-    # 空として扱ったレイヤーの名前。記録の `fallback` にそのまま入る（設計 11.2）。
+    # 空として扱ったレイヤーの名前。記録の `fallback` にそのまま入る。
     dropped: list[str] = field(default_factory=list)
 
     @property
@@ -255,7 +255,7 @@ def load_layer(path: str, script_homes: tuple[str, ...]) -> tuple[Definition | N
     """レイヤーの定義を読む。無ければ None（無いレイヤー = 空）。
     破損していても組み込みには戻さない。
 
-    共通レイヤーが在るのに組み込みに戻すと、共通レイヤーの配点が消える側になる（設計 11.2）。
+    共通レイヤーが在るのに組み込みに戻すと、共通レイヤーの配点が消える側になる。
     破損したレイヤーは空として扱い、苦情だけを返す。
     """
     if not path:
@@ -277,7 +277,7 @@ def parse(
 
     共通レイヤーは `.ccnavi/common/scripts/`、
     各レイヤーはその `<ccnavi ディレクトリ>/scripts/` だけ。
-    たがいの側を指す定義はここで error にする（設計 11.4.2）。プロジェクトの
+    たがいの側を指す定義はここで error にする。プロジェクトの
     リポジトリに入る定義が、ワークスペースの道具に依存する形を作らないため。
     """
     problems: list[Problem] = []
@@ -296,7 +296,7 @@ def parse(
             )
         ]
     # 書かれた鍵だけを持つ。既定で埋めると、合成のときに「書いていないレイヤー」が
-    # 共通レイヤーの緩めた境目の点を気づかないうちに戻す（設計 11.4.2）。
+    # 共通レイヤーの緩めた境目の点を気づかないうちに戻す。
     # 順を見るときだけ既定で補う。
     levels: dict[str, int] = {}
     raw_levels = data.get("levels")
@@ -524,10 +524,10 @@ def mark_layer(definition: Definition, layer: str, home: str) -> None:
 
 
 def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition, list[Problem]]:
-    """共通レイヤーの配点に、行き先のレイヤーの配点を足す（設計 11.4.2）。
+    """共通レイヤーの配点に、行き先のレイヤーの配点を足す。
 
     `factors` は連結。同 `id` で全欄が一致すれば重複として後ろを捨て（info）、
-    中身が違えば両方を数え、後ろのレイヤーの項目を `<レイヤー>:<id>` と名乗らせる（warn）。
+    中身が違えば両方を数え、後ろのレイヤーの項目を `<レイヤー>:<id>` という名前にする（warn）。
     `levels` は書かれた鍵だけを合わせ、キーごとに小さいほうを採る。どのレイヤーも書いて
     いない鍵は既定（`DEFAULT_LEVELS`）。
 
@@ -560,7 +560,7 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
                     SEVERITY_WARN,
                     f.id,
                     f"`{f.id}` が前のレイヤーと同じ id で中身が違う。両方を数え、{layer} の側は"
-                    f" `{qualified}` と名乗る（記録と record-risk もこの名前）。"
+                    f" `{qualified}` という名前にする（記録と record-risk もこの名前）。"
                     "同じ項目のつもりなら全欄を揃え、別の項目なら id を変えてください",
                 )
             )
@@ -601,7 +601,7 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
 
 
 def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
-    """`script:` が指す先が、そのレイヤーの git プロジェクトルートに在るか（設計 11.4.2）。
+    """`script:` が指す先が、そのレイヤーの git プロジェクトルートに在るか。
 
     `layer` を渡すと、そのレイヤーから来た項目だけを見る。走らせるときは今までどおり
     「測れなかった」でその項目の点を加えるが、`--lint` は在ることを先に言う。
@@ -628,8 +628,8 @@ def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
 def definition_path(conf: settings.Settings, root: str, project: str) -> str:
     """そのプロジェクトのレイヤーの risks.yml。空の `project` はワークスペース自身のレイヤー。
 
-    予約名（`common` / `self`）のプロジェクトはレイヤーとして数えないので、パスを持たない
-    （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身のレイヤーの
+    予約名（`common` / `self`）のプロジェクトはレイヤーとして数えないので、パスを持たない。
+    名前で引くと `project or LAYER_SELF` がワークスペース自身のレイヤーの
     名前と一致し、そのプロジェクトの配点がワークスペースのレイヤーとして合成される。
     配点を書ける側がレイヤーを選べると、自分のリスクを自分で下げる方法になる。
     """
@@ -644,11 +644,11 @@ def definition_path(conf: settings.Settings, root: str, project: str) -> str:
 def layer_definition(
     conf: settings.Settings, root: str = "", project: str = ""
 ) -> tuple[Definition, list[Problem]]:
-    """共通レイヤー + そのレイヤーの配点と、そのレイヤーの苦情（設計 11.4.2）。
+    """共通レイヤー + そのレイヤーの配点と、そのレイヤーの苦情。
 
     共通レイヤー自身の苦情は返さない。言う場所は `--lint` の共通レイヤーの項で、そこと二重に
     言うと同じ文を 2 度読むことになる。共通レイヤーが破損していれば組み込みに戻り、
-    そのときはレイヤーを足さない（設計 11.2）。
+    そのときはレイヤーを足さない。
 
     ファイルが無いのは正常（無い = 空）。共通レイヤーにも config にも `risks.yml` が無ければ
     組み込みの 4 項目を使う。共通レイヤーだけが無く config が在れば、共通レイヤーは空として
@@ -794,7 +794,7 @@ class Hit:
     id: str
     points: int
     detail: str
-    # この項目が書いてあるレイヤー（設計 11.9）。記録に残す。
+    # この項目が書いてあるレイヤー。記録に残す。
     source: str = ""
 
 
@@ -845,7 +845,7 @@ def evaluate(
     """差分と判定から点を出す。定性項目に判定が無ければ pending に積む。"""
     score = Score()
     for f in definition.factors:
-        # 加点した項目には、その定義が書いてあるレイヤーを残す（設計 11.9）。
+        # 加点した項目には、その定義が書いてあるレイヤーを残す。
         where = f.source
         if f.kind in (KIND_LINES, KIND_FILES, KIND_DELETED):
             # include / exclude があれば、数える差分をその項目の対象パスに絞る。
@@ -878,7 +878,7 @@ def evaluate(
                 score.hits.append(Hit(f.id, points, f"{f.message}（{shown}）", where))
         elif f.kind == KIND_SCRIPT:
             # 解く基準はそのレイヤーの git プロジェクトルート。共通レイヤーと自身のレイヤーは
-            # ワークスペースルート、プロジェクトのレイヤーはそのプロジェクト（設計 11.4.2）。
+            # ワークスペースルート、プロジェクトのレイヤーはそのプロジェクト。
             points, note = run_script(f.home or root, str(f.value), worktree, env)
             if points is None:
                 score.hits.append(

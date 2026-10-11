@@ -44,8 +44,7 @@ COMMON_PHASES_NOTE = "共通には置けない。使わない"
 def layer_phase_types(path: str, common: bool = False) -> tuple[list, str]:
     """そのレイヤーのフェーズ定義と、読めなかった理由。無いレイヤーは空。
 
-    合成はしない。フェーズ定義は足し算をせず、使うのは親の `project:` が指す 1 本だけ
-    （設計 11.4.1）。
+    合成はしない。フェーズ定義は足し算をせず、使うのは親の `project:` が指す 1 本だけ。
     ここで出すのは「どのレイヤーに何が書いてあるか」。その 1 本の中の参照先
     （`overlap` / `requires` / `after`）は、読み込みで確かめる。
 
@@ -71,7 +70,7 @@ def layer_phase_set(path: str, common: bool = False) -> tuple[phasetypes.PhaseTy
 def layer_risk(conf: settings.Settings, name: str, path: str) -> tuple[list, str]:
     """そのレイヤーのリスクの項目と、読めなかった理由。無いレイヤーは空（組み込みには戻さない）。
 
-    `script:` に書けるパスはレイヤーごとに違う（設計 11.4.2）ので、読み方もレイヤーごとに分ける。
+    `script:` に書けるパスはレイヤーごとに違うので、読み方もレイヤーごとに分ける。
     """
     if not path or not os.path.isfile(path):
         return [], ""

@@ -22,7 +22,7 @@
   リンク越し）は読みも書きもしない
 - md が直下にあるディレクトリごとに `index.jsonl`。1 行
   `{"concept_id":…,"directory":…,"frontmatter":{…}|null,"mtime":"YYYY-MM-DDTHH:MM:SS"}`。
-  `concept_id` はツリーのルートからの相対パスから `.md` を落としたもの。ルート直下の
+  `concept_id` はツリーのルートからの相対パスから `.md` を除いたもの。ルート直下の
   `directory` は `.`
 - `concept_id` と `mtime` が既存の行と同じなら、その行を使い回す（読み直さない）。
   書くのは一時ファイルに書いて置き換える形で、中身が同じなら書かない。一時ファイルは
@@ -40,7 +40,7 @@
   同じ名前で置いたファイルを壊さない
 - md が全部消えたディレクトリ（追跡はされているが実体が無い）の `index.jsonl` は、上の条件で
   消す。それ以外の経路で残った古い `index.jsonl` は読まない
-- git への問い合わせの失敗（git が無い・期限切れ・壊れたリポジトリ）は「git の外」とも
+- git への問い合わせの失敗（git が無い・期限切れ・破損したリポジトリ）は「git の外」とも
   「無視されていない」とも別に扱う
 
 frontmatter は PyYAML の SafeLoader（別名を拒む `flow._Loader`）で読む。読めないもの・
@@ -275,7 +275,7 @@ def at_start(conf: settings.Settings, root: str, deadline: float | None = None) 
     使う時間は START_SECONDS と、渡された期限（hook の判定の期限）の残りの小さいほう。
     残りが MIN_REFRESH_SECONDS に満たない（期限が既に切れているときも）なら新しくせず、
     md を読まず書かずに既存の index.jsonl の行だけを集めて案内する（git には STALE_SECONDS
-    だけ与える）。何が起きても開始は止めない。md が 1 本も無い・何かが壊れたときは何も出さない
+    だけ与える）。何が起きても開始は止めない。md が 1 本も無い・何かが失敗したときは何も出さない
     （空を返す）。索引の対象外にしたツリーと、触らなかった index.jsonl があれば短くつける。
     git への問い合わせに失敗したツリーは何も言わない（対象外と取り違えさせない）。
     """

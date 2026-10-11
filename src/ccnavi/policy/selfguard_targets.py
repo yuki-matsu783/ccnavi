@@ -58,7 +58,7 @@ def targets(
     layers: list[settings.LayerFile] = (),
     projects_dir: str = "",
 ) -> list[Target]:
-    """守る対象を組み立てる（設計 11.6）。
+    """守る対象を組み立てる。
 
     ルールファイルと実行ファイルは設定で動くので、解決済みのパスを受け取る。
     空なら、その設定を持たないということなので、対象からも外れる。

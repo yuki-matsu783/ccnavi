@@ -11,19 +11,19 @@
 深刻度の分け方は 1 つの原則で決めてある。
 
 * error はガードが働かない、あるいは働きすぎて全部を止める記述。放っておくと
-  防御が消えるか、セッションで何もできなくなる。CI が落とす対象はここだけでよい
+  防御が消えるか、セッションで何もできなくなる。CI を失敗させる対象はここだけでよい
 * warn は判定そのものは動くが、書いたユーザが意図した防御が働いていない記述。
   直さなくても今のところ困ることは起きないが、守っているつもりの穴が開いている
 
 ## 設計からの読み替え
 
-設計 付録 D.2「診断コマンド」の `--lint` と D.4「設定lintの検証項目」は、
+もとの設計の診断コマンド `--lint` と「設定lintの検証項目」は、
 config.yaml という 1 枚の設定ファイルに、ツールの許可・保護領域・
 禁止コマンドがまとめて書かれている前提で書かれている。現在の形はそうではない。
 設定は `.claude/settings.json` の env で渡す環境変数、防御の中身はルールファイルで、
-パスの列挙という考え方そのものが無い。そこで D.4 の 9 項目を次のように読み替えた。
+パスの列挙という考え方そのものが無い。そこで検証項目の 9 項目を次のように読み替えた。
 
-| D.4 の項目 | 現在の形での読み替え | 深刻度 |
+| 設計の検証項目 | 現在の形での読み替え | 深刻度 |
 |---|---|---|
 | 3 正規表現がコンパイル可能か | regex / pattern を組み立てられるか | error |
 | 6 tools セクションが存在するか | ルールが 1 件でも組み上がるか | error |
@@ -32,8 +32,8 @@ config.yaml という 1 枚の設定ファイルに、ツールの許可・保�
 | 8 重複していないか | id の欠落と重複 | warn |
 | 7,9 保護領域・immutable の漏れ | どのツールにも当たらない match | warn |
 
-読み替えても変わらないのは、CI で走らせて error だけを落とす対象にするという
-D.4 の使い方のほうで、終了コードはそれに合わせてある。
+読み替えても変わらないのは、CI で走らせて error だけで失敗させる対象にするという
+設計の検証項目の使い方のほうで、終了コードはそれに合わせてある。
 """
 
 from __future__ import annotations
@@ -325,7 +325,7 @@ def check(
 
     for line in complaints.splitlines():
         # 判定の側は "ccnavi: " を付けて標準エラーへ書く。ここでは深刻度が
-        # 頭に付くので、その前置きは落とす。
+        # 頭に付くので、その前置きは除く。
         problems.append(Problem(SEVERITY_WARN, "(mode)", line.removeprefix("ccnavi: ")))
 
     if mode == modes.DISABLE:
@@ -346,7 +346,7 @@ def check(
     problems.extend(_sh_compat(root))
     problems.extend(lint_project._after(root))
     if os.path.exists(conf.rules) or _named_rules(conf, root):
-        # 共通レイヤーのルールが無いのは「設定が無い」正常（無い = 空）。壊れているときだけ言う。
+        # 共通レイヤーのルールが無いのは「設定が無い」正常（無い = 空）。不正なときだけ言う。
         # 診断の `--rules` で名指しされたファイルが無いのは、置き場が空なのとは別なので言う。
         problems.extend(lint_rules._rules(conf.rules, root))
     problems.extend(_phases(conf))
@@ -398,7 +398,7 @@ def _sh_compat(root: str) -> list[Problem]:
     """`.ccnavi/scripts/` の sh と、この実行ファイルの互換の版（version.COMPAT）が揃っているか。
 
     食い違っても判定は動くので warn。sh が使うフラグや出力の形が変わっていれば、sh の側で
-    チケットやレビューの操作が落ちる。sh が無いワークスペース（試しの置き場）は言わない。
+    チケットやレビューの操作が失敗する。sh が無いワークスペース（試しの置き場）は言わない。
     レイヤーのファイルの書式の版（`version:`）は、読む側が既に error で言う。
     """
     path = os.path.join(root, SH_COMPAT_FILE)
@@ -436,7 +436,7 @@ def _risk(conf: settings.Settings, root: str) -> list[Problem]:
     """共通レイヤーのリスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。
 
     `script:` が指す先が在ることも見る。走らせるときは「測れなかった」で重いほうに
-    なるが、そこで気づくのは子を閉じる時点になる（設計 11.4.2）。
+    なるが、そこで気づくのは子を閉じる時点になる。
     """
     if not conf.risk:
         return []
@@ -503,7 +503,7 @@ def flow_problems(
 
 
 def _phases(conf: settings.Settings) -> list[Problem]:
-    """共通レイヤーに `phases.yml` が置かれていないか（設計 11.4.1）。
+    """共通レイヤーに `phases.yml` が置かれていないか。
 
     フェーズ定義は config の 1 本だけで、共通レイヤーには置けない。あれば error で名指しする。
     判定には使わず、空として扱っている。無いのは正常で、何も言わない。
@@ -526,7 +526,7 @@ def family_check(
 ) -> list[Problem]:
     """取り込みの後の検査（`ccnavi sync check <P> [<リポジトリ>]`）。
 
-    この親子のチケットの承認済みチケットを判定し直し（C3）、本物とする側の検査（親のワークツリーの外のチケット・
+    この親子のチケットの承認済みチケットを判定し直し（C3）、正とする側の検査（親のワークツリーの外のチケット・
     決まらない）とあわせて、止める理由（error）を返す。レイヤーの食い違いは warn で返す。
     error があれば sh が親子のチケットの取り込み状態を `blocked` にする。
     `repo` は取り込み状態の名前（`self` かプロジェクト名）で、sh が渡す。
@@ -562,7 +562,7 @@ def family_check(
             ]
         problems.extend(found)
     # 親のワークツリーの中の読めないチケットも止める理由（読めないチケットはリストに入らないので、
-    # 判定し直しの対象から気づかないうちに落ちる）。
+    # 判定し直しの対象から気づかないうちに外れる）。
     if st.home is not None:
         for _, message in approval.unreadable_copies(conf, st.home.root):
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", message))

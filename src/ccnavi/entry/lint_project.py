@@ -208,7 +208,7 @@ def _local_settings(root: str) -> list[Problem]:
 
 
 def _bin_path(root: str, declared: object) -> list[Problem]:
-    """`.claude/settings.json` の env の実行ファイルのパスを見る（設計 launcher-scripts 9 節）。
+    """`.claude/settings.json` の env の実行ファイルのパスを見る。
 
     プロセスの環境ではなく設定ファイルを読む。hook が起動するのは、ここに書いたパス
     （`"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"`）だから。

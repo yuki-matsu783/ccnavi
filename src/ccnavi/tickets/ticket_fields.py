@@ -38,14 +38,14 @@ def set_fields(text: str, fields: dict[str, str]) -> str:
 def script_fields_set(text: str) -> tuple[str, ...]:
     """その版が既に値を持っている、スクリプトの欄。
 
-    正規化した内容を照合する側が「落としてよい欄」を決めるのに使う（`post_findings._script_writes`）。
-    落としてよいのは、コミット済みの版がまだ持っていない欄だけ。 副命令はどれも
+    正規化した内容を照合する側が「除いてよい欄」を決めるのに使う（`post_findings._script_writes`）。
+    除いてよいのは、コミット済みの版がまだ持っていない欄だけ。 副命令はどれも
     1 度しか書かない（`ops.start` は着手済みを拒む）ので、既に値がある欄が変わったのなら、
     それは副命令が書いたものではない。
 
     とくに `base_sha` は、サブエージェント終了時チェック（`phase_scope.scope_findings` の
     `base_sha..HEAD`）と実績リスク（`risk.measure`）の基準点。ここを書き換えられると、
-    コミット済みの範囲外の変更が検査から消える。落とす欄を「いつでも」にすると、その
+    コミット済みの範囲外の変更が検査から消える。除く欄を「いつでも」にすると、その
     書き換えが実行後チェックからも消える。
     """
     lines = text.splitlines()
@@ -65,21 +65,21 @@ def script_fields_set(text: str) -> tuple[str, ...]:
 
 
 def script_shape(text: str, drop: tuple[str, ...] = ticket_model.SCRIPT_FIELDS) -> str | None:
-    """frontmatter を持つチケットなら、`drop` の欄を落として正規化した内容を返す。無ければ None。
+    """frontmatter を持つチケットなら、`drop` の欄を除いて正規化した内容を返す。無ければ None。
 
     実行後チェックが「この変更は ccnavi の副命令が書いたぶんか」を、台帳ではなく内容で
     答えるのに使う（`post_findings._script_writes`）。台帳を持たないのは、承認とマーカーが親の
     ブランチに乗って別の機械へ届くため。台帳はワークスペース側にあって git に入らないので、
     clone した続きでは 1 件も残っていない。内容で見るなら、どの機械でも同じ答えになる。
 
-    落とすのは `drop` に挙げた欄の行と、その欄の値として続く字下げの行だけ。`drop` は
+    除くのは `drop` に挙げた欄の行と、その欄の値として続く字下げの行だけ。`drop` は
     `ticket_model.SCRIPT_FIELDS` の部分集合で、決めるのは呼ぶ側（`script_fields_set` を引いて、
     コミット済みの版がまだ持っていない欄だけを渡す）。範囲
     （`allow` / `ask` / `deny`）も `parent` も `project` も `phase` も本文も残るので、
     そこが 1 文字でも変われば別の内容になり、チェックは今までどおり報告する。
 
     切り出し方は `set_fields` と揃える。あちらが行単位で書き換えるので、こちらも行単位で
-    落とす。揃えないと、スクリプトが書いた直後の内容が「スクリプトが書いていない形」に見える。
+    除く。揃えないと、スクリプトが書いた直後の内容が「スクリプトが書いていない形」に見える。
 
     frontmatter を持たないもの（マーカー、`.risk.json`、閉じの記録）は None。範囲を
     宣言しないので、正規の設置と偽の設置を内容からは見分けられない。そこは外れる。

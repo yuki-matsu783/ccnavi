@@ -11,7 +11,7 @@
 チケットを動かす・書く操作（承認・欄の書き換え・閉じる・レビューへ送る・続きの子を起こす）は
 `approval_ops` にある。こちらは approval を読む向きで、approval は approval_ops を知らない。
 
-## なぜ承認済みチケットを本物とするのか
+## なぜ承認済みチケットを正とするのか
 
 チケットの提案はエージェントが書ける。判定が提案を直接読むと、範囲の外で
 止められたエージェントが範囲を書き足して通れる。承認のときに承認済みチケットを置き、判定は
@@ -22,7 +22,7 @@
 承認済みチケットは `.ccnavi/approved/` に置く。ccnavi ディレクトリの下なので、組み込みの
 保護がエージェントの書き込みを止める。
 
-本物とするのはこの置き場で、チケットの中の欄ではない。 そこに置けたのは書ける権限を持つ
+正とするのはこの置き場で、チケットの中の欄ではない。 そこに置けたのは書ける権限を持つ
 ユーザだけだから。だから提案を手で `doing/` へ動かすことが、端末・ボード・Chrome に続く承認の
 経路になる。その経路は承認の画面を通らないので、承認のときにしか当たらなかった構造の検査は
 `blocking_problems` が判定の側で当てる。
@@ -199,7 +199,7 @@ def load_copy(
     if ticket is None:
         detail = problems[0].detail if problems else "チケットとして読めない"
         return None, detail
-    # 前の版の承認が書いた記録（`ccnavi_approved`）。いまの承認は書かない。承認を本物とするのは
+    # 前の版の承認が書いた記録（`ccnavi_approved`）。いまの承認は書かない。承認を正とするのは
     # 置き場で、`.ccnavi/approved/` は組み込みの保護がエージェントの書き込みを止める。
     # 欄が無いぶんの検査（親子・計画・置き場）は `blocking_problems` が判定の側で当てる。
     if require_record and not ticket.completed_at:
@@ -327,7 +327,7 @@ def settle_old_workflows(
     欄を採り、違えば欄を使わず一直線（前の番号を全部待つ。いちばん厳しい形）で読む。
     `Ticket.workflow_record_differs` を立て、`--lint` と status が warn で言う。
 
-    承認のあとに phases.yml を直した本物の古い承認も一直線に倒れる。止まる側で、並行に戻すには
+    承認のあとに phases.yml を直した実際の古い承認も一直線で読まれる。止まる側で、並行に戻すには
     改版で `--agree` を通す（待ち方のファイルが書かれ、欄より先に読まれる）。
     """
     cache: dict[str, dict | None] = {}
@@ -396,11 +396,11 @@ def read_raw(conf: settings.Settings, root: str) -> Raw:
 def scan(
     conf: settings.Settings, root: str, closed: bool = False, raw: Raw | None = None
 ) -> tuple[list[ticket_model.Ticket], list[str]]:
-    """判定と承認が読む承認済みチケット。本物とするツリーの側だけを残す。
+    """判定と承認が読む承認済みチケット。正とするツリーの側だけを残す。
 
-    本物とするのは親のツリー（親自身なら自分のツリー）。提案の `dedupe` と違い、そこに無ければ
-    落とす。子のワークツリーに checkout されているのは切った時点の版なので、親のツリーで
-    閉じたあとも開いた版が残る。「本物とする側に無ければ全部残す」にすると、閉じたチケットが
+    正とするのは親のツリー（親自身なら自分のツリー）。提案の `dedupe` と違い、そこに無ければ
+    外す。子のワークツリーに checkout されているのは切った時点の版なので、親のツリーで
+    閉じたあとも開いた版が残る。「正とする側に無ければ全部残す」にすると、閉じたチケットが
     開いたものとして復活する。親のツリーがその識別子をどの置き場（作業中・レビュー待ち・
     閉じた）にも持っていなければ元ツリー（ワークスペースルート。プロジェクトのチケットなら
     そのプロジェクト）の側を採り、そこにも無いときと、元ツリーより先の置き場に在るチケットが
@@ -442,7 +442,7 @@ def scan(
 def scan_review(
     conf: settings.Settings, root: str, raw: Raw | None = None
 ) -> tuple[list[ticket_model.Ticket], list[str]]:
-    """レビュー待ちのチケット。本物とするツリーの側だけを残す（`scan` と同じ規則）。"""
+    """レビュー待ちのチケット。正とするツリーの側だけを残す（`scan` と同じ規則）。"""
     if raw is not None:
         kept = archive.drop_archived(root, _authoritative(raw.review, raw.everything))
         approval_checks.mark_imported(conf, root, kept)
@@ -460,14 +460,14 @@ def scan_proposals(
 ) -> tuple[list[ticket_model.Ticket], list[ticket_mod.Problem]]:
     """提案（`todo/` と `review/`）を、承認済みチケットがどのツリーにあるかに従ってまとめる。
 
-    承認済みの識別子の提案は、承認済みチケットで本物とするツリー（親のツリー → 元ツリー →
+    承認済みの識別子の提案は、承認済みチケットで正とするツリー（親のツリー → 元ツリー →
     決まらない。`ticket_fold.authority`）を決め、そのツリーに在るものだけを残す。
-    承認で本物とするツリーの `todo/` が消えても、承認の前に切ったワークツリーには `todo/` の提案が
+    承認で正とするツリーの `todo/` が消えても、承認の前に切ったワークツリーには `todo/` の提案が
     残る。提案だけでまとめると、その古い提案が承認待ちや改版（巻き戻し）として読まれる。
-    承認済みチケットの側（`_authoritative`）は「本物とするツリーに無ければ落とす」なので、それと揃える。
+    承認済みチケットの側（`_authoritative`）は「正とするツリーに無ければ外す」なので、それと揃える。
 
     `everything` は承認済みチケットの全部（`Raw.everything` の形）。呼び手が読んであれば
-    渡す。取り込み済みの親子のチケットも、本物とするのは親のブランチ `P` のワークツリー（名前 `P`）
+    渡す。取り込み済みの親子のチケットも、正とするのは親のブランチ `P` のワークツリー（名前 `P`）
     なので、同じ規則で決まる（理由を付けるのは `mark_imported` と `family_problems`）。
     """
     kept, problems, _ = read_proposals(conf, root, everything)
@@ -483,7 +483,7 @@ def read_proposals(
 ]:
     """`scan_proposals` と同じもの（残した提案と苦情）。
 
-    本物とするツリーの外に残った `todo/` の提案（`stale_proposals`）を 3 つ目に添える。
+    正とするツリーの外に残った `todo/` の提案（`stale_proposals`）を 3 つ目に添える。
     """
     if everything is None:
         everything = all_tickets(conf, root)
@@ -497,10 +497,10 @@ def stale_proposals(
     kept: list[ticket_model.Ticket],
     everything: list[ticket_model.Ticket],
 ) -> list[tuple[ticket_model.Ticket, str]]:
-    """承認済みの識別子の `todo/` の提案のうち、本物とするツリーの外に在るので読まなかったもの。
+    """承認済みの識別子の `todo/` の提案のうち、正とするツリーの外に在るので読まなかったもの。
 
-    (提案, 本物とするツリーの名前) のリスト。`found` はまとめる前の提案、`kept` は残した側。
-    本物とするツリーの `todo/` に同じ中身の提案が在るもの（親のツリーの改版が子のワークツリーに
+    (提案, 正とするツリーの名前) のリスト。`found` はまとめる前の提案、`kept` は残した側。
+    正とするツリーの `todo/` に同じ中身の提案が在るもの（親のツリーの改版が子のワークツリーに
     入っているだけ）は入れない。`review/` の提案も入れない（置き場が動いた結果で、承認の対象に
     ならない）。
     """
@@ -530,7 +530,7 @@ def _same_todo(t: ticket_model.Ticket, u: ticket_model.Ticket) -> bool:
 
 
 def revision_elsewhere(t: ticket_model.Ticket, current: ticket_model.Ticket | None) -> bool:
-    """本物とするツリーの外の `todo/` の提案が、計画の違う親の版（場所違いの改版か巻き戻しの元）か。
+    """正とするツリーの外の `todo/` の提案が、計画の違う親の版（場所違いの改版か巻き戻しの元）か。
 
     条件は承認の改版（`agree.waiting`）と同じく、作業中の承認済みチケットがある親で、計画か
     フィードバック計画が違うもの。
@@ -550,12 +550,12 @@ def revision_elsewhere_text(
     where: str,
     fams: syncstate.Families | None = None,
 ) -> str:
-    """本物とするツリーの外に在る計画の違う版の案内。ファイルの場所と、改版を書く置き場を名指しする。
+    """正とするツリーの外に在る計画の違う版の案内。ファイルの場所と、改版を書く置き場を名指しする。
 
     場所はどちらもワークスペースルートからのパスで出す（ツリーの名前ではなく、
     `.claude/worktrees/<親>` や `projects/<名前>`）。`--lint` と `--agree`（`--verify` も）が
     同じ文面を出す。取り込み済みの親子のチケットでは、親子のチケットが決まらない・閉じているなら止まった理由と
-    手順（`family_stop_text`。`family_problems` と同じ文面）を足す。決まっていれば、本物とする
+    手順（`family_stop_text`。`family_problems` と同じ文面）を足す。決まっていれば、正とする
     ツリーが親のワークツリー（`family_problems` が言う書く場所と同じ）なので、場所は繰り返さず
     push してから頼むことだけを足す。
     """
@@ -563,7 +563,7 @@ def revision_elsewhere_text(
     place = tree_path(conf, root, where, t.project)
     todo = f"{conf.tickets}/{ticket_model.TODO}/"
     text = (
-        f"{t.ticket} の計画の違う提案が {rel} に在るが、本物とするツリー（{place}）の外なので"
+        f"{t.ticket} の計画の違う提案が {rel} に在るが、正とするツリー（{place}）の外なので"
         f"承認の対象にならない。改版なら {place} の {todo} に書き、古い版なら消してください"
     )
     fams = fams or syncstate.Families(conf, root)
@@ -599,13 +599,13 @@ def all_tickets(
     closed_all: list[ticket_model.Ticket] | None = None,
     review: list[ticket_model.Ticket] | None = None,
 ) -> list[ticket_model.Ticket]:
-    """作業中・レビュー待ち・閉じたの全部を、重複をまとめずに。本物とするツリーを決めるために使う。
+    """作業中・レビュー待ち・閉じたの全部を、重複をまとめずに。正とするツリーを決めるために使う。
 
     3 つは呼び手が持ち込める。**読んだものを覚えておくのではなく、
     同じ呼び出しの中で今しがた読んだものを渡してもらう仕組み。
     ** `scan` は `scan_all` を呼んだ直後にここを呼ぶので、
     渡さないと同じ引数の `scan_all` が 1 つの式の中で 2 回走る。
-    置き場のチケットは 1 本ずつYAML として解析されるので、
+    置き場のチケットは 1 本ずつ YAML として解析されるので、
     この重複はチケットの本数にそのまま比例する。
 
     渡すのは「自分が読んだ側」だけで、残りはここで読む。読む範囲も読む順も変わらない。
@@ -624,12 +624,12 @@ def all_tickets(
 def _authoritative(
     found: list[ticket_model.Ticket], everything: list[ticket_model.Ticket]
 ) -> list[ticket_model.Ticket]:
-    # 本物とするのは親のツリー → 元ツリー（先へ進んだチケットが無いときだけ）→
+    # 正とするのは親のツリー → 元ツリー（先へ進んだチケットが無いときだけ）→
     # 決まらない（全部残す）。
-    # 親のツリーが無いとき（作る前と、合流して片付けた後）は元ツリーを本物とする。ワークツリーは
+    # 親のツリーが無いとき（作る前と、合流して片付けた後）は元ツリーを正とする。ワークツリーは
     # 片付ければ消えるが、元ツリー（ワークスペースルート。プロジェクトのチケットならその
     # プロジェクト）は消えない。リポジトリをまたいだ衝突はまとめない。違うチケットなので、
-    # 本物とする側を決めるとどちらかが気づかないうちに消え、`--lint` の「複数のリポジトリにある」も
+    # 正とする側を決めるとどちらかが気づかないうちに消え、`--lint` の「複数のリポジトリにある」も
     # 出なくなる。決め方は `ticket_fold.authority` の 1 つで、承認済みの識別子の提案
     # （`ticket_fold.fold`）も同じ関数で決める。
     seen = approval_checks._by_id(everything)
@@ -667,7 +667,7 @@ def home_dir(
     """
     home = parent or ticket_id
     # 取り込み済みの親子のチケットは、親のブランチ（親のワークツリー）だけに書く。
-    # 本物とする側のツリーが無いときに元ツリーに未コミットで書く形は、取り込み済みならやめる。
+    # 正とする側のツリーが無いときに元ツリーに未コミットで書く形は、取り込み済みならやめる。
     # 決まらない親子のチケットは、ここへ来る前に状態の操作と承認が止める。
     st = syncstate.standing_any(conf, root, home, project)
     if st.imported and st.home is not None and not st.stop:

@@ -1,4 +1,4 @@
-"""全体計画の待ち方（設計 9.7）。
+"""全体計画の待ち方。
 
 `--agree` が全体計画を承認するとき（改版を含む）に、ここで待ち方を計算して親の承認済み
 チケットの `workflow:` に書き出す。判定・延期・フィードバック計画の前提はそのコピーだけを読む。
@@ -106,7 +106,7 @@ def waits_of(parent: ticket_model.Ticket, number: int, types: dict | None) -> li
 
 
 def problems(parent: ticket_model.Ticket, types: dict | None) -> list[rules.Problem]:
-    """全体計画の待ち方が組めるか。順序、終端、延期の引き受け手（設計 9.7）。"""
+    """全体計画の待ち方が組めるか。順序、終端、延期の引き受け手。"""
     found: list[rules.Problem] = []
     if types is None or not parent.has_plan:
         return found

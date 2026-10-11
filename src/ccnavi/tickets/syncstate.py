@@ -16,7 +16,7 @@
 ## 取り込み済みの親子のチケット
 
 取り込み状態のある親子のチケットを「取り込み済みの親子のチケット」と呼び、
-本物とする側を親のブランチ `P`（手元では `.claude/worktrees/<P>` で HEAD が `P` を指すツリー）に
+正とする側を親のブランチ `P`（手元では `.claude/worktrees/<P>` で HEAD が `P` を指すツリー）に
 固定する。取り込み状態の無い親子のチケット（`ccnavi-sync.sh` が入る前に送った、origin が無い、
 一度も push していない）は今の動きのまま（Chrome はリモートにある `P` しか見ないので、
 二重状態は起きない）。
@@ -27,11 +27,11 @@
 
 - 閉じた: 統合先の取り込み結果の `done/` に親のチケットがある（親のワークツリーが無いか、
   あれば親のチケットの承認の時刻が同じ）、または取り込み状態が `closed`。
-  統合先の `done/` を本物とする（マージ後にホストが `P` を
+  統合先の `done/` を正とする（マージ後にホストが `P` を
   消した正常系）
 - `gone`・`blocked`・取り込み状態が破損している・`present` なのに親のワークツリーが無い:
   決まらない。その親子のチケットの承認も状態の操作も止める
-- `present` で親のワークツリーがある: 親のブランチ上のチケットだけが本物
+- `present` で親のワークツリーがある: 親のブランチ上のチケットだけが正
 
 ## 統合先の取り込み結果
 
@@ -45,7 +45,7 @@
 
 取り込み状態の途中（`sync`・`<リポジトリ>`・`families`・`integration` と、その下の読むファイル）に
 シンボリックリンクがあれば読まず、「取り込み状態が不正」とする。sh はコピーするときに
-リンクを落としているが、読む側でも辿らない。
+リンクを除いているが、読む側でも辿らない。
 
 ## 入れ替えの一瞬
 
@@ -88,7 +88,7 @@ _SWAPPING = "統合先の取り込み結果の入れ替えが終わらない"
 _RETRIES = 5
 _RETRY_WAIT = 0.05
 # 取り込み状態のファイル 1 つ（親子のチケットの取り込み状態・head）の大きさの上限。
-# 超えたら切らずに「壊れている」とする。
+# 超えたら切らずに「不正」とする。
 _RECORD_LIMIT = 64 * 1024
 
 
@@ -222,7 +222,7 @@ class Integration:
             return None, f"{rel} を読めない（{exc.strerror or type(exc).__name__}）"
 
     def names(self, rel: str) -> tuple[list[str], str]:
-        """取り込み結果の中のディレクトリのファイルの名前（リンクは落とす）。無ければ空。"""
+        """取り込み結果の中のディレクトリのファイルの名前（リンクは除く）。無ければ空。"""
         parts, why = _parts(rel)
         if why:
             return [], why
@@ -368,7 +368,7 @@ def done_copy(integ: Integration, approved_rel: str, ident: str) -> DoneCopy | N
     """統合先の `done/<識別子>.md` の frontmatter の欄。無い・読めなければ None。
 
     閉じたかを決めるのに要るのは識別子・親・着手と取り消しの欄だけなので、チケットとしての検査
-    （範囲の欄など）は掛けない（検査に落ちる古いチケットでも、閉じた記録として読む）。
+    （範囲の欄など）は掛けない（検査に失敗する古いチケットでも、閉じた記録として読む）。
     """
     data, why = integ.file(f"{approved_rel.strip('/')}/done/{ident}.md")
     if data is None or why:
@@ -468,7 +468,7 @@ class Families:
         return self._done[repo]
 
     def standing(self, family_id: str, project: str = "") -> Standing:
-        """この親子のチケットの立ち位置（本物とする側の規則）。"""
+        """この親子のチケットの立ち位置（正とする側の規則）。"""
         key = (project or "", family_id)
         if key not in self._standings:
             self._standings[key] = self._standing(family_id, project or "")
@@ -531,7 +531,7 @@ class Families:
         3. ほかのツリー（ワークスペースルート・プロジェクト・ワークツリー）の承認済みの親チケット
         4. どれにも無ければ識別子
 
-        本物とする側は、この名前のブランチの上の親チケットが自分で名乗る形で決まる（`claims`）。
+        正とする側は、この名前のブランチの上の親チケットが自分で宣言する形で決まる（`claims`）。
         ここで引いた名前と取り込み状態の名前が食い違うか、名前が使えない（`branch_refusal`）なら、立ち位置
         （`standing`）が止める。
         """
@@ -562,7 +562,7 @@ class Families:
 
         リポジトリが分かればそれで引く。分からなければ、取り込み済みならその取り込み状態のリポジトリ、
         そうでなければ識別子の名前のワークツリーの元リポジトリで引く。それも無ければ全部のツリーの
-        親チケットを見て、名乗る名前が 1 つに決まればそれ、決まらなければ識別子。
+        親チケットを見て、宣言する名前が 1 つに決まればそれ、決まらなければ識別子。
         """
         if project is None:
             st = self.standing_any(family_id)
@@ -575,7 +575,7 @@ class Families:
         if project is not None:
             return self.branch(family_id, project)
         # リポジトリが決まらない（取り込み前で、親のワークツリーもまだ無い）。どのリポジトリの
-        # ツリーの親チケットでも、名乗る名前が 1 つに決まるときだけそれを使う。
+        # ツリーの親チケットでも、宣言する名前が 1 つに決まるときだけそれを使う。
         found = {
             name
             for work in self._all_trees()
@@ -584,12 +584,12 @@ class Families:
         return found.pop() if len(found) == 1 else family_id
 
     def claims(self, family_id: str, project: str = "") -> list[str]:
-        """親子のチケットを名乗るブランチ。
+        """親子のチケットを宣言するブランチ。
 
         手元のツリー（同じリポジトリのワークスペースルートかプロジェクトと、ワークツリー）のうち、
-        HEAD が指すブランチの名前が、そのツリーの親チケットが名乗る名前（`declared_branch`。
+        HEAD が指すブランチの名前が、そのツリーの親チケットが宣言する名前（`declared_branch`。
         承認済みチケットは `branch:`、無ければ識別子。提案は識別子）と同じもの。2 本以上あれば
-        どれを本物とするか決まらない（`standing` が止める）。
+        どれを正とするか決まらない（`standing` が止める）。
         """
         found: set[str] = set()
         for work in self._all_trees():
@@ -721,8 +721,8 @@ class Families:
         elif record.branch and record.branch != branch:
             stop = (
                 f"親子のチケット {family_id} の取り込み状態の親のブランチ（{record.branch}）と、"
-                f"親チケットが名乗る親のブランチ（{branch}）が違う。取り込んだ後に `branch:` が"
-                "変わったか、別のブランチ上のチケットを見ている。どちらのチケットを本物とするかが決まらない"
+                f"親チケットが宣言する親のブランチ（{branch}）が違う。取り込んだ後に `branch:` が"
+                "変わったか、別のブランチ上のチケットを見ている。どちらのチケットを正とするかが決まらない"
             )
         elif home is None:
             named = self._named_tree(family_id, project)
@@ -731,26 +731,26 @@ class Families:
             if busy:
                 stop = (
                     f"親のワークツリー（{where}）に途中の操作（{busy}）がある。"
-                    "済ませるか取りやめるまで、取り込み済みの親子のチケットでどのチケットを本物とするかが"
+                    "済ませるか取りやめるまで、取り込み済みの親子のチケットでどのチケットを正とするかが"
                     "決まらない"
                 )
             elif named is not None:
                 stop = (
                     f"親のワークツリー（{where}）の HEAD がブランチ {branch} を指していない。"
-                    "取り込み済みの親子のチケットでどのチケットを本物とするかが決まらない"
+                    "取り込み済みの親子のチケットでどのチケットを正とするかが決まらない"
                 )
             else:
                 stop = (
                     f"親のワークツリー（{where}）が無い。"
-                    "取り込み済みの親子のチケットでどのチケットを本物とするかが決まらない"
+                    "取り込み済みの親子のチケットでどのチケットを正とするかが決まらない"
                     "（取り込み状態は、親のワークツリーを片付けても残る）"
                 )
         else:
             rivals = [b for b in self.claims(family_id, project) if b != branch]
             stop = (
-                f"親子のチケット {family_id} を名乗るブランチが 1 本でない"
+                f"親子のチケット {family_id} を宣言するブランチが 1 本でない"
                 f"（{', '.join([branch, *rivals])}。どれもその上の親チケットが自分のブランチだと"
-                "名乗っている）。どのチケットを本物とするかが決まらない"
+                "宣言している）。どのチケットを正とするかが決まらない"
                 if rivals
                 else ""
             )
@@ -787,7 +787,7 @@ class Families:
 
 
 def approved_branch(conf: settings.Settings, tree_root: str, family_id: str) -> str | None:
-    """そのツリーの承認済みの親チケット（`doing/`・`done/`・`review/`）が名乗る親のブランチ名。
+    """そのツリーの承認済みの親チケット（`doing/`・`done/`・`review/`）が宣言する親のブランチ名。
 
     `branch:` があればその値、無ければ識別子。承認済みの親チケットが無ければ None。
     チケットとしての検査は掛けない（値は読んだまま返し、使えるかは `Families.branch_refusal` が
@@ -797,7 +797,7 @@ def approved_branch(conf: settings.Settings, tree_root: str, family_id: str) -> 
 
 
 def declared_branch(conf: settings.Settings, tree_root: str, family_id: str) -> str | None:
-    """そのツリーの親チケットが名乗る親のブランチ名（`claims` が使う）。
+    """そのツリーの親チケットが宣言する親のブランチ名（`claims` が使う）。
 
     承認済みチケットは `approved_branch` と同じ。提案（`todo/`）しか無ければ識別子（提案の `branch:`
     は承認されるまで使わない）。親チケットが無ければ None。
@@ -877,7 +877,7 @@ def archived_copy(root: str, repo: str, ident: str) -> DoneCopy | None:
 
 
 def standing(conf: settings.Settings, root: str, family_id: str, project: str = "") -> Standing:
-    """この親子のチケットの立ち位置（本物とする側の規則）。1 回だけ引くときの形。"""
+    """この親子のチケットの立ち位置（正とする側の規則）。1 回だけ引くときの形。"""
     return Families(conf, root).standing(family_id, project)
 
 
@@ -911,7 +911,7 @@ def guidance(root: str, st: Standing) -> list[str]:
     if record is not None and record.broken:
         return [
             f"取り込み状態（{record.path}）の中身をユーザが確かめてください。"
-            f"壊れていればユーザが '{sync} --forget {name}' で"
+            f"破損していればユーザが '{sync} --forget {name}' で"
             f"消してから、オンラインで '{sync} {name}' を打ち直してください",
         ]
     if record is not None and record.state == STATE_GONE:
@@ -944,7 +944,7 @@ def guidance(root: str, st: Standing) -> list[str]:
             "承認済みの親チケットの branch: をユーザが確かめてください"
             "（使えない名前か統合先の名前）。直すなら提案を出し直して承認し直す"
         ]
-    if "名乗るブランチが 1 本でない" in st.stop:
+    if "宣言するブランチが 1 本でない" in st.stop:
         return [
             f"親子のチケット {name} の親チケットを、親のブランチ {branch} の上だけに"
             "残してください。"

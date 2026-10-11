@@ -11,7 +11,7 @@
 - 判定: `judge_approval`（実行前チェックのモジュール `ccnavi.hook.judge` と
   紛れないように名前を変えた）は承認の対象と画面とダイジェストを返す。通らない理由を返す
   `withdraw` と `confirm` は `core_withdraw` と `core_review` にある
-- Changes: 書き込みを値として並べたもの（`plan`）。書くときの落ち方（止める・言って続ける）
+- Changes: 書き込みを値として並べたもの（`plan`）。書くときの失敗の仕方（止める・言って続ける）
   もつけてある。`per_branch` はブランチごとの create / update / delete で、Chrome はこれを
   1 コミットにする
 - Writer(FS): `write_fs` が Changes をディスクに書く。fsio を通るので、C1 の記録層
@@ -115,7 +115,7 @@ class Verdict:
 
 
 def say_elsewhere(stderr: TextIO, gathered: agree.Gathered) -> None:
-    """本物とするツリーの外に在る計画の違う版の案内（`Gathered.elsewhere`）を標準エラーに出す。
+    """正とするツリーの外に在る計画の違う版の案内（`Gathered.elsewhere`）を標準エラーに出す。
 
     `--verify` のテキストは本文に同じ段を持つので、そこでは呼ばない（同じ名指しを 2 度出さない）。
     """
@@ -182,7 +182,7 @@ class Changes:
 
     @property
     def lines(self) -> list[str]:
-        """ユーザに見せる行（標準出力の分）。書き込みが落ちたときの行は入らない。"""
+        """ユーザに見せる行（標準出力の分）。書き込みが失敗したときの行は入らない。"""
         out: list[str] = []
         for item in self.planned.stage.items:
             if isinstance(item, fsio.Line) and item.stream == fsio.STREAM_OUT:
@@ -241,7 +241,7 @@ def plan(snapshot: Snapshot, verdict: Verdict) -> Changes:
 
 
 def write_fs(stdout: TextIO, stderr: TextIO, planned: agree.Planned) -> agree.Applied:
-    """並べた書き込みをディスクに書く（Writer(FS)）。前の `_apply` と同じ落ち方をする。
+    """並べた書き込みをディスクに書く（Writer(FS)）。前の `_apply` と同じ失敗の仕方をする。
 
     - `FAIL_STOP`: `undo` を消し、`ccnavi: <識別子>: <理由>` を言って止める。置いたものは戻さない
     - `FAIL_WARN`: 同じ形で言って続ける

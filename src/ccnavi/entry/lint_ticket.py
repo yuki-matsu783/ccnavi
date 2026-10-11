@@ -200,7 +200,7 @@ def _start_unrecorded(conf: settings.Settings, t) -> str:
 
 
 def _types_resolver(conf: settings.Settings, root: str):
-    """`project:` から、そのチケットに使う定義を引く（設計 11.4.1）。
+    """`project:` から、そのチケットに使う定義を引く。
 
     承認の対象の中でもチケットごとにレイヤーが違いうるので、1 つに決めずに引く形で渡す。
     読み込みは 1 レイヤー 1 回。
@@ -216,7 +216,7 @@ def _types_resolver(conf: settings.Settings, root: str):
 
 
 def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
-    """チケットと承認済みチケットとワークツリーが合っているかを見る（REQ-TKT-25）。
+    """チケットと承認済みチケットとワークツリーが合っているかを見る。
 
     判定に使われるのは承認済みチケットの側だけなので、ここで問うのは「使われている範囲は何か」と
     「ワークツリーと提案がそれと一致しているか」。一致していない状態は誤りでは
@@ -258,7 +258,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     index = approval_checks.by_id(copies)
     done = {t.ticket for t in closed + review}
 
-    # 承認済みの識別子の提案は、承認済みチケットと合わせて本物とするツリーを決める
+    # 承認済みの識別子の提案は、承認済みチケットと合わせて正とするツリーを決める
     # （`approval.scan_proposals` と同じまとめ方）。外に残った古い提案は別に名指しする。
     proposals, complaints, stale = approval.read_proposals(conf, root, raw.everything)
     problems.extend(complaints)
@@ -354,7 +354,7 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
         Problem(
             SEVERITY_ERROR,
             "(ticket)",
-            f"承認済みチケットの置き場（{conf.approved}）が"
+            f"承認済みチケットの置き場（{conf.approved}）が "
             f"ccnavi ディレクトリ（{conf.project_home}）の外にある。"
             "組み込みの保護が及ばないので、エージェントが承認済みチケットを書き換えられ、"
             "承認が意味を持たない",
@@ -370,20 +370,20 @@ def _approval_problems(
     closed: list,
     review: list,
 ) -> list[Problem]:
-    """承認で落ちるものを、承認の前に名指しする。ユーザが端末で初めて知るより早く。
+    """承認で失敗するものを、承認の前に名指しする。ユーザが端末で初めて知るより早く。
 
     承認と同じ関数を通す（`agree_candidates.candidates`）。ここだけ
-    `agree_candidates.validate` を当てる形にすると、順序で落ちる子（前のフェーズが閉じていない）・
+    `agree_candidates.validate` を当てる形にすると、順序で失敗する子（前のフェーズが閉じていない）・
     計画に無い番号・`project:` の食い違い・改版の検査が抜ける。同じ事実を数える経路が 2 本あると、
     片方が気づかないうちに弱くなる。`--agree --preview --verify` と同じ答えをここでも言う。
 
-    範囲の超過は承認では落ちないが、判定で止まるので同じく名指しする（warn）。
+    範囲の超過は承認では失敗しないが、判定で止まるので同じく名指しする（warn）。
 
     「まだ承認できない」だけは warn にする。前のフェーズが閉じていない子
     （`rules.KIND_NOT_YET`）は、書いた側に直すものが無く、前が閉じれば同じ提案が通る。
     `--lint` はワークスペース全体を見る道具で、その終了コードは VS Code の設定画面が
     保存してよいかの判断にも使われる（`phases-panel.ts`）。ここを error にすると、
-    編集と関わりのない提案 1 本で、設定の保存も CI も止まる。承認そのものは落とす
+    編集と関わりのない提案 1 本で、設定の保存も CI も止まる。承認そのものは通さない
     （`agree_candidates.candidates` の側は error のまま）ので、緩むのは報告の重さだけ。
     """
     pending, revisions = agree.waiting(
@@ -424,7 +424,7 @@ def _proposal_problems(
 ) -> list[Problem]:
     """提案の側。承認待ち、先行が閉じていない着手済み、同じ識別子の重複。
 
-    承認で落ちるものは `_approval_problems` が言う（承認と同じ関数を通す）。
+    承認で失敗するものは `_approval_problems` が言う（承認と同じ関数を通す）。
 
     `todo/` に在るものは全部承認待ち。同じ識別子がどこかの置き場（作業中・レビュー待ち・
     閉じた）に在れば、親の改版でない限り書き損じなので名指しする。
@@ -440,8 +440,8 @@ def _proposal_problems(
     error にすると、ワークツリーを 2 本持つだけで閉じたチケットが全部 error になり、`--lint` が
     常に非ゼロで終わる。捕まえたいのは 1 つのツリーの中で 2 つの状態に在る形だけ。
 
-    リポジトリをまたいだら、状態が何であれ error にする。プロジェクトは自分の git を持つので
-    （設計 11）、そこに同じ識別子が在るのは同じチケットではなく違うチケットどうしの衝突。
+    リポジトリをまたいだら、状態が何であれ error にする。プロジェクトは自分の git を持つので、
+    そこに同じ識別子が在るのは同じチケットではなく違うチケットどうしの衝突。
     識別子はユーザが選ぶ短い連番で、プロジェクトが独立に振れば重なる。コミットの遅れでは説明が付かないから、
     ツリーごとの免除を当ててはいけない。
     """
@@ -457,7 +457,7 @@ def _proposal_problems(
         return (repo_of.get(at, at), at, state)
 
     seen: dict[str, list[tuple[str, str, str]]] = {}
-    # チケットそのものも識別子ごとに持つ。どれが本物か決まるかの判断は `ticket_fold.collisions` が
+    # チケットそのものも識別子ごとに持つ。どれが正か決まるかの判断は `ticket_fold.collisions` が
     # 決め、ボードの `scattered` と状態の操作が止まる条件に揃える（同じ答えを 2 か所で
     # 出さない）。数えるのは `index`（識別子ごとに 1 つ）ではなく全部。同じ識別子が 2 つ
     # 残っているのがまさに言いたい形なので、引き当ての表で数えると自分でまとめてしまう。
@@ -539,7 +539,7 @@ def _proposal_problems(
                 )
             )
             continue
-        # 本物とするツリーでまとめて 2 つ以上残る形（状態の操作が止まる）と、その中で 2 つの
+        # 正とするツリーでまとめて 2 つ以上残る形（状態の操作が止まる）と、その中で 2 つの
         # 置き場に在る形（動かす途中で止まった形跡）。`todo/` に在るのは親の改版の途中なので
         # error にしない。ツリーをまたいだチケットはまとめれば 1 つに決まるので、
         # ここには出てこない。
@@ -566,16 +566,16 @@ def _rel(root: str, path: str) -> str:
 def _stale_problems(
     root: str, conf: settings.Settings, stale: list, index: dict, done: set[str]
 ) -> list[Problem]:
-    """本物とするツリーの外に残った、承認済みの識別子の `todo/` の提案。
+    """正とするツリーの外に残った、承認済みの識別子の `todo/` の提案。
 
     `approval.stale_proposals` が返すもの。
 
-    承認の対象にもボードにも入らない（本物とするツリーの側だけを読む）。名指しするのは 2 つだけ。
+    承認の対象にもボードにも入らない（正とするツリーの側だけを読む）。名指しするのは 2 つだけ。
 
-    - 計画の違う親の版。本物としないツリーに書いた改版か、改版の前に切ったワークツリーに
-      残った古い版（巻き戻しの元）。書く場所を案内する（改版は本物とするツリーの `todo/` に
+    - 計画の違う親の版。正としないツリーに書いた改版か、改版の前に切ったワークツリーに
+      残った古い版（巻き戻しの元）。書く場所を案内する（改版は正とするツリーの `todo/` に
       置く）。文面は `--agree` と同じ（`approval.revision_elsewhere_text`）
-    - 閉じたかレビュー待ちの識別子の `todo/`。前から出していた再開の案内を、本物とするツリーの
+    - 閉じたかレビュー待ちの識別子の `todo/`。前から出していた再開の案内を、正とするツリーの
       外に在っても同じく出す
 
     計画の同じ古い提案は言わない。承認の前に切ったワークツリーに残るのは普通の形で、言うと

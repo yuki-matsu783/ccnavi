@@ -57,7 +57,7 @@ DEADLINE_SECONDS = 3.0
 PERMISSION_JUDGED = ("auto", "default", "acceptEdits", "plan")
 
 # ユーザにも classifier にも確認できないモード。ここで ask を返すと「誰も答えないまま
-# 通る」になってしまうので、許可としない（REQ-PRE-08）。
+# 通る」になってしまうので、許可としない。
 PERMISSION_NO_JUDGE = ("dontAsk", "bypassPermissions")
 
 # 判定を権限モードへ渡したことを表す内部の値。タイプ名（rules.ALLOW など）と
@@ -218,7 +218,7 @@ def decide_before(
             hookio.write_context(stdout, hookio.PRE_TOOL_USE, guard)
         return EXIT_OK
 
-    # 組み込みの既定に戻ったときだけ言う。レイヤーが壊れて空になったのは組み込みへの
+    # 組み込みの既定に戻ったときだけ言う。レイヤーが不正で空になったのは組み込みへの
     # 退避ではないので、同じ文面を出すと「既定で判定している」と読み違えられる。
     # そちらは記録の `fallback` にレイヤーの名前が残り、`--lint` が error で言う。
     fallback = (
@@ -333,7 +333,7 @@ def decide_before(
             )
 
     # サブエージェントには、状態を動かすスクリプトもレビューのスクリプトも打たせない。
-    # 閉じるのは親だけ（REQ-TKT-10）。ルールより先に見る。ルールが allow と
+    # 閉じるのは親だけ。ルールより先に見る。ルールが allow と
     # 書いていても、この 2 本はサブエージェントの手には渡さない。
     if (
         conf.tickets_enabled
@@ -363,7 +363,7 @@ def decide_before(
     raw: approval.Raw | None = None
 
     # HITL ポイント。人間レビュー要のフェーズが終わっていてマーカーが無い間、
-    # サブエージェントの起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。
+    # サブエージェントの起動と、例外の 3 本以外のシェル実行を止める。
     # ルールより先に見る。置き場を読むのは cwd がワークツリーかプロジェクトの中のときだけ
     # （`phase.parent_at`）。
     if conf.tickets_enabled and payload.tool_name in phase_forms.HELD_TOOLS:
@@ -377,7 +377,7 @@ def decide_before(
 
     # 承認済みチケットの索引。ワークツリーへの書き込みでは、プロジェクトの食い違いの点検と
     # チケットの範囲の判定の両方が引く。走査は 1 回で数百ミリ秒かかるので、1 回の判定で
-    # 1 度だけ読んで両方に渡す（設計 9）。ワークスペースルートへの書き込みとシェルでは読まない。
+    # 1 度だけ読んで両方に渡す。ワークスペースルートへの書き込みとシェルでは読まない。
     # 条件は project_mismatch の早く返る条件と同じ式。ticket_verdict は dest で見るが、dest が
     # None でなければ target は dest そのものなので、先へ進むときはここも同じツリーで読んでいる。
     index = None
@@ -401,7 +401,7 @@ def decide_before(
             record.code, record.rules = reasons.CODE_TICKET_PROJECT, [reasons.TICKET_RULE]
             return refuse(stdout, mode, record, rules.DENY, notices + [mismatch], conf=conf)
 
-    # 着手中の子のフローは書き換えさせない（設計 9.3.1）。ルールより先に見る。
+    # 着手中の子のフローは書き換えさせない。ルールより先に見る。
     # 置き場は承認済みの領域で、エージェントの書き込みは組み込みの保護でも止まる。ロックは
     # その保護を切った設定でも当てはまり、止めた理由（着手中）を名指しする（厳しくする向きだけ）。
     if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
@@ -505,7 +505,7 @@ def decide_before(
 
     record.rules = [rule.id or f"({verdict})" for rule in group]
     record.unwrapped = shellread.SEP.join(dict.fromkeys(layer for _, layer, _ in via if layer))
-    # 判定を下したのは最初に当たったルール（設計 11.9）。そのレイヤーを 1 欄で残す。
+    # 判定を下したのは最初に当たったルール。そのレイヤーを 1 欄で残す。
     # id の前置きからも読めるが、欄にしておくと記録をレイヤーで数えられる。ルールファイルの
     # 外から足したルール（組み込みの保護、チケット）はレイヤーを持たないので空のまま。
     if group:
@@ -526,7 +526,7 @@ def decide_before(
         ]
     record.quoted = [name for name, hit in zip(record.rules, inside, strict=True) if hit]
 
-    # ルールの判定とチケットの判定を合わせ、強い側を採る（設計 9.5）。同じ強さならルール。
+    # ルールの判定とチケットの判定を合わせ、強い側を採る。同じ強さならルール。
     # ルールの deny はどう書いても最も強いので、そのときはチケットを見ない。
     # チケットが当てはまるのは閉じる向きだけ（範囲の外・deny・ask）。ユーザが書いたルールの allow を
     # 作業 1 本のあいだ狭めることはあっても、ルールの deny や ask を緩めることは無い。
@@ -554,7 +554,7 @@ def decide_before(
     context = ctxfile.for_rules(
         stderr, conf.state, payload, group, ctxfile.bases(conf, root, target)
     )
-    # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。判定には
+    # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文。判定には
     # 足さない（`ticket_guard.propose_notice` の説明）ので、ルールの文と同じ経路
     # （additionalContext）で渡す。応答は 1 つの JSON なので、まとめる。
     told = (
@@ -575,7 +575,7 @@ def decide_before(
         if notices or context:
             # 通した回にも言う。ガードが今なにを見ていないのかを言わないでいると、
             # 誰も知らないまま作業が進む。呼び出しごとに出るのでうるさいが、
-            # うるさいのが正しい。壊れた設定と未承認のチケットはどちらも
+            # うるさいのが正しい。不正な設定と未承認のチケットはどちらも
             # 短命であるべきで、気づかないうちに残り続けるより気づかれたほうがよい。
             # ルールの additionalContext も同じ経路で、通す代わりに一言添える。
             hookio.write_context(
@@ -794,7 +794,7 @@ def project_mismatch(
     """ワークツリーの元リポジトリと、そこに結び付く承認済みチケットの `project:` が
     違えば、その理由の文。
 
-    範囲の宣言ではなく取り違えなので、ルールより先に見る（REQ-MLT-12）。ルールが
+    範囲の宣言ではなく取り違えなので、ルールより先に見る。ルールが
     allow と言っていても通さない。子は親から継ぐ。判定はエージェントの申告を見ない。
     行き先のツリーが誰のものかは、そのツリーの `.git` が指す先で決まっている。
 
@@ -803,7 +803,7 @@ def project_mismatch(
     """
     if t.is_main:
         return ""
-    # 読むのは本物とする側（親のツリー）のチケット。子のツリーにも checkout されているが、
+    # 読むのは正とする側（親のツリー）のチケット。子のツリーにも checkout されているが、
     # 閉じるのも着手の欄を書くのも親のツリーの側なので、そこを読まないと閉じた
     # チケットの範囲がいつまでも判定に使われる。
     assert index is not None
@@ -875,7 +875,7 @@ def flow_lock(
     return "", copies
 
 
-# 判定の強さ。ルールの判定とチケットの判定を合わせるとき、強い側を採る（設計 1）。
+# 判定の強さ。ルールの判定とチケットの判定を合わせるとき、強い側を採る。
 # 何も言わない（空）がいちばん弱い。同じ強さならルールを採る。
 STRENGTH = {rules.DENY: 3, rules.ASK: 2, rules.ALLOW: 1, "": 0}
 
@@ -896,7 +896,7 @@ def ticket_verdict(
 
     鍵はファイルの行き先。解いた先が `.claude/worktrees/<名前>/` の中なら、その名前と
     同じ識別子の承認済みチケットで判定する。ワークスペースルートの直下ならチケットは無く、ルールだけで判定する。
-    呼び出し元の cwd も agent_id も使わない（REQ-TKT-01）。
+    呼び出し元の cwd も agent_id も使わない。
 
     範囲の中は allow、範囲の `ask` は ask、範囲の外とチケットの `deny` は deny。
     チケットが境界を明示している以上、外に出たことは「宣言に反した」になる。
@@ -1056,12 +1056,12 @@ def undeclared_verdict(permission_mode: str, degraded: str, guard_unwatched: str
     渡すのは「ルールが言及していない」ときだけ。読み切れなかったコマンド
     （degraded）は渡さない。ccnavi が読めなかったという事実は判定の結果に
     現れないので、渡すと「判断材料が足りない」ことが誰にも伝わらないまま
-    モードの既定になる。読めなかったことを言えるのはここだけ（REQ-PRE-04）。
+    モードの既定になる。読めなかったことを言えるのはここだけ。
 
     知らないモードは ask として扱う。名前が 1 つ増えたときに、それが確認なしに通るのではなく
     確認になるように。設定漏れがガードの消失にならない側へ既定を置く。
 
-    確認できる者が居ないモードは、既定では通さない（REQ-PRE-08）。そこで ask を
+    確認できる者が居ないモードは、既定では通さない。そこで ask を
     返しても「誰も答えないまま通る」になってしまうため。CCNAVI_GUARD_UNWATCHED を
     disable にしたプロジェクトだけ、ここも渡す側になる。読み切れなかった
     呼び出しは、その設定でも渡さない。渡す先が「確認しない」と決まっている以上、

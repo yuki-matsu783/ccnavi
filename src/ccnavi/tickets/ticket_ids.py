@@ -165,7 +165,7 @@ def issue_slug(title: str, room: int = SUGGESTED_ID_LENGTH) -> str:
     """issue のタイトルから作る slug。英数字と日本語の字だけを残し、ほかは `-` にまとめる。
 
     NFKC で全角英数を半角に、半角カナを全角にそろえ、ASCII の英字は小文字にする。
-    前後の `-` を落とし、`room` 文字で切る。何も残らなければ空（呼び手が `EMPTY_SLUG` で埋める）。
+    前後の `-` を除き、`room` 文字で切る。何も残らなければ空（呼び手が `EMPTY_SLUG` で埋める）。
     """
     text = unicodedata.normalize("NFKC", title or "")
     text = "".join(c.lower() if c.isascii() else c for c in text)
@@ -183,7 +183,7 @@ def issue_identifier(
     （`feature-12-web-<slug>`。issue の番号はリポジトリごとなので、ワークスペースや
     別のプロジェクトの同じ番号の issue と名前を分ける）。
     タイトルから何も残らなければ slug は `issue`。全体は `SUGGESTED_ID_LENGTH` 文字に収める。
-    末尾が `-<2 桁>` になるときは、その部分を落とす（`-<2 桁>-<2 桁>` なら子の識別子そのもの、
+    末尾が `-<2 桁>` になるときは、その部分を除く（`-<2 桁>-<2 桁>` なら子の識別子そのもの、
     `-<2 桁>` だけでも子の識別子の途中の `<親>-<フェーズ番号>` と紛れる。lint の warn に当たらない
     名前にする）。
     「issue → 識別子」はこの 1 つだけで、Chrome 拡張も Pyodide の上でこれを呼ぶ。

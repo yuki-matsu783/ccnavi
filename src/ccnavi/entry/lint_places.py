@@ -12,7 +12,7 @@ from ..tickets import ticket_places
 
 
 def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
-    """下書きの置き場が、そのリポジトリの git に追跡されていないか（REQ-TKT-44）。
+    """下書きの置き場が、そのリポジトリの git に追跡されていないか。
 
     実行前チェックはチケットの範囲を `scratchpad/` に当てない
     （`ticket_places.is_scratch_place`）。外してよい根拠は「git が追跡しないので
@@ -95,14 +95,14 @@ def _tracked(root: str, rel: str) -> str:
 # `tests/`（test_lint_places.py・test_setup.py）と導入スクリプト（scripts/ccnavi-setup.sh）も
 # 同じ句を持つ。
 # 載せ忘れは先頭の句の直後が `（入れ子のリポジトリとして` で、`tests/` がそれで見分ける。
-# 変えるならそちらも直す（設計 wip/design/i0064-fixed-places.md §4.2）。
+# 変えるならそちらも直す。
 _TRACKED_LEAD = "`{rel}/` はワークスペースの git が追跡している"
 # 索引の mode のうち gitlink（入れ子のリポジトリを 1 つの版として載せたもの）。
 _GITLINK_MODE = "160000"
 
 
 def _projects(conf: settings.Settings, root: str) -> list[Problem]:
-    """プロジェクトの置き場が正しい形か（REQ-MLT-16）。
+    """プロジェクトの置き場が正しい形か。
 
     置き場が無いのは不備ではない。あるなら、ワークスペースの git で無視されていること、
     予約名（`common` / `self`、表記違いも含む）を使っていないこと、プロジェクトが
@@ -242,7 +242,7 @@ def _sh_word(path: str) -> str:
 
 
 def _in_index(root: str, rel: str) -> str | None:
-    """置き場が索引に載っているなら、その苦情の文面。載っていなければ None（設計 §4.1・§4.2）。
+    """置き場が索引に載っているなら、その苦情の文面。載っていなければ None。
 
     - 通常のファイルが 1 本以上ある: ぶつかり。ワークスペース自身のソースに `projects/` が
       あるので、`.gitignore` に足せという案内は誤り（ソースが追跡から外れる）。改名を案内する。
@@ -251,7 +251,6 @@ def _in_index(root: str, rel: str) -> str | None:
       改名は要らない。索引から外して無視に入れる 2 手を案内する。`.gitignore` に既に
       `/projects/` があっても、索引に載っている限り追跡は外れないので言う
     - `.gitmodules` で意図して置いたサブモジュールも mode だけで見るので載せ忘れになる
-      （設計 §4.5 の分岐 2）
 
     導入スクリプト（scripts/ccnavi-setup.sh）が同じ条件と同じ文面を持つ。変えるならそちらも直す
     （tests/sh/test_setup.py が 1 文目の一致を見る）。
@@ -269,7 +268,7 @@ def _in_index(root: str, rel: str) -> str | None:
             f"このままだと `{rel}/` の下で `.git` を持つディレクトリ（サブモジュールを含む）が"
             "プロジェクトとして数えられ、その中の設定が判定に使われる。"
             f"直すには、ワークスペースの `{rel}/` を別の名前に移す（例: `git mv {rel} apps`）。"
-            f"ccnavi でプロジェクトを置かないなら、このままでも動く。そのときは `{rel}/` の下に"
+            f"ccnavi でプロジェクトを置かないなら、このままでも動く。そのときは `{rel}/` の下に "
             "`.git` を持つものを置かない"
         )
         if links:
@@ -297,10 +296,10 @@ def _in_index(root: str, rel: str) -> str | None:
 
 
 def _ticket_places(conf: settings.Settings, root: str) -> list[Problem]:
-    """走査されないチケットの置き場が残っていないか（REQ-MLT-16）。
+    """走査されないチケットの置き場が残っていないか。
 
     提案の置き場はどのツリーでも同じ相対（`wip/proposals/`）で、プロジェクト向けはその
-    プロジェクトのツリーに置く（設計 11.5、REQ-MLT-14）。ワークスペースの
+    プロジェクトのツリーに置く。ワークスペースの
     `wip/<名前>/proposals/` は、名前が `projects/` に在っても在らなくても走査されない。走査
     されない置き場は、提案があっても画面にもボードにも出ない。気づかないうちに消えるのが
     いちばん困るので名指しし、名前が在るなら正しい置き場を案内する。error にはしない。

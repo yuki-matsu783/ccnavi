@@ -293,7 +293,7 @@ def undo(change: Change) -> str:
     """
     if change.kind == KIND_COMMITTED:
         # コミット済みには 1 つに決まる手順が無い。空を返し、呼ぶ側が
-        # 「戻す手順」の行そのものを落とす。間違った手順を 1 行書くより、
+        # 「戻す手順」の行そのものを省く。間違った手順を 1 行書くより、
         # 書かないほうがよい（revert も reset もラッパースクリプトが拒む）。
         return ""
     quoted = f'"{change.path}"'
@@ -317,7 +317,7 @@ def restore(top: str, change: Change, aside: str, timeout: float = WRITE_TIMEOUT
         return _git(top, ["restore", "--staged", "--worktree", "--", change.path], timeout)
 
     if change.staged:
-        # 索引から落としてから動かす。先に動かすと索引に消えたファイルへの
+        # 索引から外してから動かす。先に動かすと索引に消えたファイルへの
         # 追加が残り、次の status が「消えた」を新しい変更として持ち出す。
         failed = _git(top, ["rm", "--cached", "--", change.path], timeout)
         if failed:

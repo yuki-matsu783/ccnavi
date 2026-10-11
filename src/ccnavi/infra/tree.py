@@ -5,7 +5,7 @@
 サブエージェントは親と作業ディレクトリを共有することがある。そこから子の
 ワークツリーへ絶対パスで書いた呼び出しを `cwd` で判定すると、親のチケットで
 判定されてしまう。行き先で決めれば、誰が書いてもその場所のチケットで判定され、
-サブエージェントの起動の仕方が判定に影響しない（REQ-TKT-01）。
+サブエージェントの起動の仕方が判定に影響しない。
 
 参考にした運用はここを `cwd` で決めていて、そのために並行実施に踏み切れずにいた。
 「隔離はされるが統制は効かない」という穴の実体がこれ。
@@ -38,7 +38,7 @@ WORKTREES_DIR = os.path.join(".claude", "worktrees")
 # ワークスペースルートの名前。空文字。チケットは持たない。
 MAIN = ""
 
-# ツリーの種類（設計 11.3）。ワークスペースルート、プロジェクト（`projects/` の直下にある別の
+# ツリーの種類。ワークスペースルート、プロジェクト（`projects/` の直下にある別の
 # リポジトリ）、ワークツリー。プロジェクトはワークスペースの git には入らず、自分の git を持つ。
 KIND_MAIN = "main"
 KIND_PROJECT = "project"
@@ -90,7 +90,7 @@ def projects(projects_dir: str) -> list[Tree]:
 
 
 def worktrees(root: str, projects_dir: str = "") -> list[Tree]:
-    """ワークスペースルートの下にある、本物のワークツリーの一覧。
+    """ワークスペースルートの下にある、実際のワークツリーの一覧。
 
     元リポジトリはワークスペースでもプロジェクトでもよい。
 
@@ -217,7 +217,7 @@ def git_dir(tree_root: str) -> str | None:
 
 
 def head_text(tree_root: str) -> str | None:
-    """このツリーの `HEAD` の中身（前後の空白を落とす）。読めなければ None。"""
+    """このツリーの `HEAD` の中身（前後の空白を除く）。読めなければ None。"""
     gitdir = git_dir(tree_root)
     if gitdir is None:
         return None
@@ -306,7 +306,7 @@ def branch_of(tree_root: str) -> str | None:
     読むのはファイルだけで、git は起こさない（判定の中から呼ばれうる）。`.git` が
     ディレクトリならその `HEAD`、ファイル（`gitdir: <場所>`、相対ならツリーから）ならその
     場所の `HEAD`。`ref: refs/heads/<名前>` の形だけを名前として読み、切り離した HEAD
-    （sha）・空・壊れた中身・読めないものは None（呼び手はツリーの名前で代える）。
+    （sha）・空・不正な中身・読めないものは None（呼び手はツリーの名前で代える）。
     """
     head = head_text(tree_root)
     if head is None:

@@ -81,7 +81,7 @@ class FileState:
 
 @dataclass
 class Entry:
-    """1 つの識別子の今。`hits` が 2 つ以上なら、どれが本物か決まらない。"""
+    """1 つの識別子の今。`hits` が 2 つ以上なら、どれが正か決まらない。"""
 
     ident: str
     hits: list[ticket_model.Ticket] = field(default_factory=list)
@@ -184,7 +184,7 @@ class _Family:
             return [
                 f"- {e.ident}  {role}  {t.title}".rstrip(),
                 f"    置き場: 複数の場所にある（{where}）",
-                "    止まっている理由: どれが本物か決まらないので、状態の操作は止まる",
+                "    止まっている理由: どれが正か決まらないので、状態の操作は止まる",
                 "    次の一手: ユーザに 1 つにしてもらう（先に進んだ側を合流させるか、"
                 "残ったワークツリーを片付ける）",
             ]

@@ -122,7 +122,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--approved", default=None)
     parser.add_argument("--phases", default=None)
     parser.add_argument("--risk", default=None)
-    # プロジェクトの置き場と、ccnavi ディレクトリ（設計 11）。
+    # プロジェクトの置き場と、ccnavi ディレクトリ。
     parser.add_argument("--projects", default=None)
     parser.add_argument("--project-home", default="")
     # 1 つのプロジェクトのルールファイルを名前で差し替える（<名前>=<パス>）。診断だけ。
@@ -257,7 +257,7 @@ def _recorded_run(
     「置き場の外」として止める側）。置き場の外が入っていたら止めるのは C1 で、
     ここは集めて書くだけ。
 
-    終了コード: コマンドが落ちても、そこまでに書いたパスで一覧を書く（C1 は落ちた回も
+    終了コード: コマンドが失敗しても、そこまでに書いたパスで一覧を書く（C1 は失敗した回も
     戻すのに一覧を使う）。一覧を書けなければ、コマンドの結果に依らず 1 で終わる
     （C1 はそれを「書いたものが分からない」として扱う）。行き先が断られたときはコマンドを
     走らせずに 1 で終わる。
@@ -419,7 +419,7 @@ def _parsed(
     if not cli_args._one_wrapper_flag_each(stderr, args):
         return EXIT_ERROR
     # `--docs` に添えたほかの経路のフラグは、気づかれないまま無視せずに止める。
-    # レイヤーの置き場の差し替えはこの後で落とされ、`--ticket-control` などは
+    # レイヤーの置き場の差し替えはこの後で無視され、`--ticket-control` などは
     # 設定に重ねられるので、その前に見る。
     if args.docs:
         refused = cli_args._not_with_docs(args)
@@ -473,9 +473,9 @@ def _parsed(
 
     # ドキュメントの索引を引く経路。payload を読まず、判定も記録もしない。
     # 絞り込みのフラグは `--docs` でだけ読む。ほかの経路で渡されたら止める。このフラグが
-    # 無かったころは argparse が知らないフラグとして止めていたので、落として先へ進めると
+    # 無かったころは argparse が知らないフラグとして止めていたので、無視して先へ進めると
     # `ticket start X --limit 3` のような打ち間違いが通るようになる（`--flow` は診断の中の
-    # 差し替えで、落としても何も動かないので落とすだけにしている）。
+    # 差し替えで、無視しても何も動かないので無視するだけにしている）。
     if not args.docs:
         stray = cli_args._docs_flags_given(args)
         if stray:
@@ -505,7 +505,7 @@ def _parsed(
     conf.integration_branch = args.integration_branch.strip()
 
     # フローの確かめは `--lint` だけが読む。判定にも採点にも影響しないが、ほかの差し替えと同じく
-    # 診断の外では落として言う。診断でも `--lint` でなければ読む先が無いので、そう言って落とす。
+    # 診断の外では無視して言う。診断でも `--lint` でなければ読む先が無いので、そう言って無視する。
     if args.flow:
         if not diagnosing:
             stderr.write(cli_args.DIAGNOSIS_ONLY.format(flag="--flow"))
@@ -534,7 +534,7 @@ def _parsed(
 
     # 診断の経路。どちらも payload を読まず、判定を実行にも記録にも繋げない。
     # ユーザが端末から打って「このルールは何に当たるのか」を確かめるための場所で、
-    # 判定そのものは実運用と同じ関数を通る（REQ-DIA-03）。
+    # 判定そのものは実運用と同じ関数を通る。
     if args.test is not None:
         if args.json:
             return diagnose.test_json(stdout, stderr, conf, root, args.test[0], args.test[1])
@@ -569,7 +569,7 @@ def _parsed(
             stderr.write("ccnavi: --verify は --agree --preview と一緒に使う\n")
             return EXIT_ERROR
         # 承認できる状態かを確かめるだけ。置かないのは `--preview` と同じで、違うのは
-        # 通るかどうかを終了コードで返すところ（REQ-APV-13）。答えは 0（はい）と
+        # 通るかどうかを終了コードで返すところ。答えは 0（はい）と
         # 3（いいえ）で、使い方と設定の誤りの 1 とは分ける。
         if args.verify:
             return core.verify(stdout, stderr, conf, root, args.json, list(args.command))
@@ -606,7 +606,7 @@ def _parsed(
     # 取り込みの sh（`ccnavi-sync.sh`）がパスを聞く経路。読むだけで、チケット制御の有無に依らない。
     if list(args.command) == ["sync", "paths"]:
         return EXIT_OK if cli_ops.sync_paths(stdout, root, conf) == 0 else EXIT_ERROR
-    # 取り込みの後の検査（本物とする側とレイヤーの食い違い）。
+    # 取り込みの後の検査（正とする側とレイヤーの食い違い）。
     # error があれば sh が親子のチケットの取り込みを止める。
     if len(args.command) in (3, 4) and list(args.command[:2]) == ["sync", "check"]:
         repo = args.command[3] if len(args.command) == 4 else None

@@ -1,4 +1,4 @@
-"""該当したルールがモデルへ渡す文（additionalContext）を組む（REQ-PRE-12）。
+"""該当したルールがモデルへ渡す文（additionalContext）を組む。
 
 文（`additionalContext`）と、ファイルの本文（`additionalContextFile`）と、
 1 度だけ渡す文（`additionalContextOnce` / `additionalContextOnceFile`）の 3 つを

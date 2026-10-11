@@ -1,7 +1,7 @@
 """この呼び出しに適用するルール集合を決める。
 
-組み込みの deny を土台に、共通レイヤーを足し、そのツリーのレイヤーを足したものが答えになる
-（設計 11.4）。足すだけで、後ろのレイヤーが前のレイヤーを上書きしたり取り消したりすることは
+組み込みの deny を土台に、共通レイヤーを足し、そのツリーのレイヤーを足したものが答えになる。
+足すだけで、後ろのレイヤーが前のレイヤーを上書きしたり取り消したりすることは
 ない。組み込みの deny（取り返しの付かない操作の止め）は、共通レイヤーと config の有無・状態に
 よらず常に適用される。判定そのものはここに無い。
 
@@ -31,7 +31,7 @@
 破損しているレイヤーも空として扱うが、そちらは記録の `fallback` にレイヤーの名前を残し、`--lint` が
 error で言う。組み込みの既定には戻さない。共通レイヤーが在るのに組み込みへ戻すと、共通レイヤーの
 deny が消える側になる。共通レイヤー自身が読めないときだけ、今までどおり組み込みの既定に戻り、
-そのときレイヤーは足さない（REQ-PRE-06）。
+そのときレイヤーは足さない。
 """
 
 from __future__ import annotations
@@ -76,7 +76,7 @@ def read_common(
     読めなければ組み込みの既定に戻る。「設定が読めない」は「判断できない」
     ではなく「設定が破損している」。拒否にすると、破損したファイルを直すための
     呼び出しまで止まって回復できなくなる。既定モードが block なので、
-    ファイルを置く前に hook を登録しただけでセッションの呼び出しが全部止まる（REQ-PRE-06）。
+    ファイルを置く前に hook を登録しただけでセッションの呼び出しが全部止まる。
     既定は設定の全体を受け取る。守る場所のパスは設定で動くので（builtin.rule_data）。
     """
     rules_path = conf.rules
@@ -101,7 +101,7 @@ def load_rules(
 ) -> tuple[rules.RuleSet, str]:
     """共通レイヤーのルール集合（組み込みの deny の土台つき）と、それがどこから来たかを返す。
 
-    組み込みの deny は共通レイヤーの有無・状態によらず常に足す（設計 11.2）。共通レイヤーが
+    組み込みの deny は共通レイヤーの有無・状態によらず常に足す。共通レイヤーが
     読めずに組み込みの既定へ戻ったときは、既定が同じ deny を持つので足さない。
 
     出所は、いま適用しているルールがどこから来たか。既定を使っているなら
@@ -151,7 +151,7 @@ def layers(conf: settings.Settings, root: str) -> list[Layer]:
 
     予約名のプロジェクト（`projects/common/` と `projects/self/`）は数えない。
     `common:id` / `self:id` と区別が付かないので、名前を 2 つ予約するほうが、
-    接頭辞の表記を別にするより手間が少ない（設計 11.4）。表記違い（`projects/Self/`）も
+    接頭辞の表記を別にするより手間が少ない。表記違い（`projects/Self/`）も
     同じに扱う（`settings.is_reserved_layer_name`）。`--lint` が error で言う。
 
     数えないことは、そのプロジェクトが緩く扱われるという意味ではない。行き先の
@@ -177,7 +177,7 @@ def layers(conf: settings.Settings, root: str) -> list[Layer]:
 
 
 def layer_for(conf: settings.Settings, root: str, target: tree.Tree | None) -> list[Layer]:
-    """このツリーに足すレイヤー。行き先の 1 つだけ（設計 11.4 書き込み系）。
+    """このツリーに足すレイヤー。書き込み系は行き先の 1 つだけ。
 
     ワークスペースのツリー（ワークスペースルートと、そこから切ったワークツリー）なら
     自身のレイヤー。プロジェクトのツリーならそのレイヤー。ワークスペースルートの外に行き先が
@@ -206,7 +206,7 @@ def rules_for(
     payload: hookio.Input,
     record: audit.Record,
 ) -> tuple[rules.RuleSet, str, tree.Tree | None]:
-    """この呼び出しに適用するルール集合と、その出所と、行き先のツリー（設計 11.4）。
+    """この呼び出しに適用するルール集合と、その出所と、行き先のツリー。
 
     パスを持つツール（PATH_TOOLS）は行き先で 1 本に決まる。
     共通レイヤーに、行き先のツリーのレイヤーを足す。
@@ -216,7 +216,7 @@ def rules_for(
     どのプロジェクトのものかは特定しない。Bash で特定する仕掛け（cwd、cd の追跡、引数の語の走査）は
     「どのルールファイルを引くか」にしか影響せず、副作用は結局実行後チェックが拾う。WebFetch・Skill・
     Agent は特定する材料を持たない。和なら deny と ask は増える側になり、緩むのは allow の共有だけに
-    なる（REQ-MLT-05）。読めないレイヤーは和から外し、外したことを記録に残す（REQ-MLT-06）。
+    なる。読めないレイヤーは和から外し、外したことを記録に残す。
     """
     target = None
     if payload.tool_name in PATH_TOOLS:
@@ -354,7 +354,7 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
             view.missing = True
             continue
         if views[0].unreadable:
-            # 共通レイヤーが破損しているときはレイヤーを足さない（設計 11.2）。診断もそう見せる。
+            # 共通レイヤーが破損しているときはレイヤーを足さない。診断もそう見せる。
             continue
         try:
             extra, notes = rules.load(layer.path, root)
@@ -421,7 +421,7 @@ def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
     ccnavi の設定ファイルで、書き換えられたら戻すほうが筋が通る。判定に使われない
     ものを守るだけなので、緩む側にはならない。
 
-    在るかどうかは見ない。無いファイルは selfguard が対象から外す（REQ-SLF-03）ので、
+    在るかどうかは見ない。無いファイルは selfguard が対象から外すので、
     ここで存在を確かめると、同じ判断が 2 か所に分かれる。
     """
     found = [
@@ -440,7 +440,7 @@ def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
             )
         if origin == settings.ORIGIN_PROJECT:
             # 共通レイヤーのミラー。ワークスペースの中では判定に読まないが、書き換えられたら
-            # 戻す（設計 11.6）。
+            # 戻す。
             for kind in settings.LAYER_KINDS:
                 found.append(
                     settings.LayerFile(
@@ -461,7 +461,7 @@ def mark_source(rule_set: rules.RuleSet, layer: str) -> None:
 
 def prefix_ids(rule_set: rules.RuleSet, layer: str) -> None:
     """レイヤーのルールの id にレイヤーの名前をつける。
-    `self:docs` / `lib:source` の形（REQ-MLT-07）。
+    `self:docs` / `lib:source` の形。
 
     レイヤーどうしで同じ id があっても記録の上では衝突せず、読んだユーザがどのファイルを
     見に行けばよいかが id だけで分かる。共通レイヤーのルールは裸の id のまま。
