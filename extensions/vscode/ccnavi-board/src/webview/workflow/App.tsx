@@ -187,13 +187,16 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
 
   const dirty = useMemo(() => answer !== undefined && isDirty(answer), [answer]);
 
-  const sentDirty = useRef(false);
+  // 拡張ホストへは、答えの未保存と、線を変えて答えを待っているか（`pending`）を送る。待つ間もボードの承認を
+  // 止めるため（答えが届くまで未保存に数えないと、その間に承認が通る）。題の「●」と「未保存」は答えから決める
+  const sentDirty = useRef("false/false");
   useEffect(() => {
-    if (sentDirty.current !== dirty) {
-      sentDirty.current = dirty;
-      post({ type: "dirty", dirty });
+    const key = `${dirty}/${pending}`;
+    if (sentDirty.current !== key) {
+      sentDirty.current = key;
+      post({ type: "dirty", dirty, checking: pending });
     }
-  }, [dirty]);
+  }, [dirty, pending]);
 
   // 未保存の線の写しを、止まってから拡張ホストに覚えさせる。未保存でなくなったら消させる
   const sentDraft = useRef(false);

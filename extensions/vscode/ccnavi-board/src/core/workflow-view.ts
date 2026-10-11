@@ -22,7 +22,7 @@
  */
 import type { AppearanceMessage } from "./appearance.js";
 import type { ApprovePlan } from "./approvemodel.js";
-import type { PlanOrder, PlanOrderAnswer } from "./planordermodel.js";
+import type { PlanOrder, PlanOrderAnswer, PlanOrderWrite } from "./planordermodel.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
 import { isTicketId } from "./ticket-id.js";
 
@@ -67,7 +67,11 @@ export type ToWorkflow =
 export type WorkflowMessage =
   | { readonly type: "ready" }
   | { readonly type: "reload"; readonly dirty: boolean }
-  | { readonly type: "dirty"; readonly dirty: boolean }
+  /**
+   * 未保存か（答えの線が提案と違うか）と、線を変えて答えを待っているか（`checking`）。拡張ホストは題の「●」を
+   * `dirty` で、ボードの承認を止めるかを `dirty || checking` で決める（答えを待つ間に承認が通らないように）
+   */
+  | { readonly type: "dirty"; readonly dirty: boolean; readonly checking: boolean }
   /** 線を変えた。この先行で実行ファイルに振り直させる（書きはしない）。答えは `answer` */
   | { readonly type: "order"; readonly seq: number; readonly order: PlanOrder }
   /** 「この順序に決める」。`expect` は開いたときの `source_sha` */
@@ -114,7 +118,7 @@ export function asWorkflowMessage(message: unknown): WorkflowMessage | undefined
     case "reload":
       return { type: "reload", dirty: message.dirty === true };
     case "dirty":
-      return typeof message.dirty === "boolean" ? { type: "dirty", dirty: message.dirty } : undefined;
+      return typeof message.dirty === "boolean" ? { type: "dirty", dirty: message.dirty, checking: message.checking === true } : undefined;
     case "order": {
       const order = asPlanOrder(message.order);
       return order === undefined || typeof message.seq !== "number" || !Number.isFinite(message.seq) ? undefined : { type: "order", seq: message.seq, order };
@@ -138,6 +142,46 @@ export function asWorkflowMessage(message: unknown): WorkflowMessage | undefined
 /** 開くコマンドに渡された親の識別子。識別子の形でなければ undefined（開く先は実行ファイルが引き直す） */
 export function workflowTicketOf(value: unknown): string | undefined {
   return isTicketId(value) ? value : undefined;
+}
+
+// ---- パネル（`workflow-panel.ts`）の決めごと。VS Code に触れないものだけここに出してテストする
+
+/** ボードの答えから引いた、親の今。`proposal` は提案の置き場（無ければ null）、`approved` は承認済みチケットがあるか */
+export interface ParentNow {
+  readonly proposal: "todo" | "review" | null;
+  readonly approved: boolean;
+}
+
+/**
+ * 提案が承認待ちから無くなった理由。まだ承認待ちなら undefined（何も言わない）。`revision` は開いたときの答えが
+ * 改版か（承認済みの親に対する提案）。改版は承認されても取り下げられても承認済みチケットが残るので、言い切らない。
+ * `now` が undefined なら、ボードにその親が無い（取り下げ・削除）
+ */
+export function goneReasonOf(ticket: string, revision: boolean, now: ParentNow | undefined): string | undefined {
+  if (now?.proposal === "todo") {
+    return undefined;
+  }
+  const readOnly = "この図は読むだけです";
+  if (revision && now?.approved === true) {
+    return `${ticket} の改版の提案が承認待ちから無くなりました（承認されたか、取り下げ・削除されました）。順序を変えるには、改版の提案を出してからこのタブを開き直してください。${readOnly}`;
+  }
+  if (now?.approved === true) {
+    return `${ticket} は承認済みです（承認待ちの提案はもうありません）。順序を変えるには、改版の提案を出してからこのタブを開き直してください。${readOnly}`;
+  }
+  return `${ticket} の提案が承認待ちの置き場から無くなりました（取り下げ・削除）。${readOnly}`;
+}
+
+/**
+ * 閉じた後に「開き直して戻す」を聞くか。未保存で写し（`draft`）があり、読み込めていて、保存の途中でないときだけ。
+ * 保存を押してすぐ閉じたなら書き込みは通るので、戻すかを聞かない（戻してもハッシュが違って戻らない）
+ */
+export function restoreAsked(state: { readonly dirty: boolean; readonly draft: boolean; readonly loaded: boolean; readonly saving: boolean }): boolean {
+  return state.dirty && state.draft && state.loaded && !state.saving;
+}
+
+/** 保存の答えから、帳面に覚えるハッシュ（書けたときだけ。書いたあとに読み直したもの） */
+export function savedShaOf(result: PlanOrderWrite): string | undefined {
+  return result.kind === "written" ? result.answer.source_sha : undefined;
 }
 
 /** タブの題。未保存の間は頭に「●」 */

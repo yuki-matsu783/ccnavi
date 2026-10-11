@@ -49,7 +49,17 @@ import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { markUnsaved, rememberSaved } from "./core/workflow-tabs.js";
 import { renderWorkflowPage } from "./core/workflow-render.js";
-import { asWorkflowMessage, workflowTicketOf, workflowTitle, type ToWorkflow, type WorkflowData, type WorkflowMessage } from "./core/workflow-view.js";
+import {
+  asWorkflowMessage,
+  goneReasonOf,
+  restoreAsked,
+  savedShaOf,
+  workflowTicketOf,
+  workflowTitle,
+  type ToWorkflow,
+  type WorkflowData,
+  type WorkflowMessage,
+} from "./core/workflow-view.js";
 import { showLoading } from "./loading.js";
 import * as diaglog from "./log.js";
 import { requireTickets } from "./ticket-control.js";
@@ -229,7 +239,7 @@ function postNotices(current: PanelState): void {
 function askRestore(current: PanelState): void {
   const loaded = current.loaded;
   const draft = current.draft;
-  if (!current.dirty || draft === undefined || loaded === undefined) {
+  if (!restoreAsked({ dirty: current.dirty, draft: draft !== undefined, loaded: loaded !== undefined, saving: current.saving }) || draft === undefined || loaded === undefined) {
     return;
   }
   const restore: Restore = { draft, sha: loaded.source_sha };
@@ -297,13 +307,8 @@ async function goneReason(current: PanelState): Promise<string | undefined> {
     return undefined;
   }
   const found = board.board.tickets.find((t) => t.ticket === current.ticket && t.parent === "");
-  if (found?.proposal?.state === "todo") {
-    return undefined;
-  }
-  if (found !== undefined && found.copy.status !== "none") {
-    return `${current.ticket} は承認済みです（承認待ちの提案はもうありません）。順序を変えるには、改版の提案を出してからこのタブを開き直してください。この図は読むだけです`;
-  }
-  return `${current.ticket} の提案が承認待ちの置き場から無くなりました（取り下げ・削除）。この図は読むだけです`;
+  const revision = current.loaded?.plans.some((plan) => plan.current !== null) === true;
+  return goneReasonOf(current.ticket, revision, found === undefined ? undefined : { proposal: found.proposal?.state ?? null, approved: found.copy.status !== "none" });
 }
 
 /** いま見せるものを渡す。**画面の編集はここで捨てられる**（読み直し・取り込む・保存が通ったときだけ呼ぶ） */
@@ -409,7 +414,8 @@ async function handleMessage(current: PanelState, message: WorkflowMessage | und
   switch (message.type) {
     case "dirty":
       current.dirty = message.dirty;
-      markUnsaved(current.ticket, message.dirty);
+      // 線の答えを待つ間も、ボードの承認を止める（題の「●」は答えの未保存だけ）
+      markUnsaved(current.ticket, message.dirty || message.checking);
       current.panel.title = workflowTitle(current.ticket, message.dirty);
       if (!message.dirty) {
         current.draft = undefined;
@@ -499,13 +505,16 @@ async function save(current: PanelState, order: PlanOrder, expect: string): Prom
   current.saving = false;
   current.wroteAt = Date.now();
   log.info("ワークフローの保存", { screen: SCREEN, result: result.kind });
+  // 書けたら、タブを閉じていても書いたあとのハッシュを覚える（保存を押してすぐ閉じても、承認の注意が効く）
+  const sha = savedShaOf(result);
+  if (sha !== undefined) {
+    rememberSaved(current.ticket, sha);
+  }
   if (!alive(current) || current.loaded !== loaded) {
     return;
   }
   switch (result.kind) {
     case "written": {
-      // 書いたあとに読み直したハッシュを覚える。承認の一覧を開くときに比べ、保存したあとに提案が変わったかを見る
-      rememberSaved(current.ticket, result.answer.source_sha);
       const moved = result.answer.children.filter((child) => child.ticket !== child.new_ticket).length;
       await reload(current);
       vscode.window.showInformationMessage(
