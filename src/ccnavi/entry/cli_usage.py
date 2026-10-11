@@ -254,6 +254,10 @@ scripts in .ccnavi/scripts/, which call
         (drops the worktrees of the closed children - finished or cancelled -, of
          phase N when given; only children in doing/ keep theirs; a child id
          stands for its parent, read from the ticket)
+    ccnavi worktree remaining <parent> [--cwd <dir>]
+        (lists, and never removes, the worktrees of the family that are still
+         there: one named differently from the parent that holds its tickets, and
+         a closed child's that has unsaved drafts; prints nothing when none)
     ccnavi sync paths
         (for .ccnavi/scripts/ccnavi-sync.sh: one "<key> <value>" per line - the
          approved and proposal places, the ccnavi directory, and the integration

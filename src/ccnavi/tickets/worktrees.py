@@ -49,6 +49,7 @@ from typing import TextIO
 
 from ..infra import gitcmd, settings, tree
 from . import approval, approval_checks, phase, ticket_ids, ticket_model
+from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 30.0
 
@@ -270,6 +271,99 @@ def run_tidy(
         if not d.removed:
             code = 1
     return code
+
+
+@dataclass
+class Left:
+    """ready の後に残ったワークツリー 1 本。`why` は残った理由、`check` は消す前に確かめること。"""
+
+    name: str
+    path: str
+    why: list[str]
+    check: list[str]
+
+
+def _leftover_facts(path: str) -> tuple[list[str], list[str]]:
+    """残ったワークツリーが抱えているもの（理由と、確かめること）。何も読めなければ空。
+
+    `drop` が DIRTY・IGNORED で止める条件と同じ。消さずに読むだけ。
+    """
+    why: list[str] = []
+    check: list[str] = []
+    done = gitcmd.run(
+        path, ["status", "--porcelain", "--untracked-files=all"], TIMEOUT_SECONDS, raw_paths=True
+    )
+    changes = [line for line in done.out.splitlines() if line.strip()] if done.ok else []
+    if changes:
+        scratch = [c for c in changes if "wip/scratchpad/" in c.replace("\\", "/")]
+        why.append(
+            "未保存の下書きがある（wip/scratchpad/）" if scratch else "未コミットの変更がある"
+        )
+        check.append(f"`git -C {path} status` で中身を見て、要るものはコミットするか退避する")
+    ignored, _ = _ignored(path)
+    if ignored:
+        why.append("git が無視しているファイル（.env など）がある")
+        check.append("無視されたファイルを見て、要るものは退避する")
+    return why, check
+
+
+def remaining(root: str, conf: settings.Settings, family: str, cwd: str = "") -> list[Left]:
+    """ready の最後の `drop <親>` の後に、まだ残っている親子のワークツリー。見るだけで消さない。
+
+    - 名前が親の識別子と違うが、その親の提案か承認済みチケットを持つワークツリー
+      （親の作業を別の名前のワークツリーで進めた場合。`drop <親>` は名前で消すので拾えない）
+    - 閉じた子のワークツリーで、未保存の下書きや無視されたファイルがあって `drop` が消さなかったもの
+    """
+    family = family_for(root, conf, family)
+    open_all, _ = approval.scan_all(conf, root)
+    closed_all, _ = approval.scan_all(conf, root, closed=True)
+    review_all, _ = approval.review_all(conf, root)
+    proposals, _ = ticket_mod.scan_all(root, conf.tickets, conf.projects)
+    everything = open_all + closed_all + review_all + proposals
+    mine = [t for t in everything if (t.parent or t.ticket) == family]
+    members = {t.ticket for t in mine}
+    holders: dict[str, str] = {}
+    for t in mine:
+        if t.tree and t.tree not in members:
+            holders.setdefault(t.tree, t.tree_root)
+    found: list[Left] = []
+    for name, top in sorted(holders.items()):
+        path = tree.worktree_path(root, name)
+        if not os.path.isdir(path) or os.path.islink(path):
+            continue
+        branch = tree.branch_of(top)
+        why = [f"名前が親 {family} と違うので、親の片付けの対象にならなかった"]
+        check = [
+            f"{('ブランチ ' + branch + ' の') if branch else ''}作業が push 済みで、"
+            "ほかのセッションが使っていないことを確かめる"
+        ]
+        more_why, more_check = _leftover_facts(path)
+        found.append(Left(name, path, why + more_why, check + more_check))
+    for t in tidy_targets(root, conf, family):
+        path = tree.worktree_path(root, t.ticket)
+        if t.ticket == family or not os.path.isdir(path) or os.path.islink(path):
+            continue
+        if _owner(path)[0] == "":
+            continue
+        why, check = _leftover_facts(path)
+        if why:
+            found.append(Left(t.ticket, path, why, check))
+    return found
+
+
+def run_remaining(stdout: TextIO, root: str, conf: settings.Settings, family: str, cwd: str) -> int:
+    """`worktree remaining <親>`。残りを一覧にする。出すだけで消さない。無ければ何も出さない。"""
+    left = remaining(root, conf, family, cwd)
+    if not left:
+        return 0
+    stdout.write("残っているワークツリー（自動では消していない。要らなければ確かめてから消す）:\n")
+    for item in left:
+        stdout.write(f"- {item.name}（{item.path}）\n")
+        stdout.write(f"  残った理由: {'。'.join(item.why)}\n")
+        for line in item.check:
+            stdout.write(f"  消す前に確かめること: {line}\n")
+        stdout.write(f"  消すコマンド: {retry_command(root, item.name)}\n")
+    return 0
 
 
 def _ignored(top: str) -> tuple[list[str], str]:
