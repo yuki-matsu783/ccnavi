@@ -446,37 +446,102 @@ def internal_error_notice(code: str, event: str, kind: str, log_path: str) -> st
     )
 
 
-def payload_unusable(code: str, problem: str) -> str:
+# 判定に達しなかった回（payload 不正・期限切れ）に、直す側として名指しする先。
+_CHECK_SETUP = (
+    "the ccnavi hook registration in .claude/settings.json and whether this ccnavi build "
+    "matches the Claude Code version"
+)
+
+# payload を読めずに止めた（enable の exit 2）とき、イベントごとに何が起きたかと次の一手。
+# exit 2 の意味と標準エラーの宛先はイベントで違う。PreToolUse は呼び出しを止めてモデルへ、
+# PostToolUse は走った後でモデルへ、UserPromptSubmit はユーザの発言を止めてユーザへ、Stop と
+# SubagentStop は終わりを止めてモデルへ届く。ほかのイベントは止まらず、ユーザにだけ見える。
+_PAYLOAD_STOPPED = {
+    hookio.PRE_TOOL_USE: (
+        "so it could not judge this call and stopped it. Rewriting the call will not help. "
+        f"Tell the user, so they can check {_CHECK_SETUP}."
+    ),
+    hookio.POST_TOOL_USE: (
+        "so it could not check what this call changed. The call has already run, and this is "
+        "not about what you wrote. Do not retry it. "
+        f"Tell the user, so they can check {_CHECK_SETUP}."
+    ),
+    hookio.USER_PROMPT_SUBMIT: (
+        "so it held this message back before Claude saw it. Sending it again will not help "
+        f"until someone checks {_CHECK_SETUP}."
+    ),
+    hookio.STOP: (
+        "so it could not check the end of this turn and kept it from ending. This is not "
+        "about your work. Do not go on with the task: tell the user, so they can check "
+        f"{_CHECK_SETUP}, and end the turn."
+    ),
+    hookio.SUBAGENT_STOP: (
+        "so it could not check this subagent's work and kept it from ending. This is not "
+        "about your work. Do not go on with the task: put this in your final report, so the "
+        f"user can check {_CHECK_SETUP}, and end."
+    ),
+}
+
+
+def payload_unusable(code: str, problem: str, *, event: str = "", mode: str = "") -> str:
     """hook の入力（payload）を読めなかったときの文。
 
-    ccnavi は何の呼び出しかも分からないので止める。呼び出しを書き直しても入力は変わらず、
-    直せるのは hook の登録か ccnavi・Claude Code の版を合わせるユーザだけ。
+    ccnavi は何の呼び出しかも分からないので、enable では止める（`modes.fail_closed`）。呼び出しを
+    書き直しても入力は変わらず、直せるのは hook の登録か ccnavi・Claude Code の版を合わせる
+    ユーザだけ。
+
+    文はイベントとモードに合わせる。exit 2 が何を止め、標準エラーが誰に届くかはイベントで違い、
+    UserPromptSubmit で「この呼び出しを止めた」と言うと、ユーザが自分の発言についての文として
+    読めない。dry-run は exit 0 で通すので「止めた」と言わない。event はイベント名すら読めなかった
+    回は空で、そのときは何を止めたかを言わない。
     """
-    return "\n".join(
-        [
-            f"[ccnavi] {code}",
-            f"ccnavi could not read the hook input from Claude Code ({problem}), so it could not "
-            "judge this call and stopped it. Rewriting the call will not help. Tell the user, so "
-            "they can check the ccnavi hook registration in .claude/settings.json and whether "
-            "this ccnavi build matches the Claude Code version.",
-        ]
-    )
+    head = f"[ccnavi] {code}"
+    said = f"ccnavi could not read the hook input from Claude Code ({problem}), "
+    if mode == DRY_RUN:
+        return "\n".join(
+            [
+                head,
+                said + "so it could not check this "
+                f"{event or 'hook'} event. CCNAVI_MODE is dry-run, so nothing was stopped; under "
+                f"enable it would have been. The user needs to check {_CHECK_SETUP}.",
+            ]
+        )
+    stopped = _PAYLOAD_STOPPED.get(event)
+    if stopped is None:
+        stopped = (
+            f"so it could not check this {event or 'hook'} event and stopped with exit code 2. "
+            "This is not about anything that was written, and repeating it will not help. "
+            f"The user needs to check {_CHECK_SETUP}."
+        )
+    return "\n".join([head, said + stopped])
 
 
-def deadline_exceeded(code: str, seconds: float) -> str:
+def deadline_exceeded(code: str, seconds: float, *, mode: str = "") -> str:
     """判定が期限に届かなかったときの文。
 
     照合が長引くのは、コマンドの文字列が長いか、`>` のような照合を伸ばす形が多いとき。
     短く分ければ通る見込みがある。同じ形で続けて止まるなら、ルールの側の問題なので
     ユーザに伝えさせる。
+
+    期限を見るのは実行前チェック（PreToolUse）だけなので、宛先はツール呼び出しを書いたモデル。
+    dry-run は exit 0 で通すので「止めた」と言わず、enable なら止めていたと言う。
     """
+    if mode == DRY_RUN:
+        what = (
+            "CCNAVI_MODE is dry-run, so the call goes through; under enable it would have been "
+            "stopped."
+        )
+    else:
+        what = "so it stopped it."
     return "\n".join(
         [
             f"[ccnavi] {code}",
-            f"ccnavi ran out of time ({seconds:g} s) before it finished judging this call, so it "
-            "stopped it. Long commands and long inline text make matching slow: split the command "
+            f"ccnavi ran out of time ({seconds:g} s) before it finished judging this call"
+            + (". " if mode == DRY_RUN else ", ")
+            + what
+            + " Long commands and long inline text make matching slow: split the command "
             "into smaller ones, or write long text to a file with the Write tool and pass the "
-            "file. If a short command keeps stopping here, tell the user.",
+            "file. If a short command keeps hitting this, tell the user.",
         ]
     )
 

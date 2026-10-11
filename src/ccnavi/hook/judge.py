@@ -492,7 +492,9 @@ def decide_before(
         for rule in rule_set.section(name):
             if time.monotonic() > deadline:
                 stderr.write(
-                    reasons.deadline_exceeded(audit.REASON_DEADLINE_EXCEEDED, DEADLINE_SECONDS)
+                    reasons.deadline_exceeded(
+                        audit.REASON_DEADLINE_EXCEEDED, DEADLINE_SECONDS, mode=mode
+                    )
                     + "\n"
                 )
                 record.decision, record.reason = audit.SKIP, audit.REASON_DEADLINE_EXCEEDED
