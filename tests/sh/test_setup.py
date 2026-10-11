@@ -141,8 +141,8 @@ LAUNCHER_PARTS = (".ccnavi", "scripts", LAUNCHER_NAME)
 # CCNAVI_BIN_PATH に書くパス。固定。
 BIN_PATH = "/".join(LAUNCHER_PARTS)
 # 配布先の .gitignore に足す `--docs` の索引の 1 行と見出し。docsearch は git がそこの
-# index.jsonl を無視しているときだけ書く（README「ドキュメントの索引」）。
-INDEX_LINE = "**/index.jsonl"
+# ccnavi-index.jsonl を無視しているときだけ書く（README「ドキュメントの索引」）。
+INDEX_LINE = "**/ccnavi-index.jsonl"
 INDEX_HEADER = "# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）"
 
 
@@ -1670,9 +1670,9 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
 
 
 class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
-    """`--docs` の索引（`**/index.jsonl`）を .gitignore に足す。
+    """`--docs` の索引（`**/ccnavi-index.jsonl`）を .gitignore に足す。
 
-    docsearch は git がそこの index.jsonl を無視しているときだけ書く。無視の 1 行が無い
+    docsearch は git がそこの ccnavi-index.jsonl を無視しているときだけ書く。無視の 1 行が無い
     配布先では、配った実行ファイルの `--docs` が索引を作らない。
     """
 
@@ -1701,19 +1701,42 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
         self.assertEqual(first.count(INDEX_HEADER), 1)
 
     def test_does_not_add_it_when_the_line_is_already_there(self):
-        for existing in (INDEX_LINE, "index.jsonl"):
+        for existing in (INDEX_LINE, "ccnavi-index.jsonl"):
             with self.subTest(existing=existing):
                 self.write_gitignore(f"node_modules/\n{existing}\n")
                 self.make_git()
                 self.run_setup("--deploy", self.make_source())
                 written = self.gitignore()
                 self.assertTrue(written.startswith(f"node_modules/\n{existing}\n"), written)
-                self.assertEqual(written.count("index.jsonl"), 1, written)
+                self.assertEqual(written.count("ccnavi-index.jsonl"), 1, written)
                 self.assertNotIn(INDEX_HEADER, written)
 
+    def test_an_old_name_line_does_not_count_and_the_new_line_is_added(self):
+        """旧名 index.jsonl の行は、新しい名前の索引を無視しない行としては数えない。"""
+        for old in ("**/index.jsonl", "index.jsonl"):
+            with self.subTest(old=old):
+                self.write_gitignore(f"node_modules/\n{old}\n")
+                self.make_git()
+                self.run_setup("--deploy", self.make_source())
+                written = self.gitignore()
+                self.assertTrue(written.startswith(f"node_modules/\n{old}\n"), written)
+                self.assertIn(f"{INDEX_HEADER}\n{INDEX_LINE}\n", written)
+
+    def test_an_old_name_negation_does_not_stop_the_new_line(self):
+        self.write_gitignore("!**/index.jsonl\n")
+        self.make_git()
+        result = self.run_setup("--deploy", self.make_source())
+        self.assertNotIn("ユーザが索引を追跡しているので", result.stdout)
+        self.assertIn(f"{INDEX_HEADER}\n{INDEX_LINE}\n", self.gitignore())
+
     def test_does_not_undo_a_negation_of_the_user(self):
-        """ユーザが index.jsonl を否定していれば足さず、そう言う（--check でも）。"""
-        for negation in ("!**/index.jsonl", "!index.jsonl", "!docs/index.jsonl", "!*.jsonl"):
+        """ユーザが ccnavi-index.jsonl を否定していれば足さず、そう言う（--check でも）。"""
+        for negation in (
+            "!**/ccnavi-index.jsonl",
+            "!ccnavi-index.jsonl",
+            "!docs/ccnavi-index.jsonl",
+            "!*.jsonl",
+        ):
             with self.subTest(negation=negation):
                 before = f"*.log\n{negation}\n/.ccnavi/bin/{THIS_MACHINE}/\n"
                 self.write_gitignore(before)
@@ -1735,7 +1758,7 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
 
     def test_compares_lines_without_cr_and_trailing_spaces(self):
         """CRLF の .gitignore や行末に空白のある行も、同じ行として数える。"""
-        for line in (f"{INDEX_LINE}\r", f"{INDEX_LINE}  ", "index.jsonl\t"):
+        for line in (f"{INDEX_LINE}\r", f"{INDEX_LINE}  ", "ccnavi-index.jsonl\t"):
             with self.subTest(line=line):
                 before = f"node_modules/\r\n{line}\n/.ccnavi/bin/{THIS_MACHINE}/\r\n"
                 self.write_gitignore(before)

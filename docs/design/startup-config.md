@@ -32,7 +32,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 
 | イベント | すること | 応答 |
 |---|---|---|
-| `SessionStart` | コアファイルのバックアップを取る（実行ファイルはここだけ）。`additionalContextOnce` の記憶を捨てる（`source=startup` なら `match: Stop` の数えも。6.6）。サブエージェントでなければ、ccnavi が前提にしている作業の決まり（ワークツリー・`ccnavi-git.sh`・`wip/scratchpad/`・プロジェクトへの `cd`・サブエージェント・合意の要る変更。チケット制御が有効なら `ccnavi-ticket.sh status` も）を 1 行ずつ渡し（ワークツリーと git の行は、共通レイヤーと自身のレイヤーの deny に `workspace-root`・`raw-git` があるときだけ）、索引の案内を出す回は `--docs` で詳しく引くよう添える（REQ-SES-06）。チケット制御が有効なら、直接作業とチケット作業の使い分けをモデルに渡す（9.1）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を渡す（11.13）。サブエージェントでなければ、ワークスペースとプロジェクトの md の frontmatter の索引を差分で新しくし（3 秒と hook の判定の期限の残りの小さいほうまで）、`--docs` での引き方と、索引の対象外にしたツリーと書き換えなかった index.jsonl を渡す（10） | `additionalContext` |
+| `SessionStart` | コアファイルのバックアップを取る（実行ファイルはここだけ）。`additionalContextOnce` の記憶を捨てる（`source=startup` なら `match: Stop` の数えも。6.6）。サブエージェントでなければ、ccnavi が前提にしている作業の決まり（ワークツリー・`ccnavi-git.sh`・`wip/scratchpad/`・プロジェクトへの `cd`・サブエージェント・合意の要る変更。チケット制御が有効なら `ccnavi-ticket.sh status` も）を 1 行ずつ渡し（ワークツリーと git の行は、共通レイヤーと自身のレイヤーの deny に `workspace-root`・`raw-git` があるときだけ）、索引の案内を出す回は `--docs` で詳しく引くよう添える（REQ-SES-06）。チケット制御が有効なら、直接作業とチケット作業の使い分けをモデルに渡す（9.1）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を渡す（11.13）。サブエージェントでなければ、ワークスペースとプロジェクトの md の frontmatter の索引を差分で新しくし（3 秒と hook の判定の期限の残りの小さいほうまで）、`--docs` での引き方と、無視の行を足したツリー（その `.gitignore` に未コミットの差分が残る）と、索引の対象外にしたツリーと、書き換えなかった ccnavi-index.jsonl を渡す（10） | `additionalContext` |
 | `UserPromptSubmit` | 保護領域にいまある変更を記録し、ターンの基準にする（7.4）。このセッションがまだ知らない承認を 1 度伝える（9.4）。依頼文に issue・MR の指定があれば、紐づくブランチを探してユーザに確かめる指示を渡す（9.13） | 無し。伝えることがあれば `additionalContext` |
 | `PreToolUse` | 呼び出しを判定する（6 章）。コアファイルをバックアップする（8 章）。cwd がプロジェクトの中に入った最初の回に、そのスキルの目録を添える（11.13） | `permissionDecision` と `additionalContext` |
 | `PostToolUse` | コアファイルをバックアップと突き合わせて戻す。作業ツリーを git で読み、保護領域の変更を報告し、設定に従って戻す（7 章）。チケットの状態を承認済みチケットへ書き出し、フェーズの終わりを告げる（9.8）。サブエージェントが差し戻しを無視して終わったことを親に言う | 終了コード 2 と標準エラー、または `additionalContext` |
@@ -99,7 +99,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 | `.claude/settings.json` の `hooks` | 7 つのイベントに実行ファイルを登録する。既に別の表記で登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true`。`--no-vscode` で触らない |
 | 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,agree,fetch,sync,clean,branches,start,launcher}.sh`、共通部の部品 `ccnavi-common-{state,lock,c1,host,log}.sh` と `ccnavi-clean.js`。取り込み（`ccnavi-fetch.sh`）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは触らず、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも外れていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない） |
-| 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行と、`--docs` の索引の `**/index.jsonl` の 1 行。索引の行は別の見出しの下に入り、`index.jsonl` の行が既にあれば足さない。`index.jsonl` を否定する行があればユーザの除外として足さない。どちらも配布先が git のリポジトリで、配るときだけ。振り分けの sh は追跡する側に置く。`projects/` の下のプロジェクトには足さない |
+| 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行と、`--docs` の索引の `**/ccnavi-index.jsonl` の 1 行。索引の行は別の見出しの下に入り、`ccnavi-index.jsonl` の行が既にあれば足さない（旧名 `index.jsonl` の行は数えない）。`ccnavi-index.jsonl` を否定する行があればユーザの除外として足さない。どちらも配布先が git のリポジトリで、配るときだけ。振り分けの sh は追跡する側に置く。導入スクリプトは `projects/` の下のプロジェクトには足さない（そこは `--docs` が索引を書く前に、そのプロジェクトの `.gitignore` に足す。10 と ADR-0112） |
 
 置き場は 2 つに分けて固定する。
 

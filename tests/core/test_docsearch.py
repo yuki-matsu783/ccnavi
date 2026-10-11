@@ -2,7 +2,8 @@
 
 見るのは次のとおり。
 
-1. 索引: git が挙げる md をディレクトリごとの `index.jsonl` に書く。無視されていなければ書かない。
+1. 索引: git が挙げる md をディレクトリごとの `ccnavi-index.jsonl` に書く。無視されていなければ
+   書く前に .gitignore へ 1 行足す。
    実体の無い md と ccnavi ディレクトリの下は載せない。md が全部消えたディレクトリの索引は消す
 2. 差分: `concept_id` と `mtime` が同じ行は読み直さない。中身が同じなら書かない
 3. frontmatter: 不正なもの・別名・リストでないものは null。スカラーの tags は 1 要素。日付は文字列
@@ -10,7 +11,7 @@
 5. CLI: `--docs` の外の絞り込みは理由を言って失敗にする。誤った値は 1、0 件は 0
    どこから打ってもワークスペースを引く
 6. プロジェクト: 置き場の直下の各 git も引く。パスはワークスペースルートから。
-   index.jsonl を無視していなければ対象外
+   ccnavi-index.jsonl を無視していなければ対象外
 7. SessionStart: 索引を新しくして案内をつける。対象外は名指し。
    サブエージェントと git の外では案内を出さない
 """
@@ -79,13 +80,13 @@ class Repo(unittest.TestCase):
         self.addCleanup(self.dir.cleanup)
         self.root = os.path.realpath(self.dir.name)
         git(self.root, "init", "-q")
-        write(os.path.join(self.root, ".gitignore"), "**/index.jsonl\n")
+        write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\n")
 
     def put(self, rel: str, text: str, mtime: float | None = NOON) -> str:
         return write(os.path.join(self.root, *rel.split("/")), text, mtime)
 
     def index_of(self, rel_dir: str) -> str:
-        return os.path.join(self.root, *[p for p in rel_dir.split("/") if p], "index.jsonl")
+        return os.path.join(self.root, *[p for p in rel_dir.split("/") if p], "ccnavi-index.jsonl")
 
     def rows_of(self, rel_dir: str) -> list[dict]:
         with open(self.index_of(rel_dir), encoding="utf-8") as f:
@@ -100,7 +101,9 @@ class IndexTest(Repo):
         self.put("README.md", doc(type="guide", title="はじめに"))
         self.put("docs/adr/0001-a.md", doc(type="adr", tags="[git, worktree]"))
         built = docsearch_index.build(self.root)
-        self.assertEqual(sorted(built.written), ["docs/adr/index.jsonl", "index.jsonl"])
+        self.assertEqual(
+            sorted(built.written), ["ccnavi-index.jsonl", "docs/adr/ccnavi-index.jsonl"]
+        )
         (row,) = self.rows_of("docs/adr")
         self.assertEqual(
             row,
@@ -117,28 +120,87 @@ class IndexTest(Repo):
             f.seek(0)
             self.assertNotIn(", ", f.read())  # 1 行は詰めた JSON
 
-    def test_a_tree_that_ignores_no_index_is_left_out(self):
-        write(os.path.join(self.root, ".gitignore"), "")
+    def test_a_tree_that_ignores_no_index_gets_one_line_in_its_gitignore(self):
+        write(os.path.join(self.root, ".gitignore"), "build/\n")
+        self.put("a.md", doc(type="guide"))
+        built = docsearch_index.build(self.root)
+        self.assertFalse(built.unignored)
+        self.assertEqual(built.ignore_added, ".gitignore")
+        self.assertEqual(built.written, ["ccnavi-index.jsonl"])
+        self.assertEqual(
+            read(os.path.join(self.root, ".gitignore")), "build/\n**/ccnavi-index.jsonl\n"
+        )
+        # 2 回目は足さない。
+        again = docsearch_index.build(self.root)
+        self.assertEqual((again.ignore_added, again.written), ("", []))
+        self.assertEqual(
+            read(os.path.join(self.root, ".gitignore")), "build/\n**/ccnavi-index.jsonl\n"
+        )
+
+    def test_the_line_is_added_after_a_missing_final_newline_without_touching_others(self):
+        write(os.path.join(self.root, ".gitignore"), "build/\r\n*.log")
+        self.put("a.md", doc(type="guide"))
+        docsearch_index.build(self.root)
+        self.assertEqual(
+            read(os.path.join(self.root, ".gitignore")), "build/\r\n*.log\n**/ccnavi-index.jsonl\n"
+        )
+
+    def test_a_missing_gitignore_is_created(self):
+        os.remove(os.path.join(self.root, ".gitignore"))
+        self.put("a.md", doc(type="guide"))
+        built = docsearch_index.build(self.root)
+        self.assertEqual(built.ignore_added, ".gitignore")
+        self.assertEqual(read(os.path.join(self.root, ".gitignore")), "**/ccnavi-index.jsonl\n")
+        self.assertEqual(built.written, ["ccnavi-index.jsonl"])
+
+    def test_a_negation_of_the_index_is_respected(self):
+        for negation in ("!**/ccnavi-index.jsonl", "!ccnavi-index.jsonl", "!docs/*.jsonl"):
+            with self.subTest(negation=negation):
+                write(os.path.join(self.root, ".gitignore"), negation + "\n")
+                self.put("a.md", doc(type="guide"))
+                built = docsearch_index.build(self.root)
+                self.assertTrue(built.unignored)
+                self.assertEqual((built.rows, built.written, built.ignore_added), ([], [], ""))
+                self.assertEqual(read(os.path.join(self.root, ".gitignore")), negation + "\n")
+                self.assertFalse(os.path.exists(self.index_of("")))
+
+    def test_an_unwritable_gitignore_leaves_the_tree_out(self):
+        os.remove(os.path.join(self.root, ".gitignore"))
+        os.mkdir(os.path.join(self.root, ".gitignore"))  # ふつうのファイルではない
         self.put("a.md", doc(type="guide"))
         built = docsearch_index.build(self.root)
         self.assertTrue(built.unignored)
-        self.assertEqual((built.rows, built.written), ([], []))
-        self.assertFalse(os.path.exists(self.index_of("")))
+        self.assertEqual((built.rows, built.written, built.ignore_added), ([], [], ""))
+
+    def test_nothing_is_added_when_not_refreshing(self):
+        write(os.path.join(self.root, ".gitignore"), "")
+        self.put("a.md", doc(type="guide"))
+        built = docsearch_index.build(self.root, refresh=False)
+        self.assertTrue(built.unignored)
+        self.assertEqual(read(os.path.join(self.root, ".gitignore")), "")
+
+    def test_a_partly_ignored_tree_gets_no_line(self):
+        write(os.path.join(self.root, ".gitignore"), "/docs/ccnavi-index.jsonl\n")
+        self.put("a.md", doc(type="guide"))
+        self.put("docs/b.md", doc(type="guide"))
+        built = docsearch_index.build(self.root)
+        self.assertEqual((built.ignore_added, built.written), ("", ["docs/ccnavi-index.jsonl"]))
+        self.assertEqual(read(os.path.join(self.root, ".gitignore")), "/docs/ccnavi-index.jsonl\n")
 
     def test_a_tracked_index_is_not_rewritten_but_its_rows_are_built(self):
         self.put("a.md", doc(type="guide"))
         self.put("docs/b.md", doc(type="adr"))
         write(self.index_of(""), "tracked\n")
-        git(self.root, "add", "-f", "index.jsonl")
+        git(self.root, "add", "-f", "ccnavi-index.jsonl")
         built = docsearch_index.build(self.root)
         self.assertFalse(built.unignored)
         self.assertEqual([r["concept_id"] for r in built.rows], ["a", "docs/b"])
-        self.assertEqual(built.written, ["docs/index.jsonl"])
+        self.assertEqual(built.written, ["docs/ccnavi-index.jsonl"])
         with open(self.index_of(""), encoding="utf-8") as f:
             self.assertEqual(f.read(), "tracked\n")
 
     def test_lists_untracked_but_not_ignored_files_and_skips_ignored_ones(self):
-        write(os.path.join(self.root, ".gitignore"), "**/index.jsonl\nbuild/\n")
+        write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\nbuild/\n")
         self.put("new.md", doc(type="guide"))
         self.put("build/out.md", doc(type="guide"))
         self.put("notes.txt", "not md")
@@ -155,7 +217,7 @@ class IndexTest(Repo):
         built = docsearch_index.build(self.root)
         self.assertEqual([r["concept_id"] for r in built.rows], ["keep/a"])
         self.assertFalse(os.path.exists(self.index_of("gone")))
-        self.assertEqual(built.removed, ["gone/index.jsonl"])
+        self.assertEqual(built.removed, ["gone/ccnavi-index.jsonl"])
 
     def test_leaves_out_the_ccnavi_directory(self):
         self.put(".ccnavi/approved/done/i0001.md", "---\nversion: 1\nticket: i0001\n---\n")
@@ -199,7 +261,7 @@ class IncrementalTest(Repo):
         built = docsearch_index.build(self.root)
         self.assertEqual(built.parsed, 1)
         self.assertEqual(self.rows_of("")[0]["frontmatter"]["type"], "changed")
-        self.assertEqual(built.written, ["index.jsonl"])
+        self.assertEqual(built.written, ["ccnavi-index.jsonl"])
 
     def test_no_refresh_uses_existing_rows_and_writes_nothing(self):
         self.put("a.md", doc(type="guide"))
@@ -217,7 +279,7 @@ class IncrementalTest(Repo):
         built = docsearch_index.build(self.root)
         self.assertEqual(built.parsed, 1)
         self.assertEqual([r["concept_id"] for r in built.rows], ["a"])
-        self.assertEqual((built.written, built.foreign), ([], ["index.jsonl"]))
+        self.assertEqual((built.written, built.foreign), ([], ["ccnavi-index.jsonl"]))
         with open(self.index_of(""), encoding="utf-8") as f:
             self.assertEqual(f.read(), "{not json\n")
 
@@ -555,9 +617,10 @@ class ProjectsTest(Repo):
 
     def setUp(self):
         super().setUp()
-        write(os.path.join(self.root, ".gitignore"), "**/index.jsonl\n/projects/\n")
-        self.lib = self.project("lib", "**/index.jsonl\n")
-        self.bare = self.project("bare", "")
+        write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\n/projects/\n")
+        self.lib = self.project("lib", "**/ccnavi-index.jsonl\n")
+        # ユーザが索引を追跡している（否定の行がある）プロジェクトは、足さず対象外のまま。
+        self.bare = self.project("bare", "!**/ccnavi-index.jsonl\n")
         self.put("docs/w.md", doc(type="guide", title="ワークスペース"))
         self.put("projects/lib/docs/x.md", doc(type="adr", title="lib の決定"))
         self.put("projects/bare/y.md", doc(type="guide"))
@@ -585,7 +648,7 @@ class ProjectsTest(Repo):
             [("docs/w", "docs"), ("projects/lib/docs/x", "projects/lib/docs")],
         )
         # 書く行はそのプロジェクトのルートからの相対。
-        with open(os.path.join(self.lib, "docs", "index.jsonl"), encoding="utf-8") as f:
+        with open(os.path.join(self.lib, "docs", "ccnavi-index.jsonl"), encoding="utf-8") as f:
             self.assertEqual(json.loads(f.readline())["concept_id"], "docs/x")
 
     def test_path_narrows_to_one_project(self):
@@ -596,9 +659,27 @@ class ProjectsTest(Repo):
         done = self.ccnavi("--format", "count")
         self.assertEqual(done.stdout, "matched=2 total=2\n")
         self.assertIn(f"bare {docsearch.UNIGNORED}", done.stderr)
-        self.assertFalse(os.path.exists(os.path.join(self.bare, "index.jsonl")))
+        self.assertFalse(os.path.exists(os.path.join(self.bare, "ccnavi-index.jsonl")))
         with open(os.path.join(self.bare, ".gitignore"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "")  # .gitignore は書き換えない
+            self.assertEqual(f.read(), "!**/ccnavi-index.jsonl\n")  # 否定があれば書き換えない
+
+    def test_a_project_without_ignore_gets_the_line_and_is_indexed(self):
+        plain = self.project("plain", "node_modules/\n")
+        self.put("projects/plain/z.md", doc(type="guide", title="plain の文書"))
+        done = self.ccnavi("--format", "path")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("projects/plain/z", done.stdout.splitlines())
+        self.assertIn("projects/plain/.gitignore に", done.stderr)
+        self.assertEqual(
+            read(os.path.join(plain, ".gitignore")), "node_modules/\n**/ccnavi-index.jsonl\n"
+        )
+        self.assertTrue(os.path.exists(os.path.join(plain, "ccnavi-index.jsonl")))
+        # 2 回目は足さない。
+        again = self.ccnavi("--format", "path")
+        self.assertNotIn("を足した", again.stderr)
+        self.assertEqual(
+            read(os.path.join(plain, ".gitignore")), "node_modules/\n**/ccnavi-index.jsonl\n"
+        )
 
     def test_the_ccnavi_directory_of_a_project_is_left_out(self):
         self.put("projects/lib/.ccnavi/approved/doing/i0001.md", "---\nversion: 1\n---\n")
@@ -646,18 +727,38 @@ class SessionStartTest(Repo):
         self.assertIn(docsearch.CONVENTION_DOC, self.context(self.root))
 
     def test_names_a_project_left_out(self):
-        write(os.path.join(self.root, ".gitignore"), "**/index.jsonl\n/projects/\n")
+        write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\n/projects/\n")
         self.put("docs/a.md", doc(type="guide"))
         home = os.path.join(self.root, "projects", "bare")
         os.makedirs(home)
         git(home, "init", "-q")
+        write(os.path.join(home, ".gitignore"), "!**/ccnavi-index.jsonl\n")
         self.put("projects/bare/y.md", doc(type="guide"))
         said = self.context(self.root)
         self.assertIn("--docs", said)
         self.assertIn(f"bare {docsearch.UNIGNORED}", said)
 
-    def test_only_the_left_out_line_when_nothing_is_indexed(self):
+    def test_names_a_project_that_got_the_line(self):
+        write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\n/projects/\n")
+        self.put("docs/a.md", doc(type="guide"))
+        home = os.path.join(self.root, "projects", "plain")
+        os.makedirs(home)
+        git(home, "init", "-q")
+        self.put("projects/plain/y.md", doc(type="guide"))
+        said = self.context(self.root)
+        self.assertIn(f"projects/plain/.gitignore {docsearch.IGNORE_ADDED}", said)
+        self.assertNotIn(docsearch.UNIGNORED, said)
+        self.assertEqual(read(os.path.join(home, ".gitignore")), "**/ccnavi-index.jsonl\n")
+
+    def test_names_the_workspace_that_got_the_line(self):
         write(os.path.join(self.root, ".gitignore"), "")
+        self.put("docs/a.md", doc(type="guide"))
+        said = self.context(self.root)
+        self.assertIn(f".gitignore {docsearch.IGNORE_ADDED}", said)
+        self.assertIn("grep・Glob より先に", said)
+
+    def test_only_the_left_out_line_when_nothing_is_indexed(self):
+        write(os.path.join(self.root, ".gitignore"), "!**/ccnavi-index.jsonl\n")
         self.put("docs/a.md", doc(type="guide"))
         said = self.context(self.root)
         self.assertIn(f"{docsearch.WORKSPACE} {docsearch.UNIGNORED}", said)
@@ -688,14 +789,14 @@ def can_symlink_dirs() -> bool:
 
 
 class ForeignIndexTest(Repo):
-    """A: ccnavi の形でない index.jsonl は上書きも削除もしない。"""
+    """A: ccnavi の形でない ccnavi-index.jsonl は上書きも削除もしない。"""
 
     def test_a_foreign_index_is_not_overwritten(self):
         self.put("a.md", doc(type="guide"))
         foreign = '{"name": "other tool"}\n'
         write(self.index_of(""), foreign)
         built = docsearch_index.build(self.root)
-        self.assertEqual(built.foreign, ["index.jsonl"])
+        self.assertEqual(built.foreign, ["ccnavi-index.jsonl"])
         self.assertIn("ccnavi の索引ではない", built.problems[0])
         with open(self.index_of(""), encoding="utf-8") as f:
             self.assertEqual(f.read(), foreign)
@@ -713,7 +814,7 @@ class ForeignIndexTest(Repo):
     def test_an_empty_index_is_ours(self):
         self.put("a.md", doc(type="guide"))
         write(self.index_of(""), "\n")
-        self.assertEqual(docsearch_index.build(self.root).written, ["index.jsonl"])
+        self.assertEqual(docsearch_index.build(self.root).written, ["ccnavi-index.jsonl"])
 
     def test_cli_and_session_start_name_it(self):
         self.put("a.md", doc(type="guide"))
@@ -721,9 +822,86 @@ class ForeignIndexTest(Repo):
         done = run_ccnavi(
             ["--root", self.root, "--log", "", "--docs", "--format", "count"], env=clean_env()
         )
-        self.assertIn("index.jsonl は ccnavi の索引ではないので書き換えない", done.stderr)
+        self.assertIn("ccnavi-index.jsonl は ccnavi の索引ではないので書き換えない", done.stderr)
         conf = settings.load(self.root)[0]
-        self.assertIn("書き換えなかった: index.jsonl", docsearch.at_start(conf, self.root))
+        self.assertIn("書き換えなかった: ccnavi-index.jsonl", docsearch.at_start(conf, self.root))
+
+
+class LegacyIndexTest(Repo):
+    """旧 index.jsonl は、ccnavi が書いた形のものだけ、新しい名前に移る時に消す。"""
+
+    def legacy(self, rel_dir: str = "") -> str:
+        return os.path.join(self.root, *[p for p in rel_dir.split("/") if p], "index.jsonl")
+
+    def ours(self, concept_id: str, directory: str) -> str:
+        row = {"concept_id": concept_id, "directory": directory, "frontmatter": None, "mtime": "x"}
+        return json.dumps(row) + "\n"
+
+    def test_our_old_index_is_removed_when_the_new_one_is_written(self):
+        self.put("a.md", doc(type="guide"))
+        self.put("docs/b.md", doc(type="guide"))
+        write(self.legacy(), self.ours("a", "."))
+        write(self.legacy("docs"), self.ours("docs/b", "docs"))
+        built = docsearch_index.build(self.root)
+        self.assertEqual(sorted(built.migrated), ["docs/index.jsonl", "index.jsonl"])
+        self.assertFalse(os.path.exists(self.legacy()))
+        self.assertFalse(os.path.exists(self.legacy("docs")))
+        self.assertTrue(os.path.exists(self.index_of("")))
+
+    def test_another_tools_index_is_left_alone(self):
+        self.put("a.md", doc(type="guide"))
+        self.put("docs/b.md", doc(type="guide"))
+        other = '{"name": "other tool"}\n'
+        partial = self.ours("docs/b", "docs") + "not json\n"
+        write(self.legacy(), other)
+        write(self.legacy("docs"), partial)
+        built = docsearch_index.build(self.root)
+        self.assertEqual((built.migrated, built.foreign, built.problems), ([], [], []))
+        self.assertEqual(read(self.legacy()), other)
+        self.assertEqual(read(self.legacy("docs")), partial)
+        self.assertTrue(os.path.exists(self.index_of("")))
+
+    def test_an_empty_or_linked_old_index_is_left_alone(self):
+        self.put("a.md", doc(type="guide"))
+        self.put("docs/b.md", doc(type="guide"))
+        write(self.legacy(), "\n")
+        target = write(os.path.join(self.root, "target.txt"), self.ours("docs/b", "docs"))
+        try:
+            os.symlink(target, self.legacy("docs"))
+        except (OSError, NotImplementedError):
+            self.skipTest("symlink が作れない")
+        built = docsearch_index.build(self.root)
+        self.assertEqual(built.migrated, [])
+        self.assertTrue(os.path.exists(self.legacy()))
+        self.assertTrue(os.path.islink(self.legacy("docs")))
+
+    def test_a_tracked_old_index_is_left_alone(self):
+        self.put("a.md", doc(type="guide"))
+        write(self.legacy(), self.ours("a", "."))
+        git(self.root, "add", "-f", "index.jsonl")
+        built = docsearch_index.build(self.root)
+        self.assertEqual(built.migrated, [])
+        self.assertTrue(os.path.exists(self.legacy()))
+
+    def test_nothing_is_removed_when_the_new_index_cannot_be_written(self):
+        write(os.path.join(self.root, ".gitignore"), "!**/ccnavi-index.jsonl\n")
+        self.put("a.md", doc(type="guide"))
+        write(self.legacy(), self.ours("a", "."))
+        built = docsearch_index.build(self.root)
+        self.assertTrue(built.unignored)
+        self.assertTrue(os.path.exists(self.legacy()))
+
+    def test_nothing_is_removed_without_refresh(self):
+        self.put("a.md", doc(type="guide"))
+        write(self.legacy(), self.ours("a", "."))
+        docsearch_index.build(self.root, refresh=False)
+        self.assertTrue(os.path.exists(self.legacy()))
+
+    def test_an_old_index_in_a_directory_without_md_is_not_touched(self):
+        self.put("a.md", doc(type="guide"))
+        write(self.legacy("empty"), self.ours("empty/c", "empty"))
+        docsearch_index.build(self.root)
+        self.assertTrue(os.path.exists(self.legacy("empty")))
 
 
 class OutsideTest(Repo):
@@ -737,7 +915,7 @@ class OutsideTest(Repo):
         return path
 
     def assert_nothing_outside(self, outside: str, built: docsearch_index.Built) -> None:
-        self.assertFalse(os.path.exists(os.path.join(outside, "index.jsonl")))
+        self.assertFalse(os.path.exists(os.path.join(outside, "ccnavi-index.jsonl")))
         self.assertEqual([r for r in built.rows if r["concept_id"].startswith("linked")], [])
 
     def test_under_refuses_a_path_outside(self):
@@ -778,7 +956,7 @@ class RobustTest(Repo):
         self.put("a.md", doc(type="guide"))
         write(self.index_of(""), "[" * 100000 + "\n")
         built = docsearch_index.build(self.root)
-        self.assertEqual(built.foreign, ["index.jsonl"])
+        self.assertEqual(built.foreign, ["ccnavi-index.jsonl"])
 
     def test_one_broken_directory_does_not_stop_the_others(self):
         self.put("bad/a.md", doc(type="guide"))
@@ -820,7 +998,7 @@ class DeadlineTest(Repo):
     def test_parse_stops_between_files_and_keeps_the_rest_waiting(self):
         self.put("a.md", doc(type="guide"))
         one = docsearch_index._Dir(
-            "", "index.jsonl", self.index_of(""), True, docsearch_index.ABSENT, {}, None
+            "", "ccnavi-index.jsonl", self.index_of(""), True, docsearch_index.ABSENT, {}, None
         )
         one.order = ["a"]
         one.pending = [("a.md", "a", "2026-01-01T00:00:00")]
@@ -850,7 +1028,7 @@ class DeadlineTest(Repo):
         ):
             built = docsearch_index.build(self.root, deadline=time.monotonic() + 600)
         self.assertTrue(built.timed_out)
-        self.assertEqual(built.written, ["index.jsonl"])
+        self.assertEqual(built.written, ["ccnavi-index.jsonl"])
         rows = {r["concept_id"]: r for r in map(json.loads, read(self.index_of("")).splitlines())}
         self.assertEqual(rows["a"]["frontmatter"], {"type": "guide"})
         self.assertEqual(rows["b"], old_b)
@@ -1037,7 +1215,7 @@ class DedupeAndProjectsTest(Repo):
 
 
 class LineSeparatorTest(Repo):
-    """自分の index.jsonl を、値の中の U+2028・U+2029・U+0085 で割って foreign にしない。"""
+    """自分の ccnavi-index.jsonl を、値の中の U+2028・U+2029・U+0085 で割って foreign にしない。"""
 
     def test_a_line_separator_in_a_value_keeps_the_index_ours(self):
         for escape, char in (("\\L", " "), ("\\P", " "), ("\\N", "\u0085")):
@@ -1086,16 +1264,16 @@ class CrossDeviceTest(Repo):
         with self.exdev():
             built = docsearch_index.build(self.root)
         self.assertEqual(built.problems, [])
-        self.assertEqual(sorted(built.written), ["docs/index.jsonl", "index.jsonl"])
+        self.assertEqual(sorted(built.written), ["ccnavi-index.jsonl", "docs/ccnavi-index.jsonl"])
         self.assertEqual(self.rows_of("docs")[0]["frontmatter"], {"type": "guide"})
         self.assertEqual(self.leftovers("docs"), [])
         self.assertEqual(self.leftovers(""), [])
         status = git(self.root, "status", "--porcelain", "--untracked-files=all")
-        self.assertNotIn("index.jsonl", status)
+        self.assertNotIn("ccnavi-index.jsonl", status)
         self.assertNotIn(docsearch_index.LOCAL_TMP_PREFIX, status)
 
     def test_does_not_write_when_the_temporary_would_not_be_ignored(self):
-        write(os.path.join(self.root, ".gitignore"), "/docs/index.jsonl\n")
+        write(os.path.join(self.root, ".gitignore"), "/docs/ccnavi-index.jsonl\n")
         self.put("docs/a.md", doc(type="guide"))
         with self.exdev():
             built = docsearch_index.build(self.root)
@@ -1108,9 +1286,9 @@ class CrossDeviceTest(Repo):
     def test_sweeps_only_its_own_stale_leftovers(self):
         self.put("docs/a.md", doc(type="guide"))
         old = time.time() - docsearch_index.TMP_STALE_SECONDS - 60
-        mine = write(os.path.join(self.root, "docs", ".ccnavi-tmp-1-1", "index.jsonl"), "x")
+        mine = write(os.path.join(self.root, "docs", ".ccnavi-tmp-1-1", "ccnavi-index.jsonl"), "x")
         theirs = write(os.path.join(self.root, "docs", ".ccnavi-tmp-2-2", "notes.txt"), "keep")
-        fresh = write(os.path.join(self.root, "docs", ".ccnavi-tmp-3-3", "index.jsonl"), "x")
+        fresh = write(os.path.join(self.root, "docs", ".ccnavi-tmp-3-3", "ccnavi-index.jsonl"), "x")
         for path in (mine, theirs):
             os.utime(os.path.dirname(path), (old, old))
         with self.exdev():
@@ -1145,14 +1323,14 @@ class PathspecMagicTest(Repo):
     """パスやユーザの環境を pathspec の magic として読ませない。"""
 
     def test_check_ignore_takes_a_path_that_looks_like_magic(self):
-        paths = [":(exclude)x/index.jsonl", ":!y/index.jsonl", "*/index.jsonl"]
+        paths = [":(exclude)x/ccnavi-index.jsonl", ":!y/ccnavi-index.jsonl", "*/ccnavi-index.jsonl"]
         self.assertEqual(docsearch_index._ignored(self.root, paths), set(paths))
 
     @unittest.skipIf(os.name == "nt", "Windows では `:` を名前に使えない")
     def test_a_directory_named_like_magic_is_indexed(self):
         self.put(":(exclude)x/a.md", doc(type="guide"))
         built = docsearch_index.build(self.root)
-        self.assertEqual(built.written, [":(exclude)x/index.jsonl"])
+        self.assertEqual(built.written, [":(exclude)x/ccnavi-index.jsonl"])
 
     def test_pathspec_environment_of_the_user_does_not_break_the_index(self):
         self.put("docs/a.md", doc(type="guide"))
