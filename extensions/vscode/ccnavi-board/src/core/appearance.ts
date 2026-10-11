@@ -48,7 +48,7 @@ export interface AppearanceMessage {
  * `ScreenHost<D>` はそのまま渡せる（`post` は `unknown` を取り、`boolean` を返す）。
  */
 export interface AppearanceSink {
-  /** 生きている画面にだけ届く。届いたら真、落ちるので送らなかったら偽 */
+  /** 生きている画面にだけ届く。届いたら真、失われるので送らなかったら偽 */
   post(message: AppearanceMessage): boolean;
 }
 

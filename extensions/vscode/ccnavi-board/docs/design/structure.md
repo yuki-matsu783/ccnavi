@@ -48,7 +48,7 @@ src/
     phases-doc.ts     phases.yml の読み書き（同じくコメントを残す）
     phases-graph.ts   フェーズの図の点・線・置き場所を定義のリストから組む。VS Code に触れないので単体で試せる
     phases-route.ts   図の線の経路（点を横切らない折れ線）。VS Code に触れないので単体で試せる
-    flow-doc.ts       子のフロー（YAML）の読み書きと編集（知らない欄・種類を落とさない）、雛形、入れ子の段の数え方と注意。正しいかは決めない（描けないときだけ断る）
+    flow-doc.ts       子のフロー（YAML）の読み書きと編集（知らない欄・種類を失わない）、雛形、入れ子の段の数え方と注意。正しいかは決めない（描けないときだけ断る）
     flow-view.ts      フロー編集の拡張ホストと画面の契約（見せる形 FlowPage / FlowData、押した操作 FlowMessage とその形の確認、錠を実行ファイルの答えから引く flowTargetOf、カードのボタンの言葉、エージェントへの依頼のボタンの言葉と依頼の文）
     flow-render.ts    フロー編集の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     flow-lint.ts      フローの本文を呼ぶたびに別の名前の一時ファイルに書いて実行ファイル（--lint --json --flow）に確かめさせ、(flow) の error を理由にする。通れば実行ファイルが読んだ中身（flow.data）と、(flow) の warn（パスを直したもの）・渡る手順（rendered）・候補（candidates）を返す
@@ -74,7 +74,7 @@ src/
   webview/            画面（React）。DOM を触る側で、vscode も node も import しない。tsconfig.webview.json で型を見る
     vscode.ts         acquireVsCodeApi の窓口。画面ごとの契約に依存しない（送り口は poster<M>() で作る）
     initial.ts        埋め込みの JSON（最初の 1 枚）を読む。画面ごとの契約に依存しない
-    appearance.ts     見た目の切り替え（body のクラスの付け替え）。5 画面で 1 本
+    appearance.ts     見た目の切り替え（body のクラスの書き換え）。5 画面で 1 本
     Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。4 画面（ボード・ルール管理・リスク管理・フェーズ管理）で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。4 画面で同じ位置）で出る
     TargetSelect.tsx  ルール管理とフェーズ管理の、設定の対象を切り替える欄
     Tour.css          Tour.tsx の CSS（吹き出しの案内と見本の帯）。各画面の style.css が @import する
@@ -181,7 +181,7 @@ scripts/
   package.sh          vsix の組み立て
 ```
 
-**テストの ID。** 名前の頭に付ける `CB-T…` / `CB-D…` は「落ちたテストを名指しする」ためのもので、README やチケットの記録から参照する。
+**テストの ID。** 名前の頭に付ける `CB-T…` / `CB-D…` は「失敗したテストを名指しする」ためのもので、README やチケットの記録から参照する。
 
 | 何 | 決まり |
 |---|---|

@@ -10,9 +10,9 @@ import type { ProjectRow } from "../../core/projects-view.js";
  *
  * 実行ファイルは、ワークスペース自身のソースに `projects/` がある（ぶつかり）ときも、
  * `.gitignore` に入れる前に `git add -A` して入れ子のリポジトリが gitlink で載った（載せ忘れ）ときも、
- * 同じ先頭の句で言う（src/ccnavi/entry/lint.py の `_TRACKED_LEAD`。設計 wip/design/i0064-fixed-places.md §4.2）。
+ * 同じ先頭の句で言う（src/ccnavi/entry/lint.py の `_TRACKED_LEAD`）。
  * どちらでも `.gitignore` に `/projects/` を足すだけでは直らない（ぶつかりなら誤り、載せ忘れなら半分）ので、
- * 画面は `.gitignore` に追加のボタンと「無視されていない」の帯を出さず、苦情の帯だけを出す（§4.5 の分岐 1 の案 A）。
+ * 画面は `.gitignore` に追加のボタンと「無視されていない」の帯を出さず、苦情の帯だけを出す。
  * 2 つを見分ける句（`（入れ子のリポジトリとして`）には頼らない。文面を変えるなら lint.py と揃える。
  */
 export function isTrackedProjectsDir(problem: LintProblem, projectsRel: string): boolean {

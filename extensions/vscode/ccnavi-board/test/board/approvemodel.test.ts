@@ -121,7 +121,7 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
   assert.ok(none.includes("承認済みになったチケットはありません"));
   assert.ok(!none.includes("入っています"));
 
-  // 書けたあとの後始末（マーカーを置く）で落ちたときは、言い方を変える
+  // 書けたあとの後始末（マーカーを置く）で失敗したときは、言い方を変える
   const after = partialMessage({
     placed: ["i0001"],
     ticket: "i0001",

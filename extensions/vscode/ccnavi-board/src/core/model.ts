@@ -65,12 +65,12 @@ export interface SeenInJson {
 }
 
 /**
- * 子チケットのフロー（設計 9.3.1）。親は null。
+ * 子チケットのフロー。親は null。
  * `locked` は判定がいまそのファイルへの書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）。
  * 拡張はそのまま受け取るだけで、`started_at` などから組み直さない。
  */
 export interface FlowJson {
-  /** 読む先の絶対パス（本物とする側のツリーの版、無ければ子のワークツリーの版。どちらにも無ければ本物とする側のツリーのパス） */
+  /** 読む先の絶対パス（正とする側のツリーの版、無ければ子のワークツリーの版。どちらにも無ければ正とする側のツリーのパス） */
   readonly path: string;
   /** ツリーのルートからの相対。承認済みの領域の固定の置き場（既定 `.ccnavi/approved/flows/<子>.yml`） */
   readonly rel: string;
@@ -156,7 +156,7 @@ export interface TicketJson {
   readonly cancelled_at: string;
   readonly cancel_reason: string;
   readonly seen_in: readonly SeenInJson[];
-  /** どれが本物か決まらないチケットの全部。決まっていれば空 */
+  /** どれが正か決まらないチケットの全部。決まっていれば空 */
   readonly scattered: readonly SeenInJson[];
   readonly risk: Record<string, unknown> | null;
   readonly judge: Record<string, unknown> | null;
@@ -232,7 +232,7 @@ export interface LayerFileJson {
 }
 
 /**
- * レイヤー（layer）1 つ（設計 11.2。共通・ワークスペース・プロジェクトの設定のどれか）。拡張が使うのはルール・配点・フェーズ定義の
+ * レイヤー（layer）1 つ（共通・ワークスペース・プロジェクトの設定のどれか）。拡張が使うのはルール・配点・フェーズ定義の
  * ファイルの場所と、読めなかった理由だけなので、それだけを読む。宣言の中身は読まない（足し算の表示は `sums` から読む）。
  */
 export interface LayerJson {

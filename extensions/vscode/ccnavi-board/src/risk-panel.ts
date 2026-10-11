@@ -8,7 +8,7 @@
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存や作成が通った）。
  * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかはユーザが決める。
  *
- * 対象は 3 種（設計 11.2、11.4.2）。共通の設定の配点（`.ccnavi/common/risks.yml`。場所は固定）、
+ * 対象は 3 種。共通の設定の配点（`.ccnavi/common/risks.yml`。場所は固定）、
  * ワークスペースの設定の配点（既定 `.ccnavi/config/risks.yml`）、プロジェクト 1 つの設定の配点
  * （既定 `projects/<名前>/.ccnavi/config/risks.yml`）。タブは 1 枚だけで、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
@@ -280,7 +280,7 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
     other = self === undefined || self.risk.path === "" ? undefined : resolveIn(root, self.risk.path);
   } else {
     // 設定ファイルの場所は実行ファイルに聞く。`.ccnavi` から自分で組むと、組み方が実行ファイルと
-    // 食い違ったときに、この画面で保存した配点が判定に使われなくなる。答えは元リポジトリの版（設計 11.2）。
+    // 食い違ったときに、この画面で保存した配点が判定に使われなくなる。答えは元リポジトリの版。
     if (!board.ok) {
       throw new Error(`設定ファイルの場所を実行ファイルから取得できません: ${board.error}`);
     }
@@ -708,7 +708,7 @@ async function create(current: PanelState): Promise<void> {
     current.wroteAt = Date.now();
     fs.writeFileSync(loaded.riskPath, BUILTIN_RISK_TEXT, { encoding: "utf8", flag: "wx" });
   } catch (error) {
-    // 書けなかったのに猶予を残したままだと、その間の本物の外部変更が知らされない。
+    // 書けなかったのに猶予を残したままだと、その間の実際の外部変更が知らされない。
     current.wroteAt = 0;
     fail(current, `${loaded.riskRel} に書けません: ${(error as Error).message}`);
     return;

@@ -59,7 +59,7 @@ export function readPhases(text: string): PhasesDocument {
     problems.push(`version ${String(version)} は実行ファイルが読めません（読むのは ${PHASES_VERSION}）。フェーズは番号だけの挙動になります`);
   }
 
-  // 実行ファイルは前後の空白を落として読む（phasetypes.parse）。同じ読み方にする
+  // 実行ファイルは前後の空白を除いて読む（phasetypes.parse）。同じ読み方にする
   const orderNode = doc.get("order", true);
   let order: PhaseOrder = "sequential";
   if (orderNode !== undefined && orderNode !== null) {

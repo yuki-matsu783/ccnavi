@@ -21,13 +21,13 @@
  * | 画面の状態 | 渡し方（`Delivery`） |
  * |---|---|
  * | 組み上がっている | `posted`。`postMessage` で中身だけ渡し、画面は要るところだけ描き直す |
- * | 作り直している最中 | `deferred`。渡さない。 受け取る側（`message` のリスナ）はまだ無く、送っても落ちる |
+ * | 作り直している最中 | `deferred`。渡さない。 受け取る側（`message` のリスナ）はまだ無く、送っても失われる |
  * | 裏に回っている / まだ 1 枚も入れていない | `rebuilt`。入れ物ごと入れ直す。表に戻ると VS Code はこれから作り直す |
  *
  * `deferred` になったものは捨てられる。画面が組み上がると `ready` が届くので、受けた側がそこで
  * 渡し直す（board-panel の `ready` → `redraw`）。1 度きりの指示（「このプロジェクトで絞って開く」）は、
  * `rebuilt` なら入れ物に埋めて渡り、`posted` なら `post` が真を返したときだけ渡っている。
- * 渡る前に消さないこと。 消してから落ちると二度と届かない。
+ * 渡る前に消さないこと。 消してから失敗すると二度と届かない。
  *
  * 画面の生死は 2 つで見る。裏に回ったことは `hidden()` で教えてもらい、加えて呼ばれるたびに
  * `surface.visible` も読む。片方だけでは足りない。
@@ -75,7 +75,7 @@ export interface ScreenHost<D> {
    * あれば `rebuilt` に渡す。省けば `data` をそのまま使う
    */
   send(data: D, rebuilt?: D): Delivery;
-  /** 生きている画面にだけ届くメッセージ。届いたら真、落ちるので送らなかったら偽 */
+  /** 生きている画面にだけ届くメッセージ。届いたら真、失われるので送らなかったら偽 */
   post(message: unknown): boolean;
   /** 画面から `ready` が届いた。呼んだ側は、続けて中身を渡し直す */
   ready(): void;
@@ -160,7 +160,7 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
     ready(): void {
       sync();
       // 裏にいる画面は `ready` を送らない。届いたなら、それは捨てられた画面が残していったもの。
-      // これを真に受けると、作り直し中の画面へ送って落とすことになる。
+      // これを真に受けると、作り直し中の画面へ送って失うことになる。
       // （`live` と `post` も表に出ていることを見るので、ここは二重の確認。単体では外から観測できない）
       if (!seen) {
         return;
@@ -184,7 +184,7 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
  * - 入れ物（HTML）は 1 度しか入れない。 入れ直すと画面は作り直され、ユーザが打ちかけていた
  *   内容が消える。2 枚目からは必ず `postMessage`（`posted`）で渡す
  * - 表裏を見ない。 裏でも `postMessage` は届く（`postMessage` の文書が「live な画面には届く。
- *   保持する画面は裏でも live」と言う）。見て組み上がっていないものとして扱うと、裏にいる間の `lock` や `changed` の知らせが落ちる。
+ *   保持する画面は裏でも live」と言う）。見て組み上がっていないものとして扱うと、裏にいる間の `lock` や `changed` の知らせが失われる。
  *   ただし VS Code の文書は同じ型定義の中で食い違っている（`retainContextWhenHidden` の側は
  *   「裏に回った画面にはメッセージを送れない」と言う）。どちらが正しくても正しく動くよう、呼ぶ側は
  *   表に戻ったときに、いま出すべき知らせ（`lock`・`changed`）と見た目（`appearance`）を送り直す

@@ -40,7 +40,7 @@ export function draftOf(sections: Sections, nextKey: () => string): Draft {
   return draft;
 }
 
-/** 拡張ホストへ返す形に戻す。鍵は落とす */
+/** 拡張ホストへ返す形に戻す。鍵は除く */
 export function sectionsOf(draft: Draft): Sections {
   const sections = {} as Record<Section, RuleForm[]>;
   for (const section of SECTIONS) {

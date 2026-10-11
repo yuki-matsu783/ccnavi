@@ -1,6 +1,6 @@
 /**
  * 取り下げの見本（test/fixtures/host/<github|gitlab>/<場面>/。`scene.json` の `kind` が `withdraw`）。
- * 承認コミットを引いて提案を読むまでのホストの応答を、本物の形に合わせて手で組んだもの。
+ * 承認コミットを引いて提案を読むまでのホストの応答を、実際の形に合わせて手で組んだもの。
  *
  * GitHub の見本は次のとおり。
  * - `commits.json`: `GET /repos/<o>/<r>/commits?sha=<先頭>&path=<doing/>` の答え

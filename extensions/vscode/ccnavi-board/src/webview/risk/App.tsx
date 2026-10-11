@@ -22,7 +22,7 @@ import { post } from "./post.js";
 import { countText, findText } from "./text.js";
 import { draftOf, emptyFactor, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
-/** 中身が読めなかったときの錠。画面は保存させない（押せる形で出して落とさない） */
+/** 中身が読めなかったときの錠。画面は保存させない（押せる形で出して異常終了させない） */
 const NO_LOCK: Lock = { locked: true, reason: "", doing: [] };
 
 const EMPTY_DRAFT: Draft = { levels: { medium: "", high: "", critical: "" }, rows: [] };

@@ -136,7 +136,7 @@ function History({ entries }: { readonly entries: readonly HistoryEntryJson[] })
 /**
  * 枠付きのバッジは、ユーザが動く必要がある状態だけ。未承認、レビュー準備中／レビュー待ち、
  * 書き込み停止中、先行待ち、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
- * 本物が決まらないチケット。出すバッジが無ければ行ごと出さない。
+ * 正が決まらないチケット。出すバッジが無ければ行ごと出さない。
  */
 function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   const badges: JSX.Element[] = [];
@@ -176,7 +176,7 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   if (isHighRisk(card.riskLevel)) {
     badges.push(<Badge key="risk" kind={`risk risk-${card.riskLevel.toLowerCase()}`} text={riskText(card)} />);
   }
-  // ほかのツリー上にもチケットがあること自体は普通なので数では出さない。どれが本物か決まらないときだけ言う。
+  // ほかのツリー上にもチケットがあること自体は普通なので数では出さない。どれが正か決まらないときだけ言う。
   if (card.scattered.length > 0) {
     const where = card.scattered.map((s) => `${s.tree || "main"}:${s.state}`).join(", ");
     badges.push(<Badge key="seen" kind="seen" text={`複数の場所にある（${card.scattered.length} か所）`} title={where} />);

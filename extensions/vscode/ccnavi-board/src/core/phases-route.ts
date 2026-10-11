@@ -65,7 +65,7 @@ export function routeOf(a: string, b: string, at: ReadonlyMap<string, Point>): R
   return { from, to, fromSide: "r", toSide: "l" };
 }
 
-/** 続けて同じ点が来たら 1 つにし、一直線に並ぶ途中の点を落とす */
+/** 続けて同じ点が来たら 1 つにし、一直線に並ぶ途中の点を除く */
 function tidy(points: readonly Point[]): Point[] {
   const out: Point[] = [];
   for (const point of points) {

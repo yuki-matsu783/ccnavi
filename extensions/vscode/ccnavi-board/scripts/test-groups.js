@@ -31,7 +31,7 @@ const TEST_DIR = path.join(ROOT, "test");
 // fixtures は実行時に名前で開く固定データ。
 const NOT_GROUPS = new Set(["helpers", "fixtures"]);
 
-// 「環境が足りないので回せなかった」の終了コード。テストが落ちた（1）とは分ける。
+// 「環境が足りないので回せなかった」の終了コード。テストが失敗した（1）とは分ける。
 // ターンの終わりの hook は、これを差し戻しに数えずユーザへ言う。
 const NOT_READY = 3;
 
@@ -83,7 +83,7 @@ function resolveImport(from, spec) {
   if (base.endsWith(".js")) {
     candidates.push(base.slice(0, -3) + ".ts", base.slice(0, -3) + ".tsx");
   }
-  // CSS は書いたパスのまま（`@import "./Card.css"`）。拡張子を落とした形は書かない
+  // CSS は書いたパスのまま（`@import "./Card.css"`）。拡張子を除いた形は書かない
   if (base.endsWith(".css")) {
     candidates.push(base);
   }
@@ -286,7 +286,7 @@ function callFor(rel, map) {
 
   // 画面（React）は esbuild がバンドルし、テストはバンドルしたものを読む。その道は import では
   // 辿れないので、バンドルしたものを読むグループを足す。辿れたぶん（テストが画面のファイルを
-  // 直に import している場合）は落とさずに和を取る。
+  // 直に import している場合）は除かずに和を取る。
   // 画面のファイルは `tsconfig.json` が exclude するので、`tsconfig.test.json` では型を見ない。
   // esbuild も型を見ない。回すグループが 0 本でも、画面の型の検査だけは必ず通す
   // （通さないと「型の検査だけ通しました」と出るのに何も見ていないターンができる）
@@ -397,8 +397,8 @@ function main(argv) {
   if (!fs.existsSync(tsc)) {
     console.error("ccnavi-board: node_modules が無いのでテストを回せません。");
     console.error("extensions/vscode/ccnavi-board で 'pnpm install --frozen-lockfile' を通してください。");
-    // 3 は「環境が足りない」で、テストが落ちたのではない。hook はこれを差し戻しに
-    // 数えない（落ちてもいないテストを直せと言われることになるため）。
+    // 3 は「環境が足りない」で、テストが失敗したのではない。hook はこれを差し戻しに
+    // 数えない（失敗してもいないテストを直せと言われることになるため）。
     return NOT_READY;
   }
 
@@ -415,7 +415,7 @@ function main(argv) {
 
   // バンドルするのは、型を見ないときでも必ず。`clean-out.js` が `out/webview` を消すので、
   // ここで作り直さないと、バンドルしたものを読む側（拡張の webview-asset.ts、board の
-  // テスト）が「画面がバンドルされていない」で落ちる。esbuild は 0.1 秒ほど。
+  // テスト）が「画面がバンドルされていない」で失敗する。esbuild は 0.1 秒ほど。
   code = run(process.execPath, [path.join("scripts", "bundle-webview.js")]);
   if (code !== 0) return code;
 
@@ -430,10 +430,10 @@ function main(argv) {
     return 0;
   }
   console.log(`ccnavi-board: ${plan.groups.join(" ")}（${files.length} ファイル）`);
-  // spec レポータにするのは、落ちたものが末尾にまとまるから。node は出力先がターミナルでないときは
-  // 既定で TAP を出し、そこでは `not ok` が落ちたファイルの位置に出る。ターンの終わりの
-  // hook がモデルへ渡せるのは末尾 40 行だけなので、TAP だと「落ちた」とだけ伝わって
-  // 何が落ちたかが入らない。
+  // spec レポータにするのは、失敗したものが末尾にまとまるから。node は出力先がターミナルでないときは
+  // 既定で TAP を出し、そこでは `not ok` が失敗したファイルの位置に出る。ターンの終わりの
+  // hook がモデルへ渡せるのは末尾 40 行だけなので、TAP だと「失敗した」とだけ伝わって
+  // 何が失敗したかが入らない。
   return run(process.execPath, ["--test", "--test-reporter=spec", ...files]);
 }
 

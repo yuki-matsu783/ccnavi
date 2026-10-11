@@ -155,7 +155,7 @@ test("CB-D43 「レビュー済み連絡」は親とフェーズを送り、提�
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "reviewed", parent: "i0001", phase: 2 });
     const before = page.posted.length;
-    // 本物の Webview では VS Code がリンクの遷移を横取りして既定のブラウザで開く。happy-dom には無いので既定の動きだけ止める
+    // 実際の Webview では VS Code がリンクの遷移を横取りして既定のブラウザで開く。happy-dom には無いので既定の動きだけ止める
     page.document.addEventListener("click", (event) => {
       if ((event.target as unknown as { closest: (s: string) => unknown }).closest("a")) { event.preventDefault(); }
     });

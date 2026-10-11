@@ -33,11 +33,11 @@ import { localStamp } from "./stamp.js";
 export const MAX_ROUNDS = 3;
 
 export interface WriteDeps extends ReadDeps {
-  /** ホストの種類（応答が落ちた書き込みの見分け方が違う。無ければ github） */
+  /** ホストの種類（応答が届かなかった書き込みの見分け方が違う。無ければ github） */
   readonly kind?: "github" | "gitlab";
   /** 拡張の版（状態の履歴の `version` とコミットの見出し） */
   readonly version: string;
-  /** 待つ（書いた直後の読み取りの遅れ）。無ければ本物の時計。試験は 0 秒にする */
+  /** 待つ（書いた直後の読み取りの遅れ）。無ければ実物の時計。試験は 0 秒にする */
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
@@ -193,11 +193,11 @@ async function send(
   return (await deps.call("commit", [repo.owner, repo.repo, family, expected, message.headline, message.body, adds, dels])) as Committed;
 }
 
-/** 遡る最初の親の数の上限（応答が落ちた書き込みを探す） */
+/** 遡る最初の親の数の上限（応答が届かなかった書き込みを探す） */
 const FIND_DEPTH = 20;
 
 /**
- * 応答が落ちた書き込みを、今の先頭から最初の親を遡って探す。見分け方は「書いた中身と親の組」による。
+ * 応答が届かなかった書き込みを、今の先頭から最初の親を遡って探す。見分け方は「書いた中身と親の組」による。
  * そのコミットの上で書いた各パスが書いたとおりで、親の上ではそうでない（この書き込みで変わった）。
  * GitHub は `expectedHeadOid` で書くので、親が読んだ先頭のものだけ。GitLab は親から最初の親を遡って読んだ先頭に
  * 届くものだけ（読んだ後に積まれた）。見つからなければ null
@@ -228,9 +228,9 @@ async function findWritten(deps: WriteDeps, repo: RepoConfig, now: string, read:
 /**
  * 1 コミットで書く。service worker が形や保護で断ったら（400）、原因を言って失敗にする。GitLab で書く前の確認で先頭が
  * 動いていたら（412。何も送っていない）「動いた」。ほかの失敗では先頭を読み直し、動いていなければ失敗。動いていれば、
- * 応答だけが落ちた自分の書き込みを探し（`findWritten`）、見つかれば書けたとする。見つからず、今の先頭に書いた中身が
+ * 応答だけが届かなかった自分の書き込みを探し（`findWritten`）、見つかれば書けたとする。見つからず、今の先頭に書いた中身が
  * 在るなら（書いたか見分けられない）ユーザの対応に切り替える。無ければ「動いた」（読み直して再試行する）。
- * 応答が落ちた後の確かめそのものが落ちたら（429・5xx など）、書いたかもしれないが確認できないのでユーザの対応に切り替える
+ * 応答が届かなかった後の確かめそのものが失敗したら（429・5xx など）、書いたかもしれないが確認できないのでユーザの対応に切り替える
  */
 async function commitOnce(
   deps: WriteDeps,
@@ -274,7 +274,7 @@ async function commitOnce(
   }
 }
 
-/** 書いた後の確かめ。合わない・確かめが落ちたら、書いたものが残っているのでユーザの対応に切り替える（failed にしない） */
+/** 書いた後の確かめ。合わない・確かめが失敗したら、書いたものが残っているのでユーザの対応に切り替える（failed にしない） */
 async function finish(deps: WriteDeps, repo: RepoConfig, oid: string, rows: readonly ChangeRow[], rounds: number, lines: readonly string[]): Promise<Outcome> {
   let wrong: string[];
   try {
@@ -345,7 +345,7 @@ async function undoRows(deps: WriteDeps, repo: RepoConfig, parent: string, rows:
       }
       const blob = obj.type === "blob" ? texts[obj.oid] : undefined;
       if (!blob || blob.binary || typeof blob.text !== "string") return `${row.path} の直前の中身を読めない`;
-      // バイト列のまま戻す（BOM も落とさない。戻した後に blob の sha で確かめる）
+      // バイト列のまま戻す（BOM も除かない。戻した後に blob の sha で確かめる）
       const undo: ChangeRow = { op: row.op === "delete" ? "create" : "update", path: row.path, base64: textBase64(blob.text) };
       if ((await blobSha(rowBytes(undo))) !== obj.oid) return `${row.path} の直前の中身をバイト列のまま読めない`;
       out.push(undo);
@@ -369,7 +369,7 @@ function attention(family: string, done: Committed, why: string): Outcome {
 /**
  * 自分の書き込み（`done`）を元に戻す。今の先頭で、書いた各パスがまだ自分の書いたとおりのときだけ積み、各ファイルに
  * 「最後に変えたのは自分のコミット」を付ける（GitLab が他人の変更の上に書かないよう断る）。
- * 送った応答が落ちたら、届いたか（今の先頭の親が送った先で、中身が戻したとおり）を見る。元に戻すコミットがさらに競合して
+ * 送ったのに応答が届かなかったら、届いたか（今の先頭の親が送った先で、中身が戻したとおり）を見る。元に戻すコミットがさらに競合して
  * 同じパスが変わっていれば、ユーザの対応に切り替える。
  */
 async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: Committed, rows: readonly ChangeRow[]): Promise<{ kind: "reverted" } | { kind: "stop"; outcome: Outcome }> {
@@ -391,7 +391,7 @@ async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: C
       if (status === REFUSED || status === HOST_REFUSED) return human((err as Error).message ?? String(err));
       // 送る前の確認で先頭が動いた（何も送っていない）: 上限の範囲で今の先頭から確かめ直す
       if (status === HOST_MOVED) continue;
-      // 応答だけが落ちたか: 今の先頭の親が送った先で、中身が戻したとおりなら届いている
+      // 応答だけが届かなかったか: 今の先頭の親が送った先で、中身が戻したとおりなら届いている
       const now = (await deps.call("branchHead", [repo.owner, repo.repo, family])) as string | null;
       if (now !== null && now !== cur) {
         const ps = (await deps.call("commitParents", [repo.owner, repo.repo, now])) as string[];
@@ -413,7 +413,7 @@ async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: C
 /**
  * 事後確認。書いたコミットの親が読んだ先頭と違えば、自分の書き込みの直前（その親）の状態で、
  * 同じ時刻で判定し直す。同じ書くものなら残す（`kept`）。違えば元に戻す（`reverted` で読み直して再試行する）。
- * 途中でホストや Python が落ちたら（429・5xx・MR が消えた など）、書いたものを確かめ切れないのでユーザの対応に切り替える
+ * 途中でホストや Python が失敗したら（429・5xx・MR が消えた など）、書いたものを確かめ切れないのでユーザの対応に切り替える
  */
 async function settleRace(
   deps: WriteDeps,

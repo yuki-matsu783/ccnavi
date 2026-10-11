@@ -95,10 +95,10 @@ test("CB-T188 id が空の定義は図に出ず、数だけ返る。同じ id �
   assert.deepEqual(edges(form(phase("a"), phase("a", { requires: ["b"] }), phase("b"))), []);
 });
 
-test("CB-T189 点は id・題・区分・レビューを持ち、前後の空白は落とす", () => {
+test("CB-T189 点は id・題・区分・レビューを持ち、前後の空白は除く", () => {
   const graph = graphOf(form(phase(" a ", { title: " 調査 ", kind: "feedback", review: "none", requires: [" b "] }), phase("b")));
   assert.deepEqual(graph.nodes[0], { id: "a", title: "調査", kind: "feedback", review: "none", x: graph.nodes[0].x, y: graph.nodes[0].y });
-  // 参照の側の空白も落として突き合わせる（落とさないと線にならない）
+  // 参照の側の空白も除いて突き合わせる（除かないと線にならない）
   assert.deepEqual(edges(form(phase(" a ", { requires: [" b "] }), phase("b"))), [["requires", "a", "b"]]);
 });
 
@@ -118,7 +118,7 @@ test("CB-T190b id にハイフンが入っていても、線が別の線と混�
   assert.equal(new Set(graph.edges.map((edge) => edge.id)).size, 2);
 });
 
-test("CB-T191 位置の記録は、動かした点を丸めて入れ、図から消えた定義を落とす", () => {
+test("CB-T191 位置の記録は、動かした点を丸めて入れ、図から消えた定義を除く", () => {
   // ドラッグそのものは jsdom で見る（CB-D80）。ここで見るのは、それが呼ぶ中身
   assert.deepEqual(withSpot({}, "a", 10.4, 20.6), { a: { x: 10, y: 21 } });
   assert.deepEqual(withSpot({ a: { x: 1, y: 2 } }, "b", 3, 4), { a: { x: 1, y: 2 }, b: { x: 3, y: 4 } });

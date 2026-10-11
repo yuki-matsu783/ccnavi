@@ -9,7 +9,7 @@
  * - 画像・SVG・MathML・フォーム・style は出さない。画像は外への通信（読んだことの漏れ）になるため
  * - リンクは新しいタブで開き、`noopener noreferrer` を付ける
  * - 中身を隠す書き方は通さない（承認者に見えないまま承認させない）。
- *   `hidden`・`class`・`style`・`id`・`color` などの属性と、`font`・`details`・`summary` などの要素は落とす。
+ *   `hidden`・`class`・`style`・`id`・`color` などの属性と、`font`・`details`・`summary` などの要素は除く。
  *   HTML コメントは消さずに「〈HTML コメント: …〉」の文字で見せる
  */
 import createDOMPurify, { type Config, type WindowLike } from "dompurify";

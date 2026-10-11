@@ -86,7 +86,7 @@ test("CB-T182 見た目は画面に中身を渡す段取りを通る。組み上
   // 入れ物は入ったが、まだ組み上がっていない（受け取る側が無い）
   host.send("あ");
   assert.equal(sendAppearance(host, "claude-dark"), false);
-  assert.deepEqual(spy.posted, [], "落ちるものを送ると、送ったつもりの切り替えが残る");
+  assert.deepEqual(spy.posted, [], "失われるものを送ると、送ったつもりの切り替えが残る");
 
   // 組み上がった
   host.ready();
@@ -125,15 +125,15 @@ test("CB-T182b 保持する画面は裏でも送る。1 枚目を読み込んで
 /**
  * 見た目の配線を、ソースを読んで見張る（CB-T157 と同じ手）。
  *
- * 退行そのもの（`followAppearance` が `webview.postMessage` を直に呼ぶ、送り直しを落とす）は
+ * 退行そのもの（`followAppearance` が `webview.postMessage` を直に呼ぶ、送り直しを省く）は
  * `src/appearance.ts` と 5 つのパネルで起きるが、そこは `vscode` を import するので単体では
  * 動かせない。上の 2 本（CB-T182 / CB-T182b）が見ているのは段取りの側で、配線を戻してもテストは通ったまま。
- * 名前で見るだけなので表記を変えて呼ぶ方法までは防げないが、うっかり落とすことは防げる。
+ * 名前で見るだけなので表記を変えて呼ぶ方法までは防げないが、うっかり外すことは防げる。
  */
 const EXT_SRC = path.join(WEBVIEW_SRC, "..");
 
 /**
- * コードだけを返す。コメントを落とすのが肝で、落とさないと「`webview.postMessage` は呼ばない」と
+ * コードだけを返す。コメントを外すのが肝で、外さないと「`webview.postMessage` は呼ばない」と
  * 書いた説明そのものが「呼んでいる」として当たる。
  */
 function source(name: string): string {

@@ -42,7 +42,7 @@ import {
 } from "./state.js";
 import { countText, findText, hasContext } from "./text.js";
 
-/** 中身が読めなかったときの錠。画面は保存させない（押せる形で出して落とさない） */
+/** 中身が読めなかったときの錠。画面は保存させない（押せる形で出して異常終了させない） */
 const NO_LOCK: Lock = { locked: true, reason: "", doing: [] };
 
 /** 直前の操作の一言。生きている画面にしか届かないので持ち越さない */
@@ -138,7 +138,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   }, [dirty]);
 
   /**
-   * id を打っている途中はstate を書き直さない（打ちかけの id が state に入る）。書くのは欄を
+   * id を打っている途中は state を書き直さない（打ちかけの id が state に入る）。書くのは欄を
    * 確定した（native の `change`）ときだけ。React の `onChange` は打つたびに呼ばれるので、
    * ここは素の DOM のイベントで受ける。いまの編集は描き直しのたびに `latest` へ入れる
    * （`useLayoutEffect` は描き直しと同じ順番で走るので、確定が届いた時点では今の編集が入っている）。

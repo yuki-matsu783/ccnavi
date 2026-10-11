@@ -94,7 +94,7 @@ function named(info: VersionInfo): string {
 
 /**
  * 起動のときに言う食い違い。揃っていれば undefined。聞けなかった（`failed`）ときも言わない
- * （起動の知らせは食い違いだけにする。実行ファイルが無い・壊れているは画面を開いたときに言う）
+ * （起動の知らせは食い違いだけにする。実行ファイルが無い・破損しているは画面を開いたときに言う）
  */
 export function skewMessage(probe: VersionProbe, fromSource: boolean): string | undefined {
   if (probe.kind === "old") {

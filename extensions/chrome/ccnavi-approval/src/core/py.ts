@@ -50,7 +50,7 @@ export interface Snapshot {
   readonly workspace?: Workspace;
   /**
    * 親子のチケットの識別子 → 親のブランチ名。閉包の先行の親子のチケットを読みに行くブランチの見当で、
-   * 判定には使わない（読んだブランチの親チケットが名乗らなければ Python は使わない）
+   * 判定には使わない（読んだブランチの親チケットが宣言しなければ Python は使わない）
    */
   readonly hints?: Readonly<Record<string, string>>;
 }
@@ -63,7 +63,7 @@ export interface Family {
   readonly title: string;
   readonly state: string;
   readonly closed: boolean;
-  /** 親子のチケットが決まらない理由（同じ親子のチケットを名乗るブランチが 2 本以上ある など）。あればこの親子のチケットは判定しない */
+  /** 親子のチケットが決まらない理由（同じ親子のチケットを宣言するブランチが 2 本以上ある など）。あればこの親子のチケットは判定しない */
   readonly conflict?: string;
 }
 
@@ -72,7 +72,7 @@ export interface Closure {
   readonly families: readonly string[];
   /** ブランチ名 → 親子のチケットの識別子 */
   readonly idents?: Readonly<Record<string, string>>;
-  /** 同じ親子のチケットを名乗るブランチが無いかを確かめるために読むブランチ（判定の入力には入れない） */
+  /** 同じ親子のチケットを宣言するブランチが無いかを確かめるために読むブランチ（判定の入力には入れない） */
   readonly rivals?: readonly string[];
   readonly need: readonly string[];
   readonly absent: readonly string[];

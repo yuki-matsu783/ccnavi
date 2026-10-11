@@ -35,7 +35,7 @@ export function draftOf(form: PhasesForm, nextKey: () => string): Draft {
   return { order: form.order, rows: form.phases.map((phase) => ({ key: nextKey(), phase })) };
 }
 
-/** 拡張ホストへ返す形に戻す。鍵は落とす */
+/** 拡張ホストへ返す形に戻す。鍵は除く */
 export function formOf(draft: Draft): PhasesForm {
   return { order: draft.order, phases: draft.rows.map((row) => row.phase) };
 }
@@ -50,7 +50,7 @@ export function emptyPhase(): PhaseForm {
 
 /**
  * 同じ id の定義。実行ファイルは後ろで何も出さずに上書きするので、画面で止める。
- * 前後の空白は落として見る（`--lint` が見るのと同じ形）。
+ * 前後の空白は除いて見る（`--lint` が見るのと同じ形）。
  */
 export function duplicates(draft: Draft): ReadonlySet<string> {
   const seen = new Set<string>();
@@ -108,7 +108,7 @@ export function saveView(view: View): void {
   setState({ ...((getState() ?? {}) as object), view });
 }
 
-/** state に残してある点の位置。Webview の state は型を持たず、値はそのまま SVG の座標になるので、数でない値はここで落とす */
+/** state に残してある点の位置。Webview の state は型を持たず、値はそのまま SVG の座標になるので、数でない値はここで外す */
 export function loadSpots(): Spots {
   const saved = (getState() ?? {}) as { spots?: unknown };
   const raw = typeof saved.spots === "object" && saved.spots !== null ? (saved.spots as Record<string, unknown>) : {};

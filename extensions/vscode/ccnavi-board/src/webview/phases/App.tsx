@@ -87,7 +87,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const [helpOpen, setHelpOpen] = useState(false);
   /**
    * 案内を始める前の画面の様子。案内は一覧と図を切り替え、見本の行と関係の欄を開き、絞り込みを外すので、
-   * 閉じたらこれに戻す。案内の間の一覧と図の切り替えはstate（`saveView`）に書かない（途中でタブを
+   * 閉じたらこれに戻す。案内の間の一覧と図の切り替えは state（`saveView`）に書かない（途中でタブを
    * 閉じたときに、次から図で開く、ということを起こさない）。
    */
   const beforeTour = useRef<TourSnapshot | undefined>(undefined);
@@ -196,7 +196,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
    * 最中に絞り込みや「外で変わった」の報せが届くと、掴んだ点が掴む前の位置へ戻る。
    *
    * 読み込み中とエラーの早めの return より前に置く。 後ろに置くと、中身から読み込み中・エラーへ
-   * 移ったときにフックの数が変わって React が落ちる
+   * 移ったときにフックの数が変わって React が失敗する
    */
   const graph = useMemo(() => graphOf(formOf(draft)), [draft]);
 

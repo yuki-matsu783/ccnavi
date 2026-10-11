@@ -2,7 +2,7 @@
  * フロー編集画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
- * 子チケット 1 枚のフロー（設計 9.3.1）を図で直す。開くのはボードのカードの「フロー」だけで、
+ * 子チケット 1 枚のフローを図で直す。開くのはボードのカードの「フロー」だけで、
  * タブは子ごとに 1 枚（同じ子をもう 1 度開けば前面に出す）。
  *
  * 画面は React（`src/webview/flow/`）で、ここが渡すのは「いま何を見せるか」（`FlowData`）だけ。
@@ -295,7 +295,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   const { bytes, mtimeMs } = read;
   const refuse = (why: string): Error => new Error(`フローのファイルを開きません（${shown}）: ${why}。エディタで直してから再読込してください`);
   // 正しいかは実行ファイルに聞く（SubagentStart と同じ読み）。読んだバイトのまま渡す（UTF-8 として不正かどうかも
-  // 実行ファイルが言う）。読めないフローを画面で直すと、読めなかった部分を落として書くことになる。エディタで直させる
+  // 実行ファイルが言う）。読めないフローを画面で直すと、読めなかった部分を省いて書くことになる。エディタで直させる
   const verdict = await lintText(root, tmpDir, bytes, shown);
   if (!verdict.ok) {
     throw refuse(verdict.error);
@@ -934,14 +934,14 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
     fail(current, lock.reason);
     return;
   }
-  // 3. 置き場が同じ。往復の間にチケットが動くと、読む先（本物とする側のツリー）が替わることがある
+  // 3. 置き場が同じ。往復の間にチケットが動くと、読む先（正とする側のツリー）が替わることがある
   const filePath = loaded.target.flow.path;
   if (target.flow.path !== filePath) {
     fail(current, `フローの置き場が変わりました（${loaded.shown} → ${shownPath(current.folder.uri.fsPath, target.flow.path)}）。再読込してから編集し直してください`);
     return;
   }
   // 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）。5. リンクを辿らない。
-  // 6. 一時ファイルに書いて入れ替える（途中で落ちても半端なファイルを残さない）。4〜6 は flow-write.ts
+  // 6. 一時ファイルに書いて入れ替える（途中で異常終了しても半端なファイルを残さない）。4〜6 は flow-write.ts
   current.wroteAt = Date.now();
   const written = writeFlowFile(target.flow.tree, filePath, text, { exists: loaded.exists, mtimeMs: loaded.mtimeMs });
   if (!written.ok) {

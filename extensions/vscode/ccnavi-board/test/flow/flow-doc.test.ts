@@ -1,5 +1,5 @@
 /**
- * 子のフローの読み書き（`core/flow-doc.ts`）。YAML の読み書き、知らない欄と知らない種類を落とさないこと、雛形、
+ * 子のフローの読み書き（`core/flow-doc.ts`）。YAML の読み書き、知らない欄と知らない種類を失わないこと、雛形、
  * 編集の関数、入れ子の段の数え方を見る。
  */
 import { test } from "node:test";
@@ -170,7 +170,7 @@ test("CB-T221 画面が断るのは描けないときだけ。正しいか（id 
   for (const text of ["nodes:\n  - {id: a}\n  - {id: a}\n", "nodes: []\nconnections: {}\n", "nodes: []\nconnections: [1]\n", "x: &a [1]\nnodes: [{id: a, data: *a}]\n"]) {
     assert.ok(parseFlow(text).ok, text);
   }
-  // 別名を重ねて膨らませる形（billion laughs）は、yaml の読み手が辿る数の上限で断る（落ちない）
+  // 別名を重ねて膨らませる形（billion laughs）は、yaml の読み手が辿る数の上限で断る（失敗しない）
   const lines = ["a0: &a0 [x, x, x, x, x, x, x, x, x, x]"];
   for (let i = 1; i < 12; i += 1) {
     lines.push(`a${i}: &a${i} [${Array.from({ length: 10 }, () => `*a${i - 1}`).join(", ")}]`);
@@ -428,7 +428,7 @@ test("CB-T256 ノードを放すと、真ん中が枠の中ならそのグルー
 test("CB-T257 まとめて動かしたときは React Flow の位置（枠からの位置）で読み、グループを先に置く", () => {
   const grouped = groupNodes(three(), ["a"]);
   assert.ok(grouped !== undefined);
-  // 枠と c を一緒に動かす。c は枠の新しい位置の中に落ちるので入る
+  // 枠と c を一緒に動かす。c は枠の新しい位置の中に収まるので入る
   const next = placeNodes(grouped.doc, [
     { id: "c", position: { x: 300, y: 300 } },
     { id: "group-1", position: { x: 276, y: 248 } },

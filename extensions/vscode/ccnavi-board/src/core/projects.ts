@@ -1,6 +1,5 @@
 /**
- * プロジェクト管理画面の判断。ワークスペース内のプロジェクト（`projects/` の直下で `.git` を持つもの、
- * 設計 11.2）を一覧し、clone の入力を検査し、ターミナルへ送るコマンド行を組む。
+ * プロジェクト管理画面の判断。ワークスペース内のプロジェクト（`projects/` の直下で `.git` を持つもの）を一覧し、clone の入力を検査し、ターミナルへ送るコマンド行を組む。
  *
  * ここは vscode にも子プロセスにも触れない。ファイルの有無や git の答えは呼び手が渡す。
  * 何がプロジェクトかは実行ファイルの答え（`--explain --json` の trees、`--lint --json` の苦情）に
@@ -20,9 +19,9 @@ export type { ProjectRow, ProjectsPage, Stray };
 // ---- clone の入力
 
 export interface RemoteInfo {
-  /** 打たれたままの URL（前後の空白だけ落とす） */
+  /** 打たれたままの URL（前後の空白だけ除く） */
   readonly url: string;
-  /** 同じリポジトリかを比べる鍵。scheme・ユーザ・ポート・末尾の `.git` と `/` を落とし、小文字にした `host/path` */
+  /** 同じリポジトリかを比べる鍵。scheme・ユーザ・ポート・末尾の `.git` と `/` を除き、小文字にした `host/path` */
   readonly key: string;
   /** URL の末尾から採った、`projects/<名前>` の既定の名前 */
   readonly name: string;
@@ -204,7 +203,7 @@ export function gitignoreWithProjects(text: string | undefined, projectsRel: str
     return text ?? "";
   }
   const head = text === undefined || text === "" ? "" : text.endsWith("\n") ? `${text}\n` : `${text}\n\n`;
-  return `${head}# ccnavi のプロジェクト置き場。各プロジェクトは自分の git を持つ（設計 11.2）。\n/${projectsRel}/\n`;
+  return `${head}# ccnavi のプロジェクト置き場。各プロジェクトは自分の git を持つ。\n/${projectsRel}/\n`;
 }
 
 // ---- 画面の中身

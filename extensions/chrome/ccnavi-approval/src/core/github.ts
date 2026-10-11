@@ -126,7 +126,7 @@ function rateLimit(res: Res): { text: string; wait: number | null } | null {
 }
 
 /**
- * 転送を追わずに呼ぶ（`redirect: "error"`）。fetch そのものが落ちたら（転送された・通信が落ちた。ブラウザでは両者を
+ * 転送を追わずに呼ぶ（`redirect: "error"`）。fetch そのものが失敗したら（転送された・通信が途切れた。ブラウザでは両者を
  * 見分けられない）、原因の分かる文面に包む。status は 0 のまま（書く流れは「届いたか分からない」として確かめる）
  */
 export async function fetchNoRedirect(client: Pick<Client, "fetch">, url: string, init: Parameters<Fetch>[1], what: string): ReturnType<Fetch> {
@@ -548,7 +548,7 @@ export async function approvalCommit(client: Client, owner: string, repo: string
   return chain.has(commit) ? { commit, parent } : null;
 }
 
-/** コミットの親（書いた後の確かめ。応答だけが落ちたとき、新しい先頭が自分の書いたものかを見る） */
+/** コミットの親（書いた後の確かめ。応答だけが届かなかったとき、新しい先頭が自分の書いたものかを見る） */
 export async function commitParents(client: Client, owner: string, repo: string, sha: string): Promise<string[]> {
   const { status, body } = await rest(client, `${repoPath(owner, repo)}/commits/${checkOid(sha)}`);
   if (status === 404) return [];

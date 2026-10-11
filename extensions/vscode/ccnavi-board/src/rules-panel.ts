@@ -8,7 +8,7 @@
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存が通った）。
  * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかはユーザが決める。
  *
- * 対象は 3 種（設計 11.2）。共通の設定のルール（`.ccnavi/common/rules.yml`）、
+ * 対象は 3 種。共通の設定のルール（`.ccnavi/common/rules.yml`）、
  * ワークスペースの設定のルール（既定 `.ccnavi/config/rules.yml`）、プロジェクト 1 つの設定のルール
  * （既定 `projects/<名前>/.ccnavi/config/rules.yml`）。タブは 1 枚だけで、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
@@ -272,7 +272,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   } else {
     // 設定ファイルの場所は実行ファイルに聞く。`.ccnavi` から自分で組むと、組み方が実行ファイルと
     // 食い違ったときに、この画面で保存したルールが判定に使われなくなる。答えは元リポジトリの版で、
-    // ワークツリーの中の版は指さない（設計 11.2）。
+    // ワークツリーの中の版は指さない。
     if (!board.ok) {
       throw new Error(`設定ファイルの場所を実行ファイルから取得できません: ${board.error}`);
     }
@@ -875,7 +875,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
       fs.writeFileSync(loaded.rulesPath, text, { encoding: "utf8", flag: "wx" });
     }
   } catch (error) {
-    // 書けなかったのに猶予を残したままだと、その間の本物の外部変更が知らされない。
+    // 書けなかったのに猶予を残したままだと、その間の実際の外部変更が知らされない。
     current.wroteAt = 0;
     fail(current, `ルールファイルに書けません: ${(error as Error).message}`);
     return;

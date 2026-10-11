@@ -643,7 +643,7 @@ test("CB-T16 本文の文字列で表示が崩れない", async () => {
   }
 });
 
-test("CB-T118 本物が決まらないチケットだけをバッジにし、場所を tooltip に出す", async () => {
+test("CB-T118 どれが正か決まらないチケットだけをバッジにし、場所を tooltip に出す", async () => {
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-02-03")!;
   const where = [
@@ -850,7 +850,7 @@ test("CB-T141 止まっているカードに「書き込み停止中」のバッ
   }
 });
 
-test("CB-T142 見た目の切り替えは body のクラスだけを付け替える。中身は作り直さない", async () => {
+test("CB-T142 見た目の切り替えは body のクラスだけを書き換える。中身は作り直さない", async () => {
   const page = await openBoard();
   try {
     assert.equal(page.document.body.className, "");

@@ -275,6 +275,6 @@ test("CB-T199 知らない order は苦情にし、画面は sequential とし�
   const out = listed.apply({ ...listed.model.form, order: "dag" });
   assert.equal(out.match(/^order:/gm)?.length, 1);
   assert.match(out, /^order: dag$/m);
-  // 前後の空白は実行ファイルと同じに落として読む
+  // 前後の空白は実行ファイルと同じに除いて読む
   assert.equal(readPhases(SAMPLE.replace("version: 1\n", 'version: 1\norder: " dag "\n')).model.form.order, "dag");
 });

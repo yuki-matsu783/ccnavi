@@ -298,7 +298,7 @@ export function Graph({ graph, onPick }: { readonly graph: PhasesGraph; readonly
     saveSpots(spots);
   }, [spots]);
 
-  // 図に出なくなった定義の位置は state から落とす（id を打ち替えるたびに溜まるため）
+  // 図に出なくなった定義の位置は state から除く（id を打ち替えるたびに溜まるため）
   const known = useRef<string>("");
   useEffect(() => {
     const ids = graph.nodes.map((node) => node.id).join("\u0000");

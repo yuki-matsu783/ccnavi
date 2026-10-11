@@ -36,7 +36,7 @@ export function draftOf(form: RiskForm, nextKey: () => string): Draft {
   return { levels: form.levels, rows: form.factors.map((factor) => ({ key: nextKey(), factor })) };
 }
 
-/** 拡張ホストへ返す形に戻す。鍵は落とす */
+/** 拡張ホストへ返す形に戻す。鍵は除く */
 export function formOf(draft: Draft): RiskForm {
   return { levels: draft.levels, factors: draft.rows.map((row) => row.factor) };
 }

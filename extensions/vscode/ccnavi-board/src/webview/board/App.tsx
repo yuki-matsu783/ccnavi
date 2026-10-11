@@ -91,7 +91,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     return () => window.removeEventListener("message", onMessage);
   }, [requestTour]);
 
-  // 覚えていた値が候補に無ければ（その親が消えた等）「すべて」のまま。覚え直すのも、落とした後の値
+  // 覚えていた値が候補に無ければ（その親が消えた等）「すべて」のまま。覚え直すのも、外した後の値
   const project = projectOptions(board).includes(view.project) ? view.project : EMPTY.project;
   // アーカイブを表示しているときは、退避した親も絞り込みの候補に入る（選んでいた親が退避されても外さない）
   const parentOptions = board === undefined ? [] : view.archived ? [...board.parents, ...board.archivedParents] : board.parents;
@@ -124,7 +124,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   }, [filtering]);
 
   /**
-   * 覚える。落とした後の値（候補に無い絞り込みは「すべて」）で書くので、消えた親の絞り込みは
+   * 覚える。外した後の値（候補に無い絞り込みは「すべて」）で書くので、消えた親の絞り込みは
    * ここで正規化される。ユーザが触ったときだけでなく、拡張ホストから絞り込みを渡されたときも通る。
    *
    * 読み直せなかった画面（絞り込みの部品が無い）では書かない。書くと、覚えていた絞り込みが

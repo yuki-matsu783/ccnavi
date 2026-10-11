@@ -7,10 +7,10 @@
  *
  * GitLab の Commits API には「先頭がこの sha のときだけ」の指定が無い。書く直前に先頭を読み、違えば書かずに
  * 「動いた」（409）で返す。それでも間に入った書き込みは防げないので、答えにコミットの親（`parent_ids[0]`）を返し、
- * 書く流れ（`write.ts`）が事後に確かめて、違えば判定し直し、元に戻す。ccnavi の書き込みどうしの競合を捕まえる seq ファイルは、本物で確かめるまで書かない。
+ * 書く流れ（`write.ts`）が事後に確かめて、違えば判定し直し、元に戻す。ccnavi の書き込みどうしの競合を捕まえる seq ファイルは、実際の GitLab で確かめるまで書かない。
  *
  * MR のスレッドとレビュー（`reviewCopy`）は、手元の `ccnavi-review.sh` の `find_mr`・`threads`・`reviews`
- * （GitLab の枝）と同じ問い合わせ・同じページの切り方・同じ欄の落とし方（jq の `//`・`tostring`、型は jq と同じく
+ * （GitLab の枝）と同じ問い合わせ・同じページの切り方・同じ欄の省き方（jq の `//`・`tostring`、型は jq と同じく
  * そのまま残す）で組む。同じ見本（test/fixtures/host/gitlab/。手で組んだもの）から同じ結果になることを試験が見る。
  *
  * 書き込みの update・delete には `last_commit_id`（そのファイルを最後に変えたコミット）を付け、
@@ -239,7 +239,7 @@ export async function tree(client: Client, owner: string, repo: string, _oid: st
   return out;
 }
 
-/** BOM を落とさない（落とすと、元に戻すコミットで戻すバイト列が元と変わる） */
+/** BOM を除かない（除くと、元に戻すコミットで戻すバイト列が元と変わる） */
 const DECODER = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 function fromBase64(text: string): Uint8Array {
@@ -248,7 +248,7 @@ function fromBase64(text: string): Uint8Array {
 }
 
 /**
- * blob を sha で 1 件ずつ取る（`repository/blobs/:sha`。1 件ずつ。GraphQL でまとめて取れるかは本物で確かめていない）。
+ * blob を sha で 1 件ずつ取る（`repository/blobs/:sha`。1 件ずつ。GraphQL でまとめて取れるかは実際の GitLab で確かめていない）。
  * NUL を含むか UTF-8 として読めなければバイナリ。大きさが `size` と合わなければ止める
  */
 export async function blobs(client: Client, owner: string, repo: string, oids: readonly string[]): Promise<Record<string, BlobText>> {
@@ -284,7 +284,7 @@ export async function viewer(client: Client): Promise<string> {
 
 /**
  * PAT の期限（`GET /personal_access_tokens/self` の `expires_at`、`YYYY-MM-DD`）。その日の終わり（UTC）を ISO で返す。
- * 読めなければ空（project access token で返るかは本物で確かめていない）
+ * 読めなければ空（project access token で返るかは実際の GitLab で確かめていない）
  */
 export async function tokenExpiry(client: Client): Promise<string> {
   const { status, body } = await get(client, "/personal_access_tokens/self");
@@ -354,7 +354,7 @@ type MrItem = { iid?: unknown; web_url?: unknown; source_project_id?: unknown };
 async function openMrs(client: Client, owner: string, repo: string, branch: string): Promise<MrItem[]> {
   const pid = await projectId(client, owner, repo);
   // API は source_project_id で絞れないので、全ページ（20 ページまで）を読んでから絞る（1 ページ目がフォークで埋まっても
-  // 本物を外さない。sh の find_mr と同じ）
+  // このプロジェクトの MR を外さない。sh の find_mr と同じ）
   const all = await pages(client, `${project(owner, repo)}/merge_requests?state=opened&source_branch=${encodeURIComponent(checkBranch(branch))}`, THREAD_PAGES, `${branch} のマージリクエストの一覧`);
   return (all as MrItem[]).filter((m) => m && m.source_project_id === pid);
 }
@@ -422,7 +422,7 @@ export async function reviewers(client: Client, owner: string, repo: string, num
   const all = await pages(client, `${project(owner, repo)}/merge_requests/${number}/reviewers`, THREAD_PAGES, `マージリクエスト !${number} のレビュアー`);
   return (all as { state?: unknown; updated_at?: unknown; created_at?: unknown; user?: { id?: unknown; username?: unknown } | null }[]).map((r) => {
     const raw = alt(r.state, "");
-    // jq の ascii_upcase は文字列でなければ落ちる（sh は取得した結果を組めずに止まる）。同じく止める
+    // jq の ascii_upcase は文字列でなければ失敗する（sh は取得した結果を組めずに止まる）。同じく止める
     if (r.state !== "requested_changes" && typeof raw !== "string") throw new HostError(`マージリクエスト !${number} のレビュアーの state が文字列でない`);
     return {
       state: r.state === "requested_changes" ? "CHANGES_REQUESTED" : asciiUpcase(raw as string),
@@ -452,7 +452,7 @@ export async function reviewCopy(client: Client, owner: string, repo: string, br
 
 /**
  * compare の変更の一覧を打ち切られたとみなす件数。GitLab の差分の件数の上限（`diff_max_files`）は既定が 1000 で、
- * インスタンスの管理者が 500 まで下げられる。その最小値より下の 450 件以上で、打ち切られたとみなす（本物の
+ * インスタンスの管理者が 500 まで下げられる。その最小値より下の 450 件以上で、打ち切られたとみなす（実際の
  * インスタンスの値は確かめていない）
  */
 export const COMPARE_FILES_NEAR = 450;

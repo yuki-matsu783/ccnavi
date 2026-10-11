@@ -4,7 +4,7 @@
 //   node scripts/test.js --e2e   試験用の通信先（127.0.0.1）で組み立て（dist-e2e/）→ 拡張を読み込んだ Chromium で実機の試験
 //
 // 実機の試験は Playwright の Chromium を使う（PLAYWRIGHT_BROWSERS_PATH。`playwright install` はしない）。
-// 無ければ 3 で終わる（落ちた 1 とは分ける）。
+// 無ければ 3 で終わる（失敗した 1 とは分ける）。
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";

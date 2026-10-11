@@ -11,7 +11,7 @@
  * - `ResizeObserver`（`dom.ts` の `measure` と同じ理由。点の大きさが測れないと線が 1 本も出ない）
  * - `DOMMatrixReadOnly`（React Flow が点の transform を読むのに使う。無いと例外で止まる）
  *
- * どちらも大きさと行列を偽るだけで、本物の配置はしない。だから、ここで見てよいのは
+ * どちらも大きさと行列を偽るだけで、実際の配置はしない。だから、ここで見てよいのは
  * 「動かしたら state に入るか」までで、動いた先の座標そのものは見ない（図の倍率で決まる）。
  */
 import type { JSDOM as JSDOMType } from "jsdom" with { "resolution-mode": "import" };
@@ -34,7 +34,7 @@ export interface JsdomPage {
   state(): unknown;
   /** 画面が vscode.postMessage で送ったもの（古い順） */
   readonly posted: { readonly type: string }[];
-  /** セレクタで 1 つ取る。無ければ落とす */
+  /** セレクタで 1 つ取る。無ければ失敗させる */
   one(selector: string): Element;
   /** セレクタで全部取る */
   all(selector: string): Element[];

@@ -61,8 +61,8 @@ function cssFiles(dir: string = WEBVIEW_SRC): string[] {
  * ように `.` で始まらないものは node_modules から解く（esbuild がバンドルするときと同じ解き方）。
  *
  * 外から来る CSS を入れているのは図の 1 本だけ（React Flow の CSS）。ここで解けないと、このテストは
- * 落ちるのではなく `readFileSync` の ENOENT で例外になるので、行き先を間違えたのか置き忘れたのかが
- * 読めなくなる。解けないパスは名指しで落とす。
+ * 失敗するのではなく `readFileSync` の ENOENT で例外になるので、行き先を間違えたのか置き忘れたのかが
+ * 読めなくなる。解けないパスは名指しで失敗させる。
  */
 function importsOf(file: string): string[] {
   const text = fs.readFileSync(file, "utf8");
@@ -155,7 +155,7 @@ test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使�
 test("CB-T193 動いた表示は、光らせない設定を尊び、色だけに頼らない", () => {
   const html = flatStyle(board());
   // 光るのは既定のときだけ。`prefers-reduced-motion` では輪だけが残る（`styles/button.css` の
-  // 回り記号と同じ書き方）。ここを落とすと、動きを嫌うユーザに 2 秒の脈動が出る
+  // 回り記号と同じ書き方）。ここを外すと、動きを嫌うユーザに 2 秒の脈動が出る
   assert.match(html, /@media \(prefers-reduced-motion: reduce\) \{ \.card\.moved \{ animation: none; \} \}/);
   // どこからどこへ動いたかは帯の文で言う（色が見分けられなくても読める）。中身は Card.tsx の movedLabel
   assert.match(html, /\.moved-mark \{[^}]*color: var\(--vscode-charts-green\);/);

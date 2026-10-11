@@ -1,17 +1,17 @@
 /**
  * GitLab 対応のレビューで直したもの。模擬の GitHub・GitLab と Node の上の Pyodide で回す。
  *
- * - 応答が落ちた書き込みの受け直し（PROBE-2・3）: 自分のコミットを「書いた中身と親の組」で見分けたときだけ受け直す。
+ * - 応答が返らなかった書き込みの受け直し（PROBE-2・3）: 自分のコミットを「書いた中身と親の組」で見分けたときだけ受け直す。
  *   見分けられなければユーザの対応に切り替える
  * - 事後確認は周ごとに 1 つの時刻で判定し直す（時計が進んでも、無関係な割り込みでは元に戻さない）
- * - 事後確認と元に戻すコミットの途中でホストが落ちたら、書いたが確認できなかったとしてユーザの対応に切り替える
+ * - 事後確認と元に戻すコミットの途中でホストが動かなくなったら、書いたが確認できなかったとしてユーザの対応に切り替える
  * - service worker: 読み取りも登録したリポジトリだけ。「始める」は統合先の先頭で閉じた識別子と互換の版を確かめ直す
  * - GitLab の compare は、折りたたまれた・大きすぎる・時間切れ・上限に近い一覧を読めないとする
  * - GitLab の tree と discussions のページの上限、429 と 403、転送を追わない、シンボリックリンク
  * - 元に戻すコミットはバイト列のまま戻す（BOM も）
  * - 「要確認」の親子のチケットには、そのブラウザで書くボタンを出さない
  *
- * 最新のレビューで足したもの: 確かめが落ちたら要確認、元に戻す前の 412 で元に戻し直す、別の線に付け替わったら
+ * 最新のレビューで足したもの: 確かめが失敗したら要確認、元に戻す前の 412 で元に戻し直す、別の線に移ったら
  * ユーザの対応に切り替える、update の last_commit_id、MR の全ページとフォークの除外、転送を追わない
  */
 import { before, test } from "node:test";
@@ -83,10 +83,10 @@ async function start(mock: MockGitHub, host = "gitlab.com", repo = GITLAB_REPO, 
   return { d, shown: shownOf(await collectRepo(repo, d), "i0001") };
 }
 
-test("CX-T161 GitLab で応答が落ち、その上に無関係な書き込みが積まれても、自分のコミットを中身と親の組で見分けて事後確認する（PROBE-2）", async () => {
+test("CX-T161 GitLab で応答が返らず、その上に無関係な書き込みが積まれても、自分のコミットを中身と親の組で見分けて事後確認する（PROBE-2）", async () => {
   const mock = new MockGitLab(parentOnly());
   const { d, shown } = await start(mock);
-  // 書く直前に判定の変わる書き込み（子の提案）が入り、応答が落ち、その後に無関係なコードが積まれる
+  // 書く直前に判定の変わる書き込み（子の提案）が入り、応答が返らず、その後に無関係なコードが積まれる
   mock.beforeCommit = (b) => void mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み X");
   mock.loseCommitResponse = true;
   let pushed = false;
@@ -106,7 +106,7 @@ test("CX-T161 GitLab で応答が落ち、その上に無関係な書き込み�
   assert.ok(!(DOING in files) && TODO in files && CHILD in files && "src/zzz.py" in files);
 });
 
-test("CX-T162 GitHub で応答が落ち、その上に無関係な書き込みが積まれても、親が読んだ先頭の自分のコミットだけを受け直す（PROBE-3）", async () => {
+test("CX-T162 GitHub で応答が返らず、その上に無関係な書き込みが積まれても、親が読んだ先頭の自分のコミットだけを受け直す（PROBE-3）", async () => {
   const mock = new MockGitHub(parentOnly());
   const { d, shown } = await start(mock, "github.com", GH_REPO);
   const before = mock.head("i0001");
@@ -125,7 +125,7 @@ test("CX-T162 GitHub で応答が落ち、その上に無関係な書き込み�
   assert.equal(mock.commitCalls.length, 1);
 });
 
-test("CX-T163 GitLab で応答が落ち、自分のコミットを見分けられない（上に merge が積まれた）のに書いた中身が在るなら、ユーザの対応に切り替える", async () => {
+test("CX-T163 GitLab で応答が返らず、自分のコミットを見分けられない（上に merge が積まれた）のに書いた中身が在るなら、ユーザの対応に切り替える", async () => {
   const mock = new MockGitLab(parentOnly());
   mock.branch("side", "main");
   mock.push("side", { "src/side.py": "s\n" }, "別の枝");
@@ -154,7 +154,7 @@ test("CX-T164 事後確認は周ごとに 1 つの時刻で判定し直す。時
   assert.equal(mock.glCommits.length, 1);
 });
 
-test("CX-T165 事後確認の途中でホストが落ちたら、書いたが確認できなかったとしてユーザの対応に切り替える（失敗とは文面を分ける）", async () => {
+test("CX-T165 事後確認の途中でホストが動かなくなったら、書いたが確認できなかったとしてユーザの対応に切り替える（失敗とは文面を分ける）", async () => {
   const mock = new MockGitLab(parentOnly());
   const { d, shown } = await start(mock);
   mock.beforeCommit = (b) => void mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み");
@@ -255,7 +255,7 @@ test("CX-T170 GitLab のシンボリックリンク（mode 120000）はパスで
   assert.match(fam?.result?.undecided ?? "", /シンボリックリンク/);
 });
 
-test("CX-T171 元に戻すコミットはバイト列のまま戻す（BOM も落とさない）", async () => {
+test("CX-T171 元に戻すコミットはバイト列のまま戻す（BOM も失わない）", async () => {
   const f = parentOnly();
   const original = '﻿{"at": "2026-09-01T00:00:00Z", "ticket": "i0001", "kind": "note"}\n';
   f.i0001.files[EVENTS] = original;
@@ -284,8 +284,8 @@ test("CX-T172 「要確認」の親子のチケットには、そのブラウザ
 
 // ---- 最新のレビューで直したもの ------------------------------------------------
 
-test("CX-T174 応答が落ちた後の確かめや、書いた後の確かめが落ちたら、失敗でなく要確認（書いたかもしれないが確認できない）", async () => {
-  // 応答が落ちた直後に先頭を読む要求も落ちる
+test("CX-T174 応答が返らなかった後の確かめや、書いた後の確かめが失敗したら、失敗でなく要確認（書いたかもしれないが確認できない）", async () => {
+  // 応答が返らなかった直後に先頭を読む要求も失敗する
   const lost = new MockGitLab(parentOnly());
   const a = await start(lost);
   lost.loseCommitResponse = true;
@@ -297,7 +297,7 @@ test("CX-T174 応答が落ちた後の確かめや、書いた後の確かめが
   assert.match(out.kind === "attention" ? out.message : "", /書いたかもしれないが確認できなかった/);
   assert.equal(lost.glCommits.length, 1);
 
-  // 割り込みは無く書けたが、書いた後の中身を読む要求が落ちる
+  // 割り込みは無く書けたが、書いた後の中身を読む要求が失敗する
   const after = new MockGitLab(parentOnly());
   const b = await start(after);
   after.onRequest = (method, u) => {
@@ -338,7 +338,7 @@ test("CX-T175 元に戻すコミットを送る前の確認で先頭が動いた
   assert.ok(!(DOING in files) && TODO in files && "src/zzz.py" in files);
 });
 
-test("CX-T176 GitLab で応答が落ち、先頭が読んだ先頭に届かない別の線（同じ中身のコミット）に付け替わったら、自分のものと取らずユーザの対応に切り替える", async () => {
+test("CX-T176 GitLab で応答が返らず、先頭が読んだ先頭に届かない別の線（同じ中身のコミット）に移ったら、自分のものと取らずユーザの対応に切り替える", async () => {
   const mock = new MockGitLab(parentOnly());
   const { d, shown } = await start(mock);
   const read = mock.head("i0001") as string;
@@ -394,7 +394,7 @@ test("CX-T178 GitLab の開いた MR は全ページを読んでからこのプ�
   mock.forkMrs.push({ branch: "i0001", number: 900 });
   assert.equal(await gl.openMr(client, "acme", "widgets", "i0001"), null);
   assert.deepEqual(await gl.pullApprovals(client, "acme", "widgets", "i0001"), []);
-  // 1 ページ目（100 件）がフォークで埋まり、本物は 2 ページ目
+  // 1 ページ目（100 件）がフォークで埋まり、実物は 2 ページ目
   for (let i = 1; i < 120; i += 1) mock.forkMrs.push({ branch: "i0001", number: 900 + i });
   mock.pulls.i0001 = [{ number: 7, reviews: [{ user: "reviewer", state: "APPROVED" }] }];
   assert.equal((await gl.openMr(client, "acme", "widgets", "i0001"))?.number, 7);
@@ -402,7 +402,7 @@ test("CX-T178 GitLab の開いた MR は全ページを読んでからこのプ�
   assert.ok(mock.calls.some((c) => c.includes("/merge_requests")));
 });
 
-test("CX-T179 転送は追わない: GitHub と GitLab の要求に redirect: \"error\" を付け、fetch そのものが落ちたら原因の分かる文面にする", async () => {
+test("CX-T179 転送は追わない: GitHub と GitLab の要求に redirect: \"error\" を付け、fetch そのものが失敗したら原因の分かる文面にする", async () => {
   const seen: string[] = [];
   const ok = async (_url: string, init: { redirect?: string }) => {
     seen.push(String(init.redirect));

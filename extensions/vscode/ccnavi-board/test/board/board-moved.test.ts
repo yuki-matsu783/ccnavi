@@ -68,7 +68,7 @@ function moveTo(board: ReturnType<typeof buildBoard>, ticket: string, to: string
   };
 }
 
-/** 見本のボードから `ticket` を 1 枚落とした形 */
+/** 見本のボードから `ticket` を 1 枚除いた形 */
 function without(board: ReturnType<typeof buildBoard>, ticket: string): ReturnType<typeof buildBoard> {
   return {
     ...board,

@@ -75,7 +75,7 @@ const WRAP = 4;
 /** work の枠と feedback の枠の間の余白（`COLUMN` に足す） */
 export const FEEDBACK_GAP = 90;
 
-/** 前後の空白を落とした id。画面の他の場所（重なりの検査）と同じ読み方 */
+/** 前後の空白を除いた id。画面の他の場所（重なりの検査）と同じ読み方 */
 function idOf(phase: { readonly id: string }): string {
   return phase.id.trim();
 }
@@ -93,7 +93,7 @@ function edgeId(relation: Relation, a: string, b: string): string {
 }
 
 /**
- * 線を組む。行き先がこのファイルに無いものは落とす。同じ組は 1 本にする
+ * 線を組む。行き先がこのファイルに無いものは省く。同じ組は 1 本にする
  * （`a` が `b` を、`b` が `a` を挙げていても 1 本）。
  *
  * 辿るのは先に出てきた定義だけ（`kept`）。同じ id が 2 つあるとき、点は先のほうを出すので、

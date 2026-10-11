@@ -53,7 +53,7 @@
  * | 決めた結果の文の上に、連絡も次の「決める」も被せない | 続きの子の識別子と次の 2 手を渡す前に、文が消える |
  *
  * これらは `test/shared/approval-machine.test.ts` が見る。同じファイルの変異テストが、
- * ガードを 1 つ消したらテストが落ちることまで見るので、ガードを足したらそちらにも足す。
+ * ガードを 1 つ消したらテストが失敗することまで見るので、ガードを足したらそちらにも足す。
  */
 import type { ApprovalOverlay } from "./board-view.js";
 import type { ApproveOutcome, PreviewParse } from "./approvemodel.js";
@@ -241,7 +241,7 @@ function opened(
     if (input.tickets.length === 0) {
       return stay(state, { kind: "warn", text: "絞り込みで見えている承認待ちがありません" });
     }
-    // 1 つでもいまのボードで承認待ちでなければ、ボードが古い。落として送ると「見せた 2 件の
+    // 1 つでもいまのボードで承認待ちでなければ、ボードが古い。外して送ると「見せた 2 件の
     // つもりが 1 件」になるので、削らずに止める
     const pending = new Set(input.pending);
     if (!input.tickets.every((id) => pending.has(id))) {

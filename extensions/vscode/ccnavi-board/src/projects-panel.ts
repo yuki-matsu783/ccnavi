@@ -258,7 +258,7 @@ function watchProjects(current: PanelState, projectsRel: string, selfRulesRel: s
   }
   const { folder } = current;
   // clone の完了（`.git` の出現）、ワークスペースとプロジェクトの設定のルールファイルの出入り、origin の変化、ワークツリーの登録、`.gitignore`。
-  // 設定のパス（ccnavi ディレクトリの下の `config/`）はワークスペースの設定のパスから取る。プロジェクトの設定も同じ形（設計 11.2）。
+  // 設定のパス（ccnavi ディレクトリの下の `config/`）はワークスペースの設定のパスから取る。プロジェクトの設定も同じ形。
   // ワークスペースの設定のパスが取れない（JSON として読めない）なら、設定のルールファイルの監視は張らない。
   const rel = projectsRel;
   const layerDir = selfRulesRel === "" ? "" : path.posix.dirname(selfRulesRel);

@@ -39,7 +39,7 @@ export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を�
 #                      'sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>' で記録する。
 #                      判定が揃うまで子は閉じられない。子の HEAD が動けば取り直し
 #
-# このファイルが無ければ組み込み（下の定量 4 項目と同じ値）。壊れていれば組み込みを使い、--lint が言う。
+# このファイルが無ければ組み込み（下の定量 4 項目と同じ値）。不正なら組み込みを使い、--lint が言う。
 version: 1
 levels:
   medium: 20
