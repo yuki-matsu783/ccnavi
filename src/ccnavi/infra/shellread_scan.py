@@ -9,6 +9,8 @@ import re
 import shlex
 from dataclasses import dataclass, field
 
+from . import shellread_words
+
 # 読み切れなかった理由。何が読みを止めたかまで名指しする。
 # 「読めなかった」だけでは、読み手は直す先が分からない。
 REASON_UNTERMINATED = "unterminated-quote"
@@ -47,6 +49,12 @@ _BEFORE_WORD = " \t\r;&|()<>"
 # 切り出した中身の代わりに外側へ残す 1 文字。消さずに残すのは、外側の語の数と形を
 # 保つため。`> "$(pwd)/x"` は `> $/x` になり、リダイレクト先の後半が語として残る。
 _PLACEHOLDER = "$"
+
+
+def _fold_gt(text: str) -> str:
+    """引用の中の `>` を身代わりの文字にする。shlex が演算子として返さないように。"""
+    return text.replace(">", shellread_words.QUOTED_GT)
+
 
 # 走査が止まって調べる文字。それ以外は正規表現でまとめて飛ばす。1 文字ずつ見ると、
 # ファイル 1 本分の中身を持つヒアドキュメントで判定の期限に影響する。
@@ -281,7 +289,7 @@ class _Scanner:
         j = self.s.find("'", self.i + 1)
         if j < 0:
             raise _Unreadable(REASON_UNTERMINATED)
-        self.emit(self.s[self.i : j + 1], collect)
+        self.emit(_fold_gt(self.s[self.i : j + 1]), collect)
         self.i = j + 1
 
     def ansi_c(self, collect: bool) -> None:
@@ -298,7 +306,7 @@ class _Scanner:
             if s[j] == "\\":
                 raise _Unreadable(REASON_ANSI_C)
             if s[j] == "'":
-                self.emit("'" + s[self.i + 2 : j + 1], collect)
+                self.emit(_fold_gt("'" + s[self.i + 2 : j + 1]), collect)
                 self.i = j + 1
                 return
             j += 1
@@ -320,7 +328,8 @@ class _Scanner:
             m = stop.search(s, self.i)
             end = m.start() if m else len(s)
             if end > self.i:
-                self.emit(s[self.i : end], collect)
+                text = s[self.i : end]
+                self.emit(_fold_gt(text) if terminator else text, collect)
                 self.i = end
                 continue
             c = s[self.i]
@@ -336,7 +345,7 @@ class _Scanner:
                 self.backquote()
             if c == "$" and self.dollar(collect, quoted=True):
                 continue
-            self.emit(c, collect)
+            self.emit(_fold_gt(c) if terminator else c, collect)
             self.i += 1
         if terminator:
             raise _Unreadable(REASON_UNTERMINATED)

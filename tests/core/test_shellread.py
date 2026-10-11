@@ -190,8 +190,11 @@ class WordSepTest(_Readable, unittest.TestCase):
             'grep -n "<<EOF" README.md': (
                 "grep -n " + WORD_SEP + "<" + WORD_SEP + WORD_SEP + "<" + WORD_SEP + "EOF README.md"
             ),
-            # 引用符だけで書かれた演算子 1 語は演算子のまま（shlex が引用の有無を返さない）。
-            'grep -n ">" f': "grep -n > f",
+            # 引用符だけで書かれた `>` は文字として読む（走査が身代わりに置き換えてから渡す）。
+            'grep -n ">" f': "grep -n " + WORD_SEP + ">" + WORD_SEP + " f",
+            "grep -n '>' f": "grep -n " + WORD_SEP + ">" + WORD_SEP + " f",
+            # 引用の中の `>` と、語の中の `>` は同じ形に読む。
+            'grep -n "a>b" f': "grep -n a" + WORD_SEP + ">" + WORD_SEP + "b f",
             # 素の演算子は空白付きで残る。
             "echo x>f": "echo x > f",
             "cmd 2>&1": "cmd 2 >& 1",
