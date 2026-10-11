@@ -87,11 +87,13 @@ _SESSION_AND_KEY = (
     ("subagent-", ".unchecked"),  # subagent._unchecked_path
     ("subagent-", ".running"),  # subagent._running_path
 )
-# `<セッション>.json`（post._seen_path）。Claude Code のセッションは UUID なので、その形に
+# `<セッション>.reported.json`（post._seen_path）と、改名の前の `<セッション>.json`
+# （post._legacy_seen_path）。Claude Code のセッションは UUID なので、その形に
 # 限る。`.+` で読むと、置き場に置かれた別のファイル（`package.json`、レビューの結果の
 # コピーなど）をセッションの記録と読み違えて消す。形の違う名前は知らないファイルとして残す。
 _SEEN = re.compile(
-    r"^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\.json$"
+    r"^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})"
+    r"(?:\.reported)?\.json$"
 )
 
 

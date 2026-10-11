@@ -123,6 +123,7 @@ import hashlib
 import os
 import shutil
 import time
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TextIO
@@ -173,6 +174,7 @@ ACTION_MISSING = "missing"  # 対象が無く、戻す先も無い
 ACTION_FAILED = "failed"  # 戻そうとして駄目だった
 ACTION_WOULD = "would-restore"  # dry-run。戻す代わりに言うだけ
 ACTION_LEFT = "left-as-repair"  # 読めないルールファイルへの修復なので戻さなかった
+ACTION_REBASED = "rebased"  # 大きい対象が変わったので、新しい版を基準に取り直した
 
 # 共通レイヤーのルールファイルに付けるバックアップの key（_places）。
 COMMON_RULES_KEY = "rules"
@@ -246,9 +248,13 @@ def before(
     outcomes = []
     for target in found:
         if target.heavy:
-            # 大きい対象はセッション開始で 1 度だけバックアップする。呼び出しのたびに
-            # 数十 MB をコピーすると、判定を待たせるために置いた仕組みが、判定より
-            # 重くなる。
+            # 大きい対象は、呼び出しのたびにコピーも読みもしない（数十 MB を毎回扱うと、
+            # 判定より重くなる）。大きさと更新時刻が変わったときだけ、新しい版を基準に
+            # 取り直す。ツールを呼ぶ前に、ccnavi の外で再ビルドされていた場合もここで取り直す。
+            if setting == ENABLE:
+                outcome = _rebase_if_changed(state_dir, session, target)
+                if outcome is not None:
+                    outcomes.append(outcome)
             continue
         content = _read(target.path)
         if content is not None:
@@ -413,9 +419,8 @@ def at_start(
 
     大きい対象をバックアップするのはここだけ。実行ファイルがこれにあたり、ツール呼び出しの
     たびに数十 MB をコピーするわけにはいかないので、コピーするのはセッションに 1 度。そのあいだに
-    作り直されたものはバックアップと食い違うが、作り直しはユーザが起こす作業なので、食い違いは
-    報告に出てユーザの目に触れる。何も出さずに新しいほうをバックアップし直すと、差し替えと作り直しが
-    同じ見た目になる。
+    ツール呼び出しの外で作り直されたものは、次の実行前の照合で新しい版として基準に取り込む。
+    ツール呼び出しの中で変わったものは、実行後に、その直前の版へ戻す。
 
     小さいほうも一緒にバックアップする。実行前のバックアップが始まるのは最初のツール呼び出しからで、
     それより前に設定ファイルを消されると、バックアップを持たないまま実行後チェックに入る。
@@ -578,15 +583,29 @@ def _save_heavy(state_dir: str, session: str, target: selfguard_targets.Target) 
         shape = os.stat(target.path)
     except OSError as exc:
         return f"{exc}"
-    digest = _digest(target.path)
+    # 先にコピーして、その中身の digest で名前を付ける。ハッシュを読んでからコピーすると、
+    # その間に書き換えられた版が、読んだハッシュの名前で入ってしまう。
+    scratch = _store_path(state_dir, "scratch-" + uuid.uuid4().hex)
+    failed = _copy(target.path, scratch + _PART_SUFFIX)
+    if failed:
+        return failed
+    digest = _digest(scratch + _PART_SUFFIX)
     if not digest:
+        with contextlib.suppress(OSError):
+            os.remove(scratch + _PART_SUFFIX)
         return f"読めない: {target.path}"
 
     entry = _store_path(state_dir, digest)
-    if not os.path.exists(entry):
-        failed = _place(target.path, entry)
-        if failed:
-            return failed
+    if os.path.exists(entry):
+        with contextlib.suppress(OSError):
+            os.remove(scratch + _PART_SUFFIX)
+    else:
+        try:
+            os.replace(scratch + _PART_SUFFIX, entry)
+        except OSError as exc:
+            with contextlib.suppress(OSError):
+                os.remove(scratch + _PART_SUFFIX)
+            return f"{exc}"
     # 最後に使った時刻にする。掃除はこれを見て、使われなくなった実体を削除する。
     with contextlib.suppress(OSError):
         os.utime(entry, None)
@@ -604,12 +623,15 @@ def _save_heavy(state_dir: str, session: str, target: selfguard_targets.Target) 
 def _check_heavy(
     setting: str, state_dir: str, session: str, target: selfguard_targets.Target
 ) -> Outcome | None:
-    """大きい対象を、大きさと更新時刻で照合する。
+    """大きい対象を、大きさと更新時刻で照合する。変わっていれば、直前の版に戻す。
 
-    中身は読まない。バックアップした時点の大きさと更新時刻を参照に書いてあるので、
-    差し替えられればどちらかが必ず動く。同じ大きさで同じ時刻に作った別のものまでは
-    見分けられないが、そこを見分けるには毎回全部を読むことになり、実行前
-    チェックに設けた期限を設定ファイル 1 つのために使い切ることになる。
+    中身は読まない。参照に書いた大きさと更新時刻は、実行前の照合（`_rebase_if_changed`）で
+    そのツール呼び出しの直前の版に取り直してある。変わればどちらかが必ず動く。同じ大きさで
+    同じ時刻に作った別のものまでは見分けられないが、そこを見分けるには毎回全部を読むことに
+    なり、実行前チェックに設けた期限を設定ファイル 1 つのために使い切ることになる。
+
+    ここで見つかる変化は、この呼び出しの中で起きたもの。ツール呼び出しの外の変更は、
+    実行前に基準へ取り込み済みなので、ここには出てこない。
 
     バックアップが無いときは何も出さない。セッション開始のイベントに登録していない、あるいは
     実行ファイルを指していない設定がこれで、異常ではない。登録の漏れは
@@ -622,8 +644,18 @@ def _check_heavy(
     if _same_shape(target.path, size, mtime):
         return None
     if setting != ENABLE:
-        return Outcome(target, ACTION_WOULD, "本来ならバックアップから戻す（今回は触っていない）")
+        return Outcome(
+            target,
+            ACTION_WOULD,
+            "このツール呼び出しで変わった。enable なら直前の版に戻す（今回は触っていない）",
+        )
+    return _restore_heavy(state_dir, digest, target, mtime)
 
+
+def _restore_heavy(
+    state_dir: str, digest: str, target: selfguard_targets.Target, mtime: int
+) -> Outcome:
+    """実行ファイルを、参照の版（直前のツール呼び出しの直前に取った版）に戻す。"""
     entry = _store_path(state_dir, digest)
     if not os.path.exists(entry):
         return Outcome(
@@ -632,6 +664,18 @@ def _check_heavy(
             "バックアップの実体が見つからないので戻せない。"
             "ccnavi を作り直して、セッションを開き直してください",
         )
+    existed = os.path.exists(target.path)
+    kept = ""
+    if existed:
+        # 戻すと、この呼び出しで書かれた版は消える。消す前に退避する。退避できなければ戻さない。
+        kept = os.path.join(
+            state_dir,
+            "aside",
+            f"{time.strftime('%Y%m%d-%H%M%S')}-{os.path.basename(target.path)}",
+        )
+        failed = _copy(target.path, kept)
+        if failed:
+            return Outcome(target, ACTION_FAILED, f"退避できないので戻さない: {failed}")
     failed = _place(entry, target.path)
     if failed:
         return Outcome(target, ACTION_FAILED, f"戻せない: {failed}")
@@ -639,7 +683,38 @@ def _check_heavy(
     # 次の照合で毎回一致しないまま報告されつづける。
     with contextlib.suppress(OSError):
         os.utime(target.path, (mtime, mtime))
-    return Outcome(target, ACTION_RESTORED, "セッション開始の時点の実行ファイルに戻した")
+    if existed:
+        detail = f"このツール呼び出しで変わったので、直前の版に戻した（書かれていた版は {kept}）"
+    else:
+        detail = "このツール呼び出しで消えたので、直前の版に戻した"
+    return Outcome(target, ACTION_RESTORED, detail)
+
+
+def _rebase_if_changed(
+    state_dir: str, session: str, target: selfguard_targets.Target
+) -> Outcome | None:
+    """実行前の照合。大きさか更新時刻が変わっていれば、ツール呼び出しの外の変更として受け入れる。
+
+    そのときの版を基準に取り直す。このツール呼び出しで起きた変化は、実行後の照合
+    （`_check_heavy`）が、ここで取った版に戻す。
+    """
+    ref = _parse_ref(_read(_ref_path(state_dir, session, target)))
+    if ref is None:
+        return None
+    _, size, mtime = ref
+    if _same_shape(target.path, size, mtime) or not os.path.exists(target.path):
+        return None
+    return _rebase_heavy(state_dir, session, target)
+
+
+def _rebase_heavy(state_dir: str, session: str, target: selfguard_targets.Target) -> Outcome:
+    """今の版を基準にバックアップし直す。取れなければ、その理由を報告する。"""
+    failed = _save_heavy(state_dir, session, target)
+    if failed:
+        return Outcome(target, ACTION_FAILED, f"新しい版を基準に取れない: {failed}")
+    return Outcome(
+        target, ACTION_REBASED, "ツール呼び出しの外で変わったので、その版を基準にし直した"
+    )
 
 
 def _same_shape(path: str, size: int, mtime: int) -> bool:
@@ -740,7 +815,13 @@ def report(outcomes: list[Outcome]) -> str:
             "読めなかった共通レイヤーのルールファイルに加えられた修復は、元に戻していません。"
             "直した中身が意図どおりかを、ユーザが確かめてください。"
         )
-    if any(outcome.action != ACTION_LEFT for outcome in outcomes):
+    if any(outcome.action == ACTION_REBASED for outcome in outcomes):
+        # 取り直した版は、ccnavi の外で作り直されたものも含めて、この時点から基準になる。
+        lines.append(
+            "実行ファイルは新しい版を基準に取り直しました。ccnavi の外で作り直された版も、"
+            "この時点から基準になります。"
+        )
+    if any(outcome.action not in (ACTION_LEFT, ACTION_REBASED) for outcome in outcomes):
         lines.append(
             "変更が要るなら、何をなぜ変えたいのかをユーザに伝えて依頼してください。"
             "自分で書き換えると、次の呼び出しで同じように戻ります。"

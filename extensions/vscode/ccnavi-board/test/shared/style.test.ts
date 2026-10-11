@@ -279,3 +279,8 @@ test("CB-T291 狭い幅（520px 以下）では一覧の欄を 1 列にして行
   // 全体計画の待ち方の選択は外したので、その欄の規則も無い
   assert.doesNotMatch(phases, /\.order select/);
 });
+
+test("CB-T397 畳んだ部品箱と右の欄は、中身のボタンの display に負けずに隠れる", () => {
+  const css = screenStyle("flow");
+  assert.match(css, /\.flow-palette\[data-folded="1"\] > :not\(\.flow-fold\)[^{]*\{\s*display: none !important;?\s*\}/);
+});

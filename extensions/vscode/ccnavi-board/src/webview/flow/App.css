@@ -11,8 +11,8 @@
 .flow-body[data-palette-folded="1"] { grid-template-columns: auto minmax(0, 1fr) 300px; }
 .flow-body[data-side-folded="1"] { grid-template-columns: 150px minmax(0, 1fr) auto; }
 .flow-body[data-palette-folded="1"][data-side-folded="1"] { grid-template-columns: auto minmax(0, 1fr) auto; }
-/* 畳んだら札のボタンだけ残す（中身は消さずに隠す。欄の入力途中の状態を残す） */
-.flow-palette[data-folded="1"] > :not(.flow-fold), .flow-side[data-folded="1"] > :not(.flow-fold) { display: none; }
+/* 畳んだら札のボタンだけ残す（中身は消さずに隠す。欄の入力途中の状態を残す）。部品のボタンの `display: flex`（下）より詳細度が低いので `!important` で勝つ */
+.flow-palette[data-folded="1"] > :not(.flow-fold), .flow-side[data-folded="1"] > :not(.flow-fold) { display: none !important; }
 .flow-body .flow-fold { margin-left: 0; align-self: flex-start; white-space: nowrap; }
 .flow-body[data-palette-folded="1"] .flow-palette { padding: 4px; }
 @media (max-width: 820px) {
