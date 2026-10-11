@@ -48,7 +48,10 @@ git に聞く検査で、hook がコマンド行から決められるもので�
 - `crit review <file.html>` はファイルのモードになり、HTML のソースに行の指摘を付けられる。偽の `gh` で `crit push <番号>` を
   打つと、`POST repos/{owner}/{repo}/pulls/<番号>/reviews` に `{"event":"COMMENT","comments":[{"path":"wip/eli5/phase-1.html","line":4,"side":"RIGHT"}]}`
   を送った。GitHub ではレビューのコメント（`reviewThreads` の 1 件）になり、sh の `fetch` が未解決のスレッドとして取得する
-- 確かめていないもの: 本物の GitHub・GitLab が受け付けるか（認証済みの `gh` / `glab` と実物のマージリクエストが要る）、GitLab の
+- 実物の GitHub（2026-10-12 に 1 アカウントで実測）: 手で組んだ同じ欄の `POST pulls/<番号>/reviews` を受け付け、`reviewThreads` の 1 件に
+  なって sh の `fetch` が未解決として取る。差分に無い行・ファイルへのレビューは 422 で拒まれ、作られない
+  （`tests/manual/github/probe_github.py`。crit 自身は起動していない）
+- 確かめていないもの: 実際の crit が `gh` で送る通し（送る欄が上の JSON と同じか）、`CHANGES_REQUESTED` を実物のホストが返す形（別のアカウントが要る）、本物の GitLab が受け付けるか（認証済みの `glab` と実物のマージリクエストが要る）、GitLab の
   `glab` での送り方（Draft Notes をまとめて公開する。discussion になるので sh の `fetch` は `resolvable` の注記として拾うはず）
 
 ### スレッドが止めること・選べること

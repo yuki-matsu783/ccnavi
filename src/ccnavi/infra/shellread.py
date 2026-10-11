@@ -222,6 +222,8 @@ def _prepare(src: str) -> str:
     誰も書かない表記だし、変わるのは引数の文字列であってどのコマンドが走るかではない。
     """
     src = src.replace(SEP, " ").replace(WORD_SEP, " ")
+    for stand_in in shellread_words.QUOTED_BACK:
+        src = src.replace(stand_in, " ")
     return src.replace("\\\r\n", "").replace("\\\n", "")
 
 
@@ -621,6 +623,8 @@ def _join(token: str) -> str:
     for c in token:
         if c.isspace():
             out.append(WORD_SEP)
+        elif c in shellread_words.QUOTED_BACK:
+            out.append(WORD_SEP + shellread_words.QUOTED_BACK[c] + WORD_SEP)
         elif c in shellread_words._PUNCTUATION:
             out.append(WORD_SEP + c + WORD_SEP)
         else:

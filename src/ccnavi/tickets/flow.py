@@ -260,14 +260,20 @@ def info(conf: settings.Settings, root: str, child: ticket_model.Ticket) -> dict
         return None
     draft = draft_file(conf, base, child.ticket)
     draft_exists = os.path.lexists(draft)
+    # 錠の種類。レビュー中（`review/`）は着手の有無によらず止める。着手中は `doing/` の着手したもの
+    lock_kind = None
+    if child.state == ticket_model.REVIEW:
+        lock_kind = ticket_model.REVIEW
+    elif child.in_progress and child.state == ticket_model.DOING:
+        lock_kind = ticket_model.DOING
     return {
         "path": path,
         "rel": flow_rel(conf, child.ticket),
         "tree": base,
         "exists": exists,
         "linked": exists and linked(base, path),
-        "locked": child.state == ticket_model.REVIEW
-        or (child.in_progress and child.state == ticket_model.DOING),
+        "locked": lock_kind is not None,
+        "lock_kind": lock_kind,
         "draft": {
             "path": draft,
             "rel": draft_rel(conf, child.ticket),

@@ -69,7 +69,7 @@ export interface SeenInJson {
 
 /**
  * 子チケットのフロー。親は null。
- * `locked` は判定がいまそのファイルへの書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）。
+ * `locked` は判定がいまそのファイルへの書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中・レビュー中）。
  * 拡張はそのまま受け取るだけで、`started_at` などから組み直さない。
  */
 export interface FlowJson {
@@ -83,6 +83,11 @@ export interface FlowJson {
   /** ファイルか、ツリーのルートからそこまでの途中がシンボリックリンク（実行ファイルの答え） */
   readonly linked: boolean;
   readonly locked: boolean;
+  /**
+   * 錠の種類（`locked` が真のとき）。`doing` は着手中、`review` はレビュー中（実行ファイルの答え）。
+   * 止めていなければ null。この欄を出さない古い実行ファイルでは undefined（種類が分からないので両方を 1 つの言葉で言う）
+   */
+  readonly lock_kind?: "doing" | "review" | null;
   /** エージェントが書く下書き。置き場はフローと同じツリーの提案の置き場。この欄を出さない古い実行ファイルでは null */
   readonly draft: FlowDraftJson | null;
 }
@@ -565,6 +570,8 @@ function flow(raw: Record<string, unknown>): FlowJson | null {
     linked: raw.linked !== false,
     // 欄が欠けていたら止まっている扱いにする（止まっているかを確かめられないので、書かせない）
     locked: raw.locked !== false,
+    // 種類の欄が無い古い実行ファイルは undefined のまま（両方を 1 つの言葉で言う）
+    lock_kind: raw.lock_kind === undefined ? undefined : raw.lock_kind === "doing" || raw.lock_kind === "review" ? raw.lock_kind : null,
     draft: isRecord(raw.draft) ? flowDraft(raw.draft) : null,
   };
 }

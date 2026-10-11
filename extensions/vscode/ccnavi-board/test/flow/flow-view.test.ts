@@ -48,13 +48,16 @@ test("CB-T226 ボードの「フロー」ボタンの識別子は、識別子に
   assert.equal(flowTicketOf({}), undefined);
 });
 
-test("CB-T227 カードのボタンの言葉は、在るか・着手中か（実行ファイルの答え）で 作成 / 編集 / 閲覧（着手中・レビュー中）", () => {
+test("CB-T227 カードのボタンの言葉は、在るか・錠の種類（実行ファイルの答え）で 作成 / 編集 / 閲覧（着手中 / レビュー中）", () => {
   const base = { path: "/ws/.ccnavi/approved/flows/x.yml", rel: ".ccnavi/approved/flows/x.yml", tree: "/ws", linked: false, draft: null };
-  assert.equal(flowButtonLabel({ ...base, exists: false, locked: false }), "フロー: 作成");
-  assert.equal(flowButtonLabel({ ...base, exists: true, locked: false }), "フロー: 編集");
-  assert.equal(flowButtonLabel({ ...base, exists: true, locked: true }), "フロー: 閲覧（着手中・レビュー中）");
+  assert.equal(flowButtonLabel({ ...base, exists: false, locked: false, lock_kind: null }), "フロー: 作成");
+  assert.equal(flowButtonLabel({ ...base, exists: true, locked: false, lock_kind: null }), "フロー: 編集");
+  assert.equal(flowButtonLabel({ ...base, exists: true, locked: true, lock_kind: "doing" }), "フロー: 閲覧（着手中）");
+  assert.equal(flowButtonLabel({ ...base, exists: true, locked: true, lock_kind: "review" }), "フロー: 閲覧（レビュー中）");
   // 無いまま着手した子も、読むだけ
-  assert.equal(flowButtonLabel({ ...base, exists: false, locked: true }), "フロー: 閲覧（着手中・レビュー中）");
+  assert.equal(flowButtonLabel({ ...base, exists: false, locked: true, lock_kind: "doing" }), "フロー: 閲覧（着手中）");
+  // 種類を返さない古い実行ファイルは、両方を 1 つの言葉で言う
+  assert.equal(flowButtonLabel({ ...base, exists: true, locked: true }), "フロー: 閲覧（着手中・レビュー中）");
 });
 
 test("CB-T228 錠は実行ファイルの flow.locked をそのまま使う。親・無い子・欄の無い子は引けない", () => {
@@ -110,12 +113,33 @@ test("CB-T229 ボードの JSON の flow は子だけが持ち、locked が欠�
   const parsed = parseBoardJson(JSON.stringify(raw));
   assert.ok(parsed.ok);
   assert.ok(parsed.board.tickets.filter((t) => t.flow !== null).every((t) => t.flow?.locked === true));
+
   // カードにも反映され、親のカードには無い。ボタンの開く先は子のカードだけ
   const built = buildBoard(board);
   assert.ok(flowCardOf(built, "i0001-01-01") !== undefined);
   assert.equal(flowCardOf(built, "i0001"), undefined);
   assert.equal(flowCardOf(built, "i9999-01-01"), undefined);
   assert.equal(flowCardOf(built, "i0001-02-05"), undefined);
+});
+
+test("CB-T230 錠の種類（lock_kind）はボードの JSON から読む。doing・review はそのまま、知らない値は null、欄が無いときは undefined", () => {
+  const raw = JSON.parse(fixtureText()) as { tickets: { ticket: string; flow: Record<string, unknown> | null }[] };
+  const flowOf = (ticket: string): Record<string, unknown> => {
+    const flow = raw.tickets.find((t) => t.ticket === ticket)?.flow;
+    assert.ok(flow);
+    return flow;
+  };
+  flowOf("i0001-02-02").lock_kind = "doing";
+  flowOf("i0001-02-04").lock_kind = "review";
+  flowOf("i0001-01-01").lock_kind = "bogus";
+  delete flowOf("i0001-02-03").lock_kind;
+  const parsed = parseBoardJson(JSON.stringify(raw));
+  assert.ok(parsed.ok);
+  const kindOf = (ticket: string) => parsed.board.tickets.find((t) => t.ticket === ticket)?.flow?.lock_kind;
+  assert.equal(kindOf("i0001-02-02"), "doing");
+  assert.equal(kindOf("i0001-02-04"), "review");
+  assert.equal(kindOf("i0001-01-01"), null);
+  assert.equal(kindOf("i0001-02-03"), undefined);
 });
 
 test("CB-T241 閉じた子（完了・取り消し）でファイルが無ければ、古い実行ファイルの答えでもカードにフローを載せない", () => {
