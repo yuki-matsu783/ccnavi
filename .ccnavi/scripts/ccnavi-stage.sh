@@ -8,12 +8,14 @@
 # wip/scratchpad/ に元ファイルを cp して、そちらを編集し、できたものを元の場所へ差し替えてもらう。
 # 差し替えの mv は、フルパスを手で組むと書き間違えやすいので、このスクリプトが組む。
 #
-# <パス> は元のファイル。cwd からの相対でも絶対でもよく、ワークスペースルートの下の実在するファイルだけを受ける。
+# <パス> は元のファイル。cwd からの相対でも絶対でもよく、ワークスペースルートの下の実在するファイルだけを受ける
+# （リンクと、途中のリンクでワークスペースの外に出るものは断る）。
 # 下書きは wip/scratchpad/<ワークスペースルートからの相対パス> に置く（元と同じ階層を保つので、同じ名前が衝突しない）。
 # 下書きが既にあれば上書きしない（編集中のものを消さないため）。
 #
 # --commands は、編集が済んだあとに打つ。下書きが元と違うものだけ、差し替えの mv をフルパスで 1 行ずつ出す。
-# 元と同じ（まだ編集していない）ものと、下書きがまだ無いものは、その旨を標準エラーに言い、mv は出さない。
+# 元と同じ（まだ編集していない）もの、下書きがまだ無いもの、下書きを作った後に元が変わったもの
+# （cp 時の写し <下書き>.orig と比べる。mv すると他の人の変更を上書きする）は、その旨を標準エラーに言い、mv は出さない。
 # 複数ファイルを直すときは、すべての下書きを作ってから --commands を打つ。
 #
 # 打ったあとの進め方（CLAUDE.md）:
@@ -95,6 +97,21 @@ relative_of() {
 		printf 'ccnavi-stage: %s は実在するファイルではありません。\n' "$root/$rl_rel" >&2
 		return 1
 	fi
+	# リンクは解かれた先がワークスペースの外かもしれない。元がリンクなら、mv がリンクを通常のファイルに
+	# 置き換えてしまう。どちらも断る（リンクの先の実体を直接渡す）。
+	if [ -L "$root/$rl_rel" ]; then
+		printf 'ccnavi-stage: %s はシンボリックリンクです。リンクの先の実体を渡してください。\n' "$root/$rl_rel" >&2
+		return 1
+	fi
+	rl_dir=$(ccnavi_phys "$(dirname "$root/$rl_rel")")
+	rl_root=$(ccnavi_phys "$root")
+	case "$rl_dir" in
+	"$rl_root" | "$rl_root"/*) ;;
+	*)
+		printf 'ccnavi-stage: %s は、途中のリンクを解くとワークスペースルートの外（%s）に出ます。\n' "$root/$rl_rel" "$rl_dir" >&2
+		return 1
+		;;
+	esac
 	printf '%s\n' "$rl_rel"
 }
 
@@ -103,6 +120,7 @@ made=""
 mvs=""
 same=""
 missing=""
+changed=""
 for arg in "$@"; do
 	rel=$(relative_of "$arg") || {
 		bad=1
@@ -115,6 +133,9 @@ for arg in "$@"; do
 			missing="${missing:+$missing }$rel"
 		elif cmp -s "$orig" "$draft"; then
 			same="${same:+$same }$rel"
+		elif [ -f "$draft.orig" ] && ! cmp -s "$orig" "$draft.orig"; then
+			# 下書きを作った後に元が変わった。mv すると、その変更を黙って上書きする。
+			changed="${changed:+$changed }$rel"
 		else
 			mvs="${mvs}mv '$draft' '$orig'
 "
@@ -130,6 +151,8 @@ for arg in "$@"; do
 	else
 		mkdir -p "$(dirname "$draft")"
 		cp "$orig" "$draft"
+		# 作った時点の元の写し。--commands が、元が後から変わっていないかを確かめるのに使う。
+		cp "$orig" "$draft.orig"
 		printf '下書きを作った: %s\n' "$draft"
 		made=1
 	fi
@@ -144,10 +167,11 @@ fi
 
 [ -z "$missing" ] || printf 'ccnavi-stage: 下書きがまだ無い（先に <パス> だけで打つ）: %s\n' "$missing" >&2
 [ -z "$same" ] || printf 'ccnavi-stage: 下書きが元と同じ（まだ編集していない）: %s\n' "$same" >&2
+[ -z "$changed" ] || printf 'ccnavi-stage: 下書きを作った後に元のファイルが変わっている（別のセッションかユーザの変更かもしれない。mv は出さない。元の差分を確かめ、下書きに取り込んでから、下書きと %s.orig を作り直す）: %s\n' '<下書き>' "$changed" >&2
 if [ -z "$mvs" ]; then
 	printf 'ccnavi-stage: 差し替える編集済みの下書きがありません。\n' >&2
 	exit 1
 fi
 printf '差し替えは、ユーザが次を打つ（元のファイルは保護対象なので、エージェントは差し替えない）:\n'
 printf '%s' "$mvs"
-[ -z "$missing$same" ] || exit 1
+[ -z "$missing$same$changed" ] || exit 1

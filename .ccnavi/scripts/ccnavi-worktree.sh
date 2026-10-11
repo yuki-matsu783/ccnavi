@@ -113,7 +113,13 @@ cgit() {
 	return 0
 }
 
-if [ -e "$dest" ]; then
+if [ -e "$dest" ] || [ -L "$dest" ]; then
+	# 在るのは、このリポジトリのワークツリーで、同じ名前のブランチを開いているときだけ成功にする。
+	have=$(git worktree list --porcelain 2>/dev/null | awk -v want="$(ccnavi_phys "$dest")" '
+		/^worktree / { p = substr($0, 10) }
+		/^branch / { if (p == want) print substr($0, 8) }')
+	[ "$have" = "refs/heads/$name" ] ||
+		fail dest-exists "${dest} は既にありますが、ブランチ ${name} を開いているこのリポジトリのワークツリーではありません（${have:-ワークツリーの登録が無い}）。中身を確かめ、要らなければユーザに確かめてから片付け、別の名前で打ち直してください。"
 	printf 'ワークツリーは既にある: %s\n' "$dest"
 	log_info 既にある -- "name=$name"
 	exit 0
@@ -158,6 +164,11 @@ if ! cgit fetch origin "$integ"; then
 	log_info fetch-failed -- "integration=$integ" "offline=${offline:-no}"
 	if [ -z "$offline" ]; then
 		printf 'ワークツリーは切っていない。origin から統合先 %s を取れなかった（上の出力に原因が出ている。ネットワーク・認証・origin の設定のどれか）。\n' "$integ"
+		case "$cgit_out" in
+		*"couldn't find remote ref"*)
+			printf '注意: origin に統合先 %s が無い（名前の誤りか、統合先の設定の誤り）。--offline で切ると古い手元の統合先から切るので、先に名前を確かめる（CCNAVI_INTEGRATION_BRANCH）。\n' "$integ"
+			;;
+		esac
 		printf '次の手:\n'
 		printf '  1. 原因を直せるなら直して、同じコマンドを打ち直す: sh %s/ccnavi-worktree.sh %s\n' "$scripts" "$name"
 		printf '     認証や origin の設定が要るときは、ユーザに頼む（ccnavi は git config を通さない）\n'

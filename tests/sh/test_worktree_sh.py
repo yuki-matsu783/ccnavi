@@ -40,7 +40,11 @@ for a in "$@"; do
   case "$a" in
   fetch | push | pull | ls-remote)
     if [ -n "${{FAKE_FETCH_FAIL:-}}" ]; then
-      echo "fatal: unable to access 'https://example.invalid/': Could not resolve host" >&2
+      if [ "$FAKE_FETCH_FAIL" = 1 ]; then
+        echo "fatal: unable to access 'https://example.invalid/': Could not resolve host" >&2
+      else
+        echo "$FAKE_FETCH_FAIL" >&2
+      fi
       exit 128
     fi
     exec '{git}' -c "url.{bare}.insteadOf=$FAKE_ORIGIN_URL" "$@" ;;
@@ -102,6 +106,7 @@ class WorktreeShTest(unittest.TestCase):
         )
 
     def run_sh(self, *args, fail_fetch=False, cwd=None):
+        """fail_fetch が文字列なら、fetch はその文で失敗する。真なら名前が引けない失敗。"""
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         env.pop("CLAUDE_PROJECT_DIR", None)
         env.update(
@@ -112,7 +117,7 @@ class WorktreeShTest(unittest.TestCase):
             }
         )
         if fail_fetch:
-            env["FAKE_FETCH_FAIL"] = "1"
+            env["FAKE_FETCH_FAIL"] = fail_fetch if isinstance(fail_fetch, str) else "1"
         return subprocess.run(
             [SHELL, os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-worktree.sh"), *args],
             cwd=cwd or self.ws,
@@ -194,6 +199,25 @@ class WorktreeShTest(unittest.TestCase):
         self.assertIn("同じコマンドを打ち直す", result.stdout)
         self.assertIn("topic --offline", result.stdout)
         self.assertIn("ユーザに", result.stdout)
+
+    def test_missing_remote_branch_is_called_out(self):
+        result = self.run_sh(
+            "topic", fail_fetch="fatal: couldn't find remote ref main", cwd=self.ws
+        )
+        self.assertEqual(4, result.returncode, result.stderr)
+        self.assertIn("origin に統合先 main が無い", result.stdout)
+
+    def test_existing_directory_that_is_not_the_worktree_is_refused(self):
+        write(os.path.join(self.wt("topic"), "stray.txt"), "x")
+        result = self.run_sh("topic")
+        self.assertEqual(1, result.returncode, result.stdout)
+        self.assertIn("ワークツリーではありません", result.stderr)
+        git(self.ws, "worktree", "add", "-q", self.wt("other"), "-b", "other")
+        os.rename(self.wt("other"), self.wt("renamed-away"))
+        git(self.ws, "worktree", "repair", self.wt("renamed-away"))
+        result = self.run_sh("renamed-away")
+        self.assertEqual(1, result.returncode, "別のブランチを開いたワークツリーは成功にしない")
+        self.assertIn("other", result.stderr)
 
     def test_offline_cuts_from_local_and_says_it_may_be_stale(self):
         result = self.run_sh("topic", "--offline", fail_fetch=True)

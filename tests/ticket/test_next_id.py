@@ -76,6 +76,9 @@ class NextIdTest(unittest.TestCase):
             (("zzz", "x"), "先頭の語 zzz は使えない"),
             (("feature", "bad-12"), "末尾が `-<2 桁>`"),
             (("feature", "a/b"), "slug a/b は使えない"),
+            (("feature", "ab..c"), ".."),
+            (("feature", "a."), "."),
+            (("feature", "x.lock"), ".lock"),
             (("feature", "x" * 45), "勧める長さ"),
             (("feature",), "2 つで打つ"),
         ):

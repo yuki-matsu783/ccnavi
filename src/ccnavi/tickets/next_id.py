@@ -44,7 +44,7 @@ def identifier_problem(prefix: str, slug: str, serial: int, prefixes) -> str:
             f"{ident} は末尾が `-<2 桁>` で、子の識別子の途中（`<親>-<フェーズ番号>`）と紛れる。"
             "slug の末尾を変える"
         )
-    problem = ticket_ids.id_problem(ident)
+    problem = ticket_ids.id_problem(ident) or ticket_ids.branch_problem(ident)
     if problem:
         return problem
     if len(ident) > ticket_ids.SUGGESTED_ID_LENGTH:
