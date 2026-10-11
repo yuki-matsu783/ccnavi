@@ -243,6 +243,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "entry.lint_project",
                 "entry.lint_rules",
                 "entry.plan_order",
+                "entry.sh_ask",
                 "entry.status",
                 "entry.suggest",
                 "entry.version",

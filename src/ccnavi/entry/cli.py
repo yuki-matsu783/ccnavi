@@ -30,7 +30,7 @@ from ..tickets import (
     review,
     skillsync,
 )
-from . import cli_args, cli_ops, cli_usage, diagnose, lint, plan_order, suggest, version
+from . import cli_args, cli_ops, cli_usage, diagnose, lint, plan_order, sh_ask, suggest, version
 
 
 def _json_out_of_test(argv: list[str]) -> list[str]:
@@ -321,10 +321,14 @@ def _recorded_run(
         return EXIT_ERROR
     base = cli_args._real(os.path.abspath(args.record_tree)) if args.record_tree else real_root
     # 上書きした state の置き場（`--state`）も、リポジトリに入らない書き込み
-    # （レビューの下書きなど）の置き場なので一覧から外す。
-    conf_for_state, _ = settings.load(root)
-    cli_args._override(conf_for_state, args)
-    moved_state = cli_args._real(conf_for_state.state) if conf_for_state.state else state
+    # （レビューの下書きなど）の置き場なので一覧から外す。`--state` が効くのは診断の経路だけで、
+    # それ以外では無視されるので、ここでも見ない（見ると、一覧から外したい場所を指せてしまう）。
+    moved_state = state
+    if cli_args._diagnosing(args):
+        conf_for_state, _ = settings.load(root)
+        cli_args._override(conf_for_state, args)
+        if conf_for_state.state:
+            moved_state = cli_args._real(conf_for_state.state)
     with fsio.recording() as written:
         code = _parsed(stdin, stdout, stderr, parser, args)
     lines = []
@@ -473,19 +477,14 @@ def _parsed(
     root = args.root if args.root is not None else default_root()
     conf, problems = settings.load(root)
 
-    # レイヤーの置き場（中身の 3 本と、レイヤーを探す先の 2 本）
-    # の差し替えは診断の経路でだけ使われる。
+    # レイヤーの置き場（中身の 3 本と、レイヤーを探す先の 2 本）と、記録・state・
+    # 承認済みチケット・提案の置き場（`--log` / `--state` / `--approved` / `--tickets`）の
+    # 差し替えは診断の経路でだけ使われる。
     # hook からの判定にも、チケットとレビューの副命令にも差し替えの手段を残すと、
     # 設定を保存せずに緩める経路になるので、そこでは無視する。
     # 診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を
     # 指しても実運用に漏れない。
-    diagnosing = (
-        args.lint
-        or args.test is not None
-        or bool(args.test_samples)
-        or args.explain
-        or args.suggest
-    )
+    diagnosing = cli_args._diagnosing(args)
     if not diagnosing:
         cli_args._drop_outside_diagnosis(stderr, args)
 
@@ -680,6 +679,14 @@ def _parsed(
     if len(args.command) in (3, 4) and list(args.command[:2]) == ["sync", "check"]:
         repo = args.command[3] if len(args.command) == 4 else None
         code = cli_ops.sync_check(stdout, stderr, root, conf, args.command[2], repo)
+        return EXIT_OK if code == 0 else EXIT_ERROR
+    # sh がチケットについて聞くこと（sh はチケットの YAML を読まない）。読むだけで、何も書かない。
+    # 答えはチケット制御の有無に依らない（sh の前の見方がそうだった）。
+    if len(args.command) == 4 and list(args.command[:2]) == ["tree", "parent"]:
+        code = sh_ask.parent_tree(stdout, stderr, root, conf, args.command[2], args.command[3])
+        return EXIT_OK if code == 0 else EXIT_ERROR
+    if len(args.command) == 6 and list(args.command[:2]) == ["sync", "closed"]:
+        code = sh_ask.sync_closed(stdout, stderr, root, conf, *args.command[2:])
         return EXIT_OK if code == 0 else EXIT_ERROR
     # C1（取り込み済みの親子のチケットの状態の操作を、取り込み・書く・コミット・push の 1 操作に
     # する sh）が聞くこと。読むだけで、何も書かない。
