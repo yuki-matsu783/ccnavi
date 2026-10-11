@@ -121,7 +121,7 @@ src/
     phases/post.ts    フェーズ管理の送り口。契約に無いものは型で止まる
     phases/main.tsx   フェーズ管理画面の入口。埋め込みの JSON を読んでマウントする
     phases/App.tsx    注意の帯・ツールバー・定義の一覧と、拡張ホストからのメッセージの受け
-    phases/Phase.tsx  定義 1 件の行（要約と、開いたときの欄。scope と成果物は , 区切り。順序の欄は持たない）
+    phases/Phase.tsx  定義 1 件の行（要約と、開いたときの欄。編集可能な範囲と必須成果物は , 区切り。順序の欄は持たない）
     phases/state.ts   編集中の定義（行ごとの鍵）・開いている行（id で保持する）・id の重なり
     phases/text.ts    要約の文・絞り込みが当てる文字列・空のときの言葉
     flow/style.css    フロー編集画面の CSS の入口（先頭で React Flow の CSS を @import する）

@@ -432,8 +432,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             <p className="hint">
               親チケットの <code>plan:</code> に <code>work</code> の定義を並べたものが全体計画で、<code>--agree</code> が通ることが合意になります。レビューのあとは{" "}
               <code>feedback:</code> に <code>feedback</code> の定義を並べて計画を改訂します。<code>id</code> と <code>title</code> はどちらも一意です。<code>scope</code>{" "}
-              は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきものです。
-              <code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には使いません。範囲と成果物は <code>,</code> で区切ります。
+              は子チケットの編集可能な範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の編集可能な範囲そのまま）、<code>deliverables</code> は必須成果物で、閉じる前に存在し、git に追跡されているべきものです。
+              <code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には使いません。編集可能な範囲と必須成果物は <code>,</code> で区切ります。
             </p>
             <p className="hint">
               順序（どのフェーズがどれを待つか）はこのファイルには書きません。親チケットの計画の項に <code>after</code> で先行を書きます（最後の項がほかの全部を待つようにします）。

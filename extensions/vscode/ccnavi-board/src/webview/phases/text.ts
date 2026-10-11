@@ -23,9 +23,9 @@ export function scopeText(phase: PhaseForm): string {
   return phase.scope.length === 0 ? "（scope 未設定）" : phase.scope.join(", ");
 }
 
-/** 範囲のツールチップ */
+/** 編集可能な範囲のツールチップ */
 export function scopeTitle(phase: PhaseForm): string {
-  return phase.inherit ? "親の範囲そのまま" : phase.scope.join(", ");
+  return phase.inherit ? "親の編集可能な範囲そのまま" : phase.scope.join(", ");
 }
 
 /** リストの欄は 1 つの欄に "," 区切りで出し、打つたびにリストへ戻す */
