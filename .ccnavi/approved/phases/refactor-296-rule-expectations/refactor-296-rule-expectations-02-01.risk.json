@@ -1,0 +1,17 @@
+{
+ "points": 15,
+ "level": "LOW",
+ "hits": [
+  {
+   "id": "many-files",
+   "points": 15,
+   "detail": "ファイルが多い（18 ファイル > 10）",
+   "source": "common"
+  }
+ ],
+ "unmeasured": [],
+ "head": "c0f1e67b44083b09a60142a707553be673c8e60a",
+ "base": "5801bfb65bc0ec7753c610d88d3360bce0724817",
+ "at": "2026-10-11T17:45:12+0900",
+ "summary": "18 ファイル、+111 -111 行、消したファイル 0"
+}
