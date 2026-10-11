@@ -482,8 +482,8 @@ class PlanOrderRevisionTest(PlanOrderHarness):
         "research",
         {"type": "design", "after": [1]},
         {"type": "acceptance", "after": [1]},
-        {"type": "implement", "after": [2, 3, 5]},
         {"type": "chores", "after": [1]},
+        {"type": "implement", "after": [2, 3, 4]},
     ]
 
     def setUp(self):
@@ -498,11 +498,11 @@ class PlanOrderRevisionTest(PlanOrderHarness):
         self.commit_parent("revise")
 
     def test_a_fixed_number_stays_and_free_ones_are_packed(self):
-        order = {"plan": {"1": [], "2": [1, 5], "3": [1], "4": [2, 3, 5], "5": [1]}}
+        order = {"plan": {"1": [], "2": [1, 4], "3": [1], "4": [1], "5": [2, 3, 4]}}
         body = self.body("--order", json.dumps(order))
         self.assertEqual(body["refused"], [])
         [plan] = body["plans"]
-        self.assertEqual([i["from"] for i in plan["items"]], [1, 3, 5, 2, 4])
+        self.assertEqual([i["from"] for i in plan["items"]], [1, 3, 4, 2, 5])
         self.assertEqual([i["locked"] for i in plan["items"]], [True] + [False] * 4)
         self.assertEqual(plan["current"], {"2": [1], "3": [1], "4": [2, 3]})
         self.assertEqual(body["revision_problems"], [])
@@ -518,7 +518,7 @@ class PlanOrderRevisionTest(PlanOrderHarness):
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
     def test_a_line_into_a_fixed_number_is_refused(self):
-        order = {"plan": {"1": [5], "2": [1], "3": [1], "4": [2, 3, 5], "5": []}}
+        order = {"plan": {"1": [4], "2": [1], "3": [1], "4": [], "5": [2, 3, 4]}}
         body = self.body("--order", json.dumps(order))
         self.assertEqual([r["kind"] for r in body["refused"]], ["locked"])
         self.assertEqual(body["refused"][0]["number"], 1)
@@ -821,7 +821,7 @@ class PlanOrderApprovedChildTest(PlanOrderHarness):
         self.propose("i0001", parent_text("i0001", PlanOrderRevisionTest.REVISED))
         self.propose("i0001-02-01", child_text("i0001-02-01", "i0001", 2, ["wip/design/*"]))
         self.commit_parent("revise")
-        order = {"plan": {"1": [], "2": [1, 5], "3": [1], "4": [2, 3, 5], "5": [1]}}
+        order = {"plan": {"1": [], "2": [1, 4], "3": [1], "4": [1], "5": [2, 3, 4]}}
         body = self.body("--order", json.dumps(order))
         self.assertEqual(
             [(c["ticket"], c["new_ticket"]) for c in body["children"]],
