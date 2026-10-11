@@ -31,7 +31,8 @@ def approved_text(
 
     tickets は承認済みチケット（`ticket` `title` `parent` `phase` `is_child` を持つもの）。
     revisions は親の改版だった識別子。root はワークスペースルートで、sh のパスに使う。
-    worktrees は子のワークツリーの計画（`worktrees.child_worktrees`）。無ければ従来の案内だけを出す。
+    worktrees は子のワークツリーの計画（`worktrees.child_worktrees`）。
+    無ければ従来の案内だけを出す。
     """
     lines = ["[ccnavi] チケットが承認され、承認済みチケットの置き場（doing/）へ動いた。"]
     for t in tickets:
@@ -60,7 +61,8 @@ def approved_text(
         guide += f"子は'{ticket_sh} start <識別子>' で着手する（親が未着手だと止まる）。"
     lines.append(guide)
     if worktrees is not None:
-        lines += _child_worktree_lines(tickets, worktrees, settings.script_command(root, "ccnavi-git.sh"))
+        git_sh = settings.script_command(root, "ccnavi-git.sh")
+        lines += _child_worktree_lines(tickets, worktrees, git_sh)
     # 承認の前にワークフロー編集タブ（`--plan-order --write`）で計画の順序が書き換わると、
     # エージェントが書いた番号と承認された番号が違うことがある。書き換えられたかを見分ける材料が
     # 無い（コミットしていない編集と見分けられない）ので、計画を持つ親とその子があればいつも添える。
@@ -91,7 +93,8 @@ def _child_worktree_lines(
         if w["state"] == "create":
             base = w["base"]
             lines.append(
-                f"子 {tid} のワークツリー {path} は、親のブランチ {base} から承認の時点で作成を試みた。"
+                f"子 {tid} のワークツリー {path} は、親のブランチ {base} から"
+                "承認の時点で作成を試みた。"
                 f"無ければ '{git_sh} worktree add {path} -b {tid} {base}' で作る"
             )
         elif w["state"] == "exists":
