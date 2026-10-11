@@ -9,9 +9,9 @@
  * 組み合わせ条件を 1 行に縮めたもの（`all(regex …, not(any(2)))`）を出す。glob / regex 1 つのルールは
  * 「組み合わせ条件に変換」で同じ意味の組み合わせ条件にできる（除くものは `not: {any: …}` に入れ、`except:` は消す）。
  */
-import type { JSX, ReactNode } from "react";
+import { useState, type JSX, type ReactNode } from "react";
 
-import { KNOWN_TOOLS, SECTIONS, type FileField, type PatternKind, type RuleForm, type Section } from "../../core/rules-view.js";
+import { isToolName, KNOWN_TOOLS, SECTIONS, type FileField, type PatternKind, type RuleForm, type Section } from "../../core/rules-view.js";
 import { condProblems, condSummary, toWhenBlocker, treeOfPattern } from "../../core/rules-when.js";
 import { contextSummary, hasContext, staleMessage, summaryId, summaryMatch, summaryNote } from "./text.js";
 import { When } from "./When.js";
@@ -272,6 +272,9 @@ function toWhen(rule: RuleForm): RuleForm {
  * ツールの選択肢。`match` はツール名を `|` で並べたもので、判定は名前をそのまま突き合わせるので
  * 打ち間違えると気づかないうちに当たらなくなる。書かせずに選ばせる。ファイルに書いてある知らない名前
  * （MCP のツールなど）も、消さずにそのまま選択肢にして出す（開いただけで消えたように見えないように）。
+ *
+ * 一覧にない新しいツールは、欄に名前を打って足す。形は `isToolName` で確かめる。一覧にない名前は、
+ * ccnavi がそのツールの対象を取り出せないため、判定には届かず当たらない（`lint` が warn で言う）。
  */
 function Picker({
   rule,
@@ -286,11 +289,28 @@ function Picker({
   readonly onChange: (next: RuleForm) => void;
   readonly children: ReactNode;
 }): JSX.Element {
+  const [added, setAdded] = useState("");
+  const [addError, setAddError] = useState("");
   const chosen = rule.match.split("|").map((name) => name.trim()).filter((name) => name !== "");
   const names = [...KNOWN_TOOLS, ...chosen.filter((name) => !(KNOWN_TOOLS as readonly string[]).includes(name))];
   const toggle = (name: string, on: boolean): void => {
     const next = names.filter((item) => (item === name ? on : chosen.includes(item)));
     onChange({ ...rule, match: next.join("|") });
+  };
+  const add = (): void => {
+    const name = added.trim();
+    if (name === "") {
+      return;
+    }
+    if (!isToolName(name)) {
+      setAddError("英字で始まり、英数字・_・- だけの名前を入れてください");
+      return;
+    }
+    setAddError("");
+    setAdded("");
+    if (!chosen.includes(name)) {
+      onChange({ ...rule, match: [...chosen, name].join("|") });
+    }
   };
   return (
     <div className={open ? "picker open" : "picker"} onClick={onOpen} onFocus={onOpen}>
@@ -302,6 +322,26 @@ function Picker({
             {name}
           </label>
         ))}
+        <div className="add-tool">
+          <input
+            type="text"
+            placeholder="新しいツール名"
+            spellCheck={false}
+            value={added}
+            aria-invalid={addError !== ""}
+            onChange={(event) => setAdded(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                add();
+              }
+            }}
+          />
+          <button type="button" className="action" onClick={add}>
+            追加
+          </button>
+          {addError !== "" && <span className="add-error">{addError}</span>}
+        </div>
       </div>
     </div>
   );

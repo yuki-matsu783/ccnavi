@@ -27,6 +27,9 @@ select.f-section { max-width: 120px; }
 }
 .picker .tool { display: flex; gap: 5px; align-items: center; cursor: pointer; overflow-wrap: anywhere; }
 .picker .tool input { margin: 0; }
+.picker .add-tool { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 4px; padding-top: 5px; border-top: 1px solid var(--vscode-panel-border); }
+.picker .add-tool input { flex: 1; min-width: 120px; }
+.picker .add-error { flex-basis: 100%; color: var(--vscode-errorForeground); font-size: 0.9em; }
 .with-button { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .with-button > input { flex: 1; min-width: 80px; }
 .with-button > button { margin-left: 0; white-space: nowrap; }

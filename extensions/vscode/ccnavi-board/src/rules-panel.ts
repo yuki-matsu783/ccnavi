@@ -36,7 +36,7 @@ import { loadingText } from "./core/loading-render.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asSections, readRules, type RulesDocument } from "./core/rules-doc.js";
 import { renderRulesPage } from "./core/rules-render.js";
-import { KNOWN_TOOLS, type RulesData, type RulesMessage, type Sections, type ToRules } from "./core/rules-view.js";
+import { isToolName, type RulesData, type RulesMessage, type Sections, type ToRules } from "./core/rules-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { rulesSums, type RulesSum } from "./core/sums.js";
 import { showLoading } from "./loading.js";
@@ -925,8 +925,8 @@ function asMessage(message: unknown): RulesMessage | undefined {
       if (sections === undefined || typeof m.subject !== "string") {
         return undefined;
       }
-      // 画面の選択肢は KNOWN_TOOLS だけ。それ以外の名前で実行ファイルを起こさない
-      if (typeof m.tool !== "string" || !(KNOWN_TOOLS as readonly string[]).includes(m.tool)) {
+      // 一覧にない名前は通す（判定が対象を見ないと結果に出る）。ただし引数に渡す形は決めておく
+      if (typeof m.tool !== "string" || !isToolName(m.tool)) {
         return undefined;
       }
       return { type: "judge", sections, tool: m.tool, subject: m.subject };
