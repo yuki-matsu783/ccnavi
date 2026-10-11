@@ -17,7 +17,8 @@
    中身に戻す形。
    シェルの `rm` と Write / Edit は自己防衛の組み込みが止めるが、ラッパーを通すと `git rm` が
    同じファイルを消せた。ラッパー自身を消すと、生の git の組み込みの止め（ラッパーがあるときだけ
-   足す）も外れる。sh も同じ場所の検査を 2 重目として持つ。
+   足す）も外れる。sh も同じ場所の検査を 2 重目として持つ。承認済みチケットの置き場と
+   レビュー待ちの置き場（`wip/proposals/review/`）もエージェントからは止める（sh は `rm` を通す）。
 
 どれも組み込み。ルールを空にされても消えないように、保護の根拠を守られる対象の外に置く。
 
@@ -151,6 +152,7 @@ _MARKERS = (settings.DEFAULT_PROJECT_HOME, ".claude", ".git")
 # 止めた理由の種類。文面を分ける。
 CORE_HIT = "core"
 CORE_STORE = "store"
+CORE_REVIEW = "review"
 CORE_UNREAD = "unread"
 CORE_INDEX = "index"
 # 引数の中で、シェルが実行の時点で値を決める書き方（変数・置換）。
@@ -178,6 +180,9 @@ def check_core_paths(
       ディレクトリとその 1 つ上・実行ファイルや共通レイヤーの上・プロジェクトの置き場の上）
     - 承認済みチケットの置き場（`CORE_STORE`）。レビュー済みのマーカーを消すのはユーザが端末で
       打つ手順で、sh は通す。エージェントの呼び出しはここで止めて、ユーザに依頼させる
+    - レビュー待ちの置き場（`wip/proposals/review/` とその下。`CORE_REVIEW`）。承認済みチケットの
+      置き場と同じ扱いで、sh は `rm` を通す。置き場の親（`wip/`・`wip/proposals/`）は、置き場に
+      何かがあるときだけ当たる（親を閉じた後の `rm -r wip` の案内を止めないため）
     - 当たる先を読みで決められない指定（`:` で始まる pathspec、固定の部分の無いグロブ、
       `--pathspec-from-file`）
     - 対象を読み切れない形（`CORE_UNREAD`）。変数や置換で組み立てた語、居場所の読めない
@@ -365,6 +370,8 @@ def _core_hit(
     full = os.path.normpath(os.path.join(base, word)) if base is not None else None
     if _in_store(conf, word, full):
         return CORE_STORE
+    if _in_review(conf, word, full):
+        return CORE_REVIEW
     if compiled.search("rm " + word):
         return CORE_HIT
     if full is None:
@@ -387,6 +394,47 @@ def _in_store(conf: settings.Settings, word: str, full: str | None) -> bool:
             continue
         return True
     return False
+
+
+def _in_review(conf: settings.Settings, word: str, full: str | None) -> bool:
+    """レビュー待ちの置き場（とその下）を指すか、置き場に何かがあるときの置き場の親か。
+
+    置き場はツリーごとにあり、どのツリーのものかは問わない（承認済みチケットの置き場と同じ）。
+    親（`wip/`・`wip/proposals/`）を丸ごと消すと置き場ごと消える。空なら消えるものが無いので通す。
+    チケットを閉じた後の案内（`ccnavi-git.sh rm -r wip`。ops._close_parent）がこの形で、そのとき
+    レビュー待ちの子は残っていない（残っていれば親を閉じられない）。
+    """
+    tickets = (conf.tickets or settings.DEFAULT_TICKETS).replace("\\", "/").strip("/")
+    review = f"{tickets}/{ticket_model.REVIEW}".lower()
+    parts = review.split("/")
+    parents = ["/".join(parts[:n]) for n in range(1, len(parts))]
+    for form in (os.path.normpath(word) if not os.path.isabs(word) else word, full):
+        if form is None:
+            continue
+        text = "/" + form.replace("\\", "/").lower().strip("/") + "/"
+        if text.startswith("/../"):
+            continue
+        if "/" + review + "/" in text:
+            return True
+        place = full if full is not None else (word if os.path.isabs(word) else None)
+        for parent in parents:
+            if text.endswith("/" + parent + "/"):
+                if place is None:
+                    return True
+                return _has_entries(os.path.join(place, *review[len(parent) + 1 :].split("/")))
+    return False
+
+
+def _has_entries(path: str) -> bool:
+    """ディレクトリに何かがあるか。無いディレクトリは空と見る。読めなければ当たる側に倒す。"""
+    if not os.path.lexists(path):
+        return False
+    if not os.path.isdir(path):
+        return True
+    try:
+        return bool(os.listdir(path))
+    except OSError:
+        return True
 
 
 def _holds_core(conf: settings.Settings, root: str, full: str) -> bool:
@@ -431,6 +479,14 @@ def core_path_message(root: str, sub: str, word: str, kind: str = CORE_HIT) -> s
             "動かすのはユーザと ccnavi のスクリプトです（レビューをやり直すためにマーカーを消す "
             f"'{git_sh} rm <マーカー>' も、ユーザが端末で打つ手順です）。"
             "要るなら、何をなぜ消したいのかを伝えてユーザに依頼してください。"
+        )
+    if kind == CORE_REVIEW:
+        return (
+            f"{_GIT_SCRIPT} {sub} が、レビュー待ちの提案の置き場（{word}）を消すか、"
+            "別のコミットの中身に戻す形になっています。ここにはユーザのレビューを待つチケットがあり、"
+            "動かすのはユーザと ccnavi のスクリプトです（レビューで done/ へ動かすのも、"
+            "置き場から外すのもユーザです）。"
+            "レビュー待ちの提案を外したいなら、どれをなぜ外したいのかを伝えてユーザに依頼してください。"
         )
     if kind == CORE_INDEX:
         return (
