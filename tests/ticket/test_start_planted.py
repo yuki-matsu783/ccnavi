@@ -12,8 +12,9 @@ from __future__ import annotations
 import json
 import os
 
-from tests.ticket.test_phases import PhaseHarness, child_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
+from tests.ticketsample import child_text
 
 
 class PlantedBaseTest(PhaseHarness):

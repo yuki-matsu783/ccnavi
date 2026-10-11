@@ -29,9 +29,9 @@ from ccnavi.tickets import ticket as ticket_mod
 from ccnavi.tickets import ticket_ids, ticket_model
 from tests import ROOT, common_path, config_path
 from tests.inproc import run_ccnavi
-from tests.ticket.test_core import STAMP, _chrome
-from tests.ticket.test_phases import PHASES, child_text, parent_text
-from tests.ticket.test_ticket import RULES, git, write
+from tests.ticket.test_swap_points import STAMP
+from tests.ticket.test_ticket import git, write
+from tests.ticketsample import PHASES, RULES, child_text, load_chrome, parent_text
 
 PARENT = "feature-12-login"
 BRANCH = "feature/12-login"
@@ -353,7 +353,7 @@ class ChromeBranchFieldTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="ccnavi-chrome-branch-")
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        self.chrome = _chrome()
+        self.chrome = load_chrome()
 
     def ask(self, op, family=BRANCH, branches=None, absent=None, **extra):
         files = _workspace_files()

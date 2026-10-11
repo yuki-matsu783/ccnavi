@@ -23,8 +23,9 @@ import os
 import unittest
 
 from tests.ticket.test_board import _portable
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write
+from tests.ticketsample import child_text, parent_text
 
 FIXTURES = os.path.join(ROOT, "extensions", "vscode", "ccnavi-board", "test", "fixtures")
 

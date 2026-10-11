@@ -32,8 +32,9 @@ import yaml
 from ccnavi.infra import settings, yamlread
 from ccnavi.tickets import flow, flow_render, flow_shape, flow_text, ticket, ticket_model
 from tests import requires_symlink
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
+from tests.ticketsample import child_text, parent_text
 
 CHILD = "i0001-01-01"
 

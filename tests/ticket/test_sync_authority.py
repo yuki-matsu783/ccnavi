@@ -29,8 +29,9 @@ from ccnavi.tickets import (
     ticket_model,
 )
 from tests import requires_symlink
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, to_old_form, write
+from tests.ticketsample import child_text, parent_text
 
 
 def record_text(name, state, reason="", sha="0" * 40):

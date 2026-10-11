@@ -3,7 +3,7 @@
  * ボードを 1 回組むあいだに Python へ投げた要求を全部記録し、手元の CPython にも投げて比べる。
  *
  * 判定のコアの見本は `test/fixtures/core-scenarios.json`。手元の試験
- * （`tests/ticket/test_core.py`）が、手元で実際に書いたバイト列と同じ答えになることを確かめて
+ * （`tests/ticket/test_swap_points.py`）が、手元で実際に書いたバイト列と同じ答えになることを確かめて
  * 書き出したもので、ここでは Pyodide と手元の CPython がそのとおりの答えを返すことを見る。
  */
 import { after, test } from "node:test";

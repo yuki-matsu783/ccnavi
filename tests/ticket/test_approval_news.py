@@ -16,7 +16,8 @@ import json
 import os
 import unittest
 
-from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_phases import PhaseHarness
+from tests.ticketsample import child_text, parent_text
 
 
 class ApprovalToldTest(PhaseHarness):

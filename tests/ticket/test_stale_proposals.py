@@ -16,9 +16,10 @@ import os
 import unittest
 
 from ccnavi.tickets import approval, ticket_fold, ticket_model
-from tests.ticket.test_phases import PhaseHarness, parent_text
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_sync_authority import AuthorityHarness
 from tests.ticket.test_ticket import git, write
+from tests.ticketsample import parent_text
 
 
 class StaleProposalTest(PhaseHarness):
