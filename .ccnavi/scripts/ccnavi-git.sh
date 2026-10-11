@@ -1008,7 +1008,7 @@ ig_done() {
 		[ "$ig_has_msg" = yes ] ||
 			reject integrate-done-no-message "staged の取り込みをコミットするので、メッセージが要ります（$SELF integrate-done $ig_n -m <メッセージ>）。"
 		ig_log_open integrate-done "$ig_n"
-		ig_out=$(mktemp 2>/dev/null || mktemp -t ccnavi-integrate) || reject integrate-tmp "一時ファイルが作れません。"
+		ig_out=$(mktemp 2>/dev/null || mktemp -t ccnavi-integrate) || reject integrate-tmp "一時ファイルが作れないので、コミットしていません（staged はそのままです）。一時ファイルの置き場（TMPDIR）に書けるかを確かめてから、$SELF integrate-done $ig_n -m <メッセージ> を打ち直してください。直せないならユーザに伝えてください。"
 		ig_crc=0
 		git commit -q -m "$ig_msg" >"$ig_out" 2>&1 || ig_crc=$?
 		cat "$ig_out" >>"$ig_log"
@@ -1055,7 +1055,7 @@ grep)
 			case "open-files-in-pager" in
 			"$gr_name"*)
 				[ "${#gr_name}" -ge 2 ] &&
-					reject grep-pager "$arg は一致したファイルを外部コマンドで開きます。通しません。"
+					reject grep-pager "$arg は一致したファイルを外部コマンドで開きます。通しません。一致したファイルを見るなら、$SELF grep -l <型> で一覧を出し、Read で開いてください。"
 				;;
 			esac
 			;;
@@ -1065,7 +1065,7 @@ grep)
 				gr_ch="${gr_rest%"${gr_rest#?}"}"
 				gr_rest="${gr_rest#?}"
 				case "$gr_ch" in
-				O) reject grep-pager "$arg には -O（--open-files-in-pager）が含まれます。一致したファイルを外部コマンドで開くので通しません。" ;;
+				O) reject grep-pager "$arg には -O（--open-files-in-pager）が含まれます。一致したファイルを外部コマンドで開くので通しません。一致したファイルを見るなら、$SELF grep -l <型> で一覧を出し、Read で開いてください。" ;;
 				e | f | A | B | C | m) gr_rest="" ;;
 				esac
 			done
@@ -1129,7 +1129,7 @@ remote)
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		-v | --verbose | show | get-url) ;;
-		-*) reject remote-option "remote は一覧だけ通します ($arg は不可)。" ;;
+		-*) reject remote-option "remote は一覧だけ通します ($arg は不可)。一覧は $SELF remote -v、1 つの取得先は $SELF remote get-url <名前> で見られます。ほかの操作が要るならユーザに依頼してください。" ;;
 		add | set-url | set-head | set-branches | remove | rm | rename | prune | update)
 			reject remote-write "remote $arg は取得先・送信先を書き換えます。ユーザに依頼してください。"
 			;;
@@ -1198,7 +1198,7 @@ worktree)
 				;;
 			esac
 		done
-		[ -n "$wt_dest" ] || reject worktree-no-dest "worktree add に行き先がありません。"
+		[ -n "$wt_dest" ] || reject worktree-no-dest "worktree add に行き先がありません。$SELF worktree add .claude/worktrees/<名前> -b <名前> <起点> の形で打ってください。"
 		wt_abs=$(ccnavi_abs "$wt_dest") ||
 			reject worktree-dest-unresolved "worktree add の行き先 ($wt_dest) を絶対パスに直せません。親のディレクトリが在るか確かめてください。"
 		wt_ok=no
@@ -1589,7 +1589,7 @@ checkout | switch)
 		if [ -n "$cc_others" ]; then
 			reject carry-claimed "$cc_B は別の親子のチケット（${cc_others##*/}）の親のブランチです。2 つの親子のチケットが同じブランチを親のブランチにしていると、どちらのチケットを正とするか決まらないので移りません。"
 		fi
-		cc_out=$(mktemp 2>/dev/null || mktemp -t ccnavi-carry) || reject carry-tmp "一時ファイルが作れません。"
+		cc_out=$(mktemp 2>/dev/null || mktemp -t ccnavi-carry) || reject carry-tmp "一時ファイルが作れないので、親のブランチ $cc_B へは移っていません（何も変えていません）。一時ファイルの置き場（TMPDIR）に書けるかを確かめてから、同じコマンドを打ち直してください。直せないならユーザに伝えてください。"
 		if git show-ref --verify --quiet "refs/heads/$cc_B" || git show-ref --verify --quiet "refs/remotes/origin/$cc_B"; then
 			if ! git checkout -q "$cc_B" >"$cc_out" 2>&1; then
 				printf 'fail  git %s  親のブランチ %s へ移れなかった\n' "$sub" "$cc_B"
