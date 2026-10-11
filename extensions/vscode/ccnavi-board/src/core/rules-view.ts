@@ -55,6 +55,17 @@ export const KNOWN_TOOLS = [
   "WebFetch",
 ] as const;
 
+/**
+ * ツール名として受け付ける形。英字で始まり、英数字・`_`・`-` だけ（`Bash`、`mcp__server__tool` など）。
+ * `match` は名前を `|` で並べたものなので `|` を含めない。ccnavi の `--test` には名前を引数で渡すので、
+ * 先頭の `-` も弾く。一覧にない名前は、判定が対象を取り出せないだけで、形が正しければ受け付ける。
+ */
+const TOOL_NAME = /^[A-Za-z][A-Za-z0-9_-]*$/;
+
+export function isToolName(name: string): boolean {
+  return TOOL_NAME.test(name);
+}
+
 /** 画面で編集する 1 件。`origin` は読み込んだときの位置で、新しいルールは null */
 export interface RuleForm {
   readonly origin: { readonly section: Section; readonly index: number } | null;

@@ -208,6 +208,34 @@ test("CB-D04 絞り込みは一致しない行を隠し、開いている行は�
   }
 });
 
+test("CB-D160 一覧にない新しいツール名を追加欄に打つと、選んだ状態で match に入る。形の違う名前は足さず理由を出す", async () => {
+  const dom = await openRules();
+  try {
+    dom.click(dom.one(`${rowSelector("no-rm")} .row-head`));
+    await dom.settle();
+    dom.click(dom.one(`${rowSelector("no-rm")} input.f-match`));
+    await dom.settle();
+    const adder = `${rowSelector("no-rm")} .picker .add-tool`;
+    dom.type(dom.one<HTMLInputElement>(`${adder} input`), "2bad name");
+    dom.click(dom.one(`${adder} button`));
+    await dom.settle();
+    assert.match(dom.one(`${adder} .add-error`).textContent, /英字で始まり/);
+    assert.ok(!dom.one(`${rowSelector("no-rm")} .picker`).textContent?.includes("2bad"), "形の違う名前は選択肢に出ない");
+
+    dom.type(dom.one<HTMLInputElement>(`${adder} input`), "mcp__github__get_me");
+    dom.click(dom.one(`${adder} button`));
+    await dom.settle();
+    assert.equal(dom.all(`${adder} .add-error`).length, 0, "直した名前は通る");
+    const matched = dom.one<HTMLInputElement>(`${rowSelector("no-rm")} input.f-match`).value.split("|");
+    assert.ok(matched.includes("mcp__github__get_me"), "match に入る");
+    const box = dom.one<HTMLInputElement>(`${rowSelector("no-rm")} .picker input[value="mcp__github__get_me"]`);
+    assert.equal(box.checked, true, "選択肢に並び、選んだ状態になる");
+    assert.ok(!dom.one<HTMLButtonElement>("#save").disabled, "編集したので保存できる");
+  } finally {
+    await dom.close();
+  }
+});
+
 test("CB-D05 ツールの選択肢で選ぶと、欄と行の要約が同じ操作の中で新しい値になる", async () => {
   const dom = await openRules();
   try {
@@ -508,7 +536,7 @@ test("CB-T71 match の候補と判定の試し打ちは、権限ルールの名�
   ]);
   const dom = await openRules();
   try {
-    assert.deepEqual(dom.all("#tool option").map((option) => option.textContent), [...KNOWN_TOOLS]);
+    assert.deepEqual(dom.all("#tool-names option").map((option) => option.getAttribute("value")), [...KNOWN_TOOLS]);
   } finally {
     await dom.close();
   }

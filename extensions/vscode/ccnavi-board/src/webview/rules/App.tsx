@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
-import { KNOWN_TOOLS, SECTIONS, SECTION_LABELS, modeBanner, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
+import { isToolName, KNOWN_TOOLS, SECTIONS, SECTION_LABELS, modeBanner, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
 import type { SuggestJson } from "../../core/suggestmodel.js";
 import type { ExpectationsJson } from "../../core/testmodel.js";
 import { applyAppearance } from "../appearance.js";
@@ -397,13 +397,17 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   };
 
   const judge = (): void => {
+    if (!isToolName(tool.trim())) {
+      setStatus({ text: "ツール名は英字で始まり、英数字・_・- だけで入れてください", error: true });
+      return;
+    }
     if (subject.trim() === "") {
       setStatus({ text: "対象を入れてください", error: true });
       return;
     }
     setBusy(true);
     setStatus({ text: "判定中…", error: false });
-    post({ type: "judge", sections: sectionsOf(draft), tool, subject });
+    post({ type: "judge", sections: sectionsOf(draft), tool: tool.trim(), subject });
   };
 
   const query = find.trim().toLowerCase();
@@ -559,13 +563,20 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         <div className="judge-form">
           <label>
             ツール{" "}
-            <select id="tool" value={tool} onChange={(event) => setTool(event.target.value)}>
+            <input
+              id="tool"
+              type="text"
+              list="tool-names"
+              title="候補は判定が対象を取り出せるツール。一覧にない名前も入れられる（判定には届かない）"
+              spellCheck={false}
+              value={tool}
+              onChange={(event) => setTool(event.target.value)}
+            />
+            <datalist id="tool-names">
               {KNOWN_TOOLS.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
+                <option key={name} value={name} />
               ))}
-            </select>
+            </datalist>
           </label>
           <label className="grow" title="--test の subject">
             対象{" "}
