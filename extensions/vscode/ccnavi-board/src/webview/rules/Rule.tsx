@@ -325,6 +325,7 @@ function Picker({
         <div className="add-tool">
           <input
             type="text"
+            aria-label="新しいツール名"
             placeholder="新しいツール名"
             spellCheck={false}
             value={added}
@@ -340,7 +341,11 @@ function Picker({
           <button type="button" className="action" onClick={add}>
             追加
           </button>
-          {addError !== "" && <span className="add-error">{addError}</span>}
+          {addError !== "" && (
+            <span className="add-error" role="alert">
+              {addError}
+            </span>
+          )}
         </div>
       </div>
     </div>

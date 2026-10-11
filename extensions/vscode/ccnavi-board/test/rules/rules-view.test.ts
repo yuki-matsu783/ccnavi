@@ -9,7 +9,7 @@ test("CB-T72 ツール名は英字で始まり英数字・_・- だけを受け�
 });
 
 test("CB-T73 空・先頭の数字や記号・空白・| や -（引数として読まれる形）は受け付けない", () => {
-  for (const name of ["", " ", "2Tool", "_x", "-test", "--json", "Bash|Read", "Bash Read", "Bash;rm", "a\nb", "tool(x)"]) {
+  for (const name of ["", " ", "2Tool", "_x", "-test", "--json", "Bash|Read", "Bash Read", "Bash;rm", "a\nb", "Bash\n", "Ｂash", "tool(x)"]) {
     assert.equal(isToolName(name), false, JSON.stringify(name));
   }
 });
