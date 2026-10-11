@@ -106,6 +106,13 @@ test("CB-T240 読みはルール管理の画面と同じ yaml の既定で、YAM
   assert.match(serializeFlow(templateFlow("x", "")), /\n {6}y: 160\n/);
 });
 
+test("CB-T396 雛形のノードは重ならない（間隔がノードの幅 190 より広い）", () => {
+  const xs = templateFlow("x", "").nodes.map((node) => (node.position as { x: number }).x);
+  for (let i = 1; i < xs.length; i++) {
+    assert.ok(xs[i] - xs[i - 1] > 190 + 40, "ノードの間に線が見える隙間がある");
+  }
+});
+
 test("CB-T219 編集は触ったところだけを差し替え、ほかの欄（data・position・最上位・線）は残す", () => {
   let doc = sample();
   doc = patchData(doc, "ask-1", { questionText: "どれにする？" });

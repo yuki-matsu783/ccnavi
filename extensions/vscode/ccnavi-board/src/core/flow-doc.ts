@@ -332,10 +332,10 @@ export function templateFlow(ticket: string, title: string): FlowDoc {
         id: "read-ticket",
         type: "prompt",
         name: "チケットを読む",
-        position: { x: 260, y: 160 },
+        position: { x: 340, y: 160 },
         data: { prompt: READ_TICKET_PROMPT },
       },
-      { id: "end", type: "end", name: "終了", position: { x: 440, y: 160 }, data: { label: "終了" } },
+      { id: "end", type: "end", name: "終了", position: { x: 600, y: 160 }, data: { label: "終了" } },
     ],
     connections: [
       { id: "c-start-read-ticket", from: "start", to: "read-ticket", fromPort: OUTPUT_PORT, toPort: INPUT_PORT },
