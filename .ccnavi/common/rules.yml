@@ -36,7 +36,7 @@ deny:
       書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えてユーザに依頼してください
       （/ccnavi-config）
 
-  # チェックアウトしたブランチでは編集しない。`scratchpad` と`.claude/worktrees/` だけが編集可能。
+  # チェックアウトしたブランチでは編集しない。`scratchpad` と `.claude/worktrees/` だけが編集可能。
   # `{root}` はワークスペースルートの実パスに置き換わる。
   - id: main-tree
     match: Write|Edit|NotebookEdit

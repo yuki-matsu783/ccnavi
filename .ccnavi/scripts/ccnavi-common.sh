@@ -35,7 +35,7 @@
 
 # この sh が頼る実行ファイルの契約の版（互換の版）。実行ファイルの src/ccnavi/entry/version.py の COMPAT、
 # VS Code 拡張の EXTENSION_COMPAT と同じ値に揃える。上げるのは、sh が頼るフラグや出力の形を
-# shを直さないと動かない形に変えたときと、データの形（待ち方の置き場・取り下げの条件など）が
+# sh を直さないと動かない形に変えたときと、データの形（待ち方の置き場・取り下げの条件など）が
 # 変わるとき（上げ方は src/ccnavi/entry/version.py の説明）。`ccnavi --lint` もこの行を読んで比べる。
 CCNAVI_COMPAT=8
 
@@ -102,7 +102,7 @@ ccnavi_abs() {
 
 # 実在するディレクトリの、リンクを解いたパス。無ければ受けたパスをそのまま返す。
 #
-# gitの `rev-parse --show-toplevel` はリンクを解いたパスを返すので、ワークスペースルート（cwdから
+# git の `rev-parse --show-toplevel` はリンクを解いたパスを返すので、ワークスペースルート（cwd から
 # 論理のパスで決まる）と比べるときは両辺をこれで揃える。揃えないと、リンクを経た作業場で
 # 「.claude/worktrees/ の下か」の比較が外れ、組み込みの保護が当てはまらない。Windows は pwd -W の表記。
 ccnavi_phys() {
@@ -112,9 +112,9 @@ ccnavi_phys() {
 
 # ワークスペースルート。hook の登録・実行ファイル・保護済みスクリプトの置き場。
 #
-# git に聞かない。 gitのトップは gitの用途にだけ使う。モード B では
+# git に聞かない。 git のトップは git の用途にだけ使う。モード B では
 # `cwd` がプロジェクトの中にあると git はプロジェクトを答える。それは git として
-# 正しい答えで、ここで欲しいものとは違う（設計 11.8）。
+# 正しい答えで、ここで欲しいものとは違う。
 #
 # 目印は `.ccnavi/scripts/ccnavi-common.sh`。自分自身なので、無ければそもそも sh が呼べていない。
 # ディレクトリの `.ccnavi/scripts/` だけでは足りない。ccnavi ディレクトリの下には配点が呼ぶスクリプトの
@@ -165,7 +165,7 @@ ccnavi_workspace() {
 #
 # ユーザが端末から打つ場面では settings.json の env が反映されないので、CCNAVI_BIN_PATH が
 # 無いのが普通。そのときは ccnavi のリポジトリの組み立て（dist/ccnavi/ccnavi）、次に
-# hook と同じ振り分けの sh（.ccnavi/scripts/ccnavi-launcher.sh）を見る。振り分けの shは
+# hook と同じ振り分けの sh（.ccnavi/scripts/ccnavi-launcher.sh）を見る。振り分けの sh は
 # .ccnavi/bin/ があるときだけ選ぶ。無いのに選ぶと、ソースで動かせる ccnavi のリポジトリでも
 # 「実行ファイルが無い」で止まる。
 #
@@ -194,14 +194,14 @@ ccnavi_compat_skew() {
 	if [ -f "$1/build.py" ] && [ -f "$1/src/ccnavi/__main__.py" ]; then
 		ccnavi_cs_fix="build.py を実行して組み立て直してください（uv run --with pyinstaller python build.py）"
 	else
-		ccnavi_cs_fix="ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルとshを配り直してください"
+		ccnavi_cs_fix="ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください"
 	fi
 	if [ -z "$ccnavi_cs_have" ]; then
 		printf '実行ファイル %s は --version で互換の版を返しません（古い版です）。%s。\n' "$2" "$ccnavi_cs_fix"
 		return 1
 	fi
 	[ "$ccnavi_cs_have" = "$CCNAVI_COMPAT" ] && return 0
-	printf '実行ファイル %s は互換 %s、shは互換 %s で食い違っています。%s。\n' "$2" "$ccnavi_cs_have" "$CCNAVI_COMPAT" "$ccnavi_cs_fix"
+	printf '実行ファイル %s は互換 %s、sh は互換 %s で食い違っています。%s。\n' "$2" "$ccnavi_cs_have" "$CCNAVI_COMPAT" "$ccnavi_cs_fix"
 	return 1
 }
 
@@ -242,7 +242,7 @@ ccnavi_project() {
 	ccnavi_pj_dir=$(ccnavi_phys "$ccnavi_pj_dir")
 	ccnavi_pj_ws=$(ccnavi_phys "$ccnavi_pj_ws")
 
-	# ワークスペースの下に無ければ、名乗るプロジェクトは無い。
+	# ワークスペースの下に無ければ、宣言するプロジェクトは無い。
 	case "$ccnavi_pj_dir" in
 	"$ccnavi_pj_ws" | "$ccnavi_pj_ws"/*) ;;
 	*) return 0 ;;
@@ -254,7 +254,7 @@ ccnavi_project() {
 	"$ccnavi_pj_places"/*)
 		ccnavi_pj_name="${ccnavi_pj_rel#"$ccnavi_pj_places"/}"
 		ccnavi_pj_name="${ccnavi_pj_name%%/*}"
-		# 直下に .git を持つものだけがプロジェクト（REQ-MLT-01）。
+		# 直下に .git を持つものだけがプロジェクト。
 		if [ -e "$ccnavi_pj_ws/$ccnavi_pj_places/$ccnavi_pj_name/.git" ]; then
 			printf '%s\n' "$ccnavi_pj_name"
 		fi
@@ -284,7 +284,7 @@ ccnavi_project() {
 		"$ccnavi_pj_places"/*)
 			ccnavi_pj_name="${ccnavi_pj_orel#"$ccnavi_pj_places"/}"
 			case "$ccnavi_pj_name" in
-			*/*) return 0 ;; # 2 段以上は数えない（REQ-MLT-01）
+			*/*) return 0 ;; # 2 段以上は数えない
 			esac
 			printf '%s\n' "$ccnavi_pj_name"
 			;;
@@ -324,7 +324,7 @@ ccnavi_is_ident() {
 	[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]*) ;;
 	*) return 1 ;;
 	esac
-	# 末尾の改行が `$( )` で落ちないよう、最後に `/`（上で止めた字なので本文には無い）を足して比べる。
+	# 末尾の改行が `$( )` で無くならないよう、最後に `/`（上で止めた字なので本文には無い）を足して比べる。
 	ccnavi_ii_rest=$(printf '%s/' "$1" | LC_ALL=C tr -d 'A-Za-z0-9._\200-\377-')
 	[ "$ccnavi_ii_rest" = / ]
 }
@@ -334,7 +334,7 @@ ccnavi_is_ident() {
 # 親のブランチ名は識別子の字に階層の区切りの `/` を足したもの（`feature/123-login`）。実行ファイル
 # （`ticket_ids.branch_problem`）が字と形を確かめたものを受け取る側の 2 段目の確認で、パスや ref で意味を持つ
 # 書き方を止める: 空、先頭の `-` `.` `/`、末尾の `/` `.`、`..`、`//`、`/.`（`.` で始まる階層）、`.lock` で終わる
-# 階層、`\`、ASCII の英数字と `.` `_` `-` `/` 以外の ASCII の字（空白・制御文字・記号）、gitの ref の名前
+# 階層、`\`、ASCII の英数字と `.` `_` `-` `/` 以外の ASCII の字（空白・制御文字・記号）、git の ref の名前
 # （refs/・origin/ など）や保護されたブランチの名前を先頭の階層に持つもの、HEAD の階層を持つもの。
 ccnavi_is_branch() {
 	case "$1" in
@@ -342,10 +342,10 @@ ccnavi_is_branch() {
 	[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]*) ;;
 	*) return 1 ;;
 	esac
-	# 末尾の改行が `$( )` で落ちないよう、最後に `\`（上で止めた字なので本文には無い）を足して比べる。
+	# 末尾の改行が `$( )` で無くならないよう、最後に `\`（上で止めた字なので本文には無い）を足して比べる。
 	ccnavi_ib_rest=$(printf '%s\\' "$1" | LC_ALL=C tr -d 'A-Za-z0-9._/\200-\377-')
 	[ "$ccnavi_ib_rest" = '\' ] || return 1
-	# gitの ref の名前・リモートの名前・保護されたブランチの名前を先頭の階層に持つもの、`HEAD`・`*_HEAD` の
+	# git の ref の名前・リモートの名前・保護されたブランチの名前を先頭の階層に持つもの、`HEAD`・`*_HEAD` の
 	# 階層を持つもの（`ticket_ids.branch_problem` と同じ。大文字小文字は区別しない）。
 	ccnavi_ib_low=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
 	case "$ccnavi_ib_low" in
@@ -360,7 +360,7 @@ ccnavi_is_branch() {
 #
 # 置き場は呼んだ sh（`$0`）のディレクトリ。呼ぶ側がこのファイルを探すのと同じ
 # `dirname "$0"` で求め、このファイルを読んだのと同じ場所から読む。
-# 環境変数からは受け取らない。置き場を外から差し替えられると、保護していない場所の shを
+# 環境変数からは受け取らない。置き場を外から差し替えられると、保護していない場所の sh を
 # 保護済み sh の中で走らせられるため。
 ccnavi_lib_dir=$(dirname "$0")
 for ccnavi_lib_part in state lock c1 host log; do

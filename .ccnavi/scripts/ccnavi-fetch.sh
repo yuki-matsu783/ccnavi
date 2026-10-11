@@ -4,7 +4,7 @@
 #   sh .ccnavi/scripts/ccnavi-fetch.sh
 #
 # 1 つめは承認済みチケットとマーカー。これらは親チケットのブランチにコミットされ、A の機械から
-# push されて届く（設計 9.2）。取ってこないと、B の機械は古い版で判定する。承認したのに
+# push されて届く。取ってこないと、B の機械は古い版で判定する。承認したのに
 # 範囲が反映されない、レビュー済みなのに止まったまま、という形になる。
 #
 # 2 つめはワークツリーの起点になる統合先（CCNAVI_INTEGRATION_BRANCH、無ければ ccnavi-sync.sh が
@@ -26,12 +26,12 @@
 #
 # 待たせない。 認証を尋ねる画面を出させず（GIT_TERMINAL_PROMPT・GCM_INTERACTIVE）、
 # fetch 1 回にタイムアウトを付けて CCNAVI_FETCH_TIMEOUT 秒（既定 15）で切る。hook の上限（60 秒）に
-# 当たると、報せごと捨てられる。一度落ちた origin には、この回ではもう取りに行かない。
+# 当たると、報せごと捨てられる。一度失敗した origin には、この回ではもう取りに行かない。
 #
-# 認証で落ちたときは、そう言う。 尋ねないので、資格情報が無いか切れていると毎回落ちる。
+# 認証で失敗したときは、そう言う。 尋ねないので、資格情報が無いか切れていると毎回失敗する。
 # オフラインと同じ 1 行では、ユーザは理由を調べることになる。認証はユーザが端末で打つ git（承認の
-# shを含む）で一度済ませれば保存され、次のセッションから hook の fetch も通る。見分けは
-# gitの文言に頼るので、LC_ALL=C で英語に揃えてから見る。見分けられなければ、ただの
+# sh を含む）で一度済ませれば保存され、次のセッションから hook の fetch も通る。見分けは
+# git の文言に頼るので、LC_ALL=C で英語に揃えてから見る。見分けられなければ、ただの
 # 「取ってこられなかった」に戻るだけ。
 #
 # 取り込み済みの親子のチケットは早送りだけ。親のワークツリー（`.claude/worktrees/<P>` で、親チケットか
@@ -45,14 +45,14 @@
 # 開始から CCNAVI_FETCH_BUDGET 秒（既定 45）を過ぎたら、残りの fetch と早送りはせずに名指しする。
 # fetch 1 回のタイムアウトも枠の残りより長くしない（hook の上限は 60 秒）。
 #
-# 「リモートにその ref が無い」で落ちた fetch は、その origin を落ちたものに数えない。 数えると、
-# 同じ originの統合先の取り込みまで行われなくなる。消えたかどうかはここでは決めず、ccnavi-sync.sh に回す。
+# 「リモートにその ref が無い」で失敗した fetch は、その origin を失敗したものに数えない。 数えると、
+# 同じ origin の統合先の取り込みまで行われなくなる。消えたかどうかはここでは決めず、ccnavi-sync.sh に回す。
 #
 # 終了コード: 常に 0。取ってこられないことは失敗ではない（オフラインでも作業は続く）。
 
 set -u
 
-# 共通部分。ワークスペースルートの探し方はここにある（設計 11.8）。
+# 共通部分。ワークスペースルートの探し方はここにある。
 . "$(dirname "$0")/ccnavi-common.sh"
 
 approved=.ccnavi/approved # 固定
@@ -61,7 +61,7 @@ projects=projects          # 固定
 # 見つからなければ何も出さずに終わる。セッションの頭に走るので、ここで止めても得るものが無い。
 root=$(ccnavi_workspace) || exit 0
 
-# 認証を尋ねない。hook には端末が無く、尋ねれば落ちるか、画面を開いて誰かが閉じるまで待つ。
+# 認証を尋ねない。hook には端末が無く、尋ねれば失敗するか、画面を開いて誰かが閉じるまで待つ。
 GIT_TERMINAL_PROMPT=0
 GCM_INTERACTIVE=never
 export GIT_TERMINAL_PROMPT GCM_INTERACTIVE
@@ -78,10 +78,10 @@ esac
 started=$(date +%s)
 ccnavi_log_root="$root"
 
-# 落ちた origin を書いておく場所。同じ origin には取りに行かない。周はパイプの中（サブシェル）で
+# 失敗した origin を書いておく場所。同じ origin には取りに行かない。周はパイプの中（サブシェル）で
 # 回るので、変数では渡らない。
 scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-fetch) || exit 0
-# dashは EXIT の trap を INT・TERM・HUP で走らせないので、そちらにも置く。
+# dash は EXIT の trap を INT・TERM・HUP で走らせないので、そちらにも置く。
 fetch_cleaned=""
 fetch_cleanup() {
 	[ -z "$fetch_cleaned" ] || return 0
@@ -93,7 +93,7 @@ trap 'fetch_cleanup' EXIT
 trap 'fetch_cleanup; exit 130' INT TERM HUP
 : >"$scratch/failed"
 
-# 認証で落ちたときに git（と資格情報の仕組み）が出す文言。https・ssh・GitHub・GitLab。
+# 認証で失敗したときに git（と資格情報の仕組み）が出す文言。https・ssh・GitHub・GitLab。
 auth_failed='Authentication failed|could not read (Username|Password)|terminal prompts disabled'
 auth_failed="$auth_failed"'|Invalid username or password|HTTP Basic: Access denied'
 auth_failed="$auth_failed"'|Permission denied \(publickey|returned error: 40[13]'
@@ -106,8 +106,8 @@ ccnavi_fetch_left() {
 	printf '%s\n' "$ccnavi_fl_left"
 }
 
-# origin へ 1 本取りに行く。取れたら 0、落ちたら 1、認証で落ちたら 3。取りに行かなかったら 2。
-# リモートにその ref が無くて落ちたら 4（その origin を落ちたものに数えない）。
+# origin へ 1 本取りに行く。取れたら 0、失敗したら 1、認証で失敗したら 3。取りに行かなかったら 2。
+# リモートにその ref が無くて失敗したら 4（その origin を失敗したものに数えない）。
 # 時間の枠（CCNAVI_FETCH_BUDGET、既定 45 秒）を過ぎていたら取りに行かずに 5。
 #
 # タイムアウト監視（ccnavi_git_timed）が limit 秒か枠の残りの短い方で切る。hook の上限（60 秒）を超えないため。
@@ -134,9 +134,9 @@ ccnavi_fetch_git() {
 	return 0
 }
 
-# 取りに行く。取れたら 0。<ツリー> <ブランチ> <落ちたときの 1 行> [<リモートに無いときの 1 行>]
+# 取りに行く。取れたら 0。<ツリー> <ブランチ> <失敗したときの 1 行> [<リモートに無いときの 1 行>]
 #
-# 落ちたときの 1 行は、その origin で初めて落ちたときだけ出す。同じ originの 2 件目は
+# 失敗したときの 1 行は、その origin で初めて失敗したときだけ出す。同じ origin の 2 件目は
 # 取りに行かず、何も出さない。分け方に要る判定を、報せの `$( )` の外に置くための関数。
 ccnavi_fetch_or_note() {
 	ccnavi_fetch_git "$1" "$2"
@@ -144,7 +144,7 @@ ccnavi_fetch_or_note() {
 	[ "$ccnavi_fn_rc" -eq 0 ] && return 0
 	[ "$ccnavi_fn_rc" -eq 2 ] && return 1
 	if [ "$ccnavi_fn_rc" -eq 5 ]; then
-		printf '%s: 時間の枠（%s 秒）を過ぎたので %s を取りに行かなかった。後で sh %s/.ccnavi/scripts/ccnavi-sync.shを打つか、もう一度セッションを始めてください\n' \
+		printf '%s: 時間の枠（%s 秒）を過ぎたので %s を取りに行かなかった。後で sh %s/.ccnavi/scripts/ccnavi-sync.sh を打つか、もう一度セッションを始めてください\n' \
 			"$(basename "$1")" "$budget" "$2" "$root"
 		return 1
 	fi
@@ -173,7 +173,7 @@ ccnavi_fetch_integration() {
 
 # そのブランチをチェックアウトしているツリーのパス。どこにも無ければ空。
 #
-# チェックアウトされているブランチの ref は付け替えない（索引と作業ツリーが食い違う）。
+# チェックアウトされているブランチの ref は書き換えない（索引と作業ツリーが食い違う）。
 # 在れば `merge --ff-only`、無ければ `update-ref` に分ける、その分け目を返す。
 ccnavi_fetch_tree_of() {
 	ccnavi_ft_want="refs/heads/$2"

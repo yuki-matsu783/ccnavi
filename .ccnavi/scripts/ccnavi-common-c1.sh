@@ -8,8 +8,8 @@
 # 親のブランチ 1 本に対応する。ここで対象にするのは、origin があり取り込み状態が present の親子のチケットのうち、
 # chat だけのものを除いたもの。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に関数を呼ぶ。
 #
-#   ccnavi_c1_family <識別子>   親子のチケットと、C1の対象か（ccnavi_c1_target に yes / no / stop）
-#   ccnavi_c1_begin             1 ロック 2 途中の操作 3 C1の外の変更の見分けとコミット 4 取り込み 5 未送信の確かめ
+#   ccnavi_c1_family <識別子>   親子のチケットと、C1 の対象か（ccnavi_c1_target に yes / no / stop）
+#   ccnavi_c1_begin             1 ロック 2 途中の操作 3 C1 の外の変更の見分けとコミット 4 取り込み 5 未送信の確かめ
 #   ccnavi_c1_write <文> -- <実行ファイルの引数>...
 #                               6 元の先頭 7 書く 8 コミット 9 push 10 届いたか 11 戻して 1 回だけやり直す
 #   ccnavi_c1_end               ロックを外す（trap の EXIT・INT・TERM・HUP にも置く）
@@ -19,13 +19,13 @@
 #   ccnavi_c1_label  文面の頭（ccnavi-ticket など）
 #   ccnavi_c1_exe    関数。実行ファイルを `--root <ルート>` つきで起こし、引数を渡す
 #
-# 文面はすべて標準エラーへ出す（ボードは標準出力の JSONを読むため）。実行ファイルの標準出力は
+# 文面はすべて標準エラーへ出す（ボードは標準出力の JSON を読むため）。実行ファイルの標準出力は
 # そのまま通す。ccnavi_c1_capture に書き先を入れると、そこへ書く。
 #
 # 実行ファイルはネットワークに出ずコミットもしない。見分けと書いたパスの一覧は実行ファイルが
-# 出し（`c1 family`・`c1 sort`・`--record-writes`）、取り込み（ccnavi-sync.shを入れ子のロックで起こす）・
+# 出し（`c1 family`・`c1 sort`・`--record-writes`）、取り込み（ccnavi-sync.sh を入れ子のロックで起こす）・
 # コミット（`commit --only`。ほかのステージ済みの変更を巻き込まない）・push・届いたかの確かめ・戻し（比較つきの update-ref。reset は
-# 使わない）はここが持つ。git は ccnavi-git.shを通らずに直に呼ぶ。ccnavi-git.shはエージェントの入口の
+# 使わない）はここが持つ。git は ccnavi-git.sh を通らずに直に呼ぶ。ccnavi-git.sh はエージェントの入口の
 # 保護で、ここの戻し（`restore --source` など）には当てない。
 #
 # 環境変数: CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/ CCNAVI_C1_TIMEOUT（push・ls-remote 1 回の
@@ -36,7 +36,7 @@
 # タイムアウトを付け、pinentry などが尋ねて止まりっぱなしにならないようにする（切れたら失敗）。
 #
 # 途中で INT・TERM・HUP が来たら、送る前の自分のコミットを戻す（ccnavi_c1_end）。強制終了（KILL）で
-# 残ったコミットは、次の C1の 5 が「未送信」で止まり、戻し方を言う。
+# 残ったコミットは、次の C1 の 5 が「未送信」で止まり、戻し方を言う。
 
 ccnavi_c1_target=""
 ccnavi_c1_why=""
@@ -68,10 +68,10 @@ ccnavi_c1_number() {
 	esac
 }
 
-# 親子のチケットと、C1の対象か。<識別子>
+# 親子のチケットと、C1 の対象か。<識別子>
 #
 # ccnavi_c1_target: yes（C1 で回す）/ no（今の手元の動きのまま）/ stop（取り込み済みだが止める理由がある）。
-# 実行ファイルが答えなかった（古い・落ちた）ときは、取り込み状態があれば stop、無ければ no。
+# 実行ファイルが答えなかった（古い・失敗した）ときは、取り込み状態があれば stop、無ければ no。
 ccnavi_c1_family() {
 	ccnavi_c1_target=no
 	ccnavi_c1_why=""
@@ -104,12 +104,12 @@ ccnavi_c1_family() {
 		return 0
 	}
 	: >"$ccnavi_c1_tmp/hints"
-	# Windows の実行ファイルの CRLF を落として読む（1 行 1 項目の値の末尾に CR を残さない）。
+	# Windows の実行ファイルの CRLF の CR を除いて読む（1 行 1 項目の値の末尾に CR を残さない）。
 	ccnavi_c1_exe c1 family "$1" 2>"$ccnavi_c1_tmp/family-err" </dev/null | tr -d '\r' >"$ccnavi_c1_tmp/family" || :
 	if [ "$(head -n 1 "$ccnavi_c1_tmp/family" 2>/dev/null)" != "c1 1" ]; then
 		ccnavi_c1_family_id="$ccnavi_cf_p"
 		ccnavi_c1_target=stop
-		ccnavi_c1_why="実行ファイルが C1の問い合わせ（c1 family）に応答しない（$(head -n 1 "$ccnavi_c1_tmp/family-err" 2>/dev/null)）。親子のチケットの取り込み状態があるので、書かずに止める。実行ファイルを新しくしてください"
+		ccnavi_c1_why="実行ファイルが C1 の問い合わせ（c1 family）に応答しない（$(head -n 1 "$ccnavi_c1_tmp/family-err" 2>/dev/null)）。親子のチケットの取り込み状態があるので、書かずに止める。実行ファイルを新しくしてください"
 		return 0
 	fi
 	ccnavi_c1_target=$(sed -n 's/^target //p' "$ccnavi_c1_tmp/family" | head -n 1)
@@ -140,7 +140,7 @@ ccnavi_c1_family() {
 		ccnavi_c1_why="実行ファイルの出力（target）を読めない"
 		;;
 	esac
-	log_debug C1の対象を決めた -- "family=$ccnavi_c1_family_id" "target=$ccnavi_c1_target"
+	log_debug C1 の対象を決めた -- "family=$ccnavi_c1_family_id" "target=$ccnavi_c1_target"
 	return 0
 }
 
@@ -235,22 +235,22 @@ ccnavi_c1_prepare() {
 	ccnavi_cp_try=0
 	while :; do
 		ccnavi_cp_try=$((ccnavi_cp_try + 1))
-		# 3. C1の外の変更を見分け、(b) を取り込みの前にコミットする。
+		# 3. C1 の外の変更を見分け、(b) を取り込みの前にコミットする。
 		ccnavi_c1_sort "$ccnavi_c1_tmp/sort" || return 1
 		ccnavi_c1_stops "$ccnavi_c1_tmp/sort" "ユーザの判断が未送信" \
 			"。承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが打つ。何も書いていない" \
-			"置き場に ccnaviの知らない変更がある" "。ユーザが確かめてください。何も書いていない" || return 1
+			"置き場に ccnavi の知らない変更がある" "。ユーザが確かめてください。何も書いていない" || return 1
 		sed -n 's/^keep //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/keep"
 		sed -n 's/^b //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/b"
 		if [ -s "$ccnavi_c1_tmp/b" ]; then
-			ccnavi_c1_commit "$ccnavi_c1_tmp/b" "ccnavi: $ccnavi_c1_family_id の hookのマーカーと状態の履歴をコミットする" || return 1
+			ccnavi_c1_commit "$ccnavi_c1_tmp/b" "ccnavi: $ccnavi_c1_family_id の hook のマーカーと状態の履歴をコミットする" || return 1
 		fi
 		# 4. 取り込み（ccnavi-sync.sh。ロックは入れ子で渡る）。統合先の取り込み結果も同じ回で書く。
 		ccnavi_cp_rc=0
 		sh "$ccnavi_c1_sh/ccnavi-sync.sh" "$ccnavi_c1_family_id" </dev/null >"$ccnavi_c1_tmp/sync" 2>&1 || ccnavi_cp_rc=$?
 		sed "s/^/  /" "$ccnavi_c1_tmp/sync" >&2
 		if [ "$ccnavi_cp_rc" -ne 0 ]; then
-			# 3 と 4 の間に hook が書いた（mergeが書きかけと重なった）なら、3 から 1 回だけやり直す。
+			# 3 と 4 の間に hook が書いた（merge が書きかけと重なった）なら、3 から 1 回だけやり直す。
 			if [ "$ccnavi_cp_try" -eq 1 ] && grep -q '書きかけの' "$ccnavi_c1_tmp/sync" 2>/dev/null; then
 				ccnavi_c1_say "取り込みが書きかけと重なった。変更の見分けからもう 1 回だけやり直す"
 				continue
@@ -264,11 +264,11 @@ ccnavi_c1_prepare() {
 			ccnavi_c1_say "取り込みの後、親子のチケットの取り込み状態が ${ccnavi_cp_state:-（無い）} になった。何も書いていない（上の ccnavi-sync.sh の文面）"
 			return 1
 		fi
-		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める（REQ-APV-11 の補足）。
+		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める。
 		ccnavi_c1_sort "$ccnavi_c1_tmp/unsent" "refs/remotes/origin/$ccnavi_c1_branch" || return 1
 		ccnavi_c1_stops "$ccnavi_c1_tmp/unsent" "置き場に未送信のユーザの判断のコミットがある" \
 			"。承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが打つ。何も書いていない" \
-			"置き場に ccnaviの知らない未送信のコミットがある" \
+			"置き場に ccnavi の知らない未送信のコミットがある" \
 			"。ユーザが確かめてください。前の状態の操作が送る前に強制終了されて残ったものなら、中身を確かめてから承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）で送るか、ユーザがそのコミットを取り除く。何も書いていない" || return 1
 		return 0
 	done
@@ -276,7 +276,7 @@ ccnavi_c1_prepare() {
 
 # 一覧のパスだけをコミットする。<一覧> <文>。新しいファイルは先に add する。
 # 変わったものが 1 つも無ければコミットせずに 0（ccnavi_c1_committed は空）。
-# 落ちたら、この実行が add したパスを索引から外して 1（索引を元に戻す）。
+# 失敗したら、この実行が add したパスを索引から外して 1（索引を元に戻す）。
 ccnavi_c1_committed=""
 ccnavi_c1_commit() {
 	ccnavi_c1_committed=""
@@ -294,14 +294,14 @@ ccnavi_c1_commit() {
 		if [ -e "$ccnavi_c1_tree/$ccnavi_cc_path" ] || [ -L "$ccnavi_c1_tree/$ccnavi_cc_path" ]; then
 			if [ -z "$(git -C "$ccnavi_c1_tree" ls-files -- ":(literal)$ccnavi_cc_path" 2>/dev/null)" ]; then
 				if ! git -C "$ccnavi_c1_tree" add -- ":(literal)$ccnavi_cc_path" 2>"$ccnavi_c1_tmp/err"; then
-					ccnavi_c1_say "$ccnavi_cc_path を addできなかった（$(head -n 1 "$ccnavi_c1_tmp/err")）"
+					ccnavi_c1_say "$ccnavi_cc_path を add できなかった（$(head -n 1 "$ccnavi_c1_tmp/err")）"
 					ccnavi_c1_unstage "$ccnavi_c1_tmp/added" "$ccnavi_cc_base"
 					return 1
 				fi
 				printf '%s\n' "$ccnavi_cc_path" >>"$ccnavi_c1_tmp/added"
 			fi
 		elif [ -z "$(git -C "$ccnavi_c1_tree" ls-files -- ":(literal)$ccnavi_cc_path" 2>/dev/null)" ]; then
-			continue # 作って消した（gitの知らない）パス
+			continue # 作って消した（git の知らない）パス
 		fi
 		printf '%s\n' "$ccnavi_cc_path" >>"$ccnavi_c1_tmp/paths"
 	done <"$1"
@@ -309,7 +309,7 @@ ccnavi_c1_commit() {
 	sed 's/^/:(literal)/' "$ccnavi_c1_tmp/paths" | tr '\n' '\000' >"$ccnavi_c1_tmp/pathspec"
 	if ! xargs -0 git -C "$ccnavi_c1_tree" status --porcelain --untracked-files=all -- \
 		<"$ccnavi_c1_tmp/pathspec" >"$ccnavi_c1_tmp/status" 2>"$ccnavi_c1_tmp/err"; then
-		ccnavi_c1_say "gitの状態を読めない（$(head -n 1 "$ccnavi_c1_tmp/err")）。コミットしない"
+		ccnavi_c1_say "git の状態を読めない（$(head -n 1 "$ccnavi_c1_tmp/err")）。コミットしない"
 		ccnavi_c1_unstage "$ccnavi_c1_tmp/added" "$ccnavi_cc_base"
 		return 1
 	fi
@@ -368,7 +368,7 @@ ccnavi_c1_run() {
 	fi
 }
 
-# 6〜11。<文> -- <実行ファイルの引数>...。終了コードは実行ファイルのもの（C1 で落ちたら 1）。
+# 6〜11。<文> -- <実行ファイルの引数>...。終了コードは実行ファイルのもの（C1 で失敗したら 1）。
 ccnavi_c1_write() {
 	ccnavi_cw_message="$1"
 	shift
@@ -393,7 +393,7 @@ ccnavi_c1_write() {
 			return 1
 		fi
 		if [ "$ccnavi_cw_rc" -ne 0 ]; then
-			# 落ちた回は、ここまでに書いたものを戻す（コミットしない）。
+			# 失敗した回は、ここまでに書いたものを戻す（コミットしない）。
 			ccnavi_c1_restore_written "$ccnavi_cw_list" "$ccnavi_cw_h0"
 			rm -f "$ccnavi_cw_list"
 			return "$ccnavi_cw_rc"
@@ -424,7 +424,7 @@ ccnavi_c1_write() {
 			rm -f "$ccnavi_cw_list"
 			return 0
 		fi
-		# 10. 落ちたように見えても、届いていれば成功。
+		# 10. 失敗したように見えても、届いていれば成功。
 		if ccnavi_git_timed "$ccnavi_cw_timeout" "$ccnavi_c1_tmp/ls-err" "$ccnavi_c1_tree" \
 			ls-remote origin "refs/heads/$ccnavi_c1_branch" >"$ccnavi_c1_tmp/ls" &&
 			grep -F -x -q -- "$ccnavi_cw_head${ccnavi_c1_tab}refs/heads/$ccnavi_c1_branch" "$ccnavi_c1_tmp/ls"; then
@@ -451,7 +451,7 @@ ccnavi_c1_write() {
 		fi
 		ccnavi_c1_say "書いたものを戻した。取り込みからもう 1 回だけやり直す"
 		ccnavi_c1_prepare || return 1
-		# 届いていたのに確かめ（ls-remote）も落ちていた回は、取り込みで自分のコミットが戻ってくる。
+		# 届いていたのに確かめ（ls-remote）も失敗していた回は、取り込みで自分のコミットが戻ってくる。
 		# そのときは書き直さず、届いていたとして終える。
 		if [ -n "$ccnavi_cw_c" ] &&
 			git -C "$ccnavi_c1_tree" merge-base --is-ancestor "$ccnavi_cw_c" HEAD 2>/dev/null; then
