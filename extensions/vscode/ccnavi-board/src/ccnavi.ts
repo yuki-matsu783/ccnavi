@@ -3,7 +3,7 @@
  * 実行ファイルはネットワークに出ないので、ここで待つのはワークスペースの走査だけ。
  *
  * 走らせるのは 9 つ。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
- * `--test-samples --json`（見本の一括）、`--lint`（設定の検証）、`--lint --json`（同じ苦情を
+ * `--test-expectations --json`（期待する判定の一括）、`--lint`（設定の検証）、`--lint --json`（同じ苦情を
  * 機械可読で。プロジェクト管理画面が読む）、`--lint --json --flow <パス>`（子のフロー 1 本を
  * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--agree --preview --json`（承認待ちの一覧を見る）、
  * `--agree --yes … --json`（見せた一覧を承認する。ユーザがオーバーレイで押したときだけ）、
@@ -60,9 +60,9 @@ import { parseBoardJson, type BoardJson } from "./core/model.js";
 import { parsePlanOrder, type PlanOrder, type PlanOrderAnswer, type PlanOrderWrite } from "./core/planordermodel.js";
 import { parseSuggestJson, type SuggestJson } from "./core/suggestmodel.js";
 import {
-  parseSamplesJson,
+  parseExpectationsJson,
   parseTestJson,
-  type SamplesJson,
+  type ExpectationsJson,
   type TestJson,
 } from "./core/testmodel.js";
 import { missingFlags, parseVersionJson, type VersionProbe } from "./core/version.js";
@@ -99,7 +99,7 @@ const APPROVE_TIMEOUT_MS = 60_000;
 const EXPLAIN_TIMEOUT_MS = 60_000;
 
 /**
- * 診断の 4 本（`--test` / `--test-samples` / `--lint` / `--lint --json`）に付ける期限（ミリ秒）。
+ * 診断の 4 本（`--test` / `--test-expectations` / `--lint` / `--lint --json`）に付ける期限（ミリ秒）。
  * この 4 本を待つ間、ルール管理・リスク管理・フェーズ管理の画面はボタンを非活性にし、返事が
  * 届いたときにしか活性へ戻さない。ボードと違って HTML の総取り替えも監視の読み直しも無いので、
  * 返らないと画面を閉じるまで戻れない（編集中の内容は消える）。値はボードと承認に揃えて 60 秒。
@@ -404,13 +404,13 @@ export async function runTest(
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
 }
 
-/** 見本をぜんぶ判定に掛ける */
-export async function runSamples(
+/** 期待する判定をぜんぶ判定に掛ける */
+export async function runExpectations(
   root: string,
   setting: string,
   rules: RulesOverride,
-  samplesPath: string,
-): Promise<RunResult<SamplesJson>> {
+  expectationsPath: string,
+): Promise<RunResult<ExpectationsJson>> {
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
@@ -418,23 +418,23 @@ export async function runSamples(
   const ran = await run(launcher, root, [
     ...overrideArgs(rules),
     ...RULES_ONLY,
-    "--test-samples",
-    samplesPath,
+    "--test-expectations",
+    expectationsPath,
     "--json",
   ], DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: cutOff("ccnavi --test-samples --json", DIAGNOSE_TIMEOUT_MS) };
+    return { ok: false, error: cutOff("ccnavi --test-expectations --json", DIAGNOSE_TIMEOUT_MS) };
   }
   if (ran.code !== 0) {
-    return { ok: false, error: `ccnavi --test-samples --json が失敗しました: ${ran.stderr}` };
+    return { ok: false, error: `ccnavi --test-expectations --json が失敗しました: ${ran.stderr}` };
   }
-  const parsed = parseSamplesJson(ran.stdout);
+  const parsed = parseExpectationsJson(ran.stdout);
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
 }
 
 /**
  * 記録からルールの候補を起こす（`--suggest --json`、README「候補の JSON」）。読むのは保存済みの
- * ルールと記録で、編集中の内容は渡さない。候補は実行ファイルが `--lint` と見本の判定で確かめたものだけ。
+ * ルールと記録で、編集中の内容は渡さない。候補は実行ファイルが `--lint` と期待する判定の確認で確かめたものだけ。
  * 記録を読むので `--log ""` は付けない（state の置き場は実行ファイルが外す）。`--suggest` を知らない古い実行ファイルは失敗にする。
  */
 export async function runSuggest(root: string, setting: string): Promise<RunResult<SuggestJson>> {

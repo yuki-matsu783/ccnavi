@@ -190,7 +190,7 @@ export function c1TargetOf(stdout: string): string {
  * プロジェクト 1 つのルールは `--project-rules-file <名前>=<パス>` で（README「lint の JSON」）。
  * ワークスペースの設定は同じオプションに名前 `self` で渡す。実行ファイルはレイヤー（layer）の名前で差し替えを引き、
  * `self` という名前のプロジェクトはプロジェクトの設定として数えないので取り違えない。
- * どれも診断（`--lint` / `--test` / `--test-samples` / `--explain`）でだけ有効で、
+ * どれも診断（`--lint` / `--test` / `--test-expectations` / `--explain`）でだけ有効で、
  * hook からの判定にもチケットとレビューの副命令にも届かない（実行ファイルが診断以外では断る）。
  * 拡張がこれらを足すのは `--lint` と `--test` だけなので、そこは変わらない。
  */

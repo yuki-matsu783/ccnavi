@@ -2,7 +2,7 @@
  "version": 1,
  "root": "/ws",
  "rules_path": "/ws\\rules.yml",
- "samples_path": "/ws\\samples.yml",
+ "expectations_path": "/ws\\samples.yml",
  "counts": {
   "deny": {
    "ok": 1,
@@ -19,7 +19,7 @@
  },
  "mismatches": 1,
  "skipped": 1,
- "samples": [
+ "expectations": [
   {
    "expected": "deny",
    "tool": "Bash",

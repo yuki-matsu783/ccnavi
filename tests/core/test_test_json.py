@@ -8,7 +8,7 @@ VS Code 拡張のルール管理画面が読む形を、`--test` と同じ判定
 3. `--test-expectations` が期待する判定をタイプの期待と突き合わせ、食い違いを数える。
    文字で出すときは食い違いがあれば終了コード 1、JSON では常に 0
 4. 拡張側のフィクスチャ（extensions/vscode/ccnavi-board/test/fixtures/test.json と
-   samples.json）と同じ形である
+   expectations.json）と同じ形である
 
 形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてこのテストを走らせ、フィクスチャを書き直す。
 """
@@ -287,7 +287,7 @@ class TestJsonTest(unittest.TestCase):
         self.assertIn("食い違い: allow のはずが deny", plain.stdout)
         self.assertIn("食い違い 1 件、判定に入らなかったもの 1 件", plain.stdout)
 
-        self._check_fixture("samples.json", body)
+        self._check_fixture("expectations.json", body)
 
     def test_unreadable_expectations_fail_loudly(self):
         done = ccnavi(

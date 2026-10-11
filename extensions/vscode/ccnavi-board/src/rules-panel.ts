@@ -29,7 +29,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { loadBoard, runLint, runSamples, runSuggest, runTest, type RulesOverride } from "./ccnavi.js";
+import { loadBoard, runExpectations, runLint, runSuggest, runTest, type RulesOverride } from "./ccnavi.js";
 import { envFromSettingsJson, hooksFor, parseHooks, type HookEntry } from "./core/hooks.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
@@ -49,7 +49,7 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_RULES = ".ccnavi/common/rules.yml";
-const DEFAULT_SAMPLES = ".ccnavi/common/rule-samples.yml";
+const DEFAULT_EXPECTATIONS =".ccnavi/common/rule-samples.yml";
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "rules";
 /** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */
@@ -75,8 +75,8 @@ interface Loaded {
   readonly hooks: readonly HookEntry[];
   readonly hookFiles: { readonly settings: boolean; readonly settingsLocal: boolean };
   readonly mode: string;
-  readonly samplesPath: string;
-  readonly samplesRel: string;
+  readonly expectationsPath: string;
+  readonly expectationsRel: string;
 }
 
 interface PanelState {
@@ -149,8 +149,8 @@ function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-function samplesSetting(): string {
-  return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("samplesPath", DEFAULT_SAMPLES);
+function expectationsSetting(): string {
+  return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("expectationsPath", DEFAULT_EXPECTATIONS);
 }
 
 /** `ccnaviBoard.openRules` の本体。引数なしは共通の設定のルール */
@@ -310,7 +310,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     ...(settingsText === undefined ? [] : parseHooks(settingsText, "settings")),
     ...(localText === undefined ? [] : parseHooks(localText, "settings-local")),
   ];
-  const samplesRel = samplesSetting();
+  const expectationsRel = expectationsSetting();
   return {
     target,
     exists,
@@ -325,8 +325,8 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     hooks,
     hookFiles: { settings: settingsText !== undefined, settingsLocal: localText !== undefined },
     mode: env("CCNAVI_MODE"),
-    samplesPath: resolveIn(root, samplesRel),
-    samplesRel,
+    expectationsPath: resolveIn(root, expectationsRel),
+    expectationsRel,
   };
 }
 
@@ -491,7 +491,7 @@ function show(current: PanelState): void {
       model: loaded.doc.model,
       hooks: loaded.hooks,
       hookFiles: loaded.hookFiles,
-      samplesPath: loaded.samplesRel,
+      expectationsPath: loaded.expectationsRel,
       lock: current.lock,
       notices: loaded.notices,
       target: { kind: loaded.target.kind, name: loaded.target.kind === "project" ? loaded.target.name : "" },
@@ -589,7 +589,7 @@ function rulesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<RulesDa
  *
  * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間にユーザが「更新」を押せば、
  * 画面の編集は捨てられ、新しい中身が出ている。そこへ古い編集を書くと、捨てたはずのものが
- * ファイルに入る。 判定とサンプルはファイルに触らないが、捨てた編集で出した答えを
+ * ファイルに入る。 判定と期待する判定の確認はファイルに触らないが、捨てた編集で出した答えを
  * 「いまのルールの判定」として見せることになるので、同じく無かったことにする。
  */
 function stale(current: PanelState, loaded: Loaded, what: string): boolean {
@@ -702,7 +702,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       if (current.loaded === undefined) {
         return;
       }
-      const target = message.which === "rules" ? current.loaded.rulesPath : current.loaded.samplesPath;
+      const target = message.which === "rules" ? current.loaded.rulesPath : current.loaded.expectationsPath;
       void vscode.workspace.openTextDocument(target).then(
         (document) => vscode.window.showTextDocument(document),
         () => vscode.window.showInformationMessage(`ファイルを開けませんでした: ${target}`),
@@ -760,7 +760,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       current.host.post({ type: "judged", result: result.value, hooks: hooksFor(loaded.hooks, message.tool) } satisfies ToRules);
       return;
     }
-    case "samples": {
+    case "expectations": {
       const loaded = current.loaded;
       if (loaded === undefined) {
         return;
@@ -772,15 +772,15 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
         fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
         return;
       }
-      const result = await runSamples(root, binSetting(), rules, loaded.samplesPath);
-      if (!alive(current) || stale(current, loaded, "このサンプルの判定")) {
+      const result = await runExpectations(root, binSetting(), rules, loaded.expectationsPath);
+      if (!alive(current) || stale(current, loaded, "この期待する判定の確認")) {
         return;
       }
       if (!result.ok) {
         fail(current, result.error);
         return;
       }
-      current.host.post({ type: "sampled", result: result.value } satisfies ToRules);
+      current.host.post({ type: "expectationsChecked", result: result.value } satisfies ToRules);
       return;
     }
     case "suggest": {
@@ -907,14 +907,14 @@ function asMessage(message: unknown): RulesMessage | undefined {
       }
       return { type: "pickFile", key: m.key, field: m.field };
     case "openFile":
-      return m.which === "rules" || m.which === "samples" ? { type: "openFile", which: m.which } : undefined;
+      return m.which === "rules" || m.which === "expectations" ? { type: "openFile", which: m.which } : undefined;
     case "save": {
       const sections = asSections(m.sections);
       return sections === undefined ? undefined : { type: "save", sections };
     }
-    case "samples": {
+    case "expectations": {
       const sections = asSections(m.sections);
-      return sections === undefined ? undefined : { type: "samples", sections };
+      return sections === undefined ? undefined : { type: "expectations", sections };
     }
     case "judge": {
       const sections = asSections(m.sections);

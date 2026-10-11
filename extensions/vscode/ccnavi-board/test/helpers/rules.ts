@@ -51,7 +51,7 @@ export function page(overrides: Partial<RulesPage> = {}): RulesPage {
     model: readRules(RULES).model,
     hooks: parseHooks(JSON.stringify({ hooks: {} }), "settings"),
     hookFiles: { settings: true, settingsLocal: false },
-    samplesPath: ".ccnavi/common/rule-samples.yml",
+    expectationsPath: ".ccnavi/common/rule-samples.yml",
     lock: { locked: false, reason: "", doing: [] },
     ...overrides,
   };
