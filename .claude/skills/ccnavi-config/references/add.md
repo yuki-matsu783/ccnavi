@@ -120,7 +120,7 @@ phases:
   research:
     kind: work                  # work は全体計画に、feedback はフィードバック計画にだけ置ける
     title: 調査                 # id と title はどちらも一意
-    review: none                # none | mr。既定であって上限ではない（計画の項で mr に強められる）
+    review: none                # none | chat | mr。既定であって上限ではない（計画の項で mr に強められる）。chat はこのセッションでユーザが見る（マージリクエストは作らない）
     scope: ["wip/research/*"]   # 子が宣言できる範囲の上限。inherit なら親の範囲そのまま
     deliverables: ["wip/research/summary.md"]   # 閉じる前に親のワークツリーに在って追跡されているべきもの
     when: 既存の振る舞いや依存が分からないとき   # 案内。次のフェーズを促す文に出る
@@ -139,7 +139,7 @@ phases:
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
-    review: mr                  # feedback は mr 固定
+    review: mr                  # feedback は chat か mr（none は書けない）
     scope: inherit
 ```
 
@@ -153,7 +153,9 @@ phases:
   最後の子を閉じられないので、必ず作れる名前にする
 - `overlap` は対称に効く。`acceptance: overlap: [implement]` と書けば implement 側にも効く。
   `requires` は計画を承認するときに見る（「implement を置くなら acceptance も要る」）
-- `feedback` のフェーズ定義は必ず `review: mr`
+- `feedback` のフェーズ定義の `review` は `chat` か `mr`。`none` は書けない
+- 小さい作業を親 1 本・子 1 本で回すなら、`review: chat`・`scope: inherit` の定義（例: `quick`）を 1 つ置き、親は `plan: [quick]`・`feedback: []` にする
+  （手順は docs/design/tickets/phases.md の「小さい作業」）
 - `when` と `agent` は判定に使われない案内。`when` は「次は X の計画です（定義の案内: …）」の
   形でモデルに届くので、そのフェーズ定義を飛ばしてよい条件まで書く
 
