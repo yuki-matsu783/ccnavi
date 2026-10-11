@@ -32,9 +32,11 @@ pnpm test:e2e   # 拡張を読み込んだ Chromium（Playwright、PLAYWRIGHT_BR
 
 ### ホストの応答の見本（レビュー済み）
 
-GitHub と GitLab の 2 つ。どちらも実際の形に合わせて手で組んだもので、実物からは録っていない。GitHub の形（`reviewThreads` の欄・ページング・
-古い行の `line` が null・REST のレビュー）は、2026-10-12 に実物と突き合わせて、sh の読み方と合うことを確かめた
-（`tests/manual/github/probe_github.py`。古い行の null とページングは手で問い合わせて確認した）。GitLab の見本は `test/fixtures/host/gitlab/<場面>/`（`scene.json` に名前空間・プロジェクト・
+GitHub と GitLab の 2 つ。どちらも実際の形に合わせて手で組んだもので、実物からは録っていない。GitHub の形は、2026-10-12 に実物と突き合わせて、
+sh の読み方と合うことを確かめた（1 アカウントだけ。`CHANGES_REQUESTED` は未確認）。`tests/manual/github/probe_github.py` が見るのは
+`reviewThreads` の欄・解決済みの区別・書き換えられた行の `line` が null になること・COMMENTED のレビュー・gh と curl の両経路。
+ページング（`first:1` と `after: <endCursor>`）は probe には無く、同じ問い合わせの `first` を 1 にして手で打って確かめた
+（2026-10-12、2 本のスレッドで 1 ページ目 `hasNextPage: true`、`endCursor` を渡した 2 ページ目に残りの 1 本）。GitLab の見本は `test/fixtures/host/gitlab/<場面>/`（`scene.json` に名前空間・プロジェクト・
 親のブランチ・依頼を投稿したアカウントの id `poster`、ホストの応答は `mrs.json`・`discussions.<N>.json`・`reviewers.<N>.json`・`user.json`）。
 代役は sh の試験の `tests/sh/gitlab_host.py` と拡張の試験の `test/helpers/gitlab-fixture.ts`、試験は `tests/sh/test_review_host_fixture.py` の
 `GitLabHostFixtureTest` と拡張の CX-T144。結論（`conclusion.json`）を出すときは、`poster` が投稿した ccnavi の依頼のスレッドを数えない（目印は誰でも書けるので、書いたアカウントで見分ける）。

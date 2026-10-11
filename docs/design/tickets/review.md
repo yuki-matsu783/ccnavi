@@ -143,14 +143,17 @@ C1 の書いたパスの一覧の検査は、`review ready` が消した `wip/` 
    ターンを終える。sh は crit を起動しない（crit は閉じるまで戻らない）
 4. ユーザはツリーのルート（か、同じブランチのチェックアウトのルート）で `crit review <相対パス>` を開き、HTML のソースの行に指摘を付けて、
    `crit push <番号>` で送る。`crit <相対パス>` だけだと描画のプレビューになり、そこで付けたピンは `crit push` で送られない（crit v0.21.0 で確認）。crit push は GitHub では `gh`、GitLab では `glab` を使い、マージリクエストの差分にあるファイルの行にだけ送れる。
-   **実測したこと（GitHub、2026-10-12）:** crit が送るのと同じ形の `POST pulls/<番号>/reviews`（`event: COMMENT` と `comments[]` の
-   `path`・`line`・`side`）は実物が受け付け、行のスレッドになって sh の `fetch` / `confirm` が未解決として数える。差分に無い行・ファイルへの
-   指摘は 422（`Line could not be resolved` / `Path could not be resolved`）で拒まれ、レビューごと作られない。手順は `tests/manual/github/probe_github.py`。
-   **確かめていないこと:** GitLab（`glab`）での crit push（偽の `gh` で GitHub の送り方だけを見た）、実際の crit が `gh` で送った場合の通し。また、ユーザの手元のチェックアウトがマージリクエストの先頭より古いと、crit が送る行の番号が
+   **実測したこと（GitHub、2026-10-12、1 アカウントだけ）:** 手で組んだ `POST pulls/<番号>/reviews`（`event: COMMENT` と `comments[]` の
+   `path`・`line`・`side`。crit が送ると見た JSON と同じ欄）は実物が受け付け、行のスレッドになって sh の `fetch` / `confirm` が未解決として数える。
+   差分に無い行・ファイルへのレビューは 422（`Line could not be resolved` / `Path could not be resolved`）で拒まれ、レビューは作られない。
+   手順は `tests/manual/github/probe_github.py`（crit 自身は起動していない）。
+   **確かめていないこと:** 実際の crit が `gh` で送った通し（crit が送る本文・欄が上の JSON と同じかも含む）、GitLab（`glab`）での crit push
+   （偽の `gh` で GitHub の送り方だけを見た）、`CHANGES_REQUESTED` のレビューを実物のホストが返す形（自分の PR には変更要求を出せず、別のアカウントが要る）。また、ユーザの手元のチェックアウトがマージリクエストの先頭より古いと、crit が送る行の番号が
    ずれる。`crit review` を開く前に、手元をマージリクエストの先頭に合わせる
 5. 送られた指摘はユーザのスレッドで、本文が目印で始まらないので、`confirm` は未解決として数えて止め、`decide` は 1 件ずつ行き先を選ばせる
-   （`review_host._unresolved`。依頼者と同じアカウントが送っても数える）。`crit push --event request-changes` は変更要求のレビューになり、
-   `decide` でも通せない
+   （`review_host._unresolved`。依頼者と同じアカウントが送っても数える。GitHub の実物では、依頼者と同じアカウントの行コメントが
+   未解決のスレッドとして `confirm` を止め、`decide` で受け入れられることを確かめた）。`crit push --event request-changes` は変更要求のレビューに
+   なり、`decide` でも通せない設計だが、実物のホストでは確かめていない（fixture の試験だけ）
 6. 依頼の後に `wip/eli5/` の下だけを変えたコミットは「ユーザが見るものが動いた」に数えない。直したら push するだけで、
    `confirm` は止まらず、`request` の打ち直しも要らない（打つと「依頼済み」で止まる）。**代わりに、直した ELI5 をユーザが見直す保証は無い。**
    直す前の行に付いたスレッドは未解決のまま残るので、ユーザが resolve する（か `decide` で決める）。ELI5 とほかのファイルを一緒に変えた
