@@ -1,4 +1,0 @@
-{"at": "2026-10-11T08:35:14Z", "ticket": "refactor-296-rule-expectations-02-01", "kind": "approved", "from": "todo", "to": "doing", "via": "board", "tree": "refactor-296-rule-expectations"}
-{"at": "2026-10-11T08:35:42Z", "ticket": "refactor-296-rule-expectations-02-01", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "5801bfb65bc0ec7753c610d88d3360bce0724817"}
-{"at": "2026-10-11T08:45:12Z", "ticket": "refactor-296-rule-expectations-02-01", "kind": "finished", "from": "doing", "to": "review", "via": "cli"}
-{"at": "2026-10-11T08:51:14Z", "ticket": "refactor-296-rule-expectations-02-01", "kind": "settled", "from": "review", "to": "done", "via": "board", "actor": "yuki-matsu783", "phase": 2}
