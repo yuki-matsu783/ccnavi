@@ -16,6 +16,7 @@ from ..tickets import (
     phase,
     phasetypes,
     risk,
+    session_rejects,
     ticket_model,
     workflow,
 )
@@ -25,6 +26,10 @@ from . import diagnose_board, diagnose_shared
 # レイヤーの見出し。共通レイヤーと自身のレイヤーだけ日本語の名前で出す。
 # プロジェクトは名前そのもので、それが id の前置き（`lib:schema`）と同じ表記になる。
 LAYER_LABELS = {ruleload.LAYER_COMMON: "共通レイヤー", ruleload.LAYER_SELF: "自身のレイヤー"}
+
+
+# 却下の走査に使う時間の上限（秒）。SessionStart と違って期限が無いので長めに取る。
+EXPLAIN_REJECTS_BUDGET = 5.0
 
 
 def layer_label(name: str) -> str:
@@ -262,7 +267,26 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             stdout.write(
                 f"  {parent.ticket} フェーズ {ph.label}: {state} / {marks} / {hold}{review}\n"
             )
+    _explain_rejects(stdout, conf, root, copies)
     return 0
+
+
+def _explain_rejects(
+    stdout: TextIO, conf: settings.Settings, root: str, copies: list[ticket_model.Ticket]
+) -> None:
+    """上位の設定に却下された要求を全件。SessionStart は数件に絞るので、全部はここで見せる。
+
+    該当が無ければ節を出さない。見せるだけで、判定は変えない。
+    """
+    try:
+        found = session_rejects.find_all(conf, root, budget=EXPLAIN_REJECTS_BUDGET, copies=copies)
+    except Exception:  # noqa: BLE001 - 一覧の足しで、--explain を止めない
+        return
+    if not found.rejects:
+        return
+    stdout.write("\n■ 上位の設定に却下された要求\n")
+    for line in session_rejects.explain_lines(found):
+        stdout.write(f"{line}\n")
 
 
 def explain_json(

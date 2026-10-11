@@ -41,6 +41,11 @@ BUDGET_SECONDS = 0.5
 # 1 回で当てる項の数の上限。承認済みチケット数 × 項数 × ルール数で伸びるので、ここで打ち切る。
 MAX_ENTRIES = 500
 
+APPROXIMATE_NOTE = (
+    "重なりは glob の前置に 1 文字足したパスで近似している"
+    "（項の一部だけが退けられる形は拾わない）。"
+)
+
 ORIGIN_RULE = "ルール"
 ORIGIN_PARENT = "親"
 ORIGIN_TYPE = "フェーズ定義"
@@ -179,6 +184,50 @@ def _reject_of(
     return None
 
 
+def find_all(
+    conf: settings.Settings,
+    root: str,
+    only: str = "",
+    budget: float = BUDGET_SECONDS,
+    deadline: float | None = None,
+    copies: list[ticket_model.Ticket] | None = None,
+) -> Found:
+    """開いている承認済みチケットの却下を全件返す（絞りも文面も作らない）。
+
+    `notice`（SessionStart）と `--explain` の両方が呼ぶ。`only` があれば、その
+    チケット（ツリーの名前で引く）だけを見る。見つからなければ空。
+    `copies` を渡せば置き場を読み直さない（`--explain` は読みを 1 度に保つ）。
+    """
+    limit = time.monotonic() + budget
+    if deadline is not None:
+        limit = min(limit, deadline)
+    if copies is None:
+        copies, _ = approval.scan(conf, root)
+    index = approval_checks.by_id(copies)
+    if not only:
+        return check(conf, root, copies, index, limit)
+    bound = tree.lookup(index, only)
+    if bound is None:
+        return Found()
+    return check(conf, root, [bound], index, limit)
+
+
+def explain_lines(found: Found) -> list[str]:
+    """`--explain` の節の本文。1 件 1 行で、末尾に近似であることと確かめられない件数を添える。"""
+    lines = [
+        f"  {r.ticket} {r.decision} `{r.request}`: {r.reason}（出所: {r.origin}）"
+        for r in found.rejects
+    ]
+    if found.truncated:
+        lines.append("  （件数か時間の上限で途中まで数えた）")
+    lines.append(f"  {APPROXIMATE_NOTE}" + _unchecked_note(found))
+    return lines
+
+
+def _unchecked_note(found: Found) -> str:
+    return f"regex の項 {found.unchecked} 件は確かめられない。" if found.unchecked else ""
+
+
 def notice(conf: settings.Settings, root: str, cwd: str, deadline: float | None = None) -> str:
     """SessionStart に足す文。却下が無ければ空。
 
@@ -187,30 +236,20 @@ def notice(conf: settings.Settings, root: str, cwd: str, deadline: float | None 
     何が起きてもセッションの開始は止めない（失敗したら何も言わない）。
     """
     try:
-        limit = time.monotonic() + BUDGET_SECONDS
-        if deadline is not None:
-            limit = min(limit, deadline)
-        copies, _ = approval.scan(conf, root)
-        index = approval_checks.by_id(copies)
         here = tree.tree_of(root, cwd or root, conf.projects)
         if here is None or here.is_main:
-            return _count_line(conf, root, copies, index, limit)
-        bound = tree.lookup(index, here.name)
+            return _count_line(find_all(conf, root, deadline=deadline))
+        copies, _ = approval.scan(conf, root)
+        bound = tree.lookup(approval_checks.by_id(copies), here.name)
         if bound is None:
             return ""
-        return render(bound.ticket, check(conf, root, [bound], index, limit))
+        found = find_all(conf, root, only=here.name, deadline=deadline, copies=copies)
+        return render(bound.ticket, found)
     except Exception:  # noqa: BLE001 - 案内の足しで、セッションの開始を止めない
         return ""
 
 
-def _count_line(
-    conf: settings.Settings,
-    root: str,
-    copies: list[ticket_model.Ticket],
-    index: dict[str, ticket_model.Ticket],
-    deadline: float,
-) -> str:
-    found = check(conf, root, copies, index, deadline)
+def _count_line(found: Found) -> str:
     names = sorted({r.ticket for r in found.rejects})
     if not names:
         return ""
@@ -237,11 +276,5 @@ def render(ticket: str, found: Found) -> str:
         lines.append(f"- ほか {total - SHOWN} 件。全部は ccnavi --explain で範囲とルールを見る。")
     else:
         lines.append("詳しくは ccnavi --explain で範囲とルールを見る。")
-    note = (
-        "重なりは glob の前置に 1 文字足したパスで近似している"
-        "（項の一部だけが退けられる形は拾わない）。"
-    )
-    if found.unchecked:
-        note += f"regex の項 {found.unchecked} 件は確かめられない。"
-    lines.append(note)
+    lines.append(APPROXIMATE_NOTE + _unchecked_note(found))
     return "\n".join(lines)

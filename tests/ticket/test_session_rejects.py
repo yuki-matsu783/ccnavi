@@ -250,6 +250,78 @@ class SessionRejectsTest(PhaseHarness):
         result = self.hook("PreToolUse", "Write", self.parent_tree, file_path=target)
         self.assertIn("deny", result.stdout)
 
+    # ---- 8. `--explain` の全件の節
+
+    def explained(self):
+        result = self.ccnavi(EXPLAIN)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return result.stdout
+
+    def section_of(self, out):
+        """節の見出しから次の見出しまで。"""
+        head = "■ 上位の設定に却下された要求"
+        self.assertIn(head, out)
+        body = out.split(head, 1)[1].split("\n■", 1)[0]
+        return body.splitlines()[1:]
+
+    def test_explainは却下を全件出す(self):
+        globs = [f"src/secret/{i:02d}/*" for i in range(12)]
+        self.approved_parent(("src/*", "wip/*", *globs))
+
+        lines = self.section_of(self.explained())
+
+        rows = [ln for ln in lines if "src/secret/" in ln]
+        self.assertEqual(len(rows), 12, "\n".join(lines))
+        for g in globs:
+            self.assertEqual(len([ln for ln in rows if g in ln]), 1, g)
+
+    def test_explainの1行に要求と理由と出所が入る(self):
+        self.reject_by_deny()
+
+        lines = self.section_of(self.explained())
+
+        rows = [ln for ln in lines if SECRET in ln]
+        self.assertEqual(len(rows), 1, "\n".join(lines))
+        self.assertIn("i0001", rows[0])  # どのチケットか
+        self.assertIn(MESSAGE, rows[0])  # 理由
+        self.assertIn("no-secret", rows[0])  # 出所
+
+    def test_explainの節の末尾に近似であることを添える(self):
+        self.reject_by_deny()
+
+        text = "\n".join(self.section_of(self.explained()))
+
+        self.assertIn("近似", text)
+
+    def test_explainは上位の出所も出す(self):
+        self.approved_parent(("wip/*",))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("docs/*",), False))
+        self.commit_parent()
+        self.approve_all("i0001-01-01")
+        self.worktree("i0001-01-01", "i0001")
+        self.assertEqual(self.ccnavi("ticket", "start", "i0001-01-01").returncode, 0)
+
+        text = "\n".join(self.section_of(self.explained()))
+
+        self.assertIn("docs/*", text)
+        self.assertIn("親 i0001", text)
+
+    def test_explainは却下が無ければ節を出さない(self):
+        self.approved_parent(("src/*", "wip/*"))
+
+        out = self.explained()
+
+        self.assertNotIn("上位の設定に却下された要求", out)
+
+    def test_explainのjsonに却下の欄は無い(self):
+        self.reject_by_deny()
+
+        result = self.ccnavi(EXPLAIN, "--json")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn(REJECT_WORD, result.stdout)
+        self.assertNotIn(MESSAGE, result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
