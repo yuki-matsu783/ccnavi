@@ -91,7 +91,10 @@ class BoardTest(PhaseHarness):
         self.assertEqual(parent["copy"]["status"], "open")
 
     def test_the_proposal_says_whether_it_has_a_plan(self):
-        """提案の `has_plan` は、親の提案が計画（`plan:` か `feedback:`）を持つか。
+        """提案の `has_plan` は、親の提案が全体計画（`plan:`）を持つか。
+
+        計画の順序を直すタブ（`--plan-order`）は `plan:` を持たない親を開けないので、
+        `feedback:` だけの親は偽にする。
 
         ボードは承認待ちの親の提案のカードに、計画の順序を直すタブの入口をこれで出し分ける。
         承認前の親は `parents[]` に出ないので、提案の側で言う。子の提案と、承認済みだけの
@@ -100,10 +103,13 @@ class BoardTest(PhaseHarness):
         self.scene()
         self.propose("i0002", parent_text("i0002", ["research", "design"]))
         self.propose("i0003", parent_text("i0003", [], copy=None))
+        self.propose("i0004", parent_text("i0004", [], ["design-feedback"], copy=None))
         self.commit_parent()
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         self.assertTrue(by_id["i0002"]["proposal"]["has_plan"])
         self.assertFalse(by_id["i0003"]["proposal"]["has_plan"])
+        self.assertFalse(by_id["i0004"]["proposal"]["has_plan"])
+        self.assertEqual(self.ccnavi("--plan-order", "i0004", "--json").returncode, 1)
         self.assertFalse(by_id["i0001-02-03"]["proposal"]["has_plan"])
         self.assertIsNone(by_id["i0001-02-02"]["proposal"])
 
