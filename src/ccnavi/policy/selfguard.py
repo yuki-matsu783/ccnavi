@@ -173,6 +173,7 @@ ACTION_MISSING = "missing"  # 対象が無く、戻す先も無い
 ACTION_FAILED = "failed"  # 戻そうとして駄目だった
 ACTION_WOULD = "would-restore"  # dry-run。戻す代わりに言うだけ
 ACTION_LEFT = "left-as-repair"  # 読めないルールファイルへの修復なので戻さなかった
+ACTION_REBASED = "rebased"  # 大きい対象が変わったので、新しい版を基準に取り直した
 
 # 共通レイヤーのルールファイルに付けるバックアップの key（_places）。
 COMMON_RULES_KEY = "rules"
@@ -246,9 +247,13 @@ def before(
     outcomes = []
     for target in found:
         if target.heavy:
-            # 大きい対象はセッション開始で 1 度だけバックアップする。呼び出しのたびに
-            # 数十 MB をコピーすると、判定を待たせるために置いた仕組みが、判定より
-            # 重くなる。
+            # 大きい対象は、呼び出しのたびにコピーも読みもしない（数十 MB を毎回扱うと、
+            # 判定より重くなる）。大きさと更新時刻が変わったときだけ、新しい版を基準に
+            # 取り直す。ツールを呼ぶ前に、ccnavi の外で再ビルドされていた場合もここで取り直す。
+            if setting == ENABLE:
+                outcome = _rebase_if_changed(state_dir, session, target)
+                if outcome is not None:
+                    outcomes.append(outcome)
             continue
         content = _read(target.path)
         if content is not None:
@@ -413,9 +418,8 @@ def at_start(
 
     大きい対象をバックアップするのはここだけ。実行ファイルがこれにあたり、ツール呼び出しの
     たびに数十 MB をコピーするわけにはいかないので、コピーするのはセッションに 1 度。そのあいだに
-    作り直されたものはバックアップと食い違うが、作り直しはユーザが起こす作業なので、食い違いは
-    報告に出てユーザの目に触れる。何も出さずに新しいほうをバックアップし直すと、差し替えと作り直しが
-    同じ見た目になる。
+    作り直されたものは、次の照合（実行前・実行後）で大きさと更新時刻が変わっていることから見つかり、
+    新しい版を基準に取り直す。取り直しは報告に出る。
 
     小さいほうも一緒にバックアップする。実行前のバックアップが始まるのは最初のツール呼び出しからで、
     それより前に設定ファイルを消されると、バックアップを持たないまま実行後チェックに入る。
@@ -604,12 +608,16 @@ def _save_heavy(state_dir: str, session: str, target: selfguard_targets.Target) 
 def _check_heavy(
     setting: str, state_dir: str, session: str, target: selfguard_targets.Target
 ) -> Outcome | None:
-    """大きい対象を、大きさと更新時刻で照合する。
+    """大きい対象を、大きさと更新時刻で照合する。変わっていれば、新しい版を基準に取り直す。
 
     中身は読まない。バックアップした時点の大きさと更新時刻を参照に書いてあるので、
-    差し替えられればどちらかが必ず動く。同じ大きさで同じ時刻に作った別のものまでは
+    変わればどちらかが必ず動く。同じ大きさで同じ時刻に作った別のものまでは
     見分けられないが、そこを見分けるには毎回全部を読むことになり、実行前
     チェックに設けた期限を設定ファイル 1 つのために使い切ることになる。
+
+    再ビルドを戻さないのは、開発中に実行ファイルを何度も作り直すため。取り直しは
+    報告に出る。差し替えも同じく新しい版として受け入れられるので、その意味で
+    この照合は「作り直しの検知」ではなく「基準の更新」になる。
 
     バックアップが無いときは何も出さない。セッション開始のイベントに登録していない、あるいは
     実行ファイルを指していない設定がこれで、異常ではない。登録の漏れは
@@ -622,8 +630,15 @@ def _check_heavy(
     if _same_shape(target.path, size, mtime):
         return None
     if setting != ENABLE:
-        return Outcome(target, ACTION_WOULD, "本来ならバックアップから戻す（今回は触っていない）")
+        return Outcome(
+            target,
+            ACTION_WOULD,
+            "実行ファイルが変わった。enable なら新しい版を基準にする（今回は触っていない）",
+        )
+    if os.path.exists(target.path):
+        return _rebase_heavy(state_dir, session, target)
 
+    # 消された。取り直す版が無いので、セッション開始の版に戻す。
     entry = _store_path(state_dir, digest)
     if not os.path.exists(entry):
         return Outcome(
@@ -639,7 +654,35 @@ def _check_heavy(
     # 次の照合で毎回一致しないまま報告されつづける。
     with contextlib.suppress(OSError):
         os.utime(target.path, (mtime, mtime))
-    return Outcome(target, ACTION_RESTORED, "セッション開始の時点の実行ファイルに戻した")
+    return Outcome(
+        target, ACTION_RESTORED, "消えていたので、セッション開始の時点の実行ファイルに戻した"
+    )
+
+
+def _rebase_if_changed(
+    state_dir: str, session: str, target: selfguard_targets.Target
+) -> Outcome | None:
+    """実行前の照合。大きさか更新時刻が変わっていれば、新しい版を基準に取り直す。
+
+    消えているときは何もしない。戻すのは実行後の照合（`_check_heavy`）が受け持つ。
+    """
+    ref = _parse_ref(_read(_ref_path(state_dir, session, target)))
+    if ref is None:
+        return None
+    _, size, mtime = ref
+    if not os.path.exists(target.path) or _same_shape(target.path, size, mtime):
+        return None
+    return _rebase_heavy(state_dir, session, target)
+
+
+def _rebase_heavy(state_dir: str, session: str, target: selfguard_targets.Target) -> Outcome:
+    """今の版を基準にバックアップし直す。取れなければ、その理由を報告する。"""
+    failed = _save_heavy(state_dir, session, target)
+    if failed:
+        return Outcome(target, ACTION_FAILED, f"新しい版を基準に取れない: {failed}")
+    return Outcome(
+        target, ACTION_REBASED, "実行ファイルが変わったので、新しい版を基準にバックアップし直した"
+    )
 
 
 def _same_shape(path: str, size: int, mtime: int) -> bool:
@@ -740,7 +783,13 @@ def report(outcomes: list[Outcome]) -> str:
             "読めなかった共通レイヤーのルールファイルに加えられた修復は、元に戻していません。"
             "直した中身が意図どおりかを、ユーザが確かめてください。"
         )
-    if any(outcome.action != ACTION_LEFT for outcome in outcomes):
+    if any(outcome.action == ACTION_REBASED for outcome in outcomes):
+        # 取り直した版は、ccnavi の外で作り直されたものも含めて、この時点から基準になる。
+        lines.append(
+            "実行ファイルは新しい版を基準に取り直しました。ccnavi の外で作り直された版も、"
+            "この時点から基準になります。"
+        )
+    if any(outcome.action not in (ACTION_LEFT, ACTION_REBASED) for outcome in outcomes):
         lines.append(
             "変更が要るなら、何をなぜ変えたいのかをユーザに伝えて依頼してください。"
             "自分で書き換えると、次の呼び出しで同じように戻ります。"
