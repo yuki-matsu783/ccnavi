@@ -3079,7 +3079,7 @@ class TicketTest(unittest.TestCase):
         親に 1 行言う。"""
         self.family()
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
-        log = os.path.join(self.root, "decisions.jsonl")
+        log = os.path.join(self.root, "logs", "decisions.jsonl")
         stop = {
             "hook_event_name": "SubagentStop",
             "cwd": child,
@@ -3087,7 +3087,7 @@ class TicketTest(unittest.TestCase):
             "agent_id": "sub-7",
         }
         with mock.patch.object(phase_scope, "scope_findings", return_value=([], "読めない")):
-            done = self.ccnavi("--mode", "enable", "--log", log, stdin=json.dumps(stop))
+            done = self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         with open(log, encoding="utf-8") as f:
             row = json.loads(f.read().splitlines()[-1])
