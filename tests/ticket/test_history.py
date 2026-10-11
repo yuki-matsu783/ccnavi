@@ -102,7 +102,7 @@ class HistoryTest(TicketTest):
 
     def test_markers_are_left_on_the_parent(self):
         """終わりの告知（hook）・依頼・レビュー済み・子の done への移動が、それぞれ残る。"""
-        self.family(review=(True, False))
+        self.family(review=(True, False), plan=["work-mr"])
         for child in ("i0001-01-01", "i0001-01-02"):
             tree = os.path.join(self.root, ".claude", "worktrees", child)
             write(os.path.join(tree, "src", child[-1], "work.py"), "x\n")
@@ -110,7 +110,7 @@ class HistoryTest(TicketTest):
             git(tree, "commit", "--quiet", "-m", "work")
         self.close_phase()
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn("フェーズ 1 が終わりました", self.reason(said))
+        self.assertIn("フェーズ 1（MR作業） が終わりました", self.reason(said))
         fixture = self.remote(merge=("i0001-01-01", "i0001-01-02"))
         requested = self.request(fixture)
         self.assertEqual(requested.returncode, 0, requested.stderr)

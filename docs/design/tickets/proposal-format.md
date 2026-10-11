@@ -99,6 +99,18 @@ base_sha: ""
   承認のあとの判定は写しを読み、`phases.yml` を読まない。`phases.yml` を直したら、承認待ちの提案は `--fill-phases` を
   打ち直す。改版の提案では、子が承認された番号が使う定義は承認済みチケットの値のまま（`--fill-phases` がそう差し込む）。
   子に `phases:` は書けない（error。子は `phase:` で番号を指す）（9.7）
+- 親の提案の雛形は `ccnavi ticket new <識別子> --title <題> --plan <型,型,...> [--issue N]` で作る（`tickets/scaffold.py`。
+  REQ-TKT-56）。識別子と同名のワークツリーの中から打つと、`<提案の置き場>/todo/<識別子>.md` に書く。生成物は
+  `version` `ticket` `issue`（`--issue` があれば）`title` `phases` `plan` `rationale` `allow` と本文の見出し。
+  - `allow` は plan の順に各型の `scope` を集め、重複を除いた `match: Write|Edit` の項にする（案 A。判定側で `wip/` を
+    既定で許すことはしない。承認していない範囲が黙って広がるため）。項が 20 件を超えれば止める
+  - `plan` は各項が前の項を `after` に書いた一直線（終端が 1 つになり、承認の検査を通る）。並行させたい項はユーザが `after` を直す
+  - `phases:` は書いた直後に `plan_phases.fill`（`--fill-phases` と同じ関数）で差し込む。失敗したら雛形も消す
+  - 止める場合は何も書かない。`phases.yml` が無いか読めない（承認の検査を通る plan と写しを作れない。9.7）、plan の型が無い・
+    `feedback` の定義、`scope: inherit` の型だけで `allow` が空（`allow` か `ask` が 1 件は要る）、子の識別子（`<親>-<NN>-<NN>`。
+    雛形は親だけ）、識別子の形の誤り、cwd が識別子と同名のワークツリーの中でない（切り方を案内する）、同じ識別子の提案か承認済みチケットが既に在る
+  - `ccnavi-ticket.sh` は `new` を通さない（保護対象の sh を直さないため）。`--fill-phases` と同じく実行ファイルを直接打つ。
+    `new` は承認ではなく、`todo/` に書くだけなので、組み込みの止め（9.2）には当たらない
 - `started_at` `completed_at` `base_sha` `cancelled_at` `cancel_reason` はスクリプトの欄。スクリプトが
   承認済みチケットの行を書き換える（本文とユーザの書いた行は保つ）
 - `mr` は親の任意の欄で、仕事を載せるマージリクエストの番号（正の整数。`"!12"`・`"#12"` も可）。同じリポジトリのものだけで、

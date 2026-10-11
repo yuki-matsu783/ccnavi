@@ -195,6 +195,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.phase_scope",
                 "tickets.plan_order",
                 "tickets.plan_phases",
+                "tickets.scaffold",
             }
         ),
     ),
@@ -213,6 +214,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.next_id",
                 "tickets.ops",
                 "tickets.ops_close",
+                "tickets.ops_plan",
                 "tickets.ops_stop",
                 "tickets.ops_stop_request",
                 "hook.post",

@@ -101,8 +101,8 @@ def type_for(
     定義は親に固定した写し（`phases:`）から引き、`phases.yml` は読まない。承認のあとに
     `phases.yml` を直しても、進行中の親の子の範囲の上限は変わらない。計画を持つ親の写しに定義が
     無いときは、親が判定の側の検査（`workflow.errors`）で止まり、子も `child_problems` で止まる
-    （`blocked`）ので、定義で切り詰めずに通る形は残らない。計画を持たない親とその子は今のまま
-    （番号だけ。定義で切り詰めない）。
+    （`blocked`）ので、定義で切り詰めずに通る形は残らない。計画を持たない親は `ticket start` が
+    止まるので、その子の範囲を引くのは、止まる前に着手していた親だけ（番号だけ。定義で切り詰めない）。
     """
     item = plan_item(child, parent)
     if item is None or parent is None:
