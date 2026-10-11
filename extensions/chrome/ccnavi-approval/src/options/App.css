@@ -1,0 +1,51 @@
+/*
+ * 設定画面の骨組み（`App.tsx`・`Repos.tsx`・`Tokens.tsx`）。本文の幅、節、登録した一覧の行、登録の欄、
+ * 直前の操作の一言（`Status.tsx`）、PAT を作るページへのリンク。
+ * ボタン（button.action）・欄・一覧の行（.list / .row / .field / .cap）は共通の部品のまま使う。
+ */
+#root { max-width: 860px; margin: 0 auto; padding: 8px 4px 24px; }
+.toolbar { padding: 6px 0 10px; }
+.toolbar h1 { margin: 0; font-size: 1.3em; }
+section { margin-bottom: 22px; }
+h2 { margin-top: 4px; }
+
+/* 登録した一覧の行。押して開く行ではないので、開閉の手がかり（指の形・ホバーの地）は出さない */
+.entry > .row-head { grid-template-columns: minmax(0, 1fr) auto; cursor: default; padding: 6px 10px; }
+.entry > .row-head:hover { background: none; outline: none; }
+.entry .text { overflow-wrap: anywhere; }
+section > .list { margin-bottom: 12px; }
+
+/* 登録の欄。欄名を左、欄を右に並べる（欄と欄名は .field が display: contents で格子に並べる） */
+.form {
+  display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 6px 12px; align-items: center;
+  padding: 10px 12px; border: 1px solid var(--vscode-panel-border); border-radius: 5px;
+  background: var(--vscode-editorWidget-background);
+}
+.form .buttons { grid-column: 2 / -1; display: flex; gap: 6px; padding-top: 4px; }
+/* 共通の骨組みが整えるのは text・search の欄だけ。数・パスワード・日付の欄も同じ見た目にする */
+input[type=number], input[type=password], input[type=date] {
+  background: var(--vscode-input-background); color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 2px;
+  min-height: 24px; padding: 2px 6px; font: inherit;
+}
+input[type=number]:focus, input[type=password]:focus, input[type=date]:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.field > input[type=date] { max-width: 200px; }
+
+/* 直前の操作の一言。何も言っていない間も場所を取らず、読み上げの場所としては残す */
+.status { margin: 8px 0 0; overflow-wrap: anywhere; }
+.status:empty { margin: 0; }
+.status.ok { color: var(--ok-text); }
+.status.error { color: var(--error-text); }
+.hint { margin: 10px 0 0; line-height: 1.6; }
+
+.links { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+a { color: var(--vscode-textLink-foreground); }
+a:hover, a:active { color: var(--vscode-textLink-activeForeground); }
+a:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+
+/* 狭い幅。欄名を欄の上に置いて 1 列にする（共通の一覧の 520px と同じ境目） */
+@media (max-width: 520px) {
+  .form { grid-template-columns: minmax(0, 1fr); gap: 2px 12px; }
+  .form .buttons { grid-column: 1 / -1; padding-top: 8px; }
+  .field > .cap { text-align: left; margin-top: 4px; }
+}

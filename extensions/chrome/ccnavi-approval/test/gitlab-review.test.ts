@@ -22,7 +22,7 @@ import * as gh from "../src/core/github.js";
 import * as gl from "../src/core/gitlab.js";
 import { dispatch, type Deps } from "../src/core/protocol.js";
 import type { PyCall } from "../src/core/py.js";
-import { renderRepo } from "../src/core/render.js";
+import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo, type RepoBoard } from "../src/core/snapshot.js";
@@ -274,7 +274,7 @@ test("CX-T172 「要確認」の親子のチケットには、そのブラウザ
   const dom = new JSDOM("<!doctype html><body></body>");
   const md = createRenderer(dom.window as unknown as Window & typeof globalThis);
   const actions = { approve: () => undefined, withdraw: () => undefined, review: () => undefined, dismiss: () => undefined };
-  const html = renderRepo(dom.window.document, md, b, actions, { attention: { i0001: "元に戻せなかった" } });
+  const html = renderBoard(dom.window.document, md, b, actions, { attention: { i0001: "元に戻せなかった" } });
   const box = html.querySelector('[data-family="i0001"]') as HTMLElement;
   assert.deepEqual([...box.querySelectorAll("button")].map((x) => (x as HTMLElement).dataset.action), ["dismiss"]);
   assert.match(box.textContent ?? "", /ほかの承認者には見えない/);

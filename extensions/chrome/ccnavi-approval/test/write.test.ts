@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 
 import type { PyCall } from "../src/core/py.js";
-import { renderRepo } from "../src/core/render.js";
+import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo, type RepoBoard } from "../src/core/snapshot.js";
@@ -174,7 +174,7 @@ test("CX-T105 互換の版が違えば承認も取り下げも書かない（7.3
   assert.equal(mock.commitCalls.length, 0);
   const dom = new JSDOM("<!doctype html><body></body>");
   const md = createRenderer(dom.window as unknown as Parameters<typeof createRenderer>[0]);
-  dom.window.document.body.append(renderRepo(dom.window.document, md, b, { approve: () => undefined, withdraw: () => undefined }));
+  renderBoard(dom.window.document, md, b, { approve: () => undefined, withdraw: () => undefined });
   assert.equal(dom.window.document.querySelectorAll("button").length, 0);
 });
 
@@ -259,7 +259,7 @@ test("CX-T111 承認の画面（ボタンのある形）でも、悪意のある
   const doc = dom.window.document;
   const md = createRenderer(dom.window as unknown as Parameters<typeof createRenderer>[0]);
   const pressed: string[] = [];
-  doc.body.append(renderRepo(doc, md, b, { approve: (_, f) => pressed.push(`approve ${f.family.name}`), withdraw: () => undefined }));
+  renderBoard(doc, md, b, { approve: (_, f) => pressed.push(`approve ${f.family.name}`), withdraw: () => undefined });
   const box = doc.querySelector('[data-family="i0002"]');
   assert.ok(box);
   assert.equal(box.querySelectorAll("script, img, svg, iframe, form, style, input").length, 0);

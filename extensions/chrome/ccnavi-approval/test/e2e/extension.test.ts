@@ -182,13 +182,19 @@ async function press(page: Page, selector: string): Promise<string> {
 test("CX-T075 ボードで承認すると、親のブランチへ 1 コミットで書き、書いた後の中身を確かめて描き直す", async () => {
   const page = await openBoard();
   const before = mock.head("i0001");
+  const proposal = mock.files("i0001")["wip/proposals/todo/i0001.md"];
   const said = await press(page, '[data-family="i0001"] button[data-action=approve]');
   assert.match(said, /^written: 承認を書いた/);
   assert.equal(mock.commitCalls.length, 1);
   const call = mock.commitCalls[0];
   assert.deepEqual([call.branch, call.expected, call.result], ["i0001", before, "written"]);
   assert.match(call.headline, /^ccnavi: i0001 を承認（Chrome 拡張 /);
-  assert.ok(mock.files("i0001")[".ccnavi/approved/doing/i0001.md"]);
+  // 承認は提案の中身を変えずに動かす（REQ-APV-05）。承認したことは状態の履歴に残す
+  const files = mock.files("i0001");
+  assert.ok(!("wip/proposals/todo/i0001.md" in files));
+  assert.equal(files[".ccnavi/approved/doing/i0001.md"], proposal);
+  const event = JSON.parse(files[".ccnavi/approved/events/i0001.ndjson"].trim().split("\n").pop() as string);
+  assert.deepEqual([event.kind, event.via, event.actor], ["approved", "chrome", LOGIN]);
   // 描き直したボード: i0001 は承認待ちから消え、作業中の承認済みチケットに出る
   assert.equal(await page.locator('[data-family="i0001"] .entry').count(), 0);
   assert.equal(await page.locator('[data-family="i0001"] .approved-item[data-ticket="i0001"]').count(), 1);
@@ -323,11 +329,17 @@ test("CX-T159 セルフホストの GitLab（足した通信先）: 登録して
   assert.ok((await review.textContent())?.includes("隠れた本文"));
 
   const before = lab.head("i0001");
+  const proposal = lab.files("i0001")["wip/proposals/todo/i0001.md"];
   const said = await press(page, `${GL_REPO} [data-family="i0001"] button[data-action=approve]`);
   assert.match(said, /^written: 承認を書いた/);
   assert.equal(lab.glCommits.length, 1);
   assert.deepEqual([lab.glCommits[0].branch, lab.glCommits[0].parent, lab.glCommits[0].result], ["i0001", before, "written"]);
-  assert.ok(lab.files("i0001")[".ccnavi/approved/doing/i0001.md"]);
+  // 承認は提案の中身を変えずに動かす（REQ-APV-05）。承認したことは状態の履歴に残す
+  const files = lab.files("i0001");
+  assert.ok(!("wip/proposals/todo/i0001.md" in files));
+  assert.equal(files[".ccnavi/approved/doing/i0001.md"], proposal);
+  const event = JSON.parse(files[".ccnavi/approved/events/i0001.ndjson"].trim().split("\n").pop() as string);
+  assert.deepEqual([event.kind, event.via], ["approved", "chrome"]);
   assert.ok(lab.calls.some((c) => c.endsWith("/personal_access_tokens/self")));
   assert.ok(!(await page.content()).includes(TOKEN));
   await page.close();

@@ -28,7 +28,7 @@ keywords: [設計, 画面, approval-machine, 見た目, ScreenHost, screenHost, 
 | ユーザが押せる操作 | `core/board-view.ts` の `BoardMessage` → 画面のボタン → `board-panel.ts` の `KNOWN`（形の確認の一覧）と `asMessage`（形の確認）と `handleMessage`（処理）。`KNOWN` か処理を書き忘れると型が合わなくなる（どちらも型で網羅を強制してある） |
 | 画面が覚えるもの | `webview/board/state.ts`（形と既定）→ `App.tsx`（読み書き）→ `test/board/board.dom.test.ts` |
 
-**画面を 1 つ足すとき、使い回せるもの。** `webviewScript` / `webviewStyle`（画面の名前で読む。拡張子は関数の側が付ける）、`poster<M>()`、`core/screen-host.ts`（`screenHost` / `retainedHost` と `embedJson`）、`webview/styles/`（`page.css`・`list.css`）、`webview/vscode.ts`・`webview/initial.ts`・`webview/appearance.ts`、テストの共通部品（`test/helpers/dom.ts`・`test/helpers/bundle.ts`）。
+**画面を 1 つ足すとき、使い回せるもの。** `webviewScript` / `webviewStyle`（画面の名前で読む。拡張子は関数の側が付ける）、`poster<M>()`、`core/screen-host.ts`（`screenHost` / `retainedHost` と `embedJson`）、共通の部品 `@ccnavi/shared`（`extensions/shared/styles/` の `button.css`・`page.css`・`list.css`。画面の style.css で `button.css`・`../styles/appearance.css`・`page.css` の順に @import する）、`webview/vscode.ts`・`webview/initial.ts`・`webview/appearance.ts`、テストの共通部品（`test/helpers/dom.ts`・`test/helpers/bundle.ts`）。
 
 画面ごとに要るのは、契約（`*-view.ts`）・入れ物を組む関数・画面の CSS（`webview/<名前>/style.css` と部品ごとの CSS）・`ready` を受けて渡し直す数行・テストの入口（`test/helpers/<名前>.ts`）と、`test/shared/style.test.ts` の `reactPages` への 1 行（足し忘れは CB-T127 が止める）。
 

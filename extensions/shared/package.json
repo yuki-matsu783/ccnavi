@@ -1,0 +1,7 @@
+{
+  "name": "@ccnavi/shared",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "VS Code 拡張（ccnavi-board）と Chrome 拡張（ccnavi-approval）で共通の部品。今は画面の CSS だけ（styles/）。読む側の esbuild がバンドルするので、配布物には含めない"
+}

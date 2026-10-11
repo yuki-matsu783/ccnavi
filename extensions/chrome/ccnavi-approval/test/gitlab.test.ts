@@ -18,7 +18,7 @@ import { JSDOM } from "jsdom";
 import * as gl from "../src/core/gitlab.js";
 import { dispatch, type Deps } from "../src/core/protocol.js";
 import type { PyCall } from "../src/core/py.js";
-import { renderRepo } from "../src/core/render.js";
+import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo, type RepoBoard } from "../src/core/snapshot.js";
@@ -360,8 +360,7 @@ test("CX-T153 GitLab のスレッドの悪意のある本文は描いても実�
   const { board } = await panelOn(reviewingOnGitLab("hostile"));
   const dom = new JSDOM("<!doctype html><body></body>", { runScripts: "outside-only" });
   const md = createRenderer(dom.window as unknown as Window & typeof globalThis);
-  const html = renderRepo(dom.window.document, md, board, { approve: () => undefined, withdraw: () => undefined, review: () => undefined });
-  dom.window.document.body.append(html);
+  const html = renderBoard(dom.window.document, md, board, { approve: () => undefined, withdraw: () => undefined, review: () => undefined });
   const box = dom.window.document.querySelector(`[data-family="${FAMILY}"] .review`) as HTMLElement;
   assert.match(box.querySelector("h4")?.textContent ?? "", /マージリクエスト !7/);
   assert.equal(box.querySelectorAll(".thread").length, 8);
@@ -474,14 +473,13 @@ test("CX-T158 ボードの「始める」の欄と「要確認」: issue の題�
     start: (_r: RepoBoard, issue: { number: number }) => void pressed.push(`start ${issue.number}`),
     dismiss: (_r: RepoBoard, family: string) => void pressed.push(`dismiss ${family}`),
   };
-  const first = renderRepo(dom.window.document, md, b, actions);
+  const first = renderBoard(dom.window.document, md, b, actions);
   (first.querySelector("[data-testid=start] button[data-action=issues]") as HTMLElement).click();
   const hostile = '<img src=x onerror="window.__pwned=\'issue\'">題';
-  const html = renderRepo(dom.window.document, md, b, actions, {
+  const html = renderBoard(dom.window.document, md, b, actions, {
     issues: { list: [{ number: 12, title: hostile, url: "javascript:window.__pwned='url'" }], error: "" },
     attention: { i0001: "元に戻せなかった", gone: "見えない親子のチケット" },
   });
-  dom.window.document.body.append(html);
   const item = html.querySelector("[data-testid=start] li[data-issue='12']") as HTMLElement;
   assert.ok(item.textContent?.includes(hostile));
   assert.equal(item.querySelectorAll("img, a").length, 0);

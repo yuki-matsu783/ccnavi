@@ -3,7 +3,7 @@
  * バンドルする（`scripts/bundle-webview.js`）と画面 1 つにつき 1 本になり、拡張がそれを `<style nonce>` に
  * 流し込む。
  *
- * ここで見るのは 3 つ。骨組み（`styles/page.css`）が 5 画面とも 1 か所から来ていること、
+ * ここで見るのは 3 つ。骨組み（共通の部品 `extensions/shared/styles/page.css`）が 5 画面とも 1 か所から来ていること、
  * ハイコントラストのテーマ向けの書き方が残っていること、そして置いた CSS がバンドルから漏れて
  * いないこと（`@import` を書き忘れると、見た目だけが気づかないうちに抜ける）。
  */
@@ -46,6 +46,9 @@ function board(): string {
 function rulesOnly(): string {
   return reactPages()[4][1];
 }
+
+/** 共通の部品（`@ccnavi/shared`）の CSS の置き場。骨組み・ボタン・一覧はここにあり、各画面の style.css が読む */
+const SHARED_STYLES = path.join(WEBVIEW_SRC, "..", "..", "..", "..", "shared", "styles");
 
 /** `src/webview/` の下の CSS 全部（リポジトリのルートからのパス） */
 function cssFiles(dir: string = WEBVIEW_SRC): string[] {
@@ -247,9 +250,16 @@ test("CB-T290 意味の色を文字に使うときは前景色へ混ぜ、Light 
     }
   }
   // ボード以外の画面の CSS は、意味の色を文字の色に直接使わない（枠・縁・記号には使ってよい）。
-  // ボード（board/）と配色（appearance.css）・ボタン（button.css）はここでは見ない
-  const skip = new Set([path.join(WEBVIEW_SRC, "styles", "appearance.css"), path.join(WEBVIEW_SRC, "styles", "button.css")]);
-  for (const file of cssFiles().filter((f) => !f.startsWith(path.join(WEBVIEW_SRC, "board")) && !skip.has(f))) {
+  // ボード（board/）と配色（appearance.css）・ボタン（共通の部品の button.css）はここでは見ない。
+  // 共通の部品の CSS（骨組み・一覧）も見る。Chrome 拡張向けの変数の定義（browser-theme.css）は配色なので外す
+  const skip = new Set([
+    path.join(WEBVIEW_SRC, "styles", "appearance.css"),
+    path.join(SHARED_STYLES, "button.css"),
+    path.join(SHARED_STYLES, "browser-theme.css"),
+  ]);
+  const files = [...cssFiles(), ...cssFiles(SHARED_STYLES)];
+  assert.ok(files.includes(path.join(SHARED_STYLES, "page.css")), `共通の部品の CSS が見つからない: ${SHARED_STYLES}`);
+  for (const file of files.filter((f) => !f.startsWith(path.join(WEBVIEW_SRC, "board")) && !skip.has(f))) {
     const text = fs.readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
     assert.doesNotMatch(text, /(?:^|[\s;{])color: var\(--vscode-(?:editorWarning-foreground|editorInfo-foreground|editorError-foreground|charts-green|charts-yellow)/m, file);
   }

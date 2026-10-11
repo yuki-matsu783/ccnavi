@@ -1,0 +1,16 @@
+/*
+ * 消毒した Markdown の本文（`Markdown.tsx`）。チケットとレビューのスレッドの本文。
+ * 見出しはボードの見出し（欄・親子のチケット）より大きくしない。長い語とコードは折り返して、欄の幅に収める。
+ */
+.markdown { overflow-wrap: anywhere; }
+.markdown :is(h1, h2, h3, h4, h5, h6) { margin: 10px 0 4px; font-size: 1em; }
+.markdown h1 { font-size: 1.15em; }
+.markdown h2 { font-size: 1.05em; }
+.markdown p, .markdown ul, .markdown ol { margin: 4px 0; }
+.markdown ul, .markdown ol { padding-left: 20px; }
+.markdown pre, .markdown code { background: var(--vscode-textCodeBlock-background); border-radius: 3px; }
+.markdown code { padding: 0 3px; }
+.markdown pre { padding: 6px 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.markdown pre code { padding: 0; }
+/* 親子のチケットの欄（`.family`）の地はコードの地と同じ色なので、欄の中では本文の地に替えて見分けられるようにする */
+.family .markdown pre, .family .markdown code { background: var(--vscode-editor-background); }

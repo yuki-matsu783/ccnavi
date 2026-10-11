@@ -5,7 +5,9 @@
 // 1. 型を見る（画面・Worker・service worker は tsconfig.json、Node で回す部品は tsconfig.node.json）
 // 2. 通信先の一覧（既定 hosts.json）から manifest.json を組む。`host_permissions` と CSP の
 //    `connect-src` は一覧の API のオリジンだけ。組織ごとのビルドは --hosts で一覧を替える
-// 3. esbuild で 4 本（background・board・options・worker）をバンドルする
+// 3. esbuild で 4 本（background・board・options・worker）をバンドルする。ボード（board）と設定画面（options）は React。
+//    CSS は入口の src/options/style.css と src/board/style.css から options.css と board.css を組む
+//    （共通の部品 @ccnavi/shared の CSS を読む）
 // 4. 同梱の Pyodide を node_modules からコピーし、scripts/pyodide-files.json のハッシュと突き合わせる
 //    （npm の lockfile の integrity とは別に、コピーした物そのものを確かめる）
 // 5. 同梱の Python（PyYAML・ccnavi・入口）を zip に組む（scripts/python.js）
@@ -67,8 +69,8 @@ export async function build({ hostsFile = path.join(HERE, "hosts.json"), out = p
   await esbuild.build({
     entryPoints: {
       background: "src/background/main.ts",
-      board: "src/board/main.ts",
-      options: "src/options/main.ts",
+      board: "src/board/main.tsx",
+      options: "src/options/main.tsx",
       worker: "src/worker/main.ts",
     },
     absWorkingDir: HERE,
@@ -79,7 +81,23 @@ export async function build({ hostsFile = path.join(HERE, "hosts.json"), out = p
     minify: true,
     legalComments: "linked",
     external: ["./pyodide/pyodide.mjs"],
-    define: { __CCNAVI_HOSTS__: JSON.stringify(hosts), __CCNAVI_VERSION__: JSON.stringify(version), __CCNAVI_COMPAT__: JSON.stringify(compat) },
+    jsx: "automatic",
+    define: {
+      __CCNAVI_HOSTS__: JSON.stringify(hosts),
+      __CCNAVI_VERSION__: JSON.stringify(version),
+      __CCNAVI_COMPAT__: JSON.stringify(compat),
+      // React の開発用の検査（開発者向けの警告と遅い経路）を外す
+      "process.env.NODE_ENV": '"production"',
+    },
+    logLevel: "warning",
+  });
+  // CSS は JS の入口から import させず、別に組む（VS Code 拡張の scripts/bundle-webview.js と同じ分け方）
+  await esbuild.build({
+    entryPoints: { options: "src/options/style.css", board: "src/board/style.css" },
+    absWorkingDir: HERE,
+    outdir: out,
+    bundle: true,
+    minify: true,
     logLevel: "warning",
   });
   for (const name of fs.readdirSync(path.join(HERE, "static"))) {
