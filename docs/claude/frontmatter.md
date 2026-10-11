@@ -3,7 +3,7 @@ title: md の frontmatter の決まり
 type: guide
 description: mdの頭に付けるfrontmatterのキーとtypeの値。ccnavi --docsはこれを索引にして検索する
 tags: [frontmatter, docs-search]
-keywords: [frontmatter, type, tags, keywords, index.jsonl, ccnavi --docs, 索引, 検索, タグ, kebab-case]
+keywords: [frontmatter, type, tags, keywords, ccnavi-index.jsonl, ccnavi --docs, 索引, 検索, タグ, kebab-case]
 ---
 
 # md の frontmatter の決まり
@@ -84,18 +84,22 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 
 `projects/<名前>/`のmdも同じ決まりで書く。`ccnavi --docs`はワークスペースとプロジェクトをまとめて検索し、プロジェクトのmdは
 `projects/<名前>/…`のパスで表示する。`docs/spec/`のような、プロジェクト固有の置き場にある文書には、上の表で近い値を使うか、表に行を足す。
-索引に載るのは、そのリポジトリの`.gitignore`に`**/index.jsonl`があるプロジェクトだけ。無いプロジェクトは、SessionStartの
-案内に名前が出る。`.gitignore`への追記は、そのプロジェクトのチケットの中で行う。ccnaviはプロジェクトの`.gitignore`を書き換えず、
-導入スクリプト`scripts/ccnavi-setup.sh`が追記するのもワークスペースの`.gitignore`だけ。
+プロジェクトの`.gitignore`に`**/ccnavi-index.jsonl`が無ければ、ccnaviが索引を書く前にその1行を追記する（ファイルが無ければ作る）。
+追記するのは1行だけで、既存の行は変えない。追記したプロジェクトは、SessionStartの案内とstderrに名前が出る。
+`.gitignore`が未コミットの差分として残るので、そのプロジェクトのチケットの中でコミットする。
+ユーザが`!`で`ccnavi-index.jsonl`を否定している（索引を追跡している）プロジェクトには追記せず、索引の対象外として案内に名前を出す。
+追記に失敗したときも、対象外として案内する。導入スクリプト`scripts/ccnavi-setup.sh`が追記するのはワークスペースの`.gitignore`だけ
 
 ## 索引のファイル
 
-- `index.jsonl`はmdのあるディレクトリごとにccnaviが書く生成物。手で直さない。同じ名前のファイルを別のツールが
-  使っている場合、ccnaviはそのファイルを上書きせず、案内にそのパスを出す
+- `ccnavi-index.jsonl`はmdのあるディレクトリごとにccnaviが書く生成物。手で直さない。ccnaviの形でないファイルを同じ名前で
+  置かれている場合、ccnaviはそのファイルを上書きせず、案内にそのパスを出す
+- 以前の名前は`index.jsonl`だった。新しい名前の索引を書くとき、同じディレクトリにccnaviが書いた形の`index.jsonl`があれば消す。
+  ほかのツールの`index.jsonl`と、gitで追跡しているものは触らない
 - 初回の実行（`--docs`かSessionStart）ではmdをすべて読むので、mdが数千本あると数秒かかる。SessionStartでは短い制限時間で
   打ち切り、読めた分だけを索引に書いて、残りは次回に回す。2回目からは、更新日時が変わったmdだけを読む
-- mdを消しても`index.jsonl`が残ることがある。gitで追跡していないmdしか無いディレクトリや、ディレクトリごと消したときなどである。
-  残った`index.jsonl`は読まれないので、結果は変わらない。気になるなら消してよい。gitの無視対象なので差分は出ない
+- mdを消しても`ccnavi-index.jsonl`が残ることがある。gitで追跡していないmdしか無いディレクトリや、ディレクトリごと消したときなどである。
+  残った`ccnavi-index.jsonl`は読まれないので、結果は変わらない。気になるなら消してよい。gitの無視対象なので差分は出ない
 
 ## 対象外
 
