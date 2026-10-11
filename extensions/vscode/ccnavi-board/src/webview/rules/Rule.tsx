@@ -105,6 +105,11 @@ export function Rule(props: RuleProps): JSX.Element {
           <span className="clip" title={rule.pattern === "" ? "" : `${rule.kind} ${rule.pattern}`}>
             {rule.pattern === "" ? <span className="dim">（{rule.kind} 未設定）</span> : <code>{rule.pattern}</code>}
             {summaryNote(section, rule) !== "" && <span className="sum-note">{summaryNote(section, rule)}</span>}
+            {rule.excepts !== undefined && rule.excepts.length > 0 && (
+              <span className="sum-note sum-except" title={`except: ${rule.excepts.join(" / ")}`}>
+                除外 {rule.excepts.length}
+              </span>
+            )}
           </span>
           {/* 刻みは折りたたんだままでも見える。見えないと「毎回渡る」と思ったまま渡す文を直すことになる */}
           {rule.every === "" ? (
@@ -144,6 +149,19 @@ export function Rule(props: RuleProps): JSX.Element {
             {text("pattern", "f-pattern pattern", rule.kind === "glob" ? "*git push*" : "\\bgit push\\b")}
           </div>
         </Captioned>
+        {/* 除くもの（except）は見せるだけ。書き戻しは元のノードのままなので、消えも変わりもしない */}
+        {rule.excepts !== undefined && rule.excepts.length > 0 && (
+          <Captioned name="除外" yamlKey="except">
+            <div className="f-except">
+              {rule.excepts.map((item, i) => (
+                <div key={i}>
+                  <code>{item}</code>
+                </div>
+              ))}
+              <span className="dim">パターンに当たっても、これに当たれば当たらない扱い。画面では編集しません。ルールファイルで直してください</span>
+            </div>
+          </Captioned>
+        )}
         {section === "deny" ? (
           <Captioned name="メッセージ" yamlKey="message">
             {area("message", "f-message", "なぜ拒否するかと、代わりに何をすればよいか（拒否されたモデルに届く）")}

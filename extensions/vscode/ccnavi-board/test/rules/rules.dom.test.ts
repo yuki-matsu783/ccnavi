@@ -764,3 +764,27 @@ test("CB-T312 ルールのファイルが無いのは正常で、不備の帯は
     await dom.close();
   }
 });
+
+test("CB-D98 except は畳んだ行に件数、開いた行に中身を見せる", async () => {
+  const text = `version: 1
+deny:
+  - id: workspace-root
+    match: Write
+    regex: '^{root}[\\\\/]'
+    except:
+      - regex: '^{root}[\\\\/]wip[\\\\/]scratchpad(?:[\\\\/]|$)'
+      - glob: '{root}/.claude/worktrees/*'
+    message: main では編集しない
+`;
+  const dom = await openRules({ model: readRules(text).model });
+  try {
+    const row = rowSelector("workspace-root");
+    assert.equal(dom.one(`${row} .sum-except`).textContent, "除外 2");
+    dom.click(dom.one(`${row} .row-head`));
+    await dom.settle();
+    const shown = dom.all(`${row} .f-except code`).map((el) => el.textContent);
+    assert.deepEqual(shown, ["regex: ^{root}[\\\\/]wip[\\\\/]scratchpad(?:[\\\\/]|$)", "glob: {root}/.claude/worktrees/*"]);
+  } finally {
+    await dom.close();
+  }
+});

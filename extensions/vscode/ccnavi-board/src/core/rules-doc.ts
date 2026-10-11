@@ -81,6 +81,29 @@ function formOf(section: Section, index: number, map: YAMLMap): RuleForm {
     additionalContextFile: scalarText(map, "additionalContextFile"),
     additionalContextOnceFile: scalarText(map, "additionalContextOnceFile"),
     every: scalarText(map, "every"),
+    ...exceptsOf(map),
+  };
+}
+
+/**
+ * `except:` の各パターンを、見せる形（`glob: …` / `regex: …`）にする。書いていなければ欄ごと省く。
+ * 形の誤り（マッピングでない要素など）もそのまま文字にして見せる。止めるのは保存前の `--lint`。
+ */
+function exceptsOf(map: YAMLMap): { excepts?: readonly string[] } {
+  const seq = map.get("except", true);
+  if (seq === undefined || seq === null) {
+    return {};
+  }
+  if (!isSeq(seq)) {
+    return { excepts: [String(map.get("except"))] };
+  }
+  return {
+    excepts: seq.items.map((item) => {
+      if (!isMap(item)) {
+        return String(item);
+      }
+      return item.items.map((pair) => `${String((pair.key as Scalar).value)}: ${String((pair.value as Scalar | null)?.value ?? "")}`).join(", ");
+    }),
   };
 }
 
@@ -230,7 +253,10 @@ function restoreBlocks(output: string, placed: readonly YAMLMap[], keeps: readon
   return result;
 }
 
-/** 欄を順に書く。変わっていない欄は触らず、元の書き方（引用符・折り返し）を残す */
+/**
+ * 欄を順に書く。変わっていない欄は触らず、元の書き方（引用符・折り返し）を残す。
+ * `except:` は画面で編集しないので書かない。元のノードを使い回すので、書いてあればそのまま残る。
+ */
 function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
   setText(doc, node, "id", form.id, Scalar.PLAIN);
   setText(doc, node, "match", form.match, Scalar.PLAIN);
@@ -370,6 +396,7 @@ function asForm(raw: unknown): RuleForm | undefined {
     return undefined;
   }
   const text = (v: unknown) => (typeof v === "string" ? v : "");
+  const excepts = Array.isArray(r.excepts) ? r.excepts.filter((v): v is string => typeof v === "string") : undefined;
   return {
     origin: parsedOrigin,
     id: text(r.id),
@@ -382,5 +409,6 @@ function asForm(raw: unknown): RuleForm | undefined {
     additionalContextFile: text(r.additionalContextFile),
     additionalContextOnceFile: text(r.additionalContextOnceFile),
     every: text(r.every),
+    ...(excepts === undefined ? {} : { excepts }),
   };
 }
