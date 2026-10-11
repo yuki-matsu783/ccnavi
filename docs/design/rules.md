@@ -158,12 +158,26 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 
 | 操作 | 既定での扱い |
 |---|---|
-| `rm -rf`、`git push`、`git reset --hard` | 止める |
+| `rm -rf`、`git push`、`git reset --hard` | 止める。表記違いも止める（下） |
+| 生の git（チケット制御が有効で、ワークスペースルートに `ccnavi-git.sh` があるとき） | 止める（`builtin-ticket-raw-git`。9.1） |
 | 認証情報の置き場（`.env`、`.ssh/`、`id_rsa`、`.netrc`、`.npmrc` など）への `Bash` `Read` `Write` `Edit` | 止める |
 | シェルから `.claude/hooks/` `.claude/settings*.json`、ccnavi ディレクトリ `.ccnavi`、`logs/decisions.jsonl` `logs/state` `logs/archive`、`ccnavi-git.sh` へ書き込む形 | 止める（書き込みの形と場所の組で見る。8.2） |
 | `Read`（認証情報の置き場を除く。強いタイプが先に当たる） | 通す |
 | `Write` / `Edit` でルールファイルを直す | 既定では止めない。権限モードに委ねる |
 | それ以外 | 権限モードに委ねる |
+
+取り返しの付かない操作の 3 本（`builtin-recursive-delete`・`builtin-git-push`・`builtin-git-reset-hard`）は、既定のときに限らず
+常に当たる土台の deny で、glob の文字列一致ではなく regex で書く。glob（`*rm -rf *`・`*git push*`）は表記違いに外れるため。
+
+- git は、サブコマンドの前に挟むグローバルオプション（`-C <path>`・`-c <k=v>`・`--git-dir[=]<dir>`・`--work-tree[=]<dir>`・`--no-pager` など）を
+  読み飛ばしてから `push` / `reset` を見る。`reset` は後ろのどこかに `--hard`（略した `--har` も）があれば止める。`legit push` のような語と、
+  `git commit -m push` のように値の位置にある語は当てない
+- rm は、再帰（`-r` `-R` `--recursive`）と強制（`-f` `--force`）の組を、まとめた形（`-rf` `-fr` `-Rfv`）・分けた形（`-r -f`）・順序・
+  長い形（略した形も）を問わずに止める。片方だけ（`rm -r`・`rm -f`）は当てない。語を「再帰でも強制でもない語」などに分けて読み、
+  先読みを使わずに後戻りを語の数に比例する範囲に抑える。共通レイヤーの見本の `recursive-delete` も同じ式
+
+生の git の 1 本（`builtin-ticket-raw-git`）は、ルールファイルが読めずに既定を使っている間も足す。ラッパーはルールファイルを読まずに動き、
+衝突の解決に要る `add`・`restore --ours` / `--theirs`・`merge-file -p` を通すので、直す道は残る（REQ-PRE-06）。
 
 既定にはプロジェクトの `allow` が無いので、読み取り以外はほぼ確認になる。
 自身のレイヤーかプロジェクトのレイヤーが読めないときは、既定を使わない。そのレイヤーを空として扱い、Bash の和からも
