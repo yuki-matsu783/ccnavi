@@ -24,9 +24,9 @@ def run(root, payload, mode="enable"):
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
     environment.pop("CLAUDE_PROJECT_DIR", None)
-    log = os.path.join(root, "decisions.jsonl")
+    log = os.path.join(root, "logs", "decisions.jsonl")
     result = run_ccnavi(
-        ["--root", root, "--log", log, "--mode", mode],
+        ["--root", root, "--mode", mode],
         input=json.dumps(payload),
         cwd=ROOT,
         env=environment,
