@@ -210,6 +210,13 @@ def _issue_number(raw) -> int | None:
     return number if number > 0 else None
 
 
+def _mr_number(raw) -> int | None:
+    """MR の番号。`12`・`"!12"`・`"#12"` を読む。読めなければ None。"""
+    if isinstance(raw, str):
+        raw = raw.strip().lstrip("!#").strip()
+    return _issue_number(raw)
+
+
 def load(path: str) -> tuple[ticket_model.Ticket | None, list[Problem]]:
     """チケットを読んで組み立てる。無いことは不備ではない。"""
     try:
@@ -383,6 +390,24 @@ def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Pro
         else:
             ticket.issue = number
             ticket.issue_repo = repo
+
+    raw_mr = front.get("mr")
+    if raw_mr is not None and raw_mr != "":
+        mr_number = _mr_number(raw_mr)
+        if mr_number is None:
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    name,
+                    "`mr` はマージリクエストの番号（正の整数）で書く。`!12`・`#12` も可。"
+                    "同じリポジトリのものだけ（`owner/repo` 形式は書けない）",
+                )
+            )
+            return True
+        if ticket.is_child:
+            problems.append(Problem(SEVERITY_WARN, name, "`mr` は親だけの欄。子では読まない"))
+        else:
+            ticket.mr = mr_number
 
     raw_branch = front.get(ticket_ids.BRANCH_KEY)
     if raw_branch is not None:

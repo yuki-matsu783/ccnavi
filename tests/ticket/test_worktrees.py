@@ -393,3 +393,53 @@ class DropTest(PhaseHarness):
                 refused = self.drop(name)
                 self.assertNotEqual(refused.returncode, 0)
         self.assertTrue(os.path.isdir(os.path.join(self.root, ".claude", "worktrees")))
+
+
+class RemainingTest(PhaseHarness):
+    """`worktree remaining <親>`。ready の後に残った親子のワークツリーを、消さずに一覧にする。"""
+
+    def setUp(self):
+        super().setUp()
+        self.propose("i0001", parent_without_plan("i0001"))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+
+    def remaining(self):
+        return self.ccnavi("--cwd", self.root, "worktree", "remaining", "i0001")
+
+    def test_says_nothing_when_nothing_is_left(self):
+        listed = self.remaining()
+        self.assertEqual(listed.returncode, 0, listed.stdout + listed.stderr)
+        self.assertEqual(listed.stdout, "")
+
+    def test_lists_a_worktree_named_differently_that_holds_the_parents_tickets(self):
+        tree = self.worktree("work-a", "i0001")
+        write(os.path.join(tree, "wip", "scratchpad", "memo.md"), "メモ\n")
+        listed = self.remaining()
+        self.assertEqual(listed.returncode, 0, listed.stdout + listed.stderr)
+        self.assertIn("- work-a（", listed.stdout)
+        self.assertIn("名前が親 i0001 と違う", listed.stdout)
+        self.assertIn("未保存の下書きがある（wip/scratchpad/）", listed.stdout)
+        self.assertIn("消す前に確かめること", listed.stdout)
+        self.assertIn("ccnavi-clean.sh --worktree work-a", listed.stdout)
+        # 出すだけで消さない
+        self.assertTrue(os.path.exists(os.path.join(tree, "wip", "scratchpad", "memo.md")))
+
+    def test_lists_a_closed_child_kept_for_an_unsaved_draft_and_not_a_clean_one(self):
+        for name in ("i0001-01-01", "i0001-01-02"):
+            self.propose(name, child_text(name, "i0001", 1, ["src/*"], review=False))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        dirty = self.run_child("i0001-01-01", [("src/a.py", "x = 1\n")])
+        clean = self.run_child("i0001-01-02", [("src/b.py", "y = 1\n")])
+        for name in ("i0001-01-01", "i0001-01-02"):
+            self.assertEqual(self.close_child(name).returncode, 0)
+        write(os.path.join(dirty, "wip", "scratchpad", "memo.md"), "メモ\n")
+        listed = self.remaining()
+        self.assertEqual(listed.returncode, 0, listed.stdout + listed.stderr)
+        self.assertIn("- i0001-01-01（", listed.stdout)
+        self.assertIn("未保存の下書きがある（wip/scratchpad/）", listed.stdout)
+        self.assertIn("ccnavi-clean.sh --worktree i0001-01-01", listed.stdout)
+        self.assertNotIn("i0001-01-02", listed.stdout)
+        self.assertTrue(os.path.isdir(clean))
+        self.assertTrue(os.path.exists(os.path.join(dirty, "wip", "scratchpad", "memo.md")))

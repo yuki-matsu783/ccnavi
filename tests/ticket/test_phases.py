@@ -24,7 +24,7 @@ import tempfile
 import unittest
 
 from ccnavi.tickets import history
-from tests import common_path, config_path
+from tests import can_case_sensitive, common_path, config_path
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import ROOT, git, read_json, write
 from tests.ticketsample import PHASES, RULES, child_text, parent_text
@@ -908,6 +908,8 @@ class PhaseTest(PhaseHarness):
     def test_c1_lets_ready_remove_wip_in_any_case_but_nothing_else(self):
         """C1 の置き場の外の検査は、ready が消す wip/ の判定（大文字小文字と \\ を問わない）と
         同じ判定で、消したものだけを通す。"""
+        if not can_case_sensitive():
+            self.skipTest("大文字小文字を区別しないファイルシステムでは大文字違いを並べられない")
         fixture = self.closed_family()
         odd = ["WIP/eli5/a.html", "wip\\eli5\\b.html"]
         for rel in odd:

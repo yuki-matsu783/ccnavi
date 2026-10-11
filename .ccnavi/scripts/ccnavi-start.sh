@@ -556,6 +556,13 @@ report() {
 	printf 'ワークツリー: %s\n' "$wt"
 	printf 'ブランチ: %s\n' "$1"
 	printf 'MR: %s\n' "${2:--}"
+	report_mr_number=${2##*/}
+	case "$report_mr_number" in
+	'' | *[!0-9]*) ;;
+	*)
+		printf '案内: 提案の frontmatter に mr: %s を書く（この MR の番号。書くと、この MR の番号を含む依頼が、すでにあるチケットに結び付くと分かる）\n' "$report_mr_number"
+		;;
+	esac
 	if [ -n "$switched" ]; then
 		printf '案内: 名前に / を含むブランチなので、識別子 %s のブランチで切ってから switch で %s へ移した。識別子のブランチは手元に残る（要らなければユーザが消す）\n' "$(printf '%s' "$1" | tr '/' '-')" "$1"
 	fi

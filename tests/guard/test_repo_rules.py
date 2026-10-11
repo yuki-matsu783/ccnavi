@@ -116,6 +116,23 @@ class RepoRulesTest(unittest.TestCase):
             with self.subTest(subject=subject):
                 self.assert_verdict(subject, "allow", "prefer-read-grep")
 
+    def test_worktree_add_は通して_fetch_の案内を添える(self):
+        # 止めない。遅れの判定で止めるのは ccnavi-git.sh の中（hook はネットワークに出ない）。
+        body = self.assert_verdict(
+            "sh /repo/.ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/y -b y main",
+            "allow",
+            "ccnavi-git-worktree-add",
+        )
+        self.assertIn("fetch origin", body["response"])
+        self.assertIn("ワークツリーの作り方", body["response"])
+        # ほかのサブコマンドには添えない。
+        self.assertNotIn(
+            "ccnavi-git-worktree-add",
+            hit(
+                judge("Bash", "sh /repo/.ccnavi/scripts/ccnavi-git.sh worktree list"),
+            ),
+        )
+
     def test_引用付きの_find_は_allow_に当たる(self):
         self.assert_verdict('find /repo -name "a b"', "allow", "prefer-glob")
 

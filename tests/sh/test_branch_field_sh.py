@@ -125,6 +125,8 @@ class BranchFieldTest(unittest.TestCase):
         self.tree = os.path.join(self.ws, ".claude", "worktrees", PARENT)
         # ユーザが既に作って送ってあるブランチ（`/` を含む）。
         self.remote_commit("src/login.py", "print('login')\n", branch=BRANCH, start="main")
+        # worktree add は、統合先から切るとき最後の fetch が新しいことを求める。
+        git(self.ws, "fetch", "-q", "origin")
 
     # ---- 道具
 

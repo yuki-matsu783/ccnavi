@@ -57,6 +57,7 @@ from . import (
     phase,
     phase_forms,
     review_host,
+    ticket_fields,
     ticket_model,
     ticket_places,
 )
@@ -230,12 +231,45 @@ def requested(
         fsio.remove(
             os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
         )
+    _note_mr(stderr, root, conf, parent, result.mr.number)
     done = "依頼し直した" if again else "依頼した"
     stdout.write(
         f"OK: レビューを{done}（{result.mr.url or result.url}）。"
         f"{phase_forms.TURN_DEFINED}を終えてユーザを待ってください\n"
     )
     return 0
+
+
+def _note_mr(
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    parent: ticket_model.Ticket,
+    number: int,
+) -> None:
+    """親の承認済みチケットの `mr:` が空なら、この MR の番号を書き足す。
+
+    書くのは空のときだけ。同じ値なら何もせず、違う値なら上書きせず警告する。
+    書き足しは失敗してもレビューの依頼を止めない（マーカーは置けている）。
+    書いたパスは `fsio` が記録するので、C1 のコミットに入る。
+    """
+    path = approval.copy_path(
+        approval.home_dir(conf, root, parent.ticket, "", project=parent.project), parent.ticket
+    )
+    failed, result = approval_ops.note_mr(path, number)
+    if failed:
+        stderr.write(
+            f"ccnavi: 警告: {parent.ticket} の `mr:` に MR !{number} を書けない: {failed}\n"
+        )
+    elif result == ticket_fields.MR_SET:
+        stderr.write(f"ccnavi: {parent.ticket} の `mr:` に MR !{number} を書き足した\n")
+    elif result == ticket_fields.MR_DIFFERS:
+        stderr.write(
+            f"ccnavi: 警告: {parent.ticket} の `mr:` に別の値が既にある。上書きしない。"
+            f"今回のレビューの MR は !{number}。値が合っているか、ユーザが確かめてください\n"
+        )
+    elif result == ticket_fields.MR_UNREADABLE:
+        stderr.write(f"ccnavi: 警告: {parent.ticket} の frontmatter を読めず、`mr:` を書けない\n")
 
 
 def reviewed_mark(

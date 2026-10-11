@@ -19,6 +19,7 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
 version: 1
 ticket: feature-50-settings-split-02-01
 issue: 50                # 親だけ。マージリクエストの Closes に写す。省ける
+mr: 12                   # 親だけ。仕事を載せる MR の番号（同じリポジトリ）。省ける。依頼文の MR の番号をこのチケットに結び付ける
 branch: feature/50-settings  # 親だけ。識別子と違う親のブランチ名。省けば識別子
 project: lib             # 置き場と同じ名前。省ける（決めるのは置き場。11）
 parent: feature-50-settings-split  # 子だけ
@@ -100,6 +101,15 @@ base_sha: ""
   子に `phases:` は書けない（error。子は `phase:` で番号を指す）（9.7）
 - `started_at` `completed_at` `base_sha` `cancelled_at` `cancel_reason` はスクリプトの欄。スクリプトが
   承認済みチケットの行を書き換える（本文とユーザの書いた行は保つ）
+- `mr` は親の任意の欄で、仕事を載せるマージリクエストの番号（正の整数。`"!12"`・`"#12"` も可）。同じリポジトリのものだけで、
+  `owner/repo` の形や 0・数でないものは error、子に書くと warn で無視する。`issue` と並べて検索に使い、
+  UserPromptSubmit の hook（`branchfind`）が依頼文の MR の番号を「すでにあるチケットに結び付く」と判定する
+  （提案も承認済みも対象。`branch:` が `mr-N` の形の慣習名による結び付きは併用）。書くのは (1) 提案者
+  （`ccnavi-start.sh --issue N` が Draft MR を作ると、出力が「提案の frontmatter に `mr: <番号>` を書く」と案内する）、
+  (2) 承認のあとの `review request` が MR を作ったとき、ccnavi が親の承認済みチケットの **空の `mr:` にだけ**
+  書き足す。同じ値なら何もせず、違う値が既にあれば上書きせず警告する。スクリプトだけが書く欄（`SCRIPT_FIELDS`）では
+  ないので、提案に書いてよく、承認はそのまま写す。改版の不変検査は、承認済みと改版の両方に値があって違うときだけ error
+  （書き足しの後に、書き足す前の写しで改版しても弾かない）
 - フロー（次の節）はチケットの欄では指さない。欄 `flow` は廃止。書いてあっても読まない（warn も出さない）
 
 #### 9.3.1 子のフロー

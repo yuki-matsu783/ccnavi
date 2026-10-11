@@ -79,6 +79,24 @@ def update_fields(path: str, fields: dict) -> str:
     return approval_marks.write_ticket(path, ticket_fields.set_fields(text, fields))
 
 
+def note_mr(path: str, number: int) -> tuple[str, str]:
+    """承認済みチケットの `mr:` が空のときだけ番号を書き足す。答えは (失敗の理由か空, 結果)。
+
+    結果は `ticket_fields.MR_SET`（書いた）・`MR_SAME`（同じ値が既にあった。何もしない）・
+    `MR_DIFFERS`（違う値が既にあった。書かない）・`MR_UNREADABLE`（frontmatter を読めない）。
+    書くのは欄の 1 行だけで、ユーザの書いたコメントや本文は保つ。
+    """
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    except OSError as exc:
+        return f"読めない ({exc})", ""
+    new, result = ticket_fields.set_mr(text, number)
+    if result != ticket_fields.MR_SET:
+        return "", result
+    return approval_marks.write_ticket(path, new), result
+
+
 def close_copy(approved_dir: str, ticket_id: str) -> str:
     """承認済みチケットを `doing/` から `done/` へ動かす。"""
     return move_file(

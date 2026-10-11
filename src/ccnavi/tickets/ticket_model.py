@@ -180,6 +180,12 @@ class Ticket:
     # issue_repo は、課題が別のリポジトリにあるときのその表記（`issue: owner/repo#N` の
     # `owner/repo`）。同じリポジトリの課題なら空。識別子は issue から決めずユーザが付ける。
     issue_repo: str = ""
+    # mr はこの親の仕事を載せるマージリクエストの番号（同じリポジトリのもの）。
+    # 親だけが持つ任意の欄。提案者が書くか、`review request` が MR を作った後に
+    # 空のときだけ ccnavi が書き足す（`ticket_fields.set_mr`）。UserPromptSubmit が、
+    # 依頼文の MR の番号を「すでにあるチケットに結び付く」と判定するのに使う（`branchfind`）。
+    # スクリプトだけが書く欄（SCRIPT_FIELDS）ではない。
+    mr: int | None = None
     # branch は親のブランチ名。親だけが持つ任意の欄で、無ければ親のブランチ名は
     # 識別子そのもの。識別子・ファイル名・ワークツリー名は `/` を含まないまま、`feature/123-login`
     # のような既存のブランチで作業するために使う。承認画面に出し、承認のダイジェストに入る

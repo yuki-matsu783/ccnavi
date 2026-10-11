@@ -188,7 +188,9 @@ def decide_at_prompt(
         functools.partial(skillsync.is_synced_write, conf, root),
         root,
     )
-    hint = branchfind.prompt_context(conf, root, payload.prompt)
+    hint = branchfind.prompt_context(
+        conf, root, payload.prompt, payload.cwd, payload.session_id, stderr
+    )
     # バックグラウンドのサブエージェントが範囲を確かめられないまま終わり、そのあと親が
     # ツールを使わずにターンを終えたなら、印はここまで残っている。次の依頼の前に言う。
     unchecked = subagent.unchecked_scope(conf.state, payload) if conf.tickets_enabled else ""

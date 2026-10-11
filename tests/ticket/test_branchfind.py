@@ -26,12 +26,17 @@ def with_branch(text, branch):
     return "\n".join([*head, f"branch: {branch}", rest])
 
 
+def with_mr(text, mr):
+    head, rest = text.split("\n", 3)[:3], text.split("\n", 3)[3]
+    return "\n".join([*head, f"mr: {mr}", rest])
+
+
 class PromptHintTest(PhaseHarness):
-    def prompt(self, text, *extra):
+    def prompt(self, text, *extra, session="s1"):
         payload = {
             "hook_event_name": "UserPromptSubmit",
             "cwd": self.parent_tree,
-            "session_id": "s1",
+            "session_id": session,
             "prompt": text,
         }
         result = self.ccnavi("--mode", "enable", *extra, stdin=json.dumps(payload))
@@ -60,6 +65,99 @@ class PromptHintTest(PhaseHarness):
         self.assertIn("MCP で代行し、同じコマンドを打ち直す", said)
         self.assertIn("終了コード 1・2 なら、出力の理由をユーザに伝える", said)
         self.assertNotIn("ccnavi-branches.sh", said)
+
+    def test_a_ccnavi_notice_is_not_a_reference(self):
+        notice = "[ccnavi] 取り込み済み: https://example.com/acme/widgets/pull/296 を閉じた\n"
+        self.assertEqual(self.prompt(notice), "")
+        # 通知の外にも指定があるときは、外の分だけ拾う
+        said = self.prompt(notice + "\n#10 を直して", session="s2")
+        sh = settings.script_command(self.root, "ccnavi-start.sh")
+        self.assertIn(f"'{sh} --issue 10'", said)
+        self.assertNotIn("296", said)
+
+    def test_pasted_content_and_other_session_messages_are_not_references(self):
+        self.assertEqual(self.prompt("<pasted_content>ログ #10 と MR !7</pasted_content>"), "")
+        self.assertEqual(self.prompt("<system-reminder>issue 11</system-reminder>"), "")
+        self.assertEqual(
+            self.prompt("Another Claude session sent a message:\nPR #12 を出した", session="s3"),
+            "",
+        )
+        said = self.prompt("<pasted_content>#10</pasted_content> と !7", session="s4")
+        self.assertIn("--mr 7", said)
+        self.assertNotIn("--issue 10", said)
+
+    def test_a_number_tied_to_a_ticket_does_not_say_start(self):
+        text = with_branch(parent_text("feature-152-login", ["research"], issue=152), "topic/x")
+        self.propose("feature-152-login", text)
+        self.commit_parent("propose")
+        self.approve()
+        said = self.prompt("#152 を直して")
+        self.assertIn("すでに feature-152-login(doing)", said)
+        self.assertIn("結び付いている", said)
+        self.assertIn("ワークツリー", said)
+        self.assertIn("言い直してもらう", said)
+        self.assertNotIn("ccnavi-start.sh --issue", said)
+        # 結び付かない番号は今までどおり
+        self.assertIn("--issue 9", self.prompt("#9 を直して", session="s5"))
+
+    def test_a_branch_name_with_the_number_is_not_a_mr_binding(self):
+        text = with_branch(parent_text("fix-12-foo", ["research"], issue=3), "fix-12-foo")
+        self.propose("fix-12-foo", text)
+        self.commit_parent("propose")
+        self.approve()
+        said = self.prompt("MR !12 を見て")
+        self.assertIn("--mr 12", said)
+        self.assertNotIn("結び付いている", said)
+
+    def test_a_mr_branch_of_a_ticket_says_continue(self):
+        text = with_branch(parent_text("feature-3-foo", ["research"], issue=3), "mr-12")
+        self.propose("feature-3-foo", text)
+        self.commit_parent("propose")
+        self.approve()
+        said = self.prompt("MR !12 を見て")
+        self.assertIn("すでに feature-3-foo(doing)", said)
+        self.assertNotIn("--mr 12", said)
+
+    def test_a_mr_field_of_an_approved_ticket_says_continue(self):
+        self.propose("feature-3-foo", with_mr(parent_text("feature-3-foo", ["research"]), 12))
+        self.commit_parent("propose")
+        self.approve()
+        said = self.prompt("MR !12 を見て")
+        self.assertIn("すでに feature-3-foo(doing)", said)
+        self.assertNotIn("--mr 12", said)
+        # 番号が別なら結び付かない
+        other = self.prompt("MR !13 を見て", session="s2")
+        self.assertIn("--mr 13", other)
+        self.assertNotIn("結び付いている", other)
+
+    def test_a_mr_field_of_a_proposal_says_continue(self):
+        self.propose("feature-3-foo", with_mr(parent_text("feature-3-foo", ["research"]), 12))
+        said = self.prompt("MR !12 を見て")
+        self.assertIn("すでに feature-3-foo(todo)", said)
+        self.assertIn("結び付いている", said)
+        self.assertNotIn("--mr 12", said)
+
+    def test_the_mr_field_and_the_branch_convention_are_both_kept(self):
+        # `mr:` の一致を先に見る。慣習名（branch: mr-N）は併用で残る
+        by_field = with_mr(parent_text("feature-3-foo", ["research"]), 12)
+        by_name = with_branch(parent_text("feature-4-bar", ["research"]), "mr-14")
+        self.propose("feature-3-foo", by_field)
+        self.propose("feature-4-bar", by_name)
+        self.commit_parent("propose")
+        self.approve()
+        self.assertIn("すでに feature-3-foo(doing)", self.prompt("MR !12 を見て"))
+        self.assertIn("すでに feature-4-bar(doing)", self.prompt("MR !14 を見て", session="s2"))
+
+    def test_the_mr_field_is_not_an_issue_binding(self):
+        self.propose("feature-3-foo", with_mr(parent_text("feature-3-foo", ["research"]), 12))
+        self.assertIn("--issue 12", self.prompt("#12 を直して"))
+
+    def test_the_same_number_is_said_once_per_session(self):
+        self.assertIn("--issue 152", self.prompt("#152 を直して"))
+        self.assertEqual(self.prompt("#152 の続き"), "")
+        # 別の番号は言う。別のセッションは別に数える
+        self.assertIn("--issue 153", self.prompt("#152 と #153"))
+        self.assertIn("--issue 152", self.prompt("#152 を直して", session="other"))
 
     def test_no_reference_no_instruction(self):
         self.assertEqual(self.prompt("README の見出し # 概要 を直して。色は #fff"), "")
@@ -209,6 +307,17 @@ class BranchesCommandTest(PhaseHarness):
         self.assertTrue(data["candidates"][0]["local"])
         text = self.branches("mr", 5, result).stdout
         self.assertIn("MR=!5(opened,フォーク)", text)
+
+    def test_tickets_with_the_mr_field_join_the_candidates(self):
+        self.propose("feature-3-foo", with_mr(parent_text("feature-3-foo", ["research"]), 12))
+        self.propose("feature-4-bar", with_mr(parent_text("feature-4-bar", ["research"]), 13))
+        data = self.json_of("mr", 12)
+        self.assertEqual([c["branch"] for c in data["candidates"]], ["feature-3-foo"])
+        self.assertEqual(data["candidates"][0]["sources"], ["ticket"])
+        self.assertEqual([t["ticket"] for t in data["issue_tickets"]], ["feature-3-foo"])
+        self.assertEqual(self.json_of("mr", 99)["candidates"], [])
+        # issue の枝は `mr:` を見ない
+        self.assertEqual(self.json_of("issue", 12)["issue_tickets"], [])
 
     def test_an_mr_without_the_host_says_so_and_has_no_candidate(self):
         result = self.host({"checked": False, "reason": "origin が無い"})

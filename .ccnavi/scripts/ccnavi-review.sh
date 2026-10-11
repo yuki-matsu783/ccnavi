@@ -1114,7 +1114,14 @@ $wip_gone
 EOF_WIP
 		if [ -n "$ready_tree" ] &&
 			[ -n "$(git -C "$ready_tree" status --porcelain --untracked-files=no -- "$@" 2>/dev/null)" ]; then
-			fail ready-unsent "${ready_tree} の置き場（${ready_place}）か wip/ に未コミットの変更がある（閉じたチケットを logs/archive/ へ退避した削除や、wip/ の追跡済みのファイルの削除など）。コミットして push してから、もう一度 ready を打ってください（Draft はまだ外していない）。"
+			ready_git="sh ${root}/.ccnavi/scripts/ccnavi-git.sh"
+			fail ready-unsent "${ready_tree} の置き場（${ready_place}）か wip/ に未コミットの変更がある（閉じたチケットを logs/archive/ へ退避した削除や、wip/ の追跡済みのファイルの削除など）。Draft はまだ外していない。
+原因: 親が取り込み済みでないため、退避と wip/ の削除を ready が自動でコミットできない（C1 が動かない）。親のワークツリーの名前が親の識別子と違うことが多い。承認済みチケットがどのツリーに在るかを確かめる（ここで見たのは ${ready_tree}）。
+次の順に打つ（${ready_tree} の中で）:
+  1) cd ${ready_tree} && ${ready_git} add -u -- ${ready_place} wip
+  2) ${ready_git} commit -m '<退避と wip/ の削除を説明する 1 行>'
+  3) ${ready_git} push
+  4) ready --parent ${family} を打ち直す"
 		fi
 	fi
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
@@ -1133,6 +1140,9 @@ EOF_WIP
 	fi
 	exe_cwd="$here"
 	ccnavi worktree drop "$family" || :
+	# 親と名前が違うワークツリーや、下書きがあって消されなかった子のワークツリーは、drop では消えない。
+	# 一覧を出すだけで消さない（消すかどうかはユーザが決める）。残りが無ければ何も出ない。
+	ccnavi worktree remaining "$family" || :
 	;;
 close-early)
 	# ユーザが端末で打つ。exe が残りを見せて y/N を取り、マーカーを置いて下書きを書く。
