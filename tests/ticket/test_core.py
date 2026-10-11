@@ -11,7 +11,7 @@ Chrome（Pyodide）と手元が同じコアで判定するため。
 3. plan と Writer(FS): 書くもの（Changes）を並べるだけではディスクは変わらず、並べたものを
    書いた結果が Changes のとおりになる（改版・マーカーの消去・フローの移動・フィードバック計画）
 4. Chrome の入口（`ccnavi_chrome.py`）が同じ入力から、手元が実際に書いたのと同じバイト列を出す
-   （新規・マーカーの消去・改版・フィードバック計画・多段の先行と落ちる提案・取り下げ・レビュー済み）。
+   （新規・マーカーの消去・改版・フィードバック計画・多段の先行と外れる提案・取り下げ・レビュー済み）。
    同じ要求と答えを拡張の試験の見本（`extensions/chrome/ccnavi-approval/test/fixtures/core-scenarios.json`）
    に置き、拡張の試験が Pyodide でも同じ答えになることを見る
 5. 承認の取り下げの条件
@@ -166,8 +166,8 @@ class CoreHarness(PhaseHarness):
         """手元のツリーから、拡張が組むのと同じ形の要求を作る（統合先は main）。
 
         ブランチの先頭は既定で `0` を並べたもの。
-        `heads` で名前ごとに本物の先頭を渡せる（レビュー済みは
-        依頼時の先頭と比べるので、親のブランチの本物の先頭が要る）。
+        `heads` で名前ごとに実際の先頭を渡せる（レビュー済みは
+        依頼時の先頭と比べるので、親のブランチの実際の先頭が要る）。
         """
         chrome = _chrome()
         place = _place_of(chrome)
@@ -545,7 +545,7 @@ class PlanWriterTest(CoreHarness):
         self.assertTrue(os.path.exists(os.path.join(self.approved, "flows", "i0001-01-01.yml")))
 
     def test_a_flow_that_cannot_be_written_says_so_and_skips_the_rest(self):
-        """移せなかったフローは行で言い、元を消さない（前と同じ落ち方）。"""
+        """移せなかったフローは行で言い、元を消さない（前と同じ失敗の仕方）。"""
         self.family(plan=["design"])
         todo = os.path.join(self.root, "wip", "proposals", "todo")
         write(
@@ -677,7 +677,7 @@ class DurableWiringTest(CoreHarness):
 
 
 class WriterFailureTest(CoreHarness):
-    """Writer(FS) の落ち方。並べる段では書き込みが落ちないので、書くときの枝を試す。"""
+    """Writer(FS) の失敗の仕方。並べる段では書き込みが失敗しないので、書くときの枝を試す。"""
 
     def planned(self):
         snapshot = self.snapshot()
@@ -685,7 +685,7 @@ class WriterFailureTest(CoreHarness):
             return core.plan(snapshot, core.judge_approval(snapshot))
 
     def failing(self, name, when):
-        """`fsio.<name>` を、`when(引数)` が真の呼び出しだけ落とす。"""
+        """`fsio.<name>` を、`when(引数)` が真の呼び出しだけ失敗させる。"""
         real = getattr(fsio, name)
 
         def fake(*args):
@@ -709,7 +709,7 @@ class WriterFailureTest(CoreHarness):
         return os.path.join(self.approved, "phases", "i0001", "workflow.yml")
 
     def test_a_failed_move_does_not_leave_the_workflow_alone(self):
-        """待ち方は提案を動かす前に書く。動かす段で落ちたら待ち方も戻す。"""
+        """待ち方は提案を動かす前に書く。動かす段で失敗したら待ち方も戻す。"""
         doing = os.path.join("doing", "i0001.md")
         todo = os.path.join("todo", "i0001.md")
         for name, when in (
@@ -727,7 +727,7 @@ class WriterFailureTest(CoreHarness):
                 self.assertFalse(os.path.exists(self.held()), err)
 
     def test_a_failed_revision_puts_the_workflow_back(self):
-        """改版でチケットを書く段で落ちたら、先に書いた待ち方を前の中身へ戻す。"""
+        """改版でチケットを書く段で失敗したら、先に書いた待ち方を前の中身へ戻す。"""
         self.family(plan=["research", "design"])
         with open(self.held(), "rb") as f:
             before = f.read()
@@ -849,7 +849,7 @@ class WriterFailureTest(CoreHarness):
 
 
 def _normalized(changes):
-    """経路（`via`）の欄を落とした Changes。手元の CLI（board・cli）と Chrome（chrome）で違う所。"""
+    """経路（`via`）の欄を除いた Changes。手元の CLI（board・cli）と Chrome（chrome）で違う所。"""
     out = {}
     for name, rows in (changes or {}).items():
         kept = []
@@ -898,7 +898,7 @@ def _flat(lines):
 class CoreChromeTest(CoreHarness):
     """Chrome の入口が、手元の CLI が実際に書いたのと同じバイト列と出力を出す。
 
-    比べるのは、Changes（経路の欄だけを落として）、見せる行、止まったか、問題点の文面、
+    比べるのは、Changes（経路の欄だけを除いて）、見せる行、止まったか、問題点の文面、
     画面の本文とダイジェスト。取り下げは手元の CLI が無い（Chrome だけの操作）ので、
     手元のコアを通して書いたものと比べる。
     """
@@ -1042,7 +1042,7 @@ class CoreChromeTest(CoreHarness):
         self.assertIn("  i0001 のフィードバック計画を改版した", answer["lines"])
 
     def test_predecessors_across_families(self):
-        """多段の先行（閉包）。通る子と、先行が閉じていないので落ちる子（文面まで同じ）。"""
+        """多段の先行（閉包）。通る子と、先行が閉じていないので外れる子（文面まで同じ）。"""
         copies = {
             "i0001": [
                 ("doing", parent_text("i0001", ["research"])),
@@ -1356,7 +1356,7 @@ class ChromePlacementTest(CoreHarness):
     def test_the_module_loads_without_the_env_name_constants(self):
         # B4 （2 段目）定数を外しても読み込める。外している間は読み込みだけを見る。
         # `settings.load` は i0064 まで定数を引くので、外したまま置き場を聞くと
-        # 正しい実装でも落ちる。置き場は戻してから聞く。
+        # 正しい実装でも失敗する。置き場は戻してから聞く。
         saved = {name: getattr(settings, name) for name in ENV_CONSTANTS if hasattr(settings, name)}
         for name, value in saved.items():
             self.addCleanup(setattr, settings, name, value)
@@ -1589,7 +1589,7 @@ class WithdrawTest(CoreHarness):
         self.assertTrue(any("子の提案" in p for p in listed[0][2]), listed)
 
     def test_a_leftover_temporary_file_is_not_a_marker(self):
-        """書きかけで落ちて残った一時ファイルだけなら、マーカーとは数えず取り下げられる。"""
+        """書きかけで止まって残った一時ファイルだけなら、マーカーとは数えず取り下げられる。"""
         text = self.approved_parent()
         marks = os.path.join(self.approved, "phases", "i0001")
         # 実際に残りうる名前。待ち方（write_bytes_atomic）と、受け入れた指摘の記録
@@ -1598,7 +1598,7 @@ class WithdrawTest(CoreHarness):
         write(os.path.join(marks, ".accepted.abc12345.part.json"), "half")
         problems = self.problems({"i0001": text.encode()})
         self.assertFalse(any("マーカー" in p for p in problems), problems)
-        # 本物のマーカーが一緒に在れば、今までどおり止める。
+        # 実際のマーカーが一緒に在れば、今までどおり止める。
         write(os.path.join(marks, "1.pending"), "{}")
         problems = self.problems({"i0001": text.encode()})
         self.assertTrue(any("マーカーがある" in p for p in problems), problems)
@@ -1674,7 +1674,7 @@ class RecordWritesTest(CoreHarness):
         self.assertTrue(listed)
 
     def test_a_failed_command_still_writes_its_list(self):
-        """コマンドが落ちても一覧は書く（C1 が戻すのに使う）。終了コードはコマンドのもの。"""
+        """コマンドが失敗しても一覧は書く（C1 が戻すのに使う）。終了コードはコマンドのもの。"""
         result, listed = self.record("ticket", "start", "nope")
         self.assertNotEqual(result.returncode, 0)
         self.assertTrue(os.path.exists(os.path.join(self.place(), "self", "i0001.t.writes")))

@@ -126,7 +126,7 @@ class CleanCases:
 
     def run_clean(self, *args, cwd=None):
         env = dict(os.environ)
-        env.pop("CCNAVI_WORKSPACE", None)  # 本物のワークスペースを指させない
+        env.pop("CCNAVI_WORKSPACE", None)  # 実際のワークスペースを指させない
         if self.path is not None:
             env["PATH"] = self.path
         script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-clean.sh").replace(os.sep, "/")

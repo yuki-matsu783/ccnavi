@@ -138,7 +138,7 @@ class BranchesCommandTest(PhaseHarness):
         self.assertEqual([t["ticket"] for t in data["issue_tickets"]], ["feature-152-login"])
 
     def test_an_approved_parent_names_its_branch_field(self):
-        # 承認済みの親は `branch:` のブランチを名乗る。移る前の識別子のブランチにも結び付ける
+        # 承認済みの親は `branch:` のブランチを宣言する。移る前の識別子のブランチにも結び付ける
         text = with_branch(
             parent_text("feature-152-login", ["research"], issue=152), "feature/152-login"
         )

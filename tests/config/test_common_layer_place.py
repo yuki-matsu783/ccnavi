@@ -17,7 +17,7 @@ hook は引数を渡さずに起動するので、hook からの判定の入口�
 起動は `ConfigUnionHarness.ccnavi` を使わない。あちらはフラグを渡さずに既定の置き場から
 読ませるので、フラグを足した形を見られない。ここは `flags` で足せる形にしてある。
 
-実装は入っている。ここが落ちたら、env を読む経路が戻ったということ。
+実装は入っている。ここが失敗したら、env を読む経路が戻ったということ。
 """
 
 from __future__ import annotations
@@ -194,7 +194,7 @@ class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
 
     `--project-rules-file` / `--project-phases-file` と揃える。有効なのは `--lint` /
     `--test` / `--test-samples` / `--explain` だけで、hook からの判定と
-    `ticket` / `review` の副命令では落ちる。落としたことは標準エラーに出す。
+    `ticket` / `review` の副命令では無視する。無視したことは標準エラーに出す。
 
     上の `FlagsStillMoveTheCommonLayerTest` と対で読む。あちらは診断では有効なことを、
     ここは診断の外では有効でないことを見る。片方だけだと、フラグを消しても
@@ -213,7 +213,7 @@ class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
         self.assertIn("--rules は診断", result.stderr)
 
     def test_each_of_the_three_flags_says_it_was_dropped(self):
-        """3 本とも、落としたことを標準エラーで名指しする。"""
+        """3 本とも、無視したことを標準エラーで名指しする。"""
         for kind, _env, flag, _field in KINDS:
             with self.subTest(flag=flag):
                 result = self.decide(
@@ -252,7 +252,7 @@ class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
         self.assertNotIn("--rules", result.stderr)
 
     def test_the_flags_still_work_for_the_diagnosis_that_judges(self):
-        """判定を通す診断（`--test`）では有効。落とす先を間違えていないことの裏。"""
+        """判定を通す診断（`--test`）では有効。無視する先を間違えていないことの裏。"""
         done = self.bare(
             "--test", "Read", self.target(), "--json", flags=("--rules", self.other_rules)
         )
@@ -268,7 +268,7 @@ class TheDefaultPlaceStaysGuardedTest(CommonLayerPlaceHarness):
         """env がよそを指していても、`.ccnavi/common/` の 3 本は組み込みで止まる。
 
         守る対象は既定の置き場から組み立てる。env を読む経路が戻ると、
-        `builtin-guard-common-layer` が env の指すよそへ付け替わり、ここが落ちる。
+        `builtin-guard-common-layer` が env の指すよそへ移り、ここが失敗する。
         """
         for path in (self.rules, self.phases, self.risk):
             with self.subTest(path=os.path.basename(path)):

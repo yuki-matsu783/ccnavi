@@ -1,7 +1,7 @@
 """ルールファイルを読めないときの受入テスト。
 
-別ファイルにしてあるのは、ここが「ガードが落ちたときの振る舞い」という
-独立した関心で、壊れたルールファイルを自分で用意する必要があるため。
+別ファイルにしてあるのは、ここが「ガードが機能しなくなったときの振る舞い」という
+独立した関心で、不正なルールファイルを自分で用意する必要があるため。
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import unittest
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
-# YAML として壊れている。閉じていないリスト 1 つ。書き損じの典型。
+# YAML として不正である。閉じていないリスト 1 つ。書き損じの典型。
 BROKEN = "version: 2\ndeny: [\n  - id: x\n"
 
 
@@ -81,7 +81,7 @@ class FallbackTest(unittest.TestCase):
         self.without_rules = empty.name
 
     def test_不正なルールでもセッションは動き続ける(self):
-        # ここが要件の中心。拒否にすると、壊れたファイルを直すための呼び出しまで
+        # ここが要件の中心。拒否にすると、不正なファイルを直すための呼び出しまで
         # 止まって回復できなくなる。既定モードが block なので、ルールを置く前に
         # hook を登録しただけでセッションが何もできなくなる。
         #
@@ -121,10 +121,10 @@ class FallbackTest(unittest.TestCase):
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
 
     def test_既定は設定の修復を妨げない(self):
-        # REQ-PRE-06 が「読み取りと設定自身の修復を妨げない」と書いている意味。
+        # 要件が「読み取りと設定自身の修復を妨げない」と書いている意味。
         # ここを止めると直す方法が 1 つも残らない。
         #
-        # Write / Edit は Claude Code の権限モードに従う。妨げてはいないが、ガードが落ちている
+        # Write / Edit は Claude Code の権限モードに従う。妨げてはいないが、ガードが機能していない
         # あいだにガードの設定を書き換える操作なので、ユーザが 1 度見る側に置く。
         for tool in ("Read", "Write", "Edit"):
             with self.subTest(tool=tool):
@@ -136,7 +136,7 @@ class FallbackTest(unittest.TestCase):
                 )
 
     def test_既定はシェルから設定を書き換えさせない(self):
-        # 上と対になっている。ここを通すと、シェルでルールを壊し、壊れた結果
+        # 上と対になっている。ここを通すと、シェルでルールを壊し、その結果
         # 緩んだ既定に戻る、という順路ができる。壊す側と直す側で経路を分ける。
         out = out_of(
             self,
@@ -168,8 +168,8 @@ class FallbackTest(unittest.TestCase):
     def test_既定のシェルの保護は設定で動かした置き場にも当たる(self):
         # 実行ファイルは設定で動く（ccnavi ディレクトリと共通レイヤーは固定）。
         # 既定の側だけ空の設定で組んでいると、動かしたワークスペースではルールファイルが
-        # 壊れたときにだけそこへの書き込みが止まらない（issue #14）。
-        # 絶対パスは `/` で書いて shlex.quote で引用する。bash は引用されない `\` を落とすので、
+        # 不正になったときにだけそこへの書き込みが止まらない（issue #14）。
+        # 絶対パスは `/` で書いて shlex.quote で引用する。bash は引用されない `\` を取り除くので、
         # `\` の表記のまま埋め込むと、ガードが見る行き先が変わる。
         for env, command in [
             ({"CCNAVI_BIN_PATH": "tools/guard/ccnavi"}, "cp /tmp/x tools/guard/ccnavi"),
@@ -186,7 +186,7 @@ class FallbackTest(unittest.TestCase):
     def test_既定はマージの解決を妨げない(self):
         # 衝突マーカーの入ったルールファイルは YAML として読めないので、
         # 衝突を解いている最中は必ず既定を使っている。そこで解決の手が止まると、
-        # ガードが落ちた状態から出られない。どれもファイルに新しい文面を書かない。
+        # ガードが機能しない状態から出られない。どれもファイルに新しい文面を書かない。
         for command in [
             "sh .ccnavi/scripts/ccnavi-git.sh restore --ours -- .ccnavi/common/rules.yml",
             "sh .ccnavi/scripts/ccnavi-git.sh add -- .ccnavi/common/rules.yml",
@@ -198,7 +198,7 @@ class FallbackTest(unittest.TestCase):
                 self.assertNotEqual(out.get("permissionDecision"), "deny", f"止めた: {command!r}")
 
     def test_既定に戻ったことは記録に残る(self):
-        # ガードが落ちたまま何回動いたかは、これでしか数えられない。
+        # ガードが機能しないまま何回動いたかは、これでしか数えられない。
         log = os.path.join(self.directory.name, "decisions.jsonl")
         run(self.root, pre_tool_use("Bash", "command", "cat README.md"), log=log)
         with open(log, encoding="utf-8") as f:

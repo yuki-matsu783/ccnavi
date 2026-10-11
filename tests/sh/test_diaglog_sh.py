@@ -117,7 +117,7 @@ class _Workspace(unittest.TestCase):
 def sh_word(text: str) -> str:
     """sh の 1 語。CR は script の中に生で書かず、`$cr`（run_sh が作る）でつなぐ。
 
-    Git Bash の sh は、script を読むときに生の CR を落とす。
+    Git Bash の sh は、script を読むときに生の CR を除く。
     """
     return '"$cr"'.join(shlex.quote(part) for part in text.split("\r"))
 

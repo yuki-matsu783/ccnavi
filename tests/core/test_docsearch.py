@@ -5,9 +5,9 @@
 1. 索引: git が挙げる md をディレクトリごとの `index.jsonl` に書く。無視されていなければ書かない。
    実体の無い md と ccnavi ディレクトリの下は載せない。md が全部消えたディレクトリの索引は消す
 2. 差分: `concept_id` と `mtime` が同じ行は読み直さない。中身が同じなら書かない
-3. frontmatter: 壊れたもの・別名・リストでないものは null。スカラーの tags は 1 要素。日付は文字列
+3. frontmatter: 不正なもの・別名・リストでないものは null。スカラーの tags は 1 要素。日付は文字列
 4. 引く: 完全一致・部分一致・日時、同じものは OR・違うものは AND、並べ方、出力の形、桁揃え
-5. CLI: `--docs` の外の絞り込みは言って落とす。誤った値は 1、0 件は 0
+5. CLI: `--docs` の外の絞り込みは理由を言って失敗にする。誤った値は 1、0 件は 0
    どこから打ってもワークスペースを引く
 6. プロジェクト: 置き場の直下の各 git も引く。パスはワークスペースルートから。
    index.jsonl を無視していなければ対象外
@@ -481,7 +481,7 @@ class CliTest(Repo):
         self.assertEqual(done.returncode, 1)
         self.assertIn("ccnavi: --type は --docs でだけ使える", done.stderr)
         self.assertIn("ccnavi: --limit は --docs でだけ使える", done.stderr)
-        # 以前は argparse が知らないフラグとして止めていた打ち間違い。落として進めない。
+        # 以前は argparse が知らないフラグとして止めていた打ち間違い。失敗にして進めない。
         done = self.ccnavi("ticket", "start", "i0001", "--limit", "3")
         self.assertEqual(done.returncode, 1)
         self.assertIn("--limit は --docs でだけ使える", done.stderr)
@@ -768,7 +768,7 @@ class OutsideTest(Repo):
 
 
 class RobustTest(Repo):
-    """C: 壊れた入力で落ちない。"""
+    """C: 不正な入力で異常終了しない。"""
 
     def test_front_matter_that_json_cannot_write_is_none(self):
         huge = b"---\nn: 1" + b"9" * 5000 + b"\n---\n"
@@ -1163,7 +1163,7 @@ class PathspecMagicTest(Repo):
 
 
 class JsonOutputTest(Repo):
-    """どの出力の形でも落ちず、正しい JSON を出す。"""
+    """どの出力の形でも異常終了せず、正しい JSON を出す。"""
 
     def test_deep_front_matter_is_null_and_json_output_works(self):
         nested = "[" * 40 + "]" * 40

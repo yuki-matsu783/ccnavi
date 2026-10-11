@@ -56,7 +56,7 @@ def _load_build():
 
 
 # この機械で組み立てたときに build.py が書く目印。導入スクリプトはこれを自分の uname と
-# 比べる。ここを本物の build_target から取るので、2 つの語が食い違えばテストが落ちる。
+# 比べる。ここを実際の build_target から取るので、2 つの語が食い違えばテストが失敗する。
 THIS_MACHINE = _load_build().build_target()
 # どの機械とも一致しない目印。
 ANOTHER_MACHINE = "haiku-riscv64"
@@ -106,7 +106,7 @@ FETCH_COMMAND = 'sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh"'
 # 無いと止められた側にほかに取れる方法がない。
 GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
 # 実際に配る sh。3 本が起動して最初に読む共通部（入口の ccnavi-common.sh と部品 5 本）も要る。
-# 配らないと、配った先で 3 本とも「共通部が読めない」で落ちる。
+# 配らないと、配った先で 3 本とも「共通部が読めない」で失敗する。
 # 承認済みチケットをコミットして push する sh（ccnavi-push-approved.sh）も配る。
 # ボードは承認のあとこれを端末に送るので、配らないと配布先のボードは
 # 承認の push ができない（設計 approve-carry 1.5）。
@@ -129,7 +129,7 @@ DEPLOY_SCRIPTS = (
     "ccnavi-start.sh",
 )
 RULES_PARTS = (".ccnavi", "common", "rules.yml")
-# --deploy が配る残りの設定 2 本（設計 11.9）。リスクの配点は共通レイヤー、
+# --deploy が配る残りの設定 2 本。リスクの配点は共通レイヤー、
 # フェーズ定義は自身のレイヤー（scope がワークスペースのレイアウトに付くため）。
 RISK_PARTS = (".ccnavi", "common", "risks.yml")
 PHASES_PARTS = (".ccnavi", "config", "phases.yml")
@@ -791,7 +791,7 @@ class DoesNotWeakenTheGuard(SetupTest):
     def test_refuses_disable(self):
         """`disable` は書かない。
 
-        監視される側が書けるファイルから監視を止める形になる。設定lint が
+        監視される側が書けるファイルから監視を止める形になる。設定 lint が
         error として報告する記述を、導入の側が作ってはいけない。
         """
         result = self.run_setup("--mode", "disable")
@@ -879,7 +879,7 @@ class ReadsTheRegistrationCarefully(SetupTest):
         """別の表記で登録されているイベントは、足さずにユーザへ見せる。
 
         どちらが正しいかをここで決められない。何も言わずに足すと判定が 2 回走り、
-        何も言わずに飛ばすとそのイベントが落ちたままになる。
+        何も言わずに飛ばすとそのイベントが抜けたままになる。
         """
         self.write_settings(
             {
@@ -903,7 +903,7 @@ class ReadsTheRegistrationCarefully(SetupTest):
         """無関係な hook にたまたま名前が入っているだけなら、登録する。
 
         部分一致だけで見ていると、この 1 件があるだけでイベントが丸ごと
-        落ちる。しかも設定lint は PreToolUse の登録を検査していないので、
+        外れる。しかも設定 lint は PreToolUse の登録を検査していないので、
         判定が 1 行も走らない状態を誰も見つけられない。
         """
         self.write_settings(
@@ -926,7 +926,7 @@ class RefusesShapesItCannotHandle(SetupTest):
     def test_refuses_to_write_over_a_settings_file_it_cannot_read(self):
         """読めない設定ファイルには書かない。
 
-        壊れた JSON を空のオブジェクトとして扱うと、書き損じたカンマ 1 つで
+        不正な JSON を空のオブジェクトとして扱うと、書き損じたカンマ 1 つで
         そのプロジェクトの設定が丸ごと消える。
         """
         self.write_settings('{"env": {,}')
@@ -939,7 +939,7 @@ class RefusesShapesItCannotHandle(SetupTest):
     def test_refuses_json_whose_shape_it_does_not_expect(self):
         """想定と違う型は、jq の生のエラーではなく 2 で断る。
 
-        握りつぶして進むとどこかで必ず落ちる。落ちた先の終了コード（jq の 5）は
+        握りつぶして進むとどこかで必ず失敗する。失敗した先の終了コード（jq の 5）は
         このスクリプトが宣言していない値なので、呼んだ側は引数の誤りとも
         環境の不足とも区別が付かない。
         """
@@ -964,7 +964,7 @@ class RefusesShapesItCannotHandle(SetupTest):
                     self.assertEqual(f.read(), raw)
 
     def test_accepts_an_entry_without_a_hooks_key(self):
-        """`hooks` を持たないエントリは、壊れてはいない。そのまま扱う。"""
+        """`hooks` を持たないエントリは、不正ではない。そのまま扱う。"""
         self.write_settings({"hooks": {"PreToolUse": [{"matcher": "Bash"}]}})
         result = self.run_setup()
 
@@ -1075,7 +1075,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     def make_source(self, built=True, parts=True, target=THIS_MACHINE, launcher=True):
         """配布元のふりをするディレクトリを作る。
 
-        本物を組み立てない。PyInstaller に 11 秒かかるし、ここで見たいのは
+        実物を組み立てない。PyInstaller に 11 秒かかるし、ここで見たいのは
         「どこから何を配るか」であって、実行ファイルの中身ではない。
 
         target は build.py が dist/ccnavi.target に書く目印。None なら書かない
@@ -1109,7 +1109,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 encoding="utf-8",
             ) as f:
                 f.write("deny: []\n")
-            # 設定 3 本のひな形。risk は共通レイヤー、phases は自身のレイヤー（設計 11.9）。
+            # 設定 3 本のひな形。risk は共通レイヤー、phases は自身のレイヤー。
             with open(os.path.join(src, *RISK_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nlevels: {}\nfactors: []\n")
             os.makedirs(os.path.join(src, ".ccnavi", "config"))
@@ -1124,8 +1124,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 ) as f:
                     f.write(f"# {name}\n")
             if launcher:
-                # 振り分けの sh は本物をコピーし、代わりに通る sh と同じ置き場に置く。配布先で
-                # 中身が同じであることを見るため。モードは落として置く。配布元の置き方に
+                # 振り分けの sh は実物をコピーし、代わりに通る sh と同じ置き場に置く。配布先で
+                # 中身が同じであることを見るため。モードは外して置く。配布元の置き方に
                 # 依らず、配った先で実行ビットが付くことを見るため。
                 shutil.copy(LAUNCHER, os.path.join(src, *LAUNCHER_PARTS))
                 os.chmod(os.path.join(src, *LAUNCHER_PARTS), 0o644)
@@ -1134,7 +1134,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     def install_script(self, src):
         """配布元のふりをするディレクトリに、このスクリプト自身を置く。
 
-        既定の配布元は「打ったスクリプトの置き場の 1 つ上」。本物の ccnavi の
+        既定の配布元は「打ったスクリプトの置き場の 1 つ上」。実際の ccnavi の
         根をそのまま配布元にすると、テストが走った機械に dist/ が組み立てて
         あるかどうかで結果が変わる。
         """
@@ -1345,10 +1345,10 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
     @unittest.skipIf(os.name == "nt", "Windows の実行の許しは別の仕組み")
     def test_the_executable_can_still_be_run(self):
-        """実行の許しを落とさない。
+        """実行の許しを外さない。
 
-        落ちていると hook は「実行ファイルが無い」ではなく「起動できない」で
-        何も言わずに失敗する。設定lint も実行ファイルは在ると言うので、誰も気付かない。
+        外れていると hook は「実行ファイルが無い」ではなく「起動できない」で
+        何も言わずに失敗する。設定 lint も実行ファイルは在ると言うので、誰も気付かない。
         """
         src = self.make_source()
         self.run_setup("--deploy", src)
@@ -1434,7 +1434,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
     @unittest.skipIf(os.name == "nt", "Windows の実行の許しは別の仕組み")
     def test_puts_the_run_bit_back_on_a_launcher_it_keeps(self):
-        """配布先の sh の実行ビットが落ちていれば、配らない回でも付け直す（S14）。
+        """配布先の sh の実行ビットが外れていれば、配らない回でも付け直す（S14）。
 
         sh は追跡するので、Windows で足した sh は 100644 で入り、別の機械で clone した
         直後は実行ビットが無い。配布先に既に在るからと触らずにいると、打ち直しても

@@ -1,4 +1,4 @@
-"""このリポジトリの本物のルール（.ccnavi/common/rules.yml）と組み込みルールで判定する受入テスト。
+"""このリポジトリの実際のルール（.ccnavi/common/rules.yml）と組み込みルールで判定する受入テスト。
 
 tests/fixtures/ のルールではなく、運用に使っている rules.yml をそのまま `--test` に
 渡す。見るのは、shellread が目印を 2 つに分けたあとの判定（wip/design/shellread-sep.md
@@ -45,7 +45,7 @@ YES = " --agree --yes x"
 
 
 def judge(tool: str, subject: str, bin_path: str = "") -> dict:
-    """1 件を本物のルールで判定して、試験の JSON を返す。
+    """1 件を実際のルールで判定して、試験の JSON を返す。
 
     承認済みチケットと state は外し、記録も残さない。組み込みの selfguard（設定ファイルの保護）は
     既定のまま有効にする。4 の表はそれを含めた判定なので。
@@ -147,8 +147,8 @@ class RepoRulesTest(unittest.TestCase):
         self.assertEqual(body["code"], "UNDECLARED")
 
     def test_引用だけの二重の山括弧は読めないまま止まる(self):
-        # 許容した誤検知（設計 12.2、tests/guard/test_acceptance.py）。生の文字列に
-        # heredoc が当たり、読めなかったことを名乗る。
+        # 許容した誤検知（tests/guard/test_acceptance.py）。生の文字列に
+        # heredoc が当たり、読めなかったことを示す。
         body = judge("Bash", 'grep -n "<<" README.md')
         self.assertEqual(body["verdict"], "deny")
         self.assertEqual(body["code"], "PARSE_UNCERTAIN")
@@ -176,7 +176,7 @@ class RepoRulesTest(unittest.TestCase):
 
         別のフラグの値に書いた `--preview` で免除が成立していた。argparse は
         `--reason=--preview` を値として読み取るので `--preview` はフラグにならず、実行ファイルは
-        本物の `--agree` を走らせる。hook が見る文字列と、実行ファイルが走らせる枝が
+        実際の `--agree` を走らせる。hook が見る文字列と、実行ファイルが走らせる枝が
         そこで食い違う（端末さえ取れれば、エージェントが自分で承認を置けることになる）。
         """
         for subject in [
@@ -598,7 +598,7 @@ class SubstRepoRulesTest(unittest.TestCase):
         )
 
     def test_改行とプロセス置換と語の途中の井桁は_allow_を後ろまで広げない(self):
-        # 今は allow が後ろのコマンドまで通していた（設計 0）。
+        # 今は allow が後ろのコマンドまで通していた。
         self.check(
             [
                 ("grep -n x f\nsh evil.sh", "ask", "", "UNDECLARED"),

@@ -69,7 +69,7 @@ class PlacesHarness(unittest.TestCase):
     ここには何も書かれない。
     """
 
-    # 落ちたとき、どの欄が既定から外れたかを省かずに見せる。
+    # 失敗したとき、どの欄が既定から外れたかを省かずに見せる。
     maxDiff = None
 
     def setUp(self):

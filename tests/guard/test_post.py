@@ -1,6 +1,6 @@
 """実行後チェックの受入テスト。
 
-道具を外から動かす。本物の git リポジトリを一時ディレクトリに作り、そこを
+道具を外から動かす。実際の git リポジトリを一時ディレクトリに作り、そこを
 汚してから payload を渡し、返ってきた文と終了コードと記録だけを読む。
 作業ツリーの実物を見るのがこのチェックの要点なので、git を差し替えると、
 テストが通ることとチェックが動くことが別の話になる。
@@ -216,9 +216,9 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("protected/keep.txt", result.stderr)
         # どの設定が言っているか。名指ししないと直しに行く先が決まらない。
         self.assertIn("rule: protected", result.stderr)
-        # 原因となった直前の実行（REQ-PST-02）。
+        # 原因となった直前の実行。
         self.assertIn("Bash(python build.py)", result.stderr)
-        # 戻す手順（REQ-PST-03）。
+        # 戻す手順。
         self.assertIn('git restore --staged --worktree -- "protected/keep.txt"', result.stderr)
         # ルールが持つ文面。止めるだけでは足りないという道具の目的そのもの。
         self.assertIn("Ask the user", result.stderr)
@@ -379,7 +379,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
             self.assertEqual(f.read(), "changed by a build\n", "予行はファイルに触らない")
         self.assertIn("would-restore:", result.stderr)
         self.assertIn("put it back to its committed content", result.stderr)
-        # 誰も戻していないので、戻す手順は落とさない。
+        # 誰も戻していないので、戻す手順は省かない。
         self.assertIn('git restore --staged --worktree -- "protected/keep.txt"', result.stderr)
         self.assertIn("would-restore 1", self.records()[-1]["detail"])
 
@@ -404,7 +404,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertNotIn("would-restore", self.records()[-1].get("detail", ""))
 
     def test_モードが予行なら戻しの宣言によらず予行として言う(self):
-        # CCNAVI_MODE=dry-run は戻しの側も予行に落とす（modes.effective_setting）。
+        # CCNAVI_MODE=dry-run は戻しの側も予行にする（modes.effective_setting）。
         self.run_hook(mode="dry-run", command="ls")
         self.dirty()
 
@@ -472,7 +472,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
 
     def test_HEADを持たない記録は基準なしとして扱う(self):
         # heads の無い記録は、記録が無いときと同じ。コミットのぶんを数えられない
-        # 基準で報告すると、このターンに入ったコミットを知らないうちに落とす。
+        # 基準で報告すると、このターンに入ったコミットを知らないうちに取りこぼす。
         self.run_hook(event="UserPromptSubmit")
         turn = os.path.join(self.state, "s1.turn.json")
         with open(turn, encoding="utf-8") as f:
@@ -882,7 +882,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
 
     def test_基準点の書き換えは言う(self):
         # `base_sha` はサブエージェント終了時チェックと実績リスクの基準点。書き換えられると
-        # コミット済みの範囲外の変更が検査から消えるので、正規化で落としてはいけない。
+        # コミット済みの範囲外の変更が検査から消えるので、正規化で除いてはいけない。
         self.use(ticket_repo(text=STARTED))
         write(self.path(DOING), STARTED.replace("1111111111111111", "2222222222222222"))
 

@@ -116,7 +116,7 @@ class AskTest(unittest.TestCase):
 
 class NoJudgeTest(unittest.TestCase):
     def test_bypass_permissions_refuses(self):
-        """確認できる者が居ないモードでは許可としない（REQ-PRE-08）。"""
+        """確認できる者が居ないモードでは許可としない。"""
         result, record = run("bypassPermissions")
         self.assertEqual("deny", decision_of(self, result))
         self.assertEqual("deny", record["decision"])
@@ -135,7 +135,7 @@ class NoJudgeTest(unittest.TestCase):
                 self.assertEqual("handover", record["decision"])
 
     def test_an_unreadable_command_is_refused_even_with_the_gate_open(self):
-        """読み切れなかった呼び出しは、確認を省くモードでも渡さない（REQ-PRE-04）。
+        """読み切れなかった呼び出しは、確認を省くモードでも渡さない。
         渡す先が「確認しない」と決まっている以上、読めなかったことを言える場所が他に無い。"""
         result, record = run(
             "bypassPermissions",

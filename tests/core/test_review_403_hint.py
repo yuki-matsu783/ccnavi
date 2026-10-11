@@ -5,7 +5,7 @@ GitHub ではスレッドの解決状態（`threads`）と Draft 外し（`undra
 そこでは `confirm` / `fetch` / `ready` だけが 403 で止まる。curl の経路は `-f` が本文を
 捨てるので、画面に残るのは番号だけになり、認証の失敗と見分けが付かない。
 
-案内そのものは `api_failed` の `graphql` の枝が出す。本物の GitHub の GraphQL を
+案内そのものは `api_failed` の `graphql` の枝が出す。実際の GitHub の GraphQL を
 失敗させる環境は作れない（`remote_kind` はホスト名で github と読むので、127.0.0.1 に
 立てた偽物は gitlab として読まれる）。そこで 2 本に分ける。
 
@@ -96,7 +96,7 @@ class OrdinaryFailuresStaySilentTest(unittest.TestCase):
             cwd=self.dir,
             check=True,
         )
-        # 閉じたポート。最初の API 呼び出し（マージリクエストを探す GET）で落ちる。
+        # 閉じたポート。最初の API 呼び出し（マージリクエストを探す GET）で失敗する。
         subprocess.run(
             ["git", "remote", "add", "origin", "http://127.0.0.1:9/root/p.git"],
             cwd=self.dir,

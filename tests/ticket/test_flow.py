@@ -1,17 +1,17 @@
-"""子チケットのフロー（設計 9.3.1・9.12）の受入テスト。
+"""子チケットのフローの受入テスト。
 
 見るのは 8 つ。
 
 1. 置き場は承認済みの領域の `flows/<子>.yml` に固定。以前の `flow:` の欄は何も言わず無視する
 2. エージェントの書き込みは、どのツリーの置き場でも組み込みの保護が止める。ユーザが保存したフローを
    実行後チェックが範囲外の変更として報告しない（H1）
-3. YAML のフロー（nodes / connections）を、順に並べた手順にする。知らない種類も落とさない。
+3. YAML のフロー（nodes / connections）を、順に並べた手順にする。知らない種類も除かない。
    別名（アンカーとエイリアス）は読まない
-4. 壊れた・大きい・リンクのフローで落ちない。文の量に上限がある。ccnavi の接頭辞を真似させない
+4. 不正な・大きい・リンクのフローで失敗しない。文の量に上限がある。ccnavi の接頭辞を真似させない
 5. 着手中の子のフローへの書き込みを止める。解いたパスと解く前のパスの両方で。着手の前と、
    終わった後は止めない
 6. SubagentStart がフローのファイルを名指しし、手順と、askUserQuestion / subAgent の
-   ノードでの動き方を渡す。フローが壊れていても残りの文は渡す
+   ノードでの動き方を渡す。フローが不正でも残りの文は渡す
 7. `--explain --json` の子に `flow` の欄が出る（ボードが読む）。閉じた子でフローが無ければ出さない
 8. 入れ子のサブエージェントが差し戻しを無視して終わったら、`systemMessage` にも載せる
 9. エージェントの下書き（`wip/proposals/flows/<子>.yml`）は書ける。効力は無く、
@@ -350,7 +350,7 @@ class FlowRenderTest(unittest.TestCase):
     def test_flow_text_cannot_pose_as_ccnavi(self):
         """フローの文に `[ccnavi]` や改行・制御文字を入れても ccnavi の行に見せられない（M3・L6）。
 
-        接頭辞は亀甲括弧に置き換え、改行と制御文字は落とす。
+        接頭辞は亀甲括弧に置き換え、改行と制御文字は除く。
         """
         data = {
             "nodes": [
@@ -459,7 +459,7 @@ class FlowRenderTest(unittest.TestCase):
         os.symlink(os.path.join(root, "elsewhere"), os.path.join(root, ".ccnavi", "approved", "x"))
         data, why = flow.load(os.path.join(root, ".ccnavi", "approved", "x", "b.yml"), root)
         self.assertEqual((data, why), (None, flow.LINKED))
-        # リンクの無い本物は読む。
+        # リンクの無い実際のファイルは読む。
         plain = write(os.path.join(flows, "c.yml"), WORKFLOW_YAML)
         self.assertIsNotNone(flow.load(plain, root)[0])
 
@@ -916,7 +916,7 @@ class FlowLockTest(FlowHarness):
         self.assertIn("フローを読めない", self.reason(result))
 
     def test_a_malformed_flow_keeps_the_rest_of_subagent_start(self):
-        """型の崩れたフローでも SubagentStart は落ちず、子の一覧と範囲は渡る（H3）。
+        """型の崩れたフローでも SubagentStart は失敗せず、子の一覧と範囲は渡る（H3）。
 
         形の誤りは `--lint --flow` と同じ理由の 1 行で言い、手順は並べない
         （`flow_shape.shape_problem`）。

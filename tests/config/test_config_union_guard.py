@@ -1,4 +1,4 @@
-"""設定 3 本の和の受入テスト。設定ファイルの保護（設計 11.6）と導入スクリプト（11.9 末尾）。
+"""設定 3 本の和の受入テスト。設定ファイルの保護と導入スクリプト。
 
 selfguard のコアに、各レイヤーの `.ccnavi/config/` の 3 本と共通レイヤーの phases / risk が入る。
 Write / Edit の拒否、シェルからの書き込みの拒否、バックアップと復元の 3 つとも、
@@ -7,7 +7,7 @@ Write / Edit の拒否、シェルからの書き込みの拒否、バックア�
 
 ルールファイルは何でも通す 1 本にしてある。止まるなら、それはルールの外の組み込み。
 
-実装は入っている。ここが落ちたら、設定ファイルの保護か導入スクリプトが設計 11.6 / 11.9 と
+実装は入っている。ここが失敗したら、設定ファイルの保護か導入スクリプトが設計と
 食い違ったということ。
 """
 
@@ -61,7 +61,7 @@ class GuardHarness(ConfigUnionHarness):
     def setUp(self):
         super().setUp()
         write(self.rules, json.dumps(OPEN_RULES))
-        # 共通レイヤーには phases.yml を置けない（`--lint` が error）が、置かれても守る（11.6）。
+        # 共通レイヤーには phases.yml を置けない（`--lint` が error）が、置かれても守る。
         # 守ることを見るために置き、ワークツリー側の設定ができるようコミットしておく。
         write(self.phases, COMMON_PHASES)
         git(self.ws, "add", "-A")
@@ -83,16 +83,16 @@ class GuardHarness(ConfigUnionHarness):
         return before, read(path), result
 
     def said(self, result, note=""):
-        """落ちたときに何が起きたかをつける。標準エラーを見ないと理由が出ない。"""
+        """失敗したときに何が起きたかをつける。標準エラーを見ないと理由が出ない。"""
         head = f"{note}\n" if note else ""
         return f"{head}stdout: {result.stdout}\nstderr: {result.stderr}"
 
 
 class RestoreTest(GuardHarness):
-    """バックアップと復元（11.6、REQ-MLT-08 の変更）。"""
+    """バックアップと復元。"""
 
     def test_project_layer_files_are_restored(self):
-        """11.6: プロジェクトのレイヤーの 3 本がバックアップと復元の対象。"""
+        """プロジェクトのレイヤーの 3 本がバックアップと復元の対象。"""
         for kind in ("rules", "phases", "risk"):
             with self.subTest(kind=kind):
                 path = layer_path(self.lib, kind)
@@ -102,7 +102,7 @@ class RestoreTest(GuardHarness):
                 self.assertIn(os.path.basename(path), result.stdout, self.said(result, kind))
 
     def test_own_layer_files_are_restored(self):
-        """11.6: 自身のレイヤー `<ワークスペースルート>/.ccnavi/config/` の 3 本も対象。"""
+        """自身のレイヤー `<ワークスペースルート>/.ccnavi/config/` の 3 本も対象。"""
         write(layer_path(self.ws, "risk"), COMMON_RISK)
         for kind in ("rules", "phases", "risk"):
             with self.subTest(kind=kind):
@@ -112,7 +112,7 @@ class RestoreTest(GuardHarness):
                 self.assertIn("restored", result.stdout, self.said(result, kind))
 
     def test_common_phases_and_risk_are_restored(self):
-        """11.6: 共通レイヤーの phases.yml / risks.yml を足す（既存の穴の修正）。"""
+        """共通レイヤーの phases.yml / risks.yml を足す（既存の穴の修正）。"""
         for path in (self.phases, self.risk):
             name = os.path.basename(path)
             with self.subTest(path=name):
@@ -121,7 +121,7 @@ class RestoreTest(GuardHarness):
                 self.assertIn("restored", result.stdout, self.said(result, name))
 
     def test_copies_in_a_worktree_cut_from_a_project_are_restored(self):
-        """11.6: プロジェクトである元リポジトリから切ったワークツリー側の設定も対象。"""
+        """プロジェクトである元リポジトリから切ったワークツリー側の設定も対象。"""
         tree = self.worktree(self.lib, "w1")
         copy = layer_path(tree, "rules")
         self.assertTrue(
@@ -134,14 +134,14 @@ class RestoreTest(GuardHarness):
         self.assertIn("統合すれば", result.stdout, self.said(result))
 
     def test_copies_in_a_worktree_cut_from_the_workspace_are_restored(self):
-        """11.6: ワークスペースから切ったワークツリー側の、自身のレイヤーの設定も対象。"""
+        """ワークスペースから切ったワークツリー側の、自身のレイヤーの設定も対象。"""
         tree = self.worktree(self.ws, "w2")
         copy = layer_path(tree, "phases")
         before, after, result = self.break_and_restore(copy, broken="version: 1\nphases: {}\n")
         self.assertEqual(after, before, self.said(result))
 
     def test_copies_of_the_common_layer_in_a_worktree_are_restored(self):
-        """11.6: ワークスペースから切ったワークツリー側の、共通レイヤーの設定も対象（既存の穴）。
+        """ワークスペースから切ったワークツリー側の、共通レイヤーの設定も対象（既存の穴）。
 
         共通レイヤーの 3 本はワークスペースの git が追跡しているので、ワークツリー側の設定もできる。
         直す前は、そこがルールの allow `worktrees` に当たって書けてしまい、戻りもしなかった。
@@ -161,7 +161,7 @@ class RestoreTest(GuardHarness):
                 self.assertIn("統合すれば", result.stdout, self.said(result, name))
 
     def test_deleted_layer_file_comes_back_from_the_project_git(self):
-        """11.6 / REQ-SLF: バックアップが無ければ、そのレイヤーの git（プロジェクト自身）
+        """バックアップが無ければ、そのレイヤーの git（プロジェクト自身）
         から戻る。"""
         path = layer_path(self.lib, "rules")
         expected = read(path)
@@ -173,13 +173,13 @@ class RestoreTest(GuardHarness):
         self.assertEqual(read(path), expected, self.said(result))
 
     def test_missing_layer_files_are_not_reported(self):
-        """11.6 / REQ-SLF-03: 無いものは対象から外れる。app のレイヤーが無いことは言わない。"""
+        """無いものは対象から外れる。app のレイヤーが無いことは言わない。"""
         result = self.run_hook("PreToolUse")
         self.assertNotIn("app", result.stdout, self.said(result))
         self.assertEqual(result.stderr, "", self.said(result))
 
     def test_record_names_the_layer_that_was_restored(self):
-        """11.6: 記録の `guarded` に、レイヤーの名前付きの鍵で何をしたかが残る。"""
+        """記録の `guarded` に、レイヤーの名前付きの鍵で何をしたかが残る。"""
         self.break_and_restore(layer_path(self.lib, "phases"))
         with open(self.log, encoding="utf-8") as f:
             line = json.loads([ln for ln in f if ln.strip()][-1])
@@ -189,10 +189,10 @@ class RestoreTest(GuardHarness):
             line["guarded"],
         )
 
-    # 組み込みの既定を使っている間の修復（REQ-PRE-06、selfguard._left_as_repair）
+    # 組み込みの既定を使っている間の修復（selfguard._left_as_repair）
 
     def test_a_repair_of_an_unreadable_common_rules_file_is_left(self):
-        """REQ-PRE-06: 読めない共通レイヤーのルールを名指しのツールで直した結果は、
+        """読めない共通レイヤーのルールを名指しのツールで直した結果は、
         実行後に戻さない。"""
         fixed = json.dumps(OPEN_RULES)
         for tool in ("Write", "Edit"):
@@ -238,7 +238,7 @@ class RestoreTest(GuardHarness):
 
 
 class DenyTest(GuardHarness):
-    """`.ccnavi/` 全体への組み込みの deny（11.6）。ルールに宣言が無くても止まる。"""
+    """`.ccnavi/` 全体への組み込みの deny。ルールに宣言が無くても止まる。"""
 
     def test_a_rule_named_like_a_builtin_does_not_replace_it(self):
         """組み込みの名前（`builtin-guard-`）のルールは読み込まず、組み込みは常に足す。
@@ -282,7 +282,7 @@ class DenyTest(GuardHarness):
         self.assertTrue(any("builtin-guard-" in p["detail"] for p in errors), errors)
 
     def test_named_tool_writes_into_project_home_are_denied(self):
-        """11.6: `*/.ccnavi/*` への Write / Edit は `builtin-guard-project-home` で止まる。"""
+        """`*/.ccnavi/*` への Write / Edit は `builtin-guard-project-home` で止まる。"""
         targets = (
             layer_path(self.lib, "rules"),
             os.path.join(self.lib, HOME, "scripts", "count.sh"),
@@ -296,7 +296,7 @@ class DenyTest(GuardHarness):
                     self.assert_denied(result, "builtin-guard-project-home")
 
     def test_shell_writes_into_project_home_are_denied(self):
-        """11.6: シェルからの書き込みは `builtin-guard-setting-files` の 1 本で止まる。"""
+        """シェルからの書き込みは `builtin-guard-setting-files` の 1 本で止まる。"""
         for command in (
             "echo x > projects/lib/.ccnavi/scripts/count.sh",
             "echo x >> .ccnavi/config/rules.yml",
@@ -309,7 +309,7 @@ class DenyTest(GuardHarness):
                 self.assert_denied(result, "builtin-guard-setting-files")
 
     def test_reading_project_home_is_allowed(self):
-        """11.6: 読むだけなら通る。名前が出ただけでは止めない。"""
+        """読むだけなら通る。名前が出ただけでは止めない。"""
         for command in (
             "cat projects/lib/.ccnavi/config/rules.yml",
             "grep -n deny .ccnavi/config/rules.yml",
@@ -321,14 +321,14 @@ class DenyTest(GuardHarness):
         )
 
     def test_disable_does_not_add_the_deny(self):
-        """11.6: 設定ファイルの保護を disable にすれば組み込みの deny も足さない。"""
+        """設定ファイルの保護を disable にすれば組み込みの deny も足さない。"""
         result = self.hook("Write", self.ws, file_path=layer_path(self.lib, "rules"))
         self.assertNotIn("builtin-guard-project-home", self.reason(result))
         result = self.hook("Write", self.ws, file_path=self.phases)
         self.assertNotIn("builtin-guard-common-layer", self.reason(result))
 
     def test_named_tool_writes_into_the_common_layer_are_denied(self):
-        """11.6: 共通レイヤーの 3 本への Write / Edit は、ルールに宣言が無くても組み込みで止まる。
+        """共通レイヤーの 3 本への Write / Edit は、ルールに宣言が無くても組み込みで止まる。
 
         土台の共通レイヤーは既定の置き場（`.ccnavi/common/`）にある。ルールの 1 行に任せると、
         書き換えたルールファイルのもとでは通ってしまう（issue #14）。
@@ -340,7 +340,7 @@ class DenyTest(GuardHarness):
                     self.assert_denied(result, "builtin-guard-common-layer")
 
     def test_common_layer_copies_in_a_worktree_are_denied(self):
-        """11.6: ワークスペースから切ったワークツリー側の共通レイヤーも止まる。
+        """ワークスペースから切ったワークツリー側の共通レイヤーも止まる。
 
         統合すればそのまま main の設定になる。
         """
@@ -351,7 +351,7 @@ class DenyTest(GuardHarness):
         )
 
     def test_common_layer_deny_names_only_those_files(self):
-        """11.6: 同じ名前の別のファイルは止めない。
+        """同じ名前の別のファイルは止めない。
 
         当てるのはワークスペースルートと、そこから切ったワークツリーの下の同じ相対だけ。
         """
@@ -363,7 +363,7 @@ class DenyTest(GuardHarness):
                 self.assert_not_denied(self.guarded_hook("Write", self.ws, file_path=path))
 
     def test_shell_writes_into_the_common_layer_are_denied(self):
-        """11.6: 共通レイヤーの 3 本へのシェルからの書き込みは組み込みで止まる。
+        """共通レイヤーの 3 本へのシェルからの書き込みは組み込みで止まる。
 
         置き場は `.ccnavi/common/` に固定なので、ccnavi ディレクトリを丸ごと拾う 1 本
         （`_PLACES` の `\\.ccnavi`）が当てる。動かした置き場は
@@ -384,7 +384,7 @@ class DenyTest(GuardHarness):
         self.assertNotIn("builtin-guard-setting-files", self.reason(result))
 
     def test_copying_out_of_the_common_layer_is_allowed(self):
-        """11.6: 共通レイヤーの 3 本が cp / ln / install の元の側にだけ出る形は、
+        """共通レイヤーの 3 本が cp / ln / install の元の側にだけ出る形は、
         読むだけなので通る。
 
         写す側は行き先（最後の引数か `-t` の値）だけを見る。元の側で当たると、
@@ -406,7 +406,7 @@ class DenyTest(GuardHarness):
                     self.assertNotIn("builtin-guard-setting-files", self.reason(result))
 
     def test_copying_into_the_common_layer_is_denied(self):
-        """11.6: 行き先が共通レイヤーの 3 本（かその置き場）になる cp / ln / install は止まる。
+        """行き先が共通レイヤーの 3 本（かその置き場）になる cp / ln / install は止まる。
 
         後ろに別のコマンドをつないだ形、前につないだ形、引用でつないだ語、
         `-t` で行き先を前に出した形も同じ。元の側に出ただけの形を通すために、
@@ -447,7 +447,7 @@ class DenyTest(GuardHarness):
                 self.assert_denied(result, "builtin-guard-setting-files")
 
     def test_writing_from_the_common_layer_side_is_still_denied(self):
-        """11.6: 書き込みの表記は、共通レイヤーの 3 本が前に出た形でも今までどおり止まる。
+        """書き込みの表記は、共通レイヤーの 3 本が前に出た形でも今までどおり止まる。
 
         元と行き先の区別をするのは cp / ln / install だけ。mv は元を消し、rm / tee /
         sed -i / リダイレクトは名指ししたところを書く。
@@ -470,7 +470,7 @@ class DenyTest(GuardHarness):
 
         hook の payload では共通レイヤーを動かせない（`--rules` は診断でだけ有効）。
         試験は判定そのものを実運用と同じ関数に通す経路なので、動かした先を保護が
-        追うかどうかは、こちらで見る（REQ-DIA-03）。
+        追うかどうかは、こちらで見る。
         """
         done = self.ccnavi(*flags, "--test", "--json", "Bash", command, guard=guard)
         try:
@@ -480,7 +480,7 @@ class DenyTest(GuardHarness):
         return [hit["id"] for hit in body.get("rules", [])]
 
     def test_shell_writes_into_a_moved_common_layer_are_denied(self):
-        """11.6: 共通レイヤーが既定の置き場の外にあっても、シェルからの書き込みは組み込みで止まる。
+        """共通レイヤーが既定の置き場の外にあっても、シェルからの書き込みは組み込みで止まる。
 
         置き場を動かせるのは診断のためのフラグ（`--rules` / `--phases` / `--risk`）だけ
         （env は使われず、フラグも診断でだけ有効）。それでも動かせる以上、
@@ -490,12 +490,12 @@ class DenyTest(GuardHarness):
 
         末尾の 2 本が境界を見る。前と後ろの両方が要る。`otherpolicy/rules.yml` は
         前の境界（`(?:^|[^\\w.-])`）だけを、`policy/rules.yml.bak` は後ろの境界
-        （`_TERM`）だけを落とす。片方しか置かないと、置かなかったほうの境界を消す変異があっても
+        （`_TERM`）だけを外す。片方しか置かないと、置かなかったほうの境界を消す変異があっても
         テストが通る。
         """
         policy = write(os.path.join(self.ws, "policy", "rules.yml"), read(self.rules))
         moved = ("--rules", policy)
-        # 絶対パスは `/` で書く。bash は引用されない `\` を落とすので、`\` の表記のままでは
+        # 絶対パスは `/` で書く。bash は引用されない `\` を消すので、`\` の表記のままでは
         # そのコマンドは設定ファイルに書かない。
         for command in (
             "echo x > policy/rules.yml",
@@ -514,7 +514,7 @@ class DenyTest(GuardHarness):
                 self.assertNotIn("builtin-guard-setting-files", self.judged(command, *moved))
 
     def test_copies_of_a_moved_common_layer_look_only_at_the_destination(self):
-        """11.6: 動かした共通レイヤーの 3 本も、cp / ln / install は行き先の側だけで当てる。
+        """動かした共通レイヤーの 3 本も、cp / ln / install は行き先の側だけで当てる。
 
         動かした先の表記（`common_shell_clause`）は書き込み用とコピー用に分けて足す。
         書き込み用（空白で閉じる）をそのまま写す側に足すと、元の側に出ただけで当たる。
@@ -575,7 +575,7 @@ class DenyTest(GuardHarness):
                 self.assertNotIn("builtin-guard-setting-files", self.judged(command, *moved_flags))
 
     def test_a_directory_holding_a_moved_common_layer_is_guarded_by_name(self):
-        """11.6: 動かした共通レイヤーの入っているディレクトリを行き先にした形（`_moved_holders`）。
+        """動かした共通レイヤーの入っているディレクトリを行き先にした形（`_moved_holders`）。
 
         行き先の表記に共通レイヤーの名前が出ないので、元の名前で見る。同じ名前を置く形と、名前の
         決まらない形は止め、別の名前を置くだけの形は止めない。
@@ -605,7 +605,7 @@ class DenyTest(GuardHarness):
                 self.assertNotIn("builtin-guard-setting-files", self.judged(command, *moved))
 
     def test_lint_warns_about_new_files_in_a_worktree_project_home(self):
-        """11.6: ワークツリーの `.ccnavi/` に元リポジトリに無いファイルがあれば --lint warn。"""
+        """ワークツリーの `.ccnavi/` に元リポジトリに無いファイルがあれば --lint warn。"""
         tree = self.worktree(self.lib, "w1")
         write(os.path.join(tree, HOME, "scripts", "new.sh"), "echo new\n")
 
@@ -616,7 +616,7 @@ class DenyTest(GuardHarness):
 @unittest.skipUnless(SHELL, "sh も bash も見つからない")
 @unittest.skipUnless(HAS_JQ, "jq が見つからない")
 class SetupTest(unittest.TestCase):
-    """導入スクリプト（11.9「導入スクリプト」）。tests/sh/test_setup.py の作りに合わせる。"""
+    """導入スクリプト。tests/sh/test_setup.py の作りに合わせる。"""
 
     def setUp(self):
         self.dir = tempfile.mkdtemp(prefix="ccnavi-union-setup-")
@@ -681,7 +681,7 @@ class SetupTest(unittest.TestCase):
             return json.load(f)
 
     def test_deploy_copies_common_rules_and_risk_and_own_phases(self):
-        """11.9: 共通レイヤーに rules.yml と risks.yml、
+        """共通レイヤーに rules.yml と risks.yml、
         自身のレイヤーに phases.yml のひな形を配る。"""
         src = self.make_source()
         result = self.run_setup("--mode", "enable", "--deploy", src)
@@ -693,7 +693,7 @@ class SetupTest(unittest.TestCase):
         self.assertNotIn("まだ無いもの", result.stdout)
 
     def test_missing_templates_are_named(self):
-        """11.9: 3 本とも「まだ無いもの」の点検に数える。"""
+        """3 本とも「まだ無いもの」の点検に数える。"""
         result = self.run_setup("--mode", "enable", "--no-deploy")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("まだ無いもの", result.stdout)

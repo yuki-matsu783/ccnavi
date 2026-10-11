@@ -1,4 +1,4 @@
-"""着手の前に共通レイヤーをプロジェクトの `.ccnavi/common/` へミラーする（設計 11.12）。
+"""着手の前に共通レイヤーをプロジェクトの `.ccnavi/common/` へミラーする。
 
 共通レイヤー（ワークスペースルートの `.ccnavi/common/`）はワークスペースの git にあり、
 プロジェクトだけを clone したユーザからは見えない。プロジェクト向けの親の `ticket start` で、
@@ -607,7 +607,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertFalse([p for p in warns if ".ccnavi/common" in p["detail"]], warns)
 
     def test_the_mirror_in_the_original_project_is_restored(self):
-        """11.6: 元のプロジェクトの `.ccnavi/common/` のミラーも、守る対象（書き換えは戻す）。"""
+        """元のプロジェクトの `.ccnavi/common/` のミラーも、守る対象（書き換えは戻す）。"""
         mirror = mirror_of(self.lib, "rules.yml")
         write(mirror, json.dumps(COMMON_RULES))
         git(self.lib, "add", "-A")

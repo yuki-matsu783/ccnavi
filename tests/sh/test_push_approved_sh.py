@@ -5,7 +5,7 @@
 17. 置き場（`.ccnavi/approved`）の変更だけをコミットし、同じツリーの他の未コミットはコミットしない
 18. コミットするものが無ければ 0 で `コミットして push する承認済みチケットは無い。`
 19. `main` の上のツリーはコミットして push しない（0、標準エラーにブランチ名）
-20. push が落ちると 1、コミットは残る
+20. push が失敗すると 1、コミットは残る
 21. detached のツリーは飛ばす
 22. `ccnavi-agree.sh` が承認のあとコミットして push する
 23. `ccnavi-agree.sh` は並べた識別子を `--agree` の後ろに渡し、`-` で始まる語と空の語は断る
@@ -40,7 +40,7 @@ APPROVED = ".ccnavi/approved/doing"
 MESSAGE = "ccnavi: 承認済みチケットを更新"
 NOTHING = "コミットして push する承認済みチケットは無い。"
 
-# 承認の代わり。STUB_ARGS があれば受けた引数を 1 行ずつ書き、STUB_EXIT が 0 でなければ落ち、
+# 承認の代わり。STUB_ARGS があれば受けた引数を 1 行ずつ書き、STUB_EXIT が 0 でなければ失敗し、
 # STUB_TREE があればそこに承認済みチケットを置く。
 STUB = """#!/bin/sh
 [ -z "${STUB_ARGS:-}" ] || printf '%s\\n' "$@" > "$STUB_ARGS"
@@ -272,7 +272,7 @@ class PushApprovedTest(Workspace):
 
         result = self.push()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        # 同じ中身なので、名前の付け替えとして読まずに 2 つのパスで見る。
+        # 同じ中身なので、改名として読まずに 2 つのパスで見る。
         out = git(tree, "show", "--name-only", "--no-renames", "--format=", "HEAD").stdout
         self.assertEqual(sorted(out.split()), sorted([flow, taken]), result.stdout + result.stderr)
         self.assertTrue(self.dirty(tree, rewritten))
@@ -385,7 +385,7 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.head_of(remote, "develop-v1.0.0"), before)
         self.assertNotEqual(self.head(project), before)
 
-    # ---- 20. push が落ちる
+    # ---- 20. push が失敗する
 
     def test_failed_push_exits_1_and_keeps_the_commit(self):
         git(self.ws, "remote", "set-url", "origin", os.path.join(self._tmp.name, "missing.git"))
@@ -441,14 +441,14 @@ class PushApprovedTest(Workspace):
         env が指した置き場はコミットしない。以前は 12（`CCNAVI_TICKETS_APPROVED` で置き場が動く）と
         パスの正規化の 2 本（`CCNAVI_PROJECTS=/`・`CCNAVI_TICKETS_APPROVED=.`）が見ていた。
 
-        3 つのどれか 1 つでも読まれれば、下の確かめのどれかが落ちる。
+        3 つのどれか 1 つでも読まれれば、下の確かめのどれかが失敗する。
 
         - `CCNAVI_PROJECTS`: `projects/app` がコミットされず、env が指す `x/stray` がコミットされる
         - `CCNAVI_TICKETS_APPROVED`: 既定の置き場の代わりに `approved/tickets` がコミットされる
         - `CCNAVI_TICKETS_PROPOSAL`: `wip/proposals/todo` の削除がコミットされず、env が指す
           `elsewhere/proposals/todo` の削除がコミットされる
 
-        `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は落ちる。
+        `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は失敗する。
         写す前の sh は 3 つの値を読むため。
         """
         project = os.path.join(self.ws, "projects", "app")
@@ -469,7 +469,7 @@ class PushApprovedTest(Workspace):
         # env が指す承認済みチケットの置き場。読まれたときにだけコミットされる。
         other = "approved/tickets"
         write(os.path.join(tree, *other.split("/"), "i0009.md"), "approved\n")
-        # env が指すプロジェクトの置き場（`/x` は末尾の / を落とすとルートの下の `x`）。
+        # env が指すプロジェクトの置き場（`/x` は末尾の / を除くとルートの下の `x`）。
         # 読まれたときにだけ、その下のリポジトリが運ばれる。
         stray = os.path.join(self.ws, "x", "stray")
         stray_remote = self.repository(stray, "work")
@@ -509,14 +509,14 @@ class PushApprovedTest(Workspace):
         )
 
     def test_a_failed_add_in_one_tree_does_not_stop_the_others(self):
-        """7. 1 本のツリーで `git add` が落ちても、もう 1 本はコミットして push する。
+        """7. 1 本のツリーで `git add` が失敗しても、もう 1 本はコミットして push する。
 
-        終了コードは 1 で、落ちたツリーを標準エラーで名指しする。
+        終了コードは 1 で、失敗したツリーを標準エラーで名指しする。
         """
         locked = self.worktree("locked")
         self.place(locked)
         before = self.head(locked)
-        # そのツリーのインデックスを他のプロセスが握っている形。`git add` が落ちる。
+        # そのツリーのインデックスを他のプロセスが握っている形。`git add` が失敗する。
         gitdir = git(locked, "rev-parse", "--absolute-git-dir").stdout.strip()
         write(os.path.join(gitdir, "index.lock"))
         tree = self.worktree("i0002")
@@ -527,7 +527,7 @@ class PushApprovedTest(Workspace):
         self.assertTrue(self.said(result, "locked"), result.stderr)
         self.assertEqual(self.head(locked), before)
         self.assertEqual(self.remote_head("locked"), "")
-        # 落ちたツリーのあとでも、他のツリーはコミットして push する。
+        # 失敗したツリーのあとでも、他のツリーはコミットして push する。
         self.assertEqual(self.subject(tree), MESSAGE)
         self.assertEqual(self.committed(tree), [f"{APPROVED}/i0002.md"])
         self.assertEqual(self.remote_head("i0002"), self.head(tree))
@@ -535,7 +535,7 @@ class PushApprovedTest(Workspace):
     def test_a_symlink_under_worktrees_is_not_followed(self):
         """8. `.claude/worktrees/` の下のシンボリックリンクは辿らない。標準エラーに言う。
 
-        リンク先はワークスペースの外のリポジトリ。本物のワークツリーはコミットして push する。
+        リンク先はワークスペースの外のリポジトリ。実際のワークツリーはコミットして push する。
         """
         outside = os.path.join(self._tmp.name, "outside")
         outside_remote = self.repository(outside, "work")
@@ -583,7 +583,7 @@ class PushApprovedTest(Workspace):
         """`projects/` そのものがシンボリックリンクなら、その下のリポジトリにコミットしない。
 
         リンク先の中の 1 件ずつはリンクではないので、置き場の段で確かめないと辿ってしまう。
-        飛ばしたことは標準エラーに言う。本物のワークツリーはコミットして push する。
+        飛ばしたことは標準エラーに言う。実際のワークツリーはコミットして push する。
         """
         app, remote = self.outside_repository("elsewhere-projects")
         before = self.head(app)
@@ -668,7 +668,7 @@ class PushApprovedTest(Workspace):
 @unittest.skipUnless(SHELL and GIT, "sh と git が要る")
 class ApproveCarriesTest(Workspace):
     """22. `ccnavi-agree.sh` は承認のあと `ccnavi-push-approved.sh` で
-    コミットして push する（設計 1.4）。
+    コミットして push する。
     """
 
     scripts = APPROVE_SCRIPTS

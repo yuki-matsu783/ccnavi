@@ -168,7 +168,7 @@ class CompatAgreesTest(unittest.TestCase):
     def test_v8_renaming_the_approve_flag_to_agree_raised_the_compat_to_3(self):
         """V8 `--approve` を `--agree` に改名したので 3 以上。
 
-        改名の前の sh（互換 2）は `--approve` を渡して落ちるので、食い違いとして知らせる。
+        改名の前の sh（互換 2）は `--approve` を渡して失敗するので、食い違いとして知らせる。
         """
         self.assertGreaterEqual(version.COMPAT, 3)
 

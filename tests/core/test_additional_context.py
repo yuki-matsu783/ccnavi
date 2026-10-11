@@ -296,7 +296,7 @@ class AdditionalContextTest(unittest.TestCase):
         write(os.path.join(self.root, "docs", "guide.md"), "ルートの案内")
         wt = os.path.join(self.root, ".claude", "worktrees", "feat")
         write(os.path.join(wt, "docs", "guide.md"), "ワークツリーの案内")
-        # 本物のワークツリーと見なされるには、.git ファイルと登録簿の相互参照が要る。
+        # 実際のワークツリーと見なされるには、.git ファイルと登録簿の相互参照が要る。
         gitdir = os.path.join(self.root, ".git", "worktrees", "feat")
         write(os.path.join(wt, ".git"), f"gitdir: {gitdir}\n")
         write(os.path.join(gitdir, "gitdir"), os.path.join(wt, ".git") + "\n")

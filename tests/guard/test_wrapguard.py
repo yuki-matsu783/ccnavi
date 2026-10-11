@@ -256,7 +256,7 @@ class ShAgreesTest(unittest.TestCase):
         for name in ("ccnavi-git.sh", *common_sh(common_dir)):
             source = os.path.join(self.SH_DIR, name)
             if not os.path.isfile(source):
-                # コピーする版は変えた sh だけを置く。残りは本物を使う。
+                # コピーする版は変えた sh だけを置く。残りは実物を使う。
                 source = os.path.join(ROOT, ".ccnavi", "scripts", name)
             shutil.copy(source, scripts)
         self.git("init", "--quiet", "-b", "main", cwd=self.root)
@@ -340,7 +340,7 @@ class ShAgreesTest(unittest.TestCase):
             ticket("i0001-01-01", "i0001"),
         )
         result = self.run_sh(os.path.join(link, ".claude", "worktrees", "i0001-01-01"), "push")
-        # 本物の sh も両辺をリンクを解いたパスで比べる。比べないとリンクを経た作業場で保護が外れる。
+        # 実際の sh も両辺をリンクを解いたパスで比べる。比べないとリンクを経た作業場で保護が外れる。
         stopped = "子チケットのワークツリー" in result.stderr
         self.assertTrue(stopped, result.stderr)
 

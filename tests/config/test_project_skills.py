@@ -114,7 +114,7 @@ class ProjectSkillsTest(unittest.TestCase):
         self.assertIn("- notes: （説明が無い）", self.context("SessionStart", self.lib))
 
     def test_unbuildable_frontmatter_falls_back_to_the_directory_name(self):
-        """値を組み立てられない frontmatter（`!!int` の空など）でも hook は落ちない。"""
+        """値を組み立てられない frontmatter（`!!int` の空など）でも hook は失敗しない。"""
         self.put("broken", "---\nname: !!int\ndescription: !!bool maybe\n---\n本文\n")
         self.assertIn("- broken: （説明が無い）", self.context("SessionStart", self.lib))
 

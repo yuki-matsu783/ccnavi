@@ -1,7 +1,7 @@
-"""取り込み済みの親子のチケットで本物とする側。
+"""取り込み済みの親子のチケットで正とする側。
 
 取り込み状態（`<state の置き場>/sync/<リポジトリ>/families/<P>`）がある親子のチケットは、
-本物とする側を親のブランチ（`.claude/worktrees/<P>` で HEAD が `<P>` を指すツリー）に固定し、
+正とする側を親のブランチ（`.claude/worktrees/<P>` で HEAD が `<P>` を指すツリー）に固定し、
 決まらなければ承認も状態の操作も実行前チェックも止める。
 取り込み状態の無い親子のチケットは前と同じ答え。
 
@@ -126,7 +126,7 @@ class ReaderTest(unittest.TestCase):
 
     def test_a_swap_that_never_ends_reads_as_broken(self):
         # 取り込んだ形跡があるのに入れ替えが終わらなければ、何も言わずに「取り込み状態が無い」にせず
-        # 壊れているとする。
+        # 不正とする。
         self.put("sync/self/integration.old.9/head", "branch main\n")
         started = time.monotonic()
         found = syncstate.integration(self.state, "self")
@@ -267,7 +267,7 @@ class PresentTest(AuthorityHarness):
 
     def test_a_copy_only_outside_the_parent_tree_is_not_trusted(self):
         # 元ツリー（ワークスペースルート）に未コミットで残ったチケット。
-        # 本物とする側のツリーが無いときに元ツリーを採る形。
+        # 正とする側のツリーが無いときに元ツリーを採る形。
         self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["wip/design/*"]))
         stray = os.path.join(self.root, ".ccnavi", "approved", "doing", "i0001-02-02.md")
         with open(
@@ -282,7 +282,7 @@ class PresentTest(AuthorityHarness):
         self.record("present")
         copies, _ = approval.scan(self.conf(), self.root)
         after = {t.ticket: t.blocked for t in copies}
-        # リストは変えない（落とさない）。理由だけが足される。
+        # リストは変えない（除かない）。理由だけが足される。
         self.assertEqual(sorted(before), sorted(after))
         self.assertIn("ワークツリーの外", after["i0001-02-02"])
         self.assertEqual("", after["i0001-01-01"])
@@ -694,7 +694,7 @@ class IntegrationDoneTest(AuthorityHarness):
         os.makedirs(os.path.join(base, "integration.old.9"))
         preview = self.preview()
         self.assertTrue(self.rejected_with(preview, "i0001-01-02", "入れ替えが終わらない"), preview)
-        # 壊れた head（リンク）。
+        # 破損した head（リンク）。
         os.rmdir(os.path.join(base, "integration.old.9"))
         real = write(os.path.join(self.root, "elsewhere-head"), "branch main\n")
         os.symlink(real, os.path.join(base, "integration", "head"))

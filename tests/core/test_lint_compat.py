@@ -1,6 +1,6 @@
 """`--lint` が `.ccnavi/scripts/` の sh の互換の版の食い違いを言うこと。
 
-sh は `ccnavi-common.sh` の `CCNAVI_COMPAT=<数>` で互換の版を名乗る。実行ファイルの
+sh は `ccnavi-common.sh` の `CCNAVI_COMPAT=<数>` で互換の版を宣言する。実行ファイルの
 `src/ccnavi/entry/version.py` の COMPAT と違えば `(version)` の warn で言い、直し方（ccnavi の
 リポジトリなら組み立て直し、配布先なら配り直し）を名指しする。sh の無いワークスペースでは言わない。
 """
@@ -68,7 +68,7 @@ class LintShCompatTest(unittest.TestCase):
         self.assertIn("scripts/ccnavi-setup.sh", said[0]["detail"])
 
     def test_v23_an_sh_without_the_line_is_old(self):
-        """V23 互換の版を名乗らない sh は、互換の版を持つ前の古い sh。"""
+        """V23 互換の版を宣言しない sh は、互換の版を持つ前の古い sh。"""
         self.put_sh("# nothing")
         said = self.said()
         self.assertEqual([p["severity"] for p in said], ["warn"], said)

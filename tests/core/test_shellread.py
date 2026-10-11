@@ -108,7 +108,7 @@ class ReadTest(_Readable, unittest.TestCase):
         self.assertIn("git push", self.readable("echo $(git push origin main)"))
 
     def test_算術式は取り除かれる(self):
-        # 中でコマンドは走らない。落とす理由は別にあって、左シフトの `<<` が
+        # 中でコマンドは走らない。除く理由は別にあって、左シフトの `<<` が
         # ヒアドキュメントの区切り記号と同じ表記だから。残すと本文の始まりに
         # 見えて、閉じない本文としてコマンド全体が読めなくなる。
         for src in ["echo $((1 << 2))", "echo $(( 1 << 2 ))", "n=$((i + 1))"]:
@@ -208,7 +208,7 @@ class WordSepTest(_Readable, unittest.TestCase):
                 self.assertEqual(show(self.readable(src)), show(want))
 
     def test_引用だけの二重の山括弧は今までどおり諦める(self):
-        # 許容した誤検知（設計 12.2）。目印を分けても変わらない。
+        # 許容した誤検知。目印を分けても変わらない。
         result = read('grep -n "<<" f')
         self.assertTrue(result.degraded, "引用の << を普通に読んでしまった")
         self.assertEqual(result.reason, REASON_UNTERMINATED)
@@ -896,7 +896,7 @@ class BraceTest(unittest.TestCase):
             # （敵対的レビュー）。
             "{git,\rpush,origin,main}": ["{git,\rpush,origin,main}"],
             # シェルは代入の右辺、case のパターン、[[ ]] の中を広げないが、並べる
-            # （許容した誤検知。設計 12.2）。
+            # （許容した誤検知）。
             "x={a,b}": ["{a,b}"],
             "case $x in {a,b}) :;; esac": ["{a,b}"],
             "[[ $f == *.{jpg,png} ]]": ["{jpg,png}"],

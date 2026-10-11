@@ -333,7 +333,7 @@ class HostFixtureTest(unittest.TestCase):
                 self.assertFalse(any(a.startswith(("--actor", "--via")) for a in self.passed()))
 
     def old_exe(self, flags):
-        """古い実行ファイルの代役。知らないフラグ（--actor・--via）を渡されると引数の誤りで落ちる。
+        """古い実行ファイルの代役。知らないフラグ（--actor・--via）を渡されると引数の誤りで失敗する。
 
         `flags` が None なら `--version --json` を知らない（`--actor` を入れる前の版）。
         387d4a6 の実行ファイルは
@@ -367,7 +367,7 @@ class HostFixtureTest(unittest.TestCase):
         return path
 
     def test_an_old_exe_gets_only_the_flags_it_knows(self):
-        """`--version --json` の flags に無いフラグは渡さない（古いものが落ちる）。"""
+        """`--version --json` の flags に無いフラグは渡さない（古いものが失敗する）。"""
         for flags, confirm_actor in ((None, False), (["--actor"], True)):
             with self.subTest(flags=flags):
                 exe = self.old_exe(flags)
@@ -584,7 +584,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
 
         見本の場面は i0001 の MR しか持たないので、i0002 に移ると作る側へ進む。作る要求
         （POST .../merge_requests）だけはこの試験の curl が受けて本文を書き留め、ほかは代役に回す。
-        作った後の投稿は見本に無い MR へ向かうので落ちてよい。見るのは宛先だけ。
+        作った後の投稿は見本に無い MR へ向かうので失敗してよい。見るのは宛先だけ。
         """
         out = os.path.join(self._tmp.name, "out")
         stub = self.request_stub(out)
@@ -727,7 +727,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
             # 実行ビットを持てないファイルシステム（NTFS）では、モード 100755 のファイルを作れない。
             del cases["実行ビット付き"]
         if not argument_keeps_quote():
-            # 引数の `'` が sh に届く前に落ちる環境では、名前に `'` を持つファイルを名指しできない。
+            # 引数の `'` が sh に届く前に外れる環境では、名前に `'` を持つファイルを名指しできない。
             del cases["名前に '"]
         if linked:
             cases["シンボリックリンク"] = (

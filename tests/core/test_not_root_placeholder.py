@@ -4,8 +4,8 @@
 先読みが使えないので、実行ファイルがルートを 1 文字ずつ
 「ここで終わる／ここが違う／ここは同じ」の入れ子に展開する。
 
-このファイルは実装より先に書いてある。 実装が入るまで落ちるのが正しい。
-落ち方が「機能が無い」であって「テストが壊れている」ではないことだけを見ること。
+このファイルは実装より先に書いてある。実装が入るまで失敗するのが正しい。
+失敗の仕方が「機能が無い」であって「テストが誤っている」ではないことだけを見ること。
 
 内部の構造には触れない。見るのは外から観測できるものだけ。
 
@@ -14,7 +14,7 @@
   - hook として呼んだときの判定
   - `--lint` の言い分
 
-`_build` の戻り値の形をどう変えるか（設計 4.4 の案 1 か案 2）は実装フェーズの
+`_build` の戻り値の形をどう変えるか（設計にある 2 つの案のどちらか）は実装フェーズの
 判断なので、ここでは縛らない。
 """
 
@@ -30,10 +30,10 @@ from ccnavi.policy import rules
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
-# 「ワークスペースルートの外」。設計 3.2 の、置ける唯一の形。
+# 「ワークスペースルートの外」を書ける唯一の形。
 NOT_ROOT = "^{!root}"
 
-# 展開しても現れてはいけない表記。設計 2.5。
+# 展開しても現れてはいけない表記。
 # 繰り返しは `_unsupported` が見ないので、ここで見る。
 _QUANTIFIER = re.compile(r"(?<!\\)[*+]|(?<!\\)\{\d")
 _LOOKAROUND = ("(?=", "(?!", "(?<=", "(?<!")
@@ -46,7 +46,7 @@ def absolute(path: str) -> str:
     変わるのは絶対かどうかで、`rules.real_root` が呼ぶ `os.path.realpath` は、
     相対のパスなら頭に cwd を足す。POSIX で `C:\Users\...` をそのまま渡すと、ルートが
     `<cwd>/C:\Users\...` になってしまい、「中」のはずのパスが全部「外」になり、長さの境界も
-    cwd のぶんだけ変わる。設計 2.3 の表は Windows の表記のまま残して、頭だけを機械に
+    cwd のぶんだけ変わる。設計の表は Windows の表記のまま残して、頭だけを機械に
     合わせる（docs/claude/environment.md「実行環境」: 4 つのどれでも動くように書く）。
 
     `\` は POSIX でも普通の 1 文字として残る（`realpath` が切るのは `/` だけ）。
@@ -99,7 +99,7 @@ def outside_rule(expression: str = NOT_ROOT, **extra) -> dict:
 
 
 class NotRootExpansionTest(unittest.TestCase):
-    """展開した式が、どの表記を「外」と数えるか。設計 2。"""
+    """展開した式が、どの表記を「外」と数えるか。"""
 
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
@@ -107,7 +107,7 @@ class NotRootExpansionTest(unittest.TestCase):
         self.path = rules_file(self.dir.name, outside_rule())
 
     def compiled(self, root: str):
-        """そのルートで組み立てた式を返す。苦情が出ていれば落とす。"""
+        """そのルートで組み立てた式を返す。苦情が出ていればテストを失敗させる。"""
         rule_set, problems = rules.load(self.path, root)
         self.assertEqual([str(p) for p in problems], [], f"root={root!r}")
         return rule_set.deny[0].compiled
@@ -124,7 +124,7 @@ class NotRootExpansionTest(unittest.TestCase):
             with self.subTest(root=root, path=path):
                 self.assertFalse(pattern.search(path), f"中のはずが当たる: {path!r}")
 
-    # --- 観点 1: 設計 2.3 の表 ---
+    # --- 観点 1: 設計の表 ---
 
     def test_the_table_of_what_counts_as_outside(self):
         root = absolute(r"C:\Users\u\Desktop\git\ccnavi")
@@ -149,7 +149,7 @@ class NotRootExpansionTest(unittest.TestCase):
     # --- 観点 2: 末尾が区切りのルート（レビューで見つかった最重の欠陥）---
 
     def test_root_that_ends_with_a_separator(self):
-        """ルートの末尾の区切りを落とさないと、ルート直下まで「外」になる。
+        """ルートの末尾の区切りを取り除かないと、ルート直下まで「外」になる。
 
         Windows では `os.path.realpath('/')` が `C:\\` を返すので、
         ドライブ直下をワークスペースにした環境は必ずこの形になる。
@@ -170,14 +170,14 @@ class NotRootExpansionTest(unittest.TestCase):
                 self.assert_outside(root, stem + r"-fork\x.md", absolute(r"D:\elsewhere\x.md"))
 
     def test_root_that_normalizes_to_nothing_is_refused(self):
-        """正規化した結果が空になるルートでは「外」が定義できない。設計 2.0。
+        """正規化した結果が空になるルートでは「外」が定義できない。
 
         `/` の意味が機械で違うので、表記ではなく正規化の結果で場合分けする。
         POSIX では `realpath('/')` が `/` で、`rstrip` すると空になる（拒否が正しい）。
         Windows では `C:\\` を返すので `C:` が残り、それは正しく展開できる
         ルートなので拒否してはいけない。
 
-        表記だけを見て「`/` なら拒否」と書くと、Windows でだけ落ちるテストになる。
+        表記だけを見て「`/` なら拒否」と書くと、Windows でだけ失敗するテストになる。
         """
         for root in ("\\", "/"):
             with self.subTest(root=root, real=rules.real_root(root)):
@@ -190,7 +190,7 @@ class NotRootExpansionTest(unittest.TestCase):
     def test_the_root_itself_is_inside(self):
         """対象がルートそのものなら「中」。敵対的レビューで見つかった欠陥の回帰テスト。
 
-        最内に `\\Z` を混ぜると、ルートを最後までなぞり切った位置で「外」に落ちる。
+        最内に `\\Z` を混ぜると、ルートを最後までなぞり切った位置で「外」と判定される。
         `Glob` を `path` 省略で呼ぶと対象が cwd（＝ルート）になるので、
         いちばん普通の呼び出しが「外」になってしまう。
 
@@ -216,10 +216,10 @@ class NotRootExpansionTest(unittest.TestCase):
         self.assert_outside(root, absolute(r"C:\Users\taniyama\ccnaviX\x.md"))
 
     def test_turkish_dotted_i_is_a_known_exception(self):
-        """`re.IGNORECASE` は `İ`/`ı` を `I`/`i` と同一視する。設計 2.4。
+        """`re.IGNORECASE` は `İ`/`ı` を `I`/`i` と同一視する。
 
         ファイルシステムは同一視しないので、本当は別の場所だが「中」と数える。
-        意図した挙動として固定する。直すなら設計 2.4 から変えること。
+        意図した挙動として固定する。直すなら設計から変えること。
         """
         root = absolute(r"C:\Users\taniyama\ccnavi")
         self.assert_inside(
@@ -244,7 +244,7 @@ class NotRootExpansionTest(unittest.TestCase):
     # --- 観点 7: 展開結果が契約を守る ---
 
     def test_expansion_has_no_quantifier_and_no_lookaround(self):
-        """展開結果は繰り返しも先読みも含まない。設計 2.5。
+        """展開結果は繰り返しも先読みも含まない。
 
         `_unsupported` は繰り返しを見ないので、そこに掛け直すだけでは
         この性質を確かめられない。だからここで直接見る。
@@ -273,7 +273,7 @@ class NotRootExpansionTest(unittest.TestCase):
     # --- 観点 12: 後ろに続く式 ---
 
     def test_an_expression_may_follow_the_placeholder(self):
-        """`^{!root}.*\\.py$` は「外にある .py」として意味を持つ。設計 3.3。"""
+        """`^{!root}.*\\.py$` は「外にある .py」として意味を持つ。"""
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         path = rules_file(directory.name, outside_rule(NOT_ROOT + r".*\.py$"))
@@ -288,7 +288,7 @@ class NotRootExpansionTest(unittest.TestCase):
     # --- 観点 15: レイヤー ---
 
     def test_the_placeholder_always_means_the_workspace_root(self):
-        """どのレイヤーに書いても展開先はワークスペースルート。設計 2.6。
+        """どのレイヤーに書いても展開先はワークスペースルート。
 
         レイヤーごとにルートが変わると、プロジェクトのレイヤーに書いた 1 行が
         別の場所を指すことになる。
@@ -305,7 +305,7 @@ class NotRootExpansionTest(unittest.TestCase):
 
 
 class NotRootLimitTest(unittest.TestCase):
-    """ルートが長すぎるときの扱い。設計 4。"""
+    """ルートが長すぎるときの扱い。"""
 
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
@@ -315,7 +315,7 @@ class NotRootLimitTest(unittest.TestCase):
         """ちょうどその長さのルートのパス。実在しなくてよい。
 
         末尾が区切りにならないようにする。区切りで終わると `rstrip` で 1 字縮み、
-        測りたい境界から外れる（設計 2.0）。
+        測りたい境界から外れる。
         """
         body = ("d" * 9 + "\\") * (length // 10 + 2)
         root = (absolute("C:\\") + body)[:length]
@@ -326,7 +326,7 @@ class NotRootLimitTest(unittest.TestCase):
     # --- 観点 8: 境界 ---
 
     def test_the_boundary_is_two_hundred_and_fifty_six(self):
-        """255 字は通り、256 字は error で名指しされる。設計 4.1。"""
+        """255 字は通り、256 字は error で名指しされる。"""
         path = rules_file(self.dir.name, outside_rule())
         ok = self.long_root(255)
         self.assertEqual(len(ok), 255)
@@ -347,9 +347,9 @@ class NotRootLimitTest(unittest.TestCase):
         """しきい値より遥かに長いルートでも、未処理例外にならず苦情になる。
 
         このテストは `except RecursionError` の側を実行しない。 `_expand_not_root` が
-        256 字で先に止めるので、`re.compile` まで届かない。組み立てが落ちるのは 493 字で、
+        256 字で先に止めるので、`re.compile` まで届かない。組み立てが失敗するのは 493 字で、
         256〜493 の範囲は事前の検査で全部止まる（変異テストで、`except RecursionError` を
-        丸ごと消してもこのテストが落ちないことを確認済み）。
+        丸ごと消してもこのテストが失敗しないことを確認済み）。
 
         ここで縛っているのは「長すぎるルートを渡しても呼び出し側へ例外が漏れない」ことだけ。
         それでも `rules.py` が `RecursionError` を捕まえているのは、しきい値や展開の形を
@@ -367,9 +367,9 @@ class NotRootLimitTest(unittest.TestCase):
     # --- 観点 9: 生成できないときの扱い ---
 
     def test_deny_falls_closed(self):
-        """組み立てられない `deny` は、`match` の全部を止める。設計 4.3。
+        """組み立てられない `deny` は、`match` の全部を止める。
 
-        捨てると「保護が消える」ほうに落ちる。ここで止まらずに通ると、
+        捨てると「保護が消える」側に倒れる。ここで止まらずに通ると、
         このチケットで作ったものが丸ごと意味を失う。
         """
         path = rules_file(self.dir.name, outside_rule())
@@ -381,7 +381,7 @@ class NotRootLimitTest(unittest.TestCase):
             self.assertTrue(pattern.search(path_to_write), "match の全部に当たるべき")
 
     def test_ask_falls_closed_like_deny(self):
-        """組み立てられない `ask` も `match` の全部に当たる。設計 4.3。
+        """組み立てられない `ask` も `match` の全部に当たる。
 
         設計は deny / ask / allow の 3 つを決めているが、テストは deny と allow しか
         見ていなかった（敵対的レビューの指摘）。確認は戻せるので、ask は deny と同じ向き。
@@ -410,7 +410,7 @@ class NotRootLimitTest(unittest.TestCase):
         self.assertIn("組み立てられない", rule.spoken_message())
 
     def test_allow_falls_the_other_way(self):
-        """組み立てられない `allow` は、どれにも当たらない。設計 4.3。
+        """組み立てられない `allow` は、どれにも当たらない。
 
         当たる扱いにすると ccnavi が何も言わずに通す範囲が広がる。deny とは逆の側を採る。
         """
@@ -428,7 +428,7 @@ class NotRootLimitTest(unittest.TestCase):
 
 
 class NotRootWritingTest(unittest.TestCase):
-    """どこに書けるか。設計 3。"""
+    """どこに書けるか。"""
 
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
@@ -448,7 +448,7 @@ class NotRootWritingTest(unittest.TestCase):
         self.assertEqual(self.problems_for(outside_rule(NOT_ROOT)), "")
 
     def test_the_placeholder_is_refused_in_a_glob(self):
-        """`glob` は fnmatch に翻訳されるので、入れ子の展開を埋める場所が無い。設計 3.1。"""
+        """`glob` は fnmatch に翻訳されるので、入れ子の展開を埋める場所が無い。"""
         rule = {
             "id": "outside-workspace",
             "match": "Write",
@@ -470,7 +470,7 @@ class NotRootWritingTest(unittest.TestCase):
                 self.assertIn("error", said, f"`{suffix}` が通ってしまう")
 
     def test_a_structural_suffix_is_only_a_warning(self):
-        """`^{!root}[\\\\/]foo` は壊れてはいないが、まず勘違い。設計 3.3。
+        """`^{!root}[\\\\/]foo` は不正ではないが、まず勘違い。
 
         展開結果が一致し終わる位置がパスの区切りである保証は無い。
         止めるほどではないので warn。
@@ -481,7 +481,7 @@ class NotRootWritingTest(unittest.TestCase):
 
 
 class NotRootJudgeTest(unittest.TestCase):
-    """hook として呼んだときの判定。設計 4.7。"""
+    """hook として呼んだときの判定。"""
 
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()

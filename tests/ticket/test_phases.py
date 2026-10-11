@@ -1,4 +1,4 @@
-"""フェーズ定義と計画（REQ-TKT-26〜35、設計 9.7）の受入テスト。
+"""フェーズ定義と計画の受入テスト。
 
 見るのは 9 つ。
 
@@ -138,7 +138,7 @@ class PhaseHarness(unittest.TestCase):
         self.phases = write(config_path(self.root, "phases"), PHASES)
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
-        # 承認済みチケットとマーカーは親のツリーに置かれ、親のブランチに乗る（設計 9.2）。
+        # 承認済みチケットとマーカーは親のツリーに置かれ、親のブランチに乗る。
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "approved")
 
     # ---- 道具
@@ -218,7 +218,7 @@ class PhaseHarness(unittest.TestCase):
     def start_parent(self, name="i0001"):
         """親を着手する（済んでいれば何もしない）。
 
-        子の着手は親が着手済みであることを前提にする（REQ-TKT-48）。親を飛ばしたまま
+        子の着手は親が着手済みであることを前提にする。親を飛ばしたまま
         子を進められたころの手順をそのまま残すと、最初の子の着手で止まる。
         """
         started = self.ccnavi("ticket", "start", name)
@@ -324,7 +324,7 @@ class PhaseHarness(unittest.TestCase):
 
 
 class ApproveOnlyTest(PhaseHarness):
-    """`--agree <識別子>...` で承認の対象を絞っても、絞らないときに落ちるものは通らない。"""
+    """`--agree <識別子>...` で承認の対象を絞っても、絞らないときに外れるものは通らない。"""
 
     def test_child_cannot_be_approved_without_the_parents_pending_revision(self):
         self.family(plan=("acceptance", "implement"))
@@ -345,8 +345,8 @@ class ApproveOnlyTest(PhaseHarness):
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-02.md")))
 
     def test_child_of_a_rejected_parent_is_not_approved(self):
-        # 親が落ちたら（置き場に無いプロジェクト）、その子も親が承認されていないので落ちる。
-        # 子自身は正しいので、落ちた親を対応表に残すと子だけ承認済みチケットになる
+        # 親が外れたら（置き場に無いプロジェクト）、その子も親が承認されていないので外れる。
+        # 子自身は正しいので、外れた親を対応表に残すと子だけ承認済みチケットになる
         parent = parent_text("i0001", ["design"]).replace("plan:", "project: nope\nplan:", 1)
         self.propose("i0001", parent)
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/design/*",)))
@@ -489,7 +489,7 @@ class PhaseTest(PhaseHarness):
         self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["wip/design/*"]))
         self.commit_parent()
         result = self.approve()
-        # 1 番目は通り、2 番目は「1 が閉じるまで」で落ちる。
+        # 1 番目は通り、2 番目は「1 が閉じるまで」で外れる。
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
         self.assertIn("閉じるまで承認しない", result.stderr)
@@ -517,7 +517,7 @@ class PhaseTest(PhaseHarness):
     def test_a_batch_does_not_pass_a_later_child_over_one_that_reopens_an_earlier_phase(self):
         """前のフェーズに足す子と次のフェーズの子を一緒に承認しても、次の子は通さない（issue #31）。
 
-        1 本ずつ承認すれば、前の子の承認でフェーズが開き直り、次の子は落ちる。まとめて承認しても
+        1 本ずつ承認すれば、前の子の承認でフェーズが開き直り、次の子は外れる。まとめて承認しても
         同じ答えにする。
         識別子の順（-02 が -03 より先）で検査すると、開き直す前の状態で次の子が通っていた。
         """
@@ -547,7 +547,7 @@ class PhaseTest(PhaseHarness):
     def test_a_new_parent_and_a_later_phase_child_together_still_keep_the_order(self):
         """承認済みチケットの無い親と、2 番目のフェーズの子を一緒に承認しても、子は通さない。
 
-        1 本ずつなら、親を承認したあと子は「1 が閉じるまで」で落ちる。一緒に出すと親の計画が
+        1 本ずつなら、親を承認したあと子は「1 が閉じるまで」で外れる。一緒に出すと親の計画が
         ディスクに無く、フェーズが 1 つも並ばないので、順序の検査が何も見ずに通っていた。
         """
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
@@ -561,7 +561,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("1（調査） が閉じるまで承認しない（子がまだ無い）", result.stderr)
 
     def test_a_new_parent_with_children_in_two_phases_passes_only_the_first(self):
-        """親・1 番目の子・2 番目の子を一緒に承認すると、1 番目の子までが通り、2 番目は落ちる。"""
+        """親・1 番目の子・2 番目の子を一緒に承認すると、1 番目の子までが通り、2 番目は外れる。"""
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.propose(
             "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], review=False)
@@ -895,7 +895,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("合意の範囲に入る", closed.stdout)
         self.assertIn("確認を取り直さずに進める", closed.stdout)
         self.assertIn("squash", closed.stdout)
-        # 閉じた記録は進め方によらず置く（REQ-TKT-47）。
+        # 閉じた記録は進め方によらず置く。
         record = read_json(os.path.join(self.approved, "phases", "i0001", "closed.json"))
         self.assertEqual(record["reviews"], {"1": "mr"})
         self.commit_parent("状態の移動")
@@ -1212,7 +1212,7 @@ class WrapperFlagsComeOnceTest(PhaseHarness):
     """sh が計算して渡すパス（`--root` / `--cwd`）は 2 度渡せない（issue #65）。
 
     `ccnavi-review.sh` は `"$bin" --root "$root" --cwd "$here" "$@"` の形で呼ぶ。
-    どちらも「いまどこで動いているか」で、エージェントが名乗るものではない。後ろに
+    どちらも「いまどこで動いているか」で、エージェントが宣言するものではない。後ろに
     1 本足すと argparse が後勝ちで読むので、2 本目が在ること自体を断る。
     """
 
@@ -1234,12 +1234,12 @@ class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
     """`ticket` の副命令に `--phases` を足しても、定義は共通レイヤーのまま（issue #65）。
 
     `.ccnavi/scripts/ccnavi-ticket.sh` が引数をそのまま渡すので、この形はエージェントが
-    Bash で打てる。通していた頃は、`review: mr` の定義を `review: none` と名乗る
+    Bash で打てる。通していた頃は、`review: mr` の定義を `review: none` と宣言する
     ファイルに差し替えて、レビュー待ちを飛ばせた。
     """
 
     def test_a_phases_flag_on_ticket_done_does_not_drop_the_review(self):
-        # 同じ `design` を `review: none` と名乗るファイル。
+        # 同じ `design` を `review: none` と宣言するファイル。
         loose = write(
             os.path.join(self.root, "loose.yml"),
             "version: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n"
@@ -1256,7 +1256,7 @@ class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
         closed = self.ccnavi("ticket", "finish", "i0001-01-01", "--phases", loose)
 
         self.assertEqual(closed.returncode, 0, closed.stderr)
-        self.assertIn("--phases は診断", closed.stderr, "落としたことを言っていない")
+        self.assertIn("--phases は診断", closed.stderr, "無視したことを言っていない")
         # `review: mr` のまま。閉じた先はレビュー待ちで、`.ccnavi/approved/done/` ではない。
         self.assertTrue(
             os.path.exists(
@@ -1271,7 +1271,7 @@ class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
 
 
 class ChatReviewTest(PhaseHarness):
-    """このセッションで見るフェーズ（REQ-TKT-45〜47、設計 9.8）。"""
+    """このセッションで見るフェーズ。"""
 
     def chat_phase(self, plan=("chores", "design")):
         """`review: chat` のフェーズを 1 つ終わらせて、告知の文を返す。"""
@@ -1616,7 +1616,7 @@ class ScopeLimitTest(PhaseHarness):
     def test_dry_run_lets_the_write_through_and_says_which_limit(self):
         """8. dry-run: 同じ Write は通り、enable なら止めたことと `limit: phase type` が出る。
 
-        dry-run の文面は今の judge.decide_before のもの（設計 4.4「新しい処理は足さない」）。
+        dry-run の文面は今の judge.decide_before のもの（新しい処理は足さない）。
         """
         tree = self.approved_child(
             child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
@@ -1687,7 +1687,7 @@ class ScopeLimitTest(PhaseHarness):
         )
         for label, text in (
             ("定義を消した", PHASES_WITHOUT_RESEARCH),
-            ("phases.yml が壊れた", "version: 1\nphases: [\n"),
+            ("phases.yml が不正", "version: 1\nphases: [\n"),
         ):
             with self.subTest(label):
                 write(self.phases, text)
@@ -1701,7 +1701,7 @@ class ScopeLimitTest(PhaseHarness):
                 self.assertIn("DENY_TICKET_SCOPE", self.reason(beyond_parent))
                 self.assertIn("limit: parent i0001", self.reason(beyond_parent))
 
-    # ---- 判定が落ちない（チケット approve-carry-04 の 6〜8）
+    # ---- 判定が失敗しない（チケット approve-carry-04 の 6〜8）
 
     def assert_answered(self, result):
         """hook が例外で終わらず、判定の答えとして読める形で返したこと。"""
@@ -1723,7 +1723,7 @@ class ScopeLimitTest(PhaseHarness):
         self.break_phases_encoding()
         result = self.write_to(tree, "src/a/x.py")
         self.assert_answered(result)
-        # 読めない定義は「壊れている」と同じ扱い。定義では切り詰めず、そう言う。
+        # 読めない定義は「不正」と同じ扱い。定義では切り詰めず、そう言う。
         self.assertNotEqual(self.decision(result), "deny", result.stdout)
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(result))
         self.assertIn("定義の上限では切り詰めていない", self.reason(result))
@@ -1746,7 +1746,7 @@ class ScopeLimitTest(PhaseHarness):
         """8. 親が計画を持ち番号が計画にあっても、phases.yml がどのレイヤーにも無ければ注記しない。
 
         「定義が読めない」は phases.yml が在って読めないときだけ。無いのは番号だけの挙動
-        （設計 4.2 の表の 1 行目）で、注記を出すと毎回の Write に余計な 1 行が載る。
+        で、注記を出すと毎回の Write に余計な 1 行が載る。
         """
         tree = self.approved_child(
             child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
@@ -1782,7 +1782,7 @@ class ScopeLimitTest(PhaseHarness):
     def test_regex_child_ignores_case_like_the_glob_child(self):
         """14. regex の子: 範囲の表記は glob の子と同じく大文字小文字を区別しない。
 
-        範囲はユーザが宣言する意図なので、`regex` で書いても同じ場所を指す（設計 9.3）。
+        範囲はユーザが宣言する意図なので、`regex` で書いても同じ場所を指す。
         区別が要るなら `(?-i:...)` で囲む。
         """
         tree = self.approved_child(

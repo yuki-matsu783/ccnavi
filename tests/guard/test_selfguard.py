@@ -1,10 +1,10 @@
 """ccnavi 自身の設定ファイルを守る仕組みの受入テスト。
 
-道具を外から動かす。本物の git リポジトリを一時ディレクトリに作り、実行前の
+道具を外から動かす。実際の git リポジトリを一時ディレクトリに作り、実行前の
 payload でバックアップを取らせ、設定ファイルを壊してから実行後の payload を渡し、
 ファイルが実際にどうなったかを読む。
 
-ここで確かめたいのは 1 つに尽きる。ルールファイルを壊す経路と、壊れたことに
+ここで確かめたいのは 1 つに尽きる。ルールファイルを壊す経路と、壊されたことに
 気づく経路が、同じファイルに依存していないこと。ルール由来の保護は、ルールを
 空にされると保護領域ごと消える。この仕組みはそこを埋めるために在る。
 """
@@ -27,7 +27,7 @@ from tests import ROOT
 from tests.inproc import run_ccnavi
 
 # 振り分けの sh の名前。この名前なら、実体は隣ではなく `../bin/<os>-<arch>/` に在る
-# （設計 launcher-scripts 3.2・3.3）。名前が入る前でもファイルごと落ちないように取る。
+# 名前が入る前でもファイルごと異常終了しないように取る。
 LAUNCHER_NAME = getattr(platformtag, "LAUNCHER_NAME", "ccnavi-launcher.sh")
 
 RULES = {
@@ -95,7 +95,7 @@ class SelfGuardTest(unittest.TestCase):
         return path
 
     def worktree(self, name="w1"):
-        """本物のワークツリーを `.claude/worktrees/<名前>` に作る。
+        """実際のワークツリーを `.claude/worktrees/<名前>` に作る。
 
         git に作らせる。守る側は `.git` ファイルと main の登録の相互参照が
         両向きに揃ったものだけをワークツリーと呼ぶので、手でディレクトリを
@@ -1226,7 +1226,7 @@ class SelfGuardTest(unittest.TestCase):
         # G2。既定の置き場では ccnavi ディレクトリの保護（`*/.ccnavi/*`）と二重に止まり、
         # 先に名指しされるのはそちら。ccnavi ディレクトリの名前は動かせない（置き場は固定）ので、
         # 残った実行ファイル由来の保護が止めていることは、`.ccnavi/` の外に置いた
-        # 振り分け（`tools/`）で確かめる（REQ-SLF-07 を ccnavi ディレクトリの保護に
+        # 振り分け（`tools/`）で確かめる（実行ファイル由来の保護を ccnavi ディレクトリの保護に
         # 頼らせない）。
         spelled, _, exe = self.scripts_layout()
         bundled = os.path.join(os.path.dirname(exe), "_internal", "x")

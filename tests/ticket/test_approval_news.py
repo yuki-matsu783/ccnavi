@@ -74,7 +74,7 @@ class ApprovalToldTest(PhaseHarness):
         self.next_child()
         prompt = self.approve_yes(["i0001", "i0001-01-01"])
         self.assertIn("i0001-01-01", prompt)
-        # 子より先に親を着手する順も、この文で伝える（REQ-TKT-48）。
+        # 子より先に親を着手する順も、この文で伝える。
         self.assertIn("start <親>", prompt)
 
     def test_a_batch_without_a_new_parent_does_not_ask_for_the_parent_start(self):

@@ -137,7 +137,7 @@ class RejectTest(GitWrapperTest):
 
     def test_global_config_option_is_rejected_without_reading_its_value(self):
         # `git -c diff.external=<コマンド>` は分類上ただの diff のまま任意コマンドを
-        # 実行する。危ない設定名の列挙は網羅できないので、値を見ずに形で落とす。
+        # 実行する。危ない設定名の列挙は網羅できないので、値を見ずに形で弾く。
         self.assertRejected("-c", "diff.external=echo", "diff")
         self.assertRejected("--config-env=diff.external=X", "diff")
 
@@ -212,7 +212,7 @@ class RejectTest(GitWrapperTest):
     def test_the_alternative_it_names_is_not_a_denied_form(self):
         # 生の git は PreToolUse で止まる。案内が `git stash push -u` と書くと、
         # 案内された先でもう 1 度拒否される。代わりの手段が拒否される案内は、
-        # 案内が無いのとほとんど同じ。名乗るならラッパースクリプトの形で名乗る。
+        # 案内が無いのとほとんど同じ。示すならラッパースクリプトの形で示す。
         for args in (
             ("reset", "--hard"),
             ("clean", "-fd"),
@@ -600,7 +600,7 @@ class WorktreeRemoveHintTest(GitWrapperTest):
         hint = hints[0]
         for word in ("cwd", "サブシェル", "worktree list", "rmdir", "ユーザ"):
             self.assertIn(word, hint)
-        # 案内が勧める形は、生の git ではなくラッパースクリプトの形で名乗る。
+        # 案内が勧める形は、生の git ではなくラッパースクリプトの形で示す。
         self.assertIn("ccnavi-git.sh worktree list", hint)
         self.assertNotIn("git worktree", hint.replace("ccnavi-git.sh worktree", ""))
         # 消し残しを消す rmdir には、打ったパスをそのまま入れる。
@@ -633,8 +633,8 @@ def git_out(cwd, *args):
 class ResetGuidanceTest(GitWrapperTest):
     """reset は通さず、リモートに合わせたいときは ccnavi-sync.sh を案内する。
 
-    前は `checkout -B <ブランチ> <リモート>/<ブランチ>` を案内していた。付け替えはブランチにしか無い
-    コミットを何も言わずに外し、親のブランチなら承認済みチケットの置き場ごと中身を変えるので、
+    前は `checkout -B <ブランチ> <リモート>/<ブランチ>` を案内していた。強制の移動は、
+    ブランチにしか無いコミットを何も言わずに外し、親のブランチなら承認済みチケットの置き場ごと中身を変えるので、
     ccnavi-sync.sh（早送りか merge、衝突したら取りやめる）を入れたときに止め、案内を移した。
     """
 
@@ -662,7 +662,7 @@ class ResetGuidanceTest(GitWrapperTest):
         ):
             self.assertIn(form, stderr)
         self.assertNotIn("checkout -B", stderr)
-        # 勧める形はラッパースクリプトの形で名乗る。生の git を勧めると、勧めた先でもう 1 度止まる。
+        # 勧める形はラッパースクリプトの形で示す。生の git を勧めると、勧めた先でもう 1 度止まる。
         rest = stderr.replace("ccnavi-git.sh", "").replace("ccnavi-sync.sh", "")
         for raw in ("git checkout", "git merge", "git fetch", "git stash"):
             self.assertNotIn(raw, rest)
@@ -688,7 +688,7 @@ class ResetGuidanceTest(GitWrapperTest):
             with self.subTest(args=args):
                 result = self.assertRejected(*args)
                 self.assertIn("ccnavi-sync.sh", result.stderr)
-                self.assertIn("付け替え", result.stderr)
+                self.assertIn("別のコミットへ移します", result.stderr)
         # switch -C は、全引数の `-C`（判定の起点を動かす）で前から止まっている。
         self.assertRejected("switch", "-C", branch, "upstream")
         self.assertEqual(before, git_out(self.dir, "rev-parse", branch))
@@ -894,7 +894,7 @@ class StoreRewindTest(GitWrapperTest):
     def test_the_store_does_not_move_with_the_environment(self):
         """置き場の env を入れても、既定の置き場を戻す形を止める（置き場は固定。A9）。
 
-        env で保護を外せないことを見る。`.ccnavi/scripts/` が写す版（i0064-10）になる前は落ちる。
+        env で保護を外せないことを見る。`.ccnavi/scripts/` が写す版（i0064-10）になる前は失敗する。
         写す前の sh（`ccnavi-git.sh` の `store_hit`）は `CCNAVI_TICKETS_APPROVED` と
         `CCNAVI_TICKETS_PROPOSAL` のパスを置き場と読み、既定の置き場の restore を止めないため。
         承認済みとレビュー待ちは別々に打つ（一緒に打つと、片方の保護だけで止まって
@@ -957,7 +957,7 @@ def write_text(path, text):
 class WorktreeNameTest(GitWrapperTest):
     """worktree add は行き先の名前とブランチ名を揃える形だけ通す。
 
-    親のブランチ名は親の識別子で、ワークツリーの名前も同じ。-B（既存のブランチの付け替え）・
+    親のブランチ名は親の識別子で、ワークツリーの名前も同じ。-B（既存のブランチの移動）・
     --detach・-f はその結び付きを崩すか、親のブランチを別のコミットへ向け直す。
     """
 
@@ -1566,7 +1566,7 @@ class TagListOnlyTest(GitWrapperTest):
 class PlacesAreNotReadTest(GitWrapperTest):
     """置き場を動かす環境変数は読まない（置き場は固定。A9）。
 
-    `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は落ちる。
+    `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は失敗する。
     写す前の sh（`ccnavi-common.sh` の `ccnavi_project`）は `CCNAVI_PROJECTS` を読むため。
     """
 

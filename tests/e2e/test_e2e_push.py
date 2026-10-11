@@ -1,6 +1,6 @@
 """チケットの作成から承認、承認済みチケットの push までを 1 本に通す受入テスト。
 
-本物の sh（`.ccnavi/scripts/`）と組み立て済みの実行ファイル（`dist/ccnavi`）を、使い捨ての
+実際の sh（`.ccnavi/scripts/`）と組み立て済みの実行ファイル（`dist/ccnavi`）を、使い捨ての
 ワークスペースと bare のリモートの上で順に呼ぶ。筋書きは次のとおりで、段ごとに前の段の
 結果を前提にする。
 
@@ -96,7 +96,7 @@ class ApproveAndPushTest(unittest.TestCase):
         self.ws = os.path.join(self.tmp, "ws")
         WorkspaceTest.build_workspace.__func__(WorkspaceTest, self.ws)
         # 承認は共通レイヤーのルールを読む。無いと承認は通るが「ルールを読めない」と言うので、
-        # 本物のワークスペースと同じく置いておく。中身は空でよい。
+        # 実際のワークスペースと同じく置いておく。中身は空でよい。
         write(os.path.join(self.ws, ".ccnavi", "common", "rules.yml"), "version: 1\n")
         git(self.ws, "add", ".ccnavi/common/rules.yml")
         git(self.ws, "commit", "-q", "-m", "rules")

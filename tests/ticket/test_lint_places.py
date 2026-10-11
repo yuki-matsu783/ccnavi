@@ -6,7 +6,7 @@
 非ゼロで終わる。同じリポジトリの中での carry-over は `tests/ticket/test_ticket.py` が見る。
 
 ここで見るのは逆側で、リポジトリをまたいだ衝突は免除してはいけないこと。
-プロジェクトは自分の git を持つ（設計 11）。識別子はユーザが選ぶ短い連番なので、
+プロジェクトは自分の git を持つ。識別子はユーザが選ぶ短い連番なので、
 プロジェクトが独立に振ればぶつかる。これは同じチケットではなく違うものなので、コミットの遅れでは
 説明が付かない。ツリーごとの免除をここに当てると、承認がどちらの実体のものか
 分からないまま誰も気づかなくなる。
@@ -138,7 +138,7 @@ class CrossRepositoryTest(unittest.TestCase):
 
         承認済みチケットは親のブランチに乗るので、プロジェクトのチケットは合流するまで
         親のワークツリーにしか無い。ワークツリーの名前は識別子と同じなので、ここで
-        「本物とするツリー」の規則を当てると、もう片方のプロジェクトの実体が気づかないうちに消え、
+        「正とするツリー」の規則を当てると、もう片方のプロジェクトの実体が気づかないうちに消え、
         「複数のリポジトリにある」も出なくなる。違うものは 1 つにまとめない。
         """
         self.project("app", "doing")
@@ -360,7 +360,7 @@ class ProjectsCollisionTest(unittest.TestCase):
         self.assertIn(NOT_IGNORED, found[0]["detail"])
 
     def test_empty_projects_flag_does_not_crash_the_lint(self):
-        """`--projects ""`（診断のフラグ）でも `--lint` は落ちず、置き場の苦情は出さない。"""
+        """`--projects ""`（診断のフラグ）でも `--lint` は失敗せず、置き場の苦情は出さない。"""
         self.no_tracking()
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
@@ -372,7 +372,7 @@ class ProjectsCollisionTest(unittest.TestCase):
         )
 
         # 終了コードは見ない（この部屋の rules.yml は空で、`deny` が空の error が出る）。
-        # 落ちたなら JSON の報告が無い。
+        # 失敗したなら JSON の報告が無い。
         try:
             problems = json.loads(result.stdout)["problems"]
         except (ValueError, KeyError) as exc:
@@ -382,7 +382,7 @@ class ProjectsCollisionTest(unittest.TestCase):
         self.assertEqual([p for p in problems if p["where"] == "(projects)"], [])
 
     def test_projects_on_another_drive_does_not_crash_the_lint(self):
-        """`--projects` が別のドライブを指して `relpath` が ValueError でも `--lint` は落ちない。
+        """`--projects` が別のドライブを指して `relpath` が ValueError でも `--lint` は失敗しない。
 
         Windows 以外では別のドライブが作れないので、`--projects` に置き場のディレクトリを渡し、
         `relpath` がそのパスだけ ValueError を投げるように差し替える（Windows の挙動の再現）。

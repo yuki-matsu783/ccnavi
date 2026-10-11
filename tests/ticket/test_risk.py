@@ -1,4 +1,4 @@
-"""実績で測るリスク（設計 9.9、REQ-RSK）の受入テスト。
+"""実績で測るリスクの受入テスト。
 
 見るのは 6 つ。
 
@@ -7,7 +7,7 @@
 3. スクリプトの項目（点を受け取る。測れなければ重いほうとして扱う）
 4. 定性の項目（判定が揃うまで閉じられない。judge で記録。HEAD が動けば取り直し）
 5. HIGH 以上なら宣言に関わらずレビューが要る（レビューで止まり、依頼文にリスクの行が載る）
-6. --lint が壊れた定義を言い、壊れていれば組み込みに戻る
+6. --lint が不正な定義を言い、不正なら組み込みに戻る
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ class DefinitionTest(unittest.TestCase):
 
     def test_undecodable_file_is_a_complaint_not_an_exception(self):
         """UTF-8 として読めない定義は、共通レイヤーなら組み込みへ、
-        レイヤーなら空へ落ちて苦情を返す。"""
+        レイヤーなら空にして苦情を返す。"""
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "risks.yml")
             with open(path, "wb") as f:
@@ -422,7 +422,7 @@ class RiskTest(PhaseHarness):
         closed = self.ccnavi("ticket", "finish", "i0001-01-01", "--risk", cheap)
 
         self.assertEqual(closed.returncode, 0, closed.stderr)
-        self.assertIn("--risk は診断", closed.stderr, "落としたことを言っていない")
+        self.assertIn("--risk は診断", closed.stderr, "無視したことを言っていない")
         self.assertEqual(25, self.record()["points"], "渡した配点で採点された")
 
     def test_an_empty_risk_flag_on_ticket_done_is_dropped_too(self):
@@ -443,10 +443,10 @@ class RiskTest(PhaseHarness):
 
         sh は自分の `--root` を先に置き、エージェントの引数を後ろに繋ぐ
         （`exec "$bin" --root "$root" ticket "$@"`）。argparse は後勝ちなので、後ろに
-        1 本足すと sh が渡した本物を上書きできた。`--root` からは共通レイヤーの 3 本も
+        1 本足すと sh が渡した正しい値を上書きできた。`--root` からは共通レイヤーの 3 本も
         `projects` も `approved` も導かれるので、`--risk` を使わずに同じ差し替えができる。
-        実際に確かめると、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子が
-        「リスク 0」で本物の置き場に閉じられた。
+        実際に確かめると、実際のツリーへシンボリックリンクを張った偽のルートを渡すと、子が
+        「リスク 0」で実際の置き場に閉じられた。
 
         ここでは偽のルートの中身を作り込まない。2 本目が在ること自体を断るので、
         中身に関わらず同じところで止まる。

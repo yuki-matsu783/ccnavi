@@ -4,15 +4,15 @@
 それが有効かを見る側で、無効になる経路が 3 つあるので 3 つとも見る。
 
 1. 締め出しを外す（`tests/__init__.py` から消える、環境変数の名前が変わる）
-2. `tests/inproc.py` が環境を空にするときに巻き添えで落とす。ccnavi は判定の中で
+2. `tests/inproc.py` が環境を空にするときに巻き添えで消す。ccnavi は判定の中で
    git を起こす（`src/ccnavi/infra/gitcmd.py`）ので、この経路だけがホストの設定を読み直す
-3. 検査対象の sh が環境を消毒するときに巻き添えで落とす。`ccnavi-git.sh` は
+3. 検査対象の sh が環境を消毒するときに巻き添えで消す。`ccnavi-git.sh` は
    `GIT_CONFIG_COUNT` などを unset していて、そこに名前が足されると気づかないうちに外れる
 
 3 のぶんは `tests/sh/test_gitwrap.py` が持つ（ラッパーを起こす道具があちらにある）。
 
 締め出さないと何が起きるかは、2 つとも実際に起きている。`init.defaultBranch = main` を
-持つ機械では `tests/guard/test_post.py` が落ち、`commit.gpgsign = true` を持つ機械では
+持つ機械では `tests/guard/test_post.py` が失敗し、`commit.gpgsign = true` を持つ機械では
 commit が 10 倍遅くなる。どちらも「テストが緩む」ではなく「テストの答えが機械で変わる」。
 """
 
@@ -84,8 +84,8 @@ class BlocksTheHostConfigTest(unittest.TestCase):
 class SurvivesTheClearedEnvironmentTest(unittest.TestCase):
     """`run_ccnavi(env=...)` が環境を空にしても、締め出しだけは残る。
 
-    ccnavi は判定の中で git を起こすので、ここで落ちるとその経路だけがホストの
-    `~/.gitconfig` を読み直す。落ちても大半のテストは通ってしまうので、それを確かめるテストが要る。
+    ccnavi は判定の中で git を起こすので、ここで外れるとその経路だけがホストの
+    `~/.gitconfig` を読み直す。外れても大半のテストは通ってしまうので、それを確かめるテストが要る。
     """
 
     def test_the_block_is_still_there_with_an_empty_env(self):

@@ -182,7 +182,7 @@ class SectionsTest(unittest.TestCase):
 
     def test_読み切れないコマンドは拒否ではなく確認になる(self):
         # 対象を確定できなかっただけで、禁じられたことをしたわけではない。
-        # 設計 6.3 の PARSE_UNCERTAIN はユーザに確認を出す。
+        # PARSE_UNCERTAIN はユーザに確認を出す。
         self.rules(
             deny=[rule("push", "Bash", "*git push*")],
             allow=[rule("anything", "Bash", "*", message="")],

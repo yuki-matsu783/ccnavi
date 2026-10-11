@@ -5,13 +5,13 @@
 1. C の読み手（libyaml）でも純 Python の読み手でも、`yaml.safe_load` と同じ値を返す
 2. libyaml の無い PyYAML（`CSafeLoader` が無い）でも、純 Python の読み手に戻って読める
 3. 任意の Python の型を作るタグは、どちらの読み手でも断る（safe のまま）
-4. 入れ子が深い文書でプロセスが落ちない。C の読み手は組み立ての再帰が C のスタックに乗るので、
+4. 入れ子が深い文書でプロセスが異常終了しない。C の読み手は組み立ての再帰が C のスタックに乗るので、
    深い文書は純 Python の読み手に回り、`yaml.YAMLError` で断られる
 5. 値を組み立てる途中の失敗（`!!int` の空・ありえない日付など）も、素の例外ではなく
    `yaml.YAMLError` で上がる。呼び手はそれしか捕まえない
 6. タブ・BOM・`!` 単体など、二つの読み手で結果が分かれる文書でも、C を使ったときの結果は
    純 Python の読み手と同じ
-7. 壊れたチケットがあっても、hook は落ちずに同じ判定を返す
+7. 不正なチケットがあっても、hook は異常終了せずに同じ判定を返す
 
 C の読み手が無い環境では、C の側の確かめは飛ばしたと明示する（知らせずに純 Python だけで通さない）。
 """
@@ -236,9 +236,9 @@ class DeepNestingTest(unittest.TestCase):
         self.assertEqual(yamlread.safe_load(doc), yaml.safe_load(doc))
 
     def test_very_deep_does_not_crash(self):
-        """数万段の入れ子でもプロセスが落ちず、`yaml.YAMLError` で断られる。
+        """数万段の入れ子でもプロセスが異常終了せず、`yaml.YAMLError` で断られる。
 
-        落ちると親のテストまで巻き込むので、別のプロセスで読む。C の読み手（既定）と
+        異常終了すると親のテストまで巻き込むので、別のプロセスで読む。C の読み手（既定）と
         純 Python の読み手の両方で見る。
         """
         for loader in LOADERS:
@@ -265,7 +265,7 @@ class DeepNestingTest(unittest.TestCase):
             self.skipTest(NO_C)
 
 
-# hook を本物のプロセスで動かす。`pure` は libyaml を外してから動かす。
+# hook を実際のプロセスで動かす。`pure` は libyaml を外してから動かす。
 _HOOK = (
     "import runpy, sys, yaml\n"
     "if sys.argv.pop(1) == 'pure' and hasattr(yaml, 'CSafeLoader'):\n"
@@ -276,7 +276,7 @@ _HOOK = (
 
 
 class BrokenTicketHookTest(unittest.TestCase):
-    """壊れたチケットがあっても、PreToolUse は落ちずに、無いときと同じ判定を返す。
+    """不正なチケットがあっても、PreToolUse は異常終了せずに、無いときと同じ判定を返す。
 
     hook が非 0 で終わると Claude Code は判定を読まないので、止めるはずの呼び出しが通る。
     """

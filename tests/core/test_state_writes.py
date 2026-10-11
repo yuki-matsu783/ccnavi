@@ -104,7 +104,7 @@ class UnreadableStateTest(unittest.TestCase):
 
 
 class LeftoverTempTest(unittest.TestCase):
-    """落ちて残った一時ファイル（`.once-….part.json`）を、本番と同じ条件で掃く。"""
+    """失敗して残った一時ファイル（`.once-….part.json`）を、本番と同じ条件で掃く。"""
 
     def test_forget_sweeps_this_sessions_leftover_temporary_file(self):
         state = tempfile.mkdtemp(prefix="ccnavi-leftover-")

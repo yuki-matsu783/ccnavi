@@ -1,4 +1,4 @@
-"""`--project-risk-file <名前>=<パス>` の受入テスト（REQ-DIA-09）。
+"""`--project-risk-file <名前>=<パス>` の受入テスト。
 
 VS Code 拡張のリスク管理画面が、編集中のレイヤー（自身かプロジェクト）の配点を保存せずに、
 共通レイヤーと合わせて検証するための差し替え。config 単体の形式だけでなく、合成したあとの
@@ -75,7 +75,7 @@ class ProjectRiskFileTest(ConfigUnionHarness):
         tmp = self.edited("lib-risks.yml", SCRIPT_FACTOR)
         args = ("--project-risk-file", f"lib={tmp}")
 
-        # 置いてなければ落ちる。差し替えファイルの置き場（ws/tmp）には引かない。
+        # 置いてなければ失敗する。差し替えファイルの置き場（ws/tmp）には引かない。
         missing = self.risk_problems("error", "(projects/lib)", *args)
         self.assertTrue(any("count.sh" in p["detail"] for p in missing), missing)
 
