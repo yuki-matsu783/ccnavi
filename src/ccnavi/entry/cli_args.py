@@ -51,7 +51,19 @@ LAYER_OVERRIDES = (
     ("--projects", "projects", None),
     ("--project-home", "project_home", ""),
 )
-# 無視したときの文面。5 本のフラグで同じものを使う。制限が 2 つあるように読ませない。
+# 記録と状態の置き場を動かすフラグと、「渡されなかった」ときの値。レイヤーの置き場と同じく
+# 診断の経路でだけ使われる。`--log` / `--state` は判定の記録と実行後チェックの記録を止めたり
+# 別の場所へ逃がしたりでき、`--approved` / `--tickets` は承認済みチケットと提案の置き場を
+# 差し替えられる。sh（`ccnavi-ticket.sh` / `ccnavi-review.sh`）は受け取った引数を `"$@"` で
+# そのまま渡すので、診断の外で受けると、エージェントが記録を消した形や置き場を差し替えた形で
+# チケットとレビューの副命令を動かせる。
+PLACE_OVERRIDES = (
+    ("--log", "log", None),
+    ("--state", "state", None),
+    ("--approved", "approved", None),
+    ("--tickets", "tickets", ""),
+)
+# 無視したときの文面。置き場を動かすフラグで同じものを使う。制限が 2 つあるように読ませない。
 DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）でだけ効く\n"
 # `.ccnavi/scripts/` の sh が自分で計算して渡すパスと、渡されなかったときの値。
 # どちらも「いまどこで動いているか」で、エージェントが申告するものではない。
@@ -85,15 +97,31 @@ def _one_wrapper_flag_each(stderr: TextIO, args: argparse.Namespace) -> bool:
     return True
 
 
+def _diagnosing(args: argparse.Namespace) -> bool:
+    """診断の経路か。置き場を動かすフラグはここでだけ効く。
+
+    診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を
+    指しても実運用に漏れない。
+    """
+    return bool(
+        args.lint
+        or args.test is not None
+        or bool(args.test_samples)
+        or args.explain
+        or args.suggest
+    )
+
+
 def _drop_outside_diagnosis(stderr: TextIO, args: argparse.Namespace) -> None:
-    """診断の外で渡されたレイヤーの置き場の差し替えを、標準エラーに出して無視する。
+    """診断の外で渡された置き場の差し替え（レイヤー・記録・状態・チケット）を、
+    標準エラーに出して無視する。
 
     フラグは設定ファイルより強いので、無視しないと保存していない `rules.yml` /
     `phases.yml` / `risks.yml` で判定と採点が走り、レイヤーそのものも外せる。届く経路は
     `.ccnavi/scripts/` の sh で、受け取った引数を実行ファイルへそのまま渡す。だからレイヤーを動かす
     フラグは診断の経路（`--lint`・`--test` など）でだけ受ける。
     """
-    for flag, name, absent in LAYER_OVERRIDES:
+    for flag, name, absent in (*LAYER_OVERRIDES, *PLACE_OVERRIDES):
         if getattr(args, name) == absent:
             continue
         stderr.write(DIAGNOSIS_ONLY.format(flag=flag))

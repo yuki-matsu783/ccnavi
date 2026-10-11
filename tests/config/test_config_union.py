@@ -451,12 +451,6 @@ class ConfigUnionHarness(unittest.TestCase):
             [
                 "--root",
                 self.ws,
-                "--approved",
-                ".ccnavi/approved",
-                "--state",
-                self.state,
-                "--log",
-                self.log,
                 "--guard-core-files",
                 guard,
                 "--restore-if-deny",

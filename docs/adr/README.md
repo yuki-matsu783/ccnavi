@@ -133,6 +133,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0075](0075-post-monitor-tells-its-own-writes-by-shape.md) | 実行後チェックは、自分の副命令の書き込みを正規化した内容で見分ける |
 | [0077](0077-judging-lives-in-the-hook-not-the-sh.md) | 止める・通すの判定は hook が持ち、sh の検査は 2 重目にする |
 | [0114](0114-raw-git-is-a-builtin-deny-under-ticket-control.md) | チケット制御が有効な間は生の git を組み込みで止め、土台の deny を表記違いに強くする |
+| [0115](0115-wrapper-sh-judging-is-an-exception.md) | 入口を 1 本に寄せたラッパーの中の可否の判定は、止める・通すの原則の例外にする |
 
 ### チケット制御
 

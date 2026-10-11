@@ -39,7 +39,7 @@ class JapaneseIdentifierTest(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
         write(common_path(self.root, "rules"), json.dumps(RULES))
-        self.state = os.path.join(self.root, "state")
+        self.state = os.path.join(self.root, "logs", "state")
         self.parent_tree = self.worktree(PARENT, "main")
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "approved")
 
@@ -55,12 +55,6 @@ class JapaneseIdentifierTest(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--approved",
-                ".ccnavi/approved",
-                "--state",
-                self.state,
-                "--log",
-                "",
                 "--guard-core-files",
                 "disable",
                 "--restore-if-deny",

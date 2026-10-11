@@ -21,7 +21,7 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 
 | `--result` の JSON | 形 |
 |---|---|
-| `confirm` / `decide` が受け取るもの | `{host: github\|gitlab, mr: {number, url}, threads: [{id, resolved, url, path, line, body, created_at}], reviews: [{state, url, submitted_at, author}], fetched_at}` |
+| `confirm` / `decide` が受け取るもの | `{host: github\|gitlab, mr: {number, url}, threads: [{id, resolved, url, path, line, body, created_at, author}], reviews: [{state, url, submitted_at, author}], fetched_at}` |
 | `request` の投稿の結果 | `{host, mr, url, created_at}` |
 
 | sh の呼び方 | 実行ファイルの段 |

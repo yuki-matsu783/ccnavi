@@ -23,6 +23,7 @@ import os
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -118,6 +119,9 @@ class FetchTest(unittest.TestCase):
     def fetch(self, cwd=None, **extra):
         script = posix(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-fetch.sh"))
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        # 親のワークツリーかは実行ファイルに聞く（sh はチケットを読まない）。
+        # ソースの実行ファイルを渡す。
+        env["CCNAVI_BIN_PATH"] = self.source_exe()
         env.update(extra)
         return subprocess.run(
             [SHELL, script],
@@ -128,6 +132,16 @@ class FetchTest(unittest.TestCase):
             encoding="utf-8",
             errors="replace",
         )
+
+    def source_exe(self):
+        path = os.path.join(os.path.dirname(self.ws), "source-bin", "ccnavi")
+        if not os.path.exists(path):
+            write(
+                path,
+                f'#!/bin/sh\nPYTHONPATH="{ROOT}/src" exec "{sys.executable}" -m ccnavi "$@"\n',
+            )
+            os.chmod(path, 0o755)
+        return path
 
     def sha(self, tree, ref):
         done = git(tree, "rev-parse", "--verify", "-q", ref, check=False)

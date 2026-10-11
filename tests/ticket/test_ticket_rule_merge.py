@@ -166,8 +166,8 @@ class Workspace(unittest.TestCase):
 
         # 共通レイヤーは既定の置き場に置く。`--rules` は診断でだけ有効なので渡せない。
         self.rules = write(common_path(self.root, "rules"), json.dumps(SILENT))
-        self.state = os.path.join(self.root, "state")
-        self.log = os.path.join(self.root, "decisions.jsonl")
+        self.state = os.path.join(self.root, "logs", "state")
+        self.log = os.path.join(self.root, "logs", "decisions.jsonl")
         self.parent_tree = self.worktree("i0001", "main")
         self.child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
 
@@ -189,14 +189,6 @@ class Workspace(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--tickets",
-                self.TICKETS,
-                "--approved",
-                self.APPROVED,
-                "--state",
-                self.state,
-                "--log",
-                self.log,
                 "--guard-core-files",
                 core,
                 "--restore-if-deny",
@@ -590,13 +582,6 @@ class TicketPlaces(Workspace):
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("POST_TICKET_SCOPE", result.stderr)
         self.assertIn(rel, result.stderr)
-
-
-class TicketPlacesElsewhere(TicketPlaces):
-    """置き場のパスを変えても、そのパスで外れる。既定のパスを決め打ちしていないこと。"""
-
-    TICKETS = "work/proposals"
-    APPROVED = ".ccnavi/copies"
 
 
 class ScratchPlace(Workspace):

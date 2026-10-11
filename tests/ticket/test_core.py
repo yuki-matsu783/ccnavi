@@ -1678,8 +1678,7 @@ class RecordWritesTest(CoreHarness):
 
     def record(self, *args, stdin="", target=None):
         target = target or os.path.join(self.place(), "self", "i0001.t.writes")
-        state = os.path.join(self.root, "logs", "state")
-        result = self.ccnavi("--state", state, "--record-writes", target, *args, stdin=stdin)
+        result = self.ccnavi("--record-writes", target, *args, stdin=stdin)
         listed = []
         if os.path.isfile(target):
             with open(target, encoding="utf-8") as f:
@@ -1795,10 +1794,6 @@ class RecordWritesTest(CoreHarness):
             [
                 "--root",
                 linked,
-                "--state",
-                os.path.join(linked, "logs", "state"),
-                "--log",
-                "",
                 "--guard-core-files",
                 "disable",
                 "--restore-if-deny",

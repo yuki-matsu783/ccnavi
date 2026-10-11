@@ -35,6 +35,12 @@ state も内部で外す。拡張と `scripts/check_rules.py` は念のため `-
 診断の外（hook からの判定、`ticket` / `review` の副命令）に渡すと外し、外したことを標準エラーに
 出す。守る対象も本来の場所のまま（守る側は差し替えを見ない `layer_real_path` を引く）。
 
+**記録・state・承認済みチケット・提案の置き場を動かす `--log` / `--state` / `--approved` / `--tickets` も、診断でだけ有効になる。**
+診断の外に渡すと、レイヤーの置き場のフラグと同じく外し、同じ文面を標準エラーに出す。`.ccnavi/scripts/` の sh
+（`ccnavi-ticket.sh` / `ccnavi-review.sh`）は受け取った引数を `"$@"` で実行ファイルへそのまま渡すので、診断の外で効くと、
+エージェントが記録を止めた形（`--log ""`）や、承認済みチケット・提案の置き場を差し替えた形で副命令を動かせる（P2・P6）。
+C1 の書いたパスの一覧（`--record-writes`）も、診断の外では `--state` を見ずに既定の state の置き場だけを一覧から外す。
+
 **互換の版**（`src/ccnavi/entry/version.py` の `COMPAT`）は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh の `CCNAVI_COMPAT`、拡張の
 `EXTENSION_COMPAT`）の契約の版で、3 か所に同じ値を書く。sh は実行ファイルを起動する前に、拡張は起動のときに `--version` を読んで
 比べ、`--lint` は sh の値と比べる（`(version)` の warn）。食い違えば、どれも直し方（ccnavi のリポジトリなら組み立て直し、配布先なら

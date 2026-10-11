@@ -99,6 +99,36 @@ class SyncPathsTest(unittest.TestCase):
         found = self.paths({"CCNAVI_TICKET_CONTROL": "disable"})
         self.assertEqual(".ccnavi/approved", found["approved"])
 
+    def test_place_flags_are_ignored_outside_diagnosis(self):
+        # sh は受け取った引数を `"$@"` で渡すので、副命令に置き場のフラグを足されても効かない。
+        # 無視したことは標準エラーに出す。
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment.pop("CLAUDE_PROJECT_DIR", None)
+        elsewhere = os.path.join(self.ws, "elsewhere")
+        result = run_ccnavi(
+            [
+                "--root",
+                self.ws,
+                "--approved",
+                "x/approved",
+                "--tickets",
+                "x/proposals",
+                "--state",
+                elsewhere,
+                "--log",
+                "",
+                "sync",
+                "paths",
+            ],
+            env=environment,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        found = dict((line.split(" ", 1) + [""])[:2] for line in result.stdout.splitlines())
+        self.assertEqual(".ccnavi/approved", found["approved"])
+        self.assertEqual("wip/proposals", found["proposals"])
+        for flag in ("--approved", "--tickets", "--state", "--log"):
+            self.assertIn(f"ccnavi: {flag} は診断", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

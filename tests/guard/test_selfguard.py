@@ -84,8 +84,8 @@ class SelfGuardTest(unittest.TestCase):
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "--quiet", "-m", "init")
 
-        self.state = os.path.join(self.repo, "state")
-        self.log = os.path.join(self.repo, "decisions.jsonl")
+        self.state = os.path.join(self.repo, "logs", "state")
+        self.log = os.path.join(self.repo, "logs", "decisions.jsonl")
 
     def binary(self, text="MZ fake executable\n"):
         """実行ファイルの代わりを置く。`.gitignore` の中に在る想定なので、
@@ -138,10 +138,6 @@ class SelfGuardTest(unittest.TestCase):
             [
                 "--root",
                 self.repo,
-                "--state",
-                self.state,
-                "--log",
-                self.log,
                 "--mode",
                 mode,
                 "--guard-core-files",
@@ -565,10 +561,9 @@ class SelfGuardTest(unittest.TestCase):
                 os.path.join(self.repo, "logs", "decisions.20260927-120000.jsonl"),
                 os.path.join(self.repo, "Logs", "State", "x.json"),
                 os.path.join(self.repo, "logs", "archive", "self", "done", "i0001.md"),
-                # 置き場を動かしてある（--state / --log）。
                 os.path.join(self.state, "denied-x.json"),
                 self.log,
-                os.path.join(self.repo, "decisions.20260927-120000-2.jsonl"),
+                os.path.join(self.repo, "logs", "decisions.20260927-120000-2.jsonl"),
             ):
                 with self.subTest(tool=tool, path=path):
                     key = "notebook_path" if tool == "NotebookEdit" else "file_path"

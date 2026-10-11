@@ -60,10 +60,6 @@ class ScratchpadCopyTest(unittest.TestCase):
             [
                 "--root",
                 self.repo,
-                "--state",
-                "",
-                "--log",
-                "",
                 "--mode",
                 "enable",
                 "--guard-core-files",

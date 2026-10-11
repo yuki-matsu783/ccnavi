@@ -402,8 +402,9 @@ ccnavi の動作に依存する決まりなので、ワークスペースの `CL
 別の場所を指せるのはフラグ（`--log` / `--state` / `--approved` / `--tickets` / `--projects` /
 `--project-home`）だけで、hook からは渡らない。共通レイヤーの置き場（`.ccnavi/common/`）は `--project-home` で
 ccnavi ディレクトリを動かしても動かず、別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけ。
-レイヤーの置き場を動かすこれらのフラグ（`--projects` / `--project-home` を含む）は診断（`--lint` / `--test` /
-`--test-samples` / `--explain`）に限り、hook からの判定と `ticket` / `review` の副命令に渡すと無視し、標準エラーに出す。
+置き場を動かすこれらのフラグは、どれも診断（`--lint` / `--test` / `--test-samples` / `--explain`）に限る。
+hook からの判定と `ticket` / `review` などの副命令に渡すと無視し、標準エラーに出す。`.ccnavi/scripts/` の sh は受け取った
+引数を実行ファイルへそのまま渡すので、診断の外でも効くと、記録を止める・置き場を差し替えるといった形で副命令を動かせてしまうため。
 
 以前は 6 つの環境変数（`CCNAVI_PROJECTS`・`CCNAVI_PROJECT_HOME`・`CCNAVI_TICKETS_PROPOSAL`・
 `CCNAVI_TICKETS_APPROVED`・`CCNAVI_LOG`・`CCNAVI_STATE`）で置き場を動かせたが、廃止した。
