@@ -35,6 +35,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `DENY_SUBAGENT_TICKET_OP` | サブエージェントがチケットの状態・レビュー・push を動かそうとした |
 | `DENY_CHILD_PUSH` | 子チケットのワークツリーから `ccnavi-git.sh push` を打った。`cd` の行き先が読めない push を含む（9.10） |
 | `DENY_SCRIPT_ENV_OVERRIDE` | 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼んだ（8.2） |
+| `DENY_WRAPPER_CORE_PATH` | `ccnavi-git.sh` の `rm`・`restore --source`・`checkout <ref> <パス>` で、自己防衛の対象を消す・別のコミットの中身に戻そうとした（8.2） |
 | `POST_VIOLATION` / `POST_PREEXISTING` / `POST_TICKET_SCOPE` | 実行後チェック。保護領域の変更 / 前から在った変更 / チケットの範囲外 |
 
 記録の `skip` の理由: `mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、

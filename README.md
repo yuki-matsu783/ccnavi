@@ -1363,6 +1363,9 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 - `.claude/` の `hooks/` と `settings*.json`、ccnavi ディレクトリ（`.ccnavi`）、`ccnavi-git.sh`、実行ファイル、
   共通レイヤーの 3 本（`.ccnavi/common/`）、記録と state の置き場（`logs/decisions.jsonl` と `logs/state`）、閉じたチケットの退避（`logs/archive`）
 - パスは「区切りが続くか、そこで終わる」形で当てるので、`rm -rf .ccnavi` や `mv .ccnavi .ccnavi.bak` も止まる
+- `ccnavi-git.sh` を通しても同じ場所は消せない。`rm`・`restore --source <ref>`・`checkout <ref> <パス>` で上の場所
+  （とそれを中に含むディレクトリ）を消す・別のコミットの中身に戻す形は `builtin-guard-wrapper-paths`（`DENY_WRAPPER_CORE_PATH`）で止まる。
+  衝突を解く `restore --ours / --theirs` と、索引の中身に戻す `restore` / `restore --staged` は通る
 - 場所のパスは大文字小文字を区別せずに当てる。コマンドの名前（`rm` / `cp`）も区別しない。止める側が広がるだけなので問題にしない
 
 名指しのツール（`Write` / `Edit` / `NotebookEdit`）からも守る。
@@ -2753,6 +2756,9 @@ commit 845d832e329aa533ee8e0acf3ee61ea1990c47ca
 - 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）に当たるパスには、
   `checkout <ref> <パス>`・`restore --source <ref>`・`restore --ours / --theirs` を通さない。置き場を過去の中身に戻したり、
   衝突を片側に寄せたりすると、承認が無かったことにも戻ったことにもなる
+- ccnavi 自身を守る場所（`.ccnavi/`・`.claude/settings*.json`・`.claude/hooks/`・記録と state・`ccnavi-git.sh`）には、
+  `rm`・`restore --source <ref>`・`checkout <ref> <パス>` を通さない。hook が先に止め、ラッパースクリプトも 2 重目に止める。
+  ラッパースクリプト自身を消すと、生の git の止め（ラッパースクリプトがあるときだけ働く）も外れるため。衝突の解決（`restore --ours / --theirs`）は通る
 - 親のワークツリーでは、親のブランチ（承認済みの親チケットの `branch:`、無ければ識別子）のほかへ `checkout`・`switch` で移れない。
   識別子のブランチの上から承認済みの `branch:` のブランチへ移るのは、承認済みチケットを取り込む 1 操作になる
   `worktree add` は行き先の名前とブランチ名を揃える形だけで、違う名前のブランチを出すのは行き先の名前の親チケットが
