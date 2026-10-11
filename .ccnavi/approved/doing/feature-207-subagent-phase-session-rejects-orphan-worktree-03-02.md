@@ -12,6 +12,8 @@ human_review:
 allow:
   - match: Write|Edit
     glob: "docs/CONTEXT.md"
+started_at: "2026-10-12T05:58:23+0900"
+base_sha: "8b735d179b2728f18fbe249825438e0cc1a9ff3a"
 ---
 ## やること
 
