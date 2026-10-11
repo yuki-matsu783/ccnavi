@@ -1,0 +1,13 @@
+/*
+ * ボードの CSS の入口。ビルド（scripts/build.js）が 1 本にまとめて dist/board.css に出す。
+ * `@import` を並べるだけで、ボードの部品の CSS は同じ置き場に置く（`Board.css`）。
+ *
+ * 共通の部品（ボタン・骨組み）は VS Code 拡張と同じ `@ccnavi/shared` の CSS で、並べる順も設定画面と同じ
+ * （ボタン・配色・骨組み）。配色は VS Code の外なので `browser-theme.css`（Claude の配色を `:root` と
+ * `prefers-color-scheme` で定義する）を使う。ボードの部品は共通の骨組みの後に読み、同じクラス名
+ * （`.path`・`.empty`・`.problems`・`h2` など）はボードの側で上書きする。
+ */
+@import "@ccnavi/shared/styles/button.css";
+@import "@ccnavi/shared/styles/browser-theme.css";
+@import "@ccnavi/shared/styles/page.css";
+@import "./Board.css";

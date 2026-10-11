@@ -5,8 +5,9 @@
 // 1. 型を見る（画面・Worker・service worker は tsconfig.json、Node で回す部品は tsconfig.node.json）
 // 2. 通信先の一覧（既定 hosts.json）から manifest.json を組む。`host_permissions` と CSP の
 //    `connect-src` は一覧の API のオリジンだけ。組織ごとのビルドは --hosts で一覧を替える
-// 3. esbuild で 4 本（background・board・options・worker）をバンドルする。設定画面（options）は React で、
-//    その CSS は入口の src/options/style.css から options.css を組む（共通の部品 @ccnavi/shared の CSS を読む）
+// 3. esbuild で 4 本（background・board・options・worker）をバンドルする。設定画面（options）は React。
+//    CSS は入口の src/options/style.css と src/board/style.css から options.css と board.css を組む
+//    （共通の部品 @ccnavi/shared の CSS を読む）
 // 4. 同梱の Pyodide を node_modules からコピーし、scripts/pyodide-files.json のハッシュと突き合わせる
 //    （npm の lockfile の integrity とは別に、コピーした物そのものを確かめる）
 // 5. 同梱の Python（PyYAML・ccnavi・入口）を zip に組む（scripts/python.js）
@@ -92,7 +93,7 @@ export async function build({ hostsFile = path.join(HERE, "hosts.json"), out = p
   });
   // CSS は JS の入口から import させず、別に組む（VS Code 拡張の scripts/bundle-webview.js と同じ分け方）
   await esbuild.build({
-    entryPoints: { options: "src/options/style.css" },
+    entryPoints: { options: "src/options/style.css", board: "src/board/style.css" },
     absWorkingDir: HERE,
     outdir: out,
     bundle: true,
