@@ -130,6 +130,8 @@ def run(
         )
     if not (title or "").strip():
         return refuse("--title <題> が要る")
+    if any(unicodedata.category(ch) in ("Cc", "Zl", "Zp") for ch in title):
+        return refuse("--title に改行や制御文字は使えない")
     if issue is not None and issue <= 0:
         return refuse("--issue には正の整数を渡す")
     plan = parse_plan(plan_text)
@@ -146,7 +148,7 @@ def run(
         return refuse(
             f"cwd が .claude/worktrees/{ident} の中ではない。"
             "提案は識別子と同名のワークツリーに書く。"
-            f"先に 'sh {git_sh} worktree add .claude/worktrees/{ident}"
+            f"先に '{git_sh} worktree add {tree.worktree_path(root, ident)}"
             f" -b {ident} <統合先>' で切り、そのワークツリーの中から打つ"
         )
 

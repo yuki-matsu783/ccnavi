@@ -115,6 +115,14 @@ class TicketNewTest(PhaseHarness):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("子の識別子", result.stderr)
 
+    def test_a_title_with_line_breaks_or_control_characters_is_refused(self):
+        for title in ("a\nb", "a\u2028b", "a\x85b", "a\x7fb"):
+            with self.subTest(title=title):
+                result = self.new(title=title)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("制御文字", result.stderr)
+        self.assertFalse(os.path.exists(self.todo))
+
     def test_an_unknown_type_lists_the_usable_ones(self):
         result = self.new(plan="design,nothing")
         self.assertNotEqual(result.returncode, 0)
@@ -135,6 +143,8 @@ class TicketNewTest(PhaseHarness):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("worktree add", result.stderr)
         self.assertIn(f".claude/worktrees/{IDENT}", result.stderr)
+        self.assertNotIn("sh sh", result.stderr)
+        self.assertIn("'sh ", result.stderr)
         self.assertFalse(os.path.exists(self.todo))
 
     def test_a_worktree_with_another_name_is_not_accepted(self):
