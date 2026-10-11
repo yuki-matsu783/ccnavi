@@ -73,8 +73,25 @@ def _violation(
         lines.append(f"restored: ccnavi moved this file to {moved}. It was not deleted.")
     else:
         lines.append("restored: ccnavi put this path back to its committed content.")
+    if _in_approved_area(change.path):
+        lines.append(APPROVED_HINT)
     lines.append(_messages(group))
     return "\n".join(line for line in lines if line)
+
+
+# 承認済みの置き場の報告につける 1 行。判定は変えない。ccnavi-ticket.sh / ccnavi-review.sh が
+# 前に書いた未コミットの変更は、後のどのコマンドの後でも同じ形で報告され、
+# 受け取った側が自分の違反と読んで undo を打つ（打つと手順が進まなくなる）。
+APPROVED_HINT = (
+    "note: this is the approved area. If ccnavi-ticket.sh / ccnavi-review.sh ran earlier in this "
+    "session (start, finish, confirm, ...), ccnavi itself most likely wrote this and the call "
+    "shown after: did not. Do not run undo:. Tell the user only if you do not know what wrote it."
+)
+
+
+def _in_approved_area(path: str) -> bool:
+    """報告のパスが承認済みの置き場（`.ccnavi/approved/`）の下か。"""
+    return f"/{path.replace(chr(92), '/').lower()}".find("/.ccnavi/approved/") >= 0
 
 
 def _preexisting(finding: post_findings.Finding) -> str:
