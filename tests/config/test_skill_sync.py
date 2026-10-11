@@ -49,7 +49,7 @@ class SkillSyncTest(ConfigUnionHarness):
         """1: 概念スキルの SKILL.md と references を写し、concept: true の無いスキルは写さない"""
         write(self.source("testing", "SKILL.md"), concept_skill("testing"))
         write(self.source("testing", "references", "common", "unit", "basics.md"), "# 基本\n")
-        write(self.source("testing", "references", "common", "index.jsonl"), "{}\n")
+        write(self.source("testing", "references", "common", "ccnavi-index.jsonl"), "{}\n")
         write(self.source("commit", "SKILL.md"), plain_skill("commit"))
 
         tree, started = self.start_parent()
@@ -65,7 +65,9 @@ class SkillSyncTest(ConfigUnionHarness):
         )
         self.assertFalse(
             os.path.exists(
-                os.path.join(tree, "skills", "testing", "references", "common", "index.jsonl")
+                os.path.join(
+                    tree, "skills", "testing", "references", "common", "ccnavi-index.jsonl"
+                )
             )
         )
         self.assertFalse(os.path.exists(os.path.join(tree, "skills", "commit")))

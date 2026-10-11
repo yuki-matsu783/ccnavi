@@ -176,7 +176,7 @@ CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）�
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・設定 3 本（.ccnavi/common/rules.yml、
 .ccnavi/common/risks.yml、.ccnavi/config/phases.yml）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
---docs の索引（**/index.jsonl）は、配布先の .gitignore に足す（index.jsonl を否定する
+--docs の索引（**/ccnavi-index.jsonl）は、配布先の .gitignore に足す（ccnavi-index.jsonl を否定する
 行があれば足さない）。
 
 置き場（記録・控え・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）は既定に
@@ -739,22 +739,22 @@ fi
 # hook が起動しない。置き場は配った機械のぶんだけ足す。別の機械で実行し直せば、その機械の
 # ぶんが足される。
 #
-# 配った実行ファイルの `--docs` は、md のあるディレクトリごとに index.jsonl を書く。ただし書くのは
+# 配った実行ファイルの `--docs` は、md のあるディレクトリごとに ccnavi-index.jsonl を書く。ただし書くのは
 # git がそのファイルを無視しているときだけなので（README「ドキュメントの索引」）、無視する
-# 行が無い配布先では索引が作られない。そこで、実行ファイルと同じ回に `**/index.jsonl` も足す。
+# 行が無い配布先では索引が作られない。そこで、実行ファイルと同じ回に `**/ccnavi-index.jsonl` も足す。
 # 見出しは実行ファイルの塊と分ける。同じ見出しの下に置くと、何のための行かが分からなくなる。
-# `/` を含まない `index.jsonl` もどの階層にも当てはまるので、その行が既にあれば足さない。
-# `index.jsonl` を否定する行（`!**/index.jsonl`、`!docs/index.jsonl` など）があれば、ユーザは
+# `/` を含まない `ccnavi-index.jsonl` もどの階層にも当てはまるので、その行が既にあれば足さない。
+# `ccnavi-index.jsonl` を否定する行（`!**/ccnavi-index.jsonl`、`!docs/ccnavi-index.jsonl` など）があれば、ユーザは
 # 索引を追跡すると決めている。後ろに足すと git は後の行を優先するので、その否定を無効にして
 # しまう。この場合は足さずに、その旨を伝える（「揃っていない」には数えない）。
 IGNORE_HEADER="# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）"
 INDEX_IGNORE_HEADER="# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）"
-INDEX_IGNORE_LINE="**/index.jsonl"
+INDEX_IGNORE_LINE="**/ccnavi-index.jsonl"
 # ignore_todo は、表示と「揃っているか」の判定に使う全体。書き込むときは塊ごとに分けて持つ。
 ignore_todo=""
 ignore_bin_todo=""
 ignore_index_todo=""
-# ユーザが index.jsonl を否定している行（改行で終わる）。あれば索引の行は足さない。
+# ユーザが ccnavi-index.jsonl を否定している行（改行で終わる）。あれば索引の行は足さない。
 ignore_index_negated=""
 # .gitignore の行を、比べやすい形で出す。CRLF の `\r` と行末の空白を取り除く（git も行末の
 # 空白は読まない）。ファイルが無ければ何も出さない。
@@ -776,11 +776,11 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 		ignore_bin_todo="/$BUILD_ROOT/$built/
 "
 	fi
-	negated=$(gitignore_lines | grep -E '^!.*(index|\*)\.jsonl$' || true)
+	negated=$(gitignore_lines | grep -E '^!.*(ccnavi-index|\*)\.jsonl$' || true)
 	if [ -n "$negated" ]; then
 		ignore_index_negated="$negated
 "
-	elif ! ignored_already "$INDEX_IGNORE_LINE" "index.jsonl"; then
+	elif ! ignored_already "$INDEX_IGNORE_LINE" "ccnavi-index.jsonl"; then
 		ignore_index_todo="$INDEX_IGNORE_LINE
 "
 	fi
@@ -917,7 +917,7 @@ report_deploy() {
 		printf '%s' "$ignore_todo" | sed 's/^/  /'
 	fi
 	if [ -n "$ignore_index_negated" ]; then
-		printf '.gitignore に index.jsonl を否定する行があり、ユーザが索引を追跡しているので %s は足していません:\n' "$INDEX_IGNORE_LINE"
+		printf '.gitignore に ccnavi-index.jsonl を否定する行があり、ユーザが索引を追跡しているので %s は足していません:\n' "$INDEX_IGNORE_LINE"
 		printf '%s' "$ignore_index_negated" | sed 's/^/  /'
 	fi
 	if [ -n "$launcher_mode_todo" ]; then

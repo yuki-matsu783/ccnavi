@@ -14,32 +14,39 @@
 - 組むのはワークスペースルートと、プロジェクトの置き場の直下の各プロジェクト（`tree.projects`。
   それぞれ別の git）。どれも `.git` をルートに持つものだけ。引くときは全部を合わせ、
   `concept_id` はワークスペースルートからの相対（`projects/<名前>/docs/x`）にする。
-  index.jsonl に書く行はそのツリーのルートからの相対
+  ccnavi-index.jsonl に書く行はそのツリーのルートからの相対
 - 対象は各ツリーの `git ls-files --cached --others --exclude-standard` の `*.md`。消したがまだ
   ステージしていないもの（実体が無いもの）と、シンボリックリンク・ふつうのファイルでない
   ものは飛ばす。ccnavi ディレクトリ（`.ccnavi/`）の下はチケットとマーカーの置き場で、
   文書ではないので載せない。実体のパスがツリーの外に出るディレクトリ（ジャンクションや
   リンク越し）は読みも書きもしない
-- md が直下にあるディレクトリごとに `index.jsonl`。1 行
+- md が直下にあるディレクトリごとに `ccnavi-index.jsonl`。1 行
   `{"concept_id":…,"directory":…,"frontmatter":{…}|null,"mtime":"YYYY-MM-DDTHH:MM:SS"}`。
   `concept_id` はツリーのルートからの相対パスから `.md` を除いたもの。ルート直下の
   `directory` は `.`
 - `concept_id` と `mtime` が既存の行と同じなら、その行を使い回す（読み直さない）。
   書くのは一時ファイルに書いて置き換える形で、中身が同じなら書かない。一時ファイルは
   git のディレクトリ（`.git/`）の中に排他で作る（作業ツリーの `git status` に出さない）。
-  `.git` が別のファイルシステムなら、そのディレクトリの下の `.ccnavi-tmp-*/index.jsonl`
+  `.git` が別のファイルシステムなら、そのディレクトリの下の `.ccnavi-tmp-*/ccnavi-index.jsonl`
   （git に無視されることを確かめてから）に作る
 - 期限（SessionStart）を過ぎたら md を読むのをやめるが、どのディレクトリも読めた分までは書く
-- 書くのは、git がそこの `index.jsonl` を無視しているときだけ。作業ツリーに追跡されて
+- 書くのは、git がそこの `ccnavi-index.jsonl` を無視しているときだけ。作業ツリーに追跡されて
   いないファイルを置くと、`git status`・実行後チェック・`worktree remove` のどれにも出る。
-  md を持つディレクトリのどれでも無視されていないツリーは、索引の対象外にして引かない
-  （案内と標準エラーで名指しする。`.gitignore` は書き換えない）。一部のディレクトリだけが
-  無視されていないなら（追跡されている index.jsonl など）、そこは書かずに行だけを組む
-- ccnavi が書いた形でない index.jsonl は、上書きも削除もしない。空か、空でない行が
+  md を持つディレクトリのどれでも無視されていないツリーは、書く前に、そのツリーのルートの
+  `.gitignore` に `**/ccnavi-index.jsonl` を 1 行だけ足して確かめ直す（ワークスペースも
+  プロジェクトも同じ。ファイルが無ければ作る。既存の行は変えない）。足したことは
+  SessionStart の案内と標準エラーで名指しする（未コミットの差分が残るため）。`!` で
+  ccnavi-index.jsonl を否定する行があれば（ユーザが追跡している）足さない。足せなかった・
+  足しても無視されないツリーだけが索引の対象外になり、引かない（案内と標準エラーで名指しする）。
+  一部のディレクトリだけが無視されていないなら（追跡されている ccnavi-index.jsonl など）、
+  足さず、そこは書かずに行だけを組む
+- ccnavi が書いた形でない ccnavi-index.jsonl は、上書きも削除もしない。空か、空でない行が
   全部この 4 つの鍵を持つ行として読めるときだけを ccnavi のものとみなす。よその道具が
   同じ名前で置いたファイルを壊さない
-- md が全部消えたディレクトリ（追跡はされているが実体が無い）の `index.jsonl` は、上の条件で
-  消す。それ以外の経路で残った古い `index.jsonl` は読まない
+- 旧名 `index.jsonl`: 新しい名前の索引を書けるディレクトリで、ccnavi が書いた形（空でない行が
+  全部 4 つの鍵を持つ）で、git が追跡していないものだけを消す。ほかの道具のものは触らない
+- md が全部消えたディレクトリ（追跡はされているが実体が無い）の `ccnavi-index.jsonl` は、上の条件で
+  消す。それ以外の経路で残った古い `ccnavi-index.jsonl` は読まない
 - git への問い合わせの失敗（git が無い・期限切れ・破損したリポジトリ）は「git の外」とも
   「無視されていない」とも別に扱う
 
@@ -150,12 +157,16 @@ class Collected:
     """ワークスペースとプロジェクトを合わせた索引。concept_id はワークスペースルートから。"""
 
     rows: list[dict] = field(default_factory=list)
-    # md を持つが index.jsonl を無視していないので対象外にしたツリーの名前。
+    # md を持つが ccnavi-index.jsonl を無視していないので対象外にしたツリーの名前。
     unignored: list[str] = field(default_factory=list)
     # git への問い合わせに失敗したツリー（名前: 理由）。対象外とも git の外とも別。
     failed: list[str] = field(default_factory=list)
-    # ccnavi のものでないので触らなかった index.jsonl（ワークスペースルートから）。
+    # ccnavi のものでないので触らなかった ccnavi-index.jsonl（ワークスペースルートから）。
     foreign: list[str] = field(default_factory=list)
+    # 無視の行を足したツリーの .gitignore（ワークスペースルートから）。未コミットの差分が残る。
+    ignore_added: list[str] = field(default_factory=list)
+    # 新しい名前に移る時に消した、ccnavi が書いた形の旧 index.jsonl（ワークスペースルートから）。
+    migrated: list[str] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
     # どれかのツリーが md を持ち、索引の対象だった。
     indexable: bool = False
@@ -198,6 +209,9 @@ def collect(
             return f"{place.prefix}/{rel}" if place.prefix else rel
 
         result.foreign.extend(at(p) for p in built.foreign)
+        result.migrated.extend(at(p) for p in built.migrated)
+        if built.ignore_added:
+            result.ignore_added.append(at(built.ignore_added))
         result.problems.extend(at(p) for p in built.problems)
         for row in built.rows:
             moved = _prefixed(row, place.prefix)
@@ -210,7 +224,8 @@ def collect(
     return result
 
 
-UNIGNORED = "は .gitignore に `**/index.jsonl` が無いので索引の対象外"
+UNIGNORED = "は .gitignore に `**/ccnavi-index.jsonl` が無く、足せなかったので索引の対象外"
+IGNORE_ADDED = "に `**/ccnavi-index.jsonl` を足した（未コミットの差分が残る）"
 
 
 # --- 入口 ---------------------------------------------------------------------------
@@ -220,7 +235,7 @@ UNIGNORED = "は .gitignore に `**/index.jsonl` が無いので索引の対象�
 # 使い回せていれば数百本の md でも 1 秒に届かない。初めての大きなプロジェクトだけが
 # ここに当たり、書けたディレクトリの分は次のセッションで使い回される。
 START_SECONDS = 3.0
-# 残りがこれに満たなければ新しくしない（既存の index.jsonl だけで案内する）。
+# 残りがこれに満たなければ新しくしない（既存の ccnavi-index.jsonl だけで案内する）。
 MIN_REFRESH_SECONDS = 0.5
 # 新しくしないときに git に与える時間（ls-files と check-ignore）。
 STALE_SECONDS = 1.0
@@ -251,6 +266,8 @@ def run(
         stderr.write(f"ccnavi: git への問い合わせに失敗したので引かない: {failure}\n")
     for problem in found.problems:
         stderr.write(f"ccnavi: 索引を残せなかった（引くのは続ける）: {problem}\n")
+    for path in found.ignore_added:
+        stderr.write(f"ccnavi: {path} {IGNORE_ADDED}\n")
     if found.unignored:
         stderr.write(f"ccnavi: {', '.join(found.unignored)} {UNIGNORED}\n")
     hits, matched = docsearch_query.search(found.rows, query)
@@ -274,9 +291,9 @@ def at_start(conf: settings.Settings, root: str, deadline: float | None = None) 
 
     使う時間は START_SECONDS と、渡された期限（hook の判定の期限）の残りの小さいほう。
     残りが MIN_REFRESH_SECONDS に満たない（期限が既に切れているときも）なら新しくせず、
-    md を読まず書かずに既存の index.jsonl の行だけを集めて案内する（git には STALE_SECONDS
+    md を読まず書かずに既存の ccnavi-index.jsonl の行だけを集めて案内する（git には STALE_SECONDS
     だけ与える）。何が起きても開始は止めない。md が 1 本も無い・何かが失敗したときは何も出さない
-    （空を返す）。索引の対象外にしたツリーと、触らなかった index.jsonl があれば短くつける。
+    （空を返す）。索引の対象外にしたツリーと、触らなかった ccnavi-index.jsonl があれば短くつける。
     git への問い合わせに失敗したツリーは何も言わない（対象外と取り違えさせない）。
     """
     try:
@@ -303,7 +320,7 @@ def _has_md(root: str) -> bool:
         return False
 
 
-# 案内で名指しする、触らなかった index.jsonl の数の上限。
+# 案内で名指しする、触らなかった ccnavi-index.jsonl の数の上限。
 FOREIGN_SHOWN = 3
 # 引き方の案内の頭。作業の決まり（`reasons.conventions`）が、この案内を出した回にだけ
 # 「詳しくは --docs で引く」を添えるのに使う。
@@ -312,9 +329,12 @@ GUIDE_HEAD = "[ccnavi] ドキュメント（*.md）を探すときは"
 
 def notice(conf: settings.Settings, root: str, found: Collected) -> str:
     extra = []
+    if found.ignore_added:
+        extra.append(f"{', '.join(found.ignore_added)} {IGNORE_ADDED}")
     if found.unignored:
         extra.append(
-            f"{', '.join(found.unignored)} {UNIGNORED}（ccnavi は .gitignore を書き換えない）"
+            f"{', '.join(found.unignored)} {UNIGNORED}"
+            "（.gitignore が書けないか、ccnavi-index.jsonl を否定する行がある）"
         )
     if found.foreign:
         names = ", ".join(found.foreign[:FOREIGN_SHOWN])

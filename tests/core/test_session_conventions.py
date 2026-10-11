@@ -157,7 +157,7 @@ class SessionConventionsTest(unittest.TestCase):
 
         subprocess.run(["git", "init", "-q", self.root], check=True)
         with open(os.path.join(self.root, ".gitignore"), "w", encoding="utf-8") as f:
-            f.write("**/index.jsonl\n")
+            f.write("**/ccnavi-index.jsonl\n")
         with open(os.path.join(self.root, "README.md"), "w", encoding="utf-8") as f:
             f.write("---\ntype: guide\n---\n# x\n")
         text = self.start("--mode", "enable")
