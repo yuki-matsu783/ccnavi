@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>フェーズ 3: 一覧のファイル名を切り替える</title>
+<style>
+  body { font-family: sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.8; color: #222; background: #fff; }
+  h1 { font-size: 1.3rem; }
+  h2 { font-size: 1.05rem; margin-top: 2rem; border-bottom: 1px solid #ccc; }
+  .box { background: #f3f6fa; padding: 0.8rem 1rem; border-radius: 6px; }
+  @media (prefers-color-scheme: dark) {
+    body { color: #ddd; background: #1b1b1b; }
+    h2 { border-color: #555; }
+    .box { background: #262c33; }
+  }
+</style>
+</head>
+<body>
+<h1>フェーズ 3: 一覧のファイル名を切り替える</h1>
+
+<h2>なにを変えるのか</h2>
+<p>「この操作はこう判定されるはず」という答えを書いた一覧のファイルがあります。
+フェーズ 1 と 2 で、プログラムと画面は「期待する判定」という呼び方になりました。
+でも、ファイルの名前だけは、まだ昔の <code>rule-samples.yml</code> のままでした。
+このフェーズで、名前を <code>rule-expectations.yml</code> に切り替えます。</p>
+
+<h2>このフェーズでやること</h2>
+<div class="box">
+<ul>
+  <li>一覧のファイルの名前を変えました。中身の判定の並びと件数は変えていません。ファイルの冒頭の説明などの言い回しだけ、新しい呼び方に直しました。</li>
+  <li>古い名前を指していた場所（プログラム、テスト、画面の拡張、設定の既定値）を、新しい名前に直しました。</li>
+</ul>
+</div>
+
+<h2>ふだんと違うところ</h2>
+<p>この一覧のファイルは、エージェントが勝手に書き換えられないように守られています。
+そのため、名前の切り替えは、エージェントではなく人（あなた）が手で行いました。
+ccnavi が「このチケットで決めた範囲の外だ」と警告を出していますが、これはその手作業の変更に対するものです。</p>
+
+<h2>まだやらないこと</h2>
+<ul>
+  <li>README、設計書、スキル、ADR の言い回しは、フェーズ 4 で直します。</li>
+</ul>
+
+<h2>気をつけてほしいこと</h2>
+<ul>
+  <li>テストが落ちるものがありますが、すべて前から落ちていたもので、今回の変更とは関係ありません（変更前のツリーで確かめました）。</li>
+  <li>「見本」という言葉が 5 行残っています。これは別のファイル（<code>.env.sample</code>）の名前を指す言葉なので、わざと直していません。</li>
+</ul>
+
+<h2>どれくらい危ないか</h2>
+<p>ファイル名と、それを指す文字列を変えただけで、判定の中身は変えていません。名前の指し違いがあると、一覧を読めなくなるので、念のため人が見ます。</p>
+</body>
+</html>
