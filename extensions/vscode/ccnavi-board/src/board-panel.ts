@@ -40,6 +40,7 @@ import { runInTerminal, scriptShell } from "./terminal.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { requireTickets, ticketControl } from "./ticket-control.js";
+import * as diaglog from "./log.js";
 
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "board";
@@ -524,6 +525,12 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
       // 見せたダイジェスト（承認画面の本文・判定が読んだ中身・承認済みチケットに書き込まれる中身）も渡す。識別子が同じでも、
       // 見せたあとに提案や判定が読んだ承認済みチケット・マーカーの中身が変われば承認しない
       const outcome = await runApproveYes(root, binSetting(), effect.tickets, effect.digest, effect.only);
+      // 承認済みチケットを置くのは取り返しがつかないので、受け付けたことと結果を 1 行残す
+      diaglog.get("ccnavi-board", root).info("承認を打った", {
+        result: outcome.ok ? "approved" : "mismatch" in outcome ? "mismatch" : "error",
+        requested: effect.tickets.length,
+        approved: outcome.ok ? outcome.value.approved.length : 0,
+      });
       if (outcome.ok) {
         // 承認した親は承認待ちから無くなる。あとで出す改版の提案を、前の保存と比べない
         forgetSaved(outcome.value.approved);
@@ -567,6 +574,11 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
         effect.choices,
         effect.digest,
       );
+      // 行き先を置くのは取り返しがつかない（続きの子が起きる）ので、受け付けたことと結果を 1 行残す
+      diaglog.get("ccnavi-board", root).info("残った指摘の行き先を置いた", {
+        result: outcome.ok ? "decided" : "mismatch" in outcome ? "mismatch" : "error",
+        phase: effect.phase,
+      });
       if (state === current) {
         dispatch(current, { kind: "decided", outcome });
       }
