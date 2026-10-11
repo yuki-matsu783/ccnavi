@@ -245,7 +245,10 @@ ccnavi_fetch_forward() {
 	[ "$ccnavi_fw_remote" = "$ccnavi_fw_local" ] && return 0
 	git -C "$1" merge-base --is-ancestor "$ccnavi_fw_remote" "$ccnavi_fw_local" 2>/dev/null && return 0
 	if ! git -C "$1" merge-base --is-ancestor "$ccnavi_fw_local" "$ccnavi_fw_remote" 2>/dev/null; then
-		printf '%s: リモートと分かれているので、取り込みが要る（sh %s/.ccnavi/scripts/ccnavi-sync.sh %s）\n' "$2" "$root" "$2"
+		# 分岐か、浅い clone で履歴が足りないだけかは見分けない。見るのは一致しているかどうかだけ。
+		printf '%s: リモートの最新と一致しないので、取り込みが要る（手元 %s、リモート %s。浅い clone なら git fetch --unshallow。sh %s/.ccnavi/scripts/ccnavi-sync.sh %s）\n' \
+			"$2" "$(git -C "$1" rev-parse --short "$ccnavi_fw_local")" \
+			"$(git -C "$1" rev-parse --short "$ccnavi_fw_remote")" "$root" "$2"
 		return 0
 	fi
 	# ロックは 1 回だけ試す（待たない）。取れなければ他の操作の最中なので早送りしない。
@@ -316,8 +319,10 @@ report=$(
 		if git -C "$tree" merge --ff-only --quiet "@{u}" 2>/dev/null; then
 			printf '%s: 承認済みチケットとマーカーを %s 件分だけ新しくした（%s）\n' "$name" "$behind" "$branch"
 		else
-			printf '%s: リモートと分岐しているので進めない。ユーザに合流させてもらってください（%s）\n' \
-				"$name" "$branch"
+			# 分岐か、浅い clone で履歴が足りないだけかは見分けない。見るのは一致しているかどうかだけ。
+			printf '%s: %s がリモートの最新と一致しないので進めない（手元 %s、リモート %s）。分岐しているか、clone が浅くて履歴が足りない。ユーザに更新してもらってください（浅いなら git fetch --unshallow）\n' \
+				"$name" "$branch" "$(git -C "$tree" rev-parse --short HEAD)" \
+				"$(git -C "$tree" rev-parse --short "@{u}")"
 		fi
 	done
 
