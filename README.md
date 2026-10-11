@@ -1393,7 +1393,9 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 - パスは「区切りが続くか、そこで終わる」形で当てるので、`rm -rf .ccnavi` や `mv .ccnavi .ccnavi.bak` も止まる
 - `ccnavi-git.sh` を通しても同じ場所は消せない。`rm`・`restore --source <ref>`・`checkout <ref> <パス>` で上の場所
   （とそれを中に含むディレクトリ）を消す・別のコミットの中身に戻す形は `builtin-guard-wrapper-paths`（`DENY_WRAPPER_CORE_PATH`）で止まる。
-  衝突を解く `restore --ours / --theirs` と、索引の中身に戻す `restore` / `restore --staged` は通る
+  衝突を解く `restore --ours / --theirs` と、索引の中身に戻す `restore` / `restore --staged`、何も消さない `rm -n` / `--dry-run` は通る。
+  パスを変数・置換で組み立てた形と、居場所の読めない `cd` / `pushd` の後の相対パスは、当たるかを確かめられないので止まる。
+  承認済みチケットの置き場（`.ccnavi/approved/`）をエージェントがラッパーで消す形も止まる（レビュー済みのマーカーを消す `rm` はユーザが端末で打つ）
 - 場所のパスは大文字小文字を区別せずに当てる。コマンドの名前（`rm` / `cp`）も区別しない。止める側が広がるだけなので問題にしない
 
 名指しのツール（`Write` / `Edit` / `NotebookEdit`）からも守る。

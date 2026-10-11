@@ -434,6 +434,10 @@ CORE_CASES = (
     ("rm --pathspec-from-file=list.txt", True),
     ("rm src/a.py", False),
     ("rm src/*.py", False),
+    # 何も消さない形と、ワークスペースの記録の置き場ではない logs。
+    ("rm -n .claude/settings.json", False),
+    ("rm .claude/settings.json --dry-run", False),
+    ("rm -r tests/logs", False),
     # 別のコミットの中身に戻す。
     ("restore --source=HEAD~5 -- .ccnavi", True),
     ("restore -s HEAD .ccnavi/common/rules.yml", True),
@@ -464,6 +468,8 @@ class CorePathTest(unittest.TestCase):
         "src/a.py",
         "projects/p/.ccnavi/config/rules.yml",
         ".claude/settings.json",
+        "tests/logs/a.txt",
+        ".ccnavi/approved/phases/i0001/1.reviewed",
     )
     # 同じコマンドを通す allow を置く。ルールが先に当たるなら通ってしまう。
     RULES = {
@@ -538,6 +544,46 @@ class CorePathTest(unittest.TestCase):
                 decision, _ = self.hook(command)
                 self.assertEqual(decision == "deny", stops, command)
 
+    def test_hook_only_forms(self):
+        """sh が別の理由で断る形と、sh が通してユーザに任せる形も、
+        hook はエージェントから止める。
+        """
+        for args, kind_text in (
+            # 長いオプションの省略形（sh は省略形を断る）。
+            ("restore --sou=HEAD~1 .claude/settings.json", "ccnavi 自身を守る場所"),
+            ("restore --so HEAD~1 .claude/settings.json", "ccnavi 自身を守る場所"),
+            ("rm --pathspec-from-fi=list.txt", "ccnavi 自身を守る場所"),
+            # 索引の中身に戻す checkout（sh は restore を案内して断る）。文面も restore を案内する。
+            ("checkout -- .ccnavi/common/rules.yml", "restore <パス>"),
+            # レビュー済みのマーカーを消すのはユーザが端末で打つ手順（sh は通す）。
+            ("rm .ccnavi/approved/phases/i0001/1.reviewed", "ユーザに依頼"),
+        ):
+            with self.subTest(args=args):
+                decision, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh " + args)
+                self.assertEqual(decision, "deny", reason)
+                self.assertIn(wrapguard.CODE_CORE_PATH, reason)
+                self.assertIn(kind_text, reason)
+
+    def test_unreadable_targets_stop(self):
+        """対象を読み切れない形は、共通ルールの allow に落とさずに止める。"""
+        for command, stops in (
+            ("X=.ccnavi; sh .ccnavi/scripts/ccnavi-git.sh rm -r $X", True),
+            ("sh .ccnavi/scripts/ccnavi-git.sh rm $(printf .ccnavi/rules.yml)", True),
+            ("pushd .ccnavi && sh scripts/ccnavi-git.sh rm rules.yml", True),
+            ('cd "$D" && sh /x/.ccnavi/scripts/ccnavi-git.sh rm a.py', True),
+            ("sh .ccnavi/scripts/ccnavi-git.sh restore --source=HEAD -- $P", True),
+            ("sh .ccnavi/scripts/ccnavi-git.sh checkout $B .ccnavi/common/rules.yml", True),
+            # 起点だけを変数で渡す形と、索引に戻す形は対象が読めるので通す。
+            ("sh .ccnavi/scripts/ccnavi-git.sh restore --source $R src/a.py", False),
+            ("sh .ccnavi/scripts/ccnavi-git.sh checkout $B", False),
+            ("sh .ccnavi/scripts/ccnavi-git.sh restore $P", False),
+        ):
+            with self.subTest(command=command):
+                decision, reason = self.hook(command)
+                self.assertEqual(decision == "deny", stops, reason)
+                if stops:
+                    self.assertIn(wrapguard.CODE_CORE_PATH, reason)
+
     def test_restore_from_a_list_without_source(self):
         # 索引の中身に戻すだけなら、パスをファイルから読む形もここでは止めない。
         decision, reason = self.hook(
@@ -582,7 +628,7 @@ class CorePathShAgreesTest(unittest.TestCase):
         for name in CorePathTest.FILES:
             if not os.path.exists(os.path.join(self.root, name)):
                 write(os.path.join(self.root, name), "x\n")
-        write(os.path.join(self.root, ".gitignore"), "logs/\n")
+        write(os.path.join(self.root, ".gitignore"), "/logs/\n")
         git = ["git", "-c", "user.email=t@example.com", "-c", "user.name=t"]
         for args in (["init", "--quiet", "-b", "main"], ["add", "-A"], ["commit", "-qm", "i"]):
             subprocess.run(git + args, cwd=self.root, check=True, capture_output=True)
@@ -593,13 +639,19 @@ class CorePathShAgreesTest(unittest.TestCase):
         env.update(GIT_ENV)
         env["PWD"] = self.root
         script = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-git.sh")
-        # rm は --dry-run で試す（消さずに、通るかだけを見る）。
-        words = args.split()
-        if words[0] == "rm":
-            words.insert(1, "--dry-run")
-        return subprocess.run(
-            ["sh", script, *words], cwd=self.root, env=env, capture_output=True, text=True
-        )
+        # 消した形は試すたびに戻す（--dry-run は自己防衛の検査を通るので、本当に打つ）。
+        try:
+            return subprocess.run(
+                ["sh", script, *args.split()],
+                cwd=self.root,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+        finally:
+            subprocess.run(
+                ["git", "reset", "-q", "--hard"], cwd=self.root, env=env, capture_output=True
+            )
 
     def test_sh_agrees(self):
         for args, stops in CORE_CASES:
@@ -613,6 +665,19 @@ class CorePathShAgreesTest(unittest.TestCase):
                     self.assertTrue(any(s in result.stderr for s in said), result.stderr)
                 else:
                     self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_user_removes_a_review_marker(self):
+        """レビュー済みのマーカーを消す手順（phase._erase_steps）は、sh が通す。"""
+        result = self.run_sh("rm .ccnavi/approved/phases/i0001/1.reviewed")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_records_of_the_workspace_only(self):
+        """記録の置き場はワークスペースルートの logs だけ。ほかの階層の logs は守る場所ではない。"""
+        result = self.run_sh("rm -r logs/state")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("ccnavi 自身を守る場所", result.stderr)
+        result = self.run_sh("rm -r tests/logs")
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":

@@ -148,11 +148,22 @@ _GLOB = re.compile(r"[*?\[]")
 _MARKERS = (settings.DEFAULT_PROJECT_HOME, ".claude", ".git")
 
 
+# 止めた理由の種類。文面を分ける。
+CORE_HIT = "core"
+CORE_STORE = "store"
+CORE_UNREAD = "unread"
+CORE_INDEX = "index"
+# 引数の中で、シェルが実行の時点で値を決める書き方（変数・置換）。
+_EXPANDS = re.compile(r"[$`]")
+# ラッパーを通る副命令を、走査が読み切れなかったときに生の文字列で探す。
+_DEGRADED_CORE = re.compile(r"ccnavi-git\.sh['\"]?\s+(rm|mv|restore|checkout)\b", re.IGNORECASE)
+
+
 def check_core_paths(
     conf: settings.Settings, root: str, cwd: str, subject: str, degraded: str
-) -> tuple[str, str]:
+) -> tuple[str, str, str]:
     """`ccnavi-git.sh` で自己防衛の対象を消す・別のコミットの中身に戻す形なら
-    （副命令, 当たった語）。
+    （副命令, 当たった語, 理由の種類）。
 
     当たるとみなすのは次のどれか。
 
@@ -162,16 +173,26 @@ def check_core_paths(
       実行ファイル・動かした共通レイヤー）
     - そのパスが守る場所を中に含むディレクトリ（ツリーの頂上・`.ccnavi` や `.claude` を持つ
       ディレクトリとその 1 つ上・実行ファイルや共通レイヤーの上・プロジェクトの置き場の上）
+    - 承認済みチケットの置き場（`CORE_STORE`）。レビュー済みのマーカーを消すのはユーザが端末で
+      打つ手順で、sh は通す。エージェントの呼び出しはここで止めて、ユーザに依頼させる
     - 当たる先を読みで決められない指定（`:` で始まる pathspec、固定の部分の無いグロブ、
-      `--pathspec-from-file`、居場所の読めない `..`）
+      `--pathspec-from-file`）
+    - 対象を読み切れない形（`CORE_UNREAD`）。変数や置換で組み立てた語、居場所の読めない
+      `cd` / `pushd` の後の相対パス、走査が読み切れないコマンド行。共通ルールの allow
+      （`*ccnavi-git.sh*`）が生の文字列に当たるので、ここで見ないと確認に落ちずに通る
+    - `checkout -- <パス>`（索引の中身に戻す。`CORE_INDEX`）。sh はこの形を通さないので、
+      sh と同じく restore を案内する
 
-    通すのは、索引の中身に戻す `restore`（`--staged` も、衝突を解く `--ours` / `--theirs` も）。
-    消える・過去の中身になるのでないものは、ルールとラッパーの許可リストに任せる。
-    読み切れない形は、allow が当たらずに確認になるので、ここでは見ない。
+    通すのは、索引の中身に戻す `restore`（`--staged` も、衝突を解く `--ours` / `--theirs` も）と、
+    何も消さない `rm -n` / `--dry-run`。消える・過去の中身になるのでないものは、ルールと
+    ラッパーの許可リストに任せる。
     """
     if degraded:
-        return "", ""
-    pattern = ""
+        found = _DEGRADED_CORE.search(subject)
+        if found:
+            return found.group(1).lower(), "読み切れないコマンド行", CORE_UNREAD
+        return "", "", ""
+    compiled = None
     for words, here in shellread.placed(subject):
         call = _script_call(words)
         if not call or os.path.basename(call[0].replace("\\", "/")) != _GIT_SCRIPT:
@@ -180,12 +201,13 @@ def check_core_paths(
         if not args or args[0] not in _CORE_SUBS:
             continue
         sub = args[0]
-        paths, unknown = _core_targets(sub, args[1:])
+        paths, unknown, index = _core_targets(sub, args[1:])
         if unknown:
-            return sub, unknown
+            kind = CORE_UNREAD if _EXPANDS.search(unknown) else CORE_HIT
+            return sub, unknown, kind
         if not paths:
             continue
-        if not pattern:
+        if compiled is None:
             pattern = selfguard_shell.guard_shell_regex(
                 root, conf.bin, conf.project_home, selfguard_shell.common_layer_files(conf)
             )
@@ -194,19 +216,32 @@ def check_core_paths(
         if here is not None and cwd:
             base = here if os.path.isabs(here) else os.path.join(cwd, here)
         for path in paths:
-            if _core_hit(conf, root, compiled, path, base):
-                return sub, path
-    return "", ""
+            kind = _core_hit(conf, root, compiled, path, base)
+            if kind:
+                return sub, path, CORE_INDEX if index and kind == CORE_HIT else kind
+    return "", "", ""
 
 
-def _core_targets(sub: str, args: list[str]) -> tuple[list[str], str]:
-    """副命令の引数から、消す・戻す先のパスの語（, 読めない指定があればその語）。
+def _long_option(arg: str, full: str, least: int) -> bool:
+    """`--名前`（`=値` を除く）が full か、git が受ける full の省略形
+    （least 字以上の前方一致）か。"""
+    return len(arg) >= least and full.startswith(arg)
 
-    `restore` は `--source` が無ければ何も返さない。`checkout` は最初の語（行き先か起点）を除く。
+
+def _core_targets(sub: str, args: list[str]) -> tuple[list[str], str, bool]:
+    """副命令の引数から、消す・戻す先のパスの語（, 読めない指定があればその語,
+    索引の中身に戻す `checkout -- <パス>` か）。
+
+    `restore` は `--source` が無ければ何も返さない。`checkout` は `--` より前の最初の語（行き先か
+    起点）を除く。`rm` は `-n` / `--dry-run` があれば何も返さない。長いオプションは、git が受ける
+    省略形（`--sou=` など）も同じに読む。パスに変数・置換があれば、その語を読めない指定として
+    返す。
     """
     longs, shorts = _VALUE_LONGS[sub], _VALUE_SHORTS[sub]
     positional: list[str] = []
+    before_dashes = 0
     source = False
+    dry = False
     after_dashes = False
     from_file = ""
     i = 0
@@ -218,13 +253,18 @@ def _core_targets(sub: str, args: list[str]) -> tuple[list[str], str]:
             continue
         if arg == "--":
             after_dashes = True
+            before_dashes = len(positional)
             continue
         if arg.startswith("--"):
             name, eq, _ = arg.partition("=")
-            if name == "--pathspec-from-file":
+            if _long_option(name, "--pathspec-from-file", len("--pathspec-fr")):
                 from_file = arg
-            if name == "--source":
+                name = "--pathspec-from-file"
+            if _long_option(name, "--source", len("--so")):
                 source = True
+                name = "--source"
+            if _long_option(name, "--dry-run", len("--d")):
+                dry = True
             if name in longs and not eq:
                 i += 1
             continue
@@ -234,47 +274,79 @@ def _core_targets(sub: str, args: list[str]) -> tuple[list[str], str]:
             ch, rest = rest[0], rest[1:]
             if sub == "restore" and ch == "s":
                 source = True
+            if sub == "rm" and ch == "n":
+                dry = True
             if ch in shorts:
                 if not rest:
                     i += 1
                 break
-    if sub == "restore":
-        if not source:
-            return [], ""
-        return positional, from_file
+    if not after_dashes:
+        before_dashes = len(positional)
+    if sub == "restore" and not source:
+        return [], "", False
+    if sub == "rm" and dry:
+        return [], "", False
     if from_file:
         # パスをファイルから読む形。どこに当たるかを読みで決められない。
-        return [], from_file
+        return [], from_file, False
+    index = False
+    targets = positional
     if sub == "checkout":
-        return positional[1:] if not after_dashes else positional, ""
-    return positional, ""
+        # `checkout -- <パス>` は起点が無く、索引の中身に戻す。
+        index = before_dashes == 0 and after_dashes
+        targets = positional if index else positional[1:]
+    # パスを変数・置換で組み立てた語。どこに当たるかを読みで決められない。
+    unread = next((p for p in targets if _EXPANDS.search(p)), "")
+    if unread:
+        return [], unread, False
+    return targets, "", index
 
 
 def _core_hit(
     conf: settings.Settings, root: str, compiled: re.Pattern, path: str, base: str | None
-) -> bool:
-    """パスの語 1 つが、自己防衛の対象に当たるか（当たるかを決められない語も当たる側）。"""
+) -> str:
+    """パスの語 1 つが自己防衛の対象に当たるなら、理由の種類。
+
+    当たるかを決められない語も当たる側に倒す。
+    """
     word = path.replace("\\", "/")
     if word.startswith(":"):
-        return True
+        return CORE_HIT
     glob = _GLOB.search(word)
     if glob:
         # グロブの前の固定の部分（最後の `/` まで）のディレクトリとして見る。
         head = word[: glob.start()]
         word = head[: head.rfind("/") + 1] if "/" in head else ""
         if not word.strip("/."):
-            return True
+            return CORE_HIT
+    if base is None and not os.path.isabs(word):
+        # 居場所が読めない（`cd "$D"`・`pushd`）。相対パスはどこを指すかを決められない。
+        return CORE_UNREAD
+    full = os.path.normpath(os.path.join(base, word)) if base is not None else None
+    if _in_store(conf, word, full):
+        return CORE_STORE
     if compiled.search("rm " + word):
-        return True
-    if base is None:
-        # 居場所が読めない。ツリーの頂上かもしれない語と、上へ出る語は決められない。
-        return os.path.isabs(word) is False and (
-            word.strip("/") in ("", ".") or ".." in word.split("/")
-        )
-    full = os.path.normpath(os.path.join(base, word))
+        return CORE_HIT
+    if full is None:
+        return ""
     if compiled.search("rm " + full.replace("\\", "/")):
+        return CORE_HIT
+    return CORE_HIT if _holds_core(conf, root, full) else ""
+
+
+def _in_store(conf: settings.Settings, word: str, full: str | None) -> bool:
+    """承認済みチケットの置き場（とその下）を指すか。置き場の親は守る場所として扱う。"""
+    store = (conf.approved or settings.DEFAULT_APPROVED).replace("\\", "/").strip("/").lower()
+    if not store:
+        return False
+    for form in (os.path.normpath(word) if not os.path.isabs(word) else word, full):
+        if form is None:
+            continue
+        text = "/" + form.replace("\\", "/").lower().strip("/") + "/"
+        if text.startswith("/../") or "/" + store + "/" not in text:
+            continue
         return True
-    return _holds_core(conf, root, full)
+    return False
 
 
 def _holds_core(conf: settings.Settings, root: str, full: str) -> bool:
@@ -309,9 +381,32 @@ def _holds_core(conf: settings.Settings, root: str, full: str) -> bool:
     )
 
 
-def core_path_message(root: str, sub: str, word: str) -> str:
+def core_path_message(root: str, sub: str, word: str, kind: str = CORE_HIT) -> str:
     """自己防衛の対象をラッパーで消す・戻す形を止めた文。"""
     git_sh = settings.script_command(root, _GIT_SCRIPT)
+    if kind == CORE_STORE:
+        return (
+            f"{_GIT_SCRIPT} {sub} が、承認済みチケットの置き場（{word}）を消すか、"
+            "別のコミットの中身に戻す形になっています。ここには承認済みチケットとレビュー済みのマーカーがあり、"
+            "動かすのはユーザと ccnavi のスクリプトです（レビューをやり直すためにマーカーを消す "
+            f"'{git_sh} rm <マーカー>' も、ユーザが端末で打つ手順です）。"
+            "要るなら、何をなぜ消したいのかを伝えてユーザに依頼してください。"
+        )
+    if kind == CORE_INDEX:
+        return (
+            f"{_GIT_SCRIPT} {sub} にパスを渡す形（{word}）は、そのファイルの書きかけを消します。"
+            f"戻したいファイルがあるなら '{git_sh} restore <パス>' を名指しで使ってください。"
+            "ccnavi 自身を守る場所（hook の登録・設定・保護済みのスクリプト・記録）を戻すなら、"
+            "何をなぜ戻したいのかを伝えてユーザに依頼してください。"
+        )
+    if kind == CORE_UNREAD:
+        return (
+            f"{_GIT_SCRIPT} {sub} の対象（{word}）を読み切れません。変数・置換で組み立てた値と、"
+            "居場所を読めない cd / pushd の後の相対パスは、ccnavi 自身を守る場所"
+            "（hook の登録・ルールとフェーズの設定・保護済みのスクリプト・実行ファイル・"
+            "判定の記録）に当たるかを確かめられないので止めました。消す・戻すファイルを、値を先に読んでから"
+            f"パスのまま 1 つずつ名指しし、'{git_sh} {sub} <パス>' の形で打ってください。"
+        )
     return (
         f"{_GIT_SCRIPT} {sub} が、ccnavi 自身を守る場所（{word}）を消すか、別のコミットの中身に"
         "戻す形になっています。ここには hook の登録・ルールとフェーズの設定・保護済みのスクリプト・"

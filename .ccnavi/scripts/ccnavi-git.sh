@@ -433,10 +433,14 @@ store_hit() {
 # hook の自己防衛が止める場所で、このスクリプト自身を消すと生の git の止めも外れる。止めるのは hook が先
 # （DENY_WRAPPER_CORE_PATH）で、ここは 2 重目。見るのは既定の置き場の名前だけ（動かした置き場は hook が見る）。
 #
-# 当たるとみなすのは、`.ccnavi/` の下・`.claude/settings*.json`・`.claude/hooks/`・`logs/` の記録と
-# state と退避・`ccnavi-git.sh`、それらを中に含むディレクトリ（ツリーの頂上と、`.ccnavi`・`.claude`・
-# `.git` を直に、または 1 つ下に持つディレクトリ）。`:` で始まる pathspec と、グロブの前に固定の
+# 当たるとみなすのは、`.ccnavi/` の下・`.claude/settings*.json`・`.claude/hooks/`・ワークスペースルートの
+# `logs/` の記録と state と退避・`ccnavi-git.sh`、それらを中に含むディレクトリ（ツリーの頂上と、`.ccnavi`・
+# `.claude`・`.git` を直に、または 1 つ下に持つディレクトリ）。`:` で始まる pathspec と、グロブの前に固定の
 # ディレクトリが無い指定は、どこに当たるかを決められないので当たるとみなす。大文字小文字はそろえる。
+#
+# 承認済みチケットの置き場（`.ccnavi/approved/` の下）はここでは見ない。レビュー済みのマーカーを消す
+# `rm` はユーザが端末で打つ手順で、過去の中身に戻す形は store_hit が止める。エージェントの呼び出しは
+# hook が止める（DENY_WRAPPER_CORE_PATH）。
 core_hit() {
 	in_core=no
 	ch_arg=$(printf '%s' "$1" | tr '\\' '/')
@@ -485,9 +489,11 @@ core_hit() {
 	set +f
 	IFS="$ch_ifs"
 	ch_low=$(printf '%s' "$ch_norm/" | tr '[:upper:]' '[:lower:]')
+	ch_ws=$(printf '%s' "/${WS_P#/}" | tr '[:upper:]' '[:lower:]')
 	case "$ch_low" in
-	*/.ccnavi/* | */.claude/ | */.claude/hooks/* | */.claude/settings*.json/* | \
-		*/logs/ | */logs/state/* | */logs/archive/* | */logs/decisions*.jsonl/* | */ccnavi-git.sh/*)
+	*/.ccnavi/approved/*) return 0 ;;
+	*/.ccnavi/* | */.claude/ | */.claude/hooks/* | */.claude/settings*.json/* | */ccnavi-git.sh/* | \
+		"$ch_ws"/logs/ | "$ch_ws"/logs/state/* | "$ch_ws"/logs/archive/* | "$ch_ws"/logs/decisions*.jsonl/*)
 		in_core=yes
 		return 0
 		;;
@@ -1424,26 +1430,38 @@ rm)
 	# git が守っている線がそこなので、こちらで引く線も同じ場所にする。
 	# -r は通す。付けても、中の 1 つでも書きかけがあれば git が止める。
 	[ "$#" -eq 0 ] && reject rm-no-path "rm は消すファイルを名指ししてください ($SELF rm <パス>)。"
+	# ccnavi 自身を守る場所は、消える形だけ止める。-n / --dry-run は何も消さないので通す
+	# （オプションはパスの後ろにも置けるので、全部を読んでから決める）。
 	ow_spec "cached quiet dry-run ignore-unmatch sparse pathspec-file-nul force" "pathspec-from-file" "" "rqnf" ""
+	rm_dry=no
+	rm_core=""
 	rm_cb() {
 		case "$1:${2:-}" in
 		opt:--force | opt:-f)
 			reject rm-force "rm の $2 (--force) はコミットしていない変更ごと消します。付けずに実行し、git が止めたなら、その中身を確かめてからユーザに伝えてください。"
 			;;
+		opt:--dry-run | opt:-n)
+			rm_dry=yes
+			;;
 		pos:. | pos::/ | "pos:*" | "pos::/*" | pos:./)
 			reject rm-whole-tree "rm にツリー全体 ($2) を渡すと、追跡されているファイルがまとめて消えます。消すものを 1 つずつ名指ししてください。"
 			;;
 		opt:--pathspec-from-file)
-			core_reject "$2"
+			[ -n "$rm_core" ] || rm_core="--pathspec-from-file"
 			;;
 		pos:*)
-			core_hit "$2"
-			[ "$in_core" = yes ] && core_reject "$2"
+			if [ -z "$rm_core" ]; then
+				core_hit "$2"
+				[ "$in_core" = yes ] && rm_core="$2"
+			fi
 			;;
 		esac
 		return 0
 	}
 	opt_walk rm_cb ${1+"$@"}
+	if [ "$rm_dry" = no ] && [ -n "$rm_core" ]; then
+		core_reject "$rm_core"
+	fi
 	;;
 
 restore)

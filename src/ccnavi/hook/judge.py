@@ -265,7 +265,7 @@ def decide_before(
         # git のラッパーの `rm`・`restore --source`・`checkout <ref> <パス>` で、自己防衛の対象を
         # 消す・別のコミットの中身に戻す形。シェルの rm と同じ場所を、ラッパー越しにも止める。
         # ラッパー自身が消えると、生の git の組み込みの止め（ラッパーがあるときだけ足す）も外れる。
-        sub, word = wrapguard.check_core_paths(
+        sub, word, kind = wrapguard.check_core_paths(
             conf, root, payload.cwd, record.subject, record.degraded
         )
         if sub:
@@ -281,7 +281,7 @@ def decide_before(
                         wrapguard.CODE_CORE_PATH,
                         wrapguard.CORE_PATH_RULE_ID,
                         subject,
-                        wrapguard.core_path_message(root, sub, word),
+                        wrapguard.core_path_message(root, sub, word, kind),
                     )
                 ],
                 conf=conf,
