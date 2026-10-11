@@ -265,7 +265,8 @@ def info(conf: settings.Settings, root: str, child: ticket_model.Ticket) -> dict
         "tree": base,
         "exists": exists,
         "linked": exists and linked(base, path),
-        "locked": child.in_progress and child.state == ticket_model.DOING,
+        "locked": child.state == ticket_model.REVIEW
+        or (child.in_progress and child.state == ticket_model.DOING),
         "draft": {
             "path": draft,
             "rel": draft_rel(conf, child.ticket),
