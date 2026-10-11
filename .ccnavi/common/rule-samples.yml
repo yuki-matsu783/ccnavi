@@ -34,6 +34,18 @@ deny:
     subject: "/repo/projects/lib/docs/skills/deploy/SKILL.md"
     why: プロジェクトのスキル（docs/skills/ に置く）も元ツリーでは触らない。プロジェクトから切ったワークツリーで直す
   - tool: Write
+    subject: "/repo/wip/scratchpadx/a.md"
+    why: workspace-root の except が除くのは wip/scratchpad/ だけ。名前の続く別のディレクトリは除かない
+  - tool: Write
+    subject: "/repo/wip/a.md"
+    why: wip/ の直下は除かない。下書きは wip/scratchpad/ に置く
+  - tool: Write
+    subject: "/repo/.claude/worktreesx/a.md"
+    why: .claude/worktrees/ と名前の続く別のディレクトリも除かない
+  - tool: Write
+    subject: "/repo/.clang-format"
+    why: .c で始まる隠しファイルも、.claude/worktrees/ の外なので止まる
+  - tool: Write
     subject: "/repo/.claude/worktrees/x/.claude/settings.json"
     why: ワークツリーの中でも hook の登録は触らない（guard-settings）。統合で main の登録になる
   - tool: Edit
@@ -174,6 +186,11 @@ deny:
     why: .claude を通らないパス。Bash の対象は解かれないので名前で捕まえる
 
 ask:
+  - tool: Write
+    subject: "/repo/wip/scratchpad/a.md"
+    why: >-
+      workspace-root の except で除く下書きの置き場。止めないが allow にも無いので、
+      権限モードに渡る（端末からの試験では ask）
   - tool: Write
     subject: "/repo/.claude/worktrees/x/pyproject.toml"
     why: 実行時の依存が変わる。main の側は deny なのでワークツリーで見る
