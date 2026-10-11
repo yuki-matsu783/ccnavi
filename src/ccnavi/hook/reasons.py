@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 
-from ..infra import settings, shellread, shellread_scan, shellread_words, tree
+from ..infra import hookio, settings, shellread, shellread_scan, shellread_words, tree
 from ..infra.modes import DRY_RUN
 from ..policy import rules
 from ..tickets import phase, phase_forms, ticket_guard, ticket_places
@@ -325,10 +325,84 @@ def subagent_forbidden(subject: str, runner: str, inner: str) -> str:
     )
 
 
-def builtin_refusal(code: str, subject: str, text: str) -> str:
-    """組み込みの判定で止めた文。ルールに当たったのではないので、ルールの id は出さない。"""
+def builtin_refusal(code: str, rule_id: str, subject: str, text: str) -> str:
+    """組み込みの判定で止めた文。
+
+    rule_id は記録の `rules` に残す名前と同じもの。ルールファイルには無いので、`builtin rule:` と
+    断ってファイルの中を探させない。文面と記録が同じ識別子を持てば、受け取った文から記録の行を
+    引ける。ルールファイルのルールで止めた文（reason_for）と同じ並びにしてある。
+    """
     shown = _shorten(subject)
-    return "\n".join([f"[ccnavi] {code}", f"subject: {shown}", text])
+    return "\n".join([f"[ccnavi] {code} (builtin rule: {rule_id})", f"subject: {shown}", text])
+
+
+def internal_error(code: str, event: str, kind: str, log_path: str) -> str:
+    """ccnavi 自身の例外で判定や検査を終えられなかったときに、モデルへ返す文。
+
+    呼び出しの中身が原因ではないので、書き直し方は言えない。言えるのは、同じ呼び出しを
+    繰り返しても結果は変わらないことと、直せるのはユーザだということ。診断ログの場所を
+    名指しするのは、ユーザが例外の型と場所をそこで読めるようにするため。
+    """
+    if event == hookio.POST_TOOL_USE:
+        what = (
+            "ccnavi hit an internal error while checking what this call changed, so the "
+            "protected areas were not checked after it ran."
+        )
+    else:
+        what = "ccnavi hit an internal error before it could judge this call, so it stopped it."
+    return "\n".join(
+        [
+            f"[ccnavi] {code}",
+            f"{what} The cause is in ccnavi, not in the call ({kind}); the details are in the "
+            f"diagnostic log {log_path}. Do not retry the same call to get around it. Tell the "
+            "user that ccnavi failed here and where the log is, and let them decide how to go on.",
+        ]
+    )
+
+
+def internal_error_notice(code: str, event: str, kind: str, log_path: str) -> str:
+    """ccnavi 自身の例外で、ツールの呼び出しを持たないイベントの処理を終えられなかったときに、
+    ユーザへ見せる文。止めていないことと、診断ログの場所を言う。"""
+    return (
+        f"[ccnavi] {code}: ccnavi hit an internal error while handling {event} ({kind}) and "
+        f"skipped what it does there. Nothing was stopped. The details are in the diagnostic "
+        f"log {log_path}."
+    )
+
+
+def payload_unusable(code: str, problem: str) -> str:
+    """hook の入力（payload）を読めなかったときの文。
+
+    ccnavi は何の呼び出しかも分からないので止める。呼び出しを書き直しても入力は変わらず、
+    直せるのは hook の登録か ccnavi・Claude Code の版を合わせるユーザだけ。
+    """
+    return "\n".join(
+        [
+            f"[ccnavi] {code}",
+            f"ccnavi could not read the hook input from Claude Code ({problem}), so it could not "
+            "judge this call and stopped it. Rewriting the call will not help. Tell the user, so "
+            "they can check the ccnavi hook registration in .claude/settings.json and whether "
+            "this ccnavi build matches the Claude Code version.",
+        ]
+    )
+
+
+def deadline_exceeded(code: str, seconds: float) -> str:
+    """判定が期限に届かなかったときの文。
+
+    照合が長引くのは、コマンドの文字列が長いか、`>` のような照合を伸ばす形が多いとき。
+    短く分ければ通る見込みがある。同じ形で続けて止まるなら、ルールの側の問題なので
+    ユーザに伝えさせる。
+    """
+    return "\n".join(
+        [
+            f"[ccnavi] {code}",
+            f"ccnavi ran out of time ({seconds:g} s) before it finished judging this call, so it "
+            "stopped it. Long commands and long inline text make matching slow: split the command "
+            "into smaller ones, or write long text to a file with the Write tool and pass the "
+            "file. If a short command keeps stopping here, tell the user.",
+        ]
+    )
 
 
 def rewrite_rule(form: str) -> str:

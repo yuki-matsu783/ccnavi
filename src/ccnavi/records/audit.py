@@ -42,6 +42,9 @@ REASON_NO_SUBJECT = "no-subject"
 REASON_NOTHING_TO_RUN = "nothing-to-run"
 REASON_PAYLOAD_UNUSABLE = "payload-unusable"
 REASON_DEADLINE_EXCEEDED = "deadline-exceeded"
+# ccnavi 自身の例外で、イベントの処理を終えられなかった。呼び出しの中身が原因ではないので、
+# 判定に至らなかった理由として残す。例外の型と場所は detail に入れる。
+REASON_INTERNAL_ERROR = "internal-error"
 # 実行後チェックだけが出す 2 つは post.py が持っている。判定に至らなかった
 # 理由という点では同じだが、あちらは作業ツリーを読めたかどうかの話なので、
 # 名前もそちらに置いてある。

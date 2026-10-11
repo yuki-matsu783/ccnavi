@@ -253,7 +253,10 @@ def decide_before(
                 notices
                 + [
                     reasons.builtin_refusal(
-                        wrapguard.CODE_ENV, subject, wrapguard.env_message(script, names)
+                        wrapguard.CODE_ENV,
+                        wrapguard.ENV_RULE_ID,
+                        subject,
+                        wrapguard.env_message(script, names),
                     )
                 ],
                 conf=conf,
@@ -278,7 +281,10 @@ def decide_before(
                 notices
                 + [
                     reasons.builtin_refusal(
-                        phase_forms.CODE_RECORDS_PRUNE, subject, phase_forms.prune_message()
+                        phase_forms.CODE_RECORDS_PRUNE,
+                        phase_forms.RECORDS_PRUNE_RULE_ID,
+                        subject,
+                        phase_forms.prune_message(),
                     )
                 ],
                 conf=conf,
@@ -305,6 +311,7 @@ def decide_before(
                 + [
                     reasons.builtin_refusal(
                         phase_forms.CODE_TICKET_APPROVAL,
+                        phase_forms.TICKET_APPROVAL_RULE_ID,
                         subject,
                         phase_forms.guard_off_message(found)
                         if kind == "guard-off"
@@ -331,6 +338,7 @@ def decide_before(
                 + [
                     reasons.builtin_refusal(
                         wrapguard.CODE_CHILD_PUSH,
+                        wrapguard.CHILD_PUSH_RULE_ID,
                         subject,
                         wrapguard.child_push_message(name, parent),
                     )
@@ -480,7 +488,10 @@ def decide_before(
         layers = sorted(inner, key=lambda x: x[2]) if name != rules.ALLOW else []
         for rule in rule_set.section(name):
             if time.monotonic() > deadline:
-                stderr.write("ccnavi: 判定を終える前に期限に達した\n")
+                stderr.write(
+                    reasons.deadline_exceeded(audit.REASON_DEADLINE_EXCEEDED, DEADLINE_SECONDS)
+                    + "\n"
+                )
                 record.decision, record.reason = audit.SKIP, audit.REASON_DEADLINE_EXCEEDED
                 return modes.fail_closed(mode)
             raw_skipped = capped and rule.id in SHELL_GUARD_RULE_IDS
@@ -595,7 +606,10 @@ def decide_before(
         # `>` の上限で止めた。当たった ask のルールがあれば、その文も後ろに並べる。
         texts = [
             reasons.builtin_refusal(
-                reasons.CODE_REDIRECT_LIMIT_DENY, subject, selfguard_shell.REDIRECT_LIMIT_MESSAGE
+                reasons.CODE_REDIRECT_LIMIT_DENY,
+                reasons.REDIRECT_LIMIT_RULE,
+                subject,
+                selfguard_shell.REDIRECT_LIMIT_MESSAGE,
             ),
             *(
                 reasons.reason_for(

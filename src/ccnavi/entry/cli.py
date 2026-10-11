@@ -14,12 +14,14 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import io
 import os
 import tempfile
 import time
+import traceback
 from typing import TextIO
 
-from ..hook import events, judge
+from ..hook import events, judge, reasons
 from ..infra import fsio, hookio, modes, settings
 from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
@@ -764,7 +766,7 @@ def _parsed(
         stderr.write(cli_usage.USAGE)
         return EXIT_ERROR
     except hookio.Unusable as exc:
-        stderr.write(f"ccnavi: {exc}\n")
+        stderr.write(reasons.payload_unusable(audit.REASON_PAYLOAD_UNUSABLE, str(exc)) + "\n")
         diaglog.get("ccnavi", root).warn("hook の payload を読めない", mode=mode)
         cli_args._record(
             stderr,
@@ -777,17 +779,25 @@ def _parsed(
         )
         return modes.fail_closed(mode)
 
-    history.set_via(history.VIA_HOOK)
     record = audit.Record(
         mode=mode,
         permission_mode=payload.permission_mode,
         event=payload.event,
         tool=payload.tool_name,
-        subject=judge.subject_of(payload),
         session=payload.session_id,
     )
 
-    code = events.decide(stdout, stderr, mode, conf, root, payload, record, deadline)
+    # 判定の途中の出力は手元に溜め、終えてから出す。例外で終えられなかった回に、途中まで書いた
+    # JSON と内部エラーの応答が混ざって、どちらも読まれなくなるのを避けるため。
+    buffered = io.StringIO()
+    try:
+        history.set_via(history.VIA_HOOK)
+        record.subject = judge.subject_of(payload)
+        code = events.decide(buffered, stderr, mode, conf, root, payload, record, deadline)
+    except Exception as exc:  # noqa: BLE001 想定外の例外を、終了コード 1 で通る形にしない
+        code = _internal_error(stdout, stderr, mode, root, payload, record, exc)
+    else:
+        stdout.write(buffered.getvalue())
     cli_args._record(stderr, log, record)
     # 診断ログ。受け付けたイベントと最終判定だけ。subject（コマンドの全文）は書かない。
     # 呼び出しごとに走るので DEBUG に置き、既定の INFO では行を増やさない。
@@ -801,6 +811,57 @@ def _parsed(
         exit=code,
     )
     return code
+
+
+def _internal_error(
+    stdout: TextIO,
+    stderr: TextIO,
+    mode: str,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+    exc: Exception,
+) -> int:
+    """イベントの処理が想定外の例外で終わったときの応答と記録。
+
+    例外を抜けさせると Python は終了コード 1 で終わる。Claude Code は 0 と 2 以外を止める扱いに
+    しないので、PreToolUse の呼び出しがそのまま通り、記録も残らない。ここで受けて、判定に
+    達せなかった回として終える。
+
+    - PreToolUse: 呼び出しを止める（dry-run は通す）。標準エラーの文がモデルに届く
+    - PostToolUse: ツールはもう走っているので止めるものは無い。enable は終了コード 2 と
+      標準エラーで、実行後の検査をしていないことをモデルに言う（dry-run は 0）
+    - それ以外: 終了コード 0 で、ユーザに `systemMessage` で知らせる。2 で終えると、Stop と
+      SubagentStop は終われなくなり、UserPromptSubmit は依頼文を消すので、ccnavi の不具合が
+      作業そのものを止める
+    """
+    kind = type(exc).__name__
+    frames = traceback.extract_tb(exc.__traceback__)
+    where = f"{os.path.basename(frames[-1].filename)}:{frames[-1].lineno}" if frames else ""
+    log_path = os.path.join(root, diaglog.DIAG_DIR, "ccnavi.log")
+    # 例外の文は書かない。コマンドやパスの断片が混ざることがある。型と場所があれば辿れる。
+    diaglog.get("ccnavi", root).error(
+        "hook の処理が例外で終わった",
+        event=payload.event,
+        tool=payload.tool_name,
+        mode=mode,
+        error=kind,
+        at=where,
+    )
+    record.decision, record.reason = audit.SKIP, audit.REASON_INTERNAL_ERROR
+    record.code, record.rules = "", []
+    record.detail = f"{kind} at {where}" if where else kind
+    if payload.event in (hookio.PRE_TOOL_USE, hookio.POST_TOOL_USE):
+        stderr.write(
+            reasons.internal_error(audit.REASON_INTERNAL_ERROR, payload.event, kind, log_path)
+            + "\n"
+        )
+        return modes.fail_closed(mode)
+    hookio.write_system_message(
+        stdout,
+        reasons.internal_error_notice(audit.REASON_INTERNAL_ERROR, payload.event, kind, log_path),
+    )
+    return EXIT_OK
 
 
 def default_root() -> str:

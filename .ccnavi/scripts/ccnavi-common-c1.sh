@@ -446,7 +446,7 @@ ccnavi_c1_write() {
 		rm -f "$ccnavi_cw_list"
 		if [ "$ccnavi_cw_try" -ge 2 ]; then
 			ccnavi_c1_say "2 回目も送れなかった。書いたものは戻した。オンラインで sh $ccnavi_c1_sh/ccnavi-sync.sh $ccnavi_c1_family_id を打って取り込んでから、打ち直してください"
-			log_info C1 で送れなかった -- "family=$ccnavi_c1_family_id" "reason=c1-push"
+			log_error C1 で送れなかった -- "family=$ccnavi_c1_family_id" "reason=c1-push"
 			return 1
 		fi
 		ccnavi_c1_say "書いたものを戻した。取り込みからもう 1 回だけやり直す"

@@ -769,7 +769,12 @@ class SelfGuardTest(unittest.TestCase):
         decision, reason = self.verdict(result)
         self.assertEqual(decision, "deny")
         # 既存の拒否と同じ見出し（コード・subject・本文）で、書き直し方まで言う。
-        self.assertTrue(reason.startswith("[ccnavi] DENY_REDIRECT_LIMIT\nsubject: "), reason)
+        self.assertTrue(
+            reason.startswith(
+                "[ccnavi] DENY_REDIRECT_LIMIT (builtin rule: (redirect-limit))\nsubject: "
+            ),
+            reason,
+        )
         self.assertIn(selfguard_shell.REDIRECT_LIMIT_MESSAGE, reason)
         self.assertIn("止めました", reason)
         self.assertIn("Write / Edit", reason)
