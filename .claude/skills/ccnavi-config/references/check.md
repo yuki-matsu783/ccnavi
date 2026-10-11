@@ -33,7 +33,7 @@ ccnavi --lint --log "" --state ""
 ## 2. rules: 見本を回す
 
 ```sh
-uv run python tools/check_rules.py            # このリポジトリ。承認済みチケットと記録を外して回す
+uv run python scripts/check_rules.py            # このリポジトリ。承認済みチケットと記録を外して回す
 ccnavi --test-samples .ccnavi/common/rule-samples.yml --log "" --state "" --approved ""
 ```
 

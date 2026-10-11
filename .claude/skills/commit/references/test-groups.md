@@ -28,12 +28,12 @@ uv run python -m unittest discover -s tests -t .         # 全件
 
 複数のグループは 1 つずつ続けて回す（`discover -s` は 1 か所しか取らない）。
 
-全件は `tools/run_tests.py` のほうが速い（モジュールごとに別プロセスで同時に回す。中身は discover と同じ）。
+全件は `python -m tests`（`tests/__main__.py`）のほうが速い（モジュールごとに別プロセスで同時に回す。中身は discover と同じ）。
 
 ```sh
-uv run python tools/run_tests.py                 # 全件
-uv run python tools/run_tests.py tests/ticket    # グループを名指し（複数書ける）
-uv run python tools/run_tests.py --plan          # 何をどの順で回すか出すだけ
+uv run python -m tests                 # 全件
+uv run python -m tests tests/ticket    # グループを名指し（複数書ける）
+uv run python -m tests --plan          # 何をどの順で回すか出すだけ
 ```
 
 落ちたら新しいプロセスを起こすのをやめ、落ちた 1 本の出力だけを出す。ターンの終わりの hook はこれを使わない。
