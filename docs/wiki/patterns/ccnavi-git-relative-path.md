@@ -20,7 +20,8 @@ commit スキルの「git の入口」と `docs/claude/worktree.md` の「基本
 
 ## 操作の例
 
-feature-207 で、サブエージェント 4 本以上がこの書き方で失敗したか迷った。コマンド名を変数に入れて試すと `DENY_COMMAND_NAME_EXPANSION` で止まった。
+feature-207 で、複数のサブエージェントが、commit スキルの相対パスの記述と実際に動く呼び方（絶対パスの直書き）の食い違いを報告した。
+別のサブエージェントは `ccnavi-git.sh` のパスをシェル変数に入れて呼び、`DENY_COMMAND_NAME_EXPANSION` の通知を受けた（dry-run だったので実際には止まらなかった。`enable` なら止まる）。
 
 ## 回避策
 
