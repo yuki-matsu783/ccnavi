@@ -80,10 +80,12 @@ deny:
   #      `-c diff.external=<コマンド>` は分類上ただの diff のまま任意コマンドを実行する
   #
   # glob ではなく regex なのは、`*git*` だと誘導先の `ccnavi-git.sh` にも当たって
-  # 出口ごと塞がるため。`git` がコマンドの位置に立つ形だけを拾う。
+  # 出口ごと塞がるため。`git` の前が語の頭か切れ目の字（`/usr/bin/git` の `/` も切れ目）の形を拾う。
+  # パスの前置き（`(\S*[\\/])?`）は書かない。`/` も切れ目の字なので当たる形は同じで、書くと
+  # 長い語で照合が入力の長さの 2 乗に伸び、hook の timeout を超えて止められずに通る。
   - id: raw-git
     match: Bash
-    regex: '(^|[^\w.-])(\S*[\\/])?git(\.exe)?\s'
+    regex: '(^|[^\w.-])git(\.exe)?\s'
     message: >-
       生の git は実行しません。'sh {root}/.ccnavi/scripts/ccnavi-git.sh <サブコマンド> ...'
       を使ってください。通る形は同じスクリプトの --help 参照。返るのは要約と
@@ -137,13 +139,14 @@ deny:
   # 再帰的な強制削除は止める。組み込みの土台と同じ式。
   # glob の `*rm -rf *` だと `rm -fr`・`rm -r -f`・`rm --recursive --force` が外れるので、
   # 再帰（-r / -R / --recursive）と強制（-f / --force）の組を、まとめた形・分けた形・順序・
-  # 長い形（略した形も）を問わずに拾う。片方だけ（rm -r、rm -f）は当てない。
+  # 長い形（略した形も）を問わずに拾う。片方だけ（rm -r、rm -f）は当てない。`--` の後ろは
+  # オペランドなので選択肢に読まない（rm -f -- -r）。
   # 先読みを使わずに、照合の時間を入力の長さにほぼ比例させる形で書いてある（所有的な繰り返しと
   # アトミックグループ）。コマンドの中で最初の rm に決め、選択肢でない語は選択肢の語を
   # 読み飛ばさない形で読む。後戻りが長引くと、判定の期限に気づかないまま hook の timeout に達する。
   - id: recursive-delete
     match: Bash
-    regex: '(?:^|\x00)(?>(?:[^\x00]*?[^\w.\x00-])??rm(?:\.exe)?\s)\s*+(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdeghijklmnopqstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdeghijklmnopqstuvwxyz]*+[rf][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00rf][^\s\x00]*+|[rf][a-z]*+[^\s\x00a-z][^\s\x00]*+|))\s++)*+(?:-[a-eg-qs-z]*+(?:r[a-eg-z]*+f|f[a-qs-z]*+r)[a-z]*+(?:[\s\x00]|$)|(?:-[a-qs-z]*+r[a-z]*+|--r[a-z]*+)\s++(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdeghijklmnopqrstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdeghijklmnopqrstuvwxyz]*+[f][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00f][^\s\x00]*+|[f][a-z]*+[^\s\x00a-z][^\s\x00]*+|))\s++)*+(?:-[a-eg-z]*+f[a-z]*+|--f[a-z]*+)(?:[\s\x00]|$)|(?:-[a-eg-z]*+f[a-z]*+|--f[a-z]*+)\s++(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdefghijklmnopqstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdefghijklmnopqstuvwxyz]*+[r][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00r][^\s\x00]*+|[r][a-z]*+[^\s\x00a-z][^\s\x00]*+|))\s++)*+(?:-[a-qs-z]*+r[a-z]*+|--r[a-z]*+)(?:[\s\x00]|$))'
+    regex: '(?:^|\x00)(?>(?:[^\x00]*?[^\w.\x00-])??rm(?:\.exe)?\s)\s*+(?:(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdeghijklmnopqstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdeghijklmnopqstuvwxyz]*+[rf][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00rf][^\s\x00]*+|[rf][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+(?:(?:-[a-eg-qs-z]*+r[a-eg-z]*+|--r[a-z]*+)\s++(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdeghijklmnopqrstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdeghijklmnopqrstuvwxyz]*+[f][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00f][^\s\x00]*+|[f][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+|(?:-[a-eg-qs-z]*+f[a-qs-z]*+|--f[a-z]*+)\s++(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdefghijklmnopqstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdefghijklmnopqstuvwxyz]*+[r][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00r][^\s\x00]*+|[r][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+)?--(?:\s++[^\s\x00]++)*?\s++(?:[^\s\x00]*?[^\w\s\x00.-])??rm(?:\.exe)?\s++)*+(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdeghijklmnopqstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdeghijklmnopqstuvwxyz]*+[rf][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00rf][^\s\x00]*+|[rf][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+(?:-[a-eg-qs-z]*+(?:r[a-eg-z]*+f|f[a-qs-z]*+r)[a-z]*+(?:[\s\x00]|$)|(?:-[a-qs-z]*+r[a-z]*+|--r[a-z]*+)\s++(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdeghijklmnopqrstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdeghijklmnopqrstuvwxyz]*+[f][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00f][^\s\x00]*+|[f][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+(?:-[a-eg-z]*+f[a-z]*+|--f[a-z]*+)(?:[\s\x00]|$)|(?:-[a-eg-z]*+f[a-z]*+|--f[a-z]*+)\s++(?:(?:[^\s\x00-][^\s\x00]*+|-(?:[abcdefghijklmnopqstuvwxyz]++(?:[^\s\x00a-z][^\s\x00]*+)?|[^\s\x00a-z-][^\s\x00]*+|)|-[abcdefghijklmnopqstuvwxyz]*+[r][a-z]*+[^\s\x00a-z][^\s\x00]*+|--(?:[^\s\x00r][^\s\x00]*+|[r][a-z]*+[^\s\x00a-z][^\s\x00]*+))\s++)*+(?:-[a-qs-z]*+r[a-z]*+|--r[a-z]*+)(?:[\s\x00]|$))'
     message: >-
       再帰的な強制削除です。消す対象を 1 つずつ名指しするか、git の管理下なら
       'ccnavi-git.sh rm <パス>' を使ってください。git が中身を持っているので戻せます。
@@ -151,7 +154,7 @@ deny:
   # find の -delete と -fprintf は消すことも書くこともできるので止める。
   - id: find-writes
     match: Bash
-    regex: '(^|\x00)(\S*[\\/])?find(\.exe)?\s[^\x00]*\s-(delete|fprintf|fls|fprint)\b'
+    regex: '(^|\x00)(?:[^\s\x00\\/]*+[\\/])*+find(\.exe)?\s[^\x00]*\s-(delete|fprintf|fls|fprint)\b'
     message: >-
       探すだけなら Glob ツールを使うか、-delete を外した find にしてください。
 
@@ -198,7 +201,7 @@ ask:
   # 調査で一度きりなら WebFetch ツール、何度も叩くなら .ccnavi/scripts/ の sh。
   - id: prefer-webfetch
     match: Bash
-    regex: '(^|\x00)(\S*[\\/])?(curl|wget)(\.exe)?\s'
+    regex: '(^|\x00)(?:[^\s\x00\\/]*+[\\/])*+(curl|wget)(\.exe)?\s'
     additionalContext: >-
       外から取ってくるコマンドです。調査で一度きりなら WebFetch ツールを、
       何度も叩くなら {root}/.ccnavi/scripts/ の sh に固めてから実行してください。
