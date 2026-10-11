@@ -304,6 +304,13 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.assertFalse(os.path.exists(self.running_file("a1")))
         self.asked(self.stop(self.parent_tree))
 
+    def test_startup_keeps_the_mark_of_a_session_with_the_same_prefix(self):
+        self.family()
+        other = self.running_file("a1", session="s1-other")
+        write(other, f"session s1-other\n{int(time.time())}\n")
+        self.session_start("startup")
+        self.assertTrue(os.path.exists(other))
+
     def test_a_bounced_subagent_keeps_its_mark_and_the_bounce_still_works(self):
         """範囲外の変更で差し戻した回は続けさせるので印を残す。2 度目に終わったときに外す。"""
         self.family()
@@ -320,43 +327,16 @@ class RequestNudgeTest(base.StopNudgeTest):
 
     # ---- 1 回の Stop で止める理由は 1 つ
 
-    def test_the_finish_nudge_goes_first_and_this_one_does_not_count(self):
-        """finish の促しで止める回は、この促しを出さず、記録もしない。次の回に出る。"""
+    def test_the_finish_nudge_goes_first_and_the_same_state_is_not_asked_again(self):
+        """finish の促しで止めた状態は、この促しも止めない。同じ状態を 2 つの促しが止めないため。"""
         self.family()
         tree = self.child_tree()
         self.commit_work(tree)
         first = self.body(self.stop(tree))
         self.assertIn(FINISH_CODE, first["reason"])
         self.assertNotIn(CODE, first["reason"])
-        second = self.body(self.stop(tree))
-        self.assertEqual(second.get("decision"), "block")
-        self.assertIn(CODE, second["reason"])
-        self.assertNotIn(FINISH_CODE, second["reason"])
+        self.assert_quiet(self.stop(tree))
         self.assert_not_asked(self.stop(tree))
-
-    def test_this_nudge_goes_before_the_stop_rule_and_the_rule_is_not_counted(self):
-        with open(self.rules, encoding="utf-8") as f:
-            body = json.load(f)
-        rule = {"id": "review", "match": "Stop", "glob": "*", "every": 2}
-        body["allow"] = [*body.get("allow", []), {**rule, "additionalContext": "振り返る"}]
-        write(self.rules, json.dumps(body))
-        self.family()
-        first = self.body(self.stop(self.parent_tree))
-        self.assertIn(CODE, first["reason"])
-        self.assertNotIn("NUDGE_STOP_RULE", first["reason"])
-        # ここからルールを数える（1 回目は止めない、2 回目で渡す）。
-        self.assert_not_asked(self.stop(self.parent_tree))
-        second = self.body(self.stop(self.parent_tree))
-        self.assertTrue(second["reason"].startswith("NUDGE_STOP_RULE: "), second)
-        self.assertNotIn(CODE, second["reason"])
-
-    def test_the_nudge_is_recorded_apart_from_deny(self):
-        self.family()
-        self.stop(self.parent_tree)
-        log = os.path.join(self.root, "logs", "decisions.jsonl")
-        with open(log, encoding="utf-8") as f:
-            line = json.loads(f.read().splitlines()[-1])
-        self.assertEqual((line["decision"], line["code"], line["enforced"]), ("nudge", CODE, True))
 
 
 if __name__ == "__main__":

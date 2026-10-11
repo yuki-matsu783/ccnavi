@@ -263,12 +263,8 @@ class StopNudgeTest(TicketTest):
         first = self.body(self.stop(tree))
         self.assertIn(CODE, first.get("reason", ""))
         self.assertNotIn("NUDGE_STOP_RULE", first.get("reason", ""))
-        # finish の促しは同じ HEAD では 1 回だけ。作業中の子が残るので、次の回は依頼までの道の
-        # 促しが 1 回止める（これもルールを数えない）。
-        second = self.body(self.stop(tree))
-        self.assertIn("NUDGE_TICKET_REQUEST", second.get("reason", ""))
-        self.assertNotIn("NUDGE_STOP_RULE", second.get("reason", ""))
-        # ここからルールを数える（1 回目は止めない）。
+        # finish の促しは同じ HEAD では 1 回だけ。同じ状態を依頼までの道の促しがもう 1 回止める
+        # ことも無い。ここからルールを数える（1 回目は止めない）。
         self.assert_quiet(self.stop(tree))
         third = self.body(self.stop(tree))
         self.assertEqual(third.get("decision"), "block")
