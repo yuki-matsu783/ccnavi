@@ -378,7 +378,7 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, onSele
   const base = useMemo(() => stepsOf(doc, readOnly), [doc, readOnly]);
   const edges = useMemo(() => edgesOf(doc, selected, readOnly), [doc, selected, readOnly]);
   const [nodes, setNodes] = useState<FlowNodeView[]>(base);
-  const [maximized, toggleMaximize] = useMaximize();
+  const [maximized, toggleMaximize, maxBox] = useMaximize();
 
   // コピーが替わったら手元を作り直す。測った大きさと、選んでいるか（Shift で選び足したものも）は引き継ぐ。
   // 呼び手が図の外から選んだノード（`focus`。部品箱で足したもの）は、それが替わったときだけ、それ 1 つを選ぶ。
@@ -423,7 +423,7 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, onSele
   );
 
   return (
-    <div className={`graph flow-graph ${maximizeClass(maximized)}`} id="flow-graph" data-nodes={doc.nodes.length} data-edges={edges.length} data-readonly={readOnly ? "1" : "0"}>
+    <div ref={maxBox} className={`graph flow-graph ${maximizeClass(maximized)}`} id="flow-graph" data-nodes={doc.nodes.length} data-edges={edges.length} data-readonly={readOnly ? "1" : "0"}>
       <Actions.Provider value={actions}>
         <ReactFlow<FlowNodeView, FlowEdge>
           nodes={nodes}

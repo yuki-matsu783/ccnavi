@@ -100,7 +100,7 @@ function targetOf(tree: CondNode, key: string): { readonly path: CondPath; reado
 
 export function When({ tree, onChange }: WhenProps): JSX.Element {
   const [picked, setPicked] = useState("r");
-  const [maximized, toggleMaximize] = useMaximize();
+  const [maximized, toggleMaximize, maxBox] = useMaximize();
   const layout = useMemo(() => layoutCond(tree), [tree]);
   const problems = useMemo(() => condProblems(tree), [tree]);
   const brokenKeys = useMemo(() => new Set(problems.map((p) => pathKey(p.path))), [problems]);
@@ -130,7 +130,7 @@ export function When({ tree, onChange }: WhenProps): JSX.Element {
 
   return (
     <div className="cond" data-nodes={layout.places.length}>
-      <div className={`cond-canvas ${maximizeClass(maximized)}`}>
+      <div ref={maxBox} className={`cond-canvas ${maximizeClass(maximized)}`}>
         <ReactFlow<CondFlowNode, Edge>
           // 組み合わせ条件の形が変わったら置き直して全体を映す（点の数で見分ける）
           key={layout.places.length}

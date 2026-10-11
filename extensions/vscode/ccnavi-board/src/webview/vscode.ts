@@ -40,3 +40,21 @@ export function getState(): unknown {
 export function setState(state: unknown): void {
   api.setState(state);
 }
+
+/** 覚えているものの 1 つのキーを読む。読めなければ undefined（覚えられなくても画面は動く） */
+export function readState(key: string): unknown {
+  try {
+    return ((getState() ?? {}) as Record<string, unknown>)[key];
+  } catch {
+    return undefined;
+  }
+}
+
+/** 覚えているものの 1 つのキーだけを書く（ほかのキーは残す）。書けなくても画面は動く */
+export function mergeState(key: string, value: unknown): void {
+  try {
+    setState({ ...((getState() ?? {}) as Record<string, unknown>), [key]: value });
+  } catch {
+    // 覚えられなくても画面は動く
+  }
+}

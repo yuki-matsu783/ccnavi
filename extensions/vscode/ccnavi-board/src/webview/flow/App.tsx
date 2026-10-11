@@ -53,7 +53,8 @@ import { canRedo, canUndo, emptyHistory, record, redo, seal, undo, type FlowHist
 import type { FlowChecks, FlowData, FlowLock, FlowOffer, FlowPage, FlowProposal, ToFlow } from "../../core/flow-view.js";
 import { applyAppearance } from "../appearance.js";
 import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
-import { getState, setState } from "../vscode.js";
+import { graphMaximized } from "../shared/Maximize.js";
+import { mergeState, readState } from "../vscode.js";
 import { Canvas, type Selection } from "./Canvas.js";
 import { Inspector } from "./Inspector.js";
 import { post } from "./post.js";
@@ -80,41 +81,23 @@ function pageOf(data: FlowData): FlowPage | undefined {
 
 /** 画面が覚えておくもの（HTML を作り直しても残る）。ミニマップを出すか、左右の欄を畳んだか */
 function minimapShown(): boolean {
-  try {
-    const state = getState() as { minimap?: unknown } | undefined;
-    return state?.minimap !== false;
-  } catch {
-    return true;
-  }
+  return readState("minimap") !== false;
 }
 
 function rememberMinimap(shown: boolean): void {
-  try {
-    const state = (getState() ?? {}) as Record<string, unknown>;
-    setState({ ...state, minimap: shown });
-  } catch {
-    // 覚えられなくても画面は動く
-  }
+  mergeState("minimap", shown);
 }
 
 type Side = "palette" | "side";
 
 function sideFolded(side: Side): boolean {
-  try {
-    const state = getState() as { folded?: Record<string, unknown> } | undefined;
-    return state?.folded?.[side] === true;
-  } catch {
-    return false;
-  }
+  const folded = readState("folded") as Record<string, unknown> | undefined;
+  return folded?.[side] === true;
 }
 
 function rememberSideFolded(side: Side, folded: boolean): void {
-  try {
-    const state = (getState() ?? {}) as { folded?: Record<string, unknown> };
-    setState({ ...state, folded: { ...state.folded, [side]: folded } });
-  } catch {
-    // 覚えられなくても画面は動く
-  }
+  const now = (readState("folded") ?? {}) as Record<string, unknown>;
+  mergeState("folded", { ...now, [side]: folded });
 }
 
 /**
@@ -200,9 +183,11 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [minimap, setMinimap] = useState(minimapShown);
   const [folded, setFolded] = useState<Readonly<Record<Side, boolean>>>(() => ({ palette: sideFolded("palette"), side: sideFolded("side") }));
   const toggleSide = (side: Side): void => {
-    const next = !folded[side];
-    rememberSideFolded(side, next);
-    setFolded((now) => ({ ...now, [side]: next }));
+    setFolded((now) => {
+      const next = !now[side];
+      rememberSideFolded(side, next);
+      return { ...now, [side]: next };
+    });
   };
   const [reviewSave, setReviewSave] = useState(() => pageOf(initial)?.reviewSave === true);
   const [review, setReview] = useState<FlowDiff | undefined>(undefined);
@@ -228,6 +213,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   // 取り込んだ下書きのハッシュと中身。編集中の中身が取り込んだ中身と同じ間だけ持ち、保存に付ける（違えば下書きを消させない）
   const imported = useRef<{ readonly hash: string; readonly doc: FlowDoc } | undefined>(undefined);
   const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
+  // 案内の間は、畳んだ欄も開いて見せる（案内が指す部品箱と右の欄が見えるように）。覚えている状態は変えない
+  const fold = { palette: folded.palette && !tour.touring, side: folded.side && !tour.touring };
   const requestTour = tour.request;
 
   useEffect(() => {
@@ -582,6 +569,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   onKey.current = (event: KeyboardEvent): void => {
+    // 図を全画面にしている間は、見えない文書を直さない
+    if (graphMaximized()) {
+      return;
+    }
     if (proposal !== undefined || requestText !== undefined) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -722,12 +713,12 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           ))}
         </ul>
       )}
-      <div className="flow-body" data-palette-folded={folded.palette ? "1" : "0"} data-side-folded={folded.side ? "1" : "0"}>
-        <nav className="flow-palette" id="flow-palette" aria-label="部品箱">
-          <button type="button" className="action small flow-fold" data-action="toggle-palette" aria-expanded={!folded.palette} title={folded.palette ? "部品箱を開く" : "部品箱を畳む"} onClick={() => toggleSide("palette")}>
-            {folded.palette ? "▶ 部品" : "◀ 部品"}
+      <div className="flow-body" data-palette-folded={fold.palette ? "1" : "0"} data-side-folded={fold.side ? "1" : "0"}>
+        <nav className="flow-palette" id="flow-palette" aria-label="部品箱" data-folded={fold.palette ? "1" : "0"}>
+          <button type="button" className="action small flow-fold" data-action="toggle-palette" aria-expanded={!fold.palette} title={fold.palette ? "部品箱を開く" : "部品箱を畳む"} onClick={() => toggleSide("palette")}>
+            {fold.palette ? "▶ 部品" : "◀ 部品"}
           </button>
-          {!folded.palette && PALETTE.map((type) => {
+          {PALETTE.map((type) => {
             const badge = badgeOf(type);
             return (
               <button key={type} type="button" className="action small palette-item" data-action="add-node" data-type={type} disabled={readOnly} title={badge?.title} onClick={() => add(type)}>
@@ -763,16 +754,12 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
             }
           }}
         />
-        <div className="flow-side">
-          <button type="button" className="action small flow-fold" data-action="toggle-side" aria-expanded={!folded.side} title={folded.side ? "右の欄を開く" : "右の欄を畳む"} onClick={() => toggleSide("side")}>
-            {folded.side ? "◀ 詳細" : "詳細 ▶"}
+        <div className="flow-side" data-folded={fold.side ? "1" : "0"}>
+          <button type="button" className="action small flow-fold" data-action="toggle-side" aria-expanded={!fold.side} title={fold.side ? "右の欄を開く" : "右の欄を畳む"} onClick={() => toggleSide("side")}>
+            {fold.side ? "◀ 詳細" : "詳細 ▶"}
           </button>
-          {!folded.side && (
-            <>
-              <Inspector doc={doc} selected={selected} readOnly={readOnly} onChange={edit} onSeal={() => setHistory(seal)} onSelect={setSelected} candidates={checks?.candidates} />
-              <Preview checks={checks} checking={checking} error={checkError} />
-            </>
-          )}
+          <Inspector doc={doc} selected={selected} readOnly={readOnly} onChange={edit} onSeal={() => setHistory(seal)} onSelect={setSelected} candidates={checks?.candidates} />
+          <Preview checks={checks} checking={checking} error={checkError} />
         </div>
       </div>
       {tour.touring && <Tour steps={TOUR_STEPS} onClose={tour.end} />}

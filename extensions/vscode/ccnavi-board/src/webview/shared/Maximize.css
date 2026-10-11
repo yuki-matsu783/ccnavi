@@ -4,7 +4,7 @@
 .graph-max { position: relative; }
 body .graph-max.is-max {
   position: fixed; inset: 0; z-index: 100;
-  width: 100vw; height: 100vh; max-height: none; min-height: 0; margin: 0;
+  width: auto; height: auto; max-height: none; min-height: 0; margin: 0;
   border: none; border-radius: 0;
   background: var(--vscode-editor-background);
 }

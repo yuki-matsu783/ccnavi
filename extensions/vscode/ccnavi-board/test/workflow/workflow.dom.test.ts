@@ -400,8 +400,12 @@ test("CB-D187 項を押すと右の欄に詳細を出す。欄は畳め、畳ん
     assert.equal(dom.one('.plan-graph[data-part="plan"] .plan-node[data-picked="1"] .plan-node-title').textContent, "設計");
     dom.click(dom.one('.plan-graph[data-part="plan"] button[data-action="toggle-plan-detail"]'));
     await dom.settle();
-    assert.equal(dom.all('.plan-graph[data-part="plan"] .plan-detail-list').length, 0);
-    assert.equal(dom.one('.plan-graph[data-part="plan"] .plan-graph-body').getAttribute("data-folded"), "1");
+    assert.equal(dom.one('.plan-graph[data-part="plan"] .plan-detail').getAttribute("data-folded"), "1");
+    assert.equal(dom.one('.plan-graph[data-part="feedback"] .plan-detail').getAttribute("data-folded"), "1", "ほかの計画の欄も同じ状態");
+    assert.ok(dom.all('.plan-graph[data-part="plan"] .plan-detail-list').length > 0, "畳んでも中身は残す");
+    dom.click(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n1"] .react-flow__handle'));
+    await dom.settle();
+    assert.equal(dom.one('.plan-graph[data-part="plan"] .plan-detail-list').getAttribute("data-number"), "2", "取っ手のクリックでは選び直さない");
   } finally {
     await dom.close();
   }
