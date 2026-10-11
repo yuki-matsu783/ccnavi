@@ -225,6 +225,8 @@ _NOT_WITH_DOCS = (
     "--projects",
     "--project-home",
     "--cwd",
+    "--permission-mode",
+    "--agent-id",
     "--record-writes",
     "--record-tree",
     "--choose-out",

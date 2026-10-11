@@ -10,6 +10,7 @@ export const TEST_VERSION = 1;
 
 export interface RuleHitJson {
   readonly id: string;
+  /** `file` はルールファイルから読んだルール。`outside` はチケットの範囲・組み込みの保護・退避した既定のように外から来た根拠で、式は短く切ってある */
   readonly source: "file" | "outside";
   readonly section: string;
   readonly kind: string;
@@ -157,7 +158,9 @@ function hits(value: unknown): RuleHitJson[] {
     .filter(isRecord)
     .map((h) => ({
       id: str(h.id),
-      source: h.source === "outside" ? "outside" : "file",
+      // 知らない値は `outside` に倒す。ルールファイルの外の根拠（組み込みの保護など）を
+      // ルールファイルのルールとして見せると、ユーザは無いルールを探しに行く。
+      source: h.source === "file" ? "file" : "outside",
       section: str(h.section),
       kind: str(h.kind),
       written: str(h.written),

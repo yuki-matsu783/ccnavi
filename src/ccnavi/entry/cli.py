@@ -157,6 +157,11 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # （preview の `digest`）。`--yes` と一緒に渡す。
     parser.add_argument("--digest", default="")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
+    # `--test` の payload に載せる Claude Code の権限モードとサブエージェントの印。hook は
+    # この 2 つを Claude Code から受け取り、判定がそれで変わる。呼び出しが来たディレクトリは
+    # `--cwd`（sh が渡すものと同じフラグ）で渡す。
+    parser.add_argument("--permission-mode", default="")
+    parser.add_argument("--agent-id", default="")
     # 期待する判定をぜんぶ判定に掛ける。scripts/check_rules.py と VS Code 拡張が呼ぶ。
     parser.add_argument("--test-expectations", metavar="FILE", default="")
     parser.add_argument("--explain", action="store_true")
@@ -587,13 +592,25 @@ def _parsed(
             flow_path=args.flow,
         )
 
+    # `--test` の payload の欄。ほかの経路では読む先が無いので、黙って捨てずに断る。
+    if args.test is None and (args.permission_mode or args.agent_id):
+        flag = "--permission-mode" if args.permission_mode else "--agent-id"
+        stderr.write(f"ccnavi: {flag} は --test でだけ使える\n")
+        return EXIT_ERROR
+
     # 診断の経路。どちらも payload を読まず、判定を実行にも記録にも繋げない。
     # ユーザが端末から打って「このルールは何に当たるのか」を確かめるための場所で、
-    # 判定そのものは実運用と同じ関数を通る。
+    # 判定そのものは実運用と同じ関数を通る。判定が読む切り替えの環境変数も、hook と同じ
+    # 関数で解いてから渡す（`_resolve_switches`）。
+    if args.test is not None or args.test_expectations or (args.explain and not args.json):
+        _resolve_switches(stderr, conf, args)
     if args.test is not None:
+        call = diagnose.Call(
+            cwd=args.cwd, permission_mode=args.permission_mode, agent_id=args.agent_id
+        )
         if args.json:
-            return diagnose.test_json(stdout, stderr, conf, root, args.test[0], args.test[1])
-        return diagnose.test(stdout, stderr, conf, root, args.test[0], args.test[1])
+            return diagnose.test_json(stdout, stderr, conf, root, args.test[0], args.test[1], call)
+        return diagnose.test(stdout, stderr, conf, root, args.test[0], args.test[1], call)
     if args.test_expectations:
         return diagnose.test_expectations(
             stdout, stderr, conf, root, args.test_expectations, args.json
@@ -822,21 +839,12 @@ def _hook(
         return _hook_crashed(stdout, stderr, conf, root, so_far, exc)
 
 
-def _hook_steps(
-    stdin: TextIO,
-    stdout: TextIO,
-    stderr: TextIO,
-    conf: settings.Settings,
-    problems: list[str],
-    root: str,
-    args: argparse.Namespace,
-    so_far: _HookSoFar,
-) -> int:
-    for problem in problems:
-        stderr.write(f"ccnavi: {problem}\n")
+def _resolve_switches(stderr: TextIO, conf: settings.Settings, args: argparse.Namespace) -> None:
+    """判定が読む切り替えの環境変数を解いて、設定に戻す。hook と診断（`--test` など）で同じもの。
 
-    mode = modes.resolve_mode(stderr, args.mode, conf)
-    so_far.mode = mode
+    解く前の値は書いたままの表記（大文字・前後の空白）を持つ。判定はどれも解いた後の値と
+    比べるので、診断が解かずに判定を呼ぶと、hook とは違う答えになる。
+    """
     conf.restore_if_deny = selfguard.resolve(
         stderr, args.restore_if_deny, conf.restore_if_deny, settings.RESTORE_IF_DENY_ENV
     )
@@ -855,6 +863,24 @@ def _hook_steps(
         settings.GUARD_UNWATCHED_ENV,
         selfguard.GATE_SETTINGS,
     )
+
+
+def _hook_steps(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    problems: list[str],
+    root: str,
+    args: argparse.Namespace,
+    so_far: _HookSoFar,
+) -> int:
+    for problem in problems:
+        stderr.write(f"ccnavi: {problem}\n")
+
+    mode = modes.resolve_mode(stderr, args.mode, conf)
+    so_far.mode = mode
+    _resolve_switches(stderr, conf, args)
     log = audit.Log(conf.log)
     so_far.log = log
     deadline = time.monotonic() + judge.DEADLINE_SECONDS
