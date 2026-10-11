@@ -30,7 +30,7 @@ keywords: [scratchpad, wip/scratchpad, スクラッチパッド, 下書き, 使�
 ## 書き込みを止められている場所を直したいとき
 
 保護対象のファイル（`rules.yml`・hook・ラッパースクリプトなど）や、チェックアウトしたブランチ直下のように書き込みを止められている場所を直したいときは、ワークスペースルートの`wip/scratchpad/`に元ファイルを`cp`して、そちらを編集する。
-`cp`と案内は`sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-stage.sh <元のパス>...`が行う。下書きはワークスペースルートからの相対パスと同じ階層（`wip/scratchpad/.ccnavi/common/rules.yml`など）に置かれ、既にある下書きは上書きしない。
+`cp`と案内は`sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-stage.sh <元のパス>...`が行う。下書きはワークスペースルートからの相対パスと同じ階層（`wip/scratchpad/.ccnavi/config/common/rules.yml`など）に置かれ、既にある下書きは上書きしない。
 編集が済んだら、全部の下書きがそろってから`ccnavi-stage.sh --commands <元のパス>...`を打つ。元と違う下書きだけ、差し替えの`mv`がフルパスで出る（元と同じ下書きと、まだ無い下書きは理由が出て、`mv`は出ない）。差し替えはユーザの手で、スクリプトは元のファイルを動かさない。そのあとはセッションの種類で分かれる。
 
 - 対話セッション: `ccnavi-stage.sh --commands`が出した`mv`をそのままユーザに案内して、ターンを終える。
@@ -43,6 +43,6 @@ keywords: [scratchpad, wip/scratchpad, スクラッチパッド, 下書き, 使�
 上の`wip/scratchpad/`は、ユーザが差し替える前提の下書きの置き場。チケットの承認を通して保護済みファイルを直すときは、別の経路になる。
 `implement`フェーズは保護済みファイル（`.ccnavi/scripts/`・`.claude/hooks/`・`rules.yml`）を承認しない。承認の対象になるのは`staging`フェーズだけ。
 
-- 親の計画に`staging`の項を置き、その前に受入テスト作成の項を置く（`.ccnavi/config/phases.yml`の`staging`の定義）
+- 親の計画に`staging`の項を置き、その前に受入テスト作成の項を置く（`.ccnavi/config/project/phases.yml`の`staging`の定義）
 - `staging`の子では、完成品を`wip/design/scripts/`に全文で置く。元のファイルは書き換えない
 - 差し替えはユーザが行う。写す順は`ccnavi-common.sh`が先（起動時に読むスクリプトがこれに依るため。Issue #212）

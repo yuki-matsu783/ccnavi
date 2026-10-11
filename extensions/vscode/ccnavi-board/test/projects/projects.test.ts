@@ -111,7 +111,7 @@ test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引�
     JSON.stringify({
       version: 1,
       root: "/ws",
-      rules: "/ws/.ccnavi/common/rules.yml",
+      rules: "/ws/.ccnavi/config/common/rules.yml",
       mode: "enable",
       ticket_control: "enable",
       projects: ["app", "lib"],
@@ -145,16 +145,16 @@ test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引�
     strays: [],
     projectsRel: "projects",
     ignored: false,
-    rulesRels: { app: "projects/app/.ccnavi/config/rules.yml", lib: "projects/lib/.ccnavi/config/rules.yml" },
+    rulesRels: { app: "projects/app/.ccnavi/config/project/rules.yml", lib: "projects/lib/.ccnavi/config/project/rules.yml" },
     rulesExists: { app: true },
     hasClaudeDir: { lib: true },
-    selfRulesRel: ".ccnavi/config/rules.yml",
+    selfRulesRel: ".ccnavi/config/project/rules.yml",
     selfRulesExists: false,
   });
   assert.equal(page.rows.length, 2);
   const [app, lib] = page.rows;
   assert.equal(app.originKey, "gitlab.example.com/g/app");
-  assert.equal(app.rulesRel, "projects/app/.ccnavi/config/rules.yml");
+  assert.equal(app.rulesRel, "projects/app/.ccnavi/config/project/rules.yml");
   assert.equal(app.problems.length, 1);
   assert.equal(app.problems[0].severity, "error");
   assert.equal(lib.rulesExists, false);
@@ -165,7 +165,7 @@ test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引�
   assert.deepEqual(lib.problems.map((p) => p.detail), [".claude/ がある"]);
   assert.equal(page.dirProblems.length, 1);
   assert.deepEqual(page.workspaceWorktrees, ["i0001"]);
-  assert.equal(page.selfRulesRel, ".ccnavi/config/rules.yml");
+  assert.equal(page.selfRulesRel, ".ccnavi/config/project/rules.yml");
   assert.equal(page.selfRulesExists, false);
   assert.deepEqual(page.existingNames, ["app", "lib", "i0001", "i0002"]);
   assert.equal(duplicateOf(page.rows, "gitlab.example.com/g/app")?.name, "app");

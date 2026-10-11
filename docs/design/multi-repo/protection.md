@@ -15,10 +15,10 @@ keywords: [コアファイル, 保護, 共通レイヤー, ミラー, プロジ�
 | 対象 | 場所 |
 |---|---|
 | hook の登録 | `.claude/settings.json`、`.claude/settings.local.json` |
-| 共通レイヤーのファイル | `<root>/.ccnavi/common/{rules,phases,risks}.yml`（`phases.yml` は置けない（11.4.1）が、置かれても守る） |
-| 共通レイヤーのミラー | `projects/<名前>/.ccnavi/common/{rules,phases,risks}.yml`（11.12。単体 clone では共通レイヤーとして読まれる） |
-| 自身のレイヤーの 3 本 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risks}.yml` |
-| プロジェクトのレイヤーの 3 本 | `projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml` |
+| 共通レイヤーのファイル | `<root>/.ccnavi/config/common/{rules,phases,risks}.yml`（`phases.yml` は置けない（11.4.1）が、置かれても守る） |
+| 共通レイヤーのミラー | `projects/<名前>/.ccnavi/config/common/{rules,phases,risks}.yml`（11.12。単体 clone では共通レイヤーとして読まれる） |
+| 自身のレイヤーの 3 本 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml` |
+| プロジェクトのレイヤーの 3 本 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` |
 | 実行ファイル | `CCNAVI_BIN_PATH`（振り分けの sh）と、sh が起動する実体（8.2） |
 | ワークツリー側の設定 | 上の各ファイルのうち追跡されているものについて、**その元リポジトリから切った**ワークツリーが持つ同じファイル |
 
@@ -53,10 +53,10 @@ ccnavi ディレクトリの全体に組み込みの deny を掛ける。`match:
 
 元と行き先がある `cp` `ln` `install` は、行き先の側だけで当てる。行き先は GNU の読み方で決める。`-t <dir>` /
 `--target-directory=<dir>`（まとめた短いオプション `-vt`、値を続けた `-t.ccnavi`、頭だけの `--target`、空白で値を渡す形も同じ）があればその値、
-無ければ選択肢でない最後の引数。最後の引数のあとに回した選択肢（`cp /tmp/x .ccnavi/common/rules.yml -f`・`-S .bak`・`--`）は飛ばし、
+無ければ選択肢でない最後の引数。最後の引数のあとに回した選択肢（`cp /tmp/x .ccnavi/config/common/rules.yml -f`・`-S .bak`・`--`）は飛ばし、
 文字列の終わり・コマンドの切れ目・後ろのリダイレクトまでを引数のリストとして読む。値を取る選択肢の値に出た `-t`（`-S -t`・`-Svt`）と
 `--` のあとの `-t` は行き先を名指ししないので、そのときも最後の引数を見る。
-`cp .ccnavi/common/rules.yml /tmp/backup.yml` や `cp -t /tmp/out .ccnavi/common/rules.yml` のように守る場所が元の側に出ただけの形は
+`cp .ccnavi/config/common/rules.yml /tmp/backup.yml` や `cp -t /tmp/out .ccnavi/config/common/rules.yml` のように守る場所が元の側に出ただけの形は
 読むだけなので組み込みの保護では止めず、通すかどうかはルールに任せる。`cp /tmp/x .ccnavi && echo` や `cp /tmp/x .ccnavi > /dev/null` のように
 後ろに何か続けた形、`sudo` / `env` の後ろ（shellread が実行役のコマンドを外した層）、`cd` で移った先から見た表記も止める。
 動かした ccnavi ディレクトリ・共通レイヤーの 3 本・実行ファイルの表記は、書き込み用・最後の引数用・`-t` の値用に分けて足す

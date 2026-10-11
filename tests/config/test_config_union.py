@@ -5,9 +5,9 @@
 
 レイヤーは 3 種。
 
-- 共通レイヤー: `.ccnavi/common/{rules,phases,risks}.yml`（置き場は固定。env では動かさない）
-- ワークスペース自身のレイヤー: `<ワークスペースルート>/.ccnavi/config/`
-- プロジェクトのレイヤー: `projects/<名前>/.ccnavi/config/`
+- 共通レイヤー: `.ccnavi/config/common/{rules,phases,risks}.yml`（置き場は固定。env では動かさない）
+- ワークスペース自身のレイヤー: `<ワークスペースルート>/.ccnavi/config/project/`
+- プロジェクトのレイヤー: `projects/<名前>/.ccnavi/config/project/`
 
 lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無いレイヤー = 空）。
 
@@ -248,7 +248,7 @@ FILE_NAMES = {"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml"}
 
 def layer_path(root, kind, home=HOME):
     """その git プロジェクトルートのレイヤーのファイル（rules / phases / risk）のパス。"""
-    return os.path.join(root, home, "config", FILE_NAMES[kind])
+    return os.path.join(root, home, "config", "project", FILE_NAMES[kind])
 
 
 def write_layer(root, *, rules=None, phases=None, risk=None, home=HOME):
@@ -339,7 +339,7 @@ def build_template():
     for rel in KEEP:
         write(os.path.join(ws, *rel.split("/")), "keep\n")
     write_layer(ws, rules=OWN_RULES, phases=OWN_PHASES)
-    common = os.path.join(ws, ".ccnavi", "common")
+    common = os.path.join(ws, ".ccnavi", "config", "common")
     write(os.path.join(common, "rules.yml"), json.dumps(COMMON_RULES))
     write(os.path.join(common, "risks.yml"), COMMON_RISK)
     git(ws, "add", "-A")
@@ -363,7 +363,7 @@ class ConfigUnionHarness(unittest.TestCase):
         self.ws = os.path.join(base, "ws")
         shutil.copytree(_TEMPLATE, self.ws)
 
-        common = os.path.join(self.ws, ".ccnavi", "common")
+        common = os.path.join(self.ws, ".ccnavi", "config", "common")
         self.rules = os.path.join(common, "rules.yml")
         self.phases = os.path.join(common, "phases.yml")
         self.risk = os.path.join(common, "risks.yml")
@@ -1068,8 +1068,8 @@ class WiringTest(ConfigUnionHarness):
         """`projects/` が無く自身のレイヤーも無ければ、
         共通レイヤーだけで判定し記録する。"""
         # 自身のレイヤーだけを消す。
-        # 共通レイヤーも同じ ccnavi ディレクトリの下（`.ccnavi/common/`）にある。
-        shutil.rmtree(os.path.join(self.ws, HOME, "config"))
+        # 共通レイヤーも同じ ccnavi ディレクトリの下（`.ccnavi/config/common/`）にある。
+        shutil.rmtree(os.path.join(self.ws, HOME, "config", "project"))
         # `projects/` を作らないワークスペースにする（置き場は固定で、数えない口は無い）。消さずに
         # 外へ動かす。Windows は .git の中の読み取り専用のファイルを消せない。
         os.rename(self.projects, os.path.join(self.ws, "moved-away"))

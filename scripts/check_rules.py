@@ -20,8 +20,8 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 共通レイヤーのルールと期待する判定の置き場。
-RULES = os.path.join(ROOT, ".ccnavi", "common", "rules.yml")
-EXPECTATIONS = os.path.join(ROOT, ".ccnavi", "common", "rule-expectations.yml")
+RULES = os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml")
+EXPECTATIONS = os.path.join(ROOT, ".ccnavi", "config", "common", "rule-expectations.yml")
 
 
 def arguments(rules_path: str = RULES) -> list[str]:

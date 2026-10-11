@@ -195,7 +195,10 @@ class ProjectsCollisionTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.ws, ignore_errors=True)
         os.makedirs(os.path.join(self.ws, ".claude"))
         git(self.ws, "init", "--quiet", "-b", "main")
-        write(os.path.join(self.ws, ".ccnavi", "common", "rules.yml"), json.dumps({"version": 1}))
+        write(
+            os.path.join(self.ws, ".ccnavi", "config", "common", "rules.yml"),
+            json.dumps({"version": 1}),
+        )
         write(os.path.join(self.ws, "src", "keep.py"), "print(1)\n")
         self.projects = os.path.join(self.ws, "projects")
 

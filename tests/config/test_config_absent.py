@@ -281,7 +281,9 @@ class BuiltinSpeedTest(unittest.TestCase):
     """
 
     def common_rule(self, rule_id):
-        with open(os.path.join(ROOT, ".ccnavi", "common", "rules.yml"), encoding="utf-8") as f:
+        with open(
+            os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml"), encoding="utf-8"
+        ) as f:
             data = yamlread.safe_load(f.read())
         found = [r for r in data["deny"] if r["id"] == rule_id]
         self.assertEqual(len(found), 1)
@@ -292,7 +294,9 @@ class BuiltinSpeedTest(unittest.TestCase):
 
     def test_common_regexes_return_quickly(self):
         """共通ルールの regex（組み合わせ条件と except の中も）も、長い入力ですぐ返る。"""
-        with open(os.path.join(ROOT, ".ccnavi", "common", "rules.yml"), encoding="utf-8") as f:
+        with open(
+            os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml"), encoding="utf-8"
+        ) as f:
             data = yamlread.safe_load(f.read())
         found = []
 
@@ -508,7 +512,7 @@ class AbsentRiskTest(ConfigUnionHarness):
 
 
 class MirrorIsNotReadInTheWorkspaceTest(ConfigUnionHarness):
-    """ワークスペースの中では、プロジェクトのミラー（`.ccnavi/common/`）を共通レイヤーとして読まない。"""
+    """ワークスペースの中では、プロジェクトのミラー（`.ccnavi/config/common/`）を共通レイヤーとして読まない。"""
 
     MIRROR_RULES = {
         "version": 1,
@@ -523,7 +527,7 @@ class MirrorIsNotReadInTheWorkspaceTest(ConfigUnionHarness):
     }
 
     def place_mirror(self):
-        mirror = os.path.join(self.lib, ".ccnavi", "common")
+        mirror = os.path.join(self.lib, ".ccnavi", "config", "common")
         write(os.path.join(mirror, "rules.yml"), json.dumps(self.MIRROR_RULES))
         write(
             os.path.join(mirror, "risks.yml"),
@@ -554,20 +558,23 @@ class MirrorIsNotReadInTheWorkspaceTest(ConfigUnionHarness):
 
         self.assertEqual([f.id for f in definition.factors], ["big-diff", "schema"])
         paths = [p["detail"] for p in self.problems("error")]
-        self.assertFalse([d for d in paths if "mirror" in d or "lib/.ccnavi/common" in d], paths)
+        self.assertFalse(
+            [d for d in paths if "mirror" in d or "lib/.ccnavi/config/common" in d], paths
+        )
 
 
 class StandaloneCloneTest(ConfigUnionHarness):
     """プロジェクトを単体で clone したとき。
 
-    そのプロジェクトがルートになる。`.ccnavi/common/`（ミラー）が共通レイヤー、`.ccnavi/config/` が
+    そのプロジェクトがルートになる。`.ccnavi/config/common/`（ミラー）が共通レイヤー、
+    `.ccnavi/config/project/` が
     自身のレイヤーとして読まれ、ワークスペースの中と同じ「共通 + 1 レイヤー」の和で判定される。
     """
 
     def setUp(self):
         super().setUp()
         # lib を単体の clone に見立てる。ミラーは共通レイヤーの写し。
-        self.mirror = os.path.join(self.lib, ".ccnavi", "common")
+        self.mirror = os.path.join(self.lib, ".ccnavi", "config", "common")
         write(os.path.join(self.mirror, "rules.yml"), json.dumps(COMMON_RULES))
         write(os.path.join(self.mirror, "risks.yml"), COMMON_RISK)
         self.ws = self.lib
@@ -606,11 +613,12 @@ class StandaloneCloneTest(ConfigUnionHarness):
         self.assertIn("critical", LIB_RISK)
 
     def test_the_mirror_script_resolves_from_the_clone_root(self):
-        """ミラーの `script:` は `.ccnavi/common/scripts/` を指し、その clone のルートから解く。"""
+        """ミラーの `script:` は `.ccnavi/config/common/scripts/` を指し、その clone
+        のルートから解く。"""
         write(
             os.path.join(self.mirror, "risks.yml"),
             COMMON_RISK
-            + "  - {id: counted, points: 5, script: .ccnavi/common/scripts/count.sh, message: m}\n",
+            + "  - {id: counted, points: 5, script: .ccnavi/config/common/scripts/count.sh, message: m}\n",  # noqa: E501
         )
         write(os.path.join(self.mirror, "scripts", "count.sh"), "printf 1\n")
         conf, _ = settings.load(self.lib)
@@ -622,7 +630,7 @@ class StandaloneCloneTest(ConfigUnionHarness):
         self.assertEqual(risk.script_problems(definition), [])
 
     def test_the_phases_come_from_the_config_only(self):
-        """フェーズ定義は config の 1 本（`.ccnavi/config/phases.yml`）。"""
+        """フェーズ定義は config の 1 本（`.ccnavi/config/project/phases.yml`）。"""
         sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
 
         self.assertEqual(list(sums), ["self"])
@@ -631,7 +639,7 @@ class StandaloneCloneTest(ConfigUnionHarness):
         )
         self.assertEqual(
             sums["self"]["phases"]["path"],
-            os.path.join(self.lib, ".ccnavi", "config", "phases.yml"),
+            os.path.join(self.lib, ".ccnavi", "config", "project", "phases.yml"),
         )
 
     def test_lint_reads_the_mirror_as_the_common_layer(self):

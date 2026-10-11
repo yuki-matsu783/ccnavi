@@ -26,7 +26,7 @@ def layer_home(conf: settings.Settings, root: str, name: str) -> str:
 
 def layer_config(conf: settings.Settings, root: str, name: str, kind: str) -> str:
     """そのレイヤーの phases / risk のパス。
-    共通レイヤーは `.ccnavi/common/` 固定で、設定が持つ既定そのもの。"""
+    共通レイヤーは `.ccnavi/config/common/` 固定で、設定が持つ既定そのもの。"""
     if name == ruleload.LAYER_COMMON:
         return conf.phases if kind == settings.KIND_PHASES else conf.risk
     return settings.layer_path(conf, layer_home(conf, root, name), kind, name)

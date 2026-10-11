@@ -608,7 +608,7 @@ def decide_after(
     # 保護の根拠を、この呼び出しが触れる前の状態に返してから読む。
     # 書いた先を渡すのは、組み込みの既定を使っている間の修復を戻さないため
     # （selfguard._left_as_repair）。
-    # 着手のときに共通レイヤーをプロジェクトの `.ccnavi/common/` へミラーした分は、
+    # 着手のときに共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーした分は、
     # 置き場・パスの途中のリンク・内容で見分けて外す。
     # 戻す側と、報告する側の両方で同じ答えを使う。
     synced = functools.partial(skillsync.is_synced_write, conf, root)

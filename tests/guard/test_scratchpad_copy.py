@@ -6,7 +6,7 @@
 その形だけを通し、置き場を足場にして守る場所へ書く形は通さないことを確かめる。
 
 以前は保護の式に否定先読みを足して通していた。ルールの読み込みは先読みを受け付けないので、
-保護の 1 本がまるごと外れ、`echo x > .ccnavi/common/rules.yml` まで通っていた。
+保護の 1 本がまるごと外れ、`echo x > .ccnavi/config/common/rules.yml` まで通っていた。
 `test_the_guard_itself_still_stops_writes` はその戻りを見る。
 """
 
@@ -41,7 +41,9 @@ class ScratchpadCopyTest(unittest.TestCase):
         self.repo = os.path.realpath(tempfile.mkdtemp(prefix="ccnavi-scratchpad-"))
         self.addCleanup(shutil.rmtree, self.repo, ignore_errors=True)
         subprocess.run(["git", "init", "--quiet"], cwd=self.repo, check=True)
-        write(os.path.join(self.repo, ".ccnavi", "common", "rules.yml"), json.dumps(RULES))
+        write(
+            os.path.join(self.repo, ".ccnavi", "config", "common", "rules.yml"), json.dumps(RULES)
+        )
         write(os.path.join(self.repo, ".ccnavi", "scripts", "ccnavi-git.sh"), "#!/bin/sh\n")
         os.makedirs(os.path.join(self.repo, "wip", "scratchpad"))
         self.pad = os.path.join(self.repo, "wip", "scratchpad")
@@ -101,7 +103,7 @@ class ScratchpadCopyTest(unittest.TestCase):
             self.skipTest("シンボリックリンクを作れない機械")
         for command in (
             # `..` で置き場の外へ出る
-            "cp /tmp/x wip/scratchpad/../../.ccnavi/common/rules.yml",
+            "cp /tmp/x wip/scratchpad/../../.ccnavi/config/common/rules.yml",
             # 置き場の中のリンクを通って守る場所へ書く
             "cp /tmp/x wip/scratchpad/link/scripts/ccnavi-git.sh",
             # リンクを作る・リンクのまま写す・行き先を -t で動かす
@@ -120,9 +122,9 @@ class ScratchpadCopyTest(unittest.TestCase):
             "install --dir .ccnavi wip/scratchpad/ccnavi-git.sh",
             "cp -x .ccnavi/scripts/ccnavi-git.sh wip/scratchpad/ccnavi-git.sh",
             # 1 本目で置き場へ写し、続くコマンドで守る場所へ書く
-            "cp a wip/scratchpad/ccnavi-git.sh && cp /tmp/x .ccnavi/common/rules.yml",
-            "cp a wip/scratchpad/ccnavi-git.sh; echo x > .ccnavi/common/rules.yml",
-            "cp a wip/scratchpad/ccnavi-git.sh > .ccnavi/common/rules.yml",
+            "cp a wip/scratchpad/ccnavi-git.sh && cp /tmp/x .ccnavi/config/common/rules.yml",
+            "cp a wip/scratchpad/ccnavi-git.sh; echo x > .ccnavi/config/common/rules.yml",
+            "cp a wip/scratchpad/ccnavi-git.sh > .ccnavi/config/common/rules.yml",
             # 表記どおりに読めない行き先
             "cp $X wip/scratchpad/ccnavi-git.sh",
             # 名前が似ているだけの別の場所
@@ -157,9 +159,9 @@ class ScratchpadCopyTest(unittest.TestCase):
 
     def test_the_guard_itself_still_stops_writes(self):
         for command in (
-            "echo x > .ccnavi/common/rules.yml",
-            "sed -i s/a/b/ .ccnavi/common/rules.yml",
-            "cp /tmp/x .ccnavi/common/rules.yml",
+            "echo x > .ccnavi/config/common/rules.yml",
+            "sed -i s/a/b/ .ccnavi/config/common/rules.yml",
+            "cp /tmp/x .ccnavi/config/common/rules.yml",
         ):
             with self.subTest(command=command):
                 self.assertEqual(RULE_ID, self.decide(command))

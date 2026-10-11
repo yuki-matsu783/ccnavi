@@ -380,7 +380,7 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
     C1 がコミットするのは状態だけ。
 
     例外は 2 つ。`ticket start` の中で configsync がミラーしたプロジェクトの
-    `.ccnavi/common/`と skillsync が写した概念スキルの `skills/<概念>/`
+    `.ccnavi/config/common/`と skillsync が写した概念スキルの `skills/<概念>/`
     （どちらも `skillsync.is_synced_write` が内容で読めるもの）と、`review ready` が
     消した途中の作業の置き場（`wip/`）のファイル（消したもの、つまり今は無いものだけ。
     `review.remove_wip` が追跡済みのものだけを消す）。

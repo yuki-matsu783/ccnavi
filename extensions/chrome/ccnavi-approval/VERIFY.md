@@ -43,7 +43,7 @@
    grep -qxF '.claude/worktrees/' .gitignore || printf '.claude/worktrees/\n' >> .gitignore
    ```
 
-4. 置かれたもの（`.claude/settings.json`・`.ccnavi/common/`・`.ccnavi/config/`・`.ccnavi/scripts/`・`.gitignore`・`.vscode/settings.json`）を
+4. 置かれたもの（`.claude/settings.json`・`.ccnavi/config/common/`・`.ccnavi/config/project/`・`.ccnavi/scripts/`・`.gitignore`・`.vscode/settings.json`）を
    コミットして `main` へ push します。`.ccnavi/bin/` は `.gitignore` に入るので送りません。
    **統合先（`main`）への commit と push はユーザが素の `git` で打ちます。** ccnavi のラッパー（`ccnavi-git.sh`）は `main` へ直接は送らず、
    エージェントにも打たせません。

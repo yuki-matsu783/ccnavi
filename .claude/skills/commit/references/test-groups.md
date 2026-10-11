@@ -74,7 +74,7 @@ uv run python -m tests --plan          # 何をどの順で回すか出すだけ
 全件を回すとき:
 
 - 表のどの行にも当たらないファイルを変えた
-- `.ccnavi/scripts/ccnavi-common*.sh`（入口と部品）、`.ccnavi/common/`、`.ccnavi/config/`、`tests/__init__.py`、`tests/inproc.py`、
+- `.ccnavi/scripts/ccnavi-common*.sh`（入口と部品）、`.ccnavi/config/common/`、`.ccnavi/config/project/`、`tests/__init__.py`、`tests/inproc.py`、
   `pyproject.toml`・`uv.lock` を変えた（ほぼ全グループが読む）
 - 統合先に取り込む前、MR に出す前
 - どの行に当たるか迷った

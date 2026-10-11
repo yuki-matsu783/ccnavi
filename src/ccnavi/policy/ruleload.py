@@ -7,12 +7,12 @@
 
 ## レイヤーは 3 種
 
-- 共通レイヤー: `.ccnavi/common/rules.yml`。どのツリーにも当てはまる。
+- 共通レイヤー: `.ccnavi/config/common/rules.yml`。どのツリーにも当てはまる。
   置き場は固定で、env では動かない。プロジェクトを単体で clone したときは、そのプロジェクトの
-  `.ccnavi/common/`（ミラー）がこれになる。ワークスペースの中では、プロジェクトのミラーは読まない
-- 自身のレイヤー: ワークスペースルートの `.ccnavi/config/rules.yml`
-  （単体 clone では、そのプロジェクトの `.ccnavi/config/rules.yml`）
-- プロジェクトのレイヤー: `projects/<名前>/.ccnavi/config/rules.yml`
+  `.ccnavi/config/common/`（ミラー）がこれになる。ワークスペースの中では、プロジェクトのミラーは読まない
+- 自身のレイヤー: ワークスペースルートの `.ccnavi/config/project/rules.yml`
+  （単体 clone では、そのプロジェクトの `.ccnavi/config/project/rules.yml`）
+- プロジェクトのレイヤー: `projects/<名前>/.ccnavi/config/project/rules.yml`
 
 自身のレイヤーとプロジェクトのレイヤーの置き場も固定で、env では動かない。
 

@@ -83,14 +83,14 @@ test("CB-D34 失敗の一言は次の一覧が届いたら消える。案内は�
 
 test("CB-T113 カードはレイヤーの置き場を出す。自身のレイヤーは本体の枠に出す。操作のボタンは無い", async () => {
   const dom = await openProjects([
-    row({ name: "app", rel: "projects/app", rulesRel: "projects/app/.ccnavi/config/rules.yml" }),
+    row({ name: "app", rel: "projects/app", rulesRel: "projects/app/.ccnavi/config/project/rules.yml" }),
     row({ rulesExists: false }),
     row({ name: "Self", rel: "projects/Self", rulesRel: "", rulesExists: false }),
   ]);
   try {
     const rules = (name: string): string => text(dom.one(`${cardSelector(name)} .field:nth-child(2) dd`));
-    assert.equal(rules("app"), "あり projects/app/.ccnavi/config/rules.yml");
-    assert.equal(rules("lib"), "なし projects/lib/.ccnavi/config/rules.yml");
+    assert.equal(rules("app"), "あり projects/app/.ccnavi/config/project/rules.yml");
+    assert.equal(rules("lib"), "なし projects/lib/.ccnavi/config/project/rules.yml");
     // 予約名のプロジェクトはレイヤーが無いので、置く先も出さない
     assert.match(rules("Self"), /設定の対象になっていません/);
     assert.equal(dom.all("section.list button").length, 0, "カードに操作のボタンがある");
@@ -154,7 +154,7 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
   ]);
   try {
     const dirs = flat.all("ul.lint li").flatMap((li) => [...text(li).matchAll(/プロジェクトの設定は ([^ ]+)\/ に置いてください/g)].map((m) => m[1]));
-    assert.deepEqual(dirs, [".ccnavi/config", "conf/ccnavi", ".ccnavi/config"]);
+    assert.deepEqual(dirs, [".ccnavi/config/project", "conf/ccnavi", ".ccnavi/config/project"]);
   } finally {
     await flat.close();
   }

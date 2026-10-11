@@ -159,11 +159,11 @@ def _sync_config(
     found: ticket_model.Ticket,
     worktree: str,
 ) -> list[str] | None:
-    """親の着手の前に、共通レイヤーをプロジェクトの `.ccnavi/common/` へミラーする。
+    """親の着手の前に、共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーする。
 
     返すのは着手の出力に足す行。ミラーできなければ None（着手しない）。子は親のブランチに
     含まれるので配らない。ワークスペース自身の作業は、共通レイヤーと同じリポジトリにあるので配らない。
-    プロジェクトの `.ccnavi/config/` には触れない。
+    プロジェクトの `.ccnavi/config/project/` には触れない。
     """
     if found.is_child or not found.project:
         return []
@@ -223,8 +223,8 @@ def _sync_common(
         return None
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     lines = [
-        f"共通レイヤーとプロジェクト {found.project} のミラー（.ccnavi/common/）が違っていたので、"
-        "共通レイヤーの中身に揃えた（プロジェクトの .ccnavi/config/ には触れていない）:"
+        f"共通レイヤーとプロジェクト {found.project} のミラー（.ccnavi/config/common/）が違っていたので、"  # noqa: E501
+        "共通レイヤーの中身に揃えた（プロジェクトの .ccnavi/config/project/ には触れていない）:"
     ]
     for c in changes:
         state = "消した" if c.deletes else ("上書き" if c.before is not None else "新しく置いた")

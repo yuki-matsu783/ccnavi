@@ -74,7 +74,7 @@ class VersionFlagTest(unittest.TestCase):
     def test_v12_it_reads_no_settings_and_no_workspace(self):
         """V12 読めない設定のワークスペースでも、在らないルートでも答える。"""
         with tempfile.TemporaryDirectory() as root:
-            write(os.path.join(root, ".ccnavi", "common", "rules.yml"), "version: [\n")
+            write(os.path.join(root, ".ccnavi", "config", "common", "rules.yml"), "version: [\n")
             broken = ccnavi("--version", root=root)
         self.assertEqual(broken.returncode, 0, broken.stderr)
         self.assertEqual(broken.stderr, "")

@@ -46,12 +46,12 @@ allow: []
 export function page(overrides: Partial<RulesPage> = {}): RulesPage {
   return {
     root: "/ws",
-    rulesPath: ".ccnavi/common/rules.yml",
+    rulesPath: ".ccnavi/config/common/rules.yml",
     mode: "enable",
     model: readRules(RULES).model,
     hooks: parseHooks(JSON.stringify({ hooks: {} }), "settings"),
     hookFiles: { settings: true, settingsLocal: false },
-    expectationsPath: ".ccnavi/common/rule-expectations.yml",
+    expectationsPath: ".ccnavi/config/common/rule-expectations.yml",
     lock: { locked: false, reason: "", doing: [] },
     ...overrides,
   };

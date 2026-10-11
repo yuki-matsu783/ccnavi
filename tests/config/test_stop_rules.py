@@ -277,7 +277,7 @@ class StopRulesTest(unittest.TestCase):
             "version": 1,
             "allow": [stop_rule("lib-review", additionalContext="外の文", every=2)],
         }
-        write(os.path.join(home, ".ccnavi", "config", "rules.yml"), json.dumps(layer))
+        write(os.path.join(home, ".ccnavi", "config", "project", "rules.yml"), json.dumps(layer))
         for cwd in (self.root, home, self.root, home):
             self.assertEqual(self.blocked(self.stop(cwd=cwd)), "")
 
@@ -290,13 +290,13 @@ class StopRulesTest(unittest.TestCase):
         home = self.project()
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
         stale = {"version": 1, "allow": [stop_rule(additionalContext=NUDGE, every=3)]}
-        write(os.path.join(home, ".ccnavi", "config", "rules.yml"), json.dumps(stale))
+        write(os.path.join(home, ".ccnavi", "config", "project", "rules.yml"), json.dumps(stale))
         got = [bool(self.blocked(self.stop(cwd=home))) for _ in range(6)]
         self.assertEqual(got, [False, True, False, True, False, True])
 
     def test_the_workspace_own_layer_applies_and_the_same_id_counts_once(self):
         own = {"version": 1, "allow": [stop_rule(additionalContext="自身のレイヤー", every=2)]}
-        write(os.path.join(self.root, ".ccnavi", "config", "rules.yml"), json.dumps(own))
+        write(os.path.join(self.root, ".ccnavi", "config", "project", "rules.yml"), json.dumps(own))
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
         self.stop()
         reason = self.blocked(self.stop())
@@ -369,7 +369,7 @@ class StopRulesTest(unittest.TestCase):
         os.makedirs(os.path.join(home, ".git"))
         self.rules(ruleset({"id": "src", "match": "Write", "glob": "*/src/*"}))
         layer = {"version": 1, "allow": [stop_rule("outer", additionalContext=NUDGE, every=5)]}
-        write(os.path.join(home, ".ccnavi", "config", "rules.yml"), json.dumps(layer))
+        write(os.path.join(home, ".ccnavi", "config", "project", "rules.yml"), json.dumps(layer))
         out = self.lint()
         self.assertTrue(
             any("使われない" in line and "outer" in line for line in out.splitlines()), out

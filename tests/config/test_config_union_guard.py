@@ -1,6 +1,7 @@
 """設定 3 本の和の受入テスト。設定ファイルの保護。
 
-selfguard のコアに、各レイヤーの `.ccnavi/config/` の 3 本と共通レイヤーの phases / risk が入る。
+selfguard のコアに、各レイヤーの `.ccnavi/config/project/` の 3 本と共通レイヤーの phases / risk
+が入る。
 Write / Edit の拒否、シェルからの書き込みの拒否、バックアップと復元の 3 つとも、
 共通レイヤーの rules.yml に掛けているものをそのまま掛ける。
 元リポジトリから切ったワークツリー側の設定も対象。
@@ -100,7 +101,7 @@ class RestoreTest(GuardHarness):
                 self.assertIn(os.path.basename(path), result.stdout, self.said(result, kind))
 
     def test_own_layer_files_are_restored(self):
-        """自身のレイヤー `<ワークスペースルート>/.ccnavi/config/` の 3 本も対象。"""
+        """自身のレイヤー `<ワークスペースルート>/.ccnavi/config/project/` の 3 本も対象。"""
         write(layer_path(self.ws, "risk"), COMMON_RISK)
         for kind in ("rules", "phases", "risk"):
             with self.subTest(kind=kind):
@@ -147,7 +148,7 @@ class RestoreTest(GuardHarness):
         tree = self.worktree(self.ws, "w3")
         for name in ("rules.yml", "phases.yml", "risks.yml"):
             with self.subTest(name=name):
-                copy = os.path.join(tree, ".ccnavi", "common", name)
+                copy = os.path.join(tree, ".ccnavi", "config", "common", name)
                 self.assertTrue(
                     os.path.exists(copy),
                     "共通レイヤーは追跡されているのでワークツリー側の設定がある",
@@ -285,7 +286,7 @@ class DenyTest(GuardHarness):
             layer_path(self.lib, "rules"),
             os.path.join(self.lib, HOME, "scripts", "count.sh"),
             layer_path(self.ws, "phases"),
-            os.path.join(self.app, HOME, "config", "rules.yml"),
+            os.path.join(self.app, HOME, "config", "project", "rules.yml"),
         )
         for path in targets:
             for tool in ("Write", "Edit"):
@@ -297,10 +298,10 @@ class DenyTest(GuardHarness):
         """シェルからの書き込みは `builtin-guard-setting-files` の 1 本で止まる。"""
         for command in (
             "echo x > projects/lib/.ccnavi/scripts/count.sh",
-            "echo x >> .ccnavi/config/rules.yml",
-            "sed -i s/deny/allow/ projects/lib/.ccnavi/config/rules.yml",
-            "cp /tmp/x .ccnavi/config/phases.yml",
-            "cd projects/lib && echo x > .ccnavi/config/risks.yml",
+            "echo x >> .ccnavi/config/project/rules.yml",
+            "sed -i s/deny/allow/ projects/lib/.ccnavi/config/project/rules.yml",
+            "cp /tmp/x .ccnavi/config/project/phases.yml",
+            "cd projects/lib && echo x > .ccnavi/config/project/risks.yml",
         ):
             with self.subTest(command=command):
                 result = self.guarded_hook("Bash", self.ws, command=command)
@@ -309,8 +310,8 @@ class DenyTest(GuardHarness):
     def test_reading_project_home_is_allowed(self):
         """読むだけなら通る。名前が出ただけでは止めない。"""
         for command in (
-            "cat projects/lib/.ccnavi/config/rules.yml",
-            "grep -n deny .ccnavi/config/rules.yml",
+            "cat projects/lib/.ccnavi/config/project/rules.yml",
+            "grep -n deny .ccnavi/config/project/rules.yml",
         ):
             with self.subTest(command=command):
                 self.assert_not_denied(self.guarded_hook("Bash", self.ws, command=command))
@@ -328,7 +329,8 @@ class DenyTest(GuardHarness):
     def test_named_tool_writes_into_the_common_layer_are_denied(self):
         """共通レイヤーの 3 本への Write / Edit は、ルールに宣言が無くても組み込みで止まる。
 
-        土台の共通レイヤーは既定の置き場（`.ccnavi/common/`）にある。ルールの 1 行に任せると、
+        土台の共通レイヤーは既定の置き場（`.ccnavi/config/common/`）にある。ルールの 1
+        行に任せると、
         書き換えたルールファイルのもとでは通ってしまう（issue #14）。
         """
         for path in (self.rules, self.phases, self.risk):
@@ -343,7 +345,7 @@ class DenyTest(GuardHarness):
         統合すればそのまま main の設定になる。
         """
         tree = self.worktree(self.ws, "w5")
-        copy = os.path.join(tree, ".ccnavi", "common", "phases.yml")
+        copy = os.path.join(tree, ".ccnavi", "config", "common", "phases.yml")
         self.assert_denied(
             self.guarded_hook("Write", self.ws, file_path=copy), "builtin-guard-common-layer"
         )
@@ -363,14 +365,14 @@ class DenyTest(GuardHarness):
     def test_shell_writes_into_the_common_layer_are_denied(self):
         """共通レイヤーの 3 本へのシェルからの書き込みは組み込みで止まる。
 
-        置き場は `.ccnavi/common/` に固定なので、ccnavi ディレクトリを丸ごと拾う 1 本
+        置き場は `.ccnavi/config/common/` に固定なので、ccnavi ディレクトリを丸ごと拾う 1 本
         （`_PLACES` の `\\.ccnavi`）が当てる。動かした置き場は
         `test_shell_writes_into_a_moved_common_layer_are_denied` が見る。
         """
         for command in (
-            "echo x > .ccnavi/common/rules.yml",
-            "sed -i s/deny/allow/ .ccnavi/common/phases.yml",
-            "cp /tmp/x .ccnavi/common/risks.yml",
+            "echo x > .ccnavi/config/common/rules.yml",
+            "sed -i s/deny/allow/ .ccnavi/config/common/phases.yml",
+            "cp /tmp/x .ccnavi/config/common/risks.yml",
         ):
             with self.subTest(command=command):
                 result = self.hook("Bash", self.ws, guard="enable", command=command)
@@ -391,13 +393,13 @@ class DenyTest(GuardHarness):
         absolute = os.path.dirname(self.rules).replace(os.sep, "/")
         for name in ("rules.yml", "phases.yml", "risks.yml"):
             for command in (
-                f"cp .ccnavi/common/{name} /tmp/backup.yml",
+                f"cp .ccnavi/config/common/{name} /tmp/backup.yml",
                 f"cp {absolute}/{name} /tmp/backup.yml",
-                f"ln -s .ccnavi/common/{name} /tmp/link.yml",
-                f"install -m 644 .ccnavi/common/{name} /tmp/x.yml",
-                f"cp .ccnavi/common/{name} /tmp/a.yml && cat /tmp/a.yml",
-                f"cp .ccnavi/common/{name} /tmp/a.yml 2>/dev/null",
-                "cp -r .ccnavi/common /tmp/out",
+                f"ln -s .ccnavi/config/common/{name} /tmp/link.yml",
+                f"install -m 644 .ccnavi/config/common/{name} /tmp/x.yml",
+                f"cp .ccnavi/config/common/{name} /tmp/a.yml && cat /tmp/a.yml",
+                f"cp .ccnavi/config/common/{name} /tmp/a.yml 2>/dev/null",
+                "cp -r .ccnavi/config/common /tmp/out",
             ):
                 with self.subTest(command=command):
                     result = self.hook("Bash", self.ws, guard="enable", command=command)
@@ -413,17 +415,17 @@ class DenyTest(GuardHarness):
         absolute = os.path.dirname(self.rules).replace(os.sep, "/")
         for name in ("rules.yml", "phases.yml", "risks.yml"):
             for command in (
-                f"cp /tmp/x .ccnavi/common/{name}",
+                f"cp /tmp/x .ccnavi/config/common/{name}",
                 f"cp /tmp/x {absolute}/{name}",
-                f"ln -sf /tmp/x .ccnavi/common/{name}",
-                f"install /tmp/x .ccnavi/common/{name}",
-                f"cp .ccnavi/common/{name} .ccnavi/common/{name}",
-                f"cp /tmp/x .ccnavi/common/{name} && echo done",
-                f"cp /tmp/x .ccnavi/common/{name}; echo done",
-                f"cp /tmp/x .ccnavi/common/{name} > /dev/null 2>&1",
-                f"echo go && cp /tmp/x .ccnavi/common/{name}",
-                f'cp "/tmp/a b" .ccnavi/common/{name}',
-                f'cp /tmp/x ".ccnavi/common/{name}"',
+                f"ln -sf /tmp/x .ccnavi/config/common/{name}",
+                f"install /tmp/x .ccnavi/config/common/{name}",
+                f"cp .ccnavi/config/common/{name} .ccnavi/config/common/{name}",
+                f"cp /tmp/x .ccnavi/config/common/{name} && echo done",
+                f"cp /tmp/x .ccnavi/config/common/{name}; echo done",
+                f"cp /tmp/x .ccnavi/config/common/{name} > /dev/null 2>&1",
+                f"echo go && cp /tmp/x .ccnavi/config/common/{name}",
+                f'cp "/tmp/a b" .ccnavi/config/common/{name}',
+                f'cp /tmp/x ".ccnavi/config/common/{name}"',
                 f"cd .ccnavi && cp /tmp/x common/{name}",
             ):
                 with self.subTest(command=command):
@@ -431,14 +433,14 @@ class DenyTest(GuardHarness):
                     self.assert_denied(result, "builtin-guard-setting-files")
         # 行き先をディレクトリにした形。
         for command in (
-            "cp /tmp/rules.yml .ccnavi/common",
-            "cp /tmp/rules.yml .ccnavi/common/",
+            "cp /tmp/rules.yml .ccnavi/config/common",
+            "cp /tmp/rules.yml .ccnavi/config/common/",
             f"cp /tmp/rules.yml {absolute}",
-            "cp /tmp/rules.yml .ccnavi/common && echo done",
-            "cp -t .ccnavi/common /tmp/rules.yml",
-            "cp --target-directory=.ccnavi/common /tmp/rules.yml",
-            "install -Dt .ccnavi/common /tmp/rules.yml",
-            "ln -st .ccnavi/common /tmp/rules.yml",
+            "cp /tmp/rules.yml .ccnavi/config/common && echo done",
+            "cp -t .ccnavi/config/common /tmp/rules.yml",
+            "cp --target-directory=.ccnavi/config/common /tmp/rules.yml",
+            "install -Dt .ccnavi/config/common /tmp/rules.yml",
+            "ln -st .ccnavi/config/common /tmp/rules.yml",
         ):
             with self.subTest(command=command):
                 result = self.hook("Bash", self.ws, guard="enable", command=command)
@@ -452,12 +454,12 @@ class DenyTest(GuardHarness):
         """
         for name in ("rules.yml", "phases.yml", "risks.yml"):
             for command in (
-                f"mv .ccnavi/common/{name} /tmp/x",
-                f"rm .ccnavi/common/{name}",
-                f"tee .ccnavi/common/{name} < /tmp/x",
-                f"sed -i s/deny/allow/ .ccnavi/common/{name}",
-                f"echo x > .ccnavi/common/{name}",
-                f"cp .ccnavi/common/{name} /tmp/x && rm .ccnavi/common/{name}",
+                f"mv .ccnavi/config/common/{name} /tmp/x",
+                f"rm .ccnavi/config/common/{name}",
+                f"tee .ccnavi/config/common/{name} < /tmp/x",
+                f"sed -i s/deny/allow/ .ccnavi/config/common/{name}",
+                f"echo x > .ccnavi/config/common/{name}",
+                f"cp .ccnavi/config/common/{name} /tmp/x && rm .ccnavi/config/common/{name}",
             ):
                 with self.subTest(command=command):
                     result = self.hook("Bash", self.ws, guard="enable", command=command)

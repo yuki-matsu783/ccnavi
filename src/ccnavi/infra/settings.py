@@ -27,7 +27,8 @@ from typing import NamedTuple
 # ccnavi が読む環境変数。
 #
 # 共通レイヤーの 3 本（ルール・フェーズ定義・リスクの配点）はここに無い。置き場は
-# `.ccnavi/common/` に固定で、env では動かない。3 つのレイヤーのうち共通レイヤーだけが別の決まり方を
+# `.ccnavi/config/common/` に固定で、env では動かない。3
+# つのレイヤーのうち共通レイヤーだけが別の決まり方を
 # していた非対称を無くしたもの。診断のためにここを動かすには `--rules` /
 # `--phases` / `--risk` のフラグを使う。hook は引数を渡さずに起動するので、
 # 判定の入口は固定される。
@@ -121,7 +122,7 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 
 # 既定の置き場。ワークスペースルートからの相対。
 #
-# ユーザが持つ設定（共通レイヤーの 3 本）は ccnavi ディレクトリの下の `.ccnavi/common/`、
+# ユーザが持つ設定（共通レイヤーの 3 本）は ccnavi ディレクトリの下の `.ccnavi/config/common/`、
 # 実行のたびに書かれる記録と state は `logs/` に置く。
 # `.claude/` には Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だけを残す。
 #
@@ -130,7 +131,7 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 # hook は引数を渡さずに起動するから、判定の入口はここから動かない。
 # 判定の記録のファイル名は `decisions.jsonl`。
 DEFAULT_LOG = os.path.join("logs", "decisions.jsonl")
-DEFAULT_RULES = os.path.join(".ccnavi", "common", "rules.yml")
+DEFAULT_RULES = os.path.join(".ccnavi", "config", "common", "rules.yml")
 # state はセッションごとの一時的な状態なので、記録とは分けてまとめておく。
 # 配る対象ではないし、消えても次の起動で取り直せる。
 DEFAULT_STATE = os.path.join("logs", "state")
@@ -146,9 +147,9 @@ DEFAULT_TICKETS = "wip/proposals"
 # 下に `doing/`（作業中）と `done/`（閉じた）と `phases/`（マーカー）が並ぶ。
 DEFAULT_APPROVED = ".ccnavi/approved"
 # フェーズ定義はユーザが持つ設定なので、承認済みチケットと同じ保護の内側に置く。
-DEFAULT_PHASES = os.path.join(".ccnavi", "common", "phases.yml")
+DEFAULT_PHASES = os.path.join(".ccnavi", "config", "common", "phases.yml")
 # リスクの配点もユーザが持つ設定。エージェントが配点を書けると、自分のリスクを自分で決められる。
-DEFAULT_RISK = os.path.join(".ccnavi", "common", "risks.yml")
+DEFAULT_RISK = os.path.join(".ccnavi", "config", "common", "risks.yml")
 # プロジェクトの置き場。ワークスペースの直下に固定するのは、列挙が速いことと、
 # 何がプロジェクトかで迷わないため。ワークスペースの `.gitignore` に入れる
 # （プロジェクトは自分の git を持つ）。
@@ -209,9 +210,9 @@ def bin_command(bin_path: str) -> str:
 
 
 # ccnavi ディレクトリの下の固定のパス。レイヤーはこの形でしか置けない。
-LAYER_CONFIG_DIR = "config"
+LAYER_CONFIG_DIR = "config/project"
 # 共通レイヤーとそのミラーの置き場（ccnavi ディレクトリからの相対）。
-COMMON_DIR = "common"
+COMMON_DIR = "config/common"
 # レイヤーが持てる設定。3 本は独立に無くてよい。
 KIND_RULES = "rules"
 KIND_PHASES = "phases"
@@ -242,7 +243,7 @@ MIRROR_KEY_HOME = "mirror/"
 ORIGIN_COMMON = "common-layer"
 ORIGIN_SELF = "self-layer"
 ORIGIN_PROJECT = "project-layer"
-# プロジェクトの `.ccnavi/common/`（共通レイヤーのミラー）。ワークスペースの中では
+# プロジェクトの `.ccnavi/config/common/`（共通レイヤーのミラー）。ワークスペースの中では
 # 判定に読まれないが、守る対象には入る。
 ORIGIN_MIRROR = "mirror-layer"
 
@@ -294,7 +295,7 @@ def layer_script_home(conf: Settings) -> str:
     形は `<ccnavi ディレクトリ>/scripts/` で、"/" 区切り。
     解く基準はそのレイヤーの git プロジェクトルート。
 
-    共通レイヤー（と単体 clone でそれになるミラー）だけは `.ccnavi/common/scripts/`
+    共通レイヤー（と単体 clone でそれになるミラー）だけは `.ccnavi/config/common/scripts/`
     （risk.SCRIPT_HOMES。解く基準は、そのとき共通レイヤーを持つルート）。
     たがいの側は指せない。プロジェクトの `.ccnavi/` はそのプロジェクトだけで閉じる。
     """
@@ -525,7 +526,7 @@ def layer_real_path(conf: Settings, home_root: str, kind: str) -> str:
 
 
 def mirror_real_path(conf: Settings, home_root: str, kind: str) -> str:
-    """プロジェクトの `.ccnavi/common/`（共通レイヤーのミラー）の設定ファイルの場所。"""
+    """プロジェクトの `.ccnavi/config/common/`（共通レイヤーのミラー）の設定ファイルの場所。"""
     home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("/", os.sep)
     return os.path.join(home_root, home, COMMON_DIR, LAYER_FILE_NAMES[kind])
 

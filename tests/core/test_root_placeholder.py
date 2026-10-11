@@ -45,7 +45,9 @@ class WorkspaceRootRealRuleTest(unittest.TestCase):
         self.dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.dir.cleanup)
         self.root = os.path.realpath(self.dir.name)
-        with open(os.path.join(ROOT, ".ccnavi", "common", "rules.yml"), encoding="utf-8") as f:
+        with open(
+            os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml"), encoding="utf-8"
+        ) as f:
             raw = next(r for r in yaml.safe_load(f)["deny"] if r["id"] == "workspace-root")
         rule_set, problems = rules.parse({"version": 1, "deny": [raw]}, self.root)
         self.assertEqual([p for p in problems if p.severity == rules.SEVERITY_ERROR], [])
@@ -78,7 +80,7 @@ class WorkspaceRootRealRuleTest(unittest.TestCase):
             "/README.md",
             "/.claude/settings.json",
             "/.cfoo",
-            "/.ccnavi/common/rules.yml",
+            "/.ccnavi/config/common/rules.yml",
         ]:
             with self.subTest(tail=tail):
                 self.assertTrue(self.hits(tail))
@@ -149,7 +151,7 @@ class RootPlaceholderTest(unittest.TestCase):
             os.path.join(self.root, "README.md"),
             os.path.join(self.root, "src", "ccnavi", "entry", "cli.py"),
             os.path.join(self.root, ".gitignore"),
-            os.path.join(self.root, ".ccnavi", "common", "rules.yml"),
+            os.path.join(self.root, ".ccnavi", "config", "common", "rules.yml"),
             os.path.join(self.root, ".claude", "settings.json"),
             os.path.join(self.root, ".claude", "skills", "x", "SKILL.md"),
         ]
@@ -163,7 +165,9 @@ class RootPlaceholderTest(unittest.TestCase):
             os.path.join(
                 self.root, ".claude", "worktrees", "x", "src", "ccnavi", "entry", "cli.py"
             ),
-            os.path.join(self.root, ".claude", "worktrees", "x", ".ccnavi", "common", "rules.yml"),
+            os.path.join(
+                self.root, ".claude", "worktrees", "x", ".ccnavi", "config", "common", "rules.yml"
+            ),
         ]
         for path in allowed:
             with self.subTest(path=path):

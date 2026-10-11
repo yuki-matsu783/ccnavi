@@ -133,7 +133,7 @@ def fixture_workspace(name: str = "rules.yml") -> str:
     `--rules` は診断でだけ有効なので、見本のルールを指すのには使わない。
     `--root` にここを渡して、共通レイヤーの既定の置き場から読ませる。
 
-    リポジトリ自身をルートにしないので、走った機械の `.ccnavi/common/rules.yml` が
+    リポジトリ自身をルートにしないので、走った機械の `.ccnavi/config/common/rules.yml` が
     判定に入り込まない。
 
     組むのは見本ごとにプロセスで 1 度。中身は読むだけなので使い回してよい。

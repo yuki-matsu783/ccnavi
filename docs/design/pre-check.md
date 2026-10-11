@@ -202,8 +202,8 @@ Bash のコマンドに現れるパスは対象外で、コマンド文字列と
 
 ```
 [ccnavi] DENY_COMMAND_PATTERN (rule: builtin-guard-setting-files)
-subject: env rm -f .ccnavi/common/rules.yml
-`env` が実行する `rm -f .ccnavi/common/rules.yml` に当たりました。
+subject: env rm -f .ccnavi/config/common/rules.yml
+`env` が実行する `rm -f .ccnavi/config/common/rules.yml` に当たりました。
 ガード自身の設定と hook を、…
 ```
 

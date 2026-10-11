@@ -131,11 +131,11 @@ DEPLOY_SCRIPTS = (
     "ccnavi-stage.sh",
     "ccnavi-worktree.sh",
 )
-RULES_PARTS = (".ccnavi", "common", "rules.yml")
+RULES_PARTS = (".ccnavi", "config", "common", "rules.yml")
 # --deploy が配る残りの設定 2 本。リスクの配点は共通レイヤー、
 # フェーズ定義は自身のレイヤー（scope がワークスペースのレイアウトに付くため）。
-RISK_PARTS = (".ccnavi", "common", "risks.yml")
-PHASES_PARTS = (".ccnavi", "config", "phases.yml")
+RISK_PARTS = (".ccnavi", "config", "common", "risks.yml")
+PHASES_PARTS = (".ccnavi", "config", "project", "phases.yml")
 # 置き場は 2 つに分けて固定する（設計 launcher-scripts 1）。hook が起動する振り分けの sh は
 # 代わりに通る sh と同じ .ccnavi/scripts/、機械ごとの組み立ては .ccnavi/bin/<os>-<arch>/。
 BIN_DIR_PARTS = (".ccnavi", "bin")
@@ -353,7 +353,7 @@ class WritesTheExpectedShape(SetupTest):
         self.assertEqual(env["CCNAVI_BIN_PATH"], BIN_PATH)
 
     def test_does_not_write_the_common_layer_paths(self):
-        """共通レイヤーの 3 本は `.ccnavi/common/` 固定なので、env には書かない。
+        """共通レイヤーの 3 本は `.ccnavi/config/common/` 固定なので、env には書かない。
 
         既定と同じ値を書いても動きは変わらないが、読まれない語が設定に残ると、
         そこを直せば置き場が動くと読める。`--all` の一覧にも書かない。
@@ -1115,7 +1115,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             # 設定 3 本のひな形。risk は共通レイヤー、phases は自身のレイヤー。
             with open(os.path.join(src, *RISK_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nlevels: {}\nfactors: []\n")
-            os.makedirs(os.path.join(src, ".ccnavi", "config"))
+            os.makedirs(os.path.join(src, ".ccnavi", "config", "project"))
             with open(os.path.join(src, *PHASES_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nphases: {}\n")
             os.makedirs(os.path.join(src, ".ccnavi", "scripts"))
@@ -1591,7 +1591,7 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
         for wide in (
             "/.ccnavi/",
             "/.ccnavi/bin/",
-            "/.ccnavi/common/",
+            "/.ccnavi/config/common/",
             "/.ccnavi/scripts/",
             f"/{BIN_PATH}",
         ):

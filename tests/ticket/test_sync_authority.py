@@ -879,13 +879,13 @@ class LintTest(AuthorityHarness):
         base = os.path.join(self.state, "sync", "self", "integration")
         write(os.path.join(base, "head"), "branch main\nsha abc\n")
         with open(self.phases, encoding="utf-8") as f:
-            write(os.path.join(base, ".ccnavi", "config", "phases.yml"), f.read())
+            write(os.path.join(base, ".ccnavi", "config", "project", "phases.yml"), f.read())
         with open(self.rules, encoding="utf-8") as f:
-            write(os.path.join(base, ".ccnavi", "common", "rules.yml"), f.read())
+            write(os.path.join(base, ".ccnavi", "config", "common", "rules.yml"), f.read())
         problems = json.loads(self.ccnavi("--lint", "--json").stdout)["problems"]
         drift = [p for p in problems if p["where"] == "(sync/self/integration)"]
         self.assertEqual([], drift)
-        write(os.path.join(base, ".ccnavi", "config", "phases.yml"), "types: {}\n")
+        write(os.path.join(base, ".ccnavi", "config", "project", "phases.yml"), "types: {}\n")
         problems = json.loads(self.ccnavi("--lint", "--json").stdout)["problems"]
         drift = [p for p in problems if p["where"] == "(sync/self/integration)"]
         self.assertEqual(1, len(drift), drift)

@@ -97,13 +97,13 @@ DEPLOY_BIN_DIR="dist/ccnavi"
 # どの機械向けに組み立てたかの目印。build.py が `<os>-<arch>` の 1 行で書く。
 # dist/ccnavi/ の外にあるので、copy_tree が配布先へコピーすることはない。
 DEPLOY_TARGET_FILE="dist/ccnavi.target"
-DEPLOY_RULES=".ccnavi/common/rules.yml"
-# 設定 3 本のひな形。rules と risk は汎用なので共通レイヤー（.ccnavi/common/）へ配る。
+DEPLOY_RULES=".ccnavi/config/common/rules.yml"
+# 設定 3 本のひな形。rules と risk は汎用なので共通レイヤー（.ccnavi/config/common/）へ配る。
 # phases はワークスペースのレイアウト（scope のパス）に依存するので、自身のレイヤー
-# （.ccnavi/config/）へ配る。共通レイヤーに phases を置くと、その scope が
+# （.ccnavi/config/project/）へ配る。共通レイヤーに phases を置くと、その scope が
 # projects/ の下のプロジェクトにも適用されてしまう。
-DEPLOY_RISK=".ccnavi/common/risks.yml"
-DEPLOY_PHASES=".ccnavi/config/phases.yml"
+DEPLOY_RISK=".ccnavi/config/common/risks.yml"
+DEPLOY_PHASES=".ccnavi/config/project/phases.yml"
 DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-common.sh は、3 本の sh が `.` で読み込む共通部分の入口。入口は同じディレクトリの部品
 # ccnavi-common-{state,lock,c1,host,log}.sh を読む。どちらも配らないと、配布先で 3 本とも
@@ -177,8 +177,8 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
                             取り込みは通信する。1 台だけで使い、リモートに合わせる必要が無いときに指定する
 
 CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
-.ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・設定 3 本（.ccnavi/common/rules.yml、
-.ccnavi/common/risks.yml、.ccnavi/config/phases.yml）・代わりに通る sh と振り分けの sh
+.ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・設定 3 本（.ccnavi/config/common/rules.yml、
+.ccnavi/config/common/risks.yml、.ccnavi/config/project/phases.yml）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
 --docs の索引（**/ccnavi-index.jsonl）は、配布先の .gitignore に足す（ccnavi-index.jsonl を否定する
 行があれば足さない）。

@@ -1,7 +1,7 @@
 # フェーズ定義。ユーザが持つ設定で、エージェントは書き換えない。
 #
 # ここは自身のレイヤー（ワークスペース自身のレイヤー）。`scope` のパスはこのワークスペースの
-# レイアウトに従属しているので、共通レイヤー（.ccnavi/common/phases.yml）ではなくこちらに置く。
+# レイアウトに従属しているので、共通レイヤー（.ccnavi/config/common/phases.yml）ではなくこちらに置く。
 # 共通レイヤーに置くと、projects/ の下のプロジェクトにも同じ scope が適用されてしまう。
 #
 # 親チケットの `plan:` に、ここに書いたフェーズ定義の名前を並べ、項に `after: [番号]` で先行を
@@ -56,7 +56,7 @@ phases:
     kind: work
     title: 実装とテスト
     review: mr
-    scope: ["src/*", "tests/*", "build.py", "pyproject.toml", "scripts/*", ".ccnavi/*", ".ccnavi/common/phases.yml", "extensions/*"]
+    scope: ["src/*", "tests/*", "build.py", "pyproject.toml", "scripts/*", ".ccnavi/*", ".ccnavi/config/common/phases.yml", "extensions/*"]
     when: 振る舞いを変えるとき。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
 
   staging:

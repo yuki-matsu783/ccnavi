@@ -495,7 +495,7 @@ def _phases(conf: settings.Settings) -> list[Problem]:
             SEVERITY_ERROR,
             "(phases)",
             f"{conf.phases} は共通レイヤーには置けない。判定に使わず、空として扱っている。"
-            "フェーズ定義は、使うレイヤーの .ccnavi/config/phases.yml に置いてください",
+            "フェーズ定義は、使うレイヤーの .ccnavi/config/project/phases.yml に置いてください",
         )
     ]
 

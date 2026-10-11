@@ -20,9 +20,9 @@ def plan_missing(stderr: TextIO, found: ticket_model.Ticket) -> bool:
     if found.is_child or found.has_plan:
         return False
     where = (
-        f"projects/{found.project}/.ccnavi/config/phases.yml"
+        f"projects/{found.project}/.ccnavi/config/project/phases.yml"
         if found.project
-        else ".ccnavi/config/phases.yml"
+        else ".ccnavi/config/project/phases.yml"
     )
     stderr.write(
         f"ccnavi: 親 {found.ticket} に plan が無いので着手できない（子や子の提案があっても同じ）。"

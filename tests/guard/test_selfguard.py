@@ -78,7 +78,7 @@ class SelfGuardTest(unittest.TestCase):
 
         git(self.repo, "init", "--quiet")
         self.settings = os.path.join(self.repo, ".claude", "settings.json")
-        self.rules = os.path.join(self.repo, ".ccnavi", "common", "rules.yml")
+        self.rules = os.path.join(self.repo, ".ccnavi", "config", "common", "rules.yml")
         write(self.settings, json.dumps(SETTINGS, indent=2) + "\n")
         write(self.rules, json.dumps(RULES))
         git(self.repo, "add", "-A")
@@ -287,7 +287,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_ワークツリーの中のルールファイルも戻る(self):
         work = self.worktree()
-        copy = os.path.join(work, ".ccnavi", "common", "rules.yml")
+        copy = os.path.join(work, ".ccnavi", "config", "common", "rules.yml")
         self.run_hook("PreToolUse")
         write(copy, json.dumps({"version": 1, "deny": []}))
 
@@ -356,7 +356,7 @@ class SelfGuardTest(unittest.TestCase):
         self.worktree()
         projects = os.path.join(self.repo, "projects")
         home = os.path.join(projects, "lib")
-        project = os.path.join(home, ".ccnavi", "config", "rules.yml")
+        project = os.path.join(home, ".ccnavi", "config", "project", "rules.yml")
         write(project, json.dumps(RULES))
 
         layers = [settings.LayerFile(settings.ORIGIN_PROJECT, "lib", "rules", project)]
@@ -368,7 +368,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertFalse(own[0].copy)
         self.assertEqual(
             [t.label for t in found if t.copy],
-            self.own_copies((".ccnavi", "common", "rules.yml")),
+            self.own_copies((".ccnavi", "config", "common", "rules.yml")),
         )
 
     def test_root_の外を指すルールファイルにはワークツリー側が無い(self):
@@ -400,7 +400,7 @@ class SelfGuardTest(unittest.TestCase):
     def test_ルールに書かなくてもシェルからの書き込みは止まる(self):
         # RULES にこの場所を守るルールは 1 件も無い。それでも止まるのが要点で、
         # 止める側もルールファイルの外に置いてあることを確かめている。
-        result = self.run_hook("PreToolUse", command="echo x > .ccnavi/common/rules.yml")
+        result = self.run_hook("PreToolUse", command="echo x > .ccnavi/config/common/rules.yml")
 
         self.assertIn("deny", result.stdout)
         self.assertIn("builtin-guard-setting-files", result.stdout)
@@ -417,7 +417,7 @@ class SelfGuardTest(unittest.TestCase):
                     self.run_hook("PreToolUse", tool=tool, **{field: "README.md"})
                     self.assertEqual(built.call_count, 0)
             built.reset_mock()
-            result = self.run_hook("PreToolUse", command="echo x > .ccnavi/common/rules.yml")
+            result = self.run_hook("PreToolUse", command="echo x > .ccnavi/config/common/rules.yml")
             self.assertEqual(built.call_count, 1)
         self.assertIn("deny", result.stdout)
         self.assertIn("builtin-guard-setting-files", result.stdout)
@@ -432,7 +432,7 @@ class SelfGuardTest(unittest.TestCase):
 
         everything = built(None)
         shell = next(r for r in everything if r.id == selfguard_shell.SHELL_RULE_ID)
-        command = "echo x > .ccnavi/common/rules.yml"
+        command = "echo x > .ccnavi/config/common/rules.yml"
         self.assertTrue(shell.matches("Bash", command))
         self.assertEqual([r.key() for r in built("Bash")], [r.key() for r in everything])
         rest = [r.key() for r in everything if r.id != selfguard_shell.SHELL_RULE_ID]
@@ -446,7 +446,7 @@ class SelfGuardTest(unittest.TestCase):
         # issue #61。保護はパスに当てるので、`cd` で入ると行き先から名前が消える。
         # hook の登録そのもの（.claude/settings.json と .claude/hooks/）にも及んでいた。
         for command in [
-            "cd .ccnavi/common && echo x > rules.yml",
+            "cd .ccnavi/config/common && echo x > rules.yml",
             "cd .ccnavi && echo x > common/rules.yml",
             "cd .claude && echo x > settings.json",
             "cd .claude/hooks && echo x > lint-py.sh",
@@ -458,14 +458,14 @@ class SelfGuardTest(unittest.TestCase):
                 self.assertIn("builtin-guard-setting-files", result.stdout, command)
 
     def test_cd_で入っても読むだけなら通る(self):
-        result = self.run_hook("PreToolUse", command="cd .ccnavi/common && cat rules.yml")
+        result = self.run_hook("PreToolUse", command="cd .ccnavi/config/common && cat rules.yml")
 
         self.assertNotIn("deny", result.stdout)
 
     def test_設定ファイルを読むだけなら通る(self):
         # 場所の名前が出たかどうかでは止めない。ここは読むほうが普通の場所で、
         # 名前で止めると、いちばんガードを直したいときにいちばん強く止まる。
-        result = self.run_hook("PreToolUse", command="cat .ccnavi/common/rules.yml")
+        result = self.run_hook("PreToolUse", command="cat .ccnavi/config/common/rules.yml")
 
         self.assertNotIn("deny", result.stdout)
 
@@ -503,8 +503,8 @@ class SelfGuardTest(unittest.TestCase):
         rules = self.rules_in_shell()
         for command in [
             f"sed -n 1,20p {rules}",
-            "sed -n 1,20p /x/.claude/worktrees/feature-id/.ccnavi/common/rules.yml",
-            "sed -n 1,20p /x/.claude/worktrees/feature-12-improve/.ccnavi/common/rules.yml",
+            "sed -n 1,20p /x/.claude/worktrees/feature-id/.ccnavi/config/common/rules.yml",
+            "sed -n 1,20p /x/.claude/worktrees/feature-12-improve/.ccnavi/config/common/rules.yml",
             f"sed -E -e s/a-i/b/ {rules}",
             f"sed -ne 's/a-i/b/p' {rules}",
         ]:
@@ -515,7 +515,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_disable_なら止める側も足さない(self):
         result = self.run_hook(
-            "PreToolUse", setting="disable", command="echo x > .ccnavi/common/rules.yml"
+            "PreToolUse", setting="disable", command="echo x > .ccnavi/config/common/rules.yml"
         )
 
         self.assertNotIn("builtin-guard-setting-files", result.stdout)
@@ -632,10 +632,10 @@ class SelfGuardTest(unittest.TestCase):
     def test_空白を含むパスへのリダイレクトも止まる(self):
         # 行き先の引用が空白を含むと、語の中の目印で行き先が途切れて穴になっていた。
         for command in [
-            'echo x > "projects/has space/.ccnavi/config/rules.yml"',
-            'echo x > "a b/.ccnavi/common/rules.yml"',
-            'echo x >> "a b/.ccnavi/common/rules.yml"',
-            'echo x >"a b/.ccnavi/common/rules.yml"',
+            'echo x > "projects/has space/.ccnavi/config/project/rules.yml"',
+            'echo x > "a b/.ccnavi/config/common/rules.yml"',
+            'echo x >> "a b/.ccnavi/config/common/rules.yml"',
+            'echo x >"a b/.ccnavi/config/common/rules.yml"',
         ]:
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", command=command)
@@ -652,7 +652,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_空白なしのリダイレクトは止まったまま(self):
         for command in [
-            "echo x > .ccnavi/common/rules.yml",
+            "echo x > .ccnavi/config/common/rules.yml",
             f"echo x > {self.rules_in_shell()}",
         ]:
             with self.subTest(command=command):
@@ -663,9 +663,9 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_引用の中の大なりは空白があっても書き込みではない(self):
         for command in [
-            'echo "a > .ccnavi/common/rules.yml"',
-            'echo ">  .ccnavi/common/rules.yml"',
-            'echo "x y > .ccnavi/common/rules.yml"',
+            'echo "a > .ccnavi/config/common/rules.yml"',
+            'echo ">  .ccnavi/config/common/rules.yml"',
+            'echo "x y > .ccnavi/config/common/rules.yml"',
         ]:
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", command=command)
@@ -676,10 +676,10 @@ class SelfGuardTest(unittest.TestCase):
         # 引用の中の空白の連続と、空白に隣り合う演算子の文字は、語の中の目印が 2 つ続く形になる。
         # 目印 1 つずつしか通さない式では、この形が穴になっていた。
         for command in [
-            'echo x > "projects/New folder (2)/.ccnavi/common/rules.yml"',
-            'echo x > "projects/has  space/.ccnavi/config/rules.yml"',
-            'echo x > "projects/R & D/.ccnavi/config/rules.yml"',
-            'echo x > "a; b/.ccnavi/common/rules.yml"',
+            'echo x > "projects/New folder (2)/.ccnavi/config/common/rules.yml"',
+            'echo x > "projects/has  space/.ccnavi/config/project/rules.yml"',
+            'echo x > "projects/R & D/.ccnavi/config/project/rules.yml"',
+            'echo x > "a; b/.ccnavi/config/common/rules.yml"',
         ]:
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", command=command)
@@ -689,17 +689,17 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_空白を含む行き先のほかの書き方も止まったまま(self):
         for command in [
-            'echo x > "a(1)/.ccnavi/common/rules.yml"',
-            'echo x > "R&D/.ccnavi/common/rules.yml"',
-            'echo x > "a b /.ccnavi/common/rules.yml"',
+            'echo x > "a(1)/.ccnavi/config/common/rules.yml"',
+            'echo x > "R&D/.ccnavi/config/common/rules.yml"',
+            'echo x > "a b /.ccnavi/config/common/rules.yml"',
             'echo x > "C:\\my dir\\.ccnavi\\common\\rules.yml"',
-            'echo x >| "a b/.ccnavi/common/rules.yml"',
-            'echo x &> "a b/.ccnavi/common/rules.yml"',
-            'echo x 2> "a b/.ccnavi/common/rules.yml"',
-            'echo x >& "a b/.ccnavi/common/rules.yml"',
-            "echo x > a\\ b/.ccnavi/common/rules.yml",
-            'echo x > "a\tb/.ccnavi/common/rules.yml"',
-            'cat <<EOF > "a b/.ccnavi/common/rules.yml"\nx\nEOF',
+            'echo x >| "a b/.ccnavi/config/common/rules.yml"',
+            'echo x &> "a b/.ccnavi/config/common/rules.yml"',
+            'echo x 2> "a b/.ccnavi/config/common/rules.yml"',
+            'echo x >& "a b/.ccnavi/config/common/rules.yml"',
+            "echo x > a\\ b/.ccnavi/config/common/rules.yml",
+            'echo x > "a\tb/.ccnavi/config/common/rules.yml"',
+            'cat <<EOF > "a b/.ccnavi/config/common/rules.yml"\nx\nEOF',
         ]:
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", command=command)
@@ -709,10 +709,10 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_引用の中の大なりは目印が続いても書き込みではない(self):
         for command in [
-            'echo "a >b c/.ccnavi/common/rules.yml"',
-            'echo "a  >  b/.ccnavi/common/rules.yml"',
-            'echo "1>2" .ccnavi/common/rules.yml',
-            'grep -n "regex: (>" .ccnavi/common/rules.yml',
+            'echo "a >b c/.ccnavi/config/common/rules.yml"',
+            'echo "a  >  b/.ccnavi/config/common/rules.yml"',
+            'echo "1>2" .ccnavi/config/common/rules.yml',
+            'grep -n "regex: (>" .ccnavi/config/common/rules.yml',
             'echo x > "a b" .ccnavi/scripts/count.sh',
             # 行き先の語は目印で終わらない。引用の中の空白のあとに保護対象の名前が続いても、
             # 行き先は `a .ccnavi` という別のディレクトリの下で、保護対象ではない。
@@ -744,7 +744,9 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_大なりを長く並べても後ろの書き込みは止まる(self):
         n = 500
-        command = "echo x " + ">" * n + '"' + "a " * n + '"\necho x > .ccnavi/common/rules.yml'
+        command = (
+            "echo x " + ">" * n + '"' + "a " * n + '"\necho x > .ccnavi/config/common/rules.yml'
+        )
 
         result = self.run_hook("PreToolUse", command=command)
 
@@ -784,7 +786,7 @@ class SelfGuardTest(unittest.TestCase):
     def test_上限ちょうどの大なりなら生の文字列にも保護を当てる(self):
         # 閉じない引用で縮退させ、生の文字列に当てる。`>` は保護対象への 1 個と合わせて 50 個。
         command = (
-            "echo x > .ccnavi/common/rules.yml; echo "
+            "echo x > .ccnavi/config/common/rules.yml; echo "
             + ">a" * (selfguard_shell.REDIRECT_LIMIT - 1)
             + ' "'
         )
@@ -813,7 +815,7 @@ class SelfGuardTest(unittest.TestCase):
         command = (
             "echo "
             + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
-            + '; echo x > .ccnavi/common/rules.yml; echo "'
+            + '; echo x > .ccnavi/config/common/rules.yml; echo "'
         )
         self.assertTrue(shellread.read(command).degraded)
 
@@ -831,7 +833,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_読み解けた形には上限を掛けない(self):
         many = ">a" * (selfguard_shell.REDIRECT_LIMIT + 10)
-        protected = f"echo {many}; echo x > .ccnavi/common/rules.yml"
+        protected = f"echo {many}; echo x > .ccnavi/config/common/rules.yml"
         harmless = f"echo {many}"
         for command in (protected, harmless):
             self.assertFalse(shellread.read(command).degraded)
@@ -849,7 +851,7 @@ class SelfGuardTest(unittest.TestCase):
         protected = (
             "echo "
             + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
-            + '; echo x > .ccnavi/common/rules.yml; echo "'
+            + '; echo x > .ccnavi/config/common/rules.yml; echo "'
         )
         unrelated = 'echo "' + ">a" * (selfguard_shell.REDIRECT_LIMIT + 1)
         for mode in self.MODES:
@@ -938,7 +940,7 @@ class SelfGuardTest(unittest.TestCase):
             {"id": "askme", "match": "Bash", "regex": "askme", "message": "ask the user."}
         ]
         write(self.rules, json.dumps(rules_data))
-        self.run_hook("PreToolUse", command="echo x > .ccnavi/common/rules.yml")
+        self.run_hook("PreToolUse", command="echo x > .ccnavi/config/common/rules.yml")
         builtin_deny = self.records()[-1]
         self.assertEqual(builtin_deny["rules"], ["builtin-guard-setting-files"])
 
@@ -955,12 +957,13 @@ class SelfGuardTest(unittest.TestCase):
         # `grep -n "<<"` で縮退させる。この縮退は読みを止めても実行役の中身（レイヤー）を作るので、
         # 生の文字列の経路に入りつつ、`sudo` が実行する `tee` がレイヤーに出る。上限で外すのは
         # 生の文字列への照合だけで、レイヤーには保護をそのまま当てる。
-        command = 'grep -n "<<" f; sudo tee .ccnavi/common/rules.yml </dev/null; echo' + " >a" * (
-            selfguard_shell.REDIRECT_LIMIT + 1
+        command = (
+            'grep -n "<<" f; sudo tee .ccnavi/config/common/rules.yml </dev/null; echo'
+            + " >a" * (selfguard_shell.REDIRECT_LIMIT + 1)
         )
         reading = shellread.read(command)
         self.assertTrue(reading.degraded)
-        self.assertIn("tee .ccnavi/common/rules.yml", reading.unwrapped)
+        self.assertIn("tee .ccnavi/config/common/rules.yml", reading.unwrapped)
         self.assertGreater(command.count(">"), selfguard_shell.REDIRECT_LIMIT)
 
         decision, reason = self.verdict(self.run_hook("PreToolUse", command=command))

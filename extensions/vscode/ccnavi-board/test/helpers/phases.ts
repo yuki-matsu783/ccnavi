@@ -87,7 +87,7 @@ export function phasesHtml(data: PhasesData, options: Partial<RenderOptions> = {
 export function page(overrides: Partial<PhasesPage> = {}): PhasesPage {
   return {
     root: "/ws",
-    phasesPath: ".ccnavi/config/phases.yml",
+    phasesPath: ".ccnavi/config/project/phases.yml",
     exists: true,
     model: readPhases(SAMPLE_PHASES_TEXT).model,
     lock: { locked: false, reason: "", doing: [] },

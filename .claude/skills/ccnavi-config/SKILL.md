@@ -1,7 +1,7 @@
 ---
 name: ccnavi-config
 description: >-
-  ccnavi の設定 3 本（rules.yml・risks.yml は .ccnavi/common/ と config/、phases.yml は config/）を書く・足す・直す・
+  ccnavi の設定 3 本（rules.yml・risks.yml は .ccnavi/config/common/ と config/project/、phases.yml は config/project/）を書く・足す・直す・
   確かめる。ルールを足したい、フェーズ定義やリスクの配点を変えたい、書いた設定が
   意図どおりに効いているか疑わしい、`/ccnavi-config` と打たれた、のどれでも使う。
   足すときは下書きを検証してからユーザに渡し、確かめるときは lint と期待する判定を回して
@@ -18,13 +18,13 @@ ccnavi の判定と進め方は 3 本のファイルで決まる。どれもユ�
 | `phases.yml` | フェーズ定義（config にだけ置く）。親の `plan:` に並べる名前と、その範囲・レビュー・成果物。順序は持たない（親の計画の項の `after` で書く） | 計画の無い親だけが使える（番号だけのフェーズ）。計画を持つ親は承認できない |
 | `risks.yml` | 子を閉じるときに差分を数える配点。HIGH 以上はレビューが済むまで止まる | 組み込みの配点（定量 4 項目） |
 
-置けるレイヤーは 3 つで、置き場はどれも固定。共通レイヤーは `.ccnavi/common/`、自身のレイヤーはワークスペースの
-`.ccnavi/config/`、プロジェクトのレイヤーは `projects/<名前>/.ccnavi/config/`。`rules.yml` と `risks.yml` は共通レイヤーと
+置けるレイヤーは 3 つで、置き場はどれも固定。共通レイヤーは `.ccnavi/config/common/`、自身のレイヤーはワークスペースの
+`.ccnavi/config/project/`、プロジェクトのレイヤーは `projects/<名前>/.ccnavi/config/project/`。`rules.yml` と `risks.yml` は共通レイヤーと
 config のどちらにも置け、判定には、共通レイヤーにその判定に関わるレイヤーを足したものを使う。足すだけで、上書きも取り消しもしない。
 `phases.yml` は config にだけ置き、親チケットの `project:` が指す 1 本で決まる（足し算はしない）。共通レイヤーに `phases.yml` があると error。
 `phases.yml` を読むのは提案の承認の検査と `--plan-order <親> --fill-phases`（写しを差し込む）と `--lint` だけで、承認のあとの判定は
 親チケットに写した定義（`phases:`）を読む。直しても進行中の親には届かない。
-共通レイヤーは、親の着手でプロジェクトの `.ccnavi/common/` へミラーされる（プロジェクトの `config/` には触れない）。
+共通レイヤーは、親の着手でプロジェクトの `.ccnavi/config/common/` へミラーされる（プロジェクトの `config/` には触れない）。
 どのレイヤーを足すかは操作で決まる。
 
 - `rules.yml`: パスを持つツールは行き先のレイヤー、パスを持たないツールは自身のレイヤーと全プロジェクトのレイヤー
@@ -79,4 +79,4 @@ ccnavi --explain --log "" --state ""
 - `--rules` / `--phases` / `--risk` で下書きを差し替えられる
 
 `--test` に禁止語を書かない（`ccnavi --test Bash "git push"` はその Bash 自体が `raw-git` に当たる）。
-単発で試したいものも期待のファイルを `wip/scratchpad/` に書いて `--test-expectations` で回す。その形は `.ccnavi/common/rule-expectations.yml` の先頭のコメントにある。
+単発で試したいものも期待のファイルを `wip/scratchpad/` に書いて `--test-expectations` で回す。その形は `.ccnavi/config/common/rule-expectations.yml` の先頭のコメントにある。

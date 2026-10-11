@@ -7,9 +7,9 @@
  * `retainContextWhenHidden` が真で、入れ物（HTML）は 1 度しか入らない。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存が通った）。
  *
- * 対象は 2 種。ワークスペースの設定の定義（既定 `.ccnavi/config/phases.yml`）と、
- * プロジェクト 1 つの設定の定義（既定 `projects/<名前>/.ccnavi/config/phases.yml`）。フェーズ定義は config にだけ置き、
- * 共通の設定（`.ccnavi/common/phases.yml`）には置けない。使われるのは親チケットの `project:` が指す 1 本だけで、足し算はしない。
+ * 対象は 2 種。ワークスペースの設定の定義（既定 `.ccnavi/config/project/phases.yml`）と、
+ * プロジェクト 1 つの設定の定義（既定 `projects/<名前>/.ccnavi/config/project/phases.yml`）。フェーズ定義は config にだけ置き、
+ * 共通の設定（`.ccnavi/config/common/phases.yml`）には置けない。使われるのは親チケットの `project:` が指す 1 本だけで、足し算はしない。
  * タブは 1 枚だけで、別の対象を開くとそのタブの中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[].phases_file`）を使い、拡張は組まない。
  *
@@ -52,7 +52,7 @@ import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 120;
-const DEFAULT_PHASES = ".ccnavi/config/phases.yml";
+const DEFAULT_PHASES = ".ccnavi/config/project/phases.yml";
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "phases";
 /** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */

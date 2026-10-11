@@ -30,7 +30,7 @@ class StartPlanTest(PhaseHarness):
         started = self.ccnavi("ticket", "start", "i0001")
         self.assertEqual(started.returncode, 1, started.stdout)
         self.assertIn("plan が無いので着手できない", started.stderr)
-        self.assertIn(".ccnavi/config/phases.yml", started.stderr)
+        self.assertIn(".ccnavi/config/project/phases.yml", started.stderr)
         self.assertIn("work を 1 つ", started.stderr)
         self.assertIn("書くのはユーザ", started.stderr)
         # 着手の欄は書かれない

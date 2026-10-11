@@ -95,7 +95,7 @@ keywords: [置き場, 環境変数, CCNAVI_PROJECTS, CCNAVI_PROJECT_HOME, CCNAVI
 - `.gitignore` に `/projects/` を足せない（足すとソースが追跡から外れる）ので、
   「無視されていない」の警告が消えない
 - `projects/` の下で `.git` を持つもの（サブモジュールなど）がプロジェクトとして数えられ、
-  その中の `.ccnavi/config/` がレイヤーとして読まれる
+  その中の `.ccnavi/config/project/` がレイヤーとして読まれる
 
 **知らせる場所は 3 つ。**
 

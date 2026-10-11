@@ -14,7 +14,7 @@ function sum(name: string, rules: unknown[], extra: Record<string, unknown> = {}
   return {
     name,
     layers: ["common", name],
-    rules: { path: name === "self" ? ".ccnavi/config/rules.yml" : `projects/${name}/.ccnavi/config/rules.yml`, unreadable: "", missing: false, deny: of("deny"), ask: of("ask"), allow: of("allow") },
+    rules: { path: name === "self" ? ".ccnavi/config/project/rules.yml" : `projects/${name}/.ccnavi/config/project/rules.yml`, unreadable: "", missing: false, deny: of("deny"), ask: of("ask"), allow: of("allow") },
     risk: {
       levels: { medium: 20, high: 40, critical: name === "self" ? 70 : 50 },
       factors:

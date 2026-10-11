@@ -30,7 +30,7 @@ function judged(rules: readonly RuleHitJson[]): { type: string; result: TestJson
   const result: TestJson = {
     version: 1,
     root: "/ws",
-    rules_path: ".ccnavi/common/rules.yml",
+    rules_path: ".ccnavi/config/common/rules.yml",
     known: true,
     tool: "Bash",
     subject: "x",
@@ -338,7 +338,7 @@ test("CB-D124 「記録から候補を出す」は suggest を送り、届いた
       count: 6,
       summary: "ルールを足す候補",
       layer: "common",
-      rules_path: "/ws/.ccnavi/common/rules.yml",
+      rules_path: "/ws/.ccnavi/config/common/rules.yml",
       expectations: [],
       yaml: "# ルールを足す候補\nrules:\n  ask: []\n",
     };
@@ -543,12 +543,12 @@ test("CB-T71 match の候補と判定の試し打ちは、権限ルールの名�
 });
 
 test("CB-T112 ルール管理画面は注意を上部に出し、無ければ出さない", async () => {
-  const dom = await openRules({ rulesPath: "projects/lib/.ccnavi/config/rules.yml", notices: ["実行ファイルはこのファイルを読めない: <理由>"] });
+  const dom = await openRules({ rulesPath: "projects/lib/.ccnavi/config/project/rules.yml", notices: ["実行ファイルはこのファイルを読めない: <理由>"] });
   try {
     const warned = dom.all(".banner.warn:not(.hidden)").map((banner) => banner.textContent ?? "");
     assert.deepEqual(warned, ["実行ファイルはこのファイルを読めない: <理由>"]);
     assert.equal(dom.all(".banner.warn script").length, 0, "文面から要素は生えない");
-    assert.equal(dom.one(".toolbar .path").textContent, "projects/lib/.ccnavi/config/rules.yml");
+    assert.equal(dom.one(".toolbar .path").textContent, "projects/lib/.ccnavi/config/project/rules.yml");
   } finally {
     await dom.close();
   }
@@ -625,7 +625,7 @@ test("CB-D83 未保存の変更の有無は変わったときだけ拡張ホス�
       [true, false],
       "編集を捨てたことも伝える",
     );
-    await dom.send({ type: "data", data: { kind: "page", page: page({ rulesPath: "projects/web/.ccnavi/config/rules.yml" }) } });
+    await dom.send({ type: "data", data: { kind: "page", page: page({ rulesPath: "projects/web/.ccnavi/config/project/rules.yml" }) } });
     assert.equal(dom.all("#ccnavi-loading").length, 0);
     assert.equal(dom.all(".rule").length, 3);
     // 前の対象のルールで出した判定は、切り替え先の結果として残さない

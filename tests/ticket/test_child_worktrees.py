@@ -50,9 +50,7 @@ class ChildWorktreesTest(unittest.TestCase):
         self.assertEqual(plan[0]["state"], worktrees.CHILD_NO_PARENT)
 
     def test_parents_are_not_planned(self):
-        plan = worktrees.child_worktrees(
-            self.root, [ticket_model.Ticket(ticket="i1", parent="")]
-        )
+        plan = worktrees.child_worktrees(self.root, [ticket_model.Ticket(ticket="i1", parent="")])
         self.assertEqual(plan, [])
 
 

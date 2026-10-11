@@ -173,10 +173,10 @@ test("CB-D61 ファイルが外で変わったら帯を出し、届いた中身�
     assert.ok(!dom.one("#changed").classList.contains("hidden"));
     assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).value, "調べる", "帯が出ても編集は消さない");
     // 再読込が通ったら、その中身で描き直す
-    await dom.send({ type: "data", data: { kind: "page", page: page({ phasesPath: ".ccnavi/config/phases.yml" }) } });
+    await dom.send({ type: "data", data: { kind: "page", page: page({ phasesPath: ".ccnavi/config/project/phases.yml" }) } });
     assert.ok(dom.one("#changed").classList.contains("hidden"));
     assert.ok(dom.one("#dirty").classList.contains("hidden"));
-    assert.equal(dom.one(".path").textContent, ".ccnavi/config/phases.yml");
+    assert.equal(dom.one(".path").textContent, ".ccnavi/config/project/phases.yml");
     assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p6")} input.f-title`).value, "調査");
   } finally {
     await dom.close();

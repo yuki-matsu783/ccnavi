@@ -1,9 +1,9 @@
-"""着手の前に共通レイヤーをプロジェクトの `.ccnavi/common/` へミラーする。
+"""着手の前に共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーする。
 
-共通レイヤー（ワークスペースルートの `.ccnavi/common/`）はワークスペースの git にあり、
+共通レイヤー（ワークスペースルートの `.ccnavi/config/common/`）はワークスペースの git にあり、
 プロジェクトだけを clone したユーザからは見えない。プロジェクト向けの親の `ticket start` で、
-共通レイヤーの中身を、親のワークツリーにあるプロジェクトの `.ccnavi/common/` へ写す。
-プロジェクトの `.ccnavi/config/` には触れない。
+共通レイヤーの中身を、親のワークツリーにあるプロジェクトの `.ccnavi/config/common/` へ写す。
+プロジェクトの `.ccnavi/config/project/` には触れない。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。共通レイヤーは
 rules / risks の 2 本（と、期待とスクリプト）を持ち、lib の config は 3 本とも別の中身を持つ。
@@ -17,7 +17,8 @@ app は `.ccnavi/` を持たない。
 3. 写せない形（読めない・phases.yml がある・リンク・書き込みの失敗）では何も写さず、着手しない。
    上書きの記録・知らせ・閉じるのを止める処理は無い
 4. ミラーの書き込みを、実行後チェックとバックアップと復元が戻さず、報告もしない。条件は 3 つ
-   （承認済みの親のワークツリーの `.ccnavi/common/`・途中にリンクが無い・内容が共通レイヤーと同一）
+   （承認済みの親のワークツリーの
+   `.ccnavi/config/common/`・途中にリンクが無い・内容が共通レイヤーと同一）
 5. 条件を外れるもの（config、中身の違うミラー、他のワークツリー、リンク）は今までどおり扱う
 """
 
@@ -48,18 +49,18 @@ SCOPE = ("src/*",)
 
 COMMON_SCRIPT_RISK = (
     COMMON_RISK
-    + "  - {id: counted, points: 5, script: .ccnavi/common/scripts/count.sh, message: 数えた}\n"
+    + "  - {id: counted, points: 5, script: .ccnavi/config/common/scripts/count.sh, message: 数えた}\n"  # noqa: E501
 )
 COUNT_SH = "printf '{\"points\": 1}'\n"
 EXPECTATIONS = "version: 1\nexpectations: []\n"
 
 
 def mirror_of(tree_root, name):
-    return os.path.join(tree_root, ".ccnavi", "common", *name.split("/"))
+    return os.path.join(tree_root, ".ccnavi", "config", "common", *name.split("/"))
 
 
 def config_of(tree_root, kind):
-    return os.path.join(tree_root, ".ccnavi", "config", settings.LAYER_FILE_NAMES[kind])
+    return os.path.join(tree_root, ".ccnavi", "config", "project", settings.LAYER_FILE_NAMES[kind])
 
 
 class ConfigMirrorTest(ConfigUnionHarness):
@@ -89,11 +90,15 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
     def add_script(self):
         write(self.risk, COMMON_SCRIPT_RISK)
-        write(os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh"), COUNT_SH)
+        write(os.path.join(self.ws, ".ccnavi", "config", "common", "scripts", "count.sh"), COUNT_SH)
 
     def test_parent_start_mirrors_the_common_layer_and_leaves_config_alone(self):
-        """1: 共通レイヤーの中身を親のワークツリーの `.ccnavi/common/` へ写す。config は触らない"""
-        write(os.path.join(self.ws, ".ccnavi", "common", "rule-expectations.yml"), EXPECTATIONS)
+        """1: 共通レイヤーの中身を親のワークツリーの `.ccnavi/config/common/` へ写す。config
+        は触らない"""
+        write(
+            os.path.join(self.ws, ".ccnavi", "config", "common", "rule-expectations.yml"),
+            EXPECTATIONS,
+        )
         config_before = {k: read(config_of(self.lib, k)) for k in ("rules", "phases", "risk")}
 
         tree, started = self.start_parent()
@@ -107,7 +112,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         # 元リポジトリのミラーは触らない（親のブランチに乗って届く）。
         self.assertFalse(os.path.exists(mirror_of(self.lib, "rules.yml")))
         self.assertIn("ミラー", started.stdout)
-        self.assertIn(".ccnavi/common/rules.yml", started.stdout)
+        self.assertIn(".ccnavi/config/common/rules.yml", started.stdout)
         # 上書きの記録は置かない。
         marks = self.approved_path("phases", "i0001", "config-sync.json", project="lib")
         self.assertFalse(os.path.exists(marks))
@@ -134,9 +139,9 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         listed = read(target).splitlines()
         for rel in (
-            ".ccnavi/common/rules.yml",
-            ".ccnavi/common/risks.yml",
-            ".ccnavi/common/scripts/count.sh",
+            ".ccnavi/config/common/rules.yml",
+            ".ccnavi/config/common/risks.yml",
+            ".ccnavi/config/common/scripts/count.sh",
         ):
             self.assertIn(rel, listed)
         self.assertNotIn("置き場の外", started.stderr)
@@ -149,8 +154,10 @@ class ConfigMirrorTest(ConfigUnionHarness):
         tree, started = self.start_parent()
 
         self.assertEqual(read(mirror_of(tree, "scripts/count.sh")), COUNT_SH)
-        self.assertIn("script: .ccnavi/common/scripts/count.sh", read(mirror_of(tree, "risks.yml")))
-        self.assertIn(".ccnavi/common/scripts/count.sh", started.stdout)
+        self.assertIn(
+            "script: .ccnavi/config/common/scripts/count.sh", read(mirror_of(tree, "risks.yml"))
+        )
+        self.assertIn(".ccnavi/config/common/scripts/count.sh", started.stdout)
         self.assertTrue(
             configsync.is_synced_write(conf, self.ws, mirror_of(tree, "scripts/count.sh"))
         )
@@ -161,7 +168,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         write(
             self.risk,
             COMMON_SCRIPT_RISK
-            + "  - {id: again, points: 2, script: .ccnavi/common/scripts/count.sh,"
+            + "  - {id: again, points: 2, script: .ccnavi/config/common/scripts/count.sh,"
             " message: もう一度}\n",
         )
         self.propose(
@@ -174,7 +181,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         self.assertEqual(why, "")
         rels = [c.rel for c in changes]
-        self.assertEqual(rels.count(".ccnavi/common/scripts/count.sh"), 1, rels)
+        self.assertEqual(rels.count(".ccnavi/config/common/scripts/count.sh"), 1, rels)
 
     def test_files_gone_from_the_common_layer_are_removed_from_the_mirror(self):
         """1: 共通レイヤーから無くなったファイルは、ミラーからも消す。config は消さない。"""
@@ -213,7 +220,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
     def test_a_missing_or_empty_common_layer_leaves_the_mirror_alone(self):
         """1: 共通レイヤーが無い（空）なら配らず、ミラーを消さない。着手は止めない。"""
-        common = os.path.join(self.ws, ".ccnavi", "common")
+        common = os.path.join(self.ws, ".ccnavi", "config", "common")
         for name in os.listdir(common):
             os.remove(os.path.join(common, name))
         write(mirror_of(self.lib, "rules.yml"), json.dumps(COMMON_RULES))
@@ -232,8 +239,8 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         self.assertNotIn("ミラー", started.stdout)
         self.assertEqual(
-            sorted(os.listdir(os.path.join(tree, ".ccnavi", "common"))),
-            sorted(os.listdir(os.path.join(self.ws, ".ccnavi", "common"))),
+            sorted(os.listdir(os.path.join(tree, ".ccnavi", "config", "common"))),
+            sorted(os.listdir(os.path.join(self.ws, ".ccnavi", "config", "common"))),
         )
 
     def test_child_start_does_not_mirror(self):
@@ -393,7 +400,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         elsewhere = os.path.join(os.path.dirname(tree), "elsewhere")
         os.makedirs(elsewhere)
         os.makedirs(os.path.join(tree, ".ccnavi"), exist_ok=True)
-        self.symlink_or_skip(elsewhere, os.path.join(tree, ".ccnavi", "common"))
+        self.symlink_or_skip(elsewhere, os.path.join(tree, ".ccnavi", "config", "common"))
 
         started = self.ccnavi("ticket", "start", "i0001")
 
@@ -431,12 +438,12 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertEqual(len(ordered), len(changes))
 
     def test_post_monitor_does_not_report_the_mirror(self):
-        """4: 範囲の外（`.ccnavi/common/`）への書き込みでも、ミラーした分は報告しない。"""
+        """4: 範囲の外（`.ccnavi/config/common/`）への書き込みでも、ミラーした分は報告しない。"""
         tree, _ = self.start_parent()
 
         said = self.hook("Bash", tree, event="PostToolUse", command="ls")
 
-        self.assertNotIn(".ccnavi/common", said.stdout + said.stderr)
+        self.assertNotIn(".ccnavi/config/common", said.stdout + said.stderr)
 
     def test_post_monitor_reports_an_edit_after_the_mirror(self):
         """5: ミラーの後に手を入れて共通レイヤーと違う中身にしたものは、今までどおり報告する。"""
@@ -590,7 +597,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         stopped = self.hook("", self.ws, event="Stop")
 
-        self.assertIn(".ccnavi/common/rules.yml", self.system_message(stopped))
+        self.assertIn(".ccnavi/config/common/rules.yml", self.system_message(stopped))
 
     def test_the_mirror_commit_itself_is_not_reported_at_the_end_of_the_turn(self):
         """4: ミラーした分をコミットしても、ターンの終わりに違反として並ばない。"""
@@ -601,12 +608,12 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         stopped = self.hook("", self.ws, event="Stop")
 
-        self.assertNotIn(".ccnavi/common", self.system_message(stopped))
+        self.assertNotIn(".ccnavi/config/common", self.system_message(stopped))
 
     def test_a_non_utf8_script_is_not_reported_after_it_is_committed(self):
         """4: コミット分はバイト列のまま比べる。UTF-8 でないスクリプトもミラーした分に数える。"""
         write(self.risk, COMMON_SCRIPT_RISK)
-        script = os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh")
+        script = os.path.join(self.ws, ".ccnavi", "config", "common", "scripts", "count.sh")
         os.makedirs(os.path.dirname(script), exist_ok=True)
         with open(script, "wb") as f:
             f.write(b"# \x82\xa0\rprintf 1\n")
@@ -626,7 +633,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         """
         self.add_script()
         tree, _ = self.start_parent()
-        for rel in (".ccnavi/common/risks.yml", ".ccnavi/common/scripts/count.sh"):
+        for rel in (".ccnavi/config/common/risks.yml", ".ccnavi/config/common/scripts/count.sh"):
             write(
                 os.path.join(self.lib, *rel.split("/")), read(os.path.join(tree, *rel.split("/")))
             )
@@ -643,10 +650,10 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         warns = self.problems("warn")
 
-        self.assertFalse([p for p in warns if ".ccnavi/common" in p["detail"]], warns)
+        self.assertFalse([p for p in warns if ".ccnavi/config/common" in p["detail"]], warns)
 
     def test_the_mirror_in_the_original_project_is_restored(self):
-        """元のプロジェクトの `.ccnavi/common/` のミラーも、守る対象（書き換えは戻す）。"""
+        """元のプロジェクトの `.ccnavi/config/common/` のミラーも、守る対象（書き換えは戻す）。"""
         mirror = mirror_of(self.lib, "rules.yml")
         write(mirror, json.dumps(COMMON_RULES))
         git(self.lib, "add", "-A")

@@ -28,7 +28,7 @@ function answer(problems: readonly { severity: string; where: string; detail: st
       ...(flow === ABSENT ? {} : { flow }),
       version: 1,
       root: "/ws",
-      rules: "/ws/.ccnavi/common/rules.yml",
+      rules: "/ws/.ccnavi/config/common/rules.yml",
       mode: "enable",
       ticket_control: "enable",
       projects: [],

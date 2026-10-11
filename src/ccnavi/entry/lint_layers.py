@@ -31,7 +31,7 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
     """レイヤーに食い違いが無いか。
 
     見るのは 2 つ。レイヤーのファイルが読めることと、レイヤーをまたいだ重複と同名の衝突。
-    `.ccnavi/config/` が無いことは言わない。
+    `.ccnavi/config/project/` が無いことは言わない。
     無いのは正常（無いレイヤー = 空）で、言うと本当に言うべきものが埋もれる。
 
     共通レイヤーは `_rules` が別に見ているので、ここではレイヤーの 2 つ目以降だけを回す。
@@ -79,7 +79,7 @@ def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
     全欄一致で捨てた重複を info で言う。共通レイヤー自身の苦情は `_phases` / `_risk` が
     別に言うので、ここではレイヤーの側だけを数える。
 
-    `.ccnavi/config/` が無いことは言わない。無いのは正常（無いレイヤー = 空）。
+    `.ccnavi/config/project/` が無いことは言わない。無いのは正常（無いレイヤー = 空）。
     """
     problems: list[Problem] = []
     names = [ruleload.LAYER_SELF]
@@ -125,7 +125,7 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
             if os.path.exists(os.path.join(origin, home, rel.replace("/", os.sep))):
                 continue
             if work.project and rel.startswith(f"{settings.COMMON_DIR}/"):
-                # プロジェクトのワークツリーの `.ccnavi/common/` は、親の着手がミラーした
+                # プロジェクトのワークツリーの `.ccnavi/config/common/` は、親の着手がミラーした
                 # 共通レイヤー。ワークスペースの中では読まれないので、言わない。
                 continue
             where = os.path.normcase(
@@ -263,7 +263,7 @@ def _layer_files(conf: settings.Settings, home_rel: str) -> list[tuple[str, str]
 
 
 def _common_rel(kind: str) -> str:
-    return f".ccnavi/common/{settings.LAYER_FILE_NAMES[kind]}"
+    return f".ccnavi/config/common/{settings.LAYER_FILE_NAMES[kind]}"
 
 
 def _same_text(a: bytes | None, b: bytes | None) -> bool:

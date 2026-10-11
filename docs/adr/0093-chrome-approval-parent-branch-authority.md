@@ -198,7 +198,7 @@ REQ-APV-14 の案内（`ticket.py:1163-1179`）に「push してから依頼す�
 - **リモート（Chrome 拡張）**: ホストにブランチ `P` がある。`origin/P` の中身を本物とする。統合先は上の名前のブランチの先頭
 - **手元（hook・lint・ボード・コマンド）**: `.claude/worktrees/P` があり、その HEAD がブランチ `P` を指している。中身は「最後に取り込んだ `origin/P` + 手元の作業」
 - **手元の統合先**（D26）: 最後に取り込んだ `origin/<統合先>` を優先する。`ccnavi-sync.sh` と C1 が取り込むたびに、
-  その先頭から判定に要るもの（`.ccnavi/approved/done/` の一覧と中身、`.ccnavi/common/` のレイヤー、自身の `.ccnavi/config/` のレイヤー、置き場のパスの設定）を
+  その先頭から判定に要るもの（`.ccnavi/approved/done/` の一覧と中身、`.ccnavi/config/common/` のレイヤー、自身の `.ccnavi/config/project/` のレイヤー、置き場のパスの設定）を
   統合先の取り込み結果 `sync/<リポジトリ>/integration/`（と、その中の `head` に `remote`・`branch`・`sha`・`fetched_at`。D33 の形）へ書き出す。
   ワークスペースとプロジェクトのリポジトリで取り込み結果を分ける。判定は git を起こさず、この取り込み結果を読む
   - origin が無い・一度も取り込んでいないリポジトリでは、今どおり作業ツリーを読む
@@ -225,7 +225,7 @@ REQ-APV-14 の案内（`ticket.py:1163-1179`）に「push してから依頼す�
      閉包の親のワークツリーが手元に無ければ「決まらない」で止め、切り直しを案内する。こうすると、他のワークツリー上の古いチケットで `PRED_SCATTERED`（`approval.py:626,719`）が
      出るかどうかが Chrome と食い違わない。取り込み済みでない親子のチケットは今の全ツリー走査のまま（Chrome はその親子のチケットを見ない）
 6. **レイヤーと設定は `P` から読まない**。`P` の上で書き換えれば承認やレビューを不要にできてしまうため
-   - 共通レイヤー（`.ccnavi/common/`）とワークスペース自身のレイヤー: ワークスペースの統合先から読む（手元は `sync/self/integration/`）
+   - 共通レイヤー（`.ccnavi/config/common/`）とワークスペース自身のレイヤー: ワークスペースの統合先から読む（手元は `sync/self/integration/`）
    - 置き場: 既定（提案は `wip/proposals`、承認済みは `.ccnavi/approved`）に固定する。統合先の `.claude/settings.json` からは読まない
    - プロジェクトのレイヤー（D28）: ADR-0084 の configsync（`configsync.py:1-20`）は着手のときに共通レイヤーを**親のワークツリー（`P` の上）のプロジェクトのレイヤー**へコピーする。
      判定はこれを読まず、「**プロジェクトの統合先の現在のレイヤー**（手元は `sync/<プロジェクト>/integration/`）に、共通レイヤーを `configsync.projected` で写したレイヤー」を計算して使う。
@@ -690,7 +690,7 @@ sh の書き方（Windows Git Bash・WSL・Linux・macOS の bash 3.2 と BSD �
 ### 5.4 将来の強化案: 承認者の署名（案 S。今回は入れない）
 
 - 承認者ごとに Chrome 拡張の中で鍵を作り、承認の中身（承認済みチケットの本文、識別子、判定が読んだ中身のダイジェスト）に署名し、その署名を承認済みチケットのキーの値として承認済みチケットの欄に載せる
-- 公開鍵は統合先の保護された場所（例 `.ccnavi/common/approvers.yml`）に登録し、取り込みで検証する。取り下げとレビュー済みも対象
+- 公開鍵は統合先の保護された場所（例 `.ccnavi/config/common/approvers.yml`）に登録し、取り込みで検証する。取り下げとレビュー済みも対象
 - メリット: 一人開発でも、PAT が漏れても、承認は偽造できない
 - デメリット: 鍵の置き場が同じ OS ユーザーから守れない問題が残り、鍵の運用と手元の署名検証の依存が増える
 
@@ -1335,7 +1335,7 @@ Chrome の画面では、マージリクエストに Approve が付いている�
 |---|---|---|
 | 取り込みの sh（4.2・3.6） | `.ccnavi/scripts/ccnavi-sync.sh`（新規） | `ccnavi-sync.sh [<P>...]`。省けば `.claude/worktrees/` の下の親のワークツリー全部。リポジトリごとに `ls-remote --heads origin` を 1 回（2 列目を `grep -F -x` で完全一致）、落ちたら止める。`P` があれば fetch して早送りか merge（索引が HEAD と同じときだけ。衝突したら `merge --abort` してユーザの対応に切り替える）、親子のチケットの取り込み状態を `present` で書く。`P` が無く取り込み状態も無ければ「まだ送っていない親子のチケット」で今のまま。取り込み状態があれば統合先の `done/<P>.md` を `cat-file -e` で見て `closed`、無ければ統合先を取り直して確かめ直し（既定 3 回、5 秒おき）、`ccnavi-review.sh merged` でマージ済みと分かれば「反映待ち」で止め、どれにも当たらなければ `gone` を書いて理由と戻し方 1・2 を出して止める。ロックは待って取る |
 | 統合先の名前（D30） | `ccnavi-sync.sh`、`ccnavi sync paths`、`settings.integration_local` | 環境変数 `CCNAVI_INTEGRATION_BRANCH`、空なら `.claude/settings.local.json` の `env` の値（JSON は実行ファイルが読んで 1 行で返す。D33）、空ならホストのデフォルトブランチ（リモートの一覧にある `origin/HEAD`、無ければ `main`・`master`）。設定した名前がリモートに無ければ既定に切り替えずに止める。使った名前とどこから決めたかを出力の頭と統合先の取り込み結果の `head`（`source` は `env`・`settings.local.json`・`default`）に出す。実行ファイルは環境変数を読まない |
-| 統合先の取り込み結果（D26） | `logs/state/sync/<リポジトリ>/integration/` | 統合先の先頭から `<置き場>/done/`・`.ccnavi/common/`・`<ccnavi ディレクトリ>/config/`・`.claude/settings.json` をファイルのまま同じ順序でコピーし（11.4.2 で `ls-tree` と `cat-file blob` に替えた）、`head` に `remote`・`branch`・`source`・`sha`・`fetched_at`。一時の置き場に組んでから入れ替える |
+| 統合先の取り込み結果（D26） | `logs/state/sync/<リポジトリ>/integration/` | 統合先の先頭から `<置き場>/done/`・`.ccnavi/config/common/`・`<ccnavi ディレクトリ>/config/`・`.claude/settings.json` をファイルのまま同じ順序でコピーし（11.4.2 で `ls-tree` と `cat-file blob` に替えた）、`head` に `remote`・`branch`・`source`・`sha`・`fetched_at`。一時の置き場に組んでから入れ替える |
 | 親子のチケットの取り込み状態（3.6） | `logs/state/sync/<リポジトリ>/families/<P>` | 1 行 1 項目（`remote`・`branch`・`sha`・`fetched_at`・`state`・`reason`）。`state` は `present`・`closed`・`gone`（`blocked` は 2c） |
 | ロック（D32） | `ccnavi-common.sh` の `ccnavi_lock_take` / `ccnavi_lock_drop` | `mkdir` で取り、`owner` に `<ホスト名> <pid> <開始時刻> <持ち主の情報>`。古いロック（同じホストで `kill -0` が落ちる・10 分を過ぎた・`owner` が読めず `find -mmin +10`）は `mv` で強制取得し、持ち主が替わっていたら戻す。入れ子は `CCNAVI_LOCK_HELD`。sync は `CCNAVI_LOCK_WAIT`（既定 120 秒）待ち、SessionStart は 1 回だけ試す |
 | SessionStart の早送りだけ（D12） | `ccnavi-fetch.sh` | 取り込み済みの親子のチケット（`.claude/worktrees/` の直下で、ディレクトリ名 = ブランチ名、親の承認済みチケットか提案があり、親子のチケットの取り込み状態がある）は、ロックを 1 回だけ試し、`origin/<P>` の祖先なら `merge --ff-only`。書きかけとの重なりは git に任せ、拒まれたら重なったパスと `ccnavi-sync.sh <P>` を言う。分かれていれば「取り込みが要る」と 1 行言う（merge しない）。開始から 45 秒（`CCNAVI_FETCH_BUDGET`）を過ぎたら飛ばして名指しする。それ以外のツリーは前のまま |

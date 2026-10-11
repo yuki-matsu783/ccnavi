@@ -53,11 +53,11 @@ test("CB-T3 JSON でなければ理由を返す", () => {
 test("CB-T110 layers[] からルールファイルの置き場を読み、欠けた JSON でも全体を捨てずに空で補う", () => {
   const board = fixture();
   assert.deepEqual(board.layers.map((l) => l.name), ["common", "self"]);
-  assert.equal(board.layers[1].rules.path, "<root>/.ccnavi/config/rules.yml");
+  assert.equal(board.layers[1].rules.path, "<root>/.ccnavi/config/project/rules.yml");
   assert.equal(board.layers[1].rules.unreadable, "");
-  assert.equal(board.layers[1].phasesFile.path, "<root>/.ccnavi/config/phases.yml");
-  assert.equal(board.layers[1].risk.path, "<root>/.ccnavi/config/risks.yml");
-  assert.equal(board.layers[0].phasesFile.path, "<root>/.ccnavi/common/phases.yml");
+  assert.equal(board.layers[1].phasesFile.path, "<root>/.ccnavi/config/project/phases.yml");
+  assert.equal(board.layers[1].risk.path, "<root>/.ccnavi/config/project/risks.yml");
+  assert.equal(board.layers[0].phasesFile.path, "<root>/.ccnavi/config/common/phases.yml");
   // 実行ファイルは常に layers を出す。欠けていれば（不正な JSON）CB-T4 と同じく既定値の空で補う
   const missing = parseBoardJson(JSON.stringify({ version: BOARD_VERSION }));
   assert.ok(missing.ok);
@@ -74,7 +74,7 @@ test("CB-T318 sums[] を読む。ワークスペースの足し算（共通 + �
   assert.deepEqual(board.sums.map((s) => s.name), ["self"]);
   const self = board.sums[0];
   assert.deepEqual(self.layers, ["common", "self"]);
-  assert.equal(self.rules.path, "<root>/.ccnavi/config/rules.yml");
+  assert.equal(self.rules.path, "<root>/.ccnavi/config/project/rules.yml");
   assert.equal(self.rules.missing, true);
   assert.deepEqual(self.rules.deny.map((r) => [r.id, r.source, r.match, r.kind]), [["guard-approved", "common", "Write|Edit|NotebookEdit", "glob"]]);
   assert.deepEqual(self.risk.levels, { medium: 20, high: 40, critical: 70 });

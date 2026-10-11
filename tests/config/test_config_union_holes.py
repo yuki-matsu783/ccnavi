@@ -231,18 +231,18 @@ class BuiltinGlobCaseTest(GuardHarness):
     """
 
     def test_the_builtin_project_home_deny_matches_a_swapped_spelling(self):
-        """`.Ccnavi/config/rules.yml` への Write も組み込みの deny で止まる。"""
+        """`.Ccnavi/config/project/rules.yml` への Write も組み込みの deny で止まる。"""
         # ccnavi ディレクトリがディスクに無いことが前提。あると realpath がパスを補正して、
         # 問いが消える。
         self.assertFalse(os.path.exists(os.path.join(self.app, HOME)))
-        exact = os.path.join(self.app, HOME, "config", "rules.yml")
+        exact = os.path.join(self.app, HOME, "config", "project", "rules.yml")
         self.assert_denied(
             self.guarded_hook("Write", self.ws, file_path=exact), "builtin-guard-project-home"
         )
 
         # 区別する機械でも止める。組み込みの保護だけが機械で当たり方を変えると、
         # どの機械でも区別しないルールの glob やチケットの範囲と食い違う。
-        swapped = os.path.join(self.app, ".Ccnavi", "config", "rules.yml")
+        swapped = os.path.join(self.app, ".Ccnavi", "config", "project", "rules.yml")
         result = self.guarded_hook("Write", self.ws, file_path=swapped)
         self.assert_denied(result, "builtin-guard-project-home")
 
@@ -285,8 +285,8 @@ class ShellPlaceTest(GuardHarness):
             "mv .ccnavi-notes.md notes.md",
             "rm -r .claude-backup",
             "rm -r .claude/worktrees/w1",
-            "cp .ccnavi/config/rules.yml /tmp/x",
-            "cat .ccnavi/config/rules.yml",
+            "cp .ccnavi/config/project/rules.yml /tmp/x",
+            "cat .ccnavi/config/project/rules.yml",
         ):
             with self.subTest(command=command):
                 self.assert_not_denied(self.guarded_hook("Bash", self.ws, command=command))
@@ -295,14 +295,14 @@ class ShellPlaceTest(GuardHarness):
         """共通レイヤーの 1 本をコピー元に書いただけの読みは通る。
 
         共通レイヤーの節をコピーする側にも書き込む側と同じ `_TERM` で足すと、空白を名前の終わりに
-        数えるのでコピー元に当たり、`cp .ccnavi/common/rules.yml /tmp/x` が止まっていた。
+        数えるのでコピー元に当たり、`cp .ccnavi/config/common/rules.yml /tmp/x` が止まっていた。
         """
         for name in ("rules.yml", "phases.yml", "risks.yml"):
             for command in (
-                f"cp .ccnavi/common/{name} /tmp/x",
-                f"cp {self.ws}/.ccnavi/common/{name} /tmp/x",
-                f"ln -s .ccnavi/common/{name} /tmp/x",
-                f"install .ccnavi/common/{name} /tmp/x",
+                f"cp .ccnavi/config/common/{name} /tmp/x",
+                f"cp {self.ws}/.ccnavi/config/common/{name} /tmp/x",
+                f"ln -s .ccnavi/config/common/{name} /tmp/x",
+                f"install .ccnavi/config/common/{name} /tmp/x",
             ):
                 with self.subTest(command=command):
                     self.assert_not_denied(self.guarded_hook("Bash", self.ws, command=command))
@@ -312,12 +312,12 @@ class ShellPlaceTest(GuardHarness):
         書き込みも止まる。"""
         for name in ("rules.yml", "phases.yml", "risks.yml"):
             for command in (
-                f"cp /tmp/x .ccnavi/common/{name}",
-                f"cp /tmp/x {self.ws}/.ccnavi/common/{name}",
-                f"cp /tmp/x .ccnavi/common/{name} && echo done",
-                f"ln -sf /tmp/x .ccnavi/common/{name}",
-                f"echo x > .ccnavi/common/{name}",
-                f"rm .ccnavi/common/{name}",
+                f"cp /tmp/x .ccnavi/config/common/{name}",
+                f"cp /tmp/x {self.ws}/.ccnavi/config/common/{name}",
+                f"cp /tmp/x .ccnavi/config/common/{name} && echo done",
+                f"ln -sf /tmp/x .ccnavi/config/common/{name}",
+                f"echo x > .ccnavi/config/common/{name}",
+                f"rm .ccnavi/config/common/{name}",
             ):
                 with self.subTest(command=command):
                     result = self.guarded_hook("Bash", self.ws, command=command)
@@ -360,11 +360,11 @@ class CopyDestinationTest(GuardHarness):
 
     def test_the_four_forms_of_the_report(self):
         """読むだけのコピーは通り、行き先にした 3 形は止まる。"""
-        self.assert_not_guarded("cp .ccnavi/common/rules.yml /tmp/x")
+        self.assert_not_guarded("cp .ccnavi/config/common/rules.yml /tmp/x")
         for command in (
-            "cp /tmp/x .ccnavi/common/rules.yml",
-            "cp -t .ccnavi/common /tmp/x",
-            "cp --target-directory=.ccnavi/common /tmp/x",
+            "cp /tmp/x .ccnavi/config/common/rules.yml",
+            "cp -t .ccnavi/config/common /tmp/x",
+            "cp --target-directory=.ccnavi/config/common /tmp/x",
         ):
             with self.subTest(command=command):
                 self.assert_guarded(command)
@@ -374,20 +374,20 @@ class CopyDestinationTest(GuardHarness):
         for command in (
             "cp -t .ccnavi /tmp/x",
             "cp -t.ccnavi /tmp/x",
-            "cp -vt .ccnavi/common /tmp/x",
+            "cp -vt .ccnavi/config/common /tmp/x",
             "cp -rft .ccnavi/scripts /tmp/count.sh",
-            "cp --target-directory .ccnavi/common /tmp/x",
-            "cp --target=.ccnavi/common /tmp/x",
-            "cp --t .ccnavi/common /tmp/x",
-            "ln -st .ccnavi/common /tmp/rules.yml",
-            "ln --target-directory=.ccnavi/common /tmp/rules.yml",
-            "install -Dt .ccnavi/common /tmp/rules.yml",
-            "install -m 644 -t .ccnavi/common /tmp/rules.yml",
+            "cp --target-directory .ccnavi/config/common /tmp/x",
+            "cp --target=.ccnavi/config/common /tmp/x",
+            "cp --t .ccnavi/config/common /tmp/x",
+            "ln -st .ccnavi/config/common /tmp/rules.yml",
+            "ln --target-directory=.ccnavi/config/common /tmp/rules.yml",
+            "install -Dt .ccnavi/config/common /tmp/rules.yml",
+            "install -m 644 -t .ccnavi/config/common /tmp/rules.yml",
             "cp -t .claude/hooks /tmp/x.sh",
             "cp -t .claude /tmp/settings.json",
             "cp -t .claude/ /tmp/settings.json",
             "cp -t logs/state /tmp/x",
-            "cp -t /abs/path/.ccnavi/common /tmp/x",
+            "cp -t /abs/path/.ccnavi/config/common /tmp/x",
         ):
             with self.subTest(command=command):
                 self.assert_guarded(command)
@@ -395,18 +395,18 @@ class CopyDestinationTest(GuardHarness):
     def test_options_after_the_destination_are_skipped(self):
         """GNU は選択肢を後ろにも置ける。足しただけで行き先が最後の引数でなくなる形も止める。"""
         for command in (
-            "cp /tmp/x .ccnavi/common/rules.yml -f",
-            "cp /tmp/x .ccnavi/common/rules.yml -f -v",
-            "cp /tmp/x .ccnavi/common/rules.yml -S .bak",
-            "cp /tmp/x .ccnavi/common/rules.yml --suffix .bak --verbose",
-            "cp /tmp/x .ccnavi/common/rules.yml --backup=numbered",
-            "install /tmp/x .ccnavi/common/rules.yml -m 644 -o root -g root",
-            "ln -s /tmp/x .ccnavi/common/rules.yml --force",
+            "cp /tmp/x .ccnavi/config/common/rules.yml -f",
+            "cp /tmp/x .ccnavi/config/common/rules.yml -f -v",
+            "cp /tmp/x .ccnavi/config/common/rules.yml -S .bak",
+            "cp /tmp/x .ccnavi/config/common/rules.yml --suffix .bak --verbose",
+            "cp /tmp/x .ccnavi/config/common/rules.yml --backup=numbered",
+            "install /tmp/x .ccnavi/config/common/rules.yml -m 644 -o root -g root",
+            "ln -s /tmp/x .ccnavi/config/common/rules.yml --force",
             "cp /tmp/x .ccnavi -r",
-            "cp /tmp/x .ccnavi/common/rules.yml -f 2>/dev/null",
-            "cp /tmp/x .ccnavi/common/rules.yml -f && echo done",
-            "cp /tmp/x .ccnavi/common/rules.yml -S -t",
-            "cp /tmp/x .ccnavi/common/rules.yml --",
+            "cp /tmp/x .ccnavi/config/common/rules.yml -f 2>/dev/null",
+            "cp /tmp/x .ccnavi/config/common/rules.yml -f && echo done",
+            "cp /tmp/x .ccnavi/config/common/rules.yml -S -t",
+            "cp /tmp/x .ccnavi/config/common/rules.yml --",
         ):
             with self.subTest(command=command):
                 self.assert_guarded(command)
@@ -418,13 +418,13 @@ class CopyDestinationTest(GuardHarness):
         ファイルに読む。行き先は最後の引数のままなので、そちらで止める。
         """
         for command in (
-            "cp -Svt /tmp/x .ccnavi/common/rules.yml",
-            "cp -S -t /tmp/x .ccnavi/common/rules.yml",
-            "cp --suffix -t /tmp/x .ccnavi/common/rules.yml",
-            "install -m -t /tmp/x .ccnavi/common/rules.yml",
-            "cp -- -t /tmp/x .ccnavi/common/rules.yml",
-            "cp /tmp/x '' .ccnavi/common/rules.yml",
-            "install /tmp/x --strip .ccnavi/common/rules.yml",
+            "cp -Svt /tmp/x .ccnavi/config/common/rules.yml",
+            "cp -S -t /tmp/x .ccnavi/config/common/rules.yml",
+            "cp --suffix -t /tmp/x .ccnavi/config/common/rules.yml",
+            "install -m -t /tmp/x .ccnavi/config/common/rules.yml",
+            "cp -- -t /tmp/x .ccnavi/config/common/rules.yml",
+            "cp /tmp/x '' .ccnavi/config/common/rules.yml",
+            "install /tmp/x --strip .ccnavi/config/common/rules.yml",
         ):
             with self.subTest(command=command):
                 self.assert_guarded(command)
@@ -432,24 +432,24 @@ class CopyDestinationTest(GuardHarness):
     def test_detours_around_the_destination_are_denied(self):
         """つないだ後ろのコマンド、引用、大文字小文字、`\\` 区切り、`--`、実行役のコマンド。"""
         for command in (
-            "echo go && cp /tmp/x .ccnavi/common/rules.yml",
-            "true; cp /tmp/x .ccnavi/common/rules.yml",
-            "cat /tmp/x | cp /dev/stdin .ccnavi/common/rules.yml",
-            "cp /tmp/x .ccnavi/common/rules.yml | cat",
-            'cp /tmp/x ".ccnavi/common/"rules.yml',
+            "echo go && cp /tmp/x .ccnavi/config/common/rules.yml",
+            "true; cp /tmp/x .ccnavi/config/common/rules.yml",
+            "cat /tmp/x | cp /dev/stdin .ccnavi/config/common/rules.yml",
+            "cp /tmp/x .ccnavi/config/common/rules.yml | cat",
+            'cp /tmp/x ".ccnavi/config/common/"rules.yml',
             "cp /tmp/x '.ccnavi'/common/rules.yml",
             "cp /tmp/x .CCNAVI/Common/RULES.yml",
-            "CP /tmp/x .ccnavi/common/rules.yml",
+            "CP /tmp/x .ccnavi/config/common/rules.yml",
             "cp /tmp/x '.ccnavi\\common\\rules.yml'",
-            "cp -- /tmp/x .ccnavi/common/rules.yml",
-            "cp -T /tmp/x .ccnavi/common/rules.yml",
-            "sudo cp /tmp/x .ccnavi/common/rules.yml",
-            "sudo -u root cp -t .ccnavi/common /tmp/x",
-            "env FOO=1 cp /tmp/x .ccnavi/common/rules.yml",
-            "nohup cp /tmp/x .ccnavi/common/rules.yml",
-            "sh -c 'cp /tmp/x .ccnavi/common/rules.yml'",
-            "cp /tmp/x .ccnavi/common/rules.yml {fd}>/dev/null",
-            "cd .ccnavi/common && cp /tmp/rules.yml .",
+            "cp -- /tmp/x .ccnavi/config/common/rules.yml",
+            "cp -T /tmp/x .ccnavi/config/common/rules.yml",
+            "sudo cp /tmp/x .ccnavi/config/common/rules.yml",
+            "sudo -u root cp -t .ccnavi/config/common /tmp/x",
+            "env FOO=1 cp /tmp/x .ccnavi/config/common/rules.yml",
+            "nohup cp /tmp/x .ccnavi/config/common/rules.yml",
+            "sh -c 'cp /tmp/x .ccnavi/config/common/rules.yml'",
+            "cp /tmp/x .ccnavi/config/common/rules.yml {fd}>/dev/null",
+            "cd .ccnavi/config/common && cp /tmp/rules.yml .",
             "cp /tmp/settings.json .claude/",
             "mv /tmp/settings.json .claude/",
         ):
@@ -459,28 +459,28 @@ class CopyDestinationTest(GuardHarness):
     def test_reading_copies_pass_through_the_guard(self):
         """守る場所が元の側にだけ出る形は、選択肢やつないだコマンドがあっても組み込みの保護では止めない。"""
         for command in (
-            "cp .ccnavi/common/rules.yml /tmp/x",
-            "cp /repo/.ccnavi/common/rules.yml /tmp/backup.yml",
+            "cp .ccnavi/config/common/rules.yml /tmp/x",
+            "cp /repo/.ccnavi/config/common/rules.yml /tmp/backup.yml",
             "cp -r .ccnavi /tmp/keep",
-            "cp -v .ccnavi/common/rules.yml .ccnavi/common/phases.yml /tmp/out/",
-            "cp .ccnavi/common/rules.yml /tmp/x -f",
-            "cp .ccnavi/common/rules.yml -t /tmp/out",
-            "cp -t /tmp/out .ccnavi/common/rules.yml",
-            "cp --target-directory=/tmp/out .ccnavi/common/rules.yml",
-            "cp -T .ccnavi/common /tmp/out",
-            "cp -v -t /tmp/out .ccnavi/common/rules.yml",
-            "cp --verbose -t /tmp/out .ccnavi/common/rules.yml",
-            "cp -t /tmp/out .ccnavi/common/rules.yml .ccnavi/common/phases.yml",
-            "ln -s .ccnavi/common/rules.yml /tmp/link",
-            "install -m 644 .ccnavi/common/rules.yml /tmp/x",
+            "cp -v .ccnavi/config/common/rules.yml .ccnavi/config/common/phases.yml /tmp/out/",
+            "cp .ccnavi/config/common/rules.yml /tmp/x -f",
+            "cp .ccnavi/config/common/rules.yml -t /tmp/out",
+            "cp -t /tmp/out .ccnavi/config/common/rules.yml",
+            "cp --target-directory=/tmp/out .ccnavi/config/common/rules.yml",
+            "cp -T .ccnavi/config/common /tmp/out",
+            "cp -v -t /tmp/out .ccnavi/config/common/rules.yml",
+            "cp --verbose -t /tmp/out .ccnavi/config/common/rules.yml",
+            "cp -t /tmp/out .ccnavi/config/common/rules.yml .ccnavi/config/common/phases.yml",
+            "ln -s .ccnavi/config/common/rules.yml /tmp/link",
+            "install -m 644 .ccnavi/config/common/rules.yml /tmp/x",
             "cp .claude/settings.json /tmp/x",
             "cp .claude/hooks/x.sh /tmp/x",
             "cp logs/decisions.jsonl /tmp/x",
             "cp -r logs/state /tmp/x",
             "cp .ccnavi/scripts/ccnavi-git.sh /tmp/x",
-            "sudo cp .ccnavi/common/rules.yml /tmp/x",
-            "cp .ccnavi/common/rules.yml /tmp/x && cat /tmp/x",
-            "cp .ccnavi/common/rules.yml /tmp/x 2>/dev/null",
+            "sudo cp .ccnavi/config/common/rules.yml /tmp/x",
+            "cp .ccnavi/config/common/rules.yml /tmp/x && cat /tmp/x",
+            "cp .ccnavi/config/common/rules.yml /tmp/x 2>/dev/null",
         ):
             with self.subTest(command=command):
                 self.assert_not_guarded(command)
@@ -488,17 +488,17 @@ class CopyDestinationTest(GuardHarness):
     def test_writes_from_the_source_side_are_still_denied(self):
         """元と行き先を分けるのは cp / ln / install だけ。書き込み側は今までどおり。"""
         for command in (
-            "mv .ccnavi/common/rules.yml /tmp/x",
-            "rm .ccnavi/common/rules.yml",
-            "tee .ccnavi/common/rules.yml < /tmp/x",
-            "dd if=/tmp/x of=.ccnavi/common/rules.yml",
-            "truncate -s 0 .ccnavi/common/rules.yml",
-            "patch .ccnavi/common/rules.yml /tmp/p",
-            "shred .ccnavi/common/rules.yml",
-            "sed -i s/deny/allow/ .ccnavi/common/rules.yml",
-            "echo x > .ccnavi/common/rules.yml",
-            "cp .ccnavi/common/rules.yml /tmp/a && rm .ccnavi/common/rules.yml",
-            "cp .ccnavi/common/rules.yml /tmp/a > .ccnavi/common/phases.yml",
+            "mv .ccnavi/config/common/rules.yml /tmp/x",
+            "rm .ccnavi/config/common/rules.yml",
+            "tee .ccnavi/config/common/rules.yml < /tmp/x",
+            "dd if=/tmp/x of=.ccnavi/config/common/rules.yml",
+            "truncate -s 0 .ccnavi/config/common/rules.yml",
+            "patch .ccnavi/config/common/rules.yml /tmp/p",
+            "shred .ccnavi/config/common/rules.yml",
+            "sed -i s/deny/allow/ .ccnavi/config/common/rules.yml",
+            "echo x > .ccnavi/config/common/rules.yml",
+            "cp .ccnavi/config/common/rules.yml /tmp/a && rm .ccnavi/config/common/rules.yml",
+            "cp .ccnavi/config/common/rules.yml /tmp/a > .ccnavi/config/common/phases.yml",
         ):
             with self.subTest(command=command):
                 self.assert_guarded(command)
@@ -507,7 +507,9 @@ class CopyDestinationTest(GuardHarness):
         """後ろの選択肢の割り方は 1 通り。当たらない長い並びでもすぐ返る。"""
         regex = re.compile(selfguard_shell.guard_shell_regex(self.ws), re.IGNORECASE)
         for tail in (" -S" * 60, " -S -" * 60, " --suffix" * 60, " -m x" * 60):
-            text = shellread.read("cp /tmp/x .ccnavi/common/rules.yml" + tail + " /tmp/y").text
+            text = shellread.read(
+                "cp /tmp/x .ccnavi/config/common/rules.yml" + tail + " /tmp/y"
+            ).text
             with self.subTest(tail=tail[:12]):
                 start = time.monotonic()
                 regex.search(text)

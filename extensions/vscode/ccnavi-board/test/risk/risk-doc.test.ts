@@ -26,7 +26,7 @@ factors:
   # 例: 使うときにコメントを外す
   # - id: complexity
   #   points: 30
-  #   script: .ccnavi/common/risk/complexity.sh
+  #   script: .ccnavi/config/common/risk/complexity.sh
 `;
 
 test("CB-T72 境目の点と項目を読む。加点条件は 1 つで、値は欄の文字として持つ", () => {
@@ -92,7 +92,7 @@ test("CB-T76 加点条件を変えると前の加点条件の欄は消え、新�
   const f = doc.model.form;
   const changed: FactorForm = { ...f.factors[0], kind: "files_over", value: "10" };
   const fresh: FactorForm = { origin: null, id: "deletes", points: "20", kind: "deleted_over", value: "3", max: "", include: "", exclude: "", message: "消したファイルが多い" };
-  const scripted: FactorForm = { origin: null, id: "complexity", points: "30", kind: "script", value: ".ccnavi/common/risk/complexity.sh", max: "", include: "", exclude: "", message: "" };
+  const scripted: FactorForm = { origin: null, id: "complexity", points: "30", kind: "script", value: ".ccnavi/config/common/risk/complexity.sh", max: "", include: "", exclude: "", message: "" };
   const out = doc.apply({ levels: f.levels, factors: [changed, fresh, scripted, f.factors[2]] });
   assert.match(out, /  - id: big-diff\n    points: 25\n    files_over: 10\n    message: 行数が多い\n/);
   assert.doesNotMatch(out, /lines_over/);
@@ -103,7 +103,7 @@ test("CB-T76 加点条件を変えると前の加点条件の欄は消え、新�
   assert.deepEqual(again.factors.map((x) => [x.id, x.kind, x.value]), [
     ["big-diff", "files_over", "10"],
     ["deletes", "deleted_over", "3"],
-    ["complexity", "script", ".ccnavi/common/risk/complexity.sh"],
+    ["complexity", "script", ".ccnavi/config/common/risk/complexity.sh"],
     ["untested", "judge", "テストの無い振る舞いの変更を含むか"],
   ]);
 });
