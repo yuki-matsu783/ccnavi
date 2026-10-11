@@ -899,6 +899,25 @@ class TicketPlaceTest(Harness, unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, self.said(result))
 
+    def test_未コミットのレビュー待ちを閉じた置き場へ動かしても言わない(self):
+        # `finish` で `review/` に置いたものをコミットせずに `confirm` した形。`review/` の側は
+        # HEAD に無いので git status から消え、`doing/` の削除と `done/` の新規が組になる。
+        placed = TICKET.replace(
+            "---\nbody", 'started_at: ""\ncompleted_at: ""\nbase_sha: ""\n---\nbody'
+        )
+        self.use(ticket_repo(text=placed))
+        os.remove(self.path(DOING))
+        write(
+            self.path(".ccnavi/approved/done/i0001.md"),
+            placed.replace('started_at: ""', 'started_at: "2026-09-22T00:00:00Z"')
+            .replace('completed_at: ""', 'completed_at: "2026-09-22T01:00:00Z"')
+            .replace('base_sha: ""', 'base_sha: "1111111111111111"'),
+        )
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 0, self.said(result))
+
     def test_基準点の書き換えは言う(self):
         # `base_sha` はサブエージェント終了時チェックと実績リスクの基準点。書き換えられると
         # コミット済みの範囲外の変更が検査から消えるので、正規化で除いてはいけない。
