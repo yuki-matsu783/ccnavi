@@ -12,7 +12,7 @@ import { readRules } from "../../src/core/rules-doc.js";
 import { renderRulesPage, type RenderOptions } from "../../src/core/rules-render.js";
 import type { RulesData, RulesPage } from "../../src/core/rules-view.js";
 import { screenScript, screenStyle } from "./bundle.js";
-import { loadPage, type DomPage } from "./dom.js";
+import { loadPage, type DomPage, type LoadOptions } from "./dom.js";
 
 export const NONCE = "TEST-NONCE-123";
 
@@ -57,16 +57,19 @@ export function page(overrides: Partial<RulesPage> = {}): RulesPage {
   };
 }
 
-/** HTML を happy-dom に読ませ、React がマウントし終わるまで待つ */
-export async function openPage(data: RulesData, initialState?: unknown): Promise<DomPage> {
-  const dom = await loadPage(rulesHtml(data), initialState);
+/**
+ * HTML を happy-dom に読ませ、React がマウントし終わるまで待つ。条件の木の図を見るテストは
+ * `{ measure: true }` を渡す（渡さないと React Flow は点を隠したまま線を描かない。`dom.ts` の `measure`）
+ */
+export async function openPage(data: RulesData, initialState?: unknown, options: LoadOptions = {}): Promise<DomPage> {
+  const dom = await loadPage(rulesHtml(data), initialState, options);
   await dom.settle();
   return dom;
 }
 
 /** 見本のルールを開く。差し替えたいところだけ渡す */
-export async function openRules(overrides: Partial<RulesPage> = {}, initialState?: unknown): Promise<DomPage> {
-  return openPage({ kind: "page", page: page(overrides) }, initialState);
+export async function openRules(overrides: Partial<RulesPage> = {}, initialState?: unknown, options: LoadOptions = {}): Promise<DomPage> {
+  return openPage({ kind: "page", page: page(overrides) }, initialState, options);
 }
 
 /** ルール 1 行の中の要素。id で名指しする（画面は `data-id` に今の id を出す） */

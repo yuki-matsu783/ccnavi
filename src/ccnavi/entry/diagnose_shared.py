@@ -87,6 +87,16 @@ def layer_risk(conf: settings.Settings, name: str, path: str) -> tuple[list, str
 
 def rule_form(rule: rules.Rule) -> dict:
     """ルールの書き方。書いた表記と、翻訳後の式。"""
+    if rule.when is not None:
+        # 木には翻訳後の式が 1 本に定まらない。書いた形（`when` のマッピング）を添える。
+        # `written` は木を 1 行にした形だけにする。`kind` が `when` を言うので、`written_body` の
+        # 先頭の `when: ` を残すと、`kind` と並べて出す画面で「when when: …」と二重になる。
+        return {
+            "kind": rules.WHEN_KEY,
+            "written": rule.when.describe(),
+            "pattern": rule.compiled.pattern if rule.compiled else "",
+            "when": rule.when.written(),
+        }
     return {
         "kind": "glob" if rule.glob else "regex",
         "written": rule.glob or rule.regex,

@@ -296,3 +296,49 @@ allow:
   assert.match(broken, /every: x\n/);
   assert.equal(readRules(broken).model.sections.allow[0].every, "x");
 });
+
+const EXCEPT_TEXT = `version: 1
+deny:
+  # ルート直下は止め、置き場だけ除く
+  - id: workspace-root
+    match: Write|Edit
+    regex: '^{root}[\\\\/]'
+    except:
+      - regex: '^{root}[\\\\/]wip[\\\\/]scratchpad(?:[\\\\/]|$)'
+      - glob: '{root}/.claude/worktrees/*'
+    message: main では編集しない
+allow:
+  - id: plain
+    match: Read
+    glob: "*"
+`;
+
+test("CB-T331 except は見せる形で読み、書いていないルールには欄が無い", () => {
+  const { model } = readRules(EXCEPT_TEXT);
+  assert.deepEqual(model.problems, []);
+  assert.deepEqual(model.sections.deny[0].excepts, [
+    "regex: ^{root}[\\\\/]wip[\\\\/]scratchpad(?:[\\\\/]|$)",
+    "glob: {root}/.claude/worktrees/*",
+  ]);
+  assert.equal(model.sections.allow[0].excepts, undefined);
+});
+
+test("CB-T332 except は書き戻しで消えない（欄を変えても、タイプを移しても、並べ替えても）", () => {
+  const doc = readRules(EXCEPT_TEXT);
+  const s = doc.model.sections;
+  assert.equal(doc.apply(s), EXCEPT_TEXT);
+  const edited = doc.apply({
+    deny: [],
+    ask: [{ ...s.deny[0], pattern: "^{root}[\\\\/]src[\\\\/]", message: "" }],
+    allow: s.allow,
+  });
+  assert.ok(edited.includes("    except:\n      - regex: '^{root}[\\\\/]wip"), edited);
+  const again = readRules(edited).model.sections;
+  assert.equal(again.ask[0].pattern, "^{root}[\\\\/]src[\\\\/]");
+  assert.deepEqual(again.ask[0].excepts, s.deny[0].excepts);
+  // 画面が送り返した形（asSections）を通しても同じ
+  const sent = asSections(JSON.parse(JSON.stringify(s)));
+  assert.ok(sent);
+  assert.equal(doc.apply(sent), EXCEPT_TEXT);
+  assert.deepEqual(sent.deny[0].excepts, s.deny[0].excepts);
+});

@@ -853,6 +853,49 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 先読み・後読み・後方参照は受け付けない（エンジンをまたいで同じ意味に保ち、組み合わせ爆発を避けるため。
 判定の途中で止まったままの hook は期限に達し、呼び出しはそのまま通ってしまう）。
 
+「A だが B は除く」は `except:` で書く。値は `glob` か `regex` のどちらか 1 つだけを持つマッピングのリストで、
+本体に当たっても、どれかに当たればそのルールは当たらない。各パターンは本体と同じ読み方をする
+（`{root}`・`{!root}`・大文字小文字の無視・先読みの禁止）。
+
+```yaml
+  - id: workspace-root
+    match: Write|Edit|NotebookEdit
+    regex: '^{root}[\\/]'
+    except:
+      - regex: '^{root}[\\/]wip[\\/]scratchpad(?:[\\/]|$)'
+      - regex: '^{root}[\\/]\.claude[\\/]worktrees(?:[\\/]|$)'
+    message: ...
+```
+
+当てる文字列は本体と同じで、`Bash` ならコマンド列の全体になる。除く語をコマンドのどこかに足すだけで外れるので、
+`Bash` の `deny` / `ask` には付けないか、語の位置まで狭く書く（`--lint` が warn で言う）。
+空のリスト、`glob` と `regex` の両方がある要素、知らないキーを持つ要素は、ルールごと読み込まずに `--lint` が error にする。
+
+「A か B」「A かつ B」のような組み合わせは、`glob` / `regex` の代わりに `when:` で条件の木として書く。
+ルールが持てるのは `glob` / `regex` / `when` のどれか 1 つ。ノードは次のどれか 1 つのキーだけを持つマッピングで、
+`glob: '…'` と `regex: '…'` が葉（本体と同じ読み方）、`all: [ノード, …]` は全部に、`any: [ノード, …]` はどれかに
+当たれば当たり、`not: ノード` は当たらなければ当たる。
+
+```yaml
+  - id: secrets
+    match: Write|Edit
+    when:
+      any:
+        - glob: '*.pem'
+        - all:
+            - glob: '*/secrets/*'
+            - not: {glob: '*.md'}
+    message: ...
+```
+
+葉が当てる文字列は本体と同じで、`Bash` ならコマンド列の全体。`except:` も併せて書け、木に当たっても除くものに
+当たれば当たらない。入れ子は 8 段、ノードは 64 個まで。知らないキー、キーが 0 個・2 個以上のノード、空のリスト、
+型の違う値はルールごと読み込まずに `--lint` が error にする。何にでも当たる・何にも当たらないノードと、
+`Bash` / `PowerShell` の `deny` / `ask` で `not` を使った木は warn になる。
+
+`except` と `when` の使い分け。「ここは除く」だけなら `except` のほうが読みやすい（このリポジトリの
+`workspace-root` がこの形）。組み合わせが要るとき、除外の中にさらに例外があるときに `when` を使う。
+
 ### 同じ呼び出しを繰り返し止めたとき
 
 止められたエージェントは、言い回しを少し変えて同じことを打ち直すことがある。同じルールが同じ呼び出しを
@@ -2144,7 +2187,7 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
 | `verdict` / `code` | 判定（`deny` / `ask` / `allow` / `skip`）と根拠コード |
 | `reason` / `degraded` / `fallback` | `skip` の理由、生の文字列に当てたかどうか、組み込みの既定で判定したかどうか。無ければ空 |
 | `unwrapped` | 実行役のコマンドが中で実行するコマンド、または `cd` で移った先から見たパスでルールに当たったときの、そのコマンド。複数なら `\x00` でつなぐ。元の形で当たったとき・当たらなかったときは空 |
-| `rules[]` | 当たったルール。`{id, source, section, kind, written, pattern}`。`source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように外から来た根拠）。`kind` は `glob` か `regex`、`written` は書いたまま、`pattern` は翻訳後の正規表現 |
+| `rules[]` | 当たったルール。`{id, source, section, kind, written, pattern}`。`source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように外から来た根拠）。`kind` は `glob`・`regex`・`when` のどれか、`written` は書いたまま（`when` は木を 1 行にした形で、`when: ` は付けない）、`pattern` は翻訳後の正規表現（`when` はふつう空）。`when` のルールだけ、書いた木そのものを `when` に持つ |
 | `response` | エージェントに返る文面そのもの。無ければ空 |
 | `quoted` | 当たったルールのうち、引用の中から切り出したコマンドにだけ当たったものの id。そういうルールがあるときだけ出る |
 
@@ -2201,6 +2244,7 @@ error 2 件、warn 2 件、info 0 件
 | warn | `allow` が空（言及の無い呼び出しが全部、権限モードへ渡る） |
 | warn | `id` の無いルール、`id` が重複するルール |
 | warn | 判定が対象を取り出せないツールを `match` に書いたルール |
+| warn | 本体（`glob` / `regex` 1 つ）が何にでも当たる `deny`（`.*` や `.` など。`match` のツールを丸ごと止める。`except` があれば除いたもの以外を止める。ツールごと止めると決めた `glob: "*"` ちょうどは言わない） |
 | warn | 何にでも当たる、または選択肢が 3 つ以上ある `allow` に `additionalContext`（か `additionalContextFile`）を書いたルール（当たるたびに同じ文が積まれる。`additionalContextOnce` は文脈ごとに 1 度なので指摘しない） |
 | warn | `additionalContextFile` / `additionalContextOnceFile` が指すファイルが無い（作るまで何も足さない）、または先頭 4000 文字を超える（先頭だけが届き、切ったことを添える） |
 

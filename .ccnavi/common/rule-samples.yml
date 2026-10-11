@@ -34,6 +34,18 @@ deny:
     subject: "/repo/projects/lib/skills/deploy/SKILL.md"
     why: プロジェクトのスキル（skills/ に置く）も元ツリーでは触らない。プロジェクトから切ったワークツリーで直す
   - tool: Write
+    subject: "/repo/wip/scratchpadx/a.md"
+    why: workspace-root の except が除くのは wip/scratchpad/ だけ。名前の続く別のディレクトリは除かない
+  - tool: Write
+    subject: "/repo/wip/a.md"
+    why: wip/ の直下は除かない。下書きは wip/scratchpad/ に置く
+  - tool: Write
+    subject: "/repo/.claude/worktreesx/a.md"
+    why: .claude/worktrees/ と名前の続く別のディレクトリも除かない
+  - tool: Write
+    subject: "/repo/.clang-format"
+    why: .c で始まる隠しファイルも、.claude/worktrees/ の外なので止まる
+  - tool: Write
     subject: "/repo/.claude/worktrees/x/.claude/settings.json"
     why: ワークツリーの中でも hook の登録は触らない（guard-settings）。統合で main の登録になる
   - tool: Edit
@@ -83,6 +95,37 @@ deny:
   - tool: Bash
     subject: "cat /repo/.env.production"
     why: 環境名が付いた形も同じ場所
+  - tool: Read
+    subject: "/repo/.env"
+    why: 認証情報。Read でも同じ
+  - tool: Read
+    subject: "C:\\repo\\.env.local"
+    why: Windows の区切りでも同じ。環境名付きも .env のうち
+  - tool: Bash
+    subject: "cat /repo/.env.example.bak"
+    why: 見本の名前で終わらない形は除かない（見本を写した中身かもしれない）
+  - tool: Read
+    subject: "/repo/.env.example"
+    why: >-
+      値を持たない見本の .env。共通の credentials-files は not で除くが、常に有効な組み込みの
+      builtin-credentials（実行ファイルの土台）が .env の後ろに続く名前ごと止める。
+      組み込みの match は Bash|Read|Write|Edit で、NotebookEdit には当たらない（ask の見本）
+  - tool: NotebookEdit
+    subject: "/repo/.claude/worktrees/x/secrets/.env.example"
+    why: >-
+      見本の名前で終わっても、secrets/ の下なので除かない。例外は .env の枝にだけ掛かる。
+      組み込みの builtin-credentials は NotebookEdit を見ないので、ここで外れると素通りする
+  - tool: NotebookEdit
+    subject: "/repo/.claude/worktrees/x/.env.local"
+    why: NotebookEdit でも .env は止める。組み込みは NotebookEdit を見ない
+  - tool: Bash
+    subject: "cat /repo/.env; cat /repo/.env.example"
+    why: >-
+      Bash の credentials には例外を付けていないので、見本の名前を足しても外れない
+  - tool: Bash
+    subject: "cat /repo/secrets/token; cat /repo/.env.example"
+    why: >-
+      同上。.aws・secrets・*.pem は組み込みが止めないので、ここで外れると素通りする
   - tool: Bash
     subject: "cat /repo/certs/server.pem"
     why: 同上
@@ -174,6 +217,16 @@ deny:
     why: .claude を通らないパス。Bash の対象は解かれないので名前で捕まえる
 
 ask:
+  - tool: Write
+    subject: "/repo/wip/scratchpad/a.md"
+    why: >-
+      workspace-root の except で除く下書きの置き場。止めないが allow にも無いので、
+      権限モードに渡る（端末からの試験では ask）
+  - tool: NotebookEdit
+    subject: "/repo/.claude/worktrees/x/.env.example"
+    why: >-
+      値を持たない見本の .env。credentials-files が除き、組み込みの builtin-credentials は
+      NotebookEdit を見ないので、どのルールにも当たらず権限モードへ渡る
   - tool: Write
     subject: "/repo/.claude/worktrees/x/pyproject.toml"
     why: 実行時の依存が変わる。main の側は deny なのでワークツリーで見る

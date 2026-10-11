@@ -4,11 +4,17 @@
  * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
  * ツールの欄（`match`）は押すと選択肢が出る。`message` は deny だけの欄で、ask と allow に
  * 残っていれば「どこにも届かない」と言って消すボタンだけ出す。
+ *
+ * 条件の木（`when:`）を持つルールは、パターンの欄の代わりに木の図（`When.tsx`）を出し、畳んだ行には
+ * 木を 1 行に縮めたもの（`all(regex …, not(any(2)))`）を出す。glob / regex 1 つのルールは
+ * 「条件の木に変換」で同じ意味の木にできる（除くものは `not: {any: …}` に入れ、`except:` は消す）。
  */
 import type { JSX, ReactNode } from "react";
 
 import { KNOWN_TOOLS, SECTIONS, type FileField, type PatternKind, type RuleForm, type Section } from "../../core/rules-view.js";
+import { condProblems, condSummary, toWhenBlocker, treeOfPattern } from "../../core/rules-when.js";
 import { contextSummary, hasContext, staleMessage, summaryId, summaryMatch, summaryNote } from "./text.js";
+import { When } from "./When.js";
 
 /** 1 行の欄（input）で受ける値 */
 type TextKey = "id" | "match" | "pattern" | "every" | "additionalContextFile" | "additionalContextOnceFile";
@@ -42,6 +48,8 @@ export interface RuleProps {
 
 export function Rule(props: RuleProps): JSX.Element {
   const { rule, section } = props;
+  // glob と regex の併記や、except が木へそのまま移せない形なら、「条件の木に変換」を押させずに理由を出す
+  const blocker = toWhenBlocker(rule);
 
   const text = (name: TextKey, className: string, placeholder: string): JSX.Element => (
     <input
@@ -102,9 +110,23 @@ export function Rule(props: RuleProps): JSX.Element {
           <span className="dim mono clip" title={rule.match}>
             {summaryMatch(rule)}
           </span>
-          <span className="clip" title={rule.pattern === "" ? "" : `${rule.kind} ${rule.pattern}`}>
-            {rule.pattern === "" ? <span className="dim">（{rule.kind} 未設定）</span> : <code>{rule.pattern}</code>}
+          <span className="clip" title={rule.when !== undefined ? `when: ${condSummary(rule.when)}` : rule.pattern === "" ? "" : `${rule.kind} ${rule.pattern}`}>
+            {rule.when !== undefined ? (
+              <>
+                <code className="sum-when">{condSummary(rule.when)}</code>
+                {condProblems(rule.when).length > 0 && <span className="sum-note sum-when-error">木に誤り {condProblems(rule.when).length}</span>}
+              </>
+            ) : rule.pattern === "" ? (
+              <span className="dim">（{rule.kind} 未設定）</span>
+            ) : (
+              <code>{rule.pattern}</code>
+            )}
             {summaryNote(section, rule) !== "" && <span className="sum-note">{summaryNote(section, rule)}</span>}
+            {rule.excepts !== undefined && rule.excepts.length > 0 && (
+              <span className="sum-note sum-except" title={`except: ${rule.excepts.join(" / ")}`}>
+                除外 {rule.excepts.length}
+              </span>
+            )}
           </span>
           {/* 刻みは折りたたんだままでも見える。見えないと「毎回渡る」と思ったまま渡す文を直すことになる */}
           {rule.every === "" ? (
@@ -135,15 +157,48 @@ export function Rule(props: RuleProps): JSX.Element {
             ))}
           </select>
         </Captioned>
-        <Captioned name="パターン" yamlKey="glob / regex">
-          <div className="inline">
-            <select className="f-kind" value={rule.kind} onChange={(event) => props.onChange({ ...rule, kind: event.target.value as PatternKind })}>
-              <option value="glob">glob</option>
-              <option value="regex">regex</option>
-            </select>
-            {text("pattern", "f-pattern pattern", rule.kind === "glob" ? "*git push*" : "\\bgit push\\b")}
-          </div>
-        </Captioned>
+        {rule.when !== undefined ? (
+          <Captioned name="条件の木" yamlKey="when">
+            {/* 開いた行にだけ図を置く（畳んだ行の分まで React Flow を立ち上げない） */}
+            {props.open ? <When tree={rule.when} onChange={(when) => props.onChange({ ...rule, when })} /> : <span />}
+          </Captioned>
+        ) : (
+          <Captioned name="パターン" yamlKey="glob / regex">
+            <div className="inline">
+              <select className="f-kind" value={rule.kind} onChange={(event) => props.onChange({ ...rule, kind: event.target.value as PatternKind })}>
+                <option value="glob">glob</option>
+                <option value="regex">regex</option>
+              </select>
+              {text("pattern", "f-pattern pattern", rule.kind === "glob" ? "*git push*" : "\\bgit push\\b")}
+              <button
+                type="button"
+                className="action small"
+                data-action="to-when"
+                disabled={blocker !== undefined}
+                title={blocker ?? "このパターン（と除外）を、同じ意味の条件の木（when）に書き直す。除外は not の中へ移る"}
+                onClick={() => props.onChange(toWhen(rule))}
+              >
+                条件の木に変換
+              </button>
+            </div>
+          </Captioned>
+        )}
+        {/* 除くもの（except）は見せるだけ。書き戻しは元のノードのままなので、消えも変わりもしない */}
+        {rule.excepts !== undefined && rule.excepts.length > 0 && (
+          <Captioned name="除外" yamlKey="except">
+            <div className="f-except">
+              {rule.excepts.map((item, i) => (
+                <div key={i}>
+                  <code>{item}</code>
+                </div>
+              ))}
+              <span className="dim">
+                {rule.when !== undefined ? "条件の木に当たっても" : "パターンに当たっても"}、これに当たれば当たらない扱い。画面では編集しません。ルールファイルで直すか、
+                {rule.when !== undefined ? "条件の木の not に移してください" : "「条件の木に変換」で木の中へ移してください"}
+              </span>
+            </div>
+          </Captioned>
+        )}
         {section === "deny" ? (
           <Captioned name="メッセージ" yamlKey="message">
             {area("message", "f-message", "なぜ拒否するかと、代わりに何をすればよいか（拒否されたモデルに届く）")}
@@ -196,6 +251,21 @@ export function Rule(props: RuleProps): JSX.Element {
       </div>
     </li>
   );
+}
+
+/**
+ * glob / regex 1 つのルールを、同じ意味の条件の木にする。除くもの（`except:`）は木の中へ移し、
+ * 書き戻しで `except:` を消す（`dropExcept`）。木 → 1 つへは戻さない
+ */
+function toWhen(rule: RuleForm): RuleForm {
+  const { excepts, exceptNodes, ...rest } = rule;
+  const moved = exceptNodes ?? [];
+  return {
+    ...rest,
+    pattern: "",
+    when: treeOfPattern(rule.kind, rule.pattern, moved),
+    ...(excepts !== undefined || exceptNodes !== undefined ? { dropExcept: true } : {}),
+  };
 }
 
 /**

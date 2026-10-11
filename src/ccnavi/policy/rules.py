@@ -62,6 +62,65 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
 読み込み時に置き換わる。「ワークスペースの下」を絶対パスの直書きなしに書くための
 もので、Windows と WSL と Linux で表記が分かれない。glob なら `{root}/wip/*`、regex なら
 `^{root}[\\/]` のように書く。ワークスペースルートが渡らない読み方をしたルールは error で名指しする。
+
+## 除く（except）
+
+ルールは省略できるキー `except:` を持てる。値はリストで、各要素は `glob` か `regex` の
+どちらか 1 つだけを持つマッピング。本体の `glob` / `regex` に当たっても、`except` の
+どれかに当たれば、そのルールは当たらない扱いになる。`match`（ツール名）の見方は変わらない。
+
+    deny:
+      - id: workspace-root
+        match: Write|Edit|NotebookEdit
+        regex: '^{root}[\\/]'
+        except:
+          - regex: '^{root}[\\/]wip[\\/]scratchpad(?:[\\/]|$)'
+          - regex: '^{root}[\\/]\\.claude[\\/]worktrees(?:[\\/]|$)'
+        message: ...
+
+先読みを禁じているので、「A だが B は除く」を 1 本の regex で書くと 1 文字ずつの
+場合分けになる。`except` はそれを 2 本の式に分けて書くためのもの。各パターンには本体と
+同じ読み方（`{root}` の置き換え、`{!root}` の扱い、大文字小文字の無視、先読み・後方参照の
+禁止、glob の翻訳）を当てる。当てる文字列も本体と同じで、Bash ならコマンド列の全体。
+コマンドのどこかに除く語を足すだけで外れるので、Bash の `deny` / `ask` に付けるときは
+狭く書く（lint が warn で言う）。
+
+空のリスト、マッピングでない要素、`glob` と `regex` の両方がある・どちらも無い要素、
+知らないキーを持つ要素は、ルールごと読み込まずに error で名指しする。
+
+## 条件の木（when）
+
+本体は `glob` / `regex` の代わりに `when:` でも書ける。ルールが持つのは 3 つのうち
+ちょうど 1 つ。`when` の値はノードで、ノードは次のどれか 1 つのキーだけを持つマッピング。
+
+    glob: '<glob>'          葉。本体の glob と同じ読み方
+    regex: '<regex>'        葉。本体の regex と同じ読み方
+    all: [ノード, ...]       全部に当たれば当たる（1 個以上）
+    any: [ノード, ...]       どれかに当たれば当たる（1 個以上）
+    not: ノード              当たらなければ当たる
+
+    deny:
+      - id: secrets
+        match: Write|Edit
+        when:
+          any:
+            - glob: '*.pem'
+            - all:
+                - glob: '*/secrets/*'
+                - not: {glob: '*.md'}
+        message: ...
+
+葉には本体と同じ読み方（`{root}`、`{!root}`、大文字小文字の無視、先読み・後方参照の禁止、
+glob の翻訳）を当て、当てる文字列も本体と同じ（Bash ならコマンド列の全体）。`except:` と
+併せて書けて、意味は `all: [when, not: {any: except}]`。
+
+判定が重くならないように、入れ子は 8 段、ノードは 64 個まで。知らないキー、キーが 0 個・
+2 個以上のノード、空のリスト、型の違う値と合わせて、ルールごと読み込まずに error で名指しする。
+葉の `{!root}` を組み立てられないときは、本体と同じく `deny` / `ask` は `match` の全部に当てて
+止め、`allow` はルールごと使わない。
+
+「除く」だけなら `except` のほうが読みやすい。`when` は「A か B」「A かつ B」のように、
+1 本の式に詰めると読めなくなる組み合わせのために使う。
 """
 
 from __future__ import annotations
@@ -157,6 +216,24 @@ _GENERATED_QUANTIFIER = re.compile(r"(?<!\\)[*+]|(?<!\\)\{\d")
 # `{!root}` の直後に続けてよい書き始め。生成した式が読み終える位置はパスの区切りとは
 # 限らないので、任意の位置まで進む書き方で受けていないものは warn で伝える。
 _SKIPS_ANYWHERE = re.compile(r"(?:\.[*+]|\[\\s\\S\][*+])")
+
+# ルールの本体に当たっても、ここに並べたどれかに当たれば当たらない扱いにするキー。
+# 各要素は `glob` か `regex` のどちらか 1 つだけを持つマッピングで、`when:` の葉と同じ形。
+# 書き方を 1 つにしておけば、except から when へ書き換えるときに葉を写すだけで済む。
+EXCEPT_KEY = "except"
+EXCEPT_FIELDS = ("glob", "regex")
+
+# 条件の木を書くキーと、ノードに書けるキー。葉は except の要素と同じ形（`glob` / `regex`）。
+WHEN_KEY = "when"
+WHEN_LEAVES = EXCEPT_FIELDS
+WHEN_ALL = "all"
+WHEN_ANY = "any"
+WHEN_NOT = "not"
+WHEN_KINDS = (*WHEN_LEAVES, WHEN_ALL, WHEN_ANY, WHEN_NOT)
+# 入れ子の段数とノードの数の上限。判定は呼び出しのたびに木をたどるので、書き方しだいで
+# 重くならないように頭打ちにする。根が 1 段目。
+MAX_WHEN_DEPTH = 8
+MAX_WHEN_NODES = 64
 
 # レイヤーの名前と id の間に入る文字（`self:docs` / `lib:source`、ruleload.prefix_ids）。
 # 書かれたままの id にこれが入っていると、レイヤーをつけた形と見分けが付かない。
@@ -299,6 +376,81 @@ class Problem:
 
 
 @dataclass
+class Exclusion:
+    """ルールの `except:` の 1 件。本体と同じ読み方で組み立てた式を持つ。"""
+
+    glob: str = ""
+    regex: str = ""
+    compiled: re.Pattern | None = None
+
+    def written(self) -> dict:
+        """書いた表記に戻した形。`{"glob": ...}` か `{"regex": ...}`。"""
+        return {"glob": self.glob} if self.glob else {"regex": self.regex}
+
+
+@dataclass
+class Condition:
+    """`when:` のノード 1 つ。葉（glob / regex）か、all / any / not。
+
+    葉は本体と同じ読み方で組み立てた式を持つ。`where` は苦情と lint で名指しするための
+    位置（`when.any[1].not` のような形）で、比較（key）と書き戻し（written）には入れない。
+    """
+
+    kind: str
+    text: str = ""
+    children: list[Condition] = field(default_factory=list)
+    compiled: re.Pattern | None = None
+    where: str = ""
+
+    def is_leaf(self) -> bool:
+        return self.kind in WHEN_LEAVES
+
+    def hits(self, subject: str) -> bool:
+        if self.is_leaf():
+            return self.compiled is not None and self.compiled.search(subject) is not None
+        if self.kind == WHEN_ALL:
+            return all(c.hits(subject) for c in self.children)
+        if self.kind == WHEN_ANY:
+            return any(c.hits(subject) for c in self.children)
+        return not self.children[0].hits(subject)
+
+    def written(self) -> dict:
+        """書いた表記に戻した形。"""
+        if self.is_leaf():
+            return {self.kind: self.text}
+        if self.kind == WHEN_NOT:
+            return {WHEN_NOT: self.children[0].written()}
+        return {self.kind: [c.written() for c in self.children]}
+
+    def key(self) -> tuple:
+        """比べるための形。葉は `{root}` を置き換えたあとの式で比べる（Rule.key と同じ理由）。"""
+        if self.is_leaf():
+            return (self.kind, self.compiled.pattern if self.compiled else self.text)
+        return (self.kind, tuple(c.key() for c in self.children))
+
+    def describe(self) -> str:
+        """1 行で読める形。`any(glob '*.pem', all(glob '*/secrets/*', not(glob '*.md')))`。"""
+        if self.is_leaf():
+            return f"{self.kind} '{self.text}'"
+        return f"{self.kind}({', '.join(c.describe() for c in self.children)})"
+
+    def lines(self, indent: str = "") -> list[str]:
+        """字下げで読める形。1 ノード 1 行。"""
+        if self.is_leaf():
+            return [indent + self.describe()]
+        out = [indent + self.kind]
+        for c in self.children:
+            out.extend(c.lines(indent + "  "))
+        return out
+
+    def walk(self) -> Iterator[Condition]:
+        """自分と、その下のノードを根から順に。"""
+        yield self
+        for c in self.children:
+            yield from c.walk()
+
+
+@dataclass
 class Rule:
     """探すものと、見つけたときに言うことの組。"""
 
@@ -376,6 +528,26 @@ class Rule:
     # 対象で、外すものが無ければ受け取ったまま返す。
     exempt: Callable[[str], str] | None = field(default=None, repr=False, compare=False)
 
+    # excepts は `except:` の各パターン。本体（compiled）に当たっても、どれかに当たれば
+    # このルールは当たらない。当てる文字列は本体と同じ（Bash ならコマンド列の全体）。
+    excepts: list[Exclusion] = field(default_factory=list)
+
+    # when は `when:` で書いた本体（条件の木）。glob / regex で書いたルールでは None。
+    # `when` のルールの compiled はふつう None で、葉を組み立てられずに止める側へ倒した
+    # deny / ask だけが、何にでも当たる式を compiled に持つ（そちらを先に見る）。木は
+    # 書いた表記を出すために残す。
+    when: Condition | None = None
+
+    def built(self) -> bool:
+        """判定に使える本体を持つか。"""
+        return self.compiled is not None or self.when is not None
+
+    def written_body(self) -> str:
+        """本体を書いた表記で 1 行に。`when` は木を 1 行にした形。"""
+        if self.when is not None:
+            return f"{WHEN_KEY}: {self.when.describe()}"
+        return self.glob or self.regex
+
     def spoken_message(self) -> str:
         """モデルへ渡す文面。`{root}` をワークスペースルートの実パスにしたもの。
 
@@ -396,6 +568,11 @@ class Rule:
             self.bare_id,
             self.match,
             self.compiled.pattern if self.compiled else "",
+            # 条件の木。葉の式と組み方の両方を比べる。
+            self.when.key() if self.when is not None else (),
+            # 除くものが違えば別の定義。比べないと、except だけが違う後ろのレイヤーの 1 本を
+            # 重複として捨て、前のレイヤーの except で通るはずのないものが通ってしまう。
+            tuple(e.compiled.pattern if e.compiled else "" for e in self.excepts),
             self.message,
             self.additional_context,
             self.additional_context_once,
@@ -411,13 +588,28 @@ class Rule:
 
     def matches(self, tool: str, subject: str) -> bool:
         """このルールがこのツールと対象に当たるかどうか。"""
-        if self.compiled is None or not subject:
+        if not self.built() or not subject:
             return False
         if tool_matches(self.match, tool):
             if self.exempt is not None:
                 subject = self.exempt(subject)
-            return self.compiled.search(subject) is not None
+            return self.hits(subject)
         return False
+
+    def hits(self, subject: str) -> bool:
+        """ツール名を見ずに、対象の文字列だけで当たるか。
+
+        本体に当たり、except のどれにも当たらないときに当たる。
+        """
+        if not self.body_hits(subject):
+            return False
+        return not any(e.compiled is not None and e.compiled.search(subject) for e in self.excepts)
+
+    def body_hits(self, subject: str) -> bool:
+        """本体（glob / regex / when）だけで当たるか。except は見ない。"""
+        if self.compiled is not None:
+            return self.compiled.search(subject) is not None
+        return self.when is not None and self.when.hits(subject)
 
 
 def tool_matches(match: str, tool: str) -> bool:
@@ -531,13 +723,12 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
             problems.append(Problem(SEVERITY_ERROR, f"({name})", f"`{name}` がリストではない"))
             continue
         for i, raw in enumerate(raw_section):
-            rule, problem = _build(raw, name, i, root, builtin)
+            rule, found = _build(raw, name, i, root, builtin)
             # 苦情とルールは同時に返りうる。`{!root}` を組み立てられなかった deny / ask が
             # これで、「報告する」と「保護を消さない」を両立させる唯一の方法。
             # 捨てるだけにすると、生成に失敗した deny が気づかないうちに消えて、
             # 止められずに通るようになる。
-            if problem is not None:
-                problems.append(problem)
+            problems.extend(found)
             if rule is not None:
                 rule_set.section(name).append(rule)
 
@@ -546,20 +737,23 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
 
 def _build(
     raw: object, section: str, index: int, root: str = "", builtin: bool = False
-) -> tuple[Rule | None, Problem | None]:
-    """ルール 1 件を組み立てる。返るのは (ルール, 苦情) で、どちらも無いことがありうる。
+) -> tuple[Rule | None, list[Problem]]:
+    """ルール 1 件を組み立てる。返るのは (ルール, 苦情のリスト) で、どちらも無いことがありうる。
 
     3 通りある。
 
-    - `(rule, None)`   組み立てられた
-    - `(None, problem)` 受け付けられない。判定に使わない
-    - `(rule, problem)` 苦情はあるが判定には使う。`{!root}` を組み立てられなかった
+    - `(rule, [])`        組み立てられた
+    - `(None, problems)`  受け付けられない。判定に使わない
+    - `(rule, problems)`  苦情はあるが判定には使う。`{!root}` を組み立てられなかった
       `deny` / `ask` がこれで、`match` の全部に当たる式を持って止める側になる。
-      捨てると「ワークスペースの外の全部」が止められずに通るので、報告だけでは足りない
+      捨てると「ワークスペースの外の全部」が止められずに通るので、報告だけでは足りない。
+      `{!root}` の後ろの書き方への warn もここに入る
+
+    苦情をリストにしてあるのは、本体と `except` の各パターンがそれぞれ warn を出しうるため。
     """
     where = f"{section}[{index}]"
     if not isinstance(raw, dict):
-        return None, Problem(SEVERITY_ERROR, where, "ルールがマッピングではない")
+        return None, [Problem(SEVERITY_ERROR, where, "ルールがマッピングではない")]
 
     written_id = str(raw.get("id") or "")
     rule = Rule(
@@ -581,85 +775,209 @@ def _build(
     name = f"{section}:{rule.id}" if rule.id else where
 
     if ID_SEPARATOR in written_id:
-        return None, Problem(
-            SEVERITY_ERROR,
-            name,
-            f"id に `{ID_SEPARATOR}` は書けない。レイヤーの名前を添えた形"
-            f"（`self{ID_SEPARATOR}id` / `<プロジェクト名>{ID_SEPARATOR}id`）と"
-            "見分けが付かず、記録を読んだユーザがどのファイルを直すのか決められない",
-        )
+        return None, [
+            Problem(
+                SEVERITY_ERROR,
+                name,
+                f"id に `{ID_SEPARATOR}` は書けない。レイヤーの名前を添えた形"
+                f"（`self{ID_SEPARATOR}id` / `<プロジェクト名>{ID_SEPARATOR}id`）と"
+                "見分けが付かず、記録を読んだユーザがどのファイルを直すのか決められない",
+            )
+        ]
     if not builtin and written_id.lower().startswith(RESERVED_ID_PREFIX):
-        return None, Problem(
-            SEVERITY_ERROR,
-            name,
-            f"`{RESERVED_ID_PREFIX}` で始まる id は組み込みルールの名前で、"
-            "ルールファイルには書けない。同じ名前で書いても組み込みは置き換わらない。"
-            "別の名前にしてください。"
-            "組み込みを外したいなら env（CCNAVI_GUARD_CORE_FILES など）で"
-            "その保護ごと切ってください",
-        )
+        return None, [
+            Problem(
+                SEVERITY_ERROR,
+                name,
+                f"`{RESERVED_ID_PREFIX}` で始まる id は組み込みルールの名前で、"
+                "ルールファイルには書けない。同じ名前で書いても組み込みは置き換わらない。"
+                "別の名前にしてください。"
+                "組み込みを外したいなら env（CCNAVI_GUARD_CORE_FILES など）で"
+                "その保護ごと切ってください",
+            )
+        ]
     if not rule.message and section in _NEEDS_MESSAGE:
-        return None, Problem(
-            SEVERITY_ERROR, name, "文面が無い。ルールは代わりに何をすべきかを言わなければならない"
-        )
+        return None, [
+            Problem(
+                SEVERITY_ERROR,
+                name,
+                "文面が無い。ルールは代わりに何をすべきかを言わなければならない",
+            )
+        ]
     if not rule.match:
-        return None, Problem(SEVERITY_ERROR, name, "match が無い。どのツールにもヒットしない")
-    if not rule.glob and not rule.regex:
-        return None, Problem(SEVERITY_ERROR, name, "glob も regex も無い")
-    if rule.glob and rule.regex:
-        return None, Problem(
-            SEVERITY_ERROR, name, "glob と regex の両方がある。どちらで判定するのか決められない"
+        return None, [Problem(SEVERITY_ERROR, name, "match が無い。どのツールにもヒットしない")]
+    # `when` と並べたかどうかはキーの有無で見る。値の真偽で見ると `glob: ''` や `glob: 0` を
+    # 添えた木が通り、書いた人の意図（どちらで判定するのか）が決まらないまま読み込まれる。
+    # 拡張の画面（rules-doc.ts の readRules）もキーの有無で見ている。
+    has_when = WHEN_KEY in raw
+    bodies = [
+        key
+        for key, present in (
+            ("glob", "glob" in raw if has_when else bool(rule.glob)),
+            ("regex", "regex" in raw if has_when else bool(rule.regex)),
+            (WHEN_KEY, has_when),
         )
+        if present
+    ]
+    if not bodies:
+        return None, [Problem(SEVERITY_ERROR, name, "glob も regex も when も無い")]
+    if len(bodies) == 2:
+        return None, [
+            Problem(
+                SEVERITY_ERROR,
+                name,
+                f"{bodies[0]} と {bodies[1]} の両方がある。どちらで判定するのか決められない",
+            )
+        ]
+    if len(bodies) > 2:
+        return None, [
+            Problem(
+                SEVERITY_ERROR,
+                name,
+                "glob と regex と when が並んでいる。書けるのは 1 つだけで、"
+                "どれで判定するのか決められない",
+            )
+        ]
 
-    # `{root}` はワークスペースルートの実パスに置き換える。書いた表記（rule.glob / rule.regex）は
+    tree: Condition | None = None
+    if WHEN_KEY in raw:
+        tree, problem = _when(raw.get(WHEN_KEY), name)
+        if problem is not None:
+            return None, [problem]
+
+    excepts, problem = _excepts(raw, name)
+    if problem is not None:
+        return None, [problem]
+
+    problems: list[Problem] = []
+    if tree is not None:
+        refused = ""
+        for leaf in tree.walk():
+            if not leaf.is_leaf():
+                continue
+            label = f"{leaf.where} の "
+            glob, regex = (leaf.text, "") if leaf.kind == "glob" else ("", leaf.text)
+            part = _compile(glob, regex, root, name, label)
+            if part.error is not None:
+                return None, problems + [part.error]
+            if part.note is not None:
+                problems.append(part.note)
+            if part.refused and not refused:
+                refused = label + part.refused
+            leaf.compiled = part.compiled
+        rule.when = tree
+        if refused:
+            # 葉を 1 つでも組み立てられなければ、木の意味が決まらない。`not` の下の葉なら
+            # 外すと当たる範囲が狭まり、上なら広がるので、葉だけ外す形は向きが定まらない。
+            # 本体を組み立てられなかったときと同じく、deny / ask は全部止め、allow は使わない。
+            degraded, refused_problem = _ungeneratable(rule, section, name, refused)
+            return degraded, problems + [refused_problem]
+    else:
+        built = _compile(rule.glob, rule.regex, root, name, "")
+        if built.error is not None:
+            return None, [built.error]
+        if built.note is not None:
+            problems.append(built.note)
+        if built.refused:
+            # 本体を組み立てられなかった deny / ask は、`match` の全部に当てて止める。
+            # except は付けない。付けると「全部止める」に穴が空き、保護を消さないための形が崩れる。
+            degraded, refused_problem = _ungeneratable(rule, section, name, built.refused)
+            return degraded, problems + [refused_problem]
+        rule.compiled = built.compiled
+
+    for i, (glob, regex) in enumerate(excepts):
+        label = f"except[{i}] の "
+        part = _compile(glob, regex, root, name, label)
+        if part.error is not None:
+            return None, problems + [part.error]
+        if part.note is not None:
+            problems.append(part.note)
+        if part.refused:
+            # except を組み立てられないときは、その except を持たないルールとして使う。deny / ask は
+            # 当たる範囲が広がる（止める側に外れる）。allow は広がると通す範囲が増えるので、
+            # ルールごと判定に使わない。
+            problems.append(Problem(SEVERITY_ERROR, name, label + part.refused))
+            if section == ALLOW:
+                return None, problems
+            continue
+        rule.excepts.append(Exclusion(glob=glob, regex=regex, compiled=part.compiled))
+
+    return rule, problems
+
+
+@dataclass
+class _Built:
+    """式 1 つを組み立てた結果。`refused` は `{!root}` を展開できなかった理由。"""
+
+    compiled: re.Pattern | None = None
+    error: Problem | None = None
+    note: Problem | None = None
+    refused: str = ""
+
+
+def _compile(glob: str, regex: str, root: str, name: str, label: str) -> _Built:
+    """`glob` か `regex` の 1 つを、判定に使う式に組み立てる。
+
+    ルールの本体と `except` の各パターンが同じこの 1 本を通る。`{root}` の置き換え、
+    `{!root}` の展開、先読み・後方参照の禁止、大文字小文字の無視を、両方で食い違わせないため。
+    `label` は苦情の頭に付ける語（本体なら空、except なら `except[0] の `）。
+    """
+    # `{root}` はワークスペースルートの実パスに置き換える。書いた表記（glob / regex）は
     # そのまま残し、置き換えるのは翻訳後の式だけ。報告と --explain は書いた表記を出す。
-    uses_root = ROOT_PLACEHOLDER in rule.regex or ROOT_PLACEHOLDER in rule.glob
+    uses_root = ROOT_PLACEHOLDER in regex or ROOT_PLACEHOLDER in glob
     if uses_root and not root:
-        return None, Problem(
-            SEVERITY_ERROR, name, f"`{ROOT_PLACEHOLDER}` を使うにはワークスペースルートが要る"
+        return _Built(
+            error=Problem(
+                SEVERITY_ERROR,
+                name,
+                f"{label}`{ROOT_PLACEHOLDER}` を使うにはワークスペースルートが要る",
+            )
         )
 
     # `{!root}` は `regex` 専用。`glob` は fnmatch に翻訳されるので、入れ子の選択肢を持つ
     # 展開結果を埋める場所が無い。
-    if NOT_ROOT_PLACEHOLDER in rule.glob:
-        return None, Problem(
-            SEVERITY_ERROR,
-            name,
-            f"`{NOT_ROOT_PLACEHOLDER}` は `glob` には書けない。"
-            f"`regex: '^{NOT_ROOT_PLACEHOLDER}'` と書いてください",
+    if NOT_ROOT_PLACEHOLDER in glob:
+        return _Built(
+            error=Problem(
+                SEVERITY_ERROR,
+                name,
+                f"{label}`{NOT_ROOT_PLACEHOLDER}` は `glob` には書けない。"
+                f"`regex: '^{NOT_ROOT_PLACEHOLDER}'` と書いてください",
+            )
         )
 
     note: Problem | None = None
-    uses_not_root = NOT_ROOT_PLACEHOLDER in rule.regex
+    uses_not_root = NOT_ROOT_PLACEHOLDER in regex
     if uses_not_root:
-        misplaced = _not_root_placement(rule.regex)
+        misplaced = _not_root_placement(regex)
         if misplaced:
-            return None, Problem(SEVERITY_ERROR, name, misplaced)
+            return _Built(error=Problem(SEVERITY_ERROR, name, label + misplaced))
         if not root:
-            return None, Problem(
-                SEVERITY_ERROR,
-                name,
-                f"`{NOT_ROOT_PLACEHOLDER}` を使うにはワークスペースルートが要る",
+            return _Built(
+                error=Problem(
+                    SEVERITY_ERROR,
+                    name,
+                    f"{label}`{NOT_ROOT_PLACEHOLDER}` を使うにはワークスペースルートが要る",
+                )
             )
-        suffix = _not_root_suffix(rule.regex)
+        suffix = _not_root_suffix(regex)
         if suffix:
-            note = Problem(SEVERITY_WARN, name, suffix)
+            note = Problem(SEVERITY_WARN, name, label + suffix)
 
-    if rule.regex:
-        unsupported = _unsupported(rule.regex)
+    if regex:
+        unsupported = _unsupported(regex)
         if unsupported:
-            return None, Problem(SEVERITY_ERROR, name, f"{unsupported}は使えない")
-        expression = (
-            rule.regex.replace(ROOT_PLACEHOLDER, root_pattern(root)) if uses_root else rule.regex
-        )
+            return _Built(error=Problem(SEVERITY_ERROR, name, f"{label}{unsupported}は使えない"))
+        expression = regex.replace(ROOT_PLACEHOLDER, root_pattern(root)) if uses_root else regex
         if uses_not_root:
             expanded, refused = _expand_not_root(expression, root)
             if refused:
-                return _ungeneratable(rule, section, name, refused)
+                return _Built(note=note, refused=refused)
             expression = expanded
     else:
-        glob = rule.glob.replace(ROOT_PLACEHOLDER, root_glob(root)) if uses_root else rule.glob
-        expression = translate(glob)
+        expression = translate(
+            glob.replace(ROOT_PLACEHOLDER, root_glob(root)) if uses_root else glob
+        )
 
     # `glob` も `regex` も、どの機械でも大文字小文字を区別せずに当てる。区別するかを機械で
     # 変えると、同じルールが Windows では当たり Linux では当たらない。`*/.ccnavi/*` と書いた
@@ -671,18 +989,148 @@ def _build(
     flags = re.IGNORECASE
 
     try:
-        rule.compiled = re.compile(expression, flags)
+        return _Built(compiled=re.compile(expression, flags), note=note)
     except re.error as exc:
-        return None, Problem(SEVERITY_ERROR, name, f"正規表現として組み立てられない: {exc}")
+        return _Built(
+            error=Problem(SEVERITY_ERROR, name, f"{label}正規表現として組み立てられない: {exc}")
+        )
     except RecursionError:
         # `re` の組み立ては入れ子を再帰で読む。捕捉しないとプロセスごと異常終了し、
         # hook の異常終了は呼び出しを止めずに通してしまう。
         # shellread が同じ形で `RecursionError` を安全側にしているのに倣う。
         if uses_not_root:
-            return _ungeneratable(rule, section, name, "入れ子が深すぎて組み立てられない")
-        return None, Problem(SEVERITY_ERROR, name, "入れ子が深すぎて組み立てられない")
+            return _Built(note=note, refused="入れ子が深すぎて組み立てられない")
+        return _Built(
+            error=Problem(SEVERITY_ERROR, name, f"{label}入れ子が深すぎて組み立てられない")
+        )
 
-    return rule, note
+
+def _excepts(raw: dict, name: str) -> tuple[list[tuple[str, str]], Problem | None]:
+    """`except:` を読む。返すのは (glob, regex) の組のリストと、書式の苦情。
+
+    値はリストで、各要素は `glob` か `regex` のどちらか 1 つだけを持つマッピング。
+    キーが無ければ空のリスト。書いてあるのに空のリスト・`null` は error にする。
+    書いたユーザは何かを除いたつもりでいるので、何も除かない形を黙って受け取らない。
+    """
+    if EXCEPT_KEY not in raw:
+        return [], None
+    written = raw.get(EXCEPT_KEY)
+    if not isinstance(written, list):
+        return [], Problem(
+            SEVERITY_ERROR,
+            name,
+            f"`{EXCEPT_KEY}` がリストではない。"
+            "`- glob: '...'` か `- regex: '...'` を並べてください",
+        )
+    if not written:
+        return [], Problem(
+            SEVERITY_ERROR,
+            name,
+            f"`{EXCEPT_KEY}` が空。除くものが無いなら `{EXCEPT_KEY}` ごと消してください",
+        )
+    out: list[tuple[str, str]] = []
+    for i, item in enumerate(written):
+        where = f"{EXCEPT_KEY}[{i}]"
+        if not isinstance(item, dict):
+            return [], Problem(
+                SEVERITY_ERROR,
+                name,
+                f"{where} がマッピングではない。"
+                "`glob: '...'` か `regex: '...'` の形で書いてください",
+            )
+        unknown = sorted(str(k) for k in item if k not in EXCEPT_FIELDS)
+        if unknown:
+            return [], Problem(
+                SEVERITY_ERROR,
+                name,
+                f"{where} に知らないキー（{', '.join(unknown)}）がある。"
+                f"書けるのは `{'` か `'.join(EXCEPT_FIELDS)}` の 1 つだけ",
+            )
+        # 書いた値は文字列だけを受け取る。引用符の無い `on` は PyYAML が真偽値に読むので、
+        # 文字にすると 'True' に当てる except になってしまう（when の葉と同じ扱い）
+        for key in EXCEPT_FIELDS:
+            if key in item and not isinstance(item[key], str):
+                return [], Problem(
+                    SEVERITY_ERROR,
+                    name,
+                    f"{where} の {key} が文字列ではない。引用符で囲んでください",
+                )
+        glob = item.get("glob") or ""
+        regex = item.get("regex") or ""
+        if not glob and not regex:
+            return [], Problem(SEVERITY_ERROR, name, f"{where} に glob も regex も無い")
+        if glob and regex:
+            return [], Problem(
+                SEVERITY_ERROR,
+                name,
+                f"{where} に glob と regex の両方がある。どちらで判定するのか決められない",
+            )
+        out.append((glob, regex))
+    return out, None
+
+
+class _WhenError(Exception):
+    """`when:` の書式の誤り。木をたどる途中から一気に抜けるために使う。"""
+
+
+def _when(written: object, name: str) -> tuple[Condition | None, Problem | None]:
+    """`when:` を読んで木にする。葉の式はまだ組み立てない（_build が組み立てる）。
+
+    書式の誤りは最初の 1 件を返す。書いたユーザは条件を書いたつもりでいるので、
+    読めないノードを黙って外すと、当たる範囲が書いたものと気づかないうちに食い違う。
+    """
+    count = 0
+
+    def node(raw: object, where: str, depth: int) -> Condition:
+        nonlocal count
+        if depth > MAX_WHEN_DEPTH:
+            raise _WhenError(
+                f"{where} で入れ子が {MAX_WHEN_DEPTH} 段を超える。判定が重くならないように、"
+                "段を浅くするか、ルールを分けてください"
+            )
+        count += 1
+        if count > MAX_WHEN_NODES:
+            raise _WhenError(
+                f"{WHEN_KEY} のノードが {MAX_WHEN_NODES} 個を超える。判定が重くならないように、"
+                "ルールを分けてください"
+            )
+        if not isinstance(raw, dict):
+            raise _WhenError(
+                f"{where} がマッピングではない。"
+                f"`{'` / `'.join(WHEN_KINDS)}` のどれか 1 つのキーを持つ形で書いてください"
+            )
+        unknown = sorted(str(k) for k in raw if k not in WHEN_KINDS)
+        if unknown:
+            raise _WhenError(
+                f"{where} に知らないキー（{', '.join(unknown)}）がある。"
+                f"書けるのは `{'` / `'.join(WHEN_KINDS)}` のどれか 1 つだけ"
+            )
+        if len(raw) != 1:
+            got = "キーが無い" if not raw else f"キーが {len(raw)} つある（{', '.join(raw)}）"
+            raise _WhenError(
+                f"{where} に{got}。1 つのノードに書けるキーは 1 つだけで、"
+                f"組み合わせるなら `{WHEN_ALL}` / `{WHEN_ANY}` の下に並べてください"
+            )
+        ((kind, value),) = raw.items()
+        if kind in WHEN_LEAVES:
+            if not isinstance(value, str) or not value:
+                raise _WhenError(f"{where} の {kind} が空か、文字列ではない")
+            return Condition(kind, text=value, where=f"{where}.{kind}")
+        if kind == WHEN_NOT:
+            return Condition(
+                kind, children=[node(value, f"{where}.{kind}", depth + 1)], where=where
+            )
+        if not isinstance(value, list):
+            raise _WhenError(f"{where} の {kind} がリストではない。`- ノード` を並べてください")
+        if not value:
+            raise _WhenError(f"{where} の {kind} が空。1 つ以上のノードを並べてください")
+        children = [node(v, f"{where}.{kind}[{i}]", depth + 1) for i, v in enumerate(value)]
+        return Condition(kind, children=children, where=where)
+
+    try:
+        return node(written, WHEN_KEY, 1), None
+    except _WhenError as exc:
+        return None, Problem(SEVERITY_ERROR, name, str(exc))
 
 
 def _not_root_placement(expression: str) -> str:

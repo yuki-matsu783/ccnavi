@@ -263,7 +263,12 @@ def _repeated_denies(records: list[dict], n: int) -> list[tuple[str, str, int, l
 def _written_rule(rule: rules.Rule) -> dict:
     """ルール 1 件を、書いた表記の形に戻す。"""
     out: dict = {"id": rule.bare_id or rule.id, "match": rule.match}
-    out["glob" if rule.glob else "regex"] = rule.glob or rule.regex
+    if rule.when is not None:
+        out[rules.WHEN_KEY] = rule.when.written()
+    else:
+        out["glob" if rule.glob else "regex"] = rule.glob or rule.regex
+    if rule.excepts:
+        out[rules.EXCEPT_KEY] = [e.written() for e in rule.excepts]
     if rule.message:
         out["message"] = rule.message
     for key, value in (

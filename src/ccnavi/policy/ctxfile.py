@@ -152,7 +152,7 @@ def for_rules(
                 # id が無いと、match/glob が同じで every だけ違う 2 本が同じ鍵を共有し、
                 # 1 つの回数を 2 本で数えることになる（rules.Rule.key() は every を区別鍵に
                 # 含めるのに、ここが含めないと数えでは区別されない）。every を鍵に足して分ける。
-                key = rule.id or f"{rule.match} {rule.glob or rule.regex} {rule.every}"
+                key = rule.id or f"{rule.match} {rule.written_body()} {rule.every}"
                 hits = counted.get(key, 0) + 1
                 counted[key] = hits
                 # 渡す回は刻みの倍数になった回。その最初は刻みの回そのものなので、
