@@ -184,9 +184,10 @@ class PhaseHarness(unittest.TestCase):
         git(self.root, "worktree", "add", "--quiet", path, "-b", name, base)
         return path
 
-    def ccnavi(self, *args, stdin=""):
+    def ccnavi(self, *args, stdin="", env=None):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
+        environment.update(env or {})
         return run_ccnavi(
             [
                 "--root",

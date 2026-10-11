@@ -646,6 +646,50 @@ def integration_recorded(state: str) -> str:
     return ""
 
 
+class HookView(NamedTuple):
+    """Claude Code が起こした hook に渡るはずの値（解決する前の生の値）。"""
+
+    # mode は環境から来る CCNAVI_MODE。上書き設定ファイルの値は
+    # Settings.mode_declared_in_file に在る。
+    mode: str
+    # ticket_control は CCNAVI_TICKET_CONTROL。上書き設定ファイルが書いていればその値。
+    ticket_control: str
+
+
+def hook_view(root: str) -> HookView:
+    """hook が受け取るはずの CCNAVI_MODE と CCNAVI_TICKET_CONTROL を、診断のために組み直す。
+
+    Claude Code は `.claude/settings.json`、`.claude/settings.local.json` の順に `env` を重ね、
+    その上で hook を起こす。VS Code 拡張のように別のプロセスから実行ファイルを起こすと、
+    その `env` は渡らない。ボード（`--explain --json`）が「判定がいまどう動くか」を答えるために、
+    プロセスの環境の上にワークスペースルートの 2 本の `env` を同じ順で重ねる。
+    ホームの設定（`~/.claude/settings.json`）は読まない。実行ファイルはワークスペースの外を見ない。
+
+    hook の判定はこれを使わない。判定はプロセスに渡った環境だけを読む（`load`）。
+    値が文字列でない・ファイルが読めないときは、その段を飛ばす。
+    """
+    values = {name: os.environ.get(name, "") for name in (MODE_ENV, TICKET_CONTROL_ENV)}
+    for rel in (SHARED_CLAUDE_SETTINGS, LOCAL_CLAUDE_SETTINGS):
+        try:
+            with open(os.path.join(root, rel), encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            continue
+        env = data.get("env") if isinstance(data, dict) else None
+        if not isinstance(env, dict):
+            continue
+        for name in values:
+            if isinstance(env.get(name), str):
+                values[name] = env[name]
+    ticket_control = values[TICKET_CONTROL_ENV]
+    # ccnavi 自身のソースツリーでは、上書き設定ファイルが環境より強い（`load` と同じ順）
+    if own_source_tree(root):
+        conf, _ = _read_local(root)
+        if conf is not None and isinstance(conf.get("ticket_control"), str):
+            ticket_control = conf["ticket_control"]
+    return HookView(mode=values[MODE_ENV], ticket_control=ticket_control)
+
+
 def is_branch_prefix(word: str) -> bool:
     """親の識別子の先頭の語に使える形か（英小文字で始まる英小文字と数字。予約の名前でない）。"""
     return bool(_PREFIX.match(word or "")) and word not in _RESERVED_PREFIXES

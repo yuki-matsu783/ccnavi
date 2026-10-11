@@ -5,12 +5,13 @@
 
 from __future__ import annotations
 
+import dataclasses
 import io
 import os
 from typing import TextIO
 
-from ..infra import settings, tree
-from ..policy import ruleload, rules
+from ..infra import modes, settings, tree
+from ..policy import ruleload, rules, selfguard
 from ..tickets import (
     agree,
     approval,
@@ -32,8 +33,17 @@ from . import diagnose_shared
 BOARD_VERSION = 1
 
 
-def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> dict:
+def board(
+    conf: settings.Settings,
+    root: str,
+    stderr: TextIO | None = None,
+    mode_flag: str = "",
+    ticket_control_flag: str = "",
+) -> dict:
     """ボードの中身。形は README「ボードの JSON」に書いてある。"""
+    mode, ticket_control = hook_settings(conf, root, stderr, mode_flag, ticket_control_flag)
+    # ボードの中身も、hook が受け取るはずのチケット制御で組む。settings に出す値と食い違わせない
+    conf = dataclasses.replace(conf, ticket_control=ticket_control)
     problems: list[str] = []
     trees = tree.all_trees(root, conf.projects)
     payload: dict = {
@@ -41,7 +51,8 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         "root": root,
         "generated_at": approval_marks.now(),
         "settings": {
-            "ticket_control": conf.ticket_control or settings.TICKET_CONTROL_ENABLE,
+            "mode": mode,
+            "ticket_control": ticket_control,
             "tickets": conf.tickets,
             "approved": conf.approved,
             "projects": conf.projects,
@@ -347,6 +358,40 @@ def _one_per_file(found: list[ticket_model.Ticket]) -> list[ticket_model.Ticket]
         seen.add(key)
         kept.append(t)
     return kept
+
+
+def hook_settings(
+    conf: settings.Settings,
+    root: str,
+    stderr: TextIO | None = None,
+    mode_flag: str = "",
+    ticket_control_flag: str = "",
+) -> tuple[str, str]:
+    """hook がいま使うはずの動作モードとチケット制御を、判定と同じ解決の関数で決める。
+
+    VS Code 拡張が起こした実行ファイルには `.claude/settings*.json` の `env` が渡らないので、
+    `settings.hook_view` がそれを重ね直す。解決（読めない値は enable、設定ファイルから来た
+    disable の扱い）は `modes.resolve_mode` と `selfguard.resolve` のまま。フラグが渡されれば
+    それが勝つのも判定と同じ。読めない値の苦情は標準エラーに出す（標準出力は JSON だけ）。
+    """
+    view = settings.hook_view(root)
+    complaints = io.StringIO()
+    seen = dataclasses.replace(
+        conf,
+        mode=conf.mode_declared_in_file or view.mode,
+        mode_from_environment=view.mode,
+    )
+    mode = modes.resolve_mode(complaints, mode_flag, seen)
+    ticket_control = selfguard.resolve(
+        complaints,
+        ticket_control_flag,
+        view.ticket_control,
+        settings.TICKET_CONTROL_ENV,
+        selfguard.GATE_SETTINGS,
+    )
+    if stderr is not None:
+        stderr.write(complaints.getvalue())
+    return mode, ticket_control
 
 
 def _ticket_record(

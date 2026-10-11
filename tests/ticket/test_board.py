@@ -311,6 +311,66 @@ class BoardTest(PhaseHarness):
         self.assertEqual(board["settings"]["ticket_control"], "enable")
         self.assertTrue(board["settings"]["approved"].endswith("approved"))
 
+    def hook_settings(self, settings_env=None, local_env=None, env=None, *extra):
+        """`.claude/settings.json` と `settings.local.json` の env を置いて、settings を読む。"""
+        for name, values in (("settings.json", settings_env), ("settings.local.json", local_env)):
+            if values is not None:
+                write(os.path.join(self.root, ".claude", name), json.dumps({"env": values}))
+        result = self.ccnavi("--explain", "--json", *extra, env=env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return json.loads(result.stdout)["settings"], result.stderr
+
+    def test_mode_is_enable_when_nothing_says_otherwise(self):
+        self.assertEqual(self.hook_settings()[0]["mode"], "enable")
+
+    def test_mode_follows_the_settings_files_as_claude_code_layers_them(self):
+        """拡張が起こした実行ファイルにも、hook が受け取るはずの値を答える。
+
+        local が settings.json より強い。"""
+        got, _ = self.hook_settings({"CCNAVI_MODE": "dry-run"})
+        self.assertEqual(got["mode"], "dry-run")
+        got, _ = self.hook_settings({"CCNAVI_MODE": "dry-run"}, {"CCNAVI_MODE": "enable"})
+        self.assertEqual(got["mode"], "enable")
+
+    def test_settings_files_win_over_the_process_environment(self):
+        got, _ = self.hook_settings(env={"CCNAVI_MODE": "dry-run"})
+        self.assertEqual(got["mode"], "dry-run")
+        got, _ = self.hook_settings({"CCNAVI_MODE": "enable"}, env={"CCNAVI_MODE": "dry-run"})
+        self.assertEqual(got["mode"], "enable")
+
+    def test_disable_in_the_settings_env_is_what_the_hook_gets(self):
+        """settings の env は Claude Code が環境として渡すので、hook は disable で動く。
+
+        ボードも同じに答える。"""
+        got, _ = self.hook_settings({"CCNAVI_MODE": "disable"})
+        self.assertEqual(got["mode"], "disable")
+
+    def test_an_unreadable_mode_is_enable_and_says_so(self):
+        got, stderr = self.hook_settings({"CCNAVI_MODE": "off"})
+        self.assertEqual(got["mode"], "enable")
+        self.assertIn("is not a mode", stderr)
+
+    def test_ticket_control_follows_the_settings_files(self):
+        got, _ = self.hook_settings({"CCNAVI_TICKET_CONTROL": "disable"})
+        self.assertEqual(got["ticket_control"], "disable")
+        got, _ = self.hook_settings(
+            {"CCNAVI_TICKET_CONTROL": "disable"}, {"CCNAVI_TICKET_CONTROL": "enable"}
+        )
+        self.assertEqual(got["ticket_control"], "enable")
+        got, _ = self.hook_settings({"CCNAVI_TICKET_CONTROL": "nope"}, {})
+        self.assertEqual(got["ticket_control"], "enable")
+
+    def test_ticket_control_from_the_settings_files_empties_the_board(self):
+        """settings に出す値と、ボードの中身を組むときの値を食い違わせない。"""
+        self.scene()
+        write(
+            os.path.join(self.root, ".claude", "settings.json"),
+            json.dumps({"env": {"CCNAVI_TICKET_CONTROL": "disable"}}),
+        )
+        board = self.board()
+        self.assertEqual(board["settings"]["ticket_control"], "disable")
+        self.assertEqual(board["tickets"], [])
+
     def test_attention_and_issues_follow_the_scene(self):
         """承認待ちの子だけが要対応。順調な場面では不備は無い。レビュー準備中になれば子も親も要対応。"""
         self.scene()
