@@ -19,6 +19,6 @@ description: >-
 ## reference の置き場
 
 - 共通: `.claude/skills/testing/references/`
-- プロジェクト固有: `projects/<名前>/docs/skills/testing/references/`
+- プロジェクト固有: `projects/<名前>/skills/testing/references/`
 
 中のディレクトリ構造は任意。足し方と書き方は `docs/claude/skill-concepts.md`。

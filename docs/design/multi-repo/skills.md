@@ -30,7 +30,7 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 
 書き込みに専用の保護は無い。`skills/` は ccnavi ディレクトリ（`.ccnavi/`）の外のふつうの場所で、ほかのファイルと同じ判定になる。
 元リポジトリ（ワークスペースルートの下）は `workspace-root` が止め、承認済みチケットに結び付いたワークツリーでは範囲の中だけ書け（9.5）、
-チケットの無いワークツリー（直接作業）ではほかのファイルと同じく書ける。スキルを直すのは `skill-improve`（scope `docs/skills/*`）の子か、
+チケットの無いワークツリー（直接作業）ではほかのファイルと同じく書ける。スキルを直すのは `skill-improve`（scope `.claude/skills/*` と `docs/wiki/*`。プロジェクトは自分の `phases.yml` で決める）の子か、
 範囲に `skills/<名前>/*` を書いた提案チケットで、マージリクエストでユーザが見る。`.ccnavi/skills/` に置かなかったのは、そこを書かせるには
 `builtin-guard-project-home` などの組み込みの保護を緩める必要があるため。
 
