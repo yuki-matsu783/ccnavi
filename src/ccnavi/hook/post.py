@@ -765,7 +765,9 @@ def _save_seen(
     failed = fsio.write_json_atomic(
         _seen_path(state_dir, session),
         {
-            "seen": sorted(seen)[:SEEN_LIMIT],
+            # 切らない。切った先に在る汚れは次の呼び出しで「新しい変更」になり、戻されてしまう。
+            # 件数は在る汚れの数までで、無制限には増えない。
+            "seen": sorted(seen),
             "baseline_captured": True,
             "announced": announced,
         },

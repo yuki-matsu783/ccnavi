@@ -18,6 +18,7 @@ onedir で作る。onefile は起動のたびにランタイムを一時ディ�
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import subprocess
@@ -31,6 +32,7 @@ sys.path.insert(0, SRC)
 
 from ccnavi.entry import version  # noqa: E402
 from ccnavi.infra import platformtag  # noqa: E402
+from ccnavi.policy import selfguard  # noqa: E402
 
 # 組み立ての出力。導入スクリプトはここから配り、代わりに通る sh は env が無いときここを探す。
 DIST = os.path.join(ROOT, "dist")
@@ -159,7 +161,31 @@ def build() -> int:
         print(f"dist/ は新しい。{where}{os.sep} は前のまま", file=sys.stderr)
         return 1
     print(f"installed {live}")
+    try:
+        stamp = write_built_stamp(os.path.join(live, os.path.basename(executable())))
+    except OSError as e:
+        # 印が無い版は、次の呼び出しで組み立ての出力と認められず戻される。黙って進めない。
+        print(f"組み立ての印を書けなかった: {e}", file=sys.stderr)
+        return 1
+    print(f"stamped {stamp}")
     return 0
+
+
+def write_built_stamp(exe: str) -> str:
+    """組み立てた実行ファイルの sha256 を、その隣の印（`selfguard.BUILT_SUFFIX`）に書く。
+
+    実行ファイルを守る側は、この印と現物が一致するものだけを組み立ての出力として基準に
+    取り直す（selfguard._accepted_build）。エージェントが差し替えた版には印が合わない。
+    印のパスを返す。
+    """
+    digest = hashlib.sha256()
+    with open(exe, "rb") as f:
+        while chunk := f.read(1024 * 1024):
+            digest.update(chunk)
+    path = exe + selfguard.BUILT_SUFFIX
+    with open(path, "w", encoding="ascii", newline="\n") as f:
+        f.write(digest.hexdigest() + "\n")
+    return path
 
 
 def install(dist_dir: str, root: str, target: str) -> str:

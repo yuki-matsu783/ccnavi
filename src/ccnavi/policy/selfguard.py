@@ -630,15 +630,47 @@ def _check_heavy(
     if _same_shape(target.path, size, mtime):
         return None
     if setting != ENABLE:
+        if _accepted_build(target):
+            return Outcome(
+                target,
+                ACTION_WOULD,
+                "ccnavi の組み立てで変わった。enable なら新しい版を基準にする（触っていない）",
+            )
         return Outcome(
             target,
             ACTION_WOULD,
-            "実行ファイルが変わった。enable なら新しい版を基準にする（今回は触っていない）",
+            "ccnavi の組み立てでない変更。本来ならセッション開始の版に戻す（今回は触っていない）",
         )
-    if os.path.exists(target.path):
+    if _accepted_build(target):
         return _rebase_heavy(state_dir, session, target)
+    # ccnavi の組み立てではない（差し替えられた、または消された）。取り直さず、
+    # セッション開始の版に戻す。
+    return _restore_heavy(state_dir, digest, target, mtime)
 
-    # 消された。取り直す版が無いので、セッション開始の版に戻す。
+
+# build.py が組み立てのたびに、実行ファイルの隣へ置く印。中身は実行ファイルの sha256。
+BUILT_SUFFIX = ".built"
+
+
+def _accepted_build(target: selfguard_targets.Target) -> bool:
+    """今の実行ファイルが、ccnavi の組み立て（build.py）の出力か。
+
+    組み立てが置いた `<実行ファイル>.built` の sha256 と、現物の sha256 が一致するときだけ真。
+    印は実行ファイルと同じ置き場にあり、保護領域に入るので、エージェントの書き換えは通らない。
+    消えていれば偽。中身を読むので、大きさか更新時刻が変わったときにだけ呼ぶ。
+    """
+    if not os.path.exists(target.path):
+        return False
+    stamp = _read(target.path + BUILT_SUFFIX)
+    if not stamp:
+        return False
+    return stamp.decode("ascii", "replace").strip() == _digest(target.path)
+
+
+def _restore_heavy(
+    state_dir: str, digest: str, target: selfguard_targets.Target, mtime: int
+) -> Outcome:
+    """実行ファイルを、セッション開始の版（参照の digest の実体）に戻す。"""
     entry = _store_path(state_dir, digest)
     if not os.path.exists(entry):
         return Outcome(
@@ -647,6 +679,7 @@ def _check_heavy(
             "バックアップの実体が見つからないので戻せない。"
             "ccnavi を作り直して、セッションを開き直してください",
         )
+    existed = os.path.exists(target.path)
     failed = _place(entry, target.path)
     if failed:
         return Outcome(target, ACTION_FAILED, f"戻せない: {failed}")
@@ -654,9 +687,11 @@ def _check_heavy(
     # 次の照合で毎回一致しないまま報告されつづける。
     with contextlib.suppress(OSError):
         os.utime(target.path, (mtime, mtime))
-    return Outcome(
-        target, ACTION_RESTORED, "消えていたので、セッション開始の時点の実行ファイルに戻した"
-    )
+    if existed:
+        detail = "ccnavi の組み立てでない変更なので、セッション開始の時点の実行ファイルに戻した"
+    else:
+        detail = "消えていたので、セッション開始の時点の実行ファイルに戻した"
+    return Outcome(target, ACTION_RESTORED, detail)
 
 
 def _rebase_if_changed(
@@ -664,13 +699,14 @@ def _rebase_if_changed(
 ) -> Outcome | None:
     """実行前の照合。大きさか更新時刻が変わっていれば、新しい版を基準に取り直す。
 
-    消えているときは何もしない。戻すのは実行後の照合（`_check_heavy`）が受け持つ。
+    ccnavi の組み立てでない変わり方のときは何もしない。戻すのは実行後の照合（`_check_heavy`）が
+    受け持つ。
     """
     ref = _parse_ref(_read(_ref_path(state_dir, session, target)))
     if ref is None:
         return None
     _, size, mtime = ref
-    if not os.path.exists(target.path) or _same_shape(target.path, size, mtime):
+    if _same_shape(target.path, size, mtime) or not _accepted_build(target):
         return None
     return _rebase_heavy(state_dir, session, target)
 

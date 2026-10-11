@@ -305,6 +305,17 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
         self.assertIn("protected/keep.txt", result.stderr)
 
+    def test_起動時の変更が件数の上限を超えても戻さない(self):
+        # 基準を件数で切ると、切った先の在る汚れが「新しい変更」になり、自動復元で消される。
+        names = [os.path.join(self.repo, "protected", f"gen{i:03}.txt") for i in range(520)]
+        for path in names:
+            write(path, "generated\n")
+        self.run_hook(event="SessionStart", source="startup")
+
+        self.run_hook(command="ls", restore="enable")
+
+        self.assertTrue(all(os.path.exists(path) for path in names), "他人の書きかけを消さない")
+
     def test_前から在った変更は自動復元でも触らない(self):
         self.dirty()
 

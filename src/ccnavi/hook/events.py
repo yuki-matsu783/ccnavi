@@ -398,7 +398,9 @@ def decide_at_start(
     ctxfile.forget(conf.state, payload.session_id, startup=payload.source == "startup")
     if payload.source == "startup":
         _seen_baseline(stderr, conf, root, payload, record)
-    record.detail = _prune_at_start(stderr, conf, root, payload.session_id)
+    # 基準を取った時の注記（読めなかったツリーなど）を消さないよう、足す。
+    pruned = _prune_at_start(stderr, conf, root, payload.session_id)
+    record.detail = "; ".join(part for part in (record.detail, pruned) if part)
     record.decision, record.enforced = audit.ALLOW, True
     texts = []
     if outcomes:
