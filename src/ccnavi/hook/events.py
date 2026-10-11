@@ -313,10 +313,28 @@ def stop_rules_nudge(
             delivered.append(rule.id or f"({rules.ALLOW})")
     if not parts:
         return ""
+    _over_report(record)
     record.decision, record.code = audit.NUDGE, CODE_RULE_NUDGE
     record.enforced = True
-    record.rules = [*record.rules, *delivered]
+    record.rules = delivered
     return f"{CODE_RULE_NUDGE}: {STOP_PREFACE}\n\n" + "\n\n".join(parts)
+
+
+def _over_report(record: audit.Record) -> None:
+    """促しで止める回の記録から、同じ Stop の報告（`post.at_stop`）を detail へ移す。
+
+    1 回の Stop の記録は 1 行で、`decision` と `code` は 1 つしか持てない。止めたのは促しなので
+    促しが勝つ（`nudge` と `NUDGE_*`）。上書きするだけだと、同じ Stop で保護領域の変更を
+    報告したこと（`deny` と `POST_*`）が記録から消える。`rules` に報告のルールを残したまま
+    促しのルールを足すと、どれで止めたかが読めなくなる（`rules` は実際に渡したルールだけ）。
+    そこで報告の code と rules を `report <code> <id,…>` の形で detail に足し、
+    `rules` を空にしてから促しの側が書く。`paths` は報告の変わったパスのまま残る。
+    """
+    if record.decision != audit.DENY or not record.code:
+        return
+    note = f"report {record.code} {','.join(record.rules)}".rstrip()
+    record.detail = f"{record.detail}; {note}" if record.detail else note
+    record.rules = []
 
 
 def _finish_nudge(
@@ -348,6 +366,7 @@ def _finish_nudge(
     if failed:
         stderr.write(f"ccnavi: finish を促した記録を残せないので、促さない: {failed}\n")
         return ""
+    _over_report(record)
     record.decision, record.code = audit.NUDGE, ops_stop.CODE_FINISH_NUDGE
     record.enforced = True
     record.tree = found.ticket.ticket

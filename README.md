@@ -2034,7 +2034,7 @@ Claude Code はそこを読まないので、ccnavi が `SessionStart` と `Suba
 | `tree` / `project` | 呼び出しの行き先が属するツリーとプロジェクト |
 | `permission_mode` | Claude Code から来たモード。`handover` の行と合わせて読む |
 | `paths` | 実行後チェックが検知した「種類とパス」 |
-| `detail` | 実行後チェックでは `preexisting`・`known`・`restored`（予行では `would-restore`）の件数 |
+| `detail` | 実行後チェックでは `preexisting`・`known`・`restored`（予行では `would-restore`）の件数と、`code` が混ざった回の内訳（`codes POST_VIOLATION 2, POST_TICKET_SCOPE 1`）。`Stop` で促しと報告が重なった回は報告の `report <code> <id,…>` |
 | `degraded` | コマンドを読み切れずに生の文字列で判定した回。`command-taken-as-code`、`unterminated-quote`、`unterminated-substitution`、`ambiguous-substitution`、`backquote`（後ろの 2 つは `DENY_AMBIGUOUS_FORM` / `DENY_BACKQUOTE` で止めた回） |
 | `quoted` | 引用の中から切り出したコマンドにだけ当たったルールの id |
 | `unwrapped` | 実行役のコマンド（`env`・`sudo`・`sh -c` など）の中のコマンド、または `cd` で移った先から見たパス（設計 6.3.2）で当たったときの、そのコマンド。複数なら `\x00` でつなぐ |

@@ -35,7 +35,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `DENY_SUBAGENT_TICKET_OP` | サブエージェントがチケットの状態・レビュー・push を動かそうとした |
 | `DENY_CHILD_PUSH` | 子チケットのワークツリーから `ccnavi-git.sh push` を打った。`cd` の行き先が読めない push を含む（9.10） |
 | `DENY_SCRIPT_ENV_OVERRIDE` | 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼んだ（8.2） |
-| `POST_VIOLATION` / `POST_PREEXISTING` / `POST_TICKET_SCOPE` | 実行後チェック。保護領域の変更 / 前から在った変更 / チケットの範囲外 |
+| `POST_VIOLATION` / `POST_PREEXISTING` / `POST_TICKET_SCOPE` | 実行後チェック。保護領域の変更 / 前から在った変更 / チケットの範囲外。記録の `code` は 1 つで、件が混ざった回は `POST_VIOLATION` を `POST_TICKET_SCOPE` より先に採り、内訳を `detail` に `codes POST_VIOLATION 2, POST_TICKET_SCOPE 1` の形で書く。前から在った変更だけを知らせた回は `decision` が `allow` のまま `POST_PREEXISTING` |
 
 記録の `skip` の理由: `mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、
 `payload-unusable`、`deadline-exceeded`、`internal-error`（ccnavi 自身の例外。4.5）、`tool-cannot-write`、
@@ -52,6 +52,9 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 `\x00` でつなぎ、1000 字で切る。6.3.1）、`fallback`、`detail`、
 `tree`、`project`、`source`、`rules[]`、`quoted[]`、`paths[]`、`guarded[]`、`session`、`ms` の 23 欄。空欄は省く。
 `ts` / `mode` / `decision` / `enforced` / `ms` は常に出る。`O_APPEND` で 1 行を 1 回の write で書く。
+
+`Stop` の 1 行は、ターンの終わりの報告（7.4）と促し（`NUDGE_*`）が重なると、止めた促しの `decision`・`code`・`rules` になる。
+報告の `code` と `rules` は `detail` に `report POST_VIOLATION <id>,<id>` の形で残し、`paths` は報告の変わったパスのまま。
 
 ## 付録 C. 実測で確かめた前提
 

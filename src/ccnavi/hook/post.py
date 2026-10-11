@@ -197,6 +197,9 @@ def check(
     # 既にある detail を先頭に残す。ルールを読めなかったときのファイル名が
     # そこに入っていて、上書きすると「どのファイルが読めなかったか」が消える。
     notes = [record.detail] if record.detail else []
+    mixed = post_findings.codes_note(fresh)
+    if mixed:
+        notes.append(mixed)
     if carried:
         notes.append(f"preexisting {len(carried)}")
     if known:
@@ -209,10 +212,16 @@ def check(
 
     if fresh:
         record.decision, record.enforced = audit.DENY, enforcing
+        # 記録の code は 1 つ。件の code が混ざった回は強いほうを載せ、内訳は上の notes に書いた。
+        record.code = post_findings.record_code(fresh)
     else:
         # この呼び出しは何も汚していない。記録した変更の報告は状態の通知であって、
         # 直前の実行についての判定ではない。
         record.decision, record.enforced = audit.ALLOW, True
+        if carried:
+            # 判定は allow のまま、文面で知らせた根拠（POST_PREEXISTING）だけを残す。
+            # 文面と記録を同じ材料から作り、記録から「知らせた回」を数えられるように。
+            record.code = post_report.CODE_PREEXISTING
 
     gated = restore in (selfguard.ENABLE, selfguard.DRY_RUN)
     blocks = [
@@ -401,12 +410,16 @@ def at_stop(
     if not found:
         # 違反は無いが、数えていないツリーがある。そのことだけを言う。
         record.decision, record.enforced = audit.ALLOW, True
-        record.detail = f"uncounted {len(uncounted)}"
+        _add_detail(record, f"uncounted {len(uncounted)}")
         return _uncounted_line(uncounted)
 
     record.decision, record.enforced = audit.DENY, True
+    record.code = post_findings.record_code(found)
     record.paths = [f"{f.change.kind} {f.change.path}" for f in found]
     record.rules = sorted({rule.id or "(id 無し)" for f in found for rule in f.group})
+    # detail は足していく。読めなかったルールファイルの名前（`_read_all`）が
+    # 先に入っていることがある。
+    _add_detail(record, post_findings.codes_note(found))
 
     lines = [
         f"[ccnavi] 守ると宣言した場所が、この{phase_forms.TURN_DEFINED}で"
@@ -433,8 +446,17 @@ def at_stop(
         lines.append(f"  ほか {len(found) - REPORT_LIMIT} 件。全部は git status に出ます。")
     if uncounted:
         lines.append(_uncounted_line(uncounted, define=False))
-        record.detail = f"uncounted {len(uncounted)}"
+        _add_detail(record, f"uncounted {len(uncounted)}")
     return "\n".join(lines)
+
+
+def _add_detail(record: audit.Record, note: str) -> None:
+    """記録の detail に 1 つ足す。
+
+    上書きすると、先に入った断り（読めなかったファイルなど）が消える。
+    """
+    if note:
+        record.detail = f"{record.detail}; {note}" if record.detail else note
 
 
 def _uncounted_line(uncounted: list[str], *, define: bool = True) -> str:

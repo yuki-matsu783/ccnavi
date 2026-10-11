@@ -16,7 +16,9 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi.hook import post
+from ccnavi.hook import events, post, post_findings
+from ccnavi.infra import gitstate
+from ccnavi.records import audit
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -263,6 +265,8 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertTrue(line["enforced"])
         self.assertEqual(line["paths"], ["changed protected/keep.txt"])
         self.assertEqual(line["rules"], ["protected"])
+        # 文面の先頭の行と同じ理由コードを記録にも残す。
+        self.assertEqual(line["code"], "POST_VIOLATION")
 
     # セッションが始まる前から在った変更
 
@@ -278,6 +282,11 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertNotIn("POST_VIOLATION", text)
         # この呼び出しは何も汚していない。判定は呼び出しについてのもの。
         self.assertEqual(self.records()[-1]["decision"], "allow")
+        # 判定は allow のまま、文面で知らせた根拠を記録に残す。
+        self.assertEqual(self.records()[-1]["code"], "POST_PREEXISTING")
+        # 次の回は何も知らせないので code も無い。
+        self.run_hook(command="ls")
+        self.assertNotIn("code", self.records()[-1])
 
     def test_前から在った変更は自動復元でも触らない(self):
         self.dirty()
@@ -437,6 +446,10 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("protected/keep.txt", message)
         self.assertIn("protected", message, "どのルールが言っているか")
         self.assertIn("git restore", message, "戻す手順")
+        line = self.records()[-1]
+        self.assertEqual(line["event"], "Stop")
+        self.assertEqual(line["decision"], "deny")
+        self.assertEqual(line["code"], "POST_VIOLATION")
 
     def test_ターンの終わりも変わっていなければ何も言わない(self):
         self.run_hook(event="UserPromptSubmit")
@@ -696,6 +709,19 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("ワークツリー wt1 では、今回のターンでこの確認ができませんでした", message)
         self.assertIn("uncounted", self.records()[-1].get("detail", ""))
 
+    def test_ターンの終わりの記録は数えていないツリーと違反の両方を残す(self):
+        # detail を上書きすると、先に入った断りが消える。足していく。
+        self.run_hook(event="UserPromptSubmit")
+        later = os.path.join(self.repo, ".claude", "worktrees", "wt1")
+        git(self.repo, "worktree", "add", "--quiet", "-b", "wt1", later)
+        self.dirty()
+
+        self.run_hook(event="Stop")
+
+        line = self.records()[-1]
+        self.assertEqual(line["code"], "POST_VIOLATION")
+        self.assertIn("uncounted 1", line.get("detail", ""))
+
     def test_戻さなかった1件は記録に入りターンの終わりにユーザへ出る(self):
         # 戻していないのでファイルは汚れたまま。呼び出しごとに言えば同じ文が
         # 呼び出しの数だけ積まれるので、報告はセッションで 1 度きりにする。
@@ -762,6 +788,53 @@ def ticket_repo(committed=True, text=TICKET):
         git(repo, "commit", "--quiet", "-m", "init")
     write(common_path(repo, "rules"), json.dumps(RULES))
     return repo
+
+
+class RecordCodeTest(unittest.TestCase):
+    """記録の code は 1 つ。件の code が混ざった回は強いほうを載せ、内訳を detail に書く。"""
+
+    @staticmethod
+    def found(*codes):
+        return [
+            post_findings.Finding(gitstate.Change(path=f"f{i}"), [], "", code)
+            for i, code in enumerate(codes)
+        ]
+
+    def test_ルールの違反はチケットの範囲外より強い(self):
+        found = self.found("POST_TICKET_SCOPE", "POST_VIOLATION", "POST_TICKET_SCOPE")
+        self.assertEqual(post_findings.record_code(found), "POST_VIOLATION")
+        self.assertEqual(
+            post_findings.codes_note(found), "codes POST_VIOLATION 1, POST_TICKET_SCOPE 2"
+        )
+
+    def test_1種類だけなら内訳を書かない(self):
+        found = self.found("POST_TICKET_SCOPE", "POST_TICKET_SCOPE")
+        self.assertEqual(post_findings.record_code(found), "POST_TICKET_SCOPE")
+        self.assertEqual(post_findings.codes_note(found), "")
+
+    def test_件が無ければ空(self):
+        self.assertEqual(post_findings.record_code([]), "")
+        self.assertEqual(post_findings.codes_note([]), "")
+
+
+class StopNudgeRecordTest(unittest.TestCase):
+    """同じ Stop で報告と促しが重なった回の記録。止めた促しが勝ち、報告は detail に残る。"""
+
+    def test_報告のcodeとrulesをdetailへ移す(self):
+        record = audit.Record(
+            decision=audit.DENY,
+            code="POST_VIOLATION",
+            rules=["guard-a", "guard-b"],
+            detail="uncounted 1",
+        )
+        events._over_report(record)
+        self.assertEqual(record.detail, "uncounted 1; report POST_VIOLATION guard-a,guard-b")
+        self.assertEqual(record.rules, [])
+
+    def test_報告が無ければ何もしない(self):
+        record = audit.Record(decision=audit.ALLOW, detail="uncounted 1")
+        events._over_report(record)
+        self.assertEqual(record.detail, "uncounted 1")
 
 
 class TicketPlaceTest(Harness, unittest.TestCase):
