@@ -24,7 +24,7 @@ from __future__ import annotations
 import json
 import os
 
-from ccnavi.hook import c1
+from ccnavi.tickets import c1
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_sync_authority import AuthorityHarness
 from tests.ticket.test_ticket import git, read_json, write

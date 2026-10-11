@@ -19,7 +19,7 @@ import os
 import unittest
 from unittest import mock
 
-from ccnavi.hook import c1
+from ccnavi.tickets import c1
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, write
 

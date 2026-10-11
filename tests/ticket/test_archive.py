@@ -17,9 +17,16 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.hook import c1
 from ccnavi.infra import settings
-from ccnavi.tickets import approval, approval_checks, approval_ops, archive, history, ticket_model
+from ccnavi.tickets import (
+    approval,
+    approval_checks,
+    approval_ops,
+    archive,
+    c1,
+    history,
+    ticket_model,
+)
 from ccnavi.tickets import ticket as ticket_mod
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, read_json, write

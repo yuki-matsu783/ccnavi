@@ -19,13 +19,15 @@ import tempfile
 import time
 from typing import TextIO
 
-from ..hook import c1, core, events, judge
+from ..hook import events, judge
 from ..infra import fsio, hookio, modes, settings
 from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, diaglog
 from ..tickets import (
     branchfind,
+    c1,
+    core,
     history,
     review,
     skillsync,

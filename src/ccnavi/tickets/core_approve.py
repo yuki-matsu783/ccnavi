@@ -13,13 +13,13 @@ import json
 from typing import TextIO
 
 from ..infra import fsio, modes, settings
-from ..tickets import (
+from . import (
     agree,
     agree_candidates,
     agree_screen,
     approval,
+    core_base,
 )
-from . import core_base
 
 # ---- 手元の入口（`--agree`。端末・ボードの `--yes`・`--preview`・`--verify`） ------------------
 #

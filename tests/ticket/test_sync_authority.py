@@ -18,13 +18,13 @@ import threading
 import time
 import unittest
 
-from ccnavi.hook import core
 from ccnavi.infra import fsio, settings
 from ccnavi.tickets import (
     agree_digest,
     approval,
     approval_checks,
     approval_ops,
+    core,
     syncstate,
     ticket_model,
 )

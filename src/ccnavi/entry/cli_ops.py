@@ -12,10 +12,11 @@ import os
 import re
 from typing import TextIO
 
-from ..hook import c1, core
 from ..infra import fsio, settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..tickets import (
+    c1,
+    core,
     history,
     ops,
     phase,
