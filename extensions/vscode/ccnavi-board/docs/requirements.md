@@ -22,7 +22,7 @@ VS Code 拡張「ccnavi ボード」が外から見てどうふるまうかを�
 | プロジェクト管理画面（`projects/` の一覧と clone・設定の雛形） | [requirements/projects.md](requirements/projects.md) |
 | ルール管理画面（`rules.yml` の編集・判定を試す・hook の一覧） | [requirements/rules.md](requirements/rules.md) |
 | リスク管理画面（`risks.yml` の配点の編集） | [requirements/risk.md](requirements/risk.md) |
-| フェーズ管理画面（`phases.yml` の定義の編集と図） | [requirements/phases.md](requirements/phases.md) |
+| フェーズ管理画面（`phases.yml` の定義の編集） | [requirements/phases.md](requirements/phases.md) |
 
 ## 用語と参照
 
