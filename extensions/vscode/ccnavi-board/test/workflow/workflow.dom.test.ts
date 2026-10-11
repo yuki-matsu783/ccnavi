@@ -387,3 +387,22 @@ test("CB-D186 線を変えたら、答えを待つ間も拡張ホストに「確
     await dom.close();
   }
 });
+
+test("CB-D187 項を押すと右の欄に詳細を出す。欄は畳め、畳んだことは覚える", async () => {
+  const dom = await openWorkflow();
+  try {
+    assert.ok(dom.one('.plan-graph[data-part="plan"] .plan-detail-empty').textContent?.includes("項を押すと"));
+    dom.click(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n2"]'));
+    await dom.settle();
+    const detail = dom.one('.plan-graph[data-part="plan"] .plan-detail-list');
+    assert.equal(detail.getAttribute("data-number"), "2");
+    assert.ok(detail.textContent?.includes("設計"));
+    assert.equal(dom.one('.plan-graph[data-part="plan"] .plan-node[data-picked="1"] .plan-node-title').textContent, "設計");
+    dom.click(dom.one('.plan-graph[data-part="plan"] button[data-action="toggle-plan-detail"]'));
+    await dom.settle();
+    assert.equal(dom.all('.plan-graph[data-part="plan"] .plan-detail-list').length, 0);
+    assert.equal(dom.one('.plan-graph[data-part="plan"] .plan-graph-body').getAttribute("data-folded"), "1");
+  } finally {
+    await dom.close();
+  }
+});

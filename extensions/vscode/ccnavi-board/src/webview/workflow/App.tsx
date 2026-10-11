@@ -401,7 +401,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
       )}
       <div className="workflow-graphs">
         {sample !== undefined ? (
-          sample.plans.map((plan) => <PlanGraph key={plan.part} plan={plan} />)
+          sample.plans.map((plan) => <PlanGraph key={plan.part} plan={plan} detail />)
         ) : answer.plans.length === 0 ? (
           <p className="empty">この親の提案には計画（plan:）がありません。</p>
         ) : (
@@ -409,6 +409,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
             <PlanGraph
               key={plan.part}
               plan={plan}
+              detail
               editable={editable}
               onConnect={edit(plan.part, true)}
               onDisconnect={edit(plan.part, false)}

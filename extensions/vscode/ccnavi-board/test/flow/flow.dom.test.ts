@@ -471,3 +471,26 @@ test("CB-D122 読むだけのときは、グループの縁を出さず、「グ
     await open.close();
   }
 });
+
+test("CB-D188 部品箱と右の欄は畳める。畳むと中身を出さず、開くと戻る", async () => {
+  const dom = await openFlow({ doc: marked() });
+  try {
+    assert.ok(dom.all("#flow-palette button[data-action=add-node]").length > 0);
+    dom.click(dom.one('button[data-action="toggle-palette"]'));
+    await dom.settle();
+    assert.equal(dom.all("#flow-palette button[data-action=add-node]").length, 0);
+    assert.equal(dom.one(".flow-body").getAttribute("data-palette-folded"), "1");
+    dom.click(dom.one('button[data-action="toggle-side"]'));
+    await dom.settle();
+    assert.equal(dom.all(".flow-side .inspector").length, 0);
+    assert.equal(dom.one(".flow-body").getAttribute("data-side-folded"), "1");
+    dom.click(dom.one('button[data-action="toggle-palette"]'));
+    await dom.settle();
+    dom.click(dom.one('button[data-action="toggle-side"]'));
+    await dom.settle();
+    assert.ok(dom.all("#flow-palette button[data-action=add-node]").length > 0);
+    assert.ok(dom.all(".flow-side .inspector").length > 0);
+  } finally {
+    await dom.close();
+  }
+});

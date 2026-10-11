@@ -78,7 +78,7 @@ function pageOf(data: FlowData): FlowPage | undefined {
   return data.kind === "page" ? data.page : undefined;
 }
 
-/** 画面が覚えておくもの（HTML を作り直しても残る）。いまはミニマップを出すかだけ */
+/** 画面が覚えておくもの（HTML を作り直しても残る）。ミニマップを出すか、左右の欄を畳んだか */
 function minimapShown(): boolean {
   try {
     const state = getState() as { minimap?: unknown } | undefined;
@@ -92,6 +92,26 @@ function rememberMinimap(shown: boolean): void {
   try {
     const state = (getState() ?? {}) as Record<string, unknown>;
     setState({ ...state, minimap: shown });
+  } catch {
+    // 覚えられなくても画面は動く
+  }
+}
+
+type Side = "palette" | "side";
+
+function sideFolded(side: Side): boolean {
+  try {
+    const state = getState() as { folded?: Record<string, unknown> } | undefined;
+    return state?.folded?.[side] === true;
+  } catch {
+    return false;
+  }
+}
+
+function rememberSideFolded(side: Side, folded: boolean): void {
+  try {
+    const state = (getState() ?? {}) as { folded?: Record<string, unknown> };
+    setState({ ...state, folded: { ...state.folded, [side]: folded } });
   } catch {
     // 覚えられなくても画面は動く
   }
@@ -178,6 +198,12 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   // 図の外で選んだノード（部品箱で足した・グループ化で作った・貼り付けた）。図はこれが替わったときだけ、それを選び直す
   const [focus, setFocus] = useState<{ readonly ids: readonly string[] } | undefined>(undefined);
   const [minimap, setMinimap] = useState(minimapShown);
+  const [folded, setFolded] = useState<Readonly<Record<Side, boolean>>>(() => ({ palette: sideFolded("palette"), side: sideFolded("side") }));
+  const toggleSide = (side: Side): void => {
+    const next = !folded[side];
+    rememberSideFolded(side, next);
+    setFolded((now) => ({ ...now, [side]: next }));
+  };
   const [reviewSave, setReviewSave] = useState(() => pageOf(initial)?.reviewSave === true);
   const [review, setReview] = useState<FlowDiff | undefined>(undefined);
   // コピーしたノード（画面の中に保持する）と、同じものを何回貼り付けたか（貼り付けるたびに少しずつずらす）
@@ -696,10 +722,12 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           ))}
         </ul>
       )}
-      <div className="flow-body">
+      <div className="flow-body" data-palette-folded={folded.palette ? "1" : "0"} data-side-folded={folded.side ? "1" : "0"}>
         <nav className="flow-palette" id="flow-palette" aria-label="部品箱">
-          <h2>部品</h2>
-          {PALETTE.map((type) => {
+          <button type="button" className="action small flow-fold" data-action="toggle-palette" aria-expanded={!folded.palette} title={folded.palette ? "部品箱を開く" : "部品箱を畳む"} onClick={() => toggleSide("palette")}>
+            {folded.palette ? "▶ 部品" : "◀ 部品"}
+          </button>
+          {!folded.palette && PALETTE.map((type) => {
             const badge = badgeOf(type);
             return (
               <button key={type} type="button" className="action small palette-item" data-action="add-node" data-type={type} disabled={readOnly} title={badge?.title} onClick={() => add(type)}>
@@ -736,8 +764,15 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           }}
         />
         <div className="flow-side">
-          <Inspector doc={doc} selected={selected} readOnly={readOnly} onChange={edit} onSeal={() => setHistory(seal)} onSelect={setSelected} candidates={checks?.candidates} />
-          <Preview checks={checks} checking={checking} error={checkError} />
+          <button type="button" className="action small flow-fold" data-action="toggle-side" aria-expanded={!folded.side} title={folded.side ? "右の欄を開く" : "右の欄を畳む"} onClick={() => toggleSide("side")}>
+            {folded.side ? "◀ 詳細" : "詳細 ▶"}
+          </button>
+          {!folded.side && (
+            <>
+              <Inspector doc={doc} selected={selected} readOnly={readOnly} onChange={edit} onSeal={() => setHistory(seal)} onSelect={setSelected} candidates={checks?.candidates} />
+              <Preview checks={checks} checking={checking} error={checkError} />
+            </>
+          )}
         </div>
       </div>
       {tour.touring && <Tour steps={TOUR_STEPS} onClose={tour.end} />}
