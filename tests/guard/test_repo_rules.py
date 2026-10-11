@@ -777,6 +777,9 @@ class SubstRepoRulesTest(unittest.TestCase):
         quoted = judge("Bash", 'gh issue create --title t --body "use $(git push) here"')
         self.assertIn("inside double quotes", quoted["response"])
         self.assertEqual(quoted.get("quoted"), ["raw-git"])
+        # ラッパーのあるワークスペースでは、文字として渡す道もラッパーで案内する。
+        self.assertIn("ccnavi-git.sh commit -F <file>", quoted["response"])
+        self.assertNotIn("(git commit -F", quoted["response"])
 
         bare = judge("Bash", "echo $(git push origin main)")
         self.assertNotIn("inside double quotes", bare["response"])

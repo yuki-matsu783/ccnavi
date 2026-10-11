@@ -566,6 +566,13 @@ class CorePathTest(unittest.TestCase):
                 self.assertIn(wrapguard.CODE_CORE_PATH, reason)
                 self.assertIn(kind_text, reason)
 
+    def test_text_from_a_file_goes_through_the_wrapper(self):
+        """文字として渡す道の案内は、ラッパーのあるワークスペースでは生の git を勧めない。"""
+        decision, reason = self.hook("echo `date`")
+        self.assertEqual(decision, "deny", reason)
+        self.assertIn("ccnavi-git.sh commit -F <file>", reason)
+        self.assertNotIn(" git commit -F", reason)
+
     def test_review_place(self):
         """レビュー待ちの置き場（wip/proposals/review/）は、承認済みチケットの置き場と同じく
         エージェントのラッパーの呼び出しを止める。置き場の親を丸ごと消す形も当たる。"""

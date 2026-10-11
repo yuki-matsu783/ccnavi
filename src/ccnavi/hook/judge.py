@@ -503,7 +503,12 @@ def decide_before(
         record.code = reasons.CODE_REWRITE[forms[0]]
         record.rules = [reasons.rewrite_rule(form) for form in forms]
         parts = [
-            reasons.rewrite(record.subject, form, [text for f, text in rewrites if f == form])
+            reasons.rewrite(
+                record.subject,
+                form,
+                [text for f, text in rewrites if f == form],
+                settings.git_command(root),
+            )
             for form in forms
         ]
         return refuse(stdout, mode, record, rules.DENY, notices + parts, conf=conf, root=root)
@@ -689,7 +694,15 @@ def decide_before(
             ),
             *(
                 reasons.reason_for(
-                    rule, payload.tool_name, subject, source, record.degraded, runner, layer, quoted
+                    rule,
+                    payload.tool_name,
+                    subject,
+                    source,
+                    record.degraded,
+                    runner,
+                    layer,
+                    quoted,
+                    git=settings.git_command(root),
                 )
                 for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
             ),
@@ -704,7 +717,15 @@ def decide_before(
         # 1 つずつ直すことになり、そのたびに往復が 1 回増える。
         texts = [
             reasons.reason_for(
-                rule, payload.tool_name, subject, source, record.degraded, runner, layer, quoted
+                rule,
+                payload.tool_name,
+                subject,
+                source,
+                record.degraded,
+                runner,
+                layer,
+                quoted,
+                git=settings.git_command(root),
             )
             for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]
@@ -722,7 +743,15 @@ def decide_before(
     elif verdict == rules.ASK and not ticket_reason:
         texts = [
             reasons.reason_for(
-                rule, payload.tool_name, subject, source, record.degraded, runner, layer, quoted
+                rule,
+                payload.tool_name,
+                subject,
+                source,
+                record.degraded,
+                runner,
+                layer,
+                quoted,
+                git=settings.git_command(root),
             )
             for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]
