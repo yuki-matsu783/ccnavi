@@ -387,10 +387,16 @@ def _request_nudge(
 
     止めない回と止め方は `_finish_nudge` と同じ（`stop_hook_active`・サブエージェント・
     state の置き場・チケット制御を見て、モードは見ない。`dry-run` でも止める）。
+    加えて、このセッションに実行中のサブエージェントが居る間（`subagent.running`。記録を読めない
+    ときも）は止めず、「1 回だけ」の記録も進めない。終わったあとの Stop でまた促せる。
     同じ状態（親・フェーズ・残っている子・HEAD）では 1 回だけで、記録は
     `nudged-<セッション>.json`。進めばまた止める。判定は `ops_stop_request.pending_at_stop`。
     """
     if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
+        return ""
+    # 実行中のサブエージェントが居る間は、委任して待つ回なので止めない。記録を読めないときも
+    # 止めない。ここで返すので「1 回だけ」の記録は進まず、終わったあとの Stop でまた促せる。
+    if subagent.running(conf.state, payload.session_id):
         return ""
     found = ops_stop_request.pending_at_stop(root, conf, payload.cwd, raw)
     if found is None or ops_stop_request.nudged_before(conf.state, payload.session_id, found):
@@ -445,6 +451,10 @@ def decide_at_start(
     # 来るので、モデルの文脈が新しくなるたびに「1 度だけ渡す文」は改めて届き、`every` の
     # 刻みも 0 から数え直しになる。
     ctxfile.forget(conf.state, payload.session_id, startup=payload.source == "startup")
+    # 実行中のサブエージェントの印も起動のときだけ捨てる。
+    # compact・再開・clear では実行中の体が残りうる。
+    if payload.source == "startup":
+        subagent.forget_running(conf.state, payload.session_id)
     record.detail = _prune_at_start(stderr, conf, root, payload.session_id)
     record.decision, record.enforced = audit.ALLOW, True
     texts = []
