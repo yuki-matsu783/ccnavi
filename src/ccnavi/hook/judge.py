@@ -196,6 +196,7 @@ def decide_before(
             selfguard_shell.common_layer_files(conf),
             (conf.log, conf.state),
             tool=payload.tool_name,
+            cwd=payload.cwd,
         )
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が有効なときだけ足す。
