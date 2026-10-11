@@ -1,0 +1,90 @@
+"""`ccnavi ticket next-id [<先頭の語> <slug>]`。issue の無い親の識別子の番号を答える。
+
+番号は、承認待ち・作業中・閉じた親の識別子の番号の最大 + 1。子の識別子は数えない。
+引数なしなら番号だけ、`<先頭の語> <slug>` なら識別子を出し、形に合わなければ理由を言って止まる。
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import tempfile
+import unittest
+
+from tests.inproc import run_ccnavi
+from tests.ticket.test_lint_branch_names import ticket_text, write
+
+
+class NextIdTest(unittest.TestCase):
+    def setUp(self):
+        self.ws = tempfile.mkdtemp(prefix="ccnavi-next-id-")
+        self.addCleanup(shutil.rmtree, self.ws, ignore_errors=True)
+        os.makedirs(os.path.join(self.ws, ".claude"))
+        subprocess.run(
+            ["git", "init", "--quiet", "-b", "main"], cwd=self.ws, check=True, capture_output=True
+        )
+
+    def propose(self, name, **kwargs):
+        write(
+            os.path.join(self.ws, "wip", "proposals", "todo", name + ".md"),
+            ticket_text(name, **kwargs),
+        )
+
+    def place(self, state, name, **kwargs):
+        write(
+            os.path.join(self.ws, ".ccnavi", "approved", state, name + ".md"),
+            ticket_text(name, approved=True, **kwargs),
+        )
+
+    def next_id(self, *words):
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment.pop("CLAUDE_PROJECT_DIR", None)
+        return run_ccnavi(
+            ["--root", self.ws, "ticket", "next-id", *words],
+            input="",
+            env=environment,
+        )
+
+    def test_first_number_is_one(self):
+        result = self.next_id()
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("1\n", result.stdout)
+
+    def test_counts_proposals_doing_and_done(self):
+        self.propose("feature-3-a")
+        self.place("doing", "fix-7-b")
+        self.place("done", "chore-12-c")
+        self.assertEqual("13\n", self.next_id().stdout)
+
+    def test_children_do_not_count(self):
+        self.place("doing", "feature-4-a")
+        self.place("doing", "feature-4-a-01-01", parent="feature-4-a")
+        self.assertEqual("5\n", self.next_id().stdout)
+
+    def test_builds_identifier(self):
+        self.propose("feature-9-a")
+        result = self.next_id("chore", "skill-commit-push")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("chore-10-skill-commit-push\n", result.stdout)
+
+    def test_japanese_slug(self):
+        self.assertEqual("feature-1-統合先の解決\n", self.next_id("feature", "統合先の解決").stdout)
+
+    def test_refuses_unusable_forms(self):
+        for words, why in (
+            (("zzz", "x"), "先頭の語 zzz は使えない"),
+            (("feature", "bad-12"), "末尾が `-<2 桁>`"),
+            (("feature", "a/b"), "slug a/b は使えない"),
+            (("feature", "x" * 45), "勧める長さ"),
+            (("feature",), "2 つで打つ"),
+        ):
+            with self.subTest(words=words):
+                result = self.next_id(*words)
+                self.assertNotEqual(0, result.returncode)
+                self.assertEqual("", result.stdout)
+                self.assertIn(why, result.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()

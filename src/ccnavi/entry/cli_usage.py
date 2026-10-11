@@ -240,6 +240,10 @@ scripts in .ccnavi/scripts/, which call
         (reads only: place, approval time, started or not, uncommitted / unpushed
          by the local remote-tracking ref, why it is stopped, and the next step;
          a subagent may run it too)
+    ccnavi ticket next-id [<prefix> <slug>]
+        (reads only: the next serial number for a parent that has no issue, or
+         the identifier <prefix>-<number>-<slug> built from it; a subagent may
+         run it too)
     ccnavi review prepare   --cwd <dir> --phase N --body-file <path>
     ccnavi review requested --cwd <dir> --phase N --result <json>
     ccnavi review confirm   --cwd <dir> --phase N --result <json> [--actor <account>]
