@@ -70,6 +70,10 @@ function groupNames() {
     .sort();
 }
 
+// 共通の部品（`@ccnavi/shared`）の置き場。Chrome 拡張と分け合う CSS で、各画面の style.css が `@import` する。
+const SHARED_PREFIX = "@ccnavi/shared/";
+const SHARED_DIR = path.resolve(ROOT, "..", "..", "shared");
+
 /**
  * import のパスを、このリポジトリの中のファイルに解く。
  *
@@ -77,8 +81,15 @@ function groupNames() {
  * 解く先は `.ts` か `.tsx`。`node:fs` や `happy-dom` のような外のものは null。
  */
 function resolveImport(from, spec) {
-  if (!spec.startsWith(".")) return null;
-  const base = path.resolve(path.dirname(from), spec);
+  let base;
+  if (spec.startsWith(SHARED_PREFIX)) {
+    // 共通の部品（`@ccnavi/shared/styles/page.css`）は `extensions/shared/` の下にある
+    base = path.join(SHARED_DIR, spec.slice(SHARED_PREFIX.length));
+  } else if (spec.startsWith(".")) {
+    base = path.resolve(path.dirname(from), spec);
+  } else {
+    return null;
+  }
   const candidates = [];
   if (base.endsWith(".js")) {
     candidates.push(base.slice(0, -3) + ".ts", base.slice(0, -3) + ".tsx");
@@ -236,6 +247,14 @@ function groupsFor(wanted, map) {
  */
 function relativeToExtension(given) {
   const slashed = given.replace(/\\/g, "/");
+  // 共通の部品（`extensions/shared/`）は拡張の外だが、画面の CSS が読むので触ったと数える。
+  // 拡張のルートからの相対（`../shared/...`）で返し、`path.join(ROOT, rel)` で実体に戻れるようにする
+  const sharedMarker = "extensions/shared/";
+  const sharedAt = slashed.lastIndexOf(sharedMarker);
+  if (sharedAt >= 0) {
+    const inShared = path.posix.normalize(slashed.slice(sharedAt + sharedMarker.length));
+    return inShared.startsWith("../") ? null : "../shared/" + inShared;
+  }
   const marker = "extensions/vscode/ccnavi-board/";
   const at = slashed.lastIndexOf(marker);
   const inside = at >= 0 ? slashed.slice(at + marker.length) : slashed;
@@ -290,7 +309,8 @@ function callFor(rel, map) {
   // 画面のファイルは `tsconfig.json` が exclude するので、`tsconfig.test.json` では型を見ない。
   // esbuild も型を見ない。回すグループが 0 本でも、画面の型の検査だけは必ず通す
   // （通さないと「型の検査だけ通しました」と出るのに何も見ていないターンができる）
-  if (rel.startsWith("src/webview/")) {
+  // 共通の部品（`../shared/`）も同じ扱い。閉包に入るのは、それを `@import` する画面のバンドルだけ
+  if (rel.startsWith("src/webview/") || rel.startsWith("../shared/")) {
     return { groups: [...new Set([...groups, ...webviewGroups(map, rel)])].sort(), compile: true, webview: true };
   }
 
