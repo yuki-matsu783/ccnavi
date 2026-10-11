@@ -254,7 +254,7 @@ class StopNudgeTest(TicketTest):
         git(self.parent_tree, "branch", "-m", "i0001", "renamed")
         self.assert_no_finish_nudge(self.stop(tree))
 
-    # ---- `match: Stop` のルールと重なったとき（1 回の Stop で止める理由は 1 つにする）
+    # ---- `match: Stop` のルールと重なったとき（引き止める理由は 1 回の応答で 1 つだけにする）
 
     def test_the_finish_nudge_goes_first_and_the_stop_rule_is_not_counted(self):
         """同じ Stop で両方が止めたいとき、`finish` の促しだけを出し、ルールの数えは進めない。"""
