@@ -154,6 +154,7 @@ class CleanCases:
         write(os.path.join(top, ".venv", "pyvenv.cfg"))
         write(os.path.join(top, "pkg", "__pycache__", "m.pyc"))
         write(os.path.join(top, ".pytest_cache", "v", "cache"))
+        write(os.path.join(top, ".ruff_cache", "0.16.6", "123", "abc"))
         return top
 
     def test_removes_only_generated_directories(self):

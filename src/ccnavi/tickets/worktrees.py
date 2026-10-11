@@ -54,7 +54,7 @@ TIMEOUT_SECONDS = 30.0
 
 # どこにあっても生成物と言える名前と、隣に package.json があるときだけ生成物と見る名前。
 # `ccnavi-clean.js` の ALWAYS・BESIDE_PACKAGE_JSON と揃える。
-ALWAYS = frozenset({"node_modules", ".venv", "__pycache__", ".pytest_cache"})
+ALWAYS = frozenset({"node_modules", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache"})
 BESIDE_PACKAGE_JSON = frozenset({"out"})
 
 # drop の結果。

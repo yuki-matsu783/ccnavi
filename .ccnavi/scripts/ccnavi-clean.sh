@@ -46,7 +46,7 @@ sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>
               cwd がその中なら消さない。ブランチは残す。このときの <名前> はチケットの識別子
               （.claude/worktrees/<識別子>）だけを受ける。識別子の形でない名前は断る
 
-消すもの: node_modules / .venv / __pycache__ / .pytest_cache と、package.json の隣の out
+消すもの: node_modules / .venv / __pycache__ / .pytest_cache / .ruff_cache と、package.json の隣の out
 未コミットの変更があるワークツリーでは、何も消さずに止まる
 USAGE
 }
@@ -158,7 +158,7 @@ clean_with_sh() {
 	# 何も消さない。消す対象の中（node_modules など）は丸ごと消すので見ない。
 	cw_odd=$(cd "$cw_top" && {
 		find . -name .git -prune \
-			-o \( -name node_modules -o -name .venv -o -name __pycache__ -o -name .pytest_cache \) -prune \
+			-o \( -name node_modules -o -name .venv -o -name __pycache__ -o -name .pytest_cache -o -name .ruff_cache \) -prune \
 			-o -name "*${cw_nl}*" -print 2>/dev/null || :
 	}) || {
 		printf 'ccnavi-clean: %s に移動できません。\n' "$cw_top" >&2
@@ -173,7 +173,7 @@ clean_with_sh() {
 	# 後で見るので、ここでは降りる。読めないディレクトリは探さない（find のエラー出力は捨てる）。
 	cw_found=$(cd "$cw_top" && {
 		find . -name .git -prune \
-			-o \( -name node_modules -o -name .venv -o -name __pycache__ -o -name .pytest_cache \) \
+			-o \( -name node_modules -o -name .venv -o -name __pycache__ -o -name .pytest_cache -o -name .ruff_cache \) \
 			\( -type d -o -type l \) -print -prune \
 			-o -name out \( -type d -o -type l \) -print 2>/dev/null || :
 	} | LC_ALL=C sort)

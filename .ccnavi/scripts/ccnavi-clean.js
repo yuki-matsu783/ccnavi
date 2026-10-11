@@ -14,7 +14,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 // どこにあっても生成物と言える名前
-const ALWAYS = new Set(["node_modules", ".venv", "__pycache__", ".pytest_cache"]);
+const ALWAYS = new Set(["node_modules", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache"]);
 // ありふれた名前なので、隣に package.json があるときだけ生成物と見る
 const BESIDE_PACKAGE_JSON = new Set(["out"]);
 // 中へ降りない。git の管理領域
