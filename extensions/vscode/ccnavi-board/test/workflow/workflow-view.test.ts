@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import {
   asPlanOrder,
   asWorkflowMessage,
+  changedOrder,
   editedOrder,
   isDirty,
   orderOf,
@@ -49,6 +50,9 @@ test("CB-T345 未保存は、答えの線が提案に書いてある先行と違
   assert.equal(isDirty(planOrderSample("open")), false);
   assert.equal(isDirty(planOrderSample("reverse")), true);
   assert.equal(isDirty(planOrderSample("loose")), true);
+  // 保存と未保存の写しに渡すのは、提案と違う計画だけ
+  assert.deepEqual(changedOrder(planOrderSample("reverse")), { plan: { "1": [], "2": [1, 3], "3": [1], "4": [2] } });
+  assert.deepEqual(changedOrder(planOrderSample("open")), {});
 });
 
 test("CB-T346 番号の変わる項を並べる（保存の前に見せる）。変わらない項は並べない", () => {

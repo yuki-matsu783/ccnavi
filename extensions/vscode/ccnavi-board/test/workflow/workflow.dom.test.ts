@@ -10,6 +10,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import type { HTMLButtonElement } from "happy-dom" with { "resolution-mode": "import" };
 import type { DomPage } from "../helpers/dom.js";
 import { planOrderSample } from "../helpers/plan-order.js";
 import { lastPosted, openWorkflow, openWorkflowData } from "../helpers/workflow.js";
@@ -117,13 +118,13 @@ test("CB-D164 断られた線（循環など）は引く前の形に戻し、理
   }
 });
 
-test("CB-D165 順序の検査に error がある答えは保存できない。理由（problems）と終端に当たらない項の印を実行ファイルの答えのまま出す", async () => {
+test("CB-D165 順序の検査に error がある答えは保存できない。理由（problems）は図の下に、終端に当たらない項の印は点に、実行ファイルの答えのまま出す", async () => {
   const dom = await openWorkflow();
   try {
     const { seq } = removeEdge(dom, "after-3-4");
     await dom.send({ type: "answer", seq, answer: planOrderSample("loose") });
     assert.equal(saveButton(dom).disabled, true);
-    assert.match(dom.one("#workflow-problems").textContent ?? "", /最後の項/);
+    assert.match(dom.one('.plan-graph[data-part="plan"] .plan-graph-notes').textContent ?? "", /最後の項/);
     assert.match(saveButton(dom).getAttribute("title") ?? "", /順序の検査/);
     assert.equal(dom.one('.plan-node[data-number="3"]').getAttribute("data-loose"), "1");
   } finally {
@@ -164,6 +165,31 @@ test("CB-D166 保存の前に、番号の変わる項と付け替える子の提
   }
 });
 
+test("CB-D174 子の提案を付け替えられない理由・改版の錠・計画と食い違う子は、実行ファイルの文のまま一覧に出し、書けなければ保存できない", async () => {
+  const dom = await openWorkflow();
+  try {
+    const { seq } = removeEdge(dom, "after-1-3");
+    const reverse = planOrderSample("reverse");
+    await dom.send({
+      type: "answer",
+      seq,
+      answer: {
+        ...reverse,
+        writable: false,
+        child_problems: ["i0001-02-01 の付け替え先 i0001-03-01 が承認済みチケットと重なる"],
+        mismatched: [{ ticket: "i0001-09-01", path: "/ws/x.md", phase: 9, text: "i0001-09-01 の phase: 9 は親の計画（1〜6 番）に無い" }],
+      },
+    });
+    const listed = dom.all("#workflow-problems li").map((li) => li.textContent ?? "");
+    assert.ok(listed.some((text) => text.includes("承認済みチケットと重なる")), String(listed));
+    assert.ok(listed.some((text) => text.includes("phase: 9")), String(listed));
+    assert.equal(saveButton(dom).disabled, true);
+    assert.match(saveButton(dom).getAttribute("title") ?? "", /子の提案/);
+  } finally {
+    await dom.close();
+  }
+});
+
 test("CB-D167 案に戻すと、往復せずに開いたときの答えに戻る。未保存が消える", async () => {
   const dom = await openWorkflow();
   try {
@@ -188,7 +214,7 @@ test("CB-D168 提案が外で変わったら差分を出し、取り込むか編
     await dom.send({ type: "answer", seq, answer: planOrderSample("reverse") });
     await dom.send({ type: "changed", answer: planOrderSample("loose", "b".repeat(64)) });
     const banner = dom.one("#changed");
-    assert.match(banner.textContent ?? "", /外で変わった/);
+    assert.match(banner.textContent ?? "", /外で変わりました/);
     assert.deepEqual(
       dom.all("#changed-diff tr[data-number]").map((row) => row.getAttribute("data-number")),
       ["4"],
