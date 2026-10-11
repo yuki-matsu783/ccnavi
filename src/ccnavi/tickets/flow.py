@@ -817,7 +817,7 @@ def briefing(
         return [f"    フロー: {flow_text.clean(path)}"]
     lines = [
         f"    フロー: {flow_text.clean(path)}"
-        "（ユーザが書いた手順。編集しない）。作業の前に読み、その順に進めてください。"
+        "（合意済みの手順。編集しない）。作業の前に読み、その順に進めてください。"
     ]
     data, why = load(path, base)
     if data is None:
