@@ -569,7 +569,7 @@ sync_family() {
 	fi
 	kept_branch=$(ccnavi_record_get "$record" branch)
 	if [ "$kept_branch" = "$P" ] && [ "$B" != "$P" ]; then
-		printf '%s: 親のブランチを承認済みの branch: の %s へ移した後、まだ送っていない（取り込み状態は %s のまま）。親のワークツリーで sh %s/ccnavi-git.sh push -u origin %s を打つと取り込み状態が書き直る。取り込まずに止めた\n' \
+		printf '%s: 親のブランチを承認済みの branch: の %s へ移した後、まだ送っていない（取り込み状態は %s のまま）。親のワークツリーで sh %s/ccnavi-git.sh push -u origin %s を打つと取り込み状態が書き直される。取り込まずに止めた\n' \
 			"$P" "$B" "$P" "$here_sh" "$B"
 		fail_note
 		# 移った後の pushを待つだけなので、取り込みの後の検査で blocked にしない。
@@ -577,7 +577,7 @@ sync_family() {
 		return 0
 	fi
 	if [ -n "$kept_branch" ] && [ "$kept_branch" != "$B" ]; then
-		printf '%s: 取り込み状態の親のブランチ（%s）と、親チケットが名乗る親のブランチ（%s）が違う。取り込まずに止めた。branch: を取り込み状態の名前に戻すか、親子のチケットを捨てるならユーザが sh %s/ccnavi-sync.sh --forget %s で取り込み状態を消す\n' \
+		printf '%s: 取り込み状態の親のブランチ（%s）と、親チケットが指定する親のブランチ（%s）が違う。取り込まずに止めた。branch: を取り込み状態の名前に戻すか、親子のチケットを捨てるならユーザが sh %s/ccnavi-sync.sh --forget %s で取り込み状態を消す\n' \
 			"$P" "$kept_branch" "$B" "$here_sh" "$P"
 		fail_note
 		return 0
@@ -603,7 +603,7 @@ sync_family() {
 
 	busy=$(busy_state "$tree")
 	if [ -n "$busy" ]; then
-		printf '%s: 親のワークツリーに途中の操作（%s）がある。済ませるか取りやめてから打ち直してください（この shは触らない）\n' "$P" "$busy"
+		printf '%s: 親のワークツリーに途中の操作（%s）がある。済ませるか取りやめてから打ち直してください（この shは変更しない）\n' "$P" "$busy"
 		fail_note
 	elif has_head "$heads" "$B"; then
 		sync_present
@@ -943,7 +943,7 @@ check_family() {
 	sed -n 's/^warn /  注意: /p' "$scratch/check"
 	[ "$cf_rc" -ne 0 ] || return 0
 	cf_reason=$(sed -n 's/^error //p' "$scratch/check" | head -n 1)
-	[ -n "$cf_reason" ] || cf_reason="取り込みの後の検査が落ちた（$(head -n 1 "$scratch/check-err" 2>/dev/null)）"
+	[ -n "$cf_reason" ] || cf_reason="取り込みの後の検査が失敗した（$(head -n 1 "$scratch/check-err" 2>/dev/null)）"
 	cf_try=0
 	cf_done=""
 	while [ "$cf_try" -lt 3 ] && [ -z "$cf_done" ]; do

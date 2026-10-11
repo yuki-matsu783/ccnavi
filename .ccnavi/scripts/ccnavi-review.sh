@@ -300,7 +300,7 @@ api_failed() {
 	case "$2" in
 	graphql)
 		printf 'ccnavi-review: %s\n' \
-			"GraphQL が塞がれている環境では confirm / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。MCP などリモートを読める道具でスレッドとレビューを JSON にして 'ccnavi review confirm --phase <N> --result <json>' を打ってください。渡す JSON の形は fetch_all と同じ {host, mr, threads, reviews, fetched_at} です。Draft 外しはその道具の側で直接行ってください。" >&2
+			"GraphQL を使えない環境では confirm / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。MCP などリモートを読める道具でスレッドとレビューを JSON にして 'ccnavi review confirm --phase <N> --result <json>' を打ってください。渡す JSON の形は fetch_all と同じ {host, mr, threads, reviews, fetched_at} です。Draft 外しはその道具の側で直接行ってください。" >&2
 		;;
 	esac
 }
@@ -1068,7 +1068,7 @@ ready)
 	# shは push・Draft 外し・コメントを受け持ち、契約（標準出力の形）は前の版と変わらないため。
 	# 組み立て直しはエージェントが勝手に回さない決まりなので、誰が何をするかを言う。
 	if [ -n "${skew:-}" ]; then
-		printf 'ccnavi-review: 食い違いがあっても ready は続ける。エージェントは build.py を回さず、終わったらユーザに実行ファイルの組み立て直し（または配り直し）を頼む。\n' >&2
+		printf 'ccnavi-review: 食い違いがあっても ready は続ける。エージェントは build.py を実行せず、終わったらユーザに実行ファイルの組み立て直し（または配り直し）を頼む。\n' >&2
 	fi
 	ccnavi_c1_capture="$state/review-ready-$$.out"
 	ready_rc=0

@@ -263,7 +263,7 @@ class FetchTest(unittest.TestCase):
         self.assertNotIn("認証", done.stdout)
 
     def test_an_authentication_failure_says_so(self):
-        """401 を返すリモート。尋ねずに落ち、認証で落ちたことと、ユーザがすることを言う。"""
+        """401 を返すリモート。尋ねずに落ち、認証に失敗したことと、ユーザがすることを言う。"""
 
         class Unauthorized(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
@@ -285,7 +285,7 @@ class FetchTest(unittest.TestCase):
         done = self.fetch(LANG="ja_JP.UTF-8", LC_ALL="ja_JP.UTF-8")
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertEqual(1, done.stdout.count("取ってこられなかった"), done.stdout)
-        self.assertIn("認証で落ちた", done.stdout)
+        self.assertIn("認証に失敗した", done.stdout)
         self.assertIn("git fetch origin", done.stdout)
 
     def test_a_hanging_remote_is_cut_off(self):

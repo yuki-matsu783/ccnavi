@@ -153,7 +153,7 @@ ccnavi_fetch_or_note() {
 		return 1
 	fi
 	printf '%s\n' "$3"
-	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証で落ちた（資格情報が無いか、切れているか、権限が無い）。hook は資格情報の入力を求めない。ユーザに端末で一度 'git fetch origin' を打って認証を済ませてもらえば、次のセッションから通る"
+	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証に失敗した（資格情報が無いか、切れているか、権限が無い）。hook は資格情報の入力を求めない。ユーザに端末で一度 'git fetch origin' を打って認証を済ませてもらえば、次のセッションから通る"
 	return 1
 }
 
@@ -235,7 +235,7 @@ ccnavi_fetch_forward() {
 		return 0
 	ccnavi_fw_now=$(date +%s)
 	if [ "$((ccnavi_fw_now - started))" -ge "$budget" ]; then
-		printf '%s: 時間の枠（%s 秒）を過ぎたので早送りを飛ばした。sh %s/.ccnavi/scripts/ccnavi-sync.sh %s で取り込んでください\n' \
+		printf '%s: 時間の枠（%s 秒）を過ぎたので早送りを省略した。sh %s/.ccnavi/scripts/ccnavi-sync.sh %s で取り込んでください\n' \
 			"$2" "$budget" "$root" "$2"
 		return 0
 	fi

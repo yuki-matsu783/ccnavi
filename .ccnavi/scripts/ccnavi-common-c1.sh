@@ -428,7 +428,7 @@ ccnavi_c1_write() {
 		if ccnavi_git_timed "$ccnavi_cw_timeout" "$ccnavi_c1_tmp/ls-err" "$ccnavi_c1_tree" \
 			ls-remote origin "refs/heads/$ccnavi_c1_branch" >"$ccnavi_c1_tmp/ls" &&
 			grep -F -x -q -- "$ccnavi_cw_head${ccnavi_c1_tab}refs/heads/$ccnavi_c1_branch" "$ccnavi_c1_tmp/ls"; then
-			ccnavi_c1_say "push の応答は落ちたが、リモートには届いていた（${ccnavi_cw_head}）"
+			ccnavi_c1_say "push の応答を受け取れなかったが、リモートには届いていた（${ccnavi_cw_head}）"
 			ccnavi_c1_inflight=""
 			ccnavi_c1_sent "$ccnavi_cw_head"
 			rm -f "$ccnavi_cw_list"

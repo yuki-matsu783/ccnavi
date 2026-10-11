@@ -146,7 +146,7 @@ esac
 # 列挙して拒否するやり方は、漏れた名前が読み取り専用のまま通るので採らない。値を見ずに
 # 形で落とす。`-C <パス>` と `--git-dir` も、判定の起点が動くので同じ扱い。
 case "$1" in
--*) reject global-option "サブコマンドより前のオプション ($1) は受け取りません。素の形 ($SELF <サブコマンド> ...) で書き直してください。設定の一時上書きが要るなら、その理由をユーザに伝えてください。" ;;
+-*) reject global-option "サブコマンドより前のオプション ($1) は受け取りません。$SELF <サブコマンド> ... の形で書き直してください。設定の一時上書きが要るなら、その理由をユーザに伝えてください。" ;;
 esac
 
 sub="$1"
@@ -157,7 +157,7 @@ shift
 for arg in ${1+"$@"}; do
 	case "$arg" in
 	-c | --config-env | --config-env=*)
-		reject config-override "設定の一時上書き ($arg) は受け取りません。素の形で書き直してください。"
+		reject config-override "設定の一時上書き ($arg) は受け取りません。設定の上書きを付けない形で書き直してください。"
 		;;
 	--output | --output=* | --upload-pack* | --receive-pack* | --exec-path* | --exec=* | --ext-diff | --textconv)
 		reject output-or-exec "$arg は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すのでそちらを読んでください。"
@@ -439,7 +439,7 @@ grep)
 			case "open-files-in-pager" in
 			"$gr_name"*)
 				[ "${#gr_name}" -ge 2 ] &&
-					reject grep-pager "$arg は当たったファイルを外部コマンドで開きます。通しません。"
+					reject grep-pager "$arg は一致したファイルを外部コマンドで開きます。通しません。"
 				;;
 			esac
 			;;
@@ -449,7 +449,7 @@ grep)
 				gr_ch="${gr_rest%"${gr_rest#?}"}"
 				gr_rest="${gr_rest#?}"
 				case "$gr_ch" in
-				O) reject grep-pager "$arg には -O（--open-files-in-pager）が含まれます。当たったファイルを外部コマンドで開くので通しません。" ;;
+				O) reject grep-pager "$arg には -O（--open-files-in-pager）が含まれます。一致したファイルを外部コマンドで開くので通しません。" ;;
 				e | f | A | B | C | m) gr_rest="" ;;
 				esac
 			done
@@ -763,7 +763,7 @@ restore)
 	opt_walk restore_cb ${1+"$@"}
 	if [ -n "$rs_paths" ]; then
 		if [ "$rs_side" = yes ]; then
-			reject restore-store-side "restore --ours / --theirs で承認済みチケットの置き場に当たるパス ($rs_paths) の衝突を片側に寄せる形は通しません。置き場の衝突は、どちらの承認を採るかをユーザが決めます。$SELF merge --abort で取り込みをやめ、衝突したパスをユーザに伝えてください。"
+			reject restore-store-side "restore --ours / --theirs で承認済みチケットの置き場に当たるパス ($rs_paths) の衝突を片側の内容で解決する形は通しません。置き場の衝突は、どちらの承認を採るかをユーザが決めます。$SELF merge --abort で取り込みをやめ、衝突したパスをユーザに伝えてください。"
 		fi
 		if [ "$rs_source" = yes ]; then
 			reject restore-store-source "restore --source で承認済みチケットの置き場に当たるパス ($rs_paths) を別のコミットの中身に戻す形は通しません。置き場を動かすのはユーザとccnaviのスクリプトです。置き場の中身が食い違っているなら、ユーザに伝えてください（*?[ や: で始まる指定は、置き場に当たるかを確かめられないので同じく通しません。ファイルを1つずつ名指ししてください）。"
@@ -790,7 +790,7 @@ merge)
 			reject merge-discard-side "$2 $3 を使うと、衝突の片側が気づかないうちに捨てられます。他セッションの書きかけが入っていても差分に残りません。衝突は 1 つずつ中身を見て解いてください。"
 			;;
 		--no-verify:*)
-			reject merge-no-verify "$2 はマージ前の検査を飛ばします。検査が落ちるなら、落ちた理由を直してください。"
+			reject merge-no-verify "$2 はマージ前の検査を飛ばします。検査が失敗するなら、その原因を直してください。"
 			;;
 		esac
 	}
@@ -848,7 +848,7 @@ commit)
 		[ "$1" = opt ] || return 0
 		case "$2" in
 		--no-verify | -n)
-			reject commit-no-verify "commit の $2 (--no-verify) はコミット前の検査を飛ばします。検査が落ちるなら、落ちた理由を直してください。"
+			reject commit-no-verify "commit の $2 (--no-verify) はコミット前の検査を飛ばします。検査が失敗するなら、その原因を直してください。"
 			;;
 		--amend)
 			reject commit-amend "commit --amend は直前のコミットを書き換えます。直すなら新しいコミットを積んでください。"
@@ -969,7 +969,7 @@ checkout | switch)
 		fi
 		cc_others=$(ccnavi_family_record_of_branch "$WS" "$cc_key" "$cc_B" | grep -v -x -F -- "$cc_record" || :)
 		if [ -n "$cc_others" ]; then
-			reject carry-claimed "$cc_B は別の親子のチケット（${cc_others##*/}）の親のブランチです。2 つの親子のチケットが同じブランチを名乗ると、どちらのチケットを本物とするか決まらないので移りません。"
+			reject carry-claimed "$cc_B は別の親子のチケット（${cc_others##*/}）の親のブランチです。2 つの親子のチケットが同じブランチを親のブランチにしていると、どちらのチケットを本物とするか決まらないので移りません。"
 		fi
 		cc_out=$(mktemp 2>/dev/null || mktemp -t ccnavi-carry) || reject carry-tmp "一時ファイルが作れません。"
 		if git show-ref --verify --quiet "refs/heads/$cc_B" || git show-ref --verify --quiet "refs/remotes/origin/$cc_B"; then
@@ -996,12 +996,12 @@ checkout | switch)
 				rm -f "$cc_out"
 				exit 1
 			fi
-			cc_how="$cc_X の先頭から $cc_B を切った（承認済みチケットとマーカーはそのまま乗る）"
+			cc_how="$cc_X の先頭から $cc_B を切った（承認済みチケットとマーカーはそのまま引き継がれる）"
 		fi
 		rm -f "$cc_out"
 		log_info 親のブランチへ移った -- "family=$cc_X"
 		printf 'ok  git %s  親のブランチ %s へ移った\n' "$sub" "$cc_B"
-		printf '%s。続けて %s push -u origin %s を打つと、取り込み状態が %s で作られる（書き直る）\n' "$cc_how" "$SELF" "$cc_B" "$cc_B"
+		printf '%s。続けて %s push -u origin %s を打つと、取り込み状態が %s で作られる（書き直される）\n' "$cc_how" "$SELF" "$cc_B" "$cc_B"
 		exit 0
 	}
 	co_top=$(ccnavi_phys "$(git rev-parse --show-toplevel 2>/dev/null || :)")
@@ -1168,7 +1168,7 @@ push)
 	case "$push_record" in
 	*"
 "*)
-		reject push-ambiguous-family "$push_branch を親のブランチとする取り込み状態が 2 つ以上あります（$(printf '%s' "$push_record" | sed 's|.*/||' | tr '\n' ' ')）。2 つの親子のチケットが同じブランチを名乗ると、どちらのチケットを本物とするか決まらないので送りません。ユーザが確かめてください。"
+		reject push-ambiguous-family "$push_branch を親のブランチとする取り込み状態が 2 つ以上あります（$(printf '%s' "$push_record" | sed 's|.*/||' | tr '\n' ' ')）。2 つの親子のチケットが同じブランチを親のブランチにしていると、どちらのチケットを本物とするか決まらないので送りません。ユーザが確かめてください。"
 		;;
 	esac
 	if [ -n "$push_record" ] && [ "$(ccnavi_record_get "$push_record" state)" = gone ]; then
@@ -1180,7 +1180,7 @@ push)
 		case "$arg" in
 		-u | --set-upstream | --porcelain | --quiet | -q | --verbose | -v) ;;
 		--no-verify)
-			reject push-no-verify "$arg は送る前の検査を飛ばします。検査が落ちるなら原因を直してください。"
+			reject push-no-verify "$arg は送る前の検査を飛ばします。検査が失敗するなら原因を直してください。"
 			;;
 		--force-with-lease | --force-with-lease=* | --force-if-includes | -f | --force)
 			reject push-force "$arg はリモートの履歴を書き換えます。送り直したい理由をユーザに伝えてください。"

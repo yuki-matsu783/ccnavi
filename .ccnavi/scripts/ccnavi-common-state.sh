@@ -274,7 +274,7 @@ ccnavi_git_refusal() {
 	if [ -n "$ccnavi_gr_paths" ]; then
 		printf '書きかけの %s と重なる。コミットか退避をしてから打ち直してください' "$ccnavi_gr_paths"
 	elif grep -q 'index\.lock' "$1" 2>/dev/null; then
-		printf '索引のロック（index.lock）が残っている。別の gitが動いていないか確かめ、落ちた残りならユーザが消す'
+		printf '索引のロック（index.lock）が残っている。別の gitが動いていないか確かめ、異常終了して残ったものならユーザが消す'
 	elif grep -qi 'tell me who you are\|empty ident\|user\.email\|user\.name' "$1" 2>/dev/null; then
 		printf 'コミットするユーザの名前（user.name・user.email）が決まっていない'
 	elif grep -qi 'gpg\|signing' "$1" 2>/dev/null; then
