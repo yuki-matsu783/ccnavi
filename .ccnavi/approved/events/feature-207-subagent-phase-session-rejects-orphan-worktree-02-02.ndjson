@@ -1,4 +1,0 @@
-{"at": "2026-10-11T18:51:32Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree-02-02", "kind": "approved", "from": "todo", "to": "doing", "via": "board", "tree": "feature-207-subagent-phase-session-rejects-orphan-worktree"}
-{"at": "2026-10-11T18:52:41Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree-02-02", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "cf0d17b653bf75225aa8e748a55c87366632cf8d"}
-{"at": "2026-10-11T19:41:49Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree-02-02", "kind": "finished", "from": "doing", "to": "review", "via": "cli"}
-{"at": "2026-10-11T20:35:37Z", "ticket": "feature-207-subagent-phase-session-rejects-orphan-worktree-02-02", "kind": "settled", "from": "review", "to": "done", "via": "board", "actor": "yuki-matsu783", "phase": 2}
