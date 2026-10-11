@@ -885,7 +885,9 @@ class SubstRepoRulesTest(unittest.TestCase):
         )
         body = judge("Bash", "c=git; $c status")
         self.assertIn("`$c`", body["response"])
-        self.assertIn("becomes `git status`", body["response"])
+        # 書き直しの例に、止まる形（生の git）を使わない。
+        self.assertIn("becomes `ls -la`", body["response"])
+        self.assertNotIn("`git status`", body["response"])
 
     def test_コマンド名でない位置の変数とグロブは止めない(self):
         for subject in [

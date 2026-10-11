@@ -587,9 +587,9 @@ _REWRITE_TEXT = {
         "command name the shell works out when it runs",
         "The shell decides this command name only when it runs (from a variable, $( ), or a "
         "glob), so ccnavi cannot tell which program would run, and no rule can match it; it "
-        "stops the call. Write the command name out: `c=git; $c status` becomes `git status`, "
-        '`"$(command -v python3)" x.py` becomes `python3 x.py`, `/usr/bin/gi? status` becomes '
-        "`/usr/bin/git status`. The same goes for a script handed to sh or source: write its "
+        "stops the call. Write the command name out: `c=ls; $c -la` becomes `ls -la`, "
+        '`"$(command -v python3)" x.py` becomes `python3 x.py`, `/usr/bin/l? -la` becomes '
+        "`/usr/bin/ls -la`. The same goes for a script handed to sh or source: write its "
         "path, not `sh $SCRIPT`.",
     ),
     shellread.FORM_BACKQUOTE: (

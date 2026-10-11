@@ -1307,7 +1307,7 @@ ripgrep の既定の挙動で、ccnavi の側では変えられない。
 [ccnavi] POST_VIOLATION (rule: guard-config)
 path: .ccnavi/common/probe.json (?? / new)
 after: Bash(npm run build)
-undo: git clean -f -- ".ccnavi/common/probe.json"
+undo: rm -- ".ccnavi/common/probe.json"
 ガード自身のルールです。エージェントの判断で書き換えず、変更が要る理由を伝えてユーザに依頼してください。
 ```
 
@@ -1316,9 +1316,13 @@ undo: git clean -f -- ".ccnavi/common/probe.json"
 
 | 変更の種類 | 戻し方 |
 |---|---|
-| 中身が変わった・消えた | `git restore --staged --worktree -- <path>` |
-| 追跡されていないものが現れた | `git clean -f -- <path>` |
-| 索引に足された状態で現れた | `git rm -f -- <path>` |
+| 中身が変わった・消えた | `<git> restore --staged --worktree -- <path>` |
+| 追跡されていないものが現れた | `rm -- <path>` |
+| 索引に足された状態で現れた | `<git> restore --staged -- <path> && rm -- <path>` |
+
+`<git>` は、ワークスペースルートに git のラッパー（`.ccnavi/scripts/ccnavi-git.sh`）があればその実パス（`sh <ルート>/.ccnavi/scripts/ccnavi-git.sh`）、
+無ければ `git`。ラッパーがあるワークスペースでは生の git が止まることがあり、止まる形を案内しないため。ラッパーは `rm -f` と
+`clean` を通さないので、現れたものは索引から外してシェルの `rm` で消す形にする。
 
 ### 前から在った変更は原因にしない
 
@@ -1387,6 +1391,9 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 - `.claude/` の `hooks/` と `settings*.json`、ccnavi ディレクトリ（`.ccnavi`）、`ccnavi-git.sh`、実行ファイル、
   共通レイヤーの 3 本（`.ccnavi/common/`）、記録と state の置き場（`logs/decisions.jsonl` と `logs/state`）、閉じたチケットの退避（`logs/archive`）
 - パスは「区切りが続くか、そこで終わる」形で当てるので、`rm -rf .ccnavi` や `mv .ccnavi .ccnavi.bak` も止まる
+- `ccnavi-git.sh` を通しても同じ場所は消せない。`rm`・`restore --source <ref>`・`checkout <ref> <パス>` で上の場所
+  （とそれを中に含むディレクトリ）を消す・別のコミットの中身に戻す形は `builtin-guard-wrapper-paths`（`DENY_WRAPPER_CORE_PATH`）で止まる。
+  衝突を解く `restore --ours / --theirs` と、索引の中身に戻す `restore` / `restore --staged` は通る
 - 場所のパスは大文字小文字を区別せずに当てる。コマンドの名前（`rm` / `cp`）も区別しない。止める側が広がるだけなので問題にしない
 
 名指しのツール（`Write` / `Edit` / `NotebookEdit`）からも守る。
@@ -2035,7 +2042,7 @@ Claude Code はそこを読まないので、ccnavi が `SessionStart` と `Suba
 |---|---|---|
 | `Write` / `Edit` でルールファイルを直す | 通す | ここを止めると直す手段が 1 つも残らない |
 | シェルからルールファイルへ書き込む | 止める | ルールファイルを壊して緩い既定を使わせる手口を作らない |
-| `git add` / `git restore --ours` でマージの衝突を解く | 通す | 戻すのは既にコミットされている内容で、新しい文面は書かない |
+| `add` / `restore --ours` でマージの衝突を解く（ラッパーがあれば `sh .ccnavi/scripts/ccnavi-git.sh add` などで打つ。チケット制御が有効でラッパーがある間は、生の `git` は既定の間も止まる） | 通す | 戻すのは既にコミットされている内容で、新しい文面は書かない |
 
 止めるのは書き込みの形だけで、場所の名前が出ただけでは止めない。既定を使ったことは、止めた回だけでなく通した回にも伝える。
 
@@ -2804,6 +2811,9 @@ commit 845d832e329aa533ee8e0acf3ee61ea1990c47ca
 - 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）に当たるパスには、
   `checkout <ref> <パス>`・`restore --source <ref>`・`restore --ours / --theirs` を通さない。置き場を過去の中身に戻したり、
   衝突を片側に寄せたりすると、承認が無かったことにも戻ったことにもなる
+- ccnavi 自身を守る場所（`.ccnavi/`・`.claude/settings*.json`・`.claude/hooks/`・記録と state・`ccnavi-git.sh`）には、
+  `rm`・`restore --source <ref>`・`checkout <ref> <パス>` を通さない。hook が先に止め、ラッパースクリプトも 2 重目に止める。
+  ラッパースクリプト自身を消すと、生の git の止め（ラッパースクリプトがあるときだけ働く）も外れるため。衝突の解決（`restore --ours / --theirs`）は通る
 - 親のワークツリーでは、親のブランチ（承認済みの親チケットの `branch:`、無ければ識別子）のほかへ `checkout`・`switch` で移れない。
   識別子のブランチの上から承認済みの `branch:` のブランチへ移るのは、承認済みチケットを取り込む 1 操作になる
   `worktree add` は行き先の名前とブランチ名を揃える形だけで、違う名前のブランチを出すのは行き先の名前の親チケットが

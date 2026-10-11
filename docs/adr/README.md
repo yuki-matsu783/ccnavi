@@ -138,6 +138,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0114](0114-raw-git-is-a-builtin-deny-under-ticket-control.md) | チケット制御が有効な間は生の git を組み込みで止め、土台の deny を表記違いに強くする |
 | [0116](0116-detect-and-guide-over-front-loading.md) | 決まりを先に詰め込まず、危険と失敗を起きた時点で検知して案内する |
 | [0118](0118-wrapper-sh-judging-is-an-exception.md) | 入口を 1 本に寄せたラッパーの中の可否の判定は、止める・通すの原則の例外にする |
+| [0120](0120-wrapper-cannot-remove-core-paths.md) | git のラッパーでも、自己防衛の対象を消す・別のコミットの中身に戻す形は hook が止める |
 
 ### チケット制御
 

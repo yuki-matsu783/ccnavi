@@ -96,6 +96,23 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 ラッパーの中のチケット制御の可否を、ラッパーの外から打つ git で外させないためで、ガード自身を守る組み込みに数える（P4）。
 `CCNAVI_GUARD_CORE_FILES` では切れず、チケット制御（`CCNAVI_TICKET_CONTROL`）を切ると外れる。
 
+git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PATH`、`builtin-guard-wrapper-paths`）: `ccnavi-git.sh` の
+`rm`（`--cached` も）・`restore --source <ref>`・`checkout <ref> <パス>` で、`builtin-guard-setting-files` と同じ場所を
+消す・別のコミットの中身に戻す形を、ルールより先に止める（`wrapguard.check_core_paths`）。シェルの `rm` は止まるのに、ラッパーの
+`git rm` は同じファイルを消せた。`ccnavi-git.sh` 自身が消えると、生の git の組み込み（ラッパーがあるときだけ足す）も外れる。
+`CCNAVI_GUARD_CORE_FILES` が有効な間、チケット制御と組み込みの既定への退避に依らず足す。
+
+| 当たるもの | 理由 |
+|---|---|
+| 書いたとおりのパスか、居場所（payload の cwd から `cd` を追った先）で解いた絶対パスに、`builtin-guard-setting-files` の場所の式が当たる | シェルの書き込みと同じ場所を、同じ式で見る。実行ファイル・動かした ccnavi ディレクトリ・共通レイヤーもそこに入っている |
+| 守る場所を中に含むディレクトリ（ワークスペースルート・実行ファイル・共通レイヤー・記録と state・プロジェクトの置き場の上と、`.ccnavi`・`.claude`・`.git` を直に、または 1 つ下に持つディレクトリ） | `restore --source <ref> -- .` や `rm -r projects` で中身ごと戻す・消す |
+| `:` で始まる pathspec、グロブの前に固定のディレクトリが無い指定、`--pathspec-from-file`、居場所の読めない `..` | 当たる先を読みで決められない。git の pathspec のグロブは `/` もまたぐ |
+
+通すのは、索引の中身に戻す `restore`（`--staged`、衝突を解く `--ours` / `--theirs`）。衝突したルールファイルを直す道がここしか無く、
+索引の中身はエージェントが書けない場所から来る。拒否の文面は、変更をユーザに依頼することと、通る形を案内する。
+ラッパーも同じ場所の検査（`core_hit`）を 2 重目に持つ。見るのは既定の置き場の名前だけで、動かした置き場は hook が見る。
+`stash` と `merge` は見ない（作業ツリーの変更を退避・取り込むだけで、守る場所を自分では過去の中身にしない）。
+
 保護済みの sh の前に置く環境変数（`DENY_SCRIPT_ENV_OVERRIDE`）: 保護済みの sh（`ccnavi-*.sh`）は、
 ワークスペースルート・承認済みチケットの置き場・実行ファイルを環境変数から読む。そのため、`CCNAVI_GUARD_CORE_FILES` が有効な間は、保護済みの sh を呼ぶ
 コマンド行で `CCNAVI_` で始まる変数と `CLAUDE_PROJECT_DIR` を置く・外す形を、ルールより先に止める。数えるのは前置きの代入、

@@ -17,7 +17,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.hook import events, post, post_findings
-from ccnavi.infra import gitstate
+from ccnavi.infra import gitstate, settings
 from ccnavi.records import audit
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
@@ -229,9 +229,10 @@ class PostToolUseTest(Harness, unittest.TestCase):
 
         self.assertEqual(result.returncode, 2)
         self.assertIn("protected/generated.env", result.stderr)
-        self.assertIn(
-            "git clean -f", result.stderr, "現れたファイルを restore で戻すことはできない"
-        )
+        # 現れたファイルは restore では戻せない。git のラッパーは clean を通さないので、
+        # シェルの rm で消す。
+        self.assertIn('rm -- "protected/generated.env"', result.stderr)
+        self.assertNotIn("git clean", result.stderr)
 
     def test_同じ変更を毎回は言わない(self):
         self.run_hook(command="ls")
@@ -1162,6 +1163,48 @@ class TicketPlaceTest(Harness, unittest.TestCase):
 
         self.assertEqual(result.returncode, 2)
         self.assertIn("POST_VIOLATION", result.stderr)
+
+
+class UndoTextTest(unittest.TestCase):
+    """戻す手順の文（`gitstate.undo`）は、git のラッパーで打てる形だけを書く。"""
+
+    def change(self, kind, staged=False):
+        return gitstate.Change(kind=kind, path="p/x.txt", full="", status="", staged=staged)
+
+    def test_wrapper_forms(self):
+        git = "sh /w/.ccnavi/scripts/ccnavi-git.sh"
+        self.assertEqual(
+            gitstate.undo(self.change(gitstate.KIND_CHANGED), git),
+            f'{git} restore --staged --worktree -- "p/x.txt"',
+        )
+        # ラッパーは rm -f と clean を通さない。索引から外してシェルの rm で消す。
+        self.assertEqual(
+            gitstate.undo(self.change(gitstate.KIND_NEW, staged=True), git),
+            f'{git} restore --staged -- "p/x.txt" && rm -- "p/x.txt"',
+        )
+        self.assertEqual(gitstate.undo(self.change(gitstate.KIND_NEW), git), 'rm -- "p/x.txt"')
+
+    def test_git_command_follows_the_wrapper(self):
+        root = tempfile.mkdtemp(prefix="ccnavi-gitcmd-")
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        # ラッパーが無ければ、生の git は組み込みで止まらないので git を案内する。
+        self.assertEqual(settings.git_command(root), "git")
+        write(os.path.join(root, ".ccnavi", "scripts", "ccnavi-git.sh"), "")
+        self.assertEqual(settings.git_command(root), settings.script_command(root, "ccnavi-git.sh"))
+
+    def test_report_uses_the_wrapper(self):
+        # 実行後チェックの報告は、ワークスペースのラッパーで打てる形を案内する。
+        harness = PostToolUseTest("test_変更を検知したら差し戻し戻し方と直前の実行を返す")
+        harness.setUp()
+        self.addCleanup(harness.doCleanups)
+        write(os.path.join(harness.repo, ".ccnavi", "scripts", "ccnavi-git.sh"), "")
+        harness.run_hook(command="ls")
+        harness.dirty()
+        result = harness.run_hook(command="python build.py")
+        git = settings.script_command(harness.repo, "ccnavi-git.sh")
+        self.assertIn(
+            f'undo: {git} restore --staged --worktree -- "protected/keep.txt"', result.stderr
+        )
 
 
 if __name__ == "__main__":

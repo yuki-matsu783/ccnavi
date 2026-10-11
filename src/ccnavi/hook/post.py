@@ -48,7 +48,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TextIO
 
-from ..infra import fsio, gitcmd, gitstate, hookio, tree
+from ..infra import fsio, gitcmd, gitstate, hookio, settings, tree
 from ..policy import rules, selfguard
 from ..records import audit
 from ..tickets import (
@@ -224,6 +224,7 @@ def check(
             record.code = post_report.CODE_PREEXISTING
 
     gated = restore in (selfguard.ENABLE, selfguard.DRY_RUN)
+    git = settings.git_command(root)
     blocks = [
         post_report._violation(
             f,
@@ -231,6 +232,7 @@ def check(
             restored.get(f.key()),
             f.key() in would,
             not_restored=gated and not _restorable(f),
+            git=git,
         )
         for f in fresh
     ]
@@ -242,7 +244,7 @@ def check(
     if dropped > 0:
         shown.append(
             f"[ccnavi] {dropped} more changed paths in protected areas are not listed here. "
-            "Run 'git status' to see the rest before you undo anything."
+            f"Run '{git} status' to see the rest before you undo anything."
         )
     return "\n\n".join(shown), tried
 
@@ -407,11 +409,12 @@ def at_stop(
     if not found and not uncounted:
         record.decision, record.enforced = audit.ALLOW, True
         return ""
+    git = settings.git_command(root)
     if not found:
         # 違反は無いが、数えていないツリーがある。そのことだけを言う。
         record.decision, record.enforced = audit.ALLOW, True
         _add_detail(record, f"uncounted {len(uncounted)}")
-        return _uncounted_line(uncounted)
+        return _uncounted_line(uncounted, git=git)
 
     record.decision, record.enforced = audit.DENY, True
     record.code = post_findings.record_code(found)
@@ -428,7 +431,7 @@ def at_stop(
     for finding in found[:REPORT_LIMIT]:
         rule = finding.group[0]
         where = f"{finding.tree_name}: " if finding.tree_name else ""
-        undo = gitstate.undo(finding.change)
+        undo = gitstate.undo(finding.change, git)
         how = (
             f"戻すなら {undo}"
             if undo
@@ -443,9 +446,9 @@ def at_stop(
             f" 対象のルール: {rule.id or '(id 無し)'} / {how}"
         )
     if len(found) > REPORT_LIMIT:
-        lines.append(f"  ほか {len(found) - REPORT_LIMIT} 件。全部は git status に出ます。")
+        lines.append(f"  ほか {len(found) - REPORT_LIMIT} 件。全部は {git} status に出ます。")
     if uncounted:
-        lines.append(_uncounted_line(uncounted, define=False))
+        lines.append(_uncounted_line(uncounted, define=False, git=git))
         _add_detail(record, f"uncounted {len(uncounted)}")
     return "\n".join(lines)
 
@@ -459,7 +462,7 @@ def _add_detail(record: audit.Record, note: str) -> None:
         record.detail = f"{record.detail}; {note}" if record.detail else note
 
 
-def _uncounted_line(uncounted: list[str], *, define: bool = True) -> str:
+def _uncounted_line(uncounted: list[str], *, define: bool = True, git: str = "git") -> str:
     """コミット済みを数えなかったツリーを言う 1 行。
 
     数えていないことを言わないと、そのツリーで何も起きなかったのと見分けが付かない。
@@ -478,7 +481,7 @@ def _uncounted_line(uncounted: list[str], *, define: bool = True) -> str:
         "ターン開始時の HEAD が記録されていないか、差分を読み取れなかったためです。"
         "ターンの途中で作り、一度も触らなかったワークツリーでよく起きます。"
         "このツリーでコミットしていなければ対応は不要です。"
-        "コミットした場合は、保護領域のファイルを変更していないか `git log` で確認してください。"
+        f"コミットした場合は、保護領域のファイルを変更していないか `{git} log` で確認してください。"
     )
 
 
