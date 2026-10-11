@@ -892,7 +892,12 @@ def _hook_steps(
         stderr.write(cli_usage.USAGE)
         return EXIT_ERROR
     except hookio.Unusable as exc:
-        stderr.write(reasons.payload_unusable(audit.REASON_PAYLOAD_UNUSABLE, str(exc)) + "\n")
+        stderr.write(
+            reasons.payload_unusable(
+                audit.REASON_PAYLOAD_UNUSABLE, str(exc), event=exc.event, mode=mode
+            )
+            + "\n"
+        )
         diaglog.get("ccnavi", root).warn("hook の payload を読めない", mode=mode)
         so_far.recorded = True
         cli_args._record(
@@ -900,6 +905,7 @@ def _hook_steps(
             log,
             audit.Record(
                 mode=mode,
+                event=exc.event,
                 decision=audit.SKIP,
                 reason=audit.REASON_PAYLOAD_UNUSABLE,
             ),

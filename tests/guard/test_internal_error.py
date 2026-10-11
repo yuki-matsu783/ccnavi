@@ -225,7 +225,72 @@ class InternalErrorTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn("[ccnavi] payload-unusable", result.stderr)
-        self.assertIn("Tell the user", result.stderr)
+        # イベント名すら読めない回は、何を止めたかを言わず、直す側だけを名指しする。
+        self.assertIn("The user needs to check", result.stderr)
+        self.assertNotIn("this call", result.stderr)
+
+    def test_unusable_payload_text_follows_the_event(self):
+        """exit 2 が何を止め、文が誰に届くかはイベントで違う。文をそれに合わせる。"""
+        cases = {
+            "PreToolUse": ("stopped it", "Tell the user"),
+            "PostToolUse": ("has already run", "Tell the user"),
+            "UserPromptSubmit": ("held this message back", "Sending it again"),
+            "Stop": ("kept it from ending", "end the turn"),
+            "SubagentStop": ("kept it from ending", "final report"),
+        }
+        for event, (what, then) in cases.items():
+            with self.subTest(event=event):
+                payload = {"hook_event_name": event, "session_id": 1}
+                result = run_raw(self.root, json.dumps(payload))
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(what, result.stderr)
+                self.assertIn(then, result.stderr)
+                if event != "PreToolUse":
+                    self.assertNotIn("judge this call", result.stderr)
+                row = rows(self.root)[-1]
+                self.assertEqual(row["reason"], "payload-unusable")
+                self.assertEqual(row["event"], event)
+
+    def test_unusable_payload_in_dry_run_does_not_say_stopped(self):
+        """dry-run は exit 0 で通す。「止めた」とは言わず、enable なら止めていたと言う。"""
+        for event in ("PreToolUse", "UserPromptSubmit"):
+            with self.subTest(event=event):
+                payload = {"hook_event_name": event, "cwd": 1}
+                result = run_raw(self.root, json.dumps(payload), mode="dry-run")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("[ccnavi] payload-unusable", result.stderr)
+                self.assertIn("nothing was stopped", result.stderr)
+                self.assertNotIn("stopped it", result.stderr)
+                self.assertNotIn("held this message back", result.stderr)
+
+
+class DeadlineTextTest(unittest.TestCase):
+    """期限に届かなかった回の文。期限を見るのは実行前チェックだけ。"""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = directory.name
+
+    def run_late(self, mode):
+        with mock.patch.object(judge, "DEADLINE_SECONDS", -1):
+            return run(self.root, PRE, mode)
+
+    def test_enable_stops_and_says_so(self):
+        result, row = self.run_late("enable")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("[ccnavi] deadline-exceeded", result.stderr)
+        self.assertIn("so it stopped it", result.stderr)
+        self.assertIn("split the command", result.stderr)
+        self.assertEqual(row["reason"], "deadline-exceeded")
+
+    def test_dry_run_lets_it_through_and_does_not_say_stopped(self):
+        result, row = self.run_late("dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("[ccnavi] deadline-exceeded", result.stderr)
+        self.assertIn("would have been stopped", result.stderr)
+        self.assertNotIn("so it stopped it", result.stderr)
+        self.assertEqual(row["reason"], "deadline-exceeded")
 
 
 if __name__ == "__main__":

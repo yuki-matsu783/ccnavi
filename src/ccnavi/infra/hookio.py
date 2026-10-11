@@ -59,7 +59,16 @@ class NoPayload(Exception):
 
 
 class Unusable(Exception):
-    """payload は届いたが解釈できない。"""
+    """payload は届いたが解釈できない。
+
+    event は読めたところまでのイベント名（読めなかったら空）。止めた文
+    （`reasons.payload_unusable`）をイベントに合わせるために持つ。exit 2 の意味と
+    文の宛先は、イベントごとに違う。
+    """
+
+    def __init__(self, message: str, event: str = "") -> None:
+        super().__init__(message)
+        self.event = event
 
 
 @dataclass
@@ -128,15 +137,15 @@ def decode(stream: TextIO) -> Input:
     for name in ("tool_name", "session_id", "cwd", "permission_mode", "tool_use_id"):
         value = data.get(name)
         if value is not None and not isinstance(value, str):
-            raise Unusable(f"payload の {name} が文字列ではない")
+            raise Unusable(f"payload の {name} が文字列ではない", event)
 
     tool_input = data.get("tool_input")
     if tool_input is not None and not isinstance(tool_input, dict):
-        raise Unusable("payload の tool_input がオブジェクトではない")
+        raise Unusable("payload の tool_input がオブジェクトではない", event)
     for name in TOOL_INPUT_TEXT_FIELDS:
         value = (tool_input or {}).get(name)
         if value is not None and not isinstance(value, str):
-            raise Unusable(f"payload の tool_input.{name} が文字列ではない")
+            raise Unusable(f"payload の tool_input.{name} が文字列ではない", event)
     tool_response = data.get("tool_response")
     return Input(
         tool_response=tool_response if isinstance(tool_response, dict) else {},

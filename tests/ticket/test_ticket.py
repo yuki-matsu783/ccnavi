@@ -176,6 +176,11 @@ class TicketTest(unittest.TestCase):
         extra = ["--guard-ticket-approval", guard_ticket_approval] if guard_ticket_approval else []
         return self.ccnavi("--mode", mode, *extra, stdin=json.dumps(payload))
 
+    def last_rules(self):
+        """記録の最後の 1 行の `rules`。"""
+        with open(os.path.join(self.root, "logs", "decisions.jsonl"), encoding="utf-8") as f:
+            return json.loads(f.read().splitlines()[-1]).get("rules", [])
+
     def reason(self, result):
         if not result.stdout.strip():
             return ""
@@ -526,6 +531,8 @@ class TicketTest(unittest.TestCase):
         self.assertIn("DENY_TICKET_BLOCKED", reason)
         self.assertIn("i0001", reason)
         self.assertNotIn("DENY_TICKET_SCOPE", reason)
+        # 範囲を当てる前に止めたので、記録の名前も範囲（(ticket-scope)）と分ける。
+        self.assertEqual(self.last_rules()[0], "(ticket-blocked)")
 
     def test_a_moved_ticket_whose_project_does_not_match_its_place_cannot_write(self):
         # `project:` は宣言ではなく照合で、プロジェクトは置き場が決める。
@@ -834,6 +841,7 @@ class TicketTest(unittest.TestCase):
             command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
         )
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
+        self.assertEqual(self.last_rules(), ["(subagent-ticket-op)"])
         parent = self.hook(
             "PreToolUse",
             "Bash",
@@ -1049,6 +1057,12 @@ class TicketTest(unittest.TestCase):
 
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
+        self.assertEqual(self.last_rules(), ["(phase-review)"])
+        # 繰り返しの文面は、止めた理由（レビュー待ち）の名前で言う。
+        # 範囲（(ticket-scope)）とは言わない。
+        for _ in range(2):
+            again = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
+        self.assertIn("同じ理由（(phase-review)）", self.reason(again))
         shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(shell))
         exempt = self.hook(

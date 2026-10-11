@@ -364,7 +364,7 @@ def decide_before(
         runner, layer = ("", "")
         if not phase_forms.forbidden(subject):
             runner, layer = next((r, x) for r, x, _ in inner if phase_forms.forbidden(x))
-        record.code, record.rules = phase.CODE_SUBAGENT, [reasons.TICKET_RULE]
+        record.code, record.rules = phase.CODE_SUBAGENT, [reasons.SUBAGENT_TICKET_OP_RULE]
         record.unwrapped = layer
         return refuse(
             stdout,
@@ -390,7 +390,7 @@ def decide_before(
         held = phase.held_phase(root, conf, parent.ticket, raw) if parent is not None else None
         exempt = payload.tool_name == "Bash" and phase_forms.exempt(subject, record.degraded)
         if held is not None and not exempt:
-            record.code, record.rules = phase.CODE_REVIEW, [reasons.TICKET_RULE]
+            record.code, record.rules = phase.CODE_REVIEW, [reasons.PHASE_REVIEW_RULE]
             reason = phase.hold_reason(held, payload.tool_name, root)
             return refuse(
                 stdout, mode, record, rules.DENY, notices + [reason], conf=conf, root=root
@@ -419,7 +419,10 @@ def decide_before(
     if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
         mismatch = project_mismatch(conf, root, target, record.subject, index)
         if mismatch:
-            record.code, record.rules = reasons.CODE_TICKET_PROJECT, [reasons.TICKET_RULE]
+            record.code, record.rules = (
+                reasons.CODE_TICKET_PROJECT,
+                [reasons.TICKET_PROJECT_RULE],
+            )
             return refuse(
                 stdout, mode, record, rules.DENY, notices + [mismatch], conf=conf, root=root
             )
@@ -500,7 +503,9 @@ def decide_before(
         for rule in rule_set.section(name):
             if time.monotonic() > deadline:
                 stderr.write(
-                    reasons.deadline_exceeded(audit.REASON_DEADLINE_EXCEEDED, DEADLINE_SECONDS)
+                    reasons.deadline_exceeded(
+                        audit.REASON_DEADLINE_EXCEEDED, DEADLINE_SECONDS, mode=mode
+                    )
                     + "\n"
                 )
                 record.decision, record.reason = audit.SKIP, audit.REASON_DEADLINE_EXCEEDED
@@ -576,7 +581,14 @@ def decide_before(
             if ticket_reason:
                 # 判定を下したのはレイヤーを持たないチケット。狭められたルールの id は後ろに残し、
                 # 「ルールは通したのにチケットが止めた」回を記録から数えられるようにする。
-                record.rules = [reasons.TICKET_RULE, *record.rules]
+                # チケット自体が信頼できずに止めた回（DENY_TICKET_BLOCKED）は範囲を当てて
+                # いないので、範囲の名前（TICKET_RULE）と分ける。
+                decided_by = (
+                    reasons.TICKET_BLOCKED_RULE
+                    if code == reasons.CODE_TICKET_BLOCKED
+                    else reasons.TICKET_RULE
+                )
+                record.rules = [decided_by, *record.rules]
                 record.source = ""
 
     # 当たったルールがモデルへ渡す文。通す・聞く・止めるのどれでも、判定とは
@@ -674,11 +686,22 @@ def decide_before(
         # 結末は Claude Code の権限モードが決める。
         record.code = reasons.CODE_UNCERTAIN if record.degraded else reasons.CODE_UNDECLARED
         verdict = undeclared_verdict(payload.permission_mode, record.degraded, conf.guard_unwatched)
-        texts = [
-            reasons.undeclared(
-                payload.tool_name, subject, conf.rules, record.degraded, verdict == rules.DENY
-            )
-        ]
+        # 渡した回（HANDOVER）は文を返さないので組まない。出所は判定の出所（退避した回は
+        # 組み込みの既定）で、読めなかったルールファイルを名指ししない。
+        texts = (
+            []
+            if verdict == HANDOVER
+            else [
+                reasons.undeclared(
+                    payload.tool_name,
+                    subject,
+                    source,
+                    record.degraded,
+                    verdict=verdict,
+                    fell_back=record.fallback == builtin.FALLBACK,
+                )
+            ]
+        )
 
     if verdict == HANDOVER:
         # 判定は渡した。ここで残せるのは記録だけで、それがこの分担の要点になる。
