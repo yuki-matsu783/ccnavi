@@ -53,6 +53,7 @@ import { asWorkflowMessage, workflowTicketOf, workflowTitle, type ToWorkflow, ty
 import { showLoading } from "./loading.js";
 import * as diaglog from "./log.js";
 import { requireTickets } from "./ticket-control.js";
+import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 200;
@@ -425,6 +426,13 @@ async function handleMessage(current: PanelState, message: WorkflowMessage | und
       current.host.ready();
       redraw(current);
       postAppearance(current.host);
+      // 初回だけ吹き出しの案内を頼む。画面は図が出てから始め、閉じたら `tourDone` を返す
+      if (!tourSeen(SCREEN)) {
+        current.host.post({ type: "tour" } satisfies ToWorkflow);
+      }
+      return;
+    case "tourDone":
+      markTourSeen(SCREEN);
       return;
     case "reload": {
       if (message.dirty) {

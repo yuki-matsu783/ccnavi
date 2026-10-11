@@ -59,6 +59,8 @@ export type ToWorkflow =
   | { readonly type: "changed"; readonly answer: PlanOrderAnswer }
   /** 提案が承認待ち（`todo/`）から無くなった（承認・取り下げ・削除）。画面は読むだけになる */
   | { readonly type: "gone"; readonly reason: string }
+  /** 初回の吹き出しの案内を出す。画面は図が出てから始める（`src/tour.ts`） */
+  | { readonly type: "tour" }
   | AppearanceMessage;
 
 /** 画面 → 拡張ホスト。受け側は `asWorkflowMessage` で形を確かめてから使う */
@@ -73,7 +75,9 @@ export type WorkflowMessage =
   /** 未保存の線の写し。未保存のまま閉じられたときに戻すため、拡張ホストが覚えておく。未保存でなくなったら null */
   | { readonly type: "draft"; readonly order: PlanOrder | null }
   /** 外で変わった提案を取り込む（編集を捨てて新しい提案から始める） */
-  | { readonly type: "adopt" };
+  | { readonly type: "adopt" }
+  /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
+  | { readonly type: "tourDone" };
 
 /** 画面から届いた `--order` の形を確かめる。計画は `plan` / `feedback`、番号は数字の文字列、先行は 1 以上の整数 */
 export function asPlanOrder(value: unknown): PlanOrder | undefined {
@@ -105,6 +109,7 @@ export function asWorkflowMessage(message: unknown): WorkflowMessage | undefined
   switch (message.type) {
     case "ready":
     case "adopt":
+    case "tourDone":
       return { type: message.type };
     case "reload":
       return { type: "reload", dirty: message.dirty === true };

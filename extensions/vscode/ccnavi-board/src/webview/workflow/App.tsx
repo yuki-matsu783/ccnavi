@@ -15,13 +15,18 @@
  *
  * **置き場所は動かさない。** 番号が振り直っても点の名札の番号だけが変わる。置き場所は振り直す前の番号で覚え
  * （`layoutOf`）、「並べ直す」で今の線から組み直す。
+ *
+ * **初回の案内**（`Tour.tsx`）は図が出てから始める。図を出せない答え（計画が空）では、案内の間だけ見本の計画
+ * （`core/tour-sample.ts` の `sampleWorkflow`。実行ファイルの答えの実例）を読むだけで出す。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 
 import { layoutOf, planGraphOf, type PlanLayout } from "../../core/plan-graph.js";
+import { SAMPLE_NOTE, sampleWorkflow } from "../../core/tour-sample.js";
 import type { PlanOrder, PlanOrderAnswer } from "../../core/planordermodel.js";
 import { changedOrder, editedOrder, isDirty, planDiff, renumbered, saveBlocker, type WorkflowData, type WorkflowPage } from "../../core/workflow-view.js";
 import { applyAppearance } from "../appearance.js";
+import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
 import { PlanGraph } from "../shared/PlanGraph.js";
 import { post } from "./post.js";
 import { Review } from "./Review.js";
@@ -52,6 +57,41 @@ function partName(part: string): string {
   return part === "feedback" ? "フィードバック計画" : "全体計画";
 }
 
+/** タブの案内。画面の様子は動かさないので、閉じても戻すものは無い */
+const TOUR_STEPS: readonly TourStep[] = [
+  {
+    target: ".workflow-graphs",
+    title: "図",
+    body:
+      "点は親の計画の項で、線はどの項がどの項を待つか（after）です。項の右の点から別の項の左の点へドラッグすると、線の先の項が元の項を待ちます（逆向きでも引けます）。線の真ん中の × で待たなくなります。" +
+      "線を変えるたびに ccnavi が番号を振り直します。循環になる線と、子が承認された番号へ入る線は引けません。最後の項が待っていない項は注意の色で出ます。",
+  },
+  {
+    target: ".toolbar .controls",
+    title: "直す手段",
+    body: "「並べ直す」は今の線で点の置き場所を組み直します（番号は変わりません）。「案に戻す」は提案に書いてある順序に戻し、「再読込」は提案を読み直します。",
+  },
+  {
+    target: "#save",
+    title: "この順序に決める",
+    body:
+      "番号の変わる項と、付け替える子の提案を一覧で確かめてから、提案の計画（plan: / feedback:）と子の提案を書き換えます。承認はしません。書き換えた提案はコミットされません。" +
+      "エージェントが提案を書き直していたら、何も書かずに差分を出します。",
+  },
+  {
+    target: ".toolbar .summary",
+    title: "承認との関係",
+    body:
+      "未保存の変更があるあいだは、チケット管理画面でこの親を含む一覧を承認できません。保存したら、承認はチケット管理画面から開き直してください。" +
+      "保存したあとにエージェントが提案を書き換えると、承認の画面に注意が出ます。",
+  },
+  {
+    target: '[data-action="tour"]',
+    title: "案内",
+    body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
+  },
+];
+
 export function App({ initial }: { readonly initial: WorkflowData }): JSX.Element {
   const [data, setData] = useState<WorkflowData>(initial);
   const [answer, setAnswer] = useState<PlanOrderAnswer | undefined>(() => pageOf(initial)?.answer);
@@ -65,6 +105,9 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   const [gone, setGone] = useState<string | undefined>(undefined);
   const [review, setReview] = useState(false);
   const seq = useRef(0);
+  // 初回の案内は図が出てから始める。保存の確かめの最中は、その下を指しても見えないので待つ
+  const tour = useTour(data.kind === "page" && answer !== undefined && !review, { onEnd: () => post({ type: "tourDone" }) });
+  const requestTour = tour.request;
 
   /** 線を変えた先行で答えを頼む。前の頼みへの答えは、届いても捨てる */
   const ask = useCallback((order: PlanOrder) => {
@@ -125,6 +168,8 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
         seq.current += 1;
         setReview(false);
         setGone(String(message.reason ?? ""));
+      } else if (message.type === "tour") {
+        requestTour();
       } else if (message.type === "appearance") {
         applyAppearance(message.value);
       }
@@ -137,8 +182,8 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
       ask(draft);
     }
     return () => window.removeEventListener("message", onMessage);
-    // 最初の 1 回だけ（`ask` は変わらない）。中身が入れ替わったときの頼み直しは "data" の受けがする
-  }, [ask]);
+    // 最初の 1 回だけ（`ask` と `requestTour` は変わらない）。中身が入れ替わったときの頼み直しは "data" の受けがする
+  }, [ask, requestTour]);
 
   const dirty = useMemo(() => answer !== undefined && isDirty(answer), [answer]);
 
@@ -245,6 +290,8 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   };
 
   const rows = changed === undefined ? [] : planDiff(page.answer.plans, changed.plans);
+  // 案内の間、図を出せない答え（計画が空）なら見本の計画を読むだけで出す。見本は描くだけで、線の頼みにも保存にも使わない
+  const sample = tour.touring && answer.plans.length === 0 ? sampleWorkflow() : undefined;
 
   return (
     <>
@@ -329,7 +376,9 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
             この順序に決める
           </button>
         </div>
+        <TourButton onClick={tour.start} />
       </header>
+      {sample !== undefined ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <p className="dim small">
         項の右の点から別の項の左の点へドラッグすると、線の先の項が元の項を待ちます（逆向きでも引けます）。線の真ん中の × で待たなくなります。線を変えるたびに ccnavi が番号を振り直します。循環になる線と、子が承認された番号へ入る線は引けません。
       </p>
@@ -348,7 +397,9 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
         </ul>
       )}
       <div className="workflow-graphs">
-        {answer.plans.length === 0 ? (
+        {sample !== undefined ? (
+          sample.plans.map((plan) => <PlanGraph key={plan.part} plan={plan} />)
+        ) : answer.plans.length === 0 ? (
           <p className="empty">この親の提案には計画（plan:）がありません。</p>
         ) : (
           answer.plans.map((plan) => (
@@ -368,6 +419,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
       <footer className={status?.error === true ? "foot error" : "foot"}>
         <span id="status">{status?.text ?? ""}</span>
       </footer>
+      {tour.touring ? <Tour steps={TOUR_STEPS} onClose={tour.end} /> : null}
     </>
   );
 }
