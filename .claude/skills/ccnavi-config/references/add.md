@@ -17,7 +17,7 @@ keywords: [rules.yml, phases.yml, risks.yml, deny, ask, allow, glob, regex, ル�
    2 本にまたがるなら別々の下書きにする
 3. 今の本物を読む。同じことを言うルールやフェーズ定義が既に無いか
 4. 下書きをワークツリーの `wip/scratchpad/`（docs/claude/scratchpad.md）に書く。本物の全文を写して足す（断片だと lint に掛けられない）
-5. 検証する。lint と、rules なら見本。通るまで直す（[check.md](check.md)）
+5. 検証する。lint と、rules なら期待する判定。通るまで直す（[check.md](check.md)）
 6. ユーザに渡す（下の「ユーザに渡す形」）。置くのはユーザ
 
 ## rules.yml
@@ -99,7 +99,7 @@ allow:
   及ぼすなら `Bash|PowerShell`。ツールでない名前は `Stop`（メインエージェントのターンの終わり）だけで、
   `allow` に `glob: "*"` と `every: N` を添えて置く。渡す回にターンの終わりを止めて文を渡す。
   `every` が 2 より小さいもの、プロジェクトのレイヤーに置いたものは使われない（`--lint` が warn）。
-  当たるかは `ccnavi --test Stop "(stop)"` か見本の `tool: Stop` で確かめる
+  当たるかは `ccnavi --test Stop "(stop)"` か期待の `tool: Stop` で確かめる
 
 Bash は実行される部分に当たる。`$( )` の中や `&&` の先も 1 本ずつ当たり、ヒアドキュメントの中身は当たらない
 （既定の `heredoc` ルールが入口ごと止める）。
@@ -132,10 +132,10 @@ Bash は実行される部分に当たる。`$( )` の中や `&&` の先も 1 �
 `additionalContextFile` / `additionalContextOnceFile`（ルートからの相対。先頭 4000 文字まで）。
 広い `allow` には書かない（呼び出しのたびに同じ文が積まれる）。lint は何にでも当たる allow と選択肢が 3 つ以上ある regex を warn にする。
 
-見本を一緒に足す。ルールを 1 件足したら `.ccnavi/common/rule-samples.yml` に、当たってほしい
-見本と当たってほしくない見本を両方足す。見本は
+期待する判定を一緒に足す。ルールを 1 件足したら `.ccnavi/common/rule-expectations.yml` に、当たってほしい
+期待と当たってほしくない期待を両方足す。期待は
 `tool` `subject` `why` の 3 つで、置いたタイプが期待する判定。`subject` の `/repo` は
-ワークスペースルートに読み替わる。見本の下書きも `wip/scratchpad/` に置き、`--test-samples` で
+ワークスペースルートに読み替わる。その下書きも `wip/scratchpad/` に置き、`--test-expectations` で
 本物と一緒に回す。
 
 ## phases.yml
@@ -236,10 +236,10 @@ factors:
 得るもの: <何が止まる / 通る / 変わるか>
 失うもの: <広がる沈黙、増える確認、閉じにくくなるフェーズ、など>
 やらない場合: <今どうなっているか>
-検証: --lint error 0 / warn N（内容）、見本 deny a/b ask c/d allow e/f 食い違い 0
+検証: --lint error 0 / warn N（内容）、期待 deny a/b ask c/d allow e/f 食い違い 0
 差分:
   <本物との diff>
-見本の追加: .ccnavi/common/rule-samples.yml に <n> 件（下書き: <パス>）
+期待の追加: .ccnavi/common/rule-expectations.yml に <n> 件（下書き: <パス>）
 ```
 
 置いたあとに `/ccnavi-config` の確かめる側をもう一度回す（`additionalContextFile` の相対パスや `{root}` で答えが変わる）。
