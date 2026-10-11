@@ -1,8 +1,11 @@
 """実物の GitHub に sh 3 本と exe を当てて 1 周する。ユーザが手で走らせる道具で、
 自動テストは呼ばない。tests/manual/gitlab/probe_gitlab.py の GitHub 版。
 
-使い捨てのブランチと PR を、実験場のリポジトリ（既定 `yuki-matsu783/test-repo`。PUBLIC）に作り、
-終わったら閉じて消す。ここに秘密や個人情報を書き込まない。ほかのリポジトリには書かない。
+使い捨てのブランチと PR と issue を、実験場のリポジトリ
+（既定 `yuki-matsu783/test-repo`。PUBLIC）に作る。終わったら PR と issue は閉じ
+（public なので履歴に残る）、ブランチは消す。ここに秘密や個人情報を書き込まない。
+ほかのリポジトリには書かない。ccnavi 本体のリポジトリ（このチェックアウトの origin）は、
+指定しても拒む。
 
 tests/ticket/test_ticket.py と同じ形で一時リポジトリを作り、`ccnavi-ticket.sh` / `ccnavi-git.sh` /
 `ccnavi-review.sh` を実物に通す。人間役（レビュアー）の操作は、sh と別の道具（urllib で REST と
@@ -12,8 +15,11 @@ GraphQL を直に呼ぶ）で行う。sh と同じ道具を使わないほうが
 
 - 実験場への書き込み権限があるトークン。`GITHUB_TOKEN`、無ければ `gh auth token` から取る
 - gh（認証済み）。sh は gh があればそれを使う。curl の経路は、gh を PATH から外して
-  同じ読みをやり直して確かめる
-- 組み立て済みの exe。`CCNAVI_BIN_PATH` で絶対パスを渡す（無ければ `dist/ccnavi/ccnavi`）
+  同じ読みをやり直して確かめる。gh は `GH_TOKEN` > `GITHUB_TOKEN` > 保存済みの認証の順で使うので、
+  別のアカウントに化けないよう、この probe は `GH_TOKEN` と `GITHUB_TOKEN` に
+  同じトークンを置いて走らせる
+- 組み立て済みの exe。`CCNAVI_BIN_PATH` で絶対パスを渡す（無ければ `dist/ccnavi/ccnavi`）。
+  このチェックアウトより古い exe だと食い違うので、起動時に版を出す
 - jq と curl（sh が使う）
 
     CCNAVI_BIN_PATH=/path/to/ccnavi uv run python tests/manual/github/probe_github.py
@@ -55,9 +61,31 @@ TICKET_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-ticket.sh
 REPO = os.environ.get("CCNAVI_PROBE_REPO", "yuki-matsu783/test-repo")
 OWNER = REPO.split("/")[0]
 API = "https://api.github.com"
-# 実験場以外には書かない。変えられるのは、ユーザが明示した実験場だけ
+
+
+def _own_repo() -> str:
+    """ccnavi 本体のリポジトリ（このチェックアウトの origin）の owner/name。読めなければ空。"""
+    done = subprocess.run(
+        ["git", "-C", ROOT_OF_CCNAVI, "remote", "get-url", "origin"],
+        capture_output=True,
+        text=True,
+    )
+    url = done.stdout.strip()
+    m = re.search(r"github\.com[:/]([^/\s]+/[^/\s]+?)(?:\.git)?/?$", url)
+    return m.group(1).lower() if m else ""
+
+
+# 実験場以外には書かない。変えられるのは、ユーザが明示した実験場だけ。本体には何があっても書かない
+if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", REPO):
+    sys.exit(f"CCNAVI_PROBE_REPO は owner/name の形で ({REPO})")
+if REPO.lower() == _own_repo():
+    sys.exit(f"{REPO} は ccnavi 本体のリポジトリ。ここには書かない")
 if REPO != "yuki-matsu783/test-repo" and not os.environ.get("CCNAVI_PROBE_REPO_OK"):
     sys.exit("実験場は yuki-matsu783/test-repo だけ。ほかを使うなら CCNAVI_PROBE_REPO_OK=1 を置く")
+if not _own_repo():
+    sys.exit(
+        "このチェックアウトの origin を読めず、本体への書き込みを避けられるか分からない。止めた"
+    )
 
 
 def _token() -> str:
@@ -86,6 +114,30 @@ def _exe() -> str:
 
 
 EXE = _exe()
+
+
+def _warn_stale_exe() -> None:
+    """exe の版と、このチェックアウトの HEAD を並べて出す。古い exe は仕様が違うことがある。"""
+    ver = subprocess.run(
+        [EXE, "--version"], capture_output=True, text=True, cwd=tempfile.gettempdir()
+    )
+    head = subprocess.run(
+        ["git", "-C", ROOT_OF_CCNAVI, "rev-parse", "--short", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    shown, sha = ver.stdout.strip(), head.stdout.strip()
+    print(f"exe の版: {shown or '(読めない)'} / このチェックアウトの HEAD: {sha}", flush=True)
+    if os.environ.get("CCNAVI_PROBE_STRICT_EXE") and (not sha or sha not in shown):
+        sys.exit("exe がこのチェックアウトから組み立てたものと確認できない。build.py で組み直す")
+    if not sha or sha not in shown:
+        print(
+            "警告: exe が古いかもしれない（CCNAVI_PROBE_STRICT_EXE=1 で止める）",
+            flush=True,
+        )
+
+
+_warn_stale_exe()
 STAMP = time.strftime("%m%d-%H%M%S")
 OUT = os.environ.get("CCNAVI_PROBE_OUT") or tempfile.mkdtemp(prefix="ccnavi-probe-")
 OUT = os.path.join(OUT, "ghrun-" + STAMP)
@@ -139,6 +191,7 @@ def env_for() -> dict[str, str]:
     env.update(
         {
             "GITHUB_TOKEN": TOKEN,
+            "GH_TOKEN": TOKEN,
             "CCNAVI_BIN_PATH": EXE,
             "CCNAVI_INTEGRATION_BRANCH": BASE,
             "CCNAVI_GUARD_TICKET_APPROVAL": "disable",
@@ -170,12 +223,15 @@ def env_without_gh() -> dict[str, str]:
         shim = os.path.join(OUT, "nogh-bin")
         os.makedirs(shim, exist_ok=True)
         for name in os.listdir(gh_dir):
-            if name == "gh":
+            if os.path.splitext(name)[0].lower() == "gh":  # gh と gh.exe
                 continue
             link = os.path.join(shim, name)
             if not os.path.lexists(link):
-                with contextlib.suppress(OSError):
+                try:
                     os.symlink(os.path.join(gh_dir, name), link)
+                except OSError:  # Windows など。コピーで代える
+                    with contextlib.suppress(OSError):
+                        shutil.copy2(os.path.join(gh_dir, name), link)
         parts = [p for p in env["PATH"].split(os.pathsep) if p != gh_dir]
         env["PATH"] = os.pathsep.join([shim, *parts])
     return env
@@ -215,10 +271,12 @@ def git(cwd: str, *args: str) -> str:
 
 
 def exe(*args: str, stdin: str = "") -> subprocess.CompletedProcess:
-    return run([EXE, "--root", ROOT, *args], ROOT_OF_CCNAVI, stdin=stdin)
+    # cwd も一時リポジトリにする（--root を無視する古い exe が、本体に書かないように）
+    return run([EXE, "--root", ROOT, *args], ROOT, stdin=stdin)
 
 
-def hook(event: str, tool: str, cwd: str, **tool_input) -> str:
+def hook_full(event: str, tool: str, cwd: str, **tool_input) -> tuple[int, str, str]:
+    """hook を 1 回打つ。(終了コード, permissionDecision, 理由か追加の文脈)。"""
     payload = {
         "hook_event_name": event,
         "tool_name": tool,
@@ -228,12 +286,31 @@ def hook(event: str, tool: str, cwd: str, **tool_input) -> str:
     }
     done = exe(stdin=json.dumps(payload))
     if not done.stdout.strip():
-        return ""
+        return done.returncode, "", ""
     try:
         out = json.loads(done.stdout).get("hookSpecificOutput", {})
     except ValueError:
-        return done.stdout
-    return out.get("permissionDecisionReason") or out.get("additionalContext") or ""
+        return done.returncode, "", done.stdout
+    return (
+        done.returncode,
+        out.get("permissionDecision") or "",
+        out.get("permissionDecisionReason") or out.get("additionalContext") or "",
+    )
+
+
+def hook(event: str, tool: str, cwd: str, **tool_input) -> str:
+    return hook_full(event, tool, cwd, **tool_input)[2]
+
+
+def agent_gate(cwd: str) -> tuple[bool, str]:
+    """子を起こす Agent が止められているか。(止められている, 詳細)。
+
+    止められている = exe が正常終了し、permissionDecision が deny で、
+    理由に DENY_PHASE_REVIEW がある。
+    """
+    rc, decision, reason = hook_full("PreToolUse", "Agent", cwd, description="次の子")
+    blocked = rc == 0 and decision == "deny" and "DENY_PHASE_REVIEW" in reason
+    return blocked, f"rc={rc} decision={decision!r} reason={reason[:60]!r}"
 
 
 def sh(
@@ -249,7 +326,7 @@ def api(
     payload: dict | None = None,
     tag: str = "",
 ) -> tuple[int, object]:
-    """人間役の REST。生の応答を OUT に残す。"""
+    """人間役の REST。生の応答を OUT に残す。再送は GET だけ（POST を送り直すと二重に作る）。"""
     global API_SEQ
     API_SEQ += 1
     token = token or TOKEN
@@ -267,7 +344,7 @@ def api(
         },
     )
     status, raw = 0, ""
-    for attempt in range(3):
+    for attempt in range(3 if method == "GET" else 1):
         try:
             with urllib.request.urlopen(req, timeout=60) as res:
                 status, raw = res.status, res.read().decode("utf-8")
@@ -464,9 +541,17 @@ def main() -> int:
         "credential.helper",
         '!f() { echo username=x-access-token; echo "password=$GITHUB_TOKEN"; }; f',
     )
+    # 親のブランチ名はチケットの識別子で決まる（i0001・i0002）。実験場に同じ名前が残っていると
+    # 上書きや削除で他の人のものに触れるので、あれば止まる
+    for name in ("i0001", "i0002"):
+        st, _ = api("GET", f"/repos/{REPO}/branches/{name}", tag=f"precheck-{name}")
+        if st != 404:
+            record(f"実験場に {name} ブランチが無い", False, f"status={st}。手で片付けてから")
+            return finish()
     # 統合先は main ではなく使い捨てのブランチにする（実験場の main に触れない）。履歴は無関係でよい
-    MADE_BRANCHES.append(BASE)
     pushed = run(["git", "push", "--quiet", "origin", f"main:refs/heads/{BASE}"], ROOT)
+    if pushed.returncode == 0:
+        MADE_BRANCHES.append(BASE)
     record(
         "統合先の使い捨てブランチを push（認証画面なし）",
         pushed.returncode == 0,
@@ -533,10 +618,8 @@ def main() -> int:
         "フェーズ 1 が終わりました" in said,
         said[:120].replace("\n", " "),
     )
-    record(
-        "レビュー待ちが Agent を止める",
-        "DENY_PHASE_REVIEW" in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
-    )
+    blocked, detail = agent_gate(parent_tree)
+    record("レビュー待ちが Agent を止める", blocked, detail)
 
     # 依頼には ELI5 の HTML が要る。wip/eli5/ の下に置いてコミットする
     # （ready の前に wip/ ごと消える）
@@ -553,12 +636,13 @@ def main() -> int:
     )
     record(
         "push 前の request は前提で止まる",
-        early.returncode != 0 and "push" in early.stderr,
+        early.returncode != 0 and "親ブランチの HEAD が push されていない" in early.stderr,
         early.stderr.strip()[-120:],
     )
 
-    MADE_BRANCHES.append("i0001")
     pushed = sh(GIT_SH, parent_tree, "push", "-u", "origin", "i0001")
+    if pushed.returncode == 0:
+        MADE_BRANCHES.append("i0001")
     record(
         "親の push（ラッパースクリプト経由、認証画面なし）",
         pushed.returncode == 0,
@@ -684,10 +768,8 @@ def main() -> int:
         checked.returncode != 0 and "未解決" in checked.stderr,
         checked.stderr.strip()[:200],
     )
-    record(
-        "その間は止まったまま",
-        "DENY_PHASE_REVIEW" in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
-    )
+    blocked, detail = agent_gate(parent_tree)
+    record("その間は止まったまま", blocked, detail)
 
     # curl の経路（gh を外す）でも同じに読めるか
     curl_env = env_without_gh()
@@ -725,6 +807,41 @@ def main() -> int:
     else:
         say("自分の PR には変更要求も approve も出せないので、その段は走らない（docstring 参照）")
 
+    # 差分の外へのレビューは 422 で拒まれ、レビューごと作られない
+    # （crit push が差分外の行に付けた指摘の行き先）
+    _, before = api(
+        "GET", f"/repos/{REPO}/pulls/{num}/reviews?per_page=100", tag="reviews-before-422"
+    )
+    n_before = len(before) if isinstance(before, list) else -1
+    for label, comment, expect in (
+        ("差分外の行", {"path": "src/1/work.py", "line": 99}, "Line could not be resolved"),
+        ("差分に無いファイル", {"path": "src/keep.py", "line": 1}, "Path could not be resolved"),
+    ):
+        st, rej = api(
+            "POST",
+            f"/repos/{REPO}/pulls/{num}/reviews",
+            reviewer,
+            {
+                "event": "COMMENT",
+                "comments": [{**comment, "side": "RIGHT", "body": "範囲外"}],
+            },
+            tag="review-outside-diff",
+        )
+        errors = " ".join(rej.get("errors", [])) if isinstance(rej, dict) else ""
+        record(
+            f"{label}へのレビューは 422 で拒まれる",
+            st == 422 and expect in errors,
+            f"{st} {errors}",
+        )
+    _, after = api(
+        "GET", f"/repos/{REPO}/pulls/{num}/reviews?per_page=100", tag="reviews-after-422"
+    )
+    record(
+        "拒まれたレビューは作られない（レビューの件数が増えない）",
+        n_before >= 1 and isinstance(after, list) and len(after) == n_before,
+        f"{n_before} -> {len(after) if isinstance(after, list) else '?'}",
+    )
+
     # 1 本目を解決（GraphQL の resolveReviewThread）。2 本目は残す
     first = next(t for t in human if t["comments"]["nodes"][0]["path"] == "src/1/work.py")
     res = graphql(
@@ -752,11 +869,16 @@ def main() -> int:
         checked.stderr.strip()[:200],
     )
     second = next(t for t in human if t["id"] != first["id"])
-    graphql(
+    res2 = graphql(
         "mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id isResolved}}}",
         {"id": second["id"]},
         reviewer,
         tag="thread-resolve-2",
+    )
+    record(
+        "レビュアーが 2 本目のスレッドを解決する",
+        res2.get("data", {}).get("resolveReviewThread", {}).get("thread", {}).get("isResolved")
+        is True,
     )
     fetched = sh(REVIEW_SH, parent_tree, "fetch")
     write(os.path.join(OUT, "fetch-4-resolved.json"), fetched.stdout)
@@ -766,9 +888,11 @@ def main() -> int:
         checked.returncode == 0,
         (checked.stdout + checked.stderr).strip()[:200],
     )
+    rc, decision, reason = hook_full("PreToolUse", "Agent", parent_tree, description="次の子")
     record(
         "止まっていたのが解ける",
-        "DENY_PHASE_REVIEW" not in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
+        rc == 0 and decision != "deny" and "DENY_PHASE_REVIEW" not in reason,
+        f"rc={rc} decision={decision!r}",
     )
 
     memo = write(
@@ -783,7 +907,7 @@ def main() -> int:
         has_marker(comments_of(num), "<!-- ccnavi:comment -->"),
     )
 
-    # 履歴を変えて古くなった（outdated）スレッドの line は null で返る。sh が 0 に読むか
+    # 3 本目のスレッド。decide で受け入れる
     status, rv2 = api(
         "POST",
         f"/repos/{REPO}/pulls/{num}/reviews",
@@ -838,6 +962,45 @@ def main() -> int:
     )
     record("ready のコメントが PR にある", has_marker(comments_of(num), "<!-- ccnavi:ready -->"))
 
+    # コメントを付けた行を書き換えるコミットを push すると、スレッドは古く（outdated）なり、
+    # GraphQL の line は null になる。sh は 0 に読む。force push も履歴の書き換えもしない。
+    # push すると依頼の後に親の HEAD が動くので、依頼・confirm の段が全部済んだ ready の後でやる
+    write(os.path.join(parent_tree, "src", "2", "work.py"), "# rewritten\n")
+    commit_all(parent_tree, "コメントを付けた行を書き換える")
+    moved = sh(GIT_SH, parent_tree, "push")
+    record(
+        "書き換えのコミットを push",
+        moved.returncode == 0,
+        redact(moved.stdout + moved.stderr)[:120],
+    )
+    outdated = {}
+    for _ in range(8):  # 古くなった印が付くまで少しかかる
+        nodes = threads_of(num, "threads-outdated")
+        outdated = next(
+            (t for t in nodes if t["comments"]["nodes"][0]["path"] == "src/2/work.py"), {}
+        )
+        if outdated.get("isOutdated"):
+            break
+        time.sleep(3)
+    node = outdated.get("comments", {}).get("nodes", [{}])[0]
+    record(
+        "GraphQL は古いスレッドの line を null で返す",
+        bool(outdated.get("isOutdated")) and node.get("line") is None,
+        f"isOutdated={outdated.get('isOutdated')} line={node.get('line')} "
+        f"originalLine={node.get('originalLine')}",
+    )
+    fetched = sh(REVIEW_SH, parent_tree, "fetch")
+    write(os.path.join(OUT, "fetch-3-outdated.json"), fetched.stdout)
+    old = [t for t in fetched_json(fetched).get("threads", []) if t["path"] == "src/2/work.py"]
+    record(
+        "sh は古いスレッドを line 0・解決済みのまま読む",
+        fetched.returncode == 0
+        and len(old) == 1
+        and old[0]["line"] == 0
+        and old[0]["resolved"] is True,
+        json.dumps(old, ensure_ascii=False)[:200],
+    )
+
     # ---- 5. 別の親をユーザが早めに閉じる（close-early）
     parent2 = worktree("i0002", "main")
     propose(parent2, "i0002", allow=("src/*", "wip/*"), title="途中で早めに閉じる親")
@@ -854,8 +1017,10 @@ def main() -> int:
     commit_all(parent2, "tickets")
     approved = exe("--agree", stdin="y\n")
     record("--agree（i0002）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
-    MADE_BRANCHES.append("i0002")
-    record("i0002 の push", sh(GIT_SH, parent2, "push", "-u", "origin", "i0002").returncode == 0)
+    pushed2 = sh(GIT_SH, parent2, "push", "-u", "origin", "i0002")
+    if pushed2.returncode == 0:
+        MADE_BRANCHES.append("i0002")
+    record("i0002 の push", pushed2.returncode == 0)
     status, pr2 = api(
         "POST",
         f"/repos/{REPO}/pulls",
@@ -906,34 +1071,65 @@ def main() -> int:
         )
 
     # ---- 6. URL にトークンを埋めた origin でも読めて、出力に漏れない
+    # URL は引数にも .git/config にも置かない（ps に見える・落ちると残る）。
+    # git の環境変数での設定で、この 1 回の呼び出しの origin だけを差し替える
     scheme, _, hostpath = origin.partition("://")
-    git(parent2, "remote", "set-url", "origin", f"{scheme}://x-access-token:{TOKEN}@{hostpath}")
-    seen = sh(REVIEW_SH, parent2, "origin")
+    url_env = dict(ENV)
+    url_env.update(
+        {
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "remote.origin.url",
+            "GIT_CONFIG_VALUE_0": f"{scheme}://x-access-token:{TOKEN}@{hostpath}",
+        }
+    )
+    seen = sh(REVIEW_SH, parent2, "origin", env=url_env)
     say("トークン入り URL の origin の読み方:\n" + redact(seen.stdout + seen.stderr))
     record(
         "トークン入り URL でも host と api_base が正しい",
-        "api_base=https://api.github.com" in seen.stdout,
+        "api_base=https://api.github.com" in seen.stdout and f"path={REPO}" in seen.stdout,
     )
-    record("トークン入り URL のトークンが出力に漏れない", TOKEN not in seen.stdout + seen.stderr)
-    git(parent2, "remote", "set-url", "origin", origin)
+    leaked = TOKEN in seen.stdout + seen.stderr
+    via_url = sh(REVIEW_SH, parent2, "fetch", env=url_env)
+    leaked = leaked or TOKEN in via_url.stdout + via_url.stderr
+    record("トークン入り URL のトークンが origin / fetch の出力に漏れない", not leaked)
     return finish()
 
 
+CLEANUP_FAILED: list[str] = []
+
+
 def cleanup() -> None:
-    """作った PR を閉じ、ブランチを消し、課題を閉じる。実験場の中だけ。"""
+    """作った PR と issue を閉じ（public なので履歴には残る）、ブランチを消す。実験場の中だけ。
+
+    各呼び出しの status を見て、失敗は CLEANUP_FAILED に挙げる。
+    """
     for number in MADE_PRS:
-        api("PATCH", f"/repos/{REPO}/pulls/{number}", payload={"state": "closed"}, tag="cleanup-pr")
+        st, _ = api(
+            "PATCH", f"/repos/{REPO}/pulls/{number}", payload={"state": "closed"}, tag="cleanup-pr"
+        )
+        say(f"片付け: PR #{number} を閉じる -> {st}")
+        if st != 200:
+            CLEANUP_FAILED.append(f"PR #{number} ({st})")
     for branch in MADE_BRANCHES:
-        status, _ = api("DELETE", f"/repos/{REPO}/git/refs/heads/{branch}", tag="cleanup-branch")
-        say(f"片付け: ブランチ {branch} -> {status}")
+        st, _ = api("DELETE", f"/repos/{REPO}/git/refs/heads/{branch}", tag="cleanup-branch")
+        say(f"片付け: ブランチ {branch} を消す -> {st}")
+        if st not in (204, 422):  # 422 は既に無い
+            CLEANUP_FAILED.append(f"ブランチ {branch} ({st})")
     for number in MADE_ISSUES:
-        api(
+        st, _ = api(
             "PATCH",
             f"/repos/{REPO}/issues/{number}",
             payload={"state": "closed", "state_reason": "not_planned"},
             tag="cleanup-issue",
         )
-    say(f"片付け: PR {MADE_PRS} を閉じた、課題 {MADE_ISSUES} を閉じた")
+        say(f"片付け: issue #{number} を閉じる -> {st}")
+        if st != 200:
+            CLEANUP_FAILED.append(f"issue #{number} ({st})")
+    if CLEANUP_FAILED:
+        say(f"片付けに失敗したもの（手で片付ける）: {', '.join(CLEANUP_FAILED)}")
+    else:
+        say(f"片付け: PR {MADE_PRS} と issue {MADE_ISSUES} を閉じた")
+        say(f"片付け: ブランチ {MADE_BRANCHES} を消した")
 
 
 def finish() -> int:
@@ -947,7 +1143,7 @@ def finish() -> int:
     failed = [r for r in RESULTS if not r[1]]
     say(f"\n{len(RESULTS) - len(failed)} / {len(RESULTS)} PASS。置き場: {OUT}")
     LOG.close()
-    return 1 if failed else 0
+    return 1 if failed or CLEANUP_FAILED else 0
 
 
 def guarded() -> int:
