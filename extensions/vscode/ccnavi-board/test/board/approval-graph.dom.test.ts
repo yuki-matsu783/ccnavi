@@ -15,6 +15,7 @@ import { fixture } from "../helpers/fixture.js";
 import { approvePreview, openBoard } from "../helpers/board.js";
 import { screenStyle } from "../helpers/bundle.js";
 import { plansOf, reorderCases, type RawItem } from "../helpers/plan-reorder.js";
+import { PLAN_FIT_MIN_ZOOM } from "../../src/core/plan-graph.js";
 import type { DomPage } from "../helpers/dom.js";
 
 const DIAMOND: readonly RawItem[] = ["research", { type: "design", after: [1] }, { type: "acceptance", after: [1] }, { type: "implement", after: [2, 3] }];
@@ -86,11 +87,15 @@ test("CB-D155 計画を持つ親があれば、本文の上に計画ごとの図
     // 点は番号・題・見る場所。延期なら引き受け手、子が承認された番号は固定の印
     const n1 = dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n1"] .plan-node');
     assert.match(n1.textContent ?? "", /^1調査/);
-    assert.match(n1.textContent ?? "", /レビューなし/);
+    // 見る場所の言葉は、同じオーバーレイの本文（承認画面）と同じ言葉の短い形
+    assert.match(n1.textContent ?? "", /レビュー不要/);
     assert.equal(n1.getAttribute("data-locked"), "1");
     assert.match(n1.textContent ?? "", /子が承認済み/);
     const n2 = dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n2"] .plan-node');
-    assert.match(n2.textContent ?? "", /延期 → 4/);
+    // 延期した項は、本文の待ちの一覧と同じ言い方で引き受け手を言い、見る場所は出さない（本文も出さない）
+    assert.match(n2.textContent ?? "", /レビューは 4 と一緒に/);
+    assert.doesNotMatch(n2.textContent ?? "", /レビュー要/);
+    assert.match(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n3"] .plan-node').textContent ?? "", /レビュー要（MR）/);
     assert.equal(n2.getAttribute("data-locked"), "0");
 
     // 終端に当たらない項は、実行ファイルが言ったものだけに印。その項から end への線も
@@ -105,11 +110,11 @@ test("CB-D155 計画を持つ親があれば、本文の上に計画ごとの図
     // 図の下。すぐ始まる項・終端に当たらない項・順序の検査の理由
     const plain = dom.one('.plan-graph[data-part="plan"] .plan-graph-notes').textContent ?? "";
     assert.match(plain, /すぐ始まる: 1/);
-    assert.match(plain, /延期: 2 → 4/);
-    assert.doesNotMatch(plain, /最後の項がこの項を待っていない/);
+    assert.match(plain, /延期したレビュー: 2 は 4 と一緒に/);
+    assert.doesNotMatch(plain, /最後の項が待たない/);
     const notes = dom.one('.plan-graph[data-part="feedback"] .plan-graph-notes').textContent ?? "";
     assert.match(notes, /すぐ始まる: 5, 6/);
-    assert.match(notes, /最後の項がこの項を待っていない: 6。最後の項へ線を引くか、合流の項を置く/);
+    assert.match(notes, /最後の項が待たない: 6。最後の項へ線を引くか、合流の項を置く/);
     assert.match(notes, /フィードバック計画の最後の項（7）が 6 を待っていない/);
   } finally {
     await dom.close();
@@ -192,6 +197,37 @@ test("CB-D159 ワークフロー編集タブへの入口（「ワークフロー
     assert.doesNotMatch(dom.one(".approval").textContent ?? "", /ワークフローを編集/);
   } finally {
     await dom.close();
+  }
+});
+
+/** 見えている図の倍率と、左上の位置（React Flow の viewport の transform） */
+function viewportOf(dom: DomPage, part: string): { x: number; y: number; zoom: number } {
+  const style = dom.one(`.plan-graph[data-part="${part}"] .react-flow__viewport`).getAttribute("style") ?? "";
+  const found = /translate\(\s*(-?[\d.]+)px,\s*(-?[\d.]+)px\)\s*scale\(\s*([\d.]+)\s*\)/.exec(style);
+  assert.ok(found !== null, `viewport の transform が読めない: ${style}`);
+  return { x: Number(found[1]), y: Number(found[2]), zoom: Number(found[3]) };
+}
+
+test("CB-D160 大きな計画でも、開いた最初の図は縮めすぎない（文字が読める倍率の下限で止め、はみ出す分はパンで見せる）。そのとき左端の開始が見える。小さな計画は等倍より大きくしない", async () => {
+  const chain: RawItem[] = ["research", ...Array.from({ length: 59 }, (_, i) => ({ type: "implement", after: [i + 1] }))];
+  const big = await openOverlay(plansOf(chain, undefined));
+  try {
+    await big.settle();
+    assert.equal(big.all('.plan-graph[data-part="plan"] .plan-node').length, 60);
+    const view = viewportOf(big, "plan");
+    assert.ok(view.zoom >= PLAN_FIT_MIN_ZOOM - 1e-6, `縮めすぎ: ${view.zoom}`);
+    // 開始（いちばん左の列、x = 0）が図の左端の中に見えている
+    assert.ok(view.x >= 0 && view.x <= 80, `開始が見えていない: x=${view.x}`);
+  } finally {
+    await big.close();
+  }
+  const small = await openOverlay(plansOf(["research", { type: "design", after: [1] }], undefined));
+  try {
+    await small.settle();
+    const view = viewportOf(small, "plan");
+    assert.ok(view.zoom <= 1 + 1e-6, `小さな計画を拡大している: ${view.zoom}`);
+  } finally {
+    await small.close();
   }
 });
 
