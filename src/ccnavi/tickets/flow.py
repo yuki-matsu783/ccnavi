@@ -506,8 +506,9 @@ def parse(raw: bytes) -> tuple[dict | None, str]:
     except UnicodeDecodeError as exc:
         return None, f"{NOT_UTF8}（{exc.start + 1} バイト目）"
     try:
-        # _Loader は SafeLoader に別名を拒む処理を足したもの（任意の型は作らない）。
-        data = yaml.load(text, Loader=_Loader)
+        # C の読み手があれば C で読む。別名は C ではイベントの段で、純 Python に回れば
+        # _Loader（SafeLoader に別名を拒む処理を足したもの）が断る。任意の型は作らない。
+        data = yamlread.safe_load(text, pure=_Loader, on_alias=_AliasRefused)
     except _AliasRefused:
         return None, ALIASED
     except OSError as exc:
