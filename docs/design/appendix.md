@@ -44,7 +44,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `CORE_WITHDRAW_HAS_CHILDREN` / `CORE_WITHDRAW_MARKERS` / `CORE_WITHDRAW_TODO_EXISTS` / `CORE_WITHDRAW_NO_PRIOR` / `CORE_WITHDRAW_CHANGED` | 承認の取り下げが通らなかった。子の承認済みチケットか子の提案がある / フェーズのマーカーがある（読めないときも） / 戻す先に同じ識別子の提案がある / 承認コミットの親に提案が無い / 承認のあとに中身が変わった |
 | `CORE_APPROVE_NO_DIGEST` / `CORE_APPROVE_LIST_CHANGED` / `CORE_APPROVE_DIGEST_CHANGED` / `CORE_APPROVE_NOTHING` / `CORE_APPROVE_STOPPED` | ボードの承認（`ccnavi --agree --yes`）が通らなかった。`--digest` が無い / 見せた一覧（識別子）と今の一覧が違う / 識別子は同じで見せた中身が今と違う / 承認するものが無い / 書く途中で止まった（置いたものは残る）。確認・取り下げと同じく、標準エラーの文の頭に `[<コード>]` で載せる。Chrome 拡張の承認（入口の `plan`）も、見せたものと違う・承認するものが無いときに同じコードを答えの `code` で返す（`core_approve.refusal_code` で 1 か所で決める） |
 | `CORE_HISTORY_UNWRITABLE` | レビュー済みか取り下げで、書く前に履歴を残せないと分かったので書かなかった |
-| `NOTICE_DOC_FRONTMATTER` | `PostToolUse`。Write で新しく作った md に frontmatter か `type` が無い。止めずに `additionalContext` で 1 度だけ書き方を案内する。索引に載らない md（git が無視するもの・ccnavi ディレクトリの下）と、決まりの文書が付けないとする md（`README.md`・`CLAUDE.md` と、`docs/claude/frontmatter.md` の対象外の表の置き場。チケットの置き場・チケットの下書き `wip/design/scripts/i*.md`・`wip/scratchpad/`・`.claude/skills/yomiyasu/**`）には出さない |
+| `NOTICE_DOC_FRONTMATTER` | `PostToolUse`。Write で新しく作った md に frontmatter か `type` が無い。止めずに `additionalContext` で 1 度だけ書き方を案内する。索引に載らない md（git が無視するもの・ccnavi ディレクトリの下）と、決まりの文書が付けないとする md（`README.md`・`CLAUDE.md` と、`docs/claude/frontmatter.md` の対象外の表の置き場。チケットの置き場・チケットの下書き `wip/design/scripts/i*.md`・`wip/scratchpad/`・`.claude/skills/yomiyasu/**`）には出さない。案内しても記録（`decisions.jsonl`）の `code` には残らない |
 
 記録の `skip` の理由: `mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、
 `payload-unusable`、`deadline-exceeded`、`internal-error`（ccnavi 自身の例外。4.5）、`tool-cannot-write`、

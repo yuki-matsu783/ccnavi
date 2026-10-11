@@ -1396,12 +1396,14 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 - パスは「区切りが続くか、そこで終わる」形で当てるので、`rm -rf .ccnavi` や `mv .ccnavi .ccnavi.bak` も止まる
 - `ccnavi-git.sh` を通しても同じ場所は消せない。`rm`・`restore --source <ref>`・`checkout <ref> <パス>` で上の場所
   （とそれを中に含むディレクトリ）を消す・別のコミットの中身に戻す形は `builtin-guard-wrapper-paths`（`DENY_WRAPPER_CORE_PATH`）で止まる。
-  衝突を解く `restore --ours / --theirs` と、索引の中身に戻す `restore` / `restore --staged`、何も消さない `rm -n` / `--dry-run` は通る。
-  パスや副命令を変数・置換・glob で書いた形、標準入力から読むシェル（`echo '…' | sh`）や `xargs` に流す呼び出し、
+  衝突を解く `restore --ours / --theirs` と、索引の中身に戻す `restore` / `restore --staged`、何も消さない `rm -n` / `--dry-run` は通る
+  （後ろに `--no-dry-run` を書けば消す形として見る）。
+  パスや副命令を変数・置換・glob で書いた形、標準入力から読むシェル（`echo '…' | sh`。`bash --norc`・`bash -o pipefail`・`env sh`・`command sh` も）や `xargs` に流す呼び出し、
   居場所の読めない `cd` / `pushd` の後の相対パスは、当たるかを確かめられないので止まる。ラッパーは副命令と対象をそのまま書いて直接呼ぶ。
   `CDPATH`・`python3 -c` などの中で組み立てる形は hook では読まない（限界。設計 12.1）
   承認済みチケットの置き場（`.ccnavi/approved/`）をエージェントがラッパーで消す形も止まる（レビュー済みのマーカーを消す `rm` はユーザが端末で打つ）。
   レビュー待ちの置き場（`wip/proposals/review/`）も同じで、置き場に何かがある間はその親（`wip/`・`wip/proposals/`）を消す形も止まる。
+  親を過去のコミットの中身に戻す形（`restore --source <ref> wip`・`checkout <ref> -- wip`）は、置き場が空でも止まる。
   レビュー待ちの提案を外すのはユーザに依頼する（sh は `rm` を通すので、ユーザは端末で打てる）
 - 場所のパスは大文字小文字を区別せずに当てる。コマンドの名前（`rm` / `cp`）も区別しない。止める側が広がるだけなので問題にしない
 
