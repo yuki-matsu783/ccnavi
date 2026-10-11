@@ -44,11 +44,12 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from ..infra import fsio, settings, tree, yamlread
+from ..infra import fsio, settings, tree
 from ..policy import rules
 from . import (
     agree_candidates,
     approval,
+    approval_checks,
     approval_marks,
     flow,
     history,
@@ -806,7 +807,7 @@ def child_rebuilt(change: ChildChange) -> tuple[bytes | None, str]:
         if why:
             return None, why
     try:
-        before, after = _front(text), _front(built)
+        before, after = ticket_mod.front_mapping(text), ticket_mod.front_mapping(built)
     except (yaml.YAMLError, ValueError) as exc:
         return None, f"組んだ全文を読み直せない（{exc}）"
     if before is None or after is None:
@@ -827,41 +828,41 @@ def child_rebuilt(change: ChildChange) -> tuple[bytes | None, str]:
     return built.encode("utf-8"), ""
 
 
-def _front(text: str) -> dict | None:
-    lines = text.splitlines()
-    end = next((i for i in range(1, len(lines)) if lines[i].strip() == _FENCE), None)
-    if end is None:
-        return None
-    front = yamlread.safe_load("\n".join(lines[1:end]))
-    return front if isinstance(front, dict) else None
+def changed_elsewhere(
+    old: str, new: str, keys: tuple[str, ...], values: str
+) -> tuple[dict | None, str]:
+    """書き換えた全文を読み直し、`keys` のほかの欄と本文が元と同じか。
 
-
-_REWRITTEN = ("plan", "feedback", phasetypes.COPY_KEY)
+    （読み直した frontmatter, 違えば理由）。理由があれば書かない。`values` は理由の文で
+    書き換えた値を指す言葉（`` `phases:` の値`` など）。値にアンカーがあり、ほかの欄が別名で
+    指していると、値を差し替えたときにほかの欄も変わる。読んだ形で比べてそれを見つける。
+    """
+    try:
+        before = ticket_mod.front_mapping(old)
+        after = ticket_mod.front_mapping(new)
+    except (yaml.YAMLError, ValueError) as exc:
+        return None, (
+            f"組んだ全文を読み直せない（{exc}）。{values}をほかの欄が別名で指していないか確かめる"
+        )
+    if before is None or after is None:
+        return None, "組んだ全文の frontmatter が読めない"
+    rest_before = {k: v for k, v in before.items() if k not in keys}
+    rest_after = {k: v for k, v in after.items() if k not in keys}
+    if rest_before != rest_after:
+        return None, (
+            f"差し替えると {'・'.join(keys)} のほかの欄が変わる（{values}にアンカーがあり、"
+            "ほかの欄が別名で指しているなど）ので書かない"
+        )
+    if old.split(_FENCE, 2)[2:] != new.split(_FENCE, 2)[2:]:
+        return None, "差し替えると本文が変わるので書かない"
+    return after, ""
 
 
 def _changed_elsewhere(old: str, new: str, revised: ticket_model.Ticket) -> str:
     """組んだ全文を読み直し、計画のほかの欄と本文が元と同じか。違えば理由（書かない）。"""
-    try:
-        before = _front(old)
-        after = _front(new)
-    except (yaml.YAMLError, ValueError) as exc:
-        return (
-            f"組んだ全文を読み直せない（{exc}）。`plan:` / `feedback:` の値をほかの欄が別名で"
-            "指していないか確かめる"
-        )
-    if before is None or after is None:
-        return "組んだ全文の frontmatter が読めない"
-    rest_before = {k: v for k, v in before.items() if k not in _REWRITTEN}
-    rest_after = {k: v for k, v in after.items() if k not in _REWRITTEN}
-    if rest_before != rest_after or before.get(phasetypes.COPY_KEY) != after.get(
-        phasetypes.COPY_KEY
-    ):
-        return (
-            "差し替えると plan・feedback のほかの欄が変わる（値にアンカーがあり、ほかの欄が"
-            "別名で指しているなど）ので書かない"
-        )
-    if old.split(_FENCE, 2)[2:] != new.split(_FENCE, 2)[2:]:
-        return "差し替えると本文が変わるので書かない"
+    _, why = changed_elsewhere(old, new, PARTS, "`plan:` / `feedback:` の値")
+    if why:
+        return why
     ticket, _ = ticket_mod.parse(new)
     if ticket is None:
         return "組んだ全文がチケットとして読めないので書かない"
@@ -928,3 +929,109 @@ def write(ans: Answer, content: bytes | None) -> str:
         fsio.put_back(before)
         return done + "。書いたものは戻した"
     return ""
+
+
+# ---- 打った側の親の提案を選ぶ・保存する
+
+
+def pick(proposals: list[ticket_model.Ticket], name: str) -> tuple[ticket_model.Ticket | None, str]:
+    """承認待ち（`todo/`）の親の提案と、決まらない理由。承認と同じ集め方で走査した提案から選ぶ。
+
+    同じ識別子の提案が 2 つ以上のツリーに残っていれば（本物とするツリーが決まらない）、打った
+    ツリー（cwd を含むツリー）の側だけを採る。ほかのツリーは別のセッションの作業かもしれないので
+    書かない。cwd がどのツリーにも当たらなければ、何も決めずに理由を返す。
+    """
+    found = [
+        t
+        for t in proposals
+        if t.ticket == name and t.state == ticket_model.TODO and not t.is_child and t.path
+    ]
+    if len(found) == 1:
+        return found[0], ""
+    if not found:
+        return None, ""
+    here = os.path.realpath(os.getcwd())
+    mine = [
+        t
+        for t in found
+        if t.tree_root
+        and (
+            here == os.path.realpath(t.tree_root)
+            or here.startswith(os.path.realpath(t.tree_root) + os.sep)
+        )
+    ]
+    # ワークスペースルートのツリーは、ほかのワークツリーを中に含むので、いちばん深いツリーを採る。
+    mine.sort(key=lambda t: len(os.path.realpath(t.tree_root)), reverse=True)
+    if mine:
+        return mine[0], ""
+    places = ", ".join(f"{t.tree or 'ワークスペースルート'}" for t in found)
+    return None, (
+        f"{name} の提案が複数の場所にある（{places}）。書き換えるツリーの中から打つ"
+        "（ほかのツリーの提案は書かない）"
+    )
+
+
+def current_parent(conf: settings.Settings, root: str, name: str) -> ticket_model.Ticket | None:
+    """改版なら、その親の承認済みチケット。新規なら None。"""
+    copies, _ = approval.scan(conf, root)
+    current = approval_checks.by_id(copies).get(name)
+    if current is None or current.is_child:
+        return None
+    return current
+
+
+@dataclass
+class Saved:
+    """保存（`--write`）の結果。`messages` は 1 行ずつの知らせ、`details` はその下に並べる項。"""
+
+    ok: bool
+    written: bool = False
+    messages: list[str] = field(default_factory=list)
+    details: list[str] = field(default_factory=list)
+
+
+def save(ans: Answer, expect: str) -> Saved:
+    """振り直した計画を書き戻す。開いたときのハッシュ（`expect`）と検査を通らなければ書かない。"""
+    if expect != ans.source.sha:
+        return Saved(
+            False,
+            messages=[
+                "提案が外で変わった（--expect が親と子の提案の今の中身と違う）。何も書かない。"
+                "--plan-order <親> --json で読み直す"
+            ],
+        )
+    if ans.renumbered.refused:
+        lines = [f"引けない線: {r.text}" for r in ans.renumbered.refused]
+        return Saved(False, messages=lines + ["何も書かない"])
+    for problems, header in (
+        (ans.problems, "振り直した計画の順序の検査に error がある。何も書かない"),
+        (ans.revision_problems, "改版で通らない形（子が承認された番号の錠）。何も書かない"),
+        (ans.child_problems, "子の提案を付け替えられない。何も書かない"),
+    ):
+        if problems:
+            return Saved(False, messages=[header], details=[str(p) for p in problems])
+    content, why = rebuilt(ans)
+    if why:
+        return Saved(False, messages=[f"{ans.source.parent.path}: {why}。何も書かない"])
+    if content is None and not ans.changes:
+        return Saved(True)
+    failed = write(ans, content)
+    if failed:
+        return Saved(False, messages=[failed])
+    renamed = [
+        f"子の提案 {c.ticket.ticket} を {c.new_ticket} に付け替えた"
+        f"（phase: {c.ticket.phase} → {c.new_phase}）"
+        for c in ans.changes
+        if c.renamed
+    ]
+    return Saved(True, written=True, messages=renamed)
+
+
+def reread_sha(
+    conf: settings.Settings, root: str, name: str, current: ticket_model.Ticket | None
+) -> str:
+    """書いたあとに読み直したハッシュ（付け替えた子は新しい名前で読む）。読めなければ空。"""
+    again, _ = approval.scan_proposals(conf, root)
+    found, _ = pick(again, name)
+    reread = load(conf, root, found, again, current)[0] if found else None
+    return reread.sha if reread is not None else ""
