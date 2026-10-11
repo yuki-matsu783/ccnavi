@@ -13,7 +13,7 @@ import os
 from ..infra import settings, shellread, shellread_scan, shellread_words, tree
 from ..infra.modes import DRY_RUN
 from ..policy import rules
-from ..tickets import phase, phase_forms, ticket_places
+from ..tickets import phase, phase_forms, ticket_guard, ticket_places
 
 # 返す理由に載せる理由コード。設計の理由コードの体系から、今のビルドが実際に
 # 下せる判定に対応するものだけを借りている。
@@ -457,7 +457,8 @@ def conventions(
     それ以外の詳しい決まりは `--docs`（ワークスペースの文書の frontmatter の索引）。
 
     - ワークツリーの行は、ワークスペースのルール（共通レイヤーと自身のレイヤー）に
-      `workspace-root` の deny があるときだけ、git の行は `raw-git` の deny があるときだけ出す。
+      `workspace-root` の deny があるときだけ、git の行は `raw-git` の deny があるか、生の git を
+      組み込みで止めるとき（`ticket_guard.raw_git_applies`）だけ出す。
       決まりを支えるのはそのルールで、ルールが無いワークスペースでは文と判定が食い違う。
       ルールの有無は `deny_ids`（判定と同じ読み方）で見る
     - `projects` の行は、プロジェクトの置き場にプロジェクトがあるときだけ出す
@@ -473,7 +474,7 @@ def conventions(
             f"- 編集する前にワークツリー（{worktrees}/<名前>）を切り、その中で編集する。"
             "切り方は ccnavi-git.sh の --help（worktree add）。"
         )
-    if RULE_RAW_GIT in declared:
+    if RULE_RAW_GIT in declared or ticket_guard.raw_git_applies(conf, root):
         git_sh = settings.script_command(root, "ccnavi-git.sh")
         lines.append(
             f"- git は直接呼ばず {git_sh} を通す。止められたら迂回せず、出力の案内に従う。"
