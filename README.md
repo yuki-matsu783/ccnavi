@@ -2144,7 +2144,9 @@ ccnavi --test Bash "git push" --cwd .claude/worktrees/feat-x --permission-mode d
 | `--permission-mode <モード>` | `permission_mode` | ルールが言及していない呼び出しの結末（「ルールが言及していない呼び出し」）。`auto` / `default` / `acceptEdits` / `plan` / `dontAsk` / `bypassPermissions` のどれか。ほかの名前は断る（hook は知らない名前を `ask` にするが、試験で打ち間違いを黙って `ask` にすると、そのモードの答えに読める） |
 | `--agent-id <id>` | `agent_id` | サブエージェントに許さない操作の止め（`DENY_SUBAGENT_TICKET_OP`） |
 
-`--permission-mode` と `--agent-id` は `--test` でだけ使える。ほかの経路に渡すと終了コード 1 で断る。
+`--permission-mode` と `--agent-id` は `--test` でだけ使える。ほかの経路（`--lint`・`--explain`・`--docs` も）に渡すと終了コード 1 で断る。
+フラグは `--test <ツール> <対象>` の前か後ろに置く。2 語の間に置く（`--test Bash --permission-mode auto '<cmd>'`）と旗の名前が対象になるので、
+ツールか対象に旗が入った形と、2 語の後ろに余った語がある形は終了コード 1 で断る。
 
 いま適用されている宣言を数え上げるには `--explain`。レイヤーごとのルール、フェーズ定義とリスクの配点の表、承認されたチケットの作業範囲が出る。判定は行わない（REQ-DIA-01）。
 

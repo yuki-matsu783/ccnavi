@@ -252,11 +252,27 @@ class TestHitsTest(unittest.TestCase):
                     self.assertIn(said, done.stderr)
 
     def test_payload_flags_are_for_test_only(self):
-        for flag in ("--permission-mode", "--agent-id"):
-            with self.subTest(flag=flag):
-                done = self.ccnavi("--explain", flag, "default")
-                self.assertEqual(done.returncode, 1)
-                self.assertIn(f"{flag} は --test でだけ使える", done.stderr)
+        for route in ("--explain", "--lint", "--docs"):
+            for flag in ("--permission-mode", "--agent-id"):
+                with self.subTest(route=route, flag=flag):
+                    done = self.ccnavi(route, flag, "default")
+                    self.assertEqual(done.returncode, 1)
+                    self.assertIn(f"{flag} は --test でだけ使える", done.stderr)
+
+    def test_flags_between_tool_and_subject_and_extra_words_are_refused(self):
+        """旗を TOOL と SUBJECT の間に置いた形と、余った語は、黙って捨てずに断る。"""
+        for argv, said in (
+            (("--test", "Bash", "--permission-mode", "auto", "ls"), "旗（--permission-mode）"),
+            (("--test", "--agent-id", "a1", "ls"), "旗（--agent-id）"),
+            (("--test", "Bash", "ls", "extra"), "余った語: extra"),
+        ):
+            with self.subTest(argv=argv):
+                done = self.ccnavi(*argv)
+                self.assertEqual(done.returncode, 1, done.stdout)
+                self.assertEqual(done.stdout, "")
+                self.assertIn(said, done.stderr)
+        done = self.ccnavi("--test", "Bash", "ls", "--permission-mode", "auto")
+        self.assertEqual(done.returncode, 0, done.stderr)
 
     # ---- 3. --explain の表
 

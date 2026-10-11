@@ -80,6 +80,34 @@ def _asks_renamed_approve(argv: list[str]) -> bool:
     return any(word == RENAMED_APPROVE or word.startswith(RENAMED_APPROVE + "=") for word in argv)
 
 
+def _test_usage(parser: argparse.ArgumentParser, args: argparse.Namespace) -> str:
+    """`--test` と、その payload の欄の組み合わせの誤り。正しければ空。
+
+    どれも黙って捨てずに断る。捨てると、試したつもりの呼び出しと違う答えを読む。
+
+    - `--permission-mode` / `--agent-id` は `--test` の payload の欄で、ほかの経路
+      （`--lint`・`--explain`・`--docs` など）には読む先が無い
+    - `--test` は TOOL と SUBJECT の 2 語を取る。その間に旗を置くと（`--test Bash
+      --permission-mode auto '<cmd>'`）、旗の名前が SUBJECT になり、後ろの語は余る
+    - 余った語（`--test Bash ls extra` の `extra`）
+    """
+    if args.test is None:
+        if args.permission_mode or args.agent_id:
+            flag = "--permission-mode" if args.permission_mode else "--agent-id"
+            return f"{flag} は --test でだけ使える"
+        return ""
+    known = parser._option_string_actions
+    for word in args.test:
+        if word.partition("=")[0] in known:
+            return (
+                f"--test の TOOL と SUBJECT に旗（{word}）が入った。旗は --test <TOOL> <SUBJECT> の"
+                "前か後ろに置く"
+            )
+    if args.command:
+        return f"--test は TOOL と SUBJECT の 2 語だけを取る（余った語: {' '.join(args.command)}）"
+    return ""
+
+
 def _plan_order_usage(args: argparse.Namespace, reordering: bool) -> str:
     """`--plan-order` の組み合わせの誤り。正しければ空。"""
     if args.agree:
@@ -252,6 +280,10 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         return EXIT_ERROR
     if args.help:
         stderr.write(cli_usage.USAGE)
+        return EXIT_ERROR
+    refused = _test_usage(parser, args)
+    if refused:
+        stderr.write(f"ccnavi: {refused}\n")
         return EXIT_ERROR
     if args.record_tree and not args.record_writes:
         stderr.write("ccnavi: --record-tree は --record-writes と一緒に使う\n")
@@ -591,12 +623,6 @@ def _parsed(
             as_json=args.json,
             flow_path=args.flow,
         )
-
-    # `--test` の payload の欄。ほかの経路では読む先が無いので、黙って捨てずに断る。
-    if args.test is None and (args.permission_mode or args.agent_id):
-        flag = "--permission-mode" if args.permission_mode else "--agent-id"
-        stderr.write(f"ccnavi: {flag} は --test でだけ使える\n")
-        return EXIT_ERROR
 
     # 診断の経路。どちらも payload を読まず、判定を実行にも記録にも繋げない。
     # ユーザが端末から打って「このルールは何に当たるのか」を確かめるための場所で、
