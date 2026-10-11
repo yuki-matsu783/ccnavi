@@ -163,7 +163,10 @@ class Log:
         # 追記モードで開いたハンドルに出す。2 件が混ざらないのはそのため。
         fd = os.open(self._path, os.O_APPEND | os.O_CREAT | os.O_WRONLY, 0o600)
         try:
-            os.write(fd, (line + "\n").encode("utf-8"))
+            # payload の文字列には、UTF-8 にできない孤立したサロゲート（JSON の "\ud800"）が
+            # 来ることがある。そのまま encode すると例外で記録ごと失うので、`\ud800` の 6 文字に
+            # して書く。JSON の文字列の中なので、読み戻すと元の文字になる。
+            os.write(fd, (line + "\n").encode("utf-8", errors="backslashreplace"))
         finally:
             os.close(fd)
 
