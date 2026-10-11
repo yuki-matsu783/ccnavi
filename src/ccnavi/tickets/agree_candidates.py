@@ -40,9 +40,12 @@ class Candidate:
     overflow: list[rules.Problem] = field(default_factory=list)
     # 改版なら、いま使われている承認済みチケット。
     current: ticket_model.Ticket | None = None
-    # このチケットに使うフェーズ定義（共通レイヤー + `project:` が指すレイヤー）。
-    # 承認の対象の中でもチケットごとに違いうるので、候補が引いたものを持っておく。
+    # このチケットに使うフェーズ定義。親の写し（`phases:`）を読んだもの。親ならその提案の写し、
+    # 子なら親（承認済みか、同じ承認で通る提案）の写し。承認画面はこれで題と見る場所を出す。
     types: dict | None = None
+    # 承認したときの `phases.yml`（親の `project:` が指すレイヤーの 1 本）。写しが
+    # これと同じかを確かめ、承認画面に「この親では使わない定義」を出すのに使う。
+    config: dict | None = None
     # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
     notes: list[str] = field(default_factory=list)
     # 親の `branch:` が既にあるブランチ（手元か origin、または提案がそのブランチの上）を指すか
@@ -84,8 +87,9 @@ def candidates(
     pool = approval_checks.by_id(approved)
     batch: list[Candidate] = []
     rejected: list[tuple[ticket_model.Ticket, list[rules.Problem]]] = []
-    # レイヤーごとの読み込みは 1 プロジェクト 1 回。承認の対象に同じレイヤーのチケットが
-    # 何件あっても、ファイルを読むのはそのレイヤーにつき 1 度で足りる。
+    # レイヤーごとの `phases.yml` の読み込みは 1 プロジェクト 1 回。承認の対象に同じレイヤーの
+    # チケットが何件あっても、ファイルを読むのはそのレイヤーにつき 1 度で足りる。読むのは写しを
+    # 確かめるためで、子の定義は親の写しから引く（`phases.yml` からは引かない）。
     cache: dict[str, dict | None] = {}
     # 先行を引く対応表。先行を書いた子が居るときだけ、最初の 1 回で組む。
     preds: dict[str, list[ticket_model.Ticket]] | None = None
@@ -93,7 +97,7 @@ def candidates(
     # 1 回の承認で 1 度ずつだけ読む。
     fams = syncstate.Families(conf, root)
 
-    def types_for(t: ticket_model.Ticket) -> dict | None:
+    def config_for(t: ticket_model.Ticket) -> dict | None:
         name = project_of(t, pool)
         if name not in cache:
             cache[name] = phase.load_types(conf, root, name)
@@ -101,14 +105,19 @@ def candidates(
 
     for t in sorted(revisions, key=lambda x: x.ticket):
         current = open_index[t.ticket]
-        types = types_for(t)
+        config = config_for(t)
+        # 提案の待ち方と写しの定義も承認済みと同じ関数で入れる（計画の項の `after` と `phases:`）。
+        t.workflow = workflow.compute(t)
+        types = phasetypes.types_of(t)
         complaints = _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
-        complaints += revision_problems(root, conf, t, current, types)
+        complaints += revision_problems(root, conf, t, current, config)
         complaints += approval_checks.family_problems(conf, root, t, fams)
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
-        cand = Candidate(ticket=t, complaints=complaints, current=current, types=types)
+        cand = Candidate(
+            ticket=t, complaints=complaints, current=current, types=types, config=config
+        )
         if cand.plans_feedback:
             cand.notes = feedback_notes(root, conf, t)
         batch.append(cand)
@@ -124,8 +133,11 @@ def candidates(
     for t in sorted(
         pending, key=lambda x: (x.parent or x.ticket, x.is_child, x.phase or 0, x.ticket)
     ):
-        types = types_for(t)
-        complaints, overflow = validate(t, pool, types)
+        config = config_for(t)
+        if not t.is_child and t.has_plan:
+            t.workflow = workflow.compute(t)
+        types = types_from(t, pool)
+        complaints, overflow = validate(t, pool, config)
         complaints += _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
         complaints += approval_checks.project_problems(t, pool, conf)
         complaints += approval_checks.family_problems(conf, root, t, fams)
@@ -154,6 +166,7 @@ def candidates(
                 complaints=complaints,
                 overflow=overflow,
                 types=types,
+                config=config,
                 existing_branch=bool(t.branch) and branch_exists(root, conf, t),
             )
         )
@@ -164,16 +177,16 @@ def candidates(
 
 
 def _workflow_field(t: ticket_model.Ticket) -> list[rules.Problem]:
-    """提案に待ち方の欄（`workflow:`）が書いてあれば拒む。待ち方を書くのは `--agree` だけで、
-    置き場は `phases/<親>/workflow.yml`（承認はチケットの中身を変えない）。"""
+    """提案に待ち方の欄（`workflow:`）が書いてあれば拒む。欄は読まないので、書いてあると
+    効くと読み手に思わせる。待ち方は計画の項の `after` から計算する。"""
     if ticket_model.WORKFLOW_KEY not in t.raw:
         return []
     return [
         rules.Problem(
             rules.SEVERITY_ERROR,
             t.ticket,
-            f"`{ticket_model.WORKFLOW_KEY}` の欄は提案に書かない。待ち方は --agree が"
-            f" {approval_marks.PHASES_DIR}/<親>/{approval_marks.WORKFLOW_FILE} に書く",
+            f"`{ticket_model.WORKFLOW_KEY}` の欄は提案に書かない（読まない）。"
+            "待ち方は計画の項の `after` から決まる",
         )
     ]
 
@@ -209,7 +222,7 @@ def record_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
     """提案に承認の記録（`ccnavi_approved`）か続きの子の目印（`followup_of`）があれば拒む。
 
     承認は中身を変えないので、提案に書いた欄はそのまま承認済みチケットに入る。前の版の承認の
-    記録を持つ古い形は取り下げを記録の欄で決め、`workflow:` の欄も待ち方として読む。続きの子の
+    記録を持つ古い形は取り下げを特別に扱う（子は記録の欄で決め、親は取り下げない）。続きの子の
     目印は取り下げを止める。どちらもユーザの判断（承認・レビューの行き先）だけが残すもので、
     提案に書かせると古い形や続きの子を装える。
     """
@@ -227,6 +240,19 @@ def record_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
     ]
 
 
+def types_from(t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket]) -> dict:
+    """このチケットに使う定義。親ならその写し、子なら親の写し（親が引けなければ空）。
+
+    親は承認済みならその承認済みチケット、同じ承認で通る提案ならその提案（`pool` に入っている）。
+    `phases.yml` からは引かない。承認のあとに `phases.yml` から定義を消す・名前を変えても、
+    進行中の親の子の承認が落ちないように。
+    """
+    if t.is_child:
+        parent = pool.get(t.parent)
+        return phasetypes.types_of(parent) if parent is not None else {}
+    return phasetypes.types_of(t)
+
+
 def project_of(t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket]) -> str:
     """このチケットのレイヤーを決める `project:`。
 
@@ -238,20 +264,6 @@ def project_of(t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket]) -> 
         if parent is not None:
             return parent.project
     return t.project
-
-
-def types_resolver(conf: settings.Settings, root: str, approved: list[ticket_model.Ticket]):
-    """チケットに使う定義を引く関数。レイヤーごとの読み込みは 1 プロジェクト 1 回。"""
-    pool = approval_checks.by_id(approved)
-    cache: dict[str, dict | None] = {}
-
-    def types_for(t: ticket_model.Ticket) -> dict | None:
-        name = project_of(t, pool)
-        if name not in cache:
-            cache[name] = phase.load_types(conf, root, name)
-        return cache[name]
-
-    return types_for
 
 
 def feedback_notes(root: str, conf: settings.Settings, parent: ticket_model.Ticket) -> list[str]:
@@ -267,44 +279,32 @@ def feedback_notes(root: str, conf: settings.Settings, parent: ticket_model.Tick
     return notes
 
 
-def plan_problems(t: ticket_model.Ticket, types: dict | None) -> list[rules.Problem]:
-    """親の計画がフェーズ定義と合っているか。"""
-    problems: list[rules.Problem] = []
+def plan_problems(
+    t: ticket_model.Ticket,
+    config: dict | None,
+    held: dict[str, phasetypes.PhaseType] | None = None,
+    approved: bool = False,
+) -> list[rules.Problem]:
+    """親の計画と写し（`phases:`）が組めるか。
+
+    写しだけを読んで済むもの（写しが無い、項の定義が写しに無い、定義の形と `kind`、使われて
+    いない定義）は `phasetypes.copy_problems`、順序（`after` の形・終端・最後の項の延期・延期の
+    引き受け手とそのレビュー）は `workflow.problems` が当てる。どちらも判定の側が同じものを当てる。
+    延期できる定義か（レビュー不要の定義は延期するものが無い）はここで見る。
+
+    `config` は承認したときの `phases.yml`。写しの各定義がその同じ名前の定義と読んだ形で同じかを
+    確かめる（`copy_config_problems`）。`held` は改版で、子が承認された番号が使う定義
+    （承認済みチケットの写しの値）。`approved` は承認済みチケットに当てる（`--lint`）ときで、
+    `phases.yml` との食い違いは warn にする（進行中の親には効かないのが決まり）。
+    """
+    problems = list(phasetypes.copy_problems(t))
     if not t.has_plan:
         return problems
-    if types is None:
-        problems.append(
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                t.ticket,
-                "`plan` があるのにフェーズ定義（phases.yml）が読めない",
-            )
-        )
-        return problems
-    for key, items, kind in (
-        ("plan", t.plan, phasetypes.KIND_WORK),
-        ("feedback", t.feedback or [], phasetypes.KIND_FEEDBACK),
-    ):
-        seen_types = {item.type for item in items}
+    types = phasetypes.types_of(t)
+    for key, items in (("plan", t.plan), ("feedback", t.feedback or [])):
         for i, item in enumerate(items):
             pt = types.get(item.type)
-            if pt is None:
-                problems.append(
-                    rules.Problem(
-                        rules.SEVERITY_ERROR, t.ticket, f"`{key}[{i}]` の定義 `{item.type}` は無い"
-                    )
-                )
-                continue
-            if pt.kind != kind:
-                where = "全体計画" if key == "plan" else "フィードバック計画"
-                problems.append(
-                    rules.Problem(
-                        rules.SEVERITY_ERROR,
-                        t.ticket,
-                        f"`{key}[{i}]` の `{item.type}` は kind `{pt.kind}`。{where}には置けない",
-                    )
-                )
-            if item.deferred and pt.review == phasetypes.REVIEW_NONE:
+            if pt is not None and item.deferred and pt.review == phasetypes.REVIEW_NONE:
                 problems.append(
                     rules.Problem(
                         rules.SEVERITY_ERROR,
@@ -312,36 +312,90 @@ def plan_problems(t: ticket_model.Ticket, types: dict | None) -> list[rules.Prob
                         f"`{key}[{i}]` の `{item.type}` はレビュー不要の定義。延期するものが無い",
                     )
                 )
-            for need in pt.requires:
-                if need not in seen_types:
-                    problems.append(
-                        rules.Problem(
-                            rules.SEVERITY_ERROR,
-                            t.ticket,
-                            f"`{item.type}` を置くなら `{need}` も {key} に要る（requires）",
-                        )
-                    )
-        # 延期の先は、レビューがある項でなければならない。全体計画は待ち方（`workflow`）が
-        # 引き受け手を決めるので、そちらで見る。
-        if key == "plan":
-            continue
-        for i, item in enumerate(items):
-            if not item.deferred:
-                continue
-            target = next((x for x in items[i + 1 :] if not x.deferred), None)
-            if target is None:
-                continue
-            tpt = types.get(target.type)
-            if tpt is not None and tpt.review == phasetypes.REVIEW_NONE and target.review != "mr":
+    problems.extend(workflow.problems(t, types))
+    problems.extend(copy_config_problems(t, config, held, approved))
+    return problems
+
+
+def copy_config_problems(
+    t: ticket_model.Ticket,
+    config: dict | None,
+    held: dict[str, phasetypes.PhaseType] | None = None,
+    approved: bool = False,
+) -> list[rules.Problem]:
+    """写し（`phases:`）の各定義が、承認したときの `phases.yml` の同じ名前の定義と同じか。
+
+    読んだ形で比べる（`phasetypes.same`）。`phases.yml` にあって写しに無い定義は何も言わない
+    （この親では使わないだけ）。`held` に入っている定義（改版で、子が承認された番号が使う定義）は
+    `phases.yml` ではなく承認済みチケットの写しの値と比べる。進んでいるフェーズの範囲・見る場所・
+    成果物を改版で変えないため。
+
+    `approved` なら承認済みチケットの食い違いとして warn で言う（`--lint`）。進行中の親には
+    効かない（判定は写しを読む）ので、止めない。
+    """
+    if not phasetypes.has_copy(t) or not t.has_plan:
+        return []
+    severity = rules.SEVERITY_WARN if approved else rules.SEVERITY_ERROR
+    fill = f"`ccnavi --plan-order {t.ticket} --fill-phases`"
+    if config is None:
+        return [
+            rules.Problem(
+                severity,
+                t.ticket,
+                "`plan` があるのにフェーズ定義（phases.yml）が読めない。"
+                "写し（`phases:`）が phases.yml と同じかを確かめられない",
+            )
+        ]
+    problems: list[rules.Problem] = []
+    for ident, pt in phasetypes.types_of(t).items():
+        if held is not None and ident in held:
+            if not phasetypes.same(pt, held[ident]):
+                fields = ", ".join(phasetypes.differing(pt, held[ident]))
                 problems.append(
                     rules.Problem(
-                        rules.SEVERITY_ERROR,
+                        severity,
                         t.ticket,
-                        f"`{key}[{i}]` を延期した先の `{target.type}` にレビューが無い",
+                        f"`phases:` の `{ident}` は子が承認された番号が使う定義なので、承認済み"
+                        f"チケットの値から変えられない（違う欄: {fields}）。{fill} で差し込み直す。"
+                        "直したいときは、ユーザが承認済みチケットの `phases:` を直す",
                     )
                 )
-    if not any(p.severity == rules.SEVERITY_ERROR for p in problems):
-        problems.extend(workflow.problems(t, types))
+            continue
+        ref = config.get(ident)
+        if approved:
+            if ref is None or not phasetypes.same(pt, ref):
+                what = (
+                    "今の phases.yml に無い"
+                    if ref is None
+                    else "今の phases.yml と違う（違う欄: "
+                    + ", ".join(phasetypes.differing(pt, ref))
+                    + "）"
+                )
+                problems.append(
+                    rules.Problem(
+                        severity,
+                        t.ticket,
+                        f"`phases:` の `{ident}` が{what}。進行中の親には効かない（判定は"
+                        "承認済みチケットの写しを読む）。反映するには、子の無い番号の定義なら"
+                        f" {fill} を打った改版を出す（計画が同じでも改版になる）。子が承認された"
+                        "番号の定義なら、ユーザが承認済みチケットの `phases:` を直す",
+                    )
+                )
+            continue
+        if ref is None:
+            problems.append(
+                rules.Problem(severity, t.ticket, f"`phases:` の `{ident}` は phases.yml に無い")
+            )
+        elif not phasetypes.same(pt, ref):
+            problems.append(
+                rules.Problem(
+                    severity,
+                    t.ticket,
+                    f"`phases:` の `{ident}` が phases.yml の定義と違う"
+                    f"（違う欄: {', '.join(phasetypes.differing(pt, ref))}）。"
+                    f"{fill} で写し直す",
+                )
+            )
     return problems
 
 
@@ -350,19 +404,31 @@ def revision_problems(
     conf: settings.Settings,
     revised: ticket_model.Ticket,
     current: ticket_model.Ticket,
-    types: dict | None,
+    config: dict | None,
 ) -> list[rules.Problem]:
-    """親の改版を受けてよいか。"""
-    problems = plan_problems(revised, types)
+    """親の改版を受けてよいか。
+
+    変えてよいのは計画（`plan:` / `feedback:`）と写し（`phases:`）。写しは、子が承認された番号
+    （固定した番号）が使う定義だけ承認済みチケットの値のまま（`phases.yml` と違っていてよい）、
+    ほかは今の `phases.yml` と同じ。足すのも外すのも自由。
+    """
+    fixed = fixed_numbers(conf, root, current.ticket)
+    held_types = phasetypes.types_of(current)
+    held: dict[str, phasetypes.PhaseType] = {}
+    for n in fixed:
+        item = current.item_at(n)
+        if item is not None and item.type in held_types:
+            held[item.type] = held_types[item.type]
+    problems = plan_problems(revised, config, held)
     if any(p.severity == rules.SEVERITY_ERROR for p in problems):
         return problems
-    # 変えられるのは計画だけ。
+    # 変えられるのは計画と写しだけ。
     if _scope_signature(revised) != _scope_signature(current):
         problems.append(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 revised.ticket,
-                "改版で変えられるのは plan と feedback だけ。範囲が承認済みチケットと違う",
+                "改版で変えられるのは plan・feedback・phases だけ。範囲が承認済みチケットと違う",
             )
         )
     if (
@@ -374,7 +440,8 @@ def revision_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 revised.ticket,
-                "改版で変えられるのは plan と feedback だけ。題か課題番号が承認済みチケットと違う",
+                "改版で変えられるのは plan・feedback・phases だけ。"
+                "題か課題番号が承認済みチケットと違う",
             )
         )
     if revised.branch != current.branch:
@@ -382,47 +449,33 @@ def revision_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 revised.ticket,
-                "改版で変えられるのは plan と feedback だけ。`branch:` が承認済みチケットと違う"
-                "（親のブランチは承認で決まる）",
+                "改版で変えられるのは plan・feedback・phases だけ。"
+                "`branch:` が承認済みチケットと違う（親のブランチは承認で決まる）",
             )
         )
-    # 全体計画: 子がある番号までは同じ順序でなければならない。
-    if revised.plan != current.plan:
-        frozen = _last_phase_with_children(conf, root, current.ticket)
-        if frozen > len(revised.plan) or revised.plan[:frozen] != current.plan[:frozen]:
-            problems.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    revised.ticket,
-                    f"全体計画の {frozen} 番目までは子が承認されているので変えられない。"
-                    "番号がずれると子の phase が指す先が変わる",
-                )
-            )
-    # 延期の引き受け手: 子がある番号までは変えない。引き受け手が前へ動くと、延期した作業を
-    # 済んだレビューが引き受けたことになり、誰にも見られずに終わる。
-    frozen = _last_phase_with_children(conf, root, current.ticket)
-    held = workflow.effective(current, types).review_at
-    fresh = workflow.compute(revised, types).review_at
-    moved = [
-        n
-        for n in sorted(set(held) | set(fresh))
-        if held.get(n) != fresh.get(n)
-        and (
-            n <= frozen
-            or any(at is not None and at <= frozen for at in (held.get(n), fresh.get(n)))
-        )
-    ]
-    if moved:
+    # 錠は番号ごと。子が承認された番号（固定した番号）の項だけを変えさせない。
+    problems += lock_problems(revised, current, fixed)
+    # フィードバック計画の番号は全体計画の続きなので、フィードバック計画を立てたあとに全体計画を
+    # 変えると番号と `after` がずれる。比べるのは定義・`review`・推移的な待ちの並び。
+    # フィードバック計画を立てる改版でも同じ。全体計画の最後のレビューを済んだ扱いにするので、
+    # 一緒に足した全体計画の項までレビュー済みになる。
+    plan_changed = approval.plan_signature(revised, "plan") != approval.plan_signature(
+        current, "plan"
+    )
+    if plan_changed and (current.feedback is not None or revised.feedback is not None):
+        when = "立てたあと" if current.feedback is not None else "立てる改版で"
         problems.append(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 revised.ticket,
-                f"延期の引き受け手が変わる（{', '.join(map(str, moved))} 番目）。"
-                f"{frozen} 番目までは子が承認されているので、延期の行き先は変えられない",
+                f"フィードバック計画を{when}は全体計画を変えられない"
+                "（フィードバック計画の番号は全体計画の続きで、項を足すと番号がずれる。"
+                "全体計画を変えるなら、フィードバック計画を出す前に改版する）",
             )
         )
     # フィードバック計画: 無い状態から 1 回だけ、全体計画の最後のレビューが済んでから。
-    if revised.feedback != current.feedback:
+    # 比べるのは定義・`review`・推移的な待ちの並び（`after` だけの違いも違いとして拾う）。
+    if approval.plan_signature(revised, "feedback") != approval.plan_signature(current, "feedback"):
         if current.feedback is not None:
             # 残りの切り出し先は進め方で違う。マージリクエストがあれば issue に切り出せるが、
             # chat で回した親はホストに何も無いので、新しい親チケットの提案にする。
@@ -455,18 +508,97 @@ def _scope_signature(t: ticket_model.Ticket) -> tuple:
     return tuple((e.decision, e.glob, e.regex) for e in t.entries)
 
 
-def _last_phase_with_children(conf: settings.Settings, root: str, parent_id: str) -> int:
-    """この親で、子が承認された（開いていても閉じていても）いちばん後ろの番号。"""
-    numbers = [
+def fixed_numbers(conf: settings.Settings, root: str, parent_id: str) -> set[int]:
+    """この親で、子が承認された（開いていても閉じていても）番号の集合。改版の錠が固定する番号。"""
+    return {
         t.phase
         for t in approval.all_tickets(conf, root)
         if t.parent == parent_id and t.phase is not None
-    ]
-    return max(numbers) if numbers else 0
+    }
+
+
+def lock_problems(
+    revised: ticket_model.Ticket,
+    current: ticket_model.Ticket,
+    fixed: set[int],
+    moved: dict[int, int] | None = None,
+) -> list[rules.Problem]:
+    """改版の番号ごとの錠。`fixed` は子が承認された番号。
+
+    固定した番号の項は、定義・`review`・番号・推移的な待ち（`workflow.compute` の `waits`）を
+    変えさせない。待ちを推移的な形で比べるのは、エージェントが `--explain` の「待つ: …」を写しても、
+    直接の先行だけを書いても、同じ意味なら通すため。固定した番号が固定していない番号を待つ形
+    （子を手で動かして承認した親）では、その先行も項の同一性（定義と `review`）で比べる。
+    番号だけで比べると、先行の番号に別の項を入れ替える改版が通ってしまう。
+
+    延期の引き受け手は、承認済みか提案の引き受け手が固定した番号のときだけ比べる。まだ始まって
+    いない項の間で引き受け手が入れ替わるだけなら、済んだレビューが延期した作業を引き受けたことに
+    はならない。
+
+    `moved` は番号を振り直したとき（`--plan-order`）の、元の番号 → 振り直した番号。延期した項は
+    元の項の同一性で比べる（承認済みの n 番の延期を、振り直した先の番号の延期と比べる）。固定した
+    番号は振り直しで動かないので、ほかの比べ方は変わらない。
+    """
+    problems: list[rules.Problem] = []
+
+    def error(text: str) -> None:
+        problems.append(rules.Problem(rules.SEVERITY_ERROR, revised.ticket, text))
+
+    held_items = dict(current.numbered())
+    new_items = dict(revised.numbered())
+    held = workflow.compute(current)
+    fresh = workflow.compute(revised)
+    for n in sorted(fixed):
+        before, after = held_items.get(n), new_items.get(n)
+        if before is None:
+            continue
+        if after is None or (after.type, after.review) != (before.type, before.review):
+            shown = f"{after.type}" if after is not None else "無い"
+            error(
+                f"{n} 番目（{before.type}）は子が承認されているので、"
+                f"定義・review・番号を変えられない（改版では {shown}）。子の phase が指す先が変わる"
+            )
+            continue
+        if held.waits.get(n, []) != fresh.waits.get(n, []):
+            error(
+                f"{n} 番目（{before.type}）は子が承認されているので、待ちを変えられない"
+                f"（いま待つ: {_numbers(held.waits.get(n, []))}、"
+                f"改版: {_numbers(fresh.waits.get(n, []))}）"
+            )
+            continue
+        for m in held.waits.get(n, []):
+            if m in fixed:
+                continue
+            was, now = held_items.get(m), new_items.get(m)
+            if now is None or was is None or (now.type, now.review) != (was.type, was.review):
+                error(
+                    f"{n} 番目は子の無い {m} 番目を待っているので、{m} 番目の項"
+                    f"（{was.type if was is not None else '?'}）を入れ替えられない"
+                )
+    moved = moved or {}
+    back = {new: old for old, new in moved.items()}
+    for n in sorted(set(held.review_at) | {back.get(m, m) for m in fresh.review_at}):
+        before_at, after_at = held.review_at.get(n), fresh.review_at.get(moved.get(n, n))
+        if before_at == after_at:
+            continue
+        if before_at in fixed or after_at in fixed:
+            error(
+                f"延期の引き受け手が変わる（{n} 番目の延期: {before_at or '無し'} → "
+                f"{after_at or '無し'}）。"
+                "子が承認された番号が引き受ける延期は、行き先を変えられない"
+            )
+    return problems
+
+
+def _numbers(found: list[int]) -> str:
+    return ", ".join(map(str, found)) if found else "何も待たない"
 
 
 def validate(
-    t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket], types: dict | None = None
+    t: ticket_model.Ticket,
+    pool: dict[str, ticket_model.Ticket],
+    config: dict | None = None,
+    approved: bool = False,
 ) -> tuple[list[rules.Problem], list[rules.Problem]]:
     """承認の対象にしてよいかを見る。親子の制約はここでしか見られない。
 
@@ -478,11 +610,16 @@ def validate(
     検査を当てる（`blocking_problems`）ので「判定では補えない」わけではないが、
     判定に任せると、承認の画面では通って、あとで書き込みが止まってから気づくことになる。
     承認はユーザがまとめて見て決める場所なので、そこで外れるものはそこで言う。
+
+    `config` は承認したときの `phases.yml`（親の写しを確かめる。`plan_problems`）。子の定義は
+    親の写しから引き、`phases.yml` からは引かない。`approved` は承認済みチケットに当てる
+    `--lint` で、写しと `phases.yml` の食い違いを warn にする。
     """
     problems: list[rules.Problem] = []
     overflow: list[rules.Problem] = []
     if not t.is_child:
-        return plan_problems(t, types), overflow
+        return plan_problems(t, config, approved=approved), overflow
+    problems.extend(phasetypes.copy_problems(t))
     parent = pool.get(t.parent)
     problems.extend(approval_checks.child_problems(t, parent))
     if parent is None or parent.is_child:
@@ -493,13 +630,13 @@ def validate(
         return problems, overflow
     if parent.has_plan and t.phase is not None:
         item = parent.item_at(t.phase)
-        pt = (types or {}).get(item.type)
+        pt = phasetypes.types_of(parent).get(item.type)
         if pt is None:
             problems.append(
                 rules.Problem(
                     rules.SEVERITY_ERROR,
                     t.ticket,
-                    f"{t.phase} 番目の定義 `{item.type}` の定義が読めない",
+                    f"{t.phase} 番目の定義 `{item.type}` が親 {parent.ticket} の `phases:` に無い",
                 )
             )
             return problems, overflow

@@ -13,7 +13,6 @@ from ..infra import settings, tree
 from ..policy import ruleload, rules
 from ..tickets import (
     agree,
-    agree_candidates,
     approval,
     approval_checks,
     approval_marks,
@@ -22,7 +21,6 @@ from ..tickets import (
     flow,
     history,
     phase,
-    phasetypes,
     risk,
     ticket_fold,
     ticket_model,
@@ -98,7 +96,6 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         open_copies,
         closed_copies,
         review_copies,
-        agree_candidates.types_resolver(conf, root, open_copies),
     )
     # 先行を引く対応表。承認と着手が使うのと同じ集め方。
     preds = approval_checks.predecessor_pool_of(
@@ -243,7 +240,8 @@ def _sums(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> l
         rules    path・unreadable・missing と、deny / ask / allow（共通レイヤーに足した和）
         risk     共通 + そのレイヤーの配点。levels（実際に使う境目の点）・factors・
                  problems・fallback
-        phases   使う 1 本（足し算はしない）。path・unreadable・order・types
+        phases   使う 1 本（足し算はしない）。path・unreadable・types（定義は順序を持たないので、
+                 待ち方の欄は無い。順序は親の計画の項の `after`）
 
     判定の合成と同じ関数（`ruleload.sum_view` / `risk.layer_definition`）で組む。
     """
@@ -279,7 +277,6 @@ def _sums(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> l
                 "phases": {
                     "path": phases_path,
                     "unreadable": phases_unreadable,
-                    "order": types.order if types is not None else phasetypes.ORDER_SEQUENTIAL,
                     "types": [
                         _phase_type_record(layer.name, pt)
                         for pt in (types.values() if types is not None else [])
@@ -406,6 +403,10 @@ def _ticket_record(
                 "tree": proposal.tree,
                 "tree_root": proposal.tree_root,
                 "path": proposal.path,
+                # 親の提案が全体計画（`plan:`）を持つか。承認前の親は `parents[]` に出ないので、
+                # ボードが計画の順序を直すタブの入口を出し分けるのに使う。タブ（`--plan-order`）は
+                # `plan:` を持たない親を開けないので、`feedback:` だけの親は偽。子も偽。
+                "has_plan": not proposal.is_child and proposal.has_plan,
             }
             if proposal is not None
             else None

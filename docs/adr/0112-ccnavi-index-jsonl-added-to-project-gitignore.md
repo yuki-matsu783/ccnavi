@@ -5,7 +5,7 @@ description: --docs の索引の名前を変え、プロジェクトを含む gi
 tags: [docs-index, gitignore]
 keywords: [ccnavi-index.jsonl, index.jsonl, 索引, .gitignore, プロジェクト, 追記, 否定, 移行]
 ---
-# ADR-0111: 索引を ccnavi-index.jsonl にし、無視の行が無いツリーには .gitignore に足して索引の対象にする
+# ADR-0112: 索引を ccnavi-index.jsonl にし、無視の行が無いツリーには .gitignore に足して索引の対象にする
 
 状態: 採用（2026-10-11 にユーザが決めた）
 

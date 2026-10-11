@@ -132,7 +132,6 @@ test("CX-T146 GitLab へ承認と取り下げを書く: Commits API の 1 コミ
     [
       ["create", DOING],
       ["create", EVENTS],
-      ["create", WORKFLOW],
       ["delete", TODO],
     ].sort(),
   );
@@ -143,14 +142,13 @@ test("CX-T146 GitLab へ承認と取り下げを書く: Commits API の 1 コミ
   assert.match(files[EVENTS], new RegExp(`"actor": "${GL_LOGIN}"`));
 
   // 取り下げ: 承認コミットを GitLab の履歴（first_parent）から引き、元の提案をそのまま戻す。
-  // 固定した待ち方も一緒に消す
+  // 待ち方のファイルは無い（承認は書かない）
   const back = await withdrawTicket(GITLAB_REPO, "i0001", "i0001", "押し間違い", glDeps(mock));
   assert.equal(back.kind, "written", JSON.stringify(back));
   const second = mock.glCommits[1];
   assert.deepEqual(second.actions.map((a) => [a.action, a.file_path]).sort(), [
     ["create", TODO],
     ["delete", DOING],
-    ["delete", WORKFLOW],
     ["update", EVENTS],
   ]);
   assert.equal(mock.files("i0001")[TODO], parentOnly().i0001.files[TODO]);

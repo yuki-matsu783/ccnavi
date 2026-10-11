@@ -21,6 +21,7 @@ import { page as riskPage, riskHtml } from "../helpers/risk.js";
 import { page as phasesPage, phasesHtml } from "../helpers/phases.js";
 import { page as rulesPage, rulesHtml } from "../helpers/rules.js";
 import { flowHtml, page as flowPage } from "../helpers/flow.js";
+import { workflowHtml, workflowPage } from "../helpers/workflow.js";
 
 /** 画面の名前と、その 1 枚。中身は画面（React）が組み、CSS と body だけを拡張が入れる */
 function reactPages(appearance?: "claude-dark"): [string, string][] {
@@ -33,6 +34,7 @@ function reactPages(appearance?: "claude-dark"): [string, string][] {
     ["phases", phasesHtml({ kind: "page", page: phasesPage() }, options)],
     ["rules", rulesHtml({ kind: "page", page: rulesPage() }, options)],
     ["flow", flowHtml({ kind: "page", page: flowPage() }, options)],
+    ["workflow", workflowHtml({ kind: "page", page: workflowPage() }, options)],
   ];
 }
 
@@ -201,7 +203,7 @@ test("CB-T168 部品の CSS には、同じ名前の部品がある（部品を�
   assert.deepEqual(missing, [], "部品が無いのに CSS だけ残っている。CSS と style.css の @import を消す");
 });
 
-test("CB-T216 案内の ? は案内のある 4 画面ともヘッダの右上に同じ形で固定し、右端はその幅だけ空ける", () => {
+test("CB-T216 案内の ? は案内のある画面（プロジェクト管理画面のほか全部）でヘッダの右上に同じ形で固定し、右端はその幅だけ空ける", () => {
   // プロジェクト管理画面は案内を持たない（2026-10-05 に外した）
   for (const name of screenNames().filter((n) => n !== "projects")) {
     const style = flatStyle(`<style nonce="x">\n${screenStyle(name)}\n</style>`);
@@ -264,5 +266,6 @@ test("CB-T291 狭い幅（520px 以下）では一覧の欄を 1 列にして行
   assert.match(risk, /\.block h2 \{ display: flex; flex-wrap: wrap;/);
   const phases = flatStyle(phasesHtml({ kind: "page", page: phasesPage() }));
   assert.match(phases, /\.phase \.sum > \.clip\.mono \{ grid-row: 3; grid-column: 2 \/ -1; \}/);
-  assert.match(phases, /\.order select \{ max-width: 100%; \}/);
+  // 全体計画の待ち方の選択は外したので、その欄の規則も無い
+  assert.doesNotMatch(phases, /\.order select/);
 });

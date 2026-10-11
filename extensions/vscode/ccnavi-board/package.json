@@ -59,6 +59,10 @@
         "title": "ccnavi ボード: フェーズ管理を開く"
       },
       {
+        "command": "ccnaviBoard.openWorkflow",
+        "title": "ccnavi ボード: ワークフロー編集を開く"
+      },
+      {
         "command": "ccnaviBoard.appearance",
         "title": "ccnavi ボード: 見た目を切り替える",
         "icon": "$(color-mode)"
@@ -88,6 +92,10 @@
         {
           "command": "ccnaviBoard.openPhases",
           "when": "ccnaviBoard.ticketControl == 'enable'"
+        },
+        {
+          "command": "ccnaviBoard.openWorkflow",
+          "when": "false"
         }
       ]
     },
@@ -141,6 +149,7 @@
     "test:phases": "node scripts/test-groups.js phases",
     "test:projects": "node scripts/test-groups.js projects",
     "test:flow": "node scripts/test-groups.js flow",
+    "test:workflow": "node scripts/test-groups.js workflow",
     "test:shared": "node scripts/test-groups.js shared",
     "test:dom": "node scripts/test-groups.js --dom --all",
     "test:for": "node scripts/test-groups.js --for",

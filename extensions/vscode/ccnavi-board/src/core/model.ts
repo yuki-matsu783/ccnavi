@@ -37,6 +37,11 @@ export interface ProposalJson {
   readonly tree: string;
   readonly tree_root: string;
   readonly path: string;
+  /**
+   * 親の提案が全体計画（`plan:`）を持つか。`feedback:` だけの親と子は偽（ワークフロー編集タブは `plan:` の無い親を開けない）。ボードは計画を読まず、これで親の提案のカードの
+   * 「ワークフロー」を出し分ける。欄の無い答え（古い実行ファイル）は偽
+   */
+  readonly has_plan: boolean;
 }
 
 export interface CopyJson {
@@ -318,7 +323,6 @@ export interface SumJson {
   readonly phases: {
     readonly path: string;
     readonly unreadable: string;
-    readonly order: string;
     readonly types: readonly SumPhaseJson[];
   };
 }
@@ -454,7 +458,6 @@ function sum(raw: Record<string, unknown>): SumJson {
     phases: {
       path: str(phases.path),
       unreadable: str(phases.unreadable),
-      order: str(phases.order),
       types: list(phases.types)
         .filter(isRecord)
         .map((t) => ({ id: str(t.id), source: str(t.source), kind: str(t.kind), title: str(t.title), review: str(t.review), scope: list(t.scope).map(str) })),
@@ -577,7 +580,7 @@ function proposal(raw: Record<string, unknown>): ProposalJson | null {
   if (state !== "todo" && state !== "review") {
     return null;
   }
-  return { state, tree: str(raw.tree), tree_root: str(raw.tree_root), path: str(raw.path) };
+  return { state, tree: str(raw.tree), tree_root: str(raw.tree_root), path: str(raw.path), has_plan: raw.has_plan === true };
 }
 
 function parent(raw: Record<string, unknown>): ParentJson {

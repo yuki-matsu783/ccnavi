@@ -9,7 +9,7 @@ import type { PhasesPage } from "../../src/core/phases-view.js";
 import { openPhases } from "../helpers/phases.js";
 import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
 
-const MISSING: Partial<PhasesPage> = { exists: false, model: { version: null, form: { order: "sequential", phases: [] }, problems: [] } };
+const MISSING: Partial<PhasesPage> = { exists: false, model: { version: null, form: { phases: [] }, problems: [], unread: [] } };
 
 test("CB-T114 定義のファイルが無いのは正常で、不備の帯も作るボタンも出さず、欄を触れるようにして最初の保存で作らせる", async () => {
   const dom = await openPhases({ ...MISSING, notices: ["読めない <理由>"] });
@@ -46,7 +46,6 @@ test("CB-T239 共通の設定に phases.yml があるときは error の帯を�
 
 test("CB-T116 無いファイル（空の本文）に定義を足して書き戻すと、version と定義を持つ読めるファイルになる", () => {
   const text = readPhases("").apply({
-    order: "sequential",
     phases: [
       {
         origin: null,
@@ -57,9 +56,6 @@ test("CB-T116 無いファイル（空の本文）に定義を足して書き戻
         inherit: true,
         scope: [],
         deliverables: [],
-        overlap: [],
-        requires: [],
-        after: [],
         agent: "",
         when: "",
       },

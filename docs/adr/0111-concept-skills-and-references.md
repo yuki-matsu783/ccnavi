@@ -5,7 +5,7 @@ description: スキルの数を増やさず、概念スキル5本の references 
 tags: [skills, docs-search]
 keywords: [スキル, 概念スキル, references, skill-reference, コンテキスト, 振り返り, wiki, docs/skills]
 ---
-# ADR-0109: スキルは標準概念ごとの入口に絞り、細かい挙動は references に溜めて ccnavi --docs で引く
+# ADR-0111: スキルは標準概念ごとの入口に絞り、細かい挙動は references に溜めて ccnavi --docs で引く
 
 状態: 採用（2026-10-11 にユーザが決めた）
 

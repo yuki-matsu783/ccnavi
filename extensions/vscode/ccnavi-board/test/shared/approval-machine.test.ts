@@ -13,17 +13,24 @@ import * as ts from "typescript";
 
 import {
   approvalStep,
+  blockedBeforeApprove,
   CLOSED,
   type ApprovalEffect,
   type ApprovalState,
   type ApprovalStep,
   type ApprovalInput,
 } from "../../src/core/approval-machine.js";
-import type { ApproveMismatch, ApprovePreview, ApproveResult } from "../../src/core/approvemodel.js";
+import type { ApproveMismatch, ApprovePlan, ApprovePreview, ApproveResult } from "../../src/core/approvemodel.js";
 import type { PhaseChip } from "../../src/core/board.js";
 import type { DecidePreview } from "../../src/core/decidemodel.js";
 
 type Step = (state: ApprovalState, input: ApprovalInput) => ApprovalStep;
+/** 遷移のファイルが出すもののうち、ガードの確かめが使うもの（変異させたものも同じ形） */
+interface Machine {
+  readonly approvalStep: Step;
+  readonly blockedBeforeApprove: (tickets: readonly string[], unsaved: readonly string[]) => string[];
+}
+const MACHINE: Machine = { approvalStep, blockedBeforeApprove };
 
 /** 出た効果の配列。中身まで見ない確かめは、この形で比べる */
 function kinds(effects: readonly ApprovalEffect[]): string[] {
@@ -49,7 +56,42 @@ function previewOf(tickets: readonly string[], digest = "d1"): ApprovePreview {
     digest,
     rejected: [],
     problems: [],
+    plans: [],
   };
+}
+
+/** 計画 1 つぶんの図の中身。中身は見ないので、識別子と部分とハッシュだけ意味がある */
+function planOf(ticket: string, sha: string, part = "plan"): ApprovePlan {
+  return {
+    ticket,
+    part,
+    source_sha: sha,
+    items: [{ number: 1, from: 1, type: "research", title: "調査", review: "none", deferred: false, review_at: null, locked: false }],
+    after: {},
+    proposed: {},
+    current: null,
+    loose: [],
+    ready: [1],
+    problems: [],
+  };
+}
+
+/** 計画を持つ親の一覧。`plans` は親ごとに全体計画とフィードバック計画（同じハッシュ）。子も一覧に入れられる */
+function planPreviewOf(parents: Readonly<Record<string, string>>, children: readonly string[] = []): ApprovePreview {
+  const base = previewOf(Object.keys(parents));
+  return {
+    ...base,
+    batch: [
+      ...base.batch,
+      ...children.map((ticket) => ({ ...previewOf([ticket]).batch[0], parent: ticket.split("-")[0], phase: 1 })),
+    ],
+    plans: Object.entries(parents).flatMap(([ticket, sha]) => [planOf(ticket, sha), planOf(ticket, sha, "feedback")]),
+  };
+}
+
+/** 計画を持つ親の一覧を見せた状態 */
+function toPlanPreview(step: Step, parents: Readonly<Record<string, string>> = { i0001: "s1" }, saved: Readonly<Record<string, string>> = {}): ApprovalState {
+  return step(toLoading(step), { kind: "previewed", saved, result: { ok: true, value: planPreviewOf(parents) } }).state;
 }
 
 function resultOf(approved: readonly string[], prompt = "承認の文"): ApproveResult {
@@ -106,11 +148,11 @@ function toLoading(step: Step, only: readonly string[] = []): ApprovalState {
 }
 
 function toPreview(step: Step, tickets: readonly string[] = ["i0001"], only: readonly string[] = []): ApprovalState {
-  return step(toLoading(step, only), { kind: "previewed", result: { ok: true, value: previewOf(tickets) } }).state;
+  return step(toLoading(step, only), { kind: "previewed", saved: {}, result: { ok: true, value: previewOf(tickets) } }).state;
 }
 
 function toApproving(step: Step, tickets: readonly string[] = ["i0001"], only: readonly string[] = []): ApprovalState {
-  return step(toPreview(step, tickets, only), { kind: "confirm", tickets }).state;
+  return step(toPreview(step, tickets, only), { kind: "confirm", unsaved: [], tickets }).state;
 }
 
 /**
@@ -223,7 +265,7 @@ interface Guard {
   /** 置き換えた後（ガードが有効でなくなる形） */
   readonly into: string;
   /** 有効であることの確かめ。ガードを消したらここが失敗する（または、そこで投げる） */
-  readonly check: (step: Step) => void;
+  readonly check: (step: Step, machine: Machine) => void;
 }
 
 const GUARDS: readonly Guard[] = [
@@ -364,14 +406,14 @@ const GUARDS: readonly Guard[] = [
       // `approving` は `preview` を持っているので、ガードを弱めても投げずに 2 本目が出る。
       // そのぶん、失敗するのが確かめのほうになる
       const approving = toApproving(step);
-      const after = step(approving, { kind: "confirm", tickets: ["i0001"] });
+      const after = step(approving, { kind: "confirm", unsaved: [], tickets: ["i0001"] });
       assert.equal(after.state, approving, "承認中に押し直しても、打つのは 1 本きり");
       assert.deepEqual(kinds(after.effects), []);
       // 残りの状態も全部。1 つだけ見ると、そこ以外をガードから抜かれたときに失敗せずに通る
       assertNamed(step, ["closed", "loading", "done", "error", "prompt"]);
       for (const kind of ["closed", "loading", "done", "error", "prompt"]) {
         const state = named(step, kind);
-        assert.deepEqual(kinds(step(state, { kind: "confirm", tickets: ["i0001"] }).effects), [], kind);
+        assert.deepEqual(kinds(step(state, { kind: "confirm", unsaved: [], tickets: ["i0001"] }).effects), [], kind);
       }
     },
   },
@@ -399,7 +441,7 @@ const GUARDS: readonly Guard[] = [
       assertNamed(step, ["closed", "preview", "approving", "done", "error", "prompt"]);
       for (const kind of ["closed", "preview", "approving", "done", "error", "prompt"]) {
         const state = named(step, kind);
-        const after = step(state, { kind: "previewed", result: { ok: true, value: previewOf(["i0001"]) } });
+        const after = step(state, { kind: "previewed", saved: {}, result: { ok: true, value: previewOf(["i0001"]) } });
         assert.equal(after.state, state, `${kind}: 頼んでいない一覧で開き直さない`);
         assert.deepEqual(kinds(after.effects), [], kind);
       }
@@ -491,6 +533,59 @@ const GUARDS: readonly Guard[] = [
       assert.equal(step(prompt, { kind: "decide", parent: "i0001", phase: 1, tree: TREE, chip: chipOf() }).state.overlay?.kind, "decideLoading");
     },
   },
+  {
+    what: "未保存のワークフロー編集タブがある親を含む一覧は、承認を打たない",
+    find: "if (blocked.length > 0) {",
+    into: "if (false) {",
+    check(step) {
+      const shown = toPlanPreview(step, { i0001: "s1", i0002: "s2" });
+      for (const unsaved of [["i0001"], ["i0002"], ["i0002", "i0009"]]) {
+        const after = step(shown, { kind: "confirm", unsaved, tickets: ["i0001", "i0002"] });
+        assert.equal(after.state, shown, unsaved.join(","));
+        assert.deepEqual(kinds(after.effects), ["warn"], unsaved.join(","));
+      }
+    },
+  },
+  {
+    what: "承認を打つ直前に、未保存のワークフロー編集タブがある親が打つ識別子に入っていないかを見る",
+    find: "return tickets.filter((ticket) => held.has(ticket)).sort();",
+    into: "return [];",
+    check(_step, machine) {
+      assert.deepEqual(machine.blockedBeforeApprove(["i0002", "i0001", "i0001-01-01"], ["i0001", "i0002", "i0009"]), ["i0001", "i0002"]);
+      assert.deepEqual(machine.blockedBeforeApprove(["i0001-01-01"], ["i0001"]), [], "子の識別子は親のタブと取り違えない");
+    },
+  },
+  {
+    what: "「ワークフローを編集」でタブを開くのは、一覧を見せているとき（preview）だけ",
+    find: 'if (overlay?.kind !== "preview") {',
+    into: 'if (overlay === undefined || !("preview" in overlay)) {',
+    check(step) {
+      // 承認中にタブを開くと、承認の結果を受ける場所が消える（閉じてから開くので）
+      const approving = step(toPlanPreview(step), { kind: "confirm", unsaved: [], tickets: ["i0001"] }).state;
+      assert.equal(approving.overlay?.kind, "approving");
+      const after = step(approving, { kind: "editWorkflow", ticket: "i0001" });
+      assert.equal(after.state, approving);
+      assert.deepEqual(kinds(after.effects), []);
+      assertNamed(step, ["closed", "loading", "done", "error", "prompt", "decidePreview"]);
+      for (const kind of ["closed", "loading", "done", "error", "prompt", "decidePreview"]) {
+        const state = named(step, kind);
+        assert.deepEqual(kinds(step(state, { kind: "editWorkflow", ticket: "i0001" }).effects), [], kind);
+      }
+    },
+  },
+  {
+    what: "「ワークフローを編集」で開くのは、一覧の図にある親だけ",
+    find: "if (!overlay.preview.plans.some((plan) => plan.ticket === ticket)) {",
+    into: "if (false) {",
+    check(step) {
+      const shown = toPlanPreview(step);
+      for (const ticket of ["i0002", "i0001-01-01", ""]) {
+        const after = step(shown, { kind: "editWorkflow", ticket });
+        assert.equal(after.state, shown, ticket);
+        assert.deepEqual(kinds(after.effects), [], ticket);
+      }
+    },
+  },
 ];
 
 // --- 遷移そのもの ---
@@ -519,24 +614,24 @@ test("CB-T170 絞り込みは見えている識別子だけを絞りに通す。
 
 test("CB-T171 一覧が返ったら見せる。読めなければ、そう見せる", () => {
   const loading = toLoading(approvalStep);
-  const shown = approvalStep(loading, { kind: "previewed", result: { ok: true, value: previewOf(["i0001"]) } });
+  const shown = approvalStep(loading, { kind: "previewed", saved: {}, result: { ok: true, value: previewOf(["i0001"]) } });
   assert.equal(shown.state.overlay?.kind, "preview");
   assert.equal(shown.redraw, true);
   assert.deepEqual(shown.effects, []);
 
-  const failed = approvalStep(loading, { kind: "previewed", result: { ok: false, error: "読めない" } });
+  const failed = approvalStep(loading, { kind: "previewed", saved: {}, result: { ok: false, error: "読めない" } });
   assert.deepEqual(failed.state.overlay, { kind: "error", error: "読めない" });
 });
 
 test("CB-T172 「この N 件を承認する」は、見せたダイジェストと絞りをそのまま渡す", () => {
   const preview = toPreview(approvalStep, ["i0001", "i0002"], ["i0001", "i0002"]);
-  const after = approvalStep(preview, { kind: "confirm", tickets: ["i0001", "i0002"] });
+  const after = approvalStep(preview, { kind: "confirm", unsaved: [], tickets: ["i0001", "i0002"] });
   assert.equal(after.state.overlay?.kind, "approving");
   assert.deepEqual(after.effects, [
     { kind: "approve", tickets: ["i0001", "i0002"], digest: "d1", only: ["i0001", "i0002"] },
   ]);
   // 0 件は打たない（画面はボタンを出さないが、受け側でも持つ）
-  assert.deepEqual(approvalStep(preview, { kind: "confirm", tickets: [] }).effects, []);
+  assert.deepEqual(approvalStep(preview, { kind: "confirm", unsaved: [], tickets: [] }).effects, []);
 });
 
 test("CB-T173 承認できたら渡す文を見せ、承認の push の sh を端末に送り、ボードを読み直す。sh が無ければ言う。0 件なら何もしない", () => {
@@ -582,7 +677,7 @@ test("CB-T174 食い違いは、見せたまま同じ絞りで読み直し、返
   assert.equal(again.redraw, false);
   assert.deepEqual(again.effects, [{ kind: "loadPreview", only: ["i0001"] }]);
 
-  const shown = approvalStep(again.state, { kind: "previewed", result: { ok: true, value: previewOf(["i0001"]) } });
+  const shown = approvalStep(again.state, { kind: "previewed", saved: {}, result: { ok: true, value: previewOf(["i0001"]) } });
   assert.equal(shown.state.overlay?.kind, "preview");
   assert.equal(
     shown.state.overlay?.kind === "preview" ? shown.state.overlay.notice : "",
@@ -599,6 +694,7 @@ test("CB-T174 食い違いは、見せたまま同じ絞りで読み直し、返
   });
   const otherShown = approvalStep(other.state, {
     kind: "previewed",
+    saved: {},
     result: { ok: true, value: previewOf(["i0001", "i0002"]) },
   });
   assert.equal(
@@ -614,13 +710,13 @@ test("CB-T175 絞りが通らなくなったときだけ、1 度だけ絞りを�
     outcome: { ok: false, mismatch: mismatchOf(["i0001"], []) },
     carrier: true,
   });
-  const dropped = approvalStep(again.state, { kind: "previewed", result: { ok: false, error: "絞りが通らない" } });
+  const dropped = approvalStep(again.state, { kind: "previewed", saved: {}, result: { ok: false, error: "絞りが通らない" } });
   assert.deepEqual(dropped.effects, [{ kind: "loadPreview", only: [] }]);
   assert.deepEqual(dropped.state.only, [], "絞りを外して、いま何が承認待ちかを全部見せにいく");
   assert.equal(dropped.state.overlay?.kind, "approving");
 
   // 外したあとも読めなければ、そこで諦めて文面を見せる（二度は外さない）
-  const failed = approvalStep(dropped.state, { kind: "previewed", result: { ok: false, error: "読めない" } });
+  const failed = approvalStep(dropped.state, { kind: "previewed", saved: {}, result: { ok: false, error: "読めない" } });
   assert.deepEqual(failed.state.overlay, { kind: "error", error: "読めない" });
   assert.deepEqual(failed.effects, []);
 });
@@ -802,11 +898,61 @@ test("CB-T204 置けたら渡す文を見せて読み直す。投稿の警告は
   assert.deepEqual(kinds(failed.effects), ["refresh"]);
 });
 
+test("CB-T378 未保存のワークフロー編集タブがある親を含む一覧は、承認を打たずに理由を言う。タブの無い親と子だけなら打てる", () => {
+  const shown = toPlanPreview(approvalStep, { i0001: "s1" });
+  const blocked = approvalStep(shown, { kind: "confirm", unsaved: ["i0001"], tickets: ["i0001"] });
+  assert.equal(blocked.state, shown, "一覧を見せたまま");
+  assert.equal(blocked.redraw, false);
+  assert.deepEqual(blocked.effects, [
+    { kind: "warn", text: "親 i0001 のワークフロー編集タブに未保存の変更があります。保存するか破棄してから承認してください" },
+  ]);
+  // 別の親のタブだけが未保存なら、この一覧は打てる
+  const other = approvalStep(shown, { kind: "confirm", unsaved: ["i0002"], tickets: ["i0001"] });
+  assert.equal(other.state.overlay?.kind, "approving");
+  assert.deepEqual(kinds(other.effects), ["approve"]);
+  // 子の識別子は親のタブと取り違えない（子だけの一覧は親を含まない）
+  const children = approvalStep(toLoading(approvalStep), {
+    kind: "previewed",
+    saved: {},
+    result: { ok: true, value: planPreviewOf({}, ["i0001-01-01"]) },
+  }).state;
+  assert.deepEqual(kinds(approvalStep(children, { kind: "confirm", unsaved: ["i0001"], tickets: ["i0001-01-01"] }).effects), ["approve"]);
+  // 2 つの親が未保存なら、両方を名指しする
+  const two = approvalStep(toPlanPreview(approvalStep, { i0001: "s1", i0002: "s2" }), { kind: "confirm", unsaved: ["i0002", "i0001"], tickets: ["i0001", "i0002"] });
+  assert.deepEqual(two.effects, [
+    { kind: "warn", text: "親 i0001, i0002 のワークフロー編集タブに未保存の変更があります。保存するか破棄してから承認してください" },
+  ]);
+});
+
+test("CB-T379 「ワークフローを編集」は、オーバーレイを閉じてから親のタブを開く（開いたままにしない）", () => {
+  const shown = toPlanPreview(approvalStep);
+  const after = approvalStep(shown, { kind: "editWorkflow", ticket: "i0001" });
+  assert.deepEqual(after.state, CLOSED);
+  assert.equal(after.redraw, true, "閉じたことを先に描く");
+  assert.deepEqual(after.effects, [{ kind: "openWorkflow", ticket: "i0001" }]);
+});
+
+test("CB-T380 一覧を開くとき、タブで保存したときのハッシュと今の source_sha が違う親を覚える（保存したあとに提案が変わった）。承認は止めない", () => {
+  // 保存したまま変わっていない親・保存していない親は言わない。変わった親だけ
+  const shown = toPlanPreview(approvalStep, { i0001: "s1-after-agent", i0002: "s2", i0003: "s3" }, { i0001: "s1-saved", i0002: "s2" });
+  assert.equal(shown.overlay?.kind, "preview");
+  assert.deepEqual(shown.overlay?.kind === "preview" ? shown.overlay.changedSinceSave : undefined, ["i0001"]);
+  assert.deepEqual(kinds(approvalStep(shown, { kind: "confirm", unsaved: [], tickets: ["i0001", "i0002", "i0003"] }).effects), ["approve"]);
+  // 変わった親が無ければ持たない
+  const same = toPlanPreview(approvalStep, { i0001: "s1" }, { i0001: "s1" });
+  assert.deepEqual(same.overlay?.kind === "preview" ? same.overlay.changedSinceSave ?? [] : undefined, []);
+  // 食い違いで読み直したときも比べる
+  const approving = approvalStep(toPlanPreview(approvalStep), { kind: "confirm", unsaved: [], tickets: ["i0001"] }).state;
+  const again = approvalStep(approving, { kind: "approved", outcome: { ok: false, mismatch: mismatchOf(["i0001"], ["i0001"]) }, carrier: true });
+  const reshown = approvalStep(again.state, { kind: "previewed", saved: { i0001: "s0" }, result: { ok: true, value: planPreviewOf({ i0001: "s1" }) } });
+  assert.deepEqual(reshown.state.overlay?.kind === "preview" ? reshown.state.overlay.changedSinceSave : undefined, ["i0001"]);
+});
+
 test("CB-T180 ガードは全部効いている（表の 1 行ずつ）", () => {
   for (const guard of GUARDS) {
-    guard.check(approvalStep);
+    guard.check(approvalStep, MACHINE);
   }
-  assert.equal(GUARDS.length, 16, "ガードを足したら GUARDS にも足す");
+  assert.equal(GUARDS.length, 20, "ガードを足したら GUARDS にも足す");
 });
 
 // --- 変異テスト ---
@@ -820,7 +966,7 @@ const CORE_OUT = path.join(__dirname, "..", "..", "src", "core");
  * TypeScript の文字列を、その場で組み立てて読み込む。型は見ない（`transpileModule`）ので、
  * ガードを消して届かなくなった行が残っていても通る。
  */
-function load(source: string): { readonly approvalStep: Step } {
+function load(source: string): Machine {
   const js = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
     fileName: SOURCE,
@@ -828,7 +974,7 @@ function load(source: string): { readonly approvalStep: Step } {
   const box: { exports: Record<string, unknown> } = { exports: {} };
   const wrapper = vm.runInThisContext(`(function (exports, require, module) {${js}\n})`, { filename: SOURCE });
   wrapper(box.exports, (spec: string) => require(spec.startsWith(".") ? path.join(CORE_OUT, spec) : spec), box);
-  return box.exports as unknown as { readonly approvalStep: Step };
+  return box.exports as unknown as Machine;
 }
 
 test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが失敗する（変異テスト）", () => {
@@ -837,7 +983,7 @@ test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが失
   // 組み立て直したものが、読み込んだものと同じに動くこと。ここが成り立たないと、以下は何も見ていない
   const same = load(source);
   for (const guard of GUARDS) {
-    guard.check(same.approvalStep);
+    guard.check(same.approvalStep, same);
   }
 
   for (const guard of GUARDS) {
@@ -847,7 +993,7 @@ test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが失
     // `assert.AssertionError` に限る。 無いプロパティを読んだ `TypeError` で偶然「失敗した」ことに
     // しない（確かめる状態は、ガードを外しても投げない側を選んである）
     assert.throws(
-      () => guard.check(mutated.approvalStep),
+      () => guard.check(mutated.approvalStep, mutated),
       assert.AssertionError,
       `ガードを消しても確かめが通った（か、確かめの外で投げた）: ${guard.what}`,
     );

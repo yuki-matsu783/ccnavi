@@ -152,6 +152,62 @@ all, or a proposal the approval drops. The reasons are printed per ticket. Exit
 1 stays what it is everywhere else - a usage or settings error, not an answer -
 so a wrong spelling is never read as a proposal to fix.
 
+A parent that has a plan carries a copy of the phase types its plan uses, as
+`phases:` (keyed by type id, same fields as phases.yml). --agree refuses a copy
+that differs from phases.yml as read. The agent writes the copy with
+
+    ccnavi --plan-order <parent> --fill-phases
+
+which replaces the `phases:` value of the pending parent proposal with the
+types its plan and feedback use (taken from phases.yml; on a revision, a type
+used by a number that already has an approved child is taken from the approved
+ticket). Unused types are dropped; no other byte changes, and nothing is
+written when another field would read differently. It is a flag of its own,
+outside --agree, so the agent may run it. After approval, judging reads the
+copy and never phases.yml.
+
+The order of a pending parent's plan is set with the same flag. The VS Code
+workflow tab runs it; the agent may run it too:
+
+    ccnavi --plan-order <parent> --json [--order <JSON>]
+        (read only; with --order, the plan renumbered from the lines drawn)
+    ccnavi --plan-order <parent> --order <JSON> --expect <sha> --write [--json]
+        (write the renumbered plan back to the proposal)
+
+--order gives each item's direct predecessors by the numbers written in the
+proposal now: {"plan": {"1": [], "2": [3], "3": [1]}, "feedback": {...}}. A part
+that is passed takes every number's predecessors from it (a number left out
+waits for nothing); a part not passed stays as proposed. Items are renumbered in
+topological order, the smallest current number first among those whose
+predecessors are all placed; `after` follows the new numbers and `review: defer`
+moves with its item. On a revision, a number that already has an approved child
+stays where it is and the others fill the free numbers. A line that makes a
+cycle, changes what such a fixed number waits for, or cannot be packed around
+the fixed numbers is refused (`refused`), and nothing is renumbered.
+
+The answer carries `plans` (one per part: items with `number` and `from`,
+`after` in the new numbers, `proposed`, `current`, `loose`, `ready`,
+`problems`), `source_sha` (the parent proposal, its pending children and the
+pending children whose `predecessors` name them), the order `problems`,
+`loose`, `refused`, `revision_problems`, `children` (the pending children to
+retarget: `ticket` -> `new_ticket`, `phase` -> `new_phase`, `predecessors` ->
+`new_predecessors`), `child_problems` and `mismatched` (pending children whose
+`phase:` is not in the plan).
+
+--write rewrites the `plan:` and `feedback:` values of the parent proposal.
+A pending child (todo/) that points at a number that moves gets the new number
+in its id (`<parent>-<phase>-<seq>`; the sequence stays), its file name,
+`ticket:` and `phase:`, and pending children that name it in `predecessors`
+are fixed too. Approved children are never touched. Children are written
+first and the parent last; on a failure everything written is put back. It
+writes nothing when --expect differs from the current `source_sha`, when a
+line is refused, when the renumbered plan has an order error or breaks the
+revision lock, when another field would read differently, when a new child id
+clashes with a file or ticket that stays, or when the approved side (approved
+tickets, records, markers, flows, worktrees) refers to an id that would
+change. It never approves; approving the rewritten proposal needs a fresh
+preview, since the digest changes.
+
 Two things are not a no, because --agree does not drop them either: scope that
 exceeds the parent or the phase type (writes there stay blocked after approval),
 and a proposal that cannot be read (the scan covers every worktree, before the

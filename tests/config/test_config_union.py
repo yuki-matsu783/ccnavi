@@ -31,7 +31,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, phasecopy
 from tests.inproc import run_ccnavi
 
 # 共通レイヤー。どのツリーにも当てたい deny と、ワークスペースの allow。
@@ -141,7 +141,6 @@ phases:
     title: リリース
     review: mr
     scope: ["src/*"]
-    requires: [design]
 """
 
 COMMON_RISK = """\
@@ -280,9 +279,10 @@ def ticket_text(
     if parent:
         lines += [f"parent: {parent}", f"phase: {phase}"]
     if plan:
+        # 計画の項は、すぐ前の項を待つ一直線にする（最初の項は何も待たない）。
         lines.append("plan:")
-        for item in plan:
-            lines.append(f"  - {item}")
+        for n, item in enumerate(plan, start=1):
+            lines.append(f"  - {{type: {item}, after: [{n - 1}]}}" if n > 1 else f"  - {item}")
     lines += [
         "human_review:",
         f"  required: {'true' if review else 'false'}",
@@ -394,6 +394,14 @@ class ConfigUnionHarness(unittest.TestCase):
     def propose(self, name, text, project=""):
         """提案を置く。プロジェクト向けはそのプロジェクトの `wip/proposals/`。"""
         base = os.path.join(self.projects, project) if project else self.ws
+        # 計画を持つ親には、そのレイヤーの phases.yml から計画が使う定義の写し（`phases:`）を足す
+        # （`ccnavi --plan-order <親> --fill-phases` と同じ）。phases.yml が無ければ空の写し。
+        try:
+            with open(layer_path(base, "phases"), encoding="utf-8") as f:
+                defs = f.read()
+        except OSError:
+            defs = ""
+        text = phasecopy.insert(text, defs)
         return write(os.path.join(base, "wip", "proposals", "todo", name + ".md"), text)
 
     def approved_dir_of(self, project=""):

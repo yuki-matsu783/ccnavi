@@ -20,6 +20,7 @@ import unittest
 
 from ccnavi.entry import version
 from tests import ROOT, SRC
+from tests.inproc import run_ccnavi
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 SCRIPTS = os.path.join(ROOT, ".ccnavi", "scripts")
@@ -200,6 +201,31 @@ class CompatAgreesTest(unittest.TestCase):
         （古い実行ファイルの知らない副命令）も呼ぶ。
         """
         self.assertGreaterEqual(version.COMPAT, 8)
+
+    def test_v12_dropping_the_workflow_file_raised_the_compat_to_9(self):
+        """V12 待ち方のファイル（`phases/<親>/workflow.yml`）を無くし、待ち方を承認済みチケットの
+        計画の項の `after` から都度計算するようになった。承認はファイルを書かず、取り下げは
+        チケットのバイト一致だけで決め、ファイルを消さない。なので 9 以上。
+
+        古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）は `after` を知らずに計画を一直線と
+        読み、取り下げでファイルを探すので、食い違いとして知らせる。待ち方の決まりそのものの
+        見張りは、計画と待ち方の見本の表（tests/fixtures/plan-waits.json）のテストが持つ。
+        """
+        self.assertGreaterEqual(version.COMPAT, 9)
+
+    def test_v13_the_parent_copy_of_phase_types_ships_with_compat_9(self):
+        """V13 親チケットが計画の使うフェーズ定義の写し（`phases:`）を持ち、承認のあとの判定は
+        `phases.yml` ではなくその写しを読むようになった。写しを書く
+        `--plan-order <親> --fill-phases` も足した。待ち方のファイルを無くした変更（V12）と
+        同じ出荷にするので、版は 9 のまま。
+
+        古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）は写しを読まずに `phases.yml` で
+        判定するので、9 より前とは食い違いとして知らせる。フラグが在るかは `flags` で分かる。
+        """
+        self.assertGreaterEqual(version.COMPAT, 9)
+        flags = run_ccnavi(["--version"], cwd=ROOT).stdout
+        self.assertIn("--plan-order", flags)
+        self.assertIn("--fill-phases", flags)
 
 
 @unittest.skipIf(not SHELL, "sh も bash も見つからない")

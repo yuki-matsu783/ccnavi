@@ -67,7 +67,7 @@ export interface LoadOptions {
   readonly prepare?: (window: { readonly HTMLElement: { readonly prototype: object } }) => void;
 }
 
-/** 偽る大きさ。外枠は広め、点は `Graph.css` の `.react-flow__node-phase` と同じ幅 */
+/** 偽る大きさ。外枠は広め、点は図の点の幅の見込み（細かい置き場所は偽らないので、幅は揃っていなくてよい） */
 const SIZES: readonly [string, number, number][] = [
   [".react-flow__node", 170, 60],
   [".react-flow", 800, 480],

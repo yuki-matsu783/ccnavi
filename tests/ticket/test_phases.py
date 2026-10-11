@@ -4,7 +4,7 @@
 
 1. フェーズ定義の検証（識別子と表示名の一意、フィードバック対応は mr 固定、参照先の有無）
 2. 全体計画の承認と、計画に合わない子の拒否（kind、無い番号）。範囲の上限の超過は拒まず見せる
-3. 順序は承認で止まる（前が閉じてレビューが済むまで次の番号は承認されない、overlap は例外）
+3. 順序は承認で止まる（待つ番号が閉じてレビューが済むまで承認しない。待たない番号は並行）
 4. 成果物が無ければフェーズの最後の子を閉じられない
 5. 延期したフェーズではレビューで止まらず、次の依頼に含まれる
 6. フィードバック計画は最後のレビューの後に 1 回だけ、空でも証跡になる
@@ -24,7 +24,7 @@ import tempfile
 import unittest
 
 from ccnavi.tickets import history
-from tests import common_path, config_path
+from tests import common_path, config_path, phasecopy
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import ROOT, RULES, git, read_json, write
 
@@ -49,13 +49,11 @@ phases:
     title: 受入テスト作成
     review: mr
     scope: ["tests/*"]
-    overlap: [implement]
   implement:
     kind: work
     title: 実装とテスト
     review: mr
     scope: ["src/*", "tests/*"]
-    requires: [acceptance]
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
@@ -74,21 +72,56 @@ phases:
 """
 
 
-def parent_text(name, plan, feedback=None, allow=("src/*", "wip/*", "tests/*"), issue=None):
+def plan_item_lines(items, start=1) -> list[str]:
+    """計画の項を YAML の行にする。`start` はその計画の最初の番号（フィードバック計画は続き）。
+
+    項は定義の名前、`(名前, review)`、`{"type": …, "review": …, "after": […]}` のどれか。
+    `after` を書かない項は、すぐ前の項を待つ（一直線）。最初の項は何も待たない。
+    並行にしたい見本は辞書で `after` を明記する（`[]` なら何も待たない）。
+    """
+    lines = []
+    for i, item in enumerate(items):
+        if isinstance(item, dict):
+            kind, review = item["type"], item.get("review", "")
+            after = item.get("after")
+        elif isinstance(item, tuple):
+            kind, review, after = item[0], item[1], None
+        else:
+            kind, review, after = item, "", None
+        if after is None:
+            after = [start + i - 1] if i > 0 else []
+        fields = [f"type: {kind}"]
+        if review:
+            fields.append(f"review: {review}")
+        if after:
+            fields.append(f"after: [{', '.join(str(n) for n in after)}]")
+        lines.append(f"  - {kind}" if len(fields) == 1 else f"  - {{{', '.join(fields)}}}")
+    return lines
+
+
+def parent_text(
+    name, plan, feedback=None, allow=("src/*", "wip/*", "tests/*"), issue=None, copy=PHASES
+):
+    """親の提案の本文。
+
+    `copy` は計画が使う定義を写す元の `phases.yml`（None なら `phases:` を書かない）。
+    計画を持つ親は、計画が使う定義の写し（`phases:`）を持つ。`phases.yml` を書き換えるテストは、
+    同じ本文を `copy` に渡す。
+    """
+    text = _parent_text(name, plan, feedback, allow, issue)
+    return text if copy is None else phasecopy.insert(text, copy)
+
+
+def _parent_text(name, plan, feedback, allow, issue):
     lines = ["---", "version: 1", f"ticket: {name}"]
     if issue is not None:
         lines.append(f"issue: {issue}")
     lines.append("plan:")
-    for item in plan:
-        if isinstance(item, tuple):
-            lines.append(f"  - {{type: {item[0]}, review: {item[1]}}}")
-        else:
-            lines.append(f"  - {item}")
+    lines += plan_item_lines(plan)
     if feedback is not None:
         if feedback:
             lines.append("feedback:")
-            for item in feedback:
-                lines.append(f"  - {item}")
+            lines += plan_item_lines(feedback, start=len(plan) + 1)
         else:
             lines.append("feedback: []")
     lines += ["human_review:", "  required: true", "  reason: t", "title: 親", "rationale: r"]
@@ -121,6 +154,9 @@ def child_text(name, parent, phase, allow, review=True):
 
 class PhaseHarness(unittest.TestCase):
     """親と子を動かす道具。テストは持たない（他のテストが継いで使う）。"""
+
+    # 親の `phases:` に写す元の phases.yml の本文。phases.yml を差し替えるテストは上書きする。
+    phases_text = PHASES
 
     def setUp(self):
         self.root = tempfile.mkdtemp(prefix="ccnavi-phase-")
@@ -316,7 +352,7 @@ class PhaseHarness(unittest.TestCase):
 
     def family(self, plan=("research", "design"), feedback=None):
         """親を提案して承認する。plan の 1 番目の子もまとめて承認する。"""
-        self.propose("i0001", parent_text("i0001", list(plan), feedback))
+        self.propose("i0001", parent_text("i0001", list(plan), feedback, copy=self.phases_text))
         self.commit_parent()
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -379,10 +415,13 @@ class PhaseTest(PhaseHarness):
         )
         self.assertEqual(problems, [])
         self.assertEqual(types["fb"].review, phasetypes.REVIEW_CHAT)
-        _, problems = phasetypes.parse(
+        # 順序の欄（overlap など）は読まずに warn で言う。指す先が無くても error にしない。
+        types, problems = phasetypes.parse(
             "version: 1\nphases:\n  a: {title: A, kind: work, overlap: [nope]}\n"
         )
-        self.assertTrue(any("nope" in p.detail for p in problems), problems)
+        self.assertIsNotNone(types, problems)
+        self.assertEqual([p.severity for p in problems], ["warn"])
+        self.assertIn("読まない", problems[0].detail)
         types, problems = phasetypes.parse(PHASES)
         self.assertEqual(problems, [])
         self.assertEqual(
@@ -397,8 +436,6 @@ class PhaseTest(PhaseHarness):
                 "chores-feedback",
             },
         )
-        self.assertTrue(types["acceptance"].overlaps(types["implement"]))
-        self.assertTrue(types["implement"].overlaps(types["acceptance"]))
 
     def test_lint_reports_a_broken_phases_file(self):
         write(
@@ -427,7 +464,6 @@ class PhaseTest(PhaseHarness):
     def test_plan_that_breaks_the_rules_is_refused(self):
         cases = {
             "kind": ["implement-feedback"],
-            "requires": ["implement"],
             "defer-none": [("research", "defer"), "design"],
             "defer-last": ["design", ("implement", "defer")],
             "unknown": ["nope"],
@@ -505,14 +541,33 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
 
-    def test_overlapping_types_can_be_planned_together(self):
-        self.family(plan=["acceptance", "implement"])
+    def test_items_that_do_not_wait_on_each_other_are_planned_together(self):
+        """`after` で待たない項は並行する（前の版の `overlap` の代わり）。"""
+        plan = [
+            "acceptance",
+            {"type": "implement", "after": []},
+            {"type": "design", "after": [1, 2]},
+        ]
+        self.family(plan=plan)
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["tests/a/*"]))
         self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["src/a/*"]))
         self.commit_parent()
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
+
+    def test_requires_is_no_longer_checked(self):
+        """定義の `requires` は読まない。一緒に置く定義の組は `when` の案内と承認画面で見る。"""
+        write(
+            self.phases,
+            PHASES.replace(
+                "    title: 実装とテスト\n", "    title: 実装とテスト\n    requires: [acceptance]\n"
+            ),
+        )
+        self.propose("i0001", parent_text("i0001", ["implement"]))
+        self.commit_parent()
+        result = self.approve()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_a_batch_does_not_pass_a_later_child_over_one_that_reopens_an_earlier_phase(self):
         """前のフェーズに足す子と次のフェーズの子を一緒に承認しても、次の子は通さない（issue #31）。
@@ -1651,6 +1706,7 @@ class ScopeLimitTest(PhaseHarness):
     def test_inherit_scope_does_not_cut_by_the_type(self):
         """10. 定義の scope が inherit なら、定義では切り詰めない。"""
         write(self.phases, PHASES_INHERIT)
+        self.phases_text = PHASES_INHERIT
         tree = self.approved_child(
             child_text("i0001-01-01", "i0001", 1, ["src/a/*"]), plan=["open"]
         )
@@ -1680,8 +1736,11 @@ class ScopeLimitTest(PhaseHarness):
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
         self.assertNotIn("limit:", self.reason(outside))
 
-    def test_unreadable_type_does_not_cut_by_type_but_says_so(self):
-        """12. 親が計画を持ち番号の定義が読めないとき、定義では切り詰めず notice。親では止まる。"""
+    def test_editing_phases_yml_does_not_change_the_cut_of_an_approved_child(self):
+        """12. 承認のあとの判定は親に固定した写し（`phases:`）の定義で切り詰める。
+
+        `phases.yml` から定義を消しても、壊しても、判定は写しを読むので上限は変わらない。
+        """
         tree = self.approved_child(
             child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*", "docs/*"])
         )
@@ -1691,11 +1750,12 @@ class ScopeLimitTest(PhaseHarness):
         ):
             with self.subTest(label):
                 write(self.phases, text)
-                inside = self.write_to(tree, "src/a/x.py")
-                self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
-                self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
-                self.assertIn("research", self.reason(inside))
-                self.assertIn("定義の上限では切り詰めていない", self.reason(inside))
+                beyond_type = self.write_to(tree, "src/a/x.py")
+                self.assertEqual(self.decision(beyond_type), "deny", beyond_type.stdout)
+                self.assertIn("limit: phase type 調査 (research)", self.reason(beyond_type))
+                self.assertNotIn("定義の上限では切り詰めていない", self.reason(beyond_type))
+                inside = self.write_to(tree, "wip/research/x.md")
+                self.assertNotEqual(self.decision(inside), "deny", self.reason(inside))
                 beyond_parent = self.write_to(tree, "docs/x.md")
                 self.assertEqual(self.decision(beyond_parent), "deny", beyond_parent.stdout)
                 self.assertIn("DENY_TICKET_SCOPE", self.reason(beyond_parent))
@@ -1723,10 +1783,10 @@ class ScopeLimitTest(PhaseHarness):
         self.break_phases_encoding()
         result = self.write_to(tree, "src/a/x.py")
         self.assert_answered(result)
-        # 読めない定義は「不正」と同じ扱い。定義では切り詰めず、そう言う。
-        self.assertNotEqual(self.decision(result), "deny", result.stdout)
-        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(result))
-        self.assertIn("定義の上限では切り詰めていない", self.reason(result))
+        # 判定は親に固定した写し（`phases:`）の定義で切り詰め、phases.yml は読まない。
+        self.assertEqual(self.decision(result), "deny", result.stdout)
+        self.assertIn("limit: phase type 調査 (research)", self.reason(result))
+        self.assertNotIn("切り詰めていない", self.reason(result))
 
     def test_undecodable_phases_file_does_not_crash_the_bash_judge(self):
         """7. 同じ状態で、Bash の実行前チェック（止めるかどうかの経路）も例外で終わらない。"""
@@ -1743,24 +1803,24 @@ class ScopeLimitTest(PhaseHarness):
                 self.assert_answered(self.hook("PreToolUse", "Bash", tree, command=command))
 
     def test_no_phases_file_with_a_plan_says_nothing_about_the_type(self):
-        """8. 親が計画を持ち番号が計画にあっても、phases.yml がどのレイヤーにも無ければ注記しない。
+        """8. 承認のあとに phases.yml を消しても、判定は親に固定した写しの定義で切り詰める。
 
-        「定義が読めない」は phases.yml が在って読めないときだけ。無いのは番号だけの挙動
-        で、注記を出すと毎回の Write に余計な 1 行が載る。
+        判定は phases.yml を読まない。注記も出さない。
         """
         tree = self.approved_child(
             child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )
         os.remove(self.phases)
         self.assertFalse(os.path.exists(self.phases))
-        for rel in ("wip/research/note.md", "src/a/x.py"):
-            with self.subTest(rel):
-                result = self.write_to(tree, rel)
-                self.assert_answered(result)
-                self.assertNotEqual(self.decision(result), "deny", result.stdout)
-                self.assertNotIn("切り詰めていない", self.reason(result))
-                self.assertNotIn("読めない", self.reason(result))
-                self.assertNotIn("limit:", self.reason(result))
+        inside = self.write_to(tree, "wip/research/note.md")
+        self.assert_answered(inside)
+        self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
+        self.assertNotIn("読めない", self.reason(inside))
+        beyond = self.write_to(tree, "src/a/x.py")
+        self.assert_answered(beyond)
+        self.assertEqual(self.decision(beyond), "deny", beyond.stdout)
+        self.assertIn("limit: phase type 調査 (research)", self.reason(beyond))
+        self.assertNotIn("切り詰めていない", self.reason(beyond))
 
     def test_regex_child_is_judged_by_the_real_path(self):
         """14. regex の子: 実際のパスで親と定義に当てる。"""

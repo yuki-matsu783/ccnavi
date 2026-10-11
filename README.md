@@ -360,7 +360,7 @@ ccnavi の動作に依存する決まりなので、ワークスペースの `CL
 [ccnavi] ccnavi が前提にしている作業の決まり。
 - 編集する前にワークツリー（.claude/worktrees/<名前>）を切り、その中で編集する。切り方は ccnavi-git.sh の --help（worktree add）。
 - git は直接呼ばず sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-git.sh を通す。止められたら迂回せず、出力の案内に従う。
-- 下書きと使い捨てのファイルはワークツリーの scratchpad/ に置く（追跡されず、範囲外の変更としても報告されない）。
+- 下書きと使い捨てのファイルはワークツリーの wip/scratchpad/ に置く（追跡されてpushされるが、範囲外の変更としては報告されない）。
 - projects/<名前>/ を直すときは、そこへ cd してから作業する（git の操作は cwd のリポジトリに向く）。
 - 実装・調査・テストはサブエージェントにバックグラウンドで任せる。メインはユーザとの相談・判断・報告を受け持つ。
 - 判定が緩む・ユーザとのやり取りの形が変わる・元に戻せない・影響範囲を読み切れない変更は、実装する前にユーザと合意する。
@@ -1369,7 +1369,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 - `builtin-guard-project-home`: ccnavi ディレクトリの下（`*/.ccnavi/*`）と、`CCNAVI_BIN_PATH` のパスおよび実行ファイルの置き場
   （名前が `ccnavi-launcher.sh` なら 1 つ上の `bin/<os>-<arch>/`、それ以外なら隣の `<os>-<arch>/`）
 - `builtin-guard-common-layer`: 共通レイヤーの 3 本。ワークツリーの中の同じファイルも止まる
-- 見本 `.ccnavi/common/rule-samples.yml` も `builtin-guard-project-home` が止める。見本の下書きはワークツリーの `scratchpad/` に置き、
+- 見本 `.ccnavi/common/rule-samples.yml` も `builtin-guard-project-home` が止める。見本の下書きはワークツリーの `wip/scratchpad/` に置き、
   ルールの下書きと一緒にユーザに渡す
 
 止めるのは書き込みの形と場所の組で、場所の名前が出ただけでは止めない（`cat .ccnavi/common/rules.yml` や `git add <パス>` は通る）。
@@ -1530,7 +1530,7 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 承認する場所は 3 つ（Chrome 拡張を足せば 4 つ）。どこで承認しても**承認はチケットの中身を変えない**。提案のファイルを
 `todo/` から `doing/` へ動かすだけで、欄を書き足さず、改行も BOM も変えない。手で動かした承認と ccnavi の承認は、承認済みチケットが
 提案とバイト単位で同じになり、見分けが付かない（欄が無いことや未コミットであることは、承認が途中で止まった印ではない）。
-親の全体計画の待ち方は、`--agree` がチケットではなく `.ccnavi/approved/phases/<親>/workflow.yml` に書く。
+親の計画の待ち方は書かない。承認済みチケットの計画の項の `after` から、読むたびに計算する。
 
 | 経路 | 形 |
 |---|---|
@@ -1609,8 +1609,8 @@ sh .ccnavi/scripts/ccnavi-ticket.sh status i0002    # その親子だけ（子�
   取り込み済みの親子（C1 の対象）なら「ユーザが運ぶまで `start` は止まる」、C1 の対象外なら「`start` へ進んでよい」と添える。
   C1 が状態の操作を断る親子では、その理由を止まっている理由に出す
 - 止まっている理由は、`blocked`、取り込み済みの親子が決まらない、C1 が断る、満たしていない先行、親が未着手、の各場面。
-  `base_sha` がワークツリーの HEAD の祖先でない着手、再開で残った閉じるときの欄、履歴に着手の行が無い着手、待ち方の固定が
-  無い親は「注意」で出す（`start` も判定も止めない。`--lint` も warn）
+  `base_sha` がワークツリーの HEAD の祖先でない着手、再開で残った閉じるときの欄、履歴に着手の行が無い着手は
+  「注意」で出す（`start` も判定も止めない。`--lint` も warn）
 - 状態を動かすコマンド（`start`・`finish`・ワークツリーを作る）の行には「親（メインエージェント）だけが実行する」と書く。
   サブエージェントがその行を打っても hook が止める
 - 親を渡して何も見つからなければ終了コード 1
@@ -1647,9 +1647,8 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 範囲の外として扱わない場所。
 
 - 提案の置き場（`wip/proposals/`）と承認済みチケットの置き場（`.ccnavi/approved/`）。`review/` と承認済みチケットは組み込みの deny が止める
-- 下書きの置き場。ワークツリーのルートの直下 1 段にある `scratchpad/` で、大文字小文字を区別する。外すのは**実行前チェックだけ**で、
-  実行後チェックとサブエージェント終了時チェックは外さない。この 2 つに `scratchpad/` の変更が現れるのは `scratchpad/` が
-  追跡されているときなので、範囲外として報告する
+- 下書きの置き場。ツリーのルート直下の `wip/scratchpad/` の下で、大文字小文字を区別する。追跡される置き場なので、
+  実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/scratchpadX/` や `scratchpad/` は外さない
 - ELI5 の HTML の置き場。ワークツリーのルートからの `wip/eli5/` の下で、大文字小文字を区別する。追跡される置き場なので、
   実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/` のほかの場所や `wip/eli5x/` は外さない。
   チケットの `deny` と全面停止（`LIMIT_BLOCKED`）より先に適用される
@@ -1692,10 +1691,9 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 
 ### フェーズ定義と計画
 
-`phases.yml` に**フェーズ定義**を書き、親が `plan:` にそのリストを書くと、フェーズに意味が付く。
-置き場はレイヤーごと（共通レイヤー `.ccnavi/common/`、自身のレイヤーとプロジェクトのレイヤー `.ccnavi/config/`）で、`scope` のパスが
-レイアウトに依存するならワークスペース自身のレイヤーに置く（このリポジトリもそう）。
-フェーズ定義はユーザが持つ設定で、エージェントは書き換えない。どのレイヤーにも無ければ番号だけの挙動のまま。設計は [9.7](docs/design/tickets/phases.md)。
+`phases.yml` に**フェーズ定義**を書き、親が `plan:` にその並びと順序（項の `after`）を書くと、フェーズに意味が付く。
+置き場は親の `project:` が指すレイヤーの `.ccnavi/config/phases.yml` の 1 本（共通レイヤーには置けない）。
+フェーズ定義はユーザが持つ設定で、エージェントは書き換えない。計画の無い親は番号だけの挙動のまま。設計は [9.7](docs/design/tickets/phases.md)。
 
 ```yaml
 # .ccnavi/config/phases.yml
@@ -1705,8 +1703,8 @@ phases:
     kind: work            # work は全体計画に、feedback はフィードバック計画にだけ置ける
     title: 調査           # id と title はどちらも一意
     review: none          # none | chat | mr。既定であって上限ではない
-    scope: ["wip/research/*"]          # 子の範囲の上限。省略か inherit なら親の範囲
-    deliverables: ["wip/research/summary.md"]   # 閉じる前に在って追跡されているべきもの
+    scope: ["wip/research/*"]          # 子の範囲の上限（20 件まで）。省略か inherit なら親の範囲
+    deliverables: ["wip/research/summary.md"]   # 閉じる前に在って追跡されているべきもの（20 件まで）
     agent: explorer       # .claude/agents/<名前>.md。案内。判定には使わない
     when: 既存の振る舞いが分からないとき          # 案内。判定には使わない
   implement:
@@ -1714,72 +1712,74 @@ phases:
     title: 実装とテスト
     review: mr
     scope: ["src/*", "tests/*"]
-    requires: [acceptance]             # 計画に置くなら一緒に要る
-  chores:
-    kind: work
-    title: 片付け
-    review: chat          # このセッションでユーザが見る。マージリクエストは作らない
-    scope: ["src/*"]
+    when: 振る舞いを変えるとき。受入テスト作成を先に置く
   acceptance:
     kind: work
     title: 受入テスト作成
     review: mr
     scope: ["tests/*"]
-    overlap: [implement]               # 並行してよい（対称）
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
     review: mr                         # feedback に none は書けない（chat は可）
     scope: inherit
+    when: フィードバック計画の最後に置き、ほかの対応を受ける
 ```
+
+フェーズ定義は順序を持たない。前の版の `order`・`after`・`overlap`・`requires` が残っていれば読まずに通し、`--lint` が warn で言う。
 
 ```yaml
 # 親チケット
 ticket: i0001
 issue: 1
+phases:                                # 計画が使う定義の写し。ccnavi --plan-order i0001 --fill-phases で差し込む
+  research: {kind: work, title: 調査, review: none, scope: ["wip/research/*"], deliverables: ["wip/research/summary.md"]}
+  acceptance: {kind: work, title: 受入テスト作成, review: mr, scope: ["tests/*"]}
+  implement: {kind: work, title: 実装とテスト, review: mr, scope: ["src/*", "tests/*"]}
 plan:                                  # 全体計画。--agree が通ることが合意
-  - research
-  - {type: design, review: defer}      # レビューを次と一緒に見る（延期。省略ではない）
-  - acceptance
-  - implement
+  - research                           # 1。何も待たない
+  - {type: acceptance, after: [1], review: defer}   # 2。レビューを後ろと一緒に見る（延期。省略ではない）
+  - {type: implement, after: [1, 2]}   # 3。終端（ほかの全部を待つ）
 feedback:                              # フィードバック計画。レビューのあと改版で足す。空でも出す
-  - implement-feedback
+  - implement-feedback                 # 4。after はフィードバック計画の番号だけを指せる
 ```
 
 子は `phase: N`。N 番目のフェーズ定義は親の計画で決まる。番号は全体計画が 1 から、フィードバック計画がその続き。
 
+- **順序は計画の項の `after` で決める。** `after` は先に閉じてレビューが済んでいるべき項の番号（自分より小さい番号だけ）。
+  書かない項は何も待たない（並行する）。最後の項がほかの全部を推移的に待つこと（終端は 1 つ。全体計画とフィードバック計画の両方）。
+  独立した作業は最後に 1 項で受けるか、一直線に並べる。**辺の書き漏れは並行として通る**ので、承認の画面の待ちの一覧
+  （「すぐ始まる: 1, 3」）で確かめる。延期は、延期した項を待つ延期していない最小の番号が引き受ける
+- **待ち方は持たない。** 承認済みチケットの計画から読むたびに計算する。手で `doing/` へ動かした親も計画の `after` で読み、
+  壊れた計画（`after` の形・終端・延期の引き受け手）の親は判定で止まり、子も止まる
+- **計画が使う定義は親に固定する（`phases:`）。** 承認は写しが承認したときの `phases.yml` と同じかを確かめる。承認のあとの判定・
+  フェーズの題と見る場所・成果物・子の範囲の上限は写しを読み、`phases.yml` を読まない（あとで直しても進行中の親は変わらない）。
+  写しは `ccnavi --plan-order <親> --fill-phases` で差し込む（エージェントが打ってよい）。計画を持つのに写しの無い親は止まる
+- **順序は承認の前に振り直せる。** `ccnavi --plan-order <親> --json --order <JSON>` は、元の番号での直接の先行
+  （`{"plan": {"1": [], "2": [3], "3": [1]}}`）から番号をトポロジカル順に振り直した答えを返す（読むだけ。VS Code の
+  ワークフロー編集タブが打つ）。`--order <JSON> --expect <ハッシュ> --write` は提案の `plan:` / `feedback:` の値だけを
+  振り直した形に書き換える。`--expect`（`--json` が返す `source_sha`）が今の中身と違う・循環や子が承認された番号へ
+  入る線・順序の検査の error・改版の錠に当たれば何も書かない。番号の変わる項を指す `todo/` の子の提案は、識別子
+  （`<親>-<フェーズ番号>-<連番>` の番号）・ファイル名・`ticket:`・`phase:` を付け替え、それを指す子の `predecessors` も直す
+  （承認済みの子には触れない。付け替え先が重なるか、承認済みの側が付け替える識別子を指していれば書かない）。
+  エージェントが打ってよい。承認は書き換えたあとの一覧で行い、
+  承認を渡す文は「番号は承認済みチケットで読み直す」と添える
 - **合意は全部 `--agree` を通る。** 全体計画は親の承認、各フェーズの計画はその番号の子の承認、フィードバック計画は `feedback:` を
   足した親の改版の承認（全体計画の最後のレビューが済んでから 1 回だけ。指摘が無くても `feedback: []` で出す）
-- **順序は承認で止まる。** N 番目の子は、N-1 番目までが全部閉じてレビュー（延期でなければ）が済むまで承認されない。`overlap` の組だけ例外。
+- **順序は承認で止まる。** N 番目の子は、N 番目が待つ番号が全部閉じてレビュー（延期でなければ）が済むまで承認されない。
   フェーズには必ず子が 1 本以上あり、親は計画・合流・依頼だけをする
-- **改版**で変えられるのは `plan`（子がまだ承認されていない番号の項）と `feedback` だけ。`feedback` の承認後は新しいフィードバック作業
-  フェーズを足せないが、その中で子を足すのは何度でもできる。残る指摘はユーザが `decide` で issue に回す
+- **改版**で変えられるのは `plan`・`feedback`・`phases:` だけ。錠は番号ごとで、子が承認された番号の項は定義・`review`・番号・待ちを
+  変えられず、その番号が使う定義の写しも変えられない。フィードバック計画を立てたあと（と立てる改版）は全体計画を変えられない。
+  `feedback` の承認後は新しいフィードバック作業フェーズを足せないが、その中で子を足すのは何度でもできる。残る指摘はユーザが `decide` で issue に回す
 - **改版は正とするツリー（承認済みチケットが在るツリー。親のワークツリー `.claude/worktrees/<親>` に在ればそこ、無ければ元ツリー）の
   `todo/` に書く。** 承認済みの識別子の提案は、承認済みチケットで決めた正とするツリーの側だけを読む。
   ほかのツリー（子のワークツリー、ワークスペースルート）に書いた改版は承認待ちに入らず、`--agree` と `--lint` が
   場所と書く置き場を名指しする
 - **改版の提案では、承認済みチケットを写したときに入る `started_at`・`completed_at`・`base_sha`・`cancelled_at`・`cancel_reason` を空にする。**
   承認はチケットの中身を変えないので、提案にスクリプトだけが書く欄の値があると `--agree` と `--lint` が error にする。
-  改版は承認済みチケットの側の値を残し、計画だけを差し替える。前の版の承認が書いた記録 `ccnavi_approved` と、続きの子の目印
+  改版は承認済みチケットの側の値を残し、計画と `phases:` だけを差し替える。前の版の承認が書いた記録 `ccnavi_approved` と、続きの子の目印
   `followup_of` も提案に書けば error になるので消す
-
-**DAG で待たせる。** ファイルの頭に `order: dag` を書き、フェーズ定義に `after:` を書くと、N 番目はフェーズ定義の祖先に当たる番号だけを待ち、
-繋がっていないフェーズ定義は並行して進む。
-
-```yaml
-version: 1
-order: dag                 # 親の project: が指すこの 1 本が dag と書いたときだけ効く
-phases:
-  design:     {title: 設計, review: mr}
-  acceptance: {title: 受入テスト作成, review: none, after: [design]}
-  implement:  {title: 実装とテスト, review: none, after: [design]}   # acceptance と並行
-  docs:       {title: 文書, review: mr, after: [acceptance, implement]}   # 合流点でユーザが見る
-```
-
-- 待ち方は全体計画の承認のときに計算され、`.ccnavi/approved/phases/<親>/workflow.yml` に書き込まれる（チケットには書かない）。あとで `phases.yml` を直しても、改版を出すまで進行中の親には反映されない
-- 手で `doing/` へ動かした親はこのファイルを持たず、一直線（前の番号を全部待つ）で読む。並行にしたければ改版で `--agree` を通す
-- 承認は、`after` の循環、後ろの項が前の項の祖先になる順序、終端が 2 つ以上の計画を拒む。**辺の書き漏れは並行として通る**ので、承認の画面の待ちで確かめる
-- フィードバック計画はいつも一直線。レビュー待ちで止めるのは親ごとなので、どれかの枝がレビューを待つ間は別の枝にも子を起こせない
+- レビュー待ちで止めるのは親ごとなので、どれかの枝がレビューを待つ間は別の枝にも子を起こせない
 
 `--explain` と `SubagentStart` はフェーズを「3: 実装とテスト」のように示す。親の局面（作業中・レビュー待ち・フィードバック計画待ち・
 フィードバック対応中・閉じられる）を名指しするのは `--explain` とボードだけ。
@@ -1876,7 +1876,7 @@ JSON で渡す（`--result <path>`）。
   外から `ready --parent <親>` で打てばそのまま消える
 - 消し方は、生成物（`node_modules`・`.venv` など）を消してから `git worktree remove`（`--force` なし）。ブランチは消さない
 - git が無視しているファイル（`.env` など）があるワークツリーは、何も消さずに名指しする（`worktree remove` はそれごと消して戻せない）。
-  数えないのは生成物と、ワークツリー直下の `scratchpad/`（下書きの置き場。中身はワークツリーごと消える）だけ
+  数えないのは生成物だけ（下書きの置き場 `wip/scratchpad/` は追跡されるので、ここには現れない）
 - cwd が消す対象の中にあるときは消さず、外に出てから打つ 1 本（`sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>`）を出す。
   `ready` を親のワークツリーの中から `--parent` なしで打ったときは、親のワークツリーをこの 1 本で消す。未コミットの変更があれば何も消さずに名指しする
 - この 1 本が Claude Code の自動モードの分類器に止められたら、ユーザに許可を頼むか、ユーザのホームの `~/.claude/settings.json` の
@@ -2128,7 +2128,7 @@ uv run python scripts/check_rules.py   # 同じことを、state と記録を外
 `tool: Stop`（`subject: "(stop)"`）は、ターンの終わりに使われるルールがあるかを見る（あれば `allow`）。
 ルールを 1 件足したら見本も 1 行足し、**止めたくないものも必ず一緒に置く**。
 
-見本はエージェントが直接書けない（「コアファイルを守る」）。下書きはワークツリーの `scratchpad/` に置き、ルールの下書きと一緒にユーザに渡す。
+見本はエージェントが直接書けない（「コアファイルを守る」）。下書きはワークツリーの `wip/scratchpad/` に置き、ルールの下書きと一緒にユーザに渡す。
 `/ccnavi-config` スキルがこの流れを回し、フェーズ定義とリスクの配点も見る。
 
 ### 記録から候補を起こす
@@ -2271,7 +2271,8 @@ error 2 件、warn 2 件、info 0 件
 | info | 裸の `id` と全欄が一致する宣言を、後ろのレイヤーで捨てた（ルール / フェーズ定義 / 配点） |
 | warn | ルールの同じ `id` がレイヤーをまたいで中身違いで在る（両方とも適用されている） |
 | error | 共通レイヤーに `phases.yml` がある（判定に使わず空として扱っている。フェーズ定義は config にだけ置く） |
-| error | フェーズ定義の 1 本の中で、同じ `id` が重複する、表示名が重なる、`overlap` / `requires` がそのファイルに無いフェーズ定義を指す（そのレイヤーを空として扱っている） |
+| error | フェーズ定義の 1 本の中で、同じ `id` が重複する、表示名が重なる、`scope` か `deliverables` が 20 件を超える（そのレイヤーを空として扱っている） |
+| warn | フェーズ定義に前の版の順序の欄（`order`・`after`・`overlap`・`requires`）がある（読まない。順序は親の計画の項の `after`） |
 | warn | 配点の同じ `id` で中身が違う（両方数え、後ろのレイヤーは `<レイヤー>:<id>`） |
 | error | 合成後の `levels` が `medium <= high <= critical` になっていない（そのレイヤーを空として扱っている） |
 | error | 配点の `script:` がレイヤーの外を指す（共通レイヤーから `.ccnavi/scripts/`、自身のレイヤーやプロジェクトのレイヤーから `.ccnavi/common/scripts/`）、または指す先が git プロジェクトルートに無い |
@@ -2300,7 +2301,8 @@ error 2 件、warn 2 件、info 0 件
 | error | 孫を持つ子 |
 | warn | 範囲の超過がある子。超過は、親の範囲かフェーズ定義の `scope` を超える項と、regex の項。判定がその上限で切り詰めて止めるので、承認と同じく CI の終了コードを失敗にしない |
 | error | ワークツリーの元リポジトリと承認済みチケットの `project:` が違う |
-| error | 親が計画を持つのに `phases.yml` が読めない、`phases.yml` / `risks.yml` 自身の誤り |
+| error | 計画を持つ親に、計画が使う定義の写し（`phases:`）が無いか壊れている（判定でも親と子が止まる）、`phases.yml` / `risks.yml` 自身の誤り |
+| warn | 承認済みの親の写し（`phases:`）が今の `phases.yml` と違う・`phases.yml` が読めない（進行中の親には効かない）、写しの使われていない定義 |
 | error | 承認済みチケットが読めない |
 | warn | 未承認の提案がある |
 | warn | `predecessors` を満たしていない（`done/` に無いか取り消し済み）のに着手している子 |
@@ -2309,9 +2311,6 @@ error 2 件、warn 2 件、info 0 件
 | warn | 承認済みチケットはあるがワークツリーが無い（範囲が適用されない） |
 | warn | リモートの種類に合うトークン（`GITHUB_TOKEN` / `GITLAB_TOKEN`）が無い、`origin` が無い |
 | warn | ワークツリーでもワークスペースルートでもないのに `.claude/` を持つディレクトリがある |
-| warn | 下書きの置き場（`scratchpad/`）に追跡されているファイルがある、または `scratchpad/` が git で無視されていない。ワークスペースと各プロジェクトをそれぞれ見る |
-
-`scratchpad/` が追跡されていると、実行後チェックが下書きを範囲外として報告しはじめる。
 
 **取り込みと正とする側**。取り込み状態 `logs/state/sync/` があるときだけ見る。ただし 1 行目と 2 行目は取り込み状態が無くても見る。
 
@@ -2442,7 +2441,7 @@ ccnavi --explain --json
 | `settings` | `ticket_control`（チケット制御を使うか）/ `tickets`（提案の置き場、相対）/ `approved`（承認済みチケットの置き場）/ `projects`（プロジェクトの置き場） |
 | `trees[]` | ワークスペースルート・プロジェクト・ワークツリー。`{name, root, project, kind}`。`kind` は `main` / `project` / `worktree` |
 | `layers[]` | レイヤーごとの宣言。順序は 共通レイヤー → 自身のレイヤー → プロジェクト（名前順）。`{name, rules, phases, risk, phases_file}`。`name` は `common` / `self` / プロジェクトの名前。`rules` は `{path, unreadable, deny, ask, allow}` で、各タイプはそのレイヤーから実際に判定へ入ったルール `{id, section, source, match, kind, written, pattern, message}`（重複で捨てたものは入らない）。`phases` はそのレイヤーのファイルに書いてあるフェーズ定義 `{id, source, kind, title, review, scope}`、`risk` は `{path, unreadable, factors}`、`phases_file` は `{path, unreadable}`。phases と risk は合成前の、そのレイヤーのぶんだけ |
-| `sums[]` | ワークスペースとプロジェクトごとの「共通 + 1 レイヤー」の和（判定と同じ合成。拡張は足し直さずこれを見せる）。順序は 自身のレイヤー → プロジェクト（名前順）。`{name, layers, rules, risk, phases}`。`name` は `self` / プロジェクトの名前、`layers` は `["common", <name>]`。`rules` は `{path, unreadable, missing, deny, ask, allow}` で、各タイプは共通レイヤーに足した和（`layers[]` と違い、他のレイヤーの定義で欠けない）。`risk` は `{levels, factors, fallback, problems}`（`levels` は実際に使う境目の点）、`phases` は使う 1 本 `{path, unreadable, order, types}`（足し算はしない） |
+| `sums[]` | ワークスペースとプロジェクトごとの「共通 + 1 レイヤー」の和（判定と同じ合成。拡張は足し直さずこれを見せる）。順序は 自身のレイヤー → プロジェクト（名前順）。`{name, layers, rules, risk, phases}`。`name` は `self` / プロジェクトの名前、`layers` は `["common", <name>]`。`rules` は `{path, unreadable, missing, deny, ask, allow}` で、各タイプは共通レイヤーに足した和（`layers[]` と違い、他のレイヤーの定義で欠けない）。`risk` は `{levels, factors, fallback, problems}`（`levels` は実際に使う境目の点）、`phases` は使う 1 本 `{path, unreadable, types}`（足し算はしない。定義は順序を持たないので待ち方の欄は無い） |
 | `projects[]` | プロジェクトの名前 |
 | `problems[]` | 読めなかった提案や承認済みチケットの説明。あっても他は出す |
 | `pending_approval[]` | `--agree` で承認の対象に入る識別子（承認済みチケットの無い提案と、親の改版） |
@@ -2456,7 +2455,7 @@ ccnavi --explain --json
 |---|---|
 | `ticket` / `parent` / `phase` / `title` / `project` / `issue` / `predecessors` / `human_review` | 提案（無ければ承認済みチケット）の frontmatter から |
 | `predecessors_unmet[]` | 満たしていない先行。`{ticket, state, label}`。`state` は `todo` / `doing` / `review`（先行が閉じれば満たす）と `cancelled` / `missing` / `scattered` / `self` / `ancestor` / `cycle`（待っても満たさない）、`label` はユーザ向けの言葉（「作業中（doing/）」など）。空でなければ承認と着手（`start`）が止まる（書き込みと `finish` は止まらない）。先行が無い子・親・閉じたチケットは空。ボードはこれで「先行待ち」のバッジを出し、自分では数えない |
-| `proposal` | `{state, tree, tree_root, path}`。正とする側のツリー（親のツリー。無ければ元ツリー）の提案の置き場で見つけたもの。`state` は `todo`（承認待ち）/ `review`（レビュー待ち）。`doing/` `done/` に在るときは `null`。承認済みの識別子では、正とする側のツリーを、承認済みチケットがどのツリーにあるかで決める。そのツリーの外に残った古い提案（承認の前に切ったワークツリーの `todo/` など）は出さない（`seen_in` には出る） |
+| `proposal` | `{state, tree, tree_root, path, has_plan}`。正とする側のツリー（親のツリー。無ければ元ツリー）の提案の置き場で見つけたもの。`state` は `todo`（承認待ち）/ `review`（レビュー待ち）。`has_plan` は親の提案が全体計画（`plan:`）を持つか（`feedback:` だけの親と子は `false`。計画の順序を直すタブ（`--plan-order`）は `plan:` の無い親を開けないため）。承認前の親は `parents[]` に出ないので、ボードはこれで計画の順序を直すタブの入口を出し分ける。足しただけの欄で、読まない拡張はそのまま動く。`doing/` `done/` に在るときは `null`。承認済みの識別子では、正とする側のツリーを、承認済みチケットがどのツリーにあるかで決める。そのツリーの外に残った古い提案（承認の前に切ったワークツリーの `todo/` など）は出さない（`seen_in` には出る） |
 | `copy` | `{status, approved_at, approved_from, source_tree, path}`。`status` は `none`（未承認）/ `open`（`doing/`）/ `review`（`wip/proposals/review/`）/ `closed`（`done/`）。`approved_at` は承認の時刻で、承認済みチケットの欄ではなく、状態の履歴の `approved`（続きの子は `raised`）か、無ければ前の版の承認が書いた記録（古い形の `ccnavi_approved.approved_at`）、それも無ければ `doing/<識別子>.md` を足したコミットから引く。`approved_from` はどこから引いたか（`history` / `record` / `commit` / `uncommitted`（履歴もコミットも無い。手で置いてまだコミットしていない）/ 空（分からない））。`uncommitted` と空のとき `approved_at` は空。`source_tree` は前の版の承認が書いた欄で、新しい承認済みチケットでは空 |
 | `blocked` | 空でなければ「読めるが信じられない」理由。判定はこのチケットのワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`status` は `open` のままなので、止まっていることはこの欄でしか分からない |
 | `worktree` | `{exists, path, project}`。`.claude/worktrees/<識別子>` が実際のワークツリーか（設計 9.5 の相互参照） |
@@ -2504,6 +2503,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 | `digest` | 見せた中身のダイジェスト。`--yes` の `--digest` にそのまま渡す |
 | `rejected[]` | 承認の対象にしない提案。`{ticket, problems[]}`。載るのは形の不正な提案（親が承認されていない、計画に無い番号、順序、先行（`predecessors`）が `done/` に無いか取り消し済みなど）だけで、範囲の超過だけの子は `batch[]` に載る |
 | `problems[]` | 読めない提案や承認済みチケットの説明 |
+| `plans[]` | 承認の対象に入った計画を持つ親の、計画ごとの図の中身。`ccnavi --plan-order <親> --json` の `plans` と同じ関数で作る（`--order` は渡さないので、承認する提案そのものの順序）。`{ticket, part, source_sha, items[], after, proposed, current, loose, ready, problems}`。`items[]` は `{number, from, type, title, review, deferred, review_at, locked}`。形は設計 9.4（docs/design/tickets/approval.md） |
 
 `--preview` 自身は、対象にしない提案があっても 0 で返る。答えが要るときだけ `--verify` を足す。
 `--verify` の答えは `--preview` の答えに `verify` を足したもの。終了コードが答えそのもの（0 = はい、3 = いいえ。1 は使い方か設定の誤り）。
@@ -2531,7 +2531,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
   合うことを求める。`--digest` が無ければ承認せず、終了コードは 1
 - ダイジェストが覆うのは承認画面の本文と、判定が読んだ中身（`read_set`。承認済みチケット・提案・マーカー・フェーズ定義・取り込み状態の、
   ブランチ名とツリーからの相対パスごとの中身のハッシュ。無かったファイルも「無い」として入る）と、一括のチケットごとに書き出す中身（新規は提案の
-  ファイルのバイト列そのもの、改版は計画を差し替えた承認済みチケット。親なら `phases/<親>/workflow.yml` に書く中身を後ろに足す）。見せたあとに判定が読んだものが 1 つでも変われば、
+  ファイルのバイト列そのもの、改版は計画と `phases:` を差し替えた承認済みチケット）。見せたあとに判定が読んだものが 1 つでも変われば、
   画面が同じでもダイジェストは変わる
 - エージェントが Bash や PowerShell で `--yes` を打つ形は、組み込みの deny（`builtin-guard-ticket-approval`）が止める。`--preview` は通す
 - 後ろの `<絞り>` は `ccnavi --agree <識別子>...` と同じで、承認の対象を狭める。`--yes` の値（ユーザが見た識別子）とは別に渡す。

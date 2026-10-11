@@ -99,7 +99,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 | `.claude/settings.json` の `hooks` | 7 つのイベントに実行ファイルを登録する。既に別の表記で登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true`。`--no-vscode` で触らない |
 | 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,agree,fetch,sync,clean,branches,start,launcher}.sh`、共通部の部品 `ccnavi-common-{state,lock,c1,host,log}.sh` と `ccnavi-clean.js`。取り込み（`ccnavi-fetch.sh`）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは触らず、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも外れていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない） |
-| 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行と、`--docs` の索引の `**/ccnavi-index.jsonl` の 1 行。索引の行は別の見出しの下に入り、`ccnavi-index.jsonl` の行が既にあれば足さない（旧名 `index.jsonl` の行は数えない）。`ccnavi-index.jsonl` を否定する行があればユーザの除外として足さない。どちらも配布先が git のリポジトリで、配るときだけ。振り分けの sh は追跡する側に置く。導入スクリプトは `projects/` の下のプロジェクトには足さない（そこは `--docs` が索引を書く前に、そのプロジェクトの `.gitignore` に足す。10 と ADR-0111） |
+| 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行と、`--docs` の索引の `**/ccnavi-index.jsonl` の 1 行。索引の行は別の見出しの下に入り、`ccnavi-index.jsonl` の行が既にあれば足さない（旧名 `index.jsonl` の行は数えない）。`ccnavi-index.jsonl` を否定する行があればユーザの除外として足さない。どちらも配布先が git のリポジトリで、配るときだけ。振り分けの sh は追跡する側に置く。導入スクリプトは `projects/` の下のプロジェクトには足さない（そこは `--docs` が索引を書く前に、そのプロジェクトの `.gitignore` に足す。10 と ADR-0112） |
 
 置き場は 2 つに分けて固定する。
 
