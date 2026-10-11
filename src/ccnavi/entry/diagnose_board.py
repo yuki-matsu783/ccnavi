@@ -403,6 +403,10 @@ def _ticket_record(
                 "tree": proposal.tree,
                 "tree_root": proposal.tree_root,
                 "path": proposal.path,
+                # 親の提案が計画（`plan:` か `feedback:`）を持つか。承認前の親は `parents[]` に
+                # 出ないので、ボードが計画の順序を直すタブの入口を出し分けるのに使う。子は偽。
+                "has_plan": not proposal.is_child
+                and (bool(proposal.plan) or bool(proposal.feedback)),
             }
             if proposal is not None
             else None
