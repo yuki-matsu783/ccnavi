@@ -13,7 +13,10 @@ keywords: [実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, ワーク
 - 対応する実行環境は、WindowsのGit Bash、WindowsのWSL、Claude Code on the web（Linux）、macOSの4つ。shはどの環境でも動くように書く
 - macOSの`sh`はbash 3.2で、`sed`などのコマンドはBSD版。変数のすぐ後ろに全角文字を続けるときは`${var}`と括る。
   `$( )`の中には`case`を書かない。この2点は`tests/core/test_sh_portability.py`が検査する
-- 使える道具は`jq` 1.6、Node 22（pnpm 10）、Python 3.12（uv）、goだけ。これ以外の道具がある前提で書かない
+- 使える道具は`jq` 1.6、Node 22（pnpm 10）、Python 3.12（uv）、goだけ。これ以外の道具がある前提で書かない。
+  例外は、ホスト（GitHub・GitLab）と話すsh（`ccnavi-review.sh`・`ccnavi-branches.sh`・`ccnavi-start.sh`など）で、
+  `gh`・`glab`・`curl`を使う。無ければ何を用意すればよいかを案内して止まる。ソースで動かしているccnaviのリポジトリでは、
+  shが実行ファイルの代わりに`uv run python -m ccnavi`で起こすことがある（`uv`が無ければその道は使わない）
 - Claude Code on the webには`.ccnavi/bin`が無い。ccnaviのhookを動かすには、
   `uv run --with pyinstaller python build.py`でビルドする。ビルドしていないとランチャーが終了コード127で終わり、
   hookは何もしない
