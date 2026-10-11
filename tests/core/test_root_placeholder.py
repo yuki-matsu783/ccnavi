@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import tempfile
 import unittest
 
@@ -31,39 +30,58 @@ def write(path: str, text: str) -> str:
 
 
 class WorkspaceRootRealRuleTest(unittest.TestCase):
-    """このリポジトリの rules.yml の workspace-root が、wip/scratchpad/ だけを通すこと。"""
+    """このリポジトリの rules.yml の workspace-root が、2 つの置き場だけを通すこと。
+
+    通すのは wip/scratchpad/ と .claude/worktrees/。
+
+    判定と同じ読み方（rules.parse）で組み立てて当てる。ルールは 1 本の regex でも、
+    `except:` で置き場を除く形でも書けるので、式を取り出して当てると書き方に縛られる。
+    大文字小文字は判定と同じく区別しない。
+    """
 
     def setUp(self):
         import yaml
 
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.root = os.path.realpath(self.dir.name)
         with open(os.path.join(ROOT, ".ccnavi", "common", "rules.yml"), encoding="utf-8") as f:
-            rule = next(r for r in yaml.safe_load(f)["deny"] if r["id"] == "workspace-root")
-        self.regex = re.compile(rule["regex"].replace("{root}", re.escape("/r")))
+            raw = next(r for r in yaml.safe_load(f)["deny"] if r["id"] == "workspace-root")
+        rule_set, problems = rules.parse({"version": 1, "deny": [raw]}, self.root)
+        self.assertEqual([p for p in problems if p.severity == rules.SEVERITY_ERROR], [])
+        self.rule = rule_set.deny[0]
+
+    def hits(self, tail: str) -> bool:
+        return self.rule.matches("Write", self.root + tail)
 
     def test_wip_scratchpadだけが通る(self):
-        for path in [
-            "/r/wip/scratchpad/a.md",
-            "/r/wip/scratchpad/x/y.sh",
-            r"/r\wip\scratchpad\a",
-            "/r/.claude/worktrees/x/a.md",
+        for tail in [
+            "/wip/scratchpad/a.md",
+            "/wip/scratchpad/x/y.sh",
+            r"\wip\scratchpad\a",
+            "/wip/Scratchpad/a.md",
+            "/.claude/worktrees/x/a.md",
+            r"\.claude\worktrees\x\a.md",
         ]:
-            with self.subTest(path=path):
-                self.assertIsNone(self.regex.search(path))
+            with self.subTest(tail=tail):
+                self.assertFalse(self.hits(tail))
 
     def test_それ以外は止まる(self):
-        for path in [
-            "/r/scratchpad/a.md",
-            "/r/wip/proposals/todo/a.md",
-            "/r/wip/a.md",
-            "/r/wip",
-            "/r/wipx/a.md",
-            "/r/wip/scratchpadx/a.md",
-            "/r/wip/Scratchpad/a.md",
-            "/r/README.md",
-            "/r/.claude/settings.json",
+        for tail in [
+            "/scratchpad/a.md",
+            "/wip/proposals/todo/a.md",
+            "/wip/a.md",
+            "/wip",
+            "/w",
+            "/wipx/a.md",
+            "/wip/scratchpadx/a.md",
+            "/README.md",
+            "/.claude/settings.json",
+            "/.cfoo",
+            "/.ccnavi/common/rules.yml",
         ]:
-            with self.subTest(path=path):
-                self.assertIsNotNone(self.regex.search(path))
+            with self.subTest(tail=tail):
+                self.assertTrue(self.hits(tail))
 
 
 class RootPlaceholderTest(unittest.TestCase):
