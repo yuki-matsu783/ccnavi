@@ -9,7 +9,7 @@
 2. `every: N` で N 回に 1 度止める。本文のファイルも載る。数えはセッションごと
 3. `stop_hook_active` が真の回は止めず、数えも進めない。サブエージェント（`agent_id`）も同じ
 4. 数えを覚えられない（`--state ""`）ときは止めない
-5. `dry-run` は止めず、止めたはずの文を `systemMessage` に載せる
+5. `dry-run` でも同じ回に止める（止めないと文がモデルに届かない）
 6. cwd がプロジェクトの中でも同じルールが当たる。プロジェクトのレイヤーのルールも当たる
 7. `--lint` は `deny` / `ask` に置いたもの、`(stop)` に当たらない表記、`every` の無いものを
    warn で言う
@@ -80,6 +80,7 @@ class StopRulesTest(unittest.TestCase):
         mode: str = "enable",
         state: str | None = None,
         log: str = "",
+        env: dict | None = None,
     ) -> dict:
         payload = {
             "hook_event_name": "Stop",
@@ -99,12 +100,11 @@ class StopRulesTest(unittest.TestCase):
                 self.state if state is None else state,
                 "--approved",
                 "",
-                "--mode",
-                mode,
+                *(["--mode", mode] if mode else []),
             ],
             input=json.dumps(payload),
             cwd=ROOT,
-            env=self.env(),
+            env={**self.env(), **(env or {})},
         )
         self.assertEqual(done.returncode, 0, done.stderr)
         return json.loads(done.stdout) if done.stdout.strip() else {}
@@ -186,13 +186,19 @@ class StopRulesTest(unittest.TestCase):
 
     # --- 5. dry-run --------------------------------------------------------------
 
-    def test_dry_run_reports_instead_of_blocking(self):
+    def test_dry_run_blocks_like_enable(self):
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
         self.assertNotIn("decision", self.stop(mode="dry-run"))
         body = self.stop(mode="dry-run")
-        self.assertNotIn("decision", body)
-        self.assertIn("would have blocked this stop", body.get("systemMessage", ""))
-        self.assertIn(NUDGE, body.get("systemMessage", ""))
+        self.assertEqual(body.get("decision"), "block")
+        self.assertIn(NUDGE, body["reason"])
+        self.assertNotIn("would have blocked", body.get("systemMessage", ""))
+
+    def test_mode_disable_never_blocks(self):
+        self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
+        # disable を言えるのは起動した環境だけ（フラグの disable は enable になる）。
+        off = {"CCNAVI_MODE": "disable"}
+        self.assertEqual([self.blocked(self.stop(mode="", env=off)) for _ in range(4)], [""] * 4)
 
     # --- 5b. 止めた回の頭の文と記録 ------------------------------------------------
 

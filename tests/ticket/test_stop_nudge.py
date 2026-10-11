@@ -29,6 +29,10 @@ def load_tests(loader, tests, pattern):
 CODE = "NUDGE_TICKET_FINISH"
 
 
+def result_text(body):
+    return json.dumps(body, ensure_ascii=False)
+
+
 class StopNudgeTest(TicketTest):
     def stop(
         self, cwd, *, active=False, mode="enable", event="Stop", agent_id="", extra=(), session="s1"
@@ -87,14 +91,15 @@ class StopNudgeTest(TicketTest):
         self.assertEqual(self.ccnavi("ticket", "finish", "i0001-01-01").returncode, 0)
         self.assert_quiet(self.stop(tree))
 
-    def test_dry_run_does_not_block_but_tells_the_user(self):
+    def test_dry_run_blocks_too(self):
+        """促しは dry-run でも止める。止めないと文がモデルに届かない。"""
         self.family()
         tree = self.child_tree()
         self.commit_work(tree)
         body = self.body(self.stop(tree, mode="dry-run"))
-        self.assertNotIn("decision", body)
-        self.assertIn("would have blocked this stop", body.get("systemMessage", ""))
-        self.assertIn(CODE, body.get("systemMessage", ""))
+        self.assertEqual(body.get("decision"), "block")
+        self.assertIn(CODE, body["reason"])
+        self.assertNotIn("would have blocked", result_text(body))
 
     # ---- 促さない（除く条件を 1 つずつ固定する）
 

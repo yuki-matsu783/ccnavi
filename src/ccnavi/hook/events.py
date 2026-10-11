@@ -57,7 +57,7 @@ def decide(
     if payload.event == hookio.USER_PROMPT_SUBMIT:
         return decide_at_prompt(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.STOP:
-        return decide_at_stop(stdout, stderr, mode, conf, root, payload, record)
+        return decide_at_stop(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_START:
         return subagent.at_start(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_STOP:
@@ -195,7 +195,6 @@ def decide_at_prompt(
 def decide_at_stop(
     stdout: TextIO,
     stderr: TextIO,
-    mode: str,
     conf: settings.Settings,
     root: str,
     payload: hookio.Input,
@@ -217,8 +216,9 @@ def decide_at_stop(
 
     止めるのは 1 つだけ。cwd のワークツリーのチケットが、作業を終えたように見えるのに
     `finish` されていないとき、1 回の連鎖に 1 回だけ止めて `finish` か続ける理由を促す
-    （`_finish_nudge`）。こちらはモードを見る。enable でだけ止め、dry-run では
-    止めたはずの文を報告に載せる。止めるときも報告は同じ応答の `systemMessage` で返す。
+    （`_finish_nudge`）。こちらはモードを見ない。dry-run でも止める。Stop でモデルに文を届ける
+    経路は止めて `reason` に書くことしか無く、止めないと促しがモデルに届かないため。
+    止めるときも報告は同じ応答の `systemMessage` で返す。
 
     `finish` を促さなかった回に限り、`match: Stop` のルールが渡す回ならそこで止める
     （`stop_rules_nudge`）。止め方とモードの扱いは `finish` の促しと同じ。
@@ -246,19 +246,14 @@ def decide_at_stop(
     repeated = repeat.at_stop(conf.state, payload.session_id, repeat.threshold(conf.deny_repeat))
     if repeated:
         report = f"{report}\n\n{repeated}" if report else repeated
-    nudge = _finish_nudge(stderr, conf, root, payload, record, mode, raw)
+    nudge = _finish_nudge(stderr, conf, root, payload, record, raw)
     if not nudge:
         # finish の促しで止める回は、ルールの促しを数えもしない。1 回の Stop で
         # 止める理由は 1 つだけにし、数えを進めて届かない回を作らない。
-        nudge = stop_rules_nudge(stderr, conf, root, payload, record, mode)
-    if nudge and mode == modes.ENABLE:
+        nudge = stop_rules_nudge(stderr, conf, root, payload, record)
+    if nudge:
         hookio.write_stop_block(stdout, nudge, system=report)
         return EXIT_OK
-    if nudge:
-        # dry-run は止めない。止めたはずのことをユーザへの報告に載せる
-        # （実行後チェックと同じ言い方）。
-        told = f"[ccnavi dry-run] {modes.ENABLE} would have blocked this stop:\n{nudge}"
-        report = f"{report}\n\n{told}" if report else told
     if report:
         hookio.write_system_message(stdout, report)
     return EXIT_OK
@@ -270,7 +265,6 @@ def stop_rules_nudge(
     root: str,
     payload: hookio.Input,
     record: audit.Record,
-    mode: str,
 ) -> str:
     """`match: Stop` の `allow` のルールが、このターンの終わりで止めて渡す文。
 
@@ -312,7 +306,7 @@ def stop_rules_nudge(
     if not parts:
         return ""
     record.decision, record.code = audit.NUDGE, CODE_RULE_NUDGE
-    record.enforced = mode == modes.ENABLE
+    record.enforced = True
     record.rules = [*record.rules, *delivered]
     return f"{CODE_RULE_NUDGE}: {STOP_PREFACE}\n\n" + "\n\n".join(parts)
 
@@ -323,7 +317,6 @@ def _finish_nudge(
     root: str,
     payload: hookio.Input,
     record: audit.Record,
-    mode: str,
     raw: approval.Raw | None = None,
 ) -> str:
     """`finish` の打ち忘れを促す文。促さないなら空文字。
@@ -348,7 +341,7 @@ def _finish_nudge(
         stderr.write(f"ccnavi: finish を促した記録を残せないので、促さない: {failed}\n")
         return ""
     record.decision, record.code = audit.NUDGE, ops_stop.CODE_FINISH_NUDGE
-    record.enforced = mode == modes.ENABLE
+    record.enforced = True
     record.tree = found.ticket.ticket
     return ops_stop.finish_nudge(root, found)
 
