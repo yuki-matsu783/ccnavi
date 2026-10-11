@@ -14,5 +14,5 @@
     "sourceMap": false,
     "jsx": "react-jsx"
   },
-  "include": ["src/core/**/*.ts", "src/options/**/*.ts", "src/options/**/*.tsx", "src/types/**/*.d.ts", "test/**/*.ts"]
+  "include": ["src/core/**/*.ts", "src/options/**/*.ts", "src/options/**/*.tsx", "src/board/**/*.ts", "src/types/**/*.d.ts", "test/**/*.ts"]
 }
