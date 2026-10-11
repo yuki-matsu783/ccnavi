@@ -1,6 +1,6 @@
 /**
  * ボードの状態と副作用。読み直し・書く操作・要確認の読み書き・直前の操作の一言・PAT の期限の帯・自動の読み直しを持つ。
- * 描くのは呼び手（`main.ts`）で、ここは `document` にも `chrome` にも直接触らない。外界との接点
+ * 描くのは呼び手（`App.tsx`）で、ここは `document` にも `chrome` にも直接触らない。外界との接点
  * （service worker への依頼・`chrome.storage.local`・確認のダイアログ・Worker・blob のキャッシュ・時計とタイマー）は
  * `BoardEnv` で受け取り、Node の単体試験で差し替える。
  *
@@ -10,10 +10,9 @@
 import type { TokenStatus, Response } from "../core/protocol.js";
 import type { Host } from "../core/hosts.js";
 import type { Issue } from "../core/github.js";
-import type { Actions } from "../core/render.js";
 import { startAutoRefresh, type AutoRefresh, type AutoRefreshEnv } from "../core/autorefresh.js";
 import { readRepos, repoKey, saveRecentDays, type RepoConfig, type StorageArea } from "../core/settings.js";
-import { collectRepo, type BlobCache, type Deps, type HostCall, type RepoBoard, type Stats } from "../core/snapshot.js";
+import { collectRepo, type BlobCache, type Deps, type FamilyBoard, type HostCall, type RepoBoard, type Stats } from "../core/snapshot.js";
 import { listIssues, startIssue } from "../core/start.js";
 import { approveFamily, confirmPhase, withdrawTicket, type Outcome, type WriteDeps } from "../core/write.js";
 import type { PyWorker } from "./py-client.js";
@@ -23,18 +22,34 @@ export type Attention = Record<string, Record<string, string>>;
 
 /** 読んだ issue の一覧（「始める」） */
 export interface IssueList {
-  readonly list: Issue[] | null;
+  readonly list: readonly Issue[] | null;
   readonly error: string;
 }
 
-/** 1 つのリポジトリの欄を描く材料。`renderRepo` に渡す値そのもの。描き直すときだけ作り直す */
+/** ボタンを押したときの動き。ボードの欄（`Repo.tsx`）に渡す */
+export interface Actions {
+  approve(repo: RepoBoard, family: FamilyBoard): void;
+  withdraw(repo: RepoBoard, family: FamilyBoard, ticket: string): void;
+  /** レビュー済みにする。渡さなければ「レビュー済みにする」を出さない */
+  review?(repo: RepoBoard, family: FamilyBoard, phase: number): void;
+  /** issue の一覧を読む（「始める」）。渡さなければ「始める」の欄を出さない */
+  loadIssues?(repo: RepoBoard): void;
+  /** issue から親のブランチを作る */
+  start?(repo: RepoBoard, issue: Issue): void;
+  /** 直近の日数を変える（入力欄の文字列のまま渡す。検査と保存は呼び手）。渡さなければ入力欄を出さない */
+  setRecentDays?(repo: RepoBoard, value: string): void;
+  /** 「要確認」を外す（ユーザが確かめた） */
+  dismiss?(repo: RepoBoard, family: string): void;
+}
+
+/** 1 つのリポジトリの欄を描く材料。`Repo.tsx` に渡す値そのもの。描き直すときだけ作り直す */
 export interface Section {
   readonly board: RepoBoard;
   readonly attention: Readonly<Record<string, string>>;
   readonly issues: IssueList | undefined;
 }
 
-/** 直前の操作の一言（`#result`）。`kind` は `data-kind`、`className` は最後に決めた見た目（書けなかったときは前のまま） */
+/** 直前の操作の一言（`#result`）。`kind` は `data-kind`、`className` は最後に決めた見た目（読み直しで一言を消すときは前のまま） */
 export interface ResultLine {
   readonly kind: string | undefined;
   readonly className: string;
@@ -115,7 +130,7 @@ export interface BoardEnv {
 export interface BoardController {
   snapshot(): BoardSnapshot;
   subscribe(listener: () => void): () => void;
-  /** `renderRepo` に渡す操作 */
+  /** ボードの欄（`Repo.tsx`）に渡す操作 */
   readonly actions: Actions;
   /**
    * ボードを読み直す。`fromTimer` が真（自動）のときは、走っていれば何もせず、
@@ -284,7 +299,8 @@ export function createBoardController(env: BoardEnv): BoardController {
     try {
       tried = await fn();
     } catch (err) {
-      setResult({ kind: "failed", text: `書けなかった: ${(err as Error).message ?? String(err)}` });
+      // 投げて終わったら失敗の見た目にする（前のまま残すと、直前の成功の緑で失敗を言ってしまう）
+      set({ result: { kind: "failed", className: "notice error", text: `書けなかった: ${(err as Error).message ?? String(err)}` } });
     } finally {
       if (tried) {
         set({ busy: false });

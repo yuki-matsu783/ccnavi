@@ -1,5 +1,5 @@
 /*
- * ボードの部品（`main.ts` が描く見出し・帯・結果と、`src/core/render.ts` が描くリポジトリの欄）。
+ * ボードの部品（`static/board.html` の見出し・帯・結果と、React（`Repo.tsx` など）が描くリポジトリの欄）。
  * 配色は共通の `--vscode-*`（Chrome では `browser-theme.css` が定義する）と、`page.css` が body で決める
  * 意味の色（`--warn-text` など）を読む。ボタン（button.action）は共通の部品のまま使う。
  *

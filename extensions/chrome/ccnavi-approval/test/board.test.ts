@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 
 import type { PyCall } from "../src/core/py.js";
-import { renderRepo } from "../src/core/render.js";
+import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo, type BlobCache, type RepoBoard } from "../src/core/snapshot.js";
@@ -167,7 +167,7 @@ test("CX-T050 ボードの DOM: 承認などのボタンを出さず、悪意の
   const dom = new JSDOM("<!doctype html><body></body>");
   const doc = dom.window.document;
   const md = createRenderer(dom.window as unknown as Parameters<typeof createRenderer>[0]);
-  doc.body.append(renderRepo(doc, md, board));
+  renderBoard(doc, md, board);
   assert.equal(doc.querySelectorAll("button, form, input").length, 0);
   assert.match(doc.querySelector("[data-testid=integration]")?.textContent ?? "", /^統合先: main（ホストのデフォルトブランチ）/);
   const hostile = doc.querySelector('[data-ticket="i0002"] .markdown');

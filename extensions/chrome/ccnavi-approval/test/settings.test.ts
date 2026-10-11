@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 
-import { renderRepo } from "../src/core/render.js";
+import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import { DEFAULT_RECENT_DAYS, MAX_RECENT_DAYS, normalizeRepo, readRepos, saveRecentDays, type RepoConfig, type StorageArea } from "../src/core/settings.js";
 import type { RepoBoard } from "../src/core/snapshot.js";
@@ -55,8 +55,8 @@ test("CX-T212 ボードの入力欄: リポジトリごとに出し、変える�
     ({ repo: { host: "github.com", owner: "acme", repo, integration: "", recentDays, extraBranches: [], project: "", workspace: "" }, error: "取れなかった", families: [], candidates: [], missingExtras: [] }) as unknown as RepoBoard;
   const got: [string, string][] = [];
   const actions = { approve() {}, withdraw() {}, setRecentDays: (b: RepoBoard, v: string) => void got.push([b.repo.repo, v]) };
-  const a = renderRepo(doc, md, mk("a", 7), actions);
-  const b = renderRepo(doc, md, mk("b", 30), actions);
+  const a = renderBoard(doc, md, mk("a", 7), actions);
+  const b = renderBoard(doc, md, mk("b", 30), actions);
   const inputA = a.querySelector<HTMLInputElement>("form.recent-days input")!;
   const inputB = b.querySelector<HTMLInputElement>("form.recent-days input")!;
   assert.equal(inputA.value, "7");
@@ -65,5 +65,5 @@ test("CX-T212 ボードの入力欄: リポジトリごとに出し、変える�
   inputB.value = "5";
   b.querySelector<HTMLFormElement>("form.recent-days")!.dispatchEvent(new dom.window.Event("submit", { cancelable: true }));
   assert.deepEqual(got, [["b", "5"]]);
-  assert.equal(renderRepo(doc, md, mk("c", 7), { approve() {}, withdraw() {} }).querySelector("form.recent-days"), null);
+  assert.equal(renderBoard(doc, md, mk("c", 7), { approve() {}, withdraw() {} }).querySelector("form.recent-days"), null);
 });

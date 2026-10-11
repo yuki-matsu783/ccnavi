@@ -201,12 +201,30 @@ test("CX-T222 書く操作の最中は、重ねて押しても走らない。書
   // 操作の後の読み直しは、言ったことを消さない
   assert.deepEqual(h.c.snapshot().result, { kind: "written", className: "notice ok", text: "承認を書いた（0123456）。書いた後の中身も確かめた" });
   assert.deepEqual(h.log.set, []);
-  // 書く途中で投げたら「書けなかった」と言う（見た目は前のまま）
+  // 書く途中で投げたら「書けなかった」と失敗の見た目で言う
   const thrower = harness({ ops: { approveFamily: async () => Promise.reject(new Error("壊れた")) } });
   await thrower.c.refresh();
   thrower.c.actions.approve(thrower.c.snapshot().boards.get(KEY) as RepoBoard, family());
   await until(() => thrower.c.snapshot().result.kind === "failed" && thrower.c.snapshot().state === "done", "書けなかった");
-  assert.deepEqual(thrower.c.snapshot().result, { kind: "failed", className: "", text: "書けなかった: 壊れた" });
+  assert.deepEqual(thrower.c.snapshot().result, { kind: "failed", className: "notice error", text: "書けなかった: 壊れた" });
+});
+
+test("CX-T225 書く途中で投げたら、直前が成功（緑）でも失敗の見た目（赤）で言う。その後に書ければ緑に戻る", async () => {
+  const plan: (() => Promise<Outcome>)[] = [async () => WRITTEN, async () => Promise.reject(new Error("壊れた")), async () => WRITTEN];
+  const h = harness({ ops: { approveFamily: () => (plan.shift() as () => Promise<Outcome>)() } });
+  await h.c.refresh();
+  const b = h.c.snapshot().boards.get(KEY) as RepoBoard;
+  const press = async (kind: string, what: string) => {
+    h.c.actions.approve(b, family());
+    await until(() => h.c.snapshot().result.kind === kind && h.c.snapshot().state === "done" && !h.c.snapshot().busy, what);
+  };
+  await press("written", "書いた");
+  assert.equal(h.c.snapshot().result.className, "notice ok");
+  await press("failed", "書けなかった");
+  assert.deepEqual(h.c.snapshot().result, { kind: "failed", className: "notice error", text: "書けなかった: 壊れた" });
+  await press("written", "書き直した");
+  assert.deepEqual(h.c.snapshot().result, { kind: "written", className: "notice ok", text: "承認を書いた（0123456）。書いた後の中身も確かめた" });
+  assert.equal(plan.length, 0);
 });
 
 test("CX-T223 要確認: 書いて要確認になったら残し、押す前にも見て書かない。外すのは確認を挟み、断れば残る", async () => {
