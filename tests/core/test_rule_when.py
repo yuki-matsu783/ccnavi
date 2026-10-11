@@ -488,6 +488,15 @@ class LintTest(unittest.TestCase):
         found = self.warns(self.lint([{"id": "x", "match": "Bash", "regex": "x", "message": "m"}]))
         self.assertFalse(any("本体の" in d for d in found), found)
 
+    def test_記号だけに当たる本体は何にでも当たると言わない(self):
+        # 英字を含む文字列には当たらないので、何にでも当たるわけではない
+        for written in ({"regex": "[^\\w./ -]"}, {"regex": "\\W"}, {"glob": "*[!a-z]*"}):
+            rule = {"id": "sym", "match": "Bash", "message": "m", **written}
+            found = self.warns(self.lint([rule]))
+            self.assertFalse(
+                any(d.startswith("sym ") and "本体の" in d for d in found), (written, found)
+            )
+
     def test_except_を持つ_deny_には丸ごと止めると言わない(self):
         found = self.warns(
             self.lint(
