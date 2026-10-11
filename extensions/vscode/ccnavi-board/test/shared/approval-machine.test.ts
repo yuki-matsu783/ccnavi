@@ -49,6 +49,7 @@ function previewOf(tickets: readonly string[], digest = "d1"): ApprovePreview {
     digest,
     rejected: [],
     problems: [],
+    plans: [],
   };
 }
 

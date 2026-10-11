@@ -54,8 +54,8 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     assert.ok(body.startsWith("チケットの承認リクエスト"));
     assert.ok(body.includes("編集対象としているが"));
     assert.ok(body.includes("超えている"));
-    // 対象にしないのは形の正しくない子（計画に無い番号）。
-    assert.deepEqual(texts(page, ".approval h3"), ["承認の対象にしない提案"]);
+    // 対象にしないのは形の正しくない子（計画に無い番号）。計画の図の見出し（`.plan-graph h3`）は数えない
+    assert.deepEqual(texts(page, ".approval > h3"), ["承認の対象にしない提案"]);
     assert.ok(text(page, ".approval-rejected").includes("i0001-05-05"));
     assert.ok(text(page, ".approval-rejected").includes("計画に無い"));
     assert.equal(page.all(".approval-problems").length, 0);
