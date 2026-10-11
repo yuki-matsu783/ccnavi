@@ -138,10 +138,9 @@ def problems(
         found.append(rules.Problem(rules.SEVERITY_ERROR, parent.ticket, text))
 
     parts = [p for p in _parts(parent) if not part or p[0] == part]
+    found.extend(after_problems(parent, part))
     for key, _first, items in parts:
         for i, item in enumerate(items):
-            for value, why in item.after_errors:
-                error(f"`{key}[{i}]` の `after` の {value!r} は読めない（{why}）")
             if item.after_repeated:
                 found.append(
                     rules.Problem(
@@ -186,6 +185,27 @@ def problems(
                 and target_item.review != ticket_model.PLAN_REVIEW_MR
             ):
                 error(f"`{key}[{i}]` を延期した先の `{target_item.type}` にレビューが無い")
+    return found
+
+
+def after_problems(parent: ticket_model.Ticket, part: str = "") -> list[rules.Problem]:
+    """項の `after` の形の誤り（`after_errors`）。`part` を渡せばその計画だけ。
+
+    `--plan-order` は振り直した項を組み直すので、振り直す前の項の誤りをここで拾って足す。
+    """
+    found: list[rules.Problem] = []
+    for key, _first, items in _parts(parent):
+        if part and key != part:
+            continue
+        for i, item in enumerate(items):
+            for value, why in item.after_errors:
+                found.append(
+                    rules.Problem(
+                        rules.SEVERITY_ERROR,
+                        parent.ticket,
+                        f"`{key}[{i}]` の `after` の {value!r} は読めない（{why}）",
+                    )
+                )
     return found
 
 

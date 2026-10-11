@@ -110,8 +110,8 @@ def parse_order(text: str, parent: ticket_model.Ticket) -> tuple[Order | None, s
     """
     try:
         data = json.loads(text)
-    except ValueError as exc:
-        return None, f"JSON として読めない（{exc}）"
+    except (ValueError, RecursionError) as exc:
+        return None, f"JSON として読めない（{type(exc).__name__}）"
     if not isinstance(data, dict):
         return None, '`{"plan": {...}, "feedback": {...}}` の形で渡す'
     ranges = {key: range(first, first + len(items)) for key, first, items in _parts(parent)}
@@ -126,7 +126,9 @@ def parse_order(text: str, parent: ticket_model.Ticket) -> tuple[Order | None, s
         numbers = ranges[key]
         part: dict[int, list[int]] = {}
         for name, preds in value.items():
-            if not (isinstance(name, str) and name.isdigit() and int(name) in numbers):
+            if not (
+                isinstance(name, str) and re.fullmatch(r"[0-9]+", name) and int(name) in numbers
+            ):
                 return None, (
                     f"`{key}` の番号 {name!r} は計画に無い"
                     f"（{numbers.start}〜{numbers.stop - 1} 番）"
@@ -161,10 +163,12 @@ def renumber(parent: ticket_model.Ticket, order: Order | None, fixed: set[int]) 
     for key, first, items in _parts(parent):
         numbers = list(range(first, first + len(items)))
         given = order.get(key)
-        preds = {
-            n: (given.get(n, []) if given is not None else sorted(set(items[n - first].after)))
-            for n in numbers
-        }
+        if given is None:
+            # 渡さない計画は提案のまま（`after` の形の誤りも持ったまま）。
+            moved.update({n: n for n in numbers})
+            built[key] = [dataclasses.replace(i) for i in items]
+            continue
+        preds = {n: given.get(n, []) for n in numbers}
         held = [n for n in numbers if n in fixed]
         locked = [n for n in held if set(preds[n]) != set(items[n - first].after)]
         for n in locked:
@@ -361,6 +365,8 @@ class Answer:
     changes: list[ChildChange] = field(default_factory=list)
     # 付け替えられない理由（付け替え先の衝突、承認済みの側の参照）。
     child_problems: list[str] = field(default_factory=list)
+    # `--order` で線を引き直した計画（`plan` / `feedback`）。
+    redrawn: tuple[str, ...] = ()
 
     @property
     def writable(self) -> bool:
@@ -548,12 +554,19 @@ def answer(source: Source, order: Order | None) -> Answer:
     revised.workflow = workflow.compute(revised)
     types = phasetypes.types_of(parent)
     revised.phase_types = types
+    # 振り直した計画の項は組み直すので、提案に元からある `after` の形の誤りが消える。振り直す前の
+    # 項の誤りも検査に入れる（読めない `after` を書いた提案を、線を引き直しただけで通さない）。
+    redrawn = tuple(k for k in PARTS if k in (order or {})) if not got.refused else ()
     problems = [p for p in workflow.problems(revised, types) if p.severity == rules.SEVERITY_ERROR]
+    for key in redrawn:
+        problems += workflow.after_problems(parent, key)
     lock: list[rules.Problem] = []
     if source.current is not None and not got.refused:
         lock = agree_candidates.lock_problems(revised, source.current, source.fixed, got.moved)
     changes = _changes(source, got.moved) if not got.refused else []
-    return Answer(source, got, revised, problems, lock, changes, _child_problems(source, changes))
+    return Answer(
+        source, got, revised, problems, lock, changes, _child_problems(source, changes), redrawn
+    )
 
 
 def plans(ans: Answer) -> list[dict]:
@@ -611,6 +624,7 @@ def plans(ans: Answer) -> list[dict]:
                 "problems": [
                     str(p)
                     for p in workflow.problems(revised, types, key)
+                    + (workflow.after_problems(parent, key) if key in ans.redrawn else [])
                     if p.severity == rules.SEVERITY_ERROR
                 ],
             }
