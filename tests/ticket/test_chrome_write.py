@@ -148,6 +148,12 @@ class WriteGuardTest(ChromeWriteHarness):
         body = self.answer(self.chrome_request("plan", "i0001", shown=shown))
         self.assertIsNotNone(body["mismatch"])
         self.assertIsNone(body["changes"])
+        self.assertEqual(body["code"], "CORE_APPROVE_DIGEST_CHANGED")
+        # 見せた識別子が今の一覧と違えば、中身より先にそちらの種別
+        shown = {"ids": ["i0001", "i0002"], "digest": first["digest"]}
+        body = self.answer(self.chrome_request("plan", "i0001", shown=shown))
+        self.assertIsNone(body["changes"])
+        self.assertEqual(body["code"], "CORE_APPROVE_LIST_CHANGED")
         # 見せた後に提案が変われば、同じダイジェストでも書かない
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.commit_parent()
@@ -155,6 +161,16 @@ class WriteGuardTest(ChromeWriteHarness):
         body = self.answer(self.chrome_request("plan", "i0001", shown=shown))
         self.assertIsNotNone(body["mismatch"])
         self.assertIsNone(body["changes"])
+        self.assertEqual(body["code"], "CORE_APPROVE_DIGEST_CHANGED")
+
+    def test_nothing_to_approve_carries_its_reason_code(self):
+        self.propose("i0001", parent_text("i0001", ["research"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        body = self.answer(self.chrome_request("plan", "i0001"))
+        self.assertIsNone(body["changes"])
+        self.assertIsNone(body["mismatch"])
+        self.assertEqual(body["code"], "CORE_APPROVE_NOTHING")
 
     def test_writes_only_to_the_parent_branch(self):
         chrome = load_chrome()
@@ -182,6 +198,7 @@ class WrittenCopyTest(ChromeWriteHarness):
         self.commit_parent()
         body = self.plan()
         self.assertIsNone(body["mismatch"])
+        self.assertIsNone(body["code"])
         self.assertEqual(sorted(body["changes"]), ["i0001"])
         events = next(
             r for r in body["changes"]["i0001"] if r["path"].endswith("events/i0001.ndjson")
@@ -311,6 +328,10 @@ class WithdrawableTest(ChromeWriteHarness):
         board = self.answer(self.chrome_request("board", "i0001"))
         problems = board["withdrawable"][0]["problems"]
         self.assertTrue(any("着手済み" in p for p in problems), problems)
+        # 押した後の答え（withdraw の problems）と同じ表記でコードが載る
+        self.assertTrue(
+            any(p.startswith("[CORE_WITHDRAW_STARTED] 着手済み") for p in problems), problems
+        )
 
 
 class ProjectTest(ChromeWriteHarness):

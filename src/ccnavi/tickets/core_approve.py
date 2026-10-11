@@ -35,6 +35,25 @@ CODE_APPROVE_NOTHING = "CORE_APPROVE_NOTHING"
 # 書く途中で止まった（置いたものは残る）。
 CODE_APPROVE_STOPPED = "CORE_APPROVE_STOPPED"
 
+
+def refusal_code(verdict: core_base.Verdict) -> str:
+    """見せたものを比べた判定（`judge_approval`）で承認が通らない根拠の種別。通るなら空。
+
+    手元の `--agree --yes`（`approve_yes`）と Chrome の `plan` が同じ答えを出すよう、
+    1 か所で決める。
+    見せたものと違えば、識別子の違い（`CORE_APPROVE_LIST_CHANGED`）を中身の違いより先に見る。
+    違わなくても、承認する対象が無いか、絞りが通らなければ `CORE_APPROVE_NOTHING`。
+    """
+    mismatch = verdict.mismatch
+    if mismatch is not None:
+        if mismatch["expected"] != mismatch["current"]:
+            return CODE_APPROVE_LIST_CHANGED
+        return CODE_APPROVE_DIGEST_CHANGED
+    if not verdict.batch or verdict.gathered.refused:
+        return CODE_APPROVE_NOTHING
+    return ""
+
+
 # ---- 手元の入口（`--agree`。端末・ボードの `--yes`・`--preview`・`--verify`） ------------------
 #
 # 前は approval.py にあった。コアを通す入口なので、コアより下の段（agree）には置かない
@@ -253,7 +272,7 @@ def approve_yes(
         if as_json:
             body = {"version": agree.AGREE_VERSION, "mismatch": verdict.mismatch}
             stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
-        if wanted != current:
+        if refusal_code(verdict) == CODE_APPROVE_LIST_CHANGED:
             stderr.write(
                 core_base.tagged(
                     CODE_APPROVE_LIST_CHANGED,

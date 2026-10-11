@@ -1028,6 +1028,7 @@ class CoreChromeTest(CoreHarness):
         )
         answer = self.ask_chrome(request)
         self.assertEqual(answer["problems"], [])
+        self.assertIsNone(answer["code"])
         before = self.disk()
         checked = core.withdraw(self.snapshot(), ["i0001"], {"i0001": text.encode()}, "押し間違い")
         self.assertEqual(checked.problems, [])
@@ -1091,11 +1092,15 @@ class CoreChromeTest(CoreHarness):
         self.assertEqual(local.returncode, 1)
         self.assertEqual(refused["problems"], local.stderr.splitlines())
         self.assertIsNone(refused["changes"])
+        # 分岐の材料は文面ではなく鍵（文面の頭にも同じコードが載る）
+        self.assertEqual(refused["code"], "CORE_CONFIRM_REVIEW_OPEN")
+        self.assertTrue(refused["problems"][0].startswith("ccnavi: [CORE_CONFIRM_REVIEW_OPEN] "))
         write(fixture, json.dumps(result))
 
         request = self.confirm_request(result, compare)
         answer = self.ask_chrome(request)
         self.assertEqual(answer["problems"], [])
+        self.assertIsNone(answer["code"])
         before = self.disk()
         local = self.confirm(fixture, 1)
         self.assertEqual(local.returncode, 0, local.stdout + local.stderr)
@@ -1391,9 +1396,23 @@ class WithdrawTest(CoreHarness):
         nothing = core.withdraw(self.snapshot(), [], {})
         self.assertEqual(nothing.code, "CORE_WITHDRAW_NO_IDS")
         self.assertEqual(nothing.problems, ["[CORE_WITHDRAW_NO_IDS] 取り下げる識別子が無い"])
-        # 一覧（Chrome のボード）は今までどおり文面だけを返す
+        # 一覧（Chrome のボード）の理由にも、押した後の答えと同じ表記でコードが載る
+        todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+        write(todo, text)
         listed = core.withdrawable(self.snapshot(), "i0001")
-        self.assertFalse(any(p.startswith("[") for _, _, ps in listed for p in ps), listed)
+        self.assertEqual(
+            [(i, p) for i, _, p in listed],
+            [
+                (
+                    "i0001",
+                    [
+                        "[CORE_WITHDRAW_TODO_EXISTS] todo/ に同じ識別子の提案がある"
+                        "（戻す先に同じ識別子がすでにある）"
+                    ],
+                )
+            ],
+        )
+        os.remove(todo)
         # 通った答えはコードを持たない
         write(os.path.join(self.approved, "doing", "i0001.md"), text)
         self.assertEqual(

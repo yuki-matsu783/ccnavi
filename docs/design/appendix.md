@@ -41,7 +41,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `CORE_CONFIRM_MOVED` / `CORE_CONFIRM_RESULT_MISMATCH` / `CORE_CONFIRM_REVIEW_OPEN` | レビュー済みが通らなかった。依頼の後にユーザが見るものが動いた / 取得した結果が依頼したマージリクエストと照合できない / 変更要求のレビューか未解決のスレッドが残っている |
 | `CORE_WITHDRAW_NO_IDS` / `CORE_WITHDRAW_NOT_OPEN` / `CORE_WITHDRAW_OTHER_BRANCH` / `CORE_WITHDRAW_BLOCKED` / `CORE_WITHDRAW_FOLLOWUP` / `CORE_WITHDRAW_STARTED` | 承認の取り下げが通らなかった。識別子が無い / 作業中（`doing/`）に無い / 親のブランチの `doing/` に無い / 承認済みチケット自体が信頼できない / 続きの子で戻す提案が無い / 着手済み |
 | `CORE_WITHDRAW_HAS_CHILDREN` / `CORE_WITHDRAW_MARKERS` / `CORE_WITHDRAW_TODO_EXISTS` / `CORE_WITHDRAW_NO_PRIOR` / `CORE_WITHDRAW_CHANGED` | 承認の取り下げが通らなかった。子の承認済みチケットか子の提案がある / フェーズのマーカーがある（読めないときも） / 戻す先に同じ識別子の提案がある / 承認コミットの親に提案が無い / 承認のあとに中身が変わった |
-| `CORE_APPROVE_NO_DIGEST` / `CORE_APPROVE_LIST_CHANGED` / `CORE_APPROVE_DIGEST_CHANGED` / `CORE_APPROVE_NOTHING` / `CORE_APPROVE_STOPPED` | ボードの承認（`ccnavi --agree --yes`）が通らなかった。`--digest` が無い / 見せた一覧（識別子）と今の一覧が違う / 識別子は同じで見せた中身が今と違う / 承認するものが無い / 書く途中で止まった（置いたものは残る）。確認・取り下げと同じく、標準エラーの文の頭に `[<コード>]` で載せる |
+| `CORE_APPROVE_NO_DIGEST` / `CORE_APPROVE_LIST_CHANGED` / `CORE_APPROVE_DIGEST_CHANGED` / `CORE_APPROVE_NOTHING` / `CORE_APPROVE_STOPPED` | ボードの承認（`ccnavi --agree --yes`）が通らなかった。`--digest` が無い / 見せた一覧（識別子）と今の一覧が違う / 識別子は同じで見せた中身が今と違う / 承認するものが無い / 書く途中で止まった（置いたものは残る）。確認・取り下げと同じく、標準エラーの文の頭に `[<コード>]` で載せる。Chrome 拡張の承認（入口の `plan`）も、見せたものと違う・承認するものが無いときに同じコードを答えの `code` で返す（`core_approve.refusal_code` で 1 か所で決める） |
 | `CORE_HISTORY_UNWRITABLE` | レビュー済みか取り下げで、書く前に履歴を残せないと分かったので書かなかった |
 | `NOTICE_DOC_FRONTMATTER` | `PostToolUse`。Write で新しく作った md に frontmatter か `type` が無い。止めずに `additionalContext` で 1 度だけ書き方を案内する。索引に載らない md（git が無視するもの・ccnavi ディレクトリの下）と、決まりの文書が付けないとする md（`README.md`・`CLAUDE.md` と、`docs/claude/frontmatter.md` の対象外の表の置き場。チケットの置き場・チケットの下書き `wip/design/scripts/i*.md`・`wip/scratchpad/`・`.claude/skills/yomiyasu/**`）には出さない |
 
@@ -56,6 +56,11 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 ユーザの操作（レビュー済み・承認の取り下げ）が通らなかった答えは、`CORE_*` のコードを答えの `code` に持ち、
 文面の行にも `[<コード>]` の形で載せる（`ccnavi: ` で始まる行はその後ろ）。取り下げで理由が幾つもあるときは、
 行ごとに自分のコードを載せ、答えの `code` は最初の理由のものにする。
+Chrome 拡張の入口（`py/ccnavi_chrome.py`）が返す承認（`plan`）・取り下げ（`withdraw`）・レビュー済み（`confirm`）の
+JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`・`mismatch` と同じく、無いときは `null`）。拡張は
+分岐をこの鍵で決め、文面の言い回しを読まない。ボードの取り下げ候補（`withdrawable`）の `problems` にも、押した後の
+答えと同じ表記で `[<コード>]` を載せる。承認コミットを引けないときに拡張が足す理由も、同じ場合に `withdraw` が返す
+`[CORE_WITHDRAW_NO_PRIOR]` を頭に付ける。
 
 ルールファイルの外の決めごとで止めた回は、記録の `rules` の先頭に括弧付きの名前を置く。判定ごとに名前を分け、
 別の判定の名前を使い回さない（同じ理由の繰り返し（6.4）の鍵と文面が、止めた理由の名前になるように）。

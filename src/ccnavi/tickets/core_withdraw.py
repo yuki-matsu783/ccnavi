@@ -145,6 +145,9 @@ def withdrawable(snapshot: core_base.Snapshot, family: str) -> list[tuple[str, s
     引けなければ `withdraw` がその理由で止める）。一覧は承認コミットを引く前に組むので、
     中身の一致（`_content_problems`）は見ない（粗く出しても、押したときに `withdraw` が
     新しい Snapshot で全部を見直して止める。判定は緩めない）。
+
+    理由の文面には、押したときの答え（`withdraw` の `problems`）と同じく頭に `[<コード>]` を載せる。
+    一覧と押した後とで、同じ理由が同じ表記で見えるようにするため。
     """
     conf, root = snapshot.conf, snapshot.root
     raw = approval.read_raw(conf, root)
@@ -157,30 +160,12 @@ def withdrawable(snapshot: core_base.Snapshot, family: str) -> list[tuple[str, s
     for copy in sorted(approved, key=lambda t: t.ticket):
         if (copy.parent or copy.ticket) != family or copy.tree != family:
             continue
-        problems = _withdraw_problems(
+        reasons = _withdraw_reasons(
             conf, root, copy.ticket, copy, everything, proposals, {copy.ticket: b""}
         )
+        problems = [core_base.tagged(code, text) for code, text in reasons]
         out.append((copy.ticket, copy.title, problems))
     return out
-
-
-def _withdraw_problems(
-    conf: settings.Settings,
-    root: str,
-    ident: str,
-    copy: ticket_model.Ticket | None,
-    everything: list[ticket_model.Ticket],
-    proposals: list[ticket_model.Ticket],
-    prior_proposals: dict[str, bytes],
-    compare: bool = False,
-) -> list[str]:
-    """取り下げられない理由（文面）。`compare` なら中身の一致も見る（書く側）。"""
-    return [
-        text
-        for _, text in _withdraw_reasons(
-            conf, root, ident, copy, everything, proposals, prior_proposals, compare
-        )
-    ]
 
 
 def _withdraw_reasons(
