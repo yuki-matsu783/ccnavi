@@ -2083,6 +2083,7 @@ ccnavi --test Bash "cd /repo && git push"
 verdict: deny (DENY_COMMAND_PATTERN)
 tool: Bash
 subject: cd /repo && git push
+payload: cwd=/repo  permission_mode=(無し)  agent_id=(無し)
 rules:
   deny:git-push  glob '*git push*'
     -> (?s:(?>.*?git\ push).*)\Z
@@ -2091,9 +2092,25 @@ response:
   ...
 ```
 
-出るのは、判定と根拠コード、当たったルールとタイプ、`glob` を翻訳した正規表現、返る文面。パスなら行き着く先、実行役のコマンドの中で
+出るのは、判定と根拠コード、判定に渡した payload、当たったルールとタイプ、`glob` を翻訳した正規表現、返る文面。パスなら行き着く先、実行役のコマンドの中で
 当たったなら `unwrapped:` の行も出る。判定は実運用と同じ関数を通り（REQ-DIA-03）、モードは常に `enable`。
-`permission_mode` は来ないので、ルールが言及していない呼び出しは `ask` として出る（権限モードごとの扱いを見たいなら payload を直接流す）。
+当たったルールは判定が当てたものそのもので、ルールファイルの外から来た根拠（組み込みの保護、チケットの状態の保護、
+読めずに退避した組み込みの既定）は「ルールファイルの外にある根拠」と出る。組み込みの式は長いので、頭だけを出して全体の字数を添える。
+
+hook は Claude Code から呼び出しの場所・権限モード・サブエージェントの印を受け取り、判定がそれで変わる。試験の既定はワークスペースルートで打った、
+権限モードの無い、メインの呼び出し（ルールが言及していない呼び出しは `ask` と出る）。変えて試すときは次の 3 つを渡す。
+
+```sh
+ccnavi --test Bash "git push" --cwd .claude/worktrees/feat-x --permission-mode dontAsk --agent-id a1
+```
+
+| フラグ | payload の欄 | 変わるもの |
+|---|---|---|
+| `--cwd <ディレクトリ>` | `cwd` | Bash の行き先のツリー、`cd` の読み、レビュー待ちの止め、子からの push の止め。起動した場所からの相対でよい。無いディレクトリは断る。Windows ではネイティブの表記（`C:\...`）で書く |
+| `--permission-mode <モード>` | `permission_mode` | ルールが言及していない呼び出しの結末（「ルールが言及していない呼び出し」）。`auto` / `default` / `acceptEdits` / `plan` / `dontAsk` / `bypassPermissions` のどれか。ほかの名前は断る（hook は知らない名前を `ask` にするが、試験で打ち間違いを黙って `ask` にすると、そのモードの答えに読める） |
+| `--agent-id <id>` | `agent_id` | サブエージェントに許さない操作の止め（`DENY_SUBAGENT_TICKET_OP`） |
+
+`--permission-mode` と `--agent-id` は `--test` でだけ使える。ほかの経路に渡すと終了コード 1 で断る。
 
 いま適用されている宣言を数え上げるには `--explain`。レイヤーごとのルール、フェーズ定義とリスクの配点の表、承認されたチケットの作業範囲が出る。判定は行わない（REQ-DIA-01）。
 
@@ -2113,6 +2130,8 @@ response:
 ```
 
 （件数と中身は例。）順序は判定と同じ 共通レイヤー → 自身のレイヤー → プロジェクト（名前順）で、重複として捨てた定義は出ない。
+「どのルールも言及しない呼び出し」の節は、権限モードごとに、読めた呼び出しと読み切れない呼び出し（`degraded`）の結末を 1 行ずつ出す。
+判定と同じ関数で組み、`CCNAVI_GUARD_UNWATCHED` も hook と同じ読み方で解いた値を使う。
 読めないレイヤーは「読めない: <理由>。このレイヤーは空として扱う」、置いていないレイヤーは「このレイヤーは置いていない（無い = 空）」と出る。
 `levels` の行は共通レイヤーの値。レイヤーで `levels` を書くとキーごとに小さいほうが採られるので、チケットに適用される値はその `project:` のレイヤーで変わる。
 
@@ -2171,7 +2190,7 @@ ccnavi --test-expectations .ccnavi/common/rule-expectations.yml --json
 ```
 
 `--test` と `--test-expectations` の結果を JSON で出す。読み手は VS Code 拡張のルール管理画面。判定は文字で出すときと同じ関数を通る
-（REQ-DIA-03）。`--json` のときは終了コードが常に 0 で、食い違いの数は `mismatches` で読む。
+（REQ-DIA-03）。`--json` のときは終了コードが常に 0 で、食い違いの数は `mismatches` で読む（`--test` の payload の欄の誤りだけは、JSON を出さずに 1）。
 実例は `extensions/vscode/ccnavi-board/test/fixtures/test.json` と `expectations.json`。`tests/core/test_test_json.py` が同じ例で形を確かめる
 （形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてそのテストを走らせ、例を書き直す）。
 
@@ -2184,12 +2203,13 @@ ccnavi --test-expectations .ccnavi/common/rule-expectations.yml --json
 | `known` | 判定が対象を取り出せるツールか。偽なら以下は空のまま（ルールを書いても当たらない） |
 | `tool` / `subject` | 試した入力そのまま |
 | `resolved` | パスを行き着く先まで解いた結果。入力と同じなら空 |
-| `verdict` / `code` | 判定（`deny` / `ask` / `allow` / `skip`）と根拠コード |
+| `verdict` / `code` | 判定（`deny` / `ask` / `allow` / `skip`。`--permission-mode` を渡したときは権限モードへ渡した `handover` も）と根拠コード |
 | `reason` / `degraded` / `fallback` | `skip` の理由、生の文字列に当てたかどうか、組み込みの既定で判定したかどうか。無ければ空 |
 | `unwrapped` | 実行役のコマンドが中で実行するコマンド、または `cd` で移った先から見たパスでルールに当たったときの、そのコマンド。複数なら `\x00` でつなぐ。元の形で当たったとき・当たらなかったときは空 |
-| `rules[]` | 当たったルール。`{id, source, section, kind, written, pattern}`。`source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように外から来た根拠）。`kind` は `glob`・`regex`・`when` のどれか、`written` は書いたまま（`when` は組み合わせ条件を 1 行にした形で、`when: ` は付けない）、`pattern` は翻訳後の正規表現（`when` はふつう空）。`when` のルールだけ、書いた組み合わせ条件そのものを `when` に持つ |
+| `rules[]` | 当たったルール。`{id, source, section, kind, written, pattern}`。`source` は `file`（ルールファイルから読んだルール）か `outside`（チケットの範囲・組み込みの保護・退避した組み込みの既定のように、ルールファイルの外から来た根拠）。`outside` でもルールそのものがあれば `section` と `kind` を持ち、`written` と `pattern` は頭の 160 字に `…（全 N 字）` を添えた形に切る（組み込みの式は 2 万字を超えるものがある）。ルールの無い根拠（`(ticket-scope)` など）は `section` 以下が空。値はこの 2 つだけで、増やすときは `version` を上げる。`kind` は `glob`・`regex`・`when` のどれか、`written` は書いたまま（`when` は組み合わせ条件を 1 行にした形で、`when: ` は付けない）、`pattern` は翻訳後の正規表現（`when` はふつう空）。`when` のルールだけ、書いた組み合わせ条件そのものを `when` に持つ |
 | `response` | エージェントに返る文面そのもの。無ければ空 |
 | `quoted` | 当たったルールのうち、引用の中から切り出したコマンドにだけ当たったものの id。そういうルールがあるときだけ出る |
+| `payload` | 判定に渡した payload の欄 `{cwd, permission_mode, agent_id}`。`--cwd` / `--permission-mode` / `--agent-id` のどれかを渡したときだけ出る（渡さなければ `cwd` は `root`、ほかは空） |
 
 `--test-expectations --json` の最上位。
 
