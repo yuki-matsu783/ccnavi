@@ -121,6 +121,10 @@ class ErrorTest(unittest.TestCase):
         self.check({"glob": "*"}, "glob と when の両方", glob="*")
         self.check({"glob": "*"}, "regex と when の両方", regex="x")
         self.check({"glob": "*"}, "glob と regex と when", glob="*", regex="x")
+        # 併記はキーの有無で見る。空や偽の値を添えても、どちらで判定するのか決まらない
+        self.check({"glob": "*"}, "glob と when の両方", glob="")
+        self.check({"glob": "*"}, "glob と when の両方", glob=0)
+        self.check({"glob": "*"}, "regex と when の両方", regex=None)
         rule, problems = build({"id": "x", "match": "Write", "message": "m"})
         self.assertIsNone(rule)
         self.assertIn("glob も regex も when も無い", errors(problems)[0])

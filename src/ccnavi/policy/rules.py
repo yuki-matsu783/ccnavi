@@ -799,12 +799,16 @@ def _build(
         ]
     if not rule.match:
         return None, [Problem(SEVERITY_ERROR, name, "match が無い。どのツールにもヒットしない")]
+    # `when` と並べたかどうかはキーの有無で見る。値の真偽で見ると `glob: ''` や `glob: 0` を
+    # 添えた木が通り、書いた人の意図（どちらで判定するのか）が決まらないまま読み込まれる。
+    # 拡張の画面（rules-doc.ts の readRules）もキーの有無で見ている。
+    has_when = WHEN_KEY in raw
     bodies = [
         key
         for key, present in (
-            ("glob", bool(rule.glob)),
-            ("regex", bool(rule.regex)),
-            (WHEN_KEY, WHEN_KEY in raw),
+            ("glob", "glob" in raw if has_when else bool(rule.glob)),
+            ("regex", "regex" in raw if has_when else bool(rule.regex)),
+            (WHEN_KEY, has_when),
         )
         if present
     ]
