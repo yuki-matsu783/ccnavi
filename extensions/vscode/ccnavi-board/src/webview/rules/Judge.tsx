@@ -1,8 +1,8 @@
 /**
- * 「判定を試す」の結果。1 件の判定（`judged`）と、サンプルの一括判定（`sampled`）、記録から起こした
+ * 「判定を試す」の結果。1 件の判定（`judged`）と、期待する判定の一括確認（`expectationsChecked`）、記録から起こした
  * ルールの候補（`suggested`）。
  *
- * ここは判定しない。 出すのは実行ファイル（`--test --json` / `--test-samples --json` /
+ * ここは判定しない。 出すのは実行ファイル（`--test --json` / `--test-expectations --json` /
  * `--suggest --json`）が返した形をそのまま読んだものだけで、当たる・当たらないの理屈は持たない。
  * 候補もルールに足さない。下書きを見せるだけで、置くのはユーザ。
  */
@@ -11,7 +11,7 @@ import { Fragment, type JSX } from "react";
 import type { HookEntry } from "../../core/hooks.js";
 import { SECTIONS } from "../../core/rules-view.js";
 import type { SuggestJson } from "../../core/suggestmodel.js";
-import type { RuleHitJson, SamplesJson, TestJson } from "../../core/testmodel.js";
+import type { ExpectationsJson, RuleHitJson, TestJson } from "../../core/testmodel.js";
 
 /** 判定のバッジ。空（判定の対象外）は薄い地の色で出す */
 function Verdict({ verdict }: { readonly verdict: string }): JSX.Element {
@@ -138,9 +138,9 @@ export function JudgeResult({ judged }: { readonly judged: Judged }): JSX.Elemen
   );
 }
 
-export function SamplesResult({ result }: { readonly result: SamplesJson }): JSX.Element {
+export function ExpectationsResult({ result }: { readonly result: ExpectationsJson }): JSX.Element {
   return (
-    <div id="samples-result" className="result">
+    <div id="expectations-result" className="result">
       <div className="counts">
         {SECTIONS.map((section) => {
           const count = result.counts[section] ?? { ok: 0, total: 0 };
@@ -166,25 +166,25 @@ export function SamplesResult({ result }: { readonly result: SamplesJson }): JSX
             </tr>
           </thead>
           <tbody>
-            {result.samples.map((sample, index) => (
-              <tr key={index} className={sample.ok ? (sample.skipped ? "skipped" : "") : "ng"}>
+            {result.expectations.map((expectation, index) => (
+              <tr key={index} className={expectation.ok ? (expectation.skipped ? "skipped" : "") : "ng"}>
                 <td>
-                  <span className={`verdict ${sample.expected}`}>{sample.expected}</span>
+                  <span className={`verdict ${expectation.expected}`}>{expectation.expected}</span>
                 </td>
                 <td>
-                  <Verdict verdict={sample.known ? sample.verdict : ""} />
+                  <Verdict verdict={expectation.known ? expectation.verdict : ""} />
                 </td>
-                <td>{sample.tool}</td>
+                <td>{expectation.tool}</td>
                 <td className="cmd">
-                  <code>{sample.subject}</code>
+                  <code>{expectation.subject}</code>
                 </td>
                 <td>
-                  {sample.rules
+                  {expectation.rules
                     .filter((rule) => rule.source === "file")
                     .map((rule) => `${rule.section}:${rule.id}`)
                     .join(", ")}
                 </td>
-                <td className="why">{sample.why}</td>
+                <td className="why">{expectation.why}</td>
               </tr>
             ))}
           </tbody>

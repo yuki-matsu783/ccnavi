@@ -27,7 +27,7 @@ test("CB-T266 --suggest --json のフィクスチャ（実行ファイルの出�
     ],
   );
   assert.match(s.candidates[0].yaml, /^# /);
-  assert.equal(s.candidates[1].samples[0].subject, "git push origin main");
+  assert.equal(s.candidates[1].expectations[0].subject, "git push origin main");
 });
 
 test("CB-T267 版が違う・JSON でないときは理由を返し、allow の候補は並べない", () => {

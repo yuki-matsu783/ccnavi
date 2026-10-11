@@ -14,7 +14,7 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, e2e, d
 
 | グループ | 主題 | 時間 |
 |---|---|---|
-| `core` | 部品の単体と、速い受入テスト（shellread・glob・lint・`build.py` の形・sh の書き方、リポジトリの見本 `rule-samples.yml` といまのルールの突き合わせなど） | 約 6 秒 |
+| `core` | 部品の単体と、速い受入テスト（shellread・glob・lint・`build.py` の形・sh の書き方、リポジトリの期待する判定 `rule-expectations.yml` といまのルールの突き合わせなど） | 約 6 秒 |
 | `guard` | 判定とルール（受入テスト、自己防衛、運用のルール、縮退、実行後チェック、プロジェクト） | 約 60 秒 |
 | `config` | 設定のレイヤーの合成（rules / phases / risk） | 約 33 秒 |
 | `ticket` | チケット・フェーズ・承認・ボード・リスク | 約 140 秒 |
@@ -56,7 +56,7 @@ uv run python -m tests --plan          # 何をどの順で回すか出すだけ
 | `.claude/hooks/test-py.sh` | `e2e` |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
 | `tests/fixtures/` | `guard` `ticket` |
-| `extensions/vscode/` | `ticket`（`core` の `test_test_json` も例を読む） |
+| `extensions/vscode/` | `ticket`（`core` の `test_test_json` と `guard` の `test_suggest` も `test/fixtures/` を読む） |
 | `docs/adr/`（枚を足す・番号を動かす） | `core`（`test_adr_numbers`） |
 | そのほかのドキュメントだけ（`*.md`・`docs/`） | 回さない |
 
@@ -72,6 +72,10 @@ uv run python -m tests --plan          # 何をどの順で回すか出すだけ
   `pyproject.toml`・`uv.lock` を変えた（ほぼ全グループが読む）
 - 統合先に取り込む前、MR に出す前
 - どの行に当たるか迷った
+
+`src/` の `--json` 出力のキーや CLI の旗を変えるときは、`core` と `guard` の両方を回す。`extensions/vscode/ccnavi-board/test/fixtures/` を
+Python のテスト（`tests/core/test_test_json.py`・`tests/guard/test_suggest.py`）も読むので、fixtures の旧キーのままだと落ちる。
+拡張を別のフェーズに分けて計画するなら、前のフェーズでこの 2 本が落ちると分かったうえで分ける（直すのは fixtures を持つフェーズ）。
 
 `src/ccnavi/**/*.py` を変えたとき `e2e` は足さない（e2e は組み立て済みの実行ファイルを試す）。組み立て直したなら足す。
 

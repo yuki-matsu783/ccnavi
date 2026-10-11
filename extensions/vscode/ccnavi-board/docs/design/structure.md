@@ -23,7 +23,7 @@ src/
   projects-panel.ts   プロジェクト管理画面の Webview パネル。clone の送信、.gitignore への追記（vscode に依存する）
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
   tour.ts             画面ごとの初回の案内を見たかどうか（拡張の globalState に画面の名前ごとに持つ）（vscode に依存する）
-  ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-samples --json / --lint（--rules / --project-rules-file / --risk / --project-risk-file / --project-phases-file の差し替え）/ --lint --json（--flow でフロー 1 本を確かめる）/ --agree --preview --json / --agree --yes … --json / --suggest --json / --plan-order <親> --json（--order）と --plan-order --write の実行（Node の子プロセス）
+  ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-expectations --json / --lint（--rules / --project-rules-file / --risk / --project-risk-file / --project-phases-file の差し替え）/ --lint --json（--flow でフロー 1 本を確かめる）/ --agree --preview --json / --agree --yes … --json / --suggest --json / --plan-order <親> --json（--order）と --plan-order --write の実行（Node の子プロセス）
   git.ts              ローカルの git を読み取り専用で起動する（origin を読む。Node の子プロセス）
   webview-asset.ts    バンドルした画面（out/webview/<名前>.js）と CSS（同 .css）を読む。渡すのは画面の名前で、拡張が <script nonce> と <style nonce> に流し込む
   core/
@@ -31,7 +31,7 @@ src/
     approvemodel.ts   承認の JSON の形（--agree --preview --json / --agree --yes … --json）と読み取り。計画を持つ親の図の中身（plans）も読む。一覧のうち未保存のタブがある親と、保存したあとに提案が変わった親を引く関数と、その文
     plan-graph.ts     計画の図の点・線・置き場所を、実行ファイルの plans の 1 件から組む（start / end の仮の点と線、loose の印、引けない線・消せる線、振り直す前の番号で覚えた置き場所）。判定はしない。VS Code に触れないので単体で試せる
     planordermodel.ts --plan-order <親> --json の答えの形（実行ファイルとの契約）と読み取り。plans は承認の preview と同じ読み方。保存の答えをパネルが読む形（書いた・変わらない・外で変わった・書かなかった）
-    testmodel.ts      試験の JSON の形（--test --json / --test-samples --json）と読み取り
+    testmodel.ts      試験の JSON の形（--test --json / --test-expectations --json）と読み取り
     suggestmodel.ts   候補の JSON の形（--suggest --json）と読み取り。allow の候補は並べない
     lintmodel.ts      lint の JSON の形（--lint --json）と読み取り、プロジェクトごとの苦情とフローの苦情（(flow)）の抜き出し、古い実行ファイルの「知らないオプション」の見分け
     board.ts          列とカードへの組み立て、操作の有無（親の提案のカードの「ワークフロー」は提案の has_plan から）
@@ -169,7 +169,7 @@ media/
   icon.svg            アクティビティバーのアイコン
 test/
   fixtures/board.json 実行ファイルの出力の実例。Python 側の tests/ticket/test_board.py が書き出す
-  fixtures/test.json, samples.json  --test --json / --test-samples --json の実例。tests/core/test_test_json.py が書き出す
+  fixtures/test.json, expectations.json  --test --json / --test-expectations --json の実例。tests/core/test_test_json.py が書き出す
   fixtures/suggest.json             --suggest --json の実例。tests/guard/test_suggest.py が鍵の集合を突き合わせる
   fixtures/approve-preview.json, approve-yes.json, approve-mismatch.json  承認の JSON の実例。tests/ticket/test_approve_json.py が書き出す
   fixtures/plan-order.json          --plan-order <親> --json の答えの実例（開いたとき・逆向きの線・循環・終端の検査・書いたとき・改版）。tests/ticket/test_plan_order.py が書き出す
