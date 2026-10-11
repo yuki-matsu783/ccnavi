@@ -62,6 +62,31 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
 読み込み時に置き換わる。「ワークスペースの下」を絶対パスの直書きなしに書くための
 もので、Windows と WSL と Linux で表記が分かれない。glob なら `{root}/wip/*`、regex なら
 `^{root}[\\/]` のように書く。ワークスペースルートが渡らない読み方をしたルールは error で名指しする。
+
+## 除く（except）
+
+ルールは省略できるキー `except:` を持てる。値はリストで、各要素は `glob` か `regex` の
+どちらか 1 つだけを持つマッピング。本体の `glob` / `regex` に当たっても、`except` の
+どれかに当たれば、そのルールは当たらない扱いになる。`match`（ツール名）の見方は変わらない。
+
+    deny:
+      - id: workspace-root
+        match: Write|Edit|NotebookEdit
+        regex: '^{root}[\\/]'
+        except:
+          - regex: '^{root}[\\/]wip[\\/]scratchpad(?:[\\/]|$)'
+          - regex: '^{root}[\\/]\\.claude[\\/]worktrees(?:[\\/]|$)'
+        message: ...
+
+先読みを禁じているので、「A だが B は除く」を 1 本の regex で書くと 1 文字ずつの
+場合分けになる。`except` はそれを 2 本の式に分けて書くためのもの。各パターンには本体と
+同じ読み方（`{root}` の置き換え、`{!root}` の扱い、大文字小文字の無視、先読み・後方参照の
+禁止、glob の翻訳）を当てる。当てる文字列も本体と同じで、Bash ならコマンド列の全体。
+コマンドのどこかに除く語を足すだけで外れるので、Bash の `deny` / `ask` に付けるときは
+狭く書く（lint が warn で言う）。
+
+空のリスト、マッピングでない要素、`glob` と `regex` の両方がある・どちらも無い要素、
+知らないキーを持つ要素は、ルールごと読み込まずに error で名指しする。
 """
 
 from __future__ import annotations
@@ -157,6 +182,13 @@ _GENERATED_QUANTIFIER = re.compile(r"(?<!\\)[*+]|(?<!\\)\{\d")
 # `{!root}` の直後に続けてよい書き始め。生成した式が読み終える位置はパスの区切りとは
 # 限らないので、任意の位置まで進む書き方で受けていないものは warn で伝える。
 _SKIPS_ANYWHERE = re.compile(r"(?:\.[*+]|\[\\s\\S\][*+])")
+
+# ルールの本体に当たっても、ここに並べたどれかに当たれば当たらない扱いにするキー。
+# 各要素は `glob` か `regex` のどちらか 1 つだけを持つマッピング。本体と同じ形の葉に
+# しておくのは、あとで条件の組み合わせ（すべて・どれか・否定）を足すときに、葉の書き方を
+# 変えずに済ませるため。
+EXCEPT_KEY = "except"
+EXCEPT_FIELDS = ("glob", "regex")
 
 # レイヤーの名前と id の間に入る文字（`self:docs` / `lib:source`、ruleload.prefix_ids）。
 # 書かれたままの id にこれが入っていると、レイヤーをつけた形と見分けが付かない。
@@ -299,6 +331,19 @@ class Problem:
 
 
 @dataclass
+class Exclusion:
+    """ルールの `except:` の 1 件。本体と同じ読み方で組み立てた式を持つ。"""
+
+    glob: str = ""
+    regex: str = ""
+    compiled: re.Pattern | None = None
+
+    def written(self) -> dict:
+        """書いた表記に戻した形。`{"glob": ...}` か `{"regex": ...}`。"""
+        return {"glob": self.glob} if self.glob else {"regex": self.regex}
+
+
+@dataclass
 class Rule:
     """探すものと、見つけたときに言うことの組。"""
 
@@ -371,6 +416,10 @@ class Rule:
 
     compiled: re.Pattern | None = None
 
+    # excepts は `except:` の各パターン。本体（compiled）に当たっても、どれかに当たれば
+    # このルールは当たらない。当てる文字列は本体と同じ（Bash ならコマンド列の全体）。
+    excepts: list[Exclusion] = field(default_factory=list)
+
     def spoken_message(self) -> str:
         """モデルへ渡す文面。`{root}` をワークスペースルートの実パスにしたもの。
 
@@ -391,6 +440,9 @@ class Rule:
             self.bare_id,
             self.match,
             self.compiled.pattern if self.compiled else "",
+            # 除くものが違えば別の定義。比べないと、except だけが違う後ろのレイヤーの 1 本を
+            # 重複として捨て、前のレイヤーの except で通るはずのないものが通ってしまう。
+            tuple(e.compiled.pattern if e.compiled else "" for e in self.excepts),
             self.message,
             self.additional_context,
             self.additional_context_once,
@@ -409,8 +461,17 @@ class Rule:
         if self.compiled is None or not subject:
             return False
         if tool_matches(self.match, tool):
-            return self.compiled.search(subject) is not None
+            return self.hits(subject)
         return False
+
+    def hits(self, subject: str) -> bool:
+        """ツール名を見ずに、対象の文字列だけで当たるか。
+
+        本体に当たり、except のどれにも当たらないときに当たる。
+        """
+        if self.compiled is None or self.compiled.search(subject) is None:
+            return False
+        return not any(e.compiled is not None and e.compiled.search(subject) for e in self.excepts)
 
 
 def tool_matches(match: str, tool: str) -> bool:
@@ -524,13 +585,12 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
             problems.append(Problem(SEVERITY_ERROR, f"({name})", f"`{name}` がリストではない"))
             continue
         for i, raw in enumerate(raw_section):
-            rule, problem = _build(raw, name, i, root, builtin)
+            rule, found = _build(raw, name, i, root, builtin)
             # 苦情とルールは同時に返りうる。`{!root}` を組み立てられなかった deny / ask が
             # これで、「報告する」と「保護を消さない」を両立させる唯一の方法。
             # 捨てるだけにすると、生成に失敗した deny が気づかないうちに消えて、
             # 止められずに通るようになる。
-            if problem is not None:
-                problems.append(problem)
+            problems.extend(found)
             if rule is not None:
                 rule_set.section(name).append(rule)
 
@@ -539,20 +599,23 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
 
 def _build(
     raw: object, section: str, index: int, root: str = "", builtin: bool = False
-) -> tuple[Rule | None, Problem | None]:
-    """ルール 1 件を組み立てる。返るのは (ルール, 苦情) で、どちらも無いことがありうる。
+) -> tuple[Rule | None, list[Problem]]:
+    """ルール 1 件を組み立てる。返るのは (ルール, 苦情のリスト) で、どちらも無いことがありうる。
 
     3 通りある。
 
-    - `(rule, None)`   組み立てられた
-    - `(None, problem)` 受け付けられない。判定に使わない
-    - `(rule, problem)` 苦情はあるが判定には使う。`{!root}` を組み立てられなかった
+    - `(rule, [])`        組み立てられた
+    - `(None, problems)`  受け付けられない。判定に使わない
+    - `(rule, problems)`  苦情はあるが判定には使う。`{!root}` を組み立てられなかった
       `deny` / `ask` がこれで、`match` の全部に当たる式を持って止める側になる。
-      捨てると「ワークスペースの外の全部」が止められずに通るので、報告だけでは足りない
+      捨てると「ワークスペースの外の全部」が止められずに通るので、報告だけでは足りない。
+      `{!root}` の後ろの書き方への warn もここに入る
+
+    苦情をリストにしてあるのは、本体と `except` の各パターンがそれぞれ warn を出しうるため。
     """
     where = f"{section}[{index}]"
     if not isinstance(raw, dict):
-        return None, Problem(SEVERITY_ERROR, where, "ルールがマッピングではない")
+        return None, [Problem(SEVERITY_ERROR, where, "ルールがマッピングではない")]
 
     written_id = str(raw.get("id") or "")
     rule = Rule(
@@ -574,85 +637,156 @@ def _build(
     name = f"{section}:{rule.id}" if rule.id else where
 
     if ID_SEPARATOR in written_id:
-        return None, Problem(
-            SEVERITY_ERROR,
-            name,
-            f"id に `{ID_SEPARATOR}` は書けない。レイヤーの名前を添えた形"
-            f"（`self{ID_SEPARATOR}id` / `<プロジェクト名>{ID_SEPARATOR}id`）と"
-            "見分けが付かず、記録を読んだユーザがどのファイルを直すのか決められない",
-        )
+        return None, [
+            Problem(
+                SEVERITY_ERROR,
+                name,
+                f"id に `{ID_SEPARATOR}` は書けない。レイヤーの名前を添えた形"
+                f"（`self{ID_SEPARATOR}id` / `<プロジェクト名>{ID_SEPARATOR}id`）と"
+                "見分けが付かず、記録を読んだユーザがどのファイルを直すのか決められない",
+            )
+        ]
     if not builtin and written_id.lower().startswith(RESERVED_ID_PREFIX):
-        return None, Problem(
-            SEVERITY_ERROR,
-            name,
-            f"`{RESERVED_ID_PREFIX}` で始まる id は組み込みルールの名前で、"
-            "ルールファイルには書けない。同じ名前で書いても組み込みは置き換わらない。"
-            "別の名前にしてください。"
-            "組み込みを外したいなら env（CCNAVI_GUARD_CORE_FILES など）で"
-            "その保護ごと切ってください",
-        )
+        return None, [
+            Problem(
+                SEVERITY_ERROR,
+                name,
+                f"`{RESERVED_ID_PREFIX}` で始まる id は組み込みルールの名前で、"
+                "ルールファイルには書けない。同じ名前で書いても組み込みは置き換わらない。"
+                "別の名前にしてください。"
+                "組み込みを外したいなら env（CCNAVI_GUARD_CORE_FILES など）で"
+                "その保護ごと切ってください",
+            )
+        ]
     if not rule.message and section in _NEEDS_MESSAGE:
-        return None, Problem(
-            SEVERITY_ERROR, name, "文面が無い。ルールは代わりに何をすべきかを言わなければならない"
-        )
+        return None, [
+            Problem(
+                SEVERITY_ERROR,
+                name,
+                "文面が無い。ルールは代わりに何をすべきかを言わなければならない",
+            )
+        ]
     if not rule.match:
-        return None, Problem(SEVERITY_ERROR, name, "match が無い。どのツールにもヒットしない")
+        return None, [Problem(SEVERITY_ERROR, name, "match が無い。どのツールにもヒットしない")]
     if not rule.glob and not rule.regex:
-        return None, Problem(SEVERITY_ERROR, name, "glob も regex も無い")
+        return None, [Problem(SEVERITY_ERROR, name, "glob も regex も無い")]
     if rule.glob and rule.regex:
-        return None, Problem(
-            SEVERITY_ERROR, name, "glob と regex の両方がある。どちらで判定するのか決められない"
-        )
+        return None, [
+            Problem(
+                SEVERITY_ERROR, name, "glob と regex の両方がある。どちらで判定するのか決められない"
+            )
+        ]
 
-    # `{root}` はワークスペースルートの実パスに置き換える。書いた表記（rule.glob / rule.regex）は
+    excepts, problem = _excepts(raw, name)
+    if problem is not None:
+        return None, [problem]
+
+    problems: list[Problem] = []
+    built = _compile(rule.glob, rule.regex, root, name, "")
+    if built.error is not None:
+        return None, [built.error]
+    if built.note is not None:
+        problems.append(built.note)
+    if built.refused:
+        # 本体を組み立てられなかった deny / ask は、`match` の全部に当てて止める。
+        # except は付けない。付けると「全部止める」に穴が空き、保護を消さないための形が崩れる。
+        degraded, refused = _ungeneratable(rule, section, name, built.refused)
+        return degraded, problems + [refused]
+    rule.compiled = built.compiled
+
+    for i, (glob, regex) in enumerate(excepts):
+        label = f"except[{i}] の "
+        part = _compile(glob, regex, root, name, label)
+        if part.error is not None:
+            return None, problems + [part.error]
+        if part.note is not None:
+            problems.append(part.note)
+        if part.refused:
+            # except を組み立てられないときは、その except を持たないルールとして使う。deny / ask は
+            # 当たる範囲が広がる（止める側に外れる）。allow は広がると通す範囲が増えるので、
+            # ルールごと判定に使わない。
+            problems.append(Problem(SEVERITY_ERROR, name, label + part.refused))
+            if section == ALLOW:
+                return None, problems
+            continue
+        rule.excepts.append(Exclusion(glob=glob, regex=regex, compiled=part.compiled))
+
+    return rule, problems
+
+
+@dataclass
+class _Built:
+    """式 1 つを組み立てた結果。`refused` は `{!root}` を展開できなかった理由。"""
+
+    compiled: re.Pattern | None = None
+    error: Problem | None = None
+    note: Problem | None = None
+    refused: str = ""
+
+
+def _compile(glob: str, regex: str, root: str, name: str, label: str) -> _Built:
+    """`glob` か `regex` の 1 つを、判定に使う式に組み立てる。
+
+    ルールの本体と `except` の各パターンが同じこの 1 本を通る。`{root}` の置き換え、
+    `{!root}` の展開、先読み・後方参照の禁止、大文字小文字の無視を、両方で食い違わせないため。
+    `label` は苦情の頭に付ける語（本体なら空、except なら `except[0] の `）。
+    """
+    # `{root}` はワークスペースルートの実パスに置き換える。書いた表記（glob / regex）は
     # そのまま残し、置き換えるのは翻訳後の式だけ。報告と --explain は書いた表記を出す。
-    uses_root = ROOT_PLACEHOLDER in rule.regex or ROOT_PLACEHOLDER in rule.glob
+    uses_root = ROOT_PLACEHOLDER in regex or ROOT_PLACEHOLDER in glob
     if uses_root and not root:
-        return None, Problem(
-            SEVERITY_ERROR, name, f"`{ROOT_PLACEHOLDER}` を使うにはワークスペースルートが要る"
+        return _Built(
+            error=Problem(
+                SEVERITY_ERROR,
+                name,
+                f"{label}`{ROOT_PLACEHOLDER}` を使うにはワークスペースルートが要る",
+            )
         )
 
     # `{!root}` は `regex` 専用。`glob` は fnmatch に翻訳されるので、入れ子の選択肢を持つ
     # 展開結果を埋める場所が無い。
-    if NOT_ROOT_PLACEHOLDER in rule.glob:
-        return None, Problem(
-            SEVERITY_ERROR,
-            name,
-            f"`{NOT_ROOT_PLACEHOLDER}` は `glob` には書けない。"
-            f"`regex: '^{NOT_ROOT_PLACEHOLDER}'` と書いてください",
+    if NOT_ROOT_PLACEHOLDER in glob:
+        return _Built(
+            error=Problem(
+                SEVERITY_ERROR,
+                name,
+                f"{label}`{NOT_ROOT_PLACEHOLDER}` は `glob` には書けない。"
+                f"`regex: '^{NOT_ROOT_PLACEHOLDER}'` と書いてください",
+            )
         )
 
     note: Problem | None = None
-    uses_not_root = NOT_ROOT_PLACEHOLDER in rule.regex
+    uses_not_root = NOT_ROOT_PLACEHOLDER in regex
     if uses_not_root:
-        misplaced = _not_root_placement(rule.regex)
+        misplaced = _not_root_placement(regex)
         if misplaced:
-            return None, Problem(SEVERITY_ERROR, name, misplaced)
+            return _Built(error=Problem(SEVERITY_ERROR, name, label + misplaced))
         if not root:
-            return None, Problem(
-                SEVERITY_ERROR,
-                name,
-                f"`{NOT_ROOT_PLACEHOLDER}` を使うにはワークスペースルートが要る",
+            return _Built(
+                error=Problem(
+                    SEVERITY_ERROR,
+                    name,
+                    f"{label}`{NOT_ROOT_PLACEHOLDER}` を使うにはワークスペースルートが要る",
+                )
             )
-        suffix = _not_root_suffix(rule.regex)
+        suffix = _not_root_suffix(regex)
         if suffix:
-            note = Problem(SEVERITY_WARN, name, suffix)
+            note = Problem(SEVERITY_WARN, name, label + suffix)
 
-    if rule.regex:
-        unsupported = _unsupported(rule.regex)
+    if regex:
+        unsupported = _unsupported(regex)
         if unsupported:
-            return None, Problem(SEVERITY_ERROR, name, f"{unsupported}は使えない")
-        expression = (
-            rule.regex.replace(ROOT_PLACEHOLDER, root_pattern(root)) if uses_root else rule.regex
-        )
+            return _Built(error=Problem(SEVERITY_ERROR, name, f"{label}{unsupported}は使えない"))
+        expression = regex.replace(ROOT_PLACEHOLDER, root_pattern(root)) if uses_root else regex
         if uses_not_root:
             expanded, refused = _expand_not_root(expression, root)
             if refused:
-                return _ungeneratable(rule, section, name, refused)
+                return _Built(note=note, refused=refused)
             expression = expanded
     else:
-        glob = rule.glob.replace(ROOT_PLACEHOLDER, root_glob(root)) if uses_root else rule.glob
-        expression = translate(glob)
+        expression = translate(
+            glob.replace(ROOT_PLACEHOLDER, root_glob(root)) if uses_root else glob
+        )
 
     # `glob` も `regex` も、どの機械でも大文字小文字を区別せずに当てる。区別するかを機械で
     # 変えると、同じルールが Windows では当たり Linux では当たらない。`*/.ccnavi/*` と書いた
@@ -664,18 +798,75 @@ def _build(
     flags = re.IGNORECASE
 
     try:
-        rule.compiled = re.compile(expression, flags)
+        return _Built(compiled=re.compile(expression, flags), note=note)
     except re.error as exc:
-        return None, Problem(SEVERITY_ERROR, name, f"正規表現として組み立てられない: {exc}")
+        return _Built(
+            error=Problem(SEVERITY_ERROR, name, f"{label}正規表現として組み立てられない: {exc}")
+        )
     except RecursionError:
         # `re` の組み立ては入れ子を再帰で読む。捕捉しないとプロセスごと異常終了し、
         # hook の異常終了は呼び出しを止めずに通してしまう。
         # shellread が同じ形で `RecursionError` を安全側にしているのに倣う。
         if uses_not_root:
-            return _ungeneratable(rule, section, name, "入れ子が深すぎて組み立てられない")
-        return None, Problem(SEVERITY_ERROR, name, "入れ子が深すぎて組み立てられない")
+            return _Built(note=note, refused="入れ子が深すぎて組み立てられない")
+        return _Built(
+            error=Problem(SEVERITY_ERROR, name, f"{label}入れ子が深すぎて組み立てられない")
+        )
 
-    return rule, note
+
+def _excepts(raw: dict, name: str) -> tuple[list[tuple[str, str]], Problem | None]:
+    """`except:` を読む。返すのは (glob, regex) の組のリストと、書式の苦情。
+
+    値はリストで、各要素は `glob` か `regex` のどちらか 1 つだけを持つマッピング。
+    キーが無ければ空のリスト。書いてあるのに空のリスト・`null` は error にする。
+    書いたユーザは何かを除いたつもりでいるので、何も除かない形を黙って受け取らない。
+    """
+    if EXCEPT_KEY not in raw:
+        return [], None
+    written = raw.get(EXCEPT_KEY)
+    if not isinstance(written, list):
+        return [], Problem(
+            SEVERITY_ERROR,
+            name,
+            f"`{EXCEPT_KEY}` がリストではない。"
+            "`- glob: '...'` か `- regex: '...'` を並べてください",
+        )
+    if not written:
+        return [], Problem(
+            SEVERITY_ERROR,
+            name,
+            f"`{EXCEPT_KEY}` が空。除くものが無いなら `{EXCEPT_KEY}` ごと消してください",
+        )
+    out: list[tuple[str, str]] = []
+    for i, item in enumerate(written):
+        where = f"{EXCEPT_KEY}[{i}]"
+        if not isinstance(item, dict):
+            return [], Problem(
+                SEVERITY_ERROR,
+                name,
+                f"{where} がマッピングではない。"
+                "`glob: '...'` か `regex: '...'` の形で書いてください",
+            )
+        unknown = sorted(str(k) for k in item if k not in EXCEPT_FIELDS)
+        if unknown:
+            return [], Problem(
+                SEVERITY_ERROR,
+                name,
+                f"{where} に知らないキー（{', '.join(unknown)}）がある。"
+                f"書けるのは `{'` か `'.join(EXCEPT_FIELDS)}` の 1 つだけ",
+            )
+        glob = str(item.get("glob") or "")
+        regex = str(item.get("regex") or "")
+        if not glob and not regex:
+            return [], Problem(SEVERITY_ERROR, name, f"{where} に glob も regex も無い")
+        if glob and regex:
+            return [], Problem(
+                SEVERITY_ERROR,
+                name,
+                f"{where} に glob と regex の両方がある。どちらで判定するのか決められない",
+            )
+        out.append((glob, regex))
+    return out, None
 
 
 def _not_root_placement(expression: str) -> str:

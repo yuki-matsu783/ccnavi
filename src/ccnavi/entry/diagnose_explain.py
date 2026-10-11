@@ -141,6 +141,9 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         for name in rules.SECTIONS:
             for rule in view.rule_set.section(name):
                 written = rule.glob or rule.regex
+                if rule.excepts:
+                    excepts = ", ".join(e.glob or e.regex for e in rule.excepts)
+                    written = f"{written}  except: {excepts}"
                 stdout.write(
                     f"  {name:<5} {rule.id or '(id 無し)':<28} {rule.match:<34} {written}\n"
                 )

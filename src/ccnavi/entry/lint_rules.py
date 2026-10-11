@@ -193,6 +193,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
             )
 
     problems.extend(_every_problems(rule, name))
+    problems.extend(_except_problems(rule, name))
 
     # once の文は文脈ごとに 1 度しか積まれず、every > 1 は刻んだ回にしか積まれないので、
     # どちらも広さを報告しない。読めない every は 1（毎回渡る）になっているので、この式は
@@ -253,7 +254,7 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
             )
         ]
     problems: list[Problem] = []
-    if rule.compiled is not None and not rule.compiled.search(rules.STOP_SUBJECT):
+    if rule.compiled is not None and not rule.hits(rules.STOP_SUBJECT):
         problems.append(
             Problem(
                 SEVERITY_WARN,
@@ -272,6 +273,54 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
                 f"{rules.STOP_MATCH} のルールに every が無い（1 として扱う）ので使われない。"
                 "使えばターンが終わるたびに止めることになるので、"
                 "every: 10 のように間隔を空けてください",
+            )
+        )
+    return problems
+
+
+# 当てる文字列にコマンド列の全体を使うツール。except はこの全体に当てるので、
+# コマンドのどこかに除く語を足すだけでルールが外れる。
+_COMMAND_TOOLS = ("Bash", "PowerShell")
+
+# 「何にでも当たる」を見る文字列。空の文字列と、パスにもコマンドにも出ない制御文字の 1 字。
+# どちらにも当たる式は、当てる語を持たずに先頭で当たっている。
+_ANYTHING_PROBES = ("", "\x02")
+
+
+def _except_problems(rule: rules.Rule, name: str) -> list[Problem]:
+    """`except:` の書き方。
+
+    書式の誤りは読み込み（rules._excepts）が error にするので、ここは意味の側を見る。
+
+    見るのは 2 つで、どちらも判定は書いたとおりに動いているので warn。
+
+    1. 何にでも当たる except。ルールが何にも当たらなくなり、書いてあるのに何も止めない
+    2. Bash / PowerShell を見る deny / ask の except。当てるのはコマンド列の全体なので、
+       `git push; echo wip/scratchpad/` のように除く語を足すだけで外れる
+    """
+    if not rule.excepts:
+        return []
+    problems: list[Problem] = []
+    for i, exclusion in enumerate(rule.excepts):
+        compiled = exclusion.compiled
+        if compiled is not None and all(compiled.search(p) for p in _ANYTHING_PROBES):
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    name,
+                    f"except[{i}] は何にでも当たる。このルールはどの呼び出しにも当たらない",
+                )
+            )
+    tools = [want.strip() for want in rule.match.split("|")]
+    shells = [t for t in _COMMAND_TOOLS if t in tools]
+    if shells and rule.decision in (rules.DENY, rules.ASK):
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"{'|'.join(shells)} の except はコマンド列の全体に当たる。コマンドのどこかに"
+                "除く語を足すだけでこのルールが外れるので、except は語の位置まで狭く書くか、"
+                "ルールを分けてください",
             )
         )
     return problems
