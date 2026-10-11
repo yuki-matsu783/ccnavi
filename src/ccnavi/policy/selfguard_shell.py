@@ -469,21 +469,15 @@ SCRATCHPAD = ("wip", "scratchpad")
 # 次の 1 本でリンクの先（守る場所）へ書ける。
 _SCRATCHPAD_COPIERS = ("cp", "install")
 # 1 語の中にあると、行き先を表記どおりに読めない文字。変数・置換・グロブ・ブレース・引用・
-# リダイレクトと、shellread の目印。どれかがあれば例外にしない（止める側に倒す）。
-_SCRATCHPAD_UNREAD = set("$`*?[]{}()<>|;&'\"\n") | {shellread.SEP, shellread.WORD_SEP}
-# 例外にしない cp の選択肢の文字。`-t` は行き先を最後の語から動かし、`-s` / `-l` はリンクを作る
-# （ハードリンクなら写した下書きを直すと元が変わる）。`-P` / `-d` / `-a` / `-r` / `-R` はリンクを
-# リンクのまま写し、続く呼び出しでその先へ書ける。
-_SCRATCHPAD_SHORT_REFUSED = set("tslPdarR")
-_SCRATCHPAD_LONG_REFUSED = (
-    "--target-directory",
-    "--symbolic-link",
-    "--link",
-    "--no-dereference",
-    "--archive",
-    "--recursive",
-    "--preserve",
-)
+# リダイレクト・ホームの展開（`~`）と、shellread の目印。どれかがあれば例外にしない
+# （止める側に倒す）。
+_SCRATCHPAD_UNREAD = set("$`*?[]{}()<>|;&'\"\n~") | {shellread.SEP, shellread.WORD_SEP}
+# 例外にしてよい選択肢の文字。これだけを並べた短い選択肢（`-f` `-pv` など）と `--` のほかは、
+# `-` で始まる語が 1 つでもあれば例外にしない。止めるものを並べる形にすると、GNU の長い選択肢の
+# 省略（`--target` は `--target-directory`、`--sym` は `--symbolic-link`）や知らない選択肢に負ける。
+# `-t` は行き先を最後の語から動かし、`-s` `-l` はリンクを作り、`-P` `-d` `-a` `-r` はリンクを
+# リンクのまま写す。どれも許す側に入れない。
+_SCRATCHPAD_SHORT_ALLOWED = set("fpvnu")
 
 
 def scratchpad_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | None:
@@ -499,20 +493,33 @@ def scratchpad_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | N
 
     - 対象がコマンド 1 本だけ。つないだ形は外さない。前のコマンドが置き場にリンクを作る・`cd` で
       移る、を同じ呼び出しの中で読み切れないため
-    - コマンドが `cp` か `install` で、行き先を動かす・リンクを作る・リンクを写す選択肢が無い
-    - どの語にも、表記どおりに読めない文字（変数・グロブ・引用・リダイレクトなど）が無い
+    - コマンドが `cp` か `install` で、選択肢は許すもの（_SCRATCHPAD_SHORT_ALLOWED）と `--` だけ
+    - どの語にも、表記どおりに読めない文字（変数・グロブ・引用・リダイレクト・`~` など）が無い
     - 行き先（最後の語）に `..` の段が無く、cwd から解いた実パス（リンクを解いた先）が
       置き場そのものかその下。行き先がディレクトリなら、元の名前を足した先も同じく確かめる
+    - 行き先に既にあるファイルが、ハードリンクでほかの名前とつながっていない
 
-    cwd が空なら、相対の行き先は外さない。root が空なら何も外さない。
+    cwd が空なら、相対の行き先は外さない。root が空か、置き場そのものがリンクなら何も外さない。
     """
     if not root:
         return None
-    pad = os.path.normcase(os.path.realpath(os.path.join(root, *SCRATCHPAD)))
+    spelled = os.path.join(os.path.realpath(root), *SCRATCHPAD)
+    # 置き場（`wip/` か `scratchpad/`）そのものがリンクなら、例外を使わない。リンクの先が
+    # 守る場所なら、置き場の中へ写すことが守る場所へ書くことになる。
+    if os.path.realpath(spelled) != spelled:
+        return None
+    pad = os.path.normcase(spelled)
 
     def inside(path: str) -> bool:
         real = os.path.normcase(os.path.realpath(path))
-        return real == pad or real.startswith(pad + os.sep)
+        if not (real == pad or real.startswith(pad + os.sep)):
+            return False
+        # 既にあるファイルがほかの名前とつながっている（ハードリンク）なら、上書きはつながった先も
+        # 書き換える。つながった先が守る場所かは名前から分からないので、外さない。
+        try:
+            return not (os.path.isfile(real) and os.stat(real).st_nlink > 1)
+        except OSError:
+            return False
 
     def exempt(subject: str) -> str:
         if shellread.SEP in subject.strip(shellread.SEP):
@@ -526,10 +533,9 @@ def scratchpad_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | N
         if not sources or dest.startswith("-"):
             return subject
         for word in words[1:]:
-            if word.startswith("--"):
-                if word.startswith(_SCRATCHPAD_LONG_REFUSED):
-                    return subject
-            elif word.startswith("-") and _SCRATCHPAD_SHORT_REFUSED & set(word[1:]):
+            if word == "--" or not word.startswith("-"):
+                continue
+            if word.startswith("--") or not set(word[1:]) <= _SCRATCHPAD_SHORT_ALLOWED:
                 return subject
         if ".." in re.split(r"[\\/]", dest):
             return subject

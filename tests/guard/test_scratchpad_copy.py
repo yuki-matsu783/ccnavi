@@ -114,6 +114,15 @@ class ScratchpadCopyTest(unittest.TestCase):
             "cp -a .ccnavi wip/scratchpad/.ccnavi",
             "ln -s .ccnavi/scripts/ccnavi-git.sh wip/scratchpad/ccnavi-git.sh",
             "cp -t .ccnavi/scripts /tmp/x wip/scratchpad/ccnavi-git.sh",
+            # 長い選択肢の省略（GNU は曖昧でない範囲で受ける）と、知らない選択肢
+            "cp --target .ccnavi/scripts /tmp/x wip/scratchpad/ccnavi-git.sh",
+            "cp --target-d .ccnavi/scripts /tmp/x wip/scratchpad/ccnavi-git.sh",
+            "cp --target=.ccnavi/scripts wip/scratchpad/ccnavi-git.sh",
+            "cp --l .ccnavi/scripts/ccnavi-git.sh wip/scratchpad/ccnavi-git.sh",
+            "cp --sym .ccnavi wip/scratchpad/ccnavi-git.sh",
+            "cp --rec .ccnavi wip/scratchpad/ccnavi-git.sh",
+            "install --dir .ccnavi wip/scratchpad/ccnavi-git.sh",
+            "cp -x .ccnavi/scripts/ccnavi-git.sh wip/scratchpad/ccnavi-git.sh",
             # 1 本目で置き場へ写し、続くコマンドで守る場所へ書く
             "cp a wip/scratchpad/ccnavi-git.sh && cp /tmp/x .ccnavi/common/rules.yml",
             "cp a wip/scratchpad/ccnavi-git.sh; echo x > .ccnavi/common/rules.yml",
@@ -125,6 +134,30 @@ class ScratchpadCopyTest(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 self.assertEqual(RULE_ID, self.decide(command))
+
+    def test_a_home_destination_is_not_read_from_the_cwd(self):
+        # シェルは `~` をホームに展開する。cwd が置き場の中でも、置き場の中とは読まない。
+        self.assertEqual(RULE_ID, self.decide("cp /tmp/x ~/.claude/settings.json", cwd=self.pad))
+
+    def test_a_hard_linked_destination_is_not_exempt(self):
+        # 置き場の写しが守る場所のファイルとつながっていれば、上書きは守る場所も書き換える。
+        original = os.path.join(self.repo, ".ccnavi", "scripts", "ccnavi-git.sh")
+        try:
+            os.link(original, os.path.join(self.pad, "ccnavi-git.sh"))
+        except OSError:
+            self.skipTest("ハードリンクを作れない機械")
+        self.assertEqual(RULE_ID, self.decide("cp /tmp/x wip/scratchpad/ccnavi-git.sh"))
+
+    def test_a_linked_scratchpad_is_not_exempt(self):
+        # 置き場そのものが守る場所へのリンクなら、置き場へ写すことが守る場所へ書くことになる。
+        shutil.rmtree(self.pad)
+        try:
+            os.symlink(
+                os.path.join(self.repo, ".ccnavi", "scripts"), self.pad, target_is_directory=True
+            )
+        except OSError:
+            self.skipTest("シンボリックリンクを作れない機械")
+        self.assertEqual(RULE_ID, self.decide("cp /tmp/x wip/scratchpad/ccnavi-git.sh"))
 
     def test_the_guard_itself_still_stops_writes(self):
         for command in (
