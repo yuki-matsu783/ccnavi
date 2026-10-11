@@ -58,6 +58,57 @@ test("CB-T129 body のクラスは Claude の配色のときだけ付き、CSS �
   }
 });
 
+/** Chrome 拡張の画面が読む配色（`extensions/shared/styles/browser-theme.css`）。appearance.css の写し */
+const BROWSER_THEME = fs.readFileSync(path.join(WEBVIEW_SRC, "..", "..", "..", "..", "shared", "styles", "browser-theme.css"), "utf8");
+
+/** CSS の `--vscode-*` の宣言を、名前 -> 値で取る（コメントは除き、値は大文字小文字と空白の差を無視する） */
+function themeVariables(css: string): Map<string, string> {
+  const found = new Map<string, string>();
+  for (const match of css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/(--vscode-[\w-]+)\s*:\s*([^;}]+)[;}]/g)) {
+    found.set(match[1], match[2].trim().replace(/\s+/g, " ").toLowerCase());
+  }
+  return found;
+}
+
+/** 名前と値が食い違う変数の説明。空なら一致 */
+function themeDiff(expected: Map<string, string>, actual: Map<string, string>, allowedExtra: ReadonlySet<string>): string[] {
+  const diffs: string[] = [];
+  for (const [name, value] of expected) {
+    if (!actual.has(name)) {
+      diffs.push(`${name} が browser-theme.css に無い`);
+    } else if (actual.get(name) !== value) {
+      diffs.push(`${name}: appearance.css は ${value}、browser-theme.css は ${actual.get(name)}`);
+    }
+  }
+  for (const name of actual.keys()) {
+    if (!expected.has(name) && !allowedExtra.has(name)) {
+      diffs.push(`${name} が appearance.css に無い`);
+    }
+  }
+  return diffs;
+}
+
+test("CB-T391 browser-theme.css（Chrome 拡張）の配色は appearance.css の Claude の配色と、ライト・ダークとも同じ名前・同じ値", () => {
+  // browser-theme.css だけが持ってよいのは字体の 3 変数（VS Code の Webview では VS Code が渡す値）
+  const fontVariables = new Set(["--vscode-font-family", "--vscode-font-size", "--vscode-editor-font-family"]);
+  const [beforeDark, afterDark] = BROWSER_THEME.split("@media (prefers-color-scheme: dark)");
+  assert.notEqual(afterDark, undefined, "browser-theme.css にダークの @media が無い");
+  const light = themeVariables(beforeDark);
+  const dark = themeVariables(afterDark);
+  const [darkPart, lightPart] = APPEARANCE_STYLE.split("body.ccnavi-claude-light");
+  const expectedDark = themeVariables(darkPart);
+  const expectedLight = themeVariables(lightPart);
+  // 比べる元が空だと、何も比べないまま通る
+  assert.ok(expectedLight.size >= 30 && expectedDark.size >= 30, `appearance.css の変数が少ない: light=${expectedLight.size} dark=${expectedDark.size}`);
+  assert.deepEqual(themeDiff(expectedLight, light, fontVariables), [], "ライト");
+  // ダークは字体を持たない（ライトの :root だけが持つ）。持つなら appearance.css に無いものとして落とす
+  assert.deepEqual(themeDiff(expectedDark, dark, new Set()), [], "ダーク");
+  for (const name of fontVariables) {
+    assert.ok(light.has(name), `${name} が browser-theme.css のライトに無い`);
+    assert.ok(!expectedLight.has(name) && !expectedDark.has(name), `${name} は appearance.css に置かない`);
+  }
+});
+
 /** 段取りの下に置く Webview の代わり。何が送られたかだけを見る */
 function surface(visible = true): Surface & { visible: boolean; readonly pages: string[]; readonly posted: unknown[] } {
   const pages: string[] = [];
