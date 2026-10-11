@@ -45,9 +45,7 @@ src/
     risk-doc.ts       risks.yml の読み書き（同じくコメントを残す）と、組み込みの配点の本文
     phases-view.ts    フェーズ管理の拡張ホストと画面の契約（定義の形 PhasesForm、見せる形 PhasesPage / PhasesData、押した操作 PhasesMessage）
     phases-render.ts  フェーズ管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
-    phases-doc.ts     phases.yml の読み書き（同じくコメントを残す）
-    phases-graph.ts   フェーズの図の点・線・置き場所を定義のリストから組む。VS Code に触れないので単体で試せる
-    phases-route.ts   図の線の経路（点を横切らない折れ線）。VS Code に触れないので単体で試せる
+    phases-doc.ts     phases.yml の読み書き（同じくコメントを残す。読まない順序の欄は名指しするだけで、書き戻しで手を付けない）
     flow-doc.ts       子のフロー（YAML）の読み書きと編集（知らない欄・種類を落とさない）、雛形、入れ子の段の数え方と注意。正しいかは決めない（描けないときだけ断る）
     flow-view.ts      フロー編集の拡張ホストと画面の契約（見せる形 FlowPage / FlowData、押した操作 FlowMessage とその形の確認、錠を実行ファイルの答えから引く flowTargetOf、カードのボタンの言葉、エージェントへの依頼のボタンの言葉と依頼の文）
     flow-render.ts    フロー編集の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
@@ -115,14 +113,12 @@ src/
     phases/style.css  フェーズ管理画面の CSS の入口
     phases/App.css    App.tsx の CSS（枠と見出し）
     phases/Phase.css  Phase.tsx の CSS（定義 1 件の行）
-    phases/Graph.css  Graph.tsx の CSS（図・区分の枠・凡例）
     phases/post.ts    フェーズ管理の送り口。契約に無いものは型で止まる
     phases/main.tsx   フェーズ管理画面の入口。埋め込みの JSON を読んでマウントする
     phases/App.tsx    注意の帯・ツールバー・定義の一覧と、拡張ホストからのメッセージの受け
-    phases/Graph.tsx  図（点・線・区分の枠・凡例）
-    phases/Phase.tsx  定義 1 件の行（要約と、開いたときの欄。scope と成果物は , 区切り、関係は複数選択のセレクトボックスで選ぶ）
+    phases/Phase.tsx  定義 1 件の行（要約と、開いたときの欄。scope と成果物は , 区切り。順序の欄は持たない）
     phases/state.ts   編集中の定義（行ごとの鍵）・開いている行（id で保持する）・id の重なり
-    phases/text.ts    要約の文・絞り込みが当てる文字列・空のときの言葉
+    phases/text.ts    要約の文・絞り込みが当てる文字列・空のときの言葉・読まない欄の知らせ
     flow/style.css    フロー編集画面の CSS の入口（先頭で React Flow の CSS を @import する）
     flow/App.css      App.tsx の CSS（部品箱・図・欄の配置と目印）
     flow/Canvas.css   Canvas.tsx の CSS（図・ノード・出口）
