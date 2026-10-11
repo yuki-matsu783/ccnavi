@@ -12,9 +12,12 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import time
 import unittest
 
+from ccnavi.hook import subagent
 from ccnavi.infra import settings
+from ccnavi.tickets import ops_stop
 from tests.ticket import test_stop_nudge as base
 from tests.ticket.test_ticket import git, write
 
@@ -180,15 +183,22 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.assert_not_asked(self.stop(self.parent_tree, extra=("--ticket-control", "disable")))
         self.assert_not_asked(self.stop(self.parent_tree, mode="disable"))
 
-    def test_a_state_directory_that_cannot_be_written_means_no_nudge(self):
+    def test_a_record_that_cannot_be_written_means_no_nudge(self):
         """記録を残せないまま止めると、終えるたびに止まる。止めない側を採る。"""
         self.family()
-        shutil.rmtree(self.state, ignore_errors=True)
-        write(self.state, "ファイルで塞ぐ\n")
+        os.makedirs(
+            ops_stop.nudge_path(self.state, "s1")
+        )  # 記録のファイルの場所をディレクトリで塞ぐ
         for _ in range(2):
             result = self.stop(self.parent_tree)
             self.assert_not_asked(result)
             self.assertIn("促さない", result.stderr)
+
+    def test_a_state_directory_that_cannot_be_listed_means_no_nudge(self):
+        self.family()
+        shutil.rmtree(self.state, ignore_errors=True)
+        write(self.state, "ファイルで塞ぐ\n")
+        self.assert_not_asked(self.stop(self.parent_tree))
 
     def test_dry_run_blocks_too(self):
         self.family()
@@ -196,6 +206,117 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.assertEqual(body.get("decision"), "block")
         self.assertIn(CODE, body["reason"])
         self.assertNotIn("would have blocked", json.dumps(body, ensure_ascii=False))
+
+    # ---- 実行中のサブエージェントが居る間は、委任して待つ回なので止めない
+
+    def running_file(self, agent, session="s1"):
+        return subagent._running_path(self.state, session, agent)
+
+    def start_agent(self, agent, cwd=None, session="s1"):
+        result = self.hook(
+            "SubagentStart", "", cwd or self.parent_tree, agent_id=agent, session=session
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result
+
+    def stop_agent(self, agent, cwd=None, session="s1"):
+        return self.hook(
+            "SubagentStop", "", cwd or self.parent_tree, agent_id=agent, session=session
+        )
+
+    def session_start(self, source, session="s1"):
+        payload = {"hook_event_name": "SessionStart", "session_id": session, "source": source}
+        result = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_a_running_subagent_holds_the_nudge_without_using_it_up(self):
+        self.family()
+        self.start_agent("a1")
+        self.assertTrue(os.path.exists(self.running_file("a1")))
+        self.assert_not_asked(self.stop(self.parent_tree))
+        self.assert_not_asked(self.stop(self.parent_tree))
+        # 終わったあとの Stop でまた促せる（見送った回は「1 回だけ」を進めていない）。
+        self.assertEqual(self.stop_agent("a1").returncode, 0)
+        self.assertFalse(os.path.exists(self.running_file("a1")))
+        self.asked(self.stop(self.parent_tree))
+        self.assert_not_asked(self.stop(self.parent_tree))
+
+    def test_every_running_subagent_must_finish_including_nested_ones(self):
+        self.family()
+        self.start_agent("a1")
+        self.start_agent("a1-child", cwd=self.child_tree())
+        self.stop_agent("a1")
+        self.assert_not_asked(self.stop(self.parent_tree))
+        self.stop_agent("a1-child", cwd=self.child_tree())
+        self.asked(self.stop(self.parent_tree))
+
+    def test_a_running_subagent_of_another_session_does_not_hold_this_one(self):
+        self.family()
+        self.start_agent("a1", session="s2")
+        self.asked(self.stop(self.parent_tree, session="s1"))
+        self.assert_not_asked(self.stop(self.parent_tree, session="s2"))
+
+    def test_a_start_without_agent_id_leaves_no_mark(self):
+        """鍵が決まらないので印は置かない。その体は数えられず、促しが出うる（制限）。"""
+        self.family()
+        result = self.hook("SubagentStart", "", self.parent_tree)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        names = os.listdir(self.state) if os.path.isdir(self.state) else []
+        self.assertEqual([n for n in names if n.endswith(".running")], [])
+        self.asked(self.stop(self.parent_tree))
+
+    def test_a_mark_past_the_limit_is_not_counted(self):
+        self.family()
+        self.start_agent("a1")
+        path = self.running_file("a1")
+        old = int(time.time()) - subagent.RUNNING_MAX_SECONDS - 60
+        write(path, f"session s1\n{old}\n")
+        self.asked(self.stop(self.parent_tree))
+        # 限りの内側なら数える。
+        write(path, f"session s1\n{int(time.time()) - subagent.RUNNING_MAX_SECONDS + 600}\n")
+        self.assert_not_asked(self.stop(self.parent_tree, session="s1", extra=()))
+
+    def test_a_broken_mark_holds_the_nudge_until_it_is_old(self):
+        """開始時刻を読めない印は、更新時刻で期限を見る。新しければ促さない側に倒す。"""
+        self.family()
+        path = self.running_file("a1")
+        write(path, "")
+        self.assert_not_asked(self.stop(self.parent_tree))
+        old = time.time() - subagent.RUNNING_MAX_SECONDS - 60
+        os.utime(path, (old, old))
+        self.asked(self.stop(self.parent_tree))
+        write(path, "session s1\nnot-a-number\n")
+        self.assert_not_asked(self.stop(self.parent_tree, session="s1"))
+
+    def test_a_mark_of_a_session_with_the_same_prefix_is_not_ours(self):
+        self.family()
+        write(self.running_file("a1", session="s1"), f"session s1-other\n{int(time.time())}\n")
+        self.asked(self.stop(self.parent_tree))
+
+    def test_startup_drops_the_marks_but_compact_resume_and_clear_keep_them(self):
+        self.family()
+        self.start_agent("a1")
+        for source in ("compact", "resume", "clear"):
+            self.session_start(source)
+            self.assertTrue(os.path.exists(self.running_file("a1")), source)
+        self.assert_not_asked(self.stop(self.parent_tree))
+        self.session_start("startup")
+        self.assertFalse(os.path.exists(self.running_file("a1")))
+        self.asked(self.stop(self.parent_tree))
+
+    def test_a_bounced_subagent_keeps_its_mark_and_the_bounce_still_works(self):
+        """範囲外の変更で差し戻した回は続けさせるので印を残す。2 度目に終わったときに外す。"""
+        self.family()
+        child = self.child_tree()
+        self.start_agent("sub-1", cwd=child)
+        write(os.path.join(child, "src", "b", "outside.py"), "x\n")
+        first = self.stop_agent("sub-1", cwd=child)
+        self.assertEqual(first.returncode, 2, first.stdout + first.stderr)
+        self.assertIn("POST_TICKET_SCOPE", first.stderr)
+        self.assertTrue(os.path.exists(self.running_file("sub-1")))
+        second = self.stop_agent("sub-1", cwd=child)
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertFalse(os.path.exists(self.running_file("sub-1")))
 
     # ---- 1 回の Stop で止める理由は 1 つ
 
