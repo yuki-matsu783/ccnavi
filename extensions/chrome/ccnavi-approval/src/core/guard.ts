@@ -24,9 +24,23 @@ export interface Places {
  */
 export const DEFAULT_PLACES: Places = Object.freeze({ tickets: DEFAULT_TICKETS, approved: DEFAULT_APPROVED });
 
-/** パスが置き場（提案・承認済み）の下か */
+/** ルートから始まる形（`/`・`\`・`~`・ドライブ名）。`ccnavi_chrome._ROOTED` と同じ */
+const ROOTED = /^(?:[/\\~]|[A-Za-z]:)/;
+
+/**
+ * ツリーの中に留まる相対パスか（`ccnavi_chrome._check_rel` と同じ形の検査）。ルートから始まるもの・バックスラッシュを
+ * 含むもの・空や `.` や `..` の要素を持つものは断る。先頭の文字列だけを比べると `wip/proposals/../../x` が置き場の下に見えるため
+ */
+export function isPlainRel(path: string): boolean {
+  if (path === "" || ROOTED.test(path) || path.includes("\\")) {
+    return false;
+  }
+  return path.split("/").every((part) => part !== "" && part !== "." && part !== "..");
+}
+
+/** パスが置き場（提案・承認済み）の下か。置き場の外へ出る形のパスは下と見なさない */
 export function underPlaces(path: string, places: Places): boolean {
-  return [places.tickets, places.approved].some((p) => path.startsWith(`${p}/`));
+  return isPlainRel(path) && [places.tickets, places.approved].some((p) => path.startsWith(`${p}/`));
 }
 
 /** 書く先の名前と書くパスを見る。書けなければ理由（空なら書ける） */
