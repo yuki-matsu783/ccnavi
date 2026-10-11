@@ -520,7 +520,9 @@ class WrittenTest(unittest.TestCase):
         form = diagnose_shared.rule_form(rule)
         self.assertEqual(form["kind"], "when")
         self.assertEqual(form["when"], SECRETS["when"])
-        self.assertTrue(form["written"].startswith("when: any("))
+        # kind が when を言うので、written に `when: ` は重ねない（画面の「when when:」を避ける）
+        self.assertEqual(form["written"], rule.when.describe())
+        self.assertTrue(form["written"].startswith("any("))
 
     def test_字下げの形(self):
         rule, _ = build(SECRETS)
