@@ -27,7 +27,8 @@ src/
   webview-asset.ts    バンドルした画面（out/webview/<名前>.js）と CSS（同 .css）を読む。渡すのは画面の名前で、拡張が <script nonce> と <style nonce> に流し込む
   core/
     model.ts          ボードの JSON の形（実行ファイルとの契約）と読み取り
-    approvemodel.ts   承認の JSON の形（--agree --preview --json / --agree --yes … --json）と読み取り
+    approvemodel.ts   承認の JSON の形（--agree --preview --json / --agree --yes … --json）と読み取り。計画を持つ親の図の中身（plans）も読む
+    plan-graph.ts     計画の図の点・線・置き場所を、実行ファイルの plans の 1 件から組む（start / end の仮の点と線、loose の印、引けない線）。判定はしない。VS Code に触れないので単体で試せる
     testmodel.ts      試験の JSON の形（--test --json / --test-samples --json）と読み取り
     suggestmodel.ts   候補の JSON の形（--suggest --json）と読み取り。allow の候補は並べない
     lintmodel.ts      lint の JSON の形（--lint --json）と読み取り、プロジェクトごとの苦情とフローの苦情（(flow)）の抜き出し、古い実行ファイルの「知らないオプション」の見分け
@@ -80,7 +81,7 @@ src/
     styles/button.css 5 画面で同じボタン（button.action）
     styles/appearance.css Claude の配色（body のクラスの下でテーマ変数を上書きする）
     styles/list.css   設定 3 画面の一覧（行・開閉・欄名）
-    board/style.css   ボード画面の CSS の入口。部品の CSS を @import で並べるだけ
+    board/style.css   ボード画面の CSS の入口。部品の CSS を @import で並べるだけ（計画の図のために React Flow の CSS と shared/PlanGraph.css も読む）
     board/App.css     App.tsx の CSS（列・取っ手・畳んだ列）
     board/Card.css    Card.tsx の CSS（カード 1 枚）
     board/Approval.css Approval.tsx の CSS（承認のオーバーレイ）
@@ -88,7 +89,7 @@ src/
     board/main.tsx    ボード画面の入口。埋め込みの JSON を読んでマウントする
     board/App.tsx     ツールバー・絞り込み・列・フェーズ・脚注と、拡張ホストからのメッセージの受け
     board/Card.tsx    カード 1 枚（バッジ・属性・フェーズ行・不備・操作）
-    board/Approval.tsx 承認のオーバーレイ（一覧・本文・対象外・渡す文）
+    board/Approval.tsx 承認のオーバーレイ（一覧・計画の図（読むだけ）・本文・対象外・渡す文）
     board/Decide.tsx   残った指摘の対応方針のオーバーレイの中身（指摘ごとの選択）
     board/state.ts    画面が覚えるもの（絞り込み・畳んだ列・列の幅）の読み書き
     board/text.ts     カードとフェーズ行に出す言葉
@@ -129,6 +130,8 @@ src/
     flow/main.tsx     フロー編集画面の入口。埋め込みの JSON を読んでマウントする
     flow/App.tsx      錠の帯・ツールバー・注意・部品箱と、拡張ホストからのメッセージの受け
     flow/Canvas.tsx   図（ノード・出口・線）。動かす・繋ぐ・選ぶは呼び手に返す
+    shared/PlanGraph.tsx 計画の図の部品（React Flow）。承認のオーバーレイが読むだけで使う。editable が真なら項から項へ線を引ける（引けない線は引いている最中に断る）
+    shared/PlanGraph.css PlanGraph.tsx の CSS（図・点・仮の線・注意の色。React Flow の色を --vscode-* に置き換える）
     flow/Inspector.tsx 右の欄（ノード・線・フローの中身）
     flow/SaveReview.tsx 保存前の差分の一覧（保存する・やめる・次から確かめない）
     flow/Proposal.tsx   エージェントの下書きの差分（値の前後まで）と取り込み、エージェントへの依頼の文（コピー・新しいセッションで開く）
@@ -161,13 +164,15 @@ test/
   helpers/phases.ts   フェーズ管理画面（React）をバンドルしたものごと happy-dom で開く
   helpers/rules.ts    ルール管理画面（React）をバンドルしたものごと happy-dom で開く
   helpers/flow.ts     フロー編集画面（React）をバンドルしたものごと happy-dom で開く（図を描くので大きさの偽物を入れる）。フローの見本も持つ
-  board/              ボード（board, model, approvemodel と、画面を動かす render.dom / board.dom）
+  helpers/plan-reorder.ts 振り直しの見本の表（リポジトリの tests/fixtures/plan-reorder.json。実行ファイルのテストと共有し、書き換えない）を読み、表の計画を plans の形に並べる
+  helpers/jsdom.ts    happy-dom で固まる図の点のドラッグだけを jsdom で動かす（いま使うテストは無い）
+  board/              ボード（board, model, approvemodel と、画面を動かす render.dom / board.dom、承認のオーバーレイの計画の図を動かす approval-graph.dom）
   rules/              ルール管理（rules-doc, hooks, testmodel と、画面を動かす rules.dom。入れ物は rules-render）
   risk/               リスク管理（risk-doc と、画面を動かす risk.dom。入れ物は risk-render）
   phases/             フェーズ管理（phases-doc, phases-layer と、画面を動かす phases.dom。入れ物は phases-render）
   projects/           プロジェクト管理（projects と、画面を動かす projects.dom）
   flow/               フロー編集（flow-doc, flow-view, flow-lint, flow-match, flow-write と、書き出しを PyYAML で読み戻す flow-pyyaml（リポジトリのルートで uv run python か python3 を起動する。起動できなければ飛ばす）、画面を動かす flow.dom、線を引ける先・コピー・貼り付け・履歴・差分の flow-edit-ops、元に戻す・コピー・ミニマップ・保存前の確かめを画面で動かす flow-edit.dom、ボードのカードのボタンを動かす flow-card.dom、エージェントの下書きの取り込みと依頼のボタンを動かす flow-proposal.dom）
-  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host, approval-machine）
+  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host, approval-machine, plan-graph）
   */*.test.ts         組み立てと HTML の文字列を見る単体テスト CB-T01〜
   */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。画面はどれも React なので、描くものも動かして見る（render.dom, projects.dom, risk.dom, phases.dom, rules.dom, flow.dom）
   shared/test-ids.test.ts  ID の決まり（重複しない・名前は ID から始まる）を、テストで守る
