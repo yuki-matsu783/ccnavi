@@ -71,11 +71,12 @@ phases:
     scope: inherit
 
   # 作業の振り返りで出たスキルの候補を、ワークスペースの .claude/skills/ に配置する。
+  # 候補の根拠を溜める docs/wiki/ も同じ子で直す（wiki 層。skill-review.md）。
   # 候補の拾い方と置き場は docs/claude/skill-review.md。子は親の範囲の中にしか置けないので、
-  # 親の範囲に .claude/skills/ が無ければこのフェーズ定義は使えず、提案チケットになる。
+  # 親の範囲に .claude/skills/ と docs/wiki/ が無ければこのフェーズ定義は使えず、提案チケットになる。
   skill-improve:
     kind: feedback
     title: スキル改善
     review: mr
-    scope: [".claude/skills/*"]
+    scope: [".claude/skills/*", "docs/wiki/*"]
     when: 振り返りでスキルの候補が出たとき（docs/claude/skill-review.md）。候補が無ければ置かない
