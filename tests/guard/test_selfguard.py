@@ -11,7 +11,6 @@ payload でバックアップを取らせ、設定ファイルを壊してから
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
@@ -23,7 +22,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import platformtag, settings, shellread
-from ccnavi.policy import rules, selfguard, selfguard_shell, selfguard_targets
+from ccnavi.policy import rules, selfguard_shell, selfguard_targets
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -70,13 +69,6 @@ def write(path, text):
 def read(path):
     with open(path, encoding="utf-8") as f:
         return f.read()
-
-
-def built(path):
-    """build.py が組み立てのあとに置く印を、現物に合わせて置く。ccnavi の組み立ての再現。"""
-    with open(path, "rb") as f:
-        digest = hashlib.sha256(f.read()).hexdigest()
-    write(path + selfguard.BUILT_SUFFIX, digest + "\n")
 
 
 class SelfGuardTest(unittest.TestCase):
@@ -1145,30 +1137,52 @@ class SelfGuardTest(unittest.TestCase):
 
                 self.assertNotIn("builtin-guard-setting-files", result.stdout)
 
-    def test_セッション開始でバックアップを取り実行後に新しい版で取り直す(self):
-        # ccnavi の組み立て（印の付いた版）が変わったら戻さず、新しい版を基準にする。
+    def test_セッション開始でバックアップを取り実行後に戻す(self):
         path = self.binary()
         self.run_hook("SessionStart", bin=path)
         write(path, "MZ replaced\n")
-        built(path)
 
         result = self.run_hook("PostToolUse", bin=path)
 
-        self.assertEqual(read(path), "MZ replaced\n", "取り直した版は戻さない")
-        self.assertIn("rebased", result.stdout)
+        self.assertEqual(read(path), "MZ fake executable\n")
+        self.assertIn("restored", result.stdout)
         self.assertIn("ccnavi.exe", result.stdout)
-        self.assertIn("MZ replaced\n", self.store())
 
-    def test_取り直したあとの同じ版は繰り返し言わない(self):
+    def test_ツール呼び出しの中で変わった実行ファイルは実行後に直前の版へ戻す(self):
         path = self.binary()
         self.run_hook("SessionStart", bin=path)
+        self.run_hook("PreToolUse", bin=path)
         write(path, "MZ replaced\n")
-        built(path)
-        self.run_hook("PostToolUse", bin=path)
 
         result = self.run_hook("PostToolUse", bin=path)
 
-        self.assertNotIn("rebased", result.stdout)
+        self.assertEqual(read(path), "MZ fake executable\n")
+        self.assertIn("restored", result.stdout)
+
+    def test_ツール呼び出しの外で変わった実行ファイルは受け入れる(self):
+        # 再ビルドや別プロセスの書き込みは、次の実行前の照合で新しい版として基準に入る。
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path)
+        write(path, "MZ rebuilt\n")
+
+        self.run_hook("PreToolUse", bin=path)
+        result = self.run_hook("PostToolUse", bin=path)
+
+        self.assertEqual(read(path), "MZ rebuilt\n", "外の変更は戻さない")
+        self.assertIn("MZ rebuilt\n", self.store())
+        self.assertNotIn("restored", result.stdout)
+
+    def test_外で変わった版を基準にし_この呼び出しの変更はその版へ戻す(self):
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path)
+        write(path, "MZ rebuilt\n")
+        self.run_hook("PreToolUse", bin=path)
+        write(path, "MZ tampered\n")
+
+        result = self.run_hook("PostToolUse", bin=path)
+
+        self.assertEqual(read(path), "MZ rebuilt\n", "戻す先は、この呼び出しの直前の版")
+        self.assertIn("restored", result.stdout)
 
     def test_セッション開始を通らなければ実行ファイルは何も言わずに通る(self):
         # バックアップが無い状態。セッション開始のイベントに登録していないか、
@@ -1233,18 +1247,17 @@ class SelfGuardTest(unittest.TestCase):
         write(exe, "ELF fake executable\n")
         return spelled, launcher, exe
 
-    def test_scripts_に置いた振り分けの実体はセッション開始でバックアップし実行後に取り直す(self):
+    def test_scripts_に置いた振り分けの実体はセッション開始でバックアップし実行後に戻す(self):
         # G1。hook が実際に走らせるのは `.ccnavi/bin/<この機械>/ccnavi`。sh の隣
         # （`.ccnavi/scripts/<この機械>/`）を探していると、バックアップが無いまま差し替えを見逃す。
         spelled, _, exe = self.scripts_layout()
 
         self.run_hook("SessionStart", bin=spelled)
         write(exe, "ELF replaced\n")
-        built(exe)
         result = self.run_hook("PostToolUse", bin=spelled)
 
-        self.assertEqual(read(exe), "ELF replaced\n", "取り直した版は戻さない")
-        self.assertIn("rebased", result.stdout)
+        self.assertEqual(read(exe), "ELF fake executable\n")
+        self.assertIn("restored", result.stdout)
 
     def test_scripts_に置いた振り分けの実体は名指しのツールから止まる(self):
         # G2。既定の置き場では ccnavi ディレクトリの保護（`*/.ccnavi/*`）と二重に止まり、
@@ -1327,16 +1340,15 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("deny", result.stdout)
         self.assertIn("builtin-guard-binary", result.stdout)
 
-    def test_浅いパスの振り分けでも実体をセッション開始でバックアップし実行後に取り直す(self):
+    def test_浅いパスの振り分けでも実体をセッション開始でバックアップし実行後に戻す(self):
         # G6 のバックアップする側を、hook を通して確かめる。
         spelled, _, exe = self.scripts_layout(())
 
         self.run_hook("SessionStart", bin=spelled)
         write(exe, "ELF replaced\n")
-        built(exe)
         self.run_hook("PostToolUse", bin=spelled)
 
-        self.assertEqual(read(exe), "ELF replaced\n")
+        self.assertEqual(read(exe), "ELF fake executable\n")
 
     def test_ツールを呼ぶ前に外で作り直された実行ファイルは新しい版として取り直す(self):
         # ccnavi の外での再ビルドは、次のツール呼び出しの前に基準になる。
@@ -1344,7 +1356,6 @@ class SelfGuardTest(unittest.TestCase):
         path = self.binary()
         self.run_hook("SessionStart", bin=path)
         write(path, "MZ rebuilt\n")
-        built(path)
 
         self.run_hook("PreToolUse", bin=path)
 
@@ -1373,28 +1384,6 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertEqual(read(path), "MZ replaced\n", "予行では基準に触らない")
         self.assertIn("would-restore", result.stdout)
-
-    def test_組み立ての印が無い差し替えは取り直さず戻す(self):
-        # ccnavi の組み立てでない変更は、基準に取り込まない。エージェントが書いた版はここに当たる。
-        path = self.binary()
-        self.run_hook("SessionStart", bin=path)
-        write(path, "MZ tampered\n")
-
-        result = self.run_hook("PostToolUse", bin=path)
-
-        self.assertEqual(read(path), "MZ fake executable\n")
-        self.assertIn("restored", result.stdout)
-
-    def test_印と現物が合わなければ戻す(self):
-        # 印を書き換えても、現物の sha256 と一致しなければ組み立ての出力とは認めない。
-        path = self.binary()
-        self.run_hook("SessionStart", bin=path)
-        write(path, "MZ tampered\n")
-        write(path + selfguard.BUILT_SUFFIX, "0" * 64 + "\n")
-
-        self.run_hook("PostToolUse", bin=path)
-
-        self.assertEqual(read(path), "MZ fake executable\n")
 
     # セッション開始のバックアップ
 

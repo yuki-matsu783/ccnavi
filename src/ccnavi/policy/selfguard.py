@@ -418,8 +418,8 @@ def at_start(
 
     大きい対象をバックアップするのはここだけ。実行ファイルがこれにあたり、ツール呼び出しの
     たびに数十 MB をコピーするわけにはいかないので、コピーするのはセッションに 1 度。そのあいだに
-    作り直されたものは、次の照合（実行前・実行後）で大きさと更新時刻が変わっていることから見つかり、
-    新しい版を基準に取り直す。取り直しは報告に出る。
+    ツール呼び出しの外で作り直されたものは、次の実行前の照合で新しい版として基準に取り込む。
+    ツール呼び出しの中で変わったものは、実行後に、その直前の版へ戻す。
 
     小さいほうも一緒にバックアップする。実行前のバックアップが始まるのは最初のツール呼び出しからで、
     それより前に設定ファイルを消されると、バックアップを持たないまま実行後チェックに入る。
@@ -608,16 +608,15 @@ def _save_heavy(state_dir: str, session: str, target: selfguard_targets.Target) 
 def _check_heavy(
     setting: str, state_dir: str, session: str, target: selfguard_targets.Target
 ) -> Outcome | None:
-    """大きい対象を、大きさと更新時刻で照合する。変わっていれば、新しい版を基準に取り直す。
+    """大きい対象を、大きさと更新時刻で照合する。変わっていれば、直前の版に戻す。
 
-    中身は読まない。バックアップした時点の大きさと更新時刻を参照に書いてあるので、
-    変わればどちらかが必ず動く。同じ大きさで同じ時刻に作った別のものまでは
-    見分けられないが、そこを見分けるには毎回全部を読むことになり、実行前
-    チェックに設けた期限を設定ファイル 1 つのために使い切ることになる。
+    中身は読まない。参照に書いた大きさと更新時刻は、実行前の照合（`_rebase_if_changed`）で
+    そのツール呼び出しの直前の版に取り直してある。変わればどちらかが必ず動く。同じ大きさで
+    同じ時刻に作った別のものまでは見分けられないが、そこを見分けるには毎回全部を読むことに
+    なり、実行前チェックに設けた期限を設定ファイル 1 つのために使い切ることになる。
 
-    再ビルドを戻さないのは、開発中に実行ファイルを何度も作り直すため。取り直しは
-    報告に出る。差し替えも同じく新しい版として受け入れられるので、その意味で
-    この照合は「作り直しの検知」ではなく「基準の更新」になる。
+    ここで見つかる変化は、この呼び出しの中で起きたもの。ツール呼び出しの外の変更は、
+    実行前に基準へ取り込み済みなので、ここには出てこない。
 
     バックアップが無いときは何も出さない。セッション開始のイベントに登録していない、あるいは
     実行ファイルを指していない設定がこれで、異常ではない。登録の漏れは
@@ -630,47 +629,18 @@ def _check_heavy(
     if _same_shape(target.path, size, mtime):
         return None
     if setting != ENABLE:
-        if _accepted_build(target):
-            return Outcome(
-                target,
-                ACTION_WOULD,
-                "ccnavi の組み立てで変わった。enable なら新しい版を基準にする（触っていない）",
-            )
         return Outcome(
             target,
             ACTION_WOULD,
-            "ccnavi の組み立てでない変更。本来ならセッション開始の版に戻す（今回は触っていない）",
+            "このツール呼び出しで変わった。enable なら直前の版に戻す（今回は触っていない）",
         )
-    if _accepted_build(target):
-        return _rebase_heavy(state_dir, session, target)
-    # ccnavi の組み立てではない（差し替えられた、または消された）。取り直さず、
-    # セッション開始の版に戻す。
     return _restore_heavy(state_dir, digest, target, mtime)
-
-
-# build.py が組み立てのたびに、実行ファイルの隣へ置く印。中身は実行ファイルの sha256。
-BUILT_SUFFIX = ".built"
-
-
-def _accepted_build(target: selfguard_targets.Target) -> bool:
-    """今の実行ファイルが、ccnavi の組み立て（build.py）の出力か。
-
-    組み立てが置いた `<実行ファイル>.built` の sha256 と、現物の sha256 が一致するときだけ真。
-    印は実行ファイルと同じ置き場にあり、保護領域に入るので、エージェントの書き換えは通らない。
-    消えていれば偽。中身を読むので、大きさか更新時刻が変わったときにだけ呼ぶ。
-    """
-    if not os.path.exists(target.path):
-        return False
-    stamp = _read(target.path + BUILT_SUFFIX)
-    if not stamp:
-        return False
-    return stamp.decode("ascii", "replace").strip() == _digest(target.path)
 
 
 def _restore_heavy(
     state_dir: str, digest: str, target: selfguard_targets.Target, mtime: int
 ) -> Outcome:
-    """実行ファイルを、セッション開始の版（参照の digest の実体）に戻す。"""
+    """実行ファイルを、参照の版（直前のツール呼び出しの直前に取った版）に戻す。"""
     entry = _store_path(state_dir, digest)
     if not os.path.exists(entry):
         return Outcome(
@@ -688,25 +658,25 @@ def _restore_heavy(
     with contextlib.suppress(OSError):
         os.utime(target.path, (mtime, mtime))
     if existed:
-        detail = "ccnavi の組み立てでない変更なので、セッション開始の時点の実行ファイルに戻した"
+        detail = "このツール呼び出しで変わったので、直前の版に戻した"
     else:
-        detail = "消えていたので、セッション開始の時点の実行ファイルに戻した"
+        detail = "このツール呼び出しで消えたので、直前の版に戻した"
     return Outcome(target, ACTION_RESTORED, detail)
 
 
 def _rebase_if_changed(
     state_dir: str, session: str, target: selfguard_targets.Target
 ) -> Outcome | None:
-    """実行前の照合。大きさか更新時刻が変わっていれば、新しい版を基準に取り直す。
+    """実行前の照合。大きさか更新時刻が変わっていれば、ツール呼び出しの外の変更として受け入れる。
 
-    ccnavi の組み立てでない変わり方のときは何もしない。戻すのは実行後の照合（`_check_heavy`）が
-    受け持つ。
+    そのときの版を基準に取り直す。このツール呼び出しで起きた変化は、実行後の照合
+    （`_check_heavy`）が、ここで取った版に戻す。
     """
     ref = _parse_ref(_read(_ref_path(state_dir, session, target)))
     if ref is None:
         return None
     _, size, mtime = ref
-    if _same_shape(target.path, size, mtime) or not _accepted_build(target):
+    if _same_shape(target.path, size, mtime) or not os.path.exists(target.path):
         return None
     return _rebase_heavy(state_dir, session, target)
 
@@ -717,7 +687,7 @@ def _rebase_heavy(state_dir: str, session: str, target: selfguard_targets.Target
     if failed:
         return Outcome(target, ACTION_FAILED, f"新しい版を基準に取れない: {failed}")
     return Outcome(
-        target, ACTION_REBASED, "実行ファイルが変わったので、新しい版を基準にバックアップし直した"
+        target, ACTION_REBASED, "ツール呼び出しの外で変わったので、その版を基準にし直した"
     )
 
 
