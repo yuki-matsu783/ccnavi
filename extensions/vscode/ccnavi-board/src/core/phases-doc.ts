@@ -104,12 +104,12 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
   const kindText = scalarText(map, "kind") || "work";
   const kind: PhaseKind = (PHASE_KINDS as readonly string[]).includes(kindText) ? (kindText as PhaseKind) : "work";
   if (kind !== kindText) {
-    problems.push(`定義 ${id} の kind \`${kindText}\` は ${PHASE_KINDS.join(" か ")} ではありません。画面は work として出し、保存すると work になります`);
+    problems.push(`定義 ${id} の kind \`${kindText}\` は ${PHASE_KINDS.join("・")} のどれでもありません。画面は work として出し、保存すると work になります`);
   }
   const reviewText = scalarText(map, "review") || "mr";
   const review: Review = (REVIEWS as readonly string[]).includes(reviewText) ? (reviewText as Review) : "mr";
   if (review !== reviewText) {
-    problems.push(`定義 ${id} の review \`${reviewText}\` は ${REVIEWS.join(" か ")} ではありません。画面は mr として出し、保存すると mr になります`);
+    problems.push(`定義 ${id} の review \`${reviewText}\` は ${REVIEWS.join("・")} のどれでもありません。画面は mr として出し、保存すると mr になります`);
   }
 
   const rawScope = map.get("scope", true);
