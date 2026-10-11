@@ -362,7 +362,7 @@ class SyncTest(SyncHarness):
         mine = self.local_commit("mine.txt", "mine\n")
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("merge で取り込んだ", done.stdout)
+        self.assertIn("mergeで取り込んだ", done.stdout)
         parents = git(self.tree, "rev-list", "--parents", "-n", "1", "HEAD").stdout.split()[1:]
         self.assertEqual({theirs, mine}, set(parents))
 
