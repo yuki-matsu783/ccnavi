@@ -6,6 +6,8 @@
  * バンドルするのは `scripts/bundle-webview.js`（出口は `out/webview/projects.css`）。拡張ホストはそれを読んで
  * `<style nonce>` に流し込む（`src/core/projects-render.ts`）。
  */
-@import "../styles/page.css";
+@import "@ccnavi/shared/styles/button.css";
+@import "../styles/appearance.css";
+@import "@ccnavi/shared/styles/page.css";
 @import "./App.css";
 @import "./Project.css";

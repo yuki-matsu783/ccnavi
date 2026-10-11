@@ -1,12 +1,14 @@
 /*
- * 5 つの画面で同じ骨組み。本文・見出し上のツールバー（左にパス、右にボタン）・帯・注意・欄・脚注。
- * 画面ごとの部品（ボードの列、設定 3 画面の一覧、プロジェクトのカード）は各画面が足す。
+ * VS Code 拡張の画面と Chrome 拡張の設定画面で同じ骨組み。本文・見出し上のツールバー（左にパス、右にボタン）・
+ * 帯・注意・欄・脚注。画面ごとの部品（ボードの列、設定 3 画面の一覧、プロジェクトのカード）は各画面が足す。
  *
- * 色は VS Code のテーマ変数だけを使う（`--vscode-*`）。Claude の配色は body のクラスの下で
- * 同じ変数を上書きするだけなので（`appearance.css`）、部品はテーマ変数を読むまま変わらない。
+ * 色は VS Code のテーマ変数だけを使う（`--vscode-*`）。VS Code 拡張では Claude の配色が body のクラスの下で
+ * 同じ変数を上書きし（ccnavi-board の `src/webview/styles/appearance.css`）、Chrome 拡張では
+ * `browser-theme.css` が同じ変数を定義する。部品はテーマ変数を読むまま変わらない。
+ *
+ * ここは他の CSS を `@import` しない。読む側の入口（画面の `style.css`）が `button.css`・配色・この 1 本の順で
+ * 並べる。ここで `@import` すると、入口で並べた順とバンドルの順が食い違うため。
  */
-@import "./button.css";
-@import "./appearance.css";
 
 * { box-sizing: border-box; }
 body {

@@ -161,6 +161,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
+    "@ccnavi/shared": "workspace:*",
     "@types/jsdom": "^30.0.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.3.0",
