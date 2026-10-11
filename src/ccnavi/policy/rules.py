@@ -1039,8 +1039,17 @@ def _excepts(raw: dict, name: str) -> tuple[list[tuple[str, str]], Problem | Non
                 f"{where} に知らないキー（{', '.join(unknown)}）がある。"
                 f"書けるのは `{'` か `'.join(EXCEPT_FIELDS)}` の 1 つだけ",
             )
-        glob = str(item.get("glob") or "")
-        regex = str(item.get("regex") or "")
+        # 書いた値は文字列だけを受け取る。引用符の無い `on` は PyYAML が真偽値に読むので、
+        # 文字にすると 'True' に当てる except になってしまう（when の葉と同じ扱い）
+        for key in EXCEPT_FIELDS:
+            if key in item and not isinstance(item[key], str):
+                return [], Problem(
+                    SEVERITY_ERROR,
+                    name,
+                    f"{where} の {key} が文字列ではない。引用符で囲んでください",
+                )
+        glob = item.get("glob") or ""
+        regex = item.get("regex") or ""
         if not glob and not regex:
             return [], Problem(SEVERITY_ERROR, name, f"{where} に glob も regex も無い")
         if glob and regex:

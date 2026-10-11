@@ -144,6 +144,12 @@ class ErrorTest(unittest.TestCase):
         self.check([{"glob": "*.md", "why": "x"}], "except[0]", "知らないキー", "why")
         self.check([{"match": "Write"}], "except[0]", "知らないキー")
 
+    def test_文字列でない値は誤り(self):
+        # 引用符の無い `on` は真偽値に読まれる。黙って 'True' として当てない（when の葉と同じ）
+        for item in ({"glob": True}, {"regex": 5}, {"glob": ["*.md"]}, {"glob": None, "regex": 0}):
+            self.check([item], "except[0]", "文字列ではない")
+        self.check(yaml.safe_load("- glob: on"), "except[0]", "文字列ではない")
+
     def test_本体と同じ制約(self):
         self.check([{"regex": "a(?=b)"}], "except[0]", "先読み")
         self.check([{"regex": "a(?<!b)"}], "except[0]", "否定後読み")
