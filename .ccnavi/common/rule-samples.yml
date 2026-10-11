@@ -108,7 +108,16 @@ deny:
     subject: "/repo/.env.example"
     why: >-
       値を持たない見本の .env。共通の credentials-files は not で除くが、常に有効な組み込みの
-      builtin-credentials（実行ファイルの土台）が .env の後ろに続く名前ごと止める
+      builtin-credentials（実行ファイルの土台）が .env の後ろに続く名前ごと止める。
+      組み込みの match は Bash|Read|Write|Edit で、NotebookEdit には当たらない（ask の見本）
+  - tool: NotebookEdit
+    subject: "/repo/.claude/worktrees/x/secrets/.env.example"
+    why: >-
+      見本の名前で終わっても、secrets/ の下なので除かない。例外は .env の枝にだけ掛かる。
+      組み込みの builtin-credentials は NotebookEdit を見ないので、ここで外れると素通りする
+  - tool: NotebookEdit
+    subject: "/repo/.claude/worktrees/x/.env.local"
+    why: NotebookEdit でも .env は止める。組み込みは NotebookEdit を見ない
   - tool: Bash
     subject: "cat /repo/.env; cat /repo/.env.example"
     why: >-
@@ -213,6 +222,11 @@ ask:
     why: >-
       workspace-root の except で除く下書きの置き場。止めないが allow にも無いので、
       権限モードに渡る（端末からの試験では ask）
+  - tool: NotebookEdit
+    subject: "/repo/.claude/worktrees/x/.env.example"
+    why: >-
+      値を持たない見本の .env。credentials-files が除き、組み込みの builtin-credentials は
+      NotebookEdit を見ないので、どのルールにも当たらず権限モードへ渡る
   - tool: Write
     subject: "/repo/.claude/worktrees/x/pyproject.toml"
     why: 実行時の依存が変わる。main の側は deny なのでワークツリーで見る

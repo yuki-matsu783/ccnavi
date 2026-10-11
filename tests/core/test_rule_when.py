@@ -650,8 +650,21 @@ class CommonCredentialsTest(unittest.TestCase):
             "/repo/secrets/token.txt",
             "/repo/credentials.json",
             "/home/u/.ssh/id_ed25519",
+            # 見本の名前で終わっても、.env 以外の枝に当たるものは除かない
+            "/repo/secrets/.env.example",
+            "/home/u/.aws/.env.example",
+            "/repo/a.pem/.env.example",
+            "C:\\repo\\secrets\\.env.sample",
+            # 末尾の改行は名前の終わりではない（`$` は改行の直前にも当たる）
+            "/repo/.env.example\n",
         ):
-            self.assertTrue(self.rule.hits(subject), subject)
+            self.assertTrue(self.rule.hits(subject), repr(subject))
+
+    def test_NotebookEditも止める(self):
+        # 組み込みの builtin-credentials は NotebookEdit を見ないので、ここで外すと素通りする
+        for subject in ("/repo/secrets/.env.example", "/repo/.env", "/home/u/.aws/credentials"):
+            self.assertTrue(self.rule.matches("NotebookEdit", subject), subject)
+        self.assertFalse(self.rule.matches("NotebookEdit", "/repo/.env.example"))
 
     def test_通すもの(self):
         for subject in (
@@ -659,7 +672,8 @@ class CommonCredentialsTest(unittest.TestCase):
             "/repo/app/.env.sample",
             "C:\\repo\\.env.template",
             "/repo/x.env",
-            # 書き直す前の regex と同じく `.envrc` は当てない（組み込みが止める）
+            # 書き直す前の regex と同じく `.envrc` は当てない
+            # （Read / Write / Edit は組み込みが止める。NotebookEdit は見ない）
             "/repo/.envrc",
             "/repo/README.md",
         ):

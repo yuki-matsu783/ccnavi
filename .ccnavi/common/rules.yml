@@ -14,7 +14,8 @@
 #
 # 「A か B」「A かつ B」は glob / regex の代わりに when: で条件の木として書く。ノードは
 # `glob: '...'` / `regex: '...'`（葉）・`all: [...]`・`any: [...]`・`not: {...}` のどれか 1 つ。
-# credentials-files がこの形で、`all: [any: [認証情報の場所…], not: {any: [見本の .env]}]`。
+# credentials-files がこの形で、`any: [all: [.env, not: {any: [見本の .env]}], 残りの認証情報の場所…]`。
+# 例外を .env の枝の中に置き、他の枝に当たるパスまで外さない。
 # 除くだけなら except のほうが読みやすいので、workspace-root は except のままにしてある。
 version: 1
 
@@ -97,33 +98,36 @@ deny:
 
   # ファイルを扱うツールは対象がパス 1 つなので、条件の木で見本の .env を除ける
   # （.env.example / .env.sample / .env.template。値を持たない）。除くのは名前で終わる形だけで、
-  # `.env.example.bak` は除かない。葉は上の credentials の regex を意味ごとに分けたもの。
+  # `.env.example.bak` も、末尾に改行を足した形も除かない（`$` は改行の直前にも当たるので `\Z`）。
+  # 例外は .env の枝にだけ掛ける。木全体に掛けると `secrets/.env.example` や `.aws/.env.example`
+  # のように他の枝に当たるパスまで外れ、組み込みの builtin-credentials が見ない NotebookEdit では
+  # そのまま素通りする。葉は上の credentials の regex を意味ごとに分けたもの。
   - id: credentials-files
     match: Read|Write|Edit|NotebookEdit
     when:
-      all:
-        - any:
-            # .env と、.env.local / .env.production のような環境名付き
+      any:
+        # .env と、.env.local / .env.production のような環境名付き。見本だけは除く
+        - all:
             - regex: '(^|[ \\/])\.env\b'
-            # Cloudflare Workers の手元の秘密
-            - regex: '(^|[ \\/])\.dev\.vars\b'
-            # パッケージの取得・公開の認証
-            - regex: '(^|[ \\/])\.netrc\b'
-            - regex: '(^|[ \\/])\.npmrc\b'
-            - regex: '(^|[ \\/])\.pypirc\b'
-            # クラウドと SSH の鍵の置き場
-            - regex: '(^|[ \\/])\.aws[\\/]'
-            - regex: '(^|[ \\/])\.ssh[\\/]'
-            # 鍵のファイル（拡張子として書かれた形）
-            - regex: '[\w\-\\/]\.(pem|key)\b'
-            - regex: '[\\/]secrets[\\/]'
-            - regex: '[\\/]credentials([\\/]|\.json\b)'
-            - regex: '\b(id_rsa|id_ed25519)\b'
-        - not:
-            any:
-              - regex: '(^|[\\/])\.env\.example$'
-              - regex: '(^|[\\/])\.env\.sample$'
-              - regex: '(^|[\\/])\.env\.template$'
+            - not:
+                any:
+                  - regex: '(^|[\\/])\.env\.example\Z'
+                  - regex: '(^|[\\/])\.env\.sample\Z'
+                  - regex: '(^|[\\/])\.env\.template\Z'
+        # Cloudflare Workers の手元の秘密
+        - regex: '(^|[ \\/])\.dev\.vars\b'
+        # パッケージの取得・公開の認証
+        - regex: '(^|[ \\/])\.netrc\b'
+        - regex: '(^|[ \\/])\.npmrc\b'
+        - regex: '(^|[ \\/])\.pypirc\b'
+        # クラウドと SSH の鍵の置き場
+        - regex: '(^|[ \\/])\.aws[\\/]'
+        - regex: '(^|[ \\/])\.ssh[\\/]'
+        # 鍵のファイル（拡張子として書かれた形）
+        - regex: '[\w\-\\/]\.(pem|key)\b'
+        - regex: '[\\/]secrets[\\/]'
+        - regex: '[\\/]credentials([\\/]|\.json\b)'
+        - regex: '\b(id_rsa|id_ed25519)\b'
     message: >-
       認証情報を含む場所です。中身を読まず、必要な値をユーザに尋ねてください。
       値を持たない見本（.env.example / .env.sample / .env.template）は除いています。
