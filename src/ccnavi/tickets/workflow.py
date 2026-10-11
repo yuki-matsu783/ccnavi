@@ -83,12 +83,8 @@ def effective(parent: ticket_model.Ticket) -> ticket_model.Workflow:
     return parent.workflow if parent.workflow is not None else compute(parent)
 
 
-def waits_of(parent: ticket_model.Ticket, number: int, types: dict | None = None) -> list[int]:
-    """N 番目が待つ番号。計画に無い番号は前の番号を全部待つ（止まる側）。
-
-    `types` は前の呼び方の名残りで、読まない（待ち方はフェーズ定義を読まない）。
-    """
-    del types
+def waits_of(parent: ticket_model.Ticket, number: int) -> list[int]:
+    """N 番目が待つ番号。計画に無い番号は前の番号を全部待つ（止まる側）。"""
     return list(effective(parent).waits.get(number, range(1, number)))
 
 
@@ -174,7 +170,7 @@ def problems(
             if target is None:
                 error(
                     f"`{key}[{i}]` の延期を引き受ける項が無い"
-                    "（後ろにこれを待つ、延期していない項が要る）"
+                    "（この項を待つ、延期していない後ろの項が要る）"
                 )
                 continue
             target_item = numbered[target]

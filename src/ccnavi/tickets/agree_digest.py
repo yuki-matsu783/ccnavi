@@ -233,8 +233,7 @@ def revised_front(current: ticket_model.Ticket, revised: ticket_model.Ticket) ->
     同じものから組むので、見せた中身と書く中身が食い違わない。項の `after` も書く
     （`PlanItem.as_raw`）。`phases:`（計画が使う定義の写し）は提案の値に差し替える。差し替えないと
     改版で足した項（フィードバック計画の立案は必ず改版）が `phases:` に無い定義名を使うことになり、
-    承認したとたんに親と子が全部止まる。提案に `phases:` が無ければ外す。前の版の承認済み
-    チケットに残る `workflow:` 欄はそのまま残す（読まない）。
+    承認したとたんに親と子が全部止まる。提案に `phases:` が無ければ外す。
     """
     front = dict(current.raw)
     front["plan"] = [item.as_raw() for item in revised.plan]

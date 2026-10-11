@@ -21,7 +21,7 @@ import { embedJson, type DataMessage } from "./screen-host.js";
 import type { RulesSum } from "./sums.js";
 import type { TargetOption } from "./targets.js";
 import type { SuggestJson } from "./suggestmodel.js";
-import type { SamplesJson, TestJson } from "./testmodel.js";
+import type { ExpectationsJson, TestJson } from "./testmodel.js";
 import type { CondNode } from "./rules-when.js";
 
 // ---- ルールの形（画面と読み書きで分け合う）
@@ -144,7 +144,7 @@ export interface RulesPage {
   readonly hooks: readonly HookEntry[];
   /** 読めた設定ファイル。無いものは一覧に「無い」と出す */
   readonly hookFiles: { readonly settings: boolean; readonly settingsLocal: boolean };
-  readonly samplesPath: string;
+  readonly expectationsPath: string;
   readonly lock: Lock;
   /** 上部に出す注意（実行ファイルがこの設定を読めていない、など） */
   readonly notices?: readonly string[];
@@ -176,7 +176,7 @@ export type RulesData =
 /**
  * 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める（渡すのはそこ）。
  *
- * `judged` と `sampled` は実行ファイルに聞いた判定の結果、`suggested` は記録から起こした候補、`failed` は操作の結果をその場で言う
+ * `judged` と `expectationsChecked` は実行ファイルに聞いた判定の結果、`suggested` は記録から起こした候補、`failed` は操作の結果をその場で言う
  * 一言、`lock` は保存してよいかの取り直し、`changed` はファイルが外で変わったという帯、
  * `picked` はダイアログで選んだファイルのパス。どれも画面の編集には触らない
  * （`picked` は名指しした 1 欄だけを埋める）。
@@ -184,7 +184,7 @@ export type RulesData =
 export type ToRules =
   | DataMessage<RulesData>
   | { readonly type: "judged"; readonly result: TestJson; readonly hooks: readonly HookEntry[] }
-  | { readonly type: "sampled"; readonly result: SamplesJson }
+  | { readonly type: "expectationsChecked"; readonly result: ExpectationsJson }
   | { readonly type: "suggested"; readonly result: SuggestJson }
   | { readonly type: "failed"; readonly message: string }
   | { readonly type: "lock"; readonly lock: Lock }
@@ -207,12 +207,12 @@ export type RulesMessage =
    * 「破棄して切り替える？」を聞くかを決める
    */
   | { readonly type: "dirty"; readonly dirty: boolean }
-  | { readonly type: "openFile"; readonly which: "rules" | "samples" }
+  | { readonly type: "openFile"; readonly which: "rules" | "expectations" }
   | { readonly type: "save"; readonly sections: Sections }
   /** 編集中の内容で 1 件だけ判定する。保存は要らない */
   | { readonly type: "judge"; readonly sections: Sections; readonly tool: string; readonly subject: string }
-  /** 編集中の内容でサンプルを一括で判定する */
-  | { readonly type: "samples"; readonly sections: Sections }
+  /** 編集中の内容で期待する判定を一括で確かめる */
+  | { readonly type: "expectations"; readonly sections: Sections }
   /** 記録からルールの候補を起こす（`--suggest --json`）。読むのは保存済みのルールで、編集中の内容は渡さない */
   | { readonly type: "suggest" }
   | { readonly type: "pickFile"; readonly key: string; readonly field: FileField }

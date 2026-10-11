@@ -387,3 +387,42 @@ test("CB-D186 線を変えたら、答えを待つ間も拡張ホストに「確
     await dom.close();
   }
 });
+
+test("CB-D187 項を押すと右の欄に詳細を出す。欄は畳め、畳んだことは覚える", async () => {
+  const dom = await openWorkflow();
+  try {
+    assert.ok(dom.one('.plan-graph[data-part="plan"] .plan-detail-empty').textContent?.includes("項を押すと"));
+    dom.click(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n2"]'));
+    await dom.settle();
+    const detail = dom.one('.plan-graph[data-part="plan"] .plan-detail-list');
+    assert.equal(detail.getAttribute("data-number"), "2");
+    assert.ok(detail.textContent?.includes("設計"));
+    assert.equal(dom.one('.plan-graph[data-part="plan"] .plan-node[data-picked="1"] .plan-node-title').textContent, "設計");
+    dom.click(dom.one('.plan-graph[data-part="plan"] button[data-action="toggle-plan-detail"]'));
+    await dom.settle();
+    assert.equal(dom.one('.plan-graph[data-part="plan"] .plan-detail').getAttribute("data-folded"), "1");
+    assert.equal(dom.one('.plan-graph[data-part="feedback"] .plan-detail').getAttribute("data-folded"), "1", "ほかの計画の欄も同じ状態");
+    assert.ok(dom.all('.plan-graph[data-part="plan"] .plan-detail-list').length > 0, "畳んでも中身は残す");
+    dom.click(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n1"] .react-flow__handle'));
+    await dom.settle();
+    assert.equal(dom.one('.plan-graph[data-part="plan"] .plan-detail-list').getAttribute("data-number"), "2", "取っ手のクリックでは選び直さない");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D189 図の拡大ボタンで図だけを全画面にし、閉じる・Esc で戻す", async () => {
+  const dom = await openWorkflow();
+  try {
+    const canvas = '.plan-graph[data-part="plan"] .plan-graph-canvas';
+    assert.equal(dom.one(canvas).classList.contains("is-max"), false);
+    dom.click(dom.one(`${canvas} button[data-action="toggle-maximize"]`));
+    await dom.settle();
+    assert.ok(dom.one(canvas).classList.contains("is-max"));
+    dom.key("Escape");
+    await dom.settle();
+    assert.equal(dom.one(canvas).classList.contains("is-max"), false);
+  } finally {
+    await dom.close();
+  }
+});

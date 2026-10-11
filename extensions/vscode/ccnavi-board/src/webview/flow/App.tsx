@@ -53,7 +53,8 @@ import { canRedo, canUndo, emptyHistory, record, redo, seal, undo, type FlowHist
 import type { FlowChecks, FlowData, FlowLock, FlowOffer, FlowPage, FlowProposal, ToFlow } from "../../core/flow-view.js";
 import { applyAppearance } from "../appearance.js";
 import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
-import { getState, setState } from "../vscode.js";
+import { graphMaximized } from "../shared/Maximize.js";
+import { mergeState, readState } from "../vscode.js";
 import { Canvas, type Selection } from "./Canvas.js";
 import { Inspector } from "./Inspector.js";
 import { post } from "./post.js";
@@ -78,23 +79,25 @@ function pageOf(data: FlowData): FlowPage | undefined {
   return data.kind === "page" ? data.page : undefined;
 }
 
-/** 画面が覚えておくもの（HTML を作り直しても残る）。いまはミニマップを出すかだけ */
+/** 画面が覚えておくもの（HTML を作り直しても残る）。ミニマップを出すか、左右の欄を畳んだか */
 function minimapShown(): boolean {
-  try {
-    const state = getState() as { minimap?: unknown } | undefined;
-    return state?.minimap !== false;
-  } catch {
-    return true;
-  }
+  return readState("minimap") !== false;
 }
 
 function rememberMinimap(shown: boolean): void {
-  try {
-    const state = (getState() ?? {}) as Record<string, unknown>;
-    setState({ ...state, minimap: shown });
-  } catch {
-    // 覚えられなくても画面は動く
-  }
+  mergeState("minimap", shown);
+}
+
+type Side = "palette" | "side";
+
+function sideFolded(side: Side): boolean {
+  const folded = readState("folded") as Record<string, unknown> | undefined;
+  return folded?.[side] === true;
+}
+
+function rememberSideFolded(side: Side, folded: boolean): void {
+  const now = (readState("folded") ?? {}) as Record<string, unknown>;
+  mergeState("folded", { ...now, [side]: folded });
 }
 
 /**
@@ -178,6 +181,14 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   // 図の外で選んだノード（部品箱で足した・グループ化で作った・貼り付けた）。図はこれが替わったときだけ、それを選び直す
   const [focus, setFocus] = useState<{ readonly ids: readonly string[] } | undefined>(undefined);
   const [minimap, setMinimap] = useState(minimapShown);
+  const [folded, setFolded] = useState<Readonly<Record<Side, boolean>>>(() => ({ palette: sideFolded("palette"), side: sideFolded("side") }));
+  const toggleSide = (side: Side): void => {
+    setFolded((now) => {
+      const next = !now[side];
+      rememberSideFolded(side, next);
+      return { ...now, [side]: next };
+    });
+  };
   const [reviewSave, setReviewSave] = useState(() => pageOf(initial)?.reviewSave === true);
   const [review, setReview] = useState<FlowDiff | undefined>(undefined);
   // コピーしたノード（画面の中に保持する）と、同じものを何回貼り付けたか（貼り付けるたびに少しずつずらす）
@@ -202,6 +213,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   // 取り込んだ下書きのハッシュと中身。編集中の中身が取り込んだ中身と同じ間だけ持ち、保存に付ける（違えば下書きを消させない）
   const imported = useRef<{ readonly hash: string; readonly doc: FlowDoc } | undefined>(undefined);
   const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
+  // 案内の間は、畳んだ欄も開いて見せる（案内が指す部品箱と右の欄が見えるように）。覚えている状態は変えない
+  const fold = { palette: folded.palette && !tour.touring, side: folded.side && !tour.touring };
   const requestTour = tour.request;
 
   useEffect(() => {
@@ -556,6 +569,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   onKey.current = (event: KeyboardEvent): void => {
+    // 図を全画面にしている間は、見えない文書を直さない
+    if (graphMaximized()) {
+      return;
+    }
     if (proposal !== undefined || requestText !== undefined) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -696,9 +713,11 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           ))}
         </ul>
       )}
-      <div className="flow-body">
-        <nav className="flow-palette" id="flow-palette" aria-label="部品箱">
-          <h2>部品</h2>
+      <div className="flow-body" data-palette-folded={fold.palette ? "1" : "0"} data-side-folded={fold.side ? "1" : "0"}>
+        <nav className="flow-palette" id="flow-palette" aria-label="部品箱" data-folded={fold.palette ? "1" : "0"}>
+          <button type="button" className="action small flow-fold" data-action="toggle-palette" aria-expanded={!fold.palette} title={fold.palette ? "部品箱を開く" : "部品箱を畳む"} onClick={() => toggleSide("palette")}>
+            {fold.palette ? "▶ 部品" : "◀ 部品"}
+          </button>
           {PALETTE.map((type) => {
             const badge = badgeOf(type);
             return (
@@ -735,7 +754,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
             }
           }}
         />
-        <div className="flow-side">
+        <div className="flow-side" data-folded={fold.side ? "1" : "0"}>
+          <button type="button" className="action small flow-fold" data-action="toggle-side" aria-expanded={!fold.side} title={fold.side ? "右の欄を開く" : "右の欄を畳む"} onClick={() => toggleSide("side")}>
+            {fold.side ? "◀ 詳細" : "詳細 ▶"}
+          </button>
           <Inspector doc={doc} selected={selected} readOnly={readOnly} onChange={edit} onSeal={() => setHistory(seal)} onSelect={setSelected} candidates={checks?.candidates} />
           <Preview checks={checks} checking={checking} error={checkError} />
         </div>

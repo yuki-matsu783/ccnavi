@@ -266,7 +266,7 @@ class _Family:
             if carried:
                 stops.append(
                     "取り込み済みの親子（C1 の対象）で、承認済みチケットが親のブランチに"
-                    "未コミット。ユーザが運ぶまで start は止まる"
+                    "未コミット。ユーザがコミットして push するまで start は止まる"
                 )
         else:
             if not _started_recorded(self.conf, t):
@@ -294,13 +294,15 @@ class _Family:
         if uncommitted:
             nexts.append(
                 f"承認済みチケットが未コミット。ユーザに '{self.push_sh} {self.name}' を"
-                "打ってもらう（エージェントは運ばない）"
+                "打ってもらう（エージェントはコミットも push もしない）"
             )
         if stops:
-            nexts.append("止まっている理由を解く（ユーザに確かめる）")
+            nexts.append("止まっている原因を解消する（ユーザに確かめる）")
         elif not t.started_at:
             if uncommitted and verdict == c1.TARGET_NO:
-                nexts.append("運ぶのを待たずに start へ進んでよい（この親子は C1 の対象ではない）")
+                nexts.append(
+                    "コミットと push を待たずに start へ進んでよい（この親子は C1 の対象ではない）"
+                )
             nexts += self._start_lines(t)
         elif t.is_child:
             nexts.append(

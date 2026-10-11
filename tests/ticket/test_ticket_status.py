@@ -5,7 +5,8 @@
 止まっている理由・次の一手を ccnavi が言う。見るのは次のとおり。
 
 1. 手で置いて未コミットの承認: 時刻は「未コミット（手で置いた）」、ユーザに運んでもらう案内。
-   C1 の対象でなければ「start へ進んでよい」、対象なら「ユーザが運ぶまで start は止まる」
+   C1 の対象でなければ「start へ進んでよい」、対象なら
+   「ユーザがコミットして push するまで start は止まる」
 2. コミット済みで未 push・push 済みを、手元のリモート追跡の ref で言い分ける
 3. 止まっている理由: 親が未着手・先行・C1 が止める親子。基準点が HEAD の祖先でないことと、
    再開で残った欄は注意
@@ -78,7 +79,7 @@ class TicketStatusTest(PhaseHarness):
         self.assertIn("着手: 未着手", mine)
         self.assertIn("置き場のファイル: 未コミット", mine)
         self.assertIn("ccnavi-push-approved.sh i0001", mine)
-        self.assertIn("エージェントは運ばない", mine)
+        self.assertIn("エージェントはコミットも push もしない", mine)
         self.assertIn("start へ進んでよい", mine)
         self.assertIn("ccnavi-ticket.sh start i0001", mine)
         self.assertIn("親（メインエージェント）だけが実行する", mine)
@@ -96,7 +97,7 @@ class TicketStatusTest(PhaseHarness):
         git(self.parent_tree, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
         self.assertEqual(self.c1_target("i0001"), "yes")
         mine = self.block(self.said("i0001"), "i0001")
-        self.assertIn("ユーザが運ぶまで start は止まる", mine)
+        self.assertIn("ユーザがコミットして push するまで start は止まる", mine)
         self.assertNotIn("start へ進んでよい", mine)
         self.assertNotIn("ccnavi-ticket.sh start", mine)
 

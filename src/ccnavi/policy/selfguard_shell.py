@@ -62,7 +62,7 @@ from . import rules, selfguard_targets
 #
 # 実行前チェックはルールの regex で当てる（rules._build を通る、組み込みのルールの 1 本）。
 # 語のリストを Python で解くと、ルールの外に判定の経路がもう 1 本できて、組み込みの既定
-# （builtin）と `--lint` の見本（check_rules）から見えなくなる。shellread が語を空白で、
+# （builtin）と `--lint` の期待する判定（check_rules）から見えなくなる。shellread が語を空白で、
 # コマンドを `\x00` で、引用がつないだ空白を WORD_SEP で区切って渡すので、語の並びは
 # regex でも読める。2 つの枝は「または」で並ぶので、読み違えて両方を見る形は止まる側に倒れる。
 # 読み違えて両方を見落とす形が無いように、語の分け方を _COPY_TARGET と _COPY_LAST で揃える。
@@ -794,7 +794,7 @@ COMMON_LAYER_RULE_ID = "builtin-guard-common-layer"
 
 COMMON_LAYER_MESSAGE = (
     "ccnavi の共通レイヤーの設定（ルール・フェーズ定義・リスクの配点）です。どのツリーの判定にも"
-    "効くので、エージェントが書き換えると自分の判定を緩められます。変更が要るなら、下書きを"
+    "使われるので、エージェントが書き換えると自分の判定を緩められます。変更が要るなら、下書きを"
     "検証したうえで何をなぜ変えたいのかを伝えてユーザに依頼してください（/ccnavi-config）。"
     "読むだけなら止まりません。"
 )
@@ -804,7 +804,7 @@ RECORDS_RULE_ID = "builtin-guard-records"
 RECORDS_MESSAGE = (
     "ccnavi の記録と state の置き場（logs/decisions*.jsonl と logs/state/）か、閉じたチケットの"
     "退避（logs/archive/）です。判定が読み、「ccnavi が何を判定したか」・「何が閉じたか」を"
-    "後から確かめる元なので、エージェントは書き換えません。"
+    "後から確かめるための材料なので、エージェントは書き換えません。"
     "シェルからの書き込みでも拒否される場所です。読むだけなら止まりません。"
 )
 

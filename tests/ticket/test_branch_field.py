@@ -269,14 +269,14 @@ class BranchFieldApprovalTest(unittest.TestCase):
         self.parent_tree()
         self.propose()
         lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertIn(f"親 {PARENT} のワークツリーが {BRANCH} の上に居る", lint.stdout)
+        self.assertIn(f"親 {PARENT} のワークツリーが {BRANCH} の上にある", lint.stdout)
         # 承認の後、識別子のブランチの上に居れば、承認済みの branch: と違うと言う
         self.approve()
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "approve")
         git(self.tree, "checkout", "-q", "-b", PARENT)
         lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertIn(f"親 {PARENT} のワークツリーが {PARENT} の上に居る", lint.stdout)
+        self.assertIn(f"親 {PARENT} のワークツリーが {PARENT} の上にある", lint.stdout)
         self.assertIn(f"branch: の {BRANCH}", lint.stdout)
 
     def test_lint_is_quiet_on_the_approved_branch(self):
@@ -284,7 +284,7 @@ class BranchFieldApprovalTest(unittest.TestCase):
         self.propose()
         self.approve()
         lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertNotIn("の上に居る", lint.stdout)
+        self.assertNotIn("の上にある", lint.stdout)
 
     def approve(self):
         done = self.ccnavi("--agree", stdin="y\n")
@@ -453,7 +453,8 @@ class ChromeBranchFieldTest(unittest.TestCase):
         self.assertEqual(closure["ambiguous"], [other])
         board = self.ask("board", branches=branches)
         self.assertIn(
-            "先行の親子のチケット（feature-20-dep）を宣言するブランチが 1 本でない",
+            "先行の親子のチケット（feature-20-dep）の親のブランチとして"
+            "宣言されているブランチが 1 本でない",
             board["undecided"],
         )
 

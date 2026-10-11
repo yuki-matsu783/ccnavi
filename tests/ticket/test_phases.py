@@ -288,13 +288,12 @@ class PhaseTest(PhaseHarness):
         )
         self.assertEqual(problems, [])
         self.assertEqual(types["fb"].review, phasetypes.REVIEW_CHAT)
-        # 順序の欄（overlap など）は読まずに warn で言う。指す先が無くても error にしない。
+        # 順序の欄（overlap など）は読まない。指す先が無くても問題にしない。
         types, problems = phasetypes.parse(
             "version: 1\nphases:\n  a: {title: A, kind: work, overlap: [nope]}\n"
         )
         self.assertIsNotNone(types, problems)
-        self.assertEqual([p.severity for p in problems], ["warn"])
-        self.assertIn("読まない", problems[0].detail)
+        self.assertEqual(problems, [])
         types, problems = phasetypes.parse(PHASES)
         self.assertEqual(problems, [])
         self.assertEqual(
@@ -470,7 +469,7 @@ class PhaseTest(PhaseHarness):
             os.path.exists(os.path.join(self.approved, "doing", "i0001-01-03.md")), result.stderr
         )
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
-        self.assertIn("同じ承認で i0001-01-03 を足すので開き直る", result.stderr)
+        self.assertIn("同じ承認で i0001-01-03 を足すので再び開く", result.stderr)
 
     def test_a_new_parent_and_a_later_phase_child_together_still_keep_the_order(self):
         """承認済みチケットの無い親と、2 番目のフェーズの子を一緒に承認しても、子は通さない。
@@ -675,7 +674,7 @@ class PhaseTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["design"], feedback=["implement-feedback"]))
         planned = self.approve()
         self.assertEqual(planned.returncode, 0, planned.stdout + planned.stderr)
-        self.assertIn("済んだ扱い", planned.stdout)
+        self.assertIn("済ませた扱い", planned.stdout)
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次")
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(spawn))
         result = self.ccnavi("--explain")
@@ -801,7 +800,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("ready", closed.stdout)
         self.assertIn("`wip/` の追跡済みのファイルを消して", closed.stdout)
         self.assertIn("ready --parent i0001", closed.stdout)
-        self.assertIn("合意の範囲に入る", closed.stdout)
+        self.assertIn("合意した範囲に入る", closed.stdout)
         self.assertIn("確認を取り直さずに進める", closed.stdout)
         self.assertIn("squash", closed.stdout)
         # 閉じた記録は進め方によらず置く。

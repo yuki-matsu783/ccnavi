@@ -340,7 +340,7 @@ function FlowButton({ flow, id, closed }: { readonly flow: FlowJson; readonly id
       data-action="flow"
       data-ticket={id}
       data-flow={state}
-      title={`子チケットの作業の手順（フロー）を図で${closed && !flow.locked ? "見ます。終了済みのため書き換える必要はありません" : flow.locked ? "見ます。着手中は書き換えられません" : `${flow.exists ? "直します" : "作ります"}。着手すると、終わるまで書き換えられなくなります`}（${flow.rel}）`}
+      title={`子チケットの作業の手順（フロー）を図で${closed && !flow.locked ? "見ます。終了済みのため書き換える必要はありません" : flow.locked ? "見ます。着手中・レビュー中は書き換えられません" : `${flow.exists ? "直します" : "作ります"}。着手すると、終わるまで書き換えられなくなります`}（${flow.rel}）`}
       onClick={() => post({ type: "flow", ticket: id })}
     >
       {flowButtonLabel(flow, closed)}

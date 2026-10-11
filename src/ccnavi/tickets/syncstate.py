@@ -329,7 +329,7 @@ class DoneCopy:
     """統合先の `done/` 上のチケットの、閉じたかを決めるのに要る欄だけ。
 
     照合に使うのは、スクリプトだけが書く着手と取り消しの欄（`base_sha`・`started_at`・
-    `cancelled_at`）。`approved_at` は、承認で欄を書いていた頃の古い形を読むためだけに持つ。
+    `cancelled_at`）。
     """
 
     ticket: str
@@ -337,7 +337,6 @@ class DoneCopy:
     base_sha: str = ""
     started_at: str = ""
     cancelled_at: str = ""
-    approved_at: str = ""
 
 
 # 同じ親かを比べる欄。最初に両方が値を持つ欄で決める。
@@ -350,8 +349,6 @@ def same_parent(mine: DoneCopy | None, closed: DoneCopy) -> bool:
     `base_sha` → `started_at` → `cancelled_at` の順に、最初に両方が値を持つ欄が同じなら同じとする。
     空どうしは一致としない（空文字は無いとみなす）。どの欄でも照合できないとき、手元に親が無いときは
     同じとしない（閉じていない側に倒し、止めて戻し方を出す）。
-
-    移行の間だけ、両方に 3 つとも無く両方に古い `approved_at` があれば、それで比べる。
     """
     if mine is None:
         return False
@@ -359,9 +356,7 @@ def same_parent(mine: DoneCopy | None, closed: DoneCopy) -> bool:
         a, b = getattr(mine, name), getattr(closed, name)
         if a and b:
             return a == b
-    if any(getattr(c, n) for c in (mine, closed) for n in MATCH_FIELDS):
-        return False
-    return bool(mine.approved_at) and mine.approved_at == closed.approved_at
+    return False
 
 
 def done_copy(integ: Integration, approved_rel: str, ident: str) -> DoneCopy | None:
@@ -391,15 +386,12 @@ def _copy_fields(text: str) -> DoneCopy | None:
     front, _, problems = ticket_mod._frontmatter(text)
     if not isinstance(front, dict) or problems:
         return None
-    record = front.get("ccnavi_approved")
-    approved_at = record.get("approved_at") if isinstance(record, dict) else ""
     return DoneCopy(
         ticket=_text(front.get("ticket")),
         parent=_text(front.get("parent")),
         base_sha=_text(front.get("base_sha")),
         started_at=_text(front.get("started_at")),
         cancelled_at=_text(front.get("cancelled_at")),
-        approved_at=_text(approved_at),
     )
 
 
@@ -636,7 +628,7 @@ class Families:
             return f"親のブランチ {branch} は使えない（{why}）"
         hits = [n for n in self.integration_names(project) if n.casefold() == branch.casefold()]
         if hits:
-            return f"親のブランチ {branch} は統合先の名前（{', '.join(hits)}）に当たる"
+            return f"親のブランチ {branch} は統合先の名前（{', '.join(hits)}）と同じ"
         return ""
 
     def _all_trees(self) -> list[tree.Tree]:
@@ -748,7 +740,8 @@ class Families:
         else:
             rivals = [b for b in self.claims(family_id, project) if b != branch]
             stop = (
-                f"親子のチケット {family_id} を宣言するブランチが 1 本でない"
+                f"親子のチケット {family_id} の親のブランチとして"
+                "宣言されているブランチが 1 本でない"
                 f"（{', '.join([branch, *rivals])}。どれもその上の親チケットが自分のブランチだと"
                 "宣言している）。どのチケットを正とするかが決まらない"
                 if rivals
@@ -937,7 +930,7 @@ def guidance(root: str, st: Standing) -> list[str]:
     if "まだ送っていない（取り込み状態は" in st.stop:
         return [
             f"親のワークツリー（.claude/worktrees/{name}）で '{git} push -u origin {branch}' "
-            f"を打つと、取り込み状態が {branch} に書き直り、止めが外れる"
+            f"を打つと、取り込み状態が {branch} に書き直され、停止が解除される"
         ]
     if "検査を通らないので" in st.stop:
         return [

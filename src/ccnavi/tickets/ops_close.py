@@ -142,7 +142,7 @@ def family_stopped(
         stderr.write(
             f"ccnavi: {found.ticket}: チケットが親のブランチ {st.family} のワークツリーの外"
             f"（{found.tree or 'ワークスペースルート'}）にしか無い。"
-            "取り込み済みの親子のチケットでは親のブランチ上のチケットだけが正なので、このチケットは動かさない\n"
+            "取り込み済みの親子のチケットでは親のブランチ上のチケットだけが正なので、このチケットは動かさない。\n"
             f"  ユーザがそのチケットを親のワークツリー（.claude/worktrees/{st.family}）へ移して"
             "コミットと push をしてから打ち直す\n"
         )
@@ -187,7 +187,7 @@ def parent_not_started(
     if parent.state != ticket_model.DOING:
         # 置き場だけを言う。`review/` に親があるのは不整合なデータのときだけだが、そこで
         # 「閉じた」と言うと、文面が事実と違う。
-        stderr.write(head + f"は作業中ではない（いまは {parent.state}/）。子を足す相手ではない\n")
+        stderr.write(head + f"は作業中ではない（いまは {parent.state}/）。子を足せる親ではない\n")
         return True
     if not parent.started_at:
         stderr.write(

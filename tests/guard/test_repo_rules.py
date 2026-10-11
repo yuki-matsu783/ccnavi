@@ -11,7 +11,7 @@ tests/fixtures/ のルールではなく、運用に使っている rules.yml �
 3.4・3.5 節、12 節の A1〜A4・W1〜W3・W6・W7）。
 
 道具は外から動かす。`--test <tool> <subject> --json` の `verdict` と `rules[].id` を読む
-（形は README「試験の JSON」）。見本の `/repo` は `--root` に渡したルートに読み替える。
+（形は README「試験の JSON」）。期待する判定の `/repo` は `--root` に渡したルートに読み替える。
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from tests.inproc import run_ccnavi
 
 RULES = os.path.join(ROOT, ".ccnavi", "common", "rules.yml")
 
-# 見本のパスに書く合言葉。--test-samples と同じ読み替えを、ここでは自分で行う。
+# 期待する判定のパスに書く合言葉。--test-expectations と同じ読み替えを、ここでは自分で行う。
 PLACEHOLDER = "/repo"
 
 # 配布先の hook が起動する振り分けの sh（launcher-scripts 1 節）。
@@ -561,7 +561,7 @@ class SubstRepoRulesTest(unittest.TestCase):
 
     wip/design/shellread-subst.md の 3 と 4.3。
 
-    見本は (subject, 判定, 当たるルールの id, 根拠コード)。id が空ならどのルールにも当たらないこと、
+    期待は (subject, 判定, 当たるルールの id, 根拠コード)。id が空ならどのルールにも当たらないこと、
     コードが空なら見ない。
     """
 

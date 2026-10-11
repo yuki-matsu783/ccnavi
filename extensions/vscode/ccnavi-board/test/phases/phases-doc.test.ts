@@ -66,11 +66,6 @@ test("CB-T86 phases.yml を定義ごとに読む。kind と review は無けれ�
   const doc = readPhases(SAMPLE);
   assert.equal(doc.model.version, 1);
   assert.deepEqual(doc.model.problems, []);
-  // 順序の古い欄は読まず、読まない欄として名指しするだけ（苦情にはしない）
-  assert.deepEqual(doc.model.unread, [
-    { phase: "implement", key: "requires" },
-    { phase: "implement", key: "overlap" },
-  ]);
   const phases = doc.model.form.phases;
   assert.deepEqual(
     phases.map((p) => p.id),
@@ -138,7 +133,7 @@ test("CB-T90 足す・消す・空のリストは欄ごと消す・scope の inh
     .filter((p) => p.id !== "acceptance")
     .map((p) => {
       if (p.id === "implement") {
-        // scope を inherit にすれば値として書く。読まない欄（requires・overlap）は手を付けずに残る
+        // scope を inherit にすれば値として書く。requires・overlap は手を付けずに残る
         return { ...p, inherit: true };
       }
       if (p.id === "implement-feedback") {
@@ -176,9 +171,8 @@ test("CB-T92 version が無ければ苦情を出し、保存で先頭に足す�
   assert.ok(doc.model.problems.some((p) => p.includes("kind `strange`")));
   assert.ok(doc.model.problems.some((p) => p.includes("review `maybe`")));
   assert.ok(doc.model.problems.some((p) => p.includes("scope `everything`")));
-  // 古い順序の欄は形が崩れていても読まないので苦情にせず、読まない欄として名指しするだけ
+  // 順序の欄は読まないので、形が崩れていても苦情にしない
   assert.ok(!doc.model.problems.some((p) => p.includes("overlap")), doc.model.problems.join("\n"));
-  assert.deepEqual(doc.model.unread, [{ phase: "a", key: "overlap" }]);
   const a = doc.model.form.phases[0];
   assert.equal(a.kind, "work");
   assert.equal(a.review, "mr");
@@ -253,61 +247,4 @@ test("CB-T103 同じ元ノードを 2 回送れば書き戻さない。yes / no 
   );
   assert.match(readPhases("- a\n").model.problems[0], /最上位がマップ（キーと値の組の集まり）ではありません/);
   assert.match(readPhases("version: 1\nphases:\n  broken:\n  ok:\n    kind: work\n").model.problems[0], /保存するとこの定義は消えます/);
-});
-
-/** 前の版の順序の欄を持つファイル。実行ファイルはもう読まない（`--lint` が warn で「読まない」と言う） */
-const OLD_FIELDS = `version: 1
-order: dag
-
-phases:
-  research:
-    kind: work
-    title: 調査
-    review: none
-    scope: inherit
-  design:
-    kind: work
-    title: 設計
-    scope: inherit
-    after: [research]
-    when: 設計が要るとき
-  implement:
-    kind: work
-    title: 実装
-    scope: inherit
-    requires: [design]
-    overlap: [design]
-    after: [design]
-`;
-
-test("CB-T198 古い順序の欄（ファイルの頭の order、定義の after・overlap・requires）は読まず、読まない欄として名指しし、保存しても手を付けずに残す", () => {
-  const doc = readPhases(OLD_FIELDS);
-  assert.deepEqual(doc.model.problems, []);
-  assert.deepEqual(doc.model.unread, [
-    { phase: null, key: "order" },
-    { phase: "design", key: "after" },
-    { phase: "implement", key: "requires" },
-    { phase: "implement", key: "overlap" },
-    { phase: "implement", key: "after" },
-  ]);
-  // 変えなければ 1 文字も変わらない
-  assert.equal(doc.apply(doc.model.form), OLD_FIELDS);
-  // ほかの欄を直しても、古い欄はそのまま残る（消すのはユーザがエディタで）
-  const phases = doc.model.form.phases.map((p) => (p.id === "design" ? { ...p, when: "", title: "設計する" } : p));
-  const out = doc.apply({ phases });
-  assert.match(out, /^version: 1\norder: dag\n/);
-  assert.match(out, /\n  design:\n    kind: work\n    title: 設計する\n    scope: inherit\n    after: \[research\]\n  implement:\n/);
-  assert.match(out, /\n    requires: \[design\]\n    overlap: \[design\]\n    after: \[design\]\n$/);
-});
-
-test("CB-T199 知らない値の order も苦情にせず読まない欄として名指しし、定義を並べ替えても古い欄は元の定義に付いて動く", () => {
-  const doc = readPhases(OLD_FIELDS.replace("order: dag\n", "order: [graph]\n"));
-  assert.ok(!doc.model.problems.some((p) => p.includes("order")), doc.model.problems.join("\n"));
-  assert.deepEqual(doc.model.unread[0], { phase: null, key: "order" });
-  const [research, design, implement] = doc.model.form.phases;
-  const out = doc.apply({ phases: [implement, research, design] });
-  assert.equal(out.match(/^order:/gm)?.length, 1);
-  assert.match(out, /^order: \[graph\]$/m);
-  assert.match(out, /\nphases:\n  implement:\n    kind: work\n    title: 実装\n    scope: inherit\n    requires: \[design\]\n    overlap: \[design\]\n    after: \[design\]\n/);
-  assert.match(out, /\n  design:\n    kind: work\n    title: 設計\n    scope: inherit\n    after: \[research\]\n    when: 設計が要るとき\n$/);
 });

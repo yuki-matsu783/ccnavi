@@ -34,7 +34,7 @@ export function lockFromBoard(board: BoardJson, project?: string): Lock {
   const where = project === undefined ? "" : `プロジェクト ${project} に`;
   return {
     locked: true,
-    reason: `${where}作業中のチケットがあります（${doing.join(", ")}）。変更すると整合性が崩れるため保存はできません。先に現在の作業をすべて完了させてください。`,
+    reason: `${where}作業中のチケットがあります（${doing.join(", ")}）。変更すると整合性が失われるため保存はできません。先に現在の作業をすべて完了させてください。`,
     doing,
   };
 }

@@ -876,7 +876,7 @@ def order_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 child.ticket,
-                f"親 {parent.ticket} の計画が壊れているので、順序を数えない（{broken[0].detail}）",
+                f"親 {parent.ticket} の計画が不正なので、順序を数えない（{broken[0].detail}）",
             )
         ]
     waits = set(workflow.waits_of(parent, child.phase))
@@ -913,7 +913,7 @@ def order_problems(
             if phase.number in reopened:
                 names = ", ".join(reopened[phase.number])
                 state = (
-                    f"同じ承認で {names} を足すので開き直る"
+                    f"同じ承認で {names} を足すので再び開く"
                     if phase.ended
                     else f"同じ承認で {names} を足すが、まだ閉じていない"
                 )

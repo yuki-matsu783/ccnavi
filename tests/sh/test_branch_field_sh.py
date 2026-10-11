@@ -368,7 +368,7 @@ class BranchFieldTest(unittest.TestCase):
         self.assertEqual(self.sha(self.tree, "HEAD"), remote)
 
         lint = self.exe("--lint")
-        self.assertNotIn("の上に居る", lint.stdout + lint.stderr)
+        self.assertNotIn("の上にある", lint.stdout + lint.stderr)
 
     def test_a_family_pushed_before_approval_moves_its_record(self):
         """承認前に識別子のブランチを送った（取り込み状態が識別子）親子のチケットも、移って送れば取り込み状態が書き直る。"""
@@ -508,10 +508,10 @@ class BranchFieldTest(unittest.TestCase):
         write(os.path.join(rival, APPROVED, "doing", PARENT + ".md"), text)
         family = self.ok(self.exe("c1", "family", PARENT))
         self.assertIn("target stop\n", family.stdout)
-        self.assertIn("宣言するブランチが 1 本でない", family.stdout)
+        self.assertIn("宣言されているブランチが 1 本でない", family.stdout)
         started = self.sh("ccnavi-ticket.sh", "start", PARENT)
         self.assertNotEqual(started.returncode, 0)
-        self.assertIn("宣言するブランチが 1 本でない", started.stderr)
+        self.assertIn("宣言されているブランチが 1 本でない", started.stderr)
 
     def test_a_record_pinned_to_another_branch_stops_the_family(self):
         self.imported_family()

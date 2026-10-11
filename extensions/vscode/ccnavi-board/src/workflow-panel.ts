@@ -519,7 +519,7 @@ async function save(current: PanelState, order: PlanOrder, expect: string): Prom
       await reload(current);
       vscode.window.showInformationMessage(
         `${current.ticket} の計画の順序を提案に書きました${moved === 0 ? "" : `（子の提案 ${moved} 本の識別子と phase: を付け替えました）`}。` +
-          "承認はボードから開き直してください。書き換えた提案はコミットしていません",
+          "承認の画面はボードから開き直してください。書き換えた提案はコミットしていません",
       );
       return;
     }

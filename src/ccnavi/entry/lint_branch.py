@@ -97,7 +97,8 @@ def _number_problems(everyone: list, fresh: list, prefixes, serial: int) -> list
     """新規の提案の親の識別子の番号が、同じリポジトリの別の親と重なるか（warn）。
 
     番号は issue の番号か ccnavi の通し番号で、両方が同じ数になりうる。issue の番号はリポジトリ
-    ごとなので、比べるのは同じリポジトリ（`project`）の親どうしだけ。前の形（`i0055`）の番号も数える。
+    ごとなので、比べるのは同じリポジトリ（`project`）の親どうしだけ。
+    数えるのは `<先頭の語>-<番号>-<slug>` の形の番号だけ。
     """
     problems: list[Problem] = []
     owners: dict[tuple[str, int], set[str]] = {}
@@ -136,7 +137,7 @@ def _prefix_setting_problems(conf: settings.Settings) -> list[Problem]:
             SEVERITY_WARN,
             "(settings)",
             f"{settings.BRANCH_PREFIXES_ENV} の {', '.join(conf.branch_prefixes_rejected)} は"
-            "先頭の語に使えないので読まない（英小文字で始まる英小文字と数字。main・master・"
+            "先頭の語に使えないので読まない（英小文字で始まり、英小文字と数字だけでできた語。main・master・"
             "develop・release は使えない）。"
             f"使うリストは {', '.join(conf.branch_prefixes)}（親のブランチ名の規則）",
         )
@@ -201,7 +202,7 @@ def _worktree_problems(
                     "(ticket)",
                     f"{t.ticket} は承認済みだがワークツリー "
                     f"{tree.worktree_path(root, t.ticket)} が無い。"
-                    "ワークツリーを作るまで範囲は効かない",
+                    "ワークツリーを作るまで範囲は有効にならない",
                 )
             )
     return problems

@@ -137,7 +137,7 @@ def screen(
             # チケットの範囲はルールの allow より強い。承認するユーザは「ルールで
             # 開けてあるから範囲の外でも書ける」と読み違えやすいので、承認の前に言う。
             lines.append(
-                "    ルールの allow で許可してある場所も、この範囲の外では止まる。"
+                "    ルールの allow で許可してある場所でも、この範囲の外では止まる。"
                 "ルールの deny はこの範囲の中でも止まる"
             )
         for name in rules.SECTIONS:
@@ -154,7 +154,7 @@ def screen(
             lines.append("■ チケットで編集対象としているが、書き込めない場所")
             lines.append(
                 "    親の範囲かフェーズ定義の上限を超えている。"
-                "承認は可能だが、編集しようとすると判定が止める"
+                "承認は可能だが、編集しようとすると判定で止められる"
             )
             lines += [f"    {p.detail}" for p in cand.overflow]
         if t.is_child:
@@ -193,13 +193,13 @@ def screen(
                 lines.append(
                     f"    既存のブランチ {t.branch} を使う。識別子（{t.ticket}）と別の名前で、"
                     f"ワークツリーは .claude/worktrees/{t.ticket}。"
-                    "取り込み・送る・マージリクエストはこのブランチで行う"
+                    "取り込み・push・マージリクエストはこのブランチで行う"
                 )
             else:
                 lines.append(
                     f"    新しく切るブランチ。識別子（{t.ticket}）と別の名前で、"
                     f"ワークツリーは .claude/worktrees/{t.ticket}。"
-                    "取り込み・送る・マージリクエストはこのブランチで行う"
+                    "取り込み・push・マージリクエストはこのブランチで行う"
                 )
         if t.rationale.strip():
             lines.append("■ エージェントが書いた理由")
@@ -207,7 +207,7 @@ def screen(
         lines.append(_origin_line(t))
         warnings = [p for p in cand.complaints if p.severity == rules.SEVERITY_WARN]
         if warnings:
-            lines.append("■ 判定に効かない記述")
+            lines.append("■ 判定に使われない記述")
             lines.append(
                 "    提案に書いてあっても、判定はこれを読まない。"
                 "承認しても、編集できる場所は変わらない"

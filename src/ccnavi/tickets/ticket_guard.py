@@ -226,7 +226,7 @@ def _propose_rule(tickets_rel: str, bin_path: str) -> rules.Rule:
         id=PROPOSE_RULE_ID,
         additional_context_once=(
             f"チケットの提案を書こうとしています（{tickets_rel}/todo/ は承認待ちの置き場で、"
-            "ここに書いただけでは判定には効きません）。"
+            "ここに書いただけでは判定の対象になりません）。"
             "ユーザに承認を依頼する前に、"
             f"'{settings.bin_command(bin_path)} --agree --preview --verify <識別子>' で"
             "承認できる状態かを確かめてください。承認済みチケットは置きません。"

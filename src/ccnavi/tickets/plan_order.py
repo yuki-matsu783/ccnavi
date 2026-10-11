@@ -1001,11 +1001,14 @@ def save(ans: Answer, expect: str) -> Saved:
             ],
         )
     if ans.renumbered.refused:
-        lines = [f"引けない線: {r.text}" for r in ans.renumbered.refused]
+        lines = [f"先行の線を引けない: {r.text}" for r in ans.renumbered.refused]
         return Saved(False, messages=lines + ["何も書かない"])
     for problems, header in (
         (ans.problems, "振り直した計画の順序の検査に error がある。何も書かない"),
-        (ans.revision_problems, "改版で通らない形（子が承認された番号の錠）。何も書かない"),
+        (
+            ans.revision_problems,
+            "改版で通らない形（子が承認された番号を固定しているので、その番号の項は変えられない）。何も書かない",
+        ),
         (ans.child_problems, "子の提案を付け替えられない。何も書かない"),
     ):
         if problems:

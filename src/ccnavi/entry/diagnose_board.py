@@ -186,9 +186,10 @@ def _archived_records(root: str, skip: set[tuple[str, str]], problems: list[str]
                 "title": t.title,
                 "project": t.project,
                 "path": t.path,
-                # 承認は欄を書かない。古い形の欄が無ければ、退避した状態の履歴の承認の時刻。
-                "approved_at": t.approved_at
-                or approval_times.history_time(archive.base_dir(root, t.project), t.ticket),
+                # 承認は欄を書かない。退避した状態の履歴の承認の時刻。
+                "approved_at": approval_times.history_time(
+                    archive.base_dir(root, t.project), t.ticket
+                ),
                 "started_at": t.started_at,
                 "completed_at": t.completed_at,
                 "cancelled_at": t.cancelled_at,
@@ -469,7 +470,6 @@ def _ticket_record(
                 # 空（分からない）。uncommitted と空のとき approved_at は空。
                 "approved_at": times.get(copy.path, approval_times.ApprovedTime()).at,
                 "approved_from": times.get(copy.path, approval_times.ApprovedTime()).source,
-                "source_tree": copy.source_tree,
                 "path": copy.path,
             }
             if copy is not None

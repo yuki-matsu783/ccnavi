@@ -64,7 +64,7 @@ PLACE_OVERRIDES = (
     ("--tickets", "tickets", ""),
 )
 # 無視したときの文面。置き場を動かすフラグで同じものを使う。制限が 2 つあるように読ませない。
-DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）でだけ効く\n"
+DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）でだけ使える\n"
 # `.ccnavi/scripts/` の sh が自分で計算して渡すパスと、渡されなかったときの値。
 # どちらも「いまどこで動いているか」で、エージェントが申告するものではない。
 #
@@ -106,7 +106,7 @@ def _diagnosing(args: argparse.Namespace) -> bool:
     return bool(
         args.lint
         or args.test is not None
-        or bool(args.test_samples)
+        or bool(args.test_expectations)
         or args.explain
         or args.suggest
     )
@@ -186,7 +186,7 @@ DOCS_ONLY = "ccnavi: {flag} は --docs でだけ使える\n"
 _NOT_WITH_DOCS = (
     "--lint",
     "--test",
-    "--test-samples",
+    "--test-expectations",
     "--explain",
     "--suggest",
     "--prune",

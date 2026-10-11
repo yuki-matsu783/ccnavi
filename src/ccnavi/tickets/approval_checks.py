@@ -14,25 +14,6 @@ from ..infra import settings, tree
 from ..policy import rules
 from . import archive, syncstate, ticket_ids, ticket_model, workflow
 
-# 前の版の承認が記録（`ccnavi_approved`）に必ず書いていた欄。続きの子も `source_tree` と
-# `source_path` を空で書いていた。
-_RECORD_KEYS = ("approved_at", "source_tree", "source_path")
-
-
-def has_record(t: ticket_model.Ticket) -> bool:
-    """前の版の承認が書いた記録（`ccnavi_approved`）を持つ古い承認済みチケットか。
-
-    古い形として扱うと、取り下げは中身の一致を見ずに記録の欄で決まり、`workflow:` の欄も
-    待ち方として読まれる。`ccnavi_approved: {}` のような書きかけの記録で古い形を装えないよう、
-    前の版が必ず書いた欄が揃い、`approved_at` が空でないときだけ古い形とみなす。提案に
-    記録の欄があれば `--agree` と `--lint` が error にする
-    （`agree_candidates.record_field_problems`）。
-    """
-    meta = t.raw.get(ticket_model.APPROVAL_KEY)
-    if not isinstance(meta, dict) or not all(k in meta for k in _RECORD_KEYS):
-        return False
-    return bool(str(meta.get("approved_at") or "").strip())
-
 
 def mark_imported(
     conf: settings.Settings,
@@ -161,7 +142,7 @@ def branch_problems(
                 rules.Problem(
                     rules.SEVERITY_ERROR,
                     t.ticket,
-                    f"`branch: {t.branch}` は統合先の名前（{', '.join(hits)}）に当たる。"
+                    f"`branch: {t.branch}` は統合先の名前（{', '.join(hits)}）と同じ。"
                     "統合先を親のブランチにしない",
                 )
             )
@@ -241,7 +222,7 @@ def integration_problems(
                 rules.SEVERITY_ERROR,
                 t.ticket,
                 f"統合先の取り込み結果（sync/{repo}/integration）を読めない（{why}）。閉じた識別子の"
-                "再利用を確かめられないので決まらない。承認しない。オンラインで"
+                "再利用を確かめられない。承認しない。オンラインで"
                 f" '{sync}' を打って統合先を取り込み直してください",
             )
         ]
@@ -534,9 +515,9 @@ def predecessor_problems(
             why = {
                 PRED_SELF: "自分自身を先行に挙げている。自分が閉じるのを待つことはできない",
                 PRED_ANCESTOR: "自分の親を先行に挙げている。親は子が全部閉じてから閉じるので、"
-                "待っても満たさない",
+                "待っても満たされない",
                 PRED_CYCLE: f"先行が循環している（{p.where}）。どれも他が閉じるのを待つので、"
-                "待っても満たさない",
+                "待っても満たされない",
             }[p.state]
             problems.append(
                 rules.Problem(
@@ -702,7 +683,7 @@ def child_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 t.ticket,
-                f"親 {parent.ticket} の計画が壊れているので、子も止める（{broken[0].detail}）。"
+                f"親 {parent.ticket} の計画が不正なので、子も止める（{broken[0].detail}）。"
                 "ユーザが親の承認済みチケットの計画か、固定した定義（phases:）を直してください",
             )
         ]
@@ -733,7 +714,7 @@ def blocking_problems(
     ここに入れる、中身だけで分かる矛盾。
     - `started_at` が無いのに `base_sha` がある。`start` は 2 つを一緒に書くので道具を通らない形で、
       `base_sha` は範囲外の検査とリスクの基準点に使われる
-    - 前の版の承認の記録を持たないのに `workflow:` 欄がある。待ち方は計画の `after` から計算する
+    - `workflow:` 欄がある。待ち方は計画の `after` から計算する
       もので、欄は読まない。書いてあると効くと読み手に思わせる
     - 計画と、親に固定した定義（`phases:`）の誤り（`after` の形・終端・最後の項の延期・延期の
       引き受け手、計画を持つのに写しが無い・項の定義が写しに無い・定義の形と `kind`・引き受け手の
@@ -763,10 +744,11 @@ def content_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
                 rules.SEVERITY_ERROR,
                 t.ticket,
                 "`started_at` が無いのに `base_sha` がある。2 つは着手（`start`）が一緒に書く欄で、"
-                "片方だけの形は道具を通っていない。ユーザが承認済みチケットを確かめて直してください",
+                "片方だけの状態は `start` を通して書かれたものではない。"
+                "ユーザが承認済みチケットを確かめて直してください",
             )
         )
-    if ticket_model.WORKFLOW_KEY in t.raw and not has_record(t):
+    if ticket_model.WORKFLOW_KEY in t.raw:
         problems.append(
             rules.Problem(
                 rules.SEVERITY_ERROR,

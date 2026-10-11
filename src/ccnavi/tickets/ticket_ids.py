@@ -13,9 +13,9 @@ from . import ticket_model
 
 # 識別子。親は 1 語、子は `<親>-<2 桁のフェーズ番号>-<2 桁のフェーズ内の連番>`。新しい親は
 # `<先頭の語>-<番号>-<slug>`（`feature-12-login` など）の形にそろえる。形は lint の warn で、
-# 読めるかどうかは文字と長さだけで決める（`i0055` のような前の形も読む）。
+# 読めるかどうかは文字と長さだけで決める。
 # 識別子だけから親を割り出すときは、右から 2 段（`-<2 桁>-<2 桁>`）を剥がす。親が `-` や数字を
-# 含んでも（`web-i0012-05-01` の親は `web-i0012`）割り出し方は 1 通りに決まる。
+# 含んでも（`web-12-05-01` の親は `web-12`）割り出し方は 1 通りに決まる。
 #
 # 使える文字は ASCII の英数字と `.` `_` `-`、それに日本語の字（ひらがな・カタカナ・長音記号・
 # CJK 統合漢字・々）。先頭は ASCII の英数字。全角英数・全角記号・全角空白・ほかの Unicode は
@@ -54,11 +54,6 @@ _FORM = re.compile(
 )
 # issue から始めるときの既定の先頭の語。
 DEFAULT_ISSUE_PREFIX = "feature"
-# 前の形（`i<番号>`・`<プロジェクト名>-i<番号>`）。読むのと、通し番号を数えるのにだけ使う。
-_LEGACY_ISSUE_ID = re.compile(r"^i(?P<num>[0-9]+)\Z", re.IGNORECASE)
-_LEGACY_PROJECT_ISSUE_ID = re.compile(
-    r"^(?P<project>[A-Za-z0-9][A-Za-z0-9._-]*)-i(?P<num>[0-9]+)\Z", re.IGNORECASE
-)
 # issue のタイトルから slug を作るときに残さない字（残すのは英数字と日本語の字だけ）。
 _SLUG_DROP = re.compile(rf"[^A-Za-z0-9{JA_CHARS}]+")
 # タイトルから何も残らなかったときの slug。
@@ -131,18 +126,9 @@ def has_form(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> bool:
 
 
 def identifier_number(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> int | None:
-    """親の識別子に含まれる番号。
-
-    読むのは `<先頭の語>-<番号>-<slug>` と前の形（`i<番号>`・`<名前>-i<番号>`）だけ。
-    """
+    """親の識別子に含まれる番号。読むのは `<先頭の語>-<番号>-<slug>` だけ。"""
     matched = form_of(name, prefixes)
-    if matched:
-        return int(matched.group("num"))
-    for pattern in (_LEGACY_ISSUE_ID, _LEGACY_PROJECT_ISSUE_ID):
-        matched = pattern.match(name or "")
-        if matched:
-            return int(matched.group("num"))
-    return None
+    return int(matched.group("num")) if matched else None
 
 
 def next_serial(names, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> int:
@@ -264,11 +250,11 @@ def branch_problem(name: str) -> str:
         return (
             f"先頭の階層 `{name.split('/')[0]}` は git の ref の名前"
             "（refs・heads・remotes・tags）か"
-            "リモートの名前（origin・upstream）と紛れる。"
+            "リモートの名前（origin・upstream）と紛らわしい。"
             "`origin/main` のような名前は親のブランチにしない"
         )
     if any(p == "head" or p.endswith("_head") for p in parts):
-        return "`HEAD`・`FETCH_HEAD` のような階層は git の特別な名前と紛れる"
+        return "`HEAD`・`FETCH_HEAD` のような階層は git の特別な名前と紛らわしい"
     if (
         folded in RESERVED_BRANCH_IDS
         or parts[0] in RESERVED_BRANCH_IDS
@@ -327,11 +313,11 @@ def branch_name_problems(
     if folded in RESERVED_BRANCH_IDS or folded.startswith("release-"):
         found.append(
             "識別子が統合先や保護されたブランチの名前（main・master・develop・release・release-*）"
-            "に当たる。親のブランチ名が統合先と同じになる"
+            "と同じ。親のブランチ名が統合先と同じになる"
         )
     elif integration and folded == integration.casefold():
         found.append(
-            f"識別子が統合先の名前（{integration}）に当たる。親のブランチ名が統合先と同じになる"
+            f"識別子が統合先の名前（{integration}）と同じ。親のブランチ名が統合先と同じになる"
         )
     found.extend(_form_problems(t, serial, prefixes))
     return found
@@ -342,8 +328,7 @@ def _form_problems(
 ) -> list[str]:
     """新しい親の識別子が `<先頭の語>-<番号>-<slug>` の形と `issue:` に合っているか。
 
-    - 形（先頭の語は `prefixes` のどれか）に合わなければ言う。前の形（`i<番号>`・
-      `<プロジェクト名>-i<番号>`）は使わないと添える
+    - 形（先頭の語は `prefixes` のどれか）に合わなければ言う
     - `issue:`（同じリポジトリの課題）があれば、番号が issue と同じか。プロジェクトの issue なら
       slug の頭が `<プロジェクト名>-` か
     - 別のリポジトリの課題（`owner/repo#N`）は番号を比べない（その番号はこのリポジトリの issue と
@@ -354,20 +339,13 @@ def _form_problems(
     matched = form_of(name, prefixes)
     own_issue = t.issue is not None and not t.issue_repo
     if matched is None:
-        legacy = bool(_LEGACY_ISSUE_ID.match(name) or _LEGACY_PROJECT_ISSUE_ID.match(name))
-        head = "`i<番号>` の形はもう使わない。" if legacy else ""
         word = "・".join(prefixes)
         shape = f"`<先頭の語>-<番号>-<slug>` の形（先頭の語は {word} のどれか）"
         if own_issue:
             want = f"feature-{t.issue}-" + (f"{t.project}-" if t.project else "") + "<slug>"
-            return [
-                f"{head}親の識別子は {shape} にする。"
-                f"`issue: {t.issue}` から始めるなら `{want}` など"
-            ]
+            return [f"親の識別子は {shape} にする。`issue: {t.issue}` から始めるなら `{want}` など"]
         hint = f"次の通し番号は {serial}" if serial else "番号は既にある識別子の番号の続き"
-        return [
-            f"{head}親の識別子は {shape} にする。issue が無ければ ccnavi の通し番号を使う（{hint}）"
-        ]
+        return [f"親の識別子は {shape} にする。issue が無ければ ccnavi の通し番号を使う（{hint}）"]
     found: list[str] = []
     number = int(matched.group("num"))
     prefix = matched.group("prefix")

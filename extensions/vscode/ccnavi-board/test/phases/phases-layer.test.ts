@@ -9,7 +9,7 @@ import type { PhasesPage } from "../../src/core/phases-view.js";
 import { openPhases } from "../helpers/phases.js";
 import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
 
-const MISSING: Partial<PhasesPage> = { exists: false, model: { version: null, form: { phases: [] }, problems: [], unread: [] } };
+const MISSING: Partial<PhasesPage> = { exists: false, model: { version: null, form: { phases: [] }, problems: [] } };
 
 test("CB-T114 定義のファイルが無いのは正常で、不備の帯も作るボタンも出さず、欄を触れるようにして最初の保存で作らせる", async () => {
   const dom = await openPhases({ ...MISSING, notices: ["読めない <理由>"] });

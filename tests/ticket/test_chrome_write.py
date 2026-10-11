@@ -23,7 +23,7 @@ from ccnavi.entry import lint, version
 from ccnavi.infra import settings
 from ccnavi.tickets import history
 from tests.ticket.test_swap_points import CoreHarness
-from tests.ticket.test_ticket import git, to_old_form, write
+from tests.ticket.test_ticket import git, write
 from tests.ticketsample import child_text, load_chrome, parent_text
 
 ACTOR = {"account": "alice", "version": "9.9.9"}
@@ -306,12 +306,6 @@ class WithdrawableTest(ChromeWriteHarness):
             board["withdrawable"],
             [{"ticket": "i0001", "title": board["withdrawable"][0]["title"], "problems": []}],
         )
-        # 承認の記録を持つ古い形の親は、改版されたかを見分けられないので一律に止める。
-        to_old_form(self.approved, "i0001")
-        self.commit_parent("old form")
-        board = self.answer(self.chrome_request("board", "i0001"))
-        problems = board["withdrawable"][0]["problems"]
-        self.assertTrue(any("前の版の形" in p for p in problems), problems)
         self.start_parent()
         self.commit_parent("started")
         board = self.answer(self.chrome_request("board", "i0001"))

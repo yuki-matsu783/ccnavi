@@ -42,7 +42,6 @@ CONFIG = (
 )
 PARENT = "i0001"
 COPY = f".ccnavi/approved/doing/{PARENT}.md"
-APPROVED_AT = "2026-09-01T00:00:00+0900"
 BASE_SHA = "1" * 40
 STARTED_AT = "2026-09-02T00:00:00+09:00"
 
@@ -58,12 +57,6 @@ def copy_text(name=PARENT, base_sha=BASE_SHA, started_at=STARTED_AT, extra="", b
     fields = f"base_sha: {base_sha}\n" if base_sha else ""
     fields += f"started_at: '{started_at}'\n" if started_at else ""
     return f"{head}{fields}{extra}---\n{body}"
-
-
-def old_copy_text(name=PARENT, approved_at=APPROVED_AT, body=""):
-    """承認で欄を書いていた頃の、未着手の親の承認済みチケット（ブロックの形の ccnavi_approved）。"""
-    head = f"---\nversion: 1\nticket: {name}\n{ALLOW}"
-    return f"{head}ccnavi_approved:\n  approved_at: {approved_at}\n---\n{body}"
 
 
 def child_copy_text(name=f"{PARENT}-01-01", parent=PARENT):
@@ -579,42 +572,9 @@ class SyncTest(SyncHarness):
         self.close_on_main(copy_text(base_sha="", body="base_sha: bbbb\n"))
         self.assertEqual("closed", self.closed_after_delete()[0])
 
-    def test_an_approval_time_in_the_body_is_not_read(self):
-        # 承認の時刻は frontmatter の ccnavi_approved の中だけから拾う。本文の同じ語の行で
-        # 閉じたと読まない（Python と同じく、照合できる欄が無いので閉じていない）。
-        bare = copy_text(base_sha="", started_at="", body=f"approved_at: {APPROVED_AT}\n")
-        self.mine(bare)
-        self.close_on_main(bare)
-        self.assertEqual("gone", self.closed_after_delete()[0])
-
-    def test_an_approval_time_in_a_block_scalar_is_not_read(self):
-        # `rationale: |` の下の行は欄ではない。古い形どうしは ccnavi_approved の中の値で比べる。
-        noisy = old_copy_text().replace(
-            "ccnavi_approved:", "rationale: |\n  approved_at: 1999-01-01\nccnavi_approved:"
-        )
-        self.mine(noisy)
-        self.close_on_main(old_copy_text())
-        self.assertEqual("closed", self.closed_after_delete()[0])
-
     def test_a_crlf_done_copy_is_read(self):
         self.close_on_main(copy_text().replace("\n", "\r\n"))
         self.assertEqual("closed", self.closed_after_delete()[0])
-
-    def test_old_copies_on_both_sides_compare_the_approval_time(self):
-        # 承認で欄を書いていた頃の形どうしは、移行の間だけ approved_at で比べる。
-        self.mine(old_copy_text())
-        self.close_on_main(old_copy_text())
-        self.assertEqual("closed", self.closed_after_delete()[0])
-
-    def test_old_copies_with_another_approval_time_are_not_closed(self):
-        self.mine(old_copy_text())
-        self.close_on_main(old_copy_text(approved_at="2020-01-01T00:00:00+0900"))
-        self.assertEqual("gone", self.closed_after_delete()[0])
-
-    def test_an_old_done_copy_is_not_matched_with_a_new_one(self):
-        # 片方に着手の欄があれば approved_at では比べない。
-        self.close_on_main(old_copy_text())
-        self.assertEqual("gone", self.closed_after_delete()[0])
 
     def test_a_parent_missing_in_the_parent_tree_is_not_closed(self):
         # 承認前の提案だけが残る親のワークツリー（この親子のチケットは閉じようがない）。

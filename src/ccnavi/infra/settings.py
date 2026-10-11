@@ -377,7 +377,7 @@ class Settings:
     project_home: str = ""
     # project_rules_files は、名前で指したプロジェクトのルールファイルの差し替え
     # （名前 → 絶対パス）。`--project-rules-file <名前>=<パス>` が入れる。診断（--test /
-    # --test-samples / --lint / --explain）だけが使い、hook からの判定では空のまま。
+    # --test-expectations / --lint / --explain）だけが使い、hook からの判定では空のまま。
     # VS Code 拡張が、編集中のプロジェクトのルールを保存せずに試すために使う。
     project_rules_files: dict[str, str] = field(default_factory=dict)
     # project_phases_files は同じ差し替えをレイヤーのフェーズ定義に対して行う（名前 → 絶対パス）。

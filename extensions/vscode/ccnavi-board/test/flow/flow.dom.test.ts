@@ -10,7 +10,7 @@ import type { HTMLButtonElement, HTMLInputElement, HTMLTextAreaElement } from "h
 import { addNode, parseFlow, patchData, templateFlow, type FlowDoc } from "../../src/core/flow-doc.js";
 import { lockedReason } from "../../src/core/flow-view.js";
 import type { DomPage } from "../helpers/dom.js";
-import { openFlow, SAMPLE, sampleData, savedDoc } from "../helpers/flow.js";
+import { openFlow, SAMPLE, sampleData, savedDoc, bareFlow } from "../helpers/flow.js";
 
 function sample(): FlowDoc {
   const read = parseFlow(SAMPLE);
@@ -26,7 +26,7 @@ function clickSvg(dom: DomPage, element: unknown): void {
 
 /** 目印のある 2 種類（問いとサブエージェント）を足した雛形 */
 function marked(): FlowDoc {
-  let doc = templateFlow("i0001-01-01", "調査");
+  let doc = bareFlow("i0001-01-01", "調査");
   doc = addNode(doc, "askUserQuestion", { x: 200, y: 300 }).doc;
   doc = addNode(doc, "subAgent", { x: 400, y: 300 }).doc;
   return patchData(doc, "subAgent-1", { description: "資料を深掘りする" });
@@ -67,9 +67,9 @@ test("CB-D107 図はノードと線を描き、問いには「メインに戻る
 });
 
 test("CB-D108 ファイルが無ければ雛形を見せ、そのまま保存できる（保存でファイルを作る）", async () => {
-  const dom = await openFlow({ exists: false });
+  const dom = await openFlow({ exists: false, doc: templateFlow("i0001-01-01", "調査") });
   try {
-    assert.equal(dom.all(".react-flow__node").length, 2);
+    assert.equal(dom.all(".react-flow__node").length, 3);
     assert.match(dom.one(".toolbar").textContent ?? "", /ファイルはまだありません。保存すると作られます/);
     const save = dom.one<HTMLButtonElement>("#save");
     assert.ok(!save.disabled);
@@ -93,7 +93,7 @@ test("CB-D109 錠が掛かっていれば読むだけ。理由の帯を出し、
   const dom = await openFlow({ ticket: "i0001-02-02", doc: marked(), lock, exists: false });
   try {
     const banner = dom.one("#lock").textContent ?? "";
-    assert.match(banner, /着手中のため、フローを書き換えられません/);
+    assert.match(banner, /着手中かレビュー中のため、フローを書き換えられません/);
     assert.match(banner, /finish で終わるか cancel で取り消されると外れます/);
     for (const button of dom.all<HTMLButtonElement>('[data-action="add-node"]')) {
       assert.ok(button.disabled);
@@ -276,7 +276,7 @@ test("CB-D117 ノードと線の × で消せる。押しても選ばない。�
 
 test("CB-D118 グループは枠で描き、欄で名前を直して解ける。解くと中のノードは図の上の位置で外へ出る", async () => {
   const doc: FlowDoc = {
-    ...templateFlow("i0001-01-01", "調査"),
+    ...bareFlow("i0001-01-01", "調査"),
     nodes: [
       { id: "g", type: "group", name: "下調べ", position: { x: 40, y: 100 }, data: {}, style: { width: 300, height: 200 } },
       { id: "start", type: "start", name: "開始", position: { x: 40, y: 60 }, data: { label: "開始" }, parentId: "g" },
@@ -355,7 +355,7 @@ function pickedIds(dom: DomPage): (string | null)[] {
 }
 
 test("CB-D120 Shift を押しながら選んでいるノードを押すと、そのノードだけ選びから外れ、ほかは残る。右の欄は残ったノードに移る", async () => {
-  let doc = templateFlow("i0001-01-01", "調査");
+  let doc = bareFlow("i0001-01-01", "調査");
   doc = addNode(doc, "prompt", { x: 400, y: 80 }).doc;
   const dom = await openFlow({ doc });
   try {
@@ -403,7 +403,7 @@ test("CB-D120 Shift を押しながら選んでいるノードを押すと、そ
 /** グループ 1 つ（中に開始）と終了のフロー */
 function grouped(): FlowDoc {
   return {
-    ...templateFlow("i0001-01-01", "調査"),
+    ...bareFlow("i0001-01-01", "調査"),
     nodes: [
       { id: "g", type: "group", name: "下調べ", position: { x: 40, y: 100 }, data: {}, style: { width: 300, height: 200 } },
       { id: "start", type: "start", name: "開始", position: { x: 40, y: 60 }, data: { label: "開始" }, parentId: "g" },
@@ -469,5 +469,65 @@ test("CB-D122 読むだけのときは、グループの縁を出さず、「グ
     assert.equal(open.all(".react-flow__resize-control.handle").length, 4);
   } finally {
     await open.close();
+  }
+});
+
+test("CB-D188 部品箱と右の欄は畳める。畳んでも中身は残し（入力途中を失わない）、隠すだけ", async () => {
+  const dom = await openFlow({ doc: marked() });
+  try {
+    const palette = dom.one("#flow-palette");
+    const side = dom.one(".flow-side");
+    assert.equal(palette.getAttribute("data-folded"), "0");
+    dom.click(dom.one('button[data-action="toggle-palette"]'));
+    await dom.settle();
+    assert.equal(dom.one("#flow-palette").getAttribute("data-folded"), "1");
+    assert.equal(dom.one(".flow-body").getAttribute("data-palette-folded"), "1");
+    assert.ok(dom.all("#flow-palette button[data-action=add-node]").length > 0, "畳んでも中身は残す");
+    dom.click(dom.one('button[data-action="toggle-side"]'));
+    await dom.settle();
+    assert.equal(dom.one(".flow-side").getAttribute("data-folded"), "1");
+    assert.ok(dom.all(".flow-side .inspector").length > 0, "畳んでも中身は残す");
+    dom.click(dom.one('button[data-action="toggle-palette"]'));
+    dom.click(dom.one('button[data-action="toggle-side"]'));
+    await dom.settle();
+    assert.equal(palette.getAttribute("data-folded") ?? dom.one("#flow-palette").getAttribute("data-folded"), "0");
+    assert.equal(dom.one(".flow-side").getAttribute("data-folded"), "0");
+    assert.ok(side.isConnected, "右の欄を作り直していない");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D190 図の拡大ボタンで図だけを全画面にし、もう一度押すと戻す", async () => {
+  const dom = await openFlow({ doc: marked() });
+  try {
+    dom.click(dom.one('#flow-graph button[data-action="toggle-maximize"]'));
+    await dom.settle();
+    assert.ok(dom.one("#flow-graph").classList.contains("is-max"));
+    dom.click(dom.one('#flow-graph button[data-action="toggle-maximize"]'));
+    await dom.settle();
+    assert.equal(dom.one("#flow-graph").classList.contains("is-max"), false);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D191 図を全画面にしている間は、背後を inert にして Esc を背後へ渡さず、キー操作で文書を直さない", async () => {
+  const dom = await openFlow({ doc: marked() });
+  try {
+    let behind = 0;
+    dom.document.addEventListener("keydown", () => (behind += 1));
+    dom.click(dom.one('#flow-graph button[data-action="toggle-maximize"]'));
+    await dom.settle();
+    assert.ok(dom.document.body.hasAttribute("data-graph-max"));
+    assert.ok(dom.all("[inert]").length > 0, "背後に inert を付ける");
+    assert.equal(dom.one("#flow-graph").closest("[inert]"), null, "図そのものは inert にしない");
+    dom.key("Escape");
+    await dom.settle();
+    assert.equal(behind, 0, "Esc は図が受けて背後へ渡さない");
+    assert.equal(dom.document.body.hasAttribute("data-graph-max"), false);
+    assert.equal(dom.all("[inert]").length, 0, "戻したら inert を外す");
+  } finally {
+    await dom.close();
   }
 });

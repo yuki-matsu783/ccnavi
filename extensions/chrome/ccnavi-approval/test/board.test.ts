@@ -191,7 +191,7 @@ test("CX-T180 承認済みの親チケットの branch: で、識別子と違う
   const b = fixture();
   const files: Record<string, string> = { ...b.i0001.files };
   delete files["wip/proposals/todo/i0001.md"];
-  files[".ccnavi/approved/doing/i0001.md"] = proposal.replace("\n---\n\n", "\nccnavi_approved:\n  approved_at: 2026-09-28T00:00:00+0900\n---\n\n");
+  files[".ccnavi/approved/doing/i0001.md"] = proposal;
   b["feature/1-login"] = { ...b.i0001, files };
   delete b.i0001;
   const { board } = await run(b);

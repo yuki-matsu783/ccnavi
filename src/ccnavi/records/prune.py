@@ -82,7 +82,6 @@ _SESSION_ONLY = (
 # 名前だけでは切れ目が決まらない。既に分かっているセッションの表記に当てて決める。
 _SESSION_AND_KEY = (
     ("once-", ".json"),  # ctxfile._once_path
-    ("approved-", ".json"),  # 承認を伝えた記録（今は書かない。残ったものを掃く）
     ("subagent-", ".bounced"),  # subagent._bounce_path
     ("subagent-", ".unchecked"),  # subagent._unchecked_path
 )
@@ -420,7 +419,7 @@ def _session_entries(
         # 書き込み中に中断されて残った `write_text_atomic` の一時ファイル
         # （`.<名前>.<一意>.part.json`）は、先頭の `.` を外した名前で当てる。
         # 当たり方は名前の形で違う。
-        # - `.once-…`・`.approved-…`: 同じセッションの記録と一緒に消える
+        # - `.once-…`: 同じセッションの記録と一緒に消える
         #   （セッションの組が他に無ければ、まとめられなかったものとして、それ自身の日付で）
         # - `.nudged-…`・`.denied-…`・`.stop-…`: 当てる形の「セッション」に
         #   `.<一意>.part` まで入るので別の組になり、それ自身の日付で消える

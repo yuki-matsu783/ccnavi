@@ -42,7 +42,7 @@ from ccnavi.tickets import approval, approval_ops, core, core_base, history, tic
 from tests import config_path, requires_symlink
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_phases_dag import DEFS, PLAN
-from tests.ticket.test_ticket import ROOT, git, read_json, to_old_form, with_old_record, write
+from tests.ticket.test_ticket import ROOT, git, read_json, write
 from tests.ticketsample import CHROME, child_text, load_chrome, parent_text
 
 SCENARIOS = os.path.join(CHROME, "test", "fixtures", "core-scenarios.json")
@@ -246,11 +246,7 @@ def _approved_rows(approved_dir: str, ident: str) -> list[dict]:
 
 
 class SourcePathTest(CoreHarness):
-    """承認は提案の中身を変えない。出所（ブランチ名）は状態の履歴に残る。
-
-    前の版の承認が書いた記録（相対パスか絶対パスの `source_path`、ツリーの名前の
-    `source_tree`）を持つ承認済みチケットも同じに読む。
-    """
+    """承認は提案の中身を変えない。出所（ブランチ名）は状態の履歴に残る。"""
 
     def test_the_copy_is_the_proposal_and_the_history_records_the_branch(self):
         text = parent_text("i0001", ["research"])
@@ -266,9 +262,6 @@ class SourcePathTest(CoreHarness):
         path = os.path.join(self.approved, "doing", "i0001.md")
         with open(path, "rb") as f:
             self.assertEqual(before, f.read())
-        copy, _ = approval.load_copy(path)
-        self.assertEqual(copy.source_path, "")
-        self.assertEqual(copy.approved_at, "")
         self.assertEqual([r.get("tree") for r in _approved_rows(self.approved, "i0001")], ["i0001"])
 
     def test_a_crlf_proposal_moves_byte_for_byte(self):
@@ -281,70 +274,6 @@ class SourcePathTest(CoreHarness):
         self.assertEqual(self.approve().returncode, 0)
         with open(os.path.join(self.approved, "doing", "i0001.md"), "rb") as f:
             self.assertEqual(text.encode("utf-8"), f.read())
-
-    def test_a_copy_written_in_the_old_form_reads_the_same(self):
-        """前の形（絶対パス・ツリーの名前）の承認済みチケットと今の形の承認済みチケットで、判定の答えが同じ。"""
-        self.propose("i0001", parent_text("i0001", ["research", "design"]))
-        self.commit_parent()
-        self.assertEqual(self.approve().returncode, 0)
-        self.propose(
-            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
-        )
-        self.commit_parent()
-        new_form = self.ccnavi("--agree", "--preview", "--json")
-        verify_new = self.ccnavi("--agree", "--preview", "--verify")
-        board_new = json.loads(self.ccnavi("--explain", "--json").stdout)
-        path = os.path.join(self.approved, "doing", "i0001.md")
-        with open(path, encoding="utf-8") as f:
-            text = f.read()
-        old = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
-        # 前の形: 承認が記録の欄を書き足し、`source_path` は絶対パス。`source_tree` は
-        # ツリーの名前で、親のワークツリーではブランチ名と同じ表記。
-        legacy = with_old_record(text, old)
-        self.assertNotEqual(legacy, text)
-        write(path, legacy)
-        copy, _ = approval.load_copy(path)
-        self.assertEqual(copy.source_path, old)
-        old_form = self.ccnavi("--agree", "--preview", "--json")
-        verify_old = self.ccnavi("--agree", "--preview", "--verify")
-        board_old = json.loads(self.ccnavi("--explain", "--json").stdout)
-        a, b = json.loads(new_form.stdout), json.loads(old_form.stdout)
-        for key in ("batch", "text", "rejected", "problems"):
-            self.assertEqual(a[key], b[key], key)
-        # ダイジェストは判定が読んだ中身（read_set）で作るので、読んだ承認済みチケットの
-        # バイト列が変われば変わる（見せたあとに承認済みチケットが書き換わった承認を通さない）。
-        self.assertNotEqual(a["digest"], b["digest"])
-        self.assertEqual(verify_new.returncode, verify_old.returncode)
-        self.assertEqual(verify_new.stdout, verify_old.stdout)
-        # 板の違いは、出所をそのまま見せる欄（copy.source_tree）だけ。ここは同じ値。
-        self.assertEqual(board_new["parents"], board_old["parents"])
-        # 実行前チェックも同じ（子の範囲で書ける・範囲の外は止まる）。
-        self.assertEqual(self.approve().returncode, 0)
-        tree = self.worktree("i0001-01-01", "i0001")
-        self.start_parent()
-        self.assertEqual(self.ccnavi("ticket", "start", "i0001-01-01").returncode, 0)
-        inside = self.hook("PreToolUse", "Write", tree, file_path=f"{tree}/wip/research/a.md")
-        outside = self.hook("PreToolUse", "Write", tree, file_path=f"{tree}/src/a.py")
-        self.assertNotIn('"deny"', inside.stdout)
-        self.assertIn('"deny"', outside.stdout)
-
-    def test_a_windows_copy_is_read_the_same(self):
-        """Windows の絶対パス（このリポジトリの done/ に在る形）の `source_path` も同じに読む。"""
-        self.propose("i0001", parent_text("i0001", ["research"]))
-        self.commit_parent()
-        self.assertEqual(self.approve().returncode, 0)
-        path = os.path.join(self.approved, "doing", "i0001.md")
-        with open(path, encoding="utf-8") as f:
-            text = f.read()
-        write(path, with_old_record(text, "wip/proposals/todo/i0001.md"))
-        before = json.loads(self.ccnavi("--explain", "--json").stdout)
-        windows = r"C:\Users\someone\git\ccnavi\.claude\worktrees\i0001\wip\proposals\todo\i0001.md"
-        write(path, with_old_record(text, windows))
-        copy, _ = approval.load_copy(path)
-        self.assertEqual(copy.source_path, windows)
-        after = json.loads(self.ccnavi("--explain", "--json").stdout)
-        self.assertEqual(before["parents"], after["parents"])
-        self.assertEqual(before["tickets"], after["tickets"])
 
 
 class BranchOfTest(unittest.TestCase):
@@ -794,7 +723,7 @@ class WriterFailureTest(CoreHarness):
         with self.failing("unlink", lambda path: path.endswith("1.requested")):
             applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 0, out + err)
-        self.assertIn("消せなかった（わざと失敗させた）。requested は残っていて効く", err)
+        self.assertIn("消せなかった（わざと失敗させた）。requested は残っていて有効なまま", err)
         self.assertIn("マーカー（reviewed）を消した", out)
         self.assertTrue(os.path.exists(os.path.join(marks, "1.requested")))
         self.assertFalse(os.path.exists(os.path.join(marks, "1.reviewed")))
@@ -1386,8 +1315,7 @@ class WithdrawTest(CoreHarness):
 
     承認は提案を中身を変えずに動かすので、新しい形は「`doing/` の中身が承認コミットの親の提案と
     バイト単位で同じ」だけで決める。待ち方は `doing/` の計画から決まるので、バイト列が同じなら
-    待ち方も同じ（別に比べる段も、一緒に消すファイルも無い）。承認の記録（`ccnavi_approved`）を
-    持つ古い形の親は一律に止める（`approved_parent`。`to_old_form` で古い形にする）。
+    待ち方も同じ（別に比べる段も、一緒に消すファイルも無い）。
     """
 
     def approved_parent(self):
@@ -1395,7 +1323,6 @@ class WithdrawTest(CoreHarness):
         self.propose("i0001", text)
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        to_old_form(self.approved, "i0001")
         return text
 
     def new_parent(self, text=None, plan=("research",)):
@@ -1555,14 +1482,6 @@ class WithdrawTest(CoreHarness):
         self.assertTrue(any("提案が無い" in p for p in problems), problems)
         self.assertFalse(any("ワークフロー編集タブ" in p for p in problems), problems)
 
-    def test_an_old_form_parent_is_always_refused(self):
-        """古い形の親は、改版されたかを見分ける印が無いので一律に止める。"""
-        text = self.approved_parent()
-        problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("前の版の形" in p for p in problems), problems)
-        listed = dict((i, p) for i, _, p in core.withdrawable(self.snapshot(), "i0001"))
-        self.assertTrue(any("前の版の形" in p for p in listed["i0001"]), listed)
-
     def test_a_followup_child_is_named(self):
         self.new_parent()
         self.start_parent()
@@ -1608,10 +1527,9 @@ class WithdrawTest(CoreHarness):
         self.assertTrue(any("戻す先" in p for p in self.problems({"i0001": text.encode()})))
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.assertEqual(self.approve().returncode, 0)
-        # 改版は時刻をチケットに書かず、記録の欄も残したまま計画を書き換える。古い形の親は
-        # 改版されたかを見分けられないので、一律に止まる。
+        # 改版は計画を書き換えるので、承認コミットの親の提案と一致せず止まる。
         problems = self.problems({"i0001": text.encode()})
-        self.assertTrue(any("前の版の形" in p for p in problems), problems)
+        self.assertTrue(any("中身が変わった" in p for p in problems), problems)
 
     def test_copies_left_in_a_worktree_do_not_change_the_answer(self):
         """承認の前に切ったワークツリーに `todo/` の提案が残っていても、答えは前と同じ。"""

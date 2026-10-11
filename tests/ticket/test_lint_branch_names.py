@@ -116,9 +116,9 @@ class BranchNameRulesTest(unittest.TestCase):
     def test_names_outside_the_form_are_named(self):
         """新しい親は `<先頭の語>-<番号>-<slug>`。前の形とユーザが付けた名前は warn。"""
         for name, issue, word in (
-            ("i0131", 131, "`i<番号>` の形はもう使わない"),
-            ("I0131", None, "`i<番号>` の形はもう使わない"),
-            ("web-i0012", 12, "`i<番号>` の形はもう使わない"),
+            ("i0131", 131, "`feature-131-<slug>`"),
+            ("I0131", None, "通し番号"),
+            ("web-i0012", 12, "`feature-12-<slug>`"),
             ("login-form", None, "通し番号"),
             ("login", 12, "`feature-12-<slug>`"),
             ("feature-login", None, "通し番号"),
@@ -335,7 +335,7 @@ class LintBranchNamesTest(unittest.TestCase):
         lines = self.lint()
         joined = "\n".join(lines)
         self.assertTrue(all(line.startswith("warn: (ticket): ") for line in lines), joined)
-        self.assertIn("i0131: `i<番号>` の形はもう使わない", joined)
+        self.assertIn("i0131: 親の識別子は", joined)
         self.assertNotIn("feature-132-x:", joined)
         self.assertIn("develop: 識別子が統合先", joined)
         self.assertIn("feature-1-fix..it: 識別子に `..`", joined)
@@ -348,7 +348,7 @@ class LintBranchNamesTest(unittest.TestCase):
         self.assertEqual([], self.lint())
 
     def test_duplicate_numbers_are_named(self):
-        self.place("done", "i0062")
+        self.place("done", "feature-62-z")
         self.place("doing", "feature-63-a")
         self.propose("feature-63-b")
         self.propose("hotfix-62-c")
@@ -356,7 +356,7 @@ class LintBranchNamesTest(unittest.TestCase):
         lines = self.lint()
         joined = "\n".join(lines)
         self.assertIn("feature-63-b: 識別子の番号 63 が feature-63-a と重なる", joined)
-        self.assertIn("hotfix-62-c: 識別子の番号 62 が i0062 と重なる", joined)
+        self.assertIn("hotfix-62-c: 識別子の番号 62 が feature-62-z と重なる", joined)
         self.assertNotIn("feature-64-d:", joined)
         self.assertNotIn("feature-63-a:", joined)
 

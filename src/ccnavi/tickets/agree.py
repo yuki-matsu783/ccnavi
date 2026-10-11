@@ -450,7 +450,7 @@ def _apply_steps(
                     if moved:
                         stage.line(f"  レビュー待ちの子を閉じた: {', '.join(moved)}")
                     stage.line(
-                        "  全体計画の最後のレビューを済んだ扱いにした。残った指摘は"
+                        "  全体計画の最後のレビューを済ませた扱いにした。残った指摘は"
                         "フィードバック作業フェーズの confirm が数える"
                     )
                 continue

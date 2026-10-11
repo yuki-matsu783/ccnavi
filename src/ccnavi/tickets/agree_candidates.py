@@ -219,23 +219,21 @@ def script_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
 
 
 def record_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
-    """提案に承認の記録（`ccnavi_approved`）か続きの子の目印（`followup_of`）があれば拒む。
+    """提案に続きの子の目印（`followup_of`）があれば拒む。
 
-    承認は中身を変えないので、提案に書いた欄はそのまま承認済みチケットに入る。前の版の承認の
-    記録を持つ古い形は取り下げを特別に扱う（子は記録の欄で決め、親は取り下げない）。続きの子の
-    目印は取り下げを止める。どちらもユーザの判断（承認・レビューの行き先）だけが残すもので、
-    提案に書かせると古い形や続きの子を装える。
+    承認は中身を変えないので、提案に書いた欄はそのまま承認済みチケットに入る。続きの子の
+    目印は取り下げを止める。ユーザの判断（レビューの行き先）だけが残すもので、
+    提案に書かせると続きの子を装える。
     """
-    found = [name for name in (ticket_model.APPROVAL_KEY, approval.FOLLOWUP_KEY) if name in t.raw]
-    if not found:
+    if approval.FOLLOWUP_KEY not in t.raw:
         return []
-    names = ", ".join(f"`{name}`" for name in found)
+    names = f"`{approval.FOLLOWUP_KEY}`"
     return [
         rules.Problem(
             rules.SEVERITY_ERROR,
             t.ticket,
-            f"{names} は承認の記録で、ユーザの承認（と続きの子を起こすレビューの行き先）だけが"
-            "残すもの。提案には書かない（改版の提案で承認済みチケットを写したときも消す）",
+            f"{names} は続きの子を起こすレビューの行き先だけが残すもの。"
+            "提案には書かない（改版の提案で承認済みチケットを写したときも消す）",
         )
     ]
 
@@ -375,7 +373,7 @@ def copy_config_problems(
                     rules.Problem(
                         severity,
                         t.ticket,
-                        f"`phases:` の `{ident}` が{what}。進行中の親には効かない（判定は"
+                        f"`phases:` の `{ident}` が{what}。進行中の親には反映されない（判定は"
                         "承認済みチケットの写しを読む）。反映するには、子の無い番号の定義なら"
                         f" {fill} を打った改版を出す（計画が同じでも改版になる）。子が承認された"
                         "番号の定義なら、ユーザが承認済みチケットの `phases:` を直す",
@@ -682,7 +680,7 @@ def existing_branch_warnings(
         if hits:
             found.append(
                 f"{t.ticket}: 親のブランチ名と同じブランチ（{', '.join(hits)}）が既にある。"
-                "承認すると、そのブランチを親のブランチとして取り込み・送る。"
+                "承認すると、そのブランチを親のブランチとして取り込み、push する。"
                 "別の作業なら識別子を変える"
             )
     return found
