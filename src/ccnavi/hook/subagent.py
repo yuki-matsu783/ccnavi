@@ -80,7 +80,7 @@ def at_start(
     ]
     # フローの文に使える残り（文字）。子が多くても SubagentStart の文が長くなりすぎないように。
     budget = flow.TOTAL_TEXT_LIMIT
-    # 手順を並べるのは、cwd がその子のワークツリーで子が 1 本に決まるときだけ（M-4）。
+    # 手順を並べるのは、cwd がその子のワークツリーで子が 1 本に決まるときだけ。
     # 親のツリーからの起動（入れ子の孫も）では、どの子の担当かが hook から決められない。
     full = bound.is_child
     listed = False
@@ -189,7 +189,8 @@ def at_stop(
             record.decision, record.reason = audit.SKIP, post.REASON_WORKTREE_UNREADABLE
             record.enforced = False
         _remember(stderr, _unchecked_path(conf.state, payload.session_id, who), unchecked)
-    # 着手のあとにフローが書き換わっていれば知らせる（止めない。M-2）。
+    # 着手のあとにフローが書き換わっていれば知らせる。行き先を追えないシェルの書き込みは
+    # 止められないので、止めずに知らせる。
     changed = [n for n in (flow.changed_notice(conf, root, c) for c in targets) if n]
     if not findings:
         if changed:

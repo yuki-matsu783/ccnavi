@@ -3,12 +3,12 @@
 どれも、直さないと組み込み deny が「守っている」と言いながら回避できる形。
 `.claude/` の側も同じ当て方で守られる。
 
-- A-2 大文字小文字: `glob` と `regex` で書いたルールと組み込みの保護を、どの機械でも
+- 大文字小文字: `glob` と `regex` で書いたルールと組み込みの保護を、どの機械でも
   区別せずに当てる。区別が要る `regex` は `(?-i:...)` で囲む
-- A-3 区切りが続かないパス: `rm -rf .ccnavi` / `mv .ccnavi .ccnavi.bak` / `rm -rf .claude`
-- A-4 生の `id` のコロン: レイヤーの名前をつけた形と見分けが付かないものを error にする
-- A-5 `self` の予約: `projects/Self/` も `self` と同じに扱って数えない
-- A-6 確認だけ: 既に参照されている `.ccnavi/scripts/` のスクリプトを、表記を変えた形でも
+- 区切りが続かないパス: `rm -rf .ccnavi` / `mv .ccnavi .ccnavi.bak` / `rm -rf .claude`
+- 生の `id` のコロン: レイヤーの名前をつけた形と見分けが付かないものを error にする
+- `self` の予約: `projects/Self/` も `self` と同じに扱って数えない
+- 確認だけ: 既に参照されている `.ccnavi/scripts/` のスクリプトを、表記を変えた形でも
   区切りの無い形でも、Write / Edit とシェルの両方で書き換えられない
 
 レイヤーの名前（`self` / `common`）とプロジェクト名が同じときも、予約は両側に掛かる。
@@ -46,7 +46,7 @@ from tests.config.test_config_union import (
 )
 from tests.config.test_config_union_guard import GuardHarness
 
-# A-2 の的。`glob` と `regex` と、区別を取り戻した `regex` を 1 本ずつ持つ。
+# 大文字小文字の的。`glob` と `regex` と、区別を取り戻した `regex` を 1 本ずつ持つ。
 # `glob` も `regex` も組み込みの保護も、どの機械でも大文字小文字を区別せずに当たる。機械で変えると、
 # 同じルールが Windows では当たり Linux では当たらず、区別しないチケットの範囲とも食い違う。
 # 区別が要るときだけ、書いたユーザが `(?-i:...)` で囲む。
@@ -75,7 +75,7 @@ CASE_RULES = {
     "allow": [{"id": "anything-read", "match": "Read", "regex": "."}],
 }
 
-# A-4 の的。裸の `id` にコロンがある。共通レイヤーに置けば lib の定義に見える。
+# 生の `id` のコロンの的。裸の `id` にコロンがある。共通レイヤーに置けば lib の定義に見える。
 COLON_RULES = {
     "version": 1,
     "deny": [
@@ -105,7 +105,7 @@ factors:
   - {id: "lib:schema", points: 5, glob: "schema/**", message: スキーマに触った}
 """
 
-# A-5 の的。`projects/Self/` のレイヤーに置く deny。数えないので、当たってはいけない。
+# `self` の予約の的。`projects/Self/` のレイヤーに置く deny。数えないので、当たってはいけない。
 SELF_PROJECT_RULES = {
     "version": 1,
     "deny": [
@@ -166,7 +166,8 @@ factors:
   - {id: reserved, points: 5, glob: "src/**", message: 予約名のレイヤーで数えた}
 """
 
-# A-6 の的。レイヤーの risk が呼ぶスクリプト。これが書き換わると配点が 0 を返せる。
+# 参照されているスクリプトの的。レイヤーの risk が呼ぶスクリプト。
+# これが書き換わると配点が 0 を返せる。
 COUNT_SCRIPT = 'printf \'{"points": 30, "message": "%s"}\' "$CCNAVI_TICKET"\n'
 COUNT_RISK = (
     "version: 1\nfactors:\n"
@@ -175,7 +176,7 @@ COUNT_RISK = (
 
 
 class GlobCaseTest(ConfigUnionHarness):
-    """A-2: ルールに書いたパスの扱い。
+    """大文字小文字: ルールに書いたパスの扱い。
 
     `glob` も `regex` も、`risk.py` / `phasetypes.py` / `ticket.py` の範囲と同じく、
     どの機械でも大文字小文字を区別せずに当たる。区別すると、`.ccnavi/` を `.Ccnavi/` の
@@ -222,7 +223,7 @@ class GlobCaseTest(ConfigUnionHarness):
 
 
 class BuiltinGlobCaseTest(GuardHarness):
-    """A-2: 組み込みの `*/.ccnavi/*` も、どの機械でも大文字小文字を区別せずに当たる（穴そのもの）。
+    """組み込みの `*/.ccnavi/*` も、どの機械でも大文字小文字を区別せずに当たる（穴そのもの）。
 
     的は app のレイヤー。fixture の app は `.ccnavi/` を持たないので、`.Ccnavi/` は
     ディスクに無く、`os.path.realpath` がパスを補正しない。「まだ無いところを
@@ -247,7 +248,7 @@ class BuiltinGlobCaseTest(GuardHarness):
 
 
 class ShellPlaceTest(GuardHarness):
-    """A-3: 区切りが続かないパス。ディレクトリごと消す・退かす形（`_PLACES` / `_COPY_PLACES`）。"""
+    """区切りが続かないパス。ディレクトリごと消す・退かす形（`_PLACES` / `_COPY_PLACES`）。"""
 
     def test_removing_or_moving_the_umbrella_itself_is_denied(self):
         """`.ccnavi` で終わるパスも `builtin-guard-setting-files` で止まる。"""
@@ -657,7 +658,7 @@ class HolderDestinationTest(GuardHarness):
 
 
 class ColonIdTest(ConfigUnionHarness):
-    """A-4: 生の `id` のコロン。レイヤーの名前をつけた形（`lib:custom`）と見分けが付かない。"""
+    """生の `id` のコロン。レイヤーの名前をつけた形（`lib:custom`）と見分けが付かない。"""
 
     def test_a_colon_in_a_rule_id_is_named_by_lint(self):
         """共通レイヤーでもレイヤーでも、コロンを含む `id` は error で名指しする。"""
@@ -698,7 +699,7 @@ class ColonIdTest(ConfigUnionHarness):
 
 
 class ReservedSelfTest(ConfigUnionHarness):
-    """A-5: `self` は予約。`projects/Self/` のような表記違いも同じに扱う。"""
+    """`self` は予約。`projects/Self/` のような表記違いも同じに扱う。"""
 
     def setUp(self):
         super().setUp()
@@ -915,9 +916,10 @@ class ReservedLayerRestoreTest(GuardHarness):
 
 
 class ScriptTamperTest(GuardHarness):
-    """A-6: 既に参照されている `.ccnavi/scripts/` のスクリプトを書き換える・消す経路。
+    """既に参照されている `.ccnavi/scripts/` のスクリプトを書き換える・消す経路。
 
-    コア（バックアップと復元）には入れない。止まることだけを確かめる（A-2 と A-3 の結果）。
+    コア（バックアップと復元）には入れない。止まることだけを確かめる
+    （大文字小文字と、区切りが続かないパスを直した結果）。
     """
 
     def setUp(self):
