@@ -113,7 +113,7 @@ review_at: {3: 5}    # 延期した番号 → 引き受ける番号
 - 親の提案には `feedback: []` も書く（対応が無くても空で出す。無いと親を閉じられない）
 - 流れ: 承認 → 親に着手 → 子に着手 → 子で作業して `finish`（子は `review/`） → 親が子を合流 → ユーザが親のワークツリーの端末で
   `ccnavi-review.sh chat 1` → 子が `done/` → 親を `finish`（親は `done/`）
-- `chat` だけで回す親子は取り込み状態を持たず、`ccnavi-push-approved.sh` はコミットも push もしない（上の表のとおり）。
+- `chat` だけで回す親子は取り込み状態を持たず、`ccnavi-push-approved.sh` はコミットも push もしない（`chat` は 9.8 のとおりホストに出ないため）。
   `chat` を打ったユーザが、`.ccnavi/approved/` と `wip/proposals/` の変更を自分でコミットして push する。作業の環境と
   ユーザの端末が別の機械（クラウドのコンテナと手元）のときは、親のブランチを先に push して、手元で取り込んでから `chat` を打つ
 
