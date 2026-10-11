@@ -320,6 +320,31 @@ def decide_before(
                 ],
                 conf=conf,
             )
+        # 2 段目の無いユーザの入口（`ccnavi-sync.sh`・`ccnavi-review.sh decide`・実行ファイルの
+        # `--yes`）は、引数を変数・置換・glob で組み立てると表記の検査から外れる。読めなければ止める
+        # （phase_forms.hidden_user_entry、ADR-0120）。
+        entry, found = phase_forms.hidden_user_entry(
+            record.subject, [(r, x) for r, x, _ in inner], conf.bin
+        )
+        if entry:
+            record.code = phase_forms.CODE_TICKET_APPROVAL
+            record.rules = [phase_forms.TICKET_APPROVAL_RULE_ID]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices
+                + [
+                    reasons.builtin_refusal(
+                        phase_forms.CODE_TICKET_APPROVAL,
+                        phase_forms.TICKET_APPROVAL_RULE_ID,
+                        subject,
+                        phase_forms.hidden_entry_message(entry, found),
+                    )
+                ],
+                conf=conf,
+            )
 
     # 子チケットのワークツリーからの `ccnavi-git.sh push` は、誰が打っても止める。sh も同じ検査を
     # 持つが、止める場所は hook に置き、sh は 2 重目にする。
