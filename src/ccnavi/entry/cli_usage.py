@@ -74,9 +74,10 @@ of the path without .md; --text matches part of the path, the mtime or any
 frontmatter value; strings are compared in NFC. --since and --until take
 YYYY-MM-DD[THH[:MM[:SS]]] and --until runs to the end of what it names (a date
 to 23:59:59, THH to :59:59, THH:MM to :59). No match is still exit 0. Before
-searching it brings the per-directory index.jsonl up to date (it writes only
-where git ignores index.jsonl and the file is ccnavi's own; a tree that
-ignores none is left out and named on stderr). The first run reads the head
+searching it brings the per-directory ccnavi-index.jsonl up to date (it writes only
+where git ignores ccnavi-index.jsonl and the file is ccnavi's own; a tree that
+ignores none gets one line added to its .gitignore first, and is left out and
+named on stderr only if that fails). The first run reads the head
 of every markdown file; later runs read only those whose mtime moved.
 --no-refresh reuses what is there. --json is --format json. The rows are
 documented in README.md ("ドキュメントの索引"). These filters are for --docs
