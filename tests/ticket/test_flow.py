@@ -638,8 +638,9 @@ class FlowInfoTest(unittest.TestCase):
                 self.assertEqual(shown["locked"], started)
 
     def test_children_waiting_for_review_keep_the_field_and_are_locked(self):
-        # レビュー準備中・レビュー待ち（`review/`）は閉じた扱いにしない。フローが無くても欄を返すが、
-        # 着手の有無によらず閲覧だけにする（書き換えは `doing` の着手中と `review/` で止める）。
+        # レビュー準備中・レビュー待ち（`review/`）は閉じた扱いにしない。
+        # フローが無くても欄を返すが、着手の有無によらず閲覧だけにする
+        # （書き換えは `doing` の着手中と `review/` で止める）。
         for started in (False, True):
             with self.subTest(started=started):
                 shown = flow.info(
