@@ -18,7 +18,7 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, e2e, d
 | `guard` | 判定とルール（受入テスト、自己防衛、運用のルール、縮退、実行後チェック、プロジェクト） | 約 60 秒 |
 | `config` | 設定のレイヤーの合成（rules / phases / risk） | 約 33 秒 |
 | `ticket` | チケット・フェーズ・承認・ボード・リスク | 約 140 秒 |
-| `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・承認の push の sh・取ってくる sh・ランチャー・clean） | 約 80 秒 |
+| `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・承認の push の sh・取ってくる sh・ランチャー・clean・レビューの sh）。配布する sh を起動するテストはここに置く | 約 80 秒 |
 | `e2e` | 本物のワークスペースを組み立てて sh を外から実行する。組み立て済みの実行ファイル（`dist/ccnavi`）が要り、無ければ skip | 約 8 秒 |
 
 ```sh
@@ -53,17 +53,19 @@ uv run python -m tests --plan          # 何をどの順で回すか出すだけ
 | `.ccnavi/scripts/ccnavi-launcher.sh`・`scripts/ccnavi-setup.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-push-approved.sh`・`ccnavi-clean.sh`・`ccnavi-clean.js` | `sh` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-fetch.sh`・`ccnavi-sync.sh` | `sh` |
-| `.claude/hooks/test-py.sh` | `e2e` |
+| `.claude/hooks/test-py.sh` | `core`（`test_test_py_hook`）`e2e` |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
+| `tests/ticketsample.py` | `ticket` `sh` |
 | `tests/fixtures/` | `guard` `ticket` |
 | `extensions/vscode/` | `ticket`（`core` の `test_test_json` も例を読む） |
+| `extensions/chrome/ccnavi-approval/`（`py/`・`test/fixtures/`） | `ticket` `sh`（Chrome の入口を手元のコアと突き合わせる） |
 | `docs/adr/`（枚を足す・番号を動かす） | `core`（`test_adr_numbers`） |
 | そのほかのドキュメントだけ（`*.md`・`docs/`） | 回さない |
 
 自動テストで中身を確かめられないもの（変えたら手で動かして確かめる）:
 
 - `.claude/hooks/lint-py.sh`
-- `.claude/hooks/test-py.sh` の差し戻しの回数と、落ちたテストを差し戻すところ（`e2e` は sh の外形だけ見る）
+- `.claude/hooks/test-py.sh` の差し戻しの回数の上限（`core` の `test_test_py_hook` は回すツリーの選び方・記録の掃除・1 回の差し戻しを、`e2e` は sh の外形を見る）
 
 全件を回すとき:
 
@@ -77,7 +79,7 @@ uv run python -m tests --plan          # 何をどの順で回すか出すだけ
 
 ## 拡張（`extensions/vscode/ccnavi-board`）のグループ
 
-拡張側にも同じ分け方がある（`test/<グループ>/`。board / rules / risk / phases / projects / flow / shared）。
+拡張側にも同じ分け方がある（`test/<グループ>/`。board / rules / risk / phases / projects / flow / workflow / shared）。
 こちらは表を引かない。変えたファイルを渡せば、関わるグループだけが回る。
 
 ```sh
@@ -89,8 +91,27 @@ pnpm test                              # 全部
 
 コンパイルは 1 回なので、変えたファイルは 1 回でまとめて渡す（`pnpm test:for a.ts b.ts`）。
 
+## Chrome 拡張（`extensions/chrome/ccnavi-approval`）
+
+グループに分けていない。拡張全体が 1 つのグループで、触ったら全部を回す。
+
+```sh
+cd extensions/chrome/ccnavi-approval
+pnpm test        # 組み立て → 単体・Pyodide・手元の CPython との突き合わせ（node scripts/test.js）
+pnpm test:e2e    # 拡張を読み込んだ Chromium での試験。Chromium が要る
+```
+
+ターンの終わりの hook（`.claude/hooks/test-ext.sh`）は、VS Code の拡張と同じく触ったときだけ回す。
+回すのは `node scripts/test.js` だけで、`--e2e` は回さない。読み物（`*.md`・`docs/`）だけを触ったターンは回さない。
+
 ## 表を直すとき
 
 グループを足す・分け直すときは、ファイルを `tests/<グループ>/` へ移し、テストどうしの import
 （`from tests.<グループ>.test_x import ...`）がグループをまたがないようにする。またぐなら、共有する
-部品を `tests/` 直下の補助モジュールへ出す。置き場の決まりは `tests/core/test_layout.py` が見る。
+部品を `tests/` 直下の補助モジュール（`inproc.py`・`phasecopy.py`・`ticketsample.py`）へ出す。
+置き場の決まり（グループをまたぐ import が無いことも）は `tests/core/test_layout.py` が見る。
+
+配布する sh を起動するテストは `sh` に置く。例外は 1 つで、実行ファイル（判定）と sh が同じことを
+別の実装で持ち、同じ見本の表で両方を突き合わせるテストは、表の主題のグループに 1 ファイルで置く
+（`guard` の `test_wrapguard.py` の `ShAgreesTest`）。表を 2 つのグループに分けると、
+片方だけ直したときに食い違いに気づけないため。
