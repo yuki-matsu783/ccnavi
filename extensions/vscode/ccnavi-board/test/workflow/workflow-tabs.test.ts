@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 
 import { forgetSaved, markUnsaved, onWorkflowTabs, rememberSaved, resetWorkflowTabs, staleSaved, workflowTabs } from "../../src/core/workflow-tabs.js";
 
-test("CB-T355 未保存の親と保存したときのハッシュを持ち、変わったときだけ知らせる。閉じた・破棄した・保存したタブは未保存から外れる", () => {
+test("CB-T381 未保存の親と保存したときのハッシュを持ち、変わったときだけ知らせる。閉じた・破棄した・保存したタブは未保存から外れる", () => {
   resetWorkflowTabs();
   let calls = 0;
   const stop = onWorkflowTabs(() => {
@@ -54,7 +54,7 @@ test("CB-T355 未保存の親と保存したときのハッシュを持ち、変
   resetWorkflowTabs();
 });
 
-test("CB-T364 ボードを読み直したとき、承認待ちの親の提案に無い親の保存のハッシュを忘れる（端末や Chrome 拡張で承認した・取り下げた親）", () => {
+test("CB-T390 ボードを読み直したとき、承認待ちの親の提案に無い親の保存のハッシュを忘れる（端末や Chrome 拡張で承認した・取り下げた親）", () => {
   const saved = { i0001: "s1", i0002: "s2", i0003: "s3" };
   assert.deepEqual(staleSaved(saved, ["i0002", "i0009"]), ["i0001", "i0003"]);
   assert.deepEqual(staleSaved(saved, ["i0001", "i0002", "i0003"]), []);

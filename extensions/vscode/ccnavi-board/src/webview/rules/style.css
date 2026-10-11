@@ -5,11 +5,16 @@
  *
  * バンドルするのは `scripts/bundle-webview.js`（出口は `out/webview/rules.css`）。拡張ホストはそれを読んで
  * `<style nonce>` に流し込む（`src/core/rules-render.ts`）。
+ *
+ * **先頭の 1 行だけが外のパス**（`@xyflow/react`。条件の木の図 `When.tsx` が要る CSS で、node_modules から来る）。
+ * 色は `--xy-*` の変数で出来ていて、`When.css` が `--vscode-*` に置き換える。先に読ませるのはそのため。
  */
+@import "@xyflow/react/dist/style.css";
 @import "../styles/page.css";
 @import "../styles/list.css";
 @import "./App.css";
 @import "./Rule.css";
+@import "./When.css";
 @import "./Judge.css";
 @import "./Sum.css";
 @import "../Tour.css";

@@ -8,14 +8,15 @@
  *
  * ここはルールの意味（当たる・当たらない）には触れない。判定は実行ファイルの仕事。
  */
-import { isMap, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document } from "yaml";
+import { isMap, isNode, isScalar, isSeq, Pair, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Node } from "yaml";
 
 import { SECTIONS, type PatternKind, type RuleForm, type RulesModel, type Section, type Sections } from "./rules-view.js";
+import { asCond, sameCond, type CondNode } from "./rules-when.js";
 import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
  * ルールの形（`SECTIONS`・`RuleForm`・`RulesModel`）は画面との契約（`rules-view.ts`）にある。
- * ここに置くと、画面がそこから `yaml` を辿ってバンドルしたものに解析器が丸ごと入る。
+ * ここに置くと、画面がそこから `yaml` を辿ってバンドルしたものに解析器がすべて入る。
  */
 
 /** ブロック（`>-` / `|-`）で書かれうる文の欄。変えていなければ元の折り返しのまま戻す */
@@ -49,7 +50,13 @@ export function readRules(text: string): RulesDocument {
         problems.push(`タイプ ${section} の ${index + 1} 件目がマップ（キーと値の組の集まり）ではありません。画面に出しません`);
         return;
       }
-      sections[section].push(formOf(section, index, item));
+      const form = formOf(section, index, item);
+      if (form.when !== undefined && (item.has("glob") || item.has("regex"))) {
+        problems.push(`タイプ ${section} の ${index + 1} 件目（${form.id || "id 未設定"}）は when と glob / regex を両方書いています。どちらか 1 つにしてください`);
+      } else if (form.bothPatterns === true) {
+        problems.push(`タイプ ${section} の ${index + 1} 件目（${form.id || "id 未設定"}）は glob と regex を両方書いています。どちらか 1 つにしてください`);
+      }
+      sections[section].push(form);
     });
   }
   const version = doc.get("version");
@@ -81,6 +88,95 @@ function formOf(section: Section, index: number, map: YAMLMap): RuleForm {
     additionalContextFile: scalarText(map, "additionalContextFile"),
     additionalContextOnceFile: scalarText(map, "additionalContextOnceFile"),
     every: scalarText(map, "every"),
+    ...exceptsOf(map),
+    ...(map.has("when") ? { when: condOfYaml(map.get("when", true)) } : {}),
+    // 実行ファイルと同じく、when が無いときは値の空でない glob / regex だけを数える（`glob: ''` は書いていない扱い）
+    ...(!map.has("when") && scalarText(map, "glob") !== "" && scalarText(map, "regex") !== "" ? { bothPatterns: true } : {}),
+  };
+}
+
+/** 木のノードの深さをここまでで打ち切る（読めない入れ子で止まらないため。上限の 8 を言うのは画面と lint） */
+const READ_DEPTH = 64;
+
+/** YAML の値を、そのまま JSON にできる形にする（読めなかったノードを書き戻すため） */
+function plainOf(value: unknown): unknown {
+  return isNode(value) ? value.toJSON() : (value ?? null);
+}
+
+function shown(value: unknown): string {
+  const text = JSON.stringify(plainOf(value)) ?? "null";
+  return text.length > 80 ? `${text.slice(0, 80)}…` : text;
+}
+
+function invalid(value: unknown, reason: string): CondNode {
+  return { op: "invalid", text: shown(value), reason, raw: plainOf(value) };
+}
+
+/**
+ * `when:` のノード（と `except:` の各要素）を木にする。形が違うところは `invalid` にして残し、
+ * 他のノードは読む（1 か所の誤りで木ぜんたいを見せなくしない）。
+ */
+export function condOfYaml(value: unknown, depth = 1): CondNode {
+  if (depth > READ_DEPTH) {
+    return invalid(value, "入れ子が深すぎて読めません");
+  }
+  if (!isMap(value)) {
+    return invalid(value, "ノードはマップ（キー 1 つ）で書きます");
+  }
+  if (value.items.length !== 1) {
+    return invalid(value, `ノードのキーはちょうど 1 つです（${value.items.length} 個あります）`);
+  }
+  const pair = value.items[0];
+  const key = isScalar(pair.key) ? String(pair.key.value) : String(pair.key);
+  const inner = pair.value;
+  switch (key) {
+    case "glob":
+    case "regex":
+      if (!isScalar(inner) || typeof inner.value !== "string") {
+        return invalid(value, `${key} の値は文字列です`);
+      }
+      // 引用符の無い `yes` `on` `0755` などは、実行ファイル（PyYAML、YAML 1.1）が文字列以外に読み、
+      // 読み込みが error にする。ここ（YAML 1.2）では文字列に見えるので、誤りとして揃えて挙げる
+      if (inner.type === Scalar.PLAIN && yaml11Ambiguous(inner.value)) {
+        return invalid(value, `${key} の値 ${inner.value} は引用符で囲んでください（実行ファイルは文字列として読みません）`);
+      }
+      return { op: key, pattern: inner.value };
+    case "all":
+    case "any":
+      if (!isSeq(inner)) {
+        return invalid(value, `${key} の値はリストです`);
+      }
+      return { op: key, children: inner.items.map((item) => condOfYaml(item, depth + 1)) };
+    case "not":
+      if (inner === null || inner === undefined || (isScalar(inner) && inner.value === null)) {
+        return { op: "not", child: null };
+      }
+      return { op: "not", child: condOfYaml(inner, depth + 1) };
+    default:
+      return invalid(value, `知らないキー ${key} です（glob / regex / all / any / not）`);
+  }
+}
+
+/**
+ * `except:` の各パターンを、見せる形（`glob: …` / `regex: …`）にする。書いていなければ欄ごと省く。
+ * 形の誤り（マッピングでない要素など）もそのまま文字にして見せる。止めるのは保存前の `--lint`。
+ */
+function exceptsOf(map: YAMLMap): { excepts?: readonly string[]; exceptNodes?: readonly CondNode[] } {
+  const seq = map.get("except", true);
+  if (seq === undefined || seq === null) {
+    return {};
+  }
+  if (!isSeq(seq)) {
+    return { excepts: [String(map.get("except"))], exceptNodes: [invalid(seq, "except の値はリストです")] };
+  }
+  return {
+    exceptNodes: seq.items.map((item) => condOfYaml(item)),
+    excepts: seq.items.map((item) => {
+      if (!isMap(item)) {
+        return String(item);
+      }
+      return item.items.map((pair) => `${String((pair.key as Scalar).value)}: ${String((pair.value as Scalar | null)?.value ?? "")}`).join(", ");
+    }),
   };
 }
 
@@ -230,16 +326,27 @@ function restoreBlocks(output: string, placed: readonly YAMLMap[], keeps: readon
   return result;
 }
 
-/** 欄を順に書く。変わっていない欄は触らず、元の書き方（引用符・折り返し）を残す */
+/**
+ * 欄を順に書く。変わっていない欄は触らず、元の書き方（引用符・折り返し）を残す。
+ * `except:` は画面で編集しないので書かない。元のノードを使い回すので、書いてあればそのまま残る。
+ */
 function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
   setText(doc, node, "id", form.id, Scalar.PLAIN);
   setText(doc, node, "match", form.match, Scalar.PLAIN);
-  // glob と regex は必ず引用符で囲む。囲まないと YAML が先に解釈する（rules.yml の先頭の注意）。
-  const other: PatternKind = form.kind === "glob" ? "regex" : "glob";
-  if (node.has(other)) {
-    node.delete(other);
+  if (form.when !== undefined) {
+    writeWhen(doc, node, form.when, form.dropExcept === true);
+  } else {
+    // glob と regex は必ず引用符で囲む。囲まないと YAML が先に解釈する（rules.yml の先頭の注意）。
+    const other: PatternKind = form.kind === "glob" ? "regex" : "glob";
+    if (node.has(other)) {
+      node.delete(other);
+    }
+    setText(doc, node, form.kind, form.pattern, Scalar.QUOTE_SINGLE, node.has(form.kind) ? undefined : "match");
   }
-  setText(doc, node, form.kind, form.pattern, Scalar.QUOTE_SINGLE, node.has(form.kind) ? undefined : "match");
+  // 「条件の木に変換」で except を木へ移したときだけ消す
+  if (form.dropExcept === true) {
+    node.delete("except");
+  }
   // allow のルールは文面を持たないことがある。空のまま欄を足すと lint が「文面が無い」と
   // 言う対象が増えるだけなので、書いてあるか元から在るときだけ書く。
   if (form.message !== "" || node.has("message")) {
@@ -260,6 +367,371 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
     setText(doc, node, "additionalContextOnceFile", form.additionalContextOnceFile, Scalar.PLAIN, "additionalContextOnce");
   }
   setEvery(doc, node, form.every);
+}
+
+/**
+ * 条件の木（`when:`）を書く。読み込んだときと同じ木なら何もしない（コメントも書き方も、
+ * 両方書いてしまった `glob` も、そのまま残す。報告するのは lint）。
+ *
+ * 変えたときは `glob` / `regex` を消し、木を書く。元のノードは使い回す。子は、同じ中身のノードを先に
+ * 拾い（消した・並べ替えた子のコメントが別の子へ付け替わらないように）、残りを似たノードに当てて
+ * 値だけを書き換える（patchChildren）。包む・not を外すときも元のノードを中で使い回す。新しい葉は単引用符で囲む。
+ *
+ * まだ `when:` が無い（「条件の木に変換」した）ときは、元の `glob` / `regex` と、移す `except:` の
+ * 各要素を、変換した形（`all: [本体, not: {any: 除くもの}]`）に組んで元のノードとして当てる。
+ * 書いてあったコメント（前置き・行末）が、対応する葉に付いたまま残る。
+ */
+function writeWhen(doc: Document, node: YAMLMap, tree: CondNode, movingExcept: boolean): void {
+  const current = node.get("when", true);
+  if (current !== undefined && sameCond(condOfYaml(current), tree)) {
+    return;
+  }
+  const donor = current === undefined ? convertedFrom(node, movingExcept) : undefined;
+  node.delete("glob");
+  node.delete("regex");
+  const next = patchCond(doc, current ?? donor, tree);
+  if (current !== undefined && next === current) {
+    return;
+  }
+  if (node.has("when")) {
+    node.set("when", next);
+    return;
+  }
+  const at = node.items.findIndex((p) => String((p.key as Scalar).value) === "match");
+  node.items.splice(at >= 0 ? at + 1 : node.items.length, 0, doc.createPair("when", next));
+}
+
+/**
+ * glob / regex 1 つ（と `except:`）のルールの元のノードを、「条件の木に変換」した形に組む。
+ * 葉は元のペアの値（行末のコメント付き）をそのまま持ち、キーの前のコメントは葉の前へ移す。
+ * `except:` の各要素はノードごと移す（`movingExcept` のときだけ。消さない except は動かさない）
+ */
+function convertedFrom(node: YAMLMap, movingExcept: boolean): YAMLMap | undefined {
+  const body = node.items.find((p) => isScalar(p.key) && (p.key.value === "glob" || p.key.value === "regex") && isScalar(p.value));
+  const children: Node[] = [];
+  if (body !== undefined) {
+    const key = body.key as Scalar;
+    const leafMap = new YAMLMap();
+    leafMap.items.push(new Pair(new Scalar(key.value), body.value));
+    leafMap.commentBefore = key.commentBefore;
+    key.commentBefore = undefined;
+    children.push(leafMap);
+  }
+  if (movingExcept) {
+    const exceptPair = node.items.find((p) => isScalar(p.key) && p.key.value === "except");
+    const seq = exceptPair?.value;
+    if (exceptPair !== undefined && isSeq(seq) && seq.items.length > 0) {
+      // 先頭の要素の前のコメントは、読み込みではリストのほうに付く
+      const first = seq.items[0];
+      if (seq.commentBefore && isNode(first) && !first.commentBefore) {
+        first.commentBefore = seq.commentBefore;
+        seq.commentBefore = undefined;
+      }
+      const anyItems = new YAMLSeq();
+      anyItems.items = seq.items.slice();
+      const anyMap = new YAMLMap();
+      anyMap.items.push(new Pair(new Scalar("any"), anyItems));
+      const notMap = new YAMLMap();
+      notMap.items.push(new Pair(new Scalar("not"), anyMap));
+      notMap.commentBefore = (exceptPair.key as Scalar).commentBefore;
+      children.push(notMap);
+    }
+  }
+  if (children.length === 0) {
+    return undefined;
+  }
+  const all = new YAMLSeq();
+  all.items = children;
+  const root = new YAMLMap();
+  root.items.push(new Pair(new Scalar("all"), all));
+  return root;
+}
+
+function mapOf(doc: Document, key: string, value: unknown): YAMLMap {
+  const map = new YAMLMap();
+  map.items.push(doc.createPair(key, value));
+  return map;
+}
+
+function quoted(doc: Document, text: string): Scalar {
+  const scalar = doc.createNode(text) as Scalar;
+  scalar.type = Scalar.QUOTE_SINGLE;
+  return scalar;
+}
+
+/** 元のノードが 1 キーのマップなら、そのペアとキー */
+function soleOf(existing: unknown): { readonly pair: Pair | undefined; readonly key: string | undefined } {
+  const pair = isMap(existing) && existing.items.length === 1 ? (existing.items[0] as Pair) : undefined;
+  const key = pair !== undefined && isScalar(pair.key) ? String(pair.key.value) : undefined;
+  return { pair, key };
+}
+
+function patchCond(doc: Document, existing: unknown, tree: CondNode): Node {
+  if (tree.op === "invalid") {
+    // 読めなかったノードは、読んだ値のまま返す（画面では直せないので、壊さないことだけをする）
+    if (isNode(existing) && sameCond(condOfYaml(existing), tree)) {
+      return existing;
+    }
+    return doc.createNode(tree.raw);
+  }
+  let { pair, key } = soleOf(existing);
+  // all / any で包んだ（not を包んだときも含む）なら、元のノードは新しいまとめの子になる
+  const wrapped = isNode(existing) && wrapsInGroup(condOfYaml(existing), tree);
+  if (key === "not" && tree.op !== "not" && !wrapped && pair !== undefined && isNode(pair.value)) {
+    // not を外した: 中身のノードを使い回す（中身に付いたコメントを残す）。not に付いていた
+    // 前置きのコメントは中身へ移す（not ごと消すと、そのノードに書いた理由が消える）
+    const outer = existing as Node;
+    existing = pair.value;
+    carryComment(outer, existing as Node);
+    ({ pair, key } = soleOf(existing));
+  }
+  switch (tree.op) {
+    case "glob":
+    case "regex": {
+      if (pair !== undefined && (key === "glob" || key === "regex") && isScalar(pair.value)) {
+        if (key !== tree.op) {
+          (pair.key as Scalar).value = tree.op;
+        }
+        const scalar = pair.value;
+        if (scalar.value !== tree.pattern) {
+          scalar.value = tree.pattern;
+        }
+        // 書き方は元のまま。ただし引用符の無い `on` `yes` などは実行ファイル（PyYAML）が真偽値に
+        // 読むので囲む（setText と同じ。読み込みはこれを誤りに挙げている）
+        if ((scalar.type === Scalar.PLAIN || scalar.type === undefined) && yaml11Ambiguous(tree.pattern)) {
+          scalar.type = Scalar.QUOTE_SINGLE;
+        }
+        return existing as Node;
+      }
+      return mapOf(doc, tree.op, quoted(doc, tree.pattern));
+    }
+    case "all":
+    case "any": {
+      if (!wrapped && pair !== undefined && (key === "all" || key === "any") && isSeq(pair.value)) {
+        if (key !== tree.op) {
+          (pair.key as Scalar).value = tree.op;
+        }
+        const seq = pair.value;
+        // 先頭の子の前のコメントは、読み込みではリストのほうに付く。子へ移しておけば、
+        // 先頭の子を消したときにコメントも一緒に消え、新しい先頭に残らない（convertedFrom と同じ扱い）
+        const first = seq.items[0];
+        if (seq.commentBefore && isNode(first) && !first.commentBefore) {
+          first.commentBefore = seq.commentBefore;
+          seq.commentBefore = undefined;
+        }
+        seq.items = patchChildren(doc, seq.items, tree.children);
+        if (seq.items.length === 0) {
+          seq.flow = true;
+        }
+        return existing as Node;
+      }
+      // まとめで包んだ: 元のノードを子の候補にする（包む前のノードのコメントを残す）
+      const seq = new YAMLSeq();
+      seq.items = patchChildren(doc, existing === undefined || existing === null ? [] : [existing], tree.children);
+      seq.flow = seq.items.length === 0;
+      return mapOf(doc, tree.op, seq);
+    }
+    case "not": {
+      if (pair !== undefined && key === "not") {
+        pair.value = tree.child === null ? null : patchCond(doc, pair.value ?? undefined, tree.child);
+        return existing as Node;
+      }
+      // not で包んだ: 元のノードが中身に似ていれば中身に当てる
+      if (tree.child === null) {
+        return mapOf(doc, "not", null);
+      }
+      const inner = isNode(existing) && likeness(condOfYaml(existing), tree.child, false) > 0 ? existing : undefined;
+      return mapOf(doc, "not", patchCond(doc, inner, tree.child));
+    }
+  }
+}
+
+/** 外したノードの前置きのコメントを、残すノードの前置きへ足す */
+function carryComment(from: Node, to: Node): void {
+  if (!from.commentBefore) {
+    return;
+  }
+  to.commentBefore = to.commentBefore ? `${from.commentBefore}\n${to.commentBefore}` : from.commentBefore;
+  to.spaceBefore = to.spaceBefore || from.spaceBefore;
+}
+
+/**
+ * 新しいノードが、元のノードを all / any で包んだ形か。子のどれかが元のノードと同じか、
+ * 元のノードとして直したと見るより、子のどれかのほうが元のノードに近いとき
+ */
+function wrapsInGroup(old: CondNode, next: CondNode): boolean {
+  if (!isGroup(next) || sameCond(old, next)) {
+    return false;
+  }
+  if (next.children.some((child) => sameCond(child, old))) {
+    return true;
+  }
+  const direct = isGroup(old) ? groupLikeness(old, next, true) : 0;
+  return next.children.some((child) => likeness(old, child, true) > direct);
+}
+
+/**
+ * まとめの子を書く。同じ中身の元のノードを先に当てる（並べ替え・消しただけなら、これで全部決まる）。
+ *
+ * 残りの子（中身を直した・足した・包んだ子）は、前後で当たった子に挟まれた元のノードに当てる
+ * （消されていない子は元の相対順のまま並ぶので、挟まれた範囲の外へは当てない）。挟まれた範囲で
+ * 数が同じなら順に当てる（直しただけ。種類が違えば当てずに新しいノードにする。not や all / any で
+ * 包んだ・外したものは同じ種類に数える）。数が違うと、どれを消してどれを直したのかが位置では
+ * 決まらない。位置で当てると消した子のコメントが別の子に付くので、似ているもの（葉なら文字が
+ * 重なる）どうしだけを当て、似たものが無い子は新しいノードにする。最後に、範囲の外に残ったもの
+ * （並べ替えてから直した子）も、似ているものどうしだけを当てる。
+ */
+function patchChildren(doc: Document, olds: readonly unknown[], children: readonly CondNode[]): Node[] {
+  const read = olds.map((item) => condOfYaml(item));
+  const used = new Set<number>();
+  const chosen: (number | undefined)[] = children.map((child) => {
+    const j = read.findIndex((r, k) => !used.has(k) && sameCond(r, child));
+    if (j >= 0) {
+      used.add(j);
+      return j;
+    }
+    return undefined;
+  });
+  const assign = (i: number, k: number): void => {
+    chosen[i] = k;
+    used.add(k);
+  };
+  // 似ている組から順に当てる。同じ似かたなら位置の近い組
+  const pairUp = (rest: readonly number[], candidates: readonly number[]): void => {
+    const pairs: { i: number; k: number; score: number }[] = [];
+    for (const i of rest) {
+      for (const k of candidates) {
+        const score = likeness(read[k], children[i], true);
+        if (score > 0) {
+          pairs.push({ i, k, score });
+        }
+      }
+    }
+    pairs.sort((a, b) => b.score - a.score || Math.abs(a.i - a.k) - Math.abs(b.i - b.k));
+    for (const { i, k } of pairs) {
+      if (chosen[i] === undefined && !used.has(k)) {
+        assign(i, k);
+      }
+    }
+  };
+  // 同じ中身で当たった子のあいだに続く、当たっていない子の並び
+  const runs: number[][] = [];
+  let run: number[] = [];
+  children.forEach((_, i) => {
+    if (chosen[i] === undefined) {
+      run.push(i);
+      return;
+    }
+    if (run.length > 0) {
+      runs.push(run);
+    }
+    run = [];
+  });
+  if (run.length > 0) {
+    runs.push(run);
+  }
+  for (const r of runs) {
+    const before = r[0] - 1;
+    const after = r[r.length - 1] + 1;
+    const lo = before >= 0 ? (chosen[before] as number) : -1;
+    const hi = after < children.length ? (chosen[after] as number) : olds.length;
+    const gap = olds.flatMap((_, k) => (k > lo && k < hi && !used.has(k) ? [k] : []));
+    if (gap.length === r.length) {
+      r.forEach((i, n) => {
+        if (likeness(read[gap[n]], children[i], false) > 0) {
+          assign(i, gap[n]);
+        }
+      });
+    } else {
+      pairUp(r, gap);
+    }
+  }
+  pairUp(
+    children.flatMap((_, i) => (chosen[i] === undefined ? [i] : [])),
+    olds.flatMap((_, k) => (used.has(k) ? [] : [k])),
+  );
+  return children.map((child, i) => {
+    const j = chosen[i];
+    return patchCond(doc, j === undefined ? undefined : olds[j], child);
+  });
+}
+
+/**
+ * 元のノードと新しいノードがどれだけ似ているか。0 は別物。同じ種類なら 1 から 2 の間で大きいほど近い。
+ * not や all / any で包んだ・外した組は、中身の似かたの半分（0 から 1）。
+ *
+ * `strict` のときは、種類が同じでも中身が重ならなければ 0 にする（葉なら文字が前か後ろで 1 字も
+ * 揃わない、まとめなら似た子が 1 つも無い）。位置で決まらない組を当てるときに使う。
+ */
+function likeness(old: CondNode, next: CondNode, strict: boolean): number {
+  if (isLeaf(old) && isLeaf(next)) {
+    const text = textLikeness(old.pattern, next.pattern);
+    return strict && text === 0 ? 0 : 1 + text;
+  }
+  if (isGroup(old) && isGroup(next)) {
+    // 同じまとめとして直したか、まとめをまとめで包んだかの、近いほう
+    return Math.max(groupLikeness(old, next, strict), ...next.children.map((child) => (isGroup(child) ? groupLikeness(old, child, strict) / 2 : 0)));
+  }
+  if (old.op === "not" && next.op === "not") {
+    if (old.child === null || next.child === null) {
+      return 1;
+    }
+    const inner = likeness(old.child, next.child, strict);
+    return strict && inner === 0 ? 0 : 1 + inner / 2;
+  }
+  let score = 0;
+  // 包んだ: not の中身か、まとめの子のどれかが元のノードに似ている
+  if (next.op === "not" && next.child !== null) {
+    score = Math.max(score, likeness(old, next.child, strict) / 2);
+  }
+  if (isGroup(next)) {
+    score = Math.max(score, ...next.children.map((child) => likeness(old, child, strict) / 2));
+  }
+  // 外した: 元の not の中身が新しいノードに似ている
+  if (old.op === "not" && old.child !== null) {
+    score = Math.max(score, likeness(old.child, next, strict) / 2);
+  }
+  return score;
+}
+
+type CondLeaf = Extract<CondNode, { op: "glob" | "regex" }>;
+type CondGroup = Extract<CondNode, { op: "all" | "any" }>;
+
+function isLeaf(node: CondNode): node is CondLeaf {
+  return node.op === "glob" || node.op === "regex";
+}
+
+function isGroup(node: CondNode): node is CondGroup {
+  return node.op === "all" || node.op === "any";
+}
+
+/** まとめどうしの似かた。同じ中身の子の割合で 1 から 2。`strict` なら、似た子が 1 つも無いと 0 */
+function groupLikeness(old: CondGroup, next: CondGroup, strict: boolean): number {
+  const shared = next.children.filter((child) => old.children.some((o) => sameCond(o, child))).length;
+  if (strict && shared === 0 && (old.children.length > 0 || next.children.length > 0)) {
+    const near = next.children.some((child) => old.children.some((o) => likeness(o, child, true) > 0));
+    if (!near) {
+      return 0;
+    }
+  }
+  return 1 + shared / Math.max(1, old.children.length, next.children.length);
+}
+
+/** 2 つの文字の近さ（前と後ろで揃っている文字数の割合）。0 から 1 */
+function textLikeness(a: string, b: string): number {
+  const longest = Math.max(a.length, b.length);
+  if (longest === 0) {
+    return 1;
+  }
+  let head = 0;
+  while (head < a.length && head < b.length && a[head] === b[head]) {
+    head += 1;
+  }
+  let tail = 0;
+  while (tail < a.length - head && tail < b.length - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) {
+    tail += 1;
+  }
+  return (head + tail) / longest;
 }
 
 /**
@@ -370,6 +842,25 @@ function asForm(raw: unknown): RuleForm | undefined {
     return undefined;
   }
   const text = (v: unknown) => (typeof v === "string" ? v : "");
+  const excepts = Array.isArray(r.excepts) ? r.excepts.filter((v): v is string => typeof v === "string") : undefined;
+  let when: CondNode | undefined;
+  if (r.when !== undefined) {
+    when = asCond(r.when);
+    if (when === undefined) {
+      return undefined;
+    }
+  }
+  let exceptNodes: CondNode[] | undefined;
+  if (Array.isArray(r.exceptNodes)) {
+    exceptNodes = [];
+    for (const item of r.exceptNodes) {
+      const node = asCond(item);
+      if (node === undefined) {
+        return undefined;
+      }
+      exceptNodes.push(node);
+    }
+  }
   return {
     origin: parsedOrigin,
     id: text(r.id),
@@ -382,5 +873,10 @@ function asForm(raw: unknown): RuleForm | undefined {
     additionalContextFile: text(r.additionalContextFile),
     additionalContextOnceFile: text(r.additionalContextOnceFile),
     every: text(r.every),
+    ...(excepts === undefined ? {} : { excepts }),
+    ...(exceptNodes === undefined ? {} : { exceptNodes }),
+    ...(when === undefined ? {} : { when }),
+    ...(r.dropExcept === true ? { dropExcept: true } : {}),
+    ...(r.bothPatterns === true ? { bothPatterns: true } : {}),
   };
 }

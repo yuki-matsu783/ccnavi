@@ -15,14 +15,14 @@ from ..infra.modes import DRY_RUN
 from ..policy import rules
 from ..tickets import phase, phase_forms, ticket_places
 
-# 返す理由に載せる理由コード。設計 付録 B の体系から、今のビルドが実際に
+# 返す理由に載せる理由コード。設計の理由コードの体系から、今のビルドが実際に
 # 下せる判定に対応するものだけを借りている。
 #
-# 付録 B のコードは「どの検査がその根拠を作ったか」の名前であって、ルール 1 件を
+# 体系のコードは「どの検査がその根拠を作ったか」の名前であって、ルール 1 件を
 # 指す名前ではない。今のビルドが持つ検査は 1 つ（外から注入したルール集合を
 # 正規化済みの対象に当てる）で、当てる先がコマンドかパスかで 2 つに分かれる。
 # だからコードはその分かれ方に対応させ、どのルールだったかは出所が名指しする。
-# ルール 1 件ごとにコードを持たせれば付録 B の粒度（ヒアドキュメントなら
+# ルール 1 件ごとにコードを持たせれば体系の粒度（ヒアドキュメントなら
 # DENY_REDIRECT、DB 破壊なら DENY_DB_DESTRUCTIVE）に届くが、それはルール
 # ファイルに欄を 1 つ足すことなので書式の版が上がる。この要件が求めるのは
 # 「理由コードを含むこと」までなので、版を上げずに済む側を採る。
@@ -214,7 +214,7 @@ def reason_for(
         degraded = ""
     code = CODE_RULE_ASK if rule.decision == rules.ASK else code_for(tool, degraded)
     # 出所はルールの id で示す。プロジェクトのルールの id には `lib:git-push` の形で
-    # プロジェクトの名前が付く（REQ-MLT-07）ので、id だけでどのファイルを見に行けばよいかが
+    # プロジェクトの名前が付くので、id だけでどのファイルを見に行けばよいかが
     # 決まる。パスまで載せると、判定を試したときの一時ファイルのような読む値の無いパスが
     # そのまま毎回モデルに届く。id を持たないルールだけ、代わりにファイルを示す。
     source = f"rule: {rule.id}" if rule.id else f"rules: {rules_path}"
@@ -434,7 +434,7 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
 
 # 作業の決まりのうち、ワークツリーと git の行を支える deny の id（書かれたままの表記）。
 # この id のルールがワークスペースに無ければ、その行は出さない。
-RULE_MAIN_TREE = "main-tree"
+RULE_WORKSPACE_ROOT = "workspace-root"
 RULE_RAW_GIT = "raw-git"
 
 
@@ -444,7 +444,7 @@ def conventions(
     docs: bool = False,
     deny_ids: set[str] | None = None,
 ) -> str:
-    """セッションの頭で渡す、ccnavi の動作が前提にしている作業の決まり（REQ-SES-06）。
+    """セッションの頭で渡す、ccnavi の動作が前提にしている作業の決まり。
 
     ワークスペースの CLAUDE.md に書いていた決まりのうち、ccnavi の判定・置き場・入口に
     依存するものをここに寄せる。ccnavi を入れたワークスペースなら、どこでも同じ文が届く。
@@ -456,7 +456,7 @@ def conventions(
     それ以外の詳しい決まりは `--docs`（ワークスペースの文書の frontmatter の索引）。
 
     - ワークツリーの行は、ワークスペースのルール（共通レイヤーと自身のレイヤー）に
-      `main-tree` の deny があるときだけ、git の行は `raw-git` の deny があるときだけ出す。
+      `workspace-root` の deny があるときだけ、git の行は `raw-git` の deny があるときだけ出す。
       決まりを支えるのはそのルールで、ルールが無いワークスペースでは文と判定が食い違う。
       ルールの有無は `deny_ids`（判定と同じ読み方）で見る
     - `projects` の行は、プロジェクトの置き場にプロジェクトがあるときだけ出す
@@ -466,7 +466,7 @@ def conventions(
     """
     declared = deny_ids if deny_ids is not None else set()
     lines = ["[ccnavi] ccnavi が前提にしている作業の決まり。"]
-    if RULE_MAIN_TREE in declared:
+    if RULE_WORKSPACE_ROOT in declared:
         worktrees = tree.WORKTREES_DIR.replace("\\", "/")
         lines.append(
             f"- 編集する前にワークツリー（{worktrees}/<名前>）を切り、その中で編集する。"

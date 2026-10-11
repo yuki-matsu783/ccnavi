@@ -374,14 +374,14 @@ test("CB-T13c フェーズ行は状態の全文だけを出す。段の名前・
     const rows = page.all(".card.parent .phase");
     assert.equal(rows[0].querySelector(".phase-status")?.textContent, "終了 · レビュー依頼済み · レビュー済み · レビュー要 · リスク: 40 (HIGH) — 行数が多い（6509 行 > 300）");
     assert.equal(rows[1].querySelector(".phase-status")?.textContent, "終了 · レビュー待ち · レビュー依頼済み · レビュー要");
-    assert.equal(rows[1].querySelectorAll('button[data-action="decide"]').length, 1);
+    assert.equal(rows[1].querySelectorAll('button[data-action="review-menu"]').length, 1);
     // 状態は項目ごとの塊で、区切りの「·」は前の項目の末尾に付く。ボタンは状態の列ではなく 2 段目
     assert.deepEqual(
       [...rows[1].querySelectorAll(".phase-status .phase-item")].map((item) => item.textContent),
       ["終了 ·", "レビュー待ち ·", "レビュー依頼済み ·", "レビュー要"],
     );
     assert.equal(rows[1].querySelectorAll(".phase-status button").length, 0);
-    assert.equal(rows[1].querySelectorAll('.phase-actions button[data-action="decide"]').length, 1);
+    assert.equal(rows[1].querySelectorAll('.phase-actions button[data-action="review-menu"]').length, 1);
     assert.equal(rows[0].querySelectorAll(".phase-actions").length, 0, "リンクもボタンも無い行には 2 段目を出さない");
     // 状態は 1 か所にだけ描く（要約と全文の二重描画はしない）
     assert.equal(page.all(".phase-brief, .phase-full").length, 0);
@@ -630,7 +630,7 @@ test("CB-T15 問題とプロジェクトの絞り込みを出す", async () => {
   }
 });
 
-test("CB-T16 本文の文字列で表示を壊さない", async () => {
+test("CB-T16 本文の文字列で表示が崩れない", async () => {
   const base = fixture();
   const evil = { ...base.tickets[0], title: `<script>alert("x")</script>` };
   const page = await openBoard({ ...base, tickets: [evil, ...base.tickets.slice(1)] });
@@ -643,7 +643,7 @@ test("CB-T16 本文の文字列で表示を壊さない", async () => {
   }
 });
 
-test("CB-T118 本物が決まらないチケットだけをバッジにし、場所を tooltip に出す", async () => {
+test("CB-T118 どれが正か決まらないチケットだけをバッジにし、場所を tooltip に出す", async () => {
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-02-03")!;
   const where = [
@@ -684,22 +684,41 @@ function waitingWithMr(url: string) {
 test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連絡」と依頼へのリンク、親カードにマージリクエストへのリンクを出す。http(s) 以外はリンクにしない", async () => {
   const page = await openBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5"));
   try {
-    // 残った指摘を決めるボタンの隣に連絡のボタン。マーカーを置く操作ではないと title で言う
-    const decide = page.one('button[data-action="decide"]');
-    assert.equal(decide.getAttribute("data-parent"), "i0001");
-    assert.equal(decide.getAttribute("data-phase"), "2");
+    // レビューの 2 操作は 1 つのメニューボタンにまとまる。本体は何も送らず、開くまで項目は出ない
+    const menu = page.one('button[data-action="review-menu"]');
+    assert.equal(menu.textContent, "レビューの対応");
+    assert.equal(menu.getAttribute("data-parent"), "i0001");
+    assert.equal(menu.getAttribute("data-phase"), "2");
+    assert.equal(menu.getAttribute("aria-haspopup"), "menu");
+    assert.equal(menu.getAttribute("aria-expanded"), "false");
+    assert.equal(page.all('button[data-action="decide"], button[data-action="reviewed"]').length, 0);
+    const before = page.posted.length;
+    page.click(menu);
+    await page.settle();
+    assert.equal(page.posted.length, before, "メニューの本体を押しても何も送らない");
+    assert.equal(page.one('button[data-action="review-menu"]').getAttribute("aria-expanded"), "true");
     const reviewed = page.one('button[data-action="reviewed"]');
     assert.equal(reviewed.textContent, "レビュー済み連絡");
-    assert.equal(
-      reviewed.getAttribute("title"),
-      "レビューを終えたことを Claude Code に伝える文を作ります（エージェントが ccnavi-review.sh confirm --phase 2 を実行して、レビュー済みを記録します）",
-    );
+    assert.ok((reviewed.getAttribute("title") ?? "").includes("ccnavi-review.sh confirm --phase 2 を実行して、レビュー済みを記録します"));
+    const decide = page.one('button[data-action="decide"]');
+    assert.equal(decide.textContent, "対応方針を決める");
+    assert.equal(decide.hasAttribute("disabled"), false, "指摘の有無で無効にしない");
     page.click(reviewed);
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "reviewed", parent: "i0001", phase: 2 });
-    page.click(decide);
+    assert.equal(page.all('button[data-action="reviewed"]').length, 0, "選んだらメニューは閉じる");
+    page.click(page.one('button[data-action="review-menu"]'));
+    await page.settle();
+    page.click(page.one('button[data-action="decide"]'));
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "decide", parent: "i0001", phase: 2 });
+    // メニュー外のクリックで閉じる
+    page.click(page.one('button[data-action="review-menu"]'));
+    await page.settle();
+    assert.equal(page.all('button[data-action="decide"]').length, 1);
+    page.click(page.one(".foot"));
+    await page.settle();
+    assert.equal(page.all('button[data-action="decide"]').length, 0);
     // フェーズ行は依頼の投稿へ、親カードはマージリクエスト自体へ
     const inPhase = page.one(".phase a.mr-link");
     assert.equal(inPhase.getAttribute("href"), "https://example.com/o/r/pull/18#issuecomment-5");
@@ -831,7 +850,7 @@ test("CB-T141 止まっているカードに「書き込み停止中」のバッ
   }
 });
 
-test("CB-T142 見た目の切り替えは body のクラスだけを付け替える。中身は作り直さない", async () => {
+test("CB-T142 見た目の切り替えは body のクラスだけを書き換える。中身は作り直さない", async () => {
   const page = await openBoard();
   try {
     assert.equal(page.document.body.className, "");
@@ -953,6 +972,69 @@ test("CB-T265 先行のバッジの言葉はカードの今で分ける。承認
     assert.equal(text(page, '.card[data-id="i0001-02-04"] .badge.preds'), "先行が未完了（i0001-01-09）");
     assert.match(title("i0001-02-04"), /着手済みです/);
     assert.match(title("i0001-02-04"), /作業と finish は止まりません/);
+  } finally {
+    await page.close();
+  }
+});
+
+test("CB-T328 承認済みのカードに、start がまだなら「未着手」、済みなら「着手済み」を枠の無い属性で出す。バッジにはしない。レビュー待ち・未承認・閉じたカードには出さない", async () => {
+  const base = fixture();
+  const at = (id: string) => base.tickets.find((t) => t.ticket === id)!;
+  const tickets = base.tickets.map((t) => {
+    if (t.ticket === "i0001-02-02") {
+      return { ...t, started_at: "" }; // 承認済み・未着手
+    }
+    if (t.ticket === "i0001-02-04") {
+      return { ...t, started_at: "" }; // レビュー待ちで着手の時刻が空。copyStatus の除外だけで効く形
+    }
+    return t;
+  });
+  assert.equal(at("i0001-02-02").copy.status, "open");
+  assert.equal(at("i0001-02-04").copy.status, "review");
+  assert.equal(at("i0001").copy.status, "open");
+  assert.equal(at("i0001").started_at, ""); // 親も、承認済みで start がまだなら未着手
+  const page = await openBoard({ ...base, tickets });
+  try {
+    const card = (id: string) => `.card[data-id="${id}"]`;
+    assert.equal(text(page, `${card("i0001-02-02")} .fact.unstarted`), "未着手");
+    assert.match(page.one(`${card("i0001-02-02")} .fact.unstarted`).getAttribute("title") ?? "", /範囲は適用されません/);
+    assert.equal(page.all(`${card("i0001-02-02")} .fact.started`).length, 0);
+    assert.equal(text(page, `${card("i0001")} .fact.unstarted`), "未着手");
+    for (const t of base.tickets) {
+      assert.equal(page.all(`${card(t.ticket)} .badge.unstarted, ${card(t.ticket)} .badge.started`).length, 0, t.ticket);
+    }
+    // 承認済みでないカードには、どちらも出ない
+    for (const t of base.tickets.filter((x) => x.copy.status !== "open")) {
+      assert.equal(page.all(`${card(t.ticket)} .fact.unstarted, ${card(t.ticket)} .fact.started`).length, 0, t.ticket);
+    }
+  } finally {
+    await page.close();
+  }
+});
+
+test("CB-T329 start 後（started_at あり）の承認済みカードに「着手済み」の属性を出し、「未着手」は出さない", async () => {
+  const base = fixture();
+  const page = await openBoard(base);
+  try {
+    const card = '.card[data-id="i0001-02-02"]';
+    assert.equal(base.tickets.find((t) => t.ticket === "i0001-02-02")!.copy.status, "open");
+    assert.equal(text(page, `${card} .fact.started`), "着手済み");
+    assert.match(page.one(`${card} .fact.started`).getAttribute("title") ?? "", /範囲が適用されています/);
+    assert.equal(page.all(`${card} .fact.unstarted`).length, 0);
+  } finally {
+    await page.close();
+  }
+});
+
+test("CB-T330 先行が未達の承認済み・未着手のカードには、枠付きの「先行待ち」と枠の無い「未着手」が並ぶ", async () => {
+  const base = fixture();
+  const unmet = [{ ticket: "i0001-01-09", state: "doing", label: "作業中（doing/）" }];
+  const tickets = base.tickets.map((t) => (t.ticket === "i0001-02-02" ? { ...t, started_at: "", predecessors_unmet: unmet } : t));
+  const page = await openBoard({ ...base, tickets });
+  try {
+    const card = '.card[data-id="i0001-02-02"]';
+    assert.equal(text(page, `${card} .badge.preds`), "先行待ち（i0001-01-09）");
+    assert.equal(text(page, `${card} .fact.unstarted`), "未着手");
   } finally {
     await page.close();
   }

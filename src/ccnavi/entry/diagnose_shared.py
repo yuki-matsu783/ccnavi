@@ -44,8 +44,7 @@ COMMON_PHASES_NOTE = "共通には置けない。使わない"
 def layer_phase_types(path: str, common: bool = False) -> tuple[list, str]:
     """そのレイヤーのフェーズ定義と、読めなかった理由。無いレイヤーは空。
 
-    合成はしない。フェーズ定義は足し算をせず、使うのは親の `project:` が指す 1 本だけ
-    （設計 11.4.1）。
+    合成はしない。フェーズ定義は足し算をせず、使うのは親の `project:` が指す 1 本だけ。
     ここで出すのは「どのレイヤーに何が書いてあるか」。定義は順序を持たない（順序は親の計画の
     項の `after`）。
 
@@ -71,7 +70,7 @@ def layer_phase_set(path: str, common: bool = False) -> tuple[phasetypes.PhaseTy
 def layer_risk(conf: settings.Settings, name: str, path: str) -> tuple[list, str]:
     """そのレイヤーのリスクの項目と、読めなかった理由。無いレイヤーは空（組み込みには戻さない）。
 
-    `script:` に書けるパスはレイヤーごとに違う（設計 11.4.2）ので、読み方もレイヤーごとに分ける。
+    `script:` に書けるパスはレイヤーごとに違うので、読み方もレイヤーごとに分ける。
     """
     if not path or not os.path.isfile(path):
         return [], ""
@@ -88,6 +87,16 @@ def layer_risk(conf: settings.Settings, name: str, path: str) -> tuple[list, str
 
 def rule_form(rule: rules.Rule) -> dict:
     """ルールの書き方。書いた表記と、翻訳後の式。"""
+    if rule.when is not None:
+        # 木には翻訳後の式が 1 本に定まらない。書いた形（`when` のマッピング）を添える。
+        # `written` は木を 1 行にした形だけにする。`kind` が `when` を言うので、`written_body` の
+        # 先頭の `when: ` を残すと、`kind` と並べて出す画面で「when when: …」と二重になる。
+        return {
+            "kind": rules.WHEN_KEY,
+            "written": rule.when.describe(),
+            "pattern": rule.compiled.pattern if rule.compiled else "",
+            "when": rule.when.written(),
+        }
     return {
         "kind": "glob" if rule.glob else "regex",
         "written": rule.glob or rule.regex,

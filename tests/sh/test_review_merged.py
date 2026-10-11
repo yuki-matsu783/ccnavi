@@ -2,7 +2,7 @@
 
 ccnavi-sync.sh は答えが `none` のときだけ「マージされていない」と読み、
 親子のチケットの取り込み状態に gone を書く。
-API が落ちた・答えを読めなかったときは `unknown`（終了コード 3）、道具やトークンが無ければ
+API が失敗した・答えを読めなかったときは `unknown`（終了コード 3）、道具やトークンが無ければ
 `none` を出さずに止まる。ホストへの道具（curl）は PATH の先頭に置いた代役に差し替える。
 """
 
@@ -192,7 +192,7 @@ class ReviewMergedGitLabTest(ReviewMergedTest):
         self.assertEqual("none", done.stdout.strip())
 
     def test_the_real_request_on_a_later_page_is_found(self):
-        """1 ページ目がフォークで埋まっても、2 ページ目の本物を見落とさない。"""
+        """1 ページ目がフォークで埋まっても、2 ページ目の実物を見落とさない。"""
         forks = (
             "[" + ", ".join(f'{{"iid": {n}, "source_project_id": 99}}' for n in range(100)) + "]"
         )

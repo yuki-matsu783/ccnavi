@@ -12,7 +12,7 @@ phases:
     - docs/*
     deliverables:
     - wip/design/*.md
-    when: 触る場所が 3 か所を超えるか、外から見える振る舞いが変わるとき
+    when: 変更箇所が 3 か所を超えるか、外から見える振る舞いが変わるとき
   acceptance:
     kind: work
     title: 受入テスト作成
@@ -41,8 +41,8 @@ phases:
     scope:
     - wip/design/*
     - tests/*
-    when: 保護済みファイル（.ccnavi/scripts/、.claude/hooks/、rules.yml）を直すとき。エージェントはそこに書けないので、完成品を
-      wip/design/scripts/ に全文で置き、ユーザがコピーする。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
+    when: 保護済みファイル（.ccnavi/scripts/、.claude/hooks/、rules.yml）を修正するとき。エージェントはそこに書けないので、完成品を
+      wip/design/scripts/ に全文で配置し、ユーザがコピーする。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
   docs:
     kind: work
     title: 文書

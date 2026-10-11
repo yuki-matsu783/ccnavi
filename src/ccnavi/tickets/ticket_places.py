@@ -27,7 +27,7 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     チェックは直に呼ぶ（`post_findings._script_writes` / `post._committed_findings` /
     `post_findings.ScopeGuard.finding`、`phase_scope.scope_findings`）。
 
-    **実行後チェックから呼ぶときは、後ろに組み込みのルールが無い。** 組み込みを足すのは
+    実行後チェックから呼ぶときは、後ろに組み込みのルールが無い。 組み込みを足すのは
     `judge` だけで、実行後のルール集合には入らない。だから呼び出しごとの実行後チェックは、置き場を
     そのまま外さずに、内容で外すぶんを決める（`ticket_fields.script_shape`、`post_findings._script_writes`）。
     """
@@ -91,7 +91,7 @@ def is_scratch_place(rel: str) -> bool:
     下書きの場所を失う。開けても範囲は広がらない。ここに書いたものは git が追跡しないので、
     統合先のブランチには 1 バイトも乗らない。
 
-    **名前の大文字小文字は区別する。範囲の照合（`ticket_model._fold`）とは逆にしてある。**
+    名前の大文字小文字は区別する。範囲の照合（`ticket_model._fold`）とは逆にしてある。
     外してよい理由が「追跡されない」ことにあり、追跡から外しているのは
     `.gitignore` の `/scratchpad/` で、その照合は Linux では区別するため。区別せずに外すと、
     Linux の `SCRATCHPAD/` が「追跡されるのに範囲を当てない場所」になり、承認した範囲の外の
@@ -114,7 +114,7 @@ def is_scratch_place(rel: str) -> bool:
 # 名前は固定。設定で動かさない（動かせると、その値をソースの置き場に向けるだけで範囲を迂回できる）。
 ELI5 = "wip/eli5"
 
-# 途中の作業の置き場。調査や設計の下書きを置く場所で、マージの前に丸ごと消す。
+# 途中の作業の置き場。調査や設計の下書きを置く場所で、マージの前に全体を消す。
 # 既定のブランチに残す場所はマージリクエストと issue。パスは設定から導かず固定する。
 # 読むのは review（片付けの検査）と ops（早めに閉じたあとの案内）。
 WIP_ROOT = "wip"
@@ -125,7 +125,7 @@ def is_eli5_place(rel: str) -> bool:
 
     チケットの範囲を当てない。ELI5 はレビューの依頼に必ずつける材料で、親の範囲に
     毎回 `wip/eli5/*` を書かせると、書き忘れた親は依頼の手前で止まる。ここは `wip/` の下なので
-    `ready` の前に丸ごと消え、squash した成果物には残らない。範囲を外すのはこの 1 段だけで、
+    `ready` の前にまとめて消え、squash した成果物には残らない。範囲を外すのはこの 1 段だけで、
     `wip/` のほかの場所（`wip/design/` など）と、紛らわしい名前（`wip/eli5x/`）は外さない。
 
     `scratchpad/` と違って git が追跡する置き場なので、実行後チェック
@@ -144,7 +144,7 @@ def is_eli5_place(rel: str) -> bool:
 
 
 def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
-    """チケットの範囲を当てない場所か。**実行前チェック（`judge`）だけが使う。**
+    """チケットの範囲を当てない場所か。実行前チェック（`judge`）だけが使う。
 
     実行前は、これから書かれる 1 つのパスを見る。下書きの置き場を外すのはここだけで
     足りる。ここで通せば下書きは書けるので、これが機能の全部になる。
@@ -152,7 +152,7 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     実行後チェック（`post`）とサブエージェント終了時チェック（`phase_scope.scope_findings`）は
     下書きの置き場を外さない。チケットの置き場の外し方も同じではなく、呼び出しごとの実行後チェックは
     内容で決める（`post_findings._script_writes`）。外し方を揃えないのは、
-    **揃える意味がその 2 か所には無い**から。どちらも入力は `git status`
+    揃える意味がその 2 か所には無いから。どちらも入力は `git status`
     （`--ignored` を付けない）と `base_sha..HEAD` の差分（追跡ファイルだけ）で、
     追跡から外れている `scratchpad/` はそこに 1 本も現れない。つまり正しく設定された
     リポジトリでは、外しても外さなくても同じ答えになる。

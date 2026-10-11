@@ -2,7 +2,7 @@
  * 1 枚のカード。バッジ（ユーザが動く必要がある状態）・属性の行・親のフェーズ一覧・不備・操作。
  * 何を出すかは組み立て（core/board.ts）が決めた値のとおりで、ここで判定し直さない。
  */
-import type { JSX } from "react";
+import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { Action, Card, PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
@@ -11,6 +11,8 @@ import type { FlowJson, HistoryEntryJson } from "../../core/model.js";
 import { post } from "./post.js";
 import {
   COPY_LABELS,
+  STARTED_LABELS,
+  STARTED_TITLES,
   MARK_LABELS,
   VIA_LABELS,
   historyAt,
@@ -111,7 +113,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
 }
 
 /** カードの上で押しても提案を開かない場所。ボタン・リンク・折りたためる履歴 */
-const NOT_OPENING = "button, a, details";
+const NOT_OPENING = "button, a, details, .review-menu";
 
 /**
  * 状態の履歴。既定で折りたたみ、開くと新しい順に並ぶ。補助の記録で、列やバッジはここから決めない
@@ -135,9 +137,9 @@ function History({ entries }: { readonly entries: readonly HistoryEntryJson[] })
 }
 
 /**
- * 枠付きのバッジは、ユーザが動く必要がある状態だけ。未承認、レビュー準備中／レビュー待ち、
- * 書き込み停止中、先行待ち、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
- * 本物が決まらないチケット。出すバッジが無ければ行ごと出さない。
+ * 枠付きのバッジは、ユーザが動く必要がある状態だけ。未承認、
+ * レビュー準備中／レビュー待ち、書き込み停止中、先行待ち、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
+ * 正が決まらないチケット。出すバッジが無ければ行ごと出さない。
  */
 function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   const badges: JSX.Element[] = [];
@@ -177,7 +179,7 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   if (isHighRisk(card.riskLevel)) {
     badges.push(<Badge key="risk" kind={`risk risk-${card.riskLevel.toLowerCase()}`} text={riskText(card)} />);
   }
-  // ほかのツリー上にもチケットがあること自体は普通なので数では出さない。どれが本物か決まらないときだけ言う。
+  // ほかのツリー上にもチケットがあること自体は普通なので数では出さない。どれが正か決まらないときだけ言う。
   if (card.scattered.length > 0) {
     const where = card.scattered.map((s) => `${s.tree || "main"}:${s.state}`).join(", ");
     badges.push(<Badge key="seen" kind="seen" text={`複数の場所にある（${card.scattered.length} か所）`} title={where} />);
@@ -186,7 +188,7 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
 }
 
 /**
- * 枠の無い薄い文字で 1 行に並べる属性。承認済／レビュー待ち／クローズ、人間レビューの要否、ワークツリー、
+ * 枠の無い薄い文字で 1 行に並べる属性。承認済／レビュー待ち／クローズ、着手済み／未着手（承認済みのカードだけ）、人間レビューの要否、ワークツリー、
  * マーカー（終了と依頼済は出さない）、Draft 解除済、早めに閉じた、リスク（MEDIUM 以下）、base、プロジェクト。
  *
  * 列やバッジと同じことは重ねて書かない。完了・取り消しの列にいる閉じたカードには、クローズと人間レビューの要否を
@@ -204,6 +206,11 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
   }
   if (!closedInColumn) {
     facts.push(<Fact key="review" kind="review" text={`人間レビュー${card.reviewRequired ? "要" : "不要"}`} title={card.reviewReason} />);
+  }
+  // 着手の状態。`start` するのはエージェントなので、ユーザの対応を求めるバッジにはしない（issue #267）
+  if (card.copyStatus === "open") {
+    const state = card.startedAt === "" ? "unstarted" : "started";
+    facts.push(<Fact key="started" kind={state} text={STARTED_LABELS[state]} title={STARTED_TITLES[state]} />);
   }
   if (card.worktreeExists) {
     facts.push(<Fact key="worktree" kind="worktree" text={`ワークツリー ${worktreeName(card.worktreePath)}`} title={card.worktreePath} />);
@@ -377,35 +384,81 @@ function ActionButton({ action, id }: { readonly action: Action; readonly id: st
           この 1 件を承認
         </button>
       );
-    case "decide":
-      return (
-        <button
-          type="button"
-          className="action"
-          data-action="decide"
-          data-parent={action.parent}
-          data-phase={action.phase}
-          title={`未解決（Unresolved）の指摘の対応方針を 1 件ずつ決めます（対応しない・このフェーズで直す・issue に回す）`}
-          onClick={() => post({ type: "decide", parent: action.parent, phase: action.phase })}
-        >
-          対応方針を決める
-        </button>
-      );
-    case "reviewed":
-      // マーカーは置かない。レビューを終えたことを Claude Code に伝える文を組み、コピー / 新しいセッションで開く で渡す。
-      // confirm を打ってマーカーを置くのは、その文を受けたエージェント
-      return (
-        <button
-          type="button"
-          className="action"
-          data-action="reviewed"
-          data-parent={action.parent}
-          data-phase={action.phase}
-          title={`レビューを終えたことを Claude Code に伝える文を作ります（エージェントが ccnavi-review.sh confirm --phase ${action.phase} を実行して、レビュー済みを記録します）`}
-          onClick={() => post({ type: "reviewed", parent: action.parent, phase: action.phase })}
-        >
-          レビュー済み連絡
-        </button>
-      );
+    case "review":
+      return <ReviewMenu parent={action.parent} phase={action.phase} />;
   }
+}
+
+/**
+ * 「レビューの対応」。本体を押すとメニューが開くだけで、何も実行しない。項目は固定の 2 つで、前回の選択は覚えない。
+ * 項目は指摘の有無で無効にしない（判定は `decide` と `confirm` が持つ）。メニュー外のクリックで閉じる。
+ * 矢印キーと Esc は扱わない。
+ */
+function ReviewMenu({ parent, phase }: { readonly parent: string; readonly phase: number }): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const outside = (event: MouseEvent): void => {
+      if (!(event.target instanceof Node) || box.current === null || !box.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("click", outside);
+    return () => document.removeEventListener("click", outside);
+  }, [open]);
+  return (
+    <span className="review-menu" ref={box}>
+      <button
+        type="button"
+        className="action"
+        data-action="review-menu"
+        data-parent={parent}
+        data-phase={phase}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="レビューの対応を選びます。「対応方針を決める」は未解決（Unresolved）の指摘の行き先を 1 件ずつ決め、「レビュー済み連絡」はレビューを終えたことを Claude Code に伝える文を作ります"
+        onClick={() => setOpen(!open)}
+      >
+        レビューの対応
+      </button>
+      {open ? (
+        <span className="review-menu-list" role="menu">
+          <button
+            type="button"
+            role="menuitem"
+            className="action"
+            data-action="decide"
+            data-parent={parent}
+            data-phase={phase}
+            title="未解決（Unresolved）の指摘の対応方針を 1 件ずつ決めます（対応しない・このフェーズで直す・issue に回す）"
+            onClick={() => {
+              setOpen(false);
+              post({ type: "decide", parent, phase });
+            }}
+          >
+            対応方針を決める
+          </button>
+          {/* マーカーは置かない。未解決の指摘を読んで連絡文を組み、コピー / 新しいセッションで開く で渡す。confirm を打つのは文を受けたエージェント */}
+          <button
+            type="button"
+            role="menuitem"
+            className="action"
+            data-action="reviewed"
+            data-parent={parent}
+            data-phase={phase}
+            title={`レビューを終えたことを Claude Code に伝える文を作ります。未解決の指摘の有無を確かめて文に書きます（エージェントが ccnavi-review.sh confirm --phase ${phase} を実行して、レビュー済みを記録します）`}
+            onClick={() => {
+              setOpen(false);
+              post({ type: "reviewed", parent, phase });
+            }}
+          >
+            レビュー済み連絡
+          </button>
+        </span>
+      ) : null}
+    </span>
+  );
 }

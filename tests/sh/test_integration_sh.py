@@ -84,7 +84,7 @@ class IntegrationTest(unittest.TestCase):
         )
 
     def test_nothing_known_is_exit_1(self):
-        """origin/HEAD も origin/main・master も無ければ当てずっぽうで名乗らない。"""
+        """origin/HEAD も origin/main・master も無ければ当てずっぽうで宣言しない。"""
         result = self.integration(self.ws)
         self.assertEqual(1, result.returncode)
         self.assertEqual("", result.stdout)
@@ -116,7 +116,7 @@ class IntegrationTest(unittest.TestCase):
     def test_the_record_does_not_follow_ccnavi_state(self):
         """置き場の env は読まない。取り込み結果は既定の `logs/state/` から読む。
 
-        `CCNAVI_STATE` が読まれれば、env が指す置き場の develop-v2 が答えになって落ちる。
+        `CCNAVI_STATE` が読まれれば、env が指す置き場の develop-v2 が答えになって失敗する。
         """
         write(
             os.path.join(self.ws, "elsewhere", "sync", "self", "integration", "head"),

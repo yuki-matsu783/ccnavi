@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { cardSelector, openProjects, page, problem, row } from "../helpers/projects.js";
 import type { HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
 
-/** 要素の文字。前後の空白は落とす */
+/** 要素の文字。前後の空白は除く */
 function text(element: { textContent: string | null } | null | undefined): string {
   return (element?.textContent ?? "").trim();
 }

@@ -14,7 +14,7 @@
 レイヤーの名前（`self` / `common`）とプロジェクト名が同じときも、予約は両側に掛かる。
 
 - `projects/self/` への Write / Edit は、そのプロジェクトの deny で判定され、
-  ワークスペース自身のレイヤーのルールに落ちない（ReservedLayerNameTest）
+  ワークスペース自身のレイヤーのルールで判定されない（ReservedLayerNameTest）
 - `projects/common/` のレイヤーの 3 本は、バックアップの key が共通レイヤーと衝突せず、
   バックアップと復元の対象に入る（ReservedLayerRestoreTest）
 
@@ -187,7 +187,7 @@ class GlobCaseTest(ConfigUnionHarness):
         write(self.rules, json.dumps(CASE_RULES))
 
     def test_glob_ignores_case_on_every_machine(self):
-        """11.4: `glob` の deny は、どの機械でも大文字小文字を区別せずに当たる。"""
+        """`glob` の deny は、どの機械でも大文字小文字を区別せずに当たる。"""
         # 実体があると、区別しない機械では `os.path.realpath` がパスをディスクの側へ
         # 補正してしまい、この問い自体が消える（フラグ無しでも当たる）。
         self.assertFalse(os.path.exists(os.path.join(self.ws, "secret")))
@@ -200,7 +200,7 @@ class GlobCaseTest(ConfigUnionHarness):
         self.assert_denied(swapped, "glob-secret")
 
     def test_regex_ignores_case_on_every_machine(self):
-        """11.4: `regex` の deny も、どの機械でも大文字小文字を区別せずに当たる。
+        """`regex` の deny も、どの機械でも大文字小文字を区別せずに当たる。
 
         区別すると、`Write` の経路だけが表記違いで外れる。同じ場所へシェルから書く形は
         組み込みの保護（selfguard_shell._folded）が表記の違いを無視して止めるので、経路で答えが分かれる。
@@ -213,7 +213,7 @@ class GlobCaseTest(ConfigUnionHarness):
         self.assert_denied(swapped, "regex-token")
 
     def test_regex_can_keep_the_distinction_with_an_inline_flag(self):
-        """11.4: 区別が要る `regex` は `(?-i:...)` で囲めば書いたとおりに当たる。"""
+        """区別が要る `regex` は `(?-i:...)` で囲めば書いたとおりに当たる。"""
         exact = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "strict", "x.txt"))
         self.assert_denied(exact, "regex-exact")
 
@@ -230,7 +230,7 @@ class BuiltinGlobCaseTest(GuardHarness):
     """
 
     def test_the_builtin_project_home_deny_matches_a_swapped_spelling(self):
-        """11.6: `.Ccnavi/config/rules.yml` への Write も組み込みの deny で止まる。"""
+        """`.Ccnavi/config/rules.yml` への Write も組み込みの deny で止まる。"""
         # ccnavi ディレクトリがディスクに無いことが前提。あると realpath がパスを補正して、
         # 問いが消える。
         self.assertFalse(os.path.exists(os.path.join(self.app, HOME)))
@@ -250,7 +250,7 @@ class ShellPlaceTest(GuardHarness):
     """A-3: 区切りが続かないパス。ディレクトリごと消す・退かす形（`_PLACES` / `_COPY_PLACES`）。"""
 
     def test_removing_or_moving_the_umbrella_itself_is_denied(self):
-        """11.6: `.ccnavi` で終わるパスも `builtin-guard-setting-files` で止まる。"""
+        """`.ccnavi` で終わるパスも `builtin-guard-setting-files` で止まる。"""
         for command in (
             "rm -rf .ccnavi",
             "rm -rf projects/lib/.ccnavi",
@@ -264,14 +264,14 @@ class ShellPlaceTest(GuardHarness):
                 self.assert_denied(result, "builtin-guard-setting-files")
 
     def test_the_claude_side_is_closed_the_same_way(self):
-        """11.6: `.claude` も同じ。中身のあるディレクトリだが、丸ごと消す経路は止める。"""
+        """`.claude` も同じ。中身のあるディレクトリだが、丸ごと消す経路は止める。"""
         for command in ("rm -rf .claude", "mv .claude .claude.bak", "cp /tmp/x .claude"):
             with self.subTest(command=command):
                 result = self.guarded_hook("Bash", self.ws, command=command)
                 self.assert_denied(result, "builtin-guard-setting-files")
 
     def test_other_names_are_not_denied(self):
-        """11.6: 当たる範囲が広がっても、別名には当たらない。
+        """当たる範囲が広がっても、別名には当たらない。
 
         `.claudexyz` や `.ccnavi-notes.md` は別のファイル。`.claude/worktrees/` は
         守る対象ではないので、片付けは通る（`.claude` の側を ccnavi ディレクトリと同じ `_END` で
@@ -291,7 +291,7 @@ class ShellPlaceTest(GuardHarness):
                 self.assert_not_denied(self.guarded_hook("Bash", self.ws, command=command))
 
     def test_copying_out_of_a_common_layer_file_is_not_denied(self):
-        """11.6: 共通レイヤーの 1 本をコピー元に書いただけの読みは通る。
+        """共通レイヤーの 1 本をコピー元に書いただけの読みは通る。
 
         共通レイヤーの節をコピーする側にも書き込む側と同じ `_TERM` で足すと、空白を名前の終わりに
         数えるのでコピー元に当たり、`cp .ccnavi/common/rules.yml /tmp/x` が止まっていた。
@@ -307,7 +307,7 @@ class ShellPlaceTest(GuardHarness):
                     self.assert_not_denied(self.guarded_hook("Bash", self.ws, command=command))
 
     def test_copying_into_a_common_layer_file_is_still_denied(self):
-        """11.6: 共通レイヤーの 1 本が行き先なら、後ろにコマンドが続いても止まる。
+        """共通レイヤーの 1 本が行き先なら、後ろにコマンドが続いても止まる。
         書き込みも止まる。"""
         for name in ("rules.yml", "phases.yml", "risks.yml"):
             for command in (
@@ -323,7 +323,7 @@ class ShellPlaceTest(GuardHarness):
                     self.assert_denied(result, "builtin-guard-setting-files")
 
     def test_the_default_umbrella_is_closed_after_a_joined_command(self):
-        """11.6: 既定の名前でも、行き先のあとに別のコマンドをつないだ形は止まる。
+        """既定の名前でも、行き先のあとに別のコマンドをつないだ形は止まる。
 
         写す側の終わり（`_COPY_END`）がコマンドの切れ目を数えないと、
         `cp -r /tmp/scripts .ccnavi && echo` のようにつなぐだけで ccnavi ディレクトリの中身を
@@ -342,7 +342,7 @@ class ShellPlaceTest(GuardHarness):
 
 
 class CopyDestinationTest(GuardHarness):
-    """11.6: cp / ln / install は行き先だけで当てる（`_COPY_TARGET` / `_COPY_PLACES`）。
+    """cp / ln / install は行き先だけで当てる（`_COPY_TARGET` / `_COPY_PLACES`）。
 
     行き先は `-t <dir>` / `--target-directory` の値か、選択肢でない最後の引数。元の側に
     出ただけの守る場所は読まれるだけなので止めず、行き先になる形は書き方を変えても止める。
@@ -514,7 +514,7 @@ class CopyDestinationTest(GuardHarness):
 
 
 class HolderDestinationTest(GuardHarness):
-    """11.6: 守るものが入っているディレクトリを行き先にした形（`selfguard_shell.holder_regex`）。
+    """守るものが入っているディレクトリを行き先にした形（`selfguard_shell.holder_regex`）。
 
     行き先の表記に守るファイルの名前が出ないので、場所の表記では当たらない。元の側に
     守る名前の語か、名前の決まらない語があるときだけ止め、別の名前を置くだけの形は止めない。
@@ -660,7 +660,7 @@ class ColonIdTest(ConfigUnionHarness):
     """A-4: 生の `id` のコロン。レイヤーの名前をつけた形（`lib:custom`）と見分けが付かない。"""
 
     def test_a_colon_in_a_rule_id_is_named_by_lint(self):
-        """11.4: 共通レイヤーでもレイヤーでも、コロンを含む `id` は error で名指しする。"""
+        """共通レイヤーでもレイヤーでも、コロンを含む `id` は error で名指しする。"""
         write(self.rules, json.dumps(COLON_RULES))
         errors = self.problems("error")
         self.assertTrue(any("lib:custom" in p["where"] for p in errors), errors)
@@ -672,10 +672,10 @@ class ColonIdTest(ConfigUnionHarness):
         self.assertTrue(any("lib:custom" in p["where"] for p in errors), errors)
 
     def test_a_rule_with_a_colon_in_its_id_does_not_judge(self):
-        """11.4: 落として名指しする側を採る。
+        """そのルールを除いて名指しする側を採る。
         何も言わずに当てると、どのファイルを直すのか決まらない。
 
-        1 件の不備でガード全体は落とさない（rules.load）ので、他のルールは有効なまま。
+        1 件の不備でガード全体は止めない（rules.load）ので、他のルールは有効なまま。
         代償は、その 1 本が当たらなくなること。`--lint` が error で言うことでそれを補う。
         """
         write(self.rules, json.dumps(COLON_RULES))
@@ -684,14 +684,14 @@ class ColonIdTest(ConfigUnionHarness):
         )
 
     def test_a_colon_in_a_phase_type_id_is_named_by_lint(self):
-        """11.4.1: フェーズ定義の識別子も同じ。"""
+        """フェーズ定義の識別子も同じ。"""
         write_layer(self.lib, phases=COLON_PHASES)
         errors = self.problems("error", where=self.project_where("lib"))
         self.assertTrue(any("lib:build" in p["where"] for p in errors), errors)
         self.assertTrue(any("`:`" in p["detail"] for p in errors), errors)
 
     def test_a_colon_in_a_risk_factor_id_is_named_by_lint(self):
-        """11.4.2: リスクの項目の id も同じ。"""
+        """リスクの項目の id も同じ。"""
         write_layer(self.lib, risk=COLON_RISK)
         errors = self.problems("error", where=self.project_where("lib"))
         self.assertTrue(any("`:`" in p["detail"] for p in errors), errors)
@@ -705,12 +705,12 @@ class ReservedSelfTest(ConfigUnionHarness):
         self.self_project = self.project("Self", rules=SELF_PROJECT_RULES)
 
     def test_lint_names_the_reserved_name_whatever_the_spelling(self):
-        """11.4: `projects/Self/` も error で名指しする。"""
+        """`projects/Self/` も error で名指しする。"""
         errors = self.problems("error", where=self.project_where("Self"))
         self.assertTrue(any("self" in p["detail"] for p in errors), errors)
 
     def test_the_layer_is_not_counted(self):
-        """11.4: 数えないので、そのレイヤーの deny は Bash の和に入らない。"""
+        """数えないので、そのレイヤーの deny は Bash の和に入らない。"""
         self.assert_not_denied(self.hook("Bash", self.ws, command="kubectl get pods"))
         # 普通の名前のレイヤーは和に入る。「そもそも和が使われていない」ではないことを見る。
         self.assert_denied(self.hook("Bash", self.ws, command="psql -c 'select 1'"), "lib:raw-psql")
@@ -721,9 +721,9 @@ class ReservedLayerNameTest(ConfigUnionHarness):
 
     `layers` は `projects/self/` を数えないのに、`layer_for` は
     `target.project or LAYER_SELF` をレイヤーの名前で引いていた。`target.project` が `"self"`
-    ならレイヤーの名前と一致するので、ワークスペース自身のレイヤーが返る。**そのプロジェクトへの
+    ならレイヤーの名前と一致するので、ワークスペース自身のレイヤーが返る。そのプロジェクトへの
     Write / Edit が、プロジェクト自身の deny を一度も読まずに、ワークスペースのレイヤーの
-    ルールで判定される。**
+    ルールで判定される。
 
     穴が再現する形に組む。ワークスペース自身のレイヤーに広い `allow`（`self:wide`）と
     deny（`self:generated`）を置き、プロジェクトのレイヤーに deny（`secret`）を置く。
@@ -780,23 +780,23 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         self.assertNotIn("self:generated", self.last_record().get("rules", []))
 
     def test_a_write_into_projects_self_is_not_judged_by_the_workspace_layer(self):
-        """11.4: `projects/self/` はレイヤー無し。ワークスペースのレイヤーの allow では通らない。"""
+        """`projects/self/` はレイヤー無し。ワークスペースのレイヤーの allow では通らない。"""
         self.check_no_layer_is_borrowed(settings.LAYER_SELF)
 
     def test_the_spelling_does_not_change_it(self):
-        """11.4: `projects/Self/` も同じ（表記の大文字小文字は問わない）。"""
+        """`projects/Self/` も同じ（表記の大文字小文字は問わない）。"""
         self.check_no_layer_is_borrowed("Self")
 
     def test_a_write_into_projects_common_is_not_judged_by_the_workspace_layer(self):
-        """11.4: `common` も予約。`projects/common/` もレイヤー無し。"""
+        """`common` も予約。`projects/common/` もレイヤー無し。"""
         self.check_no_layer_is_borrowed(settings.LAYER_COMMON)
 
     def test_the_workspace_layer_deny_does_not_reach_projects_self(self):
-        """11.4: レイヤーを借りないので、ワークスペースのレイヤーの deny も当たらない。"""
+        """レイヤーを借りないので、ワークスペースのレイヤーの deny も当たらない。"""
         self.check_the_workspace_deny_does_not_reach(settings.LAYER_SELF)
 
     def test_a_project_whose_name_is_not_reserved_still_works(self):
-        """11.4 対照: 予約名でない `lib` は今までどおり自分のレイヤーで判定される。"""
+        """対照: 予約名でない `lib` は今までどおり自分のレイヤーで判定される。"""
         self.assert_denied(
             self.hook("Write", self.ws, file_path=os.path.join(self.lib, "schema", "x.sql")),
             "lib:schema",
@@ -806,7 +806,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         self.assert_denied(self.hook("Bash", self.ws, command="psql -c 'select 1'"), "lib:raw-psql")
 
     def test_lint_names_both_reserved_names(self):
-        """11.4: `projects/common/` と `projects/self/` の両方を error で名指しする。"""
+        """`projects/common/` と `projects/self/` の両方を error で名指しする。"""
         self.project(settings.LAYER_COMMON, rules=RESERVED_PROJECT_RULES)
         self.project(settings.LAYER_SELF, rules=RESERVED_PROJECT_RULES)
         for name in settings.RESERVED_LAYER_NAMES:
@@ -824,7 +824,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
                 )
 
     def test_a_ticket_cannot_name_a_reserved_layer_name(self):
-        """11.4: `project: self` / `project: common` のチケットは `--agree` で通らない。"""
+        """`project: self` / `project: common` のチケットは `--agree` で通らない。"""
         for name in settings.RESERVED_LAYER_NAMES:
             self.project(name, rules=RESERVED_PROJECT_RULES)
         # 前提。同じ本文で `project: lib` なら通る。止まる理由が予約名であることを固定する。
@@ -851,14 +851,14 @@ class ReservedLayerNameTest(ConfigUnionHarness):
 
 
 class ReservedLayerRestoreTest(GuardHarness):
-    """穴 2: `projects/common/` のレイヤーの 3 本がバックアップと復元の対象から落ちる。
+    """穴 2: `projects/common/` のレイヤーの 3 本がバックアップと復元の対象から外れる。
 
     `_layer_key` が `layer == LAYER_COMMON` の文字列比較で key を決めていた。
     `projects/common/` があると、そのレイヤーの key が `rules` / `phases` / `risk` になって
     共通レイヤーの key と完全に一致し、`_places` の重複の排除で先に積んだ共通レイヤーだけが
     残る。プロジェクトが名前を 1 つ選ぶだけで、その 3 本が守られなくなる。
 
-    key が共通レイヤーと重なると、このクラスの最初の 2 つが落ちる（戻らないので中身が壊れたまま）。
+    key が共通レイヤーと重なると、このクラスの最初の 2 つが失敗する（戻らず不正な中身が残る）。
     """
 
     def setUp(self):
@@ -871,7 +871,7 @@ class ReservedLayerRestoreTest(GuardHarness):
         )
 
     def test_the_layer_of_a_project_named_common_is_restored(self):
-        """11.6: 名札と同じ名前のプロジェクトでも、レイヤーの 3 本がバックアップと復元の対象。"""
+        """名札と同じ名前のプロジェクトでも、レイヤーの 3 本がバックアップと復元の対象。"""
         for kind in settings.LAYER_KINDS:
             with self.subTest(kind=kind):
                 path = layer_path(self.reserved, kind)
@@ -881,7 +881,7 @@ class ReservedLayerRestoreTest(GuardHarness):
                 self.assertIn("restored", result.stdout, self.said(result, kind))
 
     def test_the_restore_asks_the_project_git(self):
-        """11.6: 戻す先を聞く相手はそのプロジェクトの git。バックアップが無くても戻る。"""
+        """戻す先を聞く相手はそのプロジェクトの git。バックアップが無くても戻る。"""
         path = layer_path(self.reserved, "rules")
         expected = read(path)
         os.remove(path)
@@ -892,7 +892,7 @@ class ReservedLayerRestoreTest(GuardHarness):
         self.assertEqual(read(path), expected, self.said(result))
 
     def test_the_common_layer_is_still_restored_alongside_it(self):
-        """11.6: 共通レイヤーの phases / risk も同じ 1 回で戻る（key が衝突していない）。"""
+        """共通レイヤーの phases / risk も同じ 1 回で戻る（key が衝突していない）。"""
         for path in (self.phases, self.risk):
             name = os.path.basename(path)
             with self.subTest(path=name):
@@ -901,7 +901,7 @@ class ReservedLayerRestoreTest(GuardHarness):
                 self.assertIn("restored", result.stdout, self.said(result, name))
 
     def test_the_layer_of_a_project_named_self_is_restored_too(self):
-        """11.6: `projects/self/` の 3 本も、ワークスペース自身のレイヤーとは別に守る。"""
+        """`projects/self/` の 3 本も、ワークスペース自身のレイヤーとは別に守る。"""
         project = self.project(
             settings.LAYER_SELF, rules=RESERVED_PROJECT_RULES, phases=RESERVED_PROJECT_PHASES
         )
@@ -928,19 +928,19 @@ class ScriptTamperTest(GuardHarness):
         git(self.lib, "commit", "--quiet", "-m", "script")
 
     def test_the_reference_is_valid(self):
-        """11.4.2: 前提の確認。この `script:` は `--lint` に報告されない（参照が生きている）。"""
+        """前提の確認。この `script:` は `--lint` に報告されない（参照が生きている）。"""
         errors = self.problems("error", where=self.project_where("lib"))
         self.assertEqual([p for p in errors if "count.sh" in p["detail"]], [], errors)
 
     def test_named_tools_cannot_rewrite_it(self):
-        """11.6: Write / Edit は、正しいパスでも表記を変えた形でも止まる。"""
+        """Write / Edit は、正しいパスでも表記を変えた形でも止まる。"""
         for tool in ("Write", "Edit"):
             with self.subTest(tool=tool):
                 self.assert_denied(
                     self.guarded_hook(tool, self.ws, file_path=self.script),
                     "builtin-guard-project-home",
                 )
-        # どの機械でも止める。区別しない機械では、このパスで書けば本物が書き換わる。
+        # どの機械でも止める。区別しない機械では、このパスで書けば実際のファイルが書き換わる。
         # 区別する機械では別のファイルだが、組み込みの保護の当たり方を機械で変えない。
         # 補正が無い形（ccnavi ディレクトリがまだ無いところを表記違いで作る）は
         # BuiltinGlobCaseTest。
@@ -949,7 +949,7 @@ class ScriptTamperTest(GuardHarness):
         self.assert_denied(result, "builtin-guard-project-home")
 
     def test_the_shell_cannot_rewrite_or_delete_it(self):
-        """11.6: シェルも同じ。ccnavi ディレクトリごと消す形も、表記を変えた形も止まる。"""
+        """シェルも同じ。ccnavi ディレクトリごと消す形も、表記を変えた形も止まる。"""
         for command in (
             "rm -rf projects/lib/.ccnavi/scripts/count.sh",
             "echo x > projects/lib/.ccnavi/scripts/count.sh",

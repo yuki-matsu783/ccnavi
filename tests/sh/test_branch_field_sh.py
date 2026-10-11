@@ -4,7 +4,7 @@
 使い捨てのワークスペースと bare のリモートを組み、sh（ccnavi-git.sh・ccnavi-sync.sh・
 ccnavi-ticket.sh・ccnavi-fetch.sh）を外から呼ぶ。実行ファイルはこのツリーのソースを
 `python -m ccnavi` で起こす（tests/sh/test_c1_sh.py と同じ形）。ユーザが既に作ったブランチ
-`feature/123-login` を、識別子 `feature-123-login` の親チケットが `branch:` で名乗る。
+`feature/123-login` を、識別子 `feature-123-login` の親チケットが `branch:` で宣言する。
 
 見るのは次のとおり。
 
@@ -18,8 +18,8 @@ ccnavi-ticket.sh・ccnavi-fetch.sh）を外から呼ぶ。実行ファイルは�
    （ccnavi-fetch.sh）が親のブランチ名の ref を使う
 5. 親のワークツリーでは親のブランチ（`branch:` の値）のほかへ移れない（識別子の名前のブランチへも）
 6. 子のワークツリーからは送れない（子のブランチは子の識別子）
-7. 同じ親子のチケットを名乗るブランチが 2 本あれば、どれを本物とするか決まらないとして止める
-8. 消えた（取り込み状態が gone の）親のブランチへは送れない。同じブランチを名乗る取り込み状態が
+7. 同じ親子のチケットを宣言するブランチが 2 本あれば、どれを正とするか決まらないとして止める
+8. 消えた（取り込み状態が gone の）親のブランチへは送れない。同じブランチを宣言する取り込み状態が
    2 つでも送れない
 9. 承認前の `branch:`・使えない `branch:`（手で書いたチケットの `origin/main` など、統合先）は、
    worktree add・checkout・sync・c1 family・push のどれも使わない
@@ -499,7 +499,7 @@ class BranchFieldTest(unittest.TestCase):
     def test_two_branches_claiming_one_family_stop_it(self):
         self.imported_family()
         # 識別子と同じ名前のブランチに、branch: の無い承認済みの親チケットを置く
-        # （同じ親子のチケットを名乗る）
+        # （同じ親子のチケットを宣言する）
         # （移る前の識別子のブランチは手元に残っている）
         rival = os.path.join(self.ws, ".claude", "worktrees", "rival")
         git(self.ws, "worktree", "add", "-q", rival, PARENT)
@@ -509,10 +509,10 @@ class BranchFieldTest(unittest.TestCase):
         write(os.path.join(rival, APPROVED, "doing", PARENT + ".md"), text)
         family = self.ok(self.exe("c1", "family", PARENT))
         self.assertIn("target stop\n", family.stdout)
-        self.assertIn("名乗るブランチが 1 本でない", family.stdout)
+        self.assertIn("宣言するブランチが 1 本でない", family.stdout)
         started = self.sh("ccnavi-ticket.sh", "start", PARENT)
         self.assertNotEqual(started.returncode, 0)
-        self.assertIn("名乗るブランチが 1 本でない", started.stderr)
+        self.assertIn("宣言するブランチが 1 本でない", started.stderr)
 
     def test_a_record_pinned_to_another_branch_stops_the_family(self):
         self.imported_family()

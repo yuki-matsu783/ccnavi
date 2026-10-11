@@ -4,8 +4,8 @@
 #
 # 呼ぶ側の `set -eu` の直後に置く。`$0` は呼ばれたときのパスそのままなので、
 # `sh .ccnavi/scripts/ccnavi-git.sh` でも `sh ../../../.ccnavi/scripts/ccnavi-git.sh` でも
-# 同じディレクトリを指す。**この読み込みと、下の部品の読み込みにだけ `$0` を使い、ワークスペースルートの
-# 決定には使わない**（下の ccnavi_workspace の但し書き）。
+# 同じディレクトリを指す。この読み込みと、下の部品の読み込みにだけ `$0` を使い、ワークスペースルートの
+# 決定には使わない（下の ccnavi_workspace の但し書き）。
 #
 # ここにあるのは 8 つ。標準出力と終了コードだけを返し、標準エラーには何も書かない。
 # 失敗したときの文面は呼ぶ側が決める（reject と fail で書き方が違うため）。
@@ -112,9 +112,9 @@ ccnavi_phys() {
 
 # ワークスペースルート。hook の登録・実行ファイル・保護済みスクリプトの置き場。
 #
-# **git に聞かない。** git のトップは git の用途にだけ使う。モード B では
+# git に聞かない。 git のトップは git の用途にだけ使う。モード B では
 # `cwd` がプロジェクトの中にあると git はプロジェクトを答える。それは git として
-# 正しい答えで、ここで欲しいものとは違う（設計 11.8）。
+# 正しい答えで、ここで欲しいものとは違う。
 #
 # 目印は `.ccnavi/scripts/ccnavi-common.sh`。自分自身なので、無ければそもそも sh が呼べていない。
 # ディレクトリの `.ccnavi/scripts/` だけでは足りない。ccnavi ディレクトリの下には配点が呼ぶスクリプトの
@@ -122,7 +122,7 @@ ccnavi_phys() {
 # `.git` は駄目（プロジェクトも持つ）。`.claude/` だけも駄目（Claude Code が作る場合が
 # あり、プロジェクト側にできたものに当たる）。
 #
-# **ワークツリーは候補にせず、最初に当たったものを返す。**
+# ワークツリーは候補にせず、最初に当たったものを返す。
 #
 # `.ccnavi/scripts/` は git で追跡されているので、どのワークツリーにもコピーがある。
 # 単純に「最初に当たったもの」にすると、ワークツリーの中から打ったときワークツリー自身が
@@ -227,7 +227,7 @@ ccnavi_bin_try() {
 # いる（git 2.39.2、Git Bash と PowerShell の両方）。絶対パス、区切りは `/` のみ、
 # ドライブレターは大文字、`gitdir:` の後ろは半角空白 1 個。
 #
-# **取れなければ空を返す。止めない。** `.git` が読めない、`gitdir:` が無い、
+# 取れなければ空を返す。止めない。 `.git` が読めない、`gitdir:` が無い、
 # 元リポジトリが消えている（孤児）のどれでも空。記録の置き場のために作業を止めるのは
 # 釣り合わない。
 ccnavi_project() {
@@ -242,7 +242,7 @@ ccnavi_project() {
 	ccnavi_pj_dir=$(ccnavi_phys "$ccnavi_pj_dir")
 	ccnavi_pj_ws=$(ccnavi_phys "$ccnavi_pj_ws")
 
-	# ワークスペースの下に無ければ、名乗るプロジェクトは無い。
+	# ワークスペースの下に無ければ、宣言するプロジェクトは無い。
 	case "$ccnavi_pj_dir" in
 	"$ccnavi_pj_ws" | "$ccnavi_pj_ws"/*) ;;
 	*) return 0 ;;
@@ -254,7 +254,7 @@ ccnavi_project() {
 	"$ccnavi_pj_places"/*)
 		ccnavi_pj_name="${ccnavi_pj_rel#"$ccnavi_pj_places"/}"
 		ccnavi_pj_name="${ccnavi_pj_name%%/*}"
-		# 直下に .git を持つものだけがプロジェクト（REQ-MLT-01）。
+		# 直下に .git を持つものだけがプロジェクト。
 		if [ -e "$ccnavi_pj_ws/$ccnavi_pj_places/$ccnavi_pj_name/.git" ]; then
 			printf '%s\n' "$ccnavi_pj_name"
 		fi
@@ -284,7 +284,7 @@ ccnavi_project() {
 		"$ccnavi_pj_places"/*)
 			ccnavi_pj_name="${ccnavi_pj_orel#"$ccnavi_pj_places"/}"
 			case "$ccnavi_pj_name" in
-			*/*) return 0 ;; # 2 段以上は数えない（REQ-MLT-01）
+			*/*) return 0 ;; # 2 段以上は数えない
 			esac
 			printf '%s\n' "$ccnavi_pj_name"
 			;;
@@ -300,7 +300,7 @@ ccnavi_project() {
 # `user:token@host` の形はよくある。出力にも記録にも残すと、そこから漏れる。
 #
 # 書き方の要点が 3 つ。
-#   - `[^/]*@` で**最後の `@` まで**消す。解析側（authority の ${##*@}）が最後まで
+#   - `[^/]*@` で最後の `@` まで消す。解析側（authority の ${##*@}）が最後まで
 #     見ているので、伏せる範囲も合わせる。`[^/@]*@` にすると `glpat-A@B` の後半が残る
 #   - scheme は大文字も `git+ssh` も拾う
 #   - scheme の無い `git@host:path` の形も伏せる
@@ -324,7 +324,7 @@ ccnavi_is_ident() {
 	[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]*) ;;
 	*) return 1 ;;
 	esac
-	# 末尾の改行が `$( )` で落ちないよう、最後に `/`（上で止めた字なので本文には無い）を足して比べる。
+	# 末尾の改行が `$( )` で無くならないよう、最後に `/`（上で止めた字なので本文には無い）を足して比べる。
 	ccnavi_ii_rest=$(printf '%s/' "$1" | LC_ALL=C tr -d 'A-Za-z0-9._\200-\377-')
 	[ "$ccnavi_ii_rest" = / ]
 }
@@ -342,7 +342,7 @@ ccnavi_is_branch() {
 	[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]*) ;;
 	*) return 1 ;;
 	esac
-	# 末尾の改行が `$( )` で落ちないよう、最後に `\`（上で止めた字なので本文には無い）を足して比べる。
+	# 末尾の改行が `$( )` で無くならないよう、最後に `\`（上で止めた字なので本文には無い）を足して比べる。
 	ccnavi_ib_rest=$(printf '%s\\' "$1" | LC_ALL=C tr -d 'A-Za-z0-9._/\200-\377-')
 	[ "$ccnavi_ib_rest" = '\' ] || return 1
 	# git の ref の名前・リモートの名前・保護されたブランチの名前を先頭の階層に持つもの、`HEAD`・`*_HEAD` の

@@ -1,8 +1,8 @@
 /**
  * 承認のオーバーレイの遷移（`src/core/approval-machine.ts`）。どの状態で何を受け、何を返すか。
  *
- * 後半は**変異テスト**。ガードを 1 つずつ消したソースをその場で組み立てて、
- * 「ガードが有効であること」を確かめる関数が落ちることまで見る。ガードを足したら `GUARDS` にも足す。
+ * 後半は変異テスト。ガードを 1 つずつ消したソースをその場で組み立てて、
+ * 「ガードが有効であること」を確かめる関数が失敗することまで見る。ガードを足したら `GUARDS` にも足す。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -156,8 +156,8 @@ function toApproving(step: Step, tickets: readonly string[] = ["i0001"], only: r
 }
 
 /**
- * 名前で状態を作る。**ガードの確かめは「守る状態を全部」回す。**
- * 1 つの状態でしか押さないと、ガードから状態を 1 つ抜いた（消すのではなく弱めた）ときに落ちずに通る
+ * 名前で状態を作る。ガードの確かめは「守る状態を全部」回す。
+ * 1 つの状態でしか押さないと、ガードから状態を 1 つ抜いた（消すのではなく弱めた）ときに失敗せずに通る
  */
 function named(step: Step, kind: string): ApprovalState {
   switch (kind) {
@@ -196,7 +196,7 @@ function assertNamed(step: Step, kinds_: readonly string[]): void {
   }
 }
 
-function toPrompt(step: Step): ApprovalState {
+function toReviewedLoading(step: Step): ApprovalState {
   return step(CLOSED, {
     kind: "reviewed",
     parent: "i0001",
@@ -205,6 +205,11 @@ function toPrompt(step: Step): ApprovalState {
     chip: chipOf(),
     root: "/w",
   }).state;
+}
+
+/** 連絡の文を見せている状態（指摘は読めて、1 件も残っていない） */
+function toPrompt(step: Step): ApprovalState {
+  return step(toReviewedLoading(step), { kind: "reviewedChecked", result: { ok: true, value: { ...decidePreviewOf(), threads: [] } } }).state;
 }
 
 function toDecideLoading(step: Step): ApprovalState {
@@ -259,7 +264,7 @@ interface Guard {
   readonly find: string;
   /** 置き換えた後（ガードが有効でなくなる形） */
   readonly into: string;
-  /** 有効であることの確かめ。**ガードを消したらここが落ちる**（または、そこで投げる） */
+  /** 有効であることの確かめ。ガードを消したらここが失敗する（または、そこで投げる） */
   readonly check: (step: Step, machine: Machine) => void;
 }
 
@@ -354,7 +359,7 @@ const GUARDS: readonly Guard[] = [
     find: 'if (overlay?.kind !== "decideLoading") {',
     into: "if (false) {",
     check(step) {
-      // 閉じている状態は最後（ガードを外すと、無い持ち物を読んで投げる）
+      // 閉じている状態は最後（ガードを外すと、無いプロパティを読んで投げる）
       const kinds_ = ["decidePreview", "deciding", "preview", "prompt", "error", "closed"];
       assertNamed(step, kinds_);
       for (const kind of kinds_) {
@@ -399,12 +404,12 @@ const GUARDS: readonly Guard[] = [
     into: "if (tickets.length === 0) {",
     check(step) {
       // `approving` は `preview` を持っているので、ガードを弱めても投げずに 2 本目が出る。
-      // そのぶん、落ちるのが確かめのほうになる
+      // そのぶん、失敗するのが確かめのほうになる
       const approving = toApproving(step);
       const after = step(approving, { kind: "confirm", unsaved: [], tickets: ["i0001"] });
       assert.equal(after.state, approving, "承認中に押し直しても、打つのは 1 本きり");
       assert.deepEqual(kinds(after.effects), []);
-      // 残りの状態も全部。1 つだけ見ると、そこ以外をガードから抜かれたときに落ちずに通る
+      // 残りの状態も全部。1 つだけ見ると、そこ以外をガードから抜かれたときに失敗せずに通る
       assertNamed(step, ["closed", "loading", "done", "error", "prompt"]);
       for (const kind of ["closed", "loading", "done", "error", "prompt"]) {
         const state = named(step, kind);
@@ -417,7 +422,7 @@ const GUARDS: readonly Guard[] = [
     find: 'if (kind === "loading" || kind === "preview" || kind === "approving") {',
     into: "if (false) {",
     check(step) {
-      // **3 つとも回す。** 1 つだけ見ると、ガードからその 1 つ以外を抜かれたときに落ちずに通る
+      // 3 つとも回す。 1 つだけ見ると、ガードからその 1 つ以外を抜かれたときに失敗せずに通る
       assertNamed(step, ["loading", "preview", "approving"]);
       for (const kind of ["loading", "preview", "approving"]) {
         const state = named(step, kind);
@@ -447,8 +452,8 @@ const GUARDS: readonly Guard[] = [
     find: 'if (overlay?.kind !== "done" && overlay?.kind !== "prompt") {',
     into: "if (false) {",
     check(step) {
-      // **閉じている状態は最後。** ガードを外すと、そこは無い持ち物を読んで投げるので、
-      // 先に置くと変異テストが「確かめが落ちた」ではなく「投げた」を見ることになる
+      // 閉じている状態は最後。 ガードを外すと、そこは無いプロパティを読んで投げるので、
+      // 先に置くと変異テストが「確かめが失敗した」ではなく「投げた」を見ることになる
       assertNamed(step, ["loading", "preview", "approving", "error", "closed"]);
       for (const kind of ["loading", "preview", "approving", "error", "closed"]) {
         const state = named(step, kind);
@@ -737,21 +742,51 @@ test("CB-T177 レビュー済みの連絡は、閉じているときと、error 
     chip: chipOf(),
     root: "/w",
   };
+  // 押すと、未解決の指摘を読む（待ちの間は reviewedLoading）。マーカーは置かない
   const after = approvalStep(CLOSED, input);
-  assert.equal(after.state.overlay?.kind, "prompt");
+  assert.equal(after.state.overlay?.kind, "reviewedLoading");
   assert.equal(after.redraw, true);
-  assert.deepEqual(after.effects, [], "マーカーは置かない。文を組むだけ");
-  const overlay = after.state.overlay;
+  assert.deepEqual(after.effects, [{ kind: "loadReviewed", tree: "/w/.claude/worktrees/i0001", phase: 1 }]);
+  const none = approvalStep(after.state, { kind: "reviewedChecked", result: { ok: true, value: { ...decidePreviewOf(), threads: [] } } });
+  const overlay = none.state.overlay;
+  assert.equal(overlay?.kind, "prompt");
+  assert.deepEqual(none.effects, [], "マーカーは置かない。文を組むだけ");
   assert.equal(overlay?.kind === "prompt" ? overlay.title : "", "フェーズ 1 設計 のレビュー済み連絡");
   assert.match(
     overlay?.kind === "prompt" ? overlay.prompt : "",
     /ccnavi-review\.sh confirm --phase 1'/,
     "打つのは親のワークツリーでの check 1 本",
   );
+  assert.match(overlay?.kind === "prompt" ? overlay.prompt : "", /未解決の指摘はありません/);
+
+  // 指摘あり: 件数を言う
+  const found = approvalStep(after.state, { kind: "reviewedChecked", result: { ok: true, value: decidePreviewOf() } });
+  const foundPrompt = found.state.overlay?.kind === "prompt" ? found.state.overlay.prompt : "";
+  assert.match(foundPrompt, /未解決の指摘があります（2 件）/);
+
+  // 読めなかった: 有無を言わず、連絡は止めない
+  const failed = approvalStep(after.state, { kind: "reviewedChecked", result: { ok: false, error: "network" } });
+  const failedPrompt = failed.state.overlay?.kind === "prompt" ? failed.state.overlay.prompt : "";
+  assert.match(failedPrompt, /レビューの状況をエージェントが確かめる/);
+  assert.doesNotMatch(failedPrompt, /未解決の指摘(はありません|があります)/);
+
+  // 別のフェーズの答え（やめたあとに遅れて届いた前の連絡の分）は捨てて、待ちを続ける
+  const stale = approvalStep(after.state, { kind: "reviewedChecked", result: { ok: true, value: { ...decidePreviewOf(), phase: 2 } } });
+  assert.equal(stale.state, after.state);
+  // 読み込み中に、承認・決める・連絡をもう一度押しても被せない。やめれば閉じ、遅れた答えは受けない
+  assert.equal(approvalStep(after.state, { kind: "approve", tickets: [], filtered: false, pending: [] }).state, after.state);
+  assert.equal(approvalStep(after.state, { kind: "decide", parent: "i0001", phase: 1, tree: "/w/.claude/worktrees/i0001", chip: chipOf() }).state, after.state);
+  assert.equal(approvalStep(after.state, input).state, after.state);
+  const cancelled = approvalStep(after.state, { kind: "cancel" });
+  assert.equal(cancelled.state.overlay, undefined);
+  assert.equal(approvalStep(cancelled.state, { kind: "reviewedChecked", result: { ok: true, value: decidePreviewOf() } }).state.overlay, undefined);
+
+  // 頼んでいない（閉じた・別の）ときに届いた答えは受けない
+  assert.equal(approvalStep(CLOSED, { kind: "reviewedChecked", result: { ok: true, value: decidePreviewOf() } }).state.overlay, undefined);
 
   // 読めなかった（error）の上には被せてよい
   const onError = approvalStep({ overlay: { kind: "error", error: "x" }, only: [] }, input);
-  assert.equal(onError.state.overlay?.kind, "prompt");
+  assert.equal(onError.state.overlay?.kind, "reviewedLoading");
 
   // ボードから引けなければ言うだけ
   const noTree = approvalStep(CLOSED, { ...input, tree: undefined });
@@ -776,14 +811,7 @@ test("CB-T178 文を渡したら閉じる。コピーと新しいセッション
   assert.equal(copied.redraw, true);
   assert.deepEqual(copied.effects, [{ kind: "copy", prompt: "承認の文", what: "承認の文" }]);
 
-  const prompt = approvalStep(CLOSED, {
-    kind: "reviewed",
-    parent: "i0001",
-    phase: 1,
-    tree: "/w/.claude/worktrees/i0001",
-    chip: chipOf(),
-    root: "/w",
-  }).state;
+  const prompt = toPrompt(approvalStep);
   const opened = approvalStep(prompt, { kind: "handOver", how: "promptOpen" });
   assert.equal(opened.state.overlay, undefined);
   assert.deepEqual(kinds(opened.effects), ["openSession"]);
@@ -870,7 +898,7 @@ test("CB-T204 置けたら渡す文を見せて読み直す。投稿の警告は
   assert.deepEqual(kinds(failed.effects), ["refresh"]);
 });
 
-test("CB-T352 未保存のワークフロー編集タブがある親を含む一覧は、承認を打たずに理由を言う。タブの無い親と子だけなら打てる", () => {
+test("CB-T378 未保存のワークフロー編集タブがある親を含む一覧は、承認を打たずに理由を言う。タブの無い親と子だけなら打てる", () => {
   const shown = toPlanPreview(approvalStep, { i0001: "s1" });
   const blocked = approvalStep(shown, { kind: "confirm", unsaved: ["i0001"], tickets: ["i0001"] });
   assert.equal(blocked.state, shown, "一覧を見せたまま");
@@ -896,7 +924,7 @@ test("CB-T352 未保存のワークフロー編集タブがある親を含む一
   ]);
 });
 
-test("CB-T353 「ワークフローを編集」は、オーバーレイを閉じてから親のタブを開く（開いたままにしない）", () => {
+test("CB-T379 「ワークフローを編集」は、オーバーレイを閉じてから親のタブを開く（開いたままにしない）", () => {
   const shown = toPlanPreview(approvalStep);
   const after = approvalStep(shown, { kind: "editWorkflow", ticket: "i0001" });
   assert.deepEqual(after.state, CLOSED);
@@ -904,7 +932,7 @@ test("CB-T353 「ワークフローを編集」は、オーバーレイを閉じ
   assert.deepEqual(after.effects, [{ kind: "openWorkflow", ticket: "i0001" }]);
 });
 
-test("CB-T354 一覧を開くとき、タブで保存したときのハッシュと今の source_sha が違う親を覚える（保存したあとに提案が変わった）。承認は止めない", () => {
+test("CB-T380 一覧を開くとき、タブで保存したときのハッシュと今の source_sha が違う親を覚える（保存したあとに提案が変わった）。承認は止めない", () => {
   // 保存したまま変わっていない親・保存していない親は言わない。変わった親だけ
   const shown = toPlanPreview(approvalStep, { i0001: "s1-after-agent", i0002: "s2", i0003: "s3" }, { i0001: "s1-saved", i0002: "s2" });
   assert.equal(shown.overlay?.kind, "preview");
@@ -949,7 +977,7 @@ function load(source: string): Machine {
   return box.exports as unknown as Machine;
 }
 
-test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが落ちる（変異テスト）", () => {
+test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが失敗する（変異テスト）", () => {
   const source = fs.readFileSync(SOURCE, "utf8");
 
   // 組み立て直したものが、読み込んだものと同じに動くこと。ここが成り立たないと、以下は何も見ていない
@@ -962,7 +990,7 @@ test("CB-T181 ガードを 1 つ消すと、それを確かめるテストが落
     const at = source.split(guard.find).length - 1;
     assert.equal(at, 1, `変異させる 1 行が見つからない（${guard.what}）。ソースを直したら find も直す`);
     const mutated = load(source.replace(guard.find, guard.into));
-    // **`assert.AssertionError` に限る。** 無い持ち物を読んだ `TypeError` で偶然「落ちた」ことに
+    // `assert.AssertionError` に限る。 無いプロパティを読んだ `TypeError` で偶然「失敗した」ことに
     // しない（確かめる状態は、ガードを外しても投げない側を選んである）
     assert.throws(
       () => guard.check(mutated.approvalStep, mutated),

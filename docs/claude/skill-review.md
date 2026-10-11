@@ -3,7 +3,7 @@ type: guide
 title: スキルの振り返り
 description: ccnaviが振り返りを求めたときに拾うもの・拾わないもの・スキルのどこに足すか
 tags: [skills, feedback]
-keywords: [振り返り, スキル, SKILL.md, references, 候補, 提案, フィードバック, 訂正]
+keywords: [概念スキル, reference, 振り返り, スキル, SKILL.md, references, 候補, 提案, フィードバック, 訂正, wiki, パターン, skill-impact, 知識, 蓄積]
 ---
 
 # スキルの振り返り
@@ -19,7 +19,7 @@ keywords: [振り返り, スキル, SKILL.md, references, 候補, 提案, フィ
 
 ## スキルを直接書き換えない
 
-振り返りでは、`.claude/skills/` もプロジェクトの `docs/skills/` も書き換えない。出すのは候補か提案だけにする。
+振り返りでは、`.claude/skills/` もプロジェクトの `skills/` も書き換えない。出すのは候補か提案だけにする。
 スキルは、ユーザが承認したフェーズかチケットの中で直す。
 
 ## 拾うもの
@@ -27,6 +27,8 @@ keywords: [振り返り, スキル, SKILL.md, references, 候補, 提案, フィ
 - 「そうじゃない」「毎回〜しないで」「覚えておいて」のような、ユーザの訂正や苛立ち。いちばん強い信号になる
 - 手順の順番や進め方の訂正
 - 時間をかけてようやく分かった手順や落とし穴のうち、次の作業でも使えるもの
+- ツール操作やコマンド実行での失敗と、その修正・回避策
+  次回同じ操作で迷わないよう、正しい手順をスキルに残す
 - 読んだスキルにあった誤り、手順の抜け、古い記述
 - サブエージェントが報告に書いた「スキル候補」の節。サブエージェントには振り返りのメッセージが届かないので、報告で受け取る
 
@@ -38,19 +40,24 @@ keywords: [振り返り, スキル, SKILL.md, references, 候補, 提案, フィ
 - 解決しないまま終わった試行錯誤
 - CLAUDE.md・docs/claude/・ADRにすでに書いてあること
 
+## wiki 層
+
+候補を書く前に、拾ったものを `docs/wiki/` に溜め、`index.md` と `skill-impact.md`（却下された提案の記録）を読む。
+置き場、ファイルの中身、読む場面、書き換える場面は `docs/claude/skill-wiki.md`。
+
 ## どこに足すか
 
 上にあるものほど優先する。
 
 1. このセッションで読んだスキルを直す
-2. 同じ種類の作業を扱う既存のスキルに、節・落とし穴・使う場面を足して直す
-3. 既存のスキルに `references/<話題>.md` を足すか広げ、SKILL.md に1行の案内を足す
-4. 作業の種類ごとに新しいスキルを作る。今日の作業名・チケット番号・エラー文を名前にしない
+2. 概念スキル（`designing` `testing` `debugging` `reviewing` `releasing`）に当たる作業なら、その `references/` に足すか広げる（他のプロジェクトでも使える内容は `common/`、そのリポジトリだけの事情は `project/`）。足し方は `docs/claude/skill-concepts.md`。SKILL.md は直さない
+3. 概念スキルの対象外の既存スキルに、節・落とし穴・使う場面を足して直す。そのスキルに `references/<話題>.md` を足すか広げ、SKILL.md に1行の案内を足してもよい
+4. どれにも当たらない作業が繰り返し出たときだけ、新しいスキルの入口を提案する。今日の作業名・チケット番号・エラー文を名前にしない。ユーザの承認を取る
 
 - 直す前に、対象の SKILL.md と、手を入れる references/ を読み直す。会話中の引用で済ませない
 - 1つの事実は1か所に書く。同じ規則がすでにあるなら、新しく足さずにその文を強めるか言い直す
 - 手順の流れに沿って書き、落とし穴は該当する手順に「規則 + なぜ（1 句）」で添える。日付・番号・ユーザの言葉の引用を中身にしない
-- yomiyasuスキルを `docs/claude/`・`CLAUDE.md`・`.claude/skills/`・プロジェクトの `docs/skills/`・`rules.yml` の `message` に当てるのは、ユーザが明示的に頼んだときだけにする。その場合も、表・箇条書き・「規則 + なぜ」の形は崩さない。yomiyasuはこれらの形を平文に崩すため
+- yomiyasuスキルを `docs/claude/`・`CLAUDE.md`・`.claude/skills/`・プロジェクトの `skills/`・`rules.yml` の `message` に当てるのは、ユーザが明示的に頼んだときだけにする。その場合も、表・箇条書き・「規則 + なぜ」の形は崩さない。yomiyasuはこれらの形を平文に崩すため
 - 誤りを見つけたら、間違った文そのものを直す
 
 ## 対象のスキル
@@ -58,7 +65,7 @@ keywords: [振り返り, スキル, SKILL.md, references, 候補, 提案, フィ
 | 振り返る作業 | 対象 |
 |---|---|
 | ワークスペース自身 | `.claude/skills/<名前>/` |
-| `projects/<名前>/` の作業 | `projects/<名前>/docs/skills/<名前>/`。Claude Codeのスキルと同じ形で、ccnaviが目録を渡す |
+| `projects/<名前>/` の作業 | `projects/<名前>/skills/<名前>/`。Claude Codeのスキルと同じ形で、ccnaviが目録を渡す。概念スキルの reference は `projects/<名前>/skills/<概念>/references/` |
 
 候補は、その中身を次に使う作業の側のスキルに書く。ワークスペースとプロジェクトの両方に関わるときも、2か所には書かず、手順を実行する側の1か所にだけ書く。
 
@@ -72,7 +79,7 @@ keywords: [振り返り, スキル, SKILL.md, references, 候補, 提案, フィ
 
 ### 親チケットの下で候補を足す
 
-1. 親のワークツリーの `scratchpad/skill-candidates.md` に候補を書く。書くのは、対象のスキル、作るか直すか、中身の下書き、根拠
+1. 親のワークツリーの `scratchpad/skill-candidates.md` に候補を書く。書くのは、対象のスキル、作るか直すか、中身の下書き、根拠、動機になった wiki のパターン、wiki への反映の下書き
 2. フィードバック計画を書くとき、次の3つがすべてそろっていれば `feedback:` に `skill-improve` を入れる
    - 候補が1つ以上ある
    - `skill-improve` のフェーズ定義がある
@@ -109,8 +116,9 @@ allow:
   - match: Write|Edit
     glob: ".claude/skills/commit/*"
 ---
-対象の SKILL.md（と references/）の差分か、新しく作るなら全文の下書き。
+対象の SKILL.md（と references/）の差分か、新しく作るなら全文の下書き。動機になった wiki のパターンと、wiki（`patterns/`・`skill-impact.md`・`log.md`）に入れる差分も書く。
+`allow` には `docs/wiki/*` も足す。
 ```
 
-プロジェクトのスキルについての提案は、そのプロジェクトの提案として書き、`allow` に `docs/skills/<スキル>/*` を書く。
+プロジェクトのスキルについての提案は、そのプロジェクトの提案として書き、`allow` に `skills/<スキル>/*` を書く。
 パスはプロジェクトのルートからの相対で書く。

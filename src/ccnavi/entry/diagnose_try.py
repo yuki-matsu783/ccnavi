@@ -243,7 +243,7 @@ def _rules_hit(
 
     `source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように、
     ルールファイルの外から来た根拠）。レイヤーのルールは `self:docs` / `lib:source` の形の
-    id で当たるので（REQ-MLT-07）、同じ表記で引けるようにレイヤーごと並べる。
+    id で当たるので、同じ表記で引けるようにレイヤーごと並べる。
     """
     if not record.rules:
         return []
@@ -331,7 +331,7 @@ def run_samples(stderr: TextIO, conf: settings.Settings, root: str, path: str) -
     """見本をぜんぶ判定に掛けて、期待と突き合わせた結果を 1 つの辞書にする。
 
     判定は `judge` を通す。ここで判定を作り直さないのが肝で、別の経路で確かめると、
-    見本が通ったのに実運用で落ちる、という一番まずい形になる（REQ-DIA-03）。
+    見本が通ったのに実運用で失敗する、という一番まずい形になる。
 
     `ok` は期待どおりか。`skipped` は allow の見本が判定に入らずに通ったもので、
     呼び出しは通るので期待は満たしているが、通した理由が「allow に当たった」では
@@ -394,7 +394,7 @@ def test_samples(
     """`--test-samples`。見本をぜんぶ回して、食い違いを並べる。
 
     文字で出すときの終了コードは、食い違いが 1 件でもあれば 1。`/ccnavi-config`
-    スキルと `tools/check_rules.py` がそれを見る。JSON で出すときは常に 0 で、
+    スキルと `scripts/check_rules.py` がそれを見る。JSON で出すときは常に 0 で、
     食い違いの数は本文の `mismatches` にある。読み手が「食い違った」と
     「試験そのものが失敗した」を終了コードで見分けられるように。
     """

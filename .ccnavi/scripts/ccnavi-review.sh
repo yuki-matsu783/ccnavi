@@ -20,7 +20,7 @@
 #            下書きを書き出す → ここが（無ければ）マージリクエストを下書きで作り、依頼を投稿する
 #            → `ccnavi review requested` がマーカーを置く
 #            ユーザはレビューをマージリクエストで行うので、マージリクエストが無いことで止めない。題から Draft を
-#            外してマージするのはユーザの手に残す。
+#            外してマージするのはユーザに任せる。
 #            --eli5 <HTML> は必須（付け忘れを後回しにさせない）。変更をやさしく説明した 1 枚の HTML で、
 #            このワークツリーの wip/eli5/ の下（既定の名前は wip/eli5/phase-<N>.html）にコミットしておく。
 #            HEAD に入って push されていれば、マージリクエストの差分に載る。ここは拡張子・在ること・
@@ -116,7 +116,7 @@ esac
 #
 # 根は git に聞かない。モード B では cwd がプロジェクトの中にあると git は
 # プロジェクトを答え、チケット・マーカー・状態の置き場がプロジェクト側を指してしまう。
-# 道具の置き場は上へたどって探す（設計 11.8）。
+# 道具の置き場は上へたどって探す。
 root=$(ccnavi_workspace) ||
 	fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
 # 解いたルートを logger に渡し、書くたびに探し直させない。
@@ -204,7 +204,7 @@ elif [ "$sub" != merged ]; then
 fi
 
 # 実行ファイルがそのフラグを知っているか（`--version --json` の flags で見る）。
-# 知らない古い実行ファイルには `--actor`・`--via` を渡さない（渡すと引数の誤りで落ちる。マーカーは前と同じ中身になる）。
+# 知らない古い実行ファイルには `--actor`・`--via` を渡さない（渡すと引数の誤りで失敗する。マーカーは前と同じ中身になる）。
 # 答えは 1 度だけ引いて覚えておく。`$( )` の中から呼ぶと覚えた値が親に残らないので、親で呼ぶ。
 exe_flags=""
 exe_flags_read=""
@@ -300,7 +300,7 @@ api_failed() {
 	case "$2" in
 	graphql)
 		printf 'ccnavi-review: %s\n' \
-			"GraphQL が塞がれている環境では confirm / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。MCP などリモートを読める道具でスレッドとレビューを JSON にして 'ccnavi review confirm --phase <N> --result <json>' を打ってください。渡す JSON の形は fetch_all と同じ {host, mr, threads, reviews, fetched_at} です。Draft 外しはその道具の側で直接行ってください。" >&2
+			"GraphQL を使えない環境では confirm / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。MCP などリモートを読める道具でスレッドとレビューを JSON にして 'ccnavi review confirm --phase <N> --result <json>' を打ってください。渡す JSON の形は fetch_all と同じ {host, mr, threads, reviews, fetched_at} です。Draft 外しはその道具の側で直接行ってください。" >&2
 		;;
 	esac
 }
@@ -326,7 +326,7 @@ find_mr() {
 			"$JQ" '.[0] // empty | {number: .number, url: .html_url}'
 	else
 		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない）。
-		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても本物を外さない）
+		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても目的のものを外さない）
 		pid=$(project_id) || fail no-project-id "GitLab のプロジェクト $path の id を読めない。マージリクエストがこのプロジェクトから出たかを確かめられないので止めた（PAT の権限と origin の URL を見直してください）。"
 		mrs=$(pages "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$branch") ||
 			fail mr-list-failed "親ブランチ $branch のマージリクエストの一覧を読めない（ホストの返事は上に出ている）。"
@@ -453,7 +453,7 @@ find_posted() {
 	fi
 }
 
-# ---- Draft を外す。GitHub は GraphQL でしか外せない。GitLab は題の "Draft: " を落とす。
+# ---- Draft を外す。GitHub は GraphQL でしか外せない。GitLab は題の "Draft: " を除く。
 
 undraft() {
 	mr_number="$1"
@@ -461,7 +461,7 @@ undraft() {
 		pr=$(api GET "repos/$path/pulls/$mr_number")
 		node=$(printf '%s' "$pr" | "$JQ" -r '.node_id // empty')
 		[ -n "$node" ] || fail no-node-id "マージリクエスト #$mr_number の node_id を読めない。"
-		# 題の "Draft: " は GitLab の流儀で付けたもの。GitHub は Draft をフラグで持つので、フラグを外すときに題からも落とす。
+		# 題の "Draft: " は GitLab の流儀で付けたもの。GitHub は Draft をフラグで持つので、フラグを外すときに題からも除く。
 		title=$(printf '%s' "$pr" | "$JQ" -r '.title // empty')
 		stripped=$(printf '%s' "$title" | sed -E 's/^[[:space:]]*(\[?(Draft|WIP)\]?:?[[:space:]]*)+//I')
 		if [ -n "$stripped" ] && [ "$stripped" != "$title" ]; then
@@ -686,7 +686,7 @@ merged)
 	# 読むだけで、何も書かない。答えは 3 つで、呼ぶ側は none のときだけ「マージされていない」と読む。
 	#   merged <番号>  終了コード 0
 	#   none          終了コード 0（マージ済みの MR が無いと分かった）
-	#   unknown       終了コード 3（API が落ちた・答えを読めなかった）。道具やトークンが無ければ、
+	#   unknown       終了コード 3（API が失敗した・答えを読めなかった）。道具やトークンが無ければ、
 	#                 上の道具の選び方が 2 で止める（none は出さない）
 	if [ "$kind" = github ]; then
 		owner="${path%%/*}"
@@ -1068,7 +1068,7 @@ ready)
 	# sh は push・Draft 外し・コメントを受け持ち、契約（標準出力の形）は前の版と変わらないため。
 	# 組み立て直しはエージェントが勝手に回さない決まりなので、誰が何をするかを言う。
 	if [ -n "${skew:-}" ]; then
-		printf 'ccnavi-review: 食い違いがあっても ready は続ける。エージェントは build.py を回さず、終わったらユーザに実行ファイルの組み立て直し（または配り直し）を頼む。\n' >&2
+		printf 'ccnavi-review: 食い違いがあっても ready は続ける。エージェントは build.py を実行せず、終わったらユーザに実行ファイルの組み立て直し（または配り直し）を頼む。\n' >&2
 	fi
 	ccnavi_c1_capture="$state/review-ready-$$.out"
 	ready_rc=0

@@ -105,7 +105,7 @@ def _arr(row: dict, key: str) -> list[str]:
 
 
 def _scalars(value: Any) -> list[str]:
-    """入れ子のスカラーの値。再帰しない（深い入れ子で落ちないように）。"""
+    """入れ子のスカラーの値。再帰しない（深い入れ子で失敗しないように）。"""
     found = []
     stack = [value]
     while stack:

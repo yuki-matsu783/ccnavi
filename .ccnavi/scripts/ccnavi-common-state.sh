@@ -44,7 +44,7 @@ ccnavi_family_record() {
 # 取り込み状態の `branch` の行で探す（`branch` の無い前の取り込み状態は、鍵の識別子をブランチ名として読む）。
 # 識別子と違う名前の親のブランチ（`branch:`）でも、ブランチ名から取り込み状態を引ける。書きかけ（`*.tmp.*`）と
 # シンボリックリンクは読まない。当たった取り込み状態を 1 行に 1 つずつ全部出す（2 つ以上なら、2 つの親子の
-# チケットが同じブランチを名乗っている。呼ぶ側は止める）。
+# チケットが同じブランチを宣言している。呼ぶ側は止める）。
 ccnavi_family_record_of_branch() {
 	ccnavi_fb_dir="$(ccnavi_state "$1")/sync/$2/families"
 	[ -d "$ccnavi_fb_dir" ] || return 0
@@ -133,7 +133,7 @@ ccnavi_record_write() {
 #
 # `origin/HEAD` は clone のときに置かれる。`git init` してから `remote add` した手元や、
 # 古い clone には無いので、そのときは `origin/main`・`origin/master` の在る側を使う。
-# どちらも無ければ「分からない」。当てずっぽうで別のブランチを名乗らない。
+# どちらも無ければ「分からない」。当てずっぽうで別のブランチを宣言しない。
 # ネットワークには出ない（手元の ref だけを読む）。
 ccnavi_default_branch() {
 	ccnavi_db_head=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
@@ -274,7 +274,7 @@ ccnavi_git_refusal() {
 	if [ -n "$ccnavi_gr_paths" ]; then
 		printf '書きかけの %s と重なる。コミットか退避をしてから打ち直してください' "$ccnavi_gr_paths"
 	elif grep -q 'index\.lock' "$1" 2>/dev/null; then
-		printf '索引のロック（index.lock）が残っている。別の git が動いていないか確かめ、落ちた残りならユーザが消す'
+		printf '索引のロック（index.lock）が残っている。別の git が動いていないか確かめ、異常終了して残ったものならユーザが消す'
 	elif grep -qi 'tell me who you are\|empty ident\|user\.email\|user\.name' "$1" 2>/dev/null; then
 		printf 'コミットするユーザの名前（user.name・user.email）が決まっていない'
 	elif grep -qi 'gpg\|signing' "$1" 2>/dev/null; then

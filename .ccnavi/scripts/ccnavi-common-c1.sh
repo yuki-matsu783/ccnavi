@@ -71,7 +71,7 @@ ccnavi_c1_number() {
 # 親子のチケットと、C1 の対象か。<識別子>
 #
 # ccnavi_c1_target: yes（C1 で回す）/ no（今の手元の動きのまま）/ stop（取り込み済みだが止める理由がある）。
-# 実行ファイルが答えなかった（古い・落ちた）ときは、取り込み状態があれば stop、無ければ no。
+# 実行ファイルが答えなかった（古い・失敗した）ときは、取り込み状態があれば stop、無ければ no。
 ccnavi_c1_family() {
 	ccnavi_c1_target=no
 	ccnavi_c1_why=""
@@ -104,7 +104,7 @@ ccnavi_c1_family() {
 		return 0
 	}
 	: >"$ccnavi_c1_tmp/hints"
-	# Windows の実行ファイルの CRLF を落として読む（1 行 1 項目の値の末尾に CR を残さない）。
+	# Windows の実行ファイルの CRLF の CR を除いて読む（1 行 1 項目の値の末尾に CR を残さない）。
 	ccnavi_c1_exe c1 family "$1" 2>"$ccnavi_c1_tmp/family-err" </dev/null | tr -d '\r' >"$ccnavi_c1_tmp/family" || :
 	if [ "$(head -n 1 "$ccnavi_c1_tmp/family" 2>/dev/null)" != "c1 1" ]; then
 		ccnavi_c1_family_id="$ccnavi_cf_p"
@@ -264,7 +264,7 @@ ccnavi_c1_prepare() {
 			ccnavi_c1_say "取り込みの後、親子のチケットの取り込み状態が ${ccnavi_cp_state:-（無い）} になった。何も書いていない（上の ccnavi-sync.sh の文面）"
 			return 1
 		fi
-		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める（REQ-APV-11 の補足）。
+		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める。
 		ccnavi_c1_sort "$ccnavi_c1_tmp/unsent" "refs/remotes/origin/$ccnavi_c1_branch" || return 1
 		ccnavi_c1_stops "$ccnavi_c1_tmp/unsent" "置き場に未送信のユーザの判断のコミットがある" \
 			"。承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが打つ。何も書いていない" \
@@ -276,7 +276,7 @@ ccnavi_c1_prepare() {
 
 # 一覧のパスだけをコミットする。<一覧> <文>。新しいファイルは先に add する。
 # 変わったものが 1 つも無ければコミットせずに 0（ccnavi_c1_committed は空）。
-# 落ちたら、この実行が add したパスを索引から外して 1（索引を元に戻す）。
+# 失敗したら、この実行が add したパスを索引から外して 1（索引を元に戻す）。
 ccnavi_c1_committed=""
 ccnavi_c1_commit() {
 	ccnavi_c1_committed=""
@@ -368,7 +368,7 @@ ccnavi_c1_run() {
 	fi
 }
 
-# 6〜11。<文> -- <実行ファイルの引数>...。終了コードは実行ファイルのもの（C1 で落ちたら 1）。
+# 6〜11。<文> -- <実行ファイルの引数>...。終了コードは実行ファイルのもの（C1 で失敗したら 1）。
 ccnavi_c1_write() {
 	ccnavi_cw_message="$1"
 	shift
@@ -393,7 +393,7 @@ ccnavi_c1_write() {
 			return 1
 		fi
 		if [ "$ccnavi_cw_rc" -ne 0 ]; then
-			# 落ちた回は、ここまでに書いたものを戻す（コミットしない）。
+			# 失敗した回は、ここまでに書いたものを戻す（コミットしない）。
 			ccnavi_c1_restore_written "$ccnavi_cw_list" "$ccnavi_cw_h0"
 			rm -f "$ccnavi_cw_list"
 			return "$ccnavi_cw_rc"
@@ -424,11 +424,11 @@ ccnavi_c1_write() {
 			rm -f "$ccnavi_cw_list"
 			return 0
 		fi
-		# 10. 落ちたように見えても、届いていれば成功。
+		# 10. 失敗したように見えても、届いていれば成功。
 		if ccnavi_git_timed "$ccnavi_cw_timeout" "$ccnavi_c1_tmp/ls-err" "$ccnavi_c1_tree" \
 			ls-remote origin "refs/heads/$ccnavi_c1_branch" >"$ccnavi_c1_tmp/ls" &&
 			grep -F -x -q -- "$ccnavi_cw_head${ccnavi_c1_tab}refs/heads/$ccnavi_c1_branch" "$ccnavi_c1_tmp/ls"; then
-			ccnavi_c1_say "push の応答は落ちたが、リモートには届いていた（${ccnavi_cw_head}）"
+			ccnavi_c1_say "push の応答を受け取れなかったが、リモートには届いていた（${ccnavi_cw_head}）"
 			ccnavi_c1_inflight=""
 			ccnavi_c1_sent "$ccnavi_cw_head"
 			rm -f "$ccnavi_cw_list"
@@ -451,7 +451,7 @@ ccnavi_c1_write() {
 		fi
 		ccnavi_c1_say "書いたものを戻した。取り込みからもう 1 回だけやり直す"
 		ccnavi_c1_prepare || return 1
-		# 届いていたのに確かめ（ls-remote）も落ちていた回は、取り込みで自分のコミットが戻ってくる。
+		# 届いていたのに確かめ（ls-remote）も失敗していた回は、取り込みで自分のコミットが戻ってくる。
 		# そのときは書き直さず、届いていたとして終える。
 		if [ -n "$ccnavi_cw_c" ] &&
 			git -C "$ccnavi_c1_tree" merge-base --is-ancestor "$ccnavi_cw_c" HEAD 2>/dev/null; then

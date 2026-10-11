@@ -25,7 +25,7 @@ def _after(root: str) -> list[Problem]:
     対しては 1 つも守られていない状態は、外から見ると守られている状態と
     区別が付かない。
 
-    見に行き方は判定と同じ。別の見方をすると、検証は通ったのに実運用では
+    見に行く方法は判定と同じ。別の見方をすると、検証は通ったのに実運用では
     何も見えない、という一番まずい形になる。
     """
     registered = _registered(root)
@@ -208,7 +208,7 @@ def _local_settings(root: str) -> list[Problem]:
 
 
 def _bin_path(root: str, declared: object) -> list[Problem]:
-    """`.claude/settings.json` の env の実行ファイルのパスを見る（設計 launcher-scripts 9 節）。
+    """`.claude/settings.json` の env の実行ファイルのパスを見る。
 
     プロセスの環境ではなく設定ファイルを読む。hook が起動するのは、ここに書いたパス
     （`"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"`）だから。

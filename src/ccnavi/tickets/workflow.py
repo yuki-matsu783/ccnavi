@@ -1,4 +1,4 @@
-"""計画の待ち方（設計 9.7）。
+"""計画の待ち方。
 
 待ち方は親の計画（`plan:` / `feedback:`）の項の `after` から都度計算する。ファイルにもチケットの欄
 にも持たない。承認済みチケットの計画は承認済みの置き場にあり、変えられるのは改版（`--agree`）と
@@ -121,7 +121,7 @@ def ready(parent: ticket_model.Ticket, wf: ticket_model.Workflow | None = None) 
 def problems(
     parent: ticket_model.Ticket, types: dict | None = None, part: str = ""
 ) -> list[rules.Problem]:
-    """計画の順序が組めるか。`after` の形、終端、最後の項の延期、延期の引き受け手（設計 9.7）。
+    """計画の順序が組めるか。`after` の形、終端、最後の項の延期、延期の引き受け手。
 
     全体計画とフィードバック計画に同じ規則を当てる。`part`（`plan` か `feedback`）を渡せば、
     その計画の誤りだけを返す（`--plan-order` が計画ごとの図に分けて返すため）。

@@ -144,11 +144,18 @@ test("CB-D43 「レビュー済み連絡」は親とフェーズを送り、提�
   const tickets = base.tickets.map((t) => (t.ticket === "i0001" || t.ticket === "i0001-02-02" ? { ...t, attention: true } : t));
   const page = await openBoard({ ...base, tickets, parents: [parent] });
   try {
+    page.click(page.one('button[data-action="review-menu"][data-parent="i0001"][data-phase="2"]'));
+    await page.settle();
+    // メニューの余白（項目の間）を押しても提案は開かない
+    const gap = page.posted.length;
+    page.click(page.one(".review-menu-list"));
+    await page.settle();
+    assert.equal(page.posted.length, gap);
     page.click(page.one('button[data-action="reviewed"][data-parent="i0001"][data-phase="2"]'));
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "reviewed", parent: "i0001", phase: 2 });
     const before = page.posted.length;
-    // 本物の Webview では VS Code がリンクの遷移を横取りして既定のブラウザで開く。happy-dom には無いので既定の動きだけ止める
+    // 実際の Webview では VS Code がリンクの遷移を横取りして既定のブラウザで開く。happy-dom には無いので既定の動きだけ止める
     page.document.addEventListener("click", (event) => {
       if ((event.target as unknown as { closest: (s: string) => unknown }).closest("a")) { event.preventDefault(); }
     });

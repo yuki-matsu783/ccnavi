@@ -46,6 +46,18 @@ export function Factor(props: FactorProps): JSX.Element {
     />
   );
 
+  const globs = (name: "include" | "exclude", placeholder: string): JSX.Element => (
+    <textarea
+      className="f-value"
+      rows={2}
+      spellCheck={false}
+      placeholder={placeholder}
+      value={factor[name]}
+      disabled={disabled}
+      onChange={(event) => props.onChange({ ...factor, [name]: event.target.value })}
+    />
+  );
+
   return (
     <li className={`row factor${props.open ? " open" : ""}${props.hidden ? " hidden-by-find" : ""}`} data-key={props.factorKey} data-find={props.find}>
       <div
@@ -91,7 +103,16 @@ export function Factor(props: FactorProps): JSX.Element {
             onChange={(event) => {
               const kind = event.target.value as FactorKind;
               // 値は加点条件ごとに意味が違うので持ち越さない。max は glob だけの欄
-              props.onChange({ ...factor, kind, value: "", max: kind === "glob" ? factor.max : "" });
+              // include / exclude は数える加点条件（lines_over など）だけの欄
+              const counting = NUMERIC.includes(kind);
+              props.onChange({
+                ...factor,
+                kind,
+                value: "",
+                max: kind === "glob" ? factor.max : "",
+                include: counting ? factor.include : "",
+                exclude: counting ? factor.exclude : "",
+              });
             }}
           >
             {KINDS.map((kind) => (
@@ -114,6 +135,16 @@ export function Factor(props: FactorProps): JSX.Element {
             text("value", "f-value", KIND_LABELS[factor.kind].placeholder, NUMERIC.includes(factor.kind))
           )}
         </Captioned>
+        {NUMERIC.includes(factor.kind) && (
+          <>
+            <Captioned name="対象パス" yamlKey="include">
+              {globs("include", "src/**（glob を 1 行に 1 つ。書くと、当てはまるパスだけを数える。空なら全パス）")}
+            </Captioned>
+            <Captioned name="除外パス" yamlKey="exclude">
+              {globs("exclude", "*.lock（glob を 1 行に 1 つ。当てはまるパスは数えない。対象パスに当てはまっていても外す）")}
+            </Captioned>
+          </>
+        )}
         <Captioned name="理由" yamlKey="message">
           {text("message", "f-message", "加点の理由として依頼文と閉じたときの出力に出る短い文です。空なら id をそのまま使います")}
         </Captioned>

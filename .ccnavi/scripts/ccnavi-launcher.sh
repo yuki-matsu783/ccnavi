@@ -61,5 +61,5 @@ for target in $targets; do
 	done
 done
 
-printf 'ccnavi: この機械（%s-%s）で動く実行ファイルが %s/ にありません。ccnavi のリポジトリでは build.py を回すと置かれます。配布先では、この機械で組み立てたものを scripts/ccnavi-setup.sh で配ってください。\n' "$os" "$arch" "$bin_dir" >&2
+printf 'ccnavi: この機械（%s-%s）で動く実行ファイルが %s/ にありません。ccnavi のリポジトリでは build.py を実行すると置かれます。配布先では、この機械で組み立てたものを scripts/ccnavi-setup.sh で配ってください。\n' "$os" "$arch" "$bin_dir" >&2
 exit 127

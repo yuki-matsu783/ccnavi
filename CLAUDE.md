@@ -19,6 +19,9 @@
 
 - sh は Windows (Git Bash / WSL)・Linux・macOS のどれでも動くように書く
 - ccnavi の動作に依存する決まり（ワークツリー・git の入口・下書きの置き場・サブエージェントへの委任・合意が要る変更の範囲）は、セッション開始時に ccnavi が渡す。細かいことは、その案内の `--docs` で ccnavi に聞く
+- 書き込みを制限されている場所（保護対象のファイルなど）の修正を求められた場合は、ワークスペースルートの`wip/scratchpad/`に元ファイルをcpした上で編集する。複数ファイルを同時に直すときは、すべて作ってからターンを終える。
+  - 対話セッション: それをmvするためのコマンドをユーザに案内してターンを終える。（フルパス記載）
+  - 非対話セッション: `wip/scratchpad/`の編集済みファイルをpushし、ユーザに確認と制限対象ファイルの差し替えを頼んでターンを終える。
 
 ## 詳細
 
@@ -32,3 +35,5 @@
 | ccnavi の実行ファイル（`src/ccnavi/`）か `.ccnavi/scripts/` の sh を直す | `docs/claude/exe-boundary.md` |
 | sh・Python・TS でログを書く、logger を直す | `docs/claude/logging.md` |
 | フィードバックメッセージが届いた、`.claude/skills/` を直したくなった、フィードバック計画を書く | `docs/claude/skill-review.md` |
+| スキルの振り返りで知識を `docs/wiki/` に溜める、wiki のパターンや提案の採否を読む・書く | `docs/claude/skill-wiki.md` |
+| 概念スキル（designing・testing・debugging・reviewing・releasing）の reference を引く・足す、スキルを新しく作りたくなった | `docs/claude/skill-concepts.md` |

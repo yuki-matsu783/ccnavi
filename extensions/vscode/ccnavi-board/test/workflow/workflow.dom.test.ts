@@ -34,7 +34,7 @@ function removeEdge(dom: DomPage, edge: string): { readonly seq: number; readonl
   return { seq: sent.seq as number, order: sent.order };
 }
 
-test("CB-D161 開くと、計画ごとの図を線を引ける形で出す。提案のままなので未保存ではなく、保存と案に戻すは押せない", async () => {
+test("CB-D166 開くと、計画ごとの図を線を引ける形で出す。提案のままなので未保存ではなく、保存と案に戻すは押せない", async () => {
   const dom = await openWorkflow();
   try {
     assert.deepEqual(
@@ -56,7 +56,7 @@ test("CB-D161 開くと、計画ごとの図を線を引ける形で出す。提
   }
 });
 
-test("CB-D162 線の × を押すと、元の番号での先行を送って答えを待つ。待つ間は線を変えられない。start と end の仮の線には × が無い", async () => {
+test("CB-D167 線の × を押すと、元の番号での先行を送って答えを待つ。待つ間は線を変えられない。start と end の仮の線には × が無い", async () => {
   const dom = await openWorkflow();
   try {
     const edges = dom.all('button[data-action="plan-remove-edge"]').map((b) => b.getAttribute("data-edge"));
@@ -73,7 +73,7 @@ test("CB-D162 線の × を押すと、元の番号での先行を送って答�
   }
 });
 
-test("CB-D163 答えが届いたら、実行ファイルが振り直した番号で描き直し、未保存にして番号の変わる項を出す。図の場所は動かさない", async () => {
+test("CB-D168 答えが届いたら、実行ファイルが振り直した番号で描き直し、未保存にして番号の変わる項を出す。図の場所は動かさない", async () => {
   const dom = await openWorkflow();
   try {
     const placed = dom.one('.react-flow__node[data-id="n3"]').getAttribute("style");
@@ -97,7 +97,7 @@ test("CB-D163 答えが届いたら、実行ファイルが振り直した番号
   }
 });
 
-test("CB-D164 断られた線（循環など）は引く前の形に戻し、理由を出す。古い頼みへの答えは捨てる", async () => {
+test("CB-D169 断られた線（循環など）は引く前の形に戻し、理由を出す。古い頼みへの答えは捨てる", async () => {
   const dom = await openWorkflow();
   try {
     const { seq } = removeEdge(dom, "after-1-3");
@@ -118,7 +118,7 @@ test("CB-D164 断られた線（循環など）は引く前の形に戻し、理
   }
 });
 
-test("CB-D165 順序の検査に error がある答えは保存できない。理由（problems）は図の下に、終端に当たらない項の印は点に、実行ファイルの答えのまま出す", async () => {
+test("CB-D170 順序の検査に error がある答えは保存できない。理由（problems）は図の下に、終端に当たらない項の印は点に、実行ファイルの答えのまま出す", async () => {
   const dom = await openWorkflow();
   try {
     const { seq } = removeEdge(dom, "after-3-4");
@@ -132,7 +132,7 @@ test("CB-D165 順序の検査に error がある答えは保存できない。�
   }
 });
 
-test("CB-D166 保存の前に、番号の変わる項と付け替える子の提案（識別子と phase の前後）を見せ、保存すると開いたときのハッシュを添えて送る", async () => {
+test("CB-D171 保存の前に、番号の変わる項と付け替える子の提案（識別子と phase の前後）を見せ、保存すると開いたときのハッシュを添えて送る", async () => {
   const dom = await openWorkflow({ answer: planOrderSample("open", "a".repeat(64)) });
   try {
     const { seq } = removeEdge(dom, "after-1-3");
@@ -165,7 +165,7 @@ test("CB-D166 保存の前に、番号の変わる項と付け替える子の提
   }
 });
 
-test("CB-D174 子の提案を付け替えられない理由・改版の錠・計画と食い違う子は、実行ファイルの文のまま一覧に出し、書けなければ保存できない", async () => {
+test("CB-D179 子の提案を付け替えられない理由・改版の錠・計画と食い違う子は、実行ファイルの文のまま一覧に出し、書けなければ保存できない", async () => {
   const dom = await openWorkflow();
   try {
     const { seq } = removeEdge(dom, "after-1-3");
@@ -190,7 +190,7 @@ test("CB-D174 子の提案を付け替えられない理由・改版の錠・計
   }
 });
 
-test("CB-D167 案に戻すと、往復せずに開いたときの答えに戻る。未保存が消える", async () => {
+test("CB-D172 案に戻すと、往復せずに開いたときの答えに戻る。未保存が消える", async () => {
   const dom = await openWorkflow();
   try {
     const { seq } = removeEdge(dom, "after-1-3");
@@ -207,7 +207,7 @@ test("CB-D167 案に戻すと、往復せずに開いたときの答えに戻る
   }
 });
 
-test("CB-D168 提案が外で変わったら差分を出し、取り込むか編集を続けるかを選ばせる。編集を続けても保存はできない", async () => {
+test("CB-D173 提案が外で変わったら差分を出し、取り込むか編集を続けるかを選ばせる。編集を続けても保存はできない", async () => {
   const dom = await openWorkflow();
   try {
     const { seq } = removeEdge(dom, "after-1-3");
@@ -234,7 +234,7 @@ test("CB-D168 提案が外で変わったら差分を出し、取り込むか編
   }
 });
 
-test("CB-D169 提案が承認待ちから無くなったら（承認・取り下げ）、読むだけにして理由を出す", async () => {
+test("CB-D174 提案が承認待ちから無くなったら（承認・取り下げ）、読むだけにして理由を出す", async () => {
   const dom = await openWorkflow();
   try {
     await dom.send({ type: "gone", reason: "承認済みです。順序を変えるには改版を出してください" });
@@ -247,7 +247,7 @@ test("CB-D169 提案が承認待ちから無くなったら（承認・取り下
   }
 });
 
-test("CB-D170 読み込めなければ理由と再読込、読み込み中は一言だけ。中身が届けば図を出す", async () => {
+test("CB-D175 読み込めなければ理由と再読込、読み込み中は一言だけ。中身が届けば図を出す", async () => {
   const dom = await openWorkflowData({ kind: "error", error: "ccnavi --plan-order が失敗しました: 親の提案が無い" });
   try {
     assert.match(dom.one(".load-error").textContent ?? "", /親の提案が無い/);
@@ -263,7 +263,7 @@ test("CB-D170 読み込めなければ理由と再読込、読み込み中は一
   }
 });
 
-test("CB-D171 未保存のまま閉じた画面から戻した線（draft）があれば、開いてすぐその線で答えを頼む", async () => {
+test("CB-D176 未保存のまま閉じた画面から戻した線（draft）があれば、開いてすぐその線で答えを頼む", async () => {
   const draft = { plan: { "1": [], "2": [1, 3], "3": [1], "4": [2] } };
   const dom = await openWorkflow({ draft });
   try {
@@ -276,7 +276,7 @@ test("CB-D171 未保存のまま閉じた画面から戻した線（draft）が�
   }
 });
 
-test("CB-D172 改版で子が承認された番号は、入る線に × を出さない（変えられない）。点に印を付ける", async () => {
+test("CB-D177 改版で子が承認された番号は、入る線に × を出さない（変えられない）。点に印を付ける", async () => {
   const dom = await openWorkflow({ answer: planOrderSample("revision") });
   try {
     assert.equal(dom.one('.plan-node[data-number="1"]').getAttribute("data-locked"), "1");
@@ -288,7 +288,7 @@ test("CB-D172 改版で子が承認された番号は、入る線に × を出�
   }
 });
 
-test("CB-D173 並べ直すと、今の線で置き場所を組み直す（番号は変えない）", async () => {
+test("CB-D178 並べ直すと、今の線で置き場所を組み直す（番号は変えない）", async () => {
   const dom = await openWorkflow();
   try {
     const { seq } = removeEdge(dom, "after-1-3");
@@ -315,7 +315,7 @@ async function walkTour(dom: DomPage): Promise<string[]> {
   return titles;
 }
 
-test("CB-D177 拡張ホストが頼んだらタブの案内を出し、最後まで進めると閉じて tourDone を返す。ヘッダ右上の ? からもう一度出せる", async () => {
+test("CB-D182 拡張ホストが頼んだらタブの案内を出し、最後まで進めると閉じて tourDone を返す。ヘッダ右上の ? からもう一度出せる", async () => {
   const dom = await openWorkflow();
   try {
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
@@ -341,7 +341,7 @@ test("CB-D177 拡張ホストが頼んだらタブの案内を出し、最後ま
   }
 });
 
-test("CB-D178 図を出せない答え（計画が空）では、案内の間だけ見本の計画（実行ファイルの答えの実例）を読むだけで出し、閉じたら消す", async () => {
+test("CB-D183 図を出せない答え（計画が空）では、案内の間だけ見本の計画（実行ファイルの答えの実例）を読むだけで出し、閉じたら消す", async () => {
   const empty = { ...planOrderSample("open"), plans: [] };
   const dom = await openWorkflow({ answer: empty });
   try {
@@ -367,7 +367,7 @@ test("CB-D178 図を出せない答え（計画が空）では、案内の間だ
   }
 });
 
-test("CB-D181 線を変えたら、答えを待つ間も拡張ホストに「確かめている」を知らせる（承認を止める）。答えが届けば、答えの未保存だけになる", async () => {
+test("CB-D186 線を変えたら、答えを待つ間も拡張ホストに「確かめている」を知らせる（承認を止める）。答えが届けば、答えの未保存だけになる", async () => {
   const dom = await openWorkflow();
   try {
     const { seq } = removeEdge(dom, "after-1-3");

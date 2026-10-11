@@ -152,7 +152,7 @@ WORKFLOW_DAG = "dag"
 @dataclass
 class Workflow:
     """計画の待ち方。承認済みチケット（と提案）の計画の項の `after` から、`workflow.compute` が
-    都度計算する（設計 9.7）。ファイルにもチケットの欄にも持たない。
+    都度計算する。ファイルにもチケットの欄にも持たない。
 
     `waits` は番号 → 待つ番号（推移的に辿った全部。番号の小さい順）、`review_at` は延期した
     番号 → 引き受ける番号。全体計画もフィードバック計画も入る。`order` はいつも `dag`。
@@ -189,11 +189,11 @@ class Ticket:
     # のような既存のブランチで作業するために使う。承認画面に出し、承認のダイジェストに入る
     # （チケットの全文が入る）。
     branch: str = ""
-    # project は作業のプロジェクト（`projects/` の名前、設計 11.5）。決めるのは提案を
+    # project は作業のプロジェクト（`projects/` の名前）。決めるのは提案を
     # 置いた場所で、`ticket.scan` が入れる（プロジェクトの `wip/proposals/` ならその名前、
     # ワークツリーの中ならその元リポジトリ、ワークスペースの `wip/proposals/` なら空）。
     # 親も子も同じ置き場に並ぶので、継ぐ段は無い。判定は行き先のワークツリーの元リポジトリと
-    # 突き合わせる。
+    # 照合する。
     project: str = ""
     # declared_project は frontmatter にユーザが書いた `project:`。宣言ではなく照合に使う。
     # 置き場と違えば承認しない（approval_checks.project_problems）。`ticket.scan` を通さずに
@@ -201,7 +201,7 @@ class Ticket:
     declared_project: str = ""
     # plan は全体計画（作業のフェーズ定義のリスト）、feedback はフィードバック計画。
     # 親だけが持つ。feedback が None なのは「まだ計画していない」、[] は
-    # 「見たうえで対応なし」。設計 9.7。
+    # 「見たうえで対応なし」。
     plan: list[PlanItem] = field(default_factory=list)
     feedback: list[PlanItem] | None = None
     # workflow は計画の待ち方。計画の項の `after` から `workflow.compute` が計算して入れる
@@ -239,7 +239,7 @@ class Ticket:
     path: str = ""
     # 前の版の承認が書いた記録（`ccnavi_approved`）を持つ古い承認済みチケットにだけある。
     # いまの承認は書かないので、新しい承認済みチケットでは空。
-    # 承認を本物とするのは置き場（設計 9.2）。
+    # 承認を正とするのは置き場。
     approved_at: str = ""
     source_tree: str = ""
     source_path: str = ""

@@ -43,14 +43,15 @@ src/
     render.ts         ボードの入れ物の HTML（外部資源なし、テーマ変数だけ）。中身は画面（React）が作る
     rules-view.ts     ルール管理の拡張ホストと画面の契約（ルールの形 SECTIONS / RuleForm / RulesModel、見せる形 RulesPage / RulesData、押した操作 RulesMessage）
     rules-render.ts   ルール管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
-    rules-doc.ts      rules.yml の読み書き（yaml の Document でコメントを残す）
+    rules-doc.ts      rules.yml の読み書き（yaml の Document でコメントを残す。条件の木 when は元のノードを使い回して書き直す）
+    rules-when.ts     条件の木（when）の形 CondNode と、木の操作・書式の誤り・1 行の要約・図の置き方（yaml も DOM も入れない。画面と読み書きで分け合う）
     risk-view.ts      リスク管理の拡張ホストと画面の契約（配点の形 RiskForm、見せる形 RiskPage / RiskData、押した操作 RiskMessage）
     risk-render.ts    リスク管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     risk-doc.ts       risks.yml の読み書き（同じくコメントを残す）と、組み込みの配点の本文
     phases-view.ts    フェーズ管理の拡張ホストと画面の契約（定義の形 PhasesForm、見せる形 PhasesPage / PhasesData、押した操作 PhasesMessage）
     phases-render.ts  フェーズ管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     phases-doc.ts     phases.yml の読み書き（同じくコメントを残す。読まない順序の欄は名指しするだけで、書き戻しで手を付けない）
-    flow-doc.ts       子のフロー（YAML）の読み書きと編集（知らない欄・種類を落とさない）、雛形、入れ子の段の数え方と注意。正しいかは決めない（描けないときだけ断る）
+    flow-doc.ts       子のフロー（YAML）の読み書きと編集（知らない欄・種類を失わない）、雛形、入れ子の段の数え方と注意。正しいかは決めない（描けないときだけ断る）
     flow-view.ts      フロー編集の拡張ホストと画面の契約（見せる形 FlowPage / FlowData、押した操作 FlowMessage とその形の確認、錠を実行ファイルの答えから引く flowTargetOf、カードのボタンの言葉、エージェントへの依頼のボタンの言葉と依頼の文）
     workflow-view.ts  ワークフロー編集の拡張ホストと画面の契約（見せる形 WorkflowPage / WorkflowData、押した操作 WorkflowMessage とその形の確認、--order の形の確認）と、答えを画面の状態に整える純関数（線を元の番号の先行に戻す、未保存、番号の変わる項、外で変わった差分、保存できない理由）。パネルの決めごとのうち VS Code に触れないもの（無くなった理由、閉じた後に戻すかを聞くか、保存で覚えるハッシュ）も。番号は振り直さない
     workflow-render.ts ワークフロー編集の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
@@ -79,7 +80,7 @@ src/
   webview/            画面（React）。DOM を触る側で、vscode も node も import しない。tsconfig.webview.json で型を見る
     vscode.ts         acquireVsCodeApi の窓口。画面ごとの契約に依存しない（送り口は poster<M>() で作る）
     initial.ts        埋め込みの JSON（最初の 1 枚）を読む。画面ごとの契約に依存しない
-    appearance.ts     見た目の切り替え（body のクラスの付け替え）。5 画面で 1 本
+    appearance.ts     見た目の切り替え（body のクラスの書き換え）。5 画面で 1 本
     Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。案内のある画面（ボード・ルール管理・リスク管理・フェーズ管理・フロー編集・ワークフロー編集）で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。どの画面も同じ位置）で出る
     TargetSelect.tsx  ルール管理とフェーズ管理の、設定の対象を切り替える欄
     Tour.css          Tour.tsx の CSS（吹き出しの案内と見本の帯）。各画面の style.css が @import する
@@ -153,11 +154,13 @@ src/
     rules/style.css   ルール管理画面の CSS の入口
     rules/App.css     App.tsx の CSS（タブ・節・判定の欄・判定を試す・hook の 2 つのタブが共有する表）
     rules/Rule.css    Rule.tsx の CSS（ルール 1 件の行・ツールの選択肢）
+    rules/When.css    When.tsx の CSS（条件の木の図。React Flow の色を --vscode-* に置き換える）
     rules/Judge.css   Judge.tsx の CSS（判定の結果）
     rules/post.ts     ルール管理の送り口。契約に無いものは型で止まる
     rules/main.tsx    ルール管理画面の入口。埋め込みの JSON を読んでマウントする
     rules/App.tsx     帯・ツールバー・3 つのタブ（ルール・判定を試す・hook）と、拡張ホストからのメッセージの受け
-    rules/Rule.tsx    ルール 1 件の行（要約と、開いたときの欄。ツールの選択肢と、ファイルを選ぶ欄）
+    rules/Rule.tsx    ルール 1 件の行（要約と、開いたときの欄。ツールの選択肢と、ファイルを選ぶ欄。「条件の木に変換」）
+    rules/When.tsx    条件の木（when）の図（React Flow）と、選んだノードの操作の欄・誤りの一覧
     rules/Judge.tsx   判定の結果とサンプルの一括判定の表。ここは判定せず、実行ファイルが返した判定を読むだけ
     rules/Hooks.tsx   hook の一覧（表示するだけで書き換えない）
     rules/state.ts    編集中のルール（行ごとの鍵）・開いている行（id で保持する）・開いているタブ
@@ -183,7 +186,7 @@ test/
   helpers/plan-reorder.ts 振り直しの見本の表（リポジトリの tests/fixtures/plan-reorder.json。実行ファイルのテストと共有し、書き換えない）を読み、表の計画を plans の形に並べる
   helpers/jsdom.ts    happy-dom で固まる図の点のドラッグだけを jsdom で動かす（いま使うテストは無い）
   board/              ボード（board, model, approvemodel と、画面を動かす render.dom / board.dom、承認のオーバーレイの計画の図を動かす approval-graph.dom、カードの「ワークフロー」を動かす workflow-card.dom）
-  rules/              ルール管理（rules-doc, hooks, testmodel と、画面を動かす rules.dom。入れ物は rules-render）
+  rules/              ルール管理（rules-doc, rules-when, hooks, testmodel と、画面を動かす rules.dom。入れ物は rules-render）
   risk/               リスク管理（risk-doc と、画面を動かす risk.dom。入れ物は risk-render）
   phases/             フェーズ管理（phases-doc, phases-layer と、画面を動かす phases.dom。入れ物は phases-render）
   projects/           プロジェクト管理（projects と、画面を動かす projects.dom）
@@ -199,7 +202,7 @@ scripts/
   package.sh          vsix の組み立て
 ```
 
-**テストの ID。** 名前の頭に付ける `CB-T…` / `CB-D…` は「落ちたテストを名指しする」ためのもので、README やチケットの記録から参照する。
+**テストの ID。** 名前の頭に付ける `CB-T…` / `CB-D…` は「失敗したテストを名指しする」ためのもので、README やチケットの記録から参照する。
 
 | 何 | 決まり |
 |---|---|

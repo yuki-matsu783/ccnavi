@@ -26,9 +26,9 @@ from ..policy import selfguard
 from ..records import audit, diaglog
 from ..tickets import (
     branchfind,
-    configsync,
     history,
     review,
+    skillsync,
 )
 from . import cli_args, cli_ops, cli_usage, diagnose, lint, plan_order, suggest, version
 
@@ -152,7 +152,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # （preview の `digest`）。`--yes` と一緒に渡す。
     parser.add_argument("--digest", default="")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
-    # 見本をぜんぶ判定に掛ける。tools/check_rules.py と VS Code 拡張が呼ぶ。
+    # 見本をぜんぶ判定に掛ける。scripts/check_rules.py と VS Code 拡張が呼ぶ。
     parser.add_argument("--test-samples", metavar="FILE", default="")
     parser.add_argument("--explain", action="store_true")
     # 記録のローテートと、古い記録・終わったセッションの記録の削除（prune）。ユーザが端末から打つ。
@@ -164,7 +164,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--approved", default=None)
     parser.add_argument("--phases", default=None)
     parser.add_argument("--risk", default=None)
-    # プロジェクトの置き場と、ccnavi ディレクトリ（設計 11）。
+    # プロジェクトの置き場と、ccnavi ディレクトリ。
     parser.add_argument("--projects", default=None)
     parser.add_argument("--project-home", default="")
     # 1 つのプロジェクトのルールファイルを名前で差し替える（<名前>=<パス>）。診断だけ。
@@ -217,7 +217,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--record-writes", default="")
     # 一覧の基点（C1 の親のワークツリー）。渡すと一覧はこのツリーからの相対になり、
     # 置き場の外に書いたら error
-    # （例外は `start` の中で configsync が写したミラーだけ）。
+    # （例外は `start` の中で configsync が写したミラーと、skillsync が写した概念スキルだけ）。
     parser.add_argument("--record-tree", default="")
     # 対話の decide の前半。選択とダイジェストをこのファイルに書くだけで、
     # 何も置かない（state の置き場の
@@ -286,20 +286,20 @@ def _recorded_run(
 ) -> int:
     """`--record-writes <ファイル>` つきの 1 回。書いたパスを集め、終わったら書き出す。
 
-    **書き出す先**は、ワークスペースルートの既定の state の置き場（`logs/state`）の下の `c1/`
+    書き出す先は、ワークスペースルートの既定の state の置き場（`logs/state`）の下の `c1/`
     だけ。`--state` の上書きは見ない（上書きで置き場を動かせば、
     どこへでも書ける経路になる）。行き先・置き場・ルートは行き着く先（リンクを解いたパス、
     大文字小文字をそろえたもの）で比べ、`c1/` までの途中にリンクがあれば断る。書き出しは
     同じディレクトリの一時ファイルから `os.replace` で置き換えるので、行き先にリンクが
     あってもその先は開かない（リンクの行き先は書き換えない。Windows でも同じ）。
 
-    **一覧の形**は 1 行 1 つ、ワークスペースルートからの相対（区切りは "/"）。ルートの外と、
+    一覧の形は 1 行 1 つ、ワークスペースルートからの相対（区切りは "/"）。ルートの外と、
     別のドライブ（Windows）は絶対パスのまま。既定の state の置き場の下（リポジトリに入らない）と
     一覧のファイル自身は載せない。上書きした state の置き場への書き込みは載る（C1 が
     「置き場の外」として止める側）。置き場の外が入っていたら止めるのは C1 で、
     ここは集めて書くだけ。
 
-    **終了コード**: コマンドが落ちても、そこまでに書いたパスで一覧を書く（C1 は落ちた回も
+    終了コード: コマンドが失敗しても、そこまでに書いたパスで一覧を書く（C1 は失敗した回も
     戻すのに一覧を使う）。一覧を書けなければ、コマンドの結果に依らず 1 で終わる
     （C1 はそれを「書いたものが分からない」として扱う）。行き先が断られたときはコマンドを
     走らせずに 1 で終わる。
@@ -367,7 +367,8 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
     C1 がコミットするのは状態だけ。
 
     例外は 2 つ。`ticket start` の中で configsync がミラーしたプロジェクトの
-    `.ccnavi/common/`（`configsync.is_synced_write` が内容で読めるもの）と、`review ready` が
+    `.ccnavi/common/`と skillsync が写した概念スキルの `skills/<概念>/`
+    （どちらも `skillsync.is_synced_write` が内容で読めるもの）と、`review ready` が
     消した途中の作業の置き場（`wip/`）のファイル（消したもの、つまり今は無いものだけ。
     `review.remove_wip` が追跡済みのものだけを消す）。
     """
@@ -389,7 +390,7 @@ def _outside_places(root: str, args: argparse.Namespace, base: str, reals: list[
         if (
             starting
             and cli_args._inside(real, base)
-            and configsync.is_synced_write(conf, root, real)
+            and skillsync.is_synced_write(conf, root, real)
         ):
             continue
         found.append(real)
@@ -460,8 +461,9 @@ def _parsed(
         return version.report(stdout, parser, args.json)
     if not cli_args._one_wrapper_flag_each(stderr, args):
         return EXIT_ERROR
-    # `--docs` に添えたほかの経路のフラグは、黙って無視せずに止める。レイヤーの置き場の差し替えは
-    # この後で落とされ、`--ticket-control` などは設定に重ねられるので、その前に見る。
+    # `--docs` に添えたほかの経路のフラグは、気づかれないまま無視せずに止める。
+    # レイヤーの置き場の差し替えはこの後で無視され、`--ticket-control` などは
+    # 設定に重ねられるので、その前に見る。
     if args.docs:
         refused = cli_args._not_with_docs(args)
         if refused:
@@ -514,9 +516,9 @@ def _parsed(
 
     # ドキュメントの索引を引く経路。payload を読まず、判定も記録もしない。
     # 絞り込みのフラグは `--docs` でだけ読む。ほかの経路で渡されたら止める。このフラグが
-    # 無かったころは argparse が知らないフラグとして止めていたので、落として先へ進めると
+    # 無かったころは argparse が知らないフラグとして止めていたので、無視して先へ進めると
     # `ticket start X --limit 3` のような打ち間違いが通るようになる（`--flow` は診断の中の
-    # 差し替えで、落としても何も動かないので落とすだけにしている）。
+    # 差し替えで、無視しても何も動かないので無視するだけにしている）。
     if not args.docs:
         stray = cli_args._docs_flags_given(args)
         if stray:
@@ -546,7 +548,7 @@ def _parsed(
     conf.integration_branch = args.integration_branch.strip()
 
     # フローの確かめは `--lint` だけが読む。判定にも採点にも影響しないが、ほかの差し替えと同じく
-    # 診断の外では落として言う。診断でも `--lint` でなければ読む先が無いので、そう言って落とす。
+    # 診断の外では無視して言う。診断でも `--lint` でなければ読む先が無いので、そう言って無視する。
     if args.flow:
         if not diagnosing:
             stderr.write(cli_args.DIAGNOSIS_ONLY.format(flag="--flow"))
@@ -575,7 +577,7 @@ def _parsed(
 
     # 診断の経路。どちらも payload を読まず、判定を実行にも記録にも繋げない。
     # ユーザが端末から打って「このルールは何に当たるのか」を確かめるための場所で、
-    # 判定そのものは実運用と同じ関数を通る（REQ-DIA-03）。
+    # 判定そのものは実運用と同じ関数を通る。
     if args.test is not None:
         if args.json:
             return diagnose.test_json(stdout, stderr, conf, root, args.test[0], args.test[1])
@@ -636,7 +638,7 @@ def _parsed(
             stderr.write("ccnavi: --verify は --agree --preview と一緒に使う\n")
             return EXIT_ERROR
         # 承認できる状態かを確かめるだけ。置かないのは `--preview` と同じで、違うのは
-        # 通るかどうかを終了コードで返すところ（REQ-APV-13）。答えは 0（はい）と
+        # 通るかどうかを終了コードで返すところ。答えは 0（はい）と
         # 3（いいえ）で、使い方と設定の誤りの 1 とは分ける。
         if args.verify:
             return core.verify(stdout, stderr, conf, root, args.json, list(args.command))
@@ -673,7 +675,7 @@ def _parsed(
     # 取り込みの sh（`ccnavi-sync.sh`）がパスを聞く経路。読むだけで、チケット制御の有無に依らない。
     if list(args.command) == ["sync", "paths"]:
         return EXIT_OK if cli_ops.sync_paths(stdout, root, conf) == 0 else EXIT_ERROR
-    # 取り込みの後の検査（本物とする側とレイヤーの食い違い）。
+    # 取り込みの後の検査（正とする側とレイヤーの食い違い）。
     # error があれば sh が親子のチケットの取り込みを止める。
     if len(args.command) in (3, 4) and list(args.command[:2]) == ["sync", "check"]:
         repo = args.command[3] if len(args.command) == 4 else None

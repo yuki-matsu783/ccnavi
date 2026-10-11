@@ -129,7 +129,7 @@ class ResumedReviewWarnTest(PhaseHarness):
             file_path=os.path.join(child, "wip", "design", "x.md"),
         )
         self.assertNotIn("DENY", self.reason(result))
-        # lint は warn だけで、終了コードを落とさない
+        # lint は warn だけで、終了コードを失敗にしない
         warned = self.ccnavi("--lint")
         self.assertIn(MARKER_WORDS, warned.stdout)
         self.assertEqual(warned.returncode, 0, warned.stdout)

@@ -5,8 +5,8 @@
  * （`PhasesData`）だけで、画面が返すのはユーザが押した操作（`PhasesMessage`）だけ。画面は定義の意味を
  * 判定しない（子の範囲が上限に収まるか、レビューが要るかは実行ファイルが出す）。
  *
- * **定義の形（`PHASE_KINDS`・`PhaseForm` など）もここに置く。** 読み書き（`phases-doc.ts`）の側に
- * 置いたままだと、画面がそこから `yaml` を辿ることになり、バンドルしたものに YAML の解析器が丸ごと入る。
+ * 定義の形（`PHASE_KINDS`・`PhaseForm` など）もここに置く。 読み書き（`phases-doc.ts`）の側に
+ * 置いたままだと、画面がそこから `yaml` を辿ることになり、バンドルしたものに YAML の解析器がすべて入る。
  * 同じ理由で、ここには VS Code の API も DOM も node も入れない。
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、

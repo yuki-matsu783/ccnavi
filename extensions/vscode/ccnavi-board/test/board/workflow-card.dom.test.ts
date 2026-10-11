@@ -49,7 +49,7 @@ function cardOf(json: BoardJson, id: string): Card {
   throw new Error(`カードが無い: ${id}`);
 }
 
-test("CB-D180 カードの workflow は、計画を持つ承認待ちの親の提案（新規も改版も）だけ真。承認済みだけの親・計画の無い親・子・古い実行ファイル（has_plan が無い）は偽", () => {
+test("CB-D185 カードの workflow は、計画を持つ承認待ちの親の提案（新規も改版も）だけ真。承認済みだけの親・計画の無い親・子・古い実行ファイル（has_plan が無い）は偽", () => {
   const json = withParents();
   assert.equal(cardOf(json, "i0002").workflow, true);
   assert.equal(cardOf(json, "i0001").workflow, true, "改版の提案");
@@ -69,7 +69,7 @@ test("CB-D180 カードの workflow は、計画を持つ承認待ちの親の�
   assert.equal(cardOf(stripped, "i0002").workflow, false);
 });
 
-test("CB-D179 計画を持つ承認待ちの親の提案のカードに「ワークフロー」を出し、押すと親の識別子だけを返す（カードのファイルは開かない）", async () => {
+test("CB-D184 計画を持つ承認待ちの親の提案のカードに「ワークフロー」を出し、押すと親の識別子だけを返す（カードのファイルは開かない）", async () => {
   const dom = await openBoard(withParents());
   try {
     assert.deepEqual(

@@ -63,6 +63,34 @@ allow:
   `^{root}[\\/]`。絶対パスを直書きしない
 - `{!root}` は「ワークスペースルートの外」。`{root}` と性質が違うので、下の節を読んでから書く
 - `regex` は先読み・後読み・後方参照が使えない。組み合わせ爆発を起こす書き方をしない（hook が期限切れで素通りする）
+- 「A だが B は除く」は `except:` で書く。1 本の regex に詰めると 1 文字ずつの場合分けになり、読んで確かめられない。
+  値は `- glob: '...'` か `- regex: '...'` を並べたリストで、本体に当たっても、どれかに当たれば当たらない。
+  各パターンは本体と同じ読み方（`{root}`・`{!root}`・大文字小文字・先読みの禁止）。
+  空のリスト・`glob` と `regex` の両方・知らないキーは **error** でルールごと読まれない。
+  当てるのは本体と同じ文字列で、`Bash` ならコマンド列の全体。除く語をどこかに足すだけで外れるので、
+  `Bash` / `PowerShell` の `deny` / `ask` に付けると **warn**。付けるなら語の位置まで狭く書く
+- 「A か B」「A かつ B」は `glob` / `regex` の代わりに `when:` で条件の木として書く。ルールに書けるのは
+  `glob` / `regex` / `when` のどれか 1 つ。ノードは `glob: '...'` / `regex: '...'`（葉。本体と同じ読み方）、
+  `all: [ノード, ...]`、`any: [ノード, ...]`、`not: ノード` のどれか 1 つのキーだけを持つ。`except:` と併せて書ける。
+  知らないキー・キーが 0 個か 2 個以上のノード・空のリスト・型違い・入れ子 8 段超え・ノード 64 個超えは
+  **error** でルールごと読まれない。何にでも当たる・何にも当たらないノード（`not: {glob: '*'}`、`any` の中の `glob: '*'`）と、
+  `Bash` / `PowerShell` の `deny` / `ask` で `not` を使った木は **warn**（`not` はコマンドのどこかに語を足すだけで外れる）
+
+  ```yaml
+  - id: secrets
+    match: Write|Edit
+    when:
+      any:
+        - glob: '*.pem'
+        - all:
+            - glob: '*/secrets/*'
+            - not: {glob: '*.md'}
+    message: ...
+  ```
+
+- `except` と `when` のどちらを使うか。「本体に当たっても、ここは除く」だけなら `except`（並んだ除外を読むだけで意味が取れる。
+  `workspace-root` がこの形）。「A か B」「A かつ B」、除外の中にさらに例外がある形のように、組み合わせが要るときだけ `when`。
+  同じことを 1 本の regex の選択肢や場合分けで書きたくなったら、まず `when` に分けられないかを考える
 - 大文字小文字は `glob` も `regex` も区別せずに当たる（コマンド名も）。区別が要る部分だけ `(?-i:...)` で囲む。
   パスの文字を除外する否定（`\.[^c\\/]` など）は囲む。囲まないと大文字の側まで除外され、当たる範囲が変わる
 - `match` に書けるのは、判定が対象を取り出せるツールだけ。`Bash` `PowerShell`（コマンド）、
@@ -91,7 +119,8 @@ Bash は実行される部分に当たる。`$( )` の中や `&&` の先も 1 �
 `projects/` の外の参照用ツリー、他ツールの一時出力先まで一度に塞がる。
 
 - `match` を絞る。「外への書き込みを止める」なら `Write|Edit|NotebookEdit` にして `Read` は残す
-- 例外が要るなら `{!root}` は向いていない（例外を彫れない）。場所を名指しするルールにする
+- 例外が要るなら `except:` で除く（`except: [{regex: '^{!root}.*[\\/]tmp[\\/]'}]` のように、除く側にも `{!root}` が書ける）。
+  除く場所が多いなら、場所を名指しするルールにする
 
 ルートが 256 字以上の機械では組み立てられず、そのルールが見るツールが全部止まる。回復はユーザが
 `rules.yml` から外すことだけで、エージェントには外せない。`--lint` が error で名指しする。
@@ -122,7 +151,7 @@ phases:
   research:
     kind: work                  # work は全体計画に、feedback はフィードバック計画にだけ置ける
     title: 調査                 # id と title はどちらも一意
-    review: none                # none | mr。既定であって上限ではない（計画の項で mr に強められる）
+    review: none                # none | chat | mr。既定であって上限ではない（計画の項で mr に強められる）。chat はこのセッションでユーザが見る（マージリクエストは作らない）
     scope: ["wip/research/*"]   # 子が宣言できる範囲の上限。inherit なら親の範囲そのまま
     deliverables: ["wip/research/summary.md"]   # 閉じる前に親のワークツリーに在って追跡されているべきもの
     when: 既存の振る舞いや依存が分からないとき   # 案内。次のフェーズを促す文に出る
@@ -140,7 +169,7 @@ phases:
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
-    review: mr                  # feedback に none は書けない（chat か mr）
+    review: mr                  # feedback は chat か mr（none は書けない）
     scope: inherit
     when: フィードバック計画の最後に置き、ほかの対応を受ける
 ```
@@ -157,6 +186,8 @@ phases:
   並行させたいかは計画ごとに、親の計画の項の `after` で書く（線を引かない項は並行する）。一緒に置くべき定義の組は `when` に書く
 - `scope` と `deliverables` はそれぞれ 20 件まで
 - `feedback` のフェーズ定義に `review: none` は書けない
+- 小さい作業を親 1 本・子 1 本で回すなら、`review: chat`・`scope: inherit` の定義（例: `quick`）を 1 つ置き、親は `plan: [quick]`・`feedback: []` にする
+  （親の `phases:` は `--fill-phases` で差し込む。手順は docs/design/tickets/phases.md の「小さい作業」）
 - `when` と `agent` は判定に使われない案内。`when` は「次は X の計画です（定義の案内: …）」の
   形でモデルに届くので、そのフェーズ定義を飛ばしてよい条件まで書く
 
@@ -186,7 +217,7 @@ factors:
 
 | 加点条件 | 何を数えるか | 決めるときに考えること |
 |---|---|---|
-| `lines_over` / `files_over` / `deleted_over` | 差分の行数・ファイル数・消したファイル数が基準を超えたら加点 | 基準はこのプロジェクトの普通の子の大きさで決める。`ccnavi-git.sh log --shortstat` で最近の差分を見る |
+| `lines_over` / `files_over` / `deleted_over` | 差分の行数・ファイル数・消したファイル数が基準を超えたら加点 | 基準はこのプロジェクトの普通の子の大きさで決める。`ccnavi-git.sh log --shortstat` で最近の差分を見る。生成物やロックファイルが差分を膨らませるなら `exclude: ["*.lock"]` のように外し、一部のディレクトリだけ測るなら `include: ["src/**"]` を書く（どちらも既定は無指定＝全パス。`exclude` は `include` に当たっていても外す。バイナリは行数 0）。`*` は `/` をまたぐので `*.lock` は下の階層の `x.lock` にも当たる。`**/*.lock` はルート直下の `x.lock` に当たらない。末尾が `/` の glob はディレクトリ（`src/` は `src/**`）。`include` にワイルドカードの無い名前（`src`）を書くとそのファイルにしか当たらず点が 0 になるので、lint が warn する。rename は元のパスも見る（`include` は旧新どちらか、`exclude` は両方に当たったときだけ外す） |
 | `glob` | 当たったファイルごとに加点。`max` で上限 | 触ったらユーザが見るべき場所（CI、移行、`.claude/`）。ワークツリーのルートからの相対。`` が使える |
 | `script` | レイヤーの `scripts/` の下の sh（共通レイヤーは `.ccnavi/common/scripts/`（プロジェクトの `.ccnavi/common/` のミラーも同じ表記）、自身のレイヤーとプロジェクトのレイヤーは `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子のワークツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は重いほうとして扱われ、`points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
 | `judge` | 問いの文。親がサブエージェントに差分を読ませ、`ccnavi-ticket.sh record-risk <子> <項目> yes\|no --reason` で記録。揃うまで子は閉じられない | 差分を読んで yes / no で答えられる問いにする。「品質は十分か」は答えられない |

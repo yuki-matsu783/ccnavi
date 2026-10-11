@@ -61,7 +61,7 @@ function edgeIds(dom: DomPage, part: string): string[] {
     .sort();
 }
 
-test("CB-D155 計画を持つ親があれば、本文の上に計画ごとの図を読むだけで出す。start・end の仮の点、延期の引き受け手、固定した番号、終端に当たらない項、すぐ始まる項、順序の検査の理由は実行ファイルの答えのまま", async () => {
+test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図を読むだけで出す。start・end の仮の点、延期の引き受け手、固定した番号、終端に当たらない項、すぐ始まる項、順序の検査の理由は実行ファイルの答えのまま", async () => {
   const dom = await openOverlay(samplePlans());
   try {
     const graphs = dom.all(".approval .plan-graph");
@@ -123,7 +123,7 @@ test("CB-D155 計画を持つ親があれば、本文の上に計画ごとの図
   }
 });
 
-test("CB-D156 図は読むだけ。線を引く取っ手も、点のドラッグも、選ぶことも無く、点を押しても何も送らない", async () => {
+test("CB-D161 図は読むだけ。線を引く取っ手も、点のドラッグも、選ぶことも無く、点を押しても何も送らない", async () => {
   const dom = await openOverlay(samplePlans());
   try {
     assert.ok(dom.all(".plan-graph .react-flow__handle").length > 0, "線の端を留める取っ手が無い（点が描けていない）");
@@ -143,7 +143,7 @@ test("CB-D156 図は読むだけ。線を引く取っ手も、点のドラッグ
   }
 });
 
-test("CB-D157 plans が無い・空なら図を出さない。見本の preview（実行ファイルの出力）の plans は、その項と線のまま描く", async () => {
+test("CB-D162 plans が無い・空なら図を出さない。見本の preview（実行ファイルの出力）の plans は、その項と線のまま描く", async () => {
   const none = await openOverlay([]);
   try {
     assert.equal(none.all(".plan-graph, .plan-graphs").length, 0);
@@ -165,7 +165,7 @@ test("CB-D157 plans が無い・空なら図を出さない。見本の preview�
   }
 });
 
-test("CB-D158 振り直しの見本の表の計画（振り直す前と後）を、plans どおりの線で描く", async () => {
+test("CB-D163 振り直しの見本の表の計画（振り直す前と後）を、plans どおりの線で描く", async () => {
   const cases = reorderCases().filter((c) => c.expect !== undefined && (c.name.includes("逆向き") || c.name.includes("フィードバック計画")));
   assert.equal(cases.length, 2, "見本の表から使う 2 件が見つからない");
   for (const c of cases) {
@@ -192,7 +192,7 @@ test("CB-D158 振り直しの見本の表の計画（振り直す前と後）を
   }
 });
 
-test("CB-D159 図のある親ごとに「ワークフローを編集」を出す。押すと親の識別子を送る（閉じてタブを開くのは拡張ホスト）。承認中は出さない", async () => {
+test("CB-D164 図のある親ごとに「ワークフローを編集」を出す。押すと親の識別子を送る（閉じてタブを開くのは拡張ホスト）。承認中は出さない", async () => {
   const dom = await openOverlay(samplePlans());
   try {
     // 親 1 つに全体計画とフィードバック計画の 2 つの図。入口は親ごとに 1 つ、その親の図の前
@@ -222,7 +222,7 @@ test("CB-D159 図のある親ごとに「ワークフローを編集」を出す
   }
 });
 
-test("CB-D175 ワークフロー編集タブに未保存の変更がある親を含む一覧は、その親の図の上に理由を出し、承認のボタンを押せなくする。外れたら押せる", async () => {
+test("CB-D180 ワークフロー編集タブに未保存の変更がある親を含む一覧は、その親の図の上に理由を出し、承認のボタンを押せなくする。外れたら押せる", async () => {
   const dom = await openBoard(fixture(), { approval: { kind: "preview", preview: preview(samplePlans()) }, measure: true, unsaved: ["i0001"] });
   try {
     await dom.settle();
@@ -253,7 +253,7 @@ test("CB-D175 ワークフロー編集タブに未保存の変更がある親を
   }
 });
 
-test("CB-D176 タブで保存したあとに提案が変わった親（拡張ホストが見つけた）は、その親の図の上に注意を出す。承認は止めない", async () => {
+test("CB-D181 タブで保存したあとに提案が変わった親（拡張ホストが見つけた）は、その親の図の上に注意を出す。承認は止めない", async () => {
   const dom = await openBoard(fixture(), { approval: { kind: "preview", preview: preview(samplePlans()), changedSinceSave: ["i0001"] }, measure: true });
   try {
     await dom.settle();
@@ -282,7 +282,7 @@ function viewportOf(dom: DomPage, part: string): { x: number; y: number; zoom: n
   return { x: Number(found[1]), y: Number(found[2]), zoom: Number(found[3]) };
 }
 
-test("CB-D160 大きな計画でも、開いた最初の図は縮めすぎない（文字が読める倍率の下限で止め、はみ出す分はパンで見せる）。そのとき左端の開始が見える。小さな計画は等倍より大きくしない", async () => {
+test("CB-D165 大きな計画でも、開いた最初の図は縮めすぎない（文字が読める倍率の下限で止め、はみ出す分はパンで見せる）。そのとき左端の開始が見える。小さな計画は等倍より大きくしない", async () => {
   const chain: RawItem[] = ["research", ...Array.from({ length: 59 }, (_, i) => ({ type: "implement", after: [i + 1] }))];
   const big = await openOverlay(plansOf(chain, undefined));
   try {
@@ -305,7 +305,7 @@ test("CB-D160 大きな計画でも、開いた最初の図は縮めすぎない
   }
 });
 
-test("CB-T336 ボードの CSS は図の部品の CSS（React Flow と、その色を VS Code のテーマ変数に置き換える規則）を持つ", () => {
+test("CB-T362 ボードの CSS は図の部品の CSS（React Flow と、その色を VS Code のテーマ変数に置き換える規則）を持つ", () => {
   const style = screenStyle("board");
   assert.ok(style.includes(".react-flow"), "React Flow の CSS が入っていない");
   assert.match(style, /\.plan-graph \.react-flow \{[^}]*--xy-background-color-default: var\(--vscode-editor-background\)/);

@@ -126,7 +126,7 @@ class RotateTest(_Base):
 
     def test_tiny_and_non_finite_values_fall_back(self):
         # 0 に近づけるだけで保持日数のうちの記録を消せないよう、0 のほかは下限を置く。
-        # 有限でない値は、ローテートの大きさを整数にするところで落ちる。
+        # 有限でない値は、ローテートの大きさを整数にするところで失敗する。
         for env, default in prune.LIMITS:
             for raw in ("0.001", "0.5", "inf", "-inf", "nan", "1e400"):
                 with self.subTest(env=env, raw=raw):
@@ -238,7 +238,7 @@ class StatePruneTest(_Base):
             self.assertTrue(os.path.exists(path), path)
 
     def test_leftover_temporary_file_goes_with_its_session(self):
-        """落ちて残った `.once-<セッション>-….part.json` も、そのセッションと一緒に消える。"""
+        """失敗して残った `.once-<セッション>-….part.json` も、そのセッションと一緒に消える。"""
         doomed = self.session_files(S_OLD, 20)
         leftover = _write(
             os.path.join(self.state, f".once-{S_OLD}-main.abc12345.part.json"), age_days=20

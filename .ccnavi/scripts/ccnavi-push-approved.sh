@@ -5,7 +5,7 @@
 #
 #   sh .ccnavi/scripts/ccnavi-push-approved.sh [<親>...]
 #
-# 承認はしない。承認済みチケットは置かれただけでは他の機械に届かない（設計 9.2）ので、置いたあとに
+# 承認はしない。承認済みチケットは置かれただけでは他の機械に届かないので、置いたあとに
 # コミットして push するのがこの sh。端末の承認は ccnavi-agree.sh が、ボードの承認とフローの保存は端末に送った 1 行が、
 # ユーザの判断の入口（ccnavi-review.sh chat・close-early）が、それぞれ最後にこの sh を呼ぶ。
 # ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、この sh の打ち直しを案内する。
@@ -14,8 +14,8 @@
 # 取り込み済みの親子のチケット（origin があり、親子のチケットの取り込み状態が present。chat だけのものを除く）のワークツリーは、
 # C1 と同じ手順でコミットして push する。取り込んでから送るので、Chrome での承認と重なっても push が拒まれにくい。
 # 手順は、ロック（C1 の中からの入れ子を許す）→ 途中の操作の確認 → 取り込み（ccnavi-sync.sh）→
-# 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案と、取り込んで消えた flows/ の下書き）を commit --only → push → 落ちたように見えたら届いたかを ls-remote で確かめる。
-# push が落ちてもコミットは残す（ユーザが打ち直せる）。取り込み済みかは実行ファイル（`c1 family`）に聞く。
+# 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案と、取り込んで消えた flows/ の下書き）を commit --only → push → 失敗したように見えたら届いたかを ls-remote で確かめる。
+# push が失敗してもコミットは残す（ユーザが打ち直せる）。取り込み済みかは実行ファイル（`c1 family`）に聞く。
 # 答えない実行ファイルで親子のチケットの取り込み状態があれば、コミットせずに止める。
 #
 # <親> を並べると、その親子のチケットだけをコミットして push する。取り込み済みでない親子のチケットは
@@ -35,10 +35,10 @@
 # - ブランチの上に居ない（detached）ツリーは名指しして処理しない。失敗には数えない
 # - main / master / develop / release / release/* と、そのリポジトリの統合先（ccnavi-common-state.sh の
 #   ccnavi_integration。決まらなければ固定のリストだけ）はコミットだけして push しない
-# - 1 本のツリーで add・commit・push が落ちても、他のツリーはコミットして push する
+# - 1 本のツリーで add・commit・push が失敗しても、他のツリーはコミットして push する
 #
 # 終了コード: 0 コミットするものが無い・全部コミットした（push しなかったブランチ、処理しなかったツリーを含む） /
-#           1 ステージかコミットできなかったツリーか、push が落ちたツリーが 1 つ以上ある /
+#           1 ステージかコミットできなかったツリーか、push が失敗したツリーが 1 つ以上ある /
 #           2 引数の誤り・ワークスペースルートが見つからない・一時ファイルが作れない
 
 set -eu
@@ -77,11 +77,11 @@ root=$(ccnavi_workspace) || {
 approved=.ccnavi/approved # 固定
 proposals=wip/proposals   # 固定
 projects=projects         # 固定
-# 末尾の / を落とす。`[ -L "projects/" ]` はリンクを辿って偽になる。
+# 末尾の / を除く。`[ -L "projects/" ]` はリンクを辿って偽になる。
 approved="${approved%/}"
 proposals="${proposals%/}"
 projects="${projects%/}"
-# 落として空になるパス（`/`）と `.` は、ワークスペースルートそのものを指す。置き場なら
+# 除いて空になるパス（`/`）と `.` は、ワークスペースルートそのものを指す。置き場なら
 # ルートの直下を全部ツリーとして数え、承認済みチケットの置き場ならツリー全体をコミットする。
 # どちらも頼まれた置き場ではないので、既定に戻す。
 case "$approved" in
@@ -94,7 +94,7 @@ case "$projects" in
 "" | .) projects="projects" ;;
 esac
 # ボードのフロー編集画面が保存の途中で置く一時ファイル（flows/ の下の `.<名前>.<番号>.tmp`）。
-# 落ちて残ってもコミットしない。書きかけの中身をユーザの手順書としてコミットしないため。
+# 失敗して残ってもコミットしない。書きかけの中身をユーザの手順書としてコミットしないため。
 skip_temp=":(exclude)$approved/flows/.*.tmp"
 
 # ツリーごとの結果を subshell (while はパイプの右側なので別プロセス) の外へ持ち出すための一時ファイル。
@@ -134,7 +134,7 @@ carry_paths() {
 		"$ccnavi_c1_tmp/carry-all" >"$ccnavi_c1_tmp/carry" || :
 }
 
-# 取り込み済みの親子のチケット 1 つをコミットして push する。ccnavi_c1_family を済ませた後に呼ぶ。0 送った（push するものが無いを含む）/ 1 落ちた
+# 取り込み済みの親子のチケット 1 つをコミットして push する。ccnavi_c1_family を済ませた後に呼ぶ。0 送った（push するものが無いを含む）/ 1 失敗した
 #
 # 取り込み状態の鍵とロックは識別子（ccnavi_c1_family_id）、ref・push・ls-remote と取り込み状態の branch は
 # 親のブランチ名（ccnavi_c1_branch。親チケットの branch:、無ければ識別子）。
@@ -207,7 +207,7 @@ carry_family() {
 		ccnavi_lock_drop
 		return 0
 	fi
-	# 落ちてもコミットは残す（ユーザが打ち直せる）。C1 は未送信を見つけて止まり、これを打ち直すよう言う。
+	# 失敗してもコミットは残す（ユーザが打ち直せる）。C1 は未送信を見つけて止まり、これを打ち直すよう言う。
 	printf 'ccnavi-push-approved: %s の push が通らなかった（%s）。コミットは残した。接続を戻して sh %s/ccnavi-push-approved.sh %s を打ち直してください。\n' \
 		"$cf_p" "$(head -n 1 "$ccnavi_c1_tmp/push-err" 2>/dev/null)" "$(dirname "$0")" "$cf_p" >&2
 	ccnavi_lock_drop
@@ -272,7 +272,7 @@ for place in "$projects" ".claude/worktrees"; do
 				"$place/$(basename "$dir")" >&2
 			continue
 		fi
-		# glob が何にも当たらなければパターンがそのまま残るので、-d で落とす。
+		# glob が何にも当たらなければパターンがそのまま残るので、-d で除く。
 		[ -d "$dir" ] || continue
 		trees="$trees
 $dir"
@@ -340,7 +340,7 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 	}
 	# 承認で todo/ から消えた提案。追跡されていたものの削除だけを入れる（`ls-files --deleted`）。
 	# 未追跡の下書きも、編集中の提案も入れない。消えたものが無ければ pathspec にも足さない
-	# （git に知られていないパスを pathspec に並べると commit が落ちる）。
+	# （git に知られていないパスを pathspec に並べると commit が失敗する）。
 	gone=$(git -C "$tree" ls-files --deleted -z -- "$proposals/todo" 2>/dev/null | tr '\000' '\n' || :)
 	scope="$approved"
 	if [ -n "$gone" ]; then
@@ -384,7 +384,7 @@ $(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
 		continue
 	fi
 
-	# push は落ちても巻き戻さない。コミットは残るので、ユーザがもう一度送れる。
+	# push は失敗しても巻き戻さない。コミットは残るので、ユーザがもう一度送れる。
 	if git -C "$tree" push --quiet -u origin "$branch" 2>/dev/null; then
 		printf '承認済みチケットを %s へ送った（%s）。\n' "$branch" "$name"
 	else

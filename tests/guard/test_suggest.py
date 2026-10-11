@@ -119,7 +119,7 @@ class SuggestTest(unittest.TestCase):
         self.assertTrue(all(s["subject"].startswith("/repo/docs/") for s in found["samples"]))
 
     def test_candidates_that_fail_the_samples_are_dropped(self):
-        """いまのルールで ask にならない形（deny に当たる）は、検証で落として数だけ言う。"""
+        """いまのルールで ask にならない形（deny に当たる）は、検証で除いて数だけ言う。"""
         self._write("decisions.jsonl", [_handover("Bash", "git push --force") for _ in range(5)])
         body = self._json()
         self.assertEqual([], body["candidates"])

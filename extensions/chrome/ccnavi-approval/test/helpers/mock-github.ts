@@ -71,7 +71,7 @@ export class MockGitHub {
   expiration = "";
   /** createCommitOnBranch を受けたとき、比べる前に 1 度だけ呼ぶ（割り込みの書き手） */
   beforeCommit: ((branch: string) => void) | null = null;
-  /** 書いた後の応答を 502 にする（応答だけが落ちた形） */
+  /** 書いた後の応答を 502 にする（応答だけが失敗した形） */
   loseCommitResponse = false;
   /** 本文を返さない（バイナリとして返す）blob の sha */
   readonly binaryBlobs = new Set<string>();
@@ -83,7 +83,7 @@ export class MockGitHub {
   readonly limits: { match: RegExp; status: number; headers: Record<string, string>; graphql?: boolean }[] = [];
   /** 要求を受けるたびに呼ぶ（試験が割り込みの書き手を作る） */
   onRequest: ((method: string, url: URL) => void) | null = null;
-  /** コミットの変更の一覧（`GET /commits/<sha>` の files）を切る件数（本物は 300） */
+  /** コミットの変更の一覧（`GET /commits/<sha>` の files）を切る件数（実物は 300） */
   filesLimit = 300;
   /** 付けた見本（ブランチ → 場面）。その MR・スレッド・レビューを見本のとおりに返す */
   readonly scenes = new Map<string, Scene>();
@@ -226,7 +226,7 @@ export class MockGitHub {
     return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   }
 
-  /** コミットの変更の一覧。消えたファイルと同じ中身で足されたファイルは renamed（本物の rename 検出にそろえる） */
+  /** コミットの変更の一覧。消えたファイルと同じ中身で足されたファイルは renamed（実際の rename 検出にそろえる） */
   protected changed(c: Commit): { filename: string; status: string; previous_filename?: string }[] {
     const before = this.commits.get(c.parents[0] ?? "")?.files ?? {};
     const added = Object.keys(c.files).filter((p) => !(p in before));
@@ -351,7 +351,7 @@ export class MockGitHub {
   protected graphql(req: { query: string; variables: Record<string, unknown> }): { status: number; json: unknown } {
     const { query, variables } = req;
     if (query.includes("history(first:")) {
-      // 本物の history は first-parent に限らず祖先を日付順に返す。ここでも全部の祖先を返す
+      // 実際の history は first-parent に限らず祖先を日付順に返す。ここでも全部の祖先を返す
       const all = this.ancestors(String(variables.oid)).map((c) => ({ oid: c.sha, parents: { nodes: c.parents.slice(0, 1).map((p) => ({ oid: p })) } }));
       return { status: 200, json: { data: { repository: { object: { history: { nodes: all.slice(0, 100) } } } } } };
     }

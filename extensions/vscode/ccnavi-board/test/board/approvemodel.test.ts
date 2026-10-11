@@ -42,7 +42,7 @@ test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・
   assert.deepEqual(preview.problems, []);
 });
 
-test("CB-T328 承認の preview の plans を読む（計画を持つ親の図の中身。実行ファイルが組んだ番号・先行・終端に当たらない項・すぐ始まる項・延期の引き受け手をそのまま）", () => {
+test("CB-T354 承認の preview の plans を読む（計画を持つ親の図の中身。実行ファイルが組んだ番号・先行・終端に当たらない項・すぐ始まる項・延期の引き受け手をそのまま）", () => {
   const parsed = parseApprovePreview(fixtureText("approve-preview.json"));
   assert.ok(parsed.ok);
   if (!parsed.ok) {
@@ -187,7 +187,7 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
   assert.ok(none.includes("承認済みになったチケットはありません"));
   assert.ok(!none.includes("入っています"));
 
-  // 書けたあとの後始末（マーカーを置く）で落ちたときは、言い方を変える
+  // 書けたあとの後始末（マーカーを置く）で失敗したときは、言い方を変える
   const after = partialMessage({
     placed: ["i0001"],
     ticket: "i0001",

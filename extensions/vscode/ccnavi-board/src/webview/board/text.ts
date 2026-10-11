@@ -8,6 +8,13 @@ import type { HistoryEntryJson } from "../../core/model.js";
 
 export const COPY_LABELS = { none: "未承認", open: "承認済み", review: "レビュー待ち", closed: "クローズ", archived: "アーカイブ済み" } as const;
 
+/** 承認済みチケットの着手の状態。`start` で `started_at` が入るまで、範囲は適用されない */
+export const STARTED_LABELS = { unstarted: "未着手", started: "着手済み" } as const;
+export const STARTED_TITLES = {
+  unstarted: "承認済みですが、まだ start していません。着手の時刻（started_at）が入るまで、チケットの範囲は適用されません",
+  started: "start 済みです。チケットの範囲が適用されています",
+} as const;
+
 /** ツールバーの絞り込みのチェックボックスの言葉 */
 export const FILTER_LABELS = {
   attention: "要対応のみ",
@@ -98,7 +105,7 @@ export function isHttpUrl(url: string): boolean {
  * 承認画面の本文で、見出しの次の 1 行に説明が付く見出し。実行ファイルが置く文面と同じ表記
  * （`src/ccnavi/tickets/agree_screen.py` の `screen`）。番号が付く「課題」だけ前方一致で見る。
  *
- * **まとめるのはこのリストに載っている見出しの次の行だけ。** 知らない見出しなら何もしない。
+ * まとめるのはこのリストに載っている見出しの次の行だけ。 知らない見出しなら何もしない。
  * 向こうの文面が変わったときに、本文の中身が気づかないうちに隠れるより、まとめられないほうが軽いため
  * （「エージェントが書いた理由」の本文を隠してはいけない）。
  */

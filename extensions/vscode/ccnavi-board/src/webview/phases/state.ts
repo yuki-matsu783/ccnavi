@@ -2,7 +2,7 @@
  * フェーズ管理画面が編集中に持つもの。定義のコピー（`Draft`）と、開いている行。
  * 作りはリスク管理（`webview/risk/state.ts`）と同じで、鍵の表記だけ `p1`、`p2`、… と違う。
  *
- * 契約の `PhasesForm` は配列だけを持つが、画面は**行ごとに動かない鍵**が要る（足す・消す・
+ * 契約の `PhasesForm` は配列だけを持つが、画面は行ごとに動かない鍵が要る（足す・消す・
  * 並べ替えの間、React が同じ行を同じ行として描き直せるように）。id はユーザが打つもので、
  * 空にも重複にもなるので鍵には使えない（この画面は重複を保存前に止める）。
  *
@@ -34,7 +34,7 @@ export function draftOf(form: PhasesForm, nextKey: () => string): Draft {
   return { rows: form.phases.map((phase) => ({ key: nextKey(), phase })) };
 }
 
-/** 拡張ホストへ返す形に戻す。鍵は落とす */
+/** 拡張ホストへ返す形に戻す。鍵は除く */
 export function formOf(draft: Draft): PhasesForm {
   return { phases: draft.rows.map((row) => row.phase) };
 }
@@ -49,7 +49,7 @@ export function emptyPhase(): PhaseForm {
 
 /**
  * 同じ id の定義。実行ファイルは後ろで何も出さずに上書きするので、画面で止める。
- * 前後の空白は落として見る（`--lint` が見るのと同じ形）。
+ * 前後の空白は除いて見る（`--lint` が見るのと同じ形）。
  */
 export function duplicates(draft: Draft): ReadonlySet<string> {
   const seen = new Set<string>();

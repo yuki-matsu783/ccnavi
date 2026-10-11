@@ -2,24 +2,26 @@
 自動テストは呼ばない。
 
 tests/ticket/test_ticket.py と同じ形で一時リポジトリを作り、使い捨てのプロジェクトを
-GitLab に作って、`ccnavi-ticket.sh` / `ccnavi-git.sh` / `ccnavi-review.sh` を本物に通す。
+GitLab に作って、`ccnavi-ticket.sh` / `ccnavi-git.sh` / `ccnavi-review.sh` を実物に通す。
 人間役（レビュアー）は別ユーザのトークンで API を直に呼ぶ。
-sh と同じ道具を使わないほうが、片方の壊れがもう片方に隠れない。
+sh と同じ道具を使わないほうが、片方の不具合がもう片方に隠れない。
 
 ## 用意するもの
 
 - 動いている GitLab（既定 `http://localhost:8929`。`CCNAVI_PROBE_GITLAB` で変える）
-- トークン 2 本。`docker exec -i gitlab gitlab-rails runner - < tools/gitlab/make_gitlab_tokens.rb`
-  が `GITLAB_TOKEN`（root、エージェント役）と `CCNAVI_PROBE_REVIEWER_TOKEN`（人間役）を出す
+- トークン 2 本。
+  `docker exec -i gitlab gitlab-rails runner - < tests/manual/gitlab/make_gitlab_tokens.rb` が
+  `GITLAB_TOKEN`（root、エージェント役）と `CCNAVI_PROBE_REVIEWER_TOKEN`（人間役）を出す
 - 組み立て済みの exe（`dist/ccnavi/ccnavi`）。`CCNAVI_BIN_PATH` で差し替えられる
 - jq と curl（sh が使う）
 
-    GITLAB_TOKEN=... CCNAVI_PROBE_REVIEWER_TOKEN=... uv run python tools/gitlab/probe_gitlab.py
+    GITLAB_TOKEN=... CCNAVI_PROBE_REVIEWER_TOKEN=... \
+        uv run python tests/manual/gitlab/probe_gitlab.py
 
 ## 認証画面を出さない
 
 push は URL にトークンを埋めない（埋めると origin の URL に混ざる）。git のラッパースクリプトは
-`GIT_CONFIG_COUNT` を落とすので環境変数でも差し替えられない。一時リポジトリの
+`GIT_CONFIG_COUNT` を除くので環境変数でも差し替えられない。一時リポジトリの
 `credential.helper` を空文字で一度リセットしてから（system / global の GCM を外す）、
 トークンを返す helper を足す。
 
@@ -27,7 +29,7 @@ push は URL にトークンを埋めない（埋めると origin の URL に混
 
 sh の HTTP 経路（curl・jq・ページング・投稿・認証）と、GitLab が返す JSON の形が sh の読み方と
 合っているか。結果と生の JSON は `CCNAVI_PROBE_OUT`（既定は一時ディレクトリ）に残る。
-変更要求（request_changes）は GitLab EE の機能で、CE では 404 になる。CE ではその段だけ落ちる。
+変更要求（request_changes）は GitLab EE の機能で、CE では 404 になる。CE ではその段だけ失敗する。
 """
 
 from __future__ import annotations
@@ -41,7 +43,9 @@ import time
 import urllib.error
 import urllib.request
 
-ROOT_OF_CCNAVI = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT_OF_CCNAVI = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 REVIEW_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-review.sh")
 GIT_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-git.sh")
 TICKET_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-ticket.sh")
@@ -53,7 +57,7 @@ REVIEWER_TOKEN = os.environ.get("CCNAVI_PROBE_REVIEWER_TOKEN", "")
 if not ROOT_TOKEN or not REVIEWER_TOKEN:
     sys.exit(
         "GITLAB_TOKEN と CCNAVI_PROBE_REVIEWER_TOKEN が要る。"
-        "tools/gitlab/make_gitlab_tokens.rb で作る"
+        "tests/manual/gitlab/make_gitlab_tokens.rb で作る"
     )
 
 
@@ -380,7 +384,7 @@ def main() -> int:
     origin = f"{GITLAB}/root/{project_path}.git"
     git(ROOT, "remote", "add", "origin", origin)
     # 認証は git の設定側に置く。空文字で system / global の helper（GCM）を外し、
-    # 環境変数 GITLAB_TOKEN を返す helper を足す。ラッパースクリプトが落とすのは
+    # 環境変数 GITLAB_TOKEN を返す helper を足す。ラッパースクリプトが除くのは
     # GIT_CONFIG_COUNT だけで、環境変数は helper の sh に届く。トークンをファイルに
     # 書かない（置き去りになる）。
     git(ROOT, "config", "--add", "credential.helper", "")

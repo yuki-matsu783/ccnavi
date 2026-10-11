@@ -30,7 +30,7 @@ from . import ticket as ticket_mod
 def admit(approved_dir: str, ticket: ticket_model.Ticket, source_tree: str) -> str:
     """承認した提案を `doing/` へ動かす。動かせなかった理由を返す。動かせたら空文字。
 
-    **中身は変えない。** 提案をバイト列のまま読み（`fsio.read_bytes`）、同じバイト列を `doing/` に
+    中身は変えない。 提案をバイト列のまま読み（`fsio.read_bytes`）、同じバイト列を `doing/` に
     書いて元を消す。欄を書き足さず、改行も BOM も変えない。端末・ボード・Chrome・手で動かす、の
     どれで承認しても承認済みチケットが提案とバイト単位で同じになるように。消せなければ書いた側を
     消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で止まる。
@@ -46,7 +46,7 @@ def admit(approved_dir: str, ticket: ticket_model.Ticket, source_tree: str) -> s
         failed = fsio.write_bytes_atomic(target, content)
     if failed:
         return f"書けない ({failed})"
-    # 消せなければ書いた側を消して戻す。承認の plan では落ちたときの枝が走らないので、
+    # 消せなければ書いた側を消して戻す。承認の plan では失敗したときの枝が走らないので、
     # 同じ戻し方を Writer(FS) へ渡す。置けたと数えるのは消せたとき。
     with fsio.policy(
         message="提案を todo/ から動かせない ({reason})",
@@ -99,7 +99,7 @@ def carry_flow(
 ) -> list[str]:
     """承認した子のフローを、提案のツリーから承認済みチケットのツリーへ動かす。知らせる行を返す。
 
-    フローの置き場は承認済みチケットと同じツリー（設計 9.3.1）。ユーザは承認の前に、提案が在る
+    フローの置き場は承認済みチケットと同じツリー。ユーザは承認の前に、提案が在る
     ツリーの置き場へボードで保存する。承認で子が別のツリー（親のワークツリーなど）へ動くと、
     フローだけが元のツリーに残り、読まれなくなる（M-3）。承認はユーザの操作なので、ここで一緒に
     動かす。行き先に違う中身のフローが既に在れば上書きせず、そう言う（元のほうも残す）。
@@ -132,10 +132,10 @@ def carry_flow(
             ]
         fsio.remove(source)
         return []
-    # 落ちたときの行は承認の plan でも同じものを出せるよう、書き込みにつける（`FAIL_LINE`）。
+    # 失敗したときの行は承認の plan でも同じものを出せるよう、書き込みにつける（`FAIL_LINE`）。
     cannot = f"{proposal.ticket} のフローを {target} へ移せない ({{reason}})。{source} に残っている"
     with fsio.policy(message=cannot):
-        # 途中で落ちても書きかけを残さない書き方で置く。在るかを確かめてから置くまでの間に
+        # 途中で中断されても書きかけを残さない書き方で置く。在るかを確かめてから置くまでの間に
         # ボードの保存が割り込むと上書きしうるが、書きかけのフローを残すよりよいと採った。
         failed = fsio.write_new_durable(target, raw)
     if failed:
@@ -244,7 +244,7 @@ def next_child_id(conf: settings.Settings, root: str, parent_id: str, phase_no: 
 def existing_ticket_file(conf: settings.Settings, root: str, ident: str) -> str:
     """この識別子のファイルが、どこかの置き場にすでに在ればそのパス。無ければ空。
 
-    読めないファイル（壊れた frontmatter など）も名前で拾う。大文字小文字は区別しない
+    読めないファイル（不正な frontmatter など）も名前で拾う。大文字小文字は区別しない
     （区別しないファイルシステムでは同じファイルになる）。見るのは全ツリーの承認済みの
     `doing/` `done/` と、提案の `todo/` `review/`。
     """
@@ -279,7 +279,7 @@ def followup(
     """レビューで残った指摘の続きの子を、ユーザの判断で `doing/` に直に起こす。
 
     ユーザが端末で「続きの子で直す」と選んだことが承認そのもの。同じフェーズの番号に足すので、
-    そのフェーズは開き直り、マーカーは消える（REQ-TKT-21）。範囲は見た子の範囲の和。
+    そのフェーズは開き直り、マーカーは消える。範囲は見た子の範囲の和。
     本文には指摘を書き写す。返すのは識別子と、起こせなかった理由。
     """
     try:

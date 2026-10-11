@@ -1,38 +1,25 @@
-"""`tools/run_tests.py` が、discover と同じものを回すことの検査。
+"""`python -m tests`（`tests/__main__.py`）が、discover と同じものを回すことの検査。
 
 あの道具は「同じテストを、分けて同時に回す」もの。速くなっても、回る本数が減っていたら
 意味が逆になる。減ったことは失敗として出ないので（回らなかったテストは何も言わない）、
 ここで突き合わせる。
 
-契約は 1 つだけ。**`modules()` が並べたものの和集合が、`unittest discover` が拾う
-モジュールと一致すること。** 並べる順や同時に回す本数は速さの都合なので、契約に入れない。
+契約は 1 つだけ。`modules()` が並べたものの和集合が、`unittest discover` が拾う
+モジュールと一致すること。 並べる順や同時に回す本数は速さの都合なので、契約に入れない。
 
 `tests/fixtures/` を拾わないことを名指しで見るのは、ここが実際に起きやすい穴だから。
 `tests/` の下のディレクトリを名前だけで数えるとグループに見えるが、`__init__.py` が
 無いので discover は飛ばす。道具の側だけが拾うと `unittest tests.fixtures` が
-「importable でない」で落ち、実行全体が失敗になる。
+「importable でない」で失敗し、実行全体が失敗になる。
 """
 
 from __future__ import annotations
 
-import importlib.util
 import os
 import unittest
 
 from tests import ROOT
-
-
-def _load_run_tests():
-    """tools/ はパッケージではないので、名前でなく場所で読む。"""
-    spec = importlib.util.spec_from_file_location(
-        "ccnavi_run_tests", os.path.join(ROOT, "tools", "run_tests.py")
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-TOOL = _load_run_tests()
+from tests import __main__ as TOOL
 
 
 def discovered_modules():
@@ -56,10 +43,10 @@ class CoversTheSameModulesTest(unittest.TestCase):
         planned = set(TOOL.modules([]))
         found = discovered_modules()
         self.assertEqual(
-            found - planned, set(), "discover は拾うのに run_tests.py が回さないモジュール"
+            found - planned, set(), "discover は拾うのに python -m tests が回さないモジュール"
         )
         self.assertEqual(
-            planned - found, set(), "run_tests.py だけが回すモジュール。discover に入らない"
+            planned - found, set(), "python -m tests だけが回すモジュール。discover に入らない"
         )
 
     def test_the_plan_has_no_duplicates(self):

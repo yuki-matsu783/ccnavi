@@ -2,7 +2,7 @@
  * リポジトリ 1 つのボードを組む。書く流れ（`write.ts`）も同じ読み方で、
  * 親子のチケット 1 組ぶんの判定の入力を組み直す（`readFamily`）。
  *
- * 流れ:
+ * 流れは次のとおり。
  *
  * 1. 統合先を決める（設定か、ホストのデフォルトブランチ）。設定したブランチが無ければ止める
  * 2. 置き場のパスを Python に出させる（既定に固定。統合先の `.claude/settings.json` の `env` は読まない）
@@ -317,7 +317,7 @@ async function closureInput(
   // 判定の入力は統合先・P・閉包だけ。表示用のブランチを混ぜないよう、ここで絞る
   const all = withHints(reader.snapshot(integration));
   const closure = await py.closure(deps.py, all, family);
-  // 同じ親子のチケットを名乗るブランチの確かめ（rivals）も残す。判定の入力には Python が入れない
+  // 同じ親子のチケットを宣言するブランチの確かめ（rivals）も残す。判定の入力には Python が入れない
   const keep = new Set([integration.name, ...closure.families, ...(closure.rivals ?? [])]);
   const branches: Record<string, Branch> = {};
   for (const [k, v] of Object.entries(all.branches)) if (keep.has(k)) branches[k] = v;
@@ -333,7 +333,7 @@ async function familyBoard(
 ): Promise<FamilyBoard> {
   try {
     if (family.conflict) {
-      // 同じ親子のチケットを名乗るブランチが 2 本以上ある など。判定しない
+      // 同じ親子のチケットを宣言するブランチが 2 本以上ある など。判定しない
       return { family, result: null, error: family.conflict };
     }
     const input = await closureInput(family.name, reader, integration, place, deps, familyHints.get(hintKey(reader.repoConfig)));

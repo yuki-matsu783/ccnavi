@@ -199,7 +199,7 @@ test("CB-T238 線の言葉は真偽値を空として読み、整数の値は表
   assert.deepEqual(labels, ["", "", "ONE", "", "T", "2"]);
 });
 
-test("CB-T245 読んだバイトは UTF-8 として壊れていれば文字にしない（置き換え文字で埋めない）。BOM は 1 つ外す", () => {
+test("CB-T245 読んだバイトは UTF-8 として不正なら文字にしない（置き換え文字で埋めない）。BOM は 1 つ外す", () => {
   const tree = scratch();
   const file = place(tree);
   fs.mkdirSync(path.dirname(file), { recursive: true });

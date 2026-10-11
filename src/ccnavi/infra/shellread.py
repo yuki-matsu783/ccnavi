@@ -8,7 +8,7 @@
 
 生の文字列を探すガードは "git push origin main" を
 止めるが、それを grep するコマンドも、echo するコマンドも、それを説明する
-ヒアドキュメントの本文も同じように止める。返る拒否は本物の拒否と区別が付かないので、
+ヒアドキュメントの本文も同じように止める。返る拒否は実際の拒否と区別が付かないので、
 語を書いただけの読み手は「禁止された操作をした」と言われて次に何をすればよいか分からなくなる。
 ガードについて書く作業が、いちばんガードに引っかかる。
 
@@ -23,8 +23,7 @@
 読み分けると規則が増えるか、読み違えると止まらずに通る形（バッククォート、ブレース展開、
 実行するときに決まるコマンド名、シェルによって読みが分かれる形）は、読み解かずに並べて判定が止める。
 語の分割はそのあと shlex に任せる。引用の規則を 2 か所で持つことになるが、shlex の
-状態機械は公開されておらず、中身をコピーすると Python の版によって動かなくなる
-（wip/design/shellread-subst.md 1.1）。
+状態機械は公開されておらず、中身をコピーすると Python の版によって動かなくなる。
 
 仕事を文字列として受け取って実行するコマンドは、読み切れないものとして扱う。
 その代わり、`env` `sudo` `sh -c` のような実行役のコマンドが中で実行するコマンドを、
@@ -78,7 +77,7 @@ WORD_SEP = "\x01"
 #
 # 引用の外のブレース展開。`{git,push,origin,main}` は 1 語に見えるが、bash は
 # `git push origin main` を実行する。広げ方はシェルによって分かれる（`{1..5..2}` と `${x:-{a,b}}` は
-# zsh だけが広げ、`{01..03}` は bash 3.2 だけが 0 を落とす）。
+# zsh だけが広げ、`{01..03}` は bash 3.2 だけが 0 を省く）。
 FORM_BRACE = "brace-expansion"
 # 実行するときにシェルが決めるコマンド名。変数（`$c push`）、置換（`$(echo git) push`）、
 # グロブ（`/usr/bin/gi? push`）。どのプログラムが走るかが表記に無いので、どのルールも当たらない。
@@ -126,7 +125,7 @@ class Reading:
     """1 回の読みの結果。"""
 
     # シェルが実行しないものを取り除いたあとのコマンド。コメント、
-    # ヒアドキュメントの本文、引用が作った語のつなぎ目が落ちている。
+    # ヒアドキュメントの本文、引用が作った語のつなぎ目が無くなっている。
     # 置換の中身は外側のコマンドの後ろに、独立したコマンドとしてつないである。
     # degraded のときは空。
     text: str = ""
@@ -198,7 +197,7 @@ def placed(src: str) -> list[tuple[list[str], str | None]]:
     """外側のコマンド 1 本ずつの（語のリスト, そのコマンドが居る場所）。
 
     居る場所は `cd` を追った先で、読みの起点（打たれた場所）から見たパス。起点そのものは
-    空文字、読めなくなったら None（6.3.2 と同じ追い方）。置換の中身は並べない。
+    空文字、読めなくなったら None。置換の中身は並べない。
     読み切れない形（走査か shlex が止まる）なら空のリストを返す。呼び手は read() の
     degraded を先に見て、そちらで扱う。
     """
@@ -281,7 +280,7 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     if sum(t in ("<<", "<<-") for t in tokens) > heads:
         # 走査がヒアドキュメントと読まなかった `<<` が、トークンに出た。引用が `<<` だけの
         # 1 語（`grep -n "<<" f`）で、shlex からは演算子と区別が付かない。今までどおり
-        # 閉じない本文として縮退する（設計 12.2 の許容した誤検知）。
+        # 閉じない本文として縮退する（許容している誤検知）。
         return Reading(
             degraded=True, reason=shellread_scan.REASON_UNTERMINATED, rewrites=rewrites
         ), runnable
@@ -338,7 +337,7 @@ def _split_commands(tokens: list[str]) -> list[list[str]]:
         if not current and token in shellread_words._RESERVED:
             # コマンドの位置に置かれた予約語は、それだけで 1 本にする。後ろの語を
             # コマンドの先頭として読ませるため（`then find . -delete`）。
-            # 落とさないのは、`! grep x f` を `grep x f` と読んで allow に当てないため。
+            # 省かないのは、`! grep x f` を `grep x f` と読んで allow に当てないため。
             commands.append([token])
             continue
         current.append(token)
@@ -396,7 +395,7 @@ def _with_time(commands: list[list[str]]) -> list[list[str]]:
 def _expanded_names(commands: list[list[str]]) -> list[str]:
     """コマンドの位置に、実行するときにシェルが決める語があれば並べる。"""
     found: list[str] = []
-    # 並べた表記の、パスを落とした形。`/usr/bin/gi?` は、パスを落とした層にも `gi?` として現れる。
+    # 並べた表記の、パスを除いた形。`/usr/bin/gi?` は、パスを除いた層にも `gi?` として現れる。
     # 同じものを 2 度並べない。コマンドを数万本並べても線形で済むよう、集合で引く。
     seen: set[str] = set()
     previous: list[str] = []
@@ -493,7 +492,7 @@ def _peel(command: list[str], rewrites: list[tuple[str, str]]) -> tuple[str, lis
         rest = command[i:]
         return head, [rest] if rest else [], True
 
-    # `/bin/sh x`・`git.exe x`。どのプログラムを指すかを変えない部分を落とした名前で読む。
+    # `/bin/sh x`・`git.exe x`。どのプログラムを指すかを変えない部分を除いた名前で読む。
     name = shellread_words._base(head)
     if name != head and name:
         return head, [[name, *command[1:]]], True

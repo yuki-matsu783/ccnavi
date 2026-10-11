@@ -5,13 +5,13 @@
  * 「いま何を見せるか」（`RulesData`）だけで、ルールの行も判定の結果も hook の表も画面が作る。
  * 画面が返すのはユーザが押した操作（`RulesMessage`）だけで、判定もせず、ファイルも書かない。
  *
- * **ルールの形（`SECTIONS`・`RuleForm`・`RulesModel`）もここに置く。** 読み書き（`rules-doc.ts`）の側に
- * 置いたままだと、画面がそこから `yaml` を辿ることになり、バンドルしたものに YAML の解析器が丸ごと入る。
+ * ルールの形（`SECTIONS`・`RuleForm`・`RulesModel`）もここに置く。 読み書き（`rules-doc.ts`）の側に
+ * 置いたままだと、画面がそこから `yaml` を辿ることになり、バンドルしたものに YAML の解析器がすべて入る。
  * 同じ理由で、ここには VS Code の API も DOM も node も入れない。
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
- * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。**中身（`data`）が届くのは、画面の編集を捨ててよいとき
- * だけ**（ユーザが「再読込」を押した、保存が通って中身が入れ替わった）。ファイルが外で変わっただけの
+ * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。中身（`data`）が届くのは、画面の編集を捨ててよいとき
+ * だけ（ユーザが「再読込」を押した、保存が通って中身が入れ替わった）。ファイルが外で変わっただけの
  * ときは `changed` の帯を出し、捨てるかどうかはユーザが決める。
  */
 import type { AppearanceMessage } from "./appearance.js";
@@ -22,6 +22,7 @@ import type { RulesSum } from "./sums.js";
 import type { TargetOption } from "./targets.js";
 import type { SuggestJson } from "./suggestmodel.js";
 import type { SamplesJson, TestJson } from "./testmodel.js";
+import type { CondNode } from "./rules-when.js";
 
 // ---- ルールの形（画面と読み書きで分け合う）
 
@@ -74,13 +75,41 @@ export interface RuleForm {
    * 何回に 1 度渡すか（`every`）。当たった回数がこの倍数になった回だけ文が渡り、
    * `additionalContextOnce` はその最初の 1 回（＝ N 回目）に渡る。書いていなければ空。
    *
-   * 他の欄と同じく**書かれたままの文字**で持つ。数（`number | null`）で持つと、空欄が
+   * 他の欄と同じく書かれたままの文字で持つ。数（`number | null`）で持つと、空欄が
    * 「刻み無し」なのか「刻みとして読めない値（`0`・`-1`・`x`）だった」のかを区別できず、
    * 刻みを外す操作も、読めない値を画面から直す方法も書けない。読めない値は書いたまま
    * 書き戻し、報告するのは保存前の `ccnavi --lint`。気づかないうちに画面で直されると、lint が名指し
    * している対象が消えて苦情の出どころが分からなくなる
    */
   readonly every: string;
+  /**
+   * 除くもの（`except:`）を `glob: …` / `regex: …` の形にしたもの。見せるだけで、画面からは
+   * 編集しない。書き戻しは元のノードをそのまま使うので、ここを変えてもファイルは変わらない。
+   * 本体に当たっても、どれかに当たればルールは当たらない（判定は実行ファイルの仕事）。
+   * 書いていなければ省く。
+   */
+  readonly excepts?: readonly string[];
+  /**
+   * `except:` の各パターンを木のノードにしたもの（`excepts` と同じ並び）。「条件の木に変換」が
+   * `not: {any: …}` に入れるために持つ。書いていなければ省く
+   */
+  readonly exceptNodes?: readonly CondNode[];
+  /**
+   * 条件の木（`when:`）。在れば `kind` と `pattern` は使わない（`glob` / `regex` の代わりに木で当てる）。
+   * 書き戻しは、木が読み込んだときと同じなら元のノードに触らない。変えたら木を書き、`glob` / `regex` を消す。
+   * 書いていなければ省く
+   */
+  readonly when?: CondNode;
+  /**
+   * 「条件の木に変換」で `except:` を木の中へ移した。書き戻しで `except:` を消す。
+   * 画面が明示したときだけ消す（欄が届かなかっただけで消さないため）
+   */
+  readonly dropExcept?: boolean;
+  /**
+   * `glob` と `regex` を両方書いてある（`when:` は無い）。画面はどちらか一方しか持てないので、
+   * 「条件の木に変換」させない（変換すると片方が黙って消える）。書いていなければ省く
+   */
+  readonly bothPatterns?: boolean;
 }
 
 /** ファイル選択ダイアログで埋める欄 */

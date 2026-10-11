@@ -1,7 +1,7 @@
 """組み立ての出力を hook が起動する置き場へコピーする（build.py の install）。
 
-`build.py` は PyInstaller の出力 `dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする
-（設計 5 節の 4）。振り分けの sh（`.ccnavi/scripts/ccnavi-launcher.sh`）が起動するのは
+`build.py` は PyInstaller の出力 `dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする。
+振り分けの sh（`.ccnavi/scripts/ccnavi-launcher.sh`）が起動するのは
 こちらなので、コピーし損ねると hook は古い実行ファイルを起動し続ける。onedir の `_internal/` は
 前後の版で中身が変わるので、前の版にだけあったファイルが残ると混ざった版が動く。
 
@@ -57,7 +57,7 @@ class InstallTest(unittest.TestCase):
         os.makedirs(self.root)
 
     def install(self):
-        """`build.install`。無ければこのテストで落とす。"""
+        """`build.install`。無ければこのテストを失敗させる。"""
         install = getattr(build, "install", None)
         if install is None:
             self.fail("build.install が無い")
@@ -90,7 +90,7 @@ class InstallTest(unittest.TestCase):
 
     @unittest.skipIf(os.name == "nt", "実行ビットは POSIX でだけ意味がある")
     def test_keeps_the_executable_bit(self):
-        """落ちると、sh の `exec` が 126 で終わり hook が起動しない。"""
+        """失敗すると、sh の `exec` が 126 で終わり hook が起動しない。"""
         self.fake_build("v1")
         self.install()
         self.assertTrue(os.access(os.path.join(self.live, "ccnavi"), os.X_OK))
@@ -121,7 +121,7 @@ class InstallTest(unittest.TestCase):
 
 
 class BuildSwapFailureTest(unittest.TestCase):
-    """dist/ccnavi/ の置き換えが PermissionError で落ちたとき、build() は失敗として終わる。"""
+    """dist/ccnavi/ の置き換えが PermissionError で失敗したとき、build() は失敗として終わる。"""
 
     def setUp(self):
         self.dir = tempfile.mkdtemp(prefix="ccnavi-build-")

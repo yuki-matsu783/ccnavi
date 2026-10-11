@@ -3,7 +3,7 @@
 見るのは 2 つ。
 
 1. そのツリーがチェックアウトしているブランチを upstream まで ff で進める（承認済みチケットと
-   マーカーが届く経路。設計 9.2）
+   マーカーが届く経路）
 2. ワークツリーの起点になるデフォルトブランチを、チェックアウトされていなくても ff で進める
    （古い起点から枝が伸びないようにする）
 
@@ -134,7 +134,7 @@ class FetchTest(unittest.TestCase):
         return done.stdout.strip() if done.returncode == 0 else ""
 
     def lines(self, done):
-        """報せの本文。先頭の見出しは落とす。"""
+        """報せの本文。先頭の見出しは除く。"""
         out = [line for line in done.stdout.splitlines() if line.strip()]
         return out[1:] if out and out[0].startswith("[ccnavi]") else out
 
@@ -207,7 +207,7 @@ class FetchTest(unittest.TestCase):
         self.assertIn("未コミットの変更", done.stdout)
 
     def test_default_branch_advances_in_the_tree_that_holds_it(self):
-        # チェックアウトされているブランチの ref は付け替えず、そのツリーで ff する。
+        # チェックアウトされているブランチの ref は書き換えず、そのツリーで ff する。
         tree = os.path.join(self.ws, ".claude", "worktrees", "main-tree")
         self.leave_main()
         git(self.ws, "worktree", "add", "-q", tree, "main")
@@ -263,7 +263,7 @@ class FetchTest(unittest.TestCase):
         self.assertNotIn("認証", done.stdout)
 
     def test_an_authentication_failure_says_so(self):
-        """401 を返すリモート。尋ねずに落ち、認証で落ちたことと、ユーザがすることを言う。"""
+        """401 を返すリモート。尋ねずに失敗し、認証に失敗したことと、ユーザがすることを言う。"""
 
         class Unauthorized(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
@@ -285,7 +285,7 @@ class FetchTest(unittest.TestCase):
         done = self.fetch(LANG="ja_JP.UTF-8", LC_ALL="ja_JP.UTF-8")
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertEqual(1, done.stdout.count("取ってこられなかった"), done.stdout)
-        self.assertIn("認証で落ちた", done.stdout)
+        self.assertIn("認証に失敗した", done.stdout)
         self.assertIn("git fetch origin", done.stdout)
 
     def test_a_hanging_remote_is_cut_off(self):
@@ -388,7 +388,7 @@ class FetchTest(unittest.TestCase):
         self.assertIn("時間の枠", done.stdout)
 
     def test_a_missing_family_branch_does_not_stop_the_default_branch(self):
-        # P がリモートに無くても、その origin を落ちたものに数えない（統合先を飛ばさない）。
+        # P がリモートに無くても、その origin を失敗したものに数えない（統合先を飛ばさない）。
         self.family()
         pusher = os.path.join(self._tmp.name, "push-" + os.path.basename(self.remote))
         head = self.advance(self.remote)

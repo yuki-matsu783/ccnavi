@@ -108,6 +108,15 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
           </div>
         </>
       );
+    case "reviewedLoading":
+      return (
+        <>
+          <p className="approval-note">フェーズ {overlay.phase} の未解決（Unresolved）指摘を確かめて、連絡の文を作っています…</p>
+          <div className="approval-actions">
+            <Cancel label="やめる" />
+          </div>
+        </>
+      );
     case "decidePreview":
       return <DecideBody preview={overlay.preview} deciding={false} notice={overlay.notice} />;
     case "deciding":
@@ -250,7 +259,7 @@ function families(plans: readonly ApprovePlan[]): [string, ApprovePlan[]][] {
 }
 
 /**
- * 承認画面の本文。実行ファイルが組んだ文字列を行のまま出し、**説明の付く見出しだけ**その次の行を
+ * 承認画面の本文。実行ファイルが組んだ文字列を行のまま出し、説明の付く見出しだけその次の行を
  * ツールチップにまとめる（`approvalBody`）。まとめた説明は目には出さないが、読み上げと選択には残す。
  * まとめられるかどうかを決めるのは見出しの表記だけで、画面は中身を解釈しない。
  */

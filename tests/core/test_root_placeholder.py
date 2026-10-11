@@ -17,7 +17,7 @@ from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 # このリポジトリの rules.yml と同じ形。先読みを使わずに 1 段目で場合分けする。
-MAIN_TREE = (
+WORKSPACE_ROOT_RULE = (
     r"^{root}[\\/](?:[^.\\/][^\\/]*|\.[^c\\/][^\\/]*|\.c[^l\\/][^\\/]*|\.claude[\\/][^w\\/][^\\/]*)"
 )
 
@@ -27,6 +27,61 @@ def write(path: str, text: str) -> str:
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
     return path
+
+
+class WorkspaceRootRealRuleTest(unittest.TestCase):
+    """このリポジトリの rules.yml の workspace-root が、2 つの置き場だけを通すこと。
+
+    通すのは wip/scratchpad/ と .claude/worktrees/。
+
+    判定と同じ読み方（rules.parse）で組み立てて当てる。ルールは 1 本の regex でも、
+    `except:` で置き場を除く形でも書けるので、式を取り出して当てると書き方に縛られる。
+    大文字小文字は判定と同じく区別しない。
+    """
+
+    def setUp(self):
+        import yaml
+
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.root = os.path.realpath(self.dir.name)
+        with open(os.path.join(ROOT, ".ccnavi", "common", "rules.yml"), encoding="utf-8") as f:
+            raw = next(r for r in yaml.safe_load(f)["deny"] if r["id"] == "workspace-root")
+        rule_set, problems = rules.parse({"version": 1, "deny": [raw]}, self.root)
+        self.assertEqual([p for p in problems if p.severity == rules.SEVERITY_ERROR], [])
+        self.rule = rule_set.deny[0]
+
+    def hits(self, tail: str) -> bool:
+        return self.rule.matches("Write", self.root + tail)
+
+    def test_wip_scratchpadだけが通る(self):
+        for tail in [
+            "/wip/scratchpad/a.md",
+            "/wip/scratchpad/x/y.sh",
+            r"\wip\scratchpad\a",
+            "/wip/Scratchpad/a.md",
+            "/.claude/worktrees/x/a.md",
+            r"\.claude\worktrees\x\a.md",
+        ]:
+            with self.subTest(tail=tail):
+                self.assertFalse(self.hits(tail))
+
+    def test_それ以外は止まる(self):
+        for tail in [
+            "/scratchpad/a.md",
+            "/wip/proposals/todo/a.md",
+            "/wip/a.md",
+            "/wip",
+            "/w",
+            "/wipx/a.md",
+            "/wip/scratchpadx/a.md",
+            "/README.md",
+            "/.claude/settings.json",
+            "/.cfoo",
+            "/.ccnavi/common/rules.yml",
+        ]:
+            with self.subTest(tail=tail):
+                self.assertTrue(self.hits(tail))
 
 
 class RootPlaceholderTest(unittest.TestCase):
@@ -42,9 +97,9 @@ class RootPlaceholderTest(unittest.TestCase):
                     "version": 1,
                     "deny": [
                         {
-                            "id": "main-tree",
+                            "id": "workspace-root",
                             "match": "Write|Edit",
-                            "regex": MAIN_TREE,
+                            "regex": WORKSPACE_ROOT_RULE,
                             "message": "main では編集しない",
                         },
                         {
@@ -108,7 +163,7 @@ class RootPlaceholderTest(unittest.TestCase):
             with self.subTest(path=path):
                 out = self.judge("Write", path)
                 self.assertEqual(out.get("permissionDecision"), "deny", out)
-                self.assertIn("main-tree", out.get("permissionDecisionReason", ""))
+                self.assertIn("workspace-root", out.get("permissionDecisionReason", ""))
         allowed = [
             os.path.join(self.root, ".claude", "worktrees", "x", "README.md"),
             os.path.join(
@@ -120,7 +175,7 @@ class RootPlaceholderTest(unittest.TestCase):
             with self.subTest(path=path):
                 out = self.judge("Edit", path)
                 self.assertNotEqual(out.get("permissionDecision"), "deny", out)
-                self.assertNotIn("main-tree", out.get("permissionDecisionReason", ""))
+                self.assertNotIn("workspace-root", out.get("permissionDecisionReason", ""))
 
     def test_outside_the_root_is_not_mentioned(self):
         with tempfile.TemporaryDirectory() as elsewhere:
@@ -166,7 +221,7 @@ class RootPlaceholderTest(unittest.TestCase):
         rule_set, problems = rules.load(self.rules, self.root)
         self.assertEqual(problems, [])
         # 書いた表記は残り、置き換わるのは翻訳後の式だけ。
-        self.assertEqual(rule_set.deny[0].regex, MAIN_TREE)
+        self.assertEqual(rule_set.deny[0].regex, WORKSPACE_ROOT_RULE)
         self.assertNotIn("{root}", rule_set.deny[0].compiled.pattern)
 
 

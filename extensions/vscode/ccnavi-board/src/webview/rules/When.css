@@ -1,0 +1,57 @@
+/*
+ * 条件の木の図（`When.tsx`）。React Flow の色は `--xy-*` の変数で持っているので、`--vscode-*` に置き換える
+ * （フェーズの図 `phases/Graph.css` と同じ書き方。打ち消さず、変数を置き換える）。
+ */
+.cond { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cond-canvas {
+  height: 260px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.cond-canvas .react-flow {
+  --xy-background-color-default: var(--vscode-editor-background);
+  --xy-background-pattern-dots-color-default: var(--vscode-panel-border);
+  --xy-edge-stroke-default: var(--vscode-descriptionForeground);
+  --xy-edge-stroke-width-default: 2;
+  --xy-controls-button-background-color-default: var(--vscode-button-secondaryBackground, var(--vscode-editorWidget-background));
+  --xy-controls-button-background-color-hover-default: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
+  --xy-controls-button-color-default: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  --xy-controls-button-color-hover-default: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  --xy-controls-button-border-color-default: var(--vscode-panel-border);
+  --xy-controls-box-shadow-default: none;
+  --xy-node-background-color-default: transparent;
+  --xy-node-color-default: var(--vscode-foreground);
+  --xy-node-border-default: none;
+  --xy-node-boxshadow-hover-default: none;
+  --xy-node-boxshadow-selected-default: none;
+  --xy-handle-background-color-default: transparent;
+  --xy-handle-border-color-default: transparent;
+  --xy-attribution-background-color-default: transparent;
+}
+.cond-canvas .react-flow__node-cond { width: 180px; font-size: var(--vscode-font-size); }
+.cond-node {
+  display: flex; gap: 6px; align-items: baseline; padding: 4px 7px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border));
+  border-radius: 3px; cursor: pointer; overflow: hidden;
+}
+.cond-node:hover { background: var(--vscode-list-hoverBackground); outline: 1px dashed var(--vscode-contrastActiveBorder, transparent); }
+/* 選んだ点は縁を太く。色だけに頼らない */
+.cond-node.selected { border: 2px solid var(--vscode-focusBorder); }
+/* まとめ（all / any / not）と葉は縁の形で見分ける */
+.cond-node[data-op="not"] { border-style: dashed; }
+.cond-node[data-op="empty"] { border-style: dotted; color: var(--vscode-descriptionForeground); }
+.cond-node.broken { border-color: var(--vscode-editorError-foreground, var(--vscode-errorForeground)); }
+.cond-op { font-family: var(--vscode-editor-font-family); font-weight: 600; flex: none; }
+.cond-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--vscode-descriptionForeground); }
+.cond-label.mono { font-family: var(--vscode-editor-font-family); font-size: .92em; color: var(--vscode-foreground); }
+.cond-inspector { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.cond-inspector > .inline { flex: 1 1 320px; }
+.cond-inspector .buttons { display: flex; gap: 4px; }
+.cond-inspector .buttons button.action, .cond-add button.action { margin-left: 0; }
+.cond-add { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.cond-add .dim, .cond-inspector .dim { color: var(--vscode-descriptionForeground); }
+.cond-invalid { color: var(--error-text); overflow-wrap: anywhere; }
+.cond-problems { margin: 0; padding-left: 18px; color: var(--error-text); }
+.cond-problems button.action { margin-left: 0; color: inherit; text-align: left; }

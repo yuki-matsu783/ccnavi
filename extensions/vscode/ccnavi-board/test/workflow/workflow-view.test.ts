@@ -24,7 +24,7 @@ import {
 import { sampleWorkflow } from "../../src/core/tour-sample.js";
 import { planOrderSample } from "../helpers/plan-order.js";
 
-test("CB-T343 答えの線を、元の番号での直接の先行（--order の形）に戻す。先行の無い番号も空のリストで並べる", () => {
+test("CB-T369 答えの線を、元の番号での直接の先行（--order の形）に戻す。先行の無い番号も空のリストで並べる", () => {
   assert.deepEqual(orderOf(planOrderSample("open")), {
     plan: { "1": [], "2": [1], "3": [1], "4": [2, 3] },
     feedback: { "5": [], "6": [5] },
@@ -33,7 +33,7 @@ test("CB-T343 答えの線を、元の番号での直接の先行（--order の�
   assert.deepEqual(orderOf(planOrderSample("reverse")).plan, { "1": [], "2": [1, 3], "3": [1], "4": [2] });
 });
 
-test("CB-T344 図で線を足す・消すと、見えている番号を元の番号に直して --order を組む。提案と同じ計画は渡さない", () => {
+test("CB-T370 図で線を足す・消すと、見えている番号を元の番号に直して --order を組む。提案と同じ計画は渡さない", () => {
   const open = planOrderSample("open");
   // 3 番が 2 番を待つ線を足す（見えている番号 = 元の番号）。フィードバック計画は変えていないので渡さない
   assert.deepEqual(editedOrder(open, { part: "plan", from: 2, to: 3, add: true }), { plan: { "1": [], "2": [1], "3": [1, 2], "4": [2, 3] } });
@@ -50,7 +50,7 @@ test("CB-T344 図で線を足す・消すと、見えている番号を元の番
   assert.equal(editedOrder(open, { part: "steps", from: 1, to: 3, add: true }), undefined);
 });
 
-test("CB-T345 未保存は、答えの線が提案に書いてある先行と違うかで決める（画面は番号を数えない）", () => {
+test("CB-T371 未保存は、答えの線が提案に書いてある先行と違うかで決める（画面は番号を数えない）", () => {
   assert.equal(isDirty(planOrderSample("open")), false);
   assert.equal(isDirty(planOrderSample("reverse")), true);
   assert.equal(isDirty(planOrderSample("loose")), true);
@@ -59,7 +59,7 @@ test("CB-T345 未保存は、答えの線が提案に書いてある先行と違
   assert.deepEqual(changedOrder(planOrderSample("open")), {});
 });
 
-test("CB-T346 番号の変わる項を並べる（保存の前に見せる）。変わらない項は並べない", () => {
+test("CB-T372 番号の変わる項を並べる（保存の前に見せる）。変わらない項は並べない", () => {
   assert.deepEqual(renumbered(planOrderSample("reverse")), [
     { part: "plan", title: "実装とテスト", from: 3, number: 2 },
     { part: "plan", title: "設計", from: 2, number: 3 },
@@ -67,7 +67,7 @@ test("CB-T346 番号の変わる項を並べる（保存の前に見せる）。
   assert.deepEqual(renumbered(planOrderSample("open")), []);
 });
 
-test("CB-T347 外で提案が変わったときの差分。番号ごとに、定義と待ちの前後を並べる。変わらない番号は並べない", () => {
+test("CB-T373 外で提案が変わったときの差分。番号ごとに、定義と待ちの前後を並べる。変わらない番号は並べない", () => {
   const before = planOrderSample("open").plans;
   const after = planOrderSample("reverse").plans;
   assert.deepEqual(planDiff(before, after), [
@@ -84,7 +84,7 @@ test("CB-T347 外で提案が変わったときの差分。番号ごとに、定
   assert.deepEqual(planDiff(before, before), []);
 });
 
-test("CB-T348 保存できない理由。書けない答え（実行ファイルの writable）・未保存でない・確かめている途中・外で変わった・提案が無くなった", () => {
+test("CB-T374 保存できない理由。書けない答え（実行ファイルの writable）・未保存でない・確かめている途中・外で変わった・提案が無くなった", () => {
   const reverse = planOrderSample("reverse");
   const calm = { pending: false, changed: false, gone: false };
   assert.equal(saveBlocker(reverse, calm), "");
@@ -97,12 +97,12 @@ test("CB-T348 保存できない理由。書けない答え（実行ファイル
   assert.match(saveBlocker(blocked, calm), /子の提案/);
 });
 
-test("CB-T349 タブの題は未保存の間だけ頭に ● を付ける", () => {
+test("CB-T375 タブの題は未保存の間だけ頭に ● を付ける", () => {
   assert.equal(workflowTitle("i0001"), "ccnavi ワークフロー: i0001");
   assert.equal(workflowTitle("i0001", true), "● ccnavi ワークフロー: i0001");
 });
 
-test("CB-T350 画面から届いたものを確かめる。形が崩れていれば捨てる（保存の中身が読めないものを渡さない）", () => {
+test("CB-T376 画面から届いたものを確かめる。形が崩れていれば捨てる（保存の中身が読めないものを渡さない）", () => {
   const order = { plan: { "1": [], "2": [1] } };
   assert.deepEqual(asWorkflowMessage({ type: "ready" }), { type: "ready" });
   assert.deepEqual(asWorkflowMessage({ type: "adopt" }), { type: "adopt" });
@@ -125,19 +125,19 @@ test("CB-T350 画面から届いたものを確かめる。形が崩れていれ
   }
 });
 
-test("CB-T351 開くコマンドに渡す親の識別子。識別子の形でなければ受けない", () => {
+test("CB-T377 開くコマンドに渡す親の識別子。識別子の形でなければ受けない", () => {
   assert.equal(workflowTicketOf("i0001"), "i0001");
   for (const bad of ["", " i0001", "../i0001", "i0001/x", 1, undefined, null]) {
     assert.equal(workflowTicketOf(bad), undefined, String(bad));
   }
 });
 
-test("CB-T356 案内を閉じた（tourDone）は形を確かめて受ける", () => {
+test("CB-T382 案内を閉じた（tourDone）は形を確かめて受ける", () => {
   assert.deepEqual(asWorkflowMessage({ type: "tourDone" }), { type: "tourDone" });
   assert.deepEqual(asWorkflowMessage({ type: "tourDone", extra: 1 }), { type: "tourDone" });
 });
 
-test("CB-T357 案内の見本の計画は、実行ファイルの答えの実例（plan-order.json の open）と同じ形で、識別子とハッシュだけが見本のもの", () => {
+test("CB-T383 案内の見本の計画は、実行ファイルの答えの実例（plan-order.json の open）と同じ形で、識別子とハッシュだけが見本のもの", () => {
   const sample = sampleWorkflow();
   const real = planOrderSample("open");
   assert.equal(sample.ticket, "sample-a");
@@ -149,12 +149,12 @@ test("CB-T357 案内の見本の計画は、実行ファイルの答えの実例
   assert.deepEqual({ ...sample, ticket: real.ticket, source_sha: real.source_sha, plans: real.plans }, real);
 });
 
-test("CB-T360 未保存の知らせは、線の答えを待っている（checking）ことも運ぶ。真偽でなければ偽", () => {
+test("CB-T386 未保存の知らせは、線の答えを待っている（checking）ことも運ぶ。真偽でなければ偽", () => {
   assert.deepEqual(asWorkflowMessage({ type: "dirty", dirty: false, checking: true }), { type: "dirty", dirty: false, checking: true });
   assert.deepEqual(asWorkflowMessage({ type: "dirty", dirty: true, checking: "yes" }), { type: "dirty", dirty: true, checking: false });
 });
 
-test("CB-T361 提案が承認待ちから無くなった理由。新規の親は承認済みか取り下げかを分け、改版は分けられないので言い切らない。まだ承認待ちか、ボードに無い・確かめられないときは何も言わない", () => {
+test("CB-T387 提案が承認待ちから無くなった理由。新規の親は承認済みか取り下げかを分け、改版は分けられないので言い切らない。まだ承認待ちか、ボードに無い・確かめられないときは何も言わない", () => {
   assert.equal(goneReasonOf("i0001", false, { proposal: "todo", approved: false }), undefined);
   assert.equal(goneReasonOf("i0001", true, { proposal: "todo", approved: true }), undefined);
   assert.match(goneReasonOf("i0001", false, { proposal: null, approved: true }) ?? "", /^i0001 は承認済みです/);
@@ -167,7 +167,7 @@ test("CB-T361 提案が承認待ちから無くなった理由。新規の親は
   assert.match(goneReasonOf("i0001", true, { proposal: "review", approved: true }) ?? "", /承認されたか/);
 });
 
-test("CB-T362 閉じた後に戻すかを聞くのは、未保存で写しがあり、読み込めていて、保存の途中でないときだけ", () => {
+test("CB-T388 閉じた後に戻すかを聞くのは、未保存で写しがあり、読み込めていて、保存の途中でないときだけ", () => {
   const base = { dirty: true, draft: true, loaded: true, saving: false };
   assert.equal(restoreAsked(base), true);
   assert.equal(restoreAsked({ ...base, saving: true }), false, "保存を押してすぐ閉じた（書き込みは通る）");
@@ -176,7 +176,7 @@ test("CB-T362 閉じた後に戻すかを聞くのは、未保存で写しがあ
   assert.equal(restoreAsked({ ...base, loaded: false }), false);
 });
 
-test("CB-T363 保存で覚えるハッシュは、書けたときの答え（書いたあとに読み直したもの）だけ", () => {
+test("CB-T389 保存で覚えるハッシュは、書けたときの答え（書いたあとに読み直したもの）だけ", () => {
   const written = planOrderSample("written", "after-write");
   assert.equal(savedShaOf({ kind: "written", answer: written }), "after-write");
   for (const kind of ["unchanged", "changed"] as const) {

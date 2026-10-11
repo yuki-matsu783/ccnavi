@@ -43,7 +43,7 @@ class Candidate:
     # このチケットに使うフェーズ定義。親の写し（`phases:`）を読んだもの。親ならその提案の写し、
     # 子なら親（承認済みか、同じ承認で通る提案）の写し。承認画面はこれで題と見る場所を出す。
     types: dict | None = None
-    # 承認したときの `phases.yml`（親の `project:` が指すレイヤーの 1 本、設計 11.4.1）。写しが
+    # 承認したときの `phases.yml`（親の `project:` が指すレイヤーの 1 本）。写しが
     # これと同じかを確かめ、承認画面に「この親では使わない定義」を出すのに使う。
     config: dict | None = None
     # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
@@ -73,14 +73,14 @@ def candidates(
     revisions: list[ticket_model.Ticket],
     approved: list[ticket_model.Ticket],
 ) -> tuple[list[Candidate], list[tuple[ticket_model.Ticket, list[rules.Problem]]], dict]:
-    """承認の対象に入れるものと、落とすものに分ける。3 つめは親子を引くための対応表。
+    """承認の対象に入れるものと、外すものに分ける。3 つめは親子を引くための対応表。
 
     承認（`agree`）・見せる（`preview`）・確かめる（`verify`）に加えて、`--lint` も
-    ここを通る。承認で落ちるものを数える経路が 2 本あると、片方が気づかないうちに弱くなる
-    （実際に `--lint` は `validate` だけを当てていて、順序で落ちる子に何も言わなかった）。
+    ここを通る。承認で外れるものを数える経路が 2 本あると、片方が気づかないうちに弱くなる
+    （実際に `--lint` は `validate` だけを当てていて、順序で外れる子に何も言わなかった）。
     """
     open_index = approval_checks.by_id(approved)
-    # 親子を引く対応表は、承認済みチケットと、今回の承認で通ったものだけ。落ちた親を対応表に残すと、
+    # 親子を引く対応表は、承認済みチケットと、今回の承認で通ったものだけ。外れた親を対応表に残すと、
     # 承認されない親の範囲で子が検証され、親の承認を経ずに子の承認済みチケットができる。
     # pending は親が子より前に並ぶ（並べ替えの鍵が親の識別子）ので、子が引くときには
     # 親の通過が決まっている。
@@ -121,7 +121,7 @@ def candidates(
         if cand.plans_feedback:
             cand.notes = feedback_notes(root, conf, t)
         batch.append(cand)
-        # 通った改版だけ、一緒に承認する子から見える親にする。落ちた改版の計画で子を
+        # 通った改版だけ、一緒に承認する子から見える親にする。外れた改版の計画で子を
         # 通すと、承認されない番号の子が承認済みチケットになる。
         pool[t.ticket] = t
 
@@ -254,10 +254,10 @@ def types_from(t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket]) -> 
 
 
 def project_of(t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket]) -> str:
-    """このチケットのレイヤーを決める `project:`（設計 11.4.1）。
+    """このチケットのレイヤーを決める `project:`。
 
     子は親と同じ置き場に並ぶので、定義を引くには親のプロジェクトを使う。食い違えば
-    `project_problems` が落とす。親が対応表に居ないときだけ、子の置き場の値をそのまま読む。
+    `project_problems` が外す。親が対応表に居ないときだけ、子の置き場の値をそのまま読む。
     """
     if t.is_child:
         parent = pool.get(t.parent)
@@ -285,7 +285,7 @@ def plan_problems(
     held: dict[str, phasetypes.PhaseType] | None = None,
     approved: bool = False,
 ) -> list[rules.Problem]:
-    """親の計画と写し（`phases:`）が組めるか（設計 9.7）。
+    """親の計画と写し（`phases:`）が組めるか。
 
     写しだけを読んで済むもの（写しが無い、項の定義が写しに無い、定義の形と `kind`、使われて
     いない定義）は `phasetypes.copy_problems`、順序（`after` の形・終端・最後の項の延期・延期の
@@ -406,7 +406,7 @@ def revision_problems(
     current: ticket_model.Ticket,
     config: dict | None,
 ) -> list[rules.Problem]:
-    """親の改版を受けてよいか（設計 9.7）。
+    """親の改版を受けてよいか。
 
     変えてよいのは計画（`plan:` / `feedback:`）と写し（`phases:`）。写しは、子が承認された番号
     （固定した番号）が使う定義だけ承認済みチケットの値のまま（`phases.yml` と違っていてよい）、
@@ -523,7 +523,7 @@ def lock_problems(
     fixed: set[int],
     moved: dict[int, int] | None = None,
 ) -> list[rules.Problem]:
-    """改版の番号ごとの錠（設計 9.7）。`fixed` は子が承認された番号。
+    """改版の番号ごとの錠。`fixed` は子が承認された番号。
 
     固定した番号の項は、定義・`review`・番号・推移的な待ち（`workflow.compute` の `waits`）を
     変えさせない。待ちを推移的な形で比べるのは、エージェントが `--explain` の「待つ: …」を写しても、
@@ -606,10 +606,10 @@ def validate(
     2 つめは範囲の超過（親の範囲・定義の上限を超えた項、regex の項）で、承認は止めない。
     判定が親と定義の上限で切り詰めるので、承認で止める理由が無い。
 
-    形の検査を error に残すのは、**まとめて 1 度で見せて直させるため**。判定の側も同じ
+    形の検査を error に残すのは、まとめて 1 度で見せて直させるため。判定の側も同じ
     検査を当てる（`blocking_problems`）ので「判定では補えない」わけではないが、
     判定に任せると、承認の画面では通って、あとで書き込みが止まってから気づくことになる。
-    承認はユーザがまとめて見て決める場所なので、そこで落ちるものはそこで言う。
+    承認はユーザがまとめて見て決める場所なので、そこで外れるものはそこで言う。
 
     `config` は承認したときの `phases.yml`（親の写しを確かめる。`plan_problems`）。子の定義は
     親の写しから引き、`phases.yml` からは引かない。`approved` は承認済みチケットに当てる

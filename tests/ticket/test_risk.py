@@ -1,4 +1,4 @@
-"""実績で測るリスク（設計 9.9、REQ-RSK）の受入テスト。
+"""実績で測るリスクの受入テスト。
 
 見るのは 6 つ。
 
@@ -7,7 +7,7 @@
 3. スクリプトの項目（点を受け取る。測れなければ重いほうとして扱う）
 4. 定性の項目（判定が揃うまで閉じられない。judge で記録。HEAD が動けば取り直し）
 5. HIGH 以上なら宣言に関わらずレビューが要る（レビューで止まり、依頼文にリスクの行が載る）
-6. --lint が壊れた定義を言い、壊れていれば組み込みに戻る
+6. --lint が不正な定義を言い、不正なら組み込みに戻る
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+from ccnavi.policy.rules import SEVERITY_WARN
 from ccnavi.tickets import risk
 from tests import common_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
@@ -43,7 +44,7 @@ class DefinitionTest(unittest.TestCase):
 
     def test_undecodable_file_is_a_complaint_not_an_exception(self):
         """UTF-8 として読めない定義は、共通レイヤーなら組み込みへ、
-        レイヤーなら空へ落ちて苦情を返す。"""
+        レイヤーなら空にして苦情を返す。"""
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "risks.yml")
             with open(path, "wb") as f:
@@ -72,6 +73,102 @@ class DefinitionTest(unittest.TestCase):
                 definition, problems = risk.parse(text)
                 self.assertIsNone(definition, name)
                 self.assertTrue(problems, name)
+
+    def test_scope_globs_are_validated(self):
+        cases = {
+            "include が文字列": "version: 1\nfactors:\n"
+            "  - {id: a, points: 1, lines_over: 1, include: x}\n",
+            "exclude に空": "version: 1\nfactors:\n"
+            "  - {id: a, points: 1, files_over: 1, exclude: ['']}\n",
+            "glob 項目には書けない": "version: 1\nfactors:\n"
+            "  - {id: a, points: 1, glob: x, include: [y]}\n",
+        }
+        for name, text in cases.items():
+            with self.subTest(case=name):
+                definition, problems = risk.parse(text)
+                self.assertIsNone(definition, name)
+                self.assertTrue(problems, name)
+
+    def test_include_and_exclude_narrow_what_is_counted(self):
+        text = (
+            "version: 1\nfactors:\n"
+            "  - {id: all, points: 1, lines_over: 0}\n"
+            "  - {id: inc, points: 2, files_over: 0, include: ['src/**']}\n"
+            "  - {id: exc, points: 4, lines_over: 3, exclude: ['*.lock', 'docs/**']}\n"
+            "  - {id: both, points: 8, deleted_over: 0,\n"
+            "     include: ['src/**'], exclude: ['src/gen/**']}\n"
+        )
+        definition, problems = risk.parse(text)
+        self.assertEqual([], problems)
+        diff = risk.Diff(
+            changes=[
+                risk.Change("src/a.py", added=2),
+                risk.Change("src/gen/b.py", status="D"),
+                risk.Change("uv.lock", added=100),
+                risk.Change("docs/x.md", added=100),
+            ]
+        )
+        score = risk.evaluate(definition, diff, "", "", {}, {})
+        hit = {h.id: h.points for h in score.hits}
+        self.assertEqual(1, hit["all"])
+        self.assertEqual(2, hit["inc"])
+        # exclude だけなら、それ以外を全部数える。残るのは src/a.py の 2 行で閾値 3 以下。
+        self.assertNotIn("exc", hit)
+        # src/gen は exclude が勝つので、消したファイルは 0。
+        self.assertNotIn("both", hit)
+
+    def test_a_trailing_slash_means_a_directory(self):
+        text = "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 0, include: ['src/']}\n"
+        definition, problems = risk.parse(text)
+        self.assertEqual([], problems)
+        diff = risk.Diff(changes=[risk.Change("src/a/b.py", added=3), risk.Change("x.py", added=9)])
+        score = risk.evaluate(definition, diff, "", "", {}, {})
+        self.assertIn("3 行", score.hits[0].detail)
+
+    def test_include_without_a_wildcard_is_warned_but_still_loads(self):
+        text = "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 0, include: [src]}\n"
+        definition, problems = risk.parse(text)
+        self.assertIsNotNone(definition)
+        self.assertEqual([SEVERITY_WARN], [p.severity for p in problems])
+        self.assertIn("src/**", problems[0].detail)
+        # exclude は、ファイル名そのものを外す使い方がふつうなので言わない。
+        _, quiet = risk.parse(
+            "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 0, exclude: [x]}\n"
+        )
+        self.assertEqual([], quiet)
+        # 末尾 / や ** を書けば言わない。
+        _, ok = risk.parse(
+            "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 0, include: ['src/']}\n"
+        )
+        self.assertEqual([], ok)
+
+    def test_a_rename_is_judged_by_both_old_and_new_paths(self):
+        text = (
+            "version: 1\nfactors:\n"
+            "  - {id: inc, points: 1, lines_over: 0, include: ['src/**']}\n"
+            "  - {id: exc, points: 2, lines_over: 0, exclude: ['vendor/**']}\n"
+        )
+        definition, _ = risk.parse(text)
+        moved = risk.Change("vendor/core.py", added=60, deleted=60, status="R", old="src/core.py")
+        score = risk.evaluate(definition, risk.Diff(changes=[moved]), "", "", {}, {})
+        # 旧パスが include に当たるので数える。exclude は新旧の両方に当たらないと外さない。
+        self.assertEqual({"inc": 1, "exc": 2}, {h.id: h.points for h in score.hits})
+
+    def test_scope_key_ignores_order_and_duplicates(self):
+        a, _ = risk.parse(
+            "version: 1\nfactors:\n  - {id: a, points: 1, files_over: 1, exclude: [x, y]}\n"
+        )
+        b, _ = risk.parse(
+            "version: 1\nfactors:\n  - {id: a, points: 1, files_over: 1, exclude: [y, x, x]}\n"
+        )
+        self.assertEqual(a.factors[0].key(), b.factors[0].key())
+
+    def test_scope_is_part_of_the_layer_dedupe_key(self):
+        a, _ = risk.parse("version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 1}\n")
+        b, _ = risk.parse(
+            "version: 1\nfactors:\n  - {id: a, points: 1, lines_over: 1, exclude: ['*.lock']}\n"
+        )
+        self.assertNotEqual(a.factors[0].key(), b.factors[0].key())
 
     def test_levels_have_fixed_names(self):
         definition, problems = risk.parse("version: 1\nlevels: {medium: 5, high: 10, severe: 99}\n")
@@ -185,7 +282,7 @@ class RiskTest(PhaseHarness):
         self.assertIn(mark["risk"], ("HIGH", "CRITICAL"))
 
     def test_unreadable_name_status_or_head_refuses_to_close(self):
-        """変更の種類か先のコミットを読めなければ、0 件と数えずに閉じない（重いほうに倒す）。"""
+        """変更の種類か先のコミットを読めなければ、0 件と数えずに閉じない（重いほうとして扱う）。"""
         self.one_child()
         real = risk._git
         for failing, said in (
@@ -325,7 +422,7 @@ class RiskTest(PhaseHarness):
         closed = self.ccnavi("ticket", "finish", "i0001-01-01", "--risk", cheap)
 
         self.assertEqual(closed.returncode, 0, closed.stderr)
-        self.assertIn("--risk は診断", closed.stderr, "落としたことを言っていない")
+        self.assertIn("--risk は診断", closed.stderr, "無視したことを言っていない")
         self.assertEqual(25, self.record()["points"], "渡した配点で採点された")
 
     def test_an_empty_risk_flag_on_ticket_done_is_dropped_too(self):
@@ -346,10 +443,10 @@ class RiskTest(PhaseHarness):
 
         sh は自分の `--root` を先に置き、エージェントの引数を後ろに繋ぐ
         （`exec "$bin" --root "$root" ticket "$@"`）。argparse は後勝ちなので、後ろに
-        1 本足すと sh が渡した本物を上書きできた。`--root` からは共通レイヤーの 3 本も
+        1 本足すと sh が渡した正しい値を上書きできた。`--root` からは共通レイヤーの 3 本も
         `projects` も `approved` も導かれるので、`--risk` を使わずに同じ差し替えができる。
-        実際に確かめると、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子が
-        「リスク 0」で**本物の置き場に**閉じられた。
+        実際に確かめると、実際のツリーへシンボリックリンクを張った偽のルートを渡すと、子が
+        「リスク 0」で実際の置き場に閉じられた。
 
         ここでは偽のルートの中身を作り込まない。2 本目が在ること自体を断るので、
         中身に関わらず同じところで止まる。

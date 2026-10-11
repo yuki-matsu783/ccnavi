@@ -10,7 +10,7 @@
 #   2. 候補が 1 件ならそのブランチで続ける（ワークツリーが無ければ .claude/worktrees/<識別子> に出す）。
 #      複数なら一覧を出して終わる（ユーザが選ぶ）。0 件で --issue なら新しく作る
 #   3. 新規作成: <先頭の語>-<番号>-<slug> のブランチを統合先から切り、ワークツリー・空の初期コミット・push・Draft MR
-#   途中で落ちても、打ち直せば出来たところを飛ばして続きから進む（ブランチ・push・MR の有無を確かめる）。
+#   途中で失敗しても、打ち直せば出来たところを飛ばして続きから進む（ブランチ・push・MR の有無を確かめる）。
 #
 # git は ccnavi-git.sh を通す（読むだけの確認は git を直接呼ぶ。他のスクリプトと同じ）。ホストへの繋ぎ方は
 # ccnavi-common-host.sh（ccnavi-review.sh・ccnavi-branches.sh と同じ）。
@@ -43,12 +43,12 @@ sh .ccnavi/scripts/ccnavi-start.sh (--issue <番号> | --mr <番号>) [--slug <�
   候補が複数    何も作らず一覧を出して終わる（終了コード 3）。ユーザが選ぶ
   候補が 0 件   --issue なら新しく作る。ブランチ <先頭の語>-<番号>-<slug> を統合先から切り、ワークツリー・空の初期コミット・
                 push・Draft MR（本文に Closes #<番号>）まで。--mr は元ブランチが候補なので、無ければ止める
-  --mr          フォークから出た MR は元ブランチがこのリポジトリに無いので、理由を出して止める
+  --mr          フォークから出た MR は元ブランチがこのリポジトリにないので、理由を出して止める
   --slug <語>   ブランチ名の slug（小文字・数字・ハイフン）。省くと issue の題から作る（作れなければ止まる）
   --prefix <語> 先頭の語（既定 feature）
   --title <題>  MR の題。省くと issue の題、読めなければ「#<番号> <slug>」
   --dry-run     何も作らず、作る予定の内容だけ出す（リモートは読むだけ）
-  --mcp-checked ホストの API に届かず、既存の MR が無いことを MCP などで確かめたあとに付ける
+  --mcp-checked ホストの API に届かず、既存の MR がないことを MCP などで確かめたあとに付ける
 
   ホストを見られないときは、既存の MR を見落として重複を作らないよう新規作成に進まず止める（手元の候補がちょうど 1 件なら続ける）。
   GitHub の API に届かないとき（Claude remote など）は、MCP で代行する手順を標準出力に出して終了コード 4 で止まる。
@@ -206,7 +206,7 @@ host_open() {
 	return 0
 }
 
-# API が落ちたら、どの呼び出しかを覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。ホストの返事は書き出さない。
+# API が失敗したら、どの呼び出しかを覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。ホストの返事は書き出さない。
 host_api_failed() {
 	printf '%s %s' "$1" "$2" >"$host_err"
 	# ホストが HTTP のエラーを返したなら、その番号も残す（届いてはいるのか、届かないのかを見分けるため）。
@@ -219,7 +219,7 @@ api_failed_reason() {
 }
 
 # 親のシェルで呼ぶ。結果は issue_title_read（題。1 行、制御文字は空白）と issue_why（失敗の理由）に入れる。
-# 戻り値: 0 読めた / 1 API が落ちた（ホストに届いていない） / 2 issue が無い・権限が無い（ホストには届いた） / 3 PR の番号だった
+# 戻り値: 0 読めた / 1 API が失敗した（ホストに届いていない） / 2 issue が無い・権限が無い（ホストには届いた） / 3 PR の番号だった
 issue_title_read=""
 issue_why=""
 issue_title_get() {
@@ -264,7 +264,7 @@ slugify() {
 		cut -c1-40 | sed -e 's/-$//'
 }
 
-# 開いた MR を探す。あれば {number, url}、無ければ空。API が落ちたら 1
+# 開いた MR を探す。あれば {number, url}、無ければ空。API が失敗したら 1
 find_mr() {
 	if [ "$ccnavi_h_kind" = github ]; then
 		fm_owner="${ccnavi_h_path%%/*}"
@@ -298,7 +298,7 @@ create_mr() {
 # ---- ホストに届かないときの案内。標準出力に出して終了コード 4 で止まる。
 #
 # 段は search（既存の MR を確かめる）・title（issue の題を読む）・create（MR を作る）。
-# GitHub は MCP（mcp__github__ のツール）で代行する手順を出す。GitLab には MCP の案内が無いので、理由と手で打つ手順を出す。
+# GitHub は MCP（mcp__github__のツール）で代行する手順を出す。GitLab には MCP の案内が無いので、理由と手で打つ手順を出す。
 # 使う変数: stop_branch・stop_target・stop_title・stop_wt（段より前に出来たこと）
 stop_branch=""
 stop_target=""
@@ -323,9 +323,9 @@ stop_host() {
 	fi
 	if [ "$ccnavi_h_kind" = github ]; then
 		case "$sh_stage" in
-		search) printf 'ccnavi-start: GitHub の API に届かず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作らずに止めた。MCP（mcp__github__ のツール）で代行してください。\n' "$what" "$number" "$sh_why" ;;
-		title) printf 'ccnavi-start: GitHub の API に届かず、issue #%s の題を読めなかった（%s）。slug を決められないので、何も作らずに止めた。MCP（mcp__github__ のツール）で代行してください。\n' "$number" "$sh_why" ;;
-		*) printf 'ccnavi-start: GitHub の API に届かず、マージリクエストを作れなかった（%s）。MCP（mcp__github__ のツール）で代行してください。\n' "$sh_why" ;;
+		search) printf 'ccnavi-start: GitHub の API に届かず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作らずに止めた。MCP（mcp__github__のツール）で代行してください。\n' "$what" "$number" "$sh_why" ;;
+		title) printf 'ccnavi-start: GitHub の API に届かず、issue #%s の題を読めなかった（%s）。slug を決められないので、何も作らずに止めた。MCP（mcp__github__のツール）で代行してください。\n' "$number" "$sh_why" ;;
+		*) printf 'ccnavi-start: GitHub の API に届かず、マージリクエストを作れなかった（%s）。MCP（mcp__github__のツール）で代行してください。\n' "$sh_why" ;;
 		esac
 		printf 'ここまでに出来たこと:\n'
 		if [ "$sh_stage" = create ]; then
@@ -695,7 +695,7 @@ fi
 	printf 'ccnavi-start: 案内: MR !%s は %s。元ブランチ %s で続ける\n' "$c_mrnum" "$c_state" "$cb"
 [ -z "$unchecked" ] || printf 'ccnavi-start: 案内: ホストは見ていない（%s）。手元の候補 %s だけで続ける。既存の MR があるかは確かめていない\n' "$host_reason" "$cb"
 
-# 作りかけ（ccnavi-start.sh が途中で落ちた跡）か。ホストを見ていて MR が無く、初期コミット（init_subject）だけ
+# 作りかけ（ccnavi-start.sh が途中で失敗した跡）か。ホストを見ていて MR が無く、初期コミット（init_subject）だけ
 # 積んであり、名前に / を含まないなら、残りの段（push・MR）を続ける。
 # 統合先より進んでいない（c_ahead=0）ブランチは作りかけと見なさない。取り込み済みで消し忘れた古いブランチと区別できず、
 # 続けると空コミット・push・新しい Draft MR を作ってしまう。一覧を出してユーザに聞く

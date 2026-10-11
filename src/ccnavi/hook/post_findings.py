@@ -25,7 +25,7 @@ from . import c1
 WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
 # 返す文に載せる理由コード。cli.py の表と同じ体系から借りている。
-# 設計 7.2 が監査に残す事象名がそのまま POST_VIOLATION。
+# 監査に残す事象名がそのまま POST_VIOLATION。
 CODE_VIOLATION = "POST_VIOLATION"
 # 承認されたチケットの作業範囲の外が変わった。実行前チェックが同じことを
 # DENY_TICKET_SCOPE で止めるが、そちらは Write / Edit の引数しか見ない。
@@ -57,7 +57,7 @@ class ScopeGuard:
 
     root: str
     copies: dict[str, ticket_model.Ticket] = field(default_factory=dict)
-    # プロジェクトの置き場。ワークツリーの元リポジトリをプロジェクトまで広げる（設計 11.3）。
+    # プロジェクトの置き場。ワークツリーの元リポジトリをプロジェクトまで広げる。
     projects: str = ""
     # チケットの置き場（ツリーのルートからの相対）。提案と承認済みチケット。
     tickets: str = ""
@@ -184,11 +184,11 @@ def _findings(
 ) -> list[Finding]:
     """変更のうち、報告すべきものを返す。
 
-    ccnavi 自身が書く場所は先に落とす。落とさないと、記録を 1 行足すたびに
+    ccnavi 自身が書く場所は先に除く。除かないと、記録を 1 行足すたびに
     自分がその記録を違反として報告し、その報告がまた記録を 1 行増やす。
 
     チケットの置き場に現れた変更も、ccnavi の副命令が書いたと内容から読めるぶんだけ
-    落とす（`_script_writes`）。落とさないと、`ticket start` が着手の時刻を書くたび、
+    除く（`_script_writes`）。除かないと、`ticket start` が着手の時刻を書くたび、
     `review request` がマーカーを置くたびに、ccnavi 自身の書き込みが
     「エージェントによる書き換え」として報告され、戻す設定では戻されて手順が進まない。
 
@@ -197,13 +197,16 @@ def _findings(
     「範囲を広げれば済む」と読ませて、済まないことを 1 往復あとに知らせる。
 
     ルールの allow に当たる変更も、チケットの範囲は当てる。実行前チェックがルールと
-    チケットの厳しい側を採るのと同じ（設計 5）。allow を理由に飛ばすと、実行前に
+    チケットの厳しい側を採るのと同じ。allow を理由に飛ばすと、実行前に
     止まる書き込みがシェルから入ったときに誰も言わない。
     """
     own = tuple(os.path.realpath(p) for p in mine if p)
     name = where.name
     tree_root = where.root
     script = _script_writes(changes, places, top, where, root)
+    # `top` が空の経路（コミット済みの差分を見るターン終わりの検査）では外さない。
+    # コミット済みの変更は integrate の staged ではなく、外すとその網から保護領域の変更が抜ける。
+    script |= _integrate_writes(changes, top)
     found = []
     for change in changes:
         if any(change.full == p or change.full.startswith(p + os.sep) for p in own):
@@ -242,7 +245,7 @@ def _script_writes(
     承認済みチケットとマーカーを書く。書いた先は `deny` と宣言された場所なので、外さないと
     自分の手順を自分で違反として報告し、戻す設定では自分で戻す。
 
-    **誰が書いたかは記録せず、何が変わったかで答える。** 台帳はワークスペース側にあって
+    誰が書いたかは記録せず、何が変わったかで答える。台帳はワークスペース側にあって
     git に入らないので、承認とマーカーが親のブランチに乗って届いた先（別の機械の clone）では
     1 件も残っていない。台帳で見ると、その機械でだけ報告が出る。内容で見れば同じ答えになる。
 
@@ -289,7 +292,7 @@ def _script_writes(
             # 読めないものは外さない。読めないことは「変わっていない」ではない。
             continue
         now = fsio.read_text(change.full, errors="replace")
-        # 落としてよいのは、コミット済みの版がまだ持っていない欄だけ。副命令はどれも
+        # 省いてよいのは、コミット済みの版がまだ持っていない欄だけ。副命令はどれも
         # 1 度しか書かないので、既に値がある欄が変わったのなら副命令が書いたものではない
         # （`ticket_fields.script_fields_set`）。
         drop = _droppable(before)
@@ -308,12 +311,12 @@ def _script_writes(
             arrived.append((change, now))
     out |= _archived_removals(here, approved_rel, top, where, root)
     for change, before, drop in gone:
-        # 行き先の正規化した内容は、消えた側の落とす欄で見る。`finish` が足す `completed_at` は
-        # 消えた側がまだ持っていないので落ち、着手の時刻と基準点は両側に残る。
+        # 行き先の正規化した内容は、消えた側の省く欄で見る。`finish` が足す `completed_at` は
+        # 消えた側がまだ持っていないので省かれ、着手の時刻と基準点は両側に残る。
         shape = _shape(before, drop)
         landed = [c for c, now in arrived if _shape(now, drop) == shape]
         leaving = [c for c, other, _ in gone if _shape(other, drop) == shape]
-        # **組は 1 対 1 のときだけ外す。** どちらかの側に同じ内容が 2 つ以上あると、
+        # 組は 1 対 1 のときだけ外す。どちらかの側に同じ内容が 2 つ以上あると、
         # どれがどれの行き先なのかを内容からは決められない。正規の移動 1 件に、
         # 同じ内容のチケットのただの削除や、行き先に直接置いた偽物も一緒に外れる。
         # 同じ内容ということは識別子まで同じということなので、揃うのは普通の手順では
@@ -321,6 +324,135 @@ def _script_writes(
         if len(landed) == 1 and len(leaving) == 1:
             out.add(change.full)
             out.add(landed[0].full)
+    return out
+
+
+def _integrate_writes(changes: list[gitstate.Change], top: str) -> set[str]:
+    """`ccnavi-git.sh integrate` が統合先のツリーに staged で残した変更の実パス。
+
+    統合先のツリーは保護領域なので、外さないと integrate の結果が「保護領域の変更」として報告され、
+    戻す設定では自分で戻される。
+
+    **記録（`<git-path ccnavi-integrate>/<名前>/marker`）は信用せず、git の状態で確かめる。** 記録は
+    `.git` の中にあってエージェントにも書けるので、書かれた内容だけで外すと、任意の staged を通す
+    経路になる。外すのは次の全部が揃ったときだけ。
+
+    * 記録の state が `staged`
+    * ブランチ `branch` が記録の `branch_sha` のまま
+    * HEAD が記録の `base` のまま
+    * いまの index のツリーが記録の `tree` と同じ
+    * そのツリーが `git merge-tree --write-tree HEAD <ブランチ>`（= squash の結果）と同じ
+
+    最後の条件で、記録に何が書かれていても、外れるのは「HEAD にそのブランチを squash した結果」と
+    一字も違わない index だけになる。外す対象は HEAD との staged の差分のパスのうち、作業ツリーで
+    さらに変わっていないもの。ほかの変更、条件が欠けたツリー、git を起こせない・git が古くて
+    `merge-tree --write-tree` が無い場合は外さず、今までどおり報告する。
+    """
+    changes = [c for c in changes if c.staged]
+    if not top or not changes:
+        return set()
+    base = gitcmd.run(top, ["rev-parse", "--git-path", "ccnavi-integrate"])
+    if not base.ok or not base.out.strip():
+        return set()
+    gdir = base.out.strip()
+    if not os.path.isabs(gdir):
+        gdir = os.path.join(top, gdir)
+    try:
+        names = sorted(os.listdir(gdir))
+    except OSError:
+        return set()
+    head = gitcmd.run(top, ["rev-parse", "--verify", "HEAD"])
+    if not head.ok:
+        return set()
+    out: set[str] = set()
+    wanted = {c.path: c.full for c in changes if c.path}
+    for name in names:
+        marker = _read_record(os.path.join(gdir, name, "marker"))
+        if marker.get("state") != "staged":
+            continue
+        branch = marker.get("branch", "")
+        if not branch or branch != name or marker.get("base") != head.out.strip():
+            continue
+        tip = gitcmd.run(top, ["rev-parse", "--verify", f"refs/heads/{branch}"])
+        if not tip.ok or tip.out.strip() != marker.get("branch_sha"):
+            continue
+        if not _is_worktree_at(top, branch, tip.out.strip()):
+            continue
+        if _ticket_bound(top, branch):
+            continue
+        index = gitcmd.run(top, ["write-tree"])
+        recorded = marker.get("tree", "")
+        if not index.ok or not recorded or index.out.strip() != recorded:
+            continue
+        merged = gitcmd.run(top, ["merge-tree", "--write-tree", "HEAD", f"refs/heads/{branch}"])
+        if not merged.ok or not merged.out.strip():
+            continue
+        if merged.out.split("\n", 1)[0].strip() != recorded:
+            continue
+        # 改名の検出は切る（gitstate.read と同じ。移動元の削除も 1 件として数える）。
+        staged = gitcmd.run(
+            top, ["diff", "--cached", "--no-renames", "--name-only", "-z", "HEAD"], raw_paths=True
+        )
+        loose = gitcmd.run(top, ["diff", "--no-renames", "--name-only", "-z"], raw_paths=True)
+        if not staged.ok or not loose.ok:
+            continue
+        moved = {p for p in loose.out.split("\0") if p}
+        for path in (p for p in staged.out.split("\0") if p):
+            if path not in moved and path in wanted:
+                out.add(wanted[path])
+    return out
+
+
+def _ticket_bound(top: str, name: str) -> bool:
+    """その名前のチケットが承認済みか提案として在るか（チケット作業は integrate の対象外）。
+
+    sh の `ig_bound` の見方のうち、このツリーとワークツリーの置き場にある同名のチケットだけを見る。
+    チケットに結び付くブランチの squash を、記録を偽造して外させないため。
+    """
+    for place in (
+        ".ccnavi/approved/doing",
+        ".ccnavi/approved/done",
+        "wip/proposals/todo",
+        "wip/proposals/review",
+    ):
+        for base in (top, os.path.join(top, ".claude", "worktrees", name)):
+            if os.path.lexists(os.path.join(base, place, name + ".md")):
+                return True
+    return False
+
+
+def _is_worktree_at(top: str, branch: str, sha: str) -> bool:
+    """`.claude/worktrees/<ブランチ>` が、そのブランチを sha で開いている登録済みのワークツリーか。
+
+    ワークツリーの中の書き込みは、そのツリーの実行後チェックが見ている。ワークツリーを持たない
+    ブランチの squash を外すと、そこを通っていない中身（保護領域への書き込み）が入るので外さない。
+    """
+    listed = gitcmd.run(top, ["worktree", "list", "--porcelain"], raw_paths=True)
+    if not listed.ok:
+        return False
+    suffix = "/" + "/".join((".claude", "worktrees", branch))
+    for block in listed.out.split("\n\n"):
+        fields = dict(line.partition(" ")[::2] for line in block.splitlines() if " " in line)
+        path = fields.get("worktree", "").replace("\\", "/")
+        if (
+            path.endswith(suffix)
+            and fields.get("branch") == f"refs/heads/{branch}"
+            and fields.get("HEAD") == sha
+        ):
+            return True
+    return False
+
+
+def _read_record(path: str) -> dict[str, str]:
+    """`<鍵> <値>` を 1 行 1 項目で並べた記録を読む（sh の `ccnavi_record_get` と同じ形）。"""
+    text = fsio.read_text(path, errors="replace")
+    if text is None:
+        return {}
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        key, _, value = line.partition(" ")
+        if key and key not in out:
+            out[key] = value
     return out
 
 
@@ -356,7 +488,7 @@ def _archived_removals(
 
 
 def _droppable(before: str | None) -> tuple[str, ...]:
-    """正規化するときに落としてよいスクリプトの欄。コミット済みの版がまだ持っていない欄だけ。"""
+    """正規化するときに省いてよいスクリプトの欄。コミット済みの版がまだ持っていない欄だけ。"""
     held = ticket_fields.script_fields_set(before) if before is not None else ()
     return tuple(f for f in ticket_model.SCRIPT_FIELDS if f not in held)
 

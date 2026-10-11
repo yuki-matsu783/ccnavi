@@ -20,7 +20,7 @@ keywords: [実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, ワーク
 
 ## 呼び名
 
-- ワークスペースルート: Claude Codeを起動したディレクトリ（`CLAUDE_PROJECT_DIR`）
+- ワークスペースルート: Claude Codeを起動したディレクトリ（`CLAUDE_PROJECT_DIR`）。プロジェクトの作業もワークスペースルートで起動して`cd`で入る。プロジェクトの中で起動すると、ワークスペースの`.claude/settings.json`が読まれず、ccnaviのhookが動かない
 - gitプロジェクトルート: `.git`があるディレクトリ。ワークスペース自身、`projects/`の下の各プロジェクト、
   各ワークツリーがそれぞれ持つ
 - 統合先ブランチ: 作業を合流させるブランチ

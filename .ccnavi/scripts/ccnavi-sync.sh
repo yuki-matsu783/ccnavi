@@ -23,11 +23,11 @@
 #
 # リポジトリ（ワークスペース自身と、親子のチケットの元のプロジェクト）ごとに 1 回、次の順に行う。
 #
-#   1. `ls-remote --heads origin` で全ブランチの有無を得る。落ちたら（オフライン・認証）止める
+#   1. `ls-remote --heads origin` で全ブランチの有無を得る。失敗したら（オフライン・認証）止める
 #   2. 統合先の名前を決める。CCNAVI_INTEGRATION_BRANCH（環境変数、無ければ
 #      .claude/settings.local.json の env）、空ならホストのデフォルトブランチ（`ls-remote --symref
 #      origin HEAD`、読めなければ origin/HEAD・main・master）。設定した名前がリモートに無ければ、
-#      既定に落とさずに止める
+#      既定にせずに止める
 #   3. 統合先を fetch し、親子のチケットごとの取り込みの後、判定に要るもの（done/・共通レイヤー・自身のレイヤー・
 #      .claude/settings.json）を統合先の取り込み結果 sync/<リポジトリ>/integration/ へ同じ構成でコピーし、head に
 #      remote・branch・source・sha・fetched_at を書く。統合先の先頭が前と同じならコピーしない
@@ -53,7 +53,7 @@
 #     （取り込み状態が無ければ gone は書かずに止める）
 #
 # 統合先の取り込み結果を書いた後、present の親子のチケットごとに実行ファイルの `ccnavi sync check <P> <リポジトリ>` で
-# 判定し直す（どのチケットを本物とするかの検査と、承認済みチケットの判定し直し）。error があれば
+# 判定し直す（どのチケットを正とするかの検査と、承認済みチケットの判定し直し）。error があれば
 # 親子のチケットの取り込み状態を blocked にして、理由を reason に書いて止める。判定（hook・承認・状態の操作）は
 # blocked の親子のチケットを止める。解き方は、理由を直してから同じ P でこの sh をオンラインで打ち直すこと（取り込みで
 # present に書き直してから検査し直すので、通れば present に戻る）。書く前にロックを取り直し、取り込み状態が
@@ -236,7 +236,7 @@ elif [ -f "$root/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; the
 	sync_info=$(cd "$root" && uv run --quiet python -m ccnavi --root "$root" sync paths 2>"$scratch/info" </dev/null) ||
 		info_from="failed:uv run python -m ccnavi"
 fi
-# Windows の実行ファイルの CRLF を落とす（1 行 1 項目の値の末尾に CR を残さない）。
+# Windows の実行ファイルの CRLF の CR を除く（1 行 1 項目の値の末尾に CR を残さない）。
 sync_info=$(printf '%s\n' "$sync_info" | tr -d '\r')
 case "$info_from" in
 failed:*)
@@ -342,7 +342,7 @@ default_branch() {
 
 # fetch 1 本。単一ブランチの clone でも origin/<ブランチ> が進むよう、行き先を書いて取る
 # （sh の中の git。ccnavi-git.sh の入口の refspec の拒否とは別の話）。
-# 落ちた理由（git の標準エラー）は $scratch/err に残る。<リポジトリ> <ブランチ>
+# 失敗した理由（git の標準エラー）は $scratch/err に残る。<リポジトリ> <ブランチ>
 fetch_one() {
 	ccnavi_git_timed "$timeout" "$scratch/err" "$1" \
 		fetch --quiet --no-tags origin "+refs/heads/$2:refs/remotes/origin/$2" >/dev/null
@@ -382,7 +382,7 @@ write_integration() {
 	wi_lock_rc=0
 	ccnavi_lock_take "$root" "$wi_key" _integration "$lock_wait" || wi_lock_rc=$?
 	[ "$wi_lock_rc" -eq 0 ] || return 1
-	# 前に落ちた回の残り。
+	# 前に失敗した回の残り。
 	for wi_left in "$wi_dest".tmp.* "$wi_dest".old.*; do
 		[ -e "$wi_left" ] && rm -rf "$wi_left"
 	done
@@ -448,7 +448,7 @@ write_integration() {
 		if mv "$wi_tmp" "$wi_dest"; then
 			rm -rf "$wi_dest.old.$$"
 		else
-			# 入れ替えに落ちたら、前の取り込み結果を戻す。
+			# 入れ替えに失敗したら、前の取り込み結果を戻す。
 			[ -d "$wi_dest.old.$$" ] && mv "$wi_dest.old.$$" "$wi_dest" 2>/dev/null
 			wi_ok=no
 		fi
@@ -569,7 +569,7 @@ sync_family() {
 	fi
 	kept_branch=$(ccnavi_record_get "$record" branch)
 	if [ "$kept_branch" = "$P" ] && [ "$B" != "$P" ]; then
-		printf '%s: 親のブランチを承認済みの branch: の %s へ移した後、まだ送っていない（取り込み状態は %s のまま）。親のワークツリーで sh %s/ccnavi-git.sh push -u origin %s を打つと取り込み状態が書き直る。取り込まずに止めた\n' \
+		printf '%s: 親のブランチを承認済みの branch: の %s へ移した後、まだ送っていない（取り込み状態は %s のまま）。親のワークツリーで sh %s/ccnavi-git.sh push -u origin %s を打つと取り込み状態が書き直される。取り込まずに止めた\n' \
 			"$P" "$B" "$P" "$here_sh" "$B"
 		fail_note
 		# 移った後の push を待つだけなので、取り込みの後の検査で blocked にしない。
@@ -577,7 +577,7 @@ sync_family() {
 		return 0
 	fi
 	if [ -n "$kept_branch" ] && [ "$kept_branch" != "$B" ]; then
-		printf '%s: 取り込み状態の親のブランチ（%s）と、親チケットが名乗る親のブランチ（%s）が違う。取り込まずに止めた。branch: を取り込み状態の名前に戻すか、親子のチケットを捨てるならユーザが sh %s/ccnavi-sync.sh --forget %s で取り込み状態を消す\n' \
+		printf '%s: 取り込み状態の親のブランチ（%s）と、親チケットが指定する親のブランチ（%s）が違う。取り込まずに止めた。branch: を取り込み状態の名前に戻すか、親子のチケットを捨てるならユーザが sh %s/ccnavi-sync.sh --forget %s で取り込み状態を消す\n' \
 			"$P" "$kept_branch" "$B" "$here_sh" "$P"
 		fail_note
 		return 0
@@ -603,7 +603,7 @@ sync_family() {
 
 	busy=$(busy_state "$tree")
 	if [ -n "$busy" ]; then
-		printf '%s: 親のワークツリーに途中の操作（%s）がある。済ませるか取りやめてから打ち直してください（この sh は触らない）\n' "$P" "$busy"
+		printf '%s: 親のワークツリーに途中の操作（%s）がある。済ませるか取りやめてから打ち直してください（この sh は変更しない）\n' "$P" "$busy"
 		fail_note
 	elif has_head "$heads" "$B"; then
 		sync_present
@@ -677,7 +677,7 @@ sync_present() {
 	return 0
 }
 
-# frontmatter の行だけ（1 行目の `---` から次の `---` の手前まで）。行末の CR は落とす。標準入力から。
+# frontmatter の行だけ（1 行目の `---` から次の `---` の手前まで）。行末の CR は除く。標準入力から。
 # 1 行目が `---` でなければ何も出さない。本文に同じ語を書いた行を欄と読まないために、欄はここから拾う。
 frontmatter_of() {
 	awk '
@@ -689,7 +689,7 @@ frontmatter_of() {
 }
 
 # frontmatter の行頭にある欄 <名前> の値（最初の 1 つ）。前後の空白と、値を囲む引用符を外す。
-# 値の無い欄・空文字（`""`・`''`）は空を出す。YAML と同じく、引用符の外の ` #` から後ろは注記として落とし、
+# 値の無い欄・空文字（`""`・`''`）は空を出す。YAML と同じく、引用符の外の ` #` から後ろは注記として除き、
 # 引用符の無い `null`・`Null`・`NULL`・`~` は値が無いとみなす（Python の syncstate._text と同じ結果にする）。
 # 標準入力は frontmatter_of の出力。
 front_field() {
@@ -864,7 +864,7 @@ sync_absent() {
 		return 0
 	fi
 	# ccnavi-review.sh の道具（gh / glab / curl とトークン）で、MR がマージ済みかを先に聞く。答えは
-	# merged <番号> / none（マージされた MR が無い）/ それ以外（道具・トークンが無い、API が落ちた）。
+	# merged <番号> / none（マージされた MR が無い）/ それ以外（道具・トークンが無い、API が失敗した）。
 	# 統合先の done/ を待つ確かめ直しは、答えが得られないときだけ行う（統合先には閉じたチケットを
 	# 残さないので、マージ済みと分かれば待つものは無い）。
 	merged_rc=0
@@ -933,7 +933,7 @@ check_family() {
 	run_ccnavi sync check "$1" "$2" >"$scratch/check-raw" 2>"$scratch/check-err" || cf_rc=$?
 	tr -d '\r' <"$scratch/check-raw" >"$scratch/check"
 	if [ "$(head -n 1 "$scratch/check" 2>/dev/null)" != "check 1" ]; then
-		# 検査を実行できなかった（古い実行ファイルが副命令を知らない、落ちた）。検査の error ではない
+		# 検査を実行できなかった（古い実行ファイルが副命令を知らない、失敗した）。検査の error ではない
 		# ので親子のチケットは止めない。この検査が入る前と同じ動き。
 		printf '%s: 注意: 取り込みの後の検査を実行できなかった（%s）。親子のチケットは止めていない。実行ファイルを新しくして打ち直してください\n' \
 			"$1" "$(head -n 1 "$scratch/check-err" 2>/dev/null)"
@@ -943,7 +943,7 @@ check_family() {
 	sed -n 's/^warn /  注意: /p' "$scratch/check"
 	[ "$cf_rc" -ne 0 ] || return 0
 	cf_reason=$(sed -n 's/^error //p' "$scratch/check" | head -n 1)
-	[ -n "$cf_reason" ] || cf_reason="取り込みの後の検査が落ちた（$(head -n 1 "$scratch/check-err" 2>/dev/null)）"
+	[ -n "$cf_reason" ] || cf_reason="取り込みの後の検査が失敗した（$(head -n 1 "$scratch/check-err" 2>/dev/null)）"
 	cf_try=0
 	cf_done=""
 	while [ "$cf_try" -lt 3 ] && [ -z "$cf_done" ]; do
@@ -989,7 +989,7 @@ while IFS= read -r key <&4; do
 	repo=$(repo_dir_of "$key")
 	has_family=no
 	repo_has_families "$key" && has_family=yes
-	# 親子のチケットの無いリポジトリ（引数を省いた回のプロジェクトなど）で落ちても、名指しして続け、1 にしない。
+	# 親子のチケットの無いリポジトリ（引数を省いた回のプロジェクトなど）で失敗しても、名指しして続け、1 にしない。
 	repo_fail() {
 		[ "$has_family" = yes ] && fail_note
 		return 0
@@ -1012,20 +1012,20 @@ while IFS= read -r key <&4; do
 	fi
 	if [ -n "$integration_want" ]; then
 		if ! has_head "$heads" "$integration_want"; then
-			printf '%s統合先 %s（%s）がリモートに無い。設定を直してください。取り込みを止めた\n' "$label" \
+			printf '%s 統合先 %s（%s）がリモートに無い。設定を直してください。取り込みを止めた\n' "$label" \
 				"$integration_want" "$(source_words "$integration_source")"
 			repo_fail
 			continue
 		fi
 		integ="$integration_want"
 	elif ! integ=$(default_branch "$repo" "$heads"); then
-		printf '%s統合先が決まらない（ホストのデフォルトブランチが読めず、main・master もリモートに無い）。CCNAVI_INTEGRATION_BRANCH を設定してください。取り込みを止めた\n' "$label"
+		printf '%s 統合先が決まらない（ホストのデフォルトブランチが読めず、main・master もリモートに無い）。CCNAVI_INTEGRATION_BRANCH を設定してください。取り込みを止めた\n' "$label"
 		repo_fail
 		continue
 	fi
-	printf '%s統合先: %s（%s）\n' "$label" "$integ" "$(source_words "$integration_source")"
+	printf '%s 統合先: %s（%s）\n' "$label" "$integ" "$(source_words "$integration_source")"
 	if ! fetch_one "$repo" "$integ"; then
-		printf '%s統合先 %s を取ってこられなかった（%s）。止める\n' "$label" "$integ" "$(head -n 1 "$scratch/err")"
+		printf '%s 統合先 %s を取ってこられなかった（%s）。止める\n' "$label" "$integ" "$(head -n 1 "$scratch/err")"
 		repo_fail
 		continue
 	fi
@@ -1036,7 +1036,7 @@ while IFS= read -r key <&4; do
 		sync_family "$fam_p" "$fam_tree" "$fam_key" "$repo" "$integ" "$heads" "$fam_branch"
 	done 3<"$scratch/these"
 	if ! write_integration "$repo" "$key" "$integ"; then
-		printf '%s統合先の取り込み結果（%s/sync/%s/integration）を書けなかった\n' "$label" "$state" "$key"
+		printf '%s 統合先の取り込み結果（%s/sync/%s/integration）を書けなかった\n' "$label" "$state" "$key"
 		repo_fail
 	fi
 	while IFS="$tab" read -r fam_p fam_tree fam_key fam_branch <&3; do
