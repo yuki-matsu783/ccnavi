@@ -209,8 +209,8 @@ feedback:
 
 取り下げは「`doing/` の中身が承認コミットの親の提案とバイト単位で同じ」だけで決める。待ち方は `doing/` の計画から決まるので、待ち方を別に比べる段も、ファイルを一緒に消す段も要らない。
 
-図で順序を直した提案は、書き戻し（`--plan-order --write`）がコミットされないまま承認されるのが普通で、承認コミットの親には直す前の提案が残る。すると `doing/`（直した後）と承認コミットの親の提案（直す前）のバイト列が違い、取り下げられない。原因はチケットのバイト列の違いで、待ち方のファイルとは関係が無いので、ファイルを廃止してもこの結果は変わらない。**止まる側に倒れたまま受け入れる（決定済み）。** 書き戻しで `phase:` を書き換えた子の提案も、承認したあとは同じ理由で取り下げられない。
-取り下げの文面は、違いが `plan:` / `feedback:` / `phases:` の値（子なら `phase:` の値）だけのとき、「承認の前にワークフロー編集タブか `--fill-phases` で書き換えた提案は取り下げられない。`ccnavi-ticket.sh cancel` で取り消して、提案を出し直す」と言う。`--fill-phases` で差し込んだ `phases:` をコミットしないまま承認した場合も同じ理由で止まるので、条件に `phases:` を入れる（ほかの違いは今の文面のまま）。
+図で順序を直した提案は、書き戻し（`--plan-order --write`）がコミットされないまま承認されるのが普通で、承認コミットの親には直す前の提案が残る。すると `doing/`（直した後）と承認コミットの親の提案（直す前）のバイト列が違い、取り下げられない。原因はチケットのバイト列の違いで、待ち方のファイルとは関係が無いので、ファイルを廃止してもこの結果は変わらない。**止まる側に倒れたまま受け入れる（決定済み）。** 書き戻しで識別子と `phase:` を付け替えた子の提案と、`predecessors` を直した子の提案も、承認したあとは同じ理由で取り下げられない。
+取り下げの文面は、違いが `plan:` / `feedback:` / `phases:` の値（子なら `phase:` か `predecessors:` の値）だけのとき、「承認の前にワークフロー編集タブか `--fill-phases` で書き換えた提案は取り下げられない。`ccnavi-ticket.sh cancel` で取り消して、提案を出し直す」と言う。`--fill-phases` で差し込んだ `phases:` をコミットしないまま承認した場合も同じ理由で止まるので、条件に `phases:` を入れる（ほかの違いは今の文面のまま）。識別子を付け替えた子は、承認コミットの親に同じ識別子の提案が無いので、この案内は出ずに「提案が無い」で止まる（止まる側）。
 
 **前の版の形（`ccnavi_approved` を持つ）の親は、取り下げを一律に止める。** 今は、前の版の形の改版を見分ける印が待ち方のファイルの有無だけ（`hook/core_withdraw.py` の 169〜177 行付近）で、改版は記録の欄を残したまま計画を書き換える（`agree_digest.revised_front`）。ファイルを廃止すると、改版した前の版の親を、改版の前の提案へ戻せてしまう。前の版の形の親で進んでいるものは無いので、一律に止めても困らない。前の版の形の子は今の条件（記録の欄）のまま。
 
@@ -583,7 +583,7 @@ Chrome 拡張の承認と手で動かした承認も直す手段を持たない�
 | `tickets/approval.py`・`approval_ops.py`・`approval_checks.py` | `load_copy` が `compute` の結果を入れる。ファイルの読み書きと `settle_old_workflows` を消す。`admit` から待ち方の書き込みと戻しを外す。`blocking_problems` に `workflow.problems` のうち `phases.yml` を読まない検査を当てる。`child_problems` に「親の計画が壊れている」を足す（5）。`mark_blocked` の引数は変えない |
 | `tickets/phase.py`（`order_problems`）・`tickets/phase_scope.py` | 親の計画が壊れていれば子の順序を数えずに落とす。`phase_scope` は子の `blocked` で止まる（`child_problems` が付ける）ことを確かめる |
 | `tickets/approval_marks.py` | `WORKFLOW_FILE` を消す |
-| `hook/core_withdraw.py`・`hook/core.py` | 取り下げはチケットのバイト一致だけ。前の版の形（`ccnavi_approved`）の親は一律に止める。待ち方の比較・ファイルの削除・マーカーの検査からファイルを外す扱いを消す（Chrome に返す「消すもの」からも外れる）。違いが `plan:` / `feedback:`（子は `phase:`）の値だけのときの文面「承認の前にワークフロー編集タブで順序を直した提案は取り下げられない。取り消して出し直す」 |
+| `hook/core_withdraw.py`・`hook/core.py` | 取り下げはチケットのバイト一致だけ。前の版の形（`ccnavi_approved`）の親は一律に止める。待ち方の比較・ファイルの削除・マーカーの検査からファイルを外す扱いを消す（Chrome に返す「消すもの」からも外れる）。違いが `plan:` / `feedback:` / `phases:`（子は `phase:` か `predecessors:`）の値だけのときの文面「承認の前にワークフロー編集タブで順序を直した提案は取り下げられない。取り消して出し直す」 |
 | `hook/c1.py` | ユーザの判断が書くものの名前の一覧から `workflow.yml` を外す |
 | `entry/cli.py`・`entry/cli_args.py`・`entry/cli_usage.py`・`entry/plan_order.py`（新） | 独立したフラグ `--plan-order <親>`（`--json`・`--order`・`--write`・`--expect`）。`cli.py` で `--agree` の端末の確かめ（`_from_terminal`）の手前で分ける |
 | `tickets/phase_forms.py` | 止めの形（`_CLI_FORMS`）は変えない。`--plan-order` が止めに当たらないことを確かめるテストを足す |
