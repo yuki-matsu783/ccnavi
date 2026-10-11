@@ -19,7 +19,9 @@ from ccnavi.hook import subagent
 from ccnavi.infra import settings
 from ccnavi.tickets import ops_stop
 from tests.ticket import test_stop_nudge as base
+from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
+from tests.ticketsample import child_text
 
 CODE = "NUDGE_TICKET_REQUEST"
 FINISH_CODE = "NUDGE_TICKET_FINISH"
@@ -28,16 +30,18 @@ FINISH_CODE = "NUDGE_TICKET_FINISH"
 def load_tests(loader, tests, pattern):
     """このモジュールで書いたテストだけを走らせる（借りたテストは走らせない）。"""
     suite = unittest.TestSuite()
-    for name in sorted(vars(RequestNudgeTest)):
-        if name.startswith("test_"):
-            suite.addTest(RequestNudgeTest(name))
+    for cls in (RequestNudgeTest, PlannedRequestNudgeTest):
+        for name in sorted(vars(cls)):
+            if name.startswith("test_"):
+                suite.addTest(cls(name))
     return suite
 
 
 class RequestNudgeTest(base.StopNudgeTest):
     def assert_not_asked(self, result):
-        """依頼までの道の促しを出していない。"""
-        self.body(result)
+        """依頼までの道の促しを出していない。ほかの理由でも止めていない（`decision` が無い）。"""
+        body = self.body(result)
+        self.assertNotIn("decision", body, result.stdout)
         self.assertNotIn(CODE, result.stdout)
 
     def asked(self, result):
@@ -129,6 +133,45 @@ class RequestNudgeTest(base.StopNudgeTest):
         )
         self.assertNotIn("ELI5 の HTML を", reason)
         self.assert_not_asked(self.stop(self.parent_tree))
+
+    def test_the_request_step_reminds_to_commit_and_push_first(self):
+        """ELI5 が在っても未コミットかもしれない。`request` は HEAD の普通のファイルが前提。"""
+        self.family()
+        self.close_children(work=False)
+        write(os.path.join(self.parent_tree, "wip", "eli5", "phase-1.html"), "<p>x</p>\n")
+        reason = self.asked(self.stop(self.parent_tree))
+        self.assertIn("request --phase 1", reason)
+        self.assertIn("未コミットの変更があれば先にコミットして push", reason)
+
+    def test_a_blocked_parent_is_not_asked(self):
+        """信頼できない承認済みの親（手で書き換えた `workflow:`）には促さない。"""
+        self.family()
+        path = os.path.join(self.approved, "doing", "i0001.md")
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        forged = "workflow: {order: dag, waits: {}, review_at: {}}"
+        write(path, text.replace("\n---\n", "\n" + forged + "\n---\n", 1))
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "forge")
+        # 手で書き換えた親は信頼できない（判定が範囲を使わずに止める）。
+        blocked = self.hook("PreToolUse", "Write", self.parent_tree, file_path="src/x.py")
+        self.assertIn("DENY_TICKET_BLOCKED", self.reason(blocked))
+        self.assert_not_asked(self.stop(self.parent_tree))
+
+    def test_only_the_parent_of_the_cwd_is_looked_at(self):
+        """複数の親が居ても、cwd のツリーに結び付いた親だけを見る。"""
+        self.family()
+        self.propose("i0002", allow=("src/*", "wip/*"))
+        self.propose("i0002-01-01", parent="i0002", phase=1, allow=("src/c/*",))
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "second family")
+        self.assertEqual(self.approve().returncode, 0)
+        other = self.worktree("i0002", "main")
+        # 親 i0002 のツリーには、承認済みチケットが乗っていない（親 i0001 のツリーにある）。
+        # 結び付かないツリーは何も言われない。
+        self.assert_not_asked(self.stop(other))
+        reason = self.asked(self.stop(self.parent_tree))
+        self.assertNotIn("i0002", reason)
 
     def test_a_requested_phase_is_not_asked(self):
         """依頼のマーカーがあれば、レビュー待ち以後。
@@ -293,23 +336,29 @@ class RequestNudgeTest(base.StopNudgeTest):
         write(self.running_file("a1", session="s1"), f"session s1-other\n{int(time.time())}\n")
         self.asked(self.stop(self.parent_tree))
 
-    def test_startup_drops_the_marks_but_compact_resume_and_clear_keep_them(self):
+    def test_startup_and_resume_drop_the_marks_but_compact_and_clear_keep_them(self):
+        """起動と再開は新しいプロセスで、前の体は生きていない。compact と clear は同じプロセス。"""
         self.family()
-        self.start_agent("a1")
-        for source in ("compact", "resume", "clear"):
+        for source in ("compact", "clear"):
+            self.start_agent("a1")
             self.session_start(source)
             self.assertTrue(os.path.exists(self.running_file("a1")), source)
-        self.assert_not_asked(self.stop(self.parent_tree))
-        self.session_start("startup")
-        self.assertFalse(os.path.exists(self.running_file("a1")))
-        self.asked(self.stop(self.parent_tree))
+            self.assert_not_asked(self.stop(self.parent_tree))
+        for source in ("startup", "resume"):
+            self.start_agent("a1")
+            self.session_start(source)
+            self.assertFalse(os.path.exists(self.running_file("a1")), source)
+            self.asked(self.stop(self.parent_tree))
+            # 次の回の前提を揃える（促しの記録を捨てる）。
+            os.remove(ops_stop.nudge_path(self.state, "s1"))
 
-    def test_startup_keeps_the_mark_of_a_session_with_the_same_prefix(self):
+    def test_startup_and_resume_keep_the_mark_of_a_session_with_the_same_prefix(self):
         self.family()
         other = self.running_file("a1", session="s1-other")
         write(other, f"session s1-other\n{int(time.time())}\n")
-        self.session_start("startup")
-        self.assertTrue(os.path.exists(other))
+        for source in ("startup", "resume"):
+            self.session_start(source)
+            self.assertTrue(os.path.exists(other), source)
 
     def test_a_bounced_subagent_keeps_its_mark_and_the_bounce_still_works(self):
         """範囲外の変更で差し戻した回は続けさせるので印を残す。2 度目に終わったときに外す。"""
@@ -361,6 +410,86 @@ class RequestNudgeTest(base.StopNudgeTest):
         with open(log, encoding="utf-8") as f:
             line = json.loads(f.read().splitlines()[-1])
         self.assertEqual((line["decision"], line["code"], line["enforced"]), ("nudge", CODE, True))
+
+
+class PlannedRequestNudgeTest(PhaseHarness):
+    """計画を持つ親。フェーズの見る場所（chat・延期）と、実際のレビューの状態を作って確かめる。"""
+
+    def stop(self, cwd, session="s1"):
+        payload = {
+            "hook_event_name": "Stop",
+            "cwd": cwd,
+            "session_id": session,
+            "stop_hook_active": False,
+        }
+        result = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return json.loads(result.stdout) if result.stdout.strip() else {}
+
+    def close_first_child(self, plan, allow, rel, review=True):
+        """計画の 1 番目の子を閉じて親に合流する。親のツリーで子は全部閉じた形になる。"""
+        self.family(plan=plan)
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, allow, review=review))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01-01", [(rel, "x\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01-01")
+
+    def test_a_merge_request_phase_is_asked_as_a_control(self):
+        self.close_first_child(["design", "implement"], ["wip/design/*"], "wip/design/p.md")
+        body = self.stop(self.parent_tree)
+        self.assertEqual(body.get("decision"), "block")
+        self.assertIn(CODE, body["reason"])
+
+    def test_a_chat_phase_is_not_asked_before_the_request(self):
+        """このセッションで見る計画は `request` を打たず、ユーザが端末で進める。"""
+        self.close_first_child(["chores", "design"], ["src/a*"], "src/a1.py", review=False)
+        self.assertNotIn("decision", self.stop(self.parent_tree))
+
+    def test_a_deferred_phase_is_not_asked(self):
+        """延期したフェーズは依頼できない（次にレビューのある番号と一緒に見る）。"""
+        self.close_first_child(
+            [("design", "defer"), "implement", "acceptance"], ["wip/design/*"], "wip/design/p.md"
+        )
+        self.assertNotIn("decision", self.stop(self.parent_tree))
+
+    def test_a_real_change_request_keeps_the_requested_mark_and_is_not_asked(self):
+        """依頼したあと、レビュアーが変更要求を付けた。`confirm` は通らず、`requested` が残る。"""
+        self.close_first_child(["design", "implement"], ["wip/design/*"], "wip/design/p.md")
+        write(os.path.join(self.parent_tree, "wip", "eli5", "phase-1.html"), "<p>x</p>\n")
+        self.commit_parent("eli5")
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture, 1).returncode, 0)
+        mark = os.path.join(self.approved, "phases", "i0001", "1.requested")
+        self.assertTrue(os.path.exists(mark))
+        result = write(
+            os.path.join(self.root, "changes.json"),
+            json.dumps(
+                {
+                    "host": "fixture",
+                    "mr": {"number": 7, "url": "u/7"},
+                    "threads": [],
+                    "reviews": [
+                        {
+                            "state": "CHANGES_REQUESTED",
+                            "url": "r/1",
+                            "submitted_at": "2026-01-02T00:00:00Z",
+                            "author": "9001",
+                        }
+                    ],
+                }
+            ),
+        )
+        refused = self.confirm(result, 1)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("変更要求", refused.stderr)
+        self.assertTrue(os.path.exists(mark))
+        self.assertFalse(
+            os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
+        )
+        self.assertNotIn("decision", self.stop(self.parent_tree))
 
 
 if __name__ == "__main__":
