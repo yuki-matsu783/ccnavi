@@ -12,6 +12,7 @@
  * そのため（あとから来る `PlanGraph.css` が勝つ）。
  */
 @import "@xyflow/react/dist/style.css";
+@import "../shared/Maximize.css";
 @import "../styles/page.css";
 @import "./App.css";
 @import "./Card.css";

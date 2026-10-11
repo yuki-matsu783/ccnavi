@@ -12,6 +12,7 @@
 import { useMemo, useState, type JSX } from "react";
 import { Background, Controls, Handle, Position, ReactFlow, type Edge, type Node, type NodeProps, type NodeTypes } from "@xyflow/react";
 
+import { maximizeClass, MaximizeButton, RefitOnChange, useMaximize } from "../shared/Maximize.js";
 import {
   addChild,
   changeOp,
@@ -38,7 +39,6 @@ interface CondData extends Record<string, unknown> {
   readonly place: CondPlace;
   readonly selected: boolean;
   readonly broken: boolean;
-  readonly pick: (key: string) => void;
 }
 
 type CondFlowNode = Node<CondData, "cond">;
@@ -64,7 +64,7 @@ function CondNodeView({ data }: NodeProps<CondFlowNode>): JSX.Element {
   }
   const leafy = place.op === "glob" || place.op === "regex" || place.op === "invalid";
   return (
-    <div className={classes.join(" ")} data-op={place.op} data-key={place.key} title={OP_TITLES[place.op]} onClick={() => data.pick(place.key)}>
+    <div className={classes.join(" ")} data-op={place.op} data-key={place.key} title={OP_TITLES[place.op]}>
       <Handle type="target" position={Position.Left} isConnectable={false} />
       <Handle type="source" position={Position.Right} isConnectable={false} />
       <span className="cond-op">{place.op === "empty" ? "空" : place.op}</span>
@@ -100,6 +100,7 @@ function targetOf(tree: CondNode, key: string): { readonly path: CondPath; reado
 
 export function When({ tree, onChange }: WhenProps): JSX.Element {
   const [picked, setPicked] = useState("r");
+  const [maximized, toggleMaximize, maxBox] = useMaximize();
   const layout = useMemo(() => layoutCond(tree), [tree]);
   const problems = useMemo(() => condProblems(tree), [tree]);
   const brokenKeys = useMemo(() => new Set(problems.map((p) => pathKey(p.path))), [problems]);
@@ -113,7 +114,7 @@ export function When({ tree, onChange }: WhenProps): JSX.Element {
         id: place.key,
         type: "cond",
         position: { x: place.x, y: place.y },
-        data: { place, selected: place.key === selectedKey, broken: brokenKeys.has(place.key), pick: setPicked },
+        data: { place, selected: place.key === selectedKey, broken: brokenKeys.has(place.key) },
         draggable: false,
       })),
     [layout, selectedKey, brokenKeys],
@@ -129,7 +130,7 @@ export function When({ tree, onChange }: WhenProps): JSX.Element {
 
   return (
     <div className="cond" data-nodes={layout.places.length}>
-      <div className="cond-canvas">
+      <div ref={maxBox} className={`cond-canvas ${maximizeClass(maximized)}`}>
         <ReactFlow<CondFlowNode, Edge>
           // 組み合わせ条件の形が変わったら置き直して全体を映す（点の数で見分ける）
           key={layout.places.length}
@@ -140,6 +141,8 @@ export function When({ tree, onChange }: WhenProps): JSX.Element {
           nodesDraggable={false}
           edgesFocusable={false}
           elementsSelectable={false}
+          // 押せるのは onNodeClick があるときだけ。無いと React Flow は点を pointer-events: none で描き、押しても届かない
+          onNodeClick={(_event, node) => setPicked(node.id)}
           fitView
           fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
           ariaLabelConfig={{ "controls.zoomIn.ariaLabel": "拡大", "controls.zoomOut.ariaLabel": "縮小", "controls.fitView.ariaLabel": "全体を表示" }}
@@ -150,7 +153,9 @@ export function When({ tree, onChange }: WhenProps): JSX.Element {
         >
           <Background />
           <Controls showInteractive={false} />
+          <RefitOnChange value={maximized} />
         </ReactFlow>
+        <MaximizeButton maximized={maximized} onToggle={toggleMaximize} />
       </div>
       <Inspector tree={tree} path={target.path} node={target.node} edit={edit} />
       {problems.length > 0 && (

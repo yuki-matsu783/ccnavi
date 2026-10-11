@@ -5,6 +5,7 @@
  * 共有の図の部品の `shared/PlanGraph.css` が `--vscode-*` に置き換える。
  */
 @import "@xyflow/react/dist/style.css";
+@import "../shared/Maximize.css";
 @import "../styles/page.css";
 @import "../shared/PlanGraph.css";
 @import "./App.css";

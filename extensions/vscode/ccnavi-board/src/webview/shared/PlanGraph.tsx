@@ -17,9 +17,13 @@
  * `withLayout`）。ワークフロー編集タブは、番号が振り直っても点を動かさないためにこれを使う。開いたときの見え方
  * （全体を枠に収める）は `fitKey` が変わったときだけ合わせ直す（渡さなければ計画が替わるたび）。
  *
+ * **`detail` が真なら、項を押すと右に詳細の欄を出す**（ワークフロー編集タブ）。番号・定義・題・見る場所・延期先・固定・
+ * 先行と後続・すぐ始まるか・終端に当たらないかを、実行ファイルの値のまま読むだけで出す（直すのは線）。欄は畳める
+ * （畳んだかは画面が覚える）。
+ *
  * 見た目は `PlanGraph.css`。React Flow の CSS は `--xy-*` の変数で出来ているので、そこを `--vscode-*` で上書きする。
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type JSX, type MouseEvent as ReactMouseEvent } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type JSX, type MouseEvent as ReactMouseEvent } from "react";
 import {
   Background,
   BaseEdge,
@@ -53,10 +57,13 @@ import {
   type PlanGraphNode,
   type PlanLayout,
 } from "../../core/plan-graph.js";
+import { mergeState, readState } from "../vscode.js";
+import { maximizeClass, MaximizeButton, RefitOnChange, useMaximize } from "./Maximize.js";
 
 interface ItemData extends Record<string, unknown> {
   readonly node: PlanGraphNode;
   readonly editable: boolean;
+  readonly picked: boolean;
 }
 
 type ItemNode = Node<ItemData, "planItem">;
@@ -103,6 +110,7 @@ function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
       data-loose={node.loose ? "1" : "0"}
       data-locked={node.locked ? "1" : "0"}
       data-deferred={node.deferred ? "1" : "0"}
+      data-picked={data.picked ? "1" : "0"}
       title={title}
     >
       <Handle type="target" position={Position.Left} isConnectable={editable && !node.locked} />
@@ -187,12 +195,12 @@ function RemovableEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition,
 const NODE_TYPES: NodeTypes = { planItem: ItemView, planEnd: EndView };
 const EDGE_TYPES: EdgeTypes = { planRemovable: RemovableEdge };
 
-function nodesOf(graph: Graph, editable: boolean): PlanNode[] {
+function nodesOf(graph: Graph, editable: boolean, picked: string | undefined): PlanNode[] {
   return graph.nodes.map((node) => ({
     id: node.id,
     type: node.kind === "item" ? ("planItem" as const) : ("planEnd" as const),
     position: { x: node.x, y: node.y },
-    data: { node, editable },
+    data: { node, editable, picked: node.id === picked },
   }));
 }
 
@@ -290,8 +298,77 @@ function Notes({ plan }: { readonly plan: ApprovePlan }): JSX.Element | null {
 /** 線が引けたときに呼び手へ返すもの。`from` を `to` が待つ（番号） */
 export type PlanConnect = (from: number, to: number) => void;
 
+/**
+ * 詳細の欄を畳んだか。図が何枚あっても（全体計画とフィードバック計画）同じ値を見せるため、画面で 1 つだけ持ち、
+ * HTML を作り直しても残るよう `getState` にも書く
+ */
+const FOLD_KEY = "planDetailFolded";
+let detailFoldedNow: boolean | undefined;
+const foldListeners = new Set<() => void>();
+
+function readDetailFolded(): boolean {
+  detailFoldedNow ??= readState(FOLD_KEY) === true;
+  return detailFoldedNow;
+}
+
+function setDetailFolded(folded: boolean): void {
+  detailFoldedNow = folded;
+  mergeState(FOLD_KEY, folded);
+  foldListeners.forEach((listener) => listener());
+}
+
+function useDetailFolded(): boolean {
+  return useSyncExternalStore(
+    (listener) => {
+      foldListeners.add(listener);
+      return () => foldListeners.delete(listener);
+    },
+    readDetailFolded,
+  );
+}
+
+/** 押した項の詳細。実行ファイルの値を並べるだけ（判定しない） */
+function Detail({ plan, graph, id }: { readonly plan: ApprovePlan; readonly graph: Graph; readonly id: string | undefined }): JSX.Element {
+  const node = id === undefined ? undefined : graph.nodes.find((n) => n.id === id);
+  if (node === undefined || node.number === null) {
+    return <p className="dim small plan-detail-empty">項を押すと、ここに詳細を出します。</p>;
+  }
+  const number = node.number;
+  const numberOfNode = (nodeId: string): number | undefined => graph.nodes.find((n) => n.id === nodeId)?.number ?? undefined;
+  const listOf = (ids: readonly (number | undefined)[]): string => {
+    const numbers = ids.filter((n): n is number => n !== undefined).sort((a, b) => a - b);
+    return numbers.length === 0 ? "なし" : numbers.join(", ");
+  };
+  const before = graph.edges.filter((e) => e.kind === "after" && e.target === node.id).map((e) => numberOfNode(e.source));
+  const after = graph.edges.filter((e) => e.kind === "after" && e.source === node.id).map((e) => numberOfNode(e.target));
+  const rows: readonly (readonly [string, string])[] = [
+    ["番号", String(number)],
+    ["提案での番号", node.from === null ? "" : String(node.from)],
+    ["題", node.label],
+    ["定義", node.type],
+    ["見る場所", node.deferred ? deferText(node.reviewAt) : reviewText(node.review)],
+    ["待つ項（先行）", listOf(before)],
+    ["待たれる項（後続）", listOf(after)],
+    ["すぐ始まる", plan.ready.includes(number) ? "はい" : "いいえ"],
+    ["最後の項が待たない", node.loose ? "はい（終端に当たらない）" : "いいえ"],
+    ["番号の固定", node.locked ? "固定（子が承認済み。入る線は変えられない）" : "なし"],
+  ];
+  return (
+    <dl className="plan-detail-list" data-number={number}>
+      {rows.map(([name, value]) => (
+        <div key={name} className="plan-detail-row">
+          <dt>{name}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 export interface PlanGraphProps {
   readonly plan: ApprovePlan;
+  /** 真なら、項を押すと右に詳細の欄を出す（畳める）。承認のオーバーレイは狭いので出さない */
+  readonly detail?: boolean;
   readonly editable?: boolean;
   readonly onConnect?: PlanConnect;
   /** 線を消したときに呼ぶ。`from` を `to` が待たなくなる（番号）。渡したときだけ × を出す */
@@ -302,10 +379,13 @@ export interface PlanGraphProps {
   readonly fitKey?: unknown;
 }
 
-export function PlanGraph({ plan, editable = false, onConnect, onDisconnect, layout, fitKey }: PlanGraphProps): JSX.Element {
+export function PlanGraph({ plan, detail = false, editable = false, onConnect, onDisconnect, layout, fitKey }: PlanGraphProps): JSX.Element {
   const graph = useMemo(() => (layout === undefined ? planGraphOf(plan) : withLayout(planGraphOf(plan), layout)), [plan, layout]);
   const removable = editable && onDisconnect !== undefined;
-  const nodes = useMemo(() => nodesOf(graph, editable), [graph, editable]);
+  const [picked, setPicked] = useState<string | undefined>(undefined);
+  const folded = useDetailFolded();
+  const [maximized, toggleMaximize, maxBox] = useMaximize();
+  const nodes = useMemo(() => nodesOf(graph, editable, detail ? picked : undefined), [graph, editable, detail, picked]);
   const edges = useMemo(() => edgesOf(graph, removable), [graph, removable]);
   const numberOf = useCallback((id: string): number | undefined => graph.nodes.find((node) => node.id === id)?.number ?? undefined, [graph]);
 
@@ -338,7 +418,8 @@ export function PlanGraph({ plan, editable = false, onConnect, onDisconnect, lay
     <RemoveEdge.Provider value={removeEdge}>
     <section className="plan-graph" data-part={plan.part} data-ticket={plan.ticket} data-editable={editable ? "1" : "0"}>
       <h3>{headingOf(plan)}</h3>
-      <div className="graph plan-graph-canvas" data-nodes={graph.nodes.length} data-edges={graph.edges.length}>
+      <div className="plan-graph-body" data-folded={detail && folded ? "1" : "0"}>
+      <div ref={maxBox} className={`graph plan-graph-canvas ${maximizeClass(maximized)}`} data-nodes={graph.nodes.length} data-edges={graph.edges.length}>
         <ReactFlow<PlanNode, Edge>
           nodes={nodes}
           edges={edges}
@@ -349,6 +430,18 @@ export function PlanGraph({ plan, editable = false, onConnect, onDisconnect, lay
           nodesFocusable={false}
           edgesFocusable={false}
           elementsSelectable={false}
+          // 押せるのは onNodeClick があるときだけ（無いと点は pointer-events: none で描かれる）
+          onNodeClick={
+            detail
+              ? (event, node) => {
+                  // 線を引く取っ手の操作では選ばない（取っ手のクリックも点まで泡が上がる）
+                  if (!(event.target as Element).closest(".react-flow__handle")) {
+                    setPicked(node.type === "planItem" ? node.id : undefined);
+                  }
+                }
+              : undefined
+          }
+          onPaneClick={detail ? () => setPicked(undefined) : undefined}
           isValidConnection={isValidConnection}
           onConnect={handleConnect}
           ariaLabelConfig={{ "controls.zoomIn.ariaLabel": "拡大", "controls.zoomOut.ariaLabel": "縮小", "controls.fitView.ariaLabel": "全体を表示" }}
@@ -360,7 +453,25 @@ export function PlanGraph({ plan, editable = false, onConnect, onDisconnect, lay
           <Background />
           <Controls showInteractive={false} />
           <FitOnOpen fitKey={fitKey === undefined ? plan : fitKey} />
+          <RefitOnChange value={maximized} />
         </ReactFlow>
+        <MaximizeButton maximized={maximized} onToggle={toggleMaximize} />
+      </div>
+      {detail && (
+        <aside className="plan-detail" id="plan-detail" aria-label="項の詳細" data-folded={folded ? "1" : "0"}>
+          <button
+            type="button"
+            className="action small plan-detail-toggle"
+            data-action="toggle-plan-detail"
+            aria-expanded={!folded}
+            title={folded ? "詳細の欄を開く" : "詳細の欄を畳む"}
+            onClick={() => setDetailFolded(!folded)}
+          >
+            {folded ? "◀ 詳細" : "詳細 ▶"}
+          </button>
+          <Detail plan={plan} graph={graph} id={picked} />
+        </aside>
+      )}
       </div>
       <Notes plan={plan} />
     </section>

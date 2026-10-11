@@ -471,3 +471,63 @@ test("CB-D122 読むだけのときは、グループの縁を出さず、「グ
     await open.close();
   }
 });
+
+test("CB-D188 部品箱と右の欄は畳める。畳んでも中身は残し（入力途中を失わない）、隠すだけ", async () => {
+  const dom = await openFlow({ doc: marked() });
+  try {
+    const palette = dom.one("#flow-palette");
+    const side = dom.one(".flow-side");
+    assert.equal(palette.getAttribute("data-folded"), "0");
+    dom.click(dom.one('button[data-action="toggle-palette"]'));
+    await dom.settle();
+    assert.equal(dom.one("#flow-palette").getAttribute("data-folded"), "1");
+    assert.equal(dom.one(".flow-body").getAttribute("data-palette-folded"), "1");
+    assert.ok(dom.all("#flow-palette button[data-action=add-node]").length > 0, "畳んでも中身は残す");
+    dom.click(dom.one('button[data-action="toggle-side"]'));
+    await dom.settle();
+    assert.equal(dom.one(".flow-side").getAttribute("data-folded"), "1");
+    assert.ok(dom.all(".flow-side .inspector").length > 0, "畳んでも中身は残す");
+    dom.click(dom.one('button[data-action="toggle-palette"]'));
+    dom.click(dom.one('button[data-action="toggle-side"]'));
+    await dom.settle();
+    assert.equal(palette.getAttribute("data-folded") ?? dom.one("#flow-palette").getAttribute("data-folded"), "0");
+    assert.equal(dom.one(".flow-side").getAttribute("data-folded"), "0");
+    assert.ok(side.isConnected, "右の欄を作り直していない");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D190 図の拡大ボタンで図だけを全画面にし、もう一度押すと戻す", async () => {
+  const dom = await openFlow({ doc: marked() });
+  try {
+    dom.click(dom.one('#flow-graph button[data-action="toggle-maximize"]'));
+    await dom.settle();
+    assert.ok(dom.one("#flow-graph").classList.contains("is-max"));
+    dom.click(dom.one('#flow-graph button[data-action="toggle-maximize"]'));
+    await dom.settle();
+    assert.equal(dom.one("#flow-graph").classList.contains("is-max"), false);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D191 図を全画面にしている間は、背後を inert にして Esc を背後へ渡さず、キー操作で文書を直さない", async () => {
+  const dom = await openFlow({ doc: marked() });
+  try {
+    let behind = 0;
+    dom.document.addEventListener("keydown", () => (behind += 1));
+    dom.click(dom.one('#flow-graph button[data-action="toggle-maximize"]'));
+    await dom.settle();
+    assert.ok(dom.document.body.hasAttribute("data-graph-max"));
+    assert.ok(dom.all("[inert]").length > 0, "背後に inert を付ける");
+    assert.equal(dom.one("#flow-graph").closest("[inert]"), null, "図そのものは inert にしない");
+    dom.key("Escape");
+    await dom.settle();
+    assert.equal(behind, 0, "Esc は図が受けて背後へ渡さない");
+    assert.equal(dom.document.body.hasAttribute("data-graph-max"), false);
+    assert.equal(dom.all("[inert]").length, 0, "戻したら inert を外す");
+  } finally {
+    await dom.close();
+  }
+});
