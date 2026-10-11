@@ -137,4 +137,4 @@ class LintOpsTest(PhaseHarness):
         write(
             os.path.join(other, ".git"), "gitdir: /somewhere/projects/p/.git/worktrees/elsewhere\n"
         )
-        self.assertEqual(self.lint_lines("elsewhere"), [])
+        self.assertEqual(self.lint_lines("elsewhere は git に登録が無い"), [])

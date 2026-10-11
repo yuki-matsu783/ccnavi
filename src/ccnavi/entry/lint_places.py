@@ -91,6 +91,14 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     return problems
 
 
+def _projectless_worktrees(conf: settings.Settings, root: str) -> list[Problem]:
+    """元のプロジェクトが無いワークツリーを名指しする（warn）。判定と列挙は変えない。"""
+    return [
+        Problem(SEVERITY_WARN, f"(worktrees/{w.name})", w.said())
+        for w in tree.worktrees_without_project(root, conf.projects)
+    ]
+
+
 def _projects_rel(conf: settings.Settings, root: str) -> str:
     """プロジェクトの置き場の、ワークスペースルートからの相対（"/" 区切り）。
 
