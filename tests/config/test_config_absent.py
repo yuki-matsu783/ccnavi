@@ -219,6 +219,14 @@ BUILTIN_DENIED = (
     ("rm -rf -- x", "builtin-recursive-delete"),
     ("rm -r -f -- x", "builtin-recursive-delete"),
     (f"{GIT} reset --hard -- x", "builtin-git-reset-hard"),
+    # 空の値（読みでは空白が 2 字続く）の後ろのサブコマンド。
+    (f"{GIT} -C '' push", "builtin-git-push"),
+    (f'{GIT} -C "" reset --hard', "builtin-git-reset-hard"),
+    (f"{GIT} --work-tree '' push", "builtin-git-push"),
+    (f"{GIT} -C '' -c '' push", "builtin-git-push"),
+    # `\` の無い `$'…'` は単一引用と同じに読む。
+    (f"{GIT} $'push'", "builtin-git-push"),
+    ("rm $'-rf' x", "builtin-recursive-delete"),
 )
 BUILTIN_PASSED = (
     "legit push",
@@ -237,6 +245,7 @@ BUILTIN_PASSED = (
     "rm -f -- -r",
     "rm -r -- -f x",
     f"{GIT} reset -- --hard",
+    f"{GIT} -c x=push status",
 )
 
 # 照合の後戻りが長引く形だった入力。どれも当たらない。

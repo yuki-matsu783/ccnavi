@@ -170,7 +170,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 常に当たる土台の deny で、glob の文字列一致ではなく regex で書く。glob（`*rm -rf *`・`*git push*`）は表記違いに外れるため。
 
 - git は、サブコマンドの前に挟むグローバルオプション（`-C <path>`・`-c <k=v>`・`--git-dir[=]<dir>`・`--work-tree[=]<dir>`・`--no-pager` など）を
-  読み飛ばしてから `push` / `reset` を見る。値を取るオプションは値を最後まで読むので（`git -C gitx push` の `gitx` も 1 つの値）、`git -c push.default=current status` の値の `push` は
+  読み飛ばしてから `push` / `reset` を見る。値を取るオプションは値を最後まで読むので（`git -C gitx push` の `gitx` も 1 つの値。読みで空白が 2 字続く空の値 `git -C '' push` は空の値として読む）、`git -c push.default=current status` の値の `push` は
   サブコマンドに読まない。`push` の後ろは空白・区切り・末尾だけを見る。`reset` は後ろのどこかに `--hard`（略した `--har` も）があれば止める。`--` の後ろはパスなので見ない（`git reset -- --hard`）。
   サブコマンドを直接起こす `git-push` / `git-reset`（パス付きの `/usr/lib/git-core/git-push`、`.exe` 付き）も同じ 1 本で止める。
   `legit push` のような語と、`git commit -m push` のように値の位置にある語は当てない

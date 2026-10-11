@@ -204,9 +204,13 @@ _GIT_FREE_OPTION = rf"-{_PLAIN}*+(?:{_UPTO_ANCHOR}{_TAIL}?)?"
 # `git commit -m push` の `push` は値の位置で、サブコマンドには読まない。値まで読んだ語を
 # 読み直さない（所有的）ので、`git -c push.default=current status` の値の `push` も
 # サブコマンドには読まない。
+#
+# 値とのあいだの空白は 1 字だけ読む。読み（shellread）は語を空白 1 字でつなぎ、空の語
+# （`git -C '' push` の `''`）は空のまま残すので、空白が 2 字続くところは空の値になる。
+# 空白をまとめて読むと、空の値の次の `push` を値として読んで外れる。
 _GIT_OPTIONS = (
     r"(?:\s++(?:(?:-c|--(?:git-dir|work-tree|namespace|config-env|super-prefix"
-    rf"|attr-source))\s++{_GIT_FREE}|{_GIT_FREE_OPTION}))*+"
+    rf"|attr-source))\s{_GIT_FREE}?|{_GIT_FREE_OPTION}))*+"
 )
 
 
