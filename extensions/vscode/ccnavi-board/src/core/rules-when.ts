@@ -384,6 +384,32 @@ export function layoutCond(root: CondNode): CondLayout {
   return { places, edges };
 }
 
+/**
+ * 「条件の木に変換」できない理由。`except:` の各要素が glob / regex 1 つの葉でなければ、木の中へ
+ * そのまま移せない（読めない要素を木に入れると、元の誤りの形が変わって見つけにくくなる）。
+ * 移せるなら undefined
+ */
+export function exceptBlocker(excepts: readonly CondNode[] | undefined): string | undefined {
+  if (excepts === undefined) {
+    return undefined;
+  }
+  if (excepts.length === 0) {
+    return "except が空のリストです。ルールファイルで直してから変換してください";
+  }
+  for (const [i, node] of excepts.entries()) {
+    if (node.op === "invalid") {
+      return `except の ${i + 1} 件目が読めません（${node.reason}）。ルールファイルで直してから変換してください`;
+    }
+    if (node.op !== "glob" && node.op !== "regex") {
+      return `except の ${i + 1} 件目が glob / regex 1 つのマップではありません。ルールファイルで直してから変換してください`;
+    }
+    if (node.pattern === "") {
+      return `except の ${i + 1} 件目の ${node.op} が空です。ルールファイルで直してから変換してください`;
+    }
+  }
+  return undefined;
+}
+
 /** 画面が送ってきた木を、形だけ確かめて受け取る。形が違えば undefined */
 export function asCond(raw: unknown, depth = 0): CondNode | undefined {
   if (typeof raw !== "object" || raw === null || depth > 200) {

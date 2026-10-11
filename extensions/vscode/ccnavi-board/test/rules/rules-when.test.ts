@@ -15,6 +15,7 @@ import {
   not,
   removeAt,
   setPattern,
+  exceptBlocker,
   treeOfPattern,
   unwrapNot,
   wrapNot,
@@ -195,7 +196,7 @@ deny:
     match: Bash
     when:
       all:
-        - glob: '*git push*'
+        - glob: "*git push*"
 `,
   );
   const again = readRules(out).model;
@@ -311,6 +312,71 @@ deny:
   // 読めないノードは読んだ値のまま書き戻す
   const doc = readRules(text);
   assert.equal(doc.apply(doc.model.sections), text);
+});
+
+test("CB-T342 「条件の木に変換」で、元のパターンと except の各要素のコメント（前置き・行末）が対応する葉に残る", () => {
+  const text = `version: 1
+deny:
+  - id: commented
+    match: Write
+    # 本体の理由
+    regex: '^{root}[\\\\/]' # 本体の行末
+    # 除くものの説明
+    except:
+      # 1 つ目の理由
+      - regex: '^{root}[\\\\/]wip' # 1 つ目の行末
+      # 2 つ目の理由
+      - glob: '{root}/.claude/**'
+    message: m
+`;
+  const doc = readRules(text);
+  const rule = doc.model.sections.deny[0];
+  const converted: RuleForm = { ...rule, pattern: "", when: treeOfPattern(rule.kind, rule.pattern, rule.exceptNodes), excepts: undefined, exceptNodes: undefined, dropExcept: true };
+  const out = doc.apply({ ...doc.model.sections, deny: [converted] });
+  assert.equal(
+    out,
+    `version: 1
+deny:
+  - id: commented
+    match: Write
+    when:
+      all:
+        # 本体の理由
+        - regex: '^{root}[\\\\/]' # 本体の行末
+        # 除くものの説明
+        - not:
+            any:
+              # 1 つ目の理由
+              - regex: '^{root}[\\\\/]wip' # 1 つ目の行末
+              # 2 つ目の理由
+              - glob: '{root}/.claude/**'
+    message: m
+`,
+  );
+  assert.deepEqual(readRules(out).model.sections.deny[0].when, converted.when);
+  // 変換したあとに葉を直しても、コメントはその葉に付いたまま
+  const edited = doc.apply({ ...doc.model.sections, deny: [{ ...converted, when: setPattern(converted.when ?? leaf("glob"), [0], "^{root}") }] });
+  assert.ok(edited.includes("        # 本体の理由\n        - regex: '^{root}' # 本体の行末\n"), edited);
+});
+
+test("CB-T343 except がリストでない・要素が glob / regex 1 つでない・空なら「条件の木に変換」できない理由を返す", () => {
+  const rulesOf = (except: string) =>
+    readRules(`version: 1
+deny:
+  - id: x
+    match: Write
+    glob: '*'
+${except}
+    message: m
+`).model.sections.deny[0];
+  assert.equal(exceptBlocker(rulesOf("").exceptNodes), undefined);
+  assert.equal(exceptBlocker(rulesOf("    except:\n      - glob: '*.md'\n      - regex: 'x'").exceptNodes), undefined);
+  assert.match(exceptBlocker(rulesOf("    except: '*.md'").exceptNodes) ?? "", /except の 1 件目が読めません（except の値はリストです）/);
+  assert.match(exceptBlocker(rulesOf("    except:\n      - glob: '*.md'\n        regex: x").exceptNodes) ?? "", /1 件目が読めません/);
+  assert.match(exceptBlocker(rulesOf("    except:\n      - glob: '*.md'\n      - any: [{glob: a}]").exceptNodes) ?? "", /2 件目が glob \/ regex 1 つのマップではありません/);
+  assert.match(exceptBlocker(rulesOf("    except:\n      - '*.md'").exceptNodes) ?? "", /1 件目が読めません/);
+  assert.match(exceptBlocker(rulesOf("    except: []").exceptNodes) ?? "", /空のリスト/);
+  assert.match(exceptBlocker(rulesOf("    except:\n      - glob: ''").exceptNodes) ?? "", /glob が空/);
 });
 
 test("CB-T346 子を消してから別の子を直しても、消した子のコメントは直した子に付かない", () => {

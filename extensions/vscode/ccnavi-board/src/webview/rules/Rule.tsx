@@ -12,7 +12,7 @@
 import type { JSX, ReactNode } from "react";
 
 import { KNOWN_TOOLS, SECTIONS, type FileField, type PatternKind, type RuleForm, type Section } from "../../core/rules-view.js";
-import { condProblems, condSummary, treeOfPattern } from "../../core/rules-when.js";
+import { condProblems, condSummary, exceptBlocker, treeOfPattern } from "../../core/rules-when.js";
 import { contextSummary, hasContext, staleMessage, summaryId, summaryMatch, summaryNote } from "./text.js";
 import { When } from "./When.js";
 
@@ -48,6 +48,8 @@ export interface RuleProps {
 
 export function Rule(props: RuleProps): JSX.Element {
   const { rule, section } = props;
+  // except が木へそのまま移せない形なら、「条件の木に変換」を押させずに理由を出す
+  const blocker = exceptBlocker(rule.exceptNodes);
 
   const text = (name: TextKey, className: string, placeholder: string): JSX.Element => (
     <input
@@ -172,7 +174,8 @@ export function Rule(props: RuleProps): JSX.Element {
                 type="button"
                 className="action small"
                 data-action="to-when"
-                title="このパターン（と除外）を、同じ意味の条件の木（when）に書き直す。除外は not の中へ移る"
+                disabled={blocker !== undefined}
+                title={blocker ?? "このパターン（と除外）を、同じ意味の条件の木（when）に書き直す。除外は not の中へ移る"}
                 onClick={() => props.onChange(toWhen(rule))}
               >
                 条件の木に変換

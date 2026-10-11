@@ -8,7 +8,7 @@
  *
  * ここはルールの意味（当たる・当たらない）には触れない。判定は実行ファイルの仕事。
  */
-import { isMap, isNode, isScalar, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Node } from "yaml";
+import { isMap, isNode, isScalar, isSeq, Pair, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Node } from "yaml";
 
 import { SECTIONS, type PatternKind, type RuleForm, type RulesModel, type Section, type Sections } from "./rules-view.js";
 import { asCond, sameCond, type CondNode } from "./rules-when.js";
@@ -330,7 +330,7 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
   setText(doc, node, "id", form.id, Scalar.PLAIN);
   setText(doc, node, "match", form.match, Scalar.PLAIN);
   if (form.when !== undefined) {
-    writeWhen(doc, node, form.when);
+    writeWhen(doc, node, form.when, form.dropExcept === true);
   } else {
     // glob と regex は必ず引用符で囲む。囲まないと YAML が先に解釈する（rules.yml の先頭の注意）。
     const other: PatternKind = form.kind === "glob" ? "regex" : "glob";
@@ -372,15 +372,20 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
  * 変えたときは `glob` / `regex` を消し、木を書く。元のノードは使い回す。子は、同じ中身のノードを先に
  * 拾い（消した・並べ替えた子のコメントが別の子へ付け替わらないように）、残りを似たノードに当てて
  * 値だけを書き換える。新しい葉は単引用符で囲む。
+ *
+ * まだ `when:` が無い（「条件の木に変換」した）ときは、元の `glob` / `regex` と、移す `except:` の
+ * 各要素を、変換した形（`all: [本体, not: {any: 除くもの}]`）に組んで元のノードとして当てる。
+ * 書いてあったコメント（前置き・行末）が、対応する葉に付いたまま残る。
  */
-function writeWhen(doc: Document, node: YAMLMap, tree: CondNode): void {
+function writeWhen(doc: Document, node: YAMLMap, tree: CondNode, movingExcept: boolean): void {
   const current = node.get("when", true);
   if (current !== undefined && sameCond(condOfYaml(current), tree)) {
     return;
   }
+  const donor = current === undefined ? convertedFrom(node, movingExcept) : undefined;
   node.delete("glob");
   node.delete("regex");
-  const next = patchCond(doc, current, tree);
+  const next = patchCond(doc, current ?? donor, tree);
   if (current !== undefined && next === current) {
     return;
   }
@@ -390,6 +395,52 @@ function writeWhen(doc: Document, node: YAMLMap, tree: CondNode): void {
   }
   const at = node.items.findIndex((p) => String((p.key as Scalar).value) === "match");
   node.items.splice(at >= 0 ? at + 1 : node.items.length, 0, doc.createPair("when", next));
+}
+
+/**
+ * glob / regex 1 つ（と `except:`）のルールの元のノードを、「条件の木に変換」した形に組む。
+ * 葉は元のペアの値（行末のコメント付き）をそのまま持ち、キーの前のコメントは葉の前へ移す。
+ * `except:` の各要素はノードごと移す（`movingExcept` のときだけ。消さない except は動かさない）
+ */
+function convertedFrom(node: YAMLMap, movingExcept: boolean): YAMLMap | undefined {
+  const body = node.items.find((p) => isScalar(p.key) && (p.key.value === "glob" || p.key.value === "regex") && isScalar(p.value));
+  const children: Node[] = [];
+  if (body !== undefined) {
+    const key = body.key as Scalar;
+    const leafMap = new YAMLMap();
+    leafMap.items.push(new Pair(new Scalar(key.value), body.value));
+    leafMap.commentBefore = key.commentBefore;
+    key.commentBefore = undefined;
+    children.push(leafMap);
+  }
+  if (movingExcept) {
+    const exceptPair = node.items.find((p) => isScalar(p.key) && p.key.value === "except");
+    const seq = exceptPair?.value;
+    if (exceptPair !== undefined && isSeq(seq) && seq.items.length > 0) {
+      // 先頭の要素の前のコメントは、読み込みではリストのほうに付く
+      const first = seq.items[0];
+      if (seq.commentBefore && isNode(first) && !first.commentBefore) {
+        first.commentBefore = seq.commentBefore;
+        seq.commentBefore = undefined;
+      }
+      const anyItems = new YAMLSeq();
+      anyItems.items = seq.items.slice();
+      const anyMap = new YAMLMap();
+      anyMap.items.push(new Pair(new Scalar("any"), anyItems));
+      const notMap = new YAMLMap();
+      notMap.items.push(new Pair(new Scalar("not"), anyMap));
+      notMap.commentBefore = (exceptPair.key as Scalar).commentBefore;
+      children.push(notMap);
+    }
+  }
+  if (children.length === 0) {
+    return undefined;
+  }
+  const all = new YAMLSeq();
+  all.items = children;
+  const root = new YAMLMap();
+  root.items.push(new Pair(new Scalar("all"), all));
+  return root;
 }
 
 function mapOf(doc: Document, key: string, value: unknown): YAMLMap {

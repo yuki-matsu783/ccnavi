@@ -972,3 +972,45 @@ test("CB-D157 glob / regex と除外のルールは「条件の木に変換」�
     await dom.close();
   }
 });
+
+test("CB-D158 except が木へそのまま移せない形なら、「条件の木に変換」を押せず、理由をボタンの説明に出す", async () => {
+  const text = `version: 1
+deny:
+  - id: bad-except
+    match: Write
+    glob: '*'
+    except: '*.md'
+    message: m
+  - id: group-except
+    match: Write
+    glob: '*'
+    except:
+      - any: [{glob: a}]
+    message: m
+`;
+  const dom = await openRules({ model: readRules(text).model }, undefined, { measure: true });
+  try {
+    for (const [id, why] of [
+      ["bad-except", "except の 1 件目が読めません（except の値はリストです）"],
+      ["group-except", "except の 1 件目が glob / regex 1 つのマップではありません"],
+    ]) {
+      const row = rowSelector(id);
+      dom.click(dom.one(`${row} .row-head`));
+      await dom.settle();
+      const button = dom.one<HTMLButtonElement>(`${row} button[data-action="to-when"]`);
+      assert.equal(button.disabled, true, id);
+      assert.ok(button.title.startsWith(why), button.title);
+    }
+    const ok = rowSelector("except-rule");
+    const fine = await openRules({ model: readRules(WHEN_RULES).model }, undefined, { measure: true });
+    try {
+      fine.click(fine.one(`${ok} .row-head`));
+      await fine.settle();
+      assert.equal(fine.one<HTMLButtonElement>(`${ok} button[data-action="to-when"]`).disabled, false);
+    } finally {
+      await fine.close();
+    }
+  } finally {
+    await dom.close();
+  }
+});
