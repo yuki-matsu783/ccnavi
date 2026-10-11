@@ -25,6 +25,11 @@ def with_branch(text, branch):
     return "\n".join([*head, f"branch: {branch}", rest])
 
 
+def with_mr(text, mr):
+    head, rest = text.split("\n", 3)[:3], text.split("\n", 3)[3]
+    return "\n".join([*head, f"mr: {mr}", rest])
+
+
 class PromptHintTest(PhaseHarness):
     def prompt(self, text, *extra, session="s1"):
         payload = {
@@ -111,6 +116,40 @@ class PromptHintTest(PhaseHarness):
         said = self.prompt("MR !12 を見て")
         self.assertIn("すでに feature-3-foo(doing)", said)
         self.assertNotIn("--mr 12", said)
+
+    def test_a_mr_field_of_an_approved_ticket_says_continue(self):
+        self.propose("feature-3-foo", with_mr(parent_text("feature-3-foo", ["research"]), 12))
+        self.commit_parent("propose")
+        self.approve()
+        said = self.prompt("MR !12 を見て")
+        self.assertIn("すでに feature-3-foo(doing)", said)
+        self.assertNotIn("--mr 12", said)
+        # 番号が別なら結び付かない
+        other = self.prompt("MR !13 を見て", session="s2")
+        self.assertIn("--mr 13", other)
+        self.assertNotIn("結び付いている", other)
+
+    def test_a_mr_field_of_a_proposal_says_continue(self):
+        self.propose("feature-3-foo", with_mr(parent_text("feature-3-foo", ["research"]), 12))
+        said = self.prompt("MR !12 を見て")
+        self.assertIn("すでに feature-3-foo(todo)", said)
+        self.assertIn("結び付いている", said)
+        self.assertNotIn("--mr 12", said)
+
+    def test_the_mr_field_and_the_branch_convention_are_both_kept(self):
+        # `mr:` の一致を先に見る。慣習名（branch: mr-N）は併用で残る
+        by_field = with_mr(parent_text("feature-3-foo", ["research"]), 12)
+        by_name = with_branch(parent_text("feature-4-bar", ["research"]), "mr-14")
+        self.propose("feature-3-foo", by_field)
+        self.propose("feature-4-bar", by_name)
+        self.commit_parent("propose")
+        self.approve()
+        self.assertIn("すでに feature-3-foo(doing)", self.prompt("MR !12 を見て"))
+        self.assertIn("すでに feature-4-bar(doing)", self.prompt("MR !14 を見て", session="s2"))
+
+    def test_the_mr_field_is_not_an_issue_binding(self):
+        self.propose("feature-3-foo", with_mr(parent_text("feature-3-foo", ["research"]), 12))
+        self.assertIn("--issue 12", self.prompt("#12 を直して"))
 
     def test_the_same_number_is_said_once_per_session(self):
         self.assertIn("--issue 152", self.prompt("#152 を直して"))
@@ -267,6 +306,17 @@ class BranchesCommandTest(PhaseHarness):
         self.assertTrue(data["candidates"][0]["local"])
         text = self.branches("mr", 5, result).stdout
         self.assertIn("MR=!5(opened,フォーク)", text)
+
+    def test_tickets_with_the_mr_field_join_the_candidates(self):
+        self.propose("feature-3-foo", with_mr(parent_text("feature-3-foo", ["research"]), 12))
+        self.propose("feature-4-bar", with_mr(parent_text("feature-4-bar", ["research"]), 13))
+        data = self.json_of("mr", 12)
+        self.assertEqual([c["branch"] for c in data["candidates"]], ["feature-3-foo"])
+        self.assertEqual(data["candidates"][0]["sources"], ["ticket"])
+        self.assertEqual([t["ticket"] for t in data["issue_tickets"]], ["feature-3-foo"])
+        self.assertEqual(self.json_of("mr", 99)["candidates"], [])
+        # issue の枝は `mr:` を見ない
+        self.assertEqual(self.json_of("issue", 12)["issue_tickets"], [])
 
     def test_an_mr_without_the_host_says_so_and_has_no_candidate(self):
         result = self.host({"checked": False, "reason": "origin が無い"})

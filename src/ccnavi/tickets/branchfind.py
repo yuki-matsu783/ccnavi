@@ -177,23 +177,26 @@ def _repo_of(conf: settings.Settings, root: str, cwd: str) -> tuple[tree.Tree | 
 def _bound(conf: settings.Settings, root: str, cwd: str, ref: Ref) -> Bound | None:
     """指定がすでに結び付いている先。手元の候補（`collect` と同じ集め方）だけを見る。
 
-    照合は厳密にする。issue はチケットの `issue:` の一致、MR は承認済みチケットの `branch:` が
-    MR の慣習名（`_MR_BRANCH`）で番号が一致するときだけ。名前に番号を含むだけのブランチ
+    照合は厳密にする。issue はチケットの `issue:` の一致。MR は (1) チケットの `mr:` の一致
+    （提案も承認済みも）、(2) 承認済みチケットの `branch:` が MR の慣習名（`_MR_BRANCH`）で番号が
+    一致するとき、の順で見る。名前に番号を含むだけのブランチ
     （`fix-12-foo`）は結び付きとして数えない。読めないときは None（案内する側に倒す）。
     URL で別のリポジトリが示されているときも None（番号が同じだけの別物かもしれない）。
     """
     if ref.repo:
         return None
     try:
-        if ref.kind == ISSUE:
-            data, failed = collect(conf, root, cwd, ISSUE, ref.number, Host())
-            if failed:
-                return None
-            for c in data["candidates"]:
-                if "ticket" in c["sources"] and c["tickets"]:
-                    links = [f"{t['ticket']}({t['state']})" for t in c["tickets"]]
-                    return Bound(c["branch"], links, c["worktrees"])
+        # issue はチケットの `issue:`、MR はチケットの `mr:` の一致（どちらも提案も承認済みも対象）
+        data, failed = collect(conf, root, cwd, ref.kind, ref.number, Host())
+        if failed and ref.kind == ISSUE:
             return None
+        for c in data.get("candidates", []):
+            if "ticket" in c["sources"] and c["tickets"]:
+                links = [f"{t['ticket']}({t['state']})" for t in c["tickets"]]
+                return Bound(c["branch"], links, c["worktrees"])
+        if ref.kind == ISSUE:
+            return None
+        # MR は、`mr:` に続けて慣習名（承認済みの親の `branch:` が mr-N など）も見る
         repo, project, failed = _repo_of(conf, root, cwd)
         if repo is None or failed:
             return None
@@ -529,6 +532,15 @@ def collect(
         for name in sorted(local | origin):
             if names_number(name, number):
                 candidate(name).add_source("name")
+    elif kind == MR:
+        # 2'. MR 指定なら `mr: <番号>` を持つ親（提案も承認済みも。`mr:` は同じリポジトリだけ）。
+        for t in tickets:
+            if t.is_child or t.mr != number:
+                continue
+            approved = t.state != ticket_model.TODO
+            link = TicketLink(t.ticket, t.state, approved, t.title, t.issue)
+            issue_tickets.append(link)
+            candidate(_branch_of_ticket(t, approved)).add_source("ticket")
     # どの候補にも、ワークツリーと結び付くチケットを添える。
     for branch, c in found.items():
         c.worktrees = sorted(checked_out.get(branch, []))
