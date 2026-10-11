@@ -423,6 +423,76 @@ store_hit() {
 	return 0
 }
 
+# ---- worktree add の起点が古くないか（P14。hook は git もネットワークも起こさない決まりなので、判定はこの sh の中）
+#
+# 新しいブランチを統合先（名前そのもの、または origin/<統合先>）から切るとき、次を確かめる。
+#   (i)  最後の fetch が 10 分より前、または FETCH_HEAD が無い（共通の git ディレクトリの FETCH_HEAD の更新時刻）
+#   (ii) 起点が手元の統合先で、origin/<統合先> より遅れている（origin/<統合先> が起点なら対象外）
+# 満たさなければ拒否して手順を案内する。ここで fetch は打たない（副作用が増えるため）。
+# fetch を試して失敗した記録（このスクリプトの fetch が失敗したときに共通の git ディレクトリへ置く印）が
+# 10 分以内にあるときは、(i) は止めずに警告だけにする（オフラインで詰まないため）。
+# 起点を省いたときは今のブランチ（HEAD）が起点になるので、それが統合先なら同じ判定をする。
+# 既にあるブランチを出す形は新しく切らないので対象外。
+wt_fresh_dir() {
+	wt_fd=$(git rev-parse --git-common-dir 2>/dev/null) || return 1
+	(cd "$wt_fd" 2>/dev/null && pwd)
+}
+wt_fresh_warn=""
+wt_fresh() {
+	if [ -n "$wt_new" ]; then
+		:
+	elif [ -z "$wt_base" ] && ! git show-ref --verify --quiet "refs/heads/$wt_leaf"; then
+		:
+	else
+		return 0
+	fi
+	wt_f_top=$(ccnavi_phys "$(git rev-parse --show-toplevel 2>/dev/null || :)")
+	[ -n "$wt_f_top" ] || return 0
+	wt_f_integ=$(ccnavi_integration "$wt_f_top" "$WS") || return 0
+	[ -n "$wt_f_integ" ] || return 0
+	wt_f_from="$wt_base"
+	case "$wt_f_from" in
+	'' | HEAD) wt_f_from=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || :) ;;
+	esac
+	wt_f_origin=no
+	case "$wt_f_from" in
+	"$wt_f_integ") ;;
+	"origin/$wt_f_integ") wt_f_origin=yes ;;
+	*) return 0 ;;
+	esac
+	git show-ref --verify --quiet "refs/remotes/origin/$wt_f_integ" || return 0
+	wt_f_dir=$(wt_fresh_dir) || return 0
+
+	wt_f_behind=0
+	if [ "$wt_f_origin" = no ]; then
+		git show-ref --verify --quiet "refs/heads/$wt_f_integ" || return 0
+		wt_f_behind=$(git rev-list --count "$wt_f_integ..origin/$wt_f_integ" 2>/dev/null || echo 0)
+	fi
+
+	# 失敗した fetch も FETCH_HEAD を触る（開いて空にする）ので、失敗の印を先に見る。
+	wt_f_stale=no
+	wt_f_offline=no
+	if [ -f "$wt_f_dir/ccnavi-fetch-failed" ] &&
+		[ -z "$(find "$wt_f_dir/ccnavi-fetch-failed" -mmin +10 2>/dev/null)" ]; then
+		wt_f_offline=yes
+		wt_f_stale=yes
+	elif [ ! -f "$wt_f_dir/FETCH_HEAD" ]; then
+		wt_f_stale=yes
+	elif [ -n "$(find "$wt_f_dir/FETCH_HEAD" -mmin +10 2>/dev/null)" ]; then
+		wt_f_stale=yes
+	fi
+
+	if [ "$wt_f_behind" -ne 0 ]; then
+		reject worktree-base-behind "ワークツリーの基点 $wt_f_integ が origin/$wt_f_integ より ${wt_f_behind} 件遅れています。古い統合先から切ると、取り込み済みの変更を知らないブランチになります。$SELF fetch origin ${wt_f_integ} のあと、統合先のワークツリーで $SELF merge --ff-only origin/${wt_f_integ} を打つか、基点を origin/${wt_f_integ} にして切り直してください（$SELF worktree add $wt_dest -b ${wt_leaf} origin/${wt_f_integ}）。"
+	fi
+	if [ "$wt_f_stale" = yes ] && [ "$wt_f_offline" = no ]; then
+		reject worktree-fetch-stale "ワークツリーの基点 $wt_f_from の元になる origin/${wt_f_integ} が古いかもしれません（最後の fetch が 10 分より前、または fetch の記録がありません）。まず $SELF fetch origin ${wt_f_integ} を打ち、$SELF log --oneline ${wt_f_integ}..origin/${wt_f_integ} で遅れを確かめてから、打ち直してください。遅れていれば統合先のワークツリーで $SELF merge --ff-only origin/${wt_f_integ} を打つか、基点を origin/${wt_f_integ} にして切り直します。"
+	fi
+	if [ "$wt_f_stale" = yes ]; then
+		wt_fresh_warn="fetch を試して失敗した記録があるため、origin/${wt_f_integ} が古いかもしれないまま ${wt_f_from} から切りました（オフラインの可能性）。つながったら $SELF fetch origin ${wt_f_integ} で遅れを確かめてください。"
+	fi
+}
+
 # ---- 直接作業の取り込み（integrate / integrate --abort / integrate-done）
 #
 # チケットを起こさない直接作業のワークツリー（.claude/worktrees/<名前>。ブランチも同じ名前）を、
@@ -1192,6 +1262,8 @@ worktree)
 		elif [ -n "$wt_base" ] && [ "$wt_base" != "$wt_leaf" ]; then
 			reject worktree-name "worktree add $wt_dest $wt_base は、$wt_base を名前の違う行き先（${wt_leaf}）に出すか、ブランチの外（detached HEAD）に作ります。ワークツリーの名前はブランチ名と同じにします。新しく切るなら $SELF worktree add $wt_dest -b $wt_leaf ${wt_base}、既にあるブランチ $wt_base を出すなら行き先を .claude/worktrees/$wt_base にしてください。既にあるブランチを識別子の名前のワークツリーで使うなら、親チケット（${wt_leaf}）に branch: $wt_base を書いて承認を受けてから打ってください。"
 		fi
+		# 統合先から切るなら、起点が古くないか確かめる（名前の検査を通ったあと）。
+		wt_fresh
 		;;
 	list | prune | remove)
 		# 許可リスト。remove の --force（略した --forc も）は止める。
@@ -1884,6 +1956,19 @@ logfile="$logdir/git-$(date '+%Y%m%d-%H%M%S')-$$.log"
 status=0
 git --no-pager "$sub" ${1+"$@"} >>"$logfile" 2>&1 || status=$?
 
+# fetch を試して失敗した印（worktree add の起点の確認が、オフラインで詰まらないように使う）。
+# 成功すれば消す。FETCH_HEAD の更新時刻は成功した fetch でしか進まない。
+if [ "$sub" = fetch ]; then
+	fetch_common=$(wt_fresh_dir) || fetch_common=""
+	if [ -n "$fetch_common" ]; then
+		if [ "$status" -eq 0 ]; then
+			rm -f "$fetch_common/ccnavi-fetch-failed"
+		else
+			: >"$fetch_common/ccnavi-fetch-failed" 2>/dev/null || :
+		fi
+	fi
+fi
+
 # 記録のパス。エージェントがそのまま sed -n で開ける形で返す。
 #
 # 基準はワークスペースルート。モード B ではエージェントの cwd がプロジェクトの中に
@@ -1934,6 +2019,9 @@ if [ "$status" -eq 0 ]; then
 	fi
 	if [ "$sub" = push ]; then
 		push_record_family
+	fi
+	if [ "$sub" = worktree ] && [ -n "$wt_fresh_warn" ]; then
+		printf '警告: %s\n' "$wt_fresh_warn"
 	fi
 else
 	printf 'fail  git %s  exit=%d  log=%s\n' "$sub" "$status" "$logrel"
