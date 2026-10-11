@@ -12,6 +12,7 @@
 import { useMemo, useState, type JSX } from "react";
 import { Background, Controls, Handle, Position, ReactFlow, type Edge, type Node, type NodeProps, type NodeTypes } from "@xyflow/react";
 
+import { maximizeClass, MaximizeButton, RefitOnChange, useMaximize } from "../shared/Maximize.js";
 import {
   addChild,
   changeOp,
@@ -99,6 +100,7 @@ function targetOf(tree: CondNode, key: string): { readonly path: CondPath; reado
 
 export function When({ tree, onChange }: WhenProps): JSX.Element {
   const [picked, setPicked] = useState("r");
+  const [maximized, toggleMaximize] = useMaximize();
   const layout = useMemo(() => layoutCond(tree), [tree]);
   const problems = useMemo(() => condProblems(tree), [tree]);
   const brokenKeys = useMemo(() => new Set(problems.map((p) => pathKey(p.path))), [problems]);
@@ -128,7 +130,7 @@ export function When({ tree, onChange }: WhenProps): JSX.Element {
 
   return (
     <div className="cond" data-nodes={layout.places.length}>
-      <div className="cond-canvas">
+      <div className={`cond-canvas ${maximizeClass(maximized)}`}>
         <ReactFlow<CondFlowNode, Edge>
           // 組み合わせ条件の形が変わったら置き直して全体を映す（点の数で見分ける）
           key={layout.places.length}
@@ -151,7 +153,9 @@ export function When({ tree, onChange }: WhenProps): JSX.Element {
         >
           <Background />
           <Controls showInteractive={false} />
+          <RefitOnChange value={maximized} />
         </ReactFlow>
+        <MaximizeButton maximized={maximized} onToggle={toggleMaximize} />
       </div>
       <Inspector tree={tree} path={target.path} node={target.node} edit={edit} />
       {problems.length > 0 && (

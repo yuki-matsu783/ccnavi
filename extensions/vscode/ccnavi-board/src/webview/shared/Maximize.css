@@ -1,0 +1,11 @@
+/*
+ * 図の全画面（`Maximize.tsx`）。出している間は図の枠が画面全体を覆い、ほかの表示は隠れる。
+ */
+.graph-max { position: relative; }
+body .graph-max.is-max {
+  position: fixed; inset: 0; z-index: 100;
+  width: 100vw; height: 100vh; max-height: none; min-height: 0; margin: 0;
+  border: none; border-radius: 0;
+  background: var(--vscode-editor-background);
+}
+.graph-max-button { position: absolute; top: 6px; right: 6px; z-index: 5; margin-left: 0; }

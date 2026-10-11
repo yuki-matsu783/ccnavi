@@ -72,6 +72,7 @@ import {
   type FlowSize,
   type PortInfo,
 } from "../../core/flow-doc.js";
+import { maximizeClass, MaximizeButton, RefitOnChange, useMaximize } from "../shared/Maximize.js";
 import { badgeOf, summaryOf, type Badge } from "./text.js";
 
 /** いま選んでいるもの。線はリストの位置で指す（id が無い線もある） */
@@ -377,6 +378,7 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, onSele
   const base = useMemo(() => stepsOf(doc, readOnly), [doc, readOnly]);
   const edges = useMemo(() => edgesOf(doc, selected, readOnly), [doc, selected, readOnly]);
   const [nodes, setNodes] = useState<FlowNodeView[]>(base);
+  const [maximized, toggleMaximize] = useMaximize();
 
   // コピーが替わったら手元を作り直す。測った大きさと、選んでいるか（Shift で選び足したものも）は引き継ぐ。
   // 呼び手が図の外から選んだノード（`focus`。部品箱で足したもの）は、それが替わったときだけ、それ 1 つを選ぶ。
@@ -421,7 +423,7 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, onSele
   );
 
   return (
-    <div className="graph flow-graph" id="flow-graph" data-nodes={doc.nodes.length} data-edges={edges.length} data-readonly={readOnly ? "1" : "0"}>
+    <div className={`graph flow-graph ${maximizeClass(maximized)}`} id="flow-graph" data-nodes={doc.nodes.length} data-edges={edges.length} data-readonly={readOnly ? "1" : "0"}>
       <Actions.Provider value={actions}>
         <ReactFlow<FlowNodeView, FlowEdge>
           nodes={nodes}
@@ -459,8 +461,10 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, onSele
         >
           <Background />
           <Controls showInteractive={false} />
+          <RefitOnChange value={maximized} />
           {minimap && <MiniMap<FlowNodeView> id="flow-minimap" pannable zoomable ariaLabel="ミニマップ" nodeColor={minimapColor} nodeStrokeWidth={2} />}
         </ReactFlow>
+        <MaximizeButton maximized={maximized} onToggle={toggleMaximize} />
       </Actions.Provider>
     </div>
   );

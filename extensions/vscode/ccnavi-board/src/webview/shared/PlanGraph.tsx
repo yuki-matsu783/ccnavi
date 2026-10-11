@@ -58,6 +58,7 @@ import {
   type PlanLayout,
 } from "../../core/plan-graph.js";
 import { getState, setState } from "../vscode.js";
+import { maximizeClass, MaximizeButton, RefitOnChange, useMaximize } from "./Maximize.js";
 
 interface ItemData extends Record<string, unknown> {
   readonly node: PlanGraphNode;
@@ -371,6 +372,7 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
   const removable = editable && onDisconnect !== undefined;
   const [picked, setPicked] = useState<string | undefined>(undefined);
   const [folded, setFolded] = useState(detailFolded);
+  const [maximized, toggleMaximize] = useMaximize();
   const nodes = useMemo(() => nodesOf(graph, editable, detail ? picked : undefined), [graph, editable, detail, picked]);
   const edges = useMemo(() => edgesOf(graph, removable), [graph, removable]);
   const numberOf = useCallback((id: string): number | undefined => graph.nodes.find((node) => node.id === id)?.number ?? undefined, [graph]);
@@ -405,7 +407,7 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
     <section className="plan-graph" data-part={plan.part} data-ticket={plan.ticket} data-editable={editable ? "1" : "0"}>
       <h3>{headingOf(plan)}</h3>
       <div className="plan-graph-body" data-folded={detail && folded ? "1" : "0"}>
-      <div className="graph plan-graph-canvas" data-nodes={graph.nodes.length} data-edges={graph.edges.length}>
+      <div className={`graph plan-graph-canvas ${maximizeClass(maximized)}`} data-nodes={graph.nodes.length} data-edges={graph.edges.length}>
         <ReactFlow<PlanNode, Edge>
           nodes={nodes}
           edges={edges}
@@ -430,7 +432,9 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
           <Background />
           <Controls showInteractive={false} />
           <FitOnOpen fitKey={fitKey === undefined ? plan : fitKey} />
+          <RefitOnChange value={maximized} />
         </ReactFlow>
+        <MaximizeButton maximized={maximized} onToggle={toggleMaximize} />
       </div>
       {detail && (
         <aside className="plan-detail" id="plan-detail" aria-label="項の詳細">

@@ -494,3 +494,17 @@ test("CB-D188 部品箱と右の欄は畳める。畳むと中身を出さず、
     await dom.close();
   }
 });
+
+test("CB-D190 図の拡大ボタンで図だけを全画面にし、もう一度押すと戻す", async () => {
+  const dom = await openFlow({ doc: marked() });
+  try {
+    dom.click(dom.one('#flow-graph button[data-action="toggle-maximize"]'));
+    await dom.settle();
+    assert.ok(dom.one("#flow-graph").classList.contains("is-max"));
+    dom.click(dom.one('#flow-graph button[data-action="toggle-maximize"]'));
+    await dom.settle();
+    assert.equal(dom.one("#flow-graph").classList.contains("is-max"), false);
+  } finally {
+    await dom.close();
+  }
+});

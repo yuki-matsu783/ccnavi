@@ -406,3 +406,19 @@ test("CB-D187 項を押すと右の欄に詳細を出す。欄は畳め、畳ん
     await dom.close();
   }
 });
+
+test("CB-D189 図の拡大ボタンで図だけを全画面にし、閉じる・Esc で戻す", async () => {
+  const dom = await openWorkflow();
+  try {
+    const canvas = '.plan-graph[data-part="plan"] .plan-graph-canvas';
+    assert.equal(dom.one(canvas).classList.contains("is-max"), false);
+    dom.click(dom.one(`${canvas} button[data-action="toggle-maximize"]`));
+    await dom.settle();
+    assert.ok(dom.one(canvas).classList.contains("is-max"));
+    dom.key("Escape");
+    await dom.settle();
+    assert.equal(dom.one(canvas).classList.contains("is-max"), false);
+  } finally {
+    await dom.close();
+  }
+});
