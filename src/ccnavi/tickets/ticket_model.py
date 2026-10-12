@@ -147,7 +147,8 @@ WORKFLOW_DAG = "dag"
 
 @dataclass
 class Workflow:
-    """計画の待ち方。承認済みチケット（と提案）の計画の項の `after` から、`workflow.compute` が
+    """作業・レビュー計画（旧称ワークフロー）の待ち方。
+    承認済みチケット（と提案）の計画の項の `after` から、`workflow.compute` が
     都度計算する。ファイルにもチケットの欄にも持たない。
 
     `waits` は番号 → 待つ番号（推移的に辿った全部。番号の小さい順）、`review_at` は延期した

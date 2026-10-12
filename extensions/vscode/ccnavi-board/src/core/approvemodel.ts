@@ -59,7 +59,7 @@ export interface ApprovePlan {
   readonly ticket: string;
   /** `plan`（全体計画）か `feedback`（フィードバック計画） */
   readonly part: string;
-  /** 親の提案とその子の提案をまとめたハッシュ（ワークフロー編集タブの保存で `--expect` に返す） */
+  /** 親の提案とその子の提案をまとめたハッシュ（計画編集タブの保存で `--expect` に返す） */
   readonly source_sha: string;
   readonly items: readonly ApprovePlanItem[];
   /** 直接の先行（番号は `number`） */
@@ -95,7 +95,7 @@ export interface ApprovePreview {
 }
 
 /**
- * 一覧のうち、ワークフロー編集タブに未保存の変更がある親（識別子の順）。親は一覧の親（`parent` が null。改版も）と、
+ * 一覧のうち、計画編集タブに未保存の変更がある親（識別子の順）。親は一覧の親（`parent` が null。改版も）と、
  * 図のある親。子の識別子は親のタブと取り違えない。**空でなければ承認を打たない**（承認の遷移のガードと、画面のボタン）
  */
 export function unsavedParents(preview: ApprovePreview, unsaved: readonly string[]): string[] {
@@ -105,7 +105,7 @@ export function unsavedParents(preview: ApprovePreview, unsaved: readonly string
 
 /** 未保存のタブがあるので承認できない理由 */
 export function unsavedText(parents: readonly string[]): string {
-  return `親 ${parents.join(", ")} のワークフロー編集タブに未保存の変更があります。保存するか破棄してから承認してください`;
+  return `親 ${parents.join(", ")} の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください`;
 }
 
 /**

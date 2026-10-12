@@ -30,7 +30,7 @@ test("CB-T225 画面から届くメッセージは形を確かめ、崩れたも
   assert.deepEqual(asFlowMessage({ type: "save", doc: twin }), { type: "save", doc: twin });
   // 知らない操作・オブジェクトでないもの
   assert.equal(asFlowMessage({ type: "delete" }), undefined);
-  // 取り込み（外のワークフローを読む操作）は無い
+  // 取り込み（外のフローを読む操作）は無い
   assert.equal(asFlowMessage({ type: "import", dirty: true }), undefined);
   assert.equal(asFlowMessage("save"), undefined);
   assert.equal(asFlowMessage(null), undefined);

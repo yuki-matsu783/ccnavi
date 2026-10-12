@@ -160,7 +160,7 @@ test("CB-T317 リスクの配点の差し替え: 共通は --risk、ワークス
   ]);
 });
 
-test("CB-T365 ワークフロー編集タブの引数。読むだけは --plan-order <親> --json（線を変えたら --order に元の番号での先行の JSON）、保存は --order・--expect・--write・--json", () => {
+test("CB-T365 計画編集タブの引数。読むだけは --plan-order <親> --json（線を変えたら --order に元の番号での先行の JSON）、保存は --order・--expect・--write・--json", () => {
   assert.deepEqual(planOrderArgs("i0001"), ["--plan-order", "i0001", "--json"]);
   assert.deepEqual(planOrderArgs("i0001", {}), ["--plan-order", "i0001", "--json"], "線を変えていなければ --order を付けない");
   const order = { plan: { "1": [], "2": [1, 3], "3": [1] } };

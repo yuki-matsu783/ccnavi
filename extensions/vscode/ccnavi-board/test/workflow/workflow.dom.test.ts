@@ -1,5 +1,5 @@
 /**
- * ワークフロー編集タブ（`src/webview/workflow/`）を happy-dom で動かす。
+ * 計画編集タブ（`src/webview/workflow/`）を happy-dom で動かす。
  *
  * 画面は判定しない。線を変えるたびに、元の番号での直接の先行（`--order`）を拡張ホストに送り（`order`）、
  * 実行ファイルの答え（`answer`）が届いたらその振り直し・`problems`・`loose`・`writable` を図に出す。
@@ -254,7 +254,7 @@ test("CB-D175 読み込めなければ理由と再読込、読み込み中は一
     dom.click(dom.one('[data-action="reload"]'));
     await dom.settle();
     assert.deepEqual(lastPosted(dom, "reload"), { type: "reload", dirty: false });
-    await dom.send({ type: "data", data: { kind: "loading", text: "i0001 のワークフローを読み込み中…" } });
+    await dom.send({ type: "data", data: { kind: "loading", text: "i0001 の計画編集を読み込み中…" } });
     assert.match(dom.one("#ccnavi-loading").textContent ?? "", /読み込み中/);
     await dom.send({ type: "data", data: { kind: "page", page: { root: "/ws", ticket: "i0001", answer: planOrderSample("open") } } });
     assert.equal(dom.all(".plan-graph").length, 2);

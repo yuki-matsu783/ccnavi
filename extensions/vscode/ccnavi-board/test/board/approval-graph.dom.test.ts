@@ -192,14 +192,14 @@ test("CB-D163 振り直しの見本の表の計画（振り直す前と後）を
   }
 });
 
-test("CB-D164 図のある親ごとに「ワークフローを編集」を出す。押すと親の識別子を送る（閉じてタブを開くのは拡張ホスト）。承認中は出さない", async () => {
+test("CB-D164 図のある親ごとに「計画を編集」を出す。押すと親の識別子を送る（閉じてタブを開くのは拡張ホスト）。承認中は出さない", async () => {
   const dom = await openOverlay(samplePlans());
   try {
     // 親 1 つに全体計画とフィードバック計画の 2 つの図。入口は親ごとに 1 つ、その親の図の前
     const buttons = dom.all('.approval [data-action="edit-workflow"]');
     assert.deepEqual(
       buttons.map((b) => [b.getAttribute("data-ticket"), b.textContent]),
-      [["i0001", "ワークフローを編集"]],
+      [["i0001", "計画を編集"]],
     );
     const family = dom.one('.approval .plan-family[data-ticket="i0001"]');
     assert.deepEqual(
@@ -222,15 +222,15 @@ test("CB-D164 図のある親ごとに「ワークフローを編集」を出す
   }
 });
 
-test("CB-D180 ワークフロー編集タブに未保存の変更がある親を含む一覧は、その親の図の上に理由を出し、承認のボタンを押せなくする。外れたら押せる", async () => {
+test("CB-D180 計画編集タブに未保存の変更がある親を含む一覧は、その親の図の上に理由を出し、承認のボタンを押せなくする。外れたら押せる", async () => {
   const dom = await openBoard(fixture(), { approval: { kind: "preview", preview: preview(samplePlans()) }, measure: true, unsaved: ["i0001"] });
   try {
     await dom.settle();
     const note = dom.one('.approval .plan-family[data-ticket="i0001"] .plan-unsaved');
-    assert.equal(note.textContent, "ワークフロー編集タブに保存していない変更があります。保存するか破棄するまで、この一覧は承認できません。");
+    assert.equal(note.textContent, "計画編集タブに保存していない変更があります。保存するか破棄するまで、この一覧は承認できません。");
     const confirm = dom.one<HTMLButtonElement>('[data-action="approve-confirm"]');
     assert.equal(confirm.disabled, true);
-    assert.equal(dom.one("#approval-blocked").textContent, "親 i0001 のワークフロー編集タブに未保存の変更があります。保存するか破棄してから承認してください");
+    assert.equal(dom.one("#approval-blocked").textContent, "親 i0001 の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください");
     assert.equal(confirm.getAttribute("title"), dom.one("#approval-blocked").textContent);
     // 未保存のままでも、タブへの入口は押せる（保存しに行く）
     assert.equal(dom.one<HTMLButtonElement>('[data-action="edit-workflow"]').disabled, false);
@@ -260,7 +260,7 @@ test("CB-D181 タブで保存したあとに提案が変わった親（拡張ホ
     const note = dom.one('.approval .plan-family[data-ticket="i0001"] .plan-changed');
     assert.equal(
       note.textContent,
-      "ワークフロー編集タブで保存したあとに、提案が変わっています（エージェントが書き換えた可能性があります）。図を確かめてから承認してください。",
+      "計画編集タブで保存したあとに、提案が変わっています（エージェントが書き換えた可能性があります）。図を確かめてから承認してください。",
     );
     assert.equal(dom.one<HTMLButtonElement>('[data-action="approve-confirm"]').disabled, false);
   } finally {

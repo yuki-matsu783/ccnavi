@@ -1,6 +1,6 @@
 """計画の順序を振り直して書き戻す `ccnavi --plan-order <親>`の受入テスト。
 
-VS Code のワークフロー編集タブが打つ経路。タブは図で引いた線（元の番号での直接の先行）を
+VS Code の計画編集タブが打つ経路。タブは図で引いた線（元の番号での直接の先行）を
 `--order` に付けて実行ファイルに渡し、実行ファイルが番号を振り直して答える。保存では
 `--write --expect <ハッシュ>` で提案の計画を書き換える。見るのは 8 つ。
 
@@ -32,7 +32,7 @@ from tests.ticket.test_ticket import ROOT, write
 from tests.ticketsample import child_text, parent_text
 
 PLAN_REORDER = os.path.join(ROOT, "tests", "fixtures", "plan-reorder.json")
-# VS Code 拡張のワークフロー編集タブが読む `--plan-order` の答えの実例。
+# VS Code 拡張の計画編集タブが読む `--plan-order` の答えの実例。
 PLAN_ORDER_FIXTURE = os.path.join(
     ROOT, "extensions", "vscode", "ccnavi-board", "test", "fixtures", "plan-order.json"
 )
@@ -867,7 +867,7 @@ class PlanOrderApprovedChildTest(PlanOrderHarness):
 class PlanOrderFixtureTest(PlanOrderHarness):
     """拡張のフィクスチャ（extensions/vscode/ccnavi-board/test/fixtures/plan-order.json）と同じ形。
 
-    ワークフロー編集タブが読む答えを並べる。開いたとき（`open`）、逆向きの線で番号と子が
+    計画編集タブが読む答えを並べる。開いたとき（`open`）、逆向きの線で番号と子が
     動くとき（`reverse`）、循環で断るとき（`cycle`）、終端の検査で書けないとき（`loose`）、
     改版で子が承認された番号があるとき（`revision`）、書いたとき（`written`）。形を変えたら
     `CCNAVI_BOARD_FIXTURE=1` を付けてこのテストを走らせ、フィクスチャを書き直す。

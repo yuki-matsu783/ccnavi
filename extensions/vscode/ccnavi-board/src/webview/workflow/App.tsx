@@ -1,5 +1,5 @@
 /**
- * ワークフロー編集タブの本体。帯・ツールバー・計画ごとの図・理由の一覧・保存の確かめ。
+ * 計画編集タブの本体。帯・ツールバー・計画ごとの図・理由の一覧・保存の確かめ。
  *
  * 見せる中身は拡張ホストが渡す（`WorkflowData`）。画面が持つのは、いま見せている実行ファイルの答え（`answer`）・
  * 答えを待っているか・点の置き場所・直前の一言・外で変わった知らせだけ。
@@ -261,7 +261,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   if (data.kind === "error" || answer === undefined) {
     return (
       <>
-        <p className="empty">ワークフロー編集タブを読み込めませんでした。原因を直してから「再読込」を押してください。</p>
+        <p className="empty">計画編集タブを読み込めませんでした。原因を直してから「再読込」を押してください。</p>
         <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
         <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
           再読込
@@ -427,7 +427,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
       <header className="toolbar">
         <div className="summary" data-tour="summary">
           <span className="workflow-ticket">
-            <strong>{shownTicket}</strong> のワークフロー（計画の順序）
+            <strong>{shownTicket}</strong> の作業・レビュー計画の順序
           </span>
           <span id="dirty" data-tour="dirty" className={shownDirty ? "dirty" : "dirty hidden"}>
             未保存

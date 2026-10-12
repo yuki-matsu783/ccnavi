@@ -4,7 +4,7 @@
  *
  * 計画を持つ親が一覧にあれば、本文の上にその計画の図を読むだけで出す（`PlanGraph`。中身は preview の
  * `plans` で、承認する提案そのものの順序）。図は判定をせず、実行ファイルの答えを描くだけ。図は親ごとにまとめ、
- * その前に順序を直すワークフロー編集タブへの入口（「ワークフローを編集」）を置く。押すと拡張ホストがオーバーレイを
+ * その前に順序を直す計画編集タブへの入口（「計画を編集」）を置く。押すと拡張ホストがオーバーレイを
  * 閉じてからタブを開く（タブで保存すると、この一覧はもう承認できないため）。
  *
  * 親のタブに未保存の変更があれば、その親の図の上に理由を出し、承認のボタンを押せなくする（`unsaved`。拡張ホストが
@@ -170,11 +170,11 @@ function Body({
           {families(preview.plans).map(([ticket, plans]) => (
             <div key={ticket} className="plan-family" data-ticket={ticket}>
               {unsaved.includes(ticket) ? (
-                <p className="approval-note warn plan-unsaved">ワークフロー編集タブに保存していない変更があります。保存するか破棄するまで、この一覧は承認できません。</p>
+                <p className="approval-note warn plan-unsaved">計画編集タブに保存していない変更があります。保存するか破棄するまで、この一覧は承認できません。</p>
               ) : null}
               {changed.includes(ticket) ? (
                 <p className="approval-note warn plan-changed">
-                  ワークフロー編集タブで保存したあとに、提案が変わっています（エージェントが書き換えた可能性があります）。図を確かめてから承認してください。
+                  計画編集タブで保存したあとに、提案が変わっています（エージェントが書き換えた可能性があります）。図を確かめてから承認してください。
                 </p>
               ) : null}
               {approving ? null : (
@@ -185,10 +185,10 @@ function Body({
                     data-action="edit-workflow"
                     data-tour="edit-workflow"
                     data-ticket={ticket}
-                    title={`このオーバーレイを閉じて、${ticket} の計画の順序を直すワークフロー編集タブを開きます。保存すると提案が書き換わるので、承認は開き直してください`}
+                    title={`このオーバーレイを閉じて、${ticket} の計画の順序を直す計画編集タブを開きます。保存すると提案が書き換わるので、承認は開き直してください`}
                     onClick={() => post({ type: "editWorkflow", ticket })}
                   >
-                    ワークフローを編集
+                    計画を編集
                   </button>
                 </div>
               )}

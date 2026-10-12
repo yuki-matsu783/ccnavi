@@ -1,5 +1,5 @@
 /*
- * ワークフロー編集タブの CSS。部品 1 つに CSS 1 本（`Review.tsx` なら `Review.css`）で、ここはバンドルの入口。
+ * 計画編集タブの CSS。部品 1 つに CSS 1 本（`Review.tsx` なら `Review.css`）で、ここはバンドルの入口。
  *
  * **先頭の 1 行だけが外のパス**（`@xyflow/react`。図が要る CSS）。色は `--xy-*` の変数で出来ていて、
  * 共有の図の部品の `shared/PlanGraph.css` が `--vscode-*` に置き換える。

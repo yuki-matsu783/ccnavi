@@ -4,7 +4,7 @@
 定義の写しは `tickets/plan_phases.py` が持つ。
 
 - `--json [--order <JSON>]` と `--order <JSON> --expect <ハッシュ> --write`: 計画の番号を振り直して
-  答え、保存では提案の `plan:` / `feedback:` の値を書き換える。VS Code のワークフロー編集タブが
+  答え、保存では提案の `plan:` / `feedback:` の値を書き換える。VS Code の計画編集タブが
   打つ
 - `--fill-phases`: 計画（`plan:` / `feedback:`）の項が使うフェーズ定義だけを `phases.yml` から
   読み、提案の `phases:` の値をその定義の集まりに差し替える

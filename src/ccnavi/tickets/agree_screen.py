@@ -63,12 +63,12 @@ def approved_text(
     if worktrees is not None:
         git_sh = settings.script_command(root, "ccnavi-git.sh")
         lines += _child_worktree_lines(tickets, worktrees, git_sh)
-    # 承認の前にワークフロー編集タブ（`--plan-order --write`）で計画の順序が書き換わると、
+    # 承認の前に計画編集タブ（`--plan-order --write`）で計画の順序が書き換わると、
     # エージェントが書いた番号と承認された番号が違うことがある。書き換えられたかを見分ける材料が
     # 無い（コミットしていない編集と見分けられない）ので、計画を持つ親とその子があればいつも添える。
     if any((not t.is_child and t.has_plan) or (t.is_child and t.phase) for t in tickets):
         lines.append(
-            "番号は承認済みチケットで読み直す（承認の前にワークフロー編集タブで計画の順序と番号が"
+            "番号は承認済みチケットで読み直す（承認の前に計画編集タブで計画の順序と番号が"
             "書き換わっていることがある）。"
         )
     return "\n".join(lines)
