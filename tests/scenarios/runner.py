@@ -480,6 +480,60 @@ def summarize_hooks(hook_events, where):
     return lines, omitted
 
 
+def hook_denial_texts(hook_events):
+    """拒否・確認・ブロックの hook 応答にある理由の文面を集める。
+    ツール結果のエラーとの重複判定に使う。"""
+    texts = []
+    for ev in hook_events:
+        if ev.get("subtype") != "hook_response":
+            continue
+        data = _hook_payload(ev)
+        spec = data.get("hookSpecificOutput")
+        spec = spec if isinstance(spec, dict) else {}
+        decision = spec.get("permissionDecision") or data.get("decision")
+        reason = spec.get("permissionDecisionReason") or data.get("reason")
+        text = str(reason).strip() if reason else ""
+        if decision in ("deny", "ask", "block") and text:
+            texts.append(text)
+    return texts
+
+
+def _duplicates_hook(text, denial_texts):
+    """エラーの文面が、hook の拒否理由と（前後の空白を除いて）まったく同じなら True。"""
+    text = text.strip()
+    if not text:
+        return False
+    return text in denial_texts
+
+
+def _step_decisions_table(rows, step_sessions):
+    """判定の記録を、見出し付きの表にする。step_sessions は {step 番号: [session id]}。"""
+    lines = [
+        "| step | event | tool | decision | code | rules | subject |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for r in rows:
+        steps = sorted(n for n, sids in step_sessions.items() if r.get("session") in sids)
+        step = ",".join(str(n) for n in steps) or "?"
+        rules = r.get("rules", "")
+        if isinstance(rules, list):
+            rules = ",".join(str(x) for x in rules)
+        elif rules is None:
+            rules = ""
+        subject = _clip(r.get("subject") or "", 500, "logs/decisions.jsonl")
+        cells = [
+            step,
+            r.get("event", ""),
+            r.get("tool", ""),
+            r.get("decision", ""),
+            r.get("code", ""),
+            rules,
+            subject,
+        ]
+        lines.append("| " + " | ".join(_cell(c) for c in cells) + " |")
+    return lines
+
+
 def _cell(s):
     """表のセルに入れる文字列から、列と行を崩す文字を除く。"""
     return str(s).replace("|", "\\|").replace("\n", " ")
@@ -525,29 +579,49 @@ def write_report(scn, out, st, results, rows, raw):
         "judge の基準:",
         *[f"- {c}" for c in scn["expect"].get("judge", [])],
     ]
+    steps = scn.get("steps") or []
+    step_sessions = {}
     for p in sorted(out.glob("step-*.jsonl")):
         parsed = parse_stream(p.read_text(encoding="utf-8"))
-        ev += ["", f"## {p.stem}", "### ツール呼び出し"]
+        num = int(p.stem.split("-")[1])
+        step_sessions[num] = parsed["session_ids"]
+        ev += ["", f"## {p.stem}"]
+        if 0 < num <= len(steps) and steps[num - 1].get("prompt"):
+            ev += ["### 入力プロンプト", steps[num - 1]["prompt"].strip()]
+        ev += ["### ツール呼び出し"]
         ev += [
             f"- {t['name']}: {_clip(json.dumps(t['input'], ensure_ascii=False), 500, p.name)}"
             for t in parsed["tool_calls"]
         ]
-        ev += ["### ツール結果"]
-        ev += [
-            f"- {'エラー' if r['is_error'] else '成功'}: "
-            f"{_clip(_text_of(r['content']), EVIDENCE_LIMIT, p.name)}"
-            for r in parsed["tool_results"]
-        ]
+        denial_texts = hook_denial_texts(parsed["hook_events"])
+        ok_lines, err_lines = [], []
+        for r in parsed["tool_results"]:
+            text = _text_of(r["content"])
+            if not r["is_error"]:
+                ok_lines.append(f"- {_clip(text, EVIDENCE_LIMIT, p.name)}")
+            elif _duplicates_hook(text, denial_texts):
+                err_lines.append("- hook の応答を参照（下の「hook の応答」と同じ文）")
+            else:
+                err_lines.append(f"- {_clip(text, EVIDENCE_LIMIT, p.name)}")
+        ev += ["### ツール結果（成功）", *(ok_lines or ["- なし"])]
+        ev += ["### ツール結果（エラー）", *(err_lines or ["- なし"])]
         hook_lines, omitted = summarize_hooks(parsed["hook_events"], p.name)
         ev += ["### hook の応答（拒否・確認・案内文・Stop だけ）", *hook_lines]
         if omitted:
             counts = "、".join(f"{k} {v} 件" for k, v in sorted(omitted.items()))
             ev.append(f"- 省いた応答: {counts}（全量は {p.name}）")
         ev += ["### 最後の報告", _clip(parsed["final_text"], 3000, p.name)]
-    ev += ["", "## ccnavi の判定の記録（このセッションの行）"]
-    for r in rows:
-        head = " ".join(str(r.get(k, "")) for k in ("event", "tool", "decision", "code", "rules"))
-        ev.append(f"- {head} {_clip(r.get('subject', ''), 500, 'logs/decisions.jsonl')}")
+    ev += [
+        "",
+        "## ccnavi の判定の記録（このセッションの行）",
+        "",
+        "列: step=どの step の行か / event=hook の種類 / tool=対象のツール / "
+        "decision=判定（allow・deny・ask など）/"
+        " code=判定の理由コード / rules=当たったルール / subject=判定の対象（コマンドやパス）。"
+        "UNDECLARED はハンドオーバーに宣言が無いことを示す code。",
+        "",
+        *_step_decisions_table(rows, step_sessions),
+    ]
     (out / "evidence.md").write_text("\n".join(ev) + "\n", encoding="utf-8")
 
 
