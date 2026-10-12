@@ -2676,6 +2676,84 @@ sh や拡張が頼るフラグや出力の形を、呼ぶ側を直さないと�
 配布先なら ccnavi のリポジトリで組み立てて `sh scripts/ccnavi-setup.sh <ワークスペース> --force` で実行ファイルと sh を配り直す。
 拡張のほうが古ければ拡張を入れ直す。`--version` を知らない実行ファイルは、この仕組みより前の古い版として扱う。
 
+## 作業・レビュー計画のテンプレート
+
+```sh
+ccnavi --templates                          # 一覧（名前・層・説明・いつ使うか）
+ccnavi --templates --keyword 調査            # name・description・when の検索（語を重ねるとどれか）
+ccnavi --templates --show feature           # 1 本の中身（計画・フロー・検査・ファイルの本文）
+ccnavi --templates --layer lib --json       # 共通 + プロジェクト lib の足し算。画面向けの完全な答え
+```
+
+完了した作業の計画とフローを、次の作業で使い回すためのひな形。1 ファイル（`<名前>.yml`）に、親の作業・レビュー計画
+（全体計画 `plan:` とフィードバック計画 `feedback:` の項と `after`）と、各子のフローの本文を入れる。
+読むだけのコマンドで、何も書かないので、エージェントが打ってよい。いまの版は読む側（一覧・検索・表示・`--lint`）までで、
+下書きの作成・取り込み・テンプレートから親を起こす操作は無い。
+
+置き場は 2 層で、使うのは共通と 1 つのレイヤー（`--layer` を省けば自身のレイヤー `self`）の和。
+
+| 層 | 置き場 |
+|---|---|
+| 共通 | `.ccnavi/config/common/templates/<名前>.yml` |
+| プロジェクト（`self` かプロジェクト名） | `.ccnavi/config/project/templates/<名前>.yml` |
+
+置き場が無いのは正常（無い = 空）。同名のテンプレートが両方に在るときは、フェーズ定義と同じ扱いにする。全欄が同じならレイヤーの側を捨てて
+info、中身が違えばレイヤーの側だけを使わず error（どちらが効くかを黙って決めない）。共通のテンプレートが壊れていれば共通を空として扱い、
+レイヤーの側は使う。
+
+```yaml
+name: feature                 # ファイル名（拡張子を除く）と同じ。英数字で始め、英数字と . _ - だけ
+description: 機能を設計から実装まで進める   # 一覧に出す説明（必須）
+when: 新しい機能を足すとき     # 選ぶ手がかり（省いてよい）
+plan:                         # 全体計画。項は定義の名前か {type, review, after}
+  - design
+  - {type: implement, after: [1]}   # after はこの計画の中の添字（1 始まり）
+feedback:                     # フィードバック計画（省いてよい）。after は feedback の中の添字
+  - implement-feedback
+flows:                        # 全体計画の項の添字 → 子のフローの本文（フローのファイルと同じ形）
+  2:
+    id: wf-impl
+    name: 実装の手順
+    nodes: [...]
+    connections: [...]
+```
+
+未知の欄は warn で読まない。ファイルは、フローと同じ読み手で読む（シンボリックリンク・ハードリンク・ふつうのファイルでないもの・256 KiB 超・
+YAML の別名・UTF-8 でないものは読まない）。
+
+検査は `--lint` と `--templates` の答えが同じ関数で行う。順序（`after` の範囲・終端が 1 つ・最後の項の延期・延期の引き受け手）と、
+`flows` の添字が全体計画に在ること、フローの形は error。型が `phases.yml` に無い、`kind` が置き場と合わない、延期の引き受け手にレビューが無い、は
+warn にとどめる（定義は後から変わるので、使うときの承認で改めて error になる）。フローの警告は `--lint --flow` と同じ。
+`--lint` の指摘の場所は、共通が `(templates)`、レイヤーが `(templates/<名前>)`。
+
+`--templates --json` は、画面がそのまま描ける完全な答えを返す。形は [tests/fixtures/templates-json.json](tests/fixtures/templates-json.json)
+の見本で固定している。
+
+| 鍵 | 何 |
+|---|---|
+| `version` / `root` | 形の版（いま 1）/ ワークスペースルート |
+| `layer` / `keywords` | 一覧の対象のレイヤー（`--layer`、既定 `self`）/ 検索の語 |
+| `templates[]` | 共通 + `layer` の足し算の結果（`keywords` で絞る）。共通の側の検査は、足し算の結果のフェーズ定義で行う |
+| `layers[]` | 共通・`self`・各プロジェクトの生の中身。`{name, path, exists, unreadable, writable, problems[], templates[]}`。検査はそのレイヤーのフェーズ定義（共通は共通だけ）で行う |
+| `sums[]` | レイヤーごとの足し算の索引。`{name, layers[], templates[{name, layer, effective, dropped}]}` |
+| `errors` / `warns` / `infos` | 全レイヤーの苦情の件数 |
+
+`templates[]` と `layers[].templates[]` の 1 件。
+
+| 鍵 | 何 |
+|---|---|
+| `name` / `layer` / `path` | 名前 / `common` かレイヤーの名前 / ワークスペースルートからの相対パス（`/` 区切り） |
+| `sha` | ファイルの中身の SHA-256。保存のときの `--expect` に使う（`--plan-order` の `source_sha` と同じ流儀） |
+| `valid` | 読めたか。読めなければ下の中身は空で、理由は `problems` と `dropped.detail` |
+| `description` / `when` | 説明 / 選ぶ手がかり |
+| `plan[]` / `feedback[]` | 項 `{index, number, type, review, after}`。`index` は計画の中の添字、`number` は提案に写したときの番号（フィードバック計画は全体計画の続き）、`after` は計画の中の添字 |
+| `has_flows` / `flows[]` | フローの有無 / `{index, name, nodes, connections, node_types}`（`index` は全体計画の添字） |
+| `effective` | 足し算で使われるか。読めないもの・衝突で捨てたものは `false` |
+| `dropped` | 使われない理由 `{reason, detail}`。`reason` は `invalid`（読めない）/ `duplicate`（共通と全欄が同じ）/ `conflict`（共通と中身が違う）。使われるなら `null` |
+| `usable` | 使われていて、error も無い |
+| `writable` | 書き換えてよいか。共通は、親の着手が写したミラー（承認済みの親のワークツリーの中）では `false` |
+| `problems[]` | 検査の結果 `{severity, detail}`。`severity` は `error` / `warn` / `info` |
+
 ## ドキュメントの索引
 
 ```sh
@@ -2887,6 +2965,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/phase_forms.py` | ユーザだけが打つコマンドの形（承認・レビュー済み・ガードの切り替え・記録の片付け）を見分ける組み込みのルール |
 | `src/ccnavi/tickets/phase_scope.py` | 子チケットの範囲の当て方と、範囲の外の変更の洗い出し |
 | `src/ccnavi/tickets/phasetypes.py` | フェーズ定義（`phases.yml`）の読み込みと検証 |
+| `src/ccnavi/tickets/plan_templates.py` | 作業・レビュー計画のテンプレートの読み込み・2 層の足し算・検査・`--templates` の JSON（読む側） |
 | `src/ccnavi/tickets/flow.py` | 子チケットのフロー（作業の手順のグラフ）。置き場・着手中のロック・読み込み・子に渡す案内 |
 | `src/ccnavi/tickets/flow_text.py` | フローに書かれた文字列の整え方。制御文字・長さ・印や囲みのなりすまし |
 | `src/ccnavi/tickets/flow_shape.py` | フローの形の検査。ノード・枝・名前の食い違い |
@@ -2926,6 +3005,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/entry/lint_project.py` | lint のうち、`.claude/settings.json`・`settings.local.json` の hook と env の検査 |
 | `src/ccnavi/entry/lint_places.py` | lint のうち、下書き・プロジェクト・チケットの置き場の検査 |
 | `src/ccnavi/entry/lint_layers.py` | lint のうち、設定のレイヤーと、取り込んだレイヤーの食い違いの検査 |
+| `src/ccnavi/entry/lint_templates.py` | lint のうち、作業・レビュー計画のテンプレートの検査 |
 | `src/ccnavi/entry/lint_ticket.py` | lint のうち、承認済みチケット・承認・提案と、親子の運用に要る hook の検査 |
 | `src/ccnavi/entry/lint_branch.py` | lint のうち、チケットのブランチ名・連番・既存ブランチ・ワークツリーの検査 |
 | `src/ccnavi/entry/diagnose.py` | 判定を実行せずに試す `--test` と `--explain`。名前を引き受けるだけで、中身は下の 4 つに分けてある |
@@ -2937,6 +3017,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/entry/cli_usage.py` | `--help` の本文 |
 | `src/ccnavi/entry/cli_args.py` | 引数の読み分け。設定を上書きする旗・診断だけの旗・`--docs` と並べられない旗と、パスの見分け |
 | `src/ccnavi/entry/cli_ops.py` | チケットとレビューの副命令を ops / review へ渡す。`sync` の問い合わせ |
+| `src/ccnavi/entry/cli_templates.py` | `--templates` の引数を受けて、テンプレートの一覧・検索・表示を出す |
 | `src/ccnavi/entry/cli_plan.py` | `--plan-order` の引数を受けて答えを出す。振り直しと書き戻しは `tickets/plan_order.py` と `tickets/plan_phases.py` |
 | `build.py` | 配布物の組み立て。`dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする |
 | `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトと使い方の文書（`.ccnavi/docs/*.md`）を配る |
