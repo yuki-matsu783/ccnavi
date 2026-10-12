@@ -301,23 +301,18 @@ def _flows(
     return out
 
 
-def make(conf: settings.Settings, root: str, parent: str, name: str = "") -> Made:
-    """完了した親から下書きを作って、下書きの置き場に書く。上書きはしない。"""
-    found, children, why = _find_parent(conf, root, parent)
-    if found is None:
-        return Made(False, error=why)
-    name = (name or parent).strip()
-    if not plan_templates.NAME_RE.match(name) or len(name) > plan_templates.NAME_LIMIT:
-        return Made(
-            False,
-            error=f"下書きの名前 {_line(name)!r} は使えない（英数字で始め、英数字と `._-` だけ。"
-            f"{plan_templates.NAME_LIMIT} 字まで）。--name で付ける",
-        )
+def _build(
+    conf: settings.Settings,
+    found: ticket_model.Ticket,
+    children: list[ticket_model.Ticket],
+    name: str,
+) -> tuple[plan_templates.Template, list[str]]:
+    """完了した親の計画とフローを、下書きの中身（まだ一般化していない）に写す。何も書かない。"""
     notes: list[str] = []
     planned = len(found.plan)
     plan = _relative_items(list(found.plan), 0, "plan", notes)
     feedback = _relative_items(list(found.feedback or []), planned, "feedback", notes)
-    title = _line(found.title) or parent
+    title = _line(found.title) or found.ticket
     template = plan_templates.Template(
         name=name,
         description=f"{_TODO_PREFIX}{title}",
@@ -330,6 +325,22 @@ def make(conf: settings.Settings, root: str, parent: str, name: str = "") -> Mad
         flowless = [c for c in children if c.phase and c.phase > planned]
         if any(os.path.lexists(flow.flow_file(conf, found.tree_root, c.ticket)) for c in flowless):
             notes.append("フィードバック計画の子のフローは写さない（全体計画の子のフローだけ）")
+    return template, notes
+
+
+def make(conf: settings.Settings, root: str, parent: str, name: str = "") -> Made:
+    """完了した親から下書きを作って、下書きの置き場に書く。上書きはしない。"""
+    found, children, why = _find_parent(conf, root, parent)
+    if found is None:
+        return Made(False, error=why)
+    name = (name or parent).strip()
+    if not plan_templates.NAME_RE.match(name) or len(name) > plan_templates.NAME_LIMIT:
+        return Made(
+            False,
+            error=f"下書きの名前 {_line(name)!r} は使えない（英数字で始め、英数字と `._-` だけ。"
+            f"{plan_templates.NAME_LIMIT} 字まで）。--name で付ける",
+        )
+    template, notes = _build(conf, found, children, name)
     place = plan_templates.draft_file(conf, found.tree_root, name)
     directory = os.path.dirname(place)
     if flow.linked(found.tree_root, directory):
@@ -369,6 +380,43 @@ def make(conf: settings.Settings, root: str, parent: str, name: str = "") -> Mad
 
 def _known(conf: settings.Settings, root: str) -> list[str]:
     return [view.name for view in ruleload.layers(conf, root)]
+
+
+# ---- 親が閉じるときの案内
+
+
+def _shape(template: plan_templates.Template) -> tuple[list, list]:
+    """計画の形（全体計画とフィードバック計画の項）。取り込み済みかを見るときの比べる対象。
+
+    フローの本文は比べない。下書きの一般化でフローの文も直るので、文まで比べると、
+    取り込んだ直後でも「同じ内容」に読めない。
+    """
+    return [i.as_data() for i in template.plan], [i.as_data() for i in template.feedback]
+
+
+def close_notice(conf: settings.Settings, root: str, parent: str) -> str:
+    """親が閉じたときに出す、テンプレート化の案内 1 行（末尾の改行つき）。出さないときは空文字。
+
+    出すのは、完了した親（`done/`）が計画を持ち、その識別子の下書きがまだ無く、同じ計画の形の
+    テンプレートが取り込まれていないときだけ。`ready` で閉じると材料（`done/` と `flows/`）は
+    退避されて拾えなくなるので、`ready` の前に出す。何も書かず、読めなければ出さない。
+    """
+    found, children, _ = _find_parent(conf, root, parent)
+    if found is None:
+        return ""
+    if os.path.lexists(plan_templates.draft_file(conf, found.tree_root, parent)):
+        return ""
+    template, _ = _build(conf, found, children, parent)
+    scanned = plan_templates.scan(conf, root)
+    for view in [scanned.common, *scanned.layers]:
+        for entry in view.entries:
+            if entry.template is not None and _shape(entry.template) == _shape(template):
+                return ""
+    return (
+        "テンプレートにするなら、`ready` の前に "
+        f"`ccnavi --templates --draft {parent}` で下書きを作る"
+        "（ready で閉じると下書きの材料は退避されて拾えない）\n"
+    )
 
 
 # ---- 取り込む

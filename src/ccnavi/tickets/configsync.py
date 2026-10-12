@@ -7,7 +7,8 @@
 
 - 共通レイヤーが無い、または空なら、何も配らず、ミラーも消さない（着手は止めない）
 - 写すのは `rules.yml`・`phases.yml`・`risks.yml`・`rule-expectations.yml` と、配点の
-  `script:` が指す `.ccnavi/config/common/scripts/` の下。中身の違うものだけ上書きし、
+  `script:` が指す `.ccnavi/config/common/scripts/` の下と、作業・レビュー計画のテンプレート
+  （`.ccnavi/config/common/templates/*.yml`）。中身の違うものだけ上書きし、
   共通レイヤーから無くなったファイルはミラーからも消す。ミラーは共通レイヤーの写しで誰も編集しないので、失うものは無い
 - `script:` の値は書き換えない。ミラーの置き場も `.ccnavi/config/common/scripts/` で、共通レイヤーと
   同じ表記のまま指せる
@@ -31,7 +32,7 @@ import yaml
 
 from ..infra import fsio, settings, tree, yamlread
 from ..policy import rules
-from . import approval, approval_checks, phasetypes, risk
+from . import approval, approval_checks, flow, phasetypes, plan_templates, risk
 
 COMMON_DIR = settings.COMMON_DIR
 # 共通レイヤーの期待する判定のファイル名。
@@ -100,6 +101,37 @@ def sources(conf: settings.Settings, root: str) -> tuple[dict[str, bytes], str]:
         if why or raw is None:
             return {}, f"共通レイヤーの配点が指すスクリプト {rel} を読めない ({why or '無い'})"
         out[rel.removeprefix(_script_prefix())] = raw
+    templates, why = _templates(conf, root)
+    if why:
+        return {}, why
+    out.update(templates)
+    return out, ""
+
+
+def _templates(conf: settings.Settings, root: str) -> tuple[dict[str, bytes], str]:
+    """共通レイヤーの作業・レビュー計画のテンプレート。ミラーの置き場からの相対 → 中身。
+
+    置き場（`templates/`）が無いのは正常で、何も返さない。置き場そのものが読めない（リンクなど）ときは
+    理由を返す（ほかの設定と同じく、何も写さない）。error のあるテンプレートは 1 本ずつ
+    写さずに飛ばす（使えないテンプレートのために着手を止めない。`--lint` が error で知らせる）。
+    warn は止めない。
+    """
+    read = plan_templates.read_layer(
+        plan_templates.LAYER_COMMON, root, settings.common_templates_dir(conf, root)
+    )
+    for problem in read.problems:
+        if problem.severity == rules.SEVERITY_ERROR:
+            return {}, f"共通レイヤーのテンプレートの置き場を読めない: {problem.detail}"
+    types = plan_templates._types_for(conf, root, plan_templates.LAYER_COMMON)
+    candidates = flow.catalog(root)
+    out: dict[str, bytes] = {}
+    for entry in read.entries:
+        problems = list(entry.notes)
+        if entry.template is not None:
+            problems += plan_templates.check(entry.template, types, candidates)
+        if any(p.severity == rules.SEVERITY_ERROR for p in problems):
+            continue
+        out[f"{settings.TEMPLATES_DIR}/{entry.name}{plan_templates.SUFFIX}"] = entry.raw
     return out, ""
 
 
