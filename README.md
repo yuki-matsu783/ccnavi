@@ -863,7 +863,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
     match: Write|Edit|NotebookEdit
     regex: '^{root}[\\/]'
     except:
-      - regex: '^{root}[\\/]wip[\\/]scratchpad(?:[\\/]|$)'
+      - regex: '^{root}[\\/]wip[\\/]handoff(?:[\\/]|$)'
       - regex: '^{root}[\\/]\.claude[\\/]worktrees(?:[\\/]|$)'
     message: ...
 ```
@@ -1407,7 +1407,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 - `builtin-guard-project-home`: ccnavi ディレクトリの下（`*/.ccnavi/*`）と、`CCNAVI_BIN_PATH` のパスおよび実行ファイルの置き場
   （名前が `ccnavi-launcher.sh` なら 1 つ上の `bin/<os>-<arch>/`、それ以外なら隣の `<os>-<arch>/`）
 - `builtin-guard-common-layer`: 共通レイヤーの 3 本。ワークツリーの中の同じファイルも止まる
-- 期待する判定のファイル `.ccnavi/config/common/rule-expectations.yml` も `builtin-guard-project-home` が止める。その下書きはワークツリーの `wip/scratchpad/` に置き、
+- 期待する判定のファイル `.ccnavi/config/common/rule-expectations.yml` も `builtin-guard-project-home` が止める。その下書きはワークツリーの `wip/handoff/` に置き、
   ルールの下書きと一緒にユーザに渡す
 
 止めるのは書き込みの形と場所の組で、場所の名前が出ただけでは止めない（`cat .ccnavi/config/common/rules.yml` や `git add <パス>` は通る）。
@@ -1676,8 +1676,8 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 範囲の外として扱わない場所。
 
 - 提案の置き場（`wip/proposals/`）と承認済みチケットの置き場（`.ccnavi/approved/`）。`review/` と承認済みチケットは組み込みの deny が止める
-- 下書きの置き場。ツリーのルート直下の `wip/scratchpad/` の下で、大文字小文字を区別する。追跡される置き場なので、
-  実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/scratchpadX/` や `scratchpad/` は外さない
+- 下書きの置き場。ツリーのルート直下の `wip/handoff/` の下で、大文字小文字を区別する。追跡される置き場なので、
+  実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/handoffX/` や `scratchpad/` は外さない
 - ELI5 の HTML の置き場。ワークツリーのルートからの `wip/eli5/` の下で、大文字小文字を区別する。追跡される置き場なので、
   実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/` のほかの場所や `wip/eli5x/` は外さない。
   チケットの `deny` と全面停止（`LIMIT_BLOCKED`）より先に適用される
@@ -1912,7 +1912,7 @@ JSON で渡す（`--result <path>`）。
   外から `ready --parent <親>` で打てばそのまま消える
 - 消し方は、生成物（`node_modules`・`.venv` など）を消してから `git worktree remove`（`--force` なし）。ブランチは消さない
 - git が無視しているファイル（`.env` など）があるワークツリーは、何も消さずに名指しする（`worktree remove` はそれごと消して戻せない）。
-  数えないのは生成物だけ（下書きの置き場 `wip/scratchpad/` は追跡されるので、ここには現れない）
+  数えないのは生成物だけ（下書きの置き場 `wip/handoff/` は追跡されるので、ここには現れない）
 - cwd が消す対象の中にあるときは消さず、外に出てから打つ 1 本（`sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>`）を出す。
   `ready` を親のワークツリーの中から `--parent` なしで打ったときは、親のワークツリーをこの 1 本で消す。未コミットの変更があれば何も消さずに名指しする
 - この 1 本が Claude Code の自動モードの分類器に止められたら、ユーザに許可を頼むか、ユーザのホームの `~/.claude/settings.json` の
@@ -2186,7 +2186,7 @@ uv run python scripts/check_rules.py   # 同じことを、state と記録を外
 `tool: Stop`（`subject: "(stop)"`）は、ターンの終わりに使われるルールがあるかを見る（あれば `allow`）。
 ルールを 1 件足したら期待も 1 行足し、**止めたくないものも必ず一緒に置く**。
 
-期待のファイルはエージェントが直接書けない（「コアファイルを守る」）。下書きはワークツリーの `wip/scratchpad/` に置き、ルールの下書きと一緒にユーザに渡す。
+期待のファイルはエージェントが直接書けない（「コアファイルを守る」）。下書きはワークツリーの `wip/handoff/` に置き、ルールの下書きと一緒にユーザに渡す。
 `/ccnavi-config` スキルがこの流れを回し、フェーズ定義とリスクの配点も見る。
 
 ### 記録から候補を起こす
@@ -2694,7 +2694,7 @@ md を本文ではなく頭の frontmatter で引く。grep は当たった行�
 frontmatter か `type` が無いときに、`PostToolUse` が `[ccnavi] NOTICE_DOC_FRONTMATTER (<パス>)` で 1 度だけ案内する（止めない）。
 Edit と上書きでは出さない。索引に載らない md（git が無視するもの、`.ccnavi/` の下）と、`README.md`・`CLAUDE.md`、
 frontmatter の決まりの対象外の表にある置き場（チケットの置き場・チケットの下書き `wip/design/scripts/i*.md`・下書きの置き場
-`wip/scratchpad/`・外から取り込んだ `.claude/skills/yomiyasu/**`）にも出さない。ワークツリーの md は、ワークスペースの `.gitignore` ではなくワークツリー自身の
+`wip/handoff/`・外から取り込んだ `.claude/skills/yomiyasu/**`）にも出さない。ワークツリーの md は、ワークスペースの `.gitignore` ではなくワークツリー自身の
 git で決める（統合した後は統合先の索引に入るため）。
 
 引くのはワークスペースと、プロジェクトの置き場の直下の各プロジェクト（それぞれ別の git）を合わせたもの。どこから打っても同じで、
@@ -2958,7 +2958,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
 | `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |
 | `.ccnavi/scripts/ccnavi-worktree.sh` | 作業用のワークツリーを統合先から切る。`fetch`・遅れの確認・起点の選択（遅れていれば `origin/<統合先>` から `--no-track`）・`worktree add` を `ccnavi-git.sh` 経由で順に打つ。ワークツリーが既にあればパスを出すだけ。`fetch` が届かないときは何も切らず終了コード 4 で止まり、直して打ち直す手と `--offline`（手元の統合先から切る）を案内する |
-| `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/scratchpad/`（元と同じ階層）へ `cp` する。`--commands` は編集済みの下書きだけ、差し替えの `mv` をフルパスで出す。ユーザが差し替える |
+| `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/`（元と同じ階層）へ `cp` する。`--commands` は編集済みの下書きだけ、差し替えの `mv` をフルパスで出す。ユーザが差し替える |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。`--worktree <名前>` は掃除と `worktree remove` を 1 本で行う（本体は `ccnavi worktree drop`。cwd が中なら消さない）。配る（`scripts/ccnavi-setup.sh` の `DEPLOY_SCRIPTS`） |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tests/__main__.py` | `python -m tests`。テストをモジュールごとに別プロセスで同時に回す。回す中身は discover と同じ |
