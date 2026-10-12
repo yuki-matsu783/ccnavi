@@ -2,7 +2,7 @@ id: UC-06
 title: ルールが言及しない呼び出しは判定せず、権限モードに委ねる。案内は 1 度だけ届く
 layer: 1
 reqs: [REQ-PRE-10, REQ-PRE-11, REQ-HNT-01]
-status: draft
+status: verified
 model: haiku
 budget_usd: 1.0
 
@@ -40,5 +40,4 @@ expect:
     - 1 つ目の step で、README.md の最初の見出しを実際と合う形で答えた
 
 unconfirmed:
-  - 案内（hinted）が付く cat は、2 つのうちどちらかが決まらない。並行する 2 つの hook が同時に「出した」の印を読み書きするため、両方に付く可能性もある（排他が無い）。回し直して、ちょうど 1 つに付くかを確かめる
-  - 案内（additionalContext）の行は stream-json の hook_response の output 内にある。1 度だけ届くことは `hinted` の 2 件で見るので、judge には書かない
+  - 並行する 2 つの hook は「出した」の印を排他なしで読み書きするため、案内が両方の cat に付く可能性は残る。回した 2 回（hinted が CONTEXT.md 側・README.md 側に 1 つずつ付いた）では、ちょうど 1 つだった。両方に付いたら、この期待の hinted: false が満たされず fail になる
