@@ -253,7 +253,7 @@ class EvidenceTest(unittest.TestCase):
         return (out / "evidence.md").read_text(encoding="utf-8")
 
     def test_deny_reason_is_not_clipped(self):
-        reason = "拒否の理由" * 200
+        reason = "拒否の理由" * 300
         payload = {
             "hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": reason}
         }
@@ -323,6 +323,63 @@ class EvidenceTest(unittest.TestCase):
             runner.write_report(scn, out, {"cost_usd": 0.0}, [], rows, "")
             text = (out / "evidence.md").read_text(encoding="utf-8")
         self.assertIn("全 800 文字のうち先頭 500 文字。全量は logs/decisions.jsonl", text)
+
+    def test_nonzero_exit_stderr_is_kept_unclipped(self):
+        ev = self._hook("PreToolUse", "g", stderr="削除は禁止です" * 300)
+        ev["exit_code"] = 2
+        text = self._write([ev])
+        self.assertIn("終了コード 2: " + "削除は禁止です" * 300, text)
+
+    def test_system_message_and_stop_reason_are_kept(self):
+        sysmsg = json.dumps({"systemMessage": "保護領域が変わった"}, ensure_ascii=False)
+        halt = json.dumps({"continue": False, "stopReason": "止めた理由"}, ensure_ascii=False)
+        text = self._write(
+            [self._hook("PostToolUse", "p", sysmsg), self._hook("PreToolUse", "q", halt)]
+        )
+        self.assertIn("通知: 保護領域が変わった", text)
+        self.assertIn("停止: 止めた理由", text)
+
+    def test_session_start_system_message_is_only_counted(self):
+        sysmsg = json.dumps({"systemMessage": "起動の通知"}, ensure_ascii=False)
+        text = self._write([self._hook("SessionStart", "s", sysmsg)])
+        self.assertNotIn("起動の通知", text)
+        self.assertIn("SessionStart 1 件", text)
+
+    def test_result_table_cells_do_not_break_rows(self):
+        why = "出力に「a」が無い: l1\nl2 | l3"
+        text = self._write([], results=[("state", "ls", runner.FAIL, why)])
+        self.assertIn("l1 l2 \\| l3", text)
+
+    def test_non_text_block_in_tool_result_is_marked(self):
+        events = [
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "is_error": False,
+                            "content": [{"type": "image"}, {"type": "text", "text": "本文"}],
+                        }
+                    ]
+                },
+            }
+        ]
+        text = self._write(events)
+        self.assertIn("[image ブロック]", text)
+        self.assertIn("本文", text)
+
+
+class ResultsTableTest(unittest.TestCase):
+    def test_limit_cuts_cells_and_none_does_not(self):
+        results = [("k", "c" * 300, runner.FAIL, "w" * 300)]
+        cut = "\n".join(runner._results_table(results, 100))
+        self.assertIn("c" * 100 + " |", cut)
+        self.assertNotIn("c" * 101, cut)
+        self.assertNotIn("w" * 101, cut)
+        full = "\n".join(runner._results_table(results))
+        self.assertIn("c" * 300, full)
+        self.assertIn("w" * 300, full)
 
 
 if __name__ == "__main__":

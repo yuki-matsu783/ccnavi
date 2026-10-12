@@ -398,9 +398,16 @@ def _clip(text, limit, where):
 
 def _text_of(content):
     """ツール結果の content（文字列かブロックの列）を 1 つの文字列にする。"""
+    if content is None:
+        return ""
     if isinstance(content, list):
-        parts = [b.get("text", "") if isinstance(b, dict) else str(b) for b in content]
-        return "\n".join(p for p in parts if p)
+        parts = []
+        for b in content:
+            if isinstance(b, dict):
+                parts.append(b.get("text") or f"[{b.get('type', '?')} ブロック]")
+            else:
+                parts.append(str(b))
+        return "\n".join(parts)
     return str(content)
 
 
@@ -421,7 +428,9 @@ def _hook_payload(ev):
 def summarize_hooks(hook_events, where):
     """hook の応答を、判定に要るものの行と、省いたものの件数に分ける。
     残すのは、拒否・確認（permissionDecision が deny / ask、または decision が block）、
-    案内文（additionalContext。SessionStart のものを除く）、中身のある Stop の応答。
+    案内文（additionalContext。SessionStart のものを除く）、中身のある Stop の応答、
+    終了コードが 0 でない応答、停止（continue: false / stopReason）、
+    systemMessage（SessionStart を除く）も残す。
     hook_started / hook_progress は数えない。SessionStart と出力が空の応答は件数だけにする。"""
     lines, omitted = [], {}
     for ev in hook_events:
@@ -429,6 +438,7 @@ def summarize_hooks(hook_events, where):
             continue
         name = ev.get("hook_event") or ev.get("hook_event_name") or "?"
         data = _hook_payload(ev)
+        exit_code = ev.get("exit_code")
         spec = data.get("hookSpecificOutput")
         spec = spec if isinstance(spec, dict) else {}
         decision = spec.get("permissionDecision") or data.get("decision")
@@ -438,6 +448,16 @@ def summarize_hooks(hook_events, where):
         if decision in ("deny", "ask", "block"):
             # 拒否の文面は切らない
             lines.append(f"- [{label}] {decision}: {reason or ''}")
+        elif isinstance(exit_code, int) and exit_code != 0:
+            # 終了コードが 0 でない応答（exit 2 のブロックなど）は、文面を切らない
+            body = (
+                (ev.get("stderr") or "").strip()
+                or (ev.get("stdout") or "").strip()
+                or str(ev.get("output") or "")
+            )
+            lines.append(f"- [{label}] 終了コード {exit_code}: {body}")
+        elif data.get("continue") is False or data.get("stopReason"):
+            lines.append(f"- [{label}] 停止: {data.get('stopReason') or ''}")
         elif name == "Stop" and (data or ev.get("stdout") or ev.get("stderr")):
             body = (
                 json.dumps(data, ensure_ascii=False)
@@ -447,9 +467,16 @@ def summarize_hooks(hook_events, where):
             lines.append(f"- [{label}] {_clip(body, EVIDENCE_LIMIT, where)}")
         elif context and name != "SessionStart":
             lines.append(f"- [{label}] 案内: {_clip(context, CONTEXT_LIMIT, where)}")
+        elif data.get("systemMessage") and name != "SessionStart":
+            lines.append(f"- [{label}] 通知: {_clip(data['systemMessage'], CONTEXT_LIMIT, where)}")
         else:
             omitted[name] = omitted.get(name, 0) + 1
     return lines, omitted
+
+
+def _cell(s):
+    """表のセルに入れる文字列から、列と行を崩す文字を除く。"""
+    return str(s).replace("|", "\\|").replace("\n", " ")
 
 
 def _results_table(results, limit=None):
@@ -457,7 +484,7 @@ def _results_table(results, limit=None):
     lines = ["| 種類 | 期待 | 判定 | 理由 |", "|---|---|---|---|"]
     for kind, cond, v, why in results:
         c = json.dumps(cond, ensure_ascii=False) if not isinstance(cond, str) else cond
-        lines.append(f"| {kind} | {cut(c)} | {v} | {cut(why)} |")
+        lines.append(f"| {_cell(kind)} | {_cell(cut(c))} | {_cell(v)} | {_cell(cut(why))} |")
     return lines
 
 
