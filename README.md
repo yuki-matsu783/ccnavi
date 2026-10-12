@@ -1191,7 +1191,7 @@ ssh host rm -f .ccnavi/config/common/rules.yml         # 外さない。ssh は�
 [ccnavi] DENY_COMMAND_PATTERN (rule: builtin:guard-setting-files)
 subject: env rm -f .ccnavi/config/common/rules.yml
 `env` が実行する `rm -f .ccnavi/config/common/rules.yml` に当たりました。
-ガード自身の設定と hook を、シェルからの書き込みで変えようとしています。…
+ガード自身の設定と hook を、シェルから書き換えようとしています。…
 ```
 
 記録には欄 `unwrapped` に当たったコマンドが残り（「記録」）、`--test` は `unwrapped:` の行で出す（「ルールが何に当たるかを確かめる」）。
