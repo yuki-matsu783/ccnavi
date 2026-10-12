@@ -19,6 +19,7 @@ from typing import TextIO
 from ..infra import fsio, settings, tree
 from . import (
     approval,
+    approval_checks,
     approval_marks,
     archive,
     ops,
@@ -181,10 +182,9 @@ def _archive_place_problem(
         return ""
     shown = home.name if home is not None and home.name else "ワークスペースルート"
     return (
-        f"親 {parent.ticket} の承認済みチケットが親のワークツリー（{tree.WORKTREES_DIR}/"
-        f"{parent.ticket}）ではなく {shown} に在る。閉じたチケットの退避は親のワークツリーの"
-        "置き場からだけ行う（他の親子のチケットまで消さないため）。親のワークツリーに"
-        "承認済みチケットを置いてから打ち直してください。Draft はまだ外していない"
+        approval_checks.misplaced_home_text(root, parent.ticket, shown)
+        + "。閉じたチケットの退避は親のワークツリーの置き場からだけ行う"
+        "（他の親子のチケットまで消さないため）。Draft はまだ外していない"
     )
 
 

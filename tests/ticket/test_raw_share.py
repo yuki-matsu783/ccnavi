@@ -25,7 +25,7 @@ from unittest import mock
 from ccnavi.hook import post
 from ccnavi.records import audit
 from ccnavi.tickets import approval
-from tests.ticket.test_phases import PhaseHarness
+from tests.ticket.test_phases import PhaseHarness, git
 from tests.ticketsample import child_text, parent_text
 
 
@@ -99,8 +99,10 @@ class RawShareTest(PhaseHarness):
         self.ended_phase()
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")  # レビュー準備中にする
         # 親をもう 1 つと、ワークツリーを 2 つ足す。読む回数は変わらない。
-        self.propose("i0002", parent_text("i0002", ["chores"]))
-        self.commit_parent()
+        other = self.worktree("i0002", "main")
+        self.propose("i0002", parent_text("i0002", ["chores"]), tree=other)
+        git(other, "add", "-A")
+        git(other, "commit", "--quiet", "-m", "propose i0002")
         self.assertEqual(self.approve().returncode, 0)
         self.worktree("x1", "i0001")
         self.worktree("x2", "i0001")

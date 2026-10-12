@@ -161,13 +161,13 @@ class RequestNudgeTest(base.StopNudgeTest):
     def test_only_the_parent_of_the_cwd_is_looked_at(self):
         """複数の親が居ても、cwd のツリーに結び付いた親だけを見る。"""
         self.family()
-        self.propose("i0002", allow=("src/*", "wip/*"))
-        self.propose("i0002-01-01", parent="i0002", phase=1, allow=("src/c/*",))
-        git(self.parent_tree, "add", "-A")
-        git(self.parent_tree, "commit", "--quiet", "-m", "second family")
-        self.assertEqual(self.approve().returncode, 0)
         other = self.worktree("i0002", "main")
-        # 親 i0002 のツリーには、承認済みチケットが乗っていない（親 i0001 のツリーにある）。
+        self.propose("i0002", tree=other, allow=("src/*", "wip/*"))
+        self.propose("i0002-01-01", tree=other, parent="i0002", phase=1, allow=("src/c/*",))
+        git(other, "add", "-A")
+        git(other, "commit", "--quiet", "-m", "second family")
+        self.assertEqual(self.approve().returncode, 0)
+        # 親 i0002 のツリーの承認済みチケットは、まだ誰も着手していない。
         # 結び付かないツリーは何も言われない。
         self.assert_not_asked(self.stop(other))
         reason = self.asked(self.stop(self.parent_tree))
