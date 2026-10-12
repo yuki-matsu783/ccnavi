@@ -17,7 +17,7 @@ import { isToolName, KNOWN_TOOLS, SECTIONS, SECTION_LABELS, modeBanner, type Fil
 import type { SuggestJson } from "../../core/suggestmodel.js";
 import type { ExpectationsJson } from "../../core/testmodel.js";
 import { applyAppearance } from "../appearance.js";
-import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
+import { INTRO_COURSE, Tour, TourButton, useTour, type TourCourse, type TourStep } from "../Tour.js";
 import { Hooks } from "./Hooks.js";
 import { ExpectationsResult, JudgeResult, SuggestResult, type Judged } from "./Judge.js";
 import { TargetSelect } from "../TargetSelect.js";
@@ -410,6 +410,10 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     post({ type: "judge", sections: sectionsOf(draft), tool: tool.trim(), subject });
   };
 
+  const courses: readonly TourCourse[] = [
+    { id: INTRO_COURSE, title: "基本の案内", summary: "画面の見どころを順に回ります", steps: tourSteps(setTab, () => tabBeforeTour.current ?? tab) },
+  ];
+
   const query = find.trim().toLowerCase();
 
   return (
@@ -468,7 +472,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             保存
           </button>
         </div>
-        <TourButton onClick={tour.start} />
+        <TourButton courses={courses} onPick={tour.start} />
       </header>
       <p id="lock" className={lock.locked ? "lock" : "lock hidden"}>
         {lock.reason}
@@ -642,7 +646,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       <section id="tab-hooks" className={tab === "hooks" ? "pane active" : "pane"}>
         <Hooks hooks={page?.hooks ?? []} files={page?.hookFiles ?? { settings: false, settingsLocal: false }} />
       </section>
-      {tour.touring && <Tour steps={tourSteps(setTab, () => tabBeforeTour.current ?? tab)} onClose={tour.end} />}
+      {tour.touring && <Tour steps={(courses.find((course) => course.id === tour.course) ?? courses[0]).steps} onClose={tour.end} />}
       <footer className={status?.error === true ? "foot error" : "foot"}>
         <span id="status">{status?.text ?? ""}</span>
       </footer>
@@ -695,7 +699,7 @@ function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonl
     {
       target: '[data-action="tour"]',
       title: "案内",
-      body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
+      body: "ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。",
       before: () => peek(before()),
     },
   ];
