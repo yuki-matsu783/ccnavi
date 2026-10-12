@@ -78,8 +78,12 @@ _NOT_PREVIEW = rf"(?![^{selfguard_shell._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 # `--import` はテンプレートの下書きを取り込む形（`ccnavi --templates --import`）。取り込みはユーザが
 # 差分を読んで決めるので、下見だけの形（`--yes` なし）も含めてエージェントには打たせない。
 # 下書きを作る `--draft` は効力が無いので止めない。
+# `--rename-template`・`--move-template`・`--delete-template` も同じ。下書きの保存と削除
+# （`--save-draft`・`--delete-draft`）は下書きの置き場の中だけなので、
+# `--yes` の付かない下見は止めない。
 _CLI_FORMS = (
     rf"(--yes\b|--(?:agree|approve)\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b|--import\b"
+    r"|--(?:rename|move|delete)-template\b"
     r"|\b(ticket|review)\s+"
     r"(start|finish|cancel|record-risk|prepare|requested|confirm|ready)\b)"
 )
@@ -349,6 +353,8 @@ EXE_OPTIONS = frozenset(
         "--text", "--ticket-control", "--tickets", "--title", "--to", "--type", "--until",
         "--verify",
         "--version", "--via", "--with-feedback", "--write", "--yes", "-h", "-r",
+        "--save-draft", "--delete-draft", "--rename-template", "--move-template",
+        "--delete-template", "--new-name", "--on", "--to-layer",
     }
 )  # fmt: skip
 # 単引用符の中と、glob を引用した文字。文字どおりの値として読むため、
@@ -884,7 +890,8 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             f"'{settings.script_command(root, 'ccnavi-sync.sh')} --forget' と、ユーザの判断の入口"
             f"（'{settings.script_command(root, 'ccnavi-review.sh')} chat / "
             "close-early'）もユーザが打ちます。"
-            "テンプレートの取り込み（'ccnavi --templates --import'）も、ユーザが打ちます。"
+            "テンプレートの取り込み（'ccnavi --templates --import'）・"
+            "取り込み済みの改名/移動/削除も、ユーザが打ちます。"
             "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
             "エージェントは打ちません。"
             "承認が済んだかどうかは "

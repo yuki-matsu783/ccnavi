@@ -282,6 +282,16 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--import", dest="import_", default=None, metavar="DRAFT")
     parser.add_argument("--to", default="")
     parser.add_argument("--replace", action="store_true")
+    # テンプレートと下書きの保存・改名・移動・削除。
+    # --import と同じく --yes と --expect が揃ったときだけ書く。
+    parser.add_argument("--save-draft", dest="save_draft", default=None, metavar="DRAFT")
+    parser.add_argument("--delete-draft", dest="delete_draft", default=None)
+    parser.add_argument("--rename-template", dest="rename_template", default=None)
+    parser.add_argument("--move-template", dest="move_template", default=None)
+    parser.add_argument("--delete-template", dest="delete_template", default=None)
+    parser.add_argument("--new-name", default="")
+    parser.add_argument("--on", default="")
+    parser.add_argument("--to-layer", default="")
     # チケットの状態とレビューの操作。ユーザか、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", action="append", default=None)
@@ -345,7 +355,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if refused:
         stderr.write(f"ccnavi: {refused}\n")
         return EXIT_ERROR
-    if args.yes == cli_templates.BARE_YES and not (args.templates and args.import_ is not None):
+    if args.yes == cli_templates.BARE_YES and not (args.templates and cli_templates.editing(args)):
         stderr.write("ccnavi: --yes には識別子を渡す（値なしの --yes は --import だけ）\n")
         return EXIT_ERROR
     if args.record_tree and not args.record_writes:
@@ -368,13 +378,14 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         return EXIT_ERROR
     # 取り込みを書く形（`--templates --import --yes`）は、拡張の子プロセスから board で呼ぶ。
     # `--actor` は読まない。`--expect` と `--json` が揃ったときだけ通す。
-    if args.templates and args.import_ is not None and args.yes:
+    if args.templates and cli_templates.editing(args) and args.yes:
         if args.via and args.via != history.VIA_BOARD:
             stderr.write("ccnavi: --via は --import --yes では board だけ渡せる\n")
             return EXIT_ERROR
         if args.via and (args.expect is None or not args.json):
             stderr.write(
-                "ccnavi: --via board は --import --yes --expect <ハッシュ> --json と一緒に使う\n"
+                "ccnavi: --via board は --import / --save-draft など "
+                "--yes --expect <ハッシュ> --json と一緒に使う\n"
             )
             return EXIT_ERROR
     elif args.via and (not args.actor or not cli_ops._decide_writes(args)):
@@ -652,10 +663,10 @@ def _parsed(
         # 実行時にも端末の前のユーザが打ったことを確かめる。下見（`--yes` なし）は求めない。
         # 承認（--agree --yes）と同じく、拡張の子プロセスは端末を持たないので、端末の確認の代わりに
         # --expect の一致と hook の止めに置く。
-        if args.import_ is not None and args.yes:
+        if cli_templates.editing(args) and args.yes:
             if args.via == history.VIA_BOARD:
                 history.set_via(history.VIA_BOARD)
-            elif not cli_args._from_terminal(stdin, conf, stderr, "--import --yes"):
+            elif not cli_args._from_terminal(stdin, conf, stderr, "--templates --yes"):
                 return EXIT_ERROR
         return cli_templates.run(stdout, stderr, conf, root, args)
     if not args.docs:

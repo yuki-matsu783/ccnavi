@@ -458,6 +458,14 @@ def _ticket_record(
             if proposal is not None
             else None
         ),
+        # 完了した親から下書きを作れるか（`ccnavi --templates --draft <親>` が通る形）。
+        # ボードの親のカードが「テンプレートの下書きを作る」入口を出し分けるのに使う。
+        "template_draft": (
+            status == "closed"
+            and not source.is_child
+            and source.has_plan
+            and source.state != ticket_model.CANCELLED
+        ),
         # blocked は「読めるが信頼できない」理由。判定はこのチケットの
         # ワークツリーへの書き込みを全部止めるので、ボードが素の open として見せると、
         # 止まっていること自体がユーザに届かない。
