@@ -1061,6 +1061,42 @@ class UserOnlyTest(Drafts):
         )
         self.assertIn("--templates --import", self.reason(result))
 
+    def test_the_board_import_forms_are_denied_whatever_the_launcher(self):
+        tail = (
+            "--templates --import X --to common --yes --expect " + "a" * 64 + " --via board --json"
+        )
+        heads = (
+            "ccnavi ",
+            "python3 -u -m ccnavi ",
+            "python3 -X utf8 -m ccnavi ",
+            "uv run --project . python -m ccnavi ",
+            "uv run -m ccnavi ",
+            "py -m ccnavi ",
+            "python -m ccnavi.__main__ ",
+            "python3 main.py ",
+            "uv run python main.py ",
+            "uvx ccnavi ",
+            "npx ccnavi ",
+            "pnpm exec ccnavi ",
+            "env X=1 ccnavi ",
+        )
+        commands = [head + tail for head in heads]
+        commands += [
+            "ccnavi --via board --yes --templates --import X --to common --expect "
+            + "a" * 64
+            + " --json",
+            "ccnavi --templates --import=X --to common --yes --expect " + "a" * 64 + " --via=board",
+        ]
+        for command in commands:
+            self.assertTrue(self.denied(command), command)
+
+    def test_a_reader_may_mention_the_import_flags(self):
+        for command in (
+            'grep -rn -- "--templates --import X --yes" README.md',
+            'rg -n "templates --import .* --yes" docs',
+        ):
+            self.assertFalse(self.denied(command), command)
+
 
 class JudgmentUnchangedTest(Drafts):
     """判定・組み込みの保護・rules.yml は変えない。下書きの置き場への書き込みは止まらない。"""
