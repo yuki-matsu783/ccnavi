@@ -503,15 +503,17 @@ sh と同じ順で `.ccnavi/bin/<os>-<arch>/` の実行ファイルを自分で�
 | `dist/ccnavi/`（中身ごと） | `.ccnavi/bin/<os>-<arch>/`（`<os>-<arch>` は `dist/ccnavi.target` の目印） |
 | `.ccnavi/config/common/rules.yml` | 同じパス |
 | `.ccnavi/config/common/risks.yml` | 同じパス |
+| `.ccnavi/config/common/phases.yml` | 同じパス |
 | `.ccnavi/config/project/phases.yml` | 同じパス |
 | `.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,agree,fetch,clean,branches,start}.sh`、`ccnavi-common-{state,lock,c1,host,log}.sh`、`ccnavi-clean.js` | 同じパス |
 | `.ccnavi/scripts/ccnavi-launcher.sh` | 同じパス。配ったあと実行ビットを付ける |
 
-ルールと配点のひな形は共通レイヤー（`.ccnavi/config/common/`）へ、フェーズ定義のひな形はワークスペース自身のレイヤー
-（`.ccnavi/config/project/`）へ配る。ひな形の `scope` はそのワークスペースのレイアウトに合わせて書くもので、
-共通レイヤーに置くと全プロジェクトに適用されてしまう（「ルールは 3 つのレイヤーの和で当たる」）。どのプロジェクトでも同じ構成を
-前提にできる定義（`src/*`・`tests/*` を範囲に持つものなど）は、ユーザが共通レイヤーの `phases.yml` へ移せる。
-3 本とも、無ければ最後の点検が「まだ無いもの」として並べる。振り分けの sh と、この機械で動く
+ルールと配点のひな形は共通レイヤー（`.ccnavi/config/common/`）へ配る。フェーズ定義のひな形は 2 本で、どのプロジェクトでも
+同じ構成を前提にできる定義（`src/*`・`tests/*` を範囲に持つものなど）を共通レイヤーの `phases.yml` へ、`scope` がワークスペースの
+レイアウトに依存する定義をワークスペース自身のレイヤー（`.ccnavi/config/project/phases.yml`）へ配る。判定はこの 2 本の和を読む。
+レイアウトに依存する定義を共通レイヤーに置くと、全プロジェクトに適用されてしまう（「ルールは 3 つのレイヤーの和で当たる」）。
+配布先に既にあるファイルは、`--force` が無ければ入れ替えない。
+ルールと配点は、無ければ最後の点検が「まだ無いもの」として並べる。フェーズ定義は、共通レイヤーにも自身のレイヤーにも無いときだけ並べる。振り分けの sh と、この機械で動く
 実行ファイル（`.ccnavi/bin/<この機械>/ccnavi`）も同じ一覧に出る。
 
 振り分けの sh は hook が直に起動するので実行ビットが要る。配った回は `chmod +x` を掛け、

@@ -78,7 +78,7 @@ keywords: [診断, --explain, 記録, レイヤー]
 端末から打つ `--agree` は、承認の対象の一部が外れたら終了コード 1 で終わる。通ったぶんの承認済みチケットは置き、外れたものは名指しする。
 拡張が子プロセスで打つ `--agree --yes`（10 章）の終了コードは別。
 
-導入スクリプト `ccnavi-setup.sh` は共通レイヤーに `rules.yml` と `risks.yml`、自身のレイヤーに `phases.yml` のひな形を配り、3 本とも
-「まだ無いもの」の点検に数える。
+導入スクリプト `ccnavi-setup.sh` は共通レイヤーに `rules.yml`・`phases.yml`・`risks.yml`、自身のレイヤーに `phases.yml` のひな形を配る。
+「まだ無いもの」の点検には、`rules.yml` と `risks.yml` と、共通にも自身のレイヤーにも無い `phases.yml` を数える。
 
 dry-run でまずレイヤーの分布を見て、Bash の和と、大文字小文字を区別しない照合で増えた `ask` と `deny` を数えてから `enable` に切り替える。
