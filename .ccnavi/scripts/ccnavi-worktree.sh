@@ -1,7 +1,7 @@
 #!/bin/sh
 # ccnavi-worktree 作業用のワークツリーを統合先から切る。fetch・遅れの確認・起点の選択・worktree add を 1 本にする。
 #
-#   sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--offline] [--dry-run]
+#   sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--offline] [--from-origin] [--dry-run]
 #
 # 手で打つと、次の順になる（.ccnavi/docs/worktree.md「ワークツリーを切る」）。
 #   1. ccnavi-git.sh fetch origin <統合先>
@@ -41,11 +41,13 @@ fail() {
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--offline] [--dry-run]
+sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--offline] [--from-origin] [--dry-run]
 
   <名前>      ワークツリーの名前。ブランチ名も同じ名前で切る（/ を含められない）。行き先は
               <ワークスペースルート>/.claude/worktrees/<名前>
   --offline   fetch が失敗しても、手元の統合先から切って続ける（origin が古いかもしれない）
+  --from-origin   手元の統合先が origin と分岐していても、警告のうえ origin/<統合先> から切る
+              （切ったブランチは手元にだけある先行コミットを知らないので、統合で詰まりうる）
   --dry-run   何も作らず、切る予定の起点とパスだけ出す
 
 fetch・遅れの確認・起点の選択・worktree add を順に行う。遅れていれば origin/<統合先> から --no-track で切る。
@@ -56,11 +58,16 @@ USAGE
 
 name=""
 offline=""
+from_origin=""
 dry=""
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 	--offline)
 		offline=1
+		shift
+		;;
+	--from-origin)
+		from_origin=1
 		shift
 		;;
 	--dry-run)
@@ -134,9 +141,11 @@ choose_base() {
 	base="$integ"
 	track=""
 	behind=0
+	ahead=0
 	if git show-ref --verify --quiet "refs/remotes/origin/$integ" &&
 		git show-ref --verify --quiet "refs/heads/$integ"; then
 		behind=$(git rev-list --count "$integ..origin/$integ" 2>/dev/null || echo 0)
+		ahead=$(git rev-list --count "origin/$integ..$integ" 2>/dev/null || echo 0)
 		if [ "$behind" -ne 0 ]; then
 			base="origin/$integ"
 			track="--no-track"
@@ -149,12 +158,33 @@ choose_base() {
 	fi
 }
 
+# 手元の統合先が origin と分岐している（先行も遅れもある）。そのまま切ると、手元にだけある先行コミットを知らない
+# ブランチになり、統合で詰まる。--from-origin が無ければ切らずに止まる。
+diverged_guard() {
+	[ "$ahead" -ne 0 ] && [ "$behind" -ne 0 ] || return 0
+	if [ -n "$from_origin" ]; then
+		diverged_note="手元の ${integ} は origin/${integ} と分岐している（先行 ${ahead} 件・遅れ ${behind} 件）が、--from-origin で origin/${integ} から切った。手元にだけある先行 ${ahead} 件を、このブランチは知らない。統合（integrate）で詰まるので、先に手元の ${integ} を origin/${integ} に揃えるようユーザに頼む。詰まって取り込みの印（.git/ccnavi-integrate/<名前>/marker）が残ったときも、ユーザが手元の ${integ} を揃えてから打ち直す。"
+		return 0
+	fi
+	log_info 分岐で止めた -- "integration=$integ" "ahead=$ahead" "behind=$behind"
+	printf 'ワークツリーは切っていない。手元の %s が origin/%s と分岐している（先行 %s 件・遅れ %s 件）。\n' "$integ" "$integ" "$ahead" "$behind"
+	printf 'このまま origin/%s から切ると、手元にだけある先行 %s 件を知らないブランチになり、統合（integrate）で詰まる。\n' "$integ" "$ahead"
+	printf '次の手:\n'
+	printf '  1. 先に手元の %s を origin/%s に揃える。ccnavi は手元の統合先を進めないので、ユーザに頼む（先行分を push するか、別のブランチに退避してから揃える）\n' "$integ" "$integ"
+	printf '  2. 揃えたら同じコマンドを打ち直す: sh %s/ccnavi-worktree.sh %s\n' "$scripts" "$name"
+	printf '  3. 先行分が要らない・承知のうえなら --from-origin を付けて打ち直す（警告つきで origin/%s から切る）\n' "$integ"
+	exit 1
+}
+diverged_note=""
+
 if [ -n "$dry" ]; then
 	choose_base
+	diverged_guard
 	printf 'dry-run: 何も作らない。作る予定は次のとおり。\n'
 	printf 'ブランチ: %s（起点 %s%s）\n' "$name" "$base" "${track:+、$track}"
 	printf 'ワークツリー: %s\n' "$dest"
 	[ "$behind" -eq 0 ] || printf '案内: 手元の %s は origin/%s より %s 件遅れている（fetch 前の数）\n' "$integ" "$integ" "$behind"
+	[ -z "$diverged_note" ] || printf '案内: %s\n' "$diverged_note"
 	exit 0
 fi
 
@@ -180,6 +210,7 @@ if ! cgit fetch origin "$integ"; then
 fi
 
 choose_base
+diverged_guard
 
 # ---- worktree add。起点は省かない。拒否の文面は ccnavi-git.sh のもの（行き先・起点の直し方つき）をそのまま見せる。
 if [ -n "$track" ]; then
@@ -192,8 +223,9 @@ fi
 
 printf 'ワークツリーを切った: %s\n' "$dest"
 printf 'ブランチ: %s（起点 %s%s）\n' "$name" "$base" "${track:+、$track}"
-[ "$behind" -eq 0 ] || printf '案内: 手元の %s は origin/%s より %s 件遅れていたので origin/%s から切った（手元の %s は進めていない）\n' "$integ" "$integ" "$behind" "$integ" "$integ"
+[ "$behind" -eq 0 ] || [ -n "$diverged_note" ] || printf '案内: 手元の %s は origin/%s より %s 件遅れていたので origin/%s から切った（手元の %s は進めていない）\n' "$integ" "$integ" "$behind" "$integ" "$integ"
 [ -z "$fetch_note" ] || printf '案内: %s\n' "$fetch_note"
+[ -z "$diverged_note" ] || printf '案内: %s\n' "$diverged_note"
 # 直接作業の名前の形は実行ファイルに聞く（sh は形を判定しない）。取れなければ案内は出さない。拒否はしない。
 name_note=""
 if name_bin=$(ccnavi_bin "$root"); then
