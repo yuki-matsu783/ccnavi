@@ -22,6 +22,7 @@ import errno
 import io
 import json
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -30,7 +31,8 @@ import unittest
 from unittest import mock
 
 from ccnavi.hook import docsearch, docsearch_index, docsearch_query
-from ccnavi.infra import settings
+from ccnavi.infra import hookio, settings
+from tests import ROOT
 from tests.inproc import run_ccnavi
 
 
@@ -715,14 +717,24 @@ class SessionStartTest(Repo):
         launcher = f"sh {self.root.replace(os.sep, '/')}/.ccnavi/scripts/ccnavi-launcher.sh --docs"
         self.assertIn(launcher, said)
         self.assertIn("grep・Glob より先に", said)
-        self.assertIn("type は必須", said)
-        self.assertNotIn(docsearch.CONVENTION_DOC, said)
+        self.assertNotIn("--keyword frontmatter", said)
         self.assertNotIn(docsearch.UNIGNORED, said)
 
-    def test_names_the_convention_document_when_present(self):
+    def test_the_guide_is_one_line_without_the_option_list_or_writing_rules(self):
+        """常駐の文脈には引き方の要点だけ。オプションの一覧と frontmatter の書き方は渡さない。"""
+        self.put("docs/a.md", doc(type="guide"))
+        conf = settings.load(self.root)[0]
+        said = docsearch.at_start(conf, self.root)
+        self.assertEqual(len(said.splitlines()), 1, said)
+        self.assertIn("--docs --keyword <語>", said)
+        for listed in ("--format", "--sort", "--since", "type は必須", "kebab-case", "--help"):
+            self.assertNotIn(listed, said)
+
+    def test_points_to_the_convention_document_through_docs_when_present(self):
         self.put("docs/a.md", doc(type="guide"))
         self.put(docsearch.CONVENTION_DOC, doc(type="guide"))
-        self.assertIn(docsearch.CONVENTION_DOC, self.context(self.root))
+        said = self.context(self.root)
+        self.assertIn("--docs --keyword frontmatter", said)
 
     def test_names_a_project_left_out(self):
         write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\n/projects/\n")
@@ -772,6 +784,125 @@ class SessionStartTest(Repo):
             bare = os.path.realpath(bare)
             write(os.path.join(bare, "a.md"), doc(type="guide"))
             self.assertNotIn("--docs", self.context(bare))
+
+
+class FrontmatterHintTest(Repo):
+    """Write で新しく作った md に frontmatter か type が無ければ、PostToolUse で 1 度だけ案内する。
+
+    既にある md の Edit・上書きでは出さない。対象は索引に入る md（書いた先のツリーの git で決める）
+    から、決まりの文書が「付けない・付けなくてよい」とするもの（README.md・CLAUDE.md・下書きの
+    置き場・チケットの置き場）を除いたもの。
+    """
+
+    def hint(self, rel: str, text: str | None = None, tool="Write", kind="create", root=None):
+        base = root or self.root
+        path = os.path.join(base, *rel.split("/"))
+        if text is not None:
+            write(path, text)
+        payload = hookio.Input(
+            event=hookio.POST_TOOL_USE,
+            tool_name=tool,
+            tool_input={"file_path": path},
+            cwd=base,
+            tool_response={"type": kind, "filePath": path},
+        )
+        return docsearch.missing_frontmatter(settings.load(self.root)[0], self.root, payload)
+
+    def test_a_new_md_without_front_matter_is_told_once(self):
+        said = self.hint("docs/new.md", "# 見出し\n")
+        self.assertTrue(said.startswith(f"[ccnavi] {docsearch.CODE_MISSING_FRONTMATTER} "), said)
+        self.assertIn("(docs/new.md)", said)
+        self.assertIn("type（必須）", said)
+        self.assertNotIn("--help", said)
+
+    def test_a_missing_type_is_told_too(self):
+        said = self.hint("docs/new.md", doc(title="t"))
+        self.assertIn("type が無い", said)
+        self.assertEqual(self.hint("docs/ok.md", doc(type="guide")), "")
+
+    def test_edits_and_overwrites_are_not_told(self):
+        self.put("docs/old.md", "# 見出し\n")
+        self.assertEqual(self.hint("docs/old.md", tool="Edit", kind=""), "")
+        self.assertEqual(self.hint("docs/old.md", "# 上書き\n", kind="update"), "")
+
+    def test_files_meant_to_have_no_front_matter_are_not_told(self):
+        for rel in (
+            "README.md",
+            "extensions/x/README.md",
+            "CLAUDE.md",
+            "wip/scratchpad/draft.md",
+            "wip/proposals/todo/i0001.md",
+            ".ccnavi/notes.md",
+            "wip/design/scripts/i12.md",
+            ".claude/skills/yomiyasu/a.md",
+            ".claude/skills/yomiyasu/references/b.md",
+        ):
+            with self.subTest(rel=rel):
+                self.assertEqual(self.hint(rel, "# 見出し\n"), "")
+        # 表に無い置き場には出す。
+        self.assertNotEqual(self.hint("wip/design/notes.md", "# 見出し\n"), "")
+        self.assertNotEqual(self.hint(".claude/skills/x/references/a.md", "# 見出し\n"), "")
+
+    def test_exempt_places_match_the_convention_table(self):
+        """案内を出さない置き場は、決まりの文書の「対象外」の表で付けない・付けなくてよいとするもの。"""
+        with open(os.path.join(ROOT, *docsearch.CONVENTION_DOC.split("/")), encoding="utf-8") as f:
+            text = f.read()
+        table = text.split("## 対象外", 1)[1].split("\n\n", 2)[1]
+        places = set()
+        for row in table.splitlines()[2:]:
+            cells = [c.strip() for c in row.strip("|").split("|")]
+            if cells[1] not in ("付けない", "付けなくてよい"):
+                continue
+            for code in re.findall(r"`([^`]+)`", cells[0]):
+                if "/" in code:
+                    places.add(code if not code.endswith("/") else code + "**")
+        self.assertEqual(places, set(docsearch.NO_FRONTMATTER_PLACES))
+
+    def test_ignored_and_non_md_files_are_not_told(self):
+        write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\n/out/\n")
+        self.assertEqual(self.hint("out/a.md", "# 見出し\n"), "")
+        self.assertEqual(self.hint("docs/a.txt", "x\n"), "")
+
+    def test_the_convention_document_is_named_when_present(self):
+        self.put(docsearch.CONVENTION_DOC, doc(type="guide"))
+        said = self.hint("docs/new.md", "# 見出し\n")
+        self.assertIn(docsearch.CONVENTION_DOC, said)
+        self.assertIn("--docs --keyword frontmatter", said)
+
+    def test_a_worktree_ignored_by_the_workspace_is_judged_by_its_own_git(self):
+        """ワークスペースは `.claude/worktrees/` を無視する。
+
+        ワークツリーの md も統合後は索引に入るので、ワークツリー自身の git で決める。
+        """
+        write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\n/.claude/worktrees/\n")
+        git(self.root, "add", ".gitignore")
+        git(self.root, "commit", "-q", "-m", "seed")
+        tree_root = os.path.join(self.root, ".claude", "worktrees", "w")
+        git(self.root, "worktree", "add", "-q", tree_root, "-b", "w")
+        said = self.hint("docs/new.md", "# 見出し\n", root=tree_root)
+        self.assertIn("(.claude/worktrees/w/docs/new.md)", said)
+        self.assertEqual(self.hint("wip/scratchpad/a.md", "# 見出し\n", root=tree_root), "")
+
+    def test_post_tool_use_delivers_it_without_changing_the_decision(self):
+        path = self.put("docs/new.md", "# 見出し\n")
+        payload = {
+            "hook_event_name": "PostToolUse",
+            "session_id": "s1",
+            "cwd": self.root,
+            "tool_name": "Write",
+            "tool_input": {"file_path": path, "content": "# 見出し\n"},
+            "tool_response": {"type": "create", "filePath": path},
+        }
+        done = run_ccnavi(
+            ["--root", self.root, "--mode", "enable"],
+            input=json.dumps(payload),
+            cwd=self.root,
+            env=clean_env(),
+        )
+        self.assertEqual(done.returncode, 0, done.stderr)
+        said = json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn(docsearch.CODE_MISSING_FRONTMATTER, said)
+        self.assertNotIn("permissionDecision", done.stdout)
 
 
 # --- 8. 敵対的な入力と失敗 --------------------------------------------------------------

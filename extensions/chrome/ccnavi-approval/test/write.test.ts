@@ -98,7 +98,8 @@ test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足
   // 取り下げは出さない
   const after = (await board(d)).families.find((f) => f.family.name === "i0001")?.result;
   assert.deepEqual(after?.batch?.map((e) => e.ticket), []);
-  assert.deepEqual(after?.withdrawable?.map((w) => [w.ticket, w.problems]), [["i0001", ["todo/ に子の提案がある"]]]);
+  // 理由には押した後の答えと同じ表記でコードが載る
+  assert.deepEqual(after?.withdrawable?.map((w) => [w.ticket, w.problems]), [["i0001", ["[CORE_WITHDRAW_HAS_CHILDREN] todo/ に子の提案がある"]]]);
 });
 
 test("CX-T101 先頭が動いたら（expectedHeadOid の競合）新しい Snapshot で判定し直し、ダイジェストが同じなら見せ直さずに書く", async () => {
@@ -120,6 +121,7 @@ test("CX-T102 先頭が動いて承認待ちの中身も変わったら、書か
   mock.beforeCommit = (b) => mock.push(b, { [TODO]: mock.files(b)[TODO].replace("- **調べる**", "- **全部消す**") });
   const out = await approveFamily(REPO, "i0001", shown, d);
   assert.equal(out.kind, "changed", JSON.stringify(out));
+  assert.equal(out.kind === "changed" && out.code, "CORE_APPROVE_DIGEST_CHANGED");
   assert.deepEqual(mock.commitCalls.map((c) => c.result), ["stale"]);
   assert.ok(!(DOING in mock.files("i0001")));
 });
@@ -129,6 +131,12 @@ test("CX-T103 見せたダイジェストが今の中身と違えば、1 つも�
   const shown = shownOf(await board(d), "i0001");
   const out = await approveFamily(REPO, "i0001", { ...shown, digest: "0".repeat(64) }, d);
   assert.equal(out.kind, "changed");
+  // 分岐の材料は鍵の code。文面の頭にも同じコードが載る
+  assert.equal(out.kind === "changed" && out.code, "CORE_APPROVE_DIGEST_CHANGED");
+  assert.match(out.message, /^\[CORE_APPROVE_DIGEST_CHANGED\] /);
+  // 見せた識別子が今の一覧と違えば、中身より先にそちらの種別
+  const listed = await approveFamily(REPO, "i0001", { ...shown, ids: [...shown.ids, "i0009"] }, d);
+  assert.equal(listed.kind === "changed" && listed.code, "CORE_APPROVE_LIST_CHANGED");
   mock.push("i0001", { [TODO]: mock.files("i0001")[TODO] + "\n追記\n" });
   const again = await approveFamily(REPO, "i0001", shown, d);
   assert.equal(again.kind, "changed");

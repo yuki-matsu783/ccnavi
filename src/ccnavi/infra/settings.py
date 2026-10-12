@@ -181,6 +181,22 @@ def script_command(root: str, name: str) -> str:
     return f"sh {_quoted(f'{base}/{DEFAULT_PROJECT_HOME}/scripts/{name}')}"
 
 
+def git_command(root: str) -> str:
+    """文面で案内する git の打ち方。
+
+    ワークスペースルートに git のラッパーがあればラッパー、無ければ `git`。
+    ラッパーがあるワークスペースでは、生の git が組み込みかルールで止まることがある。止まる形を
+    案内すると、受け取ったエージェントは打って止められ、言い換えを探す。ラッパーは生の git が
+    止まっていないワークスペースでもそのまま使える。ラッパーが無いなら、生の git を組み込みで
+    止めることもない（チケット制御の生の git の止めはラッパーがあるときだけ足す）ので、
+    `git` を案内する。
+    """
+    wrapper = os.path.join(root, DEFAULT_PROJECT_HOME, "scripts", "ccnavi-git.sh")
+    if root and os.path.isfile(wrapper):
+        return script_command(root, "ccnavi-git.sh")
+    return "git"
+
+
 def _quoted(path: str) -> str:
     """文面に置くパスの表記。引用が要るときだけ引用する（引用の決め方は script_command）。"""
     if _BARE_PATH.fullmatch(path):

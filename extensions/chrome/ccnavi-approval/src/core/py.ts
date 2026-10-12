@@ -99,7 +99,10 @@ export interface BatchEntry {
 export interface Withdrawable {
   readonly ticket: string;
   readonly title: string;
-  /** 取り下げられない理由（空なら取り下げを出す。承認コミットが引けるかは押したときに見る） */
+  /**
+   * 取り下げられない理由（空なら取り下げを出す。承認コミットが引けるかは押したときに見る）。
+   * 押した後の答え（`WithdrawResult.problems`）と同じく、文面の頭に `[<コード>]` が載る
+   */
   readonly problems: readonly string[];
 }
 
@@ -155,20 +158,44 @@ export interface Written {
   readonly stopped: { readonly ticket: string; readonly reason: string } | null;
 }
 
+/**
+ * 通らなかった根拠の種別（付録 A の `CORE_*`）。通れば null。文面の頭の `[<コード>]` と同じもの。
+ * 分岐は文面の言い回しではなく、この鍵で決める
+ */
+export type ReasonCode = string | null;
+
+/** 承認: 見せた一覧（識別子）と今の一覧が違う */
+export const APPROVE_LIST_CHANGED = "CORE_APPROVE_LIST_CHANGED";
+/** 承認: 識別子は同じで、見せた中身（ダイジェスト）が今と違う */
+export const APPROVE_DIGEST_CHANGED = "CORE_APPROVE_DIGEST_CHANGED";
+/** 取り下げ: 承認コミットの親に提案が無い（承認コミットを引けない） */
+export const WITHDRAW_NO_PRIOR = "CORE_WITHDRAW_NO_PRIOR";
+
+/** 文面の頭にコードを載せる（Python の `core_base.tagged` の、`ccnavi: ` で始まらない行の形） */
+export function tagged(code: string, text: string): string {
+  return `[${code}] ${text}`;
+}
+
 export interface PlanResult extends Written {
   readonly identifiers: readonly string[];
   readonly digest: string;
   readonly mismatch: unknown;
   readonly refused: string;
   readonly rejected: readonly { readonly ticket: string; readonly problems: readonly string[] }[];
+  /** `CORE_APPROVE_*`（見せたものと違う・承認するものが無い） */
+  readonly code: ReasonCode;
 }
 
 export interface WithdrawResult extends Written {
   readonly problems: readonly string[];
+  /** `CORE_WITHDRAW_*`・`CORE_HISTORY_UNWRITABLE`。理由が幾つもあれば最初の理由のもの */
+  readonly code: ReasonCode;
 }
 
 export interface ConfirmResult extends Written {
   readonly problems: readonly string[];
+  /** `CORE_CONFIRM_*`・`CORE_HISTORY_UNWRITABLE` */
+  readonly code: ReasonCode;
   /** 依頼の後に親のブランチが動いていれば、比べる 2 つ（拡張が compare API で読んで呼び直す） */
   readonly need_compare?: { readonly base: string; readonly head: string };
 }

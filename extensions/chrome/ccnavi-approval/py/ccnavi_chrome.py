@@ -10,6 +10,8 @@
 （Changes）を値で返すだけで、ホストにもディスクにも書かない（fsio で書き込み待ちの内容を溜める段）。
 拡張は `plan`（承認）・`withdraw`（取り下げ）・`confirm`（レビュー済み）の答えを、親のブランチへの
 1 コミットにして書く。
+通らなかった答えは、理由コード（付録 A の `CORE_*`）を鍵 `code` に持つ（通れば null）。
+拡張はこの鍵で分岐する。
 ボードの答えの `reviewable` が候補のフェーズで、ホストからスレッドとレビューを取得した結果は
 拡張が組んで `result` で渡す。
 
@@ -1050,6 +1052,8 @@ def _op_plan(req: dict, root: str) -> dict:
         "text": verdict.screen_text,
         "digest": verdict.digest,
         "mismatch": verdict.mismatch,
+        # 通らなかった根拠の種別（`CORE_APPROVE_*`、手元の `--agree --yes` と同じ）。通れば null
+        "code": None if changes is not None else core.approval_refusal_code(verdict) or None,
         "refused": _relative(root, refused),
         "rejected": [
             {"ticket": t.ticket, "problems": [_relative(root, str(p)) for p in complaints]}
@@ -1080,6 +1084,8 @@ def _op_withdraw(req: dict, root: str) -> dict:
     return {
         "family": family,
         "problems": [_relative(root, p) for p in checked.problems],
+        # 通らなかった根拠の種別（`CORE_*`。文面の頭の `[<コード>]` と同じ）。通れば null
+        "code": checked.code or None,
         **body,
     }
 
@@ -1114,6 +1120,7 @@ def _op_confirm(req: dict, root: str) -> dict:
                 "family": family,
                 "need_compare": {"base": recorded, "head": head},
                 "problems": [],
+                "code": None,
                 **_changes(root, None),
             }
         changed = core.moved_on_host(
@@ -1125,6 +1132,8 @@ def _op_confirm(req: dict, root: str) -> dict:
     return {
         "family": family,
         "problems": [_relative(root, p) for p in checked.problems],
+        # 通らなかった根拠の種別（`CORE_*`。文面の頭の `[<コード>]` と同じ）。通れば null
+        "code": checked.code or None,
         **body,
     }
 

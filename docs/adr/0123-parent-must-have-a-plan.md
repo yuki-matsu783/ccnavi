@@ -5,7 +5,7 @@ description: 計画の無い親を番号だけで動かす扱いをやめ、親�
 tags: [phase, ticket, start]
 keywords: [親, 計画, plan, 番号だけ, phases.yml, start, 子のないフェーズ, 案内, finish, parent_not_started, 子チケット]
 ---
-# ADR-0121: 親は計画を必ず持ち、計画の無い親は start が止まる
+# ADR-0123: 親は計画を必ず持ち、計画の無い親は start が止まる
 
 状態: 採用（2026-10-11 にユーザが決めた）。ADR-0026 の「計画の無い親は今までどおり番号だけで動く。`phases.yml` も要らない」を置き換える
 

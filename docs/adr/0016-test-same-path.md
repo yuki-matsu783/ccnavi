@@ -39,7 +39,8 @@ VS Code 拡張が読む `--test --json` / `--test-samples --json` も同じ関�
 
 - 得たもの: ルールを足すたびに確かめられる。拡張が判定を持たずに済む
 - 失ったもの: 端末からの試験には `permission_mode` が来ないので、言及の無い呼び出しは `ask` と
-  出る（ADR-0009）。見たいなら payload を直接流す
+  出る（ADR-0009）。見たいなら payload を直接流す。後から `--test` に `--cwd`・`--permission-mode`・
+  `--agent-id` を足し、hook が受け取る payload の欄を試験でも渡せるようにした（既定は変えていない）
 
 ## 採らなかった案
 

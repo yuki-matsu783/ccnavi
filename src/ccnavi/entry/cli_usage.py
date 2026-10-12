@@ -108,6 +108,17 @@ in a file against them, run
 
 Both go through the same decision as the hook. --json prints the shape
 documented in README.md ("試験の JSON"); the VS Code extension reads it.
+--test tries the call from the workspace root, with no permission mode, from
+the main session. To try it the way another call would arrive, add
+
+    --cwd <dir> --permission-mode <mode> --agent-id <id>
+
+The mode is one of auto, default, acceptEdits, plan, dontAsk and
+bypassPermissions; any other name, and a --cwd that is not a directory, is
+refused. --permission-mode and --agent-id are for --test only (also not
+with --lint or --explain). Put flags before or after "--test <TOOL> <SUBJECT>",
+never between the two words; a flag there, or a word left over after them,
+is refused.
 
 To rotate the decision log and remove old logs and finished sessions' state
 (SessionStart does the same on its own), run

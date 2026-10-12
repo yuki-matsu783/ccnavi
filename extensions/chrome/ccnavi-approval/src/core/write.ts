@@ -21,7 +21,7 @@
  * 新しい先頭から読み直して再試行する。元に戻すコミットもさらに競合して 2 回で収まらなければ、止めてユーザの対応に切り替える（`attention`）。
  * ccnavi の書き込みどうしの競合を捕まえる seq ファイルは書かない。そのため、取り下げと子の承認が同時に通ったとき「親の無い子」が一時的に残りうる。
  */
-import { py, PyError, type Actor, type ChangeRow, type PlanResult, type Written } from "./py.js";
+import { APPROVE_DIGEST_CHANGED, APPROVE_LIST_CHANGED, py, PyError, tagged, type Actor, type ChangeRow, type PlanResult, type ReasonCode, type Written } from "./py.js";
 import type { RepoConfig } from "./settings.js";
 import { findPrior, MovedError, readFamily, type Deps as ReadDeps, type FamilyRead } from "./snapshot.js";
 import type { BlobText, FileAddition, PathObject, ReviewCopy } from "./github.js";
@@ -65,8 +65,9 @@ export function commitMessage(ids: readonly string[], verb: string, done: string
 
 export type Outcome =
   | { readonly kind: "written"; readonly oid: string; readonly rounds: number; readonly lines: readonly string[] }
-  | { readonly kind: "changed"; readonly message: string }
-  | { readonly kind: "refused"; readonly message: string }
+  /** `code` は Python が返した理由コード（`CORE_*`）。文面の頭にも `[<コード>]` で載る */
+  | { readonly kind: "changed"; readonly message: string; readonly code?: string }
+  | { readonly kind: "refused"; readonly message: string; readonly code?: string }
   | { readonly kind: "conflict"; readonly message: string }
   | { readonly kind: "failed"; readonly message: string }
   /** ユーザの対応に切り替える（元に戻すコミットでも競合が収まらない・書いたか確かめられない・書いた後の中身が違う）。ボードは親子のチケットを「要確認」で出す */
@@ -158,7 +159,13 @@ async function actorOf(deps: WriteDeps, repo: RepoConfig): Promise<Actor> {
 
 function why(res: PlanResult): string {
   const lines = [res.refused, ...res.rejected.map((r) => `${r.ticket}: ${r.problems.join(" / ")}`)].filter((s) => s);
-  return lines.join("\n") || "承認するものが無い";
+  const text = lines.join("\n") || "承認するものが無い";
+  return res.code ? tagged(res.code, text) : text;
+}
+
+/** 答えの理由コードを Outcome の `code` にする（通った答え・コードの無い答えなら付けない） */
+function codeOf(res: { readonly code?: ReasonCode }): { code?: string } {
+  return res.code ? { code: res.code } : {};
 }
 
 /** service worker の `commit` の答え。`parent` はホストが実際に積んだ先 */
@@ -480,8 +487,11 @@ export async function approveFamily(repo: RepoConfig, family: string, shown: Sho
       stamp,
       actor,
     });
-    if (res.mismatch) return { kind: "stop", outcome: { kind: "changed", message: "ボードに表示した後で承認待ちの中身が変わった。中身を見直してから承認し直してください" } };
-    if (!res.changes) return { kind: "stop", outcome: { kind: "refused", message: why(res) } };
+    if (res.code === APPROVE_LIST_CHANGED || res.code === APPROVE_DIGEST_CHANGED) {
+      const message = tagged(res.code, "ボードに表示した後で承認待ちの中身が変わった。中身を見直してから承認し直してください");
+      return { kind: "stop", outcome: { kind: "changed", message, code: res.code } };
+    }
+    if (!res.changes) return { kind: "stop", outcome: { kind: "refused", message: why(res), ...codeOf(res) } };
     const rows = rowsOf(res, family, read);
     if (typeof rows === "string") return { kind: "stop", outcome: { kind: "refused", message: rows } };
     return { kind: "rows", rows, message: commitMessage(res.identifiers, "を承認", "承認した", deps.version), lines: res.lines };
@@ -518,7 +528,7 @@ export async function withdrawTicket(repo: RepoConfig, family: string, ident: st
       actor,
     });
     if (res.problems.length > 0 || !res.changes) {
-      return { kind: "stop", outcome: { kind: "refused", message: res.problems.join("\n") || "取り下げるものが無い" } };
+      return { kind: "stop", outcome: { kind: "refused", message: res.problems.join("\n") || "取り下げるものが無い", ...codeOf(res) } };
     }
     const rows = rowsOf(res, family, read);
     if (typeof rows === "string") return { kind: "stop", outcome: { kind: "refused", message: rows } };
@@ -550,7 +560,7 @@ export async function confirmPhase(repo: RepoConfig, family: string, phase: numb
       actor,
     });
     if (res.problems.length > 0 || !res.changes) {
-      return { kind: "stop", outcome: { kind: "refused", message: res.problems.join("\n") || "レビュー済みにするものが無い" } };
+      return { kind: "stop", outcome: { kind: "refused", message: res.problems.join("\n") || "レビュー済みにするものが無い", ...codeOf(res) } };
     }
     const rows = rowsOf(res, family, read);
     if (typeof rows === "string") return { kind: "stop", outcome: { kind: "refused", message: rows } };

@@ -28,7 +28,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `DENY_TICKET_FLOW_LOCKED` | 着手中の子のフロー（承認済みの領域の `flows/<子>.yml`。ハードリンクの別名も）に書こうとした。ルールより先に止める（9.3.1） |
 | `NOTICE_TICKET_FLOW_CHANGED` | 着手中の子のフローが、着手のときに記録したハッシュから変わっている。`SubagentStart` / `SubagentStop` が知らせるだけで、止めない（9.3.1） |
 | `DENY_RECORDS_PRUNE` | 記録と state を消す `ccnavi --prune`（`--preview` なし）をシェルから打った。チケット制御に依らない |
-| `DENY_TICKET_APPROVAL_CLI` | 実行ファイルを承認用のオプション付きで直接打った。実行役のコマンド越しに打った形を含む。端末要求を切る変数とフラグをコマンド行に書いた形も（9.5） |
+| `DENY_TICKET_APPROVAL_CLI` | 実行ファイルを承認用のオプション付きで直接打った。実行役のコマンド越しに打った形を含む。端末要求を切る変数とフラグをコマンド行に書いた形も。端末を求めない入口に、止める操作（`--forget`・`decide --choices`・承認の旗と `--yes`・`--guard-ticket-approval`）を組み立てうる読み切れない引数（変数・置換・glob・`xargs`）を渡した形と、標準入力から読むシェルに入口の名前を含む文字列を流す形も（9.5） |
 | `DENY_PHASE_REVIEW` | フェーズのレビューで止まっている（レビュー準備中・レビュー待ち） |
 | `NUDGE_TICKET_FINISH` | メインエージェントの `Stop` で、cwd のワークツリーのチケットが着手済みのまま、未コミットの変更が無く、基準点より先に自分のコミットがある。同じ HEAD では 1 回だけ止めて `finish` か続ける理由を促す（9.6）。記録の `decision` は `nudge` |
 | `NUDGE_TICKET_REQUEST` | メインエージェントの `Stop` で、承認済みの親に作業中の子が残っているか、子が全部閉じたのにレビューを要するフェーズの `requested` が無い。同じ状態では 1 回だけ止めて、次の一手（`finish`・合流・ELI5・`request`）を促す（9.6）。`finish` の促しと重なった回は出ない。実行中のサブエージェントが居る間は出ない（9.12）。記録の `decision` は `nudge` |
@@ -36,7 +36,15 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `DENY_SUBAGENT_TICKET_OP` | サブエージェントがチケットの状態・レビュー・push を動かそうとした |
 | `DENY_CHILD_PUSH` | 子チケットのワークツリーから `ccnavi-git.sh push` を打った。`cd` の行き先が読めない push を含む（9.10） |
 | `DENY_SCRIPT_ENV_OVERRIDE` | 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼んだ（8.2） |
-| `POST_VIOLATION` / `POST_PREEXISTING` / `POST_TICKET_SCOPE` | 実行後チェック。保護領域の変更 / 前から在った変更 / チケットの範囲外 |
+| `DENY_WRAPPER_CORE_PATH` | `ccnavi-git.sh` の `rm`・`restore --source`・`checkout <ref> <パス>` で、自己防衛の対象か承認済みチケットの置き場かレビュー待ちの置き場（`wip/proposals/review/`。置き場に何かがある間はその親も）を消す・別のコミットの中身に戻そうとした。対象を読み切れない形（変数・置換・居場所の読めない `cd` / `pushd` の後の相対パス）、副命令が文字どおりの語でない形、標準入力から読むシェルに流す文字列の中の呼び出し、走査が読み切れず名前の直後に文字どおりの副命令が無い形と、索引の中身に戻す `checkout -- <パス>` も（8.2） |
+| `POST_VIOLATION` / `POST_PREEXISTING` / `POST_TICKET_SCOPE` | 実行後チェック。保護領域の変更 / 前から在った変更 / チケットの範囲外。記録の `code` は 1 つで、件が混ざった回は `POST_VIOLATION` を `POST_TICKET_SCOPE` より先に採り、内訳を `detail` に `codes POST_VIOLATION 2, POST_TICKET_SCOPE 1` の形で書く。前から在った変更だけを知らせた回は `decision` が `allow` のまま `POST_PREEXISTING` |
+| `CORE_CONFIRM_NO_PARENT` / `CORE_CONFIRM_NO_PHASE` / `CORE_CONFIRM_ALREADY_REVIEWED` / `CORE_CONFIRM_NOT_REQUESTED` | レビュー済み（`review confirm` と Chrome の「レビュー済み」）が通らなかった。親の承認済みチケットが作業中に無い / そのフェーズの子が無い / もうレビュー済み / 依頼の記録が無い |
+| `CORE_CONFIRM_MOVED` / `CORE_CONFIRM_RESULT_MISMATCH` / `CORE_CONFIRM_REVIEW_OPEN` | レビュー済みが通らなかった。依頼の後にユーザが見るものが動いた / 取得した結果が依頼したマージリクエストと照合できない / 変更要求のレビューか未解決のスレッドが残っている |
+| `CORE_WITHDRAW_NO_IDS` / `CORE_WITHDRAW_NOT_OPEN` / `CORE_WITHDRAW_OTHER_BRANCH` / `CORE_WITHDRAW_BLOCKED` / `CORE_WITHDRAW_FOLLOWUP` / `CORE_WITHDRAW_STARTED` | 承認の取り下げが通らなかった。識別子が無い / 作業中（`doing/`）に無い / 親のブランチの `doing/` に無い / 承認済みチケット自体が信頼できない / 続きの子で戻す提案が無い / 着手済み |
+| `CORE_WITHDRAW_HAS_CHILDREN` / `CORE_WITHDRAW_MARKERS` / `CORE_WITHDRAW_TODO_EXISTS` / `CORE_WITHDRAW_NO_PRIOR` / `CORE_WITHDRAW_CHANGED` | 承認の取り下げが通らなかった。子の承認済みチケットか子の提案がある / フェーズのマーカーがある（読めないときも） / 戻す先に同じ識別子の提案がある / 承認コミットの親に提案が無い / 承認のあとに中身が変わった |
+| `CORE_APPROVE_NO_DIGEST` / `CORE_APPROVE_LIST_CHANGED` / `CORE_APPROVE_DIGEST_CHANGED` / `CORE_APPROVE_NOTHING` / `CORE_APPROVE_STOPPED` | ボードの承認（`ccnavi --agree --yes`）が通らなかった。`--digest` が無い / 見せた一覧（識別子）と今の一覧が違う / 識別子は同じで見せた中身が今と違う / 承認するものが無い / 書く途中で止まった（置いたものは残る）。確認・取り下げと同じく、標準エラーの文の頭に `[<コード>]` で載せる。Chrome 拡張の承認（入口の `plan`）も、見せたものと違う・承認するものが無いときに同じコードを答えの `code` で返す（`core_approve.refusal_code` で 1 か所で決める） |
+| `CORE_HISTORY_UNWRITABLE` | レビュー済みか取り下げで、書く前に履歴を残せないと分かったので書かなかった |
+| `NOTICE_DOC_FRONTMATTER` | `PostToolUse`。Write で新しく作った md に frontmatter か `type` が無い。止めずに `additionalContext` で 1 度だけ書き方を案内する。索引に載らない md（git が無視するもの・ccnavi ディレクトリの下）と、決まりの文書が付けないとする md（`README.md`・`CLAUDE.md` と、`docs/claude/frontmatter.md` の対象外の表の置き場。チケットの置き場・チケットの下書き `wip/design/scripts/i*.md`・`wip/scratchpad/`・`.claude/skills/yomiyasu/**`）には出さない。案内しても記録（`decisions.jsonl`）の `code` には残らない |
 
 記録の `skip` の理由: `mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、
 `payload-unusable`、`deadline-exceeded`、`internal-error`（ccnavi 自身の例外。4.5）、`tool-cannot-write`、
@@ -46,6 +54,28 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 組み込みの判定で止めた文は、先頭の行に理由コードと記録の `rules` と同じ識別子を
 `[ccnavi] <コード> (builtin rule: <識別子>)` の形で並べる（`builtin-script-env` など）。
 
+ユーザの操作（レビュー済み・承認の取り下げ）が通らなかった答えは、`CORE_*` のコードを答えの `code` に持ち、
+文面の行にも `[<コード>]` の形で載せる（`ccnavi: ` で始まる行はその後ろ）。取り下げで理由が幾つもあるときは、
+行ごとに自分のコードを載せ、答えの `code` は最初の理由のものにする。
+Chrome 拡張の入口（`py/ccnavi_chrome.py`）が返す承認（`plan`）・取り下げ（`withdraw`）・レビュー済み（`confirm`）の
+JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`・`mismatch` と同じく、無いときは `null`）。拡張は
+分岐をこの鍵で決め、文面の言い回しを読まない。ボードの取り下げ候補（`withdrawable`）の `problems` にも、押した後の
+答えと同じ表記で `[<コード>]` を載せる。承認コミットを引けないときに拡張が足す理由も、同じ場合に `withdraw` が返す
+`[CORE_WITHDRAW_NO_PRIOR]` を頭に付ける。
+
+ルールファイルの外の決めごとで止めた回は、記録の `rules` の先頭に括弧付きの名前を置く。判定ごとに名前を分け、
+別の判定の名前を使い回さない（同じ理由の繰り返し（6.4）の鍵と文面が、止めた理由の名前になるように）。
+
+| 名前 | 理由コード |
+|---|---|
+| `(ticket-scope)` | `DENY_TICKET_SCOPE` / `TICKET_ASK`、実行後チェックと `SubagentStop` の `POST_TICKET_SCOPE` |
+| `(ticket-blocked)` | `DENY_TICKET_BLOCKED` |
+| `(ticket-project)` | `DENY_TICKET_PROJECT_MISMATCH` |
+| `(ticket-flow-lock)` | `DENY_TICKET_FLOW_LOCKED` |
+| `(phase-review)` | `DENY_PHASE_REVIEW` |
+| `(subagent-ticket-op)` | `DENY_SUBAGENT_TICKET_OP` |
+| `(redirect-limit)` | `DENY_REDIRECT_LIMIT` |
+
 ## 付録 B. 記録の 1 行
 
 `ts`（ISO 8601、ローカルのオフセット付き）、`mode`、`permission_mode`、`event`、`tool`、`subject`
@@ -53,6 +83,9 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 `\x00` でつなぎ、1000 字で切る。6.3.1）、`fallback`、`detail`、
 `tree`、`project`、`source`、`rules[]`、`quoted[]`、`paths[]`、`guarded[]`、`session`、`ms` の 23 欄。空欄は省く。
 `ts` / `mode` / `decision` / `enforced` / `ms` は常に出る。`O_APPEND` で 1 行を 1 回の write で書く。
+
+`Stop` の 1 行は、ターンの終わりの報告（7.4）と促し（`NUDGE_*`）が重なると、止めた促しの `decision`・`code`・`rules` になる。
+報告の `code` と `rules` は `detail` に `report POST_VIOLATION <id>,<id>` の形で残し、`paths` は報告の変わったパスのまま。
 
 ## 付録 C. 実測で確かめた前提
 
