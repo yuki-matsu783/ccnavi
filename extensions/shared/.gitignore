@@ -1,0 +1,2 @@
+# pnpm install が作る依存のディレクトリ。shared は workspace の一部として build のたびに作られるので追跡しない。
+node_modules/
