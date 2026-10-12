@@ -25,11 +25,12 @@ test("CB-T136 登録した入口を帳面から開く。要求する側は相手
   await screens().board("lib");
   await screens().rules({ kind: "project", name: "lib" });
   await screens().phases({ kind: "self" });
+  await screens().templates({ kind: "self" });
   await screens().risk({ kind: "workspace" });
   await screens().projects();
   await screens().flow("i0001-01-01");
   await screens().workflow("i0001");
-  assert.deepEqual(calls, ["board:lib", "rules:project", "phases:self", "risk:workspace", "projects", "flow:i0001-01-01", "workflow:i0001"]);
+  assert.deepEqual(calls, ["board:lib", "rules:project", "phases:self", "templates:self", "risk:workspace", "projects", "flow:i0001-01-01", "workflow:i0001"]);
   forgetScreens();
 });
 
