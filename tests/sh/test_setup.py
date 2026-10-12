@@ -1427,14 +1427,14 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         with open(self.deployed(*TEMPLATES_PARTS, "feature.yml"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "name: feature\n")
 
-    PROCESS = "---\nname: testing\nprocess: true\ndescription: 入口\n---\n# testing\n"
+    PROCESS = "---\nname: test\nprocess: true\ndescription: 入口\n---\n# test\n"
 
     def skill_files(self):
         return {
-            "testing/SKILL.md": self.PROCESS,
-            "testing/references/common/purpose.md": "共通\n",
-            "testing/references/common/sub/deep.md": "深い共通\n",
-            "testing/references/project/manual.md": "配布元固有\n",
+            "test/SKILL.md": self.PROCESS,
+            "test/references/common/purpose.md": "共通\n",
+            "test/references/common/sub/deep.md": "深い共通\n",
+            "test/references/project/manual.md": "配布元固有\n",
             "commit/SKILL.md": "---\nname: commit\ndescription: 配布元固有\n---\n",
             "flag/SKILL.md": '---\nname: flag\nprocess: "true"\n---\n',
             "late/SKILL.md": "---\nname: late\n---\nprocess: true\n",
@@ -1457,24 +1457,24 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(
             found,
             [
-                "testing/SKILL.md",
-                "testing/references/common/purpose.md",
-                "testing/references/common/sub/deep.md",
+                "test/SKILL.md",
+                "test/references/common/purpose.md",
+                "test/references/common/sub/deep.md",
             ],
         )
-        with open(os.path.join(base, "testing", "SKILL.md"), encoding="utf-8") as f:
+        with open(os.path.join(base, "test", "SKILL.md"), encoding="utf-8") as f:
             self.assertEqual(f.read(), self.PROCESS)
         self.assertTrue(
             names(
                 section(result.stdout, "配った"),
-                ".claude/skills/testing/references/common/purpose.md",
+                ".claude/skills/test/references/common/purpose.md",
             )
         )
         self.assertNotIn("まだ無いもの", result.stdout)
 
     def test_keeps_a_process_skill_the_project_already_has_unless_forced(self):
         src = self.make_source(skills=self.skill_files())
-        path = self.deployed(".claude", "skills", "testing", "SKILL.md")
+        path = self.deployed(".claude", "skills", "test", "SKILL.md")
         os.makedirs(os.path.dirname(path))
         with open(path, "w", encoding="utf-8") as f:
             f.write("このプロジェクトで直した\n")
@@ -1489,7 +1489,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         src = self.make_source(skills=self.skill_files())
         result = self.run_setup("--deploy", src, "--check")
         self.assertEqual(result.returncode, 1, result.stdout)
-        self.assertTrue(names(section(result.stdout, "配る"), ".claude/skills/testing/SKILL.md"))
+        self.assertTrue(names(section(result.stdout, "配る"), ".claude/skills/test/SKILL.md"))
         self.assertFalse(os.path.exists(self.deployed(".claude", "skills")), "--check は書かない")
 
     def test_a_source_without_process_skills_deploys_nothing_of_them(self):
