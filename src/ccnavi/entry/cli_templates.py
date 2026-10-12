@@ -122,6 +122,9 @@ def usage_problem(args: argparse.Namespace) -> str:
     probe = argparse.Namespace(**vars(args))
     if args.import_ is not None:
         probe.yes = ""
+    # 取り込みを書く形の `--via`（board だけ）は、cli が見る。ここでは断らない。
+    if args.import_ is not None and args.yes:
+        probe.via = ""
     refused = cli_args._not_with_docs(probe)
     if refused:
         return f"--templates は {refused} と一緒に使えない"

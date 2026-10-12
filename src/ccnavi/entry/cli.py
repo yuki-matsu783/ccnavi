@@ -365,7 +365,18 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             "（--reviewed <N> --accept-unresolved）と一緒に使う\n"
         )
         return EXIT_ERROR
-    if args.via and (not args.actor or not cli_ops._decide_writes(args)):
+    # 取り込みを書く形（`--templates --import --yes`）は、拡張の子プロセスから board で呼ぶ。
+    # `--actor` は読まない。`--expect` と `--json` が揃ったときだけ通す。
+    if args.templates and args.import_ is not None and args.yes:
+        if args.via and args.via != history.VIA_BOARD:
+            stderr.write("ccnavi: --via は --import --yes では board だけ渡せる\n")
+            return EXIT_ERROR
+        if args.via and (args.expect is None or not args.json):
+            stderr.write(
+                "ccnavi: --via board は --import --yes --expect <ハッシュ> --json と一緒に使う\n"
+            )
+            return EXIT_ERROR
+    elif args.via and (not args.actor or not cli_ops._decide_writes(args)):
         stderr.write("ccnavi: --via は decide の --actor と一緒に使う\n")
         return EXIT_ERROR
     if args.via and args.via not in (history.VIA_TERMINAL, history.VIA_BOARD):
@@ -638,12 +649,13 @@ def _parsed(
     if args.templates:
         # 取り込みを書くとき（`--import --yes`）は、hook の文字列照合だけを歯止めにせず、
         # 実行時にも端末の前のユーザが打ったことを確かめる。下見（`--yes` なし）は求めない。
-        if (
-            args.import_ is not None
-            and args.yes
-            and not cli_args._from_terminal(stdin, conf, stderr, "--import --yes")
-        ):
-            return EXIT_ERROR
+        # 承認（--agree --yes）と同じく、拡張の子プロセスは端末を持たないので、端末の確認の代わりに
+        # --expect の一致と hook の止めに置く。
+        if args.import_ is not None and args.yes:
+            if args.via == history.VIA_BOARD:
+                history.set_via(history.VIA_BOARD)
+            elif not cli_args._from_terminal(stdin, conf, stderr, "--import --yes"):
+                return EXIT_ERROR
         return cli_templates.run(stdout, stderr, conf, root, args)
     if not args.docs:
         stray = cli_args._docs_flags_given(args)

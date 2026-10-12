@@ -812,6 +812,70 @@ class ImportTest(Drafts):
         self.assertTrue(done["written"])
         self.assertTrue(done["removed"])
 
+    def test_via_board_skips_the_terminal_check(self):
+        # 拡張の子プロセスは端末を持たない。--via board なら端末の確かめを飛ばす。
+        result = self.import_(
+            "i0001",
+            "--to",
+            "common",
+            "--yes",
+            "--expect",
+            self.sha,
+            "--via",
+            "board",
+            "--json",
+            guard="enable",
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(os.path.exists(self.common_file()))
+        self.assertTrue(json.loads(result.stdout)["written"])
+
+    def test_without_via_board_the_terminal_check_stays(self):
+        result = self.import_(
+            "i0001", "--to", "common", "--yes", "--expect", self.sha, guard="enable"
+        )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("端末", result.stderr)
+        self.assertFalse(os.path.exists(self.common_file()))
+
+    def test_via_board_needs_expect_and_json(self):
+        result = self.import_("i0001", "--to", "common", "--yes", "--via", "board", "--json")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("--expect", result.stderr)
+        self.assertFalse(os.path.exists(self.common_file()))
+        self.assertTrue(os.path.exists(self.draft_path()))
+        result = self.import_(
+            "i0001", "--to", "common", "--yes", "--expect", self.sha, "--via", "board"
+        )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("--json", result.stderr)
+        self.assertFalse(os.path.exists(self.common_file()))
+        self.assertTrue(os.path.exists(self.draft_path()))
+
+    def test_via_terminal_is_refused_for_import(self):
+        result = self.import_(
+            "i0001",
+            "--to",
+            "common",
+            "--yes",
+            "--expect",
+            self.sha,
+            "--via",
+            "terminal",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("board", result.stderr)
+        self.assertFalse(os.path.exists(self.common_file()))
+
+    def test_new_text_is_in_the_preview_json(self):
+        # 同名が無い（新規の）取り込みの下見に、取り込む本文が出る。
+        shown = json.loads(self.import_("i0001", "--to", "common", "--json").stdout)
+        self.assertFalse(shown["exists"])
+        draft = self.read_draft().decode()
+        line = next(item for item in draft.splitlines() if item.startswith("name:"))
+        self.assertIn(line, shown["new_text"])
+
     # ---- 組み合わせの誤り
 
     def test_wrong_combinations_are_refused(self):
