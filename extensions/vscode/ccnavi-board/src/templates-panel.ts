@@ -86,6 +86,11 @@ interface PanelState {
   seq: number;
   /** 「破棄して切り替える？」を出している間は真。重ねて開かれても 2 枚目の問いを出さない */
   asking: boolean;
+  /**
+   * 錠の読み直しの番号。読むたびに 1 つ進め、読み終えたときに変わっていたら捨てる。
+   * 重なって起動した古い答えが後から届いても、新しい錠を上書きしないため
+   */
+  lockSeq: number;
 }
 
 /** 開いているパネル。種類ごとに 1 枚 */
@@ -178,6 +183,7 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
     dirty: false,
     seq: 0,
     asking: false,
+    lockSeq: 0,
   };
   state = current;
   followAppearance(panel, current.host);
@@ -389,7 +395,11 @@ function scheduleLock(current: PanelState): void {
  * 取り込みを止めるかを実行ファイルに聞き直して、画面に渡す。確かめられなければ閉じる側。
  * 共通の設定とワークスペースの設定は、どのツリーの doing でも止める。プロジェクトの欄は、そのプロジェクトの doing だけを見る。
  */
-async function refreshLock(current: PanelState): Promise<void> {
+async function refreshLock(current: PanelState): Promise<{ lock: Lock; projectLocks: Record<string, Lock> }> {
+  // 番号を進めてから読む。読み終えたときに番号が変わっていれば、後から別の読み直しが始まっているので、
+  // この答えは古い。画面にも `current.lock` にも入れず、読んだ値だけ返す（新しい答えを古いもので上書きしない）
+  current.lockSeq += 1;
+  const seq = current.lockSeq;
   const result = await loadBoard(current.folder.uri.fsPath, binSetting());
   let lock: Lock;
   let projectLocks: Record<string, Lock>;
@@ -400,11 +410,12 @@ async function refreshLock(current: PanelState): Promise<void> {
     lock = lockFromError(result.error);
     projectLocks = {};
   }
-  if (alive(current)) {
+  if (alive(current) && current.lockSeq === seq) {
     current.lock = lock;
     current.projectLocks = projectLocks;
     current.host.post({ type: "lock", lock, projectLocks } satisfies ToTemplates);
   }
+  return { lock, projectLocks };
 }
 
 /**
@@ -633,7 +644,12 @@ async function importYes(current: PanelState, request: ImportRequest, expect: st
     refuse("画面を読み直してください");
     return;
   }
-  const lock = request.to === "common" ? current.lock : (current.projectLocks[request.layer] ?? current.lock);
+  // 錠は押した時点で取り直す。キャッシュした錠は、チケットが動いてから更新されるまでの隙を通すため
+  const fresh = await refreshLock(current);
+  if (!alive(current)) {
+    return;
+  }
+  const lock = request.to === "common" ? fresh.lock : (fresh.projectLocks[request.layer] ?? fresh.lock);
   if (lock.locked) {
     refuse(lock.reason);
     return;
@@ -656,12 +672,16 @@ async function importYes(current: PanelState, request: ImportRequest, expect: st
     return;
   }
   const answer = result.ok ? result.value : null;
-  current.host.post({ type: "imported", request, answer, error: result.ok ? "" : result.error } satisfies ToTemplates);
   if (answer !== null && answer.written) {
+    // 先に読み直す。`reload` は中身を渡すと画面の状態の一言を消すので、「取り込みました」は読み直したあとに送る。
     // 読み直しの前に、画面の未保存の変更は無いものとして扱う（`reload` は確認を出さずに中身を渡すため）
     current.dirty = false;
     await reload(current);
+    if (!alive(current)) {
+      return;
+    }
   }
+  current.host.post({ type: "imported", request, answer, error: result.ok ? "" : result.error } satisfies ToTemplates);
 }
 
 function asRequest(value: unknown): ImportRequest | undefined {

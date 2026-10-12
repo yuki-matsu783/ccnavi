@@ -297,8 +297,10 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
     );
   };
 
+  /** 同じ名前の下書きが 2 件以上ある名前。名前では取り込み先を指せないので、取り込みは止める */
+  const duplicateNames = new Set(page.data.drafts.map((draft) => draft.name).filter((name, index, all) => all.indexOf(name) !== index));
   // 案内の「取り込む…」は、取り込める最初の 1 件に付ける（先頭が取り込めないときは、その次へ送る）
-  const importTourName = page.data.drafts.find((draft) => draft.importable)?.name;
+  const importTourName = page.data.drafts.find((draft) => draft.importable && !duplicateNames.has(draft.name))?.name;
 
   return (
     <>
@@ -391,6 +393,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                 tour={index === 0}
                 importTour={draft.name === importTourName}
                 importing={importing}
+                ambiguous={duplicateNames.has(draft.name)}
                 importLayers={page.importLayers}
                 onOpenImport={() => openImport(draft)}
                 onCloseImport={closeImport}

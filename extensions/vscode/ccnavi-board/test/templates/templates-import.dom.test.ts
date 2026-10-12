@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import type { ImportAnswer, ImportRequest } from "../../src/core/templates-view.js";
-import { answer, openTemplates } from "../helpers/templates.js";
+import { answer, fixtureJson, openTemplates, page } from "../helpers/templates.js";
 import type { DomPage } from "../helpers/dom.js";
 import type { HTMLInputElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
 
@@ -330,6 +330,56 @@ test("CB-D347 案内の「取り込む…」は取り込める最初の 1 件（
     assert.equal(marks[0].closest("li.draft")?.getAttribute("data-name"), "login");
     assert.equal(marks[0].hasAttribute("disabled"), false);
     assert.equal(dom.one('li.draft[data-tour="draft"]').getAttribute("data-name"), "broken");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D349 取り込みが書けたあとの読み直し（data）が先に届いても、「取り込みました」の帯は残る。プレビューと欄は閉じている", async () => {
+  const dom = await openTemplates();
+  try {
+    await openImport(dom, "login");
+    await chooseTo(dom, "common");
+    await previewOf(dom, LOGIN_COMMON);
+    clickImport(dom);
+    await dom.settle();
+    // 拡張ホストの送信順は、読み直しの data が先、取り込みの答え（imported）が後
+    await dom.send({ type: "data", data: { kind: "page", page: page() } });
+    await dom.send({
+      type: "imported",
+      request: LOGIN_COMMON,
+      answer: answer({ written: true, removed: true, target: ".ccnavi/config/common/templates/login.yml" }),
+      error: "",
+    });
+    await dom.settle();
+    assert.equal(text(dom.one("#status")), "取り込みました: .ccnavi/config/common/templates/login.yml。下書きを消しました");
+    assert.equal(dom.all('[data-role="import-preview"]').length, 0);
+    assert.equal(dom.all('[data-role="import-form"]').length, 0);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D350 同名の下書きが別のツリーにもあると、その名前の 2 行とも「取り込む…」は押せず、同名の札を出し、取り込みの欄は開かない。案内は取り込める別の下書きを指す", async () => {
+  const base = fixtureJson();
+  const login = base.drafts.find((draft) => draft.name === "login");
+  assert.ok(login !== undefined);
+  const dom = await openTemplates({ data: { ...base, drafts: [...base.drafts, { ...login, tree: "lib", sha: "c".repeat(64), also_in: [] }] } });
+  try {
+    const rows = dom.all('li.draft[data-name="login"]');
+    assert.equal(rows.length, 2);
+    for (const row of rows) {
+      assert.match(text(row), /同名が別のツリーにもある/);
+      const button = row.querySelector('[data-action="open-import"]');
+      assert.ok(button !== null);
+      assert.equal(button.hasAttribute("disabled"), true);
+      assert.match(button.getAttribute("title") ?? "", /名前では指せません/);
+    }
+    dom.click(dom.one('li.draft[data-name="login"] [data-action="open-import"]'));
+    await dom.settle();
+    assert.equal(dom.all('[data-role="import-form"]').length, 0);
+    // 案内の「取り込む…」は、取り込める別の下書き（research）に付く
+    assert.equal(dom.one('[data-tour="draft-import"]').closest("li.draft")?.getAttribute("data-name"), "research");
   } finally {
     await dom.close();
   }

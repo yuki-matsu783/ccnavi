@@ -14,6 +14,9 @@ import { Preview, type PreviewState } from "./Preview.js";
 import { Problems } from "./Problems.js";
 import { isTodo, layerLabel, treeLabel } from "./text.js";
 
+/** 同名が別のツリーにあるときの「取り込む…」の説明 */
+const AMBIGUOUS_TITLE = "同名の下書きが別のツリーにあり、名前では指せません。ccnavi --templates --import にパスを渡してください";
+
 export interface DraftProps {
   readonly draft: DraftEntry;
   readonly open: boolean;
@@ -24,6 +27,8 @@ export interface DraftProps {
   readonly importTour: boolean;
   /** 取り込みの欄の状態。開いているのは 1 件だけで、この下書きのものでなければ別の下書きが開いている */
   readonly importing: Importing | undefined;
+  /** 同じ名前の下書きが別のツリーにもある。名前では取り込み先を指せないので、取り込めない */
+  readonly ambiguous: boolean;
   /** 取り込み先に選べる層（common を除く） */
   readonly importLayers: readonly string[];
   readonly onOpenImport: () => void;
@@ -48,6 +53,7 @@ export function Draft({
   tour,
   importTour,
   importing,
+  ambiguous,
   importLayers,
   onOpenImport,
   onCloseImport,
@@ -85,14 +91,15 @@ export function Draft({
         {draft.exists_in.length > 0 && <span className="tag warn">{`同名あり: ${draft.exists_in.join(", ")}（取り込むと置き換え）`}</span>}
         {draft.also_in.length > 0 && <span className="tag">{`ほかのツリーにも同じ下書き: ${draft.also_in.map((tree) => treeLabel(tree)).join(", ")}`}</span>}
         {todo && <span className="tag warn">TODO が残っている</span>}
+        {ambiguous && <span className="tag bad">同名が別のツリーにもある</span>}
         {/* 見出しの開閉と混ざらないよう、このボタンの操作は見出しに伝えない（キーの Enter / Space も同じ） */}
         <button
           type="button"
           className="action small import-open"
           data-action="open-import"
           data-tour={importTour ? "draft-import" : undefined}
-          disabled={!draft.importable}
-          title={draft.importable ? undefined : "検査で error があるので取り込めません"}
+          disabled={!draft.importable || ambiguous}
+          title={!draft.importable ? "検査で error があるので取り込めません" : ambiguous ? AMBIGUOUS_TITLE : undefined}
           onClick={(event) => {
             event.stopPropagation();
             onOpenImport();

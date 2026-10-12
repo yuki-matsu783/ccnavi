@@ -168,3 +168,32 @@ test("CB-D331 対象を切り替えると switchTarget を送る。共通の設�
     await common.close();
   }
 });
+
+test("CB-D348 足し算で捨てられた行の本文は、層か sha が違えば出さず、読めない理由と直接開く先を出す。一致すれば本文を出す", async () => {
+  const dom = await openTemplates();
+  try {
+    await openRow(dom, 'li.template[data-name="feature"][data-layer="self"]');
+    dom.click(dom.one('li.template[data-name="feature"][data-layer="self"] [data-action="show-text"]'));
+    await dom.settle();
+    // 共通と同じ中身の self の feature（捨てられた行）。実行ファイルは足し算で使われる共通の本文を返す
+    const self = fixtureJson().templates.find((t) => t.name === "feature" && t.layer === "self");
+    const common = fixtureJson().templates.find((t) => t.name === "feature" && t.layer === "common");
+    assert.ok(self !== undefined && common !== undefined);
+    assert.equal(self.sha, common.sha);
+    // 層が違う本文は出さない（sha は同じでも）
+    await dom.send({ type: "detail", name: "feature", layer: "self", template: { ...common, text: "共通の本文" }, error: "" });
+    assert.equal(dom.all("pre.tpl-text").length, 0);
+    assert.match(text(dom.one('[data-role="detail-mismatch"]')), /この行の本文は読めません/);
+    assert.match(text(dom.one('[data-role="detail-mismatch"]')), /feature\.yml/);
+    // 層が同じでも sha が違う本文は出さない
+    await dom.send({ type: "detail", name: "feature", layer: "self", template: { ...self, sha: "f".repeat(64), text: "別の本文" }, error: "" });
+    assert.equal(dom.all("pre.tpl-text").length, 0);
+    assert.equal(dom.all('[data-role="detail-mismatch"]').length, 1);
+    // 層と sha が一致する本文は出す
+    await dom.send({ type: "detail", name: "feature", layer: "self", template: { ...self, text: "自分の本文" }, error: "" });
+    assert.equal(dom.all('[data-role="detail-mismatch"]').length, 0);
+    assert.equal(text(dom.one("pre.tpl-text")), "自分の本文");
+  } finally {
+    await dom.close();
+  }
+});

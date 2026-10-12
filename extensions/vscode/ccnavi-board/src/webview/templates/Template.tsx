@@ -62,7 +62,7 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
           <button type="button" className="action small" data-action="show-text" onClick={onShow}>
             本文を見る
           </button>
-          {detail !== undefined && (
+          {detail !== undefined && detailMatches(detail, entry) && (
             <>
               <h3 className="tpl-text-head">本文（制御文字・書式文字は \uXXXX で表示）</h3>
               <pre className="tpl-text" data-role="template-text">
@@ -70,11 +70,24 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
               </pre>
             </>
           )}
+          {detail !== undefined && !detailMatches(detail, entry) && (
+            <p className="hint" data-role="detail-mismatch">
+              この行の本文は読めません。実行ファイルは、足し算で使われる同名の別の層の本文を返すためです（捨てられた行など）。ファイルを直接開いて読んでください: <span className="mono">{entry.path}</span>
+            </p>
+          )}
           {detailError !== "" && <p className="status failed">{detailError}</p>}
         </div>
       )}
     </li>
   );
+}
+
+/**
+ * 届いた本文が、この行のものか。実行ファイルは層ごとでなく足し算で 1 件を返すので、捨てられた行を開くと
+ * 別の層の本文が来ることがある。層と sha（読めない行は sha が空なので層だけ）で突き合わせる
+ */
+function detailMatches(detail: TemplateDetail, entry: TemplateEntry): boolean {
+  return detail.layer === entry.layer && (entry.sha === "" || detail.sha === entry.sha);
 }
 
 /** 状態の札。使える・使われない・捨てた理由・読み取り専用・読めない。色と文字の両方で出す */
