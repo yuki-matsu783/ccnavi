@@ -708,7 +708,7 @@ allow:
 
 `match: Stop` の `allow` のルールは、メインエージェントのターンの終わり（`Stop`）に当たる。
 渡す回（`every` で決まる回）にだけ `{"decision": "block", "reason": "NUDGE_STOP_RULE: …"}` で止め、ルールの文を渡す。
-振り返り（`docs/claude/skill-review.md`）のための仕組みで、`reason` の頭には実行ファイルが決まった前置きを付ける。
+振り返り（`.ccnavi/docs/skill-review.md`）のための仕組みで、`reason` の頭には実行ファイルが決まった前置きを付ける。
 前置きの中身は、タスクの続きではないこと、振り返りだけをすること、ユーザへの問いで終わったターンならその問いを最後に書き直すこと、何も無ければ「振り返り: 無し」と書くこと。
 当てる文字列は無いので `glob: "*"` と書く。
 
@@ -718,7 +718,7 @@ allow:
     match: Stop
     glob: "*"
     every: 10
-    additionalContextFile: docs/claude/skill-review.md
+    additionalContextFile: .ccnavi/docs/skill-review.md
 ```
 
 - 読むのは共通レイヤーと自身のレイヤーだけ。プロジェクトのレイヤーに書いたものは使わない（外のリポジトリの 1 行でメインのターンを止めさせない）。同じ id は 1 本だけ
@@ -2700,7 +2700,7 @@ ccnavi --docs --path docs/claude --format count         # 件数だけ
 ```
 
 md を本文ではなく頭の frontmatter で引く。grep は当たった行を返すので、そのファイルが何の文書かは開くまで分からず、
-よそからの言及も同じ重みで混ざる。frontmatter の書き方は [docs/claude/frontmatter.md](docs/claude/frontmatter.md)。
+よそからの言及も同じ重みで混ざる。frontmatter の書き方は [.ccnavi/docs/frontmatter.md](.ccnavi/docs/frontmatter.md)。
 
 `SessionStart` が渡すのは引き方の 1 行だけで、オプションの一覧と frontmatter の書き方は渡さない。書き方は、Write で新しく作った md に
 frontmatter か `type` が無いときに、`PostToolUse` が `[ccnavi] NOTICE_DOC_FRONTMATTER (<パス>)` で 1 度だけ案内する（止めない）。
@@ -2952,7 +2952,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/entry/cli_ops.py` | チケットとレビューの副命令を ops / review へ渡す。`sync` の問い合わせ |
 | `src/ccnavi/entry/cli_plan.py` | `--plan-order` の引数を受けて答えを出す。振り直しと書き戻しは `tickets/plan_order.py` と `tickets/plan_phases.py` |
 | `build.py` | 配布物の組み立て。`dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする |
-| `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトを配る |
+| `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトと使い方の文書（`.ccnavi/docs/*.md`）を配る |
 | `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |
 | `.claude/hooks/mark-ext.sh` / `test-ext.sh` | 同じく拡張のぶん。触ったことの書き残しと、ターンの終わりに関わるグループだけ回すテスト |
 | `extensions/vscode/ccnavi-board/scripts/test-groups.js` | 拡張のテストの入口。触ったファイルから回すグループを決め、コンパイルは 1 回で済ませる |
