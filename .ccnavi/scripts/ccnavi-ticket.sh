@@ -3,6 +3,7 @@
 #
 #   sh .ccnavi/scripts/ccnavi-ticket.sh status      [<親>]
 #   sh .ccnavi/scripts/ccnavi-ticket.sh next-id     [<先頭の語> <slug>]
+#   sh .ccnavi/scripts/ccnavi-ticket.sh learn      [--note <本文>] [--target <種類>] [--signal <信号>]
 #   sh .ccnavi/scripts/ccnavi-ticket.sh start       <識別子>
 #   sh .ccnavi/scripts/ccnavi-ticket.sh finish      <識別子>
 #   sh .ccnavi/scripts/ccnavi-ticket.sh cancel      <識別子> --reason <理由>
@@ -54,6 +55,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh status [<親>]
 sh .ccnavi/scripts/ccnavi-ticket.sh next-id [<先頭の語> <slug>]
 sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel> <識別子> [--reason <理由>]
 sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>
+sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] [--signal <信号>]
 
   status       承認済みチケットの状態を聞く（読むだけ。サブエージェントも打てる）。親を省けば
                作業中・レビュー待ち・承認待ちのチケットがある親子を全部。ファイルを読んで推測せず、これを打つ
@@ -68,6 +70,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <
                完了の時刻を書く。子は実績のリスク（差分）を数えて記録する
   cancel       doing/ -> .ccnavi/approved/done/  --reason が要る。未承認の提案（todo/）は消せばよい
   record-risk  定性のリスク項目の判定を記録する（親が打つ。判断はサブエージェント）
+  learn        子の気づきの記録の雛形と判定記録の要約を書く（--note なしの形）、または気づき 1 件を記録（直接作業では受信箱）に足す（--note）。
 
   レビュー待ち（review/）から done/ へ動かすのはユーザ（ccnavi-review.sh confirm / decide、
   ccnavi --reviewed）。
@@ -91,9 +94,9 @@ case "${1:-}" in
 	;;
 esac
 
-# status と next-id は引数を省ける（引数 1 個で通す）。
+# status・next-id・learn は引数を省ける（引数 1 個で通す）。
 case "${1:-}" in
-status | next-id) ;;
+status | next-id | learn) ;;
 *)
 	[ "$#" -ge 2 ] || {
 		usage
@@ -102,9 +105,9 @@ status | next-id) ;;
 	;;
 esac
 case "$1" in
-status | next-id | start | finish | cancel | record-risk) ;;
+status | next-id | start | finish | cancel | record-risk | learn) ;;
 *)
-	printf 'ccnavi-ticket: %s は通しません。使えるのは status / next-id / start / finish / cancel / record-risk です。\n' "$1" >&2
+	printf 'ccnavi-ticket: %s は通しません。使えるのは status / next-id / start / finish / cancel / record-risk / learn です。\n' "$1" >&2
 	exit 2
 	;;
 esac
