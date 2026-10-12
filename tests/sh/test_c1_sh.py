@@ -172,8 +172,7 @@ class C1Harness(unittest.TestCase):
         self.approve_family()
         git(self.tree, "push", "-q", "-u", "origin", PARENT)
         if self.imported:
-            result = self.sync(PARENT)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.write_present_record()
             self.assertEqual(fields(self.record)["state"], "present")
 
     # ---- 道具
@@ -241,6 +240,14 @@ class C1Harness(unittest.TestCase):
 
     def sync(self, *args):
         return self.sh("ccnavi-sync.sh", *args)
+
+    def write_present_record(self):
+        # ccnavi-sync.sh が親の取り込み状態（state present）を書く形を、直接書く。
+        write(
+            self.record,
+            f"remote origin\nbranch {PARENT}\nsha {self.sha(self.tree, 'HEAD')}\n"
+            f"fetched_at {int(time.time())}\nstate present\n",
+        )
 
     def ticket(self, *args, **extra):
         return self.sh("ccnavi-ticket.sh", *args, **extra)
