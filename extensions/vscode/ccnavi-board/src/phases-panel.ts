@@ -82,9 +82,9 @@ interface Loaded {
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
   /** 上部に error の帯で出す文。共通の設定の phases.yml を読めない、など */
+  readonly errors: readonly string[];
   /** 共通の設定の定義（読み取り専用）。実行ファイルの足し算のうち出どころが共通のもの */
   readonly common: readonly CommonPhase[];
-  readonly errors: readonly string[];
   /** 切り替えられる対象（ワークスペース・設定のあるプロジェクト） */
   readonly targets: readonly TargetOption[];
 }

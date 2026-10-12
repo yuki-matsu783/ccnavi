@@ -137,3 +137,25 @@ test("CB-T404 共通の設定の別の id と表示名が重なる定義は、id
     await dom.close();
   }
 });
+
+test("CB-T405 id が空の行（打っている途中）は、共通の設定の定義と表示名が重なっても重なりの印を付けない。id を打てば止める", async () => {
+  const dom = await openPhases({ common: [{ id: "plan", title: "計画", kind: "work", review: "mr", scope: ["wip/plan/*"] }] });
+  try {
+    dom.click(dom.one('button[data-action="add"]'));
+    await dom.settle();
+    // 足した行に、共通の plan と同じ表示名を打つ（id はまだ空）
+    const titles = dom.all(".phase input.f-title");
+    dom.type(titles[titles.length - 1], "計画");
+    await dom.settle();
+    assert.equal(dom.all(".phase input.f-id.duplicate").length, 0);
+    assert.doesNotMatch(dom.one("#status").textContent ?? "", /共通の設定の定義と重なっています/);
+    // id を打てば重なりとして止める
+    const ids = dom.all(".phase input.f-id");
+    dom.type(ids[ids.length - 1], "planning");
+    await dom.settle();
+    assert.equal(dom.all(".phase input.f-id.duplicate").length, 1);
+    assert.match(dom.one("#status").textContent ?? "", /共通の設定の定義と重なっています（planning）/);
+  } finally {
+    await dom.close();
+  }
+});

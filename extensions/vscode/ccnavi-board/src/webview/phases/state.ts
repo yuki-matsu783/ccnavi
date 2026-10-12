@@ -92,6 +92,7 @@ export interface CommonClash {
 
 /**
  * 共通の設定の定義との重なり。表示名は空なら id を使う（実行ファイルと同じ）。前後の空白は除いて見る。
+ * id が空の行は数えない（打っている途中の行を重なりとして赤くしない）。
  * 同じ id の中身が同じかは画面では決めない（共通の定義は全欄を持たないので、実行ファイルの `--lint` に任せる）。
  */
 export function commonClashes(draft: Draft, common: readonly CommonPhase[]): CommonClash {
@@ -101,6 +102,11 @@ export function commonClashes(draft: Draft, common: readonly CommonPhase[]): Com
   const sameTitle = new Set<string>();
   for (const row of draft.rows) {
     const id = row.phase.id.trim();
+    // id が空の行は、まだ打っている途中。重なりの印は id で行に戻すので、空の id を入れると
+    // 空の id の行がみな赤くなる。共通の定義と比べるのは id を打ってから。
+    if (id === "") {
+      continue;
+    }
     if (ids.has(id)) {
       sameId.add(id);
       continue;
