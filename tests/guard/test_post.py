@@ -89,6 +89,15 @@ def git(repo, *args):
     return done.stdout
 
 
+# squash の取り込みを確かめるテストは `merge-tree --write-tree`（git 2.38+）を使う。
+MERGE_TREE = (
+    subprocess.run(
+        ["git", "merge-tree", "--write-tree", "HEAD", "HEAD"], capture_output=True, cwd=ROOT
+    ).returncode
+    == 0
+)
+
+
 def write(path, text):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -712,6 +721,64 @@ class PostToolUseTest(Harness, unittest.TestCase):
         result = self.run_hook(event="Stop")
 
         self.assertEqual(result.stdout, "", "取り込んだぶんを自分のターンの成果にしない")
+
+    def integrate_and_finish(self):
+        """`integrate` と `integrate-done` の後の形を作る。
+
+        squash のコミット、片付け（ブランチを消す）、記録の写し。
+        """
+        home = git(self.repo, "rev-parse", "--abbrev-ref", "HEAD").strip()
+        git(self.repo, "checkout", "--quiet", "-b", "feat")
+        self.dirty("ワークツリーで直した\n")
+        git(self.repo, "add", "--", "protected/keep.txt")
+        git(self.repo, "commit", "--quiet", "-m", "ワークツリーの作業")
+        tip = git(self.repo, "rev-parse", "HEAD").strip()
+        git(self.repo, "checkout", "--quiet", home)
+        base = git(self.repo, "rev-parse", "HEAD").strip()
+        git(self.repo, "merge", "--quiet", "--squash", "feat")
+        tree = git(self.repo, "write-tree").strip()
+        git(self.repo, "commit", "--quiet", "-m", "取り込み")
+        git(self.repo, "branch", "--quiet", "-D", "feat")
+        ddir = os.path.join(self.repo, ".git", post_findings.INTEGRATE_DONE_DIR)
+        write(
+            os.path.join(ddir, "feat"),
+            f"state staged\nbranch feat\nbranch_sha {tip}\nbase {base}\ntree {tree}\n",
+        )
+
+    @unittest.skipUnless(MERGE_TREE, "git merge-tree --write-tree (git 2.38+) is needed")
+    def test_integrate_done_の取り込みはターンの報告に並べない(self):
+        # 片付けの後なので staged の除外は効かない。squash と git で確かめたコミットだけを外す。
+        self.run_hook(event="UserPromptSubmit")
+        self.integrate_and_finish()
+
+        result = self.run_hook(event="Stop")
+
+        self.assertEqual(result.stdout, "", "正規の取り込みを違反として並べない")
+
+    @unittest.skipUnless(MERGE_TREE, "git merge-tree --write-tree (git 2.38+) is needed")
+    def test_取り込みと同じターンの直接のコミットは並べる(self):
+        self.run_hook(event="UserPromptSubmit")
+        self.integrate_and_finish()
+        write(os.path.join(self.repo, "protected", "later.txt"), "直接書いた\n")
+        git(self.repo, "add", "--", "protected/later.txt")
+        git(self.repo, "commit", "--quiet", "-m", "直接のコミット")
+
+        result = self.run_hook(event="Stop")
+
+        message = json.loads(result.stdout)["systemMessage"]
+        self.assertIn("protected/later.txt", message)
+        self.assertNotIn("protected/keep.txt", message, "取り込みの分は外す")
+
+    def test_記録の写しが無い取り込みのコミットは並べる(self):
+        # 記録が無ければ squash と確かめられないので、今までどおり報告する。
+        self.run_hook(event="UserPromptSubmit")
+        self.integrate_and_finish()
+        os.remove(os.path.join(self.repo, ".git", post_findings.INTEGRATE_DONE_DIR, "feat"))
+
+        result = self.run_hook(event="Stop")
+
+        message = json.loads(result.stdout)["systemMessage"]
+        self.assertIn("protected/keep.txt", message)
 
     def test_ターンの途中で切ったツリーも触った時点から数える(self):
         # ワークツリーを切ってから手を付けるのがこのリポジトリの手順。切ったターンが

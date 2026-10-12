@@ -274,5 +274,131 @@ class IntegrateDropsScratchpadTest(unittest.TestCase):
         self.assertFalse(post_findings._same_but_scratch(self.repo, left, ""))
 
 
+@unittest.skipUnless(merge_tree_available(), "git merge-tree --write-tree (git 2.38+) is needed")
+class IntegratedCommitsTest(unittest.TestCase):
+    """`integrate-done` が積んだ squash のコミットを、ターンの終わりの検査から外す条件。
+
+    片付けの後（ワークツリーもブランチも無い）で、記録の写しを手がかりに git で確かめる。
+    """
+
+    def setUp(self):
+        self.repo = os.path.realpath(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.repo, True)
+        git(self.repo, "init", "-q", "-b", "main")
+        write(self.repo, "a.txt", "a\n")
+        write(self.repo, "gone.txt", "gone\n")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-q", "-m", "init")
+        self.turn = git(self.repo, "rev-parse", "HEAD")
+        git(self.repo, "switch", "-q", "-c", "feat")
+        write(self.repo, "a.txt", "a2\n")
+        write(self.repo, "new.txt", "new\n")
+        write(self.repo, "wip/scratchpad/draft.txt", "draft\n")
+        git(self.repo, "rm", "-q", "gone.txt")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-q", "-m", "work")
+        self.tip = git(self.repo, "rev-parse", "HEAD")
+        git(self.repo, "switch", "-q", "main")
+        self.base = git(self.repo, "rev-parse", "HEAD")
+        git(self.repo, "merge", "-q", "--squash", "feat")
+        # integrate は下書きを外して staged にする。
+        git(self.repo, "rm", "-q", "-f", "--", "wip/scratchpad/draft.txt")
+        self.tree = git(self.repo, "write-tree")
+        git(self.repo, "commit", "-q", "-m", "squash")
+        self.squash = git(self.repo, "rev-parse", "HEAD")
+        # integrate-done の片付け（ブランチは消える）。
+        git(self.repo, "branch", "-q", "-D", "feat")
+
+    def done(self, name="feat", **over):
+        fields = {
+            "state": "staged",
+            "branch": name,
+            "branch_sha": self.tip,
+            "base": self.base,
+            "tree": self.tree,
+        }
+        fields.update(over)
+        ddir = os.path.join(self.repo, ".git", post_findings.INTEGRATE_DONE_DIR)
+        os.makedirs(ddir, exist_ok=True)
+        with open(os.path.join(ddir, name), "w", encoding="utf-8") as f:
+            f.writelines(f"{k} {v}\n" for k, v in fields.items())
+
+    def paths(self):
+        return post_findings.integrated_paths(self.repo, self.turn)
+
+    def test_squash_commit_is_dropped(self):
+        self.done()
+        self.assertEqual(self.paths(), {"a.txt", "new.txt", "gone.txt"})
+
+    def test_no_record_is_reported(self):
+        self.assertEqual(self.paths(), set())
+
+    def test_no_base_is_reported(self):
+        self.done()
+        self.assertEqual(post_findings.integrated_paths(self.repo, ""), set())
+
+    def test_direct_commit_after_the_squash_is_reported(self):
+        # 同じターンの直接のコミットは外さない。同じパスを触ったら、squash の分も外さない。
+        self.done()
+        write(self.repo, "a.txt", "edited directly\n")
+        write(self.repo, "evil.txt", "x\n")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-q", "-m", "direct")
+        self.assertEqual(self.paths(), {"new.txt", "gone.txt"})
+
+    def test_forged_record_naming_the_commit_itself_is_reported(self):
+        # 直接のコミットを、そのコミット自身を branch_sha に書いた記録で外させない。
+        write(self.repo, "evil.txt", "x\n")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-q", "-m", "direct")
+        direct = git(self.repo, "rev-parse", "HEAD")
+        self.done(
+            base=self.squash,
+            tree=git(self.repo, "rev-parse", "HEAD^{tree}"),
+            branch_sha=direct,
+        )
+        self.assertEqual(self.paths(), set())
+
+    def test_forged_record_with_unrelated_branch_is_reported(self):
+        # 記録の base と tree を直接のコミットに合わせても、merge-tree の結果が違えば外れない。
+        write(self.repo, "evil.txt", "x\n")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-q", "-m", "direct")
+        self.done(base=self.squash, tree=git(self.repo, "rev-parse", "HEAD^{tree}"))
+        self.assertEqual(self.paths(), set())
+
+    def test_forged_tree_is_reported(self):
+        self.done(tree="0" * 40)
+        self.assertEqual(self.paths(), set())
+
+    def test_forged_base_is_reported(self):
+        self.done(base="0" * 40)
+        self.assertEqual(self.paths(), set())
+
+    def test_unknown_branch_sha_is_reported(self):
+        self.done(branch_sha="0" * 40)
+        self.assertEqual(self.paths(), set())
+
+    def test_live_branch_holding_the_tip_is_reported(self):
+        # 片付けが済んでいない（ブランチが残っている）なら外さない。
+        git(self.repo, "branch", "-q", "feat", self.tip)
+        self.done()
+        self.assertEqual(self.paths(), set())
+
+    def test_record_name_mismatch_is_reported(self):
+        self.done(name="feat", branch="other")
+        self.assertEqual(self.paths(), set())
+
+    def test_ticket_bound_name_is_reported(self):
+        self.done()
+        write(self.repo, ".ccnavi/approved/doing/feat.md", "---\nticket: feat\n---\n")
+        self.assertEqual(self.paths(), set())
+
+    def test_squash_before_the_turn_is_not_counted(self):
+        # ターンの基準より前のコミットは数えない（gitstate.committed と同じ範囲）。
+        self.done()
+        self.assertEqual(post_findings.integrated_paths(self.repo, self.squash), set())
+
+
 if __name__ == "__main__":
     unittest.main()

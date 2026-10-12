@@ -992,6 +992,21 @@ ig_stop() {
 }
 
 # 中身が統合先に入りきったことを確かめてから、ワークツリー・ブランチ・記録を消す。
+# 片付けの前に、取り込みの記録を ccnavi-integrate-done/<名前> へ写して残す。ターンの終わりの実行後チェックが、
+# このターンのコミットのうち integrate の squash を見分けるのに使う（ワークツリーもブランチも消えた後なので）。
+# 実行後チェックは中身を信用せず git で確かめる（コミットの親とツリー、merge-tree の結果）。写せなくても片付けは
+# 止めない（ターンの終わりに報告が出るだけ）。古い写しは 7 日で消す。
+ig_keep_done() {
+	ig_ddir="${ig_gdir}-done"
+	mkdir -p "$ig_ddir" 2>/dev/null || return 0
+	find "$ig_ddir" -type f -mtime +7 -exec rm -f {} + 2>/dev/null || :
+	if cp "$ig_mark" "$ig_ddir/.$ig_n.$$" 2>/dev/null && mv -f "$ig_ddir/.$ig_n.$$" "$ig_ddir/$ig_n" 2>/dev/null; then
+		return 0
+	fi
+	rm -f "$ig_ddir/.$ig_n.$$" 2>/dev/null || :
+	log_info 取り込みの写しを残せなかった -- "name=$ig_n"
+}
+
 ig_cleanup() {
 	ig_chk=""
 	if [ "$ig_has_branch" = yes ]; then
@@ -1038,6 +1053,7 @@ ig_cleanup() {
 		fi
 		ig_did="${ig_did:+${ig_did}、}ブランチ $ig_n を消した（先頭は ${ig_bsha_now}）"
 	fi
+	ig_keep_done
 	ig_drop_mark ||
 		ig_stop "取り込みの記録（${ig_mark}）を消せなかった" integrate-done-marker
 	printf 'ok  git integrate-done  %s を取り込んで片付けた。%s\n' "$ig_n" "${ig_did:-片付けるものは記録だけだった}"

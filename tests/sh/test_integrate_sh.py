@@ -176,6 +176,41 @@ class IntegrateTest(unittest.TestCase):
         self.assertOk(rerun)
         self.assertIn("片付け済み", rerun.stdout)
 
+    def done_record(self):
+        return os.path.join(self.ws, ".git", "ccnavi-integrate-done", "wt")
+
+    @unittest.skipUnless(git_supports_merge_tree_write_tree(), "git 2.38+ が要る")
+    def test_done_keeps_a_copy_the_turn_end_check_can_verify(self):
+        # 片付けの後でも、ターンの終わりの検査が squash を git で確かめて外せる（post_findings）。
+        from ccnavi.hook import post_findings
+
+        self.work_in_branch()
+        before = git(self.ws, "rev-parse", "HEAD").strip()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        self.assertOk(self.run_git_sh("integrate-done", "wt", "-m", "feat: 取り込む"))
+        self.assertFalse(os.path.exists(self.marker()))
+        self.assertIn("state staged", read(self.done_record()))
+        got = post_findings.integrated_paths(os.path.realpath(self.ws), before)
+        self.assertEqual({"keep.txt", "new.txt", "gone.txt"}, got)
+
+        # 同じターンで直接積んだコミットのパスは外さない。
+        write(os.path.join(self.ws, "other.txt"), "direct\n")
+        git(self.ws, "commit", "-q", "-am", "direct")
+        got = post_findings.integrated_paths(os.path.realpath(self.ws), before)
+        self.assertEqual({"keep.txt", "new.txt", "gone.txt"}, got)
+
+    @unittest.skipUnless(git_supports_merge_tree_write_tree(), "git 2.38+ が要る")
+    def test_done_after_manual_commit_also_keeps_the_copy(self):
+        from ccnavi.hook import post_findings
+
+        self.work_in_branch()
+        before = git(self.ws, "rev-parse", "HEAD").strip()
+        self.assertOk(self.run_git_sh("integrate", "wt"))
+        git(self.ws, "commit", "-q", "-m", "by hand")
+        self.assertOk(self.run_git_sh("integrate-done", "wt"))
+        got = post_findings.integrated_paths(os.path.realpath(self.ws), before)
+        self.assertEqual({"keep.txt", "new.txt", "gone.txt"}, got)
+
     def test_manual_commit_then_done_only_cleans(self):
         self.work_in_branch()
         self.assertOk(self.run_git_sh("integrate", "wt"))

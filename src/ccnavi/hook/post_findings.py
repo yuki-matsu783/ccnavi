@@ -429,6 +429,133 @@ def _integrate_writes(changes: list[gitstate.Change], top: str) -> set[str]:
     return out
 
 
+# `ccnavi-git.sh integrate-done` が片付けの直前に残す、取り込みの記録の写しの置き場（git-path）。
+INTEGRATE_DONE_DIR = "ccnavi-integrate-done"
+
+
+def integrated_paths(top: str, base: str) -> set[str]:
+    """`base..HEAD` のコミットのうち、integrate の squash と git で確かめたものだけが
+    変えたパス（相対）。
+
+    ターンの終わりの検査（コミット済みの差分）が使う。`integrate-done` は squash を
+    コミットしてからワークツリー・ブランチ・記録を片付けるので、staged の除外
+    （`_integrate_writes`）はもう効かない。外さないと、正規の取り込みで変わった
+    ワークスペースルートのファイルが、毎回ターンの報告に並ぶ。
+
+    手がかりは `integrate-done` が残す記録の写し（`<git-path ccnavi-integrate-done>/<名前>`）。
+    `.git` の中にあってエージェントにも書けるので、**内容は信用せず git の状態で確かめる。**
+    コミット C を squash とみなすのは、次の全部が揃ったときだけ。
+
+    * C の親が 1 つで、それが記録の `base`。C のツリーが記録の `tree`
+    * 記録の `branch` がファイル名と同じで、その名前がチケットに結び付かない
+    * 記録の `branch_sha`（B）が HEAD の祖先でない（squash は B を履歴に入れない。
+      C 自身や前のコミットを B に書いた偽の記録はここで外れる）
+    * B を含むローカルのブランチと stash が無い（正規の片付けでブランチは消えている）
+    * `merge-tree --write-tree <base> B` の結果が C のツリーと、`wip/scratchpad/` の下を
+      除いて同じ
+
+    数えるコミットは `gitstate.committed` と同じ（`--first-parent --no-merges`）。返すのは、
+    squash と確かめたコミットが変え、それ以外のコミットが 1 度も変えていないパスだけ。
+    同じパスを別のコミットも変えていれば外さない。記録が無い、git を起こせない、
+    読めないものがあるときは空（外さない）。
+    """
+    if not top or not base:
+        return set()
+    loc = gitcmd.run(top, ["rev-parse", "--git-path", INTEGRATE_DONE_DIR])
+    if not loc.ok or not loc.out.strip():
+        return set()
+    ddir = loc.out.strip()
+    if not os.path.isabs(ddir):
+        ddir = os.path.join(top, ddir)
+    try:
+        names = sorted(n for n in os.listdir(ddir) if not n.startswith("."))
+    except OSError:
+        return set()
+    records = [(n, _read_record(os.path.join(ddir, n))) for n in names]
+    records = [(n, r) for n, r in records if r.get("branch") == n]
+    if not records:
+        return set()
+    listed = gitcmd.run(
+        top, ["rev-list", "--first-parent", "--no-merges", "--parents", f"{base}..HEAD"]
+    )
+    if not listed.ok:
+        return set()
+    squashed: set[str] = set()
+    other: set[str] = set()
+    for line in listed.out.splitlines():
+        sha, *parents = line.split()
+        if not sha:
+            continue
+        paths = _commit_paths(top, sha)
+        if paths is None:
+            return set()
+        if len(parents) == 1 and _is_integrate_commit(top, sha, parents[0], records):
+            squashed |= paths
+        else:
+            other |= paths
+    return squashed - other
+
+
+def _commit_paths(top: str, sha: str) -> set[str] | None:
+    """そのコミットが親から変えたパス。読めなければ None。
+
+    改名は切る（`gitstate.committed` と同じ）。
+    """
+    done = gitcmd.run(
+        top,
+        [
+            "diff-tree",
+            "--no-commit-id",
+            "--root",
+            "-r",
+            "--no-renames",
+            "--ignore-submodules=none",
+            "--name-only",
+            "-z",
+            sha,
+        ],
+        raw_paths=True,
+    )
+    if not done.ok:
+        return None
+    return {p for p in done.out.split("\0") if p}
+
+
+def _is_integrate_commit(
+    top: str, sha: str, parent: str, records: list[tuple[str, dict[str, str]]]
+) -> bool:
+    """コミットが、どれかの記録の squash だと git で確かめられるか（`integrated_paths` の条件）。"""
+    tree_of = gitcmd.run(top, ["rev-parse", "--verify", f"{sha}^{{tree}}"])
+    if not tree_of.ok:
+        return False
+    tree_sha = tree_of.out.strip()
+    for name, record in records:
+        if record.get("base") != parent or record.get("tree") != tree_sha:
+            continue
+        tip = record.get("branch_sha", "")
+        if not tip or _ticket_bound(top, name):
+            continue
+        tip_ok = gitcmd.run(top, ["rev-parse", "--verify", "--quiet", f"{tip}^{{commit}}"])
+        if not tip_ok.ok or tip_ok.out.strip() != tip:
+            continue
+        # 祖先なら 0、祖先でなければ 1。それ以外（起こせない・読めない）は外さない。
+        ancestor = gitcmd.run(top, ["merge-base", "--is-ancestor", tip, "HEAD"])
+        if ancestor.failure or ancestor.code != 1:
+            continue
+        holders = gitcmd.run(
+            top,
+            ["for-each-ref", "--format=%(refname)", "--contains", tip, "refs/heads", "refs/stash"],
+        )
+        if not holders.ok or holders.out.strip():
+            continue
+        merged = gitcmd.run(top, ["merge-tree", "--write-tree", parent, tip])
+        if not merged.ok or not merged.out.strip():
+            continue
+        if _same_but_scratch(top, merged.out.split("\n", 1)[0].strip(), tree_sha):
+            return True
+    return False
+
+
 def _same_but_scratch(top: str, left: str, right: str) -> bool:
     """2 つのツリーの差が、下書きの置き場（`wip/scratchpad/`）の下だけ（差が無いのも含む）か。
 

@@ -336,9 +336,14 @@ def _committed_findings(
         # 好きな中身でコミットしてからディスクだけ共通レイヤーの中身へ戻す形が、呼び出しごとの
         # チェック・バックアップと復元・ここの 3 つから同時に外れる。
         judged = functools.partial(_committed_synced, synced, top, changes) if synced else None
+        # `integrate-done` が積んだ squash だけが変えたパスは外す（git で確かめたものだけ）。
+        # 片付けの後なので staged の除外は効かず、正規の取り込みが毎回報告に並ぶため。
+        integrated = post_findings.integrated_paths(top, base) if changes else set()
         for finding in post_findings._findings(
             changes, w.rule_set, mine, w.source, scope, w.tree, synced=judged
         ):
+            if finding.change.path in integrated:
+                continue
             rel = tree.relative(w.tree, finding.change.full)
             if ticket_places.is_ticket_place(rel, tickets, approved):
                 continue
