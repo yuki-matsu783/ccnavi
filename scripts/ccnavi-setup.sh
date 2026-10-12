@@ -114,6 +114,10 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # .ccnavi/ の下で載せるので、配った先でも `ccnavi --docs` で引ける。rules.yml の
 # additionalContextFile（スキルの振り返りの手順）と、sh の案内が指す先でもある。
 DEPLOY_DOCS_DIR=".ccnavi/docs"
+# 共通の作業・レビュー計画のテンプレートの置き場。配布元にある *.yml を全部配る。共通レイヤーの
+# 一部なので、設定 3 本と同じく .ccnavi/config/common/ の下へ配る。配布元に置き場が無い、または
+# *.yml が 1 本も無いのは正常（共通のテンプレートはまだ無いことがある）で、何も言わずに飛ばす。
+DEPLOY_TEMPLATES_DIR=".ccnavi/config/common/templates"
 # ccnavi-common.sh は、3 本の sh が `.` で読み込む共通部分の入口。入口は同じディレクトリの部品
 # ccnavi-common-{state,lock,c1,host,log}.sh を読む。どちらも配らないと、配布先で 3 本とも
 # 起動時にエラーで止まる。部品は入口より先に配る。途中で失敗したときに、部品を読む新しい入口だけが
@@ -189,7 +193,8 @@ CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）�
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・作業の決まり（.ccnavi/CCNAVI.md）・設定 3 本（.ccnavi/config/common/rules.yml、
 .ccnavi/config/common/risks.yml、.ccnavi/config/common/phases.yml。自身のレイヤーの .ccnavi/config/project/phases.yml は
 配らず、既にあれば触らない。フェーズ定義は 2 本の和で判定する）・代わりに通る sh と振り分けの sh
-（.ccnavi/scripts/）・使い方の文書（.ccnavi/docs/*.md）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
+（.ccnavi/scripts/）・使い方の文書（.ccnavi/docs/*.md）・共通の作業・レビュー計画のテンプレート
+（.ccnavi/config/common/templates/*.yml。配布元に無ければ配らない）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
 --docs の索引（**/ccnavi-index.jsonl）は、配布先の .gitignore に足す（ccnavi-index.jsonl を否定する
 行があれば足さない）。
 
@@ -453,6 +458,8 @@ risk_verdict=""
 common_phases_verdict=""
 scripts_todo=""
 docs_todo=""
+templates_todo=""
+templates_skipped=""
 
 # 配布元にあるか、配布先にあるか、--force か。この 3 つだけで決まる。
 verdict() {
@@ -556,6 +563,36 @@ if [ -n "$deploy" ]; then
 		done
 	else
 		note_deploy absent "$DEPLOY_DOCS_DIR/" "$DEPLOY_DOCS_DIR/"
+	fi
+
+	# 共通のテンプレート。置き場が無いか空なら、何も配らず何も言わない。
+	if [ -d "$source_root/$DEPLOY_TEMPLATES_DIR" ]; then
+		for template_entry in "$source_root/$DEPLOY_TEMPLATES_DIR"/*.yml; do
+			# 配布元が空だと glob が展開されずにそのまま残る。実在するものだけを配る。
+			[ -f "$template_entry" ] || continue
+			template_name=$(basename "$template_entry")
+			# 名前は ccnavi の読み手と同じ範囲（英数字で始め、英数字と . _ - だけ）に限る。空白や
+			# glob の文字を含む名前は、単語分割で cp を失敗させて配布を半端に止めるので配らない。
+			case "$template_name" in
+			*[!A-Za-z0-9._-]* | [!A-Za-z0-9]*)
+				templates_skipped="$templates_skipped$template_name
+"
+				continue
+				;;
+			esac
+			if [ -e "$root/$DEPLOY_TEMPLATES_DIR/$template_name" ]; then
+				template_there=yes
+			else
+				template_there=no
+			fi
+			template_verdict=$(verdict "$template_entry" "$template_there")
+			note_deploy "$template_verdict" "$DEPLOY_TEMPLATES_DIR/$template_name" "$DEPLOY_TEMPLATES_DIR/$template_name"
+			case "$template_verdict" in
+			copy | replace)
+				templates_todo="$templates_todo $template_name"
+				;;
+			esac
+		done
 	fi
 
 	for name in $DEPLOY_SCRIPTS; do
@@ -978,6 +1015,10 @@ report_deploy() {
 		printf '配布元に無くて配れないもの:\n'
 		printf '%s' "$deploy_absent" | sed 's/^/  /'
 	fi
+	if [ -n "$templates_skipped" ]; then
+		printf '名前に使えない文字があるので配っていないテンプレート（英数字で始め、英数字と . _ - だけ）:\n'
+		printf '%s' "$templates_skipped" | sed 's/^/  /'
+	fi
 	if [ -n "$ignore_todo" ]; then
 		printf '%s:\n' "$3"
 		printf '%s' "$ignore_todo" | sed 's/^/  /'
@@ -1344,6 +1385,9 @@ if [ "$deploy_work" = yes ]; then
 		copy_file "$source_root/$DEPLOY_COMMON_PHASES" "$root/$DEPLOY_COMMON_PHASES"
 		;;
 	esac
+	for name in $templates_todo; do
+		copy_file "$source_root/$DEPLOY_TEMPLATES_DIR/$name" "$root/$DEPLOY_TEMPLATES_DIR/$name"
+	done
 	for name in $docs_todo; do
 		copy_file "$source_root/$DEPLOY_DOCS_DIR/$name" "$root/$DEPLOY_DOCS_DIR/$name"
 	done
@@ -1474,6 +1518,19 @@ if [ -n "$source_root" ] && [ -d "$source_root/$DEPLOY_DOCS_DIR" ]; then
 		doc_name=$(basename "$doc_entry")
 		if [ ! -f "$root/$DEPLOY_DOCS_DIR/$doc_name" ]; then
 			note_missing "${DEPLOY_DOCS_DIR}/${doc_name}（ccnavi の使い方の文書。ccnavi --docs で引く）"
+		fi
+	done
+fi
+# 共通のテンプレートも同じ。配布元にあるものだけを確かめる（配布元に無いのは正常）。
+if [ -n "$source_root" ] && [ -d "$source_root/$DEPLOY_TEMPLATES_DIR" ]; then
+	for template_entry in "$source_root/$DEPLOY_TEMPLATES_DIR"/*.yml; do
+		[ -f "$template_entry" ] || continue
+		template_name=$(basename "$template_entry")
+		case "$template_name" in
+		*[!A-Za-z0-9._-]* | [!A-Za-z0-9]*) continue ;;
+		esac
+		if [ ! -f "$root/$DEPLOY_TEMPLATES_DIR/$template_name" ]; then
+			note_missing "${DEPLOY_TEMPLATES_DIR}/${template_name}（共通の作業・レビュー計画のテンプレート。ccnavi --templates で引く）"
 		fi
 	done
 fi
