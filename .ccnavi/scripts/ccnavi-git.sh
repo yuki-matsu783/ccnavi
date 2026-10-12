@@ -112,7 +112,7 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
   取り込み  直接作業(チケットを起こさない)のワークツリーを、統合先のツリーへコミットせずに取り込む。
             統合先をチェックアウトしているツリーで打つ。チケットのワークツリーは対象外(マージリクエストで出す)
             integrate <名前>          .claude/worktrees/<名前> のブランチを merge --squash で staged にする。
-                                      wip/scratchpad/ の下書きは取り込まずに外す(wip/ のそれ以外は取り込む)。
+                                      wip/handoff/ の下書きは取り込まずに外す(wip/ のそれ以外は取り込む)。
                                       統合先のツリーに未コミットの変更があれば断る
             integrate --abort <名前>  取り込みをやめ、取り込む前に戻す(衝突で止まったときも)
             integrate-done <名前> [-m <メッセージ>]
@@ -617,7 +617,7 @@ wt_fresh() {
 #                             効かず、外からの reset は通さない。記録にあるパスだけが変わっているときに限り、
 #                             ここで `reset --merge` を打つ
 #   integrate-done <名前>     記録と今の状態が合うときだけコミットし（フックは通す）、ブランチの中身が統合先に
-#                             入りきったこと（merge-tree の結果が HEAD のツリーと同じ。wip/scratchpad/ の差は数えない）を確かめてから、
+#                             入りきったこと（merge-tree の結果が HEAD のツリーと同じ。wip/handoff/ の差は数えない）を確かめてから、
 #                             ワークツリー・ブランチ・記録を片付ける。途中で止まっても打ち直せば続きから進む
 #
 # 記録は統合先のツリーの git ディレクトリの ccnavi-integrate/<名前>/ に置く。作業ツリーを汚さず、status にも出ない。
@@ -776,17 +776,17 @@ ig_log_tail() {
 	awk 'f; /^--- 出力 ---$/ { f = 1 }' "$ig_log" | tail -n "$FAIL_LINES"
 }
 
-# 2 つのツリーの差が、wip/scratchpad/ の下だけ（差が無いのも含む）なら 0。<ツリー> <ツリー>
-# integrate は wip/scratchpad/ の追跡済みファイルを外して staged にするので、ブランチの中身が統合先に
+# 2 つのツリーの差が、wip/handoff/ の下だけ（差が無いのも含む）なら 0。<ツリー> <ツリー>
+# integrate は wip/handoff/ の追跡済みファイルを外して staged にするので、ブランチの中身が統合先に
 # 入りきったかを見るときは、その分を差し引く。wip/ のそれ以外（wip/proposals/ など）の差は数える。
 # ツリーが読めないときは 1（差があるものとして扱う）。名前は git が制御文字を引用符で囲んで出すので、
 # 改行を含む名前が下書きの下に見えることは無い。
-ig_same_but_scratch() {
+ig_same_but_handoff() {
 	[ -n "${1:-}" ] && [ -n "${2:-}" ] || return 1
 	git rev-parse --verify --quiet "$1^{tree}" >/dev/null 2>&1 || return 1
 	git rev-parse --verify --quiet "$2^{tree}" >/dev/null 2>&1 || return 1
 	ig_dt=$(git -c core.quotepath=off diff-tree -r --no-renames --name-only "$1" "$2" 2>/dev/null) || return 1
-	[ -z "$(printf '%s\n' "$ig_dt" | grep -v -e '^wip/scratchpad/' -e '^$')" ]
+	[ -z "$(printf '%s\n' "$ig_dt" | grep -v -e '^wip/handoff/' -e '^$')" ]
 }
 
 ig_short() {
@@ -869,17 +869,17 @@ ig_integrate() {
 		log_error 取り込みが衝突した -- "name=$ig_n" "exit=$ig_rc"
 		exit 1
 	fi
-	# 下書きの置き場（wip/scratchpad/）の追跡済みファイルは取り込まない。ブランチが持ち込んだパスだけを、
+	# 下書きの置き場（wip/handoff/）の追跡済みファイルは取り込まない。ブランチが持ち込んだパスだけを、
 	# 統合先の HEAD の状態に戻す（HEAD に無ければ index と作業ツリーから消す）。wip/ のそれ以外
 	# （wip/proposals/ など）と、統合先が元から持つ下書きのうちブランチが触らなかったものには触れない。
-	ig_scr=$(cd "$ig_top" && GIT_LITERAL_PATHSPECS=1 git -c core.quotepath=off diff --cached --no-renames --name-only HEAD -- wip/scratchpad/ 2>/dev/null || :)
+	ig_scr=$(cd "$ig_top" && GIT_LITERAL_PATHSPECS=1 git -c core.quotepath=off diff --cached --no-renames --name-only HEAD -- wip/handoff/ 2>/dev/null || :)
 	ig_scr_n=0
 	ig_scr_fail=""
 	if [ -n "$ig_scr" ]; then
 		while IFS= read -r ig_p; do
 			[ -n "$ig_p" ] || continue
 			case "$ig_p" in
-			wip/scratchpad/*) ;;
+			wip/handoff/*) ;;
 			*) continue ;;
 			esac
 			if git -C "$ig_top" cat-file -e "HEAD:$ig_p" 2>/dev/null; then
@@ -895,7 +895,7 @@ EOF
 	if [ -n "$ig_scr_fail" ]; then
 		ccnavi_record_write "$ig_mark" state conflict branch "$ig_n" branch_sha "$ig_bsha" base "$ig_base" \
 			tree "" integration "$ig_integ" created "$(date +%s)" || :
-		printf 'fail  git integrate  %s の下書き（wip/scratchpad/）を外せなかった（%s。コミットはしていない）  log=%s\n' "$ig_n" "$ig_scr_fail" "$ig_logrel"
+		printf 'fail  git integrate  %s の下書き（wip/handoff/）を外せなかった（%s。コミットはしていない）  log=%s\n' "$ig_n" "$ig_scr_fail" "$ig_logrel"
 		printf '案内: %s integrate --abort %s で取り込む前に戻してから、原因を確かめて打ち直す\n' "$SELF" "$ig_n"
 		log_error 下書きを外せなかった -- "name=$ig_n" "path=$ig_scr_fail"
 		exit 1
@@ -915,7 +915,7 @@ EOF
 		[ -z "$ig_sq" ] || rm -f "$ig_sq" 2>/dev/null || :
 		printf 'ok  git integrate  %s に取り込む差分は無かった（ブランチの中身は統合先に入っている）  log=%s\n' "$ig_n" "$ig_logrel"
 		[ "$ig_scr_n" -eq 0 ] ||
-			printf '下書き（wip/scratchpad/）の %d ファイルは取り込まず、外した\n' "$ig_scr_n"
+			printf '下書き（wip/handoff/）の %d ファイルは取り込まず、外した\n' "$ig_scr_n"
 		printf '次: %s integrate-done %s で片付けだけを行う\n' "$SELF" "$ig_n"
 		log_info 取り込む差分が無かった -- "name=$ig_n"
 		exit 0
@@ -923,7 +923,7 @@ EOF
 	ig_count=$(printf '%s\n' "$ig_changed" | awk 'END { print NR + 0 }')
 	printf 'ok  git integrate  %s を staged で取り込んだ（%d ファイル。コミットはしていない）  log=%s\n' "$ig_n" "$ig_count" "$ig_logrel"
 	[ "$ig_scr_n" -eq 0 ] ||
-		printf '下書き（wip/scratchpad/）の %d ファイルは取り込まず、外した\n' "$ig_scr_n"
+		printf '下書き（wip/handoff/）の %d ファイルは取り込まず、外した\n' "$ig_scr_n"
 	git diff --cached --stat 2>/dev/null | head -n "$MAX_LINES"
 	printf '次: %s status と %s diff --staged で中身を確かめる。よければ %s integrate-done %s -m <メッセージ> でコミットして片付ける。やめるなら %s integrate --abort %s で取り込む前に戻す\n' \
 		"$SELF" "$SELF" "$SELF" "$ig_n" "$SELF" "$ig_n"
@@ -1021,8 +1021,8 @@ ig_cleanup() {
 		ig_mt=$(git merge-tree --write-tree HEAD "$ig_chk" 2>/dev/null) || ig_mt_rc=$?
 		ig_mt=$(printf '%s\n' "$ig_mt" | head -n 1)
 		ig_ht=$(git rev-parse --verify "HEAD^{tree}" 2>/dev/null || :)
-		# wip/scratchpad/ の差は数えない（integrate が外した下書きの分。ig_same_but_scratch）。
-		if [ "$ig_mt_rc" -ne 0 ] || ! ig_same_but_scratch "$ig_mt" "$ig_ht"; then
+		# wip/handoff/ の差は数えない（integrate が外した下書きの分。ig_same_but_handoff）。
+		if [ "$ig_mt_rc" -ne 0 ] || ! ig_same_but_handoff "$ig_mt" "$ig_ht"; then
 			ig_stop "ブランチ $ig_n の中身が統合先（${ig_integ}）に入りきっていない（統合先とブランチを合わせた結果が統合先の今のツリーと違う。合わせて衝突するときも含む）ので、何も消していない。取り込みをまだコミットしていないか、コミットした中身が取り込んだときと違う。$SELF diff HEAD $ig_n で確かめ、ユーザに伝える" integrate-done-not-contained
 		fi
 	fi

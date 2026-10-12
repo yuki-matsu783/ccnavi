@@ -74,7 +74,7 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
         match: Write|Edit|NotebookEdit
         regex: '^{root}[\\/]'
         except:
-          - regex: '^{root}[\\/]wip[\\/]scratchpad(?:[\\/]|$)'
+          - regex: '^{root}[\\/]wip[\\/]handoff(?:[\\/]|$)'
           - regex: '^{root}[\\/]\\.claude[\\/]worktrees(?:[\\/]|$)'
         message: ...
 
@@ -531,7 +531,7 @@ class Rule:
     compiled: re.Pattern | None = None
     # exempt は、式を当てる前に対象から外すものを決める関数。組み込みの保護だけが持ち、
     # ルールファイルからは書けない。式は先読みを使えないので、「この形の中でも、これだけは
-    # 通す」は式の外で決める（selfguard_shell.scratchpad_copy_exempt）。返すのは式を当てる
+    # 通す」は式の外で決める（selfguard_shell.handoff_copy_exempt）。返すのは式を当てる
     # 対象で、外すものが無ければ受け取ったまま返す。
     exempt: Callable[[str], str] | None = field(default=None, repr=False, compare=False)
 

@@ -1,6 +1,6 @@
 """ccnavi-stage.sh の受入テスト。使い捨てのワークスペースを組み立てて sh を外から呼ぶ。
 
-確かめるのは 4 つ。元ファイルが wip/scratchpad/ の同じ階層へ cp されること。既にある下書きを
+確かめるのは 4 つ。元ファイルが wip/handoff/ の同じ階層へ cp されること。既にある下書きを
 上書きしないこと。ワークスペースの外や下書きの置き場の中を断ること。--commands が、元と違う
 下書きにだけフルパスの mv を出すこと。
 """
@@ -44,11 +44,9 @@ class StageShTest(unittest.TestCase):
         self.rules = os.path.join(self.ws, ".ccnavi", "config", "common", "rules.yml")
         self.hook = os.path.join(self.ws, ".claude", "hooks", "lint-py.sh")
         self.draft_rules = os.path.join(
-            self.ws, "wip", "scratchpad", ".ccnavi", "config", "common", "rules.yml"
+            self.ws, "wip", "handoff", ".ccnavi", "config", "common", "rules.yml"
         )
-        self.draft_hook = os.path.join(
-            self.ws, "wip", "scratchpad", ".claude", "hooks", "lint-py.sh"
-        )
+        self.draft_hook = os.path.join(self.ws, "wip", "handoff", ".claude", "hooks", "lint-py.sh")
 
     def stage(self, *args, cwd=None):
         env = dict(os.environ)
@@ -92,10 +90,10 @@ class StageShTest(unittest.TestCase):
         for path, why in (
             (outside, "の下にありません"),
             (".ccnavi/config/common/nothing.yml", "実在するファイルではありません"),
-            ("wip/scratchpad/x.md", "下書きの置き場の中"),
+            ("wip/handoff/x.md", "下書きの置き場の中"),
         ):
             with self.subTest(path=path):
-                write(os.path.join(self.ws, "wip", "scratchpad", "x.md"), "x")
+                write(os.path.join(self.ws, "wip", "handoff", "x.md"), "x")
                 result = self.stage(path)
                 self.assertEqual(2, result.returncode)
                 self.assertIn(why, result.stderr)
@@ -152,7 +150,7 @@ class StageShTest(unittest.TestCase):
                 result = self.stage(path)
                 self.assertEqual(2, result.returncode, result.stdout)
                 self.assertIn(why, result.stderr)
-        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip", "scratchpad", "link")))
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip", "handoff", "link")))
 
     def test_commands_refuse_when_the_original_changed_after_staging(self):
         self.stage(".ccnavi/config/common/rules.yml")

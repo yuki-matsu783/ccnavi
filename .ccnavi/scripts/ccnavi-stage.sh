@@ -5,12 +5,12 @@
 #   sh .ccnavi/scripts/ccnavi-stage.sh --commands <パス>...
 #
 # 保護対象のファイル（rules.yml・hook・ラッパースクリプトなど）は書けない。直すときは、ワークスペースルートの
-# wip/scratchpad/ に元ファイルを cp して、そちらを編集し、できたものを元の場所へ差し替えてもらう。
+# wip/handoff/ に元ファイルを cp して、そちらを編集し、できたものを元の場所へ差し替えてもらう。
 # 差し替えの mv は、フルパスを手で組むと書き間違えやすいので、このスクリプトが組む。
 #
 # <パス> は元のファイル。cwd からの相対でも絶対でもよく、ワークスペースルートの下の実在するファイルだけを受ける
 # （リンクと、途中のリンクでワークスペースの外に出るものは断る）。
-# 下書きは wip/scratchpad/<ワークスペースルートからの相対パス> に置く（元と同じ階層を保つので、同じ名前が衝突しない）。
+# 下書きは wip/handoff/<ワークスペースルートからの相対パス> に置く（元と同じ階層を保つので、同じ名前が衝突しない）。
 # 下書きが既にあれば上書きしない（編集中のものを消さないため）。
 #
 # --commands は、編集が済んだあとに打つ。下書きが元と違うものだけ、差し替えの mv をフルパスで 1 行ずつ出す。
@@ -20,7 +20,7 @@
 #
 # 打ったあとの進め方（CLAUDE.md）:
 #   対話セッション   mv をユーザに案内してターンを終える
-#   非対話セッション wip/scratchpad/ の編集済みファイルを push し、ユーザに確認と差し替えを頼んでターンを終える
+#   非対話セッション wip/handoff/ の編集済みファイルを push し、ユーザに確認と差し替えを頼んでターンを終える
 #
 # 終了コード: 0 成功 / 1 前提の未充足（編集済みの下書きが 1 つも無い、など） / 2 引数か環境の誤り
 
@@ -37,7 +37,7 @@ sh .ccnavi/scripts/ccnavi-stage.sh --commands <パス>...
   <パス>      直したい元のファイル（ワークスペースルートの下）。cwd からの相対でも絶対でもよい
   --commands  編集が済んだあとに打つ。下書きが元と違うものだけ、差し替えの mv をフルパスで出す
 
-下書きは wip/scratchpad/<ワークスペースルートからの相対パス> に cp する（既にあれば上書きしない）。
+下書きは wip/handoff/<ワークスペースルートからの相対パス> に cp する（既にあれば上書きしない）。
 複数ファイルを直すときは、すべての下書きを作ってから --commands を打ち、ターンを終える。
 USAGE
 }
@@ -67,7 +67,7 @@ root=$(ccnavi_workspace) || {
 	printf 'ccnavi-stage: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
 }
-scratch="$root/wip/scratchpad"
+handoff="$root/wip/handoff"
 
 # 元のファイルの、ワークスペースルートからの相対パスを出す。使えないパスは理由を言って 1 を返す。
 relative_of() {
@@ -83,7 +83,7 @@ relative_of() {
 		;;
 	esac
 	case "$rl_rel" in
-	wip/scratchpad/*)
+	wip/handoff/*)
 		printf 'ccnavi-stage: %s は下書きの置き場の中です。直したい元のファイルを渡してください。\n' "$1" >&2
 		return 1
 		;;
@@ -127,7 +127,7 @@ for arg in "$@"; do
 		continue
 	}
 	orig="$root/$rel"
-	draft="$scratch/$rel"
+	draft="$handoff/$rel"
 	if [ -n "$commands" ]; then
 		if [ ! -f "$draft" ]; then
 			missing="${missing:+$missing }$rel"
