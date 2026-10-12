@@ -38,26 +38,26 @@ keywords: [概念スキル, reference, 振り返り, スキル, SKILL.md, refere
 - 「X は使えない」のような、道具や機能を否定する主張
 - 途中で解消した一時的なエラーや、1回きりの作業の経緯
 - 解決しないまま終わった試行錯誤
-- CLAUDE.md・docs/claude/・ADRにすでに書いてあること
+- CLAUDE.md・`.ccnavi/docs/`・`docs/claude/`・ADRにすでに書いてあること
 
 ## wiki 層
 
 候補を書く前に、拾ったものを `docs/wiki/` に溜め、`index.md` と `skill-impact.md`（却下された提案の記録）を読む。
-置き場、ファイルの中身、読む場面、書き換える場面は `docs/claude/skill-wiki.md`。
+置き場、ファイルの中身、読む場面、書き換える場面は `.ccnavi/docs/skill-wiki.md`。
 
 ## どこに足すか
 
 上にあるものほど優先する。
 
 1. このセッションで読んだスキルを直す
-2. 概念スキル（`designing` `testing` `debugging` `reviewing` `releasing`）に当たる作業なら、その `references/` に足すか広げる（他のプロジェクトでも使える内容は `common/`、そのリポジトリだけの事情は `project/`）。足し方は `docs/claude/skill-concepts.md`。SKILL.md は直さない
+2. 概念スキル（`designing` `testing` `debugging` `reviewing` `releasing`）に当たる作業なら、その `references/` に足すか広げる（他のプロジェクトでも使える内容は `common/`、そのリポジトリだけの事情は `project/`）。足し方は `.ccnavi/docs/skill-concepts.md`。SKILL.md は直さない
 3. 概念スキルの対象外の既存スキルに、節・落とし穴・使う場面を足して直す。そのスキルに `references/<話題>.md` を足すか広げ、SKILL.md に1行の案内を足してもよい
 4. どれにも当たらない作業が繰り返し出たときだけ、新しいスキルの入口を提案する。今日の作業名・チケット番号・エラー文を名前にしない。ユーザの承認を取る
 
 - 直す前に、対象の SKILL.md と、手を入れる references/ を読み直す。会話中の引用で済ませない
 - 1つの事実は1か所に書く。同じ規則がすでにあるなら、新しく足さずにその文を強めるか言い直す
 - 手順の流れに沿って書き、落とし穴は該当する手順に「規則 + なぜ（1 句）」で添える。日付・番号・ユーザの言葉の引用を中身にしない
-- yomiyasuスキルを `docs/claude/`・`CLAUDE.md`・`.claude/skills/`・プロジェクトの `skills/`・`rules.yml` の `message` に当てるのは、ユーザが明示的に頼んだときだけにする。その場合も、表・箇条書き・「規則 + なぜ」の形は崩さない。yomiyasuはこれらの形を平文に崩すため
+- yomiyasuスキルを `.ccnavi/docs/`・`docs/claude/`・`CLAUDE.md`・`.claude/skills/`・プロジェクトの `skills/`・`rules.yml` の `message` に当てるのは、ユーザが明示的に頼んだときだけにする。その場合も、表・箇条書き・「規則 + なぜ」の形は崩さない。yomiyasuはこれらの形を平文に崩すため
 - 誤りを見つけたら、間違った文そのものを直す
 
 ## 対象のスキル

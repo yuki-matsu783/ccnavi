@@ -48,9 +48,9 @@ keywords: [概念スキル, reference, references, skill-reference, 入口, desi
 
 - 置くのは `common/` か `project/` の下。どちらに置くかは、他のプロジェクトでも使えるかで決める。使えるなら `common/`（共通の提案にする）、そのリポジトリだけの事情なら `project/`
 
-- 1ファイル1話題。頭に frontmatter を付ける（`docs/claude/frontmatter.md`）
+- 1ファイル1話題。頭に frontmatter を付ける（`.ccnavi/docs/frontmatter.md`）
 - `type: skill-reference`。`tags` には概念のスキル名（`testing` など）を必ず入れる。引くときの鍵になるため
-- `keywords` には、検索する人が打つ短い語を入れる（`docs/claude/frontmatter.md` の「keywordsの注意」）
+- `keywords` には、検索する人が打つ短い語を入れる（`.ccnavi/docs/frontmatter.md` の「keywordsの注意」）
 - 本文は、手順の流れに沿って「規則 + なぜ（1句）」で書く。日付・チケット番号・エラー文を見出しや名前にしない
 
 ## 引き方
