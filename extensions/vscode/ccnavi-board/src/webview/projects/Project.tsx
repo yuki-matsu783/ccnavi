@@ -30,7 +30,7 @@ export function Project({ row, ticketsEnabled, tour = false }: ProjectProps): JS
         <span className="name mono">{row.name}</span>
         <span className="rel small dim">{row.rel}</span>
         {flags.length > 0 && (
-          <span className="flags">
+          <span className="flags" data-tour={tour ? "project-flags" : undefined}>
             {flags.map((f) => (
               <span key={f.key} className={f.className}>
                 {f.text}
@@ -52,13 +52,13 @@ export function Project({ row, ticketsEnabled, tour = false }: ProjectProps): JS
             )}
           </dd>
         </div>
-        <div className="field">
+        <div className="field" data-tour={tour ? "project-rules" : undefined}>
           <dt>ルール</dt>
           <dd>
             <Rules row={row} />
           </dd>
         </div>
-        <div className="field">
+        <div className="field" data-tour={tour ? "project-worktrees" : undefined}>
           <dt>ワークツリー</dt>
           <dd>
             {row.worktrees.length === 0 ? (

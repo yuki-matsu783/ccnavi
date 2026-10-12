@@ -3,11 +3,15 @@
  *
  * 見せる中身は拡張ホストが渡す（`ProjectsData`）。画面が自分で持つのは、ユーザが触って決めるもの
  * （clone の欄、直前の操作の一言）だけ。clone も書き込みも画面はしない。
+ *
+ * 案内の間は、今のワークスペースではなく案内用の見本（`tours/projects.yml` の `sample:`）を描く。段ごとの様子（clone の欄の例、
+ * 見せるカード、帯など）は `scene` に入れ、実際の一覧・clone の欄・直前の一言・拡張ホストへの送信には触れない。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { CloneStatus, ProjectsData, ProjectsPage, Stray, ToProjects } from "../../core/projects-view.js";
-import { tourOf } from "../../core/tour-def.js";
+import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
+import { parseProjectsSample } from "../../core/tour-projects.js";
 import { applyAppearance } from "../appearance.js";
 import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
 import projectsTour from "../tours/projects.yml";
@@ -16,8 +20,27 @@ import { post } from "./post.js";
 import { EMPTY, guessName, loadClone, saveClone, type CloneState } from "./state.js";
 import { isTrackedProjectsDir } from "./text.js";
 
-/** 案内（`tours/projects.yml`）。見本は使わず、画面は今の中身のまま指す */
+/** 案内（`tours/projects.yml`）と、案内の間だけ描く見本。今の一覧は使わない */
 const TOUR = tourOf(projectsTour);
+const SAMPLE = parseProjectsSample(TOUR.sample);
+const NO_SCENE: Scene = {};
+
+/** 段の `scene` の文字列を `,` で割る */
+function sceneList(value: Scene[string] | undefined): readonly string[] {
+  return typeof value === "string" ? value.split(",").map((item) => item.trim()).filter((item) => item !== "") : [];
+}
+
+function sceneText(value: Scene[string] | undefined): string {
+  return typeof value === "string" ? value : "";
+}
+
+/** 段の様子に合わせた見本の画面。`cards` は書いた順に並べる（先頭のカードが案内の指す先になる） */
+function samplePage(scene: Scene): ProjectsPage {
+  const base = scene.banner === "ignore" ? SAMPLE.ignore : scene.banner === "tracked" ? SAMPLE.tracked : SAMPLE.page;
+  const names = sceneList(scene.cards);
+  const rows = names.length === 0 ? base.rows : names.flatMap((name) => base.rows.filter((row) => row.name === name));
+  return { ...base, rows, strays: scene.strays === true ? base.strays : [] };
+}
 
 export function App({ initial }: { readonly initial: ProjectsData }): JSX.Element {
   const [data, setData] = useState<ProjectsData>(initial);
@@ -32,8 +55,17 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
    */
   const [status, setStatus] = useState<CloneStatus | undefined>(undefined);
 
-  const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
+  /** 案内の間の画面の様子（clone の欄の例・見せるカード・帯）。実際の clone の欄や一覧は動かさない */
+  const [scene, setScene] = useState<Scene>(NO_SCENE);
+  const tour = useTour(data.kind === "page", {
+    onStart: () => setScene(NO_SCENE),
+    onEnd: () => {
+      setScene(NO_SCENE);
+      post({ type: "tourDone" });
+    },
+  });
   const requestTour = tour.request;
+  const touring = tour.touring;
   /** 拡張ホストへの送信。案内の間は実際の操作を送らない（`tourDone` と `ready` は直に送る） */
   const act = (message: Parameters<typeof post>[0]): void => {
     if (!tour.touring) {
@@ -88,9 +120,16 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
     );
   }
 
-  const page = data.page;
+  const page = touring ? samplePage(scene) : data.page;
   const rows = page.rows;
-  const courses = coursesOf(TOUR, () => undefined);
+  const courses = coursesOf(TOUR, setScene);
+  const shownClone: CloneState = touring ? { url: sceneText(scene.url), name: sceneText(scene.name), nameTouched: false } : clone;
+  const sceneStatus = sceneText(scene.status);
+  const shownStatus: CloneStatus | undefined = touring
+    ? sceneStatus === ""
+      ? undefined
+      : { kind: scene.failed === true ? "failed" : "info", message: sceneStatus }
+    : status;
   return (
     <>
       <header className="toolbar">
@@ -107,6 +146,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
         </div>
         <TourButton courses={courses} onPick={tour.start} />
       </header>
+      {touring && <div className="banner tour-sample">{SAMPLE_NOTE}</div>}
       <Banners page={page} act={act} />
       <section className="clone" data-tour="clone">
         <h2>リポジトリを clone する</h2>
@@ -118,8 +158,11 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
               type="text"
               placeholder="https://gitlab.example.com/group/repo.git"
               spellCheck={false}
-              value={clone.url}
+              value={shownClone.url}
               onChange={(event) => {
+                if (tour.touring) {
+                  return;
+                }
                 const url = event.target.value;
                 const now = cloneRef.current;
                 remember({ ...now, url, name: now.nameTouched ? now.name : guessName(url) });
@@ -133,8 +176,11 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
               type="text"
               placeholder="URL から自動で入る"
               spellCheck={false}
-              value={clone.name}
+              value={shownClone.name}
               onChange={(event) => {
+                if (tour.touring) {
+                  return;
+                }
                 const name = event.target.value;
                 remember({ ...cloneRef.current, name, nameTouched: name !== "" });
               }}
@@ -151,8 +197,12 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
             clone
           </button>
         </div>
-        <p id="status" className={status === undefined ? "status hidden" : status.kind === "failed" ? "status failed" : "status"}>
-          {status?.message ?? ""}
+        <p
+          id="status"
+          data-tour="clone-status"
+          className={shownStatus === undefined ? "status hidden" : shownStatus.kind === "failed" ? "status failed" : "status"}
+        >
+          {shownStatus?.message ?? ""}
         </p>
       </section>
       <section className="list" data-tour="list">
@@ -197,7 +247,7 @@ function Banners({ page, act }: { readonly page: ProjectsPage; readonly act: (me
   const banners: JSX.Element[] = [];
   if (page.lintError !== "") {
     banners.push(
-      <div key="lint-error" className="banner warn">
+      <div key="lint-error" className="banner warn" data-tour="banner">
         検証結果を取得できなかったので、プロジェクトごとの結果は出せません。{page.lintError}
       </div>,
     );
@@ -205,10 +255,10 @@ function Banners({ page, act }: { readonly page: ProjectsPage; readonly act: (me
   const tracked = page.dirProblems.some((p) => isTrackedProjectsDir(p, page.projectsRel));
   if (!page.ignored && !tracked) {
     banners.push(
-      <div key="ignore" className="banner warn">
+      <div key="ignore" className="banner warn" data-tour="banner">
         <code>.gitignore</code> に <code>/{page.projectsRel}/</code>{" "}
         がありません。各プロジェクトは自分の git リポジトリを持つので、ワークスペースの git からは除外してください。
-        <button type="button" className="action" data-action="fix-ignore" onClick={() => act({ type: "fixIgnore" })}>
+        <button type="button" className="action" data-action="fix-ignore" data-tour="fix-ignore" onClick={() => act({ type: "fixIgnore" })}>
           .gitignore に追加
         </button>
       </div>,
@@ -217,7 +267,7 @@ function Banners({ page, act }: { readonly page: ProjectsPage; readonly act: (me
   const dirProblems = page.dirProblems.filter((p) => (page.ignored && !tracked) || !/無視されていない/.test(p.detail));
   for (const [index, p] of dirProblems.entries()) {
     banners.push(
-      <div key={`dir:${index}`} className={`banner ${p.severity}`}>
+      <div key={`dir:${index}`} className={`banner ${p.severity}`} data-tour={banners.length === 0 && index === 0 ? "banner" : undefined}>
         {p.severity}: {p.detail}
       </div>,
     );
@@ -228,7 +278,7 @@ function Banners({ page, act }: { readonly page: ProjectsPage; readonly act: (me
 /** ワークスペースの設定のルールの有無。無いのは正常なので warn の色は使わない */
 function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
   return (
-    <div className="self-rules">
+    <div className="self-rules" data-tour="workspace-rules">
       <span>ワークスペースの設定のルール</span>{" "}
       {page.selfRulesExists ? <span className="ok">あり</span> : <span className="dim">なし</span>}{" "}
       <span className="mono small">{page.selfRulesRel}</span>
@@ -242,7 +292,7 @@ function Strays({ strays }: { readonly strays: readonly Stray[] }): JSX.Element 
     return null;
   }
   return (
-    <section className="strays">
+    <section className="strays" data-tour="strays">
       <h2>
         プロジェクトとして認識されない git リポジトリ <span className="count">{strays.length}</span>
       </h2>

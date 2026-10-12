@@ -1,13 +1,70 @@
-# プロジェクト管理画面の案内。見本は使わず、いまのワークスペースの画面をそのまま指す。
-# 案内の間も、clone・更新などの操作は実際には送らない。
+# プロジェクト管理画面の案内。`sample:` は案内の間だけ画面に出す見本（実際のプロジェクトではない）。
+#   root / generated_at / projects_rel   見本のワークスペースのルート / 最終更新 / プロジェクトの置き場（ルートからの相対）
+#   rows                  プロジェクトのカード。name・origin・rules・claude_dir・worktrees・tickets・doing・problems
+#     rules               present（ルールファイルあり）/ absent（無い）/ reserved（予約名で設定の対象外）
+#     problems            検証の指摘。severity（error / warn）と detail（実行ファイルの文面と同じ）
+#   strays                プロジェクトとして認識されない git。path と reason（projects.ts の REASON_* と同じ）。path の順に並べる
+#   workspace_worktrees   ワークスペース（プロジェクト外）のワークツリー
+#   self_rules_exists     ワークスペースの設定のルールファイルの有無
+#   ignore_problem        .gitignore に置き場が無いときの実行ファイルの苦情（帯は画面が出すので、ここは実際の形に合わせるだけ）
+#   tracked_problem       置き場がワークスペースの git の索引に載っているときの苦情
+# `scene:` は段ごとの画面の様子。段ごとに全部を書く（前の段を引き継がない）。
+#   url / name   clone の欄に入れる URL と名前の例（案内の間は打っても変わらない）
+#   status       clone の欄の下に出す一言。failed が true なら失敗（赤）の一言
+#   cards        見せるカードの name（, で区切って複数）。書かなければ見本の全部
+#   strays       true なら「プロジェクトとして認識されない git リポジトリ」を出す
+#   banner       上の帯。ignore は .gitignore に置き場が無い帯、tracked は置き場が索引に載っている苦情の帯
 # `target:` の印（画面の data-tour）:
 #   summary / refresh   ヘッダの件数とフォルダ / 「更新」
-#   clone / clone-url / clone-name / clone-run   clone の枠 / URL の欄 / 名前の欄 / clone ボタン
+#   banner / fix-ignore   最初の帯 / 「.gitignore に追加」
+#   clone / clone-url / clone-name / clone-run / clone-status   clone の枠 / URL の欄 / 名前の欄 / clone ボタン / 欄の下の一言
 #   list   ワークスペース内のプロジェクトの一覧
-#   project / project-check   最初のプロジェクトのカード / その検証の欄（プロジェクトが無いときは中ほどに出す）
-#   workspace   ワークスペース（プロジェクト外）
+#   project / project-flags / project-rules / project-worktrees / project-check   最初のカード / その error・warn の札 / ルールの欄 / ワークツリーの欄 / 検証の欄
+#   strays   プロジェクトとして認識されない git
+#   workspace / workspace-rules   ワークスペース（プロジェクト外） / その設定のルール
 #   tour   「?」
 screen: projects
+
+sample:
+  root: /home/me/workspace
+  generated_at: "2026-09-13T00:00:00+0900"
+  projects_rel: projects
+  rows:
+    - name: app
+      origin: https://gitlab.example.com/team/app.git
+      rules: present
+      worktrees: [i0003]
+      tickets: 4
+      doing: 1
+      problems: []
+    - name: lib
+      origin: git@gitlab.example.com:team/lib.git
+      rules: absent
+      claude_dir: true
+      worktrees: []
+      tickets: 2
+      doing: 0
+      problems:
+        - severity: warn
+          detail: .claude/ を持つ。Claude Code がそこのスキルを読み込み、そこへ cd するだけで別のルートのように見える。プロジェクトの設定は .ccnavi/ に置いてください
+    - name: common
+      origin: ""
+      rules: reserved
+      worktrees: []
+      tickets: 0
+      doing: 0
+      problems:
+        - severity: error
+          detail: "`common` と `self` はレイヤーの名前として予約してある（`common` は共通レイヤー、`self` はワークスペース自身のレイヤー）。このプロジェクトはレイヤーとして数えていない（id の `common:` がどちらのレイヤーを指すか決まらないため。大文字小文字の違いは問わない）。ここに置いた宣言は 1 件も使われておらず、このプロジェクトを行き先にするパスを持つツール（Read / Grep / Glob / Write / Edit / NotebookEdit）は共通レイヤーだけで判定している。プロジェクトを別の名前に変えてください"
+  strays:
+    - path: projects/group/deep
+      reason: projects/ の直下ではなく、その下の階層にあります。プロジェクトとして扱われるのは projects/ の直下に置いたものだけです
+    - path: reference/old-repo
+      reason: projects/ の外にあります。プロジェクトとして扱われるのは projects/ の直下に置いたものだけです
+  workspace_worktrees: [i0001, i0002]
+  self_rules_exists: false
+  ignore_problem: "projects/ がワークスペースの git で無視されていない。プロジェクトは自分の git を持つので、ワークスペースの `.gitignore` に入れてください"
+  tracked_problem: "`projects/` はワークスペースの git が追跡している（入れ子のリポジトリとして: `projects/app`）。`.gitignore` に入れる前に `git add` したものとみられる。プロジェクトは自分の git を持つので、ワークスペースの git には載せない。載せたままだと、ワークスペースのコミットがプロジェクトの版を記録し続け、`.gitignore` に `/projects/` を足しても追跡は外れない。直すには、ワークスペースで `git rm -r --cached projects` を打ち（ファイルは消えない。まだコミットしていなければ `git reset -- projects`）、`.gitignore` に `/projects/` を足して（既にあればそのまま）、コミットする"
 
 courses:
   - id: intro
@@ -20,12 +77,17 @@ courses:
       - target: clone
         title: リポジトリを clone する
         body: URL を入れて clone を押すと、projects/ の直下に取り込みます。名前は URL から自動で入り、手で直せます。git clone は「ccnavi」ターミナルで動くので、認証が要るときはそこで入力します。
+        scene:
+          url: https://gitlab.example.com/team/api.git
+          name: api
       - target: list
         title: プロジェクトの一覧
         body: プロジェクトごとに、origin・設定のルール・ワークツリー・チケット・検証の結果をカードで見られます。
       - target: project-check
         title: 検証の結果
         body: プロジェクトの設定を検証した結果です。問題があるカードは、見出しに error や warn の札が出ます。
+        scene:
+          cards: lib,common,app
       - target: workspace
         title: ワークスペース（プロジェクト外）
         body: プロジェクトの外、ワークスペース自体のワークツリーと、ワークスペースの設定のルールの有無です。
@@ -42,16 +104,208 @@ courses:
     steps:
       - target: clone-url
         title: URL を入れる
-        body: clone したいリポジトリの URL を入れます。https でも ssh 形式でも構いません。
+        body: clone したいリポジトリの URL を入れます。https://host/path、ssh://host/path、git@host:path の 3 つの形が使えます。
+        scene:
+          url: https://gitlab.example.com/team/api.git
       - target: clone-name
         title: 名前を決める
-        body: projects/ の下に作るフォルダの名前です。URL の末尾から自動で入ります。変えたいときだけ直します。
+        body: projects/ の下に作るフォルダの名前で、ツリーの名前や frontmatter の project にも使われます。URL の末尾から自動で入るので、変えたいときだけ直します。
+        scene:
+          url: https://gitlab.example.com/team/api.git
+          name: api
       - target: clone-run
         title: clone を実行する
-        body: 押すと「ccnavi」ターミナルで git clone が走ります。終わると一覧に新しいカードが出ます。
+        body: 押すと「ccnavi」ターミナルで git clone が走ります。認証が要るときは、ターミナルで入力します。
+        scene:
+          url: https://gitlab.example.com/team/api.git
+          name: api
+      - target: clone-status
+        title: 送ったあとの一言
+        body: ターミナルへ送ると、欄の下にこの一言が出て、打ち込んだ URL と名前は消えます。送ったのは git clone までで、取り込みが終わると一覧が読み直されます。
+        scene:
+          status: git clone を「ccnavi」ターミナルに送りました（projects/api）。認証が要るならターミナルで入力してください。終わると一覧が更新されます
       - target: refresh
         title: 手で移したときは更新
         body: 既存のリポジトリを projects/ の直下へ自分で移したときは、更新を押すと一覧に出ます。ワークスペース直下などにあって認識されないリポジトリは、一覧の下に別枠で出ます。
+        scene:
+          strays: true
       - target: project
         title: 追加できたか確かめる
-        body: 新しいカードの検証が「問題なし」なら取り込めています。error や warn が出たら、理由に従って直します。
+        body: 取り込めたプロジェクトは、一覧にカードが加わります（見本は app）。検証が「問題なし」なら取り込めています。error や warn が出たら、理由に従って直します。
+        scene:
+          cards: app
+
+  - id: clone-refused
+    title: clone が断られた理由を知りたいとき
+    summary: clone を押すと赤い一言が出る。URL・名前・重複・既存のフォルダの 5 つの理由を読み分ける
+    steps:
+      - target: clone-status
+        title: URL の形が違う
+        body: 使える URL は https://host/path、ssh://host/path、git@host:path の 3 つだけです。ローカルのパスと file:// は使えません。URL を直して押し直します。
+        scene:
+          url: /home/me/work/api
+          status: 使える形式は https://host/path、ssh://host/path、git@host:path の 3 つです。ローカルのパスと file:// は使えません
+          failed: true
+      - target: clone-status
+        title: URL に資格情報が入っている
+        body: user:token@ の形の資格情報は、ターミナルの履歴と .git/config に平文で残るので通しません。URL からは外し、credential helper か SSH 鍵を使います。ssh の git@ はユーザ名なので構いません。
+        scene:
+          url: https://me:glpat-xxxx@gitlab.example.com/team/api.git
+          status: URL に資格情報（user:token@）が入っています。ターミナルの履歴と .git/config に平文で残るので使えません。credential helper か SSH 鍵を使ってください
+          failed: true
+      - target: clone-name
+        title: 名前に使えない文字がある
+        body: 名前は英数字で始め、英数字と . _ - だけ（ASCII）にします。名前はフォルダのパスや frontmatter の project にそのまま使われるためです。URL の末尾が日本語のときなどは、名前の欄を手で直します。
+        scene:
+          url: https://gitlab.example.com/team/api.git
+          name: ライブラリ
+          status: "名前は英数字で始め、英数字と . _ - だけ（ASCII）で付けてください。frontmatter の project: とフォルダのパスにそのまま使われます"
+          failed: true
+      - target: clone-name
+        title: 名前が既存のツリーとぶつかる
+        body: 一覧のプロジェクトと、ワークツリーの名前とは重ねられません。大文字小文字だけ違う名前もぶつかります（Windows では同じフォルダになるため）。別の名前にします。
+        scene:
+          url: https://gitlab.example.com/team/api.git
+          name: lib
+          status: lib という名前のツリーが既にあります
+          failed: true
+      - target: clone-status
+        title: 同じリポジトリを既に clone している
+        body: origin が同じプロジェクトが一覧にあると、二重に取り込まないよう断ります。名前を変えても通しません。既にあるプロジェクトを使います。
+        scene:
+          url: https://gitlab.example.com/team/app.git
+          name: app-copy
+          status: 同じリポジトリを app として既に clone しています（origin https://gitlab.example.com/team/app.git）
+          failed: true
+      - target: clone-status
+        title: フォルダが既にあり空ではない
+        body: projects/ の下に同じ名前のフォルダがあって、中身があるときは断ります。そのフォルダを移すか消すか、別の名前にします。
+        scene:
+          url: https://gitlab.example.com/team/api.git
+          name: api
+          status: projects/api が既にあり、空ではありません
+          failed: true
+
+  - id: ignore-projects
+    title: .gitignore に projects/ を足したいとき
+    summary: ワークスペースの git から projects/ を外す。帯のボタンで足し、索引に載っているときの帯を読む
+    steps:
+      - target: banner
+        title: 無視されていないと言われたとき
+        body: 各プロジェクトは自分の git を持つので、ワークスペースの git には載せません。.gitignore に /projects/ が無いと、この帯が出ます。
+        scene:
+          banner: ignore
+      - target: fix-ignore
+        title: ボタンで足す
+        body: 押すと、ワークスペースの .gitignore の末尾に、コメント付きで /projects/ を足します。ファイルが無ければ作ります。既に書いてあれば何もしません。
+        scene:
+          banner: ignore
+      - target: clone-status
+        title: 足したあと
+        body: 足したことが欄の下に出て、一覧が読み直されると帯が消えます。コミットは自分でします。
+        scene:
+          status: .gitignore に /projects/ を足しました。コミットは自分でしてください
+      - target: banner
+        title: 索引に載っているときは別の帯
+        body: projects/ がワークスペースの git の索引に載っているときは、ボタンも「無視されていない」の帯も出さず、この苦情だけを出します。.gitignore に足しても、索引に載っている限り追跡は外れません。文面の手順に従ってターミナルで直します。
+        scene:
+          banner: tracked
+      - target: refresh
+        title: 直したら更新
+        body: ターミナルで直したあと、更新を押すと帯が消えます。
+        scene:
+          banner: tracked
+
+  - id: fix-stray
+    title: 認識されない git を直したいとき
+    summary: 一覧の下に出る git リポジトリを、projects/ の直下へ移してプロジェクトにする
+    steps:
+      - target: strays
+        title: 認識されない git とは
+        body: プロジェクトとして扱われるのは、projects/ の直下にある git リポジトリだけです。それ以外の場所で見つかった git が、この枠に並びます。
+        scene:
+          strays: true
+      - target: strays
+        title: 理由を読む
+        body: 各行の右に理由が出ます。projects/ の外にあるものと、projects/ の下でも直下ではなく深い階層にあるものがあります。どちらも直下へ移せば、プロジェクトとして並びます。
+        scene:
+          strays: true
+      - target: strays
+        title: 探す範囲
+        body: ワークスペース直下から 2 階層まで（projects/ の中だけ 3 階層まで）を探します。.git・node_modules・.venv・.claude の中は探さず、一覧にあるプロジェクトとワークツリーは載せません。
+        scene:
+          strays: true
+      - target: refresh
+        title: 移して更新する
+        body: この枠から移す操作はありません。ターミナルでフォルダを projects/ の直下へ移し、更新を押します。
+        scene:
+          strays: true
+      - target: list
+        title: 一覧に加わる
+        body: 移したものは、この一覧にカードとして並び、認識されない枠からは消えます。検証の結果もカードで確かめます。
+        scene:
+          cards: app,lib
+
+  - id: read-problems
+    title: 検証の error と warn を読んで直したいとき
+    summary: カードの札と指摘の文面から、プロジェクトの設定の問題を見つけて直す
+    steps:
+      - target: project-flags
+        title: 札で探す
+        body: 問題のあるカードは、見出しに error か warn の札が付きます。作業中のものがあれば、その件数の札も並びます。まず札のあるカードを探します。
+        scene:
+          cards: common,lib,app
+      - target: project-check
+        title: error を読む
+        body: error は設定が効いていないことを示します。見本の common は、予約された名前のためレイヤーとして数えられません。文面の最後が直し方で、ここではプロジェクトの名前を変えます。
+        scene:
+          cards: common,lib
+      - target: project-check
+        title: warn を読む
+        body: warn は動くが直したほうがよいことを示します。見本の lib は .claude/ を持っているので、Claude Code がそこのスキルを読み込み、フォルダを別のワークスペースルートとして扱います。設定は .ccnavi/config/project/ の下に置きます。
+        scene:
+          cards: lib,app
+      - target: project-check
+        title: 問題なし
+        body: 指摘が無いカードは「問題なし」と出ます。検証は実行ファイルが行った結果をそのまま出していて、画面が判定し直すことはありません。
+        scene:
+          cards: app,lib
+      - target: refresh
+        title: 直したら更新
+        body: 直したあと更新を押すと、検証をやり直した結果で札と文面が変わります。
+        scene:
+          cards: common,lib,app
+
+  - id: where-settings
+    title: 設定とワークツリーの置き場を確かめたいとき
+    summary: プロジェクトごとの設定のルールと、ワークスペース自身の設定・ワークツリーの場所を見る
+    steps:
+      - target: project-rules
+        title: プロジェクトの設定のルール
+        body: プロジェクトごとの設定のルールファイルの場所です。「あり」ならそのファイルが効いています。場所はプロジェクトのルートの .ccnavi/config/project/ の下です。
+        scene:
+          cards: app,lib
+      - target: project-rules
+        title: 「なし」のとき
+        body: ファイルがまだ無いことを示し、置く先を薄く出します。設定を足すときは、この場所に置きます。
+        scene:
+          cards: lib,app
+      - target: project-rules
+        title: 設定の対象にならないとき
+        body: プロジェクトの名前が common や self だと、レイヤーの名前と重なるため設定の対象になりません。検証の error に理由が出るので、名前を変えます。
+        scene:
+          cards: common,app
+      - target: project-worktrees
+        title: プロジェクトのワークツリー
+        body: そのプロジェクトのワークツリーの件数と名前です。プロジェクトのワークツリーは、プロジェクトのカードの中に並びます。
+        scene:
+          cards: app,lib
+      - target: workspace
+        title: ワークスペースのワークツリー
+        body: プロジェクトの外、ワークスペース自体のワークツリーはこの枠に並びます。件数と名前が出ます。
+      - target: workspace-rules
+        title: ワークスペースの設定のルール
+        body: ワークスペース自体の設定のルールファイルの有無と場所です。無いのは正常なので、警告の色は使いません。
+      - target: refresh
+        title: 置いたら更新
+        body: ルールファイルを置いたり、ワークツリーを切ったり片付けたりしたあとは、更新を押すと一覧に反映されます。
