@@ -30,9 +30,9 @@ def write(path: str, text: str) -> str:
 
 
 class WorkspaceRootRealRuleTest(unittest.TestCase):
-    """このリポジトリの rules.yml の workspace-root が、2 つの置き場だけを通すこと。
+    """このリポジトリの rules.yml の workspace-root が、3 つの置き場だけを通すこと。
 
-    通すのは wip/scratchpad/ と .claude/worktrees/。
+    通すのは wip/handoff/・scratchpad/・.claude/worktrees/。
 
     判定と同じ読み方（rules.parse）で組み立てて当てる。ルールは 1 本の regex でも、
     `except:` で置き場を除く形でも書けるので、式を取り出して当てると書き方に縛られる。
@@ -56,12 +56,13 @@ class WorkspaceRootRealRuleTest(unittest.TestCase):
     def hits(self, tail: str) -> bool:
         return self.rule.matches("Write", self.root + tail)
 
-    def test_wip_scratchpadだけが通る(self):
+    def test_置き場だけが通る(self):
         for tail in [
-            "/wip/scratchpad/a.md",
-            "/wip/scratchpad/x/y.sh",
-            r"\wip\scratchpad\a",
-            "/wip/Scratchpad/a.md",
+            "/wip/handoff/a.md",
+            "/wip/handoff/x/y.sh",
+            r"\wip\handoff\a",
+            "/wip/Handoff/a.md",
+            "/scratchpad/a.md",
             "/.claude/worktrees/x/a.md",
             r"\.claude\worktrees\x\a.md",
         ]:
@@ -70,13 +71,14 @@ class WorkspaceRootRealRuleTest(unittest.TestCase):
 
     def test_それ以外は止まる(self):
         for tail in [
-            "/scratchpad/a.md",
+            "/scratchpadx/a.md",
+            "/wip/scratchpad/a.md",
             "/wip/proposals/todo/a.md",
             "/wip/a.md",
             "/wip",
             "/w",
             "/wipx/a.md",
-            "/wip/scratchpadx/a.md",
+            "/wip/handoffx/a.md",
             "/README.md",
             "/.claude/settings.json",
             "/.cfoo",

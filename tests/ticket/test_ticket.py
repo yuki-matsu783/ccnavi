@@ -1299,7 +1299,7 @@ class TicketTest(unittest.TestCase):
         with open(fixture, encoding="utf-8") as f:
             posted = json.load(f)["comments"]
         self.assertIn("見てほしい点", posted[0]["body"])
-        note = "wip/scratchpad/ 配下は作業中の下書きで、レビューの対象外。integrate で消える。"
+        note = "wip/handoff/ 配下はユーザに渡す写しで、レビューの対象外。integrate で消える。"
         self.assertTrue(posted[0]["body"].rstrip("\n").endswith(note), posted[0]["body"])
         self.assertEqual(posted[0]["body"].count(note), 1)
         mr_drafts = [name for name in os.listdir(self.state) if name.startswith("review-mr-")]

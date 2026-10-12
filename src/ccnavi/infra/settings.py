@@ -234,6 +234,9 @@ KIND_RULES = "rules"
 KIND_PHASES = "phases"
 KIND_RISK = "risk"
 LAYER_KINDS = (KIND_RULES, KIND_PHASES, KIND_RISK)
+# 作業・レビュー計画のテンプレートの置き場（`config/common/` と `config/project/` の下）。
+# ファイル 1 本ではなくディレクトリなので、3 本を回す `LAYER_KINDS` には入れない。
+TEMPLATES_DIR = "templates"
 # レイヤーの設定のファイル名。kind は記録と `--explain --json` の鍵の表記なので、
 # ファイル名とは別に持つ。
 LAYER_FILE_NAMES = {KIND_RULES: "rules.yml", KIND_PHASES: "phases.yml", KIND_RISK: "risks.yml"}
@@ -539,6 +542,22 @@ def layer_real_path(conf: Settings, home_root: str, kind: str) -> str:
     """レイヤーの設定ファイルが本来ある場所。差し替えを見ない。"""
     home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("/", os.sep)
     return os.path.join(home_root, home, LAYER_CONFIG_DIR, LAYER_FILE_NAMES[kind])
+
+
+def layer_templates_dir(conf: Settings, home_root: str) -> str:
+    """レイヤーの作業・レビュー計画のテンプレートの置き場（絶対）。`<名前>.yml` を並べる。
+
+    ルール・フェーズ定義・配点の 3 本（`LAYER_KINDS`）は 1 本のファイルだが、テンプレートは
+    ディレクトリなので、`layer_path` には載せず別に持つ。置き場の差し替えフラグも無い。
+    """
+    home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("/", os.sep)
+    return os.path.join(home_root, home, LAYER_CONFIG_DIR, TEMPLATES_DIR)
+
+
+def common_templates_dir(conf: Settings, root: str) -> str:
+    """共通レイヤーのテンプレートの置き場（絶対）。ミラー先の `config/common/` も同じ形。"""
+    home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("/", os.sep)
+    return os.path.join(root, home, COMMON_DIR, TEMPLATES_DIR)
 
 
 def mirror_real_path(conf: Settings, home_root: str, kind: str) -> str:

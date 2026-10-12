@@ -923,7 +923,7 @@ deny:
     match: Write
     regex: '^{root}[\\\\/]'
     except:
-      - regex: '^{root}[\\\\/]wip[\\\\/]scratchpad(?:[\\\\/]|$)'
+      - regex: '^{root}[\\\\/]wip[\\\\/]handoff(?:[\\\\/]|$)'
       - glob: '{root}/.claude/worktrees/*'
     message: main では編集しない
 `;
@@ -934,7 +934,7 @@ deny:
     dom.click(dom.one(`${row} .row-head`));
     await dom.settle();
     const shown = dom.all(`${row} .f-except code`).map((el) => el.textContent);
-    assert.deepEqual(shown, ["regex: ^{root}[\\\\/]wip[\\\\/]scratchpad(?:[\\\\/]|$)", "glob: {root}/.claude/worktrees/*"]);
+    assert.deepEqual(shown, ["regex: ^{root}[\\\\/]wip[\\\\/]handoff(?:[\\\\/]|$)", "glob: {root}/.claude/worktrees/*"]);
   } finally {
     await dom.close();
   }
