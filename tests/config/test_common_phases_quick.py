@@ -1,4 +1,4 @@
-"""共通の phases.yml の `quick` が `review: mr` であることの受入テスト（#379）。"""
+"""共通の phases.yml の `quick-work` が `review: mr` であることの受入テスト（#379）。"""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ PHASES = Path(__file__).resolve().parents[2] / ".ccnavi" / "config" / "common" /
 class CommonQuickReviewTest(unittest.TestCase):
     def test_quick_reviews_by_mr(self):
         text = PHASES.read_text(encoding="utf-8")
-        m = re.search(r"^  quick:\n((?:    .*\n)+)", text, re.MULTILINE)
-        self.assertIsNotNone(m, "quick の定義が無い")
+        m = re.search(r"^  quick-work:\n((?:    .*\n)+)", text, re.MULTILINE)
+        self.assertIsNotNone(m, "quick-work の定義が無い")
         self.assertRegex(m.group(1), r"(?m)^    review: mr$")
 
 
