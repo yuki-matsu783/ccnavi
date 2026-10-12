@@ -167,6 +167,7 @@ def _item_names(scanned: plan_templates.Scan, name: str) -> list[str]:
 def draft_json(draft: Draft, scanned: plan_templates.Scan) -> dict:
     """画面（将来のボードのテンプレート管理画面）が取り込みを出せる 1 本分の答え。
 
+    `text` は読んだ下書きの本文そのまま（編集画面が元の本文を取るため。reveal はしない）。
     `importable` は読めて error が無いこと。`exists_in` は同じ名前のテンプレートが在るレイヤー
     （取り込むと新規ではなく置き換えになる）。`problems` の深刻度は下書きの検査のままで、
     `--lint` は error も warn に下げて出す。
@@ -192,6 +193,7 @@ def draft_json(draft: Draft, scanned: plan_templates.Scan) -> dict:
     out["importable"] = draft.importable
     out["exists_in"] = _item_names(scanned, draft.name)
     out["also_in"] = list(draft.also)
+    out["text"] = draft.entry.raw.decode("utf-8-sig", errors="replace")
     return out
 
 
@@ -611,45 +613,62 @@ def _existing(plan: ImportPlan, root: str) -> None:
         )
 
 
-def _collisions(conf: settings.Settings, root: str, plan: ImportPlan) -> None:
-    """取り込むと、共通とレイヤーに同名で中身の違うものが並ぶ形になるなら断る。
+def collide(
+    conf: settings.Settings,
+    root: str,
+    template: plan_templates.Template,
+    to: str,
+    layer: str,
+) -> tuple[list[str], list[str]]:
+    """取り込むと、共通とレイヤーに同名で中身の違うものが並ぶ形になるなら断る。(errors, infos)。
 
     足し算はその形のレイヤーの側を使わない error にする（`plan_templates.merge`）。
+    `to` が common なら `layer` は使わない。project なら `layer` は取り込み先のレイヤー。
     """
-    template = plan.draft.entry.template if plan.draft else None
-    if template is None:
-        return
+    errors: list[str] = []
+    infos: list[str] = []
     scanned = plan_templates.scan(conf, root)
     mine = plan_templates.dump(template)
     name = template.name
-    if plan.to == TO_COMMON:
+    if to == TO_COMMON:
         for view in scanned.layers:
             for other in view.entries:
                 if other.name != name or other.template is None:
                     continue
                 if plan_templates.dump(other.template) != mine:
-                    plan.errors.append(
+                    errors.append(
                         f"{view.name} に同名で中身の違う {other.rel} が在る。共通へ取り込むと"
                         f"{view.name} の側が使われなくなる。先に {view.name} の側を直す"
                     )
                 else:
-                    plan.infos.append(
+                    infos.append(
                         f"{view.name} に全欄が同じ {other.rel} が在る"
                         f"（取り込むと {view.name} の側は捨てられる）"
                     )
-        return
+        return errors, infos
     for other in scanned.common.entries:
         if other.name != name or other.template is None:
             continue
         if plan_templates.dump(other.template) != mine:
-            plan.errors.append(
-                f"共通に同名で中身の違う {other.rel} が在る。取り込んでも {plan.layer} の側は"
+            errors.append(
+                f"共通に同名で中身の違う {other.rel} が在る。取り込んでも {layer} の側は"
                 "使われない。別の名前にする"
             )
         else:
-            plan.infos.append(
-                f"共通に全欄が同じ {other.rel} が在る（取り込んでも {plan.layer} の側は捨てられる）"
+            infos.append(
+                f"共通に全欄が同じ {other.rel} が在る（取り込んでも {layer} の側は捨てられる）"
             )
+    return errors, infos
+
+
+def _collisions(conf: settings.Settings, root: str, plan: ImportPlan) -> None:
+    """`collide` の結果を取り込みの下見に足す。"""
+    template = plan.draft.entry.template if plan.draft else None
+    if template is None:
+        return
+    errs, infos = collide(conf, root, template, plan.to, plan.layer)
+    plan.errors.extend(errs)
+    plan.infos.extend(infos)
 
 
 @dataclass
