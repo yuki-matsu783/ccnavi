@@ -1,9 +1,9 @@
 /**
- * 5 つの画面の CSS。置き場は画面（React）と同じ `src/webview/<名前>/` で、部品 1 つに CSS 1 本。
+ * 6 つの画面の CSS。置き場は画面（React）と同じ `src/webview/<名前>/` で、部品 1 つに CSS 1 本。
  * バンドルする（`scripts/bundle-webview.js`）と画面 1 つにつき 1 本になり、拡張がそれを `<style nonce>` に
  * 流し込む。
  *
- * ここで見るのは 3 つ。骨組み（共通の部品 `extensions/shared/styles/page.css`）が 5 画面とも 1 か所から来ていること、
+ * ここで見るのは 3 つ。骨組み（共通の部品 `extensions/shared/styles/page.css`）が 6 画面とも 1 か所から来ていること、
  * ハイコントラストのテーマ向けの書き方が残っていること、そして置いた CSS がバンドルから漏れて
  * いないこと（`@import` を書き忘れると、見た目だけが気づかないうちに抜ける）。
  */
@@ -113,7 +113,7 @@ function firstSelector(file: string): string | undefined {
   return found === null ? undefined : found[1].trim().replace(/\s*\n\s*/g, " ");
 }
 
-test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・欄・脚注）を 1 か所から持つ", () => {
+test("CB-T127 6 つの画面は同じ骨組みの CSS（ツールバー・帯・欄・脚注）を 1 か所から持つ", () => {
   // 画面を足したら、その 1 枚を reactPages に足す（足さないと、ここから下の検査に入らない）
   assert.deepEqual(reactPages().map(([name]) => name).sort(), screenNames(), "reactPages に無い画面がある");
   for (const [name, html] of reactPages()) {
@@ -130,7 +130,7 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
     assert.ok(html.includes("\n<body>\n"));
     assert.ok(style.includes("body.ccnavi-claude-light:not("));
   }
-  // 切り替えを受け取る側は 5 画面とも画面（React）の中にある。動かして見るのは各画面の dom のテスト
+  // 切り替えを受け取る側は 6 画面とも画面（React）の中にある。動かして見るのは各画面の dom のテスト
   // （ボードは CB-T142、プロジェクト管理は CB-D32、リスク管理は CB-D57、ルール管理は CB-D0b）
   for (const [, html] of reactPages("claude-dark")) {
     assert.ok(html.includes('\n<body class="ccnavi-claude-dark">\n'));

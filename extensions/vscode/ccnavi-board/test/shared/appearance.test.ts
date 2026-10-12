@@ -178,7 +178,7 @@ test("CB-T182b 保持する画面は裏でも送る。1 枚目を読み込んで
  * 見た目の配線を、ソースを読んで見張る（CB-T157 と同じ手）。
  *
  * 退行そのもの（`followAppearance` が `webview.postMessage` を直に呼ぶ、送り直しを省く）は
- * `src/appearance.ts` と 5 つのパネルで起きるが、そこは `vscode` を import するので単体では
+ * `src/appearance.ts` と 8 つのパネルで起きるが、そこは `vscode` を import するので単体では
  * 動かせない。上の 2 本（CB-T182 / CB-T182b）が見ているのは段取りの側で、配線を戻してもテストは通ったまま。
  * 名前で見るだけなので表記を変えて呼ぶ方法までは防げないが、うっかり外すことは防げる。
  */
@@ -206,7 +206,7 @@ test("CB-T183 見た目は段取りを通る。直に postMessage を呼ぶ道�
   assert.match(follow, /export function followAppearance\(panel: vscode\.WebviewPanel, host: AppearanceSink\)/);
 });
 
-test("CB-T183b 5 画面とも、段取りに繋いで、組み上がったところで送り直す", () => {
+test("CB-T183b 6 画面とも、段取りに繋いで、組み上がったところで送り直す", () => {
   for (const name of [...REBUILT_PANELS, ...RETAINED_PANELS]) {
     const text = source(name);
     assert.match(text, /followAppearance\(panel, current\.host\)/, `${name} が段取りに繋いでいない`);
@@ -229,7 +229,7 @@ test("CB-T183c 保持する画面は、表に戻ったところでも送り直�
 });
 
 /**
- * 見た目のメッセージが、5 画面すべての契約（`To*`）に入っていること。tsc が見る。
+ * 見た目のメッセージが、6 画面すべての契約（`To*`）に入っていること。tsc が見る。
  *
  * 旧いコードは呼び出しのたびに `{ type: "appearance", value } satisfies ToBoard` と書いていて、
  * その画面の契約に入っていることをコンパイラが確かめていた。`postAppearance(host)` にそろえたときに
@@ -246,7 +246,7 @@ const IN_EVERY_CONTRACT: readonly [ToBoard, ToProjects, ToRisk, ToRules, ToPhase
   APPEARANCE,
 ];
 
-test("CB-T184 見た目のメッセージは 5 画面すべての契約に入っている（外すとコンパイルが通らない）", () => {
+test("CB-T184 見た目のメッセージは 6 画面すべての契約に入っている（外すとコンパイルが通らない）", () => {
   assert.equal(IN_EVERY_CONTRACT.length, 6);
   for (const message of IN_EVERY_CONTRACT) {
     assert.deepEqual(message, { type: "appearance", value: "claude-dark" });
