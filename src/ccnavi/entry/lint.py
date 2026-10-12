@@ -151,6 +151,18 @@ def report(
                 f"今は {selfguard.ENABLE} として動いている",
             )
         )
+    # 学びの蓄積の切り替えも 2 値。書き誤りは disable として動くので、書いたユーザが「効いている」と
+    # 思い続けないよう warn で言う。
+    learning_declared = (conf.learning_declared or "").strip()
+    if learning_declared and learning_declared not in ("enable", "disable"):
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(learning)",
+                f"{settings.LEARNING_ENV}={learning_declared}。enable か disable しか受け付けない。"
+                "今は disable として動いている",
+            )
+        )
     # 切ってあること自体は設定として正しい。それでも言うのは、切れている状態が
     # 外から見て「ルールが揃っている状態」と区別が付かないため。
     if guard_unwatched == selfguard.DISABLE:

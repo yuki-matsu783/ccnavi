@@ -399,6 +399,7 @@ class Settings:
     ticket_control: str = ""
     ticket_control_declared: str = ""
     learning: str = ""
+    learning_declared: str = ""
 
     # tickets は提案の置き場（各作業ツリーのルートからの相対、"/" 区切り）、
     # approved は承認済みチケットの置き場（各ツリーのルートからの相対、"/" 区切り）。
@@ -486,6 +487,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         ticket_control=os.environ.get(TICKET_CONTROL_ENV, ""),
         ticket_control_declared=os.environ.get(TICKET_CONTROL_ENV, ""),
         learning=os.environ.get(LEARNING_ENV, ""),
+        learning_declared=os.environ.get(LEARNING_ENV, ""),
         tickets=DEFAULT_TICKETS,
         approved=DEFAULT_APPROVED,
         phases=os.path.join(root, DEFAULT_PHASES),
