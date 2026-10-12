@@ -5,7 +5,7 @@ description: ADR-0093 の D24（通信先はビルドに埋め込み、設定画
 tags: [approval, extension, hosts, security]
 keywords: [Chrome 拡張, 通信先, hosts.json, optional_host_permissions, chrome.permissions, CSP, connect-src, GitLab, GHES, localhost, PAT, D24]
 ---
-# ADR-0127: 通信先を設定画面で足せるようにする
+# ADR-0128: 通信先を設定画面で足せるようにする
 
 状態: 採用（ADR-0093 の D24 の行を改める。D24 の「設定画面でホストを足さない」は、この ADR の決定で取り下げる）
 
