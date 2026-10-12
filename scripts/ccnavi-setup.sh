@@ -66,8 +66,8 @@ SETTINGS_REL=".claude/settings.json"
 # VS Code へ渡す設定。値ではなくキーがあるかどうかを見て、足りないものだけを足す。
 # `git.detectWorktrees` は、.claude/worktrees/ の中のワークツリーをソース管理の
 # ビューに表示する（README「ワークツリーを VS Code から見えるようにする」）。
-# `git.repositoryScanMaxDepth` は、projects/<名前>/ のような 1 段下のリポジトリを
-# 見つけるために 2 にする（既定は 1 で、ワークスペースルート直下しか探さない）。
+# `git.repositoryScanMaxDepth` は、projects/<名前>/ のようにワークスペースルートから 2 階層下の
+# リポジトリを見つけるために 2 にする（既定は 1 で、ルートの直下の階層までしか探さない）。
 VSCODE_REL=".vscode/settings.json"
 VSCODE_KEYS='{"git.detectWorktrees": true, "git.repositoryScanMaxDepth": 2}'
 # hook はこの 1 行だけを登録する。どのイベントの処理を走らせるかは、payload にある
@@ -121,7 +121,7 @@ DEPLOY_DOCS_DIR=".ccnavi/docs"
 # *.yml が 1 本も無いのは正常（共通のテンプレートはまだ無いことがある）で、何も言わずに飛ばす。
 DEPLOY_TEMPLATES_DIR=".ccnavi/config/common/templates"
 # 共通の工程スキル。配布元の .claude/skills/ の中で、SKILL.md の frontmatter に `process: true` を持つ
-# スキルだけを配る（.ccnavi/docs/skill-processes.md）。配るのは SKILL.md と references/common/ の下。
+# スキルだけを配る（.ccnavi/docs/skill-processes.md）。配るのは SKILL.md と references/common/ の下の .md。
 # references/project/ は配布元固有の事情なので配らない。親チケットの着手は、ワークスペースのこの置き場から
 # プロジェクトの skills/<工程>/ へ写すので、配布先のワークスペースに無いと写す元が無い。
 # commit や yomiyasu のような `process: true` を持たないスキルは、配布元固有の手順や外部の取り込みなので配らない。
@@ -204,7 +204,7 @@ CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）�
 配らず、既にあれば触らない。フェーズ定義は 2 本の和で判定する）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）・使い方の文書（.ccnavi/docs/*.md）・共通の作業・レビュー計画のテンプレート
 （.ccnavi/config/common/templates/*.yml。配布元に無ければ配らない）・共通の工程スキル
-（.claude/skills/ のうち SKILL.md に process: true を持つもの。SKILL.md と references/common/ の下だけで、
+（.claude/skills/ のうち SKILL.md に process: true を持つもの。SKILL.md と references/common/ の下の .md だけで、
 references/project/ は配らない）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
 --docs の索引（**/ccnavi-index.jsonl）は、配布先の .gitignore に足す（ccnavi-index.jsonl を否定する
 行があれば足さない）。
@@ -474,17 +474,43 @@ templates_skipped=""
 skills_all=""
 skills_todo=""
 skills_skipped=""
+skills_blocked=""
 
-# 配布元のスキルが、frontmatter に `process: true` を持つか。先頭の `---` から次の `---` までの
-# 間にその 1 行があるものだけを当てる（文字列の "true"、BOM 付きは当てない。ccnavi の写しと揃える）。
+# 配布元のスキルが、frontmatter に `process: true` を持つか。先頭の `---` から閉じの `---` までの
+# 間に、その 1 行（行末の `# コメント`は可）があるものだけを当てる。親チケットの着手が写す判定
+# （src/ccnavi/tickets/skillsync.py の _process_flag）に寄せてある。CRLF の改行と、`---` の前後の空白は
+# 許し、閉じの `---` が無いもの、BOM 付き、文字列の "true"、本文だけにあるものは当てない。
+# SKILL.md 自体がリンクのものは、skillsync と同じく当てない。
+# 書き方は文書どおりの `process: true` だけを見る。`process: yes` のような別の綴りは、skillsync は
+# 真と読むが、ここでは当てない（配り漏れは、まだ無いものにも出ない。文書は `process: true` と書く）。
 is_process_skill() {
-	[ -f "$1" ] || return 1
+	{ [ -f "$1" ] && [ ! -L "$1" ]; } || return 1
 	awk '
-		NR == 1 { if ($0 != "---") { bad = 1; exit } next }
-		/^---[ \t\r]*$/ { exit }
-		/^process:[ \t]*true[ \t\r]*$/ { found = 1 }
-		END { exit (found && !bad) ? 0 : 1 }
+		{ sub(/\r$/, "") }
+		NR == 1 { if ($0 !~ /^[ \t]*---[ \t]*$/) { exit } open = 1; next }
+		$0 ~ /^[ \t]*---[ \t]*$/ { closed = 1; exit }
+		$0 ~ /^process:[ \t]*true([ \t]+#.*)?[ \t]*$/ { found = 1 }
+		END { exit (open && closed && found) ? 0 : 1 }
 	' "$1"
+}
+
+# 配布先で、$1（ルートからの相対）の道のどこかにディレクトリでないものがあるか。あれば mkdir -p が
+# 失敗し、set -e で配布が半端に止まる（設定は書かれたまま、sh だけが届かない）。
+path_blocked() {
+	pb_rest=$1
+	pb_cur=$root
+	while [ -n "$pb_rest" ]; do
+		pb_part=${pb_rest%%/*}
+		case "$pb_rest" in
+		*/*) pb_rest=${pb_rest#*/} ;;
+		*) pb_rest="" ;;
+		esac
+		pb_cur="$pb_cur/$pb_part"
+		if [ -e "$pb_cur" ] && [ ! -d "$pb_cur" ]; then
+			return 0
+		fi
+	done
+	return 1
 }
 
 # 配布元にあるか、配布先にあるか、--force か。この 3 つだけで決まる。
@@ -639,15 +665,20 @@ if [ -n "$deploy" ]; then
 				cd "$skill_path" && {
 					printf 'SKILL.md\n'
 					if [ -d references/common ] && [ ! -L references/common ]; then
-						find references/common -type f | sort
+						find references/common -type f -name '*.md' | sort
 					fi
 				}
 			)
-			while IFS= read -r skill_file; do
-				[ -n "$skill_file" ] || continue
+			# 一覧は改行で割って回す（ヒアドキュメントで入力を作らない）。glob は展開しない。
+			skill_ifs=$IFS
+			IFS='
+'
+			set -f
+			for skill_file in $skill_files; do
 				skill_rel="$skill_name/$skill_file"
-				# 名前の範囲はスキルのディレクトリ名と同じ。外れるファイルは、単語分割や glob で
-				# 配布を半端に止めるので配らない。
+				# 配るのは .md だけ（親チケットの着手が写すものと同じ）。.DS_Store や ccnavi-index.jsonl のような
+				# 生成物は配らない。名前の範囲はスキルのディレクトリ名と同じで、外れるファイルは、
+				# 単語分割や glob で配布を半端に止めるので配らない。
 				case "$skill_rel" in
 				*[!A-Za-z0-9._/-]*)
 					skills_skipped="$skills_skipped$skill_rel
@@ -655,8 +686,16 @@ if [ -n "$deploy" ]; then
 					continue
 					;;
 				esac
+				[ -f "$source_root/$DEPLOY_SKILLS_DIR/$skill_rel" ] || continue
 				skills_all="$skills_all$skill_rel
 "
+				# 配布先の道にディレクトリでないものがある、または配り先がディレクトリのときは配らない。
+				if path_blocked "$(dirname "$DEPLOY_SKILLS_DIR/$skill_rel")" ||
+					[ -d "$root/$DEPLOY_SKILLS_DIR/$skill_rel" ]; then
+					skills_blocked="$skills_blocked$DEPLOY_SKILLS_DIR/$skill_rel
+"
+					continue
+				fi
 				if [ -e "$root/$DEPLOY_SKILLS_DIR/$skill_rel" ]; then
 					skill_there=yes
 				else
@@ -670,9 +709,9 @@ if [ -n "$deploy" ]; then
 "
 					;;
 				esac
-			done <<SKILL_FILES
-$skill_files
-SKILL_FILES
+			done
+			set +f
+			IFS=$skill_ifs
 		done
 	fi
 
@@ -1100,6 +1139,10 @@ report_deploy() {
 		printf '名前に使えない文字があるので配っていないテンプレート（英数字で始め、英数字と . _ - だけ）:\n'
 		printf '%s' "$templates_skipped" | sed 's/^/  /'
 	fi
+	if [ -n "$skills_blocked" ]; then
+		printf '配布先の道にディレクトリでないものがある、または配り先がディレクトリなので配っていない共通の工程スキル:\n'
+		printf '%s' "$skills_blocked" | sed 's/^/  /'
+	fi
 	if [ -n "$skills_skipped" ]; then
 		printf '名前に使えない文字があるので配っていない共通の工程スキル（英数字と . _ - だけ。ファイルは / も可）:\n'
 		printf '%s' "$skills_skipped" | sed 's/^/  /'
@@ -1476,12 +1519,15 @@ if [ "$deploy_work" = yes ]; then
 	for name in $docs_todo; do
 		copy_file "$source_root/$DEPLOY_DOCS_DIR/$name" "$root/$DEPLOY_DOCS_DIR/$name"
 	done
-	while IFS= read -r skill_rel; do
-		[ -n "$skill_rel" ] || continue
+	skill_ifs=$IFS
+	IFS='
+'
+	set -f
+	for skill_rel in $skills_todo; do
 		copy_file "$source_root/$DEPLOY_SKILLS_DIR/$skill_rel" "$root/$DEPLOY_SKILLS_DIR/$skill_rel"
-	done <<SKILL_FILES
-$skills_todo
-SKILL_FILES
+	done
+	set +f
+	IFS=$skill_ifs
 	for name in $scripts_todo; do
 		copy_file "$source_root/$DEPLOY_SCRIPT_DIR/$name" "$root/$DEPLOY_SCRIPT_DIR/$name"
 		# hook は振り分けの sh を直接起動する。cp は元のモードをそのままコピーするとは限らないので付け直す。
@@ -1626,14 +1672,17 @@ if [ -n "$source_root" ] && [ -d "$source_root/$DEPLOY_TEMPLATES_DIR" ]; then
 	done
 fi
 # 共通の工程スキルも同じ。配布のときに数えた一覧（skills_all）で確かめる。
-while IFS= read -r skill_rel; do
-	[ -n "$skill_rel" ] || continue
+skill_ifs=$IFS
+IFS='
+'
+set -f
+for skill_rel in $skills_all; do
 	if [ ! -f "$root/$DEPLOY_SKILLS_DIR/$skill_rel" ]; then
 		note_missing "${DEPLOY_SKILLS_DIR}/${skill_rel}（共通の工程スキル。親チケットの着手がプロジェクトへ写す元）"
 	fi
-done <<SKILL_FILES
-$skills_all
-SKILL_FILES
+done
+set +f
+IFS=$skill_ifs
 if [ -n "$missing_parts" ]; then
 	printf 'まだ無いもの:\n%s' "$missing_parts"
 	# 配布をやめた理由は report_deploy が既に出している。ここで足すのは、ユーザが自分で
