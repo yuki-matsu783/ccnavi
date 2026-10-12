@@ -87,7 +87,7 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
   const blocked = lock.locked || diff?.problem !== undefined;
   return (
     <div className="review-backdrop">
-      <section className="review proposal" id="proposal-review" role="dialog" aria-modal="true" aria-labelledby="proposal-review-title">
+      <section className="review proposal" id="proposal-review" data-tour="proposal" role="dialog" aria-modal="true" aria-labelledby="proposal-review-title">
         <h2 id="proposal-review-title">エージェントの提案を確かめる</h2>
         {view.kind === "loading" && <p className="dim">下書きを ccnavi で確かめています…</p>}
         {view.kind === "error" && (
@@ -125,7 +125,7 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
             閉じる
           </button>
           {view.kind === "ready" && (
-            <button type="button" className="action primary" data-action="import-proposal" disabled={blocked} onClick={() => onImport(view.proposal)}>
+            <button type="button" className="action primary" data-action="import-proposal" data-tour="proposal-import" disabled={blocked} onClick={() => onImport(view.proposal)}>
               {dirty ? "未保存の変更を捨てて取り込む" : "取り込む"}
             </button>
           )}
@@ -143,7 +143,7 @@ export function RequestText({ prompt, onClose }: { readonly prompt: string; read
   }, []);
   return (
     <div className="review-backdrop">
-      <section className="review" id="request-text" role="dialog" aria-modal="true" aria-labelledby="request-text-title">
+      <section className="review" id="request-text" data-tour="request-text" role="dialog" aria-modal="true" aria-labelledby="request-text-title">
         <h2 id="request-text-title">エージェントに頼む文</h2>
         <p className="dim small">
           コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。エージェントは下書きを書くだけで、

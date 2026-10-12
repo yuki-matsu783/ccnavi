@@ -32,7 +32,7 @@ function body(checks: FlowChecks | undefined): JSX.Element {
 
 export function Preview({ checks, checking, error }: PreviewProps): JSX.Element {
   return (
-    <details className="flow-preview" id="flow-preview" open>
+    <details className="flow-preview" id="flow-preview" data-tour="preview" open>
       <summary title="SubagentStart で担当のサブエージェントに渡る手順です。実行ファイル（ccnavi --lint --flow）が並べたものです">担当に渡る手順</summary>
       {checking && (
         <p className="dim small" id="flow-preview-checking">
