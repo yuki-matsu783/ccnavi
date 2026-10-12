@@ -2029,7 +2029,7 @@ Claude Code はそこを読まないので、ccnavi が `SessionStart` と `Suba
 `PreToolUse` で 1 度だけ添える。本文はエージェントが要るときに参考に開く（CLAUDE.md・ccnavi の知らせ・ガードと食い違えばそちらに従う）。
 ディレクトリ名は `^[A-Za-z0-9._-]+$` のものだけを読む。上限は 30 本・4000 文字。専用の保護は無く、ほかのファイルと同じ判定になる
 （直すのは承認したチケットの範囲の中。`.ccnavi/` の外に置いたのは、組み込みの保護を緩めずに書けるようにするため）。
-ワークスペースの `.claude/skills/` で `concept: true` を持つ概念スキルは、親の `ticket start` がプロジェクトの `skills/<概念>/`（`SKILL.md` と `references/common/` の `.md`）へ写し、共通側から無くなった `.md` は写し先からも消す。`references/` の最上段は `common/`（写す）と `project/`（そのリポジトリ固有。写さない）に分けるので、プロジェクト固有の reference は上書きも削除もされない（設計 11.13）。
+ワークスペースの `.claude/skills/` で `process: true` を持つ工程スキルは、親の `ticket start` がプロジェクトの `skills/<工程>/`（`SKILL.md` と `references/common/` の `.md`）へ写し、共通側から無くなった `.md` は写し先からも消す。`references/` の最上段は `common/`（写す）と `project/`（そのリポジトリ固有。写さない）に分けるので、プロジェクト固有の reference は上書きも削除もされない（設計 11.13）。
 
 ### 参考にした運用
 

@@ -3,7 +3,7 @@ type: design
 title: 11.13 プロジェクトのスキル
 description: プロジェクトの skills/ に置くスキルの形をした手順書と目録
 tags: [design-doc, projects, skills]
-keywords: [スキル, SKILL.md, skills, 概念スキル, 目録, 写し]
+keywords: [スキル, SKILL.md, skills, 工程スキル, 目録, 写し]
 ---
 
 [設計書の入口](../../design.md) > [11. 複数のリポジトリ](../multi-repo.md)
@@ -37,14 +37,14 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 フロー編集画面の候補（`flow.candidates`、9.3.1）は、ワークスペースの `.claude/skills` だけを並べ、プロジェクトのスキルは載せない。
 フローの `skill` に書けるのは Claude Code が起動できるスキルの名前で、プロジェクトのスキルはそれに当たらないため。
 
-#### 共通の概念スキルの写し
+#### 共通の工程スキルの写し
 
-ワークスペースの `.claude/skills/<概念>/SKILL.md` の頭の frontmatter に `concept: true` があるスキルを、概念スキルと呼ぶ。プロジェクトだけを clone しても同じ入口と reference が使えるよう、
-親チケットの `ticket start`（`tickets/skillsync.py`）が、親のワークツリーにあるプロジェクトの `skills/<概念>/` へ `SKILL.md` と `references/common/` の下の `.md` を写す。`references/` の最上段は `common/`（共通。写す）と `project/`（そのリポジトリ固有。写さない）に分ける。
+ワークスペースの `.claude/skills/<工程>/SKILL.md` の頭の frontmatter に `process: true` があるスキルを、工程スキルと呼ぶ。プロジェクトだけを clone しても同じ入口と reference が使えるよう、
+親チケットの `ticket start`（`tickets/skillsync.py`）が、親のワークツリーにあるプロジェクトの `skills/<工程>/` へ `SKILL.md` と `references/common/` の下の `.md` を写す。`references/` の最上段は `common/`（共通。写す）と `project/`（そのリポジトリ固有。写さない）に分ける。
 
 - `common/` は共通の写しなので、共通レイヤーのミラー（11.12）と同じく、共通側から無くなった `.md` は写し先からも消し、空になったディレクトリも `common/` の下から片付ける。`SKILL.md` は消さない。`project/` は写さず触れないので、プロジェクト固有の reference は上書きも削除もされない。`common/` の `.md` 以外のファイルにも触れない
 - `common/` の同じパスのファイルは共通の中身で上書きする
 - 中身が同じなら書かず、知らせない。違うものを書いたときは、着手の出力に一覧とコミットの案内を出す
 - 写し先かその途中がシンボリックリンクなら、何も写さず着手しない
 - 子の着手とワークスペース自身の作業では写さない
-- 写した分は、C1 の置き場の検査・実行後チェック・復元から見ればエージェントの書き込みと区別が付かない。区別は内容で付ける（`skillsync.is_synced_write`）。通すのは、承認済みの親のワークツリーの `skills/<概念>/SKILL.md` か `skills/<概念>/references/common/` の下の `.md` で、途中にリンクが無く、中身が共通の概念スキルの同じファイルと同じものだけ（共通レイヤーのミラーと同じ厳しさ）。中身が違うもの、消す変更は共通側に無くなったファイルだけ通し、共通側にあるファイルや `SKILL.md` を消す変更は通さない。元リポジトリや子のワークツリーのファイルも通さない
+- 写した分は、C1 の置き場の検査・実行後チェック・復元から見ればエージェントの書き込みと区別が付かない。区別は内容で付ける（`skillsync.is_synced_write`）。通すのは、承認済みの親のワークツリーの `skills/<工程>/SKILL.md` か `skills/<工程>/references/common/` の下の `.md` で、途中にリンクが無く、中身が共通の工程スキルの同じファイルと同じものだけ（共通レイヤーのミラーと同じ厳しさ）。中身が違うもの、消す変更は共通側に無くなったファイルだけ通し、共通側にあるファイルや `SKILL.md` を消す変更は通さない。元リポジトリや子のワークツリーのファイルも通さない
