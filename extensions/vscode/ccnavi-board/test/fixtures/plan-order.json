@@ -765,7 +765,7 @@
       "from": 4,
       "type": "chores",
       "title": "片付け",
-      "review": "chat",
+      "review": "mr",
       "deferred": false,
       "review_at": null,
       "locked": false
