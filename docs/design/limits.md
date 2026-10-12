@@ -52,7 +52,7 @@ keywords: [限界, 保証しないこと, 誤検知, 未実装, 最終防衛線]
 | 二重引用の中の `$( )` が、文字のつもりでも実行として読まれる。シェルは実際に実行する | `\$(` で書く、単一引用、`--body-file <ファイル>` |
 | バッククォートは、文字のつもりでも中身に依らず止まる（`--body "…"` に書いた Markdown の ``` `git push` ```、閉じないバッククォート。6.3） | 単一引用で包む、`` \` `` で書く、`--body-file <ファイル>` |
 | `commit -m "$(cat <<'EOF' … EOF)"` や `gh pr create --body "$(cat <<'EOF' …)"` に heredoc のルールが当たる | 本文を Write で置いて `commit -F <ファイル>` / `--body-file <ファイル>`。改行を含む `-m "…"` |
-| `cd "$(git rev-parse --show-toplevel)"` が raw-git に当たる | ラッパースクリプトで値を出して読み、次のコマンドに値を書く |
+| `cd "$(git rev-parse --show-toplevel)"` が builtin-guard-raw-git に当たる | ラッパースクリプトで値を出して読み、次のコマンドに値を書く |
 | `grep -rn foo "$(pwd)"` や、grep を改行で 2 行つないだものが allow から外れて確認になる | 値をそのまま書く。1 行ずつ打つ |
 | `$( )` の中の、コマンドの先頭ではない `case` の語でも止まる（`"$(echo just in case)"`） | 語を変える。case は if/elif で書く |
 | `$( )` の中の縮退（`xargs`、`sh -c`、シェルによって読みが分かれる形）が、外側のコマンドにも広がる | スクリプトを Write で置いて `sh <ファイル>` |

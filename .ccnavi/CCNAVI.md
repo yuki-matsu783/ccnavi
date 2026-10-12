@@ -14,8 +14,10 @@ ccnavi が前提にしている決まり。セッションの開始（起動・�
 <!-- ccnavi:if workspace_root -->
   - 編集する前にワークツリー（{{worktrees}}/<名前>）を切り、その中で編集する。切り方は ccnavi-git.sh の --help（worktree add）。直接作業の名前は <先頭の語>-<番号>-<slug>（.ccnavi/docs/worktree.md）。
 <!-- ccnavi:endif -->
-<!-- ccnavi:if raw_git -->
+<!-- ccnavi:if git_wrapper -->
   - git は直接呼ばず {{git_sh}} を通す。止められたら迂回せず、出力の案内に従う。
+<!-- ccnavi:else -->
+  - git は直接呼ばない。止められたら迂回せず、出力の案内に従う。git の操作が要るときはユーザに頼む。
 <!-- ccnavi:endif -->
 - 置き場は 2 つある。ユーザに渡す物（保護対象を直した写し・MR と一緒に見せる物）は、ワークツリーの中でも {{handoff}}/ に置く（追跡され、チケットの範囲では報告されない。統合のときに integrate が外し、ready が消す）。その場で一時的に見せる物・コミットしたくない物は、ワークスペースルート直下の {{scratch}}/ に置く（.gitignore で追跡から外れる。ccnavi は消さないので、終わったら自分で消す）。セッションのスクラッチパッド（Environment 欄の場所）には置かない。使い分けは `.ccnavi/docs/scratchpad.md`。
 - 書き込みを止められている場所（保護対象のファイルなど）を直すときは、{{stage_sh}} <元のパス> で {{handoff}}/ に写して編集する。複数あるときはすべて写してからターンを終える。対話セッションでは、{{stage_sh}} --commands <元のパス> が出した mv（フルパス）をユーザに案内してターンを終える。非対話セッションでは、編集済みの下書きを push し、ユーザに確認と差し替えを頼んでターンを終える。

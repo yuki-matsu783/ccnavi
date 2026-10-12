@@ -19,6 +19,10 @@ ask:
     match: Bash
     regex: '\bgit\s+commit\b'
     message: Commits are read by a person one at a time.
+  - id: release
+    match: Bash
+    regex: '\bmake\s+release\b'
+    message: A release is decided by a person.
 
 allow:
   - id: listing

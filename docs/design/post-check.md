@@ -55,7 +55,7 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 | 索引に足された状態で現れた | `<git> restore --staged -- <path> && rm -- <path>` |
 
 `<git>` は、ワークスペースルートに git のラッパー（`.ccnavi/scripts/ccnavi-git.sh`）があればその実パス（`sh <ルート>/.ccnavi/scripts/ccnavi-git.sh`）、
-無ければ `git`。ラッパーがあるワークスペースでは生の git が止まることがあり、止まる形を案内しないため。ラッパーは `rm -f` と
+無ければ `git` を案内せず、ユーザに頼む文にする（生の git は組み込みでいつも止まるため）。ラッパーは `rm -f` と
 `clean` を通さないので、現れたものは索引から外してシェルの `rm` で消す形にする。
 
 このイベントにツール呼び出しを取り消す手段は無い。`enable` では終了コード 2 と標準エラーで

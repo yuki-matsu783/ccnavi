@@ -98,14 +98,14 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 `builtin-guard-project-home` より先にこちらが当たる。期待する判定（`rule-expectations.yml`）は 3 本に入らず、既定の置き場なら
 `builtin-guard-project-home` が止める。
 
-生の git（`builtin-ticket-raw-git`）: チケット制御が有効でワークスペースルートに `ccnavi-git.sh` がある間は、生の git を組み込みで止める（9.1）。
+生の git（`builtin-guard-raw-git`）: いつも、生の git を組み込みで止める（9.1）。ラッパーがあればその打ち方を文面で名指しする（ADR-0129）。
 ラッパーの中のチケット制御の可否を、ラッパーの外から打つ git で外させないためで、ガード自身を守る組み込みに数える（P4）。
 `CCNAVI_GUARD_CORE_FILES` では切れず、チケット制御（`CCNAVI_TICKET_CONTROL`）を切ると外れる。
 
 git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PATH`、`builtin-guard-wrapper-paths`）: `ccnavi-git.sh` の
 `rm`（`--cached` も）・`restore --source <ref>`・`checkout <ref> <パス>` で、`builtin-guard-setting-files` と同じ場所を
 消す・別のコミットの中身に戻す形を、ルールより先に止める（`wrapguard.check_core_paths`）。シェルの `rm` は止まるのに、ラッパーの
-`git rm` は同じファイルを消せた。`ccnavi-git.sh` 自身が消えると、生の git の組み込み（ラッパーがあるときだけ足す）も外れる。
+`git rm` は同じファイルを消せた。`ccnavi-git.sh` 自身が消えても、生の git の組み込みは足したままなので外れない。
 `CCNAVI_GUARD_CORE_FILES` が有効な間、チケット制御と組み込みの既定への退避に依らず足す。
 
 | 当たるもの | 理由 |
