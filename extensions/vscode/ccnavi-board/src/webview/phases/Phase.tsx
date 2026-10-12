@@ -33,6 +33,10 @@ export interface PhaseProps {
   readonly onChange: (next: PhaseForm) => void;
   readonly onMove: (delta: number) => void;
   readonly onRemove: () => void;
+  /** 案内が指す行か。真のとき、行と欄に `data-tour` の印を付ける（印は画面に 1 つだけ。見本の最初の行にだけ付ける） */
+  readonly tour?: boolean;
+  /** 案内の見本の行。打っても欄の文字が変わらず、「補足」の開閉も動かない */
+  readonly frozen?: boolean;
 }
 
 type TextKey = "id" | "title" | "agent" | "when";
@@ -40,6 +44,8 @@ type ListKey = "scope" | "deliverables";
 
 export function Phase(props: PhaseProps): JSX.Element {
   const { phase, disabled } = props;
+  /** 案内が指す行にだけ印を付ける */
+  const mark = (name: string): string | undefined => (props.tour === true ? name : undefined);
   const text = (name: TextKey, className: string, placeholder: string): JSX.Element => (
     <input
       type="text"
@@ -57,6 +63,7 @@ export function Phase(props: PhaseProps): JSX.Element {
       placeholder={placeholder}
       value={phase[name]}
       disabled={disabled}
+      frozen={props.frozen === true}
       onChange={(next) => props.onChange({ ...phase, [name]: next })}
     />
   );
@@ -65,6 +72,7 @@ export function Phase(props: PhaseProps): JSX.Element {
     <li className={`row phase ${phase.kind}${props.open ? " open" : ""}${props.hidden ? " hidden-by-find" : ""}`} data-key={props.phaseKey} data-find={props.find}>
       <div
         className="row-head"
+        data-tour={mark("phase-row")}
         onClick={() => {
           // 文字を選んだだけのときは開閉しない（要約をコピーする操作を妨げない）
           if (window.getSelection !== undefined && String(window.getSelection()) !== "") {
@@ -93,13 +101,13 @@ export function Phase(props: PhaseProps): JSX.Element {
         </span>
       </div>
       <div className="row-body">
-        <Captioned name="id" yamlKey="id">
+        <Captioned name="id" yamlKey="id" tour={mark("phase-id")}>
           {text("id", "f-id narrow", "implement（英数字で始まり、使えるのは英数字と . _ -）")}
         </Captioned>
-        <Captioned name="タイトル" yamlKey="title">
+        <Captioned name="タイトル" yamlKey="title" tour={mark("phase-title")}>
           {text("title", "f-title narrow", "実装とテスト（空なら id をそのまま使う）")}
         </Captioned>
-        <Captioned name="区分" yamlKey="kind">
+        <Captioned name="区分" yamlKey="kind" tour={mark("phase-kind")}>
           <select
             className="f-kind"
             value={phase.kind}
@@ -113,7 +121,7 @@ export function Phase(props: PhaseProps): JSX.Element {
             ))}
           </select>
         </Captioned>
-        <Captioned name="レビュー" yamlKey="review">
+        <Captioned name="レビュー" yamlKey="review" tour={mark("phase-review")}>
           <select
             className="f-review"
             value={phase.review}
@@ -127,7 +135,7 @@ export function Phase(props: PhaseProps): JSX.Element {
             ))}
           </select>
         </Captioned>
-        <Captioned name="編集可能な範囲" yamlKey="scope">
+        <Captioned name="編集可能な範囲" yamlKey="scope" tour={mark("phase-scope")}>
           <div className="inline">
             <select
               className="f-scope"
@@ -141,23 +149,34 @@ export function Phase(props: PhaseProps): JSX.Element {
             {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*（ワークツリーのルートからの相対。子チケットの編集可能な範囲はこの中に収める）")}
           </div>
         </Captioned>
-        <Captioned name="必須成果物" yamlKey="deliverables">
+        <Captioned name="必須成果物" yamlKey="deliverables" tour={mark("phase-deliverables")}>
           {list("deliverables", "f-deliverables", "wip/design/*.md（閉じる前に存在し、git に追跡されているべきもの）")}
         </Captioned>
         <details
           className="more"
+          data-tour={mark("phase-more")}
           open={props.moreOpen}
-          onToggle={(event) => props.onToggleMore((event.currentTarget as HTMLDetailsElement).open)}
+          onToggle={(event) => {
+            const details = event.currentTarget as HTMLDetailsElement;
+            if (props.frozen === true) {
+              // 見本の補足は、押しても開閉しない（ブラウザが先に切り替えた分を戻す）
+              if (details.open !== props.moreOpen) {
+                details.open = props.moreOpen;
+              }
+              return;
+            }
+            props.onToggleMore(details.open);
+          }}
         >
           <summary>
             <b>補足</b>
             {moreNote(phase)}
           </summary>
           <div className="sub">
-            <Captioned name="案内するエージェント" yamlKey="agent">
+            <Captioned name="案内するエージェント" yamlKey="agent" tour={mark("phase-agent")}>
               {text("agent", "f-agent narrow", "サブエージェント名（案内に出すだけで、割り当てはしない）")}
             </Captioned>
-            <Captioned name="使う場面" yamlKey="when">
+            <Captioned name="使う場面" yamlKey="when" tour={mark("phase-when")}>
               {text("when", "f-when", "この定義を計画に入れる場面（エージェントへの案内にだけ使う）")}
             </Captioned>
           </div>
@@ -193,12 +212,15 @@ function ListInput({
   className,
   placeholder,
   disabled,
+  frozen,
   onChange,
 }: {
   readonly value: readonly string[];
   readonly className: string;
   readonly placeholder: string;
   readonly disabled: boolean;
+  /** 案内の見本。打っても欄の文字を変えない */
+  readonly frozen: boolean;
   readonly onChange: (next: readonly string[]) => void;
 }): JSX.Element {
   const [text, setText] = useState(() => value.join(", "));
@@ -220,6 +242,9 @@ function ListInput({
       value={text}
       disabled={disabled}
       onChange={(event) => {
+        if (frozen) {
+          return;
+        }
         setText(event.target.value);
         onChange(splitList(event.target.value));
       }}
@@ -228,9 +253,9 @@ function ListInput({
 }
 
 /** 欄名を左に置く。YAML のキー名は欄名のツールチップに載せる */
-export function Captioned({ name, yamlKey, children }: { readonly name: string; readonly yamlKey?: string; readonly children: ReactNode }): JSX.Element {
+export function Captioned({ name, yamlKey, tour, children }: { readonly name: string; readonly yamlKey?: string; readonly tour?: string; readonly children: ReactNode }): JSX.Element {
   return (
-    <div className="field">
+    <div className="field" data-tour={tour}>
       <span className="cap" title={yamlKey === undefined ? undefined : `YAML のキー: ${yamlKey}`}>
         {name}
       </span>
