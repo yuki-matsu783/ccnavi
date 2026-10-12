@@ -329,6 +329,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # decide が書くレビュー済みのマーカーの経路（`via`）で、`terminal` か `board` を渡す。
     # `--actor` があるときだけ受け付ける。アカウントを引けなかったときに、
     # マーカーも履歴も前と同じ中身にするため。
+    # `--templates --import --yes` の board 経路（`--expect` と `--json` と組む）でも受け付ける。
     parser.add_argument("--via", default="")
     try:
         rest, test_words = _take_test_words(_json_out_of_test(argv))

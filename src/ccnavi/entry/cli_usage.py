@@ -106,6 +106,9 @@ wip/proposals/templates/NAME.yml, which has no effect and is never overwritten.
 Only the user types --import: without --yes it writes nothing and shows the
 check and the diff against the same name in the target; with --yes and the
 draft's hash as --expect it writes, then removes the draft if it is unchanged.
+The board screen runs the writing form as a child process with --via board
+(with --expect and --json): it skips the terminal confirmation, and the draft's
+hash it showed (--expect) and the hook stop it instead.
 
     ccnavi --templates --draft PARENT [--name NAME] [--json]
     ccnavi --templates --import DRAFT --to common|project [--layer NAME]
@@ -371,6 +374,8 @@ which fetches the threads and runs
         [--actor=<account> --via=terminal|board]
         (the script passes the token owner when it can read it; the reviewed mark
          keeps the account and the way. Without it the mark is as before)
+        (`--via board` is also taken by `--templates --import --yes`, with --expect
+         and --json; see --templates)
 
 A phase whose type says `review: chat` is reviewed in the session itself. There
 is no merge request and no copy to read, so a human opens that gate from the

@@ -84,7 +84,7 @@ src/
     commands.ts       ターミナルに送るコマンド行と、承認・残った指摘の対応方針を子プロセスで打つ引数の配列
     decidemodel.ts    残った指摘の JSON（実行ファイルとの契約）の読み取りと、選んだ対応方針の確かめ
     screens.ts        画面の入口の帳面（Root）。どの画面をどう開くかを 1 か所に集める。画面どうしは互いを import せず、ここへ要求を出す
-    watch.ts          4 つの画面が見張る場所（提案・承認済みチケットとマーカー・ワークツリーの登録）の glob
+    watch.ts          7 つの画面（ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集）が見張る場所（提案・承認済みチケットとマーカー・ワークツリーの登録）の glob
     locate.ts         実行ファイルの探索順
     ticket-control.ts CCNAVI_TICKET_CONTROL の読み取り（settings.json と settings.local.json）と、実行ファイルが返す値（ボードの JSON の `settings.ticket_control`）との突き合わせ
   webview/            画面（React）。DOM を触る側で、vscode も node も import しない。tsconfig.webview.json で型を見る
