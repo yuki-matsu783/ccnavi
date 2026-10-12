@@ -435,7 +435,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
 
   /** 開いている編集の欄を、その行の位置に出す。別の行のものなら出さない */
   const editPanelFor = (key: string): JSX.Element | null =>
-    editing !== undefined && editing.key === key ? (
+    !touring && editing !== undefined && editing.key === key ? (
       <EditPanel
         state={editing.state}
         layers={page.importLayers}

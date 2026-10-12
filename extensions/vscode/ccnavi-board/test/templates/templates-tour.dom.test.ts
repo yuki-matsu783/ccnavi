@@ -173,3 +173,19 @@ test("CB-D361 足し算と取り込みの案内は、見本の足し算を選び
     await dom.close();
   }
 });
+
+test("CB-D362 編集の欄を開いたまま案内を始めても、案内の間は実際の編集の欄を出さず、閉じたら元に戻る", async () => {
+  const dom = await openTemplates();
+  try {
+    dom.click(dom.one('li.draft[data-name="login"] [data-action="edit-draft"]'));
+    await dom.settle();
+    assert.equal(dom.all('[data-role="edit-panel"]').length, 1);
+    await startCourse(dom, "intro");
+    assert.equal(dom.all('[data-role="edit-panel"]').length, 0, "案内の間に実際の編集の欄が出た");
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.all('[data-role="edit-panel"]').length, 1, "閉じたあと編集の欄が戻らなかった");
+  } finally {
+    await dom.close();
+  }
+});
