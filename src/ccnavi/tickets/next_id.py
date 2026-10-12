@@ -21,9 +21,10 @@ from . import ticket as ticket_mod
 
 def serial_now(conf: settings.Settings, root: str) -> int:
     """いまの次の通し番号。`--lint` が warn に添える番号と同じ集め方。"""
-    copies, _ = approval.scan(conf, root)
-    closed, _ = approval.scan(conf, root, closed=True)
-    review, _ = approval.scan_review(conf, root)
+    raw = approval.read_raw(conf, root)
+    copies, _ = approval.scan(conf, root, raw=raw)
+    closed, _ = approval.scan(conf, root, closed=True, raw=raw)
+    review, _ = approval.scan_review(conf, root, raw=raw)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
     names = [t.ticket for t in list(copies) + list(closed) + list(review) + list(proposals)]
     return ticket_ids.next_serial(names, conf.branch_prefixes)
