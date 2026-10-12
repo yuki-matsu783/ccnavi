@@ -324,6 +324,8 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
             parts = [f"review: {pt.review}", f"scope: {scope}"]
             if pt.deliverables:
                 parts.append(f"deliverables: {', '.join(pt.deliverables)}")
+            if pt.learning == phasetypes.LEARNING_OFF:
+                parts.append("learning: off")
             parts.append(f"使う番号: {', '.join(map(str, numbers[ident]))}")
             lines.append(f"    {pt.title} / {ident}  " + "、".join(parts))
     unused = [ident for ident in types if ident not in numbers]

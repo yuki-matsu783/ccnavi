@@ -36,6 +36,11 @@ class LearningLintTest(unittest.TestCase):
         result = self.lint("enable")
         self.assertNotIn("CCNAVI_LEARNING", result.stdout + result.stderr)
 
+    def test_whitespace_value_warns(self) -> None:
+        # 空白つきの値は実行時に disable として動くので、見逃さない。
+        result = self.lint(" enable")
+        self.assertIn("CCNAVI_LEARNING", result.stdout + result.stderr)
+
     def test_unset_is_not_warned(self) -> None:
         result = self.lint(None)
         self.assertNotIn("CCNAVI_LEARNING", result.stdout + result.stderr)

@@ -316,7 +316,7 @@ scripts in .ccnavi/scripts/, which call
     ccnavi ticket learn [<id>] [--note <text> [--target <kind>] [--signal <kind>]]
         (writes the learning record scaffold and the decision-log digest into
          wip/handoff/learnings/<id>.*; with --note appends one learning,
-         or writes it to docs/wiki/inbox/ outside a ticket)
+         or writes it to docs/wiki/inbox/ outside a ticket. The <id> goes before the options.)
     ccnavi ticket new <id> --title <title> --plan <type,type,...> [--issue N]
         (writes the scaffold of a parent proposal to wip/proposals/todo/<id>.md of
          the worktree named <id>; run it inside that worktree. Collects the scope

@@ -218,6 +218,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         "範囲の外は止まる\n"
     )
     stdout.write(f"  チケット制御: {conf.ticket_control or settings.TICKET_CONTROL_ENABLE}\n")
+    stdout.write(f"  学びの蓄積: {'enable' if conf.learning_enabled else 'disable'}\n")
     if not conf.tickets_enabled:
         stdout.write(f"  {settings.TICKET_CONTROL_ENV}=disable。範囲の制限は掛かっていない\n")
         return 0
