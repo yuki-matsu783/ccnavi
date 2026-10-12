@@ -209,7 +209,7 @@ test("CB-D04 絞り込みは一致しない行を隠し、開いている行は�
   }
 });
 
-test("CB-D160 一覧にない新しいツール名を追加欄に打つと、選んだ状態で match に入る。形の違う名前は足さず理由を出す", async () => {
+test("CB-D346 一覧にない新しいツール名を追加欄に打つと、選んだ状態で match に入る。形の違う名前は足さず理由を出す", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one(`${rowSelector("no-rm")} .row-head`));

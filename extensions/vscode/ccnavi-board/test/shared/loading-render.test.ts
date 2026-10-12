@@ -9,6 +9,7 @@ import { renderProjectsPage } from "../../src/core/projects-render.js";
 import { renderBoardPage } from "../../src/core/render.js";
 import { renderRiskPage } from "../../src/core/risk-render.js";
 import { renderRulesPage } from "../../src/core/rules-render.js";
+import { renderTemplatesPage } from "../../src/core/templates-render.js";
 
 test("CB-T200 読み込み中の 1 枚はスクリプトを持たず、名前を逃がして出し、見た目のクラスと画面の CSS を持つ", () => {
   const html = renderLoadingPage("ccnavi ルール管理: <a&b>", "<a&b> のルール", { nonce: "N1", style: ".empty { color: red; }", appearance: "claude-dark" });
@@ -34,6 +35,7 @@ test("CB-T200b 読み込み中の一言は「<何>を読み込み中...」で、
     ["ルール", renderRulesPage(error, options)],
     ["フェーズ", renderPhasesPage(error, options)],
     ["リスク", renderRiskPage(error, options)],
+    ["テンプレート", renderTemplatesPage(error, options)],
   ];
   for (const [what, html] of pages) {
     assert.match(html, new RegExp(`<div id="root"><p class="empty" id="ccnavi-loading">${what}を読み込み中…</p></div>`), what);

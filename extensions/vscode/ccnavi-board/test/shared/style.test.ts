@@ -22,6 +22,7 @@ import { page as phasesPage, phasesHtml } from "../helpers/phases.js";
 import { page as rulesPage, rulesHtml } from "../helpers/rules.js";
 import { flowHtml, page as flowPage } from "../helpers/flow.js";
 import { workflowHtml, workflowPage } from "../helpers/workflow.js";
+import { page as templatesPage, templatesHtml } from "../helpers/templates.js";
 
 /** 画面の名前と、その 1 枚。中身は画面（React）が組み、CSS と body だけを拡張が入れる */
 function reactPages(appearance?: "claude-dark"): [string, string][] {
@@ -35,6 +36,7 @@ function reactPages(appearance?: "claude-dark"): [string, string][] {
     ["rules", rulesHtml({ kind: "page", page: rulesPage() }, options)],
     ["flow", flowHtml({ kind: "page", page: flowPage() }, options)],
     ["workflow", workflowHtml({ kind: "page", page: workflowPage() }, options)],
+    ["templates", templatesHtml({ kind: "page", page: templatesPage() }, options)],
   ];
 }
 

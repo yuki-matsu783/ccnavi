@@ -9,6 +9,7 @@ import type { ToPhases } from "../../src/core/phases-view.js";
 import type { ToProjects } from "../../src/core/projects-view.js";
 import type { ToRisk } from "../../src/core/risk-view.js";
 import type { ToRules } from "../../src/core/rules-view.js";
+import type { ToTemplates } from "../../src/core/templates-view.js";
 import type { AppearanceMessage } from "../../src/core/appearance.js";
 import { WEBVIEW_SRC } from "../helpers/bundle.js";
 
@@ -196,7 +197,7 @@ function source(name: string): string {
 
 /** 保持しない画面（表に戻ると作り直される）と、保持する画面（作り直されない） */
 const REBUILT_PANELS = ["board-panel.ts", "projects-panel.ts"];
-const RETAINED_PANELS = ["rules-panel.ts", "risk-panel.ts", "phases-panel.ts"];
+const RETAINED_PANELS = ["rules-panel.ts", "risk-panel.ts", "phases-panel.ts", "templates-panel.ts"];
 
 test("CB-T183 見た目は段取りを通る。直に postMessage を呼ぶ道と、自前の送り直しを持たない", () => {
   const follow = source("appearance.ts");
@@ -236,7 +237,8 @@ test("CB-T183c 保持する画面は、表に戻ったところでも送り直�
  * ここで 1 か所にまとめて確かめ直す。6 画面目を足す人は、この配列に 1 行足せば同じ検査が有効になる。
  */
 const APPEARANCE: AppearanceMessage = { type: "appearance", value: "claude-dark" };
-const IN_EVERY_CONTRACT: readonly [ToBoard, ToProjects, ToRisk, ToRules, ToPhases] = [
+const IN_EVERY_CONTRACT: readonly [ToBoard, ToProjects, ToRisk, ToRules, ToPhases, ToTemplates] = [
+  APPEARANCE,
   APPEARANCE,
   APPEARANCE,
   APPEARANCE,
@@ -245,7 +247,7 @@ const IN_EVERY_CONTRACT: readonly [ToBoard, ToProjects, ToRisk, ToRules, ToPhase
 ];
 
 test("CB-T184 見た目のメッセージは 5 画面すべての契約に入っている（外すとコンパイルが通らない）", () => {
-  assert.equal(IN_EVERY_CONTRACT.length, 5);
+  assert.equal(IN_EVERY_CONTRACT.length, 6);
   for (const message of IN_EVERY_CONTRACT) {
     assert.deepEqual(message, { type: "appearance", value: "claude-dark" });
   }
