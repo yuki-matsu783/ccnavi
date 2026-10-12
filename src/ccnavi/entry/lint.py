@@ -438,7 +438,10 @@ def _ccnavi_md(conf: settings.Settings, root: str) -> list[Problem]:
         ]
     except (OSError, UnicodeDecodeError) as exc:
         return [Problem(SEVERITY_WARN, "(ccnavi-md)", f"{path} を読めない ({exc})")]
-    return [Problem(SEVERITY_WARN, "(ccnavi-md)", f"{path}: {m}") for m in ccnavimd.problems(text)]
+    return [
+        Problem(SEVERITY_WARN, "(ccnavi-md)", f"{path}: {m}")
+        for m in ccnavimd.problems(text, ccnavimd.script_names(conf, root))
+    ]
 
 
 def _risk(conf: settings.Settings, root: str) -> list[Problem]:

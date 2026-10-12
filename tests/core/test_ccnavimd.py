@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import types
 import unittest
 
 from ccnavi.hook import ccnavimd
@@ -65,13 +66,18 @@ class ElseTest(unittest.TestCase):
         self.assertEqual(ccnavimd.render(ELSE_TEXT, {"a", "b"}, {}), "- a\n- a と b")
 
     def test_外側が成り立たなければ内側のelseも載らない(self):
-        text = "<!-- ccnavi:if a -->\n<!-- ccnavi:if b -->\nx\n<!-- ccnavi:else -->\ny\n<!-- ccnavi:endif -->\n<!-- ccnavi:endif -->"
+        text = (
+            "<!-- ccnavi:if a -->\n<!-- ccnavi:if b -->\nx\n<!-- ccnavi:else -->\ny\n"
+            "<!-- ccnavi:endif -->\n<!-- ccnavi:endif -->"
+        )
 
         self.assertEqual(ccnavimd.render(text, {"b"}, {}), "")
         self.assertEqual(ccnavimd.render(text, set(), {}), "")
 
     def test_elseの誤りを行番号つきで挙げる(self):
-        self.assertEqual(ccnavimd.problems(ELSE_TEXT.replace("a", "docs").replace("b", "tickets")), [])
+        self.assertEqual(
+            ccnavimd.problems(ELSE_TEXT.replace("a", "docs").replace("b", "tickets")), []
+        )
         joined = "\n".join(
             ccnavimd.problems(
                 "<!-- ccnavi:else -->\n<!-- ccnavi:if docs -->\n<!-- ccnavi:else -->\n"
@@ -85,14 +91,100 @@ class ElseTest(unittest.TestCase):
 class IndentTest(unittest.TestCase):
     def test_囲みの深さの分だけインデントを取る(self):
         text = (
-            "<!-- ccnavi:if a -->\n  - a\n    - 深い\n  <!-- ccnavi:if b -->\n    - b\n  <!-- ccnavi:endif -->\n"
+            "<!-- ccnavi:if a -->\n  - a\n    - 深い\n  <!-- ccnavi:if b -->\n    - b\n"
+            "  <!-- ccnavi:endif -->\n"
             "<!-- ccnavi:endif -->\n- 外"
         )
 
         self.assertEqual(ccnavimd.render(text, {"a", "b"}, {}), "- a\n  - 深い\n- b\n- 外")
 
     def test_インデントの無い囲みもそのまま載る(self):
-        self.assertEqual(ccnavimd.render("<!-- ccnavi:if a -->\n- a\n<!-- ccnavi:endif -->", {"a"}, {}), "- a")
+        self.assertEqual(
+            ccnavimd.render("<!-- ccnavi:if a -->\n- a\n<!-- ccnavi:endif -->", {"a"}, {}), "- a"
+        )
+
+
+class ScriptConditionTest(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = os.path.realpath(directory.name)
+        self.conf = types.SimpleNamespace(project_home=None)
+        self.script = os.path.join(self.root, ".ccnavi", "scripts", "ccnavimd.sh")
+        os.makedirs(os.path.dirname(self.script))
+
+    def write(self, body: str):
+        with open(self.script, "w", encoding="utf-8") as f:
+            f.write(body)
+
+    def flags(self, md: str, **kw) -> set[str]:
+        ctx = ccnavimd.Context(
+            self.conf,  # type: ignore[arg-type]
+            self.root,
+            kw.get("docs", False),
+            kw.get("deny", set()),
+            "enable",
+        )
+        return ccnavimd.script_flags(self.conf, self.root, md, ctx)  # type: ignore[arg-type]
+
+    def uses(self, *names: str) -> str:
+        return "".join(f"<!-- ccnavi:if {n} -->\n<!-- ccnavi:endif -->\n" for n in names)
+
+    def test_1つのshに書いた複数の関数がそれぞれ判定する(self):
+        self.write(
+            "ccnavi_cond_yes() { return 0; }\n"
+            "ccnavi_cond_no() { return 1; }\n"
+            "ccnavi_cond_has_docker() { return 0; }\n"
+            "ccnavi_cond_broken() { return 127; }\n"
+        )
+
+        # 0 が真、1 が偽、それ以外は判定できないので真。名前の `-` は関数では `_`
+        self.assertEqual(
+            self.flags(self.uses("yes", "no", "has-docker", "broken")),
+            {"yes", "has-docker", "broken"},
+        )
+
+    def test_関数もshも無い名前は判定できないので真(self):
+        self.assertEqual(self.flags(self.uses("nothing")), {"nothing"})
+        self.write("ccnavi_cond_other() { return 1; }\n")
+        self.assertEqual(self.flags(self.uses("nothing")), {"nothing"})
+
+    def test_shが壊れていても真(self):
+        self.write("ccnavi_cond_x() { \n")
+
+        self.assertEqual(self.flags(self.uses("x")), {"x"})
+
+    def test_状況は環境変数で渡る(self):
+        self.write(
+            "ccnavi_cond_env() {\n"
+            '  [ "$CCNAVI_DOCS" = 1 ] || return 1\n'
+            '  case " $CCNAVI_DENY_IDS " in *" a "*) return 0;; esac\n'
+            "  return 1\n"
+            "}\n"
+        )
+
+        self.assertEqual(self.flags(self.uses("env"), docs=True, deny={"a", "b"}), {"env"})
+        self.assertEqual(self.flags(self.uses("env"), docs=False, deny={"a"}), set())
+
+    def test_組み込みと同じ名前の関数は無視し_使っていない関数は走らせない(self):
+        marker = os.path.join(self.root, "ran")
+        self.write(
+            f"ccnavi_cond_docs() {{ return 1; }}\nccnavi_cond_unused() {{ touch '{marker}'; }}\n"
+        )
+
+        self.assertEqual(self.flags(self.uses("docs")), set())
+        self.assertFalse(os.path.exists(marker))
+        self.assertEqual(ccnavimd.script_names(self.conf, self.root), {"unused"})  # type: ignore[arg-type]
+
+    def test_lintは関数のある名前を許す(self):
+        self.write("ccnavi_cond_has_docker() { return 0; }\n")
+        text = self.uses("has-docker")
+
+        self.assertEqual(
+            ccnavimd.problems(text, ccnavimd.script_names(self.conf, self.root)),  # type: ignore[arg-type]
+            [],
+        )
+        self.assertIn("条件 has-docker は使えない", "\n".join(ccnavimd.problems(text)))
 
 
 class FlagsTest(unittest.TestCase):

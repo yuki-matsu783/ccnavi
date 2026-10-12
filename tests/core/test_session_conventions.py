@@ -221,7 +221,8 @@ class SessionConventionsTest(unittest.TestCase):
         self.assertEqual(block(self.start("--mode", "enable", agent_id="a1")), "")
 
     def test_常駐の文脈なので短い(self):
-        # 毎回の起動・再開・compact に届く。考え方と作業の決まりと詳細の表と進め方を合わせて 3400 字に収める。
+        # 毎回の起動・再開・compact に届く。考え方と作業の決まりと詳細の表と進め方を合わせて
+        # 3400 字に収める。
         os.makedirs(os.path.join(self.root, "projects", "lib", ".git"))
         text = block(self.start("--mode", "enable"))
         body = text.replace(self.root, "<root>")

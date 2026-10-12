@@ -11,7 +11,10 @@ md の書き方は 3 つだけ（条件 if・else と、差し込み）。
   インデントしてよい（載せるときに取る）。名前は `CONDITIONS`
 - 差し込み: `{{名前}}` を、ワークスペースごとの値に置き換える。名前は `SUBSTITUTIONS`
 
-条件の名前ごとに独立した関数（`CONDITIONS`）があり、その真偽で行を載せるかを決める。
+条件の名前ごとに独立した関数（`CONDITIONS`）があり、その真偽で行を載せるかを決める。組み込みに無い
+名前は、ワークスペースの `.ccnavi/scripts/ccnavimd.sh` の関数 `ccnavi_cond_<名前>` が判定する
+（戻り値 0 が真、1 が偽。配布先で実行ファイルを触らずに条件を足せる）。関数が無い・判定できない
+ときは、囲んだ行をそのまま出す。
 条件は、文と判定が食い違わないための仕掛けでもある。ワークツリーと git の行は、それを支える
 deny（`workspace-root` / `raw-git`）がワークスペースのルールにあるときだけ載せる。ルールが無い
 ワークスペースでその行を言うと、文と判定が食い違う。
@@ -24,7 +27,8 @@ from __future__ import annotations
 
 import os
 import re
-from collections.abc import Callable
+import subprocess
+from collections.abc import Callable, Collection
 from typing import NamedTuple
 
 from ..infra import modes, settings, tree
@@ -34,7 +38,6 @@ FILE = "CCNAVI.md"
 
 # 1 回の応答に載せる本文の上限（文字数）。固定。常駐の文脈なので毎回これだけ重くなる。
 MAX_CHARS = 6000
-
 
 
 class Context(NamedTuple):
@@ -86,6 +89,17 @@ CONDITIONS: dict[str, Callable[[Context], bool]] = {
     "docs": _docs,
     "dry-run": _dry_run,
 }
+# 配布先が足す条件は、`.ccnavi/scripts/ccnavimd.sh` に関数 `ccnavi_cond_<名前>`
+# （名前の `-` は `_`）としてまとめて書く。組み込みと同じ名前の関数は使わない。
+# 置き場は他の sh と同じ `.ccnavi/scripts/`。
+# エージェントの Write / Edit は止まる（ルール guard-scripts）ので、セッションの頭に載る文面を、
+# エージェントが条件の側から書き換えられない。
+SCRIPTS_DIR = "scripts"
+SCRIPT_FILE = "ccnavimd.sh"
+FUNCTION_PREFIX = "ccnavi_cond_"
+_FUNCTION = re.compile(rf"^\s*{FUNCTION_PREFIX}(\w+)\s*\(\s*\)", re.MULTILINE)
+CONDITION_TIMEOUT_SECONDS = 2.0
+_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 SUBSTITUTIONS = (
     "worktrees",  # ワークツリーの置き場（`.claude/worktrees`）
     "git_sh",  # git のラッパー（打てる形のコマンド）
@@ -108,10 +122,12 @@ _DIRECTIVE = re.compile(r"<!--\s*ccnavi:")
 _SUBSTITUTION = re.compile(r"\{\{\s*(\w+)\s*\}\}")
 
 
-def problems(text: str) -> list[str]:
+def problems(text: str, scripts: Collection[str] = ()) -> list[str]:
     """md の書き方の誤り。`ccnavi --lint` が使う。
 
-    条件の名前、差し込みの名前、対の取れていない囲みを見る。
+    条件の名前（組み込みか、`scripts`＝sh に書かれた関数の名前〔`-` は `_`〕にあるもの）、
+    差し込みの名前、
+    対の取れていない囲みを見る。
     """
     found: list[str] = []
     elses: list[bool] = []  # 囲みごとに、else を置いたか
@@ -119,8 +135,12 @@ def problems(text: str) -> list[str]:
         opened = _IF.match(line)
         if opened:
             elses.append(False)
-            if opened.group(1) not in CONDITIONS:
-                found.append(f"{number} 行目: 条件 {opened.group(1)} は使えない")
+            name = opened.group(1)
+            if name not in CONDITIONS and name.replace("-", "_") not in scripts:
+                found.append(
+                    f"{number} 行目: 条件 {name} は使えない"
+                    f"（組み込みの条件でも {SCRIPT_FILE} の {function_name(name)} でもない）"
+                )
         elif _ELSE.match(line):
             if not elses:
                 found.append(f"{number} 行目: ccnavi:else に対応する ccnavi:if が無い")
@@ -148,14 +168,15 @@ def _dedent(line: str, depth: int) -> str:
     for _ in range(depth):
         if not line.startswith(INDENT):
             break
-        line = line[len(INDENT):]
+        line = line[len(INDENT) :]
     return line
 
 
 def render(text: str, flags: set[str], values: dict[str, str]) -> str:
     """条件に合う行だけを残し、差し込みを解く。空行は続けて 1 つにまとめ、前後の空行は取る。
 
-    名前が `CONDITIONS` に無い条件は成り立たないものとして扱い、`SUBSTITUTIONS` に無い差し込みは
+    `flags` に無い名前の条件は成り立たないものとして扱い（組み込みに無い名前は、呼ぶ側が
+    `script_flags` で決めて渡す）、`SUBSTITUTIONS` に無い差し込みは
     そのまま残す（書き間違いが見える形で届く。誤りは `problems` が lint で言う）。
     `else` は、いちばん内側の囲みの真偽を反転する。外側が成り立たないときは、反転しても載らない。
     """
@@ -197,6 +218,73 @@ def path(conf: settings.Settings, root: str) -> str:
     return os.path.join(root, home(conf), FILE)
 
 
+def function_name(name: str) -> str:
+    """md の条件の名前に対応する、sh の関数の名前。"""
+    return FUNCTION_PREFIX + name.replace("-", "_")
+
+
+def script_path(conf: settings.Settings, root: str) -> str:
+    return os.path.join(root, home(conf), SCRIPTS_DIR, SCRIPT_FILE)
+
+
+def script_names(conf: settings.Settings, root: str) -> set[str]:
+    """`ccnavimd.sh` に関数として書かれている条件の名前（`-` は `_`。組み込みと同じ名前は除く）。"""
+    try:
+        with open(script_path(conf, root), encoding="utf-8") as f:
+            text = f.read()
+    except (OSError, UnicodeDecodeError):
+        return set()
+    builtin = {n.replace("-", "_") for n in CONDITIONS}
+    return {n for n in _FUNCTION.findall(text) if n not in builtin}
+
+
+def run_script(conf: settings.Settings, root: str, name: str, ctx: Context) -> bool:
+    """条件の関数を走らせる。戻り値 0 が真、1 が偽。判定できなければ真（囲んだ行を出す）。
+
+    判定できないのは、走らせられない・時間切れ・0 と 1 以外の戻り値（関数が無い 127、
+    シェルのエラーなど）。黙って落とすと、載るはずの決まりが誰にも気づかれずに届かなくなるため、
+    載せる側に倒す。
+
+    渡す状況は環境変数: `CCNAVI_ROOT`（ワークスペースルート）、`CCNAVI_DOCS`（索引の案内を
+    出す回なら 1）、`CCNAVI_DENY_IDS`（ルールの deny の id を空白区切り）、`CCNAVI_MODE`。
+    cwd はワークスペースルート。
+    """
+    environment = dict(os.environ)
+    environment.update(
+        {
+            "CCNAVI_ROOT": root,
+            "CCNAVI_DOCS": "1" if ctx.docs else "0",
+            "CCNAVI_DENY_IDS": " ".join(sorted(ctx.deny_ids)),
+            settings.MODE_ENV: ctx.mode,
+        }
+    )
+    path = script_path(conf, root).replace("\\", "/")
+    try:
+        done = subprocess.run(
+            ["sh", "-c", '. "$1" && "$2"', "sh", path, function_name(name)],
+            cwd=root,
+            capture_output=True,
+            env=environment,
+            timeout=CONDITION_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return True
+    return done.returncode != 1
+
+
+def script_flags(conf: settings.Settings, root: str, raw: str, ctx: Context) -> set[str]:
+    """md が使っている、組み込みに無い条件の名前のうち、成り立つもの。使っていない sh は走らせない。
+
+    関数が無い名前は判定できないので、成り立つものとして囲んだ行をそのまま出す
+    （誤りは `ccnavi --lint` が言う）。
+    """
+    available = script_names(conf, root)
+    used = {m.group(1) for m in map(_IF.match, raw.splitlines()) if m} - CONDITIONS.keys()
+    return {
+        n for n in used if n.replace("-", "_") not in available or run_script(conf, root, n, ctx)
+    }
+
+
 def flags_for(
     conf: settings.Settings, root: str, docs: bool, deny_ids: set[str], mode: str
 ) -> set[str]:
@@ -235,7 +323,9 @@ def session_text(
             f"[ccnavi] {shown} が無いか読めないので、作業の決まりを渡せない。"
             "導入スクリプト（ccnavi-setup.sh）で配る。"
         )
-    text = render(raw, flags_for(conf, root, docs, deny_ids, mode), values_for(conf, root))
+    flags = flags_for(conf, root, docs, deny_ids, mode)
+    flags |= script_flags(conf, root, raw, Context(conf, root, docs, deny_ids, mode))
+    text = render(raw, flags, values_for(conf, root))
     if len(text) > MAX_CHARS:
         text = (
             text[:MAX_CHARS].rstrip()
