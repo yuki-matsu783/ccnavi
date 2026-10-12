@@ -71,7 +71,7 @@ class LearningCliTest(unittest.TestCase):
         )
         conf, _ = settings.load(self.ws)
         conf = dataclasses.replace(conf, learning="enable")
-        found = types.SimpleNamespace(is_child=True, ticket=child)
+        found = types.SimpleNamespace(is_child=True, ticket=child, phase=None)
 
         err = io.StringIO()
         self.assertTrue(learning.record_missing(err, self.ws, conf, found))

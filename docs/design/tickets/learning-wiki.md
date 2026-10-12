@@ -253,7 +253,8 @@ learning-wiki は手順書（スキル・ルール・テンプレート）を作
 |---|---|
 | 設定 `CCNAVI_LEARNING`、`ticket learn`（雛形・要約・追記・受信箱）、子の着手の 1 行、子を閉じる検査、`ccnavi --docs` の既定からの除外、`/learn` スキル | 実装済み |
 | 共通レイヤーのフェーズ定義 `learning-consolidate` `learning-apply`、`ccnavi-ticket.sh` の `learn` の許可 | 実装済み（ユーザの許可を受けて反映した） |
-| 定義ごとの `learning` 欄、全体の既定を `enable` にすること、2 つの定義の `agent` 欄 | 未実装 |
+| 定義ごとの `learning` 欄（`phasetypes`。定義の写しにも入り、着手の 1 行と子を閉じる検査が読む） | 実装済み |
+| 全体の既定を `enable` にすること（いまの既定は `disable`。変えると既存の子の `finish` が新たに止まる）、2 つの定義の `agent` 欄 | 未実装 |
 | `--learnings`（「無し」と「拾えなかった」の区別を含む）、`--learning-decide`（取り下げを含む）、`ticket cancel` の取り下げの案内、`--lint` の検査（適用前の検査を含む）、親を閉じるときの提案の時期の知らせ、`CCNAVI_LEARNING_RECURRENCE` | 未実装 |
 
 #### 決めていないこと

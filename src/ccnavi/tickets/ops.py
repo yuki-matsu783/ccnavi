@@ -153,7 +153,7 @@ def start(
         stdout.write(line + "\n")
     for line in ops_plan.childless_notice(root, conf, found):
         stdout.write(line + "\n")
-    if found.is_child and conf.learning_enabled:
+    if learning.applies(root, conf, found):
         stdout.write(
             "学びの蓄積: 閉じる前に "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')} learn' を打ち、"

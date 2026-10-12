@@ -15,7 +15,7 @@ from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings, tree
 from ..records import audit, redact
-from . import approval, approval_checks, approval_marks, phase, ticket_model
+from . import approval, approval_checks, approval_marks, phase, phasetypes, ticket_model
 
 LEARNING_DIR = "wip/handoff/learnings"
 INBOX_DIR = "docs/wiki/inbox"
@@ -213,10 +213,28 @@ def tracked(tree_root: str, rel: str) -> bool:
     return rc == 0 and bool(out.strip())
 
 
+def phase_off(root: str, conf: settings.Settings, found: ticket_model.Ticket) -> bool:
+    """この子のフェーズ定義（親に固定した写し）が learning: off か。"""
+    if not found.is_child or found.phase is None:
+        return False
+    copies, _ = approval.scan(conf, root)
+    parent = approval_checks.by_id(copies).get(found.parent)
+    if parent is None or not parent.has_plan:
+        return False
+    item = parent.item_at(found.phase)
+    pt = phasetypes.types_of(parent).get(item.type) if item is not None else None
+    return pt is not None and pt.learning == phasetypes.LEARNING_OFF
+
+
+def applies(root: str, conf: settings.Settings, found: ticket_model.Ticket) -> bool:
+    """学びの蓄積がこの子に効くか。全体が enable で、子で、フェーズ定義が off でない。"""
+    return conf.learning_enabled and found.is_child and not phase_off(root, conf, found)
+
+
 def record_missing(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
-    if not conf.learning_enabled or not found.is_child:
+    if not applies(root, conf, found):
         return False
     child_tree = tree.worktree_path(root, found.ticket)
     rel = record_rel(found.ticket)
