@@ -8,13 +8,15 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
-import type { DraftEntry, TemplateDetail, TemplateEntry, TemplatesData, TemplatesMessage, TemplatesPage, ToTemplates } from "../../core/templates-view.js";
+import { editLockReason } from "../../core/templates-lock.js";
+import type { DraftEntry, EditAnswer, EditOp, EditRequest, TemplateDetail, TemplateEntry, TemplatesData, TemplatesMessage, TemplatesPage, ToTemplates } from "../../core/templates-view.js";
 import { tourOf } from "../../core/tour-def.js";
 import { applyAppearance } from "../appearance.js";
 import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
 import templatesTour from "../tours/templates.yml";
 import { TargetSelect } from "../TargetSelect.js";
 import { Draft } from "./Draft.js";
+import { EditPanel, type EditState } from "./EditPanel.js";
 import { defaultImporting, requestOf, sameRequest, type Importing } from "./ImportForm.js";
 import { post } from "./post.js";
 import type { PreviewState } from "./Preview.js";
@@ -44,6 +46,25 @@ function pageOf(data: TemplatesData): TemplatesPage | undefined {
   return data.kind === "page" ? data.page : undefined;
 }
 
+/** 二つの編集の要求が同じか（古い往復の答えを見分けるため。全欄を比べる） */
+function sameEditRequest(a: EditRequest, b: EditRequest): boolean {
+  return a.op === b.op && a.name === b.name && a.on === b.on && a.layer === b.layer && a.newName === b.newName && a.to === b.to && a.toLayer === b.toLayer && a.body === b.body;
+}
+
+/** 編集が書けたあとの帯の文面 */
+function doneText(request: EditRequest, answer: EditAnswer): string {
+  switch (request.op) {
+    case "save":
+      return `保存しました: ${answer.target}`;
+    case "rename":
+      return `改名しました: ${answer.target}`;
+    case "move":
+      return `移動しました: ${answer.target}`;
+    default:
+      return `消しました: ${answer.source}`;
+  }
+}
+
 export function App({ initial }: { readonly initial: TemplatesData }): JSX.Element {
   const [data, setData] = useState<TemplatesData>(initial);
   const [view, setView] = useState<View>(loadView);
@@ -53,8 +74,12 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
   const [preview, setPreview] = useState<PreviewState | undefined>(undefined);
   /** 下見・取り込みの往復の途中か */
   const [importBusy, setImportBusy] = useState(false);
-  /** 未保存の変更がある間は真（開いているプレビューと、往復の途中）。拡張ホストへ `dirty` で伝える */
-  const dirty = preview !== undefined || importBusy;
+  /** 編集の欄を開いている行のキー（`on:layer:name`）と状態（同時に 1 件）。undefined なら閉じている */
+  const [editing, setEditing] = useState<{ readonly key: string; readonly state: EditState } | undefined>(undefined);
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
+  /** 未保存の変更がある間は真（開いているプレビューと、往復の途中、編集の欄）。拡張ホストへ `dirty` で伝える */
+  const dirty = preview !== undefined || importBusy || editing !== undefined;
   /** 届いたメッセージの中で「いまの欄」を見るための ref（listener は最初の描画の値を持つため） */
   const importingRef = useRef(importing);
   importingRef.current = importing;
@@ -105,6 +130,8 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
         setImporting(undefined);
         setPreview(undefined);
         setImportBusy(false);
+        // 読み直しで編集の途中も捨てる（古い行の答えを見せないため）
+        setEditing(undefined);
       } else if (message.type === "failed") {
         setBusy(false);
         setStatus({ text: String(message.message ?? ""), error: true });
@@ -147,6 +174,31 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
           // 書かずに返った（問題で取り込めない）。答えを下見に入れ替えて見せる
           setPreview({ request: message.request, answer, error: "" });
           setStatus({ text: "取り込めませんでした", error: true });
+        }
+      } else if (message.type === "editPreview" && message.request !== undefined) {
+        // 頼んだ下見と、いまの欄の要求が同じときだけ受ける。違えば古い往復なので捨てる
+        const current = editingRef.current;
+        if (current !== undefined && sameEditRequest(current.state.request, message.request)) {
+          setEditing({ key: current.key, state: { ...current.state, answer: message.answer ?? null, error: String(message.error ?? ""), busy: false } });
+        }
+      } else if (message.type === "edited" && message.request !== undefined) {
+        const current = editingRef.current;
+        const mine = current !== undefined && sameEditRequest(current.state.request, message.request);
+        const error = String(message.error ?? "");
+        const answer = message.answer ?? null;
+        if (error !== "") {
+          // 書けなかった。欄は残して、理由を見せる
+          setStatus({ text: error, error: true });
+          if (mine && current !== undefined) {
+            setEditing({ key: current.key, state: { ...current.state, busy: false } });
+          }
+        } else if (answer !== null && (answer.written || answer.removed)) {
+          setStatus({ text: doneText(message.request, answer), error: false });
+          setEditing(undefined);
+        } else if (mine && current !== undefined) {
+          // 書かずに返った（問題で実行できない）。答えを下見に入れ替えて見せる
+          setEditing({ key: current.key, state: { ...current.state, answer, error: "", busy: false } });
+          setStatus({ text: "実行できませんでした", error: true });
         }
       } else if (message.type === "appearance") {
         applyAppearance(message.value);
@@ -238,6 +290,8 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
     if (tour.touring || importing?.draft === draft.name) {
       return;
     }
+    // 編集の欄が開いていれば閉じる（同時に開くのは 1 件だけ）
+    setEditing(undefined);
     setImporting(defaultImporting(draft));
     setPreview(undefined);
     setImportBusy(false);
@@ -280,6 +334,89 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
   /** プレビューに渡す錠。共通への取り込みは全体の錠、プロジェクトへの取り込みはそのプロジェクトの錠（無ければ全体の錠） */
   const previewLock: Lock = preview === undefined || preview.request.to === "common" ? lock : (projectLocks[preview.request.layer] ?? lock);
 
+  /** 編集の欄を開く。取り込みの欄が開いていれば閉じる。案内の間は開かない。同じ行・同じ操作の欄は開き直さない */
+  const openEdit = (request: EditRequest): void => {
+    if (tour.touring || (editing?.key === editKey(request) && editing.state.request.op === request.op)) {
+      return;
+    }
+    closeImport();
+    setEditing({ key: editKey(request), state: { request, answer: null, error: "", busy: false } });
+  };
+
+  const closeEdit = (): void => setEditing(undefined);
+
+  /** 編集の欄を変えた。開いている下見は捨てる（古い答えを見せないため） */
+  const changeEdit = (request: EditRequest): void => {
+    if (editing !== undefined) {
+      setEditing({ key: editing.key, state: { request, answer: null, error: "", busy: false } });
+    }
+  };
+
+  /** 編集の下見を頼む。何も書かない */
+  const previewEdit = (): void => {
+    if (editing === undefined || tour.touring) {
+      return;
+    }
+    setEditing({ key: editing.key, state: { ...editing.state, answer: null, error: "", busy: true } });
+    setStatus(undefined);
+    act({ type: "previewEdit", request: editing.state.request });
+  };
+
+  /** 編集を実行する。見せた主語の sha を `expect` に渡す */
+  const executeEdit = (expect: string): void => {
+    if (editing === undefined || tour.touring) {
+      return;
+    }
+    setEditing({ key: editing.key, state: { ...editing.state, busy: true } });
+    setStatus(undefined);
+    act({ type: "editYes", request: editing.state.request, expect });
+  };
+
+  /** 行の編集の要求。欄の行キーに使う（`on:layer:name`。操作は含まない） */
+  const editKey = (request: EditRequest): string => `${request.on}:${request.layer}:${request.name}`;
+
+  /** 下書きの行の編集の要求 */
+  const draftRequest = (draft: DraftEntry, op: EditOp): EditRequest => ({
+    op,
+    name: draft.name,
+    on: "draft",
+    layer: "",
+    newName: "",
+    to: "",
+    toLayer: "",
+    body: op === "save" ? draft.text : "",
+  });
+
+  /** テンプレートの行の編集の要求。移動の既定の行き先は共通。元が共通なら共通へは移せないので、最初の層へ移す */
+  const templateRequest = (entry: TemplateEntry, op: EditOp): EditRequest => {
+    const onCommon = entry.layer === "common";
+    return {
+      op,
+      name: entry.name,
+      on: onCommon ? "common" : "project",
+      layer: onCommon ? "" : entry.layer,
+      newName: "",
+      to: op === "move" ? (onCommon ? "project" : "common") : "",
+      toLayer: op === "move" && onCommon ? (page.importLayers[0] ?? "") : "",
+      body: "",
+    };
+  };
+
+  /** 開いている編集の欄を、その行の位置に出す。別の行のものなら出さない */
+  const editPanelFor = (key: string): JSX.Element | null =>
+    editing !== undefined && editing.key === key ? (
+      <EditPanel
+        state={editing.state}
+        layers={page.importLayers}
+        lockReason={editLockReason(editing.state.request, lock, projectLocks)}
+        touring={tour.touring}
+        onChange={changeEdit}
+        onPreview={previewEdit}
+        onExecute={executeEdit}
+        onClose={closeEdit}
+      />
+    ) : null;
+
   const templateRow = (entry: TemplateEntry): JSX.Element => {
     const key = `${entry.layer}/${entry.name}`;
     const shown = details[key];
@@ -293,6 +430,10 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
         detailError={shown?.error ?? ""}
         onShow={() => act({ type: "showTemplate", name: entry.name, layer: entry.layer })}
         tour={key === firstKey}
+        editEnabled={page.edit.enabled}
+        editReason={page.edit.reason}
+        onEdit={(op) => openEdit(templateRequest(entry, op))}
+        editPanel={editPanelFor(editKey(templateRequest(entry, "rename")))}
       />
     );
   };
@@ -328,7 +469,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
             </button>
           </span>
         </div>
-        {dirty && <span className="dirty">プレビューを開いています</span>}
+        {dirty && <span className="dirty">編集または下見を開いています</span>}
         <TourButton courses={courses} onPick={tour.start} />
       </header>
       {changed && (
@@ -343,7 +484,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       ))}
       {lock.locked && (
         <div className="lock" role="status" data-banner="lock">
-          取り込みは止めています: {lock.reason}
+          取り込みと編集は止めています: {lock.reason}
         </div>
       )}
       <section className="templates" data-tour="list">
@@ -395,6 +536,10 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                 importing={importing}
                 ambiguous={duplicateNames.has(draft.name)}
                 importLayers={page.importLayers}
+                editEnabled={page.edit.enabled}
+                editReason={page.edit.reason}
+                onEdit={(op) => openEdit(draftRequest(draft, op))}
+                editPanel={editPanelFor(editKey(draftRequest(draft, "save")))}
                 onOpenImport={() => openImport(draft)}
                 onCloseImport={closeImport}
                 onImportChange={changeImport}

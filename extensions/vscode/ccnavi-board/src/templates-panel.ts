@@ -37,6 +37,7 @@ import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import type { TemplatesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
 import { templatesLayerOf } from "./core/templatesmodel.js";
+import { editLockReason } from "./core/templates-lock.js";
 import { renderTemplatesPage } from "./core/templates-render.js";
 import type { EditRequest, ImportRequest, TemplatesData, TemplatesJson, TemplatesMessage, ToTemplates } from "./core/templates-view.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
@@ -217,7 +218,7 @@ async function switchTarget(current: PanelState, target: TemplatesTarget): Promi
     }
     current.asking = true;
     const choice = await vscode.window.showWarningMessage(
-      `プレビューを開いています。破棄して「${titleOf(target)}」に切り替えますか？`,
+      `編集または下見を開いています。破棄して「${titleOf(target)}」に切り替えますか？`,
       { modal: true },
       "切り替える",
     );
@@ -583,7 +584,7 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
     case "refresh": {
       if (message.dirty) {
         const choice = await vscode.window.showWarningMessage(
-          "プレビューを開いています。破棄して更新しますか？",
+          "編集または下見を開いています。破棄して更新しますか？",
           { modal: true },
           "更新",
         );
@@ -785,20 +786,7 @@ async function editYes(current: PanelState, request: EditRequest, expect: string
  * 掛かっていればその理由。主語は common なら共通の錠、project なら層の錠（無ければ作業中全体の錠）
  */
 function lockReasonOf(fresh: { lock: Lock; projectLocks: Record<string, Lock> }, request: EditRequest): string {
-  if (request.op === "save" || request.op === "delete-draft" || request.on === "draft") {
-    return "";
-  }
-  const subject = request.on === "common" ? fresh.lock : (fresh.projectLocks[request.layer] ?? fresh.lock);
-  if (subject.locked) {
-    return subject.reason;
-  }
-  if (request.op === "move") {
-    const destination = request.to === "common" ? fresh.lock : (fresh.projectLocks[request.toLayer] ?? fresh.lock);
-    if (destination.locked) {
-      return destination.reason;
-    }
-  }
-  return "";
+  return editLockReason(request, fresh.lock, fresh.projectLocks);
 }
 
 function asEditRequest(value: unknown): EditRequest | undefined {

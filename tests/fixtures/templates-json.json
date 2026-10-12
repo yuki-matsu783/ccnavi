@@ -773,6 +773,7 @@
     ],
     "tree": "",
     "checked_with": "self",
+    "text": "name: [\n",
     "importable": false,
     "exists_in": [
      "common"
@@ -835,6 +836,7 @@
     ],
     "tree": "",
     "checked_with": "self",
+    "text": "name: login\ndescription: TODO ログインを設計から実装まで進める\nwhen: 新しい機能を足すとき\nplan:\n  - design\n  - {type: implement, after: [1]}\nfeedback:\n  - implement-feedback\nflows:\n  2:\n    id: wf-impl\n    name: 実装の手順\n    version: 1.0.0\n    nodes:\n      - {id: s, type: start, name: 開始, position: {x: 0, y: 0}, data: {}}\n      - {id: p, type: prompt, name: 実装, position: {x: 1, y: 0}, data: {prompt: 先にテスト}}\n      - {id: e, type: end, name: 終了, position: {x: 2, y: 0}, data: {}}\n    connections:\n      - {id: c1, from: s, to: p, fromPort: output, toPort: input}\n      - {id: c2, from: p, to: e, fromPort: output, toPort: input}\n",
     "importable": true,
     "exists_in": [],
     "also_in": [
@@ -872,6 +874,7 @@
     "problems": [],
     "tree": "",
     "checked_with": "self",
+    "text": "name: research\ndescription: 調べてから設計する\nplan:\n  - research\n  - {type: design, after: [1]}\n",
     "importable": true,
     "exists_in": [
      "common",
