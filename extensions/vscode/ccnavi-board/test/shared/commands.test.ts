@@ -135,6 +135,8 @@ test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリ
   assert.ok(!text.includes("decide"));
   assert.ok(!text.includes("依頼し直す"));
   assert.ok(text.includes("confirm が一覧と次の手順を返すので、それに従う"));
+  // 前の会話が無い新しいセッションでも、状況の確かめ方が分かる
+  assert.ok(text.includes("'sh /ws/.ccnavi/scripts/ccnavi-ticket.sh status i0001' で確かめる（置き場のファイルを自分で探さない）"));
   // マージリクエストが無ければ行ごと省き、フェーズの表示名が無ければ番号で言う。Windows の区切りは / にそろえる
   const bare = reviewedPrompt("C:\\ws", "i0001", 3, "", "C:\\ws\\.claude\\worktrees\\i0001", "", undefined);
   assert.ok(!bare.includes("マージリクエスト:"));

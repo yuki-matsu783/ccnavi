@@ -174,6 +174,12 @@ class ApprovedTextTest(unittest.TestCase):
         text = agree_screen.approved_text([parent], set(), "/w")
         self.assertNotIn("読み直す", text)
 
+    def test_says_approval_is_done_and_where_to_check_state(self):
+        parent = ticket_model.Ticket(ticket="i0001")
+        text = agree_screen.approved_text([parent], set(), "/w")
+        self.assertIn("承認を頼み直さない", text)
+        self.assertIn("ccnavi-ticket.sh status' で状況は分かる", text)
+
 
 class PlanOrderHarness(PhaseHarness):
     def todo(self, name):
