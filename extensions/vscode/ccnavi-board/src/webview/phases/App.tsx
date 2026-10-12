@@ -20,7 +20,7 @@ import type { Lock } from "../../core/lock.js";
 import type { PhaseForm, PhasesData, PhasesPage, ToPhases } from "../../core/phases-view.js";
 import { applyAppearance } from "../appearance.js";
 import { Phase } from "./Phase.js";
-import { Tour, TourButton, type TourStep } from "../Tour.js";
+import { INTRO_COURSE, Tour, TourButton, type TourStep } from "../Tour.js";
 import { TargetSelect } from "../TargetSelect.js";
 import { post } from "./post.js";
 import { countText, duplicateNote, emptyNote, findText, hasMore } from "./text.js";
@@ -312,7 +312,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     {
       target: '[data-action="tour"]',
       title: "案内",
-      body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
+      body: "ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。",
     },
   ];
 
@@ -391,7 +391,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             保存
           </button>
         </div>
-        <TourButton onClick={startTour} />
+        <TourButton courses={[{ id: INTRO_COURSE, title: "基本の案内", summary: "画面の見どころを順に回ります", steps: tourSteps }]} onPick={startTour} />
       </header>
       <p id="lock" className={lock.locked ? "lock" : "lock hidden"}>
         {lock.reason}

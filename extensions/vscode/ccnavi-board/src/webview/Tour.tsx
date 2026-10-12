@@ -23,64 +23,164 @@ export interface TourStep {
   readonly before?: () => void;
 }
 
+/**
+ * 案内 1 本。画面ごとに「基本の案内」（`INTRO_COURSE`。初回に自動で出る）と、使い方ごとの案内（ユースケース）を持つ。
+ * 「?」を押すと一覧（`TourButton` のメニュー）が出て、選んだ 1 本だけが始まる。
+ *
+ * 案内の間、画面は今の設定ではなく案内用の見本（`core/tour-*.ts`）を描く。見本は画面の `useMemo` などで作り、
+ * 段の `before` が見本の上の様子（行を開く、点を選ぶ、タブを替える）を動かす。今の設定の編集中の内容には触れない。
+ */
+export interface TourCourse {
+  /** 案内の鍵。画面の中で一意。テストと `data-course` に使う */
+  readonly id: string;
+  /** メニューに出す題 */
+  readonly title: string;
+  /** メニューに出す 1 行の説明（何ができるようになる案内か） */
+  readonly summary: string;
+  readonly steps: readonly TourStep[]
+}
+
+/** 基本の案内の鍵。初回に自動で出る案内で、メニューの先頭に出る */
+export const INTRO_COURSE = "intro";
+
 type Spot = Rect;
 
 /** 吹き出しの幅。狭い画面では画面の幅に合わせる（CSS の max-width） */
 const BUBBLE_WIDTH = 340;
 
 /**
- * 案内を出し直すボタン。案内のある画面はどれもツールバーの最後の子に置くと、`Tour.css` がヘッダの右上の同じ位置に
- * 小さく固定する（画面ごとにボタンの列へ混ぜると、置き場所がばらつき、ボードでは操作の邪魔になった）
+ * 案内を選び直す「?」。案内のある画面はどれもツールバーの最後の子に置くと、`Tour.css` がヘッダの右上の同じ位置に
+ * 小さく固定する（画面ごとにボタンの列へ混ぜると、置き場所がばらつき、ボードでは操作の邪魔になった）。
+ *
+ * 押すと案内の一覧（基本の案内と、使い方ごとの案内）が下に開き、選んだ 1 本が始まる。案内が 1 本だけの画面は、一覧を挟まずに始める。
+ * 一覧はボタンの前の兄弟に置く（ボタンがツールバーの最後の子であることは変えない）。外を押す・Esc で閉じる
  */
-export function TourButton({ onClick }: { readonly onClick: () => void }): JSX.Element {
+export function TourButton({ courses, onPick }: { readonly courses: readonly TourCourse[]; readonly onPick: (course: string) => void }): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const holder = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const onDown = (event: Event): void => {
+      const target = event.target as HTMLElement | null;
+      if (target === null || (target.closest(".tour-menu") === null && target.closest(".tour-button") === null)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  // 開いたら先頭の案内へ焦点を移す（キーボードで選べる）
+  useEffect(() => {
+    if (open) {
+      holder.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    }
+  }, [open]);
+
+  const click = (): void => {
+    if (courses.length <= 1) {
+      onPick(courses[0]?.id ?? INTRO_COURSE);
+      return;
+    }
+    setOpen((now) => !now);
+  };
+
   return (
-    <button type="button" className="tour-button" data-action="tour" title="この画面の案内を見る" aria-label="この画面の案内を見る" onClick={onClick}>
-      ?
-    </button>
+    <>
+      {open && (
+        <div ref={holder} className="tour-menu" role="menu" aria-label="案内の一覧">
+          <p className="tour-menu-head">見たい案内を選んでください</p>
+          {courses.map((course) => (
+            <button
+              key={course.id}
+              type="button"
+              role="menuitem"
+              className="tour-menu-item"
+              data-action="tour-course"
+              data-course={course.id}
+              onClick={() => {
+                setOpen(false);
+                onPick(course.id);
+              }}
+            >
+              <span className="tour-menu-title">{course.title}</span>
+              <span className="tour-menu-summary">{course.summary}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <button
+        type="button"
+        className="tour-button"
+        data-action="tour"
+        title="案内を選ぶ"
+        aria-label="案内を選ぶ"
+        aria-haspopup={courses.length > 1 ? "menu" : undefined}
+        aria-expanded={courses.length > 1 ? open : undefined}
+        onClick={click}
+      >
+        ?
+      </button>
+    </>
   );
 }
 
 /**
  * 案内を出すかどうかの持ち物。画面の `App` が 1 つ持つ。
  *
- * - `request`: 拡張ホストの `tour`（初回）を受けたときに呼ぶ。指す先が出る（`ready`）まで待って始める。
+ * - `request`: 拡張ホストの `tour`（初回）を受けたときに呼ぶ。基本の案内（`INTRO_COURSE`）を、指す先が出る（`ready`）まで待って始める。
  *   読み込み中やエラーの画面には指す先が無い
- * - `start`: 「?」を押したとき。指す先が出ていればすぐ始め、出ていなければ（ボードの承認のオーバーレイの
+ * - `start`: 「?」のメニューで案内を選んだとき。指す先が出ていればすぐ始め、出ていなければ（ボードの承認のオーバーレイの
  *   最中など）`request` と同じく出るまで待つ。押した経路だけ待たないと、オーバーレイの上に案内が被さる
  * - `end`: 吹き出しを閉じたとき。`onEnd` を呼ぶ（画面はそこで様子を戻し、`tourDone` を返す）
+ * - `course`: いま出している案内の鍵（出していなければ undefined）。画面は鍵で見本の様子を替える
  *
- * `onStart` は始める直前に呼ぶ。案内が画面の様子（タブなど）を動かすなら、ここで今の様子を覚えておく。
+ * `onStart` は始める直前に呼ぶ（案内の鍵つき）。案内が画面の様子（タブなど）を動かすなら、ここで今の様子を覚えておく。
+ * `tourDone` は基本の案内に限らず、どの案内を閉じても返す（初回の自動の案内を出さない印は、どの案内を見ても付く）。
  */
-export function useTour(ready: boolean, hooks: { readonly onStart?: () => void; readonly onEnd: () => void }): {
+export function useTour(ready: boolean, hooks: { readonly onStart?: (course: string) => void; readonly onEnd: () => void }): {
   readonly touring: boolean;
+  readonly course: string | undefined;
   readonly request: () => void;
-  readonly start: () => void;
+  readonly start: (course?: string) => void;
   readonly end: () => void;
 } {
-  const [touring, setTouring] = useState(false);
-  const [pending, setPending] = useState(false);
+  const [course, setCourse] = useState<string | undefined>(undefined);
+  const [pending, setPending] = useState<string | undefined>(undefined);
   // 受け取る側は描くたびに作り直さないので、呼ぶ先はいまのものを ref へ入れておく
   const latest = useRef(hooks);
   latest.current = hooks;
-  const touringRef = useRef(touring);
-  touringRef.current = touring;
+  const courseRef = useRef(course);
+  courseRef.current = course;
 
   const readyRef = useRef(ready);
   readyRef.current = ready;
 
-  const begin = useCallback((): void => {
-    if (touringRef.current) {
+  const begin = useCallback((id: string): void => {
+    if (courseRef.current !== undefined) {
       return;
     }
-    latest.current.onStart?.();
-    touringRef.current = true;
-    setTouring(true);
+    latest.current.onStart?.(id);
+    courseRef.current = id;
+    setCourse(id);
   }, []);
 
   useEffect(() => {
-    if (pending && ready) {
-      setPending(false);
-      begin();
+    if (pending !== undefined && ready) {
+      setPending(undefined);
+      begin(pending);
     }
   }, [pending, ready, begin]);
 
@@ -88,27 +188,30 @@ export function useTour(ready: boolean, hooks: { readonly onStart?: () => void; 
   // 承認のオーバーレイが出た）。吹き出しは描かれなくなるので、ここで閉じたことにする。閉じずに残すと、
   // 中身が戻ったときにユーザが始めていない案内が 1 段目から出直す
   useEffect(() => {
-    if (touring && !ready) {
-      touringRef.current = false;
-      setTouring(false);
+    if (course !== undefined && !ready) {
+      courseRef.current = undefined;
+      setCourse(undefined);
       latest.current.onEnd();
     }
-  }, [touring, ready]);
+  }, [course, ready]);
 
-  const request = useCallback((): void => setPending(true), []);
-  const start = useCallback((): void => {
-    if (readyRef.current) {
-      begin();
-    } else {
-      setPending(true);
-    }
-  }, [begin]);
+  const request = useCallback((): void => setPending(INTRO_COURSE), []);
+  const start = useCallback(
+    (id: string = INTRO_COURSE): void => {
+      if (readyRef.current) {
+        begin(id);
+      } else {
+        setPending(id);
+      }
+    },
+    [begin],
+  );
   const end = useCallback((): void => {
-    touringRef.current = false;
-    setTouring(false);
+    courseRef.current = undefined;
+    setCourse(undefined);
     latest.current.onEnd();
   }, []);
-  return { touring, request, start, end };
+  return { touring: course !== undefined, course, request, start, end };
 }
 
 export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; readonly onClose: () => void }): JSX.Element {
