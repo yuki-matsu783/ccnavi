@@ -459,6 +459,7 @@ common_phases_verdict=""
 scripts_todo=""
 docs_todo=""
 templates_todo=""
+templates_skipped=""
 
 # 配布元にあるか、配布先にあるか、--force か。この 3 つだけで決まる。
 verdict() {
@@ -570,6 +571,15 @@ if [ -n "$deploy" ]; then
 			# 配布元が空だと glob が展開されずにそのまま残る。実在するものだけを配る。
 			[ -f "$template_entry" ] || continue
 			template_name=$(basename "$template_entry")
+			# 名前は ccnavi の読み手と同じ範囲（英数字で始め、英数字と . _ - だけ）に限る。空白や
+			# glob の文字を含む名前は、単語分割で cp を失敗させて配布を半端に止めるので配らない。
+			case "$template_name" in
+			*[!A-Za-z0-9._-]* | [!A-Za-z0-9]*)
+				templates_skipped="$templates_skipped$template_name
+"
+				continue
+				;;
+			esac
 			if [ -e "$root/$DEPLOY_TEMPLATES_DIR/$template_name" ]; then
 				template_there=yes
 			else
@@ -985,6 +995,10 @@ report_deploy() {
 	if [ -n "$deploy_absent" ]; then
 		printf '配布元に無くて配れないもの:\n'
 		printf '%s' "$deploy_absent" | sed 's/^/  /'
+	fi
+	if [ -n "$templates_skipped" ]; then
+		printf '名前に使えない文字があるので配っていないテンプレート（英数字で始め、英数字と . _ - だけ）:\n'
+		printf '%s' "$templates_skipped" | sed 's/^/  /'
 	fi
 	if [ -n "$ignore_todo" ]; then
 		printf '%s:\n' "$3"
@@ -1488,6 +1502,9 @@ if [ -n "$source_root" ] && [ -d "$source_root/$DEPLOY_TEMPLATES_DIR" ]; then
 	for template_entry in "$source_root/$DEPLOY_TEMPLATES_DIR"/*.yml; do
 		[ -f "$template_entry" ] || continue
 		template_name=$(basename "$template_entry")
+		case "$template_name" in
+		*[!A-Za-z0-9._-]* | [!A-Za-z0-9]*) continue ;;
+		esac
 		if [ ! -f "$root/$DEPLOY_TEMPLATES_DIR/$template_name" ]; then
 			note_missing "${DEPLOY_TEMPLATES_DIR}/${template_name}（共通の作業・レビュー計画のテンプレート。ccnavi --templates で引く）"
 		fi
