@@ -19,6 +19,15 @@
 
 deny:
   - tool: Write
+    subject: "/tmp/claude-0/-repo/0a1b2c/scratchpad/a.md"
+    why: セッションのスクラッチパッドは下書きの置き場にしない。wip/scratchpad/ に置く（session-scratchpad）
+  - tool: Edit
+    subject: "/tmp/claude-0/-repo/0a1b2c/scratchpad/sub/b.md"
+    why: 下の階層も同じ。スクラッチパッドの中ならどこでも止める（session-scratchpad）
+  - tool: NotebookEdit
+    subject: "/tmp/claude-0/-repo/0a1b2c/scratchpad/c.ipynb"
+    why: ノートブックの編集も同じ（session-scratchpad）
+  - tool: Write
     subject: "/repo/README.md"
     why: main の作業ツリーでは編集しない。作業はワークツリーの中で
   - tool: Edit
@@ -226,6 +235,9 @@ deny:
     why: 同上。コマンド列の途中でも止まる
 
 ask:
+  - tool: Write
+    subject: "/tmp/claude-0/-repo/0a1b2c/scratchpadx/a.md"
+    why: 名前の続く別のディレクトリは session-scratchpad に当たらない。止めないが allow にも無いので権限モードに渡る
   - tool: Write
     subject: "/repo/wip/scratchpad/a.md"
     why: >-

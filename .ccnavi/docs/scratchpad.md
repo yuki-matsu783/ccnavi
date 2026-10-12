@@ -1,7 +1,7 @@
 ---
 type: guide
 title: 下書きと使い捨ての置き場
-description: 下書きや使い捨てファイルの置き場（wip/scratchpad/）と、コミットしたくないものの置き場
+description: 下書きや使い捨てファイルの置き場（wip/scratchpad/）と、コミットしたくないものの置き場（未定）
 tags: [state, records]
 keywords: [scratchpad, wip/scratchpad, スクラッチパッド, 下書き, 使い捨て, 一時ファイル, ワークツリー, セッション, integrate]
 ---
@@ -21,11 +21,15 @@ keywords: [scratchpad, wip/scratchpad, スクラッチパッド, 下書き, 使�
 - 照らし合わせの対象から外れるのは、ツリーのルート直下の`wip/scratchpad/`の下だけで、大文字と小文字も区別する。`wip/scratchpadX/`・`docs/wip/scratchpad/`・`scratchpad/`や、`wip/scratchpad`という名前のファイルは普通の作業対象と同じように判定され、チケットの範囲の外なら止められる
 - マージリクエストのレビュー依頼には「`wip/scratchpad/`配下は作業中の下書きで、レビューの対象外」と書かれる。レビューでは読まなくてよい
 - ルートは他セッションと共有しているので、ファイル名が他の下書きと重ならないようにする
-- ワークスペースルートの`wip/scratchpad/`へは、`workspace-root`のルールの例外として書き込める
+- ワークスペースルートの`wip/scratchpad/`へは、`workspace-root`のルールの例外として書き込める。ワークツリーを切らなくても書ける（ルートでの編集全体が止まるわけではない）
+
+## セッションのスクラッチパッドには置かない
+
+Claude Codeのセッションが示すスクラッチパッド（Environment欄の`.../scratchpad`、`/tmp/claude-*`の下）は、下書きの置き場ではない。下書きは上の`wip/scratchpad/`に置く。セッションのスクラッチパッドへの書き込みは、ccnaviが`wip/scratchpad/`へ案内して止める。
 
 ## コミットしたくないもの
 
-機密、巨大な出力など、追跡してpushしたくないものは、セッションのスクラッチパッド（Environment欄に場所が書かれている）に置く。ワークスペースの外にあるので、履歴にもpushにも載らない。
+機密、巨大な出力など、追跡してpushしたくないものの置き場は、まだ決まっていない。セッションのスクラッチパッドには置かない。置く必要があるかを先に確かめ、置く必要があるときはユーザに場所を尋ねる。
 
 ## 書き込みを止められている場所を直したいとき
 

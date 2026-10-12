@@ -63,6 +63,16 @@ deny:
       プロジェクト（projects/<名前>/）の中を直すときは、'cd projects/<名前>' してから、そのプロジェクトで
       'sh {root}/.ccnavi/scripts/ccnavi-git.sh worktree add ...' を打ってワークツリーを切り、その中で編集してください。
 
+  # セッションが示すスクラッチパッド（/tmp/claude-*/ の下の scratchpad）は下書きの置き場にしない。
+  # 下書きは wip/scratchpad/ に置く（.ccnavi/docs/scratchpad.md）。シェルのリダイレクトなどによる書き込みは止めない。
+  - id: session-scratchpad
+    match: Write|Edit|NotebookEdit
+    regex: '^(?:/private)?/tmp/claude-[^\\/]+[\\/](?:[^\\/]+[\\/])*scratchpad(?:[\\/]|$)'
+    message: >-
+      セッションのスクラッチパッドには書けません。下書きは wip/scratchpad/ に置いてください。
+      ワークツリーの中ならそのワークツリーの wip/scratchpad/、ワークツリーが無ければワークスペースルート直下の
+      wip/scratchpad/ です。置いたファイルのパスも伝えてください（.ccnavi/docs/scratchpad.md）。
+
   # PowerShell はまとめて止め、Bash に寄せる。
   - id: no-powershell
     match: PowerShell
