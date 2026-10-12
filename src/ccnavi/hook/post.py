@@ -79,9 +79,9 @@ REASON_NO_TURN_BASELINE = "no-turn-baseline"
 REPORT_LIMIT = 12
 
 # ターンの基準（`_save_turn`）を切る件数の上限。セッションが長引いても膨らまないように。
-# 報告済みの記録（seen）は切らない。切ると、切った先の汚れが次の呼び出しで新しい変更になり、
-# 戻されてしまうため（`_save_seen`）。
-SEEN_LIMIT = 500
+# 報告済みの記録は切らない。切ると、切った先の汚れが次の呼び出しで新しい変更になり、
+# 戻されてしまうため（`_save_reported`）。
+BASELINE_LIMIT = 500
 
 
 def check(
@@ -135,7 +135,7 @@ def check(
     # ターンの終わりが「数えていない」と言う（`_uncounted_line`）。
     _note_new_trees(stderr, state_dir, payload.session_id, read)
 
-    seen, baseline, announced = _load_seen(stderr, state_dir, payload.session_id)
+    reported, baseline, announced = _load_reported(stderr, state_dir, payload.session_id)
 
     found = _found(read, mine, scope, places, synced, root)
     if not found:
@@ -147,12 +147,12 @@ def check(
         # 読めなかったツリーが在るなら、その汚れは見えていない。記録を空にすると、
         # 読めるようになったあとに起動時の汚れが新しい変更として戻されるので、書かない。
         if (not baseline or not announced) and len(read) == len(watched):
-            _save_seen(stderr, state_dir, payload.session_id, set())
+            _save_reported(stderr, state_dir, payload.session_id, set())
         record.decision, record.enforced = audit.ALLOW, True
         return "", False
 
-    fresh = [f for f in found if f.key() not in seen]
-    known = [f for f in found if f.key() in seen]
+    fresh = [f for f in found if f.key() not in reported]
+    known = [f for f in found if f.key() in reported]
     # 基準が無いセッションでは、今そこに在るものは直前の実行の結果ではない。
     # 記録を取るだけにして、原因を付けずに 1 度だけ伝える。
     # 基準が在るなら、起動時に在ったものが、まだ伝えられていない分に当たる。
@@ -190,11 +190,11 @@ def check(
     # 戻していた」と書くと、設定を enable にしたときに起きることを読み違えさせる。
     would = {f.key() for f in fresh if _restorable(f)} if restore == selfguard.DRY_RUN else set()
 
-    _save_seen(
+    _save_reported(
         stderr,
         state_dir,
         payload.session_id,
-        seen
+        reported
         # 戻せたものは記録に入れない。同じ場所がもう一度汚れたら、それは
         # すでに知っている変更ではなく新しい出来事なので、もう一度言う。
         | {f.key() for f in fresh if f.key() not in restored}
@@ -384,7 +384,7 @@ def at_stop(
     変えるためのもので、こちらはユーザが「このターンで何が変わったか」を 1 度で
     見るためのものになる。
 
-    セッションの記録（`seen`）は見ない。あれは「モデルへ 1 度伝えた」を
+    セッションの記録（`reported`）は見ない。あれは「モデルへ 1 度伝えた」を
     覚えているもので、ユーザはまだ 1 度も見ていないことがある。代わりに見るのは
     ターンの始まりに取った基準で、そこに無いものだけが、このターンで起きたこと。
 
@@ -584,13 +584,13 @@ def _restore(
     return done
 
 
-def _seen_path(state_dir: str, session: str) -> str:
-    """報告済みの変更の記録。改名前は `<セッション>.json` だった（`_legacy_seen_path`）。"""
+def _reported_path(state_dir: str, session: str) -> str:
+    """報告済みの変更の記録。改名前は `<セッション>.json` だった（`_legacy_reported_path`）。"""
     name = fsio.safe_name(session) or "unknown"
     return os.path.join(state_dir, f"{name}.reported.json")
 
 
-def _legacy_seen_path(state_dir: str, session: str) -> str:
+def _legacy_reported_path(state_dir: str, session: str) -> str:
     name = fsio.safe_name(session) or "unknown"
     return os.path.join(state_dir, f"{name}.json")
 
@@ -689,7 +689,7 @@ def _save_turn(
         return
     failed = fsio.write_json_atomic(
         _turn_path(state_dir, session),
-        {"baseline": sorted(baseline)[:SEEN_LIMIT], "heads": dict(sorted(heads.items()))},
+        {"baseline": sorted(baseline)[:BASELINE_LIMIT], "heads": dict(sorted(heads.items()))},
     )
     if failed:
         stderr.write(f"ccnavi: {phase_forms.TURN_DEFINED}の基準を書けない: {failed}\n")
@@ -730,7 +730,7 @@ def capture_baseline(
     基準を初回の実行後チェックで取ると、そのとき触ったツリーしか見えない。ここで
     全部のツリーを見ておけば、基準はセッションの始まりの状態になる。
     記録は「まだ伝えていない」で書く。起動時に在った変更は、初回の実行後チェックで
-    1 度だけモデルへ伝える（`_load_seen` の `announced`）。
+    1 度だけモデルへ伝える（`_load_reported` の `announced`）。
 
     読めなかったツリーが 1 つでもあれば、基準は書かない。読めなかったツリーの
     汚れを、後から「新しい変更」として差し戻すことになるため。その場合は基準が無い
@@ -742,10 +742,10 @@ def capture_baseline(
     if len(read) != len(watched):
         return
     found = _found(read, mine, scope, places, synced, root)
-    _save_seen(stderr, state_dir, session, {f.key() for f in found}, announced=False)
+    _save_reported(stderr, state_dir, session, {f.key() for f in found}, announced=False)
 
 
-def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool, bool]:
+def _load_reported(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool, bool]:
     """すでに報告した変更と、基準を持つか、起動時の変更をもう伝えたかを返す。
 
     基準を持つのは、SessionStart の基準か、改名の前の記録（それは初回の実行後
@@ -757,31 +757,34 @@ def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     """
     if not state_dir:
         return set(), False, True
-    data, failed = fsio.read_json(_seen_path(state_dir, session))
+    data, failed = fsio.read_json(_reported_path(state_dir, session))
     legacy = isinstance(failed, FileNotFoundError)
     if legacy:
-        data, failed = fsio.read_json(_legacy_seen_path(state_dir, session))
+        data, failed = fsio.read_json(_legacy_reported_path(state_dir, session))
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
             stderr.write(f"ccnavi: 実行後チェックの記録を読めない: {failed}\n")
         return set(), False, True
-    seen = data.get("seen") if isinstance(data, dict) else None
-    if not isinstance(seen, list):
+    # キーも改名した（`seen` → `reported`）。改名の前に書かれた記録も読む。
+    items = None
+    if isinstance(data, dict):
+        items = data.get("reported", data.get("seen"))
+    if not isinstance(items, list):
         return set(), False, True
-    seen_set = {s for s in seen if isinstance(s, str)}
+    reported_set = {s for s in items if isinstance(s, str)}
     # 改名の前の記録は、初回の実行後チェックが伝えたあとに書かれたもの。
     if legacy:
-        return seen_set, True, True
+        return reported_set, True, True
     if data.get("baseline_captured") is not True:
         return set(), False, True
-    return seen_set, True, data.get("announced") is not False
+    return reported_set, True, data.get("announced") is not False
 
 
-def _save_seen(
+def _save_reported(
     stderr: TextIO,
     state_dir: str,
     session: str,
-    seen: set[str],
+    reported: set[str],
     announced: bool = True,
 ) -> None:
     """記録を書く。書けなかったことは報告して捨てる。
@@ -795,11 +798,11 @@ def _save_seen(
     if not state_dir:
         return
     failed = fsio.write_json_atomic(
-        _seen_path(state_dir, session),
+        _reported_path(state_dir, session),
         {
             # 切らない。切った先に在る汚れは次の呼び出しで「新しい変更」になり、戻されてしまう。
             # 件数は在る汚れの数までで、無制限には増えない。
-            "seen": sorted(seen),
+            "reported": sorted(reported),
             "baseline_captured": True,
             "announced": announced,
         },
@@ -808,4 +811,4 @@ def _save_seen(
         stderr.write(f"ccnavi: 実行後チェックの記録を書けない: {failed}\n")
         return
     # 改名の前の記録は、新しい記録に置き換わったので消す。
-    fsio.remove(_legacy_seen_path(state_dir, session))
+    fsio.remove(_legacy_reported_path(state_dir, session))

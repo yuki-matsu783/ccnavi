@@ -56,8 +56,8 @@ class WiringTest(unittest.TestCase):
             lambda: ctxfile.for_rules(self.err, self.state, _payload(), [_once_rule()], [])
         )
 
-    def test_post_seen_state(self):
-        self._assert_atomic(lambda: post._save_seen(self.err, self.state, "s1", {"a"}))
+    def test_post_reported_state(self):
+        self._assert_atomic(lambda: post._save_reported(self.err, self.state, "s1", {"a"}))
 
     def test_post_turn_state(self):
         self._assert_atomic(

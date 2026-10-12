@@ -477,7 +477,7 @@ def decide_at_start(
     if payload.source in ("startup", "resume"):
         subagent.forget_running(conf.state, payload.session_id)
     if payload.source == "startup":
-        _seen_baseline(stderr, conf, root, payload, record)
+        _reported_baseline(stderr, conf, root, payload, record)
     # 基準を取った時の注記（読めなかったツリーなど）を消さないよう、足す。
     pruned = _prune_at_start(stderr, conf, root, payload.session_id)
     record.detail = "; ".join(part for part in (record.detail, pruned) if part)
@@ -525,7 +525,7 @@ def decide_at_start(
     return EXIT_OK
 
 
-def _seen_baseline(
+def _reported_baseline(
     stderr: TextIO,
     conf: settings.Settings,
     root: str,
