@@ -48,6 +48,13 @@ UTF-8（BOM は 1 つ外す）で、例外は外に出さない。
 - フローは `flow.parse` と `flow_shape.structure_problems` / `name_problems`（`--lint --flow` の
   `lint.flow_problems` が組むのと同じ部品）。`flows` のキーが全体計画の添字に在ること
 
+## 下書き（溜める側）
+
+エージェントは下書きだけを書ける。置き場は提案の置き場の下の `templates/<名前>.yml`
+（既定は `wip/proposals/templates/`。プロジェクトのツリーならそのプロジェクトの下）。下書きに
+効力は無い（`scan` も `--templates` の足し算も読まない）。置き場のパスの関数は子のフローの下書き
+（`flow.draft_rel` / `flow.draft_file`）と同じ形。下書きの作成・検査・取り込みは `template_drafts`。
+
 ## 往復
 
 `parse_template` で読んだ `Template` を `dump` で書き、もう一度読むと同じ `Template` になり、
@@ -82,6 +89,11 @@ from . import (
 
 SUFFIX = flow.SUFFIX
 FIELDS = ("name", "description", "when", "plan", "feedback", "flows")
+# 下書きの置き場（提案の置き場の下）の名前と、`Entry.layer` に入れる印。
+DRAFT_DIR = "templates"
+LAYER_DRAFT = "draft"
+# 機械が下書きの `description` に入れる、一般化が済んでいない印。残っていれば検査が warn で言う。
+TODO_MARK = "TODO"
 # 名前に使える文字。ファイル名になるので、区切りも空白も入れない。
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 NAME_LIMIT = 64
@@ -211,6 +223,33 @@ class Scan:
             if found.name == name:
                 return found
         return None
+
+
+# ---- 下書きの置き場
+
+
+def draft_dir_rel(conf: settings.Settings) -> str:
+    """テンプレートの下書きの置き場。提案の置き場の `templates/`（ツリーのルートからの相対）。
+
+    提案の置き場は丸ごとチケットの範囲の外で、`templates/` は守る状態の置き場でも走査の
+    対象でもないので、エージェントは判定を変えずに書ける。
+    """
+    return f"{flow.tickets_rel(conf)}/{DRAFT_DIR}"
+
+
+def draft_rel(conf: settings.Settings, name: str) -> str:
+    """テンプレートの下書き 1 本の置き場。`draft_dir_rel` の下の `<名前>.yml`。"""
+    return f"{draft_dir_rel(conf)}/{name}{SUFFIX}"
+
+
+def draft_dir(conf: settings.Settings, tree_root: str) -> str:
+    """このツリーでのテンプレートの下書きの置き場の絶対パス。"""
+    return os.path.normpath(os.path.join(tree_root, *draft_dir_rel(conf).split("/")))
+
+
+def draft_file(conf: settings.Settings, tree_root: str, name: str) -> str:
+    """このツリーでのテンプレートの下書き 1 本の絶対パス。"""
+    return os.path.normpath(os.path.join(tree_root, *draft_rel(conf, name).split("/")))
 
 
 # ---- 読む（1 ファイル）
@@ -421,6 +460,7 @@ def check(
 
     順序の誤りと、`flows` の添字・フローの形は error。型 id が定義に無い、`kind` が置き場と
     合わない、延期の引き受け手にレビューが無い、は warn（定義が後から変わりうるため）。
+    `description` か `when` に `TODO` が残っている（下書きの一般化が済んでいない）のも warn。
     """
     name = template.name
     found: list[Problem] = []
@@ -428,6 +468,13 @@ def check(
     def say(severity: str, text: str) -> None:
         found.append(Problem(severity, name, text))
 
+    for key in ("description", "when"):
+        if TODO_MARK in getattr(template, key):
+            say(
+                SEVERITY_WARN,
+                f"`{key}` に {TODO_MARK} が残っている（固有名の一般化が済んでいない下書き）。"
+                "直してから取り込む",
+            )
     total = len(template.plan) + len(template.feedback)
     if total > ticket_ids.MAX_CHILD_NUMBER:
         say(

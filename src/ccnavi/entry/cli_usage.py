@@ -100,6 +100,17 @@ draws, documented in README.md ("作業・レビュー計画のテンプレー�
 is shared with --docs and is refused elsewhere; the other --docs filters are
 refused here. --lint reports the same checks.
 
+Templates are collected in two steps. An agent may type --draft: it copies the
+plan and the child flows of a finished parent (still in done/) into a draft at
+wip/proposals/templates/NAME.yml, which has no effect and is never overwritten.
+Only the user types --import: without --yes it writes nothing and shows the
+check and the diff against the same name in the target; with --yes and the
+draft's hash as --expect it writes, then removes the draft if it is unchanged.
+
+    ccnavi --templates --draft PARENT [--name NAME] [--json]
+    ccnavi --templates --import DRAFT --to common|project [--layer NAME]
+                       [--replace] [--yes --expect HASH] [--json]
+
 The common layer's own three files are moved by --rules, --phases and --risk,
 and where the layers are looked for by --projects and --project-home. All five
 are on the same gate: diagnosis only, dropped everywhere else.

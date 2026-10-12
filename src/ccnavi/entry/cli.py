@@ -211,7 +211,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--expect", default=None, metavar="SHA")
     # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイでユーザが押した承認。端末は要らない。
-    parser.add_argument("--yes", default="")
+    # 値なしの `--yes` は `--templates --import` だけが読む（`_run` が、ほかの経路では断る）。
+    parser.add_argument("--yes", nargs="?", const=cli_templates.BARE_YES, default="")
     # 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに書き込む中身のダイジェスト
     # （preview の `digest`）。`--yes` と一緒に渡す。
     parser.add_argument("--digest", default="")
@@ -271,6 +272,16 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--templates", action="store_true")
     parser.add_argument("--show", default=None, metavar="NAME")
     parser.add_argument("--layer", default="")
+    # テンプレートの溜める側。
+    # `--draft <親>` は完了した親から下書きを作る。効力が無いのでエージェントが打ってよい。
+    # `--import <下書き> --to common|project` はユーザ専用（`phase_forms._CLI_FORMS` が止める）。
+    # `--yes` と `--expect` が揃ったときだけ書く。
+    # `--name` は下書きの名前、`--replace` は取り込み先の同名の置き換え。
+    parser.add_argument("--draft", default=None, metavar="PARENT")
+    parser.add_argument("--name", default="")
+    parser.add_argument("--import", dest="import_", default=None, metavar="DRAFT")
+    parser.add_argument("--to", default="")
+    parser.add_argument("--replace", action="store_true")
     # チケットの状態とレビューの操作。ユーザか、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", action="append", default=None)
@@ -327,6 +338,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     refused = _test_usage(parser, args)
     if refused:
         stderr.write(f"ccnavi: {refused}\n")
+        return EXIT_ERROR
+    if args.yes == cli_templates.BARE_YES and not (args.templates and args.import_ is not None):
+        stderr.write("ccnavi: --yes には識別子を渡す（値なしの --yes は --import だけ）\n")
         return EXIT_ERROR
     if args.record_tree and not args.record_writes:
         stderr.write("ccnavi: --record-tree は --record-writes と一緒に使う\n")
@@ -550,7 +564,7 @@ def _parsed(
         return version.report(stdout, parser, args.json)
     if not cli_args._one_wrapper_flag_each(stderr, args):
         return EXIT_ERROR
-    if args.templates or args.show is not None or args.layer:
+    if cli_templates.asked(args):
         refused = cli_templates.usage_problem(args)
         if refused:
             stderr.write(f"ccnavi: {refused}\n")

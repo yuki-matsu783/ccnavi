@@ -185,6 +185,11 @@ def flow_file(conf: settings.Settings, tree_root: str, ticket_id: str) -> str:
     )
 
 
+def tickets_rel(conf: settings.Settings) -> str:
+    """提案の置き場のパス（"/" 区切り、前後の区切りなし）。下書きの置き場もこの下に並ぶ。"""
+    return _place_rel(conf.tickets or settings.DEFAULT_TICKETS)
+
+
 def draft_rel(conf: settings.Settings, ticket_id: str) -> str:
     """子のフローの下書きの置き場。提案の置き場の `flows/<子>.yml`。
 
@@ -194,7 +199,7 @@ def draft_rel(conf: settings.Settings, ticket_id: str) -> str:
     （`briefing` も着手のハッシュも読まない）。有効になるのはユーザが取り込んで
     `flow_rel` に保存したものだけ。
     """
-    return f"{_place_rel(conf.tickets or settings.DEFAULT_TICKETS)}/{FLOWS_DIR}/{ticket_id}{SUFFIX}"
+    return f"{tickets_rel(conf)}/{FLOWS_DIR}/{ticket_id}{SUFFIX}"
 
 
 def draft_file(conf: settings.Settings, tree_root: str, ticket_id: str) -> str:
