@@ -221,14 +221,14 @@ allow:
     match: Write|Edit
     glob: "*/.claude/worktrees/*"
 
-  # スキルの振り返り（docs/claude/skill-review.md）。ターンの終わり 10 回に 1 度、止めて手順を渡す。
+  # スキルの振り返り（.ccnavi/docs/skill-review.md）。ターンの終わり 10 回に 1 度、止めて手順を渡す。
   # Stop はツールではなくメインエージェントのターンの終わり。何も許可しない。文を渡すためだけに allow に置く。
   # finish の促しが出る回・連鎖の 2 回目・サブエージェントでは止めず、数えもしない。
   - id: skill-review-every-10
     match: Stop
     glob: "*"
     every: 10
-    additionalContextFile: docs/claude/skill-review.md
+    additionalContextFile: .ccnavi/docs/skill-review.md
 
   # 提案を書くとき（親のフィードバック計画の改版を含む）に、振り返りの候補を思い出させる。
   # 当てるのはワークツリーの中の todo/ だけで、上の worktrees の allow の内側。判定は変わらない。
@@ -241,7 +241,7 @@ allow:
       最後の項がほかの全部を after で待つ形にする（後ろに足すだけだと承認で落ちる）ので、
       最後の項の after に skill-improve の番号も足すか、skill-improve を最後に置いてほかの全部を
       待たせる。定義は ccnavi --plan-order <親> --fill-phases で親の phases: に写す。
-      手順は docs/claude/skill-review.md。
+      手順は .ccnavi/docs/skill-review.md。
 
   # git の入口。サブコマンドの選別はラッパースクリプトの中で行うので、ここでは区別しない。
   - id: ccnavi-git
@@ -260,7 +260,7 @@ allow:
       ワークツリーを切る前に、先に 'sh {root}/.ccnavi/scripts/ccnavi-git.sh fetch origin <統合先>' を打ち、
       'sh {root}/.ccnavi/scripts/ccnavi-git.sh log --oneline <統合先>..origin/<統合先>' で遅れを確かめてください。
       遅れていれば、手元の統合先を進めてから（統合先のワークツリーで 'merge --ff-only origin/<統合先>'）切ります。
-      手順は docs/claude/worktree.md の「ワークツリーの作り方」にあります。
+      手順は .ccnavi/docs/worktree.md の「ワークツリーを切る」にあります。
 
   # ファイルを読むだけの cat と grep。止めずに通して、Read / Grep ツールのほうを
   # 一度だけ勧める。読む手段を取り上げるのが目的ではないので deny でも ask でもない。

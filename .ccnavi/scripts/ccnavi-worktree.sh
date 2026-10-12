@@ -3,7 +3,7 @@
 #
 #   sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--offline] [--dry-run]
 #
-# 手で打つと、次の順になる（docs/claude/worktree.md「ワークツリーの作り方」）。
+# 手で打つと、次の順になる（.ccnavi/docs/worktree.md「ワークツリーを切る」）。
 #   1. ccnavi-git.sh fetch origin <統合先>
 #   2. ccnavi-git.sh log --oneline <統合先>..origin/<統合先> で遅れを確かめる
 #   3. 遅れていれば origin/<統合先> から --no-track で、遅れていなければ <統合先> から切る

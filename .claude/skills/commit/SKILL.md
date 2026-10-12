@@ -80,7 +80,7 @@ hook（`lint-py.sh` `test-py.sh` `mark-ext.sh` `test-ext.sh`）が同じ検査�
 | `refactor` | 挙動を変えないコード整理 |
 | `test` | `tests/*.py` / `tests/fixtures/` |
 | `docs` | `README.md` / `docs/requirements.md`・`docs/requirements/` / `docs/design.md`・`docs/design/` / `docs/CONTEXT.md` |
-| `ai-asset` | `.claude/` 配下（settings.json / hooks / skills / ccnavi のルール）と `CLAUDE.md`・`docs/claude/`。エージェント向けの指示は docs ではなくこちら |
+| `ai-asset` | `.claude/` 配下（settings.json / hooks / skills / ccnavi のルール）と `CLAUDE.md`・`.ccnavi/docs/`・`docs/claude/`。エージェント向けの指示は docs ではなくこちら |
 | `chore` | `.gitignore` / 雑務 |
 | `build` | `pyproject.toml` / `uv.lock` |
 | `ci` | CI 設定 |

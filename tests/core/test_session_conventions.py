@@ -21,11 +21,11 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, put_ccnavi_md
 from tests.core.test_lint import SOUND, rules_file
 from tests.inproc import run_ccnavi
 
-HEAD = "[ccnavi] ccnavi が前提にしている作業の決まり。"
+HEAD = "# ccnavi の作業の決まり"
 WORKTREE_LINE = ".claude/worktrees/<名前>"
 GIT_LINE = "git は直接呼ばず"
 # ワークツリーと git の行を支える deny。中身は判定に関わらないので最小にしてある。
@@ -39,11 +39,15 @@ RAW_GIT = {"id": "raw-git", "match": "Bash", "glob": "*never-git *", "message": 
 
 
 def block(text: str) -> str:
-    """additionalContext から作業の決まりの段落だけを抜く。無ければ空。"""
-    for part in text.split("\n\n"):
-        if part.startswith(HEAD):
-            return part
-    return ""
+    """additionalContext から作業の決まり（.ccnavi/CCNAVI.md の本文）だけを抜く。無ければ空。
+
+    本文は空行を挟んで続く。次の `[ccnavi]` で始まる段落（索引の案内など）の手前までを返す。
+    """
+    start = text.find(HEAD)
+    if start < 0:
+        return ""
+    end = text.find("\n\n[ccnavi] ", start)
+    return text[start:] if end < 0 else text[start:end]
 
 
 class SessionConventionsTest(unittest.TestCase):
@@ -52,6 +56,7 @@ class SessionConventionsTest(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = os.path.realpath(directory.name)
         self.rules = rules_file(self.root, SOUND, WORKSPACE_ROOT_RULE, RAW_GIT)
+        put_ccnavi_md(self.root)
 
     def start(self, *extra, **payload_extra) -> str:
         payload = {"hook_event_name": "SessionStart", "session_id": "s1", **payload_extra}
@@ -79,8 +84,25 @@ class SessionConventionsTest(unittest.TestCase):
         self.assertIn("wip/scratchpad/", text)
         self.assertIn("integrate が外す", text)
         self.assertNotIn("追跡されず", text)
-        self.assertIn("サブエージェントにバックグラウンドで任せる", text)
+        self.assertIn("サブエージェントにバックグラウンドで任せ", text)
         self.assertIn("実装する前にユーザと合意する", text)
+
+    def test_考え方と保護対象の直し方も届く(self):
+        text = block(self.start("--mode", "enable"))
+
+        self.assertIn("案内が出たらそれに従い、迂回しない", text)
+        self.assertIn("他セッションのもの", text)
+        self.assertIn(f"sh {self.root}/.ccnavi/scripts/ccnavi-stage.sh <元のパス>", text)
+        self.assertIn(
+            "--commands <元のパス> が出した mv（フルパス）をユーザに案内してターンを終える", text
+        )
+
+    def test_ccnavi_mdが無ければ無いことだけを言う(self):
+        os.remove(os.path.join(self.root, ".ccnavi", "CCNAVI.md"))
+        text = self.start("--mode", "enable")
+
+        self.assertIn(".ccnavi/CCNAVI.md が無いか読めない", text)
+        self.assertNotIn(HEAD, text)
 
     def test_main_treeとraw_gitのdenyが無ければその2行は出ない(self):
         rules_file(self.root, SOUND)
@@ -179,7 +201,7 @@ class SessionConventionsTest(unittest.TestCase):
             f.write("---\ntype: guide\n---\n# x\n")
         text = self.start("--mode", "enable")
 
-        self.assertIn("--docs で、--keyword <語> を付けて引いてください", block(text))
+        self.assertIn("--docs で、--keyword <語> を付けて引く", block(text))
         # 「下の案内」が指す索引の案内は、決まりより後ろにある。
         self.assertLess(text.index(HEAD), text.index("[ccnavi] ドキュメント（*.md）"))
 
@@ -189,17 +211,22 @@ class SessionConventionsTest(unittest.TestCase):
         self.assertTrue(text.splitlines()[-1].startswith("（現状: CCNAVI_MODE=dry-run"), text)
         self.assertLess(text.index(HEAD), text.index("チケット制御を使っている"))
 
+    def test_チケット制御がdisableならdry_runの注記も出ない(self):
+        text = self.start("--mode", "dry-run", "--ticket-control", "disable")
+
+        self.assertIn(HEAD, text)
+        self.assertNotIn("（現状:", text)
+
     def test_サブエージェントには出さない(self):
         self.assertEqual(block(self.start("--mode", "enable", agent_id="a1")), "")
 
     def test_常駐の文脈なので短い(self):
-        # 毎回の起動・再開・compact に届く。項目ごとに 1 行、全体で数百字に収める。
+        # 毎回の起動・再開・compact に届く。考え方と作業の決まりと進め方を合わせて 2600 字に収める。
         os.makedirs(os.path.join(self.root, "projects", "lib", ".git"))
         text = block(self.start("--mode", "enable"))
         body = text.replace(self.root, "<root>")
 
-        self.assertLessEqual(len(text.splitlines()), 9, text)
-        self.assertLess(len(body), 700, body)
+        self.assertLess(len(body), 2600, body)
 
 
 if __name__ == "__main__":

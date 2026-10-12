@@ -16,7 +16,7 @@ keywords: [rules.yml, phases.yml, risks.yml, deny, ask, allow, glob, regex, ル�
 2. どのファイルかを決める。止める・聞く・通すなら rules、フェーズと範囲なら phases、閉じるときの重さなら risk。
    2 本にまたがるなら別々の下書きにする
 3. 今の本物を読む。同じことを言うルールやフェーズ定義が既に無いか
-4. 下書きをワークツリーの `wip/scratchpad/`（docs/claude/scratchpad.md）に書く。本物の全文を写して足す（断片だと lint に掛けられない）
+4. 下書きをワークツリーの `wip/scratchpad/`（.ccnavi/docs/scratchpad.md）に書く。本物の全文を写して足す（断片だと lint に掛けられない）
 5. 検証する。lint と、rules なら期待する判定。通るまで直す（[check.md](check.md)）
 6. ユーザに渡す（下の「ユーザに渡す形」）。置くのはユーザ
 
@@ -118,7 +118,7 @@ Bash は実行される部分に当たる。`$( )` の中や `&&` の先も 1 �
 | 対象がルートそのもの | 「中」。`Glob` を `path` 省略で呼ぶと対象が cwd（＝ルート）になる |
 | 大文字小文字 | 区別しないので、表記だけが違うパスは「中」 |
 
-素朴に `deny: ^{!root}` と置かない。セッションのスクラッチパッド（docs/claude/scratchpad.md）、
+素朴に `deny: ^{!root}` と置かない。セッションのスクラッチパッド（.ccnavi/docs/scratchpad.md）、
 `projects/` の外の参照用ツリー、他ツールの一時出力先まで一度に塞がる。
 
 - `match` を絞る。「外への書き込みを止める」なら `Write|Edit|NotebookEdit` にして `Read` は残す

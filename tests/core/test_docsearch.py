@@ -228,6 +228,15 @@ class IndexTest(Repo):
         self.assertEqual([r["concept_id"] for r in built.rows], ["a"])
         self.assertFalse(os.path.exists(self.index_of(".ccnavi/approved/done")))
 
+    def test_keeps_the_docs_directory_inside_the_ccnavi_directory(self):
+        self.put(".ccnavi/approved/done/i0001.md", "---\nversion: 1\nticket: i0001\n---\n")
+        self.put(".ccnavi/docs/usage.md", doc(type="guide"))
+        built = docsearch_index.build(
+            self.root, (".ccnavi",), kept_dirs=docsearch.kept_dirs(".ccnavi")
+        )
+        self.assertEqual([r["concept_id"] for r in built.rows], [".ccnavi/docs/usage"])
+        self.assertFalse(os.path.exists(self.index_of(".ccnavi/approved/done")))
+
     def test_not_a_repository_raises(self):
         with (
             tempfile.TemporaryDirectory() as bare,
