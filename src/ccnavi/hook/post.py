@@ -234,7 +234,7 @@ def check(
             record.code = post_report.CODE_PREEXISTING
 
     gated = restore in (selfguard.ENABLE, selfguard.DRY_RUN)
-    git = settings.git_command(root)
+    git = settings.git_wrapper_command(root)
     blocks = [
         post_report._violation(
             f,
@@ -255,7 +255,11 @@ def check(
     if dropped > 0:
         shown.append(
             f"[ccnavi] {dropped} more changed paths in protected areas are not listed here. "
-            f"Run '{git} status' to see the rest before you undo anything."
+            + (
+                f"Run '{git} status' to see the rest before you undo anything."
+                if git
+                else "Ask the user to check the rest with git status before you undo anything."
+            )
         )
     return "\n\n".join(shown), tried
 
@@ -425,7 +429,7 @@ def at_stop(
     if not found and not uncounted:
         record.decision, record.enforced = audit.ALLOW, True
         return ""
-    git = settings.git_command(root)
+    git = settings.git_wrapper_command(root)
     if not found:
         # 違反は無いが、数えていないツリーがある。そのことだけを言う。
         record.decision, record.enforced = audit.ALLOW, True
@@ -454,6 +458,8 @@ def at_stop(
             else (
                 f"{finding.change.path} はすでにコミット済みなので、"
                 "取り込む前に中身を確かめ、不要な変更なら取り消してください"
+                if finding.change.kind == gitstate.KIND_COMMITTED
+                else f"{finding.change.path} を元に戻す操作はユーザに頼んでください"
             )
         )
         kind = gitstate.KIND_LABELS.get(finding.change.kind, finding.change.kind)
@@ -462,7 +468,12 @@ def at_stop(
             f" 対象のルール: {rules.record_name(rule)} / {how}"
         )
     if len(found) > REPORT_LIMIT:
-        lines.append(f"  ほか {len(found) - REPORT_LIMIT} 件。全部は {git} status に出ます。")
+        all_at = (
+            f"全部は {git} status に出ます。"
+            if git
+            else "全部はユーザに git status で確かめてもらってください。"
+        )
+        lines.append(f"  ほか {len(found) - REPORT_LIMIT} 件。{all_at}")
     if uncounted:
         lines.append(_uncounted_line(uncounted, define=False, git=git))
         _add_detail(record, f"uncounted {len(uncounted)}")
@@ -478,7 +489,7 @@ def _add_detail(record: audit.Record, note: str) -> None:
         record.detail = f"{record.detail}; {note}" if record.detail else note
 
 
-def _uncounted_line(uncounted: list[str], *, define: bool = True, git: str = "git") -> str:
+def _uncounted_line(uncounted: list[str], *, define: bool = True, git: str | None = None) -> str:
     """コミット済みを数えなかったツリーを言う 1 行。
 
     数えていないことを言わないと、そのツリーで何も起きなかったのと見分けが付かない。
@@ -497,7 +508,13 @@ def _uncounted_line(uncounted: list[str], *, define: bool = True, git: str = "gi
         "ターン開始時の HEAD が記録されていないか、差分を読み取れなかったためです。"
         "ターンの途中で作り、一度も触らなかったワークツリーでよく起きます。"
         "このツリーでコミットしていなければ対応は不要です。"
-        f"コミットした場合は、保護領域のファイルを変更していないか `{git} log` で確認してください。"
+        + (
+            "コミットした場合は、保護領域のファイルを変更していないか"
+            f"`{git} log` で確認してください。"
+            if git
+            else "コミットした場合は、保護領域のファイルを変更していないか"
+            "ユーザに確かめてもらってください。"
+        )
     )
 
 

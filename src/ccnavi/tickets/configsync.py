@@ -7,12 +7,14 @@
 
 - 共通レイヤーが無い、または空なら、何も配らず、ミラーも消さない（着手は止めない）
 - 写すのは `rules.yml`・`phases.yml`・`risks.yml`・`rule-expectations.yml` と、配点の
-  `script:` が指す `.ccnavi/config/common/scripts/` の下。中身の違うものだけ上書きし、
+  `script:` が指す `.ccnavi/config/common/scripts/` の下と、作業・レビュー計画のテンプレート
+  （`.ccnavi/config/common/templates/*.yml`）。中身の違うものだけ上書きし、
   共通レイヤーから無くなったファイルはミラーからも消す。ミラーは共通レイヤーの写しで誰も編集しないので、失うものは無い
 - `script:` の値は書き換えない。ミラーの置き場も `.ccnavi/config/common/scripts/` で、共通レイヤーと
   同じ表記のまま指せる
 - 写す前に、ミラーとして（単体 clone では共通レイヤーとして）読めるかを確かめる。error が
-  あれば何も写さず、着手しない
+  あれば何も写さず、着手しない。ただしテンプレートは別で、error のある 1 本は飛ばし、置き場が
+  読めない（リンクなど）ときはテンプレートだけ写さず、ほかの設定の写しと着手は止めない
 - 写し先かその途中がシンボリックリンクなら止める
 - 上書きと削除は一時ファイルからの置き換えで行う。途中で止まれば、した分を元へ戻す
 
@@ -31,7 +33,7 @@ import yaml
 
 from ..infra import fsio, settings, tree, yamlread
 from ..policy import rules
-from . import approval, approval_checks, phasetypes, risk
+from . import approval, approval_checks, flow, phasetypes, plan_templates, risk
 
 COMMON_DIR = settings.COMMON_DIR
 # 共通レイヤーの期待する判定のファイル名。
@@ -100,7 +102,35 @@ def sources(conf: settings.Settings, root: str) -> tuple[dict[str, bytes], str]:
         if why or raw is None:
             return {}, f"共通レイヤーの配点が指すスクリプト {rel} を読めない ({why or '無い'})"
         out[rel.removeprefix(_script_prefix())] = raw
+    out.update(_templates(conf, root))
     return out, ""
+
+
+def _templates(conf: settings.Settings, root: str) -> dict[str, bytes]:
+    """共通レイヤーの作業・レビュー計画のテンプレート。ミラーの置き場からの相対 → 中身。
+
+    置き場（`templates/`）が無いのは正常で、何も返さない。置き場そのものが読めない（リンクなど）
+    ときも、理由は返さずテンプレートを 1 本も写さない（ほかの設定のミラーと着手は止めない。
+    置き場がリンクなのは、dotfiles 管理などで起こりうる）。error のあるテンプレートは 1 本ずつ
+    写さずに飛ばす（使えないテンプレートのために着手を止めない。`--lint` が error で知らせる）。
+    warn は止めない。
+    """
+    read = plan_templates.read_layer(
+        plan_templates.LAYER_COMMON, root, settings.common_templates_dir(conf, root)
+    )
+    if read.unreadable:
+        return {}
+    types = plan_templates.types_for(conf, root, plan_templates.LAYER_COMMON)
+    candidates = flow.catalog(root)
+    out: dict[str, bytes] = {}
+    for entry in read.entries:
+        problems = list(entry.notes)
+        if entry.template is not None:
+            problems += plan_templates.check(entry.template, types, candidates)
+        if any(p.severity == rules.SEVERITY_ERROR for p in problems):
+            continue
+        out[f"{settings.TEMPLATES_DIR}/{entry.name}{plan_templates.SUFFIX}"] = entry.raw
+    return out
 
 
 def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Change], str]:

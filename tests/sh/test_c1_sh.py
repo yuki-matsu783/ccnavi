@@ -133,10 +133,27 @@ class C1Harness(unittest.TestCase):
     plan = ("design",)
     imported = True
 
+    @classmethod
+    def setUpClass(cls):
+        # クラスごとに 1 回だけ組み、同じ絶対パスの作り置き（pristine）を取っておく。
+        # git のワークツリーとスクリプトは絶対パスを持つので、戻す先は同じパスにする。
+        cls._base = tempfile.mkdtemp()
+        cls.addClassCleanup(shutil.rmtree, cls._base, ignore_errors=True)
+        inst = cls("run")
+        inst._build(cls._base)
+        cls._pristine = cls._base + "-pristine"
+        cls.addClassCleanup(shutil.rmtree, cls._pristine, ignore_errors=True)
+        shutil.copytree(cls._base, cls._pristine, symlinks=True)
+        cls._attrs = {k: v for k, v in inst.__dict__.items() if not k.startswith("_")}
+
     def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self._tmp.cleanup)
-        base = self._tmp.name
+        # テストごとに、作り置きを同じ絶対パスへ戻す。
+        self._base = type(self)._base
+        shutil.rmtree(self._base, ignore_errors=True)
+        shutil.copytree(type(self)._pristine, self._base, symlinks=True)
+        self.__dict__.update(type(self)._attrs)
+
+    def _build(self, base):
         self.ws = os.path.join(base, "ws")
         self.scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(self.scripts)
@@ -172,8 +189,7 @@ class C1Harness(unittest.TestCase):
         self.approve_family()
         git(self.tree, "push", "-q", "-u", "origin", PARENT)
         if self.imported:
-            result = self.sync(PARENT)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.write_present_record()
             self.assertEqual(fields(self.record)["state"], "present")
 
     # ---- 道具
@@ -242,6 +258,14 @@ class C1Harness(unittest.TestCase):
     def sync(self, *args):
         return self.sh("ccnavi-sync.sh", *args)
 
+    def write_present_record(self):
+        # ccnavi-sync.sh が親の取り込み状態（state present）を書く形を、直接書く。
+        write(
+            self.record,
+            f"remote origin\nbranch {PARENT}\nsha {self.sha(self.tree, 'HEAD')}\n"
+            f"fetched_at {int(time.time())}\nstate present\n",
+        )
+
     def ticket(self, *args, **extra):
         return self.sh("ccnavi-ticket.sh", *args, **extra)
 
@@ -254,9 +278,9 @@ class C1Harness(unittest.TestCase):
         return done.stdout.split("\t")[0] if done.stdout else ""
 
     def pusher(self):
-        path = os.path.join(self._tmp.name, "pusher")
+        path = os.path.join(self._base, "pusher")
         if not os.path.isdir(path):
-            git(self._tmp.name, "clone", "-q", self.remote, path)
+            git(self._base, "clone", "-q", self.remote, path)
             for key, value in CONFIG:
                 git(path, "config", key, value)
         git(path, "fetch", "-q", "--prune", "origin")
@@ -492,8 +516,8 @@ class C1TicketTest(C1Harness):
         rel = f"{APPROVED}/phases/{PARENT}/2.pending"
         body = json.dumps({"review": "mr", "at": "t"})
         self.remote_commit(rel, body)
-        once = os.path.join(self._tmp.name, "once")
-        shim = os.path.join(self._tmp.name, "hookshim")
+        once = os.path.join(self._base, "once")
+        shim = os.path.join(self._base, "hookshim")
         target = os.path.join(self.tree, *rel.split("/"))
         executable(
             os.path.join(shim, "git"),
@@ -527,7 +551,7 @@ class C1TicketTest(C1Harness):
 
     def reject_pushes(self, times):
         """リモートの pre-receive が、最初の <times> 回の push を断る（-1 はずっと）。"""
-        counter = os.path.join(self._tmp.name, "rejected")
+        counter = os.path.join(self._base, "rejected")
         write(counter, "0\n")
         executable(
             os.path.join(self.remote, "hooks", "pre-receive"),
@@ -578,7 +602,7 @@ class C1TicketTest(C1Harness):
         import signal
         import time
 
-        mark = os.path.join(self._tmp.name, "pushing")
+        mark = os.path.join(self._base, "pushing")
         hooks = git(self.tree, "rev-parse", "--git-path", "hooks").stdout.strip()
         hooks = hooks if os.path.isabs(hooks) else os.path.join(self.tree, hooks)
         executable(os.path.join(hooks, "pre-push"), f"#!/bin/sh\n: >'{mark}'\nsleep 5\nexit 1\n")
@@ -604,7 +628,7 @@ class C1TicketTest(C1Harness):
     # ---- 6. 届いていた push
 
     def test_a_push_whose_reply_was_lost_counts_as_sent(self):
-        shim = os.path.join(self._tmp.name, "shim")
+        shim = os.path.join(self._base, "shim")
         executable(os.path.join(shim, "git"), LOST_REPLY.format(git=GIT))
         path = shim + os.pathsep + os.environ.get("PATH", "")
         result = self.ticket("start", PARENT, PATH=path)
@@ -618,9 +642,9 @@ class C1TicketTest(C1Harness):
 
         戻して取り込み直すと自分のコミットが戻るので、書き直さずに成功で終える。
         """
-        count = os.path.join(self._tmp.name, "ls-count")
+        count = os.path.join(self._base, "ls-count")
         write(count, "0\n")
-        shim = os.path.join(self._tmp.name, "shim2")
+        shim = os.path.join(self._base, "shim2")
         executable(
             os.path.join(shim, "git"),
             "#!/bin/sh\n"
@@ -662,7 +686,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.dirty(), "")
 
     def test_a_hanging_signer_is_cut_off(self):
-        signer = executable(os.path.join(self._tmp.name, "slow-gpg"), "#!/bin/sh\nsleep 30\n")
+        signer = executable(os.path.join(self._base, "slow-gpg"), "#!/bin/sh\nsleep 30\n")
         git(self.ws, "config", "commit.gpgsign", "true")
         git(self.ws, "config", "gpg.program", signer)
         result = self.ticket("start", PARENT, CCNAVI_C1_COMMIT_TIMEOUT="2")
@@ -819,9 +843,9 @@ class TidyAfterFinishTest(C1Harness):
     """
 
     def test_finish_asks_the_exe_to_tidy_after_sending(self):
-        log = os.path.join(self._tmp.name, "tidy.log")
+        log = os.path.join(self._base, "tidy.log")
         logger = executable(
-            os.path.join(self._tmp.name, "bin", "logger"),
+            os.path.join(self._base, "bin", "logger"),
             "#!/bin/sh\n"
             'case " $* " in\n'
             f"*\" worktree tidy \"*) printf '%s\\n' \"$*\" >>'{log}' ;;\n"
@@ -878,7 +902,7 @@ class PlacesAreNotReadTest(C1Harness):
         )
 
     def test_the_state_variable_does_not_move_the_lock_or_the_record(self):
-        outside = os.path.join(self._tmp.name, "elsewhere-state")
+        outside = os.path.join(self._base, "elsewhere-state")
         # 既定の置き場（logs/state/locks/...）のロックを持たれていれば、env を入れても止まる。
         self.hold_lock()
         held = self.ticket("start", PARENT, CCNAVI_STATE=outside)
@@ -1076,6 +1100,29 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertNotIn(taken, left)
         self.assertEqual(git(self.tree, "diff", "--cached", "--name-only").stdout, "")
 
+    def test_push_approved_carries_a_removed_template_draft_with_the_flow(self):
+        """取り込んで消えたテンプレートの下書きも、フローの下書きと同じ形で運ぶ（C1 の手順）。"""
+        drafts = "wip/proposals/templates"
+        taken = f"{drafts}/feature.yml"
+        rewritten = f"{drafts}/research.yml"
+        for rel in (taken, rewritten):
+            write(os.path.join(self.tree, rel), "name: x\n")
+        git(self.tree, "add", "--", taken, rewritten)
+        git(self.tree, "commit", "-q", "-m", "drafts")
+        git(self.tree, "push", "-q", "origin", PARENT)
+        flow_rel = f"{APPROVED}/flows/{CHILD}.yml"
+        write(os.path.join(self.tree, flow_rel), "nodes: []\n")
+        os.remove(os.path.join(self.tree, taken))
+        write(os.path.join(self.tree, rewritten), "name: y\n")
+        result = self.sh("ccnavi-push-approved.sh", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        out = git(self.tree, "show", "--name-only", "--no-renames", "--format=", "HEAD").stdout
+        self.assertEqual(sorted(out.split()), sorted([flow_rel, taken]))
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        left = self.dirty()
+        self.assertIn(rewritten, left)
+        self.assertNotIn(taken, left)
+
     def test_push_approved_without_names_carries_the_family_through_c1(self):
         rel = f"{APPROVED}/flows/{CHILD}.yml"
         write(os.path.join(self.tree, rel), "steps: []\n")
@@ -1163,12 +1210,12 @@ class C1ReviewTest(C1Harness):
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
         self.posted = GitLab.posted
-        shim = os.path.join(self._tmp.name, "shim")
+        shim = os.path.join(self._base, "shim")
         url = f"http://127.0.0.1:{GitLab.port}/demo/greeter.git"
         executable(os.path.join(shim, "git"), URL_GIT.format(url=url, git=GIT))
         self.path = shim + os.pathsep + os.environ.get("PATH", "")
         self.half = executable(
-            os.path.join(self._tmp.name, "bin", "half"),
+            os.path.join(self._base, "bin", "half"),
             HALF.format(root=ROOT, python=sys.executable),
         )
 
@@ -1322,12 +1369,12 @@ class C1HostHarness(C1Harness):
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
-        shim = os.path.join(self._tmp.name, "shim")
+        shim = os.path.join(self._base, "shim")
         url = f"http://127.0.0.1:{Host.port}/demo/greeter.git"
         executable(os.path.join(shim, "git"), URL_GIT.format(url=url, git=GIT))
         self.path = shim + os.pathsep + os.environ.get("PATH", "")
         self.half = executable(
-            os.path.join(self._tmp.name, "bin", "hosthalf"),
+            os.path.join(self._base, "bin", "hosthalf"),
             HOST_HALF.format(root=ROOT, python=sys.executable),
         )
 
@@ -1352,7 +1399,7 @@ class C1HostTest(C1HostHarness):
     """ホストに触る副命令（request・confirm・ready・decide・close-early）の C1。"""
 
     def test_request_confirm_and_ready_are_carried(self):
-        body = write(os.path.join(self._tmp.name, "body.md"), "見てほしい\n")
+        body = write(os.path.join(self._base, "body.md"), "見てほしい\n")
         self.eli5()
         requested = self.review("request", "--phase", "1", "--body-file", body, "--eli5", ELI5)
         self.assertEqual(requested.returncode, 0, requested.stdout + requested.stderr)
@@ -1362,9 +1409,9 @@ class C1HostTest(C1HostHarness):
         # 指摘はユーザが crit push で行のスレッドとして送る
         self.assertIn(f"`crit review {ELI5}`", Host.notes[0]["body"])
         self.assertIn("`crit push 1`", Host.notes[0]["body"])
-        log = os.path.join(self._tmp.name, "tidy.log")
+        log = os.path.join(self._base, "tidy.log")
         logger = executable(
-            os.path.join(self._tmp.name, "bin", "logger"),
+            os.path.join(self._base, "bin", "logger"),
             "#!/bin/sh\n"
             'case " $* " in\n'
             f"*\" worktree \"*) printf '%s\\n' \"$*\" >>'{log}' ;;\n"
@@ -1403,7 +1450,7 @@ class C1HostTest(C1HostHarness):
         git(self.tree, "commit", "-q", "-m", "old")
         git(self.tree, "push", "-q", "origin", PARENT)
         mover = executable(
-            os.path.join(self._tmp.name, "bin", "mover"),
+            os.path.join(self._base, "bin", "mover"),
             "#!/bin/sh\n"
             'case " $* " in\n'
             '*" review ready "*)\n'
@@ -1532,7 +1579,7 @@ class C1HostTest(C1HostHarness):
         self.eli5()
         head = self.sha(self.tree, "HEAD")
         mover = executable(
-            os.path.join(self._tmp.name, "bin", "mover"),
+            os.path.join(self._base, "bin", "mover"),
             "#!/bin/sh\n"
             'case " $* " in\n'
             '*" review ready "*)\n'
@@ -1594,7 +1641,7 @@ class C1HostTest(C1HostHarness):
             ),
         )  # fmt: skip
         # リモートは 1 回目の push だけ断る
-        once = os.path.join(self._tmp.name, "refused-once")
+        once = os.path.join(self._base, "refused-once")
         executable(
             os.path.join(self.remote, "hooks", "pre-receive"),
             f"#!/bin/sh\n[ -e '{once}' ] && exit 0\n: >'{once}'\necho refused >&2\nexit 1\n",
@@ -1615,8 +1662,8 @@ class C1HostTest(C1HostHarness):
 
     def test_a_request_is_not_posted_twice_across_runs(self):
         """投稿の後に失敗した依頼を打ち直しても、同じ目印の依頼は投稿し直さない。"""
-        body = write(os.path.join(self._tmp.name, "body.md"), "見てほしい\n")
-        once = os.path.join(self._tmp.name, "failed-once")
+        body = write(os.path.join(self._base, "body.md"), "見てほしい\n")
+        once = os.path.join(self._base, "failed-once")
         html = self.eli5()
         first = self.review(
             "request", "--phase", "1", "--body-file", body, "--eli5", html, HALF_FAIL=once
@@ -1634,7 +1681,7 @@ class C1HostTest(C1HostHarness):
     def test_terminal_decide_chooses_outside_c1_and_writes_inside(self):
         """端末の decide は、選ぶのを C1 の外で済ませ、C1 の中では --yes で書くだけ。"""
         chooser = executable(
-            os.path.join(self._tmp.name, "bin", "chooser"),
+            os.path.join(self._base, "bin", "chooser"),
             "#!/bin/sh\n"
             'case " $* " in\n'
             '*" --choose-out "*)\n'
@@ -1685,12 +1732,12 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         from tests.sh import github_host
 
         self.host = github_host
-        shim = os.path.join(self._tmp.name, "shim")
+        shim = os.path.join(self._base, "shim")
         executable(
             os.path.join(shim, "git"),
             URL_GIT.format(url="https://github.com/acme/widgets.git", git=GIT),
         )
-        fakes = os.path.join(self._tmp.name, "fakes")
+        fakes = os.path.join(self._base, "fakes")
         github_host.install(fakes, sys.executable)
         self.path = os.pathsep.join([shim, fakes, os.environ.get("PATH", "")])
         self.finish_phase_one()
@@ -1705,7 +1752,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
             PATH=self.path,
             GITHUB_TOKEN="t0k",
             FAKE_GITHUB_SCENE=scene or self.SCENE,
-            FAKE_GITHUB_STATE=os.path.join(self._tmp.name, "comments.json"),
+            FAKE_GITHUB_STATE=os.path.join(self._base, "comments.json"),
         )
 
     def files(self, base, prefixes):
@@ -1774,9 +1821,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
                 "absent": [],
             },
         }
-        answer = json.loads(
-            chrome.handle(json.dumps(request), os.path.join(self._tmp.name, "memfs"))
-        )
+        answer = json.loads(chrome.handle(json.dumps(request), os.path.join(self._base, "memfs")))
         self.assertNotIn("error", answer, answer)
         return answer
 
@@ -1796,7 +1841,7 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         return text
 
     def request(self):
-        body = write(os.path.join(self._tmp.name, "body.md"), "見てほしい\n")
+        body = write(os.path.join(self._base, "body.md"), "見てほしい\n")
         html = self.eli5()
         requested = self.review("request", "--phase", "1", "--body-file", body, "--eli5", html)
         self.assertEqual(requested.returncode, 0, requested.stdout + requested.stderr)
@@ -1883,7 +1928,7 @@ class C1HostNotImportedTest(C1HostHarness):
 
     def mover(self, tree_line):
         return executable(
-            os.path.join(self._tmp.name, "bin", "mover"),
+            os.path.join(self._base, "bin", "mover"),
             "#!/bin/sh\n"
             'case " $* " in\n'
             '*" review ready "*)\n'
@@ -1899,8 +1944,8 @@ class C1HostNotImportedTest(C1HostHarness):
 
     def test_ready_stops_when_the_archived_tree_has_uncommitted_changes(self):
         # 退避したツリー（実行ファイルが答える）に未コミットの削除がある。cwd が綺麗でも止める。
-        other = os.path.join(self._tmp.name, "other")
-        git(self._tmp.name, "init", "-q", "-b", "main", other)
+        other = os.path.join(self._base, "other")
+        git(self._base, "init", "-q", "-b", "main", other)
         for key, value in CONFIG:
             git(other, "config", key, value)
         write(os.path.join(other, APPROVED, "done", "old.md"), "x\n")

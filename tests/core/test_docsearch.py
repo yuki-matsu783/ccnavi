@@ -869,7 +869,7 @@ class FrontmatterHintTest(Repo):
             "README.md",
             "extensions/x/README.md",
             "CLAUDE.md",
-            "wip/scratchpad/draft.md",
+            "wip/handoff/draft.md",
             "wip/proposals/todo/i0001.md",
             ".ccnavi/notes.md",
             "wip/design/scripts/i12.md",
@@ -920,7 +920,7 @@ class FrontmatterHintTest(Repo):
         git(self.root, "worktree", "add", "-q", tree_root, "-b", "w")
         said = self.hint("docs/new.md", "# 見出し\n", root=tree_root)
         self.assertIn("(.claude/worktrees/w/docs/new.md)", said)
-        self.assertEqual(self.hint("wip/scratchpad/a.md", "# 見出し\n", root=tree_root), "")
+        self.assertEqual(self.hint("wip/handoff/a.md", "# 見出し\n", root=tree_root), "")
 
     def test_post_tool_use_delivers_it_without_changing_the_decision(self):
         path = self.put("docs/new.md", "# 見出し\n")

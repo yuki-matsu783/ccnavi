@@ -78,13 +78,13 @@ limit: parent i0001: src/*, tests/*
 （`ticket_places.is_ticket_place`）、呼び出しごとの実行後チェックは内容で選ぶ（`post_findings._script_writes`、7.2）。
 ワークツリーのルートからの相対パスを `/` の境で見て大文字小文字を区別しない。
 
-下書きの置き場（ワークツリーのルートからの相対で `wip/scratchpad/` の下）も、範囲の外として扱わない
-（`ticket_places.is_scratch_place`）。ワークツリーで作業するエージェントが、範囲を宣言したワークツリーでも手元に下書きを
+下書きの置き場（ワークツリーのルートからの相対で `wip/handoff/` の下）も、範囲の外として扱わない
+（`ticket_places.is_handoff_place`）。ワークツリーで作業するエージェントが、範囲を宣言したワークツリーでも手元に下書きを
 置けるようにするため。追跡して push する置き場で、`ccnavi-git.sh integrate` が取り込むときに外し、`ready` が `wip/` ごと
 消すので、統合先の成果物には残らない。追跡されるので、実行前チェック（`ticket_places.is_unscoped`）に加えて、
 実行後チェック（`post_findings.ScopeGuard.finding`）とサブエージェント終了時チェック（`phase_scope.scope_findings`）でも外す。
 外さないと、実行前に通った書き込みがコミットのあとで範囲外として報告される。
-外すのは `wip/scratchpad/` の下だけで、`wip/` のほかの場所・`wip/scratchpadX/`・`docs/wip/scratchpad/`・
+外すのは `wip/handoff/` の下だけで、`wip/` のほかの場所・`wip/handoffX/`・`docs/wip/handoff/`・
 同じ名前のファイルは外さない。以前の置き場だったワークツリー直下の `scratchpad/`（`.gitignore` で追跡から外していた）は
 廃止したので、特別扱いしない。大文字小文字は区別する。置き場の名前は設定で動かさない。
 
@@ -94,11 +94,11 @@ ELI5 の HTML の置き場（ワークツリーのルートからの相対で `w
 外すのは `wip/eli5/` の下だけで、`wip/` のほかの場所・`wip/eli5x/`・`docs/wip/eli5/`・同じ名前のファイルは外さない。
 大文字小文字は区別し、`\` は `/` に直さずに見る（`wip\eli5\x.py` という名前の 1 ファイルは置き場ではない）。
 `tree.relative` が `os.sep` を `/` に直すので、Windows の区切りはこれで足りる。チケットの置き場（`ticket_places._under`）と
-下書きの置き場（`ticket_places.is_scratch_place`）も、同じく `\` を直さずに見る。名前は設定で動かさない。
+下書きの置き場（`ticket_places.is_handoff_place`）も、同じく `\` を直さずに見る。名前は設定で動かさない。
 `wip/` は `ready` の前に丸ごと消すので、ここに置いたものは squash した成果物に残らない。`ready` の前提は大文字小文字を区別せず、
 名前が `wip\` で始まる 1 ファイルも `wip/` の残りとして止める（区別しない FS で `WIP/eli5/` を先に作った形を拾う）。
 **この除外は、チケットの `deny` と、チケットが信頼できないときの全面停止（`LIMIT_BLOCKED`）より先に適用される**（`is_unscoped` が
-範囲の判定より前にある。順を変えるとチケットの置き場と `wip/scratchpad/` の扱いにも及ぶので、この弱さは受け入れている）。
+範囲の判定より前にある。順を変えるとチケットの置き場と `wip/handoff/` の扱いにも及ぶので、この弱さは受け入れている）。
 
 `Read` `Grep` `Glob` は範囲を見ない。Bash の実行前チェックにもチケットの範囲は当てない。コマンド
 文字列からパスを追えないため。シェルが書いたものは実行後チェックが `POST_TICKET_SCOPE` で言い

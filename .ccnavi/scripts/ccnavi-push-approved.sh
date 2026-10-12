@@ -1,6 +1,6 @@
 #!/bin/sh
 # ccnavi-push-approved 承認済みチケットの置き場（と、承認で todo/ から消えた提案、取り込んで消えた
-# フローの下書き）だけをコミットし、
+# フローとテンプレートの下書き）だけをコミットし、
 # 保護されたブランチでなければ push する。
 #
 #   sh .ccnavi/scripts/ccnavi-push-approved.sh [<親>...]
@@ -14,7 +14,7 @@
 # 取り込み済みの親子のチケット（origin があり、親子のチケットの取り込み状態が present。chat だけのものを除く）のワークツリーは、
 # C1 と同じ手順でコミットして push する。取り込んでから送るので、Chrome での承認と重なっても push が拒まれにくい。
 # 手順は、ロック（C1 の中からの入れ子を許す）→ 途中の操作の確認 → 取り込み（ccnavi-sync.sh）→
-# 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案と、取り込んで消えた flows/ の下書き）を commit --only → push → 失敗したように見えたら届いたかを ls-remote で確かめる。
+# 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案と、取り込んで消えた flows/ と templates/ の下書き）を commit --only → push → 失敗したように見えたら届いたかを ls-remote で確かめる。
 # push が失敗してもコミットは残す（ユーザが打ち直せる）。取り込み済みかは実行ファイル（`c1 family`）に聞く。
 # 答えない実行ファイルで親子のチケットの取り込み状態があれば、コミットせずに止める。
 #
@@ -26,8 +26,10 @@
 # wip/proposals の todo/ から動かす（コピーは作らない）ので、
 # そこで追跡されていたファイルの削除も同じコミットに入れる。todo/ の書きかけ（未追跡・編集中）はコミットしない。
 # 同じく、ボードのフロー編集画面が取り込んだ下書き（wip/proposals の flows/）を
-# フローの保存のあとに消すので、追跡されていた下書きの削除だけをコミットする。未追跡の下書きと、書き直された
-# 下書き（消えていない）はコミットしない。`ccnavi c1 sort` の置き場には足さず、消えたものだけをここで拾う。
+# フローの保存のあとに消し、`ccnavi --templates --import` が取り込んだテンプレートの下書き
+# （wip/proposals の templates/）を取り込みのあとに消すので、追跡されていた下書きの削除だけをコミットする。
+# 未追跡の下書きと、書き直された下書き（消えていない）はコミットしない。`ccnavi c1 sort` の置き場には足さず、
+# 消えたものだけをここで拾う。
 #
 # - コミットはパスを限る。`-a` も `add -A` も使わない。他人の書きかけをコミットしない
 # - シンボリックリンクは辿らない。置き場（projects/ や .claude/worktrees/）そのものも、その下の
@@ -120,7 +122,7 @@ fi
 tab=$(printf '\t')
 
 # 置き場の変更のパス（承認済み、レビュー待ちの review/、承認で消えた todo/ の提案、取り込んで消えた
-# flows/ の下書き）を ccnavi_c1_tmp/carry に。
+# flows/ と templates/ の下書き）を ccnavi_c1_tmp/carry に。
 # 書きかけの一時ファイル（fsio の `.<名前>.<一意>.part*`、フローの保存の `flows/.*.tmp`、configsync の
 # `*.ccnavi-sync`）はコミットしない。
 carry_paths() {
@@ -128,7 +130,7 @@ carry_paths() {
 	git -C "$1" -c core.quotepath=false status --porcelain -z --untracked-files=all --no-renames \
 		-- "$approved" "$proposals/review" 2>/dev/null | tr '\000' '\n' |
 		sed -n 's/^...//p' >"$ccnavi_c1_tmp/carry-all" || :
-	git -C "$1" ls-files --deleted -z -- "$proposals/todo" "$proposals/flows" 2>/dev/null | tr '\000' '\n' \
+	git -C "$1" ls-files --deleted -z -- "$proposals/todo" "$proposals/flows" "$proposals/templates" 2>/dev/null | tr '\000' '\n' \
 		>>"$ccnavi_c1_tmp/carry-all" || :
 	grep -v -E '(^|/)\.[^/]*\.part(\.[^/]*)?$|(^|/)flows/\.[^/]*\.tmp$|\.ccnavi-sync$' \
 		"$ccnavi_c1_tmp/carry-all" >"$ccnavi_c1_tmp/carry" || :
@@ -351,9 +353,9 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 		scope="$approved
 $proposals/todo"
 	fi
-	# 取り込んで消えたフローの下書き。追跡されていたものの削除だけを、1 件ずつのパスで入れる。
+	# 取り込んで消えたフローとテンプレートの下書き。追跡されていたものの削除だけを、1 件ずつのパスで入れる。
 	# 置き場ごと pathspec に並べると、書き直されて残っている下書きまでコミットに入るため。
-	drafts=$(git -C "$tree" ls-files --deleted -z -- "$proposals/flows" 2>/dev/null | tr '\000' '\n' || :)
+	drafts=$(git -C "$tree" ls-files --deleted -z -- "$proposals/flows" "$proposals/templates" 2>/dev/null | tr '\000' '\n' || :)
 	if [ -n "$drafts" ]; then
 		printf '%s\n' "$drafts" | while IFS= read -r removed; do
 			[ -n "$removed" ] || continue

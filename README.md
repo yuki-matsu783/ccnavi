@@ -419,7 +419,7 @@ hook からの判定と `ticket` / `review` などの副命令に渡すと無視
 | `CCNAVI_GUARD_UNWATCHED` | `enable`（既定）、`disable`。ユーザにも classifier にも確認できないモード（`dontAsk` / `bypassPermissions`）で、ルールがどこも言及しない呼び出しを止めるか。`disable` なら判定を返さず、そのモードの取り決めに委ねる（読み切れなかった呼び出しは委ねない。「ルールが言及していない呼び出し」）。`dry-run` は無く、それ以外の値は `enable` として動き、`--lint` が指摘する |
 | `CCNAVI_BIN_PATH` | hook が起動する ccnavi 自身。指定すると守る対象に入る。既定は無い（導入スクリプトは振り分けの sh `.ccnavi/scripts/ccnavi-launcher.sh` と書き、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に入る。「実行ファイルとルールを配る」）。拡張子は書かない。Windows の `.exe` は ccnavi が補う |
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--agree` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
-| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--agree` / `--reviewed` / `--close-early` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--agree` と `--reviewed` と `--close-early` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も同じ理由コードで止める（表示・検索の道具だけのコマンドは除く）。端末を求めない入口（`ccnavi-sync.sh`・`ccnavi-review.sh decide`・実行ファイルの `--yes`）に、変数・置換・glob で組み立てた引数や `xargs` で流し込む引数を渡す形も、読み切れないので同じ理由コードで止める。テストや端末の無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする |
+| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--agree` / `--reviewed` / `--close-early` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--agree` と `--reviewed` と `--close-early` と、書くとき（`--yes`）の `--templates --import` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も同じ理由コードで止める（表示・検索の道具だけのコマンドは除く）。端末を求めない入口（`ccnavi-sync.sh`・`ccnavi-review.sh decide`・実行ファイルの `--yes`）に、変数・置換・glob で組み立てた引数や `xargs` で流し込む引数を渡す形も、読み切れないので同じ理由コードで止める。テストや端末の無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
 `${CLAUDE_PROJECT_DIR}` は hook の `command` では展開されるが `env` では展開されない。
@@ -593,6 +593,8 @@ allow:
 | ワークスペース自身のレイヤー | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml` | ワークスペース自身のツリーにだけ適用するもの |
 | プロジェクトのレイヤー | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | そのプロジェクトのツリーにだけ適用するもの |
 
+作業・レビュー計画のテンプレートは、共通が `.ccnavi/config/common/templates/`、プロジェクトが `.ccnavi/config/project/templates/` に置く。この表の 3 本には入らず、`*/.ccnavi/*` の一般の保護で守られる。
+
 3 レイヤーとも置き場は固定で、環境変数では動かない（「設定」の「置き場は固定」）。
 自身のレイヤーとプロジェクトのレイヤーは形が同じで、どちらも git プロジェクトルートの直下に置く。
 
@@ -622,6 +624,7 @@ allow:
 - プロジェクト向けの親チケットに着手するとき、ワークスペースルートの `.ccnavi/config/common/` の中身を、そのプロジェクトの `.ccnavi/config/common/` へ
   ミラーする。プロジェクトの `.ccnavi/config/project/` には触れない。ミラーは誰も編集しないので、上書きで失うものは無く、名指しも知らせも要らない。
   配点の `script:` の値は書き換えない。コピーするものがプロジェクトのレイヤーとして読めなければ、何もコピーせず着手しない。
+  共通の作業・レビュー計画のテンプレート（`.ccnavi/config/common/templates/*.yml`）も同じように写す（error のあるテンプレートは写さずに飛ばす。置き場が読めない（リンクなど）ときはテンプレートだけ写さない。どちらも着手は止めない。`--lint` が error で知らせる）。
   コミットはエージェントが `ccnavi-git.sh` で行う
 
 できないこと: プロジェクトのレイヤーで共通レイヤーの `ask` を `allow` に緩める、共通レイヤーの `allow` をプロジェクトごとに外す、
@@ -865,7 +868,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
     match: Write|Edit|NotebookEdit
     regex: '^{root}[\\/]'
     except:
-      - regex: '^{root}[\\/]wip[\\/]scratchpad(?:[\\/]|$)'
+      - regex: '^{root}[\\/]wip[\\/]handoff(?:[\\/]|$)'
       - regex: '^{root}[\\/]\.claude[\\/]worktrees(?:[\\/]|$)'
     message: ...
 ```
@@ -1317,7 +1320,7 @@ undo: rm -- ".ccnavi/config/common/probe.json"
 | 索引に足された状態で現れた | `<git> restore --staged -- <path> && rm -- <path>` |
 
 `<git>` は、ワークスペースルートに git のラッパー（`.ccnavi/scripts/ccnavi-git.sh`）があればその実パス（`sh <ルート>/.ccnavi/scripts/ccnavi-git.sh`）、
-無ければ `git`。ラッパーがあるワークスペースでは生の git が止まることがあり、止まる形を案内しないため。ラッパーは `rm -f` と
+無ければ `git` を案内せず、git の操作はユーザに頼む文にする（生の git は組み込みでいつも止まるため）。ラッパーは `rm -f` と
 `clean` を通さないので、現れたものは索引から外してシェルの `rm` で消す形にする。
 
 ### 前から在った変更は原因にしない
@@ -1409,7 +1412,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 - `builtin:guard-project-home`: ccnavi ディレクトリの下（`*/.ccnavi/*`）と、`CCNAVI_BIN_PATH` のパスおよび実行ファイルの置き場
   （名前が `ccnavi-launcher.sh` なら 1 つ上の `bin/<os>-<arch>/`、それ以外なら隣の `<os>-<arch>/`）
 - `builtin:guard-common-layer`: 共通レイヤーの 3 本。ワークツリーの中の同じファイルも止まる
-- 期待する判定のファイル `.ccnavi/config/common/rule-expectations.yml` も `builtin:guard-project-home` が止める。その下書きはワークツリーの `wip/scratchpad/` に置き、
+- 期待する判定のファイル `.ccnavi/config/common/rule-expectations.yml` も `builtin:guard-project-home` が止める。その下書きはワークツリーの `wip/handoff/` に置き、
   ルールの下書きと一緒にユーザに渡す
 
 止めるのは書き込みの形と場所の組で、場所の名前が出ただけでは止めない（`cat .ccnavi/config/common/rules.yml` や `git add <パス>` は通る）。
@@ -1678,8 +1681,8 @@ jq -r 'select(.rules[0]? == "builtin:ticket-scope" and (.rules | length) > 1) | 
 範囲の外として扱わない場所。
 
 - 提案の置き場（`wip/proposals/`）と承認済みチケットの置き場（`.ccnavi/approved/`）。`review/` と承認済みチケットは組み込みの deny が止める
-- 下書きの置き場。ツリーのルート直下の `wip/scratchpad/` の下で、大文字小文字を区別する。追跡される置き場なので、
-  実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/scratchpadX/` や `scratchpad/` は外さない
+- 下書きの置き場。ツリーのルート直下の `wip/handoff/` の下で、大文字小文字を区別する。追跡される置き場なので、
+  実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/handoffX/` や `scratchpad/` は外さない
 - ELI5 の HTML の置き場。ワークツリーのルートからの `wip/eli5/` の下で、大文字小文字を区別する。追跡される置き場なので、
   実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/` のほかの場所や `wip/eli5x/` は外さない。
   チケットの `deny` と全面停止（`LIMIT_BLOCKED`）より先に適用される
@@ -1789,7 +1792,8 @@ feedback:                              # フィードバック計画。レビュ
   各項が前の項を待つ一直線の `plan`、`phases:` の写しを持つ親の提案を書く。対象は親だけ。`phases.yml` が無いとき、
   `inherit` の型だけで `allow` が空になるとき、既に同じ識別子の提案があるときは、何も書かずに理由を言う。
   `ccnavi-ticket.sh` には通さず、実行ファイルを直接打つ（`--fill-phases` と同じ）。書いたあとは rationale と本文を埋め、
-  `--lint` で確かめてから承認を頼む
+  `--lint` で確かめてから承認を頼む。`--plan` の代わりに `--template <名前> [--layer <名前>] [--with-feedback]` を渡すと、溜めた
+  テンプレートから計画と子のフローの下書きを作る（フィードバック計画は `--with-feedback` のときだけ書く。「作業・レビュー計画のテンプレート」の「使う」）
 - **計画が使う定義は親に固定する（`phases:`）。** 承認は写しが承認したときの `phases.yml` と同じかを確かめる。承認のあとの判定・
   フェーズの題と見る場所・成果物・子の範囲の上限は写しを読み、`phases.yml` を読まない（あとで直しても進行中の親は変わらない）。
   写しは `ccnavi --plan-order <親> --fill-phases` で差し込む（エージェントが打ってよい）。計画を持つのに写しの無い親は止まる
@@ -1914,7 +1918,7 @@ JSON で渡す（`--result <path>`）。
   外から `ready --parent <親>` で打てばそのまま消える
 - 消し方は、生成物（`node_modules`・`.venv` など）を消してから `git worktree remove`（`--force` なし）。ブランチは消さない
 - git が無視しているファイル（`.env` など）があるワークツリーは、何も消さずに名指しする（`worktree remove` はそれごと消して戻せない）。
-  数えないのは生成物だけ（下書きの置き場 `wip/scratchpad/` は追跡されるので、ここには現れない）
+  数えないのは生成物だけ（下書きの置き場 `wip/handoff/` は追跡されるので、ここには現れない）
 - cwd が消す対象の中にあるときは消さず、外に出てから打つ 1 本（`sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>`）を出す。
   `ready` を親のワークツリーの中から `--parent` なしで打ったときは、親のワークツリーをこの 1 本で消す。未コミットの変更があれば何も消さずに名指しする
 - この 1 本が Claude Code の自動モードの分類器に止められたら、ユーザに許可を頼むか、ユーザのホームの `~/.claude/settings.json` の
@@ -2049,7 +2053,7 @@ Claude Code はそこを読まないので、ccnavi が `SessionStart` と `Suba
 |---|---|---|
 | `Write` / `Edit` でルールファイルを直す | 通す | ここを止めると直す手段が 1 つも残らない |
 | シェルからルールファイルへ書き込む | 止める | ルールファイルを壊して緩い既定を使わせる手口を作らない |
-| `add` / `restore --ours` でマージの衝突を解く（ラッパーがあれば `sh .ccnavi/scripts/ccnavi-git.sh add` などで打つ。チケット制御が有効でラッパーがある間は、生の `git` は既定の間も止まる） | 通す | 戻すのは既にコミットされている内容で、新しい文面は書かない |
+| `add` / `restore --ours` でマージの衝突を解く（ラッパーがあれば `sh .ccnavi/scripts/ccnavi-git.sh add` などで打つ。生の `git` はいつも止まる） | 通す | 戻すのは既にコミットされている内容で、新しい文面は書かない |
 
 止めるのは書き込みの形だけで、場所の名前が出ただけでは止めない。既定を使ったことは、止めた回だけでなく通した回にも伝える。
 
@@ -2188,7 +2192,7 @@ uv run python scripts/check_rules.py   # 同じことを、state と記録を外
 `tool: Stop`（`subject: "(stop)"`）は、ターンの終わりに使われるルールがあるかを見る（あれば `allow`）。
 ルールを 1 件足したら期待も 1 行足し、**止めたくないものも必ず一緒に置く**。
 
-期待のファイルはエージェントが直接書けない（「コアファイルを守る」）。下書きはワークツリーの `wip/scratchpad/` に置き、ルールの下書きと一緒にユーザに渡す。
+期待のファイルはエージェントが直接書けない（「コアファイルを守る」）。下書きはワークツリーの `wip/handoff/` に置き、ルールの下書きと一緒にユーザに渡す。
 `/ccnavi-config` スキルがこの流れを回し、フェーズ定義とリスクの配点も見る。
 
 ### 記録から候補を起こす
@@ -2681,6 +2685,191 @@ sh や拡張が頼るフラグや出力の形を、呼ぶ側を直さないと�
 配布先なら ccnavi のリポジトリで組み立てて `sh scripts/ccnavi-setup.sh <ワークスペース> --force` で実行ファイルと sh を配り直す。
 拡張のほうが古ければ拡張を入れ直す。`--version` を知らない実行ファイルは、この仕組みより前の古い版として扱う。
 
+## 作業・レビュー計画のテンプレート
+
+```sh
+ccnavi --templates                          # 一覧（名前・層・説明・いつ使うか）
+ccnavi --templates --keyword 調査            # name・description・when の検索（語を重ねるとどれか）
+ccnavi --templates --show feature           # 1 本の中身（計画・フロー・検査・ファイルの本文）
+ccnavi --templates --layer lib --json       # 共通 + プロジェクト lib の足し算。画面向けの完全な答え
+ccnavi --templates --draft <親> [--name <名前>]    # 完了した親から下書きを作る（エージェントが打ってよい）
+ccnavi --templates --import <下書き> --to common|project [--layer <名前>] [--replace]
+                                            # 下書きを取り込む前の下見（何も書かない。ユーザ専用）
+ccnavi --templates --import <下書き> --to common|project [--layer <名前>] [--replace] --yes --expect <ハッシュ>
+                                            # 取り込む（ユーザ専用）
+```
+
+完了した作業の計画とフローを、次の作業で使い回すためのひな形。1 ファイル（`<名前>.yml`）に、親の作業・レビュー計画
+（全体計画 `plan:` とフィードバック計画 `feedback:` の項と `after`）と、各子のフローの本文を入れる。
+一覧・検索・表示は読むだけで、何も書かないので、エージェントが打ってよい。いまの版は、読む側（一覧・検索・表示・`--lint`）と、
+溜める側（下書きの作成と取り込み）、使う側（`ticket new --template`）、案内と配布（親の `finish` の案内、共通のテンプレートのミラーと導入スクリプトでの配布）まで。
+
+**案内。** 計画を持つ親を `ticket finish` で閉じると、出力の最後に 1 行出る。`ready` で閉じると下書きの材料（`done/` と `flows/`）は
+`logs/archive/` へ退避されて拾えないので、`ready` の前に下書きを作る合図になる。
+
+```
+テンプレートにするなら、`ready` の前に `ccnavi --templates --draft i0001` で下書きを作る（ready で閉じると下書きの材料は退避されて拾えない）。下書きは取り込むか消してから ready
+```
+
+出すのは、その親が計画を持ち、親の識別子の下書き（`wip/proposals/templates/<親>.yml`）がまだ無く、同じ計画の形（`plan` と `feedback` の項、`type`・`review`・`after`）の
+テンプレートが共通にもレイヤーにも取り込まれていないときだけ。フローの文は比べない（下書きの一般化で変わるため）。出力に足すだけで、終了コードも閉じる判定も変わらない。
+マージリクエストで見るフェーズが無い親（統合先に取り込むところまでの案内）と、Draft を外し済みの親には出さない。
+
+**配布。** 共通のテンプレートは、設定の共通レイヤーと同じ経路で配布先へ届く。プロジェクト向けの親の着手が、ワークスペースルートの
+`.ccnavi/config/common/templates/*.yml` をプロジェクトの `.ccnavi/config/common/templates/` へミラーする（単体 clone ではこれが共通として読まれる）。
+ミラーの前に、テンプレートをミラーとして読めるか（error が無いか）を確かめる（error のある 1 本は飛ばし、置き場が読めないときはテンプレートだけ写さない。着手は止めない）。
+導入スクリプトは、配布元の `.ccnavi/config/common/templates/*.yml` があれば配布先の同じ場所へ写す（既にあるものは `--force` のときだけ入れ替える。
+英数字で始まり `[A-Za-z0-9._-]` だけの名前に限り、空白などを含む名前は配らずに言う）。無ければ何もしない。
+
+置き場は 2 層で、使うのは共通と 1 つのレイヤー（`--layer` を省けば自身のレイヤー `self`）の和。
+
+| 層 | 置き場 |
+|---|---|
+| 共通 | `.ccnavi/config/common/templates/<名前>.yml` |
+| プロジェクト（`self` かプロジェクト名） | `.ccnavi/config/project/templates/<名前>.yml` |
+
+置き場が無いのは正常（無い = 空）。同名のテンプレートが両方に在るときは、フェーズ定義と同じ扱いにする。全欄が同じならレイヤーの側を捨てて
+info、中身が違えばレイヤーの側だけを使わず error（どちらが効くかを黙って決めない）。共通のテンプレートが壊れていれば共通を空として扱い、
+レイヤーの側は使う。
+
+```yaml
+name: feature                 # ファイル名（拡張子を除く）と同じ。英数字で始め、英数字と . _ - だけ
+description: 機能を設計から実装まで進める   # 一覧に出す説明（必須）
+when: 新しい機能を足すとき     # 選ぶ手がかり（省いてよい）
+plan:                         # 全体計画。項は定義の名前か {type, review, after}
+  - design
+  - {type: implement, after: [1]}   # after はこの計画の中の添字（1 始まり）
+feedback:                     # フィードバック計画（省いてよい）。after は feedback の中の添字
+  - implement-feedback
+flows:                        # 全体計画の項の添字 → 子のフローの本文（フローのファイルと同じ形）
+  2:
+    id: wf-impl
+    name: 実装の手順
+    nodes: [...]
+    connections: [...]
+```
+
+未知の欄は warn で読まない。ファイルは、フローと同じ読み手で読む（シンボリックリンク・ハードリンク・ふつうのファイルでないもの・256 KiB 超・
+YAML の別名・UTF-8 でないものは読まない）。
+
+検査は `--lint` と `--templates` の答えが同じ関数で行う。順序（`after` の範囲・終端が 1 つ・最後の項の延期・延期の引き受け手）と、
+`flows` の添字が全体計画に在ること、フローの形は error。型が `phases.yml` に無い、`kind` が置き場と合わない、延期の引き受け手にレビューが無い、は
+warn にとどめる（定義は後から変わるので、使うときの承認で改めて error になる）。フローの警告は `--lint --flow` と同じ。
+`--lint` の指摘の場所は、共通が `(templates)`、レイヤーが `(templates/<名前>)`。
+
+### 下書きを作る（`--draft`）と取り込む（`--import`）
+
+溜める流れは「完了した親 → 下書き（効力なし）→ ユーザが差分を読んで取り込む」。
+
+1. **下書きを作る**（エージェントが打ってよい）。`ccnavi --templates --draft <親>` は、完了した親（`done/` に在る）の計画と、
+   各子のフロー（`.ccnavi/approved/flows/<子>.yml`）を 1 ファイルに写し、`wip/proposals/templates/<名前>.yml` に書く
+   （プロジェクトのツリーならそのプロジェクトの下）。名前の既定は親の識別子で、`--name` で付ける。
+   - `after` は各計画の中の添字（1 始まり）に直す。フィードバック計画の `after` は全体計画の続きの番号なので、全体計画の項数を引く
+   - フローは、全体計画の n 番目の項の子のうち、フローを持つ最初の 1 本を写す。フィードバック計画の子のフローは写さない
+   - 固有名の一般化は機械ではやらない。親の題から入れる `description` と `when` の両方に `TODO` の印を付ける。エージェントが固有名を消して
+     印を外す（残っていれば検査が warn で言う）
+   - **未追跡の下書きは `ready` を止める。** 下書きは `wip/` の未追跡のファイルで、親の `ready` は未追跡のファイルを名指しして止める。
+     `--draft` を打ったら、取り込むか、`ready` の前に下書きを消す（またはコミットする）。出力の次の手と親の `finish` の案内にもこの 1 行がある
+   - 同名の下書きがあれば上書きせず断る。作業中の親、取り消した親、`ready` で閉じて退避済み（`logs/archive/`）の親は読めないと言って終了コード 1 で終わる。
+     `ready` の前に（`done/` に在るうちに）作る
+2. **下書きには効力が無い**。`--templates` の足し算にも `templates[]` にも入らない。一覧の最後に `下書き: N 件（wip/proposals/templates/）` の
+   1 行が出て、`--json` の `drafts[]` に名前・置かれたツリー・パス・ハッシュ・検査の結果が入る。`--lint` は下書きの苦情を error にせず
+   warn と info だけで言う（場所は `(template-drafts)`）。下書きの置き場は判定の範囲外で、エージェントは書ける
+3. **取り込む**（ユーザ専用。`phase_forms._CLI_FORMS` が止めるので、エージェントは下見も含めて打てない）。`--yes` と `--expect` が揃うまで何も書かない。
+   `--yes` で書くときは端末の前のユーザが打つ。止めるのは hook の止めと、実行時の端末の確認（標準入力が端末でなければ書かず終了コード 1）の 2 つ。下見は端末でなくても動く。
+   hook の照合は文字列なので、`uv run --project …` や `python -u -m ccnavi` などの書き方は読み切れない。この穴は `--agree`・`--reviewed`・`--close-early` にも効く前からのもの
+   - 下見（`--yes` なし）は、下書きを取り込み先の定義で検査し（error があれば取り込めないと言う）、取り込み先の同名との差分を前後 3 行つきの
+     unified diff で見せる。新規なら本文を全部見せる（フローの文は案内文になるので読む）。続けて打つ形（ハッシュ入り）を出す
+   - `--to common` は `.ccnavi/config/common/templates/<名前>.yml`、`--to project` は `--layer`（既定 `self`）の
+     `.ccnavi/config/project/templates/<名前>.yml`。同名が既にあれば `--replace` が要る（改訂は差分を見せたうえで置き換える）。共通とレイヤーに
+     同名で中身の違うものが並ぶ取り込みは、足し算がレイヤーの側を使わなくなるので断る
+   - `--yes --expect <ハッシュ>` で書く。`--expect` が下書きの今の中身のハッシュと違えば（見せたあとに書き直された）書かない。
+     下書きの中身は書き換えずそのまま書く。書き方は一時ファイル → fsync → 差し替えで、リンク・ハードリンク・ふつうのファイルでないものには書かない
+   - 書けたら、下書きの今の中身が取り込んだときの中身と同じときだけ下書きを消す。違えば消さずにそう言う。リンクなどは消さない
+   - 消した下書きの削除は、承認済みチケットの置き場に変更があるツリーで `ccnavi-push-approved.sh` がコミットして push する
+   - 下見は制御文字・書式文字（右から左への上書き、幅ゼロの文字、復帰など）を `\uXXXX` に直して見せる。そうした文字を含む下書きは検査が error にして、取り込めない
+   - `--json` で下見と結果を機械が読める形で返す（`ok`・`errors[]`・`problems[]`・`diff[]`・`written`・`removed`）
+
+`--templates --json` は、画面がそのまま描ける完全な答えを返す。形は [tests/fixtures/templates-json.json](tests/fixtures/templates-json.json)
+の見本で固定している。
+
+| 鍵 | 何 |
+|---|---|
+| `version` / `root` | 形の版（いま 1）/ ワークスペースルート |
+| `layer` / `keywords` | 一覧の対象のレイヤー（`--layer`、既定 `self`）/ 検索の語 |
+| `templates[]` | 共通 + `layer` の足し算の結果（`keywords` で絞る）。共通の側の検査は、足し算の結果のフェーズ定義で行う |
+| `layers[]` | 共通・`self`・各プロジェクトの生の中身。`{name, path, exists, unreadable, writable, problems[], templates[]}`。検査はそのレイヤーのフェーズ定義（共通は共通だけ）で行う |
+| `sums[]` | レイヤーごとの足し算の索引。`{name, layers[], templates[{name, layer, effective, dropped}]}` |
+| `errors` / `warns` / `infos` | 全レイヤーの苦情の件数（下書きは数えない） |
+| `drafts[]` | 下書き（効力なし。`templates[]` にも足し算にも入らない。`keywords` で絞る）。下の表 |
+
+`templates[]` と `layers[].templates[]` の 1 件。
+
+| 鍵 | 何 |
+|---|---|
+| `name` / `layer` / `path` | 名前 / `common` かレイヤーの名前 / ワークスペースルートからの相対パス（`/` 区切り） |
+| `sha` | ファイルの中身の SHA-256。保存のときの `--expect` に使う（`--plan-order` の `source_sha` と同じ流儀） |
+| `valid` | 読めたか。読めなければ下の中身は空で、理由は `problems` と `dropped.detail` |
+| `description` / `when` | 説明 / 選ぶ手がかり |
+| `plan[]` / `feedback[]` | 項 `{index, number, type, review, after}`。`index` は計画の中の添字、`number` は提案に写したときの番号（フィードバック計画は全体計画の続き）、`after` は計画の中の添字 |
+| `has_flows` / `flows[]` | フローの有無 / `{index, name, nodes, connections, node_types}`（`index` は全体計画の添字） |
+| `effective` | 足し算で使われるか。読めないもの・衝突で捨てたものは `false` |
+| `dropped` | 使われない理由 `{reason, detail}`。`reason` は `invalid`（読めない）/ `duplicate`（共通と全欄が同じ）/ `conflict`（共通と中身が違う）。使われるなら `null` |
+| `usable` | 使われていて、error も無い |
+| `writable` | 書き換えてよいか。共通は、親の着手が写したミラー（承認済みの親のワークツリーの中）では `false` |
+| `problems[]` | 検査の結果 `{severity, detail}`。`severity` は `error` / `warn` / `info` |
+
+`drafts[]` の 1 件。画面が取り込みを出せる形で、`name`・`path`（ツリーからの相対）・`sha`・`valid`・`description`・`when`・`plan[]`・
+`feedback[]`・`has_flows`・`flows[]`・`problems[]` は上の表と同じ。足すのは次の欄。
+
+| 鍵 | 何 |
+|---|---|
+| `tree` | 下書きが在るツリーの名前。ワークスペースルートは空 |
+| `checked_with` | 検査に使ったフェーズ定義の層（`self` かプロジェクト名）。`templates[].layer`（ファイルが在る層）とは別 |
+| `importable` | 読めて、error が無い（取り込みの前提。取り込み先の定義での検査は `--import` が行う） |
+| `exists_in` | 同じ名前のテンプレートが在るレイヤー（`common` を含む）。在れば取り込みは置き換え（`--replace`）になる |
+| `also_in` | 同じ中身の下書きを持つほかのツリー（`tree` と同じ表記。ワークスペースルートは空。親のブランチに乗った下書きは子のワークツリーにも在る） |
+
+失敗（`--show` の無い名前、不明な `--layer`、`--draft`・`--import` の失敗）は、`--json` なら `{version, ok: false, error}` を標準出力に出して終了コード 1。
+
+### 使う（`ticket new --template`）
+
+```sh
+ccnavi ticket new <識別子> --title <題> --template <名前> [--layer <名前>] [--with-feedback] [--issue N]
+```
+
+識別子と同名のワークツリーの中で打つ（`--plan` の雛形と同じ。`ccnavi-ticket.sh` には通さず、実行ファイルを直接打つ）。
+エージェントが打ってよい（フローの下書きに効力が無く、提案も通常の承認を通るため）。
+
+1. **テンプレートを引く。** 共通 + 1 つのレイヤー（`--layer` を省けば、ワークツリーのレイヤー）の足し算から名前で引く。
+   使えるのは足し算で取り込まれていて、error が無いもの。無い・読めない・error がある・フェーズ定義（`phases.yml`）に無い型を使う・
+   `kind` が置き場と合わない、のときは理由を言って終了コード 1（何も書かない）。共通とレイヤーに同名で中身が違うものが並ぶ
+   ときは共通が引かれ、使わなかったレイヤーの側を `note:` で言う
+2. **親の提案を書く。** `wip/proposals/todo/<識別子>.md` に、テンプレートの項から `plan:`（`type`・`review`・`after`）を書く。
+   **`feedback:` は既定では書かず、`--with-feedback` のときだけ書く。** フィードバック計画は全体計画の最後のレビューを見て、改版で 1 回だけ足す決まりで、
+   最初の提案に入れると、承認後に全体計画を改版できなくなる（`agree_candidates` の改版の検査が拒む）。書かなかったときは、テンプレートにフィードバック計画（N 項）が
+   あること、全体計画のレビューを見てから足すなら `--with-feedback` を付けて作り直すか提案を改版で足すことを、出力が言う。`--with-feedback` は
+   `ticket new --template` でだけ使える（それ以外、`--template` なしでは断る）。`after` はテンプレートの計画の中の添字から**提案の絶対番号に付け直す**（全体計画はそのまま、フィードバック計画は全体計画の
+   項数を足す。`--draft` が行う正規化の逆）。`allow` は計画とフィードバック計画の型の `scope` を集めたもの、`phases:` の写しは
+   `--plan` の雛形と同じく書いたあとに差し込む。書いた提案に承認の検査（順序・終端・`kind`）を当て、通らなければ消して断る
+3. **子のフローの下書きを書く。** `flows` の全体計画の n 番目の項を、`wip/proposals/flows/<識別子>-<NN>-01.yml` に書く
+   （`NN` は n の 2 桁）。子の識別子は承認のあとに決まるが、連番はフェーズごとに 1 から数えるので、親の提案の段では各フェーズの
+   最初の子 `-01` と決める。**子の提案の足場は作らない**（子の提案は手で書く。9.3）。別の連番で子を起こすなら、下書きの名前を
+   子の識別子に合わせる。下書きに効力は無く、フローの文は子への案内文になるので、ユーザがフロー編集画面で読んで取り込むまで効かない
+4. **上書きしない。** 同じ識別子の提案・承認済みチケット、子の識別子の提案・フロー・フロー下書きが在れば、何も書かずに断る。
+   `--plan` とは一緒に使えない（計画はテンプレートから作る）
+
+```text
+feature-9-from-template の提案を .../wip/proposals/todo/feature-9-from-template.md に書いた（テンプレート feature、common の .ccnavi/config/common/templates/feature.yml）
+plan（3 項）: 1 research / 2 design（待つ 1・defer） / 3 implement（待つ 2）
+テンプレートにはフィードバック計画（2 項）がある。全体計画のレビューを見てから足すなら、`--with-feedback` を付けて作り直すか、提案を改版で足す
+フローの下書き 1 件:
+  計画の 3 番目 -> feature-9-from-template-03-01: .../wip/proposals/flows/feature-9-from-template-03-01.yml
+下書きには効力が無い。フローの文は子への案内文になるので、ユーザがフロー編集画面で読んで取り込むまで効かない。...
+```
+
+書いたあとは、rationale と本文、テンプレートの固有名の残りを直し、`ccnavi --lint` で確かめてから承認をユーザに頼む。
+
 ## ドキュメントの索引
 
 ```sh
@@ -2697,7 +2886,7 @@ md を本文ではなく頭の frontmatter で引く。grep は当たった行�
 frontmatter か `type` が無いときに、`PostToolUse` が `[ccnavi] NOTICE_DOC_FRONTMATTER (<パス>)` で 1 度だけ案内する（止めない）。
 Edit と上書きでは出さない。索引に載らない md（git が無視するもの、`.ccnavi/` の下）と、`README.md`・`CLAUDE.md`、
 frontmatter の決まりの対象外の表にある置き場（チケットの置き場・チケットの下書き `wip/design/scripts/i*.md`・下書きの置き場
-`wip/scratchpad/`・外から取り込んだ `.claude/skills/yomiyasu/**`）にも出さない。ワークツリーの md は、ワークスペースの `.gitignore` ではなくワークツリー自身の
+`wip/handoff/`・外から取り込んだ `.claude/skills/yomiyasu/**`）にも出さない。ワークツリーの md は、ワークスペースの `.gitignore` ではなくワークツリー自身の
 git で決める（統合した後は統合先の索引に入るため）。
 
 引くのはワークスペースと、プロジェクトの置き場の直下の各プロジェクト（それぞれ別の git）を合わせたもの。どこから打っても同じで、
@@ -2826,7 +3015,7 @@ commit 845d832e329aa533ee8e0acf3ee61ea1990c47ca
   衝突を片側に寄せたりすると、承認が無かったことにも戻ったことにもなる
 - ccnavi 自身を守る場所（`.ccnavi/`・`.claude/settings*.json`・`.claude/hooks/`・記録と state・`ccnavi-git.sh`）には、
   `rm`・`restore --source <ref>`・`checkout <ref> <パス>` を通さない。hook が先に止め、ラッパースクリプトも 2 重目に止める。
-  ラッパースクリプト自身を消すと、生の git の止め（ラッパースクリプトがあるときだけ働く）も外れるため。衝突の解決（`restore --ours / --theirs`）は通る
+  生の git の止めは組み込みでいつも働くので、ラッパースクリプト自身を消しても外れない。衝突の解決（`restore --ours / --theirs`）は通る
 - 親のワークツリーでは、親のブランチ（承認済みの親チケットの `branch:`、無ければ識別子）のほかへ `checkout`・`switch` で移れない。
   識別子のブランチの上から承認済みの `branch:` のブランチへ移るのは、承認済みチケットを取り込む 1 操作になる
   `worktree add` は行き先の名前とブランチ名を揃える形だけで、違う名前のブランチを出すのは行き先の名前の親チケットが
@@ -2892,6 +3081,8 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/phase_forms.py` | ユーザだけが打つコマンドの形（承認・レビュー済み・ガードの切り替え・記録の片付け）を見分ける組み込みのルール |
 | `src/ccnavi/tickets/phase_scope.py` | 子チケットの範囲の当て方と、範囲の外の変更の洗い出し |
 | `src/ccnavi/tickets/phasetypes.py` | フェーズ定義（`phases.yml`）の読み込みと検証 |
+| `src/ccnavi/tickets/plan_templates.py` | 作業・レビュー計画のテンプレートの読み込み・2 層の足し算・検査・`--templates` の JSON（読む側）と、下書きの置き場 |
+| `src/ccnavi/tickets/template_drafts.py` | テンプレートの下書きの作成（完了した親から）・検査と、ユーザの取り込み（差分・`--expect`・書き込み・下書きの削除）（溜める側） |
 | `src/ccnavi/tickets/flow.py` | 子チケットのフロー（作業の手順のグラフ）。置き場・着手中のロック・読み込み・子に渡す案内 |
 | `src/ccnavi/tickets/flow_text.py` | フローに書かれた文字列の整え方。制御文字・長さ・印や囲みのなりすまし |
 | `src/ccnavi/tickets/flow_shape.py` | フローの形の検査。ノード・枝・名前の食い違い |
@@ -2902,7 +3093,8 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/review_close.py` | 親を閉じる（`review ready` と `close-early`） |
 | `src/ccnavi/tickets/plan_order.py` | 計画の番号の振り直しと、提案への書き戻し（`--plan-order <親>`）。書き換えた全文を読み直す検査はここにまとめる |
 | `src/ccnavi/tickets/plan_phases.py` | 計画が使うフェーズ定義を、親の提案の `phases:` に写す（`--plan-order <親> --fill-phases`） |
-| `src/ccnavi/tickets/scaffold.py` | 親の提案の雛形を作る（`ticket new`）。選んだフェーズの `scope` を集めて `allow` に書き、一直線の `plan` と `phases:` の写しを入れる |
+| `src/ccnavi/tickets/scaffold.py` | 親の提案の雛形を作る（`ticket new`）。選んだフェーズの `scope` を集めて `allow` に書き、一直線の `plan`（`--template` ならテンプレートの計画）と `phases:` の写しを入れる |
+| `src/ccnavi/tickets/template_use.py` | テンプレートを使う側。名前で引く（使えるものだけ）・`after` を提案の絶対番号に付け直す・子のフローの下書きの識別子と文面を組む |
 | `src/ccnavi/tickets/ops.py` | チケットの状態を動かす `ticket start / finish / cancel / record-risk`。閉じるときに実績のリスクを数える |
 | `src/ccnavi/tickets/ops_close.py` | チケットを引いて動かしてよいかの検査。置き場の引き当て、取り込み済みの親子の停止、着手の前（親・先行）と終了の前（親を閉じられる・成果物）の検査 |
 | `src/ccnavi/tickets/ops_stop.py` | Stop で `finish` の打ち忘れを促す判定と、基準点の確認（git の読み取り） |
@@ -2932,6 +3124,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/entry/lint_project.py` | lint のうち、`.claude/settings.json`・`settings.local.json` の hook と env の検査 |
 | `src/ccnavi/entry/lint_places.py` | lint のうち、下書き・プロジェクト・チケットの置き場の検査 |
 | `src/ccnavi/entry/lint_layers.py` | lint のうち、設定のレイヤーと、取り込んだレイヤーの食い違いの検査 |
+| `src/ccnavi/entry/lint_templates.py` | lint のうち、作業・レビュー計画のテンプレートの検査 |
 | `src/ccnavi/entry/lint_ticket.py` | lint のうち、承認済みチケット・承認・提案と、親子の運用に要る hook の検査 |
 | `src/ccnavi/entry/lint_branch.py` | lint のうち、チケットのブランチ名・連番・既存ブランチ・ワークツリーの検査 |
 | `src/ccnavi/entry/diagnose.py` | 判定を実行せずに試す `--test` と `--explain`。名前を引き受けるだけで、中身は下の 4 つに分けてある |
@@ -2943,9 +3136,10 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/entry/cli_usage.py` | `--help` の本文 |
 | `src/ccnavi/entry/cli_args.py` | 引数の読み分け。設定を上書きする旗・診断だけの旗・`--docs` と並べられない旗と、パスの見分け |
 | `src/ccnavi/entry/cli_ops.py` | チケットとレビューの副命令を ops / review へ渡す。`sync` の問い合わせ |
+| `src/ccnavi/entry/cli_templates.py` | `--templates` の引数を受けて、テンプレートの一覧・検索・表示と、下書きの作成・取り込み（`--draft` / `--import`）を行う |
 | `src/ccnavi/entry/cli_plan.py` | `--plan-order` の引数を受けて答えを出す。振り直しと書き戻しは `tickets/plan_order.py` と `tickets/plan_phases.py` |
 | `build.py` | 配布物の組み立て。`dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする |
-| `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトと使い方の文書（`.ccnavi/docs/*.md`）を配る |
+| `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトと使い方の文書（`.ccnavi/docs/*.md`）と共通のテンプレート（`.ccnavi/config/common/templates/*.yml`）を配る |
 | `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |
 | `.claude/hooks/mark-ext.sh` / `test-ext.sh` | 同じく拡張のぶん。触ったことの書き残しと、ターンの終わりに関わるグループだけ回すテスト |
 | `extensions/vscode/ccnavi-board/scripts/test-groups.js` | 拡張のテストの入口。触ったファイルから回すグループを決め、コンパイルは 1 回で済ませる |
@@ -2961,7 +3155,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
 | `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |
 | `.ccnavi/scripts/ccnavi-worktree.sh` | 作業用のワークツリーを統合先から切る。`fetch`・遅れの確認・起点の選択（遅れていれば `origin/<統合先>` から `--no-track`）・`worktree add` を `ccnavi-git.sh` 経由で順に打つ。ワークツリーが既にあればパスを出すだけ。`fetch` が届かないときは何も切らず終了コード 4 で止まり、直して打ち直す手と `--offline`（手元の統合先から切る）を案内する |
-| `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/scratchpad/`（元と同じ階層）へ `cp` する。`--commands` は編集済みの下書きだけ、差し替えの `mv` をフルパスで出す。ユーザが差し替える |
+| `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/`（元と同じ階層）へ `cp` する。`--commands` は編集済みの下書きだけ、差し替えの `mv` をフルパスで出す。ユーザが差し替える |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。`--worktree <名前>` は掃除と `worktree remove` を 1 本で行う（本体は `ccnavi worktree drop`。cwd が中なら消さない）。配る（`scripts/ccnavi-setup.sh` の `DEPLOY_SCRIPTS`） |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tests/__main__.py` | `python -m tests`。テストをモジュールごとに別プロセスで同時に回す。回す中身は discover と同じ |

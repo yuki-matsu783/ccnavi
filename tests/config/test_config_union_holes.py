@@ -278,7 +278,7 @@ class ShellPlaceTest(GuardHarness):
         `.claudexyz` や `.ccnavi-notes.md` は別のファイル。`.claude/worktrees/` は
         守る対象ではないので、片付けは通る（`.claude` の側を ccnavi ディレクトリと同じ `_END` で
         閉じると、ここが止まる）。ccnavi ディレクトリから外へコピーするだけの読みも通る。
-        `rm -rf` は組み込みの deny（`builtin:recursive-delete`）が常に止めるので、`-f` は付けない。
+        `rm -rf` は組み込みの deny（`builtin:recursive-delete`）が止めるので、`-f` は付けない。
         """
         for command in (
             "rm -r .claudexyz",

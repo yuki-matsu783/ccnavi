@@ -238,8 +238,11 @@ def family_for(root: str, conf: settings.Settings, ident: str) -> str:
     （`<x>-<2 桁>-<2 桁>`。`rel-2026-10-06` など。lint は warn にとどめる）で終わっていても、
     名前の形から末尾を剥がして別の親と読み違えないため。見つからないときだけ名前の形で割り出す。
     """
-    found = approval.scan(conf, root)[0] + approval.scan(conf, root, closed=True)[0]
-    found += approval.scan_review(conf, root)[0]
+    raw = approval.read_raw(conf, root)
+    found = (
+        approval.scan(conf, root, raw=raw)[0] + approval.scan(conf, root, closed=True, raw=raw)[0]
+    )
+    found += approval.scan_review(conf, root, raw=raw)[0]
     for t in found:
         if t.ticket == ident:
             return t.parent or t.ticket
@@ -295,10 +298,8 @@ def _leftover_facts(path: str) -> tuple[list[str], list[str]]:
     )
     changes = [line for line in done.out.splitlines() if line.strip()] if done.ok else []
     if changes:
-        scratch = [c for c in changes if "wip/scratchpad/" in c.replace("\\", "/")]
-        why.append(
-            "未保存の下書きがある（wip/scratchpad/）" if scratch else "未コミットの変更がある"
-        )
+        scratch = [c for c in changes if "wip/handoff/" in c.replace("\\", "/")]
+        why.append("未保存の下書きがある（wip/handoff/）" if scratch else "未コミットの変更がある")
         check.append(f"`git -C {path} status` で中身を見て、要るものはコミットするか退避する")
     ignored, _ = _ignored(path)
     if ignored:
@@ -371,7 +372,7 @@ def _ignored(top: str) -> tuple[list[str], str]:
 
     `--directory` で、全体が無視されたディレクトリは 1 行（末尾の `/`）にまとめる。生成物
     （`ccnavi-clean.js` と同じ名前。`out` は package.json の隣だけ）は消してよいので数えない。
-    下書きの置き場（`wip/scratchpad/`）は追跡されるファイルで、gitが無視するものではないので、
+    下書きの置き場（`wip/handoff/`）は追跡されるファイルで、gitが無視するものではないので、
     ここには現れない。
     """
     done = gitcmd.run(

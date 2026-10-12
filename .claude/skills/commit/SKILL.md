@@ -99,7 +99,7 @@ prefix か主題が別なら別コミットに分ける。要件（`docs/require
 - 開発環境の副産物: `.DS_Store` / `Thumbs.db` / `desktop.ini` / `*.swp` / `*.swo` / `*~` / `*.log` / `tmp/` / `*.tmp` / `*.tmp.*` / `*.bak` / `*.orig` / `*.stackdump` / `.claude/settings.local.json`
 - このリポジトリの生成物: `dist/` / `build/` / `__pycache__/` / `*.pyc` / `.venv/` / `.ruff_cache/` / `*.jsonl` / `logs/`（判定記録。絶対パスとコマンド全文が入る） / `knowledge/`（参照専用の外部資料）
 
-`wip/scratchpad/`（下書きの置き場）は追跡してpushする置き場なので、除外しない。統合時に `ccnavi-git.sh integrate` が外す。
+`wip/handoff/`（下書きの置き場）は追跡してpushする置き場なので、除外しない。統合時に `ccnavi-git.sh integrate` が外す。
 `.gitignore` に無い新種の副産物を見つけたら、この一覧と `.gitignore` の両方に足す。
 削除されたファイル（`status` の `D`）は除外対象ではなく、他と同じく `add --` に並べてよい。
 除外したファイルがあれば、コミット前にチャットへ列挙する。

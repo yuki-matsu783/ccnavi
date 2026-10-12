@@ -637,7 +637,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("読めない", explained.stdout)
 
     def test_lint_no_longer_asks_for_a_scratchpad_ignore_line(self):
-        # 下書きの置き場は `wip/scratchpad/`（追跡する）に一本化した。ワークツリー直下の
+        # 下書きの置き場は `wip/handoff/`（追跡する）に一本化した。ワークツリー直下の
         # `scratchpad/` を無視しているかの警告は出さない。
         result = self.ccnavi("--lint")
         text = result.stdout + result.stderr

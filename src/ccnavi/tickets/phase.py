@@ -299,6 +299,8 @@ def phases_of(
     `raw` は呼び手が `approval.read_raw` で読んだ置き場。読んでから置き場のファイルを
     動かしていないときだけ渡す。渡せば 3 つの `scan` が置き場を読み直さない。無ければここで読む。
     """
+    if raw is None:
+        raw = approval.read_raw(conf, root)
     open_copies, _ = approval.scan(conf, root, raw=raw)
     closed_copies, _ = approval.scan(conf, root, closed=True, raw=raw)
     by_number: dict[int, Phase] = {}

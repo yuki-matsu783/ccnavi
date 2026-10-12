@@ -15,10 +15,11 @@ md の書き方は 3 つだけ（条件 if・else と、差し込み）。
 名前は、ワークスペースの `.ccnavi/scripts/ccnavimd.sh` の関数 `ccnavi_cond_<名前>` が判定する
 （戻り値 0 が真、1 が偽。配布先で実行ファイルを触らずに条件を足せる）。関数が無い・判定できない
 ときは、囲んだ行をそのまま出す。
-条件は、文と判定が食い違わないための仕掛けでもある。ワークツリーと git の行は、それを支える
-deny（id `workspace-root` / `raw-git`）がワークスペースのルールにあるときだけ載せる（条件の名前は
-`workspace_root` / `raw_git`）。ルールが無い
-ワークスペースでその行を言うと、文と判定が食い違う。
+条件は、文と判定が食い違わないための仕掛けでもある。ワークツリーの行は、それを支える
+deny（id `workspace-root`）がワークスペースのルールにあるときだけ載せる（条件の名前は
+`workspace_root`）。ルールが無いワークスペースでその行を言うと、文と判定が食い違う。
+git の行は、組み込みの deny（生の git）がいつも止めるので条件を付けず、入口（ラッパー）の有無で
+文を分ける（条件の名前は `git_wrapper`）。
 
 md が無い・読めないときは、無いことだけを 1 行で言う。何も言わずに黙ると、決まりが渡って
 いないことに誰も気づけない。長すぎるときは `MAX_CHARS` で切り、切ったことを末尾に言う。
@@ -33,7 +34,7 @@ from collections.abc import Callable, Collection
 from typing import NamedTuple
 
 from ..infra import modes, settings, tree
-from ..tickets import ticket_guard, ticket_places
+from ..tickets import ticket_places
 
 FILE = "CCNAVI.md"
 
@@ -56,9 +57,9 @@ def _workspace_root(ctx: Context) -> bool:
     return "workspace-root" in ctx.deny_ids
 
 
-def _raw_git(ctx: Context) -> bool:
-    """`raw-git` の deny がある、または生の git を組み込みで止める。"""
-    return "raw-git" in ctx.deny_ids or ticket_guard.raw_git_applies(ctx.conf, ctx.root)
+def _git_wrapper(ctx: Context) -> bool:
+    """ワークスペースに git の入口（`ccnavi-git.sh`）がある。無ければ git の行は頼む形になる。"""
+    return settings.has_git_wrapper(ctx.root)
 
 
 def _projects(ctx: Context) -> bool:
@@ -84,7 +85,7 @@ def _dry_run(ctx: Context) -> bool:
 # md の `<!-- ccnavi:if 名前 -->` の名前と、その真偽を返す関数。条件を足すときはここに 1 つ足す。
 CONDITIONS: dict[str, Callable[[Context], bool]] = {
     "workspace_root": _workspace_root,
-    "raw_git": _raw_git,
+    "git_wrapper": _git_wrapper,
     "projects": _projects,
     "tickets": _tickets,
     "docs": _docs,
@@ -106,7 +107,8 @@ SUBSTITUTIONS = (
     "git_sh",  # git のラッパー（打てる形のコマンド）
     "ticket_sh",  # チケットの sh
     "stage_sh",  # 保護対象を下書きで直すための sh
-    "scratch",  # 下書きの置き場（`wip/scratchpad`）
+    "handoff",  # ユーザに渡す物の置き場（`wip/handoff`）
+    "scratch",  # 使い捨ての置き場（ワークスペースルート直下の `scratchpad` の絶対パス。無視される）
     "projects",  # プロジェクトの置き場（ワークスペースルートからの相対）
     "tickets_dir",  # 提案の置き場
     "approved_dir",  # 承認済みチケットの置き場
@@ -315,7 +317,8 @@ def values_for(conf: settings.Settings, root: str) -> dict[str, str]:
         "git_sh": settings.script_command(root, "ccnavi-git.sh"),
         "ticket_sh": settings.script_command(root, "ccnavi-ticket.sh"),
         "stage_sh": settings.script_command(root, "ccnavi-stage.sh"),
-        "scratch": ticket_places.SCRATCH,
+        "handoff": ticket_places.HANDOFF,
+        "scratch": os.path.join(root, ticket_places.SCRATCH_ROOT).replace("\\", "/"),
         "projects": projects,
         "tickets_dir": conf.tickets,
         "approved_dir": conf.approved,

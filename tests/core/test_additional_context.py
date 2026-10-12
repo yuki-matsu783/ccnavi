@@ -197,6 +197,27 @@ class AdditionalContextTest(unittest.TestCase):
         self.run_ccnavi("--state", state, "--test", "Write", target)
         self.assertEqual(hit("s3").get("additionalContext"), NOTE)
 
+    def test_record_marks_only_the_call_that_delivered_the_once_text(self):
+        self.rules(
+            allow=[
+                rule("src", "Write", "", glob="*/src/*", additionalContextOnce=NOTE),
+                rule("doc", "Write", "", glob="*/doc/*", additionalContext=NOTE),
+            ],
+        )
+
+        def hit(*parts: str) -> None:
+            self.judge("Write", os.path.join(self.root, *parts))
+
+        hit("src", "a.py")
+        hit("src", "b.py")
+        hit("doc", "a.md")
+        hit("doc", "b.md")
+        log = os.path.join(self.root, "logs", "decisions.jsonl")
+        with open(log, encoding="utf-8") as f:
+            rows = [json.loads(line) for line in f if line.strip()]
+        # 欄は、once の案内を渡した 1 回目にだけ付く。2 回目と、毎回渡す案内だけの回には付かない。
+        self.assertEqual([r.get("hinted") for r in rows], [True, None, None, None])
+
     def test_both_texts_join_the_first_time_and_only_the_short_one_after(self):
         always = "src は自由に直してよい。"
         self.rules(

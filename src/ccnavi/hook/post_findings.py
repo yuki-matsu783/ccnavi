@@ -100,9 +100,9 @@ class ScopeGuard:
         rel = tree.relative(t, full)
         if ticket_places.is_ticket_place(rel, self.tickets, self.approved):
             return None
-        # 下書きの置き場（`wip/scratchpad/`）と ELI5 の置き場は追跡されるので、ここでも外す
+        # 下書きの置き場（`wip/handoff/`）と ELI5 の置き場は追跡されるので、ここでも外す
         # （実行前チェックと揃える）。
-        if ticket_places.is_scratch_place(rel) or ticket_places.is_eli5_place(rel):
+        if ticket_places.is_handoff_place(rel) or ticket_places.is_eli5_place(rel):
             return None
         parent = self.copies.get(ticket.parent) if ticket.is_child else None
         # 定義は親に固定した写し（`phases:`）から引く。`phases.yml` は開かない。
@@ -366,10 +366,10 @@ def _integrate_writes(changes: list[gitstate.Change], top: str) -> set[str]:
     * HEAD が記録の `base` のまま
     * いまの index のツリーが記録の `tree` と同じ
     * そのツリーが `git merge-tree --write-tree HEAD <ブランチ>`（= squash の結果）と同じ。
-      ただし `wip/scratchpad/` の下の差は数えない（`integrate` が下書きを外すため）
+      ただし `wip/handoff/` の下の差は数えない（`integrate` が下書きを外すため）
 
     最後の条件で、記録に何が書かれていても、外れるのは「HEAD にそのブランチを squash した結果」と
-    `wip/scratchpad/` の下以外は一字も違わない index だけになる。
+    `wip/handoff/` の下以外は一字も違わない index だけになる。
     外す対象は HEAD との staged の差分のパスのうち、作業ツリーでさらに変わっていないもの。
     ほかの変更、条件が欠けたツリー、git を起こせない・git が古くて
     `merge-tree --write-tree` が無い場合は外さず、今までどおり報告する。
@@ -413,7 +413,7 @@ def _integrate_writes(changes: list[gitstate.Change], top: str) -> set[str]:
         merged = gitcmd.run(top, ["merge-tree", "--write-tree", "HEAD", f"refs/heads/{branch}"])
         if not merged.ok or not merged.out.strip():
             continue
-        if not _same_but_scratch(top, merged.out.split("\n", 1)[0].strip(), recorded):
+        if not _same_but_handoff(top, merged.out.split("\n", 1)[0].strip(), recorded):
             continue
         # 改名の検出は切る（gitstate.read と同じ。移動元の削除も 1 件として数える）。
         staged = gitcmd.run(
@@ -451,7 +451,7 @@ def integrated_paths(top: str, base: str) -> set[str]:
     * 記録の `branch_sha`（B）が HEAD の祖先でない（squash は B を履歴に入れない。
       C 自身や前のコミットを B に書いた偽の記録はここで外れる）
     * B を含むローカルのブランチと stash が無い（正規の片付けでブランチは消えている）
-    * `merge-tree --write-tree <base> B` の結果が C のツリーと、`wip/scratchpad/` の下を
+    * `merge-tree --write-tree <base> B` の結果が C のツリーと、`wip/handoff/` の下を
       除いて同じ
 
     数えるコミットは `gitstate.committed` と同じ（`--first-parent --no-merges`）。返すのは、
@@ -551,15 +551,15 @@ def _is_integrate_commit(
         merged = gitcmd.run(top, ["merge-tree", "--write-tree", parent, tip])
         if not merged.ok or not merged.out.strip():
             continue
-        if _same_but_scratch(top, merged.out.split("\n", 1)[0].strip(), tree_sha):
+        if _same_but_handoff(top, merged.out.split("\n", 1)[0].strip(), tree_sha):
             return True
     return False
 
 
-def _same_but_scratch(top: str, left: str, right: str) -> bool:
-    """2 つのツリーの差が、下書きの置き場（`wip/scratchpad/`）の下だけ（差が無いのも含む）か。
+def _same_but_handoff(top: str, left: str, right: str) -> bool:
+    """2 つのツリーの差が、下書きの置き場（`wip/handoff/`）の下だけ（差が無いのも含む）か。
 
-    `integrate` は squash のあとで、ブランチが持ち込んだ `wip/scratchpad/` の分を index から外す。
+    `integrate` は squash のあとで、ブランチが持ち込んだ `wip/handoff/` の分を index から外す。
     なので index のツリーは `merge-tree --write-tree` の結果と、その分だけ違う。`wip/` のそれ以外
     （`wip/proposals/` など）の差は数える。ツリーが読めないときは False。
     """
@@ -572,7 +572,7 @@ def _same_but_scratch(top: str, left: str, right: str) -> bool:
     )
     if not diff.ok:
         return False
-    prefix = ticket_places.SCRATCH + "/"
+    prefix = ticket_places.HANDOFF + "/"
     return all(p.startswith(prefix) for p in diff.out.split("\0") if p)
 
 

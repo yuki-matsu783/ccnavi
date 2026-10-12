@@ -114,6 +114,10 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # .ccnavi/ の下で載せるので、配った先でも `ccnavi --docs` で引ける。rules.yml の
 # additionalContextFile（スキルの振り返りの手順）と、sh の案内が指す先でもある。
 DEPLOY_DOCS_DIR=".ccnavi/docs"
+# 共通の作業・レビュー計画のテンプレートの置き場。配布元にある *.yml を全部配る。共通レイヤーの
+# 一部なので、設定 3 本と同じく .ccnavi/config/common/ の下へ配る。配布元に置き場が無い、または
+# *.yml が 1 本も無いのは正常（共通のテンプレートはまだ無いことがある）で、何も言わずに飛ばす。
+DEPLOY_TEMPLATES_DIR=".ccnavi/config/common/templates"
 # ccnavi-common.sh は、3 本の sh が `.` で読み込む共通部分の入口。入口は同じディレクトリの部品
 # ccnavi-common-{state,lock,c1,host,log}.sh を読む。どちらも配らないと、配布先で 3 本とも
 # 起動時にエラーで止まる。部品は入口より先に配る。途中で失敗したときに、部品を読む新しい入口だけが
@@ -131,7 +135,7 @@ DEPLOY_DOCS_DIR=".ccnavi/docs"
 # issue・MR の指定を見つけるとこの表記を案内するので、配らないと案内どおりに実行しても動かない。
 # ccnavi-start.sh は issue・MR の指定を受けた着手の入口で、hook がこの表記を案内する。中で ccnavi-branches.sh を呼ぶ。
 # ccnavi-stage.sh は、書き込みを止められている保護対象のファイルを下書きの置き場で直すための支度をする sh。
-# CLAUDE.md の決まり（wip/scratchpad/ に cp して編集し、ユーザが差し替える）の手順を 1 本にしたもの。
+# CLAUDE.md の決まり（wip/handoff/ に cp して編集し、ユーザが差し替える）の手順を 1 本にしたもの。
 # ccnavi-worktree.sh は作業用のワークツリーを統合先から切る sh（fetch・遅れの確認・起点の選択・worktree add を
 # 1 本にしたもの）。.ccnavi/docs/worktree.md の「ワークツリーを切る」の手順を打つ。
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
@@ -189,7 +193,8 @@ CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）�
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・作業の決まり（.ccnavi/CCNAVI.md）・設定 3 本（.ccnavi/config/common/rules.yml、
 .ccnavi/config/common/risks.yml、.ccnavi/config/common/phases.yml。自身のレイヤーの .ccnavi/config/project/phases.yml は
 配らず、既にあれば触らない。フェーズ定義は 2 本の和で判定する）・代わりに通る sh と振り分けの sh
-（.ccnavi/scripts/）・使い方の文書（.ccnavi/docs/*.md）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
+（.ccnavi/scripts/）・使い方の文書（.ccnavi/docs/*.md）・共通の作業・レビュー計画のテンプレート
+（.ccnavi/config/common/templates/*.yml。配布元に無ければ配らない）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
 --docs の索引（**/ccnavi-index.jsonl）は、配布先の .gitignore に足す（ccnavi-index.jsonl を否定する
 行があれば足さない）。
 
@@ -453,6 +458,8 @@ risk_verdict=""
 common_phases_verdict=""
 scripts_todo=""
 docs_todo=""
+templates_todo=""
+templates_skipped=""
 
 # 配布元にあるか、配布先にあるか、--force か。この 3 つだけで決まる。
 verdict() {
@@ -556,6 +563,36 @@ if [ -n "$deploy" ]; then
 		done
 	else
 		note_deploy absent "$DEPLOY_DOCS_DIR/" "$DEPLOY_DOCS_DIR/"
+	fi
+
+	# 共通のテンプレート。置き場が無いか空なら、何も配らず何も言わない。
+	if [ -d "$source_root/$DEPLOY_TEMPLATES_DIR" ]; then
+		for template_entry in "$source_root/$DEPLOY_TEMPLATES_DIR"/*.yml; do
+			# 配布元が空だと glob が展開されずにそのまま残る。実在するものだけを配る。
+			[ -f "$template_entry" ] || continue
+			template_name=$(basename "$template_entry")
+			# 名前は ccnavi の読み手と同じ範囲（英数字で始め、英数字と . _ - だけ）に限る。空白や
+			# glob の文字を含む名前は、単語分割で cp を失敗させて配布を半端に止めるので配らない。
+			case "$template_name" in
+			*[!A-Za-z0-9._-]* | [!A-Za-z0-9]*)
+				templates_skipped="$templates_skipped$template_name
+"
+				continue
+				;;
+			esac
+			if [ -e "$root/$DEPLOY_TEMPLATES_DIR/$template_name" ]; then
+				template_there=yes
+			else
+				template_there=no
+			fi
+			template_verdict=$(verdict "$template_entry" "$template_there")
+			note_deploy "$template_verdict" "$DEPLOY_TEMPLATES_DIR/$template_name" "$DEPLOY_TEMPLATES_DIR/$template_name"
+			case "$template_verdict" in
+			copy | replace)
+				templates_todo="$templates_todo $template_name"
+				;;
+			esac
+		done
 	fi
 
 	for name in $DEPLOY_SCRIPTS; do
@@ -797,10 +834,21 @@ fi
 IGNORE_HEADER="# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）"
 INDEX_IGNORE_HEADER="# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）"
 INDEX_IGNORE_LINE="**/ccnavi-index.jsonl"
+# ワークスペースルート直下の scratchpad/ は、直接作業で一時的にユーザへ見せる物とコミットしたくない物の
+# 置き場（.ccnavi/docs/scratchpad.md）。追跡されると意味が無いので、実行ファイルと同じ回に足す。
+# `scratchpad/` はどの階層の同名にも当たるので、ルートに固定した `/scratchpad` が既にあるとき、
+# または同等以上の `/scratchpad/`・`scratchpad`・`scratchpad/` があるときは足さない。
+# 末尾に `/` を付けないのは、scratchpad が symlink でも当たるようにするため（`/scratchpad/` はディレクトリにしか当たらない）。
+# `!/scratchpad` のようにユーザが否定している行があれば、追跡すると決めているので足さずに伝える。
+SCRATCH_IGNORE_HEADER="# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）"
+SCRATCH_IGNORE_LINE="/scratchpad"
 # ignore_todo は、表示と「揃っているか」の判定に使う全体。書き込むときは塊ごとに分けて持つ。
 ignore_todo=""
 ignore_bin_todo=""
 ignore_index_todo=""
+ignore_scratch_todo=""
+# ユーザが scratchpad を否定している行（改行で終わる）。あれば /scratchpad は足さない。
+ignore_scratch_negated=""
 # ユーザが ccnavi-index.jsonl を否定している行（改行で終わる）。あれば索引の行は足さない。
 ignore_index_negated=""
 # .gitignore の行を、比べやすい形で出す。CRLF の `\r` と行末の空白を取り除く（git も行末の
@@ -831,7 +879,15 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 		ignore_index_todo="$INDEX_IGNORE_LINE
 "
 	fi
-	ignore_todo="$ignore_bin_todo$ignore_index_todo"
+	scratch_negated=$(gitignore_lines | grep -E '^!/?scratchpad/?$' || true)
+	if [ -n "$scratch_negated" ]; then
+		ignore_scratch_negated="$scratch_negated
+"
+	elif ! ignored_already "$SCRATCH_IGNORE_LINE" "/scratchpad/" "scratchpad/" "scratchpad"; then
+		ignore_scratch_todo="$SCRATCH_IGNORE_LINE
+"
+	fi
+	ignore_todo="$ignore_bin_todo$ignore_index_todo$ignore_scratch_todo"
 fi
 
 copy_tree() {
@@ -959,6 +1015,10 @@ report_deploy() {
 		printf '配布元に無くて配れないもの:\n'
 		printf '%s' "$deploy_absent" | sed 's/^/  /'
 	fi
+	if [ -n "$templates_skipped" ]; then
+		printf '名前に使えない文字があるので配っていないテンプレート（英数字で始め、英数字と . _ - だけ）:\n'
+		printf '%s' "$templates_skipped" | sed 's/^/  /'
+	fi
 	if [ -n "$ignore_todo" ]; then
 		printf '%s:\n' "$3"
 		printf '%s' "$ignore_todo" | sed 's/^/  /'
@@ -966,6 +1026,10 @@ report_deploy() {
 	if [ -n "$ignore_index_negated" ]; then
 		printf '.gitignore に ccnavi-index.jsonl を否定する行があり、ユーザが索引を追跡しているので %s は足していません:\n' "$INDEX_IGNORE_LINE"
 		printf '%s' "$ignore_index_negated" | sed 's/^/  /'
+	fi
+	if [ -n "$ignore_scratch_negated" ]; then
+		printf '.gitignore に scratchpad を否定する行があり、ユーザが追跡しているので %s は足していません:\n' "$SCRATCH_IGNORE_LINE"
+		printf '%s' "$ignore_scratch_negated" | sed 's/^/  /'
 	fi
 	if [ -n "$launcher_mode_todo" ]; then
 		printf '%s:\n' "$4"
@@ -1285,7 +1349,7 @@ if [ "$vscode_linked" = yes ]; then
 fi
 
 # 配る。順は実行ファイル → 設定 3 本（ルール・リスクの配点・フェーズ定義）→
-# 代わりに通る sh → 振り分けの sh。途中で失敗したときに、判定するものだけがあって
+# 共通のテンプレート → 文書 → 代わりに通る sh → 振り分けの sh。途中で失敗したときに、判定するものだけがあって
 # 何を止めるかが無い、という状態にしないため。
 if [ "$deploy_work" = yes ]; then
 	case "$bin_verdict" in
@@ -1321,6 +1385,9 @@ if [ "$deploy_work" = yes ]; then
 		copy_file "$source_root/$DEPLOY_COMMON_PHASES" "$root/$DEPLOY_COMMON_PHASES"
 		;;
 	esac
+	for name in $templates_todo; do
+		copy_file "$source_root/$DEPLOY_TEMPLATES_DIR/$name" "$root/$DEPLOY_TEMPLATES_DIR/$name"
+	done
 	for name in $docs_todo; do
 		copy_file "$source_root/$DEPLOY_DOCS_DIR/$name" "$root/$DEPLOY_DOCS_DIR/$name"
 	done
@@ -1364,6 +1431,7 @@ if [ "$deploy_work" = yes ]; then
 	}
 	append_ignore "$IGNORE_HEADER" "$ignore_bin_todo"
 	append_ignore "$INDEX_IGNORE_HEADER" "$ignore_index_todo"
+	append_ignore "$SCRATCH_IGNORE_HEADER" "$ignore_scratch_todo"
 fi
 
 report_deploy '配った' '入れ替えた' '.gitignore に足した' '実行ビットを付けた'
@@ -1450,6 +1518,19 @@ if [ -n "$source_root" ] && [ -d "$source_root/$DEPLOY_DOCS_DIR" ]; then
 		doc_name=$(basename "$doc_entry")
 		if [ ! -f "$root/$DEPLOY_DOCS_DIR/$doc_name" ]; then
 			note_missing "${DEPLOY_DOCS_DIR}/${doc_name}（ccnavi の使い方の文書。ccnavi --docs で引く）"
+		fi
+	done
+fi
+# 共通のテンプレートも同じ。配布元にあるものだけを確かめる（配布元に無いのは正常）。
+if [ -n "$source_root" ] && [ -d "$source_root/$DEPLOY_TEMPLATES_DIR" ]; then
+	for template_entry in "$source_root/$DEPLOY_TEMPLATES_DIR"/*.yml; do
+		[ -f "$template_entry" ] || continue
+		template_name=$(basename "$template_entry")
+		case "$template_name" in
+		*[!A-Za-z0-9._-]* | [!A-Za-z0-9]*) continue ;;
+		esac
+		if [ ! -f "$root/$DEPLOY_TEMPLATES_DIR/$template_name" ]; then
+			note_missing "${DEPLOY_TEMPLATES_DIR}/${template_name}（共通の作業・レビュー計画のテンプレート。ccnavi --templates で引く）"
 		fi
 	done
 fi

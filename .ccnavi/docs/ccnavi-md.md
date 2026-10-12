@@ -31,7 +31,7 @@ keywords: [CCNAVI.md, ccnavi:if, ccnavi:else, ccnavi:endif, 条件, 差し込み
 | 条件の名前 | 成り立つとき |
 |---|---|
 | `workspace_root` | ワークスペースのルール（共通レイヤーか自身のレイヤー）の`deny`にid `workspace-root`がある |
-| `raw_git` | 同じく`deny`にid `raw-git`がある、または生のgitを組み込みで止める（チケット制御が有効でラッパーがある） |
+| `git_wrapper` | ワークスペースに git の入口（`.ccnavi/scripts/ccnavi-git.sh`）がある。生の git は組み込みでいつも止まるので、git の行は、これが偽のときは入口を名指しせず「ユーザに頼む」形になる |
 | `projects` | プロジェクトの置き場に`.git`を持つプロジェクトがある |
 | `tickets` | チケット制御を使っている（`CCNAVI_TICKET_CONTROL`が`disable`でない） |
 | `docs` | mdの索引の案内（`--docs`）を出す回 |
@@ -71,7 +71,8 @@ mdでは`<!-- ccnavi:if has_docker -->`と書く。
 |---|---|
 | `worktrees` | ワークツリーの置き場（`.claude/worktrees`） |
 | `git_sh` / `ticket_sh` / `stage_sh` | `ccnavi-git.sh` / `ccnavi-ticket.sh` / `ccnavi-stage.sh`を打てる形にしたコマンド |
-| `scratch` | 下書きの置き場（`wip/scratchpad`） |
+| `handoff` | ユーザに渡す物の置き場（`wip/handoff`） |
+| `scratch` | 使い捨ての置き場（ワークスペースルート直下の`scratchpad`の絶対パス。`.gitignore`で追跡から外れる。ワークツリーの中から相対で書くとワークツリー直下に作ってしまうため、絶対パスで差し込む） |
 | `projects` | プロジェクトの置き場（ワークスペースルートからの相対） |
 | `tickets_dir` / `approved_dir` | 提案の置き場 / 承認済みチケットの置き場 |
 | `mode_env` | `CCNAVI_MODE` |

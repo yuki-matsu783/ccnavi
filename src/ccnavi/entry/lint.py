@@ -43,7 +43,15 @@ from ..tickets import (
     syncstate,
     ticket_model,
 )
-from . import lint_layers, lint_places, lint_project, lint_rules, lint_ticket, version
+from . import (
+    lint_layers,
+    lint_places,
+    lint_project,
+    lint_rules,
+    lint_templates,
+    lint_ticket,
+    version,
+)
 
 # `--lint --json` の形の版。欄を足すだけなら上げない。欄の意味や名前を変えたら上げ、
 # 読む側（VS Code 拡張）は違う版を「読めない」として扱う。
@@ -340,6 +348,7 @@ def check(
     problems.extend(lint_layers._layers(io.StringIO(), conf, root))
     problems.extend(lint_layers._legacy_places(conf, root))
     problems.extend(lint_layers._layer_configs(conf, root))
+    problems.extend(lint_templates._templates(conf, root))
     problems.extend(lint_layers._worktree_layers(conf, root))
     problems.extend(lint_places._ticket_places(conf, root))
     problems.extend(lint_places._projectless_worktrees(conf, root))
@@ -545,9 +554,10 @@ def family_check(
     fams = syncstate.Families(conf, root)
     project = None if repo is None else syncstate.project_of_key(repo)
     st = fams.standing_any(family, project)
-    copies, _ = approval.scan(conf, root)
-    closed, _ = approval.scan(conf, root, closed=True)
-    review, _ = approval.scan_review(conf, root)
+    raw = approval.read_raw(conf, root)
+    copies, _ = approval.scan(conf, root, raw=raw)
+    closed, _ = approval.scan(conf, root, closed=True, raw=raw)
+    review, _ = approval.scan_review(conf, root, raw=raw)
 
     def ours(t: ticket_model.Ticket) -> bool:
         return (t.parent or t.ticket) == family and syncstate.repo_key(t.project) == st.repo

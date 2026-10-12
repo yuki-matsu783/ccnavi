@@ -21,6 +21,7 @@ keywords: [置き場, 提案, 承認済みチケット, マーカー, wip/propos
 | 状態の履歴 | 同 `events/<識別子>.ndjson`（9.6。1 行 1 JSON の追記だけ） | 状態を動かす実行ファイル（承認・`ticket` と `review` の副命令・`--reviewed`・`close-early`・hook の告知）。書き換え・消すコードは無い | 親のブランチにコミット（`ccnavi-push-approved.sh` が置き場ごとコミットして push する） |
 | 子のフロー | 同 `flows/<子>.yml`（9.3.1） | ユーザ（ボードのフロー編集画面）。エージェントの Write / Edit は判定が止める。承認で提案のツリーから一緒に動く | 親のブランチにコミット（`ccnavi-push-approved.sh` が置き場ごとコミットして push する） |
 | 子のフローの下書き | フローと同じツリーの `wip/proposals/flows/<子>.yml`（9.3.1。効力は無い） | 頼まれたエージェント。ユーザがフロー編集画面で取り込み、保存が成功したら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んで消えた削除は `ccnavi-push-approved.sh` がフローと一緒にコミットして push する |
+| テンプレートの下書き | 提案の置き場の `wip/proposals/templates/<名前>.yml`（そのツリーの。プロジェクトのツリーならそのプロジェクトの下。9.15。効力は無い） | 頼まれたエージェント（`ccnavi --templates --draft <親>` か直接）。ユーザが `ccnavi --templates --import` で取り込み、書けたら同じ中身のときだけ消す | 書いたエージェントがコミットしてよい。取り込んで消えた削除は `ccnavi-push-approved.sh` が承認済みチケットの置き場の変更と一緒にコミットして push する |
 | ワークツリー | `.claude/worktrees/<識別子>/` | 親が git のラッパースクリプトで切る | 管理外 |
 
 状態は置き場で表す。チケットは 1 本のファイルで、2 つの置き場を行き来する。ユーザが動かす
@@ -71,8 +72,8 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 `ccnavi sync check <P>` でその親子のチケットを判定し直し、error があればその取り込み状態を `blocked` にして止める
 （理由を直して打ち直せば `present` に戻る）。
 
-**`ccnavi-git.sh` の中の判定は P13 の例外。** git の入口は `ccnavi-git.sh` 1 本に寄せてあり（チケット制御が有効なら
-生の `git` は組み込みで止まる）、その中で次の可否を sh が一次に判定する。チケットに結び付くブランチの `integrate` を断る
+**`ccnavi-git.sh` の中の判定は P13 の例外。** git の入口は `ccnavi-git.sh` 1 本に寄せてあり（生の
+`git` は組み込みでいつも止まる）、その中で次の可否を sh が一次に判定する。チケットに結び付くブランチの `integrate` を断る
 （`integrate-ticket`）、統合先への push を断る、親のブランチを 2 つの親子のチケットが宣言していれば・取り込み状態が `gone`
 なら push を断る、承認済みの `branch:` のブランチへ移る 1 操作の前提（作業ツリーが綺麗・途中の操作が無い・取り込み状態が
 合う）を確かめる。`integrate` / `integrate-done` の状態操作（取り込みの記録・`merge --squash`・取り込んだブランチの

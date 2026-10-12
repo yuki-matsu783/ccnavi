@@ -82,7 +82,10 @@ def rule_data(root: str, conf: settings.Settings) -> dict:
     )
     return {
         "version": rules.VERSION,
-        "deny": [_config_via_bash(shell, settings.git_command(root)), *_deny(root)],
+        "deny": [
+            _config_via_bash(shell, settings.git_command(root), settings.has_git_wrapper(root)),
+            *_deny(root),
+        ],
         "allow": _ALLOW,
     }
 
@@ -117,7 +120,17 @@ def read_allow() -> list[rules.Rule]:
 CONFIG_VIA_BASH_RULE_ID = "builtin:guard-config-via-bash"
 
 
-def _config_via_bash(regex: str, git: str = "git") -> dict:
+def _config_via_bash(regex: str, git: str = "git", wrapper: bool = False) -> dict:
+    # 競合の解き方の一文は、ラッパーがあるときだけ書く。無いときは生の git が止まるので、
+    # 打てる形を案内せず、ユーザに頼む。
+    resolve = (
+        "マージの衝突を解くことは止めていません。"
+        f"{git} add <パス>、{git} restore --ours -- <パス>（または --theirs）は、"
+        "コミット済みの版を戻すだけなので使えます。"
+        if wrapper
+        else "マージの衝突を解くことは、ここではエージェントが git を実行しないため、"
+        "ユーザに頼んでください。"
+    )
     return {
         "id": CONFIG_VIA_BASH_RULE_ID,
         "match": "Bash",
@@ -129,10 +142,7 @@ def _config_via_bash(regex: str, git: str = "git") -> dict:
             "ルールファイルを読めなかったため、ccnavi は組み込みの既定で動いています。"
             "シェルで書き込むのは適切ではありません。"
             "新しい内容は Write か Edit のツールで書いてください。"
-            "そうすると、確かめられて記録される経路で直せます。"
-            "マージの衝突を解くことは止めていません。"
-            f"{git} add <パス>、{git} restore --ours -- <パス>（または --theirs）は、"
-            "コミット済みの版を戻すだけなので使えます。"
+            "そうすると、確かめられて記録される経路で直せます。" + resolve
         ),
     }
 
@@ -297,10 +307,11 @@ RECURSIVE_DELETE_REGEX = (
 )
 
 
-# 設定で動かない残り。止める形は設定に依らない。文面の git の打ち方だけがワークスペースで変わる
-# （ラッパーがあればラッパー。生の git が止まるワークスペースで、止まる形を案内しないため）。
+# 設定で動かない残り。止める形は設定に依らない。文面の git の打ち方だけがワークスペースで変わる。
+# ラッパーが無いときは生の git も止まるので、`git` の形を案内せず、ユーザに頼む文にする。
 def _deny(root: str) -> list[dict]:
     git = settings.git_command(root)
+    wrapper = settings.has_git_wrapper(root)
     return [
         {
             "id": "builtin:recursive-delete",
@@ -309,6 +320,9 @@ def _deny(root: str) -> list[dict]:
             "message": (
                 "再帰的な強制削除は取り消せません。消すものを 1 つずつ名指しするか、"
                 f"ファイルが追跡されているなら {git} rm <パス> を使ってください。"
+                if wrapper
+                else "再帰的な強制削除は取り消せません。消すものを 1 つずつ名指しするか、"
+                "ユーザに削除を頼んでください。"
             ),
         },
         {
@@ -327,6 +341,8 @@ def _deny(root: str) -> list[dict]:
             "message": (
                 f"作業中の変更が失われます。{git} stash push -u で退避するか、"
                 f"ファイルを名指しして {git} restore <パス> を使ってください。"
+                if wrapper
+                else "作業中の変更が失われます。変更を捨てる前に、ユーザに確認してください。"
             ),
         },
         {
@@ -349,13 +365,13 @@ def _deny(root: str) -> list[dict]:
             "id": GIT_DIR_RULE_ID,
             "match": "Write|Edit|NotebookEdit",
             "regex": selfguard_shell.GIT_DIR_PATH_REGEX,
-            "message": _git_dir_message(git),
+            "message": _git_dir_message(git, wrapper),
         },
         {
             "id": GIT_DIR_SHELL_RULE_ID,
             "match": "Bash",
             "regex": selfguard_shell.git_dir_shell_regex(),
-            "message": _git_dir_message(git),
+            "message": _git_dir_message(git, wrapper),
         },
     ]
 
@@ -368,12 +384,17 @@ GIT_DIR_RULE_ID = "builtin:guard-git-dir"
 GIT_DIR_SHELL_RULE_ID = "builtin:guard-git-dir-via-bash"
 
 
-def _git_dir_message(git: str) -> str:
+def _git_dir_message(git: str, wrapper: bool) -> str:
+    how = (
+        f"git のサブコマンドでできる作業なら、{git} <サブコマンド> で実行してください。"
+        if wrapper
+        else ""
+    )
     return (
         ".git ディレクトリの中に直接書き込もうとしています。"
         "git を通さない変更は、履歴を失わせたり、"
         "フックを通してコマンドを走らせたりするおそれがあります。"
-        f"git のサブコマンドでできる作業なら、{git} <サブコマンド> で実行してください。"
+        f"{how}"
         "フック、.git/info/exclude、MERGE_MSG、index.lock、ワークツリーの .git ファイルは、"
         "どのサブコマンドでも編集されません。"
         "変更が必要なら、ファイル名と理由を添えてユーザに頼んでください。"

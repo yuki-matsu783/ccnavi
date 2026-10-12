@@ -74,8 +74,12 @@ HELD_TOOLS = ("Agent", *SHELL_TOOLS)
 _PREVIEW_END = rf"[ \t;&|\r\n{re.escape(shellread.SEP)}]"
 _PREVIEW_WORD = rf"[ \t]--preview(?={_PREVIEW_END}|$)"
 _NOT_PREVIEW = rf"(?![^{selfguard_shell._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
+#
+# `--import` はテンプレートの下書きを取り込む形（`ccnavi --templates --import`）。取り込みはユーザが
+# 差分を読んで決めるので、下見だけの形（`--yes` なし）も含めてエージェントには打たせない。
+# 下書きを作る `--draft` は効力が無いので止めない。
 _CLI_FORMS = (
-    rf"(--yes\b|--(?:agree|approve)\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b"
+    rf"(--yes\b|--(?:agree|approve)\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b|--import\b"
     r"|\b(ticket|review)\s+"
     r"(start|finish|cancel|record-risk|prepare|requested|confirm|ready)\b)"
 )
@@ -289,6 +293,7 @@ _OPEN_PART = re.compile(
 )
 _APPROVAL_FLAGS = ("--agree", "--approve", "--reviewed")
 _YES_FLAGS = ("--yes",)
+_IMPORT_FLAGS = ("--import",)
 _GUARD_FLAGS = ("--guard-ticket-approval",)
 _FORGET_FLAGS = ("--forget",)
 _CHOICES_FLAGS = ("--choices",)
@@ -313,17 +318,24 @@ _EXE_DIAGNOSES = frozenset(
 EXE_OPTIONS = frozenset(
     {
         "--accept-unresolved", "--actor", "--agent-id", "--agree", "--approved", "--body-file",
-        "--chat", "--choose-out", "--close-early", "--cwd", "--digest", "--docs", "--expect",
+        "--chat", "--choose-out", "--close-early", "--cwd", "--digest", "--docs", "--draft",
+        "--expect",
         "--explain", "--fill-phases", "--flow", "--format", "--guard-core-files",
-        "--guard-ticket-approval", "--help", "--integration-branch", "--issue", "--json",
-        "--keyword", "--limit", "--lint", "--log", "--mode", "--no-refresh", "--order", "--path",
+        "--guard-ticket-approval", "--help", "--import", "--integration-branch", "--issue",
+        "--json",
+        "--keyword", "--layer", "--limit", "--lint", "--log", "--mode", "--name", "--no-refresh",
+        "--order",
+        "--path",
         "--permission-mode", "--phase", "--phases", "--plan", "--plan-order", "--preview",
         "--project-home", "--project-phases-file", "--project-risk-file", "--project-rules-file",
-        "--projects", "--prune", "--reason", "--record-tree", "--record-writes",
+        "--projects", "--prune", "--reason", "--record-tree", "--record-writes", "--replace",
         "--restore-if-deny", "--result", "--reverse", "--reviewed", "--risk", "--root", "--rules",
-        "--since", "--sort", "--state", "--suggest", "--tag", "--test", "--test-expectations",
-        "--text", "--ticket-control", "--tickets", "--title", "--type", "--until", "--verify",
-        "--version", "--via", "--write", "--yes", "-h", "-r",
+        "--show", "--since", "--sort", "--state", "--suggest", "--tag", "--template", "--templates",
+        "--test",
+        "--test-expectations",
+        "--text", "--ticket-control", "--tickets", "--title", "--to", "--type", "--until",
+        "--verify",
+        "--version", "--via", "--with-feedback", "--write", "--yes", "-h", "-r",
     }
 )  # fmt: skip
 # 単引用符の中と、glob を引用した文字。文字どおりの値として読むため、
@@ -487,10 +499,11 @@ def _hidden_args(kind: str, args: list[str]) -> str:
     guard = [a for a in opened if _could_be(a, _GUARD_FLAGS)]
     if guard:
         return guard[0]
-    if any(_could_be(a, _APPROVAL_FLAGS) for a in args) and any(
+    # テンプレートの取り込み（`--import` と `--yes`）も、承認と同じく組で読めない形にして隠せる。
+    if any(_could_be(a, _APPROVAL_FLAGS + _IMPORT_FLAGS) for a in args) and any(
         _could_be(a, _YES_FLAGS) for a in args
     ):
-        return next(a for a in opened if _could_be(a, _APPROVAL_FLAGS + _YES_FLAGS))
+        return next(a for a in opened if _could_be(a, _APPROVAL_FLAGS + _IMPORT_FLAGS + _YES_FLAGS))
     return ""
 
 
@@ -858,6 +871,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             f"'{settings.script_command(root, 'ccnavi-sync.sh')} --forget' と、ユーザの判断の入口"
             f"（'{settings.script_command(root, 'ccnavi-review.sh')} chat / "
             "close-early'）もユーザが打ちます。"
+            "テンプレートの取り込み（'ccnavi --templates --import'）も、ユーザが打ちます。"
             "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
             "エージェントは打ちません。"
             "承認待ちの一覧を見るだけなら 'ccnavi --agree --preview' は通ります。"

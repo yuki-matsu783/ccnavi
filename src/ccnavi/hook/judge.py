@@ -202,13 +202,12 @@ def decide_before(
         )
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が有効なときだけ足す。
+    # 生の git は、チケット制御の有無によらず止める。入口を git のラッパー 1 本に寄せ、
+    # チケット制御の可否の一部をラッパーの中に置くため。ルールファイルが読めない間も、
+    # 共通レイヤーが無くても足す（`ticket_guard.raw_git_rule`）。
+    rule_set.deny.append(ticket_guard.raw_git_rule(root))
     if conf.tickets_enabled:
         rule_set.deny.extend(ticket_guard.guard_rules(conf.tickets, root))
-        # 生の git を止め、入口を git のラッパー 1 本に寄せる。チケット制御の可否の一部は
-        # ラッパーの中にあり、外から打てれば外れる。ルールファイルが読めない間も足す
-        # （`ticket_guard.raw_git_rule`）。
-        if ticket_guard.raw_git_applies(conf, root):
-            rule_set.deny.append(ticket_guard.raw_git_rule(root))
         # ユーザの判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:
@@ -266,7 +265,7 @@ def decide_before(
             )
         # git のラッパーの `rm`・`restore --source`・`checkout <ref> <パス>` で、自己防衛の対象を
         # 消す・別のコミットの中身に戻す形。シェルの rm と同じ場所を、ラッパー越しにも止める。
-        # ラッパー自身が消えると、生の git の組み込みの止め（ラッパーがあるときだけ足す）も外れる。
+        # ラッパー自身が消えても、生の git の組み込みの止めは外れない（いつも足す）。
         sub, word, kind = wrapguard.check_core_paths(
             conf, root, payload.cwd, record.subject, record.degraded
         )
@@ -496,7 +495,7 @@ def decide_before(
     # 書き直しを求める形は、ルールより先に止める（読み分けずに止めて書き直しを案内する）。
     # ブレース展開と、実行するときに決まるコマンド名は、ルールを当てる読みと実行されるものが
     # 食い違う。
-    # `{git,push,origin,main}` も `c=git; $c push origin main` も、raw-git に当たらないまま push を
+    # `{git,push,origin,main}` も `c=git; $c push origin main` も、生の git に当たらないまま push を
     # 実行する。バッククォートとシェルで読みが分かれる形は、読み分けると規則が増え、読み違えると
     # 止まらずに通る。どれも書き直す方法が必ずあるので、読み解かずに止めて、形ごとの書き直し方を
     # 1 回で返す。
@@ -509,7 +508,7 @@ def decide_before(
                 record.subject,
                 form,
                 [text for f, text in rewrites if f == form],
-                settings.git_command(root),
+                settings.git_wrapper_command(root),
             )
             for form in forms
         ]
@@ -651,7 +650,7 @@ def decide_before(
 
     # 当たったルールがモデルへ渡す文。通す・聞く・止めるのどれでも、判定とは
     # 別の経路（additionalContext）で届く。
-    context = ctxfile.for_rules(
+    context, record.hinted = ctxfile.deliver(
         stderr, conf.state, payload, group, ctxfile.bases(conf, root, target)
     )
     # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文。判定には
@@ -704,7 +703,7 @@ def decide_before(
                     runner,
                     layer,
                     quoted,
-                    git=settings.git_command(root),
+                    git=settings.git_wrapper_command(root),
                 )
                 for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
             ),
@@ -727,7 +726,7 @@ def decide_before(
                 runner,
                 layer,
                 quoted,
-                git=settings.git_command(root),
+                git=settings.git_wrapper_command(root),
             )
             for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]
@@ -753,7 +752,7 @@ def decide_before(
                 runner,
                 layer,
                 quoted,
-                git=settings.git_command(root),
+                git=settings.git_wrapper_command(root),
             )
             for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]

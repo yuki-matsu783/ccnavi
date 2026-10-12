@@ -15,13 +15,16 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config/
 | hook の登録、実行ファイル、保護済みスクリプト、スキル、CLAUDE.md | ワークスペースルート | ワークスペース |
 | 共通レイヤーのルール / フェーズ定義 / リスクの配点 | `.ccnavi/config/common/{rules,phases,risks}.yml`（置き場は固定） | ワークスペース |
 | ルールの期待する判定 | `.ccnavi/config/common/rule-expectations.yml` | ワークスペース |
+| 共通の作業・レビュー計画のテンプレート | `.ccnavi/config/common/templates/<名前>.yml`（置き場は固定。9.15。`*/.ccnavi/*` の一般の保護で守る） | ワークスペース |
 | 共通レイヤーのミラー | `projects/<名前>/.ccnavi/config/common/`（親の着手でワークスペースルートの `.ccnavi/config/common/` から配る。11.12。誰も編集しない） | プロジェクト |
 | ワークスペース自身のレイヤーの 3 本 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml` | ワークスペース |
 | プロジェクトのレイヤーの 3 本 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | プロジェクト |
+| 自身・プロジェクトのレイヤーのテンプレート | `<ツリー>/.ccnavi/config/project/templates/<名前>.yml`（9.15。共通のテンプレートと同じく一般の保護で守る） | そのツリーのリポジトリ |
 | 固有スクリプト（配点の `script:` が指す先） | 共通レイヤーとそのミラーは `.ccnavi/config/common/scripts/`。自身のレイヤーとプロジェクトのレイヤーは、それぞれの `.ccnavi/scripts/` | レイヤーと同じ |
 | プロジェクト | `projects/<名前>/`（`projects/` は固定。ワークスペースルートからの相対）。直下で `.git` を持つディレクトリだけ。1 段に固定 | ワークスペースでは無視。プロジェクト自身の git |
 | ワークツリー | `.claude/worktrees/<識別子>/`。ワークスペースかプロジェクトから切る | 管理外 |
 | 提案 | そのツリーの `wip/proposals/<状態>/<識別子>.md`。プロジェクト向けはそのプロジェクトの git が持つ | そのツリーのリポジトリ |
+| テンプレートの下書き | そのツリーの `wip/proposals/templates/<名前>.yml`（フローの下書きと同じ扱い。ユーザが取り込む。9.15） | そのツリーのリポジトリ |
 | 承認済みチケット（閉じたものを含む）、フェーズのマーカー | 親チケットのツリーの `.ccnavi/approved/`（9.2）。承認済みチケットに `project:` が入る | そのツリーのリポジトリ |
 | 記録、state、セッションの状態 | ワークスペースの `logs/`（`logs/decisions.jsonl`、`logs/state/`、`logs/session/`） | 管理外 |
 | git のラッパースクリプトの記録 | ワークスペースの `logs/<プロジェクト>/`。ワークスペース自身は `logs/` | 管理外 |

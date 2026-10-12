@@ -79,7 +79,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
     match: Write|Edit|NotebookEdit
     regex: '^{root}[\\/]'
     except:
-      - regex: '^{root}[\\/]wip[\\/]scratchpad(?:[\\/]|$)'
+      - regex: '^{root}[\\/]wip[\\/]handoff(?:[\\/]|$)'
       - regex: '^{root}[\\/]\.claude[\\/]worktrees(?:[\\/]|$)'
 ```
 
@@ -159,7 +159,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | 操作 | 既定での扱い |
 |---|---|
 | `rm -rf`、`git push`、`git reset --hard` | 止める。表記違いも止める（下） |
-| 生の git（チケット制御が有効で、ワークスペースルートに `ccnavi-git.sh` があるとき） | 止める（`builtin:ticket-raw-git`。9.1） |
+| 生の git（いつも） | 止める（`builtin:guard-raw-git`。9.1） |
 | 認証情報の置き場（`.env`、`.ssh/`、`id_rsa`、`.netrc`、`.npmrc` など）への `Bash` `Read` `Write` `Edit` | 止める |
 | シェルから `.claude/hooks/` `.claude/settings*.json`、ccnavi ディレクトリ `.ccnavi`、`logs/decisions.jsonl` `logs/state` `logs/archive`、`ccnavi-git.sh` へ書き込む形 | 止める（書き込みの形と場所の組で見る。8.2） |
 | `.git` の中（`.git/` の下と、ワークツリーの `.git` ファイル）への `Write` `Edit` `NotebookEdit` と、シェルから書き込む形 | 止める（`builtin:guard-git-dir`・`builtin:guard-git-dir-via-bash`。下） |
@@ -215,9 +215,9 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
   - 親から始める `find`（`find . -name index.lock -delete`）。開始点が `.git` の形だけを見る
   - Windows の別名（8.3 形式の `GIT~1`、`.git::$INDEX_ALLOCATION`）。解決済みのパスでも別名のまま残る
 
-生の git の 1 本（`builtin:ticket-raw-git`）は、`git` がコマンドの位置にある形だけに当てる（行頭とコマンドの切れ目の後ろ、
+生の git の 1 本（`builtin:guard-raw-git`）は、`git` がコマンドの位置にある形だけに当てる（行頭とコマンドの切れ目の後ろ、
 `env`・`sudo`・`xargs` などの前置きは外した中のコマンドの層で、パス付き（`C:\Git\git.exe` も）と `git.exe` も。`then`・`do` などの予約語は
-区切りの直後のものだけ読み飛ばす）。`grep git README.md`・`echo to do git` の引数の `git` には当てない。共通レイヤーの見本の `raw-git` は位置を問わずに当てるまま。ルールファイルが読めずに既定を使っている間も足す。ラッパーはルールファイルを読まずに動き、
+区切りの直後のものだけ読み飛ばす）。`grep git README.md`・`echo to do git` の引数の `git` には当てない。ルールファイルが読めずに既定を使っている間も足す。ラッパーはルールファイルを読まずに動き、
 衝突の解決に要る `add`・`restore --ours` / `--theirs`・`merge-file -p` を通すので、直す道は残る（REQ-PRE-06）。
 
 既定にはプロジェクトの `allow` が無いので、読み取り以外はほぼ確認になる。

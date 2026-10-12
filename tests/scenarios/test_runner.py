@@ -71,6 +71,18 @@ class CheckDecisionTest(unittest.TestCase):
         cond = {"subject_contains": "ccnavi-git.sh status", "decision_not": "deny"}
         self.assertEqual(runner.check_decision(rows, cond)[0], runner.PASS)
 
+    def test_hinted_true_and_false(self):
+        rows = [
+            rec(decision="allow", subject="cat a", hinted=True),
+            rec(decision="allow", subject="cat b"),
+        ]
+        first = {"subject_contains": "cat a"}
+        second = {"subject_contains": "cat b"}
+        self.assertEqual(runner.check_decision(rows, {**first, "hinted": True})[0], runner.PASS)
+        self.assertEqual(runner.check_decision(rows, {**first, "hinted": False})[0], runner.FAIL)
+        self.assertEqual(runner.check_decision(rows, {**second, "hinted": False})[0], runner.PASS)
+        self.assertEqual(runner.check_decision(rows, {**second, "hinted": True})[0], runner.FAIL)
+
     def test_decisions_none(self):
         rows = [rec(decision="deny", rules=["workspace-root"], tool="Edit")]
         cond = {"tool": "Edit", "decision": "deny", "rules_include": ["workspace-root"]}
@@ -157,6 +169,39 @@ class EvaluateTest(unittest.TestCase):
             ng = {"run": "echo hello", "expect_not_contains": "hello"}
             self.assertEqual(runner.check_state(ok, d)[0], runner.PASS)
             self.assertEqual(runner.check_state(ng, d)[0], runner.FAIL)
+
+
+class FinishOrderTest(unittest.TestCase):
+    """finish は state を確かめてから setup のファイルを消す。"""
+
+    REL = "sub/keep.txt"
+
+    def run_finish(self, root, out, scn):
+        st = {
+            "setup_made": runner._setup(scn, root),
+            "session_ids": [],
+            "pre_digests": {},
+            "cost_usd": 0.0,
+        }
+        return runner.finish(scn, out, st, root)
+
+    def scenario(self):
+        return {
+            "id": "UC-XX",
+            "title": "t",
+            "setup": {"files": {self.REL: "x\n"}},
+            "expect": {"state": [{"run": f"cat {self.REL}", "expect_contains": "x"}]},
+        }
+
+    def test_state_sees_setup_files(self):
+        with tempfile.TemporaryDirectory() as d:
+            root, out = Path(d) / "root", Path(d) / "out"
+            root.mkdir()
+            out.mkdir()
+            code = self.run_finish(root, out, self.scenario())
+            self.assertEqual(code, 0)
+            report = json.loads((out / "report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report[0]["verdict"], runner.PASS)
 
 
 class PreflightTest(unittest.TestCase):
@@ -303,7 +348,7 @@ class EvidenceTest(unittest.TestCase):
             }
         ]
         text = self._write(events)
-        self.assertIn("- 成功: working tree clean", text)
+        self.assertIn("### ツール結果（成功）\n- working tree clean", text)
         self.assertLess(text.index("## 機械判定の結果"), text.index("judge の基準"))
         self.assertIn("| files_unchanged | README.md | ", text)
 
@@ -368,6 +413,157 @@ class EvidenceTest(unittest.TestCase):
         text = self._write(events)
         self.assertIn("[image ブロック]", text)
         self.assertIn("本文", text)
+
+    def test_error_duplicating_hook_denial_points_to_hook(self):
+        payload = {
+            "hookSpecificOutput": {
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "DENY_PATH 本文",
+            }
+        }
+        events = [
+            self._hook("PreToolUse", "guard", json.dumps(payload, ensure_ascii=False)),
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "is_error": True,
+                            "content": "DENY_PATH 本文",
+                        }
+                    ]
+                },
+            },
+        ]
+        text = self._write(events)
+        self.assertIn("hook の応答を参照", text)
+        self.assertEqual(text.count("DENY_PATH 本文"), 1)
+
+    def test_short_error_contained_in_hook_reason_is_not_collapsed(self):
+        payload = {
+            "hookSpecificOutput": {
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "ファイル /a/b.txt への書き込みは禁止です",
+            }
+        }
+        events = [
+            self._hook("PreToolUse", "guard", json.dumps(payload, ensure_ascii=False)),
+            {
+                "type": "user",
+                "message": {
+                    "content": [{"type": "tool_result", "is_error": True, "content": "禁止"}]
+                },
+            },
+        ]
+        text = self._write(events)
+        self.assertNotIn("hook の応答を参照", text)
+        self.assertIn("### ツール結果（エラー）\n- 禁止", text)
+
+    def test_error_with_extra_text_after_hook_reason_is_kept(self):
+        payload = {
+            "hookSpecificOutput": {
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "DENY本文",
+            }
+        }
+        events = [
+            self._hook("PreToolUse", "guard", json.dumps(payload, ensure_ascii=False)),
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "is_error": True,
+                            "content": "DENY本文\n別の原因 exit 1",
+                        }
+                    ]
+                },
+            },
+        ]
+        text = self._write(events)
+        self.assertIn("別の原因 exit 1", text)
+        self.assertNotIn("hook の応答を参照", text)
+
+    def test_whitespace_only_hook_reason_does_not_collapse_errors(self):
+        payload = {
+            "hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "  "}
+        }
+        events = [
+            self._hook("PreToolUse", "guard", json.dumps(payload, ensure_ascii=False)),
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {"type": "tool_result", "is_error": True, "content": "全然別のエラー"}
+                    ]
+                },
+            },
+        ]
+        text = self._write(events)
+        self.assertIn("- 全然別のエラー", text)
+        self.assertNotIn("hook の応答を参照", text)
+
+    def test_success_and_error_are_under_separate_headings(self):
+        events = [
+            {
+                "type": "user",
+                "message": {
+                    "content": [{"type": "tool_result", "is_error": False, "content": "ok本文"}]
+                },
+            },
+            {
+                "type": "user",
+                "message": {
+                    "content": [{"type": "tool_result", "is_error": True, "content": "別のエラー"}]
+                },
+            },
+        ]
+        text = self._write(events)
+        self.assertIn("### ツール結果（成功）\n- ok本文", text)
+        self.assertIn("### ツール結果（エラー）\n- 別のエラー", text)
+
+    def test_input_prompt_is_in_each_step(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "step-1.jsonl").write_text("", encoding="utf-8")
+            scn = {
+                "id": "UC-99",
+                "title": "t",
+                "expect": {},
+                "steps": [{"prompt": "  ワークツリーは切らない  "}],
+            }
+            runner.write_report(scn, out, {"cost_usd": 0.0}, [], [], "")
+            text = (out / "evidence.md").read_text(encoding="utf-8")
+        self.assertIn("### 入力プロンプト\nワークツリーは切らない", text)
+
+    def test_decisions_table_has_headers_and_step_column(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            for num, sid in ((1, "S1"), (2, "S2")):
+                line = {"type": "result", "session_id": sid, "result": "x"}
+                (out / f"step-{num}.jsonl").write_text(
+                    json.dumps(line, ensure_ascii=False) + "\n", encoding="utf-8"
+                )
+            rows = [
+                {"event": "SessionStart", "session": "S2", "decision": "allow"},
+                {
+                    "event": "PreToolUse",
+                    "tool": "Read",
+                    "session": "S1",
+                    "decision": "deny",
+                    "code": "UNDECLARED",
+                    "subject": "a|b",
+                },
+            ]
+            runner.write_report(
+                {"id": "UC-99", "title": "t", "expect": {}}, out, {"cost_usd": 0.0}, [], rows, ""
+            )
+            text = (out / "evidence.md").read_text(encoding="utf-8")
+        self.assertIn("| step | event | tool | decision | code | rules | subject |", text)
+        self.assertIn("| 2 | SessionStart |", text)
+        self.assertIn("| 1 | PreToolUse | Read | deny | UNDECLARED |", text)
 
 
 class ResultsTableTest(unittest.TestCase):

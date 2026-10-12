@@ -26,14 +26,17 @@ expect:
       tool: Bash
       subject_contains: cat README.md
       decision_not: deny
+      rules_include: [prefer-read-grep]
+      hinted: true
     - event: PreToolUse
       tool: Bash
       subject_contains: cat docs/CONTEXT.md
       decision_not: deny
+      rules_include: [prefer-read-grep]
+      hinted: false
   judge:
     - 1 つ目の step で、README.md の最初の見出しを実際と合う形で答えた
-    - Read ツールを勧める案内が、hook の応答に 1 度だけ出ていて、2 つ目の cat では出ていない
 
 unconfirmed:
-  - ルール prefer-read-grep が当たった判定の記録の形（decision 値と code、`rules` に id が入るか）。確定したら、2 つの cat のうち 1 つ目だけに `rules_include` で prefer-read-grep を足し、2 つ目には足さない
-  - 案内（Read ツールを勧める文）が 1 度だけ届くこと。stream-json で additionalContext がどの行に出るか確かめて、judge の基準の読み方を確定する（include-hook-events の出力に出るか）
+  - ルール prefer-read-grep が当たった判定の記録の形は確定済み（decision allow、`rules` は ['prefer-read-grep']）。案内を出した呼び出しは記録の `hinted` で見る。回し直して `hinted` が 1 つ目の cat にだけ付くことを確かめる
+  - 案内（additionalContext）の行は stream-json の hook_response の output 内にある。1 度だけ届くことは `hinted` の 2 件で見るので、judge には書かない

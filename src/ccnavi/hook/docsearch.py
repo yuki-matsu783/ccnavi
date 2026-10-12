@@ -423,7 +423,8 @@ NO_FRONTMATTER_PLACES = (
     "wip/proposals/**",
     ".ccnavi/approved/**",
     "wip/design/scripts/i*.md",
-    "wip/scratchpad/**",
+    "wip/handoff/**",
+    "scratchpad/**",
     ".claude/skills/yomiyasu/**",
 )
 _NO_FRONTMATTER = re.compile(
@@ -463,7 +464,7 @@ def missing_frontmatter(conf: settings.Settings, root: str, payload: hookio.Inpu
             return ""
         rel = tree.relative(where, written)
         home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).strip("/")
-        exempt = tuple(p for p in (home, ticket_places.SCRATCH, conf.tickets.strip("/")) if p)
+        exempt = tuple(p for p in (home, ticket_places.HANDOFF, conf.tickets.strip("/")) if p)
         if (
             not rel
             or rel.startswith("../")

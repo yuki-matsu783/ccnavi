@@ -346,7 +346,7 @@ class BuiltinSpeedTest(unittest.TestCase):
                     self.assertLess(time.monotonic() - start, SLOW_LIMIT)
 
 
-RAW_GIT_BUILTIN = "builtin:ticket-raw-git"
+RAW_GIT_BUILTIN = "builtin:guard-raw-git"
 
 
 class BuiltinFormsTest(ConfigUnionHarness):
@@ -364,7 +364,9 @@ class BuiltinFormsTest(ConfigUnionHarness):
         for command in BUILTIN_PASSED:
             with self.subTest(command=command):
                 result = self.hook("Bash", self.ws, command=command)
-                self.assertNotEqual(self.decision(result), "deny", result.stdout)
+                # 生の git は組み込みで常に止まる。ほかの土台の deny に当たっていないことを見る。
+                if self.decision(result) == "deny":
+                    self.assert_denied(result, RAW_GIT_BUILTIN)
 
     def test_without_the_common_layer(self):
         os.remove(self.rules)
@@ -377,8 +379,8 @@ class BuiltinFormsTest(ConfigUnionHarness):
     def test_next_step_names_the_git_wrapper(self):
         """次の一手に挙げる git の操作は、ラッパーがあればラッパーの実パスで書く。
 
-        ラッパーがあるワークスペースでは生の git が止まることがあり、止まる形を案内しない。
-        無ければ生の git は組み込みで止まらないので、`git` のまま書く。
+        生の git は組み込みで常に止まるので、止まる形（`git`）は案内しない。ラッパーが無いときは
+        git の操作をユーザに頼む文にする。
         """
         os.remove(self.rules)
         cases = (
@@ -390,6 +392,7 @@ class BuiltinFormsTest(ConfigUnionHarness):
                 denied = self.hook("Bash", self.ws, command=command)
                 self.assert_denied(denied, rule)
                 self.assertNotIn("ccnavi-git.sh", self.reason(denied))
+                self.assertNotIn("'git ", self.reason(denied))
         write(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh"), "")
         wrapper = settings.script_command(self.ws, "ccnavi-git.sh")
         for command, rule in cases:
@@ -401,10 +404,9 @@ class BuiltinFormsTest(ConfigUnionHarness):
 
 
 class BuiltinRawGitTest(ConfigUnionHarness):
-    """チケット制御が有効で git のラッパーがあれば、生の git を組み込みで止め、ラッパーへ誘導する。
+    """生の git は組み込みで常に止める。ラッパーがあればラッパーへ誘導し、無ければユーザに頼む。
 
-    共通レイヤーの有無にも、壊れて組み込みの既定に戻ったときにも依らない。チケット制御が無効なときと、
-    ラッパーが無いワークスペースでは足さない。
+    共通レイヤーの有無、壊れて組み込みの既定に戻ったとき、チケット制御の可否、ラッパーの有無に依らない。
     """
 
     def setUp(self):
@@ -462,16 +464,21 @@ class BuiltinRawGitTest(ConfigUnionHarness):
                 self.hook("Bash", self.ws, command=command)
                 self.assertNotIn(RAW_GIT_BUILTIN, self.last_record().get("rules", []))
 
-    def test_not_added_when_ticket_control_is_disabled(self):
+    def test_denied_when_ticket_control_is_disabled(self):
         os.remove(self.rules)
-        self.hook("Bash", self.ws, command=f"{GIT} status", env={TICKET_CONTROL: "disable"})
-        self.assertNotIn(RAW_GIT_BUILTIN, self.last_record().get("rules", []))
+        result = self.hook(
+            "Bash", self.ws, command=f"{GIT} status", env={TICKET_CONTROL: "disable"}
+        )
+        self.assert_denied(result, RAW_GIT_BUILTIN)
 
-    def test_not_added_without_the_wrapper(self):
+    def test_denied_without_the_wrapper_and_names_no_script(self):
+        """ラッパーが無いときも止める。誘導先が無いので、スクリプトを名指しせず、ユーザに頼む文にする。"""
         os.remove(self.rules)
         os.remove(self.script)
-        self.hook("Bash", self.ws, command=f"{GIT} status")
-        self.assertNotIn(RAW_GIT_BUILTIN, self.last_record().get("rules", []))
+        result = self.hook("Bash", self.ws, command=f"{GIT} status")
+        self.assert_denied(result, RAW_GIT_BUILTIN)
+        self.assertNotIn("ccnavi-git.sh", self.reason(result))
+        self.assertIn("ユーザ", self.reason(result))
 
 
 GIT_DIR_BUILTIN = builtin.GIT_DIR_RULE_ID
@@ -579,7 +586,7 @@ class BuiltinGitDirTest(ConfigUnionHarness):
         os.remove(self.rules)
         path = os.path.join(self.ws, ".git", "config")
         denied = self.hook("Write", self.ws, file_path=path)
-        self.assertIn("git <サブコマンド>", self.reason(denied))
+        self.assertNotIn("git <サブコマンド>", self.reason(denied))
         write(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh"), "")
         wrapper = settings.script_command(self.ws, "ccnavi-git.sh")
         for tool, field, value in (
@@ -599,7 +606,11 @@ class BuiltinGitWordingTest(unittest.TestCase):
     （ラッパーが無ければ、生の git を組み込みで止めることもない）。
     """
 
-    IDS = ("builtin:recursive-delete", "builtin:git-reset-hard", builtin.CONFIG_VIA_BASH_RULE_ID)
+    IDS = (
+        "builtin:recursive-delete",
+        "builtin:git-reset-hard",
+        builtin.CONFIG_VIA_BASH_RULE_ID,
+    )
 
     def messages(self, root):
         found = {r["id"]: r["message"] for r in builtin.base_data(root)["deny"]}
@@ -625,9 +636,10 @@ class BuiltinGitWordingTest(unittest.TestCase):
         root = tempfile.mkdtemp(prefix="ccnavi-builtin:words-")
         self.addCleanup(shutil.rmtree, root, ignore_errors=True)
         texts = self.messages(root)
-        self.assertIn("git rm <パス>", texts["builtin:recursive-delete"])
-        self.assertIn("git stash push -u", texts["builtin:git-reset-hard"])
-        self.assertIn("git restore --ours -- <パス>", texts[builtin.CONFIG_VIA_BASH_RULE_ID])
+        self.assertIn("ユーザに削除を頼んでください", texts["builtin:recursive-delete"])
+        self.assertIn("ユーザに確認してください", texts["builtin:git-reset-hard"])
+        self.assertIn("ユーザに頼んでください", texts[builtin.CONFIG_VIA_BASH_RULE_ID])
+        # 生の git は止まるので、`git` の形は案内しない。ユーザに頼む文になる。
 
 
 class AbsentRiskTest(ConfigUnionHarness):

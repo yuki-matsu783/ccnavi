@@ -475,28 +475,28 @@ _BUILD_DIR = r"(?:" + "|".join(platformtag.SYSTEMS) + r")-[a-z0-9_]+"
 
 # 守る場所を写して直すための下書きの置き場（.ccnavi/docs/scratchpad.md）。
 # ワークスペースルートからの相対。
-SCRATCHPAD = ("wip", "scratchpad")
+HANDOFF = ("wip", "handoff")
 # 行き先の下書きの置き場へ写すときに通すコマンド。`ln` は外す。置き場にリンクを作れると、
 # 次の 1 本でリンクの先（守る場所）へ書ける。
-_SCRATCHPAD_COPIERS = ("cp", "install")
+_HANDOFF_COPIERS = ("cp", "install")
 # 1 語の中にあると、行き先を表記どおりに読めない文字。変数・置換・グロブ・ブレース・引用・
 # リダイレクト・ホームの展開（`~`）と、shellread の目印。どれかがあれば例外にしない
 # （止める側に倒す）。
-_SCRATCHPAD_UNREAD = set("$`*?[]{}()<>|;&'\"\n~") | {shellread.SEP, shellread.WORD_SEP}
+_HANDOFF_UNREAD = set("$`*?[]{}()<>|;&'\"\n~") | {shellread.SEP, shellread.WORD_SEP}
 # 例外にしてよい選択肢の文字。これだけを並べた短い選択肢（`-f` `-pv` など）と `--` のほかは、
 # `-` で始まる語が 1 つでもあれば例外にしない。止めるものを並べる形にすると、GNU の長い選択肢の
 # 省略（`--target` は `--target-directory`、`--sym` は `--symbolic-link`）や知らない選択肢に負ける。
 # `-t` は行き先を最後の語から動かし、`-s` `-l` はリンクを作り、`-P` `-d` `-a` `-r` はリンクを
 # リンクのまま写す。どれも許す側に入れない。
-_SCRATCHPAD_SHORT_ALLOWED = set("fpvnu")
+_HANDOFF_SHORT_ALLOWED = set("fpvnu")
 
 
-def scratchpad_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | None:
-    """シェルから書き込む形の保護から、下書きの置き場（`wip/scratchpad/`）へ写す cp を外す関数。
+def handoff_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | None:
+    """シェルから書き込む形の保護から、下書きの置き場（`wip/handoff/`）へ写す cp を外す関数。
 
     守る場所のファイルを直したいときは、置き場へ写して写しを直す（.ccnavi/docs/scratchpad.md）。
     保護の式は行き先の最後の語に守る名前があれば当たるので、`cp .ccnavi/scripts/ccnavi-git.sh
-    wip/scratchpad/ccnavi-git.sh` のように同じ名前で写すと止まる。その 1 本を通す。
+    wip/handoff/ccnavi-git.sh` のように同じ名前で写すと止まる。その 1 本を通す。
 
     式の中では決めない。式は先読みを使えず（rules._UNSUPPORTED）、使えたとしても `.*` の先読みは
     後ろに続く別のコマンドの表記で外れる。ここでは行き先を実際のパスに解き、置き場の中に
@@ -504,7 +504,7 @@ def scratchpad_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | N
 
     - 対象がコマンド 1 本だけ。つないだ形は外さない。前のコマンドが置き場にリンクを作る・`cd` で
       移る、を同じ呼び出しの中で読み切れないため
-    - コマンドが `cp` か `install` で、選択肢は許すもの（_SCRATCHPAD_SHORT_ALLOWED）と `--` だけ
+    - コマンドが `cp` か `install` で、選択肢は許すもの（_HANDOFF_SHORT_ALLOWED）と `--` だけ
     - どの語にも、表記どおりに読めない文字（変数・グロブ・引用・リダイレクト・`~` など）が無い
     - 行き先（最後の語）に `..` の段が無く、cwd から解いた実パス（リンクを解いた先）が
       置き場そのものかその下。行き先がディレクトリなら、元の名前を足した先も同じく確かめる
@@ -514,8 +514,8 @@ def scratchpad_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | N
     """
     if not root:
         return None
-    spelled = os.path.join(os.path.realpath(root), *SCRATCHPAD)
-    # 置き場（`wip/` か `wip/scratchpad/`）そのものがリンクなら、例外を使わない。リンクの先が
+    spelled = os.path.join(os.path.realpath(root), *HANDOFF)
+    # 置き場（`wip/` か `wip/handoff/`）そのものがリンクなら、例外を使わない。リンクの先が
     # 守る場所なら、置き場の中へ写すことが守る場所へ書くことになる。
     if os.path.realpath(spelled) != spelled:
         return None
@@ -536,9 +536,9 @@ def scratchpad_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | N
         if shellread.SEP in subject.strip(shellread.SEP):
             return subject
         words = subject.strip(shellread.SEP).split()
-        if len(words) < 3 or words[0] not in _SCRATCHPAD_COPIERS:
+        if len(words) < 3 or words[0] not in _HANDOFF_COPIERS:
             return subject
-        if any(ch in _SCRATCHPAD_UNREAD for word in words for ch in word):
+        if any(ch in _HANDOFF_UNREAD for word in words for ch in word):
             return subject
         *sources, dest = [w for w in words[1:] if w != "--"]
         if not sources or dest.startswith("-"):
@@ -546,7 +546,7 @@ def scratchpad_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | N
         for word in words[1:]:
             if word == "--" or not word.startswith("-"):
                 continue
-            if word.startswith("--") or not set(word[1:]) <= _SCRATCHPAD_SHORT_ALLOWED:
+            if word.startswith("--") or not set(word[1:]) <= _HANDOFF_SHORT_ALLOWED:
                 return subject
         if ".." in re.split(r"[\\/]", dest):
             return subject
@@ -984,7 +984,7 @@ def add_rules(
                 "message": SHELL_MESSAGE,
             },
             root,
-            exempt=scratchpad_copy_exempt(root, cwd),
+            exempt=handoff_copy_exempt(root, cwd),
         )
     clause = binary_clause(bin_path)
     if clause:

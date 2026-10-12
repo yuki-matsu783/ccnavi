@@ -210,8 +210,8 @@ class IntegrateWritesTest(unittest.TestCase):
 
 
 @unittest.skipUnless(merge_tree_available(), "git merge-tree --write-tree (git 2.38+) is needed")
-class IntegrateDropsScratchpadTest(unittest.TestCase):
-    """`integrate` が `wip/scratchpad/` を外した index は、squash との差がそこだけなら外す。"""
+class IntegrateDropsHandoffTest(unittest.TestCase):
+    """`integrate` が `wip/handoff/` を外した index は、squash との差がそこだけなら外す。"""
 
     def setUp(self):
         self.repo = os.path.realpath(tempfile.mkdtemp())
@@ -222,7 +222,7 @@ class IntegrateDropsScratchpadTest(unittest.TestCase):
         git(self.repo, "commit", "-q", "-m", "init")
         git(self.repo, "switch", "-q", "-c", "feat")
         write(self.repo, "a.txt", "a2\n")
-        write(self.repo, "wip/scratchpad/draft.txt", "draft\n")
+        write(self.repo, "wip/handoff/draft.txt", "draft\n")
         write(self.repo, "wip/proposals/todo/p.md", "p\n")
         git(self.repo, "add", ".")
         git(self.repo, "commit", "-q", "-m", "work")
@@ -251,27 +251,27 @@ class IntegrateDropsScratchpadTest(unittest.TestCase):
         return {os.path.realpath(os.path.join(self.repo, r)) for r in rels}
 
     def test_index_without_the_scratchpad_is_dropped(self):
-        git(self.repo, "rm", "-q", "-f", "--", "wip/scratchpad/draft.txt")
+        git(self.repo, "rm", "-q", "-f", "--", "wip/handoff/draft.txt")
         self.mark()
         got = post_findings._integrate_writes(self.changes, self.repo)
         self.assertEqual(got, self.full("a.txt", "wip/proposals/todo/p.md"))
 
     def test_index_missing_other_wip_paths_is_reported(self):
-        git(self.repo, "rm", "-q", "-f", "--", "wip/scratchpad/draft.txt")
+        git(self.repo, "rm", "-q", "-f", "--", "wip/handoff/draft.txt")
         git(self.repo, "rm", "-q", "-f", "--", "wip/proposals/todo/p.md")
         self.mark()
         self.assertEqual(post_findings._integrate_writes(self.changes[:1], self.repo), set())
 
-    def test_same_but_scratch_only_ignores_the_scratchpad(self):
+    def test_same_but_handoff_only_ignores_the_handoff_place(self):
         left = git(self.repo, "write-tree")
-        git(self.repo, "rm", "-q", "-f", "--", "wip/scratchpad/draft.txt")
+        git(self.repo, "rm", "-q", "-f", "--", "wip/handoff/draft.txt")
         only_scratch = git(self.repo, "write-tree")
-        self.assertTrue(post_findings._same_but_scratch(self.repo, left, only_scratch))
+        self.assertTrue(post_findings._same_but_handoff(self.repo, left, only_scratch))
         git(self.repo, "rm", "-q", "-f", "--", "wip/proposals/todo/p.md")
         also_proposal = git(self.repo, "write-tree")
-        self.assertFalse(post_findings._same_but_scratch(self.repo, left, also_proposal))
-        self.assertFalse(post_findings._same_but_scratch(self.repo, left, "0" * 40))
-        self.assertFalse(post_findings._same_but_scratch(self.repo, left, ""))
+        self.assertFalse(post_findings._same_but_handoff(self.repo, left, also_proposal))
+        self.assertFalse(post_findings._same_but_handoff(self.repo, left, "0" * 40))
+        self.assertFalse(post_findings._same_but_handoff(self.repo, left, ""))
 
 
 @unittest.skipUnless(merge_tree_available(), "git merge-tree --write-tree (git 2.38+) is needed")
@@ -293,7 +293,7 @@ class IntegratedCommitsTest(unittest.TestCase):
         git(self.repo, "switch", "-q", "-c", "feat")
         write(self.repo, "a.txt", "a2\n")
         write(self.repo, "new.txt", "new\n")
-        write(self.repo, "wip/scratchpad/draft.txt", "draft\n")
+        write(self.repo, "wip/handoff/draft.txt", "draft\n")
         git(self.repo, "rm", "-q", "gone.txt")
         git(self.repo, "add", ".")
         git(self.repo, "commit", "-q", "-m", "work")
@@ -302,7 +302,7 @@ class IntegratedCommitsTest(unittest.TestCase):
         self.base = git(self.repo, "rev-parse", "HEAD")
         git(self.repo, "merge", "-q", "--squash", "feat")
         # integrate は下書きを外して staged にする。
-        git(self.repo, "rm", "-q", "-f", "--", "wip/scratchpad/draft.txt")
+        git(self.repo, "rm", "-q", "-f", "--", "wip/handoff/draft.txt")
         self.tree = git(self.repo, "write-tree")
         git(self.repo, "commit", "-q", "-m", "squash")
         self.squash = git(self.repo, "rev-parse", "HEAD")
