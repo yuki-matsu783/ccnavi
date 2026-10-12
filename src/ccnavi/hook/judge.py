@@ -215,8 +215,9 @@ def decide_before(
 
     subject, bare, inner, rewrites = screen(payload.tool_name, record.subject, record)
 
-    # 文面の `subject:` には、読み直す前の原文を出す。照合には読み直した後の subject を使う。
-    display_subject = record.subject
+    # 文面の `subject:` には、読み直す前の原文を出す。秘密の形は記録と同じく伏せる。
+    # 照合には読み直した後の subject を使う。
+    display_subject = audit._redacted(record.subject)
 
     if not subject:
         # コマンドは在るが、実行される部分が残らなかった。コメントだけの行が
