@@ -148,7 +148,7 @@ launcher の正規表現だけに頼る穴は、この 2 段目を持たない�
 そうした文字を含む下書きは、検査が error にして取り込めない。
 
 **`--templates` の一覧。** 下書きがあれば最後に `下書き: N 件（wip/proposals/templates/）` を 1 行出す。`--json` は `drafts[]` を足す
-（`templates[]` にも `layers[]` にも `sums[]` にも入れない）。1 件は `name`・`tree`・`path`・`sha`・`valid`・`importable`・`checked_with`
+（`templates[]` にも `layers[]` にも `sums[]` にも入れない）。1 件は `name`・`tree`・`path`・`sha`・`text`・`valid`・`importable`・`checked_with`
 （検査に使ったフェーズ定義の層。`templates[].layer`＝ファイルが在る層とは意味が違うので名前を分けた）・
 `exists_in`（同名のテンプレートが在るレイヤー）・`also_in`（`tree` と同じ表記で、ワークスペースルートは空。人間向けの言い方は text 出力の側で作る）・`description`・`when`・`plan`・`feedback`・`flows`・`problems`。`errors` / `warns` /
 `infos` には数えない。`LINT_VERSION` は上げない。
@@ -162,7 +162,7 @@ error があれば断る。行き先に同名があれば断る）、`--delete-t
 ほかの層に同名があれば info で知らせる）。どれも `--yes` なしは下見で、何も書かずに差分・検査・主語のハッシュを返す。`--yes --expect <主語のハッシュ>` が
 揃ったときだけ書き、書く直前にも読み直して比べる。端末の確認は `--import` と同じ（標準入力が端末か。画面の子プロセスは `--via board` で免除）。
 保存は、`name:` を変える本文、UTF-8 でない本文、制御文字や書式文字を含む本文、上限（256KiB）を超える本文を断る。検査に error があっても書く（下書きに効力は無い）。
-エージェントが打てるのは `--save-draft` と `--delete-draft` の下見だけで、`--rename-template`・`--move-template`・`--delete-template` は下見も打てない（`phase_forms._CLI_FORMS`）。
+エージェントが打てるのは `--delete-draft` の下見だけで、`--save-draft`・`--rename-template`・`--move-template`・`--delete-template` は下見も打てない（`phase_forms._CLI_FORMS`）。`--save-draft` を打たせないのは、`--body-file` に任意のパスを渡すと、読んだ中身が下見の出力（差分・本文）に出るため。エージェントは下書きを Write で直接編集する。
 `template_edit.prepare` が下見（主語の探索・検査・差分）、`template_edit.commit` が `--expect` の照合と書く処理を担う。主語の探索と
 衝突の判定（`template_drafts.collide`）は取り込みと共有する。`--json` の答えは `template_edit.plan_json`。
 
