@@ -69,6 +69,7 @@ src/
     tour-flow.ts      フロー編集の案内の見本（tours/flow.yml の sample）を FlowDoc と FlowChecks にし、段ごとの scene を読む。yaml を持たず、実際の読み取り・実行ファイルとの一致はテストが見る
     tour-workflow.ts  計画編集の案内の見本（名前付きの --plan-order の答え）を parsePlanOrder に通して、画面が描く形にする
     tour-phases.ts    フェーズ管理の案内の見本（tours/phases.yml の sample:）を、phases.yml と同じ書き方から PhasesPage にする小さな読み取り。yaml を持たず、readPhases と同じ結果になることをテストが見る
+    tour-projects.ts  プロジェクト管理の案内の見本（tours/projects.yml の sample:）を ProjectsPage にする小さな読み取り。yaml を持たず、buildProjectsPage と同じ形になることをテストが見る
     yaml11.ts         実行ファイル（PyYAML、YAML 1.1）が文字列以外に読む語の見分け。risk-doc と phases-doc が引用符を足す判断に使う
     targets.ts        ルール管理・リスク管理・フェーズ管理が切り替える設定の対象（共通・ワークスペース・プロジェクト。3 画面とも同じ 3 種）の一覧と、欄の値
     sums.ts           ルール管理とリスク管理の足し算（共通の設定 + 1 つの設定）の表示用の形。ボードの JSON の sums[] を並べ直すだけで、足し直さない
