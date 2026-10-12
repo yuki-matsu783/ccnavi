@@ -1,9 +1,9 @@
 """導入スクリプト（`scripts/ccnavi-setup.sh`）が配る設定のひな形の置き場。
 
-rules と risk は汎用なので共通レイヤー（`.ccnavi/config/common/`）へ配る。phases は 2 本で、
-どのプロジェクトでも同じ構成を前提にできる定義を共通レイヤーへ、ワークスペースのレイアウトに依存する
-定義を自身のレイヤー（`.ccnavi/config/project/`）へ配る。配らないときは、rules と risk と、
-phases が共通にも自身のレイヤーにも無いことが「まだ無いもの」に名前が出る。
+rules・phases・risk のひな形は、どれも共通レイヤー（`.ccnavi/config/common/`）へ配る。
+自身のレイヤー（`.ccnavi/config/project/`）の phases.yml は配らない（レイアウトに依存する定義は
+配布先のユーザが書く。既にあれば触らない）。配らないときは、rules と risk と、phases が共通にも
+自身のレイヤーにも無いことが「まだ無いもの」に名前が出る。
 """
 
 from __future__ import annotations
@@ -123,9 +123,10 @@ class SetupTest(unittest.TestCase):
         with open(os.path.join(self.dir, ".claude", "settings.json"), encoding="utf-8") as f:
             return json.load(f)
 
-    def test_deploy_copies_common_rules_and_risk_and_own_phases(self):
-        """共通レイヤーに rules.yml と risks.yml、
-        自身のレイヤーに phases.yml のひな形を配る。"""
+    def test_deploy_copies_common_rules_and_risk_and_phases(self):
+        """共通レイヤーに rules.yml・risks.yml・phases.yml のひな形を配る。
+
+        自身のレイヤーの phases.yml は、配布元にあっても配らない。"""
         src = self.make_source()
         result = self.run_setup("--mode", "enable", "--deploy", src)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -137,25 +138,31 @@ class SetupTest(unittest.TestCase):
             os.path.isfile(os.path.join(self.dir, ".ccnavi", "config", "common", "risks.yml"))
         )
         self.assertTrue(
-            os.path.isfile(os.path.join(self.dir, HOME, "config", "project", "phases.yml"))
+            os.path.isfile(os.path.join(self.dir, ".ccnavi", "config", "common", "phases.yml"))
         )
+        self.assertFalse(
+            os.path.exists(os.path.join(self.dir, HOME, "config", "project", "phases.yml"))
+        )
+        self.assertNotIn(".ccnavi/config/project/phases.yml", result.stdout)
         self.assertNotIn("まだ無いもの", result.stdout)
 
     def test_deploy_copies_common_phases(self):
-        """共通レイヤーの phases.yml も配る。
+        """共通レイヤーの phases.yml を配る。中身は配布元のまま。
 
-        中身は配布元のまま、自身のレイヤーの phases.yml とは別のファイル。"""
+        配布先に既にある自身のレイヤーの phases.yml は、--force でも触らない。"""
         src = self.make_source()
-        result = self.run_setup("--mode", "enable", "--deploy", src)
+        mine = "version: 1\nphases:\n  mine:\n    kind: work\n    title: 自分の\n"
+        own = write(os.path.join(self.dir, HOME, "config", "project", "phases.yml"), mine)
+        result = self.run_setup("--mode", "enable", "--deploy", src, "--force")
         self.assertEqual(result.returncode, 0, result.stderr)
 
         common = os.path.join(self.dir, ".ccnavi", "config", "common", "phases.yml")
-        own = os.path.join(self.dir, HOME, "config", "project", "phases.yml")
         with open(common, encoding="utf-8") as f:
             self.assertEqual(f.read(), COMMON_PHASES)
         with open(own, encoding="utf-8") as f:
-            self.assertEqual(f.read(), OWN_PHASES)
+            self.assertEqual(f.read(), mine)
         self.assertIn(".ccnavi/config/common/phases.yml", result.stdout)
+        self.assertNotIn(".ccnavi/config/project/phases.yml", result.stdout)
 
     def test_existing_common_phases_is_kept_without_force(self):
         """配布先に共通レイヤーの phases.yml があれば、--force の無い配布では入れ替えない。"""
@@ -184,7 +191,7 @@ class SetupTest(unittest.TestCase):
         self.assertIn("まだ無いもの", result.stdout)
         self.assertIn(".ccnavi/config/common/rules.yml", result.stdout)
         self.assertIn(".ccnavi/config/common/risks.yml", result.stdout)
-        self.assertIn(".ccnavi/config/project/phases.yml", result.stdout)
+        self.assertIn(".ccnavi/config/common/phases.yml", result.stdout)
 
 
 if __name__ == "__main__":
