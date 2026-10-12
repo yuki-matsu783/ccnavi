@@ -986,7 +986,10 @@ def _compile(glob: str, regex: str, root: str, name: str, label: str) -> _Built:
                 return _Built(note=note, refused=refused)
             expression = expanded
     else:
-        expression = translate(
+        # glob は文字列全体に当たる約束なので、先頭に固定する。固定しないと search が当て始めの
+        # 位置ごとに末尾まで読み、`*git push*` のような式が入力の長さの 2 乗で遅くなる（#241）。
+        # 先頭に `*` を書かない glob が文字列の途中に当たることも、この約束どおりに無くなる。
+        expression = "^" + translate(
             glob.replace(ROOT_PLACEHOLDER, root_glob(root)) if uses_root else glob
         )
 
