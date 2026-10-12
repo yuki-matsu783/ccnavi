@@ -1265,8 +1265,12 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             for rel, text in (skills or {}).items():
                 path = os.path.join(src, ".claude", "skills", *rel.split("/"))
                 os.makedirs(os.path.dirname(path), exist_ok=True)
-                with open(path, "w", encoding="utf-8") as f:
-                    f.write(text)
+                if isinstance(text, bytes):
+                    with open(path, "wb") as f:
+                        f.write(text)
+                else:
+                    with open(path, "w", encoding="utf-8") as f:
+                        f.write(text)
             if launcher:
                 # 振り分けの sh は実物をコピーし、代わりに通る sh と同じ置き場に置く。配布先で
                 # 中身が同じであることを見るため。モードは外して置く。配布元の置き方に
@@ -1485,7 +1489,85 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         with open(path, encoding="utf-8") as f:
             self.assertEqual(f.read(), self.PROCESS)
 
-    def test_check_names_the_process_skill_files_not_there_yet(self):
+    def test_reads_the_process_flag_like_the_ticket_start_does(self):
+        """配る判定は、親チケットの着手が写す判定（skillsync）と同じ答えを返す。
+
+        食い違うと、着手が写す元の SKILL.md が配布先に届かないまま、何の知らせも出ない。
+        特に Windows の Git Bash は、SKILL.md を CRLF で取り出すことがある。
+        """
+        from ccnavi.tickets import skillsync
+
+        cases = {
+            "lf": ("---\nname: x\nprocess: true\n---\n", True),
+            "crlf": ("---\r\nname: x\r\nprocess: true\r\n---\r\n", True),
+            "padded fences": ("--- \nprocess: true\n---  \n", True),
+            "trailing comment": ("---\nprocess: true # 工程\n---\n", True),
+            "no closing fence": ("---\nprocess: true\n", False),
+            "flag before the fence": ("process: true\n---\nname: x\n---\n", False),
+            "bom": ("﻿---\nprocess: true\n---\n", False),
+            "string": ('---\nprocess: "true"\n---\n', False),
+            "commented out": ("---\n# process: true\n---\n", False),
+            "in the body": ("---\nname: x\n---\nprocess: true\n", False),
+        }
+        for label, (text, expected) in cases.items():
+            with self.subTest(label=label):
+                self.assertIs(skillsync._process_flag(text.encode("utf-8")), expected)
+                src = self.make_source(skills={"probe/SKILL.md": text.encode("utf-8")})
+                target = tempfile.mkdtemp(prefix="ccnavi-setup-")
+                self.addCleanup(shutil.rmtree, target, ignore_errors=True)
+                result = self.run_raw(target, "--mode", "enable", "--deploy", src)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIs(
+                    os.path.exists(os.path.join(target, ".claude", "skills", "probe", "SKILL.md")),
+                    expected,
+                )
+
+    def test_deploys_only_markdown_under_references_common(self):
+        """ccnavi-index.jsonl や .DS_Store のような生成物は配らない（着手が写すのも .md だけ）。"""
+        files = {
+            "process-test/SKILL.md": self.PROCESS,
+            "process-test/references/common/purpose.md": "共通\n",
+            "process-test/references/common/ccnavi-index.jsonl": "{}\n",
+            "process-test/references/common/.DS_Store": "x",
+            "process-test/references/common/blob.bin": "x",
+        }
+        src = self.make_source(skills=files)
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        base = self.deployed(".claude", "skills", "process-test")
+        self.assertEqual(
+            sorted(os.listdir(os.path.join(base, "references", "common"))), ["purpose.md"]
+        )
+
+    def test_does_not_deploy_a_skill_md_that_is_a_symlink(self):
+        """着手の写しは SKILL.md のリンクを弾く。配る側も、リンク先の中身を配らない。"""
+        src = self.make_source(skills=self.skill_files())
+        skill_md = os.path.join(src, ".claude", "skills", "process-test", "SKILL.md")
+        os.remove(skill_md)
+        outside = os.path.join(src, "outside.md")
+        with open(outside, "w", encoding="utf-8") as f:
+            f.write(self.PROCESS)
+        os.symlink(outside, skill_md)
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(os.path.exists(self.deployed(".claude", "skills", "process-test")))
+
+    def test_names_a_blocked_place_and_goes_on_deploying(self):
+        """配布先の道にファイルがあると mkdir が失敗して配布が半端に止まる。名指しして続ける。"""
+        src = self.make_source(skills=self.skill_files())
+        os.makedirs(self.deployed(".claude", "skills"))
+        with open(self.deployed(".claude", "skills", "process-test"), "w", encoding="utf-8") as f:
+            f.write("ユーザのファイル\n")
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        blocked = section(result.stdout, "配布先の道にディレクトリでないものがある")
+        self.assertTrue(names(blocked, ".claude/skills/process-test/SKILL.md"))
+        with open(self.deployed(".claude", "skills", "process-test"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "ユーザのファイル\n")
+        # 後ろの配布物が届いている。
+        self.assertTrue(os.path.exists(self.deployed(*LAUNCHER_PARTS)))
+
+    def test_check_lists_the_process_skill_files_it_would_deploy(self):
         src = self.make_source(skills=self.skill_files())
         result = self.run_setup("--deploy", src, "--check")
         self.assertEqual(result.returncode, 1, result.stdout)
