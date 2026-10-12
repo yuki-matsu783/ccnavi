@@ -45,6 +45,43 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(ccnavimd.render("\n\na\n\n\n\nb\n\n", set(), {}), "a\n\nb")
 
 
+ELSE_TEXT = """<!-- ccnavi:if a -->
+- a
+<!-- ccnavi:if b -->
+- a と b
+<!-- ccnavi:else -->
+- a で b でない
+<!-- ccnavi:endif -->
+<!-- ccnavi:else -->
+- a でない
+<!-- ccnavi:endif -->
+"""
+
+
+class ElseTest(unittest.TestCase):
+    def test_成り立たないときの行が載る(self):
+        self.assertEqual(ccnavimd.render(ELSE_TEXT, set(), {}), "- a でない")
+        self.assertEqual(ccnavimd.render(ELSE_TEXT, {"a"}, {}), "- a\n- a で b でない")
+        self.assertEqual(ccnavimd.render(ELSE_TEXT, {"a", "b"}, {}), "- a\n- a と b")
+
+    def test_外側が成り立たなければ内側のelseも載らない(self):
+        text = "<!-- ccnavi:if a -->\n<!-- ccnavi:if b -->\nx\n<!-- ccnavi:else -->\ny\n<!-- ccnavi:endif -->\n<!-- ccnavi:endif -->"
+
+        self.assertEqual(ccnavimd.render(text, {"b"}, {}), "")
+        self.assertEqual(ccnavimd.render(text, set(), {}), "")
+
+    def test_elseの誤りを行番号つきで挙げる(self):
+        self.assertEqual(ccnavimd.problems(ELSE_TEXT.replace("a", "docs").replace("b", "tickets")), [])
+        joined = "\n".join(
+            ccnavimd.problems(
+                "<!-- ccnavi:else -->\n<!-- ccnavi:if docs -->\n<!-- ccnavi:else -->\n"
+                "<!-- ccnavi:else -->\n<!-- ccnavi:endif -->\n"
+            )
+        )
+        self.assertIn("1 行目: ccnavi:else に対応する ccnavi:if が無い", joined)
+        self.assertIn("4 行目: 1 つの ccnavi:if に ccnavi:else は 1 つだけ", joined)
+
+
 class FlagsTest(unittest.TestCase):
     def test_条件は関数の真偽で決まる(self):
         ctx = ccnavimd.Context(None, "", True, {"workspace-root"}, "dry-run")  # type: ignore[arg-type]

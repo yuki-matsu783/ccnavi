@@ -6,7 +6,8 @@
 md の書き方は 2 つだけ。
 
 - 条件: `<!-- ccnavi:if 名前 -->` と `<!-- ccnavi:endif -->` で行を囲む。名前が成り立つときだけ、
-  囲んだ行を載せる。入れ子にできる（外側も内側も成り立つときだけ載る）。名前は `CONDITIONS`
+  囲んだ行を載せる。途中に `<!-- ccnavi:else -->` を 1 つ置くと、成り立たないときの行を分けられる。
+  入れ子にできる（外側も内側も成り立つときだけ載る）。名前は `CONDITIONS`
 - 差し込み: `{{名前}}` を、ワークスペースごとの値に置き換える。名前は `SUBSTITUTIONS`
 
 条件の名前ごとに独立した関数（`CONDITIONS`）があり、その真偽で行を載せるかを決める。
@@ -97,6 +98,7 @@ SUBSTITUTIONS = (
 )
 
 _IF = re.compile(r"^\s*<!--\s*ccnavi:if\s+(\S+)\s*-->\s*$")
+_ELSE = re.compile(r"^\s*<!--\s*ccnavi:else\s*-->\s*$")
 _ENDIF = re.compile(r"^\s*<!--\s*ccnavi:endif\s*-->\s*$")
 _DIRECTIVE = re.compile(r"<!--\s*ccnavi:")
 _SUBSTITUTION = re.compile(r"\{\{\s*(\w+)\s*\}\}")
@@ -108,24 +110,31 @@ def problems(text: str) -> list[str]:
     条件の名前、差し込みの名前、対の取れていない囲みを見る。
     """
     found: list[str] = []
-    depth = 0
+    elses: list[bool] = []  # 囲みごとに、else を置いたか
     for number, line in enumerate(text.splitlines(), 1):
         opened = _IF.match(line)
         if opened:
-            depth += 1
+            elses.append(False)
             if opened.group(1) not in CONDITIONS:
                 found.append(f"{number} 行目: 条件 {opened.group(1)} は使えない")
+        elif _ELSE.match(line):
+            if not elses:
+                found.append(f"{number} 行目: ccnavi:else に対応する ccnavi:if が無い")
+            elif elses[-1]:
+                found.append(f"{number} 行目: 1 つの ccnavi:if に ccnavi:else は 1 つだけ")
+            else:
+                elses[-1] = True
         elif _ENDIF.match(line):
-            depth -= 1
-            if depth < 0:
+            if not elses:
                 found.append(f"{number} 行目: ccnavi:endif に対応する ccnavi:if が無い")
-                depth = 0
+            else:
+                elses.pop()
         elif _DIRECTIVE.search(line):
             found.append(f"{number} 行目: ccnavi: の囲みは 1 行に 1 つ、単独で書く")
         for name in _SUBSTITUTION.findall(line):
             if name not in SUBSTITUTIONS:
                 found.append(f"{number} 行目: 差し込み {{{{{name}}}}} は使えない")
-    if depth > 0:
+    if elses:
         found.append("ccnavi:if に対応する ccnavi:endif が無い")
     return found
 
@@ -135,6 +144,7 @@ def render(text: str, flags: set[str], values: dict[str, str]) -> str:
 
     名前が `CONDITIONS` に無い条件は成り立たないものとして扱い、`SUBSTITUTIONS` に無い差し込みは
     そのまま残す（書き間違いが見える形で届く。誤りは `problems` が lint で言う）。
+    `else` は、いちばん内側の囲みの真偽を反転する。外側が成り立たないときは、反転しても載らない。
     """
     out: list[str] = []
     stack: list[bool] = []
@@ -142,6 +152,10 @@ def render(text: str, flags: set[str], values: dict[str, str]) -> str:
         opened = _IF.match(line)
         if opened:
             stack.append(opened.group(1) in flags)
+            continue
+        if _ELSE.match(line):
+            if stack:
+                stack[-1] = not stack[-1]
             continue
         if _ENDIF.match(line):
             if stack:
