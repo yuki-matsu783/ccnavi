@@ -37,7 +37,7 @@
 .approval-note { margin: 4px 0 8px; }
 .approval-note.warn { color: var(--board-warn-text); }
 .approval-note.error { color: var(--board-error-text); white-space: pre-wrap; overflow-wrap: anywhere; }
-/* 計画の図を親ごとにまとめた塊。注意と「ワークフローを編集」を、その親の図の前に置く */
+/* 計画の図を親ごとにまとめた塊。注意と「計画を編集」を、その親の図の前に置く */
 .plan-family + .plan-family { margin-top: 12px; }
 .plan-family-actions { display: flex; justify-content: flex-end; margin: 4px 0; }
 .approval-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: flex-end; }

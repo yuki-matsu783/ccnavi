@@ -1,5 +1,5 @@
 /**
- * ボードのカードの「ワークフロー」ボタン（ワークフロー編集タブの入口）。出すのは、計画を持つ承認待ち（`todo/`）の
+ * ボードのカードの「計画編集」ボタン（計画編集タブの入口）。出すのは、計画を持つ承認待ち（`todo/`）の
  * 親の提案だけ。計画を持つかは実行ファイルが提案の `has_plan` で言い、画面は計画を読まない。押すと拡張ホストへ
  * 親の識別子を返すだけ（拡張ホストはいまのボードで確かめてからタブを開く）。
  */
@@ -69,14 +69,14 @@ test("CB-D185 カードの workflow は、計画を持つ承認待ちの親の�
   assert.equal(cardOf(stripped, "i0002").workflow, false);
 });
 
-test("CB-D184 計画を持つ承認待ちの親の提案のカードに「ワークフロー」を出し、押すと親の識別子だけを返す（カードのファイルは開かない）", async () => {
+test("CB-D184 計画を持つ承認待ちの親の提案のカードに「計画編集」を出し、押すと親の識別子だけを返す（カードのファイルは開かない）", async () => {
   const dom = await openBoard(withParents());
   try {
     assert.deepEqual(
       dom.all('[data-action="workflow"]').map((b) => [b.getAttribute("data-ticket"), b.textContent]).sort(),
       [
-        ["i0001", "ワークフロー"],
-        ["i0002", "ワークフロー"],
+        ["i0001", "計画編集"],
+        ["i0002", "計画編集"],
       ],
     );
     assert.equal(dom.all('.card.child [data-action="workflow"]').length, 0);

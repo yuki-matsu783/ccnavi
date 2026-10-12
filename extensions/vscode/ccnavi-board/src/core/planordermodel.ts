@@ -3,7 +3,7 @@
  * の答え（実行ファイルとの契約）と読み取り。形はリポジトリの設計（`docs/design/tickets/approval.md` の
  * 計画の順序の振り直しの表）と、Python 側が書き出す実例 `test/fixtures/plan-order.json`。
  *
- * ワークフロー編集タブ（`workflow-panel.ts`）が読む。**番号の振り直し・順序の検査・書けるか（`writable`）は
+ * 計画編集タブ（`workflow-panel.ts`）が読む。**番号の振り直し・順序の検査・書けるか（`writable`）は
  * 実行ファイルが答え、拡張は読むだけ**。計画ごとの図の中身（`plans`）は承認の preview と同じ関数で作られるので、
  * 読み方も `approvemodel.ts` の `readPlans` を使う。
  *

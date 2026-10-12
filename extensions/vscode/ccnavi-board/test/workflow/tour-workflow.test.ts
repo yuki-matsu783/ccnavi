@@ -1,5 +1,5 @@
 /**
- * ワークフロー編集画面の案内の見本（`tours/workflow.yml` の `sample:`）と、段の `scene`・指す先の検査。
+ * 計画編集画面の案内の見本（`tours/workflow.yml` の `sample:`）と、段の `scene`・指す先の検査。
  *
  * 見本は実行ファイルの答え（`--plan-order <親> --json`）の形で書き、`parseWorkflowSample` が欠けた欄を埋めて
  * `parsePlanOrder` に通す。実行ファイルの答えの実例（`test/fixtures/plan-order.json`）と形がずれないこと、実行ファイルが

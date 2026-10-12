@@ -1,5 +1,5 @@
 /**
- * ワークフロー編集タブの、拡張ホストと Webview の間の契約。フロー編集（`flow-view.ts`）と同じ作り。
+ * 計画編集タブの、拡張ホストと Webview の間の契約。フロー編集（`flow-view.ts`）と同じ作り。
  *
  * タブは親の提案（`todo/` にある計画付きの提案）ごとに 1 枚で、計画の項どうしの先行（線）を図で引き直す。
  * 拡張ホストが渡すのは「いま何を見せるか」（`WorkflowData`）だけで、画面が返すのはユーザが押した操作
@@ -186,7 +186,7 @@ export function savedShaOf(result: PlanOrderWrite): string | undefined {
 
 /** タブの題。未保存の間は頭に「●」 */
 export function workflowTitle(ticket: string, dirty = false): string {
-  return `${dirty ? "● " : ""}ccnavi ワークフロー: ${ticket}`;
+  return `${dirty ? "● " : ""}ccnavi 計画編集: ${ticket}`;
 }
 
 // ---- 答えを画面の状態に整える

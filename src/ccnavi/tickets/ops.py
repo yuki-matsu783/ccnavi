@@ -84,6 +84,8 @@ def start(
     if found.started_at:
         stderr.write(f"ccnavi: {ticket_id} は着手済み（{found.started_at}）\n")
         return 1
+    if ops_close.misplaced_home(stderr, root, conf, found):
+        return 1
     if ops_plan.plan_missing(stderr, found):
         return 1
     if ops_close.parent_not_started(stderr, root, conf, found):
@@ -252,6 +254,8 @@ def finish(
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')} start {ticket_id}' "
             "を通してください\n"
         )
+        return 1
+    if ops_close.misplaced_home(stderr, root, conf, found):
         return 1
     if ops_close.parent_still_busy(stderr, root, conf, found):
         return 1

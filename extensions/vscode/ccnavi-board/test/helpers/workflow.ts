@@ -1,5 +1,5 @@
 /**
- * ワークフロー編集タブ（React）を happy-dom で動かす。`test/helpers/flow.ts` と同じ役割。
+ * 計画編集タブ（React）を happy-dom で動かす。`test/helpers/flow.ts` と同じ役割。
  *
  * 画面はバンドルした 1 本（`out/webview/workflow.js`）で、拡張はそれを `<script nonce>` に流し込む。
  * この入口のパス（`test/helpers/<画面の名前>.ts`）が約束で、`scripts/test-groups.js` はそれを辿る。

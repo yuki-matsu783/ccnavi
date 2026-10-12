@@ -26,7 +26,7 @@ sample:
     projects: [web]
     pending_approval: [sample-a, sample-a-01-01]
     tickets:
-      # 承認待ちの親（計画あり）と、その子。「承認」「ワークフロー」「フロー: 作成」を見せる
+      # 承認待ちの親（計画あり）と、その子。「承認」「計画編集」「フロー: 作成」を見せる
       - ticket: sample-a
         title: "（見本）ログイン画面にパスワードの再設定を足す"
         proposal: { state: todo, has_plan: true }
@@ -288,7 +288,7 @@ courses:
         scene: { overlay: approval }
       - target: approve-confirm
         title: 承認する
-        body: 「この N 件を承認する」で承認します。ワークフロー編集タブに未保存の変更がある親が一覧にあると、押せなくなって理由が出ます。
+        body: 「この N 件を承認する」で承認します。計画編集タブに未保存の変更がある親が一覧にあると、押せなくなって理由が出ます。
         scene: { overlay: approval }
       - target: approval-handover
         title: 承認のあと
@@ -418,7 +418,7 @@ courses:
 
   - id: flow
     title: 子チケットの手順や計画の順序を見直したいとき
-    summary: フローとワークフローを開くボタンの見分け方
+    summary: フローを開くボタンと計画編集を開くボタンの見分け方
     steps:
       - target: flow-create
         title: フローを作る
@@ -428,8 +428,8 @@ courses:
         body: "着手すると、終わるまでフローは書き換えられません。ボタンは「フロー: 閲覧（着手中）」になり、読むだけの画面が開きます。レビュー中も同じです。"
       - target: workflow-button
         title: 計画の順序を直す
-        body: 計画を持つ承認待ちの親には「ワークフロー」が出ます。計画の項どうしの順序（どの項がどの項を待つか）を図で直すタブを開きます。保存すると提案が書き換わるので、承認はそのあとに開き直します。
+        body: 計画を持つ承認待ちの親には「計画編集」が出ます。計画の項どうしの順序（どの項がどの項を待つか）を図で直すタブを開きます。保存すると提案が書き換わるので、承認はそのあとに開き直します。
       - target: edit-workflow
         title: 承認の画面から直す
-        body: 承認の一覧にも、親ごとに「ワークフローを編集」があります。押すとオーバーレイを閉じて、編集タブを開きます。
+        body: 承認の一覧にも、親ごとに「計画を編集」があります。押すとオーバーレイを閉じて、編集タブを開きます。
         scene: { overlay: approval }

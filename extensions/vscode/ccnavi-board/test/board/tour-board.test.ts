@@ -73,8 +73,8 @@ test("CB-T421 ボードの見本の鍵はどれも読み取りが読む（綴り
   assert.deepEqual(lostKeys(raw, parsed.ok ? parsed.board : undefined, "board", free), []);
 });
 
-test("CB-T422 見本には、使い方ごとの案内が見せる状態が揃っている（承認待ち・レビュー待ち・HIGH・不備・先行待ち・取り消し・フェーズの進み・フロー・ワークフロー）", () => {
-  // 承認待ち: 1 件ずつ承認する操作と、「ワークフロー」の入口を持つ
+test("CB-T422 見本には、使い方ごとの案内が見せる状態が揃っている（承認待ち・レビュー待ち・HIGH・不備・先行待ち・取り消し・フェーズの進み・フロー・計画編集）", () => {
+  // 承認待ち: 1 件ずつ承認する操作と、「計画編集」の入口を持つ
   assert.ok(card("sample-a").pendingApproval && card("sample-a").actions.some((a) => a.kind === "approve"));
   assert.ok(card("sample-a").workflow);
   assert.equal(card("sample-a").copyStatus, "none");

@@ -21,7 +21,7 @@ export type RiskTarget = RulesTarget;
 /** フェーズ管理画面が直す定義のファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定（ルール管理・リスク管理と同じ 3 種） */
 export type PhasesTarget = RulesTarget;
 
-/** 画面の入口（サイドパネルに並ぶ 5 つと、ボードから開くフロー編集・ワークフロー編集）。引数は開く側が解く（空の表記や未登録のプロジェクトの扱いは各パネルの持ち物） */
+/** 画面の入口（サイドパネルに並ぶ 5 つと、ボードから開くフロー編集・計画編集）。引数は開く側が解く（空の表記や未登録のプロジェクトの扱いは各パネルの持ち物） */
 export interface Screens {
   /** ボード。`project` は開いたときの絞り込み（`""` はワークスペース（プロジェクト外）、`"*"` は全部、未指定は前回のまま） */
   readonly board: (project?: string) => Promise<void>;
@@ -35,7 +35,7 @@ export interface Screens {
    */
   readonly flow: (ticket: string) => Promise<void>;
   /**
-   * 親の提案 1 枚のワークフロー編集タブ（計画の項どうしの先行を図で引き直す）。対象は承認待ち（`todo/`）の
+   * 親の提案 1 枚の計画編集タブ（計画の項どうしの先行を図で引き直す）。対象は承認待ち（`todo/`）の
    * 計画を持つ親。タブは親ごとに 1 枚で、同じ親をもう 1 度開けば前面に出す
    */
   readonly workflow: (ticket: string) => Promise<void>;

@@ -22,7 +22,7 @@ import { embedJson, type DataMessage } from "./screen-host.js";
 export type ApprovalOverlay =
   | { readonly kind: "loading" }
   /**
-   * `changedSinceSave` は、ワークフロー編集タブで保存したあとに提案が変わった親（一覧を開いた時点で拡張ホストが比べた）。
+   * `changedSinceSave` は、計画編集タブで保存したあとに提案が変わった親（一覧を開いた時点で拡張ホストが比べた）。
    * 図の上に注意を出すだけで、承認は止めない
    */
   | { readonly kind: "preview"; readonly preview: ApprovePreview; readonly notice?: string; readonly changedSinceSave?: readonly string[] }
@@ -96,7 +96,7 @@ export type BoardData =
        */
       readonly moved?: readonly Moved[];
       /**
-       * ワークフロー編集タブに未保存の変更がある親（`core/workflow-tabs.ts`）。その親を含む承認の一覧は、
+       * 計画編集タブに未保存の変更がある親（`core/workflow-tabs.ts`）。その親を含む承認の一覧は、
        * 承認のボタンを押せなくして理由を出す。拡張ホストはタブの様子が変わるたびに描き直す
        */
       readonly unsaved?: readonly string[];
@@ -145,13 +145,13 @@ export type BoardMessage =
    */
   | { readonly type: "flow"; readonly ticket: string }
   /**
-   * 親の提案のカードの「ワークフロー」を押した。拡張ホストはいまのボードでそのカードが入口を出していることを
-   * 確かめてから、その親のワークフロー編集タブを開く（`ccnaviBoard.openWorkflow` と同じ入口）
+   * 親の提案のカードの「計画編集」を押した。拡張ホストはいまのボードでそのカードが入口を出していることを
+   * 確かめてから、その親の計画編集タブを開く（`ccnaviBoard.openWorkflow` と同じ入口）
    */
   | { readonly type: "workflow"; readonly ticket: string }
   /**
-   * 承認のオーバーレイの「ワークフローを編集」を押した。拡張ホストはオーバーレイを閉じてから、その親の
-   * ワークフロー編集タブを開く（一覧の図にある親だけ。決めるのは承認の遷移）
+   * 承認のオーバーレイの「計画を編集」を押した。拡張ホストはオーバーレイを閉じてから、その親の
+   * 計画編集タブを開く（一覧の図にある親だけ。決めるのは承認の遷移）
    */
   | { readonly type: "editWorkflow"; readonly ticket: string }
   /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */

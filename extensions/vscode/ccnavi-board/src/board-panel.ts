@@ -77,7 +77,7 @@ interface PanelState {
    * 承認の文を渡してボードに戻った時点で動いた表示が消える。決めるのは `core/board-moved.ts`
    */
   moved: MovedState;
-  /** ワークフロー編集タブの帳面（`core/workflow-tabs.ts`）を見るのをやめる */
+  /** 計画編集タブの帳面（`core/workflow-tabs.ts`）を見るのをやめる */
   stopTabs?: () => void;
 }
 
@@ -194,7 +194,7 @@ function registerPanelHandlers(current: PanelState): void {
     }
   });
 
-  // ワークフロー編集タブが未保存になった・未保存でなくなったら描き直す（承認のボタンを押せる・押せない）
+  // 計画編集タブが未保存になった・未保存でなくなったら描き直す（承認のボタンを押せる・押せない）
   current.stopTabs = onWorkflowTabs(() => {
     if (state === current) {
       redraw(current);
@@ -272,7 +272,7 @@ async function update(): Promise<void> {
     }
     const board = buildBoard(result.board);
     current.board = board;
-    // 承認待ちの親の提案に無い親の、ワークフロー編集タブの保存のハッシュを忘れる。端末や Chrome 拡張で承認した・
+    // 承認待ちの親の提案に無い親の、計画編集タブの保存のハッシュを忘れる。端末や Chrome 拡張で承認した・
     // 取り下げた親を、あとで出す改版の提案と比べない（ボードから承認したときは承認の結果でも忘れる）
     forgetSaved(staleSaved(workflowTabs().saved, todoParentsOf(board)));
     show(current, board);
@@ -401,7 +401,7 @@ function handleMessage(message: BoardMessage | undefined): void {
       });
       return;
     case "approveConfirm":
-      // 押した時点のワークフロー編集タブの様子を添える。未保存のタブがある親を含む一覧は遷移が打たない
+      // 押した時点の計画編集タブの様子を添える。未保存のタブがある親を含む一覧は遷移が打たない
       dispatch(current, { kind: "confirm", tickets: message.tickets, unsaved: workflowTabs().unsaved });
       return;
     case "approveCancel":
@@ -522,13 +522,13 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
     case "loadPreview": {
       const result = await runApprovePreview(root, binSetting(), effect.only);
       if (state === current) {
-        // ワークフロー編集タブが保存したときのハッシュは、一覧が返ったこの時点のものと比べる
+        // 計画編集タブが保存したときのハッシュは、一覧が返ったこの時点のものと比べる
         dispatch(current, { kind: "previewed", result, saved: workflowTabs().saved });
       }
       return;
     }
     case "approve": {
-      // 打つ直前にもう 1 度、ワークフロー編集タブに未保存の変更がある親を含まないかを見る（遷移が見たあとに
+      // 打つ直前にもう 1 度、計画編集タブに未保存の変更がある親を含まないかを見る（遷移が見たあとに
       // 未保存になっていれば打たない）。一覧の親の識別子と、帳面の親の識別子を突き合わせる
       const blocked = blockedBeforeApprove(effect.tickets, workflowTabs().unsaved);
       if (blocked.length > 0) {

@@ -190,9 +190,14 @@ class TicketTest(unittest.TestCase):
         out = json.loads(result.stdout).get("hookSpecificOutput", {})
         return out.get("permissionDecisionReason") or out.get("additionalContext") or ""
 
-    def propose(self, name, **kw):
+    def propose(self, name, tree=None, **kw):
+        """提案を書く。`tree` を渡さなければ親 i0001 のワークツリーに書く。
+
+        別の親の提案は、識別子と同じ名前のワークツリー（`tree`）に書く。別名のツリーの提案は
+        承認が止まる（`approval_checks.place_problems`）。
+        """
         return write(
-            os.path.join(self.parent_tree, "wip", "proposals", "todo", name + ".md"),
+            os.path.join(tree or self.parent_tree, "wip", "proposals", "todo", name + ".md"),
             ticket_text(name, **kw),
         )
 
@@ -422,17 +427,23 @@ class TicketTest(unittest.TestCase):
     def test_approve_only_the_listed_tickets(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
-        self.propose("i0002", allow=("docs/*",))
+        other = self.worktree("i0002", "main")
+        self.propose("i0002", tree=other, allow=("docs/*",))
         result = self.ccnavi("--agree", "i0001", "i0001-01-01", stdin="y\n")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認待ち 3 件のうち、指定の 2 件", result.stdout)
         self.assertNotIn("i0002", result.stdout.split("チケットの承認リクエスト")[1])
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0002.md")))
+        self.assertFalse(
+            os.path.exists(os.path.join(other, ".ccnavi", "approved", "doing", "i0002.md"))
+        )
         # 残した分は次の --agree で承認の対象に入る
         self.assertEqual(self.approve().returncode, 0)
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0002.md")))
+        # 承認済みチケットは提案を書いたツリー（親 i0002 のワークツリー）に置かれる
+        self.assertTrue(
+            os.path.exists(os.path.join(other, ".ccnavi", "approved", "doing", "i0002.md"))
+        )
 
     def test_listed_child_without_its_pending_parent_is_refused(self):
         self.propose("i0001", allow=("src/*", "wip/*"))

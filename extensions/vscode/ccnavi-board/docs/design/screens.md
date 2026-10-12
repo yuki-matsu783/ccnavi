@@ -12,7 +12,7 @@ keywords: [設計, 画面, approval-machine, 見た目, ScreenHost, screenHost, 
 
 この画面の遷移は `core/approval-machine.ts` の 1 か所にまとめてある。散らばっていると必要なガード条件を書き漏らすため。「この状態ではこれを受けない」というガード条件は、そのファイルの先頭の表にある。`board-panel.ts` は入力を渡し、返ってきた「やること」を実行するだけ。単体テストは CB-T169〜181 と CB-T378〜380（CB-T181 は、ガード条件を 1 つ消すとテストが失敗することを確かめる変異テスト）。
 
-ワークフロー編集タブとの結び付き（未保存のタブがある親を含む一覧は承認を打たない、「ワークフローを編集」は閉じてからタブを開く、保存したあとに提案が変わった親を覚える）も、この遷移のガードと入力に置いた。遷移は VS Code に触れないので、タブの様子（未保存の親・保存したときのハッシュ）は `board-panel.ts` が帳面 `core/workflow-tabs.ts` から引いて入力に添える。押された時点の様子で決めるので、`board-panel.ts` は承認を打つ直前（`approve` のやること）にももう 1 度帳面を見る。その確かめも遷移のファイルの純関数（`blockedBeforeApprove`）にして、変異テストの表に入れてある。
+計画編集タブとの結び付き（未保存のタブがある親を含む一覧は承認を打たない、「計画を編集」は閉じてからタブを開く、保存したあとに提案が変わった親を覚える）も、この遷移のガードと入力に置いた。遷移は VS Code に触れないので、タブの様子（未保存の親・保存したときのハッシュ）は `board-panel.ts` が帳面 `core/workflow-tabs.ts` から引いて入力に添える。押された時点の様子で決めるので、`board-panel.ts` は承認を打つ直前（`approve` のやること）にももう 1 度帳面を見る。その確かめも遷移のファイルの純関数（`blockedBeforeApprove`）にして、変異テストの表に入れてある。
 
 ## 見た目
 
@@ -47,7 +47,7 @@ keywords: [設計, 画面, approval-machine, 見た目, ScreenHost, screenHost, 
 | パネル | 作るもの | 裏に回ったとき |
 |---|---|---|
 | `retainContextWhenHidden: false`（ボード・プロジェクト管理） | `screenHost(surface, render)` | 画面は捨てられる。入れ物ごと入れ直す |
-| `retainContextWhenHidden: true`（ルール管理・リスク管理・フェーズ管理・フロー編集・ワークフロー編集） | `retainedHost(surface, render)` | 画面は生きている。何もしない |
+| `retainContextWhenHidden: true`（ルール管理・リスク管理・フェーズ管理・フロー編集・計画編集） | `retainedHost(surface, render)` | 画面は生きている。何もしない |
 
 返る形（`ScreenHost<D>`）と呼び方（`send` / `post` / `ready` / `hidden`）は同じ。取り違えても型では止まらない（保持する画面に `screenHost` を使うと打ちかけが消え、逆だと中身が古いまま更新されない）。保持する画面のパネルは、`ScreenHost` を返す関数（`rulesHost`・`riskHost`・`phasesHost`・`flowHost`・`workflowHost`）で `retainedHost` の形に合わせる。この関数は `panel.options.retainContextWhenHidden` を見て、偽なら診断ログに残す。
 
@@ -56,4 +56,4 @@ keywords: [設計, 画面, approval-machine, 見た目, ScreenHost, screenHost, 
 保持する画面に中身（`data`）を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存や作成が通って中身が入れ替わった）。監視がファイルの変化に気づいても中身は渡さず、帯（`changed`）を出してユーザに決めてもらう。
 
 画面（`*-panel.ts`）どうしは互いを import しない。ある画面から別の画面を開く導線（ルール管理からフェーズ管理の対象を切り替える、など）は、相手のパネルの関数を直に呼ばず、`core/screens.ts` の帳面（`screens().board(...)`）を通す。帳面に入口を載せるのは `extension.ts` だけで、載せ方を見る場所もそこ 1 か所。
-画面の様子をほかの画面が知る必要があるときも、相手のパネルを読まずに小さな帳面を通す。ボードのカードの「ワークフロー」は、いまのボードでそのカードが入口を出しているかを確かめてから、コマンド `ccnaviBoard.openWorkflow`（帳面の `screens().workflow` と同じ入口）を呼ぶ。ワークフロー編集タブの未保存と保存したときのハッシュは `core/workflow-tabs.ts` にあり、タブが書いてボードが読む（変わったら知らせを受けて描き直す）。
+画面の様子をほかの画面が知る必要があるときも、相手のパネルを読まずに小さな帳面を通す。ボードのカードの「計画編集」は、いまのボードでそのカードが入口を出しているかを確かめてから、コマンド `ccnaviBoard.openWorkflow`（帳面の `screens().workflow` と同じ入口）を呼ぶ。計画編集タブの未保存と保存したときのハッシュは `core/workflow-tabs.ts` にあり、タブが書いてボードが読む（変わったら知らせを受けて描き直す）。

@@ -1,5 +1,5 @@
 /**
- * ワークフロー編集タブの拡張ホストと画面の契約（`src/core/workflow-view.ts`）。実行ファイルの答えを画面の状態に
+ * 計画編集タブの拡張ホストと画面の契約（`src/core/workflow-view.ts`）。実行ファイルの答えを画面の状態に
  * 整える純関数を見る。**番号は振り直さない**（振り直しの正は実行ファイル）。ここが組むのは、図で変えた線を
  * 元の番号（いま提案に書いてある番号）での直接の先行（`--order` の形）に戻すことと、見せる文の材料だけ。
  */
@@ -97,8 +97,8 @@ test("CB-T374 保存できない理由。書けない答え（実行ファイル
 });
 
 test("CB-T375 タブの題は未保存の間だけ頭に ● を付ける", () => {
-  assert.equal(workflowTitle("i0001"), "ccnavi ワークフロー: i0001");
-  assert.equal(workflowTitle("i0001", true), "● ccnavi ワークフロー: i0001");
+  assert.equal(workflowTitle("i0001"), "ccnavi 計画編集: i0001");
+  assert.equal(workflowTitle("i0001", true), "● ccnavi 計画編集: i0001");
 });
 
 test("CB-T376 画面から届いたものを確かめる。形が崩れていれば捨てる（保存の中身が読めないものを渡さない）", () => {

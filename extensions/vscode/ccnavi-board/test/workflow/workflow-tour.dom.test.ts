@@ -1,5 +1,5 @@
 /**
- * ワークフロー編集画面の案内（`src/webview/tours/workflow.yml`）を happy-dom で動かす。
+ * 計画編集画面の案内（`src/webview/tours/workflow.yml`）を happy-dom で動かす。
  *
  * 案内の間、画面は今の計画ではなく見本の答え（実行ファイルの答えの形。`core/tour-workflow.ts`）を描く。段ごとの様子
  * （描く答え・開く確かめ・選ぶ項）は `scene` が決め、指す先は `data-tour` の印。実際の答え・未保存の線・置き場所・確かめと、

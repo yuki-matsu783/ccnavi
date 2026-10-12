@@ -351,7 +351,7 @@ function FlowButton({ flow, id, closed }: { readonly flow: FlowJson; readonly id
 }
 
 /**
- * 親の提案の計画の順序を直すワークフロー編集タブを開くボタン。出すかは組み立て（`card.workflow`）が決め、
+ * 親の提案の計画の順序を直す計画編集タブを開くボタン。出すかは組み立て（`card.workflow`）が決め、
  * 押したら拡張ホストへ返すだけ
  */
 function WorkflowButton({ id }: { readonly id: string }): JSX.Element {
@@ -362,10 +362,10 @@ function WorkflowButton({ id }: { readonly id: string }): JSX.Element {
       data-action="workflow"
       data-tour="workflow-button"
       data-ticket={id}
-      title="計画の項どうしの順序（どの項がどの項を待つか）を図で直すワークフロー編集タブを開きます。保存すると提案が書き換わるので、承認はそのあとに開き直してください"
+      title="計画の項どうしの順序（どの項がどの項を待つか）を図で直す計画編集タブを開きます。保存すると提案が書き換わるので、承認はそのあとに開き直してください"
       onClick={() => post({ type: "workflow", ticket: id })}
     >
-      ワークフロー
+      計画編集
     </button>
   );
 }
