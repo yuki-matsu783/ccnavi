@@ -72,8 +72,8 @@ ccnavi ディレクトリの組み込みルール（`builtin-guard-project-home`
 `ccnavi sync check <P>` でその親子のチケットを判定し直し、error があればその取り込み状態を `blocked` にして止める
 （理由を直して打ち直せば `present` に戻る）。
 
-**`ccnavi-git.sh` の中の判定は P13 の例外。** git の入口は `ccnavi-git.sh` 1 本に寄せてあり（チケット制御が有効なら
-生の `git` は組み込みで止まる）、その中で次の可否を sh が一次に判定する。チケットに結び付くブランチの `integrate` を断る
+**`ccnavi-git.sh` の中の判定は P13 の例外。** git の入口は `ccnavi-git.sh` 1 本に寄せてあり（生の
+`git` は組み込みでいつも止まる）、その中で次の可否を sh が一次に判定する。チケットに結び付くブランチの `integrate` を断る
 （`integrate-ticket`）、統合先への push を断る、親のブランチを 2 つの親子のチケットが宣言していれば・取り込み状態が `gone`
 なら push を断る、承認済みの `branch:` のブランチへ移る 1 操作の前提（作業ツリーが綺麗・途中の操作が無い・取り込み状態が
 合う）を確かめる。`integrate` / `integrate-done` の状態操作（取り込みの記録・`merge --squash`・取り込んだブランチの

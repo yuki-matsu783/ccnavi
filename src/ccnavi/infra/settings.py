@@ -182,18 +182,28 @@ def script_command(root: str, name: str) -> str:
     return f"sh {_quoted(f'{base}/{DEFAULT_PROJECT_HOME}/scripts/{name}')}"
 
 
-def git_command(root: str) -> str:
-    """文面で案内する git の打ち方。
-
-    ワークスペースルートに git のラッパーがあればラッパー、無ければ `git`。
-    ラッパーがあるワークスペースでは、生の git が組み込みかルールで止まることがある。止まる形を
-    案内すると、受け取ったエージェントは打って止められ、言い換えを探す。ラッパーは生の git が
-    止まっていないワークスペースでもそのまま使える。ラッパーが無いなら、生の git を組み込みで
-    止めることもない（チケット制御の生の git の止めはラッパーがあるときだけ足す）ので、
-    `git` を案内する。
-    """
+def has_git_wrapper(root: str) -> bool:
+    """ワークスペースルートに git のラッパー（`ccnavi-git.sh`）がある。"""
     wrapper = os.path.join(root, DEFAULT_PROJECT_HOME, "scripts", "ccnavi-git.sh")
-    if root and os.path.isfile(wrapper):
+    return bool(root) and os.path.isfile(wrapper)
+
+
+def git_wrapper_command(root: str) -> str | None:
+    """文面で案内する git の入口。ラッパーがあれば打てる形、無ければ None。
+
+    生の git は組み込みで常に止まるので、ラッパーが無いときに `git` の形を案内すると、
+    案内した行そのものが止まる。呼ぶ側は None のとき、git の操作をユーザに頼む文にする。
+    """
+    return script_command(root, "ccnavi-git.sh") if has_git_wrapper(root) else None
+
+
+def git_command(root: str) -> str:
+    """文面で案内する git の打ち方。ラッパーがあればラッパー。無ければ `git`。
+
+    生の git は組み込みで常に止まるので、`git` を案内するのは誤り。呼ぶ側は
+    `has_git_wrapper` が偽のとき、この値を文に入れず、ユーザに頼む文にする。
+    """
+    if has_git_wrapper(root):
         return script_command(root, "ccnavi-git.sh")
     return "git"
 

@@ -178,6 +178,8 @@ class PostToolUseTest(Harness, unittest.TestCase):
         # 共通レイヤーは既定の置き場へ。`--rules` は診断でだけ有効。
         self.rules = common_path(self.repo, "rules")
         write(self.rules, json.dumps(RULES))
+        # 戻す手順はラッパーの打ち方で書く。ラッパーが無いときの文は下のテストで見る。
+        write(os.path.join(self.repo, ".ccnavi", "scripts", "ccnavi-git.sh"), "exit 0\n")
         self.state = os.path.join(self.repo, "logs", "state")
         self.log = os.path.join(self.repo, "logs", "decisions.jsonl")
 
@@ -229,9 +231,23 @@ class PostToolUseTest(Harness, unittest.TestCase):
         # 原因となった直前の実行。
         self.assertIn("Bash(python build.py)", result.stderr)
         # 戻す手順。
-        self.assertIn('git restore --staged --worktree -- "protected/keep.txt"', result.stderr)
+        self.assertIn(
+            'ccnavi-git.sh restore --staged --worktree -- "protected/keep.txt"', result.stderr
+        )
         # ルールが持つ文面。止めるだけでは足りないという道具の目的そのもの。
         self.assertIn("Ask the user", result.stderr)
+
+    def test_ラッパーが無ければ戻す手順は書かずユーザに頼む(self):
+        """生の git は組み込みで止まるので、戻す `git` の形を案内すると、案内した行が止まる。"""
+        os.remove(os.path.join(self.repo, ".ccnavi", "scripts", "ccnavi-git.sh"))
+        self.run_hook(command="ls")
+        self.dirty()
+
+        result = self.run_hook(command="python build.py")
+
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertNotIn("git restore", result.stderr)
+        self.assertIn("ユーザに頼んで", result.stderr)
 
     def test_新しく現れたファイルは消す手順を返す(self):
         self.run_hook(command="ls")
@@ -432,7 +448,9 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("would-restore:", result.stderr)
         self.assertIn("put it back to its committed content", result.stderr)
         # 誰も戻していないので、戻す手順は省かない。
-        self.assertIn('git restore --staged --worktree -- "protected/keep.txt"', result.stderr)
+        self.assertIn(
+            'ccnavi-git.sh restore --staged --worktree -- "protected/keep.txt"', result.stderr
+        )
         self.assertIn("would-restore 1", self.records()[-1]["detail"])
 
     def test_自動復元の予行は現れたファイルにも触らない(self):
@@ -492,7 +510,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         message = json.loads(result.stdout)["systemMessage"]
         self.assertIn("protected/keep.txt", message)
         self.assertIn("protected", message, "どのルールが言っているか")
-        self.assertIn("git restore", message, "戻す手順")
+        self.assertIn("ccnavi-git.sh restore", message, "戻す手順")
         line = self.records()[-1]
         self.assertEqual(line["event"], "Stop")
         self.assertEqual(line["decision"], "deny")
@@ -628,7 +646,9 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("watched/deps.txt", result.stderr)
         self.assertNotIn("restored: ccnavi", result.stderr)
         # 戻していないので、戻す手順は載せたままにする。
-        self.assertIn('git restore --staged --worktree -- "watched/deps.txt"', result.stderr)
+        self.assertIn(
+            'ccnavi-git.sh restore --staged --worktree -- "watched/deps.txt"', result.stderr
+        )
         # 手順だけだと「自分で戻せ」としか読めない。戻さなかった理由をつける。
         self.assertIn("not-restored:", result.stderr)
         self.assertIn("`ask`, not `deny`", result.stderr)
