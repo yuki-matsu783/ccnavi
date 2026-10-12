@@ -152,8 +152,9 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertFalse(os.path.exists(self.approved_copy("i0004")))
 
     def test_the_same_id_in_two_layers_is_not_a_conflict(self):
-        """レイヤーをまたぐ `id` の衝突は無い。使うのは親の `project:` が指す 1 本だけ。
+        """自身のレイヤーとプロジェクトのレイヤーどうしは足さないので、その間の `id` の衝突は無い。
 
+        足すのは共通レイヤーと親の `project:` が指すレイヤーだけ。
         自身のレイヤーと lib が同じ `design` を別の中身で持っても、どちらも error にならず、
         lib 向けの親は lib の `design` を使う。"""
         write_layer(self.ws, phases=OWN_PHASES_DESIGN)
@@ -312,6 +313,28 @@ class PhaseUnionTest(ConfigUnionHarness):
 
         errors = self.phase_problems("error")
         self.assertTrue(any(p["where"].startswith("(phases)") for p in errors), errors)
+
+    def test_a_broken_common_layer_leaves_the_layer_types_in_use(self):
+        """共通レイヤーの phases.yml が読めなくても、レイヤーの定義だけで `plan:` が読める。
+
+        共通の定義は空として扱うので、共通にしか無い定義を使う計画は承認で止まる。
+        """
+        write(self.phases, "version: 1\nphases: [\n")
+
+        self.assertEqual(self.phase_problems("error", "lib"), [])
+        self.propose("i0001", ticket_text("i0001", plan=["docs"], allow=("docs/*",)))
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.assertTrue(os.path.exists(self.approved_copy("i0001")))
+        sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
+        self.assertEqual(
+            {t["id"]: t["source"] for t in sums["self"]["phases"]["types"]}, {"docs": "self"}
+        )
+
+        self.propose("i0002", ticket_text("i0002", plan=["design"], allow=("wip/design/*",)))
+        refused = self.approve()
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertFalse(os.path.exists(self.approved_copy("i0002")))
 
     def test_a_missing_phases_file_is_normal(self):
         """phases.yml が無いのは正常（空）。--lint に出さず、`plan:` だけが読めない。"""
@@ -683,6 +706,27 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertIn("省略", self.reason(said))
         mark = json.loads(read(self.approved_path("phases", "i0001", "1.skipped")))
         self.assertEqual(mark.get("source"), "lib", mark)
+
+    def test_the_mark_names_common_when_the_type_comes_from_common(self):
+        """共通レイヤーの定義を写した親のマーカーは、`source` が `common`。
+
+        `--explain --json` の和と同じ。lib の `work` は共通レイヤーの `work` と全欄が同じなので、
+        和では共通の側が残る。
+        写しは出どころを持たないが、共通レイヤーの定義と中身が同じなら共通の定義として記す。
+        """
+        write(self.phases, LIB_PHASES_WORK)
+        tree = self.one_child()
+        self.commit(tree, "src/a.py", "1\n")
+        closed = self.ccnavi("ticket", "finish", "i0001-01-01")
+        self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
+
+        said = self.hook("Bash", self.parent_tree, event="PostToolUse", command="ls")
+        self.assertIn("省略", self.reason(said))
+        mark = json.loads(read(self.approved_path("phases", "i0001", "1.skipped")))
+        sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
+        explained = {t["id"]: t["source"] for t in sums["lib"]["phases"]["types"]}
+        self.assertEqual(explained["work"], "common")
+        self.assertEqual(mark.get("source"), explained["work"], mark)
 
 
 class LayerPlaceFlagsAreDiagnosisOnlyTest(RiskUnionTest):

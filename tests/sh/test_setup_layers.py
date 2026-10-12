@@ -1,8 +1,9 @@
 """導入スクリプト（`scripts/ccnavi-setup.sh`）が配る設定のひな形の置き場。
 
-rules と risk は汎用なので共通レイヤー（`.ccnavi/config/common/`）へ、phases はワークスペースの
-レイアウトに依存するので自身のレイヤー（`.ccnavi/config/project/`）へ配る。配らないときは
-3 本とも「まだ無いもの」に名前が出る。
+rules と risk は汎用なので共通レイヤー（`.ccnavi/config/common/`）へ配る。phases は 2 本で、
+どのプロジェクトでも同じ構成を前提にできる定義を共通レイヤーへ、ワークスペースのレイアウトに依存する
+定義を自身のレイヤー（`.ccnavi/config/project/`）へ配る。配らないときは、rules と risk と、
+phases が共通にも自身のレイヤーにも無いことが「まだ無いもの」に名前が出る。
 """
 
 from __future__ import annotations
@@ -31,7 +32,14 @@ HOME = ".ccnavi"
 
 # 配布元に置くひな形。導入スクリプトは中身を読まずに写すので、形だけ整えてある。
 COMMON_RISK = "version: 1\nlevels: {medium: 20, high: 40, critical: 70}\nfactors: {}\n"
-COMMON_PHASES = "version: 1\nphases: {}\n"
+COMMON_PHASES = (
+    "version: 1\nphases:\n  implement:\n    kind: work\n    title: 実装とテスト\n"
+    '    review: mr\n    scope: ["src/*", "tests/*"]\n'
+)
+OWN_PHASES = (
+    "version: 1\nphases:\n  docs:\n    kind: work\n    title: 文書\n"
+    '    review: mr\n    scope: ["docs/*"]\n'
+)
 
 
 def write(path, text):
@@ -60,7 +68,8 @@ class SetupTest(unittest.TestCase):
         )
 
     def make_source(self):
-        """配布元のふり。実行ファイルと、共通レイヤーの rules / risk と、自身のレイヤーの phases。
+        """配布元のふり。実行ファイルと、共通レイヤーの rules / phases / risk と、
+        自身のレイヤーの phases。
 
         代わりに通る sh 3 本は起動して最初に共通部（ccnavi-common.sh と部品の
         ccnavi-common-*.sh）を読むので、配布元にも
@@ -79,7 +88,8 @@ class SetupTest(unittest.TestCase):
         shutil.copy(LAUNCHER, os.path.join(src, ".ccnavi", "scripts", "ccnavi-launcher.sh"))
         write(os.path.join(src, ".ccnavi", "config", "common", "rules.yml"), "deny: []\n")
         write(os.path.join(src, ".ccnavi", "config", "common", "risks.yml"), COMMON_RISK)
-        write(os.path.join(src, HOME, "config", "project", "phases.yml"), COMMON_PHASES)
+        write(os.path.join(src, ".ccnavi", "config", "common", "phases.yml"), COMMON_PHASES)
+        write(os.path.join(src, HOME, "config", "project", "phases.yml"), OWN_PHASES)
         # セッションの開始で渡す作業の決まりと、使い方の文書も配るもの。
         write(os.path.join(src, ".ccnavi", "CCNAVI.md"), "# ccnavi の作業の決まり\n")
         write(os.path.join(src, ".ccnavi", "docs", "worktree.md"), "# ワークツリー\n")
@@ -131,8 +141,44 @@ class SetupTest(unittest.TestCase):
         )
         self.assertNotIn("まだ無いもの", result.stdout)
 
+    def test_deploy_copies_common_phases(self):
+        """共通レイヤーの phases.yml も配る。
+
+        中身は配布元のまま、自身のレイヤーの phases.yml とは別のファイル。"""
+        src = self.make_source()
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        common = os.path.join(self.dir, ".ccnavi", "config", "common", "phases.yml")
+        own = os.path.join(self.dir, HOME, "config", "project", "phases.yml")
+        with open(common, encoding="utf-8") as f:
+            self.assertEqual(f.read(), COMMON_PHASES)
+        with open(own, encoding="utf-8") as f:
+            self.assertEqual(f.read(), OWN_PHASES)
+        self.assertIn(".ccnavi/config/common/phases.yml", result.stdout)
+
+    def test_existing_common_phases_is_kept_without_force(self):
+        """配布先に共通レイヤーの phases.yml があれば、--force の無い配布では入れ替えない。"""
+        src = self.make_source()
+        mine = "version: 1\nphases:\n  mine:\n    kind: work\n    title: 自分の\n"
+        common = write(os.path.join(self.dir, ".ccnavi", "config", "common", "phases.yml"), mine)
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(common, encoding="utf-8") as f:
+            self.assertEqual(f.read(), mine)
+
+    def test_phases_only_in_common_is_not_missing(self):
+        """フェーズ定義が共通レイヤーにだけあれば、
+
+        自身のレイヤーの phases.yml が無くても「まだ無いもの」に出さない。"""
+        write(os.path.join(self.dir, ".ccnavi", "config", "common", "phases.yml"), COMMON_PHASES)
+        result = self.run_setup("--mode", "enable", "--no-deploy")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn(".ccnavi/config/project/phases.yml", result.stdout)
+        self.assertNotIn(".ccnavi/config/common/phases.yml", result.stdout)
+
     def test_missing_templates_are_named(self):
-        """3 本とも「まだ無いもの」の点検に数える。"""
+        """rules と risk と、どこにも無いフェーズ定義を「まだ無いもの」の点検に数える。"""
         result = self.run_setup("--mode", "enable", "--no-deploy")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("まだ無いもの", result.stdout)

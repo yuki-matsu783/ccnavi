@@ -311,6 +311,27 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertIn("ミラーとして読めない", started.stderr)
         self.assertFalse(os.path.exists(mirror_of(tree, "rules.yml")))
 
+    def test_without_a_common_phases_file_the_mirror_has_none(self):
+        """1: 共通レイヤーに phases.yml が無く config にだけあるとき、
+
+        ミラーに phases.yml は置かず、着手は通る。
+
+        前に配った phases.yml がミラーに残っていれば消す。config の phases.yml には触れない。
+        """
+        self.propose(
+            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
+        self.assertEqual(self.approve().returncode, 0)
+        tree = self.worktree(self.lib, "i0001")
+        write(mirror_of(tree, "phases.yml"), COMMON_PHASES)
+
+        started = self.ccnavi("ticket", "start", "i0001")
+
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        self.assertTrue(os.path.exists(mirror_of(tree, "rules.yml")))
+        self.assertFalse(os.path.exists(mirror_of(tree, "phases.yml")))
+        self.assertEqual(read(config_of(tree, settings.KIND_PHASES)), LIB_PHASES)
+
     def test_a_common_phases_file_is_mirrored(self):
         """1: 共通レイヤーの phases.yml もミラーへ写す。config の phases.yml には触れない。"""
         write(self.phases, COMMON_PHASES)

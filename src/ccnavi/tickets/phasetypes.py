@@ -432,8 +432,24 @@ def types_of(t: ticket_model.Ticket) -> dict[str, PhaseType]:
         t.phase_types = read_copy(t.phases_raw)[0] if t.phases_raw is not None else PhaseTypes()
     # 出どころのレイヤーは、写しの元の `phases.yml`（親の `project:` が指すレイヤー）。記録の
     # `source` になる。`project` は読んだあとに置き場から入るので、引くたびに付け直す。
+    # 写しは出どころを持たないので、共通レイヤーの定義と同じかはマーカーを置くところで見る
+    # （`origin`）。
     mark_source(t.phase_types, t.project or settings.LAYER_SELF)
     return t.phase_types
+
+
+def origin(pt: PhaseType, common: dict[str, PhaseType] | None) -> str:
+    """写しの定義の出どころのレイヤー。記録の `source` に書く。
+
+    写しは出どころを持たないので、`types_of` は親の `project:` のレイヤーを付ける。共通レイヤーに
+    同じ `id` で読んだ形も同じ定義があれば、その定義は共通レイヤーから来たと読む（和を組むときも、
+    全欄が同じ定義は共通の側が残る。`--explain --json` の `source` と揃う）。承認のあとに共通の
+    定義が直されていれば、写しはもう共通の定義と同じでないので、親のレイヤーのままにする。
+    """
+    found = (common or {}).get(pt.id)
+    if found is not None and same(found, pt):
+        return settings.LAYER_COMMON
+    return pt.source
 
 
 def has_copy(t: ticket_model.Ticket) -> bool:
