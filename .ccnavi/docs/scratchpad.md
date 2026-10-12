@@ -8,7 +8,7 @@ keywords: [scratchpad, handoff, wip/handoff, スクラッチパッド, 下書き
 
 # 置き場の使い分け
 
-置き場は2つある。どちらも作業の最後には残らない。
+置き場は2つある。`wip/handoff/`はチケット作業の最後に`integrate`・`ready`が片付ける。`scratchpad/`はccnaviが消さないので、終わったら自分で消す。
 
 | | `wip/handoff/` | `scratchpad/` |
 |---|---|---|
