@@ -178,9 +178,9 @@ def scope_findings(
         # （実行前チェックも直さない）。
         if ticket_places.is_ticket_place(rel, conf.tickets, conf.approved):
             continue
-        # 下書きの置き場（`wip/scratchpad/`）と ELI5 の置き場は追跡されるので、ここでも外す
+        # 下書きの置き場（`wip/handoff/`）と ELI5 の置き場は追跡されるので、ここでも外す
         # （実行前チェックと揃える）。下書きは `integrate` が外し、`ready` が `wip/` ごと消す。
-        if ticket_places.is_scratch_place(rel) or ticket_places.is_eli5_place(rel):
+        if ticket_places.is_handoff_place(rel) or ticket_places.is_eli5_place(rel):
             continue
         found = scope_verdict(child, parent, pt, rel)
         if found.outside:

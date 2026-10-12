@@ -131,7 +131,7 @@ DEPLOY_DOCS_DIR=".ccnavi/docs"
 # issue・MR の指定を見つけるとこの表記を案内するので、配らないと案内どおりに実行しても動かない。
 # ccnavi-start.sh は issue・MR の指定を受けた着手の入口で、hook がこの表記を案内する。中で ccnavi-branches.sh を呼ぶ。
 # ccnavi-stage.sh は、書き込みを止められている保護対象のファイルを下書きの置き場で直すための支度をする sh。
-# CLAUDE.md の決まり（wip/scratchpad/ に cp して編集し、ユーザが差し替える）の手順を 1 本にしたもの。
+# CLAUDE.md の決まり（wip/handoff/ に cp して編集し、ユーザが差し替える）の手順を 1 本にしたもの。
 # ccnavi-worktree.sh は作業用のワークツリーを統合先から切る sh（fetch・遅れの確認・起点の選択・worktree add を
 # 1 本にしたもの）。.ccnavi/docs/worktree.md の「ワークツリーを切る」の手順を打つ。
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
@@ -797,10 +797,21 @@ fi
 IGNORE_HEADER="# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）"
 INDEX_IGNORE_HEADER="# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）"
 INDEX_IGNORE_LINE="**/ccnavi-index.jsonl"
+# ワークスペースルート直下の scratchpad/ は、直接作業で一時的にユーザへ見せる物とコミットしたくない物の
+# 置き場（.ccnavi/docs/scratchpad.md）。追跡されると意味が無いので、実行ファイルと同じ回に足す。
+# `scratchpad/` はどの階層の同名にも当たるので、ルートに固定した `/scratchpad` が既にあるとき、
+# または同等以上の `/scratchpad/`・`scratchpad`・`scratchpad/` があるときは足さない。
+# 末尾に `/` を付けないのは、scratchpad が symlink でも当たるようにするため（`/scratchpad/` はディレクトリにしか当たらない）。
+# `!/scratchpad` のようにユーザが否定している行があれば、追跡すると決めているので足さずに伝える。
+SCRATCH_IGNORE_HEADER="# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）"
+SCRATCH_IGNORE_LINE="/scratchpad"
 # ignore_todo は、表示と「揃っているか」の判定に使う全体。書き込むときは塊ごとに分けて持つ。
 ignore_todo=""
 ignore_bin_todo=""
 ignore_index_todo=""
+ignore_scratch_todo=""
+# ユーザが scratchpad を否定している行（改行で終わる）。あれば /scratchpad は足さない。
+ignore_scratch_negated=""
 # ユーザが ccnavi-index.jsonl を否定している行（改行で終わる）。あれば索引の行は足さない。
 ignore_index_negated=""
 # .gitignore の行を、比べやすい形で出す。CRLF の `\r` と行末の空白を取り除く（git も行末の
@@ -831,7 +842,15 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 		ignore_index_todo="$INDEX_IGNORE_LINE
 "
 	fi
-	ignore_todo="$ignore_bin_todo$ignore_index_todo"
+	scratch_negated=$(gitignore_lines | grep -E '^!/?scratchpad/?$' || true)
+	if [ -n "$scratch_negated" ]; then
+		ignore_scratch_negated="$scratch_negated
+"
+	elif ! ignored_already "$SCRATCH_IGNORE_LINE" "/scratchpad/" "scratchpad/" "scratchpad"; then
+		ignore_scratch_todo="$SCRATCH_IGNORE_LINE
+"
+	fi
+	ignore_todo="$ignore_bin_todo$ignore_index_todo$ignore_scratch_todo"
 fi
 
 copy_tree() {
@@ -966,6 +985,10 @@ report_deploy() {
 	if [ -n "$ignore_index_negated" ]; then
 		printf '.gitignore に ccnavi-index.jsonl を否定する行があり、ユーザが索引を追跡しているので %s は足していません:\n' "$INDEX_IGNORE_LINE"
 		printf '%s' "$ignore_index_negated" | sed 's/^/  /'
+	fi
+	if [ -n "$ignore_scratch_negated" ]; then
+		printf '.gitignore に scratchpad を否定する行があり、ユーザが追跡しているので %s は足していません:\n' "$SCRATCH_IGNORE_LINE"
+		printf '%s' "$ignore_scratch_negated" | sed 's/^/  /'
 	fi
 	if [ -n "$launcher_mode_todo" ]; then
 		printf '%s:\n' "$4"
@@ -1364,6 +1387,7 @@ if [ "$deploy_work" = yes ]; then
 	}
 	append_ignore "$IGNORE_HEADER" "$ignore_bin_todo"
 	append_ignore "$INDEX_IGNORE_HEADER" "$ignore_index_todo"
+	append_ignore "$SCRATCH_IGNORE_HEADER" "$ignore_scratch_todo"
 fi
 
 report_deploy '配った' '入れ替えた' '.gitignore に足した' '実行ビットを付けた'

@@ -395,16 +395,16 @@ class RemainingTest(PhaseHarness):
 
     def test_lists_a_worktree_named_differently_that_holds_the_parents_tickets(self):
         tree = self.worktree("work-a", "i0001")
-        write(os.path.join(tree, "wip", "scratchpad", "memo.md"), "メモ\n")
+        write(os.path.join(tree, "wip", "handoff", "memo.md"), "メモ\n")
         listed = self.remaining()
         self.assertEqual(listed.returncode, 0, listed.stdout + listed.stderr)
         self.assertIn("- work-a（", listed.stdout)
         self.assertIn("名前が親 i0001 と違う", listed.stdout)
-        self.assertIn("未保存の下書きがある（wip/scratchpad/）", listed.stdout)
+        self.assertIn("未保存の下書きがある（wip/handoff/）", listed.stdout)
         self.assertIn("消す前に確かめること", listed.stdout)
         self.assertIn("ccnavi-clean.sh --worktree work-a", listed.stdout)
         # 出すだけで消さない
-        self.assertTrue(os.path.exists(os.path.join(tree, "wip", "scratchpad", "memo.md")))
+        self.assertTrue(os.path.exists(os.path.join(tree, "wip", "handoff", "memo.md")))
 
     def test_lists_a_closed_child_kept_for_an_unsaved_draft_and_not_a_clean_one(self):
         for name in ("i0001-01-01", "i0001-01-02"):
@@ -415,12 +415,12 @@ class RemainingTest(PhaseHarness):
         clean = self.run_child("i0001-01-02", [("src/b.py", "y = 1\n")])
         for name in ("i0001-01-01", "i0001-01-02"):
             self.assertEqual(self.close_child(name).returncode, 0)
-        write(os.path.join(dirty, "wip", "scratchpad", "memo.md"), "メモ\n")
+        write(os.path.join(dirty, "wip", "handoff", "memo.md"), "メモ\n")
         listed = self.remaining()
         self.assertEqual(listed.returncode, 0, listed.stdout + listed.stderr)
         self.assertIn("- i0001-01-01（", listed.stdout)
-        self.assertIn("未保存の下書きがある（wip/scratchpad/）", listed.stdout)
+        self.assertIn("未保存の下書きがある（wip/handoff/）", listed.stdout)
         self.assertIn("ccnavi-clean.sh --worktree i0001-01-01", listed.stdout)
         self.assertNotIn("i0001-01-02", listed.stdout)
         self.assertTrue(os.path.isdir(clean))
-        self.assertTrue(os.path.exists(os.path.join(dirty, "wip", "scratchpad", "memo.md")))
+        self.assertTrue(os.path.exists(os.path.join(dirty, "wip", "handoff", "memo.md")))

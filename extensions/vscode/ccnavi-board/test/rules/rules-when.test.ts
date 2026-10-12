@@ -38,7 +38,7 @@ deny:
         - not:
             any:
               # 下書きの置き場
-              - regex: '^{root}[\\\\/]wip[\\\\/]scratchpad(?:[\\\\/]|$)'
+              - regex: '^{root}[\\\\/]wip[\\\\/]handoff(?:[\\\\/]|$)'
               # ワークツリー
               - glob: '{root}/.claude/worktrees/**'
     message: >-
@@ -52,7 +52,7 @@ allow:
 
 const EXPECTED: CondNode = group("all", [
   leaf("regex", "^{root}[\\\\/]"),
-  not(group("any", [leaf("regex", "^{root}[\\\\/]wip[\\\\/]scratchpad(?:[\\\\/]|$)"), leaf("glob", "{root}/.claude/worktrees/**")])),
+  not(group("any", [leaf("regex", "^{root}[\\\\/]wip[\\\\/]handoff(?:[\\\\/]|$)"), leaf("glob", "{root}/.claude/worktrees/**")])),
 ]);
 
 function withWhen(sections: Sections, when: CondNode): Sections {

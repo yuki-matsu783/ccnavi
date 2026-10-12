@@ -69,9 +69,9 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 
 止めるのは書き込みの形と場所の組で、場所の名前が出ただけでは止めない（`cat rules.yml` も `git add <パス>` も通る）。
 
-下書きの置き場（ワークスペースルートの `wip/scratchpad/`）へ写す cp は、行き先の最後の語に守る名前があっても
-`builtin-guard-setting-files` から外す（`selfguard_shell.scratchpad_copy_exempt`）。守る場所を直すときは、置き場へ写して
-写しを直すため（`cp .ccnavi/scripts/ccnavi-git.sh wip/scratchpad/ccnavi-git.sh`）。式は先読みを使えないので（5.1）、
+下書きの置き場（ワークスペースルートの `wip/handoff/`）へ写す cp は、行き先の最後の語に守る名前があっても
+`builtin-guard-setting-files` から外す（`selfguard_shell.handoff_copy_exempt`）。守る場所を直すときは、置き場へ写して
+写しを直すため（`cp .ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh`）。式は先読みを使えないので（5.1）、
 外すかどうかは式の外で、行き先を実際のパスに解いて決める。外すのは次をすべて満たすときだけ。
 
 - コマンドが 1 本だけ（つないだ形は外さない。前のコマンドが置き場にリンクを作る形や `cd` を読み切れないため）
@@ -81,7 +81,7 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 - 変数・グロブ・引用・リダイレクト・`~` など、表記どおりに読めない文字が無い
 - 行き先に `..` の段が無く、payload の cwd から解いた実パス（リンクを解いた先）が置き場の中。行き先がディレクトリなら、
   元の名前を足した先も置き場の中。cwd が無ければ相対の行き先は外さない
-- 置き場（`wip/` か `wip/scratchpad/`）そのものがリンクではない
+- 置き場（`wip/` か `wip/handoff/`）そのものがリンクではない
 - 行き先に既にあるファイルが、ハードリンクでほかの名前とつながっていない（上書きがつながった先も書き換えるため）
 
 組み込みの既定のシェルの 1 本（`builtin-guard-config-via-bash`）には、この例外を付けない。

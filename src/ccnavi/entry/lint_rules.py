@@ -305,7 +305,7 @@ def _except_problems(rule: rules.Rule, name: str) -> list[Problem]:
 
     1. 何にでも当たる except。ルールが何にも当たらなくなり、書いてあるのに何も止めない
     2. Bash / PowerShell を見る deny / ask の except。当てるのはコマンド列の全体なので、
-       `git push; echo wip/scratchpad/` のように除く語を足すだけで外れる
+       `git push; echo wip/handoff/` のように除く語を足すだけで外れる
     """
     if not rule.excepts:
         return []

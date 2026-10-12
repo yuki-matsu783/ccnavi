@@ -24,7 +24,8 @@ WORKSPACE_ROOT = {
     "match": "Write|Edit|NotebookEdit",
     "regex": r"^{root}[\\/]",
     "except": [
-        {"regex": r"^{root}[\\/]wip[\\/]scratchpad(?:[\\/]|$)"},
+        {"regex": r"^{root}[\\/]wip[\\/]handoff(?:[\\/]|$)"},
+        {"regex": r"^{root}[\\/]scratchpad(?:[\\/]|$)"},
         {"regex": r"^{root}[\\/]\.claude[\\/]worktrees(?:[\\/]|$)"},
     ],
     "message": "main では編集しない",
@@ -212,13 +213,16 @@ class WorkspaceRootTest(unittest.TestCase):
 
     def test_置き場だけが通る(self):
         for tail in [
-            "/wip/scratchpad/a.md",
-            "/wip/scratchpad/x/y.sh",
-            "/wip/scratchpad",
-            "/wip/scratchpad/",
-            "/WIP/Scratchpad/a.md",
-            r"\wip\scratchpad\a.md",
-            "/wip\\scratchpad/a.md",
+            "/wip/handoff/a.md",
+            "/wip/handoff/x/y.sh",
+            "/wip/handoff",
+            "/wip/handoff/",
+            "/WIP/Handoff/a.md",
+            "/scratchpad/a.md",
+            "/scratchpad",
+            r"\scratchpad\a.md",
+            r"\wip\handoff\a.md",
+            "/wip\\handoff/a.md",
             "/.claude/worktrees/x/a.md",
             "/.claude/worktrees",
             r"\.claude\worktrees\x\a.md",
@@ -234,10 +238,11 @@ class WorkspaceRootTest(unittest.TestCase):
             "/wip/",
             "/wip/a.md",
             "/wipx/a.md",
-            "/wip/scratchpa",
-            "/wip/scratchpadx",
-            "/wip/scratchpadx/a.md",
-            "/scratchpad/a.md",
+            "/wip/handof",
+            "/wip/scratchpad/a.md",
+            "/scratchpadx/a.md",
+            "/wip/handoffx",
+            "/wip/handoffx/a.md",
             "/.cfoo",
             "/.claude/settings.json",
             "/.claude/worktreesx/a.md",
@@ -316,7 +321,7 @@ class JudgeTest(unittest.TestCase):
     def test_パス(self):
         path = os.path.join(self.root, "README.md")
         self.assertEqual(self.decision("Write", {"file_path": path}), "deny")
-        kept = os.path.join(self.root, "wip", "scratchpad", "a.md")
+        kept = os.path.join(self.root, "wip", "handoff", "a.md")
         self.assertNotEqual(self.decision("Write", {"file_path": kept}), "deny")
 
     def test_コマンドと入れ子のコマンド(self):
@@ -413,8 +418,8 @@ class MergeTest(unittest.TestCase):
         ruleload.merge_rules(base, extra, "lib")
         merged = base.deny[1]
         self.assertEqual(merged.id, "lib:b")
-        self.assertEqual(len(merged.excepts), 2)
-        self.assertFalse(merged.matches("Write", "/r/wip/scratchpad/a.md"))
+        self.assertEqual(len(merged.excepts), 3)
+        self.assertFalse(merged.matches("Write", "/r/wip/handoff/a.md"))
 
     def test_except_だけが違えば別の定義(self):
         with_except = {"id": "a", "match": "Write", "glob": "*", "message": "m"}

@@ -586,26 +586,30 @@ class TicketPlaces(Workspace):
         self.assertIn(rel, result.stderr)
 
 
-class ScratchPlace(Workspace):
-    """下書きの置き場（`wip/scratchpad/`）は、チケットの範囲を当てない。
+class HandoffPlace(Workspace):
+    """下書きの置き場（`wip/handoff/`）は、チケットの範囲を当てない。
 
     追跡される置き場なので、実行前チェックだけでなく、実行後チェックと
-    サブエージェント終了時チェックも外す。外すのは `wip/scratchpad/` の下だけで、`wip/` の
+    サブエージェント終了時チェックも外す。外すのは `wip/handoff/` の下だけで、`wip/` の
     ほかの場所と紛らわしい名前は今までどおり範囲の外として止まる。ワークツリー直下の
-    `scratchpad/`（廃止した置き場）も特別扱いしない。
+    旧 `scratchpad/`（廃止した置き場。ルート直下の `scratchpad/` とは別）も特別扱いしない。
 
     ルールはワークツリーを allow で開ける。
     """
 
-    # (相対パス, 外すか, なぜ)。素の `wip/scratchpad` は別の 1 本で見る。1 つのツリーに
+    # (相対パス, 外すか, なぜ)。素の `wip/handoff` は別の 1 本で見る。1 つのツリーに
     # ディレクトリとファイルの両方は置けないので、この表には入れられない。
     CASES = (
-        ("wip/scratchpad/draft.yml", True, "下書きの置き場そのもの"),
-        ("wip/scratchpad/staging/rules.yml", True, "その下も置き場"),
-        ("wip/scratchpadX/a.md", False, "前置に続けただけの場所は置き場ではない"),
+        ("wip/handoff/draft.yml", True, "下書きの置き場そのもの"),
+        ("wip/handoff/staging/rules.yml", True, "その下も置き場"),
+        ("wip/handoffX/a.md", False, "前置に続けただけの場所は置き場ではない"),
         ("wip/design/a.md", False, "wip/ のほかの場所には広げない"),
-        ("docs/wip/scratchpad/a.md", False, "ルートの直下の wip/ だけ"),
-        ("scratchpad/a.md", False, "廃止した置き場。普通の作業対象"),
+        ("docs/wip/handoff/a.md", False, "ルートの直下の wip/ だけ"),
+        (
+            "scratchpad/a.md",
+            False,
+            "ワークツリー直下の旧置き場（ルート直下のものとは別）。普通の作業対象",
+        ),
         ("WIP/scratchpad/a.md", False, "表記は区別する"),
     )
 
@@ -628,34 +632,34 @@ class ScratchPlace(Workspace):
                 self.assertEqual(self.last_record().get("code", ""), code, self.reason(result))
 
     def test_a_file_named_like_the_place_is_not_the_place(self):
-        result = self.write_hook(self.child, "wip/scratchpad")
+        result = self.write_hook(self.child, "wip/handoff")
         self.assertEqual(self.decision(result), "deny", self.reason(result))
         self.assertEqual(self.last_record().get("code", ""), "DENY_TICKET_SCOPE")
 
     def test_post_tool_use_does_not_report_the_scratch_place(self):
-        exempt = self.after_shell(self.child, "wip/scratchpad/draft.yml", session="s-in")
+        exempt = self.after_shell(self.child, "wip/handoff/draft.yml", session="s-in")
         self.assertNotIn("POST_TICKET_SCOPE", exempt.stderr, exempt.stderr)
-        other = self.after_shell(self.child, "wip/scratchpadX/draft.yml", session="s-out")
+        other = self.after_shell(self.child, "wip/handoffX/draft.yml", session="s-out")
         self.assertIn("POST_TICKET_SCOPE", other.stderr)
-        self.assertIn("wip/scratchpadX/draft.yml", other.stderr)
+        self.assertIn("wip/handoffX/draft.yml", other.stderr)
         old = self.after_shell(self.child, "scratchpad/draft.yml", session="s-old")
         self.assertIn("POST_TICKET_SCOPE", old.stderr)
 
     def test_subagent_stop_leaves_the_scratch_place_alone(self):
-        rel = "wip/scratchpad/draft.yml"
+        rel = "wip/handoff/draft.yml"
         write(os.path.join(self.child, *rel.split("/")), "x\n")
         result = self.hook("SubagentStop", "", self.child, agent_id="sub-3")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("POST_TICKET_SCOPE", result.stderr)
 
     def test_subagent_stop_bounces_the_old_scratchpad_and_lookalikes(self):
-        for rel in ("scratchpad/draft.yml", "wip/scratchpadX/draft.yml"):
+        for rel in ("scratchpad/draft.yml", "wip/handoffX/draft.yml"):
             write(os.path.join(self.child, *rel.split("/")), "x\n")
         result = self.hook("SubagentStop", "", self.child, agent_id="sub-4")
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("POST_TICKET_SCOPE", result.stderr)
         self.assertIn("scratchpad/draft.yml", result.stderr)
-        self.assertIn("wip/scratchpadX/draft.yml", result.stderr)
+        self.assertIn("wip/handoffX/draft.yml", result.stderr)
 
 
 class Eli5Place(Workspace):
