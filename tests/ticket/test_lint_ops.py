@@ -131,6 +131,13 @@ class LintOpsTest(PhaseHarness):
             lines,
         )
 
+    def test_the_form_follows_the_branch_prefixes_setting(self):
+        self.propose("i0001", parent_text("i0001", ["design"], copy=self.phases_text))
+        self.commit_parent()
+        self.worktree("feature-12-direct", "main")
+        lint = self.ccnavi("--lint", "--mode", "enable", env={"CCNAVI_BRANCH_PREFIXES": "wip"})
+        self.assertIn("feature-12-direct の名前が", lint.stdout)
+
     def test_a_direct_work_worktree_in_the_form_is_not_warned(self):
         self.propose("i0001", parent_text("i0001", ["design"], copy=self.phases_text))
         self.commit_parent()
