@@ -6,13 +6,11 @@
  * （見本を出している間は全面の覆いがクリックを受けるので、見本のボタンは押せない）。
  *
  * ボードの見本は実行ファイルの出力と同じ形（`BoardJson`）で書き、`buildBoard` を通す。カードの形を
- * ここで組むと、カードの欄が増えたときに見本だけが古くなる。ワークフロー編集タブの見本も同じで、
- * `--plan-order <親> --json` の答えの実例（拡張のテストのフィクスチャ `plan-order.json` の `open`）を写して
- * `parsePlanOrder` を通す（実例とずれないことはテストが見る）。DOM に触れないので単体で試せる。
+ * ここで組むと、カードの欄が増えたときに見本だけが古くなる。DOM に触れないので単体で試せる。
+ * ワークフロー編集画面の見本は、案内の定義（`webview/tours/workflow.yml`）に書き、`tour-workflow.ts` が読む。
  */
 import { buildBoard, type Board } from "./board.js";
 import type { BoardJson, ParentJson, PhaseJson, TicketJson } from "./model.js";
-import { parsePlanOrder, type PlanOrderAnswer } from "./planordermodel.js";
 
 export { SAMPLE_NOTE } from "./tour-def.js";
 
@@ -125,62 +123,4 @@ export function sampleBoard(root: string, generatedAt: string): Board {
     parents: [SAMPLE_PARENT],
   };
   return buildBoard(json);
-}
-
-/** 見本の計画の項（実行ファイルの答えと同じ形） */
-function planItem(number: number, type: string, title: string, review: string): Record<string, unknown> {
-  return { number, from: number, type, title, review, deferred: false, review_at: null, locked: false };
-}
-
-/**
- * ワークフロー編集タブの見本の計画。全体計画 1〜4（2 と 3 が 1 を待ち、4 が両方を待つ）と、フィードバック計画 5〜6。
- * 図を出せない答え（計画が空）のタブで、案内の間だけ読むだけで出す。保存にも線の頼みにも使わない
- */
-export function sampleWorkflow(): PlanOrderAnswer {
-  const sha = "sample";
-  const json = {
-    version: 1,
-    ticket: "sample-a",
-    source_sha: sha,
-    plans: [
-      {
-        ticket: "sample-a",
-        part: "plan",
-        source_sha: sha,
-        items: [planItem(1, "research", "調査", "none"), planItem(2, "design", "設計", "mr"), planItem(3, "implement", "実装とテスト", "mr"), planItem(4, "docs", "docs", "")],
-        after: { "2": [1], "3": [1], "4": [2, 3] },
-        proposed: { "2": [1], "3": [1], "4": [2, 3] },
-        current: null,
-        loose: [],
-        ready: [1],
-        problems: [],
-      },
-      {
-        ticket: "sample-a",
-        part: "feedback",
-        source_sha: sha,
-        items: [planItem(5, "design-feedback", "design-feedback", ""), planItem(6, "implement-feedback", "実装フィードバック対応", "mr")],
-        after: { "6": [5] },
-        proposed: { "6": [5] },
-        current: null,
-        loose: [],
-        ready: [5],
-        problems: [],
-      },
-    ],
-    problems: [],
-    loose: [],
-    refused: [],
-    revision_problems: [],
-    children: [],
-    child_problems: [],
-    mismatched: [],
-    writable: true,
-  };
-  const parsed = parsePlanOrder(JSON.stringify(json));
-  if (!parsed.ok) {
-    // 見本が実行ファイルの形から外れた（テストが先に落ちる）
-    throw new Error(parsed.error);
-  }
-  return parsed.value;
 }
