@@ -5,7 +5,7 @@ description: 書き込みは実行ファイルに任せ、取り込みと同じ�
 tags: [phase, ticket, extension]
 keywords: [テンプレート, テンプレート管理, 下書き, 保存, 改名, 移動, 削除, --save-draft, --rename-template, --move-template, --delete-template, --delete-draft, --via board, --expect, features, template_draft]
 ---
-# ADR-0133: テンプレート管理画面から下書きの保存と、取り込み済みの改名・移動・削除をできるようにする
+# ADR-0134: テンプレート管理画面から下書きの保存と、取り込み済みの改名・移動・削除をできるようにする
 
 状態: 採用（2026-10-12 に、書き込みの担当・端末確認の水準・範囲・錠の対象・カードの入口・新しい ADR の 5 点をユーザが決めた。ADR-0130 の「ボードのカードからの入口は作らない」を改める）
 
