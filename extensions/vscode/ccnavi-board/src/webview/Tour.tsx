@@ -87,6 +87,8 @@ const BUBBLE_WIDTH = 340;
 export function TourButton({ courses, onPick }: { readonly courses: readonly TourCourse[]; readonly onPick: (course: string) => void }): JSX.Element {
   const [open, setOpen] = useState(false);
   const holder = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const many = courses.length > 1;
 
   useEffect(() => {
     if (!open) {
@@ -98,16 +100,19 @@ export function TourButton({ courses, onPick }: { readonly courses: readonly Tou
         setOpen(false);
       }
     };
+    // Esc は一覧を閉じて「?」へ焦点を戻す（body に落とさない）。ほかの Esc（選択肢を閉じる）には任せず、ここで受けたら止める
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {
+        event.stopPropagation();
         setOpen(false);
+        button.current?.focus();
       }
     };
     document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     return () => {
       document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
     };
   }, [open]);
 
@@ -119,7 +124,7 @@ export function TourButton({ courses, onPick }: { readonly courses: readonly Tou
   }, [open]);
 
   const click = (): void => {
-    if (courses.length <= 1) {
+    if (!many) {
       onPick(courses[0]?.id ?? INTRO_COURSE);
       return;
     }
@@ -129,17 +134,30 @@ export function TourButton({ courses, onPick }: { readonly courses: readonly Tou
   return (
     <>
       {open && (
-        <div ref={holder} className="tour-menu" role="menu" aria-label="案内の一覧">
+        <div
+          ref={holder}
+          className="tour-menu"
+          role="group"
+          aria-label="案内の一覧"
+          // 一覧と「?」の外へ焦点が出たら閉じる（Tab で抜けたとき開いたまま残さない）
+          onBlur={(event) => {
+            const next = event.relatedTarget as Node | null;
+            if (next !== null && !event.currentTarget.contains(next) && next !== button.current) {
+              setOpen(false);
+            }
+          }}
+        >
           <p className="tour-menu-head">見たい案内を選んでください</p>
           {courses.map((course) => (
             <button
               key={course.id}
               type="button"
-              role="menuitem"
               className="tour-menu-item"
               data-action="tour-course"
               data-course={course.id}
               onClick={() => {
+                // 案内を閉じたとき焦点を戻す先は、始める時点で焦点のある要素。消えるメニューの項目ではなく「?」にしておく
+                button.current?.focus();
                 setOpen(false);
                 onPick(course.id);
               }}
@@ -151,14 +169,15 @@ export function TourButton({ courses, onPick }: { readonly courses: readonly Tou
         </div>
       )}
       <button
+        ref={button}
         type="button"
         className="tour-button"
         data-action="tour"
         data-tour="tour"
-        title="案内を選ぶ"
-        aria-label="案内を選ぶ"
-        aria-haspopup={courses.length > 1 ? "menu" : undefined}
-        aria-expanded={courses.length > 1 ? open : undefined}
+        title={many ? "案内を選ぶ" : "この画面の案内を見る"}
+        aria-label={many ? "案内を選ぶ" : "この画面の案内を見る"}
+        aria-haspopup={many ? "true" : undefined}
+        aria-expanded={many ? open : undefined}
         onClick={click}
       >
         ?
@@ -268,7 +287,12 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
       if (cancelled) {
         return;
       }
-      const el = document.querySelector(step.target);
+      let el: Element | null = null;
+      try {
+        el = document.querySelector(step.target);
+      } catch {
+        // 選択子として読めない指す先（定義の誤り）は無いものとして、文だけを中ほどに出す
+      }
       if (el === null) {
         setSpot(undefined);
       } else {

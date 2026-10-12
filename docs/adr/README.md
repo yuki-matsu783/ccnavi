@@ -214,8 +214,8 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0074](0074-board-shows-what-moved.md) | ボードは「動いた」を表示し、その表示を時間では消さない |
 | [0082](0082-phase-graph-groups-tour.md) | フェーズの図を区分の枠で分け、図の下は凡例と当てはまるときだけの注意にし、細かい案内は初回の吹き出しとヘルプに寄せる（図は ADR-0109 がなくした） |
 | [0083](0083-tour-on-every-screen-with-samples.md) | 初回の吹き出しの案内を拡張の 5 画面すべてに出し、中身が空の画面では案内の間だけ見本を出す |
-| [0124](0124-tour-courses-in-yaml.md) | 案内を使い方ごとの案内（ユースケース）に分け、見本と段を YAML で定義する |
 | [0091](0091-project-skills-in-docs-skills.md) | プロジェクトのスキルは `docs/skills/` に置き、ccnavi は目録だけを渡す（置き場は ADR-0111 が `skills/` に改める） |
+| [0124](0124-tour-courses-in-yaml.md) | 案内を使い方ごとの案内（ユースケース）に分け、見本と段を YAML で定義する |
 
 ### 開発と文書
 
