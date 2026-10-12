@@ -40,6 +40,7 @@ import type { ProjectsData, ProjectsMessage, ToProjects } from "./core/projects-
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { readOrigin } from "./git.js";
 import { runInTerminal } from "./terminal.js";
+import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 300;
@@ -409,6 +410,14 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     // 裏にいる間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
     // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て捨てている
     postAppearance(current.host);
+    // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す
+    if (!tourSeen(SCREEN)) {
+      current.host.post({ type: "tour" } satisfies ToProjects);
+    }
+    return;
+  }
+  if (message.type === "tourDone") {
+    markTourSeen(SCREEN);
     return;
   }
   // 「更新」は一覧が無くても通す。読み直せなかったところからユーザが抜け出す方法がこれしかない
@@ -479,6 +488,7 @@ function asMessage(message: unknown): ProjectsMessage | undefined {
     case "ready":
     case "refresh":
     case "fixIgnore":
+    case "tourDone":
       return { type: m.type };
     case "clone":
       return typeof m.url === "string" && typeof m.name === "string" ? { type: "clone", url: m.url, name: m.name } : undefined;
