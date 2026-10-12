@@ -221,8 +221,11 @@ class ArchiveChecksTest(ChecksHarness):
 class ReadyHarness(PhaseHarness):
     """`review ready` が条件を確かめてから閉じた親子のチケットを退避する。"""
 
-    def closable(self):
-        """親を閉じて片付け、push 済みにする。fixture（マージリクエストの取得結果）を返す。"""
+    def closable(self, before_close=None):
+        """親を閉じて片付け、push 済みにする。fixture（マージリクエストの取得結果）を返す。
+
+        `before_close` があれば、親を閉じる直前に呼ぶ。親の finish の結果は `self.parent_closed`。
+        """
         self.family(plan=["design"])
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
@@ -238,7 +241,9 @@ class ReadyHarness(PhaseHarness):
         self.start_parent()
         self.propose("i0001", parent_text("i0001", ["design"], feedback=[]))
         self.assertEqual(self.approve().returncode, 0)
-        closed = self.ccnavi("ticket", "finish", "i0001")
+        if before_close:
+            before_close()
+        closed = self.parent_closed = self.ccnavi("ticket", "finish", "i0001")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("logs/archive/", closed.stdout)
         # 統合先にたまっていた過去の親（閉じた親子のチケット）

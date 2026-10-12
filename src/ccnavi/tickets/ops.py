@@ -37,6 +37,7 @@ from . import (
     phase,
     risk,
     skillsync,
+    template_drafts,
     ticket_ids,
     ticket_model,
     ticket_places,
@@ -347,6 +348,8 @@ def _close_parent(
         "途中の作業もチケットも既定のブランチに残さない。マージはユーザが squash で行う。"
         f"{READY_FLOW_AGREED}\n"
     )
+    # 材料は ready で退避されるので、ready の前の今しか拾えない。出力に足すだけで、判定は変えない。
+    stdout.write(template_drafts.close_notice(conf, root, found.ticket))
 
 
 def cancel(
