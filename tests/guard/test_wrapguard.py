@@ -574,7 +574,7 @@ class CorePathTest(unittest.TestCase):
         """文字として渡す道の案内は、ラッパーのあるワークスペースでは生の git を勧めない。"""
         decision, reason = self.hook("echo `date`")
         self.assertEqual(decision, "deny", reason)
-        self.assertIn("ccnavi-git.sh commit -F <file>", reason)
+        self.assertIn("ccnavi-git.sh commit -F <ファイル>", reason)
         self.assertNotIn(" git commit -F", reason)
 
     def test_dry_run_given_last(self):

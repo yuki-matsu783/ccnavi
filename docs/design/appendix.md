@@ -69,13 +69,13 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 
 | 名前 | 理由コード |
 |---|---|
-| `(ticket-scope)` | `DENY_TICKET_SCOPE` / `TICKET_ASK`、実行後チェックと `SubagentStop` の `POST_TICKET_SCOPE` |
-| `(ticket-blocked)` | `DENY_TICKET_BLOCKED` |
-| `(ticket-project)` | `DENY_TICKET_PROJECT_MISMATCH` |
-| `(ticket-flow-lock)` | `DENY_TICKET_FLOW_LOCKED` |
-| `(phase-review)` | `DENY_PHASE_REVIEW` |
-| `(subagent-ticket-op)` | `DENY_SUBAGENT_TICKET_OP` |
-| `(redirect-limit)` | `DENY_REDIRECT_LIMIT` |
+| `builtin:ticket-scope` | `DENY_TICKET_SCOPE` / `TICKET_ASK`、実行後チェックと `SubagentStop` の `POST_TICKET_SCOPE` |
+| `builtin:ticket-blocked` | `DENY_TICKET_BLOCKED` |
+| `builtin:ticket-project` | `DENY_TICKET_PROJECT_MISMATCH` |
+| `builtin:ticket-flow-lock` | `DENY_TICKET_FLOW_LOCKED` |
+| `builtin:phase-review` | `DENY_PHASE_REVIEW` |
+| `builtin:subagent-ticket-op` | `DENY_SUBAGENT_TICKET_OP` |
+| `builtin:redirect-limit` | `DENY_REDIRECT_LIMIT` |
 
 ## 付録 B. 記録の 1 行
 

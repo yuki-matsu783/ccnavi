@@ -61,7 +61,7 @@ CODE_TICKET_ASK = "TICKET_ASK"
 # 当てられなかったので止めた。権限モードに依らず止め、確認には回さない。ルールに当たったのでは
 # ないので、記録のルール名は括弧付きの REDIRECT_LIMIT_RULE にする。
 CODE_REDIRECT_LIMIT_DENY = "DENY_REDIRECT_LIMIT"
-REDIRECT_LIMIT_RULE = "(redirect-limit)"
+REDIRECT_LIMIT_RULE = "builtin:redirect-limit"
 
 # ワークツリーの元リポジトリと、チケットが承認されたプロジェクトが食い違っている。
 CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
@@ -74,16 +74,16 @@ CODE_TICKET_BLOCKED = "DENY_TICKET_BLOCKED"
 
 # 範囲外で止めたことを記録に残すときのルール名。対応するルールがルールファイルに
 # 無いので、括弧付きにして、ファイルの中を探しても見つからないことを見た目で示す。
-TICKET_RULE = "(ticket-scope)"
+TICKET_RULE = "builtin:ticket-scope"
 
 # 範囲を当てる前に止めた組み込みの判定の、記録のルール名。範囲の外に書いたのではないので
 # TICKET_RULE を使い回さない。使い回すと、記録の `rules` で範囲外の件数に混ざり、繰り返しの
-# 文面（repeat.note）も「同じ理由（(ticket-scope)）」と、止めた理由と違う名前を言う。形は
+# 文面（repeat.note）も「同じ理由（builtin:ticket-scope）」と、止めた理由と違う名前を言う。形は
 # フローのロック（flow.LOCK_RULE）・`>` の上限（REDIRECT_LIMIT_RULE）と同じ括弧付き。
-SUBAGENT_TICKET_OP_RULE = "(subagent-ticket-op)"  # DENY_SUBAGENT_TICKET_OP
-PHASE_REVIEW_RULE = "(phase-review)"  # DENY_PHASE_REVIEW
-TICKET_PROJECT_RULE = "(ticket-project)"  # DENY_TICKET_PROJECT_MISMATCH
-TICKET_BLOCKED_RULE = "(ticket-blocked)"  # DENY_TICKET_BLOCKED
+SUBAGENT_TICKET_OP_RULE = "builtin:subagent-ticket-op"  # DENY_SUBAGENT_TICKET_OP
+PHASE_REVIEW_RULE = "builtin:phase-review"  # DENY_PHASE_REVIEW
+TICKET_PROJECT_RULE = "builtin:ticket-project"  # DENY_TICKET_PROJECT_MISMATCH
+TICKET_BLOCKED_RULE = "builtin:ticket-blocked"  # DENY_TICKET_BLOCKED
 
 # 書き直しを求める形（shellread の FORM_*）ごとの理由コード。ルールに当たったのではなく読みの
 # 決めごとで止めたので、記録のルール名は TICKET_RULE と同じく括弧付きの形の名前にする
@@ -552,7 +552,7 @@ def deadline_exceeded(code: str, seconds: float, *, mode: str = "") -> str:
 
 def rewrite_rule(form: str) -> str:
     """書き直しを求める形で止めたときに、記録の `rules` に残す名前。"""
-    return f"({form})"
+    return f"builtin:{form}"
 
 
 def rewrite(subject: str, form: str, found: list[str], git: str = "git") -> str:
@@ -579,39 +579,46 @@ _REWRITES_SHOWN = 5
 # 形ごとの（見つけたものの呼び名, 書き直し方）。
 _REWRITE_TEXT = {
     shellread.FORM_BRACE: (
-        "brace expansion outside quotes",
-        "Outside quotes the shell expands these into several words before the command runs, "
-        "so the words ccnavi reads are not the words that would run. bash and zsh expand them "
-        "differently, so ccnavi does not guess the result; it stops the call, also in the few "
-        "places where no shell expands them (an assignment, a case pattern, [[ ]]). Write the "
-        "words out instead: "
-        "`--exclude-dir={a,b}` becomes `--exclude-dir=a --exclude-dir=b`, `cp f{,.bak}` "
-        "becomes `cp f f.bak`, `{1..3}` becomes `1 2 3`. If the braces are meant as text, "
-        "put them in single quotes: '{a,b}'.",
+        "引用の外の波括弧展開",
+        "引用の外では、シェルがコマンドを実行する前に波括弧を複数の語に展開します。"
+        "そのため、ccnavi が読んだ語と実際に実行される語が一致しません。"
+        "bash と zsh で展開の結果が異なるので、ccnavi は結果を推測せず、呼び出しを止めます。"
+        "代入や case のパターン、[[ ]] のように展開されない箇所でも止まります。"
+        "語を書き出してください。"
+        "`--exclude-dir={a,b}` は `--exclude-dir=a --exclude-dir=b`、"
+        "`cp f{,.bak}` は `cp f f.bak`、`{1..3}` は `1 2 3` と書きます。"
+        "波括弧を文字として使うなら、シングルクォートで囲んでください（'{a,b}'）。",
     ),
     shellread.FORM_COMMAND_NAME: (
-        "command name the shell works out when it runs",
-        "The shell decides this command name only when it runs (from a variable, $( ), or a "
-        "glob), so ccnavi cannot tell which program would run, and no rule can match it; it "
-        "stops the call. Write the command name out: `c=ls; $c -la` becomes `ls -la`, "
-        '`"$(command -v python3)" x.py` becomes `python3 x.py`, `/usr/bin/l? -la` becomes '
-        "`/usr/bin/ls -la`. The same goes for a script handed to sh or source: write its "
-        "path, not `sh $SCRIPT`.",
+        "実行時に決まるコマンド名",
+        "シェルは、このコマンド名を実行するときに変数・コマンド置換・グロブから決めます。"
+        "どのプログラムが走るかが表記から分からないので、どのルールも当てられません。"
+        "そのため、呼び出しを止めます。"
+        "コマンド名を直接書いてください。"
+        "`c=ls; $c -la` は `ls -la`、"
+        '`"$(command -v python3)" x.py` は `python3 x.py`、'
+        "`/usr/bin/l? -la` は `/usr/bin/ls -la` と書きます。"
+        "sh や source に渡すスクリプトも、`sh $SCRIPT` ではなくパスを直接書いてください。",
     ),
     shellread.FORM_BACKQUOTE: (
-        "backquote",
-        "The shell runs what is between backquotes, also inside double quotes and unquoted "
-        "heredocs. ccnavi does not read backquotes; it stops the call. For a command "
-        "substitution, write $( ) instead. To keep backquotes as text (Markdown in an issue or "
-        "PR body, for example), put the text in single quotes, escape each one as \\`, or pass "
-        "the text from a file (gh --body-file <file>, {git} commit -F <file>).",
+        "バッククォート",
+        "バッククォートの中身は、二重引用符の中や引用なしの here-doc でもシェルが実行します。"
+        "ccnavi はバッククォートを読まないので、呼び出しを止めます。"
+        "コマンド置換には `$( )` を使ってください。"
+        "バッククォートを文字として残すなら（Issue や PR 本文の Markdown など）、"
+        "シングルクォートで囲むか、1 つずつ \\` とエスケープするか、ファイルから渡してください"
+        "（`gh --body-file <ファイル>`、`{git} commit -F <ファイル>`）。",
     ),
     shellread.FORM_AMBIGUOUS: (
-        "form that shells read differently",
-        "bash and zsh read this form differently, or it nests too deep, so ccnavi cannot tell "
-        "what would run; it stops the call. Write it in a plain form: if/elif instead of case "
-        "inside $( ); a space in $( (cmd) | x ) so it is not read as arithmetic; run the inner "
-        "command first and write its value into the next command instead of nesting $( ) "
-        "deeply; & instead of coproc; a for loop instead of select.",
+        "読みが分かれる形",
+        "bash と zsh で読みが分かれる形か、入れ子が深すぎる形なので、"
+        "実行される内容を確定できません。"
+        "そのため、呼び出しを止めます。"
+        "素直な形に書き直してください。"
+        "`$( )` の中の case は if と elif にしてください。"
+        "`$((cmd) | x)` は算術式と読まれるので、`$( (cmd) | x )` と空白を入れてください。"
+        "内側のコマンドを先に実行し、その値を次のコマンドに書いてください。"
+        "入れ子の `$( )` を深くしないでください。"
+        "coproc の代わりに `&` を、select の代わりに for を使ってください。",
     ),
 }

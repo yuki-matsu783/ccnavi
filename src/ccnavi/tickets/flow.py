@@ -105,7 +105,7 @@ from . import flow_render, flow_shape, flow_text, ticket_model
 
 # ロックで止めたときの理由コードと、記録のルール名。
 CODE_LOCKED = "DENY_TICKET_FLOW_LOCKED"
-LOCK_RULE = "(ticket-flow-lock)"
+LOCK_RULE = "builtin:ticket-flow-lock"
 
 # 置き場。承認済みチケットの置き場の下の `flows/<子>.yml`。
 FLOWS_DIR = "flows"

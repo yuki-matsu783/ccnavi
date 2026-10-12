@@ -360,8 +360,8 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("'lib'", self.reason(denied))
         self.assertIn("'app'", self.reason(denied))
         self.assertEqual(self.last_record()["code"], "DENY_TICKET_PROJECT_MISMATCH")
-        # 範囲の判定ではないので、記録の名前は (ticket-scope) を使い回さない。
-        self.assertEqual(self.last_record()["rules"], ["(ticket-project)"])
+        # 範囲の判定ではないので、記録の名前は builtin:ticket-scope を使い回さない。
+        self.assertEqual(self.last_record()["rules"], ["builtin:ticket-project"])
 
         right = self.worktree(self.lib, "i0008")
         allowed = self.hook("Write", self.ws, file_path=os.path.join(right, "src", "a.py"))

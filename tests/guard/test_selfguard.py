@@ -768,7 +768,7 @@ class SelfGuardTest(unittest.TestCase):
         # 既存の拒否と同じ見出し（コード・subject・本文）で、書き直し方まで言う。
         self.assertTrue(
             reason.startswith(
-                "[ccnavi] DENY_REDIRECT_LIMIT (builtin rule: (redirect-limit))\nsubject: "
+                "[ccnavi] DENY_REDIRECT_LIMIT (builtin rule: builtin:redirect-limit)\nsubject: "
             ),
             reason,
         )
@@ -780,7 +780,7 @@ class SelfGuardTest(unittest.TestCase):
         record = self.records()[-1]
         self.assertEqual(record["decision"], "deny")
         self.assertEqual(record["code"], "DENY_REDIRECT_LIMIT")
-        self.assertEqual(record["rules"][0], "(redirect-limit)")
+        self.assertEqual(record["rules"][0], "builtin:redirect-limit")
         return reason
 
     def test_上限ちょうどの大なりなら生の文字列にも保護を当てる(self):
@@ -916,7 +916,7 @@ class SelfGuardTest(unittest.TestCase):
         reason = self.assert_limit_denied(result, command)
         self.assertNotIn("anything-else", reason)
         self.assertEqual(reason.count("[ccnavi] "), 1)
-        self.assertEqual(self.records()[-1]["rules"], ["(redirect-limit)"])
+        self.assertEqual(self.records()[-1]["rules"], ["builtin:redirect-limit"])
 
     def test_外す保護が当たらないなら上限を掛けない(self):
         # 保護を切り、チケット制御も切ると、シェルから書き込む形の保護は 1 本も無い。
@@ -949,7 +949,7 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assert_limit_denied(result, command)
         record = self.records()[-1]
-        self.assertEqual(record["rules"], ["(redirect-limit)", "askme"])
+        self.assertEqual(record["rules"], ["builtin:redirect-limit", "askme"])
         self.assertEqual(record.get("source", ""), builtin_deny.get("source", ""))
         self.assertEqual(record.get("source", ""), "")
 

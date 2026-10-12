@@ -1663,10 +1663,10 @@ Write / Edit の対象を解いた先が `.claude/worktrees/<名前>/` の中な
 | 何も言わない | ワークツリーにチケットが無い | 権限モードに従う（`UNDECLARED`） |
 
 チケットの判定がルールの判定より強かった回は、文面の頭に `rule: <id> (allow) lets this through, but the ticket for this worktree narrows it` が載り、
-チケットの `deny` の項に当たったなら `ticket entry: deny <パターン>` も載る。記録では `rules` が `(ticket-scope)` とルールの id のリストになり、`source` は空になる。
+チケットの `deny` の項に当たったなら `ticket entry: deny <パターン>` も載る。記録では `rules` が `builtin:ticket-scope` とルールの id のリストになり、`source` は空になる。
 
 ```sh
-jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subject' logs/decisions.jsonl
+jq -r 'select(.rules[0]? == "builtin:ticket-scope" and (.rules | length) > 1) | .subject' logs/decisions.jsonl
 ```
 
 子の範囲は、子の宣言を親の範囲とフェーズ定義の `scope` の両方で切り詰めたもの（フェーズ定義が `inherit` か、`phases.yml` がどのレイヤーにも無ければ親だけ）。
@@ -2066,7 +2066,7 @@ Claude Code はそこを読まないので、ccnavi が `SessionStart` と `Suba
 | `decision` | `allow` `ask` `deny` `handover` `skip`。`handover` は権限モードに委ねた回 |
 | `enforced` | 実際に適用したか。`dry-run` は `false` |
 | `code` | 判定の根拠の種別。一覧は [設計 付録 A](docs/design/appendix.md)。よく出るのは `DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE`。実行後チェックの行は `POST_VIOLATION` などで、件が混ざった回は強いほう 1 つ |
-| `rules` | 当たったルールの id。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`(ticket-scope)`、`(phase-review)` など。判定ごとに分かれる。一覧は付録 A） |
+| `rules` | 当たったルールの id。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`builtin:ticket-scope`、`builtin:phase-review` など。判定ごとに分かれる。一覧は付録 A） |
 | `reason` | `skip` の理由。`mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、`payload-unusable`、`deadline-exceeded`、`tool-cannot-write`、`worktree-unreadable`（`detail` に理由）、`no-turn-baseline` の 9 つ |
 | `tree` / `project` | 呼び出しの行き先が属するツリーとプロジェクト |
 | `permission_mode` | Claude Code から来たモード。`handover` の行と合わせて読む |
@@ -2245,7 +2245,7 @@ ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml --json
 | `verdict` / `code` | 判定（`deny` / `ask` / `allow` / `skip`。`--permission-mode` を渡したときは権限モードへ渡した `handover` も）と根拠コード |
 | `reason` / `degraded` / `fallback` | `skip` の理由、生の文字列に当てたかどうか、組み込みの既定で判定したかどうか。無ければ空 |
 | `unwrapped` | 実行役のコマンドが中で実行するコマンド、または `cd` で移った先から見たパスでルールに当たったときの、そのコマンド。複数なら `\x00` でつなぐ。元の形で当たったとき・当たらなかったときは空 |
-| `rules[]` | 当たったルール。`{id, source, section, kind, written, pattern}`。`source` は `file`（ルールファイルから読んだルール）か `outside`（チケットの範囲・組み込みの保護・退避した組み込みの既定のように、ルールファイルの外から来た根拠）。`outside` でもルールそのものがあれば `section` と `kind` を持ち、`written` と `pattern` は頭の 160 字に `…（全 N 字）` を添えた形に切る（組み込みの式は 2 万字を超えるものがある）。ルールの無い根拠（`(ticket-scope)` など）は `section` 以下が空。値はこの 2 つだけで、増やすときは `version` を上げる。`kind` は `glob`・`regex`・`when` のどれか、`written` は書いたまま（`when` は組み合わせ条件を 1 行にした形で、`when: ` は付けない）、`pattern` は翻訳後の正規表現（`when` はふつう空）。`when` のルールだけ、書いた組み合わせ条件そのものを `when` に持つ |
+| `rules[]` | 当たったルール。`{id, source, section, kind, written, pattern}`。`source` は `file`（ルールファイルから読んだルール）か `outside`（チケットの範囲・組み込みの保護・退避した組み込みの既定のように、ルールファイルの外から来た根拠）。`outside` でもルールそのものがあれば `section` と `kind` を持ち、`written` と `pattern` は頭の 160 字に `…（全 N 字）` を添えた形に切る（組み込みの式は 2 万字を超えるものがある）。ルールの無い根拠（`builtin:ticket-scope` など）は `section` 以下が空。値はこの 2 つだけで、増やすときは `version` を上げる。`kind` は `glob`・`regex`・`when` のどれか、`written` は書いたまま（`when` は組み合わせ条件を 1 行にした形で、`when: ` は付けない）、`pattern` は翻訳後の正規表現（`when` はふつう空）。`when` のルールだけ、書いた組み合わせ条件そのものを `when` に持つ |
 | `response` | エージェントに返る文面そのもの。無ければ空 |
 | `quoted` | 当たったルールのうち、引用の中から切り出したコマンドにだけ当たったものの id。そういうルールがあるときだけ出る |
 | `payload` | 判定に渡した payload の欄 `{cwd, permission_mode, agent_id}`。`--cwd` / `--permission-mode` / `--agent-id` のどれかを渡したときだけ出る（渡さなければ `cwd` は `root`、ほかは空） |

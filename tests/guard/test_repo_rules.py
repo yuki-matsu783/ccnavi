@@ -36,9 +36,9 @@ APPROVAL = "builtin-guard-ticket-approval"
 APPROVAL_CODE = "DENY_TICKET_APPROVAL_CLI"
 SETTING_FILES = "builtin-guard-setting-files"
 # 書き直しを求める形で止めたときの、記録のルール名。読み分けずに止め、書き直し方を案内する。
-NAME = "(command-name-expansion)"
-BACKQUOTE = "(backquote)"
-AMBIGUOUS = "(ambiguous-form)"
+NAME = "builtin:command-name-expansion"
+BACKQUOTE = "builtin:backquote"
+AMBIGUOUS = "builtin:ambiguous-form"
 TICKET_STATE = "builtin-ticket-state-shell"
 # 承認の形の末尾。
 YES = " --agree --yes x"
@@ -905,7 +905,7 @@ class SubstRepoRulesTest(unittest.TestCase):
         body = judge("Bash", "c=git; $c status")
         self.assertIn("`$c`", body["response"])
         # 書き直しの例に、止まる形（生の git）を使わない。
-        self.assertIn("becomes `ls -la`", body["response"])
+        self.assertIn("`c=ls; $c -la` は `ls -la`", body["response"])
         self.assertNotIn("`git status`", body["response"])
 
     def test_コマンド名でない位置の変数とグロブは止めない(self):
@@ -928,7 +928,7 @@ class SubstRepoRulesTest(unittest.TestCase):
 
     def test_引用の外のブレース展開は一律に止める(self):
         # Issue #38。どのルールにも当たらないまま、bash は広げた語を実行していた。
-        brace, code = "(brace-expansion)", "DENY_BRACE_EXPANSION"
+        brace, code = "builtin:brace-expansion", "DENY_BRACE_EXPANSION"
         self.check(
             [
                 ("{git,push,origin,main}", "deny", brace, code),
