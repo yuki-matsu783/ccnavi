@@ -247,15 +247,22 @@ ccnavi_git_timed() {
 	fi
 	ccnavi_gt_pid=$!
 	# タイムアウト監視の中で標準入出力を先に閉じる（呼ぶ側のパイプを開いたまま残らないように）。
+	# sleep は背景で起こして wait で待つ。TERM を受けたら sleep も止めて抜ける（sleep を ppid 1 で残さない）。
 	(
 		exec </dev/null >/dev/null 2>&1
-		sleep "$ccnavi_gt_limit"
+		ccnavi_gt_sleep=""
+		trap 'test -z "$ccnavi_gt_sleep" || kill "$ccnavi_gt_sleep"; exit 0' TERM
+		sleep "$ccnavi_gt_limit" &
+		ccnavi_gt_sleep=$!
+		wait "$ccnavi_gt_sleep"
 		kill "$ccnavi_gt_pid"
 	) &
 	ccnavi_gt_dog=$!
 	ccnavi_gt_rc=0
 	wait "$ccnavi_gt_pid" 2>/dev/null || ccnavi_gt_rc=$?
 	kill "$ccnavi_gt_dog" 2>/dev/null || :
+	# 見張りの終了を回収して、シェルに「Terminated」の報告を出させない。
+	wait "$ccnavi_gt_dog" 2>/dev/null || :
 	ccnavi_gt_dog=""
 	return "$ccnavi_gt_rc"
 }
