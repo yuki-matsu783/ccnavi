@@ -571,9 +571,11 @@ wt_fresh() {
 	wt_f_dir=$(wt_fresh_dir) || return 0
 
 	wt_f_behind=0
+	wt_f_ahead=0
 	if [ "$wt_f_origin" = no ]; then
 		git show-ref --verify --quiet "refs/heads/$wt_f_integ" || return 0
 		wt_f_behind=$(git rev-list --count "$wt_f_integ..origin/$wt_f_integ" 2>/dev/null || echo 0)
+		wt_f_ahead=$(git rev-list --count "origin/$wt_f_integ..$wt_f_integ" 2>/dev/null || echo 0)
 	fi
 
 	# 失敗した fetch も FETCH_HEAD を触る（開いて空にする）ので、失敗の印を先に見る。
@@ -589,6 +591,9 @@ wt_fresh() {
 		wt_f_stale=yes
 	fi
 
+	if [ "$wt_f_behind" -ne 0 ] && [ "$wt_f_ahead" -ne 0 ]; then
+		reject worktree-base-diverged "ワークツリーの基点 $wt_f_integ が origin/$wt_f_integ と分岐しています（先行 ${wt_f_ahead} 件・遅れ ${wt_f_behind} 件）。$SELF merge --ff-only では進められません。基点を origin/${wt_f_integ} にして切ると、手元にだけある先行 ${wt_f_ahead} 件を知らないブランチになり、統合で詰まります。ユーザに頼んで、先行分を push するか別のブランチに退避してから、手元の ${wt_f_integ} を origin/${wt_f_integ} に揃えてください。揃えたら打ち直します。"
+	fi
 	if [ "$wt_f_behind" -ne 0 ]; then
 		reject worktree-base-behind "ワークツリーの基点 $wt_f_integ が origin/$wt_f_integ より ${wt_f_behind} 件遅れています。古い統合先から切ると、取り込み済みの変更を知らないブランチになります。$SELF fetch origin ${wt_f_integ} のあと、統合先のワークツリーで $SELF merge --ff-only origin/${wt_f_integ} を打つか、基点を origin/${wt_f_integ} にして切り直してください（$SELF worktree add $wt_dest -b ${wt_leaf} origin/${wt_f_integ}）。"
 	fi

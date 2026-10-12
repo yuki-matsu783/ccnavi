@@ -1460,6 +1460,18 @@ class WorktreeFreshBaseTest(GitWrapperTest):
         git(self.dir, "merge", "-q", "--ff-only", f"origin/{self.integ}")
         self.assertCreated("a", "-b", "a")
 
+    def test_diverged_is_rejected_with_a_message_that_does_not_suggest_ff_only(self):
+        write_text(os.path.join(self.dir, "local.txt"), "l\n")
+        git(self.dir, "add", "local.txt")
+        git(self.dir, "commit", "-q", "-m", "local only")
+        self.push_from_elsewhere()
+        git(self.dir, "fetch", "-q", "origin")
+        result = self.assertRejected(
+            "worktree", "add", ".claude/worktrees/a", "-b", "a", self.integ
+        )
+        self.assertIn("分岐しています", result.stderr)
+        self.assertNotIn("より 1 件遅れて", result.stderr)
+
     def test_origin_as_the_base_skips_the_behind_check(self):
         self.push_from_elsewhere()
         git(self.dir, "fetch", "-q", "origin")

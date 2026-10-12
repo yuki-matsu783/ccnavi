@@ -20,6 +20,11 @@
 #   - 直せない・オフラインで続けるなら --offline を付けて打ち直す。fetch は試すが、失敗しても手元の統合先から切る。
 #     origin が古いかもしれないので、切ったことをユーザに伝える（取り込むときに遅れが分かる）
 #
+# 手元の統合先が origin/<統合先> と分岐している（先行も遅れもある）ときは、切らずに終了コード 1 で止まり、
+# 先に手元の統合先を揃えるよう案内する（そのまま切ると、手元にだけある先行コミットを知らないブランチになり、
+# 統合で詰まる）。承知のうえなら --from-origin を付けると、警告つきで origin/<統合先> から切る。
+# fetch が失敗して --offline で続けるときは、origin/<統合先> が古いかもしれないので、止めずに警告だけにする。
+#
 # --dry-run は何も作らず、切る予定の起点とパスだけを出す（fetch もしない）。
 #
 # 終了コード: 0 完了 / 1 前提の未充足か worktree add の拒否 / 2 引数か環境の誤り /
@@ -46,7 +51,8 @@ sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--offline] [--from-origin] [--dr
   <名前>      ワークツリーの名前。ブランチ名も同じ名前で切る（/ を含められない）。行き先は
               <ワークスペースルート>/.claude/worktrees/<名前>
   --offline   fetch が失敗しても、手元の統合先から切って続ける（origin が古いかもしれない）
-  --from-origin   手元の統合先が origin と分岐していても、警告のうえ origin/<統合先> から切る
+  --from-origin
+              手元の統合先が origin と分岐していても、警告のうえ origin/<統合先> から切る
               （切ったブランチは手元にだけある先行コミットを知らないので、統合で詰まりうる）
   --dry-run   何も作らず、切る予定の起点とパスだけ出す
 
@@ -159,9 +165,21 @@ choose_base() {
 }
 
 # 手元の統合先が origin と分岐している（先行も遅れもある）。そのまま切ると、手元にだけある先行コミットを知らない
-# ブランチになり、統合で詰まる。--from-origin が無ければ切らずに止まる。
+# ブランチになり、統合で詰まる。--from-origin が無ければ切らずに止まる。dry-run は止まらず、止まることを案内するだけ。fetch が失敗した（--offline）ときは古い ref の判定なので止めない。
 diverged_guard() {
 	[ "$ahead" -ne 0 ] && [ "$behind" -ne 0 ] || return 0
+	if [ -n "$fetch_note" ]; then
+		diverged_note="手元の ${integ} は origin/${integ} と分岐しているように見える（先行 ${ahead} 件・遅れ ${behind} 件）が、fetch が失敗していて origin/${integ} が古いかもしれないので止めなかった。つながったら ccnavi-git.sh fetch origin ${integ} で確かめ、本当に分岐していれば手元の ${integ} を揃えるようユーザに頼む。"
+		return 0
+	fi
+	if [ -n "$dry" ]; then
+		if [ -n "$from_origin" ]; then
+			diverged_note="手元の ${integ} は origin/${integ} と分岐している（先行 ${ahead} 件・遅れ ${behind} 件。fetch 前の数）。実行すると --from-origin で origin/${integ} から切る。手元にだけある先行 ${ahead} 件を、そのブランチは知らず、統合（integrate）で詰まる。"
+		else
+			diverged_note="手元の ${integ} は origin/${integ} と分岐している（先行 ${ahead} 件・遅れ ${behind} 件。fetch 前の数）。実行すると切らずに終了コード 1 で止まる。承知のうえなら --from-origin を付けると origin/${integ} から切る。"
+		fi
+		return 0
+	fi
 	if [ -n "$from_origin" ]; then
 		diverged_note="手元の ${integ} は origin/${integ} と分岐している（先行 ${ahead} 件・遅れ ${behind} 件）が、--from-origin で origin/${integ} から切った。手元にだけある先行 ${ahead} 件を、このブランチは知らない。統合（integrate）で詰まるので、先に手元の ${integ} を origin/${integ} に揃えるようユーザに頼む。詰まって取り込みの印（.git/ccnavi-integrate/<名前>/marker）が残ったときも、ユーザが手元の ${integ} を揃えてから打ち直す。"
 		return 0
@@ -176,6 +194,7 @@ diverged_guard() {
 	exit 1
 }
 diverged_note=""
+fetch_note=""
 
 if [ -n "$dry" ]; then
 	choose_base
