@@ -152,7 +152,11 @@ class ReasonTest(unittest.TestCase):
         self.assertEqual(len(got), 1)
         self.assertIn("git push origin main", got[0], "何に当たったのかが無い")
         self.assertIn("DENY_COMMAND_PATTERN", got[0], "理由コードが無い")
-        self.assertIn("rule: git-push", got[0], "どのルールが言っているのかが無い")
+        self.assertIn(
+            "rule: .ccnavi/config/common/rules.yml:git-push",
+            got[0],
+            "どのルールが言っているのかが無い",
+        )
         self.assertNotIn(
             common_path(fixture_workspace(), "rules"),
             got[0],
@@ -167,7 +171,7 @@ class ReasonTest(unittest.TestCase):
         self.assertEqual(len(got), 1)
         self.assertIn(os.path.join(ROOT, ".env"), got[0])
         self.assertIn("DENY_PATH", got[0])
-        self.assertIn("rule: dotenv", got[0])
+        self.assertIn("rule: .ccnavi/config/common/rules.yml:dotenv", got[0])
 
     def test_複数返った理由は一件ずつ単独で読んで成立する(self):
         # 同じ出来事に複数の判定が同時に当たるとき、そのうちどれがユーザの目に
@@ -390,7 +394,7 @@ class RecordTest(unittest.TestCase):
         # 何も起きなくても判定は記録に残らないといけない。
         self.assertEqual(got[0]["decision"], "deny")
         self.assertFalse(got[0]["enforced"], "warn は呼び出しを通したはず")
-        self.assertEqual(got[0].get("rules"), ["git-push"])
+        self.assertEqual(got[0].get("rules"), [".ccnavi/config/common/rules.yml:git-push"])
 
     def test_読めたものと読めなかったものを分けて記録する(self):
         got = self.logged(
@@ -419,7 +423,7 @@ class RecordTest(unittest.TestCase):
 
         self.assertEqual(len(got), 2)
         self.assertEqual(got[0]["decision"], "deny")
-        self.assertEqual(got[0].get("quoted"), ["git-push"])
+        self.assertEqual(got[0].get("quoted"), [".ccnavi/config/common/rules.yml:git-push"])
         self.assertEqual(got[1]["decision"], "deny")
         self.assertNotIn("quoted", got[1], "引用の外の置換に quoted が付いている")
 

@@ -325,7 +325,9 @@ class JudgeTest(unittest.TestCase):
     def says(self, command: str) -> tuple[str, bool]:
         out = self.judge("Bash", {"command": command})
         reason = out.get("permissionDecisionReason", "")
-        return out.get("permissionDecision", ""), "(rule: publish)" in reason
+        return out.get("permissionDecision", ""), (
+            "(rule: .ccnavi/config/common/rules.yml:publish)" in reason
+        )
 
     def test_パス(self):
         decision = self.judge("Write", {"file_path": os.path.join(self.root, "k.pem")})
@@ -531,10 +533,11 @@ class LintTest(unittest.TestCase):
         found = self.warns(problems)
         self.assertFalse(any("本体の" in d and "何にでも当たる" in d for d in found), found)
 
-    def test_id_の無いルールは組み合わせ条件で名指しする(self):
+    def test_id_の無いルールは_error_で読まない(self):
         raw = {k: v for k, v in SECRETS.items() if k != "id"}
-        found = self.warns(self.lint([raw]))
-        self.assertTrue(any("when: any(glob '*.pem'" in d for d in found), found)
+        problems = self.lint([raw])
+        errors = [p.detail for p in problems if p.severity == rules.SEVERITY_ERROR]
+        self.assertTrue(any("id が無い" in d for d in errors), errors)
 
 
 class MergeTest(unittest.TestCase):
@@ -667,7 +670,7 @@ class CommandLineTest(unittest.TestCase):
         body = json.loads(self.run_cli("--test-expectations", expectations, "--json"))
         self.assertEqual(body["mismatches"], 0, body)
         hit = body["expectations"][0]["rules"][0]
-        self.assertEqual(hit["id"], "secrets")
+        self.assertEqual(hit["id"], ".ccnavi/config/common/rules.yml:secrets")
         self.assertEqual(hit["kind"], "when")
 
 
@@ -711,7 +714,7 @@ class CommonCredentialsTest(unittest.TestCase):
             self.assertTrue(self.rule.hits(subject), repr(subject))
 
     def test_NotebookEditも止める(self):
-        # 組み込みの builtin-deny-credentials は NotebookEdit を見ないので、ここで外すと素通りする
+        # 組み込みの builtin:credentials は NotebookEdit を見ないので、ここで外すと素通りする
         for subject in ("/repo/secrets/.env.example", "/repo/.env", "/home/u/.aws/credentials"):
             self.assertTrue(self.rule.matches("NotebookEdit", subject), subject)
         self.assertFalse(self.rule.matches("NotebookEdit", "/repo/.env.example"))

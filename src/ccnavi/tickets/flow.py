@@ -9,7 +9,7 @@
 置き場を持つツリーはチケットと同じ（承認済みチケットが在るツリー。プロジェクトの
 チケットならそのプロジェクトのツリー）で、チケットと同じ git に乗る。
 
-承認済みの領域は組み込みの保護（`builtin-guard-project-home`）がエージェントの
+承認済みの領域は組み込みの保護（`builtin:guard-project-home`）がエージェントの
 Write / Edit / NotebookEdit を止め、パスの出るシェルからの書き込みも組み込みが止める。
 だから「承認済みの領域のフローは、ユーザが取り込んで保存したものだけ」は運用ではなく判定で守られる（行き先を追えないシェルの書き込みは
 止まらないので、着手のあとの書き換えは知らせる。下の「着手のあとの書き換え」）。ユーザはボードのフロー編集画面で
@@ -105,7 +105,7 @@ from . import flow_render, flow_shape, flow_text, ticket_model
 
 # ロックで止めたときの理由コードと、記録のルール名。
 CODE_LOCKED = "DENY_TICKET_FLOW_LOCKED"
-LOCK_RULE = "(ticket-flow-lock)"
+LOCK_RULE = "builtin:ticket-flow-lock"
 
 # 置き場。承認済みチケットの置き場の下の `flows/<子>.yml`。
 FLOWS_DIR = "flows"

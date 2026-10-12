@@ -295,7 +295,10 @@ def _lint_errors(path: str, root: str, rule_id: str, layer: bool) -> bool:
 def _expectations_pass(
     conf: settings.Settings, root: str, expectations: list[dict], want: str, rule_id: str
 ) -> bool:
-    """期待がぜんぶ期待したタイプになり、候補に当たるか（`--test-expectations` と同じ）。"""
+    """期待がぜんぶ期待したタイプになり、候補に当たるか（`--test-expectations` と同じ）。
+
+    rule_id は記録に出る名前（`rules.record_name` の形）で、当たったルールをこれで引く。
+    """
     for expectation in expectations:
         subject = expectation["subject"].replace(diagnose.EXPECTATION_PLACEHOLDER, root)
         out = diagnose.try_one(io.StringIO(), conf, root, expectation["tool"], subject)
@@ -349,8 +352,10 @@ def _rule_candidates(
             with open(path, "w", encoding="utf-8") as f:
                 yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
             trial = dataclasses.replace(conf, rules=path)
+            # 候補は試す共通レイヤー（path）に書いてあるので、記録名はその相対パスと書いた id。
+            record = f"{ruleload.relpath(path, root)}{rules.ID_SEPARATOR}{rule_id}"
             if _lint_errors(path, root, rule_id, False) or not _expectations_pass(
-                trial, root, expectations, rules.ASK, rule_id
+                trial, root, expectations, rules.ASK, record
             ):
                 dropped += 1
                 continue
@@ -391,7 +396,7 @@ def _message_candidates(
                 (view, rule)
                 for view in views
                 for rule in view.rule_set.section(rules.DENY)
-                if rule.id == rule_id
+                if rules.record_name(rule) == rule_id
             ),
             None,
         )

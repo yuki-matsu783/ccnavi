@@ -90,7 +90,7 @@ export function decidePreviewArgs(phase: number): readonly string[] {
 /**
  * `ccnavi-review.sh decide <N> --choices <JSON> --digest <ダイジェスト>`。ユーザがオーバーレイで選んだ行き先を置く。
  * ダイジェストは見せたときの preview の `digest`。見せたあとに指摘が変わっていれば、実行ファイルは何も置かない。
- * エージェントがこの形を打つと、組み込みの deny（builtin-guard-ticket-approval）が止める
+ * エージェントがこの形を打つと、組み込みの deny（builtin:guard-ticket-approval）が止める
  */
 export function decideArgs(
   phase: number,

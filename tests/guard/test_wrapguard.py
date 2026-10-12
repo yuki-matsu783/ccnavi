@@ -288,7 +288,8 @@ class ChildPushTest(unittest.TestCase):
         # 文面の先頭に、記録の `rules` と同じ識別子を出す。
         reason = self.hook(self.root, 'cd "$X" && ' + " ".join(GIT + ["push"]))
         self.assertIn(
-            f"[ccnavi] {wrapguard.CODE_CHILD_PUSH} (builtin rule: {wrapguard.CHILD_PUSH_RULE_ID})",
+            f"[ccnavi] {wrapguard.CODE_CHILD_PUSH} "
+            f"(組み込みのルール: {wrapguard.CHILD_PUSH_RULE_ID})",
             reason,
         )
 
@@ -524,7 +525,8 @@ class CorePathTest(unittest.TestCase):
     def test_refusal_names_the_way_out(self):
         _, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh rm .ccnavi/scripts/ccnavi-git.sh")
         self.assertIn(
-            f"[ccnavi] {wrapguard.CODE_CORE_PATH} (builtin rule: {wrapguard.CORE_PATH_RULE_ID})",
+            f"[ccnavi] {wrapguard.CODE_CORE_PATH} "
+            f"(組み込みのルール: {wrapguard.CORE_PATH_RULE_ID})",
             reason,
         )
         # 代わりの手段（ユーザに依頼）と、通る衝突の解決を名指しする。実パスで書く。
@@ -574,7 +576,7 @@ class CorePathTest(unittest.TestCase):
         """文字として渡す道の案内は、ラッパーのあるワークスペースでは生の git を勧めない。"""
         decision, reason = self.hook("echo `date`")
         self.assertEqual(decision, "deny", reason)
-        self.assertIn("ccnavi-git.sh commit -F <file>", reason)
+        self.assertIn("ccnavi-git.sh commit -F <ファイル>", reason)
         self.assertNotIn(" git commit -F", reason)
 
     def test_dry_run_given_last(self):

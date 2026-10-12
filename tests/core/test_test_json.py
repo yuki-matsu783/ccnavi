@@ -164,7 +164,7 @@ class TestJsonTest(unittest.TestCase):
         hit = body["rules"][0]
         self.assertEqual(
             (hit["id"], hit["section"], hit["kind"], hit["source"]),
-            ("git-push", "deny", "glob", "file"),
+            ("rules.yml:git-push", "deny", "glob", "file"),
         )
         self.assertEqual(hit["written"], "*git push*")
         self.assertNotEqual(hit["pattern"], "")
@@ -243,7 +243,7 @@ class TestJsonTest(unittest.TestCase):
                 body = json.loads(done.stdout)
                 self.assertTrue(body["known"])
                 self.assertEqual(body["verdict"], "deny")
-                self.assertEqual([hit["id"] for hit in body["rules"]], [rule_id])
+                self.assertEqual([hit["id"] for hit in body["rules"]], [f"named.yml:{rule_id}"])
 
     def test_expectations_count_mismatches_and_skips(self):
         done = ccnavi(
@@ -266,7 +266,7 @@ class TestJsonTest(unittest.TestCase):
         wrong = by_subject["git push --force"]
         self.assertFalse(wrong["ok"])
         self.assertEqual((wrong["expected"], wrong["verdict"]), ("allow", "deny"))
-        self.assertEqual(wrong["rules"][0]["id"], "git-push")
+        self.assertEqual(wrong["rules"][0]["id"], "rules.yml:git-push")
         skipped = by_subject["# comment only"]
         self.assertTrue(skipped["ok"])
         self.assertTrue(skipped["skipped"])

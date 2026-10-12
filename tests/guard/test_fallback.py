@@ -184,7 +184,7 @@ class FallbackTest(unittest.TestCase):
                     run(self.root, pre_tool_use("Bash", "command", command), env=env),
                 )
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
-                self.assertIn("builtin-guard-config-via-bash", out["permissionDecisionReason"])
+                self.assertIn("builtin:guard-config-via-bash", out["permissionDecisionReason"])
 
     def test_既定はマージの解決を妨げない(self):
         # 衝突マーカーの入ったルールファイルは YAML として読めないので、
@@ -209,7 +209,7 @@ class FallbackTest(unittest.TestCase):
             records = [json.loads(line) for line in f if line.strip()]
 
         self.assertEqual(len(records), 1)
-        self.assertEqual(records[0].get("fallback"), "builtin-rules")
+        self.assertEqual(records[0].get("fallback"), "builtin:rules")
         self.assertEqual(records[0].get("detail"), self.broken)
         # 判定には達しているので skip ではない。既定にプロジェクトの allow が
         # 無いので、どのルールも言及しない呼び出しは Claude Code の権限モードに従う。

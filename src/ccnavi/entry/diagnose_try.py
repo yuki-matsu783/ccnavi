@@ -344,7 +344,7 @@ def _rules_hit(record: audit.Record) -> list[dict]:
     引くのは判定が当てたルールそのもの（`record.hits`）。ルールファイルを別の読み方で
     読み直すと、判定が足した組み込みや、レイヤーの和で重複として捨てられた側の定義を
     引けず、判定の根拠と違うものを見せる（P9）。`hits` は `rules` の末尾と同じ順に並ぶので、
-    id ではなく位置で対応させる。id の無いルール（`(deny)`）もこれで引ける。
+    id ではなく位置で対応させる。id は必須なので、同じ id のルールが複数あっても位置で引き分ける。
 
     `source` は `file`（ルールファイルから読んだルール）か `outside`（チケットの範囲や
     組み込みの保護・退避した既定のように、ルールファイルの外から来た根拠）。
@@ -361,7 +361,7 @@ def _rules_hit(record: audit.Record) -> list[dict]:
     hits = []
     for i, name in enumerate(record.rules):
         rule = hits_of[i - offset] if i >= offset else None
-        if rule is None or (rule.id or name) != name:
+        if rule is None or rules.record_name(rule) != name:
             hits.append(
                 {
                     "id": name,

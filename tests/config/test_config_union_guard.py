@@ -240,7 +240,7 @@ class DenyTest(GuardHarness):
     """`.ccnavi/` 全体への組み込みの deny。ルールに宣言が無くても止まる。"""
 
     def test_a_rule_named_like_a_builtin_does_not_replace_it(self):
-        """組み込みの名前（`builtin-guard-`）のルールは読み込まず、組み込みは常に足す。
+        """組み込みの名前（`builtin:guard-`）のルールは読み込まず、組み込みは常に足す。
 
         以前は何にも当たらない 1 本をこの名前で書くだけで、
         共通レイヤーの保護が気づかないうちに消えた。
@@ -249,7 +249,7 @@ class DenyTest(GuardHarness):
             OPEN_RULES,
             deny=[
                 {
-                    "id": "builtin-guard-common-layer",
+                    "id": "builtin:guard-common-layer",
                     "match": "Write|Edit|NotebookEdit",
                     "regex": "never-matches-anything",
                     "message": "decoy",
@@ -258,8 +258,8 @@ class DenyTest(GuardHarness):
         )
         write(self.rules, json.dumps(decoy))
         result = self.guarded_hook("Write", self.ws, file_path=self.phases)
-        self.assert_denied(result, "builtin-guard-common-layer")
-        self.assertIn("builtin-guard-", result.stderr, self.said(result))
+        self.assert_denied(result, "builtin:guard-common-layer")
+        self.assertIn("builtin:guard-", result.stderr, self.said(result))
 
     def test_lint_names_a_rule_named_like_a_builtin_in_any_layer(self):
         """プロジェクトのレイヤーに書いても `--lint` が error で名指しする。"""
@@ -269,7 +269,7 @@ class DenyTest(GuardHarness):
                 "version": 1,
                 "deny": [
                     {
-                        "id": "builtin-guard-setting-files",
+                        "id": "builtin:guard-setting-files",
                         "match": "Bash",
                         "regex": "never-matches-anything",
                         "message": "decoy",
@@ -278,10 +278,10 @@ class DenyTest(GuardHarness):
             },
         )
         errors = self.problems("error", where=self.project_where("lib"))
-        self.assertTrue(any("builtin-guard-" in p["detail"] for p in errors), errors)
+        self.assertTrue(any("builtin:" in p["detail"] for p in errors), errors)
 
     def test_named_tool_writes_into_project_home_are_denied(self):
-        """`*/.ccnavi/*` への Write / Edit は `builtin-guard-project-home` で止まる。"""
+        """`*/.ccnavi/*` への Write / Edit は `builtin:guard-project-home` で止まる。"""
         targets = (
             layer_path(self.lib, "rules"),
             os.path.join(self.lib, HOME, "scripts", "count.sh"),
@@ -292,10 +292,10 @@ class DenyTest(GuardHarness):
             for tool in ("Write", "Edit"):
                 with self.subTest(tool=tool, path=os.path.relpath(path, self.ws)):
                     result = self.guarded_hook(tool, self.ws, file_path=path)
-                    self.assert_denied(result, "builtin-guard-project-home")
+                    self.assert_denied(result, "builtin:guard-project-home")
 
     def test_shell_writes_into_project_home_are_denied(self):
-        """シェルからの書き込みは `builtin-guard-setting-files` の 1 本で止まる。"""
+        """シェルからの書き込みは `builtin:guard-setting-files` の 1 本で止まる。"""
         for command in (
             "echo x > projects/lib/.ccnavi/scripts/count.sh",
             "echo x >> .ccnavi/config/project/rules.yml",
@@ -305,7 +305,7 @@ class DenyTest(GuardHarness):
         ):
             with self.subTest(command=command):
                 result = self.guarded_hook("Bash", self.ws, command=command)
-                self.assert_denied(result, "builtin-guard-setting-files")
+                self.assert_denied(result, "builtin:guard-setting-files")
 
     def test_reading_project_home_is_allowed(self):
         """読むだけなら通る。名前が出ただけでは止めない。"""
@@ -322,9 +322,9 @@ class DenyTest(GuardHarness):
     def test_disable_does_not_add_the_deny(self):
         """設定ファイルの保護を disable にすれば組み込みの deny も足さない。"""
         result = self.hook("Write", self.ws, file_path=layer_path(self.lib, "rules"))
-        self.assertNotIn("builtin-guard-project-home", self.reason(result))
+        self.assertNotIn("builtin:guard-project-home", self.reason(result))
         result = self.hook("Write", self.ws, file_path=self.phases)
-        self.assertNotIn("builtin-guard-common-layer", self.reason(result))
+        self.assertNotIn("builtin:guard-common-layer", self.reason(result))
 
     def test_named_tool_writes_into_the_common_layer_are_denied(self):
         """共通レイヤーの 3 本への Write / Edit は、ルールに宣言が無くても組み込みで止まる。
@@ -337,7 +337,7 @@ class DenyTest(GuardHarness):
             for tool in ("Write", "Edit"):
                 with self.subTest(tool=tool, path=os.path.basename(path)):
                     result = self.guarded_hook(tool, self.ws, file_path=path)
-                    self.assert_denied(result, "builtin-guard-common-layer")
+                    self.assert_denied(result, "builtin:guard-common-layer")
 
     def test_common_layer_copies_in_a_worktree_are_denied(self):
         """ワークスペースから切ったワークツリー側の共通レイヤーも止まる。
@@ -347,7 +347,7 @@ class DenyTest(GuardHarness):
         tree = self.worktree(self.ws, "w5")
         copy = os.path.join(tree, ".ccnavi", "config", "common", "phases.yml")
         self.assert_denied(
-            self.guarded_hook("Write", self.ws, file_path=copy), "builtin-guard-common-layer"
+            self.guarded_hook("Write", self.ws, file_path=copy), "builtin:guard-common-layer"
         )
 
     def test_common_layer_deny_names_only_those_files(self):
@@ -376,12 +376,12 @@ class DenyTest(GuardHarness):
         ):
             with self.subTest(command=command):
                 result = self.hook("Bash", self.ws, guard="enable", command=command)
-                self.assert_denied(result, "builtin-guard-setting-files")
+                self.assert_denied(result, "builtin:guard-setting-files")
         # 名前の途中で当たったものは別のファイル。
         result = self.hook(
             "Bash", self.ws, guard="enable", command="echo x > myccnavi/common/rules.yml"
         )
-        self.assertNotIn("builtin-guard-setting-files", self.reason(result))
+        self.assertNotIn("builtin:guard-setting-files", self.reason(result))
 
     def test_copying_out_of_the_common_layer_is_allowed(self):
         """共通レイヤーの 3 本が cp / ln / install の元の側にだけ出る形は、
@@ -403,7 +403,7 @@ class DenyTest(GuardHarness):
             ):
                 with self.subTest(command=command):
                     result = self.hook("Bash", self.ws, guard="enable", command=command)
-                    self.assertNotIn("builtin-guard-setting-files", self.reason(result))
+                    self.assertNotIn("builtin:guard-setting-files", self.reason(result))
 
     def test_copying_into_the_common_layer_is_denied(self):
         """行き先が共通レイヤーの 3 本（かその置き場）になる cp / ln / install は止まる。
@@ -430,7 +430,7 @@ class DenyTest(GuardHarness):
             ):
                 with self.subTest(command=command):
                     result = self.hook("Bash", self.ws, guard="enable", command=command)
-                    self.assert_denied(result, "builtin-guard-setting-files")
+                    self.assert_denied(result, "builtin:guard-setting-files")
         # 行き先をディレクトリにした形。
         for command in (
             "cp /tmp/rules.yml .ccnavi/config/common",
@@ -444,7 +444,7 @@ class DenyTest(GuardHarness):
         ):
             with self.subTest(command=command):
                 result = self.hook("Bash", self.ws, guard="enable", command=command)
-                self.assert_denied(result, "builtin-guard-setting-files")
+                self.assert_denied(result, "builtin:guard-setting-files")
 
     def test_writing_from_the_common_layer_side_is_still_denied(self):
         """書き込みの表記は、共通レイヤーの 3 本が前に出た形でも今までどおり止まる。
@@ -463,7 +463,7 @@ class DenyTest(GuardHarness):
             ):
                 with self.subTest(command=command):
                     result = self.hook("Bash", self.ws, guard="enable", command=command)
-                    self.assert_denied(result, "builtin-guard-setting-files")
+                    self.assert_denied(result, "builtin:guard-setting-files")
 
     def judged(self, command, *flags, guard="enable"):
         """`--test --json` で 1 本判定し、当たったルールの id を返す。
@@ -504,14 +504,14 @@ class DenyTest(GuardHarness):
             f"echo x > {policy.replace(os.sep, '/')}",
         ):
             with self.subTest(command=command):
-                self.assertIn("builtin-guard-setting-files", self.judged(command, *moved))
+                self.assertIn("builtin:guard-setting-files", self.judged(command, *moved))
         # 名前の途中で当たったものは別のファイル。前と後ろの両方を見る。
         for command in (
             "echo x > otherpolicy/rules.yml",
             "echo x > policy/rules.yml.bak",
         ):
             with self.subTest(command=command):
-                self.assertNotIn("builtin-guard-setting-files", self.judged(command, *moved))
+                self.assertNotIn("builtin:guard-setting-files", self.judged(command, *moved))
 
     def test_copies_of_a_moved_common_layer_look_only_at_the_destination(self):
         """動かした共通レイヤーの 3 本も、cp / ln / install は行き先の側だけで当てる。
@@ -542,7 +542,7 @@ class DenyTest(GuardHarness):
             ):
                 with self.subTest(command=command):
                     self.assertNotIn(
-                        "builtin-guard-setting-files", self.judged(command, *moved_flags)
+                        "builtin:guard-setting-files", self.judged(command, *moved_flags)
                     )
             for command in (
                 f"cp /tmp/x {rel}",
@@ -565,14 +565,14 @@ class DenyTest(GuardHarness):
                 f"echo x > {rel}",
             ):
                 with self.subTest(command=command):
-                    self.assertIn("builtin-guard-setting-files", self.judged(command, *moved_flags))
+                    self.assertIn("builtin:guard-setting-files", self.judged(command, *moved_flags))
         # 名前の途中や続きで当たったものは別のファイル。
         for command in (
             "cp /tmp/x otherpolicy/rules.yml",
             "cp /tmp/x policy/rules.yml.bak",
         ):
             with self.subTest(command=command):
-                self.assertNotIn("builtin-guard-setting-files", self.judged(command, *moved_flags))
+                self.assertNotIn("builtin:guard-setting-files", self.judged(command, *moved_flags))
 
     def test_a_directory_holding_a_moved_common_layer_is_guarded_by_name(self):
         """動かした共通レイヤーの入っているディレクトリを行き先にした形（`_moved_holders`）。
@@ -594,7 +594,7 @@ class DenyTest(GuardHarness):
             "cp -r /tmp/policy .",
         ):
             with self.subTest(command=command):
-                self.assertIn("builtin-guard-setting-files", self.judged(command, *moved))
+                self.assertIn("builtin:guard-setting-files", self.judged(command, *moved))
         for command in (
             "cp /tmp/notes.txt policy/",
             "cp -t policy /tmp/notes.txt",
@@ -602,7 +602,7 @@ class DenyTest(GuardHarness):
             "cp /tmp/rules.yml otherpolicy/",
         ):
             with self.subTest(command=command):
-                self.assertNotIn("builtin-guard-setting-files", self.judged(command, *moved))
+                self.assertNotIn("builtin:guard-setting-files", self.judged(command, *moved))
 
     def test_lint_warns_about_new_files_in_a_worktree_project_home(self):
         """ワークツリーの `.ccnavi/` に元リポジトリに無いファイルがあれば --lint warn。"""

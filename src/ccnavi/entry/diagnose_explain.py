@@ -194,9 +194,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
                 if rule.excepts:
                     excepts = ", ".join(e.glob or e.regex for e in rule.excepts)
                     written = f"{written}  except: {excepts}"
-                stdout.write(
-                    f"  {name:<5} {rule.id or '(id 無し)':<28} {rule.match:<34} {written}\n"
-                )
+                stdout.write(f"  {name:<5} {rule.id:<28} {rule.match:<34} {written}\n")
                 # 組み合わせ条件は 1 行だと入れ子が読みにくいので、
                 # 個別条件が 3 つ以上なら続けて字下げで出す。
                 if rule.when is not None and sum(n.is_leaf() for n in rule.when.walk()) >= 3:

@@ -749,7 +749,7 @@ class FlowGuardTest(FlowHarness):
     """エージェントはどのツリーの置き場にも書けない。ユーザの保存は報告しない。"""
 
     def test_agent_writes_are_denied_in_every_tree(self):
-        """組み込みの保護（builtin-guard-project-home）が、承認済みの領域の `flows/` を
+        """組み込みの保護（builtin:guard-project-home）が、承認済みの領域の `flows/` を
         ワークスペースルート・親のワークツリー・子のワークツリー・プロジェクトのどれでも止める。"""
         child_tree = self.worktree(CHILD, "i0001")
         project = os.path.join(self.root, "projects", "p")
@@ -761,14 +761,14 @@ class FlowGuardTest(FlowHarness):
                     result = self.write_to(self.flow_in(where), tool=tool, guard="enable")
                     out = json.loads(result.stdout)["hookSpecificOutput"]
                     self.assertEqual(out["permissionDecision"], "deny", out)
-                    self.assertIn("builtin-guard-project-home", out["permissionDecisionReason"])
+                    self.assertIn("builtin:guard-project-home", out["permissionDecisionReason"])
                     self.assertIn("子のフロー", out["permissionDecisionReason"])
         # 組み込みを切っても、ルールの 1 本（このハーネスでは `*/.ccnavi/*`）が止める。
         result = self.write_to(self.flow_in(self.parent_tree), agent_id="sub-1")
         self.assertEqual(
             json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"], "deny"
         )
-        # シェルから書く形は builtin-guard-setting-files が止める。
+        # シェルから書く形は builtin:guard-setting-files が止める。
         rel = ".ccnavi/approved/flows/i0001-01-01.yml"
         for command in (f"echo x > {rel}", f"cp /tmp/x {rel}", f"tee {rel} < /dev/null"):
             with self.subTest(command=command):
@@ -784,7 +784,7 @@ class FlowGuardTest(FlowHarness):
                 )
                 out = json.loads(result.stdout)["hookSpecificOutput"]
                 self.assertEqual(out["permissionDecision"], "deny", out)
-                self.assertIn("builtin-guard-setting-files", out["permissionDecisionReason"])
+                self.assertIn("builtin:guard-setting-files", out["permissionDecisionReason"])
 
     def test_a_flow_saved_by_a_person_is_not_blamed_on_the_agent(self):
         """ユーザがボードで保存したフロー（hook を通らない書き込み）を、次のエージェントの呼び出しの
@@ -1041,7 +1041,7 @@ class FlowDraftTest(FlowHarness):
                     result = self.write_to(draft, tool=tool, agent_id=agent_id, guard="enable")
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertNotEqual(self.decision(result), "deny", result.stdout)
-                    self.assertNotIn("builtin-guard", result.stdout)
+                    self.assertNotIn("builtin:guard", result.stdout)
         # シェルから書いても止めない。
         rel = f"wip/proposals/flows/{CHILD}.yml"
         payload = {
@@ -1058,7 +1058,7 @@ class FlowDraftTest(FlowHarness):
         # 効力のあるフローは今までどおり止まる。
         result = self.write_to(self.flow_path, guard="enable")
         self.assertEqual(self.decision(result), "deny", result.stdout)
-        self.assertIn("builtin-guard-project-home", self.reason(result))
+        self.assertIn("builtin:guard-project-home", self.reason(result))
 
     def test_the_draft_can_be_written_while_the_child_is_in_progress(self):
         """着手中のロックが止めるのはフローだけ。下書きは止めない（取り込みはボードが止める）。"""

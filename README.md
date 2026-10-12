@@ -565,6 +565,7 @@ allow:
 
 ### `id` と表記の決まり
 
+- `id` は必須。書かないルールは読み込まず、`--lint` が error で名指しする（記録と文面にこの名前が出るため、名前の無いルールは記録も報告も指せない）
 - `id` にコロンは書けない（レイヤーの名前を添えた `self:id` / `<プロジェクト名>:id` と見分けが付かないため）。
   `--lint` が error にし、その 1 件は読み込まれない。ルール・フェーズ定義・リスクの配点の 3 本とも同じ
 - `glob` も `regex` も、どの機械でも大文字小文字を区別せずに当てる。`*/.ccnavi/*` は `.Ccnavi/` にも当たる。
@@ -613,7 +614,8 @@ allow:
   使わない。共通レイヤーのルール自身が破損して読めないときだけ組み込みの既定を使い、そのときレイヤーは足さない
 - ワークスペースの中で共通レイヤーとして読むのは、ワークスペースルートの `.ccnavi/config/common/` だけ。プロジェクトの `.ccnavi/config/common/`
   （下のミラー）は、そのプロジェクトだけを clone したときにだけ共通レイヤーとして読まれ、そのとき `.ccnavi/config/project/` は自身のレイヤーになる
-- id にはレイヤーの名前が付く。共通レイヤーは裸の `id`、自身のレイヤーは `self:id`、プロジェクトは `<名前>:id`。記録と文面にはこの形で出る
+- id にはレイヤーの名前が付く。共通レイヤーは裸の `id`、自身のレイヤーは `self:id`、プロジェクトは `<名前>:id`。`--explain` などの画面はこの形で出す
+- 記録（決定ログの `rules` 欄）と文面に出す名前は、ルールファイル由来なら `<ワークスペースのルートからの相対パス>:<書いた id>`（例: `.ccnavi/config/common/rules.yml:raw-git`、`projects/lib/.ccnavi/config/project/rules.yml:schema`）。レイヤーの前置きは付けない。組み込みのルールは id そのもの（`builtin:git-push`）
 - 同じ宣言の重複は 1 本にまとめる。裸の `id` が同じで全欄（`{root}` を置き換えた後）が一致する定義は、後ろのレイヤーのものを
   捨て、`--lint` が info で知らせる
 - 同じ `id` で中身が違うルールは両方とも適用され、`--lint` が warn で知らせる。`deny` と `ask` は増えるほうになる。リスクの配点も両方を数え、後ろのレイヤーの項目は
@@ -1186,7 +1188,7 @@ ssh host rm -f .ccnavi/config/common/rules.yml         # 外さない。ssh は�
 中で実行されるコマンドで当たったときは、拒否と確認の文面に 1 行足す。
 
 ```
-[ccnavi] DENY_COMMAND_PATTERN (rule: builtin-guard-setting-files)
+[ccnavi] DENY_COMMAND_PATTERN (rule: builtin:guard-setting-files)
 subject: env rm -f .ccnavi/config/common/rules.yml
 `env` が実行する `rm -f .ccnavi/config/common/rules.yml` に当たりました。
 ガード自身の設定と hook を、シェルからの書き込みで変えようとしています。…
@@ -1393,7 +1395,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
   共通レイヤーの 3 本（`.ccnavi/config/common/`）、記録と state の置き場（`logs/decisions.jsonl` と `logs/state`）、閉じたチケットの退避（`logs/archive`）
 - パスは「区切りが続くか、そこで終わる」形で当てるので、`rm -rf .ccnavi` や `mv .ccnavi .ccnavi.bak` も止まる
 - `ccnavi-git.sh` を通しても同じ場所は消せない。`rm`・`restore --source <ref>`・`checkout <ref> <パス>` で上の場所
-  （とそれを中に含むディレクトリ）を消す・別のコミットの中身に戻す形は `builtin-guard-wrapper-paths`（`DENY_WRAPPER_CORE_PATH`）で止まる。
+  （とそれを中に含むディレクトリ）を消す・別のコミットの中身に戻す形は `builtin:guard-wrapper-paths`（`DENY_WRAPPER_CORE_PATH`）で止まる。
   衝突を解く `restore --ours / --theirs` と、索引の中身に戻す `restore` / `restore --staged`、何も消さない `rm -n` / `--dry-run` は通る
   （後ろに `--no-dry-run` を書けば消す形として見る）。
   パスや副命令を変数・置換・glob で書いた形、標準入力から読むシェル（`echo '…' | sh`。`bash --norc`・`bash -o pipefail`・`env sh`・`command sh` も）や `xargs` に流す呼び出し、
@@ -1407,14 +1409,14 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 
 名指しのツール（`Write` / `Edit` / `NotebookEdit`）からも守る。
 
-- `builtin-guard-project-home`: ccnavi ディレクトリの下（`*/.ccnavi/*`）と、`CCNAVI_BIN_PATH` のパスおよび実行ファイルの置き場
+- `builtin:guard-project-home`: ccnavi ディレクトリの下（`*/.ccnavi/*`）と、`CCNAVI_BIN_PATH` のパスおよび実行ファイルの置き場
   （名前が `ccnavi-launcher.sh` なら 1 つ上の `bin/<os>-<arch>/`、それ以外なら隣の `<os>-<arch>/`）
-- `builtin-guard-common-layer`: 共通レイヤーの 3 本。ワークツリーの中の同じファイルも止まる
-- 期待する判定のファイル `.ccnavi/config/common/rule-expectations.yml` も `builtin-guard-project-home` が止める。その下書きはワークツリーの `wip/handoff/` に置き、
+- `builtin:guard-common-layer`: 共通レイヤーの 3 本。ワークツリーの中の同じファイルも止まる
+- 期待する判定のファイル `.ccnavi/config/common/rule-expectations.yml` も `builtin:guard-project-home` が止める。その下書きはワークツリーの `wip/handoff/` に置き、
   ルールの下書きと一緒にユーザに渡す
 
 止めるのは書き込みの形と場所の組で、場所の名前が出ただけでは止めない（`cat .ccnavi/config/common/rules.yml` や `git add <パス>` は通る）。
-`builtin-guard-` で始まる id はどのレイヤーのルールファイルにも書けない（書けば error。`--lint` も指摘する）。外したいなら env でこの機能ごと切る。
+`builtin:guard-` で始まる id はどのレイヤーのルールファイルにも書けない（書けば error。`--lint` も指摘する）。外したいなら env でこの機能ごと切る。
 ルールファイルが読めず既定を使っている間は、共通レイヤーのルールファイルを Write / Edit で直した結果を戻さない（実行前に読めなかったときに限る）。
 
 `PreToolUse` の登録ごと消された場合は ccnavi が一切動かない。hook の登録を hook 自身で守ることはできない。
@@ -1474,7 +1476,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 | `.ccnavi/approved/done/` | 閉じた。取り消しは `cancelled_at` を持ってここに入る | `ccnavi-review.sh confirm` / `decide`、`ccnavi --reviewed`、`close-early`（ユーザ）。レビュー不要の `finish` と `cancel --reason` |
 
 - `.ccnavi/approved/` へ動かすのはユーザ、`wip/proposals/` へ動かすのはエージェント
-- `review/` への直接の作成・移動は誰がやっても止まる（`builtin-ticket-state`）。`.ccnavi/approved/` は ccnavi ディレクトリを守る組み込みのルールが止める
+- `review/` への直接の作成・移動は誰がやっても止まる（`builtin:ticket-state`）。`.ccnavi/approved/` は ccnavi ディレクトリを守る組み込みのルールが止める
 - 動かすスクリプトと push はサブエージェントには打てない（`DENY_SUBAGENT_TICKET_OP`）。子チケットのワークツリーからの push は
   git のラッパースクリプトが拒む。合流と push と閉じるのは親の仕事
 - `start` は置き場を動かさず、着手の時刻と基準点（そのワークツリーの HEAD）を書く。`finish` は完了の時刻を書き、フェーズが
@@ -1570,7 +1572,7 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 | ボード | `--agree --preview --json` で読んでオーバーレイに出し、押したら `--agree --yes <識別子,…> --digest <値> --json` を打つ（「承認の JSON」）。1 件以上通れば `ccnavi-push-approved.sh` を統合ターミナルへ送る |
 | ファイルを動かす | 提案を `.ccnavi/approved/doing/` へ動かす。GitHub の画面しか使えないユーザ向け。承認の画面を通らないぶん、構造の検査は判定のときに行い、引っかかれば `DENY_TICKET_BLOCKED` で止まる（`--lint` とボードの JSON の `blocked` でも分かる） |
 
-エージェントが `--yes` を打つ形は組み込みの deny（`builtin-guard-ticket-approval`）が止める。`--preview` は通す。
+エージェントが `--yes` を打つ形は組み込みの deny（`builtin:guard-ticket-approval`）が止める。`--preview` は通す。
 
 **承認済みチケットは親チケットのブランチに乗って他の機械へ届く。** 承認しても push しなければ、他の機械では承認されなかったことになる。
 承認の push は `sh .ccnavi/scripts/ccnavi-push-approved.sh` で行う。
@@ -1666,10 +1668,10 @@ Write / Edit の対象を解いた先が `.claude/worktrees/<名前>/` の中な
 | 何も言わない | ワークツリーにチケットが無い | 権限モードに従う（`UNDECLARED`） |
 
 チケットの判定がルールの判定より強かった回は、文面の頭に `rule: <id> (allow) lets this through, but the ticket for this worktree narrows it` が載り、
-チケットの `deny` の項に当たったなら `ticket entry: deny <パターン>` も載る。記録では `rules` が `(ticket-scope)` とルールの id のリストになり、`source` は空になる。
+チケットの `deny` の項に当たったなら `ticket entry: deny <パターン>` も載る。記録では `rules` が `builtin:ticket-scope` とルールの id のリストになり、`source` は空になる。
 
 ```sh
-jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subject' logs/decisions.jsonl
+jq -r 'select(.rules[0]? == "builtin:ticket-scope" and (.rules | length) > 1) | .subject' logs/decisions.jsonl
 ```
 
 子の範囲は、子の宣言を親の範囲とフェーズ定義の `scope` の両方で切り詰めたもの（フェーズ定義が `inherit` か、`phases.yml` がどのレイヤーにも無ければ親だけ）。
@@ -1965,7 +1967,7 @@ Draft を外すので、squash でマージすると既定のブランチには�
 退避の削除は、C1 の見分けと実行後チェックが ccnavi の書き込みとして外す。外すのは、ready のマーカーにそのツリーから移したと載っていて
 （比べている版がマーカーを書いたときの先頭と同じ間だけ。ready の削除をコミットしてツリーが進めば、マーカーは以後の削除に効かない）、
 `done/`・`phases/`・`events/`・`flows/` の下にあり、消えた中身が退避したコピーと同じもの（履歴は ready の流れの行だけを足したもの）。
-`logs/archive/` は記録と state の置き場の守り（`builtin-guard-records` と、シェルの側の `builtin-guard-setting-files`）が書き込みを止める。
+`logs/archive/` は記録と state の置き場の守り（`builtin:guard-records` と、シェルの側の `builtin:guard-setting-files`）が書き込みを止める。
 
 **まだ残っているが早めに閉じたいとき**は、ユーザが端末で `close-early --reason <理由>` を打つ。作業中の子がいる間は打てない。残っているものを全部
 見せてから y/N を取り、未着手の子の取り消し（理由は `close-early: <理由>`）、省略とレビュー済みのマーカー、未解決の受け入れ、残りの issue への書き出しを行う。
@@ -2070,7 +2072,7 @@ Claude Code はそこを読まないので、ccnavi が `SessionStart` と `Suba
 | `decision` | `allow` `ask` `deny` `handover` `skip`。`handover` は権限モードに委ねた回 |
 | `enforced` | 実際に適用したか。`dry-run` は `false` |
 | `code` | 判定の根拠の種別。一覧は [設計 付録 A](docs/design/appendix.md)。よく出るのは `DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE`。実行後チェックの行は `POST_VIOLATION` などで、件が混ざった回は強いほう 1 つ |
-| `rules` | 当たったルールの id。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`(ticket-scope)`、`(phase-review)` など。判定ごとに分かれる。一覧は付録 A） |
+| `rules` | 当たったルールの名前（ルールファイル由来は `<相対パス>:<id>`、組み込みは id）。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`builtin:ticket-scope`、`builtin:phase-review` など。判定ごとに分かれる。一覧は付録 A） |
 | `reason` | `skip` の理由。`mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、`payload-unusable`、`deadline-exceeded`、`tool-cannot-write`、`worktree-unreadable`（`detail` に理由）、`no-turn-baseline` の 9 つ |
 | `tree` / `project` | 呼び出しの行き先が属するツリーとプロジェクト |
 | `permission_mode` | Claude Code から来たモード。`handover` の行と合わせて読む |
@@ -2080,7 +2082,7 @@ Claude Code はそこを読まないので、ccnavi が `SessionStart` と `Suba
 | `quoted` | 引用の中から切り出したコマンドにだけ当たったルールの id |
 | `unwrapped` | 実行役のコマンド（`env`・`sudo`・`sh -c` など）の中のコマンド、または `cd` で移った先から見たパス（設計 6.3.2）で当たったときの、そのコマンド。複数なら `\x00` でつなぐ |
 | `fallback` | ルールファイルを読めず組み込みの既定で判定した回（`detail` にパス）。自身のレイヤーやプロジェクトのレイヤーが読めなかった回は、そのレイヤーの名前（`self`、`lib` など）が入り、そのレイヤーを空として判定している |
-| `source` | 判定を下したルールのレイヤー。`common` / `self` / プロジェクトの名前。`rules` の id もレイヤーの名前付き（共通レイヤーは裸、それ以外は `self:worktrees`、`lib:schema`） |
+| `source` | 判定を下したルールのレイヤー。`common` / `self` / プロジェクトの名前。`rules` の名前にはレイヤーの前置きが付かない（相対パスで出どころが分かる） |
 
 ```sh
 jq -r 'select(.unwrapped) | .rules[]' logs/decisions.jsonl | sort | uniq -c
@@ -2107,7 +2109,7 @@ URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、
 
 動かした数はセッション開始の行の `detail` に `pruned rotated=1 logs=2 state=5` の形で残る。手で走らせるなら端末から打つ。
 エージェントが Bash から `--preview` の無い形を打つと、チケット制御に依らず `DENY_RECORDS_PRUNE` で止まる。
-記録と state の置き場は、シェルからの書き込みと同じく `Write` / `Edit` からも止まる（`builtin-guard-records`）。
+記録と state の置き場は、シェルからの書き込みと同じく `Write` / `Edit` からも止まる（`builtin:guard-records`）。
 
 ```sh
 ccnavi --prune --preview   # 動かすものを並べるだけ
@@ -2249,7 +2251,7 @@ ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml --json
 | `verdict` / `code` | 判定（`deny` / `ask` / `allow` / `skip`。`--permission-mode` を渡したときは権限モードへ渡した `handover` も）と根拠コード |
 | `reason` / `degraded` / `fallback` | `skip` の理由、生の文字列に当てたかどうか、組み込みの既定で判定したかどうか。無ければ空 |
 | `unwrapped` | 実行役のコマンドが中で実行するコマンド、または `cd` で移った先から見たパスでルールに当たったときの、そのコマンド。複数なら `\x00` でつなぐ。元の形で当たったとき・当たらなかったときは空 |
-| `rules[]` | 当たったルール。`{id, source, section, kind, written, pattern}`。`source` は `file`（ルールファイルから読んだルール）か `outside`（チケットの範囲・組み込みの保護・退避した組み込みの既定のように、ルールファイルの外から来た根拠）。`outside` でもルールそのものがあれば `section` と `kind` を持ち、`written` と `pattern` は頭の 160 字に `…（全 N 字）` を添えた形に切る（組み込みの式は 2 万字を超えるものがある）。ルールの無い根拠（`(ticket-scope)` など）は `section` 以下が空。値はこの 2 つだけで、増やすときは `version` を上げる。`kind` は `glob`・`regex`・`when` のどれか、`written` は書いたまま（`when` は組み合わせ条件を 1 行にした形で、`when: ` は付けない）、`pattern` は翻訳後の正規表現（`when` はふつう空）。`when` のルールだけ、書いた組み合わせ条件そのものを `when` に持つ |
+| `rules[]` | 当たったルール。`{id, source, section, kind, written, pattern}`。`id` は記録の名前（ルールファイル由来は `<相対パス>:<書いた id>`、組み込みは id）。`source` は `file`（ルールファイルから読んだルール）か `outside`（チケットの範囲・組み込みの保護・退避した組み込みの既定のように、ルールファイルの外から来た根拠）。`outside` でもルールそのものがあれば `section` と `kind` を持ち、`written` と `pattern` は頭の 160 字に `…（全 N 字）` を添えた形に切る（組み込みの式は 2 万字を超えるものがある）。ルールの無い根拠（`builtin:ticket-scope` など）は `section` 以下が空。値はこの 2 つだけで、増やすときは `version` を上げる。`kind` は `glob`・`regex`・`when` のどれか、`written` は書いたまま（`when` は組み合わせ条件を 1 行にした形で、`when: ` は付けない）、`pattern` は翻訳後の正規表現（`when` はふつう空）。`when` のルールだけ、書いた組み合わせ条件そのものを `when` に持つ |
 | `response` | エージェントに返る文面そのもの。無ければ空 |
 | `quoted` | 当たったルールのうち、引用の中から切り出したコマンドにだけ当たったものの id。そういうルールがあるときだけ出る |
 | `payload` | 判定に渡した payload の欄 `{cwd, permission_mode, agent_id}`。`--cwd` / `--permission-mode` / `--agent-id` のどれかを渡したときだけ出る（渡さなければ `cwd` は `root`、ほかは空） |
@@ -2285,8 +2287,8 @@ ccnavi: 設定を検証する
 warn: (mode): dry-run なので判定しても呼び出しに手を出さない
 error: deny:no-message: 文面が無い。ルールは代わりに何をすべきかを言わなければならない
 error: deny:both: glob と regex の両方がある。どちらで判定するのか決められない
-warn: (id 無し: ask Agent|Bash *npm audit*): id が無い。記録も報告もこのルールを名指しできない
-error 2 件、warn 2 件、info 0 件
+error: ask[2]: id が無い。ルールには id を書いてください（記録と文面にこの名前が出る）
+error 3 件、warn 1 件、info 0 件
 ```
 
 先頭の数行は「何を見て検証したか」（「チケットの承認の経路を守る」はチケット制御が有効なときだけ）。モードは検証を起動した環境から
@@ -2305,7 +2307,8 @@ error 2 件、warn 2 件、info 0 件
 | error | `deny` が空（何も止めないガードは、入っているように見えて入っていない） |
 | error | `additionalContextFile` / `additionalContextOnceFile` が絶対パスか `..` で上に出るパス（実行時も読まない） |
 | warn | `allow` が空（言及の無い呼び出しが全部、権限モードへ渡る） |
-| warn | `id` の無いルール、`id` が重複するルール |
+| error | `id` の無いルール（読み込まない。記録も報告もこのルールを名指しできない） |
+| warn | `id` が重複するルール |
 | warn | 判定が対象を取り出せないツールを `match` に書いたルール |
 | warn | 本体（`glob` / `regex` 1 つ）が何にでも当たる `deny`（`.*` や `.` など。`match` のツールを丸ごと止める。`except` があれば除いたもの以外を止める。ツールごと止めると決めた `glob: "*"` ちょうどは言わない） |
 | warn | 何にでも当たる、または選択肢が 3 つ以上ある `allow` に `additionalContext`（か `additionalContextFile`）を書いたルール（当たるたびに同じ文が積まれる。`additionalContextOnce` は文脈ごとに 1 度なので指摘しない） |
@@ -2598,7 +2601,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
   ブランチ名とツリーからの相対パスごとの中身のハッシュ。無かったファイルも「無い」として入る）と、一括のチケットごとに書き出す中身（新規は提案の
   ファイルのバイト列そのもの、改版は計画と `phases:` を差し替えた承認済みチケット）。見せたあとに判定が読んだものが 1 つでも変われば、
   画面が同じでもダイジェストは変わる
-- エージェントが Bash や PowerShell で `--yes` を打つ形は、組み込みの deny（`builtin-guard-ticket-approval`）が止める。`--preview` は通す
+- エージェントが Bash や PowerShell で `--yes` を打つ形は、組み込みの deny（`builtin:guard-ticket-approval`）が止める。`--preview` は通す
 - 後ろの `<絞り>` は `ccnavi --agree <識別子>...` と同じで、承認の対象を狭める。`--yes` の値（ユーザが見た識別子）とは別に渡す。
   比べるのは「その絞りで今できる一覧」と「見た識別子」
 

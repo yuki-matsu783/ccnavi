@@ -51,7 +51,7 @@ def _handover(tool: str, subject: str) -> str:
     )
 
 
-def _deny(subject: str, rule: str = "git-push") -> str:
+def _deny(subject: str, rule: str = ".ccnavi/config/common/rules.yml:git-push") -> str:
     return _line(
         event="PreToolUse",
         tool="Bash",
@@ -143,7 +143,7 @@ class SuggestTest(unittest.TestCase):
 
     def test_denies_from_outside_the_rules_are_not_candidates(self):
         """ルールファイルに無い根拠の拒否は、直す文面が無いので候補にしない。"""
-        self._write("decisions.jsonl", [_deny("rm x", rule="builtin-guard-x") for _ in range(3)])
+        self._write("decisions.jsonl", [_deny("rm x", rule="builtin:guard-x") for _ in range(3)])
         body = self._json()
         self.assertEqual([], body["candidates"])
         self.assertEqual(1, body["dropped"])

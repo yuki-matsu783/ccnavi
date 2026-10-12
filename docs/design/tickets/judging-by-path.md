@@ -37,7 +37,7 @@ keywords: [判定, ワークツリー, 承認済みチケット, 範囲, REQ-TKT
 
 **理由コードは増やさない。** 範囲の外も、チケットの `deny` の項も、ルールを狭めた回も `DENY_TICKET_SCOPE`。
 区別は文面と記録で持つ。チケットがルールより強かった回は、文面の頭に `rule:` 行を足し、記録の `rules` を
-`(ticket-scope)` とルールの id のリストにし、`source` を空にする。チケット（子か親）の `deny` の項に当たったときは
+`builtin:ticket-scope` とルールの id のリストにし、`source` を空にする。チケット（子か親）の `deny` の項に当たったときは
 `ticket entry:` 行も足す。
 
 ```

@@ -247,11 +247,12 @@ ID_SEPARATOR = ":"
 # 全体を見る `--lint` は warn にする（提案 1 本で設定画面の保存と CI が止まらないように）。
 KIND_NOT_YET = "not-yet"
 
-# 組み込みルールの名前の頭。ルールファイルからは書けない（読み込まずに error）。
+# 組み込みルールの名前の頭（`builtin:` で始まる id は全部組み込み）。ルールファイルからは書けない
+# （読み込まずに error）。
 # 同じ id で書いたルールがあると組み込みを足さない形にすると、何にも当たらない 1 本を
 # その名前で書くだけで組み込みの保護を気づかれないうちに消せてしまう。ルールファイルの記述に依らず
 # 足すのが組み込みの役目なので、置き換える経路をなくす。外したいなら env でその保護ごと切る。
-RESERVED_ID_PREFIX = "builtin-guard-"
+RESERVED_ID_PREFIX = "builtin:"
 
 
 def root_pattern(root: str) -> str:
@@ -519,9 +520,12 @@ class Rule:
     # from_file は、ルールファイル（共通レイヤー・自身のレイヤー・プロジェクトのレイヤー）から
     # 読んだルールであること。組み込み（土台・退避した既定・設定ファイルの保護・チケットの保護）は
     # 偽。`--test` が当たったルールを「ルールファイルの中」と「外から来た根拠」に分けるのに読む。
-    # id の前置きでは分けられない（`builtin-ticket-*` のように `builtin-guard-` で始まらない
+    # id の前置きでは分けられない（`builtin:ticket-*` のように `builtin:guard-` で始まらない
     # 組み込みがある）し、`source` でも分けられない（退避した既定は共通レイヤーの名前を持つ）。
     from_file: bool = field(default=False, compare=False)
+    # file はこのルールが来たルールファイルの、ワークスペースのルートからの相対パス（`/` 区切り）。
+    # 組み込みは空。記録名（record_name）の前半になる。読んだ側（ruleload）が入れる。
+    file: str = field(default="", compare=False)
 
     # degraded_message は、ルールが書かれたとおりに組み立てられず、保護を消さないために
     # 別の形で判定に使っているときに、止められた側へ返す文面。`{!root}` を展開できなかった
@@ -562,7 +566,11 @@ class Rule:
         組み立てに失敗して別の形で判定に使っているときは、書いた文面ではそれを説明できない
         （「外への書き込みです」としか言わない）ので、そちらを先に返す。
         """
-        return fill_root(self.degraded_message or self.message, self.root)
+        if self.degraded_message:
+            # 名前は読み込みのあとで決まる（ファイルの相対パス）ので、ここで入れる。
+            text = self.degraded_message.replace(DEGRADED_RULE_NAME, record_name(self))
+            return fill_root(text, self.root)
+        return fill_root(self.message, self.root)
 
     def key(self) -> tuple:
         """レイヤーをまたいで「同じ定義」と言えるかどうかの鍵。
@@ -618,6 +626,17 @@ class Rule:
         if self.compiled is not None:
             return self.compiled.search(subject) is not None
         return self.when is not None and self.when.hits(subject)
+
+
+def record_name(rule: Rule) -> str:
+    """決定ログの rules 欄と文面に出す名前。
+
+    ルールファイル由来は `<ワークスペースのルートからの相対パス>:<書いた id>`。
+    組み込みは id そのもの（`builtin:git-push`）。レイヤーの前置きは付けない。
+    """
+    if rule.from_file:
+        return f"{rule.file}{ID_SEPARATOR}{rule.bare_id}"
+    return rule.id
 
 
 def tool_matches(match: str, tool: str) -> bool:
@@ -765,6 +784,14 @@ def _build(
         return None, [Problem(SEVERITY_ERROR, where, "ルールがマッピングではない")]
 
     written_id = str(raw.get("id") or "")
+    if not builtin and not written_id.strip():
+        return None, [
+            Problem(
+                SEVERITY_ERROR,
+                where,
+                "id が無い。ルールには id を書いてください（記録と文面にこの名前が出る）",
+            )
+        ]
     rule = Rule(
         id=written_id,
         bare_id=written_id,
@@ -782,18 +809,8 @@ def _build(
         root=root,
         from_file=not builtin,
     )
-    name = f"{section}:{rule.id}" if rule.id else where
+    name = f"{section}:{rule.id}"
 
-    if ID_SEPARATOR in written_id:
-        return None, [
-            Problem(
-                SEVERITY_ERROR,
-                name,
-                f"id に `{ID_SEPARATOR}` は書けない。レイヤーの名前を添えた形"
-                f"（`self{ID_SEPARATOR}id` / `<プロジェクト名>{ID_SEPARATOR}id`）と"
-                "見分けが付かず、記録を読んだユーザがどのファイルを直すのか決められない",
-            )
-        ]
     if not builtin and written_id.lower().startswith(RESERVED_ID_PREFIX):
         return None, [
             Problem(
@@ -804,6 +821,16 @@ def _build(
                 "別の名前にしてください。"
                 "組み込みを外したいなら env（CCNAVI_GUARD_CORE_FILES など）で"
                 "その保護ごと切ってください",
+            )
+        ]
+    if not builtin and ID_SEPARATOR in written_id:
+        return None, [
+            Problem(
+                SEVERITY_ERROR,
+                name,
+                f"id に `{ID_SEPARATOR}` は書けない。レイヤーの名前を添えた形"
+                f"（`self{ID_SEPARATOR}id` / `<プロジェクト名>{ID_SEPARATOR}id`）と"
+                "見分けが付かず、記録を読んだユーザがどのファイルを直すのか決められない",
             )
         ]
     if not rule.message and section in _NEEDS_MESSAGE:
@@ -1247,11 +1274,15 @@ def _ungeneratable(rule: Rule, section: str, name: str, detail: str) -> tuple[Ru
     # 書いた文面（message）は残す。`--explain` と記録が書いた表記を出す約束は、
     # glob / regex だけでなく文面にも当てはまる（Rule の message のコメント）。
     rule.degraded_message = (
-        f"{detail}。保護が消えるのを避けるため、ルール '{rule.id or name}' が見るツール"
+        f"{detail}。保護が消えるのを避けるため、ルール '{DEGRADED_RULE_NAME}' が見るツール"
         f"（{rule.match}）を止めています。ワークスペースをもっと浅い場所へ移すか、"
         "ユーザに、このルールが書かれているルールファイルから外してもらってください。"
     )
     return rule, problem
+
+
+# degraded_message の中のルールの名前。読み込みのあとで記録名に置き換える（spoken_message）。
+DEGRADED_RULE_NAME = "{rule}"
 
 
 def _unsupported(expression: str) -> str:

@@ -46,7 +46,7 @@ FENCE_CLOSE = "  ---- 目録ここまで ----"
 # 名前は読まない。パスは文にそのまま出るので、名前で文を組み立てさせない。
 NAME = re.compile(r"^[A-Za-z0-9._-]+$")
 # 1 度だけ渡す文の数えの鍵（`ctxfile` の記録）。プロジェクトごとに分ける。
-ONCE_ID = "builtin-project-skills"
+ONCE_ID = "builtin:project-skills"
 
 
 def skills_dir(project_root: str) -> str:

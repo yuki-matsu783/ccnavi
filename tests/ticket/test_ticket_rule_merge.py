@@ -334,23 +334,23 @@ class PreToolUseTable(Workspace):
             "no-ticket": ("deny", "DENY_PATH", "rule", "rule-deny"),
         },
         "ask": {
-            "deny": ("deny", "DENY_TICKET_SCOPE", "ticket", "(ticket-scope)"),
-            "outside": ("deny", "DENY_TICKET_SCOPE", "ticket", "(ticket-scope)"),
+            "deny": ("deny", "DENY_TICKET_SCOPE", "ticket", "builtin:ticket-scope"),
+            "outside": ("deny", "DENY_TICKET_SCOPE", "ticket", "builtin:ticket-scope"),
             "ask": ("ask", "RULE_ASK", "rule", "rule-ask"),
             "allow": ("ask", "RULE_ASK", "rule", "rule-ask"),
             "no-ticket": ("ask", "RULE_ASK", "rule", "rule-ask"),
         },
         "allow": {
-            "deny": ("deny", "DENY_TICKET_SCOPE", "ticket", "(ticket-scope)"),
-            "outside": ("deny", "DENY_TICKET_SCOPE", "ticket", "(ticket-scope)"),
-            "ask": ("ask", "TICKET_ASK", "ticket", "(ticket-scope)"),
+            "deny": ("deny", "DENY_TICKET_SCOPE", "ticket", "builtin:ticket-scope"),
+            "outside": ("deny", "DENY_TICKET_SCOPE", "ticket", "builtin:ticket-scope"),
+            "ask": ("ask", "TICKET_ASK", "ticket", "builtin:ticket-scope"),
             "allow": ("allow", "", "", "rule-allow"),
             "no-ticket": ("allow", "", "", "rule-allow"),
         },
         "silent": {
-            "deny": ("deny", "DENY_TICKET_SCOPE", "ticket", "(ticket-scope)"),
-            "outside": ("deny", "DENY_TICKET_SCOPE", "ticket", "(ticket-scope)"),
-            "ask": ("ask", "TICKET_ASK", "ticket", "(ticket-scope)"),
+            "deny": ("deny", "DENY_TICKET_SCOPE", "ticket", "builtin:ticket-scope"),
+            "outside": ("deny", "DENY_TICKET_SCOPE", "ticket", "builtin:ticket-scope"),
+            "ask": ("ask", "TICKET_ASK", "ticket", "builtin:ticket-scope"),
             # チケットの範囲の中で、ルールも何も言わない。ルールの id もチケットの理由も残らない。
             "allow": ("allow", "", "", None),
             # 権限モードに委ねる行。payload に permission_mode を入れないので、委ねた先の
@@ -390,10 +390,16 @@ class PreToolUseTable(Workspace):
 
                 rules = record.get("rules") or []
                 if first_rule is None:
-                    self.assertNotIn("(ticket-scope)", rules, rules)
+                    self.assertNotIn("builtin:ticket-scope", rules, rules)
                 else:
                     self.assertTrue(rules, record)
-                    self.assertEqual(rules[0], first_rule, rules)
+                    # ルールファイル由来の記録名は `<相対パス>:<id>`（表では id だけで書く）。
+                    expected = (
+                        first_rule
+                        if first_rule.startswith("builtin:")
+                        else f".ccnavi/config/common/rules.yml:{first_rule}"
+                    )
+                    self.assertEqual(rules[0], expected, rules)
 
                 if text_from == "ticket":
                     # 判定を下したのがレイヤーを持たないチケットなら、レイヤーの欄は空。
@@ -402,9 +408,12 @@ class PreToolUseTable(Workspace):
                     # deny に当たった）両方載る。
                     if rule_section in ("ask", "allow"):
                         # チケットがルールを狭めた回は、ルールの id も記録に残し、文面が名指しする。
-                        self.assertIn(f"rule-{rule_section}", rules, rules)
                         self.assertIn(
-                            f"rule: rule-{rule_section} ({rule_section}) lets this through, "
+                            f".ccnavi/config/common/rules.yml:rule-{rule_section}", rules, rules
+                        )
+                        self.assertIn(
+                            f"rule: .ccnavi/config/common/rules.yml:rule-{rule_section} "
+                            f"({rule_section}) lets this through, "
                             "but the ticket for this worktree narrows it",
                             reason,
                         )
@@ -515,13 +524,13 @@ class TicketPlaces(Workspace):
     def test_state_directories_stay_with_the_builtin_guard(self):
         result = self.write_hook(self.child, f"{self.TICKETS}/review/i0009.md")
         self.assertEqual(self.decision(result), "deny")
-        self.assertIn("builtin-ticket-state", self.reason(result))
+        self.assertIn("builtin:ticket-state", self.reason(result))
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(result))
 
     def test_approved_tickets_stay_with_the_builtin_guard(self):
         result = self.write_hook(self.child, f"{self.APPROVED}/doing/i0009.md", core="enable")
         self.assertEqual(self.decision(result), "deny", self.reason(result))
-        self.assertIn("builtin-guard-project-home", self.reason(result))
+        self.assertIn("builtin:guard-project-home", self.reason(result))
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(result))
 
     def test_post_tool_use_exempts_the_ticket_places_only(self):
@@ -544,7 +553,7 @@ class TicketPlaces(Workspace):
     def test_post_tool_use_reports_a_scope_finding_without_restoring_it(self):
         """範囲外は報告するが戻さない。戻す根拠はルールの `deny` だけ（post._restorable）。
 
-        報告しているのはルールファイルに無いルール（`(ticket-scope)`）で、
+        報告しているのはルールファイルに無いルール（`builtin:ticket-scope`）で、
         `CCNAVI_RESTORE_IF_DENY` が言う「`deny` と宣言した場所」ではない。
         """
         rel = "docs/b.md"
@@ -858,7 +867,7 @@ class Diagnostics(Workspace):
         result = self.ccnavi("--test", "Write", target)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("verdict: deny (DENY_TICKET_SCOPE)", result.stdout)
-        self.assertIn("(ticket-scope)", result.stdout)
+        self.assertIn("builtin:ticket-scope", result.stdout)
         self.assertIn("rule-allow", result.stdout)
 
     def test_approval_screen_says_rule_allow_stops_outside_the_area(self):

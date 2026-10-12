@@ -256,7 +256,8 @@ LAYER_FILE_NAMES = {KIND_RULES: "rules.yml", KIND_PHASES: "phases.yml", KIND_RIS
 LAYER_COMMON = "common"
 LAYER_SELF = "self"
 # レイヤーの名札に予約してある表記。プロジェクトはこの名前を使えない。
-RESERVED_LAYER_NAMES = (LAYER_COMMON, LAYER_SELF)
+# `builtin` は組み込みのルールの id（`builtin:<名前>`）と同じ形の前置きになるため予約する。
+RESERVED_LAYER_NAMES = (LAYER_COMMON, LAYER_SELF, "builtin")
 # 予約名のプロジェクトのバックアップの key につける前置き。名札の側（`rules:self`）と
 # プロジェクトの側を分ける（_layer_key）。
 PROJECT_KEY_HOME = "projects/"

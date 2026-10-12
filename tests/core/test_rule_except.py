@@ -328,7 +328,9 @@ class JudgeTest(unittest.TestCase):
         def says(command: str) -> tuple[str, bool]:
             out = self.judge("Bash", {"command": command})
             reason = out.get("permissionDecisionReason", "")
-            return out.get("permissionDecision", ""), "(rule: publish)" in reason
+            return out.get("permissionDecision", ""), (
+                "(rule: .ccnavi/config/common/rules.yml:publish)" in reason
+            )
 
         self.assertEqual(says("npm publish"), ("deny", True))
         self.assertEqual(says("npm publish --dry-run"), ("ask", False))

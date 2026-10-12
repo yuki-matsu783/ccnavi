@@ -35,7 +35,7 @@ CODE_TICKET_SCOPE = "POST_TICKET_SCOPE"
 
 # 範囲外の変更を報告しているのは、ルールファイルの中のルールではなく承認済みチケット。
 # 出所にこの名前をつけて、ルールファイルを探しても見つからないことを示す。
-TICKET_SCOPE_RULE = "(ticket-scope)"
+TICKET_SCOPE_RULE = "builtin:ticket-scope"
 
 # 1 回の記録に載せる code の強さの順。記録の `code` は 1 つなので、件の code が混ざった回は
 # 強いほうを載せ、内訳は detail に書く（`codes_note`）。ルールが守ると宣言した場所の変更は、

@@ -163,7 +163,7 @@ def _reject_of(
     probe = probe_of(entry)
     rule = _denied_by(rule_set, os.path.join(target.root, *probe.split("/")))
     if rule is not None:
-        origin = f"{ORIGIN_RULE} {rule.id or '(id 無し)'}（レイヤー {rule.source or '?'}）"
+        origin = f"{ORIGIN_RULE} {rules.record_name(rule)}（レイヤー {rule.source or '?'}）"
         return Reject(t.ticket, entry.decision, entry.glob, rule.spoken_message(), origin)
     if parent is not None and parent.decide(probe) not in (rules.ALLOW, rules.ASK):
         return Reject(
