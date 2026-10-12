@@ -38,8 +38,8 @@ export interface ProposalJson {
   readonly tree_root: string;
   readonly path: string;
   /**
-   * 親の提案が全体計画（`plan:`）を持つか。`feedback:` だけの親と子は偽（ワークフロー編集タブは `plan:` の無い親を開けない）。ボードは計画を読まず、これで親の提案のカードの
-   * 「ワークフロー」を出し分ける。欄の無い答え（古い実行ファイル）は偽
+   * 親の提案が全体計画（`plan:`）を持つか。`feedback:` だけの親と子は偽（計画編集タブは `plan:` の無い親を開けない）。ボードは計画を読まず、これで親の提案のカードの
+   * 「計画編集」を出し分ける。欄の無い答え（古い実行ファイル）は偽
    */
   readonly has_plan: boolean;
 }

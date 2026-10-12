@@ -1,5 +1,5 @@
 /**
- * ワークフロー編集画面の案内の見本（`webview/tours/workflow.yml` の `sample:`）を、画面が描く形にする。
+ * 計画編集画面の案内の見本（`webview/tours/workflow.yml` の `sample:`）を、画面が描く形にする。
  *
  * 見本は「実行ファイルの答え」（`--plan-order <親> --json` の答え。`planordermodel.ts` の `PlanOrderAnswer`）を、名前を付けて
  * 何本か持つ。段の `scene.answer` が、その段で画面が描く答えを名前で選ぶ。画面は答えをそのまま描くので、

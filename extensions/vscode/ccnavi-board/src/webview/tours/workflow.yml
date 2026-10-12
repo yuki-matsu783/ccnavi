@@ -1,4 +1,4 @@
-# ワークフロー編集画面の案内。`sample:` は案内の間だけ画面に出す見本（実際の提案ではない）。
+# 計画編集画面の案内。`sample:` は案内の間だけ画面に出す見本（実際の提案ではない）。
 #
 # 見本は「実行ファイルの答え」（`--plan-order <親> --json` の答え）に名前を付けて並べたもの。実行ファイルの JSON と同じ形で書き、
 # 欠けた欄は `core/tour-workflow.ts` の決まりで埋める（ticket・part・source_sha・項の from・proposed・loose の寄せ集め・writable など）。

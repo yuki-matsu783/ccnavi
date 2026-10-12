@@ -534,7 +534,7 @@ const GUARDS: readonly Guard[] = [
     },
   },
   {
-    what: "未保存のワークフロー編集タブがある親を含む一覧は、承認を打たない",
+    what: "未保存の計画編集タブがある親を含む一覧は、承認を打たない",
     find: "if (blocked.length > 0) {",
     into: "if (false) {",
     check(step) {
@@ -547,7 +547,7 @@ const GUARDS: readonly Guard[] = [
     },
   },
   {
-    what: "承認を打つ直前に、未保存のワークフロー編集タブがある親が打つ識別子に入っていないかを見る",
+    what: "承認を打つ直前に、未保存の計画編集タブがある親が打つ識別子に入っていないかを見る",
     find: "return tickets.filter((ticket) => held.has(ticket)).sort();",
     into: "return [];",
     check(_step, machine) {
@@ -556,7 +556,7 @@ const GUARDS: readonly Guard[] = [
     },
   },
   {
-    what: "「ワークフローを編集」でタブを開くのは、一覧を見せているとき（preview）だけ",
+    what: "「計画を編集」でタブを開くのは、一覧を見せているとき（preview）だけ",
     find: 'if (overlay?.kind !== "preview") {',
     into: 'if (overlay === undefined || !("preview" in overlay)) {',
     check(step) {
@@ -574,7 +574,7 @@ const GUARDS: readonly Guard[] = [
     },
   },
   {
-    what: "「ワークフローを編集」で開くのは、一覧の図にある親だけ",
+    what: "「計画を編集」で開くのは、一覧の図にある親だけ",
     find: "if (!overlay.preview.plans.some((plan) => plan.ticket === ticket)) {",
     into: "if (false) {",
     check(step) {
@@ -898,13 +898,13 @@ test("CB-T204 置けたら渡す文を見せて読み直す。投稿の警告は
   assert.deepEqual(kinds(failed.effects), ["refresh"]);
 });
 
-test("CB-T378 未保存のワークフロー編集タブがある親を含む一覧は、承認を打たずに理由を言う。タブの無い親と子だけなら打てる", () => {
+test("CB-T378 未保存の計画編集タブがある親を含む一覧は、承認を打たずに理由を言う。タブの無い親と子だけなら打てる", () => {
   const shown = toPlanPreview(approvalStep, { i0001: "s1" });
   const blocked = approvalStep(shown, { kind: "confirm", unsaved: ["i0001"], tickets: ["i0001"] });
   assert.equal(blocked.state, shown, "一覧を見せたまま");
   assert.equal(blocked.redraw, false);
   assert.deepEqual(blocked.effects, [
-    { kind: "warn", text: "親 i0001 のワークフロー編集タブに未保存の変更があります。保存するか破棄してから承認してください" },
+    { kind: "warn", text: "親 i0001 の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください" },
   ]);
   // 別の親のタブだけが未保存なら、この一覧は打てる
   const other = approvalStep(shown, { kind: "confirm", unsaved: ["i0002"], tickets: ["i0001"] });
@@ -920,11 +920,11 @@ test("CB-T378 未保存のワークフロー編集タブがある親を含む一
   // 2 つの親が未保存なら、両方を名指しする
   const two = approvalStep(toPlanPreview(approvalStep, { i0001: "s1", i0002: "s2" }), { kind: "confirm", unsaved: ["i0002", "i0001"], tickets: ["i0001", "i0002"] });
   assert.deepEqual(two.effects, [
-    { kind: "warn", text: "親 i0001, i0002 のワークフロー編集タブに未保存の変更があります。保存するか破棄してから承認してください" },
+    { kind: "warn", text: "親 i0001, i0002 の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください" },
   ]);
 });
 
-test("CB-T379 「ワークフローを編集」は、オーバーレイを閉じてから親のタブを開く（開いたままにしない）", () => {
+test("CB-T379 「計画を編集」は、オーバーレイを閉じてから親のタブを開く（開いたままにしない）", () => {
   const shown = toPlanPreview(approvalStep);
   const after = approvalStep(shown, { kind: "editWorkflow", ticket: "i0001" });
   assert.deepEqual(after.state, CLOSED);

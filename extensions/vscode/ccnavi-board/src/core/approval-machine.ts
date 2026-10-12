@@ -35,7 +35,7 @@
  *
  * ## ガード（消すと承認が正しく動かなくなる順）
  *
- * 承認のほかに、残った指摘を決める流れとワークフロー編集タブのぶんがある。数は数えて書かない。足したときに古くなるため。
+ * 承認のほかに、残った指摘を決める流れと計画編集タブのぶんがある。数は数えて書かない。足したときに古くなるため。
  *
  * | ガード | 消すとどうなる |
  * |---|---|
@@ -53,10 +53,10 @@
  * | 一覧を受けるのは、それを頼んだ状態のときだけ（残った指摘も同じ） | 閉じたあとに返ってきた一覧が、勝手にオーバーレイを開く |
  * | 承認と残った指摘は互いの途中に被さらない | 見せている一覧が、別の一覧になってしまう |
  * | 決めた結果の文の上に、連絡も次の「決める」も被せない | 続きの子の識別子と次の 2 手を渡す前に、文が消える |
- * | ワークフロー編集タブに未保存の変更がある親を含む一覧は、承認を打たない | 未保存の順序のまま承認され、直したつもりの順序と違うものが通る |
+ * | 計画編集タブに未保存の変更がある親を含む一覧は、承認を打たない | 未保存の順序のまま承認され、直したつもりの順序と違うものが通る |
  * | 承認を打つ直前にも、未保存のタブがある親が打つ識別子に入っていないかを見る（`blockedBeforeApprove`） | 押したあとにタブで線を変えた一覧が、そのまま承認される |
- * | 「ワークフローを編集」でタブを開くのは、一覧を見せているとき（preview）だけ | 承認を打っている最中に閉じられ、結果を受ける場所が消える |
- * | 「ワークフローを編集」で開くのは、一覧の図にある親だけ | 古い画面から届いた識別子で、承認と関係の無いタブが開く |
+ * | 「計画を編集」でタブを開くのは、一覧を見せているとき（preview）だけ | 承認を打っている最中に閉じられ、結果を受ける場所が消える |
+ * | 「計画を編集」で開くのは、一覧の図にある親だけ | 古い画面から届いた識別子で、承認と関係の無いタブが開く |
  *
  * これらは `test/shared/approval-machine.test.ts` が見る。同じファイルの変異テストが、
  * ガードを 1 つ消したらテストが失敗することまで見るので、ガードを足したらそちらにも足す。
@@ -112,16 +112,16 @@ export type ApprovalInput =
       readonly pending: readonly string[];
     }
   /**
-   * 一覧（`--agree --preview --json`）が返った。`saved` はワークフロー編集タブが最後に保存したときの
+   * 一覧（`--agree --preview --json`）が返った。`saved` は計画編集タブが最後に保存したときの
    * `source_sha`（親ごと。`core/workflow-tabs.ts`）。一覧の計画と比べて、保存したあとに変わった親を覚える
    */
   | { readonly kind: "previewed"; readonly result: PreviewParse; readonly saved: Readonly<Record<string, string>> }
   /**
-   * 「この N 件を承認する」を押した。`unsaved` は**押した時点の**、ワークフロー編集タブに未保存の変更がある親
+   * 「この N 件を承認する」を押した。`unsaved` は**押した時点の**、計画編集タブに未保存の変更がある親
    * （呼ぶ側が帳面から引いて渡す）
    */
   | { readonly kind: "confirm"; readonly tickets: readonly string[]; readonly unsaved: readonly string[] }
-  /** 一覧の図の「ワークフローを編集」を押した。オーバーレイを閉じてから、その親のタブを開く */
+  /** 一覧の図の「計画を編集」を押した。オーバーレイを閉じてから、その親のタブを開く */
   | { readonly kind: "editWorkflow"; readonly ticket: string }
   /**
    * 承認（`--agree --yes`）の結果が返った。食い違い（`mismatch`）もここに入る。
@@ -192,7 +192,7 @@ export type ApprovalEffect =
   | { readonly kind: "copy"; readonly prompt: string; readonly what: string }
   /** 文を埋めて新しいセッションで開く */
   | { readonly kind: "openSession"; readonly prompt: string }
-  /** 親のワークフロー編集タブを開く（`screens().workflow`） */
+  /** 親の計画編集タブを開く（`screens().workflow`） */
   | { readonly kind: "openWorkflow"; readonly ticket: string }
   /** ユーザに言う（警告） */
   | { readonly kind: "warn"; readonly text: string }
@@ -330,7 +330,7 @@ function confirmed(state: ApprovalState, tickets: readonly string[], unsaved: re
     return stay(state);
   }
   const preview = state.overlay.preview;
-  // ワークフロー編集タブに未保存の変更がある親を含む一覧は打たない（画面のボタンも押せないが、ここでも止める）
+  // 計画編集タブに未保存の変更がある親を含む一覧は打たない（画面のボタンも押せないが、ここでも止める）
   const blocked = unsavedParents(preview, unsaved);
   if (blocked.length > 0) {
     return stay(state, { kind: "warn", text: unsavedText(blocked) });
@@ -497,7 +497,7 @@ function handedOver(state: ApprovalState, how: "promptCopy" | "promptOpen"): App
 }
 
 /**
- * 「ワークフローを編集」。オーバーレイを**閉じてから**タブを開く（開いたままにしない）。タブで保存すると提案が
+ * 「計画を編集」。オーバーレイを**閉じてから**タブを開く（開いたままにしない）。タブで保存すると提案が
  * 書き換わり、この一覧はダイジェストが変わってもう承認できないので、承認はタブを保存したあとに開き直す
  */
 function editWorkflow(state: ApprovalState, ticket: string): ApprovalStep {
@@ -513,7 +513,7 @@ function editWorkflow(state: ApprovalState, ticket: string): ApprovalStep {
 
 /**
  * 承認を打つ直前の確かめ（`board-panel.ts` が `approve` のやることを行う前に呼ぶ）。打つ識別子のうち、
- * ワークフロー編集タブに未保存の変更がある親（識別子の順）。空でなければ打たない。遷移が「押した時点」で見た
+ * 計画編集タブに未保存の変更がある親（識別子の順）。空でなければ打たない。遷移が「押した時点」で見た
  * あとに未保存になったものを、ここで拾う。子の識別子は親のタブと取り違えない（識別子が違う）
  */
 export function blockedBeforeApprove(tickets: readonly string[], unsaved: readonly string[]): string[] {

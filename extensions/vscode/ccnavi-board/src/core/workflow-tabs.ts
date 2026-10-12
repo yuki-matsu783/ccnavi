@@ -1,5 +1,5 @@
 /**
- * ワークフロー編集タブの帳面。タブ（`workflow-panel.ts`）が書き、ボード（`board-panel.ts`）が読む。
+ * 計画編集タブの帳面。タブ（`workflow-panel.ts`）が書き、ボード（`board-panel.ts`）が読む。
  *
  * 画面どうしは互いを import しない（`screens.ts`）ので、ボードの承認がタブの様子を知る道はここだけにする。
  * 持つのは 2 つ。

@@ -54,7 +54,7 @@ export function approveArgs(
 }
 
 /**
- * `--plan-order <親> --json [--order <JSON>]`。ワークフロー編集タブが計画の図を読む（何も書かない）。
+ * `--plan-order <親> --json [--order <JSON>]`。計画編集タブが計画の図を読む（何も書かない）。
  * `order` は元の番号（いま提案に書いてある番号）での直接の先行で、線を変えたときだけ付ける（空なら提案のまま）。
  * 番号の振り直しと順序の検査は実行ファイルが答える
  */
@@ -64,7 +64,7 @@ export function planOrderArgs(parent: string, order?: Readonly<Record<string, un
 }
 
 /**
- * `--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`。ワークフロー編集タブの保存。
+ * `--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`。計画編集タブの保存。
  * `expect` は開いたときの `source_sha`。親か子の提案が外で変わっていれば、実行ファイルは何も書かない。
  * `--write` は `--order` を求めるので、空でも付ける
  */

@@ -60,7 +60,7 @@
       },
       {
         "command": "ccnaviBoard.openWorkflow",
-        "title": "ccnavi ボード: ワークフロー編集を開く"
+        "title": "ccnavi ボード: 計画編集を開く"
       },
       {
         "command": "ccnaviBoard.appearance",

@@ -1,5 +1,5 @@
 /**
- * ワークフロー編集タブの Webview パネル。生成・更新・破棄、提案の監視、Webview からの操作の受け付け。
+ * 計画編集タブ（作業・レビュー計画の編集。旧称ワークフロー編集）の Webview パネル。生成・更新・破棄、提案の監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
  * 親の提案（承認待ちの置き場 `todo/` にある、計画を持つ親。新規と改版の両方）の計画の項どうしの先行（線）を
@@ -117,19 +117,19 @@ function binSetting(): string {
 export async function openWorkflow(ticket: unknown): Promise<void> {
   const parent = workflowTicketOf(ticket);
   if (parent === undefined) {
-    void vscode.window.showWarningMessage("ワークフロー編集タブを開く親の識別子が渡されていません（ボードの親の提案から開きます）");
+    void vscode.window.showWarningMessage("計画編集タブを開く親の識別子が渡されていません（ボードの親の提案から開きます）");
     return;
   }
   await openWorkflowPanel(parent, undefined);
 }
 
 async function openWorkflowPanel(ticket: string, restore: Restore | undefined): Promise<void> {
-  if (!requireTickets("ワークフロー編集タブ")) {
+  if (!requireTickets("計画編集タブ")) {
     return;
   }
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、ワークフロー編集タブを表示できません");
+    vscode.window.showInformationMessage("ワークスペースが開かれていないため、計画編集タブを表示できません");
     return;
   }
   const open = panels.get(ticket);
@@ -137,7 +137,7 @@ async function openWorkflowPanel(ticket: string, restore: Restore | undefined): 
     open.panel.reveal(open.panel.viewColumn);
     if (restore !== undefined) {
       // 既に開いている画面の編集を何も言わずに差し替えない
-      void vscode.window.showWarningMessage(`${ticket} のワークフロー編集タブは既に開いているため、閉じる前の編集を戻せませんでした。`);
+      void vscode.window.showWarningMessage(`${ticket} の計画編集タブは既に開いているため、閉じる前の編集を戻せませんでした。`);
     }
     return;
   }
@@ -145,7 +145,7 @@ async function openWorkflowPanel(ticket: string, restore: Restore | undefined): 
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
-    vscode.window.showErrorMessage(`ワークフロー編集タブを表示できません: ${error instanceof Error ? error.message : String(error)}`);
+    vscode.window.showErrorMessage(`計画編集タブを表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
   const panel = vscode.window.createWebviewPanel("ccnaviWorkflow", workflowTitle(ticket), vscode.ViewColumn.One, {
@@ -155,7 +155,7 @@ async function openWorkflowPanel(ticket: string, restore: Restore | undefined): 
     // 線の引き直しの途中を持つので、タブを裏に回しても捨てない
     retainContextWhenHidden: true,
   });
-  showLoading(panel, workflowTitle(ticket), SCREEN, `${ticket} のワークフロー`);
+  showLoading(panel, workflowTitle(ticket), SCREEN, `${ticket} の計画編集`);
   const current: PanelState = {
     ticket,
     panel,
@@ -246,7 +246,7 @@ function askRestore(current: PanelState): void {
   const back = "開き直して戻す";
   void vscode.window
     .showWarningMessage(
-      `${current.ticket} のワークフロー（計画の順序）を未保存のまま閉じました。編集を戻しますか？`,
+      `${current.ticket} の作業・レビュー計画の順序を未保存のまま閉じました。編集を戻しますか？`,
       { modal: true, detail: "「破棄する」を選ぶと、閉じる前の編集は残りません。提案が閉じた後に変わっていれば、戻せません。" },
       back,
       "破棄する",
@@ -345,7 +345,7 @@ function redraw(current: PanelState): void {
     showError(current, current.error);
     return;
   }
-  current.host.send({ kind: "loading", text: loadingText(`${current.ticket} のワークフロー`) });
+  current.host.send({ kind: "loading", text: loadingText(`${current.ticket} の計画編集`) });
 }
 
 function workflowHost(panel: vscode.WebviewPanel, rootPath: string): ScreenHost<WorkflowData> {
@@ -504,7 +504,7 @@ async function save(current: PanelState, order: PlanOrder, expect: string): Prom
   const result = await runPlanOrderWrite(root(current), binSetting(), current.ticket, order, expect);
   current.saving = false;
   current.wroteAt = Date.now();
-  log.info("ワークフローの保存", { screen: SCREEN, ticket: current.ticket, result: result.kind });
+  log.info("計画編集の保存", { screen: SCREEN, ticket: current.ticket, result: result.kind });
   // 書けたら、タブを閉じていても書いたあとのハッシュを覚える（保存を押してすぐ閉じても、承認の注意が効く）
   const sha = savedShaOf(result);
   if (sha !== undefined) {
@@ -544,7 +544,7 @@ async function save(current: PanelState, order: PlanOrder, expect: string): Prom
       return;
     case "error":
       current.wroteAt = 0;
-      log.error("ワークフローの保存に失敗", { screen: SCREEN });
+      log.error("計画編集の保存に失敗", { screen: SCREEN });
       fail(current, result.error);
       return;
     default: {

@@ -8,7 +8,7 @@
  * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--agree --preview --json`（承認待ちの一覧を見る）、
  * `--agree --yes … --json`（見せた一覧を承認する。ユーザがオーバーレイで押したときだけ）、
  * `--suggest --json`（記録からルールの候補を起こす。ルール管理画面が読む。記録を読むので `--log ""` は付けない）、
- * `--plan-order <親> --json [--order <JSON>]`（親の提案の計画の順序を振り直した答え。ワークフロー編集タブが読む）と
+ * `--plan-order <親> --json [--order <JSON>]`（親の提案の計画の順序を振り直した答え。計画編集タブが読む）と
  * `--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`（その保存。提案を書き換えるのは実行ファイル）。
  * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
  * 判定と検証はルールファイルを差し替えられる。
@@ -599,14 +599,14 @@ export async function runC1Target(root: string, setting: string, parent: string)
   return ran.code === 0 ? c1TargetOf(ran.stdout) : "";
 }
 
-/** ワークフロー編集タブの 2 本が求めるフラグ。知らない古い実行ファイルは、確かめられないとして失敗にする */
+/** 計画編集タブの 2 本が求めるフラグ。知らない古い実行ファイルは、確かめられないとして失敗にする */
 const PLAN_ORDER_FLAGS = ["--plan-order", "--order", "--expect", "--write"] as const;
 
 /**
  * 実行ファイルが `--plan-order` を知っているかを聞く（`--version --json`）。知っていれば undefined、知らなければ理由。
- * ワークフロー編集タブは読み込むたびに 1 回聞く（線を変えるたびには聞かない。往復が倍になるため）
+ * 計画編集タブは読み込むたびに 1 回聞く（線を変えるたびには聞かない。往復が倍になるため）
  */
-export async function checkPlanOrder(root: string, setting: string, what = "ワークフロー編集タブ"): Promise<string | undefined> {
+export async function checkPlanOrder(root: string, setting: string, what = "計画編集タブ"): Promise<string | undefined> {
   const probe = await probeVersion(root, setting);
   if (probe === undefined) {
     return NOT_FOUND;
@@ -639,7 +639,7 @@ export async function runPlanOrder(root: string, setting: string, parent: string
 }
 
 /**
- * ワークフロー編集タブの保存（`--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`）。
+ * 計画編集タブの保存（`--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`）。
  * 書くのは実行ファイルで、拡張はファイルを書かない。`expect` は開いたときの `source_sha` で、親か子の提案が外で
  * 変わっていれば実行ファイルは何も書かない（答えの `source_sha` が今の値になるので `changed` にする）。
  * 書かなかった理由は実行ファイルの標準エラーの文のまま返す
