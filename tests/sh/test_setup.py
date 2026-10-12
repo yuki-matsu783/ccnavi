@@ -22,6 +22,10 @@ import unittest
 from tests import ROOT
 
 SCRIPT = os.path.join(ROOT, "scripts", "ccnavi-setup.sh")
+# ユーザがコピーするまで `scripts/` に入らない版（共通のテンプレートを配る）。
+# 共通のテンプレートを配るテストは、この版があればこれで走らせる。コピーしたあと（この版が
+# 無くなったあと）は `SCRIPT` が同じ中身になるので、コピーの前後どちらでも通る。
+STAGED_SCRIPT = os.path.join(ROOT, "wip", "design", "scripts", "ccnavi-setup.sh")
 
 
 def _launcher_source():
@@ -146,6 +150,8 @@ DOCS_PARTS = (".ccnavi", "docs")
 # セッションの開始で渡す作業の決まり。
 CCNAVI_MD_PARTS = (".ccnavi", "CCNAVI.md")
 DEPLOY_DOCS = ("worktree.md", "frontmatter.md")
+# 共通の作業・レビュー計画のテンプレート。配布元の templates/*.yml を全部配る。
+TEMPLATES_PARTS = (".ccnavi", "config", "common", "templates")
 LAUNCHER_PARTS = (".ccnavi", "scripts", LAUNCHER_NAME)
 # CCNAVI_BIN_PATH に書くパス。固定。
 BIN_PATH = "/".join(LAUNCHER_PARTS)
@@ -1081,7 +1087,15 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     プロジェクトの中に実体を置く経路がこのスクリプトに要る。
     """
 
-    def make_source(self, built=True, parts=True, target=THIS_MACHINE, launcher=True, docs=True):
+    def make_source(
+        self,
+        built=True,
+        parts=True,
+        target=THIS_MACHINE,
+        launcher=True,
+        docs=True,
+        templates=None,
+    ):
         """配布元のふりをするディレクトリを作る。
 
         実物を組み立てない。PyInstaller に 11 秒かかるし、ここで見たいのは
@@ -1092,6 +1106,9 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
         launcher が偽なら、.ccnavi/scripts/ccnavi-launcher.sh だけを置かない。
         docs が偽なら、使い方の文書の置き場（.ccnavi/docs/）を置かない。
+
+        templates は {ファイル名: 中身}。渡せば共通のテンプレートの置き場に置く
+        （空の dict なら、置き場だけ作る）。渡さなければ置き場も作らない。
         """
         src = tempfile.mkdtemp(prefix="ccnavi-source-")
         self.addCleanup(shutil.rmtree, src, ignore_errors=True)
@@ -1143,6 +1160,13 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 for name in DEPLOY_DOCS:
                     with open(os.path.join(src, *DOCS_PARTS, name), "w", encoding="utf-8") as f:
                         f.write(f"# {name}\n")
+            if templates is not None:
+                os.makedirs(os.path.join(src, *TEMPLATES_PARTS))
+                for name, text in templates.items():
+                    with open(
+                        os.path.join(src, *TEMPLATES_PARTS, name), "w", encoding="utf-8"
+                    ) as f:
+                        f.write(text)
             if launcher:
                 # 振り分けの sh は実物をコピーし、代わりに通る sh と同じ置き場に置く。配布先で
                 # 中身が同じであることを見るため。モードは外して置く。配布元の置き方に
@@ -1257,6 +1281,98 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         absent = section(result.stdout, "配布元に無くて配れないもの")
         self.assertTrue(names(absent, ".ccnavi/docs/"), result.stdout)
+
+    # ---- 共通の作業・レビュー計画のテンプレート
+
+    def staged_setup(self):
+        """共通のテンプレートを配る版。コピーする前は `wip/design/scripts/`、あとは `scripts/`。"""
+        return STAGED_SCRIPT if os.path.isfile(STAGED_SCRIPT) else SCRIPT
+
+    def run_staged(self, target, *args):
+        return subprocess.run(
+            [SHELL, self.staged_setup(), target, *args],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=clean_env(),
+        )
+
+    def listing(self, base):
+        found = []
+        for parent, _, names in os.walk(base):
+            for name in names:
+                found.append(os.path.relpath(os.path.join(parent, name), base).replace(os.sep, "/"))
+        return sorted(found)
+
+    def test_deploys_the_common_templates_without_changing_them(self):
+        """配布元の共通のテンプレートを、配布先の同じ場所へ中身を変えずに配る。"""
+        templates = {"feature.yml": "name: feature\nplan: [design]\n", "fix.yml": "name: fix\n"}
+        src = self.make_source(templates=templates)
+        result = self.run_staged(self.dir, "--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for name, text in templates.items():
+            with open(self.deployed(*TEMPLATES_PARTS, name), encoding="utf-8") as f:
+                self.assertEqual(f.read(), text, name)
+            self.assertTrue(
+                names(section(result.stdout, "配った"), ".ccnavi/config/common/templates/" + name)
+            )
+        self.assertNotIn("まだ無いもの", result.stdout)
+
+    def test_only_yml_files_of_the_templates_place_are_deployed(self):
+        """`.yml` でないもの、`.` で始まるものは配らない（読まれないため）。"""
+        src = self.make_source(
+            templates={"feature.yml": "name: feature\n", "notes.txt": "x\n", ".hidden.yml": "x\n"}
+        )
+        result = self.run_staged(self.dir, "--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(os.listdir(self.deployed(*TEMPLATES_PARTS)), ["feature.yml"])
+
+    def test_keeps_a_common_template_the_project_already_has_unless_forced(self):
+        """配布先に既にあるテンプレートは入れ替えない。入れ替えるのは --force のときだけ。"""
+        src = self.make_source(templates={"feature.yml": "name: feature\n"})
+        os.makedirs(self.deployed(*TEMPLATES_PARTS))
+        with open(self.deployed(*TEMPLATES_PARTS, "feature.yml"), "w", encoding="utf-8") as f:
+            f.write("name: feature\ndescription: このプロジェクトで直した\n")
+        self.run_staged(self.dir, "--deploy", src)
+        with open(self.deployed(*TEMPLATES_PARTS, "feature.yml"), encoding="utf-8") as f:
+            self.assertIn("このプロジェクトで直した", f.read())
+        self.run_staged(self.dir, "--deploy", src, "--force")
+        with open(self.deployed(*TEMPLATES_PARTS, "feature.yml"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "name: feature\n")
+
+    def test_a_source_without_templates_deploys_exactly_what_it_did_before(self):
+        """配布元に共通のテンプレートが無ければ（置き場が無い・空）、何も足さず何も言わない。
+
+        配られるファイルも標準出力も、テンプレートを知らない版（`scripts/`）と同じ。
+        """
+        other = tempfile.mkdtemp(prefix="ccnavi-setup-")
+        self.addCleanup(shutil.rmtree, other, ignore_errors=True)
+        for templates in (None, {}):
+            with self.subTest(templates=templates):
+                src = self.make_source(templates=templates)
+                target = tempfile.mkdtemp(prefix="ccnavi-setup-")
+                self.addCleanup(shutil.rmtree, target, ignore_errors=True)
+                before = subprocess.run(
+                    [SHELL, SCRIPT, other, "--mode", "enable", "--deploy", src],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    env=clean_env(),
+                )
+                after = self.run_staged(target, "--mode", "enable", "--deploy", src)
+                self.assertEqual(after.returncode, before.returncode, after.stderr)
+                self.assertEqual(
+                    after.stdout.replace(target, "<T>"), before.stdout.replace(other, "<T>")
+                )
+                self.assertEqual(
+                    after.stderr.replace(target, "<T>"), before.stderr.replace(other, "<T>")
+                )
+                self.assertEqual(self.listing(target), self.listing(other))
+                self.assertFalse(os.path.exists(os.path.join(target, *TEMPLATES_PARTS)))
+                shutil.rmtree(other)
+                os.makedirs(other)
 
     def test_says_nothing_is_missing_after_it_copied(self):
         """配ったあとは「まだ無いもの」が出ない。
