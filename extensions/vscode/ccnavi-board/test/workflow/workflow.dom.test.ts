@@ -322,12 +322,15 @@ test("CB-D182 拡張ホストが頼んだらタブの案内を出し、最後ま
     assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
     await dom.send({ type: "tour" });
     await dom.settle();
-    // 計画のあるタブでは見本を出さない
-    assert.equal(dom.all(".tour-sample").length, 0);
+    // 計画のあるタブでも、案内の間は見本を出す（今の計画には触れない）
+    assert.equal(dom.all(".tour-sample").length, 1);
     assert.deepEqual(await walkTour(dom), ["図", "直す手段", "この順序に決める", "承認との関係", "案内"]);
     assert.equal(dom.all(".tour").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
+    // 「?」は案内の一覧を開き、基本の案内を選ぶと最初の段から始まる
     dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    dom.click(dom.one('[data-action="tour-course"][data-course="intro"]'));
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, "図");
     dom.key("Escape");
@@ -341,7 +344,7 @@ test("CB-D182 拡張ホストが頼んだらタブの案内を出し、最後ま
   }
 });
 
-test("CB-D183 図を出せない答え（計画が空）では、案内の間だけ見本の計画（実行ファイルの答えの実例）を読むだけで出し、閉じたら消す", async () => {
+test("CB-D183 図を出せない答え（計画が空）でも、案内の間は見本の計画（実行ファイルの答えの形）を描き、閉じたら実際の表示に戻る", async () => {
   const empty = { ...planOrderSample("open"), plans: [] };
   const dom = await openWorkflow({ answer: empty });
   try {
@@ -350,10 +353,10 @@ test("CB-D183 図を出せない答え（計画が空）では、案内の間だ
     await dom.settle();
     assert.equal(dom.all(".tour-sample").length, 1, "見本だと分かる帯が無い");
     assert.deepEqual(
-      dom.all(".plan-graph").map((graph) => [graph.getAttribute("data-part"), graph.getAttribute("data-editable")]),
+      dom.all(".plan-graph").map((graph) => [graph.getAttribute("data-part"), graph.getAttribute("data-ticket")]),
       [
-        ["plan", "0"],
-        ["feedback", "0"],
+        ["plan", "sample-a"],
+        ["feedback", "sample-a"],
       ],
     );
     assert.equal(dom.one("#tour-title").textContent, "図");
@@ -361,6 +364,7 @@ test("CB-D183 図を出せない答え（計画が空）では、案内の間だ
     dom.key("Escape");
     await dom.settle();
     assert.equal(dom.all(".plan-graph, .tour-sample").length, 0, "閉じたのに見本が残った");
+    assert.match(dom.one(".workflow-graphs").textContent ?? "", /計画（plan:）がありません/);
     assert.equal(dom.posted.filter((message) => message.type === "order" || message.type === "save" || message.type === "dirty").length, 0);
   } finally {
     await dom.close();

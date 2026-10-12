@@ -47,7 +47,7 @@ export function DecideBody({
         {count === 0 || preview.can_issue ? "" : " issue に回せるのは、フィードバック計画が承認されたあとです。"}
       </p>
       {count === 0 ? null : (
-        <ol className="decide-threads">
+        <ol className="decide-threads" data-tour="decide-threads">
           {preview.threads.map((t) => (
             <li key={t.key} className="decide-thread" data-key={t.key}>
               <div className="decide-where">
@@ -82,6 +82,7 @@ export function DecideBody({
           type="button"
           className="action primary"
           data-action="decide-confirm"
+          data-tour="decide-confirm"
           disabled={deciding || !done}
           onClick={() => post({ type: "decideConfirm", choices })}
         >

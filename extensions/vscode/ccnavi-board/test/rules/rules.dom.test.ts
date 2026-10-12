@@ -12,7 +12,8 @@ import type { RuleHitJson, TestJson } from "../../src/core/testmodel.js";
 import { openPage, openRules, page, rowSelector } from "../helpers/rules.js";
 import type { DomPage } from "../helpers/dom.js";
 import { sumsBoard } from "../helpers/sums.js";
-import type { HTMLButtonElement, HTMLInputElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
+import type { HTMLButtonElement, HTMLDetailsElement, HTMLInputElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
+import { loadTour } from "../helpers/tour.js";
 
 /** 直前に送った保存の中身 */
 function savedSections(dom: DomPage): Sections {
@@ -635,7 +636,7 @@ test("CB-D83 未保存の変更の有無は変わったときだけ拡張ホス�
   }
 });
 
-test("CB-D101 ルール管理の案内はタブを切り替えて中を指し、閉じたら始める前のタブに戻す。途中の切り替えは state に書かない", async () => {
+test("CB-D101 ルール管理の基本の案内は見本の上でタブを切り替えて中を指し、実際のタブは動かさない。途中の切り替えは state に書かない", async () => {
   const dom = await openRules({}, { tab: "hooks" });
   try {
     assert.ok(dom.one("#tab-hooks").classList.contains("active"));
@@ -652,10 +653,125 @@ test("CB-D101 ルール管理の案内はタブを切り替えて中を指し、
       await dom.settle();
     }
     assert.deepEqual(titles, ["3 つのタブ", "ルール", "絞り込み", "判定を試す", "hook", "保存", "案内"]);
-    assert.deepEqual(tabs, ["tab-rules", "tab-rules", "tab-rules", "tab-judge", "tab-hooks", "tab-hooks", "tab-hooks"]);
-    assert.ok(dom.one("#tab-hooks").classList.contains("active"), "始める前のタブに戻っていない");
+    // 案内は見本の上のタブを動かす。最後の 2 段は「ルール」のタブで保存と案内の入口を指す
+    assert.deepEqual(tabs, ["tab-rules", "tab-rules", "tab-rules", "tab-judge", "tab-hooks", "tab-rules", "tab-rules"]);
+    assert.ok(dom.one("#tab-hooks").classList.contains("active"), "実際のタブが動いた");
     assert.equal((dom.state() as { tab?: string }).tab, "hooks");
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D192 「?」は案内の一覧を開き、選んだ案内だけが始まる。基本の案内が先頭で、閉じたら tourDone を返す", async () => {
+  const dom = await openRules();
+  try {
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    const items = dom.all<HTMLButtonElement>('[data-action="tour-course"]');
+    assert.deepEqual(
+      items.map((item) => item.dataset.course),
+      loadTour("rules").courses.map((course) => course.id),
+    );
+    assert.equal(items[0].dataset.course, "intro");
+    assert.equal(dom.all(".tour").length, 0, "一覧を開いただけで案内が始まった");
+    dom.click(items[1]);
+    await dom.settle();
+    assert.equal(dom.all(".tour-menu").length, 0);
+    assert.equal(dom.all(".tour").length, 1);
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D193 使い方ごとの案内は、全部の段で指す先が画面にあり、実際のルールではなく見本を描く。実際の編集は動かない", async () => {
+  const def = loadTour("rules");
+  for (const course of def.courses) {
+    const dom = await openRules({}, undefined, { measure: true });
+    try {
+      dom.click(dom.one('[data-action="tour"]'));
+      await dom.settle();
+      dom.click(dom.one(`[data-action="tour-course"][data-course="${course.id}"]`));
+      await dom.settle();
+      for (const [index, step] of course.steps.entries()) {
+        await dom.settle();
+        const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
+        assert.equal(dom.one("#tour-title").textContent, step.title, at);
+        if (step.target !== "") {
+          assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面に無い`);
+          assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先が無い）`);
+        }
+        // 実際のルール（git-push の日本語メッセージの見本とは別の id）は出さず、見本の id が並ぶ
+        const ids = dom.all(".rule").map((row) => row.getAttribute("data-id"));
+        assert.ok(ids.includes("protect-env"), at);
+        assert.ok(!ids.includes("deps"), `${at}: 実際のルールが出ている`);
+        assert.ok(dom.all(".banner.tour-sample").length === 1, at);
+        dom.click(dom.one('[data-action="tour-next"]'));
+        await dom.settle();
+      }
+      assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の段で閉じない`);
+      assert.deepEqual(dom.all(".rule").map((row) => row.getAttribute("data-id")), ["git-push", "no-rm", "deps"], "閉じたあと実際のルールに戻らない");
+      assert.equal(dom.all("#dirty:not(.hidden)").length, 0, "案内が未保存にした");
+      assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), []);
+    } finally {
+      await dom.close();
+    }
+  }
+});
+
+test("CB-D194 組み合わせ条件の案内は、見本の行を開いて図を出し、段の scene が選ぶ点を替える", async () => {
+  const dom = await openRules({}, undefined, { measure: true });
+  try {
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    dom.click(dom.one('[data-action="tour-course"][data-course="combo-when"]'));
+    await dom.settle();
+    const open: string[] = [];
+    const picked: string[] = [];
+    const tabs: string[] = [];
+    while (dom.all(".tour").length > 0) {
+      await dom.settle();
+      open.push(String(dom.all(".rule.open").length));
+      picked.push(dom.all(".cond-inspector").map((el) => el.getAttribute("data-key") ?? "").join(","));
+      tabs.push(dom.one(".pane.active").id);
+      dom.click(dom.one('[data-action="tour-next"]'));
+      await dom.settle();
+    }
+    // 行を開く前（1 段目）は閉じていて、開いてからは図の点を段ごとに替える
+    assert.equal(open[0], "0");
+    assert.equal(open[1], "1");
+    assert.deepEqual(picked.slice(2, 5), ["r.0", "r.1.0", "r.1"]);
+    assert.ok(tabs.includes("tab-judge"), "判定を試すのタブに移らない");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D195 畳んだタイプがあっても、案内は見本の行を畳まずに指す。メニューから始めた案内を閉じると焦点は「?」へ戻る。メニューは Esc で閉じて「?」へ戻る", async () => {
+  const dom = await openRules({}, undefined, { measure: true });
+  try {
+    dom.click(dom.one('[data-action="fold-section"][data-section="deny"]'));
+    await dom.settle();
+    assert.ok(dom.one('[data-section="deny"]').classList.contains("folded"));
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    // Esc: 一覧が閉じ、焦点は「?」
+    dom.key("Escape");
+    await dom.settle();
+    assert.equal(dom.all(".tour-menu").length, 0);
+    assert.equal(dom.document.activeElement?.getAttribute("data-action"), "tour");
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    dom.click(dom.one('[data-action="tour-course"][data-course="combo-when"]'));
+    await dom.settle();
+    assert.equal(dom.one('[data-section="deny"]').classList.contains("folded"), false, "案内の間も畳んだままで、指す先が見えない");
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.document.activeElement?.getAttribute("data-action"), "tour", "閉じたあと焦点が「?」に戻らない");
+    assert.ok(dom.one('[data-section="deny"]').classList.contains("folded"), "閉じたあと畳み直らない");
   } finally {
     await dom.close();
   }
@@ -1097,6 +1213,248 @@ deny:
         { op: "glob", pattern: "*.key" },
       ],
     });
+  } finally {
+    await dom.close();
+  }
+});
+
+/** 案内が今いる段（0 始まり）。`startCourse` で 0 に戻し、`toStep` で進めたり戻したりする */
+const position = new WeakMap<DomPage, number>();
+
+/** 「?」の一覧から使い方ごとの案内を始める */
+async function startCourse(dom: DomPage, id: string): Promise<void> {
+  dom.click(dom.one('[data-action="tour"]'));
+  await dom.settle();
+  dom.click(dom.one(`[data-action="tour-course"][data-course="${id}"]`));
+  await dom.settle();
+  position.set(dom, 0);
+}
+
+/** 案内の n 段目（0 始まり）へ移る。吹き出しの題が、定義の段の題と同じであることも見る */
+async function toStep(dom: DomPage, id: string, index: number): Promise<void> {
+  const steps = loadTour("rules").courses.find((course) => course.id === id)!.steps;
+  let at = position.get(dom) ?? 0;
+  while (at !== index) {
+    dom.click(dom.one(at < index ? '[data-action="tour-next"]' : '[data-action="tour-back"]'));
+    await dom.settle();
+    at += at < index ? 1 : -1;
+  }
+  position.set(dom, at);
+  await dom.settle();
+  assert.equal(dom.one("#tour-title").textContent, steps[index].title);
+}
+
+test("CB-D300 ユースケースの一覧は、基本の案内の後ろに、足したユースケースが定義の順で並び、題と要約が出る", async () => {
+  const dom = await openRules();
+  try {
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    const items = dom.all<HTMLButtonElement>('[data-action="tour-course"]');
+    const courses = loadTour("rules").courses;
+    assert.ok(items.length >= 10);
+    for (const [i, course] of courses.entries()) {
+      assert.equal(items[i].dataset.course, course.id);
+      assert.ok(items[i].textContent?.includes(course.title), course.id);
+    }
+    for (const id of ["add-rule", "context-every", "check-expectations", "suggest-rule", "except-to-when", "read-sum", "find-fold-move", "save-error"]) {
+      assert.ok(items.some((item) => item.dataset.course === id), id);
+    }
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D301 案内の間の足し算は見本を出し、段の scene が枠を開いて足し算を替える。閉じたあとは実際の足し算に戻り、案内で選んだものを持ち越さない", async () => {
+  const sums = rulesSums(sumsBoard());
+  const dom = await openRules({ target: { kind: "project", name: "lib" }, sums }, undefined, { measure: true });
+  try {
+    assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "lib");
+    assert.equal(dom.one<HTMLDetailsElement>("#sum").open, false);
+    await startCourse(dom, "read-sum");
+    await toStep(dom, "read-sum", 0);
+    assert.equal(dom.one<HTMLDetailsElement>("#sum").open, true, "足し算の枠が開かない");
+    assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "web");
+    assert.deepEqual(
+      dom.all('#sum .sum-section[data-section="deny"] tbody tr').map((tr) => tr.querySelector("td")?.textContent),
+      ["git-push", "no-rm-rf", "web:no-prod-deploy"],
+    );
+    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "5 件（common + web）");
+    await toStep(dom, "read-sum", 4);
+    assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
+    assert.ok(dom.all('#sum .sum-section[data-section="deny"] tbody tr').some((tr) => tr.querySelector("td")?.textContent === "self:protect-secrets"));
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "lib", "閉じたあと案内で選んだ足し算が残る");
+    assert.equal(dom.one<HTMLDetailsElement>("#sum").open, false);
+    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3 件（common + lib）");
+    assert.deepEqual(dom.posted.filter((message) => message.type !== "ready" && message.type !== "tourDone"), []);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D302 絞り込みと畳みの案内は、scene の find で件数を「一致 / 全体」にし、fold で名指しのタイプだけを畳む。閉じたら元に戻る", async () => {
+  const dom = await openRules({}, undefined, { measure: true });
+  try {
+    await startCourse(dom, "find-fold-move");
+    await toStep(dom, "find-fold-move", 1);
+    assert.equal(dom.one<HTMLInputElement>("#find").value, "git");
+    assert.match(dom.one('[data-count="deny"]').textContent ?? "", /^1 \/ \d+/);
+    await toStep(dom, "find-fold-move", 2);
+    assert.equal(dom.one<HTMLInputElement>("#find").value, "");
+    assert.ok(dom.one('[data-section="allow"]').classList.contains("folded"));
+    assert.equal(dom.one('[data-section="deny"]').classList.contains("folded"), false);
+    assert.equal(dom.one('[data-section="ask"]').classList.contains("folded"), false);
+    // 次の段は畳まない（段ごとに全部を書き直す）
+    await toStep(dom, "find-fold-move", 3);
+    assert.equal(dom.all(".rule-section.folded").length, 0);
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.all(".rule-section.folded").length, 0, "案内が畳みを残した");
+    assert.equal(dom.one<HTMLInputElement>("#find").value, "");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D303 保存前の検証エラーの案内は、その段にだけ見本の報告を下の欄に出し、前後の段と閉じたあとには残さない。実際の操作の一言も出さない", async () => {
+  const dom = await openRules({}, undefined, { measure: true });
+  try {
+    await startCourse(dom, "save-error");
+    assert.equal(dom.one("#status").textContent, "");
+    await toStep(dom, "save-error", 1);
+    assert.match(dom.one("#status").textContent ?? "", /--lint が error を報告しました/);
+    assert.match(dom.one("#status").textContent ?? "", /error: db-migrate: ask に message がある/);
+    assert.ok(dom.one("footer").classList.contains("error"));
+    await toStep(dom, "save-error", 2);
+    assert.match(dom.one("#status").textContent ?? "", /error: db-migrate/, "検証エラーを読む段の続きで消えた");
+    await toStep(dom, "save-error", 4);
+    assert.equal(dom.one("#status").textContent, "", "エラーの段を過ぎても残っている");
+    assert.equal(dom.one("footer").classList.contains("error"), false);
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.one("#status").textContent, "");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D304 一括確認と候補の案内は、その段から結果を出す。食い違う行に印があり、閉じたあとは結果が残らない", async () => {
+  const dom = await openRules({}, undefined, { measure: true });
+  try {
+    await startCourse(dom, "check-expectations");
+    assert.equal(dom.all("#expectations-result").length, 0, "押す前に結果が出ている");
+    await toStep(dom, "check-expectations", 2);
+    assert.equal(dom.one(".pane.active").id, "tab-judge");
+    assert.match(dom.one('[data-tour="expectations-counts"]').textContent ?? "", /allow 1\/2/);
+    assert.match(dom.one('[data-tour="expectations-counts"]').textContent ?? "", /不一致 1 件/);
+    assert.equal(dom.all('[data-tour="expectation-ng"]').length, 1);
+    assert.match(dom.one('[data-tour="expectation-ng"]').textContent ?? "", /\.env\.example/);
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.all("#expectations-result").length, 0, "案内の結果が残った");
+
+    await startCourse(dom, "suggest-rule");
+    assert.equal(dom.all("#suggest-result").length, 0);
+    await toStep(dom, "suggest-rule", 1);
+    assert.equal(dom.all("#suggest-result .candidate").length, 2);
+    assert.equal(dom.all('[data-tour="suggest-candidate"]').length, 1);
+    assert.match(dom.one("#suggest-result").textContent ?? "", /expectations:/);
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.all("#suggest-result").length, 0, "案内の候補が残った");
+    assert.deepEqual(dom.posted.filter((message) => message.type !== "ready" && message.type !== "tourDone"), []);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D305 ルールの欄の案内は、scene の open と more で行と「コンテキストの追加」を開き、判定の結果は scene の judge で見本を出す", async () => {
+  const dom = await openRules({}, undefined, { measure: true });
+  try {
+    await startCourse(dom, "context-every");
+    await toStep(dom, "context-every", 0);
+    assert.equal(dom.all(".rule.open").length, 0);
+    assert.match(dom.one('[data-id="db-migrate"] .sum-every').textContent ?? "", /3 回ごと/);
+    await toStep(dom, "context-every", 1);
+    assert.deepEqual(dom.all(".rule.open").map((row) => row.getAttribute("data-id")), ["db-migrate"]);
+    assert.equal(dom.one<HTMLDetailsElement>('[data-id="db-migrate"] details.more').open, true);
+    assert.equal(dom.one<HTMLInputElement>('[data-id="db-migrate"] .f-every').value, "3");
+    assert.equal(dom.one('[data-tour="rule-db-migrate-every"]').tagName, "DIV");
+    await toStep(dom, "context-every", 4);
+    assert.deepEqual(dom.all(".rule.open").map((row) => row.getAttribute("data-id")), ["deps-change"]);
+    assert.equal(dom.all('[data-tour="rule-deps-change-once"]').length, 1);
+    await toStep(dom, "context-every", 6);
+    assert.equal(dom.one(".pane.active").id, "tab-judge");
+    assert.match(dom.one("#judge-result .response").textContent ?? "", /migrate でないかを確かめる/);
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.all("#judge-result").length, 0, "案内の判定が残った");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D306 案内の間は、ルールを足す・変換するなどの編集が効かない（行が増えず、未保存にならず、拡張ホストへ何も送らない）", async () => {
+  const dom = await openRules({}, undefined, { measure: true });
+  try {
+    await startCourse(dom, "add-rule");
+    await toStep(dom, "add-rule", 0);
+    const before = dom.all(".rule").length;
+    dom.click(dom.one('[data-tour="add-deny"]'));
+    await dom.settle();
+    assert.equal(dom.all(".rule").length, before, "案内の間にルールが足された");
+    dom.click(dom.one('[data-tour="add-deny"]'));
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.deepEqual(dom.all(".rule").map((row) => row.getAttribute("data-id")), ["git-push", "no-rm", "deps"]);
+
+    await startCourse(dom, "except-to-when");
+    await toStep(dom, "except-to-when", 2);
+    const toWhen = dom.one<HTMLButtonElement>('[data-tour="rule-protect-secrets-to-when"]');
+    assert.equal(toWhen.disabled, false);
+    dom.click(toWhen);
+    await dom.settle();
+    assert.equal(dom.all('[data-id="protect-secrets"] [data-action="to-when"]').length, 1, "案内の間に組み合わせ条件へ変換された");
+    assert.match(dom.one('[data-tour="rule-protect-secrets-except"]').textContent ?? "", /glob: \*\*\/secrets\/README\.md/);
+    assert.equal(dom.all("#dirty:not(.hidden)").length, 0);
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), []);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D320 案内の間は、案内の外の操作（開く・選ぶ・読み直す・判定・タブ・畳み・追加）が拡張ホストへも実際の state へも届かない", async () => {
+  const dom = await openRules();
+  try {
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 1);
+    // 案内の覆いは押せないので、ボタンへ直にクリックを流して送信口とハンドラの守りを見る
+    const selectors = [
+      '[data-action="open-rules"]',
+      '[data-action="reload"]',
+      '[data-action="expectations"]',
+      '[data-action="suggest"]',
+      '[data-action="judge"]',
+      '[data-action="fold-section"]',
+      '[data-action="add"]',
+      '[data-tab="hooks"]',
+    ];
+    for (const selector of selectors) {
+      for (const el of dom.all(selector)) {
+        dom.click(el);
+      }
+    }
+    await dom.settle();
+    assert.deepEqual(
+      dom.posted.filter((message) => message.type !== "ready"),
+      [],
+      "案内の間に拡張ホストへ送った",
+    );
+    assert.equal((dom.state() as { tab?: string } | undefined)?.tab, undefined, "案内の間に実際のタブを書いた");
   } finally {
     await dom.close();
   }

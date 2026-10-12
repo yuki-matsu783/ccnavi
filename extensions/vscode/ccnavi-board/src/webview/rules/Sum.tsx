@@ -14,23 +14,28 @@ export interface SumProps {
   readonly sums: readonly RulesSum[];
   /** 最初に見せる足し算の名前 */
   readonly initial: string;
+  /**
+   * 案内の間の様子。あれば、枠を開くか（`open`）と選ぶ足し算（`picked`）は画面の中の選びではなくこれに従う。
+   * 案内の間の見本は鍵を替えて別に作るので、閉じたあとの実際の枠には持ち越さない
+   */
+  readonly tour?: { readonly open: boolean; readonly picked: string };
 }
 
-export function Sum({ sums, initial }: SumProps): JSX.Element | null {
+export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
   const [picked, setPicked] = useState(initial);
   if (sums.length === 0) {
     return null;
   }
-  const sum = sums.find((s) => s.name === picked) ?? sums[0];
+  const sum = sums.find((s) => s.name === (tour === undefined ? picked : tour.picked)) ?? sums[0];
   const total = SECTIONS.reduce((n, section) => n + sum[section].length, 0);
   return (
-    <details className="sum" id="sum">
+    <details className="sum" id="sum" data-tour="sum" open={tour === undefined ? undefined : tour.open}>
       <summary>足し算（読み取り専用。共通の設定 + 1 つの設定の和）</summary>
       <p className="hint">
         判定に効くルールは、共通の設定と、その設定のルールの和です。ここは実行ファイルが出した結果をそのまま見せるだけで、直すときは画面上部の「設定」の欄で編集する 1 本に切り替えます。保存済みの内容の和で、編集中の内容は含みません。
         パスを持たないツール（Bash など）が当てるのは、全プロジェクトの設定を足した和ではありません。
       </p>
-      <label className="sum-pick">
+      <label className="sum-pick" data-tour="sum-pick">
         足し算{" "}
         <select id="sum-select" value={sum.name} onChange={(event) => setPicked(event.target.value)}>
           {sums.map((s) => (
@@ -44,11 +49,11 @@ export function Sum({ sums, initial }: SumProps): JSX.Element | null {
         <div className="banner warn">実行ファイルは {sum.path} を読めず、その設定を空として扱っています（共通の設定のルールだけが効いています）: {sum.unreadable}</div>
       )}
       {sum.missing && sum.unreadable === "" && <p className="hint">{sum.path} は無いので、共通の設定のルールだけの和です（無いのは「設定が無い」正常な状態です）。</p>}
-      <p className="count" data-count="sum">
+      <p className="count" data-count="sum" data-tour="sum-count">
         {total} 件（{sum.layers.join(" + ")}）
       </p>
       {SECTIONS.map((section) => (
-        <section className="sum-section" data-section={section} key={section}>
+        <section className="sum-section" data-section={section} data-tour={`sum-${section}`} key={section}>
           <h3>
             <span className={`section-name ${section}`}>{section}</span> <span className="section-label">{SECTION_LABELS[section]}</span>{" "}
             <span className="count">{sum[section].length} 件</span>

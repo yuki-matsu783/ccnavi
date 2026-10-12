@@ -44,12 +44,16 @@ export interface RuleProps {
   /** 「コンテキストの追加」の開閉。最初は値の有無で決め、以後はユーザの操作を覚える */
   readonly moreOpen: boolean;
   readonly onToggleMore: (open: boolean) => void;
+  /** 案内が指定する、組み合わせ条件の図で選ぶ点（`pathKey`）。普段は渡さない */
+  readonly pickNode?: string;
 }
 
 export function Rule(props: RuleProps): JSX.Element {
   const { rule, section } = props;
   // glob と regex の併記や、except が組み合わせ条件へそのまま移せない形なら、「組み合わせ条件に変換」を押させずに理由を出す
   const blocker = toWhenBlocker(rule);
+  /** 案内が指す先（`data-tour`）。id 未設定の行には付けない（行ごとに名前を分けるので、別の行の欄を指さない） */
+  const tour = (name: string): string | undefined => (rule.id === "" ? undefined : `rule-${rule.id}-${name}`);
 
   const text = (name: TextKey, className: string, placeholder: string): JSX.Element => (
     <input
@@ -66,7 +70,7 @@ export function Rule(props: RuleProps): JSX.Element {
   );
   /** 手で書くほかに、VS Code のダイアログでも選べる欄。選んだ結果は拡張ホストが `picked` で返す */
   const file = (name: FileField, label: string, className: string, placeholder: string): JSX.Element => (
-    <Captioned name={label} yamlKey={name}>
+    <Captioned name={label} yamlKey={name} tour={tour(name === "additionalContextFile" ? "file" : "once-file")}>
       <div className="with-button">
         {text(name, className, placeholder)}
         <button type="button" className="action small" title="ファイルを選ぶ" onClick={() => props.onPickFile(name)}>
@@ -88,7 +92,7 @@ export function Rule(props: RuleProps): JSX.Element {
   }
 
   return (
-    <li className={classes.join(" ")} data-key={props.ruleKey} data-id={rule.id} data-find={props.find}>
+    <li className={classes.join(" ")} data-key={props.ruleKey} data-id={rule.id} data-find={props.find} data-tour={rule.id === "" ? undefined : `rule-${rule.id}`}>
       <div
         className="row-head"
         onClick={() => {
@@ -143,12 +147,12 @@ export function Rule(props: RuleProps): JSX.Element {
         <Captioned name="id" yamlKey="id">
           {text("id", "f-id narrow", "git-push")}
         </Captioned>
-        <Captioned name="ツール" yamlKey="match">
+        <Captioned name="ツール" yamlKey="match" tour={tour("match")}>
           <Picker rule={rule} open={props.pickerOpen} onOpen={props.onOpenPicker} onChange={props.onChange}>
             {text("match", "f-match", "Bash / Write|Edit")}
           </Picker>
         </Captioned>
-        <Captioned name="タイプ" yamlKey="deny / ask / allow">
+        <Captioned name="タイプ" yamlKey="deny / ask / allow" tour={tour("type")}>
           <select className="f-section" value={section} onChange={(event) => props.onMoveSection(event.target.value as Section)}>
             {SECTIONS.map((name) => (
               <option key={name} value={name}>
@@ -158,12 +162,12 @@ export function Rule(props: RuleProps): JSX.Element {
           </select>
         </Captioned>
         {rule.when !== undefined ? (
-          <Captioned name="組み合わせ条件" yamlKey="when">
+          <Captioned name="組み合わせ条件" yamlKey="when" tour={tour("pattern")}>
             {/* 開いた行にだけ図を置く（畳んだ行の分まで React Flow を立ち上げない） */}
-            {props.open ? <When tree={rule.when} onChange={(when) => props.onChange({ ...rule, when })} /> : <span />}
+            {props.open ? <When tree={rule.when} pick={props.pickNode} onChange={(when) => props.onChange({ ...rule, when })} /> : <span />}
           </Captioned>
         ) : (
-          <Captioned name="パターン" yamlKey="glob / regex">
+          <Captioned name="パターン" yamlKey="glob / regex" tour={tour("pattern")}>
             <div className="inline">
               <select className="f-kind" value={rule.kind} onChange={(event) => props.onChange({ ...rule, kind: event.target.value as PatternKind })}>
                 <option value="glob">glob</option>
@@ -174,6 +178,7 @@ export function Rule(props: RuleProps): JSX.Element {
                 type="button"
                 className="action small"
                 data-action="to-when"
+                data-tour={tour("to-when")}
                 disabled={blocker !== undefined}
                 title={blocker ?? "このパターン（と除外）を、同じ意味の組み合わせ条件（when）に書き直す。除外は not の中へ移る"}
                 onClick={() => props.onChange(toWhen(rule))}
@@ -185,7 +190,7 @@ export function Rule(props: RuleProps): JSX.Element {
         )}
         {/* 除くもの（except）は見せるだけ。書き戻しは元のノードのままなので、消えも変わりもしない */}
         {rule.excepts !== undefined && rule.excepts.length > 0 && (
-          <Captioned name="除外" yamlKey="except">
+          <Captioned name="除外" yamlKey="except" tour={tour("except")}>
             <div className="f-except">
               {rule.excepts.map((item, i) => (
                 <div key={i}>
@@ -200,7 +205,7 @@ export function Rule(props: RuleProps): JSX.Element {
           </Captioned>
         )}
         {section === "deny" ? (
-          <Captioned name="メッセージ" yamlKey="message">
+          <Captioned name="メッセージ" yamlKey="message" tour={tour("message")}>
             {area("message", "f-message", "なぜ拒否するかと、代わりに何をすればよいか（拒否されたモデルに届く）")}
           </Captioned>
         ) : (
@@ -215,7 +220,7 @@ export function Rule(props: RuleProps): JSX.Element {
           )
         )}
         {/* コンテキストの 4 欄は出番が少ないので見出し 1 行に折りたたむ。値があるルールだけ最初から開く */}
-        <details className="more" open={props.moreOpen} onToggle={(event) => props.onToggleMore(event.currentTarget.open)}>
+        <details className="more" data-tour={tour("context")} open={props.moreOpen} onToggle={(event) => props.onToggleMore(event.currentTarget.open)}>
           <summary>
             <b>コンテキストの追加</b>
             {contextSummary(rule)}
@@ -224,20 +229,20 @@ export function Rule(props: RuleProps): JSX.Element {
             {/* 刻みは渡す文の前。ここから下の 4 欄が「何回に 1 度届くか」を決める欄なので、先に置く。
                 type は text（number ではない）。数でない値を空にしてしまうと、読めない値を
                 見せて直させるという欄の目的が消える */}
-            <Captioned name="every" yamlKey="every">
+            <Captioned name="every" yamlKey="every" tour={tour("every")}>
               {text("every", "f-every", "5（空なら毎回渡す）")}
             </Captioned>
-            <Captioned name="additionalContext" yamlKey="additionalContext">
+            <Captioned name="additionalContext" yamlKey="additionalContext" tour={tour("text")}>
               {area("additionalContext", "f-context", "ヒットしたときにモデルへ渡すプロンプト")}
             </Captioned>
             {file("additionalContextFile", "additionalContextFile", "f-context-file", "ヒットしたときにモデルへ渡すファイル（先頭 4000 文字まで）")}
-            <Captioned name="additionalContextOnce" yamlKey="additionalContextOnce">
+            <Captioned name="additionalContextOnce" yamlKey="additionalContextOnce" tour={tour("once")}>
               {area("additionalContextOnce", "f-once", "セッションで最初にヒットしたときだけモデルへ渡すプロンプト")}
             </Captioned>
             {file("additionalContextOnceFile", "additionalContextOnceFile", "f-once-file", "セッションで最初にヒットしたときだけモデルへ渡すファイル（先頭 4000 文字まで）")}
           </div>
         </details>
-        <span className="buttons">
+        <span className="buttons" data-tour={tour("buttons")}>
           <button type="button" className="action small" title="上へ" onClick={() => props.onMove(-1)}>
             ↑
           </button>
@@ -352,10 +357,10 @@ function Picker({
   );
 }
 
-/** 欄名を左に置く。YAML のキー名は欄名のツールチップに載せる */
-function Captioned({ name, yamlKey, children }: { readonly name: string; readonly yamlKey?: string; readonly children: ReactNode }): JSX.Element {
+/** 欄名を左に置く。YAML のキー名は欄名のツールチップに載せる。`tour` は案内が指す先の名前 */
+function Captioned({ name, yamlKey, tour, children }: { readonly name: string; readonly yamlKey?: string; readonly tour?: string; readonly children: ReactNode }): JSX.Element {
   return (
-    <div className="field">
+    <div className="field" data-tour={tour}>
       <span className="cap" title={yamlKey === undefined ? undefined : `YAML のキー: ${yamlKey}`}>
         {name}
       </span>

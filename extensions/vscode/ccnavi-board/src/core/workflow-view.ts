@@ -22,7 +22,7 @@
  */
 import type { AppearanceMessage } from "./appearance.js";
 import type { ApprovePlan } from "./approvemodel.js";
-import type { PlanOrder, PlanOrderAnswer, PlanOrderWrite } from "./planordermodel.js";
+import type { PlanOrder, PlanOrderAnswer, PlanOrderRefusal, PlanOrderWrite } from "./planordermodel.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
 import { isTicketId } from "./ticket-id.js";
 
@@ -378,6 +378,14 @@ export function saveBlocker(answer: PlanOrderAnswer, state: SaveState): string {
     return "改版で通らない形（子が承認された番号を固定しているので、その番号の項は変えられない）のため、保存できません";
   }
   return "順序の検査に error があるため、保存できません";
+}
+
+/** 線を変えて、実行ファイルの答えを待つ間に出す一言 */
+export const CHECKING_TEXT = "線を変えた順序を ccnavi に確かめています…";
+
+/** 実行ファイルが断った線（`refused`）を言う一言。線は引く前の答えのまま、理由を実行ファイルの文で並べる */
+export function refusedText(refused: readonly PlanOrderRefusal[]): string {
+  return `この線は引けません。線は引く前のままです: ${refused.map((r) => r.text).join("、")}`;
 }
 
 /** 最初の中身を埋める `<script type="application/json">` の id */

@@ -16,20 +16,36 @@
  * **置き場所は動かさない。** 番号が振り直っても点の名札の番号だけが変わる。置き場所は振り直す前の番号で覚え
  * （`layoutOf`）、「並べ直す」で今の線から組み直す。
  *
- * **初回の案内**（`Tour.tsx`）は図が出てから始める。図を出せない答え（計画が空）では、案内の間だけ見本の計画
- * （`core/tour-sample.ts` の `sampleWorkflow`。実行ファイルの答えの実例）を読むだけで出す。
+ * **案内**（`Tour.tsx`）は図が出てから始める。案内の間は今の計画ではなく、案内用の見本（`tours/workflow.yml` の `sample:`。実行ファイルの
+ * 答えの形）を描く。見本は名前を付けた答えの束で、段の `scene` が描く答えを選ぶ。画面の state（実際の答え・未保存の線・置き場所・
+ * 保存の確かめ）と拡張ホストへの送信（線の頼み・保存・再読込）には触れない。案内の間は、線も保存も効かない。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 
 import { layoutOf, planGraphOf, type PlanLayout } from "../../core/plan-graph.js";
-import { SAMPLE_NOTE, sampleWorkflow } from "../../core/tour-sample.js";
+import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
+import { parseWorkflowSample } from "../../core/tour-workflow.js";
 import type { PlanOrder, PlanOrderAnswer } from "../../core/planordermodel.js";
-import { changedOrder, editedOrder, isDirty, planDiff, renumbered, saveBlocker, type WorkflowData, type WorkflowPage } from "../../core/workflow-view.js";
+import {
+  changedOrder,
+  CHECKING_TEXT,
+  editedOrder,
+  goneReasonOf,
+  isDirty,
+  planDiff,
+  refusedText,
+  renumbered,
+  saveBlocker,
+  type WorkflowData,
+  type WorkflowPage,
+} from "../../core/workflow-view.js";
 import { applyAppearance } from "../appearance.js";
-import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
+import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
 import { PlanGraph } from "../shared/PlanGraph.js";
+import workflowTour from "../tours/workflow.yml";
 import { post } from "./post.js";
 import { Review } from "./Review.js";
+import { useGraphMarks } from "./tour-marks.js";
 
 /** 未保存の線の写しを拡張ホストへ送るまでの間（線を変えるたびに送らない） */
 const DRAFT_MS = 300;
@@ -57,40 +73,28 @@ function partName(part: string): string {
   return part === "feedback" ? "フィードバック計画" : "全体計画";
 }
 
-/** タブの案内。画面の様子は動かさないので、閉じても戻すものは無い */
-const TOUR_STEPS: readonly TourStep[] = [
-  {
-    target: ".workflow-graphs",
-    title: "図",
-    body:
-      "点は親の計画の項で、線はどの項がどの項を待つか（after）です。項の右の点から別の項の左の点へドラッグすると、線の先の項が元の項を待ちます（逆向きでも引けます）。線の真ん中の × で待たなくなります。" +
-      "線を変えるたびに ccnavi が番号を振り直します。循環になる線と、子が承認された番号へ入る線は引けません。最後の項が待っていない項は注意の色で出ます。",
-  },
-  {
-    target: ".toolbar .controls",
-    title: "直す手段",
-    body: "「並べ直す」は今の線で点の置き場所を組み直します（番号は変わりません）。「案に戻す」は提案に書いてある順序に戻し、「再読込」は提案を読み直します。",
-  },
-  {
-    target: "#save",
-    title: "この順序に決める",
-    body:
-      "番号の変わる項と、付け替える子の提案を一覧で確かめてから、提案の計画（plan: / feedback:）と子の提案を書き換えます。承認はしません。書き換えた提案はコミットされません。" +
-      "エージェントが提案を書き直していたら、何も書かずに差分を出します。",
-  },
-  {
-    target: ".toolbar .summary",
-    title: "承認との関係",
-    body:
-      "未保存の変更があるあいだは、チケット管理画面でこの親を含む一覧を承認できません。保存したら、承認はチケット管理画面から開き直してください。" +
-      "保存したあとにエージェントが提案を書き換えると、承認の画面に注意が出ます。",
-  },
-  {
-    target: '[data-action="tour"]',
-    title: "案内",
-    body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
-  },
-];
+/**
+ * 案内（`tours/workflow.yml`）と、案内の間だけ描く見本。今の計画は使わず、画面が持つ実際の答え・未保存の線・置き場所にも触れない。
+ * 読み込み時に形を確かめる（壊れていればテストが先に落とす）。
+ */
+const TOUR = tourOf(workflowTour);
+const SAMPLE = parseWorkflowSample(TOUR.sample);
+const NO_SCENE: Scene = {};
+
+/** 見本の答えごとの点の置き場所。`base`（その答えを引く前の答え）の置き場所のままにする（実際の画面と同じ）。`tidy` は今の線から組み直した置き場所 */
+const SAMPLE_LAYOUTS: Readonly<Record<string, { readonly kept: Readonly<Record<string, PlanLayout>>; readonly tidy: Readonly<Record<string, PlanLayout>> }>> = Object.fromEntries(
+  Object.entries(SAMPLE.answers).map(([name, sample]) => [name, { kept: layoutsOf(SAMPLE.answers[sample.base].answer), tidy: layoutsOf(sample.answer) }]),
+);
+
+/** 段の `scene` が選ぶ答えの名前。無い・知らない名前は、開いたときの答え */
+function sampleName(value: Scene[string] | undefined, fallback = "open"): string {
+  return typeof value === "string" && value in SAMPLE.answers ? value : fallback;
+}
+
+/** 案内の間、図の部品へ何も頼まない（線を引く・消すは効かない） */
+function noop(): void {
+  // 案内の間は線を変えない
+}
 
 export function App({ initial }: { readonly initial: WorkflowData }): JSX.Element {
   const [data, setData] = useState<WorkflowData>(initial);
@@ -105,15 +109,33 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   const [gone, setGone] = useState<string | undefined>(undefined);
   const [review, setReview] = useState(false);
   const seq = useRef(0);
+  /**
+   * 案内の間は見本の答えを描き、段ごとの様子（描く答え・開く確かめ・選ぶ項など）は `scene` に入れる。
+   * 実際の答え・未保存の線・置き場所・確かめは動かさないので、閉じたあとに戻すものは無い
+   */
+  const [scene, setScene] = useState<Scene>(NO_SCENE);
   // 初回の案内は図が出てから始める。保存の確かめの最中は、その下を指しても見えないので待つ
-  const tour = useTour(data.kind === "page" && answer !== undefined && !review, { onEnd: () => post({ type: "tourDone" }) });
+  const tour = useTour(data.kind === "page" && answer !== undefined && !review, {
+    onStart: () => setScene(NO_SCENE),
+    onEnd: () => {
+      setScene(NO_SCENE);
+      post({ type: "tourDone" });
+    },
+  });
   const requestTour = tour.request;
+  const graphs = useRef<HTMLDivElement>(null);
+  const touring = tour.touring;
+  const shownName = sampleName(scene.answer);
+  const picked = typeof scene.pick === "number" ? scene.pick : undefined;
+  // 見本の図は、描く答え・並べ直した図か・選んだ項が変わるたびに作り直す（選んだ項や置き場所を前の段から持ち越さない）
+  const sceneKey = `${shownName}|${scene.tidy === true ? "tidy" : "kept"}|${picked ?? ""}`;
+  useGraphMarks(graphs, touring, picked, sceneKey);
 
   /** 線を変えた先行で答えを頼む。前の頼みへの答えは、届いても捨てる */
   const ask = useCallback((order: PlanOrder) => {
     seq.current += 1;
     setPending(true);
-    setStatus({ text: "線を変えた順序を ccnavi に確かめています…", error: false });
+    setStatus({ text: CHECKING_TEXT, error: false });
     post({ type: "order", seq: seq.current, order });
   }, []);
 
@@ -147,7 +169,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
         if (got === undefined) {
           setStatus({ text: `順序を確かめられませんでした。線は引く前のままです: ${String(message.error ?? "")}`, error: true });
         } else if (got.refused.length > 0) {
-          setStatus({ text: `この線は引けません。線は引く前のままです: ${got.refused.map((r) => r.text).join("、")}`, error: true });
+          setStatus({ text: refusedText(got.refused), error: true });
         } else {
           setAnswer(got);
           setStatus(undefined);
@@ -248,17 +270,40 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
     );
   }
   const page = data.page;
-  const editable = !pending && !busy && gone === undefined && !review;
-  const blocker = saveBlocker(answer, { pending, changed: changed !== undefined, gone: gone !== undefined });
-  const moved = renumbered(answer);
+
+  // 案内の間は、見本の答えと、段の様子（`scene`）が描くものを使う。実際の答え・待ち・帯・確かめは使わない
+  const sample = SAMPLE.answers[shownName];
+  const sampleBase = SAMPLE.answers[sample.base].answer;
+  const shownAnswer = touring ? sample.answer : answer;
+  const shownTicket = touring ? SAMPLE.ticket : page.ticket;
+  const shownPending = touring ? scene.checking === true : pending;
+  const shownBusy = touring ? false : busy;
+  const shownGone = touring ? (scene.gone === true ? goneReasonOf(SAMPLE.ticket, false, { proposal: null, approved: true }) : undefined) : gone;
+  const shownChanged = touring ? SAMPLE.answers[sampleName(scene.changed, "")]?.answer : changed;
+  const shownDiff = touring ? scene.diff !== false : showDiff;
+  const shownReview = touring ? scene.review === true : review;
+  const shownDirty = touring ? isDirty(sample.answer) : dirty;
+  const sceneRefused = touring && typeof scene.refused === "string" ? SAMPLE.answers[sampleName(scene.refused)]?.answer.refused : undefined;
+  const shownStatus: Status | undefined = touring
+    ? sceneRefused !== undefined
+      ? { text: refusedText(sceneRefused), error: true }
+      : scene.checking === true
+        ? { text: CHECKING_TEXT, error: false }
+        : undefined
+    : status;
+  const shownLayouts = touring ? SAMPLE_LAYOUTS[shownName][scene.tidy === true ? "tidy" : "kept"] : layouts;
+  const editable = !shownPending && !shownBusy && shownGone === undefined && !shownReview;
+  const blocker = saveBlocker(shownAnswer, { pending: shownPending, changed: shownChanged !== undefined, gone: shownGone !== undefined });
+  const moved = renumbered(shownAnswer);
   const notes = [
-    ...answer.revision_problems.map((text) => ({ text, kind: "revision" })),
-    ...answer.child_problems.map((text) => ({ text, kind: "child" })),
-    ...answer.mismatched.map((m) => ({ text: m.text, kind: "mismatched" })),
+    ...shownAnswer.revision_problems.map((text) => ({ text, kind: "revision" })),
+    ...shownAnswer.child_problems.map((text) => ({ text, kind: "child" })),
+    ...shownAnswer.mismatched.map((m) => ({ text: m.text, kind: "mismatched" })),
   ];
 
+  // 案内の間は、画面の state にも拡張ホストにも何も頼まない（押せるように見える部品も、ここで止める）
   const edit = (part: string, add: boolean) => (from: number, to: number): void => {
-    if (!editable) {
+    if (touring || !editable) {
       return;
     }
     const order = editedOrder(answer, { part, from, to, add });
@@ -268,6 +313,9 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   };
 
   const revert = (): void => {
+    if (touring) {
+      return;
+    }
     seq.current += 1;
     setPending(false);
     setAnswer(page.answer);
@@ -275,53 +323,81 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   };
 
   const relayout = (): void => {
+    if (touring) {
+      return;
+    }
     setLayouts(layoutsOf(answer));
     setFit((n) => n + 1);
   };
 
   const reload = (): void => {
+    if (touring) {
+      return;
+    }
     setBusy(true);
     setStatus(undefined);
     post({ type: "reload", dirty });
   };
 
   const confirmSave = (): void => {
+    if (touring) {
+      return;
+    }
     setReview(false);
     setBusy(true);
     setStatus({ text: "提案を書き換えています…", error: false });
     post({ type: "save", order: changedOrder(answer), expect: page.answer.source_sha });
   };
 
-  const rows = changed === undefined ? [] : planDiff(page.answer.plans, changed.plans);
-  // 案内の間、図を出せない答え（計画が空）なら見本の計画を読むだけで出す。見本は描くだけで、線の頼みにも保存にも使わない
-  const sample = tour.touring && answer.plans.length === 0 ? sampleWorkflow() : undefined;
+  const rows = shownChanged === undefined ? [] : planDiff((touring ? sampleBase : page.answer).plans, shownChanged.plans);
+  const courses = coursesOf(TOUR, setScene);
 
   return (
     <>
-      {gone !== undefined && (
-        <div id="gone" className="lock" role="status">
-          {gone}
+      {shownGone !== undefined && (
+        <div id="gone" className="lock" role="status" data-tour="gone">
+          {shownGone}
         </div>
       )}
-      {changed !== undefined && gone === undefined && (
-        <div id="changed" className="banner warn" role="status">
+      {shownChanged !== undefined && shownGone === undefined && (
+        <div id="changed" className="banner warn" role="status" data-tour="changed">
           <span className="workflow-banner-text">
-            {showDiff
+            {shownDiff
               ? "提案が外で変わりました（エージェントが書き換えた可能性があります）。下の差分を見て、取り込むか編集を続けるかを選んでください。"
               : "提案が外で変わったため、保存できません。「取り込む」で新しい提案から始めてください（いまの編集は捨てます）。"}
           </span>
-          <button type="button" className="action" data-action="adopt" disabled={busy} onClick={() => post({ type: "adopt" })}>
-            {dirty ? "取り込む（編集を捨てる）" : "取り込む"}
+          <button
+            type="button"
+            className="action"
+            data-action="adopt"
+            data-tour="adopt"
+            disabled={shownBusy}
+            onClick={() => {
+              if (!touring) {
+                post({ type: "adopt" });
+              }
+            }}
+          >
+            {shownDirty ? "取り込む（編集を捨てる）" : "取り込む"}
           </button>
-          {showDiff && (
-            <button type="button" className="action" data-action="keep-editing" onClick={() => setShowDiff(false)}>
+          {shownDiff && (
+            <button
+              type="button"
+              className="action"
+              data-action="keep-editing"
+              onClick={() => {
+                if (!touring) {
+                  setShowDiff(false);
+                }
+              }}
+            >
               編集を続ける（保存はできない）
             </button>
           )}
         </div>
       )}
-      {changed !== undefined && showDiff && gone === undefined && (
-        <section id="changed-diff">
+      {shownChanged !== undefined && shownDiff && shownGone === undefined && (
+        <section id="changed-diff" data-tour="changed-diff">
           {rows.length === 0 ? (
             <p className="dim small">計画の順序は同じです。子の提案か、親の提案のほかの欄が変わりました。</p>
           ) : (
@@ -349,22 +425,30 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
         </section>
       )}
       <header className="toolbar">
-        <div className="summary">
+        <div className="summary" data-tour="summary">
           <span className="workflow-ticket">
-            <strong>{page.ticket}</strong> のワークフロー（計画の順序）
+            <strong>{shownTicket}</strong> のワークフロー（計画の順序）
           </span>
-          <span id="dirty" className={dirty ? "dirty" : "dirty hidden"}>
+          <span id="dirty" data-tour="dirty" className={shownDirty ? "dirty" : "dirty hidden"}>
             未保存
           </span>
         </div>
-        <div className="controls">
-          <button type="button" className="action" data-action="relayout" title="今の線で点の置き場所を組み直します（番号は変わりません）" onClick={relayout}>
+        <div className="controls" data-tour="controls">
+          <button type="button" className="action" data-action="relayout" data-tour="relayout" title="今の線で点の置き場所を組み直します（番号は変わりません）" onClick={relayout}>
             並べ直す
           </button>
-          <button type="button" className="action" data-action="revert" disabled={!dirty || busy || gone !== undefined} title="提案に書いてある先行と番号に戻します" onClick={revert}>
+          <button
+            type="button"
+            className="action"
+            data-action="revert"
+            data-tour="revert"
+            disabled={!shownDirty || shownBusy || shownGone !== undefined}
+            title="提案に書いてある先行と番号に戻します"
+            onClick={revert}
+          >
             案に戻す
           </button>
-          <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" data-tour="reload" disabled={shownBusy} onClick={reload}>
             再読込
           </button>
           <button
@@ -372,26 +456,31 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
             className="action primary"
             id="save"
             data-action="save"
-            disabled={busy || blocker !== ""}
+            data-tour="save"
+            disabled={shownBusy || blocker !== ""}
             title={blocker === "" ? "提案の計画と、番号の変わる項を指す子の提案を書き換えます（承認はしません）" : blocker}
-            onClick={() => setReview(true)}
+            onClick={() => {
+              if (!touring) {
+                setReview(true);
+              }
+            }}
           >
             この順序に決める
           </button>
         </div>
-        <TourButton onClick={tour.start} />
+        <TourButton courses={courses} onPick={tour.start} />
       </header>
-      {sample !== undefined ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
+      {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <p className="dim small">
         項の右の点から別の項の左の点へドラッグすると、線の先の項が元の項を待ちます（逆向きでも引けます）。線の真ん中の × で待たなくなります。線を変えるたびに ccnavi が番号を振り直します。循環になる線と、子が承認された番号へ入る線は引けません。
       </p>
       {moved.length > 0 && (
-        <p id="workflow-renumbered" className="small">
+        <p id="workflow-renumbered" className="small" data-tour="renumbered">
           番号が変わる項: {moved.map((item) => `${item.title} ${item.from} → ${item.number}`).join("、")}
         </p>
       )}
       {notes.length > 0 && (
-        <ul className="problems" id="workflow-problems">
+        <ul className="problems" id="workflow-problems" data-tour="problems">
           {notes.map((note, index) => (
             <li key={index} data-kind={note.kind}>
               {note.text}
@@ -399,13 +488,15 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
           ))}
         </ul>
       )}
-      <div className="workflow-graphs">
-        {sample !== undefined ? (
-          sample.plans.map((plan) => <PlanGraph key={plan.part} plan={plan} detail />)
-        ) : answer.plans.length === 0 ? (
+      <div className="workflow-graphs" data-tour="graphs" ref={graphs}>
+        {shownAnswer.plans.length === 0 ? (
           <p className="empty">この親の提案には計画（plan:）がありません。</p>
+        ) : touring ? (
+          shownAnswer.plans.map((plan) => (
+            <PlanGraph key={`${sceneKey}|${plan.part}`} plan={plan} detail editable={editable} onConnect={noop} onDisconnect={noop} layout={shownLayouts[plan.part]} fitKey={0} />
+          ))
         ) : (
-          answer.plans.map((plan) => (
+          shownAnswer.plans.map((plan) => (
             <PlanGraph
               key={plan.part}
               plan={plan}
@@ -413,17 +504,17 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
               editable={editable}
               onConnect={edit(plan.part, true)}
               onDisconnect={edit(plan.part, false)}
-              layout={layouts[plan.part]}
+              layout={shownLayouts[plan.part]}
               fitKey={fit}
             />
           ))
         )}
       </div>
-      {review && <Review ticket={page.ticket} answer={answer} onConfirm={confirmSave} onCancel={() => setReview(false)} />}
-      <footer className={status?.error === true ? "foot error" : "foot"}>
-        <span id="status">{status?.text ?? ""}</span>
+      {shownReview && <Review ticket={shownTicket} answer={shownAnswer} focus={!touring} onConfirm={confirmSave} onCancel={() => (touring ? undefined : setReview(false))} />}
+      <footer className={shownStatus?.error === true ? "foot error" : "foot"} data-tour="status">
+        <span id="status">{shownStatus?.text ?? ""}</span>
       </footer>
-      {tour.touring ? <Tour steps={TOUR_STEPS} onClose={tour.end} /> : null}
+      {touring ? <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} /> : null}
     </>
   );
 }
