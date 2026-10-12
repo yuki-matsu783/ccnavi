@@ -1,12 +1,12 @@
 ---
 type: guide
-title: 実行環境と呼び名
-description: 対応する実行環境（Windows、macOS、Linux）と、プロジェクトで使う用語の定義、文書やコメントでのADRへの触れ方
+title: 実行環境とADRの扱い
+description: ccnaviの開発で対応する実行環境（Windows、macOS、Linux）と、sh・Pythonを書くときの決まり、文書やコメントでのADRへの触れ方
 tags: [sh-scripts, environment]
-keywords: [実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, ワークスペースルート, 統合先ブランチ, 用語, sh, bash, BSD, ADR, ADR番号, コメント]
+keywords: [実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, sh, bash, BSD, ADR, ADR番号, コメント]
 ---
 
-# 実行環境と呼び名
+# 実行環境とADRの扱い
 
 ## 実行環境
 
@@ -24,13 +24,6 @@ keywords: [実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, ワーク
 - Claude Code on the webには`.ccnavi/bin`が無い。ccnaviのhookを動かすには、
   `uv run --with pyinstaller python build.py`でビルドする。ビルドしていないとランチャーが終了コード127で終わり、
   hookは何もしない
-
-## 呼び名
-
-- ワークスペースルート: Claude Codeを起動したディレクトリ（`CLAUDE_PROJECT_DIR`）。プロジェクトの作業もワークスペースルートで起動して`cd`で入る。プロジェクトの中で起動すると、ワークスペースの`.claude/settings.json`が読まれず、ccnaviのhookが動かない
-- gitプロジェクトルート: `.git`があるディレクトリ。ワークスペース自身、`projects/`の下の各プロジェクト、
-  各ワークツリーがそれぞれ持つ
-- 統合先ブランチ: 作業を合流させるブランチ
 
 ## 文書とコメントでのADRの扱い
 

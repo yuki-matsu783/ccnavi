@@ -105,7 +105,7 @@ export interface Judged {
 export function JudgeResult({ judged }: { readonly judged: Judged }): JSX.Element {
   const { result } = judged;
   return (
-    <div id="judge-result" className="result">
+    <div id="judge-result" className="result" data-tour="judge-result">
       {result.known ? (
         <>
           <p>
@@ -140,8 +140,8 @@ export function JudgeResult({ judged }: { readonly judged: Judged }): JSX.Elemen
 
 export function ExpectationsResult({ result }: { readonly result: ExpectationsJson }): JSX.Element {
   return (
-    <div id="expectations-result" className="result">
-      <div className="counts">
+    <div id="expectations-result" className="result" data-tour="expectations-result">
+      <div className="counts" data-tour="expectations-counts">
         {SECTIONS.map((section) => {
           const count = result.counts[section] ?? { ok: 0, total: 0 };
           return (
@@ -167,7 +167,11 @@ export function ExpectationsResult({ result }: { readonly result: ExpectationsJs
           </thead>
           <tbody>
             {result.expectations.map((expectation, index) => (
-              <tr key={index} className={expectation.ok ? (expectation.skipped ? "skipped" : "") : "ng"}>
+              <tr
+                key={index}
+                className={expectation.ok ? (expectation.skipped ? "skipped" : "") : "ng"}
+                data-tour={!expectation.ok && result.expectations.findIndex((item) => !item.ok) === index ? "expectation-ng" : undefined}
+              >
                 <td>
                   <span className={`verdict ${expectation.expected}`}>{expectation.expected}</span>
                 </td>
@@ -202,7 +206,7 @@ const SUGGEST_KINDS: Readonly<Record<string, string>> = {
 
 export function SuggestResult({ result }: { readonly result: SuggestJson }): JSX.Element {
   return (
-    <div id="suggest-result" className="result">
+    <div id="suggest-result" className="result" data-tour="suggest-result">
       <p>
         記録 {result.logs.length} 本・{result.records} 行から、候補 {result.candidates.length} 件
         （検証を通らず除いたもの {result.dropped} 件）。どれも下書きで、置くのはユーザです。
@@ -211,7 +215,7 @@ export function SuggestResult({ result }: { readonly result: SuggestJson }): JSX
         <p className="empty">候補はありません</p>
       ) : (
         result.candidates.map((candidate, index) => (
-          <div key={index} className="candidate" data-id={candidate.id}>
+          <div key={index} className="candidate" data-id={candidate.id} data-tour={index === 0 ? "suggest-candidate" : undefined}>
             <p>
               <span className={`verdict ${candidate.section}`}>{candidate.section}</span>{" "}
               {SUGGEST_KINDS[candidate.kind] ?? candidate.kind}: <code>{candidate.id}</code>

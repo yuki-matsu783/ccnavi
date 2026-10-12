@@ -86,7 +86,7 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
           <p className="approval-note">
             Claude Code に伝える文を用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。
           </p>
-          <pre className="approval-text">{overlay.prompt}</pre>
+          <pre className="approval-text" data-tour="approval-prompt">{overlay.prompt}</pre>
           <HandOver />
         </>
       );
@@ -95,7 +95,7 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
         <>
           <h2 id="approval-title">{overlay.title}</h2>
           <p className="approval-note">{overlay.note}</p>
-          <pre className="approval-text">{overlay.prompt}</pre>
+          <pre className="approval-text" data-tour="approval-prompt">{overlay.prompt}</pre>
           <HandOver />
         </>
       );
@@ -146,7 +146,7 @@ function Body({
       <h2 id="approval-title">{count === 0 ? "承認待ちのチケットなし" : `承認待ちのチケット ${count} 件`}</h2>
       {notice ? <p className="approval-note warn">{notice}</p> : null}
       {count === 0 ? null : (
-        <table className="approval-batch">
+        <table className="approval-batch" data-tour="approval-batch">
           <thead>
             <tr>
               <th>ID</th>
@@ -166,7 +166,7 @@ function Body({
         </table>
       )}
       {preview.plans.length > 0 ? (
-        <div className="plan-graphs">
+        <div className="plan-graphs" data-tour="approval-plan">
           {families(preview.plans).map(([ticket, plans]) => (
             <div key={ticket} className="plan-family" data-ticket={ticket}>
               {unsaved.includes(ticket) ? (
@@ -183,6 +183,7 @@ function Body({
                     type="button"
                     className="action"
                     data-action="edit-workflow"
+                    data-tour="edit-workflow"
                     data-ticket={ticket}
                     title={`このオーバーレイを閉じて、${ticket} の計画の順序を直すワークフロー編集タブを開きます。保存すると提案が書き換わるので、承認は開き直してください`}
                     onClick={() => post({ type: "editWorkflow", ticket })}
@@ -235,6 +236,7 @@ function Body({
             type="button"
             className="action primary"
             data-action="approve-confirm"
+            data-tour="approve-confirm"
             data-tickets={tickets.join(",")}
             disabled={approving || blockedText !== ""}
             title={blockedText === "" ? undefined : blockedText}
@@ -268,7 +270,7 @@ function BodyText({ text }: { readonly text: string }): JSX.Element {
   // 末尾に改行を足さない。実行ファイルが組んだ文字列と同じものが選択とコピーで取れるようにする。
   const br = (i: number): string => (i === lines.length - 1 ? "" : "\n");
   return (
-    <pre className="approval-text">
+    <pre className="approval-text" data-tour="approval-text">
       {lines.map((body, i) =>
         body.note === "" ? (
           <Fragment key={i}>{body.line + br(i)}</Fragment>
@@ -289,7 +291,7 @@ function BodyText({ text }: { readonly text: string }): JSX.Element {
 /** 承認の文とレビュー済みの連絡は、同じ 2 ボタンで渡す。文は拡張ホストが持っている分を使う */
 function HandOver(): JSX.Element {
   return (
-    <div className="approval-actions">
+    <div className="approval-actions" data-tour="approval-handover">
       <button type="button" className="action primary" data-action="prompt-copy" onClick={() => post({ type: "promptCopy" })}>
         コピー
       </button>

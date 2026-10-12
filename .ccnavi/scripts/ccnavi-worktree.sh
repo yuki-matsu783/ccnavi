@@ -3,7 +3,7 @@
 #
 #   sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--offline] [--dry-run]
 #
-# 手で打つと、次の順になる（docs/claude/worktree.md「ワークツリーの作り方」）。
+# 手で打つと、次の順になる（.ccnavi/docs/worktree.md「ワークツリーを切る」）。
 #   1. ccnavi-git.sh fetch origin <統合先>
 #   2. ccnavi-git.sh log --oneline <統合先>..origin/<統合先> で遅れを確かめる
 #   3. 遅れていれば origin/<統合先> から --no-track で、遅れていなければ <統合先> から切る
@@ -194,4 +194,10 @@ printf 'ワークツリーを切った: %s\n' "$dest"
 printf 'ブランチ: %s（起点 %s%s）\n' "$name" "$base" "${track:+、$track}"
 [ "$behind" -eq 0 ] || printf '案内: 手元の %s は origin/%s より %s 件遅れていたので origin/%s から切った（手元の %s は進めていない）\n' "$integ" "$integ" "$behind" "$integ" "$integ"
 [ -z "$fetch_note" ] || printf '案内: %s\n' "$fetch_note"
+# 直接作業の名前の形は実行ファイルに聞く（sh は形を判定しない）。取れなければ案内は出さない。拒否はしない。
+name_note=""
+if name_bin=$(ccnavi_bin "$root"); then
+	name_note=$("$name_bin" --root "$root" worktree name "$name" 2>/dev/null </dev/null) || name_note=""
+fi
+[ -z "$name_note" ] || printf '%s\n' "$name_note"
 log_info 完了 -- "name=$name" "base=$base"

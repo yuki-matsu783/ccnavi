@@ -26,7 +26,7 @@ keywords: [wiki, パターン, skill-impact, index.md, log.md, purpose.md, 知�
 | `skill-impact.md` | 提案ごとの対象のスキル、要点、差分、採否（承認・却下・差し戻し）とその理由。却下された提案は差分ごと残す |
 | `log.md` | 振り返りごとの経過。日付、拾ったもの、どのパターンを足したか・直したか |
 
-- 各ファイルの frontmatter は `docs/claude/frontmatter.md` に従う。`type` は `skill-wiki` にする
+- 各ファイルの frontmatter は `.ccnavi/docs/frontmatter.md` に従う。`type` は `skill-wiki` にする
 - パターンは重複して作らない。似たものがあれば、そのページに根拠を足すか言い直す。1 つの事実は 1 か所に書く
 - 溜めるのは「拾うもの」に当たるものだけ。「拾わないもの」は wiki にも書かない
 - 採否は MR の結果か、ユーザの承認・却下で決まる。エージェントが推測で書かない。結果が分かったら `skill-impact.md` を直す

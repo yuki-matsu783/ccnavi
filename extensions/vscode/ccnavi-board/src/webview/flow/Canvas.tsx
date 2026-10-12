@@ -44,6 +44,7 @@ import {
   type NodeChange,
   type NodeProps,
   type NodeTypes,
+  useNodesInitialized,
   type OnSelectionChangeParams,
 } from "@xyflow/react";
 
@@ -51,6 +52,7 @@ import {
   canConnect,
   connectionFrom,
   connectionFromPort,
+  connectionId,
   connectionLabel,
   connectionsOf,
   connectionTo,
@@ -87,6 +89,8 @@ interface StepData extends Record<string, unknown> {
   readonly outputs: readonly PortInfo[];
   readonly known: boolean;
   readonly readOnly: boolean;
+  /** 案内が指す印（`data-tour`）。案内の間だけ付ける */
+  readonly mark?: string;
 }
 
 type StepNode = Node<StepData, "step">;
@@ -94,6 +98,7 @@ type StepNode = Node<StepData, "step">;
 interface GroupData extends Record<string, unknown> {
   readonly name: string;
   readonly readOnly: boolean;
+  readonly mark?: string;
 }
 
 type GroupNode = Node<GroupData, "flowGroup">;
@@ -102,6 +107,7 @@ type FlowNodeView = StepNode | GroupNode;
 interface EdgeData extends Record<string, unknown> {
   readonly index: number;
   readonly readOnly: boolean;
+  readonly mark?: string;
 }
 
 type FlowEdge = Edge<EdgeData, "flow">;
@@ -151,7 +157,7 @@ function StepView({ id, data }: NodeProps<StepNode>): JSX.Element {
   const actions = useContext(Actions);
   const many = data.outputs.length > 1 || data.outputs.some((port) => port.label !== "");
   return (
-    <div className="flow-node" data-type={cssType(data.type, data.known)} title={data.known ? undefined : `この画面に入力欄が無い種類です（${data.type || "種類なし"}）。中身は保存してもそのまま残ります`}>
+    <div className="flow-node" data-type={cssType(data.type, data.known)} data-tour={data.mark} title={data.known ? undefined : `この画面に入力欄が無い種類です（${data.type || "種類なし"}）。中身は保存してもそのまま残ります`}>
       {!data.readOnly && <RemoveButton action="canvas-remove-node" label="このノードを消す" onRemove={() => actions.removeNode(id)} />}
       {data.inputs.map((port, index) => (
         <Handle
@@ -202,7 +208,7 @@ function GroupView({ id, data, selected }: NodeProps<GroupNode>): JSX.Element {
         color="var(--vscode-focusBorder)"
         onResizeEnd={(_event, params) => actions.resizeGroup(id, { width: params.width, height: params.height }, { x: params.x, y: params.y })}
       />
-      <div className="flow-group" data-type="group">
+      <div className="flow-group" data-type="group" data-tour={data.mark}>
         <span className="flow-group-label">{data.name}</span>
       </div>
       {!data.readOnly && <RemoveButton action="canvas-remove-node" label="このグループを消す（中のノードは残す）" onRemove={() => actions.removeNode(id)} />}
@@ -241,7 +247,7 @@ function FlowEdgeView({ sourceX, sourceY, targetX, targetY, sourcePosition, targ
   const offset = label === undefined || label === "" ? 0 : 20;
   return (
     <>
-      <g {...handlers}>
+      <g data-tour={data?.mark} {...handlers}>
         <BaseEdge path={path} markerEnd={markerEnd} style={style} label={label} labelX={labelX} labelY={labelY} interactionWidth={interactionWidth} />
       </g>
       {shown && (
@@ -262,7 +268,7 @@ const EDGE_TYPES: EdgeTypes = { flow: FlowEdgeView };
 /** グループを奥に描く。選んでも（React Flow は選んだ点を 1000 だけ手前に上げる）ほかのノードより奥に留める */
 const GROUP_Z = -2000;
 
-function stepsOf(doc: FlowDoc, readOnly: boolean): FlowNodeView[] {
+function stepsOf(doc: FlowDoc, readOnly: boolean, marks: boolean): FlowNodeView[] {
   const connections = connectionsOf(doc);
   const views = doc.nodes.map((node, index): FlowNodeView => {
     const type = nodeType(node);
@@ -275,7 +281,7 @@ function stepsOf(doc: FlowDoc, readOnly: boolean): FlowNodeView[] {
         width: size.width,
         height: size.height,
         zIndex: GROUP_Z,
-        data: { name: nodeName(node) || String((node.data as { label?: unknown } | undefined)?.label ?? "") || node.id, readOnly },
+        data: { name: nodeName(node) || String((node.data as { label?: unknown } | undefined)?.label ?? "") || node.id, readOnly, ...(marks ? { mark: `node-${node.id}` } : {}) },
       };
     }
     const ports = portsOf(node, connections);
@@ -294,6 +300,7 @@ function stepsOf(doc: FlowDoc, readOnly: boolean): FlowNodeView[] {
         outputs: ports.outputs,
         known: isEditableType(type),
         readOnly,
+        ...(marks ? { mark: `node-${node.id}` } : {}),
       },
     };
   });
@@ -301,7 +308,7 @@ function stepsOf(doc: FlowDoc, readOnly: boolean): FlowNodeView[] {
   return [...views.filter((view) => view.type === "flowGroup"), ...views.filter((view) => view.type !== "flowGroup")];
 }
 
-function edgesOf(doc: FlowDoc, selected: Selection | undefined, readOnly: boolean): FlowEdge[] {
+function edgesOf(doc: FlowDoc, selected: Selection | undefined, readOnly: boolean, marks: boolean): FlowEdge[] {
   // 行き先の無い線と、グループに繋がる線は描けない（グループは出入口を持たない）。コピーには残る
   const ids = new Set(doc.nodes.filter((node) => !isGroup(node)).map((node) => node.id));
   const edges: FlowEdge[] = [];
@@ -320,7 +327,7 @@ function edgesOf(doc: FlowDoc, selected: Selection | undefined, readOnly: boolea
       label: label === "" ? undefined : label,
       selected: selected?.kind === "edge" && selected.index === index,
       markerEnd: { type: MarkerType.ArrowClosed, color: "var(--vscode-descriptionForeground)" },
-      data: { index, readOnly },
+      data: { index, readOnly, ...(marks && connectionId(c) !== "" ? { mark: `edge-${connectionId(c)}` } : {}) },
     });
   });
   return edges;
@@ -341,6 +348,11 @@ export interface CanvasProps {
   readonly focus?: { readonly ids: readonly string[] } | undefined;
   /** 右下にミニマップを出すか */
   readonly minimap?: boolean;
+  /**
+   * ノードと線に案内の印（`data-tour="node-<id>"` / `edge-<線の id>`）を付ける。案内の間だけ真にする（ふだんは付けない）。
+   * 真の間は、図が組み上がって収まったあとに `resize` を流し、案内が指す先の位置を測り直させる
+   */
+  readonly marks?: boolean;
   /** ドラッグを放した点。位置は React Flow の決まり（グループの中のノードはグループからの位置） */
   readonly onMove: (moves: readonly { readonly id: string; readonly position: FlowPoint }[]) => void;
   readonly onConnect: (from: string, fromPort: string, to: string, toPort: string) => void;
@@ -374,10 +386,27 @@ function minimapColor(node: FlowNodeView): string {
   }
 }
 
-export function Canvas({ doc, readOnly, selected, focus, minimap = false, onSelect, onPick, onMove, onConnect, onRemoveNode, onRemoveEdge, onResizeGroup }: CanvasProps): JSX.Element {
-  const base = useMemo(() => stepsOf(doc, readOnly), [doc, readOnly]);
-  const edges = useMemo(() => edgesOf(doc, selected, readOnly), [doc, selected, readOnly]);
-  const [nodes, setNodes] = useState<FlowNodeView[]>(base);
+/**
+ * 案内の間の図。図は組み上がってから全体を収める（`fitView`）ので、案内が最初に測った位置は動く。
+ * 収まったころに `resize` を流すと、案内は指す先を測り直す（`Tour.tsx` が `resize` で測り直す）
+ */
+function TourSettle(): null {
+  const ready = useNodesInitialized();
+  useEffect(() => {
+    if (!ready) {
+      return;
+    }
+    const timer = setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
+    return () => clearTimeout(timer);
+  }, [ready]);
+  return null;
+}
+
+export function Canvas({ doc, readOnly, selected, focus, minimap = false, marks = false, onSelect, onPick, onMove, onConnect, onRemoveNode, onRemoveEdge, onResizeGroup }: CanvasProps): JSX.Element {
+  const base = useMemo(() => stepsOf(doc, readOnly, marks), [doc, readOnly, marks]);
+  const edges = useMemo(() => edgesOf(doc, selected, readOnly, marks), [doc, selected, readOnly, marks]);
+  // 作り直したとき（案内の見本へ替える・戻す）は、呼び手が図の外から選ぶと言ったノード（`focus`）を選んだ状態で始める
+  const [nodes, setNodes] = useState<FlowNodeView[]>(() => base.map((node) => (focus?.ids.includes(node.id) ? { ...node, selected: true } : node)));
   const [maximized, toggleMaximize, maxBox] = useMaximize();
 
   // コピーが替わったら手元を作り直す。測った大きさと、選んでいるか（Shift で選び足したものも）は引き継ぐ。
@@ -423,7 +452,7 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, onSele
   );
 
   return (
-    <div ref={maxBox} className={`graph flow-graph ${maximizeClass(maximized)}`} id="flow-graph" data-nodes={doc.nodes.length} data-edges={edges.length} data-readonly={readOnly ? "1" : "0"}>
+    <div ref={maxBox} className={`graph flow-graph ${maximizeClass(maximized)}`} id="flow-graph" data-tour="graph" data-nodes={doc.nodes.length} data-edges={edges.length} data-readonly={readOnly ? "1" : "0"}>
       <Actions.Provider value={actions}>
         <ReactFlow<FlowNodeView, FlowEdge>
           nodes={nodes}
@@ -462,6 +491,7 @@ export function Canvas({ doc, readOnly, selected, focus, minimap = false, onSele
           <Background />
           <Controls showInteractive={false} />
           <RefitOnChange value={maximized} />
+          {marks && <TourSettle />}
           {minimap && <MiniMap<FlowNodeView> id="flow-minimap" pannable zoomable ariaLabel="ミニマップ" nodeColor={minimapColor} nodeStrokeWidth={2} />}
         </ReactFlow>
         <MaximizeButton maximized={maximized} onToggle={toggleMaximize} />

@@ -25,6 +25,8 @@ export interface FactorProps {
   readonly open: boolean;
   /** 欄を触れるか。保存の往復の間と、ファイルが無い間は触れない */
   readonly disabled: boolean;
+  /** 案内が指す行。中の部品に `data-tour` の印を付ける（行ごとに付けると、畳んだ行を指してしまう） */
+  readonly tour?: boolean;
   readonly onToggle: () => void;
   readonly onChange: (next: FactorForm) => void;
   readonly onMove: (delta: number) => void;
@@ -33,6 +35,8 @@ export interface FactorProps {
 
 export function Factor(props: FactorProps): JSX.Element {
   const { factor, disabled } = props;
+  /** 案内の指す先の印。指される行だけに付ける */
+  const mark = (name: string): { "data-tour"?: string } => (props.tour === true ? { "data-tour": name } : {});
   const text = (name: keyof FactorForm & ("id" | "points" | "value" | "max" | "message"), className: string, placeholder: string, numeric = false): JSX.Element => (
     <input
       type="text"
@@ -59,7 +63,7 @@ export function Factor(props: FactorProps): JSX.Element {
   );
 
   return (
-    <li className={`row factor${props.open ? " open" : ""}${props.hidden ? " hidden-by-find" : ""}`} data-key={props.factorKey} data-find={props.find}>
+    <li className={`row factor${props.open ? " open" : ""}${props.hidden ? " hidden-by-find" : ""}`} data-key={props.factorKey} data-find={props.find} {...mark("factor-row")}>
       <div
         className="row-head"
         onClick={() => {
@@ -89,13 +93,13 @@ export function Factor(props: FactorProps): JSX.Element {
         </span>
       </div>
       <div className="row-body">
-        <Captioned name="id" yamlKey="id">
+        <Captioned name="id" yamlKey="id" {...mark("factor-id")}>
           {text("id", "f-id narrow", "big-diff")}
         </Captioned>
-        <Captioned name="点" yamlKey="points">
+        <Captioned name="点" yamlKey="points" {...mark("factor-points")}>
           {text("points", "f-points num", "25", true)}
         </Captioned>
-        <Captioned name="加点条件" yamlKey={KINDS_KEYS}>
+        <Captioned name="加点条件" yamlKey={KINDS_KEYS} {...mark("factor-kind")}>
           <select
             className="f-kind"
             value={factor.kind}
@@ -122,7 +126,7 @@ export function Factor(props: FactorProps): JSX.Element {
             ))}
           </select>
         </Captioned>
-        <Captioned name={valueLabel(factor.kind)} yamlKey={factor.kind}>
+        <Captioned name={valueLabel(factor.kind)} yamlKey={factor.kind} {...mark("factor-value")}>
           {factor.kind === "glob" ? (
             <div className="inline">
               {text("value", "f-value", KIND_LABELS[factor.kind].placeholder)}
@@ -137,18 +141,18 @@ export function Factor(props: FactorProps): JSX.Element {
         </Captioned>
         {NUMERIC.includes(factor.kind) && (
           <>
-            <Captioned name="対象パス" yamlKey="include">
+            <Captioned name="対象パス" yamlKey="include" {...mark("factor-include")}>
               {globs("include", "src/**（glob を 1 行に 1 つ。書くと、当てはまるパスだけを数える。空なら全パス）")}
             </Captioned>
-            <Captioned name="除外パス" yamlKey="exclude">
+            <Captioned name="除外パス" yamlKey="exclude" {...mark("factor-exclude")}>
               {globs("exclude", "*.lock（glob を 1 行に 1 つ。当てはまるパスは数えない。対象パスに当てはまっていても外す）")}
             </Captioned>
           </>
         )}
-        <Captioned name="理由" yamlKey="message">
+        <Captioned name="理由" yamlKey="message" {...mark("factor-message")}>
           {text("message", "f-message", "加点の理由として依頼文と閉じたときの出力に出る短い文です。空なら id をそのまま使います")}
         </Captioned>
-        <span className="buttons">
+        <span className="buttons" {...mark("factor-buttons")}>
           <button type="button" className="action small" title="上へ" disabled={disabled} onClick={() => props.onMove(-1)}>
             ↑
           </button>
@@ -165,9 +169,20 @@ export function Factor(props: FactorProps): JSX.Element {
 }
 
 /** 欄名を左に置く。YAML のキー名は欄名のツールチップに載せる */
-export function Captioned({ name, yamlKey, children }: { readonly name: string; readonly yamlKey?: string; readonly children: ReactNode }): JSX.Element {
+export function Captioned({
+  name,
+  yamlKey,
+  children,
+  "data-tour": tour,
+}: {
+  readonly name: string;
+  readonly yamlKey?: string;
+  readonly children: ReactNode;
+  /** 案内の指す先の印 */
+  readonly "data-tour"?: string;
+}): JSX.Element {
   return (
-    <div className="field">
+    <div className="field" data-tour={tour}>
       <span className="cap" title={yamlKey === undefined ? undefined : `YAML のキー: ${yamlKey}`}>
         {name}
       </span>

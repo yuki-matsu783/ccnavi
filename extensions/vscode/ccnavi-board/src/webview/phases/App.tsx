@@ -17,10 +17,13 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
-import type { PhaseForm, PhasesData, PhasesPage, ToPhases } from "../../core/phases-view.js";
+import type { PhaseForm, PhasesData, PhasesMessage, PhasesPage, ToPhases } from "../../core/phases-view.js";
 import { applyAppearance } from "../appearance.js";
 import { Phase } from "./Phase.js";
-import { Tour, TourButton, type TourStep } from "../Tour.js";
+import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
+import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
+import { parsePhasesSample, parsePhasesTexts } from "../../core/tour-phases.js";
+import phasesTour from "../tours/phases.yml";
 import { TargetSelect } from "../TargetSelect.js";
 import { post } from "./post.js";
 import { countText, duplicateNote, emptyNote, findText, hasMore } from "./text.js";
@@ -31,13 +34,28 @@ const NO_LOCK: Lock = { locked: true, reason: "", doing: [] };
 
 const EMPTY_DRAFT: Draft = { rows: [] };
 
-/** 案内を始める前の画面の様子（`beforeTour`） */
-interface TourSnapshot {
-  readonly find: string;
-  readonly open: ReadonlySet<string>;
-  readonly more: ReadonlyMap<string, boolean>;
-  /** 始めたときの中身。案内の間に読み直されたら、開いていた行の鍵は古いので戻さない */
-  readonly data: PhasesData;
+/**
+ * 案内（`tours/phases.yml`）と、案内の間だけ描く見本。今の定義は使わず、画面が持つ編集中の内容にも触れない。
+ * 読み込み時に形を確かめる（壊れていればテストが先に落とす）。
+ */
+const TOUR = tourOf(phasesTour);
+const SAMPLE = parsePhasesSample(TOUR.sample);
+const TEXTS = parsePhasesTexts(TOUR.sample);
+/** 見本の行の鍵。実際の行の鍵（`p1`…）と重ならない */
+function sampleDraft(page: PhasesPage, prefix: string): Draft {
+  let seq = 0;
+  return draftOf(page.model.form, () => `${prefix}${(seq += 1)}`);
+}
+const SAMPLE_DRAFT = sampleDraft(SAMPLE.page, "s");
+const PROJECT_DRAFT = sampleDraft(SAMPLE.project, "t");
+/** 「＋ 定義を追加」で足した行の見本（`add: blank` は空の行、`add: filled` は書いた行） */
+const ADDED_KEY = "s-add";
+const ADDED_BLANK = emptyPhase();
+const NO_SCENE: Scene = {};
+
+/** 段の `scene` の文字列を `,` で割る */
+function sceneList(value: Scene[string] | undefined): ReadonlySet<string> {
+  return new Set(typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : []);
 }
 
 interface Status {
@@ -79,17 +97,29 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const [changed, setChanged] = useState(false);
   const [find, setFind] = useState("");
   const [focusKey, setFocusKey] = useState<string | undefined>(undefined);
-  /** 吹き出しの案内を出しているか。拡張ホストの `tour`（初回）かヘルプのボタンで出る */
-  const [touring, setTouring] = useState(false);
-  /** 拡張ホストが初回の案内を頼んだが、中身がまだ無くて出せていない */
-  const [tourPending, setTourPending] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  /** 案内を始める前の画面の様子。案内は見本の行と補足を開き、絞り込みを外すので、閉じたらこれに戻す */
-  const beforeTour = useRef<TourSnapshot | undefined>(undefined);
-
 
   const { draft, open, more } = editing;
   const page = pageOf(data);
+  /**
+   * 案内の間は見本を描き、段ごとの様子（開く定義・絞り込み・設定の切り替えなど）は `scene` に入れる。実際の編集中の定義や開いた行は
+   * 動かさないので、閉じたあとに戻すものは無い。
+   */
+  const [scene, setScene] = useState<Scene>(NO_SCENE);
+  const tour = useTour(data.kind === "page", {
+    onStart: () => setScene(NO_SCENE),
+    onEnd: () => {
+      setScene(NO_SCENE);
+      post({ type: "tourDone" });
+    },
+  });
+  const requestTour = tour.request;
+  /** 拡張ホストへの送信。案内の間は実際の操作を送らない（`tourDone` と最初の `ready` は直に送る） */
+  const act = (message: PhasesMessage): void => {
+    if (!tour.touring) {
+      post(message);
+    }
+  };
 
   useEffect(() => {
     const onMessage = (event: MessageEvent): void => {
@@ -115,7 +145,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         setBusy(false);
         setStatus(undefined);
       } else if (message.type === "tour") {
-        setTourPending(true);
+        requestTour();
       } else if (message.type === "appearance") {
         applyAppearance(message.value);
       }
@@ -123,7 +153,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     window.addEventListener("message", onMessage);
     post({ type: "ready" });
     return () => window.removeEventListener("message", onMessage);
-  }, [nextKey]);
+  }, [nextKey, requestTour]);
 
   // 足した行の id へ焦点を移す。折りたたんだままでは何を足したか分からないので、行は開いて出してある
   useEffect(() => {
@@ -154,35 +184,13 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   }, [dirty]);
 
   const reload = (): void => {
+    if (tour.touring) {
+      return;
+    }
     setBusy(true);
     setStatus(undefined);
     post({ type: "reload", dirty });
   };
-
-  // 初回の案内は、定義の中身が出てから始める（読み込み中やエラーの画面には指す先が無い）
-  useEffect(() => {
-    if (tourPending && data.kind === "page") {
-      setTourPending(false);
-      if (!touring) {
-        beforeTour.current = { find, open: editing.open, more: editing.more, data };
-        setTouring(true);
-      }
-    }
-  }, [tourPending, data, find, editing, touring]);
-
-  // 案内の最中に中身が読み込み中やエラーへ替わった。吹き出しは描かれなくなるので、ここで閉じたことにする
-  // （閉じずに残すと、中身が戻ったときにユーザが始めていない案内が 1 段目から出直す）。行の鍵は古いので戻さない
-  useEffect(() => {
-    if (touring && data.kind !== "page") {
-      setTouring(false);
-      const was = beforeTour.current;
-      beforeTour.current = undefined;
-      if (was !== undefined) {
-        setFind(was.find);
-      }
-      post({ type: "tourDone" });
-    }
-  }, [touring, data]);
 
   if (data.kind === "loading") {
     return (
@@ -208,6 +216,9 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   }
 
   const editDraft = (next: Draft, open?: ReadonlySet<string>): void => {
+    if (tour.touring) {
+      return;
+    }
     setEditing((now) => ({ ...now, draft: next, open: open ?? now.open }));
     setDirty(true);
     // id が重なっている間はその文面だけを出す。直前の失敗の文面は今のことではない
@@ -221,6 +232,9 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   };
 
   const toggle = (key: string): void => {
+    if (tour.touring) {
+      return;
+    }
     const next = new Set(open);
     if (next.has(key)) {
       next.delete(key);
@@ -232,6 +246,9 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   };
 
   const toggleMore = (key: string, value: boolean): void => {
+    if (tour.touring) {
+      return;
+    }
     setEditing((now) => ({ ...now, more: new Map(now.more).set(key, value) }));
   };
 
@@ -252,72 +269,13 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     editDraft({ ...draft, rows: draft.rows.filter((row) => row.key !== key) });
   };
 
-  const startTour = (): void => {
-    beforeTour.current = { find, open, more, data };
-    setHelpOpen(false);
-    setTouring(true);
-  };
-
-  /** 案内を閉じた（最後まで見ても、途中でやめても）。前の様子に戻し、拡張ホストに伝える（次からは初回の案内を出さない） */
-  const endTour = (): void => {
-    setTouring(false);
-    const was = beforeTour.current;
-    if (was !== undefined) {
-      setFind(was.find);
-      if (was.data === data) {
-        setEditing((now) => ({ ...now, open: was.open, more: was.more }));
-      }
-    }
-    beforeTour.current = undefined;
-    post({ type: "tourDone" });
-  };
-
-  /** 案内で指す見本の行。補足（agent / when）を持つ最初の行、無ければ最初の行 */
-  const sample = draft.rows.find((item) => item.phase.id.trim() !== "" && hasMore(item.phase)) ?? draft.rows[0];
-
-  /** 見本の行とその補足を開く。絞り込みで隠れないよう外す（閉じたら戻す） */
-  const openSample = (): void => {
-    if (sample === undefined) {
-      return;
-    }
-    setFind("");
-    setEditing((now) => ({ ...now, open: new Set([...now.open, sample.key]), more: new Map(now.more).set(sample.key, true) }));
-  };
-
-  const tourSteps: readonly TourStep[] = [
-    {
-      target: "#phases",
-      title: "フェーズ定義",
-      body: "工程の型です。作業（work）の定義は親チケットの計画 plan: に、フィードバック対応（feedback）の定義はレビューのあとの feedback: に並べます。順序（どのフェーズがどれを待つか）は、親チケットの計画の項の after で決めます（この画面には書きません）。行を押すと欄が開き、「＋ 定義を追加」で増やせます。",
-    },
-    {
-      target: sample === undefined ? "#phases" : `.phase[data-key="${sample.key}"] details.more`,
-      title: "補足",
-      body:
-        sample === undefined
-          ? "定義を足して行を開くと「補足」の欄があり、案内するエージェントと使う場面を書けます。どちらもエージェントへの案内にだけ使い、判定には使いません。"
-          : "案内するエージェントと使う場面です。どちらもエージェントへの案内にだけ使い、判定には使いません。計画のどこに置くか（受入テスト作成を先に置く、フィードバック計画の最後に置く、など）も使う場面に書きます。",
-      before: openSample,
-    },
-    {
-      target: "#save",
-      title: "保存",
-      body: "保存すると実行ファイルが検証してから書き込みます。通らなければ、下に理由が出ます。",
-    },
-    {
-      target: '[data-action="help"]',
-      title: "ヘルプ",
-      body: "細かい説明はここから開けます。",
-    },
-    {
-      target: '[data-action="tour"]',
-      title: "案内",
-      body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
-    },
-  ];
+  const courses = coursesOf(TOUR, setScene);
 
   /** 定義を足す。絞り込みは外す（id が空の行は絞り込みに当たらず隠れる） */
   const add = (): void => {
+    if (tour.touring) {
+      return;
+    }
     const row = { key: nextKey(), phase: emptyPhase() };
     editDraft({ ...draft, rows: [...draft.rows, row] }, new Set([...open, row.key]));
     setFind("");
@@ -326,54 +284,86 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     setFocusKey(row.key);
   };
 
-  const dup = duplicates(draft);
-  const query = find.trim().toLowerCase();
-  const rows = draft.rows.map((row) => {
+  // 案内の間は、今の定義ではなく見本を描く。画面の state（編集中の定義・開いた行・絞り込み・状態の一言）は触らない
+  const touring = tour.touring;
+  const sampleLib = scene.target === "lib";
+  const shownPage: PhasesPage | undefined = touring ? (sampleLib ? SAMPLE.project : SAMPLE.page) : page;
+  const sampleBase = sampleLib ? PROJECT_DRAFT : SAMPLE_DRAFT;
+  /** 案内で足した行（`add`）。見本の末尾に付ける */
+  const addedRow = touring && (scene.add === "blank" || scene.add === "filled") ? { key: ADDED_KEY, phase: scene.add === "blank" ? ADDED_BLANK : SAMPLE.added } : undefined;
+  const shownDraft: Draft = !touring ? draft : addedRow === undefined ? sampleBase : { rows: [...sampleBase.rows, addedRow] };
+  const shownDirty = touring ? scene.dirty === true : dirty;
+  const shownBusy = touring ? false : busy;
+  const sampleLocked = touring && scene.locked === true;
+  const shownLock: Lock = touring
+    ? sampleLocked
+      ? { locked: true, reason: sampleLib ? TEXTS.locks.lib : TEXTS.locks.self, doing: [] }
+      : { locked: false, reason: "", doing: [] }
+    : lock;
+  const sceneOpen = sceneList(scene.open);
+  const sceneMore = sceneList(scene.more);
+  const isShownOpen = (row: { readonly key: string; readonly phase: PhaseForm }): boolean => (touring ? row.key === ADDED_KEY || sceneOpen.has(row.phase.id) : open.has(row.key));
+  const isShownMore = (row: { readonly key: string; readonly phase: PhaseForm }): boolean => (touring ? sceneMore.has(row.phase.id) : more.get(row.key) === true);
+  const shownFind = touring ? (typeof scene.find === "string" ? scene.find : "") : find;
+  const shownChanged = touring ? scene.changed === true : changed;
+  const shownHelp = touring ? scene.help === true : helpOpen;
+
+  const dup = touring ? new Set<string>() : duplicates(draft);
+  const query = shownFind.trim().toLowerCase();
+  const rows = shownDraft.rows.map((row) => {
     const text = findText(row.phase);
     return { ...row, find: text, hidden: query !== "" && !text.includes(query) };
   });
   const shown = rows.filter((row) => !row.hidden).length;
-  const kept = rows.filter((row) => row.hidden && open.has(row.key)).length;
-  const shownStatus: Status | undefined = dup.size > 0 ? { text: duplicateNote(dup), error: true } : status;
+  const kept = rows.filter((row) => row.hidden && isShownOpen(row)).length;
+  /** 案内が指す定義（足した行、無ければ開いている最初の行、それも無ければ最初の行）。中の部品の `data-tour` はこの行にだけ付く */
+  const tourRowKey = touring
+    ? (addedRow?.key ?? rows.find((row) => !row.hidden && isShownOpen(row))?.key ?? rows.find((row) => !row.hidden)?.key)
+    : undefined;
+  const shownStatus: Status | undefined = touring
+    ? scene.error === true
+      ? { text: TEXTS.error, error: true }
+      : undefined
+    : dup.size > 0
+      ? { text: duplicateNote(dup), error: true }
+      : status;
 
   return (
     <>
-      {(page?.errors ?? []).map((error, index) => (
+      {(touring ? [] : page?.errors ?? []).map((error, index) => (
         <div key={`error-${index}`} className="banner error" data-banner="common-phases">
           {error}
         </div>
       ))}
-      {(page?.notices ?? []).map((notice, index) => (
+      {(touring ? [] : page?.notices ?? []).map((notice, index) => (
         <div key={index} className="banner warn">
           {notice}
         </div>
       ))}
-      <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
+      {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
+      <div id="changed" data-tour="changed" className={shownChanged ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
           更新
         </button>
       </div>
       <header className="toolbar">
         <div className="summary">
-          <TargetSelect
-            target={page?.target}
-            targets={page?.targets}
-            disabled={busy}
-            onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })}
-          />
-          <span className="path" title={page?.root ?? ""}>
-            {page?.phasesPath ?? ""}
+          <span data-tour="target">
+            <TargetSelect target={shownPage?.target} targets={shownPage?.targets} disabled={shownBusy} onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })} />
           </span>
-          <span id="dirty" className={dirty ? "dirty" : "dirty hidden"}>
+          <span className="path" data-tour="path" title={touring ? "" : page?.root ?? ""}>
+            {touring ? `（見本）${shownPage?.phasesPath ?? ""}` : page?.phasesPath ?? ""}
+          </span>
+          <span id="dirty" data-tour="dirty" className={shownDirty ? "dirty" : "dirty hidden"}>
             未保存
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="open-phases" disabled={page?.exists !== true} onClick={() => post({ type: "openFile" })}>
+          <button type="button" className="action" data-action="open-phases" data-tour="open-file" disabled={shownPage?.exists !== true} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
             更新
           </button>
           <button
@@ -381,8 +371,12 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             className="action primary"
             id="save"
             data-action="save"
-            disabled={!dirty || lock.locked || busy || dup.size > 0}
+            data-tour="save"
+            disabled={!shownDirty || shownLock.locked || shownBusy || dup.size > 0}
             onClick={() => {
+              if (tour.touring) {
+                return;
+              }
               setBusy(true);
               setStatus({ text: "検証して保存中…", error: false });
               post({ type: "save", form: formOf(draft) });
@@ -391,12 +385,12 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             保存
           </button>
         </div>
-        <TourButton onClick={startTour} />
+        <TourButton courses={courses} onPick={tour.start} />
       </header>
-      <p id="lock" className={lock.locked ? "lock" : "lock hidden"}>
-        {lock.reason}
+      <p id="lock" data-tour="lock" className={shownLock.locked ? "lock" : "lock hidden"}>
+        {shownLock.reason}
       </p>
-      {page !== undefined && page.model.problems.length > 0 && (
+      {!touring && page !== undefined && page.model.problems.length > 0 && (
         <ul className="problems">
           {page.model.problems.map((problem, index) => (
             <li key={index}>{problem}</li>
@@ -406,29 +400,45 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       <section className="block">
         <h2>
           フェーズ定義{" "}
-          <span className="count" id="phase-count">
-            {countText(draft.rows.length, query, shown, kept)}
+          <span className="count" id="phase-count" data-tour="phase-count">
+            {countText(shownDraft.rows.length, query, shown, kept)}
           </span>
-          <button type="button" className="action small" data-action="add" disabled={busy} onClick={add}>
+          <button type="button" className="action small" data-action="add" data-tour="add" disabled={shownBusy} onClick={add}>
             ＋ 定義を追加
           </button>
           <button
             type="button"
-            className={helpOpen ? "action small on" : "action small"}
+            className={shownHelp ? "action small on" : "action small"}
             data-action="help"
+            data-tour="help"
             title="この画面の説明"
-            aria-expanded={helpOpen}
+            aria-expanded={shownHelp}
             aria-controls="help"
-            onClick={() => setHelpOpen(!helpOpen)}
+            onClick={() => {
+              if (!tour.touring) {
+                setHelpOpen(!helpOpen);
+              }
+            }}
           >
             ヘルプ
           </button>
         </h2>
-        <div className="find">
-          <input id="find" type="search" placeholder="id・title・scope・when で絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
+        <div className="find" data-tour="find">
+          <input
+            id="find"
+            type="search"
+            placeholder="id・title・scope・when で絞り込む"
+            spellCheck={false}
+            value={shownFind}
+            onChange={(event) => {
+              if (!tour.touring) {
+                setFind(event.target.value);
+              }
+            }}
+          />
         </div>
-        {helpOpen && (
-          <div className="help-panel" id="help">
+        {shownHelp && (
+          <div className="help-panel" id="help" data-tour="help-panel">
             <p className="hint">
               親チケットの <code>plan:</code> に <code>work</code> の定義を並べたものが全体計画で、<code>--agree</code> が通ることが合意になります。レビューのあとは{" "}
               <code>feedback:</code> に <code>feedback</code> の定義を並べて計画を改訂します。<code>id</code> と <code>title</code> はどちらも一意です。<code>scope</code>{" "}
@@ -441,7 +451,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             </p>
           </div>
         )}
-        <ul className="list" id="phases">
+        <ul className="list" id="phases" data-tour="phases">
           {rows.map((row) => (
             <Phase
               key={row.key}
@@ -449,10 +459,12 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               phase={row.phase}
               find={row.find}
               hidden={row.hidden}
-              open={open.has(row.key)}
-              moreOpen={more.get(row.key) === true}
+              open={isShownOpen(row)}
+              moreOpen={isShownMore(row)}
               duplicate={dup.has(row.phase.id.trim())}
-              disabled={busy}
+              disabled={shownBusy}
+              tour={row.key === tourRowKey}
+              frozen={touring}
               onToggle={() => toggle(row.key)}
               onToggleMore={(value) => toggleMore(row.key, value)}
               onChange={(phase) => editRow(row.key, phase)}
@@ -460,12 +472,14 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               onRemove={() => remove(row.key)}
             />
           ))}
-          {draft.rows.length === 0 && <li className="empty">{emptyNote(page?.exists === true)}</li>}
+          {shownDraft.rows.length === 0 && <li className="empty">{emptyNote(shownPage?.exists === true)}</li>}
         </ul>
       </section>
-      {touring && <Tour steps={tourSteps} onClose={endTour} />}
+      {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
       <footer className={shownStatus?.error === true ? "foot error" : "foot"}>
-        <span id="status">{shownStatus?.text ?? ""}</span>
+        <span id="status" data-tour="status">
+          {shownStatus?.text ?? ""}
+        </span>
       </footer>
     </>
   );

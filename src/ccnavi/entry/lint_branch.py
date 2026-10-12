@@ -165,9 +165,18 @@ def _existing_branch_problems(
 
 
 def _worktree_problems(
-    root: str, conf: settings.Settings, worktrees: list, index: dict, copies: list
+    root: str,
+    conf: settings.Settings,
+    worktrees: list,
+    index: dict,
+    copies: list,
+    known: frozenset = frozenset(),
 ) -> list[Problem]:
-    """ワークツリーの側。チケットの無いツリー、迷い込んだ承認済みチケット、元リポジトリの食い違い、ツリーの無い承認済みチケット。"""
+    """ワークツリーの側。チケットの無いツリー、迷い込んだ承認済みチケット、元リポジトリの食い違い、ツリーの無い承認済みチケット。
+
+    `known` は未承認・閉じた・審査中を含む、チケットの識別子の集まり。
+    直接作業（どのチケットでもないツリー）の名前だけを、`known` と照らして見る。
+    """
     problems: list[Problem] = []
     for t in worktrees:
         if t.name not in index:
@@ -179,6 +188,9 @@ def _worktree_problems(
                     "そこへの書き込みはルールだけで判定する",
                 )
             )
+            text = ticket_ids.direct_name_warning(t.name, conf.branch_prefixes)
+            if text and t.name not in known:
+                problems.append(Problem(SEVERITY_WARN, "(ticket)", text))
 
         bound = index.get(t.name)
         if bound is not None:

@@ -245,3 +245,14 @@ def common_sh(scripts_dir: str = SH_SCRIPTS) -> tuple[str, ...]:
     if "ccnavi-common.sh" not in names:
         raise FileNotFoundError(os.path.join(scripts_dir, "ccnavi-common.sh"))
     return names
+
+
+def put_ccnavi_md(root: str) -> str:
+    """作業ディレクトリに、このリポジトリの `.ccnavi/CCNAVI.md` を写す。
+
+    セッション開始で渡す作業の決まりの原本。
+    """
+    target = os.path.join(root, ".ccnavi", "CCNAVI.md")
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    _shutil.copyfile(os.path.join(ROOT, ".ccnavi", "CCNAVI.md"), target)
+    return target

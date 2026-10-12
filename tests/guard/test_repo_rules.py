@@ -124,7 +124,7 @@ class RepoRulesTest(unittest.TestCase):
             "ccnavi-git-worktree-add",
         )
         self.assertIn("fetch origin", body["response"])
-        self.assertIn("ワークツリーの作り方", body["response"])
+        self.assertIn("ワークツリーを切る", body["response"])
         # ほかのサブコマンドには添えない。
         self.assertNotIn(
             "ccnavi-git-worktree-add",

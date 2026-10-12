@@ -350,7 +350,7 @@ test("CB-D66 読み直せなかった画面からも、再読込を頼める", a
   }
 });
 
-test("CB-D100 拡張ホストが頼んだらリスク管理の案内を出し、閉じたら tourDone を返す。ファイルが無いときは作るボタンから始める", async () => {
+test("CB-D100 拡張ホストが頼んだらリスク管理の基本の案内（題と順序はそのまま）を出し、閉じたら tourDone を返す。ファイルが無くても同じ案内から始まる", async () => {
   const dom = await openRisk();
   try {
     // 案内の入口は ? 1 文字で、ヘッダ（ツールバー）の最後の子。位置は Tour.css が 5 画面とも右上に揃える
@@ -368,11 +368,12 @@ test("CB-D100 拡張ホストが頼んだらリスク管理の案内を出し、
   } finally {
     await dom.close();
   }
+  // ファイルが無いときの説明は、基本の案内の頭には出さず、使い方ごとの案内（create-file）に分けた
   const missing = await openRisk({ exists: false, builtin: true });
   try {
-    missing.click(missing.one('[data-action="tour"]'));
+    await missing.send({ type: "tour" });
     await missing.settle();
-    assert.equal(missing.one("#tour-title").textContent, "まずファイルを作る");
+    assert.equal(missing.one("#tour-title").textContent, "リスクレベルの境目の点");
   } finally {
     await missing.close();
   }

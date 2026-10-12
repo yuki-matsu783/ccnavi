@@ -162,6 +162,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         "レイヤーごとの設定を読んで、判定の材料に組む",
         frozenset(
             {
+                "hook.ccnavimd",
                 "hook.docsearch",
                 "hook.docsearch_index",
                 "hook.docsearch_query",

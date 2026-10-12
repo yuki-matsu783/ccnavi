@@ -190,8 +190,13 @@ def _sweep(tmp_dir: str) -> None:
                 os.remove(path)
 
 
-def _excluded(rel: str, excluded_dirs: tuple[str, ...]) -> bool:
-    return any(rel == d or rel.startswith(d + "/") for d in excluded_dirs)
+def _within(rel: str, dirs: tuple[str, ...]) -> bool:
+    return any(rel == d or rel.startswith(d + "/") for d in dirs)
+
+
+def _excluded(rel: str, excluded_dirs: tuple[str, ...], kept_dirs: tuple[str, ...] = ()) -> bool:
+    """excluded_dirs の下で、kept_dirs の下でないもの。kept_dirs は除外の中の例外。"""
+    return _within(rel, excluded_dirs) and not _within(rel, kept_dirs)
 
 
 def _mtime(seconds: float) -> str:
@@ -493,6 +498,7 @@ def build(
     refresh: bool = True,
     deadline: float | None = None,
     parse: bool = True,
+    kept_dirs: tuple[str, ...] = (),
 ) -> Built:
     """1 つの git の作業ツリー（base）の md の索引を組み、無視されている索引を差分で書く。
 
@@ -512,7 +518,9 @@ def build(
     `.git` が無ければ `NotARepository`、git に聞けなければ `GitFailed`。
     """
     result = Built()
-    listed = [p for p in _listed(base, _left(deadline)) if not _excluded(p, excluded_dirs)]
+    listed = [
+        p for p in _listed(base, _left(deadline)) if not _excluded(p, excluded_dirs, kept_dirs)
+    ]
     by_dir: dict[str, list[str]] = {}
     for rel in listed:
         by_dir.setdefault(rel.rpartition("/")[0], []).append(rel)

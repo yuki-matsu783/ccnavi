@@ -212,10 +212,16 @@ def _worktree(
     消させない）。
     """
     verb = words[1] if len(words) > 1 else ""
+    if verb == "name" and len(words) == 3:
+        # 直接作業の名前の形を言う（warn の 1 行。拒否はしない）。sh の作成の後に呼ぶ。
+        text = ticket_ids.direct_name_warning(words[2], conf.branch_prefixes)
+        if text:
+            stdout.write(f"warn: {text}\n")
+        return EXIT_OK
     if verb not in ("drop", "tidy", "remaining") or len(words) != 3:
         stderr.write(
             "ccnavi: worktree drop <名前> か worktree tidy <親> [--phase <N>]"
-            " か worktree remaining <親>\n"
+            " か worktree remaining <親> か worktree name <名前>\n"
         )
         return EXIT_ERROR
     target = words[2]

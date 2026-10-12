@@ -29,7 +29,7 @@
 #   ccnavi-common-host.sh   ホスト（GitHub / GitLab）への接続（ccnavi_host_*）
 #   ccnavi-common-log.sh    診断ログの 4 つ（log_debug / log_info / log_warn / log_error）。標準出力にも
 #                           標準エラーにも何も出さず、`logs/diag/<出どころ>.log` に 1 行足すだけ。
-#                           決まりは docs/claude/logging.md
+#                           決まりは ccnavi のリポジトリの docs/claude/logging.md
 #
 # 部品が 1 本でも欠けていれば、標準エラーに配り直しを言って 1 で終わる。
 
@@ -184,7 +184,7 @@ ccnavi_bin() {
 
 # 実行ファイルの `--version` が言う互換の版と CCNAVI_COMPAT を比べる。揃っていれば何も出さずに 0、
 # 食い違えば直し方を含む 1 行を標準出力に出して 1 を返す。呼ぶ側はその行を標準エラーへ書き、止めずに先へ進む。
-# 止めるか通すかは実行ファイルと hook が判定する（docs/claude/exe-boundary.md）。
+# 止めるか通すかは実行ファイルと hook が判定する。
 #
 # `--version` を知らない古い実行ファイルは互換の版を答えないので、古い版として知らせる。
 # 直し方は、ccnavi のリポジトリ（build.py とソースがある）なら組み立て直し、配布先なら配り直し。

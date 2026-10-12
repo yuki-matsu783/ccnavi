@@ -18,8 +18,8 @@
 - 対象は各ツリーの `git ls-files --cached --others --exclude-standard` の `*.md`。消したがまだ
   ステージしていないもの（実体が無いもの）と、シンボリックリンク・ふつうのファイルでない
   ものは飛ばす。ccnavi ディレクトリ（`.ccnavi/`）の下はチケットとマーカーの置き場で、
-  文書ではないので載せない。実体のパスがツリーの外に出るディレクトリ（ジャンクションや
-  リンク越し）は読みも書きもしない
+  文書ではないので載せない。ただし使い方の文書の置き場 `.ccnavi/docs/` は載せる。
+  実体のパスがツリーの外に出るディレクトリ（ジャンクションやリンク越し）は読みも書きもしない
 - md が直下にあるディレクトリごとに `ccnavi-index.jsonl`。1 行
   `{"concept_id":…,"directory":…,"frontmatter":{…}|null,"mtime":"YYYY-MM-DDTHH:MM:SS"}`。
   `concept_id` はツリーのルートからの相対パスから `.md` を除いたもの。ルート直下の
@@ -76,7 +76,7 @@ from ..tickets import ticket_places
 from . import docsearch_index, docsearch_query
 
 # 規約の詳しい文書。ワークスペースに在るときだけ案内に名前を出す。
-CONVENTION_DOC = "docs/claude/frontmatter.md"
+CONVENTION_DOC = ".ccnavi/docs/frontmatter.md"
 
 
 def _rel(path: str, root: str) -> str:
@@ -97,10 +97,21 @@ class Place:
     base: str
     prefix: str
     excluded: tuple[str, ...]
+    # excluded の中で索引に載せる例外（ccnavi ディレクトリの文書の置き場）。
+    kept: tuple[str, ...] = ()
 
 
 # 案内と標準エラーで、ワークスペース自身を指す名前。
 WORKSPACE = "ワークスペース"
+
+
+# ccnavi ディレクトリの下で、使い方の文書を置く場所。ここだけは索引に載せる。
+DOCS_DIR = "docs"
+
+
+def kept_dirs(home: str) -> tuple[str, ...]:
+    """ccnavi ディレクトリ（home）を除外するなかで、索引に載せる例外。"""
+    return (f"{home}/{DOCS_DIR}",) if home else ()
 
 
 def places(conf: settings.Settings, root: str) -> list[Place]:
@@ -116,12 +127,13 @@ def places(conf: settings.Settings, root: str) -> list[Place]:
     projects_rel = _rel(conf.projects, root) if conf.projects else ""
     if projects_rel:
         workspace_excluded.append(projects_rel)
-    found = [Place(WORKSPACE, root, "", tuple(workspace_excluded))]
+    kept = kept_dirs(home)
+    found = [Place(WORKSPACE, root, "", tuple(workspace_excluded), kept)]
     for project in tree.projects(conf.projects):
         prefix = _rel(project.root, root)
         if not prefix:
             prefix = f"{os.path.basename(os.path.normpath(conf.projects))}/{project.project}"
-        found.append(Place(project.project, project.root, prefix, own))
+        found.append(Place(project.project, project.root, prefix, own, kept))
     return found
 
 
@@ -191,7 +203,12 @@ def collect(
             break
         try:
             built = docsearch_index.build(
-                place.base, place.excluded, refresh=refresh, deadline=deadline, parse=parse
+                place.base,
+                place.excluded,
+                refresh=refresh,
+                deadline=deadline,
+                parse=parse,
+                kept_dirs=place.kept,
             )
         except docsearch_index.NotARepository:
             continue
@@ -320,7 +337,7 @@ def _has_md(root: str) -> bool:
 
 # 案内で名指しする、触らなかった ccnavi-index.jsonl の数の上限。
 FOREIGN_SHOWN = 3
-# 引き方の案内の頭。作業の決まり（`reasons.conventions`）が、この案内を出した回にだけ
+# 引き方の案内の頭。作業の決まり（`ccnavimd.session_text`）が、この案内を出した回にだけ
 # 「詳しくは --docs で引く」を添えるのに使う。
 GUIDE_HEAD = "[ccnavi] ドキュメント（*.md）を探すときは"
 
@@ -447,7 +464,11 @@ def missing_frontmatter(conf: settings.Settings, root: str, payload: hookio.Inpu
         rel = tree.relative(where, written)
         home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).strip("/")
         exempt = tuple(p for p in (home, ticket_places.SCRATCH, conf.tickets.strip("/")) if p)
-        if not rel or rel.startswith("../") or docsearch_index._excluded(rel, exempt):
+        if (
+            not rel
+            or rel.startswith("../")
+            or docsearch_index._excluded(rel, exempt, kept_dirs(home))
+        ):
             return ""
         if _NO_FRONTMATTER.match(rel):
             return ""

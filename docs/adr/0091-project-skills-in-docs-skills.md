@@ -11,7 +11,7 @@ keywords: [スキル, プロジェクト, docs/skills, 目録, SKILL.md, 振り�
 
 ## 状況
 
-振り返り（ADR-0090、`docs/claude/skill-review.md`）で拾った手順を、プロジェクトの作業にも残したいという要望が出た
+振り返り（ADR-0090、`.ccnavi/docs/skill-review.md`）で拾った手順を、プロジェクトの作業にも残したいという要望が出た
 （2026-09-27）。スキルの置き場は Claude Code の決まりでは `.claude/skills/` だが、プロジェクトは `.claude/` を持たない
 決まり（ADR-0033、REQ-MLT-16）。Claude Code がそこのスキルを読み、ワークスペースルートの決め方も最初の `.claude/` で
 止まるので、cd 1 回で別のルートに見える。

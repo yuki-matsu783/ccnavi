@@ -23,6 +23,11 @@
  * 実行ファイルに確かめさせた中身が届き（`proposal`）、文の前後まで見せる差分（`Proposal.tsx`）から「取り込む」で
  * 編集中の内容に入れる（`edit()` を通すので元に戻せる）。保存のときに取り込んだ下書きのハッシュを添え、拡張ホストは
  * 保存が通ったあと、同じ中身の下書きだけを消す。依頼のボタン（`request`）は着手の前だけ拡張ホストが言葉を渡す。
+ *
+ * 案内（`tours/flow.yml`）。 案内の間は、実際のフローではなく案内用の見本（`core/tour-flow.ts`）を描く。見本の上の様子
+ * （どの見本か・選ぶノード・未保存か・差分や下書きを出すか）は段ごとの `scene` が決め、画面の state には入れない。
+ * 実際の編集内容・履歴・選択・保存・下書きには触れず、案内の間は編集・保存・拡張ホストへの送信（`post.ts` の `muteForTour`）が動かない。
+ * 閉じたら実際の表示に戻る。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 
@@ -50,18 +55,21 @@ import {
   type PaletteType,
 } from "../../core/flow-doc.js";
 import { canRedo, canUndo, emptyHistory, record, redo, seal, undo, type FlowHistory } from "../../core/flow-history.js";
-import type { FlowChecks, FlowData, FlowLock, FlowOffer, FlowPage, FlowProposal, ToFlow } from "../../core/flow-view.js";
+import { lockedReason, OPEN_LOCK, type FlowChecks, type FlowData, type FlowLock, type FlowOffer, type FlowPage, type FlowProposal, type ToFlow } from "../../core/flow-view.js";
+import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
+import { parseFlowSample, sceneOf } from "../../core/tour-flow.js";
 import { applyAppearance } from "../appearance.js";
-import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
+import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
 import { graphMaximized } from "../shared/Maximize.js";
 import { mergeState, readState } from "../vscode.js";
 import { Canvas, type Selection } from "./Canvas.js";
 import { Inspector } from "./Inspector.js";
-import { post } from "./post.js";
+import { muteForTour, post } from "./post.js";
 import { Preview } from "./Preview.js";
 import { ProposalReview, RequestText, type ProposalView } from "./Proposal.js";
 import { SaveReview } from "./SaveReview.js";
 import { badgeOf } from "./text.js";
+import flowTour from "../tours/flow.yml";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
 const NO_LOCK: FlowLock = { locked: true, reason: "" };
@@ -140,31 +148,23 @@ function inField(target: EventTarget | null): boolean {
   return tag === "input" || tag === "textarea" || tag === "select" || element.isContentEditable === true;
 }
 
-const TOUR_STEPS: readonly TourStep[] = [
-  {
-    target: "#flow-palette",
-    title: "部品箱",
-    body: "押すと、ノードが図に足されます。ユーザに聞く（askUserQuestion）ノードでは、担当のサブエージェントが手を止めてメインに返します。サブエージェントのノードは入れ子のサブエージェントとして起動し、入れ子の上限に達したらメインに返します。",
-  },
-  {
-    target: "#flow-graph",
-    title: "図",
-    body:
-      "ノードの右の点から次のノードの左の点へドラッグすると、線でつながります（開始へ入る線と、終了から出る線は引けません）。ノードや線を押すと、右の欄で中身を直せます。ノードや線にポインタを載せると × が出て、押すと消せます。" +
-      "Shift を押しながらノードを押すか、Shift を押しながら何も無いところをドラッグして囲むと、複数のノードを選べます。選んだノードは「グループ化」で枠にまとめられます。枠の中へドラッグしたノードは枠に入り、外へドラッグすると枠から出ます。" +
-      "Ctrl+Z で元に戻し、Ctrl+Shift+Z（Ctrl+Y）でやり直せます。選んだノードは Ctrl+C でコピーして Ctrl+V で貼り付け、Ctrl+D で複製できます（開始はコピーしません）。",
-  },
-  {
-    target: "#inspector",
-    title: "欄",
-    body: "選んだノードの中身（プロンプト、問いと選択肢、分岐の条件など）を直せます。この画面に入力欄が無い種類は、名前だけを直せて、中身はそのまま残ります。",
-  },
-  {
-    target: "#save",
-    title: "保存",
-    body: "読み込んだ時点からの変更（足した・消した・変えたノードと線）を一覧で表示してから保存します。保存の直前に、子チケットが着手中でないかを ccnavi に確かめ直します。着手中なら書き込みません（担当のサブエージェントが読んでいる手順が、途中で変わるのを防ぐためです）。",
-  },
-];
+/** 案内（`tours/flow.yml`）と、案内の間だけ描く見本。実際のフローにも、画面が持つ編集中の内容にも触れない */
+const TOUR = tourOf(flowTour);
+const SAMPLE = parseFlowSample(TOUR.sample);
+const NO_SCENE: Scene = {};
+const NOOP = (): void => undefined;
+/** 部品箱のボタンの印（`data-tour="palette-<ここ>"`）。小文字の英字と - だけ */
+const PALETTE_MARKS: Readonly<Record<PaletteType, string>> = {
+  start: "start",
+  end: "end",
+  prompt: "prompt",
+  subAgent: "sub-agent",
+  askUserQuestion: "ask",
+  ifElse: "if-else",
+  switch: "switch",
+  loop: "loop",
+  skill: "skill",
+};
 
 export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [data, setData] = useState<FlowData>(initial);
@@ -183,6 +183,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [minimap, setMinimap] = useState(minimapShown);
   const [folded, setFolded] = useState<Readonly<Record<Side, boolean>>>(() => ({ palette: sideFolded("palette"), side: sideFolded("side") }));
   const toggleSide = (side: Side): void => {
+    // 案内の間は畳んだ欄も開いて見せる（畳み直さない）。覚えている状態も変えない
+    if (tour.touring) {
+      return;
+    }
     setFolded((now) => {
       const next = !now[side];
       rememberSideFolded(side, next);
@@ -212,7 +216,26 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [requestText, setRequestText] = useState<string | undefined>(undefined);
   // 取り込んだ下書きのハッシュと中身。編集中の中身が取り込んだ中身と同じ間だけ持ち、保存に付ける（違えば下書きを消させない）
   const imported = useRef<{ readonly hash: string; readonly doc: FlowDoc } | undefined>(undefined);
-  const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
+  // 案内の間の見本の上の様子（どの見本か・選ぶノードなど）。実際の選択や編集は動かさないので、閉じたあとに戻すものは図の選択だけ
+  const [scene, setScene] = useState<Scene>(NO_SCENE);
+  const tour = useTour(data.kind === "page", {
+    onStart: () => {
+      muteForTour(true);
+      setScene(NO_SCENE);
+    },
+    onEnd: () => {
+      muteForTour(false);
+      setScene(NO_SCENE);
+      // 案内で図を作り直したので、実際の図は選んでいたノードを選び直して始める
+      setFocus({ ids: picked });
+      post({ type: "tourDone" });
+    },
+  });
+  const sc = sceneOf(SAMPLE, scene);
+  // 段の様子が替わるたびに新しい値にする（図は替わったときだけ、そのノードを選び直す）
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const tourFocus = useMemo(() => ({ ids: sc.picked }), [scene]);
+
   // 案内の間は、畳んだ欄も開いて見せる（案内が指す部品箱と右の欄が見えるように）。覚えている状態は変えない
   const fold = { palette: folded.palette && !tour.touring, side: folded.side && !tour.touring };
   const requestTour = tour.request;
@@ -307,16 +330,20 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
 
   const sentDirty = useRef(false);
   useEffect(() => {
-    if (sentDirty.current !== dirty) {
+    // 案内の間は送らない（閉じたあとにもう一度見て、送り損ねたぶんを送る）
+    if (!tour.touring && sentDirty.current !== dirty) {
       sentDirty.current = dirty;
       post({ type: "dirty", dirty });
     }
-  }, [dirty]);
+  }, [dirty, tour.touring]);
 
   // 未保存のコピーを拡張ホストに覚えさせる（未保存のまま閉じられたら、開き直して戻せるように）。
   // 打つたびには送らず、止まってから送る。未保存でなくなったら覚えたコピーを消させる
   const sentDraft = useRef(false);
   useEffect(() => {
+    if (tour.touring) {
+      return;
+    }
     if (!dirty) {
       if (sentDraft.current) {
         sentDraft.current = false;
@@ -331,7 +358,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       }
     }, DRAFT_MS);
     return () => clearTimeout(timer);
-  }, [doc, dirty]);
+  }, [doc, dirty, tour.touring]);
 
   // 図で選んでいるノードが変わった。毎回同じ関数を渡す（React Flow は onSelectionChange が替わるたびに
   // その時の選択で呼び直すので、描くたびに作り直すと、押した直後の古い選択で呼ばれる）
@@ -344,7 +371,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
 
   // 編集が止まったら実行ファイルに確かめ直させる。出している答えが指すコピーと同じなら頼まない
   useEffect(() => {
-    if (doc === undefined || pendingDoc.current === doc) {
+    if (doc === undefined || pendingDoc.current === doc || tour.touring) {
       return;
     }
     // コピーが替わった。待っていた答えは古いコピーのものなので捨てる（番号を進める）
@@ -362,7 +389,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       post({ type: "check", seq: checkSeq.current, doc });
     }, CHECK_MS);
     return () => clearTimeout(timer);
-  }, [doc]);
+  }, [doc, tour.touring]);
 
   // 取り込んだ中身から編集で離れたら、取り込んだ記録を外す（元に戻して同じ中身にしても付け直さない。下書きを消さない側）
   useEffect(() => {
@@ -411,7 +438,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
    * 同じ欄に続けて打ったものは 1 件にまとめる
    */
   const edit = (next: FlowDoc, typing?: string): void => {
-    if (lock.locked || next === doc) {
+    if (tour.touring || lock.locked || next === doc) {
       return;
     }
     const at = now();
@@ -421,7 +448,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
 
   /** 戻した・やり直したコピーに無いものを選んでいたら外す（線は配列の位置で指すので、線の選択は外す） */
   const travel = (moved: { readonly history: FlowHistory; readonly doc: FlowDoc } | undefined): void => {
-    if (moved === undefined || readOnly) {
+    if (moved === undefined || readOnly || tour.touring) {
       return;
     }
     setHistory(moved.history);
@@ -434,12 +461,18 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const redoEdit = (): void => travel(redo(history, doc));
 
   const reload = (): void => {
+    if (tour.touring) {
+      return;
+    }
     setBusy(true);
     setStatus(undefined);
     post({ type: "reload", dirty });
   };
 
   const add = (type: PaletteType): void => {
+    if (tour.touring) {
+      return;
+    }
     const added = addNode(doc, type, nextSpot(doc));
     edit(added.doc);
     setSelected({ kind: "node", id: added.id });
@@ -448,6 +481,9 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
 
   /** 消したものを選んでいたら、選ぶのをやめる（線は配列の位置で指すので、線を消したら線の選択は外す） */
   const removeNodeAt = (id: string): void => {
+    if (tour.touring) {
+      return;
+    }
     edit(removeNode(doc, id));
     // ノードと一緒に線も消えて配列の位置がずれるので、線の選択も外す
     if ((selected?.kind === "node" && selected.id === id) || selected?.kind === "edge") {
@@ -455,6 +491,9 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     }
   };
   const removeEdgeAt = (index: number): void => {
+    if (tour.touring) {
+      return;
+    }
     edit(removeConnectionAt(doc, index));
     if (selected?.kind === "edge") {
       setSelected(undefined);
@@ -464,6 +503,9 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   // グループ化できるのは、グループでないノードを 2 つ以上選んでいるとき
   const groupable = picked.filter((id) => doc.nodes.some((node) => node.id === id && !isGroup(node)));
   const group = (): void => {
+    if (tour.touring) {
+      return;
+    }
     const grouped = groupNodes(doc, groupable);
     if (grouped === undefined) {
       return;
@@ -484,6 +526,9 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   const copy = (): void => {
+    if (tour.touring) {
+      return;
+    }
     const copied = copyNodes(doc, chosen);
     if (copied === undefined) {
       setStatus({ text: "コピーできるノードが選ばれていません（開始はコピーしません）", error: false });
@@ -496,7 +541,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
 
   const paste = (): void => {
     const held = clip.current;
-    if (held === undefined || readOnly) {
+    if (held === undefined || readOnly || tour.touring) {
       return;
     }
     held.pasted += 1;
@@ -507,7 +552,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   const duplicate = (): void => {
-    if (readOnly) {
+    if (readOnly || tour.touring) {
       return;
     }
     const made = duplicateNodes(doc, chosen);
@@ -521,12 +566,18 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   const toggleMinimap = (): void => {
+    if (tour.touring) {
+      return;
+    }
     const next = !minimap;
     setMinimap(next);
     rememberMinimap(next);
   };
 
   const sendSave = (): void => {
+    if (tour.touring) {
+      return;
+    }
     setReview(undefined);
     setBusy(true);
     setStatus({ text: "着手中でないかを確かめて保存中…", error: false });
@@ -535,13 +586,16 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   const openProposal = (): void => {
+    if (tour.touring) {
+      return;
+    }
     setProposal({ kind: "loading" });
     post({ type: "openProposal" });
   };
 
   /** 下書きの中身を編集中の内容に入れる。書かない（保存はいつもの経路）。着手中は入れない */
   const importProposal = (taken: FlowProposal): void => {
-    if (lock.locked) {
+    if (lock.locked || tour.touring) {
       return;
     }
     edit(taken.doc);
@@ -552,6 +606,9 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   const save = (): void => {
+    if (tour.touring) {
+      return;
+    }
     // 未保存なら、差分が空（順序だけ変わった）でも一覧を出す（一覧がそう言う）
     if (reviewSave && dirty) {
       setReview(diffFlows(base, doc));
@@ -561,6 +618,9 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   const confirmSave = (skipNext: boolean): void => {
+    if (tour.touring) {
+      return;
+    }
     if (skipNext) {
       setReviewSave(false);
       post({ type: "reviewSave", value: false });
@@ -569,6 +629,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   };
 
   onKey.current = (event: KeyboardEvent): void => {
+    // 案内の間は、案内が受ける（Esc・矢印・Tab）。裏の編集（Ctrl+Z など）は動かさない
+    if (tour.touring) {
+      return;
+    }
     // 図を全画面にしている間は、見えない文書を直さない
     if (graphMaximized()) {
       return;
@@ -609,26 +673,53 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     }
   };
 
+  const touring = tour.touring;
+
+  // 案内の間に描くもの。実際の値は触らず、見本の上の様子（scene）から決める
+  const courses = coursesOf(TOUR, setScene);
+  const sampleGroupable = sc.picked.filter((id) => sc.flow.doc.nodes.some((node) => node.id === id && !isGroup(node)));
+  const shownPage = touring ? { ...SAMPLE.page, exists: true } : page;
+  const shownDoc = touring ? sc.flow.doc : doc;
+  const shownLock: FlowLock = touring ? (sc.lock ? { locked: true, reason: lockedReason(SAMPLE.page.ticket) } : OPEN_LOCK) : lock;
+  const shownReadOnly = touring ? sc.lock : readOnly;
+  const shownDirty = touring ? sc.dirty : dirty;
+  const shownChanged = touring ? sc.changed : changed;
+  const shownOffer = touring ? (sc.offer ? SAMPLE.offer : undefined) : offer;
+  const shownRequest = touring ? SAMPLE.request : request;
+  const shownChecks = touring ? sc.flow.checks : checks;
+  const shownChecking = touring ? sc.checking : checking;
+  const shownCheckError = touring ? undefined : checkError;
+  const shownNotices = touring ? flowNotices(sc.flow.doc, { exe: true }) : notices;
+  const shownSelected: Selection | undefined = touring ? sc.selected : selected;
+  const shownMinimap = touring ? sc.minimap : minimap;
+  const shownBusy = touring ? false : busy;
+  const canUndoNow = touring ? sc.history : canUndo(history);
+  const canRedoNow = touring ? sc.history : canRedo(history);
+  const copyableNow = touring ? sc.picked.length > 0 : copyable;
+  const hasClipNow = touring ? sc.clip : hasClip;
+  const groupableCount = touring ? sampleGroupable.length : groupable.length;
+
   return (
     <>
-      {lock.locked && (
-        <div id="lock" className="lock" role="status">
-          {lock.reason === "" ? "着手中かどうかを確かめられないため、読み取り専用で開いています。" : lock.reason}
+      {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
+      {shownLock.locked && (
+        <div id="lock" className="lock" data-tour="lock" role="status">
+          {shownLock.reason === "" ? "着手中かどうかを確かめられないため、読み取り専用で開いています。" : shownLock.reason}
         </div>
       )}
-      <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
+      <div id="changed" data-tour="changed" className={shownChanged ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。再読込してください。
-        <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" disabled={shownBusy} onClick={reload}>
           再読込
         </button>
       </div>
-      {offer !== undefined && (
-        <div id="offer" className="banner missing" role="status">
+      {shownOffer !== undefined && (
+        <div id="offer" data-tour="offer" className="banner missing" role="status">
           <span>
-            提案あり: エージェントの下書き（{offer.draftPath}）が、いまのフローと違います。
-            {offer.problem !== undefined && <span className="dim">（読めません: {offer.problem}）</span>}
+            提案あり: エージェントの下書き（{shownOffer.draftPath}）が、いまのフローと違います。
+            {shownOffer.problem !== undefined && <span className="dim">（読めません: {shownOffer.problem}）</span>}
           </span>
-          <button type="button" className="action" data-action="open-proposal" disabled={busy} onClick={openProposal}>
+          <button type="button" className="action" data-action="open-proposal" disabled={shownBusy} onClick={openProposal}>
             提案を見る
           </button>
         </div>
@@ -636,77 +727,79 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       <header className="toolbar">
         <div className="summary">
           <span className="flow-ticket">
-            <strong>{page.ticket}</strong> {page.title}
+            <strong>{shownPage.ticket}</strong> {shownPage.title}
           </span>
-          <span className="path" title={`${page.flowRel}（承認済みの領域です。書き込むのもコミットするのもユーザだけです）`}>
-            {page.flowPath}
+          <span className="path" title={`${shownPage.flowRel}（承認済みの領域です。書き込むのもコミットするのもユーザだけです）`}>
+            {shownPage.flowPath}
           </span>
-          {!page.exists && <span className="dim">（ファイルはまだありません。保存すると作られます）</span>}
-          <span id="dirty" className={dirty ? "dirty" : "dirty hidden"}>
+          {!shownPage.exists && <span className="dim">（ファイルはまだありません。保存すると作られます）</span>}
+          <span id="dirty" data-tour="dirty" className={shownDirty ? "dirty" : "dirty hidden"}>
             未保存
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="undo" disabled={readOnly || !canUndo(history)} title="元に戻す（Ctrl+Z）" onClick={undoEdit}>
+          <button type="button" className="action" data-action="undo" data-tour="undo" disabled={shownReadOnly || !canUndoNow} title="元に戻す（Ctrl+Z）" onClick={undoEdit}>
             元に戻す
           </button>
-          <button type="button" className="action" data-action="redo" disabled={readOnly || !canRedo(history)} title="やり直す（Ctrl+Shift+Z / Ctrl+Y）" onClick={redoEdit}>
+          <button type="button" className="action" data-action="redo" data-tour="redo" disabled={shownReadOnly || !canRedoNow} title="やり直す（Ctrl+Shift+Z / Ctrl+Y）" onClick={redoEdit}>
             やり直す
           </button>
-          <button type="button" className="action" data-action="copy-nodes" disabled={!copyable} title="選んだノードと、それらをつなぐ線をコピーします（Ctrl+C）。開始はコピーしません" onClick={copy}>
+          <button type="button" className="action" data-action="copy-nodes" data-tour="copy" disabled={!copyableNow} title="選んだノードと、それらをつなぐ線をコピーします（Ctrl+C）。開始はコピーしません" onClick={copy}>
             コピー
           </button>
-          <button type="button" className="action" data-action="paste-nodes" disabled={readOnly || !hasClip} title="コピーしたノードを貼り付けます（Ctrl+V）" onClick={paste}>
+          <button type="button" className="action" data-action="paste-nodes" data-tour="paste" disabled={shownReadOnly || !hasClipNow} title="コピーしたノードを貼り付けます（Ctrl+V）" onClick={paste}>
             貼り付け
           </button>
-          <button type="button" className="action" data-action="duplicate-nodes" disabled={readOnly || !copyable} title="選んだノードをその場で複製します（Ctrl+D）。開始は複製しません" onClick={duplicate}>
+          <button type="button" className="action" data-action="duplicate-nodes" data-tour="duplicate" disabled={shownReadOnly || !copyableNow} title="選んだノードをその場で複製します（Ctrl+D）。開始は複製しません" onClick={duplicate}>
             複製
           </button>
           <button
             type="button"
             className="action"
             data-action="group-nodes"
-            disabled={readOnly || groupable.length < 2}
+            data-tour="group"
+            disabled={shownReadOnly || groupableCount < 2}
             title="Shift を押しながらノードを 2 つ以上選ぶと、枠（グループ）にまとめられます。枠は図の上の囲みで、手順は変わりません"
             onClick={group}
           >
             グループ化
           </button>
-          <button type="button" className="action" data-action="toggle-minimap" aria-pressed={minimap} title="図の右下のミニマップを出す・隠す" onClick={toggleMinimap}>
-            {minimap ? "ミニマップを隠す" : "ミニマップを出す"}
+          <button type="button" className="action" data-action="toggle-minimap" data-tour="minimap" aria-pressed={shownMinimap} title="図の右下のミニマップを出す・隠す" onClick={toggleMinimap}>
+            {shownMinimap ? "ミニマップを隠す" : "ミニマップを出す"}
           </button>
-          {request !== undefined && !lock.locked && (
+          {shownRequest !== undefined && !shownLock.locked && (
             <button
               type="button"
               className="action"
               data-action="request-flow"
-              disabled={busy}
+              data-tour="request"
+              disabled={shownBusy}
               title="エージェントへの依頼の文を組みます。エージェントは下書きを書くだけで、取り込むかはこの画面で決めます"
               onClick={() => post({ type: "request" })}
             >
-              {request}
+              {shownRequest}
             </button>
           )}
-          <button type="button" className="action" data-action="open-flow" disabled={!page.exists} onClick={() => post({ type: "openFile" })}>
+          <button type="button" className="action" data-action="open-flow" disabled={!shownPage.exists} onClick={() => post({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" disabled={shownBusy} onClick={reload}>
             再読込
           </button>
-          <button type="button" className="action primary" id="save" data-action="save" disabled={lock.locked || busy || (!dirty && page.exists)} onClick={save}>
+          <button type="button" className="action primary" id="save" data-action="save" data-tour="save" disabled={shownLock.locked || shownBusy || (!shownDirty && shownPage.exists)} onClick={save}>
             保存
           </button>
         </div>
-        <TourButton onClick={tour.start} />
+        <TourButton courses={courses} onPick={tour.start} />
       </header>
-      {notices.length + (checks?.warns.length ?? 0) > 0 && (
-        <ul className="problems" id="flow-notices">
-          {notices.map((notice) => (
+      {shownNotices.length + (shownChecks?.warns.length ?? 0) > 0 && (
+        <ul className="problems" id="flow-notices" data-tour="notices">
+          {shownNotices.map((notice) => (
             <li key={notice} data-source="screen">
               {notice}
             </li>
           ))}
-          {(checks?.warns ?? []).map((warn, index) => (
+          {(shownChecks?.warns ?? []).map((warn, index) => (
             <li key={`exe-${index}`} data-source="exe" title="ccnavi --lint --flow の warn です（保存は止めません）">
               {warn}
             </li>
@@ -714,14 +807,14 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         </ul>
       )}
       <div className="flow-body" data-palette-folded={fold.palette ? "1" : "0"} data-side-folded={fold.side ? "1" : "0"}>
-        <nav className="flow-palette" id="flow-palette" aria-label="部品箱" data-folded={fold.palette ? "1" : "0"}>
+        <nav className="flow-palette" id="flow-palette" data-tour="palette" aria-label="部品箱" data-folded={fold.palette ? "1" : "0"}>
           <button type="button" className="action small flow-fold" data-action="toggle-palette" aria-expanded={!fold.palette} title={fold.palette ? "部品箱を開く" : "部品箱を畳む"} onClick={() => toggleSide("palette")}>
             {fold.palette ? "▶ 部品" : "◀ 部品"}
           </button>
           {PALETTE.map((type) => {
             const badge = badgeOf(type);
             return (
-              <button key={type} type="button" className="action small palette-item" data-action="add-node" data-type={type} disabled={readOnly} title={badge?.title} onClick={() => add(type)}>
+              <button key={type} type="button" className="action small palette-item" data-action="add-node" data-tour={`palette-${PALETTE_MARKS[type]}`} data-type={type} disabled={shownReadOnly} title={badge?.title} onClick={() => add(type)}>
                 {TYPE_LABELS[type]}
                 {badge !== undefined && <span className={`flow-badge ${badge.kind}`}>{badge.kind === "ask" ? "戻る" : "入れ子"}</span>}
               </button>
@@ -729,13 +822,16 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           })}
         </nav>
         <Canvas
-          doc={doc}
-          readOnly={readOnly}
-          selected={selected}
-          onSelect={setSelected}
-          focus={focus}
-          minimap={minimap}
-          onPick={pick}
+          // 案内の見本と実際のフローは別の図にする（組み直すと、収まる位置も選びも見本のものになる）。見本は見本の名前ごとに組み直す
+          key={touring ? `tour:${sc.name}` : "real"}
+          doc={shownDoc}
+          readOnly={touring || readOnly}
+          selected={shownSelected}
+          onSelect={touring ? NOOP : setSelected}
+          focus={touring ? tourFocus : focus}
+          minimap={shownMinimap}
+          marks={touring}
+          onPick={touring ? NOOP : pick}
           onMove={(moves) => {
             // 押しただけ（動かしていない）なら未保存にしない（placeNodes が同じものを返す）
             const next = placeNodes(doc, moves);
@@ -754,22 +850,35 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
             }
           }}
         />
-        <div className="flow-side" data-folded={fold.side ? "1" : "0"}>
+        <div className="flow-side" data-tour="side" data-folded={fold.side ? "1" : "0"}>
           <button type="button" className="action small flow-fold" data-action="toggle-side" aria-expanded={!fold.side} title={fold.side ? "右の欄を開く" : "右の欄を畳む"} onClick={() => toggleSide("side")}>
             {fold.side ? "◀ 詳細" : "詳細 ▶"}
           </button>
-          <Inspector doc={doc} selected={selected} readOnly={readOnly} onChange={edit} onSeal={() => setHistory(seal)} onSelect={setSelected} candidates={checks?.candidates} />
-          <Preview checks={checks} checking={checking} error={checkError} />
+          <Inspector
+            doc={shownDoc}
+            selected={shownSelected}
+            readOnly={shownReadOnly}
+            onChange={touring ? NOOP : edit}
+            onSeal={touring ? NOOP : () => setHistory(seal)}
+            onSelect={touring ? NOOP : setSelected}
+            candidates={shownChecks?.candidates}
+          />
+          <Preview checks={shownChecks} checking={shownChecking} error={shownCheckError} />
         </div>
       </div>
-      {tour.touring && <Tour steps={TOUR_STEPS} onClose={tour.end} />}
-      {review !== undefined && <SaveReview diff={review} onConfirm={confirmSave} onCancel={() => setReview(undefined)} />}
-      {proposal !== undefined && (
+      {touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
+      {!touring && review !== undefined && <SaveReview diff={review} onConfirm={confirmSave} onCancel={() => setReview(undefined)} />}
+      {touring && sc.review && <SaveReview diff={diffFlows(sc.base.doc, sc.flow.doc)} onConfirm={NOOP} onCancel={NOOP} />}
+      {!touring && proposal !== undefined && (
         <ProposalReview view={proposal} base={base} lock={lock} dirty={dirty} onImport={importProposal} onCancel={() => setProposal(undefined)} />
       )}
-      {requestText !== undefined && <RequestText prompt={requestText} onClose={() => setRequestText(undefined)} />}
-      <footer className={status?.error === true ? "foot error" : "foot"}>
-        <span id="status">{status?.text ?? ""}</span>
+      {touring && sc.proposal && (
+        <ProposalReview view={{ kind: "ready", proposal: SAMPLE.proposal }} base={sc.base.doc} lock={shownLock} dirty={sc.dirty} onImport={NOOP} onCancel={NOOP} />
+      )}
+      {!touring && requestText !== undefined && <RequestText prompt={requestText} onClose={() => setRequestText(undefined)} />}
+      {touring && sc.requestText && <RequestText prompt={SAMPLE.requestPrompt} onClose={NOOP} />}
+      <footer className={!touring && status?.error === true ? "foot error" : "foot"}>
+        <span id="status">{touring ? "" : status?.text ?? ""}</span>
       </footer>
     </>
   );

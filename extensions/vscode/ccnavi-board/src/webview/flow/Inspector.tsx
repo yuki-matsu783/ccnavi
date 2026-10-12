@@ -90,13 +90,13 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect,
         return node === undefined ? `${id}（見つかりません）` : nodeName(node) || id;
       };
       return (
-        <aside className="inspector" id="inspector" data-selected="edge" onBlur={onSeal}>
+        <aside className="inspector" id="inspector" data-tour="inspector" data-selected="edge" onBlur={onSeal}>
           <h2>線</h2>
           <p className="mono small">
             {name(connectionFrom(connection))} → {name(connectionTo(connection))}
           </p>
           <p className="dim small">出口: {connectionFromPort(connection)}{connectionLabel(doc, connection) !== "" ? `（${connectionLabel(doc, connection)}）` : ""}</p>
-          <label className="field">
+          <label className="field" data-tour="inspector-condition">
             <span title="condition">条件</span>
             <input
               type="text"
@@ -126,7 +126,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect,
     }
   }
   return (
-    <aside className="inspector" id="inspector" data-selected="flow" onBlur={onSeal}>
+    <aside className="inspector" id="inspector" data-tour="inspector" data-selected="flow" onBlur={onSeal}>
       <h2>フロー</h2>
       <label className="field">
         <span title="name">名前</span>
@@ -148,8 +148,8 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
   const badge = badgeOf(type);
   const members = group ? doc.nodes.filter((n) => groupOf(doc, n)?.id === node.id).length : 0;
   const host = groupOf(doc, node);
-  const text = (key: string, label: string, options: { readonly area?: boolean; readonly placeholder?: string } = {}): JSX.Element => (
-    <label className="field">
+  const text = (key: string, label: string, options: { readonly area?: boolean; readonly placeholder?: string; readonly tour?: string } = {}): JSX.Element => (
+    <label className="field" data-tour={options.tour}>
       <span title={`data.${key}`}>{label}</span>
       {options.area === true ? (
         <textarea className={`f-${key}`} rows={5} value={dataText(node, key)} placeholder={options.placeholder} disabled={readOnly} onChange={(event) => onChange(patchData(doc, node.id, { [key]: event.target.value }), `node:${node.id}:${key}`)} />
@@ -159,11 +159,11 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
     </label>
   );
   /** 候補から選べる欄。`list` は datalist の id。候補が無ければふつうの欄 */
-  const pickable = (key: string, label: string, list: readonly LintFlowCandidate[] | undefined, listId: string, placeholder: string): JSX.Element => {
+  const pickable = (key: string, label: string, list: readonly LintFlowCandidate[] | undefined, listId: string, placeholder: string, tour?: string): JSX.Element => {
     const value = dataText(node, key);
     const found = list === undefined ? undefined : candidateOf(list, value);
     return (
-      <label className="field">
+      <label className="field" data-tour={tour}>
         <span title={`data.${key}`}>{label}</span>
         <input
           type="text"
@@ -190,7 +190,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
     );
   };
   return (
-    <aside className="inspector" id="inspector" data-selected="node" data-type={type} onBlur={onSeal}>
+    <aside className="inspector" id="inspector" data-tour="inspector" data-selected="node" data-type={type} onBlur={onSeal}>
       <h2>
         {TYPE_LABELS[type] ?? (type || "種類なし")} <span className="mono small dim">{node.id}</span>
       </h2>
@@ -205,18 +205,18 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
         <input type="text" className="f-name" value={nodeName(node)} disabled={readOnly} onChange={(event) => onChange(renameNode(doc, node.id, event.target.value), `node:${node.id}:name`)} />
       </label>
       {(type === "start" || type === "end") && text("label", "説明")}
-      {type === "prompt" && text("prompt", "プロンプト", { area: true })}
+      {type === "prompt" && text("prompt", "プロンプト", { area: true, tour: "inspector-prompt" })}
       {type === "subAgent" && (
         <>
           {text("description", "何を任せるか")}
-          {pickable("builtInType", "サブエージェントの種類", candidates?.agents, "flow-agent-candidates", "general-purpose / Explore / Plan など")}
-          {text("prompt", "プロンプト", { area: true })}
+          {pickable("builtInType", "サブエージェントの種類", candidates?.agents, "flow-agent-candidates", "general-purpose / Explore / Plan など", "inspector-agent")}
+          {text("prompt", "プロンプト", { area: true, tour: "inspector-prompt" })}
         </>
       )}
       {type === "askUserQuestion" && (
         <>
-          {text("questionText", "問い", { area: true })}
-          <label className="field check">
+          {text("questionText", "問い", { area: true, tour: "inspector-question" })}
+          <label className="field check" data-tour="inspector-multiselect">
             <input
               type="checkbox"
               className="f-multiSelect"
@@ -228,10 +228,10 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
           </label>
         </>
       )}
-      {(type === "ifElse" || type === "switch") && text("evaluationTarget", "何で分けるか")}
+      {(type === "ifElse" || type === "switch") && text("evaluationTarget", "何で分けるか", { tour: "inspector-target" })}
       {type === "loop" && (
         <>
-          {text("condition", "繰り返す条件")}
+          {text("condition", "繰り返す条件", { tour: "inspector-loop" })}
           <label className="field">
             <span title="data.maxIterations">繰り返す回数の上限</span>
             <input
@@ -262,6 +262,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
               type="button"
               className="action"
               data-action="ungroup"
+              data-tour="inspector-ungroup"
               disabled={readOnly}
               title="枠だけ消して、中のノードはその場に残します"
               onClick={() => {
@@ -309,7 +310,7 @@ function Branches({ doc, node, readOnly, onChange }: { readonly doc: FlowDoc; re
   const loop = nodeType(node) === "loop";
   const fixed = nodeType(node) === "ifElse" || loop;
   return (
-    <fieldset className="branches">
+    <fieldset className="branches" data-tour="inspector-branches">
       <legend title={`data.${key ?? ""}`}>{options ? "選択肢（1 件ずつが出口）" : "出口"}</legend>
       {items.map((item, index) => (
         <div key={index} className="branch" data-index={index}>
