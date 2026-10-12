@@ -6,6 +6,8 @@
 2. 子の親が承認済みの一覧に無く、別のツリーに在る（error のまま、文面に置き場所を添える）
 3. 計画の無い親（warn。`ticket start` も止まる）
 4. `.claude/worktrees/` の下で git に登録が無いディレクトリ（warn）
+5. 直接作業のワークツリーの名前が `<先頭の語>-<番号>-<slug>` の形でない（warn。
+   既存の名前は変えなくてよい）
 """
 
 from __future__ import annotations
@@ -111,6 +113,29 @@ class LintOpsTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["design"], copy=self.phases_text))
         self.commit_parent()
         self.assertEqual(self.lint_lines("plan が無い"), [])
+
+    # ---- 直接作業の名前
+
+    def test_a_direct_work_worktree_with_a_free_name_is_warned(self):
+        self.propose("i0001", parent_text("i0001", ["design"], copy=self.phases_text))
+        self.commit_parent()
+        self.worktree("rename-x", "main")
+        lines = self.lint_lines("直接作業のワークツリー rename-x")
+        self.assertTrue(
+            any(
+                "`<先頭の語>-<番号>-<slug>` の形でない" in line
+                and "worktree add .claude/worktrees/<名前> -b <名前> <統合先>" in line
+                and "既にある名前は変えなくてよい" in line
+                for line in lines
+            ),
+            lines,
+        )
+
+    def test_a_direct_work_worktree_in_the_form_is_not_warned(self):
+        self.propose("i0001", parent_text("i0001", ["design"], copy=self.phases_text))
+        self.commit_parent()
+        self.worktree("feature-12-direct", "main")
+        self.assertEqual(self.lint_lines("直接作業のワークツリー"), [])
 
     # ---- 4. 登録の無いディレクトリ
 

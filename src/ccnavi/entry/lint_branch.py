@@ -165,9 +165,18 @@ def _existing_branch_problems(
 
 
 def _worktree_problems(
-    root: str, conf: settings.Settings, worktrees: list, index: dict, copies: list
+    root: str,
+    conf: settings.Settings,
+    worktrees: list,
+    index: dict,
+    copies: list,
+    known: frozenset = frozenset(),
 ) -> list[Problem]:
-    """ワークツリーの側。チケットの無いツリー、迷い込んだ承認済みチケット、元リポジトリの食い違い、ツリーの無い承認済みチケット。"""
+    """ワークツリーの側。チケットの無いツリー、迷い込んだ承認済みチケット、元リポジトリの食い違い、ツリーの無い承認済みチケット。
+
+    `known` は未承認・閉じた・審査中を含む、チケットの識別子の集まり。
+    直接作業（どのチケットでもないツリー）の名前だけを、`known` と照らして見る。
+    """
     problems: list[Problem] = []
     for t in worktrees:
         if t.name not in index:
@@ -179,6 +188,19 @@ def _worktree_problems(
                     "そこへの書き込みはルールだけで判定する",
                 )
             )
+            if t.name not in known and not ticket_ids.has_form(t.name, conf.branch_prefixes):
+                problems.append(
+                    Problem(
+                        SEVERITY_WARN,
+                        "(ticket)",
+                        f"直接作業のワークツリー {t.name} の名前が "
+                        "`<先頭の語>-<番号>-<slug>` の形でない。"
+                        "新しく切るときは、先頭の語（CCNAVI_BRANCH_PREFIXES）と番号（issue の番号、"
+                        "無ければ `ccnavi-ticket.sh next-id` の通し番号）を付けて "
+                        "`worktree add .claude/worktrees/<名前> -b <名前> <統合先>` で切る。"
+                        "既にある名前は変えなくてよい",
+                    )
+                )
 
         bound = index.get(t.name)
         if bound is not None:
