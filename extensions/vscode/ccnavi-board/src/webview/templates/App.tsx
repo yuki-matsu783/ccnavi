@@ -1,16 +1,18 @@
 /**
- * テンプレート管理画面の本体。帯・件数の要約・表示の切り替え・テンプレートの一覧・下書きの一覧。
+ * テンプレート管理画面の本体。帯・件数の要約・テンプレートの一覧・足し算の枠・下書きの一覧。
  *
  * 見せる中身は拡張ホストが渡す（`TemplatesData`）。画面が自分で持つのは、ユーザが触って決めるもの
- * （表示の切り替え、開いている行、本文の取り出しの結果）だけ。有効か・捨てた理由・取り込めるかは実行ファイルの答えを読むだけ。
- * 取り込み（取り込み先の選択・下見・取り込みの実行）の状態と配線もここで持つ。取り込みの欄は `ImportForm.tsx`、下見は `Preview.tsx`。
+ * （開いている行、本文の取り出しの結果）だけ。有効か・捨てた理由・取り込めるかは実行ファイルの答えを読むだけ。
+ * 取り込み（取り込み先の選択・下見・取り込みの実行）の状態と配線もここで持つ。取り込みの欄は `ImportForm.tsx`、下見は `Preview.tsx`。 案内の間は見本（`core/tour-templates.ts`）を描き、実際の中身・開閉・取り込みの欄には触れない。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
+import { defaultSum } from "../../core/sums.js";
 import { editLockReason } from "../../core/templates-lock.js";
 import type { DraftEntry, EditAnswer, EditOp, EditRequest, TemplateDetail, TemplateEntry, TemplatesData, TemplatesMessage, TemplatesPage, ToTemplates } from "../../core/templates-view.js";
-import { tourOf } from "../../core/tour-def.js";
+import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
+import { parseTemplatesSample } from "../../core/tour-templates.js";
 import { applyAppearance } from "../appearance.js";
 import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
 import templatesTour from "../tours/templates.yml";
@@ -20,13 +22,20 @@ import { EditPanel, type EditState } from "./EditPanel.js";
 import { defaultImporting, requestOf, sameRequest, type Importing } from "./ImportForm.js";
 import { post } from "./post.js";
 import type { PreviewState } from "./Preview.js";
-import { loadView, saveView, type View } from "./state.js";
+import { Sum } from "./Sum.js";
 import { Template } from "./Template.js";
 import { Problems } from "./Problems.js";
-import { layerLabel, layersFor, templatesFor } from "./text.js";
+import { layerFor } from "./text.js";
 
-/** 案内（`tours/templates.yml`）。画面は今の中身のまま指す（見本は使わない） */
+/** 案内（`tours/templates.yml`）と、案内の間だけ描く見本。今の中身は使わず、画面が持つ開閉・取り込みの欄にも触れない */
 const TOUR = tourOf(templatesTour);
+const SAMPLE = parseTemplatesSample(TOUR.sample);
+const NO_SCENE: Scene = {};
+
+/** 段の `scene` の文字列を `,` で割る */
+function sceneList(value: Scene[string] | undefined): readonly string[] {
+  return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
+}
 
 /** 中身が無いときの錠。画面は取り込みを止めない理由が無いので、止めていない扱いにする */
 const NO_LOCK: Lock = { locked: false, reason: "", doing: [] };
@@ -67,7 +76,6 @@ function doneText(request: EditRequest, answer: EditAnswer): string {
 
 export function App({ initial }: { readonly initial: TemplatesData }): JSX.Element {
   const [data, setData] = useState<TemplatesData>(initial);
-  const [view, setView] = useState<View>(loadView);
   /** 取り込みの欄を開いている下書き（同時に 1 件）。undefined なら閉じている */
   const [importing, setImporting] = useState<Importing | undefined>(undefined);
   /** 取り込みの下見の答え。開いている欄の要求と同じものだけを入れる */
@@ -96,7 +104,15 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
   /** 本文の答え（キーは `layer/name`） */
   const [details, setDetails] = useState<Readonly<Record<string, Detail>>>({});
 
-  const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
+  /** 案内の間の様子（開く行・開く下書き・取り込みの欄・足し算）。実際の開閉や取り込みの欄は動かさないので、閉じたあとに戻すものは無い */
+  const [scene, setScene] = useState<Scene>(NO_SCENE);
+  const tour = useTour(data.kind === "page", {
+    onStart: () => setScene(NO_SCENE),
+    onEnd: () => {
+      setScene(NO_SCENE);
+      post({ type: "tourDone" });
+    },
+  });
   const requestTour = tour.request;
   /** 拡張ホストへの送信。案内の間は実際の操作を送らない（`tourDone` と `ready` は直に送る） */
   const act = (message: TemplatesMessage): void => {
@@ -231,20 +247,34 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
         <p className="empty">テンプレート管理画面を読み込めませんでした。原因を直してから「更新」を押してください。別の設定を選べば、このタブの中身がその設定に替わります。</p>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="refresh" onClick={() => post({ type: "refresh", dirty: false })}>
+        <button type="button" className="action" data-action="reload" onClick={() => post({ type: "refresh", dirty: false })}>
           更新
         </button>
       </>
     );
   }
 
-  const page = data.page;
-  const courses = coursesOf(TOUR, () => undefined);
-  const shownTemplates = templatesFor(page.target, page.data.templates);
-  const shownLayers = layersFor(page.target, page.data.layers);
-  const count = view === "sum" ? shownTemplates.length : shownLayers.reduce((total, layer) => total + layer.templates.length, 0);
+  const touring = tour.touring;
+  /** 案内の間は見本を描く。実際の中身（`data.page`）は案内の間は使わない */
+  const page = touring ? SAMPLE.page : data.page;
+  const courses = coursesOf(TOUR, setScene);
+  /** 案内の間の様子から作る、見本の開閉・取り込みの欄・下見 */
+  const sceneOpenTemplates = new Set(sceneList(scene.open).map((name) => `self/${name}`));
+  const sceneOpenDrafts = new Set(sceneList(scene.draft));
+  const sceneDraft = typeof scene.import === "string" && scene.import !== "" ? SAMPLE.page.data.drafts.find((draft) => draft.name === scene.import) : undefined;
+  const sceneImporting: Importing | undefined = sceneDraft === undefined ? undefined : defaultImporting(sceneDraft);
+  const scenePreview: PreviewState | undefined =
+    scene.preview === true && sceneImporting !== undefined ? { request: requestOf(sceneImporting), answer: SAMPLE.preview, error: "" } : undefined;
+  const sceneSum = typeof scene.sum === "string" && scene.sum !== "" ? scene.sum : undefined;
+  const shownLock: Lock = touring ? NO_LOCK : lock;
+  const shownBusy = touring ? false : busy;
+  const shownDirty = touring ? false : dirty;
+  const shownStatus: Status | undefined = touring ? undefined : status;
+  const layer = layerFor(page.target, page.data.layers);
+  const shownTemplates: readonly TemplateEntry[] = layer?.templates ?? [];
+  const count = shownTemplates.length;
   /** 案内が指すテンプレート（いま見えている一覧の最初の 1 件）。`data-tour` はこの 1 件にだけ付く */
-  const first: TemplateEntry | undefined = view === "sum" ? shownTemplates[0] : shownLayers.flatMap((layer) => layer.templates)[0];
+  const first: TemplateEntry | undefined = shownTemplates[0];
   const firstKey = first === undefined ? undefined : `${first.layer}/${first.name}`;
 
   const toggleTemplate = (key: string): void => {
@@ -284,11 +314,6 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
     setBusy(true);
     setStatus(undefined);
     act({ type: "refresh", dirty });
-  };
-
-  const pick = (next: View): void => {
-    setView(next);
-    saveView(next);
   };
 
   /** 取り込みの欄を開く。別の下書きの欄が開いていれば閉じ、そのプレビューも捨てる。案内の間は開かない */
@@ -410,7 +435,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
 
   /** 開いている編集の欄を、その行の位置に出す。別の行のものなら出さない */
   const editPanelFor = (key: string): JSX.Element | null =>
-    editing !== undefined && editing.key === key ? (
+    !touring && editing !== undefined && editing.key === key ? (
       <EditPanel
         state={editing.state}
         layers={page.importLayers}
@@ -426,14 +451,16 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
   const templateRow = (entry: TemplateEntry): JSX.Element => {
     const key = `${entry.layer}/${entry.name}`;
     const shown = details[key];
+    const sampleText = touring && scene.body === true ? SAMPLE.texts[entry.name] : undefined;
+    const sampleDetail: TemplateDetail | undefined = sampleText === undefined ? undefined : { ...entry, text: sampleText };
     return (
       <Template
         key={key}
         entry={entry}
-        open={openTemplates.has(key)}
+        open={touring ? sceneOpenTemplates.has(key) : openTemplates.has(key)}
         onToggle={() => toggleTemplate(key)}
-        detail={shown?.detail}
-        detailError={shown?.error ?? ""}
+        detail={touring ? sampleDetail : shown?.detail}
+        detailError={touring ? "" : (shown?.error ?? "")}
         onShow={() => act({ type: "showTemplate", name: entry.name, layer: entry.layer })}
         tour={key === firstKey}
         editEnabled={page.edit.enabled}
@@ -451,77 +478,70 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
 
   return (
     <>
-      <header className="toolbar">
-        <div className="summary" data-tour="summary">
-          <span>テンプレート {shownTemplates.length} 件</span>
-          <span>下書き {page.data.drafts.length} 件</span>
-          <span>error {page.data.errors}</span>
-          <span>warn {page.data.warns}</span>
-          <span>info {page.data.infos}</span>
-        </div>
-        <span data-tour="target">
-          <TargetSelect target={page.target} targets={page.targets} disabled={tour.touring} onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })} />
-        </span>
-        <div className="controls">
-          <button type="button" className="action" data-action="refresh" data-tour="refresh" disabled={busy} onClick={refresh}>
-            更新
-          </button>
-          <span data-tour="view" className="view-switch">
-            <button type="button" className={view === "sum" ? "action small on" : "action small"} data-action="view-sum" aria-pressed={view === "sum"} onClick={() => pick("sum")}>
-              足し算
-            </button>
-            <button type="button" className={view === "raw" ? "action small on" : "action small"} data-action="view-raw" aria-pressed={view === "raw"} onClick={() => pick("raw")}>
-              層ごと
-            </button>
-          </span>
-        </div>
-        {dirty && <span className="dirty">編集または下見を開いています</span>}
-        <TourButton courses={courses} onPick={tour.start} />
-      </header>
-      {changed && (
-        <div className="banner warn" data-banner="changed">
-          ファイルが外で変わりました。「更新」で読み直します（開いているプレビューは破棄されます）。
-        </div>
-      )}
       {page.notices.map((notice, index) => (
         <div key={index} className="banner warn">
           {notice}
         </div>
       ))}
-      {lock.locked && (
-        <div className="lock" role="status" data-banner="lock">
-          取り込みと編集は止めています: {lock.reason}
+      <div id="changed" data-banner="changed" className={changed && !touring ? "banner warn" : "banner warn hidden"}>
+        ファイルの変更を検知しました。更新してください（開いているプレビューは破棄されます）。
+        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={refresh}>
+          更新
+        </button>
+      </div>
+      {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
+      <header className="toolbar">
+        <div className="summary" data-tour="target">
+          <TargetSelect target={touring ? undefined : page.target} targets={touring ? undefined : page.targets} disabled={shownBusy} onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })} />
+          <span className="path" title={touring ? "" : page.root}>
+            {touring ? `（見本）${layer?.path ?? ""}` : (layer?.path ?? "")}
+          </span>
+          <span id="dirty" className={shownDirty ? "dirty" : "dirty hidden"}>
+            編集または下見を開いています
+          </span>
         </div>
-      )}
+        <div className="controls">
+          <button type="button" className="action" data-action="reload" data-tour="refresh" title="ファイルを読み直します" disabled={shownBusy} onClick={refresh}>
+            更新
+          </button>
+        </div>
+        <TourButton courses={courses} onPick={tour.start} />
+      </header>
+      <p id="lock" data-banner="lock" className={shownLock.locked ? "lock" : "lock hidden"}>
+        {shownLock.locked ? `取り込みと編集は止めています: ${shownLock.reason}` : ""}
+      </p>
+      <p className="count" id="counts" data-tour="summary">
+        <span>テンプレート {shownTemplates.length} 件</span>・<span>下書き {page.data.drafts.length} 件</span>・<span>error {page.data.errors}</span>・<span>warn {page.data.warns}</span>・<span>info {page.data.infos}</span>
+      </p>
       <section className="templates" data-tour="list">
         <h2>
           テンプレート <span className="count">{count}</span>
         </h2>
-        {view === "sum" ? (
-          shownTemplates.length === 0 ? (
-            <p className="empty">{"テンプレートがありません。共通は .ccnavi/config/common/templates/、プロジェクトは .ccnavi/config/project/templates/ に <名前>.yml で置きます。"}</p>
-          ) : (
-            <ul className="list">{shownTemplates.map((entry) => templateRow(entry))}</ul>
-          )
+        {layer === undefined ? (
+          <p className="empty">この設定のテンプレートの置き場を、実行ファイルが返していません。</p>
         ) : (
-          shownLayers.map((layer) => (
-            <div className="tpl-layer" data-layer={layer.name} key={layer.name}>
-              <h3>
-                {layerLabel(layer.name)} <span className="mono small dim">{layer.path}</span>
-              </h3>
-              {!layer.exists && <p className="hint">置き場がありません</p>}
-              {layer.unreadable !== "" && <p className="status failed">読めません: {layer.unreadable}</p>}
-              {!layer.writable && <span className="tag">読み取り専用</span>}
-              <Problems problems={layer.problems} />
-              {layer.templates.length === 0 ? (
-                <p className="hint">テンプレートはありません</p>
-              ) : (
-                <ul className="list">{layer.templates.map((entry) => templateRow(entry))}</ul>
-              )}
-            </div>
-          ))
+          <>
+            {!layer.exists && <p className="hint">置き場がありません</p>}
+            {layer.unreadable !== "" && <p className="status failed">読めません: {layer.unreadable}</p>}
+            {!layer.writable && <span className="tag">読み取り専用</span>}
+            <Problems problems={layer.problems} />
+            {shownTemplates.length === 0 ? (
+              <p className="empty">{"テンプレートがありません。共通は .ccnavi/config/common/templates/、プロジェクトは .ccnavi/config/project/templates/ に <名前>.yml で置きます。"}</p>
+            ) : (
+              <ul className="list">{shownTemplates.map((entry) => templateRow(entry))}</ul>
+            )}
+          </>
         )}
       </section>
+      {page.data.sums.length > 0 && (
+        <Sum
+          sums={page.data.sums}
+          initial={defaultSum(page.data.sums, touring ? undefined : page.target)}
+          // 見本は別の枠として作る（閉じたあと、見本で選んだ足し算が実際の枠に残らない）
+          key={touring ? "tour" : `${page.target.kind}:${page.target.name}`}
+          tour={touring ? { open: sceneSum !== undefined, picked: sceneSum ?? page.data.sums[0]?.name ?? "" } : undefined}
+        />
+      )}
       <section className="drafts" data-tour="drafts">
         <h2>
           下書き <span className="count">{page.data.drafts.length}</span>
@@ -535,11 +555,11 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
               <Draft
                 key={`${draft.tree}:${draft.name}`}
                 draft={draft}
-                open={openDrafts.has(draft.name)}
+                open={touring ? sceneOpenDrafts.has(draft.name) : openDrafts.has(draft.name)}
                 onToggle={() => toggleDraft(draft.name)}
                 tour={index === 0}
                 importTour={draft.name === importTourName}
-                importing={importing}
+                importing={touring ? sceneImporting : importing}
                 ambiguous={duplicateNames.has(draft.name)}
                 importLayers={page.importLayers}
                 editEnabled={page.edit.enabled}
@@ -550,25 +570,24 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                 onCloseImport={closeImport}
                 onImportChange={changeImport}
                 onPreview={requestPreview}
-                preview={preview}
+                preview={touring ? scenePreview : preview}
                 onClosePreview={() => setPreview(undefined)}
-                importBusy={importBusy}
-                lock={previewLock}
+                importBusy={touring ? false : importBusy}
+                lock={touring ? NO_LOCK : previewLock}
                 onImport={importYes}
-                touring={tour.touring}
+                touring={touring}
               />
             ))}
           </ul>
         )}
       </section>
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
-      <footer className="foot">
-        {status !== undefined && (
-          <span className={status.error ? "status failed" : "status"} id="status">
-            {status.text}
+      <footer className={shownStatus?.error === true ? "foot error" : "foot"}>
+        {shownStatus !== undefined && (
+          <span className={shownStatus.error ? "status failed" : "status"} id="status">
+            {shownStatus.text}
           </span>
-        )}{" "}
-        最終更新 {page.generatedAt}（{page.root}）
+        )}
       </footer>
     </>
   );

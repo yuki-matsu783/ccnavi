@@ -143,7 +143,7 @@ test("CB-D354 書けたら欄を閉じて結果を状態の欄に出す。書け
 });
 
 test("CB-D355 共通のテンプレートの「削除」は下見から実行まで進む。作業中の錠が掛かると錠の帯が出て実行は押せず、下書きの削除には錠の帯が出ない", async () => {
-  const free = await openTemplates();
+  const free = await openTemplates({ target: { kind: "workspace", name: "" } });
   try {
     await clickAction(free, 'li.template[data-name="feature"][data-layer="common"]', "delete-template");
     assert.equal(free.one('[data-role="edit-panel"]').getAttribute("data-op"), "delete");
@@ -159,7 +159,7 @@ test("CB-D355 共通のテンプレートの「削除」は下見から実行ま
   } finally {
     await free.close();
   }
-  const locked = await openTemplates({ lock: { locked: true, reason: "作業中のチケットがあります（T1）", doing: ["T1"] } });
+  const locked = await openTemplates({ target: { kind: "workspace", name: "" }, lock: { locked: true, reason: "作業中のチケットがあります（T1）", doing: ["T1"] } });
   try {
     await clickAction(locked, 'li.template[data-name="feature"][data-layer="common"]', "delete-template");
     await previewOf(locked, DELETE_FEATURE, FEATURE_DELETE_ANSWER);
@@ -175,7 +175,7 @@ test("CB-D355 共通のテンプレートの「削除」は下見から実行ま
 });
 
 test("CB-D356 編集が使えない（古い版）と、下書きの編集・改名・削除と、テンプレートの改名・移動・削除は押せず、理由を title に出す", async () => {
-  const dom = await openTemplates({ edit: { enabled: false, reason: "古い版です" } });
+  const dom = await openTemplates({ target: { kind: "workspace", name: "" }, edit: { enabled: false, reason: "古い版です" } });
   try {
     for (const action of ["edit-draft", "rename-draft", "delete-draft"]) {
       const button = dom.one(`li.draft[data-name="login"] [data-action="${action}"]`);

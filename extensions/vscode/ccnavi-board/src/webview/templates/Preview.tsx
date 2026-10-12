@@ -56,7 +56,7 @@ export function Preview({ answer, error, lock, busy, onImport, onClose }: Previe
   }
   const draft = answer.draft;
   return (
-    <section className="import-preview" data-role="import-preview">
+    <section className="import-preview" data-role="import-preview" data-tour="import-preview">
       <p>
         取り込み先: <span className="mono">{answer.target}</span>（{answer.exists ? "置き換える" : "新しく置く"}）
       </p>

@@ -72,6 +72,7 @@ src/
     tour-risk.ts      リスク管理の案内の見本（tours/risk.yml の sample:）を、risks.yml と同じ書き方から RiskPage（配点あり・ファイル無し・足し算）にする小さな読み取り。yaml を持たず、readRisk と同じ結果になることをテストが見る
     tour-flow.ts      フロー編集の案内の見本（tours/flow.yml の sample）を FlowDoc と FlowChecks にし、段ごとの scene を読む。yaml を持たず、実際の読み取り・実行ファイルとの一致はテストが見る
     tour-workflow.ts  計画編集の案内の見本（名前付きの --plan-order の答え）を parsePlanOrder に通して、画面が描く形にする
+    tour-templates.ts テンプレート管理の案内の見本（tours/templates.yml の sample:）を、小さい書き方から TemplatesPage（自身の層のテンプレート・下書き・足し算）と本文・下見の見本にする小さな読み取り。判定はせず、見本に書いた値をそのまま使う
     tour-phases.ts    フェーズ管理の案内の見本（tours/phases.yml の sample:）を、phases.yml と同じ書き方から PhasesPage にする小さな読み取り。yaml を持たず、readPhases と同じ結果になることをテストが見る
     yaml11.ts         実行ファイル（PyYAML、YAML 1.1）が文字列以外に読む語の見分け。risk-doc と phases-doc が引用符を足す判断に使う
     targets.ts        ルール管理・リスク管理・フェーズ管理・テンプレート管理が切り替える設定の対象（共通・ワークスペース・プロジェクト。4 画面とも同じ 3 種）の一覧と、欄の値
@@ -91,7 +92,7 @@ src/
     vscode.ts         acquireVsCodeApi の窓口。画面ごとの契約に依存しない（送り口は poster<M>() で作る）
     initial.ts        埋め込みの JSON（最初の 1 枚）を読む。画面ごとの契約に依存しない
     appearance.ts     見た目の切り替え（body のクラスの書き換え）。6 画面で 1 本
-    tours/<画面>.yml   案内の定義（sample: 案内の間だけ描く見本、courses: 基本の案内と使い方ごとの案内。段は target=data-tour の値・題・本文・scene）。ビルドのとき esbuild のプラグインが JSON にしてバンドルへ入れる（画面に YAML の解析器は入らない）。ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集・プロジェクト管理の 8 画面（プロジェクト管理とテンプレート管理は sample: を持たない）。list.css の `.field` / `.sum` は `display: contents` で箱を持たないので、指す先がそれでも `Tour.tsx` の `boxOf` が子の枠を合わせて光らせる
+    tours/<画面>.yml   案内の定義（sample: 案内の間だけ描く見本、courses: 基本の案内と使い方ごとの案内。段は target=data-tour の値・題・本文・scene）。ビルドのとき esbuild のプラグインが JSON にしてバンドルへ入れる（画面に YAML の解析器は入らない）。ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集・プロジェクト管理の 8 画面（プロジェクト管理は sample: を持たない）。list.css の `.field` / `.sum` は `display: contents` で箱を持たないので、指す先がそれでも `Tour.tsx` の `boxOf` が子の枠を合わせて光らせる
     Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。案内のある画面（ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集）で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。どの画面も同じ位置）で案内の一覧を開き、選んだ 1 本が出る（coursesOf が YAML の定義から案内の一覧を作る）
     TargetSelect.tsx  ルール管理・フェーズ管理・テンプレート管理の、設定の対象を切り替える欄
     workflow/tour-marks.ts 案内の間だけ、計画の図の中の項・線に data-tour の印を付ける（共通の図の部品 shared/PlanGraph.tsx には口が無いため）
@@ -143,18 +144,21 @@ src/
     templates/Draft.css Draft.tsx の CSS（下書き 1 件）
     templates/ImportForm.css ImportForm.tsx の CSS（取り込みの欄）
     templates/Preview.css Preview.tsx の CSS（下見の答え）
+    templates/Sum.css   Sum.tsx の CSS（足し算の枠と表）
+    templates/EditPanel.css EditPanel.tsx の CSS（編集の欄）
     templates/Plan.css  Plan.tsx の CSS（計画の表）
     templates/Problems.css Problems.tsx の CSS（苦情の一覧）
     templates/post.ts   テンプレート管理の送り口。契約に無いものは型で止まる
     templates/main.tsx  テンプレート管理画面の入口。埋め込みの JSON を読んでマウントする
-    templates/App.tsx   帯・ツールバー（足し算と層ごと）・一覧と下書き、取り込みの配線、拡張ホストからのメッセージの受け
+    templates/App.tsx   帯・ツールバー・開いている対象の層の一覧と下書き・足し算の枠、取り込みの配線、拡張ホストからのメッセージの受け。案内の間は見本を描く
+    templates/Sum.tsx   足し算の枠（読み取り専用。実行ファイルの索引を、足し算を選ぶ欄と表で出す。ルール管理・リスク管理の Sum.tsx と同じ作り）
+    templates/EditPanel.tsx 編集の欄（下書きの保存・改名・削除、テンプレートの改名・移動・削除。下見を読んでから実行する）
     templates/Template.tsx テンプレート 1 件（札・計画・フロー・本文）
     templates/Draft.tsx 下書き 1 件（札と「取り込む…」）
     templates/ImportForm.tsx 取り込みの欄（取り込み先と置き換え、下見を頼む）
     templates/Preview.tsx 取り込みの下見の答え（差分か取り込む本文と問題。取り込むボタン）
     templates/Plan.tsx  計画の表（番号・種類・レビュー・待つ項）
     templates/Problems.tsx 苦情の一覧（深刻度は色と文字の両方で出す）
-    templates/state.ts  画面が覚えるもの（表示の切り替え。足し算か層ごと）
     templates/text.ts   答えの値を読みやすい言葉に直す（判定はしない）
     flow/style.css    フロー編集画面の CSS の入口（先頭で React Flow の CSS を @import する）
     flow/App.css      App.tsx の CSS（部品箱・図・欄の配置と目印）
@@ -219,7 +223,7 @@ test/
   rules/              ルール管理（rules-doc, rules-when, hooks, testmodel と、画面を動かす rules.dom。入れ物は rules-render）
   risk/               リスク管理（risk-doc と、画面を動かす risk.dom。入れ物は risk-render）
   phases/             フェーズ管理（phases-doc, phases-layer と、画面を動かす phases.dom。入れ物は phases-render）
-  templates/          テンプレート管理（templates-model・templates-args・templates-render の単体テストと、画面を動かす templates.dom・templates-import.dom・templates-tour.dom）
+  templates/          テンプレート管理（templates-model・templates-args・templates-render の単体テストと、画面を動かす templates.dom・templates-import.dom・templates-edit.dom・templates-tour.dom、案内の見本の tour-templates）
   projects/           プロジェクト管理（projects と、画面を動かす projects.dom）
   flow/               フロー編集（flow-doc, flow-view, flow-lint, flow-match, flow-write と、書き出しを PyYAML で読み戻す flow-pyyaml（リポジトリのルートで uv run python か python3 を起動する。起動できなければ飛ばす）、画面を動かす flow.dom、線を引ける先・コピー・貼り付け・履歴・差分の flow-edit-ops、元に戻す・コピー・ミニマップ・保存前の確かめを画面で動かす flow-edit.dom、ボードのカードのボタンを動かす flow-card.dom、エージェントの下書きの取り込みと依頼のボタンを動かす flow-proposal.dom）
   workflow/           計画編集（planordermodel, workflow-view, ボードと結ぶ帳面の workflow-tabs と、画面を動かす workflow.dom）
