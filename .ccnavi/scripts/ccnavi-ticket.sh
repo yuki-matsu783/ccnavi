@@ -218,6 +218,11 @@ start | finish | cancel)
 esac
 
 rc=0
-ccnavi_c1_exe ticket "$@" || rc=$?
+# learn は作業ディレクトリのワークツリーで書き先と識別子が決まるので、cwd を実行ファイルへ渡す
+# （ソースで動かす形は cd "$root" してから起こすため、渡さないとワークスペースルートの扱いになる）。
+case "$1" in
+learn) ccnavi_c1_exe --cwd "$here" ticket "$@" || rc=$? ;;
+*) ccnavi_c1_exe ticket "$@" || rc=$? ;;
+esac
 [ "$rc" -ne 0 ] || tidy_after "$@"
 exit "$rc"
