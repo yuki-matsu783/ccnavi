@@ -1,6 +1,6 @@
 ---
 title: ワークツリーから相対パスで ccnavi-git.sh を呼ぶ
-type: skill-wiki
+type: learning-wiki
 description: ワークツリーの中で ../../../.ccnavi/scripts/ccnavi-git.sh と相対パスで呼ぶと、cwd によって届かないパターン
 tags: [skills, feedback]
 keywords: [ccnavi-git.sh, 相対パス, 絶対パス, ワークツリー, cwd, git, 入口, DENY_COMMAND_NAME_EXPANSION]

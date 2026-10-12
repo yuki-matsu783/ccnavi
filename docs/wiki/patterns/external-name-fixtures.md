@@ -1,6 +1,6 @@
 ---
 title: 外に見える名前の改名と拡張の fixtures
-type: skill-wiki
+type: learning-wiki
 description: src の --json キーや CLI の旗を改めると、拡張の fixtures を読む Python のテストが落ちるパターン
 tags: [skills, feedback]
 keywords: [fixtures, 改名, JSON, キー, 旗, test_test_json, test_suggest, core, guard, フェーズ]

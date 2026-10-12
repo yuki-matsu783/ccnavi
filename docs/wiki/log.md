@@ -1,6 +1,6 @@
 ---
 title: スキル振り返りの経過
-type: skill-wiki
+type: learning-wiki
 description: 振り返りごとに拾ったものと、足した・直したパターンの記録
 tags: [skills, feedback]
 keywords: [振り返り, 経過, ログ, パターン, wiki]

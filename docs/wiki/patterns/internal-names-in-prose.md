@@ -1,6 +1,6 @@
 ---
 title: 説明に内部の呼び名を使う
-type: skill-wiki
+type: learning-wiki
 description: issue のタイトルや作業中の呼び名をそのまま提案や説明に使い、ユーザに伝わらないパターン
 tags: [skills, feedback]
 keywords: [用語, 呼び名, issue, タイトル, 初出, 定義, 言い換え, 説明]
