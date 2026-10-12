@@ -97,6 +97,19 @@ def for_rules(
     unsure_speaks: bool = True,
     counts_path: str = "",
 ) -> str:
+    """`deliver` の案内の文だけ。once を渡したかどうかが要らない呼び出し元用。"""
+    return deliver(stderr, state_dir, payload, group, bases, unsure_speaks, counts_path)[0]
+
+
+def deliver(
+    stderr: TextIO,
+    state_dir: str,
+    payload: hookio.Input,
+    group: list[rules.Rule],
+    bases: list[str] | None = None,
+    unsure_speaks: bool = True,
+    counts_path: str = "",
+) -> tuple[str, bool]:
     """該当したルールがモデルへ渡す案内。1 件ごとに独立した文章なので空行で区切る。
 
     渡るかどうかは「渡す回」で決まる。`every: N` はその刻みで、該当した回数が N の
@@ -128,10 +141,14 @@ def for_rules(
 
     `counts_path` は数えの記録の置き場を差し替える。空なら文脈ごとの `once-*.json`。
     Stop の促しは compact・再開をまたいで数えたいので、別の記録（`stop_path`）を渡す。
+
+    返すのは（案内の文, この呼び出しで once の案内を渡したか）。後者は判定の記録の
+    `hinted` になる。文が空でなくても、毎回渡す文だけなら False。
     """
     if not unsure_speaks and not state_dir:
-        return ""
+        return "", False
     parts: list[str] = []
+    told_once = False
     counted: dict[str, int] | None = None
     consulted = False
     for rule in group:
@@ -181,12 +198,13 @@ def for_rules(
             )
             if once:
                 parts.append(once)
+                told_once = True
     if counted is not None:
         saved = _save_once(stderr, counts_path or _path_of(state_dir, payload), counted)
         if not saved and not unsure_speaks:
             # 数えを書けなかった。次の回も同じ数えから始まり、同じ回に止め続けうる。
-            return ""
-    return "\n\n".join(parts)
+            return "", False
+    return "\n\n".join(parts), told_once
 
 
 def _with_file(stderr: TextIO, bases: list[str], text: str, rel: str) -> str:

@@ -149,7 +149,7 @@ def _selected(rec, cond):
 
 
 def _satisfies(rec, cond):
-    """その呼び出しがどう判定されたかを決める欄（decision・code・rules_include・decision_not）。"""
+    """その呼び出しがどう判定されたかを決める欄（decision・code・rules_include・decision_not・hinted）。"""
     if "decision" in cond and rec.get("decision") != cond["decision"]:
         return False
     if "decision_not" in cond and rec.get("decision") == cond["decision_not"]:
@@ -157,6 +157,9 @@ def _satisfies(rec, cond):
     if "code" in cond and rec.get("code") != cond["code"]:
         return False
     rules = rec.get("rules") or []
+    # hinted は、その呼び出しで once の案内を渡した行にだけ付く。欄が無い行は false 扱い。
+    if "hinted" in cond and bool(rec.get("hinted")) != bool(cond["hinted"]):
+        return False
     return all(r in rules for r in cond.get("rules_include", []))
 
 

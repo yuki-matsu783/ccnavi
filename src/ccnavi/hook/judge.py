@@ -650,7 +650,7 @@ def decide_before(
 
     # 当たったルールがモデルへ渡す文。通す・聞く・止めるのどれでも、判定とは
     # 別の経路（additionalContext）で届く。
-    context = ctxfile.for_rules(
+    context, record.hinted = ctxfile.deliver(
         stderr, conf.state, payload, group, ctxfile.bases(conf, root, target)
     )
     # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文。判定には

@@ -101,6 +101,11 @@ class Record:
     # つなぐ。元の形で当たったときは空。元の形だけを見ても、どこが当たったのかは
     # 分からないので残す。数えれば、実行役のコマンド越しに止めた件数も分かる。
     unwrapped: str = ""
+    # hinted は、この呼び出しで `additionalContextOnce` の案内を実際に渡したとき true。
+    # 渡した後の呼び出しと、毎回渡す案内（`additionalContext`）だけの呼び出しでは false で、
+    # 記録の行には書かない。案内がどの呼び出しに付いたかは、hook の応答からは分からない
+    # （tool_use_id も command も入らない）ので、記録に残す。
+    hinted: bool = False
     # fallback は、ルールファイルを読めずに組み込みの既定で判定したことを示す。
     # そのとき判定に使われているのはプロジェクトのルールではないので、記録を数えるときに
     # 混ぜられない。ガードが機能しないまま何回動いたかも、これでしか分からない。
@@ -221,6 +226,8 @@ class Log:
         ):
             if value:
                 out[key] = value
+        if record.hinted:
+            out["hinted"] = True
         if record.rules:
             out["rules"] = record.rules
         if record.quoted:

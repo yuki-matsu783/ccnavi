@@ -60,6 +60,7 @@ expect:
       decision: deny
       code: DENY_PATH
       rules_include: [workspace-root]
+      hinted: false              # once の案内をその呼び出しで渡したか（true / false。欄の無い行は false）
       subject_contains: README.md
       min_count: 1               # 省略時は 1
   decisions_none:                # 出ていてはいけない判定（同じ欄で書く）

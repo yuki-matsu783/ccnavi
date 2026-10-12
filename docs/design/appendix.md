@@ -82,7 +82,7 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 `ts`（ISO 8601、ローカルのオフセット付き）、`mode`、`permission_mode`、`event`、`tool`、`subject`
 （秘密の形を伏せ（4.7）、1000 字で切り `…(+N)`）、`decision`、`enforced`、`code`、`reason`、`degraded`、`unwrapped`（当たった中で実行されるコマンド。
 `\x00` でつなぎ、1000 字で切る。6.3.1）、`fallback`、`detail`、
-`tree`、`project`、`source`、`rules[]`、`quoted[]`、`paths[]`、`guarded[]`、`session`、`ms` の 23 欄。空欄は省く。
+`tree`、`project`、`source`、`hinted`（この呼び出しで `additionalContextOnce` の案内を渡した回だけ true。6.6）、`rules[]`、`quoted[]`、`paths[]`、`guarded[]`、`session`、`ms` の 24 欄。空欄は省く。
 `ts` / `mode` / `decision` / `enforced` / `ms` は常に出る。`O_APPEND` で 1 行を 1 回の write で書く。
 
 `Stop` の 1 行は、ターンの終わりの報告（7.4）と促し（`NUDGE_*`）が重なると、止めた促しの `decision`・`code`・`rules` になる。

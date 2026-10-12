@@ -71,6 +71,18 @@ class CheckDecisionTest(unittest.TestCase):
         cond = {"subject_contains": "ccnavi-git.sh status", "decision_not": "deny"}
         self.assertEqual(runner.check_decision(rows, cond)[0], runner.PASS)
 
+    def test_hinted_true_and_false(self):
+        rows = [
+            rec(decision="allow", subject="cat a", hinted=True),
+            rec(decision="allow", subject="cat b"),
+        ]
+        first = {"subject_contains": "cat a"}
+        second = {"subject_contains": "cat b"}
+        self.assertEqual(runner.check_decision(rows, {**first, "hinted": True})[0], runner.PASS)
+        self.assertEqual(runner.check_decision(rows, {**first, "hinted": False})[0], runner.FAIL)
+        self.assertEqual(runner.check_decision(rows, {**second, "hinted": False})[0], runner.PASS)
+        self.assertEqual(runner.check_decision(rows, {**second, "hinted": True})[0], runner.FAIL)
+
     def test_decisions_none(self):
         rows = [rec(decision="deny", rules=["workspace-root"], tool="Edit")]
         cond = {"tool": "Edit", "decision": "deny", "rules_include": ["workspace-root"]}

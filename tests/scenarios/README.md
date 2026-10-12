@@ -64,6 +64,7 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
   - `decision`: `deny` / `ask` / `allow` / `handover`（ルールが言及せず権限モードに委ねた）/ `skip`
   - `code`: `DENY_PATH` / `DENY_COMMAND_PATTERN` / `DENY_COMMAND_NAME_EXPANSION` / `UNDECLARED` など
   - `rules`: 当たったルールの id の配列。シナリオでは `rules_include` で「含む」を比べる
+  - `hinted`: その呼び出しで `additionalContextOnce` の案内を渡したとき true（付かない行は false 扱い）。シナリオでは `hinted: true` / `hinted: false` で比べる
   - `subject`: 対象のパスかコマンド。シナリオでは `subject_contains` で「含む」を比べる
 - シナリオは普段のワークスペースルートで回す。ccnavi 本体にはブランチ・コミット・MR・issue を作らず、そういう作業は `projects/test-repo` で行う
 - `setup` の `files` は、回す前に作り、回したあとに消すファイル（ワークスペースルートからのパス → 中身）
