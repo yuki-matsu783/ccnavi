@@ -47,7 +47,7 @@ def approved_text(
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
     lines.append(
         "承認はユーザが済ませた。承認を頼み直さない。前の会話が無くても、この文と "
-        f"'{ticket_sh} status <親>' で状況は分かる。承認済みかどうかや置き場は、"
+        f"'{ticket_sh} status' で状況は分かる。承認済みかどうかや置き場は、"
         "ファイルを自分で探さず status で確かめる。"
     )
     # 子の着手は親の着手を前提にする。順をここで言わないと、
