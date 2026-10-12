@@ -5,7 +5,7 @@ description: phases.yml を共通レイヤーにも置けるようにし、判�
 tags: [config, phases]
 keywords: [フェーズ定義, phases.yml, 共通レイヤー, 足し算, 合成, 衝突, title, ミラー, scope]
 ---
-# ADR-0124: フェーズ定義を共通レイヤーと project レイヤーの足し算にする
+# ADR-0125: フェーズ定義を共通レイヤーと project レイヤーの足し算にする
 
 状態: 採用（実装済み。2026-10-12 にユーザが決めた。ADR-0107 の「`phases.yml` は config だけに置き、足し算はしない」を改める）
 
@@ -45,6 +45,7 @@ ADR-0107 は、フェーズ定義（`phases.yml`）を config の 1 本だけに
 - 失ったもの: 共通の定義と同じ `id` の定義をレイヤーで別の中身にできない。変えたいときは別の `id` を付ける（このリポジトリの `implement-ccnavi` がその例）
 - 失ったもの: 共通の `phases.yml` を直すと、全プロジェクトの次の承認に効く。進行中の親は写しを読むので変わらない
 - 失ったもの: ミラーは次の親の着手まで共通とずれる（ルールと配点と同じ）
+- 失ったもの: この変更より前に配られた `.ccnavi/config/project/phases.yml`（`quick` や `implement` などの汎用の定義を含む版）は、`ccnavi-setup.sh` を打ち直しても `--force` が無いかぎり入れ替わらない。共通の `phases.yml` と同じ `id` で中身が違う定義（旧版の `implement` など）があると、`--lint` が error を出し、そのレイヤーの定義を全部空として扱う。移行は、`phases.yml` から共通に移った定義（`quick` `research` `design` `acceptance` `implement` `design-feedback` `implement-feedback`）を消し、そのプロジェクトだけに要る定義を残す。ユーザが持つ設定なので、書き換えるのはユーザ
 
 ## 採らなかった案
 
