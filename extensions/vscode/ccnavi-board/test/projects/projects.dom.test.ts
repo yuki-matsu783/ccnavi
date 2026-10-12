@@ -95,7 +95,7 @@ test("CB-T113 カードはレイヤーの置き場を出す。自身のレイヤ
     assert.match(rules("Self"), /設定の対象になっていません/);
     assert.equal(dom.all("section.list button").length, 0, "カードに操作のボタンがある");
 
-    assert.match(text(dom.one("section.workspace")), /ワークスペースの設定のルール なし \.ccnavi\/config\/rules\.yml$/);
+    assert.match(text(dom.one("section.workspace")), /ワークスペースの設定のルール なし \.ccnavi\/config\/project\/rules\.yml$/);
     assert.equal(dom.all("section.workspace button").length, 0);
   } finally {
     await dom.close();
@@ -103,7 +103,7 @@ test("CB-T113 カードはレイヤーの置き場を出す。自身のレイヤ
 
   const exists = await openProjects([], { selfRulesExists: true });
   try {
-    assert.match(text(exists.one("section.workspace")), /ワークスペースの設定のルール あり \.ccnavi\/config\/rules\.yml$/);
+    assert.match(text(exists.one("section.workspace")), /ワークスペースの設定のルール あり \.ccnavi\/config\/project\/rules\.yml$/);
   } finally {
     await exists.close();
   }
@@ -140,7 +140,7 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
     const lint = dom.all(`${cardSelector("lib")} ul.lint li`).map((li) => text(li));
     assert.ok(!lint.some((l) => /\.claude\/ を持つ/.test(l)), lint.join(" / "));
     assert.ok(lint.some((l) => l === "warn: .claude/settings.json を読めない: 壊れている"), lint.join(" / "));
-    assert.ok(lint.some((l) => /\.claude\/ があります。Claude Code は.*プロジェクトの設定は \.ccnavi\/config\/ に置いてください/.test(l)), lint.join(" / "));
+    assert.ok(lint.some((l) => /\.claude\/ があります。Claude Code は.*プロジェクトの設定は \.ccnavi\/config\/project\/ に置いてください/.test(l)), lint.join(" / "));
     assert.ok(lint.some((l) => l === "error: 文面が無い"), lint.join(" / "));
   } finally {
     await dom.close();

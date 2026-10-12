@@ -402,7 +402,7 @@ write_integration() {
 		return 1
 	}
 	wi_ok=yes
-	for wi_path in "$approved/done" ".ccnavi/config/common" "$home/config" ".claude/settings.json"; do
+	for wi_path in "$approved/done" ".ccnavi/config/common" "$home/config/project" ".claude/settings.json"; do
 		git -C "$wi_repo" cat-file -e "$wi_ref:$wi_path" 2>/dev/null || continue
 		if ! git -C "$wi_repo" -c core.quotepath=false ls-tree -r --full-tree "$wi_ref" -- "$wi_path" \
 			>"$scratch/tree" 2>/dev/null; then

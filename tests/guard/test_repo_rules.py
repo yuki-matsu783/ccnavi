@@ -133,6 +133,15 @@ class RepoRulesTest(unittest.TestCase):
             ),
         )
 
+    def test_ワークツリー側の共通レイヤーの設定は_guard_ccnavi_config_が止める(self):
+        # 組み込みの保護も同じ入力を止める。判定だけでは取りこぼすので、当たったルールの id で見る。
+        for name in ("rules", "phases", "risks"):
+            with self.subTest(name=name):
+                path = f"/repo/.claude/worktrees/x/.ccnavi/config/common/{name}.yml"
+                body = judge("Edit", path)
+                self.assertEqual(body["verdict"], "deny", body["response"])
+                self.assertIn("guard-ccnavi-config", hit(body), body["rules"])
+
     def test_引用付きの_find_は_allow_に当たる(self):
         self.assert_verdict('find /repo -name "a b"', "allow", "prefer-glob")
 

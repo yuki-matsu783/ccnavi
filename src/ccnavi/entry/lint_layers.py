@@ -71,6 +71,39 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
     return problems
 
 
+def _legacy_places(conf: settings.Settings, root: str) -> list[Problem]:
+    """旧い置き場（`.ccnavi/common/`・`.ccnavi/config/{rules,phases,risks}.yml`）に設定が残っていないか。
+
+    設定の置き場は `.ccnavi/config/common/` と `.ccnavi/config/project/` に移った。旧い置き場の
+    ファイルは読まれないので、書いたルール・配点・フェーズ定義が黙って効かなくなる。
+    ワークスペースと、その下のプロジェクトの両方を見る。移すのはユーザで、ここは名指しするだけ。
+    """
+    problems: list[Problem] = []
+    home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
+    names = tuple(settings.LAYER_FILE_NAMES.values())
+    bases = [("", root)] + [(f"projects/{t.name} ", t.root) for t in tree.projects(conf.projects)]
+    for label, base in bases:
+        for old, new in (
+            (f"{home}/common", f"{home}/{settings.COMMON_DIR}"),
+            (f"{home}/config", f"{home}/{settings.LAYER_CONFIG_DIR}"),
+        ):
+            for name in names:
+                path = os.path.join(base, *old.split("/"), name)
+                if not os.path.isfile(path):
+                    continue
+                where = f"({label.strip() or 'legacy'})"
+                shown = f"{label.replace(' ', '/')}{old}/{name}"
+                problems.append(
+                    Problem(
+                        SEVERITY_WARN,
+                        where,
+                        f"{shown} は旧い置き場で、読まれていない。"
+                        f"{label.replace(' ', '/')}{new}/{name} へ移す",
+                    )
+                )
+    return problems
+
+
 def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
     """各レイヤーの phases / risk が、共通レイヤーと合成できるか。
 

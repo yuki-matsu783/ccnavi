@@ -692,7 +692,7 @@ class SelfGuardTest(unittest.TestCase):
             'echo x > "a(1)/.ccnavi/config/common/rules.yml"',
             'echo x > "R&D/.ccnavi/config/common/rules.yml"',
             'echo x > "a b /.ccnavi/config/common/rules.yml"',
-            'echo x > "C:\\my dir\\.ccnavi\\common\\rules.yml"',
+            'echo x > "C:\\my dir\\.ccnavi\\config\\common\\rules.yml"',
             'echo x >| "a b/.ccnavi/config/common/rules.yml"',
             'echo x &> "a b/.ccnavi/config/common/rules.yml"',
             'echo x 2> "a b/.ccnavi/config/common/rules.yml"',

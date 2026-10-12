@@ -108,7 +108,7 @@ test("CB-D13 ファイルが無ければ欄も追加も押せず、「作る」�
 test("CB-T82 ファイルが無ければ組み込みだと言って作るボタンを出し、あれば出さない", async () => {
   const missing = await openRisk({ exists: false, builtin: true });
   try {
-    assert.match(missing.one(".banner.missing").textContent, /\.ccnavi\/common\/risks\.yml がありません。実行ファイルは組み込みの配点で数えています/);
+    assert.match(missing.one(".banner.missing").textContent, /\.ccnavi\/config\/common\/risks\.yml がありません。実行ファイルは組み込みの配点で数えています/);
     assert.equal(missing.all('button[data-action="create"]').length, 1);
     assert.ok(missing.one<HTMLButtonElement>('button[data-action="open-risk"]').disabled);
   } finally {

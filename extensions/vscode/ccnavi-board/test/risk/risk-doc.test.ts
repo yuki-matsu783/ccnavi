@@ -97,7 +97,7 @@ test("CB-T76 加点条件を変えると前の加点条件の欄は消え、新�
   assert.match(out, /  - id: big-diff\n    points: 25\n    files_over: 10\n    message: 行数が多い\n/);
   assert.doesNotMatch(out, /lines_over/);
   assert.match(out, /  - id: deletes\n    points: 20\n    deleted_over: 3\n    message: 消したファイルが多い\n/);
-  assert.match(out, /  - id: complexity\n    points: 30\n    script: \.ccnavi\/common\/risk\/complexity\.sh\n/);
+  assert.match(out, /  - id: complexity\n    points: 30\n    script: \.ccnavi\/config\/common\/risk\/complexity\.sh\n/);
   assert.doesNotMatch(out, /id: ci/);
   const again = readRisk(out).model.form;
   assert.deepEqual(again.factors.map((x) => [x.id, x.kind, x.value]), [

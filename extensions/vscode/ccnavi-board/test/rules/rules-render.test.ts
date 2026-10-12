@@ -43,7 +43,7 @@ test("CB-T49 埋め込む中身は JSON で、文面の < は実体にして scr
   assert.doesNotMatch(rendered, /<b>push<\/b>/);
   // ツールの一覧もタイプの読みも埋め込まない。画面が契約（rules-view）から持つ
   assert.doesNotMatch(rendered, /"tools"/);
-  assert.match(rendered, /"rulesPath":"\.ccnavi\/common\/rules\.yml"/);
+  assert.match(rendered, /"rulesPath":"\.ccnavi\/config\/common\/rules\.yml"/);
 });
 
 // 画面のスクリプトはバンドルした 1 本を流し込む（ファイルとしては読ませない）。

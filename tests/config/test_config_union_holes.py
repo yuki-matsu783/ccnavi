@@ -440,7 +440,7 @@ class CopyDestinationTest(GuardHarness):
             "cp /tmp/x '.ccnavi'/common/rules.yml",
             "cp /tmp/x .CCNAVI/Common/RULES.yml",
             "CP /tmp/x .ccnavi/config/common/rules.yml",
-            "cp /tmp/x '.ccnavi\\common\\rules.yml'",
+            "cp /tmp/x '.ccnavi\\config\\common\\rules.yml'",
             "cp -- /tmp/x .ccnavi/config/common/rules.yml",
             "cp -T /tmp/x .ccnavi/config/common/rules.yml",
             "sudo cp /tmp/x .ccnavi/config/common/rules.yml",
