@@ -76,7 +76,7 @@ test("CB-T116 無いファイル（空の本文）に定義を足して書き戻
 const COMMON_PLAN = { id: "plan", title: "調査", kind: "work", review: "mr", scope: ["wip/plan/*"] };
 const COMMON_IMPL = { id: "implement", title: "実装とテスト", kind: "work", review: "mr", scope: ["src/*", "tests/*"] };
 
-test("CB-T402 共通の設定の定義は、足し算（sums[].phases.types）のうち出どころが common のものだけを取る。足し算が無ければ空", () => {
+test("CB-T527 共通の設定の定義は、足し算（sums[].phases.types）のうち出どころが common のものだけを取る。足し算が無ければ空", () => {
   const sum = {
     name: "self",
     layers: ["common", "self"],
@@ -93,7 +93,7 @@ test("CB-T402 共通の設定の定義は、足し算（sums[].phases.types）�
   assert.deepEqual(commonPhases(undefined), []);
 });
 
-test("CB-T403 共通の設定の定義は一覧の下に読み取り専用で並び、出どころが共通だと分かる。無ければ欄を出さない", async () => {
+test("CB-T528 共通の設定の定義は一覧の下に読み取り専用で並び、出どころが共通だと分かる。無ければ欄を出さない", async () => {
   const dom = await openPhases({ common: [COMMON_IMPL] });
   try {
     const items = dom.all("#common-phases li.common-phase");
@@ -117,7 +117,7 @@ test("CB-T403 共通の設定の定義は一覧の下に読み取り専用で並
   }
 });
 
-test("CB-T404 共通の設定の別の id と表示名が重なる定義は、id の重なりと同じく保存を止めて下部に error の文を出す。直せば保存できる", async () => {
+test("CB-T529 共通の設定の別の id と表示名が重なる定義は、id の重なりと同じく保存を止めて下部に error の文を出す。直せば保存できる", async () => {
   // 共通の plan と、見本の research（p1）の表示名「調査」が重なる
   const dom = await openPhases({ common: [COMMON_PLAN] });
   try {
@@ -138,7 +138,7 @@ test("CB-T404 共通の設定の別の id と表示名が重なる定義は、id
   }
 });
 
-test("CB-T405 id が空の行（打っている途中）は、共通の設定の定義と表示名が重なっても重なりの印を付けない。id を打てば止める", async () => {
+test("CB-T530 id が空の行（打っている途中）は、共通の設定の定義と表示名が重なっても重なりの印を付けない。id を打てば止める", async () => {
   const dom = await openPhases({ common: [{ id: "plan", title: "計画", kind: "work", review: "mr", scope: ["wip/plan/*"] }] });
   try {
     dom.click(dom.one('button[data-action="add"]'));
