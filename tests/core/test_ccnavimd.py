@@ -45,6 +45,15 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(ccnavimd.render("\n\na\n\n\n\nb\n\n", set(), {}), "a\n\nb")
 
 
+class FlagsTest(unittest.TestCase):
+    def test_条件は関数の真偽で決まる(self):
+        ctx = ccnavimd.Context(None, "", True, {"workspace-root"}, "dry-run")  # type: ignore[arg-type]
+
+        self.assertTrue(ccnavimd.CONDITIONS["workspace-root"](ctx))
+        self.assertTrue(ccnavimd.CONDITIONS["docs"](ctx))
+        self.assertTrue(ccnavimd.CONDITIONS["dry-run"](ctx))
+
+
 class ProblemsTest(unittest.TestCase):
     def test_誤りを行番号つきで挙げる(self):
         found = ccnavimd.problems(
@@ -57,13 +66,6 @@ class ProblemsTest(unittest.TestCase):
         self.assertIn("2 行目: 差し込み {{nope}} は使えない", joined)
         self.assertIn("4 行目: ccnavi:endif に対応する ccnavi:if が無い", joined)
         self.assertIn("ccnavi:if に対応する ccnavi:endif が無い", joined)
-
-    def test_deny_は任意のidを条件にできる(self):
-        self.assertEqual(ccnavimd.problems("<!-- ccnavi:if deny:future-rule -->\n<!-- ccnavi:endif -->\n"), [])
-        self.assertIn(
-            "条件 deny: は使えない",
-            "\n".join(ccnavimd.problems("<!-- ccnavi:if deny: -->\n<!-- ccnavi:endif -->\n")),
-        )
 
     def test_このリポジトリのccnavi_mdに誤りは無い(self):
         with open(os.path.join(ROOT, ".ccnavi", "CCNAVI.md"), encoding="utf-8") as f:

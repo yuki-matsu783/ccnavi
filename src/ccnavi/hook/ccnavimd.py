@@ -9,10 +9,10 @@ md の書き方は 2 つだけ。
   囲んだ行を載せる。入れ子にできる（外側も内側も成り立つときだけ載る）。名前は `CONDITIONS`
 - 差し込み: `{{名前}}` を、ワークスペースごとの値に置き換える。名前は `SUBSTITUTIONS`
 
+条件の名前ごとに独立した関数（`CONDITIONS`）があり、その真偽で行を載せるかを決める。
 条件は、文と判定が食い違わないための仕掛けでもある。ワークツリーと git の行は、それを支える
-deny（`deny:workspace-root` / `deny:raw-git`）がワークスペースのルールにあるときだけ載せる。
-ルールが無いワークスペースでその行を言うと、文と判定が食い違う。`deny:<id>` は任意の id で
-使えるので、deny を足しても実行ファイルを直さずに md で条件にできる。
+deny（`workspace-root` / `raw-git`）がワークスペースのルールにあるときだけ載せる。ルールが無い
+ワークスペースでその行を言うと、文と判定が食い違う。
 
 md が無い・読めないときは、無いことだけを 1 行で言う。何も言わずに黙ると、決まりが渡って
 いないことに誰も気づけない。長すぎるときは `MAX_CHARS` で切り、切ったことを末尾に言う。
@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Callable
+from typing import NamedTuple
 
 from ..infra import modes, settings, tree
 from ..tickets import ticket_guard, ticket_places
@@ -31,16 +33,57 @@ FILE = "CCNAVI.md"
 # 1 回の応答に載せる本文の上限（文字数）。固定。常駐の文脈なので毎回これだけ重くなる。
 MAX_CHARS = 6000
 
-# `deny:<id>` は、ワークスペースのルールに id `<id>` の deny があるとき成り立つ（id は任意）。
-# `deny:raw-git` は、生の git を組み込みで止めるときも成り立つ。
-DENY_PREFIX = "deny:"
-RAW_GIT_ID = "raw-git"
-CONDITIONS = (
-    "projects",  # プロジェクトの置き場に、`.git` を持つプロジェクトがある
-    "tickets",  # チケット制御を使っている
-    "docs",  # md の索引の案内（`--docs`）を出す回
-    "dry-run",  # CCNAVI_MODE が dry-run
-)
+
+
+class Context(NamedTuple):
+    """条件の判定に渡す、そのセッションの状況。"""
+
+    conf: settings.Settings
+    root: str
+    docs: bool  # 索引の案内（`--docs`）を出す回か
+    deny_ids: set[str]  # ワークスペースのルールの deny の id
+    mode: str
+
+
+def _workspace_root(ctx: Context) -> bool:
+    """ワークスペースのルールに `workspace-root` の deny がある。"""
+    return "workspace-root" in ctx.deny_ids
+
+
+def _raw_git(ctx: Context) -> bool:
+    """`raw-git` の deny がある、または生の git を組み込みで止める。"""
+    return "raw-git" in ctx.deny_ids or ticket_guard.raw_git_applies(ctx.conf, ctx.root)
+
+
+def _projects(ctx: Context) -> bool:
+    """プロジェクトの置き場に、`.git` を持つプロジェクトがある。"""
+    return bool(tree.projects(ctx.conf.projects))
+
+
+def _tickets(ctx: Context) -> bool:
+    """チケット制御を使っている。"""
+    return bool(ctx.conf.tickets_enabled)
+
+
+def _docs(ctx: Context) -> bool:
+    """md の索引の案内（`--docs`）を出す回。"""
+    return ctx.docs
+
+
+def _dry_run(ctx: Context) -> bool:
+    """CCNAVI_MODE が dry-run。"""
+    return ctx.mode == modes.DRY_RUN
+
+
+# md の `<!-- ccnavi:if 名前 -->` の名前と、その真偽を返す関数。条件を足すときはここに 1 つ足す。
+CONDITIONS: dict[str, Callable[[Context], bool]] = {
+    "workspace-root": _workspace_root,
+    "raw-git": _raw_git,
+    "projects": _projects,
+    "tickets": _tickets,
+    "docs": _docs,
+    "dry-run": _dry_run,
+}
 SUBSTITUTIONS = (
     "worktrees",  # ワークツリーの置き場（`.claude/worktrees`）
     "git_sh",  # git のラッパー（打てる形のコマンド）
@@ -59,13 +102,6 @@ _DIRECTIVE = re.compile(r"<!--\s*ccnavi:")
 _SUBSTITUTION = re.compile(r"\{\{\s*(\w+)\s*\}\}")
 
 
-def known(name: str) -> bool:
-    """使える条件の名前か。`deny:` に続く id は任意。"""
-    if name.startswith(DENY_PREFIX):
-        return len(name) > len(DENY_PREFIX)
-    return name in CONDITIONS
-
-
 def problems(text: str) -> list[str]:
     """md の書き方の誤り。`ccnavi --lint` が使う。
 
@@ -77,7 +113,7 @@ def problems(text: str) -> list[str]:
         opened = _IF.match(line)
         if opened:
             depth += 1
-            if not known(opened.group(1)):
+            if opened.group(1) not in CONDITIONS:
                 found.append(f"{number} 行目: 条件 {opened.group(1)} は使えない")
         elif _ENDIF.match(line):
             depth -= 1
@@ -97,7 +133,7 @@ def problems(text: str) -> list[str]:
 def render(text: str, flags: set[str], values: dict[str, str]) -> str:
     """条件に合う行だけを残し、差し込みを解く。空行は続けて 1 つにまとめ、前後の空行は取る。
 
-    名前が `CONDITIONS` にも `deny:<id>` にも当たらない条件は成り立たないものとして扱い、`SUBSTITUTIONS` に無い差し込みは
+    名前が `CONDITIONS` に無い条件は成り立たないものとして扱い、`SUBSTITUTIONS` に無い差し込みは
     そのまま残す（書き間違いが見える形で届く。誤りは `problems` が lint で言う）。
     """
     out: list[str] = []
@@ -136,20 +172,9 @@ def path(conf: settings.Settings, root: str) -> str:
 def flags_for(
     conf: settings.Settings, root: str, docs: bool, deny_ids: set[str], mode: str
 ) -> set[str]:
-    """成り立つ条件の名前。"""
-    found: set[str] = set()
-    found.update(DENY_PREFIX + rule_id for rule_id in deny_ids)
-    if ticket_guard.raw_git_applies(conf, root):
-        found.add(DENY_PREFIX + RAW_GIT_ID)
-    if tree.projects(conf.projects):
-        found.add("projects")
-    if conf.tickets_enabled:
-        found.add("tickets")
-    if docs:
-        found.add("docs")
-    if mode == modes.DRY_RUN:
-        found.add("dry-run")
-    return found
+    """成り立つ条件の名前。`CONDITIONS` の関数を 1 つずつ呼んで集める。"""
+    ctx = Context(conf, root, docs, deny_ids, mode)
+    return {name for name, check in CONDITIONS.items() if check(ctx)}
 
 
 def values_for(conf: settings.Settings, root: str) -> dict[str, str]:
