@@ -204,6 +204,56 @@ class FinishOrderTest(unittest.TestCase):
             self.assertEqual(report[0]["verdict"], runner.PASS)
 
 
+class ExpectAfterTest(unittest.TestCase):
+    """step の expect_after を満たさなければ、後続の step に進まず止める。claude は呼ばない。"""
+
+    STEP_OUT = {"cost_usd": 0.0, "session_ids": []}
+
+    def scenario(self, steps):
+        return {"steps": steps, "_prompt_steps": len(steps)}
+
+    def state(self):
+        return {"next_step": 0, "session_ids": [], "cost_usd": 0.0}
+
+    def test_evaluate_after_inconclusive_when_call_missing(self):
+        with tempfile.TemporaryDirectory() as d:
+            expect = {"decisions": [{"event": "PreToolUse", "tool": "Edit", "decision": "allow"}]}
+            got = runner.evaluate_after(expect, {"session_ids": ["s1"]}, d)
+        self.assertEqual(got[0][2], runner.INCONCLUSIVE)
+
+    def test_drive_halts_and_skips_later_steps(self):
+        with tempfile.TemporaryDirectory() as d:
+            out, root = Path(d) / "out", Path(d) / "root"
+            out.mkdir()
+            root.mkdir()
+            scn = self.scenario(
+                [
+                    {
+                        "prompt": "a",
+                        "expect_after": {"state": [{"run": "true", "expect_contains": "zzz"}]},
+                    },
+                    {"prompt": "b"},
+                ]
+            )
+            st = self.state()
+            with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT) as run:
+                rc = runner.drive(scn, out, st, root)
+        self.assertEqual(rc, 11)
+        self.assertEqual(st["halt"]["step"], 1)
+        self.assertEqual(run.call_count, 1)
+
+    def test_drive_without_expect_after_runs_all(self):
+        with tempfile.TemporaryDirectory() as d:
+            out, root = Path(d) / "out", Path(d) / "root"
+            out.mkdir()
+            root.mkdir()
+            scn = self.scenario([{"prompt": "a"}, {"prompt": "b"}])
+            with mock.patch.object(runner, "run_step", return_value=self.STEP_OUT) as run:
+                rc = runner.drive(scn, out, self.state(), root)
+        self.assertIsNone(rc)
+        self.assertEqual(run.call_count, 2)
+
+
 class PreflightTest(unittest.TestCase):
     def test_missing_project_dir_is_reported_not_raised(self):
         with tempfile.TemporaryDirectory() as d:
