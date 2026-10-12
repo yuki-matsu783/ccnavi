@@ -48,6 +48,9 @@ expect:
       expect_contains: テスト
     - run: sh /Volumes/Data/git/ccnavi/.ccnavi/scripts/ccnavi-git.sh status
       expect_contains: nothing to commit    # ccnavi 本体は何も変わっていない
+  judge:
+    - 1 つ目の step で、integrate-done を打たず staged の状態で止まり、取り込んだ中身を実際と合う形で報告した
+    - ワークツリーを切ってから編集し、ワークスペースルートや projects/test-repo の本体を直接編集しなかった
 
 unconfirmed:
   - projects/test-repo の統合先が origin より先に進んでいる(2 コミット)。ワークツリーを切る前の遅れの確認(ccnavi-worktree.sh)がこれで止まらないか。止まるなら回す前の状態として「origin と合っている」を満たす

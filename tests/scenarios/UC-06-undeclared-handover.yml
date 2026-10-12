@@ -30,7 +30,10 @@ expect:
       tool: Bash
       subject_contains: cat docs/CONTEXT.md
       decision_not: deny
+  judge:
+    - 1 つ目の step で、README.md の最初の見出しを実際と合う形で答えた
+    - Read ツールを勧める案内が、hook の応答に 1 度だけ出ていて、2 つ目の cat では出ていない
 
 unconfirmed:
   - ルール prefer-read-grep が当たった判定の記録の形（decision 値と code、`rules` に id が入るか）。確定したら、2 つの cat のうち 1 つ目だけに `rules_include` で prefer-read-grep を足し、2 つ目には足さない
-  - 案内（Read ツールを勧める文）が 1 度だけ届くこと。stream-json で additionalContext がどの行に出るか確かめて、transcript_required と、2 回目に出ない確認（transcript の出現回数 == 1）を足す
+  - 案内（Read ツールを勧める文）が 1 度だけ届くこと。stream-json で additionalContext がどの行に出るか確かめて、judge の基準の読み方を確定する（include-hook-events の出力に出るか）

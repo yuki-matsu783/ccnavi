@@ -1,0 +1,226 @@
+"""受入シナリオの実行器の単体テスト。claude は呼ばない（呼べない門をここで確かめる）。
+
+シナリオを回すこと自体は、全量テストに入れない（docs/claude/acceptance-scenarios.md）。
+ここで確かめるのは、実行器の判定の部分と、シナリオの YAML の形、そして全量テストが
+シナリオを拾わないこと。
+"""
+
+import json
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+from tests import __main__ as full_run
+from tests.scenarios import runner
+
+SCENARIOS = sorted(Path(__file__).parent.glob("UC-*.yml"))
+EXPECT_KEYS = {
+    "decisions",
+    "decisions_none",
+    "files_unchanged",
+    "state",
+    "transcript_forbidden",
+    "judge",
+}
+
+
+def rec(**kw):
+    base = {"event": "PreToolUse", "tool": "Bash", "session": "s1"}
+    base.update(kw)
+    return base
+
+
+class CheckDecisionTest(unittest.TestCase):
+    def test_pass_when_decision_matches(self):
+        rows = [rec(decision="deny", code="DENY_PATH", rules=["workspace-root"], subject="/a/b")]
+        cond = {"decision": "deny", "code": "DENY_PATH", "rules_include": ["workspace-root"]}
+        self.assertEqual(runner.check_decision(rows, cond)[0], runner.PASS)
+
+    def test_inconclusive_when_call_never_made(self):
+        rows = [rec(tool="Read", decision="handover")]
+        v, _ = runner.check_decision(rows, {"tool": "Edit", "decision": "deny"})
+        self.assertEqual(v, runner.INCONCLUSIVE)
+
+    def test_fail_when_call_made_but_allowed(self):
+        rows = [rec(tool="Edit", decision="allow", subject="/x/README.md")]
+        v, why = runner.check_decision(rows, {"tool": "Edit", "decision": "deny"})
+        self.assertEqual(v, runner.FAIL)
+        self.assertIn("allow", why)
+
+    def test_subject_contains_selects_the_call(self):
+        rows = [
+            rec(decision="allow", subject="cat a.txt"),
+            rec(decision="deny", subject="cat .env", rules=["credentials"]),
+        ]
+        cond = {"subject_contains": "cat .env", "decision": "deny"}
+        self.assertEqual(runner.check_decision(rows, cond)[0], runner.PASS)
+
+    def test_min_count(self):
+        rows = [rec(decision="deny"), rec(decision="deny")]
+        self.assertEqual(
+            runner.check_decision(rows, {"decision": "deny", "min_count": 3})[0], runner.FAIL
+        )
+        self.assertEqual(
+            runner.check_decision(rows, {"decision": "deny", "min_count": 2})[0], runner.PASS
+        )
+
+    def test_decision_not(self):
+        rows = [rec(decision="handover", subject="ccnavi-git.sh status")]
+        cond = {"subject_contains": "ccnavi-git.sh status", "decision_not": "deny"}
+        self.assertEqual(runner.check_decision(rows, cond)[0], runner.PASS)
+
+    def test_decisions_none(self):
+        rows = [rec(decision="deny", rules=["workspace-root"], tool="Edit")]
+        cond = {"tool": "Edit", "decision": "deny", "rules_include": ["workspace-root"]}
+        self.assertEqual(runner.check_decision_none(rows, cond)[0], runner.FAIL)
+        self.assertEqual(runner.check_decision_none([], cond)[0], runner.PASS)
+
+
+class ReadDecisionsTest(unittest.TestCase):
+    def test_only_the_given_sessions_are_read(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "decisions.jsonl"
+            lines = [rec(session="mine"), rec(session="other"), rec(session="mine2")]
+            p.write_text("\n".join(json.dumps(r) for r in lines) + "\nnot json\n", encoding="utf-8")
+            rows = runner.read_decisions(p, ["mine", "mine2"])
+        self.assertEqual([r["session"] for r in rows], ["mine", "mine2"])
+
+    def test_missing_log_is_empty(self):
+        self.assertEqual(runner.read_decisions("/no/such/file.jsonl", ["s"]), [])
+
+
+class ParseStreamTest(unittest.TestCase):
+    def test_extracts_evidence_and_skips_bad_lines(self):
+        events = [
+            {"type": "system", "subtype": "init", "session_id": "abc"},
+            {
+                "type": "assistant",
+                "session_id": "abc",
+                "message": {"content": [{"type": "tool_use", "name": "Edit", "input": {"x": 1}}]},
+            },
+            {
+                "type": "user",
+                "message": {
+                    "content": [{"type": "tool_result", "is_error": True, "content": "no"}]
+                },
+            },
+            {"type": "result", "session_id": "abc", "result": "終わり", "total_cost_usd": 0.01},
+        ]
+        text = "\n".join(json.dumps(e) for e in events) + "\nnoise\n"
+        got = runner.parse_stream(text)
+        self.assertEqual(got["session_ids"], ["abc"])
+        self.assertEqual(got["tool_calls"][0]["name"], "Edit")
+        self.assertTrue(got["tool_results"][0]["is_error"])
+        self.assertEqual(got["final_text"], "終わり")
+        self.assertAlmostEqual(got["cost_usd"], 0.01)
+
+
+class EvaluateTest(unittest.TestCase):
+    def test_overall_orders_fail_over_inconclusive_over_review(self):
+        mk = lambda *vs: [("k", "c", v, "") for v in vs]  # noqa: E731
+        self.assertEqual(runner.overall(mk(runner.PASS, runner.PASS)), runner.PASS)
+        self.assertEqual(runner.overall(mk(runner.PASS, runner.REVIEW)), runner.REVIEW)
+        self.assertEqual(
+            runner.overall(mk(runner.REVIEW, runner.INCONCLUSIVE)), runner.INCONCLUSIVE
+        )
+        self.assertEqual(runner.overall(mk(runner.INCONCLUSIVE, runner.FAIL)), runner.FAIL)
+
+    def test_files_unchanged_and_forbidden_and_judge(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "a.txt").write_text("1", encoding="utf-8")
+            pre = {"a.txt": runner.file_digest(Path(d) / "a.txt")}
+            expect = {
+                "files_unchanged": ["a.txt"],
+                "transcript_forbidden": ["secret-value"],
+                "judge": ["迂回しなかった"],
+            }
+            got = runner.evaluate(expect, [], "出力に secret-value がある", d, pre)
+            by_kind = {k: v for k, _, v, _ in got}
+            self.assertEqual(by_kind["files_unchanged"], runner.PASS)
+            self.assertEqual(by_kind["transcript_forbidden"], runner.FAIL)
+            self.assertEqual(by_kind["judge"], runner.REVIEW)
+            (Path(d) / "a.txt").write_text("2", encoding="utf-8")
+            got = runner.evaluate({"files_unchanged": ["a.txt"]}, [], "", d, pre)
+            self.assertEqual(got[0][2], runner.FAIL)
+
+    def test_state_command(self):
+        with tempfile.TemporaryDirectory() as d:
+            ok = {"run": "echo hello", "expect_contains": "hello"}
+            ng = {"run": "echo hello", "expect_not_contains": "hello"}
+            self.assertEqual(runner.check_state(ok, d)[0], runner.PASS)
+            self.assertEqual(runner.check_state(ng, d)[0], runner.FAIL)
+
+
+class PreflightTest(unittest.TestCase):
+    def test_missing_project_dir_is_reported_not_raised(self):
+        with tempfile.TemporaryDirectory() as d:
+            facts = runner.preflight_facts(d)
+        self.assertIn("置き場が無い", facts)
+
+
+class PersistTest(unittest.TestCase):
+    def test_session_is_kept_only_when_the_next_prompt_resumes(self):
+        steps = [{"prompt": "a"}, {"human": True}, {"prompt": "b", "resume": True}, {"prompt": "c"}]
+        self.assertTrue(runner._persist_needed(steps, 0))
+        self.assertTrue(runner._persist_needed(steps, 1))
+        self.assertFalse(runner._persist_needed(steps, 2))
+        self.assertFalse(runner._persist_needed(steps, 3))
+
+
+class EntryGateTest(unittest.TestCase):
+    """全量テストなど、`python -m tests.scenarios.runner` 以外から claude を呼べないこと。"""
+
+    def test_run_step_refuses_when_imported(self):
+        with mock.patch.object(subprocess, "run") as run:
+            with self.assertRaises(RuntimeError):
+                runner.run_step({}, {"prompt": "x"}, Path("."), 1, "id", None, False, ".")
+            run.assert_not_called()
+
+    def test_cmd_run_refuses_when_imported(self):
+        with mock.patch.object(subprocess, "run") as run:
+            args = mock.Mock(scenario="x", confirmed=True, root=".", out=None)
+            with self.assertRaises(RuntimeError):
+                runner.cmd_run(args)
+            run.assert_not_called()
+
+
+class FullRunDoesNotPickScenariosTest(unittest.TestCase):
+    """`python -m tests`（全量）が拾うのは、この実行器の単体テストだけ。"""
+
+    def test_only_this_module_is_collected_from_scenarios(self):
+        mine = [m for m in full_run.modules([]) if m.startswith("tests.scenarios")]
+        self.assertEqual(mine, ["tests.scenarios.test_runner"])
+
+    def test_no_other_test_module_in_scenarios(self):
+        extra = [
+            p.name for p in Path(__file__).parent.glob("test_*.py") if p.name != "test_runner.py"
+        ]
+        self.assertEqual(extra, [], "シナリオを回す道を test_ のモジュールに置かない")
+
+
+class ScenarioFilesTest(unittest.TestCase):
+    def test_scenarios_exist(self):
+        self.assertTrue(SCENARIOS)
+
+    def test_each_scenario_is_well_formed(self):
+        for path in SCENARIOS:
+            with self.subTest(scenario=path.name):
+                scn = runner.load_scenario(path)
+                self.assertTrue(path.name.startswith(scn["id"]))
+                self.assertIn(scn["status"], {"draft", "verified"})
+                self.assertTrue(scn["steps"])
+                self.assertFalse(set(scn["expect"]) - EXPECT_KEYS, "知らない期待の欄がある")
+                self.assertTrue(any(scn["expect"].get(k) for k in EXPECT_KEYS), "期待が 1 つも無い")
+                self.assertNotIn("transcript_required", scn["expect"])
+                for step in scn["steps"]:
+                    self.assertTrue(
+                        step.get("human") or step.get("prompt"), "step に prompt も human も無い"
+                    )
+                    if step.get("human"):
+                        self.assertTrue(step.get("instruction"))
+
+
+if __name__ == "__main__":
+    unittest.main()

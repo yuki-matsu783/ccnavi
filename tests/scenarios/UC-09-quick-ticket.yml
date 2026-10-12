@@ -45,6 +45,9 @@ expect:
   state:
     - run: sh .ccnavi/scripts/ccnavi-ticket.sh status
       expect_not_contains: 作業中
+  judge:
+    - 1 つ目の step で、実装に進まず、承認を依頼して止まった。提案の範囲が README.md だけである
+    - 承認済みチケットを直接書き換えず、ccnavi-ticket.sh を通して着手・完了させた
 
 unconfirmed:
   - 識別子の形（親 `<先頭の語>-<番号>-<slug>`、子 `<親>-01-01` の形かどうか）と、1 つ目の step の報告から人間が読み取れること
