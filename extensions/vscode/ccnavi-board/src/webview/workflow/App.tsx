@@ -26,7 +26,7 @@ import { SAMPLE_NOTE, sampleWorkflow } from "../../core/tour-sample.js";
 import type { PlanOrder, PlanOrderAnswer } from "../../core/planordermodel.js";
 import { changedOrder, editedOrder, isDirty, planDiff, renumbered, saveBlocker, type WorkflowData, type WorkflowPage } from "../../core/workflow-view.js";
 import { applyAppearance } from "../appearance.js";
-import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
+import { INTRO_COURSE, Tour, TourButton, useTour, type TourCourse, type TourStep } from "../Tour.js";
 import { PlanGraph } from "../shared/PlanGraph.js";
 import { post } from "./post.js";
 import { Review } from "./Review.js";
@@ -91,6 +91,9 @@ const TOUR_STEPS: readonly TourStep[] = [
     body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
   },
 ];
+
+/** ワークフロー編集画面の案内の一覧。先頭が基本の案内（初回に自動で出る） */
+const COURSES: readonly TourCourse[] = [{ id: INTRO_COURSE, title: "基本の案内", summary: "画面の見どころを順に回ります", steps: TOUR_STEPS }];
 
 export function App({ initial }: { readonly initial: WorkflowData }): JSX.Element {
   const [data, setData] = useState<WorkflowData>(initial);
@@ -379,7 +382,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
             この順序に決める
           </button>
         </div>
-        <TourButton onClick={tour.start} />
+        <TourButton courses={COURSES} onPick={tour.start} />
       </header>
       {sample !== undefined ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <p className="dim small">
@@ -423,7 +426,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
       <footer className={status?.error === true ? "foot error" : "foot"}>
         <span id="status">{status?.text ?? ""}</span>
       </footer>
-      {tour.touring ? <Tour steps={TOUR_STEPS} onClose={tour.end} /> : null}
+      {tour.touring ? <Tour steps={(COURSES.find((course) => course.id === tour.course) ?? COURSES[0]).steps} onClose={tour.end} /> : null}
     </>
   );
 }

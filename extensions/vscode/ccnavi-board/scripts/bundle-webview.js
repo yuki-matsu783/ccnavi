@@ -26,6 +26,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const esbuild = require("esbuild");
+const YAML = require("yaml");
 
 const here = path.resolve(__dirname, "..");
 const WEBVIEW_DIR = path.join(here, "src", "webview");
@@ -61,6 +62,18 @@ if (styleless.length > 0) {
   process.exit(1);
 }
 
+// 案内の定義（`src/webview/tours/*.yml`）を、JSON のモジュールにして読ませる。画面に YAML の解析器を入れないため、
+// 読むのはここ（ビルドのとき）だけ。形の検査は画面が `tourOf`（`src/core/tour-def.ts`）で行い、テストも同じ検査を通す。
+const yamlPlugin = {
+  name: "tour-yaml",
+  setup(build) {
+    build.onLoad({ filter: /\.ya?ml$/ }, (args) => {
+      const text = fs.readFileSync(args.path, "utf8");
+      return { contents: `export default ${JSON.stringify(YAML.parse(text))};`, loader: "js", watchFiles: [args.path] };
+    });
+  },
+};
+
 const common = {
   outdir: OUT_DIR,
   bundle: true,
@@ -80,6 +93,7 @@ esbuild
     // 同じ図の部品（shared/PlanGraph.tsx）を持つので約 420KB あるが、タブを開いたときにしか読まない。
     // 図の部品は画面ごとのバンドルにそれぞれ入る（共有の置き場は src/webview/shared/ で、分割はしない）
     entryPoints: found.map((screen) => ({ in: screen.entry, out: screen.name })),
+    plugins: [yamlPlugin],
     platform: "browser",
     // Webview は VS Code に入っている Chromium。ES2022 で足りる
     target: "es2022",

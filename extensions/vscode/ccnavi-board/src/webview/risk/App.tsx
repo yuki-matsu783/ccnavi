@@ -14,7 +14,7 @@ import type { Lock } from "../../core/lock.js";
 import { BUILTIN_LEVELS, LEVEL_NAMES, type FactorForm, type LevelName, type RiskData, type RiskPage, type ToRisk } from "../../core/risk-view.js";
 import { applyAppearance } from "../appearance.js";
 import { TargetSelect } from "../TargetSelect.js";
-import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
+import { INTRO_COURSE, Tour, TourButton, useTour, type TourCourse, type TourStep } from "../Tour.js";
 import { defaultSum } from "../../core/sums.js";
 import { Captioned, Factor } from "./Factor.js";
 import { Sum } from "./Sum.js";
@@ -266,7 +266,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
             保存
           </button>
         </div>
-        <TourButton onClick={tour.start} />
+        <TourButton courses={[{ id: INTRO_COURSE, title: "基本の案内", summary: "画面の見どころを順に回ります", steps: readOnly ? [MISSING_STEP, ...TOUR_STEPS] : TOUR_STEPS }]} onPick={tour.start} />
       </header>
       <p id="lock" className={lock.locked ? "lock" : "lock hidden"}>
         {lock.reason}
