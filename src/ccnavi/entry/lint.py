@@ -25,7 +25,7 @@ import re
 from dataclasses import replace
 from typing import TextIO
 
-from ..hook import judge
+from ..hook import ccnavimd, judge
 from ..infra import modes, settings, tree
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
@@ -324,6 +324,7 @@ def check(
 
     problems.extend(lint_project._project_settings(root))
     problems.extend(_sh_compat(root))
+    problems.extend(_ccnavi_md(conf, root))
     problems.extend(lint_project._after(root))
     if os.path.exists(conf.rules) or _named_rules(conf, root):
         # 共通レイヤーのルールが無いのは「設定が無い」正常（無い = 空）。不正なときだけ言う。
@@ -411,6 +412,33 @@ def _sh_compat(root: str) -> list[Problem]:
             f"{compat_fix(root)}",
         )
     ]
+
+
+def _ccnavi_md(conf: settings.Settings, root: str) -> list[Problem]:
+    """セッションの頭で渡す作業の決まり（`.ccnavi/CCNAVI.md`）の書き方。
+
+    無いのは warn。判定は動くが、セッションの開始で作業の決まりが渡らない。
+    条件や差し込みの名前の誤りは、その行が黙って落ちる・そのまま届くので、行番号つきで言う。
+    ccnavi を入れる前のワークスペース（`.ccnavi/` 自体が無い）は言わない。
+    """
+    path = ccnavimd.path(conf, root)
+    if not os.path.isdir(os.path.dirname(path)):
+        return []
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    except FileNotFoundError:
+        return [
+            Problem(
+                SEVERITY_WARN,
+                "(ccnavi-md)",
+                f"{path} が無い。セッションの開始で作業の決まりが渡らない。"
+                "導入スクリプト（ccnavi-setup.sh）で配る",
+            )
+        ]
+    except (OSError, UnicodeDecodeError) as exc:
+        return [Problem(SEVERITY_WARN, "(ccnavi-md)", f"{path} を読めない ({exc})")]
+    return [Problem(SEVERITY_WARN, "(ccnavi-md)", f"{path}: {m}") for m in ccnavimd.problems(text)]
 
 
 def _risk(conf: settings.Settings, root: str) -> list[Problem]:

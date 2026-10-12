@@ -98,6 +98,9 @@ DEPLOY_BIN_DIR="dist/ccnavi"
 # dist/ccnavi/ の外にあるので、copy_tree が配布先へコピーすることはない。
 DEPLOY_TARGET_FILE="dist/ccnavi.target"
 DEPLOY_RULES=".ccnavi/config/common/rules.yml"
+# セッションの開始（SessionStart）で ccnavi がモデルに渡す作業の決まり。文面はこの md にあり、
+# 実行ファイルは条件と差し込みを解くだけ。無いと、決まりが渡らないことを 1 行で言うだけになる。
+DEPLOY_CCNAVI_MD=".ccnavi/CCNAVI.md"
 # 設定 3 本のひな形。rules と risk は汎用なので共通レイヤー（.ccnavi/config/common/）へ配る。
 # phases はワークスペースのレイアウト（scope のパス）に依存するので、自身のレイヤー
 # （.ccnavi/config/project/）へ配る。共通レイヤーに phases を置くと、その scope が
@@ -105,6 +108,10 @@ DEPLOY_RULES=".ccnavi/config/common/rules.yml"
 DEPLOY_RISK=".ccnavi/config/common/risks.yml"
 DEPLOY_PHASES=".ccnavi/config/project/phases.yml"
 DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
+# ccnavi の使い方の文書（md）の置き場。配布元にある *.md を全部配る。--docs の索引はここだけ
+# .ccnavi/ の下で載せるので、配った先でも `ccnavi --docs` で引ける。rules.yml の
+# additionalContextFile（スキルの振り返りの手順）と、sh の案内が指す先でもある。
+DEPLOY_DOCS_DIR=".ccnavi/docs"
 # ccnavi-common.sh は、3 本の sh が `.` で読み込む共通部分の入口。入口は同じディレクトリの部品
 # ccnavi-common-{state,lock,c1,host,log}.sh を読む。どちらも配らないと、配布先で 3 本とも
 # 起動時にエラーで止まる。部品は入口より先に配る。途中で失敗したときに、部品を読む新しい入口だけが
@@ -124,7 +131,7 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-stage.sh は、書き込みを止められている保護対象のファイルを下書きの置き場で直すための支度をする sh。
 # CLAUDE.md の決まり（wip/scratchpad/ に cp して編集し、ユーザが差し替える）の手順を 1 本にしたもの。
 # ccnavi-worktree.sh は作業用のワークツリーを統合先から切る sh（fetch・遅れの確認・起点の選択・worktree add を
-# 1 本にしたもの）。docs/claude/worktree.md の「ワークツリーの作り方」の手順を打つ。
+# 1 本にしたもの）。.ccnavi/docs/worktree.md の「ワークツリーを切る」の手順を打つ。
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # git で追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順番も最後にする。途中で失敗したときに、
 # hook が起動する sh だけがあって、代わりに通る sh が無い状態を作らないため。
@@ -177,9 +184,9 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
                             取り込みは通信する。1 台だけで使い、リモートに合わせる必要が無いときに指定する
 
 CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
-.ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・設定 3 本（.ccnavi/config/common/rules.yml、
+.ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・作業の決まり（.ccnavi/CCNAVI.md）・設定 3 本（.ccnavi/config/common/rules.yml、
 .ccnavi/config/common/risks.yml、.ccnavi/config/project/phases.yml）・代わりに通る sh と振り分けの sh
-（.ccnavi/scripts/）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
+（.ccnavi/scripts/）・使い方の文書（.ccnavi/docs/*.md）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
 --docs の索引（**/ccnavi-index.jsonl）は、配布先の .gitignore に足す（ccnavi-index.jsonl を否定する
 行があれば足さない）。
 
@@ -438,9 +445,11 @@ build_dir_rel=""
 bin_verdict=""
 launcher_verdict=""
 rules_verdict=""
+ccnavi_md_verdict=""
 risk_verdict=""
 phases_verdict=""
 scripts_todo=""
+docs_todo=""
 
 # 配布元にあるか、配布先にあるか、--force か。この 3 つだけで決まる。
 verdict() {
@@ -499,6 +508,14 @@ if [ -n "$deploy" ]; then
 	rules_verdict=$(verdict "$source_root/$DEPLOY_RULES" "$rules_there")
 	note_deploy "$rules_verdict" "$DEPLOY_RULES" "$DEPLOY_RULES"
 
+	if [ -e "$root/$DEPLOY_CCNAVI_MD" ]; then
+		ccnavi_md_there=yes
+	else
+		ccnavi_md_there=no
+	fi
+	ccnavi_md_verdict=$(verdict "$source_root/$DEPLOY_CCNAVI_MD" "$ccnavi_md_there")
+	note_deploy "$ccnavi_md_verdict" "$DEPLOY_CCNAVI_MD" "$DEPLOY_CCNAVI_MD"
+
 	if [ -e "$root/$DEPLOY_RISK" ]; then
 		risk_there=yes
 	else
@@ -514,6 +531,28 @@ if [ -n "$deploy" ]; then
 	fi
 	phases_verdict=$(verdict "$source_root/$DEPLOY_PHASES" "$phases_there")
 	note_deploy "$phases_verdict" "$DEPLOY_PHASES" "$DEPLOY_PHASES"
+
+	if [ -d "$source_root/$DEPLOY_DOCS_DIR" ]; then
+		for doc_entry in "$source_root/$DEPLOY_DOCS_DIR"/*.md; do
+			# 配布元が空だと glob が展開されずにそのまま残る。実在するものだけを配る。
+			[ -f "$doc_entry" ] || continue
+			doc_name=$(basename "$doc_entry")
+			if [ -e "$root/$DEPLOY_DOCS_DIR/$doc_name" ]; then
+				doc_there=yes
+			else
+				doc_there=no
+			fi
+			doc_verdict=$(verdict "$doc_entry" "$doc_there")
+			note_deploy "$doc_verdict" "$DEPLOY_DOCS_DIR/$doc_name" "$DEPLOY_DOCS_DIR/$doc_name"
+			case "$doc_verdict" in
+			copy | replace)
+				docs_todo="$docs_todo $doc_name"
+				;;
+			esac
+		done
+	else
+		note_deploy absent "$DEPLOY_DOCS_DIR/" "$DEPLOY_DOCS_DIR/"
+	fi
 
 	for name in $DEPLOY_SCRIPTS; do
 		if [ -e "$root/$DEPLOY_SCRIPT_DIR/$name" ]; then
@@ -1263,6 +1302,11 @@ if [ "$deploy_work" = yes ]; then
 		copy_file "$source_root/$DEPLOY_RULES" "$root/$DEPLOY_RULES"
 		;;
 	esac
+	case "$ccnavi_md_verdict" in
+	copy | replace)
+		copy_file "$source_root/$DEPLOY_CCNAVI_MD" "$root/$DEPLOY_CCNAVI_MD"
+		;;
+	esac
 	case "$risk_verdict" in
 	copy | replace)
 		copy_file "$source_root/$DEPLOY_RISK" "$root/$DEPLOY_RISK"
@@ -1273,6 +1317,9 @@ if [ "$deploy_work" = yes ]; then
 		copy_file "$source_root/$DEPLOY_PHASES" "$root/$DEPLOY_PHASES"
 		;;
 	esac
+	for name in $docs_todo; do
+		copy_file "$source_root/$DEPLOY_DOCS_DIR/$name" "$root/$DEPLOY_DOCS_DIR/$name"
+	done
 	for name in $scripts_todo; do
 		copy_file "$source_root/$DEPLOY_SCRIPT_DIR/$name" "$root/$DEPLOY_SCRIPT_DIR/$name"
 		# hook は振り分けの sh を直接起動する。cp は元のモードをそのままコピーするとは限らないので付け直す。
@@ -1343,6 +1390,9 @@ esac
 if [ ! -f "$root/$DEPLOY_RULES" ]; then
 	note_missing "${DEPLOY_RULES}（何を止めるかのルール。無いと組み込みの既定だけで判定する）"
 fi
+if [ ! -f "$root/$DEPLOY_CCNAVI_MD" ]; then
+	note_missing "${DEPLOY_CCNAVI_MD}（セッションの開始で渡す作業の決まり。無いと決まりが渡らない）"
+fi
 if [ ! -f "$root/$DEPLOY_RISK" ]; then
 	note_missing "${DEPLOY_RISK}（リスクの配点。無いと組み込みの配点で測る）"
 fi
@@ -1388,6 +1438,16 @@ for name in $DEPLOY_SCRIPTS; do
 		note_missing "${DEPLOY_SCRIPT_DIR}/${name}（${why}）"
 	fi
 done
+# 使い方の文書は、配布元にあるものを一覧にして確かめる（配布元が無いときは確かめられない）。
+if [ -n "$source_root" ] && [ -d "$source_root/$DEPLOY_DOCS_DIR" ]; then
+	for doc_entry in "$source_root/$DEPLOY_DOCS_DIR"/*.md; do
+		[ -f "$doc_entry" ] || continue
+		doc_name=$(basename "$doc_entry")
+		if [ ! -f "$root/$DEPLOY_DOCS_DIR/$doc_name" ]; then
+			note_missing "${DEPLOY_DOCS_DIR}/${doc_name}（ccnavi の使い方の文書。ccnavi --docs で引く）"
+		fi
+	done
+fi
 if [ -n "$missing_parts" ]; then
 	printf 'まだ無いもの:\n%s' "$missing_parts"
 	# 配布をやめた理由は report_deploy が既に出している。ここで足すのは、ユーザが自分で

@@ -11,7 +11,7 @@
 # 見るのは cwd のリポジトリ（ワークスペース・projects/<名前>・そのワークツリー）。プロジェクトの issue・MR は
 # projects/<名前>/ に cd してから打つ。
 #
-# 役割の分け方（docs/claude/exe-boundary.md）:
+# 役割の分け方:
 #   - ホスト（GitHub / GitLab）はこの sh が読む。MR 指定なら、その MR の元ブランチ。issue 指定なら、
 #     その issue を参照している開いた MR の元ブランチ。繋ぎ方は ccnavi-common-host.sh の「ホスト（GitHub /
 #     GitLab）への接続」（ccnavi-review.sh と同じ。gh / glab か、curl と GITHUB_TOKEN / GITLAB_TOKEN）

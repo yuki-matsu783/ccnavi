@@ -97,7 +97,7 @@ keywords: [Chrome 拡張, PAT, Pyodide, 親のブランチ, 統合先, 本物と
 
 #### 今の運用（読んだもの）
 
-- ワークツリーの置き場は `.claude/worktrees/<ブランチ名>`（`docs/claude/worktree.md:34`）
+- ワークツリーの置き場は `.claude/worktrees/<ブランチ名>`（`.ccnavi/docs/worktree.md:34`）
 - 着手はワークツリーの**ディレクトリ名**が識別子と大文字小文字まで一致することを求め、
   作り方として `worktree add ".claude/worktrees/<id>" -b <id>` を案内する（`ccnavi/ops.py:57-68`）。子も同じ（`ccnavi/review.py:524`）
 - 「ワークツリーの名前は識別子と同じ」は既に明文（設計 9.3）。識別子の形の規則は 設計 9.3

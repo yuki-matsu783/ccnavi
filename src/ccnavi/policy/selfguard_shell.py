@@ -466,7 +466,7 @@ def binary_holders(bin_path: str) -> tuple[tuple[str, str], ...]:
 # 機械ごとの組み立ての置き場。`bin/` の下に並ぶ。
 _BUILD_DIR = r"(?:" + "|".join(platformtag.SYSTEMS) + r")-[a-z0-9_]+"
 
-# 守る場所を写して直すための下書きの置き場（docs/claude/scratchpad.md）。
+# 守る場所を写して直すための下書きの置き場（.ccnavi/docs/scratchpad.md）。
 # ワークスペースルートからの相対。
 SCRATCHPAD = ("wip", "scratchpad")
 # 行き先の下書きの置き場へ写すときに通すコマンド。`ln` は外す。置き場にリンクを作れると、
@@ -487,7 +487,7 @@ _SCRATCHPAD_SHORT_ALLOWED = set("fpvnu")
 def scratchpad_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | None:
     """シェルから書き込む形の保護から、下書きの置き場（`wip/scratchpad/`）へ写す cp を外す関数。
 
-    守る場所のファイルを直したいときは、置き場へ写して写しを直す（docs/claude/scratchpad.md）。
+    守る場所のファイルを直したいときは、置き場へ写して写しを直す（.ccnavi/docs/scratchpad.md）。
     保護の式は行き先の最後の語に守る名前があれば当たるので、`cp .ccnavi/scripts/ccnavi-git.sh
     wip/scratchpad/ccnavi-git.sh` のように同じ名前で写すと止まる。その 1 本を通す。
 

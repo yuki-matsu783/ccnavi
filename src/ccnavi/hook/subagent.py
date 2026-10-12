@@ -21,7 +21,7 @@ from ..tickets import ticket as ticket_mod
 from . import judge, post, post_findings, projskills, reasons
 
 # サブエージェントには Stop の振り返り（`match: Stop` のルールの文）が届かないので、
-# 始まりに 1 行だけ渡す。メインはこの節を集めて振り返りに使う（docs/claude/skill-review.md）。
+# 始まりに 1 行だけ渡す。メインはこの節を集めて振り返りに使う（.ccnavi/docs/skill-review.md）。
 CANDIDATE_NOTE = (
     "[ccnavi] 作業中に手順の見落としやすい点やスキルの誤りに気づいたら、最後の報告に"
     "「スキル候補」の節を足して書いてください（対象のスキル・何を直すか・根拠）。"

@@ -80,6 +80,9 @@ class SetupTest(unittest.TestCase):
         write(os.path.join(src, ".ccnavi", "config", "common", "rules.yml"), "deny: []\n")
         write(os.path.join(src, ".ccnavi", "config", "common", "risks.yml"), COMMON_RISK)
         write(os.path.join(src, HOME, "config", "project", "phases.yml"), COMMON_PHASES)
+        # セッションの開始で渡す作業の決まりと、使い方の文書も配るもの。
+        write(os.path.join(src, ".ccnavi", "CCNAVI.md"), "# ccnavi の作業の決まり\n")
+        write(os.path.join(src, ".ccnavi", "docs", "worktree.md"), "# ワークツリー\n")
         # 承認の push の sh と、端末で承認する sh も配るもの。
         # 無いと「まだ無いもの」に名前が出る。
         for name in (
