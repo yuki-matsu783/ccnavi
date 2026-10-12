@@ -439,7 +439,15 @@ def _ccnavi_md(conf: settings.Settings, root: str) -> list[Problem]:
         ]
     except (OSError, UnicodeDecodeError) as exc:
         return [Problem(SEVERITY_WARN, "(ccnavi-md)", f"{path} を読めない ({exc})")]
-    return [Problem(SEVERITY_WARN, "(ccnavi-md)", f"{path}: {m}") for m in ccnavimd.problems(text)]
+    # 条件の名前の形（sh の関数名に使えない `-` など）は、どちらでも判定できないので error
+    errors = [
+        Problem(SEVERITY_ERROR, "(ccnavi-md)", f"{path}: {m}") for m in ccnavimd.name_problems(text)
+    ]
+    warns = [
+        Problem(SEVERITY_WARN, "(ccnavi-md)", f"{path}: {m}")
+        for m in ccnavimd.problems(text, ccnavimd.script_names(conf, root))
+    ]
+    return errors + warns
 
 
 def _risk(conf: settings.Settings, root: str) -> list[Problem]:

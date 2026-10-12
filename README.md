@@ -366,37 +366,14 @@ md の構成は、考え方（コンテキストを清潔に保つ・判断す�
 （ワークツリー・git の入口・下書きの置き場・保護対象の直し方・`projects/`・`status`・`--docs`）、チケット制御を使っているときの
 作業の進め方（直接作業とチケット作業の使い分け）。詳しいことは名指しした入口（`--help`、拒否の案内、`status`、`--docs`）に聞く。
 
-md の書き方は 2 つだけ。
+md の書き方（条件 `ccnavi:if` / `ccnavi:else`、差し込み `{{名前}}`）と、条件の判定の仕組み、条件の足し方は、配布先にも配る [`.ccnavi/docs/ccnavi-md.md`](.ccnavi/docs/ccnavi-md.md) に書いてある。
 
-| 書き方 | 意味 |
-|---|---|
-| `<!-- ccnavi:if 名前 -->` … `<!-- ccnavi:endif -->` | 名前が成り立つときだけ、囲んだ行を載せる（入れ子にできる） |
-| `{{名前}}` | ワークスペースごとの値に置き換える |
+条件を足す手順（ccnavi の開発）。
 
-| 条件の名前 | 成り立つとき |
-|---|---|
-| `workspace-root` | ワークスペースのルール（共通レイヤーか自身のレイヤー）の `deny` に id `workspace-root` がある |
-| `raw-git` | 同じく `deny` に id `raw-git` がある、または生の git を組み込みで止める（チケット制御が有効でラッパーがある） |
-| `projects` | プロジェクトの置き場に `.git` を持つプロジェクトがある |
-| `tickets` | チケット制御を使っている（`CCNAVI_TICKET_CONTROL` が `disable` でない） |
-| `docs` | md の索引の案内（`--docs`）を出す回 |
-| `dry-run` | `CCNAVI_MODE` が `dry-run` |
-
-| 差し込みの名前 | 値 |
-|---|---|
-| `worktrees` | ワークツリーの置き場（`.claude/worktrees`） |
-| `git_sh` / `ticket_sh` / `stage_sh` | `ccnavi-git.sh` / `ccnavi-ticket.sh` / `ccnavi-stage.sh` を打てる形にしたコマンド |
-| `scratch` | 下書きの置き場（`wip/scratchpad`） |
-| `projects` | プロジェクトの置き場（ワークスペースルートからの相対） |
-| `tickets_dir` / `approved_dir` | 提案の置き場 / 承認済みチケットの置き場 |
-| `mode_env` | `CCNAVI_MODE` |
-
-ワークツリーと git の行は、それを支える deny があるときだけ出す。ルールが無いワークスペースで出すと、文と判定が食い違う。
-共通レイヤーが読めずに組み込みの既定に戻ったときも出ない（既定にはこの 2 つの id が無い）。
-
-md が無い・読めないときは、無いことだけを 1 行で言う（黙ると、決まりが渡っていないことに誰も気づけない）。
-本文は 6000 文字で切り、切ったことを末尾に言う。`ccnavi --lint` は、md が無いこと、知らない条件や差し込みの名前、
-対の取れていない囲みを `(ccnavi-md)` の warn で行番号つきで言う。
+1. `src/ccnavi/hook/ccnavimd.py` に、`(ctx: Context) -> bool` の関数を 1 つ書く。判定に要る状況が `Context` に無ければ、フィールドを足して `flags_for` で渡す。
+2. 関数を `CONDITIONS` に登録する。名前は md に書くもの（`-` 区切り）。
+3. `.ccnavi/CCNAVI.md` で `<!-- ccnavi:if 名前 -->` … `<!-- ccnavi:endif -->` で行を囲む。
+4. `.ccnavi/docs/ccnavi-md.md` の条件の表に 1 行足す。判定の関数のテストを `tests/core/test_ccnavimd.py` に足す。
 
 `command` を `${CCNAVI_BIN_PATH}` で書くのは、守る対象と起動する実体を 1 か所にまとめるため
 （shell form なので環境変数は shell が展開する）。その代わり、`env` からこの 1 行が消えると hook が起動しなくなる。
@@ -1466,7 +1443,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 どちらで進めるかはモデルが決める。ccnavi は判定で強制せず、`SessionStart` で `.ccnavi/CCNAVI.md` の「作業の進め方」（条件 `tickets`）を渡す。
 サブエージェントには渡さない。
 
-最後の行（`dry-run` の条件）は dry-run のときだけ出る。それ以外の手順（レビューの sh、`review: mr` / `chat`、配点の書き方、後工程）は、必要になった場所で改めて届く。
+最後の行（`dry_run` の条件）は dry-run のときだけ出る。それ以外の手順（レビューの sh、`review: mr` / `chat`、配点の書き方、後工程）は、必要になった場所で改めて届く。
 
 ### 置き場と状態
 
