@@ -1,0 +1,42 @@
+---
+type: guide
+title: フェーズが育つ流れ
+description: phases.yml のフェーズ定義が、計画で使いたい型の不足から下書き・検証・配置・親への固定・配布までどう育つかの全体像
+tags: [phase, config, ticket]
+keywords: [フェーズ, フェーズ定義, phases.yml, 育つ, 全体像, plan, 計画, fill-phases, plan-order, 写し, scope, review, ミラー]
+---
+
+# フェーズが育つ流れ
+
+フェーズ定義は「作業の型」（種類、ユーザが見る場所、範囲の上限、成果物）で、親が `plan:` に並べて使う。
+計画に使いたい型が無い、または範囲やレビューの置き方が合わないときに足す・直す。
+
+```
+きっかけ → 下書き → 検証 → 承認（ユーザが置く） → 効く → 配る
+```
+
+| 段階 | 何が起きるか | 誰が | 使うもの |
+|---|---|---|---|
+| きっかけ | 計画を書こうとして使える定義が無い、`scope` が実際の置き場に合わない、レビューの見る場所を変えたい | エージェントかユーザ | 計画の提案、`ccnavi --lint` |
+| 下書き | 定義を 1 つ足す・直す。`kind` `title` `review` `scope` `deliverables` を決める。順序は定義でなく親の計画の項の `after` で書く | エージェント | `/ccnavi-config`、置き場は `wip/handoff/` |
+| 検証 | `id` と `title` の重複、`scope` が親の外に出ないか、件数の上限を機械に聞く。`--phases` で下書きを差し替える | エージェント | `ccnavi --lint --phases <下書き>` |
+| 承認 | ユーザが置く。フェーズ定義はユーザの持ち物で、エージェントは書き換えない | ユーザ | `ccnavi-stage.sh --commands` |
+| 効く | 親の提案を承認するとき、計画が使う定義だけを親の `phases:` に写して固定する。承認のあとの判定は写しを読む | ccnavi | `ccnavi --plan-order <親> --fill-phases` |
+| 配る | 共通レイヤーの `phases.yml` は、親の着手でプロジェクトの `.ccnavi/config/common/` へミラーされ、導入 sh が配布先へも配る | ccnavi | 親の `ticket start`、`ccnavi-setup.sh` |
+
+## 規則
+
+- 定義を直しても、進行中の親には届かない。承認したときの定義を親に固定するため（途中で緩むのを防ぐ）。直したいときは親の計画を改版する
+- 足すのは共通レイヤーと、親の `project:` が指す 1 レイヤーの 2 本だけ（ADR-0125）。どのプロジェクトでも同じ構成を前提にできる定義は共通、`scope` がレイアウトに依存する定義はレイヤーに置く
+- 同じ `id` で中身が違う、または `title` が重なる定義は error。レイヤー側のその定義だけを使わず、ほかの定義は使う
+- `scope` を超えても承認は止まらず、承認画面に警告として出る。判定は子の範囲を上限でも切り詰める
+- 計画の無い親は着手できない。定義が 1 つも無ければ計画は承認できない
+
+## 次に読む
+
+| 読むとき | 開くファイル |
+|---|---|
+| 定義の欄と計画の書き方 | `docs/design/tickets/phases.md` |
+| フェーズ管理の全体 | `docs/design/tickets/phase-management.md` |
+| 共通と config の足し算 | `docs/adr/0125-phases-add-common-and-project-layers.md` |
+| 計画ごと使い回したい | `.ccnavi/docs/templates.md` |
