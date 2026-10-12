@@ -125,6 +125,22 @@ def has_form(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> bool:
     return form_of(name, prefixes) is not None
 
 
+def direct_name_warning(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> str:
+    """直接作業のワークツリーの名前が形に合わないときの案内（1 行）。合えば空。
+
+    `--lint` の warn と、`ccnavi-worktree.sh` が切ったあとに出す案内が同じ文面を使う。拒否はしない。
+    """
+    if has_form(name, prefixes):
+        return ""
+    return (
+        f"直接作業のワークツリー {name} の名前が `<先頭の語>-<番号>-<slug>` の形でない。"
+        "新しく切るときは、先頭の語（CCNAVI_BRANCH_PREFIXES）と番号（issue の番号、"
+        "無ければ `ccnavi-ticket.sh next-id` の通し番号）を付けて "
+        "`worktree add .claude/worktrees/<名前> -b <名前> <統合先>` で切る。"
+        "既にある名前は変えなくてよい"
+    )
+
+
 def identifier_number(name: str, prefixes=settings.DEFAULT_BRANCH_PREFIXES) -> int | None:
     """親の識別子に含まれる番号。読むのは `<先頭の語>-<番号>-<slug>` だけ。"""
     matched = form_of(name, prefixes)
