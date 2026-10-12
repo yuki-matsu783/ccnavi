@@ -6,11 +6,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   templatesArgs,
+  templatesEditArgs,
+  templatesEditYesArgs,
   templatesImportArgs,
   templatesImportYesArgs,
   templatesShowArgs,
 } from "../../src/core/commands.js";
-import type { ImportRequest } from "../../src/core/templates-view.js";
+import type { EditRequest, ImportRequest } from "../../src/core/templates-view.js";
 
 const COMMON: ImportRequest = { draft: "login", to: "common", layer: "", replace: false };
 const PROJECT: ImportRequest = { draft: "login", to: "project", layer: "self", replace: false };
@@ -79,6 +81,75 @@ test("CB-T549 実行の引数は --via board が --json の前、--yes と --exp
     "--layer",
     "self",
     "--replace",
+    "--yes",
+    "--expect",
+    "ab12",
+    "--via",
+    "board",
+    "--json",
+  ]);
+});
+
+const EDIT_BASE: EditRequest = { op: "save", name: "login", on: "draft", layer: "", newName: "", to: "", toLayer: "", body: "" };
+
+test("CB-T559 下見の引数（保存）は --save-draft と --body-file。--yes は付けない", () => {
+  assert.deepEqual(templatesEditArgs({ ...EDIT_BASE, op: "save" }, "/tmp/body.yml"), [
+    "--templates",
+    "--save-draft",
+    "login",
+    "--body-file",
+    "/tmp/body.yml",
+    "--json",
+  ]);
+});
+
+test("CB-T560 実行の引数（保存）は --yes --expect --via board が --json の前に並ぶ", () => {
+  assert.deepEqual(templatesEditYesArgs({ ...EDIT_BASE, op: "save" }, "/tmp/body.yml", "ab12"), [
+    "--templates",
+    "--save-draft",
+    "login",
+    "--body-file",
+    "/tmp/body.yml",
+    "--yes",
+    "--expect",
+    "ab12",
+    "--via",
+    "board",
+    "--json",
+  ]);
+});
+
+test("CB-T561 改名は project のとき --layer が --new-name の前に並ぶ", () => {
+  assert.deepEqual(
+    templatesEditArgs({ ...EDIT_BASE, op: "rename", name: "feature", on: "project", layer: "self", newName: "feature2" }, ""),
+    ["--templates", "--rename-template", "feature", "--on", "project", "--layer", "self", "--new-name", "feature2", "--json"],
+  );
+});
+
+test("CB-T562 移動は common から project へ。--to project の後ろに --to-layer が並ぶ", () => {
+  assert.deepEqual(
+    templatesEditArgs({ ...EDIT_BASE, op: "move", name: "feature", on: "common", to: "project", toLayer: "self" }, ""),
+    ["--templates", "--move-template", "feature", "--on", "common", "--to", "project", "--to-layer", "self", "--json"],
+  );
+});
+
+test("CB-T563 削除は common のとき --layer を付けず、--on common を並べる", () => {
+  assert.deepEqual(templatesEditArgs({ ...EDIT_BASE, op: "delete", name: "feature", on: "common" }, ""), [
+    "--templates",
+    "--delete-template",
+    "feature",
+    "--on",
+    "common",
+    "--json",
+  ]);
+});
+
+test("CB-T564 下書きの削除は --delete-draft <名前> だけ。実行は --yes --expect を続ける", () => {
+  assert.deepEqual(templatesEditArgs({ ...EDIT_BASE, op: "delete-draft" }, ""), ["--templates", "--delete-draft", "login", "--json"]);
+  assert.deepEqual(templatesEditYesArgs({ ...EDIT_BASE, op: "delete-draft" }, "", "ab12"), [
+    "--templates",
+    "--delete-draft",
+    "login",
     "--yes",
     "--expect",
     "ab12",

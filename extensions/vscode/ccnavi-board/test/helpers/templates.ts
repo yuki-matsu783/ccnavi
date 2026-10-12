@@ -50,6 +50,7 @@ export function page(overrides: Partial<TemplatesPage> = {}): TemplatesPage {
     lock: { locked: false, reason: "", doing: [] },
     projectLocks: {},
     importLayers: ["self", "lib"],
+    edit: { enabled: true, reason: "" },
     notices: [],
     ...overrides,
   };

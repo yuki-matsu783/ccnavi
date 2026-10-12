@@ -11,7 +11,7 @@
  * ターミナルに Enter まで送る。承認と同時にターミナルで走り、ユーザはターミナルでその結果を見る。
  */
 import * as path from "node:path";
-import type { ImportRequest } from "./templates-view.js";
+import type { EditRequest, ImportRequest } from "./templates-view.js";
 
 /** 承認の push の sh の、ワークスペースルートからのパス */
 export const PUSH_APPROVED_SCRIPT = ".ccnavi/scripts/ccnavi-push-approved.sh";
@@ -99,6 +99,36 @@ export function templatesImportArgs(request: ImportRequest): readonly string[] {
  */
 export function templatesImportYesArgs(request: ImportRequest, expect: string): readonly string[] {
   return [...templatesImportBase(request), "--yes", "--expect", expect, "--via", "board", "--json"];
+}
+
+/** 編集の引数のうち `--json` の前まで。旗の組み合わせは src/ccnavi/entry/cli_templates.py の `_edit_problem` が決める。下見と実行で共有する */
+function templatesEditBase(request: EditRequest, bodyFile: string): string[] {
+  const layer = request.on === "project" ? ["--layer", request.layer] : [];
+  switch (request.op) {
+    case "save":
+      return ["--templates", "--save-draft", request.name, "--body-file", bodyFile];
+    case "delete-draft":
+      return ["--templates", "--delete-draft", request.name];
+    case "rename":
+      return ["--templates", "--rename-template", request.name, "--on", request.on, ...layer, "--new-name", request.newName];
+    case "move":
+      return [
+        "--templates", "--move-template", request.name, "--on", request.on, ...layer,
+        "--to", request.to, ...(request.to === "project" ? ["--to-layer", request.toLayer] : []),
+      ];
+    case "delete":
+      return ["--templates", "--delete-template", request.name, "--on", request.on, ...layer];
+  }
+}
+
+/** 編集の下見（`--yes` を付けない。何も書かない）。`bodyFile` は save のときだけ使う本文の一時ファイル */
+export function templatesEditArgs(request: EditRequest, bodyFile: string): readonly string[] {
+  return [...templatesEditBase(request, bodyFile), "--json"];
+}
+
+/** 編集の実行。`expect` は下見で見せた主語のハッシュ。`--via board` でボードから来た実行だと実行ファイルに伝える */
+export function templatesEditYesArgs(request: EditRequest, bodyFile: string, expect: string): readonly string[] {
+  return [...templatesEditBase(request, bodyFile), "--yes", "--expect", expect, "--via", "board", "--json"];
 }
 
 /**
