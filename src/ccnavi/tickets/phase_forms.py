@@ -887,6 +887,9 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "テンプレートの取り込み（'ccnavi --templates --import'）も、ユーザが打ちます。"
             "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
             "エージェントは打ちません。"
+            "承認が済んだかどうかは "
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} status' で確かめます。"
+            "置き場のファイルを自分で探さず、承認を頼み直す前に status を打ってください。"
             "承認待ちの一覧を見るだけなら 'ccnavi --agree --preview' は通ります。"
         ),
         decision=rules.DENY,

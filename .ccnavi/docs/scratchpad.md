@@ -40,6 +40,10 @@ keywords: [scratchpad, handoff, wip/handoff, スクラッチパッド, 下書き
 - ルートは他セッションと共有しているので、ファイル名が他の下書きと重ならないようにする
 - ワークスペースルートの`wip/handoff/`へは、`workspace-root`のルールの例外として書き込める。ワークツリーを切らなくても書ける（ルートでの編集全体が止まるわけではない）
 
+## テストのフィクスチャを手で組むとき
+
+シェルで`.ccnavi/`や`.claude/`の名前を持つ場所へ書き込むと、場所がワークスペースの外（`/tmp/fx/.ccnavi/`など）でも`builtin:guard-setting-files`が止まる。パスの指す場所までは見ない、止める側に倒した仕様。フィクスチャは`wip/handoff/`の下に作る。保護された場所そのものは、Python など別の手段でも書き換えない。読むだけの`cat`・`grep`・`ls`は止まらない。
+
 ## セッションのスクラッチパッドには置かない
 
 Claude Codeのセッションが示すスクラッチパッド（Environment欄の`.../scratchpad`、`/tmp/claude-*`の下）は、置き場ではない。ユーザに渡す物は`wip/handoff/`、使い捨ては`scratchpad/`に置く。セッションのスクラッチパッドへの書き込みは、ccnaviがこの2つへ案内して止める。

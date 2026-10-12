@@ -48,7 +48,7 @@ raw-git にも recursive-delete にも当たらず、deny のはずが ask に�
 - 入れ子は外側の表記だけを並べる
 - 読み（`text`・`bare`・`degraded`・`unwrapped`）は変えない。縮退した形でも、走査が通った範囲で見つけたものは並ぶ
 
-**判定は、並んでいればルールより先に止める。** コードは `DENY_BRACE_EXPANSION`、記録の `rules` は `(brace-expansion)`。
+**判定は、並んでいればルールより先に止める。** コードは `DENY_BRACE_EXPANSION`、記録の `rules` は `builtin:brace-expansion`。
 見る順は、サブエージェントの禁止・フェーズの HITL ポイント・プロジェクトの食い違いの後、ルールの前。文面は見つけた表記を
 5 件まで名指しし、語を並べて書く例（`--exclude-dir=a --exclude-dir=b`、`cp f f.bak`、`1 2 3`）と、文字なら単一引用で包むことを案内する。
 
