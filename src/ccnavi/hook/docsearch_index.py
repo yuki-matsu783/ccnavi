@@ -699,6 +699,7 @@ def _add_ignore(base: str) -> bool:
     """ツリーのルートの `.gitignore` に IGNORE_LINE を 1 行足す。足したら True。
 
     `!` で索引を否定する行があれば（ユーザが追跡している）足さない。ファイルが無ければ作る。
+    同じ行（前後の空白を除いて比べる）が既にあれば足さずに True を返す（重複させない）。
     既存の行は変えず、末尾に改行が無いときだけ改行を 1 つ補ってから足す。リンク・ふつうでない
     もの・読めないもの・書けないものは足さずに False（呼び出し側が「対象外」に回す）。
     """
@@ -714,8 +715,11 @@ def _add_ignore(base: str) -> bool:
             with open(path, "rb") as f:
                 existing = f.read()
         text = existing.decode("utf-8", errors="replace")
-        if any(_negates_index(line.strip()) for line in text.splitlines()):
+        lines = [line.strip() for line in text.splitlines()]
+        if any(_negates_index(line) for line in lines):
             return False
+        if IGNORE_LINE in lines:
+            return True
         lead = b"" if not existing or existing.endswith(b"\n") else b"\n"
         flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
         flags |= getattr(os, "O_BINARY", 0)

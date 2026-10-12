@@ -147,6 +147,15 @@ class IndexTest(Repo):
             read(os.path.join(self.root, ".gitignore")), "build/\r\n*.log\n**/ccnavi-index.jsonl\n"
         )
 
+    def test_a_line_already_there_is_not_appended_again(self):
+        # 同じ行が既にあれば（前後の空白は除く）、足さずに読めたことにする。
+        write(os.path.join(self.root, ".gitignore"), "build/\n  **/ccnavi-index.jsonl  \n")
+        self.assertTrue(docsearch_index._add_ignore(self.root))
+        self.assertTrue(docsearch_index._add_ignore(self.root))
+        self.assertEqual(
+            read(os.path.join(self.root, ".gitignore")), "build/\n  **/ccnavi-index.jsonl  \n"
+        )
+
     def test_a_missing_gitignore_is_created(self):
         os.remove(os.path.join(self.root, ".gitignore"))
         self.put("a.md", doc(type="guide"))
