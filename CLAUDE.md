@@ -16,7 +16,8 @@
 
 ## 詳細
 
-ccnavi の使い方（`.ccnavi/docs/`）の引き先は `.ccnavi/CCNAVI.md` の表にある（セッション開始時に ccnavi が渡す）。ccnavi の開発（`docs/claude/`）は、作業が表の「読むとき」に当てはまった場合に参照する。
+ccnavi の開発（`docs/claude/`）は、作業が表の「読むとき」に当てはまった場合に参照する。
+ccnavi の使い方（`.ccnavi/docs/`）は `.ccnavi/CCNAVI.md` の表に記載する。
 
 | 読むとき | 開くファイル |
 |---|---|
