@@ -111,6 +111,24 @@ draft's hash as --expect it writes, then removes the draft if it is unchanged.
     ccnavi --templates --import DRAFT --to common|project [--layer NAME]
                        [--replace] [--yes --expect HASH] [--json]
 
+A collected template is used when a parent proposal is started. An agent may
+type it (the flow drafts have no effect either):
+
+    ccnavi ticket new ID --title TITLE --template NAME [--layer self|PROJECT]
+                         [--issue N]
+
+It writes wip/proposals/todo/ID.md in the worktree named ID, with plan: and
+feedback: taken from the template (after is renumbered from the position inside
+each plan to the proposal's numbers; the feedback plan continues the main
+plan), then fills phases:. The flow of the n-th plan item goes to
+wip/proposals/flows/ID-NN-01.yml, a draft that has no effect until the user
+imports it in the flow editor. NAME is looked up in the common layer plus one
+layer (the worktree's own layer unless --layer says otherwise). It stops, and
+writes nothing, for an unknown or unusable template (an error, or one dropped
+by a clash), a type that phases.yml lacks, --plan given too, or a proposal or
+flow draft that already exists. The proposal still goes through the usual
+approval.
+
 The common layer's own three files are moved by --rules, --phases and --risk,
 and where the layers are looked for by --projects and --project-home. All five
 are on the same gate: diagnosis only, dropped everywhere else.
@@ -275,6 +293,9 @@ scripts in .ccnavi/scripts/, which call
          .ccnavi/approved/done/; cancel moves it to .ccnavi/approved/done/)
     ccnavi ticket record-risk <child> <factor> yes|no --reason <why>   (qualitative risk)
     ccnavi ticket new <id> --title <title> --plan <type,type,...> [--issue N]
+    ccnavi ticket new <id> --title <title> --template <name> [--layer <name>] [--issue N]
+        (the second form takes the plan, and the child flow drafts, from a template;
+         see the --templates section above)
         (writes the scaffold of a parent proposal to wip/proposals/todo/<id>.md of
          the worktree named <id>; run it inside that worktree. Collects the scope
          of the chosen phases from phases.yml into allow, chains the plan in a

@@ -292,6 +292,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--title", default="")
     parser.add_argument("--plan", default="")
     parser.add_argument("--issue", type=int, default=None)
+    # `ticket new <識別子> --template <名前> [--layer <名前>]`。計画と子のフローの下書きを
+    # テンプレートから作る（`--plan` の代わり。`--templates`（一覧）とは別の旗）。
+    parser.add_argument("--template", default="")
     parser.add_argument("--reviewed", type=int, default=None)
     parser.add_argument("--accept-unresolved", action="store_true")
     parser.add_argument("--chat", action="store_true")

@@ -428,8 +428,11 @@ def _flows(raw, problems: list[Problem], stem: str) -> dict[int, dict] | None:
     return out
 
 
-def _flow_read(body: dict) -> tuple[dict | None, str]:
-    """フローの本文を、フローのファイルと同じ読み手と形の検査で確かめる。"""
+def dump_flow(body: dict) -> tuple[str, str]:
+    """フローの本文を、フローのファイルの文面（YAML）にする。(文面, 書けない理由)。
+
+    使う側（`template_use`）が子のフローの下書きに書く文面と、`_flow_read` が確かめる文面は同じ。
+    """
     try:
         text = yaml.dump(
             body,
@@ -440,7 +443,15 @@ def _flow_read(body: dict) -> tuple[dict | None, str]:
             width=10**6,
         )
     except (yaml.YAMLError, RecursionError, ValueError, TypeError) as exc:
-        return None, f"YAML に書けない ({_line(exc)})"
+        return "", f"YAML に書けない ({_line(exc)})"
+    return text, ""
+
+
+def _flow_read(body: dict) -> tuple[dict | None, str]:
+    """フローの本文を、フローのファイルと同じ読み手と形の検査で確かめる。"""
+    text, why = dump_flow(body)
+    if why:
+        return None, why
     return flow.parse(text.encode("utf-8"))
 
 

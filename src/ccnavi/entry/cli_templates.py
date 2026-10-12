@@ -29,10 +29,16 @@ from . import cli_args
 BARE_YES = "\x00bare"
 
 
+def _ticket_new(args: argparse.Namespace) -> bool:
+    """`ticket new` か（`--template` と `--layer` を読む経路）。"""
+    return list(args.command[:2]) == ["ticket", "new"]
+
+
 def asked(args: argparse.Namespace) -> bool:
     """`--templates` に関わるフラグが 1 つでも渡されたか（組み合わせの誤りを見る入口）。"""
     return bool(
         args.templates
+        or args.template
         or args.show is not None
         or args.layer
         or args.draft is not None
@@ -91,10 +97,13 @@ def _storing_problem(args: argparse.Namespace) -> str:
 
 def usage_problem(args: argparse.Namespace) -> str:
     """`--templates` の組み合わせの誤り。正しければ空。設定を読む前に見る。"""
+    if args.template and (args.templates or not _ticket_new(args)):
+        return "--template は ticket new <識別子> --title <題> --template <名前> でだけ使う"
     if not args.templates:
         for flag, given in (
             ("--show", args.show is not None),
-            ("--layer", bool(args.layer)),
+            # `ticket new --template` の `--layer` は、テンプレートを引くレイヤー。
+            ("--layer", bool(args.layer) and not _ticket_new(args)),
             ("--draft", args.draft is not None),
             ("--import", args.import_ is not None),
             ("--name", bool(args.name)),

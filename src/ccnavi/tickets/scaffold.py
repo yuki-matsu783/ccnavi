@@ -17,6 +17,19 @@
 - 既にある提案・承認済みチケットは上書きしない
 - 書いたあとに `plan_phases.fill` で `phases:`（定義の写し）を差し込む。無いと `--agree` が落ちる
 
+## テンプレートから作る（`--template <名前> [--layer <名前>]`）
+
+`--plan` の代わりに、溜めたテンプレート（`plan_templates`）の計画を使う（併用は断る）。引き方・
+`after` の付け直し・子のフローの下書きの組み方は `template_use`。ここは書く側:
+
+- 項は `type`・`review`・`after` をそのまま写す（`after` は提案の絶対番号。フィードバック計画は
+  全体計画の続き）。`allow` は計画とフィードバック計画の型の `scope` を集める
+- 書く前に、項の型が `phases.yml` に在ること・kind が置き場（plan は work、feedback は feedback）と
+  合うことを確かめる。書いたあとに承認の検査（`agree_candidates.plan_problems`）を当て、
+  error なら消す
+- 子のフローの下書きを `<提案の置き場>/flows/<親>-<NN>-01.yml` に書く（子の提案の足場は作らない）。
+  下書きに効力は無い。同じ子の識別子の提案・フロー・下書きが在れば、何も書かずに断る。書き損じたら戻す
+
 ネットワークにも git にも触らない。
 """
 
@@ -24,12 +37,24 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import unicodedata
+from dataclasses import dataclass
 from typing import TextIO
 
 from ..infra import fsio, settings, tree
 from ..infra.modes import EXIT_ERROR, EXIT_OK
-from . import phasetypes, plan_phases, ticket_ids, ticket_model
+from ..policy.rules import SEVERITY_ERROR
+from . import (
+    agree_candidates,
+    flow,
+    phasetypes,
+    plan_phases,
+    plan_templates,
+    template_use,
+    ticket_ids,
+    ticket_model,
+)
 from . import ticket as ticket_mod
 
 # 雛形に添える、ユーザが書く欄の目印。
@@ -70,16 +95,54 @@ def collect_allow(
 
 def render(ident: str, title: str, plan: list[str], allow: list[str], issue: int | None) -> str:
     """雛形の全文。`phases:` は書かない（書いたあとに `plan_phases.fill` が差し込む）。"""
+    items = [
+        plan_templates.Item(type=name, after=[number - 1] if number > 1 else [])
+        for number, name in enumerate(plan, start=1)
+    ]
+    return render_items(ident, title, items, [], allow, issue)
+
+
+# 引用符なしで書いてよい型の名前（YAML の真偽・null の語は除く）。
+_PLAIN = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
+_YAML_WORDS = frozenset({"y", "n", "yes", "no", "on", "off", "true", "false", "null"})
+
+
+def _scalar(text: str) -> str:
+    if _PLAIN.fullmatch(text) and text.lower() not in _YAML_WORDS:
+        return text
+    return _quote(text)
+
+
+def _item_line(item: plan_templates.Item) -> str:
+    """計画の 1 項（`ticket.parse` が読める形。`PlanItem.as_raw` と同じ書き分け）。"""
+    if not item.review and not item.after:
+        return f"  - {_scalar(item.type)}"
+    parts = [f"type: {_scalar(item.type)}"]
+    if item.review:
+        parts.append(f"review: {_scalar(item.review)}")
+    if item.after:
+        parts.append(f"after: [{', '.join(str(n) for n in item.after)}]")
+    return "  - {" + ", ".join(parts) + "}"
+
+
+def render_items(
+    ident: str,
+    title: str,
+    plan: list[plan_templates.Item],
+    feedback: list[plan_templates.Item],
+    allow: list[str],
+    issue: int | None,
+) -> str:
+    """雛形の全文。`after` は提案の絶対番号（フィードバック計画は全体計画の続き）で渡す。"""
     lines = [ticket_model.FENCE, f"version: {ticket_model.VERSION}", f"ticket: {ident}"]
     if issue is not None:
         lines.append(f"issue: {issue}")
     lines.append(f"title: {_quote(title)}")
     lines.append("plan:")
-    for number, name in enumerate(plan, start=1):
-        if number == 1:
-            lines.append(f"  - {name}")
-        else:
-            lines.append(f"  - {{type: {name}, after: [{number - 1}]}}")
+    lines.extend(_item_line(item) for item in plan)
+    if feedback:
+        lines.append("feedback:")
+        lines.extend(_item_line(item) for item in feedback)
     lines.append("rationale: |")
     lines.append(f"  {RATIONALE_TODO}")
     lines.append("allow:")
@@ -113,8 +176,14 @@ def run(
     title: str,
     plan_text: str,
     issue: int | None,
+    template: str = "",
+    layer: str = "",
 ) -> int:
-    """`ticket new` の本体。書けたら 0、書かなければ 1（理由は標準エラー）。"""
+    """`ticket new` の本体。書けたら 0、書かなければ 1（理由は標準エラー）。
+
+    `template` を渡すと、`--plan`（型の列）の代わりにテンプレートから計画と子のフローの下書きを作る
+    （`layer` はテンプレートを足し算で引くレイヤー。省けば cwd のツリーのレイヤー）。
+    """
 
     def refuse(why: str) -> int:
         stderr.write(f"ccnavi: ticket new: {why}。何も書かない\n")
@@ -135,7 +204,12 @@ def run(
     if issue is not None and issue <= 0:
         return refuse("--issue には正の整数を渡す")
     plan = parse_plan(plan_text)
-    if not plan:
+    if template:
+        if (plan_text or "").strip():
+            return refuse("--template と --plan は一緒に使えない（計画はテンプレートから作る）")
+    elif layer:
+        return refuse("--layer は --template と一緒に使う")
+    elif not plan:
         return refuse('--plan "design,acceptance,implement" のように型をカンマで区切って渡す')
 
     where = tree.tree_of(root, cwd, conf.projects)
@@ -159,19 +233,28 @@ def run(
             "plan の型の定義を読めず、承認の検査を通る plan と写し（phases:）を作れない"
             "（設計 9.7）。phases.yml を用意してから打つ"
         )
-    unknown = [n for n in dict.fromkeys(plan) if n not in types]
-    if unknown:
-        return refuse(
-            f"plan の型 {', '.join(unknown)} が phases.yml に無い。使える型: "
-            + ", ".join(n for n, t in types.items() if t.kind == phasetypes.KIND_WORK)
-        )
-    feedback = [n for n in dict.fromkeys(plan) if types[n].kind != phasetypes.KIND_WORK]
-    if feedback:
-        return refuse(
-            f"plan の型 {', '.join(feedback)} は feedback の定義。plan には work の定義だけを置く"
-        )
+    used: _Used | None = None
+    if template:
+        used, why = _from_template(conf, root, where, types, ident, template, layer)
+        if used is None:
+            return refuse(why)
+        scoped = [item.type for item in used.plan + used.feedback]
+    else:
+        unknown = [n for n in dict.fromkeys(plan) if n not in types]
+        if unknown:
+            return refuse(
+                f"plan の型 {', '.join(unknown)} が phases.yml に無い。使える型: "
+                + ", ".join(n for n, t in types.items() if t.kind == phasetypes.KIND_WORK)
+            )
+        feedback = [n for n in dict.fromkeys(plan) if types[n].kind != phasetypes.KIND_WORK]
+        if feedback:
+            return refuse(
+                f"plan の型 {', '.join(feedback)} は feedback の定義。"
+                "plan には work の定義だけを置く"
+            )
+        scoped = plan
 
-    allow, inherited = collect_allow(types, plan)
+    allow, inherited = collect_allow(types, scoped)
     if not allow:
         return refuse(
             f"plan の型（{', '.join(inherited)}）が scope: inherit だけで、allow に書く範囲が"
@@ -186,6 +269,10 @@ def run(
     taken = _existing(conf, where.root, ident)
     if taken:
         return refuse(f"{ident} の提案か承認済みチケットが既に在る（{taken}）。上書きしない")
+    if used is not None:
+        clash = _flow_clash(conf, where.root, used)
+        if clash:
+            return refuse(clash)
 
     path = os.path.join(
         where.root,
@@ -197,9 +284,11 @@ def run(
         os.makedirs(os.path.dirname(path), exist_ok=True)
     except OSError as exc:
         return refuse(f"{os.path.dirname(path)} を作れない（{exc}）")
-    failed = fsio.write_new_durable(
-        path, render(ident, title.strip(), plan, allow, issue).encode("utf-8")
-    )
+    if used is None:
+        text = render(ident, title.strip(), plan, allow, issue)
+    else:
+        text = render_items(ident, title.strip(), used.plan, used.feedback, allow, issue)
+    failed = fsio.write_new_durable(path, text.encode("utf-8"))
     if failed:
         return refuse(f"{path} に書けない（{failed}）")
 
@@ -213,18 +302,175 @@ def run(
         fsio.remove(path)
         return refuse(f"phases: を差し込めなかった（{done.why}）")
 
-    stdout.write(f"{ident} の雛形を {path} に書いた\n")
-    stdout.write(f"plan: {' -> '.join(plan)}（各項は前の項を待つ一直線）\n")
+    written: list[str] = []
+    if used is not None:
+        # 承認の検査（定義の kind と置き場、順序）を、書いた提案に当てる。通らなければ書き戻す。
+        problem = _agree_problem(conf, root, path, where.project)
+        if problem:
+            fsio.remove(path)
+            return refuse(f"テンプレートから作った提案が承認の検査を通らない（{problem}）")
+        failed = _write_flows(conf, where.root, used, written)
+        if failed:
+            for rolled in written:
+                fsio.remove(rolled)
+            fsio.remove(path)
+            return refuse(failed)
+
+    if used is None:
+        stdout.write(f"{ident} の雛形を {path} に書いた\n")
+        stdout.write(f"plan: {' -> '.join(plan)}（各項は前の項を待つ一直線）\n")
+    else:
+        _report(stdout, ident, path, used, written)
     stdout.write("allow（phases.yml の scope を集めた）:\n")
     for glob in allow:
         stdout.write(f"  {ALLOW_MATCH} {glob}\n")
+    tail = "並行させたい項は after を直す。" if used is None else "計画の項と文の固有名を直す。"
     stdout.write(
-        "次にやること: rationale と本文を書き、allow を実際の作業に合わせて絞る・足す。"
-        "並行させたい項は after を直す。plan を変えたら "
+        f"次にやること: rationale と本文を書き、allow を実際の作業に合わせて絞る・足す。{tail}"
+        "plan を変えたら "
         f"'ccnavi --plan-order {ident} --fill-phases' で phases: を打ち直す。"
         "'ccnavi --lint' で確かめてから、承認をユーザに頼む\n"
     )
     return EXIT_OK
+
+
+@dataclass
+class _Used:
+    """テンプレートから組んだ、書く中身。"""
+
+    found: template_use.Found
+    plan: list[plan_templates.Item]
+    feedback: list[plan_templates.Item]
+    # (子の識別子, 全体計画の項の添字, 文面)。
+    drafts: list[tuple[str, int, str]]
+
+
+def _from_template(
+    conf: settings.Settings,
+    root: str,
+    where: tree.Tree,
+    types: dict[str, phasetypes.PhaseType],
+    ident: str,
+    name: str,
+    layer: str,
+) -> tuple[_Used | None, str]:
+    """テンプレートを引いて、書く中身を組む。組めなければ (None, 理由)。何も書かない。"""
+    layer = layer or where.project or plan_templates.LAYER_SELF
+    found, why = template_use.resolve(conf, root, layer, name)
+    if found is None:
+        return None, why
+    template = found.template
+    plan, feedback = template_use.absolute(template)
+    missing = [n for n in dict.fromkeys(i.type for i in plan + feedback) if n not in types]
+    if missing:
+        return None, (
+            f"テンプレート {name!r} の項の定義 {', '.join(missing)} が phases.yml に無い"
+            f"（{where.project or '自身'} のレイヤー）。テンプレートを直すか、"
+            "ユーザに phases.yml へ足してもらう"
+        )
+    for key, items, kind in (
+        ("plan", plan, phasetypes.KIND_WORK),
+        ("feedback", feedback, phasetypes.KIND_FEEDBACK),
+    ):
+        wrong = [i.type for i in items if types[i.type].kind != kind]
+        if wrong:
+            return None, (
+                f"テンプレート {name!r} の {key} の型 {', '.join(dict.fromkeys(wrong))} は"
+                f" kind が {kind} でない。{key} には {kind} の定義だけを置く"
+            )
+    why = template_use.child_problem(ident, template)
+    if why:
+        return None, why
+    drafts, why = template_use.flow_drafts(ident, template)
+    if why:
+        return None, why
+    return _Used(found, plan, feedback, drafts), ""
+
+
+def _flow_clash(conf: settings.Settings, top: str, used: _Used) -> str:
+    """子のフローの下書きを書けない理由（在るものは上書きしない）。書けるなら空。"""
+    if not used.drafts:
+        return ""
+    directory = os.path.dirname(flow.draft_file(conf, top, used.drafts[0][0]))
+    if flow.linked(top, directory):
+        place = f"{flow.tickets_rel(conf)}/{flow.FLOWS_DIR}"
+        return f"フロー下書きの置き場（{place}/）の途中にリンクがあるので書かない"
+    for child, _, _ in used.drafts:
+        draft = flow.draft_file(conf, top, child)
+        if os.path.lexists(draft):
+            return f"フロー下書き {flow.draft_rel(conf, child)} が既に在る。上書きしない"
+        if os.path.lexists(flow.flow_file(conf, top, child)):
+            return f"子 {child} のフロー（{flow.flow_rel(conf, child)}）が既に在る。上書きしない"
+        taken = _existing(conf, top, child)
+        if taken:
+            return f"{child} の提案か承認済みチケットが既に在る（{taken}）。上書きしない"
+    return ""
+
+
+def _write_flows(conf: settings.Settings, top: str, used: _Used, written: list[str]) -> str:
+    """子のフローの下書きを書く。書いたパスを `written` に足す。書けなければ理由。"""
+    for child, _, text in used.drafts:
+        place = flow.draft_file(conf, top, child)
+        try:
+            os.makedirs(os.path.dirname(place), exist_ok=True)
+        except OSError as exc:
+            return f"{os.path.dirname(place)} を作れない（{exc}）"
+        failed = fsio.write_new_durable(place, text.encode("utf-8"))
+        if failed:
+            return f"フロー下書き {flow.draft_rel(conf, child)} に書けない（{failed}）"
+        written.append(place)
+    return ""
+
+
+def _agree_problem(conf: settings.Settings, root: str, path: str, project: str) -> str:
+    """書いた提案に承認の検査（`agree_candidates.plan_problems`）を当てた error。無ければ空。"""
+    target, _ = ticket_mod.load(path)
+    if target is None:
+        return "親の提案として読めない"
+    target.project = project
+    config = phasetypes.load_types(conf, root, project)
+    found = agree_candidates.plan_problems(target, config)
+    return " / ".join(p.detail for p in found if p.severity == SEVERITY_ERROR)
+
+
+def _plan_text(items: list[plan_templates.Item], first: int) -> str:
+    parts = []
+    for number, item in enumerate(items, start=first):
+        extra = []
+        if item.after:
+            extra.append("待つ " + ",".join(str(n) for n in item.after))
+        if item.review:
+            extra.append(item.review)
+        parts.append(f"{number} {item.type}" + (f"（{'・'.join(extra)}）" if extra else ""))
+    return " / ".join(parts)
+
+
+def _report(stdout: TextIO, ident: str, path: str, used: _Used, written: list[str]) -> None:
+    """テンプレートから作ったときの出力。何を書いたか、フローの下書きの効力、次の手。"""
+    found = used.found
+    stdout.write(
+        f"{ident} の提案を {path} に書いた"
+        f"（テンプレート {found.template.name}、{found.entry.layer} の {found.entry.rel}）\n"
+    )
+    stdout.write(f"plan（{len(used.plan)} 項）: {_plan_text(used.plan, 1)}\n")
+    if used.feedback:
+        text = _plan_text(used.feedback, len(used.plan) + 1)
+        stdout.write(f"feedback（{len(used.feedback)} 項）: {text}\n")
+    for note in found.notes:
+        stdout.write(f"note: {note}\n")
+    for warn in found.warns:
+        stdout.write(f"warn: {warn}\n")
+    if written:
+        stdout.write(f"フローの下書き {len(written)} 件:\n")
+        for (child, index, _), place in zip(used.drafts, written, strict=True):
+            stdout.write(f"  計画の {index} 番目 -> {child}: {place}\n")
+        stdout.write(
+            "下書きには効力が無い。フローの文は子への案内文になるので、ユーザがフロー編集画面で"
+            "読んで取り込むまで効かない。子の識別子は各フェーズの最初の子"
+            f"（{ident}-<NN>-01）と仮定した。別の連番で子を起こすなら下書きの名前を合わせる\n"
+        )
+    else:
+        stdout.write("フローの下書きは無い（テンプレートに flows が無い）\n")
 
 
 def _existing(conf: settings.Settings, top: str, ident: str) -> str:
