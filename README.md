@@ -421,6 +421,7 @@ hook からの判定と `ticket` / `review` などの副命令に渡すと無視
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--agree` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--agree` / `--reviewed` / `--close-early` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--agree` と `--reviewed` と `--close-early` と、書くとき（`--yes`）の `--templates --import` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も同じ理由コードで止める（表示・検索の道具だけのコマンドは除く）。端末を求めない入口（`ccnavi-sync.sh`・`ccnavi-review.sh decide`・実行ファイルの `--yes`）に、変数・置換・glob で組み立てた引数や `xargs` で流し込む引数を渡す形も、読み切れないので同じ理由コードで止める。テストや端末の無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
+| `CCNAVI_LEARNING` | 学びの蓄積（learning-wiki。`docs/design/tickets/learning-wiki.md`）を使うか。`enable` / `disable`、既定 `disable`。`enable` にすると、子チケットを閉じるときに気づきの記録（`wip/handoff/learnings/<子>.md`）を求め、`ticket learn` が使える |
 
 `${CLAUDE_PROJECT_DIR}` は hook の `command` では展開されるが `env` では展開されない。
 `env` には相対パスを書く。値の変更はセッションを開き直すまで反映されない。
