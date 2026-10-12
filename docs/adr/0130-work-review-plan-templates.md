@@ -7,7 +7,7 @@ keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedba
 ---
 # ADR-0130: 完了した作業・レビュー計画と子のフローをテンプレートとして溜め、下書きから取り込んで再利用する
 
-状態: 採用（2026-10-12 に、単位・蓄積の契機・置き場の層・入口の 4 点をユーザが推奨案で決めた。段階 1〜5 を実装した。保護済みの sh（`ccnavi-push-approved.sh`・`ccnavi-setup.sh`）の変更は `wip/design/scripts/` にステージしてあり、ユーザのコピーを待つ。ボードのテンプレート管理画面は別に作る）
+状態: 採用（2026-10-12 に、単位・蓄積の契機・置き場の層・入口の 4 点をユーザが推奨案で決めた。段階 1〜5 を実装した。保護済みの sh（`ccnavi-push-approved.sh`・`ccnavi-setup.sh`）の変更は、ユーザの許可を得て直接反映した。ボードのテンプレート管理画面は別に作る）
 
 ## 状況
 
@@ -62,7 +62,7 @@ keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedba
 4. **案内と配布**: 親の `finish` の案内、共通レイヤーのミラー（`configsync`）と導入 sh（`ccnavi-setup.sh`）への配布の追記
 5. **文書と画面**: 設計書・README・`.ccnavi/docs/`。ボードの画面は別に決める
 
-`ccnavi-push-approved.sh`・`ccnavi-setup.sh`・`.ccnavi/scripts/` の sh は保護済みで、エージェントは書けない。完成品を `wip/design/scripts/` に全文で置き、ユーザがコピーする（段階 2 と 4）。
+`ccnavi-push-approved.sh`・`ccnavi-setup.sh`・`.ccnavi/scripts/` の sh は保護済みで、エージェントは書けない。通常は完成品を `wip/design/scripts/` に全文で置き、ユーザがコピーする。今回（段階 2 と 4）はユーザが直接直す許可を出した。
 
 ## 得たもの・失ったもの
 
@@ -88,7 +88,7 @@ keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedba
 | `ticket new --template` の入口は実行ファイル（`ccnavi ticket new`）で、`ccnavi-ticket.sh` は通さない | `ccnavi-ticket.sh` は `new` を元から通さない |
 | 親の finish の案内は、計画を持ち、下書きが無く、同じ計画の形（`type`・`review`・`after`）のテンプレートが無いときだけ出す。マージリクエストで見るフェーズの無い親（`ready` が無い）には出さない | 同じ案内を繰り返さない。案内の文面が合うのは `ready` で閉じる親だけ |
 | 共通テンプレートのミラーは、error のあるテンプレートを 1 本ずつ飛ばして着手は止めない。置き場そのものが読めない（リンクなど）ときも、テンプレートだけ写さず着手は止めない | 使えないテンプレートのために作業を止めない。`--lint` が error で知らせる |
-| 導入 sh と `ccnavi-push-approved.sh` の変更は、保護済みなので `wip/design/scripts/` にステージし、ユーザがコピーする | 保護済みの sh はエージェントが書けない |
+| 導入 sh と `ccnavi-push-approved.sh` の変更は、保護済みなので通常は `wip/design/scripts/` にステージし、ユーザがコピーする。今回はユーザが直接直す許可を出し、反映した | 保護済みの sh はエージェントが書けない |
 
 ## まだ決めていないこと
 

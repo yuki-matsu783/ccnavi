@@ -22,7 +22,7 @@ keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedba
 
 共通とプロジェクトに同名があり、中身が違うときは error になり、プロジェクト側は使われない。
 
-共通のテンプレートは、導入 sh（`ccnavi-setup.sh`）が配布先へ配り、親の着手がプロジェクトの `.ccnavi/config/common/` へ写す（error のあるテンプレートは写さずに飛ばし、置き場が読めないときはテンプレートだけ写さない。どちらも着手は止めない）。導入 sh が配るのは、ユーザがステージ版（`wip/design/scripts/ccnavi-setup.sh`）を `scripts/` に差し替えたあとの話で、差し替える前の導入 sh はテンプレートを配らない。名前に使えない文字（空白など）を含むテンプレートは配られない。
+共通のテンプレートは、導入 sh（`ccnavi-setup.sh`）が配布先へ配り、親の着手がプロジェクトの `.ccnavi/config/common/` へ写す（error のあるテンプレートは写さずに飛ばし、置き場が読めないときはテンプレートだけ写さない。どちらも着手は止めない）。導入 sh は配布元の `.ccnavi/config/common/templates/*.yml` を配布先の同じ場所へ写す。名前に使えない文字（空白など）を含むテンプレートは配られない。
 
 ## 見つける
 
@@ -36,7 +36,7 @@ keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedba
 1. 計画を持つ親が閉じるときに、ccnavi が案内を 1 行出す。`ready` の前に `ccnavi --templates --draft <親>` で下書きを作る。`ready` を打つと下書きの材料が退避されて拾えなくなる
 2. 下書きの `description` と `when` に `TODO` の印が付く。固有名を一般化し、効かなかった手順を削り、印を消す。直すのはエージェントでよい
 3. ユーザが `ccnavi --templates --import <名前> --to common|project` で取り込む。`--yes` なしだと何も書かず、検査と差分（既存があれば文の前後まで）を見せる。読んだうえで、表示された `--expect <ハッシュ>` を付けて `--yes` で書く
-4. 取り込んだ下書きは消える。消したことを `ccnavi-push-approved.sh` がコミットする（ユーザがステージ版 `wip/design/scripts/` を `.ccnavi/scripts/` に差し替えたあとの話。差し替える前は、この sh は下書きの削除をコミットしない）
+4. 取り込んだ下書きは消える。消したことを `ccnavi-push-approved.sh` がコミットする
 
 `--import` のフラグ。
 
