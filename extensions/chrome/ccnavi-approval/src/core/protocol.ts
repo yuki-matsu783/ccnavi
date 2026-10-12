@@ -87,7 +87,8 @@ function fromBoard(sender: Sender): boolean {
 }
 
 export interface Deps {
-  readonly hosts: readonly Host[];
+  /** 通信先の一覧（ビルドに埋め込んだものと、設定画面で足したもの）。頼みのたびに読む */
+  getHosts(): Promise<readonly Host[]>;
   /** 同梱の ccnavi の互換の版（「始める」の前に統合先の CCNAVI_COMPAT と比べる。無ければ比べずに断る） */
   readonly compat?: number;
   readonly extensionId: string;
@@ -123,10 +124,10 @@ export const MAX_HEADLINE = 200;
 const MAX_BODY = 64 * 1024;
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
-function hostOf(deps: Deps, id: unknown): Host {
-  const host = deps.hosts.find((h) => h.id === id);
+async function hostOf(deps: Deps, id: unknown): Promise<Host> {
+  const host = (await deps.getHosts()).find((h) => h.id === id);
   if (!host) {
-    throw new github.HostError(`ビルドで組み込んだ通信先に無いホスト: ${String(id)}`);
+    throw new github.HostError(`通信先に無いホスト（一覧にない・設定画面で足していない）: ${String(id)}`);
   }
   return host;
 }
@@ -144,7 +145,7 @@ export async function dispatch(message: unknown, sender: Sender, deps: Deps): Pr
     if (msg.kind === "host" && (msg.op === "commit" || msg.op === "createBranch") && !fromBoard(sender)) {
       return { ok: false, error: "書く要求はボードからだけ受け付ける" };
     }
-    const host = hostOf(deps, msg.host);
+    const host = await hostOf(deps, msg.host);
     switch (msg.kind) {
       case "token.set": {
         if (typeof msg.token !== "string" || !TOKEN.test(msg.token)) {
@@ -287,7 +288,7 @@ async function integrationHead(client: github.Client, cfg: RepoConfig, integ: st
 async function workspaceOf(deps: Deps, cfg: RepoConfig): Promise<{ client: github.Client; cfg: RepoConfig; integ: string; head: string }> {
   const ws = (await deps.getRepos()).find((x) => repoKey(x) === cfg.workspace && !x.project);
   if (!ws) throw new Error(`ワークスペースのリポジトリ ${cfg.workspace || "（未設定）"} が設定画面に登録されていない`);
-  const host = hostOf(deps, ws.host);
+  const host = await hostOf(deps, ws.host);
   const token = await deps.getToken(host.id);
   if (!token) throw new Error(`${host.id} の PAT が無い`);
   const client: github.Client = { host, token, fetch: deps.fetch, counter: { rest: 0, graphql: 0 }, sleep: deps.sleep };

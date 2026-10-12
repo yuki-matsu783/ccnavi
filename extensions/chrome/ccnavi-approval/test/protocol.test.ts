@@ -48,7 +48,7 @@ test("CX-T012 他の拡張・ウェブページ・別の拡張のオリジンか
   assert.equal((await dispatch(msg, BOARD, d)).ok, true);
 });
 
-test("CX-T013 操作は名前で限る。未対応の操作・焼き込んでいないホスト・形の悪い引数は受けない", async () => {
+test("CX-T013 操作は名前で限る。未対応の操作・通信先の一覧に無いホスト・形の悪い引数は受けない", async () => {
   const d = deps(mock(), new Map([["github.com", TOKEN]]));
   const call = (m: Record<string, unknown>) => dispatch(m, BOARD, d);
   assert.match(((await call({ kind: "host", host: "github.com", op: "createCommitOnBranch", args: ["acme", "widgets"] })) as { error: string }).error, /未対応の操作/);

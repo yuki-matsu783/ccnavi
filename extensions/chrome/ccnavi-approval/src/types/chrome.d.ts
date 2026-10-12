@@ -24,6 +24,12 @@ declare namespace chrome {
   namespace tabs {
     function create(props: { url: string }): Promise<unknown>;
   }
+  namespace permissions {
+    /** 設定画面のボタンから呼ぶ（ユーザの操作が要る）。許可されたら true */
+    function request(permissions: { origins: string[] }): Promise<boolean>;
+    /** 外した通信先の許可を外す。許可が無ければ false */
+    function remove(permissions: { origins: string[] }): Promise<boolean>;
+  }
   namespace action {
     const onClicked: { addListener(cb: () => void): void };
     function setBadgeText(details: { text: string }): Promise<void>;

@@ -10,6 +10,7 @@ import { JSDOM } from "jsdom";
 import { act, createElement, type ComponentType } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
+import { loadHosts } from "../src/core/custom-hosts.js";
 import type { TokenMeta } from "../src/core/expiry.js";
 import { dispatch, type Deps } from "../src/core/protocol.js";
 import type { RepoConfig } from "../src/core/settings.js";
@@ -30,9 +31,13 @@ const storage: Record<string, unknown> = {};
 const tokens = new Map<string, string>();
 const metas = new Map<string, TokenMeta>();
 const sent: Record<string, unknown>[] = [];
+/** 通信先の許可の呼び出し（request・remove）と、request に答える値 */
+const permissionCalls: { op: string; origins: string[] }[] = [];
+const grant = { ok: true };
 const NOW = new Date("2026-10-01T00:00:00Z");
 const deps: Deps = {
-  hosts: HOSTS,
+  // 通信先は組み込みと、設定画面で足したもの（storage の customHosts）を合わせる
+  getHosts: async () => loadHosts(chromeStub.storage.local, HOSTS),
   extensionId: EXT_ID,
   base: BASE,
   fetch: async () => {
@@ -51,6 +56,16 @@ const chromeStub = {
     sendMessage: async (message: Record<string, unknown>) => {
       sent.push(message);
       return dispatch(structuredClone(message), OPTIONS, deps);
+    },
+  },
+  permissions: {
+    request: async (p: { origins: string[] }) => {
+      permissionCalls.push({ op: "request", origins: p.origins });
+      return grant.ok;
+    },
+    remove: async (p: { origins: string[] }) => {
+      permissionCalls.push({ op: "remove", origins: p.origins });
+      return true;
     },
   },
   storage: {
@@ -107,6 +122,8 @@ beforeEach(() => {
   tokens.clear();
   metas.clear();
   sent.length = 0;
+  permissionCalls.length = 0;
+  grant.ok = true;
 });
 
 afterEach(async () => {
@@ -435,4 +452,97 @@ test("CX-T218 設定画面の状態欄: 同じ一言が続いても、言い直�
     assert.notEqual($("#token-msg").firstElementChild, before);
   }
   token.stop();
+});
+
+const fillHost = (kind: string, url: string) => {
+  $<HTMLSelectElement>("#host-kind").value = kind;
+  $<HTMLInputElement>("#host-url").value = url;
+};
+const submitHost = () => click("#host-form button[type=submit]");
+const hostList = () => text("#host-list");
+const EMPTY_HOSTS = "足したホストは無い（GitHub.com と GitLab.com は組み込み）";
+
+test("CX-T240 設定画面の通信先: localhost:8080 の GitLab を許可を求めてから足す。PAT の欄とリポジトリの選び先に出し、外すと PAT と許可も消える", async () => {
+  await mount();
+  assert.equal(hostList(), EMPTY_HOSTS);
+  fillHost("gitlab", "http://localhost:8080/");
+  await submitHost();
+  assert.deepEqual(permissionCalls, [{ op: "request", origins: ["http://localhost/*"] }]);
+  assert.equal(text("#host-msg"), "http://localhost:8080（GitLab）を足した。PAT は「PAT」の節で登録する");
+  assert.equal($("#host-msg").className, "status ok");
+  assert.deepEqual(storage.customHosts, [{ kind: "gitlab", url: "http://localhost:8080" }]);
+  assert.equal(hostList(), "http://localhost:8080（GitLab）外す");
+  const ids = ["github.com", "gitlab.com", "localhost_8080_http"];
+  assert.deepEqual(
+    [...$<HTMLSelectElement>("#token-host").options].map((o) => o.value),
+    ids,
+  );
+  assert.deepEqual(
+    [...$<HTMLSelectElement>("#repo-host").options].map((o) => o.value),
+    ids,
+  );
+  // PAT を登録してから外す（外すと PAT は消え、許可も外す）
+  $<HTMLSelectElement>("#token-host").value = "localhost_8080_http";
+  $<HTMLInputElement>("#token-value").value = TOKEN;
+  await submitToken();
+  assert.equal(tokens.get("localhost_8080_http"), TOKEN);
+  await click("#host-list button");
+  assert.equal(tokens.has("localhost_8080_http"), false);
+  assert.deepEqual(storage.customHosts, []);
+  assert.deepEqual(permissionCalls.at(-1), { op: "remove", origins: ["http://localhost/*"] });
+  assert.equal(text("#host-msg"), "localhost_8080_http を外した。PAT も消した。ホスト側でも失効させてください");
+  assert.equal(hostList(), EMPTY_HOSTS);
+});
+
+test("CX-T241 設定画面の通信先: 許可を断られたら足さない。https でない・組み込みと同じ名前・パスつきは足さずに理由を出す", async () => {
+  await mount();
+  grant.ok = false;
+  fillHost("gitlab", "https://gitlab.example.com");
+  await submitHost();
+  assert.match(text("#host-msg"), /許可しないと足せない/);
+  assert.equal($("#host-msg").className, "status error");
+  assert.equal(storage.customHosts, undefined);
+  assert.equal(hostList(), EMPTY_HOSTS);
+
+  grant.ok = true;
+  fillHost("gitlab", "http://gitlab.example.com");
+  await submitHost();
+  assert.match(text("#host-msg"), /https に限る/);
+
+  fillHost("gitlab", "https://gitlab.com");
+  await submitHost();
+  assert.match(text("#host-msg"), /足してあるか、組み込みの通信先と同じ名前/);
+
+  fillHost("gitlab", "https://gitlab.example.com/gitlab");
+  await submitHost();
+  assert.match(text("#host-msg"), /オリジンだけ/);
+  assert.equal(storage.customHosts, undefined);
+});
+
+test("CX-T242 設定画面の通信先: リポジトリが残っているホストは外さない（先にリポジトリを外させる）", async () => {
+  await mount();
+  fillHost("gitlab", "http://localhost:8080");
+  await submitHost();
+  storage.repos = [{ host: "localhost_8080_http", owner: "acme", repo: "widgets", integration: "", recentDays: 7, extraBranches: [], project: "", workspace: "" }];
+  await click("#host-list button");
+  assert.equal(text("#host-msg"), "localhost_8080_http のリポジトリが残っている。先にリポジトリを外してから、ホストを外す");
+  assert.deepEqual(storage.customHosts, [{ kind: "gitlab", url: "http://localhost:8080" }]);
+  assert.equal(permissionCalls.some((c) => c.op === "remove"), false);
+});
+
+test("CX-T250 設定画面の通信先: 同じ許可を別の行が使っているあいだは外しても許可を外さない。読めない行は足す・外すのあとも残す", async () => {
+  await mount();
+  storage.customHosts = [{ kind: "x", url: "ftp://old.example.com" }];
+  fillHost("gitlab", "https://gitlab.example.com");
+  await submitHost();
+  fillHost("gitlab", "https://gitlab.example.com:8443");
+  await submitHost();
+  assert.equal(permissionCalls.filter((c) => c.op === "request").length, 2);
+  // 8443 を外す。同じ許可（https://gitlab.example.com/*）はもう 1 つの行が使っているので、許可は外さない
+  const rows = [...container.querySelectorAll("#host-list button")];
+  await act(async () => (rows[1] as HTMLButtonElement).click());
+  await settle();
+  assert.equal(permissionCalls.some((c) => c.op === "remove"), false);
+  // 読めない行は残っている
+  assert.deepEqual(storage.customHosts, [{ kind: "x", url: "ftp://old.example.com" }, { kind: "gitlab", url: "https://gitlab.example.com" }]);
 });

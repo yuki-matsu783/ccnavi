@@ -75,7 +75,7 @@ async function pause(client: Client, seconds: number): Promise<void> {
 /** 1 回の呼び出し。401 は差し替えを促し、429（レート制限）は Retry-After が短ければ 1 回だけ待ち直す */
 async function send(client: Client, url: string, init: Parameters<Fetch>[1], what: string): Promise<Res> {
   for (let attempt = 0; ; attempt += 1) {
-    // 別のホストへの転送を追わない（PAT を載せた要求を埋め込んだ通信先の外へ出さない）
+    // 別のホストへの転送を追わない（PAT を載せた要求を通信先の一覧の外へ出さない）
     const res = await fetchNoRedirect(client, url, init, what);
     if (res.status === 401) throw new HostError("PAT で認証できない（401）。設定画面で差し替えてください", 401);
     if (res.status === 429) {

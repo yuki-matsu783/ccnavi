@@ -6,11 +6,14 @@
  * 1 日 1 回（`chrome.alarms`）比べて、切れる 7 日前からバッジに出す。
  */
 import { ALARM, ensureDailyAlarm } from "../core/alarm.js";
+import { loadHosts } from "../core/custom-hosts.js";
 import { badgeText, expiryNotice, type TokenMeta } from "../core/expiry.js";
 import { dispatch, type Deps } from "../core/protocol.js";
 import { readRepos } from "../core/settings.js";
 
-const HOSTS = __CCNAVI_HOSTS__;
+/** ビルドに埋め込んだ通信先。設定画面で足したものは `loadHosts` が `chrome.storage.local` から合わせる */
+const BUILT_IN = __CCNAVI_HOSTS__;
+const hosts = () => loadHosts(chrome.storage.local, BUILT_IN);
 const tokenKey = (host: string) => `token:${host}`;
 const metaKey = (host: string) => `tokenMeta:${host}`;
 
@@ -29,7 +32,7 @@ async function getMeta(host: string): Promise<TokenMeta> {
 /** 期限をバッジに出す。PAT が無いホストは数えない */
 async function refreshBadge(): Promise<void> {
   const notices = [];
-  for (const h of HOSTS) {
+  for (const h of await hosts()) {
     if ((await getToken(h.id)) === "") continue;
     notices.push(expiryNotice(h.id, await getMeta(h.id), new Date()));
   }
@@ -41,7 +44,7 @@ async function refreshBadge(): Promise<void> {
 }
 
 const deps: Deps = {
-  hosts: HOSTS,
+  getHosts: hosts,
   compat: __CCNAVI_COMPAT__,
   extensionId: chrome.runtime.id,
   base: chrome.runtime.getURL(""),
@@ -61,7 +64,7 @@ const deps: Deps = {
   now: () => new Date(),
   async getRepos() {
     const got = await chrome.storage.local.get("repos");
-    return readRepos(got.repos, HOSTS);
+    return readRepos(got.repos, await hosts());
   },
 };
 

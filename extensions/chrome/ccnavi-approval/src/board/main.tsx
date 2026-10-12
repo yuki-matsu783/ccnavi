@@ -13,12 +13,15 @@
  */
 import { createRoot } from "react-dom/client";
 
+import { loadHosts } from "../core/custom-hosts.js";
 import { createRenderer } from "../core/sanitize.js";
 import { App } from "./App.js";
 import { blobCache } from "./cache.js";
 import { createBoardController } from "./controller.js";
 import { startWorker } from "./py-client.js";
 
+// 設定画面で足したホストを読んでから組む（開いたあとに足したホストは、開き直すまで出ない）
+const hosts = await loadHosts(chrome.storage.local, __CCNAVI_HOSTS__);
 const md = createRenderer(window);
 const main = document.getElementById("boards") as HTMLElement;
 const frame = {
@@ -29,7 +32,7 @@ const frame = {
 };
 
 const controller = createBoardController({
-  hosts: __CCNAVI_HOSTS__,
+  hosts,
   version: __CCNAVI_VERSION__,
   send: (message) => chrome.runtime.sendMessage(message),
   storage: chrome.storage.local,
