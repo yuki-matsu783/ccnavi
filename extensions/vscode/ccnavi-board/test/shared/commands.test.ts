@@ -160,6 +160,14 @@ test("CB-T317 リスクの配点の差し替え: 共通は --risk、ワークス
   ]);
 });
 
+test("CB-T531 フェーズ定義の共通の差し替え: 共通の設定は --phases、ワークスペースとプロジェクトは --project-phases-file の名前=", () => {
+  assert.deepEqual(overrideArgs({ kind: "phases", path: "/tmp/p.yml" }), ["--phases", "/tmp/p.yml"]);
+  assert.deepEqual(overrideArgs({ kind: "layerPhases", name: "self", path: "/tmp/p.yml" }), [
+    "--project-phases-file",
+    "self=/tmp/p.yml",
+  ]);
+});
+
 test("CB-T365 計画編集タブの引数。読むだけは --plan-order <親> --json（線を変えたら --order に元の番号での先行の JSON）、保存は --order・--expect・--write・--json", () => {
   assert.deepEqual(planOrderArgs("i0001"), ["--plan-order", "i0001", "--json"]);
   assert.deepEqual(planOrderArgs("i0001", {}), ["--plan-order", "i0001", "--json"], "線を変えていなければ --order を付けない");

@@ -1,0 +1,57 @@
+# プロジェクト管理画面の案内。見本は使わず、いまのワークスペースの画面をそのまま指す。
+# 案内の間も、clone・更新などの操作は実際には送らない。
+# `target:` の印（画面の data-tour）:
+#   summary / refresh   ヘッダの件数とフォルダ / 「更新」
+#   clone / clone-url / clone-name / clone-run   clone の枠 / URL の欄 / 名前の欄 / clone ボタン
+#   list   ワークスペース内のプロジェクトの一覧
+#   project / project-check   最初のプロジェクトのカード / その検証の欄（プロジェクトが無いときは中ほどに出す）
+#   workspace   ワークスペース（プロジェクト外）
+#   tour   「?」
+screen: projects
+
+courses:
+  - id: intro
+    title: 基本の案内
+    summary: 画面の見方。一覧・clone・検証
+    steps:
+      - target: summary
+        title: プロジェクトの置き場
+        body: ワークスペースの projects/ の直下にある git リポジトリが、プロジェクトとして並びます。ここに件数と置き場のフォルダが出ます。
+      - target: clone
+        title: リポジトリを clone する
+        body: URL を入れて clone を押すと、projects/ の直下に取り込みます。名前は URL から自動で入り、手で直せます。git clone は「ccnavi」ターミナルで動くので、認証が要るときはそこで入力します。
+      - target: list
+        title: プロジェクトの一覧
+        body: プロジェクトごとに、origin・設定のルール・ワークツリー・チケット・検証の結果をカードで見られます。
+      - target: project-check
+        title: 検証の結果
+        body: プロジェクトの設定を検証した結果です。問題があるカードは、見出しに error や warn の札が出ます。
+      - target: workspace
+        title: ワークスペース（プロジェクト外）
+        body: プロジェクトの外、ワークスペース自体のワークツリーと、ワークスペースの設定のルールの有無です。
+      - target: refresh
+        title: 更新
+        body: 一覧を読み直します。clone や移動をターミナルで済ませたあとに押します。
+      - target: tour
+        title: 案内
+        body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
+
+  - id: add-project
+    title: プロジェクトを足したいとき
+    summary: clone するか、既存のリポジトリを projects/ の下へ移して、一覧に出す
+    steps:
+      - target: clone-url
+        title: URL を入れる
+        body: clone したいリポジトリの URL を入れます。https でも ssh 形式でも構いません。
+      - target: clone-name
+        title: 名前を決める
+        body: projects/ の下に作るフォルダの名前です。URL の末尾から自動で入ります。変えたいときだけ直します。
+      - target: clone-run
+        title: clone を実行する
+        body: 押すと「ccnavi」ターミナルで git clone が走ります。終わると一覧に新しいカードが出ます。
+      - target: refresh
+        title: 手で移したときは更新
+        body: 既存のリポジトリを projects/ の直下へ自分で移したときは、更新を押すと一覧に出ます。ワークスペース直下などにあって認識されないリポジトリは、一覧の下に別枠で出ます。
+      - target: project
+        title: 追加できたか確かめる
+        body: 新しいカードの検証が「問題なし」なら取り込めています。error や warn が出たら、理由に従って直します。

@@ -18,10 +18,8 @@ export type RulesTarget =
 /** リスク管理画面が直す配点のファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定 */
 export type RiskTarget = RulesTarget;
 
-/** フェーズ管理画面が直す定義のファイル。ワークスペースの設定とプロジェクト 1 つの設定だけ（共通の設定の定義は読み取り専用で並べる） */
-export type PhasesTarget =
-  | { readonly kind: "self" }
-  | { readonly kind: "project"; readonly name: string };
+/** フェーズ管理画面が直す定義のファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定（ルール管理・リスク管理と同じ 3 種） */
+export type PhasesTarget = RulesTarget;
 
 /** 画面の入口（サイドパネルに並ぶ 5 つと、ボードから開くフロー編集・計画編集）。引数は開く側が解く（空の表記や未登録のプロジェクトの扱いは各パネルの持ち物） */
 export interface Screens {

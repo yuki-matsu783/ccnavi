@@ -74,6 +74,33 @@ export function courseOf(courses: readonly TourCourse[], id: string | undefined)
 
 type Spot = Rect;
 
+/**
+ * 指す先の枠。`display: contents` の要素（設定 3 画面の `.field` など。共通の list.css）は自分の箱を持たず、
+ * `getBoundingClientRect` が 0 を返すので、光る枠が出ない。その場合は子の枠を合わせたものを返す。
+ * 子が 1 つも箱を持たないとき（畳まれて見えないなど）は 0 のまま返す
+ */
+export function boxOf(el: Element): Rect {
+  const rect = el.getBoundingClientRect();
+  if (typeof getComputedStyle !== "function" || getComputedStyle(el).display !== "contents") {
+    return { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
+  }
+  let top = Infinity;
+  let left = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (const child of Array.from(el.children)) {
+    const box = boxOf(child);
+    if (box.width === 0 && box.height === 0) {
+      continue;
+    }
+    top = Math.min(top, box.top);
+    left = Math.min(left, box.left);
+    right = Math.max(right, box.left + box.width);
+    bottom = Math.max(bottom, box.top + box.height);
+  }
+  return top === Infinity ? { top: rect.top, left: rect.left, width: 0, height: 0 } : { top, left, width: right - left, height: bottom - top };
+}
+
 /** 吹き出しの幅。狭い画面では画面の幅に合わせる（CSS の max-width） */
 const BUBBLE_WIDTH = 340;
 
@@ -300,11 +327,12 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
         if (!scrolled) {
           scrolled = true;
           // 画面より高い要素（長い一覧）は頭を見せる。中ほどに置くと、何を指しているのかが見えない
-          const tall = el.getBoundingClientRect().height > window.innerHeight * 0.6;
-          el.scrollIntoView?.({ block: tall ? "start" : "center" });
+          const tall = boxOf(el).height > window.innerHeight * 0.6;
+          // 箱を持たない要素（display: contents）は scrollIntoView が何もしないので、箱を持つ最初の子孫を動かす
+          const scroller = getComputedStyle(el).display === "contents" ? Array.from(el.querySelectorAll("*")).find((child) => getComputedStyle(child).display !== "contents") ?? el : el;
+          scroller.scrollIntoView?.({ block: tall ? "start" : "center" });
         }
-        const rect = el.getBoundingClientRect();
-        setSpot({ top: rect.top, left: rect.left, width: rect.width, height: rect.height });
+        setSpot(boxOf(el));
       }
       setMeasured(true);
     };

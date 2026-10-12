@@ -12,7 +12,7 @@ keywords: [対象外, VS Code 拡張, レイヤー]
 
 - VS Code 拡張の画面のレイヤーへの追従は、拡張の要件（`extensions/vscode/ccnavi-board/docs/requirements/`）が決める。
   ルール管理とリスク管理は、編集する 1 本（共通・ワークスペース・プロジェクト）を切り替え、足し算の表示は実行ファイルの出力を使う。
-  フェーズ管理は、ワークスペースの config とプロジェクトの config を開く（共通レイヤーの `phases.yml` を開く口は、拡張の要件が決める）。
+  フェーズ管理は、共通レイヤー・ワークスペースの config・プロジェクトの config を開く（共通レイヤーの `phases.yml` は `--phases` で差し替える）。
   フェーズ定義は `--project-phases-file` で、共通レイヤーと足した形で検証してから保存する
 - `CCNAVI_TICKET_CONTROL` のプロジェクト単位化。この変数はワークスペース単位のつまみで、README の語をその意味に直すだけ
 - 統合先ブランチの git オブジェクトから設定を読む形。読むのは checkout されている版だけ

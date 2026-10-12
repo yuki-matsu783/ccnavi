@@ -218,6 +218,7 @@ export type LintOverride =
   | RulesOverride
   | { readonly kind: "risk"; readonly path: string }
   | { readonly kind: "layerRisk"; readonly name: string; readonly path: string }
+  | { readonly kind: "phases"; readonly path: string }
   | { readonly kind: "layerPhases"; readonly name: string; readonly path: string };
 
 export function overrideArgs(override: LintOverride): string[] {
@@ -232,6 +233,8 @@ export function overrideArgs(override: LintOverride): string[] {
       return ["--risk", override.path];
     case "layerRisk":
       return ["--project-risk-file", `${override.name}=${override.path}`];
+    case "phases":
+      return ["--phases", override.path];
     case "layerPhases":
       return ["--project-phases-file", `${override.name}=${override.path}`];
   }
