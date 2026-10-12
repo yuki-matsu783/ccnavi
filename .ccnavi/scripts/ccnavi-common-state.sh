@@ -251,9 +251,12 @@ ccnavi_git_timed() {
 	(
 		exec </dev/null >/dev/null 2>&1
 		ccnavi_gt_sleep=""
-		trap 'test -z "$ccnavi_gt_sleep" || kill "$ccnavi_gt_sleep"; exit 0' TERM
+		ccnavi_gt_stop=""
+		trap 'ccnavi_gt_stop=1; test -z "$ccnavi_gt_sleep" || kill "$ccnavi_gt_sleep"; exit 0' TERM
 		sleep "$ccnavi_gt_limit" &
 		ccnavi_gt_sleep=$!
+		# sleep を起こした直後に TERM が来て trap が先に走った場合は、ここで sleep を止める。
+		test -z "$ccnavi_gt_stop" || { kill "$ccnavi_gt_sleep"; exit 0; }
 		wait "$ccnavi_gt_sleep"
 		kill "$ccnavi_gt_pid"
 	) &
