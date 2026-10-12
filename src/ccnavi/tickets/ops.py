@@ -157,7 +157,8 @@ def start(
         stdout.write(
             "学びの蓄積: 閉じる前に "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')} learn' を打ち、"
-            f"wip/handoff/learnings/{found.ticket}.md に気づきを書く（無ければ learnings: none）\n"
+            f"wip/handoff/learnings/{found.ticket}.md に気づきを書いて git add と git commit をする"
+            "（無ければ learnings: none）\n"
         )
     return 0
 

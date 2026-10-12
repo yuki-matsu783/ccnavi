@@ -12,6 +12,7 @@ import glob
 import json
 import os
 import re
+import shlex
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings, tree
@@ -95,6 +96,7 @@ def scaffold_text(ident: str, parent: str) -> str:
 
 def clean_body(body: str) -> str:
     text = body.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub("[\u2028\u2029\x85]", "\n", text)
     text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
     text = redact.redact(text.strip())
     if len(text) > NOTE_LIMIT:
@@ -253,15 +255,29 @@ def read_log_records(log: str) -> tuple[list[dict], bool]:
 
 def command_word(subject: str) -> str:
     """実行の文字列から、先頭の環境変数の代入と `env` を飛ばした最初の語の名前。"""
-    words = subject.split()
-    i = 0
-    while i < len(words) and (
-        re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", words[i]) or words[i] == "env"
-    ):
-        i += 1
-    if i >= len(words):
+    try:
+        tokens = shlex.split(subject, posix=True)
+    except ValueError:
         return ""
-    return re.split(r"[/\\]", words[i])[-1]
+    i = 0
+    after_env = False
+    while i < len(tokens):
+        tok = tokens[i]
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", tok, re.DOTALL):
+            i += 1
+        elif tok == "env":
+            after_env = True
+            i += 1
+        elif after_env and tok.startswith("-"):
+            i += 1
+        else:
+            break
+    if i >= len(tokens):
+        return ""
+    word = re.split(r"[/\\]", tokens[i])[-1]
+    if not re.fullmatch(r"[A-Za-z0-9._+-]+", word):
+        return ""
+    return word
 
 
 def build_digest(records: list[dict], recorded: bool, tree_name: str | None = None) -> dict:
@@ -309,7 +325,8 @@ def head_text(tree_root: str, rel: str) -> str | None:
     rc, out = gitcmd.output(tree_root, ["ls-tree", "HEAD", "--", rel], GIT_TIMEOUT)
     if rc != 0 or not out.strip():
         return None
-    if out.split()[0] == "120000":
+    parts = out.split()
+    if len(parts) < 2 or parts[0] not in ("100644", "100755") or parts[1] != "blob":
         return None
     rc, out = gitcmd.output(tree_root, ["show", f"HEAD:{rel}"], GIT_TIMEOUT)
     if rc != 0:
@@ -381,7 +398,7 @@ def run(
         proj = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
         if proj is not None and proj.name:
             ident = f"project-{proj.name}"
-            tree_root = proj.root
+            tree_root = root
             tree_name = proj.name
         else:
             ident = "root"
@@ -423,6 +440,15 @@ def run(
             stderr.write(f"ccnavi: 書けない（{e}）\n")
             return 1
         if not os.path.exists(rec_path):
+            blank = True
+        else:
+            try:
+                with open(rec_path, encoding="utf-8", errors="replace") as f:
+                    blank = not f.read().strip()
+            except OSError as e:
+                stderr.write(f"ccnavi: 書けない（{e}）\n")
+                return 1
+        if blank:
             msg = fsio.write_text_atomic(rec_path, scaffold_text(ident, parent))
             if msg:
                 stderr.write(f"ccnavi: 書けない（{msg}）\n")
@@ -436,10 +462,10 @@ def run(
             return 1
         stdout.write(
             f"記録: {record_rel(ident)}"
-            "（気づきを書いて git add する。"
+            "（気づきを書いて git add と git commit をする。"
             "無ければ learnings: none のまま）\n"
         )
-        stdout.write(f"要約: {digest_rel(ident)}（git add する。直さない）\n")
+        stdout.write(f"要約: {digest_rel(ident)}（git add と git commit をする。直さない）\n")
         return 0
 
     msg = validate(note, target, signal)
@@ -464,7 +490,7 @@ def run(
                     text = f.read()
             else:
                 text = scaffold_text(ident, parent)
-        except OSError as e:
+        except (OSError, ValueError) as e:
             stderr.write(f"ccnavi: 書けない（{e}）\n")
             return 1
         msg = fsio.write_text_atomic(rec_path, append_entry(text, entry, ident, parent))

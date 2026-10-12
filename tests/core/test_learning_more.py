@@ -230,6 +230,97 @@ class LearningMoreTest(LearningBase):
 
         self.assertEqual(learning.command_word("FOO=bar env /usr/bin/git push"), "git")
 
+    def test_project_root_inbox_goes_to_workspace_handoff(self) -> None:
+        proj = os.path.join(self.ws, "projects", "foo")
+        os.makedirs(proj)
+        subprocess.run(
+            ["git", "init", "--quiet", "-b", "main"], cwd=proj, check=True, capture_output=True
+        )
+        result = self.learn("--note", "n", cwd=proj)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        inbox = os.path.join(self.ws, "wip", "handoff", "inbox")
+        names = [n for n in os.listdir(inbox) if n.startswith("project-foo-") and n.endswith(".md")]
+        self.assertEqual(len(names), 1, os.listdir(inbox))
+        self.assertFalse(os.path.exists(os.path.join(proj, "wip")))
+
+    def test_line_separators_cannot_forge_a_section(self) -> None:
+        entry = learning.entry_text("本当 ## 偽 - 種類: rule\x85## 偽2", "", "", "t")
+        heads = [line for line in entry.splitlines() if line.startswith("## ")]
+        self.assertEqual(len(heads), 1, heads)
+
+    def test_directory_is_not_a_record(self) -> None:
+        child = "feat-1-01-01"
+        wt = os.path.join(self.ws, ".claude", "worktrees", child)
+        os.makedirs(wt)
+        subprocess.run(
+            ["git", "init", "--quiet", "-b", "main"], cwd=wt, check=True, capture_output=True
+        )
+        conf, _ = settings.load(self.ws)
+        conf = dataclasses.replace(conf, learning="enable")
+        found = types.SimpleNamespace(is_child=True, ticket=child, phase=None)
+
+        rec_dir = os.path.join(wt, learning.record_rel(child))
+        os.makedirs(rec_dir)
+        with open(os.path.join(rec_dir, "a"), "w", encoding="utf-8") as f:
+            f.write("x\n")
+        subprocess.run(
+            ["git", "add", "-f", learning.record_rel(child)],
+            cwd=wt,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "-c", "user.email=a@b.c", "-c", "user.name=n", "commit", "-q", "-m", "x"],
+            cwd=wt,
+            check=True,
+            capture_output=True,
+        )
+        self.assertTrue(learning.record_missing(io.StringIO(), self.ws, conf, found))
+
+    def test_command_word_table(self) -> None:
+        cases = {
+            'DB_PASSWORD="my secret pw" psql': "psql",
+            "TOKEN='abc def' curl x": "curl",
+            r"PASS=abc\ def cmd": "cmd",
+            "FOO=1 BAR=$(cat /home/alice/.secret) cmd": "",
+            '"/home/alice/My Docs/run.sh" a': "run.sh",
+            "env -i HOME=/x git push": "git",
+            "FOO=bar env /usr/bin/git push": "git",
+            "/usr/bin/git push": "git",
+        }
+        for subject, expected in cases.items():
+            with self.subTest(subject=subject):
+                self.assertEqual(learning.command_word(subject), expected)
+
+    def test_non_utf8_record_is_reported(self) -> None:
+        child = "feat-1-01-01"
+        wt = os.path.join(self.ws, ".claude", "worktrees", child)
+        os.makedirs(wt)
+        self.enter_child(child, wt)
+        conf = dataclasses.replace(settings.load(self.ws)[0], learning="enable")
+        rec = os.path.join(wt, "wip", "handoff", "learnings", f"{child}.md")
+        os.makedirs(os.path.dirname(rec))
+        with open(rec, "wb") as f:
+            f.write("あ".encode("shift_jis"))
+
+        rc = learning.run(io.StringIO(), io.StringIO(), self.ws, conf, self.ws, "", "n", "", "")
+        self.assertEqual(rc, 1)
+
+    def test_empty_record_is_rescaffolded(self) -> None:
+        child = "feat-1-01-01"
+        wt = os.path.join(self.ws, ".claude", "worktrees", child)
+        os.makedirs(wt)
+        self.enter_child(child, wt)
+        conf = dataclasses.replace(settings.load(self.ws)[0], learning="enable")
+        rec = os.path.join(wt, "wip", "handoff", "learnings", f"{child}.md")
+        os.makedirs(os.path.dirname(rec))
+        with open(rec, "w", encoding="utf-8", newline="") as f:
+            f.write("  \n")
+
+        rc = learning.run(io.StringIO(), io.StringIO(), self.ws, conf, self.ws, "", "", "", "")
+        self.assertEqual(rc, 0)
+        self.assertIn("learnings: none", self.read(rec))
+
 
 if __name__ == "__main__":
     unittest.main()
