@@ -1018,8 +1018,8 @@ class CommandNameTest(unittest.TestCase):
     def test_コマンド名の位置の展開とグロブを並べる(self):
         cases = {
             "c=git; $c push origin main": ["$c"],
-            # 置換は走査が `$` 1 文字に置き換える。
-            "$(echo git) push origin main": ["$"],
+            # 判定は置換を `$` 1 文字で見るが、表示する名前は置換の全文。
+            "$(echo git) push origin main": ["$(echo git)"],
             "/usr/bin/gi? push origin main": ["/usr/bin/gi?"],
             "/bin/r[m] -rf /tmp/x": ["/bin/r[m]"],
             "git${IFS}push origin main": ["git${IFS}push"],
@@ -1041,10 +1041,23 @@ class CommandNameTest(unittest.TestCase):
             "{fd}>&2 $c push": ["$c"],
             # 外側が縮退していない `eval` は、読み直した層も見る。
             'FOO=1 eval "$c status"': ["$c"],
+            # 置換の全文を表示する。
+            "$(command -v ls) -la": ["$(command -v ls)"],
+            "$(command -v /usr/bin/ls) -la": ["$(command -v /usr/bin/ls)"],
+            '"$(command -v python3)" x.py': ["$(command -v python3)"],
+            "$(echo git) push": ["$(echo git)"],
+            "env $(command -v ls) -la": ["$(command -v ls)"],
+            "$(echo a) push; $(echo b) push": ["$(echo a)", "$(echo b)"],
+            "c=ls; $c -la": ["$c"],
+            # 二重引用の中の `"` と `\` を含む置換も、全文をそのまま書き戻す。
+            '"$(echo a\\"b)" push': ['$(echo a\\"b)'],
         }
         for src, want in cases.items():
             with self.subTest(src=src):
                 self.assertEqual(rewrites_of(src, shellread.FORM_COMMAND_NAME), want)
+
+    def test_二重引用の中の置換はコマンド名の位置でなければ並べない(self):
+        self.assertEqual(rewrites_of('echo "$(echo a b)" | cat', shellread.FORM_COMMAND_NAME), [])
 
     def test_コマンド名でない位置は並べない(self):
         for src in [

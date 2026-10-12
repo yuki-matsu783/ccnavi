@@ -169,7 +169,7 @@ class Reading:
 
 def read(src: str) -> Reading:
     """コマンド文字列を 1 本読む。"""
-    reading, commands = _read(src, 0)
+    reading, commands, full = _read(src, 0)
     # `sh -c` と `eval` に渡った文字列はシェルが読み直すので、そこで見つけた形も並べる。
     reread: list[tuple[str, str]] = []
     marks: list[bool] = []
@@ -182,12 +182,15 @@ def read(src: str) -> Reading:
     # `eval` と `sh -c` の文字列を読み直した層は、外側が縮退していれば見ない。そのときは確認に
     # なるので、止めて書き直させると、書き直し先がファイルになって中身が見えなくなる。
     # 縮退していない（`FOO=1 eval "$c"`）なら確認になる保証が無いので、見る。
-    looked = [
-        layer
-        for (_, layer, _), reread_layer in zip(layers, marks, strict=True)
-        if not (reread_layer and reading.degraded)
-    ]
+    looked = _looked(layers, marks, reading.degraded)
     names = _expanded_names([command for command, _ in commands] + looked)
+    # 表示する名前は、置換を全文で書いた形に差し替える。判定は名前が有るかどうかだけで決まる
+    # （judge.py は書き直しの形が 1 つでもあれば止める）。
+    # 全文の形で名前が有るかどうかが変わるなら、差し替えない。
+    if full is not None:
+        shown = _full_names(full, reading.degraded)
+        if shown and names:
+            names = shown
     rewrites = reading.rewrites + reread + [(FORM_COMMAND_NAME, name) for name in names]
     reading.rewrites = list(dict.fromkeys(rewrites))
     return reading
@@ -203,7 +206,7 @@ def placed(src: str) -> list[tuple[list[str], str | None]]:
     """
     src = _prepare(src)
     try:
-        outer, _, _, _ = shellread_scan._scan(src)
+        outer, _, _, _, _ = shellread_scan._scan(src)
         tokens = shellread_scan._tokenize(outer)
     except (shellread_scan._Unreadable, ValueError):
         return []
@@ -227,24 +230,31 @@ def _prepare(src: str) -> str:
     return src.replace("\\\r\n", "").replace("\\\n", "")
 
 
-def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
+def _read(
+    src: str, depth: int
+) -> tuple[Reading, list[tuple[list[str], bool]], list[tuple[list[str], bool]] | None]:
     """読みと、層を作る先のコマンドのリストを返す。
 
     リストの 1 つずつは（コマンド, 引用の中から切り出したコマンドか）。外側のコマンドが先、
     切り出した中身のコマンドが後ろ。読み切れない形でも、トークンに割れる限り返す。
+    3 つめは同じリストの、置換を全文で書いた形。外側のコマンドだけが違う。作れなければ None。
     """
     if depth > _MAX_DEPTH:
-        return _stopped(
-            shellread_scan._Unreadable(
-                shellread_scan.REASON_AMBIGUOUS_SUBST, shellread_scan._TOO_DEEP
-            )
-        ), []
+        return (
+            _stopped(
+                shellread_scan._Unreadable(
+                    shellread_scan.REASON_AMBIGUOUS_SUBST, shellread_scan._TOO_DEEP
+                )
+            ),
+            [],
+            None,
+        )
     src = _prepare(src)
 
     try:
-        outer, found, heads, braces = shellread_scan._scan(src)
+        outer, found, heads, braces, full = shellread_scan._scan(src)
     except shellread_scan._Unreadable as e:
-        return _stopped(e), []
+        return _stopped(e), [], None
     rewrites = [(FORM_BRACE, brace) for brace in braces]
 
     try:
@@ -252,9 +262,11 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     except ValueError:
         # 閉じない引用符で shlex が投げる。走査は通ったのに shlex が閉じないと読むのは、
         # `$'…\'…'` のように 2 つの読みが分かれる形。読み切れないものとして扱う。
-        return Reading(
-            degraded=True, reason=shellread_scan.REASON_UNTERMINATED, rewrites=rewrites
-        ), []
+        return (
+            Reading(degraded=True, reason=shellread_scan.REASON_UNTERMINATED, rewrites=rewrites),
+            [],
+            None,
+        )
 
     # `cd` が移った先から見たパスを別に組む。元のトークン列は動かさない。
     moved_tokens = shellread_cd._resolve_cd(tokens)
@@ -274,22 +286,26 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     runnable = [(command, False) for command in _with_time(commands)]
     inners: list[tuple[Reading, bool]] = []
     for body, quoted in found:
-        inner, inner_commands = _read(body, depth + 1)
+        inner, inner_commands, _ = _read(body, depth + 1)
         inners.append((inner, quoted))
         rewrites.extend(inner.rewrites)
         runnable.extend((command, quoted or q) for command, q in inner_commands)
+    # 外側のコマンドを全文の形に置き換えたもの。中身は同じ列のまま後ろにつなぐ。
+    full_runnable = _full_runnable(full, commands, runnable)
 
     if sum(t in ("<<", "<<-") for t in tokens) > heads:
         # 走査がヒアドキュメントと読まなかった `<<` が、トークンに出た。引用が `<<` だけの
         # 1 語（`grep -n "<<" f`）で、shlex からは演算子と区別が付かない。今までどおり
         # 閉じない本文として縮退する（許容している誤検知）。
-        return Reading(
-            degraded=True, reason=shellread_scan.REASON_UNTERMINATED, rewrites=rewrites
-        ), runnable
+        return (
+            Reading(degraded=True, reason=shellread_scan.REASON_UNTERMINATED, rewrites=rewrites),
+            runnable,
+            full_runnable,
+        )
 
     why = shellread_words._classify(commands)
     if why:
-        return Reading(degraded=True, reason=why, rewrites=rewrites), runnable
+        return Reading(degraded=True, reason=why, rewrites=rewrites), runnable, full_runnable
 
     # 中身は外側の後ろにつなぐ。置換のあった位置で挟むと外側のコマンドが 2 本に分かれ、
     # `find $(pwd) -name x -delete` の -delete が find と別のコマンドに見える。
@@ -305,7 +321,11 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
         if inner.degraded:
             # 中身が 1 つでも読めなければ全体を読めないとする。複合コマンドで 1 区間が
             # 読めないときと同じ扱い。理由は中身のものを返す。
-            return Reading(degraded=True, reason=inner.reason, rewrites=rewrites), runnable
+            return (
+                Reading(degraded=True, reason=inner.reason, rewrites=rewrites),
+                runnable,
+                full_runnable,
+            )
         texts.append(inner.text)
         moveds.append(inner.moved)
         if not quoted:
@@ -316,7 +336,41 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
         moved=SEP.join(m for m in moveds if m),
         rewrites=rewrites,
     )
-    return reading, runnable
+    return reading, runnable, full_runnable
+
+
+def _full_runnable(
+    full: str, commands: list[list[str]], runnable: list[tuple[list[str], bool]]
+) -> list[tuple[list[str], bool]] | None:
+    """外側のコマンドを全文の形で組み直した、層を作る先のリスト。
+
+    語の数が揃わなければ None。揃わないときは placeholder の名前で見る。
+    """
+    try:
+        full_outer = _split_commands(shellread_scan._tokenize(full))
+    except ValueError:
+        return None
+    if len(full_outer) != len(commands):
+        return None
+    return [(command, False) for command in _with_time(full_outer)] + runnable[len(commands) :]
+
+
+def _looked(
+    layers: list[tuple[str, list[str], bool]], marks: list[bool], degraded: bool
+) -> list[list[str]]:
+    """コマンド名を見る層。読み直した層は、外側が縮退していれば見ない。"""
+    return [
+        layer
+        for (_, layer, _), reread_layer in zip(layers, marks, strict=True)
+        if not (reread_layer and degraded)
+    ]
+
+
+def _full_names(full: list[tuple[list[str], bool]], degraded: bool) -> list[str]:
+    """置換を全文で書いた形で並べるコマンド名。層も全文の形から作る。"""
+    marks: list[bool] = []
+    layers = _unwrap(full, [], marks)
+    return _expanded_names([command for command, _ in full] + _looked(layers, marks, degraded))
 
 
 def _stopped(e: shellread_scan._Unreadable) -> Reading:
@@ -587,7 +641,7 @@ def _reread(src: str, rewrites: list[tuple[str, str]]) -> list[list[str]]:
     外側と同じ走査で読むので、文字列の中のコマンド置換の中身も並ぶ。
     トークンに割れなければ層を作らない。中で見つけた、書き直しを求める形は rewrites に足す。
     """
-    reading, commands = _read(src, 0)
+    reading, commands, _ = _read(src, 0)
     rewrites.extend(reading.rewrites)
     return [command for command, _ in commands]
 
