@@ -491,8 +491,7 @@ def prefix_ids(rule_set: rules.RuleSet, layer: str) -> None:
     """
     mark_source(rule_set, layer)
     for rule in rule_set.all():
-        if rule.id:
-            rule.id = f"{layer}{rules.ID_SEPARATOR}{rule.id}"
+        rule.id = f"{layer}{rules.ID_SEPARATOR}{rule.id}"
 
 
 def stop_rules(conf: settings.Settings, root: str) -> list[rules.Rule]:

@@ -579,7 +579,7 @@ class BuiltinGitDirTest(ConfigUnionHarness):
         os.remove(self.rules)
         path = os.path.join(self.ws, ".git", "config")
         denied = self.hook("Write", self.ws, file_path=path)
-        self.assertIn("'git <subcommand>'", self.reason(denied))
+        self.assertIn("git <サブコマンド>", self.reason(denied))
         write(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh"), "")
         wrapper = settings.script_command(self.ws, "ccnavi-git.sh")
         for tool, field, value in (
@@ -625,9 +625,9 @@ class BuiltinGitWordingTest(unittest.TestCase):
         root = tempfile.mkdtemp(prefix="ccnavi-builtin:words-")
         self.addCleanup(shutil.rmtree, root, ignore_errors=True)
         texts = self.messages(root)
-        self.assertIn("'git rm <path>'", texts["builtin:recursive-delete"])
-        self.assertIn("'git stash push -u'", texts["builtin:git-reset-hard"])
-        self.assertIn("'git restore --ours -- <path>'", texts[builtin.CONFIG_VIA_BASH_RULE_ID])
+        self.assertIn("git rm <パス>", texts["builtin:recursive-delete"])
+        self.assertIn("git stash push -u", texts["builtin:git-reset-hard"])
+        self.assertIn("git restore --ours -- <パス>", texts[builtin.CONFIG_VIA_BASH_RULE_ID])
 
 
 class AbsentRiskTest(ConfigUnionHarness):

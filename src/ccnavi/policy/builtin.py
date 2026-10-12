@@ -126,13 +126,13 @@ def _config_via_bash(regex: str, git: str = "git") -> dict:
         # そのまま保護を弱めることになる。
         "regex": regex,
         "message": (
-            "ccnavi is running on its built-in defaults because its rule file "
-            "could not be read, and the shell is not the way to write it. "
-            "Put new content there with the Write or Edit tool, so the repair "
-            "goes through a path that is checked and recorded. Resolving a merge "
-            f"conflict is not blocked: '{git} add <path>' and "
-            f"'{git} restore --ours -- <path>' (or --theirs) put back "
-            "a version that is already committed instead of writing new content."
+            "ルールファイルを読めなかったため、ccnavi は組み込みの既定で動いています。"
+            "シェルで書き込むのは適切ではありません。"
+            "新しい内容は Write か Edit のツールで書いてください。"
+            "そうすると、確かめられて記録される経路で直せます。"
+            "マージの衝突を解くことは止めていません。"
+            f"{git} add <パス>、{git} restore --ours -- <パス>（または --theirs）は、"
+            "コミット済みの版を戻すだけなので使えます。"
         ),
     }
 
@@ -307,8 +307,8 @@ def _deny(root: str) -> list[dict]:
             "match": "Bash",
             "regex": RECURSIVE_DELETE_REGEX,
             "message": (
-                "A recursive forced delete cannot be undone. Name what to remove "
-                f"one at a time, or use '{git} rm <path>' when the files are tracked."
+                "再帰的な強制削除は取り消せません。消すものを 1 つずつ名指しするか、"
+                f"ファイルが追跡されているなら {git} rm <パス> を使ってください。"
             ),
         },
         {
@@ -316,8 +316,8 @@ def _deny(root: str) -> list[dict]:
             "match": "Bash",
             "regex": GIT_PUSH_REGEX,
             "message": (
-                "git push is not run by the agent. Leave the branch as it is "
-                "and ask the user to push."
+                "エージェントは git push を実行しません。"
+                "ブランチはそのままにして、push はユーザに頼んでください。"
             ),
         },
         {
@@ -325,8 +325,8 @@ def _deny(root: str) -> list[dict]:
             "match": "Bash",
             "regex": GIT_RESET_HARD_REGEX,
             "message": (
-                f"Work in progress would be lost. Use '{git} stash push -u' to set it "
-                f"aside, or name the files and use '{git} restore <path>'."
+                f"作業中の変更が失われます。{git} stash push -u で退避するか、"
+                f"ファイルを名指しして {git} restore <パス> を使ってください。"
             ),
         },
         {
@@ -342,8 +342,7 @@ def _deny(root: str) -> list[dict]:
                 r"|\b(id_rsa|id_ed25519)\b"
             ),
             "message": (
-                "This is a place credentials live. Do not read it; "
-                "ask the user for the value you need."
+                "認証情報のある場所です。読まないでください。必要な値は、ユーザに尋ねてください。"
             ),
         },
         {
@@ -371,14 +370,17 @@ GIT_DIR_SHELL_RULE_ID = "builtin:guard-git-dir-via-bash"
 
 def _git_dir_message(git: str) -> str:
     return (
-        "This writes inside the .git directory directly. Changes there bypass git "
-        "and can lose history or run commands through hooks. If a git subcommand does "
-        f"the job, run it as '{git} <subcommand>'. No subcommand edits hooks, "
-        ".git/info/exclude, MERGE_MSG, index.lock or the .git file of a worktree: "
-        "ask the user to change them, naming the file and why. For a stale index.lock, "
-        "first confirm that no git process is running, then ask the user to remove it. "
-        "To ignore files, edit .gitignore instead. "
-        "Reading files under .git is not blocked."
+        ".git ディレクトリの中に直接書き込もうとしています。"
+        "git を通さない変更は、履歴を失わせたり、"
+        "フックを通してコマンドを走らせたりするおそれがあります。"
+        f"git のサブコマンドでできる作業なら、{git} <サブコマンド> で実行してください。"
+        "フック、.git/info/exclude、MERGE_MSG、index.lock、ワークツリーの .git ファイルは、"
+        "どのサブコマンドでも編集されません。"
+        "変更が必要なら、ファイル名と理由を添えてユーザに頼んでください。"
+        "index.lock が古く残っているときは、git のプロセスが動いていないことを確かめてから、"
+        "ユーザに削除を頼んでください。"
+        "ファイルを無視したいときは、.gitignore を編集してください。"
+        ".git の下のファイルを読むことは止めていません。"
     )
 
 

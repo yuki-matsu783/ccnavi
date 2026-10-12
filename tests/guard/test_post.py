@@ -478,7 +478,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
 
         with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "committed\n")
-        self.assertIn("is not a setting", result.stderr)
+        self.assertIn("は設定ではありません", result.stderr)
 
     # ターンの終わり
 
