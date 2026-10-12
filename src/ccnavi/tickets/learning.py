@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import datetime
 import glob
 import json
 import os
@@ -19,6 +20,7 @@ from . import approval, approval_checks, approval_marks, phase, phasetypes, tick
 
 LEARNING_DIR = "wip/handoff/learnings"
 INBOX_DIR = "docs/wiki/inbox"
+INBOX_DIR_ROOT = "wip/handoff/inbox"
 TARGETS = ("rule", "risk", "phase", "template", "skill", "docs")
 UNDECIDED = "未定"
 SIGNALS = ("訂正", "落とし穴", "失敗と回避", "誤り")
@@ -27,6 +29,7 @@ NOTE_LIMIT = 2000
 CUT_MARK = "…(切り詰め)"
 TITLE_LIMIT = 60
 GIT_TIMEOUT = 5.0
+INBOX_TRIES = 50
 
 
 def record_rel(ident: str) -> str:
@@ -37,8 +40,10 @@ def digest_rel(ident: str) -> str:
     return f"{LEARNING_DIR}/{ident}.digest.json"
 
 
-def inbox_rel(ident: str, stamp14: str) -> str:
-    return f"{INBOX_DIR}/{ident}-{stamp14}.md"
+def inbox_rel(ident: str, stamp14: str, root: bool = False, n: int = 0) -> str:
+    directory = INBOX_DIR_ROOT if root else INBOX_DIR
+    suffix = f"-{n}" if n > 0 else ""
+    return f"{directory}/{ident}-{stamp14}{suffix}.md"
 
 
 def stamp14(now_text: str) -> str:
@@ -47,12 +52,51 @@ def stamp14(now_text: str) -> str:
     return digits[:14]
 
 
+def utc14() -> str:
+    return datetime.datetime.now(datetime.UTC).strftime("%Y%m%d%H%M%S")
+
+
+def write_new(path: str, text: str) -> str:
+    """新しいファイルとして書く。既に在れば書かずに "exists"。成功なら空文字、駄目なら理由。"""
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+    except OSError as e:
+        return str(e)
+    try:
+        with open(path, "x", encoding="utf-8", newline="") as f:
+            f.write(text)
+    except FileExistsError:
+        return "exists"
+    except OSError as e:
+        return str(e)
+    return ""
+
+
+def unsafe_path(tree_root: str, rel: str) -> str:
+    """書く先に途中のリンクや、作業ツリーの外を指すものが在れば、そのパス。無ければ空文字。"""
+    parts = [p for p in rel.split("/") if p]
+    if not parts:
+        return ""
+    cur = tree_root
+    for part in parts:
+        cur = os.path.join(cur, part)
+        if os.path.islink(cur):
+            return cur
+    if os.path.exists(cur):
+        real_root = os.path.realpath(tree_root)
+        if not os.path.realpath(cur).startswith(real_root + os.sep):
+            return cur
+    return ""
+
+
 def scaffold_text(ident: str, parent: str) -> str:
     return f"---\nticket: {ident}\nparent: {parent}\nlearnings: none\n---\n\n"
 
 
 def clean_body(body: str) -> str:
-    text = redact.redact(body.strip())
+    text = body.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
+    text = redact.redact(text.strip())
     if len(text) > NOTE_LIMIT:
         return text[:NOTE_LIMIT] + CUT_MARK
     return text
@@ -124,13 +168,47 @@ def bump_count(text: str) -> str:
     return text
 
 
-def append_entry(text: str, entry: str) -> str:
-    out = bump_count(text)
-    if out and not out.endswith("\n"):
-        out += "\n"
-    if not out.endswith("\n\n"):
-        out += "\n"
-    return out + entry
+def _frontmatter_end(lines: list[str]) -> int | None:
+    """行の並びの frontmatter の閉じ `---` の位置。frontmatter が無ければ None。"""
+    if not lines or lines[0].strip() != "---":
+        return None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            return i
+    return None
+
+
+def _has_usable_frontmatter(text: str) -> bool:
+    lines = text.split("\n")
+    end = _frontmatter_end(lines)
+    if end is None:
+        return False
+    return any(line.startswith("learnings:") for line in lines[1:end])
+
+
+def _count_entries(text: str) -> str:
+    """frontmatter の learnings: を、frontmatter の外の `## ` の行の数に合わせる。"""
+    lines = text.split("\n")
+    end = _frontmatter_end(lines)
+    if end is None:
+        return text
+    n = sum(1 for line in lines[end + 1 :] if line.startswith("## "))
+    for i in range(1, end):
+        if lines[i].startswith("learnings:"):
+            lines[i] = f"learnings: {n}"
+            break
+    return "\n".join(lines)
+
+
+def append_entry(text: str, entry: str, ident: str = "", parent: str = "") -> str:
+    text = text.lstrip("﻿").replace("\r\n", "\n")
+    if not _has_usable_frontmatter(text):
+        text = scaffold_text(ident, parent) + text.lstrip("\n")
+    if not text.endswith("\n"):
+        text += "\n"
+    if not text.endswith("\n\n"):
+        text += "\n"
+    return _count_entries(text + entry)
 
 
 def inbox_text(ident: str, entry: str, now_text: str) -> str:
@@ -154,7 +232,7 @@ def read_log_records(log: str) -> tuple[list[dict], bool]:
         return [], False
     base, ext = os.path.splitext(log)
     pattern = f"{glob.escape(base)}.*{ext}"
-    paths = sorted(glob.glob(pattern)) + [log]
+    paths = list(dict.fromkeys(sorted(glob.glob(pattern)) + [log]))
     records: list[dict] = []
     recorded = False
     for path in paths:
@@ -173,7 +251,22 @@ def read_log_records(log: str) -> tuple[list[dict], bool]:
     return records, recorded
 
 
-def build_digest(records: list[dict], recorded: bool) -> dict:
+def command_word(subject: str) -> str:
+    """実行の文字列から、先頭の環境変数の代入と `env` を飛ばした最初の語の名前。"""
+    words = subject.split()
+    i = 0
+    while i < len(words) and (
+        re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", words[i]) or words[i] == "env"
+    ):
+        i += 1
+    if i >= len(words):
+        return ""
+    return re.split(r"[/\\]", words[i])[-1]
+
+
+def build_digest(records: list[dict], recorded: bool, tree_name: str | None = None) -> dict:
+    if tree_name is not None:
+        records = [r for r in records if r.get("tree", "") == tree_name]
     kinds = {
         "deny": audit.DENY,
         "ask": audit.ASK,
@@ -194,9 +287,7 @@ def build_digest(records: list[dict], recorded: bool) -> dict:
         if tool in ("Bash", "PowerShell"):
             subject = rec.get("subject")
             if isinstance(subject, str):
-                parts = subject.split()
-                if parts:
-                    word = re.split(r"[/\\]", parts[0])[-1]
+                word = command_word(subject)
         key = (rule, tool, word)
         repeated_counts[key] = repeated_counts.get(key, 0) + 1
     ordered = sorted(repeated_counts.items(), key=lambda kv: (-kv[1], kv[0]))
@@ -211,6 +302,19 @@ def build_digest(records: list[dict], recorded: bool) -> dict:
 def tracked(tree_root: str, rel: str) -> bool:
     rc, out = gitcmd.output(tree_root, ["ls-files", "--", rel], GIT_TIMEOUT)
     return rc == 0 and bool(out.strip())
+
+
+def head_text(tree_root: str, rel: str) -> str | None:
+    """HEAD に入っている `rel` の中身。HEAD に無い、リンクである、読めないときは None。"""
+    rc, out = gitcmd.output(tree_root, ["ls-tree", "HEAD", "--", rel], GIT_TIMEOUT)
+    if rc != 0 or not out.strip():
+        return None
+    if out.split()[0] == "120000":
+        return None
+    rc, out = gitcmd.output(tree_root, ["show", f"HEAD:{rel}"], GIT_TIMEOUT)
+    if rc != 0:
+        return None
+    return out
 
 
 def phase_off(root: str, conf: settings.Settings, found: ticket_model.Ticket) -> bool:
@@ -238,19 +342,15 @@ def record_missing(
         return False
     child_tree = tree.worktree_path(root, found.ticket)
     rel = record_rel(found.ticket)
-    path = os.path.join(child_tree, rel)
-    if os.path.isfile(path):
-        try:
-            with open(path, encoding="utf-8", errors="replace") as f:
-                content = f.read()
-        except OSError:
-            content = ""
-        if content.strip() and tracked(child_tree, rel):
-            return False
+    text = head_text(child_tree, rel)
+    if text is not None and text.strip():
+        return False
     stderr.write(
-        f"ccnavi: {found.ticket} の気づきの記録（{rel}）が無いか、空か、追跡されていない。"
+        f"ccnavi: {found.ticket} の気づきの記録（{rel}）が、子のブランチの HEAD に無いか、"
+        "空か、リンクになっている（コミットが要る）。"
         f"'{settings.script_command(root, 'ccnavi-ticket.sh')} learn' を打って記録を書き、"
-        "git add してから閉じてください（気づきが無ければ learnings: none のままでよい）\n"
+        "git add と git commit をしてから閉じてください"
+        "（気づきが無ければ learnings: none のままでよい）\n"
     )
     return True
 
@@ -278,12 +378,20 @@ def run(
 
     here = phase.worktree_at(root, conf, cwd)
     if here is None:
-        ident = "root"
-        tree_root = root
+        proj = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
+        if proj is not None and proj.name:
+            ident = f"project-{proj.name}"
+            tree_root = proj.root
+            tree_name = proj.name
+        else:
+            ident = "root"
+            tree_root = root
+            tree_name = ""
         bound = None
     else:
         ident = here.name
         tree_root = here.root
+        tree_name = here.name
         bound = _bound_ticket(root, conf, here.name)
 
     if ident_arg and ident_arg != ident:
@@ -302,6 +410,12 @@ def run(
             )
             return 1
         parent = bound.parent if bound.is_child else ""
+        bad = unsafe_path(tree_root, record_rel(ident)) or unsafe_path(tree_root, digest_rel(ident))
+        if bad:
+            stderr.write(
+                f"ccnavi: {bad} はシンボリックリンクか、作業ツリーの外を指すので書かない\n"
+            )
+            return 1
         rec_path = os.path.join(tree_root, record_rel(ident))
         try:
             os.makedirs(os.path.dirname(rec_path), exist_ok=True)
@@ -309,14 +423,14 @@ def run(
             stderr.write(f"ccnavi: 書けない（{e}）\n")
             return 1
         if not os.path.exists(rec_path):
-            msg = fsio.write_text(rec_path, scaffold_text(ident, parent))
+            msg = fsio.write_text_atomic(rec_path, scaffold_text(ident, parent))
             if msg:
                 stderr.write(f"ccnavi: 書けない（{msg}）\n")
                 return 1
         records, recorded = read_log_records(conf.log)
-        digest = build_digest(records, recorded)
+        digest = build_digest(records, recorded, tree_name)
         digest_text = json.dumps(digest, ensure_ascii=True, indent=1) + "\n"
-        msg = fsio.write_text(os.path.join(tree_root, digest_rel(ident)), digest_text)
+        msg = fsio.write_text_atomic(os.path.join(tree_root, digest_rel(ident)), digest_text)
         if msg:
             stderr.write(f"ccnavi: 書けない（{msg}）\n")
             return 1
@@ -336,6 +450,12 @@ def run(
 
     if bound is not None:
         parent = bound.parent if bound.is_child else ""
+        bad = unsafe_path(tree_root, record_rel(ident))
+        if bad:
+            stderr.write(
+                f"ccnavi: {bad} はシンボリックリンクか、作業ツリーの外を指すので書かない\n"
+            )
+            return 1
         rec_path = os.path.join(tree_root, record_rel(ident))
         try:
             os.makedirs(os.path.dirname(rec_path), exist_ok=True)
@@ -347,23 +467,28 @@ def run(
         except OSError as e:
             stderr.write(f"ccnavi: 書けない（{e}）\n")
             return 1
-        msg = fsio.write_text(rec_path, append_entry(text, entry))
+        msg = fsio.write_text_atomic(rec_path, append_entry(text, entry, ident, parent))
         if msg:
             stderr.write(f"ccnavi: 書けない（{msg}）\n")
             return 1
         stdout.write(f"追記した: {record_rel(ident)}\n")
         return 0
 
-    rel = inbox_rel(ident, stamp14(now_text))
-    inbox_path = os.path.join(tree_root, rel)
-    try:
-        os.makedirs(os.path.dirname(inbox_path), exist_ok=True)
-    except OSError as e:
-        stderr.write(f"ccnavi: 書けない（{e}）\n")
+    inbox_dir = INBOX_DIR if here is not None else INBOX_DIR_ROOT
+    bad = unsafe_path(tree_root, inbox_dir)
+    if bad:
+        stderr.write(f"ccnavi: {bad} はシンボリックリンクか、作業ツリーの外を指すので書かない\n")
         return 1
-    msg = fsio.write_text(inbox_path, inbox_text(ident, entry, now_text))
-    if msg:
-        stderr.write(f"ccnavi: 書けない（{msg}）\n")
-        return 1
-    stdout.write(f"受信箱に書いた: {rel}\n")
-    return 0
+    stamp = utc14()
+    for n in range(INBOX_TRIES):
+        rel = inbox_rel(ident, stamp, root=here is None, n=n)
+        msg = write_new(os.path.join(tree_root, rel), inbox_text(ident, entry, now_text))
+        if msg == "exists":
+            continue
+        if msg:
+            stderr.write(f"ccnavi: 書けない（{msg}）\n")
+            return 1
+        stdout.write(f"受信箱に書いた: {rel}\n")
+        return 0
+    stderr.write("ccnavi: 受信箱の名前が決まらない\n")
+    return 1

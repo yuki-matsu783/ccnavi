@@ -39,7 +39,7 @@ class LearningCliTest(unittest.TestCase):
     def test_note_at_root_goes_to_inbox(self) -> None:
         result = self.learn("--note", "テストの気づき\n2 行目", "--target", "skill")
         self.assertEqual(result.returncode, 0, result.stderr)
-        inbox = os.path.join(self.ws, "docs", "wiki", "inbox")
+        inbox = os.path.join(self.ws, "wip", "handoff", "inbox")
         names = os.listdir(inbox)
         self.assertEqual(len(names), 1, names)
         name = names[0]
@@ -60,7 +60,7 @@ class LearningCliTest(unittest.TestCase):
         result = self.learn("--note", "x", "--target", "zzz")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--target", result.stderr)
-        self.assertFalse(os.path.exists(os.path.join(self.ws, "docs")))
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip")))
 
     def test_record_missing_needs_tracked_record(self) -> None:
         child = "feat-1-01-01"
@@ -86,6 +86,14 @@ class LearningCliTest(unittest.TestCase):
 
         subprocess.run(
             ["git", "add", "-f", learning.record_rel(child)],
+            cwd=wt,
+            check=True,
+            capture_output=True,
+        )
+        # 追加しただけで、コミット前なので、まだ閉じさせない。
+        self.assertTrue(learning.record_missing(io.StringIO(), self.ws, conf, found))
+        subprocess.run(
+            ["git", "-c", "user.email=a@b.c", "-c", "user.name=n", "commit", "-q", "-m", "x"],
             cwd=wt,
             check=True,
             capture_output=True,
