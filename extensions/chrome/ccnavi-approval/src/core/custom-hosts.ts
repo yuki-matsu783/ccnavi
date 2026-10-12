@@ -1,0 +1,91 @@
+/**
+ * 設定画面で足すホスト（`chrome.storage.local` の `customHosts`）。ビルドに埋め込んだ一覧（`hosts.json`）と
+ * 合わせて、通信先の一覧になる。
+ *
+ * 保存するのは種類と、入れたオリジンだけ（`{ kind, url }`）。API の欄は読むたびに、一覧と同じ規則
+ * （`endpoint`）で組み直す。だから保存された値を手で書き換えても、https でないホストは通らない。
+ * 足すときの許可（`chrome.permissions.request`）は設定画面の役目で、ここには持たない。
+ */
+import type { StorageArea } from "./settings.js";
+import { endpoint, ID, type Host, type HostKind } from "./hosts.js";
+
+export const CUSTOM_KEY = "customHosts";
+
+/** 保存する 1 行。URL はオリジン（パスなし） */
+export interface CustomRow {
+  readonly kind: HostKind;
+  readonly url: string;
+}
+
+/** 種類と URL から通信先を組む。読めなければ理由を投げる */
+export function customHost(kind: unknown, value: unknown): Host {
+  if (kind !== "github" && kind !== "gitlab") {
+    throw new Error("種類は GitHub か GitLab を選んでください");
+  }
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error("ホストの URL を入れてください（例 https://gitlab.example.com）");
+  }
+  const url = endpoint(value.trim(), "ホストの URL");
+  if (url.pathname !== "/" && url.pathname !== "") {
+    throw new Error("ホストの URL はオリジンだけ（パスは書かない。例 https://gitlab.example.com）");
+  }
+  if (url.hostname.startsWith("[") || url.hostname.includes(":")) {
+    throw new Error("IPv6 のアドレスは登録できない（名前か 127.0.0.1 で書く）");
+  }
+  const origin = url.origin;
+  // id は `ホスト名` か `ホスト名-ポート`（`:` は鍵の名前に使えないため）
+  const id = url.hostname + (url.port ? `-${url.port}` : "");
+  if (!ID.test(id)) {
+    throw new Error(`ホストの名前が使えない形: ${id}`);
+  }
+  const api = kind === "gitlab" ? `${origin}/api/v4` : `${origin}/api/v3`;
+  const graphql = kind === "gitlab" ? api : `${origin}/api/graphql`;
+  return { id, kind, api, graphql, web: origin };
+}
+
+/** 保存された配列から、読めた行だけを取る（読めない行は捨てる） */
+export function readCustomRows(value: unknown): CustomRow[] {
+  if (!Array.isArray(value)) return [];
+  const out: CustomRow[] = [];
+  for (const raw of value) {
+    const row = raw as { kind?: unknown; url?: unknown } | null;
+    try {
+      const h = customHost(row?.kind, row?.url);
+      out.push({ kind: h.kind, url: h.web });
+    } catch {
+      // 読めない行は省く
+    }
+  }
+  return out;
+}
+
+/** 行から通信先を組む（読めない行は外す。`builtIn` と同じ名前の行も外す） */
+export function readCustomHosts(value: unknown, builtIn: readonly Host[]): Host[] {
+  const out: Host[] = [];
+  for (const row of readCustomRows(value)) {
+    const h = customHost(row.kind, row.url);
+    if (builtIn.some((b) => b.id === h.id) || out.some((o) => o.id === h.id)) continue;
+    out.push(h);
+  }
+  return out;
+}
+
+/** ビルドの一覧と設定のホストを合わせた通信先の一覧（ビルドのものが先） */
+export async function loadHosts(area: StorageArea, builtIn: readonly Host[]): Promise<Host[]> {
+  const got = await area.get(CUSTOM_KEY);
+  return [...builtIn, ...readCustomHosts(got[CUSTOM_KEY], builtIn)];
+}
+
+/**
+ * ホストの許可の型（`chrome.permissions` の origins に渡す）。API と画面は同じオリジン。
+ * Chrome の一致パターンは port を書けないため、port を外す（`http://localhost/*` は port を問わず一致する）。
+ */
+export function originPattern(h: Host): string {
+  const u = new URL(h.web);
+  return `${u.protocol}//${u.hostname}/*`;
+}
+
+/** 保存する行（ホストの web のオリジン） */
+export function rowOf(h: Host): CustomRow {
+  return { kind: h.kind, url: h.web };
+}
