@@ -235,3 +235,24 @@ test("CB-T385 提案の has_plan（計画を持つか）を読む。無い・真
     );
   }
 });
+
+test("CB-T570 チケットの template_draft（完了した計画付きの親から下書きを作れるか）を読む。無い・真偽でない値は偽（古い実行ファイルの答え）", () => {
+  const parsed = parseBoardJson(
+    JSON.stringify({
+      version: BOARD_VERSION,
+      tickets: [
+        { ticket: "a", parent: "", copy: { status: "closed" }, template_draft: true },
+        { ticket: "b", parent: "", copy: { status: "closed" } },
+        { ticket: "c", parent: "", copy: { status: "closed" }, template_draft: "yes" },
+      ],
+      parents: [],
+    }),
+  );
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.deepEqual(
+      parsed.board.tickets.map((t) => t.template_draft),
+      [true, false, false],
+    );
+  }
+});

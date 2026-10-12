@@ -6,6 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   templatesArgs,
+  templatesDraftArgs,
   templatesEditArgs,
   templatesEditYesArgs,
   templatesImportArgs,
@@ -157,4 +158,8 @@ test("CB-T564 下書きの削除は --delete-draft <名前> だけ。実行は -
     "board",
     "--json",
   ]);
+});
+
+test("CB-T571 下書きの引数は --templates --draft <親> --json（完了した親から下書きを作る）", () => {
+  assert.deepEqual(templatesDraftArgs("i0001"), ["--templates", "--draft", "i0001", "--json"]);
 });

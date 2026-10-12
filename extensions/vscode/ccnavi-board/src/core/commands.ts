@@ -93,6 +93,13 @@ export function templatesImportArgs(request: ImportRequest): readonly string[] {
 }
 
 /**
+ * `--templates --draft <親> --json`。完了した親から下書きを作る（効力の無い下書きを書くだけ）。`--root` は `run()` が付ける
+ */
+export function templatesDraftArgs(parent: string): readonly string[] {
+  return ["--templates", "--draft", parent, "--json"];
+}
+
+/**
  * `--templates --import <下書き> --to … [--layer <名前>] [--replace] --yes --expect <sha> --via board --json`。
  * 取り込みの実行。`expect` は見せた下書きの sha で、変わっていれば実行ファイルは何も書かない。
  * `--via board` で、ボードから来た実行だと実行ファイルに伝える

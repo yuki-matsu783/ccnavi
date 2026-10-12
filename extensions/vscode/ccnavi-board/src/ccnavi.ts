@@ -52,6 +52,7 @@ import {
   REVIEW_SCRIPT,
   templatesArgs,
   templatesEditArgs,
+  templatesDraftArgs,
   templatesEditYesArgs,
   templatesImportArgs,
   templatesImportYesArgs,
@@ -825,6 +826,48 @@ export async function runTemplateImportYes(
     "ccnavi --templates --import --yes --json",
     "（取り込めたかは分かりません。一覧を読み直して確かめてください）",
   );
+}
+
+/** 下書きを作った答え */
+export interface DraftMade {
+  readonly name: string;
+  /** ワークスペースルートからの相対 */
+  readonly path: string;
+  readonly notes: readonly string[];
+}
+
+/** 完了した親から下書きを作る（`--templates --draft <親> --json`）。失敗は理由の文にして返す */
+export async function runTemplateDraft(root: string, setting: string, parent: string): Promise<RunResult<DraftMade>> {
+  const what = "ccnavi --templates --draft --json";
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, templatesDraftArgs(parent), DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(ran.stdout);
+  } catch {
+    return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
+  }
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return { ok: false, error: `${what} の出力を読めません` };
+  }
+  const r = raw as Record<string, unknown>;
+  if (r.ok !== true) {
+    return { ok: false, error: typeof r.error === "string" && r.error !== "" ? r.error : `${what} が失敗しました` };
+  }
+  return {
+    ok: true,
+    value: {
+      name: typeof r.name === "string" ? r.name : "",
+      path: typeof r.path === "string" ? r.path : "",
+      notes: Array.isArray(r.notes) ? r.notes.filter((n): n is string => typeof n === "string") : [],
+    },
+  };
 }
 
 /** 編集の子プロセス（下見と実行で共有）。save の本文は一時ディレクトリの本文ファイルに書いて渡し、終わったら消す */
