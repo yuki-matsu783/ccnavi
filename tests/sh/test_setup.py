@@ -1119,7 +1119,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 encoding="utf-8",
             ) as f:
                 f.write("deny: []\n")
-            # 設定 3 本のひな形。risk は共通レイヤー、phases は共通レイヤーと自身のレイヤーの 2 本。
+            # 設定 3 本のひな形は共通レイヤー。
+            # 自身のレイヤーの phases.yml は配布元にあっても配らない。
             with open(os.path.join(src, *RISK_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nlevels: {}\nfactors: []\n")
             with open(os.path.join(src, *COMMON_PHASES_PARTS), "w", encoding="utf-8") as f:
@@ -1209,7 +1210,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertTrue(os.path.isfile(self.deployed(*RULES_PARTS)))
         self.assertTrue(os.path.isfile(self.deployed(*RISK_PARTS)))
         self.assertTrue(os.path.isfile(self.deployed(*COMMON_PHASES_PARTS)))
-        self.assertTrue(os.path.isfile(self.deployed(*PHASES_PARTS)))
+        # 自身のレイヤーの phases.yml は配らない（レイアウトに依存する定義は配布先のユーザが書く）
+        self.assertFalse(os.path.exists(self.deployed(*PHASES_PARTS)))
         for name in DEPLOY_SCRIPTS:
             self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", name)))
 

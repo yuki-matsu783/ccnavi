@@ -1,8 +1,8 @@
 ---
 name: debugging
-concept: true
+process: true
 description: >-
-  デバッグの標準的な考え方への入口。不具合の原因調査、再現手順の作成、失敗したコマンドやログの切り分けで使う。細かい手順は references にあり、ccnavi --docs で共通とプロジェクトの両方から引く。
+  デバッグの標準的な考え方への入口。不具合の原因調査(それ以外の調べものは investigating)、再現手順の作成、失敗したコマンドやログの切り分けで使う。細かい手順は references にあり、ccnavi --docs で共通とプロジェクトの両方から引く。
 ---
 
 # debugging
@@ -21,4 +21,4 @@ description: >-
 - 共通: `.claude/skills/debugging/references/common/`（プロジェクトの `skills/debugging/references/common/` へ写される。プロジェクトの中では直さない）
 - そのリポジトリ固有: `references/project/`（ワークスペースは `.claude/skills/debugging/references/project/`、プロジェクトは `projects/<名前>/skills/debugging/references/project/`。写されない）
 
-中のディレクトリ構造は任意。足し方と書き方は `.ccnavi/docs/skill-concepts.md`。
+中のディレクトリ構造は任意。足し方と書き方は `.ccnavi/docs/skill-processes.md`。

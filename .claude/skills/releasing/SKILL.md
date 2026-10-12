@@ -1,6 +1,6 @@
 ---
 name: releasing
-concept: true
+process: true
 description: >-
   リリースの標準的な考え方への入口。統合先への取り込み、版の切り出し、配布物の作成、公開前の確認で使う。細かい手順は references にあり、ccnavi --docs で共通とプロジェクトの両方から引く。
 ---
@@ -21,4 +21,4 @@ description: >-
 - 共通: `.claude/skills/releasing/references/common/`（プロジェクトの `skills/releasing/references/common/` へ写される。プロジェクトの中では直さない）
 - そのリポジトリ固有: `references/project/`（ワークスペースは `.claude/skills/releasing/references/project/`、プロジェクトは `projects/<名前>/skills/releasing/references/project/`。写されない）
 
-中のディレクトリ構造は任意。足し方と書き方は `.ccnavi/docs/skill-concepts.md`。
+中のディレクトリ構造は任意。足し方と書き方は `.ccnavi/docs/skill-processes.md`。

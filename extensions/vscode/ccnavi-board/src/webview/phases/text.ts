@@ -66,7 +66,7 @@ export function emptyNote(exists: boolean): string {
 /** 共通の設定の定義と表示名が重なっているときに下部へ出す文 */
 export function commonTitleNote(ids: ReadonlySet<string>): string {
   const names = Array.from(ids).map((id) => (id === "" ? "空" : id));
-  return `表示名（title）が共通の設定の定義と重なっています（${names.join(", ")}）。重なったままだと、この設定の定義は 1 つも使われません。変えるまで保存できません`;
+  return `表示名（title）が共通の設定の定義と重なっています（${names.join(", ")}）。重なったままだと、その定義は使われません。変えるまで保存できません`;
 }
 
 /** 共通の設定にも同じ id がある定義に添える文 */

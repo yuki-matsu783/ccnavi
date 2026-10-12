@@ -185,16 +185,16 @@ def _sync_skills(
     found: ticket_model.Ticket,
     worktree: str,
 ) -> list[str] | None:
-    """共通の概念スキルをプロジェクトの `skills/` へ写す。消さない。"""
+    """共通の工程スキルをプロジェクトの `skills/` へ写す。消さない。"""
     changes, why = skillsync.plan(root, worktree)
     if why:
-        stderr.write(f"ccnavi: {found.ticket} の概念スキルを写せない: {why}\n")
+        stderr.write(f"ccnavi: {found.ticket} の工程スキルを写せない: {why}\n")
         return None
     if not changes:
         return []
     failed = skillsync.apply(changes)
     if failed:
-        stderr.write(f"ccnavi: {found.ticket} の概念スキルを写せない: {failed}\n")
+        stderr.write(f"ccnavi: {found.ticket} の工程スキルを写せない: {failed}\n")
         return None
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     lines = skillsync.describe(found.project, changes)

@@ -101,13 +101,13 @@ DEPLOY_RULES=".ccnavi/config/common/rules.yml"
 # セッションの開始（SessionStart）で ccnavi がモデルに渡す作業の決まり。文面はこの md にあり、
 # 実行ファイルは条件と差し込みを解くだけ。無いと、決まりが渡らないことを 1 行で言うだけになる。
 DEPLOY_CCNAVI_MD=".ccnavi/CCNAVI.md"
-# 設定 3 本のひな形。rules と risk は汎用なので共通レイヤー（.ccnavi/config/common/）へ配る。
-# phases は 2 本で、判定はその和を読む。どのプロジェクトでも同じ構成（src/*・tests/* など）を前提に
-# できる定義は共通レイヤーへ、ワークスペースのレイアウト（scope のパス）に依存する定義は自身のレイヤー
-# （.ccnavi/config/project/）へ配る。レイアウトに依存する定義を共通レイヤーに置くと、その scope が
-# projects/ の下のプロジェクトにも適用されてしまう。
+# 設定 3 本のひな形。rules・phases・risk はどれも共通レイヤー（.ccnavi/config/common/）へ配る。
+# phases の判定は、共通レイヤーと自身のレイヤー（.ccnavi/config/project/）の和を読む。自身のレイヤーの
+# phases.yml は配らない。そこに置くのはワークスペースのレイアウト（scope のパス）に依存する定義で、
+# 配布元のものは配布元のレイアウトに合わせてあるため。配布先に既にあれば触らない。
 DEPLOY_RISK=".ccnavi/config/common/risks.yml"
 DEPLOY_COMMON_PHASES=".ccnavi/config/common/phases.yml"
+# 点検でだけ見る。共通レイヤーにも自身のレイヤーにも無いときだけ「まだ無いもの」に出す。
 DEPLOY_PHASES=".ccnavi/config/project/phases.yml"
 DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi の使い方の文書（md）の置き場。配布元にある *.md を全部配る。--docs の索引はここだけ
@@ -187,8 +187,8 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
 
 CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・作業の決まり（.ccnavi/CCNAVI.md）・設定 3 本（.ccnavi/config/common/rules.yml、
-.ccnavi/config/common/risks.yml、フェーズ定義の .ccnavi/config/common/phases.yml と .ccnavi/config/project/phases.yml。
-フェーズ定義は 2 本の和で判定する）・代わりに通る sh と振り分けの sh
+.ccnavi/config/common/risks.yml、.ccnavi/config/common/phases.yml。自身のレイヤーの .ccnavi/config/project/phases.yml は
+配らず、既にあれば触らない。フェーズ定義は 2 本の和で判定する）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）・使い方の文書（.ccnavi/docs/*.md）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
 --docs の索引（**/ccnavi-index.jsonl）は、配布先の .gitignore に足す（ccnavi-index.jsonl を否定する
 行があれば足さない）。
@@ -451,7 +451,6 @@ rules_verdict=""
 ccnavi_md_verdict=""
 risk_verdict=""
 common_phases_verdict=""
-phases_verdict=""
 scripts_todo=""
 docs_todo=""
 
@@ -536,13 +535,6 @@ if [ -n "$deploy" ]; then
 	common_phases_verdict=$(verdict "$source_root/$DEPLOY_COMMON_PHASES" "$common_phases_there")
 	note_deploy "$common_phases_verdict" "$DEPLOY_COMMON_PHASES" "$DEPLOY_COMMON_PHASES"
 
-	if [ -e "$root/$DEPLOY_PHASES" ]; then
-		phases_there=yes
-	else
-		phases_there=no
-	fi
-	phases_verdict=$(verdict "$source_root/$DEPLOY_PHASES" "$phases_there")
-	note_deploy "$phases_verdict" "$DEPLOY_PHASES" "$DEPLOY_PHASES"
 
 	if [ -d "$source_root/$DEPLOY_DOCS_DIR" ]; then
 		for doc_entry in "$source_root/$DEPLOY_DOCS_DIR"/*.md; do
@@ -1329,11 +1321,6 @@ if [ "$deploy_work" = yes ]; then
 		copy_file "$source_root/$DEPLOY_COMMON_PHASES" "$root/$DEPLOY_COMMON_PHASES"
 		;;
 	esac
-	case "$phases_verdict" in
-	copy | replace)
-		copy_file "$source_root/$DEPLOY_PHASES" "$root/$DEPLOY_PHASES"
-		;;
-	esac
 	for name in $docs_todo; do
 		copy_file "$source_root/$DEPLOY_DOCS_DIR/$name" "$root/$DEPLOY_DOCS_DIR/$name"
 	done
@@ -1415,7 +1402,7 @@ if [ ! -f "$root/$DEPLOY_RISK" ]; then
 fi
 # フェーズ定義は共通レイヤーと自身のレイヤーの和。どちらか片方があれば足りるので、両方無いときだけ言う。
 if [ ! -f "$root/$DEPLOY_PHASES" ] && [ ! -f "$root/$DEPLOY_COMMON_PHASES" ]; then
-	note_missing "${DEPLOY_PHASES}（フェーズ定義。共通の ${DEPLOY_COMMON_PHASES} にも無いと plan を持つ親を承認できず、plan の無い親は start が止まる）"
+	note_missing "${DEPLOY_COMMON_PHASES}（フェーズ定義。自身のレイヤーの ${DEPLOY_PHASES} にも無いと plan を持つ親を承認できず、plan の無い親は start が止まる）"
 fi
 # 配るものの一覧（DEPLOY_SCRIPTS）を使って確かめる。ここで名前を決め打ちすると、配る sh を
 # 足したときに、その sh が無いことをこの一覧だけが報告しなくなる。
