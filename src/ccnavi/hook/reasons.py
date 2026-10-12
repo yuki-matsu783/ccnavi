@@ -696,6 +696,7 @@ def conventions(
         lines.append(
             f"- 編集する前にワークツリー（{worktrees}/<名前>）を切り、その中で編集する。"
             "切り方は ccnavi-git.sh の --help（worktree add）。"
+            "直接作業の名前は <先頭の語>-<番号>-<slug>（docs/claude/worktree.md）。"
         )
     if RULE_RAW_GIT in declared or ticket_guard.raw_git_applies(conf, root):
         git_sh = settings.script_command(root, "ccnavi-git.sh")
