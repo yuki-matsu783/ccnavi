@@ -312,7 +312,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     {
       target: '[data-action="tour"]',
       title: "案内",
-      body: "ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。",
+      body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
     },
   ];
 

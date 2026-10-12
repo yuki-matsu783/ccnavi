@@ -37,3 +37,23 @@ test("CB-T406 判定・期待する判定・候補の見本は、実行ファイ
   assert.ok(sample.checked !== undefined && sample.checked.expectations.length >= 1);
   assert.ok(sample.suggested !== undefined && sample.suggested.candidates.length >= 1);
 });
+
+test("CB-T407 ルールの案内の scene は、見本にあるタブ・行の id・判定の名前だけを指す（綴り違いが既定へ黙って戻らない）", () => {
+  const ids = new Set([...sample.sections.deny, ...sample.sections.ask, ...sample.sections.allow].map((rule) => rule.id));
+  for (const course of loadTour("rules").courses) {
+    for (const [index, step] of course.steps.entries()) {
+      const at = `${course.id} の ${index + 1} 段目`;
+      const scene = step.scene;
+      assert.ok(scene.tab === undefined || ["rules", "judge", "hooks"].includes(String(scene.tab)), `${at}: tab`);
+      for (const id of String(scene.open ?? "").split(",").filter((item) => item.trim() !== "")) {
+        assert.ok(ids.has(id.trim()), `${at}: open の ${id} が見本に無い`);
+      }
+      assert.ok(scene.judge === undefined || String(scene.judge) in sample.judges, `${at}: judge の ${String(scene.judge)} が見本に無い`);
+      assert.ok(scene.when === undefined || /^r(\.\d+)*$/.test(String(scene.when)), `${at}: when`);
+      const known = ["tab", "open", "when", "more", "find", "tool", "subject", "judge", "checked", "suggested"];
+      for (const key of Object.keys(scene)) {
+        assert.ok(known.includes(key), `${at}: scene の鍵 ${key} を画面は読まない`);
+      }
+    }
+  }
+});

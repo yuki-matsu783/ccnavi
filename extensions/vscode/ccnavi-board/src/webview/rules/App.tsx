@@ -441,6 +441,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const sceneOpen = new Set(sceneList(scene.open));
   const shownTab: TabName = touring ? (scene.tab === "judge" || scene.tab === "hooks" ? scene.tab : "rules") : tab;
   const shownDraft = touring ? SAMPLE_DRAFT : draft;
+  // 畳んだタイプの中は指しても見えない（0×0 を照らす）。案内の間は畳まない
+  const shownFolded: ReadonlySet<Section> = touring ? new Set() : folded;
   const shownFind = touring ? (typeof scene.find === "string" ? scene.find : "") : find;
   const sceneJudge = typeof scene.judge === "string" ? SAMPLE.judges[scene.judge] : undefined;
   const shownJudged: Judged | undefined = touring
@@ -553,9 +555,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           const shown = rows.filter((row) => !row.hidden).length;
           const kept = rows.filter((row) => row.hidden && isShownOpen(row)).length;
           // 絞り込み中は折りたたんだタイプの中も見えるので、矢印も開いた向きにする
-          const shownAsOpen = query !== "" || !folded.has(section);
+          const shownAsOpen = query !== "" || !shownFolded.has(section);
           return (
-            <section className={folded.has(section) ? "rule-section folded" : "rule-section"} data-section={section} key={section}>
+            <section className={shownFolded.has(section) ? "rule-section folded" : "rule-section"} data-section={section} key={section}>
               <h2>
                 <button
                   type="button"
@@ -596,7 +598,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
                     onRemove={() => remove(section, row.key)}
                     onOpenPicker={() => setPickerKey(row.key)}
                     onPickFile={(field) => post({ type: "pickFile", key: row.key, field })}
-                    pickNode={touring && typeof scene.when === "string" ? scene.when : undefined}
+                    pickNode={touring ? (typeof scene.when === "string" ? scene.when : "r") : undefined}
                     onToggleMore={(value) => setMoreOpen(new Map([...moreOpen, [row.key, value]]))}
                   />
                 ))}

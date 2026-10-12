@@ -750,6 +750,33 @@ test("CB-D194 組み合わせ条件の案内は、見本の行を開いて図を
   }
 });
 
+test("CB-D195 畳んだタイプがあっても、案内は見本の行を畳まずに指す。メニューから始めた案内を閉じると焦点は「?」へ戻る。メニューは Esc で閉じて「?」へ戻る", async () => {
+  const dom = await openRules({}, undefined, { measure: true });
+  try {
+    dom.click(dom.one('[data-action="fold-section"][data-section="deny"]'));
+    await dom.settle();
+    assert.ok(dom.one('[data-section="deny"]').classList.contains("folded"));
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    // Esc: 一覧が閉じ、焦点は「?」
+    dom.key("Escape");
+    await dom.settle();
+    assert.equal(dom.all(".tour-menu").length, 0);
+    assert.equal(dom.document.activeElement?.getAttribute("data-action"), "tour");
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    dom.click(dom.one('[data-action="tour-course"][data-course="combo-when"]'));
+    await dom.settle();
+    assert.equal(dom.one('[data-section="deny"]').classList.contains("folded"), false, "案内の間も畳んだままで、指す先が見えない");
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.document.activeElement?.getAttribute("data-action"), "tour", "閉じたあと焦点が「?」に戻らない");
+    assert.ok(dom.one('[data-section="deny"]').classList.contains("folded"), "閉じたあと畳み直らない");
+  } finally {
+    await dom.close();
+  }
+});
+
 test("CB-D106 読み込み中に頼まれた案内はルールが出てから始め、別の対象へ切り替わって読み込み中になったら閉じて tourDone を返す", async () => {
   const dom = await openPage({ kind: "loading", text: "ルールを読み込み中…" });
   try {

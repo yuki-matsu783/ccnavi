@@ -61,7 +61,8 @@ export function condOfRaw(raw: unknown, at = "when"): CondNode {
 function ruleOfRaw(raw: unknown, section: Section, index: number): RuleForm {
   const at = `${section}[${index}]`;
   const r = object(raw, at);
-  const kind = r.regex !== undefined ? "regex" : "glob";
+  // glob と regex を両方書いたときは glob（実際の読み取りと同じ）
+  const kind = r.glob === undefined && r.regex !== undefined ? "regex" : "glob";
   const when = r.when === undefined ? undefined : condOfRaw(r.when, `${at}.when`);
   const exceptNodes = Array.isArray(r.except) ? r.except.map((item, i) => condOfRaw(item, `${at}.except[${i}]`)) : undefined;
   return {

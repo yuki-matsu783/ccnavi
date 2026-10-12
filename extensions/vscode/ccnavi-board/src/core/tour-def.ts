@@ -47,6 +47,17 @@ export const INTRO_ID = "intro";
 export const SAMPLE_NOTE = "案内のための見本を表示しています。実際のチケット・プロジェクト・設定ではなく、案内を閉じると消えます。";
 
 const ID = /^[a-z][a-z0-9-]*$/;
+/** 指す先（`data-tour` の値）。選択子に埋めるので、引用符や括弧を入れない */
+const TARGET = /^[a-z][a-z0-9-]*$/;
+
+const COURSE_KEYS = ["id", "title", "summary", "steps"];
+const STEP_KEYS = ["target", "title", "body", "scene"];
+const ROOT_KEYS = ["screen", "sample", "courses"];
+
+/** 知らない鍵（綴り違い）を名指しする。黙って捨てると、空の指す先や空の様子に化ける */
+function unknownKey(map: Record<string, unknown>, known: readonly string[]): string | undefined {
+  return Object.keys(map).find((key) => !known.includes(key));
+}
 
 export type TourParsed = { readonly ok: true; readonly value: TourDef } | { readonly ok: false; readonly error: string };
 
@@ -64,6 +75,10 @@ export function parseTour(raw: unknown): TourParsed {
   if (root === undefined) {
     return { ok: false, error: "案内の定義がオブジェクトではない" };
   }
+  const rootUnknown = unknownKey(root, ROOT_KEYS);
+  if (rootUnknown !== undefined) {
+    return { ok: false, error: `知らない鍵 ${rootUnknown}（screen / sample / courses だけ）` };
+  }
   const screen = text(root.screen);
   if (screen === undefined) {
     return { ok: false, error: "screen が無い" };
@@ -78,6 +93,10 @@ export function parseTour(raw: unknown): TourParsed {
     const course = object(rawCourse);
     if (course === undefined) {
       return { ok: false, error: `${at} がオブジェクトではない` };
+    }
+    const courseUnknown = unknownKey(course, COURSE_KEYS);
+    if (courseUnknown !== undefined) {
+      return { ok: false, error: `${at} に知らない鍵 ${courseUnknown}` };
     }
     const id = text(course.id);
     if (id === undefined || !ID.test(id)) {
@@ -105,13 +124,17 @@ export function parseTour(raw: unknown): TourParsed {
       if (step === undefined) {
         return { ok: false, error: `${stepAt} がオブジェクトではない` };
       }
+      const stepUnknown = unknownKey(step, STEP_KEYS);
+      if (stepUnknown !== undefined) {
+        return { ok: false, error: `${stepAt} に知らない鍵 ${stepUnknown}` };
+      }
       const stepTitle = text(step.title);
       const body = text(step.body);
       if (stepTitle === undefined || body === undefined) {
         return { ok: false, error: `${stepAt} の title と body が要る` };
       }
-      if (step.target !== undefined && typeof step.target !== "string") {
-        return { ok: false, error: `${stepAt}.target は文字列にする` };
+      if (step.target !== undefined && step.target !== "" && (typeof step.target !== "string" || !TARGET.test(step.target))) {
+        return { ok: false, error: `${stepAt}.target は小文字の英字で始まり、英小文字・数字・- だけにする（空なら中ほどに出す）` };
       }
       const scene: Record<string, SceneValue> = {};
       if (step.scene !== undefined) {
