@@ -545,8 +545,8 @@ class TicketTest(unittest.TestCase):
         self.assertIn("DENY_TICKET_BLOCKED", reason)
         self.assertIn("i0001", reason)
         self.assertNotIn("DENY_TICKET_SCOPE", reason)
-        # 範囲を当てる前に止めたので、記録の名前も範囲（(ticket-scope)）と分ける。
-        self.assertEqual(self.last_rules()[0], "(ticket-blocked)")
+        # 範囲を当てる前に止めたので、記録の名前も範囲（builtin:ticket-scope）と分ける。
+        self.assertEqual(self.last_rules()[0], "builtin:ticket-blocked")
 
     def test_a_moved_ticket_whose_project_does_not_match_its_place_cannot_write(self):
         # `project:` は宣言ではなく照合で、プロジェクトは置き場が決める。
@@ -792,18 +792,18 @@ class TicketTest(unittest.TestCase):
         self.family()
         target = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-01.md")
         result = self.hook("PreToolUse", "Write", self.parent_tree, file_path=target)
-        self.assertIn("builtin-ticket-state", self.reason(result))
+        self.assertIn("builtin:ticket-state", self.reason(result))
         moved = self.hook(
             "PreToolUse",
             "Bash",
             self.parent_tree,
             command="mv .ccnavi/approved/doing/i0001-01-01.md wip/proposals/review/",
         )
-        self.assertIn("builtin-ticket-state", self.reason(moved))
+        self.assertIn("builtin:ticket-state", self.reason(moved))
         # todo/ への作成は自由。
         todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-03.md")
         free = self.hook("PreToolUse", "Write", self.parent_tree, file_path=todo)
-        self.assertNotIn("builtin-ticket-state", self.reason(free))
+        self.assertNotIn("builtin:ticket-state", self.reason(free))
 
     def test_copies_into_the_state_directory_are_read_by_their_destination(self):
         """コピーする動詞の行き先は、組み込みの保護と同じ部品で読む（`-t` の値か最後の引数）。
@@ -833,7 +833,7 @@ class TicketTest(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
-                self.assertIn("builtin-ticket-state", self.reason(result))
+                self.assertIn("builtin:ticket-state", self.reason(result))
         for command in (
             "cp wip/proposals/review/i0001-01-01.md /tmp/x",
             "cp -t /tmp/out wip/proposals/review/i0001-01-01.md",
@@ -843,7 +843,7 @@ class TicketTest(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
-                self.assertNotIn("builtin-ticket-state", self.reason(result))
+                self.assertNotIn("builtin:ticket-state", self.reason(result))
 
     def test_subagent_cannot_move_state(self):
         self.family()
@@ -855,7 +855,7 @@ class TicketTest(unittest.TestCase):
             command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
         )
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
-        self.assertEqual(self.last_rules(), ["(subagent-ticket-op)"])
+        self.assertEqual(self.last_rules(), ["builtin:subagent-ticket-op"])
         parent = self.hook(
             "PreToolUse",
             "Bash",
@@ -1071,12 +1071,12 @@ class TicketTest(unittest.TestCase):
 
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
-        self.assertEqual(self.last_rules(), ["(phase-review)"])
+        self.assertEqual(self.last_rules(), ["builtin:phase-review"])
         # 繰り返しの文面は、止めた理由（レビュー待ち）の名前で言う。
-        # 範囲（(ticket-scope)）とは言わない。
+        # 範囲（builtin:ticket-scope）とは言わない。
         for _ in range(2):
             again = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
-        self.assertIn("同じ理由（(phase-review)）", self.reason(again))
+        self.assertIn("同じ理由（builtin:phase-review）", self.reason(again))
         shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(shell))
         exempt = self.hook(

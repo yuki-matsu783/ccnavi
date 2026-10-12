@@ -32,14 +32,14 @@ PLACEHOLDER = "/repo"
 
 # 配布先の hook が起動する振り分けの sh（launcher-scripts 1 節）。
 LAUNCHER = ".ccnavi/scripts/ccnavi-launcher.sh"
-APPROVAL = "builtin-guard-ticket-approval"
+APPROVAL = "builtin:guard-ticket-approval"
 APPROVAL_CODE = "DENY_TICKET_APPROVAL_CLI"
-SETTING_FILES = "builtin-guard-setting-files"
+SETTING_FILES = "builtin:guard-setting-files"
 # 書き直しを求める形で止めたときの、記録のルール名。読み分けずに止め、書き直し方を案内する。
-NAME = "(command-name-expansion)"
-BACKQUOTE = "(backquote)"
-AMBIGUOUS = "(ambiguous-form)"
-TICKET_STATE = "builtin-ticket-state-shell"
+NAME = "builtin:command-name-expansion"
+BACKQUOTE = "builtin:backquote"
+AMBIGUOUS = "builtin:ambiguous-form"
+TICKET_STATE = "builtin:ticket-state-shell"
 # 承認の形の末尾。
 YES = " --agree --yes x"
 
@@ -77,13 +77,20 @@ def judge(tool: str, subject: str, bin_path: str = "") -> dict:
     return json.loads(done.stdout)
 
 
+def written_id(name: str) -> str:
+    """記録名（`<相対パス>:<書いた id>`）から書いた id を取り出す。組み込みの名前はそのまま。"""
+    if name.startswith("builtin:"):
+        return name
+    return name.rsplit(":", 1)[-1]
+
+
 def hit(body: dict) -> list[str]:
-    return [rule["id"] for rule in body["rules"]]
+    return [written_id(rule["id"]) for rule in body["rules"]]
 
 
 def blocking(body: dict) -> set[str]:
     """deny / ask の側で当たったルール。組み込みは `section` が空で返るので、allow 以外を数える。"""
-    return {rule["id"] for rule in body["rules"] if rule.get("section") != "allow"}
+    return {written_id(rule["id"]) for rule in body["rules"] if rule.get("section") != "allow"}
 
 
 @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
@@ -152,7 +159,7 @@ class RepoRulesTest(unittest.TestCase):
                 with self.subTest(layer=layer, tool=tool):
                     body = judge(tool, place)
                     self.assertEqual(body["verdict"], "deny", body["response"])
-                    self.assertIn("builtin-guard-project-home", hit(body), body["rules"])
+                    self.assertIn("builtin:guard-project-home", hit(body), body["rules"])
             for command in (
                 f"cp {tree}/wip/proposals/templates/feature.yml {place}",
                 f"tee {place}",
@@ -168,7 +175,7 @@ class RepoRulesTest(unittest.TestCase):
         # ワークツリーの中なら通る。
         body = judge("Write", "/repo/.claude/worktrees/x/wip/proposals/templates/feature.yml")
         self.assertEqual(body["verdict"], "allow", body["response"])
-        self.assertNotIn("builtin-guard-project-home", hit(body), body["rules"])
+        self.assertNotIn("builtin:guard-project-home", hit(body), body["rules"])
 
     def test_引用付きの_find_は_allow_に当たる(self):
         self.assert_verdict('find /repo -name "a b"', "allow", "prefer-glob")
@@ -179,7 +186,7 @@ class RepoRulesTest(unittest.TestCase):
             ('find /repo -name "a b" -delete', "find-writes"),
             (
                 'sed -i "s/a b/c/" /repo/.ccnavi/config/common/rules.yml',
-                "builtin-guard-setting-files",
+                "builtin:guard-setting-files",
             ),
         ]:
             with self.subTest(subject=subject):
@@ -188,7 +195,7 @@ class RepoRulesTest(unittest.TestCase):
     def test_入力に混ざった語の中の目印は取り除かれる(self):
         # `git␁push` のまま読むと実在しない 1 語で、どのルールにも当たらない。
         # 取り除いて `git push` と読み、raw-git に当たる。
-        self.assert_verdict("git" + shellread.WORD_SEP + "push", "deny", "builtin-guard-raw-git")
+        self.assert_verdict("git" + shellread.WORD_SEP + "push", "deny", "builtin:guard-raw-git")
 
     # 変わってはいけないもの
 
@@ -207,7 +214,7 @@ class RepoRulesTest(unittest.TestCase):
         self.assertIn("raw text", body["response"])
 
     def test_コマンド置換の中の_git_は止まる(self):
-        self.assert_verdict("echo $(git push origin main)", "deny", "builtin-guard-raw-git")
+        self.assert_verdict("echo $(git push origin main)", "deny", "builtin:guard-raw-git")
 
     def test_パイプで繋いだ_curl_は_ask_のまま(self):
         self.assert_verdict('echo "a b" | curl -d @- x', "ask", "prefer-webfetch")
@@ -220,7 +227,7 @@ class RepoRulesTest(unittest.TestCase):
             'ccnavi --agree "i0001 --preview"',
         ]:
             with self.subTest(subject=subject):
-                self.assert_verdict(subject, "deny", "builtin-guard-ticket-approval")
+                self.assert_verdict(subject, "deny", "builtin:guard-ticket-approval")
 
     def test_語にくっついた_preview_は承認の免除にならない(self):
         """免除の理由になるのは、単独の語として現れた `--preview` だけ。
@@ -238,7 +245,7 @@ class RepoRulesTest(unittest.TestCase):
             "uv run python -m ccnavi --agree --reason=--preview i0001",
         ]:
             with self.subTest(subject=subject):
-                self.assert_verdict(subject, "deny", "builtin-guard-ticket-approval")
+                self.assert_verdict(subject, "deny", "builtin:guard-ticket-approval")
 
     def test_確かめる枝は今までどおり免除の側(self):
         """`--agree --preview --verify` は免除の側。厳しくしたことで巻き添えにしない。"""
@@ -249,7 +256,7 @@ class RepoRulesTest(unittest.TestCase):
         ]:
             with self.subTest(subject=subject):
                 body = judge("Bash", subject)
-                self.assertNotIn("builtin-guard-ticket-approval", hit(body), body["rules"])
+                self.assertNotIn("builtin:guard-ticket-approval", hit(body), body["rules"])
 
     def test_設定の場所の名前は語の中の目印でも終わる(self):
         # selfguard の `_TERM` / `_END` は語の中の目印も語の終わりとして数える。
@@ -260,7 +267,7 @@ class RepoRulesTest(unittest.TestCase):
             'mv ".ccnavi;x" y',
         ]:
             with self.subTest(subject=subject):
-                self.assert_verdict(subject, "deny", "builtin-guard-setting-files")
+                self.assert_verdict(subject, "deny", "builtin:guard-setting-files")
 
 
 class LauncherJudgeTest(unittest.TestCase):
@@ -345,7 +352,7 @@ class TicketApprovalPathTest(LauncherJudgeTest):
     def test_コミットの文面に書いた承認の形は_raw_git_だけに当たる(self):
         # A3 の続き。git を直に打ったことでは止まるが、承認のルールには当たらない。
         body = self.judge("git commit -m 'docs: ccnavi --agree --yes の説明'")
-        self.assertIn("builtin-guard-raw-git", hit(body), body["rules"])
+        self.assertIn("builtin:guard-raw-git", hit(body), body["rules"])
         self.assertNotIn(APPROVAL, hit(body), body["rules"])
 
     def test_sudo_の_sh_c_と_find_exec_の中の承認も止まる(self):
@@ -456,7 +463,7 @@ class RunnerTest(LauncherJudgeTest):
             "sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file x.md": set(),
             "sh .ccnavi/scripts/ccnavi-agree.sh": {APPROVAL},
             "exec zsh": set(),
-            "time git log --oneline": {"builtin-guard-raw-git"},
+            "time git log --oneline": {"builtin:guard-raw-git"},
             "find . -name '*.pyc' -exec rm {} +": set(),
             "xargs -n1 -I{} echo {}": set(),
             "sudo -E env PATH=/x make install": set(),
@@ -644,9 +651,9 @@ class SubstRepoRulesTest(unittest.TestCase):
     def test_引用の中の置換は中身で判定する(self):
         self.check(
             [
-                ('echo "$(git push origin main)"', "deny", "builtin-guard-raw-git", ""),
-                ('grep -n "$(git push)" f', "deny", "builtin-guard-raw-git", ""),
-                ('h="$(git rev-parse HEAD)"', "deny", "builtin-guard-raw-git", ""),
+                ('echo "$(git push origin main)"', "deny", "builtin:guard-raw-git", ""),
+                ('grep -n "$(git push)" f', "deny", "builtin:guard-raw-git", ""),
+                ('h="$(git rev-parse HEAD)"', "deny", "builtin:guard-raw-git", ""),
                 ('echo "$(rm -rf /tmp/x)"', "deny", "recursive-delete", ""),
                 ("cat <<EOF\nuse $(rm -rf /tmp/x)\nEOF", "deny", "recursive-delete", ""),
             ]
@@ -668,7 +675,7 @@ class SubstRepoRulesTest(unittest.TestCase):
         self.check(
             [
                 ("find $(pwd) -name x -delete", "deny", "find-writes", ""),
-                ("echo a#; git push origin main", "deny", "builtin-guard-raw-git", ""),
+                ("echo a#; git push origin main", "deny", "builtin:guard-raw-git", ""),
                 ("curl https://example.com/#top; rm -rf /tmp/x", "deny", "recursive-delete", ""),
                 ("ls\nfind . -delete", "deny", "find-writes", ""),
                 ("echo hi\ncurl https://example.com", "ask", "prefer-webfetch", ""),
@@ -679,30 +686,30 @@ class SubstRepoRulesTest(unittest.TestCase):
     def test_組み込みの保護も中身に当たる(self):
         self.check(
             [
-                ('echo "$(ccnavi --agree x)"', "deny", "builtin-guard-ticket-approval", ""),
-                ("ls\nccnavi --agree x", "deny", "builtin-guard-ticket-approval", ""),
+                ('echo "$(ccnavi --agree x)"', "deny", "builtin:guard-ticket-approval", ""),
+                ("ls\nccnavi --agree x", "deny", "builtin:guard-ticket-approval", ""),
                 (
                     'echo "$(tee /repo/.ccnavi/config/common/rules.yml < /tmp/x)"',
                     "deny",
-                    "builtin-guard-setting-files",
+                    "builtin:guard-setting-files",
                     "",
                 ),
                 (
                     "cat /tmp/x >(tee /repo/.ccnavi/config/common/rules.yml)",
                     "deny",
-                    "builtin-guard-setting-files",
+                    "builtin:guard-setting-files",
                     "",
                 ),
                 (
                     "ls\nsed -i s/a/b/ /repo/.ccnavi/config/common/rules.yml",
                     "deny",
-                    "builtin-guard-setting-files",
+                    "builtin:guard-setting-files",
                     "",
                 ),
                 (
                     'echo x > "$(pwd)/.ccnavi/config/common/rules.yml"',
                     "deny",
-                    "builtin-guard-setting-files",
+                    "builtin:guard-setting-files",
                     "",
                 ),
             ]
@@ -713,7 +720,7 @@ class SubstRepoRulesTest(unittest.TestCase):
     def test_文字として書いたものと既存の読みは変わらない(self):
         self.check(
             [
-                ("echo $(git push origin main)", "deny", "builtin-guard-raw-git", ""),
+                ("echo $(git push origin main)", "deny", "builtin:guard-raw-git", ""),
                 ("echo $((1 << 2))", "ask", "", "UNDECLARED"),
                 ('grep -n "git push" README.md', "allow", "prefer-read-grep", ""),
                 ("grep -n '$(git push)' f", "allow", "prefer-read-grep", ""),
@@ -770,10 +777,10 @@ class SubstRepoRulesTest(unittest.TestCase):
                 (
                     'gh issue create --title t --body "use $(git push) here"',
                     "deny",
-                    "builtin-guard-raw-git",
+                    "builtin:guard-raw-git",
                     "",
                 ),
-                ('cd "$(git rev-parse --show-toplevel)"', "deny", "builtin-guard-raw-git", ""),
+                ('cd "$(git rev-parse --show-toplevel)"', "deny", "builtin:guard-raw-git", ""),
                 ('grep -rn foo "$(pwd)"', "ask", "", "UNDECLARED"),
                 ('find "$(pwd)" -name x', "ask", "", "UNDECLARED"),
                 ('cat "$(ls -t logs/git-*.log | head -1)"', "ask", "", "UNDECLARED"),
@@ -824,15 +831,15 @@ class SubstRepoRulesTest(unittest.TestCase):
 
     def test_引用の中から切り出したコマンドに当たったときだけ断りが出る(self):
         quoted = judge("Bash", 'gh issue create --title t --body "use $(git push) here"')
-        self.assertIn("inside double quotes", quoted["response"])
+        self.assertIn("二重引用符の中", quoted["response"])
         # 引用の中の git push は、組み込みの push と生の git の両方に当たる。
-        self.assertIn("builtin-guard-raw-git", quoted.get("quoted"))
+        self.assertIn("builtin:guard-raw-git", quoted.get("quoted"))
         # ラッパーのあるワークスペースでは、文字として渡す道もラッパーで案内する。
         self.assertIn("ccnavi-git.sh commit -F <file>", quoted["response"])
         self.assertNotIn("(git commit -F", quoted["response"])
 
         bare = judge("Bash", "echo $(git push origin main)")
-        self.assertNotIn("inside double quotes", bare["response"])
+        self.assertNotIn("二重引用符の中", bare["response"])
         self.assertFalse(bare.get("quoted"), bare.get("quoted"))
 
     def test_縮退の断りは理由ごとに違う(self):
@@ -903,8 +910,8 @@ class SubstRepoRulesTest(unittest.TestCase):
         # エスケープがあれば展開しないと中身が決まらないので、確定できない読みとして止める側へ渡す。
         self.check(
             [
-                ("$'git' push origin main", "deny", "builtin-guard-raw-git", ""),
-                ("git $'push' origin main", "deny", "builtin-guard-raw-git", ""),
+                ("$'git' push origin main", "deny", "builtin:guard-raw-git", ""),
+                ("git $'push' origin main", "deny", "builtin:guard-raw-git", ""),
                 ("rm $'-rf' /tmp/x", "deny", "recursive-delete", ""),
                 ("echo $'a\\ngit push'", "ask", "", "PARSE_UNCERTAIN"),
             ]
@@ -939,7 +946,7 @@ class SubstRepoRulesTest(unittest.TestCase):
         body = judge("Bash", "c=git; $c status")
         self.assertIn("`$c`", body["response"])
         # 書き直しの例に、止まる形（生の git）を使わない。
-        self.assertIn("becomes `ls -la`", body["response"])
+        self.assertIn("`c=ls; $c -la` は `ls -la`", body["response"])
         self.assertNotIn("`git status`", body["response"])
 
     def test_コマンド名でない位置の変数とグロブは止めない(self):
@@ -962,7 +969,7 @@ class SubstRepoRulesTest(unittest.TestCase):
 
     def test_引用の外のブレース展開は一律に止める(self):
         # Issue #38。どのルールにも当たらないまま、bash は広げた語を実行していた。
-        brace, code = "(brace-expansion)", "DENY_BRACE_EXPANSION"
+        brace, code = "builtin:brace-expansion", "DENY_BRACE_EXPANSION"
         self.check(
             [
                 ("{git,push,origin,main}", "deny", brace, code),
@@ -982,7 +989,7 @@ class SubstRepoRulesTest(unittest.TestCase):
                     "",
                 ),
                 ("grep -n '{a,b}' f", "allow", "prefer-read-grep", ""),
-                ("git show HEAD@{1}", "deny", "builtin-guard-raw-git", ""),
+                ("git show HEAD@{1}", "deny", "builtin:guard-raw-git", ""),
             ]
         )
 

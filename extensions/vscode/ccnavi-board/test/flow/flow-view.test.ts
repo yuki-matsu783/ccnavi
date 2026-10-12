@@ -122,7 +122,7 @@ test("CB-T229 ボードの JSON の flow は子だけが持ち、locked が欠�
   assert.equal(flowCardOf(built, "i0001-02-05"), undefined);
 });
 
-test("CB-T230 錠の種類（lock_kind）はボードの JSON から読む。doing・review はそのまま、知らない値は null、欄が無いときは undefined", () => {
+test("CB-T534 錠の種類（lock_kind）はボードの JSON から読む。doing・review はそのまま、知らない値は null、欄が無いときは undefined", () => {
   const raw = JSON.parse(fixtureText()) as { tickets: { ticket: string; flow: Record<string, unknown> | null }[] };
   const flowOf = (ticket: string): Record<string, unknown> => {
     const flow = raw.tickets.find((t) => t.ticket === ticket)?.flow;

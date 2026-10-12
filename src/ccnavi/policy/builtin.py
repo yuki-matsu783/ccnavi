@@ -32,7 +32,7 @@ block なので、ファイルを置く前に hook を登録した時点でセ�
 
 止めるのは書き込む形だけで、場所の名前が出たかどうかでは止めない。
 同じ場所には `selfguard_shell.add_rules` の組み込みも当たる（ルールファイルが読める間の
-`builtin-guard-setting-files`）。ルールファイルの側にシェルからの書き込みを止める 1 本は
+`builtin:guard-setting-files`）。ルールファイルの側にシェルからの書き込みを止める 1 本は
 無いので、ここが外れているときに残る保護はこれだけになる。
 場所の名前で止めると、`git add <パス>` も `git restore --ours -- <パス>` も止まる。
 どちらもファイルの中身を書かないのに。
@@ -117,18 +117,19 @@ def read_allow() -> list[rules.Rule]:
     return built.allow
 
 
-CONFIG_VIA_BASH_RULE_ID = "builtin-guard-config-via-bash"
+CONFIG_VIA_BASH_RULE_ID = "builtin:guard-config-via-bash"
 
 
 def _config_via_bash(regex: str, git: str = "git", wrapper: bool = False) -> dict:
     # 競合の解き方の一文は、ラッパーがあるときだけ書く。無いときは生の git が止まるので、
     # 打てる形を案内せず、ユーザに頼む。
     resolve = (
-        "Resolving a merge conflict is not blocked: "
-        f"'{git} add <path>' and '{git} restore --ours -- <path>' (or --theirs) put back "
-        "a version that is already committed instead of writing new content."
+        "マージの衝突を解くことは止めていません。"
+        f"{git} add <パス>、{git} restore --ours -- <パス>（または --theirs）は、"
+        "コミット済みの版を戻すだけなので使えます。"
         if wrapper
-        else "Resolving a merge conflict needs the user, because git is not run by the agent here."
+        else "マージの衝突を解くことは、ここではエージェントが git を実行しないため、"
+        "ユーザに頼んでください。"
     )
     return {
         "id": CONFIG_VIA_BASH_RULE_ID,
@@ -138,10 +139,10 @@ def _config_via_bash(regex: str, git: str = "git", wrapper: bool = False) -> dic
         # そのまま保護を弱めることになる。
         "regex": regex,
         "message": (
-            "ccnavi is running on its built-in defaults because its rule file "
-            "could not be read, and the shell is not the way to write it. "
-            "Put new content there with the Write or Edit tool, so the repair "
-            "goes through a path that is checked and recorded. " + resolve
+            "ルールファイルを読めなかったため、ccnavi は組み込みの既定で動いています。"
+            "シェルで書き込むのは適切ではありません。"
+            "新しい内容は Write か Edit のツールで書いてください。"
+            "そうすると、確かめられて記録される経路で直せます。" + resolve
         ),
     }
 
@@ -313,39 +314,39 @@ def _deny(root: str) -> list[dict]:
     wrapper = settings.has_git_wrapper(root)
     return [
         {
-            "id": "builtin-deny-recursive-delete",
+            "id": "builtin:recursive-delete",
             "match": "Bash",
             "regex": RECURSIVE_DELETE_REGEX,
             "message": (
-                "A recursive forced delete cannot be undone. Name what to remove "
-                f"one at a time, or use '{git} rm <path>' when the files are tracked."
+                "再帰的な強制削除は取り消せません。消すものを 1 つずつ名指しするか、"
+                f"ファイルが追跡されているなら {git} rm <パス> を使ってください。"
                 if wrapper
-                else "A recursive forced delete cannot be undone. Name what to remove "
-                "one at a time, or ask the user to remove it."
+                else "再帰的な強制削除は取り消せません。消すものを 1 つずつ名指しするか、"
+                "ユーザに削除を頼んでください。"
             ),
         },
         {
-            "id": "builtin-deny-git-push",
+            "id": "builtin:git-push",
             "match": "Bash",
             "regex": GIT_PUSH_REGEX,
             "message": (
-                "git push is not run by the agent. Leave the branch as it is "
-                "and ask the user to push."
+                "エージェントは git push を実行しません。"
+                "ブランチはそのままにして、push はユーザに頼んでください。"
             ),
         },
         {
-            "id": "builtin-deny-git-reset-hard",
+            "id": "builtin:git-reset-hard",
             "match": "Bash",
             "regex": GIT_RESET_HARD_REGEX,
             "message": (
-                f"Work in progress would be lost. Use '{git} stash push -u' to set it "
-                f"aside, or name the files and use '{git} restore <path>'."
+                f"作業中の変更が失われます。{git} stash push -u で退避するか、"
+                f"ファイルを名指しして {git} restore <パス> を使ってください。"
                 if wrapper
-                else "Work in progress would be lost. Ask the user before discarding changes."
+                else "作業中の変更が失われます。変更を捨てる前に、ユーザに確認してください。"
             ),
         },
         {
-            "id": "builtin-deny-credentials",
+            "id": "builtin:credentials",
             "match": "Bash|Read|Write|Edit",
             # 先頭の境界（行頭・空白・区切り）を付ける。常時有効の土台なので、
             # `jq '.env.X'` のようなフィールド参照や `process.env` を巻き込まない
@@ -357,8 +358,7 @@ def _deny(root: str) -> list[dict]:
                 r"|\b(id_rsa|id_ed25519)\b"
             ),
             "message": (
-                "This is a place credentials live. Do not read it; "
-                "ask the user for the value you need."
+                "認証情報のある場所です。読まないでください。必要な値は、ユーザに尋ねてください。"
             ),
         },
         {
@@ -380,21 +380,28 @@ def _deny(root: str) -> list[dict]:
 # 壊すと履歴や作業中の変更ごと失う。hook を書けば、以後の git の操作のたびに任意のコマンドが走る。
 # 名指しのツールとシェルで当てる先が違う（パスとコマンド文字列）ので、id を分ける。
 # 読むだけ（`cat .git/config`、名指しの Read）は止めない。
-GIT_DIR_RULE_ID = "builtin-guard-git-dir"
-GIT_DIR_SHELL_RULE_ID = "builtin-guard-git-dir-via-bash"
+GIT_DIR_RULE_ID = "builtin:guard-git-dir"
+GIT_DIR_SHELL_RULE_ID = "builtin:guard-git-dir-via-bash"
 
 
 def _git_dir_message(git: str, wrapper: bool) -> str:
-    how = f"If a git subcommand does the job, run it as '{git} <subcommand>'. " if wrapper else ""
+    how = (
+        f"git のサブコマンドでできる作業なら、{git} <サブコマンド> で実行してください。"
+        if wrapper
+        else ""
+    )
     return (
-        "This writes inside the .git directory directly. Changes there bypass git "
-        f"and can lose history or run commands through hooks. {how}"
-        "No subcommand edits hooks, "
-        ".git/info/exclude, MERGE_MSG, index.lock or the .git file of a worktree: "
-        "ask the user to change them, naming the file and why. For a stale index.lock, "
-        "first confirm that no git process is running, then ask the user to remove it. "
-        "To ignore files, edit .gitignore instead. "
-        "Reading files under .git is not blocked."
+        ".git ディレクトリの中に直接書き込もうとしています。"
+        "git を通さない変更は、履歴を失わせたり、"
+        "フックを通してコマンドを走らせたりするおそれがあります。"
+        f"{how}"
+        "フック、.git/info/exclude、MERGE_MSG、index.lock、ワークツリーの .git ファイルは、"
+        "どのサブコマンドでも編集されません。"
+        "変更が必要なら、ファイル名と理由を添えてユーザに頼んでください。"
+        "index.lock が古く残っているときは、git のプロセスが動いていないことを確かめてから、"
+        "ユーザに削除を頼んでください。"
+        "ファイルを無視したいときは、.gitignore を編集してください。"
+        ".git の下のファイルを読むことは止めていません。"
     )
 
 
@@ -404,9 +411,9 @@ _ALLOW: list[dict] = [
         # ここまで確認を出すと、本当に見てほしい 1 件が見落とされる。
         # Grep と Glob は書かない。対象は取り出せる（探し始める場所のパス）が、
         # それは探索の中身を代表しない。Read は 1 ファイルずつなので
-        # builtin-deny-credentials が先に当たって止まるのに対し、Grep はその deny の
+        # builtin:credentials が先に当たって止まるのに対し、Grep はその deny の
         # match に無いので、ここで広く許すと credentials ごと止められずに通る。
-        "id": "builtin-read-anything",
+        "id": "builtin:read-anything",
         "match": "Read",
         "glob": "*",
     },
@@ -414,7 +421,7 @@ _ALLOW: list[dict] = [
 
 # 既定に戻ったことを記録に残すための値。呼び出しごとの記録を数えれば、
 # ガードが機能しないまま何回動いたかが後から分かる。
-FALLBACK = "builtin-rules"
+FALLBACK = "builtin:rules"
 
 # 返す理由に載せる出所。既定を使っているとき、適用しているルールは読めなかった
 # ファイルの中には無い。そのファイルの名前を出所として出すと、見に行ったユーザが

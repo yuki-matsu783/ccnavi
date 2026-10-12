@@ -212,8 +212,8 @@ def resolve(
     if value in allowed:
         return value
     stderr.write(
-        f"ccnavi: {name}={value!r} is not a setting; using {ENABLE}. "
-        f"Valid values are {', '.join(allowed)}\n"
+        f"ccnavi: {name}={value!r} は設定ではありません。{ENABLE} を使います。"
+        f"有効な値は {', '.join(allowed)} です\n"
     )
     return ENABLE
 

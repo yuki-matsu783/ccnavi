@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from unittest import mock
 
 from ccnavi.infra import settings
@@ -765,7 +766,11 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         stopped = self.hook("", self.ws, event="Stop")
 
-        self.assertNotIn(".ccnavi/config/common", self.system_message(stopped))
+        # 違反の一覧は「<ツリー>: <パス>」の行で並ぶ。文面の `対象のルール` には
+        # 共通レイヤーの記録名が出るので、行の頭で分ける。
+        self.assertIsNone(
+            re.search(r"(?m)^\s*\S+: \.ccnavi/config/common/", self.system_message(stopped))
+        )
 
     def test_a_non_utf8_script_is_not_reported_after_it_is_committed(self):
         """4: コミット分はバイト列のまま比べる。UTF-8 でないスクリプトもミラーした分に数える。"""

@@ -203,7 +203,7 @@ class FailStreakTest(unittest.TestCase):
                 {
                     "hook_event_name": "PreToolUse",
                     "tool_name": "Bash",
-                    "tool_input": {"command": "git status"},
+                    "tool_input": {"command": "ls"},
                 }
             )
             self.assertNotIn(NOTE, result.stdout)

@@ -13,14 +13,14 @@ from ..infra import hookio, settings
 from ..policy import ctxfile, rules, selfguard_shell
 from . import ticket_model
 
-STATE_RULE_ID = "builtin-ticket-state"
+STATE_RULE_ID = "builtin:ticket-state"
 # 同じ置き場をシェルからの書き込みで守る 1 本。
 STATE_SHELL_RULE_ID = STATE_RULE_ID + "-shell"
 # 提案を書いた回に、承認を頼む前の確認を伝えるルールの id。
-PROPOSE_RULE_ID = "builtin-ticket-propose"
+PROPOSE_RULE_ID = "builtin:ticket-propose"
 # 生の git を止め、入口を git のラッパー 1 本に寄せるルールの id。ccnavi 自身の約束を守るので、
-# ルールファイルからは書けない（予約の接頭辞 `builtin-guard-`）。
-RAW_GIT_RULE_ID = "builtin-guard-raw-git"
+# ルールファイルからは書けない（予約の接頭辞 `builtin:guard-`）。
+RAW_GIT_RULE_ID = "builtin:guard-raw-git"
 
 # `git` がコマンドの位置に立つ形。glob の `*git*` だと誘導先の `ccnavi-git.sh` にも当たって
 # 出口ごと塞がるので、前後の切れ目を見る。
@@ -35,7 +35,7 @@ RAW_GIT_RULE_ID = "builtin-guard-raw-git"
 # 入れないのは、区切りの字ごとに残りを読み直さないため（区切りの後ろからは、その区切りで当たる）。
 # 引用しない `C:\Git\git.exe` はシェルが `\` を外して `C:Gitgit.exe` と読むので、ドライブ名
 # （`C:`）で始まり `git` / `git.exe` で終わる語も止める（実際には走らない形だが、止める側に倒す）。
-# 共通レイヤーの見本（位置を問わず当てる `raw-git`）は削除した（ADR-0129）。
+# 共通レイヤーの見本（位置を問わず当てる `raw-git`）は削除した（ADR-0131）。
 # その結果、コマンドの位置に無い git は止まらなくなった。
 _SEPARATOR = r"[\x00\n;&|({`!]"
 _KEYWORD = r"(?:then|do|else|elif|if|while|until|time)\s++"

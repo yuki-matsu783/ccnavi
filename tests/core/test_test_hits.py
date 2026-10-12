@@ -4,7 +4,7 @@
 
 1. 当たったルール（`rules`）は判定が当てたルールそのもので、ルールファイルを別に読み直さない。
    組み込み（設定ファイルの保護・チケットの状態の保護・退避した既定）は `outside` で、式は短く切る。
-   レイヤーの和で重複として捨てられる側のプロジェクトの定義も、id の無いルールも引ける
+   レイヤーの和で重複として捨てられる側のプロジェクトの定義も、同じ id のルールも位置で引ける
 2. payload の欄（`--cwd`・`--permission-mode`・`--agent-id`）が判定に渡り、使った payload が出る。
    知らない権限モードと無いディレクトリは断る。切り替えの環境変数は hook と同じく解いてから
    判定に渡す
@@ -98,7 +98,7 @@ class TestHitsTest(unittest.TestCase):
         hit = body["rules"][0]
         self.assertEqual(
             (hit["id"], hit["source"], hit["section"]),
-            ("builtin-guard-setting-files", "outside", "deny"),
+            ("builtin:guard-setting-files", "outside", "deny"),
         )
         # 組み込みの式は 2 万字を超える。そのまま出さず、切ったことと全体の字数を添える。
         self.assertLess(len(hit["written"]), 300)
@@ -106,15 +106,15 @@ class TestHitsTest(unittest.TestCase):
         self.assertLess(len(hit["pattern"]), 300)
 
         plain = self.ccnavi("--test", "Bash", "echo x > .ccnavi/config/common/rules.yml").stdout
-        self.assertIn("deny:builtin-guard-setting-files（ルールファイルの外にある根拠）", plain)
+        self.assertIn("deny:builtin:guard-setting-files（ルールファイルの外にある根拠）", plain)
         self.assertLess(max(len(line) for line in plain.splitlines()), 1000)
 
     def test_ticket_state_guard_is_outside(self):
         body = self.body("Write", f"{self.root}/wip/proposals/review/x.md")
         self.assertEqual(body["verdict"], "deny")
         by_id = {hit["id"]: hit for hit in body["rules"]}
-        self.assertEqual(by_id["builtin-ticket-state"]["source"], "outside")
-        self.assertEqual(by_id["builtin-ticket-state"]["section"], "deny")
+        self.assertEqual(by_id["builtin:ticket-state"]["source"], "outside")
+        self.assertEqual(by_id["builtin:ticket-state"]["section"], "deny")
 
     def test_fallback_defaults_are_outside(self):
         broken = write(os.path.join(self.root, "broken.yml"), "deny: [\n")
@@ -133,13 +133,21 @@ class TestHitsTest(unittest.TestCase):
         self.assertEqual(plain.returncode, 1, plain.stdout)
         self.assertNotIn("ヒットしたルール", plain.stdout)
 
-    def test_rule_without_id_is_found_by_position(self):
+    def test_rule_hit_is_named_by_file_and_id(self):
+        # id は必須。記録の名前はルールファイルの相対パスと書いた id の形になる。
         rules = write(
             os.path.join(self.root, "noid.yml"),
             json.dumps(
                 {
                     "version": 1,
-                    "deny": [{"match": "Bash", "glob": "*rm -rf*", "message": "消さない"}],
+                    "deny": [
+                        {
+                            "id": "rm-build",
+                            "match": "Bash",
+                            "glob": "*rm -rf*",
+                            "message": "消さない",
+                        }
+                    ],
                 }
             ),
         )
@@ -148,7 +156,7 @@ class TestHitsTest(unittest.TestCase):
         hit = body["rules"][0]
         self.assertEqual(
             (hit["id"], hit["source"], hit["section"], hit["kind"], hit["written"]),
-            ("(deny)", "file", "deny", "glob", "*rm -rf*"),
+            ("noid.yml:rm-build", "file", "deny", "glob", "*rm -rf*"),
         )
 
     def test_same_definition_in_two_projects_shows_the_one_that_hit(self):
@@ -189,7 +197,12 @@ class TestHitsTest(unittest.TestCase):
                 hit = body["rules"][0]
                 self.assertEqual(
                     (hit["id"], hit["source"], hit["section"], hit["written"]),
-                    (f"{name}:schema", "file", "deny", "*/schema/*"),
+                    (
+                        f"projects/{name}/.ccnavi/config/project/rules.yml:schema",
+                        "file",
+                        "deny",
+                        "*/schema/*",
+                    ),
                 )
 
     # ---- 2. payload の欄

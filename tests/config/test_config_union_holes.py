@@ -38,6 +38,7 @@ from tests.config.test_config_union import (
     HOME,
     ConfigUnionHarness,
     git,
+    layer_id,
     layer_path,
     read,
     ticket_text,
@@ -237,21 +238,21 @@ class BuiltinGlobCaseTest(GuardHarness):
         self.assertFalse(os.path.exists(os.path.join(self.app, HOME)))
         exact = os.path.join(self.app, HOME, "config", "project", "rules.yml")
         self.assert_denied(
-            self.guarded_hook("Write", self.ws, file_path=exact), "builtin-guard-project-home"
+            self.guarded_hook("Write", self.ws, file_path=exact), "builtin:guard-project-home"
         )
 
         # 区別する機械でも止める。組み込みの保護だけが機械で当たり方を変えると、
         # どの機械でも区別しないルールの glob やチケットの範囲と食い違う。
         swapped = os.path.join(self.app, ".Ccnavi", "config", "project", "rules.yml")
         result = self.guarded_hook("Write", self.ws, file_path=swapped)
-        self.assert_denied(result, "builtin-guard-project-home")
+        self.assert_denied(result, "builtin:guard-project-home")
 
 
 class ShellPlaceTest(GuardHarness):
     """区切りが続かないパス。ディレクトリごと消す・退かす形（`_PLACES` / `_COPY_PLACES`）。"""
 
     def test_removing_or_moving_the_umbrella_itself_is_denied(self):
-        """`.ccnavi` で終わるパスも `builtin-guard-setting-files` で止まる。"""
+        """`.ccnavi` で終わるパスも `builtin:guard-setting-files` で止まる。"""
         for command in (
             "rm -rf .ccnavi",
             "rm -rf projects/lib/.ccnavi",
@@ -262,14 +263,14 @@ class ShellPlaceTest(GuardHarness):
         ):
             with self.subTest(command=command):
                 result = self.guarded_hook("Bash", self.ws, command=command)
-                self.assert_denied(result, "builtin-guard-setting-files")
+                self.assert_denied(result, "builtin:guard-setting-files")
 
     def test_the_claude_side_is_closed_the_same_way(self):
         """`.claude` も同じ。中身のあるディレクトリだが、丸ごと消す経路は止める。"""
         for command in ("rm -rf .claude", "mv .claude .claude.bak", "cp /tmp/x .claude"):
             with self.subTest(command=command):
                 result = self.guarded_hook("Bash", self.ws, command=command)
-                self.assert_denied(result, "builtin-guard-setting-files")
+                self.assert_denied(result, "builtin:guard-setting-files")
 
     def test_other_names_are_not_denied(self):
         """当たる範囲が広がっても、別名には当たらない。
@@ -277,7 +278,7 @@ class ShellPlaceTest(GuardHarness):
         `.claudexyz` や `.ccnavi-notes.md` は別のファイル。`.claude/worktrees/` は
         守る対象ではないので、片付けは通る（`.claude` の側を ccnavi ディレクトリと同じ `_END` で
         閉じると、ここが止まる）。ccnavi ディレクトリから外へコピーするだけの読みも通る。
-        `rm -rf` は組み込みの deny（`builtin-deny-recursive-delete`）が止めるので、`-f` は付けない。
+        `rm -rf` は組み込みの deny（`builtin:recursive-delete`）が止めるので、`-f` は付けない。
         """
         for command in (
             "rm -r .claudexyz",
@@ -321,7 +322,7 @@ class ShellPlaceTest(GuardHarness):
             ):
                 with self.subTest(command=command):
                     result = self.guarded_hook("Bash", self.ws, command=command)
-                    self.assert_denied(result, "builtin-guard-setting-files")
+                    self.assert_denied(result, "builtin:guard-setting-files")
 
     def test_the_default_umbrella_is_closed_after_a_joined_command(self):
         """既定の名前でも、行き先のあとに別のコマンドをつないだ形は止まる。
@@ -339,7 +340,7 @@ class ShellPlaceTest(GuardHarness):
         ):
             with self.subTest(command=command):
                 result = self.guarded_hook("Bash", self.ws, command=command)
-                self.assert_denied(result, "builtin-guard-setting-files")
+                self.assert_denied(result, "builtin:guard-setting-files")
 
 
 class CopyDestinationTest(GuardHarness):
@@ -351,12 +352,12 @@ class CopyDestinationTest(GuardHarness):
 
     def assert_guarded(self, command):
         self.assert_denied(
-            self.guarded_hook("Bash", self.ws, command=command), "builtin-guard-setting-files"
+            self.guarded_hook("Bash", self.ws, command=command), "builtin:guard-setting-files"
         )
 
     def assert_not_guarded(self, command):
         result = self.guarded_hook("Bash", self.ws, command=command)
-        self.assertNotIn("builtin-guard-setting-files", result.stdout + result.stderr)
+        self.assertNotIn("builtin:guard-setting-files", result.stdout + result.stderr)
 
     def test_the_four_forms_of_the_report(self):
         """読むだけのコピーは通り、行き先にした 3 形は止まる。"""
@@ -525,12 +526,12 @@ class HolderDestinationTest(GuardHarness):
 
     def assert_guarded(self, command):
         self.assert_denied(
-            self.guarded_hook("Bash", self.ws, command=command), "builtin-guard-setting-files"
+            self.guarded_hook("Bash", self.ws, command=command), "builtin:guard-setting-files"
         )
 
     def assert_not_guarded(self, command):
         result = self.guarded_hook("Bash", self.ws, command=command)
-        self.assertNotIn("builtin-guard-setting-files", result.stdout + result.stderr)
+        self.assertNotIn("builtin:guard-setting-files", result.stdout + result.stderr)
 
     def test_the_forms_of_the_report_are_denied(self):
         """報告の 2 形。cp と mv で、行き先を `logs/` だけで書く。"""
@@ -748,7 +749,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         self.assert_not_denied(allowed)
         record = self.last_record()
         self.assertEqual(record["decision"], "allow", record)
-        self.assertIn("self:wide", record["rules"], record)
+        self.assertIn("self:wide", [layer_id(n) for n in record["rules"]], record)
 
     def check_no_layer_is_borrowed(self, name):
         """`projects/<name>/` への Write が、どのレイヤーの rules でも判定されないこと。"""
@@ -759,7 +760,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
 
         record = self.last_record()
         # 穴の本体。レイヤーの名前で引くと、ここに `self:wide` が入り、decision が allow になる。
-        self.assertNotIn("self:wide", record.get("rules", []), record)
+        self.assertNotIn("self:wide", [layer_id(n) for n in record.get("rules", [])], record)
         self.assertNotEqual(record["decision"], "allow", record)
         # プロジェクトのレイヤーも足さない（レイヤー無し）。
         # 共通レイヤーに `*/secret/*` は無いので deny でもない。
@@ -780,7 +781,9 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         self.assert_not_denied(
             self.hook("Write", self.ws, file_path=os.path.join(project, "generated", "x.py"))
         )
-        self.assertNotIn("self:generated", self.last_record().get("rules", []))
+        self.assertNotIn(
+            "self:generated", [layer_id(n) for n in self.last_record().get("rules", [])]
+        )
 
     def test_a_write_into_projects_self_is_not_judged_by_the_workspace_layer(self):
         """`projects/self/` はレイヤー無し。ワークスペースのレイヤーの allow では通らない。"""
@@ -805,13 +808,21 @@ class ReservedLayerNameTest(ConfigUnionHarness):
             "lib:schema",
         )
         # 広い allow は行き先の 1 レイヤーにしか足さないので、lib には当たらない。
-        self.assertNotIn("self:wide", self.last_record().get("rules", []))
+        self.assertNotIn("self:wide", [layer_id(n) for n in self.last_record().get("rules", [])])
         self.assert_denied(self.hook("Bash", self.ws, command="psql -c 'select 1'"), "lib:raw-psql")
 
-    def test_lint_names_both_reserved_names(self):
-        """`projects/common/` と `projects/self/` の両方を error で名指しする。"""
-        self.project(settings.LAYER_COMMON, rules=RESERVED_PROJECT_RULES)
-        self.project(settings.LAYER_SELF, rules=RESERVED_PROJECT_RULES)
+    def test_builtin_is_a_reserved_layer_name(self):
+        """`builtin` は予約名。組み込みの id（`builtin:<名前>`）と取り違えないよう拒否する。"""
+        self.assertTrue(settings.is_reserved_layer_name("builtin"))
+        self.assertTrue(settings.is_reserved_layer_name("Builtin"))
+        self.project("builtin", rules=RESERVED_PROJECT_RULES)
+        errors = self.problems("error", where=self.project_where("builtin"))
+        self.assertTrue(any("予約" in p["detail"] for p in errors), errors)
+
+    def test_lint_names_every_reserved_name(self):
+        """`projects/common/`・`projects/self/`・`projects/builtin/` を error で名指しする。"""
+        for name in settings.RESERVED_LAYER_NAMES:
+            self.project(name, rules=RESERVED_PROJECT_RULES)
         for name in settings.RESERVED_LAYER_NAMES:
             with self.subTest(name=name):
                 errors = self.problems("error", where=self.project_where(name))
@@ -837,7 +848,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
-        numbered = zip(("i0002", "i0003"), settings.RESERVED_LAYER_NAMES, strict=True)
+        numbered = zip(("i0002", "i0003", "i0004"), settings.RESERVED_LAYER_NAMES, strict=True)
         for number, name in numbered:
             with self.subTest(project=name):
                 proposal = self.propose(
@@ -942,7 +953,7 @@ class ScriptTamperTest(GuardHarness):
             with self.subTest(tool=tool):
                 self.assert_denied(
                     self.guarded_hook(tool, self.ws, file_path=self.script),
-                    "builtin-guard-project-home",
+                    "builtin:guard-project-home",
                 )
         # どの機械でも止める。区別しない機械では、このパスで書けば実際のファイルが書き換わる。
         # 区別する機械では別のファイルだが、組み込みの保護の当たり方を機械で変えない。
@@ -950,7 +961,7 @@ class ScriptTamperTest(GuardHarness):
         # BuiltinGlobCaseTest。
         swapped = os.path.join(self.lib, ".Ccnavi", "scripts", "count.sh")
         result = self.guarded_hook("Write", self.ws, file_path=swapped)
-        self.assert_denied(result, "builtin-guard-project-home")
+        self.assert_denied(result, "builtin:guard-project-home")
 
     def test_the_shell_cannot_rewrite_or_delete_it(self):
         """シェルも同じ。ccnavi ディレクトリごと消す形も、表記を変えた形も止まる。"""
@@ -963,12 +974,12 @@ class ScriptTamperTest(GuardHarness):
             with self.subTest(command=command):
                 self.assert_denied(
                     self.guarded_hook("Bash", self.ws, command=command),
-                    "builtin-guard-setting-files",
+                    "builtin:guard-setting-files",
                 )
         # シェルの側も、場所のパスはどの機械でも区別せずに当てる（selfguard_shell._folded）。
         swapped = "rm -rf projects/lib/.Ccnavi/scripts/count.sh"
         result = self.guarded_hook("Bash", self.ws, command=swapped)
-        self.assert_denied(result, "builtin-guard-setting-files")
+        self.assert_denied(result, "builtin:guard-setting-files")
 
 
 if __name__ == "__main__":

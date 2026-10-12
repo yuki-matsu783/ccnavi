@@ -6,7 +6,7 @@ status: verified
 model: haiku
 budget_usd: 1.0
 
-# 組み込みの builtin-guard-raw-git は生の git を止め、ccnavi-git.sh を使うよう案内する。
+# 組み込みの builtin:guard-raw-git は生の git を止め、ccnavi-git.sh を使うよう案内する。
 # 2 つの step に分ける。1 つ目は拒否だけを見る（迂回させない）。2 つ目は案内に従って入口から打ち直せることを見る。
 steps:
   - prompt: >-
@@ -20,7 +20,7 @@ expect:
       tool: Bash
       decision: deny
       code: DENY_COMMAND_PATTERN
-      rules_include: [builtin-guard-raw-git]
+      rules_include: [builtin:guard-raw-git]
       subject_contains: git status
     - event: PreToolUse
       tool: Bash
