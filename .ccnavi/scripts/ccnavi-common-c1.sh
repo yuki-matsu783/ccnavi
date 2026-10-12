@@ -502,6 +502,7 @@ ccnavi_c1_end() {
 	# タイムアウト監視の途中で切られたら、監視も止める（後で別のプロセスを kill しないように）。
 	if [ -n "${ccnavi_gt_dog:-}" ]; then
 		kill "$ccnavi_gt_dog" 2>/dev/null || :
+		wait "$ccnavi_gt_dog" 2>/dev/null || :
 		ccnavi_gt_dog=""
 	fi
 	if [ -n "$ccnavi_c1_inflight" ] && [ -n "$ccnavi_c1_tmp" ]; then
