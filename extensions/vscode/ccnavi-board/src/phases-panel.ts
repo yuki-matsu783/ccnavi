@@ -407,7 +407,8 @@ function watchFiles(current: PanelState): void {
     watcher.dispose();
   }
   current.fileWatchers = [];
-  const phasesRel = current.loaded?.phasesRel ?? DEFAULT_PHASES;
+  // 読めていないときの仮の場所。共通の設定を開いているなら共通の場所を見る（読めなかった後も、その設定の変化を拾うため）
+  const phasesRel = current.loaded?.phasesRel ?? (current.target.kind === "workspace" ? DEFAULT_COMMON_PHASES : DEFAULT_PHASES);
   const patterns: vscode.RelativePattern[] = [
     patternFor(current.folder, phasesRel),
     new vscode.RelativePattern(current.folder, ".claude/settings.json"),
