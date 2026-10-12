@@ -298,7 +298,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
             </div>
             <TourButton courses={courses} onPick={tour.start} />
           </header>
-          {(board?.problems.length ?? 0) > 0 ? (
+          {(sample === undefined ? board?.problems.length ?? 0 : 0) > 0 ? (
             <ul className="problems">
               {(board?.problems ?? []).map((problem, i) => (
                 <li key={i}>{problem}</li>
