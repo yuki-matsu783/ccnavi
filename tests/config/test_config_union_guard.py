@@ -60,8 +60,8 @@ class GuardHarness(ConfigUnionHarness):
     def setUp(self):
         super().setUp()
         write(self.rules, json.dumps(OPEN_RULES))
-        # 共通レイヤーには phases.yml を置けない（`--lint` が error）が、置かれても守る。
-        # 守ることを見るために置き、ワークツリー側の設定ができるようコミットしておく。
+        # 共通レイヤーの phases.yml も守る対象。守ることを見るために置き、ワークツリー側の設定が
+        # できるようコミットしておく。
         write(self.phases, COMMON_PHASES)
         git(self.ws, "add", "-A")
         git(self.ws, "commit", "--quiet", "-m", "common phases")

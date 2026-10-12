@@ -62,3 +62,17 @@ export function emptyNote(exists: boolean): string {
   }
   return "ファイルがありません（この設定に定義が無い、という正常な状態です）。定義を足して保存すると、ファイルが作られます";
 }
+
+/** 共通の設定の定義と表示名が重なっているときに下部へ出す文 */
+export function commonTitleNote(ids: ReadonlySet<string>): string {
+  const names = Array.from(ids).map((id) => (id === "" ? "空" : id));
+  return `表示名（title）が共通の設定の定義と重なっています（${names.join(", ")}）。重なったままだと、この設定の定義は 1 つも使われません。変えるまで保存できません`;
+}
+
+/** 共通の設定にも同じ id がある定義に添える文 */
+export function commonIdNote(ids: ReadonlySet<string>): string {
+  return `共通の設定にも同じ id があります（${Array.from(ids).join(", ")}）。全欄が同じなら共通の側が使われ、中身が違えば保存の検証（--lint）が error にします。変えたいときは別の id にしてください`;
+}
+
+/** 共通の設定の定義の欄の見出しにつける説明 */
+export const COMMON_NOTE = "開いている設定の定義に足して使われます。この画面では編集しません（.ccnavi/config/common/phases.yml）";

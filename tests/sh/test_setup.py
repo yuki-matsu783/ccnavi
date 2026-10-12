@@ -136,6 +136,7 @@ RULES_PARTS = (".ccnavi", "config", "common", "rules.yml")
 # フェーズ定義は自身のレイヤー（scope がワークスペースのレイアウトに付くため）。
 RISK_PARTS = (".ccnavi", "config", "common", "risks.yml")
 PHASES_PARTS = (".ccnavi", "config", "project", "phases.yml")
+COMMON_PHASES_PARTS = (".ccnavi", "config", "common", "phases.yml")
 # 置き場は 2 つに分けて固定する（設計 launcher-scripts 1）。hook が起動する振り分けの sh は
 # 代わりに通る sh と同じ .ccnavi/scripts/、機械ごとの組み立ては .ccnavi/bin/<os>-<arch>/。
 BIN_DIR_PARTS = (".ccnavi", "bin")
@@ -1118,9 +1119,11 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 encoding="utf-8",
             ) as f:
                 f.write("deny: []\n")
-            # 設定 3 本のひな形。risk は共通レイヤー、phases は自身のレイヤー。
+            # 設定 3 本のひな形。risk は共通レイヤー、phases は共通レイヤーと自身のレイヤーの 2 本。
             with open(os.path.join(src, *RISK_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nlevels: {}\nfactors: []\n")
+            with open(os.path.join(src, *COMMON_PHASES_PARTS), "w", encoding="utf-8") as f:
+                f.write("version: 1\nphases: {}\n")
             os.makedirs(os.path.join(src, ".ccnavi", "config", "project"))
             with open(os.path.join(src, *PHASES_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nphases: {}\n")
@@ -1205,6 +1208,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             self.assertEqual(f.read(), g.read())
         self.assertTrue(os.path.isfile(self.deployed(*RULES_PARTS)))
         self.assertTrue(os.path.isfile(self.deployed(*RISK_PARTS)))
+        self.assertTrue(os.path.isfile(self.deployed(*COMMON_PHASES_PARTS)))
         self.assertTrue(os.path.isfile(self.deployed(*PHASES_PARTS)))
         for name in DEPLOY_SCRIPTS:
             self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", name)))

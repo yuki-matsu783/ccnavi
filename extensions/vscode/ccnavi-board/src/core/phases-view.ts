@@ -1,5 +1,7 @@
 /**
- * フェーズ管理画面の、拡張ホストと Webview の間の契約。対象はワークスペースの設定とプロジェクトの設定の 2 種だけ（共通の設定には置けない）。リスク管理（`risk-view.ts`）と同じ作り。
+ * フェーズ管理画面の、拡張ホストと Webview の間の契約。編集する対象はワークスペースの設定とプロジェクトの設定の 2 種。リスク管理（`risk-view.ts`）と同じ作り。
+ * 判定に使われる定義は、共通の設定（`.ccnavi/config/common/phases.yml`）と、開いている設定の和。共通の設定の定義は
+ * 読み取り専用で並べ（`PhasesPage.common`）、出どころが共通か開いている設定かを見分けられるようにする。
  *
  * 画面は React で組み、拡張ホストは HTML を組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。渡すのは「いま何を見せるか」
  * （`PhasesData`）だけで、画面が返すのはユーザが押した操作（`PhasesMessage`）だけ。画面は定義の意味を
@@ -50,6 +52,19 @@ export interface PhasesForm {
   readonly phases: readonly PhaseForm[];
 }
 
+/**
+ * 共通の設定の定義 1 件（読み取り専用）。実行ファイルの足し算（`--explain --json` の `sums[].phases.types`）のうち、
+ * 出どころ（`source`）が共通の設定のもの。拡張は足し直さず、そのまま見せる
+ */
+export interface CommonPhase {
+  readonly id: string;
+  readonly title: string;
+  readonly kind: string;
+  readonly review: string;
+  /** `inherit` の 1 語なら親の範囲そのまま */
+  readonly scope: readonly string[];
+}
+
 export interface PhasesModel {
   readonly version: number | null;
   readonly form: PhasesForm;
@@ -85,8 +100,13 @@ export interface PhasesPage {
   readonly lock: Lock;
   /** 上部に出す注意（実行ファイルがこの設定を読めていない、など） */
   readonly notices?: readonly string[];
-  /** 上部に error の帯で出す文（共通の設定に phases.yml がある、など）。画面は開いたまま。`--lint` が error を言う間は保存できない（先に消すか config へ移す） */
+  /** 上部に error の帯で出す文（共通の設定の phases.yml を読めない、など）。画面は開いたまま。`--lint` が error を言う間は保存できない */
   readonly errors?: readonly string[];
+  /**
+   * 共通の設定の定義（読み取り専用）。開いている設定の定義に足されて判定に使われる。同じ id で中身が違う定義や、
+   * 表示名（title）の重なりは、実行ファイルが error にする（そのとき開いている設定の定義は使われない）。無ければ欄を出さない
+   */
+  readonly common?: readonly CommonPhase[];
   /** 開いている対象と、切り替えられる対象。無ければ切り替えの欄を出さない */
   readonly target?: { readonly kind: string; readonly name: string };
   readonly targets?: readonly TargetOption[];

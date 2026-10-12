@@ -6,13 +6,13 @@
 プロジェクトの `.ccnavi/config/project/` には触れない。
 
 - 共通レイヤーが無い、または空なら、何も配らず、ミラーも消さない（着手は止めない）
-- 写すのは `rules.yml`・`risks.yml`・`rule-expectations.yml` と、配点の `script:` が指す
-  `.ccnavi/config/common/scripts/` の下。中身の違うものだけ上書きし、共通レイヤーから無くなった
-  ファイルはミラーからも消す。ミラーは共通レイヤーの写しで誰も編集しないので、失うものは無い
+- 写すのは `rules.yml`・`phases.yml`・`risks.yml`・`rule-expectations.yml` と、配点の
+  `script:` が指す `.ccnavi/config/common/scripts/` の下。中身の違うものだけ上書きし、
+  共通レイヤーから無くなったファイルはミラーからも消す。ミラーは共通レイヤーの写しで誰も編集しないので、失うものは無い
 - `script:` の値は書き換えない。ミラーの置き場も `.ccnavi/config/common/scripts/` で、共通レイヤーと
   同じ表記のまま指せる
 - 写す前に、ミラーとして（単体 clone では共通レイヤーとして）読めるかを確かめる。error が
-  あれば何も写さず、着手しない。共通レイヤーに `phases.yml` があるときも error で、配らない
+  あれば何も写さず、着手しない
 - 写し先かその途中がシンボリックリンクなら止める
 - 上書きと削除は一時ファイルからの置き換えで行う。途中で止まれば、した分を元へ戻す
 
@@ -31,7 +31,7 @@ import yaml
 
 from ..infra import fsio, settings, tree, yamlread
 from ..policy import rules
-from . import approval, approval_checks, risk
+from . import approval, approval_checks, phasetypes, risk
 
 COMMON_DIR = settings.COMMON_DIR
 # 共通レイヤーの期待する判定のファイル名。
@@ -70,20 +70,14 @@ def common_dir(conf: settings.Settings, root: str) -> str:
 def sources(conf: settings.Settings, root: str) -> tuple[dict[str, bytes], str]:
     """共通レイヤーのうち、ミラーへ写すもの。ミラーの置き場からの相対 → 中身。
 
-    読めなければ理由を返す（何も写さない）。共通レイヤーに `phases.yml` があるときも理由を返す
-    （置けないものなので配らない）。
+    読めなければ理由を返す（何も写さない）。
     """
     base = common_dir(conf, root)
     out: dict[str, bytes] = {}
-    phases = os.path.join(base, settings.LAYER_FILE_NAMES[settings.KIND_PHASES])
-    if os.path.lexists(phases):
-        return {}, (
-            "共通レイヤーに phases.yml がある（置けないので配らない。"
-            "フェーズ定義は config の phases.yml に置く）"
-        )
     risk_raw = b""
     for name in (
         settings.LAYER_FILE_NAMES[settings.KIND_RULES],
+        settings.LAYER_FILE_NAMES[settings.KIND_PHASES],
         settings.LAYER_FILE_NAMES[settings.KIND_RISK],
         EXPECTATIONS_NAME,
     ):
@@ -95,7 +89,7 @@ def sources(conf: settings.Settings, root: str) -> tuple[dict[str, bytes], str]:
         out[name] = raw
         if name == settings.LAYER_FILE_NAMES[settings.KIND_RISK]:
             risk_raw = raw
-    for kind in (settings.KIND_RULES, settings.KIND_RISK):
+    for kind in settings.LAYER_KINDS:
         name = settings.LAYER_FILE_NAMES[kind]
         if name in out:
             why = _unreadable_as_common(kind, out[name])
@@ -249,6 +243,12 @@ def _unreadable_as_common(kind: str, content: bytes) -> str:
         text = content.decode("utf-8")
     except UnicodeDecodeError:
         return "UTF-8 として読めない"
+    if kind == settings.KIND_PHASES:
+        types, problems = phasetypes.parse(text, "(phases)")
+        errors = [p for p in problems if p.severity == rules.SEVERITY_ERROR]
+        if types is None or errors:
+            return "; ".join(p.detail for p in errors) or "フェーズ定義として読めない"
+        return ""
     if kind == settings.KIND_RISK:
         definition, problems = risk.parse(text, "(risk)", risk.SCRIPT_HOMES)
         errors = [p for p in problems if p.severity == rules.SEVERITY_ERROR]

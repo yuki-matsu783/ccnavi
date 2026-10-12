@@ -117,7 +117,7 @@ def common_path(root: str, kind: str) -> str:
 def config_path(root: str, kind: str) -> str:
     """ワークスペースルートの config（自身のレイヤー）のファイル（rules / phases / risk）のパス。
 
-    フェーズ定義は config にだけ置ける（共通レイヤーには置けない）。
+    フェーズ定義は共通レイヤーと config の両方に置け、判定は 2 本の和を読む。
     """
     return os.path.join(
         root,

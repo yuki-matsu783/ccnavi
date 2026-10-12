@@ -37,7 +37,7 @@ test("CX-T022 パスを tree と blob に引き、tree は再帰で読む。無�
   assert.equal(objs[".claude/settings.json"]?.type, "blob");
   assert.equal(objs["wip/proposals"], null);
   const entries = await gh.tree(c, "acme", "widgets", objs[".ccnavi/config/project"]?.oid as string);
-  // フェーズ定義は config にだけ置く（共通レイヤーには置けない）
+  // この見本はフェーズ定義を config にだけ置く（共通レイヤーにも置けるが、ここでは置いていない）
   assert.deepEqual(entries.map((e) => e.path), ["phases.yml"]);
   const texts = await gh.blobs(c, "acme", "widgets", [entries[0].sha]);
   assert.equal(blobSha(texts[entries[0].sha].text as string), entries[0].sha);

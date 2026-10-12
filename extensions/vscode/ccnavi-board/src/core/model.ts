@@ -255,8 +255,7 @@ export interface LayerJson {
   /** リスクの配点のファイル（`risk` の `path` と `unreadable`） */
   readonly risk: LayerFileJson;
   /**
-   * フェーズ定義のファイル（`phases_file`）。共通の設定に phases.yml があるときは、`unreadable` に
-   * 「共通には置けない。使わない」が入る（置けないので判定に使わない）
+   * フェーズ定義のファイル（`phases_file`）。読めなければ `unreadable` に理由が入る（そのファイルの定義は空として扱われる）
    */
   readonly phasesFile: LayerFileJson;
 }
@@ -327,7 +326,10 @@ export interface SumJson {
     readonly fallback: string;
     readonly problems: readonly string[];
   };
-  /** 使う 1 本だけ（足し算はしない） */
+  /**
+   * 共通の設定 + そのレイヤーの定義（判定に使う和）。`path` と `unreadable` はそのレイヤーのファイル。
+   * 各定義の `source` が出どころ（`common` かそのレイヤーの名前）
+   */
   readonly phases: {
     readonly path: string;
     readonly unreadable: string;

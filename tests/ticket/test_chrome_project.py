@@ -61,7 +61,8 @@ def workspace(compat=version.COMPAT, **extra):
 
 
 def project_integration(**extra):
-    # フェーズ定義は config にだけ置く。親の `project:` が指すプロジェクトの config 1 本が使われる
+    # フェーズ定義は、ワークスペースの共通レイヤーと、親の `project:` が指す
+    # プロジェクトの config の和
     files = {
         ".ccnavi/config/project/rules.yml": '{"version": 1, "deny": []}\n',
         ".ccnavi/config/project/phases.yml": PHASES,
@@ -170,7 +171,10 @@ class ChromeProjectTest(unittest.TestCase):
         )
 
     def test_the_project_family_is_judged_by_the_project_phases_and_ignores_the_mirror(self):
-        """フェーズ定義は親の `project:` が指す config の 1 本だけ。ミラーは足さない。"""
+        """フェーズ定義は共通レイヤー（ワークスペースの統合先）と、親の `project:` が指す
+        config の和。
+
+        プロジェクトの `.ccnavi/config/common/`（ミラー）は足さない。"""
         trunk = project_integration(
             **{
                 ".ccnavi/config/common/phases.yml": PHASES,
@@ -195,6 +199,11 @@ class ChromeProjectTest(unittest.TestCase):
             [e["ticket"] for e in self.ask("board", branches=bare).get("batch", [])],
             ["web-i0012", "web-i0012-01-01"],
         )
+        # ワークスペースの共通レイヤーに定義があれば、プロジェクトの config に無くてもその定義が効く
+        common = workspace(**{".ccnavi/config/common/phases.yml": PHASES})
+        board = self.ask("board", branches=bare, ws=common)
+        self.assertNotIn("error", board, board)
+        self.assertEqual([e["ticket"] for e in board["batch"]], ["web-i0012", "web-i0012-01-01"])
 
     def test_records_are_kept_apart_for_the_workspace_and_the_project(self):
         place = self.chrome._placement()

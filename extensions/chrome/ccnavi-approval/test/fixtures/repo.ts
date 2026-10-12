@@ -170,7 +170,7 @@ export interface FixtureBranch {
 const MAIN_FILES: Record<string, string> = {
   ".claude/settings.json": JSON.stringify({ env: { CCNAVI_TICKET_CONTROL: "enable" } }, null, 2) + "\n",
   ".ccnavi/scripts/ccnavi-common.sh": COMMON_SH(1),
-  // フェーズ定義は config にだけ置く（共通レイヤーには置けない）。ワークスペースの親は自身の config の定義を使う
+  // フェーズ定義は共通レイヤーと config の和。この見本は自身の config にだけ置き、ワークスペースの親はその定義を使う
   ".ccnavi/config/project/phases.yml": PHASES,
   ".ccnavi/config/common/rules.yml": RULES,
   ".ccnavi/approved/done/i0005.md": done("i0005", null, null),
@@ -268,7 +268,7 @@ export function requestedMark(head: string, mr = 42, host: "github" | "gitlab" =
  * プロジェクトのリポジトリ（手元では `projects/web` に clone されるもの）。模擬の GitLab に載せる。
  *
  * - `main`（プロジェクトの統合先）: 閉じた親子のチケット web-i0003 の `done/` とプロジェクトのレイヤー（rules.yml と phases.yml。
- *   フェーズ定義は親の `project:` が指すこのプロジェクトの config の 1 本だけが使われる）。
+ *   フェーズ定義は、ワークスペースの共通レイヤーと、親の `project:` が指すこのプロジェクトの config の和が使われる）。
  *   共通レイヤー・設定・互換のマーカーはワークスペース（`fixture()` の `main`）から読む（置き場のパスは既定に固定）。
  *   プロジェクトの `.ccnavi/config/common/`（親の着手が配るミラー）はワークスペースの中では共通として読まない
  * - `web-i0012`（直近）: issue #12 から始めた親と子の提案

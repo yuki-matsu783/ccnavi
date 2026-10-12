@@ -8,7 +8,7 @@
  *
  * 開いている行は Webview の state（`{ open: [id, …] }`）に残す。
  */
-import type { PhaseForm, PhasesForm } from "../../core/phases-view.js";
+import type { CommonPhase, PhaseForm, PhasesForm } from "../../core/phases-view.js";
 import { getState, setState } from "../vscode.js";
 
 /** 行 1 つ。`key` は画面の中だけの鍵で、拡張ホストへは渡さない */
@@ -80,4 +80,42 @@ export function saveOpen(draft: Draft, open: ReadonlySet<string>): void {
 /** state に残してある id から、いまの行の鍵に直す */
 export function openedFromIds(draft: Draft, ids: ReadonlySet<string>): ReadonlySet<string> {
   return new Set(draft.rows.filter((row) => row.phase.id !== "" && ids.has(row.phase.id)).map((row) => row.key));
+}
+
+/** 編集中の定義と共通の設定の定義の重なり */
+export interface CommonClash {
+  /** 共通の設定にも同じ id がある定義の id。全欄が同じなら共通の側が使われ、違えば実行ファイルが error にする */
+  readonly ids: ReadonlySet<string>;
+  /** 共通の設定の別の id と表示名（title）が重なる定義の id。実行ファイルが error にするので、画面で止める */
+  readonly titles: ReadonlySet<string>;
+}
+
+/**
+ * 共通の設定の定義との重なり。表示名は空なら id を使う（実行ファイルと同じ）。前後の空白は除いて見る。
+ * id が空の行は数えない（打っている途中の行を重なりとして赤くしない）。
+ * 同じ id の中身が同じかは画面では決めない（共通の定義は全欄を持たないので、実行ファイルの `--lint` に任せる）。
+ */
+export function commonClashes(draft: Draft, common: readonly CommonPhase[]): CommonClash {
+  const ids = new Set(common.map((c) => c.id));
+  const titles = new Map(common.map((c) => [c.title || c.id, c.id] as const));
+  const sameId = new Set<string>();
+  const sameTitle = new Set<string>();
+  for (const row of draft.rows) {
+    const id = row.phase.id.trim();
+    // id が空の行は、まだ打っている途中。重なりの印は id で行に戻すので、空の id を入れると
+    // 空の id の行がみな赤くなる。共通の定義と比べるのは id を打ってから。
+    if (id === "") {
+      continue;
+    }
+    if (ids.has(id)) {
+      sameId.add(id);
+      continue;
+    }
+    const title = row.phase.title.trim() || id;
+    const owner = titles.get(title);
+    if (owner !== undefined && owner !== id) {
+      sameTitle.add(id);
+    }
+  }
+  return { ids: sameId, titles: sameTitle };
 }

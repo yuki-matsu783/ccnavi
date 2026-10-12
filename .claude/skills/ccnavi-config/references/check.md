@@ -23,7 +23,7 @@ ccnavi --lint --log "" --state ""
 | 出どころ | error（防御が消える・全部止まる） | warn（判定は動くが意図とずれる） |
 |---|---|---|
 | `(rules)` / ルール id | 読めない、版が違う、`deny` が空、文面・match・glob を欠く、glob と regex の両方、`except` の形（空・要素が glob / regex の 1 つでない・知らないキー）、`when` の形（glob / regex と並べた・知らないキー・キーが 1 つでないノード・空のリスト・型違い・8 段 / 64 個の上限超え）、`ask` `allow` に `message`、組めない正規表現、`additionalContextFile` が上に出る | `allow` が空、id 無し・重複、当てる対象の無いツール、広い allow に文、指すファイルが無い・長い、何にでも当たる単体の `deny`（`glob: "*"` ちょうどは除く）、何にでも当たる `except`、Bash / PowerShell の deny / ask の `except`、何にでも当たる・何にも当たらない `when` のノード、Bash / PowerShell の deny / ask の `when` の `not` |
-| `(phases)` | 読めない、版が違う、`phases` が無い、kind / review の値、feedback が none、id / title の重複、scope が外に出る、scope / deliverables が 20 件を超える | ―（順序の欄は読まず、警告も出さない） |
+| `(phases)` | 読めない、版が違う、`phases` が無い、kind / review の値、feedback が none、id / title の重複、scope が外に出る、scope / deliverables が 20 件を超える、config の定義が共通レイヤーと同じ id で中身が違う・title が重なる | ―（順序の欄は読まず、警告も出さない） |
 | `(risk)` | 読めない、版が違う、levels の順、id の重複・形、points が負、加点条件が 0 か 2 つ、script の置き場が外、glob が組めない | 知らないリスクレベル名 |
 | `(ticket)` `(project)` `(mode)` | 承認済みチケットの置き場が守られていない、計画を持つ親に定義の写し（phases:）が無いか壊れている | dry-run、登録の欠け、ワークツリーとチケットの食い違い |
 
@@ -70,7 +70,7 @@ ccnavi --explain --log "" --state ""
 
 承認済みの親とその計画が出る。見るのは 4 つ。
 
-- 開いている親の `plan:` / `feedback:` が指すフェーズ定義が、全部 phases.yml に在るか。無ければ
+- 開いている親の `plan:` / `feedback:` が指すフェーズ定義が、全部 phases.yml（共通レイヤーと親の `project:` のレイヤーの和）に在るか。無ければ
   その親は次のフェーズを承認できない
 - `review: none` のフェーズ定義が、本当にユーザが見なくてよい成果か。`when` に「飛ばしてよい条件」まで
   書いてあるか

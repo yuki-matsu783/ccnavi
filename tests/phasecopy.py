@@ -31,6 +31,25 @@ def definitions(phases_yml: str) -> dict:
     return out
 
 
+def combined(*phases_ymls: str) -> str:
+    """共通レイヤーとレイヤーの `phases.yml` を足した本文。同じ id は前のものを残す。
+
+    判定は共通レイヤー + 親の `project:` が指すレイヤーの和を読むので、写しもその和から取る。
+    """
+    merged: dict = {}
+    for text in phases_ymls:
+        for ident, body in definitions(text).items():
+            merged.setdefault(ident, body)
+    if not merged:
+        return ""
+    return yaml.safe_dump(
+        {"version": 1, "phases": merged},
+        allow_unicode=True,
+        sort_keys=False,
+        default_flow_style=False,
+    )
+
+
 def used_types(front: dict) -> list[str]:
     """frontmatter の計画の項が使う定義の名前（出てきた順、重なりなし）。"""
     names: list[str] = []

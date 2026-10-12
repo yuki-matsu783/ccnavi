@@ -9,7 +9,11 @@
  * 帯（`changed`）が出るだけ。
  *
  * id の重なりだけは画面で止める。 同じ id が 2 つあると実行ファイルは後ろで何も出さずに上書きする。
- * 止めるのはここだけで、書式の検証は保存のときに実行ファイル（`--lint`）へ渡す。
+ * 共通の設定の定義と表示名が重なる定義も止める（重なると、この設定の定義が 1 つも使われない）。
+ * 止めるのはこの 2 つだけで、書式の検証と、共通の設定と同じ id の中身の比べは保存のときに実行ファイル（`--lint`）へ渡す。
+ *
+ * 共通の設定の定義は、開いている設定の定義に足されて判定に使われる。編集はせず、出どころが分かるように別の欄に
+ * 読み取り専用で並べる（`PhasesPage.common`。実行ファイルの足し算のうち出どころが共通のもの）。
  *
  * **図と、全体計画の待ち方（`order`）の選択は持たない。** 順序（どのフェーズがどれを待つか）はフェーズ定義では
  * なく親チケットの計画の項の `after` で決める。
@@ -17,7 +21,7 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
-import type { PhaseForm, PhasesData, PhasesMessage, PhasesPage, ToPhases } from "../../core/phases-view.js";
+import type { CommonPhase, PhaseForm, PhasesData, PhasesMessage, PhasesPage, ToPhases } from "../../core/phases-view.js";
 import { applyAppearance } from "../appearance.js";
 import { Phase } from "./Phase.js";
 import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
@@ -26,8 +30,8 @@ import { parsePhasesSample, parsePhasesTexts } from "../../core/tour-phases.js";
 import phasesTour from "../tours/phases.yml";
 import { TargetSelect } from "../TargetSelect.js";
 import { post } from "./post.js";
-import { countText, duplicateNote, emptyNote, findText, hasMore } from "./text.js";
-import { draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
+import { COMMON_NOTE, commonIdNote, commonTitleNote, countText, duplicateNote, emptyNote, findText, hasMore } from "./text.js";
+import { commonClashes, draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
 const NO_LOCK: Lock = { locked: true, reason: "", doing: [] };
@@ -309,6 +313,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const shownHelp = touring ? scene.help === true : helpOpen;
 
   const dup = touring ? new Set<string>() : duplicates(draft);
+  const common = touring ? [] : (page?.common ?? []);
+  const clash = commonClashes(touring ? { rows: [] } : draft, common);
   const query = shownFind.trim().toLowerCase();
   const rows = shownDraft.rows.map((row) => {
     const text = findText(row.phase);
@@ -326,7 +332,9 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       : undefined
     : dup.size > 0
       ? { text: duplicateNote(dup), error: true }
-      : status;
+      : clash.titles.size > 0
+        ? { text: commonTitleNote(clash.titles), error: true }
+        : status;
 
   return (
     <>
@@ -372,7 +380,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             id="save"
             data-action="save"
             data-tour="save"
-            disabled={!shownDirty || shownLock.locked || shownBusy || dup.size > 0}
+            disabled={!shownDirty || shownLock.locked || shownBusy || dup.size > 0 || clash.titles.size > 0}
             onClick={() => {
               if (tour.touring) {
                 return;
@@ -461,7 +469,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               hidden={row.hidden}
               open={isShownOpen(row)}
               moreOpen={isShownMore(row)}
-              duplicate={dup.has(row.phase.id.trim())}
+              duplicate={dup.has(row.phase.id.trim()) || clash.titles.has(row.phase.id.trim())}
               disabled={shownBusy}
               tour={row.key === tourRowKey}
               frozen={touring}
@@ -474,7 +482,13 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           ))}
           {shownDraft.rows.length === 0 && <li className="empty">{emptyNote(shownPage?.exists === true)}</li>}
         </ul>
+        {clash.ids.size > 0 && (
+          <p className="hint" id="common-same-id">
+            {commonIdNote(clash.ids)}
+          </p>
+        )}
       </section>
+      {common.length > 0 && <CommonList common={common} />}
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
       <footer className={shownStatus?.error === true ? "foot error" : "foot"}>
         <span id="status" data-tour="status">
@@ -482,5 +496,27 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         </span>
       </footer>
     </>
+  );
+}
+
+/** 共通の設定の定義（読み取り専用）。出どころが共通であることを見出しで言い、編集の欄は持たない */
+function CommonList(props: { readonly common: readonly CommonPhase[] }): JSX.Element {
+  return (
+    <section className="block" id="common-phases">
+      <h2>
+        共通の設定の定義{" "}
+        <span className="count" id="common-count">
+          {props.common.length}
+        </span>
+      </h2>
+      <p className="hint">{COMMON_NOTE}</p>
+      <ul className="list">
+        {props.common.map((phase) => (
+          <li key={phase.id} className="common-phase" data-id={phase.id} data-source="common">
+            <code>{phase.id}</code> {phase.title} <span>（{phase.kind} / review: {phase.review} / scope: {phase.scope.join(", ")}）</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

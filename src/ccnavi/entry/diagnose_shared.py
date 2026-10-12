@@ -37,30 +37,21 @@ def written(entry) -> str:
     return entry.glob or entry.regex
 
 
-# 共通レイヤーに置かれた phases.yml について、`--explain` が言う文。
-COMMON_PHASES_NOTE = "共通には置けない。使わない"
-
-
-def layer_phase_types(path: str, common: bool = False) -> tuple[list, str]:
+def layer_phase_types(path: str) -> tuple[list, str]:
     """そのレイヤーのフェーズ定義と、読めなかった理由。無いレイヤーは空。
 
-    合成はしない。フェーズ定義は足し算をせず、使うのは親の `project:` が指す 1 本だけ。
-    ここで出すのは「どのレイヤーに何が書いてあるか」。定義は順序を持たない（順序は親の計画の
-    項の `after`）。
-
-    `common` は共通レイヤーかどうか。共通レイヤーの phases.yml は置けず、判定に使わないので、
-    あれば中身を読まずに理由だけ返す（`--lint` が error で言う）。
+    合成はしない。ここで出すのは「どのレイヤーに何が書いてあるか」で、共通レイヤーも同じ読み方を
+    する。判定が使う和（共通レイヤー + 親の `project:` が指すレイヤー）は `phasetypes.layer_types`
+    が組む。定義は順序を持たない（順序は親の計画の項の `after`）。
     """
-    types, why = layer_phase_set(path, common)
+    types, why = layer_phase_set(path)
     return (list(types.values()) if types is not None else []), why
 
 
-def layer_phase_set(path: str, common: bool = False) -> tuple[phasetypes.PhaseTypes | None, str]:
+def layer_phase_set(path: str) -> tuple[phasetypes.PhaseTypes | None, str]:
     """`layer_phase_types` と同じ。定義の集合のまま返す。無ければ None。"""
     if not path or not os.path.isfile(path):
         return None, ""
-    if common:
-        return None, COMMON_PHASES_NOTE
     types, notes = phasetypes.load(path)
     if types is None:
         return None, "; ".join(str(n) for n in notes) or "読めない"

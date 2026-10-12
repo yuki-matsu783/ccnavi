@@ -1,6 +1,7 @@
 """親の提案の `phases:` に、計画が使うフェーズ定義を写す（`--plan-order <親> --fill-phases`）。
 
-計画（`plan:` / `feedback:`）の項が使うフェーズ定義だけを `phases.yml` から読み、提案の
+計画（`plan:` / `feedback:`）の項が使うフェーズ定義だけを `phases.yml`（共通レイヤーと、親の
+`project:` が指すレイヤーの和）から読み、提案の
 `phases:`（親に固定する定義の写し）の値をその定義の集まりに差し替える（無ければ `plan:` の前に
 足す。項が使わない定義は外す）。写し間違いを無くし、`phases.yml` を直したあとに承認待ちの
 提案を追いつかせるのも同じ 1 本で済ませるため。
@@ -76,8 +77,8 @@ def fill(
     config = phasetypes.load_types(conf, root, target.project)
     if config is None:
         return Filled(
-            f"フェーズ定義（{target.project or '自身'} のレイヤーの phases.yml）が"
-            "無いか読めないので、写せない。何も書かない"
+            f"フェーズ定義（共通レイヤーと {target.project or '自身'} のレイヤーの phases.yml）が"
+            "どちらも無いか読めないので、写せない。何も書かない"
         )
     held = _held(conf, root, current)
     copy: dict[str, dict] = {}

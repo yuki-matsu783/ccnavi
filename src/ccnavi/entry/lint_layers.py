@@ -107,10 +107,11 @@ def _legacy_places(conf: settings.Settings, root: str) -> list[Problem]:
 def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
     """各レイヤーの phases / risk が、共通レイヤーと合成できるか。
 
-    見るのは合成したあとの内容。同 `id` で中身が違う、`title` がレイヤーをまたいで重なる、
-    `levels` が逆転する、`script:` がレイヤーの外を指すか指す先が無い、を error で言い、
-    全欄一致で捨てた重複を info で言う。共通レイヤー自身の苦情は `_phases` / `_risk` が
-    別に言うので、ここではレイヤーの側だけを数える。
+    見るのは合成したあとの内容。phases は同 `id` で中身が違う、`title` が共通レイヤーと重なる、
+    risk は `levels` が逆転する、`script:` がレイヤーの外を指すか指す先が無い、を error で言い、
+    phases の全欄一致で捨てた重複を info で言う。共通レイヤー自身の苦情は `lint._phases` /
+    `lint._risk` が別に言うので、ここではレイヤーの側だけを数える。自身のレイヤーとプロジェクトの
+    レイヤーどうしは合成しないので、その間の重なりは言わない。
 
     `.ccnavi/config/project/` が無いことは言わない。無いのは正常（無いレイヤー = 空）。
     """

@@ -462,13 +462,16 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
     )
 
 
-def _type_source(phase: Phase) -> dict:
+def _type_source(phase: Phase, common: dict[str, phasetypes.PhaseType] | None) -> dict:
     """定義を根拠に置くマーカーに足す、その定義のレイヤー。
 
     `review:` が絡むマーカー（省略と保留）にだけ足す。他のマーカーは定義を見ずに置くので、
     レイヤーを書いても根拠にならない。定義の無いフェーズでは欄そのものを置かない。
+    写しの定義が共通レイヤーの定義と同じなら `common`（`phasetypes.origin`）。
     """
-    return {"source": phase.type.source} if phase.type is not None else {}
+    if phase.type is None:
+        return {}
+    return {"source": phasetypes.origin(phase.type, common)}
 
 
 def announce(
@@ -485,6 +488,11 @@ def announce(
     texts = []
     where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     phases = phases_of(root, conf, parent.ticket, raw=raw)
+    # マーカーの `source` を決めるためだけに読む。判定は写しを読み、ここで読んだ定義は使わない。
+    # 読むのはマーカーを置くフェーズがあるときだけ。
+    common: dict[str, phasetypes.PhaseType] | None = None
+    if any(p.ended and not p.marks and not p.deferred for p in phases):
+        common, _ = phasetypes.common_types(conf)
     for phase in phases:
         if not phase.ended or phase.marks:
             continue
@@ -507,7 +515,7 @@ def announce(
                 parent.ticket,
                 n,
                 approval_marks.MARK_PENDING,
-                {"review": phase.review_kind, **_type_source(phase)},
+                {"review": phase.review_kind, **_type_source(phase, common)},
             )
             if failed:
                 stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
@@ -567,7 +575,7 @@ def announce(
                 parent.ticket,
                 n,
                 approval_marks.MARK_SKIPPED,
-                {"tickets": [t.ticket for t in phase.tickets], **_type_source(phase)},
+                {"tickets": [t.ticket for t in phase.tickets], **_type_source(phase, common)},
             )
             if failed:
                 stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")

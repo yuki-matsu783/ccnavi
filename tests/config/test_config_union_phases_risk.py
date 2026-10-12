@@ -1,8 +1,8 @@
-"""設定の受入テスト。phases は config の 1 本、risk は共通 + 1 レイヤーの和。
+"""設定の受入テスト。phases も risk も共通 + 1 レイヤーの和。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。
-共通レイヤーは phases を持たない（置けない）。自身のレイヤーに `docs`、lib のレイヤーに
-`design` / `build` / `release` がある。
+土台の共通レイヤーは phases を持たない（足し算を見るテストが自分で置く）。自身のレイヤーに
+`docs`、lib のレイヤーに `design` / `build` / `release` がある。
 risk は共通レイヤーに `big-diff`、lib のレイヤーに `schema` と `levels: {critical: 50}` がある。
 
 使うフェーズ定義と足す配点のレイヤーは、親の承認済みチケットの `project:` で決まる。lib 向けの提案は
@@ -103,7 +103,10 @@ phases:
 
 
 class PhaseUnionTest(ConfigUnionHarness):
-    """phases は config の 1 本。足し算はしない。承認と --lint で見る。"""
+    """phases は共通レイヤー + 親の `project:` が指すレイヤーの和。承認と --lint で見る。
+
+    自身のレイヤーとプロジェクトのレイヤーどうしは足さない（足すのは共通レイヤーとの 2 本だけ）。
+    """
 
     def phase_problems(self, severity, layer=""):
         """phases の Problem。`layer` を渡すと、そのレイヤーのものだけ。
@@ -149,8 +152,9 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertFalse(os.path.exists(self.approved_copy("i0004")))
 
     def test_the_same_id_in_two_layers_is_not_a_conflict(self):
-        """レイヤーをまたぐ `id` の衝突は無い。使うのは親の `project:` が指す 1 本だけ。
+        """自身のレイヤーとプロジェクトのレイヤーどうしは足さないので、その間の `id` の衝突は無い。
 
+        足すのは共通レイヤーと親の `project:` が指すレイヤーだけ。
         自身のレイヤーと lib が同じ `design` を別の中身で持っても、どちらも error にならず、
         lib 向けの親は lib の `design` を使う。"""
         write_layer(self.ws, phases=OWN_PHASES_DESIGN)
@@ -193,25 +197,144 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertEqual(self.phase_problems("error"), [])
         self.assertEqual(self.phase_problems("info"), [])
 
-    def test_a_common_phases_file_is_an_error_and_is_not_used(self):
-        """共通レイヤーの phases.yml は --lint が error で名指しし、判定では空として扱う。
+    def test_a_common_phases_file_is_not_an_error_and_is_used(self):
+        """共通レイヤーの phases.yml は置ける。
 
-        記録の `fallback` には残さない。`plan:` が共通レイヤーの定義を指しても承認は止まる。"""
+        --lint は error を出さず、`plan:` が共通レイヤーの定義を指せる。"""
         write(self.phases, COMMON_PHASES)
 
-        errors = self.phase_problems("error")
-        self.assertTrue(any(self.phases in p["detail"] for p in errors), errors)
+        self.assertEqual(self.phase_problems("error"), [])
         self.propose(
             "i0001",
             ticket_text("i0001", plan=["design"], allow=("wip/design/*",)),
         )
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.assertTrue(os.path.exists(self.approved_copy("i0001")))
+        explained = self.ccnavi("--explain").stdout
+        self.assertNotIn("共通には置けない", explained)
+        record = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "src", "a.py"))
+        self.assertNotIn("fallback", self.last_record(), record.stdout)
+
+    def test_only_the_common_layer_has_phases(self):
+        """レイヤーに phases.yml が無くても、共通レイヤーの定義だけで `plan:` が読める。"""
+        write(self.phases, COMMON_PHASES)
+        os.remove(layer_path(self.ws, "phases"))
+
+        self.assertEqual(self.phase_problems("error"), [])
+        self.propose("i0001", ticket_text("i0001", plan=["design"], allow=("wip/design/*",)))
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        # app は `.ccnavi/` を持たないが、共通レイヤーの定義は使える。
+        self.propose(
+            "i0002",
+            ticket_text("i0002", project="app", plan=["design"], allow=("wip/design/*",)),
+            project="app",
+        )
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+
+    def test_common_and_layer_types_add_up(self):
+        """共通レイヤーの定義とレイヤーの定義を足す。1 つの計画で両方を使える。"""
+        write(self.phases, COMMON_PHASES)
+
+        self.propose(
+            "i0001",
+            ticket_text("i0001", plan=["design", "docs"], allow=("wip/design/*", "docs/*")),
+        )
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
+        by_id = {t["id"]: t["source"] for t in sums["self"]["phases"]["types"]}
+        self.assertEqual(by_id, {"design": "common", "docs": "self"})
+        # 自身のレイヤーの定義はプロジェクトには足さない。
+        self.assertNotIn("docs", [t["id"] for t in sums["app"]["phases"]["types"]])
+        self.assertEqual([t["id"] for t in sums["app"]["phases"]["types"]], ["design"])
+
+    def test_fill_phases_takes_types_from_both_layers(self):
+        """`--plan-order <親> --fill-phases` は共通レイヤーとレイヤーの和から写す。"""
+        write(self.phases, COMMON_PHASES)
+        text = ticket_text("i0001", plan=["design", "docs"], allow=("wip/design/*", "docs/*"))
+        write(os.path.join(self.ws, "wip", "proposals", "todo", "i0001.md"), text)
+
+        filled = self.ccnavi("--plan-order", "i0001", "--fill-phases")
+        self.assertEqual(filled.returncode, 0, filled.stdout + filled.stderr)
+        body = read(os.path.join(self.ws, "wip", "proposals", "todo", "i0001.md"))
+        self.assertIn("設計", body)
+        self.assertIn("文書", body)
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+
+    def test_same_id_with_different_body_across_common_is_an_error(self):
+        """共通レイヤーと同じ id で中身が違う定義は error。そのレイヤーは空として扱う。"""
+        write(self.phases, COMMON_PHASES)
+        write_layer(
+            self.ws,
+            phases=OWN_PHASES_DESIGN
+            + "  docs:\n    kind: work\n    title: 文書\n    review: none\n"
+            + '    scope: ["docs/*"]\n',
+        )
+
+        errors = [p for p in self.phase_problems("error") if p["where"].startswith("(self)")]
+        self.assertTrue(any("design" in p["where"] + p["detail"] for p in errors), errors)
+        # 衝突したレイヤーは空なので、同じレイヤーの docs も使えない。
+        self.propose("i0001", ticket_text("i0001", plan=["docs"], allow=("docs/*",)))
         refused = self.approve()
         self.assertNotEqual(refused.returncode, 0)
         self.assertFalse(os.path.exists(self.approved_copy("i0001")))
-        explained = self.ccnavi("--explain").stdout
-        self.assertIn("共通には置けない", explained)
-        record = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "src", "a.py"))
-        self.assertNotIn("fallback", self.last_record(), record.stdout)
+
+    def test_title_overlap_with_common_is_an_error(self):
+        """共通レイヤーの定義と `title` が重なる別 id の定義は error。"""
+        write(self.phases, COMMON_PHASES)
+        write_layer(self.lib, phases=LIB_PHASES_TITLE_OVERLAP)
+
+        errors = self.phase_problems("error", "lib")
+        self.assertTrue(any("設計" in p["detail"] for p in errors), errors)
+
+    def test_identical_type_in_common_and_layer_is_dropped_with_info(self):
+        """共通レイヤーと全欄が同じ定義は、レイヤーの側を捨てて info で言う。error ではない。"""
+        write(self.phases, COMMON_PHASES)
+
+        # lib の design は共通レイヤーの design と全欄が同じ。
+        self.assertEqual(self.phase_problems("error", "lib"), [])
+        infos = self.phase_problems("info", "lib")
+        self.assertTrue(any("design" in p["where"] + p["detail"] for p in infos), infos)
+        self.propose(
+            "i0001",
+            ticket_text("i0001", project="lib", plan=["design", "build"], allow=("src/*",)),
+            project="lib",
+        )
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+
+    def test_a_broken_common_phases_file_is_an_error(self):
+        """読めない共通レイヤーの phases.yml は --lint が error で名指しする。"""
+        write(self.phases, "version: 1\nphases: [\n")
+
+        errors = self.phase_problems("error")
+        self.assertTrue(any(p["where"].startswith("(phases)") for p in errors), errors)
+
+    def test_a_broken_common_layer_leaves_the_layer_types_in_use(self):
+        """共通レイヤーの phases.yml が読めなくても、レイヤーの定義だけで `plan:` が読める。
+
+        共通の定義は空として扱うので、共通にしか無い定義を使う計画は承認で止まる。
+        """
+        write(self.phases, "version: 1\nphases: [\n")
+
+        self.assertEqual(self.phase_problems("error", "lib"), [])
+        self.propose("i0001", ticket_text("i0001", plan=["docs"], allow=("docs/*",)))
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.assertTrue(os.path.exists(self.approved_copy("i0001")))
+        sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
+        self.assertEqual(
+            {t["id"]: t["source"] for t in sums["self"]["phases"]["types"]}, {"docs": "self"}
+        )
+
+        self.propose("i0002", ticket_text("i0002", plan=["design"], allow=("wip/design/*",)))
+        refused = self.approve()
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertFalse(os.path.exists(self.approved_copy("i0002")))
 
     def test_a_missing_phases_file_is_normal(self):
         """phases.yml が無いのは正常（空）。--lint に出さず、`plan:` だけが読めない。"""
@@ -583,6 +706,27 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertIn("省略", self.reason(said))
         mark = json.loads(read(self.approved_path("phases", "i0001", "1.skipped")))
         self.assertEqual(mark.get("source"), "lib", mark)
+
+    def test_the_mark_names_common_when_the_type_comes_from_common(self):
+        """共通レイヤーの定義を写した親のマーカーは、`source` が `common`。
+
+        `--explain --json` の和と同じ。lib の `work` は共通レイヤーの `work` と全欄が同じなので、
+        和では共通の側が残る。
+        写しは出どころを持たないが、共通レイヤーの定義と中身が同じなら共通の定義として記す。
+        """
+        write(self.phases, LIB_PHASES_WORK)
+        tree = self.one_child()
+        self.commit(tree, "src/a.py", "1\n")
+        closed = self.ccnavi("ticket", "finish", "i0001-01-01")
+        self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
+
+        said = self.hook("Bash", self.parent_tree, event="PostToolUse", command="ls")
+        self.assertIn("省略", self.reason(said))
+        mark = json.loads(read(self.approved_path("phases", "i0001", "1.skipped")))
+        sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
+        explained = {t["id"]: t["source"] for t in sums["lib"]["phases"]["types"]}
+        self.assertEqual(explained["work"], "common")
+        self.assertEqual(mark.get("source"), explained["work"], mark)
 
 
 class LayerPlaceFlagsAreDiagnosisOnlyTest(RiskUnionTest):

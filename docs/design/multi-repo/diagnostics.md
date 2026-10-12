@@ -21,9 +21,9 @@ keywords: [診断, --explain, 記録, レイヤー]
   allow self:worktrees       Write|Edit               */.claude/worktrees/*
 ■ rules lib（projects/lib/.ccnavi/config/project/rules.yml、deny 2 / ask 0 / allow 1）
   deny  lib:schema           Write|Edit               */schema/*
-■ phases（自身のレイヤー 7 種、lib 3 種。使うのは親の project: が指す 1 本）
+■ phases（共通レイヤー 7 種、自身のレイヤー 4 種、lib 1 種。使うのは共通 + 親の project: が指すレイヤーの和）
   id            レイヤー     kind  title         review  scope
-  design        self   work  設計          mr      wip/design/*, docs/*
+  design        共通   work  設計          mr      wip/design/*, docs/*
   build         lib    work  ビルド        mr      src/*
 ■ risk（levels: medium 20 / high 40 / critical 70）
   id            レイヤー     加点条件          points  message
@@ -33,7 +33,7 @@ keywords: [診断, --explain, 記録, レイヤー]
 
 レイヤーごとの表は、判定と同じ順・同じ重ね方で読んだ結果を並べる。
 読めないレイヤーはその位置に「読めない: <理由>」と、空として扱っていることを出す。置いていないレイヤーは「置いていない（無い = 空）」と出す。
-`levels` の行に出るのは共通レイヤーの側の値で、実際に使われる値はチケットのレイヤーで決まる。共通レイヤーに `phases.yml` があれば、`--lint` が error でそのファイルを名指しし、`--explain` の phases では「共通には置けない。使わない」と出す（11.4.1）。ファイルが無いことは、どのレイヤーでも不備として出さない（11.2）。
+`levels` の行に出るのは共通レイヤーの側の値で、実際に使われる値はチケットのレイヤーで決まる。phases の表はレイヤーごとに書いてある定義を並べ、判定が使うのは共通と親の `project:` が指すレイヤーの和（11.4.1）。和は `--explain --json` の `sums[].phases` に出す。ファイルが無いことは、どのレイヤーでも不備として出さない（11.2）。
 
 記録の 1 行は `tree` と `project`（この呼び出しがどのツリーのものと判定されたか）に加えて、出どころのレイヤー
 （`common | self | <名前>`）を持つ。入るのは判定を下したルール（当たったものの先頭）のレイヤーで、当たらなかった行は空。
@@ -78,7 +78,7 @@ keywords: [診断, --explain, 記録, レイヤー]
 端末から打つ `--agree` は、承認の対象の一部が外れたら終了コード 1 で終わる。通ったぶんの承認済みチケットは置き、外れたものは名指しする。
 拡張が子プロセスで打つ `--agree --yes`（10 章）の終了コードは別。
 
-導入スクリプト `ccnavi-setup.sh` は共通レイヤーに `rules.yml` と `risks.yml`、自身のレイヤーに `phases.yml` のひな形を配り、3 本とも
-「まだ無いもの」の点検に数える。
+導入スクリプト `ccnavi-setup.sh` は共通レイヤーに `rules.yml`・`phases.yml`・`risks.yml`、自身のレイヤーに `phases.yml` のひな形を配る。
+「まだ無いもの」の点検には、`rules.yml` と `risks.yml` と、共通にも自身のレイヤーにも無い `phases.yml` を数える。
 
 dry-run でまずレイヤーの分布を見て、Bash の和と、大文字小文字を区別しない照合で増えた `ask` と `deny` を数えてから `enable` に切り替える。

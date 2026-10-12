@@ -1,8 +1,9 @@
 """`--project-phases-file <名前>=<パス>` の受入テスト。
 
 VS Code 拡張のフェーズ管理画面が、
-編集中のレイヤーの定義を保存せずに検証するための差し替え。フェーズ定義は足し算をしないので、
-検証するのはその 1 本の中身だけ。fixture は tests/config/test_config_union.py の
+編集中のレイヤーの定義を保存せずに検証するための差し替え。フェーズ定義は共通レイヤーとの和なので、
+差し替えた 1 本を共通レイヤーの定義と足した形で検証する（同じ id で中身が違う、表示名の重なり）。
+fixture は tests/config/test_config_union.py の
 ConfigUnionHarness を継ぐ（自身のレイヤーに `docs`「文書」、lib のレイヤーに
 `design`「設計」/ `build` / `release`）。
 """
@@ -13,7 +14,14 @@ import json
 import os
 import unittest
 
-from tests.config.test_config_union import LIB_PHASES, ConfigUnionHarness, layer_path, read, write
+from tests.config.test_config_union import (
+    COMMON_PHASES,
+    LIB_PHASES,
+    ConfigUnionHarness,
+    layer_path,
+    read,
+    write,
+)
 
 # lib のレイヤーの build の表示名を、同じ 1 本の中の design と同じ「設計」にしたもの。
 LIB_TITLE_OVERLAP = LIB_PHASES.replace("title: ビルド", "title: 設計")
@@ -55,6 +63,20 @@ class ProjectPhasesFileTest(ConfigUnionHarness):
         # 定義の無いレイヤーは error。拡張がレイヤーのファイルを最初の保存まで作らないのはこのため。
         empty = write(os.path.join(self.ws, "tmp", "empty.yml"), EMPTY_LAYER)
         self.assertTrue(self.phase_errors("(self)", "--project-phases-file", f"self={empty}"))
+
+    def test_the_swapped_file_is_checked_together_with_the_common_layer(self):
+        """差し替えた 1 本は共通レイヤーの定義と足して確かめる。
+
+        共通の design と中身が違う design は error。"""
+        write(self.phases, COMMON_PHASES)
+        # lib の design は共通の design と全欄が同じなので、そのままなら error にならない。
+        self.assertEqual(self.phase_errors("(projects/lib)"), [])
+        edited = write(
+            os.path.join(self.ws, "tmp", "lib-phases.yml"),
+            LIB_PHASES.replace('scope: ["wip/design/*"]', 'scope: ["docs/*"]', 1),
+        )
+        errors = self.phase_errors("(projects/lib)", "--project-phases-file", f"lib={edited}")
+        self.assertTrue(any("design" in p["where"] + p["detail"] for p in errors), errors)
 
     def test_is_ignored_outside_diagnostics_and_needs_name_and_path(self):
         edited = write(os.path.join(self.ws, "tmp", "lib-phases.yml"), LIB_TITLE_OVERLAP)
