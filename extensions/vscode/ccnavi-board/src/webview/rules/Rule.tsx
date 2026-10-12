@@ -44,6 +44,8 @@ export interface RuleProps {
   /** 「コンテキストの追加」の開閉。最初は値の有無で決め、以後はユーザの操作を覚える */
   readonly moreOpen: boolean;
   readonly onToggleMore: (open: boolean) => void;
+  /** 案内が指定する、組み合わせ条件の図で選ぶ点（`pathKey`）。普段は渡さない */
+  readonly pickNode?: string;
 }
 
 export function Rule(props: RuleProps): JSX.Element {
@@ -88,7 +90,7 @@ export function Rule(props: RuleProps): JSX.Element {
   }
 
   return (
-    <li className={classes.join(" ")} data-key={props.ruleKey} data-id={rule.id} data-find={props.find}>
+    <li className={classes.join(" ")} data-key={props.ruleKey} data-id={rule.id} data-find={props.find} data-tour={rule.id === "" ? undefined : `rule-${rule.id}`}>
       <div
         className="row-head"
         onClick={() => {
@@ -160,7 +162,7 @@ export function Rule(props: RuleProps): JSX.Element {
         {rule.when !== undefined ? (
           <Captioned name="組み合わせ条件" yamlKey="when">
             {/* 開いた行にだけ図を置く（畳んだ行の分まで React Flow を立ち上げない） */}
-            {props.open ? <When tree={rule.when} onChange={(when) => props.onChange({ ...rule, when })} /> : <span />}
+            {props.open ? <When tree={rule.when} pick={props.pickNode} onChange={(when) => props.onChange({ ...rule, when })} /> : <span />}
           </Captioned>
         ) : (
           <Captioned name="パターン" yamlKey="glob / regex">

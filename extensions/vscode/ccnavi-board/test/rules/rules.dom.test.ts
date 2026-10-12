@@ -13,6 +13,7 @@ import { openPage, openRules, page, rowSelector } from "../helpers/rules.js";
 import type { DomPage } from "../helpers/dom.js";
 import { sumsBoard } from "../helpers/sums.js";
 import type { HTMLButtonElement, HTMLInputElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
+import { loadTour } from "../helpers/tour.js";
 
 /** 直前に送った保存の中身 */
 function savedSections(dom: DomPage): Sections {
@@ -635,7 +636,7 @@ test("CB-D83 未保存の変更の有無は変わったときだけ拡張ホス�
   }
 });
 
-test("CB-D101 ルール管理の案内はタブを切り替えて中を指し、閉じたら始める前のタブに戻す。途中の切り替えは state に書かない", async () => {
+test("CB-D101 ルール管理の基本の案内は見本の上でタブを切り替えて中を指し、実際のタブは動かさない。途中の切り替えは state に書かない", async () => {
   const dom = await openRules({}, { tab: "hooks" });
   try {
     assert.ok(dom.one("#tab-hooks").classList.contains("active"));
@@ -652,10 +653,98 @@ test("CB-D101 ルール管理の案内はタブを切り替えて中を指し、
       await dom.settle();
     }
     assert.deepEqual(titles, ["3 つのタブ", "ルール", "絞り込み", "判定を試す", "hook", "保存", "案内"]);
-    assert.deepEqual(tabs, ["tab-rules", "tab-rules", "tab-rules", "tab-judge", "tab-hooks", "tab-hooks", "tab-hooks"]);
-    assert.ok(dom.one("#tab-hooks").classList.contains("active"), "始める前のタブに戻っていない");
+    // 案内は見本の上のタブを動かす。最後の 2 段は「ルール」のタブで保存と案内の入口を指す
+    assert.deepEqual(tabs, ["tab-rules", "tab-rules", "tab-rules", "tab-judge", "tab-hooks", "tab-rules", "tab-rules"]);
+    assert.ok(dom.one("#tab-hooks").classList.contains("active"), "実際のタブが動いた");
     assert.equal((dom.state() as { tab?: string }).tab, "hooks");
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D192 「?」は案内の一覧を開き、選んだ案内だけが始まる。基本の案内が先頭で、閉じたら tourDone を返す", async () => {
+  const dom = await openRules();
+  try {
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    const items = dom.all<HTMLButtonElement>('[data-action="tour-course"]');
+    assert.deepEqual(
+      items.map((item) => item.dataset.course),
+      loadTour("rules").courses.map((course) => course.id),
+    );
+    assert.equal(items[0].dataset.course, "intro");
+    assert.equal(dom.all(".tour").length, 0, "一覧を開いただけで案内が始まった");
+    dom.click(items[1]);
+    await dom.settle();
+    assert.equal(dom.all(".tour-menu").length, 0);
+    assert.equal(dom.all(".tour").length, 1);
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D193 使い方ごとの案内は、全部の段で指す先が画面にあり、実際のルールではなく見本を描く。実際の編集は動かない", async () => {
+  const def = loadTour("rules");
+  for (const course of def.courses) {
+    const dom = await openRules({}, undefined, { measure: true });
+    try {
+      dom.click(dom.one('[data-action="tour"]'));
+      await dom.settle();
+      dom.click(dom.one(`[data-action="tour-course"][data-course="${course.id}"]`));
+      await dom.settle();
+      for (const [index, step] of course.steps.entries()) {
+        await dom.settle();
+        const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
+        assert.equal(dom.one("#tour-title").textContent, step.title, at);
+        if (step.target !== "") {
+          assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面に無い`);
+          assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先が無い）`);
+        }
+        // 実際のルール（git-push の日本語メッセージの見本とは別の id）は出さず、見本の id が並ぶ
+        const ids = dom.all(".rule").map((row) => row.getAttribute("data-id"));
+        assert.ok(ids.includes("protect-env"), at);
+        assert.ok(!ids.includes("deps"), `${at}: 実際のルールが出ている`);
+        assert.ok(dom.all(".banner.tour-sample").length === 1, at);
+        dom.click(dom.one('[data-action="tour-next"]'));
+        await dom.settle();
+      }
+      assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の段で閉じない`);
+      assert.deepEqual(dom.all(".rule").map((row) => row.getAttribute("data-id")), ["git-push", "no-rm", "deps"], "閉じたあと実際のルールに戻らない");
+      assert.equal(dom.all("#dirty:not(.hidden)").length, 0, "案内が未保存にした");
+      assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), []);
+    } finally {
+      await dom.close();
+    }
+  }
+});
+
+test("CB-D194 組み合わせ条件の案内は、見本の行を開いて図を出し、段の scene が選ぶ点を替える", async () => {
+  const dom = await openRules({}, undefined, { measure: true });
+  try {
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    dom.click(dom.one('[data-action="tour-course"][data-course="combo-when"]'));
+    await dom.settle();
+    const open: string[] = [];
+    const picked: string[] = [];
+    const tabs: string[] = [];
+    while (dom.all(".tour").length > 0) {
+      await dom.settle();
+      open.push(String(dom.all(".rule.open").length));
+      picked.push(dom.all(".cond-inspector").map((el) => el.getAttribute("data-key") ?? "").join(","));
+      tabs.push(dom.one(".pane.active").id);
+      dom.click(dom.one('[data-action="tour-next"]'));
+      await dom.settle();
+    }
+    // 行を開く前（1 段目）は閉じていて、開いてからは図の点を段ごとに替える
+    assert.equal(open[0], "0");
+    assert.equal(open[1], "1");
+    assert.deepEqual(picked.slice(2, 5), ["r.0", "r.1.0", "r.1"]);
+    assert.ok(tabs.includes("tab-judge"), "判定を試すのタブに移らない");
   } finally {
     await dom.close();
   }
