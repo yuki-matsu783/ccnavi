@@ -72,7 +72,7 @@ export function changedTo(draft: DraftEntry, importing: Importing, to: string): 
 /** 取り込みの欄。錠は出さない（錠は `Preview.tsx` が出す） */
 export function ImportForm({ draft, importing, layers, busy, touring, onChange, onPreview, onClose }: ImportFormProps): JSX.Element {
   return (
-    <div className="import-form" data-role="import-form" data-draft={draft.name}>
+    <div className="import-form" data-role="import-form" data-draft={draft.name} data-tour="import-form">
       <label>
         取り込み先 <select id="import-to" data-action="import-to" value={importing.to} onChange={(event) => onChange(changedTo(draft, importing, event.currentTarget.value))}>
           <option value="common">共通（.ccnavi/config/common/templates）</option>

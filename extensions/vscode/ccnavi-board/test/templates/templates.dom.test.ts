@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import type { TemplateDetail } from "../../src/core/templates-view.js";
 import { fixtureJson, openTemplates, page, openPage } from "../helpers/templates.js";
 import type { DomPage } from "../helpers/dom.js";
-import type { HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
+import type { HTMLDetailsElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
 
 /** 要素の文字。前後の空白は除く */
 function text(element: { textContent: string | null } | null | undefined): string {
@@ -22,40 +22,52 @@ async function openRow(dom: DomPage, selector: string): Promise<void> {
   await dom.settle();
 }
 
-test("CB-D324 足し算の一覧は data.templates の件数だけ行を出し、捨てた理由と使えない札を行に出す", async () => {
+test("CB-D324 一覧は開いている対象の層のテンプレートだけを出し、捨てた理由と使えない札を行に出す。足し算の枠は別に出す", async () => {
   const dom = await openTemplates();
   try {
-    assert.equal(dom.all("li.template").length, fixtureJson().templates.length);
-    assert.match(text(dom.one('li.template[data-name="broken"][data-layer="common"]')), /捨てた: 読めない/);
+    // 対象は self。一覧は self の層の 4 件（ends / feature / local / research）だけで、共通の層の行は出さない
+    assert.deepEqual(
+      dom.all("li.template").map((li) => `${li.getAttribute("data-layer")}/${li.getAttribute("data-name")}`),
+      ["self/ends", "self/feature", "self/local", "self/research"],
+    );
     assert.match(text(dom.one('li.template[data-name="feature"][data-layer="self"]')), /捨てた: 共通と同じ中身/);
     assert.match(text(dom.one('li.template[data-name="ends"][data-layer="self"]')), /使えない/);
-    // 同じ名前の行は層で引き分ける
-    assert.match(text(dom.one('li.template[data-name="feature"][data-layer="common"]')), /使える/);
+    assert.match(text(dom.one('li.template[data-name="research"][data-layer="self"]')), /捨てた: 共通と食い違う/);
+    assert.equal(dom.all('button[data-action="view-sum"], button[data-action="view-raw"]').length, 0);
+    assert.equal(dom.all("details#sum").length, 1);
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D325 「層ごと」は層の箱を共通と自分の 2 つ出し、自分の層の苦情を [warn] の文字つきで出す。表示は覚える", async () => {
+test("CB-D325 足し算の枠は閉じた枠で出て、選んだ足し算の索引（名前・由来・状態・捨てた理由）を表に出す。足し算は欄で切り替える", async () => {
   const dom = await openTemplates();
   try {
-    dom.click(dom.one('button[data-action="view-raw"]'));
+    const sum = dom.one<HTMLDetailsElement>("details#sum");
+    assert.equal(sum.open, false);
+    assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
+    const rows = dom.all("details#sum tbody tr").map((tr) => `${tr.getAttribute("data-layer")}/${tr.getAttribute("data-name")}`);
+    assert.deepEqual(rows, ["common/broken", "common/feature", "common/research", "self/ends", "self/feature", "self/local", "self/research"]);
+    assert.match(text(dom.one('details#sum tr[data-layer="common"][data-name="broken"]')), /読めない/);
+    assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="feature"]')), /使われない/);
+    assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="research"]')), /共通と食い違う/);
+    assert.match(text(dom.one('[data-count="sum"]')), /使われるのは 4 件（common \+ self）/);
+    dom.change(dom.one<HTMLSelectElement>("select#sum-select"), "lib");
     await dom.settle();
     assert.deepEqual(
-      dom.all("div.tpl-layer").map((box) => box.getAttribute("data-layer")),
-      ["common", "self"],
+      dom.all("details#sum tbody tr").map((tr) => `${tr.getAttribute("data-layer")}/${tr.getAttribute("data-name")}`),
+      ["common/broken", "common/feature", "common/research", "lib/lib"],
     );
-    const warn = dom.one('div.tpl-layer[data-layer="self"] .tpl-problems li.sev-warn');
-    assert.match(text(warn), /\[warn\]/);
-    assert.match(text(warn), /notes\.txt/);
-    assert.deepEqual(dom.state(), { view: "raw" });
+    // 画面が覚えるものは無い（表示の切り替えを廃止した）
+    assert.equal(dom.state(), undefined);
   } finally {
     await dom.close();
   }
 });
 
 test("CB-D326 見出しを押すと開き、計画の表が番号と種類を出す。本文は依頼を送り、返った本文の見えない文字を \\u で見せる", async () => {
-  const dom = await openTemplates();
+  // 共通の層の行を開くので、対象は共通の設定（workspace）にする（一覧は開いている対象の層だけ）
+  const dom = await openPage({ kind: "page", page: page({ target: { kind: "workspace", name: "" } }) });
   try {
     await openRow(dom, 'li.template[data-name="feature"][data-layer="common"]');
     // 全体計画（先頭の表）は 2 行、フィードバック計画（次の表）は 1 行
@@ -112,13 +124,14 @@ test("CB-D328 下書きは 3 件出て、取り込めない・TODO・同名あ�
   }
 });
 
-test("CB-D329 変更の帯は changed で出し、更新は refresh を送る。錠は理由を帯に出す", async () => {
+test("CB-D329 外の変更の帯は changed で隠れた帯が現れ、更新は refresh を送る。錠は隠れた p が理由つきで現れる", async () => {
   const dom = await openTemplates();
   try {
-    assert.equal(dom.all('[data-banner="changed"]').length, 0);
+    assert.ok(dom.one("#changed").classList.contains("hidden"));
+    assert.ok(dom.one("#lock").classList.contains("hidden"));
     await dom.send({ type: "changed" });
-    assert.equal(dom.all('[data-banner="changed"]').length, 1);
-    dom.click(dom.one('button[data-action="refresh"]'));
+    assert.ok(!dom.one("#changed").classList.contains("hidden"));
+    dom.click(dom.one('#changed button[data-action="reload"]'));
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "refresh"), [{ type: "refresh", dirty: false }]);
     await dom.send({
@@ -126,7 +139,8 @@ test("CB-D329 変更の帯は changed で出し、更新は refresh を送る。
       lock: { locked: true, reason: "作業中のチケットがあります（T1）", doing: ["T1"] },
       projectLocks: {},
     });
-    assert.match(text(dom.one('[data-banner="lock"]')), /作業中のチケットがあります（T1）/);
+    assert.ok(!dom.one("#lock").classList.contains("hidden"));
+    assert.match(text(dom.one("#lock")), /取り込みは止めています: 作業中のチケットがあります（T1）/);
   } finally {
     await dom.close();
   }
