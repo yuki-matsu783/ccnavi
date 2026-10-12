@@ -184,7 +184,7 @@ def check_decision_none(rows, cond):
         )
     ]
     if hit:
-        return FAIL, f"出ていた: {hit[0].get('subject', '')[:80]}"
+        return FAIL, f"出ていた: {_clip(hit[0].get('subject', ''), 200, 'logs/decisions.jsonl')}"
     return PASS, "出ていない"
 
 
@@ -203,7 +203,8 @@ def check_state(item, root):
     )
     out = (r.stdout or "") + (r.stderr or "")
     if "expect_contains" in item and item["expect_contains"] not in out:
-        return FAIL, f"出力に「{item['expect_contains']}」が無い: {out.strip()[:120]}"
+        tail = _clip(out.strip(), 300, "state の run を手で打ち直して確かめる")
+        return FAIL, f"出力に「{item['expect_contains']}」が無い: {tail}"
     if "expect_not_contains" in item and item["expect_not_contains"] in out:
         return FAIL, f"出力に「{item['expect_not_contains']}」がある"
     return PASS, "一致"
@@ -383,6 +384,110 @@ def finish(scn, out, st, root):
     return {PASS: 0, FAIL: 1, INCONCLUSIVE: 2, REVIEW: 2}[final]
 
 
+EVIDENCE_LIMIT = 1000
+CONTEXT_LIMIT = 2000
+
+
+def _clip(text, limit, where):
+    """limit を超えたら切り、切ったことと全量の在りかを末尾に書く。"""
+    text = str(text)
+    if len(text) <= limit:
+        return text
+    return f"{text[:limit]}…（全 {len(text)} 文字のうち先頭 {limit} 文字。全量は {where}）"
+
+
+def _text_of(content):
+    """ツール結果の content（文字列かブロックの列）を 1 つの文字列にする。"""
+    if content is None:
+        return ""
+    if isinstance(content, list):
+        parts = []
+        for b in content:
+            if isinstance(b, dict):
+                parts.append(b.get("text") or f"[{b.get('type', '?')} ブロック]")
+            else:
+                parts.append(str(b))
+        return "\n".join(parts)
+    return str(content)
+
+
+def _hook_payload(ev):
+    """hook_response の stdout / output が JSON オブジェクトならその dict を返す。違えば {}。"""
+    for key in ("stdout", "output"):
+        raw = ev.get(key)
+        if isinstance(raw, str) and raw.lstrip().startswith("{"):
+            try:
+                data = json.loads(raw)
+            except ValueError:
+                continue
+            if isinstance(data, dict):
+                return data
+    return {}
+
+
+def summarize_hooks(hook_events, where):
+    """hook の応答を、判定に要るものの行と、省いたものの件数に分ける。
+    残すのは、拒否・確認（permissionDecision が deny / ask、または decision が block）、
+    案内文（additionalContext。SessionStart のものを除く）、中身のある Stop の応答、
+    終了コードが 0 でない応答、停止（continue: false / stopReason）、
+    systemMessage（SessionStart を除く）も残す。
+    hook_started / hook_progress は数えない。SessionStart と出力が空の応答は件数だけにする。"""
+    lines, omitted = [], {}
+    for ev in hook_events:
+        if ev.get("subtype") != "hook_response":
+            continue
+        name = ev.get("hook_event") or ev.get("hook_event_name") or "?"
+        data = _hook_payload(ev)
+        exit_code = ev.get("exit_code")
+        spec = data.get("hookSpecificOutput")
+        spec = spec if isinstance(spec, dict) else {}
+        decision = spec.get("permissionDecision") or data.get("decision")
+        reason = spec.get("permissionDecisionReason") or data.get("reason")
+        context = spec.get("additionalContext")
+        label = f"{name} {ev.get('hook_name', '')}".strip()
+        if decision in ("deny", "ask", "block"):
+            # 拒否の文面は切らない
+            lines.append(f"- [{label}] {decision}: {reason or ''}")
+        elif isinstance(exit_code, int) and exit_code != 0:
+            # 終了コードが 0 でない応答（exit 2 のブロックなど）は、文面を切らない
+            body = (
+                (ev.get("stderr") or "").strip()
+                or (ev.get("stdout") or "").strip()
+                or str(ev.get("output") or "")
+            )
+            lines.append(f"- [{label}] 終了コード {exit_code}: {body}")
+        elif data.get("continue") is False or data.get("stopReason"):
+            lines.append(f"- [{label}] 停止: {data.get('stopReason') or ''}")
+        elif name == "Stop" and (data or ev.get("stdout") or ev.get("stderr")):
+            body = (
+                json.dumps(data, ensure_ascii=False)
+                if data
+                else ev.get("stdout") or ev.get("stderr")
+            )
+            lines.append(f"- [{label}] {_clip(body, EVIDENCE_LIMIT, where)}")
+        elif context and name != "SessionStart":
+            lines.append(f"- [{label}] 案内: {_clip(context, CONTEXT_LIMIT, where)}")
+        elif data.get("systemMessage") and name != "SessionStart":
+            lines.append(f"- [{label}] 通知: {_clip(data['systemMessage'], CONTEXT_LIMIT, where)}")
+        else:
+            omitted[name] = omitted.get(name, 0) + 1
+    return lines, omitted
+
+
+def _cell(s):
+    """表のセルに入れる文字列から、列と行を崩す文字を除く。"""
+    return str(s).replace("|", "\\|").replace("\n", " ")
+
+
+def _results_table(results, limit=None):
+    cut = (lambda s: s) if limit is None else (lambda s: s[:limit])
+    lines = ["| 種類 | 期待 | 判定 | 理由 |", "|---|---|---|---|"]
+    for kind, cond, v, why in results:
+        c = json.dumps(cond, ensure_ascii=False) if not isinstance(cond, str) else cond
+        lines.append(f"| {_cell(kind)} | {_cell(cut(c))} | {_cell(v)} | {_cell(cut(why))} |")
+    return lines
+
+
 def write_report(scn, out, st, results, rows, raw):
     lines = [
         f"# {scn['id']} {scn['title']}",
@@ -390,10 +495,7 @@ def write_report(scn, out, st, results, rows, raw):
         f"全体: {overall(results)}  費用: {st['cost_usd']:.3f} USD",
         "",
     ]
-    lines += ["| 種類 | 期待 | 判定 | 理由 |", "|---|---|---|---|"]
-    for kind, cond, v, why in results:
-        c = json.dumps(cond, ensure_ascii=False) if not isinstance(cond, str) else cond
-        lines.append(f"| {kind} | {c[:100]} | {v} | {why[:100]} |")
+    lines += _results_table(results, 100)
     if scn.get("unconfirmed"):
         lines += ["", "## 確かめる点（unconfirmed）"] + [f"- {u}" for u in scn["unconfirmed"]]
     (out / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -405,27 +507,41 @@ def write_report(scn, out, st, results, rows, raw):
         ),
         encoding="utf-8",
     )
-    ev = ["# 証拠（意味の判定用）", "", "judge の基準:"] + [
-        f"- {c}" for c in scn["expect"].get("judge", [])
+    ev = [
+        "# 証拠（意味の判定用）",
+        "",
+        "## 機械判定の結果",
+        "",
+        f"全体: {overall(results)}",
+        "",
+        *_results_table(results),
+        "",
+        "judge の基準:",
+        *[f"- {c}" for c in scn["expect"].get("judge", [])],
     ]
     for p in sorted(out.glob("step-*.jsonl")):
         parsed = parse_stream(p.read_text(encoding="utf-8"))
         ev += ["", f"## {p.stem}", "### ツール呼び出し"]
         ev += [
-            f"- {t['name']}: {json.dumps(t['input'], ensure_ascii=False)[:200]}"
+            f"- {t['name']}: {_clip(json.dumps(t['input'], ensure_ascii=False), 500, p.name)}"
             for t in parsed["tool_calls"]
         ]
-        ev += ["### ツール結果（エラーだけ）"]
-        ev += [f"- {str(r['content'])[:300]}" for r in parsed["tool_results"] if r["is_error"]]
+        ev += ["### ツール結果"]
         ev += [
-            "### hook の応答",
-            *[f"- {json.dumps(h, ensure_ascii=False)[:300]}" for h in parsed["hook_events"]],
+            f"- {'エラー' if r['is_error'] else '成功'}: "
+            f"{_clip(_text_of(r['content']), EVIDENCE_LIMIT, p.name)}"
+            for r in parsed["tool_results"]
         ]
-        ev += ["### 最後の報告", parsed["final_text"][:1500]]
+        hook_lines, omitted = summarize_hooks(parsed["hook_events"], p.name)
+        ev += ["### hook の応答（拒否・確認・案内文・Stop だけ）", *hook_lines]
+        if omitted:
+            counts = "、".join(f"{k} {v} 件" for k, v in sorted(omitted.items()))
+            ev.append(f"- 省いた応答: {counts}（全量は {p.name}）")
+        ev += ["### 最後の報告", _clip(parsed["final_text"], 3000, p.name)]
     ev += ["", "## ccnavi の判定の記録（このセッションの行）"]
     for r in rows:
         head = " ".join(str(r.get(k, "")) for k in ("event", "tool", "decision", "code", "rules"))
-        ev.append(f"- {head} {str(r.get('subject', ''))[:100]}")
+        ev.append(f"- {head} {_clip(r.get('subject', ''), 500, 'logs/decisions.jsonl')}")
     (out / "evidence.md").write_text("\n".join(ev) + "\n", encoding="utf-8")
 
 

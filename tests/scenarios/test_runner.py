@@ -77,6 +77,12 @@ class CheckDecisionTest(unittest.TestCase):
         self.assertEqual(runner.check_decision_none(rows, cond)[0], runner.FAIL)
         self.assertEqual(runner.check_decision_none([], cond)[0], runner.PASS)
 
+    def test_decisions_none_subject_is_clipped_with_notice(self):
+        rows = [rec(decision="deny", tool="Edit", subject="s" * 300)]
+        v, why = runner.check_decision_none(rows, {"tool": "Edit", "decision": "deny"})
+        self.assertEqual(v, runner.FAIL)
+        self.assertIn("全 300 文字のうち先頭 200 文字。全量は logs/decisions.jsonl", why)
+
 
 class ReadDecisionsTest(unittest.TestCase):
     def test_only_the_given_sessions_are_read(self):
@@ -220,6 +226,160 @@ class ScenarioFilesTest(unittest.TestCase):
                     )
                     if step.get("human"):
                         self.assertTrue(step.get("instruction"))
+
+
+class EvidenceTest(unittest.TestCase):
+    def _hook(self, event, name, stdout="", stderr=""):
+        return {
+            "type": "system",
+            "subtype": "hook_response",
+            "hook_event": event,
+            "hook_name": name,
+            "stdout": stdout,
+            "stderr": stderr,
+        }
+
+    def _write(self, events, results=None):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        out = Path(tmp.name)
+        (out / "step-1.jsonl").write_text(
+            "\n".join(json.dumps(e, ensure_ascii=False) for e in events) + "\n", encoding="utf-8"
+        )
+        scn = {"id": "UC-99", "title": "t", "expect": {"judge": ["基準A"]}}
+        st = {"cost_usd": 0.0}
+        results = results or [("files_unchanged", "README.md", runner.PASS, "変わっていない")]
+        runner.write_report(scn, out, st, results, [], "")
+        return (out / "evidence.md").read_text(encoding="utf-8")
+
+    def test_deny_reason_is_not_clipped(self):
+        reason = "拒否の理由" * 300
+        payload = {
+            "hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": reason}
+        }
+        text = self._write(
+            [self._hook("PreToolUse", "guard", json.dumps(payload, ensure_ascii=False))]
+        )
+        self.assertIn(reason, text)
+
+    def test_session_start_and_empty_hooks_are_only_counted(self):
+        payload = {"hookSpecificOutput": {"additionalContext": "長い前置き" * 50}}
+        text = self._write(
+            [
+                self._hook("SessionStart", "start", json.dumps(payload, ensure_ascii=False)),
+                self._hook("SessionStart", "start2"),
+                self._hook("PostToolUse", "empty"),
+            ]
+        )
+        self.assertNotIn("長い前置き", text)
+        self.assertIn("PostToolUse 1 件", text)
+        self.assertIn("SessionStart 2 件", text)
+
+    def test_additional_context_and_stop_are_kept(self):
+        ctx = {"hookSpecificOutput": {"additionalContext": "git の入口は…"}}
+        text = self._write(
+            [
+                self._hook("PreToolUse", "guide", json.dumps(ctx, ensure_ascii=False)),
+                self._hook("Stop", "stop", stdout="止める理由"),
+            ]
+        )
+        self.assertIn("案内: git の入口は…", text)
+        self.assertIn("止める理由", text)
+
+    def test_long_context_says_it_was_clipped(self):
+        ctx = {"hookSpecificOutput": {"additionalContext": "あ" * 5000}}
+        text = self._write([self._hook("PreToolUse", "guide", json.dumps(ctx, ensure_ascii=False))])
+        self.assertIn("全 5000 文字のうち先頭 2000 文字。全量は step-1.jsonl", text)
+
+    def test_tool_results_include_success_and_machine_results_come_first(self):
+        events = [
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {"type": "tool_result", "is_error": False, "content": "working tree clean"}
+                    ]
+                },
+            }
+        ]
+        text = self._write(events)
+        self.assertIn("- 成功: working tree clean", text)
+        self.assertLess(text.index("## 機械判定の結果"), text.index("judge の基準"))
+        self.assertIn("| files_unchanged | README.md | ", text)
+
+    def test_machine_result_table_in_evidence_is_not_clipped(self):
+        why = "理由" * 100
+        text = self._write([], results=[("state", "ls", runner.FAIL, why)])
+        self.assertIn(why, text)
+
+    def test_decision_subject_clipped_with_notice(self):
+        # write_report の rows 引数を使うため、直接呼ぶ
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            scn = {"id": "UC-99", "title": "t", "expect": {}}
+            rows = [
+                {"event": "PreToolUse", "tool": "Bash", "decision": "deny", "subject": "s" * 800}
+            ]
+            runner.write_report(scn, out, {"cost_usd": 0.0}, [], rows, "")
+            text = (out / "evidence.md").read_text(encoding="utf-8")
+        self.assertIn("全 800 文字のうち先頭 500 文字。全量は logs/decisions.jsonl", text)
+
+    def test_nonzero_exit_stderr_is_kept_unclipped(self):
+        ev = self._hook("PreToolUse", "g", stderr="削除は禁止です" * 300)
+        ev["exit_code"] = 2
+        text = self._write([ev])
+        self.assertIn("終了コード 2: " + "削除は禁止です" * 300, text)
+
+    def test_system_message_and_stop_reason_are_kept(self):
+        sysmsg = json.dumps({"systemMessage": "保護領域が変わった"}, ensure_ascii=False)
+        halt = json.dumps({"continue": False, "stopReason": "止めた理由"}, ensure_ascii=False)
+        text = self._write(
+            [self._hook("PostToolUse", "p", sysmsg), self._hook("PreToolUse", "q", halt)]
+        )
+        self.assertIn("通知: 保護領域が変わった", text)
+        self.assertIn("停止: 止めた理由", text)
+
+    def test_session_start_system_message_is_only_counted(self):
+        sysmsg = json.dumps({"systemMessage": "起動の通知"}, ensure_ascii=False)
+        text = self._write([self._hook("SessionStart", "s", sysmsg)])
+        self.assertNotIn("起動の通知", text)
+        self.assertIn("SessionStart 1 件", text)
+
+    def test_result_table_cells_do_not_break_rows(self):
+        why = "出力に「a」が無い: l1\nl2 | l3"
+        text = self._write([], results=[("state", "ls", runner.FAIL, why)])
+        self.assertIn("l1 l2 \\| l3", text)
+
+    def test_non_text_block_in_tool_result_is_marked(self):
+        events = [
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "is_error": False,
+                            "content": [{"type": "image"}, {"type": "text", "text": "本文"}],
+                        }
+                    ]
+                },
+            }
+        ]
+        text = self._write(events)
+        self.assertIn("[image ブロック]", text)
+        self.assertIn("本文", text)
+
+
+class ResultsTableTest(unittest.TestCase):
+    def test_limit_cuts_cells_and_none_does_not(self):
+        results = [("k", "c" * 300, runner.FAIL, "w" * 300)]
+        cut = "\n".join(runner._results_table(results, 100))
+        self.assertIn("c" * 100 + " |", cut)
+        self.assertNotIn("c" * 101, cut)
+        self.assertNotIn("w" * 101, cut)
+        full = "\n".join(runner._results_table(results))
+        self.assertIn("c" * 300, full)
+        self.assertIn("w" * 300, full)
 
 
 if __name__ == "__main__":
