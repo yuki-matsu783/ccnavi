@@ -9,7 +9,7 @@
  * 誤り（空の演算子、中が空の not、空の個別条件、読めなかったノード、深さとノード数の上限）は図の下に並べ、
  * 押すとその点を選ぶ。止めるのは保存前の `--lint` で、ここは見せるだけ。
  */
-import { useMemo, useState, type JSX } from "react";
+import { useEffect, useMemo, useState, type JSX } from "react";
 import { Background, Controls, Handle, Position, ReactFlow, type Edge, type Node, type NodeProps, type NodeTypes } from "@xyflow/react";
 
 import { maximizeClass, MaximizeButton, RefitOnChange, useMaximize } from "../shared/Maximize.js";
@@ -78,6 +78,8 @@ const NODE_TYPES: NodeTypes = { cond: CondNodeView };
 export interface WhenProps {
   readonly tree: CondNode;
   readonly onChange: (next: CondNode) => void;
+  /** 外から選ばせる点（`pathKey`）。案内が見本の点を指すのに使う。変わったときだけ選び直す */
+  readonly pick?: string;
 }
 
 /** 選んだ点の親（`empty` の点は親の not に効かせる）と、その点そのもの */
@@ -98,8 +100,13 @@ function targetOf(tree: CondNode, key: string): { readonly path: CondPath; reado
   return undefined;
 }
 
-export function When({ tree, onChange }: WhenProps): JSX.Element {
-  const [picked, setPicked] = useState("r");
+export function When({ tree, onChange, pick }: WhenProps): JSX.Element {
+  const [picked, setPicked] = useState(pick ?? "r");
+  useEffect(() => {
+    if (pick !== undefined) {
+      setPicked(pick);
+    }
+  }, [pick]);
   const [maximized, toggleMaximize, maxBox] = useMaximize();
   const layout = useMemo(() => layoutCond(tree), [tree]);
   const problems = useMemo(() => condProblems(tree), [tree]);
@@ -130,7 +137,7 @@ export function When({ tree, onChange }: WhenProps): JSX.Element {
 
   return (
     <div className="cond" data-nodes={layout.places.length}>
-      <div ref={maxBox} className={`cond-canvas ${maximizeClass(maximized)}`}>
+      <div ref={maxBox} data-tour="when-graph" className={`cond-canvas ${maximizeClass(maximized)}`}>
         <ReactFlow<CondFlowNode, Edge>
           // 組み合わせ条件の形が変わったら置き直して全体を映す（点の数で見分ける）
           key={layout.places.length}
@@ -208,11 +215,11 @@ function Inspector({
   if (node === null) {
     // 中が空の not の穴
     const parent = path.slice(0, -1);
-    return <div className="cond-inspector" data-key={pathKey(path)}>{adders(parent, 0)}</div>;
+    return <div className="cond-inspector" data-tour="when-inspector" data-key={pathKey(path)}>{adders(parent, 0)}</div>;
   }
 
   return (
-    <div className="cond-inspector" data-key={pathKey(path)} data-op={node.op}>
+    <div className="cond-inspector" data-tour="when-inspector" data-key={pathKey(path)} data-op={node.op}>
       {(node.op === "glob" || node.op === "regex") && (
         <span className="inline">
           <select className="f-cond-op" value={node.op} onChange={(event) => edit(changeOp(tree, path, event.target.value as "glob" | "regex"))}>

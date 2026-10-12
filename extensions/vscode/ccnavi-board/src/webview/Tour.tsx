@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
 
+import { INTRO_ID, type Scene, type TourDef } from "../core/tour-def.js";
 import { placeBubble, type Rect } from "../core/tour-place.js";
 
 export interface TourStep {
@@ -37,11 +38,39 @@ export interface TourCourse {
   readonly title: string;
   /** メニューに出す 1 行の説明（何ができるようになる案内か） */
   readonly summary: string;
-  readonly steps: readonly TourStep[]
+  readonly steps: readonly TourStep[];
 }
 
 /** 基本の案内の鍵。初回に自動で出る案内で、メニューの先頭に出る */
-export const INTRO_COURSE = "intro";
+export const INTRO_COURSE = INTRO_ID;
+
+/** 指す先の印の選択子。`target` が空の段は、どこにも当たらない選択子にして吹き出しを中ほどに出す */
+export function targetSelector(target: string): string {
+  return target === "" ? "[data-tour-none]" : `[data-tour="${target}"]`;
+}
+
+/**
+ * 定義（YAML）から案内の一覧を作る。段の下ごしらえは、その段の `scene` を画面の `apply` に渡すこと。
+ * 画面は `apply` で「見本の上の様子」（開く行・タブ・選ぶ点）を state に入れ、見本を描く。
+ */
+export function coursesOf(def: TourDef, apply: (scene: Scene) => void): readonly TourCourse[] {
+  return def.courses.map((course) => ({
+    id: course.id,
+    title: course.title,
+    summary: course.summary,
+    steps: course.steps.map((step) => ({
+      target: targetSelector(step.target),
+      title: step.title,
+      body: step.body,
+      before: () => apply(step.scene),
+    })),
+  }));
+}
+
+/** 鍵で案内を引く。無ければ先頭（基本の案内） */
+export function courseOf(courses: readonly TourCourse[], id: string | undefined): TourCourse {
+  return courses.find((course) => course.id === id) ?? courses[0];
+}
 
 type Spot = Rect;
 
@@ -125,6 +154,7 @@ export function TourButton({ courses, onPick }: { readonly courses: readonly Tou
         type="button"
         className="tour-button"
         data-action="tour"
+        data-tour="tour"
         title="案内を選ぶ"
         aria-label="案内を選ぶ"
         aria-haspopup={courses.length > 1 ? "menu" : undefined}
