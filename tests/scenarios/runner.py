@@ -492,17 +492,18 @@ def hook_denial_texts(hook_events):
         spec = spec if isinstance(spec, dict) else {}
         decision = spec.get("permissionDecision") or data.get("decision")
         reason = spec.get("permissionDecisionReason") or data.get("reason")
-        if decision in ("deny", "ask", "block") and reason:
-            texts.append(str(reason).strip())
+        text = str(reason).strip() if reason else ""
+        if decision in ("deny", "ask", "block") and text:
+            texts.append(text)
     return texts
 
 
 def _duplicates_hook(text, denial_texts):
-    """エラーの文面が、hook の拒否理由と同じ文を含む（または含まれる）なら True。"""
+    """エラーの文面が、hook の拒否理由と（前後の空白を除いて）まったく同じなら True。"""
     text = text.strip()
     if not text:
         return False
-    return any(d in text or text in d for d in denial_texts)
+    return text in denial_texts
 
 
 def _step_decisions_table(rows, step_sessions):
@@ -517,7 +518,9 @@ def _step_decisions_table(rows, step_sessions):
         rules = r.get("rules", "")
         if isinstance(rules, list):
             rules = ",".join(str(x) for x in rules)
-        subject = _clip(r.get("subject", ""), 500, "logs/decisions.jsonl")
+        elif rules is None:
+            rules = ""
+        subject = _clip(r.get("subject") or "", 500, "logs/decisions.jsonl")
         cells = [
             step,
             r.get("event", ""),

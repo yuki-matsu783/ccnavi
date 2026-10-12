@@ -440,6 +440,71 @@ class EvidenceTest(unittest.TestCase):
         self.assertIn("hook の応答を参照", text)
         self.assertEqual(text.count("DENY_PATH 本文"), 1)
 
+    def test_short_error_contained_in_hook_reason_is_not_collapsed(self):
+        payload = {
+            "hookSpecificOutput": {
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "ファイル /a/b.txt への書き込みは禁止です",
+            }
+        }
+        events = [
+            self._hook("PreToolUse", "guard", json.dumps(payload, ensure_ascii=False)),
+            {
+                "type": "user",
+                "message": {
+                    "content": [{"type": "tool_result", "is_error": True, "content": "禁止"}]
+                },
+            },
+        ]
+        text = self._write(events)
+        self.assertNotIn("hook の応答を参照", text)
+        self.assertIn("### ツール結果（エラー）\n- 禁止", text)
+
+    def test_error_with_extra_text_after_hook_reason_is_kept(self):
+        payload = {
+            "hookSpecificOutput": {
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "DENY本文",
+            }
+        }
+        events = [
+            self._hook("PreToolUse", "guard", json.dumps(payload, ensure_ascii=False)),
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "is_error": True,
+                            "content": "DENY本文\n別の原因 exit 1",
+                        }
+                    ]
+                },
+            },
+        ]
+        text = self._write(events)
+        self.assertIn("別の原因 exit 1", text)
+        self.assertNotIn("hook の応答を参照", text)
+
+    def test_whitespace_only_hook_reason_does_not_collapse_errors(self):
+        payload = {
+            "hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "  "}
+        }
+        events = [
+            self._hook("PreToolUse", "guard", json.dumps(payload, ensure_ascii=False)),
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {"type": "tool_result", "is_error": True, "content": "全然別のエラー"}
+                    ]
+                },
+            },
+        ]
+        text = self._write(events)
+        self.assertIn("- 全然別のエラー", text)
+        self.assertNotIn("hook の応答を参照", text)
+
     def test_success_and_error_are_under_separate_headings(self):
         events = [
             {
