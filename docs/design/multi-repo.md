@@ -15,7 +15,7 @@ keywords: [複数のリポジトリ, ワークスペース, プロジェクト, 
 Claude Code はワークスペースを開く。要求は [要件 REQ-MLT](../requirements/multi-repo.md)。
 
 - 道具はワークスペース、設定はプロジェクト、git はツリーごと
-- ルールとリスクの配点は「共通レイヤー + そのツリーのレイヤー」の和で判定する。足すだけで上書きは無く、厳しいほうを採る。フェーズ定義は足し算をせず、config にだけ置き、親の `project:` が指す 1 本で決まる（11.4）
+- ルールとリスクの配点は「共通レイヤー + そのツリーのレイヤー」の和で判定する。足すだけで上書きは無く、厳しいほうを採る。フェーズ定義も「共通レイヤー + 親の `project:` が指すレイヤー」の和で、同 `id` で中身が違う定義と `title` の重なりは error（11.4）
 - 共通と config はどちらか片方だけでも、両方無くても動く。ファイルが無いのは「設定が無い」正常で、不正なときだけ不備として出す（11.2）
 - パスを持つツールは共通レイヤー + 行き先の 1 レイヤー、パスを持たないツールは共通レイヤー + 全部のレイヤー（11.4）
 - チケットのプロジェクトは提案を置いた場所で決まり、判定はその値を見ない
@@ -36,7 +36,7 @@ Claude Code はワークスペースを開く。要求は [要件 REQ-MLT](../re
 |---|---|---|
 | 11.2 | [multi-repo/places.md](multi-repo/places.md) | ワークスペースとプロジェクトで何をどこに置くか |
 | 11.3 | [multi-repo/trees.md](multi-repo/trees.md) | 3 種のツリーと所属の決め方 |
-| 11.4 | [multi-repo/rules.md](multi-repo/rules.md) | ルールとリスクの配点は共通レイヤーとツリーのレイヤーの和、フェーズ定義は親の `project:` が指す config の 1 本 |
+| 11.4 | [multi-repo/rules.md](multi-repo/rules.md) | ルールとリスクの配点は共通レイヤーとツリーのレイヤーの和、フェーズ定義は共通レイヤーと親の `project:` が指すレイヤーの和 |
 | 11.5 | [multi-repo/tickets.md](multi-repo/tickets.md) | チケットのプロジェクトは提案を置いた場所で決まる |
 | 11.6 | [multi-repo/protection.md](multi-repo/protection.md) | 複数リポジトリでのコアファイル |
 | 11.7 | [multi-repo/post-check.md](multi-repo/post-check.md) | ツリーごとの実行後チェック |

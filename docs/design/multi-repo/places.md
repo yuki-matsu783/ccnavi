@@ -1,7 +1,7 @@
 ---
 type: design
 title: 11.2 置き場
-description: ワークスペースとプロジェクトで何をどこに置くか。ルールとリスクは common と config の両方、フェーズ定義は config だけ。ファイルが無いのは設定が無い正常
+description: ワークスペースとプロジェクトで何をどこに置くか。ルールとリスクとフェーズ定義は common と config の両方。ファイルが無いのは設定が無い正常
 tags: [design-doc, projects]
 keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config/project, .ccnavi/config/common, ミラー, 単体 clone, 無い = 空]
 ---
@@ -13,8 +13,7 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config/
 | 何 | 場所 | git |
 |---|---|---|
 | hook の登録、実行ファイル、保護済みスクリプト、スキル、CLAUDE.md | ワークスペースルート | ワークスペース |
-| 共通レイヤーのルール / リスクの配点 | `.ccnavi/config/common/{rules,risks}.yml`（置き場は固定） | ワークスペース |
-| 共通レイヤーのフェーズ定義 | 置けない。`.ccnavi/config/common/phases.yml` があれば error（11.4.1） | |
+| 共通レイヤーのルール / フェーズ定義 / リスクの配点 | `.ccnavi/config/common/{rules,phases,risks}.yml`（置き場は固定） | ワークスペース |
 | ルールの期待する判定 | `.ccnavi/config/common/rule-expectations.yml` | ワークスペース |
 | 共通レイヤーのミラー | `projects/<名前>/.ccnavi/config/common/`（親の着手でワークスペースルートの `.ccnavi/config/common/` から配る。11.12。誰も編集しない） | プロジェクト |
 | ワークスペース自身のレイヤーの 3 本 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml` | ワークスペース |
@@ -35,12 +34,12 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config/
 共通レイヤーの置き場は固定。別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけで、
 それも診断（`--lint` / `--test` / `--test-expectations` / `--explain`）に限る。レイヤーを探す先を動かす `--projects` / `--project-home` も同じ。
 自身のレイヤーとプロジェクトのレイヤーはそのツリーにだけ適用され、どちらも git プロジェクトルートの下の `.ccnavi/config/project/` に置く。
-ワークスペース自身にレイヤーを分けるのは、ワークスペースのフェーズ定義（`scope: ["src/*", ...]`）がそのレイアウトにしか合わないから。
+ワークスペース自身にレイヤーを分けるのは、ワークスペースのフェーズ定義の一部（`scope` に `build.py` や `extensions/*` を持つものなど）がそのレイアウトにしか合わないから。
 
 **何をどこに置けるか。** ルールとリスクの配点は、共通（`.ccnavi/config/common/`）と config（ワークスペース自身かプロジェクトの `.ccnavi/config/project/`）の
-両方に置け、効くのは和（合成は 11.4）。フェーズ定義（`phases.yml`）は config だけに置き、共通には置けない。
-ワークスペースのフェーズ定義は自身のレイヤー `<ワークスペースルート>/.ccnavi/config/project/phases.yml` に置き、プロジェクトのフェーズ定義は
-そのプロジェクトの `.ccnavi/config/project/phases.yml` に置く。どのフェーズ定義を使うかは親の `project:` が決める（11.4.1）。
+両方に置け、効くのは和（合成は 11.4）。フェーズ定義（`phases.yml`）も同じで、どのプロジェクトでも同じ構成を前提にできる定義は共通に、
+レイアウトに依存する定義はワークスペース自身のレイヤー `<ワークスペースルート>/.ccnavi/config/project/phases.yml` か、
+そのプロジェクトの `.ccnavi/config/project/phases.yml` に置く。共通に足すレイヤーは親の `project:` が決める（11.4.1）。
 導入スクリプトのひな形は、共通レイヤーにルールと配点、自身のレイヤーにフェーズ定義を置く（11.9）。
 自身のレイヤーの `.ccnavi/config/project/` もユーザの持ち物で、エージェントの Write / Edit は通らない（チケットの `allow` に `.ccnavi/*` があっても組み込みの deny が優先される）。
 

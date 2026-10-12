@@ -15,7 +15,7 @@ keywords: [コアファイル, 保護, 共通レイヤー, ミラー, プロジ�
 | 対象 | 場所 |
 |---|---|
 | hook の登録 | `.claude/settings.json`、`.claude/settings.local.json` |
-| 共通レイヤーのファイル | `<root>/.ccnavi/config/common/{rules,phases,risks}.yml`（`phases.yml` は置けない（11.4.1）が、置かれても守る） |
+| 共通レイヤーのファイル | `<root>/.ccnavi/config/common/{rules,phases,risks}.yml` |
 | 共通レイヤーのミラー | `projects/<名前>/.ccnavi/config/common/{rules,phases,risks}.yml`（11.12。単体 clone では共通レイヤーとして読まれる） |
 | 自身のレイヤーの 3 本 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml` |
 | プロジェクトのレイヤーの 3 本 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` |
