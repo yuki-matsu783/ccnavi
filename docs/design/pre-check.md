@@ -201,7 +201,7 @@ Bash のコマンドに現れるパスは対象外で、コマンド文字列と
 1 行にまとめ、200 字で切る。
 
 ```
-[ccnavi] DENY_COMMAND_PATTERN (rule: builtin-guard-setting-files)
+[ccnavi] DENY_COMMAND_PATTERN (rule: builtin:guard-setting-files)
 subject: env rm -f .ccnavi/config/common/rules.yml
 `env` が実行する `rm -f .ccnavi/config/common/rules.yml` に当たりました。
 ガード自身の設定と hook を、…
@@ -209,7 +209,7 @@ subject: env rm -f .ccnavi/config/common/rules.yml
 
 - 層で当たった件には、読めなかった断り（6.3 の縮退）を付けない
 - `deny` のコードは、当たったルールが全部層で当たったなら、縮退していても `DENY_COMMAND_PATTERN`。1 本でも元の形で当たり、
-  縮退していれば `PARSE_UNCERTAIN`。ただし承認のルール（`builtin-guard-ticket-approval`）が当たった件に入っていれば、
+  縮退していれば `PARSE_UNCERTAIN`。ただし承認のルール（`builtin:guard-ticket-approval`）が当たった件に入っていれば、
   どこで当たったか・縮退しているかに依らず `DENY_TICKET_APPROVAL_CLI` を優先する（元の形が縮退していれば読めなかった
   断りは付く）。`PARSE_UNCERTAIN` の件数で数える集計とはずれる。`ask` は `RULE_ASK` のまま。生の文字列の `>` が上限（50 個）を超えて組み込みの保護を当てずに止めた回は `DENY_REDIRECT_LIMIT`。ルールの `deny` に当たっていれば、そのルールのコードのまま
 - 記録の欄 `unwrapped` には、当たった層だけを `\x00` でつないで残す（同じ層は 1 回）。元の形で当たったルールの分は空。
@@ -243,7 +243,7 @@ subject: env rm -f .ccnavi/config/common/rules.yml
 文面: 層と同じ 1 行を足す（`reasons.ran_by`）。記録の `unwrapped` には当たった層が残るが、実行役のコマンドの層と同じ欄なので区別は付かない。
 
 ```
-[ccnavi] DENY_COMMAND_PATTERN (rule: builtin-guard-setting-files)
+[ccnavi] DENY_COMMAND_PATTERN (rule: builtin:guard-setting-files)
 subject: cd .claude && echo x > settings.json
 `cd` で移った先から見ると `echo .claude/x > .claude/settings.json` で、そこに当たりました。
 ガード自身の設定と hook を、…
@@ -319,6 +319,9 @@ ccnavi は判定を返さず、Claude Code の権限モードに従う（REQ-PRE
 | 記録を読めなかった | 届ける側を採り、書き戻さない（数えを 0 で上書きしない）。一時的に開けないだけなら `fsio.read_json` が数回打ち直す |
 
 記録は一時ファイルに書いてから差し替える。
+
+`additionalContextOnce` の文を渡した呼び出しには、判定の記録に `hinted: true` を付ける（付録 B）。2 回目以降と、毎回渡す文だけの呼び出しには付けない。
+`PreToolUse` のルールの文だけが対象で、チケットの提案の助言とプロジェクトのスキルの目録には付けない。
 
 #### 渡す回
 

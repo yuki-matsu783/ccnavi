@@ -554,9 +554,10 @@ def family_check(
     fams = syncstate.Families(conf, root)
     project = None if repo is None else syncstate.project_of_key(repo)
     st = fams.standing_any(family, project)
-    copies, _ = approval.scan(conf, root)
-    closed, _ = approval.scan(conf, root, closed=True)
-    review, _ = approval.scan_review(conf, root)
+    raw = approval.read_raw(conf, root)
+    copies, _ = approval.scan(conf, root, raw=raw)
+    closed, _ = approval.scan(conf, root, closed=True, raw=raw)
+    review, _ = approval.scan_review(conf, root, raw=raw)
 
     def ours(t: ticket_model.Ticket) -> bool:
         return (t.parent or t.ticket) == family and syncstate.repo_key(t.project) == st.repo

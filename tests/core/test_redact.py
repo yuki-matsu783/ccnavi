@@ -330,7 +330,7 @@ class RecordTest(unittest.TestCase):
         self.assertIn("no-this-token", proc.stdout + proc.stderr)
         (line,) = self._lines()
         self.assertEqual(line["decision"], "deny")
-        self.assertEqual(line["rules"], ["no-this-token"])
+        self.assertEqual(line["rules"], [".ccnavi/config/common/rules.yml:no-this-token"])
         self.assertNotIn(LONG, line["subject"])
 
     def test_redact_failure_writes_no_plain_text(self):

@@ -53,7 +53,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 `no-turn-baseline`。
 
 組み込みの判定で止めた文は、先頭の行に理由コードと記録の `rules` と同じ識別子を
-`[ccnavi] <コード> (builtin rule: <識別子>)` の形で並べる（`builtin-script-env` など）。
+`[ccnavi] <コード> (組み込みのルール: <識別子>)` の形で並べる（`builtin:script-env` など）。
 
 ユーザの操作（レビュー済み・承認の取り下げ）が通らなかった答えは、`CORE_*` のコードを答えの `code` に持ち、
 文面の行にも `[<コード>]` の形で載せる（`ccnavi: ` で始まる行はその後ろ）。取り下げで理由が幾つもあるときは、
@@ -69,20 +69,20 @@ JSON も、同じコードを鍵 `code` に持つ（通れば `null`。`stopped`
 
 | 名前 | 理由コード |
 |---|---|
-| `(ticket-scope)` | `DENY_TICKET_SCOPE` / `TICKET_ASK`、実行後チェックと `SubagentStop` の `POST_TICKET_SCOPE` |
-| `(ticket-blocked)` | `DENY_TICKET_BLOCKED` |
-| `(ticket-project)` | `DENY_TICKET_PROJECT_MISMATCH` |
-| `(ticket-flow-lock)` | `DENY_TICKET_FLOW_LOCKED` |
-| `(phase-review)` | `DENY_PHASE_REVIEW` |
-| `(subagent-ticket-op)` | `DENY_SUBAGENT_TICKET_OP` |
-| `(redirect-limit)` | `DENY_REDIRECT_LIMIT` |
+| `builtin:ticket-scope` | `DENY_TICKET_SCOPE` / `TICKET_ASK`、実行後チェックと `SubagentStop` の `POST_TICKET_SCOPE` |
+| `builtin:ticket-blocked` | `DENY_TICKET_BLOCKED` |
+| `builtin:ticket-project` | `DENY_TICKET_PROJECT_MISMATCH` |
+| `builtin:ticket-flow-lock` | `DENY_TICKET_FLOW_LOCKED` |
+| `builtin:phase-review` | `DENY_PHASE_REVIEW` |
+| `builtin:subagent-ticket-op` | `DENY_SUBAGENT_TICKET_OP` |
+| `builtin:redirect-limit` | `DENY_REDIRECT_LIMIT` |
 
 ## 付録 B. 記録の 1 行
 
 `ts`（ISO 8601、ローカルのオフセット付き）、`mode`、`permission_mode`、`event`、`tool`、`subject`
 （秘密の形を伏せ（4.7）、1000 字で切り `…(+N)`）、`decision`、`enforced`、`code`、`reason`、`degraded`、`unwrapped`（当たった中で実行されるコマンド。
 `\x00` でつなぎ、1000 字で切る。6.3.1）、`fallback`、`detail`、
-`tree`、`project`、`source`、`rules[]`、`quoted[]`、`paths[]`、`guarded[]`、`session`、`ms` の 23 欄。空欄は省く。
+`tree`、`project`、`source`、`hinted`（この呼び出しで `additionalContextOnce` の案内を渡した回だけ true。6.6）、`rules[]`、`quoted[]`、`paths[]`、`guarded[]`、`session`、`ms` の 24 欄。空欄は省く。
 `ts` / `mode` / `decision` / `enforced` / `ms` は常に出る。`O_APPEND` で 1 行を 1 回の write で書く。
 
 `Stop` の 1 行は、ターンの終わりの報告（7.4）と促し（`NUDGE_*`）が重なると、止めた促しの `decision`・`code`・`rules` になる。

@@ -1126,7 +1126,7 @@ class JudgmentUnchangedTest(Drafts):
                 result = self.write_to(self.draft_path("x"), tool, agent_id)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertNotEqual(self.decision(result), "deny", (tool, agent_id, result.stdout))
-                self.assertNotIn("builtin-guard", result.stdout)
+                self.assertNotIn("builtin:guard", result.stdout)
 
     def test_the_shell_may_write_the_draft_place_too(self):
         payload = {
@@ -1149,7 +1149,7 @@ class JudgmentUnchangedTest(Drafts):
             path = os.path.join(self.parent_tree, *rel.split("/"))
             result = self.write_to(path)
             self.assertEqual(self.decision(result), "deny", (rel, result.stdout))
-            self.assertIn("builtin-guard", result.stdout)
+            self.assertIn("builtin:guard", result.stdout)
 
     def test_the_draft_place_is_not_part_of_the_post_check(self):
         write(self.draft_path("x"), "name: x\n")

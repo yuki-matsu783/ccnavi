@@ -99,7 +99,7 @@ deny:
   # （.env.example / .env.sample / .env.template。値を持たない）。除くのは名前で終わる形だけで、
   # `.env.example.bak` も、末尾に改行を足した形も除かない（`$` は改行の直前にも当たるので `\Z`）。
   # 例外は .env の個別条件にだけ掛ける。組み合わせ条件全体に掛けると `secrets/.env.example` や `.aws/.env.example`
-  # のように他の個別条件に当たるパスまで外れ、組み込みの builtin-deny-credentials が見ない NotebookEdit では
+  # のように他の個別条件に当たるパスまで外れ、組み込みの builtin:credentials が見ない NotebookEdit では
   # そのまま素通りする。個別条件は上の credentials の regex を意味ごとに分けたもの。
   - id: credentials-files
     match: Read|Write|Edit|NotebookEdit

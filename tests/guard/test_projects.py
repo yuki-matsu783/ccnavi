@@ -251,12 +251,12 @@ class ProjectsTest(unittest.TestCase):
     def test_writes_are_judged_by_the_rules_of_the_project_they_land_in(self):
         denied = self.hook("Write", self.ws, file_path=os.path.join(self.app, "schema", "x.sql"))
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
-        self.assertIn("app:schema", self.reason(denied))
+        self.assertIn("projects/app/.ccnavi/config/project/rules.yml:schema", self.reason(denied))
         self.assertIn("write a migration", self.reason(denied))
         record = self.last_record()
         self.assertEqual(record["project"], "app")
         self.assertEqual(record["tree"], "app")
-        self.assertEqual(record["rules"], ["app:schema"])
+        self.assertEqual(record["rules"], ["projects/app/.ccnavi/config/project/rules.yml:schema"])
 
         # lib に schema の deny は無い。app の deny は lib には当たらない。
         passed = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "schema", "x.sql"))
@@ -273,7 +273,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(allowed.returncode, 0, allowed.stderr)
         record = self.last_record()
         self.assertEqual(record["decision"], "allow")
-        self.assertEqual(record["rules"], ["ws-src"])
+        self.assertEqual(record["rules"], [".ccnavi/config/common/rules.yml:ws-src"])
         self.assertNotIn("project", record)
 
         # ワークスペースの schema/ は誰も守っていない。app の deny は当たらない。
@@ -287,7 +287,9 @@ class ProjectsTest(unittest.TestCase):
         for cwd in (self.ws, self.app, self.lib):
             denied = self.hook("Bash", cwd, command="psql -c 'select 1'")
             self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
-            self.assertIn("lib:raw-psql", self.reason(denied))
+            self.assertIn(
+                "projects/lib/.ccnavi/config/project/rules.yml:raw-psql", self.reason(denied)
+            )
             denied = self.hook("Bash", cwd, command="rm -rf build")
             self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
             self.assertIn("ws-rm", self.reason(denied))
@@ -296,7 +298,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(allowed.returncode, 0, allowed.stderr)
         record = self.last_record()
         self.assertEqual(record["decision"], "allow")
-        self.assertEqual(record["rules"], ["app:npm"])
+        self.assertEqual(record["rules"], ["projects/app/.ccnavi/config/project/rules.yml:npm"])
         self.assertEqual(record["project"], "lib")
 
     # ---- 3. 読めないプロジェクトのルール
@@ -323,7 +325,7 @@ class ProjectsTest(unittest.TestCase):
 
         denied = self.hook("Bash", self.app, command="psql")
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
-        self.assertIn("lib:raw-psql", self.reason(denied))
+        self.assertIn("projects/lib/.ccnavi/config/project/rules.yml:raw-psql", self.reason(denied))
         record = self.last_record()
         self.assertEqual(record.get("fallback"), "app", record)
         self.assertIn("unreadable layer: app", record["detail"])
@@ -334,7 +336,7 @@ class ProjectsTest(unittest.TestCase):
         tree = self.worktree(self.app, "i0007")
         denied = self.hook("Write", self.ws, file_path=os.path.join(tree, "schema", "x.sql"))
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
-        self.assertIn("app:schema", self.reason(denied))
+        self.assertIn("projects/app/.ccnavi/config/project/rules.yml:schema", self.reason(denied))
         record = self.last_record()
         self.assertEqual(record["tree"], "i0007")
         self.assertEqual(record["project"], "app")
@@ -360,8 +362,8 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("'lib'", self.reason(denied))
         self.assertIn("'app'", self.reason(denied))
         self.assertEqual(self.last_record()["code"], "DENY_TICKET_PROJECT_MISMATCH")
-        # 範囲の判定ではないので、記録の名前は (ticket-scope) を使い回さない。
-        self.assertEqual(self.last_record()["rules"], ["(ticket-project)"])
+        # 範囲の判定ではないので、記録の名前は builtin:ticket-scope を使い回さない。
+        self.assertEqual(self.last_record()["rules"], ["builtin:ticket-project"])
 
         right = self.worktree(self.lib, "i0008")
         allowed = self.hook("Write", self.ws, file_path=os.path.join(right, "src", "a.py"))
@@ -600,11 +602,11 @@ class ProjectsTest(unittest.TestCase):
         after = self.hook("Bash", self.app, event="PostToolUse", command="python gen.py")
         self.assertEqual(after.returncode, 2, after.stdout + after.stderr)
         self.assertIn("POST_VIOLATION", after.stderr)
-        self.assertIn("app:schema", after.stderr)
+        self.assertIn("projects/app/.ccnavi/config/project/rules.yml:schema", after.stderr)
         self.assertIn("tree: app", after.stderr)
         record = self.last_record()
         self.assertEqual(record["project"], "app")
-        self.assertEqual(record["rules"], ["app:schema"])
+        self.assertEqual(record["rules"], ["projects/app/.ccnavi/config/project/rules.yml:schema"])
 
         # ターンの終わりは全部のツリーを見て、ツリーの名前をつけてユーザに言う。
         stopped = self.hook("", self.ws, event="Stop")
@@ -671,12 +673,12 @@ class ProjectsTest(unittest.TestCase):
             "Write", self.ws, env=env, file_path=os.path.join(self.app, "schema", "x.sql")
         )
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
-        self.assertIn("app:schema", self.reason(denied))
+        self.assertIn("projects/app/.ccnavi/config/project/rules.yml:schema", self.reason(denied))
         self.assertEqual(self.last_record()["project"], "app")
 
         denied = self.hook("Bash", self.ws, env=env, command="psql -c 'select 1'")
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
-        self.assertIn("lib:raw-psql", self.reason(denied))
+        self.assertIn("projects/lib/.ccnavi/config/project/rules.yml:raw-psql", self.reason(denied))
 
     # ---- 8. --project-rules-file は診断でだけ 1 つのプロジェクトのルールを差し替える
 
@@ -702,7 +704,7 @@ class ProjectsTest(unittest.TestCase):
         body = json.loads(tried.stdout)
         self.assertEqual(body["verdict"], "deny", tried.stdout)
         hit = body["rules"][0]
-        self.assertEqual(hit["id"], "lib:docs")
+        self.assertEqual(hit["id"], "tmp/lib-rules.yml:docs")
         # 当たったルールはプロジェクトの名前付きで引け、翻訳後の式まで見える。
         self.assertEqual(hit["source"], "file")
         self.assertEqual(hit["written"], "*/docs/*")

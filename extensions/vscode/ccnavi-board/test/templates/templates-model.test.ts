@@ -58,7 +58,7 @@ test("CB-T533 捨てた理由を読める。共通の broken は invalid、self 
   assert.equal(common?.dropped, null, "捨てていなければ null");
 });
 
-test("CB-T534 下書きの login は importable・checked_with・exists_in・also_in を型どおり読む", () => {
+test("CB-T558 下書きの login は importable・checked_with・exists_in・also_in を型どおり読む", () => {
   const data = fixture();
   const login = data.drafts.find((draft) => draft.name === "login");
   assert.deepEqual(

@@ -119,12 +119,11 @@ def _preexisting(finding: post_findings.Finding) -> str:
 def _source(source: str, group: list[rules.Rule]) -> str:
     """どの設定がこの場所を守ると言っているかを名指しする。
 
-    実行前の理由（reasons.reason_for）と同じで、示すのはルールの id。プロジェクトの
-    ルールの id にはプロジェクトの名前が付くので、id だけで直しに行く先が決まる。
-    id を持たないルールだけ、代わりにファイルを示す。
+    実行前の理由（reasons.reason_for）と同じで、示すのは記録名（`<相対パス>:<書いた id>`）。
+    どのファイルのどのルールかが名前だけで決まるので、直しに行く先が分かる。
     """
-    named = [rule.id for rule in group if rule.id]
-    return f"rule: {','.join(named)}" if named else f"rules: {source}"
+    named = [rules.record_name(rule) for rule in group]
+    return f"rule: {','.join(named)}"
 
 
 def _messages(group: list[rules.Rule]) -> str:

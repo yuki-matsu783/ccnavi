@@ -101,6 +101,11 @@ class Record:
     # つなぐ。元の形で当たったときは空。元の形だけを見ても、どこが当たったのかは
     # 分からないので残す。数えれば、実行役のコマンド越しに止めた件数も分かる。
     unwrapped: str = ""
+    # hinted は、この呼び出しで `additionalContextOnce` の案内を実際に渡したとき true。
+    # 渡した後の呼び出しと、毎回渡す案内（`additionalContext`）だけの呼び出しでは false で、
+    # 記録の行には書かない。案内がどの呼び出しに付いたかは、hook の応答からは分からない
+    # （tool_use_id も command も入らない）ので、記録に残す。
+    hinted: bool = False
     # fallback は、ルールファイルを読めずに組み込みの既定で判定したことを示す。
     # そのとき判定に使われているのはプロジェクトのルールではないので、記録を数えるときに
     # 混ぜられない。ガードが機能しないまま何回動いたかも、これでしか分からない。
@@ -136,7 +141,7 @@ class Record:
     # 和で増えた拒否がどのレイヤーのものかを、id を全部読むまで言えない。
     source: str = ""
     # hits は判定が当てたルールそのもの（`rules.Rule`）で、`rules` の末尾と同じ順に並ぶ。
-    # `rules` の先頭に足す擬似の id（`(ticket-scope)` など）の分だけ、`rules` のほうが長い。
+    # `rules` の先頭に足す擬似の id（`builtin:ticket-scope` など）の分だけ、`rules` のほうが長い。
     # 読むのは診断（`--test`）だけで、記録の 1 行には書かない（`Log._as_dict` は欄を名指しで
     # 書く）。判定と別の読み方でルールを引き直すと、試験で見せた根拠が判定の根拠と食い違う。
     # 型を `list` に留めるのは、記録の層から判定の層（policy）へ依存を張らないため。
@@ -221,6 +226,8 @@ class Log:
         ):
             if value:
                 out[key] = value
+        if record.hinted:
+            out["hinted"] = True
         if record.rules:
             out["rules"] = record.rules
         if record.quoted:

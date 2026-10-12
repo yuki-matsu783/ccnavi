@@ -51,6 +51,18 @@ _BEFORE_WORD = " \t\r;&|()<>"
 _PLACEHOLDER = "$"
 
 
+def _full_text(source: str, quoted: bool) -> str:
+    """置換の全文を、外側の語の 1 つとして書き戻した形。
+
+    外側が二重引用の中なら、いったん引用を閉じて 1 語として引用し直し、また開く。
+    shlex は二重引用の中の `\\$` と `\\\\` を外さないので、エスケープでは書けない。
+    引用の外では shlex.quote だけで 1 語になる。
+    """
+    if quoted:
+        return '"' + shlex.quote(source) + '"'
+    return shlex.quote(source)
+
+
 def _fold(text: str) -> str:
     """引用の中の `>` と、`<<` の一部でない `<` を身代わりの文字にする。
 
@@ -159,6 +171,8 @@ class _Scanner:
         self.s = src
         self.i = 0
         self.out: list[str] = []
+        # out と同じ位置に、置換を全文で書き戻したものを積む。語の数は out と揃う。
+        self.full: list[str] = []
         self.found: list[tuple[str, bool]] = []
         # 本文を待っているヒアドキュメント: (区切り, 区切りが引用されていたか)
         self.pending: list[tuple[str, bool]] = []
@@ -171,11 +185,14 @@ class _Scanner:
     def emit(self, text: str, collect: bool) -> None:
         if collect:
             self.out.append(text)
+            self.full.append(text)
 
-    def add(self, body: str, quoted: bool, collect: bool) -> None:
+    def add(self, body: str, quoted: bool, collect: bool, source: str) -> None:
+        """置換を 1 つ切り出す。source は置換の原文（`$(` から `)` まで）。"""
         if collect:
             self.found.append((body, quoted))
             self.out.append(_PLACEHOLDER)
+            self.full.append(_full_text(source, quoted))
 
     # --- コマンドの文脈
 
@@ -385,7 +402,7 @@ class _Scanner:
         self.command(collect=False, closing=True)
         body = self.s[start : self.i]
         self.i += 1
-        self.add(body, quoted, collect)
+        self.add(body, quoted, collect, self.s[start - 2 : self.i])
 
     def backquote(self) -> None:
         """バッククォート。中身を読まずに読みを止める。
@@ -546,8 +563,9 @@ class _Scanner:
         self.found.extend((b, True) for b, _ in inner.found)
 
 
-def _scan(src: str) -> tuple[str, list[tuple[str, bool]], int, list[str]]:
-    """走査して、shlex に渡す文字列、切り出した中身、`<<` を読んだ数、ブレース展開を返す。"""
+def _scan(src: str) -> tuple[str, list[tuple[str, bool]], int, list[str], str]:
+    """走査して、shlex に渡す文字列、切り出した中身、`<<` を読んだ数、ブレース展開、
+    置換を全文で書き戻した文字列を返す。後ろの文字列は前の文字列と語の数が揃う。"""
     x = _Scanner(src)
     try:
         x.command(collect=True, closing=False)
@@ -557,7 +575,7 @@ def _scan(src: str) -> tuple[str, list[tuple[str, bool]], int, list[str]]:
     if x.pending:
         # 本文が始まらないまま終わったヒアドキュメント（`cat <<'EOF' > f` だけ）。
         raise _Unreadable(REASON_UNTERMINATED)
-    return "".join(x.out), x.found, x.heads, x.braces
+    return "".join(x.out), x.found, x.heads, x.braces, "".join(x.full)
 
 
 def _tokenize(src: str) -> list[str]:

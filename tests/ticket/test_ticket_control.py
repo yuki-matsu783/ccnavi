@@ -109,7 +109,7 @@ class TicketControlTest(unittest.TestCase):
         result = self.start("--mode", "enable", env={"CCNAVI_TICKET_CONTROL": "off"})
 
         self.assertIn("直接作業", self.context(result))
-        self.assertIn("CCNAVI_TICKET_CONTROL='off' is not a setting", result.stderr)
+        self.assertIn("CCNAVI_TICKET_CONTROL='off' は設定ではありません", result.stderr)
 
     def test_dry_runなら末尾にその旨と次からの従い方が付く(self):
         text = self.context(self.start("--mode", "dry-run"))

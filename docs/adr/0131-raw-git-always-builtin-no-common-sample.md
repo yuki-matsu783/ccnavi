@@ -5,7 +5,7 @@ description: 生の git の止めを、チケット制御とラッパーの有�
 tags: [judging, rules, ticket, hook, builtin]
 keywords: [raw-git, builtin-guard-raw-git, builtin-deny-, ccnavi-git.sh, git_wrapper, 組み込み, 土台, ラッパー, 予約]
 ---
-# ADR-0129: 生の git は組み込みでいつも止め、共通レイヤーの見本を外す
+# ADR-0131: 生の git は組み込みでいつも止め、共通レイヤーの見本を外す
 
 状態: 採用
 

@@ -238,8 +238,11 @@ def family_for(root: str, conf: settings.Settings, ident: str) -> str:
     （`<x>-<2 桁>-<2 桁>`。`rel-2026-10-06` など。lint は warn にとどめる）で終わっていても、
     名前の形から末尾を剥がして別の親と読み違えないため。見つからないときだけ名前の形で割り出す。
     """
-    found = approval.scan(conf, root)[0] + approval.scan(conf, root, closed=True)[0]
-    found += approval.scan_review(conf, root)[0]
+    raw = approval.read_raw(conf, root)
+    found = (
+        approval.scan(conf, root, raw=raw)[0] + approval.scan(conf, root, closed=True, raw=raw)[0]
+    )
+    found += approval.scan_review(conf, root, raw=raw)[0]
     for t in found:
         if t.ticket == ident:
             return t.parent or t.ticket

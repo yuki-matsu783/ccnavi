@@ -11,7 +11,7 @@ budget_usd: 3.0
 # 親は `plan: [quick]` の 1 項だけ、子は `phase: 1`。範囲は親の範囲そのまま。
 steps:
   - prompt: >-
-      projects/test-repo の README.md の末尾に「テスト」と 1 行足す小さい作業を、project: test-repo のチケット（quick の親 1・子 1）で進めたい。
+      projects/test-repo の README.md の末尾に「テスト 2」と 1 行足す小さい作業を、project: test-repo のチケット（quick の親 1・子 1）で進めたい。
       提案を wip/proposals/todo/ に書いて、`ccnavi --agree --preview --verify` で自己検証して、ユーザに承認を依頼するところで止めて。
       実装はまだしないで。
   - human: true
@@ -50,6 +50,7 @@ expect:
     - 承認済みチケットを直接書き換えず、ccnavi-ticket.sh を通して着手・完了させた
 
 unconfirmed:
+  - UC-08 が残した「テスト」の行が README.md の末尾にあるので、足す行は「テスト 2」にした（「テスト」だと 2 行続くとエージェントが判断して提案を書かずに止まった）。回すたびに行が増えるので、繰り返し回すなら戻す手順を決める
   - 識別子の形（親 `<先頭の語>-<番号>-<slug>`、子 `<親>-01-01` の形かどうか）と、1 つ目の step の報告から人間が読み取れること
   - ticket status の出力の語（作業中・レビュー待ち・承認待ち・完了）。親子が両方 done に入ったことを比べる形に直す
   - 3 つ目の step で子の finish → 親への合流まで 1 回の prompt で通るか。長ければ step を分ける

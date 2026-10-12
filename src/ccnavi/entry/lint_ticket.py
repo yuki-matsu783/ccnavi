@@ -278,7 +278,7 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
     """承認済みチケットの置き場が守られているか。
 
     置き場は ccnavi ディレクトリ（`.ccnavi/`）の下にあり、守るのは組み込みの 1 本
-    （`builtin-guard-project-home`）。ルールファイルには書かせない（書かせると消せる）。
+    （`builtin:guard-project-home`）。ルールファイルには書かせない（書かせると消せる）。
     ここで見るのは、置き場が本当に ccnavi ディレクトリの下にあるか。外に向けると、
     その 1 本が当たらず、エージェントが承認済みチケットを書けて承認の意味が無くなる。
 

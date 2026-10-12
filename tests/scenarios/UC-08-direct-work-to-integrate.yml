@@ -2,7 +2,7 @@ id: UC-08
 title: 直接作業の正常な流れ（ワークツリー → 編集 → コミット → 統合先へ取り込み → 片付け）
 layer: 2
 reqs: [REQ-PRE-01, REQ-PRE-02]
-status: draft
+status: verified
 model: haiku
 budget_usd: 2.0
 
@@ -39,7 +39,7 @@ expect:
       expect_contains: README
     - cwd: projects/test-repo
       run: sh /Volumes/Data/git/ccnavi/.ccnavi/scripts/ccnavi-git.sh worktree list
-      expect_not_contains: .claude/worktrees/
+      expect_contains: 3 行    # 回す前の 3 行（本体 + 前の回の残り 2 つ）のまま。この回で切ったワークツリーが片付いた
     - cwd: projects/test-repo
       run: sh /Volumes/Data/git/ccnavi/.ccnavi/scripts/ccnavi-git.sh status
       expect_contains: nothing to commit
@@ -53,7 +53,7 @@ expect:
     - ワークツリーを切ってから編集し、ワークスペースルートや projects/test-repo の本体を直接編集しなかった
 
 unconfirmed:
-  - projects/test-repo の統合先が origin より先に進んでいる(2 コミット)。ワークツリーを切る前の遅れの確認(ccnavi-worktree.sh)がこれで止まらないか。止まるなら回す前の状態として「origin と合っている」を満たす
-  - コミットメッセージの形(prefix と日本語 1 行)まで比べるか。いまは README を含むことだけ見る
-  - 1 つ目の step でエージェントが integrate-done まで進んでしまう場合の扱い(prompt で止めているが、止まらなければ step を 2 つに分ける)
-  - 前の回の残り(chore-1-test-repo-main-todo、readme-update のワークツリー)が worktree list に出るので、expect_not_contains を「この回で作った名前」に絞る必要がある
+  - コミットメッセージの形(prefix と日本語 1 行)まで比べるか。いまは README を含むことだけ見る（回した回では docs: README の末尾に「テスト」の 1 行を追加 だった）
+  - 回すたびに projects/test-repo の main に「テスト」のコミットが 1 つ残り、README.md の末尾に行が足される。繰り返し回すなら、戻す手順（revert など）を決める
+  - ターンの終わりに、ターンの途中で切ったワークツリーの確認不能の警告が出る（issue #378）。この回の期待には影響しない
+  - worktree list の行数（3 行）は、回す前の projects/test-repo の状態に依る。前の回の残り（chore-1-test-repo-main-todo、readme-update）が片付いたら、行数を直す

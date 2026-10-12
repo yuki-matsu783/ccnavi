@@ -34,12 +34,13 @@ def _places(
 
     正とするツリーの側だけを読む（approval.scan / ticket.scan のまとめ方）。
     """
+    raw = approval.read_raw(conf, root)
     hits: list[ticket_model.Ticket] = []
-    copies, notes = approval.scan(conf, root)
+    copies, notes = approval.scan(conf, root, raw=raw)
     hits += [t for t in copies if t.ticket == ticket_id]
-    review, more = approval.scan_review(conf, root)
+    review, more = approval.scan_review(conf, root, raw=raw)
     hits += [t for t in review if t.ticket == ticket_id]
-    closed, _ = approval.scan(conf, root, closed=True)
+    closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     hits += [t for t in closed if t.ticket == ticket_id]
     proposals, problems = ticket_mod.scan(root, conf.tickets, conf.projects)
     # `todo/` は承認の前の状態。承認済みチケット（作業中・レビュー待ち・閉じた）が在れば、同じ

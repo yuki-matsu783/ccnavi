@@ -17,7 +17,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 
 | 欄 | 意味 |
 |---|---|
-| `id` | 識別子。文面と記録に出す。無ければルールファイルの名前を出す |
+| `id` | 識別子。必須。文面と記録に出す。記録では `<ワークスペースのルートからの相対パス>:<id>`（組み込みは `builtin:<名前>`）。id の無いルールは読み込まず error で名指しする |
 | `match` | ツール名を `\|` でつないだもの。`Bash` `PowerShell` `Read` `Edit` `Write` `NotebookEdit` `Grep` `Glob` `Skill` `Agent` `WebFetch`。ツールでない名前として `Stop`（メインエージェントのターンの終わり）。`Stop` を書けるのは `allow` だけ（6.6） |
 | `glob` | `fnmatch` の記法。文字列全体に当たる |
 | `regex` | Python の正規表現。`re.search`。先読み・後読み・後方参照は受け付けない |
@@ -159,15 +159,15 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | 操作 | 既定での扱い |
 |---|---|
 | `rm -rf`、`git push`、`git reset --hard` | 止める。表記違いも止める（下） |
-| 生の git（いつも） | 止める（`builtin-guard-raw-git`。9.1） |
+| 生の git（いつも） | 止める（`builtin:guard-raw-git`。9.1） |
 | 認証情報の置き場（`.env`、`.ssh/`、`id_rsa`、`.netrc`、`.npmrc` など）への `Bash` `Read` `Write` `Edit` | 止める |
 | シェルから `.claude/hooks/` `.claude/settings*.json`、ccnavi ディレクトリ `.ccnavi`、`logs/decisions.jsonl` `logs/state` `logs/archive`、`ccnavi-git.sh` へ書き込む形 | 止める（書き込みの形と場所の組で見る。8.2） |
-| `.git` の中（`.git/` の下と、ワークツリーの `.git` ファイル）への `Write` `Edit` `NotebookEdit` と、シェルから書き込む形 | 止める（`builtin-guard-git-dir`・`builtin-guard-git-dir-via-bash`。下） |
+| `.git` の中（`.git/` の下と、ワークツリーの `.git` ファイル）への `Write` `Edit` `NotebookEdit` と、シェルから書き込む形 | 止める（`builtin:guard-git-dir`・`builtin:guard-git-dir-via-bash`。下） |
 | `Read`（認証情報の置き場を除く。強いタイプが先に当たる） | 通す |
 | `Write` / `Edit` でルールファイルを直す | 既定では止めない。権限モードに委ねる |
 | それ以外 | 権限モードに委ねる |
 
-取り返しの付かない操作の 3 本（`builtin-deny-recursive-delete`・`builtin-deny-git-push`・`builtin-deny-git-reset-hard`）は、既定のときに限らず
+取り返しの付かない操作の 3 本（`builtin:recursive-delete`・`builtin:git-push`・`builtin:git-reset-hard`）は、既定のときに限らず
 常に当たる土台の deny で、glob の文字列一致ではなく regex で書く。glob（`*rm -rf *`・`*git push*`）は表記違いに外れるため。
 
 - git は、サブコマンドの前に挟むグローバルオプション（`-C <path>`・`-c <k=v>`・`--git-dir[=]<dir>`・`--work-tree[=]<dir>`・`--no-pager` など）を
@@ -182,7 +182,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
   rm と reset は、後の始まりで当たるなら最初の始まりでも当たるので、コマンドの中で最初の `rm` / `reset` に決めて 1 度だけ読む。
   git のオプションは、中に git の始まりを持たない語だけを読み、`git -c git -c …` のような並びで読み直しを積もらせない
 
-`.git` の中への書き込みの 2 本（`builtin-guard-git-dir`・`builtin-guard-git-dir-via-bash`）も、既定のときに限らず常に当たる土台の deny。
+`.git` の中への書き込みの 2 本（`builtin:guard-git-dir`・`builtin:guard-git-dir-via-bash`）も、既定のときに限らず常に当たる土台の deny。
 参照・索引・設定・hook を git を通さずに書き換えると、履歴や作業中の変更を失い、hook なら以後の git の操作のたびに任意のコマンドが走る。
 文面は git の打ち方（ラッパーがあれば `ccnavi-git.sh`）を案内する。
 サブコマンドの無い書き換え（hook、`.git/info/exclude`、`MERGE_MSG`、`index.lock`、ワークツリーの `.git` ファイル）は、ファイルと理由を添えてユーザに頼むよう案内する。
@@ -215,7 +215,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
   - 親から始める `find`（`find . -name index.lock -delete`）。開始点が `.git` の形だけを見る
   - Windows の別名（8.3 形式の `GIT~1`、`.git::$INDEX_ALLOCATION`）。解決済みのパスでも別名のまま残る
 
-生の git の 1 本（`builtin-guard-raw-git`）は、`git` がコマンドの位置にある形だけに当てる（行頭とコマンドの切れ目の後ろ、
+生の git の 1 本（`builtin:guard-raw-git`）は、`git` がコマンドの位置にある形だけに当てる（行頭とコマンドの切れ目の後ろ、
 `env`・`sudo`・`xargs` などの前置きは外した中のコマンドの層で、パス付き（`C:\Git\git.exe` も）と `git.exe` も。`then`・`do` などの予約語は
 区切りの直後のものだけ読み飛ばす）。`grep git README.md`・`echo to do git` の引数の `git` には当てない。ルールファイルが読めずに既定を使っている間も足す。ラッパーはルールファイルを読まずに動き、
 衝突の解決に要る `add`・`restore --ours` / `--theirs`・`merge-file -p` を通すので、直す道は残る（REQ-PRE-06）。
