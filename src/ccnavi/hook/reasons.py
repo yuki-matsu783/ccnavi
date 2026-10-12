@@ -286,7 +286,7 @@ def reason_for(
     # 出所は記録名（`<ワークスペースからの相対パス>:<書いた id>`）で示す。どのファイルの
     # どのルールかが、名前だけで決まる。判定を試したときの一時ファイルのように
     # ワークスペースの外にあるものは、相対パスが `../` で始まる長い名前になる。
-    source = f"rule: {rules.record_name(rule)}" if rule.id else f"rules: {rules_path}"
+    source = f"rule: {rules.record_name(rule)}"
     if rule.id == phase_forms.TICKET_APPROVAL_RULE_ID:
         # 組み込み。ルールファイルには無いので、そこを探させない。
         code, source = (
@@ -350,11 +350,12 @@ def inside_quotes(git: str = "git") -> str:
     git が止まるので、止まる形を案内しない。
     """
     return (
-        "note: this rule matched a command inside double quotes or an unquoted heredoc. The "
-        "shell runs $( ) and backquotes there; they are not only written down. To keep them as "
-        "text, use single quotes, escape them as \\$( and \\`, or pass the text from a file "
-        f"({git} commit -F <file>, gh --body-file <file>). To use a value such as a git revision, "
-        "print it with one command first and write the value into the next."
+        "注: このルールは二重引用符の中、または引用しないヒアドキュメントの中のコマンドに"
+        "当たりました。そこではシェルが $( ) とバッククォートを実行します。文字として書くだけでは"
+        "ありません。文字のまま渡すには、シングルクォートで囲むか、\\$( と \\` と書くか、"
+        f"文面をファイルから渡してください（{git} commit -F <file>、gh --body-file <file>）。"
+        "git のリビジョンのような値を使うには、先に 1 つのコマンドで値を出力し、"
+        "次のコマンドに値を書いてください。"
     )
 
 

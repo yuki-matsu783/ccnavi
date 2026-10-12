@@ -18,6 +18,14 @@ class IdRequiredTest(unittest.TestCase):
         self.assertEqual(problems[0].severity, rules.SEVERITY_ERROR)
         self.assertIn("id が無い", problems[0].detail)
 
+    def test_空白だけの_id_も_error_で除外される(self):
+        raw = {"id": "  ", "match": "Bash", "glob": "*rm -rf*", "message": "消さない"}
+        found, problems = rules._build(raw, "deny", 0)
+        self.assertIsNone(found)
+        self.assertEqual(len(problems), 1)
+        self.assertEqual(problems[0].severity, rules.SEVERITY_ERROR)
+        self.assertIn("id が無い", problems[0].detail)
+
     def test_id_が無くても他のルールは残る(self):
         rule_set, problems = rules.parse(
             {

@@ -120,8 +120,8 @@ def _source(source: str, group: list[rules.Rule]) -> str:
     実行前の理由（reasons.reason_for）と同じで、示すのは記録名（`<相対パス>:<書いた id>`）。
     どのファイルのどのルールかが名前だけで決まるので、直しに行く先が分かる。
     """
-    named = [rules.record_name(rule) for rule in group if rule.id]
-    return f"rule: {','.join(named)}" if named else f"rules: {source}"
+    named = [rules.record_name(rule) for rule in group]
+    return f"rule: {','.join(named)}"
 
 
 def _messages(group: list[rules.Rule]) -> str:

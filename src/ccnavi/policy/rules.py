@@ -779,7 +779,7 @@ def _build(
         return None, [Problem(SEVERITY_ERROR, where, "ルールがマッピングではない")]
 
     written_id = str(raw.get("id") or "")
-    if not builtin and not written_id:
+    if not builtin and not written_id.strip():
         return None, [
             Problem(
                 SEVERITY_ERROR,

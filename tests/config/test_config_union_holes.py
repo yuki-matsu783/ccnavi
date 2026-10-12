@@ -811,10 +811,18 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         self.assertNotIn("self:wide", [layer_id(n) for n in self.last_record().get("rules", [])])
         self.assert_denied(self.hook("Bash", self.ws, command="psql -c 'select 1'"), "lib:raw-psql")
 
-    def test_lint_names_both_reserved_names(self):
-        """`projects/common/` と `projects/self/` の両方を error で名指しする。"""
-        self.project(settings.LAYER_COMMON, rules=RESERVED_PROJECT_RULES)
-        self.project(settings.LAYER_SELF, rules=RESERVED_PROJECT_RULES)
+    def test_builtin_is_a_reserved_layer_name(self):
+        """`builtin` は予約名。組み込みの id（`builtin:<名前>`）と取り違えないよう拒否する。"""
+        self.assertTrue(settings.is_reserved_layer_name("builtin"))
+        self.assertTrue(settings.is_reserved_layer_name("Builtin"))
+        self.project("builtin", rules=RESERVED_PROJECT_RULES)
+        errors = self.problems("error", where=self.project_where("builtin"))
+        self.assertTrue(any("予約" in p["detail"] for p in errors), errors)
+
+    def test_lint_names_every_reserved_name(self):
+        """`projects/common/`・`projects/self/`・`projects/builtin/` を error で名指しする。"""
+        for name in settings.RESERVED_LAYER_NAMES:
+            self.project(name, rules=RESERVED_PROJECT_RULES)
         for name in settings.RESERVED_LAYER_NAMES:
             with self.subTest(name=name):
                 errors = self.problems("error", where=self.project_where(name))
@@ -840,7 +848,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
-        numbered = zip(("i0002", "i0003"), settings.RESERVED_LAYER_NAMES, strict=True)
+        numbered = zip(("i0002", "i0003", "i0004"), settings.RESERVED_LAYER_NAMES, strict=True)
         for number, name in numbered:
             with self.subTest(project=name):
                 proposal = self.propose(

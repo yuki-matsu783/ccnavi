@@ -798,14 +798,14 @@ class SubstRepoRulesTest(unittest.TestCase):
 
     def test_引用の中から切り出したコマンドに当たったときだけ断りが出る(self):
         quoted = judge("Bash", 'gh issue create --title t --body "use $(git push) here"')
-        self.assertIn("inside double quotes", quoted["response"])
+        self.assertIn("二重引用符の中", quoted["response"])
         self.assertEqual(quoted.get("quoted"), [".ccnavi/config/common/rules.yml:raw-git"])
         # ラッパーのあるワークスペースでは、文字として渡す道もラッパーで案内する。
         self.assertIn("ccnavi-git.sh commit -F <file>", quoted["response"])
         self.assertNotIn("(git commit -F", quoted["response"])
 
         bare = judge("Bash", "echo $(git push origin main)")
-        self.assertNotIn("inside double quotes", bare["response"])
+        self.assertNotIn("二重引用符の中", bare["response"])
         self.assertFalse(bare.get("quoted"), bare.get("quoted"))
 
     def test_縮退の断りは理由ごとに違う(self):
