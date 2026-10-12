@@ -22,15 +22,17 @@ expect:
       decision: handover
       code: UNDECLARED
       subject_contains: README.md
+    # 2 つの cat は Claude Code が並行に走らせるので、案内がどちらの cat に付くかは決まらない（回し直しで CONTEXT.md 側に付いた）。
+    # 「案内が付いた cat が 1 つ」「付かなかった cat が 1 つ」の 2 件で、2 つの cat のうちちょうど 1 つに付くことを見る。
     - event: PreToolUse
       tool: Bash
-      subject_contains: cat README.md
+      subject_contains: "cat "
       decision_not: deny
       rules_include: [prefer-read-grep]
       hinted: true
     - event: PreToolUse
       tool: Bash
-      subject_contains: cat docs/CONTEXT.md
+      subject_contains: "cat "
       decision_not: deny
       rules_include: [prefer-read-grep]
       hinted: false
@@ -38,5 +40,5 @@ expect:
     - 1 つ目の step で、README.md の最初の見出しを実際と合う形で答えた
 
 unconfirmed:
-  - ルール prefer-read-grep が当たった判定の記録の形は確定済み（decision allow、`rules` は ['prefer-read-grep']）。案内を出した呼び出しは記録の `hinted` で見る。回し直して `hinted` が 1 つ目の cat にだけ付くことを確かめる
+  - 案内（hinted）が付く cat は、2 つのうちどちらかが決まらない。並行する 2 つの hook が同時に「出した」の印を読み書きするため、両方に付く可能性もある（排他が無い）。回し直して、ちょうど 1 つに付くかを確かめる
   - 案内（additionalContext）の行は stream-json の hook_response の output 内にある。1 度だけ届くことは `hinted` の 2 件で見るので、judge には書かない
