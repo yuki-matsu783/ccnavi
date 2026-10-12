@@ -7,8 +7,10 @@
  * `rules-doc.ts` は YAML の解析器を持つので画面から読めない。同じ読み方をここで小さく持ち、そろっていることはテストが見る。
  */
 import type { HookEntry } from "./hooks.js";
+import { BOARD_VERSION, parseBoardJson } from "./model.js";
 import type { CondNode } from "./rules-when.js";
 import { SECTIONS, type RuleForm, type Section, type Sections } from "./rules-view.js";
+import { rulesSums, type RulesSum } from "./sums.js";
 import { parseSuggestJson, type SuggestJson } from "./suggestmodel.js";
 import { parseExpectationsJson, parseTestJson, type ExpectationsJson, type TestJson } from "./testmodel.js";
 
@@ -19,6 +21,10 @@ export interface RulesSample {
   readonly judges: Readonly<Record<string, TestJson>>;
   readonly checked: ExpectationsJson | undefined;
   readonly suggested: SuggestJson | undefined;
+  /** 「足し算」の見本。実行ファイルが出す結果（`sums[]`）と同じ形で書き、ボードの JSON の読み取りを通す */
+  readonly sums: readonly RulesSum[];
+  /** 保存前の検証エラーの見本（`--lint` の報告を画面が付けた 1 文）。無ければ空 */
+  readonly saveError: string;
 }
 
 function object(value: unknown, at: string): Record<string, unknown> {
@@ -92,6 +98,21 @@ function viaJson<T>(parse: (text: string) => { readonly ok: true; readonly value
   return parsed.value;
 }
 
+/** 足し算は実行ファイルの JSON（ボードの `sums[]`）と同じ形で書き、実際の読み取り（`parseBoardJson` → `rulesSums`）を通す */
+function sumsOfRaw(raw: unknown): readonly RulesSum[] {
+  if (raw === undefined) {
+    return [];
+  }
+  if (!Array.isArray(raw)) {
+    throw new Error("sample.sums はリスト");
+  }
+  const parsed = parseBoardJson(JSON.stringify({ version: BOARD_VERSION, sums: raw }));
+  if (!parsed.ok) {
+    throw new Error(`sample.sums: ${parsed.error}`);
+  }
+  return rulesSums(parsed.board);
+}
+
 export function parseRulesSample(raw: unknown): RulesSample {
   const root = object(raw, "sample");
   const rules = object(root.rules, "sample.rules");
@@ -122,6 +143,8 @@ export function parseRulesSample(raw: unknown): RulesSample {
     hooks,
     judges,
     checked: root.checked === undefined ? undefined : viaJson(parseExpectationsJson, { version: 1, ...object(root.checked, "sample.checked") }, "sample.checked"),
+    sums: sumsOfRaw(root.sums),
+    saveError: str(root.save_error),
     suggested: root.suggested === undefined ? undefined : viaJson(parseSuggestJson, { version: 1, ...object(root.suggested, "sample.suggested") }, "sample.suggested"),
   };
 }

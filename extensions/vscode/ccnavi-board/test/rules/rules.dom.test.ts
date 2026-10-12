@@ -12,7 +12,7 @@ import type { RuleHitJson, TestJson } from "../../src/core/testmodel.js";
 import { openPage, openRules, page, rowSelector } from "../helpers/rules.js";
 import type { DomPage } from "../helpers/dom.js";
 import { sumsBoard } from "../helpers/sums.js";
-import type { HTMLButtonElement, HTMLInputElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
+import type { HTMLButtonElement, HTMLDetailsElement, HTMLInputElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
 import { loadTour } from "../helpers/tour.js";
 
 /** 直前に送った保存の中身 */
@@ -1213,6 +1213,214 @@ deny:
         { op: "glob", pattern: "*.key" },
       ],
     });
+  } finally {
+    await dom.close();
+  }
+});
+
+/** 案内が今いる段（0 始まり）。`startCourse` で 0 に戻し、`toStep` で進めたり戻したりする */
+const position = new WeakMap<DomPage, number>();
+
+/** 「?」の一覧から使い方ごとの案内を始める */
+async function startCourse(dom: DomPage, id: string): Promise<void> {
+  dom.click(dom.one('[data-action="tour"]'));
+  await dom.settle();
+  dom.click(dom.one(`[data-action="tour-course"][data-course="${id}"]`));
+  await dom.settle();
+  position.set(dom, 0);
+}
+
+/** 案内の n 段目（0 始まり）へ移る。吹き出しの題が、定義の段の題と同じであることも見る */
+async function toStep(dom: DomPage, id: string, index: number): Promise<void> {
+  const steps = loadTour("rules").courses.find((course) => course.id === id)!.steps;
+  let at = position.get(dom) ?? 0;
+  while (at !== index) {
+    dom.click(dom.one(at < index ? '[data-action="tour-next"]' : '[data-action="tour-back"]'));
+    await dom.settle();
+    at += at < index ? 1 : -1;
+  }
+  position.set(dom, at);
+  await dom.settle();
+  assert.equal(dom.one("#tour-title").textContent, steps[index].title);
+}
+
+test("CB-D300 ユースケースの一覧は、基本の案内の後ろに、足したユースケースが定義の順で並び、題と要約が出る", async () => {
+  const dom = await openRules();
+  try {
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    const items = dom.all<HTMLButtonElement>('[data-action="tour-course"]');
+    const courses = loadTour("rules").courses;
+    assert.ok(items.length >= 10);
+    for (const [i, course] of courses.entries()) {
+      assert.equal(items[i].dataset.course, course.id);
+      assert.ok(items[i].textContent?.includes(course.title), course.id);
+    }
+    for (const id of ["add-rule", "context-every", "check-expectations", "suggest-rule", "except-to-when", "read-sum", "find-fold-move", "save-error"]) {
+      assert.ok(items.some((item) => item.dataset.course === id), id);
+    }
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D301 案内の間の足し算は見本を出し、段の scene が枠を開いて足し算を替える。閉じたあとは実際の足し算に戻り、案内で選んだものを持ち越さない", async () => {
+  const sums = rulesSums(sumsBoard());
+  const dom = await openRules({ target: { kind: "project", name: "lib" }, sums }, undefined, { measure: true });
+  try {
+    assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "lib");
+    assert.equal(dom.one<HTMLDetailsElement>("#sum").open, false);
+    await startCourse(dom, "read-sum");
+    await toStep(dom, "read-sum", 0);
+    assert.equal(dom.one<HTMLDetailsElement>("#sum").open, true, "足し算の枠が開かない");
+    assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "web");
+    assert.deepEqual(
+      dom.all('#sum .sum-section[data-section="deny"] tbody tr').map((tr) => tr.querySelector("td")?.textContent),
+      ["git-push", "no-rm-rf", "web:no-prod-deploy"],
+    );
+    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "5 件（common + web）");
+    await toStep(dom, "read-sum", 4);
+    assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
+    assert.ok(dom.all('#sum .sum-section[data-section="deny"] tbody tr').some((tr) => tr.querySelector("td")?.textContent === "self:protect-secrets"));
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "lib", "閉じたあと案内で選んだ足し算が残る");
+    assert.equal(dom.one<HTMLDetailsElement>("#sum").open, false);
+    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3 件（common + lib）");
+    assert.deepEqual(dom.posted.filter((message) => message.type !== "ready" && message.type !== "tourDone"), []);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D302 絞り込みと畳みの案内は、scene の find で件数を「一致 / 全体」にし、fold で名指しのタイプだけを畳む。閉じたら元に戻る", async () => {
+  const dom = await openRules({}, undefined, { measure: true });
+  try {
+    await startCourse(dom, "find-fold-move");
+    await toStep(dom, "find-fold-move", 1);
+    assert.equal(dom.one<HTMLInputElement>("#find").value, "git");
+    assert.match(dom.one('[data-count="deny"]').textContent ?? "", /^1 \/ \d+/);
+    await toStep(dom, "find-fold-move", 2);
+    assert.equal(dom.one<HTMLInputElement>("#find").value, "");
+    assert.ok(dom.one('[data-section="allow"]').classList.contains("folded"));
+    assert.equal(dom.one('[data-section="deny"]').classList.contains("folded"), false);
+    assert.equal(dom.one('[data-section="ask"]').classList.contains("folded"), false);
+    // 次の段は畳まない（段ごとに全部を書き直す）
+    await toStep(dom, "find-fold-move", 3);
+    assert.equal(dom.all(".rule-section.folded").length, 0);
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.all(".rule-section.folded").length, 0, "案内が畳みを残した");
+    assert.equal(dom.one<HTMLInputElement>("#find").value, "");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D303 保存前の検証エラーの案内は、その段にだけ見本の報告を下の欄に出し、前後の段と閉じたあとには残さない。実際の操作の一言も出さない", async () => {
+  const dom = await openRules({}, undefined, { measure: true });
+  try {
+    await startCourse(dom, "save-error");
+    assert.equal(dom.one("#status").textContent, "");
+    await toStep(dom, "save-error", 1);
+    assert.match(dom.one("#status").textContent ?? "", /--lint が error を報告しました/);
+    assert.match(dom.one("#status").textContent ?? "", /error: db-migrate: ask に message がある/);
+    assert.ok(dom.one("footer").classList.contains("error"));
+    await toStep(dom, "save-error", 2);
+    assert.match(dom.one("#status").textContent ?? "", /error: db-migrate/, "検証エラーを読む段の続きで消えた");
+    await toStep(dom, "save-error", 4);
+    assert.equal(dom.one("#status").textContent, "", "エラーの段を過ぎても残っている");
+    assert.equal(dom.one("footer").classList.contains("error"), false);
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.one("#status").textContent, "");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D304 一括確認と候補の案内は、その段から結果を出す。食い違う行に印があり、閉じたあとは結果が残らない", async () => {
+  const dom = await openRules({}, undefined, { measure: true });
+  try {
+    await startCourse(dom, "check-expectations");
+    assert.equal(dom.all("#expectations-result").length, 0, "押す前に結果が出ている");
+    await toStep(dom, "check-expectations", 2);
+    assert.equal(dom.one(".pane.active").id, "tab-judge");
+    assert.match(dom.one('[data-tour="expectations-counts"]').textContent ?? "", /allow 1\/2/);
+    assert.match(dom.one('[data-tour="expectations-counts"]').textContent ?? "", /不一致 1 件/);
+    assert.equal(dom.all('[data-tour="expectation-ng"]').length, 1);
+    assert.match(dom.one('[data-tour="expectation-ng"]').textContent ?? "", /\.env\.example/);
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.all("#expectations-result").length, 0, "案内の結果が残った");
+
+    await startCourse(dom, "suggest-rule");
+    assert.equal(dom.all("#suggest-result").length, 0);
+    await toStep(dom, "suggest-rule", 1);
+    assert.equal(dom.all("#suggest-result .candidate").length, 2);
+    assert.equal(dom.all('[data-tour="suggest-candidate"]').length, 1);
+    assert.match(dom.one("#suggest-result").textContent ?? "", /expectations:/);
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.all("#suggest-result").length, 0, "案内の候補が残った");
+    assert.deepEqual(dom.posted.filter((message) => message.type !== "ready" && message.type !== "tourDone"), []);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D305 ルールの欄の案内は、scene の open と more で行と「コンテキストの追加」を開き、判定の結果は scene の judge で見本を出す", async () => {
+  const dom = await openRules({}, undefined, { measure: true });
+  try {
+    await startCourse(dom, "context-every");
+    await toStep(dom, "context-every", 0);
+    assert.equal(dom.all(".rule.open").length, 0);
+    assert.match(dom.one('[data-id="db-migrate"] .sum-every').textContent ?? "", /3 回ごと/);
+    await toStep(dom, "context-every", 1);
+    assert.deepEqual(dom.all(".rule.open").map((row) => row.getAttribute("data-id")), ["db-migrate"]);
+    assert.equal(dom.one<HTMLDetailsElement>('[data-id="db-migrate"] details.more').open, true);
+    assert.equal(dom.one<HTMLInputElement>('[data-id="db-migrate"] .f-every').value, "3");
+    assert.equal(dom.one('[data-tour="rule-db-migrate-every"]').tagName, "DIV");
+    await toStep(dom, "context-every", 4);
+    assert.deepEqual(dom.all(".rule.open").map((row) => row.getAttribute("data-id")), ["deps-change"]);
+    assert.equal(dom.all('[data-tour="rule-deps-change-once"]').length, 1);
+    await toStep(dom, "context-every", 6);
+    assert.equal(dom.one(".pane.active").id, "tab-judge");
+    assert.match(dom.one("#judge-result .response").textContent ?? "", /migrate でないかを確かめる/);
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.all("#judge-result").length, 0, "案内の判定が残った");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D306 案内の間は、ルールを足す・変換するなどの編集が効かない（行が増えず、未保存にならず、拡張ホストへ何も送らない）", async () => {
+  const dom = await openRules({}, undefined, { measure: true });
+  try {
+    await startCourse(dom, "add-rule");
+    await toStep(dom, "add-rule", 0);
+    const before = dom.all(".rule").length;
+    dom.click(dom.one('[data-tour="add-deny"]'));
+    await dom.settle();
+    assert.equal(dom.all(".rule").length, before, "案内の間にルールが足された");
+    dom.click(dom.one('[data-tour="add-deny"]'));
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.deepEqual(dom.all(".rule").map((row) => row.getAttribute("data-id")), ["git-push", "no-rm", "deps"]);
+
+    await startCourse(dom, "except-to-when");
+    await toStep(dom, "except-to-when", 2);
+    const toWhen = dom.one<HTMLButtonElement>('[data-tour="rule-protect-secrets-to-when"]');
+    assert.equal(toWhen.disabled, false);
+    dom.click(toWhen);
+    await dom.settle();
+    assert.equal(dom.all('[data-id="protect-secrets"] [data-action="to-when"]').length, 1, "案内の間に組み合わせ条件へ変換された");
+    assert.match(dom.one('[data-tour="rule-protect-secrets-except"]').textContent ?? "", /glob: \*\*\/secrets\/README\.md/);
+    assert.equal(dom.all("#dirty:not(.hidden)").length, 0);
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), []);
   } finally {
     await dom.close();
   }

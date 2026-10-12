@@ -441,8 +441,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const sceneOpen = new Set(sceneList(scene.open));
   const shownTab: TabName = touring ? (scene.tab === "judge" || scene.tab === "hooks" ? scene.tab : "rules") : tab;
   const shownDraft = touring ? SAMPLE_DRAFT : draft;
-  // 畳んだタイプの中は指しても見えない（0×0 を照らす）。案内の間は畳まない
-  const shownFolded: ReadonlySet<Section> = touring ? new Set() : folded;
+  // 畳んだタイプの中は指しても見えない（0×0 を照らす）。案内の間は、段の `fold` が名指ししたタイプだけを畳む（見出しを指す段でだけ使う）
+  const shownFolded: ReadonlySet<Section> = touring ? new Set(SECTIONS.filter((section) => sceneList(scene.fold).includes(section))) : folded;
   const shownFind = touring ? (typeof scene.find === "string" ? scene.find : "") : find;
   const sceneJudge = typeof scene.judge === "string" ? SAMPLE.judges[scene.judge] : undefined;
   const shownJudged: Judged | undefined = touring
@@ -454,6 +454,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const shownSuggested = touring ? (scene.suggested === true ? SAMPLE.suggested : undefined) : suggested;
   const shownHits: ReadonlySet<string> = touring ? new Set(sceneJudge?.rules.map((rule) => rule.id) ?? []) : hits;
   const shownDirty = touring ? false : dirty;
+  // 保存前の検証エラーの見本（`sample.save_error`）。実際の直前の操作の一言は、案内の間は出さない
+  const shownStatus: Status | undefined = touring ? (scene.error === true && SAMPLE.saveError !== "" ? { text: SAMPLE.saveError, error: true } : undefined) : status;
   const shownLock: Lock = touring ? { locked: false, reason: "", doing: [] } : lock;
   const shownTool = touring ? (typeof scene.tool === "string" ? scene.tool : KNOWN_TOOLS[0]) : tool;
   const shownSubject = touring ? (typeof scene.subject === "string" ? scene.subject : "") : subject;
@@ -482,7 +484,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </div>
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <header className="toolbar">
-        <div className="summary">
+        <div className="summary" data-tour="target">
           <TargetSelect
             target={touring ? undefined : page?.target}
             targets={touring ? undefined : page?.targets}
@@ -545,7 +547,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       <section id="tab-rules" data-tour="rules" className={`pane${shownTab === "rules" ? " active" : ""}${query === "" ? "" : " finding"}`} ref={list}>
         <div className="find">
           <input id="find" data-tour="find" type="search" placeholder="id・ツール・パターン・メッセージで絞り込む" spellCheck={false} value={shownFind} onChange={(event) => setFind(event.target.value)} />
-          <span className="hint">判定は強い順に deny &gt; ask &gt; allow</span>
+          <span className="hint" data-tour="order-hint">判定は強い順に deny &gt; ask &gt; allow</span>
         </div>
         {SECTIONS.map((section) => {
           const rows = shownDraft[section].map((row) => {
@@ -557,13 +559,14 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           // 絞り込み中は折りたたんだタイプの中も見えるので、矢印も開いた向きにする
           const shownAsOpen = query !== "" || !shownFolded.has(section);
           return (
-            <section className={shownFolded.has(section) ? "rule-section folded" : "rule-section"} data-section={section} key={section}>
+            <section className={shownFolded.has(section) ? "rule-section folded" : "rule-section"} data-section={section} data-tour={`section-${section}`} key={section}>
               <h2>
                 <button
                   type="button"
                   className="twist"
                   data-action="fold-section"
                   data-section={section}
+                  data-tour={`fold-${section}`}
                   aria-expanded={shownAsOpen}
                   title="このタイプを開く／畳む"
                   onClick={() => fold(section)}
@@ -571,10 +574,10 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
                   {shownAsOpen ? "▾" : "▸"}
                 </button>{" "}
                 <span className={`section-name ${section}`}>{section}</span> <span className="section-label">{SECTION_LABELS[section]}</span>{" "}
-                <span className="count" data-count={section}>
+                <span className="count" data-count={section} data-tour={`count-${section}`}>
                   {countText(query, shown, shownDraft[section].length, kept)}
                 </span>
-                <button type="button" className="action small" data-action="add" data-section={section} onClick={() => add(section)}>
+                <button type="button" className="action small" data-action="add" data-section={section} data-tour={`add-${section}`} onClick={() => add(section)}>
                   ＋ ルールを追加
                 </button>
               </h2>
@@ -606,7 +609,17 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             </section>
           );
         })}
-        {!touring && page?.sums !== undefined && <Sum sums={page.sums} initial={defaultSum(page.sums, page.target)} key={`${page.target?.kind ?? ""}:${page.target?.name ?? ""}`} />}
+        {touring ? (
+          // 案内の間の見本は鍵を替えて別に作る（閉じたあとの実際の枠に、案内で選んだ足し算を持ち越さない）
+          <Sum
+            sums={SAMPLE.sums}
+            initial={defaultSum(SAMPLE.sums, undefined)}
+            key="tour-sum"
+            tour={{ open: typeof scene.sum === "string" && scene.sum !== "", picked: typeof scene.sum === "string" && scene.sum !== "" ? scene.sum : SAMPLE.sums[0]?.name ?? "" }}
+          />
+        ) : (
+          page?.sums !== undefined && <Sum sums={page.sums} initial={defaultSum(page.sums, page.target)} key={`${page.target?.kind ?? ""}:${page.target?.name ?? ""}`} />
+        )}
       </section>
       <section id="tab-judge" className={shownTab === "judge" ? "pane active" : "pane"}>
         <p className="hint">
@@ -652,7 +665,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           </button>
         </div>
         {shownJudged !== undefined && <JudgeResult judged={shownJudged} />}
-        <div className="expectations-head">
+        <div className="expectations-head" data-tour="expectations">
           <button
             type="button"
             className="action"
@@ -667,12 +680,12 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             期待する判定を一括で確かめる
           </button>
           <span className="path">{touring ? "（見本）rule-expectations.yml" : page?.expectationsPath ?? ""}</span>
-          <button type="button" className="action" data-action="open-expectations" onClick={() => post({ type: "openFile", which: "expectations" })}>
+          <button type="button" className="action" data-action="open-expectations" data-tour="open-expectations" onClick={() => post({ type: "openFile", which: "expectations" })}>
             エディタで開く
           </button>
         </div>
         {shownChecked !== undefined && <ExpectationsResult result={shownChecked} />}
-        <div className="expectations-head">
+        <div className="expectations-head" data-tour="suggest">
           <button
             type="button"
             className="action"
@@ -695,8 +708,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         <Hooks hooks={touring ? SAMPLE.hooks : page?.hooks ?? []} files={touring ? { settings: true, settingsLocal: false } : page?.hookFiles ?? { settings: false, settingsLocal: false }} />
       </section>
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
-      <footer className={status?.error === true ? "foot error" : "foot"}>
-        <span id="status">{status?.text ?? ""}</span>
+      <footer className={shownStatus?.error === true ? "foot error" : "foot"} data-tour="status">
+        <span id="status">{shownStatus?.text ?? ""}</span>
       </footer>
     </>
   );
