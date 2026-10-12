@@ -156,7 +156,7 @@ phases:
   research:
     kind: work                  # work は全体計画に、feedback はフィードバック計画にだけ置ける
     title: 調査                 # id と title はどちらも一意
-    review: none                # none | chat | mr。既定であって上限ではない（計画の項で mr に強められる）。chat はこのセッションでユーザが見る（マージリクエストは作らない）
+    review: none                # none | mr。既定であって上限ではない（計画の項で mr に強められる）
     scope: ["wip/research/*"]   # 子が宣言できる範囲の上限。inherit なら親の範囲そのまま
     deliverables: ["wip/research/summary.md"]   # 閉じる前に親のワークツリーに在って追跡されているべきもの
     when: 既存の振る舞いや依存が分からないとき   # 案内。次のフェーズを促す文に出る
@@ -174,7 +174,7 @@ phases:
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
-    review: mr                  # feedback は chat か mr（none は書けない）
+    review: mr                  # feedback は mr（none は書けない）
     scope: inherit
     when: フィードバック計画の最後に置き、ほかの対応を受ける
 ```
