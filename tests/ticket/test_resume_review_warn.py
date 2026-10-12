@@ -83,7 +83,9 @@ class ResumedReviewWarnTest(PhaseHarness):
             # マーカーのツリーを、ワークスペースルートからの相対で示す
             self.assertIn("ツリー .claude/worktrees/i0001で", text)
             # 取り込み済みの親子だけ push-approved が送る。それ以外はユーザがコミットする
-            self.assertIn("取り込み済みで origin があり、chat だけでない親子なら", text)
+            self.assertIn(
+                "取り込み済みで origin があり、マージリクエストで見るフェーズがある親子なら", text
+            )
             self.assertIn("ccnavi-push-approved.sh i0001", text)
             self.assertIn("ユーザが自分でコミットする", text)
             self.assertIn("新しいチケットを作り直す", text)

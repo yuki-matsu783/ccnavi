@@ -63,7 +63,7 @@ class RawShareTest(PhaseHarness):
         return result, reads
 
     def ended_phase(self):
-        """`review: chat` のフェーズ 1 を終わらせる（レビュー準備中になる手前）。"""
+        """フェーズ 1 を終わらせる（レビュー準備中になる手前）。"""
         self.family(plan=["chores", "design"])
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["src/a*"], review=False))
         self.commit_parent()
@@ -126,7 +126,7 @@ class RawShareTest(PhaseHarness):
         result, reads = self.counted(
             lambda: self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         )
-        self.assertIn("ccnavi-review.sh chat 1", self.reason(result))
+        self.assertIn("request --phase 1", self.reason(result))
         self.assertEqual(reads.counts(), ONCE)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.pending")))
 

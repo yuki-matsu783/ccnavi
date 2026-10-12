@@ -7,7 +7,7 @@ C1 は、取り込み済みの親子のチケットで状態を書く操作を
 見るのは 4 つ。sh の側（ロック・取り込み・コミット・push・戻し）は tests/sh/test_c1_sh.py が見る。
 
 1. `ccnavi c1 family <識別子>`: 親子のチケット（子なら親）と、C1 の対象か。
-   取り込み状態の無い親子のチケット・chat だけの親子のチケットは対象外、
+   取り込み状態の無い親子のチケット・マージリクエストで見るフェーズが無い親子のチケットは対象外、
    決まらない親子のチケットは stop
 2. `ccnavi c1 sort <親> [<版>]`: 置き場の変更の見分け（ccnavi が書いたと内容で分かるもの・
    ユーザがコミットして push するもの・見分けられないもの、数えない一時ファイル、
@@ -15,7 +15,7 @@ C1 は、取り込み済みの親子のチケットで状態を書く操作を
 3. `--record-tree`: 書いたパスの一覧の基点を親のワークツリーにし、置き場の外に書けば error
    （一覧は書く。着手で configsync がミラーした `.ccnavi/config/common/` は例外で、
    tests/config/test_config_sync.py が見る）
-4. ユーザの判断の入口の sh（`ccnavi-review.sh chat / close-early`）は
+4. ユーザの判断の入口の sh（`ccnavi-review.sh close-early`）は
    エージェントから止める
 """
 
@@ -77,17 +77,17 @@ class FamilyTest(AuthorityHarness):
         self.assertEqual(result.returncode, 1)
 
 
-class ChatOnlyFamilyTest(AuthorityHarness):
+class WithoutMrFamilyTest(AuthorityHarness):
     def setUp(self):
         super(AuthorityHarness, self).setUp()
-        self.family(plan=["chores"])
+        self.family(plan=["research"])
 
-    def test_a_chat_only_family_is_not_a_target(self):
+    def test_a_family_without_a_merge_request_phase_is_not_a_target(self):
         self.record("present")
         result = self.ccnavi("c1", "family", "i0001")
         answer = lines(result.stdout)
         self.assertEqual(answer["target"], "no")
-        self.assertIn("chat だけの親子のチケット", answer["why"])
+        self.assertIn("マージリクエストで見るフェーズが無い親子のチケット", answer["why"])
 
 
 class SortTest(AuthorityHarness):
@@ -195,7 +195,7 @@ class SortTest(AuthorityHarness):
         reviewed = f"{APPROVED}/phases/i0001/1.reviewed"
         early = f"{APPROVED}/phases/i0001/2.skipped"
         extra = f"{APPROVED}/phases/i0001/3.pending"
-        self.put(reviewed, json.dumps({"by": "chat", "at": "t"}))
+        self.put(reviewed, json.dumps({"by": "decide", "at": "t"}))
         self.put(early, json.dumps({"by": "close-early", "at": "t"}))
         self.put(extra, json.dumps({"review": "mr", "at": "t", "reviewed": True}))
         found = dict((path, kind) for kind, path in self.sort())
@@ -255,7 +255,7 @@ class SortTest(AuthorityHarness):
         pending = f"{APPROVED}/phases/i0001/2.pending"
         reviewed = f"{APPROVED}/phases/i0001/1.reviewed"
         self.put(pending, json.dumps({"review": "mr", "at": "t"}))
-        self.put(reviewed, json.dumps({"by": "chat", "at": "t"}))
+        self.put(reviewed, json.dumps({"by": "decide", "at": "t"}))
         self.put("src/code.py", "x = 1\n")
         self.commit_parent("unsent")
         self.assertEqual(self.sort(base), sorted([("b", pending), ("c", reviewed)]))
@@ -317,11 +317,9 @@ class RecordTreeTest(AuthorityHarness):
 class HumanEntryGuardTest(AuthorityHarness):
     def test_the_human_entries_are_denied_to_the_agent(self):
         for command in (
-            "sh .ccnavi/scripts/ccnavi-review.sh chat 1",
             "sh .ccnavi/scripts/ccnavi-review.sh close-early --reason r",
             # シェルに選択肢を付けた形も同じ
             "sh -x .ccnavi/scripts/ccnavi-push-approved.sh",
-            "bash -e -x .ccnavi/scripts/ccnavi-review.sh chat 1",
             "sh -x .ccnavi/scripts/ccnavi-sync.sh --forget i0001",
         ):
             result = self.ccnavi(
@@ -505,5 +503,3 @@ class BypassTest(AuthorityHarness):
     def test_record_risk_and_human_entries_are_not_refused_here(self):
         risk = self.ccnavi("ticket", "record-risk", "i0001-01-01", "x", "yes", "--reason", "r")
         self.assertNotIn("C1 の対象", risk.stderr)
-        chat = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat")
-        self.assertNotIn("C1 の対象", chat.stderr)

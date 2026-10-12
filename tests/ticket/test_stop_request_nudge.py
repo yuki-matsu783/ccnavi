@@ -413,7 +413,7 @@ class RequestNudgeTest(base.StopNudgeTest):
 
 
 class PlannedRequestNudgeTest(PhaseHarness):
-    """計画を持つ親。フェーズの見る場所（chat・延期）と、実際のレビューの状態を作って確かめる。"""
+    """計画を持つ親。フェーズの見る場所（延期）と、実際のレビューの状態を作って確かめる。"""
 
     def stop(self, cwd, session="s1"):
         payload = {
@@ -442,11 +442,6 @@ class PlannedRequestNudgeTest(PhaseHarness):
         body = self.stop(self.parent_tree)
         self.assertEqual(body.get("decision"), "block")
         self.assertIn(CODE, body["reason"])
-
-    def test_a_chat_phase_is_not_asked_before_the_request(self):
-        """このセッションで見る計画は `request` を打たず、ユーザが端末で進める。"""
-        self.close_first_child(["chores", "design"], ["src/a*"], "src/a1.py", review=False)
-        self.assertNotIn("decision", self.stop(self.parent_tree))
 
     def test_a_deferred_phase_is_not_asked(self):
         """延期したフェーズは依頼できない（次にレビューのある番号と一緒に見る）。"""

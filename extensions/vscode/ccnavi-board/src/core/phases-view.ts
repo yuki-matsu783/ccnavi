@@ -26,7 +26,7 @@ export const PHASE_KINDS = ["work", "feedback"] as const;
 export type PhaseKind = (typeof PHASE_KINDS)[number];
 
 /** レビューの既定。phasetypes.REVIEWS と同じ順 */
-export const REVIEWS = ["none", "chat", "mr"] as const;
+export const REVIEWS = ["none", "mr"] as const;
 export type Review = (typeof REVIEWS)[number];
 
 /** 画面で編集する定義 1 件。`origin` は読み込んだときの位置で、新しい定義は null */
@@ -81,7 +81,6 @@ export const KIND_LABELS: Readonly<Record<PhaseKind, string>> = {
 /** レビューの既定の説明。select のラベル */
 export const REVIEW_LABELS: Readonly<Record<Review, string>> = {
   none: "none（既定。レビューを求めない。ただし実績のリスクが HIGH 以上ならレビューが要る）",
-  chat: "chat（このセッションでユーザが差分を見る。ホストへは出ない）",
   mr: "mr（マージリクエストのレビューを受ける）",
 };
 

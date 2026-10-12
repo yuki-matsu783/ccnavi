@@ -7,7 +7,7 @@ model: haiku
 budget_usd: 3.0
 
 # 設計に触れる・ユーザのレビューが要る作業は、提案を書いて承認を受ける（docs/design/tickets/phases.md の「小さい作業」）。
-# 承認（`ccnavi --agree`）と chat レビュー（`ccnavi-review.sh chat`）は人間しかできないので、そこで止める。
+# 承認（`ccnavi --agree`）とマージリクエストのレビュー（ホスト上）は人間しかできないので、そこで止める。
 # 親は `plan: [quick]` の 1 項だけ、子は `phase: 1`。範囲は親の範囲そのまま。
 steps:
   - prompt: >-
@@ -21,15 +21,15 @@ steps:
       - 承認画面に、親の範囲（README.md）と、リスクの見立て（LOW）が出ている
       - 「新たに書ける領域」に README.md 以外が無い
   - prompt: >-
-      承認した。着手して、README.md に追記して、子を finish し、親に合流するところまで進めて。
+      承認した。着手して、README.md に追記して、子を finish し、親に合流し、ELI5 の HTML を wip/eli5/phase-1.html に書いてコミットして push し、`sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file <依頼文> --eli5 wip/eli5/phase-1.html` でレビューを依頼するところまで進めて。
     resume: true
   - human: true
     instruction: >-
-      親のワークツリーの端末で `sh .ccnavi/scripts/ccnavi-review.sh chat 1` を打つ。
+      依頼で作られたマージリクエスト（test-repo。ホストの認証が要る）を開き、指摘なしでレビューする。
     check:
-      - 差分が README.md の末尾 1 行の追加だけである
+      - 差分が README.md の末尾 1 行の追加と、ELI5 の HTML（wip/eli5/phase-1.html）だけである
   - prompt: >-
-      レビューが済んだ。親を finish して。
+      レビューが済んだ。`sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1` で確認し、親を finish して push し、`sh .ccnavi/scripts/ccnavi-review.sh ready` で Draft を外して。
     resume: true
 
 expect:
@@ -55,4 +55,4 @@ unconfirmed:
   - ticket status の出力の語（作業中・レビュー待ち・承認待ち・完了）。親子が両方 done に入ったことを比べる形に直す
   - 3 つ目の step で子の finish → 親への合流まで 1 回の prompt で通るか。長ければ step を分ける
   - 承認済みチケットの置き場が、project が test-repo の親ではプロジェクトの側になるか（docs/design/tickets/places.md で確かめる）
-  - chat レビューの `1` は番号（フェーズ）。親のワークツリーの場所は、2 つ目の step の報告に出させる
+  - マージリクエストの作成に test-repo のホスト認証が要る。無い環境では 4 つ目の step から先を回せない

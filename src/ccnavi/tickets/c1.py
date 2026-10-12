@@ -8,7 +8,7 @@
 - `ccnavi c1 family <識別子>`: その識別子の親子のチケットと、C1 の対象かと、親のブランチ名
   （`branch`。親チケットの `branch:`、無ければ識別子）
   - 対象は、置き場のパスが相対で、取り込み状態があり（取り込み済み）、
-    chat だけの親子のチケットでなく、止める理由（閉じた・gone・blocked・親のワークツリーが無い
+    マージリクエストで見るフェーズが無い親子のチケットでなく、止める理由（閉じた・gone・blocked・親のワークツリーが無い
     など）の無い親子のチケット
   - 止める理由のある取り込み済みの親子のチケットは `target stop`。sh は何も書かずに止める
   - origin の無い親のワークツリーは対象外（ローカルの git の設定だけを読む）
@@ -106,8 +106,8 @@ def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, s
     if not st.imported:
         why = "親子のチケットの取り込み状態が無い（取り込み済みでない。今の手元の動きのまま）"
         return TARGET_NO, why, st
-    if _chat_only(conf, root, parent):
-        why = "chat だけの親子のチケット（マージリクエストを持たない。今の手元の動きのまま）"
+    if _without_mr(conf, root, parent):
+        why = "マージリクエストで見るフェーズが無い親子のチケット（今の手元の動きのまま）"
         return TARGET_NO, why, st
     if st.stop or st.home is None:
         return TARGET_STOP, st.stop or "親のワークツリーが決まらない", st
@@ -167,9 +167,9 @@ def _project_guess(fams: syncstate.Families, parent: str, st: syncstate.Standing
     return named[0].project if len(named) == 1 else ""
 
 
-def _chat_only(conf: settings.Settings, root: str, parent: str) -> bool:
+def _without_mr(conf: settings.Settings, root: str, parent: str) -> bool:
     try:
-        return phase.chat_only(root, conf, parent)
+        return phase.without_mr(root, conf, parent)
     except (OSError, ValueError):
         return False
 

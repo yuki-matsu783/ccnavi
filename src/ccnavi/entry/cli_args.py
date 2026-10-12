@@ -203,7 +203,6 @@ _NOT_WITH_DOCS = (
     "--body-file",
     "--reason",
     "--accept-unresolved",
-    "--chat",
     "--flow",
     "--project-rules-file",
     "--project-phases-file",

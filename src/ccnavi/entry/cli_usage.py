@@ -372,14 +372,6 @@ which fetches the threads and runs
         (the script passes the token owner when it can read it; the reviewed mark
          keeps the account and the way. Without it the mark is as before)
 
-A phase whose type says `review: chat` is reviewed in the session itself. There
-is no merge request and no copy to read, so a human opens that gate from the
-terminal with
-
-    ccnavi --reviewed N --chat --cwd <parent worktree>
-
-which only applies to phases whose type declared `chat`.
-
 A human closes a parent early ("good enough for now") with
 
     sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh close-early --reason <why>

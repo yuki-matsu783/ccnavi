@@ -10,7 +10,6 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh ready [--parent <親>]                  （閉じたチケットを logs/archive/ へ退避し、MR の Draft を外し、親のワークツリーを消す）
 #   sh .ccnavi/scripts/ccnavi-review.sh close-early --reason <理由> [--no-issue]  （ユーザが端末で打つ。残りを issue に書き出して早めに閉じる）
 #   sh .ccnavi/scripts/ccnavi-review.sh origin                                 （origin をどう読んだか。ホスト・scheme・API の URL）
-#   sh .ccnavi/scripts/ccnavi-review.sh chat <N>              （ユーザが端末で打つ。chat のフェーズのレビュー済み）
 #
 # リモート（GitHub / GitLab）を読み書きするのはこのスクリプトで、ccnavi の実行ファイルは
 # ネットワークに出ない。実行ファイルが見るのは作業ツリーの中（フェーズ・ブランチ・マーカー）
@@ -42,12 +41,12 @@
 # GITHUB_TOKEN / GITLAB_TOKEN。どちらも無ければ止まる。結果の組み立てには jq が要る。
 # 道具は起動時に絶対パスへ解いて固定する。PATH の細工で差し替えられないように。
 #
-# 取り込み済みの親子のチケット（origin があり、親子のチケットの取り込み状態が present。chat だけのものを除く）では、状態を書く
+# 取り込み済みの親子のチケット（origin があり、親子のチケットの取り込み状態が present。マージリクエストで見るフェーズが無いものを除く）では、状態を書く
 # request（マーカー）・confirm・decide（--preview を除く）・ready を C1 で回す
 # （Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため）。
 # ロック → 途中の操作の確認 → hook のマーカーと状態の履歴を先にコミット → 取り込み → 未送信の確かめを済ませてから
 # ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
-# ユーザの判断（chat・close-early）は実行ファイルが書いた後、取り込み済みの親子のチケットなら
+# ユーザの判断（close-early）は実行ファイルが書いた後、取り込み済みの親子のチケットなら
 # 承認の push（ccnavi-push-approved.sh <親>）を呼んで送る。
 # ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、承認の push の打ち直しを案内する。
 # それ以外は今のまま。
@@ -60,7 +59,7 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-early|chat|fetch|origin|merged> [--phase <N>] [--body-file <path>] [--eli5 <html>] [--parent <親>]
+sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-early|fetch|origin|merged> [--phase <N>] [--body-file <path>] [--eli5 <html>] [--parent <親>]
 
   request      --phase <N> --body-file <依頼文> --eli5 <HTML>
                                                   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く。
@@ -74,7 +73,6 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
   decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（ユーザが端末で打つ。--preview は一覧を JSON で見るだけ）
   ready        [--parent <親>]                    閉じられて push 済みなら、閉じたチケットを logs/archive/ へ退避し wip/ の追跡済みのファイルを消して削除を push し、Draft を外す（「マージに進んでよい」の合図。マージはユーザが squash で）。最後に親のワークツリーを消す（中から打ったときは消さず、外から打つ 1 本を出す）。--parent なら親のワークツリーの外から打てる
   close-early  --reason <理由> [--no-issue]       まだ残っているが早めに閉じる判断（ユーザが端末で打つ）。残りを issue に書き出す。Draft は親が ready で外す
-  chat         <N>                                chat で見るフェーズをユーザがこのセッションで見終えた（ユーザが端末で打つ。ccnavi --reviewed <N> --chat）
   fetch                                           リモートから取ってきた時点の状態を JSON で標準出力へ
   origin                                          origin をどう読んだか（ホスト・scheme・API の URL）
   merged                                          いまのブランチのマージリクエストがマージ済みなら "merged <番号>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が観測ずれを確かめる）
@@ -102,13 +100,13 @@ fail() {
 sub="$1"
 shift
 case "$sub" in
-request | confirm | comment | decide | ready | close-early | chat | fetch | origin | merged) ;;
+request | confirm | comment | decide | ready | close-early | fetch | origin | merged) ;;
 -h | --help | help)
 	usage
 	exit 0
 	;;
 *)
-	fail unknown-sub "$sub は通しません。使えるのは request / confirm / comment / decide / ready / close-early / chat / fetch / origin / merged です。" 2
+	fail unknown-sub "$sub は通しません。使えるのは request / confirm / comment / decide / ready / close-early / fetch / origin / merged です。" 2
 	;;
 esac
 
@@ -220,11 +218,7 @@ exe_knows() {
 }
 
 # ---- リモート。origin の URL でホストを見分ける。
-# ユーザの判断の入口（chat）はホストに触らないので、origin も道具も要らない。
 needs_host=yes
-case "$sub" in
-chat) needs_host=no ;;
-esac
 if [ "$needs_host" = yes ]; then
 	origin=$(git remote get-url origin 2>/dev/null || :)
 	[ -z "$origin" ] && fail no-origin "origin が無い。レビューは実際のマージリクエストに結び付けるので、リモートが要る。"
@@ -1199,16 +1193,5 @@ close-early)
 	# 取り込み済みの親子のチケットなら、早めに閉じたマーカー（ユーザの判断）を承認の push で送る。
 	carry_human "$family" || exit 1
 	printf 'OK: 早めに閉じた（%s）。あとは親に、閉じて片付けて push し、ready を打たせてください。マージはユーザが行う\n' "$url"
-	;;
-chat)
-	# ユーザが端末で打つ。chat で見るフェーズを、このセッションで見終えたと置く（ccnavi --reviewed <N> --chat）。
-	# 取り込み済みの親子のチケットなら、置いた後に承認の push で送る。
-	n="${1:-}"
-	case "$n" in
-	'' | *[!0-9]*) fail chat-no-phase "chat には <N>（フェーズ番号）が要る。" 2 ;;
-	esac
-	[ "$#" -eq 1 ] || fail chat-bad-args "chat は <N> だけを取る。" 2
-	ccnavi --reviewed "$n" --chat || exit $?
-	carry_human "$family" || exit 1
 	;;
 esac

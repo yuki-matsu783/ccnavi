@@ -25,9 +25,10 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
    tests/config/ が見る）
 8. hook の書きかけ（pending・skipped・状態の履歴の追記）はコミットし、
    ユーザの判断（c）と知らない変更（d）は止める
-9. ユーザの判断の入口（ccnavi-review.sh chat など）は、取り込み済みの親子のチケットなら
+9. ユーザの判断の入口（ccnavi-review.sh close-early など）は、取り込み済みの親子のチケットなら
    承認の push を自動で呼ぶ
-10. 取り込み状態の無い親子のチケット・origin の無いリポジトリ・chat だけの親子のチケットは今のまま
+10. 取り込み状態の無い親子のチケット・origin の無いリポジトリ・
+    マージリクエストで見るフェーズが無い親子のチケットは今のまま
     （コミットも push もしない）
 11. 承認の push（ccnavi-push-approved.sh <親>）は取り込んでから送り、失敗してもコミットを残す
 12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、C1 の confirm が
@@ -406,7 +407,7 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.dirty(), "")
 
     def test_a_human_decision_not_yet_sent_stops_without_writing(self):
-        self.mark(1, "reviewed", {"by": "chat", "at": "t"})
+        self.mark(1, "reviewed", {"by": "decide", "at": "t"})
         copy = self.read(self.copy(PARENT))
         head = self.sha(self.tree, "HEAD")
         result = self.ticket("start", PARENT)
@@ -959,13 +960,13 @@ class C1NotImportedTest(C1Harness):
         self.assertIn(f"{APPROVED}/doing/{PARENT}.md", self.dirty())
 
 
-class C1ChatOnlyTest(C1Harness):
-    """10. chat だけの親子のチケット（マージリクエストを持たない）は、
+class C1WithoutMrTest(C1Harness):
+    """10. マージリクエストで見るフェーズが無い親子のチケットは、
     取り込み済みでも
     C1 にしない。
     """
 
-    plan = ("chores",)
+    plan = ("research",)
 
     def test_start_only_writes(self):
         head = self.sha(self.tree, "HEAD")
@@ -975,14 +976,14 @@ class C1ChatOnlyTest(C1Harness):
         self.assertIn(f"{APPROVED}/doing/{PARENT}.md", self.dirty())
         family = self.exe("c1", "family", PARENT)
         self.assertIn("target no", family.stdout)
-        self.assertIn("chat だけの親子のチケット", family.stdout)
+        self.assertIn("マージリクエストで見るフェーズが無い親子のチケット", family.stdout)
 
 
 class PhaseOne:
-    """フェーズ 1（chat で見る）の子を閉じるまでの道具。"""
+    """フェーズ 1 の子を閉じるまでの道具。"""
 
     def finish_phase_one(self):
-        """フェーズ 1（chat で見る）の子を着手して閉じる。"""
+        """フェーズ 1 の子を着手して閉じる。"""
         self.assertEqual(self.ticket("start", PARENT).returncode, 0)
         tree = self.child_tree()
         started = self.ticket("start", CHILD)
@@ -1001,29 +1002,6 @@ class C1HumanTest(PhaseOne, C1Harness):
     """
 
     plan = ("chores", "design")
-
-    def test_chat_review_is_carried(self):
-        self.finish_phase_one()
-        result = self.sh("ccnavi-review.sh", "chat", "1", cwd=self.tree, stdin="y\n")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        rel = f"{APPROVED}/phases/{PARENT}/1.reviewed"
-        self.assertTrue(os.path.isfile(os.path.join(self.tree, rel)))
-        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
-        self.assertIn(rel, self.committed())
-        self.assertEqual(self.dirty(), "")
-
-    def test_a_chat_review_typed_directly_is_named_as_a_human_decision(self):
-        """直に打った chat の書き込みは、次の C1 で (c) として止まり、承認の push を案内する。"""
-        self.finish_phase_one()
-        typed = self.exe("--cwd", self.tree, "--reviewed", "1", "--chat", stdin="y\n")
-        self.assertEqual(typed.returncode, 0, typed.stdout + typed.stderr)
-        stopped = self.ticket("finish", CHILD)
-        self.assertEqual(stopped.returncode, 1, stopped.stdout + stopped.stderr)
-        self.assertIn("ユーザの判断が未送信", stopped.stderr)
-        self.assertNotIn("知らない変更", stopped.stderr)
-        carried = self.sh("ccnavi-push-approved.sh", PARENT)
-        self.assertEqual(carried.returncode, 0, carried.stdout + carried.stderr)
-        self.assertEqual(self.dirty(), "")
 
     def test_push_approved_without_names_skips_child_trees(self):
         """名前を省いた承認の push: 親は 1 度だけコミットして push し、
@@ -1131,26 +1109,6 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認済みチケットを、取り込んでから", result.stdout)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
-
-
-class C1NotImportedHumanTest(PhaseOne, C1Harness):
-    """10. 取り込み状態の無い親子のチケットでは、
-    ユーザの判断の入口は置くだけでコミットしない（今のまま）。"""
-
-    plan = ("chores", "design")
-    imported = False
-
-    def test_chat_review_is_not_carried(self):
-        self.finish_phase_one()
-        head = self.sha(self.tree, "HEAD")
-        remote = self.remote_sha()
-        result = self.sh("ccnavi-review.sh", "chat", "1", cwd=self.tree, stdin="y\n")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        rel = f"{APPROVED}/phases/{PARENT}/1.reviewed"
-        self.assertTrue(os.path.isfile(os.path.join(self.tree, rel)))
-        self.assertEqual(self.sha(self.tree, "HEAD"), head)
-        self.assertEqual(self.remote_sha(), remote)
-        self.assertNotIn("push-approved", result.stdout + result.stderr)
 
 
 # 実行ファイルの半分の代役。残った指摘の行き先（`--reviewed ... --yes`）だけを代わりに書き

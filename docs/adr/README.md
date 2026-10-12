@@ -233,3 +233,4 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0036](0036-tests-at-stop.md) | テストは編集ごとの hook ではなくターンの終わりに回す |
 | [0061](0061-ext-tests-by-group-at-stop.md) | 拡張のテストもターンの終わりに回し、回すのは触ったファイルが関わるグループだけ |
 | [0037](0037-rewrite-design-doc.md) | 設計書を実装に合わせて書き直す |
+| [0132](0132-abolish-review-chat.md) | レビューの chat を廃止し、見る場所を none と mr の 2 つにする |
