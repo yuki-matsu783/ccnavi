@@ -19,7 +19,17 @@ import * as crypto from "node:crypto";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { checkTemplates, loadBoard, runTemplateImport, runTemplateImportYes, runTemplates, runTemplateShow } from "./ccnavi.js";
+import {
+  checkTemplates,
+  checkTemplatesEdit,
+  loadBoard,
+  runTemplateEdit,
+  runTemplateEditYes,
+  runTemplateImport,
+  runTemplateImportYes,
+  runTemplates,
+  runTemplateShow,
+} from "./ccnavi.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { loadingText } from "./core/loading-render.js";
 import type { BoardJson } from "./core/model.js";
@@ -27,8 +37,9 @@ import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import type { TemplatesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
 import { templatesLayerOf } from "./core/templatesmodel.js";
+import { editLockReason } from "./core/templates-lock.js";
 import { renderTemplatesPage } from "./core/templates-render.js";
-import type { ImportRequest, TemplatesData, TemplatesJson, TemplatesMessage, ToTemplates } from "./core/templates-view.js";
+import type { EditRequest, ImportRequest, TemplatesData, TemplatesJson, TemplatesMessage, ToTemplates } from "./core/templates-view.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
 import * as diaglog from "./log.js";
@@ -54,6 +65,8 @@ interface Loaded {
   readonly projectLocks: Record<string, Lock>;
   /** 取り込み先に選べる層の名前（`data.layers` の name のうち common 以外） */
   readonly importLayers: readonly string[];
+  /** 編集の旗を実行ファイルが持つか。持たなければ理由（画面の編集の欄を無効にする） */
+  readonly edit: { readonly enabled: boolean; readonly reason: string };
   /** 上部に出す注意。今は空のまま渡す（画面の欄を残すため） */
   readonly notices: readonly string[];
 }
@@ -205,7 +218,7 @@ async function switchTarget(current: PanelState, target: TemplatesTarget): Promi
     }
     current.asking = true;
     const choice = await vscode.window.showWarningMessage(
-      `プレビューを開いています。破棄して「${titleOf(target)}」に切り替えますか？`,
+      `編集または下見を開いています。破棄して「${titleOf(target)}」に切り替えますか？`,
       { modal: true },
       "切り替える",
     );
@@ -268,7 +281,10 @@ async function readPage(root: string, target: TemplatesTarget): Promise<Loaded> 
   }
   const { lock, projectLocks } = locksOf(board.board);
   const importLayers = result.value.layers.map((l) => l.name).filter((n) => n !== "common");
-  return { target, data: result.value, targets, lock, projectLocks, importLayers, notices: [] };
+  // 編集の旗は取り込みとは別に確かめる。持たない古い実行ファイルでは、編集の欄だけを無効にする
+  const editReason = await checkTemplatesEdit(root, binSetting());
+  const edit = { enabled: editReason === undefined, reason: editReason ?? "" };
+  return { target, data: result.value, targets, lock, projectLocks, importLayers, edit, notices: [] };
 }
 
 function registerPanelHandlers(current: PanelState): void {
@@ -441,6 +457,7 @@ function show(current: PanelState): void {
       lock: current.lock,
       projectLocks: current.projectLocks,
       importLayers: loaded.importLayers,
+      edit: loaded.edit,
       notices: loaded.notices,
     },
   });
@@ -567,7 +584,7 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
     case "refresh": {
       if (message.dirty) {
         const choice = await vscode.window.showWarningMessage(
-          "プレビューを開いています。破棄して更新しますか？",
+          "編集または下見を開いています。破棄して更新しますか？",
           { modal: true },
           "更新",
         );
@@ -628,6 +645,24 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
       await importYes(current, message.request, message.expect);
       return;
     }
+    case "previewEdit": {
+      // 下見は何も書かない。答えを見せるだけ
+      const result = await runTemplateEdit(current.folder.uri.fsPath, binSetting(), message.request);
+      if (!alive(current)) {
+        return;
+      }
+      current.host.post({
+        type: "editPreview",
+        request: message.request,
+        answer: result.ok ? result.value : null,
+        error: result.ok ? "" : result.error,
+      } satisfies ToTemplates);
+      return;
+    }
+    case "editYes": {
+      await editYes(current, message.request, message.expect);
+      return;
+    }
   }
 }
 
@@ -684,6 +719,106 @@ async function importYes(current: PanelState, request: ImportRequest, expect: st
   current.host.post({ type: "imported", request, answer, error: result.ok ? "" : result.error } satisfies ToTemplates);
 }
 
+/**
+ * 編集の実行。取り込みと同じく、実行ファイルを呼ぶ前に拡張の側で確かめられることを確かめる。
+ * 書けたら一覧と下書きを読み直す（下書きは編集で消えることがある）。
+ */
+async function editYes(current: PanelState, request: EditRequest, expect: string): Promise<void> {
+  const refuse = (error: string): void => {
+    current.host.post({ type: "edited", request, answer: null, error } satisfies ToTemplates);
+  };
+  const loaded = current.loaded;
+  if (loaded === undefined) {
+    refuse("画面を読み直してください");
+    return;
+  }
+  if (!loaded.edit.enabled) {
+    refuse(loaded.edit.reason);
+    return;
+  }
+  // 錠は押した時点で取り直す（取り込みと同じ理由）
+  const fresh = await refreshLock(current);
+  if (!alive(current)) {
+    return;
+  }
+  const reason = lockReasonOf(fresh, request);
+  if (reason !== "") {
+    refuse(reason);
+    return;
+  }
+  if (request.on === "project" && !loaded.importLayers.includes(request.layer)) {
+    refuse(`層が一覧にありません: ${request.layer}`);
+    return;
+  }
+  if (request.op === "move" && request.to === "project" && !loaded.importLayers.includes(request.toLayer)) {
+    refuse(`層が一覧にありません: ${request.toLayer}`);
+    return;
+  }
+  // 下書きを既存のものとして触る操作だけ、一覧に在るかを見る。保存は新しい下書きも作るので見ない
+  const touchesDraft = request.op === "delete-draft" || (request.op !== "save" && request.on === "draft");
+  if (touchesDraft && !loaded.data.drafts.some((d) => d.name === request.name)) {
+    refuse(`下書きが一覧にありません: ${request.name}`);
+    return;
+  }
+  if (!/^[0-9a-f]{64}$/.test(expect)) {
+    refuse("ハッシュの形が違います");
+    return;
+  }
+
+  const result = await runTemplateEditYes(current.folder.uri.fsPath, binSetting(), request, expect);
+  if (!alive(current)) {
+    return;
+  }
+  const answer = result.ok ? result.value : null;
+  if (answer !== null && (answer.written || answer.removed)) {
+    // 取り込みと同じく、先に読み直してから結果を送る
+    current.dirty = false;
+    await reload(current);
+    if (!alive(current)) {
+      return;
+    }
+  }
+  current.host.post({ type: "edited", request, answer, error: result.ok ? "" : result.error } satisfies ToTemplates);
+}
+
+/**
+ * 編集の主語（と移す先）の錠。下書きだけを触る操作には効力が無いので空文字。掛かっていなければ空文字、
+ * 掛かっていればその理由。主語は common なら共通の錠、project なら層の錠（無ければ作業中全体の錠）
+ */
+function lockReasonOf(fresh: { lock: Lock; projectLocks: Record<string, Lock> }, request: EditRequest): string {
+  return editLockReason(request, fresh.lock, fresh.projectLocks);
+}
+
+function asEditRequest(value: unknown): EditRequest | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+  const r = value as { op?: unknown; name?: unknown; on?: unknown; layer?: unknown; newName?: unknown; to?: unknown; toLayer?: unknown; body?: unknown };
+  const op = r.op;
+  const on = r.on;
+  const to = r.to;
+  if (op !== "save" && op !== "delete-draft" && op !== "rename" && op !== "move" && op !== "delete") {
+    return undefined;
+  }
+  if (on !== "draft" && on !== "common" && on !== "project") {
+    return undefined;
+  }
+  if (to !== "" && to !== "common" && to !== "project") {
+    return undefined;
+  }
+  if (
+    typeof r.name !== "string" ||
+    typeof r.layer !== "string" ||
+    typeof r.newName !== "string" ||
+    typeof r.toLayer !== "string" ||
+    typeof r.body !== "string" ||
+    r.name.trim() === ""
+  ) {
+    return undefined;
+  }
+  return { op, name: r.name, on, layer: r.layer, newName: r.newName, to, toLayer: r.toLayer, body: r.body };
+}
+
 function asRequest(value: unknown): ImportRequest | undefined {
   if (typeof value !== "object" || value === null) {
     return undefined;
@@ -719,6 +854,14 @@ function asMessage(message: unknown): TemplatesMessage | undefined {
     case "importYes": {
       const request = asRequest(m.request);
       return request !== undefined && typeof m.expect === "string" ? { type: "importYes", request, expect: m.expect } : undefined;
+    }
+    case "previewEdit": {
+      const request = asEditRequest(m.request);
+      return request === undefined ? undefined : { type: "previewEdit", request };
+    }
+    case "editYes": {
+      const request = asEditRequest(m.request);
+      return request !== undefined && typeof m.expect === "string" ? { type: "editYes", request, expect: m.expect } : undefined;
     }
     case "ready":
     case "tourDone":

@@ -5,11 +5,22 @@
     ccnavi --templates --draft <親> [--name <名前>] [--json]
     ccnavi --templates --import <下書き> --to common|project [--layer <名前>] [--replace]
                        [--yes --expect <ハッシュ>] [--json]
+    ccnavi --templates --save-draft <名前> --body-file <ファイル>
+                       [--yes --expect <ハッシュ>] [--json]
+    ccnavi --templates --delete-draft <名前> [--yes --expect <ハッシュ>] [--json]
+    ccnavi --templates --rename-template <名前> --new-name <新名> --on draft|common|project
+                       [--layer <名前>] [--yes --expect <ハッシュ>] [--json]
+    ccnavi --templates --move-template <名前> --on common|project [--layer <名前>]
+                       --to common|project [--to-layer <名前>] [--yes --expect <ハッシュ>] [--json]
+    ccnavi --templates --delete-template <名前> --on common|project [--layer <名前>]
+                       [--yes --expect <ハッシュ>] [--json]
 
 一覧・検索・表示は読むだけ。`--draft` は完了した親から下書きの置き場に下書きを書くだけで、
-下書きに効力は無いので、どちらもエージェントが打ってよい。`--import` はユーザ専用で、`--yes` と
-`--expect` が揃ったときだけ書く。エージェントが打てない形は `phase_forms._CLI_FORMS` が止める。
-cli を読まない。
+下書きに効力は無いので、エージェントが打ってよい。`--delete-draft` の下見（`--yes` なし）も
+エージェントが打ってよい。`--import` はユーザ専用で、`--yes` と `--expect` が揃ったときだけ書く。
+`--save-draft` `--rename-template` `--move-template` `--delete-template` もエージェントが打てない
+（下見も含む。下書きの編集は Write で行う）。エージェントが打てない形は `phase_forms._CLI_FORMS`
+が止める。cli を読まない。
 """
 
 from __future__ import annotations
@@ -22,11 +33,34 @@ from ..infra import settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN
-from ..tickets import plan_templates, template_drafts
+from ..tickets import flow, plan_templates, template_drafts, template_edit
 from . import cli_args
 
-# 値なしで渡された `--yes`。`--import` だけが読む（ほかの経路の `--yes` は識別子を取る）。
+# 値なしで渡された `--yes`。取り込みと編集の旗だけが読む（ほかの経路の `--yes` は識別子を取る）。
 BARE_YES = "\x00bare"
+
+# 編集の旗（旗, 引数の属性, op）。1 度に 1 つだけ渡す。
+EDIT_FLAGS = (
+    ("--save-draft", "save_draft", template_edit.OP_SAVE),
+    ("--delete-draft", "delete_draft", template_edit.OP_DELETE_DRAFT),
+    ("--rename-template", "rename_template", template_edit.OP_RENAME),
+    ("--move-template", "move_template", template_edit.OP_MOVE),
+    ("--delete-template", "delete_template", template_edit.OP_DELETE),
+)
+
+
+def edit_op(args) -> tuple[str, str, str]:
+    """渡された編集の旗 (旗, 名前, op)。無ければ ("", "", "")。"""
+    for flag, attr, op in EDIT_FLAGS:
+        value = getattr(args, attr)
+        if value is not None:
+            return flag, value, op
+    return "", "", ""
+
+
+def editing(args) -> bool:
+    """取り込み（--import）か編集の旗が渡されたか。値なしの --yes を読む形。"""
+    return args.import_ is not None or bool(edit_op(args)[0])
 
 
 def _ticket_new(args: argparse.Namespace) -> bool:
@@ -47,11 +81,88 @@ def asked(args: argparse.Namespace) -> bool:
         or args.name
         or args.to
         or args.replace
+        or bool(edit_op(args)[0])
+        or bool(args.new_name)
+        or bool(args.on)
+        or bool(args.to_layer)
     )
+
+
+def _edit_problem(args: argparse.Namespace) -> str | None:
+    """編集の旗（保存・削除・改名・移動）の組み合わせの誤り。編集の旗が無ければ None。
+
+    正しければ空文字。
+    """
+    flag, name, op = edit_op(args)
+    if not flag:
+        return None
+    others = [f for f, attr, _ in EDIT_FLAGS if f != flag and getattr(args, attr) is not None]
+    if others:
+        return (
+            "--save-draft / --delete-draft / --rename-template / --move-template / "
+            "--delete-template は一緒に使えない"
+        )
+    if args.draft is not None or args.import_ is not None:
+        return f"{flag} は --draft・--import と一緒に使えない"
+    if args.show is not None or args.keyword:
+        return f"{flag} は --show・--keyword と一緒に使えない"
+    if not name.strip():
+        return f"{flag} には名前を渡す"
+    if op == template_edit.OP_SAVE:
+        if not args.body_file:
+            return "--save-draft には --body-file <ファイル> を付ける"
+        if args.new_name or args.on or args.to or args.to_layer or args.layer or args.replace:
+            return "--save-draft に使えない旗がある（--body-file だけ）"
+    elif op == template_edit.OP_DELETE_DRAFT:
+        if (
+            args.body_file
+            or args.new_name
+            or args.on
+            or args.to
+            or args.to_layer
+            or args.layer
+            or args.replace
+        ):
+            return "--delete-draft に使えない旗がある"
+    elif op == template_edit.OP_RENAME:
+        if args.on not in ("draft", "common", "project"):
+            return "--rename-template には --on draft か common か project を付ける"
+        if not args.new_name.strip():
+            return "--rename-template には --new-name を付ける"
+        if args.body_file or args.to or args.to_layer or args.replace:
+            return "--rename-template に使えない旗がある"
+        if args.layer and args.on != template_edit.ON_PROJECT:
+            return "--layer は --on project のときだけ使う"
+    elif op == template_edit.OP_MOVE:
+        if args.on not in (template_edit.ON_COMMON, template_edit.ON_PROJECT):
+            return "--move-template には --on common か project を付ける"
+        if args.to not in template_drafts.TARGETS:
+            return "--move-template には --to common か project を付ける"
+        if args.layer and args.on != template_edit.ON_PROJECT:
+            return "--layer は --on project のときだけ使う"
+        if args.to_layer and args.to != template_drafts.TO_PROJECT:
+            return "--to-layer は --to project のときだけ使う"
+        if args.body_file or args.new_name or args.replace:
+            return "--move-template に使えない旗がある"
+    elif op == template_edit.OP_DELETE:
+        if args.on not in (template_edit.ON_COMMON, template_edit.ON_PROJECT):
+            return "--delete-template には --on common か project を付ける"
+        if args.layer and args.on != template_edit.ON_PROJECT:
+            return "--layer は --on project のときだけ使う"
+        if args.body_file or args.new_name or args.to or args.to_layer or args.replace:
+            return "--delete-template に使えない旗がある"
+    if args.yes not in ("", BARE_YES):
+        return f"--yes に値は付けない（{flag} --yes --expect <ハッシュ>）"
+    if args.yes and args.expect is None:
+        return "--yes には --expect <主語のハッシュ>（下見が見せる）を付ける"
+    return ""
 
 
 def _storing_problem(args: argparse.Namespace) -> str:
     """溜める側（`--draft` / `--import`）の組み合わせの誤り。"""
+    edit = _edit_problem(args)
+    if edit is not None:
+        return edit
     if args.draft is not None and args.import_ is not None:
         return "--draft と --import は一緒に使えない"
     if args.draft is not None:
@@ -112,19 +223,30 @@ def usage_problem(args: argparse.Namespace) -> str:
             ("--name", bool(args.name)),
             ("--to", bool(args.to)),
             ("--replace", args.replace),
+            ("--save-draft", args.save_draft is not None),
+            ("--delete-draft", args.delete_draft is not None),
+            ("--rename-template", args.rename_template is not None),
+            ("--move-template", args.move_template is not None),
+            ("--delete-template", args.delete_template is not None),
+            ("--new-name", bool(args.new_name)),
+            ("--on", bool(args.on)),
+            ("--to-layer", bool(args.to_layer)),
         ):
             if given:
                 return f"{flag} は --templates と一緒に使う"
         return ""
     if args.docs:
         return "--templates は --docs と一緒に使えない"
-    # 値なしの `--yes` は `--import` が読む。ほかの経路のフラグとは並べられない。
+    # 値なしの `--yes` は `--import` と編集の旗が読む。ほかの経路のフラグとは並べられない。
     probe = argparse.Namespace(**vars(args))
-    if args.import_ is not None:
+    if editing(args):
         probe.yes = ""
     # 取り込みを書く形の `--via`（board だけ）は、cli が見る。ここでは断らない。
-    if args.import_ is not None and args.yes:
+    if editing(args) and args.yes:
         probe.via = ""
+    # 保存の本文（`--body-file`）は下書きの中身で、`--docs` の断りには当たらない。
+    if edit_op(args)[2] == template_edit.OP_SAVE:
+        probe.body_file = ""
     refused = cli_args._not_with_docs(probe)
     if refused:
         return f"--templates は {refused} と一緒に使えない"
@@ -137,7 +259,7 @@ def usage_problem(args: argparse.Namespace) -> str:
     storing = _storing_problem(args)
     if storing:
         return storing
-    if args.expect is not None and args.import_ is None:
+    if args.expect is not None and not editing(args):
         return "--expect は --import と一緒に使う"
     if args.show is not None and args.keyword:
         return "--show は --keyword と一緒に使えない"
@@ -157,6 +279,8 @@ def run(
 
     `--layer` を省けば、一覧と表示はワークスペース自身のレイヤー（共通 + self）。
     """
+    if edit_op(args)[0]:
+        return _edit(stdout, stderr, conf, root, args)
     if args.draft is not None:
         return _draft(stdout, stderr, conf, root, args)
     if args.import_ is not None:
@@ -360,6 +484,122 @@ def _import_text(
         stdout.write(f"下書き {draft.rel} を消した（取り込んだときと同じ中身だった）\n")
     elif result.kept:
         stdout.write(f"下書き {draft.rel}: {result.kept}\n")
+
+
+def _edit(
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    args: argparse.Namespace,
+) -> int:
+    """下書きの保存・削除、取り込み済みの改名・移動・削除（`--save-draft` など。ユーザ専用）。
+
+    `--yes` と `--expect` が揃うまで何も書かない。
+    """
+    flag, name, op = edit_op(args)
+    body = None
+    if op == template_edit.OP_SAVE:
+        try:
+            with open(args.body_file, "rb") as f:
+                # 上限の 1 バイト先まで読み、大きすぎは prepare に断らせる。
+                body = f.read(flow.FILE_LIMIT + 1)
+        except OSError as exc:
+            return _fail(stdout, stderr, args.json, f"--body-file を読めない（{exc}）")
+    on = args.on
+    if op in (template_edit.OP_SAVE, template_edit.OP_DELETE_DRAFT):
+        on = template_edit.ON_DRAFT
+    plan = template_edit.prepare(
+        conf,
+        root,
+        op,
+        name.strip(),
+        on=on,
+        layer=args.layer.strip(),
+        new_name=args.new_name,
+        to=args.to,
+        to_layer=args.to_layer.strip(),
+        body=body,
+    )
+    result = None
+    if args.yes:
+        result = template_edit.commit(plan, args.expect or "")
+    elif args.expect is not None and plan.ok and args.expect != plan.sha:
+        plan.errors.append(
+            "--expect が主語の今の中身のハッシュと違う（見せたあとに書き直された）。"
+            f"今のハッシュ: {plan.sha}"
+        )
+    ok = result.ok if result is not None else plan.ok
+    if args.json:
+        stdout.write(json.dumps(template_edit.plan_json(plan, result), ensure_ascii=True, indent=1))
+        stdout.write("\n")
+        return EXIT_OK if ok else EXIT_ERROR
+    out = stdout if ok else stderr
+    _edit_text(out, stdout, plan, result, flag, args)
+    return EXIT_OK if ok else EXIT_ERROR
+
+
+def _edit_text(
+    out: TextIO,
+    stdout: TextIO,
+    plan: template_edit.EditPlan,
+    result: template_edit.EditResult | None,
+    flag: str,
+    args: argparse.Namespace,
+) -> None:
+    if plan.source_rel:
+        stdout.write(f"{flag} {plan.name}: {plan.source_rel}\n")
+    if plan.sha:
+        stdout.write(f"  ハッシュ: {plan.sha}\n")
+    if plan.target_rel and plan.target_rel != plan.source_rel:
+        stdout.write(f"  書き先: {plan.target_rel}\n")
+    # 読み違えを誘う文字は `\uXXXX` にして見せる（`prepare` が reveal 済みの文を作る）。
+    for problem in plan.problems:
+        stdout.write(f"  {_label(problem.severity)} {plan_templates.reveal(problem.detail)}\n")
+    for line in plan.infos:
+        stdout.write(f"  info  {plan_templates.reveal(line)}\n")
+    errors = result.errors if result is not None and result.errors else plan.errors
+    for line in errors:
+        out.write(f"ccnavi: {plan_templates.reveal(line)}\n")
+    if errors:
+        if result is None:
+            stdout.write("何も書いていない。\n")
+        return
+    if result is None:
+        if plan.diff:
+            stdout.write(f"--- 差分（前後 {template_drafts.DIFF_CONTEXT} 行つき） ---\n")
+            for line in plan.diff:
+                stdout.write(line + "\n")
+        stdout.write("何も書いていない。この内容で実行するなら、ユーザが次を打つ。\n")
+        stdout.write(
+            f"  ccnavi --templates {_edit_tokens(flag, plan, args)} --yes --expect {plan.sha}\n"
+        )
+        return
+    if plan.op == template_edit.OP_SAVE:
+        stdout.write(f"書いた: {plan.target_rel}\n")
+    elif plan.op in (template_edit.OP_RENAME, template_edit.OP_MOVE):
+        stdout.write(f"書いた: {plan.target_rel}（元の {plan.source_rel} を消した）\n")
+    else:
+        stdout.write(f"消した: {plan.source_rel}\n")
+    for line in result.infos:
+        stdout.write(f"  info  {line}\n")
+
+
+def _edit_tokens(flag: str, plan: template_edit.EditPlan, args: argparse.Namespace) -> str:
+    """下見の答えを書き込みの形に直した旗の並び（`--yes --expect` の前まで）。"""
+    tokens = [flag, plan.name]
+    if plan.op == template_edit.OP_SAVE:
+        tokens += ["--body-file", args.body_file]
+    for flag_name, value in (
+        ("--on", args.on),
+        ("--new-name", args.new_name),
+        ("--layer", args.layer),
+        ("--to", args.to),
+        ("--to-layer", args.to_layer),
+    ):
+        if value:
+            tokens += [flag_name, value]
+    return " ".join(tokens)
 
 
 def _show_change(stdout: TextIO, plan: template_drafts.ImportPlan) -> None:

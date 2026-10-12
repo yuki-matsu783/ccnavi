@@ -29,6 +29,8 @@ export interface VersionInfo {
   readonly built: boolean;
   readonly compat: number;
   readonly flags: readonly string[];
+  /** 旗から読めない振る舞い（JSON の欄の有無など）。`features` を持たない古い実行ファイルは空 */
+  readonly features: readonly string[];
 }
 
 /**
@@ -68,6 +70,7 @@ export function parseVersionJson(text: string): ParsedVersion {
       built: r.built === true,
       compat: r.compat,
       flags: r.flags.filter((f): f is string => typeof f === "string"),
+      features: Array.isArray(r.features) ? r.features.filter((f): f is string => typeof f === "string") : [],
     },
   };
 }
@@ -129,4 +132,22 @@ export function missingFlags(probe: VersionProbe, flags: readonly string[], what
     return undefined;
   }
   return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} に対応していません（古い版です）。${what} で確かめられないので進めません。${rebuildHint(fromSource)}`;
+}
+
+/**
+ * 振る舞い（`features`）を実行ファイルが持つかを見る。持っていれば undefined、足りなければ理由。
+ * 文面と確かめられないときの扱いは `missingFlags` と同じ。`what` は使おうとしたもの
+ */
+export function missingFeatures(probe: VersionProbe, features: readonly string[], what: string, fromSource: boolean): string | undefined {
+  if (probe.kind === "failed") {
+    return `実行ファイルの版を確かめられないので ${what} を使いません: ${probe.error}`;
+  }
+  if (probe.kind === "old") {
+    return `実行ファイルが古い版です（--version に対応していません）。${what} で確かめられないので進めません。${rebuildHint(fromSource)}`;
+  }
+  const missing = features.filter((feature) => !probe.info.features.includes(feature));
+  if (missing.length === 0) {
+    return undefined;
+  }
+  return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} の機能を持ちません（古い版です）。${what} で確かめられないので進めません。${rebuildHint(fromSource)}`;
 }

@@ -84,6 +84,11 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 親のワークツリーの中）は共通レイヤーの写しで誰も編集しないので、`writable` は `false`。レイヤーの置き場は常に `true`。
 ミラーへの配布は「案内と配布」の節のとおり。
 
+`drafts[]` には下書きの本文そのまま（`text`）を足す（`--show --json` の `template.text` と同じ読み方）。`--version --json` は `features`
+（文字列の配列: `templates.edit`・`templates.draft-text`・`board.template-draft`）を足し、旗から読めない振る舞いを古い実行ファイルと見分ける。
+`features` を足しても互換の版（COMPAT）は上げない。ボードの JSON（`--explain --json`）のチケットは `template_draft`（真偽）を持ち、完了した（`done/` の）
+計画付きの親（取り消し以外）だけ真。親のカードは、これが真のときだけ「テンプレートの下書きを作る」ボタンを出し、押すと `--templates --draft <親> --json` を呼ぶ。
+
 **`--lint`。** `lint_templates` が `plan_templates.scan` の苦情を `(templates)`（共通）・`(templates/<レイヤー>)` の場所で出す。
 置き場の無いワークスペースでは何も言わない。読むのは設定の置き場だけで、承認済みチケットの置き場は読まないので、走査に写し（`copies`）を
 渡す必要は無く、置き場の読み直しの回数も増えない。`--lint --json` の形は欄を足していないので、版は上げない。
@@ -143,12 +148,23 @@ launcher の正規表現だけに頼る穴は、この 2 段目を持たない�
 そうした文字を含む下書きは、検査が error にして取り込めない。
 
 **`--templates` の一覧。** 下書きがあれば最後に `下書き: N 件（wip/proposals/templates/）` を 1 行出す。`--json` は `drafts[]` を足す
-（`templates[]` にも `layers[]` にも `sums[]` にも入れない）。1 件は `name`・`tree`・`path`・`sha`・`valid`・`importable`・`checked_with`
+（`templates[]` にも `layers[]` にも `sums[]` にも入れない）。1 件は `name`・`tree`・`path`・`sha`・`text`・`valid`・`importable`・`checked_with`
 （検査に使ったフェーズ定義の層。`templates[].layer`＝ファイルが在る層とは意味が違うので名前を分けた）・
 `exists_in`（同名のテンプレートが在るレイヤー）・`also_in`（`tree` と同じ表記で、ワークスペースルートは空。人間向けの言い方は text 出力の側で作る）・`description`・`when`・`plan`・`feedback`・`flows`・`problems`。`errors` / `warns` /
 `infos` には数えない。`LINT_VERSION` は上げない。
 
 **`--lint`。** 下書きの苦情は `(template-drafts)` の場所で、error を warn に下げて出す（効力が無い）。深刻度は warn と info だけ。
+
+**編集（保存・改名・移動・削除）。** 旗は `--save-draft <名前> --body-file <ファイル>`（下書きの本文を置き換える）、`--delete-draft <名前>`（下書きを消す）、
+`--rename-template <名前> --new-name <新名> --on draft|common|project [--layer <層>]`（改名。`name:` も書き換え、行き先に同名があれば断る）、
+`--move-template <名前> --on common|project [--layer <層>] --to common|project [--to-layer <層>]`（層の間の移動。中身は変えず、行き先の定義で検査し、
+error があれば断る。行き先に同名があれば断る）、`--delete-template <名前> --on common|project [--layer <層>]`（取り込み済みを消す。下書きには触らず、
+ほかの層に同名があれば info で知らせる）。どれも `--yes` なしは下見で、何も書かずに差分・検査・主語のハッシュを返す。`--yes --expect <主語のハッシュ>` が
+揃ったときだけ書き、書く直前にも読み直して比べる。端末の確認は `--import` と同じ（標準入力が端末か。画面の子プロセスは `--via board` で免除）。
+保存は、`name:` を変える本文、UTF-8 でない本文、制御文字や書式文字を含む本文、上限（256KiB）を超える本文を断る。検査に error があっても書く（下書きに効力は無い）。
+エージェントが打てるのは `--delete-draft` の下見だけで、`--save-draft`・`--rename-template`・`--move-template`・`--delete-template` は下見も打てない（`phase_forms._CLI_FORMS`）。`--save-draft` を打たせないのは、`--body-file` に任意のパスを渡すと、読んだ中身が下見の出力（差分・本文）に出るため。エージェントは下書きを Write で直接編集する。
+`template_edit.prepare` が下見（主語の探索・検査・差分）、`template_edit.commit` が `--expect` の照合と書く処理を担う。主語の探索と
+衝突の判定（`template_drafts.collide`）は取り込みと共有する。`--json` の答えは `template_edit.plan_json`。
 
 **取り込んで消えた下書きのコミット。** `ccnavi-push-approved.sh` は `ls-files --deleted` で追跡されていて消えた `todo/` の提案と `flows/` の下書きを
 コミットする。`templates/` も同じ形で足した（C1 の手順の `carry_paths` と、そうでないツリーのコミットの 2 か所）。既存の挙動は変わらない。承認済みチケットの置き場に

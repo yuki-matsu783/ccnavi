@@ -150,6 +150,8 @@ export interface TicketJson {
   readonly predecessors_unmet: readonly PredecessorUnmetJson[];
   readonly human_review: { readonly required: boolean; readonly reason: string };
   readonly proposal: ProposalJson | null;
+  /** 完了した計画付きの親から、テンプレートの下書きを作れるか。この欄を出さない古い実行ファイルは偽 */
+  readonly template_draft: boolean;
   /**
    * 空でなければ「読めるが信頼できない」理由（親が引けないなど、範囲をどこで切り詰めるか決まらない）。判定はこのチケットの
    * ワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`copy.status` は
@@ -525,6 +527,7 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     history: list(raw.history).filter(isRecord).map(historyEntry),
     issues: list(raw.issues).map(str),
     attention: raw.attention === true,
+    template_draft: raw.template_draft === true,
   };
 }
 

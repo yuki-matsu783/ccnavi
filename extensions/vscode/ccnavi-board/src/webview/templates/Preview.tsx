@@ -30,7 +30,7 @@ export interface PreviewProps {
 }
 
 /** 差分の 1 行の色の区別。先頭の記号は消さず、色だけに頼らないようにする */
-function diffClass(line: string): string {
+export function diffClass(line: string): string {
   if (line.startsWith("@@")) {
     return "diff-hunk";
   }
