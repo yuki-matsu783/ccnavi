@@ -89,7 +89,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 ```
 
 - `steps` は上から順に回す。`resume: true` の step は、直前の step のセッション ID を `--resume` で渡す
-- step に `expect_after`（`decisions`・`state`。書き方は `expect` と同じ）を書くと、実行器はその step を回し終えたあとに評価し、満たさなければ後続の step（人間の操作を含む）に進まず `inconclusive` で止める。「この step の成果が出ていないのに、次の操作を人間に頼む」のを避けるため。欄が無い step はそのまま進む。人間の操作の step には付けない
+- step に `expect_after`（`decisions`・`state`。書き方は `expect` と同じ）を書くと、実行器はその step を回し終えたあとに評価し、満たさなければ後続の step（人間の操作を含む）に進まず `inconclusive` で止める。「この step の成果が出ていないのに、次の操作を人間に頼む」のを避けるため。欄が無い step はそのまま進む。人間の操作の step には付けない。評価で例外（コマンドのタイムアウトなど）が出たときも、止めて `inconclusive` にする。人間の操作の step に付けたり、`decisions`・`state` 以外の欄を書いたりすると、読み込みの時点で ValueError になる
 - `expect` の機械で比べる欄（`decisions`・`decisions_none`・`files_unchanged`・`state`・`transcript_forbidden`）は、
   比べられる形で書く。「それらしく見えた」は期待にしない。意味で読むものは `judge` に自然文の基準で書く（下の「判定の 3 つ」）
 - `decisions` の欄の意味と取りうる値は `tests/scenarios/README.md` の「前提」にある。`decision_not` は「その値でない」を比べる
@@ -124,10 +124,11 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    （`step-N.jsonl`、`report.md`、`report.json`、`evidence.md`）
 4. **人間の操作の step で止める。** 実行器は `instruction` と `check` を出して終了コード 10 で止まる。
    人間が「次へ」と言ったら `uv run python -m tests.scenarios.runner next <出力の置き場>` で続ける。直す必要があると言われたら、直してから `next` を打つ
-5. **判定を読む。** `report.md` に期待ごとの判定が出る（下の「判定の 3 つ」）。`judge` がある場合は、`evidence.md` を別のエージェントに読ませる
-6. **後片付けをする。** 実行器が `setup.files` を消す。シナリオで作ったワークツリー・ブランチ・MR は、`projects/test-repo` のものだけ残してよい（後でまとめて片付ける）。
+5. **`expect_after` を満たさず止まった回を扱う。** `expect_after` を満たさず止まった回は `next` で続けられない（終了コード 2）。prompt か期待を直して、`run` からやり直す。止まった回の `report.md` には `expect_after` の行が `inconclusive` で出て、止まった step より後に頼る `decisions`・`state` の判定は載せない
+6. **判定を読む。** `report.md` に期待ごとの判定が出る（下の「判定の 3 つ」）。`judge` がある場合は、`evidence.md` を別のエージェントに読ませる
+7. **後片付けをする。** 実行器が `setup.files` を消す。シナリオで作ったワークツリー・ブランチ・MR は、`projects/test-repo` のものだけ残してよい（後でまとめて片付ける）。
    ccnavi 本体に変更が残っていたら、期待が破れたということなので、そのまま報告して直さない（見つけたものの扱いに従い issue にする）
-7. **結果を残す。** `report.md` が、各 step の期待と実際、費用をまとめている。期待と違えば、どの欄で違ったかが分かる
+8. **結果を残す。** `report.md` が、各 step の期待と実際、費用をまとめている。期待と違えば、どの欄で違ったかが分かる
 
 ## 判定の 3 つ
 
@@ -137,7 +138,7 @@ AI の出力を機械だけで判定することはできない。ccnavi の判�
 | 判定 | 意味 | 何で決まるか |
 |---|---|---|
 | `pass` / `fail` | 機械で比べた結果 | `decisions`（回した step のセッション ID の行だけを `logs/decisions.jsonl` から取り出して比べる）、`decisions_none`、`files_unchanged`、`state`、`transcript_forbidden` |
-| `inconclusive`（未成立） | 期待した呼び出し自体が記録に無い。`fail` にしない | `decisions` の `event`・`tool`・`subject_contains` に当たる行が無い |
+| `inconclusive`（未成立） | 期待した呼び出し自体が記録に無い。`fail` にしない | `decisions` の `event`・`tool`・`subject_contains` に当たる行が無い。`expect_after` を満たさず止めた回も `inconclusive`(理由に満たさなかった欄が出る) |
 | `needs-review` | 意味で読む | `judge`。実行器が `evidence.md` に、機械判定の表・judge の基準・step ごとの入力プロンプト・ツール呼び出しと結果（成功とエラーは別の見出し。hook の拒否理由と同じ文のエラーは「hook の応答を参照」と書く）・hook の応答（拒否・確認・終了コードが 0 でないもの・停止・案内文・通知・Stop だけ。他は件数）・最後の報告・判定の行（step 列つきの表）を抜き出す。拒否の文面は全文を載せ、他を切るときは切ったことと全量の在りかを書く。別のエージェントが基準に照らして読み、`report.md` に結果を書く |
 
 全体の判定は `fail` > `inconclusive` > `needs-review` > `pass` の順で重い方を採る。`inconclusive` が出たら、

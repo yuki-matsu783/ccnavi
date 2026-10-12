@@ -65,6 +65,24 @@ def load_scenario(path):
     data.setdefault("budget_usd", 1.0)
     data.setdefault("permission_mode", "auto")
     data.setdefault("expect", {})
+    for n, step in enumerate(data["steps"], 1):
+        after = step.get("expect_after")
+        if after is None:
+            continue
+        if step.get("human"):
+            raise ValueError(
+                f"{path}: step {n} 人間の操作の step には expect_after を付けられません"
+            )
+        extra = set(after) - {"decisions", "state"} if isinstance(after, dict) else None
+        if extra is None:
+            raise ValueError(
+                f"{path}: step {n} expect_after は decisions と state を持つ dict です"
+            )
+        if extra:
+            raise ValueError(
+                f"{path}: step {n} expect_after に書けるのは decisions と state だけです: "
+                + ", ".join(sorted(extra))
+            )
     return data
 
 
@@ -390,7 +408,10 @@ def drive(scn, out, st, root):
         _write_state(out, st)
         after = step.get("expect_after")
         if after:
-            bad = [r for r in evaluate_after(after, st, root) if r[2] != PASS]
+            try:
+                bad = [r for r in evaluate_after(after, st, root) if r[2] != PASS]
+            except Exception as e:  # check_state の timeout・cwd 不在など。止めて finish に回す
+                bad = [("expect_after", after, INCONCLUSIVE, f"評価で例外: {e!r}")]
             if bad:
                 st["halt"] = {
                     "step": idx + 1,
@@ -412,6 +433,8 @@ def finish(scn, out, st, root):
         results = evaluate(scn["expect"], rows, raw, root, st["pre_digests"])
         halt = st.get("halt")
         if halt:
+            # 止まった回は後続の step が回っていないので、decisions・state は必ず落ちる。外す
+            results = [r for r in results if r[0] not in ("decisions", "state")]
             results.append(
                 ("expect_after", {"step": halt["step"]}, INCONCLUSIVE, "; ".join(halt["reasons"]))
             )

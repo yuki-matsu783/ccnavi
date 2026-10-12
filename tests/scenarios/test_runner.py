@@ -253,6 +253,81 @@ class ExpectAfterTest(unittest.TestCase):
         self.assertIsNone(rc)
         self.assertEqual(run.call_count, 2)
 
+    def test_drive_halts_when_evaluation_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            out, root = Path(d) / "out", Path(d) / "root"
+            out.mkdir()
+            root.mkdir()
+            scn = self.scenario(
+                [
+                    {
+                        "prompt": "a",
+                        "expect_after": {"state": [{"run": "true", "expect_contains": "zzz"}]},
+                    },
+                    {"prompt": "b"},
+                ]
+            )
+            st = self.state()
+            with (
+                mock.patch.object(runner, "run_step", return_value=self.STEP_OUT) as run,
+                mock.patch.object(
+                    runner,
+                    "check_state",
+                    side_effect=subprocess.TimeoutExpired("x", 1),
+                ),
+            ):
+                rc = runner.drive(scn, out, st, root)
+        self.assertEqual(rc, 11)
+        self.assertIn("評価で例外", st["halt"]["reasons"][0])
+        self.assertEqual(run.call_count, 1)
+
+    def test_finish_drops_decisions_and_state_when_halted_and_reports_inconclusive(self):
+        scn = {
+            "id": "T",
+            "title": "t",
+            "steps": [],
+            "expect": {"state": [{"run": "true", "expect_contains": "zzz"}]},
+        }
+        st = {
+            "setup_made": [],
+            "session_ids": [],
+            "pre_digests": {},
+            "cost_usd": 0.0,
+            "halt": {"step": 1, "reasons": ["r"]},
+        }
+        with tempfile.TemporaryDirectory() as d:
+            root, out = Path(d) / "root", Path(d) / "out"
+            root.mkdir()
+            out.mkdir()
+            rc = runner.finish(scn, out, st, root)
+            report = json.loads((out / "report.json").read_text(encoding="utf-8"))
+        self.assertEqual(rc, 2)
+        self.assertEqual([r["kind"] for r in report], ["expect_after"])
+        self.assertEqual(report[0]["verdict"], runner.INCONCLUSIVE)
+
+    def load_yml(self, text):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "scn.yml"
+            path.write_text(text, encoding="utf-8")
+            return runner.load_scenario(path)
+
+    def test_load_scenario_rejects_expect_after_on_human_step(self):
+        text = (
+            "id: T\n"
+            "steps:\n"
+            "  - human: true\n"
+            "    instruction: x\n"
+            "    expect_after:\n"
+            "      decisions: []\n"
+        )
+        with self.assertRaisesRegex(ValueError, "人間の操作の step には expect_after"):
+            self.load_yml(text)
+
+    def test_load_scenario_rejects_unknown_expect_after_key(self):
+        text = "id: T\nsteps:\n  - prompt: a\n    expect_after:\n      files_unchanged: [x]\n"
+        with self.assertRaisesRegex(ValueError, "files_unchanged"):
+            self.load_yml(text)
+
 
 class PreflightTest(unittest.TestCase):
     def test_missing_project_dir_is_reported_not_raised(self):
