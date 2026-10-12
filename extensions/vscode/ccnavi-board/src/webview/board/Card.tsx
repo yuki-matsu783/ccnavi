@@ -63,6 +63,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
     <li
       className={classes.join(" ")}
       data-id={card.id}
+      data-tour={`card-${card.id}`}
       data-path={card.openPath}
       data-project={card.project}
       data-family={card.family}
@@ -83,7 +84,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
         <span className="where">{where}</span>
       </div>
       {moved !== undefined ? (
-        <div className="moved-mark" title="前回の更新から列が変わりました。この表示は、次にどれかのカードの列が変わるまで残ります">
+        <div className="moved-mark" data-tour="moved" title="前回の更新から列が変わりました。この表示は、次にどれかのカードの列が変わるまで残ります">
           {movedLabel(moved)}
         </div>
       ) : null}
@@ -93,7 +94,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
       {card.phases.length > 0 ? <Phases phases={card.phases} /> : null}
       {card.history.length > 0 ? <History entries={card.history} /> : null}
       {card.issues.length > 0 ? (
-        <ul className="issues">
+        <ul className="issues" data-tour="issues">
           {card.issues.map((issue, i) => (
             <li key={i}>{issue}</li>
           ))}
@@ -121,7 +122,7 @@ const NOT_OPENING = "button, a, details, .review-menu";
  */
 function History({ entries }: { readonly entries: readonly HistoryEntryJson[] }): JSX.Element {
   return (
-    <details className="history">
+    <details className="history" data-tour="history">
       <summary>履歴（{entries.length} 件）</summary>
       <ol className="history-list">
         {[...entries].reverse().map((e, i) => (
@@ -161,7 +162,7 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
     // 識別子（`i0001-02-02`）の途中では折り返さない。折り返すのは識別子の間の空白か、見出しと括弧の間だけ
     const badge = predecessorsBadge(card);
     badges.push(
-      <span key="preds" className="badge preds" title={badge.title}>
+      <span key="preds" className="badge preds" data-tour="badge-preds" title={badge.title}>
         {badge.lead}（
         {badge.ids.map((id, i) => (
           <span key={id}>
@@ -249,7 +250,7 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
  */
 function Phases({ phases }: { readonly phases: readonly PhaseChip[] }): JSX.Element {
   return (
-    <ul className="phases">
+    <ul className="phases" data-tour="phases">
       {phases.map((p) => {
         return (
           <li key={p.number} className={`phase phase-${p.state}${p.gateClosed ? " review-hold" : ""}`}>
@@ -297,7 +298,7 @@ function StatusItems({ items }: { readonly items: readonly string[] }): JSX.Elem
 
 function Badge({ kind, text, title = "" }: { readonly kind: string; readonly text: string; readonly title?: string }): JSX.Element {
   return (
-    <span className={`badge ${kind}`} title={title === "" ? undefined : title}>
+    <span className={`badge ${kind}`} data-tour={`badge-${kind.split(" ")[0]}`} title={title === "" ? undefined : title}>
       {text}
     </span>
   );
@@ -321,7 +322,7 @@ function MrLink({ url, number, title }: { readonly url: string; readonly number:
     return <Fact kind="mr" text={text} title={url} />;
   }
   return (
-    <a className="fact mr mr-link" href={url} title={title}>
+    <a className="fact mr mr-link" data-tour="mr" href={url} title={title}>
       {text}
     </a>
   );
@@ -338,6 +339,7 @@ function FlowButton({ flow, id, closed }: { readonly flow: FlowJson; readonly id
       type="button"
       className="action flow"
       data-action="flow"
+      data-tour={`flow-${state}`}
       data-ticket={id}
       data-flow={state}
       title={`子チケットの作業の手順（フロー）を図で${closed && !flow.locked ? "見ます。終了済みのため書き換える必要はありません" : flow.locked ? "見ます。着手中・レビュー中は書き換えられません" : `${flow.exists ? "直します" : "作ります"}。着手すると、終わるまで書き換えられなくなります`}（${flow.rel}）`}
@@ -358,6 +360,7 @@ function WorkflowButton({ id }: { readonly id: string }): JSX.Element {
       type="button"
       className="action"
       data-action="workflow"
+      data-tour="workflow-button"
       data-ticket={id}
       title="計画の項どうしの順序（どの項がどの項を待つか）を図で直すワークフロー編集タブを開きます。保存すると提案が書き換わるので、承認はそのあとに開き直してください"
       onClick={() => post({ type: "workflow", ticket: id })}
@@ -377,6 +380,7 @@ function ActionButton({ action, id }: { readonly action: Action; readonly id: st
           type="button"
           className="action"
           data-action="approve-one"
+          data-tour="approve-one"
           data-ticket={id}
           title={`このチケットだけを承認します（ccnavi --agree ${id}）。まとめて承認するなら上部のボタンを使ってください`}
           onClick={() => post({ type: "approve", tickets: [id], filtered: true })}
@@ -415,6 +419,7 @@ function ReviewMenu({ parent, phase }: { readonly parent: string; readonly phase
         type="button"
         className="action"
         data-action="review-menu"
+        data-tour="review-menu"
         data-parent={parent}
         data-phase={phase}
         aria-haspopup="menu"
