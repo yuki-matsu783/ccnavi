@@ -1,4 +1,15 @@
-"""フェーズ定義。親の `project:` が指す config の `phases.yml` を 1 本だけ読む。
+"""フェーズ定義。共通レイヤーの `phases.yml` に、親の `project:` が指す config の `phases.yml` を
+足して読む。
+
+## 足し算
+
+使う定義は、共通レイヤー（`.ccnavi/config/common/phases.yml`）と、親の `project:` が指す
+レイヤー（空ならワークスペース自身）の config の和。共通レイヤーには、どのプロジェクトでも同じ
+構成（`src/*`・`tests/*` など）を前提にできる定義を置き、置き場の構成に依存する定義だけを
+レイヤーに置く。どちらが無くても正常（無い = 空）で、両方無いときだけ定義が無い。
+足すだけで、レイヤーが共通レイヤーの定義を上書きすることはない。同じ id で中身が違う定義と、
+`title` がレイヤーをまたいで重なる定義は error で、そのレイヤーを空として扱う（`merge`）。
+定義は順序を持たないので、足し算で整合を取る欄は id と `title` だけ。
 
 ## 定義はユーザが持つ
 
@@ -49,7 +60,7 @@ import yaml
 
 from ..infra import fsio, globmatch, settings, tree, yamlread
 from ..policy import rules
-from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
+from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from . import ticket as ticket_mod
 from . import ticket_model
 
@@ -545,30 +556,114 @@ def types_path(conf: settings.Settings, root: str, project: str) -> str:
     return settings.layer_path(conf, home, settings.KIND_PHASES, project or settings.LAYER_SELF)
 
 
+def common_types(
+    conf: settings.Settings,
+) -> tuple[PhaseTypes | None, list[rules.Problem]]:
+    """共通レイヤーの定義と、その苦情。ファイルが無いか壊れていれば None。
+
+    単体 clone では、共通レイヤーは着手のときに配られたミラー（そのプロジェクトの
+    `.ccnavi/config/common/`）になる。苦情を言う場所は `--lint` の共通レイヤーの項。
+    """
+    if not conf.phases or not os.path.exists(conf.phases):
+        return None, []
+    types, notes = load(conf.phases)
+    mark_source(types, settings.LAYER_COMMON)
+    return types, list(notes)
+
+
+def merge(
+    common: PhaseTypes | None, extra: PhaseTypes | None, layer: str
+) -> tuple[PhaseTypes, list[Problem]]:
+    """共通レイヤーの定義に、行き先のレイヤーの定義を id ごとに足す。
+
+    足すだけで、レイヤーが共通レイヤーの定義を上書きすることはない。同じ `id` で全欄が一致する
+    ものは重複とみなしてレイヤーの側を捨て（info）、中身が違えば error。`title` の重なりも
+    レイヤーをまたいで error（ユーザは表示名で見るので、承認画面で見分けられない）。
+
+    error があるとき、そのレイヤーは空として扱い、共通レイヤーの定義だけを返す。衝突した片方を
+    何も言わずに採ると、どちらの `review:` が使われているかをユーザが読めない。止まる側を採る。
+    """
+    base = PhaseTypes(common or {})
+    problems: list[Problem] = []
+    titles = {pt.title: ident for ident, pt in base.items()}
+    added: dict[str, PhaseType] = {}
+    for ident, pt in (extra or {}).items():
+        pt.source = layer
+        prior = base.get(ident)
+        if prior is not None:
+            if same(prior, pt):
+                problems.append(
+                    Problem(
+                        SEVERITY_INFO,
+                        ident,
+                        f"`{ident}` は共通レイヤーと全欄が同じなので、{layer} の側を捨てた。"
+                        "共通レイヤーの 1 本を使う",
+                    )
+                )
+            else:
+                problems.append(
+                    Problem(
+                        SEVERITY_ERROR,
+                        ident,
+                        f"`{ident}` は共通レイヤーと同じ id で中身が違う"
+                        f"（違う欄: {', '.join(differing(prior, pt))}）。"
+                        f"{layer} のレイヤーは空として扱う。どちらの定義が効いているかを"
+                        "ユーザが読み取れないので、断りなく片方を採ることはしない",
+                    )
+                )
+            continue
+        if pt.title in titles:
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    ident,
+                    f"表示名 `{pt.title}` が共通レイヤーの `{titles[pt.title]}` と重なる。"
+                    f"{layer} のレイヤーは空として扱う",
+                )
+            )
+            continue
+        titles[pt.title] = ident
+        added[ident] = pt
+    if any(p.severity == SEVERITY_ERROR for p in problems):
+        return base, problems
+    merged = PhaseTypes(base)
+    merged.update(added)
+    return merged, problems
+
+
 def layer_types(
     conf: settings.Settings, root: str, project: str = ""
 ) -> tuple[dict[str, PhaseType] | None, list[rules.Problem]]:
-    """使うフェーズ定義（親の `project:` が指す config の 1 本）と、その苦情。
+    """使うフェーズ定義（共通レイヤー + 親の `project:` が指すレイヤー）と、**そのレイヤーの**苦情。
 
-    足し算はしない。使うのは親の承認済みチケットの `project:` が指すレイヤーの `phases.yml` だけで、
-    空ならワークスペース自身のレイヤー（単体 clone ではそのプロジェクトの
-    `.ccnavi/config/project/`）。
-    共通レイヤーの `phases.yml` は置けないので、あっても読まない（`--lint` が error で言う）。
+    どのレイヤーを足すかは親の承認済みチケットの `project:` が決める。空ならワークスペース自身の
+    レイヤー（単体 clone ではそのプロジェクトの `.ccnavi/config/project/`）。自身のレイヤーと
+    プロジェクトのレイヤーどうしは足さない。
 
-    ファイルが無いのは正常（`None`、苦情なし）。壊れていれば空として扱い（`None`）、苦情を返す。
-    `id` の重複・`title` の重なりは、その 1 本の読み込みで確かめる。
+    どちらのファイルも、無いのは正常（無い = 空、苦情なし）。両方無ければ `None`。壊れたファイルも
+    空として扱う。共通レイヤーが壊れていれば共通レイヤーを空として、レイヤーの定義だけを使う
+    （共通レイヤーの苦情は返さない。言う場所は `--lint` の共通レイヤーの項で、二重に言わない）。
+    レイヤーが壊れていれば共通レイヤーの定義だけを使い、レイヤーの苦情を返す。
     """
+    common, _ = common_types(conf)
     path = types_path(conf, root, project)
     if not path or not os.path.exists(path):
-        return None, []
-    types, notes = load(path)
-    mark_source(types, project or settings.LAYER_SELF)
-    return types, list(notes)
+        return common, []
+    layer = project or settings.LAYER_SELF
+    extra, notes = load(path)
+    mark_source(extra, layer)
+    if extra is None:
+        return common, list(notes)
+    if common is None:
+        return extra, list(notes)
+    merged, problems = merge(common, extra, layer)
+    return merged, list(notes) + problems
 
 
 def load_types(
     conf: settings.Settings, root: str = "", project: str = ""
 ) -> dict[str, PhaseType] | None:
-    """判定が使うフェーズ定義。無いか読めなければ None（番号だけの挙動）。"""
+    """判定が使うフェーズ定義（共通レイヤー + レイヤーの和）。どちらにも無ければ None
+    （番号だけの挙動）。"""
     types, _ = layer_types(conf, root, project)
     return types

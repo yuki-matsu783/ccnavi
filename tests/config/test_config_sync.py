@@ -14,7 +14,7 @@ app は `.ccnavi/` を持たない。
 1. 親の `ticket start` が、共通レイヤーの中身を親のワークツリーのミラーへ写し、config には触れない。
    共通レイヤーから無くなったファイルはミラーからも消す。`script:` の値は書き換えない
 2. 子の着手とワークスペース自身の作業では写さない
-3. 写せない形（読めない・phases.yml がある・リンク・書き込みの失敗）では何も写さず、着手しない。
+3. 写せない形（読めない・リンク・書き込みの失敗）では何も写さず、着手しない。
    上書きの記録・知らせ・閉じるのを止める処理は無い
 4. ミラーの書き込みを、実行後チェックとバックアップと復元が戻さず、報告もしない。条件は 3 つ
    （承認済みの親のワークツリーの
@@ -311,9 +311,24 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertIn("ミラーとして読めない", started.stderr)
         self.assertFalse(os.path.exists(mirror_of(tree, "rules.yml")))
 
-    def test_a_common_phases_file_stops_the_start(self):
-        """3: 共通レイヤーに phases.yml があれば error で、何も配らず着手しない。"""
+    def test_a_common_phases_file_is_mirrored(self):
+        """1: 共通レイヤーの phases.yml もミラーへ写す。config の phases.yml には触れない。"""
         write(self.phases, COMMON_PHASES)
+        self.propose(
+            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
+        self.assertEqual(self.approve().returncode, 0)
+        tree = self.worktree(self.lib, "i0001")
+
+        started = self.ccnavi("ticket", "start", "i0001")
+
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        self.assertEqual(read(mirror_of(tree, "phases.yml")), COMMON_PHASES)
+        self.assertEqual(read(config_of(tree, settings.KIND_PHASES)), LIB_PHASES)
+
+    def test_a_common_phases_file_the_mirror_cannot_hold_stops_the_start(self):
+        """3: フェーズ定義として読めない共通レイヤーの phases.yml は写さず、着手しない。"""
+        write(self.phases, "version: 1\nphases: [\n")
         self.propose(
             "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
         )

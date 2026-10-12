@@ -205,7 +205,7 @@ def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) ->
     順序は 共通レイヤー → 自身のレイヤー → プロジェクト（名前順）。
 
     rules は重複を捨てたあとの、そのレイヤーから実際に判定へ入ったぶん。phases と risk は
-    そのレイヤーのファイルに書いてあるぶんで、合成はしない（合成の結果は親のフェーズの
+    そのレイヤーのファイルに書いてあるぶんで、合成はしない（合成の結果は `sums` と親のフェーズの
     側に出る）。読めないレイヤーは `unreadable` に理由が入り、中身は空になる。
     """
     said = stderr if stderr is not None else io.StringIO()
@@ -213,9 +213,7 @@ def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) ->
     for view in ruleload.survey(said, conf, root):
         phases_path = diagnose_shared.layer_config(conf, root, view.name, settings.KIND_PHASES)
         risk_path = diagnose_shared.layer_config(conf, root, view.name, settings.KIND_RISK)
-        types, phases_unreadable = diagnose_shared.layer_phase_types(
-            phases_path, common=view.name == ruleload.LAYER_COMMON
-        )
+        types, phases_unreadable = diagnose_shared.layer_phase_types(phases_path)
         factors, risk_unreadable = diagnose_shared.layer_risk(conf, view.name, risk_path)
         out.append(
             {
@@ -252,10 +250,12 @@ def _sums(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> l
         rules    path・unreadable・missing と、deny / ask / allow（共通レイヤーに足した和）
         risk     共通 + そのレイヤーの配点。levels（実際に使う境目の点）・factors・
                  problems・fallback
-        phases   使う 1 本（足し算はしない）。path・unreadable・types（定義は順序を持たないので、
-                 待ち方の欄は無い。順序は親の計画の項の `after`）
+        phases   共通 + そのレイヤーの定義。path・unreadable（そのレイヤーのファイル）・types
+                 （各定義の source が出どころのレイヤー。定義は順序を持たないので、待ち方の欄は
+                 無い。順序は親の計画の項の `after`）。足すときの衝突は `--lint` が言う
 
-    判定の合成と同じ関数（`ruleload.sum_view` / `risk.layer_definition`）で組む。
+    判定の合成と同じ関数（`ruleload.sum_view` / `risk.layer_definition` /
+    `phase.layer_types`）で組む。
     """
     said = stderr if stderr is not None else io.StringIO()
     out = []
@@ -264,7 +264,8 @@ def _sums(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> l
         view = ruleload.sum_view(said, conf, root, layer)
         definition, notes = risk.layer_definition(conf, root, project)
         phases_path = diagnose_shared.layer_config(conf, root, layer.name, settings.KIND_PHASES)
-        types, phases_unreadable = diagnose_shared.layer_phase_set(phases_path)
+        _, phases_unreadable = diagnose_shared.layer_phase_set(phases_path)
+        types, _ = phase.layer_types(conf, root, project)
         out.append(
             {
                 "name": layer.name,
@@ -290,7 +291,7 @@ def _sums(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> l
                     "path": phases_path,
                     "unreadable": phases_unreadable,
                     "types": [
-                        _phase_type_record(layer.name, pt)
+                        _phase_type_record(pt.source or layer.name, pt)
                         for pt in (types.values() if types is not None else [])
                     ],
                 },

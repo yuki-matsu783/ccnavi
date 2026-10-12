@@ -394,14 +394,17 @@ class ConfigUnionHarness(unittest.TestCase):
     def propose(self, name, text, project=""):
         """提案を置く。プロジェクト向けはそのプロジェクトの `wip/proposals/`。"""
         base = os.path.join(self.projects, project) if project else self.ws
-        # 計画を持つ親には、そのレイヤーの phases.yml から計画が使う定義の写し（`phases:`）を足す
-        # （`ccnavi --plan-order <親> --fill-phases` と同じ）。phases.yml が無ければ空の写し。
-        try:
-            with open(layer_path(base, "phases"), encoding="utf-8") as f:
-                defs = f.read()
-        except OSError:
-            defs = ""
-        text = phasecopy.insert(text, defs)
+        # 計画を持つ親には、共通レイヤーとそのレイヤーの phases.yml の和から、計画が使う定義の
+        # 写し（`phases:`）を足す（`ccnavi --plan-order <親> --fill-phases` と同じ）。
+        # どちらにも無ければ空の写し。
+        texts = []
+        for path in (self.phases, layer_path(base, "phases")):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    texts.append(f.read())
+            except OSError:
+                pass
+        text = phasecopy.insert(text, phasecopy.combined(*texts))
         return write(os.path.join(base, "wip", "proposals", "todo", name + ".md"), text)
 
     def approved_dir_of(self, project=""):
@@ -1159,7 +1162,7 @@ class ExplainTest(ConfigUnionHarness):
         self.assertIn("self:generated", ids(layers["self"]["rules"]["deny"]))
         self.assertIn("lib:schema", ids(layers["lib"]["rules"]["deny"]))
         self.assertEqual(layers["app"]["rules"]["deny"], [])
-        # フェーズ定義は config の 1 本だけ。共通レイヤーには何も無い（置けない）。
+        # この土台の共通レイヤーは phases.yml を持たないので、共通レイヤーの定義は空。
         self.assertEqual(layers["common"]["phases"], [])
         self.assertIn("build", ids(layers["lib"]["phases"]))
         self.assertIn("big-diff", ids(layers["common"]["risk"]["factors"]))

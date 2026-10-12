@@ -38,6 +38,7 @@ from ..tickets import (
     flow_shape,
     flow_text,
     history,
+    phasetypes,
     risk,
     syncstate,
     ticket_model,
@@ -484,22 +485,14 @@ def flow_problems(
 
 
 def _phases(conf: settings.Settings) -> list[Problem]:
-    """共通レイヤーに `phases.yml` が置かれていないか。
+    """共通レイヤーの `phases.yml` が読めるか。無いのは正常（無い = 空）で、何も言わない。
 
-    フェーズ定義は config の 1 本だけで、共通レイヤーには置けない。あれば error で名指しする。
-    判定には使わず、空として扱っている。無いのは正常で、何も言わない。
-    各レイヤーの `phases.yml` が読めるかは `lint_layers._layer_configs` が見る。
+    読めなければ判定は共通レイヤーを空として扱い、各レイヤーの定義だけを使う。
+    各レイヤーの `phases.yml` が読めるか、共通レイヤーと足せるかは
+    `lint_layers._layer_configs` が見る。
     """
-    if not conf.phases or not os.path.exists(conf.phases):
-        return []
-    return [
-        Problem(
-            SEVERITY_ERROR,
-            "(phases)",
-            f"{conf.phases} は共通レイヤーには置けない。判定に使わず、空として扱っている。"
-            "フェーズ定義は、使うレイヤーの .ccnavi/config/project/phases.yml に置いてください",
-        )
-    ]
+    _, notes = phasetypes.common_types(conf)
+    return [Problem(p.severity, "(phases)", f"{p.rule}: {p.detail}") for p in notes]
 
 
 def family_check(
