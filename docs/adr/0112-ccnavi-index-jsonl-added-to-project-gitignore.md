@@ -36,5 +36,5 @@ ccnavi は他人のリポジトリの `.gitignore` を書き換えない設計�
 
 ## 置き換え関係
 
-`.gitignore` を書き換えないとした記述（`docs/claude/frontmatter.md`、`docs/design/startup-config.md`、`docs/design/diagnostics.md`）は、この ADR に合わせて直した。
+`.gitignore` を書き換えないとした記述（`.ccnavi/docs/frontmatter.md`、`docs/design/startup-config.md`、`docs/design/diagnostics.md`）は、この ADR に合わせて直した。
 過去の ADR の本文は当時の事実として残す。
