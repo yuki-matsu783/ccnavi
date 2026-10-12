@@ -153,6 +153,17 @@ class WorktreeShTest(unittest.TestCase):
         self.assertIn("起点 main", result.stdout)
         self.assertEqual("topic", git(self.wt("topic"), "branch", "--show-current"))
 
+    def test_a_free_name_is_warned_after_the_cut_and_still_cut(self):
+        result = self.run_sh("topic")
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertIn("warn: 直接作業のワークツリー topic の名前が", result.stdout)
+        self.assertEqual("topic", git(self.wt("topic"), "branch", "--show-current"))
+
+    def test_a_name_in_the_form_is_not_warned(self):
+        result = self.run_sh("feature-12-topic")
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertNotIn("warn:", result.stdout)
+
     def test_cuts_from_origin_when_local_is_behind(self):
         ahead = self.advance_origin()
         result = self.run_sh("topic")
