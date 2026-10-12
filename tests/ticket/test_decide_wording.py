@@ -32,6 +32,8 @@ class DecidedPromptTest(unittest.TestCase):
         text = review_decide._decided_prompt("/w", decision([t]), picked, "")
         self.assertIn("未解決（Unresolved）の指摘の対応方針を決めた（対応しない 1 件）", text)
         self.assertNotIn("0 件", text)
+        self.assertIn("ccnavi-ticket.sh status", text)
+        self.assertIn("置き場のファイルを自分で探さない", text)
 
 
 class ThreadLabelTest(unittest.TestCase):

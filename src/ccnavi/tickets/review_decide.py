@@ -74,6 +74,15 @@ def _followup_from_choice(
     return ident
 
 
+def _status_line(root: str, parent: ticket_model.Ticket) -> str:
+    """前の会話が無い新しいセッションでも、状況の確かめ方が分かるようにする 1 文。"""
+    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+    return (
+        f"前の会話が無くても、状況は '{ticket_sh} status {parent.ticket}' で確かめる"
+        "（置き場のファイルを自分で探さない）。"
+    )
+
+
 def _followup_next(root: str, parent: ticket_model.Ticket, ident: str) -> str:
     """続きの子を起こしたあと、エージェントが打つ 2 手。"""
     git_sh = settings.script_command(root, "ccnavi-git.sh")
@@ -578,6 +587,8 @@ def _decided_prompt(
         return (
             f"[ccnavi] ユーザが親 {d.parent.ticket} のフェーズ {d.ph.number} をレビュー済みにした"
             "（未解決（Unresolved）の指摘なし）。次のフェーズへ進める。"
+            + "\n"
+            + _status_line(root, d.parent)
         )
     # 選ばれなかった行き先（0 件）は並べない
     counts = "、".join(
@@ -598,9 +609,13 @@ def _decided_prompt(
         return (
             f"{head}\n直す指摘は続きの子チケット {followup} に載せ、承認済みにしてある。"
             f"{_followup_next(root, d.parent, followup)}。指摘:\n{items}\n"
-            "サブエージェントには渡さない。"
+            "サブエージェントには渡さない。\n"
+            f"{_status_line(root, d.parent)}"
         )
-    return f"{head}\nフェーズ {d.ph.number} はレビュー済みになった。次のフェーズへ進める。"
+    return (
+        f"{head}\nフェーズ {d.ph.number} はレビュー済みになった。次のフェーズへ進める。\n"
+        f"{_status_line(root, d.parent)}"
+    )
 
 
 def _reviewed_in_chat(

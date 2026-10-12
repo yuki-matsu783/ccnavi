@@ -45,6 +45,11 @@ def approved_text(
         title = f": {t.title}" if t.title else ""
         lines.append(f"- {t.ticket}{title}（{where}）")
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+    lines.append(
+        "承認はユーザが済ませた。承認を頼み直さない。前の会話が無くても、この文と "
+        f"'{ticket_sh} status <親>' で状況は分かる。承認済みかどうかや置き場は、"
+        "ファイルを自分で探さず status で確かめる。"
+    )
     # 子の着手は親の着手を前提にする。順をここで言わないと、
     # 最初の子の着手で止まってから読むことになる。ただし勧めるのは、この回に承認された
     # 親が居るときだけ。改版と子だけの回で `start <親>` を勧めると、親は着手済みなので

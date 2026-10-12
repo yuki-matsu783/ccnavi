@@ -198,6 +198,10 @@ export function reviewedPrompt(
       "未解決の指摘が残っていれば confirm が一覧と次の手順を返すので、それに従う。" +
       "マーカーが置かれて止まらなくなったら、次のフェーズへ進む。",
   );
+  lines.push(
+    `前の会話が無くても、状況は '${scriptCommand(root, "ccnavi-ticket.sh")} status ${parent}' で確かめる` +
+      "（置き場のファイルを自分で探さない）。",
+  );
   return lines.join("\n");
 }
 
