@@ -46,7 +46,7 @@ export function SaveReview({ diff, onConfirm, onCancel }: SaveReviewProps): JSX.
   }, []);
   return (
     <div className="review-backdrop">
-      <section className="review" id="save-review" role="dialog" aria-modal="true" aria-labelledby="save-review-title">
+      <section className="review" id="save-review" data-tour="review" role="dialog" aria-modal="true" aria-labelledby="save-review-title">
         <h2 id="save-review-title">保存する前に変更を確かめる</h2>
         <p className="dim small">読み込んだ時点からの変更です。</p>
         {isEmptyDiff(diff) && (
@@ -66,7 +66,7 @@ export function SaveReview({ diff, onConfirm, onCancel }: SaveReviewProps): JSX.
         <Items title="足した線" kind="added-connections" items={diff.addedConnections} />
         <Items title="消した線" kind="removed-connections" items={diff.removedConnections} />
         <Items title="変えた線" kind="changed-connections" items={diff.changedConnections} />
-        <label className="review-skip">
+        <label className="review-skip" data-tour="review-skip">
           <input type="checkbox" className="f-review-skip" checked={skip} onChange={(event) => setSkip(event.target.checked)} />
           次から確かめずに保存する（設定 ccnaviBoard.flowSaveReview で戻せます）
         </label>
