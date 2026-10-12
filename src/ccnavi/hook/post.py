@@ -305,7 +305,8 @@ def _committed_findings(
     """このターンでコミットに入った、保護領域の変更。
 
     見るのは、ターンの始まりに記録した HEAD からの差分（`gitstate.committed`）。
-    記録を持たないツリー（ターンの途中で現れた、HEAD を読めなかった）は飛ばす。
+    記録を持たないツリー（ターンの途中で切られた）は、記録済みの他のツリーとの
+    分岐点（`gitstate.fork_base`）を基準にする。それも取れないものは飛ばす。
     数えていない期間を、数えたことにしない。
 
     チケットの置き場は外す。承認はユーザが提案を `.ccnavi/approved/` へ動かして
@@ -316,9 +317,8 @@ def _committed_findings(
 
     2 つめに返すのは、数えなかったツリーの名前。何も出さずに飛ばすことはしない。基準が
     無いのは、ターンの途中で切られたツリー（プロンプトのときに無かった）か、
-    そのとき HEAD を読めなかったツリーで、どちらも「変わっていない」ではない。
-    ワークツリーを切ってから手を付けるのがこのリポジトリの手順なので、切った
-    ターンのコミットはここに当たる。そのことを言わないと、見ていない期間が
+    そのとき HEAD を読めなかったツリーで、分岐点も取れないものがここに当たる。
+    「変わっていない」ではないので、そのことを言わないと、見ていない期間が
     「何も起きなかった」と同じ見た目になる。
     """
     out: list[post_findings.Finding] = []
@@ -326,6 +326,9 @@ def _committed_findings(
     tickets, approved = places
     for w, top, _ in read:
         base = heads.get(top)
+        if not base:
+            # ターンの途中で切られたツリー。記録済みの他のツリーの HEAD との分岐点を基準にする。
+            base = gitstate.fork_base(top, [sha for t, sha in heads.items() if t != top])
         if not base:
             uncounted.append(w.tree.name or ".")
             continue

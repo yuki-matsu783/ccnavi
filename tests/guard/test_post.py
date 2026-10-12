@@ -821,12 +821,27 @@ class PostToolUseTest(Harness, unittest.TestCase):
             "今回のターンでこの確認ができませんでした", message, "基準が付いたツリーは数える"
         )
 
+    def test_ターンの途中で切ったツリーのコミットは分岐点から数える(self):
+        # 記録済みの HEAD との分岐点を基準にするので、確認不能の警告は出ず、保護領域の変更は並ぶ。
+        self.run_hook(event="UserPromptSubmit")
+        later = os.path.join(self.repo, ".claude", "worktrees", "wt1")
+        git(self.repo, "worktree", "add", "--quiet", "-b", "wt1", later)
+        write(os.path.join(later, "protected", "keep.txt"), "切ったあとに汚してコミット\n")
+        git(later, "add", "--", "protected/keep.txt")
+        git(later, "commit", "--quiet", "-m", "切ったあとのコミット")
+
+        result = self.run_hook(event="Stop")
+
+        message = json.loads(result.stdout)["systemMessage"]
+        self.assertIn("protected/keep.txt", message)
+        self.assertNotIn("今回のターンでこの確認ができませんでした", message)
+
     def test_基準を持たないツリーは数えていないと言う(self):
         # ターンの途中で切ったワークツリーは、プロンプトのときに無いので基準を
         # 持たない。何も言わずに飛ばすと、そのツリーで何も起きなかったのと見分けが付かない。
         self.run_hook(event="UserPromptSubmit")
         later = os.path.join(self.repo, ".claude", "worktrees", "wt1")
-        git(self.repo, "worktree", "add", "--quiet", "-b", "wt1", later)
+        git(self.repo, "worktree", "add", "--quiet", "--orphan", "-b", "wt1", later)
 
         result = self.run_hook(event="Stop")
 
@@ -838,7 +853,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         # detail を上書きすると、先に入った断りが消える。足していく。
         self.run_hook(event="UserPromptSubmit")
         later = os.path.join(self.repo, ".claude", "worktrees", "wt1")
-        git(self.repo, "worktree", "add", "--quiet", "-b", "wt1", later)
+        git(self.repo, "worktree", "add", "--quiet", "--orphan", "-b", "wt1", later)
         self.dirty()
 
         self.run_hook(event="Stop")
