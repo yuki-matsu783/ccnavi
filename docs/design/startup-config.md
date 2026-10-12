@@ -37,7 +37,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 | `PreToolUse` | 呼び出しを判定する（6 章）。コアファイルをバックアップする（8 章）。cwd がプロジェクトの中に入った最初の回に、そのスキルの目録を添える（11.13） | `permissionDecision` と `additionalContext` |
 | `PostToolUse` | コアファイルをバックアップと突き合わせて戻す。作業ツリーを git で読み、保護領域の変更を報告し、設定に従って戻す（7 章）。チケットの状態を承認済みチケットへ書き出し、フェーズの終わりを告げる（9.8）。サブエージェントが差し戻しを無視して終わったことを親に言う。Write で新しく作った md に frontmatter か `type` が無ければ、書き方を 1 度だけ案内する（止めない。`NOTICE_DOC_FRONTMATTER`。10） | 終了コード 2 と標準エラー、または `additionalContext` |
 | `PostToolUseFailure` | ツール自体の失敗を数える（`failstreak`）。ユーザの中断（`is_interrupt`）は数えない。連続が `CCNAVI_FAIL_STREAK_COUNT` 回（既定 3、0 なら使わない）に達した回に、資料の索引（`--docs`）を引く案内を返す。判定は持たず、止められないイベント。成功（`PostToolUse`）で連続を 0 に戻し、案内は連続の中で 1 回だけ。`PreToolUse` の `deny`（`dry-run` でも）も同じ連続に数え、案内は拒否の文面の末尾に付く。記録は `state/failstreak-<セッション>-<main\|エージェント>.json` | `additionalContext` |
-| `Stop` | このターンで変わった保護領域をユーザへ報告する（7.4）。メインエージェントの cwd のワークツリーのチケットが、作業を終えたように見えるのに `finish` されていなければ、1 回だけ止めて促す（9.6）。促さなかった回は、レビューの依頼までの道の途中（承認済みの親に作業中の子が残っている、または子が全部閉じたのに依頼のマーカーが無い）なら、1 回だけ止めて次の一手を促す（`NUDGE_TICKET_REQUEST`。実行中のサブエージェントが居る間は止めない。9.6・9.12）。どちらも促さなかった回は、`match: Stop` のルールが渡す回なら止めてその文を渡す（6.6） | `systemMessage`。止めるときは `decision: block` と `reason` も |
+| `Stop` | このターンで変わった保護領域をユーザへ報告する（7.4）。メインエージェントの cwd のワークツリーのチケットが、作業を終えたように見えるのに `finish` されていなければ、1 回だけ止めて促す（9.6）。促さなかった回は、レビューの依頼までの道の途中（承認済みの親に作業中の子が残っている、または子が全部閉じたのに依頼のマーカーが無い）なら、1 回だけ止めて次の一手を促す（`NUDGE_TICKET_REQUEST`。実行中のサブエージェントが居る間は止めない。9.6・9.12）。どちらも促さなかった回は、メインエージェントの cwd がチケットに結び付かない直接作業のワークツリー（`.claude/worktrees/<名前>`）に未コミットの変更か統合先に入っていないコミットがあり、`integrate <名前>` の記録も無ければ、1 回だけ止めて `integrate` の打ち方と、staged で止めてユーザに確かめてもらう手順を促す（`NUDGE_INTEGRATE`。6.6）。どれも促さなかった回は、`match: Stop` のルールが渡す回なら止めてその文を渡す（6.6） | `systemMessage`。止めるときは `decision: block` と `reason` も |
 | `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す（9.12）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を頭に置く（11.13）。気づいたスキル候補は最後の報告に節を足して返すよう 1 行渡す（6.6）。チケット制御が有効で `agent_id` があれば、実行中の印を置く（9.12） | `additionalContext` |
 | `SubagentStop` | 子のワークツリーに範囲外の変更が残っていれば 1 回だけ差し戻す。実行中の印を外す（差し戻して続けさせる回は外さない。9.12） | 終了コード 2 と標準エラー |
 | その他 | 何もせず通す。記録に `event-not-checked` | 無し |
@@ -79,7 +79,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 | `enable` の deny / ask | `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny\|ask", "permissionDecisionReason": "…", "additionalContext": "…"}}`。`additionalContext` はルールが文を持つときだけ |
 | `enable` の allow、委ねた回 | 判定は出さない。通知（既定を使った、コアファイルを戻した、ルールの文）があれば `additionalContext` だけ |
 | `dry-run` の deny / ask | `additionalContext` に「enable なら止めていた / 聞いていた」と理由を並べる。終了コード 0 |
-| `Stop` | `{"systemMessage": "…"}`。`finish` かレビュー依頼までの道を促すときは、モードによらず（`dry-run` でも）`{"decision": "block", "reason": "…", "systemMessage": "…"}`。Stop でモデルに文を届ける経路は止めることしか無いため |
+| `Stop` | `{"systemMessage": "…"}`。`finish`・レビュー依頼までの道・直接作業の `integrate` を促すときは、モードによらず（`dry-run` でも）`{"decision": "block", "reason": "…", "systemMessage": "…"}`。Stop でモデルに文を届ける経路は止めることしか無いため |
 | `PostToolUse` / `SubagentStop` の差し戻し | 標準エラーに文、終了コード 2。`dry-run` なら `additionalContext` で 0 |
 
 期限は `PreToolUse` で 3 秒。ルール照合の途中で超えたら `deadline-exceeded` として、`enable` は
