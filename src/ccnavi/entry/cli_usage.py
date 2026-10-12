@@ -279,6 +279,9 @@ scripts in .ccnavi/scripts/, which call
         (lists, and never removes, the worktrees of the family that are still
          there: one named differently from the parent that holds its tickets, and
          a closed child's that has unsaved drafts; prints nothing when none)
+    ccnavi worktree name <name>
+        (prints one "warn: ..." line when a direct-work worktree's name is not
+         <prefix>-<number>-<slug>; prints nothing when it is. Never refuses)
     ccnavi sync paths
         (for .ccnavi/scripts/ccnavi-sync.sh: one "<key> <value>" per line - the
          approved and proposal places, the ccnavi directory, and the integration
