@@ -152,6 +152,98 @@ CCNAVI_MD_PARTS = (".ccnavi", "CCNAVI.md")
 DEPLOY_DOCS = ("worktree.md", "frontmatter.md")
 # 共通の作業・レビュー計画のテンプレート。配布元の templates/*.yml を全部配る。
 TEMPLATES_PARTS = (".ccnavi", "config", "common", "templates")
+# 共通のテンプレートを持たない配布元からの配布の結果。テンプレートを知らなかった版の出力で、
+# 機械の名前は <M>、配布先は <T> に置き換えて比べる。
+NO_TEMPLATES_FILES = [
+    ".ccnavi/CCNAVI.md",
+    ".ccnavi/bin/<M>/_internal/base_library.zip",
+    ".ccnavi/bin/<M>/ccnavi",
+    ".ccnavi/config/common/phases.yml",
+    ".ccnavi/config/common/risks.yml",
+    ".ccnavi/config/common/rules.yml",
+    ".ccnavi/docs/frontmatter.md",
+    ".ccnavi/docs/worktree.md",
+    *(
+        f".ccnavi/scripts/{name}"
+        for name in (
+            "ccnavi-agree.sh",
+            "ccnavi-branches.sh",
+            "ccnavi-clean.js",
+            "ccnavi-clean.sh",
+            "ccnavi-common-c1.sh",
+            "ccnavi-common-host.sh",
+            "ccnavi-common-lock.sh",
+            "ccnavi-common-log.sh",
+            "ccnavi-common-state.sh",
+            "ccnavi-common.sh",
+            "ccnavi-fetch.sh",
+            "ccnavi-git.sh",
+            "ccnavi-launcher.sh",
+            "ccnavi-push-approved.sh",
+            "ccnavi-review.sh",
+            "ccnavi-stage.sh",
+            "ccnavi-start.sh",
+            "ccnavi-sync.sh",
+            "ccnavi-ticket.sh",
+            "ccnavi-worktree.sh",
+        )
+    ),
+    ".claude/settings.json",
+    ".vscode/settings.json",
+]
+NO_TEMPLATES_STDOUT = """\
+<T>/.claude/settings.json
+足した env:
+  CCNAVI_MODE
+  CCNAVI_BIN_PATH
+  CCNAVI_RESTORE_IF_DENY
+  CCNAVI_GUARD_CORE_FILES
+  CCNAVI_GUARD_TICKET_APPROVAL
+  CCNAVI_GUARD_UNWATCHED
+  CCNAVI_TICKET_CONTROL
+ccnavi を登録した hook:
+  SessionStart
+  UserPromptSubmit
+  PreToolUse
+  PostToolUse
+  PostToolUseFailure
+  Stop
+  SubagentStart
+  SubagentStop
+登録した hook（セッション開始時の取り込み。不要なら --no-fetch）:
+  SessionStart（.ccnavi/scripts/ccnavi-fetch.sh。セッション開始時の取り込み）
+足した .vscode/settings.json:
+  git.detectWorktrees
+配った:
+  .ccnavi/bin/<M>
+  .ccnavi/config/common/rules.yml
+  .ccnavi/CCNAVI.md
+  .ccnavi/config/common/risks.yml
+  .ccnavi/config/common/phases.yml
+  .ccnavi/docs/frontmatter.md
+  .ccnavi/docs/worktree.md
+  .ccnavi/scripts/ccnavi-ticket.sh
+  .ccnavi/scripts/ccnavi-review.sh
+  .ccnavi/scripts/ccnavi-git.sh
+  .ccnavi/scripts/ccnavi-common-state.sh
+  .ccnavi/scripts/ccnavi-common-lock.sh
+  .ccnavi/scripts/ccnavi-common-c1.sh
+  .ccnavi/scripts/ccnavi-common-host.sh
+  .ccnavi/scripts/ccnavi-common-log.sh
+  .ccnavi/scripts/ccnavi-common.sh
+  .ccnavi/scripts/ccnavi-push-approved.sh
+  .ccnavi/scripts/ccnavi-agree.sh
+  .ccnavi/scripts/ccnavi-fetch.sh
+  .ccnavi/scripts/ccnavi-sync.sh
+  .ccnavi/scripts/ccnavi-clean.sh
+  .ccnavi/scripts/ccnavi-clean.js
+  .ccnavi/scripts/ccnavi-branches.sh
+  .ccnavi/scripts/ccnavi-start.sh
+  .ccnavi/scripts/ccnavi-stage.sh
+  .ccnavi/scripts/ccnavi-worktree.sh
+  .ccnavi/scripts/ccnavi-launcher.sh
+env の値は、セッションを開き直すまで反映されません。
+"""
 LAUNCHER_PARTS = (".ccnavi", "scripts", LAUNCHER_NAME)
 # CCNAVI_BIN_PATH に書くパス。固定。
 BIN_PATH = "/".join(LAUNCHER_PARTS)
@@ -1344,35 +1436,50 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     def test_a_source_without_templates_deploys_exactly_what_it_did_before(self):
         """配布元に共通のテンプレートが無ければ（置き場が無い・空）、何も足さず何も言わない。
 
-        配られるファイルも標準出力も、テンプレートを知らない版（`scripts/`）と同じ。
+        配られるファイルと標準出力・標準エラーは、テンプレートを知らなかった版の結果で、
+        ここに固定する（版に依らず通る。別の版のスクリプトと比べると、ユーザがステージ版を
+        `scripts/` にコピーしたあとは同じファイル同士の比べになり、何も見なくなる）。
         """
-        other = tempfile.mkdtemp(prefix="ccnavi-setup-")
-        self.addCleanup(shutil.rmtree, other, ignore_errors=True)
         for templates in (None, {}):
             with self.subTest(templates=templates):
                 src = self.make_source(templates=templates)
                 target = tempfile.mkdtemp(prefix="ccnavi-setup-")
                 self.addCleanup(shutil.rmtree, target, ignore_errors=True)
-                before = subprocess.run(
-                    [SHELL, SCRIPT, other, "--mode", "enable", "--deploy", src],
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    env=clean_env(),
-                )
-                after = self.run_staged(target, "--mode", "enable", "--deploy", src)
-                self.assertEqual(after.returncode, before.returncode, after.stderr)
+                result = self.run_staged(target, "--mode", "enable", "--deploy", src)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(result.stderr, "")
+                shown = result.stdout.replace(target, "<T>").replace(THIS_MACHINE, "<M>")
+                self.assertEqual(shown, NO_TEMPLATES_STDOUT)
                 self.assertEqual(
-                    after.stdout.replace(target, "<T>"), before.stdout.replace(other, "<T>")
+                    [f.replace(THIS_MACHINE, "<M>") for f in self.listing(target)],
+                    NO_TEMPLATES_FILES,
                 )
-                self.assertEqual(
-                    after.stderr.replace(target, "<T>"), before.stderr.replace(other, "<T>")
-                )
-                self.assertEqual(self.listing(target), self.listing(other))
                 self.assertFalse(os.path.exists(os.path.join(target, *TEMPLATES_PARTS)))
-                shutil.rmtree(other)
-                os.makedirs(other)
+
+    def test_a_template_name_with_a_space_is_skipped_and_the_rest_is_deployed(self):
+        """空白や glob の文字を含む名前は配らず、そのことを言う。ほかのファイルは配る。
+
+        単語分割で cp が失敗すると、配布が半端なところで止まる。
+        """
+        src = self.make_source(
+            templates={
+                "feature.yml": "name: feature\n",
+                "my plan.yml": "name: x\n",
+                "star*.yml": "name: y\n",
+                "-dash.yml": "name: z\n",
+            }
+        )
+        result = self.run_staged(self.dir, "--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(os.listdir(self.deployed(*TEMPLATES_PARTS)), ["feature.yml"])
+        # ほかのファイルは配られている。
+        self.assertTrue(os.path.isfile(self.deployed(*LAUNCHER_PARTS)))
+        self.assertTrue(os.path.isfile(self.deployed(*RULES_PARTS)))
+        said = result.stdout
+        self.assertIn("名前に使えない文字があるので配っていないテンプレート", said)
+        for name in ("my plan.yml", "star*.yml", "-dash.yml"):
+            self.assertIn(f"  {name}\n", said)
+        self.assertNotIn("まだ無いもの", said)
 
     def test_says_nothing_is_missing_after_it_copied(self):
         """配ったあとは「まだ無いもの」が出ない。

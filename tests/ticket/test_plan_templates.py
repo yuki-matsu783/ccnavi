@@ -22,6 +22,8 @@ import shutil
 import tempfile
 import unittest
 
+import yaml
+
 from ccnavi.tickets import plan_templates
 from tests import ROOT, common_path, config_path, requires_symlink
 from tests.inproc import run_ccnavi
@@ -161,6 +163,58 @@ class ReadTest(unittest.TestCase):
         other, _ = plan_templates.parse_template(loose.encode(), "feature")
         same, _ = plan_templates.parse_template(FEATURE.encode(), "feature")
         self.assertEqual(plan_templates.dump(other), plan_templates.dump(same))
+
+    PROMPTS = (
+        "一行目\n二行目\n",
+        "一行目\n二行目",
+        "段落\n\n次の段落\n",
+        "日本語: コロン\n- ハイフン\n# 見出し\n'q' \"d\"\n",
+        # literal にできない: 行末の空白、先頭の空白・改行、末尾の空行、タブ、制御文字、復帰。
+        "行末の空白 \n次\n",
+        "  先頭の空白\n次\n",
+        "\n先頭の改行\n",
+        "末尾の空行\n\n",
+        "tab\there\n次\n",
+        "esc\x1b\n次\n",
+        "a\r\nb\n",
+        "幅ゼロ\u200b\n次\n",
+        "改行なし",
+    )
+
+    def test_multiline_strings_are_written_as_literal_blocks_and_round_trip(self):
+        for prompt in self.PROMPTS:
+            with self.subTest(prompt=prompt):
+                body = {"id": "x", "name": "n", "nodes": [{"id": "p", "data": {"prompt": prompt}}]}
+                t = plan_templates.Template(
+                    name="t",
+                    description="d",
+                    plan=[plan_templates.Item("design")],
+                    flows={1: body},
+                )
+                text = plan_templates.dump(t)
+                again, notes = plan_templates.parse_template(text.encode(), "t")
+                self.assertIsNotNone(again, notes)
+                self.assertEqual(again, t)
+                self.assertEqual(again.flows[1]["nodes"][0]["data"]["prompt"], prompt)
+                self.assertEqual(plan_templates.dump(again), text)
+                literal = "prompt: |" in text
+                self.assertEqual(literal, plan_templates._literal_ok(prompt), text)
+        # 読める形で出る。
+        t = plan_templates.Template(
+            name="t",
+            description="d",
+            plan=[plan_templates.Item("design")],
+            flows={1: {"nodes": [{"data": {"prompt": "一行目\n二行目\n"}}]}},
+        )
+        self.assertIn("prompt: |\n", plan_templates.dump(t))
+        self.assertIn("\n          一行目\n          二行目\n", plan_templates.dump(t))
+
+    def test_the_flow_text_uses_the_same_literal_blocks(self):
+        body = {"id": "x", "nodes": [{"id": "p", "data": {"prompt": "a\nb\n"}}]}
+        text, why = plan_templates.dump_flow(body)
+        self.assertEqual(why, "")
+        self.assertIn("prompt: |", text)
+        self.assertEqual(yaml.safe_load(text), body)
 
     def test_string_flow_keys_are_read_as_numbers(self):
         text = FEATURE.replace("\n  2:\n", '\n  "2":\n')
@@ -385,6 +439,58 @@ class CheckTest(Harness):
         self.assertEqual(self.problems(row, "error"), [])
         self.assertEqual(len(self.problems(row, "warn")), 1)
 
+    def test_the_limit_counts_the_plan_and_the_feedback_plan_together(self):
+        def chain(count: int, kind: str) -> list:
+            return [
+                plan_templates.Item(kind, after=[i - 1] if i > 1 else [])
+                for i in range(1, count + 1)
+            ]
+
+        def errors(plan: int, feedback: int) -> list[str]:
+            t = plan_templates.Template(
+                name="t",
+                description="d",
+                plan=chain(plan, "design"),
+                feedback=chain(feedback, "implement-feedback"),
+            )
+            return [p.detail for p in plan_templates.check(t, None, None) if p.severity == "error"]
+
+        for plan, feedback in ((99, 0), (60, 39), (59, 40), (1, 98)):
+            with self.subTest(plan=plan, feedback=feedback):
+                self.assertEqual(errors(plan, feedback), [])
+        for plan, feedback in ((100, 0), (98, 2), (60, 40), (1, 99)):
+            with self.subTest(plan=plan, feedback=feedback):
+                found = errors(plan, feedback)
+                self.assertTrue(any("上限 99 項" in d for d in found), found)
+
+    def test_hidden_characters_anywhere_in_the_strings_are_an_error(self):
+        flow_body = {"id": "x", "name": "n", "nodes": [{"id": "p", "data": {"prompt": "a\u200bb"}}]}
+        for where in ("description", "when", "flow"):
+            with self.subTest(where=where):
+                t = plan_templates.Template(
+                    name="t", description="d", when="w", plan=[plan_templates.Item("design")]
+                )
+                if where == "flow":
+                    t.flows = {1: flow_body}
+                else:
+                    setattr(t, where, "x\u202ey")
+                found = plan_templates.check(t, None, None)
+                self.assertTrue(
+                    any(
+                        p.severity == "error" and "制御文字・書式文字が含まれている" in p.detail
+                        for p in found
+                    )
+                )
+                # 苦情の文面に生の文字は出ない。
+                self.assertFalse(any("\u202e" in p.detail or "\u200b" in p.detail for p in found))
+        # 改行とタブは対象外。
+        t = plan_templates.Template(
+            name="t", description="a\tb\nc", plan=[plan_templates.Item("design")]
+        )
+        self.assertEqual(
+            [p for p in plan_templates.check(t, None, None) if p.severity == "error"], []
+        )
+
     def test_a_changed_definition_only_warns(self):
         # 型が phases.yml から消えても、読むのも一覧も止まらない（使うときの承認で error になる）。
         self.own("feature", FEATURE)
@@ -460,6 +566,39 @@ class CliTest(Harness):
         out = self.ccnavi("--templates", "--show", "nothing")
         self.assertEqual(out.returncode, 1)
         self.assertIn("nothing", out.stderr)
+
+    def test_failures_are_json_on_stdout_when_json_is_asked(self):
+        for args in (
+            ["--templates", "--show", "nothing", "--json"],
+            ["--templates", "--layer", "nowhere", "--json"],
+            ["--templates", "--show", "feature", "--layer", "nowhere", "--json"],
+        ):
+            with self.subTest(args=args):
+                out = self.ccnavi(*args)
+                self.assertEqual(out.returncode, 1)
+                answer = json.loads(out.stdout)
+                self.assertFalse(answer["ok"])
+                self.assertTrue(answer["error"])
+                self.assertEqual(answer["version"], plan_templates.JSON_VERSION)
+                self.assertEqual(out.stderr, "")
+
+    def test_sums_use_the_same_dropped_shape_as_the_templates(self):
+        self.own("research", RESEARCH.replace("調べてから", "調べずに"))
+        self.own("feature", FEATURE.replace("機能を", "別の機能を"))
+        self.common("broken", "name: [\n")
+        answer = self.answer()
+        dropped = {
+            (row["layer"], row["name"]): row["dropped"]
+            for sums in answer["sums"]
+            for row in sums["templates"]
+            if row["dropped"] is not None
+        }
+        self.assertEqual(dropped[("self", "research")]["reason"], "conflict")
+        self.assertEqual(dropped[("common", "broken")]["reason"], "invalid")
+        for value in dropped.values():
+            self.assertEqual(set(value), {"reason", "detail"})
+        kept = [r for s in answer["sums"] for r in s["templates"] if r["name"] == "feature"]
+        self.assertTrue(any(r["dropped"] is None for r in kept))
 
     def test_show_prefers_the_effective_one(self):
         self.own("research", RESEARCH.replace("調べてから", "調べずに"))
@@ -570,6 +709,11 @@ def showcase(root: str) -> None:
     )
     write(drafts + "research.yml", RESEARCH)
     write(drafts + "broken.yml", "name: [\n")
+    # 同じ中身の下書きがもう 1 つのツリー（lib）にもある（also_in に値が入る）。
+    write(
+        os.path.join(root, "projects", "lib", "wip", "proposals", "templates", "login.yml"),
+        FEATURE.replace("feature", "login").replace("機能を設計から", "TODO ログインを設計から"),
+    )
 
 
 class ShapeTest(unittest.TestCase):

@@ -58,10 +58,15 @@ class Drafts(PhaseHarness):
         write(common_path(self.root, "phases"), PHASES)
         self.conf, _ = settings.load(self.root)
 
-    def tpl(self, *args):
-        """`--templates` と `--lint` を動かす。PhaseHarness.ccnavi が足す判定の旗は付けない。"""
+    def tpl(self, *args, guard=None):
+        """`--templates` と `--lint` を動かす。PhaseHarness.ccnavi が足す判定の旗は付けない。
+
+        `guard` は端末の確かめ（CCNAVI_GUARD_TICKET_APPROVAL）。`--templates` は旗では渡せない。
+        """
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         env.pop("CLAUDE_PROJECT_DIR", None)
+        if guard is not None:
+            env[settings.GUARD_TICKET_APPROVAL_ENV] = guard
         return run_ccnavi(["--root", self.root, *args], env=env, cwd=ROOT)
 
     # ---- 完了した親
@@ -112,7 +117,8 @@ class Drafts(PhaseHarness):
         """下書きの TODO を直す（エージェントが一般化したあとの形）。"""
         text = self.read_draft(name).decode("utf-8")
         fixed = text.replace(f"{plan_templates.TODO_MARK} 一般化する: 親", description).replace(
-            "「親」と同じ形の作業をするとき", "新しい機能を足すとき"
+            f"{plan_templates.TODO_MARK} 一般化する: 「親」と同じ形の作業をするとき",
+            "新しい機能を足すとき",
         )
         self.assertNotIn(plan_templates.TODO_MARK, fixed)
         write(self.draft_path(name), fixed)
@@ -120,8 +126,9 @@ class Drafts(PhaseHarness):
 
     # ---- 取り込み
 
-    def import_(self, *args):
-        return self.tpl("--templates", "--import", *args)
+    def import_(self, *args, guard="disable"):
+        """`--import`。書くときの端末の確かめ（既定は有効）は、テストでは切っておく。"""
+        return self.tpl("--templates", "--import", *args, guard=guard)
 
     def common_file(self, name="i0001"):
         return os.path.join(plan_templates_dir(self.conf, self.root), name + ".yml")
@@ -257,9 +264,14 @@ class MakeTest(Drafts):
         template = self.drafted()
         self.assertTrue(template.description.startswith(plan_templates.TODO_MARK))
         self.assertIn("親", template.description)
+        self.assertTrue(template.when.startswith(plan_templates.TODO_MARK))
         self.assertIn("親", template.when)
         self.assertIn("warn", result.stdout)
         self.assertIn(f"`description` に {plan_templates.TODO_MARK} が残っている", result.stdout)
+        self.assertIn(f"`when` に {plan_templates.TODO_MARK} が残っている", result.stdout)
+        # 次の手に、未追跡の下書きが ready を止めることを言う。
+        self.assertIn("未追跡", result.stdout)
+        self.assertIn("ready が止まる", result.stdout)
         # 一般化して印を消せば、苦情は消える。
         self.generalize()
         row = self.answer()["drafts"][0]
@@ -438,7 +450,8 @@ class EffectTest(Drafts):
             plan_template("lib-draft", "  - design\n"),
         )
         (row,) = self.answer()["drafts"]
-        self.assertEqual(row["layer"], "lib")
+        self.assertEqual(row["checked_with"], "lib")
+        self.assertNotIn("layer", row)
         self.assertEqual(row["tree"], "lib")
         self.assertEqual(row["path"], "wip/proposals/templates/lib-draft.yml")
 
@@ -833,6 +846,92 @@ class ImportTest(Drafts):
         result = self.import_("i0001", "--to", "common", "--yes")
         self.assertEqual(result.returncode, 1)
         self.assertIn("--expect", result.stderr)
+
+    # ---- 書くときの端末の確かめ
+
+    def test_writing_needs_a_terminal_at_run_time_but_the_preview_does_not(self):
+        # hook の文字列照合だけを歯止めにしない。書くとき（--yes）は標準入力が端末であること。
+        refused = self.import_(
+            "i0001", "--to", "common", "--yes", "--expect", self.sha, guard="enable"
+        )
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertIn("端末", refused.stderr)
+        self.assertFalse(os.path.exists(self.common_file()))
+        self.assertTrue(os.path.exists(self.draft_path()))
+        # 下見は端末でなくても動く。
+        preview = self.import_("i0001", "--to", "common", guard="enable")
+        self.assertEqual(preview.returncode, 0, preview.stdout + preview.stderr)
+        self.assertIn("何も書いていない", preview.stdout)
+        # 切り方（テスト用）を使えば書ける。
+        done = self.import_("i0001", "--to", "common", "--yes", "--expect", self.sha)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    # ---- 制御文字・書式文字
+
+    HIDDEN = "\u202e"  # 右から左への上書き
+    ZERO = "\u200b"  # 幅ゼロの空白
+
+    def hide(self, *chars):
+        """下書きの先にテストの説明へ文字を混ぜる。(新しいハッシュ)。"""
+        text = self.read_draft().decode().replace("先にテスト", "先に" + "".join(chars) + "テスト")
+        write(self.draft_path(), text)
+        return plan_templates.digest(text.encode())
+
+    def test_hidden_characters_are_an_error_and_shown_as_escapes_in_the_preview(self):
+        sha = self.hide(self.HIDDEN, self.ZERO)
+        result = self.import_("i0001", "--to", "common")
+        out = result.stdout + result.stderr
+        self.assertEqual(result.returncode, 1, out)
+        self.assertNotIn(self.HIDDEN, out)
+        self.assertNotIn(self.ZERO, out)
+        self.assertIn("\\u202e", out)
+        self.assertIn("\\u200b", out)
+        self.assertIn("制御文字・書式文字が含まれている", out)
+        # error の下書きは取り込めない。
+        done = self.import_("i0001", "--to", "common", "--yes", "--expect", sha)
+        self.assertEqual(done.returncode, 1)
+        self.assertFalse(os.path.exists(self.common_file()))
+        self.assertTrue(os.path.exists(self.draft_path()))
+
+    def test_the_check_reports_each_kind_of_hidden_character_as_an_error(self):
+        for char in ("\u202e", "\u200b", "\u200d", "\u2060", "\ufeff", "\u2028", "\u2029", "\x1b"):
+            with self.subTest(char=repr(char)):
+                text = self.read_draft().decode()
+                template, _ = plan_templates.parse_template(text.encode(), "i0001")
+                template.description += char
+                found = plan_templates.check(template, None, None)
+                self.assertTrue(
+                    any(
+                        p.severity == SEVERITY_ERROR
+                        and "制御文字・書式文字が含まれている" in p.detail
+                        for p in found
+                    )
+                )
+
+    def test_hidden_characters_in_a_comment_are_an_error_but_crlf_is_not(self):
+        text = self.read_draft().decode()
+        crlf = text.replace("\n", "\r\n")
+        write(self.draft_path(), crlf)
+        ok = self.import_("i0001", "--to", "common")
+        self.assertEqual(ok.returncode, 0, ok.stdout + ok.stderr)
+        # コメントの中は、読んだ中身に出ないが、生の本文を見て止める。
+        write(self.draft_path(), text + "# 末尾\u202e隠す\n")
+        bad = self.import_("i0001", "--to", "common")
+        self.assertEqual(bad.returncode, 1, bad.stdout + bad.stderr)
+        self.assertNotIn("\u202e", bad.stdout + bad.stderr)
+        self.assertIn("\\u202e", bad.stdout + bad.stderr)
+
+    def test_a_diff_shows_hidden_characters_as_escapes_too(self):
+        self.existing(self.read_draft().decode().replace("先にテスト", "先に\u202e実装"))
+        result = self.import_("i0001", "--to", "common", "--replace")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("\u202e", result.stdout)
+        self.assertIn("\\u202e", result.stdout)
+
+    def test_hidden_characters_do_not_change_what_is_written(self):
+        # 表示だけを直す。書く中身はバイト列のまま（error でなければ書く）。
+        plan = self.prepared()
+        self.assertEqual(plan.raw, self.read_draft())
 
     def test_the_layer_flag_with_to_common_is_refused(self):
         result = self.import_("i0001", "--to", "common", "--layer", "self")

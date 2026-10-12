@@ -264,8 +264,8 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         self.assertTrue(os.path.isfile(mirror_of(tree, "templates/feature.yml")))
 
-    def test_a_symlinked_templates_place_stops_the_start(self):
-        """3: 共通のテンプレートの置き場がリンクなら読まない。着手しない。"""
+    def test_a_symlinked_templates_place_skips_only_the_templates(self):
+        """3: 共通のテンプレートの置き場がリンクなら、テンプレートだけ写さず、着手は止まらない。"""
         real = os.path.join(self.ws, "elsewhere")
         write(os.path.join(real, "feature.yml"), FEATURE_TEMPLATE)
         link = os.path.join(self.ws, ".ccnavi", "config", "common", "templates")
@@ -274,12 +274,14 @@ class ConfigMirrorTest(ConfigUnionHarness):
             "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
         )
         self.assertEqual(self.approve().returncode, 0)
-        self.worktree(self.lib, "i0001")
+        tree = self.worktree(self.lib, "i0001")
 
         started = self.ccnavi("ticket", "start", "i0001")
 
-        self.assertNotEqual(started.returncode, 0, started.stdout)
-        self.assertIn("テンプレートの置き場を読めない", started.stderr)
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        self.assertFalse(os.path.exists(mirror_of(tree, "templates/feature.yml")))
+        # ほかの設定のミラーは写る。
+        self.assertTrue(os.path.isfile(mirror_of(tree, "rules.yml")))
 
     def test_a_script_shared_by_two_factors_is_mirrored_once(self):
         """1: 2 つの項目が同じスクリプトを指しても、写すのは 1 回。"""

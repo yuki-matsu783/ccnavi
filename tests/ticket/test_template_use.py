@@ -21,7 +21,7 @@ import os
 import textwrap
 
 from ccnavi.infra import settings
-from ccnavi.tickets import agree_candidates, flow, phasetypes, plan_templates
+from ccnavi.tickets import agree_candidates, flow, phasetypes, plan_templates, workflow
 from ccnavi.tickets import ticket as ticket_mod
 from tests.ticket.test_parent_phases import front_of
 from tests.ticket.test_template_drafts import FLOW_IMPL, Drafts
@@ -110,7 +110,7 @@ class ProposalTest(Use):
         self.put("feature", FEATURE)
 
     def test_the_plan_and_feedback_are_written_with_absolute_after(self):
-        result = self.new("--issue", "9")
+        result = self.new("--issue", "9", "--with-feedback")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         front = front_of(self.written())
         self.assertEqual(front["ticket"], IDENT)
@@ -155,7 +155,7 @@ class ProposalTest(Use):
         self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
 
     def test_the_output_says_what_was_written_and_what_the_flow_draft_is(self):
-        result = self.new()
+        result = self.new("--with-feedback")
         self.assertEqual(result.returncode, 0, result.stderr)
         out = result.stdout
         self.assertIn(f"{IDENT} の提案を", out)
@@ -166,6 +166,39 @@ class ProposalTest(Use):
         self.assertIn("下書きには効力が無い", out)
         self.assertIn("フロー編集画面", out)
         self.assertIn("ccnavi --lint", out)
+
+    def test_the_feedback_plan_is_not_written_unless_asked_for(self):
+        result = self.new()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        front = front_of(self.written())
+        self.assertNotIn("feedback", front)
+        self.assertEqual(len(front["plan"]), 3)
+        self.assertNotIn("implement-feedback", front["phases"])
+        # テンプレートにフィードバック計画があることと、足し方を言う。
+        self.assertIn("フィードバック計画（2 項）がある", result.stdout)
+        self.assertIn("--with-feedback", result.stdout)
+        self.assertNotIn("feedback（", result.stdout)
+        # 全体計画だけの提案は、承認のあとで全体計画を改版できる形のまま（検査を通る）。
+        parsed, notes = ticket_mod.parse(self.written())
+        self.assertIsNotNone(parsed, notes)
+        config = phasetypes.load_types(self.conf, self.root, "")
+        found = agree_candidates.plan_problems(parsed, config)
+        self.assertEqual([p.detail for p in found if p.severity == "error"], [])
+
+    def test_a_template_without_a_feedback_plan_says_nothing_about_it(self):
+        self.put("small", SMALL)
+        result = self.new(template="small")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("--with-feedback", result.stdout)
+        self.assertEqual(
+            front_of(self.written())["plan"], ["design", {"type": "implement", "after": [1]}]
+        )
+
+    def test_with_feedback_on_a_template_without_one_writes_nothing_extra(self):
+        self.put("small", SMALL)
+        result = self.new("--with-feedback", template="small")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("feedback", front_of(self.written()))
 
     def test_a_template_without_flows_writes_no_flow_draft(self):
         self.put("small", SMALL)
@@ -344,6 +377,23 @@ class LayerTest(Use):
         self.assertIn("--template", result.stderr)
         self.nothing_written()
 
+    def test_with_feedback_is_only_for_ticket_new_template(self):
+        self.put("small", SMALL)
+        for argv, needle in (
+            (["--templates", "--with-feedback"], "--with-feedback は"),
+            (["--templates", "--template", "small", "--with-feedback"], "--template は"),
+            (["ticket", "status", "--with-feedback"], "--with-feedback は"),
+            (
+                ["ticket", "new", "x", "--title", "t", "--plan", "design", "--with-feedback"],
+                "--with-feedback は",
+            ),
+        ):
+            with self.subTest(argv=argv):
+                result = self.tpl(*argv)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(needle, result.stderr)
+        self.nothing_written()
+
     def test_template_is_only_for_ticket_new(self):
         self.put("small", SMALL)
         for argv in (
@@ -373,29 +423,78 @@ class RoundTripTest(Use):
         {"type": "implement-feedback", "after": []},
         {"type": "implement-feedback", "after": [4]},
     ]
+    # defer・複数の after・同じ型の繰り返し、フィードバック計画の after が複数（5, 6 の続き）。
+    RICH_PLAN = [
+        {"type": "research", "after": []},
+        {"type": "design", "review": "defer", "after": [1]},
+        {"type": "design", "after": [1]},
+        {"type": "implement", "after": [2, 3]},
+    ]
+    RICH_FEEDBACK = [
+        {"type": "implement-feedback", "after": []},
+        {"type": "implement-feedback", "after": [5]},
+        {"type": "implement-feedback", "review": "defer", "after": [5, 6]},
+        {"type": "implement-feedback", "after": [5, 7]},
+    ]
 
-    def test_a_template_drafted_from_a_done_parent_gives_the_same_plan_and_flow(self):
-        self.done_parent(self.PLAN, feedback=self.FEEDBACK, flows={"i0001-03-01": FLOW_IMPL})
+    def roundtrip(self, plan, feedback, flow_child):
+        """`--draft` -> 取り込み -> `--template ... --with-feedback`。元と作った提案を返す。"""
+        self.done_parent(plan, feedback=feedback, flows={flow_child: FLOW_IMPL})
         self.assertEqual(self.draft().returncode, 0)
         sha = self.generalize()
         imported = self.import_("i0001", "--to", "common", "--yes", "--expect", sha)
         self.assertEqual(imported.returncode, 0, imported.stdout + imported.stderr)
 
-        result = self.new(template="i0001")
+        result = self.new("--with-feedback", template="i0001")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-        original, _ = ticket_mod.parse(parent_text("i0001", self.PLAN, self.FEEDBACK))
+        original, _ = ticket_mod.parse(parent_text("i0001", plan, feedback))
         made, notes = ticket_mod.parse(self.written())
         self.assertIsNotNone(made, notes)
+        return original, made
+
+    def assert_same_plan(self, original, made):
         self.assertEqual([i.as_raw() for i in made.plan], [i.as_raw() for i in original.plan])
         self.assertEqual(
             [i.as_raw() for i in made.feedback], [i.as_raw() for i in original.feedback]
         )
+        wanted = workflow.compute(original)
+        got = workflow.compute(made)
+        self.assertEqual(got.waits, wanted.waits)
+        self.assertEqual(got.review_at, wanted.review_at)
+
+    def test_a_template_drafted_from_a_done_parent_gives_the_same_plan_and_flow(self):
+        original, made = self.roundtrip(self.PLAN, self.FEEDBACK, "i0001-03-01")
+        self.assert_same_plan(original, made)
         wanted, why = flow.parse(FLOW_IMPL.encode("utf-8"))
         self.assertEqual(why, "")
         data, why = flow.load(self.draft_of(3), self.tree)
         self.assertEqual(why, "")
         self.assertEqual(data, wanted)
+
+    def test_defer_multiple_after_repeated_types_and_feedback_after_round_trip(self):
+        original, made = self.roundtrip(self.RICH_PLAN, self.RICH_FEEDBACK, "i0001-04-01")
+        self.assertTrue(workflow.compute(original).review_at)
+        self.assert_same_plan(original, made)
+        self.assertEqual([i.after for i in made.feedback], [[], [5], [5, 6], [5, 7]])
+        data, why = flow.load(self.draft_of(4), self.tree)
+        self.assertEqual(why, "")
+
+    def test_without_with_feedback_the_main_plan_alone_round_trips(self):
+        self.done_parent(self.PLAN, feedback=self.FEEDBACK, flows={"i0001-03-01": FLOW_IMPL})
+        self.assertEqual(self.draft().returncode, 0)
+        sha = self.generalize()
+        self.assertEqual(
+            self.import_("i0001", "--to", "common", "--yes", "--expect", sha).returncode, 0
+        )
+        result = self.new(template="i0001")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        original, _ = ticket_mod.parse(parent_text("i0001", self.PLAN, self.FEEDBACK))
+        made, notes = ticket_mod.parse(self.written())
+        self.assertIsNotNone(made, notes)
+        self.assertEqual([i.as_raw() for i in made.plan], [i.as_raw() for i in original.plan])
+        self.assertFalse(made.feedback)
+        self.assertIn("フィードバック計画（2 項）がある", result.stdout)
 
     def test_absolute_is_the_inverse_of_the_draft_normalization(self):
         from ccnavi.tickets import template_use
