@@ -682,9 +682,7 @@ class TemplateDraftCarryTest(Workspace):
     """取り込んで消えたテンプレートの下書き（`wip/proposals/templates/`）は、フローの下書きと同じ形で
     コミットして push する。
 
-    `wip/design/scripts/` の版（ユーザがコピーする前）で走らせる。コピーしたあとは同じ中身なので、
-    どちらの時点でも通る。いまの `.ccnavi/scripts/` の版（`CCNAVI_SH_DIR=.ccnavi/scripts`）では
-    通らない: 消えた下書きを拾わず、コミットに入らない。
+    `.ccnavi/scripts/` の版で走らせる。この版は、消えた下書きを拾ってコミットに入れる。
     """
 
     use_staged_sh = True

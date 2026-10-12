@@ -22,10 +22,6 @@ import unittest
 from tests import ROOT
 
 SCRIPT = os.path.join(ROOT, "scripts", "ccnavi-setup.sh")
-# ユーザがコピーするまで `scripts/` に入らない版（共通のテンプレートを配る）。
-# 共通のテンプレートを配るテストは、この版があればこれで走らせる。コピーしたあと（この版が
-# 無くなったあと）は `SCRIPT` が同じ中身になるので、コピーの前後どちらでも通る。
-STAGED_SCRIPT = os.path.join(ROOT, "wip", "design", "scripts", "ccnavi-setup.sh")
 
 
 def _launcher_source():
@@ -1380,8 +1376,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     # ---- 共通の作業・レビュー計画のテンプレート
 
     def staged_setup(self):
-        """共通のテンプレートを配る版。コピーする前は `wip/design/scripts/`、あとは `scripts/`。"""
-        return STAGED_SCRIPT if os.path.isfile(STAGED_SCRIPT) else SCRIPT
+        """共通のテンプレートを配る版。いまは `scripts/` の版そのもの。"""
+        return SCRIPT
 
     def run_staged(self, target, *args):
         return subprocess.run(
