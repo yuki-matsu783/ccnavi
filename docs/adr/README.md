@@ -184,6 +184,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0108](0108-flow-loop-node.md) | 子のフローの反復は loop ノードで書き、繰り返す側を通らない巡回は warn で言う |
 | [0110](0110-scratchpad-is-wip-scratchpad-only.md) | 下書きの置き場は wip/scratchpad/ に一本化し、integrate が取り込むときに外す |
 | [0111](0111-concept-skills-and-references.md) | スキルは標準概念ごとの入口に絞り、細かい挙動は references に溜めて ccnavi --docs で引く |
+| [0126](0126-process-skills-and-investigating.md) | 概念スキルを工程スキルと呼び、調査の工程を足す |
 | [0112](0112-ccnavi-index-jsonl-added-to-project-gitignore.md) | 索引を ccnavi-index.jsonl にし、無視の行が無いツリーには .gitignore に足して索引の対象にする |
 | [0113](0113-stop-nudges-block-in-dry-run.md) | Stop の促し（finish・match: Stop）は dry-run でも止める |
 | [0119](0119-rule-expectations-rename.md) | ルールの「見本」を「期待する判定」と呼び、名前を rule-expectations に改める |

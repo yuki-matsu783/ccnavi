@@ -3,7 +3,7 @@ type: guide
 title: スキルの振り返り
 description: ccnaviが振り返りを求めたときに拾うもの・拾わないもの・スキルのどこに足すか
 tags: [skills, feedback]
-keywords: [概念スキル, reference, 振り返り, スキル, SKILL.md, references, 候補, 提案, フィードバック, 訂正, wiki, パターン, skill-impact, 知識, 蓄積]
+keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, references, 候補, 提案, フィードバック, 訂正, wiki, パターン, skill-impact, 知識, 蓄積]
 ---
 
 # スキルの振り返り
@@ -50,8 +50,8 @@ keywords: [概念スキル, reference, 振り返り, スキル, SKILL.md, refere
 上にあるものほど優先する。
 
 1. このセッションで読んだスキルを直す
-2. 概念スキル（`designing` `testing` `debugging` `reviewing` `releasing`）に当たる作業なら、その `references/` に足すか広げる（他のプロジェクトでも使える内容は `common/`、そのリポジトリだけの事情は `project/`）。足し方は `.ccnavi/docs/skill-concepts.md`。SKILL.md は直さない
-3. 概念スキルの対象外の既存スキルに、節・落とし穴・使う場面を足して直す。そのスキルに `references/<話題>.md` を足すか広げ、SKILL.md に1行の案内を足してもよい
+2. 工程スキル（`designing` `investigating` `testing` `debugging` `reviewing` `releasing`）に当たる作業なら、その `references/` に足すか広げる（他のプロジェクトでも使える内容は `common/`、そのリポジトリだけの事情は `project/`）。足し方は `.ccnavi/docs/skill-processes.md`。SKILL.md は直さない
+3. 工程スキルの対象外の既存スキルに、節・落とし穴・使う場面を足して直す。そのスキルに `references/<話題>.md` を足すか広げ、SKILL.md に1行の案内を足してもよい
 4. どれにも当たらない作業が繰り返し出たときだけ、新しいスキルの入口を提案する。今日の作業名・チケット番号・エラー文を名前にしない。ユーザの承認を取る
 
 - 直す前に、対象の SKILL.md と、手を入れる references/ を読み直す。会話中の引用で済ませない
@@ -65,7 +65,7 @@ keywords: [概念スキル, reference, 振り返り, スキル, SKILL.md, refere
 | 振り返る作業 | 対象 |
 |---|---|
 | ワークスペース自身 | `.claude/skills/<名前>/` |
-| `projects/<名前>/` の作業 | `projects/<名前>/skills/<名前>/`。Claude Codeのスキルと同じ形で、ccnaviが目録を渡す。概念スキルの reference は `projects/<名前>/skills/<概念>/references/` |
+| `projects/<名前>/` の作業 | `projects/<名前>/skills/<名前>/`。Claude Codeのスキルと同じ形で、ccnaviが目録を渡す。工程スキルの reference は `projects/<名前>/skills/<工程>/references/` |
 
 候補は、その中身を次に使う作業の側のスキルに書く。ワークスペースとプロジェクトの両方に関わるときも、2か所には書かず、手順を実行する側の1か所にだけ書く。
 

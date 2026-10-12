@@ -47,7 +47,7 @@ ccnavi が前提にしている決まり。セッションの開始（起動・�
 | md に frontmatter を付ける・直す、md の索引で引く | `.ccnavi/docs/frontmatter.md` |
 | フィードバックメッセージが届いた、`.claude/skills/` を直したくなった、フィードバック計画を書く | `.ccnavi/docs/skill-review.md` |
 | スキルの振り返りで知識を `docs/wiki/` に溜める、wiki のパターンや提案の採否を読む・書く | `.ccnavi/docs/skill-wiki.md` |
-| 概念スキル（designing・testing・debugging・reviewing・releasing）の reference を引く・足す、スキルを新しく作りたくなった | `.ccnavi/docs/skill-concepts.md` |
+| 工程スキル（designing・investigating・testing・debugging・reviewing・releasing）の reference を引く・足す、スキルを新しく作りたくなった | `.ccnavi/docs/skill-processes.md` |
 
 <!-- ccnavi:if tickets -->
   ## 作業の進め方
