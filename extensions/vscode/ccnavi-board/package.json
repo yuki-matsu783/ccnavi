@@ -1,7 +1,7 @@
 {
   "name": "ccnavi-board",
   "displayName": "ccnavi ボード",
-  "description": "ccnavi のチケットと、それに付随する提案・承認済みチケット・マーカー・ワークツリーをカンバンで表示します。承認する内容をオーバーレイで確かめて承認でき、承認の文とレビュー済みの連絡を Claude Code に渡せます。ルールと hook を画面で確かめ、ルールを直して判定を試せます。実績で測るリスクの配点とフェーズ定義も画面で直せます。projects/ のプロジェクトを一覧し、git clone をターミナルに送れます。ルール管理とリスク管理では共通・ワークスペース・プロジェクトの設定を、フェーズ管理ではワークスペース・プロジェクトの設定を切り替えて直せます。ルールとリスクでは、共通の設定との足し算も読み取りで確かめられます。",
+  "description": "ccnavi のチケットと、それに付随する提案・承認済みチケット・マーカー・ワークツリーをカンバンで表示します。承認する内容をオーバーレイで確かめて承認でき、承認の文とレビュー済みの連絡を Claude Code に渡せます。ルールと hook を画面で確かめ、ルールを直して判定を試せます。実績で測るリスクの配点とフェーズ定義も画面で直せます。projects/ のプロジェクトを一覧し、git clone をターミナルに送れます。ルール管理とリスク管理では共通・ワークスペース・プロジェクトの設定を、フェーズ管理ではワークスペース・プロジェクトの設定を切り替えて直せます。テンプレート管理では、作業・レビュー計画のテンプレートと下書きを読み、下書きを取り込めます。ルールとリスクでは、共通の設定との足し算も読み取りで確かめられます。",
   "version": "0.11.21",
   "publisher": "local",
   "private": true,
@@ -59,6 +59,10 @@
         "title": "ccnavi ボード: フェーズ管理を開く"
       },
       {
+        "command": "ccnaviBoard.openTemplates",
+        "title": "ccnavi ボード: テンプレート管理を開く"
+      },
+      {
         "command": "ccnaviBoard.openWorkflow",
         "title": "ccnavi ボード: 計画編集を開く"
       },
@@ -91,6 +95,10 @@
         },
         {
           "command": "ccnaviBoard.openPhases",
+          "when": "ccnaviBoard.ticketControl == 'enable'"
+        },
+        {
+          "command": "ccnaviBoard.openTemplates",
           "when": "ccnaviBoard.ticketControl == 'enable'"
         },
         {
@@ -135,7 +143,7 @@
             "Claude の配色（ダーク）"
           ],
           "default": "vscode",
-          "description": "ccnavi の 5 つの画面の配色です。vscode なら VS Code のテーマ変数に従います。claude-light / claude-dark は、背景・枠・文字の色と、意味を表す色を Claude の配色に置き換えます（ハイコントラストのテーマでは置き換えません）。サイドパネルのタイトルバーの配色のアイコンからも切り替えられます（今の値は見出しの横に出ます）。切り替えると、開いている画面にもその場で反映されます。"
+          "description": "ccnavi の 6 つの画面の配色です。vscode なら VS Code のテーマ変数に従います。claude-light / claude-dark は、背景・枠・文字の色と、意味を表す色を Claude の配色に置き換えます（ハイコントラストのテーマでは置き換えません）。サイドパネルのタイトルバーの配色のアイコンからも切り替えられます（今の値は見出しの横に出ます）。切り替えると、開いている画面にもその場で反映されます。"
         }
       }
     }
@@ -148,6 +156,7 @@
     "test:risk": "node scripts/test-groups.js risk",
     "test:phases": "node scripts/test-groups.js phases",
     "test:projects": "node scripts/test-groups.js projects",
+    "test:templates": "node scripts/test-groups.js templates",
     "test:flow": "node scripts/test-groups.js flow",
     "test:workflow": "node scripts/test-groups.js workflow",
     "test:shared": "node scripts/test-groups.js shared",

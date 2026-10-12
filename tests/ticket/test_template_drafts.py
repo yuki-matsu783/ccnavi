@@ -812,6 +812,70 @@ class ImportTest(Drafts):
         self.assertTrue(done["written"])
         self.assertTrue(done["removed"])
 
+    def test_via_board_skips_the_terminal_check(self):
+        # 拡張の子プロセスは端末を持たない。--via board なら端末の確かめを飛ばす。
+        result = self.import_(
+            "i0001",
+            "--to",
+            "common",
+            "--yes",
+            "--expect",
+            self.sha,
+            "--via",
+            "board",
+            "--json",
+            guard="enable",
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(os.path.exists(self.common_file()))
+        self.assertTrue(json.loads(result.stdout)["written"])
+
+    def test_without_via_board_the_terminal_check_stays(self):
+        result = self.import_(
+            "i0001", "--to", "common", "--yes", "--expect", self.sha, guard="enable"
+        )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("端末", result.stderr)
+        self.assertFalse(os.path.exists(self.common_file()))
+
+    def test_via_board_needs_expect_and_json(self):
+        result = self.import_("i0001", "--to", "common", "--yes", "--via", "board", "--json")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("--expect", result.stderr)
+        self.assertFalse(os.path.exists(self.common_file()))
+        self.assertTrue(os.path.exists(self.draft_path()))
+        result = self.import_(
+            "i0001", "--to", "common", "--yes", "--expect", self.sha, "--via", "board"
+        )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("--json", result.stderr)
+        self.assertFalse(os.path.exists(self.common_file()))
+        self.assertTrue(os.path.exists(self.draft_path()))
+
+    def test_via_terminal_is_refused_for_import(self):
+        result = self.import_(
+            "i0001",
+            "--to",
+            "common",
+            "--yes",
+            "--expect",
+            self.sha,
+            "--via",
+            "terminal",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("board", result.stderr)
+        self.assertFalse(os.path.exists(self.common_file()))
+
+    def test_new_text_is_in_the_preview_json(self):
+        # 同名が無い（新規の）取り込みの下見に、取り込む本文が出る。
+        shown = json.loads(self.import_("i0001", "--to", "common", "--json").stdout)
+        self.assertFalse(shown["exists"])
+        draft = self.read_draft().decode()
+        line = next(item for item in draft.splitlines() if item.startswith("name:"))
+        self.assertIn(line, shown["new_text"])
+
     # ---- 組み合わせの誤り
 
     def test_wrong_combinations_are_refused(self):
@@ -996,6 +1060,42 @@ class UserOnlyTest(Drafts):
             "--mode", "enable", "--guard-ticket-approval", "enable", stdin=json.dumps(payload)
         )
         self.assertIn("--templates --import", self.reason(result))
+
+    def test_the_board_import_forms_are_denied_whatever_the_launcher(self):
+        tail = (
+            "--templates --import X --to common --yes --expect " + "a" * 64 + " --via board --json"
+        )
+        heads = (
+            "ccnavi ",
+            "python3 -u -m ccnavi ",
+            "python3 -X utf8 -m ccnavi ",
+            "uv run --project . python -m ccnavi ",
+            "uv run -m ccnavi ",
+            "py -m ccnavi ",
+            "python -m ccnavi.__main__ ",
+            "python3 main.py ",
+            "uv run python main.py ",
+            "uvx ccnavi ",
+            "npx ccnavi ",
+            "pnpm exec ccnavi ",
+            "env X=1 ccnavi ",
+        )
+        commands = [head + tail for head in heads]
+        commands += [
+            "ccnavi --via board --yes --templates --import X --to common --expect "
+            + "a" * 64
+            + " --json",
+            "ccnavi --templates --import=X --to common --yes --expect " + "a" * 64 + " --via=board",
+        ]
+        for command in commands:
+            self.assertTrue(self.denied(command), command)
+
+    def test_a_reader_may_mention_the_import_flags(self):
+        for command in (
+            'grep -rn -- "--templates --import X --yes" README.md',
+            'rg -n "templates --import .* --yes" docs',
+        ):
+            self.assertFalse(self.denied(command), command)
 
 
 class JudgmentUnchangedTest(Drafts):

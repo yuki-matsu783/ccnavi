@@ -2,14 +2,17 @@
  * 実行ファイルを探して走らせる。Node の子プロセスを使うが VS Code には依存しない。
  * 実行ファイルはネットワークに出ないので、ここで待つのはワークスペースの走査だけ。
  *
- * 走らせるのは 9 つ。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
+ * 走らせるのは 13 つ。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
  * `--test-expectations --json`（期待する判定の一括）、`--lint`（設定の検証）、`--lint --json`（同じ苦情を
  * 機械可読で。プロジェクト管理画面が読む）、`--lint --json --flow <パス>`（子のフロー 1 本を
  * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--agree --preview --json`（承認待ちの一覧を見る）、
  * `--agree --yes … --json`（見せた一覧を承認する。ユーザがオーバーレイで押したときだけ）、
  * `--suggest --json`（記録からルールの候補を起こす。ルール管理画面が読む。記録を読むので `--log ""` は付けない）、
  * `--plan-order <親> --json [--order <JSON>]`（親の提案の計画の順序を振り直した答え。計画編集タブが読む）と
- * `--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`（その保存。提案を書き換えるのは実行ファイル）。
+ * `--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`（その保存。提案を書き換えるのは実行ファイル）と、
+ * `--templates --json`（テンプレートの一覧。テンプレート管理画面が読む）、`--templates --show <名前> --json`（1 件の本文）、
+ * `--templates --import <下書き> --to … --json`（取り込みの下見。何も書かない）と
+ * `--templates --import <下書き> --to … --yes --expect <ハッシュ> --via board --json`（取り込み。書くのは実行ファイル。ユーザが画面で押したときだけ）。
  * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
  * 判定と検証はルールファイルを差し替えられる。
  * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
@@ -45,6 +48,10 @@ import {
   planOrderWriteArgs,
   previewArgs,
   REVIEW_SCRIPT,
+  templatesArgs,
+  templatesImportArgs,
+  templatesImportYesArgs,
+  templatesShowArgs,
   toPosixPath,
   type Launcher,
   type LintOverride,
@@ -62,6 +69,8 @@ import { binFromSettingsJson, hostTarget, locate } from "./core/locate.js";
 import { parseBoardJson, type BoardJson } from "./core/model.js";
 import { parsePlanOrder, type PlanOrder, type PlanOrderAnswer, type PlanOrderWrite } from "./core/planordermodel.js";
 import { parseSuggestJson, type SuggestJson } from "./core/suggestmodel.js";
+import type { ImportAnswer, ImportRequest, TemplateDetail, TemplatesJson } from "./core/templates-view.js";
+import { parseImport, parseTemplates, parseTemplateShow } from "./core/templatesmodel.js";
 import {
   parseExpectationsJson,
   parseTestJson,
@@ -602,6 +611,9 @@ export async function runC1Target(root: string, setting: string, parent: string)
 /** 計画編集タブの 2 本が求めるフラグ。知らない古い実行ファイルは、確かめられないとして失敗にする */
 const PLAN_ORDER_FLAGS = ["--plan-order", "--order", "--expect", "--write"] as const;
 
+/** テンプレート管理画面が求めるフラグ。知らない古い実行ファイルは、確かめられないとして失敗にする */
+const TEMPLATES_FLAGS = ["--templates", "--show", "--import", "--expect", "--yes", "--via"] as const;
+
 /**
  * 実行ファイルが `--plan-order` を知っているかを聞く（`--version --json`）。知っていれば undefined、知らなければ理由。
  * 計画編集タブは読み込むたびに 1 回聞く（線を変えるたびには聞かない。往復が倍になるため）
@@ -673,4 +685,124 @@ export async function runPlanOrderWrite(root: string, setting: string, parent: s
     return { kind: "unchanged", answer };
   }
   return { kind: "refused", answer, reason: ran.stderr.trim() || "ccnavi が書き換えませんでした" };
+}
+
+/**
+ * 実行ファイルが `--templates` と取り込みのフラグを知っているかを聞く（`--version --json`）。知っていれば undefined、知らなければ理由。
+ * テンプレート管理画面は読み込むたびに 1 回聞く。
+ */
+export async function checkTemplates(root: string, setting: string): Promise<string | undefined> {
+  const probe = await probeVersion(root, setting);
+  if (probe === undefined) {
+    return NOT_FOUND;
+  }
+  return missingFlags(probe, TEMPLATES_FLAGS, "テンプレート管理画面", hasSource(root));
+}
+
+/** 失敗の答え（`{ok:false,error}`）の error。読めなければ空 */
+function errorOfAnswer(stdout: string): string {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(stdout);
+  } catch {
+    return "";
+  }
+  if (typeof raw === "object" && raw !== null && "error" in raw && typeof raw.error === "string") {
+    return raw.error;
+  }
+  return "";
+}
+
+/** 非 0 終了の理由。失敗の答えの error を優先し、無ければ標準エラーの最初の行、それも無ければ標準出力の最初の行 */
+function failureOf(ran: Ran): string {
+  return errorOfAnswer(ran.stdout) || firstLine(ran.stderr) || firstLine(ran.stdout);
+}
+
+/** テンプレートの一覧を読む（`--templates --json --layer <名前>`）。何も書かない */
+export async function runTemplates(root: string, setting: string, layer: string): Promise<RunResult<TemplatesJson>> {
+  const what = "ccnavi --templates --json";
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, templatesArgs(layer), DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+  }
+  if (ran.code !== 0) {
+    return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
+  }
+  const parsed = parseTemplates(ran.stdout);
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what} の出力を読めません（${parsed.error}）` };
+}
+
+/** 1 件の本文を読む（`--templates --show <名前> --layer <名前> --json`）。何も書かない */
+export async function runTemplateShow(root: string, setting: string, name: string, layer: string): Promise<RunResult<TemplateDetail>> {
+  const what = "ccnavi --templates --show --json";
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, templatesShowArgs(name, layer), DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+  }
+  if (ran.code !== 0) {
+    return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
+  }
+  const parsed = parseTemplateShow(ran.stdout);
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what} の出力を読めません（${parsed.error}）` };
+}
+
+/**
+ * 取り込みの子プロセス（下見と実行で共有）。下見でエラーを返す答えは終了コードが 1 でも `ok:true` の答えとして読む
+ * （画面が errors を並べるため）。読めず、かつ非 0 終了なら失敗にする。期限切れは `killedNote` を後ろに付ける。
+ */
+async function runImport(
+  root: string,
+  setting: string,
+  args: readonly string[],
+  what: string,
+  killedNote: string,
+): Promise<RunResult<ImportAnswer>> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, args, DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: `${cutOff(what, DIAGNOSE_TIMEOUT_MS)}${killedNote}` };
+  }
+  const parsed = parseImport(ran.stdout);
+  if (parsed.ok) {
+    return { ok: true, value: parsed.value };
+  }
+  if (ran.code !== 0) {
+    return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
+  }
+  return { ok: false, error: `${what} の出力を読めません（${parsed.error}）` };
+}
+
+/** 取り込みの下見（`--templates --import <下書き> --to … --json`）。何も書かない */
+export async function runTemplateImport(root: string, setting: string, request: ImportRequest): Promise<RunResult<ImportAnswer>> {
+  return runImport(root, setting, templatesImportArgs(request), "ccnavi --templates --import --json", "");
+}
+
+/**
+ * 取り込みの実行（`--templates --import <下書き> --to … --yes --expect <ハッシュ> --via board --json`）。
+ * 期限切れのときは、取り込めたかが分からないことを文に足す。
+ */
+export async function runTemplateImportYes(
+  root: string,
+  setting: string,
+  request: ImportRequest,
+  expect: string,
+): Promise<RunResult<ImportAnswer>> {
+  return runImport(
+    root,
+    setting,
+    templatesImportYesArgs(request, expect),
+    "ccnavi --templates --import --yes --json",
+    "（取り込めたかは分かりません。一覧を読み直して確かめてください）",
+  );
 }

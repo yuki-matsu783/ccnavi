@@ -11,6 +11,7 @@
  * ターミナルに Enter まで送る。承認と同時にターミナルで走り、ユーザはターミナルでその結果を見る。
  */
 import * as path from "node:path";
+import type { ImportRequest } from "./templates-view.js";
 
 /** 承認の push の sh の、ワークスペースルートからのパス */
 export const PUSH_APPROVED_SCRIPT = ".ccnavi/scripts/ccnavi-push-approved.sh";
@@ -61,6 +62,43 @@ export function approveArgs(
 export function planOrderArgs(parent: string, order?: Readonly<Record<string, unknown>>): readonly string[] {
   const base = ["--plan-order", parent, "--json"];
   return order === undefined || Object.keys(order).length === 0 ? base : [...base, "--order", JSON.stringify(order)];
+}
+
+/** `--templates --json --layer <名前>`。テンプレート管理画面が一覧を読む（何も書かない）。`--root` は `run()` が付ける */
+export function templatesArgs(layer: string): readonly string[] {
+  return ["--templates", "--json", "--layer", layer];
+}
+
+/** `--templates --show <名前> --layer <名前> --json`。1 件の本文を読む（何も書かない） */
+export function templatesShowArgs(name: string, layer: string): readonly string[] {
+  return ["--templates", "--show", name, "--layer", layer, "--json"];
+}
+
+/** 取り込みの引数のうち `--json` の前まで。下見と実行で共有する */
+function templatesImportBase(request: ImportRequest): string[] {
+  return [
+    "--templates",
+    "--import",
+    request.draft,
+    "--to",
+    request.to,
+    ...(request.to === "project" ? ["--layer", request.layer] : []),
+    ...(request.replace ? ["--replace"] : []),
+  ];
+}
+
+/** `--templates --import <下書き> --to … [--layer <名前>] [--replace] --json`。取り込みの下見（`--yes` を付けない。何も書かない） */
+export function templatesImportArgs(request: ImportRequest): readonly string[] {
+  return [...templatesImportBase(request), "--json"];
+}
+
+/**
+ * `--templates --import <下書き> --to … [--layer <名前>] [--replace] --yes --expect <sha> --via board --json`。
+ * 取り込みの実行。`expect` は見せた下書きの sha で、変わっていれば実行ファイルは何も書かない。
+ * `--via board` で、ボードから来た実行だと実行ファイルに伝える
+ */
+export function templatesImportYesArgs(request: ImportRequest, expect: string): readonly string[] {
+  return [...templatesImportBase(request), "--yes", "--expect", expect, "--via", "board", "--json"];
 }
 
 /**

@@ -11,6 +11,7 @@ function spy(): { readonly screens: Screens; readonly calls: string[] } {
       rules: async (target) => void calls.push(`rules:${target.kind}`),
       risk: async (target) => void calls.push(`risk:${target.kind}`),
       phases: async (target) => void calls.push(`phases:${target.kind}`),
+      templates: async (target) => void calls.push(`templates:${target.kind}`),
       projects: async () => void calls.push("projects"),
       flow: async (ticket) => void calls.push(`flow:${ticket}`),
       workflow: async (ticket) => void calls.push(`workflow:${ticket}`),

@@ -171,7 +171,7 @@ test("CB-T241 閉じた子（完了・取り消し）でファイルが無けれ
   assert.equal(card("i0001-02-03")?.flow?.exists, false);
 });
 
-test("CB-T230 置き場かその途中がリンクなら、着手前でも読むだけ。ツリーの欄が無い古い答えも書かない側", () => {
+test("CB-T557 置き場かその途中がリンクなら、着手前でも読むだけ。ツリーの欄が無い古い答えも書かない側", () => {
   const board = fixture();
   const edit = (change: (flow: NonNullable<BoardJson["tickets"][number]["flow"]>) => object): BoardJson => ({
     ...board,

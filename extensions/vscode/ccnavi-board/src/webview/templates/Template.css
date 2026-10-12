@@ -1,0 +1,25 @@
+/*
+ * テンプレート 1 件（`Template.tsx`）。見出しは名前・層・札・説明を 1 行に流し、狭い幅では折り返す。
+ * 開いた本体は縦に並べる（list.css の `.row-body` は格子なので、ここで上書きする）。
+ */
+.row.template > .row-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.row.template > .row-head:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.tpl-name { font-weight: 600; overflow-wrap: anywhere; }
+/* 層の札（span）と、層ごとの見出しの箱（div.tpl-layer。App.css）は別の要素なので、選択子を分ける */
+span.tpl-layer { font-size: .85em; }
+.tpl-desc { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; font-size: .92em; }
+.tpl-dropped { margin: 0; padding: 0 8px 6px 36px; overflow-wrap: anywhere; }
+.row.open > .tpl-body.row-body { display: block; padding: 8px 10px 10px 36px; }
+.tpl-body > p, .tpl-body > .tpl-plan-wrap, .tpl-body > .tpl-problems, .tpl-body > .tpl-flows { overflow-wrap: anywhere; }
+.tpl-flows { margin: 0 0 10px; padding-left: 20px; }
+.tpl-text-head { font-size: .92em; font-weight: 400; color: var(--vscode-descriptionForeground); margin: 0 0 4px; }
+.tpl-text {
+  margin: 0 0 10px; padding: 6px 8px; max-height: 480px; overflow: auto;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  border: 1px solid var(--vscode-panel-border); border-radius: 4px;
+  font-family: var(--vscode-editor-font-family); font-size: .92em;
+}
+@media (max-width: 520px) {
+  .row.open > .tpl-body.row-body { padding: 8px 14px 10px 14px; }
+  .tpl-dropped { padding-left: 14px; }
+}

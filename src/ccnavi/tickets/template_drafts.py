@@ -748,6 +748,7 @@ def plan_json(plan: ImportPlan, result: Imported | None = None) -> dict:
         "infos": list(plan.infos),
         "problems": [{"severity": p.severity, "detail": p.detail} for p in plan.problems],
         "diff": list(plan.diff),
+        "new_text": plan.new_text,
         "written": bool(result and result.written),
         "removed": bool(result and result.removed),
         "kept": result.kept if result else "",

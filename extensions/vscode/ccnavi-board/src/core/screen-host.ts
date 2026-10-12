@@ -8,7 +8,7 @@
  * | パネル | 使うもの | 裏に回ったとき |
  * |---|---|---|
  * | `retainContextWhenHidden: false`（ボード・プロジェクト管理） | `screenHost` | 画面は捨てられる。入れ物ごと入れ直す |
- * | `retainContextWhenHidden: true`（ルール管理・リスク管理・フェーズ管理） | `retainedHost` | 画面は生きている。何もしない |
+ * | `retainContextWhenHidden: true`（ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集） | `retainedHost` | 画面は生きている。何もしない |
  *
  * 取り違えるとどちらの向きでも不具合が出る。保持する画面に `screenHost` を当てると、裏にいる間の
  * 入れ直しでユーザが打ちかけていた内容が消える。保持しない画面に `retainedHost` を当てると、
@@ -176,7 +176,7 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
 
 /**
  * 保持する画面（`retainContextWhenHidden: true`）に中身を渡す段取り。ルール管理・リスク管理・
- * フェーズ管理が使う。返る形は `screenHost` と同じなので、パネルは作るところの 1 行だけが違う。
+ * フェーズ管理・テンプレート管理・フロー編集・計画編集が使う。返る形は `screenHost` と同じなので、パネルは作るところの 1 行だけが違う。
  *
  * 保持する画面は裏に回っても捨てられない。VS Code は DOM も Webview の中の状態もそのまま持ち、
  * 表に戻しても作り直さない。だから、この段取りが `screenHost` と違うのは次の 3 つ。
@@ -188,7 +188,7 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
  *   ただし VS Code の文書は同じ型定義の中で食い違っている（`retainContextWhenHidden` の側は
  *   「裏に回った画面にはメッセージを送れない」と言う）。どちらが正しくても正しく動くよう、呼ぶ側は
  *   表に戻ったときに、いま出すべき知らせ（`lock`・`changed`）と見た目（`appearance`）を送り直す
- *   （rules-panel / risk-panel / phases-panel）
+ *   （rules-panel / risk-panel / phases-panel / templates-panel / flow-panel / workflow-panel）
  * - `hidden()` は何もしない。 教えてもらっても、捨てられていないので扱いを変えるものが無い
  *
  * 残る `deferred` は 1 枚目だけ。入れ物を入れてから画面が組み上がる（`ready`）までの間は、

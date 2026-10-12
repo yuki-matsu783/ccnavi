@@ -209,7 +209,7 @@ test("CB-D04 絞り込みは一致しない行を隠し、開いている行は�
   }
 });
 
-test("CB-D324 一覧にない新しいツール名を追加欄に打つと、選んだ状態で match に入る。形の違う名前は足さず理由を出す", async () => {
+test("CB-D346 一覧にない新しいツール名を追加欄に打つと、選んだ状態で match に入る。形の違う名前は足さず理由を出す", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one(`${rowSelector("no-rm")} .row-head`));
@@ -640,7 +640,7 @@ test("CB-D101 ルール管理の基本の案内は見本の上でタブを切り
   const dom = await openRules({}, { tab: "hooks" });
   try {
     assert.ok(dom.one("#tab-hooks").classList.contains("active"));
-    // 案内の入口は ? 1 文字で、ヘッダ（ツールバー）の最後の子。位置は Tour.css が 5 画面とも右上に揃える
+    // 案内の入口は ? 1 文字で、ヘッダ（ツールバー）の最後の子。位置は Tour.css が 6 画面とも右上に揃える
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
     await dom.send({ type: "tour" });
     await dom.settle();

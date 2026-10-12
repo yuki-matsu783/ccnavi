@@ -1,0 +1,9 @@
+/*
+ * 苦情の一覧（`Problems.tsx`）。深刻度は色に加えて `[error]` `[warn]` `[info]` の文字でも出す。
+ */
+.tpl-problems { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.tpl-problems li { padding: 2px 8px; border-left: 3px solid currentColor; overflow-wrap: anywhere; }
+.tpl-problems li.sev-error { color: var(--error-text); }
+.tpl-problems li.sev-warn { color: var(--warn-text); }
+.tpl-problems li.sev-info { color: var(--info-text); }
+.tpl-problems .sev-label { font-family: var(--vscode-editor-font-family); font-weight: 600; }

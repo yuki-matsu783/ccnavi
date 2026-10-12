@@ -117,7 +117,9 @@ def forbidden(subject: str, unwrapped: str = "") -> bool:
 #    端末要求を外す（テストと CI のため）。切れなければ、端末を持たないエージェントは実行ファイルの
 #    側で止まる
 # 2. ボードの経路の形。`--yes`（承認と残った指摘）は端末を求めないので、ここが唯一の保護になる。
-#    `--agree` / `--reviewed` と `--yes` の組、sh の `--choices` と `--digest` の組
+#    `--agree` / `--reviewed` と `--yes` の組、sh の `--choices` と `--digest` の組、
+#    `--templates` と `--import` と `--yes` の組（テンプレートの取り込み。
+#    ボードの画面だけが `--via board` で呼ぶ）
 #
 # 実行ファイルを呼ぶ表記は追い切れない（`uv run -m ccnavi`、名前を変えたコピー、
 # `awk` の `system()`、`python -c` に引数のリストで渡す形）。だからコマンドの位置は見ず、
@@ -137,6 +139,11 @@ _GUARD_FLAG = re.compile(
 )
 _BOARD_FORMS = (
     re.compile(r"(?<![\w-])--(?:agree|approve|reviewed)(?![\w-])", re.IGNORECASE),
+    re.compile(r"(?<![\w-])--yes(?![\w-])", re.IGNORECASE),
+)
+_IMPORT_FORMS = (
+    re.compile(r"(?<![\w-])--templates(?![\w-])", re.IGNORECASE),
+    re.compile(r"(?<![\w-])--import(?![\w-])", re.IGNORECASE),
     re.compile(r"(?<![\w-])--yes(?![\w-])", re.IGNORECASE),
 )
 _DECIDE_FORMS = (
@@ -218,7 +225,7 @@ def human_path_form(subject: str) -> tuple[str, str]:
     flag = _GUARD_FLAG.search(text)
     if flag:
         return "guard-off", flag.group(0).strip()
-    for pair in (_BOARD_FORMS, _DECIDE_FORMS):
+    for pair in (_BOARD_FORMS, _IMPORT_FORMS, _DECIDE_FORMS):
         found = [rx.search(text) for rx in pair]
         if all(found):
             return "board", " … ".join(m.group(0) for m in found if m)
@@ -227,10 +234,16 @@ def human_path_form(subject: str) -> tuple[str, str]:
 
 def board_form_message(found: str) -> str:
     """ボードの経路の形で止めた文。"""
+    # 取り込みの形は、承認と残った指摘の対応方針の文に当たらない。
+    decided = (
+        "テンプレートの取り込みは、ユーザが画面か端末で下書きの差分を読んでから決めます。"
+        if "--import" in found
+        else "承認と残った指摘の対応方針は、ユーザがボードか端末で決めます。"
+    )
     return (
         f"コマンド行に、ボード経由の操作用の形（{found}）が含まれています。この形はユーザがボードの"
         "オーバーレイで押したものを拡張が打つためのもので、端末での確かめが無いので、エージェントが"
-        "打った場合はここで止めます。承認と残った指摘の対応方針は、ユーザがボードか端末で決めます。"
+        f"打った場合はここで止めます。{decided}"
         "この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
     )
 

@@ -8,6 +8,7 @@ import { openPhases } from "./phases-panel.js";
 import { openProjects } from "./projects-panel.js";
 import { openRisk } from "./risk-panel.js";
 import { openRules } from "./rules-panel.js";
+import { openTemplates } from "./templates-panel.js";
 import { registerSidebar } from "./sidebar.js";
 import { watchTicketControl } from "./ticket-control.js";
 import { initTours } from "./tour.js";
@@ -23,6 +24,7 @@ export function activate(context: vscode.ExtensionContext): void {
     rules: openRules,
     risk: openRisk,
     phases: openPhases,
+    templates: openTemplates,
     projects: openProjects,
     flow: openFlow,
     workflow: openWorkflow,
@@ -40,6 +42,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("ccnaviBoard.openProjects", () => void screens().projects()),
     vscode.commands.registerCommand("ccnaviBoard.openRisk", () => void screens().risk({ kind: "workspace" })),
     vscode.commands.registerCommand("ccnaviBoard.openPhases", () => void screens().phases({ kind: "self" })),
+    vscode.commands.registerCommand("ccnaviBoard.openTemplates", () => void screens().templates({ kind: "self" })),
     vscode.commands.registerCommand("ccnaviBoard.appearance", () => void pickAppearance()),
     // 親の識別子を引数で受けて開く（キーバインドの args や、ほかの拡張の executeCommand から）。開く親を選ぶ段が
     // 無いので、コマンドパレットには出さない（package.json の menus.commandPalette で when: false）

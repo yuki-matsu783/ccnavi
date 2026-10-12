@@ -9,7 +9,7 @@
  * この入れ物は 1 度しか入らない（`retainedHost`）。画面は編集の途中を持つので、
  * 入れ直すと打ちかけの内容が消える。2 枚目からは拡張ホストが `postMessage` で渡す（rules-panel）。
  *
- * CSS も画面の側の持ち物で、部品と同じ置き場にある（`src/webview/rules/*.css`。5 画面共通のぶんは
+ * CSS も画面の側の持ち物で、部品と同じ置き場にある（`src/webview/rules/*.css`。6 画面共通のぶんは
  * `extensions/shared/styles/` と配色の `src/webview/styles/appearance.css`）。それをバンドルした 1 本（`out/webview/rules.css`）を、ここが `<style nonce>` に
  * 流し込む。挿すのがここなのは、Webview の CSP が nonce を持つ `<style>` しか通さず、nonce を作るのが
  * 入れ物を組む側だから。

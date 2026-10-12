@@ -1,6 +1,6 @@
 /**
- * アクティビティバーの ccnavi から開くサイドパネル。並ぶのは画面の入口 5 つで、どれも Webview パネルを開く。
- * 「チケット管理」「リスク管理」「フェーズ管理」は、チケット制御（CCNAVI_TICKET_CONTROL）が
+ * アクティビティバーの ccnavi から開くサイドパネル。並ぶのは画面の入口 6 つで、どれも Webview パネルを開く。
+ * 「チケット管理」「リスク管理」「フェーズ管理」「テンプレート管理」は、チケット制御（CCNAVI_TICKET_CONTROL）が
  * disable のワークスペースでは出さない。配点は子チケットを閉じるときに、フェーズ定義は親の
  * 計画と子の範囲にしか読まれないので、disable の間はどちらも何も動かさない。使われない設定の
  * 入口を残すと、直したのに反映されていない、という読み違いの元になる。
@@ -52,6 +52,13 @@ const ENTRIES: readonly Entry[] = [
     description: "フェーズ定義（計画に並べる型、編集可能な範囲の上限、レビューの既定）の編集と保存",
     command: "ccnaviBoard.openPhases",
     icon: "milestone",
+    needsTickets: true,
+  },
+  {
+    label: "テンプレート管理",
+    description: "作業・レビュー計画のテンプレートの一覧、下書きの取り込み",
+    command: "ccnaviBoard.openTemplates",
+    icon: "files",
     needsTickets: true,
   },
   {
