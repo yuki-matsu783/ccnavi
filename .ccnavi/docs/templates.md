@@ -3,7 +3,7 @@ type: guide
 title: 作業・レビュー計画のテンプレート
 description: 完了した親の計画と子のフローをテンプレートに溜める手順と、テンプレートから親の提案を始める手順
 tags: [ticket, templates]
-keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedback, フロー, 下書き, 取り込み, --templates, --draft, --import, ticket new, 再利用, wip/proposals/templates]
+keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedback, フロー, 下書き, 取り込み, --templates, --draft, --import, --save-draft, --delete-draft, --rename-template, --move-template, --delete-template, ticket new, 再利用, wip/proposals/templates]
 ---
 
 # 作業・レビュー計画のテンプレート
@@ -53,6 +53,16 @@ keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedba
 **未追跡の下書きは `ready` を止める。** 下書きは `wip/` の未追跡のファイルで、親の `ready` は未追跡のファイルを名指しして止める。`--draft` を打ったら、取り込むか、`ready` の前に下書きを消す（またはコミットする）。
 
 `--import` の `--yes` で書くのは、端末の前のユーザが打つ。エージェントには、hook の止めと、書くときに標準入力が端末かを確かめる実行時の確認の 2 つが掛かる。下見（`--yes` なし）は端末でなくても動く。エージェントは `--import` を打てない。
+
+**下書きの手直しと整理。** 下書きには効力が無いので、エージェントは下書きを直接編集してよい。`--save-draft` と `--delete-draft` は、`--yes` を付けない下見ならエージェントも打てる。取り込み済みの改名・移動・削除（`--rename-template`・`--move-template`・`--delete-template`）はユーザ専用で、エージェントは下見も打てない。ユーザは画面（ボードのテンプレート管理）か、これらの旗で行う。作業中のチケットがあるあいだは、取り込み済みの改名・移動・削除は止まる。
+
+ユーザが改名する例。1 行目で下見し、出たハッシュを 3 行目の `<ハッシュ>` に入れて書く。
+
+```
+ccnavi --templates --rename-template <名前> --new-name <新名> --on project --layer <プロジェクト名>
+# 上の下見で出たハッシュを下の <ハッシュ> に入れる
+ccnavi --templates --rename-template <名前> --new-name <新名> --on project --layer <プロジェクト名> --yes --expect <ハッシュ>
+```
 
 ## 使う
 
