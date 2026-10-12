@@ -185,7 +185,6 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0110](0110-scratchpad-is-wip-scratchpad-only.md) | 下書きの置き場は wip/scratchpad/ に一本化し、integrate が取り込むときに外す |
 | [0111](0111-concept-skills-and-references.md) | スキルは標準概念ごとの入口に絞り、細かい挙動は references に溜めて ccnavi --docs で引く |
 | [0126](0126-process-skills-and-investigating.md) | 概念スキルを工程スキルと呼び、調査の工程を足す |
-| [0127](0127-plan-called-work-and-review-plan.md) | 親の計画とフィードバック計画をまとめて「作業・レビュー計画」と呼び、ワークフローの呼び名をやめる |
 | [0112](0112-ccnavi-index-jsonl-added-to-project-gitignore.md) | 索引を ccnavi-index.jsonl にし、無視の行が無いツリーには .gitignore に足して索引の対象にする |
 | [0113](0113-stop-nudges-block-in-dry-run.md) | Stop の促し（finish・match: Stop）は dry-run でも止める |
 | [0119](0119-rule-expectations-rename.md) | ルールの「見本」を「期待する判定」と呼び、名前を rule-expectations に改める |
@@ -219,6 +218,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0083](0083-tour-on-every-screen-with-samples.md) | 初回の吹き出しの案内を拡張の 5 画面すべてに出し、中身が空の画面では案内の間だけ見本を出す |
 | [0091](0091-project-skills-in-docs-skills.md) | プロジェクトのスキルは `docs/skills/` に置き、ccnavi は目録だけを渡す（置き場は ADR-0111 が `skills/` に改める） |
 | [0124](0124-tour-courses-in-yaml.md) | 案内を使い方ごとの案内（ユースケース）に分け、見本と段を YAML で定義する |
+| [0127](0127-plan-called-work-and-review-plan.md) | 親の計画とフィードバック計画をまとめて「作業・レビュー計画」と呼び、ワークフローの呼び名をやめる |
 
 ### 開発と文書
 
