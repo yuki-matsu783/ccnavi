@@ -276,7 +276,6 @@ def _plan_lines(items: list[ticket_model.PlanItem], start: int, types: dict | No
         elif pt is not None:
             review = {
                 phasetypes.REVIEW_MR: "レビュー要: マージリクエスト",
-                phasetypes.REVIEW_CHAT: "レビュー要: このセッションで",
             }.get(pt.review, "レビュー不要")
         lines.append(f"    {n}. {title} / {item.type}" + (f"  {review}" if review else ""))
     return lines

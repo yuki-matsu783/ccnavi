@@ -179,12 +179,12 @@ class Phase:
 
     @property
     def review_kind(self) -> str:
-        """このフェーズの終わりにユーザがどこで見るか。`none` / `chat` / `mr`。
+        """このフェーズの終わりにユーザがどこで見るか。`none` / `mr`。
 
         見る場所を言えるのは、定義と計画の項と、引き受けた延期だけ。そのうち厳しい側を
         採る。子の宣言（`human_review.required`）と実績のリスクは「要る」とだけ言い、
-        場所は言わないので、宣言が「見ない」だったフェーズを `chat` へ上げるにとどまる。
-        どちらも止める向きにしか働かず、宣言された `mr` を `chat` に下げることはない。
+        場所は言わないので、宣言が「見ない」だったフェーズを `mr` へ上げる。
+        どちらも止める向きにしか働かない。
 
         場所を言う者が 1 人も居なければ（計画が無い、定義が読めない）今までどおりで、
         子が「ユーザが見る」と言うか実績が高ければ `mr`。緩い側を採ると、定義のファイルが
@@ -208,21 +208,15 @@ class Phase:
         where = declared[0]
         for covered in declared[1:]:
             where = phasetypes.stricter(where, covered)
-        # 「要る」としか言われていないフェーズは、いちばん手間の少ない見る場所（`chat`）まで
-        # 上げる。マージリクエストを勧めるのは文の側の仕事で、強制はしない。
+        # 「要る」としか言われていないフェーズは `mr` まで上げる。
         if needed and where == phasetypes.REVIEW_NONE:
-            where = phasetypes.REVIEW_CHAT
+            where = phasetypes.REVIEW_MR
         return where
 
     @property
     def review_required(self) -> bool:
         """このフェーズの終わりにユーザのレビューが要るか。見る場所が `none` でなければ要る。"""
         return self.review_kind != phasetypes.REVIEW_NONE
-
-    @property
-    def review_in_chat(self) -> bool:
-        """このセッションでユーザが見るフェーズか。ホストへは出ない。"""
-        return self.review_kind == phasetypes.REVIEW_CHAT
 
     @property
     def gate_closed(self) -> bool:
@@ -238,18 +232,10 @@ class Phase:
 
     @property
     def review_waiting(self) -> bool:
-        """依頼を出したのにまだ止まっている。ユーザのレビュー待ち。
+        """依頼を出したあとの待ちを言う。ボードの「受け入れ」はこの欄で出し分ける。
 
         ボードはこれをそのまま使うだけで、止まっているかとマーカーから組み直さない。依頼していない
         フェーズは止まっていても待ちではなく（レビュー準備中）、先に親が request を打つ。
-
-        これはマージリクエストの待ちだけを言う。`review: chat` のフェーズは普段 `request` を
-        打たないので False のまま。ボードの「受け入れ」（未解決スレッドを受け入れて進む）が
-        この欄で出し分けられており、ホストから取得する結果の無い
-        chat のフェーズに出すと打てない操作を見せることになる。
-        打ったときは（実績のリスクが高いときに勧める向き）
-        ホストから取得する結果があるので、`mr` と同じに True でよい。
-        このセッションで見る待ちは `review_kind` と `gate_closed` で読む。
         """
         return self.gate_closed and approval_marks.MARK_REQUESTED in self.marks
 
@@ -259,9 +245,6 @@ class Phase:
 
         まだ依頼していなければ動くのはエージェント（合流・push・依頼）なので
         「レビュー準備中」、依頼が出ていれば動くのはユーザなので「レビュー待ち」。
-        `review: chat` のフェーズは普段この段を持たないので、ユーザが端末で
-        `--reviewed --chat` を打つまで「レビュー準備中」のまま。`request` を通した
-        ときだけ `mr` と同じに「レビュー待ち」へ移る。
         """
         return LABEL_WAITING if self.review_waiting else LABEL_PREPARING
 
@@ -318,8 +301,7 @@ def phases_of(
         for n, item in owner.numbered():
             by_number[n] = Phase(parent_id, n, item=item, type=types.get(item.type), owner=owner)
         # 延期を引き受けた側に、引き受けた分の「見る場所」を渡す。厳しい側を採るのは
-        # `review_kind`。ここで渡さないと、chat の計画に mr の延期が入っているときに
-        # 引き受けた側が chat のままになり、宣言した mr が消える。
+        # `review_kind`。
         #
         # 覆っている分の宣言が読めない番号は `mr` として扱う。延期できるのはレビューのある
         # 定義だけ（承認が確かめる）なので、そこには必ず見る場所を言った者が居た。
@@ -434,14 +416,6 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
             f"'{review_sh} confirm --phase {n}' で確かめます。指摘が付いていたら、"
             f"同じフェーズに子を足してやり直せます。{later}"
         )
-    elif phase.review_in_chat:
-        todo = (
-            "やること: 子の成果を親ブランチへ合流し、ユーザに差分を見てもらって、"
-            f"{phase_forms.TURN_DEFINED}を終えてユーザを待ってください。このフェーズはこのセッションで見る計画"
-            "（review: chat）なので、マージリクエストは要りません。先へ進めるのは、"
-            f"ユーザが親のワークツリーの端末で打つ '{review_sh} chat {n}' です"
-            f"（エージェントからは打てません）。{later}"
-        )
     else:
         todo = (
             "やること: 子の成果を親ブランチへ合流し、ELI5 の HTML を "
@@ -537,40 +511,16 @@ def announce(
                 "指摘があれば同じフェーズに子を足せます。レビュー済みになるまで、"
                 f"サブエージェントの起動とシェル実行は止まります。{phase_forms.EXEMPT_NOTE}"
             )
-            if phase.review_in_chat:
-                # このセッションでユーザが見る。ホストへは出ないので push もしない。
-                # 先へ進めるのは端末のユーザで、エージェントには打てない。
-                advise = (
-                    "実績のリスクが高いので、マージリクエストで見てもらうことを勧めます"
-                    "（定義の `review` を mr にするか、ユーザに相談）。それでも chat で"
-                    "通すかはユーザが決めます。"
-                    if phase.risk_escalates
-                    else ""
-                )
-                texts.append(
-                    f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました"
-                    f"（{LABEL_PREPARING}）。{who}"
-                    "このフェーズはこのセッションで見る計画（review: chat）です。"
-                    "子の成果を親ブランチへ合流し、ユーザに差分を見てもらってください。"
-                    f"{advise}"
-                    "レビュー"
-                    f"{covers}が済んだら、ユーザが親のワークツリーの端末で "
-                    f"'{settings.script_command(root, 'ccnavi-review.sh')} chat {n}' を"
-                    "打つと先へ進めます"
-                    "（この経路はエージェントには打てません）。"
-                    f"{phase_forms.TURN_DEFINED}を終えてユーザを待ってください。{hold_note}"
-                )
-            else:
-                texts.append(
-                    f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました"
-                    f"（{LABEL_PREPARING}）。{who}"
-                    "子の成果を親ブランチへ合流し、ELI5 の HTML を "
-                    f"wip/eli5/phase-{n}.html に書いてコミットして push し、"
-                    f"'{settings.script_command(root, 'ccnavi-review.sh')} request --phase {n} "
-                    f"--body-file <依頼文> --eli5 wip/eli5/phase-{n}.html' "
-                    f"でレビュー{covers}を頼み、{phase_forms.TURN_DEFINED}を終えてユーザを待ってください。"
-                    f"{hold_note}"
-                )
+            texts.append(
+                f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました"
+                f"（{LABEL_PREPARING}）。{who}"
+                "子の成果を親ブランチへ合流し、ELI5 の HTML を "
+                f"wip/eli5/phase-{n}.html に書いてコミットして push し、"
+                f"'{settings.script_command(root, 'ccnavi-review.sh')} request --phase {n} "
+                f"--body-file <依頼文> --eli5 wip/eli5/phase-{n}.html' "
+                f"でレビュー{covers}を頼み、{phase_forms.TURN_DEFINED}を終えてユーザを待ってください。"
+                f"{hold_note}"
+            )
         else:
             failed = approval_marks.write_mark(
                 where,
@@ -655,7 +605,6 @@ def review_next(
     `review_at`）のマーカー。
 
     - レビュー済み: 済んでいる（ユーザの操作で done/ へ動く）
-    - このセッションで見る（`review: chat`）: 親が見せて、ユーザが端末で `chat` を打つ
     - 依頼済みで、この子が依頼より前に閉じた: ユーザのレビューを待つ
     - 依頼済みで、この子が依頼より後に閉じた: 依頼し直しが要る
     - 未依頼: レビュー準備中。子がまだ残っていればそれを言い、前に依頼していた（続きの子を足した
@@ -679,13 +628,6 @@ def review_next(
         return (
             f"{lead}フェーズ {owner.label} はレビュー済み。ユーザの操作（confirm / decide）で "
             f"{conf.approved}/{ticket_model.DONE}/ へ動く"
-        )
-    if owner.review_in_chat and approval_marks.MARK_REQUESTED not in owner.marks:
-        return (
-            f"{lead}まだ{LABEL_PREPARING}。このフェーズはこのセッションで見る計画（review: chat）。"
-            "親が子の成果を合流してユーザに差分を見てもらい、ユーザが親のワークツリーの端末で "
-            f"'{review_sh} chat {n}' を打つまで、先へは進まない"
-            f"（打てば {conf.approved}/{ticket_model.DONE}/ へ動く）"
         )
     request = (
         f"'{review_sh} request --phase {n} --body-file <依頼文> --eli5 wip/eli5/phase-{n}.html'"
@@ -821,7 +763,8 @@ def _erase_steps(
     return (
         "レビューをやり直すならマーカーを消してください"
         f"（消し方: ユーザが{_marker_tree(root, conf, child)}で '{git} rm {mark}' を打ち、"
-        "削除をコミットする。取り込み済みで origin があり、chat だけでない親子なら "
+        "削除をコミットする。取り込み済みで origin があり、"
+        "マージリクエストで見るフェーズがある親子なら "
         f"'{push} {child.parent}' が取り込んでから送る。それ以外は何もしないので、"
         "ユーザが自分でコミットする）。"
         "続きの作業だけなら、そのままで構いません。"
@@ -980,11 +923,11 @@ def plan_finished(root: str, conf: settings.Settings, parent: ticket_model.Ticke
 
 
 def review_venues(root: str, conf: settings.Settings, parent_id: str) -> dict[int, str]:
-    """この親のフェーズ番号 → ユーザがどこで見るか（`none` / `chat` / `mr`）。"""
+    """この親のフェーズ番号 → ユーザがどこで見るか（`none` / `mr`）。"""
     return {p.number: p.review_kind for p in phases_of(root, conf, parent_id)}
 
 
-def chat_only(
+def without_mr(
     root: str, conf: settings.Settings, parent_id: str, venues: dict[int, str] | None = None
 ) -> bool:
     """マージリクエストに出さない進め方か。フェーズが 1 つも無ければ False。

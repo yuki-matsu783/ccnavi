@@ -195,7 +195,7 @@ def settle_review(
 ) -> tuple[list[str], str]:
     """この親の、この番号のフェーズのレビュー待ちの子を `done/` へ動かす。
 
-    ユーザがレビューを済ませたときに呼ぶ（`confirm` / `decide` / `--reviewed --chat` /
+    ユーザがレビューを済ませたときに呼ぶ（`confirm` / `decide` /
     `close-early` と、フィードバック計画の承認）。返すのは動かした識別子と、動かせなかった理由。
     """
     review, _ = approval.scan_review(conf, root)

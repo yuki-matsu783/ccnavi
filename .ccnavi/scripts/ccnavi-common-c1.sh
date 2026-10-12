@@ -6,7 +6,7 @@
 #
 # 取り込み済みの親子のチケットについて、チケットの状態を書く一連の操作を 1 つの操作にまとめる。親子のチケットは
 # 親のブランチ 1 本に対応する。ここで対象にするのは、origin があり取り込み状態が present の親子のチケットのうち、
-# chat だけのものを除いたもの。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に関数を呼ぶ。
+# マージリクエストで見るフェーズが無いものを除いたもの。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に関数を呼ぶ。
 #
 #   ccnavi_c1_family <識別子>   親子のチケットと、C1 の対象か（ccnavi_c1_target に yes / no / stop）
 #   ccnavi_c1_begin             1 ロック 2 途中の操作 3 C1 の外の変更の見分けとコミット 4 取り込み 5 未送信の確かめ

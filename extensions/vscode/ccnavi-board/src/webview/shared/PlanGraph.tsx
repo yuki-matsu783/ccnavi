@@ -72,7 +72,7 @@ type PlanNode = ItemNode | EndNode;
 
 /**
  * 見る場所の言葉。同じオーバーレイの本文（承認画面。`agree_screen.py`）の「レビュー不要」
- * 「レビュー要: マージリクエスト」「レビュー要: このセッションで」を、点の幅に収まる短さにしたもの。
+ * 「レビュー要: マージリクエスト」を、点の幅に収まる短さにしたもの。
  * 知らない表記はそのまま出す
  */
 function reviewText(review: string): string {
@@ -81,8 +81,6 @@ function reviewText(review: string): string {
       return "レビュー不要";
     case "mr":
       return "レビュー要（MR）";
-    case "chat":
-      return "レビュー要（このセッション）";
     default:
       return `レビュー: ${review === "" ? "?" : review}`;
   }

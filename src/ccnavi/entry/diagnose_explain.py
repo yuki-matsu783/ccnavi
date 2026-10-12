@@ -279,7 +279,6 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             hold = ph.review_label if ph.gate_closed else "止めていない"
             review = {
                 phasetypes.REVIEW_MR: " / レビューはマージリクエストで",
-                phasetypes.REVIEW_CHAT: " / レビューはこのセッションで",
             }.get(ph.review_kind, "")
             if ph.deferred:
                 review = f" / レビューは {ph.review_at} と一緒に"
