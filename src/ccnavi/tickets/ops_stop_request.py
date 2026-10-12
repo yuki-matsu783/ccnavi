@@ -19,8 +19,7 @@ cwd のツリーが、承認済みの親（`doing/`、着手済み、信頼で�
 `reviewed` を置かないだけで `requested` は残るので、同じ扱いで止まらない。同じフェーズに子を足すと
 `requested` が外れ、足した子が作業中になる。そのときは止めてよい。
 
-止めない: このセッションで見る計画（`review: chat`）の依頼前（依頼は打たず、ユーザが端末で打つ）、
-ユーザが早めに閉じた親、レビューが要らないフェーズ（省略のマーカー）、延期したフェーズ。
+止めない: ユーザが早めに閉じた親、レビューが要らないフェーズ（省略のマーカー）、延期したフェーズ。
 
 実行中のサブエージェントが居る間（委任して待つ回）も止めない。これは呼び出し側（`events._request_nudge`）が
 `subagent.running` で先に見て、ここへ来ない。そのため「1 回だけ」の記録も進まない。記録は
@@ -126,9 +125,8 @@ def pending_at_stop(
     if bound.is_child:
         return None
     for ph in phase.phases_of(root, conf, parent.ticket, raw=raw):
-        # 終わっていて、レビューが要り、まだ済んでいないフェーズ。このセッションで見る計画は、
-        # 依頼を打たずにユーザが端末で進めるので、促さない。
-        if not ph.gate_closed or ph.review_in_chat:
+        # 終わっていて、レビューが要り、まだ済んでいないフェーズ。
+        if not ph.gate_closed:
             continue
         if approval_marks.MARK_REQUESTED in ph.marks:
             continue

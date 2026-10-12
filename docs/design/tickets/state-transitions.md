@@ -41,7 +41,7 @@ keywords: [状態遷移, 置き場, マーカー, doing, review, done]
 | `doing` → `done` | `ccnavi-ticket.sh finish` | 着手済み。子ならフェーズがレビュー不要。親なら開いている子が無く、レビューで止まっておらず、計画があればフィードバック計画が承認済みで全フェーズが終わっている（早めに閉じていれば子だけ） | `completed_at` |
 | `doing` → `done`（取り消し） | `ccnavi-ticket.sh cancel --reason`、`close-early`（未着手の子） | 理由が空でない。親なら開いている子が無い | `cancelled_at`、`cancel_reason` |
 | `review` → `done` | `ccnavi-review.sh confirm` / `decide`、`ccnavi --reviewed`、`close-early`、フィードバック計画の承認 | そのフェーズ（延期を引き受けた分を含む）のレビューが済んだ（9.10） | ― |
-| 無し → `doing`（続きの子） | ユーザが `decide` / `--reviewed --chat` で選ぶ | レビューで指摘が残った（9.10）。同じフェーズの番号、範囲は見た子の和 | `followup_of`（トップレベルの欄。ccnavi が新しく作るチケットに書く） |
+| 無し → `doing`（続きの子） | ユーザが `decide` で選ぶ | レビューで指摘が残った（9.10）。同じフェーズの番号、範囲は見た子の和 | `followup_of`（トップレベルの欄。ccnavi が新しく作るチケットに書く） |
 | `doing` → `todo`（取り下げ） | Chrome 拡張（ユーザ） | 着手前の新規の承認。`doing/` の中身が承認コミットの親の提案とバイト単位で同じ（待ち方は `doing/` の計画から決まるので、別に比べない）。子もマーカーも無く、続きの子でない。承認の前に計画編集タブ（`--plan-order --write`）か `--fill-phases` で書き換えた提案は、書き換えがコミットされないまま承認されるので取り下げられない。違いが `plan:` / `feedback:` / `phases:`（子は `phase:` か `predecessors:`）の値だけなら、文面が `ccnavi-ticket.sh cancel` で取り消して出し直すよう案内する。識別子と `phase:` を付け替えた子は、承認コミットの親に同じ識別子の提案が無いので、案内は出ずに止まる | ―（承認コミットの親の提案のバイト列を戻す） |
 | `done` → `doing` | ユーザが hook の外で動かす | エージェントは `Write` でもシェルでも止まる。再開の意図がレビューのやり直しなら、そのフェーズのマーカーも手で消す | ― |
 
@@ -83,7 +83,7 @@ warn で言う（判定と `start` は止めない）。マーカーを消すか
 未着手、`blocked`、基準点が無い、子で親のブランチを引けない、親で `close_problems`（開いている子・レビュー準備中／レビュー待ち・フィードバック計画待ち・
 終わっていないフェーズ）が空でない、git を読めない、`SubagentStop`。`dry-run` は止めずに文を `systemMessage` に載せる。
 
-**レビューの依頼までの道の途中で終えようとしたら、`Stop` で 1 回だけ止める。** 子の `finish`・親ブランチへの合流・ELI5・`ccnavi-review.sh request` は決まった道で、各所で「進めてよいですか」と確認して止まる必要が無い。メインエージェントの `Stop` で、cwd のツリーが承認済みの親（`doing/`、着手済み、`blocked` でない、`close-early` が無い）に結び付いていて、(a) 作業中（`doing/`、着手済み）の子が残っている（子のツリーでは自分の子だけ。並行する別の子は別のセッションの作業）、または (b) 子が全部閉じ、レビューを要する（`review: none` でも `chat` でも延期でもない）フェーズに依頼のマーカー（`requested`）が無ければ、`decision: block` で止める（`NUDGE_TICKET_REQUEST`）。文は「決まった道の途中でユーザの許可は要らない・次のコマンド・ユーザの判断が本当に要る問いならその問いを最後に書き直して終える」で、次の一手は状態で分かれる: 作業中の子の `finish`、子のブランチが親の HEAD の祖先でなければ `ccnavi-git.sh merge <子>`、`wip/eli5/phase-N.html` が無ければ ELI5、それ以外は `request`。最後の発言は読まない（問いで終わった回も止める）。変更要求のレビューが残る間は `requested` が残るので止めない（`reviewed` を置かないだけ）。同じフェーズに子を足すと `requested` が外れ、足した子が作業中になるので止める。同じ状態（親・フェーズ・残っている子・HEAD）では 1 回だけで、記録は `finish` の促しと同じ `nudged-<セッション>.json` の`request:<親>:<フェーズ>` の鍵。進めばまた止める。`stop_hook_active` が真、サブエージェント、state の置き場が無いか書けない、チケット制御かモードが `disable` では止めない。`dry-run` でも止める。1 回の `Stop` で止める理由は 1 つで、`finish` の促しが止める回は出さず覚えもしない。この促しが止める回は、あとの直接作業の `integrate` の促し（6.6）と `match: Stop` のルールも出さず数えもしない。実行中のサブエージェントが居る間は、委任して待つ回なので止めない。判定は `SubagentStart` / `SubagentStop` が残す印（9.12）で、1 体でも実行中の印があれば（入れ子の孫も数える。読めない・壊れた印も）促しを見送り、「1 回だけ」の記録は進めない。終わったあとの `Stop` でまた促せる。数えるのはサブエージェントだけで、チームメイトと背景のシェルは待ちに数えない。制限: `agent_id` の無い `SubagentStart` は印を置けず、その体は実行中と数えられない。`SubagentStop` が `Stop` より少し遅れて来る終わりぎわの回は見送るだけで、害は無い。
+**レビューの依頼までの道の途中で終えようとしたら、`Stop` で 1 回だけ止める。** 子の `finish`・親ブランチへの合流・ELI5・`ccnavi-review.sh request` は決まった道で、各所で「進めてよいですか」と確認して止まる必要が無い。メインエージェントの `Stop` で、cwd のツリーが承認済みの親（`doing/`、着手済み、`blocked` でない、`close-early` が無い）に結び付いていて、(a) 作業中（`doing/`、着手済み）の子が残っている（子のツリーでは自分の子だけ。並行する別の子は別のセッションの作業）、または (b) 子が全部閉じ、レビューを要する（`review: none` でも延期でもない）フェーズに依頼のマーカー（`requested`）が無ければ、`decision: block` で止める（`NUDGE_TICKET_REQUEST`）。文は「決まった道の途中でユーザの許可は要らない・次のコマンド・ユーザの判断が本当に要る問いならその問いを最後に書き直して終える」で、次の一手は状態で分かれる: 作業中の子の `finish`、子のブランチが親の HEAD の祖先でなければ `ccnavi-git.sh merge <子>`、`wip/eli5/phase-N.html` が無ければ ELI5、それ以外は `request`。最後の発言は読まない（問いで終わった回も止める）。変更要求のレビューが残る間は `requested` が残るので止めない（`reviewed` を置かないだけ）。同じフェーズに子を足すと `requested` が外れ、足した子が作業中になるので止める。同じ状態（親・フェーズ・残っている子・HEAD）では 1 回だけで、記録は `finish` の促しと同じ `nudged-<セッション>.json` の`request:<親>:<フェーズ>` の鍵。進めばまた止める。`stop_hook_active` が真、サブエージェント、state の置き場が無いか書けない、チケット制御かモードが `disable` では止めない。`dry-run` でも止める。1 回の `Stop` で止める理由は 1 つで、`finish` の促しが止める回は出さず覚えもしない。この促しが止める回は、あとの直接作業の `integrate` の促し（6.6）と `match: Stop` のルールも出さず数えもしない。実行中のサブエージェントが居る間は、委任して待つ回なので止めない。判定は `SubagentStart` / `SubagentStop` が残す印（9.12）で、1 体でも実行中の印があれば（入れ子の孫も数える。読めない・壊れた印も）促しを見送り、「1 回だけ」の記録は進めない。終わったあとの `Stop` でまた促せる。数えるのはサブエージェントだけで、チームメイトと背景のシェルは待ちに数えない。制限: `agent_id` の無い `SubagentStart` は印を置けず、その体は実行中と数えられない。`SubagentStop` が `Stop` より少し遅れて来る終わりぎわの回は見送るだけで、害は無い。
 
 **子の着手は親の着手のあと。** 親が `doing/` で着手済みでなければ、子の `start` は止まる（親のワークツリーが
 要る）。案内は親の置き場で分かれ、`todo/` なら承認から、`doing/` で未着手なら親の `start` から。親が
@@ -100,8 +100,6 @@ warn で言う（判定と `start` は止めない）。マーカーを消すか
 ```
     無し ──終わった ∧ mr で見る──→ pending ──request──→ requested ──confirm / --reviewed──→ reviewed
      │
-     ├────終わった ∧ chat で見る──→ pending ──────────--reviewed --chat─────────→ reviewed
-     │
      └────終わった ∧ レビュー不要──→ skipped
 
     どのマーカーからも: 同じ番号に子が承認される ──→ 無し
@@ -114,14 +112,13 @@ warn で言う（判定と `start` は止めない）。マーカーを消すか
 | 任意 → `skipped` | `ccnavi-review.sh close-early`（ユーザ） | 終わっていないフェーズの全部に置く（9.11） |
 | 任意 → `requested` | `ccnavi-review.sh request`（親） | 9.10 の前提と ELI5 の HTML（`--eli5`。`wip/` の下にコミット済み）。`pending` は要らない |
 | `requested` → `reviewed` | `ccnavi-review.sh confirm`（親）、`ccnavi-review.sh decide`（ユーザ）、フィードバック計画の承認、`close-early` | 変更要求のレビューが無い。`confirm` は未解決が 0、`decide` は未解決をユーザが受け入れる（続きの子を起こす選択ではマーカーは置かず、そのフェーズのマーカーを消す）。置いたときに `review/` の子は `done/` へ動く |
-| `pending` → `reviewed` | `ccnavi-review.sh chat <N>`（ユーザが端末で。中身は `ccnavi --reviewed <N> --chat`） | 見る場所が `chat`。依頼の記録は要らない（9.8） |
 | 任意 → 無し | `ccnavi --agree` で同じ番号の子が承認された | 4 種を全部消す |
 
 マーカーはユーザが子を再開しても残る（機構は消さない）。再開は想定しない運用で、された場合は `--lint` と
 `ticket status` が、作業中の子のフェーズに `reviewed` が残っていると warn で言う（閉じ直したときにレビューが要らないフェーズ、つまりフェーズ定義が `review: none` で、再開された子も
 `human_review` を求めていないフェーズは言わない。判定と `start` は止めない）。再開の意図がレビューのやり直しなら、そのフェーズのマーカーを人が手で消す
 （マーカーがあるツリー、つまり `approval.home_dir` が決めるツリーで `ccnavi-git.sh rm .ccnavi/approved/phases/<親>/<N>.reviewed`
-を打ち、削除をコミットする。取り込み済み（origin があり、取り込み状態が present）で、chat だけの親子でなければ、
+を打ち、削除をコミットする。取り込み済み（origin があり、取り込み状態が present）で、マージリクエストで見るフェーズがある親子なら、
 `ccnavi-push-approved.sh <親>` が取り込んでからコミットして送る。それ以外の親子では、名指しの
 `ccnavi-push-approved.sh <親>` は「ここではコミットも push もしない」と出して終わるので、ユーザが自分でコミットする。
 引数なしの `ccnavi-push-approved.sh` は、置き場に変更のあるツリーを全部コミットする）。

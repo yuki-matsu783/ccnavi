@@ -7,7 +7,7 @@ keywords: [nudge, Stop, request, requested, finish, 合流, ELI5, 許可, 確認
 ---
 # ADR-0120: レビュー依頼までの道の途中で終えようとしたら、Stop で 1 回だけ止めて次の一手を返す
 
-状態: 採用
+状態: 採用（本文の `review: chat` は当時の記述で、ADR-0132 が廃止した）
 
 ## 状況
 

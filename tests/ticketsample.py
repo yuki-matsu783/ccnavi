@@ -59,12 +59,12 @@ phases:
   chores:
     kind: work
     title: 片付け
-    review: chat
+    review: mr
     scope: ["src/*"]
   chores-feedback:
     kind: feedback
     title: 片付けフィードバック対応
-    review: chat
+    review: mr
     scope: inherit
 """
 

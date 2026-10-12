@@ -128,7 +128,6 @@ def operate(
             args.reviewed,
             args.accept_unresolved,
             args.result,
-            args.chat,
         )
         return EXIT_OK if code == 0 else EXIT_ERROR
 
@@ -261,7 +260,7 @@ def _c1_bypass(root: str, conf: settings.Settings, args: argparse.Namespace, cwd
     行き先の `--reviewed N --accept-unresolved`）は、C1 の対象の親子のチケットでは sh が
     `--record-tree` を付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで
     C1 を通っていない。
-    ユーザの判断の操作（`--reviewed --chat`・`--close-early`）と、
+    ユーザの判断の操作（`--close-early`）と、
     書かない形（`--preview`・`--choose-out`・`review prepare`）は見ない。
     """
     if args.record_tree:
@@ -277,7 +276,6 @@ def _c1_bypass(root: str, conf: settings.Settings, args: argparse.Namespace, cwd
         and args.accept_unresolved
         and not args.preview
         and not args.choose_out
-        and not args.chat
     ):
         where = cwd[-1] if isinstance(cwd, list) and cwd else cwd
         parent = phase.parent_for_cwd(root, conf, where) if where else None
@@ -311,13 +309,12 @@ def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
 
 
 def _decide_writes(args) -> bool:
-    """書く形の decide か（`--reviewed N --accept-unresolved` の、見るだけ・chat でないもの）。"""
+    """書く形の decide か（`--reviewed N --accept-unresolved` の、見るだけでないもの）。"""
     return (
         args.reviewed is not None
         and args.accept_unresolved
         and not args.preview
         and not args.choose_out
-        and not args.chat
     )
 
 

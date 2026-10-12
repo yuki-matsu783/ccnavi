@@ -421,7 +421,7 @@ def _settle_children(
 
     呼ぶ側はこれをレビュー済みのマーカーより先に呼ぶ。マーカーを先に置くと、動かせなかった
     ときに「レビュー済みなのに子が `review/` に残る」状態になり、`confirm` は「レビュー済み」で
-    拒み、`--reviewed --chat` も「すでにレビュー済み」で戻るので、取り出す操作が無くなる。
+    拒むので、取り出す操作が無くなる。
     逆順なら、動いたのにマーカーが置けなくても、次の `confirm` が置き直す（動かす分は空）。
     """
     moved, failed = approval_ops.settle_review(conf, root, parent.ticket, [*ph.covers, ph.number])
