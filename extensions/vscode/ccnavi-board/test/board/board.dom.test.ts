@@ -467,12 +467,17 @@ test("CB-D95 拡張ホストが頼んだらボードの案内を出し、最後�
     assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
     await dom.send({ type: "tour" });
     await dom.settle();
-    // チケットがあるボードでは見本を出さない
-    assert.equal(dom.all(".tour-sample").length, 0);
+    // チケットがあるボードでも、案内の間は見本を描く
+    assert.equal(dom.all(".tour-sample").length, 1);
     assert.deepEqual(await walkTour(dom), ["集計", "絞り込み", "列", "カード", "承認", "更新", "案内"]);
     assert.equal(dom.all(".tour").length, 0);
+    assert.equal(dom.all(".tour-sample").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
+    // 「?」は案内の一覧を開き、基本の案内を選ぶと最初の段から始まる
     dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0);
+    dom.click(dom.one('[data-action="tour-course"][data-course="intro"]'));
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, "集計");
     dom.key("Escape");
@@ -532,6 +537,8 @@ test("CB-D102 承認のオーバーレイの最中に「？ 案内」を押し�
   try {
     dom.click(dom.one('[data-action="tour"]'));
     await dom.settle();
+    dom.click(dom.one('[data-action="tour-course"][data-course="intro"]'));
+    await dom.settle();
     assert.equal(dom.all(".tour").length, 0, "承認のオーバーレイの上に案内を出した");
     await dom.send({ type: "data", data: { kind: "board", board: buildBoard(json) } });
     await dom.settle();
@@ -565,6 +572,8 @@ test("CB-D104 案内を閉じたら、焦点を案内の前の場所（「？ �
     const button = dom.one<HTMLButtonElement>('[data-action="tour"]');
     button.focus();
     dom.click(button);
+    await dom.settle();
+    dom.click(dom.one('[data-action="tour-course"][data-course="intro"]'));
     await dom.settle();
     assert.equal(dom.document.activeElement, dom.one('[data-action="tour-next"]'));
     dom.key("Escape");
@@ -674,7 +683,7 @@ test("CB-D144 「アーカイブ済みチケットを表示」は既定で外れ
   }
 });
 
-test("CB-D145 退避のチケットしか無いボードで表示を入れても、「チケットなし」も案内の見本も出さない", async () => {
+test("CB-D145 退避のチケットしか無いボードで表示を入れても「チケットなし」は出さない。案内の間は見本を描き、閉じたら退避のカードに戻る", async () => {
   const archived = {
     ticket: "old",
     parent: "",
@@ -695,7 +704,12 @@ test("CB-D145 退避のチケットしか無いボードで表示を入れても
     assert.ok(!page.one('.card[data-id="old"]').classList.contains("hidden"));
     await page.send({ type: "tour" });
     await page.settle();
+    assert.equal(page.all(".tour-sample").length, 1);
+    assert.equal(page.all('.card[data-id="old"]').length, 0, "案内の間に実際の退避のカードが出た");
+    page.key("Escape");
+    await page.settle();
     assert.equal(page.all(".tour-sample").length, 0);
+    assert.ok(!page.one('.card[data-id="old"]').classList.contains("hidden"));
   } finally {
     await page.close();
   }

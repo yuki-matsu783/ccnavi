@@ -5,15 +5,17 @@
  * 決めて覚えるのは拡張ホストで、ここは渡された分を出すだけ。画面が自分で持つのは、ユーザが触って
  * 決めるもの（絞り込み・折りたたんだ列・列の幅・「更新」を押したか）だけ。判定はしない。
  */
-import { useEffect, useMemo, useRef, useState, type JSX } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX } from "react";
 
 import type { Board, BoardColumn, Card } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
 import type { BoardData, ToBoard } from "../../core/board-view.js";
-import { SAMPLE_NOTE, sampleBoard } from "../../core/tour-sample.js";
+import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
+import { OVERLAY_NAMES, parseBoardSample, type OverlayName } from "../../core/tour-board.js";
 import { applyAppearance } from "../appearance.js";
-import { INTRO_COURSE, Tour, TourButton, useTour, type TourCourse, type TourStep } from "../Tour.js";
-import { post } from "./post.js";
+import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
+import boardTour from "../tours/board.yml";
+import { mutePosts, post } from "./post.js";
 import { Approval } from "./Approval.js";
 import { CardItem } from "./Card.js";
 import { EMPTY, loadState, saveState, type ViewState } from "./state.js";
@@ -21,6 +23,18 @@ import { FILTER_LABELS } from "./text.js";
 
 /** 列の最小の幅（px）。ドラッグでもこれより狭くしない。CSS の min-width と同じ値 */
 const MIN_WIDTH = 220;
+
+/**
+ * 案内（`tours/board.yml`）。案内の間は今のチケットではなく、案内用の見本（`core/tour-board.ts`）を描く。
+ * 読み込み時に形を確かめる（壊れていればテストが先に落とす）。
+ */
+const TOUR = tourOf(boardTour);
+const NO_SCENE: Scene = {};
+
+/** 段の `scene` の文字列を `,` で割る */
+function sceneList(value: Scene[string] | undefined): readonly string[] {
+  return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
+}
 
 /**
  * プロジェクトの絞り込みの候補。「すべて」と、プロジェクトがあれば「ワークスペース（プロジェクト外）」（空）と各プロジェクト。
@@ -50,17 +64,41 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   const boardRef = useRef<Board | undefined>(board);
   boardRef.current = board;
   // 初回の案内はボードが出てから始める。承認のオーバーレイが出ている間は、その下を指しても見えないので待つ
-  const tour = useTour(board !== undefined && data.approval === undefined, { onEnd: () => post({ type: "tourDone" }) });
-  const requestTour = tour.request;
   /**
-   * 案内の間、チケットが 1 枚も無ければ見本のボードを出す（`tour-sample.ts`）。指す先のカードが無いと、
-   * 案内が列とカードを説明できないため。見本は描くだけ。 絞り込みの state や承認の件数の元にはしない
+   * 案内の段ごとの画面の様子（絞り込み・畳んだ列・出すオーバーレイ）。見本の上だけに効き、実際の絞り込みや
+   * 畳んだ列（`view`）には触れないので、閉じたあとに戻すものは無い
+   */
+  const [scene, setScene] = useState<Scene>(NO_SCENE);
+  const tour = useTour(board !== undefined && data.approval === undefined, {
+    onStart: () => setScene(NO_SCENE),
+    onEnd: () => {
+      setScene(NO_SCENE);
+      post({ type: "tourDone" });
+    },
+  });
+  const requestTour = tour.request;
+  const touring = tour.touring;
+  // 案内の間は、見本の上の操作を拡張ホストへ送らない（`tourDone` だけ返す）。描いたあとに切り替える
+  useLayoutEffect(() => {
+    mutePosts(touring);
+    return () => mutePosts(false);
+  }, [touring]);
+  const courses = coursesOf(TOUR, setScene);
+  /**
+   * 案内の間は、実際のチケットではなく見本のボードを描く（`tour-board.ts`）。見本は描くだけで、
+   * 絞り込みの state や承認の件数の元にはしない
    */
   const sample = useMemo(
-    () => (tour.touring && board !== undefined && board.totalCount === 0 && !(view.archived && board.archivedCount > 0) ? sampleBoard(board.root, board.generatedAt) : undefined),
-    [tour.touring, board, view.archived],
+    () => (touring && board !== undefined ? parseBoardSample(TOUR.sample, board.root, board.generatedAt) : undefined),
+    [touring, board?.root, board?.generatedAt],
   );
-  const shown = sample ?? board;
+  const shown = sample?.board ?? board;
+  /** 案内の間に画面の state を動かさない（見本の上の押す・入れるは何も起こさない） */
+  const change = (next: (now: ViewState) => ViewState): void => {
+    if (!touring) {
+      setView(next);
+    }
+  };
 
   useEffect(() => {
     /** 拡張ホストが指す絞り込み。候補に無ければ何もしない（いまの絞り込みを外さない） */
@@ -96,7 +134,6 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   // アーカイブを表示しているときは、退避した親も絞り込みの候補に入る（選んでいた親が退避されても外さない）
   const parentOptions = board === undefined ? [] : view.archived ? [...board.parents, ...board.archivedParents] : board.parents;
   const parent = parentOptions.some((p) => p.id === view.parent) ? view.parent : EMPTY.parent;
-  const shownParents = sample === undefined ? parentOptions : (shown?.parents ?? []);
   // 読み直せなかった画面には絞り込みの部品が無い。覚えていた値が有効なままにすると、
   // 出すものが無いのに「絞り込み中」になる
   const attention = board !== undefined && view.attention;
@@ -137,18 +174,30 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     saveState({ project, parent, attention, archived, folded: view.folded, widths: view.widths });
   }, [board === undefined, project, parent, attention, archived, view.folded, view.widths]);
 
-  // 前の読み直しから動いたカード。数えるのは拡張ホスト（`core/board-moved.ts`）で、画面は出すだけ
-  const moved = new Map((data.kind === "board" ? (data.moved ?? []) : []).map((m) => [m.id, m]));
+  // 案内の間は見本の上の様子を描く。絞り込み・畳んだ列・幅は `scene` が決め、実際の `view` は使わない（動かさない）
+  const shownProject = touring ? (typeof scene.project === "string" ? scene.project : EMPTY.project) : project;
+  const shownParent = touring ? (typeof scene.parent === "string" ? scene.parent : EMPTY.parent) : parent;
+  const shownAttention = touring ? scene.attention === true : attention;
+  const shownArchived = touring ? scene.archived === true : archived;
+  const shownFolded = touring ? sceneList(scene.fold) : view.folded;
+  const shownWidths: Readonly<Record<string, number>> = touring ? {} : view.widths;
+  const shownParents = shown === undefined ? [] : shownArchived ? [...shown.parents, ...shown.archivedParents] : shown.parents;
+  const overlay =
+    touring && sample !== undefined
+      ? typeof scene.overlay === "string" && (OVERLAY_NAMES as readonly string[]).includes(scene.overlay)
+        ? sample.overlays[scene.overlay as OverlayName]
+        : undefined
+      : data.approval;
+
+  // 前の読み直しから動いたカード。数えるのは拡張ホスト（`core/board-moved.ts`）で、画面は出すだけ。見本には見本の動いたカードがある
+  const moved = new Map((sample?.moved ?? (data.kind === "board" ? (data.moved ?? []) : [])).map((m) => [m.id, m]));
   const movedOf = (card: Card): Moved | undefined => (card.column === "archived" ? undefined : moved.get(card.id));
 
-  // 見本は絞り込みに当てない。見本のカードはどのプロジェクトにも親にも属さないので、覚えていた絞り込みが
-  // 有効なままだと全部隠れ、案内が指す先を失う
   const hiddenOf = (card: Card): boolean =>
-    sample === undefined &&
-    ((!archived && card.column === "archived") ||
-    (project !== EMPTY.project && card.project !== project) ||
-    (parent !== EMPTY.parent && card.family !== parent) ||
-    (attention && !card.attention));
+    (!shownArchived && card.column === "archived") ||
+    (shownProject !== EMPTY.project && card.project !== shownProject) ||
+    (shownParent !== EMPTY.parent && card.family !== shownParent) ||
+    (shownAttention && !card.attention);
 
   // 「承認待ち N 件を承認」は、押したときに承認の対象になるもの（絞り込みで見えている承認待ち）の数にする。
   // 「絞り込み無し」は空の配列ではなく filtered で言う。空を「全部」に読ませると、0 件のつもりが全部承認になってしまう。
@@ -166,7 +215,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
         <>
           {sample !== undefined ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
           <header className="toolbar">
-            <div className="summary">
+            <div className="summary" data-tour="summary">
               {shown.pendingApproval.length > 0 ? <span className="pending warn">承認待ち {shown.pendingApproval.length} 件</span> : null}
               {shown.issueCount > 0 ? <span className="issues warn">不備 {shown.issueCount} 件</span> : null}
               <span className="counts">
@@ -175,9 +224,9 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
             </div>
             <div className="controls">
               {shown.projects.length > 0 ? (
-                <label className="filter">
+                <label className="filter" data-tour="filter-project">
                   プロジェクト
-                  <select id="project-filter" value={project} onChange={(event) => setView((now) => ({ ...now, project: event.target.value }))}>
+                  <select id="project-filter" value={shownProject} onChange={(event) => change((now) => ({ ...now, project: event.target.value }))}>
                     <option value="*">すべて</option>
                     <option value="">ワークスペース（プロジェクト外）</option>
                     {shown.projects.map((p) => (
@@ -189,9 +238,9 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 </label>
               ) : null}
               {shownParents.length > 0 ? (
-                <label className="filter">
+                <label className="filter" data-tour="filter-parent">
                   親
-                  <select id="parent-filter" value={parent} onChange={(event) => setView((now) => ({ ...now, parent: event.target.value }))}>
+                  <select id="parent-filter" value={shownParent} onChange={(event) => change((now) => ({ ...now, parent: event.target.value }))}>
                     <option value="*">すべて</option>
                     {shownParents.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -201,11 +250,14 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                   </select>
                 </label>
               ) : null}
-              <label className="filter attention" title={FILTER_LABELS.attentionTitle}>
-                <input type="checkbox" id="attention-filter" checked={attention} onChange={(event) => setView((now) => ({ ...now, attention: event.target.checked }))} /> {FILTER_LABELS.attention}
+              <label className="filter attention" data-tour="filter-attention" title={FILTER_LABELS.attentionTitle}>
+                <input type="checkbox" id="attention-filter" checked={shownAttention} onChange={(event) => change((now) => ({ ...now, attention: event.target.checked }))} /> {FILTER_LABELS.attention}
               </label>
-              <label className="filter archived" title={FILTER_LABELS.archivedTitle}>
-                <input type="checkbox" id="archived-filter" checked={archived} onChange={(event) => {
+              <label className="filter archived" data-tour="filter-archived" title={FILTER_LABELS.archivedTitle}>
+                <input type="checkbox" id="archived-filter" checked={shownArchived} onChange={(event) => {
+                    if (touring) {
+                      return;
+                    }
                     const checked = event.target.checked;
                     revealArchived.current = checked;
                     setView((now) => ({ ...now, archived: checked }));
@@ -215,9 +267,13 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 type="button"
                 className={refreshing ? "action busy" : "action"}
                 data-action="refresh"
+                data-tour="refresh"
                 disabled={refreshing}
                 aria-busy={refreshing ? "true" : undefined}
                 onClick={() => {
+                  if (touring) {
+                    return;
+                  }
                   setRefreshing(true);
                   post({ type: "refresh" });
                 }}
@@ -229,13 +285,18 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 type="button"
                 className="action primary"
                 data-action="approve"
+                data-tour="approve"
                 disabled={visiblePending.length === 0}
-                onClick={() => post({ type: "approve", tickets: visiblePending, filtered: filtering })}
+                onClick={() => {
+                  if (!touring) {
+                    post({ type: "approve", tickets: visiblePending, filtered: filtering });
+                  }
+                }}
               >
                 承認待ち {visiblePending.length} 件を承認
               </button>
             </div>
-            <TourButton courses={COURSES} onPick={tour.start} />
+            <TourButton courses={courses} onPick={tour.start} />
           </header>
           {(board?.problems.length ?? 0) > 0 ? (
             <ul className="problems">
@@ -245,25 +306,25 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
             </ul>
           ) : null}
           {/* 退避のチケットを表示しているときは、アーカイブの列に並ぶので「チケットなし」は出さない */}
-          {shown.totalCount === 0 && !(archived && shown.archivedCount > 0) ? <p className="board-empty">チケットなし</p> : null}
-          <div className="board">
+          {shown.totalCount === 0 && !(shownArchived && shown.archivedCount > 0) ? <p className="board-empty">チケットなし</p> : null}
+          <div className="board" data-tour="board">
             {/* アーカイブの列は「アーカイブ済みチケットを表示」が ON のときだけ出す（OFF ならカードは全部隠れる） */}
-            {shown.columns.filter((column) => archived || column.state !== "archived").map((column) => (
+            {shown.columns.filter((column) => shownArchived || column.state !== "archived").map((column) => (
               <Column
                 key={column.state}
                 column={column}
                 hiddenOf={hiddenOf}
                 movedOf={movedOf}
-                folded={view.folded.includes(column.state)}
-                width={view.widths[column.state]}
+                folded={shownFolded.includes(column.state)}
+                width={shownWidths[column.state]}
                 onFold={(folded) =>
-                  setView((now) => ({
+                  change((now) => ({
                     ...now,
                     folded: folded ? [...now.folded, column.state] : now.folded.filter((f) => f !== column.state),
                   }))
                 }
                 onWidth={(width) =>
-                  setView((now) => {
+                  change((now) => {
                     const widths = { ...now.widths };
                     if (width === undefined) {
                       delete widths[column.state];
@@ -279,56 +340,11 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
           <Footer board={shown} />
         </>
       )}
-      {data.approval !== undefined ? <Approval overlay={data.approval} unsaved={data.unsaved ?? []} /> : null}
-      {tour.touring && board !== undefined ? <Tour steps={(COURSES.find((course) => course.id === tour.course) ?? COURSES[0]).steps} onClose={tour.end} /> : null}
+      {overlay !== undefined ? <Approval overlay={overlay} unsaved={touring ? [] : (data.unsaved ?? [])} /> : null}
+      {touring && board !== undefined ? <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} /> : null}
     </>
   );
 }
-
-/**
- * ボード画面の案内。指す先が無い（チケットが 1 枚も無い、絞り込みで全部隠れた）段は、吹き出しを
- * 画面の中ほどに出して文だけを見せる（`Tour.tsx`）。画面の様子は動かさないので、閉じても戻すものは無い
- */
-const TOUR_STEPS: readonly TourStep[] = [
-  {
-    target: ".toolbar .summary",
-    title: "集計",
-    body: "承認待ちと不備の件数、残りのチケット数です。絞り込みに関係なく、チケット管理画面全体の数を表示します。",
-  },
-  {
-    target: ".filter.attention",
-    title: "絞り込み",
-    body: "プロジェクトと親チケットで絞り込めます（プロジェクトや親があるときだけ欄が出ます）。「要対応のみ」は、承認待ち・レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備など、ユーザが対応する必要があるカードだけを表示します。",
-  },
-  {
-    target: ".board",
-    title: "列",
-    body: "チケットは「未着手 → 作業中 → 完了（または取り消し）」の順に列を移ります。見出しを押すと列を畳み、右端をドラッグすると幅を変えられます（ダブルクリックで元に戻ります）。",
-  },
-  {
-    target: ".column:not(.folded) .card:not(.hidden)",
-    title: "カード",
-    body: "1 枚が 1 チケットです。カードには、親か子か、フェーズの進み具合、ユーザが対応する必要がある状態を示すバッジが出ます。押すとチケットのファイルを開きます。承認とレビューの対応のボタンは、要るときだけカードに出ます。レビューの対応のボタンを押すと、「対応方針を決める」と「レビュー済み連絡」のメニューが開きます。ボタンはどれも承認と同じ大きさです。",
-  },
-  {
-    target: '[data-action="approve"]',
-    title: "承認",
-    body: "絞り込みで見えている承認待ちをまとめて承認します。押すと承認する内容がオーバーレイに出るので、確かめてから承認してください。承認のあと、Claude Code に伝える文を渡せます。",
-  },
-  {
-    target: '[data-action="refresh"]',
-    title: "更新",
-    body: "チケットとワークツリーの状態を更新します。前回の更新から列が変わったカードには動いた表示が付きます。",
-  },
-  {
-    target: '[data-action="tour"]',
-    title: "案内",
-    body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
-  },
-];
-
-/** ボード画面の案内の一覧。先頭が基本の案内（初回に自動で出る） */
-const COURSES: readonly TourCourse[] = [{ id: INTRO_COURSE, title: "基本の案内", summary: "画面の見どころを順に回ります", steps: TOUR_STEPS }];
 
 function Footer({ board }: { readonly board: Board }): JSX.Element {
   return (
@@ -415,7 +431,7 @@ function Column({
   };
 
   return (
-    <section className={classes.join(" ")} data-state={column.state} style={width === undefined ? undefined : { width: `${width}px` }} ref={section}>
+    <section className={classes.join(" ")} data-state={column.state} data-tour={`column-${column.state}`} style={width === undefined ? undefined : { width: `${width}px` }} ref={section}>
       <h2>
         <button
           type="button"
