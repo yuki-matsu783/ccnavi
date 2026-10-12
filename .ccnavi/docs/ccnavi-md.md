@@ -66,9 +66,10 @@ keywords: [CCNAVI.md, ccnavi:if, ccnavi:else, ccnavi:endif, 条件, 差し込み
 mdが無い・読めないときは、無いことだけを1行で言う（黙ると、決まりが渡っていないことに誰も気づけない）。
 本文は6000文字で切り、切ったことを末尾に言う。
 
-`ccnavi --lint`は、次を`(ccnavi-md)`のwarnで行番号つきで言う。
+`ccnavi --lint`は、次を`(ccnavi-md)`のwarnで言う。行番号が付くのは、`endif`の無い`if`を除く。
 
 - mdが無い
 - 知らない条件や差し込みの名前
 - 対の取れていない囲み（`endif`の無い`if`、`if`の無い`else`と`endif`）
 - 1つの`if`に2つ目の`else`
+- `ccnavi:`の囲みが1行に2つある、または他の文字と同じ行にある（1行に1つ、単独で書く）
