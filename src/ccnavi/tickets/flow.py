@@ -511,6 +511,21 @@ def parse(raw: bytes) -> tuple[dict | None, str]:
     文字は UTF-8（先頭の BOM は 1 つ外す。`utf-8-sig`）。UTF-8 として不正であれば読まない
     （置き換え文字で埋めて読むと、不正な部分を省いた手順が渡る）。
     """
+    data, why = parse_yaml(raw)
+    if why:
+        return None, why
+    why = flow_shape.shape_problem(data)
+    if why:
+        return None, why
+    return data, ""
+
+
+def parse_yaml(raw: bytes) -> tuple[object, str]:
+    """YAML の 1 文書として読む（形は問わない）。(中身, 読めない理由)。例外は外に出さない。
+
+    `parse` の前半。フローと同じ読み手を使う別の文書（テンプレート）が、形の検査だけ自分で
+    行えるように切り出してある。空の文書は (None, "")。
+    """
     try:
         text = raw.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
@@ -531,9 +546,6 @@ def parse(raw: bytes) -> tuple[dict | None, str]:
         return None, f"YAML として読めない ({flow_text._line(exc)})"
     except Exception as exc:  # noqa: BLE001  破損したデータで SubagentStart を止めない
         return None, f"読めない ({type(exc).__name__})"
-    why = flow_shape.shape_problem(data)
-    if why:
-        return None, why
     return data, ""
 
 

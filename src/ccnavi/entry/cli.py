@@ -35,7 +35,18 @@ from ..tickets import (
     review,
     skillsync,
 )
-from . import cli_args, cli_ops, cli_plan, cli_usage, diagnose, lint, sh_ask, suggest, version
+from . import (
+    cli_args,
+    cli_ops,
+    cli_plan,
+    cli_templates,
+    cli_usage,
+    diagnose,
+    lint,
+    sh_ask,
+    suggest,
+    version,
+)
 
 
 def _json_out_of_test(argv: list[str]) -> list[str]:
@@ -255,6 +266,11 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--format", default=None)
     parser.add_argument("--no-refresh", action="store_true")
+    # 作業・レビュー計画のテンプレートの一覧・検索（`--keyword`）・表示（`--show`）。読むだけ。
+    # `--layer` は足し算の相手のレイヤー（self かプロジェクト名。既定は self）。
+    parser.add_argument("--templates", action="store_true")
+    parser.add_argument("--show", default=None, metavar="NAME")
+    parser.add_argument("--layer", default="")
     # チケットの状態とレビューの操作。ユーザか、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", action="append", default=None)
@@ -534,6 +550,11 @@ def _parsed(
         return version.report(stdout, parser, args.json)
     if not cli_args._one_wrapper_flag_each(stderr, args):
         return EXIT_ERROR
+    if args.templates or args.show is not None or args.layer:
+        refused = cli_templates.usage_problem(args)
+        if refused:
+            stderr.write(f"ccnavi: {refused}\n")
+            return EXIT_ERROR
     # `--docs` に添えたほかの経路のフラグは、気づかれないまま無視せずに止める。
     # レイヤーの置き場の差し替えはこの後で無視され、`--ticket-control` などは
     # 設定に重ねられるので、その前に見る。
@@ -595,6 +616,8 @@ def _parsed(
     # 無かったころは argparse が知らないフラグとして止めていたので、無視して先へ進めると
     # `ticket start X --limit 3` のような打ち間違いが通るようになる（`--flow` は診断の中の
     # 差し替えで、無視しても何も動かないので無視するだけにしている）。
+    if args.templates:
+        return cli_templates.run(stdout, stderr, conf, root, args)
     if not args.docs:
         stray = cli_args._docs_flags_given(args)
         if stray:

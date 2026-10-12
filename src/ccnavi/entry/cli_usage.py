@@ -84,6 +84,22 @@ documented in README.md ("ドキュメントの索引"). These filters are for -
 only; anywhere else they stop the run with exit 1, and flags that belong to
 other runs stop --docs the same way.
 
+To list, search and read the work/review plan templates (a plan with its
+child flows in one file, kept in .ccnavi/config/common/templates/ and
+.ccnavi/config/project/templates/; it reads only and writes nothing):
+
+    ccnavi --templates [--layer self|PROJECT] [--keyword K]... [--json]
+    ccnavi --templates --show NAME [--layer self|PROJECT] [--json]
+
+The list is the common layer plus one layer (self unless --layer says
+otherwise). --keyword matches part of the name, description or when (given
+twice, either one); --show prints one template with its plan, flows and
+checks. A name that is in both layers with different content is an error, and
+the layer's one is not used. --json is the complete answer the board screen
+draws, documented in README.md ("作業・レビュー計画のテンプレート"). --keyword
+is shared with --docs and is refused elsewhere; the other --docs filters are
+refused here. --lint reports the same checks.
+
 The common layer's own three files are moved by --rules, --phases and --risk,
 and where the layers are looked for by --projects and --project-home. All five
 are on the same gate: diagnosis only, dropped everywhere else.
