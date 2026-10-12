@@ -21,7 +21,6 @@ import {
   workflowTicketOf,
   workflowTitle,
 } from "../../src/core/workflow-view.js";
-import { sampleWorkflow } from "../../src/core/tour-sample.js";
 import { planOrderSample } from "../helpers/plan-order.js";
 
 test("CB-T369 答えの線を、元の番号での直接の先行（--order の形）に戻す。先行の無い番号も空のリストで並べる", () => {
@@ -135,18 +134,6 @@ test("CB-T377 開くコマンドに渡す親の識別子。識別子の形でな
 test("CB-T382 案内を閉じた（tourDone）は形を確かめて受ける", () => {
   assert.deepEqual(asWorkflowMessage({ type: "tourDone" }), { type: "tourDone" });
   assert.deepEqual(asWorkflowMessage({ type: "tourDone", extra: 1 }), { type: "tourDone" });
-});
-
-test("CB-T383 案内の見本の計画は、実行ファイルの答えの実例（plan-order.json の open）と同じ形で、識別子とハッシュだけが見本のもの", () => {
-  const sample = sampleWorkflow();
-  const real = planOrderSample("open");
-  assert.equal(sample.ticket, "sample-a");
-  assert.deepEqual(
-    sample.plans.map((plan) => ({ ...plan, ticket: real.ticket, source_sha: real.source_sha })),
-    real.plans,
-    "見本が実例とずれた。plan-order.json を書き出し直したら tour-sample.ts の見本も写し直す",
-  );
-  assert.deepEqual({ ...sample, ticket: real.ticket, source_sha: real.source_sha, plans: real.plans }, real);
 });
 
 test("CB-T386 未保存の知らせは、線の答えを待っている（checking）ことも運ぶ。真偽でなければ偽", () => {

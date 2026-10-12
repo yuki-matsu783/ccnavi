@@ -11,11 +11,14 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
-import { BUILTIN_LEVELS, LEVEL_NAMES, type FactorForm, type LevelName, type RiskData, type RiskPage, type ToRisk } from "../../core/risk-view.js";
+import { BUILTIN_LEVELS, LEVEL_NAMES, type FactorForm, type LevelName, type RiskData, type RiskMessage, type RiskPage, type ToRisk } from "../../core/risk-view.js";
 import { applyAppearance } from "../appearance.js";
 import { TargetSelect } from "../TargetSelect.js";
-import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
+import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
+import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
+import { parseRiskSample } from "../../core/tour-risk.js";
 import { defaultSum } from "../../core/sums.js";
+import riskTour from "../tours/risk.yml";
 import { Captioned, Factor } from "./Factor.js";
 import { Sum } from "./Sum.js";
 import { post } from "./post.js";
@@ -26,6 +29,26 @@ import { draftOf, emptyFactor, formOf, keyer, loadOpen, openedFromIds, saveOpen,
 const NO_LOCK: Lock = { locked: true, reason: "", doing: [] };
 
 const EMPTY_DRAFT: Draft = { levels: { medium: "", high: "", critical: "" }, rows: [] };
+
+/**
+ * 案内（`tours/risk.yml`）と、案内の間だけ描く見本。今の配点は使わず、画面が持つ編集中の内容にも触れない。
+ * 読み込み時に形を確かめる（壊れていればテストが先に落とす）。
+ */
+const TOUR = tourOf(riskTour);
+const SAMPLE = parseRiskSample(TOUR.sample);
+/** 見本の行の鍵。実際の行の鍵（`f1`…）と重ならない */
+function sampleDraft(page: RiskPage): Draft {
+  let seq = 0;
+  return draftOf(page.model.form, () => `s${(seq += 1)}`);
+}
+const SAMPLE_DRAFT = sampleDraft(SAMPLE.page);
+const SAMPLE_MISSING_DRAFT = sampleDraft(SAMPLE.missing);
+const NO_SCENE: Scene = {};
+
+/** 段の `scene` の文字列を `,` で割る */
+function sceneList(value: Scene[string] | undefined): readonly string[] {
+  return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
+}
 
 /** 直前の操作の一言。生きている画面にしか届かないので持ち越さない */
 interface Status {
@@ -67,11 +90,25 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
 
   const { draft, open } = editing;
   const page = pageOf(data);
-  const exists = page?.exists === true;
-  /** 組み込みの配点を読み取り専用で見せている。欄は止め、「作る」だけができる */
-  const readOnly = page?.builtin === true;
-  const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
+  /**
+   * 案内の間は見本を描き、段ごとの様子（開く項目・絞り込み・足し算など）は `scene` に入れる。実際の編集中の配点や開いた行は動かさないので、
+   * 閉じたあとに戻すものは無い
+   */
+  const [scene, setScene] = useState<Scene>(NO_SCENE);
+  const tour = useTour(data.kind === "page", {
+    onStart: () => setScene(NO_SCENE),
+    onEnd: () => {
+      setScene(NO_SCENE);
+      post({ type: "tourDone" });
+    },
+  });
   const requestTour = tour.request;
+  /** 拡張ホストへの送信。案内の間は実際の操作を送らない（`tourDone` と最初の `ready` は直に送る） */
+  const act = (message: RiskMessage): void => {
+    if (!tour.touring) {
+      post(message);
+    }
+  };
 
   /**
    * 未保存の変更の有無が変わったら拡張ホストに伝える。同じ種類のタブは 1 枚で、別の対象を開くと
@@ -137,6 +174,9 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
    * ユーザが「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
    */
   const reload = (): void => {
+    if (tour.touring) {
+      return;
+    }
     setBusy(true);
     setStatus(undefined);
     post({ type: "reload", dirty });
@@ -166,6 +206,9 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   }
 
   const editDraft = (next: Draft, open?: ReadonlySet<string>): void => {
+    if (tour.touring) {
+      return;
+    }
     setEditing((now) => ({ draft: next, open: open ?? now.open }));
     setDirty(true);
   };
@@ -175,6 +218,9 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   };
 
   const toggle = (key: string): void => {
+    if (tour.touring) {
+      return;
+    }
     const next = new Set(open);
     if (next.has(key)) {
       next.delete(key);
@@ -203,52 +249,82 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   };
 
   const add = (): void => {
+    if (tour.touring) {
+      return;
+    }
     const row = { key: nextKey(), factor: emptyFactor() };
     editDraft({ ...draft, rows: [...draft.rows, row] }, new Set([...open, row.key]));
     setFocusKey(row.key);
   };
 
-  const query = find.trim().toLowerCase();
-  const rows = draft.rows.map((row) => {
+  const courses = coursesOf(TOUR, setScene);
+
+  // 案内の間は、今の配点ではなく見本を描く。画面の state（編集中の配点・開いた行・絞り込み・状態の一言）は触らない
+  const touring = tour.touring;
+  const sampleMissing = scene.missing === true;
+  const shownPage: RiskPage | undefined = touring ? (sampleMissing ? SAMPLE.missing : SAMPLE.page) : page;
+  const shownExists = shownPage?.exists === true;
+  /** 組み込みの配点を読み取り専用で見せている。欄は止め、「作る」だけができる */
+  const shownReadOnly = shownPage?.builtin === true;
+  const blank = touring ? LEVEL_NAMES.find((name) => name === scene.blank) : undefined;
+  const sampleBase = sampleMissing ? SAMPLE_MISSING_DRAFT : SAMPLE_DRAFT;
+  const shownDraft: Draft = !touring
+    ? draft
+    : blank === undefined
+      ? sampleBase
+      : { ...sampleBase, levels: { ...sampleBase.levels, [blank]: "" } as Readonly<Record<LevelName, string>> };
+  const shownDirty = touring ? false : dirty;
+  const shownBusy = touring ? false : busy;
+  const shownLock: Lock = touring ? { locked: false, reason: "", doing: [] } : lock;
+  const sceneOpen = new Set(sceneList(scene.open));
+  const isShownOpen = (row: { readonly key: string; readonly factor: FactorForm }): boolean => (touring ? sceneOpen.has(row.factor.id) : open.has(row.key));
+  const shownFind = touring ? (typeof scene.find === "string" ? scene.find : "") : find;
+
+  const query = shownFind.trim().toLowerCase();
+  const rows = shownDraft.rows.map((row) => {
     const text = findText(row.factor);
     return { ...row, find: text, hidden: query !== "" && !text.includes(query) };
   });
   const shown = rows.filter((row) => !row.hidden).length;
-  const kept = rows.filter((row) => row.hidden && open.has(row.key)).length;
+  const kept = rows.filter((row) => row.hidden && isShownOpen(row)).length;
+  /** 案内が指す項目（開いている最初の行）。中の部品の `data-tour` はこの行にだけ付く */
+  const tourRowKey = touring ? rows.find((row) => !row.hidden && isShownOpen(row))?.key : undefined;
+  const sceneSum = touring && typeof scene.sum === "string" && scene.sum !== "" ? scene.sum : undefined;
 
   return (
     <>
-      {(page?.notices ?? []).map((notice, index) => (
+      {(touring ? [] : page?.notices ?? []).map((notice, index) => (
         <div className="banner warn" key={index}>
           {notice}
         </div>
       ))}
-      <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
+      {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
+      <div id="changed" className={changed && !touring ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
           更新
         </button>
       </div>
       <header className="toolbar">
         <div className="summary">
           <TargetSelect
-            target={page?.target}
-            targets={page?.targets}
-            disabled={busy}
-            onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })}
+            target={touring ? undefined : page?.target}
+            targets={touring ? undefined : page?.targets}
+            disabled={shownBusy}
+            onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })}
           />
-          <span className="path" title={page?.root ?? ""}>
-            {page?.riskPath ?? ""}
+          <span className="path" title={touring ? "" : page?.root ?? ""}>
+            {touring ? `（見本）${shownPage?.riskPath ?? ""}` : page?.riskPath ?? ""}
           </span>
-          <span id="dirty" className={dirty ? "dirty" : "dirty hidden"}>
+          <span id="dirty" className={shownDirty ? "dirty" : "dirty hidden"}>
             未保存
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="open-risk" disabled={!exists} onClick={() => post({ type: "openFile" })}>
+          <button type="button" className="action" data-action="open-risk" disabled={!shownExists} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
             更新
           </button>
           <button
@@ -256,8 +332,12 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
             className="action primary"
             id="save"
             data-action="save"
-            disabled={!dirty || lock.locked || busy || readOnly}
+            data-tour="save"
+            disabled={!shownDirty || shownLock.locked || shownBusy || shownReadOnly}
             onClick={() => {
+              if (tour.touring) {
+                return;
+              }
               setBusy(true);
               setStatus({ text: "検証して保存中…", error: false });
               post({ type: "save", form: formOf(draft) });
@@ -266,27 +346,31 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
             保存
           </button>
         </div>
-        <TourButton onClick={tour.start} />
+        <TourButton courses={courses} onPick={tour.start} />
       </header>
-      <p id="lock" className={lock.locked ? "lock" : "lock hidden"}>
-        {lock.reason}
+      <p id="lock" className={shownLock.locked ? "lock" : "lock hidden"}>
+        {shownLock.reason}
       </p>
-      {page !== undefined && page.model.problems.length > 0 && (
+      {!touring && page !== undefined && page.model.problems.length > 0 && (
         <ul className="problems">
           {page.model.problems.map((problem, index) => (
             <li key={index}>{problem}</li>
           ))}
         </ul>
       )}
-      {page !== undefined && readOnly && (
-        <div className="banner missing">
-          <span>{page.riskPath} がありません。実行ファイルは組み込みの配点で数えています（画面の値はその組み込みの配点です）。配点を直すには、まずファイルを作ってください。</span>
+      {shownPage !== undefined && shownReadOnly && (
+        <div className="banner missing" data-tour="missing">
+          <span>{shownPage.riskPath} がありません。実行ファイルは組み込みの配点で数えています（画面の値はその組み込みの配点です）。配点を直すには、まずファイルを作ってください。</span>
           <button
             type="button"
             className="action primary"
             data-action="create"
-            disabled={busy}
+            data-tour="create"
+            disabled={shownBusy}
             onClick={() => {
+              if (tour.touring) {
+                return;
+              }
               setBusy(true);
               setStatus({ text: "ファイルを作成中…", error: false });
               post({ type: "create" });
@@ -312,9 +396,9 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
             {LEVEL_NAMES.map((name) => `${name} ${BUILTIN_LEVELS[name]}`).join(" / ")}）を使います。
           </p>
         </details>
-        <div className="levels" id="levels">
+        <div className="levels" id="levels" data-tour="levels">
           {LEVEL_NAMES.map((name) => (
-            <Captioned key={name} name={name.toUpperCase()} yamlKey={`levels.${name}`}>
+            <Captioned key={name} name={name.toUpperCase()} yamlKey={`levels.${name}`} data-tour={name === "high" ? "level-high" : undefined}>
               <input
                 type="text"
                 className="f-level"
@@ -322,8 +406,8 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
                 inputMode="numeric"
                 title={`${name.toUpperCase()} 以上になる点`}
                 placeholder={`既定 ${BUILTIN_LEVELS[name]}`}
-                value={draft.levels[name]}
-                disabled={busy || readOnly}
+                value={shownDraft.levels[name]}
+                disabled={shownBusy || shownReadOnly}
                 onChange={(event) => editDraft({ ...draft, levels: { ...draft.levels, [name]: event.target.value } as Readonly<Record<LevelName, string>> })}
               />
             </Captioned>
@@ -333,15 +417,27 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       <section className="block">
         <h2>
           項目{" "}
-          <span className="count" id="factor-count">
-            {countText(draft.rows.length, query, shown, kept)}
+          <span className="count" id="factor-count" data-tour="factor-count">
+            {countText(shownDraft.rows.length, query, shown, kept)}
           </span>
-          <button type="button" className="action small" data-action="add" disabled={busy || readOnly} onClick={add}>
+          <button type="button" className="action small" data-action="add" data-tour="add" disabled={shownBusy || shownReadOnly} onClick={add}>
             ＋ 項目を追加
           </button>
         </h2>
         <div className="find">
-          <input id="find" type="search" placeholder="id・加点条件・値・理由で絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
+          <input
+            id="find"
+            data-tour="find"
+            type="search"
+            placeholder="id・加点条件・値・理由で絞り込む"
+            spellCheck={false}
+            value={shownFind}
+            onChange={(event) => {
+              if (!tour.touring) {
+                setFind(event.target.value);
+              }
+            }}
+          />
         </div>
         <details className="help">
           <summary>説明</summary>
@@ -350,7 +446,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
             <code>script</code> が失敗したときと出力を読めないときは、安全を優先して points をそのまま加点します。<code>judge</code> の項目があると、判定が揃うまで子を閉じられません。
           </p>
         </details>
-        <ul className="list" id="factors">
+        <ul className="list" id="factors" data-tour="factors">
           {rows.map((row) => (
             <Factor
               key={row.key}
@@ -358,53 +454,31 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
               factor={row.factor}
               find={row.find}
               hidden={row.hidden}
-              open={open.has(row.key)}
-              disabled={busy || readOnly}
+              open={isShownOpen(row)}
+              disabled={shownBusy || shownReadOnly}
+              tour={row.key === tourRowKey}
               onToggle={() => toggle(row.key)}
               onChange={(factor) => editRow(row.key, factor)}
               onMove={(delta) => move(row.key, delta)}
               onRemove={() => remove(row.key)}
             />
           ))}
-          {draft.rows.length === 0 && <li className="empty">項目がありません。加点する項目が無ければ、どの子も LOW のまま閉じます</li>}
+          {shownDraft.rows.length === 0 && <li className="empty">項目がありません。加点する項目が無ければ、どの子も LOW のまま閉じます</li>}
         </ul>
       </section>
-      {page?.sums !== undefined && <Sum sums={page.sums} initial={defaultSum(page.sums, page.target)} key={`${page.target?.kind ?? ""}:${page.target?.name ?? ""}`} />}
-      {tour.touring && <Tour steps={readOnly ? [MISSING_STEP, ...TOUR_STEPS] : TOUR_STEPS} onClose={tour.end} />}
-      <footer className={status?.error === true ? "foot error" : "foot"}>
-        <span id="status">{status?.text ?? ""}</span>
+      {shownPage?.sums !== undefined && (
+        <Sum
+          sums={shownPage.sums}
+          initial={defaultSum(shownPage.sums, touring ? undefined : shownPage.target)}
+          // 見本は別の枠として作る（閉じたあと、見本で選んだ足し算が実際の枠に残らない）
+          key={touring ? "tour" : `${shownPage.target?.kind ?? ""}:${shownPage.target?.name ?? ""}`}
+          tour={touring ? { open: sceneSum !== undefined, picked: sceneSum ?? shownPage.sums[0]?.name ?? "" } : undefined}
+        />
+      )}
+      {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
+      <footer className={!touring && status?.error === true ? "foot error" : "foot"}>
+        <span id="status">{touring ? "" : status?.text ?? ""}</span>
       </footer>
     </>
   );
 }
-
-/** ファイルが無いときだけ、案内の頭で作るボタンを指す（無いうちは欄が止まっていて直せない） */
-const MISSING_STEP: TourStep = {
-  target: '[data-action="create"]',
-  title: "まずファイルを作る",
-  body: "配点のファイルがまだありません。実行ファイルは組み込みの配点で数えています。配点を直すには、ここで組み込みの配点からファイルを作ってください。",
-};
-
-/** リスク管理画面の案内。画面の様子は動かさないので、閉じても戻すものは無い */
-const TOUR_STEPS: readonly TourStep[] = [
-  {
-    target: "#levels",
-    title: "リスクレベルの境目の点",
-    body: "子チケットのリスクの点がこの値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。HIGH 以上になると、レビューが終わるまでフェーズは先へ進めません。空欄なら組み込みの値を使います。",
-  },
-  {
-    target: "#factors",
-    title: "項目",
-    body: "子チケットを閉じるとき、その差分に当てて加点する項目です。行を押すと欄が開き、加点条件と点を直せます。「＋ 項目を追加」で足せます。",
-  },
-  {
-    target: "#save",
-    title: "保存",
-    body: "保存すると実行ファイルが検証してから書き込みます。通らなければ、下に理由が出ます。",
-  },
-  {
-    target: '[data-action="tour"]',
-    title: "案内",
-    body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
-  },
-];

@@ -321,7 +321,7 @@ test("CB-D86 図・一覧と図の切り替え・全体計画の待ち方の選�
   }
 });
 
-test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最後まで進めると閉じて tourDone を返す。案内の前の様子（開いた行）に戻る。図・関係の欄・待ち方の段は無い", async () => {
+test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後まで進めると閉じて tourDone を返す。案内の間は見本を描き、閉じたら実際の定義に戻る。図・関係の欄・待ち方の段は無い", async () => {
   const dom = await openPhases();
   try {
     assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
@@ -336,9 +336,10 @@ test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最�
       await dom.settle();
       titles.push(dom.one("#tour-title").textContent);
       if (i === 0) {
-        // 補足の段で、値を持つ行（research）と、その補足が開いている
-        assert.ok(dom.one(`${rowSelector("p1")} details.more`).hasAttribute("open"));
-        assert.ok(dom.one(rowSelector("p1")).classList.contains("open"));
+        // 補足の段で、見本の行（research）と、その補足が開いている。実際の定義の行（p1…）は描かない
+        assert.ok(dom.one(`${rowSelector("s1")} details.more`).hasAttribute("open"));
+        assert.ok(dom.one(rowSelector("s1")).classList.contains("open"));
+        assert.equal(dom.all(rowSelector("p1")).length, 0, "実際の定義が出ている");
       }
     }
     assert.deepEqual(titles, ["フェーズ定義", "補足", "保存", "ヘルプ", "案内"]);
@@ -373,7 +374,7 @@ test("CB-D93 案内の間は Tab が吹き出しのボタンの中だけを巡�
     dom.document.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }));
     await dom.settle();
     assert.equal(dom.document.activeElement, dom.one('[data-action="tour-next"]'));
-    // 見本の行を出すために外した絞り込みは、閉じたら戻る
+    // 案内の間は見本を描くので絞り込みは空に見える。実際の絞り込みは、閉じたら戻る
     assert.equal(dom.one<HTMLInputElement>("#find").value, "");
     dom.key("Escape");
     await dom.settle();
@@ -429,22 +430,25 @@ test("CB-D147 案内は → で次の段へ、← で前の段へ動く。端の
   }
 });
 
-test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッダ右上の ? で案内をもう一度見られ、開いていたヘルプは閉じる", async () => {
+test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッダ右上の ? で案内の一覧を開いて見られ、案内の間は実際のヘルプを隠す", async () => {
   const dom = await openPhases();
   try {
     assert.equal(dom.all("#help").length, 0, "ヘルプを押すまで説明は出さない");
-    // 案内の入口は ? 1 文字で、ヘッダ（ツールバー）の最後の子。位置は Tour.css が 5 画面とも右上に揃える
+    // 案内の入口は ? 1 文字で、ヘッダ（ツールバー）の最後の子。位置は Tour.css が全画面とも右上に揃える
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
     dom.click(dom.one('[data-action="help"]'));
     await dom.settle();
     assert.match(dom.one("#help").textContent ?? "", /順序（どのフェーズがどれを待つか）はこのファイルには書きません。親チケットの計画の項に after で先行を書きます/);
     dom.click(dom.one('[data-action="tour"]'));
     await dom.settle();
-    assert.equal(dom.all("#help").length, 0, "案内を始めたらヘルプは閉じる");
+    dom.click(dom.one('[data-action="tour-course"][data-course="intro"]'));
+    await dom.settle();
+    assert.equal(dom.all("#help").length, 0, "案内の間は実際のヘルプを出さない");
     assert.equal(dom.one("#tour-title").textContent, "フェーズ定義");
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
     assert.equal(dom.all(".tour").length, 0);
+    assert.equal(dom.all("#help").length, 1, "閉じたら開いていたヘルプに戻る");
     // ? から始めた案内も、やめたら tourDone を返す
     assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);
   } finally {
