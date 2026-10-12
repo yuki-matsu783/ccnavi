@@ -82,6 +82,19 @@ class ElseTest(unittest.TestCase):
         self.assertIn("4 行目: 1 つの ccnavi:if に ccnavi:else は 1 つだけ", joined)
 
 
+class IndentTest(unittest.TestCase):
+    def test_囲みの深さの分だけインデントを取る(self):
+        text = (
+            "<!-- ccnavi:if a -->\n  - a\n    - 深い\n  <!-- ccnavi:if b -->\n    - b\n  <!-- ccnavi:endif -->\n"
+            "<!-- ccnavi:endif -->\n- 外"
+        )
+
+        self.assertEqual(ccnavimd.render(text, {"a", "b"}, {}), "- a\n  - 深い\n- b\n- 外")
+
+    def test_インデントの無い囲みもそのまま載る(self):
+        self.assertEqual(ccnavimd.render("<!-- ccnavi:if a -->\n- a\n<!-- ccnavi:endif -->", {"a"}, {}), "- a")
+
+
 class FlagsTest(unittest.TestCase):
     def test_条件は関数の真偽で決まる(self):
         ctx = ccnavimd.Context(None, "", True, {"workspace-root"}, "dry-run")  # type: ignore[arg-type]

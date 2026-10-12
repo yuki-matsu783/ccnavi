@@ -7,7 +7,8 @@ md の書き方は 2 つだけ。
 
 - 条件: `<!-- ccnavi:if 名前 -->` と `<!-- ccnavi:endif -->` で行を囲む。名前が成り立つときだけ、
   囲んだ行を載せる。途中に `<!-- ccnavi:else -->` を 1 つ置くと、成り立たないときの行を分けられる。
-  入れ子にできる（外側も内側も成り立つときだけ載る）。名前は `CONDITIONS`
+  入れ子にできる（外側も内側も成り立つときだけ載る）。囲みの中は 1 段につき半角空白 2 つで
+  インデントしてよい（載せるときに取る）。名前は `CONDITIONS`
 - 差し込み: `{{名前}}` を、ワークスペースごとの値に置き換える。名前は `SUBSTITUTIONS`
 
 条件の名前ごとに独立した関数（`CONDITIONS`）があり、その真偽で行を載せるかを決める。
@@ -97,6 +98,9 @@ SUBSTITUTIONS = (
     "mode_env",  # CCNAVI_MODE
 )
 
+# 囲みの中の行は、深さに応じて md の側でインデントしてよい。載せるときに取る。
+INDENT = "  "
+
 _IF = re.compile(r"^\s*<!--\s*ccnavi:if\s+(\S+)\s*-->\s*$")
 _ELSE = re.compile(r"^\s*<!--\s*ccnavi:else\s*-->\s*$")
 _ENDIF = re.compile(r"^\s*<!--\s*ccnavi:endif\s*-->\s*$")
@@ -139,6 +143,15 @@ def problems(text: str) -> list[str]:
     return found
 
 
+def _dedent(line: str, depth: int) -> str:
+    """囲みの深さの分だけ、行頭のインデント（`INDENT` 1 つにつき 1 段）を取る。"""
+    for _ in range(depth):
+        if not line.startswith(INDENT):
+            break
+        line = line[len(INDENT):]
+    return line
+
+
 def render(text: str, flags: set[str], values: dict[str, str]) -> str:
     """条件に合う行だけを残し、差し込みを解く。空行は続けて 1 つにまとめ、前後の空行は取る。
 
@@ -163,6 +176,7 @@ def render(text: str, flags: set[str], values: dict[str, str]) -> str:
             continue
         if not all(stack):
             continue
+        line = _dedent(line, len(stack))
         out.append(_SUBSTITUTION.sub(lambda m: values.get(m.group(1), m.group(0)), line))
     lines: list[str] = []
     for line in out:
