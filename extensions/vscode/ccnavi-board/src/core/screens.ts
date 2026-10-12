@@ -18,7 +18,7 @@ export type RulesTarget =
 /** リスク管理画面が直す配点のファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定 */
 export type RiskTarget = RulesTarget;
 
-/** フェーズ管理画面が直す定義のファイル。ワークスペースの設定とプロジェクト 1 つの設定だけ（共通の設定には置けない） */
+/** フェーズ管理画面が直す定義のファイル。ワークスペースの設定とプロジェクト 1 つの設定だけ（共通の設定の定義は読み取り専用で並べる） */
 export type PhasesTarget =
   | { readonly kind: "self" }
   | { readonly kind: "project"; readonly name: string };

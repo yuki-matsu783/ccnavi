@@ -8,21 +8,23 @@
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存が通った）。
  *
  * 対象は 2 種。ワークスペースの設定の定義（既定 `.ccnavi/config/project/phases.yml`）と、
- * プロジェクト 1 つの設定の定義（既定 `projects/<名前>/.ccnavi/config/project/phases.yml`）。フェーズ定義は config にだけ置き、
- * 共通の設定（`.ccnavi/config/common/phases.yml`）には置けない。使われるのは親チケットの `project:` が指す 1 本だけで、足し算はしない。
+ * プロジェクト 1 つの設定の定義（既定 `projects/<名前>/.ccnavi/config/project/phases.yml`）。判定に使われるのは、共通の設定
+ * （`.ccnavi/config/common/phases.yml`）と、親チケットの `project:` が指す設定の和。共通の設定はこの画面では編集せず、
+ * 実行ファイルの足し算（`sums[].phases.types`）のうち出どころが共通のものを読み取り専用で並べる。
  * タブは 1 枚だけで、別の対象を開くとそのタブの中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[].phases_file`）を使い、拡張は組まない。
  *
  * 検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、`--lint --project-phases-file <名前>=<パス>`
- * （ワークスペースの設定は名前が `self`）で渡す。確かめるのはその 1 本の中だけ（同じ id、表示名の重なり、定義の形）。
+ * （ワークスペースの設定は名前が `self`）で渡す。実行ファイルは共通の設定と足した形で確かめる（同じ id で中身が違う、
+ * 表示名の重なり、定義の形）。
  * 保存は、検証（`--lint`）を通り、作業中のチケットが無く、ファイルが外で変わっていないときだけ行う。
  * 作業中のチケットは、ワークスペースの設定ならどのツリーでも、プロジェクトの設定ならそのプロジェクトの分だけを見る
  * （定義は承認・着手・閉じるときに読まれるので、走っている最中に変えない）。
  * ファイルが無いのは「設定が無い」正常な状態で、帯は出さない。欄は触れ、検証を通った最初の保存でファイルを作る（雛形は置かない）。
  * 定義の無いファイル（`phases: {}`）は実行ファイルが error にするので、先に書き出さない。
  * 組み込みの既定は無い（実行ファイルも持たない。既定を組み込むと、意図せずレビューの要否が決まる）。
- * 共通の設定に `phases.yml` があるときは、実行ファイルが使わず空として扱い、`--lint` が error で言う。画面は開き、その error を上部の帯で出す
- * （画面からそのファイルを直したり消したりはしない）。
+ * 共通の設定の `phases.yml` を実行ファイルが読めないときは、共通の定義が空として扱われ、`--lint` が error で言う。画面は開き、その
+ * error を上部の帯で出す（画面からそのファイルを直したり消したりはしない）。
  *
  * チケット制御が disable のワークスペースでは、対象がどれでも開かない。定義は親チケットの計画と
  * 子の範囲にしか読まれないので、disable の間は何も動かさない。入口（サイドパネル・コマンドパレット）も同じ鍵で隠れる。
@@ -40,8 +42,9 @@ import { loadingText } from "./core/loading-render.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asPhasesForm, readPhases, type PhasesDocument } from "./core/phases-doc.js";
 import { renderPhasesPage } from "./core/phases-render.js";
-import type { PhasesData, PhasesForm, PhasesMessage, ToPhases } from "./core/phases-view.js";
+import type { CommonPhase, PhasesData, PhasesForm, PhasesMessage, ToPhases } from "./core/phases-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
+import { commonPhases } from "./core/sums.js";
 import { showLoading } from "./loading.js";
 import type { PhasesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
@@ -59,8 +62,8 @@ const SCREEN = "phases";
 const OWN_WRITE_GRACE_MS = 1500;
 /** ワークスペースかプロジェクトの設定のファイルを最初の保存で作るときに、先頭へ置く説明 */
 const LAYER_HEADER = [
-  "# このレイヤーのフェーズ定義。親チケットの project: がこのレイヤーを指すときに、これだけが使われる。",
-  "# フェーズ定義は足し算をしない。共通レイヤーの定義も、ほかのレイヤーの定義も足されない。",
+  "# このレイヤーのフェーズ定義。親チケットの project: がこのレイヤーを指すときに、共通レイヤーの定義に足して使われる。",
+  "# 共通レイヤーと同じ id で中身が違う定義や、title が重なる定義は --lint が error にし、このファイルの定義は使われない。",
   "",
 ].join("\n");
 
@@ -78,7 +81,9 @@ interface Loaded {
   readonly phasesRel: string;
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
-  /** 上部に error の帯で出す文。共通の設定に phases.yml がある、など */
+  /** 上部に error の帯で出す文。共通の設定の phases.yml を読めない、など */
+  /** 共通の設定の定義（読み取り専用）。実行ファイルの足し算のうち出どころが共通のもの */
+  readonly common: readonly CommonPhase[];
   readonly errors: readonly string[];
   /** 切り替えられる対象（ワークスペース・設定のあるプロジェクト） */
   readonly targets: readonly TargetOption[];
@@ -278,11 +283,14 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   if (layer.phasesFile.unreadable !== "") {
     notices.push(`実行ファイルはこのファイルを読めず、この設定の定義を空として扱っています: ${layer.phasesFile.unreadable}`);
   }
-  // 共通の設定に phases.yml があれば、実行ファイルは使わず空として扱い、--lint が error で言う。画面は開いたまま帯で知らせる。
-  const common = commonLayer(board.board);
-  if (common !== undefined && common.phasesFile.unreadable !== "") {
-    errors.push(`共通の設定に phases.yml があります（${common.phasesFile.path}）。共通の設定には置けず、使われません。エディタで消すか、ワークスペースかプロジェクトの設定（config）へ移してください`);
+  // 共通の設定の phases.yml を実行ファイルが読めなければ、共通の定義は空として扱われ、--lint が error で言う。画面は開いたまま帯で知らせる。
+  const commonFile = commonLayer(board.board);
+  if (commonFile !== undefined && commonFile.phasesFile.unreadable !== "") {
+    errors.push(`共通の設定の phases.yml を読めません（${commonFile.phasesFile.path}）。共通の定義は空として扱われています: ${commonFile.phasesFile.unreadable}`);
   }
+  // 判定に使われる和は実行ファイルが組む（`sums[]`）。出どころが共通の定義だけを読み取り専用で見せ、拡張は足し直さない。
+  const sumName = target.kind === "self" ? LAYER_SELF : target.name;
+  const common = commonPhases(board.board.sums.find((s) => s.name === sumName));
   let text: string;
   let mtimeMs: number;
   let exists: boolean;
@@ -302,7 +310,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   // 無いときの苦情（version が無い、phases が無い）は画面に出さない。
   const parsed = readPhases(text);
   const doc = exists ? parsed : { apply: parsed.apply, model: { ...parsed.model, problems: [] } };
-  return { target, text, exists, mtimeMs, doc, phasesPath, phasesRel, notices, errors, targets };
+  return { target, text, exists, mtimeMs, doc, phasesPath, phasesRel, notices, errors, common, targets };
 }
 
 function resolveIn(root: string, filePath: string): string {
@@ -472,6 +480,7 @@ function show(current: PanelState): void {
       lock: current.lock,
       notices: loaded.notices,
       errors: loaded.errors,
+      common: loaded.common,
       target: { kind: loaded.target.kind, name: loaded.target.kind === "project" ? loaded.target.name : "" },
       targets: loaded.targets,
     },
@@ -694,7 +703,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
   }
 
   // 1. 検証。error が 1 件でもあれば保存しない。承認済みの計画がこの定義で読めるかもここで分かる。
-  //    確かめるのはその 1 本の中だけ（共通の設定とは合成しない）。
+  //    実行ファイルは共通の設定と足した形で確かめる（同じ id で中身が違う、表示名の重なり）。
   const lint = await runLint(root, binSetting(), overrideFor(current.target, tmp));
   if (!alive(current)) {
     return;

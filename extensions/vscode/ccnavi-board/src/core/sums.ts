@@ -1,5 +1,6 @@
 /**
- * ルール管理とリスク管理が見せる「足し算」（共通の設定 + 1 つの設定）の読み取り用の表示を、ボードの JSON（`sums[]`）から取り出す。
+ * ルール管理とリスク管理が見せる「足し算」（共通の設定 + 1 つの設定）の読み取り用の表示と、フェーズ管理が見せる共通の設定の定義を、
+ * ボードの JSON（`sums[]`）から取り出す。
  *
  * 足し算の結果は実行ファイルが判定と同じ関数で組んで出す。ここは 足し直さず、形を整えて渡すだけ
  * （拡張は判定も合成もしない）。ワークスペースの足し算は「共通の設定 + ワークスペースの設定」、プロジェクトの足し算は
@@ -8,6 +9,7 @@
  * ここは vscode にも DOM にも触れない。拡張ホストと画面の両方から読まれる。
  */
 import type { BoardJson, SumFactorJson, SumJson, SumRuleJson } from "./model.js";
+import type { CommonPhase } from "./phases-view.js";
 
 /** ルール管理が見せる足し算 1 件 */
 export interface RulesSum {
@@ -78,4 +80,17 @@ export function riskSums(board: BoardJson | undefined): readonly RiskSum[] {
 export function defaultSum(sums: readonly { readonly name: string }[], target: { readonly kind: string; readonly name: string } | undefined): string {
   const want = target === undefined ? "self" : target.kind === "project" ? target.name : "self";
   return sums.find((s) => s.name === want)?.name ?? sums[0]?.name ?? "";
+}
+
+/** 出どころが共通の設定であることを言う `source` の値 */
+const COMMON_SOURCE = "common";
+
+/**
+ * フェーズ管理が見せる、共通の設定の定義（読み取り専用）。足し算（`sums[].phases.types`）のうち出どころが共通のもの。
+ * 足し算が無い（古い実行ファイル・その設定が対象でない）なら空。
+ */
+export function commonPhases(sum: SumJson | undefined): readonly CommonPhase[] {
+  return (sum?.phases.types ?? [])
+    .filter((t) => t.source === COMMON_SOURCE)
+    .map((t) => ({ id: t.id, title: t.title, kind: t.kind, review: t.review, scope: t.scope }));
 }
