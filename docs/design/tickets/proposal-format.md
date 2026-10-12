@@ -99,7 +99,7 @@ base_sha: ""
   承認のあとの判定は写しを読み、`phases.yml` を読まない。`phases.yml` を直したら、承認待ちの提案は `--fill-phases` を
   打ち直す。改版の提案では、子が承認された番号が使う定義は承認済みチケットの値のまま（`--fill-phases` がそう差し込む）。
   子に `phases:` は書けない（error。子は `phase:` で番号を指す）（9.7）
-- 親の提案の雛形は `ccnavi ticket new <識別子> --title <題> --plan <型,型,...> [--issue N]` で作る（`tickets/scaffold.py`。
+- 親の提案の雛形は `ccnavi ticket new <識別子> --title <題> (--plan <型,型,...> | --template <名前> [--layer <名>] [--with-feedback]) [--issue N]` で作る（`tickets/scaffold.py`。
   REQ-TKT-56）。識別子と同名のワークツリーの中から打つと、`<提案の置き場>/todo/<識別子>.md` に書く。生成物は
   `version` `ticket` `issue`（`--issue` があれば）`title` `phases` `plan` `rationale` `allow` と本文の見出し。
   - `allow` は plan の順に各型の `scope` を集め、重複を除いた `match: Write|Edit` の項にする（案 A。判定側で `wip/` を
@@ -112,6 +112,8 @@ base_sha: ""
   - `--plan` の代わりに `--template <名前> [--layer <名前>]` を渡すと、溜めたテンプレート（9.15）から `plan:` / `feedback:`
     （`type`・`review`・`after`）を書く。`after` はテンプレートの計画の中の添字から提案の絶対番号に付け直す。子のフローは
     `<提案の置き場>/flows/<親>-<NN>-01.yml` に下書きとして置く（子の提案の足場は作らない）。`--plan` とは併用できない。
+    `--with-feedback` は `--template` と一緒にだけ使え、付けたときだけ `feedback:` を書く。既定ではフィードバック計画を書かない
+    （最初の提案に入れると、全体計画を改版で直せなくなるため。全体計画のレビューを見てから改版で足す）。
     同じ識別子の提案、子の識別子の提案・フロー・フロー下書きが在れば上書きせず断る。詳しくは 9.15
   - `ccnavi-ticket.sh` は `new` を通さない（保護対象の sh を直さないため）。`--fill-phases` と同じく実行ファイルを直接打つ。
     `new` は承認ではなく、`todo/` に書くだけなので、組み込みの止め（9.2）には当たらない
