@@ -117,13 +117,13 @@ deny:
     subject: "/repo/.env.example"
     why: >-
       値を持たない見本の .env。共通の credentials-files は not で除くが、常に有効な組み込みの
-      builtin-credentials（実行ファイルの土台）が .env の後ろに続く名前ごと止める。
+      builtin-deny-credentials（実行ファイルの土台）が .env の後ろに続く名前ごと止める。
       組み込みの match は Bash|Read|Write|Edit で、NotebookEdit には当たらない（ask の期待）
   - tool: NotebookEdit
     subject: "/repo/.claude/worktrees/x/secrets/.env.example"
     why: >-
       見本の名前で終わっても、secrets/ の下なので除かない。例外は .env の個別条件にだけ掛かる。
-      組み込みの builtin-credentials は NotebookEdit を見ないので、ここで外れると素通りする
+      組み込みの builtin-deny-credentials は NotebookEdit を見ないので、ここで外れると素通りする
   - tool: NotebookEdit
     subject: "/repo/.claude/worktrees/x/.env.local"
     why: NotebookEdit でも .env は止める。組み込みは NotebookEdit を見ない
@@ -229,7 +229,7 @@ deny:
     subject: "sh $L status"
     why: >-
       コマンド名の位置の変数は、ルールではなく組み込みの検査（shellread の command-name-expansion、
-      DENY_COMMAND_NAME_EXPANSION）が止める。何が走るか表記に無く、raw-git などのルールが当たらないため
+      DENY_COMMAND_NAME_EXPANSION）が止める。何が走るか表記に無く、builtin-guard-raw-git などのルールが当たらないため
   - tool: Bash
     subject: "cd /repo && $CMD push origin main"
     why: 同上。コマンド列の途中でも止まる
@@ -246,7 +246,7 @@ ask:
   - tool: NotebookEdit
     subject: "/repo/.claude/worktrees/x/.env.example"
     why: >-
-      値を持たない見本の .env。credentials-files が除き、組み込みの builtin-credentials は
+      値を持たない見本の .env。credentials-files が除き、組み込みの builtin-deny-credentials は
       NotebookEdit を見ないので、どのルールにも当たらず権限モードへ渡る
   - tool: Write
     subject: "/repo/.claude/worktrees/x/pyproject.toml"
@@ -291,7 +291,7 @@ ask:
   - tool: Bash
     subject: "cd /repo/.claude/worktrees/git-wrapper && ls"
     why: >-
-      パスの中の git は raw-git に当たらない。当たるとワークツリーの出入りが丸ごと止まる。
+      パスの中の git は builtin-guard-raw-git に当たらない。当たるとワークツリーの出入りが丸ごと止まる。
       cd と ls を allow に書いてはいないので、権限モードへ渡る
   - tool: Bash
     subject: "sed -n 1,20p /repo/logs/git-20260907-000000-1.log"
@@ -357,7 +357,7 @@ allow:
   - tool: Bash
     subject: 'grep -n "git push" README.md'
     why: >-
-      引用された語は実行位置ではないので raw-git には当たらない。引用の中の空白は
+      引用された語は実行位置ではないので builtin-guard-raw-git には当たらない。引用の中の空白は
       語の中の目印（\x01）になり、コマンドの区切り（\x00）とは別なので、「後ろにコマンドが続かない」を
       求める prefer-read-grep が当てて通す。README「Bash のコマンドは実行される部分だけを見る」
   - tool: Bash

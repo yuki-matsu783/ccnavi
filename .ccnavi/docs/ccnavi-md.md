@@ -31,7 +31,7 @@ keywords: [CCNAVI.md, ccnavi:if, ccnavi:else, ccnavi:endif, 条件, 差し込み
 | 条件の名前 | 成り立つとき |
 |---|---|
 | `workspace_root` | ワークスペースのルール（共通レイヤーか自身のレイヤー）の`deny`にid `workspace-root`がある |
-| `raw_git` | 同じく`deny`にid `raw-git`がある、または生のgitを組み込みで止める（チケット制御が有効でラッパーがある） |
+| `git_wrapper` | ワークスペースに git の入口（`.ccnavi/scripts/ccnavi-git.sh`）がある。生の git は組み込みでいつも止まるので、git の行は、これが偽のときは入口を名指しせず「ユーザに頼む」形になる |
 | `projects` | プロジェクトの置き場に`.git`を持つプロジェクトがある |
 | `tickets` | チケット制御を使っている（`CCNAVI_TICKET_CONTROL`が`disable`でない） |
 | `docs` | mdの索引の案内（`--docs`）を出す回 |

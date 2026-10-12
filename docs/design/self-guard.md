@@ -96,7 +96,7 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 `builtin-guard-project-home` より先にこちらが当たる。期待する判定（`rule-expectations.yml`）は 3 本に入らず、既定の置き場なら
 `builtin-guard-project-home` が止める。
 
-生の git（`builtin-ticket-raw-git`）: チケット制御が有効でワークスペースルートに `ccnavi-git.sh` がある間は、生の git を組み込みで止める（9.1）。
+生の git（`builtin-guard-raw-git`）: いつも、生の git を組み込みで止める（9.1）。ラッパーがあればその打ち方を文面で名指しする（ADR-0129）。
 ラッパーの中のチケット制御の可否を、ラッパーの外から打つ git で外させないためで、ガード自身を守る組み込みに数える（P4）。
 `CCNAVI_GUARD_CORE_FILES` では切れず、チケット制御（`CCNAVI_TICKET_CONTROL`）を切ると外れる。
 

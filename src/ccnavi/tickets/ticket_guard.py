@@ -6,7 +6,6 @@ ticket から分けた。ticket を読まない。
 
 from __future__ import annotations
 
-import os
 import re
 from typing import TextIO
 
@@ -19,12 +18,9 @@ STATE_RULE_ID = "builtin-ticket-state"
 STATE_SHELL_RULE_ID = STATE_RULE_ID + "-shell"
 # 提案を書いた回に、承認を頼む前の確認を伝えるルールの id。
 PROPOSE_RULE_ID = "builtin-ticket-propose"
-# 生の git を止め、入口を git のラッパー 1 本に寄せるルールの id。
-RAW_GIT_RULE_ID = "builtin-ticket-raw-git"
-
-# git のラッパーの置き場（ワークスペースルートからの相対）。
-# スクリプトはワークスペースにしか無い（`settings.script_command`）ので、ルートの下だけを見る。
-GIT_SCRIPT = os.path.join(settings.DEFAULT_PROJECT_HOME, "scripts", "ccnavi-git.sh")
+# 生の git を止め、入口を git のラッパー 1 本に寄せるルールの id。ccnavi 自身の約束を守るので、
+# ルールファイルからは書けない（予約の接頭辞 `builtin-guard-`）。
+RAW_GIT_RULE_ID = "builtin-guard-raw-git"
 
 # `git` がコマンドの位置に立つ形。glob の `*git*` だと誘導先の `ccnavi-git.sh` にも当たって
 # 出口ごと塞がるので、前後の切れ目を見る。
@@ -115,44 +111,40 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     return [write_rule, shell_rule]
 
 
-def raw_git_applies(conf: settings.Settings, root: str) -> bool:
-    """生の git を組み込みで止めるか。チケット制御が有効で、誘導先のラッパーがあるときだけ。
-
-    ラッパーが無いワークスペースで止めると、git を打つ道が 1 つも残らない。
-    """
-    return conf.tickets_enabled and os.path.isfile(os.path.join(root, GIT_SCRIPT))
-
-
 def raw_git_rule(root: str) -> rules.Rule:
-    """生の git を止めるルール。組み込みで、ルールファイルには書かない。
+    """生の git を止めるルール。組み込みで、ルールファイルには書かない。いつも足す。
 
     git のラッパー（`ccnavi-git.sh`）の中には、チケット制御の約束を守る可否がある。
     承認済みチケットの置き場を別のコミットの中身に戻す `restore` と `checkout` を通さない、
     直接作業だけを取り込む `integrate`、子のワークツリーから送らない `push`、
     親のブランチへ移るときに承認済みチケットを運ぶ `checkout` など。どれも、git が
-    ラッパーの外から打てれば外れる。生の git を止めるのが共通レイヤーのルールだけだと、
-    共通レイヤーは置かなくてよいので、ccnavi 自身の約束がワークスペースの設定しだいで消える。
-    そこで止める側を組み込みに持つ。
+    ラッパーの外から打てれば外れる。そこで生の git は、チケット制御の有無や共通レイヤーの
+    有無によらず止める。
+
+    ラッパーが無いワークスペースでも止める。そのときは誘導先が無いので、文面は
+    ユーザに頼む形にする（`git` の形を案内すると、それも止まる）。
 
     土台（`base`）として扱う。共通レイヤーの `raw-git` にも当たったときは、そちらだけを言う。
     拒否は変わらず、同じ拒否を 2 つの文面で返さない。
-
-    共通レイヤーが読めずに組み込みの既定に戻っている間も足す（judge がチケット制御の
-    組み込みと同じ条件で足す）。ラッパーはルールファイルを読まずに動き、衝突の解決に要る
-    `add`・`restore --ours` / `--theirs`・`merge-file -p` を通すので、直す道は残る。
-    外すと、ルールファイルが読めない間だけチケット制御の可否がラッパーの外から外れる。
     """
-    rule = rules.Rule(
-        id=RAW_GIT_RULE_ID,
-        match="Bash",
-        regex=RAW_GIT_REGEX,
-        message=(
+    if settings.has_git_wrapper(root):
+        message = (
             "生の git は実行しません。"
             f"'{settings.script_command(root, 'ccnavi-git.sh')} <サブコマンド> ...'"
             " を使ってください。通る形は同じスクリプトの --help にあります。"
             "チケット制御の可否（承認済みチケットの置き場を戻さない・取り込み・push の条件）は"
             "このスクリプトが確かめるので、生の git では外れます。"
-        ),
+        )
+    else:
+        message = (
+            "生の git は実行しません。このワークスペースには git の入口のスクリプトが無いので、"
+            "git の操作が要るときはユーザに頼んでください。"
+        )
+    rule = rules.Rule(
+        id=RAW_GIT_RULE_ID,
+        match="Bash",
+        regex=RAW_GIT_REGEX,
+        message=message,
         decision=rules.DENY,
     )
     rule.compiled = re.compile(RAW_GIT_REGEX, re.IGNORECASE)

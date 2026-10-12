@@ -7,7 +7,7 @@ keywords: [raw-git, builtin-ticket-raw-git, ccnavi-git.sh, 組み込み, 土台,
 ---
 # ADR-0114: チケット制御が有効な間は生の git を組み込みで止め、土台の deny を表記違いに強くする
 
-状態: 採用
+状態: 採用（生の git の止めの条件と、共通レイヤーの `raw-git` の扱いは [ADR-0129](0129-raw-git-always-builtin-no-common-sample.md) で覆す）
 
 ## 状況
 

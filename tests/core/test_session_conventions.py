@@ -4,9 +4,10 @@
 
 1. 起動のたびに、ワークツリー・git の入口・下書きの置き場・サブエージェント・合意の要る変更が
    1 行ずつ届く。git の入口は打てる絶対パスで、詳しいことは --help と拒否の案内に聞く形
-2. ワークツリーの行は `workspace-root`、git の行は `raw-git` の deny がワークスペースのルール
-   （共通レイヤーか自身のレイヤー）にあるときだけ載る。ルールが読めず既定に戻ったときは載らない。
-   ただし git の行は、生の git を組み込みで止めるとき（チケット制御が有効でラッパーがある）も載る
+2. ワークツリーの行は `workspace-root` の deny がワークスペースのルール（共通レイヤーか自身の
+   レイヤー）にあるときだけ載る。ルールが読めず既定に戻ったときは載らない。
+   git の行は、生の git を組み込みがいつも止めるので常に載る。文は、ラッパーがあれば打つ形を
+   名指しし、無ければユーザに頼む形にする
 3. チケット制御が有効なときだけ、承認済みチケットの状態の確かめ方（`status`）が載る
 4. プロジェクトの置き場にプロジェクトがあるときだけ、cd してから作業する行が載る
 5. md の索引の案内が出る回だけ、詳しい決まりを --docs で引く行が載る
@@ -28,6 +29,8 @@ from tests.inproc import run_ccnavi
 HEAD = "# ccnavi の作業の決まり"
 WORKTREE_LINE = ".claude/worktrees/<名前>"
 GIT_LINE = "git は直接呼ばず"
+# ラッパーが無いワークスペースの git の行。誘導先が無いので、ユーザに頼む形になる。
+NO_WRAPPER_GIT_LINE = "git は直接呼ばない。"
 # ワークツリーと git の行を支える deny。中身は判定に関わらないので最小にしてある。
 WORKSPACE_ROOT_RULE = {
     "id": "workspace-root",
@@ -35,7 +38,6 @@ WORKSPACE_ROOT_RULE = {
     "glob": "*/never/*",
     "message": "m",
 }
-RAW_GIT = {"id": "raw-git", "match": "Bash", "glob": "*never-git *", "message": "m"}
 
 
 def block(text: str) -> str:
@@ -55,8 +57,12 @@ class SessionConventionsTest(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.root = os.path.realpath(directory.name)
-        self.rules = rules_file(self.root, SOUND, WORKSPACE_ROOT_RULE, RAW_GIT)
+        self.rules = rules_file(self.root, SOUND, WORKSPACE_ROOT_RULE)
         put_ccnavi_md(self.root)
+        self.wrapper = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-git.sh")
+        os.makedirs(os.path.dirname(self.wrapper), exist_ok=True)
+        with open(self.wrapper, "w", encoding="utf-8") as f:
+            f.write("exit 0\n")
 
     def start(self, *extra, **payload_extra) -> str:
         payload = {"hook_event_name": "SessionStart", "session_id": "s1", **payload_extra}
@@ -104,24 +110,25 @@ class SessionConventionsTest(unittest.TestCase):
         self.assertIn(".ccnavi/CCNAVI.md が無いか読めない", text)
         self.assertNotIn(HEAD, text)
 
-    def test_main_treeとraw_gitのdenyが無ければその2行は出ない(self):
+    def test_workspace_rootのdenyが無ければワークツリーの行は出ない(self):
         rules_file(self.root, SOUND)
         text = block(self.start("--mode", "enable"))
 
         self.assertNotIn(WORKTREE_LINE, text)
-        self.assertNotIn(GIT_LINE, text)
-        self.assertNotIn("ccnavi-git.sh", text)
+        # git の行は組み込みが支えるので、ルールに無くても載る。
+        self.assertIn(GIT_LINE, text)
         # ほかの行は残る。
         self.assertIn("wip/scratchpad/", text)
         self.assertIn("実装する前にユーザと合意する", text)
 
-    def test_行ごとに支えるdenyを見る(self):
+    def test_行ごとに支えるものを見る(self):
+        """ワークツリーの行は deny を見る。git の行は組み込みが支えるので、ルールに依らない。"""
         rules_file(self.root, SOUND, WORKSPACE_ROOT_RULE)
         text = block(self.start("--mode", "enable"))
         self.assertIn(WORKTREE_LINE, text)
-        self.assertNotIn(GIT_LINE, text)
+        self.assertIn(GIT_LINE, text)
 
-        rules_file(self.root, SOUND, RAW_GIT)
+        rules_file(self.root, SOUND)
         text = block(self.start("--mode", "enable"))
         self.assertNotIn(WORKTREE_LINE, text)
         self.assertIn(GIT_LINE, text)
@@ -131,41 +138,42 @@ class SessionConventionsTest(unittest.TestCase):
         own = os.path.join(self.root, ".ccnavi", "config", "project", "rules.yml")
         os.makedirs(os.path.dirname(own), exist_ok=True)
         with open(own, "w", encoding="utf-8") as f:
-            json.dump({"version": 1, "deny": [WORKSPACE_ROOT_RULE, RAW_GIT]}, f)
+            json.dump({"version": 1, "deny": [WORKSPACE_ROOT_RULE]}, f)
         text = block(self.start("--mode", "enable"))
 
         self.assertIn(WORKTREE_LINE, text)
-        self.assertIn(GIT_LINE, text)
 
     def test_allowやaskにある同じidは数えない(self):
         rules_file(self.root, SOUND)
         own = os.path.join(self.root, ".ccnavi", "config", "project", "rules.yml")
         os.makedirs(os.path.dirname(own), exist_ok=True)
         with open(own, "w", encoding="utf-8") as f:
-            json.dump({"version": 1, "ask": [WORKSPACE_ROOT_RULE], "allow": [RAW_GIT]}, f)
+            json.dump({"version": 1, "ask": [WORKSPACE_ROOT_RULE], "allow": []}, f)
         text = block(self.start("--mode", "enable"))
 
         self.assertNotIn(WORKTREE_LINE, text)
-        self.assertNotIn(GIT_LINE, text)
 
-    def test_ルールが読めず既定に戻ったら2行は出ない(self):
+    def test_ルールが読めず既定に戻ってもワークツリーの行は出ない(self):
         with open(self.rules, "w", encoding="utf-8") as f:
             f.write("version: [壊れている\n")
         text = block(self.start("--mode", "enable"))
 
         self.assertNotIn(WORKTREE_LINE, text)
-        self.assertNotIn(GIT_LINE, text)
+        # 組み込みの止めは既定の間も足すので、git の行は載る。
+        self.assertIn(GIT_LINE, text)
 
-    def test_生のgitを組み込みで止めるならraw_gitが無くてもgitの行は出る(self):
-        # チケット制御が有効で git のラッパーがあれば、組み込みが生の git を止める。
-        # 判定と文を揃える。ルールが読めず既定に戻っても組み込みは止めるので、行も出る。
-        script = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-git.sh")
-        os.makedirs(os.path.dirname(script), exist_ok=True)
-        with open(script, "w", encoding="utf-8") as f:
-            f.write("exit 0\n")
-        rules_file(self.root, SOUND)
+    def test_ラッパーが無ければgitの行はユーザに頼む形になる(self):
+        """生の git は常に止まるので、`git` を勧めない。入口が無いときは頼む文にする。"""
+        os.remove(self.wrapper)
+        text = block(self.start("--mode", "enable"))
+
+        self.assertIn(NO_WRAPPER_GIT_LINE, text)
+        self.assertNotIn(GIT_LINE, text)
+        self.assertNotIn(f"sh {self.root}/.ccnavi/scripts/ccnavi-git.sh", text)
+
+    def test_git行はチケット制御の可否に依らず載る(self):
         self.assertIn(GIT_LINE, block(self.start("--mode", "enable")))
-        self.assertNotIn(
+        self.assertIn(
             GIT_LINE, block(self.start("--mode", "enable", "--ticket-control", "disable"))
         )
         with open(self.rules, "w", encoding="utf-8") as f:

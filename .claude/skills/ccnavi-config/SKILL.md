@@ -80,5 +80,5 @@ ccnavi --explain --log "" --state ""
 - `--explain` はいま効いているルールと承認済みのチケットの範囲を並べる。判定はしない
 - `--rules` / `--phases` / `--risk` で下書きを差し替えられる
 
-`--test` に禁止語を書かない（`ccnavi --test Bash "git push"` はその Bash 自体が `raw-git` に当たる）。
+`--test` に禁止語を書かない（`ccnavi --test Bash "git push"` はその Bash 自体が `builtin-guard-raw-git` に当たる）。
 単発で試したいものも期待のファイルを `wip/scratchpad/` に書いて `--test-expectations` で回す。その形は `.ccnavi/config/common/rule-expectations.yml` の先頭のコメントにある。
