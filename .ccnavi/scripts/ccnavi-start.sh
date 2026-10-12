@@ -5,7 +5,7 @@
 #   sh .ccnavi/scripts/ccnavi-start.sh --issue <番号> [--slug <語>] [--prefix <語>] [--title <題>] [--dry-run] [--mcp-checked]
 #   sh .ccnavi/scripts/ccnavi-start.sh --mr <番号> [--dry-run]
 #
-# 流れ（docs/claude/worktree.md）:
+# 流れ（.ccnavi/docs/worktree-start.md）:
 #   1. ccnavi-branches.sh --json で既存の候補（手元＋ホスト）を探す
 #   2. 候補が 1 件ならそのブランチで続ける（ワークツリーが無ければ .claude/worktrees/<識別子> に出す）。
 #      複数なら一覧を出して終わる（ユーザが選ぶ）。0 件で --issue なら新しく作る
@@ -136,7 +136,7 @@ is_word "$opt_prefix" || fail bad-prefix "--prefix は小文字・数字・ハ�
 if [ "$what" = mr ] && { [ -n "$opt_slug" ] || [ -n "$opt_title" ]; }; then
 	fail mr-with-new "--mr には --slug と --title を付けられません（既存の MR の元ブランチで続けるだけです）。" 2
 fi
-[ "$what" = issue ] || [ -z "$mcp_checked" ] || fail mr-mcp-checked "--mcp-checked は --issue のときだけ使います。--mr は元ブランチを MCP で読んでから、docs/claude/worktree.md の手順で切ってください。" 2
+[ "$what" = issue ] || [ -z "$mcp_checked" ] || fail mr-mcp-checked "--mcp-checked は --issue のときだけ使います。--mr は元ブランチを MCP で読んでから、.ccnavi/docs/worktree.md の「ワークツリーを切る」の手順で切ってください。" 2
 
 command -v jq >/dev/null 2>&1 || fail no-jq "jq が無い。候補の JSON を読めません。" 2
 
@@ -339,12 +339,12 @@ stop_host() {
 		search)
 			if [ "$what" = issue ]; then
 				printf '  1. mcp__github__search_pull_requests を query=「repo:%s/%s is:pr is:open %s」で呼ぶ。題・本文に #%s を含むか、元ブランチの名前に %s を含む PR が、この issue に紐づく MR\n' "$sh_owner" "$sh_repo" "$number" "$number" "$number"
-				printf '  2. 見つかったら、一覧をユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞く（続けるなら docs/claude/worktree.md の「既存のブランチ」の手順）\n'
+				printf '  2. 見つかったら、一覧をユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞く（続けるなら .ccnavi/docs/worktree-start.md の「既にある / を含むブランチ」の手順）\n'
 				printf '  3. 紐づく PR が無いと確かめたら、同じコマンドに --mcp-checked を付けて打ち直す: %s --mcp-checked\n' "$sh_cmd"
 			else
 				printf '  1. mcp__github__pull_request_read を method=get owner=%s repo=%s pullNumber=%s で呼び、head.ref（元ブランチ）と head.repo.full_name を読む\n' "$sh_owner" "$sh_repo" "$number"
 				printf '  2. head.repo.full_name が %s/%s と違えばフォークの MR。元ブランチがこのリポジトリに無いので作業を始められない。ユーザに伝えて止める\n' "$sh_owner" "$sh_repo"
-				printf '  3. 同じなら head.ref のブランチで、docs/claude/worktree.md の「既存のブランチ」の手順どおりにワークツリーを切る\n'
+				printf '  3. 同じなら head.ref のブランチで、.ccnavi/docs/worktree-start.md の「既にある / を含むブランチ」の手順どおりにワークツリーを切る\n'
 			fi
 			;;
 		title)
@@ -488,7 +488,7 @@ switch_into() {
 	si_rc=0
 	(cd "$wt" && cgit switch "$si_branch") || si_rc=$?
 	if [ "$si_rc" -ne 0 ]; then
-		fail switch-failed "ワークツリー $wt は作ったが、ブランチ $si_branch へ移れなかった（上の出力を見てください）。同じ名前のチケット（親）が識別子で承認待ち・承認済みだと移れない。docs/claude/worktree.md の「既にある / を含むブランチ」の手順に従ってください。"
+		fail switch-failed "ワークツリー $wt は作ったが、ブランチ $si_branch へ移れなかった（上の出力を見てください）。同じ名前のチケット（親）が識別子で承認待ち・承認済みだと移れない。.ccnavi/docs/worktree-start.md の「既にある / を含むブランチ」の手順に従ってください。"
 	fi
 	switched="$si_branch"
 }

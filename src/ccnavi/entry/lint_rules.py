@@ -141,7 +141,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
         )
 
     # 文面の sh は `{root}` から書く。相対の `.ccnavi/scripts/...` は、cwd がプロジェクトの中
-    # だと見つからない（docs/claude/projects.md「ルールの文面にshを書くとき」）。
+    # だと見つからない（.ccnavi/docs/projects.md「ルールの文面にshを書くとき」）。
     # 絶対パスは cwd に左右されないので言わない。
     # 判定は変わらず、案内を受けたモデルの実行が失敗するだけなので warn。
     # 見る欄は、モデルに渡る文面の 3 つ。`...File` は rules.yml の外のファイルを指すので見ない。

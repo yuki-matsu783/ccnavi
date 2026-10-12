@@ -85,7 +85,7 @@ class AdrNumbersTest(unittest.TestCase):
         wrong: list[str] = []
         for name in self.sheets:
             lines = read(name).splitlines()
-            # 頭の frontmatter（docs/claude/frontmatter.md）を飛ばし、
+            # 頭の frontmatter（.ccnavi/docs/frontmatter.md）を飛ばし、
             # その次の空でない行を題とみなす。
             if lines and lines[0] == "---" and "---" in lines[1:]:
                 lines = lines[lines.index("---", 1) + 1 :]

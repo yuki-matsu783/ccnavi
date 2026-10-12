@@ -76,7 +76,7 @@ from ..tickets import ticket_places
 from . import docsearch_index, docsearch_query
 
 # 規約の詳しい文書。ワークスペースに在るときだけ案内に名前を出す。
-CONVENTION_DOC = "docs/claude/frontmatter.md"
+CONVENTION_DOC = ".ccnavi/docs/frontmatter.md"
 
 
 def _rel(path: str, root: str) -> str:

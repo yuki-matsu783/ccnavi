@@ -837,7 +837,7 @@ ig_integrate() {
 	[ "$ig_b" = "refs/heads/$ig_n" ] ||
 		reject integrate-worktree-branch ".claude/worktrees/$ig_n は、このリポジトリで $ig_n をチェックアウトしているワークツリーではありません（${ig_b:-このリポジトリの登録に無い}）。統合先と同じリポジトリのワークツリーで、名前とブランチ名を揃えたものだけを取り込みます。$SELF worktree list で確かめてください。"
 	if ig_bound "$ig_n"; then
-		reject integrate-ticket "$ig_n はチケットに結び付くワークツリーです（${ig_why}）。チケットの作業は統合先へ直接取り込まず、マージリクエストで出します（docs/claude/worktree.md の「<統合先>に取り込む」）。"
+		reject integrate-ticket "$ig_n はチケットに結び付くワークツリーです（${ig_why}）。チケットの作業は統合先へ直接取り込まず、マージリクエストで出します（.ccnavi/docs/worktree-merge.md）。"
 	fi
 	ig_wdirty=$(git -C "$ig_wt" status --porcelain 2>/dev/null | head -n 10)
 	if [ -n "$ig_wdirty" ]; then
@@ -1530,7 +1530,7 @@ restore)
 	;;
 
 merge)
-	# 早送り以外も通す。docs/claude/worktree.md の手順は、main が先に進んだ状態から
+	# 早送り以外も通す。.ccnavi/docs/worktree.md の手順は、main が先に進んだ状態から
 	# ブランチへ main を取り込む形を必ず通る。そこを --ff-only に絞ると、
 	# 枝分かれした時点でブランチが永久に統合されない。衝突の解消はメインの仕事で、
 	# 解こうとする操作をラッパースクリプトが止めてしまうと、先に進む方法が無くなる。
