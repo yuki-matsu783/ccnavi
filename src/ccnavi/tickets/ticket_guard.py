@@ -35,7 +35,7 @@ RAW_GIT_RULE_ID = "builtin:guard-raw-git"
 # 入れないのは、区切りの字ごとに残りを読み直さないため（区切りの後ろからは、その区切りで当たる）。
 # 引用しない `C:\Git\git.exe` はシェルが `\` を外して `C:Gitgit.exe` と読むので、ドライブ名
 # （`C:`）で始まり `git` / `git.exe` で終わる語も止める（実際には走らない形だが、止める側に倒す）。
-# 共通レイヤーの見本（位置を問わず当てる `raw-git`）は削除した（ADR-0129）。
+# 共通レイヤーの見本（位置を問わず当てる `raw-git`）は削除した（ADR-0131）。
 # その結果、コマンドの位置に無い git は止まらなくなった。
 _SEPARATOR = r"[\x00\n;&|({`!]"
 _KEYWORD = r"(?:then|do|else|elif|if|while|until|time)\s++"
