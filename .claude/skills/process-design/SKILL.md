@@ -1,13 +1,13 @@
 ---
-name: designing
+name: process-design
 process: true
 description: >-
   設計の標準的な考え方への入口。設計・方式の検討、変更の影響範囲の見積もり、設計書や設計判断の記録を書く作業で使う。細かい手順は references にあり、ccnavi --docs で共通とプロジェクトの両方から引く。
 ---
 
-# designing
+# process-design
 
-設計の作業に入る前に、`ccnavi --docs --type skill-reference --tag designing` で共通とプロジェクトの reference を引き、当たったものを読む。
+設計の作業に入る前に、`ccnavi --docs --type skill-reference --tag process-design` で共通とプロジェクトの reference を引き、当たったものを読む。
 
 ## 基本の考え方
 
@@ -18,7 +18,7 @@ description: >-
 
 ## reference の置き場
 
-- 共通: `.claude/skills/designing/references/common/`（プロジェクトの `skills/designing/references/common/` へ写される。プロジェクトの中では直さない）
-- そのリポジトリ固有: `references/project/`（ワークスペースは `.claude/skills/designing/references/project/`、プロジェクトは `projects/<名前>/skills/designing/references/project/`。写されない）
+- 共通: `.claude/skills/process-design/references/common/`（プロジェクトの `skills/process-design/references/common/` へ写される。プロジェクトの中では直さない）
+- そのリポジトリ固有: `references/project/`（ワークスペースは `.claude/skills/process-design/references/project/`、プロジェクトは `projects/<名前>/skills/process-design/references/project/`。写されない）
 
 中のディレクトリ構造は任意。足し方と書き方は `.ccnavi/docs/skill-processes.md`。

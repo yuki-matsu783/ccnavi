@@ -937,11 +937,15 @@ ccnavi は作業を `.claude/worktrees/` の中でさせる。VS Code の設定�
 エディタからはワークスペースルートのブランチしか見えない。
 
 ```json
-"git.detectWorktrees": true
+"git.detectWorktrees": true,
+"git.repositoryScanMaxDepth": 2
 ```
 
+2 行目は `projects/<名前>/` のようにワークスペースルートから 2 階層下にあるリポジトリを見つけるための設定で、
+既定の 1 だとルートの直下の階層までしか探さない。
+
 `sh scripts/ccnavi-setup.sh <ワークスペースルート>` が、`.claude/settings.json` と同じ 1 回で
-`.vscode/settings.json` にもこれを書く。無ければ作り、あれば足りないキーだけを足す。
+`.vscode/settings.json` にもこれらを書く。無ければ作り、あれば足りないキーだけを足す。
 VS Code の他の設定は残し、`false` と書いてあれば変えずに並べて見せる。
 
 `.vscode/settings.json` にコメントや末尾のカンマがあると（`jq` が読めない）、そのファイルは触らずに、
@@ -3153,7 +3157,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/entry/cli_templates.py` | `--templates` の引数を受けて、テンプレートの一覧・検索・表示と、下書きの作成・取り込み（`--draft` / `--import`）を行う |
 | `src/ccnavi/entry/cli_plan.py` | `--plan-order` の引数を受けて答えを出す。振り直しと書き戻しは `tickets/plan_order.py` と `tickets/plan_phases.py` |
 | `build.py` | 配布物の組み立て。`dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする |
-| `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトと使い方の文書（`.ccnavi/docs/*.md`）と共通のテンプレート（`.ccnavi/config/common/templates/*.yml`）を配る |
+| `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトと使い方の文書（`.ccnavi/docs/*.md`）と共通のテンプレート（`.ccnavi/config/common/templates/*.yml`）と共通の工程スキル（`.claude/skills/` のうち `process: true` を持つもの。`SKILL.md` と `references/common/` の下の `.md` だけ）を配る |
 | `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |
 | `.claude/hooks/mark-ext.sh` / `test-ext.sh` | 同じく拡張のぶん。触ったことの書き残しと、ターンの終わりに関わるグループだけ回すテスト |
 | `extensions/vscode/ccnavi-board/scripts/test-groups.js` | 拡張のテストの入口。触ったファイルから回すグループを決め、コンパイルは 1 回で済ませる |

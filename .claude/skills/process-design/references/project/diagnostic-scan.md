@@ -2,7 +2,7 @@
 type: skill-reference
 title: 診断に走査を足す
 description: --explain と --lint に走査を足すとき、承認済みチケットの置き場を読み直さず、新しい警告が既存の lint のテストと取り違えられないようにする
-tags: [designing, testing]
+tags: [process-design, process-test]
 keywords: [explain, lint, 診断, 走査, 置き場, copies, test_raw_share, test_lint_ops, 警告]
 ---
 

@@ -2,7 +2,7 @@
 type: skill-reference
 title: macOS の tmp のパスを揃えて比べる
 description: パスを含む文面をテストで比べるとき、macOS の tmp が /var と /private/var の 2 通りに見える差を realpath で揃える
-tags: [testing, macos]
+tags: [process-test, macos]
 keywords: [tmp, tempfile, realpath, /private/var, /var, macOS, パス, シンボリックリンク]
 ---
 

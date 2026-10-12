@@ -1,13 +1,13 @@
 ---
-name: reviewing
+name: process-review
 process: true
 description: >-
   レビューの標準的な考え方への入口。差分やチケットを他者として読む作業、レビューの指摘への対応で使う。細かい手順は references にあり、ccnavi --docs で共通とプロジェクトの両方から引く。
 ---
 
-# reviewing
+# process-review
 
-レビューの作業に入る前に、`ccnavi --docs --type skill-reference --tag reviewing` で共通とプロジェクトの reference を引き、当たったものを読む。
+レビューの作業に入る前に、`ccnavi --docs --type skill-reference --tag process-review` で共通とプロジェクトの reference を引き、当たったものを読む。
 
 ## 基本の考え方
 
@@ -18,7 +18,7 @@ description: >-
 
 ## reference の置き場
 
-- 共通: `.claude/skills/reviewing/references/common/`（プロジェクトの `skills/reviewing/references/common/` へ写される。プロジェクトの中では直さない）
-- そのリポジトリ固有: `references/project/`（ワークスペースは `.claude/skills/reviewing/references/project/`、プロジェクトは `projects/<名前>/skills/reviewing/references/project/`。写されない）
+- 共通: `.claude/skills/process-review/references/common/`（プロジェクトの `skills/process-review/references/common/` へ写される。プロジェクトの中では直さない）
+- そのリポジトリ固有: `references/project/`（ワークスペースは `.claude/skills/process-review/references/project/`、プロジェクトは `projects/<名前>/skills/process-review/references/project/`。写されない）
 
 中のディレクトリ構造は任意。足し方と書き方は `.ccnavi/docs/skill-processes.md`。
