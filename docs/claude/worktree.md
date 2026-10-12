@@ -16,11 +16,11 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
   | cwd | 呼び出し方 |
   |---|---|
   | ワークスペースルート | `sh .ccnavi/scripts/ccnavi-git.sh ...` |
-  | ワークツリーの中 | `sh ../../../.ccnavi/scripts/ccnavi-git.sh ...` |
-  | `projects/<名前>`の中 | `sh ../../.ccnavi/scripts/ccnavi-git.sh ...` |
+  | ワークツリーや`projects/<名前>`の中 | `sh <ワークスペースルートの絶対パス>/.ccnavi/scripts/ccnavi-git.sh ...` |
 
-  gitを直接呼んで拒否されると、`sh <ワークスペースルートの絶対パス>/.ccnavi/scripts/ccnavi-git.sh <サブコマンド> ...`を使うよう案内が出る。
-  パスは実際の絶対パスに展開されているので、どのcwdからでもそのまま使える
+  ワークツリーや`projects/<名前>`の中では、相対パス（`../../../`・`../../`）を使わない。cwdがその最上段のときしか届かず、サブディレクトリへ`cd`した後や別のツリーから打つと外れるため。
+  コマンド名やパスを変数に入れない（`DENY_COMMAND_NAME_EXPANSION`で止まる）。
+  gitを直接呼んで拒否されたときの案内も、実際の絶対パスに展開した同じ形で出るので、そのまま使える
 
 ## 他セッションの作業を踏まないために
 
