@@ -7,9 +7,21 @@
  * 足すときの許可（`chrome.permissions.request`）は設定画面の役目で、ここには持たない。
  */
 import type { StorageArea } from "./settings.js";
-import { endpoint, ID, type Host, type HostKind } from "./hosts.js";
+import { endpoint, type Host, type HostKind } from "./hosts.js";
 
 export const CUSTOM_KEY = "customHosts";
+
+/** 足すホストの id の形（`ホスト名[_ポート][_http]`。組み込みの一覧の ID より `_` の分だけ広い） */
+const CUSTOM_ID = /^[a-z0-9][a-z0-9._-]*$/;
+
+/**
+ * 許可の型を、`others`（h を除いた通信先：組み込みと、足したもの）も使っているか。使っていれば、許可は外さない
+ * （同じホスト名の別の port や、組み込みの host_permissions と同じ許可を一緒に外してしまうため）
+ */
+export function patternShared(h: Host, others: readonly Host[]): boolean {
+  const pattern = originPattern(h);
+  return others.some((o) => originPattern(o) === pattern);
+}
 
 /** 保存する 1 行。URL はオリジン（パスなし） */
 export interface CustomRow {
@@ -32,15 +44,30 @@ export function customHost(kind: unknown, value: unknown): Host {
   if (url.hostname.startsWith("[") || url.hostname.includes(":")) {
     throw new Error("IPv6 のアドレスは登録できない（名前か 127.0.0.1 で書く）");
   }
+  // 末尾のドットと `_` は、同じサーバーに別の id を付けさせないために拒否する
+  if (url.hostname.endsWith(".") || url.hostname.includes("_")) {
+    throw new Error("ホストの名前は末尾にドットを付けず、_ を使わない形で書く");
+  }
   const origin = url.origin;
-  // id は `ホスト名` か `ホスト名-ポート`（`:` は鍵の名前に使えないため）
-  const id = url.hostname + (url.port ? `-${url.port}` : "");
-  if (!ID.test(id)) {
+  // id は `ホスト名[_ポート][_http]`。ホスト名に `_` が無いので、読み返すと一通りに決まり、
+  // https と http・ポートの違いで別の id になる（PAT の鍵 `token:<id>` が別の送り先と重ならない）
+  const id = url.hostname + (url.port ? `_${url.port}` : "") + (url.protocol === "http:" ? "_http" : "");
+  if (!CUSTOM_ID.test(id)) {
     throw new Error(`ホストの名前が使えない形: ${id}`);
   }
   const api = kind === "gitlab" ? `${origin}/api/v4` : `${origin}/api/v3`;
   const graphql = kind === "gitlab" ? api : `${origin}/api/graphql`;
   return { id, kind, api, graphql, web: origin };
+}
+
+/** 保存された 1 行の id。読めない行は空（どの id とも一致しない） */
+export function rowId(raw: unknown): string {
+  const row = raw as { kind?: unknown; url?: unknown } | null;
+  try {
+    return customHost(row?.kind, row?.url).id;
+  } catch {
+    return "";
+  }
 }
 
 /** 保存された配列から、読めた行だけを取る（読めない行は捨てる） */

@@ -472,7 +472,7 @@ test("CX-T240 設定画面の通信先: localhost:8080 の GitLab を許可を�
   assert.equal($("#host-msg").className, "status ok");
   assert.deepEqual(storage.customHosts, [{ kind: "gitlab", url: "http://localhost:8080" }]);
   assert.equal(hostList(), "http://localhost:8080（GitLab）外す");
-  const ids = ["github.com", "gitlab.com", "localhost-8080"];
+  const ids = ["github.com", "gitlab.com", "localhost_8080_http"];
   assert.deepEqual(
     [...$<HTMLSelectElement>("#token-host").options].map((o) => o.value),
     ids,
@@ -482,15 +482,15 @@ test("CX-T240 設定画面の通信先: localhost:8080 の GitLab を許可を�
     ids,
   );
   // PAT を登録してから外す（外すと PAT は消え、許可も外す）
-  $<HTMLSelectElement>("#token-host").value = "localhost-8080";
+  $<HTMLSelectElement>("#token-host").value = "localhost_8080_http";
   $<HTMLInputElement>("#token-value").value = TOKEN;
   await submitToken();
-  assert.equal(tokens.get("localhost-8080"), TOKEN);
+  assert.equal(tokens.get("localhost_8080_http"), TOKEN);
   await click("#host-list button");
-  assert.equal(tokens.has("localhost-8080"), false);
+  assert.equal(tokens.has("localhost_8080_http"), false);
   assert.deepEqual(storage.customHosts, []);
   assert.deepEqual(permissionCalls.at(-1), { op: "remove", origins: ["http://localhost/*"] });
-  assert.equal(text("#host-msg"), "localhost-8080 を外した。PAT も消した。ホスト側でも失効させてください");
+  assert.equal(text("#host-msg"), "localhost_8080_http を外した。PAT も消した。ホスト側でも失効させてください");
   assert.equal(hostList(), EMPTY_HOSTS);
 });
 
@@ -523,9 +523,26 @@ test("CX-T242 設定画面の通信先: リポジトリが残っているホス�
   await mount();
   fillHost("gitlab", "http://localhost:8080");
   await submitHost();
-  storage.repos = [{ host: "localhost-8080", owner: "acme", repo: "widgets", integration: "", recentDays: 7, extraBranches: [], project: "", workspace: "" }];
+  storage.repos = [{ host: "localhost_8080_http", owner: "acme", repo: "widgets", integration: "", recentDays: 7, extraBranches: [], project: "", workspace: "" }];
   await click("#host-list button");
-  assert.equal(text("#host-msg"), "localhost-8080 のリポジトリが残っている。先にリポジトリを外してから、ホストを外す");
+  assert.equal(text("#host-msg"), "localhost_8080_http のリポジトリが残っている。先にリポジトリを外してから、ホストを外す");
   assert.deepEqual(storage.customHosts, [{ kind: "gitlab", url: "http://localhost:8080" }]);
   assert.equal(permissionCalls.some((c) => c.op === "remove"), false);
+});
+
+test("CX-T250 設定画面の通信先: 同じ許可を別の行が使っているあいだは外しても許可を外さない。読めない行は足す・外すのあとも残す", async () => {
+  await mount();
+  storage.customHosts = [{ kind: "x", url: "ftp://old.example.com" }];
+  fillHost("gitlab", "https://gitlab.example.com");
+  await submitHost();
+  fillHost("gitlab", "https://gitlab.example.com:8443");
+  await submitHost();
+  assert.equal(permissionCalls.filter((c) => c.op === "request").length, 2);
+  // 8443 を外す。同じ許可（https://gitlab.example.com/*）はもう 1 つの行が使っているので、許可は外さない
+  const rows = [...container.querySelectorAll("#host-list button")];
+  await act(async () => (rows[1] as HTMLButtonElement).click());
+  await settle();
+  assert.equal(permissionCalls.some((c) => c.op === "remove"), false);
+  // 読めない行は残っている
+  assert.deepEqual(storage.customHosts, [{ kind: "x", url: "ftp://old.example.com" }, { kind: "gitlab", url: "https://gitlab.example.com" }]);
 });

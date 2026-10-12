@@ -6,12 +6,21 @@
  */
 import { useEffect, useState, type FormEvent, type JSX } from "react";
 
-import { customHost, originPattern, rowOf } from "../core/custom-hosts.js";
+import { customHost, originPattern, patternShared, rowId, rowOf } from "../core/custom-hosts.js";
 import type { Host } from "../core/hosts.js";
-import { ask, loadAllHosts, loadCustomHosts, loadCustomRows, loadRepos, type Said } from "./api.js";
+import { ask, loadAllHosts, loadCustomHosts, loadRawCustomRows, loadRepos, type Said } from "./api.js";
 import { Status } from "./Status.js";
 
 const KIND = { github: "GitHub", gitlab: "GitLab" } as const;
+
+/** 許可を外す。外せなくても行は外れているので、失敗は言わない（Chrome の設定から外せる） */
+async function releasePermission(h: Host): Promise<void> {
+  try {
+    await chrome.permissions.remove({ origins: [originPattern(h)] });
+  } catch {
+    // 外せなかった許可は Chrome の設定で外せる
+  }
+}
 
 /** `onChange` は足す・外すのあとに呼ぶ（リポジトリと PAT の節が読み直す） */
 export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Element {
@@ -34,16 +43,23 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
         throw new Error(`${host.web} への通信を許可しないと足せない`);
       }
       const all = await loadAllHosts();
-      if (all.some((h) => h.id === host.id)) {
-        throw new Error(`${host.id} は足してあるか、組み込みの通信先と同じ名前`);
+      try {
+        if (all.some((h) => h.id === host.id)) {
+          throw new Error(`${host.id} は足してあるか、組み込みの通信先と同じ名前`);
+        }
+        const rows = await loadRawCustomRows();
+        await chrome.storage.local.set({ customHosts: [...rows, rowOf(host)] });
+      } catch (err) {
+        // 足せなかったら、今の許可で使う通信先が無ければ、いま付けた許可を外す
+        if (!patternShared(host, all)) await releasePermission(host);
+        throw err;
       }
-      const rows = await loadCustomRows();
-      await chrome.storage.local.set({ customHosts: [...rows, rowOf(host)] });
       setSaid({ text: `${host.web}（${KIND[host.kind]}）を足した。PAT は「PAT」の節で登録する`, ok: true });
-      await reload();
-      onChange();
     } catch (err) {
       setSaid({ text: (err as Error).message, ok: false });
+    } finally {
+      await reload();
+      onChange();
     }
   };
 
@@ -53,18 +69,25 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
       setSaid({ text: `${h.id} のリポジトリが残っている。先にリポジトリを外してから、ホストを外す`, ok: false });
       return;
     }
-    // PAT を先に消す。ホストを外したあとは、そのホストの PAT を使う頼みが届かなくなるため
-    const cleared = await ask({ kind: "token.clear", host: h.id });
-    if (!cleared.ok) {
-      setSaid({ text: cleared.error, ok: false });
-      return;
+    try {
+      // PAT を先に消す。ホストを外したあとは、そのホストの PAT を使う頼みが届かなくなるため
+      const cleared = await ask({ kind: "token.clear", host: h.id });
+      if (!cleared.ok) {
+        setSaid({ text: cleared.error, ok: false });
+        return;
+      }
+      // 読めない行も残す（対象の行だけを外す）
+      const rows = (await loadRawCustomRows()).filter((r) => rowId(r) !== h.id);
+      await chrome.storage.local.set({ customHosts: rows });
+      // 同じ許可を組み込みや別の port の行も使っていれば、許可は外さない
+      if (!patternShared(h, await loadAllHosts())) await releasePermission(h);
+      setSaid({ text: `${h.id} を外した。PAT も消した。ホスト側でも失効させてください`, ok: true });
+    } catch (err) {
+      setSaid({ text: (err as Error).message, ok: false });
+    } finally {
+      await reload();
+      onChange();
     }
-    const rows = (await loadCustomRows()).filter((r) => customHost(r.kind, r.url).id !== h.id);
-    await chrome.storage.local.set({ customHosts: rows });
-    await chrome.permissions.remove({ origins: [originPattern(h)] });
-    setSaid({ text: `${h.id} を外した。PAT も消した。ホスト側でも失効させてください`, ok: true });
-    await reload();
-    onChange();
   };
 
   return (

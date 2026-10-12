@@ -729,7 +729,7 @@ sh の書き方（Windows Git Bash・WSL・Linux・macOS の bash 3.2 と BSD �
 4. **PAT に触る場所を限る**: PAT を読むのは service worker だけ。画面と Pyodide の Worker には渡さず、ホストの API の呼び出しは、名前で限った操作として
    `chrome.runtime.sendMessage` で service worker に頼む。`sender` を確かめ、`externally_connectable` は宣言しない。
    限界: 同じ拡張オリジンなので、画面で XSS が起きれば storage を読める。主な対策は 2・3
-5. **外へ送りにくくする**（D24）: `host_permissions` と CSP の `connect-src` を、ビルドのときに埋め込んだ API のホストに限る。既定は `api.github.com` と `gitlab.com`
+5. **外へ送りにくくする**（D24。ADR-0128 が改める。設定画面で足すホストは `optional_host_permissions` で許可を取り、`connect-src` は https 全般）: `host_permissions` を、ビルドのときに埋め込んだ API のホストに限る。既定は `api.github.com` と `gitlab.com`
 6. **試験**: 悪意のある Markdown の見本（`<script>`、`<img onerror>`、`javascript:` のリンク、`<svg onload>`、`data:` の URL、実体参照で崩したスキーム）を段階 1 と段階 4 で回す
 
 ## 6. 判定のコアと差し替え点の境目
@@ -847,9 +847,9 @@ Chrome は ccnavi の .pyc を同梱するので、手元の ccnavi と版がず
 ### 8.1 形
 
 - MV3。ボードは拡張のページ（サイドパネルかタブ）。Pyodide はそのページが起動する Web Worker で動かす（動かないなら sandbox ページ。7.2）
-- CSP: `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' <API のホスト>`。Pyodide・PyYAML・ccnavi の .pyc・DOMPurify を同梱
+- CSP: `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*`（ADR-0128 で改めた形）。Pyodide・PyYAML・ccnavi の .pyc・DOMPurify を同梱
 - PAT とホストの API の呼び出しは service worker が持つ（5.5 の 4）
-- ビルドのときに API のホストの一覧から `host_permissions` と `connect-src` を生成する（D24）
+- ビルドのときに API のホストの一覧から `host_permissions` を生成する（D24。`connect-src` は ADR-0128 で固定の形）
 - コアの切り出しが済むまでは、MEMFS にブランチごとの仮のツリーを組んで今のコードを動かす（段階 1）
 
 ### 8.2 ブランチの読み方と読み取り量
@@ -1254,7 +1254,7 @@ Chrome の画面では、マージリクエストに Approve が付いている�
 | 読み取り（8.2） | `src/core/github.ts` | 置き場のパスの tree を GraphQL で引いて REST の `?recursive=1` で読み、blob は sha で 50 件ずつ GraphQL で取る。`truncated` が付いたときと、本文が大きさと合わない blob のときは止める。blob は IndexedDB に保存する。GitHub だけ（GitLab は段階 5） |
 | PAT（5.5） | `src/core/protocol.ts`・`src/background/` | `chrome.storage.local` に平文。読むのは service worker だけ。画面は PAT を受け取らず、名前で決めた読み取りの操作だけを service worker に頼む。PAT を書く・消す頼みは設定画面からだけ受ける。`externally_connectable` は宣言しない |
 | 描画（5.5 の 2） | `src/core/sanitize.ts` | Markdown は marked で HTML にし、DOMPurify でサニタイズした DOM の断片で入れる。リンクは `http:`・`https:`・`mailto:` だけ。画像・SVG・MathML・フォーム・style も除く（画像は外への通信になるため。ADR より厳しくした） |
-| 通信先の埋め込み（D24） | `hosts.json`・`scripts/build.js` | 一覧から `host_permissions` と CSP の `connect-src` を組む。CSP は `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' <API のオリジン>` |
+| 通信先の埋め込み（D24） | `hosts.json`・`scripts/build.js` | 一覧から `host_permissions` を組む。CSP は（ADR-0128 で改めた形）`script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*` |
 | 互換のマーカー（7.3） | `py/ccnavi_chrome.py` | 統合先の `CCNAVI_COMPAT` と同梱の `version.COMPAT` を比べ、違えば帯に出す（段階 1 は表示だけ） |
 | 同梱物 | `scripts/build.js`・`scripts/python.js` | Pyodide は npm の版を固定し、コピーした物のハッシュを比べる。PyYAML は純 Python 版を `uv.lock` の sdist とハッシュで取る。ccnavi と入口は .pyc（unchecked-hash）付きの zip。リポジトリには入れない |
 

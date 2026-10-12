@@ -1,5 +1,5 @@
 /**
- * 通信先の一覧から manifest を組む。通信先はビルドに埋め込み、CSP に足すのは 'wasm-unsafe-eval' だけ。
+ * 通信先の一覧から manifest を組む。一覧の通信先は host_permissions に埋め込み、設定画面で足すホストは optional（ADR-0128）。CSP に足すのは 'wasm-unsafe-eval' だけ。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -61,7 +61,7 @@ test("CX-T005 組織ごとのビルド: GHES の一覧なら通信先はその�
   assert.match(csp(), /connect-src 'self' https: http:\/\/localhost:\* http:\/\/127\.0\.0\.1:\*$/);
 });
 
-test("CX-T157 セルフホストの GitLab を足したビルド: host_permissions はそのホストだけで、既定の gitlab.com は入らない（通信先は組み立てのときに埋め込んだホストの一覧だけで決まる）", () => {
+test("CX-T157 セルフホストの GitLab を足したビルド: host_permissions はそのホストだけで、既定の gitlab.com は入らない（host_permissions は組み立てのときの一覧だけで決まる。connect-src は共通の形）", () => {
   const hosts = parseHosts(
     JSON.stringify({
       hosts: [
