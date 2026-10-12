@@ -654,8 +654,10 @@ class IntegrationDoneTest(AuthorityHarness):
 
     def test_a_new_family_cannot_reuse_a_closed_identifier(self):
         # 取り込み状態の無い新しい親子のチケット（別の親）の識別子が、統合先の done/ で閉じている。
-        self.propose("i0005", parent_text("i0005", ["research"]))
-        self.commit_parent()
+        other = self.worktree("i0005", "main")
+        self.propose("i0005", parent_text("i0005", ["research"]), tree=other)
+        git(other, "add", "-A")
+        git(other, "commit", "--quiet", "-m", "propose i0005")
         self.assertIn("i0005", [b["ticket"] for b in self.preview()["batch"]])
         self.integration_done("i0005")
         preview = self.preview()

@@ -121,6 +121,20 @@ def find(
     return hits[0]
 
 
+def misplaced_home(
+    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
+) -> bool:
+    """承認済みチケットが識別子と違う名前のワークツリーに在れば、理由を出して True を返す。
+
+    `ready` まで進むと止まる（退避は親のワークツリーの置き場からだけ行う）ので、`start` と
+    `finish` の段で止める。実装のあとで気づくと手戻りが大きい。
+    """
+    reason = approval_checks.home_problem(root, conf, found)
+    if reason:
+        stderr.write(f"ccnavi: {found.ticket}: {reason}\n")
+    return bool(reason)
+
+
 def family_stopped(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
