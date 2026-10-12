@@ -64,3 +64,4 @@ dry-run のときは末尾に 1 行足し、通ったことを許可と読まな
 | 9.12 | [tickets/subagents.md](tickets/subagents.md) | SubagentStart と SubagentStop でのサブエージェントの扱い |
 | 9.13 | [tickets/branch-lookup.md](tickets/branch-lookup.md) | issue や MR に紐づくブランチを確かめる指示 |
 | 9.14 | [tickets/phase-management.md](tickets/phase-management.md) | フェーズ管理の全体像。定義・計画・待ち方・レビュー・局面をつなぐ入口 |
+| 9.15 | [tickets/templates.md](tickets/templates.md) | 作業・レビュー計画のテンプレート。置き場・2 層の足し算・検査・`--templates` |

@@ -79,7 +79,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
     match: Write|Edit|NotebookEdit
     regex: '^{root}[\\/]'
     except:
-      - regex: '^{root}[\\/]wip[\\/]scratchpad(?:[\\/]|$)'
+      - regex: '^{root}[\\/]wip[\\/]handoff(?:[\\/]|$)'
       - regex: '^{root}[\\/]\.claude[\\/]worktrees(?:[\\/]|$)'
 ```
 

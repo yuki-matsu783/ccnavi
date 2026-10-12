@@ -35,7 +35,18 @@ from ..tickets import (
     review,
     skillsync,
 )
-from . import cli_args, cli_ops, cli_plan, cli_usage, diagnose, lint, sh_ask, suggest, version
+from . import (
+    cli_args,
+    cli_ops,
+    cli_plan,
+    cli_templates,
+    cli_usage,
+    diagnose,
+    lint,
+    sh_ask,
+    suggest,
+    version,
+)
 
 
 def _json_out_of_test(argv: list[str]) -> list[str]:
@@ -200,7 +211,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--expect", default=None, metavar="SHA")
     # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイでユーザが押した承認。端末は要らない。
-    parser.add_argument("--yes", default="")
+    # 値なしの `--yes` は `--templates --import` だけが読む（`_run` が、ほかの経路では断る）。
+    parser.add_argument("--yes", nargs="?", const=cli_templates.BARE_YES, default="")
     # 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに書き込む中身のダイジェスト
     # （preview の `digest`）。`--yes` と一緒に渡す。
     parser.add_argument("--digest", default="")
@@ -255,6 +267,21 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--format", default=None)
     parser.add_argument("--no-refresh", action="store_true")
+    # 作業・レビュー計画のテンプレートの一覧・検索（`--keyword`）・表示（`--show`）。読むだけ。
+    # `--layer` は足し算の相手のレイヤー（self かプロジェクト名。既定は self）。
+    parser.add_argument("--templates", action="store_true")
+    parser.add_argument("--show", default=None, metavar="NAME")
+    parser.add_argument("--layer", default="")
+    # テンプレートの溜める側。
+    # `--draft <親>` は完了した親から下書きを作る。効力が無いのでエージェントが打ってよい。
+    # `--import <下書き> --to common|project` はユーザ専用（`phase_forms._CLI_FORMS` が止める）。
+    # `--yes` と `--expect` が揃ったときだけ書く。
+    # `--name` は下書きの名前、`--replace` は取り込み先の同名の置き換え。
+    parser.add_argument("--draft", default=None, metavar="PARENT")
+    parser.add_argument("--name", default="")
+    parser.add_argument("--import", dest="import_", default=None, metavar="DRAFT")
+    parser.add_argument("--to", default="")
+    parser.add_argument("--replace", action="store_true")
     # チケットの状態とレビューの操作。ユーザか、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", action="append", default=None)
@@ -265,6 +292,11 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--title", default="")
     parser.add_argument("--plan", default="")
     parser.add_argument("--issue", type=int, default=None)
+    # `ticket new <識別子> --template <名前> [--layer <名前>]`。計画と子のフローの下書きを
+    # テンプレートから作る（`--plan` の代わり。`--templates`（一覧）とは別の旗）。
+    parser.add_argument("--template", default="")
+    # `ticket new --template` が、テンプレートのフィードバック計画も書く（既定は書かない）。
+    parser.add_argument("--with-feedback", action="store_true")
     parser.add_argument("--reviewed", type=int, default=None)
     parser.add_argument("--accept-unresolved", action="store_true")
     parser.add_argument("--chat", action="store_true")
@@ -311,6 +343,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     refused = _test_usage(parser, args)
     if refused:
         stderr.write(f"ccnavi: {refused}\n")
+        return EXIT_ERROR
+    if args.yes == cli_templates.BARE_YES and not (args.templates and args.import_ is not None):
+        stderr.write("ccnavi: --yes には識別子を渡す（値なしの --yes は --import だけ）\n")
         return EXIT_ERROR
     if args.record_tree and not args.record_writes:
         stderr.write("ccnavi: --record-tree は --record-writes と一緒に使う\n")
@@ -534,6 +569,11 @@ def _parsed(
         return version.report(stdout, parser, args.json)
     if not cli_args._one_wrapper_flag_each(stderr, args):
         return EXIT_ERROR
+    if cli_templates.asked(args):
+        refused = cli_templates.usage_problem(args)
+        if refused:
+            stderr.write(f"ccnavi: {refused}\n")
+            return EXIT_ERROR
     # `--docs` に添えたほかの経路のフラグは、気づかれないまま無視せずに止める。
     # レイヤーの置き場の差し替えはこの後で無視され、`--ticket-control` などは
     # 設定に重ねられるので、その前に見る。
@@ -595,6 +635,16 @@ def _parsed(
     # 無かったころは argparse が知らないフラグとして止めていたので、無視して先へ進めると
     # `ticket start X --limit 3` のような打ち間違いが通るようになる（`--flow` は診断の中の
     # 差し替えで、無視しても何も動かないので無視するだけにしている）。
+    if args.templates:
+        # 取り込みを書くとき（`--import --yes`）は、hook の文字列照合だけを歯止めにせず、
+        # 実行時にも端末の前のユーザが打ったことを確かめる。下見（`--yes` なし）は求めない。
+        if (
+            args.import_ is not None
+            and args.yes
+            and not cli_args._from_terminal(stdin, conf, stderr, "--import --yes")
+        ):
+            return EXIT_ERROR
+        return cli_templates.run(stdout, stderr, conf, root, args)
     if not args.docs:
         stray = cli_args._docs_flags_given(args)
         if stray:

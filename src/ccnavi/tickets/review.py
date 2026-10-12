@@ -70,9 +70,9 @@ REQUEST_FILE = "review-request-{parent}-{phase}.md"
 # まだマージリクエストが無いときに、sh がこれで作る。
 MR_FILE = "review-mr-{parent}.md"
 # 依頼の本文とマージリクエストの下書きの末尾に必ず書く一文。下書きの置き場
-# （ticket_places.SCRATCH）の変更を、レビュアーが読む対象に数えないため。
-SCRATCH_NOTE = (
-    f"{ticket_places.SCRATCH}/ 配下は作業中の下書きで、レビューの対象外。integrate で消える。"
+# （ticket_places.HANDOFF）の変更を、レビュアーが読む対象に数えないため。
+HANDOFF_NOTE = (
+    f"{ticket_places.HANDOFF}/ 配下はユーザに渡す写しで、レビューの対象外。integrate で消える。"
 )
 
 
@@ -117,7 +117,7 @@ def prepare(
     # 計画があれば、このレビューが含むフェーズを機械が先頭に書く。延期した分を
     # ユーザが読み落とさないように。
     body = _covered_header(root, conf, parent, ph) + body
-    body = body.rstrip("\n") + "\n\n" + SCRATCH_NOTE + "\n"
+    body = body.rstrip("\n") + "\n\n" + HANDOFF_NOTE + "\n"
     # 目印に、本文と親のブランチの先頭から作った鍵を入れる。sh は同じ目印の投稿が MR に
     # 既にあれば投稿し直さない（打ち直し・C1 のやり直しで依頼を二重にしない）。
     # 子を足してやり直した依頼は先頭が違うので、別の鍵になる。
@@ -166,7 +166,7 @@ def mr_draft(parent: ticket_model.Ticket) -> str:
         "フェーズが終わるたびに ccnavi がレビューの依頼をこのマージリクエストに投稿する。",
         "未解決のスレッドが残っている間、次のフェーズへは進めない。",
         "",
-        SCRATCH_NOTE,
+        HANDOFF_NOTE,
         "",
     ]
     return "\n".join(lines)

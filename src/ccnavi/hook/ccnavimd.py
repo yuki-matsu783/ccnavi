@@ -107,7 +107,8 @@ SUBSTITUTIONS = (
     "git_sh",  # git のラッパー（打てる形のコマンド）
     "ticket_sh",  # チケットの sh
     "stage_sh",  # 保護対象を下書きで直すための sh
-    "scratch",  # 下書きの置き場（`wip/scratchpad`）
+    "handoff",  # ユーザに渡す物の置き場（`wip/handoff`）
+    "scratch",  # 使い捨ての置き場（ワークスペースルート直下の `scratchpad` の絶対パス。無視される）
     "projects",  # プロジェクトの置き場（ワークスペースルートからの相対）
     "tickets_dir",  # 提案の置き場
     "approved_dir",  # 承認済みチケットの置き場
@@ -316,7 +317,8 @@ def values_for(conf: settings.Settings, root: str) -> dict[str, str]:
         "git_sh": settings.script_command(root, "ccnavi-git.sh"),
         "ticket_sh": settings.script_command(root, "ccnavi-ticket.sh"),
         "stage_sh": settings.script_command(root, "ccnavi-stage.sh"),
-        "scratch": ticket_places.SCRATCH,
+        "handoff": ticket_places.HANDOFF,
+        "scratch": os.path.join(root, ticket_places.SCRATCH_ROOT).replace("\\", "/"),
         "projects": projects,
         "tickets_dir": conf.tickets,
         "approved_dir": conf.approved,

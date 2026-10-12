@@ -142,6 +142,34 @@ class RepoRulesTest(unittest.TestCase):
                 self.assertEqual(body["verdict"], "deny", body["response"])
                 self.assertIn("guard-ccnavi-config", hit(body), body["rules"])
 
+    def test_テンプレートの置き場は_ccnavi_ディレクトリの一般の保護で止まる(self):
+        # 共通・プロジェクトのテンプレートは 3 本の個別の保護には入れず、
+        # `*/.ccnavi/*` の deny で止める。
+        tree = "/repo/.claude/worktrees/x"
+        for layer in ("common", "project"):
+            place = f"{tree}/.ccnavi/config/{layer}/templates/feature.yml"
+            for tool in ("Write", "Edit"):
+                with self.subTest(layer=layer, tool=tool):
+                    body = judge(tool, place)
+                    self.assertEqual(body["verdict"], "deny", body["response"])
+                    self.assertIn("builtin-guard-project-home", hit(body), body["rules"])
+            for command in (
+                f"cp {tree}/wip/proposals/templates/feature.yml {place}",
+                f"tee {place}",
+                f"echo x > {place}",
+            ):
+                with self.subTest(layer=layer, command=command):
+                    body = judge("Bash", command)
+                    self.assertEqual(body["verdict"], "deny", body["response"])
+                    self.assertIn(SETTING_FILES, hit(body), body["rules"])
+
+    def test_テンプレートの下書きの_write_は止まらない(self):
+        # 下書きの置き場（`wip/proposals/templates/`）はフローの下書きと同じ扱いで、
+        # ワークツリーの中なら通る。
+        body = judge("Write", "/repo/.claude/worktrees/x/wip/proposals/templates/feature.yml")
+        self.assertEqual(body["verdict"], "allow", body["response"])
+        self.assertNotIn("builtin-guard-project-home", hit(body), body["rules"])
+
     def test_引用付きの_find_は_allow_に当たる(self):
         self.assert_verdict('find /repo -name "a b"', "allow", "prefer-glob")
 
