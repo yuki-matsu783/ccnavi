@@ -848,9 +848,10 @@ SHELL_RULE_ID = "builtin:guard-setting-files"
 SHELL_MATCH = "Bash"
 
 SHELL_MESSAGE = (
-    "ガード自身の設定と hook を、シェルからの書き込みで変えようとしています。"
+    "ガード自身の設定と hook を、シェルから書き換えようとしています。"
     "Write / Edit でも拒否される場所です。表記を変えても同じ場所なので、変更が要る"
     "理由を伝えてユーザに依頼してください。読むだけなら cat や grep はそのまま通ります。"
+    "テスト用のフィクスチャを手で組みたいときは、scratchpad/ の下で Python から書き込んでください。"
 )
 
 # 生の文字列（読み切れなかった Bash と、読まない PowerShell）に、シェルから書き込む形の保護を
