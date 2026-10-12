@@ -222,5 +222,85 @@ class ScenarioFilesTest(unittest.TestCase):
                         self.assertTrue(step.get("instruction"))
 
 
+class EvidenceTest(unittest.TestCase):
+    def _hook(self, event, name, stdout="", stderr=""):
+        return {
+            "type": "system",
+            "subtype": "hook_response",
+            "hook_event": event,
+            "hook_name": name,
+            "stdout": stdout,
+            "stderr": stderr,
+        }
+
+    def _write(self, events):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        out = Path(tmp.name)
+        (out / "step-1.jsonl").write_text(
+            "\n".join(json.dumps(e, ensure_ascii=False) for e in events) + "\n", encoding="utf-8"
+        )
+        scn = {"id": "UC-99", "title": "t", "expect": {"judge": ["基準A"]}}
+        st = {"cost_usd": 0.0}
+        results = [("files_unchanged", "README.md", runner.PASS, "変わっていない")]
+        runner.write_report(scn, out, st, results, [], "")
+        return (out / "evidence.md").read_text(encoding="utf-8")
+
+    def test_deny_reason_is_not_clipped(self):
+        reason = "拒否の理由" * 200
+        payload = {
+            "hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": reason}
+        }
+        text = self._write(
+            [self._hook("PreToolUse", "guard", json.dumps(payload, ensure_ascii=False))]
+        )
+        self.assertIn(reason, text)
+
+    def test_session_start_and_empty_hooks_are_only_counted(self):
+        payload = {"hookSpecificOutput": {"additionalContext": "長い前置き" * 50}}
+        text = self._write(
+            [
+                self._hook("SessionStart", "start", json.dumps(payload, ensure_ascii=False)),
+                self._hook("SessionStart", "start2"),
+                self._hook("PostToolUse", "empty"),
+            ]
+        )
+        self.assertNotIn("長い前置き", text)
+        self.assertIn("PostToolUse 1 件", text)
+        self.assertIn("SessionStart 2 件", text)
+
+    def test_additional_context_and_stop_are_kept(self):
+        ctx = {"hookSpecificOutput": {"additionalContext": "git の入口は…"}}
+        text = self._write(
+            [
+                self._hook("PreToolUse", "guide", json.dumps(ctx, ensure_ascii=False)),
+                self._hook("Stop", "stop", stdout="止める理由"),
+            ]
+        )
+        self.assertIn("案内: git の入口は…", text)
+        self.assertIn("止める理由", text)
+
+    def test_long_context_says_it_was_clipped(self):
+        ctx = {"hookSpecificOutput": {"additionalContext": "あ" * 5000}}
+        text = self._write([self._hook("PreToolUse", "guide", json.dumps(ctx, ensure_ascii=False))])
+        self.assertIn("全 5000 文字のうち先頭 2000 文字。全量は step-1.jsonl", text)
+
+    def test_tool_results_include_success_and_machine_results_come_first(self):
+        events = [
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {"type": "tool_result", "is_error": False, "content": "working tree clean"}
+                    ]
+                },
+            }
+        ]
+        text = self._write(events)
+        self.assertIn("- 成功: working tree clean", text)
+        self.assertLess(text.index("## 機械判定の結果"), text.index("judge の基準"))
+        self.assertIn("| files_unchanged | README.md | ", text)
+
+
 if __name__ == "__main__":
     unittest.main()
