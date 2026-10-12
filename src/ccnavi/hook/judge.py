@@ -262,6 +262,31 @@ def decide_before(
                 conf=conf,
                 root=root,
             )
+        # git のラッパーの `rm`・`restore --source`・`checkout <ref> <パス>` で、自己防衛の対象を
+        # 消す・別のコミットの中身に戻す形。シェルの rm と同じ場所を、ラッパー越しにも止める。
+        # ラッパー自身が消えると、生の git の組み込みの止め（ラッパーがあるときだけ足す）も外れる。
+        sub, word, kind = wrapguard.check_core_paths(
+            conf, root, payload.cwd, record.subject, record.degraded
+        )
+        if sub:
+            record.code, record.rules = wrapguard.CODE_CORE_PATH, [wrapguard.CORE_PATH_RULE_ID]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices
+                + [
+                    reasons.builtin_refusal(
+                        wrapguard.CODE_CORE_PATH,
+                        wrapguard.CORE_PATH_RULE_ID,
+                        subject,
+                        wrapguard.core_path_message(root, sub, word, kind),
+                    )
+                ],
+                conf=conf,
+                root=root,
+            )
 
     # 記録と state を消す `ccnavi --prune`（`--preview` の無い形）は、チケット制御に依らず止める
     # （phase_forms.prune_form）。実行ファイルの端末要求は擬似端末を使えば通れる。記録と state の
@@ -323,6 +348,32 @@ def decide_before(
                 conf=conf,
                 root=root,
             )
+        # 2 段目の無いユーザの入口（`ccnavi-sync.sh`・`ccnavi-review.sh decide`・実行ファイルの
+        # `--yes`）は、引数を変数・置換・glob で組み立てると表記の検査から外れる。読めなければ止める
+        # （phase_forms.hidden_user_entry、ADR-0122）。
+        entry, found = phase_forms.hidden_user_entry(
+            record.subject, [(r, x) for r, x, _ in inner], conf.bin
+        )
+        if entry:
+            record.code = phase_forms.CODE_TICKET_APPROVAL
+            record.rules = [phase_forms.TICKET_APPROVAL_RULE_ID]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices
+                + [
+                    reasons.builtin_refusal(
+                        phase_forms.CODE_TICKET_APPROVAL,
+                        phase_forms.TICKET_APPROVAL_RULE_ID,
+                        subject,
+                        phase_forms.hidden_entry_message(entry, found),
+                    )
+                ],
+                conf=conf,
+                root=root,
+            )
 
     # 子チケットのワークツリーからの `ccnavi-git.sh push` は、誰が打っても止める。sh も同じ検査を
     # 持つが、止める場所は hook に置き、sh は 2 重目にする。
@@ -364,7 +415,7 @@ def decide_before(
         runner, layer = ("", "")
         if not phase_forms.forbidden(subject):
             runner, layer = next((r, x) for r, x, _ in inner if phase_forms.forbidden(x))
-        record.code, record.rules = phase.CODE_SUBAGENT, [reasons.TICKET_RULE]
+        record.code, record.rules = phase.CODE_SUBAGENT, [reasons.SUBAGENT_TICKET_OP_RULE]
         record.unwrapped = layer
         return refuse(
             stdout,
@@ -390,7 +441,7 @@ def decide_before(
         held = phase.held_phase(root, conf, parent.ticket, raw) if parent is not None else None
         exempt = payload.tool_name == "Bash" and phase_forms.exempt(subject, record.degraded)
         if held is not None and not exempt:
-            record.code, record.rules = phase.CODE_REVIEW, [reasons.TICKET_RULE]
+            record.code, record.rules = phase.CODE_REVIEW, [reasons.PHASE_REVIEW_RULE]
             reason = phase.hold_reason(held, payload.tool_name, root)
             return refuse(
                 stdout, mode, record, rules.DENY, notices + [reason], conf=conf, root=root
@@ -419,7 +470,10 @@ def decide_before(
     if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
         mismatch = project_mismatch(conf, root, target, record.subject, index)
         if mismatch:
-            record.code, record.rules = reasons.CODE_TICKET_PROJECT, [reasons.TICKET_RULE]
+            record.code, record.rules = (
+                reasons.CODE_TICKET_PROJECT,
+                [reasons.TICKET_PROJECT_RULE],
+            )
             return refuse(
                 stdout, mode, record, rules.DENY, notices + [mismatch], conf=conf, root=root
             )
@@ -449,7 +503,12 @@ def decide_before(
         record.code = reasons.CODE_REWRITE[forms[0]]
         record.rules = [reasons.rewrite_rule(form) for form in forms]
         parts = [
-            reasons.rewrite(record.subject, form, [text for f, text in rewrites if f == form])
+            reasons.rewrite(
+                record.subject,
+                form,
+                [text for f, text in rewrites if f == form],
+                settings.git_command(root),
+            )
             for form in forms
         ]
         return refuse(stdout, mode, record, rules.DENY, notices + parts, conf=conf, root=root)
@@ -500,7 +559,9 @@ def decide_before(
         for rule in rule_set.section(name):
             if time.monotonic() > deadline:
                 stderr.write(
-                    reasons.deadline_exceeded(audit.REASON_DEADLINE_EXCEEDED, DEADLINE_SECONDS)
+                    reasons.deadline_exceeded(
+                        audit.REASON_DEADLINE_EXCEEDED, DEADLINE_SECONDS, mode=mode
+                    )
                     + "\n"
                 )
                 record.decision, record.reason = audit.SKIP, audit.REASON_DEADLINE_EXCEEDED
@@ -532,6 +593,8 @@ def decide_before(
         verdict = rules.DENY
 
     record.rules = [rule.id or f"({verdict})" for rule in group]
+    # 当てたルールそのもの。診断（`--test`）が根拠を見せるのに読む。記録には書かない。
+    record.hits = list(group)
     record.unwrapped = shellread.SEP.join(dict.fromkeys(layer for _, layer, _ in via if layer))
     # 判定を下したのは最初に当たったルール。そのレイヤーを 1 欄で残す。
     # id の前置きからも読めるが、欄にしておくと記録をレイヤーで数えられる。ルールファイルの
@@ -574,7 +637,14 @@ def decide_before(
             if ticket_reason:
                 # 判定を下したのはレイヤーを持たないチケット。狭められたルールの id は後ろに残し、
                 # 「ルールは通したのにチケットが止めた」回を記録から数えられるようにする。
-                record.rules = [reasons.TICKET_RULE, *record.rules]
+                # チケット自体が信頼できずに止めた回（DENY_TICKET_BLOCKED）は範囲を当てて
+                # いないので、範囲の名前（TICKET_RULE）と分ける。
+                decided_by = (
+                    reasons.TICKET_BLOCKED_RULE
+                    if code == reasons.CODE_TICKET_BLOCKED
+                    else reasons.TICKET_RULE
+                )
+                record.rules = [decided_by, *record.rules]
                 record.source = ""
 
     # 当たったルールがモデルへ渡す文。通す・聞く・止めるのどれでも、判定とは
@@ -624,7 +694,15 @@ def decide_before(
             ),
             *(
                 reasons.reason_for(
-                    rule, payload.tool_name, subject, source, record.degraded, runner, layer, quoted
+                    rule,
+                    payload.tool_name,
+                    subject,
+                    source,
+                    record.degraded,
+                    runner,
+                    layer,
+                    quoted,
+                    git=settings.git_command(root),
                 )
                 for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
             ),
@@ -639,7 +717,15 @@ def decide_before(
         # 1 つずつ直すことになり、そのたびに往復が 1 回増える。
         texts = [
             reasons.reason_for(
-                rule, payload.tool_name, subject, source, record.degraded, runner, layer, quoted
+                rule,
+                payload.tool_name,
+                subject,
+                source,
+                record.degraded,
+                runner,
+                layer,
+                quoted,
+                git=settings.git_command(root),
             )
             for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]
@@ -657,7 +743,15 @@ def decide_before(
     elif verdict == rules.ASK and not ticket_reason:
         texts = [
             reasons.reason_for(
-                rule, payload.tool_name, subject, source, record.degraded, runner, layer, quoted
+                rule,
+                payload.tool_name,
+                subject,
+                source,
+                record.degraded,
+                runner,
+                layer,
+                quoted,
+                git=settings.git_command(root),
             )
             for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]
@@ -672,11 +766,22 @@ def decide_before(
         # 結末は Claude Code の権限モードが決める。
         record.code = reasons.CODE_UNCERTAIN if record.degraded else reasons.CODE_UNDECLARED
         verdict = undeclared_verdict(payload.permission_mode, record.degraded, conf.guard_unwatched)
-        texts = [
-            reasons.undeclared(
-                payload.tool_name, subject, conf.rules, record.degraded, verdict == rules.DENY
-            )
-        ]
+        # 渡した回（HANDOVER）は文を返さないので組まない。出所は判定の出所（退避した回は
+        # 組み込みの既定）で、読めなかったルールファイルを名指ししない。
+        texts = (
+            []
+            if verdict == HANDOVER
+            else [
+                reasons.undeclared(
+                    payload.tool_name,
+                    subject,
+                    source,
+                    record.degraded,
+                    verdict=verdict,
+                    fell_back=record.fallback == builtin.FALLBACK,
+                )
+            ]
+        )
 
     if verdict == HANDOVER:
         # 判定は渡した。ここで残せるのは記録だけで、それがこの分担の要点になる。

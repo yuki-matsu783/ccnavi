@@ -110,13 +110,13 @@ def load_rules(
     """
     rule_set = read_common(stderr, conf, record, root)
     if record.fallback != builtin.FALLBACK:
-        add_base(rule_set, stderr)
+        add_base(rule_set, stderr, root)
     return rule_set, builtin.SOURCE if record.fallback else conf.rules
 
 
-def add_base(rule_set: rules.RuleSet, stderr: TextIO | None = None) -> None:
+def add_base(rule_set: rules.RuleSet, stderr: TextIO | None = None, root: str = "") -> None:
     """組み込みの deny（土台）を足す。共通レイヤーのルールの後ろ、レイヤーより前に並ぶ。"""
-    base, problems = builtin.load_base()
+    base, problems = builtin.load_base(root)
     for problem in problems:
         if stderr is not None:
             stderr.write(f"ccnavi: {problem}\n")

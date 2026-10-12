@@ -168,6 +168,7 @@ test("CX-T133 未解決・変更要求が残れば書かない。ボードを開
   mock.attachScene(FAMILY, loadScene("paged"));
   const out = await confirmPhase(REPO, FAMILY, 1, depsFor(mock));
   assert.equal(out.kind, "refused");
+  assert.equal(out.kind === "refused" && out.code, "CORE_CONFIRM_REVIEW_OPEN");
   assert.match(out.message, /未解決のスレッドが 4 件残っている/);
   assert.equal(mock.commitCalls.length, 0);
 });
@@ -177,6 +178,7 @@ test("CX-T134 依頼の後にユーザが見るもの（置き場の外）が動
   mock.push(FAMILY, { "src/late.py": "print(1)\n" }, "依頼の後のコード");
   const out = await confirmPhase(REPO, FAMILY, 1, depsFor(mock));
   assert.equal(out.kind, "refused");
+  assert.equal(out.kind === "refused" && out.code, "CORE_CONFIRM_MOVED");
   assert.match(out.message, /依頼の後に親の HEAD が動いている/);
   assert.equal(mock.commitCalls.length, 0);
 

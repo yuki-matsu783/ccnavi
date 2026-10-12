@@ -784,6 +784,9 @@ class SubstRepoRulesTest(unittest.TestCase):
         quoted = judge("Bash", 'gh issue create --title t --body "use $(git push) here"')
         self.assertIn("inside double quotes", quoted["response"])
         self.assertEqual(quoted.get("quoted"), ["raw-git"])
+        # ラッパーのあるワークスペースでは、文字として渡す道もラッパーで案内する。
+        self.assertIn("ccnavi-git.sh commit -F <file>", quoted["response"])
+        self.assertNotIn("(git commit -F", quoted["response"])
 
         bare = judge("Bash", "echo $(git push origin main)")
         self.assertNotIn("inside double quotes", bare["response"])
@@ -892,7 +895,9 @@ class SubstRepoRulesTest(unittest.TestCase):
         )
         body = judge("Bash", "c=git; $c status")
         self.assertIn("`$c`", body["response"])
-        self.assertIn("becomes `git status`", body["response"])
+        # 書き直しの例に、止まる形（生の git）を使わない。
+        self.assertIn("becomes `ls -la`", body["response"])
+        self.assertNotIn("`git status`", body["response"])
 
     def test_コマンド名でない位置の変数とグロブは止めない(self):
         for subject in [

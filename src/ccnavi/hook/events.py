@@ -23,6 +23,7 @@ from ..tickets import (
     ops_stop,
     ops_stop_request,
     phase,
+    session_rejects,
     skillsync,
 )
 from . import docsearch, judge, post, post_findings, projskills, reasons, subagent
@@ -330,10 +331,28 @@ def stop_rules_nudge(
             delivered.append(rule.id or f"({rules.ALLOW})")
     if not parts:
         return ""
+    _over_report(record)
     record.decision, record.code = audit.NUDGE, CODE_RULE_NUDGE
     record.enforced = True
-    record.rules = [*record.rules, *delivered]
+    record.rules = delivered
     return f"{CODE_RULE_NUDGE}: {STOP_PREFACE}\n\n" + "\n\n".join(parts)
+
+
+def _over_report(record: audit.Record) -> None:
+    """促しで止める回の記録から、同じ Stop の報告（`post.at_stop`）を detail へ移す。
+
+    1 回の Stop の記録は 1 行で、`decision` と `code` は 1 つしか持てない。止めたのは促しなので
+    促しが勝つ（`nudge` と `NUDGE_*`）。上書きするだけだと、同じ Stop で保護領域の変更を
+    報告したこと（`deny` と `POST_*`）が記録から消える。`rules` に報告のルールを残したまま
+    促しのルールを足すと、どれで止めたかが読めなくなる（`rules` は実際に渡したルールだけ）。
+    そこで報告の code と rules を `report <code> <id,…>` の形で detail に足し、
+    `rules` を空にしてから促しの側が書く。`paths` は報告の変わったパスのまま残る。
+    """
+    if record.decision != audit.DENY or not record.code:
+        return
+    note = f"report {record.code} {','.join(record.rules)}".rstrip()
+    record.detail = f"{record.detail}; {note}" if record.detail else note
+    record.rules = []
 
 
 def _finish_nudge(
@@ -365,6 +384,7 @@ def _finish_nudge(
     if failed:
         stderr.write(f"ccnavi: finish を促した記録を残せないので、促さない: {failed}\n")
         return ""
+    _over_report(record)
     record.decision, record.code = audit.NUDGE, ops_stop.CODE_FINISH_NUDGE
     record.enforced = True
     record.tree = found.ticket.ticket
@@ -466,6 +486,13 @@ def decide_at_start(
     if outcomes:
         record.guarded = [f"{o.target.key}:{o.action}" for o in outcomes]
         texts.append(selfguard.report(outcomes))
+    # 承認済みチケットの要求のうち、上位（ルールの deny・親の範囲・フェーズ定義の上限）に
+    # 却下されて効かないもの（REQ-SES-02）。モデルにもユーザにも出す。サブエージェントには
+    # 出さない。索引（docsearch）より先に組むのは、こちらが短い予算で済み、索引に期限の
+    # 残りを渡すため。
+    rejects = ""
+    if conf.tickets_enabled and not payload.agent_id:
+        rejects = session_rejects.notice(conf, root, payload.cwd, deadline)
     # md の frontmatter の索引を差分で新しくし、引き方を案内する（`ccnavi --docs`）。
     # サブエージェントには出さない。失敗しても何も出さない
     # （docsearch.at_start が例外を外に出さない）。先に組むのは、作業の決まりの
@@ -485,6 +512,8 @@ def decide_at_start(
         )
     if conf.tickets_enabled:
         texts.append(reasons.ways_of_working(conf, root, mode))
+    if rejects:
+        texts.append(rejects)
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。
     skills = projskills.notice(stderr, conf, root, payload, at_start=True)
     if skills:
@@ -492,7 +521,7 @@ def decide_at_start(
     if docs:
         texts.append(docs)
     if texts:
-        hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts))
+        hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts), system=rejects)
     return EXIT_OK
 
 
@@ -667,7 +696,10 @@ def decide_after(
         bounced = "\n\n".join(p for p in (bounced, unchecked) if p)
         if bounced:
             text = f"{text}\n\n{bounced}" if text else bounced
-    if not text:
+    # frontmatter の無い md を新しく作ったなら、書いた時点で 1 度だけ書き方を案内する。
+    # 判定には加えない（差し戻しの有無は上の実行後チェックだけで決まる）。
+    hint = docsearch.missing_frontmatter(conf, root, payload)
+    if not text and not hint:
         return EXIT_OK
 
     # 差し戻すのは、直前の実行が汚したと言える分があるときだけ。セッションが
@@ -678,7 +710,7 @@ def decide_after(
     if pushback and mode == modes.ENABLE:
         # このイベントで差し戻す経路は exit 2 と標準エラーだけ。ツールは
         # すでに走っているので取り消せず、渡せるのは「次に何をするか」になる。
-        stderr.write(text + "\n")
+        stderr.write("\n\n".join(p for p in (text, hint) if p) + "\n")
         return EXIT_BLOCK
 
     if pushback:
@@ -688,6 +720,7 @@ def decide_after(
         text = (
             f"[ccnavi dry-run] {modes.ENABLE} would have sent this back as a correction:\n" + text
         )
+    text = "\n\n".join(p for p in (text, hint) if p)
     # 起動したのがサブエージェント（入れ子）なら、差し戻しを無視した知らせはその子にしか
     # 届かない。ユーザにも見えるよう `systemMessage` に同じ文を載せる。
     # 上の exit 2 の経路では標準出力の JSON が読まれないので、載せられない。

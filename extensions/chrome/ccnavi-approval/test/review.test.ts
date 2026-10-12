@@ -84,9 +84,11 @@ test("CX-T119 取り下げ: 承認コミットが P の first-parent の鎖の�
   const b = await collectRepo(REPO, d);
   const w = b.families.find((x) => x.family.name === "i0001")?.result?.withdrawable ?? [];
   assert.deepEqual(w.map((x) => x.ticket), ["i0001"]);
-  assert.match(w[0].problems.join(" "), /承認コミット/);
+  // 拡張が足す理由も、Python が同じ場合に返すのと同じコードを頭に載せる
+  assert.match(w[0].problems.join(" "), /^\[CORE_WITHDRAW_NO_PRIOR\] 承認コミット/);
   const out = await withdrawTicket(REPO, "i0001", "i0001", "", d);
   assert.equal(out.kind, "refused");
+  assert.equal(out.kind === "refused" && out.code, "CORE_WITHDRAW_NO_PRIOR");
   assert.equal(mock.commitCalls.length, 0);
 });
 

@@ -50,9 +50,13 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 
 | 変更の種類 | 戻し方 |
 |---|---|
-| 中身が変わった・消えた | `git restore --staged --worktree -- <path>` |
-| 追跡されていないものが現れた | `git clean -f -- <path>` |
-| 索引に足された状態で現れた | `git rm -f -- <path>` |
+| 中身が変わった・消えた | `<git> restore --staged --worktree -- <path>` |
+| 追跡されていないものが現れた | `rm -- <path>` |
+| 索引に足された状態で現れた | `<git> restore --staged -- <path> && rm -- <path>` |
+
+`<git>` は、ワークスペースルートに git のラッパー（`.ccnavi/scripts/ccnavi-git.sh`）があればその実パス（`sh <ルート>/.ccnavi/scripts/ccnavi-git.sh`）、
+無ければ `git`。ラッパーがあるワークスペースでは生の git が止まることがあり、止まる形を案内しないため。ラッパーは `rm -f` と
+`clean` を通さないので、現れたものは索引から外してシェルの `rm` で消す形にする。
 
 このイベントにツール呼び出しを取り消す手段は無い。`enable` では終了コード 2 と標準エラーで
 差し戻し、`dry-run` では `additionalContext` で報告だけする。報告は 12 件が上限で、超えた分は「ほか N 件」と書く。
@@ -64,6 +68,10 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 として 1 度だけ伝え、戻すなと明示し、自動復元の対象からも外す。以降に新しく現れたものだけを
 原因付きで差し戻す。既知の変更は繰り返さない。同じ場所でも「中身が変わった」の次に「消えた」が
 来れば、別の出来事としてもう一度言う。
+
+記録の `code` は文面の先頭の行と同じ材料から書く。差し戻した回は件の code のうち強いほう（`POST_VIOLATION` が
+`POST_TICKET_SCOPE` より先）で、混ざった回は内訳を `detail` に足す。前から在った変更だけを知らせた回は、`decision` が
+`allow` のまま `code` を `POST_PREEXISTING` にする（付録 A）。
 
 ### 7.4 ターンの基準とユーザへの報告
 
@@ -77,6 +85,11 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 記録に `mode-disabled` が残る）。基準が無ければ何も報告せず、記録に `no-turn-baseline` を残す（REQ-PST-06、REQ-PST-07）。
 
 呼び出しごとの報告はモデルへ、ターンの終わりの報告はユーザへ届く。
+
+ターンの終わりの記録も、報告した回は `decision` を `deny`、`code` を件の code（上と同じ選び方）にする。`detail` は
+上書きせずに足す（読めなかったルールファイル、`uncounted`、混ざった code の内訳）。同じ Stop で `finish` の促しか
+`match: Stop` のルールが止めた回は、止めた促しが記録の `decision`・`code`・`rules` を持ち、報告の `code` と `rules` は
+`detail` に `report <code> <id,…>` で残る（付録 B）。
 
 同じ報告に、このセッションで同じ理由の拒否が N 回に達した呼び出し（6.4）を並べる。拒否の文面はモデルにしか
 届かないので、言い換えて打ち直しを繰り返しているかもしれないことをユーザにも言う。言った回数を記録に残し、増えるまで繰り返さない。

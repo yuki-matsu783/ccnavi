@@ -40,6 +40,7 @@ approve = core_approve.approve
 preview = core_approve.preview
 verify = core_approve.verify
 approve_yes = core_approve.approve_yes
+approval_refusal_code = core_approve.refusal_code
 
 confirm = core_review.confirm
 confirm_local = core_review.confirm_local

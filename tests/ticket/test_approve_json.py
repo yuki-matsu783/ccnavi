@@ -170,6 +170,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(body["version"], APPROVE_VERSION)
         self.assertEqual(body["mismatch"]["expected"], ["i0001"])
         self.assertEqual(body["mismatch"]["current"], ["i0001", "i0001-01-01"])
+        self.assertIn("ccnavi: [CORE_APPROVE_LIST_CHANGED] ", result.stderr)
         self.assertFalse(self.copy_exists("i0001"))
         self.assertFalse(self.copy_exists("i0001-01-01"))
 
@@ -276,6 +277,7 @@ class ApproveJsonTest(PhaseHarness):
                 self.assertEqual(mismatch["digest"]["expected"], shown["digest"])
                 self.assertNotEqual(mismatch["digest"]["current"], shown["digest"])
                 self.assertEqual(mismatch["digest"]["current"], self.preview()["digest"])
+                self.assertIn("ccnavi: [CORE_APPROVE_DIGEST_CHANGED] ", result.stderr)
                 self.assertFalse(self.copy_exists("i0001"))
                 self.assertFalse(self.copy_exists("i0001-01-01"))
 
@@ -290,6 +292,7 @@ class ApproveJsonTest(PhaseHarness):
                 result = self.ccnavi(*args)
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                 self.assertIn("--digest", result.stderr)
+                self.assertIn("ccnavi: [CORE_APPROVE_NO_DIGEST] ", result.stderr)
                 self.assertFalse(self.copy_exists("i0001"))
                 self.assertFalse(self.copy_exists("i0001-01-01"))
 

@@ -22,6 +22,39 @@ from . import (
     worktrees,
 )
 
+# ボードの承認（`--agree --yes`）が通らなかった根拠の種別。付録 A の `CORE_APPROVE_*`。
+# 確認（`CORE_CONFIRM_*`）・取り下げ（`CORE_WITHDRAW_*`）と同じく、文面の頭に
+# `[<コード>]` で載せる。
+# `--digest` が無い。
+CODE_APPROVE_NO_DIGEST = "CORE_APPROVE_NO_DIGEST"
+# 見せた一覧（識別子）と今の一覧が違う。
+CODE_APPROVE_LIST_CHANGED = "CORE_APPROVE_LIST_CHANGED"
+# 識別子は同じで、見せた中身（ダイジェスト）が今のものと違う。
+CODE_APPROVE_DIGEST_CHANGED = "CORE_APPROVE_DIGEST_CHANGED"
+# 承認するものが無い。
+CODE_APPROVE_NOTHING = "CORE_APPROVE_NOTHING"
+# 書く途中で止まった（置いたものは残る）。
+CODE_APPROVE_STOPPED = "CORE_APPROVE_STOPPED"
+
+
+def refusal_code(verdict: core_base.Verdict) -> str:
+    """見せたものを比べた判定（`judge_approval`）で承認が通らない根拠の種別。通るなら空。
+
+    手元の `--agree --yes`（`approve_yes`）と Chrome の `plan` が同じ答えを出すよう、
+    1 か所で決める。
+    見せたものと違えば、識別子の違い（`CORE_APPROVE_LIST_CHANGED`）を中身の違いより先に見る。
+    違わなくても、承認する対象が無いか、絞りが通らなければ `CORE_APPROVE_NOTHING`。
+    """
+    mismatch = verdict.mismatch
+    if mismatch is not None:
+        if mismatch["expected"] != mismatch["current"]:
+            return CODE_APPROVE_LIST_CHANGED
+        return CODE_APPROVE_DIGEST_CHANGED
+    if not verdict.batch or verdict.gathered.refused:
+        return CODE_APPROVE_NOTHING
+    return ""
+
+
 # ---- 手元の入口（`--agree`。端末・ボードの `--yes`・`--preview`・`--verify`） ------------------
 #
 # 前は approval.py にあった。コアを通す入口なので、コアより下の段（agree）には置かない
@@ -220,8 +253,12 @@ def approve_yes(
     shown = digest.strip()
     if not shown:
         stderr.write(
-            "ccnavi: --yes には --digest（見せた承認画面の本文・判定が読んだ中身・"
-            "承認済みチケットに書き込む中身のダイジェスト）が要る\n"
+            core_base.tagged(
+                CODE_APPROVE_NO_DIGEST,
+                "ccnavi: --yes には --digest（見せた承認画面の本文・判定が読んだ中身・"
+                "承認済みチケットに書き込む中身のダイジェスト）が要る",
+            )
+            + "\n"
         )
         return 1
     # 絞りが通らなかった（承認待ちに無い識別子が入っている、親の改版を外した）ときは、
@@ -236,21 +273,29 @@ def approve_yes(
         if as_json:
             body = {"version": agree.AGREE_VERSION, "mismatch": verdict.mismatch}
             stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
-        if wanted != current:
+        if refusal_code(verdict) == CODE_APPROVE_LIST_CHANGED:
             stderr.write(
-                "ccnavi: 見せた一覧と今の一覧が違う（見せた: "
-                f"{', '.join(wanted) or '(無し)'} / 今: {', '.join(current) or '(無し)'}）。"
-                "見直してから承認してください\n"
+                core_base.tagged(
+                    CODE_APPROVE_LIST_CHANGED,
+                    "ccnavi: 見せた一覧と今の一覧が違う（見せた: "
+                    f"{', '.join(wanted) or '(無し)'} / 今: {', '.join(current) or '(無し)'}）。"
+                    "見直してから承認してください",
+                )
+                + "\n"
             )
         else:
             stderr.write(
-                "ccnavi: 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに書き込む中身が、"
-                "今のものと違う（識別子は同じで、提案か、判定が読んだ承認済みチケット・マーカーなどの"
-                "中身が変わった）。見直してから承認してください\n"
+                core_base.tagged(
+                    CODE_APPROVE_DIGEST_CHANGED,
+                    "ccnavi: 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに書き込む"
+                    "中身が、今のものと違う（識別子は同じで、提案か、判定が読んだ承認済みチケット・"
+                    "マーカーなどの中身が変わった）。見直してから承認してください",
+                )
+                + "\n"
             )
         return 1
     if not gathered.batch:
-        stderr.write("ccnavi: 承認するものが無い\n")
+        stderr.write(core_base.tagged(CODE_APPROVE_NOTHING, "ccnavi: 承認するものが無い") + "\n")
         return 1
 
     lines = io.StringIO()
@@ -258,6 +303,14 @@ def approve_yes(
     if applied.code != 0:
         # 途中で止まった。置いたものはそのまま残るので、どこまで置いたかを返す。それを言わずに
         # 失敗を返すと、ユーザは「何も起きていない」と読む（README「承認の JSON」の `partial`）。
+        stderr.write(
+            core_base.tagged(
+                CODE_APPROVE_STOPPED,
+                "ccnavi: 承認を途中で止めた。置いたものはそのまま残る"
+                f"（{', '.join(applied.placed) or '無し'}）",
+            )
+            + "\n"
+        )
         if as_json:
             body = {
                 "version": agree.AGREE_VERSION,

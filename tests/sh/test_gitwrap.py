@@ -261,6 +261,73 @@ class RejectTest(GitWrapperTest):
         self.assertNotEqual(2, result.returncode, result.stderr)
 
 
+# 拒否の文に代わりの手段を書くと決めた理由の名前。どれも以前は「通しません」「ありません」で
+# 終わり、次に何をすればよいかが無かった。
+NEEDS_ALTERNATIVE = (
+    "integrate-tmp",
+    "grep-pager",
+    "remote-option",
+    "worktree-no-dest",
+    "carry-tmp",
+)
+# 代わりの手段を示している印。ラッパーか取り込みの sh の形か、ユーザに頼むこと。
+# 「ユーザに依頼してください」で終わる拒否（remote-write など）も、正しい代わりの手段として数える。
+ALTERNATIVE_MARKS = ("$SELF", "$SYNC", "ユーザに")
+
+
+def reject_texts(reason):
+    """ccnavi-git.sh の中で、この理由の名前で拒否する文（二重引用の中身）をすべて返す。"""
+    with open(SCRIPT, encoding="utf-8") as f:
+        source = f.read()
+    head = f'reject {reason} "'
+    found = []
+    start = source.find(head)
+    while start >= 0:
+        body = start + len(head)
+        found.append(source[body : source.index('"', body)])
+        start = source.find(head, body)
+    return found
+
+
+class RejectAlternativeTest(GitWrapperTest):
+    def test_each_listed_rejection_names_what_to_do_instead(self):
+        for reason in NEEDS_ALTERNATIVE:
+            texts = reject_texts(reason)
+            with self.subTest(reason=reason):
+                self.assertTrue(texts, f"{reason} の拒否が見つからない")
+                for text in texts:
+                    self.assertTrue(
+                        any(mark in text for mark in ALTERNATIVE_MARKS),
+                        f"代わりの手段が無い: {text}",
+                    )
+
+    def test_asking_the_user_counts_as_an_alternative(self):
+        # 検査が「ユーザに依頼」で終わる正しい拒否を落とさないこと。
+        for text in reject_texts("remote-write"):
+            self.assertTrue(any(mark in text for mark in ALTERNATIVE_MARKS), text)
+
+    def test_the_pager_rejection_names_a_wrapper_form_that_passes(self):
+        for args in (("grep", "-O", "line"), ("grep", "-iO", "line"), ("grep", "--open", "line")):
+            with self.subTest(args=args):
+                result = self.assertRejected(*args)
+                self.assertIn("ccnavi-git.sh grep -l", result.stderr)
+        listed = self.run_wrapper("grep", "-l", "line")
+        self.assertEqual(0, listed.returncode, listed.stderr)
+        self.assertIn("tracked.txt", listed.stdout)
+
+    def test_the_remote_option_rejection_names_the_listing_forms(self):
+        result = self.assertRejected("remote", "--frob")
+        self.assertIn("ccnavi-git.sh remote -v", result.stderr)
+        self.assertIn("ccnavi-git.sh remote get-url", result.stderr)
+        self.assertNotEqual(2, self.run_wrapper("remote", "-v").returncode)
+
+    def test_the_missing_destination_rejection_names_the_worktree_form(self):
+        result = self.assertRejected("worktree", "add")
+        self.assertIn(
+            "ccnavi-git.sh worktree add .claude/worktrees/<名前> -b <名前>", result.stderr
+        )
+
+
 class PassTest(GitWrapperTest):
     def test_rm_removes_a_tracked_file(self):
         # rules.yml が rm -rf の代わりに名指しで勧める経路。勧めた先が

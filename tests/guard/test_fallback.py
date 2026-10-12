@@ -216,6 +216,25 @@ class FallbackTest(unittest.TestCase):
         self.assertEqual(records[0]["decision"], "ask")
         self.assertEqual(records[0].get("code"), "UNDECLARED")
 
+    def test_既定に戻った回の未言及の文は読めなかったファイルを根拠にしない(self):
+        # 読めていないファイルを出所に名指しし、そこへ allow を足せと言うと、同じ応答の
+        # 退避の文（先にそのファイルを直す）と食い違う。出所は組み込みの既定にする。
+        # 権限モードが無い payload は ask、確認できる者が居ないモードは deny になる。
+        for permission_mode, decision in (("", "ask"), ("bypassPermissions", "deny")):
+            with self.subTest(permission_mode=permission_mode):
+                payload = json.loads(pre_tool_use("Bash", "command", "frobnicate x"))
+                payload["permission_mode"] = permission_mode
+                out = out_of(self, run(self.root, json.dumps(payload)))
+                self.assertEqual(out.get("permissionDecision"), decision)
+                reason = out["permissionDecisionReason"]
+                undeclared = reason[reason.index("[ccnavi] UNDECLARED") :]
+                self.assertIn("(source: (ccnavi built-in defaults))", undeclared)
+                self.assertNotIn(self.broken, undeclared)
+                self.assertNotIn("allow section of", undeclared)
+                self.assertIn("see the note above", undeclared)
+                # 退避の文は 1 度だけ。同じ直し方を 2 度並べない。
+                self.assertEqual(reason.count("could not be read, so ccnavi is judging"), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

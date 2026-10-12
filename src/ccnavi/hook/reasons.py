@@ -78,6 +78,15 @@ CODE_TICKET_BLOCKED = "DENY_TICKET_BLOCKED"
 # 無いので、括弧付きにして、ファイルの中を探しても見つからないことを見た目で示す。
 TICKET_RULE = "(ticket-scope)"
 
+# 範囲を当てる前に止めた組み込みの判定の、記録のルール名。範囲の外に書いたのではないので
+# TICKET_RULE を使い回さない。使い回すと、記録の `rules` で範囲外の件数に混ざり、繰り返しの
+# 文面（repeat.note）も「同じ理由（(ticket-scope)）」と、止めた理由と違う名前を言う。形は
+# フローのロック（flow.LOCK_RULE）・`>` の上限（REDIRECT_LIMIT_RULE）と同じ括弧付き。
+SUBAGENT_TICKET_OP_RULE = "(subagent-ticket-op)"  # DENY_SUBAGENT_TICKET_OP
+PHASE_REVIEW_RULE = "(phase-review)"  # DENY_PHASE_REVIEW
+TICKET_PROJECT_RULE = "(ticket-project)"  # DENY_TICKET_PROJECT_MISMATCH
+TICKET_BLOCKED_RULE = "(ticket-blocked)"  # DENY_TICKET_BLOCKED
+
 # 書き直しを求める形（shellread の FORM_*）ごとの理由コード。ルールに当たったのではなく読みの
 # 決めごとで止めたので、記録のルール名は TICKET_RULE と同じく括弧付きの形の名前にする
 # （rewrite_rule）。
@@ -122,7 +131,15 @@ def fallen_back(rules_path: str) -> str:
     )
 
 
-def undeclared(tool: str, subject: str, rules_path: str, degraded: str, refused: bool) -> str:
+def undeclared(
+    tool: str,
+    subject: str,
+    source: str,
+    degraded: str,
+    *,
+    verdict: str,
+    fell_back: bool = False,
+) -> str:
     """どのタイプも言及しなかった呼び出しに返す文。
 
     危険だとは言わない。言えないから権限モードに委ねている。根拠は設定の穴で
@@ -133,43 +150,93 @@ def undeclared(tool: str, subject: str, rules_path: str, degraded: str, refused:
     何度も止まるなら、答えるべきなのは呼び出しごとの是非ではなく
     「この場所を allow に書くかどうか」になる。
 
-    refused は、確認できる者が居ないモードで許可としなかったことを示す。
-    そのときは同じ根拠でも受け取った側の次の一手が違う。ユーザに聞けるなら
-    「言えば通るかもしれない」だが、聞けないなら「言っても通らない」ので、
-    先に設定を直すか、ユーザが居るセッションでやり直すしかない。
-    """
-    shown = _shorten(subject)
+    verdict は `judge.undeclared_verdict` の戻り（ask か deny）。次の一手は、その結末と
+    読み切れたかどうか（degraded）の組で決まるので、組ごとの表（`_UNDECLARED_NEXT`）から引く。
+    `refused: bool` のように片方だけを渡すと、読めなかった回の分岐が先に当たり、止めた回にも
+    「聞いている、用途を言えば通る」と返していた。聞ける者が居ないモードで用途を言っても通らない。
+    表に無い結末（渡した回 `(handover)` など）には文を組まず空を返す。渡した回は文面を返さない
+    決まりで、呼び手もその回には呼ばない。
 
+    source は判定の出所（`ruleload.load_rules` が返すもの）。組み込みの既定に退避した回
+    （fell_back）は `builtin.SOURCE` になる。読めなかったルールファイルを根拠として名指しし、
+    そこへ allow を足せと案内すると、同じ応答の退避の文（`fallen_back`）と食い違う。直し方は
+    退避の文が言うので、ここではそれを指すだけにする。
+    """
+    template = _UNDECLARED_NEXT.get((bool(degraded), verdict))
+    if template is None:
+        return ""
     lines = [
-        f"[ccnavi] {CODE_UNCERTAIN if degraded else CODE_UNDECLARED} (source: {rules_path})",
-        f"subject: {shown}",
+        f"[ccnavi] {CODE_UNCERTAIN if degraded else CODE_UNDECLARED} (source: {source})",
+        f"subject: {_shorten(subject)}",
     ]
     if degraded:
-        lines.append(unreadable(degraded))
-        lines.append(
-            "ccnavi is asking rather than deciding because it could not tell what this call "
-            "would actually do. Say what the command is for, or rewrite it in a form that can "
-            "be read: no heredoc, no string handed to something that runs it, no case inside "
-            "$( )."
-        )
-    elif refused:
-        lines.append(
-            f"No rule in {rules_path} mentions this {'command' if tool == 'Bash' else 'path'}, "
-            "and this session has no one to ask: its permission mode answers on its own or not "
-            "at all. An undeclared call is not allowed here. Either do the work with something "
-            f"the allow section of {rules_path} already covers, or tell the user what needs to "
-            "be added there and let them decide."
-        )
+        lines.append(unreadable(degraded, matched=False))
+    if fell_back:
+        where = "the built-in defaults ccnavi fell back to"
+        then = _UNDECLARED_FALLEN_BACK[verdict]
     else:
-        lines.append(
-            f"No rule in {rules_path} mentions this {'command' if tool == 'Bash' else 'path'}, "
-            "so ccnavi has no verdict of its own and leaves the call to Claude Code's permission "
-            "mode, which in this session asks the user. This is not a warning about the call "
-            "itself. If this is ordinary work for this project, say so and ask the user to add "
-            f"it to the allow section of {rules_path}; that is what stops the same question from "
-            "coming back."
-        )
+        where = source
+        then = _UNDECLARED_THEN[verdict].format(where=source)
+    lines.append(
+        template.format(what="command" if tool == "Bash" else "path", where=where, then=then)
+    )
     return "\n".join(lines)
+
+
+# 言及の無い呼び出しの文。鍵は（読み切れなかったか, 結末）。結末は
+# `judge.undeclared_verdict` が返す ask か deny で、渡した回（handover）は文を返さない。
+# 読み切れなかった回は、ルールファイルに何を足しても読めるようにはならないので、
+# 次の一手は書き直しになる（{then} を使わない）。
+_UNDECLARED_NEXT = {
+    (False, rules.ASK): (
+        "No rule in {where} mentions this {what}, so ccnavi has no verdict of its own and "
+        "leaves the call to Claude Code's permission mode, which in this session asks the user. "
+        "This is not a warning about the call itself. {then}"
+    ),
+    (False, rules.DENY): (
+        "No rule in {where} mentions this {what}, and this session has no one to ask: its "
+        "permission mode answers on its own or not at all. An undeclared call is not allowed "
+        "here. {then}"
+    ),
+    (True, rules.ASK): (
+        "ccnavi is asking rather than deciding because it could not tell what this call "
+        "would actually do. Say what the command is for, or rewrite it in a form that can "
+        "be read: no heredoc, no string handed to something that runs it, no case inside "
+        "$( )."
+    ),
+    (True, rules.DENY): (
+        "ccnavi could not tell what this call would actually do, and this session has no one "
+        "to ask: its permission mode answers on its own or not at all. So the call is not run, "
+        "and saying what the command is for will not get it through. Rewrite it in a form that "
+        "can be read: no heredoc, no string handed to something that runs it, no case inside "
+        "$( ). If it cannot be written that way, tell the user what you need it for."
+    ),
+}
+
+# 読み切れた回の締め。ルールファイルを読めている回は、穴を塞ぐ先（allow）を名指しする。
+_UNDECLARED_THEN = {
+    rules.ASK: (
+        "If this is ordinary work for this project, say so and ask the user to add it to the "
+        "allow section of {where}; that is what stops the same question from coming back."
+    ),
+    rules.DENY: (
+        "Either do the work with something the allow section of {where} already covers, "
+        "or tell the user what needs to be added there and let them decide."
+    ),
+}
+
+# 組み込みの既定に退避した回の締め。読めなかったファイルへ allow を足せとは言わない。
+# 直し方は同じ応答の退避の文（`fallen_back`）が言うので、それを指すだけにする。
+_UNDECLARED_FALLEN_BACK = {
+    rules.ASK: (
+        "The project's rule file could not be read (see the note above), so its allow section "
+        "is not in force; ask the user to repair that file rather than to add anything to it."
+    ),
+    rules.DENY: (
+        "The project's rule file could not be read (see the note above), so its allow section "
+        "is not in force; tell the user that file has to be repaired first."
+    ),
+}
 
 
 def reason_for(
@@ -181,6 +248,8 @@ def reason_for(
     runner: str,
     inner: str,
     quoted: bool,
+    *,
+    git: str = "git",
 ) -> str:
     """当たったルール 1 件を、それだけで読んで成立する理由に組む。
 
@@ -199,6 +268,8 @@ def reason_for(
 
     inner は、ルールに当たったのが実行役のコマンド（runner）が中で実行するコマンドだった
     ときの、そのコマンド。元の形で当たったときは空。
+
+    git は文面で案内する git の打ち方（settings.git_command）。
     """
     # 改行を含む対象は 1 行にまとめる。理由の文が対象の中の改行で分断されると、
     # どこまでが対象でどこからが言い分なのかが読めなくなる。
@@ -232,7 +303,7 @@ def reason_for(
         lines.append(unreadable(degraded))
     lines.append(rule.spoken_message())
     if quoted:
-        lines.append(inside_quotes())
+        lines.append(inside_quotes(git))
     return "\n".join(lines)
 
 
@@ -270,29 +341,35 @@ def _shorten(text: str) -> str:
     return shown
 
 
-def inside_quotes() -> str:
+def inside_quotes(git: str = "git") -> str:
     """引用の中から切り出したコマンドにルールが当たったときにつける断り。
 
     書いた側は、二重引用や引用しないヒアドキュメントの中の `$( )` とバッククォートを、
     文字を書いただけのつもりでいる。実際にはシェルが実行するので止めるのは正しいが、
     文字として渡す方法を知らなければ、同じ形を書き直しては止まる。方法はあるので名指しする。
     git の値を変数に取る形は、ラッパースクリプトで出して読み、値を次に書く 2 つの手順になる。
+    git は案内する git の打ち方（settings.git_command）。ラッパーがあるワークスペースでは生の
+    git が止まるので、止まる形を案内しない。
     """
     return (
         "note: this rule matched a command inside double quotes or an unquoted heredoc. The "
         "shell runs $( ) and backquotes there; they are not only written down. To keep them as "
         "text, use single quotes, escape them as \\$( and \\`, or pass the text from a file "
-        "(git commit -F <file>, gh --body-file <file>). To use a value such as a git revision, "
+        f"({git} commit -F <file>, gh --body-file <file>). To use a value such as a git revision, "
         "print it with one command first and write the value into the next."
     )
 
 
-def unreadable(reason: str) -> str:
+def unreadable(reason: str, *, matched: bool = True) -> str:
     """コマンドを読めないまま出した 1 件につける断り。
 
     2 つの違う失敗に同じ文を使わせないために要る。「禁止されたコマンドを実行した」と
     「読めない文字列のどこかにその語がある」では次にやることが違うし、
     後者なのに前者を渡された読み手は、書いた覚えのないコマンドを探しに行く。
+
+    matched は、ルールに当たった 1 件につけるか。言及の無い回（`undeclared`）はどのルールにも
+    当たっていないので、「this rule」と言うと指す先が無い。そのときは読めなかったことだけを言い、
+    次の一手は呼び手が続けて書く。
     """
     what = {
         shellread_scan.REASON_UNTERMINATED: ("a quote or heredoc in this command never closes"),
@@ -301,6 +378,11 @@ def unreadable(reason: str) -> str:
         ),
         shellread_scan.REASON_UNTERMINATED_SUBST: "a $( ) in this command never closes",
     }.get(reason, "this command could not be read")
+    if not matched:
+        return (
+            "note: " + what + ", so ccnavi could only match its rules against the raw text "
+            "of the command, and none of them mentions it."
+        )
     return (
         "note: " + what + ", so this rule was matched against the raw text of the "
         "command instead of against what runs. If these words are only being "
@@ -370,37 +452,102 @@ def internal_error_notice(code: str, event: str, kind: str, log_path: str) -> st
     )
 
 
-def payload_unusable(code: str, problem: str) -> str:
+# 判定に達しなかった回（payload 不正・期限切れ）に、直す側として名指しする先。
+_CHECK_SETUP = (
+    "the ccnavi hook registration in .claude/settings.json and whether this ccnavi build "
+    "matches the Claude Code version"
+)
+
+# payload を読めずに止めた（enable の exit 2）とき、イベントごとに何が起きたかと次の一手。
+# exit 2 の意味と標準エラーの宛先はイベントで違う。PreToolUse は呼び出しを止めてモデルへ、
+# PostToolUse は走った後でモデルへ、UserPromptSubmit はユーザの発言を止めてユーザへ、Stop と
+# SubagentStop は終わりを止めてモデルへ届く。ほかのイベントは止まらず、ユーザにだけ見える。
+_PAYLOAD_STOPPED = {
+    hookio.PRE_TOOL_USE: (
+        "so it could not judge this call and stopped it. Rewriting the call will not help. "
+        f"Tell the user, so they can check {_CHECK_SETUP}."
+    ),
+    hookio.POST_TOOL_USE: (
+        "so it could not check what this call changed. The call has already run, and this is "
+        "not about what you wrote. Do not retry it. "
+        f"Tell the user, so they can check {_CHECK_SETUP}."
+    ),
+    hookio.USER_PROMPT_SUBMIT: (
+        "so it held this message back before Claude saw it. Sending it again will not help "
+        f"until someone checks {_CHECK_SETUP}."
+    ),
+    hookio.STOP: (
+        "so it could not check the end of this turn and kept it from ending. This is not "
+        "about your work. Do not go on with the task: tell the user, so they can check "
+        f"{_CHECK_SETUP}, and end the turn."
+    ),
+    hookio.SUBAGENT_STOP: (
+        "so it could not check this subagent's work and kept it from ending. This is not "
+        "about your work. Do not go on with the task: put this in your final report, so the "
+        f"user can check {_CHECK_SETUP}, and end."
+    ),
+}
+
+
+def payload_unusable(code: str, problem: str, *, event: str = "", mode: str = "") -> str:
     """hook の入力（payload）を読めなかったときの文。
 
-    ccnavi は何の呼び出しかも分からないので止める。呼び出しを書き直しても入力は変わらず、
-    直せるのは hook の登録か ccnavi・Claude Code の版を合わせるユーザだけ。
+    ccnavi は何の呼び出しかも分からないので、enable では止める（`modes.fail_closed`）。呼び出しを
+    書き直しても入力は変わらず、直せるのは hook の登録か ccnavi・Claude Code の版を合わせる
+    ユーザだけ。
+
+    文はイベントとモードに合わせる。exit 2 が何を止め、標準エラーが誰に届くかはイベントで違い、
+    UserPromptSubmit で「この呼び出しを止めた」と言うと、ユーザが自分の発言についての文として
+    読めない。dry-run は exit 0 で通すので「止めた」と言わない。event はイベント名すら読めなかった
+    回は空で、そのときは何を止めたかを言わない。
     """
-    return "\n".join(
-        [
-            f"[ccnavi] {code}",
-            f"ccnavi could not read the hook input from Claude Code ({problem}), so it could not "
-            "judge this call and stopped it. Rewriting the call will not help. Tell the user, so "
-            "they can check the ccnavi hook registration in .claude/settings.json and whether "
-            "this ccnavi build matches the Claude Code version.",
-        ]
-    )
+    head = f"[ccnavi] {code}"
+    said = f"ccnavi could not read the hook input from Claude Code ({problem}), "
+    if mode == DRY_RUN:
+        return "\n".join(
+            [
+                head,
+                said + "so it could not check this "
+                f"{event or 'hook'} event. CCNAVI_MODE is dry-run, so nothing was stopped; under "
+                f"enable it would have been. The user needs to check {_CHECK_SETUP}.",
+            ]
+        )
+    stopped = _PAYLOAD_STOPPED.get(event)
+    if stopped is None:
+        stopped = (
+            f"so it could not check this {event or 'hook'} event and stopped with exit code 2. "
+            "This is not about anything that was written, and repeating it will not help. "
+            f"The user needs to check {_CHECK_SETUP}."
+        )
+    return "\n".join([head, said + stopped])
 
 
-def deadline_exceeded(code: str, seconds: float) -> str:
+def deadline_exceeded(code: str, seconds: float, *, mode: str = "") -> str:
     """判定が期限に届かなかったときの文。
 
     照合が長引くのは、コマンドの文字列が長いか、`>` のような照合を伸ばす形が多いとき。
     短く分ければ通る見込みがある。同じ形で続けて止まるなら、ルールの側の問題なので
     ユーザに伝えさせる。
+
+    期限を見るのは実行前チェック（PreToolUse）だけなので、宛先はツール呼び出しを書いたモデル。
+    dry-run は exit 0 で通すので「止めた」と言わず、enable なら止めていたと言う。
     """
+    if mode == DRY_RUN:
+        what = (
+            "CCNAVI_MODE is dry-run, so the call goes through; under enable it would have been "
+            "stopped."
+        )
+    else:
+        what = "so it stopped it."
     return "\n".join(
         [
             f"[ccnavi] {code}",
-            f"ccnavi ran out of time ({seconds:g} s) before it finished judging this call, so it "
-            "stopped it. Long commands and long inline text make matching slow: split the command "
+            f"ccnavi ran out of time ({seconds:g} s) before it finished judging this call"
+            + (". " if mode == DRY_RUN else ", ")
+            + what
+            + " Long commands and long inline text make matching slow: split the command "
             "into smaller ones, or write long text to a file with the Write tool and pass the "
-            "file. If a short command keeps stopping here, tell the user.",
+            "file. If a short command keeps hitting this, tell the user.",
         ]
     )
 
@@ -410,17 +557,19 @@ def rewrite_rule(form: str) -> str:
     return f"({form})"
 
 
-def rewrite(subject: str, form: str, found: list[str]) -> str:
+def rewrite(subject: str, form: str, found: list[str], git: str = "git") -> str:
     """書き直しを求める形を止めた文。形ごとに 1 件。
 
     ルールに当たったのではないので、禁止された操作をしたとは言わない。止めたのは読みの
     決めごとで、書き直す方法は必ずある。方法を名指ししないと、同じ形を書き直しては止まる。
+    git は案内する git の打ち方（settings.git_command）。文面の `{git}` をこれに置き換える。
     """
     shown = _shorten(subject)
     listed = ", ".join(f"`{_one_line(text)}`" for text in found[:_REWRITES_SHOWN])
     if len(found) > _REWRITES_SHOWN:
         listed += f" (+{len(found) - _REWRITES_SHOWN})"
     what, how = _REWRITE_TEXT[form]
+    how = how.replace("{git}", git)
     return "\n".join(
         [f"[ccnavi] {CODE_REWRITE[form]}", f"subject: {shown}", f"{what}: {listed}", how]
     )
@@ -446,9 +595,9 @@ _REWRITE_TEXT = {
         "command name the shell works out when it runs",
         "The shell decides this command name only when it runs (from a variable, $( ), or a "
         "glob), so ccnavi cannot tell which program would run, and no rule can match it; it "
-        "stops the call. Write the command name out: `c=git; $c status` becomes `git status`, "
-        '`"$(command -v python3)" x.py` becomes `python3 x.py`, `/usr/bin/gi? status` becomes '
-        "`/usr/bin/git status`. The same goes for a script handed to sh or source: write its "
+        "stops the call. Write the command name out: `c=ls; $c -la` becomes `ls -la`, "
+        '`"$(command -v python3)" x.py` becomes `python3 x.py`, `/usr/bin/l? -la` becomes '
+        "`/usr/bin/ls -la`. The same goes for a script handed to sh or source: write its "
         "path, not `sh $SCRIPT`.",
     ),
     shellread.FORM_BACKQUOTE: (
@@ -457,7 +606,7 @@ _REWRITE_TEXT = {
         "heredocs. ccnavi does not read backquotes; it stops the call. For a command "
         "substitution, write $( ) instead. To keep backquotes as text (Markdown in an issue or "
         "PR body, for example), put the text in single quotes, escape each one as \\`, or pass "
-        "the text from a file (gh --body-file <file>, git commit -F <file>).",
+        "the text from a file (gh --body-file <file>, {git} commit -F <file>).",
     ),
     shellread.FORM_AMBIGUOUS: (
         "form that shells read differently",

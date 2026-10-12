@@ -12,6 +12,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
+import tempfile
 import time
 import unittest
 
@@ -365,16 +367,29 @@ class BuiltinFormsTest(ConfigUnionHarness):
         self.check()
 
     def test_next_step_names_the_git_wrapper(self):
-        """次の一手に挙げる git の操作は、生の git が止まる間はラッパーで打つことも添える。"""
+        """次の一手に挙げる git の操作は、ラッパーがあればラッパーの実パスで書く。
+
+        ラッパーがあるワークスペースでは生の git が止まることがあり、止まる形を案内しない。
+        無ければ生の git は組み込みで止まらないので、`git` のまま書く。
+        """
         os.remove(self.rules)
-        for command, rule in (
+        cases = (
             (f"{GIT} reset --hard", "builtin-git-reset-hard"),
             ("rm -rf x", "builtin-recursive-delete"),
-        ):
-            with self.subTest(command=command):
+        )
+        for command, rule in cases:
+            with self.subTest(command=command, wrapper=False):
                 denied = self.hook("Bash", self.ws, command=command)
                 self.assert_denied(denied, rule)
-                self.assertIn(".ccnavi/scripts/ccnavi-git.sh", self.reason(denied))
+                self.assertNotIn("ccnavi-git.sh", self.reason(denied))
+        write(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh"), "")
+        wrapper = settings.script_command(self.ws, "ccnavi-git.sh")
+        for command, rule in cases:
+            with self.subTest(command=command, wrapper=True):
+                denied = self.hook("Bash", self.ws, command=command)
+                self.assert_denied(denied, rule)
+                self.assertIn(wrapper, self.reason(denied))
+                self.assertNotIn("'git ", self.reason(denied))
 
 
 class BuiltinRawGitTest(ConfigUnionHarness):
@@ -449,6 +464,44 @@ class BuiltinRawGitTest(ConfigUnionHarness):
         os.remove(self.script)
         self.hook("Bash", self.ws, command=f"{GIT} status")
         self.assertNotIn(RAW_GIT_BUILTIN, self.last_record().get("rules", []))
+
+
+class BuiltinGitWordingTest(unittest.TestCase):
+    """組み込みの文面は、止まる形（生の git）を案内しない。
+
+    ラッパーがあるワークスペースではラッパーの実パスで、無ければ `git` で書く
+    （ラッパーが無ければ、生の git を組み込みで止めることもない）。
+    """
+
+    IDS = ("builtin-recursive-delete", "builtin-git-reset-hard", builtin.CONFIG_VIA_BASH_RULE_ID)
+
+    def messages(self, root):
+        found = {r["id"]: r["message"] for r in builtin.base_data(root)["deny"]}
+        conf = settings.Settings(project_home=settings.DEFAULT_PROJECT_HOME)
+        for rule in builtin.rule_data(root, conf)["deny"]:
+            found.setdefault(rule["id"], rule["message"])
+        return {i: found[i] for i in self.IDS}
+
+    def test_with_the_wrapper(self):
+        root = os.path.realpath(tempfile.mkdtemp(prefix="ccnavi-builtin-words-"))
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        script = os.path.join(root, ".ccnavi", "scripts", "ccnavi-git.sh")
+        os.makedirs(os.path.dirname(script))
+        with open(script, "w", encoding="utf-8"):
+            pass
+        git = settings.script_command(root, "ccnavi-git.sh")
+        for rule_id, text in self.messages(root).items():
+            with self.subTest(rule=rule_id):
+                self.assertIn(git, text)
+                self.assertNotRegex(text, r"'git ")
+
+    def test_without_the_wrapper(self):
+        root = tempfile.mkdtemp(prefix="ccnavi-builtin-words-")
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        texts = self.messages(root)
+        self.assertIn("'git rm <path>'", texts["builtin-recursive-delete"])
+        self.assertIn("'git stash push -u'", texts["builtin-git-reset-hard"])
+        self.assertIn("'git restore --ours -- <path>'", texts[builtin.CONFIG_VIA_BASH_RULE_ID])
 
 
 class AbsentRiskTest(ConfigUnionHarness):

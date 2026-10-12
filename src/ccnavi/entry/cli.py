@@ -55,6 +55,26 @@ def _json_out_of_test(argv: list[str]) -> list[str]:
     return [*argv[: at + 1], *kept, *argv[at + 3 :], "--json"]
 
 
+def _take_test_words(argv: list[str]) -> tuple[list[str], list[str] | None]:
+    """`--test` と続く 2 語を argparse に渡す前に抜き出す。
+
+    返すのは残りの語と、抜いた 2 語（無ければ None）。
+
+    `nargs=2` は版で扱いが違い、3.12 は 2 語の中の旗の名前（`--test Bash --permission-mode auto
+    ls`）を語として取らずに argparse の誤りで抜けてしまい、`_test_usage` の案内まで届かない。
+    続く 2 語をそのまま取れば、版に依らず同じ形で `_test_usage` が読める。2 語に満たないときと
+    `--` の後ろにあるときは、そのまま argparse に任せる。
+    """
+    end = argv.index("--") if "--" in argv else len(argv)
+    if "--test" not in argv[:end]:
+        return argv, None
+    at = argv.index("--test")
+    words = argv[at + 1 : at + 3]
+    if len(words) < 2:
+        return argv, None
+    return [*argv[:at], *argv[at + 3 :]], words
+
+
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。
 
@@ -78,6 +98,34 @@ RENAMED_APPROVE_NOTICE = (
 def _asks_renamed_approve(argv: list[str]) -> bool:
     """前の名前 `--approve`（`--approve=x` の形も）が渡されているか。"""
     return any(word == RENAMED_APPROVE or word.startswith(RENAMED_APPROVE + "=") for word in argv)
+
+
+def _test_usage(parser: argparse.ArgumentParser, args: argparse.Namespace) -> str:
+    """`--test` と、その payload の欄の組み合わせの誤り。正しければ空。
+
+    どれも黙って捨てずに断る。捨てると、試したつもりの呼び出しと違う答えを読む。
+
+    - `--permission-mode` / `--agent-id` は `--test` の payload の欄で、ほかの経路
+      （`--lint`・`--explain`・`--docs` など）には読む先が無い
+    - `--test` は TOOL と SUBJECT の 2 語を取る。その間に旗を置くと（`--test Bash
+      --permission-mode auto '<cmd>'`）、旗の名前が SUBJECT になり、後ろの語は余る
+    - 余った語（`--test Bash ls extra` の `extra`）
+    """
+    if args.test is None:
+        if args.permission_mode or args.agent_id:
+            flag = "--permission-mode" if args.permission_mode else "--agent-id"
+            return f"{flag} は --test でだけ使える"
+        return ""
+    known = parser._option_string_actions
+    for word in args.test:
+        if word.partition("=")[0] in known:
+            return (
+                f"--test の TOOL と SUBJECT に旗（{word}）が入った。旗は --test <TOOL> <SUBJECT> の"
+                "前か後ろに置く"
+            )
+    if args.command:
+        return f"--test は TOOL と SUBJECT の 2 語だけを取る（余った語: {' '.join(args.command)}）"
+    return ""
 
 
 def _plan_order_usage(args: argparse.Namespace, reordering: bool) -> str:
@@ -157,6 +205,11 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # （preview の `digest`）。`--yes` と一緒に渡す。
     parser.add_argument("--digest", default="")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
+    # `--test` の payload に載せる Claude Code の権限モードとサブエージェントの印。hook は
+    # この 2 つを Claude Code から受け取り、判定がそれで変わる。呼び出しが来たディレクトリは
+    # `--cwd`（sh が渡すものと同じフラグ）で渡す。
+    parser.add_argument("--permission-mode", default="")
+    parser.add_argument("--agent-id", default="")
     # 期待する判定をぜんぶ判定に掛ける。scripts/check_rules.py と VS Code 拡張が呼ぶ。
     parser.add_argument("--test-expectations", metavar="FILE", default="")
     parser.add_argument("--explain", action="store_true")
@@ -246,11 +299,18 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # マーカーも履歴も前と同じ中身にするため。
     parser.add_argument("--via", default="")
     try:
-        args = parser.parse_args(_json_out_of_test(argv))
+        rest, test_words = _take_test_words(_json_out_of_test(argv))
+        args = parser.parse_args(rest)
     except SystemExit:
         return EXIT_ERROR
+    if test_words is not None and args.test is None:
+        args.test = test_words
     if args.help:
         stderr.write(cli_usage.USAGE)
+        return EXIT_ERROR
+    refused = _test_usage(parser, args)
+    if refused:
+        stderr.write(f"ccnavi: {refused}\n")
         return EXIT_ERROR
     if args.record_tree and not args.record_writes:
         stderr.write("ccnavi: --record-tree は --record-writes と一緒に使う\n")
@@ -593,11 +653,17 @@ def _parsed(
 
     # 診断の経路。どちらも payload を読まず、判定を実行にも記録にも繋げない。
     # ユーザが端末から打って「このルールは何に当たるのか」を確かめるための場所で、
-    # 判定そのものは実運用と同じ関数を通る。
+    # 判定そのものは実運用と同じ関数を通る。判定が読む切り替えの環境変数も、hook と同じ
+    # 関数で解いてから渡す（`_resolve_switches`）。
+    if args.test is not None or args.test_expectations or (args.explain and not args.json):
+        _resolve_switches(stderr, conf, args)
     if args.test is not None:
+        call = diagnose.Call(
+            cwd=args.cwd, permission_mode=args.permission_mode, agent_id=args.agent_id
+        )
         if args.json:
-            return diagnose.test_json(stdout, stderr, conf, root, args.test[0], args.test[1])
-        return diagnose.test(stdout, stderr, conf, root, args.test[0], args.test[1])
+            return diagnose.test_json(stdout, stderr, conf, root, args.test[0], args.test[1], call)
+        return diagnose.test(stdout, stderr, conf, root, args.test[0], args.test[1], call)
     if args.test_expectations:
         return diagnose.test_expectations(
             stdout, stderr, conf, root, args.test_expectations, args.json
@@ -826,21 +892,12 @@ def _hook(
         return _hook_crashed(stdout, stderr, conf, root, so_far, exc)
 
 
-def _hook_steps(
-    stdin: TextIO,
-    stdout: TextIO,
-    stderr: TextIO,
-    conf: settings.Settings,
-    problems: list[str],
-    root: str,
-    args: argparse.Namespace,
-    so_far: _HookSoFar,
-) -> int:
-    for problem in problems:
-        stderr.write(f"ccnavi: {problem}\n")
+def _resolve_switches(stderr: TextIO, conf: settings.Settings, args: argparse.Namespace) -> None:
+    """判定が読む切り替えの環境変数を解いて、設定に戻す。hook と診断（`--test` など）で同じもの。
 
-    mode = modes.resolve_mode(stderr, args.mode, conf)
-    so_far.mode = mode
+    解く前の値は書いたままの表記（大文字・前後の空白）を持つ。判定はどれも解いた後の値と
+    比べるので、診断が解かずに判定を呼ぶと、hook とは違う答えになる。
+    """
     conf.restore_if_deny = selfguard.resolve(
         stderr, args.restore_if_deny, conf.restore_if_deny, settings.RESTORE_IF_DENY_ENV
     )
@@ -859,6 +916,24 @@ def _hook_steps(
         settings.GUARD_UNWATCHED_ENV,
         selfguard.GATE_SETTINGS,
     )
+
+
+def _hook_steps(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    problems: list[str],
+    root: str,
+    args: argparse.Namespace,
+    so_far: _HookSoFar,
+) -> int:
+    for problem in problems:
+        stderr.write(f"ccnavi: {problem}\n")
+
+    mode = modes.resolve_mode(stderr, args.mode, conf)
+    so_far.mode = mode
+    _resolve_switches(stderr, conf, args)
     log = audit.Log(conf.log)
     so_far.log = log
     deadline = time.monotonic() + judge.DEADLINE_SECONDS
@@ -870,7 +945,12 @@ def _hook_steps(
         stderr.write(cli_usage.USAGE)
         return EXIT_ERROR
     except hookio.Unusable as exc:
-        stderr.write(reasons.payload_unusable(audit.REASON_PAYLOAD_UNUSABLE, str(exc)) + "\n")
+        stderr.write(
+            reasons.payload_unusable(
+                audit.REASON_PAYLOAD_UNUSABLE, str(exc), event=exc.event, mode=mode
+            )
+            + "\n"
+        )
         diaglog.get("ccnavi", root).warn("hook の payload を読めない", mode=mode)
         so_far.recorded = True
         cli_args._record(
@@ -878,6 +958,7 @@ def _hook_steps(
             log,
             audit.Record(
                 mode=mode,
+                event=exc.event,
                 decision=audit.SKIP,
                 reason=audit.REASON_PAYLOAD_UNUSABLE,
             ),

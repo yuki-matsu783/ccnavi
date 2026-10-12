@@ -94,6 +94,9 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
                   親のワークツリーでは別のブランチへ移れない)
             承認済みチケットの置き場 (.ccnavi/approved/ と wip/proposals/review/) には
                   restore --source / --ours / --theirs と checkout <ref> <パス> を使えない
+            ccnavi 自身を守る場所 (.ccnavi/ .claude/settings*.json .claude/hooks/ logs/ の記録と state
+                  ccnavi-git.sh) には rm と restore --source と checkout <ref> <パス> を使えない
+                  (衝突の解決の restore --ours / --theirs は使える。変更が要るならユーザに依頼する)
             stash (list show push pop apply)
             merge (-X ours / -s ours / --no-verify は不可)
             merge-file -p (標準出力に出す形だけ。ファイルへは書かない)
@@ -421,6 +424,110 @@ store_hit() {
 		esac
 	done
 	return 0
+}
+
+# ccnavi 自身を守る場所（自己防衛の対象）に当たるパスかを見る。当たれば in_core=yes。
+#
+# `rm`・`restore --source`・`checkout <ref> <パス>` で、hook の登録・設定・保護済みのスクリプト・
+# 実行ファイル・記録を消す・別のコミットの中身に戻す形を止めるために使う。シェルの rm と Write / Edit は
+# hook の自己防衛が止める場所で、このスクリプト自身を消すと生の git の止めも外れる。止めるのは hook が先
+# （DENY_WRAPPER_CORE_PATH）で、ここは 2 重目。見るのは既定の置き場の名前だけ（動かした置き場は hook が見る）。
+#
+# 当たるとみなすのは、`.ccnavi/` の下・`.claude/settings*.json`・`.claude/hooks/`・ワークスペースルートの
+# `logs/` の記録と state と退避・`ccnavi-git.sh`、それらを中に含むディレクトリ（ツリーの頂上と、`.ccnavi`・
+# `.claude`・`.git` を直に、または 1 つ下に持つディレクトリ）。`:` で始まる pathspec と、グロブの前に固定の
+# ディレクトリが無い指定は、どこに当たるかを決められないので当たるとみなす。大文字小文字はそろえる。
+#
+# 承認済みチケットの置き場（`.ccnavi/approved/` の下）はここでは見ない。レビュー済みのマーカーを消す
+# `rm` はユーザが端末で打つ手順で、過去の中身に戻す形は store_hit が止める。エージェントの呼び出しは
+# hook が止める（DENY_WRAPPER_CORE_PATH）。
+core_hit() {
+	in_core=no
+	ch_arg=$(printf '%s' "$1" | tr '\\' '/')
+	case "$ch_arg" in
+	:*)
+		in_core=yes
+		return 0
+		;;
+	*'*'* | *'?'* | *'['*)
+		# グロブは / もまたぐので、グロブの前の固定のディレクトリより下のどこにでも当たる。
+		ch_arg=$(printf '%s' "$ch_arg" | sed 's/[][*?].*//')
+		case "$ch_arg" in
+		*/*) ch_arg="${ch_arg%/*}" ;;
+		*) ch_arg="" ;;
+		esac
+		case "$ch_arg" in
+		'' | . | ./ | /)
+			in_core=yes
+			return 0
+			;;
+		esac
+		;;
+	esac
+	ch_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
+	case "$ch_arg" in
+	/* | [A-Za-z]:/*) ch_path="$ch_arg" ;;
+	*) ch_path="${ch_top:+$ch_top/}$(git rev-parse --show-prefix 2>/dev/null || :)$ch_arg" ;;
+	esac
+	# `.` と `..` を取り除く。
+	ch_norm=""
+	ch_ifs="$IFS"
+	IFS=/
+	set -f
+	for ch_part in $ch_path; do
+		case "$ch_part" in
+		'' | .) ;;
+		..)
+			case "$ch_norm" in
+			*/*) ch_norm="${ch_norm%/*}" ;;
+			*) ch_norm="" ;;
+			esac
+			;;
+		*) ch_norm="$ch_norm/$ch_part" ;;
+		esac
+	done
+	set +f
+	IFS="$ch_ifs"
+	ch_low=$(printf '%s' "$ch_norm/" | tr '[:upper:]' '[:lower:]')
+	ch_ws=$(printf '%s' "/${WS_P#/}" | tr '[:upper:]' '[:lower:]')
+	case "$ch_low" in
+	*/.ccnavi/approved/*) return 0 ;;
+	*/.ccnavi/* | */.claude/ | */.claude/hooks/* | */.claude/settings*.json/* | */ccnavi-git.sh/* | \
+		"$ch_ws"/logs/ | "$ch_ws"/logs/state/* | "$ch_ws"/logs/archive/* | "$ch_ws"/logs/decisions*.jsonl/*)
+		in_core=yes
+		return 0
+		;;
+	esac
+	case "/${ch_top#/}" in
+	"$ch_norm" | "$ch_norm"/*)
+		# ツリーの頂上か、その上。
+		in_core=yes
+		return 0
+		;;
+	esac
+	# Windows の `C:/x` は上で `/C:/x` になる。ファイルシステムに聞くときは頭の / を外す。
+	ch_fs="$ch_norm"
+	case "$ch_fs" in
+	/[A-Za-z]:/*) ch_fs="${ch_fs#/}" ;;
+	esac
+	[ -d "$ch_fs" ] || return 0
+	for ch_dir in "$ch_fs" "$ch_fs"/*/ "$ch_fs"/.*/; do
+		ch_dir="${ch_dir%/}"
+		case "$ch_dir" in
+		*/. | */..) continue ;;
+		esac
+		[ -d "$ch_dir" ] || continue
+		for ch_mark in .ccnavi .claude .git; do
+			if [ -e "$ch_dir/$ch_mark" ]; then
+				in_core=yes
+				return 0
+			fi
+		done
+	done
+	return 0
+}
+core_reject() {
+	reject core-path "$sub で ccnavi 自身を守る場所 ($1) を消すか、別のコミットの中身に戻す形は通しません。hook の登録・ルールとフェーズの設定・保護済みのスクリプト・実行ファイル・判定の記録があり、消したり古い中身に戻したりすると ccnavi の止めが外れます。変更が要るなら、何をなぜ変えたいのかを伝えてユーザに依頼してください。衝突の解決の $SELF restore --ours / --theirs -- <パス> と、索引だけを戻す $SELF restore --staged <パス> は通ります（*?[ や : で始まる指定・--pathspec-from-file は、守る場所に当たるかを確かめられないので通しません。ファイルを 1 つずつ名指ししてください）。"
 }
 
 # ---- worktree add の起点が古くないか（P14。hook は git もネットワークも起こさない決まりなので、判定はこの sh の中）
@@ -1008,7 +1115,7 @@ ig_done() {
 		[ "$ig_has_msg" = yes ] ||
 			reject integrate-done-no-message "staged の取り込みをコミットするので、メッセージが要ります（$SELF integrate-done $ig_n -m <メッセージ>）。"
 		ig_log_open integrate-done "$ig_n"
-		ig_out=$(mktemp 2>/dev/null || mktemp -t ccnavi-integrate) || reject integrate-tmp "一時ファイルが作れません。"
+		ig_out=$(mktemp 2>/dev/null || mktemp -t ccnavi-integrate) || reject integrate-tmp "一時ファイルが作れないので、コミットしていません（staged はそのままです）。一時ファイルの置き場（TMPDIR）に書けるかを確かめてから、$SELF integrate-done $ig_n -m <メッセージ> を打ち直してください。直せないならユーザに伝えてください。"
 		ig_crc=0
 		git commit -q -m "$ig_msg" >"$ig_out" 2>&1 || ig_crc=$?
 		cat "$ig_out" >>"$ig_log"
@@ -1055,7 +1162,7 @@ grep)
 			case "open-files-in-pager" in
 			"$gr_name"*)
 				[ "${#gr_name}" -ge 2 ] &&
-					reject grep-pager "$arg は一致したファイルを外部コマンドで開きます。通しません。"
+					reject grep-pager "$arg は一致したファイルを外部コマンドで開きます。通しません。一致したファイルを見るなら、$SELF grep -l <型> で一覧を出し、Read で開いてください。"
 				;;
 			esac
 			;;
@@ -1065,7 +1172,7 @@ grep)
 				gr_ch="${gr_rest%"${gr_rest#?}"}"
 				gr_rest="${gr_rest#?}"
 				case "$gr_ch" in
-				O) reject grep-pager "$arg には -O（--open-files-in-pager）が含まれます。一致したファイルを外部コマンドで開くので通しません。" ;;
+				O) reject grep-pager "$arg には -O（--open-files-in-pager）が含まれます。一致したファイルを外部コマンドで開くので通しません。一致したファイルを見るなら、$SELF grep -l <型> で一覧を出し、Read で開いてください。" ;;
 				e | f | A | B | C | m) gr_rest="" ;;
 				esac
 			done
@@ -1129,7 +1236,7 @@ remote)
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		-v | --verbose | show | get-url) ;;
-		-*) reject remote-option "remote は一覧だけ通します ($arg は不可)。" ;;
+		-*) reject remote-option "remote は一覧だけ通します ($arg は不可)。一覧は $SELF remote -v、1 つの取得先は $SELF remote get-url <名前> で見られます。ほかの操作が要るならユーザに依頼してください。" ;;
 		add | set-url | set-head | set-branches | remove | rm | rename | prune | update)
 			reject remote-write "remote $arg は取得先・送信先を書き換えます。ユーザに依頼してください。"
 			;;
@@ -1198,7 +1305,7 @@ worktree)
 				;;
 			esac
 		done
-		[ -n "$wt_dest" ] || reject worktree-no-dest "worktree add に行き先がありません。"
+		[ -n "$wt_dest" ] || reject worktree-no-dest "worktree add に行き先がありません。$SELF worktree add .claude/worktrees/<名前> -b <名前> <起点> の形で打ってください。"
 		wt_abs=$(ccnavi_abs "$wt_dest") ||
 			reject worktree-dest-unresolved "worktree add の行き先 ($wt_dest) を絶対パスに直せません。親のディレクトリが在るか確かめてください。"
 		wt_ok=no
@@ -1323,18 +1430,38 @@ rm)
 	# git が守っている線がそこなので、こちらで引く線も同じ場所にする。
 	# -r は通す。付けても、中の 1 つでも書きかけがあれば git が止める。
 	[ "$#" -eq 0 ] && reject rm-no-path "rm は消すファイルを名指ししてください ($SELF rm <パス>)。"
+	# ccnavi 自身を守る場所は、消える形だけ止める。-n / --dry-run は何も消さないので通す
+	# （オプションはパスの後ろにも置けるので、全部を読んでから決める）。
 	ow_spec "cached quiet dry-run ignore-unmatch sparse pathspec-file-nul force" "pathspec-from-file" "" "rqnf" ""
+	rm_dry=no
+	rm_core=""
 	rm_cb() {
 		case "$1:${2:-}" in
 		opt:--force | opt:-f)
 			reject rm-force "rm の $2 (--force) はコミットしていない変更ごと消します。付けずに実行し、git が止めたなら、その中身を確かめてからユーザに伝えてください。"
 			;;
+		opt:--dry-run | opt:-n)
+			rm_dry=yes
+			;;
 		pos:. | pos::/ | "pos:*" | "pos::/*" | pos:./)
 			reject rm-whole-tree "rm にツリー全体 ($2) を渡すと、追跡されているファイルがまとめて消えます。消すものを 1 つずつ名指ししてください。"
 			;;
+		opt:--pathspec-from-file)
+			[ -n "$rm_core" ] || rm_core="--pathspec-from-file"
+			;;
+		pos:*)
+			if [ -z "$rm_core" ]; then
+				core_hit "$2"
+				[ "$in_core" = yes ] && rm_core="$2"
+			fi
+			;;
 		esac
+		return 0
 	}
 	opt_walk rm_cb ${1+"$@"}
+	if [ "$rm_dry" = no ] && [ -n "$rm_core" ]; then
+		core_reject "$rm_core"
+	fi
 	;;
 
 restore)
@@ -1355,6 +1482,7 @@ restore)
 	rs_source=no
 	rs_side=no
 	rs_paths=""
+	rs_core=""
 	ow_spec "staged worktree ours theirs merge quiet progress no-progress overlay no-overlay ignore-unmerged ignore-skip-worktree-bits pathspec-file-nul recurse-submodules no-recurse-submodules" \
 		"source conflict pathspec-from-file" "" "SWqm" "s"
 	restore_cb() {
@@ -1363,7 +1491,10 @@ restore)
 			case "$2" in
 			--source | -s) rs_source=yes ;;
 			--ours | --theirs) rs_side=yes ;;
-			--pathspec-from-file) rs_paths="--pathspec-from-file" ;;
+			--pathspec-from-file)
+				rs_paths="--pathspec-from-file"
+				rs_core="--pathspec-from-file"
+				;;
 			esac
 			;;
 		pos)
@@ -1374,6 +1505,10 @@ restore)
 			esac
 			store_hit "$2"
 			[ "$in_store" = yes ] && rs_paths="$2"
+			if [ -z "$rs_core" ]; then
+				core_hit "$2"
+				[ "$in_core" = yes ] && rs_core="$2"
+			fi
 			;;
 		esac
 		return 0
@@ -1386,6 +1521,11 @@ restore)
 		if [ "$rs_source" = yes ]; then
 			reject restore-store-source "restore --source で承認済みチケットの置き場に当たるパス ($rs_paths) を別のコミットの中身に戻す形は通しません。置き場を動かすのはユーザと ccnavi のスクリプトです。置き場の中身が食い違っているなら、ユーザに伝えてください（*?[ や: で始まる指定は、置き場に当たるかを確かめられないので同じく通しません。ファイルを1つずつ名指ししてください）。"
 		fi
+	fi
+	# 別のコミットの中身で戻す形は、ccnavi 自身を守る場所にも使わせない。索引の中身に戻す形
+	# （--ours / --theirs による衝突の解決を含む）は通す。
+	if [ "$rs_source" = yes ] && [ -n "$rs_core" ]; then
+		core_reject "$rs_core"
 	fi
 	;;
 
@@ -1520,6 +1660,8 @@ checkout | switch)
 			if [ "$in_store" = yes ]; then
 				reject checkout-store "$sub <ref> <パス> で承認済みチケットの置き場に当たるパス ($2) を別のコミットの中身に戻す形は通しません。置き場を動かすのはユーザと ccnavi のスクリプトです。置き場の中身が食い違っているなら、ユーザに伝えてください（*?[ や: で始まる指定は、置き場に当たるかを確かめられないので同じく通しません）。"
 			fi
+			core_hit "$2"
+			[ "$in_core" = yes ] && core_reject "$2"
 			;;
 		opt)
 			case "$sub:$2" in
@@ -1589,7 +1731,7 @@ checkout | switch)
 		if [ -n "$cc_others" ]; then
 			reject carry-claimed "$cc_B は別の親子のチケット（${cc_others##*/}）の親のブランチです。2 つの親子のチケットが同じブランチを親のブランチにしていると、どちらのチケットを正とするか決まらないので移りません。"
 		fi
-		cc_out=$(mktemp 2>/dev/null || mktemp -t ccnavi-carry) || reject carry-tmp "一時ファイルが作れません。"
+		cc_out=$(mktemp 2>/dev/null || mktemp -t ccnavi-carry) || reject carry-tmp "一時ファイルが作れないので、親のブランチ $cc_B へは移っていません（何も変えていません）。一時ファイルの置き場（TMPDIR）に書けるかを確かめてから、同じコマンドを打ち直してください。直せないならユーザに伝えてください。"
 		if git show-ref --verify --quiet "refs/heads/$cc_B" || git show-ref --verify --quiet "refs/remotes/origin/$cc_B"; then
 			if ! git checkout -q "$cc_B" >"$cc_out" 2>&1; then
 				printf 'fail  git %s  親のブランチ %s へ移れなかった\n' "$sub" "$cc_B"

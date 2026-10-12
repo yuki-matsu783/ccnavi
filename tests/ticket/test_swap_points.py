@@ -1028,6 +1028,7 @@ class CoreChromeTest(CoreHarness):
         )
         answer = self.ask_chrome(request)
         self.assertEqual(answer["problems"], [])
+        self.assertIsNone(answer["code"])
         before = self.disk()
         checked = core.withdraw(self.snapshot(), ["i0001"], {"i0001": text.encode()}, "押し間違い")
         self.assertEqual(checked.problems, [])
@@ -1091,11 +1092,15 @@ class CoreChromeTest(CoreHarness):
         self.assertEqual(local.returncode, 1)
         self.assertEqual(refused["problems"], local.stderr.splitlines())
         self.assertIsNone(refused["changes"])
+        # 分岐の材料は文面ではなく鍵（文面の頭にも同じコードが載る）
+        self.assertEqual(refused["code"], "CORE_CONFIRM_REVIEW_OPEN")
+        self.assertTrue(refused["problems"][0].startswith("ccnavi: [CORE_CONFIRM_REVIEW_OPEN] "))
         write(fixture, json.dumps(result))
 
         request = self.confirm_request(result, compare)
         answer = self.ask_chrome(request)
         self.assertEqual(answer["problems"], [])
+        self.assertIsNone(answer["code"])
         before = self.disk()
         local = self.confirm(fixture, 1)
         self.assertEqual(local.returncode, 0, local.stdout + local.stderr)
@@ -1372,6 +1377,59 @@ class WithdrawTest(CoreHarness):
         self.commit_parent("moved by hand")
         checked = core.withdraw(self.snapshot(), ["i0001-01-01"], {"i0001-01-01": child.encode()})
         self.assertEqual(checked.problems, [])
+
+    def test_each_refusal_carries_its_reason_code(self):
+        """通らなかった答えは理由コードを持ち、文面の行にも同じコードが載る。
+
+        理由が幾つもあるときは、行ごとに自分のコードを持ち、答えの `code` は最初の理由のもの。
+        """
+        text = self.new_parent()
+        write(os.path.join(self.approved, "doing", "i0001.md"), text + "書き足した\n")
+        checked = core.withdraw(self.snapshot(), ["i0001", "i0009"], {"i0001": text.encode()})
+        self.assertIsNone(checked.changes)
+        self.assertEqual(checked.code, "CORE_WITHDRAW_CHANGED")
+        self.assertTrue(checked.problems[0].startswith("[CORE_WITHDRAW_CHANGED] i0001: "))
+        self.assertIn(
+            "[CORE_WITHDRAW_NOT_OPEN] i0009: 承認済みチケットが作業中（doing/）に無い",
+            checked.problems,
+        )
+        nothing = core.withdraw(self.snapshot(), [], {})
+        self.assertEqual(nothing.code, "CORE_WITHDRAW_NO_IDS")
+        self.assertEqual(nothing.problems, ["[CORE_WITHDRAW_NO_IDS] 取り下げる識別子が無い"])
+        # 一覧（Chrome のボード）の理由にも、押した後の答えと同じ表記でコードが載る
+        todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+        write(todo, text)
+        listed = core.withdrawable(self.snapshot(), "i0001")
+        self.assertEqual(
+            [(i, p) for i, _, p in listed],
+            [
+                (
+                    "i0001",
+                    [
+                        "[CORE_WITHDRAW_TODO_EXISTS] todo/ に同じ識別子の提案がある"
+                        "（戻す先に同じ識別子がすでにある）"
+                    ],
+                )
+            ],
+        )
+        os.remove(todo)
+        # 通った答えはコードを持たない
+        write(os.path.join(self.approved, "doing", "i0001.md"), text)
+        self.assertEqual(
+            core.withdraw(self.snapshot(), ["i0001"], {"i0001": text.encode()}).code, ""
+        )
+
+    def test_a_confirm_refusal_carries_its_reason_code(self):
+        self.new_parent()
+        checked = core.confirm(self.snapshot(), "i0009", 1, None, "")
+        self.assertEqual(checked.code, "CORE_CONFIRM_NO_PARENT")
+        self.assertEqual(
+            checked.problems,
+            ["ccnavi: [CORE_CONFIRM_NO_PARENT] 親 i0009 の承認済みチケットが作業中に無い"],
+        )
+        checked = core.confirm(self.snapshot(), "i0001", 1, None, "")
+        self.assertEqual(checked.code, "CORE_CONFIRM_NOT_REQUESTED")
+        self.assertTrue(checked.problems[0].startswith("ccnavi: [CORE_CONFIRM_NOT_REQUESTED] "))
 
     def test_a_changed_copy_is_not_withdrawn(self):
         text = self.new_parent()

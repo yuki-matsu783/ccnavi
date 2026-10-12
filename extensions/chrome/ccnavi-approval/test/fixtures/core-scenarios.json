@@ -33,6 +33,7 @@
      }
     ]
    },
+   "code": null,
    "digest": "2514ccfe4d67d3c99bb6680d9c1315c06349f77539162c281135e57f10652008",
    "family": "i0001",
    "identifiers": [
@@ -114,6 +115,7 @@
      }
     ]
    },
+   "code": null,
    "digest": "0c58b20d3c29a65a207cef9e9558ff2c57268f0865d0f19657a28b8b3813e675",
    "family": "i0001",
    "identifiers": [
@@ -197,6 +199,7 @@
      }
     ]
    },
+   "code": null,
    "family": "i0001",
    "lines": [
     "レビュー待ちの子を .ccnavi/approved/done/ へ動かした: i0001-01-01",
@@ -291,6 +294,7 @@
      }
     ]
    },
+   "code": null,
    "digest": "cb17d981a7828f56745d9fb0656adf993e9dc5dfb395557b2160a4c6ecc11ed9",
    "family": "i0001",
    "identifiers": [
@@ -367,6 +371,7 @@
      }
     ]
    },
+   "code": null,
    "digest": "680b50b6deb160343c0eb66a63ea2d7ceb7f9431236710d1ce4b61be8ec6a3e7",
    "family": "i0003",
    "identifiers": [
@@ -457,6 +462,7 @@
      }
     ]
    },
+   "code": null,
    "digest": "f97cd3156924e3d12f674a516885291e1334e72bc9eecbd39d63f2753545bdc4",
    "family": "i0001",
    "identifiers": [
@@ -526,6 +532,7 @@
      }
     ]
    },
+   "code": null,
    "family": "i0001",
    "lines": [
     "  i0001 の承認を取り下げた（doing/ → todo/）"

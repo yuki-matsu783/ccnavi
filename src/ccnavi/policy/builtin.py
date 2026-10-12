@@ -82,25 +82,27 @@ def rule_data(root: str, conf: settings.Settings) -> dict:
     )
     return {
         "version": rules.VERSION,
-        "deny": [_config_via_bash(shell), *_DENY],
+        "deny": [_config_via_bash(shell, settings.git_command(root)), *_deny(root)],
         "allow": _ALLOW,
     }
 
 
-def base_data() -> dict:
+def base_data(root: str = "") -> dict:
     """常に有効な組み込みの deny（土台）。取り返しの付かない操作を止めるもので、設定に依らない。
 
     共通レイヤーと config の有無・状態によらず適用し、共通レイヤーと config のルールはその上に足す。
-    `rule_data` の deny のうち、設定で動かない残り（`_DENY`）と同じもの。
+    `rule_data` の deny のうち、設定で動かない残り（`_deny`）と同じもの。
     `Read` だけ通す allow はここに入れない。あれは組み込みの既定だけで判定するとき
     （共通レイヤーと config が両方無い・共通レイヤーが破損している）に限る。
+
+    root は文面の git の打ち方を決めるだけで、止める形は変えない（`settings.git_command`）。
     """
-    return {"version": rules.VERSION, "deny": _DENY}
+    return {"version": rules.VERSION, "deny": _deny(root)}
 
 
-def load_base() -> tuple[rules.RuleSet, list[rules.Problem]]:
+def load_base(root: str = "") -> tuple[rules.RuleSet, list[rules.Problem]]:
     """常に有効な組み込みの deny を組み立てる。`load` と同じく、問題はこのビルドの不備。"""
-    built, problems = rules.parse(base_data(), builtin=True)
+    built, problems = rules.parse(base_data(root), builtin=True)
     for rule in built.all():
         rule.base = True
     return built, problems
@@ -115,7 +117,7 @@ def read_allow() -> list[rules.Rule]:
 CONFIG_VIA_BASH_RULE_ID = "builtin-guard-config-via-bash"
 
 
-def _config_via_bash(regex: str) -> dict:
+def _config_via_bash(regex: str, git: str = "git") -> dict:
     return {
         "id": CONFIG_VIA_BASH_RULE_ID,
         "match": "Bash",
@@ -128,9 +130,9 @@ def _config_via_bash(regex: str) -> dict:
             "could not be read, and the shell is not the way to write it. "
             "Put new content there with the Write or Edit tool, so the repair "
             "goes through a path that is checked and recorded. Resolving a merge "
-            "conflict is not blocked: 'git add' and 'git restore --ours' put back "
-            "a version that is already committed instead of writing new content "
-            "(run them through .ccnavi/scripts/ccnavi-git.sh when raw git is blocked)."
+            f"conflict is not blocked: '{git} add <path>' and "
+            f"'{git} restore --ours -- <path>' (or --theirs) put back "
+            "a version that is already committed instead of writing new content."
         ),
     }
 
@@ -294,52 +296,58 @@ RECURSIVE_DELETE_REGEX = (
     rf"|{_RM_FORCE}\s++(?:{_rm_other('r')}\s++)*+{_RM_RECURSIVE}{_WORD_END})"
 )
 
-# 設定で動かない残り。
-_DENY: list[dict] = [
-    {
-        "id": "builtin-recursive-delete",
-        "match": "Bash",
-        "regex": RECURSIVE_DELETE_REGEX,
-        "message": (
-            "A recursive forced delete cannot be undone. Name what to remove "
-            "one at a time, or use 'git rm' when the files are tracked "
-            "(run it through .ccnavi/scripts/ccnavi-git.sh when raw git is blocked)."
-        ),
-    },
-    {
-        "id": "builtin-git-push",
-        "match": "Bash",
-        "regex": GIT_PUSH_REGEX,
-        "message": (
-            "git push is not run by the agent. Leave the branch as it is and ask the user to push."
-        ),
-    },
-    {
-        "id": "builtin-git-reset-hard",
-        "match": "Bash",
-        "regex": GIT_RESET_HARD_REGEX,
-        "message": (
-            "Work in progress would be lost. Use 'git stash' to set it aside, "
-            "or name the files and use 'git restore' "
-            "(run them through .ccnavi/scripts/ccnavi-git.sh when raw git is blocked)."
-        ),
-    },
-    {
-        "id": "builtin-credentials",
-        "match": "Bash|Read|Write|Edit",
-        # 先頭の境界（行頭・空白・区切り）を付ける。常時有効の土台なので、`jq '.env.X'` のような
-        # フィールド参照や `process.env` を巻き込まない（リポジトリ自身の `credentials` と同じ形）。
-        # `.env` の後ろに続く `.envrc` `.env.local` は止める。
-        "regex": (
-            r"(^|[ \\/\x00])\.(env|netrc|npmrc)"
-            r"|(^|[ \\/\x00])\.ssh[\\/]"
-            r"|\b(id_rsa|id_ed25519)\b"
-        ),
-        "message": (
-            "This is a place credentials live. Do not read it; ask the user for the value you need."
-        ),
-    },
-]
+
+# 設定で動かない残り。止める形は設定に依らない。文面の git の打ち方だけがワークスペースで変わる
+# （ラッパーがあればラッパー。生の git が止まるワークスペースで、止まる形を案内しないため）。
+def _deny(root: str) -> list[dict]:
+    git = settings.git_command(root)
+    return [
+        {
+            "id": "builtin-recursive-delete",
+            "match": "Bash",
+            "regex": RECURSIVE_DELETE_REGEX,
+            "message": (
+                "A recursive forced delete cannot be undone. Name what to remove "
+                f"one at a time, or use '{git} rm <path>' when the files are tracked."
+            ),
+        },
+        {
+            "id": "builtin-git-push",
+            "match": "Bash",
+            "regex": GIT_PUSH_REGEX,
+            "message": (
+                "git push is not run by the agent. Leave the branch as it is "
+                "and ask the user to push."
+            ),
+        },
+        {
+            "id": "builtin-git-reset-hard",
+            "match": "Bash",
+            "regex": GIT_RESET_HARD_REGEX,
+            "message": (
+                f"Work in progress would be lost. Use '{git} stash push -u' to set it "
+                f"aside, or name the files and use '{git} restore <path>'."
+            ),
+        },
+        {
+            "id": "builtin-credentials",
+            "match": "Bash|Read|Write|Edit",
+            # 先頭の境界（行頭・空白・区切り）を付ける。常時有効の土台なので、
+            # `jq '.env.X'` のようなフィールド参照や `process.env` を巻き込まない
+            # （リポジトリ自身の `credentials` と同じ形）。
+            # `.env` の後ろに続く `.envrc` `.env.local` は止める。
+            "regex": (
+                r"(^|[ \\/\x00])\.(env|netrc|npmrc)"
+                r"|(^|[ \\/\x00])\.ssh[\\/]"
+                r"|\b(id_rsa|id_ed25519)\b"
+            ),
+            "message": (
+                "This is a place credentials live. Do not read it; "
+                "ask the user for the value you need."
+            ),
+        },
+    ]
+
 
 _ALLOW: list[dict] = [
     {

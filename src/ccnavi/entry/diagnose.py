@@ -52,3 +52,4 @@ test = diagnose_try.test
 test_json = diagnose_try.test_json
 test_expectations = diagnose_try.test_expectations
 try_one = diagnose_try.try_one
+Call = diagnose_try.Call

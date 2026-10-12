@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import unicodedata
 from typing import TextIO
 
+from ..hook import judge
 from ..infra import settings, tree
 from ..policy import builtin, ruleload, rules, selfguard
 from ..tickets import (
@@ -16,6 +18,7 @@ from ..tickets import (
     phase,
     phasetypes,
     risk,
+    session_rejects,
     ticket_model,
     workflow,
 )
@@ -25,6 +28,10 @@ from . import diagnose_board, diagnose_shared
 # レイヤーの見出し。共通レイヤーと自身のレイヤーだけ日本語の名前で出す。
 # プロジェクトは名前そのもので、それが id の前置き（`lib:schema`）と同じ表記になる。
 LAYER_LABELS = {ruleload.LAYER_COMMON: "共通レイヤー", ruleload.LAYER_SELF: "自身のレイヤー"}
+
+
+# 却下の走査に使う時間の上限（秒）。SessionStart と違って期限が無いので長めに取る。
+EXPLAIN_REJECTS_BUDGET = 5.0
 
 
 def layer_label(name: str) -> str:
@@ -112,6 +119,56 @@ def _explain_risk(
             )
 
 
+# どのルールも言及しない呼び出しの結末（`judge.undeclared_verdict` の値）を、ユーザ向けの言葉に。
+_UNDECLARED_OUTCOME = {
+    judge.HANDOVER: "権限モードに委ねる",
+    rules.ASK: "ccnavi が確認を出す",
+    rules.DENY: "ccnavi が止める",
+}
+# 委ねた先がモードごとに違うときの補足。auto だけは判断するのが classifier。
+_HANDOVER_NOTE = {
+    "auto": "（classifier が判断）",
+}
+# 名前を知らないモードと、payload に権限モードが無い呼び出しの行の見出し。判定はどちらも
+# 同じ扱い（知らない名前）にする。
+_UNKNOWN_MODE = "(不明・無し)"
+
+
+def _explain_undeclared(stdout: TextIO, conf: settings.Settings) -> None:
+    """どのルールも言及しない呼び出しの結末を、権限モード × 読めたか で表にする。
+
+    表は判定と同じ関数（`judge.undeclared_verdict`）で組む。文で書くと、判定を変えたときに
+    ここだけ古い説明が残る。`conf.guard_unwatched` は hook と同じく解いた後の値で渡される
+    （cli の `_resolve_switches`）。
+    """
+    stdout.write("\n■ どのルールも言及しない呼び出し\n")
+    stdout.write(
+        "  ccnavi は判定を持たない。読めた呼び出しは Claude Code の権限モードに委ねる。"
+        "読み切れない呼び出し（実行される部分まで読み解けず、生の文字列に当てたコマンド）は、"
+        "読めなかったことを言うためにモードを問わず委ねない\n"
+    )
+    for name in (*judge.PERMISSION_JUDGED, *judge.PERMISSION_NO_JUDGE, _UNKNOWN_MODE):
+        pm = "" if name == _UNKNOWN_MODE else name
+        read, unread = (
+            judge.undeclared_verdict(pm, degraded, conf.guard_unwatched) for degraded in ("", "x")
+        )
+        shown = _UNDECLARED_OUTCOME[read] + (
+            _HANDOVER_NOTE.get(name, "") if read == judge.HANDOVER else ""
+        )
+        # 見出しの `(不明・無し)` は全角を含むので、表示の幅で揃える。
+        pad = " " * max(
+            1, 19 - sum(2 if unicodedata.east_asian_width(c) in "WF" else 1 for c in name)
+        )
+        stdout.write(
+            f"    {name}{pad}読めた: {shown} / 読み切れない: {_UNDECLARED_OUTCOME[unread]}\n"
+        )
+    stdout.write(
+        f"  {settings.GUARD_UNWATCHED_ENV}={conf.guard_unwatched or selfguard.ENABLE}"
+        f"（{' / '.join(judge.PERMISSION_NO_JUDGE)} の読めた呼び出しの結末を決める。"
+        "disable なら委ね、それ以外は止める）\n"
+    )
+
+
 def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) -> int:
     """いま有効な宣言を、判定を行わずに一覧する。
 
@@ -156,22 +213,13 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     _explain_phases(stdout, conf, root, views)
     _explain_risk(stdout, conf, root, views)
 
-    stdout.write("\n■ どのルールも言及しない呼び出し\n")
-    stdout.write("  ccnavi は判定を下さず、Claude Code の権限モードに従う\n")
-    stdout.write(
-        "    auto                          classifier（auto モードで呼び出しを通すかを決める、"
-        "Claude Code の判定役のモデル）が判断する\n"
-    )
-    stdout.write("    default / acceptEdits / plan  Claude Code 自身の権限の仕組みが決める\n")
-    stdout.write("    不明なモード                  ユーザに確認が出る\n")
-    # ここだけはレイヤーの設定で変わるので、書いてあるとおりの結末を出す。
-    if (conf.guard_unwatched or "").strip().lower() == selfguard.DISABLE:
-        stdout.write(
-            "    dontAsk / bypassPermissions   そのモードに委ねる"
-            f"（{settings.GUARD_UNWATCHED_ENV}=disable）\n"
-        )
-    else:
-        stdout.write("    dontAsk / bypassPermissions   確認できる者が居ないので通さない\n")
+    _explain_undeclared(stdout, conf)
+
+    projectless = tree.worktrees_without_project(root, conf.projects)
+    if projectless:
+        stdout.write("\n■ 元のプロジェクトが無いワークツリー\n")
+        for w in projectless:
+            stdout.write(f"  {w.said()}\n")
 
     stdout.write("\n■ チケットの作業範囲（承認済みチケット）\n")
     stdout.write(
@@ -256,7 +304,26 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             stdout.write(
                 f"  {parent.ticket} フェーズ {ph.label}: {state} / {marks} / {hold}{review}\n"
             )
+    _explain_rejects(stdout, conf, root, copies)
     return 0
+
+
+def _explain_rejects(
+    stdout: TextIO, conf: settings.Settings, root: str, copies: list[ticket_model.Ticket]
+) -> None:
+    """上位の設定に却下された要求を全件。SessionStart は数件に絞るので、全部はここで見せる。
+
+    該当が無ければ節を出さない。見せるだけで、判定は変えない。
+    """
+    try:
+        found = session_rejects.find_all(conf, root, budget=EXPLAIN_REJECTS_BUDGET, copies=copies)
+    except Exception:  # noqa: BLE001 - 一覧の足しで、--explain を止めない
+        return
+    if not found.rejects:
+        return
+    stdout.write("\n■ 上位の設定に却下された要求\n")
+    for line in session_rejects.explain_lines(found):
+        stdout.write(f"{line}\n")
 
 
 def explain_json(

@@ -37,6 +37,27 @@ CODE_TICKET_SCOPE = "POST_TICKET_SCOPE"
 # 出所にこの名前をつけて、ルールファイルを探しても見つからないことを示す。
 TICKET_SCOPE_RULE = "(ticket-scope)"
 
+# 1 回の記録に載せる code の強さの順。記録の `code` は 1 つなので、件の code が混ざった回は
+# 強いほうを載せ、内訳は detail に書く（`codes_note`）。ルールが守ると宣言した場所の変更は、
+# チケットの範囲の外より強い（ルールの deny はチケットが緩めない、と同じ向き）。
+CODE_ORDER = (CODE_VIOLATION, CODE_TICKET_SCOPE)
+
+
+def record_code(found: list[Finding]) -> str:
+    """見つけた件のうち、記録の `code` に載せる 1 つ。件が無ければ空。"""
+    codes = {f.code for f in found}
+    return next((c for c in CODE_ORDER if c in codes), "")
+
+
+def codes_note(found: list[Finding]) -> str:
+    """件の code が混ざった回の内訳。混ざらなければ空。
+
+    形は `codes POST_VIOLATION 2, POST_TICKET_SCOPE 1`。
+    """
+    counts = {c: sum(1 for f in found if f.code == c) for c in CODE_ORDER}
+    shown = [f"{c} {n}" for c, n in counts.items() if n]
+    return "codes " + ", ".join(shown) if len(shown) > 1 else ""
+
 
 def _spelled(change: gitstate.Change, top: str) -> str:
     """変更の、リンクを解く前の絶対パス。ツリーのルートが分からなければ解いた先。"""
