@@ -1187,6 +1187,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         launcher=True,
         docs=True,
         templates=None,
+        skills=None,
     ):
         """配布元のふりをするディレクトリを作る。
 
@@ -1201,6 +1202,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
         templates は {ファイル名: 中身}。渡せば共通のテンプレートの置き場に置く
         （空の dict なら、置き場だけ作る）。渡さなければ置き場も作らない。
+
+        skills は {.claude/skills/ からの相対パス: 中身}。渡せば配布元の .claude/skills/ に置く。
         """
         src = tempfile.mkdtemp(prefix="ccnavi-source-")
         self.addCleanup(shutil.rmtree, src, ignore_errors=True)
@@ -1259,6 +1262,11 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                         os.path.join(src, *TEMPLATES_PARTS, name), "w", encoding="utf-8"
                     ) as f:
                         f.write(text)
+            for rel, text in (skills or {}).items():
+                path = os.path.join(src, ".claude", "skills", *rel.split("/"))
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(text)
             if launcher:
                 # 振り分けの sh は実物をコピーし、代わりに通る sh と同じ置き場に置く。配布先で
                 # 中身が同じであることを見るため。モードは外して置く。配布元の置き方に
@@ -1418,6 +1426,78 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.run_setup("--deploy", src, "--force")
         with open(self.deployed(*TEMPLATES_PARTS, "feature.yml"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "name: feature\n")
+
+    PROCESS = "---\nname: testing\nprocess: true\ndescription: 入口\n---\n# testing\n"
+
+    def skill_files(self):
+        return {
+            "testing/SKILL.md": self.PROCESS,
+            "testing/references/common/purpose.md": "共通\n",
+            "testing/references/common/sub/deep.md": "深い共通\n",
+            "testing/references/project/manual.md": "配布元固有\n",
+            "commit/SKILL.md": "---\nname: commit\ndescription: 配布元固有\n---\n",
+            "flag/SKILL.md": '---\nname: flag\nprocess: "true"\n---\n',
+            "late/SKILL.md": "---\nname: late\n---\nprocess: true\n",
+        }
+
+    def test_deploys_only_the_common_part_of_the_process_skills(self):
+        """`process: true` のスキルの SKILL.md と references/common/ だけを、中身を変えずに配る。
+
+        references/project/ は配布元固有、process が無い・文字列・本文にあるだけのスキルは対象外。
+        """
+        src = self.make_source(skills=self.skill_files())
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        base = self.deployed(".claude", "skills")
+        found = sorted(
+            os.path.relpath(os.path.join(d, f), base).replace(os.sep, "/")
+            for d, _, fs in os.walk(base)
+            for f in fs
+        )
+        self.assertEqual(
+            found,
+            [
+                "testing/SKILL.md",
+                "testing/references/common/purpose.md",
+                "testing/references/common/sub/deep.md",
+            ],
+        )
+        with open(os.path.join(base, "testing", "SKILL.md"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), self.PROCESS)
+        self.assertTrue(
+            names(
+                section(result.stdout, "配った"),
+                ".claude/skills/testing/references/common/purpose.md",
+            )
+        )
+        self.assertNotIn("まだ無いもの", result.stdout)
+
+    def test_keeps_a_process_skill_the_project_already_has_unless_forced(self):
+        src = self.make_source(skills=self.skill_files())
+        path = self.deployed(".claude", "skills", "testing", "SKILL.md")
+        os.makedirs(os.path.dirname(path))
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("このプロジェクトで直した\n")
+        self.run_setup("--deploy", src)
+        with open(path, encoding="utf-8") as f:
+            self.assertEqual(f.read(), "このプロジェクトで直した\n")
+        self.run_setup("--deploy", src, "--force")
+        with open(path, encoding="utf-8") as f:
+            self.assertEqual(f.read(), self.PROCESS)
+
+    def test_check_names_the_process_skill_files_not_there_yet(self):
+        src = self.make_source(skills=self.skill_files())
+        result = self.run_setup("--deploy", src, "--check")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertTrue(names(section(result.stdout, "配る"), ".claude/skills/testing/SKILL.md"))
+        self.assertFalse(os.path.exists(self.deployed(".claude", "skills")), "--check は書かない")
+
+    def test_a_source_without_process_skills_deploys_nothing_of_them(self):
+        src = self.make_source(skills={"commit/SKILL.md": "---\nname: commit\n---\n"})
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(os.path.exists(self.deployed(".claude", "skills")))
+        self.assertNotIn("skills", result.stdout)
 
     def test_a_source_without_templates_deploys_exactly_what_it_did_before(self):
         """配布元に共通のテンプレートが無ければ（置き場が無い・空）、何も足さず何も言わない。

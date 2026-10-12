@@ -120,6 +120,13 @@ DEPLOY_DOCS_DIR=".ccnavi/docs"
 # 一部なので、設定 3 本と同じく .ccnavi/config/common/ の下へ配る。配布元に置き場が無い、または
 # *.yml が 1 本も無いのは正常（共通のテンプレートはまだ無いことがある）で、何も言わずに飛ばす。
 DEPLOY_TEMPLATES_DIR=".ccnavi/config/common/templates"
+# 共通の工程スキル。配布元の .claude/skills/ の中で、SKILL.md の frontmatter に `process: true` を持つ
+# スキルだけを配る（.ccnavi/docs/skill-processes.md）。配るのは SKILL.md と references/common/ の下。
+# references/project/ は配布元固有の事情なので配らない。親チケットの着手は、ワークスペースのこの置き場から
+# プロジェクトの skills/<工程>/ へ写すので、配布先のワークスペースに無いと写す元が無い。
+# commit や yomiyasu のような `process: true` を持たないスキルは、配布元固有の手順や外部の取り込みなので配らない。
+# 配布元に置き場が無い、または該当するスキルが 1 つも無いのは正常で、何も言わずに飛ばす。
+DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-common.sh は、3 本の sh が `.` で読み込む共通部分の入口。入口は同じディレクトリの部品
 # ccnavi-common-{state,lock,c1,host,log}.sh を読む。どちらも配らないと、配布先で 3 本とも
 # 起動時にエラーで止まる。部品は入口より先に配る。途中で失敗したときに、部品を読む新しい入口だけが
@@ -196,7 +203,9 @@ CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）�
 .ccnavi/config/common/risks.yml、.ccnavi/config/common/phases.yml。自身のレイヤーの .ccnavi/config/project/phases.yml は
 配らず、既にあれば触らない。フェーズ定義は 2 本の和で判定する）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）・使い方の文書（.ccnavi/docs/*.md）・共通の作業・レビュー計画のテンプレート
-（.ccnavi/config/common/templates/*.yml。配布元に無ければ配らない）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
+（.ccnavi/config/common/templates/*.yml。配布元に無ければ配らない）・共通の工程スキル
+（.claude/skills/ のうち SKILL.md に process: true を持つもの。SKILL.md と references/common/ の下だけで、
+references/project/ は配らない）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
 --docs の索引（**/ccnavi-index.jsonl）は、配布先の .gitignore に足す（ccnavi-index.jsonl を否定する
 行があれば足さない）。
 
@@ -462,6 +471,21 @@ scripts_todo=""
 docs_todo=""
 templates_todo=""
 templates_skipped=""
+skills_all=""
+skills_todo=""
+skills_skipped=""
+
+# 配布元のスキルが、frontmatter に `process: true` を持つか。先頭の `---` から次の `---` までの
+# 間にその 1 行があるものだけを当てる（文字列の "true"、BOM 付きは当てない。ccnavi の写しと揃える）。
+is_process_skill() {
+	[ -f "$1" ] || return 1
+	awk '
+		NR == 1 { if ($0 != "---") { bad = 1; exit } next }
+		/^---[ \t\r]*$/ { exit }
+		/^process:[ \t]*true[ \t\r]*$/ { found = 1 }
+		END { exit (found && !bad) ? 0 : 1 }
+	' "$1"
+}
 
 # 配布元にあるか、配布先にあるか、--force か。この 3 つだけで決まる。
 verdict() {
@@ -594,6 +618,61 @@ if [ -n "$deploy" ]; then
 				templates_todo="$templates_todo $template_name"
 				;;
 			esac
+		done
+	fi
+
+	# 共通の工程スキル。置き場が無いか、該当するスキルが無ければ、何も配らず何も言わない。
+	if [ -d "$source_root/$DEPLOY_SKILLS_DIR" ]; then
+		for skill_path in "$source_root/$DEPLOY_SKILLS_DIR"/*; do
+			skill_name=$(basename "$skill_path")
+			# スキルのディレクトリ自体がリンクのものは配らない（配布元の外を読んでしまうため）。
+			{ [ -d "$skill_path" ] && [ ! -L "$skill_path" ]; } || continue
+			is_process_skill "$skill_path/SKILL.md" || continue
+			case "$skill_name" in
+			*[!A-Za-z0-9._-]*)
+				skills_skipped="$skills_skipped$skill_name
+"
+				continue
+				;;
+			esac
+			skill_files=$(
+				cd "$skill_path" && {
+					printf 'SKILL.md\n'
+					if [ -d references/common ] && [ ! -L references/common ]; then
+						find references/common -type f | sort
+					fi
+				}
+			)
+			while IFS= read -r skill_file; do
+				[ -n "$skill_file" ] || continue
+				skill_rel="$skill_name/$skill_file"
+				# 名前の範囲はスキルのディレクトリ名と同じ。外れるファイルは、単語分割や glob で
+				# 配布を半端に止めるので配らない。
+				case "$skill_rel" in
+				*[!A-Za-z0-9._/-]*)
+					skills_skipped="$skills_skipped$skill_rel
+"
+					continue
+					;;
+				esac
+				skills_all="$skills_all$skill_rel
+"
+				if [ -e "$root/$DEPLOY_SKILLS_DIR/$skill_rel" ]; then
+					skill_there=yes
+				else
+					skill_there=no
+				fi
+				skill_verdict=$(verdict "$source_root/$DEPLOY_SKILLS_DIR/$skill_rel" "$skill_there")
+				note_deploy "$skill_verdict" "$DEPLOY_SKILLS_DIR/$skill_rel" "$DEPLOY_SKILLS_DIR/$skill_rel"
+				case "$skill_verdict" in
+				copy | replace)
+					skills_todo="$skills_todo$skill_rel
+"
+					;;
+				esac
+			done <<SKILL_FILES
+$skill_files
+SKILL_FILES
 		done
 	fi
 
@@ -1021,6 +1100,10 @@ report_deploy() {
 		printf '名前に使えない文字があるので配っていないテンプレート（英数字で始め、英数字と . _ - だけ）:\n'
 		printf '%s' "$templates_skipped" | sed 's/^/  /'
 	fi
+	if [ -n "$skills_skipped" ]; then
+		printf '名前に使えない文字があるので配っていない共通の工程スキル（英数字と . _ - だけ。ファイルは / も可）:\n'
+		printf '%s' "$skills_skipped" | sed 's/^/  /'
+	fi
 	if [ -n "$ignore_todo" ]; then
 		printf '%s:\n' "$3"
 		printf '%s' "$ignore_todo" | sed 's/^/  /'
@@ -1393,6 +1476,12 @@ if [ "$deploy_work" = yes ]; then
 	for name in $docs_todo; do
 		copy_file "$source_root/$DEPLOY_DOCS_DIR/$name" "$root/$DEPLOY_DOCS_DIR/$name"
 	done
+	while IFS= read -r skill_rel; do
+		[ -n "$skill_rel" ] || continue
+		copy_file "$source_root/$DEPLOY_SKILLS_DIR/$skill_rel" "$root/$DEPLOY_SKILLS_DIR/$skill_rel"
+	done <<SKILL_FILES
+$skills_todo
+SKILL_FILES
 	for name in $scripts_todo; do
 		copy_file "$source_root/$DEPLOY_SCRIPT_DIR/$name" "$root/$DEPLOY_SCRIPT_DIR/$name"
 		# hook は振り分けの sh を直接起動する。cp は元のモードをそのままコピーするとは限らないので付け直す。
@@ -1536,6 +1625,15 @@ if [ -n "$source_root" ] && [ -d "$source_root/$DEPLOY_TEMPLATES_DIR" ]; then
 		fi
 	done
 fi
+# 共通の工程スキルも同じ。配布のときに数えた一覧（skills_all）で確かめる。
+while IFS= read -r skill_rel; do
+	[ -n "$skill_rel" ] || continue
+	if [ ! -f "$root/$DEPLOY_SKILLS_DIR/$skill_rel" ]; then
+		note_missing "${DEPLOY_SKILLS_DIR}/${skill_rel}（共通の工程スキル。親チケットの着手がプロジェクトへ写す元）"
+	fi
+done <<SKILL_FILES
+$skills_all
+SKILL_FILES
 if [ -n "$missing_parts" ]; then
 	printf 'まだ無いもの:\n%s' "$missing_parts"
 	# 配布をやめた理由は report_deploy が既に出している。ここで足すのは、ユーザが自分で
