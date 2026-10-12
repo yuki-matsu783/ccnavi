@@ -87,11 +87,11 @@ _SESSION_AND_KEY = (
     ("subagent-", ".unchecked"),  # subagent._unchecked_path
     ("subagent-", ".running"),  # subagent._running_path
 )
-# `<セッション>.reported.json`（post._seen_path）と、改名の前の `<セッション>.json`
-# （post._legacy_seen_path）。Claude Code のセッションは UUID なので、その形に
+# `<セッション>.reported.json`（post._reported_path）と、改名の前の `<セッション>.json`
+# （post._legacy_reported_path）。Claude Code のセッションは UUID なので、その形に
 # 限る。`.+` で読むと、置き場に置かれた別のファイル（`package.json`、レビューの結果の
 # コピーなど）をセッションの記録と読み違えて消す。形の違う名前は知らないファイルとして残す。
-_SEEN = re.compile(
+_REPORTED = re.compile(
     r"^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})"
     r"(?:\.reported)?\.json$"
 )
@@ -427,7 +427,7 @@ def _session_entries(
         #   （セッションの組が他に無ければ、まとめられなかったものとして、それ自身の日付で）
         # - `.nudged-…`・`.denied-…`・`.stop-…`: 当てる形の「セッション」に
         #   `.<一意>.part` まで入るので別の組になり、それ自身の日付で消える
-        # - `.<セッション>.<一意>.part.json`（seen）と
+        # - `.<セッション>.<一意>.part.json`（報告済みの記録）と
         #   `.<セッション>.turn.<一意>.part.json`（turn）: どの形にも当たらず、消さずに残る。
         #   形を広げて当てると、知らないファイルまで消しうるので広げない
         name = fsio.temp_origin(entry)
@@ -438,7 +438,7 @@ def _session_entries(
         if pair is not None:
             keyed.append((entry, name, pair[0], pair[1]))
             continue
-        for pattern in (*_SESSION_ONLY, _SEEN):
+        for pattern in (*_SESSION_ONLY, _REPORTED):
             m = pattern.match(name)
             if m:
                 groups.setdefault(m.group("s"), []).append(path)

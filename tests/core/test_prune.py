@@ -256,7 +256,7 @@ class StatePruneTest(_Base):
             self.assertTrue(os.path.exists(path), path)
 
     def test_leftover_temporary_files_of_other_shapes(self):
-        """`.nudged-…` などはそれ自身の日付で消え、seen と turn の一時ファイルは消さずに残る。"""
+        """`.nudged-…` などはそれ自身の日付で消え、報告済みと turn の一時ファイルは消さずに残る。"""
         self.session_files(S_OLD, 20)
         own_date = _write(
             os.path.join(self.state, f".nudged-{S_OLD}.abc12345.part.json"), age_days=20
