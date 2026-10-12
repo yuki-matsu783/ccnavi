@@ -26,41 +26,49 @@ export interface ReviewProps {
   readonly answer: PlanOrderAnswer;
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
+  /** 開いたとき「保存する」へ焦点を移すか。案内の見本の確かめでは移さない（案内の吹き出しが焦点を持つ） */
+  readonly focus?: boolean;
 }
 
-export function Review({ ticket, answer, onConfirm, onCancel }: ReviewProps): JSX.Element {
+export function Review({ ticket, answer, onConfirm, onCancel, focus = true }: ReviewProps): JSX.Element {
   const confirm = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    confirm.current?.focus();
-  }, []);
+    if (focus) {
+      confirm.current?.focus();
+    }
+  }, [focus]);
   const moved = renumbered(answer);
   return (
     <div className="workflow-review-backdrop">
       <section className="workflow-review" id="save-review" role="dialog" aria-modal="true" aria-labelledby="save-review-title">
         <h2 id="save-review-title">この順序に決める</h2>
         <p className="dim small">ccnavi が {ticket} の提案の計画（plan: / feedback:）と、番号の変わる項を指す子の提案を書き換えます。承認はしません。</p>
-        <h3>番号が変わる項（{moved.length}）</h3>
-        {moved.length === 0 ? (
-          <p className="dim small">番号は変わりません（待ちだけが変わります）。</p>
-        ) : (
-          <ul id="review-numbers">
-            {moved.map((item) => (
-              <li key={`${item.part}-${item.from}`}>
-                {item.title}: {item.from} → {item.number}
-              </li>
-            ))}
-          </ul>
-        )}
-        <h3>付け替える子の提案（{answer.children.length}）</h3>
-        {answer.children.length === 0 ? (
-          <p className="dim small">付け替える子の提案はありません。</p>
-        ) : (
-          <ul id="review-children">
-            {answer.children.map((child) => (
-              <li key={child.ticket}>{childText(child)}</li>
-            ))}
-          </ul>
-        )}
+        <div data-tour="review-numbers">
+          <h3>番号が変わる項（{moved.length}）</h3>
+          {moved.length === 0 ? (
+            <p className="dim small">番号は変わりません（待ちだけが変わります）。</p>
+          ) : (
+            <ul id="review-numbers">
+              {moved.map((item) => (
+                <li key={`${item.part}-${item.from}`}>
+                  {item.title}: {item.from} → {item.number}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div data-tour="review-children">
+          <h3>付け替える子の提案（{answer.children.length}）</h3>
+          {answer.children.length === 0 ? (
+            <p className="dim small">付け替える子の提案はありません。</p>
+          ) : (
+            <ul id="review-children">
+              {answer.children.map((child) => (
+                <li key={child.ticket}>{childText(child)}</li>
+              ))}
+            </ul>
+          )}
+        </div>
         {answer.mismatched.length > 0 && (
           <>
             <h3>計画と食い違う子の提案（書き換えません）</h3>
@@ -71,7 +79,7 @@ export function Review({ ticket, answer, onConfirm, onCancel }: ReviewProps): JS
             </ul>
           </>
         )}
-        <p className="small">
+        <p className="small" data-tour="review-note">
           計画の値の中に書いたコメントは消えます（値の外のコメントは残ります）。書き換えた提案はコミットされないまま承認されるので、承認したあとは取り下げられません（取り消して出し直します）。保存したら、承認はボードから開き直してください。
         </p>
         <div className="workflow-review-actions">
