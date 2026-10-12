@@ -39,6 +39,7 @@ def asked(args: argparse.Namespace) -> bool:
     return bool(
         args.templates
         or args.template
+        or args.with_feedback
         or args.show is not None
         or args.layer
         or args.draft is not None
@@ -99,6 +100,8 @@ def usage_problem(args: argparse.Namespace) -> str:
     """`--templates` の組み合わせの誤り。正しければ空。設定を読む前に見る。"""
     if args.template and (args.templates or not _ticket_new(args)):
         return "--template は ticket new <識別子> --title <題> --template <名前> でだけ使う"
+    if args.with_feedback and (args.templates or not _ticket_new(args) or not args.template):
+        return "--with-feedback は ticket new <識別子> --title <題> --template <名前> でだけ使う"
     if not args.templates:
         for flag, given in (
             ("--show", args.show is not None),
@@ -158,8 +161,7 @@ def run(
     layer = (args.layer or plan_templates.LAYER_SELF).strip()
     known = [view.name for view in ruleload.layers(conf, root)]
     if layer not in known:
-        stderr.write(f"ccnavi: レイヤー {layer!r} は無い（{' / '.join(known)}）\n")
-        return EXIT_ERROR
+        return _fail(stdout, stderr, args.json, f"レイヤー {layer!r} は無い（{' / '.join(known)}）")
     scanned = plan_templates.scan(conf, root)
     if args.show is not None:
         return _show(stdout, stderr, conf, root, scanned, layer, args.show.strip(), args.json)
@@ -172,6 +174,17 @@ def run(
         stdout.write("\n")
         return EXIT_OK
     return _list(stdout, conf, root, scanned, layer, keywords, len(drafts))
+
+
+def _fail(stdout: TextIO, stderr: TextIO, as_json: bool, error: str) -> int:
+    """失敗の答え。`--json` なら標準出力に `{"ok": false, "error": ...}`、でなければ標準エラー。"""
+    if as_json:
+        answer = {"version": plan_templates.JSON_VERSION, "ok": False, "error": error}
+        stdout.write(json.dumps(answer, ensure_ascii=True, indent=1))
+        stdout.write("\n")
+    else:
+        stderr.write(f"ccnavi: {error}\n")
+    return EXIT_ERROR
 
 
 def _drafts(
@@ -265,6 +278,8 @@ def _draft(
     stdout.write(
         "次: description と when を固有名の無い言い方に直し、計画とフローの不要な手順を削る。"
         "効力が無い下書きで、取り込む（使えるようにする）のはユーザ\n"
+        "下書きは未追跡のファイルで、残っていると親の ready が止まる。取り込むか、"
+        "ready の前に下書きを消す（またはコミットする）\n"
     )
     return EXIT_OK
 
@@ -308,18 +323,19 @@ def _import_text(
 ) -> None:
     draft = plan.draft
     if draft is not None:
-        stdout.write(f"下書き: {draft.rel}（{draft.tree.name or 'ワークスペースルート'}）\n")
+        stdout.write(f"下書き: {draft.rel}（{template_drafts.tree_label(draft.tree.name)}）\n")
         stdout.write(f"  ハッシュ: {plan.sha}\n")
     if plan.target_rel:
         verb = "置き換える" if plan.exists else "新しく置く"
         stdout.write(f"取り込み先: {plan.target_rel}（{plan.layer}。{verb}）\n")
+    # 読み違えを誘う文字（右から左への上書き、幅ゼロの文字など）は `\uXXXX` にして見せる。
     for problem in plan.problems:
-        stdout.write(f"  {_label(problem.severity)} {problem.detail}\n")
+        stdout.write(f"  {_label(problem.severity)} {plan_templates.reveal(problem.detail)}\n")
     for line in plan.infos:
-        stdout.write(f"  info  {line}\n")
+        stdout.write(f"  info  {plan_templates.reveal(line)}\n")
     errors = result.errors if result is not None and result.errors else plan.errors
     for line in errors:
-        out.write(f"ccnavi: {line}\n")
+        out.write(f"ccnavi: {plan_templates.reveal(line)}\n")
     if draft is None or errors:
         if draft is not None and result is None:
             stdout.write("何も書いていない。\n")
@@ -344,7 +360,10 @@ def _import_text(
 
 
 def _show_change(stdout: TextIO, plan: template_drafts.ImportPlan) -> None:
-    """取り込み先の同名との差分（文の前後つき）。新規なら取り込む本文を全部見せる。"""
+    """取り込み先の同名との差分（文の前後つき）。新規なら取り込む本文を全部見せる。
+
+    `plan.diff` と `plan.new_text` は、制御文字・書式文字を `\\uXXXX` に直してある（`prepare`）。
+    """
     if plan.exists:
         if plan.diff:
             stdout.write(f"--- 差分（前後 {template_drafts.DIFF_CONTEXT} 行つき） ---\n")
@@ -375,10 +394,9 @@ def _show(
 ) -> int:
     entry = plan_templates.find(scanned, layer, name)
     if entry is None:
-        stderr.write(f"ccnavi: テンプレート {name!r} は無い（共通 + {layer}）\n")
-        return EXIT_ERROR
+        return _fail(stdout, stderr, as_json, f"テンプレート {name!r} は無い（共通 + {layer}）")
     if entry.layer == plan_templates.LAYER_COMMON:
-        types = plan_templates._types_for(conf, root, layer)
+        types = plan_templates.types_for(conf, root, layer)
         entry = plan_templates.recheck(entry, types, scanned.candidates)
     row = plan_templates.entry_json(entry)
     text = entry.raw.decode("utf-8-sig", errors="replace")
@@ -425,5 +443,6 @@ def _show(
     for said in row["problems"]:
         stdout.write(f"  {_label(said['severity'])} {said['detail']}\n")
     stdout.write("--- ファイルの中身 ---\n")
+    text = plan_templates.reveal(text)
     stdout.write(text if text.endswith("\n") or not text else text + "\n")
     return EXIT_OK

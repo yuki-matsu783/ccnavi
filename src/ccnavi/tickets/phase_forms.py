@@ -335,7 +335,7 @@ EXE_OPTIONS = frozenset(
         "--test-expectations",
         "--text", "--ticket-control", "--tickets", "--title", "--to", "--type", "--until",
         "--verify",
-        "--version", "--via", "--write", "--yes", "-h", "-r",
+        "--version", "--via", "--with-feedback", "--write", "--yes", "-h", "-r",
     }
 )  # fmt: skip
 # 単引用符の中と、glob を引用した文字。文字どおりの値として読むため、

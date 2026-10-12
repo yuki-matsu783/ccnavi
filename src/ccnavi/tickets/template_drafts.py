@@ -14,8 +14,8 @@
   親の計画の順序は承認が確かめているので、並べ替え（`plan_order.renumber`）は要らず、引き算だけで足りる
 - 子のフローは、全体計画の n 番目の項の子（`phase` が n）のうち、フローを持つ最初の 1 本を写す。
   フィードバック計画の子のフローは写さない（テンプレートの `flows` は全体計画の添字で指す）
-- 固有名の一般化は機械ではしない。`description` に `TODO` の印を入れ、`when` は親の題から入れる。
-  直すのはエージェント。印が残っていれば検査が warn で言う
+- 固有名の一般化は機械ではしない。親の題から入れる `description` と `when` の両方に `TODO` の印を
+  付ける。直すのはエージェント。印が残っていれば検査が warn で言う
 - 同名の下書きがあれば上書きせず断る。親が `ready` で閉じて退避済み（`logs/archive/`）なら、
   そこからは読まないと言って断る
 
@@ -49,6 +49,9 @@ TO_COMMON = "common"
 TO_PROJECT = "project"
 TARGETS = (TO_COMMON, TO_PROJECT)
 
+# ワークスペースのルートのツリー（名前が空）を人に見せるときの言い方。
+ROOT_LABEL = "ワークスペースルート"
+
 # 差分に添える前後の行数。
 DIFF_CONTEXT = 3
 
@@ -60,12 +63,20 @@ def _line(text: object) -> str:
     return " ".join(str(text).split())
 
 
+def tree_label(name: str) -> str:
+    """ツリー名の人間向けの表記。ワークスペースのルート（""）は言葉にする。"""
+    return name or ROOT_LABEL
+
+
 # ---- 下書きを読む
 
 
 @dataclass
 class Draft:
-    """下書きの置き場の `<名前>.yml` 1 本。`also` は同じ中身の下書きを持つほかのツリー。"""
+    """下書きの置き場の `<名前>.yml` 1 本。
+
+    `also` は同じ中身の下書きを持つほかのツリー（`tree.name` と同じ表記。ルートは ""）。
+    """
 
     tree: tree.Tree
     # 検査に使うフェーズ定義のレイヤー（自身のレイヤーかプロジェクト名）。
@@ -128,13 +139,13 @@ def scan(conf: settings.Settings, root: str, candidates: dict | None = None) -> 
         if not read.entries:
             continue
         layer = where.project if where.project in known else plan_templates.LAYER_SELF
-        types = plan_templates._types_for(conf, root, layer)
+        types = plan_templates.types_for(conf, root, layer)
         for entry in read.entries:
             if entry.template is not None:
                 entry.checks.extend(plan_templates.check(entry.template, types, candidates))
             key2 = (entry.name, entry.sha)
             if entry.sha and key2 in seen:
-                seen[key2].also.append(where.name or "(ワークスペースルート)")
+                seen[key2].also.append(where.name)
                 continue
             draft = Draft(where, layer, entry)
             if entry.sha:
@@ -176,7 +187,8 @@ def draft_json(draft: Draft, scanned: plan_templates.Scan) -> dict:
     )
     out = {key: row[key] for key in keep}
     out["tree"] = draft.tree.name
-    out["layer"] = draft.layer
+    # 検査に使ったフェーズ定義の層（`templates[].layer` の「ファイルが在る層」とは別）。
+    out["checked_with"] = draft.layer
     out["importable"] = draft.importable
     out["exists_in"] = _item_names(scanned, draft.name)
     out["also_in"] = list(draft.also)
@@ -236,7 +248,7 @@ def _find_parent(
             why = f"{parent} の完了した計画（done/）が見つからない"
         return *refuse, why
     if len({t.tree_root for t in hits}) > 1:
-        places = ", ".join(sorted(t.tree or "ワークスペースルート" for t in hits))
+        places = ", ".join(sorted(tree_label(t.tree or "") for t in hits))
         return *refuse, f"{parent} が複数のツリーにある（{places}）。決められない"
     found = hits[0]
     if found.state == ticket_model.CANCELLED:
@@ -316,7 +328,7 @@ def _build(
     template = plan_templates.Template(
         name=name,
         description=f"{_TODO_PREFIX}{title}",
-        when=f"「{title}」と同じ形の作業をするとき",
+        when=f"{_TODO_PREFIX}「{title}」と同じ形の作業をするとき",
         plan=plan,
         feedback=feedback,
         flows=_flows(conf, found, children, notes),
@@ -363,7 +375,7 @@ def make(conf: settings.Settings, root: str, parent: str, name: str = "") -> Mad
     layer = found.project if found.project in _known(conf, root) else plan_templates.LAYER_SELF
     problems = list(entry.notes)
     if entry.template is not None:
-        types = plan_templates._types_for(conf, root, layer)
+        types = plan_templates.types_for(conf, root, layer)
         problems += plan_templates.check(entry.template, types, flow.catalog(root))
     return Made(
         True,
@@ -415,7 +427,8 @@ def close_notice(conf: settings.Settings, root: str, parent: str) -> str:
     return (
         "テンプレートにするなら、`ready` の前に "
         f"`ccnavi --templates --draft {parent}` で下書きを作る"
-        "（ready で閉じると下書きの材料は退避されて拾えない）\n"
+        "（ready で閉じると下書きの材料は退避されて拾えない）。"
+        "下書きは取り込むか消してから ready\n"
     )
 
 
@@ -441,7 +454,8 @@ class ImportPlan:
     # 下書きの検査（取り込み先の定義で行った）。
     problems: list[Problem] = field(default_factory=list)
     infos: list[str] = field(default_factory=list)
-    # 取り込み先に新しく置く文面と、取り込み先のいまの文面（無ければ空）。
+    # 取り込み先に新しく置く文面と、取り込み先のいまの文面（無ければ空）。見せるためのもので、
+    # 制御文字・書式文字は `\uXXXX` に直してある（書く中身は `raw`）。
     new_text: str = ""
     old_text: str = ""
     diff: list[str] = field(default_factory=list)
@@ -474,7 +488,7 @@ def locate(conf: settings.Settings, root: str, ref: str) -> tuple[Draft | None, 
         listed = ", ".join(sorted({d.name for d in found})) or "無い"
         return None, f"下書き {name!r} は無い（{listed}）"
     if len(hits) > 1:
-        paths = ", ".join(f"{d.tree.name or 'ワークスペースルート'}:{d.rel}" for d in hits)
+        paths = ", ".join(f"{tree_label(d.tree.name)}:{d.rel}" for d in hits)
         return None, f"下書き {name!r} が中身の違う形で複数ある（{paths}）。パスで指す"
     return hits[0], ""
 
@@ -505,7 +519,7 @@ def _target(conf: settings.Settings, root: str, to: str, layer: str, plan: Impor
         return f"--to は {' か '.join(TARGETS)}"
     plan.to = to
     plan.target = os.path.join(directory, name + plan_templates.SUFFIX)
-    plan.target_rel = plan_templates._rel(root, plan.target)
+    plan.target_rel = plan_templates.relative(root, plan.target)
     return ""
 
 
@@ -536,28 +550,39 @@ def prepare(
         plan.errors.append(refused)
         return plan
     # 取り込み先の定義で検査し直す（下書きの置かれたツリーの定義とは違いうる）。
-    types = plan_templates._types_for(conf, root, plan.layer)
+    types = plan_templates.types_for(conf, root, plan.layer)
     plan.problems = list(entry.notes) + plan_templates.check(
         entry.template, types, flow.catalog(root)
     )
+    # コメントなど、読んだ中身に出ない場所の文字も見る（CRLF の改行は問題にしない）。
+    raw_hidden = plan_templates.hidden_problem(
+        entry.raw.decode("utf-8-sig", errors="replace").replace("\r\n", "\n")
+    )
+    if raw_hidden and not any(p.detail.startswith(raw_hidden[:12]) for p in plan.problems):
+        plan.problems.append(Problem(SEVERITY_ERROR, entry.name, raw_hidden))
     if any(p.severity == SEVERITY_ERROR for p in plan.problems):
         plan.errors.append("下書きに error があるので取り込めない（下の error を直す）")
     _existing(plan, root)
     _collisions(conf, root, plan)
-    plan.new_text = entry.raw.decode("utf-8-sig", errors="replace")
+    new_raw = entry.raw.decode("utf-8-sig", errors="replace")
     if plan.exists and not plan.errors:
-        plan.diff = list(
-            difflib.unified_diff(
+        # 差分は書く中身そのもので取り、見せる行だけ制御文字・書式文字を `\uXXXX` にする。
+        plan.diff = [
+            plan_templates.reveal(line)
+            for line in difflib.unified_diff(
                 plan.old_text.splitlines(),
-                plan.new_text.splitlines(),
+                new_raw.splitlines(),
                 fromfile=f"{plan.target_rel}（いまの {plan.layer}）",
                 tofile=f"{draft.rel}（下書き）",
                 n=DIFF_CONTEXT,
                 lineterm="",
             )
-        )
+        ]
         if not plan.diff:
             plan.infos.append("取り込み先と同じ中身（差分は無い）")
+    # 見せる本文。書く中身は `raw`（バイト列）で、ここは変えない。
+    plan.new_text = plan_templates.reveal(new_raw)
+    plan.old_text = plan_templates.reveal(plan.old_text)
     return plan
 
 
@@ -565,7 +590,7 @@ def _existing(plan: ImportPlan, root: str) -> None:
     """取り込み先に同名が在るか。在れば中身を読み、リンクなどなら断る。"""
     if flow.linked(plan.base, os.path.dirname(plan.target)):
         plan.errors.append(
-            f"取り込み先の置き場（{plan_templates._rel(root, os.path.dirname(plan.target))}）の"
+            f"取り込み先の置き場（{plan_templates.relative(root, os.path.dirname(plan.target))}）の"
             "途中にリンクがあるので書かない"
         )
         return
@@ -694,7 +719,7 @@ def _remove_draft(plan: ImportPlan, done: Imported) -> None:
         return
     done.removed = True
     if draft.also:
-        others = ", ".join(draft.also)
+        others = ", ".join(tree_label(name) for name in draft.also)
         done.infos.append(f"同じ中身の下書きがほかのツリー（{others}）にも在る。消していない")
 
 

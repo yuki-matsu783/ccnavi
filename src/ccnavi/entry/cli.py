@@ -295,6 +295,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # `ticket new <識別子> --template <名前> [--layer <名前>]`。計画と子のフローの下書きを
     # テンプレートから作る（`--plan` の代わり。`--templates`（一覧）とは別の旗）。
     parser.add_argument("--template", default="")
+    # `ticket new --template` が、テンプレートのフィードバック計画も書く（既定は書かない）。
+    parser.add_argument("--with-feedback", action="store_true")
     parser.add_argument("--reviewed", type=int, default=None)
     parser.add_argument("--accept-unresolved", action="store_true")
     parser.add_argument("--chat", action="store_true")
@@ -634,6 +636,14 @@ def _parsed(
     # `ticket start X --limit 3` のような打ち間違いが通るようになる（`--flow` は診断の中の
     # 差し替えで、無視しても何も動かないので無視するだけにしている）。
     if args.templates:
+        # 取り込みを書くとき（`--import --yes`）は、hook の文字列照合だけを歯止めにせず、
+        # 実行時にも端末の前のユーザが打ったことを確かめる。下見（`--yes` なし）は求めない。
+        if (
+            args.import_ is not None
+            and args.yes
+            and not cli_args._from_terminal(stdin, conf, stderr, "--import --yes")
+        ):
+            return EXIT_ERROR
         return cli_templates.run(stdout, stderr, conf, root, args)
     if not args.docs:
         stray = cli_args._docs_flags_given(args)

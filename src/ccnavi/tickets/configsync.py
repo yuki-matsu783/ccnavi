@@ -13,7 +13,8 @@
 - `script:` の値は書き換えない。ミラーの置き場も `.ccnavi/config/common/scripts/` で、共通レイヤーと
   同じ表記のまま指せる
 - 写す前に、ミラーとして（単体 clone では共通レイヤーとして）読めるかを確かめる。error が
-  あれば何も写さず、着手しない
+  あれば何も写さず、着手しない。ただしテンプレートは別で、error のある 1 本は飛ばし、置き場が
+  読めない（リンクなど）ときはテンプレートだけ写さず、ほかの設定の写しと着手は止めない
 - 写し先かその途中がシンボリックリンクなら止める
 - 上書きと削除は一時ファイルからの置き換えで行う。途中で止まれば、した分を元へ戻す
 
@@ -101,28 +102,25 @@ def sources(conf: settings.Settings, root: str) -> tuple[dict[str, bytes], str]:
         if why or raw is None:
             return {}, f"共通レイヤーの配点が指すスクリプト {rel} を読めない ({why or '無い'})"
         out[rel.removeprefix(_script_prefix())] = raw
-    templates, why = _templates(conf, root)
-    if why:
-        return {}, why
-    out.update(templates)
+    out.update(_templates(conf, root))
     return out, ""
 
 
-def _templates(conf: settings.Settings, root: str) -> tuple[dict[str, bytes], str]:
+def _templates(conf: settings.Settings, root: str) -> dict[str, bytes]:
     """共通レイヤーの作業・レビュー計画のテンプレート。ミラーの置き場からの相対 → 中身。
 
-    置き場（`templates/`）が無いのは正常で、何も返さない。置き場そのものが読めない（リンクなど）ときは
-    理由を返す（ほかの設定と同じく、何も写さない）。error のあるテンプレートは 1 本ずつ
+    置き場（`templates/`）が無いのは正常で、何も返さない。置き場そのものが読めない（リンクなど）
+    ときも、理由は返さずテンプレートを 1 本も写さない（ほかの設定のミラーと着手は止めない。
+    置き場がリンクなのは、dotfiles 管理などで起こりうる）。error のあるテンプレートは 1 本ずつ
     写さずに飛ばす（使えないテンプレートのために着手を止めない。`--lint` が error で知らせる）。
     warn は止めない。
     """
     read = plan_templates.read_layer(
         plan_templates.LAYER_COMMON, root, settings.common_templates_dir(conf, root)
     )
-    for problem in read.problems:
-        if problem.severity == rules.SEVERITY_ERROR:
-            return {}, f"共通レイヤーのテンプレートの置き場を読めない: {problem.detail}"
-    types = plan_templates._types_for(conf, root, plan_templates.LAYER_COMMON)
+    if read.unreadable:
+        return {}
+    types = plan_templates.types_for(conf, root, plan_templates.LAYER_COMMON)
     candidates = flow.catalog(root)
     out: dict[str, bytes] = {}
     for entry in read.entries:
@@ -132,7 +130,7 @@ def _templates(conf: settings.Settings, root: str) -> tuple[dict[str, bytes], st
         if any(p.severity == rules.SEVERITY_ERROR for p in problems):
             continue
         out[f"{settings.TEMPLATES_DIR}/{entry.name}{plan_templates.SUFFIX}"] = entry.raw
-    return out, ""
+    return out
 
 
 def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Change], str]:

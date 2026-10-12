@@ -178,11 +178,13 @@ def run(
     issue: int | None,
     template: str = "",
     layer: str = "",
+    with_feedback: bool = False,
 ) -> int:
     """`ticket new` の本体。書けたら 0、書かなければ 1（理由は標準エラー）。
 
     `template` を渡すと、`--plan`（型の列）の代わりにテンプレートから計画と子のフローの下書きを作る
     （`layer` はテンプレートを足し算で引くレイヤー。省けば cwd のツリーのレイヤー）。
+    フィードバック計画は `with_feedback` のときだけ書く。
     """
 
     def refuse(why: str) -> int:
@@ -209,6 +211,8 @@ def run(
             return refuse("--template と --plan は一緒に使えない（計画はテンプレートから作る）")
     elif layer:
         return refuse("--layer は --template と一緒に使う")
+    elif with_feedback:
+        return refuse("--with-feedback は --template と一緒に使う")
     elif not plan:
         return refuse('--plan "design,acceptance,implement" のように型をカンマで区切って渡す')
 
@@ -235,7 +239,7 @@ def run(
         )
     used: _Used | None = None
     if template:
-        used, why = _from_template(conf, root, where, types, ident, template, layer)
+        used, why = _from_template(conf, root, where, types, ident, template, layer, with_feedback)
         if used is None:
             return refuse(why)
         scoped = [item.type for item in used.plan + used.feedback]
@@ -343,6 +347,8 @@ class _Used:
     feedback: list[plan_templates.Item]
     # (子の識別子, 全体計画の項の添字, 文面)。
     drafts: list[tuple[str, int, str]]
+    # テンプレートにあるが書かなかったフィードバック計画の項数（`--with-feedback` なしのとき）。
+    skipped_feedback: int = 0
 
 
 def _from_template(
@@ -353,6 +359,7 @@ def _from_template(
     ident: str,
     name: str,
     layer: str,
+    with_feedback: bool = False,
 ) -> tuple[_Used | None, str]:
     """テンプレートを引いて、書く中身を組む。組めなければ (None, 理由)。何も書かない。"""
     layer = layer or where.project or plan_templates.LAYER_SELF
@@ -361,6 +368,10 @@ def _from_template(
         return None, why
     template = found.template
     plan, feedback = template_use.absolute(template)
+    skipped = 0
+    if not with_feedback:
+        # フィードバック計画は全体計画の最後のレビューを見て、改版で 1 回だけ足す決まり。
+        skipped, feedback = len(feedback), []
     missing = [n for n in dict.fromkeys(i.type for i in plan + feedback) if n not in types]
     if missing:
         return None, (
@@ -384,7 +395,7 @@ def _from_template(
     drafts, why = template_use.flow_drafts(ident, template)
     if why:
         return None, why
-    return _Used(found, plan, feedback, drafts), ""
+    return _Used(found, plan, feedback, drafts, skipped), ""
 
 
 def _flow_clash(conf: settings.Settings, top: str, used: _Used) -> str:
@@ -456,6 +467,12 @@ def _report(stdout: TextIO, ident: str, path: str, used: _Used, written: list[st
     if used.feedback:
         text = _plan_text(used.feedback, len(used.plan) + 1)
         stdout.write(f"feedback（{len(used.feedback)} 項）: {text}\n")
+    elif used.skipped_feedback:
+        stdout.write(
+            f"テンプレートにはフィードバック計画（{used.skipped_feedback} 項）がある。"
+            "全体計画のレビューを見てから足すなら、`--with-feedback` を付けて作り直すか、"
+            "提案を改版で足す\n"
+        )
     for note in found.notes:
         stdout.write(f"note: {note}\n")
     for warn in found.warns:

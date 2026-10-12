@@ -153,12 +153,12 @@ def operate(
         else:
             code = ops.cancel(stdout, stderr, root, conf, target, args.reason)
     elif kind == "ticket" and verb == "new":
-        # ticket new <識別子> --title <題> (--plan <型,型,...> | --template <名前> [--layer <名前>])
-        # [--issue N]。親の提案の雛形を作る。
+        # ticket new <識別子> --title <題> (--plan <型,型,...> |
+        # --template <名前> [--layer <名前>] [--with-feedback]) [--issue N]。親の提案の雛形を作る。
         if len(words) != 3:
             stderr.write(
                 "ccnavi: ticket new <識別子> --title <題> --plan <型,型,...> [--issue N]"
-                " か --template <名前> [--layer <名前>]\n"
+                " か --template <名前> [--layer <名前>] [--with-feedback]\n"
             )
         else:
             where = cwd[-1] if isinstance(cwd, list) and cwd else cwd
@@ -174,6 +174,7 @@ def operate(
                 args.issue,
                 args.template,
                 args.layer,
+                args.with_feedback,
             )
     elif kind == "ticket" and verb == "record-risk":
         # ticket record-risk <子> <項目> yes|no --reason <根拠>

@@ -115,15 +115,20 @@ A collected template is used when a parent proposal is started. An agent may
 type it (the flow drafts have no effect either):
 
     ccnavi ticket new ID --title TITLE --template NAME [--layer self|PROJECT]
-                         [--issue N]
+                         [--with-feedback] [--issue N]
 
-It writes wip/proposals/todo/ID.md in the worktree named ID, with plan: and
-feedback: taken from the template (after is renumbered from the position inside
-each plan to the proposal's numbers; the feedback plan continues the main
-plan), then fills phases:. The flow of the n-th plan item goes to
-wip/proposals/flows/ID-NN-01.yml, a draft that has no effect until the user
-imports it in the flow editor. NAME is looked up in the common layer plus one
-layer (the worktree's own layer unless --layer says otherwise). It stops, and
+It writes wip/proposals/todo/ID.md in the worktree named ID, with plan: taken
+from the template (after is renumbered from the position inside the plan to
+the proposal's numbers), then fills phases:. feedback: is written only with
+--with-feedback (the feedback plan continues the main plan's numbers). Without
+it the output says the template has a feedback plan: the feedback plan is added
+once, by a revision, after the last review of the main plan, and writing it in
+the first proposal would stop the main plan from being revised after approval.
+--with-feedback is refused anywhere but ticket new --template. The flow of
+the n-th plan item goes to wip/proposals/flows/ID-NN-01.yml, a draft that has
+no effect until the user imports it in the flow editor. NAME is looked up in
+the common layer plus one layer (the worktree's own layer unless --layer says
+otherwise). It stops, and
 writes nothing, for an unknown or unusable template (an error, or one dropped
 by a clash), a type that phases.yml lacks, --plan given too, or a proposal or
 flow draft that already exists. The proposal still goes through the usual
@@ -293,14 +298,16 @@ scripts in .ccnavi/scripts/, which call
          .ccnavi/approved/done/; cancel moves it to .ccnavi/approved/done/)
     ccnavi ticket record-risk <child> <factor> yes|no --reason <why>   (qualitative risk)
     ccnavi ticket new <id> --title <title> --plan <type,type,...> [--issue N]
-    ccnavi ticket new <id> --title <title> --template <name> [--layer <name>] [--issue N]
-        (the second form takes the plan, and the child flow drafts, from a template;
-         see the --templates section above)
         (writes the scaffold of a parent proposal to wip/proposals/todo/<id>.md of
          the worktree named <id>; run it inside that worktree. Collects the scope
          of the chosen phases from phases.yml into allow, chains the plan in a
          straight line and fills phases:. Stops without phases.yml, for a child
          id, or when allow would be empty. Typed directly, not via ccnavi-ticket.sh)
+    ccnavi ticket new <id> --title <title> --template <name> [--layer <name>]
+                           [--with-feedback] [--issue N]
+        (the same, but the plan and the child flow drafts come from a template
+         instead of --plan; the feedback plan is written only with --with-feedback;
+         see the --templates section above)
     ccnavi ticket status [<parent>]
         (reads only: place, approval time, started or not, uncommitted / unpushed
          by the local remote-tracking ref, why it is stopped, and the next step;

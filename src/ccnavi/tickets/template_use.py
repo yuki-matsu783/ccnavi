@@ -65,7 +65,7 @@ def resolve(conf, root: str, layer: str, name: str) -> tuple[Found | None, str]:
         )
     if entry.effective and entry.layer == plan_templates.LAYER_COMMON:
         # 共通の側は、足し算の結果の定義で検査し直す。
-        types = plan_templates._types_for(conf, root, layer)
+        types = plan_templates.types_for(conf, root, layer)
         entry = plan_templates.recheck(entry, types, scanned.candidates)
     if not entry.effective or entry.template is None:
         why = entry.dropped_detail or "読めない"

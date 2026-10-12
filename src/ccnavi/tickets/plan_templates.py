@@ -69,6 +69,7 @@ import hashlib
 import os
 import re
 import stat
+import unicodedata
 from dataclasses import dataclass, field
 
 import yaml
@@ -264,16 +265,96 @@ class _Dumper(yaml.SafeDumper):
         return True
 
 
-def dump(template: Template) -> str:
-    """テンプレートを YAML の文面にする。読み直すと同じ `Template` になる。"""
+# 取り込みの差分で見えなくなる文字: 制御文字（改行・タブを除く）・書式文字（右から左への上書き、
+# 幅ゼロの文字、BOM など）・行と段落の区切り。
+_HIDDEN_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp"})
+_SHOWN_CONTROLS = "\n\t"
+
+
+def hidden_chars(text: str) -> list[str]:
+    """`text` に含まれる、読み違えを誘う文字（`\\n` と `\\t` は除く）。出てきた順で重複なし。"""
+    return list(dict.fromkeys(ch for ch in text if _hidden(ch)))
+
+
+def _hidden(ch: str) -> bool:
+    return ch not in _SHOWN_CONTROLS and unicodedata.category(ch) in _HIDDEN_CATEGORIES
+
+
+def hidden_problem(text: str) -> str:
+    """`text` に読み違えを誘う文字があれば、error にする苦情の文面。無ければ空。"""
+    hidden = hidden_chars(text)
+    if not hidden:
+        return ""
+    shown = " ".join(escape_char(ch) for ch in hidden[:8])
+    return (
+        f"制御文字・書式文字が含まれている（{shown}{' ほか' if len(hidden) > 8 else ''}）。"
+        "右から左への上書きや幅ゼロの文字、復帰などは、読み違えを誘うので使えない。消す"
+    )
+
+
+def escape_char(ch: str) -> str:
+    """1 文字を `\\uXXXX`（BMP の外は `\\UXXXXXXXX`）にする。"""
+    return f"\\u{ord(ch):04x}" if ord(ch) <= 0xFFFF else f"\\U{ord(ch):08x}"
+
+
+def reveal(text: str) -> str:
+    """表示用: 制御文字・書式文字を `\\uXXXX` に置き換える。書く中身には使わない。"""
+    return "".join(escape_char(ch) if _hidden(ch) else ch for ch in text)
+
+
+def _strings(value: object):
+    """入れ子の中の文字列（キーも）を全部返す。"""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for key, inner in value.items():
+            yield from _strings(key)
+            yield from _strings(inner)
+    elif isinstance(value, (list, tuple)):
+        for inner in value:
+            yield from _strings(inner)
+
+
+def _literal_ok(text: str) -> bool:
+    """YAML の literal block（`|`）で、中身を変えずに書ける文字列か。
+
+    行末の空白、先頭の空白、末尾の空行、タブ・制御文字・書式文字を含むものは書けない
+    （引用符で書く）。
+    """
+    if "\n" not in text or text[0] in " \n" or text.endswith("\n\n"):
+        return False
+    if any(unicodedata.category(ch) in _HIDDEN_CATEGORIES for ch in text.replace("\n", "")):
+        return False  # タブ・復帰・NEL・Zl/Zp・書式文字を含む
+    return not any(line.endswith(" ") for line in text.split("\n"))
+
+
+def _represent_str(dumper: yaml.SafeDumper, data: str):
+    style = "|" if _literal_ok(data) else None
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=style)
+
+
+_Dumper.add_representer(str, _represent_str)
+
+
+def to_yaml(data: object) -> str:
+    """テンプレート・フロー・合成した提案を YAML の文面にする共通の 1 か所。
+
+    日本語はそのまま、キーの順は渡したまま、行は折らない。改行を含む文字列は literal block で
+    書く（読める形）。literal で表せない文字列は PyYAML が選ぶ従来の書き方（引用符）になる。
+    """
     return yaml.dump(
-        template.as_data(),
+        data,
         Dumper=_Dumper,
         allow_unicode=True,
         sort_keys=False,
         default_flow_style=False,
         width=10**6,
     )
+
+
+def dump(template: Template) -> str:
+    """テンプレートを YAML の文面にする。読み直すと同じ `Template` になる。"""
+    return to_yaml(template.as_data())
 
 
 def digest(raw: bytes) -> str:
@@ -434,14 +515,7 @@ def dump_flow(body: dict) -> tuple[str, str]:
     使う側（`template_use`）が子のフローの下書きに書く文面と、`_flow_read` が確かめる文面は同じ。
     """
     try:
-        text = yaml.dump(
-            body,
-            Dumper=_Dumper,
-            allow_unicode=True,
-            sort_keys=False,
-            default_flow_style=False,
-            width=10**6,
-        )
+        text = to_yaml(body)
     except (yaml.YAMLError, RecursionError, ValueError, TypeError) as exc:
         return "", f"YAML に書けない ({_line(exc)})"
     return text, ""
@@ -486,6 +560,9 @@ def check(
                 f"`{key}` に {TODO_MARK} が残っている（固有名の一般化が済んでいない下書き）。"
                 "直してから取り込む",
             )
+    hidden = hidden_problem("\n".join(_strings(template.as_data())))
+    if hidden:
+        say(SEVERITY_ERROR, hidden)
     total = len(template.plan) + len(template.feedback)
     if total > ticket_ids.MAX_CHILD_NUMBER:
         say(
@@ -543,7 +620,7 @@ def _composed(template: Template, ptypes: dict) -> str:
             "allow": [{"match": "Write|Edit", "glob": "src/*"}],
         }
     )
-    body = yaml.dump(front, Dumper=_Dumper, allow_unicode=True, sort_keys=False, width=10**6)
+    body = to_yaml(front)
     return f"{ticket_model.FENCE}\n{body}{ticket_model.FENCE}\n"
 
 
@@ -634,7 +711,7 @@ def _flow_problems(template: Template, candidates: dict | None) -> list[Problem]
 # ---- 読む（置き場）
 
 
-def _rel(root: str, path: str) -> str:
+def relative(root: str, path: str) -> str:
     try:
         rel = os.path.relpath(path, root)
     except ValueError:
@@ -648,7 +725,7 @@ def read_entry(layer: str, root: str, path: str, writable: bool = True) -> Entry
     """置き場の 1 本を読む。読めなければ理由を error の苦情に持つ（`template` は None）。"""
     base = os.path.basename(path)
     stem = base[: -len(SUFFIX)] if base.endswith(SUFFIX) else base
-    entry = Entry(layer=layer, name=stem, path=path, rel=_rel(root, path), writable=writable)
+    entry = Entry(layer=layer, name=stem, path=path, rel=relative(root, path), writable=writable)
     raw, why = flow.read_bytes(path, root)
     if raw is None:
         entry.notes.append(Problem(SEVERITY_ERROR, stem, why))
@@ -676,7 +753,9 @@ def read_entry(layer: str, root: str, path: str, writable: bool = True) -> Entry
 
 def read_layer(layer: str, root: str, directory: str, writable: bool = True) -> LayerRead:
     """レイヤーの置き場の `<名前>.yml` を全部読む（名前順）。無いのは正常（無い = 空）。"""
-    read = LayerRead(name=layer, directory=directory, rel=_rel(root, directory), writable=writable)
+    read = LayerRead(
+        name=layer, directory=directory, rel=relative(root, directory), writable=writable
+    )
     try:
         before = os.lstat(directory)
     except FileNotFoundError:
@@ -782,7 +861,7 @@ def common_writable(conf: settings.Settings, root: str) -> bool:
     return where is None or where.is_main or not where.project
 
 
-def _types_for(conf: settings.Settings, root: str, layer: str):
+def types_for(conf: settings.Settings, root: str, layer: str):
     """そのレイヤーの検査に使うフェーズ定義（共通 + レイヤー）。共通は共通だけ。"""
     if layer == LAYER_COMMON:
         types, _ = phasetypes.common_types(conf)
@@ -813,7 +892,7 @@ def scan(conf: settings.Settings, root: str) -> Scan:
         settings.common_templates_dir(conf, root),
         writable=common_writable(conf, root),
     )
-    common_types = _types_for(conf, root, LAYER_COMMON)
+    common_types = types_for(conf, root, LAYER_COMMON)
     for entry in common.entries:
         if entry.template is not None:
             entry.checks.extend(check(entry.template, common_types, candidates))
@@ -821,7 +900,7 @@ def scan(conf: settings.Settings, root: str) -> Scan:
     for view in ruleload.layers(conf, root):
         layer = read_layer(view.name, root, settings.layer_templates_dir(conf, view.home))
         merge(common, layer)
-        types = _types_for(conf, root, view.name)
+        types = types_for(conf, root, view.name)
         for entry in layer.entries:
             if entry.template is not None and entry.effective:
                 entry.checks.extend(check(entry.template, types, candidates))
@@ -832,7 +911,8 @@ def scan(conf: settings.Settings, root: str) -> Scan:
 def adopted(scan_: Scan, layer: str) -> list[Entry]:
     """`layer` を足したときの、取り込まれた・捨てた全部（共通が先、名前順）。
 
-    共通の側の検査は、足し算の結果のフェーズ定義でやり直す（共通だけのときと食い違いうる）。
+    読み込み済みの `Entry` を並べるだけ。共通の側の検査は共通だけのフェーズ定義で済んでいて、
+    足し算の結果の定義でやり直す（`recheck`）のは呼び出し側。
     """
     view = scan_.layer(layer)
     if view is None:
@@ -906,10 +986,16 @@ def _flow_json(index: int, body: dict) -> dict:
     }
 
 
+def _dropped_json(entry: Entry) -> dict | None:
+    """足し算で取り込まれなかった理由 `{reason, detail}`。取り込まれたものは None。"""
+    if not entry.dropped:
+        return None
+    return {"reason": entry.dropped, "detail": entry.dropped_detail}
+
+
 def entry_json(entry: Entry) -> dict:
     """画面がそのまま描ける 1 本分の答え。"""
     t = entry.template
-    dropped = {"reason": entry.dropped, "detail": entry.dropped_detail} if entry.dropped else None
     return {
         "name": entry.name,
         "layer": entry.layer,
@@ -924,7 +1010,7 @@ def entry_json(entry: Entry) -> dict:
         "flows": [_flow_json(i, t.flows[i]) for i in sorted(t.flows)] if t else [],
         "effective": entry.effective,
         "usable": entry.usable,
-        "dropped": dropped,
+        "dropped": _dropped_json(entry),
         "writable": entry.writable,
         "problems": [_problem_json(p) for p in entry.problems],
     }
@@ -959,7 +1045,7 @@ def as_json(
     """
     keywords = keywords or []
     view = scan_.layer(layer)
-    types = _types_for(conf, root, layer) if view is not None else None
+    types = types_for(conf, root, layer) if view is not None else None
     chosen: list[Entry] = []
     for entry in adopted(scan_, layer):
         # 足し算の結果で検査し直すのは共通の側（レイヤーの側は同じ定義で検査済み）。
@@ -983,7 +1069,7 @@ def as_json(
                         "name": e.name,
                         "layer": e.layer,
                         "effective": e.effective,
-                        "dropped": e.dropped or None,
+                        "dropped": _dropped_json(e),
                     }
                     for e in adopted(scan_, v.name)
                 ],
