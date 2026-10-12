@@ -566,12 +566,14 @@ timed() {
 		exec </dev/null >/dev/null 2>&1
 		timed_sleep=""
 		timed_stop=""
-		trap 'timed_stop=1; test -z "$timed_sleep" || kill "$timed_sleep"; exit 0' TERM
+		# trap は印を立てて、分かっていれば sleep を止めるだけ。抜けるのは本流で、sleep の pid を控えた後に印を見る
+		# （sleep を起こした直後に TERM が来ても、sleep を残さない）。
+		trap 'timed_stop=1; test -z "$timed_sleep" || kill "$timed_sleep"' TERM
 		sleep "$timed_limit" &
 		timed_sleep=$!
-		# sleep を起こした直後に TERM が来て trap が先に走った場合は、ここで sleep を止める。
 		test -z "$timed_stop" || { kill "$timed_sleep"; exit 0; }
 		wait "$timed_sleep"
+		test -z "$timed_stop" || exit 0
 		kill "$timed_pid"
 	) &
 	timed_dog=$!
