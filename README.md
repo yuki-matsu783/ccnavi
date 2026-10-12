@@ -1785,7 +1785,8 @@ feedback:                              # フィードバック計画。レビュ
   各項が前の項を待つ一直線の `plan`、`phases:` の写しを持つ親の提案を書く。対象は親だけ。`phases.yml` が無いとき、
   `inherit` の型だけで `allow` が空になるとき、既に同じ識別子の提案があるときは、何も書かずに理由を言う。
   `ccnavi-ticket.sh` には通さず、実行ファイルを直接打つ（`--fill-phases` と同じ）。書いたあとは rationale と本文を埋め、
-  `--lint` で確かめてから承認を頼む
+  `--lint` で確かめてから承認を頼む。`--plan` の代わりに `--template <名前> [--layer <名前>]` を渡すと、溜めた
+  テンプレートから計画と子のフローの下書きを作る（「作業・レビュー計画のテンプレート」の「使う」）
 - **計画が使う定義は親に固定する（`phases:`）。** 承認は写しが承認したときの `phases.yml` と同じかを確かめる。承認のあとの判定・
   フェーズの題と見る場所・成果物・子の範囲の上限は写しを読み、`phases.yml` を読まない（あとで直しても進行中の親は変わらない）。
   写しは `ccnavi --plan-order <親> --fill-phases` で差し込む（エージェントが打ってよい）。計画を持つのに写しの無い親は止まる
@@ -2693,7 +2694,7 @@ ccnavi --templates --import <下書き> --to common|project [--layer <名前>] [
 完了した作業の計画とフローを、次の作業で使い回すためのひな形。1 ファイル（`<名前>.yml`）に、親の作業・レビュー計画
 （全体計画 `plan:` とフィードバック計画 `feedback:` の項と `after`）と、各子のフローの本文を入れる。
 一覧・検索・表示は読むだけで、何も書かないので、エージェントが打ってよい。いまの版は、読む側（一覧・検索・表示・`--lint`）と、
-溜める側（下書きの作成と取り込み）まで。テンプレートから親を起こす操作は無い。
+溜める側（下書きの作成と取り込み）、使う側（`ticket new --template`）まで。
 
 置き場は 2 層で、使うのは共通と 1 つのレイヤー（`--layer` を省けば自身のレイヤー `self`）の和。
 
@@ -2798,6 +2799,41 @@ warn にとどめる（定義は後から変わるので、使うときの承認
 | `importable` | 読めて、error が無い（取り込みの前提。取り込み先の定義での検査は `--import` が行う） |
 | `exists_in` | 同じ名前のテンプレートが在るレイヤー（`common` を含む）。在れば取り込みは置き換え（`--replace`）になる |
 | `also_in` | 同じ中身の下書きを持つほかのツリー（親のブランチに乗った下書きは子のワークツリーにも在る） |
+
+### 使う（`ticket new --template`）
+
+```sh
+ccnavi ticket new <識別子> --title <題> --template <名前> [--layer <名前>] [--issue N]
+```
+
+識別子と同名のワークツリーの中で打つ（`--plan` の雛形と同じ。`ccnavi-ticket.sh` には通さず、実行ファイルを直接打つ）。
+エージェントが打ってよい（フローの下書きに効力が無く、提案も通常の承認を通るため）。
+
+1. **テンプレートを引く。** 共通 + 1 つのレイヤー（`--layer` を省けば、ワークツリーのレイヤー）の足し算から名前で引く。
+   使えるのは足し算で取り込まれていて、error が無いもの。無い・読めない・error がある・フェーズ定義（`phases.yml`）に無い型を使う・
+   `kind` が置き場と合わない、のときは理由を言って終了コード 1（何も書かない）。共通とレイヤーに同名で中身が違うものが並ぶ
+   ときは共通が引かれ、使わなかったレイヤーの側を `note:` で言う
+2. **親の提案を書く。** `wip/proposals/todo/<識別子>.md` に、テンプレートの項から `plan:` / `feedback:`（`type`・`review`・`after`）
+   を書く。`after` はテンプレートの計画の中の添字から**提案の絶対番号に付け直す**（全体計画はそのまま、フィードバック計画は全体計画の
+   項数を足す。`--draft` が行う正規化の逆）。`allow` は計画とフィードバック計画の型の `scope` を集めたもの、`phases:` の写しは
+   `--plan` の雛形と同じく書いたあとに差し込む。書いた提案に承認の検査（順序・終端・`kind`）を当て、通らなければ消して断る
+3. **子のフローの下書きを書く。** `flows` の全体計画の n 番目の項を、`wip/proposals/flows/<識別子>-<NN>-01.yml` に書く
+   （`NN` は n の 2 桁）。子の識別子は承認のあとに決まるが、連番はフェーズごとに 1 から数えるので、親の提案の段では各フェーズの
+   最初の子 `-01` と決める。**子の提案の足場は作らない**（子の提案は手で書く。9.3）。別の連番で子を起こすなら、下書きの名前を
+   子の識別子に合わせる。下書きに効力は無く、フローの文は子への案内文になるので、ユーザがフロー編集画面で読んで取り込むまで効かない
+4. **上書きしない。** 同じ識別子の提案・承認済みチケット、子の識別子の提案・フロー・フロー下書きが在れば、何も書かずに断る。
+   `--plan` とは一緒に使えない（計画はテンプレートから作る）
+
+```text
+feature-9-from-template の提案を .../wip/proposals/todo/feature-9-from-template.md に書いた（テンプレート feature、common の .ccnavi/config/common/templates/feature.yml）
+plan（3 項）: 1 research / 2 design（待つ 1・defer） / 3 implement（待つ 2）
+feedback（2 項）: 4 implement-feedback / 5 implement-feedback（待つ 4）
+フローの下書き 1 件:
+  計画の 3 番目 -> feature-9-from-template-03-01: .../wip/proposals/flows/feature-9-from-template-03-01.yml
+下書きには効力が無い。フローの文は子への案内文になるので、ユーザがフロー編集画面で読んで取り込むまで効かない。...
+```
+
+書いたあとは、rationale と本文、テンプレートの固有名の残りを直し、`ccnavi --lint` で確かめてから承認をユーザに頼む。
 
 ## ドキュメントの索引
 
@@ -3022,7 +3058,8 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/review_close.py` | 親を閉じる（`review ready` と `close-early`） |
 | `src/ccnavi/tickets/plan_order.py` | 計画の番号の振り直しと、提案への書き戻し（`--plan-order <親>`）。書き換えた全文を読み直す検査はここにまとめる |
 | `src/ccnavi/tickets/plan_phases.py` | 計画が使うフェーズ定義を、親の提案の `phases:` に写す（`--plan-order <親> --fill-phases`） |
-| `src/ccnavi/tickets/scaffold.py` | 親の提案の雛形を作る（`ticket new`）。選んだフェーズの `scope` を集めて `allow` に書き、一直線の `plan` と `phases:` の写しを入れる |
+| `src/ccnavi/tickets/scaffold.py` | 親の提案の雛形を作る（`ticket new`）。選んだフェーズの `scope` を集めて `allow` に書き、一直線の `plan`（`--template` ならテンプレートの計画）と `phases:` の写しを入れる |
+| `src/ccnavi/tickets/template_use.py` | テンプレートを使う側。名前で引く（使えるものだけ）・`after` を提案の絶対番号に付け直す・子のフローの下書きの識別子と文面を組む |
 | `src/ccnavi/tickets/ops.py` | チケットの状態を動かす `ticket start / finish / cancel / record-risk`。閉じるときに実績のリスクを数える |
 | `src/ccnavi/tickets/ops_close.py` | チケットを引いて動かしてよいかの検査。置き場の引き当て、取り込み済みの親子の停止、着手の前（親・先行）と終了の前（親を閉じられる・成果物）の検査 |
 | `src/ccnavi/tickets/ops_stop.py` | Stop で `finish` の打ち忘れを促す判定と、基準点の確認（git の読み取り） |
