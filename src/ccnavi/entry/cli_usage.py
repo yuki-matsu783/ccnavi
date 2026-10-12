@@ -84,6 +84,56 @@ documented in README.md ("ドキュメントの索引"). These filters are for -
 only; anywhere else they stop the run with exit 1, and flags that belong to
 other runs stop --docs the same way.
 
+To list, search and read the work/review plan templates (a plan with its
+child flows in one file, kept in .ccnavi/config/common/templates/ and
+.ccnavi/config/project/templates/; it reads only and writes nothing):
+
+    ccnavi --templates [--layer self|PROJECT] [--keyword K]... [--json]
+    ccnavi --templates --show NAME [--layer self|PROJECT] [--json]
+
+The list is the common layer plus one layer (self unless --layer says
+otherwise). --keyword matches part of the name, description or when (given
+twice, either one); --show prints one template with its plan, flows and
+checks. A name that is in both layers with different content is an error, and
+the layer's one is not used. --json is the complete answer the board screen
+draws, documented in README.md ("作業・レビュー計画のテンプレート"). --keyword
+is shared with --docs and is refused elsewhere; the other --docs filters are
+refused here. --lint reports the same checks.
+
+Templates are collected in two steps. An agent may type --draft: it copies the
+plan and the child flows of a finished parent (still in done/) into a draft at
+wip/proposals/templates/NAME.yml, which has no effect and is never overwritten.
+Only the user types --import: without --yes it writes nothing and shows the
+check and the diff against the same name in the target; with --yes and the
+draft's hash as --expect it writes, then removes the draft if it is unchanged.
+
+    ccnavi --templates --draft PARENT [--name NAME] [--json]
+    ccnavi --templates --import DRAFT --to common|project [--layer NAME]
+                       [--replace] [--yes --expect HASH] [--json]
+
+A collected template is used when a parent proposal is started. An agent may
+type it (the flow drafts have no effect either):
+
+    ccnavi ticket new ID --title TITLE --template NAME [--layer self|PROJECT]
+                         [--with-feedback] [--issue N]
+
+It writes wip/proposals/todo/ID.md in the worktree named ID, with plan: taken
+from the template (after is renumbered from the position inside the plan to
+the proposal's numbers), then fills phases:. feedback: is written only with
+--with-feedback (the feedback plan continues the main plan's numbers). Without
+it the output says the template has a feedback plan: the feedback plan is added
+once, by a revision, after the last review of the main plan, and writing it in
+the first proposal would stop the main plan from being revised after approval.
+--with-feedback is refused anywhere but ticket new --template. The flow of
+the n-th plan item goes to wip/proposals/flows/ID-NN-01.yml, a draft that has
+no effect until the user imports it in the flow editor. NAME is looked up in
+the common layer plus one layer (the worktree's own layer unless --layer says
+otherwise). It stops, and
+writes nothing, for an unknown or unusable template (an error, or one dropped
+by a clash), a type that phases.yml lacks, --plan given too, or a proposal or
+flow draft that already exists. The proposal still goes through the usual
+approval.
+
 The common layer's own three files are moved by --rules, --phases and --risk,
 and where the layers are looked for by --projects and --project-home. All five
 are on the same gate: diagnosis only, dropped everywhere else.
@@ -253,6 +303,11 @@ scripts in .ccnavi/scripts/, which call
          of the chosen phases from phases.yml into allow, chains the plan in a
          straight line and fills phases:. Stops without phases.yml, for a child
          id, or when allow would be empty. Typed directly, not via ccnavi-ticket.sh)
+    ccnavi ticket new <id> --title <title> --template <name> [--layer <name>]
+                           [--with-feedback] [--issue N]
+        (the same, but the plan and the child flow drafts come from a template
+         instead of --plan; the feedback plan is written only with --with-feedback;
+         see the --templates section above)
     ccnavi ticket status [<parent>]
         (reads only: place, approval time, started or not, uncommitted / unpushed
          by the local remote-tracking ref, why it is stopped, and the next step;

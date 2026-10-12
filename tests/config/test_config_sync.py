@@ -15,6 +15,7 @@ app は `.ccnavi/` を持たない。
    共通レイヤーから無くなったファイルはミラーからも消す。`script:` の値は書き換えない
 2. 子の着手とワークスペース自身の作業では写さない
 3. 写せない形（読めない・リンク・書き込みの失敗）では何も写さず、着手しない。
+   error のあるテンプレートだけは1本ずつ写さずに飛ばし、着手は止めない。
    上書きの記録・知らせ・閉じるのを止める処理は無い
 4. ミラーの書き込みを、実行後チェックとバックアップと復元が戻さず、報告もしない。条件は 3 つ
    （承認済みの親のワークツリーの
@@ -30,7 +31,7 @@ from unittest import mock
 
 from ccnavi.infra import settings
 from ccnavi.tickets import configsync, risk
-from tests import phasecopy
+from tests import ROOT, phasecopy
 from tests.config.test_config_union import (
     COMMON_PHASES,
     COMMON_RISK,
@@ -43,6 +44,7 @@ from tests.config.test_config_union import (
     ticket_text,
     write,
 )
+from tests.inproc import run_ccnavi
 from tests.ticketsample import PLAIN_PHASES
 
 SCOPE = ("src/*",)
@@ -52,6 +54,9 @@ COMMON_SCRIPT_RISK = (
     + "  - {id: counted, points: 5, script: .ccnavi/config/common/scripts/count.sh, message: 数えた}\n"  # noqa: E501
 )
 COUNT_SH = "printf '{\"points\": 1}'\n"
+FEATURE_TEMPLATE = (
+    "name: feature\ndescription: 機能を設計する\nwhen: 新しい機能を足すとき\nplan: [design]\n"
+)
 EXPECTATIONS = "version: 1\nexpectations: []\n"
 
 
@@ -161,6 +166,122 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertTrue(
             configsync.is_synced_write(conf, self.ws, mirror_of(tree, "scripts/count.sh"))
         )
+
+    def add_template(self, name="feature", text=FEATURE_TEMPLATE):
+        directory = os.path.join(self.ws, ".ccnavi", "config", "common", "templates")
+        return write(os.path.join(directory, name + ".yml"), text)
+
+    def test_a_common_template_is_mirrored_and_kept_by_the_next_plan(self):
+        """1: 共通のテンプレートも写す。ミラーに置いたものが次の着手で消されない。"""
+        conf = self.settings()
+        self.add_template()
+        write(
+            os.path.join(self.ws, ".ccnavi", "config", "common", "templates", ".hidden.yml"),
+            "x: 1\n",
+        )
+        write(
+            os.path.join(self.ws, ".ccnavi", "config", "common", "templates", "notes.txt"),
+            "x\n",
+        )
+
+        tree, started = self.start_parent()
+
+        self.assertEqual(read(mirror_of(tree, "templates/feature.yml")), FEATURE_TEMPLATE)
+        self.assertIn(".ccnavi/config/common/templates/feature.yml", started.stdout)
+        # `.yml` でないものと、`.` で始まるものは、テンプレートとして読まれないので写さない。
+        self.assertFalse(os.path.exists(mirror_of(tree, "templates/notes.txt")))
+        self.assertFalse(os.path.exists(mirror_of(tree, "templates/.hidden.yml")))
+        self.assertTrue(
+            configsync.is_synced_write(conf, self.ws, mirror_of(tree, "templates/feature.yml"))
+        )
+        # 中身が違えば外さない（サブディレクトリでも判定は変わらない）。
+        self.assertFalse(
+            configsync.is_synced_write(
+                conf, self.ws, mirror_of(tree, "templates/feature.yml"), b"name: feature\n"
+            )
+        )
+        # 写し終えたあとの次の計画は、何も変えない（ミラーに在るテンプレートを消さない）。
+        changes, why = configsync.plan(conf, self.ws, tree)
+        self.assertEqual((changes, why), ([], ""))
+
+    def test_the_mirrored_template_is_read_as_the_common_one_in_a_single_clone(self):
+        """1: 単体 clone では、ミラー（`config/common/`）が共通として `--templates` に読まれる。"""
+        self.add_template()
+        tree, _ = self.start_parent()
+
+        shown = run_ccnavi(
+            ["--root", tree, "--templates", "--json"],
+            env={k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            cwd=ROOT,
+        )
+
+        self.assertEqual(shown.returncode, 0, shown.stdout + shown.stderr)
+        answer = json.loads(shown.stdout)
+        common = [layer for layer in answer["layers"] if layer["name"] == "common"][0]
+        self.assertEqual([t["name"] for t in common["templates"]], ["feature"])
+        self.assertEqual(
+            common["templates"][0]["path"], ".ccnavi/config/common/templates/feature.yml"
+        )
+        self.assertEqual(
+            [(t["name"], t["effective"]) for t in answer["templates"]], [("feature", True)]
+        )
+
+    def test_a_template_gone_from_the_common_layer_is_removed_from_the_mirror(self):
+        """1: 共通のテンプレートが無くなれば、ミラーからも消す。空になった置き場も片付ける。"""
+        write(mirror_of(self.lib, "templates/old.yml"), FEATURE_TEMPLATE.replace("feature", "old"))
+        git(self.lib, "add", "-A")
+        git(self.lib, "commit", "--quiet", "-m", "old mirror")
+
+        tree, started = self.start_parent()
+
+        self.assertFalse(os.path.exists(mirror_of(tree, "templates/old.yml")))
+        self.assertFalse(os.path.isdir(mirror_of(tree, "templates")))
+        self.assertIn("消した", started.stdout)
+
+    def skipped_template_keeps_the_start(self, text):
+        """3: error のあるテンプレートは写さずに飛ばす。そのために着手は止めない。"""
+        self.add_template(text=text)
+
+        tree, started = self.start_parent()
+
+        self.assertEqual(started.returncode, 0, started.stderr)
+        self.assertTrue(os.path.isfile(mirror_of(tree, "rules.yml")))
+        self.assertFalse(os.path.exists(mirror_of(tree, "templates/feature.yml")))
+
+    def test_a_template_that_is_not_yaml_is_skipped(self):
+        self.skipped_template_keeps_the_start("plan: [design\n")
+
+    def test_a_template_with_a_broken_shape_is_skipped(self):
+        self.skipped_template_keeps_the_start(
+            "name: feature\ndescription: d\nplan: [design]\nflows: 3\n"
+        )
+
+    def test_a_template_with_only_warnings_is_mirrored(self):
+        """3: 定義に無い型は warn にとどまる（定義は後から変わる）。止めずに写す。"""
+        self.add_template(text=FEATURE_TEMPLATE.replace("design", "nothing-like-it"))
+
+        tree, _ = self.start_parent()
+
+        self.assertTrue(os.path.isfile(mirror_of(tree, "templates/feature.yml")))
+
+    def test_a_symlinked_templates_place_skips_only_the_templates(self):
+        """3: 共通のテンプレートの置き場がリンクなら、テンプレートだけ写さず、着手は止まらない。"""
+        real = os.path.join(self.ws, "elsewhere")
+        write(os.path.join(real, "feature.yml"), FEATURE_TEMPLATE)
+        link = os.path.join(self.ws, ".ccnavi", "config", "common", "templates")
+        self.symlink_or_skip(real, link)
+        self.propose(
+            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
+        )
+        self.assertEqual(self.approve().returncode, 0)
+        tree = self.worktree(self.lib, "i0001")
+
+        started = self.ccnavi("ticket", "start", "i0001")
+
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        self.assertFalse(os.path.exists(mirror_of(tree, "templates/feature.yml")))
+        # ほかの設定のミラーは写る。
+        self.assertTrue(os.path.isfile(mirror_of(tree, "rules.yml")))
 
     def test_a_script_shared_by_two_factors_is_mirrored_once(self):
         """1: 2 つの項目が同じスクリプトを指しても、写すのは 1 回。"""

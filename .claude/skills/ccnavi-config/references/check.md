@@ -50,7 +50,7 @@ ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml --log "" 
 - glob が全体に当たる書き方になっていない。 `git push *` は `cd /repo && git push` に
   当たらない。`*git push*` なら当たる
 - 語の切れ目が無い。 `*sed*` が `sedate` に当たる。右は `*sed *`、左は regex
-- タイプの順で強い側が先に当たっている。 allow に置いた期待が deny の `raw-git` に当たる、
+- タイプの順で強い側が先に当たっている。 allow に置いた期待が deny の `builtin-guard-raw-git` に当たる、
   など。この形なら期待の置き場かルールの広さのどちらかが間違っている
 
 `--json` を付けると翻訳後の正規表現（`pattern`）と返る文面（`response`）まで出る。

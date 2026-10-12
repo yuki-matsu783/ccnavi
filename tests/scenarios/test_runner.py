@@ -159,6 +159,39 @@ class EvaluateTest(unittest.TestCase):
             self.assertEqual(runner.check_state(ng, d)[0], runner.FAIL)
 
 
+class FinishOrderTest(unittest.TestCase):
+    """finish は state を確かめてから setup のファイルを消す。"""
+
+    REL = "sub/keep.txt"
+
+    def run_finish(self, root, out, scn):
+        st = {
+            "setup_made": runner._setup(scn, root),
+            "session_ids": [],
+            "pre_digests": {},
+            "cost_usd": 0.0,
+        }
+        return runner.finish(scn, out, st, root)
+
+    def scenario(self):
+        return {
+            "id": "UC-XX",
+            "title": "t",
+            "setup": {"files": {self.REL: "x\n"}},
+            "expect": {"state": [{"run": f"cat {self.REL}", "expect_contains": "x"}]},
+        }
+
+    def test_state_sees_setup_files(self):
+        with tempfile.TemporaryDirectory() as d:
+            root, out = Path(d) / "root", Path(d) / "out"
+            root.mkdir()
+            out.mkdir()
+            code = self.run_finish(root, out, self.scenario())
+            self.assertEqual(code, 0)
+            report = json.loads((out / "report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report[0]["verdict"], runner.PASS)
+
+
 class PreflightTest(unittest.TestCase):
     def test_missing_project_dir_is_reported_not_raised(self):
         with tempfile.TemporaryDirectory() as d:

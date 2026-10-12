@@ -374,10 +374,13 @@ def drive(scn, out, st, root):
 
 
 def finish(scn, out, st, root):
-    _cleanup(st["setup_made"], root)
-    raw = "".join(p.read_text(encoding="utf-8") for p in sorted(out.glob("step-*.jsonl")))
-    rows = read_decisions(Path(root) / "logs/decisions.jsonl", st["session_ids"])
-    results = evaluate(scn["expect"], rows, raw, root, st["pre_digests"])
+    try:
+        # state の run は setup のファイルが残っているうちに回す。消すのは判定のあと
+        raw = "".join(p.read_text(encoding="utf-8") for p in sorted(out.glob("step-*.jsonl")))
+        rows = read_decisions(Path(root) / "logs/decisions.jsonl", st["session_ids"])
+        results = evaluate(scn["expect"], rows, raw, root, st["pre_digests"])
+    finally:
+        _cleanup(st["setup_made"], root)
     write_report(scn, out, st, results, rows, raw)
     final = overall(results)
     print(f"\n結果: {final}（レポート: {out}/report.md）")

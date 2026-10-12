@@ -43,7 +43,15 @@ from ..tickets import (
     syncstate,
     ticket_model,
 )
-from . import lint_layers, lint_places, lint_project, lint_rules, lint_ticket, version
+from . import (
+    lint_layers,
+    lint_places,
+    lint_project,
+    lint_rules,
+    lint_templates,
+    lint_ticket,
+    version,
+)
 
 # `--lint --json` の形の版。欄を足すだけなら上げない。欄の意味や名前を変えたら上げ、
 # 読む側（VS Code 拡張）は違う版を「読めない」として扱う。
@@ -340,6 +348,7 @@ def check(
     problems.extend(lint_layers._layers(io.StringIO(), conf, root))
     problems.extend(lint_layers._legacy_places(conf, root))
     problems.extend(lint_layers._layer_configs(conf, root))
+    problems.extend(lint_templates._templates(conf, root))
     problems.extend(lint_layers._worktree_layers(conf, root))
     problems.extend(lint_places._ticket_places(conf, root))
     problems.extend(lint_places._projectless_worktrees(conf, root))
