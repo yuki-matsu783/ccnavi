@@ -62,7 +62,7 @@ if (styleless.length > 0) {
   process.exit(1);
 }
 
-// 案内の定義（`src/webview/tours/*.yml`）を、JSON のモジュールにして読ませる。画面に YAML の解析器を入れないため、
+// 案内の定義（`src/webview/tours/*.yml`）を、JSON のモジュールにして読ませる。実行時に YAML を解析しない（案内のために解析器を足さない）ため、
 // 読むのはここ（ビルドのとき）だけ。形の検査は画面が `tourOf`（`src/core/tour-def.ts`）で行い、テストも同じ検査を通す。
 const yamlPlugin = {
   name: "tour-yaml",

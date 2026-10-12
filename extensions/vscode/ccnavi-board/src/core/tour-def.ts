@@ -1,7 +1,7 @@
 /**
  * 案内（ツアー）の定義の形。画面ごとの YAML（`src/webview/tours/<画面>.yml`）を読んだ値を確かめて、画面が使う形にする。
  *
- * YAML は esbuild のプラグインが JSON にしてバンドルに入れる（`scripts/bundle-webview.js`）ので、画面は YAML の解析器を持たない。
+ * YAML は esbuild のプラグインが JSON にしてバンドルに入れる（`scripts/bundle-webview.js`）ので、実行時に YAML を解析しない（案内のために解析器を足さない。ボードとフローのバンドルには、フローの読み書き（`flow-doc.ts`）の都合で別に入っている）。
  * ここは形の検査だけで、DOM にも VS Code の API にも触れない。テストは YAML を直に読んで同じ検査を通す。
  *
  * 1 本の YAML に入るもの:

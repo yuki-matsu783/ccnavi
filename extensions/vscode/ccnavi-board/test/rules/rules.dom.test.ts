@@ -1425,3 +1425,37 @@ test("CB-D306 案内の間は、ルールを足す・変換するなどの編集
     await dom.close();
   }
 });
+
+test("CB-D320 案内の間は、案内の外の操作（開く・選ぶ・読み直す・判定・タブ・畳み・追加）が拡張ホストへも実際の state へも届かない", async () => {
+  const dom = await openRules();
+  try {
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 1);
+    // 案内の覆いは押せないので、ボタンへ直にクリックを流して送信口とハンドラの守りを見る
+    const selectors = [
+      '[data-action="open-rules"]',
+      '[data-action="reload"]',
+      '[data-action="expectations"]',
+      '[data-action="suggest"]',
+      '[data-action="judge"]',
+      '[data-action="fold-section"]',
+      '[data-action="add"]',
+      '[data-tab="hooks"]',
+    ];
+    for (const selector of selectors) {
+      for (const el of dom.all(selector)) {
+        dom.click(el);
+      }
+    }
+    await dom.settle();
+    assert.deepEqual(
+      dom.posted.filter((message) => message.type !== "ready"),
+      [],
+      "案内の間に拡張ホストへ送った",
+    );
+    assert.equal((dom.state() as { tab?: string } | undefined)?.tab, undefined, "案内の間に実際のタブを書いた");
+  } finally {
+    await dom.close();
+  }
+});

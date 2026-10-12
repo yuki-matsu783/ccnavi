@@ -26,7 +26,7 @@ import { ExpectationsResult, JudgeResult, SuggestResult, type Judged } from "./J
 import { TargetSelect } from "../TargetSelect.js";
 import { defaultSum } from "../../core/sums.js";
 import { Sum } from "./Sum.js";
-import { post } from "./post.js";
+import { mutePosts, post } from "./post.js";
 import { Rule } from "./Rule.js";
 import {
   draftOf,
@@ -138,6 +138,12 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     },
   });
   const requestTour = tour.request;
+  // 案内の間は、見本の上の操作を拡張ホストへ送らない（`tourDone` だけ返す）。描いたあとに切り替える
+  const touringNow = tour.touring;
+  useLayoutEffect(() => {
+    mutePosts(touringNow);
+    return () => mutePosts(false);
+  }, [touringNow]);
 
   /**
    * 未保存の変更の有無が変わったら拡張ホストに伝える。同じ種類のタブは 1 枚で、別の対象を開くと
@@ -298,6 +304,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   }, [focusKey]);
 
   const showTab = (name: TabName): void => {
+    if (tour.touring) {
+      return;
+    }
     setTab(name);
     saveTab(name);
   };
@@ -318,6 +327,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
    * 「破棄して読み直す？」をやめたときは `cancelled` が返り、ボタンが戻る。
    */
   const reload = (): void => {
+    if (tour.touring) {
+      return;
+    }
     setBusy(true);
     setStatus(undefined);
     post({ type: "reload", dirty });
@@ -406,6 +418,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   };
 
   const add = (section: Section): void => {
+    if (tour.touring) {
+      return;
+    }
     const row = { key: nextKey(), rule: emptyRule() };
     // 足したルールは開いて出す。折りたたんだままでは何を足したか分からない
     editDraft({ ...draft, [section]: [...draft[section], row] }, new Set([...open, row.key]));
@@ -414,6 +429,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   };
 
   const fold = (section: Section): void => {
+    if (tour.touring) {
+      return;
+    }
     setFolded(folded.has(section) ? without(folded, section) : new Set([...folded, section]));
   };
 
@@ -546,7 +564,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </nav>
       <section id="tab-rules" data-tour="rules" className={`pane${shownTab === "rules" ? " active" : ""}${query === "" ? "" : " finding"}`} ref={list}>
         <div className="find">
-          <input id="find" data-tour="find" type="search" placeholder="id・ツール・パターン・メッセージで絞り込む" spellCheck={false} value={shownFind} onChange={(event) => setFind(event.target.value)} />
+          <input id="find" data-tour="find" type="search" placeholder="id・ツール・パターン・メッセージで絞り込む" spellCheck={false} value={shownFind} onChange={(event) => (tour.touring ? undefined : setFind(event.target.value))} />
           <span className="hint" data-tour="order-hint">判定は強い順に deny &gt; ask &gt; allow</span>
         </div>
         {SECTIONS.map((section) => {
@@ -599,10 +617,10 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
                     onMoveSection={(to) => moveSection(section, row.key, to)}
                     onMove={(delta) => move(section, row.key, delta)}
                     onRemove={() => remove(section, row.key)}
-                    onOpenPicker={() => setPickerKey(row.key)}
+                    onOpenPicker={() => (tour.touring ? undefined : setPickerKey(row.key))}
                     onPickFile={(field) => post({ type: "pickFile", key: row.key, field })}
                     pickNode={touring ? (typeof scene.when === "string" ? scene.when : "r") : undefined}
-                    onToggleMore={(value) => setMoreOpen(new Map([...moreOpen, [row.key, value]]))}
+                    onToggleMore={(value) => (tour.touring ? undefined : setMoreOpen(new Map([...moreOpen, [row.key, value]])))}
                   />
                 ))}
               </ul>
