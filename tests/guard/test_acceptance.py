@@ -74,7 +74,7 @@ class VerdictTest(unittest.TestCase):
         self.assertIn("ask the user", out["permissionDecisionReason"])
 
     def test_通す呼び出しは何も言わない(self):
-        result = run(payload=pre_tool_use("Bash", "command", "git status"))
+        result = run(payload=pre_tool_use("Bash", "command", "ls -la"))
 
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout, "", "通る呼び出しでは標準出力は空")
@@ -217,7 +217,7 @@ class ReadingTest(unittest.TestCase):
         for command in [
             'grep -n "git push" README.md',
             'echo "git push origin main"',
-            'git commit -m "git push を拒否する理由を書く"',
+            'echo "git push を拒否する理由を書く"',
             "# git push origin main",
             "echo $((1 << 2))",
         ]:

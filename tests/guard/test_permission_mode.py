@@ -213,7 +213,8 @@ class RulesStillWinTest(unittest.TestCase):
 
     def test_an_explicit_ask_is_never_handed_over(self):
         """ルールが ask と書いた場所は、auto でもユーザに出す。意図した確認ポイント。"""
-        result, record = run("auto", command="git commit -m x")
+        # 生の git は組み込みの deny が先に止めるので、ask の例には使わない（fixture の release）。
+        result, record = run("auto", command="make release")
         self.assertEqual("ask", decision_of(self, result))
         self.assertEqual("RULE_ASK", record["code"])
 

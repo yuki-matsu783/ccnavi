@@ -231,7 +231,7 @@ class WordSepTest(_Readable, unittest.TestCase):
 
     def test_語の中の目印も持ち込めない(self):
         # コマンドの区切りと同じ。入力の側がこの目印を騙れると、`git␁push` のような
-        # 実在しない 1 語に見せて raw-git を外せる。取り除いて `git push` と読む。
+        # 実在しない 1 語に見せて builtin-guard-raw-git を外せる。取り除いて `git push` と読む。
         text = self.readable("git" + WORD_SEP + "push")
         self.assertNotIn(WORD_SEP, text)
         self.assertEqual(text, "git push")

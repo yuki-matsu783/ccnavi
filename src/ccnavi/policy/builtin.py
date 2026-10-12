@@ -82,7 +82,10 @@ def rule_data(root: str, conf: settings.Settings) -> dict:
     )
     return {
         "version": rules.VERSION,
-        "deny": [_config_via_bash(shell, settings.git_command(root)), *_deny(root)],
+        "deny": [
+            _config_via_bash(shell, settings.git_command(root), settings.has_git_wrapper(root)),
+            *_deny(root),
+        ],
         "allow": _ALLOW,
     }
 
@@ -117,7 +120,16 @@ def read_allow() -> list[rules.Rule]:
 CONFIG_VIA_BASH_RULE_ID = "builtin-guard-config-via-bash"
 
 
-def _config_via_bash(regex: str, git: str = "git") -> dict:
+def _config_via_bash(regex: str, git: str = "git", wrapper: bool = False) -> dict:
+    # 競合の解き方の一文は、ラッパーがあるときだけ書く。無いときは生の git が止まるので、
+    # 打てる形を案内せず、ユーザに頼む。
+    resolve = (
+        "Resolving a merge conflict is not blocked: "
+        f"'{git} add <path>' and '{git} restore --ours -- <path>' (or --theirs) put back "
+        "a version that is already committed instead of writing new content."
+        if wrapper
+        else "Resolving a merge conflict needs the user, because git is not run by the agent here."
+    )
     return {
         "id": CONFIG_VIA_BASH_RULE_ID,
         "match": "Bash",
@@ -129,10 +141,7 @@ def _config_via_bash(regex: str, git: str = "git") -> dict:
             "ccnavi is running on its built-in defaults because its rule file "
             "could not be read, and the shell is not the way to write it. "
             "Put new content there with the Write or Edit tool, so the repair "
-            "goes through a path that is checked and recorded. Resolving a merge "
-            f"conflict is not blocked: '{git} add <path>' and "
-            f"'{git} restore --ours -- <path>' (or --theirs) put back "
-            "a version that is already committed instead of writing new content."
+            "goes through a path that is checked and recorded. " + resolve
         ),
     }
 
@@ -297,22 +306,26 @@ RECURSIVE_DELETE_REGEX = (
 )
 
 
-# 設定で動かない残り。止める形は設定に依らない。文面の git の打ち方だけがワークスペースで変わる
-# （ラッパーがあればラッパー。生の git が止まるワークスペースで、止まる形を案内しないため）。
+# 設定で動かない残り。止める形は設定に依らない。文面の git の打ち方だけがワークスペースで変わる。
+# ラッパーが無いときは生の git も止まるので、`git` の形を案内せず、ユーザに頼む文にする。
 def _deny(root: str) -> list[dict]:
     git = settings.git_command(root)
+    wrapper = settings.has_git_wrapper(root)
     return [
         {
-            "id": "builtin-recursive-delete",
+            "id": "builtin-deny-recursive-delete",
             "match": "Bash",
             "regex": RECURSIVE_DELETE_REGEX,
             "message": (
                 "A recursive forced delete cannot be undone. Name what to remove "
                 f"one at a time, or use '{git} rm <path>' when the files are tracked."
+                if wrapper
+                else "A recursive forced delete cannot be undone. Name what to remove "
+                "one at a time, or ask the user to remove it."
             ),
         },
         {
-            "id": "builtin-git-push",
+            "id": "builtin-deny-git-push",
             "match": "Bash",
             "regex": GIT_PUSH_REGEX,
             "message": (
@@ -321,16 +334,18 @@ def _deny(root: str) -> list[dict]:
             ),
         },
         {
-            "id": "builtin-git-reset-hard",
+            "id": "builtin-deny-git-reset-hard",
             "match": "Bash",
             "regex": GIT_RESET_HARD_REGEX,
             "message": (
                 f"Work in progress would be lost. Use '{git} stash push -u' to set it "
                 f"aside, or name the files and use '{git} restore <path>'."
+                if wrapper
+                else "Work in progress would be lost. Ask the user before discarding changes."
             ),
         },
         {
-            "id": "builtin-credentials",
+            "id": "builtin-deny-credentials",
             "match": "Bash|Read|Write|Edit",
             # 先頭の境界（行頭・空白・区切り）を付ける。常時有効の土台なので、
             # `jq '.env.X'` のようなフィールド参照や `process.env` を巻き込まない
@@ -350,13 +365,13 @@ def _deny(root: str) -> list[dict]:
             "id": GIT_DIR_RULE_ID,
             "match": "Write|Edit|NotebookEdit",
             "regex": selfguard_shell.GIT_DIR_PATH_REGEX,
-            "message": _git_dir_message(git),
+            "message": _git_dir_message(git, wrapper),
         },
         {
             "id": GIT_DIR_SHELL_RULE_ID,
             "match": "Bash",
             "regex": selfguard_shell.git_dir_shell_regex(),
-            "message": _git_dir_message(git),
+            "message": _git_dir_message(git, wrapper),
         },
     ]
 
@@ -369,11 +384,12 @@ GIT_DIR_RULE_ID = "builtin-guard-git-dir"
 GIT_DIR_SHELL_RULE_ID = "builtin-guard-git-dir-via-bash"
 
 
-def _git_dir_message(git: str) -> str:
+def _git_dir_message(git: str, wrapper: bool) -> str:
+    how = f"If a git subcommand does the job, run it as '{git} <subcommand>'. " if wrapper else ""
     return (
         "This writes inside the .git directory directly. Changes there bypass git "
-        "and can lose history or run commands through hooks. If a git subcommand does "
-        f"the job, run it as '{git} <subcommand>'. No subcommand edits hooks, "
+        f"and can lose history or run commands through hooks. {how}"
+        "No subcommand edits hooks, "
         ".git/info/exclude, MERGE_MSG, index.lock or the .git file of a worktree: "
         "ask the user to change them, naming the file and why. For a stale index.lock, "
         "first confirm that no git process is running, then ask the user to remove it. "
@@ -388,7 +404,7 @@ _ALLOW: list[dict] = [
         # ここまで確認を出すと、本当に見てほしい 1 件が見落とされる。
         # Grep と Glob は書かない。対象は取り出せる（探し始める場所のパス）が、
         # それは探索の中身を代表しない。Read は 1 ファイルずつなので
-        # builtin-credentials が先に当たって止まるのに対し、Grep はその deny の
+        # builtin-deny-credentials が先に当たって止まるのに対し、Grep はその deny の
         # match に無いので、ここで広く許すと credentials ごと止められずに通る。
         "id": "builtin-read-anything",
         "match": "Read",

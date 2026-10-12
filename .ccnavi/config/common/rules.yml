@@ -86,26 +86,6 @@ deny:
       ファイルを読む・書く・探すなら Read / Write / Edit / Grep / Glob ツールを使ってください。 
       PowerShell でしか実行できないことはユーザに実行を依頼してください。     
 
-  # 生の git はまとめて止め、入口を .ccnavi/scripts/ccnavi-git.sh の 1 本に寄せる。
-  # 止める理由は 2 つ。
-  #
-  #   1. 出力がそのままコンテキストに載る。`git log -p` はこのリポジトリで 2 万行
-  #   2. `Bash(git diff:*)` は前方一致でしかなく、後ろに何を足されても通る。
-  #      `-c diff.external=<コマンド>` は分類上ただの diff のまま任意コマンドを実行する
-  #
-  # glob ではなく regex なのは、`*git*` だと誘導先の `ccnavi-git.sh` にも当たって
-  # 出口ごと塞がるため。`git` の前が語の頭か切れ目の字（`/usr/bin/git` の `/` も切れ目）の形を拾う。
-  # パスの前置き（`(\S*[\\/])?`）は書かない。`/` も切れ目の字なので当たる形は同じで、書くと
-  # 長い語で照合が入力の長さの 2 乗に伸び、hook の timeout を超えて止められずに通る。
-  - id: raw-git
-    match: Bash
-    regex: '(^|[^\w.-])git(\.exe)?\s'
-    message: >-
-      生の git は実行しません。'sh {root}/.ccnavi/scripts/ccnavi-git.sh <サブコマンド> ...'
-      を使ってください（コマンド名を変数に入れず、パスをそのまま書く）。diff も同じ入口です
-      （'sh {root}/.ccnavi/scripts/ccnavi-git.sh diff ...'）。通る形は同じスクリプトの
-      --help 参照。返るのは要約と先頭 40 行だけで、全量は logs/ に残ります。
-
   # settings.json の permissions.deny と同じ場所を並べてある。
   # `.pem` と `.key` は拡張子として書かれた形だけに絞ってある。
   # Bash はコマンド列の全体に当てるので、例外を付けると `cat .env; cat .env.example` のように
@@ -119,7 +99,7 @@ deny:
   # （.env.example / .env.sample / .env.template。値を持たない）。除くのは名前で終わる形だけで、
   # `.env.example.bak` も、末尾に改行を足した形も除かない（`$` は改行の直前にも当たるので `\Z`）。
   # 例外は .env の個別条件にだけ掛ける。組み合わせ条件全体に掛けると `secrets/.env.example` や `.aws/.env.example`
-  # のように他の個別条件に当たるパスまで外れ、組み込みの builtin-credentials が見ない NotebookEdit では
+  # のように他の個別条件に当たるパスまで外れ、組み込みの builtin-deny-credentials が見ない NotebookEdit では
   # そのまま素通りする。個別条件は上の credentials の regex を意味ごとに分けたもの。
   - id: credentials-files
     match: Read|Write|Edit|NotebookEdit
