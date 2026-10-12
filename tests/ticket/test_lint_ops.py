@@ -138,6 +138,13 @@ class LintOpsTest(PhaseHarness):
         lint = self.ccnavi("--lint", "--mode", "enable", env={"CCNAVI_BRANCH_PREFIXES": "wip"})
         self.assertIn("feature-12-direct の名前が", lint.stdout)
 
+    def test_worktree_name_says_the_form_only_when_it_is_off(self):
+        off = self.ccnavi("worktree", "name", "rename-x")
+        self.assertEqual(off.returncode, 0)
+        self.assertIn("warn: 直接作業のワークツリー rename-x の名前が", off.stdout)
+        on = self.ccnavi("worktree", "name", "feature-12-x")
+        self.assertEqual((on.returncode, on.stdout), (0, ""))
+
     def test_a_direct_work_worktree_in_the_form_is_not_warned(self):
         self.propose("i0001", parent_text("i0001", ["design"], copy=self.phases_text))
         self.commit_parent()

@@ -134,7 +134,7 @@ keywords: [ワークツリー, worktree, git, ccnavi-git.sh, 統合先, マー�
   - 先頭の語は `CCNAVI_BRANCH_PREFIXES` の既定（`feature` `hotfix` `fix` `bugfix` `chore` `refactor` `docs`）から選ぶ
   - 番号は issue があればその番号、無ければ `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-ticket.sh next-id` の通し番号
   - 例: `feature-341-direct-branch-name`（issue #341 の作業）、`chore-12-cleanup`（通し番号 12）
-- 形に合わない名前でも拒否はしない。`--lint` が warn で名指しするので、そのときに直す
+- 形に合わない名前でも拒否はしない。`ccnavi-worktree.sh` は切ったあとに、`--lint` と同じ文面の warn を 1 行出す（判定は `ccnavi worktree name <名前>` が持つ。sh は形を判定しない）。`--lint` も同じ warn を名指しする
 - 既にある直接作業のワークツリーとブランチの名前は変えない。この形は新しく切るものから当てる
 
 - 識別子の番号は、issueがあればその番号、無ければ次の通し番号にする。通し番号は`sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-ticket.sh next-id`で聞く（ADR-0102）。同じリポジトリの別の親と番号が重なると`--lint`が警告する

@@ -194,4 +194,10 @@ printf 'ワークツリーを切った: %s\n' "$dest"
 printf 'ブランチ: %s（起点 %s%s）\n' "$name" "$base" "${track:+、$track}"
 [ "$behind" -eq 0 ] || printf '案内: 手元の %s は origin/%s より %s 件遅れていたので origin/%s から切った（手元の %s は進めていない）\n' "$integ" "$integ" "$behind" "$integ" "$integ"
 [ -z "$fetch_note" ] || printf '案内: %s\n' "$fetch_note"
+# 直接作業の名前の形は実行ファイルに聞く（sh は形を判定しない）。取れなければ案内は出さない。拒否はしない。
+name_note=""
+if name_bin=$(ccnavi_bin "$root"); then
+	name_note=$("$name_bin" --root "$root" worktree name "$name" 2>/dev/null </dev/null) || name_note=""
+fi
+[ -z "$name_note" ] || printf '%s\n' "$name_note"
 log_info 完了 -- "name=$name" "base=$base"
