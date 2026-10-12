@@ -90,7 +90,7 @@ class TicketStatusTest(PhaseHarness):
         self.assertFalse(os.path.exists(os.path.join(self.approved, "events")))
 
     def test_an_uncommitted_ticket_of_a_c1_family_waits_for_the_user(self):
-        # マージリクエストを持つフェーズ（design）を含める。chat だけの親子は C1 の対象外。
+        # マージリクエストを持つフェーズ（design）を含める。持たない親子は C1 の対象外。
         self.by_hand(text=parent_text("i0001", ["research", "design"]))
         # C1 の対象にする: 取り込み状態が present で、親のワークツリーがあり、origin がある。
         self.imported("present")

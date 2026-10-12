@@ -36,7 +36,7 @@ TURN_DEFINED = "ターン（ユーザが指示を出してから Claude が応�
 # サブエージェントかどうかで止めるレイヤーをここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
     r"(^|[;&|]\s*)(sh|bash)(\s+-\S+)*\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
-    r"(start|finish|cancel|record-risk|request|confirm|comment|decide|ready|close-early|chat"
+    r"(start|finish|cancel|record-risk|request|confirm|comment|decide|ready|close-early"
     r"|push)\b"
 )
 
@@ -335,7 +335,7 @@ _EXE_DIAGNOSES = frozenset(
 EXE_OPTIONS = frozenset(
     {
         "--accept-unresolved", "--actor", "--agent-id", "--agree", "--approved", "--body-file",
-        "--chat", "--choose-out", "--close-early", "--cwd", "--digest", "--docs", "--draft",
+        "--choose-out", "--close-early", "--cwd", "--digest", "--docs", "--draft",
         "--expect",
         "--explain", "--fill-phases", "--flow", "--format", "--guard-core-files",
         "--guard-ticket-approval", "--help", "--import", "--integration-branch", "--issue",
@@ -832,10 +832,10 @@ _SCRIPT_FORMS = (
     # 止めていた親子のチケットが取り込み状態の無いものとして今の手元の動きに戻るので、
     # 打つのはユーザ。
     r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-sync\.sh\s[^\x00]*--forget\b"
-    # ユーザの判断に使うスクリプト。中で `--reviewed --chat`・
+    # ユーザの判断に使うスクリプト。中で
     # `--close-early` を起こし、最後に承認の push を呼ぶ。打つのはユーザ。
     r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-review\.sh\s+"
-    r"(chat|close-early)\b"
+    r"(close-early)\b"
 )
 
 
@@ -888,7 +888,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）もユーザが打ちます。"
             "親子のチケットの取り込み状態を消す "
             f"'{settings.script_command(root, 'ccnavi-sync.sh')} --forget' と、ユーザの判断の入口"
-            f"（'{settings.script_command(root, 'ccnavi-review.sh')} chat / "
+            f"（'{settings.script_command(root, 'ccnavi-review.sh')} "
             "close-early'）もユーザが打ちます。"
             "テンプレートの取り込み（'ccnavi --templates --import'）・"
             "取り込み済みの改名/移動/削除も、ユーザが打ちます。"

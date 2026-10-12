@@ -23,7 +23,7 @@ import unittest
 from ccnavi.tickets import history
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import TicketTest, git, read_json, write
-from tests.ticketsample import child_text, parent_text
+from tests.ticketsample import child_text
 
 ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 
@@ -271,55 +271,6 @@ class PhaseHistoryTest(PhaseHarness):
             return []
         with open(path, encoding="utf-8") as f:
             return [json.loads(line) for line in f if line.strip()]
-
-    def chat_phase(self):
-        """`review: chat` のフェーズを 1 つ終わらせる（test_phases.ChatReviewTest と同じ手順）。"""
-        self.family(plan=["chores"])
-        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["src/a*"], review=False))
-        self.commit_parent()
-        self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01-01", [("src/a1.py", "x\n")])
-        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
-        self.commit_parent("close 01")
-        self.merge("i0001-01-01")
-        self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-
-    def test_a_followup_child_is_raised_and_the_phase_reopens(self):
-        self.chat_phase()
-        passed = self.ccnavi(
-            "--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n直す点\n\n"
-        )
-        self.assertEqual(passed.returncode, 0, passed.stdout + passed.stderr)
-        raised = self.lines("i0001-01-02")
-        self.assertEqual(len(raised), 1, raised)
-        self.assertEqual(
-            (raised[0]["kind"], raised[0]["from"], raised[0]["to"], raised[0]["via"]),
-            ("raised", None, "doing", "terminal"),
-        )
-        self.assertEqual(raised[0]["followup_of"], ["i0001-01-01"])
-        self.assertEqual(raised[0]["phase"], 1)
-        settled = self.lines("i0001-01-01")[-1]
-        self.assertEqual((settled["kind"], settled["via"]), ("settled", "terminal"))
-        parent = [(e["kind"], e.get("mark"), e["via"]) for e in self.lines("i0001")]
-        self.assertIn(("phase-mark", "reviewed", "terminal"), parent)
-        reopened = [e for e in self.lines("i0001") if e["kind"] == "phase-reopened"]
-        self.assertEqual(reopened[-1]["cleared"], ["reviewed", "pending"])
-
-    def test_a_feedback_revision_and_closing_the_parent_are_left(self):
-        self.chat_phase()
-        passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n\n")
-        self.assertEqual(passed.returncode, 0, passed.stderr)
-        self.start_parent()
-        self.propose("i0001", parent_text("i0001", ["chores"], feedback=[]))
-        self.assertEqual(self.approve().returncode, 0)
-        self.assertEqual(self.ccnavi("ticket", "finish", "i0001").returncode, 0)
-        kinds = [(e["kind"], e["from"], e["to"], e.get("mark")) for e in self.lines("i0001")]
-        self.assertIn(("revised", "doing", "doing", None), kinds)
-        revised = next(e for e in self.lines("i0001") if e["kind"] == "revised")
-        self.assertTrue(revised["feedback"])
-        self.assertEqual(
-            kinds[-2:], [("finished", "doing", "done", None), ("parent-mark", None, None, "closed")]
-        )
 
     def test_close_early_is_left_on_the_parent_and_the_cancelled_child(self):
         self.family(plan=["research", "design"])

@@ -31,7 +31,7 @@
       research:
         kind: work            # work | feedback
         title: 調査
-        review: none          # none | chat | mr
+        review: none          # none | mr
         scope: ["wip/research/*"]   # 子の範囲の上限。inherit なら親の範囲
         deliverables: ["wip/research/summary.md"]
         agent: explorer       # 案内にだけ使う
@@ -71,16 +71,12 @@ KIND_FEEDBACK = "feedback"
 KINDS = (KIND_WORK, KIND_FEEDBACK)
 
 REVIEW_NONE = "none"
-# chat は、このセッションでユーザが差分を見る。ホストへは出ない。先へ進めるのは
-# 端末から打つ `ccnavi-review.sh chat <N>`（中身は `ccnavi --reviewed <N> --chat`）で、
-# エージェントには打てない
-# （DENY_TICKET_APPROVAL_CLI）。mr はホストのマージリクエストで見る。
-REVIEW_CHAT = "chat"
+# mr はホストのマージリクエストで見る。
 REVIEW_MR = "mr"
-REVIEWS = (REVIEW_NONE, REVIEW_CHAT, REVIEW_MR)
+REVIEWS = (REVIEW_NONE, REVIEW_MR)
 
-# 見る場所の強さ。厳しい側を採るときに使う（none < chat < mr）。
-REVIEW_RANK = {REVIEW_NONE: 0, REVIEW_CHAT: 1, REVIEW_MR: 2}
+# 見る場所の強さ。厳しい側を採るときに使う（none < mr）。
+REVIEW_RANK = {REVIEW_NONE: 0, REVIEW_MR: 1}
 
 
 def stricter(a: str, b: str) -> str:
@@ -267,13 +263,13 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         return None, problems
     pt.review = review
     if kind == KIND_FEEDBACK and review == REVIEW_NONE:
-        # フィードバック対応の結果をユーザが見ない経路は作らない。見る場所は chat でも mr でもよい。
+        # フィードバック対応の結果をユーザが見ない経路は作らない。見る場所は mr になる。
         problems.append(
             Problem(
                 SEVERITY_ERROR,
                 ident,
                 f"フィードバック対応の定義に `review: {REVIEW_NONE}` は書けない"
-                f"（`{REVIEW_CHAT}` か `{REVIEW_MR}`）",
+                f"（`{REVIEW_MR}` にする）",
             )
         )
         return None, problems

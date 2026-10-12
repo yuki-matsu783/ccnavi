@@ -389,7 +389,7 @@ class GuardScriptTest(_Workspace):
         self.assertEqual(2, result.returncode)
         self.assertEqual(
             "ccnavi-review: https://u:SECRET@h は通しません。"
-            "使えるのは request / confirm / comment / decide / ready / close-early / chat / "
+            "使えるのは request / confirm / comment / decide / ready / close-early / "
             "fetch / origin / merged です。\n",
             result.stderr,
         )

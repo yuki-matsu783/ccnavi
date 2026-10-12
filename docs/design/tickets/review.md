@@ -3,15 +3,14 @@ type: design
 title: 9.10 レビューの依頼と確認
 description: mr のフェーズでのレビューの依頼と確認の流れ
 tags: [design-doc, ticket, review]
-keywords: [レビュー, 依頼, 確認, mr, chat, ccnavi-review.sh]
+keywords: [レビュー, 依頼, 確認, mr, ccnavi-review.sh]
 ---
 
 [設計書の入口](../../design.md) > [9. チケット制御](../tickets.md)
 
 ### 9.10 レビューの依頼と確認
 
-この節は、見る場所が `mr` のフェーズの話。`chat` のフェーズは `ccnavi-review.sh chat <N>`（中身は `ccnavi --reviewed <N> --chat`）で進める（9.8）。
-ただし `request` は `chat` のフェーズでも通る（厳しくする向きなので）。`--chat` は `mr` のフェーズに当たらない。
+この節は、見る場所が `mr` のフェーズの話。
 
 リモート（GitHub / GitLab）を読み書きするのは `.ccnavi/scripts/ccnavi-review.sh` で、実行ファイルは
 ネットワークに出ない（P11）。実行ファイルが持つのは作業ツリーの中で分かる前提検査と、

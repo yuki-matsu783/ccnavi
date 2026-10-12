@@ -8,7 +8,7 @@ keywords: [チケット, 置き場, wip/proposals, .ccnavi/approved, レビュ�
 
 # ADR-0055: チケットは 2 つの置き場を行き来する 1 本のファイルにする
 
-状態: 採用
+状態: 採用（本文の `--reviewed --chat` は当時の記述で、ADR-0132 が廃止した）
 
 ## 状況
 

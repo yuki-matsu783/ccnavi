@@ -141,7 +141,7 @@ test("CB-T501 見本の open は、実例の open と同じ線・番号・見る
   // 見る場所は、実例が持つ言葉（none / mr）だけ。題は実行ファイルが定義の題を入れるので、見本は実際の定義の題を使う
   for (const plan of sample.answers.open.answer.plans) {
     for (const item of plan.items) {
-      assert.ok(["none", "mr", "chat"].includes(item.review), `${item.number} の見る場所 ${item.review}`);
+      assert.ok(["none", "mr"].includes(item.review), `${item.number} の見る場所 ${item.review}`);
       assert.notEqual(item.title, "");
     }
   }

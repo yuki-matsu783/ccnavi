@@ -321,7 +321,7 @@ def _close_parent(
         stderr.write(f"ccnavi: 閉じた記録を書けない: {failed}\n")
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     wip = ticket_places.WIP_ROOT
-    if phase.chat_only(root, conf, found.ticket, venues):
+    if phase.without_mr(root, conf, found.ticket, venues):
         stdout.write(
             f"次は、この移動をコミットし、`{wip}/` を消して"
             f"（'{git_sh} rm -r {wip}'）コミットし、統合先のブランチに取り込んでください。"

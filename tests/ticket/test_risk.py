@@ -255,33 +255,6 @@ class RiskTest(PhaseHarness):
         self.assertIn("このレビューのリスク: 95 (CRITICAL)", self.last_request_body)
         self.assertIn("行数が多い", self.last_request_body)
 
-    def test_escalated_phase_is_seen_in_the_session_and_only_recommends_a_merge_request(self):
-        """実績は「要る」としか言わない。宣言が none のフェーズは chat に上がり、MR は勧めるだけ。
-
-        強制すると、ローカルで回している作業が大きくなった時点で認証が要るようになるため、
-        勧めるだけにする。勧めたのに chat で通したことはマーカーに残る。
-        """
-        tree = self.one_child(review=False)
-        write(os.path.join(tree, "src", "a.py"), "\n".join(str(i) for i in range(20)) + "\n")
-        write(os.path.join(tree, "src", "b.py"), "b\n")
-        git(tree, "add", "-A")
-        git(tree, "commit", "--quiet", "-m", "big")
-        closed = self.close_child("i0001-01-01")
-        self.assertEqual(closed.returncode, 0, closed.stderr)
-        self.commit_parent("close 01")
-        self.merge("i0001-01-01")
-        said = self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
-        self.assertIn("実績のリスクが高い", said)
-        self.assertIn("マージリクエストで見てもらうことを勧めます", said)
-        self.assertIn("ccnavi-review.sh chat 1", said)
-        passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
-        self.assertEqual(passed.returncode, 0, passed.stderr)
-        self.assertIn("マージリクエストで見ることを勧める", passed.stdout)
-        mark = read_json(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
-        self.assertEqual(mark["by"], "chat")
-        self.assertEqual(mark["recommended"], "mr")
-        self.assertIn(mark["risk"], ("HIGH", "CRITICAL"))
-
     def test_unreadable_name_status_or_head_refuses_to_close(self):
         """変更の種類か先のコミットを読めなければ、0 件と数えずに閉じない（重いほうとして扱う）。"""
         self.one_child()

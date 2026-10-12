@@ -309,7 +309,6 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--with-feedback", action="store_true")
     parser.add_argument("--reviewed", type=int, default=None)
     parser.add_argument("--accept-unresolved", action="store_true")
-    parser.add_argument("--chat", action="store_true")
     # ユーザが端末で打つ、親を早めに閉じる操作。`--agree` / `--reviewed` と同じく、
     # ユーザの判断はフラグで受ける。
     parser.add_argument("--close-early", action="store_true")

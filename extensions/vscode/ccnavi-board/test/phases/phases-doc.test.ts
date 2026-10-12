@@ -164,14 +164,12 @@ test("CB-T91 id が重なれば書き戻さない（実行ファイルは後ろ�
   assert.throws(() => doc.apply({ phases }), /id `research` が 2 つあります/);
 });
 
-test("CB-T92a review: chat は警告なしで読め、保存でも保たれる。未知の値は警告が出る", () => {
-  const text = "version: 1\nphases:\n  quick:\n    kind: work\n    review: chat\n    scope: inherit\n";
-  const doc = readPhases(text);
-  assert.deepEqual(doc.model.problems, []);
-  assert.equal(doc.model.form.phases[0].review, "chat");
-  assert.equal(doc.apply(doc.model.form), text);
-  const bad = readPhases("version: 1\nphases:\n  q:\n    review: Chat\n    scope: inherit\n");
-  assert.ok(bad.model.problems.some((p) => p.includes("review `Chat` は none・chat・mr のどれでもありません")));
+test("CB-T92a review: chat は廃止した値で、苦情が出て mr として出る", () => {
+  const doc = readPhases("version: 1\nphases:\n  quick:\n    kind: work\n    review: chat\n    scope: inherit\n");
+  assert.ok(doc.model.problems.some((p) => p.includes("review `chat` は none・mr のどれでもありません")));
+  assert.equal(doc.model.form.phases[0].review, "mr");
+  const bad = readPhases("version: 1\nphases:\n  q:\n    review: Mr\n    scope: inherit\n");
+  assert.ok(bad.model.problems.some((p) => p.includes("review `Mr` は none・mr のどれでもありません")));
 });
 
 test("CB-T92 version が無ければ苦情を出し、保存で先頭に足す。読めない値は苦情にして既定で出す", () => {
@@ -179,7 +177,7 @@ test("CB-T92 version が無ければ苦情を出し、保存で先頭に足す�
   assert.equal(doc.model.version, null);
   assert.ok(doc.model.problems.some((p) => p.startsWith("version がありません")));
   assert.ok(doc.model.problems.some((p) => p.includes("kind `strange`")));
-  assert.ok(doc.model.problems.some((p) => p.includes("review `maybe` は none・chat・mr のどれでもありません")));
+  assert.ok(doc.model.problems.some((p) => p.includes("review `maybe` は none・mr のどれでもありません")));
   assert.ok(doc.model.problems.some((p) => p.includes("scope `everything`")));
   // 順序の欄は読まないので、形が崩れていても苦情にしない
   assert.ok(!doc.model.problems.some((p) => p.includes("overlap")), doc.model.problems.join("\n"));
