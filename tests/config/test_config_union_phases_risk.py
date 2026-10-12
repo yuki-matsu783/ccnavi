@@ -18,6 +18,7 @@ import json
 import os
 import unittest
 
+from tests import phasecopy
 from tests.config.test_config_union import (
     COMMON_PHASES,
     COMMON_RISK,
@@ -266,7 +267,12 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
     def test_same_id_with_different_body_across_common_is_an_error(self):
-        """共通レイヤーと同じ id で中身が違う定義は error。そのレイヤーは空として扱う。"""
+        """共通レイヤーと同じ id で中身が違う定義は error。
+
+        衝突した定義だけを捨て、共通の定義を使う。
+
+        そのレイヤーのほかの定義は生きている。
+        """
         write(self.phases, COMMON_PHASES)
         write_layer(
             self.ws,
@@ -277,19 +283,60 @@ class PhaseUnionTest(ConfigUnionHarness):
 
         errors = [p for p in self.phase_problems("error") if p["where"].startswith("(self)")]
         self.assertTrue(any("design" in p["where"] + p["detail"] for p in errors), errors)
-        # 衝突したレイヤーは空なので、同じレイヤーの docs も使えない。
+        # 捨てるのは衝突した design だけ。同じレイヤーの docs は使える。
         self.propose("i0001", ticket_text("i0001", plan=["docs"], allow=("docs/*",)))
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.assertTrue(os.path.exists(self.approved_copy("i0001")))
+        # design は共通レイヤーの定義が使われる。
+        sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
+        types = {t["id"]: t for t in sums["self"]["phases"]["types"]}
+        self.assertEqual(types["design"]["source"], "common")
+        self.assertEqual(types["design"]["title"], "設計")
+        self.assertEqual(types["docs"]["source"], "self")
+        # 写しが自身のレイヤーの design（中身違い）なら、承認で止まる。
+        own_copy = ticket_text("i0002", plan=["design"], allow=("wip/*",))
+        write(
+            os.path.join(self.ws, "wip", "proposals", "todo", "i0002.md"),
+            phasecopy.insert(own_copy, OWN_PHASES_DESIGN),
+        )
         refused = self.approve()
         self.assertNotEqual(refused.returncode, 0)
-        self.assertFalse(os.path.exists(self.approved_copy("i0001")))
+        self.assertFalse(os.path.exists(self.approved_copy("i0002")))
 
     def test_title_overlap_with_common_is_an_error(self):
-        """共通レイヤーの定義と `title` が重なる別 id の定義は error。"""
+        """共通レイヤーの定義と `title` が重なる別 id の定義は error。重なった定義だけを捨てる。
+
+        そのレイヤーのほかの定義は生きている。
+        """
         write(self.phases, COMMON_PHASES)
-        write_layer(self.lib, phases=LIB_PHASES_TITLE_OVERLAP)
+        write_layer(
+            self.lib,
+            phases=LIB_PHASES_TITLE_OVERLAP
+            + "  release:\n    kind: work\n    title: リリース\n    review: mr\n"
+            + '    scope: ["CHANGELOG.md"]\n',
+        )
 
         errors = self.phase_problems("error", "lib")
         self.assertTrue(any("設計" in p["detail"] for p in errors), errors)
+        sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
+        ids = sorted(t["id"] for t in sums["lib"]["phases"]["types"])
+        self.assertEqual(ids, ["design", "release"])
+        self.propose(
+            "i0001",
+            ticket_text("i0001", project="lib", plan=["release"], allow=("CHANGELOG.md",)),
+            project="lib",
+        )
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.propose(
+            "i0002",
+            ticket_text("i0002", project="lib", plan=["build"], allow=("src/*",)),
+            project="lib",
+        )
+        refused = self.approve()
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertFalse(os.path.exists(self.approved_copy("i0002")))
 
     def test_identical_type_in_common_and_layer_is_dropped_with_info(self):
         """共通レイヤーと全欄が同じ定義は、レイヤーの側を捨てて info で言う。error ではない。"""

@@ -8,7 +8,7 @@
 構成（`src/*`・`tests/*` など）を前提にできる定義を置き、置き場の構成に依存する定義だけを
 レイヤーに置く。どちらが無くても正常（無い = 空）で、両方無いときだけ定義が無い。
 足すだけで、レイヤーが共通レイヤーの定義を上書きすることはない。同じ id で中身が違う定義と、
-`title` がレイヤーをまたいで重なる定義は error で、そのレイヤーを空として扱う（`merge`）。
+`title` がレイヤーをまたいで重なる定義は error で、レイヤーの側のその定義だけを捨てる（`merge`）。
 定義は順序を持たないので、足し算で整合を取る欄は id と `title` だけ。
 
 ## 定義はユーザが持つ
@@ -596,8 +596,11 @@ def merge(
     ものは重複とみなしてレイヤーの側を捨て（info）、中身が違えば error。`title` の重なりも
     レイヤーをまたいで error（ユーザは表示名で見るので、承認画面で見分けられない）。
 
-    error があるとき、そのレイヤーは空として扱い、共通レイヤーの定義だけを返す。衝突した片方を
-    何も言わずに採ると、どちらの `review:` が使われているかをユーザが読めない。止まる側を採る。
+    error になった定義だけを捨て、共通レイヤーの定義を使う。そのレイヤーのほかの定義は足す。
+    同じ `id` なら共通レイヤーの定義が残り、`title` の重なりならレイヤーの定義が無いのと同じになる。
+    捨てる側をいつもレイヤーにするのは、共通レイヤーの定義は全プロジェクトで同じに読まれるべきで、
+    1 つのレイヤーの書き方でその中身が変わらないようにするため。error は出すので、ユーザは
+    `--lint` で捨てた定義を知る。
     """
     base = PhaseTypes(common or {})
     problems: list[Problem] = []
@@ -623,8 +626,8 @@ def merge(
                         ident,
                         f"`{ident}` は共通レイヤーと同じ id で中身が違う"
                         f"（違う欄: {', '.join(differing(prior, pt))}）。"
-                        f"{layer} のレイヤーは空として扱う。どちらの定義が効いているかを"
-                        "ユーザが読み取れないので、断りなく片方を採ることはしない",
+                        f"{layer} の `{ident}` は使わず、共通レイヤーの定義を使う。"
+                        f"中身を変えたいなら {layer} の側に別の id を付ける",
                     )
                 )
             continue
@@ -634,14 +637,12 @@ def merge(
                     SEVERITY_ERROR,
                     ident,
                     f"表示名 `{pt.title}` が共通レイヤーの `{titles[pt.title]}` と重なる。"
-                    f"{layer} のレイヤーは空として扱う",
+                    f"{layer} の `{ident}` は使わない。別の表示名を付ける",
                 )
             )
             continue
         titles[pt.title] = ident
         added[ident] = pt
-    if any(p.severity == SEVERITY_ERROR for p in problems):
-        return base, problems
     merged = PhaseTypes(base)
     merged.update(added)
     return merged, problems
