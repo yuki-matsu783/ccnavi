@@ -31,6 +31,7 @@ from . import (
     configsync,
     flow,
     history,
+    learning,
     ops_close,
     ops_plan,
     ops_stop,
@@ -152,6 +153,12 @@ def start(
         stdout.write(line + "\n")
     for line in ops_plan.childless_notice(root, conf, found):
         stdout.write(line + "\n")
+    if found.is_child and conf.learning_enabled:
+        stdout.write(
+            "学びの蓄積: 閉じる前に "
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} learn' を打ち、"
+            f"wip/handoff/learnings/{found.ticket}.md に気づきを書く（無ければ learnings: none）\n"
+        )
     return 0
 
 
@@ -261,6 +268,8 @@ def finish(
     if ops_close.parent_still_busy(stderr, root, conf, found):
         return 1
     if ops_close.deliverables_missing(stderr, root, conf, found):
+        return 1
+    if learning.record_missing(stderr, root, conf, found):
         return 1
     # 子は、閉じる前に実績のリスクを数える（risk.py）。定性項目の判定が揃わなければ閉じない。
     scored = _score_child(stdout, stderr, root, conf, found)

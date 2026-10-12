@@ -18,6 +18,7 @@ from ..tickets import (
     c1,
     core,
     history,
+    learning,
     next_id,
     ops,
     phase,
@@ -151,6 +152,13 @@ def operate(
             code = ops.finish(stdout, stderr, root, conf, target)
         else:
             code = ops.cancel(stdout, stderr, root, conf, target, args.reason)
+    elif kind == "ticket" and verb == "learn" and len(words) <= 3:
+        # ticket learn [<識別子>] [--note <本文> [--target <種類>] [--signal <信号>]]。
+        # 気づきの記録の雛形と要約、または気づき 1 件の追記（直接作業では受信箱）。
+        where = cwd[-1] if isinstance(cwd, list) and cwd else cwd
+        code = learning.run(
+            stdout, stderr, root, conf, where, target, args.note, args.target, args.signal
+        )
     elif kind == "ticket" and verb == "new":
         # ticket new <識別子> --title <題> (--plan <型,型,...> |
         # --template <名前> [--layer <名前>] [--with-feedback]) [--issue N]。親の提案の雛形を作る。

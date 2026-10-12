@@ -81,7 +81,7 @@ def entry_text(body: str, target: str, signal: str, now_text: str) -> str:
     kind = target or UNDECIDED
     sig = signal or DEFAULT_SIGNAL
     lines = cleaned.split("\n")
-    content = "\n".join([lines[0]] + ["  " + line for line in lines[1:]])
+    content = "\n".join([lines[0]] + ["  " + line if line else "" for line in lines[1:]])
     return (
         f"## {title_of(cleaned)}\n"
         "\n"
