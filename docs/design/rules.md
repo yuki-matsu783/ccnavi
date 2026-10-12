@@ -162,6 +162,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | 生の git（チケット制御が有効で、ワークスペースルートに `ccnavi-git.sh` があるとき） | 止める（`builtin-ticket-raw-git`。9.1） |
 | 認証情報の置き場（`.env`、`.ssh/`、`id_rsa`、`.netrc`、`.npmrc` など）への `Bash` `Read` `Write` `Edit` | 止める |
 | シェルから `.claude/hooks/` `.claude/settings*.json`、ccnavi ディレクトリ `.ccnavi`、`logs/decisions.jsonl` `logs/state` `logs/archive`、`ccnavi-git.sh` へ書き込む形 | 止める（書き込みの形と場所の組で見る。8.2） |
+| `.git` の中（`.git/` の下と、ワークツリーの `.git` ファイル）への `Write` `Edit` `NotebookEdit` と、シェルから書き込む形 | 止める（`builtin-guard-git-dir`・`builtin-guard-git-dir-via-bash`。下） |
 | `Read`（認証情報の置き場を除く。強いタイプが先に当たる） | 通す |
 | `Write` / `Edit` でルールファイルを直す | 既定では止めない。権限モードに委ねる |
 | それ以外 | 権限モードに委ねる |
@@ -180,6 +181,39 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
   ルールの合間でしか確かめないので、1 本の照合が後戻りで長引くと hook の timeout に達し、呼び出しは止められずに通る。
   rm と reset は、後の始まりで当たるなら最初の始まりでも当たるので、コマンドの中で最初の `rm` / `reset` に決めて 1 度だけ読む。
   git のオプションは、中に git の始まりを持たない語だけを読み、`git -c git -c …` のような並びで読み直しを積もらせない
+
+`.git` の中への書き込みの 2 本（`builtin-guard-git-dir`・`builtin-guard-git-dir-via-bash`）も、既定のときに限らず常に当たる土台の deny。
+参照・索引・設定・hook を git を通さずに書き換えると、履歴や作業中の変更を失い、hook なら以後の git の操作のたびに任意のコマンドが走る。
+文面は git の打ち方（ラッパーがあれば `ccnavi-git.sh`）を案内する。
+サブコマンドの無い書き換え（hook、`.git/info/exclude`、`MERGE_MSG`、`index.lock`、ワークツリーの `.git` ファイル）は、ファイルと理由を添えてユーザに頼むよう案内する。
+残った `index.lock` は、git のプロセスが無いことを確かめてから頼む。無視の設定は `.gitignore` で足す。
+
+- 名指しのツールは、解決済みの絶対パスに `.git` の段（前後が区切りか末尾）があれば止める。`.gitignore`・`.github/`・`repo.git/` は当たらない。`Read` は止めない。
+  名前の後ろの `.` と空白（`.git.`・`.git `）は Windows が開くときに落とすので、`.git` と同じに扱う
+- シェルは、書き込みの形と `.git` の組で止める。`cat .git/config`・`cp .git/config /tmp/x` のような読みは通る。
+  リダイレクトと `cp` `ln` `install` の行き先、`.git` をいま居る場所 `.` へ写す形は守る場所（8.2）と同じ部品で読む。
+  `.git` の前は語の頭か区切り（`/` `\` `=`）に限り、URL の中の `.git` には当てない（`-t` の値だけは前を閉じない）。
+  名前の後ろの `.`（`.git.`）は名指しのツールと同じに扱う。書き換える動詞は `.git` 用に読みの語を外す。
+  - `mv` `rm` `tee` `truncate` `patch` `shred` は、`<` の直後の語を読みとして外す（`tee /tmp/o < .git/config`・`patch -p1 < .git/x` は通る）
+  - `dd` は `of=` の値だけを書き先とみる（`dd if=.git/index of=/tmp/x` は通る）
+  - `sed -i` は式（最初の選択肢でない語）を外し、その後ろの語を書き先とみる（`sed -i 's/foo/.git/' f` は通る）。
+    `-e` で式を渡すと、2 本目以降の式の中の `.git` は書き先と区別できず止まる（`sed -i -e 's/a/b/' -e 's/c/.git/' f`）
+  - `find` は、開始点が `.git`（とその下）で、述語に `-delete` `-exec` `-execdir` `-ok` `-okdir` を持つ形を止める。
+    `find . -path ./.git -prune -o -type f -delete` は通る
+  - `xargs` は、前のコマンドが `.git` を名指しし、`xargs` が書き込む動詞（上の動詞と `cp` `ln` `install`）を走らせる形を止める。
+    `grep -rl x .git | xargs rm` のように、`.git` の中を探して外のファイルを消す形も止まる
+- git のラッパーの中で行う `.git` への書き込み（統合の片付けなど）は、外側のコマンド文字列に `.git` が出ないので当たらない
+- リダイレクトの行き先は `>` をまたがずに読むので、読み切れなかった生の文字列でも照合が長さに比例して終わる。`>` の個数の上限（8.2）の対象に入れない
+- `cd .git` のあとの相対パスへの書き込みは、同じコマンドの中なら止める（`cd .git && echo x > config`・`cd .git && find . -delete`）。
+  `cd` で移った先から見たパス（`shellread` の moved）にも当てるため
+- 止めないもの。守る場所の検出と同じく、形の分かる書き込みだけを見る
+  - `git` 自身のサブコマンド（`git config` など）
+  - `cd` が別の Bash の呼び出しにまたがる形（`cd .git/hooks` のあと、別の呼び出しで `echo x > pre-commit`）。判定はセッションの cwd を見ない
+  - インタプリタ（`python -c` など）の中の書き込み
+  - 変数・コマンド置換・グロブで書いたパス（`$h/pre-commit`、`$(… --git-path hooks)/x`、`.gi?/config`）。`shellread` は変数の値も展開の結果も知らない
+  - 上に無い書き込みの動詞（`touch` `chmod` `mkdir` `perl -pi` `rsync` `tar` `curl -o` `awk -i inplace`）。足すと読むだけの形の誤検知が増えるため、今は足さない
+  - 親から始める `find`（`find . -name index.lock -delete`）。開始点が `.git` の形だけを見る
+  - Windows の別名（8.3 形式の `GIT~1`、`.git::$INDEX_ALLOCATION`）。解決済みのパスでも別名のまま残る
 
 生の git の 1 本（`builtin-ticket-raw-git`）は、`git` がコマンドの位置にある形だけに当てる（行頭とコマンドの切れ目の後ろ、
 `env`・`sudo`・`xargs` などの前置きは外した中のコマンドの層で、パス付き（`C:\Git\git.exe` も）と `git.exe` も。`then`・`do` などの予約語は

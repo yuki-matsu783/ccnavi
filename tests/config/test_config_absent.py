@@ -261,6 +261,14 @@ SLOW_BEFORE = (
     "/" * 24000,
     "a/" * 12000,
     "git --x/git " * 2000,
+    # `.git` の 1 本の、前置きを読み直す形。
+    "mv " + "a/" * 12000,
+    "echo > " + "a/" * 12000,
+    "cp " + "a/ " * 8000 + ".",
+    # 読み切れなかった生の文字列。`>` ごとに尾を読み直さない（上限に頼らない）。
+    'echo "' + ">a" * 12000,
+    'echo "' + ">a/" * 8000,
+    'echo "> ' + "a/" * 12000,
 )
 # 共通ルールの照合が長引く形だった入力（パスの前置きを読み直す形）。
 COMMON_SLOW_BEFORE = (
@@ -464,6 +472,124 @@ class BuiltinRawGitTest(ConfigUnionHarness):
         os.remove(self.script)
         self.hook("Bash", self.ws, command=f"{GIT} status")
         self.assertNotIn(RAW_GIT_BUILTIN, self.last_record().get("rules", []))
+
+
+GIT_DIR_BUILTIN = builtin.GIT_DIR_RULE_ID
+GIT_DIR_SHELL_BUILTIN = builtin.GIT_DIR_SHELL_RULE_ID
+# `.git` の中へシェルから書き込む形と、読むだけの形。
+GIT_DIR_SHELL_DENIED = (
+    "echo x > .git/config",
+    "echo x >> /abs/repo/.git/hooks/pre-commit",
+    "cp /tmp/x .git/config",
+    "cp /tmp/x .git",
+    "cp -t .git/hooks /tmp/pre-commit",
+    "mv /tmp/x .git/HEAD",
+    "mv .git /tmp/old",
+    "rm -f .git/index.lock",
+    "tee .git/config < /tmp/x",
+    "sed -i 's/a/b/' .git/config",
+    "cp -r /tmp/x/.git .",
+    "echo x > .GIT/config",
+    "echo x > .git./config",
+    "dd if=/tmp/x of=.git/HEAD",
+    "tee .git/config < /tmp/x",
+    "rm .git",
+    "sed -i s/a/b/ /abs/.git/config",
+    "sed -i s/a/b/ x .git/config",
+    "sed -e s/a/b/ -i .git/config",
+    "find .git -name '*.lock' -delete",
+    "find .git -type f -exec rm {} +",
+    "cd .git && find . -delete",
+    "cd .git && echo x > config",
+    "printf '.git/config\\n' | xargs rm",
+)
+GIT_DIR_SHELL_PASSED = (
+    "cat .git/config",
+    "cp .git/config /tmp/x",
+    "sed -n 1p .git/config",
+    "echo x > .gitignore",
+    "echo x > .github/w.yml",
+    "sed -i 's/old.git/new.git/' README.md",
+    'echo "a > .git/x"',
+    "echo x > repo.git/config",
+    "cp ../foo/*.py .",
+    "dd if=.git/index of=/tmp/x",
+    "tee /tmp/o < .git/config",
+    "patch -p1 < .git/x",
+    "sed -i 's/foo/.git/' f",
+    "sed -i 's/\\.git\\//x/' f",
+    "find . -path ./.git -prune -o -type f -delete",
+    "printf a | xargs rm",
+    "ls .gitignore | xargs rm",
+)
+
+
+class BuiltinGitDirTest(ConfigUnionHarness):
+    """`.git` の中への書き込みは、共通レイヤーと config の有無・状態によらず土台で止める。
+
+    名指しのツール（Write / Edit / NotebookEdit）は `.git/` の下と `.git` そのもの、
+    シェルは守る場所と同じ書き込みの形で見る。読むだけと、`.gitignore`・`.github/` は
+    止めない。git のラッパーの呼び出しは、`.git` がコマンド文字列に出ないので当たらない。
+    """
+
+    def check(self):
+        for tool in ("Write", "Edit", "NotebookEdit"):
+            for path in (
+                os.path.join(self.ws, ".git", "config"),
+                os.path.join(self.ws, ".git", "hooks", "pre-commit"),
+                os.path.join(self.ws, "wt", ".git"),
+            ):
+                with self.subTest(tool=tool, path=path):
+                    field = "notebook_path" if tool == "NotebookEdit" else "file_path"
+                    result = self.hook(tool, self.ws, **{field: path})
+                    self.assert_denied(result, GIT_DIR_BUILTIN)
+        for name in (".gitignore", os.path.join(".github", "w.yml"), "repo.git"):
+            with self.subTest(path=name):
+                self.hook("Write", self.ws, file_path=os.path.join(self.ws, name))
+                self.assertNotIn(GIT_DIR_BUILTIN, self.last_record().get("rules", []))
+        for command in GIT_DIR_SHELL_DENIED:
+            with self.subTest(command=command):
+                self.assert_denied(
+                    self.hook("Bash", self.ws, command=command), GIT_DIR_SHELL_BUILTIN
+                )
+        wrapper = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh")
+        for command in (
+            *GIT_DIR_SHELL_PASSED,
+            f"sh {wrapper} integrate x",
+            f"sh {wrapper} -C {self.ws} status",
+        ):
+            with self.subTest(command=command):
+                self.hook("Bash", self.ws, command=command)
+                self.assertNotIn(GIT_DIR_SHELL_BUILTIN, self.last_record().get("rules", []))
+        self.hook("Read", self.ws, file_path=os.path.join(self.ws, ".git", "config"))
+        self.assertNotIn(GIT_DIR_BUILTIN, self.last_record().get("rules", []))
+
+    def test_with_the_common_layer(self):
+        self.check()
+
+    def test_without_the_common_layer(self):
+        os.remove(self.rules)
+        self.check()
+
+    def test_with_a_broken_common_layer(self):
+        write(self.rules, BROKEN)
+        self.check()
+
+    def test_the_message_names_the_git_wrapper(self):
+        os.remove(self.rules)
+        path = os.path.join(self.ws, ".git", "config")
+        denied = self.hook("Write", self.ws, file_path=path)
+        self.assertIn("'git <subcommand>'", self.reason(denied))
+        write(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh"), "")
+        wrapper = settings.script_command(self.ws, "ccnavi-git.sh")
+        for tool, field, value in (
+            ("Write", "file_path", path),
+            ("Bash", "command", "echo x > .git/config"),
+        ):
+            with self.subTest(tool=tool):
+                denied = self.hook(tool, self.ws, **{field: value})
+                self.assertIn(wrapper, self.reason(denied))
+                self.assertNotIn("'git ", self.reason(denied))
 
 
 class BuiltinGitWordingTest(unittest.TestCase):
