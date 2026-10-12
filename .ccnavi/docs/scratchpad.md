@@ -24,10 +24,10 @@ keywords: [scratchpad, handoff, wip/handoff, スクラッチパッド, 下書き
 ## `scratchpad/`の扱い
 
 - ワークスペースルート直下の`scratchpad/`だけが置き場。ワークツリー直下の`scratchpad/`は置き場にしない（ワークツリーごと消えるうえ、メインのルートにある`.gitignore`が効かない）
-- `.gitignore`の`/scratchpad/`で追跡から外す。コミットにもMRにも載らない
+- `.gitignore`の`/scratchpad`（末尾の`/`なし）で追跡から外す。ディレクトリにもsymlinkにも当たる。コミットにもMRにも載らない
 - メインのツリーなので、チケットの範囲は当たらない。`workspace-root`のルールの例外として、ワークツリーを切らなくても書ける（ルートでの編集全体が止まるわけではない）
 - `wip/scratchpad/`や`scratchpadX/`のように名前が違う場所は置き場ではなく、ルート直下なら止められる
-- ルールの判定は大文字と小文字を区別しない一方、`.gitignore`の`/scratchpad/`は区別する（Linuxなど）。`Scratchpad/`のような別の綴りは書き込めてしまうが追跡から外れないので、必ず小文字の`scratchpad/`を使う
+- ルールの判定は大文字と小文字を区別しない一方、`.gitignore`の`/scratchpad`は区別する（Linuxなど）。`Scratchpad/`のような別の綴りは書き込めてしまうが追跡から外れないので、必ず小文字の`scratchpad/`を使う
 
 ## `wip/handoff/`の扱い
 

@@ -799,17 +799,18 @@ INDEX_IGNORE_HEADER="# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh�
 INDEX_IGNORE_LINE="**/ccnavi-index.jsonl"
 # ワークスペースルート直下の scratchpad/ は、直接作業で一時的にユーザへ見せる物とコミットしたくない物の
 # 置き場（.ccnavi/docs/scratchpad.md）。追跡されると意味が無いので、実行ファイルと同じ回に足す。
-# `scratchpad/` はどの階層の同名にも当たるので、ルートに固定した `/scratchpad/` が既にあるとき、
-# または同等以上の `scratchpad`・`/scratchpad`・`scratchpad/` があるときは足さない。
-# `!/scratchpad/` のようにユーザが否定している行があれば、追跡すると決めているので足さずに伝える。
+# `scratchpad/` はどの階層の同名にも当たるので、ルートに固定した `/scratchpad` が既にあるとき、
+# または同等以上の `/scratchpad/`・`scratchpad`・`scratchpad/` があるときは足さない。
+# 末尾に `/` を付けないのは、scratchpad が symlink でも当たるようにするため（`/scratchpad/` はディレクトリにしか当たらない）。
+# `!/scratchpad` のようにユーザが否定している行があれば、追跡すると決めているので足さずに伝える。
 SCRATCH_IGNORE_HEADER="# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）"
-SCRATCH_IGNORE_LINE="/scratchpad/"
+SCRATCH_IGNORE_LINE="/scratchpad"
 # ignore_todo は、表示と「揃っているか」の判定に使う全体。書き込むときは塊ごとに分けて持つ。
 ignore_todo=""
 ignore_bin_todo=""
 ignore_index_todo=""
 ignore_scratch_todo=""
-# ユーザが scratchpad を否定している行（改行で終わる）。あれば /scratchpad/ は足さない。
+# ユーザが scratchpad を否定している行（改行で終わる）。あれば /scratchpad は足さない。
 ignore_scratch_negated=""
 # ユーザが ccnavi-index.jsonl を否定している行（改行で終わる）。あれば索引の行は足さない。
 ignore_index_negated=""
@@ -845,7 +846,7 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 	if [ -n "$scratch_negated" ]; then
 		ignore_scratch_negated="$scratch_negated
 "
-	elif ! ignored_already "$SCRATCH_IGNORE_LINE" "/scratchpad" "scratchpad/" "scratchpad"; then
+	elif ! ignored_already "$SCRATCH_IGNORE_LINE" "/scratchpad/" "scratchpad/" "scratchpad"; then
 		ignore_scratch_todo="$SCRATCH_IGNORE_LINE
 "
 	fi

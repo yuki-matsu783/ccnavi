@@ -154,7 +154,7 @@ BIN_PATH = "/".join(LAUNCHER_PARTS)
 INDEX_LINE = "**/ccnavi-index.jsonl"
 INDEX_HEADER = "# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）"
 # 使い捨ての置き場（ワークスペースルート直下の scratchpad/）を追跡から外す 1 行と見出し。
-SCRATCH_LINE = "/scratchpad/"
+SCRATCH_LINE = "/scratchpad"
 SCRATCH_HEADER = "# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）"
 
 
@@ -1776,7 +1776,7 @@ class KeepsTheScratchpadOutOfGit(DeploysWhatTheProjectNeeds):
         self.assertEqual(first.count(SCRATCH_HEADER), 1)
 
     def test_does_not_add_it_when_an_equivalent_line_is_already_there(self):
-        for existing in (SCRATCH_LINE, "/scratchpad", "scratchpad/", "scratchpad"):
+        for existing in (SCRATCH_LINE, "/scratchpad/", "scratchpad/", "scratchpad"):
             with self.subTest(existing=existing):
                 self.write_gitignore(f"node_modules/\n{existing}\n")
                 self.make_git()

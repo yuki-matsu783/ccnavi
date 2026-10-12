@@ -62,4 +62,4 @@ settings.local.json*
 
 # 使い捨ての置き場。ワークスペースルート直下の scratchpad/ に、直接作業の途中でユーザに見せる
 # 一時的な物や、コミットしたくない物を置く。ユーザに渡す物（wip/handoff/）と違い追跡も push もしない。
-/scratchpad/
+/scratchpad
