@@ -188,6 +188,15 @@ def has_git_wrapper(root: str) -> bool:
     return bool(root) and os.path.isfile(wrapper)
 
 
+def git_wrapper_command(root: str) -> str | None:
+    """文面で案内する git の入口。ラッパーがあれば打てる形、無ければ None。
+
+    生の git は組み込みで常に止まるので、ラッパーが無いときに `git` の形を案内すると、
+    案内した行そのものが止まる。呼ぶ側は None のとき、git の操作をユーザに頼む文にする。
+    """
+    return script_command(root, "ccnavi-git.sh") if has_git_wrapper(root) else None
+
+
 def git_command(root: str) -> str:
     """文面で案内する git の打ち方。ラッパーがあればラッパー。無ければ `git`。
 

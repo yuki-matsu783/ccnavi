@@ -265,7 +265,7 @@ def decide_before(
             )
         # git のラッパーの `rm`・`restore --source`・`checkout <ref> <パス>` で、自己防衛の対象を
         # 消す・別のコミットの中身に戻す形。シェルの rm と同じ場所を、ラッパー越しにも止める。
-        # ラッパー自身が消えると、生の git の組み込みの止め（ラッパーがあるときだけ足す）も外れる。
+        # ラッパー自身が消えても、生の git の組み込みの止めは外れない（いつも足す）。
         sub, word, kind = wrapguard.check_core_paths(
             conf, root, payload.cwd, record.subject, record.degraded
         )
@@ -508,7 +508,7 @@ def decide_before(
                 record.subject,
                 form,
                 [text for f, text in rewrites if f == form],
-                settings.git_command(root),
+                settings.git_wrapper_command(root),
             )
             for form in forms
         ]
@@ -703,7 +703,7 @@ def decide_before(
                     runner,
                     layer,
                     quoted,
-                    git=settings.git_command(root),
+                    git=settings.git_wrapper_command(root),
                 )
                 for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
             ),
@@ -726,7 +726,7 @@ def decide_before(
                 runner,
                 layer,
                 quoted,
-                git=settings.git_command(root),
+                git=settings.git_wrapper_command(root),
             )
             for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]
@@ -752,7 +752,7 @@ def decide_before(
                 runner,
                 layer,
                 quoted,
-                git=settings.git_command(root),
+                git=settings.git_wrapper_command(root),
             )
             for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]

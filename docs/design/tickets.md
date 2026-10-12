@@ -22,8 +22,7 @@ REQ-APV、REQ-RSK。用語は CONTEXT.md。
 一切見ず、`--agree` と `ticket` / `review` の副命令は止まり、VS Code 拡張は「チケット管理」の
 入口を出さない。承認済みチケットの置き場を空にすることでは切り替わらない。
 
-チケット制御が有効で、ワークスペースルートに `.ccnavi/scripts/ccnavi-git.sh` がある間は、生の git を組み込みの deny
-（`builtin-guard-raw-git`）で止め、git の入口をこのラッパー 1 本に寄せる（REQ-TKT-55）。ラッパーの中には、承認済みチケットの
+生の git は組み込みの deny（`builtin-guard-raw-git`）でいつも止め、git の入口をこのラッパー 1 本に寄せる（REQ-TKT-55）。ラッパーの中には、承認済みチケットの
 置き場を別のコミットの中身に戻す `restore` / `checkout` を通さない、直接作業だけを取り込む `integrate`、子のワークツリーから送らない
 `push`、親のブランチへ移るときに承認済みチケットを運ぶ `checkout` といった、チケット制御の可否がある。生の git は組み込みで
 いつも止める（ADR-0129）。チケット制御の有無と共通レイヤーの有無には依らない。

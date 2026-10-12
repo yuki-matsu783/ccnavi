@@ -267,7 +267,8 @@ def reason_for(
     inner は、ルールに当たったのが実行役のコマンド（runner）が中で実行するコマンドだった
     ときの、そのコマンド。元の形で当たったときは空。
 
-    git は文面で案内する git の打ち方（settings.git_command）。
+    git は文面で案内するラッパーの打ち方（settings.git_wrapper_command）。
+    ラッパーが無いときは None で、案内の形を書かない（生の git は組み込みで止まる）。
     """
     # 改行を含む対象は 1 行にまとめる。理由の文が対象の中の改行で分断されると、
     # どこまでが対象でどこからが言い分なのかが読めなくなる。
@@ -339,21 +340,21 @@ def _shorten(text: str) -> str:
     return shown
 
 
-def inside_quotes(git: str = "git") -> str:
+def inside_quotes(git: str | None = None) -> str:
     """引用の中から切り出したコマンドにルールが当たったときにつける断り。
 
     書いた側は、二重引用や引用しないヒアドキュメントの中の `$( )` とバッククォートを、
     文字を書いただけのつもりでいる。実際にはシェルが実行するので止めるのは正しいが、
     文字として渡す方法を知らなければ、同じ形を書き直しては止まる。方法はあるので名指しする。
     git の値を変数に取る形は、ラッパースクリプトで出して読み、値を次に書く 2 つの手順になる。
-    git は案内する git の打ち方（settings.git_command）。ラッパーがあるワークスペースでは生の
-    git が止まるので、止まる形を案内しない。
+    git は案内するラッパーの打ち方（settings.git_wrapper_command）。ラッパーが無いときは None で、
+    生の git の形は案内しない。
     """
     return (
         "note: this rule matched a command inside double quotes or an unquoted heredoc. The "
         "shell runs $( ) and backquotes there; they are not only written down. To keep them as "
         "text, use single quotes, escape them as \\$( and \\`, or pass the text from a file "
-        f"({git} commit -F <file>, gh --body-file <file>). To use a value such as a git revision, "
+        f"({_commit_file(git)}gh --body-file <file>). To use a value such as a git revision, "
         "print it with one command first and write the value into the next."
     )
 
@@ -550,24 +551,30 @@ def deadline_exceeded(code: str, seconds: float, *, mode: str = "") -> str:
     )
 
 
+def _commit_file(git: str | None) -> str:
+    """ファイルから本文を渡す入口の案内。ラッパーがあるときだけ `git commit -F` を名指しする。"""
+    return f"{git} commit -F <file>, " if git else ""
+
+
 def rewrite_rule(form: str) -> str:
     """書き直しを求める形で止めたときに、記録の `rules` に残す名前。"""
     return f"({form})"
 
 
-def rewrite(subject: str, form: str, found: list[str], git: str = "git") -> str:
+def rewrite(subject: str, form: str, found: list[str], git: str | None = None) -> str:
     """書き直しを求める形を止めた文。形ごとに 1 件。
 
     ルールに当たったのではないので、禁止された操作をしたとは言わない。止めたのは読みの
     決めごとで、書き直す方法は必ずある。方法を名指ししないと、同じ形を書き直しては止まる。
-    git は案内する git の打ち方（settings.git_command）。文面の `{git}` をこれに置き換える。
+    git は案内するラッパーの打ち方（settings.git_wrapper_command）。無いときは None で、
+    文面の `{commit}` は書かない。
     """
     shown = _shorten(subject)
     listed = ", ".join(f"`{_one_line(text)}`" for text in found[:_REWRITES_SHOWN])
     if len(found) > _REWRITES_SHOWN:
         listed += f" (+{len(found) - _REWRITES_SHOWN})"
     what, how = _REWRITE_TEXT[form]
-    how = how.replace("{git}", git)
+    how = how.replace("{commit}", f", {git} commit -F <file>" if git else "")
     return "\n".join(
         [f"[ccnavi] {CODE_REWRITE[form]}", f"subject: {shown}", f"{what}: {listed}", how]
     )
@@ -604,7 +611,7 @@ _REWRITE_TEXT = {
         "heredocs. ccnavi does not read backquotes; it stops the call. For a command "
         "substitution, write $( ) instead. To keep backquotes as text (Markdown in an issue or "
         "PR body, for example), put the text in single quotes, escape each one as \\`, or pass "
-        "the text from a file (gh --body-file <file>, {git} commit -F <file>).",
+        "the text from a file (gh --body-file <file>{commit}).",
     ),
     shellread.FORM_AMBIGUOUS: (
         "form that shells read differently",

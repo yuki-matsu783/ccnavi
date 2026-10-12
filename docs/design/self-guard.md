@@ -103,7 +103,7 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PATH`、`builtin-guard-wrapper-paths`）: `ccnavi-git.sh` の
 `rm`（`--cached` も）・`restore --source <ref>`・`checkout <ref> <パス>` で、`builtin-guard-setting-files` と同じ場所を
 消す・別のコミットの中身に戻す形を、ルールより先に止める（`wrapguard.check_core_paths`）。シェルの `rm` は止まるのに、ラッパーの
-`git rm` は同じファイルを消せた。`ccnavi-git.sh` 自身が消えると、生の git の組み込み（ラッパーがあるときだけ足す）も外れる。
+`git rm` は同じファイルを消せた。`ccnavi-git.sh` 自身が消えても、生の git の組み込みは足したままなので外れない。
 `CCNAVI_GUARD_CORE_FILES` が有効な間、チケット制御と組み込みの既定への退避に依らず足す。
 
 | 当たるもの | 理由 |
