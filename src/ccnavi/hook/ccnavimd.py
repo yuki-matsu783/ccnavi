@@ -10,8 +10,9 @@ md の書き方は 2 つだけ。
 - 差し込み: `{{名前}}` を、ワークスペースごとの値に置き換える。名前は `SUBSTITUTIONS`
 
 条件は、文と判定が食い違わないための仕掛けでもある。ワークツリーと git の行は、それを支える
-deny（`workspace-root` / `raw-git`）がワークスペースのルールにあるときだけ載せる。ルールが無い
-ワークスペースでその行を言うと、文と判定が食い違う。
+deny（`deny:workspace-root` / `deny:raw-git`）がワークスペースのルールにあるときだけ載せる。
+ルールが無いワークスペースでその行を言うと、文と判定が食い違う。`deny:<id>` は任意の id で
+使えるので、deny を足しても実行ファイルを直さずに md で条件にできる。
 
 md が無い・読めないときは、無いことだけを 1 行で言う。何も言わずに黙ると、決まりが渡って
 いないことに誰も気づけない。長すぎるときは `MAX_CHARS` で切り、切ったことを末尾に言う。
@@ -30,11 +31,11 @@ FILE = "CCNAVI.md"
 # 1 回の応答に載せる本文の上限（文字数）。固定。常駐の文脈なので毎回これだけ重くなる。
 MAX_CHARS = 6000
 
-COND_WORKSPACE_ROOT = "workspace-root"
-COND_RAW_GIT = "raw-git"
+# `deny:<id>` は、ワークスペースのルールに id `<id>` の deny があるとき成り立つ（id は任意）。
+# `deny:raw-git` は、生の git を組み込みで止めるときも成り立つ。
+DENY_PREFIX = "deny:"
+RAW_GIT_ID = "raw-git"
 CONDITIONS = (
-    COND_WORKSPACE_ROOT,  # ワークスペースのルールに `workspace-root` の deny がある
-    COND_RAW_GIT,  # `raw-git` の deny がある、または生の git を組み込みで止める
     "projects",  # プロジェクトの置き場に、`.git` を持つプロジェクトがある
     "tickets",  # チケット制御を使っている
     "docs",  # md の索引の案内（`--docs`）を出す回
@@ -58,6 +59,13 @@ _DIRECTIVE = re.compile(r"<!--\s*ccnavi:")
 _SUBSTITUTION = re.compile(r"\{\{\s*(\w+)\s*\}\}")
 
 
+def known(name: str) -> bool:
+    """使える条件の名前か。`deny:` に続く id は任意。"""
+    if name.startswith(DENY_PREFIX):
+        return len(name) > len(DENY_PREFIX)
+    return name in CONDITIONS
+
+
 def problems(text: str) -> list[str]:
     """md の書き方の誤り。`ccnavi --lint` が使う。
 
@@ -69,7 +77,7 @@ def problems(text: str) -> list[str]:
         opened = _IF.match(line)
         if opened:
             depth += 1
-            if opened.group(1) not in CONDITIONS:
+            if not known(opened.group(1)):
                 found.append(f"{number} 行目: 条件 {opened.group(1)} は使えない")
         elif _ENDIF.match(line):
             depth -= 1
@@ -89,7 +97,7 @@ def problems(text: str) -> list[str]:
 def render(text: str, flags: set[str], values: dict[str, str]) -> str:
     """条件に合う行だけを残し、差し込みを解く。空行は続けて 1 つにまとめ、前後の空行は取る。
 
-    名前が `CONDITIONS` に無い条件は成り立たないものとして扱い、`SUBSTITUTIONS` に無い差し込みは
+    名前が `CONDITIONS` にも `deny:<id>` にも当たらない条件は成り立たないものとして扱い、`SUBSTITUTIONS` に無い差し込みは
     そのまま残す（書き間違いが見える形で届く。誤りは `problems` が lint で言う）。
     """
     out: list[str] = []
@@ -130,10 +138,9 @@ def flags_for(
 ) -> set[str]:
     """成り立つ条件の名前。"""
     found: set[str] = set()
-    if COND_WORKSPACE_ROOT in deny_ids:
-        found.add(COND_WORKSPACE_ROOT)
-    if COND_RAW_GIT in deny_ids or ticket_guard.raw_git_applies(conf, root):
-        found.add(COND_RAW_GIT)
+    found.update(DENY_PREFIX + rule_id for rule_id in deny_ids)
+    if ticket_guard.raw_git_applies(conf, root):
+        found.add(DENY_PREFIX + RAW_GIT_ID)
     if tree.projects(conf.projects):
         found.add("projects")
     if conf.tickets_enabled:

@@ -4,7 +4,7 @@
 
 1. 起動のたびに、ワークツリー・git の入口・下書きの置き場・サブエージェント・合意の要る変更が
    1 行ずつ届く。git の入口は打てる絶対パスで、詳しいことは --help と拒否の案内に聞く形
-2. ワークツリーの行は `workspace-root`、git の行は `raw-git` の deny がワークスペースのルール
+2. ワークツリーの行は `deny:workspace-root`、git の行は `deny:raw-git` の条件で、その deny がワークスペースのルール
    （共通レイヤーか自身のレイヤー）にあるときだけ載る。ルールが読めず既定に戻ったときは載らない。
    ただし git の行は、生の git を組み込みで止めるとき（チケット制御が有効でラッパーがある）も載る
 3. チケット制御が有効なときだけ、承認済みチケットの状態の確かめ方（`status`）が載る
@@ -221,12 +221,12 @@ class SessionConventionsTest(unittest.TestCase):
         self.assertEqual(block(self.start("--mode", "enable", agent_id="a1")), "")
 
     def test_常駐の文脈なので短い(self):
-        # 毎回の起動・再開・compact に届く。考え方と作業の決まりと進め方を合わせて 2600 字に収める。
+        # 毎回の起動・再開・compact に届く。考え方と作業の決まりと詳細の表と進め方を合わせて 3400 字に収める。
         os.makedirs(os.path.join(self.root, "projects", "lib", ".git"))
         text = block(self.start("--mode", "enable"))
         body = text.replace(self.root, "<root>")
 
-        self.assertLess(len(body), 2600, body)
+        self.assertLess(len(body), 3400, body)
 
 
 if __name__ == "__main__":

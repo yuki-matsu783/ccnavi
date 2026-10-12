@@ -11,10 +11,10 @@ ccnavi が前提にしている決まり。セッションの開始（起動・�
 
 ## 作業の決まり
 
-<!-- ccnavi:if workspace-root -->
+<!-- ccnavi:if deny:workspace-root -->
 - 編集する前にワークツリー（{{worktrees}}/<名前>）を切り、その中で編集する。切り方は ccnavi-git.sh の --help（worktree add）。直接作業の名前は <先頭の語>-<番号>-<slug>（.ccnavi/docs/worktree.md）。
 <!-- ccnavi:endif -->
-<!-- ccnavi:if raw-git -->
+<!-- ccnavi:if deny:raw-git -->
 - git は直接呼ばず {{git_sh}} を通す。止められたら迂回せず、出力の案内に従う。
 <!-- ccnavi:endif -->
 - 下書きと使い捨てのファイルは、ワークツリーの中でも {{scratch}}/ に置く（追跡され、チケットの範囲では報告されない。統合のときに integrate が外す）。コミットしたくないものはセッションのスクラッチパッドに置く。
@@ -28,6 +28,25 @@ ccnavi が前提にしている決まり。セッションの開始（起動・�
 <!-- ccnavi:if docs -->
 - 詳しい決まりは下の案内の --docs で、--keyword <語> を付けて引く（例: ワークツリー、下書き、サブエージェント、相談）。
 <!-- ccnavi:endif -->
+
+## 詳細
+
+詳しい決まりは `.ccnavi/docs/` にある。作業が表の「読むとき」に当てはまったら開く。
+
+| 読むとき | 開くファイル |
+|---|---|
+| ワークツリーを切る、他セッションの変更の影響を受けた | `.ccnavi/docs/worktree.md` |
+| issue・MR を指定して作業を頼まれた | `.ccnavi/docs/worktree-start.md` |
+| `<統合先>` に取り込む、マージリクエストに出す | `.ccnavi/docs/worktree-merge.md` |
+| ワークツリーを片付ける | `.ccnavi/docs/worktree-cleanup.md` |
+| 下書きや使い捨てのファイルを置く | `.ccnavi/docs/scratchpad.md` |
+| `projects/` 配下を修正する、チケット・マーカー・記録の置き場を確かめる、`rules.yml` の `message` を書く | `.ccnavi/docs/projects.md` |
+| 提案を書く、相談が要るか迷う、ccnavi に止められた、サブエージェントに任せる | `.ccnavi/docs/decisions.md` |
+| ワークスペースルート・統合先ブランチなどの用語を確かめる | `.ccnavi/docs/terms.md` |
+| md に frontmatter を付ける・直す、md の索引で引く | `.ccnavi/docs/frontmatter.md` |
+| フィードバックメッセージが届いた、`.claude/skills/` を直したくなった、フィードバック計画を書く | `.ccnavi/docs/skill-review.md` |
+| スキルの振り返りで知識を `docs/wiki/` に溜める、wiki のパターンや提案の採否を読む・書く | `.ccnavi/docs/skill-wiki.md` |
+| 概念スキル（designing・testing・debugging・reviewing・releasing）の reference を引く・足す、スキルを新しく作りたくなった | `.ccnavi/docs/skill-concepts.md` |
 
 <!-- ccnavi:if tickets -->
 ## 作業の進め方

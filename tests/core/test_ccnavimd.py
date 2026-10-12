@@ -58,6 +58,13 @@ class ProblemsTest(unittest.TestCase):
         self.assertIn("4 行目: ccnavi:endif に対応する ccnavi:if が無い", joined)
         self.assertIn("ccnavi:if に対応する ccnavi:endif が無い", joined)
 
+    def test_deny_は任意のidを条件にできる(self):
+        self.assertEqual(ccnavimd.problems("<!-- ccnavi:if deny:future-rule -->\n<!-- ccnavi:endif -->\n"), [])
+        self.assertIn(
+            "条件 deny: は使えない",
+            "\n".join(ccnavimd.problems("<!-- ccnavi:if deny: -->\n<!-- ccnavi:endif -->\n")),
+        )
+
     def test_このリポジトリのccnavi_mdに誤りは無い(self):
         with open(os.path.join(ROOT, ".ccnavi", "CCNAVI.md"), encoding="utf-8") as f:
             self.assertEqual(ccnavimd.problems(f.read()), [])
