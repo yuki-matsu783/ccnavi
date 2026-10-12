@@ -162,6 +162,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | 生の git（チケット制御が有効で、ワークスペースルートに `ccnavi-git.sh` があるとき） | 止める（`builtin-ticket-raw-git`。9.1） |
 | 認証情報の置き場（`.env`、`.ssh/`、`id_rsa`、`.netrc`、`.npmrc` など）への `Bash` `Read` `Write` `Edit` | 止める |
 | シェルから `.claude/hooks/` `.claude/settings*.json`、ccnavi ディレクトリ `.ccnavi`、`logs/decisions.jsonl` `logs/state` `logs/archive`、`ccnavi-git.sh` へ書き込む形 | 止める（書き込みの形と場所の組で見る。8.2） |
+| `.git` の中（`.git/` の下と、ワークツリーの `.git` ファイル）への `Write` `Edit` `NotebookEdit` と、シェルから書き込む形 | 止める（`builtin-guard-git-dir`・`builtin-guard-git-dir-via-bash`。下） |
 | `Read`（認証情報の置き場を除く。強いタイプが先に当たる） | 通す |
 | `Write` / `Edit` でルールファイルを直す | 既定では止めない。権限モードに委ねる |
 | それ以外 | 権限モードに委ねる |
@@ -180,6 +181,18 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
   ルールの合間でしか確かめないので、1 本の照合が後戻りで長引くと hook の timeout に達し、呼び出しは止められずに通る。
   rm と reset は、後の始まりで当たるなら最初の始まりでも当たるので、コマンドの中で最初の `rm` / `reset` に決めて 1 度だけ読む。
   git のオプションは、中に git の始まりを持たない語だけを読み、`git -c git -c …` のような並びで読み直しを積もらせない
+
+`.git` の中への書き込みの 2 本（`builtin-guard-git-dir`・`builtin-guard-git-dir-via-bash`）も、既定のときに限らず常に当たる土台の deny。
+参照・索引・設定・hook を git を通さずに書き換えると、履歴や作業中の変更を失い、hook なら以後の git の操作のたびに任意のコマンドが走る。
+文面は git の打ち方（ラッパーがあれば `ccnavi-git.sh`）を案内する。
+
+- 名指しのツールは、解決済みの絶対パスに `.git` の段（前後が区切りか末尾）があれば止める。`.gitignore`・`.github/`・`repo.git/` は当たらない。`Read` は止めない
+- シェルは、守る場所（8.2）と同じ書き込みの形（リダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先、
+  `.git` をいま居る場所 `.` へ写す形）と `.git` の組で止める。`cat .git/config`・`cp .git/config /tmp/x` のような読みは通る。
+  `.git` の前は語の頭か区切り（`/` `\` `=`）に限り、`sed -i 's/a.git/b.git/'` の式や URL の中の `.git` には当てない（`-t` の値だけは前を閉じない）
+- git のラッパーの中で行う `.git` への書き込み（統合の片付けなど）は、外側のコマンド文字列に `.git` が出ないので当たらない
+- リダイレクトの行き先は `>` をまたがずに読むので、読み切れなかった生の文字列でも照合が長さに比例して終わる。`>` の個数の上限（8.2）の対象に入れない
+- 止めないもの: `git` 自身のサブコマンド（`git config` など）、`cd .git` のあとの相対パスへの書き込み、インタプリタ（`python -c` など）の中の書き込み。守る場所の検出と同じく、形の分かる書き込みだけを見る
 
 生の git の 1 本（`builtin-ticket-raw-git`）は、`git` がコマンドの位置にある形だけに当てる（行頭とコマンドの切れ目の後ろ、
 `env`・`sudo`・`xargs` などの前置きは外した中のコマンドの層で、パス付き（`C:\Git\git.exe` も）と `git.exe` も。`then`・`do` などの予約語は

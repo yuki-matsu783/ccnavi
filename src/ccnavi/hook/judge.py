@@ -110,6 +110,8 @@ SEARCH_TOOLS = ("Grep", "Glob")
 # 組み込みの既定に戻った間は builtin が持つ。
 # チケットの状態の置き場を守る 1 本は、チケット制御が有効なときに足す。
 # 生の文字列の `>` が上限を超えたときは、これらを生の文字列に当てない（decide_before）。
+# `.git` の中を守る土台の 1 本（builtin.GIT_DIR_SHELL_RULE_ID）は入れない。リダイレクトの行き先を
+# `>` をまたがずに読むので、照合が長さに比例して終わる（selfguard_shell.git_dir_shell_regex）。
 SHELL_GUARD_RULE_IDS = (
     selfguard_shell.SHELL_RULE_ID,
     builtin.CONFIG_VIA_BASH_RULE_ID,

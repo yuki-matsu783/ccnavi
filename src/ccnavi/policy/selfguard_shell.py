@@ -77,11 +77,9 @@ _REDIRECT = (
 # 2 つ目以降の `-i` は後ろの `[^\x00]*` が飲み込めるので、`where` を試せる位置は変わらず、
 # 当たる集合は変わらない（先読みは rules が受け付けないので使わない）。決め打ちしないと `-i` が
 # 出るたびに末尾まで読み直し、長さの 2 乗で遅くなる（#241）。
-_WRITE_VERBS = (
-    rf"({_REDIRECT}"
-    r"|(^|\x00)(mv|rm|tee|dd|truncate|patch|shred)\b[^\x00]*"
-    r"|(^|\x00)sed\b(?>[^\x00]*?[ \x01](-[A-Za-z]*?i|--i))[^\x00]*)"
-)
+_VERB_WRITE = r"(^|\x00)(mv|rm|tee|dd|truncate|patch|shred)\b[^\x00]*"
+_SED_WRITE = r"(^|\x00)sed\b(?>[^\x00]*?[ \x01](-[A-Za-z]*?i|--i))[^\x00]*"
+_WRITE_VERBS = rf"({_REDIRECT}|{_VERB_WRITE}|{_SED_WRITE})"
 _COPY_VERBS = r"(^|\x00)(cp|ln|install)\b[^\x00]*"
 _COPY_NAME = r"(^|\x00)(cp|ln|install)\b"
 
@@ -212,19 +210,28 @@ def under(directory: str) -> str:
     return r"(?:[^ \x00]*[\\/])?" + directory
 
 
-def holder_regex(directory: str, names: str) -> str:
+def holder_regex(directory: str, names: str, *, named_only: bool = False) -> str:
     """守るものが入っているディレクトリを行き先にした cp / ln / install / mv に当たる式。
 
     directory は行き先の語全体に当てる表記（under で組むか、`\\.` のように語そのもの）、
     names は守るものの名前（区切りを含まない）。元の側に names の語か、名前の決まらない語が
     あるときだけ当たる（上の _HOLD_NAME の説明）。行き先は _COPY_LAST / _COPY_TARGET と同じく、
     `-t` の値か、選択肢でない最後の引数。
+
+    named_only を立てると、元の側に names の語があるときだけ当たる（名前の決まらない語と、
+    行き先をディレクトリと見ない選択肢は数えない）。常に当たる土台（`.git` の 1 本）で使う。
+    土台は保護を切った設定でも当たるので、`cp ../src/*.py .` のような日常の写しを、守るものと
+    関係の無い文面で止めないため。
     """
     source = rf"(?:{_HEAD}(?:{names})[\\/]*|{_UNKNOWN})"
+    flag = rf"|{_NO_TARGET_FLAG}"
+    if named_only:
+        source = rf"(?:{_HEAD}(?:{names})[\\/]*)"
+        flag = ""
     dest = directory + _DIR_TAIL
     # 最後の引数が行き先。元の語は `--` の手前（選択肢として読む並び）にも、後ろにもありうる。
     before = (
-        rf"(?>(?: {_ARG})*? (?:{source}|{_NO_TARGET_FLAG}) )"
+        rf"(?>(?: {_ARG})*? (?:{source}{flag}) )"
         rf"(?:{_ARG} )*(?:--(?: [^ \x00]*)* )?{dest}{_COPY_TERM}"
     )
     after = rf"(?: {_ARG})* --(?>(?: [^ \x00]*)*? {source} )(?:[^ \x00]* )*{dest}{_COPY_TERM}"
@@ -730,6 +737,50 @@ def records_regex(log_path: str = "", state_dir: str = "") -> str:
         for where in sorted({os.path.abspath(state_dir), os.path.realpath(state_dir)}):
             alternatives.append("^" + _spelled(where) + r"(?:[\\/]|$)")
     return _folded("(?:" + "|".join(alternatives) + ")")
+
+
+# git の管理ディレクトリ（`.git/` とその中身、ワークツリーの `.git` ファイル）を、名指しのツールに
+# 当てる形。当てる先は解決済みの絶対パスなので、前は区切りで閉じる。`.gitignore` や `.github/`
+# のように `.git` の後ろに名前が続くものには当たらない。
+GIT_DIR_PATH_REGEX = r"[\\/]\.git(?:[\\/]|$)"
+
+# シェルの側で `.git` の前に来てよい 1 文字。語の頭（空白）、引用がつないだ空白、パスの区切り、
+# `--opt=` の `=`。`repo.git/` や `sed -i 's/a.git/b.git/'` の式の中の `.git` には当たらない。
+_GIT_DIR_HEAD = rf"[ {re.escape(shellread.WORD_SEP)}\\/=]"
+_GIT_DIR_NAME = r"\.git" + _END
+
+
+def git_dir_shell_regex() -> str:
+    """`.git` ディレクトリへシェルから書き込む形。組み込みの土台（builtin）が持つ。
+
+    書き込みの形（リダイレクト・書き換える動詞・`sed -i`・cp / ln / install の行き先）は
+    守る場所（`_PLACES`）と同じ部品で読む。場所の名前が出ただけでは止めない。`cat .git/config` も
+    `cp .git/config /tmp/x` も読むだけなので通る。git のラッパー（`ccnavi-git.sh`）の中で行う
+    `.git` への書き込みは、外側のコマンド文字列に `.git` が出ないので当たらない。
+
+    守る場所の表記と違い、`.git` の前に区切りを求める（`_GIT_DIR_HEAD`）。`.git` は URL や
+    裸のリポジトリの名前（`repo.git`）にも出るので、前を閉じないと `sed -i` の置換式まで止まる。
+    リダイレクトの行き先の語は、区切りで終わる前置きだけを読ませる（`_REDIRECT` の語の読みは
+    前置きを何でも食うので、ここでは使わない）。`-t` の値は `_COPY_TARGET` が値の頭を食うので
+    前を閉じられない。止める側に倒れるだけなので、そのままにする。
+
+    いま居る場所（`.`）へ `.git` を写す形（`cp -r /tmp/x/.git .`）は holder_regex で止める。
+    元の名前が決まらない語（`cp ../src/*.py .`）は数えない（named_only）。
+    """
+    # 前置きは `>` をまたがない。読みはリダイレクトを `> 行き先` にそろえるので、行き先の語に `>` は
+    # 来ない。またがせると、読み切れなかった生の文字列（`>a>a>a…`）で `>` ごとに尾を読み直し、
+    # 長さの 2 乗になる（REDIRECT_LIMIT の説明）。またがなければ、`>` ごとに読むのは次の `>`
+    # までで、合わせて長さに比例する。上限（judge.SHELL_GUARD_RULE_IDS）に頼らずに済む。
+    redirect = rf"(?:^|[^>|&])[|&]*>[>|&]* ?(?:[^ {_NOT_A_WORD}>|&][^ \x00>]*[\\/])?"
+    writes = rf"(?:{redirect}|{_VERB_WRITE}{_GIT_DIR_HEAD}|{_SED_WRITE}{_GIT_DIR_HEAD})"
+    last = r"(?:[^ \x00]*[\\/])?\.git" + _COPY_END
+    return "|".join(
+        (
+            _folded(writes + _GIT_DIR_NAME),
+            copy_destination_regex(_folded(last), _folded(_GIT_DIR_NAME)),
+            holder_regex(r"\.", r"\.git", named_only=True),
+        )
+    )
 
 
 def _spelled(path: str) -> str:

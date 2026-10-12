@@ -346,7 +346,36 @@ def _deny(root: str) -> list[dict]:
                 "ask the user for the value you need."
             ),
         },
+        {
+            "id": GIT_DIR_RULE_ID,
+            "match": "Write|Edit|NotebookEdit",
+            "regex": selfguard_shell.GIT_DIR_PATH_REGEX,
+            "message": _git_dir_message(git),
+        },
+        {
+            "id": GIT_DIR_SHELL_RULE_ID,
+            "match": "Bash",
+            "regex": selfguard_shell.git_dir_shell_regex(),
+            "message": _git_dir_message(git),
+        },
     ]
+
+
+# `.git` の中身（参照・索引・設定・hook）を直接書き換える形。書き換えは git の記録に残らず、
+# 壊すと履歴や作業中の変更ごと失う。hook を書けば、以後の git の操作のたびに任意のコマンドが走る。
+# 名指しのツールとシェルで当てる先が違う（パスとコマンド文字列）ので、id を分ける。
+# 読むだけ（`cat .git/config`、名指しの Read）は止めない。
+GIT_DIR_RULE_ID = "builtin-guard-git-dir"
+GIT_DIR_SHELL_RULE_ID = "builtin-guard-git-dir-via-bash"
+
+
+def _git_dir_message(git: str) -> str:
+    return (
+        "This writes inside the .git directory directly. Changes there bypass git "
+        "and can lose history or run commands through hooks. Make the change with "
+        f"'{git} <subcommand>' instead, or ask the user to do it. "
+        "Reading files under .git is not blocked."
+    )
 
 
 _ALLOW: list[dict] = [

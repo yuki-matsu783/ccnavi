@@ -45,6 +45,9 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 
 `logs/` の下の git のラッパースクリプトの記録は守らない。
 
+`.git` の中への書き込みは、ここではなく土台の deny（5.6 の `builtin-guard-git-dir`・`builtin-guard-git-dir-via-bash`）で止める。
+同じ書き込みの形の部品を使うが、`CCNAVI_GUARD_CORE_FILES` にも、ルールファイルが読めるかにも依らず当たる。
+
 実行ファイルのパス（`selfguard_shell.binary_clause`）: hook が実際に走らせるのは sh が起動する実体（4.6）なので、実体の置き場にも当てる。
 このパスは `builtin-guard-binary` と、`builtin-guard-setting-files` の場所の一覧と、承認のルール（9.5）の実行ファイルの名前に入る。
 パスを `.` `..` を除いた要素に割り、名前で 2 つの形を切り替える。
