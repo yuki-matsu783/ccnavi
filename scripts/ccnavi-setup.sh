@@ -800,7 +800,8 @@ INDEX_IGNORE_LINE="**/ccnavi-index.jsonl"
 # ワークスペースルート直下の scratchpad/ は、直接作業で一時的にユーザへ見せる物とコミットしたくない物の
 # 置き場（.ccnavi/docs/scratchpad.md）。追跡されると意味が無いので、実行ファイルと同じ回に足す。
 # `scratchpad/` はどの階層の同名にも当たるので、ルートに固定した `/scratchpad/` が既にあるとき、
-# または同じ意味の `scratchpad`・`/scratchpad`・`scratchpad/` があるときは足さない。
+# または同等以上の `scratchpad`・`/scratchpad`・`scratchpad/` があるときは足さない。
+# `!/scratchpad/` のようにユーザが否定している行があれば、追跡すると決めているので足さずに伝える。
 SCRATCH_IGNORE_HEADER="# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）"
 SCRATCH_IGNORE_LINE="/scratchpad/"
 # ignore_todo は、表示と「揃っているか」の判定に使う全体。書き込むときは塊ごとに分けて持つ。
@@ -808,6 +809,8 @@ ignore_todo=""
 ignore_bin_todo=""
 ignore_index_todo=""
 ignore_scratch_todo=""
+# ユーザが scratchpad を否定している行（改行で終わる）。あれば /scratchpad/ は足さない。
+ignore_scratch_negated=""
 # ユーザが ccnavi-index.jsonl を否定している行（改行で終わる）。あれば索引の行は足さない。
 ignore_index_negated=""
 # .gitignore の行を、比べやすい形で出す。CRLF の `\r` と行末の空白を取り除く（git も行末の
@@ -838,7 +841,11 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 		ignore_index_todo="$INDEX_IGNORE_LINE
 "
 	fi
-	if ! ignored_already "$SCRATCH_IGNORE_LINE" "/scratchpad" "scratchpad/" "scratchpad"; then
+	scratch_negated=$(gitignore_lines | grep -E '^!/?scratchpad/?$' || true)
+	if [ -n "$scratch_negated" ]; then
+		ignore_scratch_negated="$scratch_negated
+"
+	elif ! ignored_already "$SCRATCH_IGNORE_LINE" "/scratchpad" "scratchpad/" "scratchpad"; then
 		ignore_scratch_todo="$SCRATCH_IGNORE_LINE
 "
 	fi
@@ -977,6 +984,10 @@ report_deploy() {
 	if [ -n "$ignore_index_negated" ]; then
 		printf '.gitignore に ccnavi-index.jsonl を否定する行があり、ユーザが索引を追跡しているので %s は足していません:\n' "$INDEX_IGNORE_LINE"
 		printf '%s' "$ignore_index_negated" | sed 's/^/  /'
+	fi
+	if [ -n "$ignore_scratch_negated" ]; then
+		printf '.gitignore に scratchpad を否定する行があり、ユーザが追跡しているので %s は足していません:\n' "$SCRATCH_IGNORE_LINE"
+		printf '%s' "$ignore_scratch_negated" | sed 's/^/  /'
 	fi
 	if [ -n "$launcher_mode_todo" ]; then
 		printf '%s:\n' "$4"

@@ -75,6 +75,7 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
         regex: '^{root}[\\/]'
         except:
           - regex: '^{root}[\\/]wip[\\/]handoff(?:[\\/]|$)'
+          - regex: '^{root}[\\/]scratchpad(?:[\\/]|$)'
           - regex: '^{root}[\\/]\\.claude[\\/]worktrees(?:[\\/]|$)'
         message: ...
 

@@ -1785,6 +1785,19 @@ class KeepsTheScratchpadOutOfGit(DeploysWhatTheProjectNeeds):
                 self.assertNotIn(SCRATCH_HEADER, written)
                 self.assertEqual(written.count("scratchpad"), 1, written)
 
+    def test_does_not_undo_a_negation_of_the_user(self):
+        for negation in ("!/scratchpad/", "!scratchpad/", "!/scratchpad", "!scratchpad"):
+            with self.subTest(negation=negation):
+                self.write_gitignore(f"{negation}\n")
+                self.make_git()
+                result = self.run_setup("--deploy", self.make_source())
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                written = self.gitignore()
+                self.assertNotIn(SCRATCH_HEADER, written)
+                self.assertNotIn(f"\n{SCRATCH_LINE}\n", written)
+                self.assertIn("scratchpad を否定する行があり", result.stdout)
+                self.assertIn(negation, result.stdout)
+
     def test_a_look_alike_line_does_not_count(self):
         for other in ("wip/scratchpad/", "scratchpadx/", "/scratchpad/x"):
             with self.subTest(other=other):

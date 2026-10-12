@@ -82,7 +82,7 @@ class SessionConventionsTest(unittest.TestCase):
         self.assertIn(git_sh, text)
         self.assertIn("迂回せず", text)
         self.assertIn("wip/handoff/", text)
-        self.assertIn("integrate が外す", text)
+        self.assertIn("integrate が外し", text)
         # ルート直下の使い捨ての置き場は、ワークツリーの中から書き違えないよう絶対パスで届く。
         self.assertIn(f"{self.root}/scratchpad/", text)
         self.assertNotIn("追跡されず", text)
