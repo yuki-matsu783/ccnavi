@@ -71,7 +71,7 @@ class AbsentRulesTest(ConfigUnionHarness):
                 denied = self.hook(tool, self.ws, **{field: value})
                 self.assert_denied(denied)
                 self.assertTrue(
-                    any(name.startswith("builtin-") for name in self.last_record()["rules"]),
+                    any(name.startswith("builtin:") for name in self.last_record()["rules"]),
                     self.last_record(),
                 )
                 self.assertNotIn("fallback", self.last_record())
@@ -89,18 +89,18 @@ class AbsentRulesTest(ConfigUnionHarness):
         ):
             with self.subTest(value=value):
                 self.assert_denied(
-                    self.hook(tool, self.ws, **{field: value}), "builtin-credentials"
+                    self.hook(tool, self.ws, **{field: value}), "builtin:credentials"
                 )
         for command in ("jq -r '.hooks[0],.env.X' a.json", "echo process.env.HOME"):
             with self.subTest(command=command):
                 self.hook("Bash", self.ws, command=command)
-                self.assertNotIn("builtin-credentials", self.last_record().get("rules", []))
+                self.assertNotIn("builtin:credentials", self.last_record().get("rules", []))
 
     def test_builtin_deny_stays_on_under_the_common_layer(self):
         """共通レイヤーが在っても、組み込みの deny は土台として当たる。"""
         denied = self.hook("Bash", self.ws, command="git reset --hard HEAD~1")
 
-        self.assert_denied(denied, "builtin-git-reset-hard")
+        self.assert_denied(denied, "builtin:git-reset-hard")
 
     def test_without_both_layers_the_builtin_defaults_decide(self):
         """共通レイヤーも config も無ければ、組み込みの既定だけで判定する。`fallback` は残さない。
@@ -111,9 +111,9 @@ class AbsentRulesTest(ConfigUnionHarness):
 
         read = self.hook("Read", self.ws, file_path=os.path.join(self.ws, READ))
         self.assertEqual(self.last_record()["decision"], "allow", read.stdout)
-        self.assertEqual(self.last_record()["rules"], ["builtin-read-anything"])
+        self.assertEqual(self.last_record()["rules"], ["builtin:read-anything"])
         self.assertNotIn("fallback", self.last_record())
-        self.assert_denied(self.hook("Bash", self.ws, command=RM_RF), "builtin-recursive-delete")
+        self.assert_denied(self.hook("Bash", self.ws, command=RM_RF), "builtin:recursive-delete")
 
     def test_the_read_allow_is_not_added_when_a_layer_exists(self):
         """`Read` を通す allow は組み込みの既定だけのとき限り。config が 1 本でも在れば足さない。"""
@@ -122,7 +122,7 @@ class AbsentRulesTest(ConfigUnionHarness):
 
         self.hook("Read", self.ws, file_path=os.path.join(self.ws, READ))
 
-        self.assertNotIn("builtin-read-anything", self.last_record().get("rules", []))
+        self.assertNotIn("builtin:read-anything", self.last_record().get("rules", []))
 
     def test_a_broken_common_layer_falls_back_to_the_builtin_defaults_only(self):
         """共通レイヤーのルールが不正なら、組み込みの既定だけで判定する。`fallback` を残す。"""
@@ -133,7 +133,7 @@ class AbsentRulesTest(ConfigUnionHarness):
         )
 
         self.assertNotEqual(self.decision(generated), "deny", generated.stdout)
-        self.assertEqual(self.last_record()["fallback"], "builtin-rules")
+        self.assertEqual(self.last_record()["fallback"], "builtin:rules")
         self.hook("Read", self.ws, file_path=os.path.join(self.ws, READ))
         self.assertEqual(self.last_record()["decision"], "allow")
         self.assert_denied(self.hook("Bash", self.ws, command=RM_RF))
@@ -184,51 +184,51 @@ class AbsentRulesTest(ConfigUnionHarness):
 GIT = "git"
 # 組み込みの deny が表記違いでも止める形と、止めない形。
 BUILTIN_DENIED = (
-    (f"{GIT} -C . push", "builtin-git-push"),
-    (f"{GIT} --no-pager push", "builtin-git-push"),
-    (f"{GIT} --git-dir=.git push", "builtin-git-push"),
-    (f"{GIT} --git-dir .git push origin main", "builtin-git-push"),
-    (f"{GIT} -c x=y reset --hard", "builtin-git-reset-hard"),
-    (f"{GIT} reset -q --hard HEAD~1", "builtin-git-reset-hard"),
-    ("rm -fr x", "builtin-recursive-delete"),
-    ("rm -r -f x", "builtin-recursive-delete"),
-    ("rm -f -r x", "builtin-recursive-delete"),
-    ("rm --recursive --force x", "builtin-recursive-delete"),
-    ("rm -Rfv x", "builtin-recursive-delete"),
-    ("rm -r x -f", "builtin-recursive-delete"),
+    (f"{GIT} -C . push", "builtin:git-push"),
+    (f"{GIT} --no-pager push", "builtin:git-push"),
+    (f"{GIT} --git-dir=.git push", "builtin:git-push"),
+    (f"{GIT} --git-dir .git push origin main", "builtin:git-push"),
+    (f"{GIT} -c x=y reset --hard", "builtin:git-reset-hard"),
+    (f"{GIT} reset -q --hard HEAD~1", "builtin:git-reset-hard"),
+    ("rm -fr x", "builtin:recursive-delete"),
+    ("rm -r -f x", "builtin:recursive-delete"),
+    ("rm -f -r x", "builtin:recursive-delete"),
+    ("rm --recursive --force x", "builtin:recursive-delete"),
+    ("rm -Rfv x", "builtin:recursive-delete"),
+    ("rm -r x -f", "builtin:recursive-delete"),
     # 後ろに別の rm を引数として挟んでも、最初の rm の選択肢として読む。
-    ("rm -r rm -f", "builtin-recursive-delete"),
-    ("ls; rm a rm -rf b", "builtin-recursive-delete"),
+    ("rm -r rm -f", "builtin:recursive-delete"),
+    ("ls; rm a rm -rf b", "builtin:recursive-delete"),
     # 値を取るオプションの値まで読んだ後のサブコマンド。
-    (f"{GIT} -c push.default=current push", "builtin-git-push"),
-    (f"{GIT} -C push push", "builtin-git-push"),
-    (f"/usr/bin/{GIT} push", "builtin-git-push"),
-    (f"{GIT}.exe push", "builtin-git-push"),
-    (f"{GIT} push;", "builtin-git-push"),
+    (f"{GIT} -c push.default=current push", "builtin:git-push"),
+    (f"{GIT} -C push push", "builtin:git-push"),
+    (f"/usr/bin/{GIT} push", "builtin:git-push"),
+    (f"{GIT}.exe push", "builtin:git-push"),
+    (f"{GIT} push;", "builtin:git-push"),
     # サブコマンドを直接起こす形（パス付き・.exe 付き）。
-    (f"/usr/lib/{GIT}-core/{GIT}-push origin HEAD", "builtin-git-push"),
-    (f"{GIT}-push.exe origin", "builtin-git-push"),
-    (f"/usr/lib/{GIT}-core/{GIT}-reset --hard", "builtin-git-reset-hard"),
-    (f"{GIT}-reset.exe -q --hard HEAD", "builtin-git-reset-hard"),
-    (f"{GIT} -C x reset --hard", "builtin-git-reset-hard"),
-    (f"{GIT} status; {GIT} reset --hard", "builtin-git-reset-hard"),
+    (f"/usr/lib/{GIT}-core/{GIT}-push origin HEAD", "builtin:git-push"),
+    (f"{GIT}-push.exe origin", "builtin:git-push"),
+    (f"/usr/lib/{GIT}-core/{GIT}-reset --hard", "builtin:git-reset-hard"),
+    (f"{GIT}-reset.exe -q --hard HEAD", "builtin:git-reset-hard"),
+    (f"{GIT} -C x reset --hard", "builtin:git-reset-hard"),
+    (f"{GIT} status; {GIT} reset --hard", "builtin:git-reset-hard"),
     # 値が g・gi・git… で始まっても、値として最後まで読む。
-    (f"{GIT} -C gitx push", "builtin-git-push"),
-    (f"{GIT} -c remote.origin.url=github.com push", "builtin-git-push"),
-    (f"{GIT} -C gitlab reset --hard", "builtin-git-reset-hard"),
-    (f"{GIT} -C gi push", "builtin-git-push"),
+    (f"{GIT} -C gitx push", "builtin:git-push"),
+    (f"{GIT} -c remote.origin.url=github.com push", "builtin:git-push"),
+    (f"{GIT} -C gitlab reset --hard", "builtin:git-reset-hard"),
+    (f"{GIT} -C gi push", "builtin:git-push"),
     # `--` の後ろはオペランド。その前に揃っていれば当たる。
-    ("rm -rf -- x", "builtin-recursive-delete"),
-    ("rm -r -f -- x", "builtin-recursive-delete"),
-    (f"{GIT} reset --hard -- x", "builtin-git-reset-hard"),
+    ("rm -rf -- x", "builtin:recursive-delete"),
+    ("rm -r -f -- x", "builtin:recursive-delete"),
+    (f"{GIT} reset --hard -- x", "builtin:git-reset-hard"),
     # 空の値（読みでは空白が 2 字続く）の後ろのサブコマンド。
-    (f"{GIT} -C '' push", "builtin-git-push"),
-    (f'{GIT} -C "" reset --hard', "builtin-git-reset-hard"),
-    (f"{GIT} --work-tree '' push", "builtin-git-push"),
-    (f"{GIT} -C '' -c '' push", "builtin-git-push"),
+    (f"{GIT} -C '' push", "builtin:git-push"),
+    (f'{GIT} -C "" reset --hard', "builtin:git-reset-hard"),
+    (f"{GIT} --work-tree '' push", "builtin:git-push"),
+    (f"{GIT} -C '' -c '' push", "builtin:git-push"),
     # `\` の無い `$'…'` は単一引用と同じに読む。
-    (f"{GIT} $'push'", "builtin-git-push"),
-    ("rm $'-rf' x", "builtin-recursive-delete"),
+    (f"{GIT} $'push'", "builtin:git-push"),
+    ("rm $'-rf' x", "builtin:recursive-delete"),
 )
 BUILTIN_PASSED = (
     "legit push",
@@ -346,7 +346,7 @@ class BuiltinSpeedTest(unittest.TestCase):
                     self.assertLess(time.monotonic() - start, SLOW_LIMIT)
 
 
-RAW_GIT_BUILTIN = "builtin-ticket-raw-git"
+RAW_GIT_BUILTIN = "builtin:ticket-raw-git"
 
 
 class BuiltinFormsTest(ConfigUnionHarness):
@@ -382,8 +382,8 @@ class BuiltinFormsTest(ConfigUnionHarness):
         """
         os.remove(self.rules)
         cases = (
-            (f"{GIT} reset --hard", "builtin-git-reset-hard"),
-            ("rm -rf x", "builtin-recursive-delete"),
+            (f"{GIT} reset --hard", "builtin:git-reset-hard"),
+            ("rm -rf x", "builtin:recursive-delete"),
         )
         for command, rule in cases:
             with self.subTest(command=command, wrapper=False):
@@ -431,7 +431,7 @@ class BuiltinRawGitTest(ConfigUnionHarness):
         """ルールファイルが読めない間も止める。直す道はラッパーの add / restore --ours が残す。"""
         write(self.rules, BROKEN)
         self.assert_raw_git_denied()
-        self.assertEqual(self.last_record()["fallback"], "builtin-rules")
+        self.assertEqual(self.last_record()["fallback"], "builtin:rules")
 
     def test_only_git_at_the_command_position(self):
         """`git` がコマンドの位置にある形だけを止める。引数の語の `git` は止めない。"""
@@ -599,7 +599,7 @@ class BuiltinGitWordingTest(unittest.TestCase):
     （ラッパーが無ければ、生の git を組み込みで止めることもない）。
     """
 
-    IDS = ("builtin-recursive-delete", "builtin-git-reset-hard", builtin.CONFIG_VIA_BASH_RULE_ID)
+    IDS = ("builtin:recursive-delete", "builtin:git-reset-hard", builtin.CONFIG_VIA_BASH_RULE_ID)
 
     def messages(self, root):
         found = {r["id"]: r["message"] for r in builtin.base_data(root)["deny"]}
@@ -609,7 +609,7 @@ class BuiltinGitWordingTest(unittest.TestCase):
         return {i: found[i] for i in self.IDS}
 
     def test_with_the_wrapper(self):
-        root = os.path.realpath(tempfile.mkdtemp(prefix="ccnavi-builtin-words-"))
+        root = os.path.realpath(tempfile.mkdtemp(prefix="ccnavi-builtin:words-"))
         self.addCleanup(shutil.rmtree, root, ignore_errors=True)
         script = os.path.join(root, ".ccnavi", "scripts", "ccnavi-git.sh")
         os.makedirs(os.path.dirname(script))
@@ -622,11 +622,11 @@ class BuiltinGitWordingTest(unittest.TestCase):
                 self.assertNotRegex(text, r"'git ")
 
     def test_without_the_wrapper(self):
-        root = tempfile.mkdtemp(prefix="ccnavi-builtin-words-")
+        root = tempfile.mkdtemp(prefix="ccnavi-builtin:words-")
         self.addCleanup(shutil.rmtree, root, ignore_errors=True)
         texts = self.messages(root)
-        self.assertIn("'git rm <path>'", texts["builtin-recursive-delete"])
-        self.assertIn("'git stash push -u'", texts["builtin-git-reset-hard"])
+        self.assertIn("'git rm <path>'", texts["builtin:recursive-delete"])
+        self.assertIn("'git stash push -u'", texts["builtin:git-reset-hard"])
         self.assertIn("'git restore --ours -- <path>'", texts[builtin.CONFIG_VIA_BASH_RULE_ID])
 
 

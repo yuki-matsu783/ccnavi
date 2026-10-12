@@ -711,7 +711,7 @@ class CommonCredentialsTest(unittest.TestCase):
             self.assertTrue(self.rule.hits(subject), repr(subject))
 
     def test_NotebookEditも止める(self):
-        # 組み込みの builtin-credentials は NotebookEdit を見ないので、ここで外すと素通りする
+        # 組み込みの builtin:credentials は NotebookEdit を見ないので、ここで外すと素通りする
         for subject in ("/repo/secrets/.env.example", "/repo/.env", "/home/u/.aws/credentials"):
             self.assertTrue(self.rule.matches("NotebookEdit", subject), subject)
         self.assertFalse(self.rule.matches("NotebookEdit", "/repo/.env.example"))

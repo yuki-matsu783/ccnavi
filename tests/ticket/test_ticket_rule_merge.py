@@ -515,13 +515,13 @@ class TicketPlaces(Workspace):
     def test_state_directories_stay_with_the_builtin_guard(self):
         result = self.write_hook(self.child, f"{self.TICKETS}/review/i0009.md")
         self.assertEqual(self.decision(result), "deny")
-        self.assertIn("builtin-ticket-state", self.reason(result))
+        self.assertIn("builtin:ticket-state", self.reason(result))
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(result))
 
     def test_approved_tickets_stay_with_the_builtin_guard(self):
         result = self.write_hook(self.child, f"{self.APPROVED}/doing/i0009.md", core="enable")
         self.assertEqual(self.decision(result), "deny", self.reason(result))
-        self.assertIn("builtin-guard-project-home", self.reason(result))
+        self.assertIn("builtin:guard-project-home", self.reason(result))
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(result))
 
     def test_post_tool_use_exempts_the_ticket_places_only(self):

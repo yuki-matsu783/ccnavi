@@ -80,7 +80,7 @@ _CLI_FORMS = (
     r"(start|finish|cancel|record-risk|prepare|requested|confirm|ready)\b)"
 )
 CODE_TICKET_APPROVAL = "DENY_TICKET_APPROVAL_CLI"
-TICKET_APPROVAL_RULE_ID = "builtin-guard-ticket-approval"
+TICKET_APPROVAL_RULE_ID = "builtin:guard-ticket-approval"
 
 
 def commands(subject: str) -> list[str]:
@@ -726,7 +726,7 @@ _PREVIEW_AFTER = re.compile(r"[ \t]+--preview(?![^\s;&|])")
 _PREVIEW_BEFORE = re.compile(r"(?<!\S)--preview[ \t]+$")
 _PRUNE_SEGMENT = re.compile(r"[^;&|\n]+")
 CODE_RECORDS_PRUNE = "DENY_RECORDS_PRUNE"
-RECORDS_PRUNE_RULE_ID = "builtin-guard-records-prune"
+RECORDS_PRUNE_RULE_ID = "builtin:guard-records-prune"
 
 
 def _unquoted_marks(subject: str) -> tuple[str, set[int]]:

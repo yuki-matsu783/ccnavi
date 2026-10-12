@@ -246,11 +246,12 @@ ID_SEPARATOR = ":"
 # 全体を見る `--lint` は warn にする（提案 1 本で設定画面の保存と CI が止まらないように）。
 KIND_NOT_YET = "not-yet"
 
-# 組み込みルールの名前の頭。ルールファイルからは書けない（読み込まずに error）。
+# 組み込みルールの名前の頭（`builtin:` で始まる id は全部組み込み）。ルールファイルからは書けない
+# （読み込まずに error）。
 # 同じ id で書いたルールがあると組み込みを足さない形にすると、何にも当たらない 1 本を
 # その名前で書くだけで組み込みの保護を気づかれないうちに消せてしまう。ルールファイルの記述に依らず
 # 足すのが組み込みの役目なので、置き換える経路をなくす。外したいなら env でその保護ごと切る。
-RESERVED_ID_PREFIX = "builtin-guard-"
+RESERVED_ID_PREFIX = "builtin:"
 
 
 def root_pattern(root: str) -> str:
@@ -518,7 +519,7 @@ class Rule:
     # from_file は、ルールファイル（共通レイヤー・自身のレイヤー・プロジェクトのレイヤー）から
     # 読んだルールであること。組み込み（土台・退避した既定・設定ファイルの保護・チケットの保護）は
     # 偽。`--test` が当たったルールを「ルールファイルの中」と「外から来た根拠」に分けるのに読む。
-    # id の前置きでは分けられない（`builtin-ticket-*` のように `builtin-guard-` で始まらない
+    # id の前置きでは分けられない（`builtin:ticket-*` のように `builtin:guard-` で始まらない
     # 組み込みがある）し、`source` でも分けられない（退避した既定は共通レイヤーの名前を持つ）。
     from_file: bool = field(default=False, compare=False)
 
@@ -783,16 +784,6 @@ def _build(
     )
     name = f"{section}:{rule.id}" if rule.id else where
 
-    if ID_SEPARATOR in written_id:
-        return None, [
-            Problem(
-                SEVERITY_ERROR,
-                name,
-                f"id に `{ID_SEPARATOR}` は書けない。レイヤーの名前を添えた形"
-                f"（`self{ID_SEPARATOR}id` / `<プロジェクト名>{ID_SEPARATOR}id`）と"
-                "見分けが付かず、記録を読んだユーザがどのファイルを直すのか決められない",
-            )
-        ]
     if not builtin and written_id.lower().startswith(RESERVED_ID_PREFIX):
         return None, [
             Problem(
@@ -803,6 +794,16 @@ def _build(
                 "別の名前にしてください。"
                 "組み込みを外したいなら env（CCNAVI_GUARD_CORE_FILES など）で"
                 "その保護ごと切ってください",
+            )
+        ]
+    if not builtin and ID_SEPARATOR in written_id:
+        return None, [
+            Problem(
+                SEVERITY_ERROR,
+                name,
+                f"id に `{ID_SEPARATOR}` は書けない。レイヤーの名前を添えた形"
+                f"（`self{ID_SEPARATOR}id` / `<プロジェクト名>{ID_SEPARATOR}id`）と"
+                "見分けが付かず、記録を読んだユーザがどのファイルを直すのか決められない",
             )
         ]
     if not rule.message and section in _NEEDS_MESSAGE:

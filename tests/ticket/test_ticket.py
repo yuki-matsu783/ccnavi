@@ -792,18 +792,18 @@ class TicketTest(unittest.TestCase):
         self.family()
         target = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-01.md")
         result = self.hook("PreToolUse", "Write", self.parent_tree, file_path=target)
-        self.assertIn("builtin-ticket-state", self.reason(result))
+        self.assertIn("builtin:ticket-state", self.reason(result))
         moved = self.hook(
             "PreToolUse",
             "Bash",
             self.parent_tree,
             command="mv .ccnavi/approved/doing/i0001-01-01.md wip/proposals/review/",
         )
-        self.assertIn("builtin-ticket-state", self.reason(moved))
+        self.assertIn("builtin:ticket-state", self.reason(moved))
         # todo/ への作成は自由。
         todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-03.md")
         free = self.hook("PreToolUse", "Write", self.parent_tree, file_path=todo)
-        self.assertNotIn("builtin-ticket-state", self.reason(free))
+        self.assertNotIn("builtin:ticket-state", self.reason(free))
 
     def test_copies_into_the_state_directory_are_read_by_their_destination(self):
         """コピーする動詞の行き先は、組み込みの保護と同じ部品で読む（`-t` の値か最後の引数）。
@@ -833,7 +833,7 @@ class TicketTest(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
-                self.assertIn("builtin-ticket-state", self.reason(result))
+                self.assertIn("builtin:ticket-state", self.reason(result))
         for command in (
             "cp wip/proposals/review/i0001-01-01.md /tmp/x",
             "cp -t /tmp/out wip/proposals/review/i0001-01-01.md",
@@ -843,7 +843,7 @@ class TicketTest(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
-                self.assertNotIn("builtin-ticket-state", self.reason(result))
+                self.assertNotIn("builtin:ticket-state", self.reason(result))
 
     def test_subagent_cannot_move_state(self):
         self.family()

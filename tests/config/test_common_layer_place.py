@@ -262,12 +262,12 @@ class TheDefaultPlaceStaysGuardedTest(CommonLayerPlaceHarness):
         """env がよそを指していても、`.ccnavi/config/common/` の 3 本は組み込みで止まる。
 
         守る対象は既定の置き場から組み立てる。env を読む経路が戻ると、
-        `builtin-guard-common-layer` が env の指すよそへ移り、ここが失敗する。
+        `builtin:guard-common-layer` が env の指すよそへ移り、ここが失敗する。
         """
         for path in (self.rules, self.phases, self.risk):
             with self.subTest(path=os.path.basename(path)):
                 result = self.decide("Write", env=self.all_three(), guard="enable", file_path=path)
-                self.assertIn("builtin-guard-common-layer", self.reason(result))
+                self.assertIn("builtin:guard-common-layer", self.reason(result))
 
 
 if __name__ == "__main__":

@@ -14,13 +14,13 @@ from ..infra import hookio, settings
 from ..policy import ctxfile, rules, selfguard_shell
 from . import ticket_model
 
-STATE_RULE_ID = "builtin-ticket-state"
+STATE_RULE_ID = "builtin:ticket-state"
 # 同じ置き場をシェルからの書き込みで守る 1 本。
 STATE_SHELL_RULE_ID = STATE_RULE_ID + "-shell"
 # 提案を書いた回に、承認を頼む前の確認を伝えるルールの id。
-PROPOSE_RULE_ID = "builtin-ticket-propose"
+PROPOSE_RULE_ID = "builtin:ticket-propose"
 # 生の git を止め、入口を git のラッパー 1 本に寄せるルールの id。
-RAW_GIT_RULE_ID = "builtin-ticket-raw-git"
+RAW_GIT_RULE_ID = "builtin:ticket-raw-git"
 
 # git のラッパーの置き場（ワークスペースルートからの相対）。
 # スクリプトはワークスペースにしか無い（`settings.script_command`）ので、ルートの下だけを見る。

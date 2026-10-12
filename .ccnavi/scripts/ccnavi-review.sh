@@ -960,7 +960,7 @@ decide)
 	#   decide <N>                                   端末で 1 件ずつ選ぶ（ユーザが打つ）
 	#   decide <N> --preview                         見せる一覧を JSON で返す。何も置かない（ボードが読む）
 	#   decide <N> --choices <JSON> --digest <ダイジェスト>  ボードでユーザが押した選択を置く
-	# 最後の形は、エージェントが打つと組み込みの deny（builtin-guard-ticket-approval）が止める。
+	# 最後の形は、エージェントが打つと組み込みの deny（builtin:guard-ticket-approval）が止める。
 	n="${1:-}"
 	case "$n" in
 	'' | *[!0-9]*) fail decide-no-phase "decide には <N>（フェーズ番号）が要る。" 2 ;;

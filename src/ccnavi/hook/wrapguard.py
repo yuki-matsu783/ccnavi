@@ -40,9 +40,9 @@ from ..tickets import ticket_model
 CODE_ENV = "DENY_SCRIPT_ENV_OVERRIDE"
 CODE_CHILD_PUSH = "DENY_CHILD_PUSH"
 CODE_CORE_PATH = "DENY_WRAPPER_CORE_PATH"
-ENV_RULE_ID = "builtin-script-env"
-CHILD_PUSH_RULE_ID = "builtin-child-push"
-CORE_PATH_RULE_ID = "builtin-guard-wrapper-paths"
+ENV_RULE_ID = "builtin:script-env"
+CHILD_PUSH_RULE_ID = "builtin:child-push"
+CORE_PATH_RULE_ID = "builtin:guard-wrapper-paths"
 
 # 保護済みの sh の名前。置き場は `.ccnavi/scripts/` に固定だが、呼び出しの綴りは
 # 絶対パス・相対パス・ワークツリーの中の写しとまちまちなので、パスではなく名前で見る。
@@ -172,7 +172,7 @@ def check_core_paths(
 
     当たるとみなすのは次のどれか。
 
-    - シェルから書き込む形の組み込み（`builtin-guard-setting-files`）と同じ場所の式に、
+    - シェルから書き込む形の組み込み（`builtin:guard-setting-files`）と同じ場所の式に、
       書いたとおりのパスか、居場所から解いた絶対パスが当たる（`.ccnavi/`・
       `.claude/settings*.json`・`.claude/hooks/`・`ccnavi-git.sh`・記録と state・
       実行ファイル・動かした共通レイヤー）

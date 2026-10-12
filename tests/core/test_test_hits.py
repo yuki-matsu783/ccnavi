@@ -98,7 +98,7 @@ class TestHitsTest(unittest.TestCase):
         hit = body["rules"][0]
         self.assertEqual(
             (hit["id"], hit["source"], hit["section"]),
-            ("builtin-guard-setting-files", "outside", "deny"),
+            ("builtin:guard-setting-files", "outside", "deny"),
         )
         # 組み込みの式は 2 万字を超える。そのまま出さず、切ったことと全体の字数を添える。
         self.assertLess(len(hit["written"]), 300)
@@ -106,15 +106,15 @@ class TestHitsTest(unittest.TestCase):
         self.assertLess(len(hit["pattern"]), 300)
 
         plain = self.ccnavi("--test", "Bash", "echo x > .ccnavi/config/common/rules.yml").stdout
-        self.assertIn("deny:builtin-guard-setting-files（ルールファイルの外にある根拠）", plain)
+        self.assertIn("deny:builtin:guard-setting-files（ルールファイルの外にある根拠）", plain)
         self.assertLess(max(len(line) for line in plain.splitlines()), 1000)
 
     def test_ticket_state_guard_is_outside(self):
         body = self.body("Write", f"{self.root}/wip/proposals/review/x.md")
         self.assertEqual(body["verdict"], "deny")
         by_id = {hit["id"]: hit for hit in body["rules"]}
-        self.assertEqual(by_id["builtin-ticket-state"]["source"], "outside")
-        self.assertEqual(by_id["builtin-ticket-state"]["section"], "deny")
+        self.assertEqual(by_id["builtin:ticket-state"]["source"], "outside")
+        self.assertEqual(by_id["builtin:ticket-state"]["section"], "deny")
 
     def test_fallback_defaults_are_outside(self):
         broken = write(os.path.join(self.root, "broken.yml"), "deny: [\n")

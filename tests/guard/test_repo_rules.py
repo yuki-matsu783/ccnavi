@@ -32,14 +32,14 @@ PLACEHOLDER = "/repo"
 
 # 配布先の hook が起動する振り分けの sh（launcher-scripts 1 節）。
 LAUNCHER = ".ccnavi/scripts/ccnavi-launcher.sh"
-APPROVAL = "builtin-guard-ticket-approval"
+APPROVAL = "builtin:guard-ticket-approval"
 APPROVAL_CODE = "DENY_TICKET_APPROVAL_CLI"
-SETTING_FILES = "builtin-guard-setting-files"
+SETTING_FILES = "builtin:guard-setting-files"
 # 書き直しを求める形で止めたときの、記録のルール名。読み分けずに止め、書き直し方を案内する。
 NAME = "builtin:command-name-expansion"
 BACKQUOTE = "builtin:backquote"
 AMBIGUOUS = "builtin:ambiguous-form"
-TICKET_STATE = "builtin-ticket-state-shell"
+TICKET_STATE = "builtin:ticket-state-shell"
 # 承認の形の末尾。
 YES = " --agree --yes x"
 
@@ -151,7 +151,7 @@ class RepoRulesTest(unittest.TestCase):
             ('find /repo -name "a b" -delete', "find-writes"),
             (
                 'sed -i "s/a b/c/" /repo/.ccnavi/config/common/rules.yml',
-                "builtin-guard-setting-files",
+                "builtin:guard-setting-files",
             ),
         ]:
             with self.subTest(subject=subject):
@@ -192,7 +192,7 @@ class RepoRulesTest(unittest.TestCase):
             'ccnavi --agree "i0001 --preview"',
         ]:
             with self.subTest(subject=subject):
-                self.assert_verdict(subject, "deny", "builtin-guard-ticket-approval")
+                self.assert_verdict(subject, "deny", "builtin:guard-ticket-approval")
 
     def test_語にくっついた_preview_は承認の免除にならない(self):
         """免除の理由になるのは、単独の語として現れた `--preview` だけ。
@@ -210,7 +210,7 @@ class RepoRulesTest(unittest.TestCase):
             "uv run python -m ccnavi --agree --reason=--preview i0001",
         ]:
             with self.subTest(subject=subject):
-                self.assert_verdict(subject, "deny", "builtin-guard-ticket-approval")
+                self.assert_verdict(subject, "deny", "builtin:guard-ticket-approval")
 
     def test_確かめる枝は今までどおり免除の側(self):
         """`--agree --preview --verify` は免除の側。厳しくしたことで巻き添えにしない。"""
@@ -221,7 +221,7 @@ class RepoRulesTest(unittest.TestCase):
         ]:
             with self.subTest(subject=subject):
                 body = judge("Bash", subject)
-                self.assertNotIn("builtin-guard-ticket-approval", hit(body), body["rules"])
+                self.assertNotIn("builtin:guard-ticket-approval", hit(body), body["rules"])
 
     def test_設定の場所の名前は語の中の目印でも終わる(self):
         # selfguard の `_TERM` / `_END` は語の中の目印も語の終わりとして数える。
@@ -232,7 +232,7 @@ class RepoRulesTest(unittest.TestCase):
             'mv ".ccnavi;x" y',
         ]:
             with self.subTest(subject=subject):
-                self.assert_verdict(subject, "deny", "builtin-guard-setting-files")
+                self.assert_verdict(subject, "deny", "builtin:guard-setting-files")
 
 
 class LauncherJudgeTest(unittest.TestCase):
@@ -651,30 +651,30 @@ class SubstRepoRulesTest(unittest.TestCase):
     def test_組み込みの保護も中身に当たる(self):
         self.check(
             [
-                ('echo "$(ccnavi --agree x)"', "deny", "builtin-guard-ticket-approval", ""),
-                ("ls\nccnavi --agree x", "deny", "builtin-guard-ticket-approval", ""),
+                ('echo "$(ccnavi --agree x)"', "deny", "builtin:guard-ticket-approval", ""),
+                ("ls\nccnavi --agree x", "deny", "builtin:guard-ticket-approval", ""),
                 (
                     'echo "$(tee /repo/.ccnavi/config/common/rules.yml < /tmp/x)"',
                     "deny",
-                    "builtin-guard-setting-files",
+                    "builtin:guard-setting-files",
                     "",
                 ),
                 (
                     "cat /tmp/x >(tee /repo/.ccnavi/config/common/rules.yml)",
                     "deny",
-                    "builtin-guard-setting-files",
+                    "builtin:guard-setting-files",
                     "",
                 ),
                 (
                     "ls\nsed -i s/a/b/ /repo/.ccnavi/config/common/rules.yml",
                     "deny",
-                    "builtin-guard-setting-files",
+                    "builtin:guard-setting-files",
                     "",
                 ),
                 (
                     'echo x > "$(pwd)/.ccnavi/config/common/rules.yml"',
                     "deny",
-                    "builtin-guard-setting-files",
+                    "builtin:guard-setting-files",
                     "",
                 ),
             ]

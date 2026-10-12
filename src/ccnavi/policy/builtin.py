@@ -32,7 +32,7 @@ block なので、ファイルを置く前に hook を登録した時点でセ�
 
 止めるのは書き込む形だけで、場所の名前が出たかどうかでは止めない。
 同じ場所には `selfguard_shell.add_rules` の組み込みも当たる（ルールファイルが読める間の
-`builtin-guard-setting-files`）。ルールファイルの側にシェルからの書き込みを止める 1 本は
+`builtin:guard-setting-files`）。ルールファイルの側にシェルからの書き込みを止める 1 本は
 無いので、ここが外れているときに残る保護はこれだけになる。
 場所の名前で止めると、`git add <パス>` も `git restore --ours -- <パス>` も止まる。
 どちらもファイルの中身を書かないのに。
@@ -114,7 +114,7 @@ def read_allow() -> list[rules.Rule]:
     return built.allow
 
 
-CONFIG_VIA_BASH_RULE_ID = "builtin-guard-config-via-bash"
+CONFIG_VIA_BASH_RULE_ID = "builtin:guard-config-via-bash"
 
 
 def _config_via_bash(regex: str, git: str = "git") -> dict:
@@ -303,7 +303,7 @@ def _deny(root: str) -> list[dict]:
     git = settings.git_command(root)
     return [
         {
-            "id": "builtin-recursive-delete",
+            "id": "builtin:recursive-delete",
             "match": "Bash",
             "regex": RECURSIVE_DELETE_REGEX,
             "message": (
@@ -312,7 +312,7 @@ def _deny(root: str) -> list[dict]:
             ),
         },
         {
-            "id": "builtin-git-push",
+            "id": "builtin:git-push",
             "match": "Bash",
             "regex": GIT_PUSH_REGEX,
             "message": (
@@ -321,7 +321,7 @@ def _deny(root: str) -> list[dict]:
             ),
         },
         {
-            "id": "builtin-git-reset-hard",
+            "id": "builtin:git-reset-hard",
             "match": "Bash",
             "regex": GIT_RESET_HARD_REGEX,
             "message": (
@@ -330,7 +330,7 @@ def _deny(root: str) -> list[dict]:
             ),
         },
         {
-            "id": "builtin-credentials",
+            "id": "builtin:credentials",
             "match": "Bash|Read|Write|Edit",
             # 先頭の境界（行頭・空白・区切り）を付ける。常時有効の土台なので、
             # `jq '.env.X'` のようなフィールド参照や `process.env` を巻き込まない
@@ -365,8 +365,8 @@ def _deny(root: str) -> list[dict]:
 # 壊すと履歴や作業中の変更ごと失う。hook を書けば、以後の git の操作のたびに任意のコマンドが走る。
 # 名指しのツールとシェルで当てる先が違う（パスとコマンド文字列）ので、id を分ける。
 # 読むだけ（`cat .git/config`、名指しの Read）は止めない。
-GIT_DIR_RULE_ID = "builtin-guard-git-dir"
-GIT_DIR_SHELL_RULE_ID = "builtin-guard-git-dir-via-bash"
+GIT_DIR_RULE_ID = "builtin:guard-git-dir"
+GIT_DIR_SHELL_RULE_ID = "builtin:guard-git-dir-via-bash"
 
 
 def _git_dir_message(git: str) -> str:
@@ -388,9 +388,9 @@ _ALLOW: list[dict] = [
         # ここまで確認を出すと、本当に見てほしい 1 件が見落とされる。
         # Grep と Glob は書かない。対象は取り出せる（探し始める場所のパス）が、
         # それは探索の中身を代表しない。Read は 1 ファイルずつなので
-        # builtin-credentials が先に当たって止まるのに対し、Grep はその deny の
+        # builtin:credentials が先に当たって止まるのに対し、Grep はその deny の
         # match に無いので、ここで広く許すと credentials ごと止められずに通る。
-        "id": "builtin-read-anything",
+        "id": "builtin:read-anything",
         "match": "Read",
         "glob": "*",
     },
@@ -398,7 +398,7 @@ _ALLOW: list[dict] = [
 
 # 既定に戻ったことを記録に残すための値。呼び出しごとの記録を数えれば、
 # ガードが機能しないまま何回動いたかが後から分かる。
-FALLBACK = "builtin-rules"
+FALLBACK = "builtin:rules"
 
 # 返す理由に載せる出所。既定を使っているとき、適用しているルールは読めなかった
 # ファイルの中には無い。そのファイルの名前を出所として出すと、見に行ったユーザが

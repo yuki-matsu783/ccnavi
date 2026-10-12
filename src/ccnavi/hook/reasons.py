@@ -59,7 +59,7 @@ CODE_TICKET_ASK = "TICKET_ASK"
 
 # 生の文字列の `>` が上限（selfguard_shell.REDIRECT_LIMIT）を超え、シェルから書き込む形の保護を
 # 当てられなかったので止めた。権限モードに依らず止め、確認には回さない。ルールに当たったのでは
-# ないので、記録のルール名は括弧付きの REDIRECT_LIMIT_RULE にする。
+# ないので、記録のルール名は組み込みの名前（`builtin:` で始まる）の REDIRECT_LIMIT_RULE にする。
 CODE_REDIRECT_LIMIT_DENY = "DENY_REDIRECT_LIMIT"
 REDIRECT_LIMIT_RULE = "builtin:redirect-limit"
 
@@ -73,21 +73,22 @@ CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
 CODE_TICKET_BLOCKED = "DENY_TICKET_BLOCKED"
 
 # 範囲外で止めたことを記録に残すときのルール名。対応するルールがルールファイルに
-# 無いので、括弧付きにして、ファイルの中を探しても見つからないことを見た目で示す。
+# 無いので、組み込みの名前（`builtin:` で始まる）にして、ファイルの中を探しても見つからない
+# ことを見た目で示す。
 TICKET_RULE = "builtin:ticket-scope"
 
 # 範囲を当てる前に止めた組み込みの判定の、記録のルール名。範囲の外に書いたのではないので
 # TICKET_RULE を使い回さない。使い回すと、記録の `rules` で範囲外の件数に混ざり、繰り返しの
 # 文面（repeat.note）も「同じ理由（builtin:ticket-scope）」と、止めた理由と違う名前を言う。形は
-# フローのロック（flow.LOCK_RULE）・`>` の上限（REDIRECT_LIMIT_RULE）と同じ括弧付き。
+# フローのロック（flow.LOCK_RULE）・`>` の上限（REDIRECT_LIMIT_RULE）と同じ組み込みの名前。
 SUBAGENT_TICKET_OP_RULE = "builtin:subagent-ticket-op"  # DENY_SUBAGENT_TICKET_OP
 PHASE_REVIEW_RULE = "builtin:phase-review"  # DENY_PHASE_REVIEW
 TICKET_PROJECT_RULE = "builtin:ticket-project"  # DENY_TICKET_PROJECT_MISMATCH
 TICKET_BLOCKED_RULE = "builtin:ticket-blocked"  # DENY_TICKET_BLOCKED
 
 # 書き直しを求める形（shellread の FORM_*）ごとの理由コード。ルールに当たったのではなく読みの
-# 決めごとで止めたので、記録のルール名は TICKET_RULE と同じく括弧付きの形の名前にする
-# （rewrite_rule）。
+# 決めごとで止めたので、記録のルール名は TICKET_RULE と同じく組み込みの名前
+# （`builtin:` で始まる）にする（rewrite_rule）。
 CODE_REWRITE = {
     shellread.FORM_BRACE: "DENY_BRACE_EXPANSION",
     shellread.FORM_COMMAND_NAME: "DENY_COMMAND_NAME_EXPANSION",
@@ -291,7 +292,7 @@ def reason_for(
         # 組み込み。ルールファイルには無いので、そこを探させない。
         code, source = (
             phase_forms.CODE_TICKET_APPROVAL,
-            f"builtin rule: {rule.id} ({settings.GUARD_TICKET_APPROVAL_ENV})",
+            f"組み込みのルール: {rule.id} ({settings.GUARD_TICKET_APPROVAL_ENV})",
         )
 
     lines = [f"[ccnavi] {code} ({source})", f"subject: {shown}"]
@@ -408,12 +409,13 @@ def subagent_forbidden(subject: str, runner: str, inner: str) -> str:
 def builtin_refusal(code: str, rule_id: str, subject: str, text: str) -> str:
     """組み込みの判定で止めた文。
 
-    rule_id は記録の `rules` に残す名前と同じもの。ルールファイルには無いので、`builtin rule:` と
-    断ってファイルの中を探させない。文面と記録が同じ識別子を持てば、受け取った文から記録の行を
-    引ける。ルールファイルのルールで止めた文（reason_for）と同じ並びにしてある。
+    rule_id は記録の `rules` に残す名前と同じもの。ルールファイルには無いので、
+    `組み込みのルール:` と断ってファイルの中を探させない。文面と記録が同じ識別子を持てば、
+    受け取った文から記録の行を引ける。ルールファイルのルールで止めた文（reason_for）と
+    同じ並びにしてある。
     """
     shown = _shorten(subject)
-    return "\n".join([f"[ccnavi] {code} (builtin rule: {rule_id})", f"subject: {shown}", text])
+    return "\n".join([f"[ccnavi] {code} (組み込みのルール: {rule_id})", f"subject: {shown}", text])
 
 
 def internal_error(code: str, event: str, kind: str, log_path: str) -> str:

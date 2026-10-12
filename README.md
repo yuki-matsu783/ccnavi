@@ -1183,7 +1183,7 @@ ssh host rm -f .ccnavi/config/common/rules.yml         # 外さない。ssh は�
 中で実行されるコマンドで当たったときは、拒否と確認の文面に 1 行足す。
 
 ```
-[ccnavi] DENY_COMMAND_PATTERN (rule: builtin-guard-setting-files)
+[ccnavi] DENY_COMMAND_PATTERN (rule: builtin:guard-setting-files)
 subject: env rm -f .ccnavi/config/common/rules.yml
 `env` が実行する `rm -f .ccnavi/config/common/rules.yml` に当たりました。
 ガード自身の設定と hook を、シェルからの書き込みで変えようとしています。…
@@ -1390,7 +1390,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
   共通レイヤーの 3 本（`.ccnavi/config/common/`）、記録と state の置き場（`logs/decisions.jsonl` と `logs/state`）、閉じたチケットの退避（`logs/archive`）
 - パスは「区切りが続くか、そこで終わる」形で当てるので、`rm -rf .ccnavi` や `mv .ccnavi .ccnavi.bak` も止まる
 - `ccnavi-git.sh` を通しても同じ場所は消せない。`rm`・`restore --source <ref>`・`checkout <ref> <パス>` で上の場所
-  （とそれを中に含むディレクトリ）を消す・別のコミットの中身に戻す形は `builtin-guard-wrapper-paths`（`DENY_WRAPPER_CORE_PATH`）で止まる。
+  （とそれを中に含むディレクトリ）を消す・別のコミットの中身に戻す形は `builtin:guard-wrapper-paths`（`DENY_WRAPPER_CORE_PATH`）で止まる。
   衝突を解く `restore --ours / --theirs` と、索引の中身に戻す `restore` / `restore --staged`、何も消さない `rm -n` / `--dry-run` は通る
   （後ろに `--no-dry-run` を書けば消す形として見る）。
   パスや副命令を変数・置換・glob で書いた形、標準入力から読むシェル（`echo '…' | sh`。`bash --norc`・`bash -o pipefail`・`env sh`・`command sh` も）や `xargs` に流す呼び出し、
@@ -1404,14 +1404,14 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 
 名指しのツール（`Write` / `Edit` / `NotebookEdit`）からも守る。
 
-- `builtin-guard-project-home`: ccnavi ディレクトリの下（`*/.ccnavi/*`）と、`CCNAVI_BIN_PATH` のパスおよび実行ファイルの置き場
+- `builtin:guard-project-home`: ccnavi ディレクトリの下（`*/.ccnavi/*`）と、`CCNAVI_BIN_PATH` のパスおよび実行ファイルの置き場
   （名前が `ccnavi-launcher.sh` なら 1 つ上の `bin/<os>-<arch>/`、それ以外なら隣の `<os>-<arch>/`）
-- `builtin-guard-common-layer`: 共通レイヤーの 3 本。ワークツリーの中の同じファイルも止まる
-- 期待する判定のファイル `.ccnavi/config/common/rule-expectations.yml` も `builtin-guard-project-home` が止める。その下書きはワークツリーの `wip/scratchpad/` に置き、
+- `builtin:guard-common-layer`: 共通レイヤーの 3 本。ワークツリーの中の同じファイルも止まる
+- 期待する判定のファイル `.ccnavi/config/common/rule-expectations.yml` も `builtin:guard-project-home` が止める。その下書きはワークツリーの `wip/scratchpad/` に置き、
   ルールの下書きと一緒にユーザに渡す
 
 止めるのは書き込みの形と場所の組で、場所の名前が出ただけでは止めない（`cat .ccnavi/config/common/rules.yml` や `git add <パス>` は通る）。
-`builtin-guard-` で始まる id はどのレイヤーのルールファイルにも書けない（書けば error。`--lint` も指摘する）。外したいなら env でこの機能ごと切る。
+`builtin:guard-` で始まる id はどのレイヤーのルールファイルにも書けない（書けば error。`--lint` も指摘する）。外したいなら env でこの機能ごと切る。
 ルールファイルが読めず既定を使っている間は、共通レイヤーのルールファイルを Write / Edit で直した結果を戻さない（実行前に読めなかったときに限る）。
 
 `PreToolUse` の登録ごと消された場合は ccnavi が一切動かない。hook の登録を hook 自身で守ることはできない。
@@ -1471,7 +1471,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 | `.ccnavi/approved/done/` | 閉じた。取り消しは `cancelled_at` を持ってここに入る | `ccnavi-review.sh confirm` / `decide`、`ccnavi --reviewed`、`close-early`（ユーザ）。レビュー不要の `finish` と `cancel --reason` |
 
 - `.ccnavi/approved/` へ動かすのはユーザ、`wip/proposals/` へ動かすのはエージェント
-- `review/` への直接の作成・移動は誰がやっても止まる（`builtin-ticket-state`）。`.ccnavi/approved/` は ccnavi ディレクトリを守る組み込みのルールが止める
+- `review/` への直接の作成・移動は誰がやっても止まる（`builtin:ticket-state`）。`.ccnavi/approved/` は ccnavi ディレクトリを守る組み込みのルールが止める
 - 動かすスクリプトと push はサブエージェントには打てない（`DENY_SUBAGENT_TICKET_OP`）。子チケットのワークツリーからの push は
   git のラッパースクリプトが拒む。合流と push と閉じるのは親の仕事
 - `start` は置き場を動かさず、着手の時刻と基準点（そのワークツリーの HEAD）を書く。`finish` は完了の時刻を書き、フェーズが
@@ -1567,7 +1567,7 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 | ボード | `--agree --preview --json` で読んでオーバーレイに出し、押したら `--agree --yes <識別子,…> --digest <値> --json` を打つ（「承認の JSON」）。1 件以上通れば `ccnavi-push-approved.sh` を統合ターミナルへ送る |
 | ファイルを動かす | 提案を `.ccnavi/approved/doing/` へ動かす。GitHub の画面しか使えないユーザ向け。承認の画面を通らないぶん、構造の検査は判定のときに行い、引っかかれば `DENY_TICKET_BLOCKED` で止まる（`--lint` とボードの JSON の `blocked` でも分かる） |
 
-エージェントが `--yes` を打つ形は組み込みの deny（`builtin-guard-ticket-approval`）が止める。`--preview` は通す。
+エージェントが `--yes` を打つ形は組み込みの deny（`builtin:guard-ticket-approval`）が止める。`--preview` は通す。
 
 **承認済みチケットは親チケットのブランチに乗って他の機械へ届く。** 承認しても push しなければ、他の機械では承認されなかったことになる。
 承認の push は `sh .ccnavi/scripts/ccnavi-push-approved.sh` で行う。
@@ -1961,7 +1961,7 @@ Draft を外すので、squash でマージすると既定のブランチには�
 退避の削除は、C1 の見分けと実行後チェックが ccnavi の書き込みとして外す。外すのは、ready のマーカーにそのツリーから移したと載っていて
 （比べている版がマーカーを書いたときの先頭と同じ間だけ。ready の削除をコミットしてツリーが進めば、マーカーは以後の削除に効かない）、
 `done/`・`phases/`・`events/`・`flows/` の下にあり、消えた中身が退避したコピーと同じもの（履歴は ready の流れの行だけを足したもの）。
-`logs/archive/` は記録と state の置き場の守り（`builtin-guard-records` と、シェルの側の `builtin-guard-setting-files`）が書き込みを止める。
+`logs/archive/` は記録と state の置き場の守り（`builtin:guard-records` と、シェルの側の `builtin:guard-setting-files`）が書き込みを止める。
 
 **まだ残っているが早めに閉じたいとき**は、ユーザが端末で `close-early --reason <理由>` を打つ。作業中の子がいる間は打てない。残っているものを全部
 見せてから y/N を取り、未着手の子の取り消し（理由は `close-early: <理由>`）、省略とレビュー済みのマーカー、未解決の受け入れ、残りの issue への書き出しを行う。
@@ -2103,7 +2103,7 @@ URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、
 
 動かした数はセッション開始の行の `detail` に `pruned rotated=1 logs=2 state=5` の形で残る。手で走らせるなら端末から打つ。
 エージェントが Bash から `--preview` の無い形を打つと、チケット制御に依らず `DENY_RECORDS_PRUNE` で止まる。
-記録と state の置き場は、シェルからの書き込みと同じく `Write` / `Edit` からも止まる（`builtin-guard-records`）。
+記録と state の置き場は、シェルからの書き込みと同じく `Write` / `Edit` からも止まる（`builtin:guard-records`）。
 
 ```sh
 ccnavi --prune --preview   # 動かすものを並べるだけ
@@ -2594,7 +2594,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
   ブランチ名とツリーからの相対パスごとの中身のハッシュ。無かったファイルも「無い」として入る）と、一括のチケットごとに書き出す中身（新規は提案の
   ファイルのバイト列そのもの、改版は計画と `phases:` を差し替えた承認済みチケット）。見せたあとに判定が読んだものが 1 つでも変われば、
   画面が同じでもダイジェストは変わる
-- エージェントが Bash や PowerShell で `--yes` を打つ形は、組み込みの deny（`builtin-guard-ticket-approval`）が止める。`--preview` は通す
+- エージェントが Bash や PowerShell で `--yes` を打つ形は、組み込みの deny（`builtin:guard-ticket-approval`）が止める。`--preview` は通す
 - 後ろの `<絞り>` は `ccnavi --agree <識別子>...` と同じで、承認の対象を狭める。`--yes` の値（ユーザが見た識別子）とは別に渡す。
   比べるのは「その絞りで今できる一覧」と「見た識別子」
 

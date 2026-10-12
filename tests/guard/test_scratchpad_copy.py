@@ -22,7 +22,7 @@ import unittest
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
-RULE_ID = "builtin-guard-setting-files"
+RULE_ID = "builtin:guard-setting-files"
 
 RULES = {
     "version": 1,

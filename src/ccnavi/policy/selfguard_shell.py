@@ -843,7 +843,7 @@ def _spelled(path: str) -> str:
 # 足すルールの id。どれも rules.RESERVED_ID_PREFIX で始まり、ルールファイルからは
 # 書けない。同じ名前のルールと重なることが無いので、当たった id を名指しされたユーザは
 # 組み込みのルールだと分かる。
-SHELL_RULE_ID = "builtin-guard-setting-files"
+SHELL_RULE_ID = "builtin:guard-setting-files"
 # シェルから書き込む形の 1 本を当てるツール（`add_rules`）。
 SHELL_MATCH = "Bash"
 
@@ -897,7 +897,7 @@ def too_many_redirects(subject: str) -> bool:
 # 実行ファイルを名指しのツールから守るルールの id。Bash 側とは別に持つ。
 # 当てる先が違う（あちらはコマンド文字列、こちらはパス）ので、1 件にまとめると
 # どちらの読みで当たったのかが報告から消える。
-BINARY_RULE_ID = "builtin-guard-binary"
+BINARY_RULE_ID = "builtin:guard-binary"
 
 BINARY_MESSAGE = (
     "ccnavi 自身の実行ファイルです。ここが差し替わると、ルールを 1 行も変えずに"
@@ -905,7 +905,7 @@ BINARY_MESSAGE = (
     "伝えてユーザに依頼してください。"
 )
 
-COMMON_LAYER_RULE_ID = "builtin-guard-common-layer"
+COMMON_LAYER_RULE_ID = "builtin:guard-common-layer"
 
 COMMON_LAYER_MESSAGE = (
     "ccnavi の共通レイヤーの設定（ルール・フェーズ定義・リスクの配点）です。どのツリーの判定にも"
@@ -914,7 +914,7 @@ COMMON_LAYER_MESSAGE = (
     "読むだけなら止まりません。"
 )
 
-RECORDS_RULE_ID = "builtin-guard-records"
+RECORDS_RULE_ID = "builtin:guard-records"
 
 RECORDS_MESSAGE = (
     "ccnavi の記録と state の置き場（logs/decisions*.jsonl と logs/state/）か、閉じたチケットの"
@@ -923,7 +923,7 @@ RECORDS_MESSAGE = (
     "シェルからの書き込みでも拒否される場所です。読むだけなら止まりません。"
 )
 
-PROJECT_HOME_RULE_ID = "builtin-guard-project-home"
+PROJECT_HOME_RULE_ID = "builtin:guard-project-home"
 
 PROJECT_HOME_MESSAGE = (
     "レイヤーの設定の置き場です。ここに入っているルール・フェーズ定義・リスクの配点が"

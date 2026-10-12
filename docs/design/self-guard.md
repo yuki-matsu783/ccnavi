@@ -31,26 +31,26 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 
 | id | 足すとき | 止めるもの |
 |---|---|---|
-| `builtin-guard-setting-files` | 常に | Bash で、書き込みの形（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先、`cp` `ln` `install` `mv` で守る名前を入っているディレクトリへ置く形）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、レイヤーの設定 3 本と ccnavi ディレクトリ、共通レイヤーの 3 本（`.ccnavi/config/common/`）、記録と state の `logs/decisions.jsonl` `logs/state`、閉じたチケットの退避の `logs/archive`）の組 |
-| `builtin-guard-binary` | `CCNAVI_BIN_PATH` が設定されているとき | `Write` `Edit` `NotebookEdit` |
-| `builtin-guard-project-home` | 常に（ccnavi ディレクトリは固定の `.ccnavi`） | 同上 |
-| `builtin-guard-common-layer` | 共通レイヤーの 3 本の置き場が決まっているとき（11.6） | 同上 |
-| `builtin-guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、閉じたチケットの退避 `logs/archive/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも当てる）。シェルの側の `builtin-guard-setting-files` と同じ場所 |
+| `builtin:guard-setting-files` | 常に | Bash で、書き込みの形（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先、`cp` `ln` `install` `mv` で守る名前を入っているディレクトリへ置く形）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、レイヤーの設定 3 本と ccnavi ディレクトリ、共通レイヤーの 3 本（`.ccnavi/config/common/`）、記録と state の `logs/decisions.jsonl` `logs/state`、閉じたチケットの退避の `logs/archive`）の組 |
+| `builtin:guard-binary` | `CCNAVI_BIN_PATH` が設定されているとき | `Write` `Edit` `NotebookEdit` |
+| `builtin:guard-project-home` | 常に（ccnavi ディレクトリは固定の `.ccnavi`） | 同上 |
+| `builtin:guard-common-layer` | 共通レイヤーの 3 本の置き場が決まっているとき（11.6） | 同上 |
+| `builtin:guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、閉じたチケットの退避 `logs/archive/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも当てる）。シェルの側の `builtin:guard-setting-files` と同じ場所 |
 
 同じ設定が有効な間、`ccnavi --prune`（`--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
-`DENY_RECORDS_PRUNE`（`builtin-guard-records-prune`）で止める（`phase_forms.prune_form`）。実行ファイルの端末要求は
+`DENY_RECORDS_PRUNE`（`builtin:guard-records-prune`）で止める（`phase_forms.prune_form`）。実行ファイルの端末要求は
 擬似端末（`script -qc`）を使えば満たせてしまい、チケット制御を切ったワークスペースでは端末要求を切る変数も止まらないため。
 見るのは引用符を外したコマンド行で、コマンドの切れ目の中に ccnavi の名前と単独の語の `--prune` が並べば止める。
 免除は `--preview` が `--prune` の隣に引用をまたがずに並んだ形だけ。
 
 `logs/` の下の git のラッパースクリプトの記録は守らない。
 
-`.git` の中への書き込みは、ここではなく土台の deny（5.6 の `builtin-guard-git-dir`・`builtin-guard-git-dir-via-bash`）で止める。
+`.git` の中への書き込みは、ここではなく土台の deny（5.6 の `builtin:guard-git-dir`・`builtin:guard-git-dir-via-bash`）で止める。
 リダイレクトと `cp` `ln` `install` の行き先は同じ部品で読み、書き換える動詞・`dd`・`sed -i` は読むだけの語を外した `.git` 用の形で読む（`find` と `xargs` の形も足す）。
 `CCNAVI_GUARD_CORE_FILES` にも、ルールファイルが読めるかにも依らず当たる。
 
 実行ファイルのパス（`selfguard_shell.binary_clause`）: hook が実際に走らせるのは sh が起動する実体（4.6）なので、実体の置き場にも当てる。
-このパスは `builtin-guard-binary` と、`builtin-guard-setting-files` の場所の一覧と、承認のルール（9.5）の実行ファイルの名前に入る。
+このパスは `builtin:guard-binary` と、`builtin:guard-setting-files` の場所の一覧と、承認のルール（9.5）の実行ファイルの名前に入る。
 パスを `.` `..` を除いた要素に割り、名前で 2 つの形を切り替える。
 
 | sh の名前 | 当てるパス |
@@ -59,18 +59,18 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 | それ以外 | 末尾 2 要素（実行ファイルそのもの） |
 
 - sh かどうかは名前だけで決め、`platformtag.launched_executable`（8.3）と条件を揃える。ファイルは読まない。
-  別の名前で置いた sh は実行ファイルそのものとして読まれ、その `../bin/` は `builtin-guard-binary` から外れる
-- 既定の配置では、`builtin-guard-setting-files` の `.ccnavi` のパスと `builtin-guard-project-home` でも二重に止まる
+  別の名前で置いた sh は実行ファイルそのものとして読まれ、その `../bin/` は `builtin:guard-binary` から外れる
+- 既定の配置では、`builtin:guard-setting-files` の `.ccnavi` のパスと `builtin:guard-project-home` でも二重に止まる
 
 判定に渡るパスはワークスペースルートを継ぎ足した絶対パス（`settings._resolve_bin`）なので、名指しのツールは浅いパスでも止まる。
 相対で書いたシェルのコマンドは守らない（`CCNAVI_BIN_PATH=scripts/ccnavi-launcher.sh` での `rm -rf bin/linux-x86_64`、
-`ccnavi-launcher.sh` での `rm -rf ../bin/linux-x86_64` は `builtin-guard-binary` に当たらない）。導入スクリプトはこのパスを作らない。
+`ccnavi-launcher.sh` での `rm -rf ../bin/linux-x86_64` は `builtin:guard-binary` に当たらない）。導入スクリプトはこのパスを作らない。
 実行後のバックアップと復元（8.3）は、どのパスでも働く。
 
 止めるのは書き込みの形と場所の組で、場所の名前が出ただけでは止めない（`cat rules.yml` も `git add <パス>` も通る）。
 
 下書きの置き場（ワークスペースルートの `wip/scratchpad/`）へ写す cp は、行き先の最後の語に守る名前があっても
-`builtin-guard-setting-files` から外す（`selfguard_shell.scratchpad_copy_exempt`）。守る場所を直すときは、置き場へ写して
+`builtin:guard-setting-files` から外す（`selfguard_shell.scratchpad_copy_exempt`）。守る場所を直すときは、置き場へ写して
 写しを直すため（`cp .ccnavi/scripts/ccnavi-git.sh wip/scratchpad/ccnavi-git.sh`）。式は先読みを使えないので（5.1）、
 外すかどうかは式の外で、行き先を実際のパスに解いて決める。外すのは次をすべて満たすときだけ。
 
@@ -84,31 +84,31 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 - 置き場（`wip/` か `wip/scratchpad/`）そのものがリンクではない
 - 行き先に既にあるファイルが、ハードリンクでほかの名前とつながっていない（上書きがつながった先も書き換えるため）
 
-組み込みの既定のシェルの 1 本（`builtin-guard-config-via-bash`）には、この例外を付けない。
-組み込みはルールファイルに何が書いてあっても足す。`builtin-guard-` で始まる id はルールファイルのどのレイヤーにも書けず、
+組み込みの既定のシェルの 1 本（`builtin:guard-config-via-bash`）には、この例外を付けない。
+組み込みはルールファイルに何が書いてあっても足す。`builtin:guard-` で始まる id はルールファイルのどのレイヤーにも書けず、
 書けばそのルールを読み込まずに error にする（`--lint` も言う）。組み込みを外したいなら env（`CCNAVI_GUARD_CORE_FILES`）でこの機能ごと切る。
 組み込みの既定を使っている間（共通レイヤーのルールが不正な間）と `disable` のときは足さない。土台の deny（5.6）は別で、この間も常に当たる（設計 11.2）。既定を使っている間は、組み込みの既定（REQ-PRE-06）のシェルの 1 本
-（`builtin-guard-config-via-bash`）が、呼び出しごとに同じ設定から組んで、実行ファイル・ccnavi ディレクトリ・共通レイヤーを
+（`builtin:guard-config-via-bash`）が、呼び出しごとに同じ設定から組んで、実行ファイル・ccnavi ディレクトリ・共通レイヤーを
 動かした先への書き込みも止める。
 
-共通レイヤーの 3 本は、置き場がどこでも `builtin-guard-common-layer` が `Write` / `Edit` から止める。当てるのはワークスペースルートと、
+共通レイヤーの 3 本は、置き場がどこでも `builtin:guard-common-layer` が `Write` / `Edit` から止める。当てるのはワークスペースルートと、
 そこから切ったワークツリーの下の同じ相対（ワークスペースルートの外に置いたなら、そのパス）。既定の置き場（`.ccnavi/config/common/`）では
-`builtin-guard-project-home` より先にこちらが当たる。期待する判定（`rule-expectations.yml`）は 3 本に入らず、既定の置き場なら
-`builtin-guard-project-home` が止める。
+`builtin:guard-project-home` より先にこちらが当たる。期待する判定（`rule-expectations.yml`）は 3 本に入らず、既定の置き場なら
+`builtin:guard-project-home` が止める。
 
-生の git（`builtin-ticket-raw-git`）: チケット制御が有効でワークスペースルートに `ccnavi-git.sh` がある間は、生の git を組み込みで止める（9.1）。
+生の git（`builtin:ticket-raw-git`）: チケット制御が有効でワークスペースルートに `ccnavi-git.sh` がある間は、生の git を組み込みで止める（9.1）。
 ラッパーの中のチケット制御の可否を、ラッパーの外から打つ git で外させないためで、ガード自身を守る組み込みに数える（P4）。
 `CCNAVI_GUARD_CORE_FILES` では切れず、チケット制御（`CCNAVI_TICKET_CONTROL`）を切ると外れる。
 
-git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PATH`、`builtin-guard-wrapper-paths`）: `ccnavi-git.sh` の
-`rm`（`--cached` も）・`restore --source <ref>`・`checkout <ref> <パス>` で、`builtin-guard-setting-files` と同じ場所を
+git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PATH`、`builtin:guard-wrapper-paths`）: `ccnavi-git.sh` の
+`rm`（`--cached` も）・`restore --source <ref>`・`checkout <ref> <パス>` で、`builtin:guard-setting-files` と同じ場所を
 消す・別のコミットの中身に戻す形を、ルールより先に止める（`wrapguard.check_core_paths`）。シェルの `rm` は止まるのに、ラッパーの
 `git rm` は同じファイルを消せた。`ccnavi-git.sh` 自身が消えると、生の git の組み込み（ラッパーがあるときだけ足す）も外れる。
 `CCNAVI_GUARD_CORE_FILES` が有効な間、チケット制御と組み込みの既定への退避に依らず足す。
 
 | 当たるもの | 理由 |
 |---|---|
-| 書いたとおりのパスか、居場所（payload の cwd から `cd` を追った先）で解いた絶対パスに、`builtin-guard-setting-files` の場所の式が当たる | シェルの書き込みと同じ場所を、同じ式で見る。実行ファイル・動かした ccnavi ディレクトリ・共通レイヤーもそこに入っている |
+| 書いたとおりのパスか、居場所（payload の cwd から `cd` を追った先）で解いた絶対パスに、`builtin:guard-setting-files` の場所の式が当たる | シェルの書き込みと同じ場所を、同じ式で見る。実行ファイル・動かした ccnavi ディレクトリ・共通レイヤーもそこに入っている |
 | 守る場所を中に含むディレクトリ（ワークスペースルート・実行ファイル・共通レイヤー・記録と state・プロジェクトの置き場の上と、`.ccnavi`・`.claude`・`.git` を直に、または 1 つ下に持つディレクトリ） | `restore --source <ref> -- .` や `rm -r projects` で中身ごと戻す・消す |
 | `:` で始まる pathspec、グロブの前に固定のディレクトリが無い指定、`--pathspec-from-file`（省略形も） | 当たる先を読みで決められない。git の pathspec のグロブは `/` もまたぐ |
 | 対象を読み切れない形。変数・置換で組み立てたパス、居場所の読めない `cd` / `pushd` の後の相対パス、走査が読み切れないコマンド行 | 共通ルールの allow（`*ccnavi-git.sh*`）が生の文字列に当たるので、ここで止めないと確認に落ちずに通る（ADR-0121 の追記） |

@@ -529,10 +529,10 @@ class ConfigUnionHarness(unittest.TestCase):
         return json.loads(lines[-1])
 
     def hit_rules(self, record=None):
-        """記録の `rules` のうち、レイヤーのルール。組み込みの deny（`builtin-` で始まる id。
+        """記録の `rules` のうち、レイヤーのルール。組み込みの deny（`builtin:` で始まる id。
         共通レイヤーと config の有無によらず常に当たる）は数えない。"""
         record = record if record is not None else self.last_record()
-        return [name for name in record["rules"] if not name.startswith("builtin-")]
+        return [name for name in record["rules"] if not name.startswith("builtin:")]
 
     def assert_denied(self, result, *ids):
         self.assertEqual(self.decision(result), "deny", result.stdout + result.stderr)
@@ -922,7 +922,7 @@ class LayerFailureTest(ConfigUnionHarness):
         self.assert_not_denied(passed)
         record = self.last_record()
         self.assertEqual(record.get("fallback"), "lib", record)
-        self.assertNotEqual(record.get("fallback"), "builtin-rules")
+        self.assertNotEqual(record.get("fallback"), "builtin:rules")
         self.assertNotIn("built-in defaults", self.reason(passed))
 
     def test_broken_layer_keeps_the_common_deny(self):
@@ -956,7 +956,7 @@ class LayerFailureTest(ConfigUnionHarness):
         passed = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "schema", "x.sql"))
         self.assert_not_denied(passed)
         record = self.last_record()
-        self.assertEqual(record.get("fallback"), "builtin-rules")
+        self.assertEqual(record.get("fallback"), "builtin:rules")
         self.assertIn("built-in defaults", self.reason(passed))
         self.assertNotIn("lib:schema", self.reason(passed))
 
