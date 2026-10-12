@@ -742,23 +742,72 @@ def records_regex(log_path: str = "", state_dir: str = "") -> str:
 # git の管理ディレクトリ（`.git/` とその中身、ワークツリーの `.git` ファイル）を、名指しのツールに
 # 当てる形。当てる先は解決済みの絶対パスなので、前は区切りで閉じる。`.gitignore` や `.github/`
 # のように `.git` の後ろに名前が続くものには当たらない。
-GIT_DIR_PATH_REGEX = r"[\\/]\.git(?:[\\/]|$)"
+# 名前の後ろの `.` と空白は、Windows が名前を開くときに落とす（`.git.` も `.git ` も `.git`）。
+GIT_DIR_PATH_REGEX = r"[\\/]\.git[. ]*(?:[\\/]|$)"
 
-# シェルの側で `.git` の前に来てよい 1 文字。語の頭（空白）、引用がつないだ空白、パスの区切り、
-# `--opt=` の `=`。`repo.git/` や `sed -i 's/a.git/b.git/'` の式の中の `.git` には当たらない。
-_GIT_DIR_HEAD = rf"[ {re.escape(shellread.WORD_SEP)}\\/=]"
-_GIT_DIR_NAME = r"\.git" + _END
+# シェルの側で `.git` の前に来てよいのは、語の頭（空白）、引用がつないだ空白、パスの区切り、
+# `--opt=` の `=`。`repo.git/` や URL の中の `.git` には当たらない。
+# 名前の後ろの `.` は名指しのツールと同じ理由で飛ばす。空白は引用がつないだ空白（_END）で閉じる。
+_GIT_DIR_NAME = r"\.git\.*" + _END
+# 語の中で `.git` の手前に来てよい前置き。区切りで終わる並びに限る。
+_GIT_DIR_PREFIX = r"(?:[^ \x00\x01]*[\\/])?"
+# 書き換える動詞。守る場所の `_VERB_WRITE` から `dd` を外し（`of=` の値だけを書き先とみる）、
+# `<` の直後の語は読みなので外す（`tee /tmp/o < .git/config`・`patch -p1 < .git/x`）。
+# `<` は shellread が前後に空白を置いた 1 語にそろえる。
+_GIT_VERB_WRITE = (
+    r"(^|\x00)(mv|rm|tee|truncate|patch|shred)\b(?:[^\x00]*[^<\x00])?[ \x01]"
+    r"(?:[^ \x00\x01<]*[\\/=])?"
+)
+_GIT_DD_WRITE = r"(^|\x00)dd\b[^\x00]*[ \x01]of=(?:[^ \x00]*[\\/])?"
+# `sed -i` の式（最初の選択肢でない語）を飛ばし、その後ろの語だけを書き先とみる。`-i` は式の
+# 前（`sed -i s/a/b/ f`）にも後ろ（`sed -e s/a/b/ -i f`）にも置ける。`-e` で式を渡すと式の語は
+# `-e` の値になり、最初の選択肢でない語は式そのものかファイルになる。どちらでも後ろの語は
+# 書き先なので、止める側に倒れるだけ（`sed -i -e s/a/b/ -e s/c/.git/ f` は止まる）。
+# 前置きと選択肢の並びは `(?>...)` で決め打ちし、当たらない長い並びで読み直さない。
+_SED_SCRIPT = r"(?>(?: -[^ \x00]*)* [^- \x00][^ \x00]*)"
+_SED_IN_PLACE = r"[ \x01](?:-[A-Za-z]*?i|--i)"
+_GIT_SED_FILE = r"[^\x00]*?[ \x01]" + _GIT_DIR_PREFIX + _GIT_DIR_NAME
+_GIT_SED_WRITE = (
+    r"(^|\x00)sed\b(?:"
+    rf"(?>(?: -[^ \x00]*)*?{_SED_IN_PLACE}[^ \x00]*(?: -[^ \x00]*)* [^- \x00][^ \x00]*)"
+    rf"{_GIT_SED_FILE}"
+    rf"|{_SED_SCRIPT}(?:(?>[^\x00]*?{_SED_IN_PLACE}){_GIT_SED_FILE}"
+    rf"|(?>{_GIT_SED_FILE})[^\x00]*?{_SED_IN_PLACE}))"
+)
+# 開始点に `.git`（とその下）を置き、消す・コマンドを走らせる述語を持つ `find`。開始点は
+# 選択肢（`-H` `-L` `-P`）のあとの、`-` `!` `(` で始まらない語の並び。`find . -path ./.git
+# -prune -o … -delete` の `./.git` は述語の値なので当たらない。最初の `.git` の開始点で
+# 決め打ちする。それより後ろの述語の並びは、最初のものの後ろに含まれる。
+# `-exec` を持つ形は読み切れない形（command-taken-as-code）になり、生の文字列で当てるので、
+# 切れ目は生の `|` `;` `&` 改行も数え、`.git` の前後の引用符も許す。
+_GIT_FIND_WRITE = (
+    r"(?:^|[\x00|;&\n]) *find(?: -[HLP])*"
+    r"(?>(?: [^-!( \x00][^ \x00]*)*? (?:[^ \x00]*[\\/'\"])?\.git\.*(?:[\\/][^ \x00]*)?['\"]? )"
+    r"(?:[^\x00]*[ \x01])?(?:-delete|-exec|-execdir|-ok|-okdir)\b"
+)
+# 前のコマンドが `.git` を名指しし、その出力を `xargs` が書き込む動詞に渡す形。`xargs` を含む
+# コマンドは読み切れない形（shellread の command-taken-as-code）になり、生の文字列で当てるので、
+# 切れ目は `\x00` のほかに生の `|` `;` 改行も数え、`.git` の前後には引用符も数える。
+# コマンドの頭から最初の `.git` で決め打ちし、`.git` の数だけ尾を読み直さない。
+_GIT_XARGS_WRITE = (
+    r"(?:^|[\x00|;\n])"
+    r"(?>[^\x00|;\n]*?[ \x01\\/='\"]\.git\.*(?:[\\/ \x00\x01'\"]|$))"
+    r"[^\x00|;\n]*(?:\x00|\|) *xargs\b[^\x00|;\n]*[ \x01'\"]"
+    r"(?:rm|mv|tee|dd|truncate|patch|shred|cp|ln|install)\b"
+)
 
 
 def git_dir_shell_regex() -> str:
     """`.git` ディレクトリへシェルから書き込む形。組み込みの土台（builtin）が持つ。
 
-    書き込みの形（リダイレクト・書き換える動詞・`sed -i`・cp / ln / install の行き先）は
-    守る場所（`_PLACES`）と同じ部品で読む。場所の名前が出ただけでは止めない。`cat .git/config` も
+    リダイレクトと cp / ln / install の行き先は守る場所（`_PLACES`）と同じ部品で読む。
+    書き換える動詞・`dd`・`sed -i` は、読むだけの語（`<` の後ろ、`dd` の `if=`、`sed` の式）を
+    外した `.git` 用の形で読み、`find` の開始点と `xargs` に渡す前のコマンドも見る。
+    場所の名前が出ただけでは止めない。`cat .git/config` も
     `cp .git/config /tmp/x` も読むだけなので通る。git のラッパー（`ccnavi-git.sh`）の中で行う
     `.git` への書き込みは、外側のコマンド文字列に `.git` が出ないので当たらない。
 
-    守る場所の表記と違い、`.git` の前に区切りを求める（`_GIT_DIR_HEAD`）。`.git` は URL や
+    守る場所の表記と違い、`.git` の前に区切りを求める。`.git` は URL や
     裸のリポジトリの名前（`repo.git`）にも出るので、前を閉じないと `sed -i` の置換式まで止まる。
     リダイレクトの行き先の語は、区切りで終わる前置きだけを読ませる（`_REDIRECT` の語の読みは
     前置きを何でも食うので、ここでは使わない）。`-t` の値は `_COPY_TARGET` が値の頭を食うので
@@ -772,11 +821,14 @@ def git_dir_shell_regex() -> str:
     # 長さの 2 乗になる（REDIRECT_LIMIT の説明）。またがなければ、`>` ごとに読むのは次の `>`
     # までで、合わせて長さに比例する。上限（judge.SHELL_GUARD_RULE_IDS）に頼らずに済む。
     redirect = rf"(?:^|[^>|&])[|&]*>[>|&]* ?(?:[^ {_NOT_A_WORD}>|&][^ \x00>]*[\\/])?"
-    writes = rf"(?:{redirect}|{_VERB_WRITE}{_GIT_DIR_HEAD}|{_SED_WRITE}{_GIT_DIR_HEAD})"
-    last = r"(?:[^ \x00]*[\\/])?\.git" + _COPY_END
+    writes = rf"(?:{redirect}|{_GIT_VERB_WRITE}|{_GIT_DD_WRITE})"
+    last = r"(?:[^ \x00]*[\\/])?\.git\.*" + _COPY_END
     return "|".join(
         (
             _folded(writes + _GIT_DIR_NAME),
+            _folded(_GIT_SED_WRITE),
+            _folded(_GIT_FIND_WRITE),
+            _folded(_GIT_XARGS_WRITE),
             copy_destination_regex(_folded(last), _folded(_GIT_DIR_NAME)),
             holder_regex(r"\.", r"\.git", named_only=True),
         )

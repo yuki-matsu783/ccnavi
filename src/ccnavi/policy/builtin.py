@@ -372,8 +372,12 @@ GIT_DIR_SHELL_RULE_ID = "builtin-guard-git-dir-via-bash"
 def _git_dir_message(git: str) -> str:
     return (
         "This writes inside the .git directory directly. Changes there bypass git "
-        "and can lose history or run commands through hooks. Make the change with "
-        f"'{git} <subcommand>' instead, or ask the user to do it. "
+        "and can lose history or run commands through hooks. If a git subcommand does "
+        f"the job, run it as '{git} <subcommand>'. No subcommand edits hooks, "
+        ".git/info/exclude, MERGE_MSG, index.lock or the .git file of a worktree: "
+        "ask the user to change them, naming the file and why. For a stale index.lock, "
+        "first confirm that no git process is running, then ask the user to remove it. "
+        "To ignore files, edit .gitignore instead. "
         "Reading files under .git is not blocked."
     )
 

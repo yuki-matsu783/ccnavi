@@ -490,6 +490,18 @@ GIT_DIR_SHELL_DENIED = (
     "sed -i 's/a/b/' .git/config",
     "cp -r /tmp/x/.git .",
     "echo x > .GIT/config",
+    "echo x > .git./config",
+    "dd if=/tmp/x of=.git/HEAD",
+    "tee .git/config < /tmp/x",
+    "rm .git",
+    "sed -i s/a/b/ /abs/.git/config",
+    "sed -i s/a/b/ x .git/config",
+    "sed -e s/a/b/ -i .git/config",
+    "find .git -name '*.lock' -delete",
+    "find .git -type f -exec rm {} +",
+    "cd .git && find . -delete",
+    "cd .git && echo x > config",
+    "printf '.git/config\\n' | xargs rm",
 )
 GIT_DIR_SHELL_PASSED = (
     "cat .git/config",
@@ -501,6 +513,14 @@ GIT_DIR_SHELL_PASSED = (
     'echo "a > .git/x"',
     "echo x > repo.git/config",
     "cp ../foo/*.py .",
+    "dd if=.git/index of=/tmp/x",
+    "tee /tmp/o < .git/config",
+    "patch -p1 < .git/x",
+    "sed -i 's/foo/.git/' f",
+    "sed -i 's/\\.git\\//x/' f",
+    "find . -path ./.git -prune -o -type f -delete",
+    "printf a | xargs rm",
+    "ls .gitignore | xargs rm",
 )
 
 
