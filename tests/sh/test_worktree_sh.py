@@ -180,6 +180,53 @@ class WorktreeShTest(unittest.TestCase):
         )
         self.assertNotEqual(0, upstream.returncode, "統合先を追跡しない")
 
+    def diverge(self):
+        """手元の main にだけ 1 コミット足し、origin にも別の 1 コミットを足す（分岐）。"""
+        write(os.path.join(self.ws, "local.txt"), "l")
+        git(self.ws, "add", "local.txt")
+        git(self.ws, "commit", "-q", "-m", "local only")
+        return self.advance_origin()
+
+    def test_diverged_local_stops_with_guidance(self):
+        self.diverge()
+        result = self.run_sh("topic")
+        self.assertEqual(1, result.returncode, result.stderr + result.stdout)
+        self.assertIn("分岐している", result.stdout)
+        self.assertIn("--from-origin", result.stdout)
+        self.assertFalse(os.path.exists(self.wt("topic")))
+
+    def test_from_origin_cuts_from_origin_with_warning_when_diverged(self):
+        origin_head = self.diverge()
+        result = self.run_sh("topic", "--from-origin")
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertEqual(origin_head, self.head_of("topic"))
+        self.assertIn("分岐している", result.stdout)
+        self.assertNotIn("件遅れていたので", result.stdout)
+
+    def test_dry_run_when_diverged_creates_nothing_and_says_it_would_stop(self):
+        self.diverge()
+        git(self.ws, "fetch", "-q", self.bare, "main:refs/remotes/origin/main")
+        result = self.run_sh("topic", "--dry-run")
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertFalse(os.path.exists(self.wt("topic")))
+        self.assertIn("切らずに終了コード 1 で止まる", result.stdout)
+
+    def test_offline_when_diverged_does_not_stop_because_origin_may_be_stale(self):
+        self.diverge()
+        git(self.ws, "fetch", "-q", self.bare, "main:refs/remotes/origin/main")
+        result = self.run_sh("topic", "--offline", fail_fetch=True)
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertIn("止めなかった", result.stdout)
+
+    def test_local_ahead_only_cuts_from_local(self):
+        write(os.path.join(self.ws, "local.txt"), "l")
+        git(self.ws, "add", "local.txt")
+        git(self.ws, "commit", "-q", "-m", "local only")
+        result = self.run_sh("topic")
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertEqual(git(self.ws, "rev-parse", "main"), self.head_of("topic"))
+        self.assertNotIn("分岐", result.stdout)
+
     def test_existing_worktree_is_reported_not_recreated(self):
         self.run_sh("topic")
         write(os.path.join(self.wt("topic"), "keep.txt"), "mine")
