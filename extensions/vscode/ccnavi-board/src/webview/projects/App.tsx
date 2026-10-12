@@ -7,11 +7,17 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { CloneStatus, ProjectsData, ProjectsPage, Stray, ToProjects } from "../../core/projects-view.js";
+import { tourOf } from "../../core/tour-def.js";
 import { applyAppearance } from "../appearance.js";
+import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
+import projectsTour from "../tours/projects.yml";
 import { Project } from "./Project.js";
 import { post } from "./post.js";
 import { EMPTY, guessName, loadClone, saveClone, type CloneState } from "./state.js";
 import { isTrackedProjectsDir } from "./text.js";
+
+/** 案内（`tours/projects.yml`）。見本は使わず、画面は今の中身のまま指す */
+const TOUR = tourOf(projectsTour);
 
 export function App({ initial }: { readonly initial: ProjectsData }): JSX.Element {
   const [data, setData] = useState<ProjectsData>(initial);
@@ -25,6 +31,15 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
    * ここで消すと案内が一瞬で消える
    */
   const [status, setStatus] = useState<CloneStatus | undefined>(undefined);
+
+  const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
+  const requestTour = tour.request;
+  /** 拡張ホストへの送信。案内の間は実際の操作を送らない（`tourDone` と `ready` は直に送る） */
+  const act = (message: Parameters<typeof post>[0]): void => {
+    if (!tour.touring) {
+      post(message);
+    }
+  };
 
   // 受け取る側（メッセージ）は描くたびに作り直さない。打ちかけの欄を消すのに今の値が要るので ref へ入れておく
   const cloneRef = useRef<CloneState>(clone);
@@ -42,6 +57,8 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
         setData(message.data);
         // 一覧が新しくなったので、それを見て言った失敗はもう今のことではない
         setStatus((now) => (now?.kind === "failed" ? undefined : now));
+      } else if (message.type === "tour") {
+        requestTour();
       } else if (message.type === "failed") {
         setStatus({ kind: "failed", message: String(message.message ?? "") });
       } else if (message.type === "info") {
@@ -60,7 +77,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
     // 作り直される。その HTML は少し古いことがあるので、いまの中身をもらい直す
     post({ type: "ready" });
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [requestTour]);
 
   if (data.kind === "error") {
     return (
@@ -73,26 +90,28 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
 
   const page = data.page;
   const rows = page.rows;
+  const courses = coursesOf(TOUR, () => undefined);
   return (
     <>
       <header className="toolbar">
-        <div className="summary">
+        <div className="summary" data-tour="summary">
           <span>プロジェクト {rows.length} 件</span>
           <span className="path" title={page.projectsDir}>
             フォルダ: {`${page.projectsRel}/`}
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="refresh" onClick={() => post({ type: "refresh" })}>
+          <button type="button" className="action" data-action="refresh" data-tour="refresh" onClick={() => act({ type: "refresh" })}>
             更新
           </button>
         </div>
+        <TourButton courses={courses} onPick={tour.start} />
       </header>
-      <Banners page={page} />
-      <section className="clone">
+      <Banners page={page} act={act} />
+      <section className="clone" data-tour="clone">
         <h2>リポジトリを clone する</h2>
         <div className="clone-form">
-          <label className="grow">
+          <label className="grow" data-tour="clone-url">
             URL{" "}
             <input
               id="url"
@@ -107,7 +126,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
               }}
             />
           </label>
-          <label>
+          <label data-tour="clone-name">
             名前{" "}
             <input
               id="name"
@@ -125,8 +144,9 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
             type="button"
             className="action primary"
             data-action="clone"
+            data-tour="clone-run"
             title="git clone を「ccnavi」ターミナルで実行します。認証が要るならターミナルで入力してください"
-            onClick={() => post({ type: "clone", url: clone.url, name: clone.name })}
+            onClick={() => act({ type: "clone", url: clone.url, name: clone.name })}
           >
             clone
           </button>
@@ -135,7 +155,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
           {status?.message ?? ""}
         </p>
       </section>
-      <section className="list">
+      <section className="list" data-tour="list">
         <h2>
           ワークスペース内のプロジェクト <span className="count">{rows.length}</span>
         </h2>
@@ -143,14 +163,14 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
           <p className="empty">プロジェクトがありません。上のボタンで clone するか、既存のリポジトリを projects/ の直下に移動してください。</p>
         ) : (
           <ul className="projects">
-            {rows.map((row) => (
-              <Project key={row.name} row={row} ticketsEnabled={page.ticketsEnabled} />
+            {rows.map((row, index) => (
+              <Project key={row.name} row={row} ticketsEnabled={page.ticketsEnabled} tour={index === 0} />
             ))}
           </ul>
         )}
       </section>
       <Strays strays={page.strays} />
-      <section className="workspace">
+      <section className="workspace" data-tour="workspace">
         <h2>ワークスペース（プロジェクト外）</h2>
         <p className="hint">
           <span className="mono">{page.root}</span>（ワークツリー {page.workspaceWorktrees.length} 件
@@ -158,6 +178,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
         </p>
         <SelfRules page={page} />
       </section>
+      {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
       <footer className="foot">
         最終更新 {page.generatedAt}（{page.root}）
       </footer>
@@ -172,7 +193,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
  * `.gitignore` の帯も「無視されていない」も出さず、実行ファイルの苦情の帯だけを出す。
  * `.gitignore` に `/projects/` があっても（`page.ignored` が真でも）、索引に載っている限り苦情は出たまま。
  */
-function Banners({ page }: { readonly page: ProjectsPage }): JSX.Element {
+function Banners({ page, act }: { readonly page: ProjectsPage; readonly act: (message: Parameters<typeof post>[0]) => void }): JSX.Element {
   const banners: JSX.Element[] = [];
   if (page.lintError !== "") {
     banners.push(
@@ -187,7 +208,7 @@ function Banners({ page }: { readonly page: ProjectsPage }): JSX.Element {
       <div key="ignore" className="banner warn">
         <code>.gitignore</code> に <code>/{page.projectsRel}/</code>{" "}
         がありません。各プロジェクトは自分の git リポジトリを持つので、ワークスペースの git からは除外してください。
-        <button type="button" className="action" data-action="fix-ignore" onClick={() => post({ type: "fixIgnore" })}>
+        <button type="button" className="action" data-action="fix-ignore" onClick={() => act({ type: "fixIgnore" })}>
           .gitignore に追加
         </button>
       </div>,

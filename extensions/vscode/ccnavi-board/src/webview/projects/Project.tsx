@@ -13,9 +13,11 @@ import { problemsOf } from "./text.js";
 export interface ProjectProps {
   readonly row: ProjectRow;
   readonly ticketsEnabled: boolean;
+  /** 案内が指す先にする（一覧の最初のカードだけ） */
+  readonly tour?: boolean;
 }
 
-export function Project({ row, ticketsEnabled }: ProjectProps): JSX.Element {
+export function Project({ row, ticketsEnabled, tour = false }: ProjectProps): JSX.Element {
   const problems = problemsOf(row);
   const flags = [
     row.doing > 0 ? { key: "doing", className: "badge doing", text: `作業中 ${row.doing}` } : undefined,
@@ -23,7 +25,7 @@ export function Project({ row, ticketsEnabled }: ProjectProps): JSX.Element {
     problems.some((p) => p.severity === "warn") ? { key: "warn", className: "badge warn", text: "warn" } : undefined,
   ].filter((f) => f !== undefined);
   return (
-    <li className={`project${problems.length > 0 ? " has-problem" : ""}`} data-name={row.name}>
+    <li className={`project${problems.length > 0 ? " has-problem" : ""}`} data-name={row.name} data-tour={tour ? "project" : undefined}>
       <div className="project-head">
         <span className="name mono">{row.name}</span>
         <span className="rel small dim">{row.rel}</span>
@@ -76,7 +78,7 @@ export function Project({ row, ticketsEnabled }: ProjectProps): JSX.Element {
             </dd>
           </div>
         )}
-        <div className="field wide">
+        <div className="field wide" data-tour={tour ? "project-check" : undefined}>
           <dt>検証</dt>
           <dd>{problems.length === 0 ? <span className="ok">問題なし</span> : <Problems problems={problems} />}</dd>
         </div>
