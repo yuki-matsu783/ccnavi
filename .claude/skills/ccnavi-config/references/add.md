@@ -16,7 +16,7 @@ keywords: [rules.yml, phases.yml, risks.yml, deny, ask, allow, glob, regex, ル�
 2. どのファイルかを決める。止める・聞く・通すなら rules、フェーズと範囲なら phases、閉じるときの重さなら risk。
    2 本にまたがるなら別々の下書きにする
 3. 今の本物を読む。同じことを言うルールやフェーズ定義が既に無いか
-4. 下書きをワークツリーの `wip/scratchpad/`（.ccnavi/docs/scratchpad.md）に書く。本物の全文を写して足す（断片だと lint に掛けられない）
+4. 下書きをワークツリーの `wip/handoff/`（.ccnavi/docs/scratchpad.md）に書く。本物の全文を写して足す（断片だと lint に掛けられない）
 5. 検証する。lint と、rules なら期待する判定。通るまで直す（[check.md](check.md)）
 6. ユーザに渡す（下の「ユーザに渡す形」）。置くのはユーザ
 
@@ -138,7 +138,7 @@ Bash は実行される部分に当たる。`$( )` の中や `&&` の先も 1 �
 期待する判定を一緒に足す。ルールを 1 件足したら `.ccnavi/config/common/rule-expectations.yml` に、当たってほしい
 期待と当たってほしくない期待を両方足す。期待は
 `tool` `subject` `why` の 3 つで、置いたタイプが期待する判定。`subject` の `/repo` は
-ワークスペースルートに読み替わる。その下書きも `wip/scratchpad/` に置き、`--test-expectations` で
+ワークスペースルートに読み替わる。その下書きも `wip/handoff/` に置き、`--test-expectations` で
 本物と一緒に回す。
 
 ## phases.yml
