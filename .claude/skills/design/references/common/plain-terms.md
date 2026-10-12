@@ -2,7 +2,7 @@
 type: skill-reference
 title: 説明と提案で内部の呼び名を使わない
 description: issue のタイトルや作業中の呼び名をそのまま書かず、初めて読む人に伝わる言い方にして、初出で定義を添える
-tags: [designing]
+tags: [design]
 keywords: [用語, 呼び名, issue, タイトル, 初出, 定義, 提案, 説明, 言い換え]
 ---
 

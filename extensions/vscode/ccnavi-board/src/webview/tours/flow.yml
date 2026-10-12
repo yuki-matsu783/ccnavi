@@ -106,7 +106,7 @@ sample:
             - {name: Plan, source: builtin}
           skills:
             - {name: reviewing, source: project}
-            - {name: testing, source: project}
+            - {name: test, source: project}
 
     # 手順を新しく組む。部品箱で足す前（開始 → 終了）
     build-1:

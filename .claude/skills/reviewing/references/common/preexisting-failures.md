@@ -2,7 +2,7 @@
 type: skill-reference
 title: 既存の失敗を確かめる
 description: 報告にある「既存の失敗」は、変更前の状態（統合先）で再現するかを確かめてから既存と扱う
-tags: [reviewing, testing]
+tags: [reviewing, test]
 keywords: [既存の失敗, 既知の失敗, 再現, 統合先, 合流, 原因, 報告]
 ---
 

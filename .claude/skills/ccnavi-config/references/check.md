@@ -2,7 +2,7 @@
 type: skill-reference
 title: 確かめる
 description: 設定ファイルが意図どおりに動作するか検証する手順。lint、期待する判定のテスト、運用ルール確認
-tags: [rules, testing, config]
+tags: [rules, test, config]
 keywords: [lint, 期待する判定, テスト, deny, allow, ask, 検証, check_rules.py]
 ---
 

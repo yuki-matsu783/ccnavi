@@ -50,7 +50,7 @@ keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, refere
 上にあるものほど優先する。
 
 1. このセッションで読んだスキルを直す
-2. 工程スキル（`designing` `investigating` `testing` `debugging` `reviewing` `releasing`）に当たる作業なら、その `references/` に足すか広げる（他のプロジェクトでも使える内容は `common/`、そのリポジトリだけの事情は `project/`）。足し方は `.ccnavi/docs/skill-processes.md`。SKILL.md は直さない
+2. 工程スキル（`design` `research` `implement` `test` `debugging` `reviewing` `releasing`）に当たる作業なら、その `references/` に足すか広げる（他のプロジェクトでも使える内容は `common/`、そのリポジトリだけの事情は `project/`）。足し方は `.ccnavi/docs/skill-processes.md`。SKILL.md は直さない
 3. 工程スキルの対象外の既存スキルに、節・落とし穴・使う場面を足して直す。そのスキルに `references/<話題>.md` を足すか広げ、SKILL.md に1行の案内を足してもよい
 4. どれにも当たらない作業が繰り返し出たときだけ、新しいスキルの入口を提案する。今日の作業名・チケット番号・エラー文を名前にしない。ユーザの承認を取る
 

@@ -2,7 +2,7 @@
 type: skill-reference
 title: 手動の probe を回す
 description: tests/manual/ の probe は自動テストに入らず仕様変更で古くなるので、回す前に前提を確かめ、結果は理由まで見る
-tags: [testing]
+tags: [test]
 keywords: [probe, manual, tests/manual, 手動, 偽陽性, PASS, 前提, github, gitlab]
 ---
 

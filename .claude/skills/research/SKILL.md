@@ -1,13 +1,13 @@
 ---
-name: investigating
+name: research
 process: true
 description: >-
   調査の標準的な考え方への入口。既存コードの読み解き、技術や案の比較、変更の影響範囲の洗い出しなど、不具合の原因調査以外の調べもので使う。不具合の原因調査は debugging。細かい手順は references にあり、ccnavi --docs で共通とプロジェクトの両方から引く。
 ---
 
-# investigating
+# research
 
-調査の作業に入る前に、`ccnavi --docs --type skill-reference --tag investigating` で共通とプロジェクトの reference を引き、当たったものを読む。
+調査の作業に入る前に、`ccnavi --docs --type skill-reference --tag research` で共通とプロジェクトの reference を引き、当たったものを読む。
 
 ## 基本の考え方
 
@@ -18,7 +18,7 @@ description: >-
 
 ## reference の置き場
 
-- 共通: `.claude/skills/investigating/references/common/`（プロジェクトの `skills/investigating/references/common/` へ写される。プロジェクトの中では直さない）
-- そのリポジトリ固有: `references/project/`（ワークスペースは `.claude/skills/investigating/references/project/`、プロジェクトは `projects/<名前>/skills/investigating/references/project/`。写されない）
+- 共通: `.claude/skills/research/references/common/`（プロジェクトの `skills/research/references/common/` へ写される。プロジェクトの中では直さない）
+- そのリポジトリ固有: `references/project/`（ワークスペースは `.claude/skills/research/references/project/`、プロジェクトは `projects/<名前>/skills/research/references/project/`。写されない）
 
 中のディレクトリ構造は任意。足し方と書き方は `.ccnavi/docs/skill-processes.md`。
