@@ -104,7 +104,7 @@ export interface PhasesPage {
   readonly errors?: readonly string[];
   /**
    * 共通の設定の定義（読み取り専用）。開いている設定の定義に足されて判定に使われる。同じ id で中身が違う定義や、
-   * 表示名（title）の重なりは、実行ファイルが error にする（そのとき開いている設定の定義は使われない）。無ければ欄を出さない
+   * 表示名（title）の重なりは、実行ファイルが error にする（そのとき開いている設定のその定義だけが使われず、同じ id なら共通の定義が使われる）。無ければ欄を出さない
    */
   readonly common?: readonly CommonPhase[];
   /** 開いている対象と、切り替えられる対象。無ければ切り替えの欄を出さない */
