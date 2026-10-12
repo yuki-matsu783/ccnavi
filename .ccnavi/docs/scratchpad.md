@@ -1,7 +1,7 @@
 ---
 type: guide
 title: 下書きと使い捨ての置き場
-description: 下書きや使い捨てファイルの置き場（wip/scratchpad/）と、コミットしたくないものの置き場
+description: 下書きや使い捨てファイルの置き場（wip/scratchpad/）と、コミットしたくないものの置き場（未定）
 tags: [state, records]
 keywords: [scratchpad, wip/scratchpad, スクラッチパッド, 下書き, 使い捨て, 一時ファイル, ワークツリー, セッション, integrate]
 ---

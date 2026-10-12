@@ -30,7 +30,7 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 | 子のフロー（担当のサブエージェントが読む手順書） | 親チケットのツリーの`.ccnavi/approved/flows/<子>.yml`。置き場は固定。中身はYAML。チケットの欄で場所を指定しない |
 | 閉じたチケットの退避（`ready`がDraftを外す前に、閉じた親子のチケットの`done/`・`phases/<親>/`・`events/`・`flows/`を移す）。手元の機械にだけ残る | ワークスペースの`logs/archive/<リポジトリ>/`。ワークスペース自身は`self`、プロジェクトはその名前。その下は承認済みの領域と同じ構成 |
 | 子のフローの下書き（エージェントが書く。効力は無い） | フローを保存するツリーと同じツリーの`wip/proposals/flows/<子>.yml`。プロジェクト向けは`projects/<名前>/wip/proposals/flows/<子>.yml` |
-| 下書きと使い捨てのファイル | ワークスペースのワークツリーの`wip/scratchpad/`（追跡する。統合のときに`integrate`が外す）。コミットしたくないものは、ワークスペースの外にあるセッションのスクラッチパッド。プロジェクトの`projects/<名前>/`には`wip/`の規約が無いので、プロジェクトの作業中の下書きもワークスペース側に置く |
+| 下書きと使い捨てのファイル | ワークスペースのワークツリーの`wip/scratchpad/`（追跡する。統合のときに`integrate`が外す）。コミットしたくないものの置き場は未定（`.ccnavi/docs/scratchpad.md`）。セッションのスクラッチパッドには置かない。プロジェクトの`projects/<名前>/`には`wip/`の規約が無いので、プロジェクトの作業中の下書きもワークスペース側に置く |
 | ワークスペースのルール | 共通レイヤーの`.ccnavi/config/common/rules.yml`。リスクの配点とフェーズ定義（`phases.yml`）も同じ場所。レイアウトに依存するフェーズ定義は自身のレイヤーの`.ccnavi/config/project/phases.yml` |
 | プロジェクトの設定 | `projects/<名前>/.ccnavi/config/project/`（`rules.yml`・`phases.yml`・`risks.yml`）。ここはプロジェクト専用で、着手では上書きされない。親チケットに着手するとき、共通レイヤーはプロジェクトの`.ccnavi/config/common/`にミラーされる（設計11.12）。フェーズ定義は共通レイヤーと`config/project/`の和 |
 
