@@ -139,6 +139,8 @@ export interface Card {
    * `proposal.has_plan`）承認待ち（`todo/`）の親の提案だけ真。新規の親も改版も。承認済みだけの親と子は偽
    */
   readonly workflow: boolean;
+  /** 親のカードの「下書きを作る」（完了した計画付きの親から、テンプレートの下書きを作る）を出すか。実行ファイルの `template_draft` のまま */
+  readonly templateDraft: boolean;
   /**
    * 状態の履歴の新しい側（古い順）。補助の記録で、列やバッジはここから組まない。
    * カードの折りたためる「履歴」に並べるだけ
@@ -297,6 +299,7 @@ function toCard(
     attention: t.attention,
     flow: isParent ? null : flowOf(t.flow, column),
     workflow: isParent && t.proposal?.state === "todo" && t.proposal.has_plan === true,
+    templateDraft: isParent && t.template_draft,
     history: t.history,
     predecessorsUnmet: t.predecessors_unmet,
   };
@@ -351,6 +354,7 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     attention: false,
     flow: null,
     workflow: false,
+    templateDraft: false,
     history: a.history,
     predecessorsUnmet: [],
   };
@@ -482,6 +486,12 @@ export function todoParentsOf(board: Board): string[] {
 export function workflowCardOf(board: Board, ticket: string): Card | undefined {
   const card = parentCardOf(board, ticket);
   return card?.workflow === true ? card : undefined;
+}
+
+/** 親の識別子から、「下書きを作る」を出しているカード（完了した計画付きの親）。無ければ undefined */
+export function templateDraftCardOf(board: Board, ticket: string): Card | undefined {
+  const card = parentCardOf(board, ticket);
+  return card?.templateDraft === true ? card : undefined;
 }
 
 /** 親の識別子とフェーズの番号から、そのフェーズ行。無ければ undefined */

@@ -80,6 +80,6 @@ keywords: [診断, --explain, 記録, レイヤー]
 
 導入スクリプト `ccnavi-setup.sh` は共通レイヤーに `rules.yml`・`phases.yml`・`risks.yml` のひな形を配る。自身のレイヤーの `phases.yml` は配らず、既にあれば触らない。
 「まだ無いもの」の点検には、`rules.yml` と `risks.yml` と、共通にも自身のレイヤーにも無い `phases.yml` を数える。
-配布元に共通のテンプレート（`.ccnavi/config/common/templates/*.yml`）があるときは、配布先に無いものも挙げる（配布元に置き場が無いのは正常で、何も言わない。配れない名前のものは対象にしない）。
+配布元に共通のテンプレート（`.ccnavi/config/common/templates/*.yml`）があるときは、配布先に無いものも挙げる（配布元に置き場が無いのは正常で、何も言わない。配れない名前のものは対象にしない）。共通の工程スキルの配布先に `SKILL.md` や `references/common/` の `.md` が無いときも、書き込みのあとの点検で挙げる（`--check` は書かないので、この点検は出さず、配るものを「配る」に並べるだけ）。
 
 dry-run でまずレイヤーの分布を見て、Bash の和と、大文字小文字を区別しない照合で増えた `ask` と `deny` を数えてから `enable` に切り替える。

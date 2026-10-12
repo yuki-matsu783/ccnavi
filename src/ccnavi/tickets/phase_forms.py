@@ -78,8 +78,13 @@ _NOT_PREVIEW = rf"(?![^{selfguard_shell._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 # `--import` はテンプレートの下書きを取り込む形（`ccnavi --templates --import`）。取り込みはユーザが
 # 差分を読んで決めるので、下見だけの形（`--yes` なし）も含めてエージェントには打たせない。
 # 下書きを作る `--draft` は効力が無いので止めない。
+# `--rename-template`・`--move-template`・`--delete-template` も同じ。`--save-draft` も止める
+# （`--body-file` に任意のパスを渡して、読んだ中身を下見の出力に出せるため。下書きの編集は Write
+# でできる）。`--delete-draft` は下書きの置き場の中だけを消すので、
+# `--yes` の付かない下見は止めない。
 _CLI_FORMS = (
     rf"(--yes\b|--(?:agree|approve)\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b|--import\b"
+    r"|--(?:rename|move|delete)-template\b|--save-draft\b"
     r"|\b(ticket|review)\s+"
     r"(start|finish|cancel|record-risk|prepare|requested|confirm|ready)\b)"
 )
@@ -145,6 +150,22 @@ _IMPORT_FORMS = (
     re.compile(r"(?<![\w-])--templates(?![\w-])", re.IGNORECASE),
     re.compile(r"(?<![\w-])--import(?![\w-])", re.IGNORECASE),
     re.compile(r"(?<![\w-])--yes(?![\w-])", re.IGNORECASE),
+)
+# テンプレートの編集（保存・下書きの削除・改名・移動・削除）を `--yes` で書く形。
+# 取り込みと同じく launcher の書き方に依らず止める
+_EDIT_FORMS = (
+    re.compile(r"(?<![\w-])--templates(?![\w-])", re.IGNORECASE),
+    re.compile(
+        r"(?<![\w-])--(?:save-draft|delete-draft|rename-template|move-template|delete-template)(?![\w-])",
+        re.IGNORECASE,
+    ),
+    re.compile(r"(?<![\w-])--yes(?![\w-])", re.IGNORECASE),
+)
+# `--save-draft` は下見でも `--body-file` の中身を出力に出す。
+# launcher の書き方に依らず、`--yes` が無くても止める
+_SAVE_DRAFT_FORMS = (
+    re.compile(r"(?<![\w-])--templates(?![\w-])", re.IGNORECASE),
+    re.compile(r"(?<![\w-])--save-draft(?![\w-])", re.IGNORECASE),
 )
 _DECIDE_FORMS = (
     re.compile(r"(?<![\w-])--choices(?![\w-])", re.IGNORECASE),
@@ -225,7 +246,7 @@ def human_path_form(subject: str) -> tuple[str, str]:
     flag = _GUARD_FLAG.search(text)
     if flag:
         return "guard-off", flag.group(0).strip()
-    for pair in (_BOARD_FORMS, _IMPORT_FORMS, _DECIDE_FORMS):
+    for pair in (_BOARD_FORMS, _IMPORT_FORMS, _EDIT_FORMS, _SAVE_DRAFT_FORMS, _DECIDE_FORMS):
         found = [rx.search(text) for rx in pair]
         if all(found):
             return "board", " … ".join(m.group(0) for m in found if m)
@@ -238,6 +259,9 @@ def board_form_message(found: str) -> str:
     decided = (
         "テンプレートの取り込みは、ユーザが画面か端末で下書きの差分を読んでから決めます。"
         if "--import" in found
+        else "テンプレートの下書きの保存は、ユーザが打ちます"
+        "（`--body-file` の中身が出力に出るため）。下書きは Write で直接編集してください。"
+        if "--save-draft" in found
         else "承認と残った指摘の対応方針は、ユーザがボードか端末で決めます。"
     )
     return (
@@ -306,7 +330,14 @@ _OPEN_PART = re.compile(
 )
 _APPROVAL_FLAGS = ("--agree", "--approve", "--reviewed")
 _YES_FLAGS = ("--yes",)
-_IMPORT_FLAGS = ("--import",)
+_IMPORT_FLAGS = (
+    "--import",
+    "--save-draft",
+    "--delete-draft",
+    "--rename-template",
+    "--move-template",
+    "--delete-template",
+)
 _GUARD_FLAGS = ("--guard-ticket-approval",)
 _FORGET_FLAGS = ("--forget",)
 _CHOICES_FLAGS = ("--choices",)
@@ -350,6 +381,8 @@ EXE_OPTIONS = frozenset(
         "--text", "--ticket-control", "--tickets", "--title", "--to", "--type", "--until",
         "--verify",
         "--version", "--via", "--with-feedback", "--write", "--yes", "-h", "-r",
+        "--save-draft", "--delete-draft", "--rename-template", "--move-template",
+        "--delete-template", "--new-name", "--on", "--to-layer",
     }
 )  # fmt: skip
 # 単引用符の中と、glob を引用した文字。文字どおりの値として読むため、
@@ -885,7 +918,8 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             f"'{settings.script_command(root, 'ccnavi-sync.sh')} --forget' と、ユーザの判断の入口"
             f"（'{settings.script_command(root, 'ccnavi-review.sh')} "
             "close-early'）もユーザが打ちます。"
-            "テンプレートの取り込み（'ccnavi --templates --import'）も、ユーザが打ちます。"
+            "テンプレートの取り込み（'ccnavi --templates --import'）・"
+            "取り込み済みの改名/移動/削除・下書きの保存も、ユーザが打ちます。"
             "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
             "エージェントは打ちません。"
             "承認が済んだかどうかは "

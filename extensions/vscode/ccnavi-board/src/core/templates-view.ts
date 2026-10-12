@@ -118,6 +118,8 @@ export interface DraftEntry {
   readonly flows: readonly FlowSummary[];
   /** 深刻度は下書きの検査のまま。`--lint` は error も warn に下げる */
   readonly problems: readonly TemplateProblem[];
+  /** 下書きの本文そのまま。編集の欄の初期値 */
+  readonly text: string;
   /** 読めて error が無い（取り込める） */
   readonly importable: boolean;
   /** 検査に使ったフェーズ定義の層。templates の layer（ファイルが在る層）とは別 */
@@ -200,6 +202,57 @@ export interface ImportRequest {
   readonly replace: boolean;
 }
 
+// ---- 編集（`--templates --save-draft` などの旗。取り込みと同じく下見と実行の2段）
+
+/** 編集の種類 */
+export type EditOp = "save" | "delete-draft" | "rename" | "move" | "delete";
+/** 主語の場所。下書き・共通の設定・層（project）のどれか */
+export type EditOn = "draft" | "common" | "project";
+
+/** 編集の要求。下見と実行で同じ形を使う。使わない欄は空文字 */
+export interface EditRequest {
+  readonly op: EditOp;
+  readonly name: string;
+  readonly on: EditOn;
+  /** `on` が project のときの層の名前 */
+  readonly layer: string;
+  /** rename の新しい名前 */
+  readonly newName: string;
+  /** move の行き先。それ以外は空 */
+  readonly to: "" | "common" | "project";
+  /** `to` が project のときの行き先の層 */
+  readonly toLayer: string;
+  /** save の本文 */
+  readonly body: string;
+}
+
+/** 編集の下見と実行の答え（`template_edit.plan_json`） */
+export interface EditAnswer {
+  readonly ok: boolean;
+  readonly op: string;
+  readonly name: string;
+  readonly on: string;
+  readonly layer: string;
+  readonly new_name: string;
+  readonly to: string;
+  readonly to_layer: string;
+  /** 主語のファイル（ワークスペースルートからの相対） */
+  readonly source: string;
+  /** 書く先のファイル。消す操作は空 */
+  readonly target: string;
+  /** 主語の今のハッシュ。実行の `--expect` に使う */
+  readonly sha: string;
+  readonly errors: readonly string[];
+  readonly infos: readonly string[];
+  readonly problems: readonly TemplateProblem[];
+  readonly diff: readonly string[];
+  readonly new_text: string;
+  readonly written: boolean;
+  readonly removed: boolean;
+  /** 書いたあとの中身のハッシュ（書いていなければ空） */
+  readonly new_sha: string;
+}
+
 // ---- 画面に見せる形
 
 export interface TemplatesPage {
@@ -215,6 +268,8 @@ export interface TemplatesPage {
   readonly projectLocks: Readonly<Record<string, Lock>>;
   /** 取り込み先に選べる層の名前（`data.layers` の name のうち common 以外） */
   readonly importLayers: readonly string[];
+  /** 編集の旗を実行ファイルが持つか。持たなければ理由 */
+  readonly edit: { readonly enabled: boolean; readonly reason: string };
   readonly notices: readonly string[];
 }
 
@@ -242,6 +297,10 @@ export type ToTemplates =
   | { readonly type: "preview"; readonly request: ImportRequest; readonly answer: ImportAnswer | null; readonly error: string }
   /** 取り込みの実行の答え。`answer` が null なら `error` に理由 */
   | { readonly type: "imported"; readonly request: ImportRequest; readonly answer: ImportAnswer | null; readonly error: string }
+  /** 編集の下見の答え。`answer` が null なら `error` に理由 */
+  | { readonly type: "editPreview"; readonly request: EditRequest; readonly answer: EditAnswer | null; readonly error: string }
+  /** 編集の実行の答え。`answer` が null なら `error` に理由 */
+  | { readonly type: "edited"; readonly request: EditRequest; readonly answer: EditAnswer | null; readonly error: string }
   | AppearanceMessage;
 
 /** 画面 → 拡張ホスト。受け側が形を確かめてから使う */
@@ -261,7 +320,11 @@ export type TemplatesMessage =
   /** 取り込みの下見を頼む（何も書かない） */
   | { readonly type: "previewImport"; readonly request: ImportRequest }
   /** 取り込みを実行する。`expect` は見せた下書きの sha */
-  | { readonly type: "importYes"; readonly request: ImportRequest; readonly expect: string };
+  | { readonly type: "importYes"; readonly request: ImportRequest; readonly expect: string }
+  /** 編集の下見を頼む（何も書かない） */
+  | { readonly type: "previewEdit"; readonly request: EditRequest }
+  /** 編集を実行する。`expect` は見せた主語のハッシュ */
+  | { readonly type: "editYes"; readonly request: EditRequest; readonly expect: string };
 
 /** 最初の中身を埋める `<script type="application/json">` の id */
 export const DATA_ID = "ccnavi-templates-data";

@@ -277,7 +277,7 @@ test("CB-D343 実行ファイルの文字列は文字としてそのまま出す
   }
 });
 
-test("CB-D344 案内の間は「取り込む…」を押しても欄を開かず、開いている欄の「下見」も送らない", async () => {
+test("CB-D344 案内の間は「取り込む…」を押しても欄を開かず、開いていた実際の欄は見本に替わって下見も出ない", async () => {
   const dom = await openTemplates();
   try {
     await openImport(dom, "research");
@@ -285,8 +285,9 @@ test("CB-D344 案内の間は「取り込む…」を押しても欄を開かず
     await dom.settle();
     dom.click(dom.one('[data-action="tour-course"][data-course="import"]'));
     await dom.settle();
-    dom.click(dom.one('[data-action="preview-import"]'));
-    await dom.settle();
+    // 案内の間は実際の取り込みの欄を描かず（見本を描く）、「下見」も出ない
+    assert.equal(dom.all('[data-role="import-form"]').length, 0);
+    assert.equal(dom.all('[data-action="preview-import"]').length, 0);
     await openImport(dom, "login");
     assert.equal(dom.all('[data-role="import-form"][data-draft="login"]').length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type !== "ready"), []);

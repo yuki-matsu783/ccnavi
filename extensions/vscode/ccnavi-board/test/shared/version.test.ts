@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 
 import {
   EXTENSION_COMPAT,
+  missingFeatures,
   missingFlags,
   parseVersionJson,
   skewMessage,
@@ -24,6 +25,7 @@ function info(overrides: Partial<VersionInfo> = {}): VersionInfo {
     built: true,
     compat: EXTENSION_COMPAT,
     flags: ["--flow", "--json", "--lint", "--version"],
+    features: [],
     ...overrides,
   };
 }
@@ -36,7 +38,7 @@ test("CB-T268 版の JSON を読む。形の版が違う・compat か flags が�
   const body = { schema: VERSION_SCHEMA, version: "0.1.0", commit: "unknown", built: false, compat: 1, flags: ["--lint", 3], formats: {}, outputs: {} };
   const parsed = parseVersionJson(JSON.stringify(body));
   assert.ok(parsed.ok);
-  assert.deepEqual(parsed.value, { schema: VERSION_SCHEMA, version: "0.1.0", commit: "unknown", built: false, compat: 1, flags: ["--lint"] });
+  assert.deepEqual(parsed.value, { schema: VERSION_SCHEMA, version: "0.1.0", commit: "unknown", built: false, compat: 1, flags: ["--lint"], features: [] });
   assert.equal(parseVersionJson(JSON.stringify({ ...body, schema: VERSION_SCHEMA + 1 })).ok, false);
   assert.equal(parseVersionJson(JSON.stringify({ ...body, compat: "1" })).ok, false);
   assert.equal(parseVersionJson(JSON.stringify({ ...body, flags: undefined })).ok, false);
@@ -83,4 +85,35 @@ test("CB-T270 使うフラグを実行ファイルが知っているかを版の
 
   const failed = missingFlags({ kind: "failed", error: "打ち切った" }, ["--flow"], what, false) ?? "";
   assert.match(failed, /打ち切った/);
+});
+
+test("CB-T567 版の JSON の features を読む。持たない古い JSON は features が空", () => {
+  const body = { schema: VERSION_SCHEMA, version: "0.1.0", commit: "unknown", built: false, compat: 1, flags: ["--lint"] };
+  const withFeatures = parseVersionJson(JSON.stringify({ ...body, features: ["templates.edit", 3] }));
+  assert.ok(withFeatures.ok);
+  assert.deepEqual(withFeatures.value.features, ["templates.edit"]);
+  const without = parseVersionJson(JSON.stringify(body));
+  assert.ok(without.ok);
+  assert.deepEqual(without.value.features, []);
+});
+
+test("CB-T568 使う機能を実行ファイルが持つかを features で見る。足りなければ名指しし、確かめられなければ進めない", () => {
+  const what = "テンプレートの編集";
+  assert.equal(missingFeatures(ok({ features: ["templates.edit", "templates.draft-text"] }), ["templates.edit"], what, false), undefined);
+
+  const missing = missingFeatures(ok({ features: ["templates.edit"] }), ["templates.edit", "templates.draft-text"], what, false) ?? "";
+  assert.match(missing, /templates\.draft-text の機能を持ちません/);
+  assert.doesNotMatch(missing, /templates\.edit /);
+  assert.match(missing, /テンプレートの編集 で確かめられない/);
+
+  const old = missingFeatures({ kind: "old" }, ["templates.edit"], what, true) ?? "";
+  assert.match(old, /--version に対応していません/);
+  assert.match(old, /組み立て直して/);
+
+  const failed = missingFeatures({ kind: "failed", error: "打ち切った" }, ["templates.edit"], what, false) ?? "";
+  assert.match(failed, /打ち切った/);
+});
+
+test("CB-T569 features の無い実行ファイルは、機能を求めると足りないと言う", () => {
+  assert.match(missingFeatures(ok(), ["templates.edit"], "テンプレートの編集", false) ?? "", /templates\.edit の機能を持ちません/);
 });

@@ -57,40 +57,47 @@ class SkillSyncTest(ConfigUnionHarness):
 
     def test_start_copies_only_process_skills(self):
         """1: 工程スキルの SKILL.md と references を写し、process: true の無いスキルは写さない"""
-        write(self.source("testing", "SKILL.md"), process_skill("testing"))
-        write(self.source("testing", "references", "common", "unit", "basics.md"), "# 基本\n")
-        write(self.source("testing", "references", "common", "ccnavi-index.jsonl"), "{}\n")
+        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
+        write(self.source("process-test", "references", "common", "unit", "basics.md"), "# 基本\n")
+        write(self.source("process-test", "references", "common", "ccnavi-index.jsonl"), "{}\n")
         write(self.source("commit", "SKILL.md"), plain_skill("commit"))
 
         tree, started = self.start_parent()
 
         self.assertEqual(
-            read(os.path.join(tree, "skills", "testing", "SKILL.md")), process_skill("testing")
+            read(os.path.join(tree, "skills", "process-test", "SKILL.md")),
+            process_skill("process-test"),
         )
         self.assertEqual(
             read(
-                os.path.join(tree, "skills", "testing", "references", "common", "unit", "basics.md")
+                os.path.join(
+                    tree, "skills", "process-test", "references", "common", "unit", "basics.md"
+                )
             ),
             "# 基本\n",
         )
         self.assertFalse(
             os.path.exists(
                 os.path.join(
-                    tree, "skills", "testing", "references", "common", "ccnavi-index.jsonl"
+                    tree, "skills", "process-test", "references", "common", "ccnavi-index.jsonl"
                 )
             )
         )
         self.assertFalse(os.path.exists(os.path.join(tree, "skills", "commit")))
-        self.assertIn("skills/testing/SKILL.md", started.stdout)
+        self.assertIn("skills/process-test/SKILL.md", started.stdout)
         # 元リポジトリには触れない（親のブランチに乗って届く）。
         self.assertFalse(os.path.exists(os.path.join(self.lib, "skills")))
 
     def test_start_overwrites_common_and_leaves_project_files(self):
         """2: common/ の同じパスは共通の中身で上書きし、project/ のファイルは残す"""
-        write(self.source("testing", "SKILL.md"), process_skill("testing"))
-        write(self.source("testing", "references", "common", "shared.md"), "共通の新しい中身\n")
-        own = os.path.join(self.lib, "skills", "testing", "references", "project", "own.md")
-        stale = os.path.join(self.lib, "skills", "testing", "references", "common", "shared.md")
+        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
+        write(
+            self.source("process-test", "references", "common", "shared.md"), "共通の新しい中身\n"
+        )
+        own = os.path.join(self.lib, "skills", "process-test", "references", "project", "own.md")
+        stale = os.path.join(
+            self.lib, "skills", "process-test", "references", "common", "shared.md"
+        )
         write(own, "プロジェクト固有\n")
         write(stale, "古い中身\n")
         git(self.lib, "add", "-A")
@@ -98,17 +105,19 @@ class SkillSyncTest(ConfigUnionHarness):
 
         tree, _ = self.start_parent()
 
-        base = os.path.join(tree, "skills", "testing", "references")
+        base = os.path.join(tree, "skills", "process-test", "references")
         self.assertEqual(read(os.path.join(base, "common", "shared.md")), "共通の新しい中身\n")
         self.assertEqual(read(os.path.join(base, "project", "own.md")), "プロジェクト固有\n")
 
     def test_same_content_is_not_reported(self):
         """3: 中身が同じなら知らせない"""
-        write(self.source("testing", "SKILL.md"), process_skill("testing"))
+        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         _, first = self.start_parent("i0001")
         self.assertIn("工程スキル", first.stdout)
         tree = self.worktree(self.lib, "i0002")
-        write(os.path.join(tree, "skills", "testing", "SKILL.md"), process_skill("testing"))
+        write(
+            os.path.join(tree, "skills", "process-test", "SKILL.md"), process_skill("process-test")
+        )
         self.propose(
             "i0002", ticket_text("i0002", project="lib", plan=["build"], allow=SCOPE), project="lib"
         )
@@ -121,27 +130,27 @@ class SkillSyncTest(ConfigUnionHarness):
         """2: 工程スキルのディレクトリ自体がシンボリックリンクなら、工程スキルに数えない"""
         from ccnavi.tickets import skillsync
 
-        write(self.source("testing", "SKILL.md"), process_skill("testing"))
-        os.symlink(self.source("testing"), self.source("evil"))
-        self.assertEqual(skillsync.processes(self.ws), ["testing"])
+        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
+        os.symlink(self.source("process-test"), self.source("evil"))
+        self.assertEqual(skillsync.processes(self.ws), ["process-test"])
 
     def test_symlink_under_a_process_stops_the_copy(self):
         """2: 工程スキルの下にシンボリックリンクがあれば、何も写さず理由を返す"""
         from ccnavi.tickets import skillsync
 
-        write(self.source("testing", "SKILL.md"), process_skill("testing"))
+        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         outside = os.path.join(self.ws, "outside.md")
         write(outside, "外\n")
-        os.makedirs(self.source("testing", "references", "common"), exist_ok=True)
-        os.symlink(outside, self.source("testing", "references", "common", "leak.md"))
+        os.makedirs(self.source("process-test", "references", "common"), exist_ok=True)
+        os.symlink(outside, self.source("process-test", "references", "common", "leak.md"))
         sources, why = skillsync.sources(self.ws)
         self.assertEqual(sources, {})
         self.assertIn("シンボリックリンク", why)
 
     def test_the_start_c1_carries_the_copied_skills(self):
         """1: 書いたパスの一覧(基点は親のワークツリー)で、写した工程スキルは外でも通す"""
-        write(self.source("testing", "SKILL.md"), process_skill("testing"))
-        write(self.source("testing", "references", "common", "unit", "basics.md"), "# 基本\n")
+        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
+        write(self.source("process-test", "references", "common", "unit", "basics.md"), "# 基本\n")
         tree = self.worktree(os.path.join(self.projects, "lib"), "i0001")
         write(
             os.path.join(tree, "wip", "proposals", "todo", "i0001.md"),
@@ -161,8 +170,8 @@ class SkillSyncTest(ConfigUnionHarness):
         )
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         listed = read(target).splitlines()
-        self.assertIn("skills/testing/SKILL.md", listed)
-        self.assertIn("skills/testing/references/common/unit/basics.md", listed)
+        self.assertIn("skills/process-test/SKILL.md", listed)
+        self.assertIn("skills/process-test/references/common/unit/basics.md", listed)
         self.assertNotIn("置き場の外", started.stderr)
 
     def test_only_an_exact_copy_in_an_approved_parent_reads_as_synced(self):
@@ -170,17 +179,17 @@ class SkillSyncTest(ConfigUnionHarness):
         from ccnavi.infra import settings
         from ccnavi.tickets import skillsync
 
-        write(self.source("testing", "SKILL.md"), process_skill("testing"))
+        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         write(self.source("commit", "SKILL.md"), plain_skill("commit"))
         tree, _ = self.start_parent()
         conf, _ = settings.load(self.ws)
-        copied = os.path.join(tree, "skills", "testing", "SKILL.md")
+        copied = os.path.join(tree, "skills", "process-test", "SKILL.md")
         self.assertTrue(skillsync.is_synced_write(conf, self.ws, copied))
         # 手で書き換えた中身は外す。
         write(copied, "書き換えた\n")
         self.assertFalse(skillsync.is_synced_write(conf, self.ws, copied))
         self.assertTrue(
-            skillsync.is_synced_write(conf, self.ws, copied, process_skill("testing").encode())
+            skillsync.is_synced_write(conf, self.ws, copied, process_skill("process-test").encode())
         )
         # 消す変更は写しではない。
         self.assertFalse(skillsync.is_synced_write(conf, self.ws, copied, None))
@@ -188,24 +197,24 @@ class SkillSyncTest(ConfigUnionHarness):
         other = os.path.join(tree, "skills", "commit", "SKILL.md")
         write(other, plain_skill("commit"))
         self.assertFalse(skillsync.is_synced_write(conf, self.ws, other))
-        loose = os.path.join(tree, "skills", "testing", "notes.txt")
-        write(loose, process_skill("testing"))
+        loose = os.path.join(tree, "skills", "process-test", "notes.txt")
+        write(loose, process_skill("process-test"))
         self.assertFalse(skillsync.is_synced_write(conf, self.ws, loose))
         # 元リポジトリのファイルは外す。
-        main_copy = os.path.join(self.lib, "skills", "testing", "SKILL.md")
-        write(main_copy, process_skill("testing"))
+        main_copy = os.path.join(self.lib, "skills", "process-test", "SKILL.md")
+        write(main_copy, process_skill("process-test"))
         self.assertFalse(skillsync.is_synced_write(conf, self.ws, main_copy))
 
     def test_only_the_common_references_are_copied(self):
         """1: references/ の common 以外(プロジェクト固有)は、ワークスペースにあっても写さない"""
-        write(self.source("testing", "SKILL.md"), process_skill("testing"))
-        write(self.source("testing", "references", "common", "shared.md"), "共通\n")
-        write(self.source("testing", "references", "project", "workspace-only.md"), "固有\n")
-        write(self.source("testing", "references", "loose.md"), "直下\n")
+        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
+        write(self.source("process-test", "references", "common", "shared.md"), "共通\n")
+        write(self.source("process-test", "references", "project", "workspace-only.md"), "固有\n")
+        write(self.source("process-test", "references", "loose.md"), "直下\n")
 
         tree, _ = self.start_parent()
 
-        base = os.path.join(tree, "skills", "testing", "references")
+        base = os.path.join(tree, "skills", "process-test", "references")
         self.assertEqual(read(os.path.join(base, "common", "shared.md")), "共通\n")
         self.assertFalse(os.path.exists(os.path.join(base, "project")))
         self.assertFalse(os.path.exists(os.path.join(base, "loose.md")))
@@ -215,12 +224,12 @@ class SkillSyncTest(ConfigUnionHarness):
         from ccnavi.infra import settings
         from ccnavi.tickets import skillsync
 
-        write(self.source("testing", "SKILL.md"), process_skill("testing"))
-        write(self.source("testing", "references", "common", "shared.md"), "共通\n")
-        write(self.source("testing", "references", "project", "same.md"), "共通\n")
+        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
+        write(self.source("process-test", "references", "common", "shared.md"), "共通\n")
+        write(self.source("process-test", "references", "project", "same.md"), "共通\n")
         tree, _ = self.start_parent()
         conf, _ = settings.load(self.ws)
-        base = os.path.join(tree, "skills", "testing", "references")
+        base = os.path.join(tree, "skills", "process-test", "references")
         self.assertTrue(
             skillsync.is_synced_write(conf, self.ws, os.path.join(base, "common", "shared.md"))
         )
@@ -233,20 +242,20 @@ class SkillSyncTest(ConfigUnionHarness):
         """2: common/ そのものがシンボリックリンクなら、何も写さず理由を返す"""
         from ccnavi.tickets import skillsync
 
-        write(self.source("testing", "SKILL.md"), process_skill("testing"))
+        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
         outside = os.path.join(self.ws, "outside")
         write(os.path.join(outside, "leak.md"), "外\n")
-        os.makedirs(self.source("testing", "references"), exist_ok=True)
-        os.symlink(outside, self.source("testing", "references", "common"))
+        os.makedirs(self.source("process-test", "references"), exist_ok=True)
+        os.symlink(outside, self.source("process-test", "references", "common"))
         sources, why = skillsync.sources(self.ws)
         self.assertEqual(sources, {})
         self.assertIn("シンボリックリンク", why)
 
     def test_start_deletes_common_files_gone_from_the_source(self):
         """2: 共通側から無くなった common/ の .md は消し、空になったディレクトリも片付ける"""
-        write(self.source("testing", "SKILL.md"), process_skill("testing"))
-        write(self.source("testing", "references", "common", "kept.md"), "残る\n")
-        base = os.path.join(self.lib, "skills", "testing", "references")
+        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
+        write(self.source("process-test", "references", "common", "kept.md"), "残る\n")
+        base = os.path.join(self.lib, "skills", "process-test", "references")
         write(os.path.join(base, "common", "kept.md"), "古い\n")
         write(os.path.join(base, "common", "old", "gone.md"), "消える\n")
         write(os.path.join(base, "common", "note.txt"), "md でないものは触れない\n")
@@ -256,7 +265,7 @@ class SkillSyncTest(ConfigUnionHarness):
 
         tree, started = self.start_parent()
 
-        out = os.path.join(tree, "skills", "testing", "references")
+        out = os.path.join(tree, "skills", "process-test", "references")
         self.assertEqual(read(os.path.join(out, "common", "kept.md")), "残る\n")
         self.assertFalse(os.path.exists(os.path.join(out, "common", "old")))
         self.assertTrue(os.path.exists(os.path.join(out, "common", "note.txt")))
@@ -265,8 +274,8 @@ class SkillSyncTest(ConfigUnionHarness):
 
     def test_the_start_c1_carries_the_deletions(self):
         """1: 消した分も、書いたパスの一覧で置き場の外でも通す"""
-        write(self.source("testing", "SKILL.md"), process_skill("testing"))
-        gone = os.path.join(self.lib, "skills", "testing", "references", "common", "gone.md")
+        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
+        gone = os.path.join(self.lib, "skills", "process-test", "references", "common", "gone.md")
         write(gone, "消える\n")
         git(self.lib, "add", "-A")
         git(self.lib, "commit", "-m", "seed")
@@ -287,7 +296,7 @@ class SkillSyncTest(ConfigUnionHarness):
             "--record-writes", target, "--record-tree", tree, "ticket", "start", "i0001"
         )
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        self.assertIn("skills/testing/references/common/gone.md", read(target).splitlines())
+        self.assertIn("skills/process-test/references/common/gone.md", read(target).splitlines())
         self.assertNotIn("置き場の外", started.stderr)
 
     def test_deletions_read_as_synced_only_for_files_gone_from_the_source(self):
@@ -295,11 +304,11 @@ class SkillSyncTest(ConfigUnionHarness):
         from ccnavi.infra import settings
         from ccnavi.tickets import skillsync
 
-        write(self.source("testing", "SKILL.md"), process_skill("testing"))
-        write(self.source("testing", "references", "common", "shared.md"), "共通\n")
+        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
+        write(self.source("process-test", "references", "common", "shared.md"), "共通\n")
         tree, _ = self.start_parent()
         conf, _ = settings.load(self.ws)
-        base = os.path.join(tree, "skills", "testing")
+        base = os.path.join(tree, "skills", "process-test")
         in_source = os.path.join(base, "references", "common", "shared.md")
         gone = os.path.join(base, "references", "common", "gone.md")
         project_side = os.path.join(base, "references", "project", "own.md")

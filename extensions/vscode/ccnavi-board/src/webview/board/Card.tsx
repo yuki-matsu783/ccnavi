@@ -100,13 +100,14 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
           ))}
         </ul>
       ) : null}
-      {card.actions.length > 0 || card.flow !== null || card.workflow ? (
+      {card.actions.length > 0 || card.flow !== null || card.workflow || card.templateDraft ? (
         <div className="card-actions">
           {card.actions.map((action, i) => (
             <ActionButton key={i} action={action} id={card.id} />
           ))}
           {card.flow !== null ? <FlowButton flow={card.flow} id={card.id} closed={card.column === "done" || card.column === "cancelled"} /> : null}
           {card.workflow ? <WorkflowButton id={card.id} /> : null}
+          {card.templateDraft ? <TemplateDraftButton id={card.id} /> : null}
         </div>
       ) : null}
     </li>
@@ -366,6 +367,22 @@ function WorkflowButton({ id }: { readonly id: string }): JSX.Element {
       onClick={() => post({ type: "workflow", ticket: id })}
     >
       計画編集
+    </button>
+  );
+}
+
+/** 完了した親から、テンプレートの下書きを作るボタン。出すかは組み立て（`card.templateDraft`）が決め、押したら拡張ホストへ返すだけ */
+function TemplateDraftButton({ id }: { readonly id: string }): JSX.Element {
+  return (
+    <button
+      type="button"
+      className="action"
+      data-action="template-draft"
+      data-ticket={id}
+      title="この親の計画とフローから、テンプレートの下書きを作ります。下書きに効力は無く、テンプレート管理画面で取り込むまで使われません。親を ready で閉じる前に作ってください"
+      onClick={() => post({ type: "templateDraft", ticket: id })}
+    >
+      テンプレートの下書きを作る
     </button>
   );
 }

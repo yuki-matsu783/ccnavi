@@ -30,7 +30,7 @@ export interface PreviewProps {
 }
 
 /** 差分の 1 行の色の区別。先頭の記号は消さず、色だけに頼らないようにする */
-function diffClass(line: string): string {
+export function diffClass(line: string): string {
   if (line.startsWith("@@")) {
     return "diff-hunk";
   }
@@ -56,7 +56,7 @@ export function Preview({ answer, error, lock, busy, onImport, onClose }: Previe
   }
   const draft = answer.draft;
   return (
-    <section className="import-preview" data-role="import-preview">
+    <section className="import-preview" data-role="import-preview" data-tour="import-preview">
       <p>
         取り込み先: <span className="mono">{answer.target}</span>（{answer.exists ? "置き換える" : "新しく置く"}）
       </p>

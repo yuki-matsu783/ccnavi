@@ -1,13 +1,8 @@
 /*
- * テンプレート管理画面の骨組み（`App.tsx`）。節、要約、表示の切り替え、帯の中の欄、札（tag）と脚注の状態。
+ * テンプレート管理画面の骨組み（`App.tsx`）。節、要約、帯の中の欄、札（tag）と脚注の状態。
  * 1 件のテンプレートは `Template.css`、下書きは `Draft.css`、計画の表は `Plan.css`、苦情は `Problems.css`。
  */
 section { margin-bottom: 18px; }
-.summary { font-weight: 600; }
-.view-switch { display: inline-flex; gap: 4px; flex-wrap: wrap; }
-.action.on { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
-div.tpl-layer { margin-bottom: 14px; }
-div.tpl-layer > h3 { font-size: 1em; margin: 0 0 6px; }
 /* 札。色は意味の色を文字にだけ使い、枠は同じ色の currentColor で付ける（色だけに頼らず、必ず文字も付ける） */
 .tag { display: inline-block; font-size: .85em; padding: 0 7px; border-radius: 999px; border: 1px solid var(--vscode-panel-border); font-family: var(--vscode-editor-font-family); white-space: nowrap; }
 .tag.ok { color: var(--ok-text); border-color: currentColor; }
@@ -16,6 +11,3 @@ div.tpl-layer > h3 { font-size: 1em; margin: 0 0 6px; }
 .status { margin: 8px 0 0; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--vscode-panel-border); overflow-wrap: anywhere; }
 .status.failed { border-color: var(--vscode-editorError-foreground); color: var(--error-text); }
 .foot .status { display: inline-block; margin: 0 0 4px; }
-@media (max-width: 520px) {
-  .summary { gap: 2px 10px; }
-}

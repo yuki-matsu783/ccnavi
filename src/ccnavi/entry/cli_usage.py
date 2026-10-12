@@ -111,6 +111,22 @@ draft's hash as --expect it writes, then removes the draft if it is unchanged.
     ccnavi --templates --import DRAFT --to common|project [--layer NAME]
                        [--replace] [--yes --expect HASH] [--json]
 
+The draft and the collected template can also be edited. Without --yes they
+write nothing and show the change; with --yes and the subject's hash as
+--expect they write. Only the user types --yes. --save-draft, --rename-template,
+--move-template and --delete-template are user-only (the agent cannot type
+them, not even the preview; it edits drafts with Write). --delete-draft
+previews can be typed by the agent.
+
+    ccnavi --templates --save-draft NAME --body-file FILE [--yes --expect HASH] [--json]
+    ccnavi --templates --delete-draft NAME [--yes --expect HASH] [--json]
+    ccnavi --templates --rename-template NAME --new-name NEW --on draft|common|project
+                       [--layer NAME] [--yes --expect HASH] [--json]
+    ccnavi --templates --move-template NAME --on common|project [--layer NAME]
+                       --to common|project [--to-layer NAME] [--yes --expect HASH] [--json]
+    ccnavi --templates --delete-template NAME --on common|project [--layer NAME]
+                       [--yes --expect HASH] [--json]
+
 A collected template is used when a parent proposal is started. An agent may
 type it (the flow drafts have no effect either):
 

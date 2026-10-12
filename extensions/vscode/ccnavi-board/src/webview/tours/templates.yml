@@ -1,47 +1,182 @@
-# テンプレート管理画面の案内。見本は使わず、いまの画面をそのまま指す。
-# 案内の間も、更新・対象の切り替えなどの操作は実際には送らない。
+# テンプレート管理画面の案内。`sample:` は案内の間だけ画面に出す見本（実際のテンプレートではない）。
+#   path       見本の層の置き場（画面には「（見本）」を付けて出す）
+#   templates  見本の層（self）のテンプレート。name・description・when・plan・feedback・flows・problems・dropped（捨てた理由。あれば「使われない」）・text（本文）
+#   drafts     見本の下書き。name・description・importable・problems・plan・feedback・flows
+#   preview    取り込みの下見の見本。target（書く先）と new_text（取り込む本文）
+#   sums       「足し算」の見本。実行ファイルが出す索引の形（共通の設定 + 1 つの設定の和）
+# `scene:` は段ごとの画面の様子。段ごとに全部を書く（前の段を引き継がない）。
+#   open     開くテンプレートの名前（, で区切って複数）
+#   body     true なら、開いたテンプレートに見本の本文を出す
+#   draft    開く下書きの名前（, で区切って複数）
+#   import   取り込みの欄を開く下書きの名前
+#   preview  true なら、取り込みの欄の下に下見の見本を出す（import も要る）
+#   sum      「足し算」の枠を開き、選ぶ足し算の名前（sample.sums の name）
 # `target:` の印（画面の data-tour）:
-#   summary   ヘッダの件数（テンプレート・下書き・error / warn / info）
-#   target    対象の切り替え（共通の設定・ワークスペース・プロジェクト）
-#   view      「足し算」と「層ごと」の切り替え
-#   refresh   「更新」
-#   list      テンプレートの一覧
-#   template  一覧の最初の 1 件（開くと計画・フロー・本文が出る）
-#   drafts    下書きの一覧
-#   draft     下書きの最初の 1 件
-#   draft-import  取り込める最初の 1 件の「取り込む…」（取り込める下書きが無ければ無い）
-#   tour      「?」
+#   summary         件数の行（テンプレート・下書き・error / warn / info）
+#   target          対象の切り替えとパス
+#   refresh         「更新」
+#   list            テンプレートの一覧
+#   template        一覧の最初の 1 件（開くと計画・フロー・本文が出る）
+#   drafts          下書きの一覧
+#   draft           下書きの最初の 1 件
+#   draft-import    取り込める最初の 1 件の「取り込む…」
+#   import-form     取り込みの欄
+#   import-preview  取り込みの下見
+#   sum / sum-pick / sum-count / sum-table   足し算の枠 / 選ぶ欄 / 件数 / 表
+#   tour            「?」
 screen: templates
+
+sample:
+  path: .ccnavi/config/project/templates/
+  templates:
+    - name: feature
+      description: 機能を足す親の計画
+      when: 新しい機能を足すとき
+      plan:
+        - type: design
+          review: required
+          after: []
+        - type: implement
+          review: none
+          after: [0]
+      feedback:
+        - type: fix
+          review: none
+          after: []
+      flows:
+        - name: implement
+          nodes: 4
+          connections: 3
+      text: |
+        name: feature
+        description: 機能を足す親の計画
+        when: 新しい機能を足すとき
+    - name: research
+      description: 調べものの親の計画
+      when: 先に調べてから決めるとき
+      plan:
+        - type: investigate
+          review: none
+          after: []
+      dropped:
+        reason: conflict
+        detail: "`research` は共通と同じ名前で中身が違う。共通の定義を使う"
+      text: |
+        name: research
+  drafts:
+    - name: login
+      description: ログイン画面を足す親の計画
+      importable: true
+      problems:
+        - severity: warn
+          detail: 本文に TODO が残っている
+      plan:
+        - type: design
+          review: required
+          after: []
+      flows:
+        - name: implement
+          nodes: 3
+          connections: 2
+    - name: broken
+      description: 検査で error になる下書き
+      importable: false
+      problems:
+        - severity: error
+          detail: YAML として読めない
+  preview:
+    target: .ccnavi/config/common/templates/login.yml
+    new_text: |
+      name: login
+      description: ログイン画面を足す親の計画
+  sums:
+    - name: self
+      layers: [common, self]
+      templates:
+        - name: feature
+          layer: common
+        - name: research
+          layer: common
+        - name: feature
+          layer: self
+        - name: research
+          layer: self
+          dropped:
+            reason: conflict
+            detail: "`research` は共通と同じ名前で中身が違う。共通の定義を使う"
+    - name: lib
+      layers: [common, lib]
+      templates:
+        - name: feature
+          layer: common
+        - name: lib
+          layer: lib
 
 courses:
   - id: intro
     title: 基本の案内
-    summary: 画面の見方。テンプレートの一覧と下書き
+    summary: 画面の見方。テンプレートの一覧、足し算、下書き
     steps:
       - target: summary
         title: 件数と検査の結果
         body: テンプレートと下書きの数、そして検査の error・warn・info の数が出ます。error があるテンプレートは使えません。
+        scene: {}
       - target: target
         title: 対象を切り替える
-        body: 共通の設定・ワークスペース・プロジェクトを切り替えて、どの設定のテンプレートを見るかを選びます。
-      - target: view
-        title: 足し算と層ごと
-        body: 足し算は、共通と選んだ層を合わせて実際に使われる結果です。層ごとは、それぞれの層の生の中身を並べます。
+        body: 共通の設定・ワークスペース・プロジェクトを切り替えて、どの設定のテンプレートを見るかを選びます。パスは、いま見ている層の置き場です。
+        scene: {}
       - target: list
         title: テンプレートの一覧
-        body: 各テンプレートに、使える・使われない・捨てた理由の札が出ます。捨てた理由は、同じ中身があるか、読めないかなどです。
+        body: 選んだ層のテンプレートが並びます。各テンプレートに、使える・使われない・捨てた理由の札が出ます。捨てた理由は、同じ中身があるか、読めないかなどです。
+        scene: {}
       - target: template
         title: 1 件を開く
         body: 見出しを押すと、計画の項・フロー・検査の指摘が見えます。本文を見るボタンで本文も読めます。本文では、見えない文字を \uXXXX の形で出します。
+        scene:
+          open: feature
+          body: true
+      - target: sum
+        title: 足し算
+        body: 実際に使われるのは、共通の設定と選んだ層の和です。枠を開くと、どの名前がどの層から使われ、どれが捨てられたかの一覧が出ます。読み取り専用で、中身は上の一覧で読みます。
+        scene:
+          sum: self
       - target: drafts
         title: 下書き
         body: エージェントが書いた下書きです。効力は無く、取り込むまでテンプレートとしては使われません。
+        scene: {}
       - target: refresh
         title: 更新
         body: 一覧を読み直します。ファイルを外で書き換えたあとに押します。
+        scene: {}
       - target: tour
         title: 案内
         body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
+        scene: {}
+
+  - id: read-sum
+    title: 足し算を読むとき
+    summary: どの名前が使われ、どれが捨てられたかを見る
+    steps:
+      - target: sum
+        title: 足し算の枠
+        body: 枠を開くと、共通の設定と選んだ設定を足した結果が出ます。
+        scene:
+          sum: self
+      - target: sum-pick
+        title: 足し算を選ぶ
+        body: ワークスペースの足し算と、プロジェクトごとの足し算を切り替えます。
+        scene:
+          sum: lib
+      - target: sum-count
+        title: 使われる件数
+        body: 足し算に入る層と、実際に使われる件数が出ます。
+        scene:
+          sum: self
+      - target: sum-table
+        title: 由来と捨てた理由
+        body: 名前ごとに、どの層のものか、使われるか、捨てられたときの理由が出ます。同じ名前で中身が違うと、共通の側が使われます。
+        scene:
+          sum: self
 
   - id: read-drafts
     title: 下書きを読むとき
@@ -50,12 +185,17 @@ courses:
       - target: drafts
         title: 下書きとは
         body: 親チケットの中で書かれた、まだ効力の無いテンプレートです。ここで中身を読んでから取り込みます。
+        scene:
+          draft: login
       - target: draft
         title: 取り込めるか
         body: 取り込めるは、読めて error が無いことです。同名ありは、取り込むと同じ名前のテンプレートを置き換えます。TODO が残っているものは、直してから取り込みます。
+        scene:
+          draft: login
       - target: refresh
         title: 読み直す
         body: 下書きを直したあとは、更新を押して読み直します。
+        scene: {}
 
   - id: import
     title: 下書きを取り込むとき
@@ -64,9 +204,27 @@ courses:
       - target: draft
         title: 下書きを選ぶ
         body: 取り込む下書きの見出しを押すと、中身と問題が見えます。
+        scene:
+          draft: login
       - target: draft-import
         title: 取り込む
-        body: 取り込める下書きがあるときは、「取り込む…」で取り込みの欄が開きます。取り込み先と置き換えを選んで「下見」を押し、差分を読んでから「この内容で取り込む」を押すと書かれます（見せた下書きが途中で書き換わっていたら書かれません）。
+        body: 取り込める下書きがあるときは、「取り込む…」で取り込みの欄が開きます。
+        scene:
+          draft: login
+      - target: import-form
+        title: 取り込み先と置き換え
+        body: 取り込み先と置き換えを選んで「下見」を押します。下見は何も書きません。
+        scene:
+          draft: login
+          import: login
+      - target: import-preview
+        title: 下見を読んで取り込む
+        body: 差分か取り込む本文と指摘を読み、「この内容で取り込む」を押すと書かれます（見せた下書きが途中で書き換わっていたら書かれません）。
+        scene:
+          draft: login
+          import: login
+          preview: true
       - target: refresh
         title: 読み直す
         body: 下書きを直したあとや、外で書き換えたあとは、更新を押して読み直します。
+        scene: {}

@@ -8,8 +8,8 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { loadBoard, runApprovePreview, runApproveYes, runChildWorktreeAdd, runDecidePreview, runDecideYes } from "./ccnavi.js";
-import { buildBoard, flowCardOf, isKnownPath, parentTreeOf, phaseChipOf, todoParentsOf, workflowCardOf, type Board } from "./core/board.js";
+import { loadBoard, runApprovePreview, runApproveYes, runChildWorktreeAdd, runDecidePreview, runDecideYes, runTemplateDraft } from "./ccnavi.js";
+import { buildBoard, flowCardOf, isKnownPath, parentTreeOf, phaseChipOf, templateDraftCardOf, todoParentsOf, workflowCardOf, type Board } from "./core/board.js";
 import { flowTicketOf } from "./core/flow-view.js";
 import { screens } from "./core/screens.js";
 import { movedStep, NOTHING_MOVED, type MovedState } from "./core/board-moved.js";
@@ -455,6 +455,12 @@ function handleMessage(message: BoardMessage | undefined): void {
       // 閉じてよいか・一覧の図にある親かは遷移が決める。開くのは遷移が返す openWorkflow
       dispatch(current, { kind: "editWorkflow", ticket: message.ticket });
       return;
+    case "templateDraft":
+      // 画面が言った識別子をそのまま信頼せず、いまのボードで入口を出しているカード（完了した計画付きの親）だけを扱う
+      if (current.board !== undefined && templateDraftCardOf(current.board, message.ticket) !== undefined) {
+        void makeTemplateDraft(current, message.ticket);
+      }
+      return;
     default: {
       // `BoardMessage` に操作を足したのに、ここに処理を書いていなければ型が合わなくなる。
       // 画面のボタンだけ足して受け側を書き忘れるのを防ぐ
@@ -657,6 +663,26 @@ async function showTicketPreview(filePath: string): Promise<void> {
 }
 
 /**
+ * 完了した親から、テンプレートの下書きを作る（`ccnavi --templates --draft`）。下書きは効力が無く、書くだけなので
+ * ユーザの許可は取らない。作れたら知らせ、そこからテンプレート管理画面を開けるようにする。
+ */
+async function makeTemplateDraft(current: PanelState, ticket: string): Promise<void> {
+  const result = await runTemplateDraft(current.folder.uri.fsPath, binSetting(), ticket);
+  if (!result.ok) {
+    void vscode.window.showErrorMessage(`テンプレートの下書きを作れませんでした: ${result.error}`);
+    return;
+  }
+  const open = "テンプレート管理を開く";
+  const picked = await vscode.window.showInformationMessage(
+    `テンプレートの下書きを作りました: ${result.value.path}。効力は無く、テンプレート管理画面で内容を直して取り込むまで使われません。`,
+    open,
+  );
+  if (picked === open) {
+    await vscode.commands.executeCommand("ccnaviBoard.openTemplates");
+  }
+}
+
+/**
  * 形を確かめる操作の一覧。`BoardMessage` に足したのにここへ足していなければ、型が合わなくなる。
  * `handleMessage` の網羅検査（`never`）は処理の書き忘れしか止めないので、入口の側でも同じことをする。
  * 足し忘れると、画面のボタンは押せるのに、届いたものが何も出さずに捨てられる。
@@ -676,6 +702,7 @@ const KNOWN: Readonly<Record<BoardMessage["type"], true>> = {
   flow: true,
   editWorkflow: true,
   workflow: true,
+  templateDraft: true,
   tourDone: true,
 };
 
@@ -736,6 +763,7 @@ function asMessage(message: unknown): BoardMessage | undefined {
     }
     case "editWorkflow":
     case "workflow":
+    case "templateDraft":
       return isTicketId(m.ticket) ? { type: m.type, ticket: m.ticket } : undefined;
     default:
       return undefined;

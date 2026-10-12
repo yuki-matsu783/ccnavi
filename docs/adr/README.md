@@ -189,7 +189,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0110](0110-scratchpad-is-wip-handoff-only.md) | 下書きの置き場は wip/handoff/ に一本化し、integrate が取り込むときに外す |
 | [0129](0129-handoff-and-root-scratchpad.md) | 置き場を wip/handoff/ と ルート直下の scratchpad/ の 2 つに分ける |
 | [0111](0111-concept-skills-and-references.md) | スキルは標準概念ごとの入口に絞り、細かい挙動は references に溜めて ccnavi --docs で引く |
-| [0126](0126-process-skills-and-investigating.md) | 概念スキルを工程スキルと呼び、調査の工程を足す |
+| [0126](0126-process-skills-and-investigating.md) | 概念スキルを工程スキルと呼び、調査の工程を足す（名前と本数は ADR-0133 が改める） |
 | [0112](0112-ccnavi-index-jsonl-added-to-project-gitignore.md) | 索引を ccnavi-index.jsonl にし、無視の行が無いツリーには .gitignore に足して索引の対象にする |
 | [0113](0113-stop-nudges-block-in-dry-run.md) | Stop の促し（finish・match: Stop）は dry-run でも止める |
 | [0119](0119-rule-expectations-rename.md) | ルールの「見本」を「期待する判定」と呼び、名前を rule-expectations に改める |
@@ -202,6 +202,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0105](0105-approved-ticket-written-durably.md) | 承認済みチケットは一時ファイルに書き切って fsync してから差し替える（待ち方のファイルの記述は ADR-0109 が改める） |
 | [0109](0109-plan-order-on-plan-items.md) | フェーズの順序は親の計画の項の `after` に書き、待ち方は計画から都度計算し、計画が使う定義は親に写して固定する（採用。実行ファイルの側は実装済み。ワークフロー編集タブと図も入れた。画面の実機での確認はまだ。画面の呼び名は ADR-0127 が「計画編集タブ」に改める） |
 | [0130](0130-work-review-plan-templates.md) | 完了した作業・レビュー計画と子のフローをテンプレートとして溜め、下書きから取り込んで再利用する |
+| [0133](0133-template-edit-from-board.md) | テンプレート管理画面から下書きの保存と、取り込み済みの改名・移動・削除をできるようにする（0130 の「カードからの入口は作らない」を改める） |
 | [0123](0123-parent-must-have-a-plan.md) | 親は計画を必ず持ち、計画の無い親は start が止まる |
 
 ### 複数のリポジトリと VS Code 拡張
@@ -234,3 +235,4 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0061](0061-ext-tests-by-group-at-stop.md) | 拡張のテストもターンの終わりに回し、回すのは触ったファイルが関わるグループだけ |
 | [0037](0037-rewrite-design-doc.md) | 設計書を実装に合わせて書き直す |
 | [0132](0132-abolish-review-chat.md) | レビューの chat を廃止し、見る場所を none と mr の 2 つにする |
+| [0133](0133-process-skill-names-follow-phase-ids.md) | 工程スキルの名前を process- とフェーズ定義の id の語にし、implement を足す |
