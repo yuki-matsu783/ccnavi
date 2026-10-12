@@ -1451,7 +1451,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 どちらで進めるかはモデルが決める。ccnavi は判定で強制せず、`SessionStart` で `.ccnavi/CCNAVI.md` の「作業の進め方」（条件 `tickets`）を渡す。
 サブエージェントには渡さない。
 
-最後の行（`dry_run` の条件）は dry-run のときだけ出る。それ以外の手順（レビューの sh、`review: mr` / `chat`、配点の書き方、後工程）は、必要になった場所で改めて届く。
+最後の行（`dry_run` の条件）は dry-run のときだけ出る。それ以外の手順（レビューの sh、`review: mr`、配点の書き方、後工程）は、必要になった場所で改めて届く。
 
 ### 置き場と状態
 
@@ -1701,23 +1701,20 @@ jq -r 'select(.rules[0]? == "builtin:ticket-scope" and (.rules | length) > 1) | 
 同じ親の同じ `phase` の子が `doing/` に 1 枚も無く、`review/` か `done/` に 1 枚以上あれば、そのフェーズは終わり。取り消しだけのフェーズは終わらない。
 設計は [9.8](docs/design/tickets/hitl.md)。
 
-ユーザがどこで見るかは `none` / `chat` / `mr` の 3 つで、次のうち厳しい側が採られる（`none` < `chat` < `mr`）。
+ユーザがどこで見るかは `none` / `mr` の 2 つで、次のうち厳しい側が採られる（`none` < `mr`）。
 
 - フェーズ定義の `review`
 - 親の計画の項の `mr`（フェーズ定義の `review` が `none` でも `mr` にする）
 - 延期した番号の分を引き受けているなら、その分の宣言
 
-閉じた子の `human_review.required` が `true` か、実績のリスクが HIGH 以上のときは、`none` を `chat` に上げるだけで場所は指定しない。
+閉じた子の `human_review.required` が `true` か、実績のリスクが HIGH 以上のときは、`none` を `mr` に上げる。
 
-| | `mr` | `chat` | `none` |
-|---|---|---|---|
-| 返す文 | 合流と push を済ませ、`request` でレビューを頼み、ターンを終えてユーザを待て | 合流してユーザに差分を見てもらい、ターンを終えて待て | レビューを省略して次のフェーズへ進める |
-| HITL ポイント | 来る。レビュー済みのマーカーまで止まる | 来る。レビュー済みのマーカーまで止まる | 来ない。省略のマーカーを残す |
-| 先へ進める者 | `ccnavi-review.sh confirm` / `decide` | ユーザが親のワークツリーの端末で `ccnavi-review.sh chat <N>`（中身は `ccnavi --reviewed <N> --chat`） | — |
-| `review/` の子 | レビュー済みで `.ccnavi/approved/done/` へ動く | 同じ | `finish` の時点で `done/` へ |
-
-`chat` はホストへ出ないので、マージリクエストもトークンも要らない。`--chat` はフェーズ定義が `chat` と宣言したフェーズにしか当たらず、
-`request` を出したあとのフェーズも断る。逆向き（`chat` のフェーズを `request` でマージリクエストに出す）は通り、そこから先は `mr` と同じになる。
+| | `mr` | `none` |
+|---|---|---|
+| 返す文 | 合流と push を済ませ、`request` でレビューを頼み、ターンを終えてユーザを待て | レビューを省略して次のフェーズへ進める |
+| HITL ポイント | 来る。レビュー済みのマーカーまで止まる | 来ない。省略のマーカーを残す |
+| 先へ進める者 | `ccnavi-review.sh confirm` / `decide` | — |
+| `review/` の子 | レビュー済みで `.ccnavi/approved/done/` へ動く | `finish` の時点で `done/` へ |
 
 止めている間、その親の cwd からの `Agent` と Bash を止める（`DENY_PHASE_REVIEW`）。通すのは `ccnavi-ticket.sh` `ccnavi-review.sh`
 `ccnavi-git.sh` の 3 本だけ。Write / Edit は通すので、次のフェーズの計画はレビュー前に進められる。
@@ -1736,7 +1733,7 @@ phases:
   research:
     kind: work            # work は全体計画に、feedback はフィードバック計画にだけ置ける
     title: 調査           # id と title はどちらも一意
-    review: none          # none | chat | mr。既定であって上限ではない
+    review: none          # none | mr。既定であって上限ではない
     scope: ["wip/research/*"]          # 子の範囲の上限（20 件まで）。省略か inherit なら親の範囲
     deliverables: ["wip/research/summary.md"]   # 閉じる前に在って追跡されているべきもの（20 件まで）
     agent: explorer       # .claude/agents/<名前>.md。案内。判定には使わない
@@ -1755,7 +1752,7 @@ phases:
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
-    review: mr                         # feedback に none は書けない（chat は可）
+    review: mr                         # feedback に none は書けない
     scope: inherit
     when: フィードバック計画の最後に置き、ほかの対応を受ける
 ```
@@ -1871,7 +1868,6 @@ sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
 
 どれも直さなければレビュー済みにし、1 件でも直すなら見た子を `done/` へ動かしてマーカーは置かない。決めた内容は sh がコメントに写す。
 ボードの経路は端末を求めない代わりにダイジェスト（`digest`）の一致を求め、エージェントが同じ形を打つ経路は組み込みの deny が止める。
-`--reviewed <N> --chat` でも、レビュー済みにしたあとに指摘を 1 行ずつ打てば同じ形で続きの子を起こす。
 変更要求のレビューが出ている間はどの経路も通らない。解除できるのはレビュアーの approve / dismiss だけ。
 
 **リモートを読み書きするのは sh で、実行ファイルはネットワークに出ない。** マージリクエストの中身は `ccnavi-review.sh` が取ってきて
@@ -1882,7 +1878,6 @@ JSON で渡す（`--result <path>`）。
 | `request` | `review prepare`（前提を確かめ、マーカー付きの本文を state の置き場に書き出す）→ sh が投稿 → `review requested`（マーカーを置く） |
 | `confirm` | sh がスレッドとレビューを取ってくる → `review confirm`（判定してマーカーを置き、`review/` の子を `done/` へ動かす） |
 | `decide N` | sh が取ってくる → `--reviewed N --accept-unresolved`（ユーザに見せ、指摘ごとに対応方針を選ばせる）→ issue に回す分があれば sh が issue を作り、決めた内容をコメントに写す。ボードは `decide N --preview`（`--preview --json`。一覧とダイジェスト）と `decide N --choices <JSON> --digest <ダイジェスト>`（`--yes <JSON> --digest <ダイジェスト> --json`）で同じ経路を通る |
-| （`chat` のフェーズ） | ユーザが親のワークツリーの端末で `ccnavi-review.sh chat <N>` を打つ（中身は `ccnavi --reviewed <N> --chat`。取り込み済みの親子のチケットなら最後に承認の push（`ccnavi-push-approved.sh`）を呼ぶ）。依頼も、取得した結果も無い |
 | `comment` | sh が投稿する。実行ファイルは関わらない |
 | `ready` | Draft を外す（「マージに進んでよい」の合図）。`review ready`（親を閉じられる状態かを確かめ、マーカー `phases/<親>/ready.json` とコメントの下書きを置き、閉じた親子のチケットを手元の `logs/archive/` へ退避する）→ C1 が退避の削除をコミットして push → sh が Draft を外してコメントを投稿する。親が打つ。マージはユーザ |
 | `close-early --reason <理由> [--no-issue]` | まだ残っているが「キリの良いところまでやった」と早めに閉じる。ユーザが端末で打つ。`--close-early`（残りを見せて y/N、未着手の子を取り消し、マーカーを置く）→ sh が残りを issue に書き出し、コメントを投稿する。Draft は親が片付けてから `ready` で外す |
@@ -1910,7 +1905,7 @@ JSON で渡す（`--result <path>`）。
 **ワークツリーは ccnavi が片付ける。** マージを待たない。
 
 - 閉じた子のワークツリーは、完了でも取り消しでも消す。残るのは作業中（`doing/`）とレビュー待ち（`review/`。指摘を直す場所）の子の
-  ワークツリー。`decide`・`chat`・Chrome のレビュー済みで `done/` へ動いた子のものは、次にその親子で `finish` か `cancel` が打たれるまで残る
+  ワークツリー。`decide`・Chrome のレビュー済みで `done/` へ動いた子のものは、次にその親子で `finish` か `cancel` が打たれるまで残る
 - 子のワークツリーは、`confirm` が子を `done/` へ動かしたあと（`ccnavi-review.sh confirm`。そのフェーズの子）と、`ccnavi-ticket.sh` の
   `finish`・`cancel` のあと（親でも子でも、その親子の閉じた子を全部。親の `finish` では取りこぼしを拾う安全網）に消す。
   レビュー待ちの子のものは指摘を直す場所として残す
@@ -1977,7 +1972,7 @@ Draft を外すので、squash でマージすると既定のブランチには�
 
 リスクは宣言ではなく実績で測る。子を `ticket finish` で閉じるとき、その子のワークツリーで `base_sha..HEAD` の差分を数えて点を付け、
 `phases/<親>/<子>.risk.json` に残す。フェーズの点は子の最大値。**HIGH 以上なら、宣言に関わらずそのフェーズは人間レビューが要る扱いになる。**
-宣言が `none` なら `chat` に上がり、マージリクエストを勧める文が出る（強制はしない）。設計は [9.9](docs/design/tickets/risk.md)。
+宣言が `none` なら `mr` に上がる。設計は [9.9](docs/design/tickets/risk.md)。
 
 配点は `.ccnavi/config/common/risks.yml`（組み込みの deny が守る。エージェントは書き換えない）。無ければ組み込み。
 
@@ -2544,7 +2539,7 @@ ccnavi --explain --json
 | `plan` / `feedback` | 全体計画とフィードバック計画（`null` は未計画） |
 | `close_early` / `ready` / `closed_record` | 親のマーカー `close-early.json` / `ready.json` / `closed.json` の中身。無ければ `null`。`closed.json` は親を閉じたときに置かれ、どのフェーズをどこで見たか（`reviews`）を持つ |
 | `accepted_threads[]` | ユーザが受け入れた未解決スレッド |
-| `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, review_kind, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`review_kind` はユーザがどこで見るか（`none` / `chat` / `mr`）。`gate_closed` は判定が使うのと同じ値で、レビューが済むまで止めているかを示す（ユーザに見せる名前は「レビュー準備中」「レビュー待ち」）。`review_waiting` は依頼を出したのに止まったまま（ユーザのレビュー待ち）で、ボードはこれを写すだけで組み直さない。`chat` のフェーズは依頼を出さないので常に `false`。このセッションで見る待ちは `review_kind` と `gate_closed` で読む |
+| `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, review_kind, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`review_kind` はユーザがどこで見るか（`none` / `mr`）。`gate_closed` は判定が使うのと同じ値で、レビューが済むまで止めているかを示す（ユーザに見せる名前は「レビュー準備中」「レビュー待ち」）。`review_waiting` は依頼を出したのに止まったまま（ユーザのレビュー待ち）で、ボードはこれを写すだけで組み直さない。 |
 
 ## 承認の JSON
 
@@ -3156,7 +3151,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/scripts/ccnavi-launcher.sh` | hook が起動する振り分けの sh（モード 100755）。原本と配布先で同じパス。1 つ上の `bin/<os>-<arch>/` から、この機械の実行ファイルを選ぶ。無ければ 127 |
 | `.ccnavi/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパースクリプト |
 | `.ccnavi/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。状態を聞く `status` は読むだけで、サブエージェントも呼べる。本体は `ccnavi ticket`。取り込み済みの親子のチケットでは C1（取り込んでから書き、書いたパスだけをコミットして push するまで完了にしない） |
-| `.ccnavi/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review`。状態を書く副命令は取り込み済みの親子のチケットで C1。ユーザの判断の入口 `chat <N>`・`close-early` はユーザが打ち、取り込み済みの親子のチケットなら最後に承認の push をする |
+| `.ccnavi/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review`。状態を書く副命令は取り込み済みの親子のチケットで C1。ユーザの判断の入口 `close-early` はユーザが打ち、取り込み済みの親子のチケットなら最後に承認の push をする |
 | `.ccnavi/scripts/ccnavi-agree.sh` | 承認し、`ccnavi-push-approved.sh` でコミットして push する。ユーザが端末で打つ。本体は `ccnavi --agree` |
 | `.ccnavi/scripts/ccnavi-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。ユーザが打つ（エージェントからは止まる）。端末の `ccnavi-agree.sh`・ボードの承認とフローの保存・ユーザの判断の入口のあとに呼ばれる。`[<親>...]` で親子のチケットを限る。取り込み済みの親子のチケットはロックを取り、取り込んでから送る |
 | `.ccnavi/scripts/ccnavi-fetch.sh` | セッション開始時に親ブランチと、ワークツリーの起点になるデフォルトブランチを取ってくる。進めるのは fast-forward だけ |

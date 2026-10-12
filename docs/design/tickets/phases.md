@@ -21,7 +21,7 @@ keywords: [フェーズ, フェーズ定義, phases.yml, plan, after, 待ち方,
 |---|---|---|
 | `kind` | `work` は全体計画に、`feedback` はフィードバック計画にしか置けない。既定 `work` | 承認 |
 | `title` | ユーザ向けの名前。id と title はどちらも一意。重なれば `--lint` が error | 承認、案内 |
-| `review` | `none` / `chat` / `mr`（既定）。そのフェーズの終わりにユーザがどこで見るか。`chat` はこのセッションで見る（ホストへ出ない。9.8）。既定であって上限ではない。`feedback` のフェーズ定義に `none` は書けない | HITL ポイント |
+| `review` | `none` / `mr`（既定）。そのフェーズの終わりにユーザがどこで見るか。既定であって上限ではない。`feedback` のフェーズ定義に `none` は書けない | HITL ポイント |
 | `scope` | このフェーズ定義の子が宣言できる範囲の上限（glob のリスト。20 件まで）。省略か `inherit` なら親の範囲。子 ⊆ フェーズ定義 ⊆ 親。大文字小文字はどの機械でも区別しない（チケットの範囲と同じ規則。9.3）。超えても承認は止めず、承認画面に「チケットで編集対象としているが、書き込めない場所」として出す（9.4）。判定は子の範囲をこの上限でも切り詰める（9.5） | 承認（警告）、判定 |
 | `deliverables` | フェーズを閉じる前に、親か子のワークツリーに在って追跡されているべきファイル（glob。20 件まで）。中身は見ない | `ticket finish` |
 | `agent` / `when` | 案内。`agent` は `SubagentStart`、`when` は次のフェーズを促す文に出す。判定には使わない | 案内 |
@@ -121,12 +121,14 @@ feedback:
 - 親は `plan: [quick]` の 1 項だけを持つ。`quick` は小さい作業向けのフェーズ定義で、`review: mr`（マージリクエストでユーザが見る）、
   `scope: inherit`（範囲は親の範囲そのまま）。子は `phase: 1`。項が 1 つなので `after` は要らない（その項が終端）
 - 親の提案には、計画が使う定義の写し `phases:`（ここでは `quick` だけ）も書く。`ccnavi --plan-order <親> --fill-phases` で差し込む
-- 人間レビューの要否は、提案を書くときに決める。見るなら子に `human_review.required: true`（`quick` は `mr`）、
-  見ないなら `false` と `reason` を書く。承認した宣言のとおりに動き、あとから変えない
+- `quick` の見る場所は定義の `review: mr` で決まる。子の `human_review.required: false` ではレビューは外れない
+  （子の宣言は「要る」としか言わず、定義が言う見る場所を下げない）。レビューを外したい作業は `review: none` の定義を使う
 - 親は計画・合流・依頼だけを受け持つ。作業は子が行う（P12 のまま）
 - 親の提案には `feedback: []` も書く（対応が無くても空で出す。無いと親を閉じられない）
-- 流れ: 承認 → 親に着手 → 子に着手 → 子で作業して `finish`（子は `review/`） → 親が子を合流 → 親が `ccnavi-review.sh request` で
-  マージリクエストを作ってレビューを依頼 → ユーザがホストで見る → 親が `confirm`（子が `done/`） → 親を `finish`（親は `done/`）
+- 流れ: 承認 → 親に着手 → 子に着手 → 子で作業して `finish`（子は `review/`） → 親が子を合流 → 親が ELI5 の HTML を
+  `wip/eli5/phase-1.html` に書いてコミットして push し、`ccnavi-review.sh request --phase 1 --body-file <依頼文>
+  --eli5 wip/eli5/phase-1.html` でマージリクエストを作って依頼 → ユーザが `crit review` で指摘を付ける → 親が `confirm`
+  （指摘が残れば `decide`。子が `done/`） → 親を `finish`（親は `done/`） → push して `ready`（Draft を外す）。各段の前提は 9.10
 
 **手で動かした承認も計画の `after` で読む。** `--agree` を通さずに承認済みの置き場へ動かした親も、ユーザが中身を見て
 動かしたので `after` も承認したと読む。代わりに、`--agree` の検査を通っていない計画が壊れていても判定が進まないように、
