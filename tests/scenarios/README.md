@@ -69,6 +69,7 @@ ccnavi は「守る対象はプロジェクトが列挙し、それ以外は作�
 - シナリオは普段のワークスペースルートで回す。ccnavi 本体にはブランチ・コミット・MR・issue を作らず、そういう作業は `projects/test-repo` で行う
 - `setup` の `files` は、回す前に作り、回したあとに消すファイル（ワークスペースルートからのパス → 中身）
 - `state` は、全 step が終わったあとに打つコマンドと、出力に含まれるべき文字列
+- step の欄 `expect_after`（`decisions`・`state` を `expect` と同じ書き方で書く。満たさなければ後続の step に進まず止める）
 - `judge` は、意味で読む基準（自然文）。実行器が `evidence.md` に証拠を抜き出し、別のエージェントが読んで判定する
 - 回すのは [runner.py](runner.py)（`uv run python -m tests.scenarios.runner run <シナリオ>`）。判定は pass / fail / inconclusive（未成立）/ needs-review。
   全量テスト（`python -m tests`）には入らない。拾われるのは [test_runner.py](test_runner.py)（実行器の単体テスト）だけ

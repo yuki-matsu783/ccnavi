@@ -65,6 +65,24 @@ def load_scenario(path):
     data.setdefault("budget_usd", 1.0)
     data.setdefault("permission_mode", "auto")
     data.setdefault("expect", {})
+    for n, step in enumerate(data["steps"], 1):
+        after = step.get("expect_after")
+        if after is None:
+            continue
+        if step.get("human"):
+            raise ValueError(
+                f"{path}: step {n} 人間の操作の step には expect_after を付けられません"
+            )
+        extra = set(after) - {"decisions", "state"} if isinstance(after, dict) else None
+        if extra is None:
+            raise ValueError(
+                f"{path}: step {n} expect_after は decisions と state を持つ dict です"
+            )
+        if extra:
+            raise ValueError(
+                f"{path}: step {n} expect_after に書けるのは decisions と state だけです: "
+                + ", ".join(sorted(extra))
+            )
     return data
 
 
@@ -244,6 +262,20 @@ def evaluate(expect, rows, raw_text, root, pre_digests):
     return results
 
 
+def evaluate_after(step_expect, st, root):
+    """step の expect_after を評価する。判定の行は、ここまでに回した全 step のセッションから探す。
+    結果は evaluate と同じ形の [(種類, 内容, 判定, 理由)]。"""
+    rows = read_decisions(Path(root) / "logs/decisions.jsonl", st["session_ids"])
+    results = []
+    for cond in step_expect.get("decisions", []):
+        v, why = check_decision(rows, cond)
+        results.append(("decisions", cond, v, why))
+    for item in step_expect.get("state", []):
+        v, why = check_state(item, root)
+        results.append(("state", item, v, why))
+    return results
+
+
 def overall(results):
     kinds = [r[2] for r in results]
     for v in (FAIL, INCONCLUSIVE, REVIEW):
@@ -346,7 +378,8 @@ def _cleanup(made, root):
 
 def drive(scn, out, st, root):
     """st['next_step'] から、人間の操作の step か末尾まで進める。
-    人間の操作で止まったら 10、末尾まで進んだら None を返す。"""
+    人間の操作で止まったら 10、末尾まで進んだら None を返す。
+    expect_after を満たさなければ 11 を返す。"""
     steps = scn["steps"]
     while st["next_step"] < len(steps):
         idx = st["next_step"]
@@ -373,6 +406,22 @@ def drive(scn, out, st, root):
         st["cost_usd"] += ev["cost_usd"]
         st["next_step"] = idx + 1
         _write_state(out, st)
+        after = step.get("expect_after")
+        if after:
+            try:
+                bad = [r for r in evaluate_after(after, st, root) if r[2] != PASS]
+            except Exception as e:  # check_state の timeout・cwd 不在など。止めて finish に回す
+                bad = [("expect_after", after, INCONCLUSIVE, f"評価で例外: {e!r}")]
+            if bad:
+                st["halt"] = {
+                    "step": idx + 1,
+                    "reasons": [
+                        f"{r[0]} {json.dumps(r[1], ensure_ascii=False)}: {r[3]}" for r in bad
+                    ],
+                }
+                _write_state(out, st)
+                print(f"step {idx + 1}: expect_after を満たさない。後続の step には進まず止める")
+                return 11
     return None
 
 
@@ -382,6 +431,13 @@ def finish(scn, out, st, root):
         raw = "".join(p.read_text(encoding="utf-8") for p in sorted(out.glob("step-*.jsonl")))
         rows = read_decisions(Path(root) / "logs/decisions.jsonl", st["session_ids"])
         results = evaluate(scn["expect"], rows, raw, root, st["pre_digests"])
+        halt = st.get("halt")
+        if halt:
+            # 止まった回は後続の step が回っていないので、decisions・state は必ず落ちる。外す
+            results = [r for r in results if r[0] not in ("decisions", "state")]
+            results.append(
+                ("expect_after", {"step": halt["step"]}, INCONCLUSIVE, "; ".join(halt["reasons"]))
+            )
     finally:
         _cleanup(st["setup_made"], root)
     write_report(scn, out, st, results, rows, raw)
@@ -659,12 +715,15 @@ def cmd_run(args):
 
 def _continue(scn, out, st, root):
     rc = drive(scn, out, st, Path(root))
-    return rc if rc is not None else finish(scn, out, st, Path(root))
+    return finish(scn, out, st, Path(root)) if rc is None or rc == 11 else rc
 
 
 def cmd_next(args):
     out = Path(args.out)
     st = json.loads((out / "state.json").read_text(encoding="utf-8"))
+    if st.get("halt"):
+        print(f"step {st['halt']['step']} の expect_after を満たさず止めた回。続きは回せない")
+        return 2
     scn = load_scenario(st["scenario"])
     scn["_prompt_steps"] = sum(1 for s in scn["steps"] if not s.get("human"))
     return _continue(scn, out, st, st["root"])
