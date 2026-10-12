@@ -210,6 +210,7 @@ ccnavi を登録した hook:
   SessionStart（.ccnavi/scripts/ccnavi-fetch.sh。セッション開始時の取り込み）
 足した .vscode/settings.json:
   git.detectWorktrees
+  git.repositoryScanMaxDepth
 配った:
   .ccnavi/bin/<M>
   .ccnavi/config/common/rules.yml
@@ -2209,7 +2210,10 @@ class WritesTheVscodeSettings(SetupTest):
     def test_creates_the_file_when_it_is_not_there(self):
         result = self.run_setup()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.read_vscode(), {"git.detectWorktrees": True})
+        self.assertEqual(
+            self.read_vscode(),
+            {"git.detectWorktrees": True, "git.repositoryScanMaxDepth": 2},
+        )
 
     def test_keeps_settings_that_have_nothing_to_do_with_ccnavi(self):
         """VS Code の他の設定は残す。バックアップも 1 つ取る。"""
@@ -2220,6 +2224,7 @@ class WritesTheVscodeSettings(SetupTest):
         landed = self.read_vscode()
         self.assertEqual(landed["editor.tabSize"], 2)
         self.assertIs(landed["git.detectWorktrees"], True)
+        self.assertEqual(landed["git.repositoryScanMaxDepth"], 2)
         self.assertTrue(os.path.exists(self.vscode_path() + ".bak"))
 
     def test_running_twice_changes_nothing(self):

@@ -937,11 +937,15 @@ ccnavi は作業を `.claude/worktrees/` の中でさせる。VS Code の設定�
 エディタからはワークスペースルートのブランチしか見えない。
 
 ```json
-"git.detectWorktrees": true
+"git.detectWorktrees": true,
+"git.repositoryScanMaxDepth": 2
 ```
 
+2 行目は `projects/<名前>/` のように 1 段下にあるリポジトリを見つけるための設定で、既定の 1 だと
+ワークスペースルート直下しか探さない。
+
 `sh scripts/ccnavi-setup.sh <ワークスペースルート>` が、`.claude/settings.json` と同じ 1 回で
-`.vscode/settings.json` にもこれを書く。無ければ作り、あれば足りないキーだけを足す。
+`.vscode/settings.json` にもこれらを書く。無ければ作り、あれば足りないキーだけを足す。
 VS Code の他の設定は残し、`false` と書いてあれば変えずに並べて見せる。
 
 `.vscode/settings.json` にコメントや末尾のカンマがあると（`jq` が読めない）、そのファイルは触らずに、

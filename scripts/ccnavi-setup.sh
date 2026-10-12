@@ -66,8 +66,10 @@ SETTINGS_REL=".claude/settings.json"
 # VS Code へ渡す設定。値ではなくキーがあるかどうかを見て、足りないものだけを足す。
 # `git.detectWorktrees` は、.claude/worktrees/ の中のワークツリーをソース管理の
 # ビューに表示する（README「ワークツリーを VS Code から見えるようにする」）。
+# `git.repositoryScanMaxDepth` は、projects/<名前>/ のような 1 段下のリポジトリを
+# 見つけるために 2 にする（既定は 1 で、ワークスペースルート直下しか探さない）。
 VSCODE_REL=".vscode/settings.json"
-VSCODE_KEYS='{"git.detectWorktrees": true}'
+VSCODE_KEYS='{"git.detectWorktrees": true, "git.repositoryScanMaxDepth": 2}'
 # hook はこの 1 行だけを登録する。どのイベントの処理を走らせるかは、payload にある
 # イベント名を見て ccnavi 自身が選ぶ。
 HOOK_COMMAND='"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
