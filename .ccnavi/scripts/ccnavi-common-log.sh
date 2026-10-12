@@ -2,7 +2,7 @@
 #
 # 診断ログ（log_debug / log_info / log_warn / log_error）。
 
-# ---- 診断ログ（docs/claude/logging.md）
+# ---- 診断ログ
 #
 #   log_info <本文の語>... [-- <キー>=<値>...]
 #
