@@ -16,7 +16,8 @@ description: >-
 ## git の入口
 
 git は直接呼ばず、`ccnavi-git.sh` 経由で打つ（生の git は止められるため）。以下の例はワークスペースルートの形で書く。
-ワークツリーの中では先頭を `sh ../../../.ccnavi/scripts/ccnavi-git.sh` にする。cwd ごとの呼び方は `docs/claude/worktree.md` の「基本」を見る。
+ワークツリーや `projects/<名前>` の中では、先頭を `sh <ワークスペースルートの絶対パス>/.ccnavi/scripts/ccnavi-git.sh` と直書きする。
+相対パス（`../../../`）は cwd がワークツリーの最上段のときしか届かないため。コマンド名やパスを変数に入れない（コマンド名の位置の変数は止められる）。
 
 ## 絶対ルール
 
