@@ -1,5 +1,5 @@
 /**
- * 通信先の一覧から manifest を組む。通信先はビルドに埋め込み、CSP に足すのは 'wasm-unsafe-eval' だけ。
+ * 通信先の一覧から manifest を組む。一覧の通信先は host_permissions に埋め込み、設定画面で足すホストは optional（ADR-0128）。CSP に足すのは 'wasm-unsafe-eval' だけ。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -11,28 +11,31 @@ import { HERE } from "./helpers/python.js";
 
 const defaults = () => parseHosts(fs.readFileSync(path.join(HERE, "hosts.json"), "utf8"));
 
-test("CX-T001 既定の通信先は api.github.com と gitlab.com だけ。host_permissions と connect-src が同じ順序", () => {
+test("CX-T001 既定の通信先は api.github.com と gitlab.com。host_permissions はその 2 つ、connect-src は https 全般と loopback の http（設定画面で足すホストのため）", () => {
   const m = manifest(defaults(), "0.1.0") as { host_permissions: string[]; content_security_policy: { extension_pages: string } };
   assert.deepEqual(m.host_permissions, ["https://api.github.com/*", "https://gitlab.com/*"]);
   assert.equal(
     m.content_security_policy.extension_pages,
-    "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self'; form-action 'none'; base-uri 'none'; connect-src 'self' https://api.github.com https://gitlab.com",
+    "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self'; form-action 'none'; base-uri 'none'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*",
   );
 });
 
 test("CX-T002 CSP に 'unsafe-eval'・'unsafe-inline'・外のスクリプトを入れない。足すのは 'wasm-unsafe-eval' だけ", () => {
-  const text = csp(defaults());
+  const text = csp();
   assert.ok(!text.includes("'unsafe-eval'"));
   assert.ok(!text.includes("unsafe-inline"));
   const script = /script-src ([^;]*)/.exec(text)?.[1];
   assert.equal(script, "'self' 'wasm-unsafe-eval'");
 });
 
-test("CX-T003 manifest は externally_connectable を宣言しない。権限は storage と PAT の期限を比べる alarms だけ", () => {
+test("CX-T003 manifest は externally_connectable を宣言しない。権限は storage と PAT の期限を比べる alarms だけ。設定画面で足すホストの許可は optional に置く", () => {
   const m = manifest(defaults(), "0.1.0");
   assert.equal("externally_connectable" in m, false);
   assert.deepEqual(m.permissions, ["storage", "alarms"]);
   assert.equal(m.manifest_version, 3);
+  // 実際に許すのは登録のときに、そのオリジンだけ（ここでは広い形を宣言するだけ）
+  assert.deepEqual(m.optional_host_permissions, ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"]);
+  assert.ok(!(m.host_permissions as string[]).includes("https://*/*"));
 });
 
 test("CX-T004 一覧の誤りでビルドを止める（http・資格情報つき・重なった id・知らない kind）", () => {
@@ -54,10 +57,11 @@ test("CX-T005 組織ごとのビルド: GHES の一覧なら通信先はその�
   );
   const m = manifest(hosts, "0.1.0") as { host_permissions: string[] };
   assert.deepEqual(m.host_permissions, ["https://ghe.example.com/*"]);
-  assert.match(csp(hosts), /connect-src 'self' https:\/\/ghe\.example\.com$/);
+  // connect-src は設定画面で足すホストのために共通の形（ビルドの一覧では決まらない）
+  assert.match(csp(), /connect-src 'self' https: http:\/\/localhost:\* http:\/\/127\.0\.0\.1:\*$/);
 });
 
-test("CX-T157 セルフホストの GitLab を足したビルド: 通信先はそのホストだけで、既定の gitlab.com は入らない（通信先は組み立てのときに埋め込んだホストの一覧だけで決まる）", () => {
+test("CX-T157 セルフホストの GitLab を足したビルド: host_permissions はそのホストだけで、既定の gitlab.com は入らない（host_permissions は組み立てのときの一覧だけで決まる。connect-src は共通の形）", () => {
   const hosts = parseHosts(
     JSON.stringify({
       hosts: [
@@ -68,7 +72,7 @@ test("CX-T157 セルフホストの GitLab を足したビルド: 通信先は�
   );
   const m = manifest(hosts, "0.4.0") as { host_permissions: string[]; content_security_policy: { extension_pages: string } };
   assert.deepEqual(m.host_permissions, ["https://api.github.com/*", "https://gitlab.example.com/*"]);
-  assert.match(m.content_security_policy.extension_pages, /connect-src 'self' https:\/\/api\.github\.com https:\/\/gitlab\.example\.com$/);
+  assert.match(m.content_security_policy.extension_pages, /connect-src 'self' https: http:\/\/localhost:\* http:\/\/127\.0\.0\.1:\*$/);
   assert.ok(!JSON.stringify(m).includes("https://gitlab.com"));
   // GitLab の graphql 欄は読まない（REST だけ。通信先に余計なオリジンを足さない）
   assert.equal(hosts[1].graphql, "https://gitlab.example.com/api/v4");

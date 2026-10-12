@@ -31,7 +31,7 @@ export function deps(
   repos: RepoConfig[] = REPOS,
 ): Deps {
   return {
-    hosts: HOSTS,
+    getHosts: async () => HOSTS,
     // 同梱の互換の版（見本の統合先の CCNAVI_COMPAT と同じ）
     compat: COMPAT,
     extensionId: EXT_ID,

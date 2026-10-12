@@ -53,7 +53,7 @@ config にあると `--lint` が error で、config の側のその定義だけ�
 
 ## 絶対ルール
 
-- 3 本のファイルを書き換えない。下書きはワークツリーの `wip/scratchpad/`（.ccnavi/docs/scratchpad.md）に置き、検証を通してから
+- 3 本のファイルを書き換えない。下書きはワークツリーの `wip/handoff/`（.ccnavi/docs/scratchpad.md）に置き、検証を通してから
   「何をなぜ変えるか」と一緒にユーザに渡す。置くのはユーザ。`dry-run` で警告だけで通っても同じ
 - 判定を目で真似しない。当たるかどうかは必ず `ccnavi --test-expectations` か `--lint` に聞く
 - 期待する判定を実際の判定に合わせて書き換えない。食い違いが出たら、ルールと期待のどちらを直すかはユーザが決める
@@ -81,4 +81,4 @@ ccnavi --explain --log "" --state ""
 - `--rules` / `--phases` / `--risk` で下書きを差し替えられる
 
 `--test` に禁止語を書かない（`ccnavi --test Bash "git push"` はその Bash 自体が `raw-git` に当たる）。
-単発で試したいものも期待のファイルを `wip/scratchpad/` に書いて `--test-expectations` で回す。その形は `.ccnavi/config/common/rule-expectations.yml` の先頭のコメントにある。
+単発で試したいものも期待のファイルを `wip/handoff/` に書いて `--test-expectations` で回す。その形は `.ccnavi/config/common/rule-expectations.yml` の先頭のコメントにある。

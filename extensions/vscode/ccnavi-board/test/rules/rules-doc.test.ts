@@ -304,7 +304,7 @@ deny:
     match: Write|Edit
     regex: '^{root}[\\\\/]'
     except:
-      - regex: '^{root}[\\\\/]wip[\\\\/]scratchpad(?:[\\\\/]|$)'
+      - regex: '^{root}[\\\\/]wip[\\\\/]handoff(?:[\\\\/]|$)'
       - glob: '{root}/.claude/worktrees/*'
     message: main では編集しない
 allow:
@@ -317,7 +317,7 @@ test("CB-T331 except は見せる形で読み、書いていないルールに�
   const { model } = readRules(EXCEPT_TEXT);
   assert.deepEqual(model.problems, []);
   assert.deepEqual(model.sections.deny[0].excepts, [
-    "regex: ^{root}[\\\\/]wip[\\\\/]scratchpad(?:[\\\\/]|$)",
+    "regex: ^{root}[\\\\/]wip[\\\\/]handoff(?:[\\\\/]|$)",
     "glob: {root}/.claude/worktrees/*",
   ]);
   assert.equal(model.sections.allow[0].excepts, undefined);

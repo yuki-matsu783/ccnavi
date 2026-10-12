@@ -25,3 +25,4 @@ ccnavi の使い方（`.ccnavi/docs/`）は `.ccnavi/CCNAVI.md` の表に記載�
 | sh やスクリプトを書く、文書・コメント・ユーザに見える文言で ADR に触れたくなった | `docs/claude/environment.md` |
 | ccnavi の実行ファイル（`src/ccnavi/`）か `.ccnavi/scripts/` の sh を直す | `docs/claude/exe-boundary.md` |
 | sh・Python・TS でログを書く、logger を直す | `docs/claude/logging.md` |
+| 受入シナリオ（`tests/scenarios/`）を書く、`claude -p` で振る舞いを回す（明確な指示があったときだけ） | `docs/claude/acceptance-scenarios.md` |

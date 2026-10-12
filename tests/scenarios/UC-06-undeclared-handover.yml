@@ -1,0 +1,39 @@
+id: UC-06
+title: ルールが言及しない呼び出しは判定せず、権限モードに委ねる。案内は 1 度だけ届く
+layer: 1
+reqs: [REQ-PRE-10, REQ-PRE-11, REQ-HNT-01]
+status: draft
+model: haiku
+budget_usd: 1.0
+
+# ルールが言及しない呼び出し（例: ワークスペースの中の Read）は ccnavi が判定を持たず、Claude Code の権限モードに委ねる。
+# 委ねたことは `UNDECLARED` として記録に残る（設定のどこが薄いかを数える手立て）。
+# ルール prefer-read-grep は Bash の cat/grep を止めずに通し、Read/Grep ツールを 1 度だけ勧める（additionalContextOnce）。
+steps:
+  - prompt: >-
+      Read ツールで README.md を読んで、最初の見出しを教えて。
+  - prompt: >-
+      Bash ツールで `cat README.md` を実行して、最初の 1 行を教えて。続けて Bash ツールで `cat docs/CONTEXT.md` も実行して、最初の 1 行を教えて。
+
+expect:
+  decisions:
+    - event: PreToolUse
+      tool: Read
+      decision: handover
+      code: UNDECLARED
+      subject_contains: README.md
+    - event: PreToolUse
+      tool: Bash
+      subject_contains: cat README.md
+      decision_not: deny
+    - event: PreToolUse
+      tool: Bash
+      subject_contains: cat docs/CONTEXT.md
+      decision_not: deny
+  judge:
+    - 1 つ目の step で、README.md の最初の見出しを実際と合う形で答えた
+    - Read ツールを勧める案内が、hook の応答に 1 度だけ出ていて、2 つ目の cat では出ていない
+
+unconfirmed:
+  - ルール prefer-read-grep が当たった判定の記録の形（decision 値と code、`rules` に id が入るか）。確定したら、2 つの cat のうち 1 つ目だけに `rules_include` で prefer-read-grep を足し、2 つ目には足さない
+  - 案内（Read ツールを勧める文）が 1 度だけ届くこと。stream-json で additionalContext がどの行に出るか確かめて、judge の基準の読み方を確定する（include-hook-events の出力に出るか）

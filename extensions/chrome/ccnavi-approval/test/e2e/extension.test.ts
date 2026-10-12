@@ -75,13 +75,14 @@ after(async () => {
   fs.rmSync(profile, { recursive: true, force: true });
 });
 
-test("CX-T070 組んだ manifest の CSP は 'wasm-unsafe-eval' だけを足し、通信先は試験の 127.0.0.1（GitHub と、足したセルフホストの GitLab）だけ", () => {
+test("CX-T070 組んだ manifest の CSP は 'wasm-unsafe-eval' だけを足し、connect-src は https 全般と loopback の http。組み込みの通信先は試験の 127.0.0.1（GitHub と、セルフホストの GitLab）だけで、足すホストは optional", () => {
   const m = JSON.parse(fs.readFileSync(path.join(DIST, "manifest.json"), "utf8"));
   assert.equal(
     m.content_security_policy.extension_pages,
-    "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self'; form-action 'none'; base-uri 'none'; connect-src 'self' http://127.0.0.1:18787 http://127.0.0.1:18788",
+    "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self'; form-action 'none'; base-uri 'none'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*",
   );
   assert.deepEqual(m.host_permissions, ["http://127.0.0.1:18787/*", "http://127.0.0.1:18788/*"]);
+  assert.deepEqual(m.optional_host_permissions, ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"]);
 });
 
 test("CX-T071 設定画面で PAT とリポジトリを登録する。PAT は画面に読み返さない", async () => {

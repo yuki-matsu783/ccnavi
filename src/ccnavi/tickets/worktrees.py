@@ -295,10 +295,8 @@ def _leftover_facts(path: str) -> tuple[list[str], list[str]]:
     )
     changes = [line for line in done.out.splitlines() if line.strip()] if done.ok else []
     if changes:
-        scratch = [c for c in changes if "wip/scratchpad/" in c.replace("\\", "/")]
-        why.append(
-            "未保存の下書きがある（wip/scratchpad/）" if scratch else "未コミットの変更がある"
-        )
+        scratch = [c for c in changes if "wip/handoff/" in c.replace("\\", "/")]
+        why.append("未保存の下書きがある（wip/handoff/）" if scratch else "未コミットの変更がある")
         check.append(f"`git -C {path} status` で中身を見て、要るものはコミットするか退避する")
     ignored, _ = _ignored(path)
     if ignored:
@@ -371,7 +369,7 @@ def _ignored(top: str) -> tuple[list[str], str]:
 
     `--directory` で、全体が無視されたディレクトリは 1 行（末尾の `/`）にまとめる。生成物
     （`ccnavi-clean.js` と同じ名前。`out` は package.json の隣だけ）は消してよいので数えない。
-    下書きの置き場（`wip/scratchpad/`）は追跡されるファイルで、gitが無視するものではないので、
+    下書きの置き場（`wip/handoff/`）は追跡されるファイルで、gitが無視するものではないので、
     ここには現れない。
     """
     done = gitcmd.run(

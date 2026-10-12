@@ -3,7 +3,7 @@ type: adr
 title: ELI5 の置き場と依頼の検査を厳しくする（パスの \ と大文字小文字、名前の字、モード、互換の版）
 description: 敵対的レビューの指摘を判定を厳しくする側で直す。置き場の判定で \ を / に読み替えない、ready は大文字小文字を問わない、ELI5 の名前とモードを絞る、案内のパスを包む、互換の版を 2 に上げる
 tags: [review, ticket]
-keywords: [ELI5, wip/eli5, 置き場, バックスラッシュ, 大文字小文字, ready, シェル注入, crit, モード, シンボリックリンク, COMPAT, 互換の版, is_eli5_place, is_ticket_place, is_scratch_place]
+keywords: [ELI5, wip/eli5, 置き場, バックスラッシュ, 大文字小文字, ready, シェル注入, crit, モード, シンボリックリンク, COMPAT, 互換の版, is_eli5_place, is_ticket_place, is_handoff_place]
 ---
 # ADR-0097: ELI5 の置き場と依頼の検査を厳しくする（パスの `\` と大文字小文字、名前の字、モード、互換の版）
 
@@ -28,7 +28,7 @@ ADR-0095・0096 の変更に敵対的レビューが入り、次の指摘が出�
 
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
-| 置き場の判定（`is_eli5_place`・`_under`（チケットの置き場）・`is_scratch_place`）は、パスの `\` を `/` に読み替えない。`phase_scope.scope_findings` の読み替えも消す（範囲の照合にも影響する） | 呼び手が渡すのは `tree.relative`（`os.sep` を `/` に直したパス）か git の出すパスで、どちらも区切りは `/`。Windows の区切りは `tree.relative` が直すので、ここで読み替える理由が無い。読み替えると Linux / macOS で `\` を含む名前の 1 ファイルが置き場や範囲の中に見える。**チケットの置き場（`wip\proposals\todo\x.py`）と下書きの置き場（`scratchpad\x.py`、実行前チェックだけ）にも同じ穴があった**ので同じく直した。`scope_findings` の読み替えは `src\x.py` を `src/*` の中と読ませていた（実行前チェックは読み替えていないので、実行前は止めて終了時は通す食い違いがあった） | ELI5 だけ直す。同じ形の穴が残る |
+| 置き場の判定（`is_eli5_place`・`_under`（チケットの置き場）・`is_handoff_place`）は、パスの `\` を `/` に読み替えない。`phase_scope.scope_findings` の読み替えも消す（範囲の照合にも影響する） | 呼び手が渡すのは `tree.relative`（`os.sep` を `/` に直したパス）か git の出すパスで、どちらも区切りは `/`。Windows の区切りは `tree.relative` が直すので、ここで読み替える理由が無い。読み替えると Linux / macOS で `\` を含む名前の 1 ファイルが置き場や範囲の中に見える。**チケットの置き場（`wip\proposals\todo\x.py`）と下書きの置き場（`scratchpad\x.py`、実行前チェックだけ）にも同じ穴があった**ので同じく直した。`scope_findings` の読み替えは `src\x.py` を `src/*` の中と読ませていた（実行前チェックは読み替えていないので、実行前は止めて終了時は通す食い違いがあった） | ELI5 だけ直す。同じ形の穴が残る |
 | `ready` の前提（`_merge_problems`）は、追跡されているファイル全部を `-z` で読み、大文字小文字を問わず `wip` の下か、名前が `wip\` で始まるものを残りとして止める。消し方は実際の先頭の名前で案内する | 区別しない FS で `WIP/eli5/` を先に作った形と、`\` を含む名前の形を、成果物に残さない。pathspec の `:(icase)` は git 1.8.4 から使えるが、`\` を含む名前は拾えないので、全部を読んで絞った。git の版にも依らない | `:(icase)wip` の pathspec |
 | 範囲の除外と「動いた」の見分けは、今までどおり大文字小文字を区別する | 区別しない側に広げると除外が広がる。`WIP/eli5/` を通してしまう抜けは `ready` が拾う | 区別しない |
 | sh の置き場の検査を `wip/eli5/*` に絞る | 除外（`wip/eli5/`）と依頼の検査の置き場を揃える。`wip/design/x.html` を ELI5 にさせない | `wip/*` のまま |

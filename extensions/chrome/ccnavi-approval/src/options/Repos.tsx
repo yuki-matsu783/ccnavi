@@ -6,8 +6,9 @@
  */
 import { useEffect, useState, type FormEvent, type JSX } from "react";
 
+import type { Host } from "../core/hosts.js";
 import { normalizeRepo, repoKey, type RepoConfig } from "../core/settings.js";
-import { HOSTS, loadRepos, type Said } from "./api.js";
+import { loadAllHosts, loadRepos, type Said } from "./api.js";
 import { Status } from "./Status.js";
 
 function describe(r: RepoConfig): string {
@@ -17,20 +18,25 @@ function describe(r: RepoConfig): string {
   return `${repoKey(r)}（統合先 ${integ}・直近 ${r.recentDays} 日${extra}${proj}）`;
 }
 
-export function Repos(): JSX.Element {
+/** `revision` は通信先の一覧が変わった回数。変わったら読み直す（ホストの選び先が変わるため） */
+export function Repos({ revision }: { readonly revision: number }): JSX.Element {
+  const [hosts, setHosts] = useState<Host[]>([]);
   const [repos, setRepos] = useState<RepoConfig[]>([]);
   const [said, setSaid] = useState<Said | undefined>(undefined);
 
-  const reload = async (): Promise<void> => setRepos(await loadRepos());
+  const reload = async (): Promise<void> => {
+    setHosts(await loadAllHosts());
+    setRepos(await loadRepos());
+  };
   useEffect(() => {
     void reload();
-  }, []);
+  }, [revision]);
 
   const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     try {
-      const repo = normalizeRepo(Object.fromEntries(form.entries()) as Record<string, unknown>, HOSTS);
+      const repo = normalizeRepo(Object.fromEntries(form.entries()) as Record<string, unknown>, await loadAllHosts());
       const rest = (await loadRepos()).filter((o) => repoKey(o) !== repoKey(repo));
       if (repo.project && !rest.some((o) => repoKey(o) === repo.workspace && !o.project)) {
         throw new Error(`ワークスペースのリポジトリ ${repo.workspace} を先に登録してください`);
@@ -68,7 +74,7 @@ export function Repos(): JSX.Element {
         <label className="field">
           <span className="cap">ホスト</span>
           <select name="host" id="repo-host">
-            {HOSTS.map((h) => (
+            {hosts.map((h) => (
               <option key={h.id} value={h.id}>
                 {h.id}
               </option>

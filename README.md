@@ -354,7 +354,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 | `PreToolUse` | 呼び出しを判定し、設定ファイルをバックアップする | 判定そのものが働かない |
 | `PostToolUse` | 作業ツリーを見て、変わっていれば戻す。チケットの状態を承認済みチケットへ書き出す | 引数に現れない書き込みを取りこぼす。フェーズの終わりが伝わらない |
 | `PostToolUseFailure` | ツール自体の失敗を数え、失敗や拒否が続いたら資料を引く案内を返す（「失敗や拒否が続いたとき」） | 失敗の連続を数えられず、案内が出ない |
-| `Stop` | このターンで変わった保護領域をユーザへ報告する。cwd のワークツリーのチケットを `finish` し忘れていそうなら 1 回だけ止めて促す。レビューの依頼までの道の途中（作業中の子が残っている、子が全部閉じたのに依頼が無い）も、実行中のサブエージェントが居なければ 1 回だけ止めて次の一手を促す。`match: Stop` のルールがあれば、そのタイミングで止めて文を渡す | 変更がユーザの目に触れない。閉じ忘れたチケットが作業中に残る。ターンの終わりの促しが届かない |
+| `Stop` | このターンで変わった保護領域をユーザへ報告する。cwd のワークツリーのチケットを `finish` し忘れていそうなら 1 回だけ止めて促す。レビューの依頼までの道の途中（作業中の子が残っている、子が全部閉じたのに依頼が無い）も、実行中のサブエージェントが居なければ 1 回だけ止めて次の一手を促す。チケットに結び付かない直接作業のワークツリーに未コミットの変更か統合先に入っていないコミットがあり `integrate` の記録も無ければ、`integrate` の打ち方を 1 回だけ促す（統合の前提を満たせないときは止めずに理由を言う）。`match: Stop` のルールがあれば、そのタイミングで止めて文を渡す | 変更がユーザの目に触れない。閉じ忘れたチケットが作業中に残る。ターンの終わりの促しが届かない |
 | `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録も。実行中の印を置く | サブエージェントが自分の範囲を知らずに始める |
 | `SubagentStop` | 子のワークツリーに範囲外の変更が残っていれば 1 回だけ差し戻す。実行中の印を外す | 範囲外のコミット済みの変更が親に届く |
 
@@ -718,7 +718,7 @@ allow:
 - 読むのは共通レイヤーと自身のレイヤーだけ。プロジェクトのレイヤーに書いたものは使わない（外のリポジトリの 1 行でメインのターンを止めさせない）。同じ id は 1 本だけ
 - `every` が 2 より小さいものは使わない。本文のファイルはワークスペースルートの版だけを読む
 - 回数の記録は `logs/state/stop-<セッション>.json`。compact・再開・clear では捨てず、起動のときと古いセッションの後始末でだけ捨てる
-- 同じ `Stop` で `finish` の促し（下の「ターンの終わりの報告」）が止めるなら、そちらだけを出し、このルールは数えもしない
+- 同じ `Stop` で `finish` の促し・レビュー依頼までの道の促し・直接作業の `integrate` の促し（下の「ターンの終わりの報告」）が止めるなら、そちらだけを出し、このルールは数えもしない
 - `stop_hook_active` が真の回、サブエージェント、記録を置けない・読めない・書けないときは止めない（止め続けないため）。
   サブエージェントには、代わりに `SubagentStart` で「気づいたスキル候補は最後の報告に節を足して返す」の 1 行を渡す
 - `dry-run` でも止める（止めないと文がモデルに届かないため）。記録の `decision` は `nudge`、`rules` は渡したルールだけ
@@ -864,7 +864,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
     match: Write|Edit|NotebookEdit
     regex: '^{root}[\\/]'
     except:
-      - regex: '^{root}[\\/]wip[\\/]scratchpad(?:[\\/]|$)'
+      - regex: '^{root}[\\/]wip[\\/]handoff(?:[\\/]|$)'
       - regex: '^{root}[\\/]\.claude[\\/]worktrees(?:[\\/]|$)'
     message: ...
 ```
@@ -1343,7 +1343,9 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 
 `finish` を促さなかった回は、レビューの依頼までの道の途中なら（承認済みの親に作業中の子が残っているか、子が全部閉じたのに依頼のマーカーが無い）、決まった道の途中でユーザの許可は要らないことと次のコマンド（`finish`・合流・ELI5・`request`）を渡して止める（理由コード `NUDGE_TICKET_REQUEST`）。最後の発言は読まず、同じ状態では 1 回だけで、`dry-run` でも止める。実行中のサブエージェントが居る間（`SubagentStart` が印を置き、`SubagentStop` が外す。開始から 4 時間を過ぎた印、セッションの起動・再開で捨てる印は数えない）は、委任して待つ回なので止めず、「1 回だけ」の記録も進めない。印を読めないときも止めない。チームメイトと背景のシェルは待ちに数えない。
 
-どちらも促さなかった回は、`match: Stop` のルールが渡す回ならそこで止める（「ターンの終わりに止めて渡す」）。
+どちらも促さなかった回は、チケットに結び付かない直接作業のワークツリー（`.claude/worktrees/<名前>`）に未コミットの変更か統合先に入っていないコミットがあり、統合先のツリーに `integrate <名前>` の記録も無ければ、`integrate` の打ち方と、staged で止めてユーザに `git status`・`git diff --staged` で確かめてもらう手順を渡して止める（理由コード `NUDGE_INTEGRATE`。hook は `integrate` を打たない）。`integrate` が断る名前は促さない。統合先のツリーに未コミットの変更や途中の操作があるとき、未コミットの変更があるのに統合先の ref を引けないときは、止めずに理由を報告へ足す。同じ状態では 1 回だけで、`dry-run` でも止める。実行中のサブエージェントが居る間は止めない。
+
+これらを促さなかった回は、`match: Stop` のルールが渡す回ならそこで止める（「ターンの終わりに止めて渡す」）。
 
 同じ `Stop` で、このセッションで同じ理由の拒否が `CCNAVI_DENY_REPEAT` 回に達した呼び出しを、ルールの id と回数で 1 回だけ並べる
 （「同じ呼び出しを繰り返し止めたとき」）。回数が増えればまた並べる。
@@ -1406,7 +1408,7 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 - `builtin-guard-project-home`: ccnavi ディレクトリの下（`*/.ccnavi/*`）と、`CCNAVI_BIN_PATH` のパスおよび実行ファイルの置き場
   （名前が `ccnavi-launcher.sh` なら 1 つ上の `bin/<os>-<arch>/`、それ以外なら隣の `<os>-<arch>/`）
 - `builtin-guard-common-layer`: 共通レイヤーの 3 本。ワークツリーの中の同じファイルも止まる
-- 期待する判定のファイル `.ccnavi/config/common/rule-expectations.yml` も `builtin-guard-project-home` が止める。その下書きはワークツリーの `wip/scratchpad/` に置き、
+- 期待する判定のファイル `.ccnavi/config/common/rule-expectations.yml` も `builtin-guard-project-home` が止める。その下書きはワークツリーの `wip/handoff/` に置き、
   ルールの下書きと一緒にユーザに渡す
 
 止めるのは書き込みの形と場所の組で、場所の名前が出ただけでは止めない（`cat .ccnavi/config/common/rules.yml` や `git add <パス>` は通る）。
@@ -1675,8 +1677,8 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 範囲の外として扱わない場所。
 
 - 提案の置き場（`wip/proposals/`）と承認済みチケットの置き場（`.ccnavi/approved/`）。`review/` と承認済みチケットは組み込みの deny が止める
-- 下書きの置き場。ツリーのルート直下の `wip/scratchpad/` の下で、大文字小文字を区別する。追跡される置き場なので、
-  実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/scratchpadX/` や `scratchpad/` は外さない
+- 下書きの置き場。ツリーのルート直下の `wip/handoff/` の下で、大文字小文字を区別する。追跡される置き場なので、
+  実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/handoffX/` や `scratchpad/` は外さない
 - ELI5 の HTML の置き場。ワークツリーのルートからの `wip/eli5/` の下で、大文字小文字を区別する。追跡される置き場なので、
   実行前チェック・実行後チェック・サブエージェント終了時チェックのどれでも外す。`wip/` のほかの場所や `wip/eli5x/` は外さない。
   チケットの `deny` と全面停止（`LIMIT_BLOCKED`）より先に適用される
@@ -1912,7 +1914,7 @@ JSON で渡す（`--result <path>`）。
   外から `ready --parent <親>` で打てばそのまま消える
 - 消し方は、生成物（`node_modules`・`.venv` など）を消してから `git worktree remove`（`--force` なし）。ブランチは消さない
 - git が無視しているファイル（`.env` など）があるワークツリーは、何も消さずに名指しする（`worktree remove` はそれごと消して戻せない）。
-  数えないのは生成物だけ（下書きの置き場 `wip/scratchpad/` は追跡されるので、ここには現れない）
+  数えないのは生成物だけ（下書きの置き場 `wip/handoff/` は追跡されるので、ここには現れない）
 - cwd が消す対象の中にあるときは消さず、外に出てから打つ 1 本（`sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>`）を出す。
   `ready` を親のワークツリーの中から `--parent` なしで打ったときは、親のワークツリーをこの 1 本で消す。未コミットの変更があれば何も消さずに名指しする
 - この 1 本が Claude Code の自動モードの分類器に止められたら、ユーザに許可を頼むか、ユーザのホームの `~/.claude/settings.json` の
@@ -2186,7 +2188,7 @@ uv run python scripts/check_rules.py   # 同じことを、state と記録を外
 `tool: Stop`（`subject: "(stop)"`）は、ターンの終わりに使われるルールがあるかを見る（あれば `allow`）。
 ルールを 1 件足したら期待も 1 行足し、**止めたくないものも必ず一緒に置く**。
 
-期待のファイルはエージェントが直接書けない（「コアファイルを守る」）。下書きはワークツリーの `wip/scratchpad/` に置き、ルールの下書きと一緒にユーザに渡す。
+期待のファイルはエージェントが直接書けない（「コアファイルを守る」）。下書きはワークツリーの `wip/handoff/` に置き、ルールの下書きと一緒にユーザに渡す。
 `/ccnavi-config` スキルがこの流れを回し、フェーズ定義とリスクの配点も見る。
 
 ### 記録から候補を起こす
@@ -2881,7 +2883,7 @@ md を本文ではなく頭の frontmatter で引く。grep は当たった行�
 frontmatter か `type` が無いときに、`PostToolUse` が `[ccnavi] NOTICE_DOC_FRONTMATTER (<パス>)` で 1 度だけ案内する（止めない）。
 Edit と上書きでは出さない。索引に載らない md（git が無視するもの、`.ccnavi/` の下）と、`README.md`・`CLAUDE.md`、
 frontmatter の決まりの対象外の表にある置き場（チケットの置き場・チケットの下書き `wip/design/scripts/i*.md`・下書きの置き場
-`wip/scratchpad/`・外から取り込んだ `.claude/skills/yomiyasu/**`）にも出さない。ワークツリーの md は、ワークスペースの `.gitignore` ではなくワークツリー自身の
+`wip/handoff/`・外から取り込んだ `.claude/skills/yomiyasu/**`）にも出さない。ワークツリーの md は、ワークスペースの `.gitignore` ではなくワークツリー自身の
 git で決める（統合した後は統合先の索引に入るため）。
 
 引くのはワークスペースと、プロジェクトの置き場の直下の各プロジェクト（それぞれ別の git）を合わせたもの。どこから打っても同じで、
@@ -3093,6 +3095,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/ops.py` | チケットの状態を動かす `ticket start / finish / cancel / record-risk`。閉じるときに実績のリスクを数える |
 | `src/ccnavi/tickets/ops_close.py` | チケットを引いて動かしてよいかの検査。置き場の引き当て、取り込み済みの親子の停止、着手の前（親・先行）と終了の前（親を閉じられる・成果物）の検査 |
 | `src/ccnavi/tickets/ops_stop.py` | Stop で `finish` の打ち忘れを促す判定と、基準点の確認（git の読み取り） |
+| `src/ccnavi/tickets/ops_stop_integrate.py` | Stop で、チケットに結び付かない直接作業が `integrate` まで進んでいないことを見つけ、打ち方を促す判定（統合先のツリーが綺麗でないときは促さず理由を言う） |
 | `src/ccnavi/tickets/ops_stop_request.py` | Stop でレビュー依頼までの道（`finish`・合流・ELI5・`request`）の途中を見つけ、次の一手を促す判定 |
 | `src/ccnavi/tickets/core.py` | 承認・取り下げ・レビュー済みの判定のコアの入口。名前を束ね直すだけで、`entry/cli.py` と Chrome 拡張（Pyodide）はここを引く |
 | `src/ccnavi/tickets/core_base.py` | 判定のコアの共通部分。入力（`Snapshot`）・承認の判定（`judge_approval`）・書くもの（`Changes`）・ディスクへの書き込み |
@@ -3149,7 +3152,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/scripts/ccnavi-branches.sh` | issue・MR に紐づくブランチを探す。読むだけ。ホストは sh が読み、手元の候補は `ccnavi branches` が集める |
 | `.ccnavi/scripts/ccnavi-start.sh` | issue・MR を指定された依頼の着手の入口。`ccnavi-branches.sh` で候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る |
 | `.ccnavi/scripts/ccnavi-worktree.sh` | 作業用のワークツリーを統合先から切る。`fetch`・遅れの確認・起点の選択（遅れていれば `origin/<統合先>` から `--no-track`）・`worktree add` を `ccnavi-git.sh` 経由で順に打つ。ワークツリーが既にあればパスを出すだけ。`fetch` が届かないときは何も切らず終了コード 4 で止まり、直して打ち直す手と `--offline`（手元の統合先から切る）を案内する |
-| `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/scratchpad/`（元と同じ階層）へ `cp` する。`--commands` は編集済みの下書きだけ、差し替えの `mv` をフルパスで出す。ユーザが差し替える |
+| `.ccnavi/scripts/ccnavi-stage.sh` | 書き込みを止められている保護対象のファイルを `wip/handoff/`（元と同じ階層）へ `cp` する。`--commands` は編集済みの下書きだけ、差し替えの `mv` をフルパスで出す。ユーザが差し替える |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。`--worktree <名前>` は掃除と `worktree remove` を 1 本で行う（本体は `ccnavi worktree drop`。cwd が中なら消さない）。配る（`scripts/ccnavi-setup.sh` の `DEPLOY_SCRIPTS`） |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tests/__main__.py` | `python -m tests`。テストをモジュールごとに別プロセスで同時に回す。回す中身は discover と同じ |

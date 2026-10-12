@@ -561,15 +561,27 @@ timed() {
 	shift 2
 	"$@" </dev/null >"$timed_out" 2>/dev/null &
 	timed_pid=$!
+	# sleep は背景で起こして wait で待つ。TERM を受けたら sleep も止めて抜ける（sleep を ppid 1 で残さない）。
 	(
 		exec </dev/null >/dev/null 2>&1
-		sleep "$timed_limit"
+		timed_sleep=""
+		timed_stop=""
+		# trap は印を立てて、分かっていれば sleep を止めるだけ。抜けるのは本流で、sleep の pid を控えた後に印を見る
+		# （sleep を起こした直後に TERM が来ても、sleep を残さない）。
+		trap 'timed_stop=1; test -z "$timed_sleep" || kill "$timed_sleep"' TERM
+		sleep "$timed_limit" &
+		timed_sleep=$!
+		test -z "$timed_stop" || { kill "$timed_sleep"; exit 0; }
+		wait "$timed_sleep"
+		test -z "$timed_stop" || exit 0
 		kill "$timed_pid"
 	) &
 	timed_dog=$!
 	timed_rc=0
 	wait "$timed_pid" 2>/dev/null || timed_rc=$?
 	kill "$timed_dog" 2>/dev/null || :
+	# 見張りの終了を回収して、シェルに「Terminated」の報告を出させない。
+	wait "$timed_dog" 2>/dev/null || :
 	return "$timed_rc"
 }
 

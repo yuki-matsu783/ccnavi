@@ -147,6 +147,36 @@ class IndexTest(Repo):
             read(os.path.join(self.root, ".gitignore")), "build/\r\n*.log\n**/ccnavi-index.jsonl\n"
         )
 
+    def test_a_line_already_there_is_not_appended_again(self):
+        # 同じ行が既にあれば（末尾の空白は除く）、足さずに PRESENT を返す。
+        write(os.path.join(self.root, ".gitignore"), "build/\n**/ccnavi-index.jsonl  \n")
+        self.assertEqual(docsearch_index._add_ignore(self.root), docsearch_index.PRESENT)
+        self.assertEqual(
+            read(os.path.join(self.root, ".gitignore")), "build/\n**/ccnavi-index.jsonl  \n"
+        )
+
+    def test_a_leading_space_is_not_the_ignore_line(self):
+        # git は先頭の空白を無視しないので、先頭に空白のある行は同じ行ではない。足して直す。
+        write(os.path.join(self.root, ".gitignore"), "build/\n  **/ccnavi-index.jsonl\n")
+        self.put("a.md", doc(type="guide"))
+        built = docsearch_index.build(self.root)
+        self.assertEqual((built.unignored, built.ignore_added), (False, ".gitignore"))
+        self.assertEqual(
+            read(os.path.join(self.root, ".gitignore")),
+            "build/\n  **/ccnavi-index.jsonl\n**/ccnavi-index.jsonl\n",
+        )
+
+    def test_a_present_line_that_does_not_ignore_the_index_is_not_reported_as_added(self):
+        # 索引が追跡されていて無視されないとき、行は既にあっても書いていない。足したとは報告しない。
+        self.put("docs/a.md", doc(type="guide"))
+        self.put("docs/ccnavi-index.jsonl", "")
+        git(self.root, "add", "-f", "docs/ccnavi-index.jsonl")
+        before = read(os.path.join(self.root, ".gitignore"))
+        built = docsearch_index.build(self.root)
+        self.assertTrue(built.unignored)
+        self.assertEqual(built.ignore_added, "")
+        self.assertEqual(read(os.path.join(self.root, ".gitignore")), before)
+
     def test_a_missing_gitignore_is_created(self):
         os.remove(os.path.join(self.root, ".gitignore"))
         self.put("a.md", doc(type="guide"))
@@ -839,7 +869,7 @@ class FrontmatterHintTest(Repo):
             "README.md",
             "extensions/x/README.md",
             "CLAUDE.md",
-            "wip/scratchpad/draft.md",
+            "wip/handoff/draft.md",
             "wip/proposals/todo/i0001.md",
             ".ccnavi/notes.md",
             "wip/design/scripts/i12.md",
@@ -890,7 +920,7 @@ class FrontmatterHintTest(Repo):
         git(self.root, "worktree", "add", "-q", tree_root, "-b", "w")
         said = self.hint("docs/new.md", "# 見出し\n", root=tree_root)
         self.assertIn("(.claude/worktrees/w/docs/new.md)", said)
-        self.assertEqual(self.hint("wip/scratchpad/a.md", "# 見出し\n", root=tree_root), "")
+        self.assertEqual(self.hint("wip/handoff/a.md", "# 見出し\n", root=tree_root), "")
 
     def test_post_tool_use_delivers_it_without_changing_the_decision(self):
         path = self.put("docs/new.md", "# 見出し\n")

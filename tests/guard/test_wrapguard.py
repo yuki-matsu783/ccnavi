@@ -471,7 +471,7 @@ class CorePathTest(unittest.TestCase):
         "tests/logs/a.txt",
         ".ccnavi/approved/phases/i0001/1.reviewed",
         "wip/proposals/review/i0002.md",
-        "wip/scratchpad/a.md",
+        "wip/handoff/a.md",
     )
     # 同じコマンドを通す allow を置く。ルールが先に当たるなら通ってしまう。
     RULES = {
@@ -606,8 +606,8 @@ class CorePathTest(unittest.TestCase):
             ("cd wip && sh ../.ccnavi/scripts/ccnavi-git.sh rm -r proposals", True),
             (f"sh .ccnavi/scripts/ccnavi-git.sh rm {target}", True),
             # 下書きの置き場と、何も消さない・索引に戻す形は通す。
-            ("sh .ccnavi/scripts/ccnavi-git.sh rm -r wip/scratchpad", False),
-            ("sh .ccnavi/scripts/ccnavi-git.sh rm wip/scratchpad/a.md", False),
+            ("sh .ccnavi/scripts/ccnavi-git.sh rm -r wip/handoff", False),
+            ("sh .ccnavi/scripts/ccnavi-git.sh rm wip/handoff/a.md", False),
             ("sh .ccnavi/scripts/ccnavi-git.sh rm -n wip/proposals/review/i0002.md", False),
             (
                 "sh .ccnavi/scripts/ccnavi-git.sh restore --staged wip/proposals/review/i0002.md",

@@ -29,6 +29,10 @@ from ..tickets import flow
 INDEX_NAME = "ccnavi-index.jsonl"
 # 無視の設定が無いツリーのルートの .gitignore に足す 1 行。
 IGNORE_LINE = "**/ccnavi-index.jsonl"
+# _add_ignore の結果。
+ADDED = "added"
+PRESENT = "present"
+NOT_ADDED = ""
 # frontmatter を探すのは頭のこの長さだけ。本文は読まない。
 HEAD_LIMIT = 64 * 1024
 # 最初に読む長さ。frontmatter が無いか、ここで閉じていれば続きは読まない。
@@ -528,7 +532,7 @@ def build(
         return result
     index_rel = {d: (f"{d}/{INDEX_NAME}" if d else INDEX_NAME) for d in by_dir}
     writable = _ignored(base, sorted(index_rel.values()), _left(deadline))
-    if not writable and refresh and _add_ignore(base):
+    if not writable and refresh and _add_ignore(base) == ADDED:
         result.ignore_added = GITIGNORE
         writable = _ignored(base, sorted(index_rel.values()), _left(deadline))
     if not writable:
@@ -695,12 +699,14 @@ def _negates_index(line: str) -> bool:
     return pattern.endswith(("ccnavi-index.jsonl", "*.jsonl", "*"))
 
 
-def _add_ignore(base: str) -> bool:
-    """ツリーのルートの `.gitignore` に IGNORE_LINE を 1 行足す。足したら True。
+def _add_ignore(base: str) -> str:
+    """ツリーのルートの `.gitignore` に IGNORE_LINE を 1 行足す。結果を返す。
 
-    `!` で索引を否定する行があれば（ユーザが追跡している）足さない。ファイルが無ければ作る。
-    既存の行は変えず、末尾に改行が無いときだけ改行を 1 つ補ってから足す。リンク・ふつうでない
-    もの・読めないもの・書けないものは足さずに False（呼び出し側が「対象外」に回す）。
+    足したら ADDED。同じ行（末尾の空白を除いて比べる。git は先頭の空白を無視しないので残す）が
+    既にあれば足さずに PRESENT（行はあるのに効いていない場合も含む。書いていないので呼び出し側は
+    足したと報告しない）。`!` で索引を否定する行があれば（ユーザが追跡している）足さず NOT_ADDED。
+    ファイルが無ければ作る。既存の行は変えず、末尾に改行が無いときだけ改行を 1 つ補ってから足す。
+    リンク・ふつうでないもの・読めないもの・書けないものは足さずに NOT_ADDED。
     """
     path = os.path.join(base, GITIGNORE)
     try:
@@ -714,8 +720,11 @@ def _add_ignore(base: str) -> bool:
             with open(path, "rb") as f:
                 existing = f.read()
         text = existing.decode("utf-8", errors="replace")
-        if any(_negates_index(line.strip()) for line in text.splitlines()):
-            return False
+        lines = text.splitlines()
+        if any(_negates_index(line.strip()) for line in lines):
+            return NOT_ADDED
+        if IGNORE_LINE in (line.rstrip() for line in lines):
+            return PRESENT
         lead = b"" if not existing or existing.endswith(b"\n") else b"\n"
         flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
         flags |= getattr(os, "O_BINARY", 0)
@@ -723,8 +732,8 @@ def _add_ignore(base: str) -> bool:
         with os.fdopen(fd, "ab") as f:
             f.write(lead + IGNORE_LINE.encode("utf-8") + b"\n")
     except OSError:
-        return False
-    return True
+        return NOT_ADDED
+    return ADDED
 
 
 def _left(deadline: float | None) -> float:

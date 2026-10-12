@@ -75,16 +75,21 @@ def lands_in_finished_state(rel: str, tickets_rel: str, approved_rel: str) -> bo
     )
 
 
-# 下書きの置き場。ツリーのルートからの相対で `wip/scratchpad/`。名前は固定。設定で動かさない。
+# 下書きの置き場。ツリーのルートからの相対で `wip/handoff/`。名前は固定。設定で動かさない。
 # 動かせると、その値を実際のソースの置き場（`src` など）に向けるだけで、承認した範囲を
 # 迂回して書ける場所ができる。
 # 追跡して push する置き場で、`integrate` が取り込むときに外し（ccnavi-git.sh）、`ready` が
 # `wip/` ごと消す。成果物には残らない。
-SCRATCH = "wip/scratchpad"
+HANDOFF = "wip/handoff"
+
+# 使い捨ての置き場。ワークスペースルート直下の `scratchpad/`。`.gitignore` で追跡から外し、
+# 直接作業の途中でユーザに見せる一時的な物を置く。名前は固定。チケットの範囲は当てない
+# （ワークスペースルートはメインのツリーで、範囲を持たない）。コミットされず、片付けでも消えない。
+SCRATCH_ROOT = "scratchpad"
 
 
-def is_scratch_place(rel: str) -> bool:
-    """ツリーのルートからの相対パスが、下書きの置き場（`wip/scratchpad/`）の下にあるか。
+def is_handoff_place(rel: str) -> bool:
+    """ツリーのルートからの相対パスが、下書きの置き場（`wip/handoff/`）の下にあるか。
 
     チケットの範囲を当てない。下書き・再現用のスクリプト・調べた出力を置く場所で
     （.ccnavi/docs/scratchpad.md）、報告すると、範囲を宣言したワークツリーほど手元に何も置けなくなる。
@@ -97,12 +102,12 @@ def is_scratch_place(rel: str) -> bool:
     コミットのあとで範囲の外として報告される。
 
     名前の大文字小文字は区別する。`ready` の前提（`git ls-files -- wip`）も区別して
-    `wip/` を見るので、区別しない側に広げない。`wip/scratchpadX/` や、`scratchpad` という
+    `wip/` を見るので、区別しない側に広げない。`wip/handoffX/` や、`scratchpad` という
     名前のファイルは置き場ではない。
 
-    `\\` は `/` に直さない（`is_eli5_place` と同じ理由。`wip\\scratchpad\\x.py` は置き場ではない）。
+    `\\` は `/` に直さない（`is_eli5_place` と同じ理由。`wip\\handoff\\x.py` は置き場ではない）。
     """
-    return rel.startswith(SCRATCH + "/")
+    return rel.startswith(HANDOFF + "/")
 
 
 # ELI5 の HTML の置き場。依頼につける、変更をやさしく説明した HTML を置く。マージリクエストの
@@ -146,11 +151,11 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     実行後チェックは内容で決め（`post_findings._script_writes`）、サブエージェント終了時チェックは
     置き場そのものを外す（`phase_scope.scope_findings`）。
 
-    下書きの置き場（`is_scratch_place`）と ELI5 の置き場（`is_eli5_place`）は、
+    下書きの置き場（`is_handoff_place`）と ELI5 の置き場（`is_eli5_place`）は、
     追跡される置き場なので、実行後チェックとサブエージェント終了時チェックも同じく外す。
     """
     return (
         is_ticket_place(rel, tickets_rel, approved_rel)
-        or is_scratch_place(rel)
+        or is_handoff_place(rel)
         or is_eli5_place(rel)
     )

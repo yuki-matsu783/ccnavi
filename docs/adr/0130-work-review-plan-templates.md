@@ -5,7 +5,7 @@ description: 計画（plan:/feedback: の項と after）と子のフローを1�
 tags: [phase, ticket, docs-search]
 keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedback, フロー, 下書き, 取り込み, --templates, wip/proposals/templates, 蓄積, 再利用, ADR-0100]
 ---
-# ADR-0128: 完了した作業・レビュー計画と子のフローをテンプレートとして溜め、下書きから取り込んで再利用する
+# ADR-0130: 完了した作業・レビュー計画と子のフローをテンプレートとして溜め、下書きから取り込んで再利用する
 
 状態: 採用（2026-10-12 に、単位・蓄積の契機・置き場の層・入口の 4 点をユーザが推奨案で決めた。段階 1〜5 を実装した。保護済みの sh（`ccnavi-push-approved.sh`・`ccnavi-setup.sh`）の変更は `wip/design/scripts/` にステージしてあり、ユーザのコピーを待つ。ボードのテンプレート管理画面は別に作る）
 

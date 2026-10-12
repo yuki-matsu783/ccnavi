@@ -428,7 +428,7 @@ class IntegrateTest(unittest.TestCase):
         self.assertIn("other session", read(os.path.join(self.ws, "new.txt")))
         self.assertTrue(os.path.isfile(self.marker()))
 
-    # ---- 下書き（wip/scratchpad/）
+    # ---- 下書き（wip/handoff/）
 
     def commit_in_branch(self, files):
         for rel, text in files.items():
@@ -436,31 +436,31 @@ class IntegrateTest(unittest.TestCase):
         git(self.wt, "add", ".")
         git(self.wt, "commit", "-q", "-m", "w")
 
-    def test_integrate_drops_only_wip_scratchpad(self):
+    def test_integrate_drops_only_wip_handoff(self):
         self.commit_in_branch(
             {
                 "keep.txt": "1\n2\nthree\n",
-                "wip/scratchpad/a.txt": "draft\n",
-                "wip/scratchpad/sub/b.txt": "draft b\n",
+                "wip/handoff/a.txt": "draft\n",
+                "wip/handoff/sub/b.txt": "draft b\n",
                 "wip/proposals/todo/p.md": "proposal\n",
                 "wip/design/d.md": "design\n",
-                "wip/scratchpadX/x.txt": "not the scratchpad\n",
+                "wip/handoffX/x.txt": "not the scratchpad\n",
             }
         )
         r = self.run_git_sh("integrate", "wt")
         self.assertOk(r)
         self.assertIn("staged で取り込んだ（4 ファイル", r.stdout)
-        self.assertIn("下書き（wip/scratchpad/）の 2 ファイルは取り込まず、外した", r.stdout)
+        self.assertIn("下書き（wip/handoff/）の 2 ファイルは取り込まず、外した", r.stdout)
         self.assertEqual(
             sorted(self.status().splitlines()),
             [
                 "A  wip/design/d.md",
+                "A  wip/handoffX/x.txt",
                 "A  wip/proposals/todo/p.md",
-                "A  wip/scratchpadX/x.txt",
                 "M  keep.txt",
             ],
         )
-        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip", "scratchpad")))
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip", "handoff")))
         self.assertEqual("proposal\n", read(os.path.join(self.ws, "wip/proposals/todo/p.md")))
 
         done = self.run_git_sh("integrate-done", "wt", "-m", "feat: 下書きを外す")
@@ -468,17 +468,17 @@ class IntegrateTest(unittest.TestCase):
         self.assertEqual("", self.status())
         tracked = git(self.ws, "ls-files", "wip").split()
         self.assertEqual(
-            ["wip/design/d.md", "wip/proposals/todo/p.md", "wip/scratchpadX/x.txt"], tracked
+            ["wip/design/d.md", "wip/handoffX/x.txt", "wip/proposals/todo/p.md"], tracked
         )
         self.assertFalse(self.has_branch())
         self.assertFalse(os.path.exists(self.wt))
 
     def test_only_scratchpad_changes_leave_nothing_staged_and_still_clean(self):
-        self.commit_in_branch({"wip/scratchpad/a.txt": "draft\n"})
+        self.commit_in_branch({"wip/handoff/a.txt": "draft\n"})
         r = self.run_git_sh("integrate", "wt")
         self.assertOk(r)
         self.assertIn("差分は無かった", r.stdout)
-        self.assertIn("下書き（wip/scratchpad/）の 1 ファイルは取り込まず、外した", r.stdout)
+        self.assertIn("下書き（wip/handoff/）の 1 ファイルは取り込まず、外した", r.stdout)
         self.assertEqual("", self.status())
         self.assertFalse(os.path.exists(os.path.join(self.ws, ".git", "SQUASH_MSG")))
         done = self.run_git_sh("integrate-done", "wt")
@@ -488,7 +488,7 @@ class IntegrateTest(unittest.TestCase):
 
     def test_done_still_refuses_when_other_wip_paths_are_missing(self):
         self.commit_in_branch(
-            {"wip/scratchpad/a.txt": "draft\n", "wip/proposals/todo/p.md": "proposal\n"}
+            {"wip/handoff/a.txt": "draft\n", "wip/proposals/todo/p.md": "proposal\n"}
         )
         self.assertOk(self.run_git_sh("integrate", "wt"))
         # staged から wip/proposals/ を外してコミットすると、ブランチの中身が入りきっていない。
@@ -502,31 +502,31 @@ class IntegrateTest(unittest.TestCase):
         self.assertTrue(os.path.exists(self.wt))
 
     def test_scratchpad_already_on_main_is_not_touched(self):
-        write(os.path.join(self.ws, "wip/scratchpad/old.txt"), "from main\n")
-        write(os.path.join(self.ws, "wip/scratchpad/shared.txt"), "main version\n")
+        write(os.path.join(self.ws, "wip/handoff/old.txt"), "from main\n")
+        write(os.path.join(self.ws, "wip/handoff/shared.txt"), "main version\n")
         git(self.ws, "add", "-f", "wip")
         git(self.ws, "commit", "-q", "-m", "scratchpad on main")
         git(self.wt, "merge", "-q", "main")
         self.commit_in_branch(
             {
-                "wip/scratchpad/shared.txt": "branch version\n",
-                "wip/scratchpad/new.txt": "new draft\n",
+                "wip/handoff/shared.txt": "branch version\n",
+                "wip/handoff/new.txt": "new draft\n",
                 "keep.txt": "1\n2\nthree\n",
             }
         )
         r = self.run_git_sh("integrate", "wt")
         self.assertOk(r)
         self.assertEqual(["M  keep.txt"], self.status().splitlines())
-        self.assertEqual("main version\n", read(os.path.join(self.ws, "wip/scratchpad/shared.txt")))
-        self.assertEqual("from main\n", read(os.path.join(self.ws, "wip/scratchpad/old.txt")))
-        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip/scratchpad/new.txt")))
+        self.assertEqual("main version\n", read(os.path.join(self.ws, "wip/handoff/shared.txt")))
+        self.assertEqual("from main\n", read(os.path.join(self.ws, "wip/handoff/old.txt")))
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "wip/handoff/new.txt")))
         self.assertOk(self.run_git_sh("integrate-done", "wt", "-m", "feat: x"))
-        self.assertEqual("main version\n", read(os.path.join(self.ws, "wip/scratchpad/shared.txt")))
+        self.assertEqual("main version\n", read(os.path.join(self.ws, "wip/handoff/shared.txt")))
         self.assertFalse(self.has_branch())
 
     def test_abort_after_dropping_scratchpad_restores(self):
         self.commit_in_branch(
-            {"wip/scratchpad/a.txt": "draft\n", "wip/proposals/todo/p.md": "proposal\n"}
+            {"wip/handoff/a.txt": "draft\n", "wip/proposals/todo/p.md": "proposal\n"}
         )
         self.assertOk(self.run_git_sh("integrate", "wt"))
         r = self.run_git_sh("integrate", "--abort", "wt")

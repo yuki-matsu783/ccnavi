@@ -71,8 +71,9 @@
    ```
 
    プロキシの内側では `NODE_USE_ENV_PROXY=1 pnpm build` にします（PyYAML の sdist を PyPI から取るため）。
-2. セルフホストの GitLab（または GHES）を試すときは、通信先の一覧を書いて組み立てます。通信先は組み立てのときに埋め込み、設定画面では足せません。
-   `api`・`web` は https に限ります。GitHub の行には `graphql` も要ります。
+2. セルフホストの GitLab（または GHES）や `http://localhost:8080` を試すときは、設定画面の「通信先」で足します（組み立て直しは要りません）。
+   足すと Chrome がそのオリジンへの通信の許可を求めるので、許可します。http は localhost と 127.0.0.1 だけ。
+   組み立てのときから入れておきたいホストは、通信先の一覧を書いて組み立てます（`api`・`web` は https に限り、GitHub の行には `graphql` も要ります）。
 
    ```json
    {
