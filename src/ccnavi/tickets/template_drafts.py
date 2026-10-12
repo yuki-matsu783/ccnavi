@@ -619,8 +619,10 @@ def collide(
     template: plan_templates.Template,
     to: str,
     layer: str,
+    skip: str = "",
 ) -> tuple[list[str], list[str]]:
     """取り込むと、共通とレイヤーに同名で中身の違うものが並ぶ形になるなら断る。(errors, infos)。
+    `skip` は衝突の相手に数えないファイル（移動元自身。ワークスペースルートからの相対パス）。
 
     足し算はその形のレイヤーの側を使わない error にする（`plan_templates.merge`）。
     `to` が common なら `layer` は使わない。project なら `layer` は取り込み先のレイヤー。
@@ -635,6 +637,8 @@ def collide(
             for other in view.entries:
                 if other.name != name or other.template is None:
                     continue
+                if skip and other.rel == skip:
+                    continue
                 if plan_templates.dump(other.template) != mine:
                     errors.append(
                         f"{view.name} に同名で中身の違う {other.rel} が在る。共通へ取り込むと"
@@ -648,6 +652,8 @@ def collide(
         return errors, infos
     for other in scanned.common.entries:
         if other.name != name or other.template is None:
+            continue
+        if skip and other.rel == skip:
             continue
         if plan_templates.dump(other.template) != mine:
             errors.append(

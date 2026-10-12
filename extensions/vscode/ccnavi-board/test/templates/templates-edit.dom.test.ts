@@ -47,6 +47,7 @@ async function previewOf(dom: DomPage, request: EditRequest, overrides: Partial<
 }
 
 const SAVE: EditRequest = { op: "save", name: "login", on: "draft", layer: "", newName: "", to: "", toLayer: "", body: LOGIN_TEXT };
+const RENAME: EditRequest = { op: "rename", name: "login", on: "draft", layer: "", newName: "login2", to: "", toLayer: "", body: "" };
 const DELETE_FEATURE: EditRequest = { op: "delete", name: "feature", on: "common", layer: "", newName: "", to: "", toLayer: "", body: "" };
 const FEATURE_PATH = ".ccnavi/config/common/templates/feature.yml";
 const FEATURE_DELETE_ANSWER: Partial<EditAnswer> = { op: "delete", name: "feature", on: "common", source: FEATURE_PATH, target: "", sha: "d".repeat(64) };
@@ -186,6 +187,28 @@ test("CB-D356 編集が使えない（古い版）と、下書きの編集・改
       assert.equal(button.hasAttribute("disabled"), true);
       assert.equal(button.getAttribute("title"), "古い版です");
     }
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D358 改名が途中で失敗（書けたが元を消せなかった）と、欄を残して途中で失敗した旨を状態の欄に出す。成功の扱いにはしない", async () => {
+  const dom = await loginPage();
+  try {
+    await clickAction(dom, 'li.draft[data-name="login"]', "rename-draft");
+    dom.type(dom.one("#edit-new-name"), "login2");
+    await dom.settle();
+    await previewOf(dom, RENAME, { op: "rename", new_name: "login2" });
+    await clickYes(dom);
+    await dom.send({
+      type: "edited",
+      request: RENAME,
+      answer: editAnswer({ op: "rename", ok: false, written: true, removed: false, errors: ["元の i0001.yml を消せなかった"] }),
+      error: "",
+    });
+    assert.equal(dom.all('[data-role="edit-panel"]').length, 1);
+    assert.match(text(dom.one("#status")), /途中で失敗しました/);
+    assert.match(dom.one("#status").className, /failed/);
   } finally {
     await dom.close();
   }

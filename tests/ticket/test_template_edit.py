@@ -160,6 +160,44 @@ class Edit(Drafts):
         self.assertFalse(plan.ok)
         self.assertTrue(any("保存できるのは下書きだけ" in e for e in plan.errors), plan.errors)
 
+    # 8. move の衝突は、移動元自身を数えず、ほかの層の衝突は残す
+    def test_move_to_common_keeps_a_collision_in_another_layer(self):
+        text = self.read_draft().decode("utf-8")
+        imported = self.import_("i0001", "--to", "project", "--yes", "--expect", self.sha)
+        self.assertEqual(imported.returncode, 0, imported.stdout + imported.stderr)
+        lib = os.path.join(self.root, "projects", "lib")
+        os.makedirs(os.path.join(lib, ".git"))
+        other = os.path.join(lib, ".ccnavi", "config", "project", "templates", "i0001.yml")
+        os.makedirs(os.path.dirname(other))
+        with open(other, "wb") as f:
+            f.write(text.replace("機能を設計から実装まで進める", "別の説明").encode("utf-8"))
+        plan = template_edit.prepare(
+            self.conf,
+            self.root,
+            template_edit.OP_MOVE,
+            "i0001",
+            on=template_edit.ON_PROJECT,
+            layer="self",
+            to=template_drafts.TO_COMMON,
+        )
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("lib" in e for e in plan.errors), plan.errors)
+        self.assertFalse(any(self.project_file() in e for e in plan.errors), plan.errors)
+
+    # 9. 改名で .yml の付いた名前は作らない
+    def test_rename_to_a_name_with_the_yml_suffix_is_refused(self):
+        plan = template_edit.prepare(
+            self.conf,
+            self.root,
+            template_edit.OP_RENAME,
+            "i0001",
+            on=template_edit.ON_DRAFT,
+            new_name="zz.yml",
+        )
+        self.assertFalse(plan.ok)
+        self.assertTrue(any("zz.yml" in e and ".yml" in e for e in plan.errors), plan.errors)
+        self.assertFalse(os.path.lexists(self.draft_path("zz.yml")))
+
 
 if __name__ == "__main__":
     unittest.main()

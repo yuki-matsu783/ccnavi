@@ -147,6 +147,28 @@ class EditCli(Drafts):
         ):
             self.assertTrue(self.denied(command), command)
 
+    def test_the_agent_cannot_type_the_edit_forms_in_any_launcher_form(self):
+        for command in (
+            "uv run ccnavi --templates --delete-template a --on common --yes --expect H "
+            "--via board --json",
+            "uv run ccnavi --templates --rename-template a --on common --new-name b "
+            "--yes --expect H --json",
+            "uv run ccnavi --templates --save-draft a --body-file /tmp/x --yes --expect H --json",
+            "ccnavi --templates --save-draft a --body-file /tmp/x --json",
+        ):
+            self.assertTrue(self.denied(command), command)
+
+    def test_the_agent_cannot_preview_a_draft_save_in_any_launcher_form(self):
+        for command in (
+            "uv run ccnavi --templates --save-draft a --body-file /tmp/x --json",
+            "ccnavi --templates --save-draft a --body-file /tmp/x --json",
+        ):
+            self.assertTrue(self.denied(command), command)
+
+    def test_the_agent_can_preview_a_draft_delete(self):
+        self.assertFalse(self.denied("ccnavi --templates --delete-draft a --json"))
+        self.assertFalse(self.denied("uv run ccnavi --templates --delete-draft a --json"))
+
     def test_version_lists_the_edit_feature(self):
         result = self.tpl("--version", "--json")
         self.assertEqual(result.returncode, 0, result.stderr)

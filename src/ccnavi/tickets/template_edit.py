@@ -240,6 +240,11 @@ def _rename(conf: settings.Settings, root: str, plan: EditPlan) -> None:
     if not _name_ok(plan.new_name):
         plan.errors.append(f"新しい名前 {plan.new_name!r} は使えない")
         return
+    if plan.new_name.endswith(plan_templates.SUFFIX):
+        plan.errors.append(
+            f"新しい名前 {plan.new_name!r} は .yml で終わらない名前にする（拡張子は付けない）"
+        )
+        return
     if plan.new_name == plan.name:
         plan.errors.append("新しい名前が今の名前と同じ")
         return
@@ -329,10 +334,11 @@ def _move(conf: settings.Settings, root: str, plan: EditPlan) -> None:
     if any(p.severity == SEVERITY_ERROR for p in plan.problems):
         plan.errors.append("行き先の定義で error があるので移動できない（下の error を直す）")
         return
-    # 移動元自身が同名の相手として数えられるので、その行は捨てる。
-    errs, infos = template_drafts.collide(conf, root, template, plan.to, plan.to_layer)
-    plan.errors.extend(e for e in errs if plan.source_rel not in e)
-    plan.infos.extend(i for i in infos if plan.source_rel not in i)
+    errs, infos = template_drafts.collide(
+        conf, root, template, plan.to, plan.to_layer, skip=plan.source_rel
+    )
+    plan.errors.extend(errs)
+    plan.infos.extend(infos)
 
 
 def _delete(conf: settings.Settings, root: str, plan: EditPlan) -> None:

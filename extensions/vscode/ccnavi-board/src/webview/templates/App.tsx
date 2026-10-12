@@ -192,9 +192,15 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
           if (mine && current !== undefined) {
             setEditing({ key: current.key, state: { ...current.state, busy: false } });
           }
-        } else if (answer !== null && (answer.written || answer.removed)) {
+        } else if (answer !== null && answer.ok && (answer.written || answer.removed)) {
           setStatus({ text: doneText(message.request, answer), error: false });
           setEditing(undefined);
+        } else if (answer !== null && !answer.ok && (answer.written || answer.removed)) {
+          // 途中で失敗した（新しい側は書けたが元を消せなかった、など）。欄は残し、ファイルの状態を読み直して確かめてもらう
+          setStatus({ text: `途中で失敗しました: ${answer.errors.join(" / ") || "理由は不明です"}。一覧を読み直して、ファイルの状態を確かめてください`, error: true });
+          if (mine && current !== undefined) {
+            setEditing({ key: current.key, state: { ...current.state, answer, error: "", busy: false } });
+          }
         } else if (mine && current !== undefined) {
           // 書かずに返った（問題で実行できない）。答えを下見に入れ替えて見せる
           setEditing({ key: current.key, state: { ...current.state, answer, error: "", busy: false } });

@@ -16,10 +16,11 @@
                        [--yes --expect <ハッシュ>] [--json]
 
 一覧・検索・表示は読むだけ。`--draft` は完了した親から下書きの置き場に下書きを書くだけで、
-下書きに効力は無いので、どちらもエージェントが打ってよい。`--import` はユーザ専用で、`--yes` と
-`--expect` が揃ったときだけ書く。エージェントが打てない形は `phase_forms._CLI_FORMS` が止める。
-`--rename-template` `--move-template` `--delete-template` もエージェントが打てない
-（phase_forms が止める）。cli を読まない。
+下書きに効力は無いので、エージェントが打ってよい。`--delete-draft` の下見（`--yes` なし）も
+エージェントが打ってよい。`--import` はユーザ専用で、`--yes` と `--expect` が揃ったときだけ書く。
+`--save-draft` `--rename-template` `--move-template` `--delete-template` もエージェントが打てない
+（下見も含む。下書きの編集は Write で行う）。エージェントが打てない形は `phase_forms._CLI_FORMS`
+が止める。cli を読まない。
 """
 
 from __future__ import annotations

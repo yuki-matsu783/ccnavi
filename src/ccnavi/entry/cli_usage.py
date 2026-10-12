@@ -113,9 +113,10 @@ draft's hash as --expect it writes, then removes the draft if it is unchanged.
 
 The draft and the collected template can also be edited. Without --yes they
 write nothing and show the change; with --yes and the subject's hash as
---expect they write. Only the user types --yes. --rename-template,
+--expect they write. Only the user types --yes. --save-draft, --rename-template,
 --move-template and --delete-template are user-only (the agent cannot type
-them).
+them, not even the preview; it edits drafts with Write). --delete-draft
+previews can be typed by the agent.
 
     ccnavi --templates --save-draft NAME --body-file FILE [--yes --expect HASH] [--json]
     ccnavi --templates --delete-draft NAME [--yes --expect HASH] [--json]
