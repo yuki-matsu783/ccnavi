@@ -375,9 +375,10 @@ def followup(
 
 def predecessor_pool(conf: settings.Settings, root: str) -> dict[str, list[ticket_model.Ticket]]:
     """いまの置き場から先行を引く対応表を組む。"""
-    open_copies, _ = approval.scan(conf, root)
-    review, _ = approval.scan_review(conf, root)
-    closed, _ = approval.scan(conf, root, closed=True)
+    raw = approval.read_raw(conf, root)
+    open_copies, _ = approval.scan(conf, root, raw=raw)
+    review, _ = approval.scan_review(conf, root, raw=raw)
+    closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
     pool = approval_checks.predecessor_pool_of(open_copies, review, closed, proposals, root)
     approval_checks.align_imported(conf, root, pool)
