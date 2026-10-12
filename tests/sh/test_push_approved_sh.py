@@ -35,12 +35,6 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 PUSH_SCRIPTS = ("ccnavi-push-approved.sh", *common_sh(SH_DIR))
-# ユーザがコピーするまで `.ccnavi/scripts/` に入らない版（テンプレートの下書きの削除を運ぶ）。
-# `use_staged_sh = True` のテストは、`CCNAVI_SH_DIR` が無ければこの版を写して走らせる。
-# コピーしたあとは同じ中身になるので、コピーの前後どちらでも通る。
-# `CCNAVI_SH_DIR` を渡したときはそちらを使う。
-STAGED_DIR = os.path.join(ROOT, "wip", "design", "scripts")
-USE_STAGED = not os.environ.get("CCNAVI_SH_DIR", "")
 APPROVE_SCRIPTS = (*PUSH_SCRIPTS, "ccnavi-agree.sh")
 APPROVED = ".ccnavi/approved/doing"
 MESSAGE = "ccnavi: 承認済みチケットを更新"
@@ -86,8 +80,6 @@ class Workspace(unittest.TestCase):
     """使い捨てのワークスペースと bare のリモート。テストは持たない（下の 2 つが継いで使う）。"""
 
     scripts = PUSH_SCRIPTS
-    # 写す前の版（`STAGED_DIR`）で走らせるか。
-    use_staged_sh = False
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -96,11 +88,7 @@ class Workspace(unittest.TestCase):
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
         for name in self.scripts:
-            source = os.path.join(STAGED_DIR, name)
-            if self.use_staged_sh and USE_STAGED and os.path.isfile(source):
-                shutil.copy(source, scripts)
-            else:
-                shutil.copy(os.path.join(SH_DIR, name), scripts)
+            shutil.copy(os.path.join(SH_DIR, name), scripts)
         git(self._tmp.name, "init", "-q", "-b", "main", self.ws)
         for key, value in (
             ("user.email", "t@example.invalid"),
@@ -685,7 +673,6 @@ class TemplateDraftCarryTest(Workspace):
     `.ccnavi/scripts/` の版で走らせる。この版は、消えた下書きを拾ってコミットに入れる。
     """
 
-    use_staged_sh = True
     drafts = "wip/proposals/templates"
 
     def track(self, tree, *rels):

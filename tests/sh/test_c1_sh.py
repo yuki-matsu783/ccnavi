@@ -1077,14 +1077,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertEqual(git(self.tree, "diff", "--cached", "--name-only").stdout, "")
 
     def test_push_approved_carries_a_removed_template_draft_with_the_flow(self):
-        """取り込んで消えたテンプレートの下書きも、フローの下書きと同じ形で運ぶ（C1 の手順）。
-
-        `wip/design/scripts/` の版（ユーザがコピーする前）を写して走らせる。コピーしたあとは同じ中身
-        なので、前後どちらでも通る。`CCNAVI_SH_DIR` を渡したときは、そちらを重ねてある。
-        """
-        staged = os.path.join(ROOT, "wip", "design", "scripts", "ccnavi-push-approved.sh")
-        if not OVERLAY_DIR and os.path.isfile(staged):
-            shutil.copy(staged, self.scripts)
+        """取り込んで消えたテンプレートの下書きも、フローの下書きと同じ形で運ぶ（C1 の手順）。"""
         drafts = "wip/proposals/templates"
         taken = f"{drafts}/feature.yml"
         rewritten = f"{drafts}/research.yml"

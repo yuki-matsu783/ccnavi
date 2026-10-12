@@ -1375,20 +1375,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
     # ---- 共通の作業・レビュー計画のテンプレート
 
-    def staged_setup(self):
-        """共通のテンプレートを配る版。いまは `scripts/` の版そのもの。"""
-        return SCRIPT
-
-    def run_staged(self, target, *args):
-        return subprocess.run(
-            [SHELL, self.staged_setup(), target, *args],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=clean_env(),
-        )
-
     def listing(self, base):
         found = []
         for parent, _, names in os.walk(base):
@@ -1400,7 +1386,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         """配布元の共通のテンプレートを、配布先の同じ場所へ中身を変えずに配る。"""
         templates = {"feature.yml": "name: feature\nplan: [design]\n", "fix.yml": "name: fix\n"}
         src = self.make_source(templates=templates)
-        result = self.run_staged(self.dir, "--mode", "enable", "--deploy", src)
+        result = self.run_setup("--mode", "enable", "--deploy", src)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         for name, text in templates.items():
             with open(self.deployed(*TEMPLATES_PARTS, name), encoding="utf-8") as f:
@@ -1415,7 +1401,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         src = self.make_source(
             templates={"feature.yml": "name: feature\n", "notes.txt": "x\n", ".hidden.yml": "x\n"}
         )
-        result = self.run_staged(self.dir, "--mode", "enable", "--deploy", src)
+        result = self.run_setup("--mode", "enable", "--deploy", src)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(os.listdir(self.deployed(*TEMPLATES_PARTS)), ["feature.yml"])
 
@@ -1425,10 +1411,10 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         os.makedirs(self.deployed(*TEMPLATES_PARTS))
         with open(self.deployed(*TEMPLATES_PARTS, "feature.yml"), "w", encoding="utf-8") as f:
             f.write("name: feature\ndescription: このプロジェクトで直した\n")
-        self.run_staged(self.dir, "--deploy", src)
+        self.run_setup("--deploy", src)
         with open(self.deployed(*TEMPLATES_PARTS, "feature.yml"), encoding="utf-8") as f:
             self.assertIn("このプロジェクトで直した", f.read())
-        self.run_staged(self.dir, "--deploy", src, "--force")
+        self.run_setup("--deploy", src, "--force")
         with open(self.deployed(*TEMPLATES_PARTS, "feature.yml"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "name: feature\n")
 
@@ -1436,15 +1422,15 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         """配布元に共通のテンプレートが無ければ（置き場が無い・空）、何も足さず何も言わない。
 
         配られるファイルと標準出力・標準エラーは、テンプレートを知らなかった版の結果で、
-        ここに固定する（版に依らず通る。別の版のスクリプトと比べると、ユーザがステージ版を
-        `scripts/` にコピーしたあとは同じファイル同士の比べになり、何も見なくなる）。
+        ここに固定する（別の版のスクリプトとは比べず、`scripts/ccnavi-setup.sh` の版そのもので
+        確かめる）。
         """
         for templates in (None, {}):
             with self.subTest(templates=templates):
                 src = self.make_source(templates=templates)
                 target = tempfile.mkdtemp(prefix="ccnavi-setup-")
                 self.addCleanup(shutil.rmtree, target, ignore_errors=True)
-                result = self.run_staged(target, "--mode", "enable", "--deploy", src)
+                result = self.run_raw(target, "--mode", "enable", "--deploy", src)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual(result.stderr, "")
                 shown = result.stdout.replace(target, "<T>").replace(THIS_MACHINE, "<M>")
@@ -1468,7 +1454,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 "-dash.yml": "name: z\n",
             }
         )
-        result = self.run_staged(self.dir, "--mode", "enable", "--deploy", src)
+        result = self.run_setup("--mode", "enable", "--deploy", src)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(os.listdir(self.deployed(*TEMPLATES_PARTS)), ["feature.yml"])
         # ほかのファイルは配られている。
