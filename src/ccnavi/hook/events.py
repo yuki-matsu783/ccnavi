@@ -21,6 +21,7 @@ from ..tickets import (
     approval_checks,
     branchfind,
     ops_stop,
+    ops_stop_integrate,
     ops_stop_request,
     phase,
     session_rejects,
@@ -243,7 +244,12 @@ def decide_at_stop(
     促す（`_request_nudge`）。承認済みの親に作業中の子が残っているか、子が全部閉じたのに
     依頼のマーカーが無いとき。止め方とモードの扱いは `finish` の促しと同じ。
 
-    どちらも促さなかった回に限り、`match: Stop` のルールが渡す回ならそこで止める
+    どちらも促さなかった回に限り、チケットに結び付かない直接作業が `integrate` まで進んでいなければ
+    止めて、打ち方と staged で止めてユーザに確かめてもらう手順を促す（`_integrate_nudge`）。
+    統合の前提を満たせないときは止めず、理由を報告へ足す。
+    止め方とモードの扱いは `finish` の促しと同じ。
+
+    どれも促さなかった回に限り、`match: Stop` のルールが渡す回ならそこで止める
     （`stop_rules_nudge`）。止め方とモードの扱いは `finish` の促しと同じ。
 
     承認済みチケットの置き場は、ここで 1 度だけ読んで範囲（`scope_guard`）と `finish` の促し
@@ -273,6 +279,12 @@ def decide_at_stop(
     if not nudge:
         # finish の促しで止める回は、依頼までの道の促しを出しも数えもしない。
         nudge = _request_nudge(stderr, conf, root, payload, record, raw)
+    if not nudge:
+        # 上の促しで止める回は、直接作業の促しを出しも数えもしない。前提を満たせず促せない回は
+        # 止めずに理由だけを報告へ足す。
+        nudge, notice = _integrate_nudge(stderr, conf, root, payload, record)
+        if notice:
+            report = f"{report}\n\n{notice}" if report else notice
     if not nudge:
         # 上の促しで止める回は、ルールの促しを数えもしない。1 回の Stop で
         # 止める理由は 1 つだけにし、数えを進めて届かない回を作らない。
@@ -429,6 +441,44 @@ def _request_nudge(
     record.enforced = True
     record.tree = found.parent.ticket
     return ops_stop_request.request_nudge(root, found)
+
+
+def _integrate_nudge(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+) -> tuple[str, str]:
+    """直接作業が `integrate` まで進んでいないとき、打ち方を促す文と、促せない理由。
+
+    返すのは (止める文, 報告に足す理由)。どちらも空なら何もしない。hook 自身は `integrate`
+    を打たない。判定は `ops_stop_integrate.direct_at_stop`。理由は統合の前提（統合先のツリーが
+    綺麗なこと）を満たせないときで、止めずに報告へ足す。
+
+    止めない回と止め方は `_request_nudge` と同じ（`stop_hook_active`・サブエージェント・
+    state の置き場・チケット制御を見て、モードは見ない。実行中のサブエージェントが居る間も止めず、
+    「1 回だけ」の記録も進めない）。同じ状態では促しも理由も 1 回だけで、記録は
+    `nudged-<セッション>.json` の `integrate:` で始まる鍵。
+    """
+    if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
+        return "", ""
+    if subagent.running(conf.state, payload.session_id):
+        return "", ""
+    found = ops_stop_integrate.direct_at_stop(root, conf, payload.cwd)
+    if found is None or ops_stop_integrate.nudged_before(conf.state, payload.session_id, found):
+        return "", ""
+    failed = ops_stop_integrate.remember_nudge(conf.state, payload.session_id, found)
+    if failed:
+        stderr.write(f"ccnavi: integrate を促した記録を残せないので、促さない: {failed}\n")
+        return "", ""
+    if found.blocked:
+        return "", ops_stop_integrate.blocked_notice(found)
+    _over_report(record)
+    record.decision, record.code = audit.NUDGE, ops_stop_integrate.CODE_INTEGRATE_NUDGE
+    record.enforced = True
+    record.tree = found.name
+    return ops_stop_integrate.integrate_nudge(root, found), ""
 
 
 def decide_at_start(
