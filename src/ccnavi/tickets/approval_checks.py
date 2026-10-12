@@ -171,6 +171,81 @@ def branch_problems(
     return found
 
 
+def misplaced_home_text(root: str, family: str, shown: str) -> str:
+    """承認済みチケットが親のワークツリーに無いときの理由と直し方。
+
+    `home_problem` と ready が同じ文を出す。`ccnavi-push-approved.sh` と `ccnavi-sync.sh` は、
+    ツリーごとの置き場を送る・親のブランチを取り込むだけで、ツリーの間でチケットを動かさない。
+    承認済みチケットは手で動かさず、承認し直す。
+    """
+    worktree_sh = settings.script_command(root, "ccnavi-worktree.sh")
+    return (
+        f"親 {family} の承認済みチケットが親のワークツリー"
+        f"（{tree.WORKTREES_DIR}/{family}）ではなく {shown} に在る。"
+        "ccnavi は親のワークツリーを「名前が親の識別子のもの」として探すので、"
+        "別名のツリーで承認したチケットは、取り込み・閉じたチケットの退避・"
+        "Draft を外す ready の対象にならない。承認済みチケットは手で動かさない。直す手順: "
+        f"1) 親のワークツリーが無ければ '{worktree_sh} {family}' で切る "
+        f"2) {shown} にある {family} の提案（wip/proposals/ の todo/ か review/）を"
+        "親のワークツリーの同じ相対位置に移す "
+        "3) ユーザに承認を取り直してもらう（承認済みチケットが親のワークツリーに置かれる） "
+        f"4) {shown} に残った {family} の承認済みチケットの片付けをユーザに聞く。"
+        "ccnavi-push-approved.sh と ccnavi-sync.sh は各ツリーの置き場を送る・取り込むだけで、"
+        "ツリーの間でチケットを動かさない"
+    )
+
+
+def home_problem(root: str, conf: settings.Settings, t: ticket_model.Ticket) -> str:
+    """承認済みチケットが、識別子と違う名前のワークツリーに在るときの理由。無ければ空。
+
+    ワークスペースルートとプロジェクトの元ツリーは言わない（`ready` が退避の元として止める
+    ツリーのうち、別名のワークツリーだけを早く止める）。親の識別子は、子なら親、親なら自分。
+    """
+    if not t.tree_root:
+        return ""
+    home = tree.tree_of(root, t.tree_root, conf.projects)
+    if home is None or home.is_main:
+        return ""
+    family = t.parent or t.ticket
+    if home.name == family:
+        return ""
+    return misplaced_home_text(root, family, home.name)
+
+
+def place_problems(
+    root: str, conf: settings.Settings, t: ticket_model.Ticket
+) -> list[rules.Problem]:
+    """提案を識別子と違う名前のワークツリーに書いていれば承認しない（`--lint` の warn と同じ条件）。
+
+    承認済みチケットは提案を書いたツリーにそのまま置かれる。親のワークツリーが識別子と違う名前だと、
+    親が取り込み済みにならず、承認済みチケットの自動コミットも動かず、`start` `finish` は通っても
+    `ready` で止まる。承認のあとには取り返せないので、承認の前に止める。ワークスペースルートと
+    プロジェクトの元ツリーの提案は言わない。`branch:` で既存のブランチを名乗る親も言わない
+    （ブランチ名に `/` を含み、ワークツリーの名前にできないため）。
+    """
+    if not t.tree_root or (not t.is_child and t.branch):
+        return []
+    home = tree.tree_of(root, t.tree_root, conf.projects)
+    if home is None or home.is_main:
+        return []
+    family = t.parent or t.ticket
+    if home.name == family:
+        return []
+    worktree_sh = settings.script_command(root, "ccnavi-worktree.sh")
+    what = f"子の提案 {t.ticket}" if t.is_child else f"提案 {t.ticket}"
+    return [
+        rules.Problem(
+            rules.SEVERITY_ERROR,
+            t.ticket,
+            f"{what} を識別子と違う名前のワークツリー {home.name} に書いている。"
+            f"親のワークツリーは識別子と同じ名前（{family}）にする。承認済みチケットは提案を書いた"
+            "ツリーに置かれるので、別名のままだと親が取り込み済みにならず、承認済みチケットの自動"
+            "コミットが動かず、`ready` で止まる。承認のあとには取り返せないので、承認の前に直す: "
+            f"'{worktree_sh} {family}' で切り、提案を移して元を消してから承認を頼んでください",
+        )
+    ]
+
+
 def family_stop_text(root: str, st: syncstate.Standing) -> str:
     """親子のチケットが決まらない・閉じているので承認しない理由と、ユーザが打つ手順（`family_problems`）。"""
     hint = " / ".join(syncstate.guidance(root, st))

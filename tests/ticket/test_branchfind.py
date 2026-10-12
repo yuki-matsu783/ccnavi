@@ -32,6 +32,13 @@ def with_mr(text, mr):
 
 
 class PromptHintTest(PhaseHarness):
+    def propose_own(self, name, text):
+        """承認する提案は、識別子と同じ名前のワークツリーに書いてコミットする。"""
+        tree = self.worktree(name, "main")
+        self.propose(name, text, tree=tree)
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "propose " + name)
+
     def prompt(self, text, *extra, session="s1"):
         payload = {
             "hook_event_name": "UserPromptSubmit",
@@ -119,8 +126,7 @@ class PromptHintTest(PhaseHarness):
         self.assertNotIn("--mr 12", said)
 
     def test_a_mr_field_of_an_approved_ticket_says_continue(self):
-        self.propose("feature-3-foo", with_mr(parent_text("feature-3-foo", ["research"]), 12))
-        self.commit_parent("propose")
+        self.propose_own("feature-3-foo", with_mr(parent_text("feature-3-foo", ["research"]), 12))
         self.approve()
         said = self.prompt("MR !12 を見て")
         self.assertIn("すでに feature-3-foo(doing)", said)
@@ -141,9 +147,8 @@ class PromptHintTest(PhaseHarness):
         # `mr:` の一致を先に見る。慣習名（branch: mr-N）は併用で残る
         by_field = with_mr(parent_text("feature-3-foo", ["research"]), 12)
         by_name = with_branch(parent_text("feature-4-bar", ["research"]), "mr-14")
-        self.propose("feature-3-foo", by_field)
-        self.propose("feature-4-bar", by_name)
-        self.commit_parent("propose")
+        self.propose_own("feature-3-foo", by_field)
+        self.propose_own("feature-4-bar", by_name)
         self.approve()
         self.assertIn("すでに feature-3-foo(doing)", self.prompt("MR !12 を見て"))
         self.assertIn("すでに feature-4-bar(doing)", self.prompt("MR !14 を見て", session="s2"))

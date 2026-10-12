@@ -105,8 +105,11 @@ class PhaseHarness(unittest.TestCase):
         out = json.loads(result.stdout).get("hookSpecificOutput", {})
         return out.get("permissionDecisionReason") or out.get("additionalContext") or ""
 
-    def propose(self, name, text):
-        return write(os.path.join(self.parent_tree, "wip", "proposals", "todo", name + ".md"), text)
+    def propose(self, name, text, tree=None):
+        """提案を書く。`tree` が無ければ親 i0001 のワークツリー。別の親は同名のツリーに書く。"""
+        return write(
+            os.path.join(tree or self.parent_tree, "wip", "proposals", "todo", name + ".md"), text
+        )
 
     def approve(self):
         """承認して、承認済みチケットを親のブランチに乗せる。
