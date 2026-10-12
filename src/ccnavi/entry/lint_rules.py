@@ -93,13 +93,8 @@ def _rules(
 
     seen: set[str] = set()
     for rule in rule_set.all():
-        # id を欠いたルールは名指しできないので、当たった中身で呼ぶ。
-        name = rule.id or f"(id 無し: {rule.decision} {rule.match} {rule.written_body()})"
-        if not rule.id:
-            problems.append(
-                Problem(SEVERITY_WARN, name, "id が無い。記録や報告でこのルールを名指しできない")
-            )
-        elif rule.id in seen:
+        name = rule.id
+        if rule.id in seen:
             problems.append(
                 Problem(
                     SEVERITY_WARN,
