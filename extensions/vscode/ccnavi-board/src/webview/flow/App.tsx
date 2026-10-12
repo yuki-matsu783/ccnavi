@@ -52,7 +52,7 @@ import {
 import { canRedo, canUndo, emptyHistory, record, redo, seal, undo, type FlowHistory } from "../../core/flow-history.js";
 import type { FlowChecks, FlowData, FlowLock, FlowOffer, FlowPage, FlowProposal, ToFlow } from "../../core/flow-view.js";
 import { applyAppearance } from "../appearance.js";
-import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
+import { INTRO_COURSE, Tour, TourButton, useTour, type TourCourse, type TourStep } from "../Tour.js";
 import { graphMaximized } from "../shared/Maximize.js";
 import { mergeState, readState } from "../vscode.js";
 import { Canvas, type Selection } from "./Canvas.js";
@@ -165,6 +165,9 @@ const TOUR_STEPS: readonly TourStep[] = [
     body: "読み込んだ時点からの変更（足した・消した・変えたノードと線）を一覧で表示してから保存します。保存の直前に、子チケットが着手中でないかを ccnavi に確かめ直します。着手中なら書き込みません（担当のサブエージェントが読んでいる手順が、途中で変わるのを防ぐためです）。",
   },
 ];
+
+/** フロー編集画面の案内の一覧。先頭が基本の案内（初回に自動で出る） */
+const COURSES: readonly TourCourse[] = [{ id: INTRO_COURSE, title: "基本の案内", summary: "画面の見どころを順に回ります", steps: TOUR_STEPS }];
 
 export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [data, setData] = useState<FlowData>(initial);
@@ -697,7 +700,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
             保存
           </button>
         </div>
-        <TourButton onClick={tour.start} />
+        <TourButton courses={COURSES} onPick={tour.start} />
       </header>
       {notices.length + (checks?.warns.length ?? 0) > 0 && (
         <ul className="problems" id="flow-notices">
@@ -762,7 +765,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           <Preview checks={checks} checking={checking} error={checkError} />
         </div>
       </div>
-      {tour.touring && <Tour steps={TOUR_STEPS} onClose={tour.end} />}
+      {tour.touring && <Tour steps={(COURSES.find((course) => course.id === tour.course) ?? COURSES[0]).steps} onClose={tour.end} />}
       {review !== undefined && <SaveReview diff={review} onConfirm={confirmSave} onCancel={() => setReview(undefined)} />}
       {proposal !== undefined && (
         <ProposalReview view={proposal} base={base} lock={lock} dirty={dirty} onImport={importProposal} onCancel={() => setProposal(undefined)} />

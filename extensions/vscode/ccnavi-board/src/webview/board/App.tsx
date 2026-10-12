@@ -12,7 +12,7 @@ import type { Moved } from "../../core/board-moved.js";
 import type { BoardData, ToBoard } from "../../core/board-view.js";
 import { SAMPLE_NOTE, sampleBoard } from "../../core/tour-sample.js";
 import { applyAppearance } from "../appearance.js";
-import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
+import { INTRO_COURSE, Tour, TourButton, useTour, type TourCourse, type TourStep } from "../Tour.js";
 import { post } from "./post.js";
 import { Approval } from "./Approval.js";
 import { CardItem } from "./Card.js";
@@ -235,7 +235,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 承認待ち {visiblePending.length} 件を承認
               </button>
             </div>
-            <TourButton onClick={tour.start} />
+            <TourButton courses={COURSES} onPick={tour.start} />
           </header>
           {(board?.problems.length ?? 0) > 0 ? (
             <ul className="problems">
@@ -280,7 +280,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
         </>
       )}
       {data.approval !== undefined ? <Approval overlay={data.approval} unsaved={data.unsaved ?? []} /> : null}
-      {tour.touring && board !== undefined ? <Tour steps={TOUR_STEPS} onClose={tour.end} /> : null}
+      {tour.touring && board !== undefined ? <Tour steps={(COURSES.find((course) => course.id === tour.course) ?? COURSES[0]).steps} onClose={tour.end} /> : null}
     </>
   );
 }
@@ -326,6 +326,9 @@ const TOUR_STEPS: readonly TourStep[] = [
     body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
   },
 ];
+
+/** ボード画面の案内の一覧。先頭が基本の案内（初回に自動で出る） */
+const COURSES: readonly TourCourse[] = [{ id: INTRO_COURSE, title: "基本の案内", summary: "画面の見どころを順に回ります", steps: TOUR_STEPS }];
 
 function Footer({ board }: { readonly board: Board }): JSX.Element {
   return (

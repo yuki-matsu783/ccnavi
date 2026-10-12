@@ -17,7 +17,10 @@ import { isToolName, KNOWN_TOOLS, SECTIONS, SECTION_LABELS, modeBanner, type Fil
 import type { SuggestJson } from "../../core/suggestmodel.js";
 import type { ExpectationsJson } from "../../core/testmodel.js";
 import { applyAppearance } from "../appearance.js";
-import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
+import { courseOf, coursesOf, Tour, TourButton, useTour } from "../Tour.js";
+import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
+import { parseRulesSample } from "../../core/tour-rules.js";
+import rulesTour from "../tours/rules.yml";
 import { Hooks } from "./Hooks.js";
 import { ExpectationsResult, JudgeResult, SuggestResult, type Judged } from "./Judge.js";
 import { TargetSelect } from "../TargetSelect.js";
@@ -41,6 +44,24 @@ import {
   type TabName,
 } from "./state.js";
 import { countText, findText, hasContext } from "./text.js";
+
+/**
+ * 案内（`tours/rules.yml`）と、案内の間だけ描く見本。今の設定は使わず、画面が持つ編集中の内容にも触れない。
+ * 読み込み時に形を確かめる（壊れていればテストが先に落とす）。
+ */
+const TOUR = tourOf(rulesTour);
+const SAMPLE = parseRulesSample(TOUR.sample);
+/** 見本の行の鍵。実際の行の鍵（`r1`…）と重ならない */
+const SAMPLE_DRAFT: Draft = draftOf(SAMPLE.sections, ((): (() => string) => {
+  let seq = 0;
+  return () => `s${(seq += 1)}`;
+})());
+const NO_SCENE: Scene = {};
+
+/** 段の `scene` の文字列を `,` で割る */
+function sceneList(value: Scene[string] | undefined): readonly string[] {
+  return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
+}
 
 /** 中身が読めなかったときの錠。画面は保存させない（押せる形で出して異常終了させない） */
 const NO_LOCK: Lock = { locked: true, reason: "", doing: [] };
@@ -105,20 +126,14 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const page = pageOf(data);
 
   /**
-   * 案内はタブを切り替えて中を指すので、始める前のタブを覚えておき、閉じたら戻す。案内の間の切り替えは
-   * state（`saveTab`）に書かない（途中でタブを閉じたときに、次から別のタブで開く、ということを起こさない）
+   * 案内の間は見本を描き、段ごとの様子（開く行・タブ・選ぶ点など）は `scene` に入れる。実際のタブや開いた行は動かさないので、
+   * 閉じたあとに戻すものは無い
    */
-  const tabBeforeTour = useRef<TabName | undefined>(undefined);
+  const [scene, setScene] = useState<Scene>(NO_SCENE);
   const tour = useTour(data.kind === "page", {
-    onStart: () => {
-      tabBeforeTour.current = tab;
-    },
+    onStart: () => setScene(NO_SCENE),
     onEnd: () => {
-      const was = tabBeforeTour.current;
-      tabBeforeTour.current = undefined;
-      if (was !== undefined) {
-        setTab(was);
-      }
+      setScene(NO_SCENE);
       post({ type: "tourDone" });
     },
   });
@@ -334,6 +349,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const isOpen = (key: string): boolean => open.has(key) || transient.has(key);
 
   const editDraft = (next: Draft, opened?: ReadonlySet<string>): void => {
+    if (tour.touring) {
+      return;
+    }
     setEditing((now) => ({ draft: next, open: opened ?? now.open }));
     setDirty(true);
   };
@@ -343,6 +361,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   };
 
   const toggle = (key: string): void => {
+    if (tour.touring) {
+      return;
+    }
     const next = new Set(open);
     // その場だけ開いていた行も「開いている」。ユーザが押したらそこから閉じる
     if (isOpen(key)) {
@@ -397,6 +418,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   };
 
   const judge = (): void => {
+    if (tour.touring) {
+      return;
+    }
     if (!isToolName(tool.trim())) {
       setStatus({ text: "ツール名は英字で始まり、英数字・_・- だけで入れてください", error: true });
       return;
@@ -410,17 +434,42 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     post({ type: "judge", sections: sectionsOf(draft), tool: tool.trim(), subject });
   };
 
-  const query = find.trim().toLowerCase();
+  const courses = coursesOf(TOUR, setScene);
+
+  // 案内の間は、今の設定ではなく見本を描く。画面の state（編集中のルール・開いた行・タブ・判定の結果）は触らない
+  const touring = tour.touring;
+  const sceneOpen = new Set(sceneList(scene.open));
+  const shownTab: TabName = touring ? (scene.tab === "judge" || scene.tab === "hooks" ? scene.tab : "rules") : tab;
+  const shownDraft = touring ? SAMPLE_DRAFT : draft;
+  // 畳んだタイプの中は指しても見えない（0×0 を照らす）。案内の間は畳まない
+  const shownFolded: ReadonlySet<Section> = touring ? new Set() : folded;
+  const shownFind = touring ? (typeof scene.find === "string" ? scene.find : "") : find;
+  const sceneJudge = typeof scene.judge === "string" ? SAMPLE.judges[scene.judge] : undefined;
+  const shownJudged: Judged | undefined = touring
+    ? sceneJudge === undefined
+      ? undefined
+      : { result: sceneJudge, hooks: SAMPLE.hooks.filter((hook) => hook.event === "PreToolUse") }
+    : judged;
+  const shownChecked = touring ? (scene.checked === true ? SAMPLE.checked : undefined) : checked;
+  const shownSuggested = touring ? (scene.suggested === true ? SAMPLE.suggested : undefined) : suggested;
+  const shownHits: ReadonlySet<string> = touring ? new Set(sceneJudge?.rules.map((rule) => rule.id) ?? []) : hits;
+  const shownDirty = touring ? false : dirty;
+  const shownLock: Lock = touring ? { locked: false, reason: "", doing: [] } : lock;
+  const shownTool = touring ? (typeof scene.tool === "string" ? scene.tool : KNOWN_TOOLS[0]) : tool;
+  const shownSubject = touring ? (typeof scene.subject === "string" ? scene.subject : "") : subject;
+  const isShownOpen = (row: { readonly key: string; readonly rule: RuleForm }): boolean => (touring ? sceneOpen.has(row.rule.id) : isOpen(row.key));
+
+  const query = shownFind.trim().toLowerCase();
 
   return (
     <>
-      {page !== undefined && modeBanner(page.mode) !== "" && (
+      {!touring && page !== undefined && modeBanner(page.mode) !== "" && (
         // モードは実行ファイルの答え。enable と、答えが取れないときは帯を出さない
         <div className="banner warn">
           現在の <code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>（{modeBanner(page.mode)}）
         </div>
       )}
-      {(page?.notices ?? []).map((notice, index) => (
+      {(touring ? [] : page?.notices ?? []).map((notice, index) => (
         <div className="banner warn" key={index}>
           {notice}
         </div>
@@ -431,18 +480,19 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           更新
         </button>
       </div>
+      {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <header className="toolbar">
         <div className="summary">
           <TargetSelect
-            target={page?.target}
-            targets={page?.targets}
+            target={touring ? undefined : page?.target}
+            targets={touring ? undefined : page?.targets}
             disabled={busy}
             onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })}
           />
-          <span className="path" title={page?.root ?? ""}>
-            {page?.rulesPath ?? ""}
+          <span className="path" title={touring ? "" : page?.root ?? ""}>
+            {touring ? "（見本）rules.yml" : page?.rulesPath ?? ""}
           </span>
-          <span id="dirty" className={dirty ? "dirty" : "dirty hidden"}>
+          <span id="dirty" className={shownDirty ? "dirty" : "dirty hidden"}>
             未保存
           </span>
         </div>
@@ -457,8 +507,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             type="button"
             className="action primary"
             id="save"
+            data-tour="save"
             data-action="save"
-            disabled={!dirty || lock.locked || busy}
+            disabled={!shownDirty || shownLock.locked || busy}
             onClick={() => {
               setBusy(true);
               setStatus({ text: "検証して保存中…", error: false });
@@ -468,45 +519,45 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             保存
           </button>
         </div>
-        <TourButton onClick={tour.start} />
+        <TourButton courses={courses} onPick={tour.start} />
       </header>
-      <p id="lock" className={lock.locked ? "lock" : "lock hidden"}>
-        {lock.reason}
+      <p id="lock" className={shownLock.locked ? "lock" : "lock hidden"}>
+        {shownLock.reason}
       </p>
-      {page !== undefined && page.model.problems.length > 0 && (
+      {!touring && page !== undefined && page.model.problems.length > 0 && (
         <ul className="problems">
           {page.model.problems.map((problem, index) => (
             <li key={index}>{problem}</li>
           ))}
         </ul>
       )}
-      <nav className="tabs" role="tablist">
+      <nav className="tabs" role="tablist" data-tour="tabs">
         {([
           ["rules", "ルール"],
           ["judge", "判定を試す"],
           ["hooks", "hook"],
         ] as const).map(([name, label]) => (
-          <button key={name} type="button" className={tab === name ? "tab active" : "tab"} data-tab={name} role="tab" onClick={() => showTab(name)}>
+          <button key={name} type="button" className={shownTab === name ? "tab active" : "tab"} data-tab={name} role="tab" onClick={() => showTab(name)}>
             {label}
           </button>
         ))}
       </nav>
-      <section id="tab-rules" className={`pane${tab === "rules" ? " active" : ""}${query === "" ? "" : " finding"}`} ref={list}>
+      <section id="tab-rules" data-tour="rules" className={`pane${shownTab === "rules" ? " active" : ""}${query === "" ? "" : " finding"}`} ref={list}>
         <div className="find">
-          <input id="find" type="search" placeholder="id・ツール・パターン・メッセージで絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
+          <input id="find" data-tour="find" type="search" placeholder="id・ツール・パターン・メッセージで絞り込む" spellCheck={false} value={shownFind} onChange={(event) => setFind(event.target.value)} />
           <span className="hint">判定は強い順に deny &gt; ask &gt; allow</span>
         </div>
         {SECTIONS.map((section) => {
-          const rows = draft[section].map((row) => {
+          const rows = shownDraft[section].map((row) => {
             const text = findText(row.rule);
             return { ...row, find: text, hidden: query !== "" && !text.includes(query) };
           });
           const shown = rows.filter((row) => !row.hidden).length;
-          const kept = rows.filter((row) => row.hidden && isOpen(row.key)).length;
+          const kept = rows.filter((row) => row.hidden && isShownOpen(row)).length;
           // 絞り込み中は折りたたんだタイプの中も見えるので、矢印も開いた向きにする
-          const shownAsOpen = query !== "" || !folded.has(section);
+          const shownAsOpen = query !== "" || !shownFolded.has(section);
           return (
-            <section className={folded.has(section) ? "rule-section folded" : "rule-section"} data-section={section} key={section}>
+            <section className={shownFolded.has(section) ? "rule-section folded" : "rule-section"} data-section={section} key={section}>
               <h2>
                 <button
                   type="button"
@@ -521,7 +572,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
                 </button>{" "}
                 <span className={`section-name ${section}`}>{section}</span> <span className="section-label">{SECTION_LABELS[section]}</span>{" "}
                 <span className="count" data-count={section}>
-                  {countText(query, shown, draft[section].length, kept)}
+                  {countText(query, shown, shownDraft[section].length, kept)}
                 </span>
                 <button type="button" className="action small" data-action="add" data-section={section} onClick={() => add(section)}>
                   ＋ ルールを追加
@@ -536,10 +587,10 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
                     rule={row.rule}
                     find={row.find}
                     hidden={row.hidden}
-                    open={isOpen(row.key)}
-                    hit={row.rule.id !== "" && hits.has(row.rule.id)}
+                    open={isShownOpen(row)}
+                    hit={row.rule.id !== "" && shownHits.has(row.rule.id)}
                     pickerOpen={pickerKey === row.key}
-                    moreOpen={moreOpen.get(row.key) ?? hasContext(row.rule)}
+                    moreOpen={touring ? scene.more === true : moreOpen.get(row.key) ?? hasContext(row.rule)}
                     onToggle={() => toggle(row.key)}
                     onChange={(rule) => editRule(section, row.key, rule)}
                     onMoveSection={(to) => moveSection(section, row.key, to)}
@@ -547,6 +598,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
                     onRemove={() => remove(section, row.key)}
                     onOpenPicker={() => setPickerKey(row.key)}
                     onPickFile={(field) => post({ type: "pickFile", key: row.key, field })}
+                    pickNode={touring ? (typeof scene.when === "string" ? scene.when : "r") : undefined}
                     onToggleMore={(value) => setMoreOpen(new Map([...moreOpen, [row.key, value]]))}
                   />
                 ))}
@@ -554,13 +606,13 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             </section>
           );
         })}
-        {page?.sums !== undefined && <Sum sums={page.sums} initial={defaultSum(page.sums, page.target)} key={`${page.target?.kind ?? ""}:${page.target?.name ?? ""}`} />}
+        {!touring && page?.sums !== undefined && <Sum sums={page.sums} initial={defaultSum(page.sums, page.target)} key={`${page.target?.kind ?? ""}:${page.target?.name ?? ""}`} />}
       </section>
-      <section id="tab-judge" className={tab === "judge" ? "pane active" : "pane"}>
+      <section id="tab-judge" className={shownTab === "judge" ? "pane active" : "pane"}>
         <p className="hint">
           dry-run モードの場合でも、ここは enable モードのときの判定を返します。
         </p>
-        <div className="judge-form">
+        <div className="judge-form" data-tour="judge-form">
           <label>
             ツール{" "}
             <input
@@ -569,7 +621,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
               list="tool-names"
               title="候補は判定が対象を取り出せるツール。一覧にない名前も入れられる（判定には届かない）"
               spellCheck={false}
-              value={tool}
+              value={shownTool}
               onChange={(event) => setTool(event.target.value)}
             />
             <datalist id="tool-names">
@@ -585,7 +637,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
               type="text"
               placeholder="Bash / PowerShell ならコマンド、Read / Grep / Glob / Edit / Write なら絶対パス、Skill ならスキル名、Agent なら見出し、WebFetch なら URL"
               spellCheck={false}
-              value={subject}
+              value={shownSubject}
               onChange={(event) => setSubject(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -599,7 +651,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             判定
           </button>
         </div>
-        {judged !== undefined && <JudgeResult judged={judged} />}
+        {shownJudged !== undefined && <JudgeResult judged={shownJudged} />}
         <div className="expectations-head">
           <button
             type="button"
@@ -614,12 +666,12 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           >
             期待する判定を一括で確かめる
           </button>
-          <span className="path">{page?.expectationsPath ?? ""}</span>
+          <span className="path">{touring ? "（見本）rule-expectations.yml" : page?.expectationsPath ?? ""}</span>
           <button type="button" className="action" data-action="open-expectations" onClick={() => post({ type: "openFile", which: "expectations" })}>
             エディタで開く
           </button>
         </div>
-        {checked !== undefined && <ExpectationsResult result={checked} />}
+        {shownChecked !== undefined && <ExpectationsResult result={shownChecked} />}
         <div className="expectations-head">
           <button
             type="button"
@@ -637,68 +689,17 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           </button>
           <span className="hint">保存済みのルールで確かめた候補です。編集中の内容は使いません</span>
         </div>
-        {suggested !== undefined && <SuggestResult result={suggested} />}
+        {shownSuggested !== undefined && <SuggestResult result={shownSuggested} />}
       </section>
-      <section id="tab-hooks" className={tab === "hooks" ? "pane active" : "pane"}>
-        <Hooks hooks={page?.hooks ?? []} files={page?.hookFiles ?? { settings: false, settingsLocal: false }} />
+      <section id="tab-hooks" data-tour="hooks" className={shownTab === "hooks" ? "pane active" : "pane"}>
+        <Hooks hooks={touring ? SAMPLE.hooks : page?.hooks ?? []} files={touring ? { settings: true, settingsLocal: false } : page?.hookFiles ?? { settings: false, settingsLocal: false }} />
       </section>
-      {tour.touring && <Tour steps={tourSteps(setTab, () => tabBeforeTour.current ?? tab)} onClose={tour.end} />}
+      {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
       <footer className={status?.error === true ? "foot error" : "foot"}>
         <span id="status">{status?.text ?? ""}</span>
       </footer>
     </>
   );
-}
-
-/**
- * ルール管理画面の案内。`peek` は案内の間だけのタブの切り替え（state に書かない）、`before` は始める前のタブ。
- * 最後の段に入る前に始める前のタブへ戻す（ヘッダ右上の ? はどのタブにも出ている）
- */
-function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonly TourStep[] {
-  return [
-    {
-      target: ".tabs",
-      title: "3 つのタブ",
-      body: "「ルール」タブでは deny・ask・allow のルールを確かめて直せます。「判定を試す」タブでは、編集中のルールで判定を試せます。「hook」タブでは登録内容を確かめられます。",
-      before: () => peek("rules"),
-    },
-    {
-      target: "#tab-rules",
-      title: "ルール",
-      body: "deny（止める）・ask（確かめる）・allow（通す）のタイプごとに並びます。判定は強い順に deny > ask > allow です。行を押すと欄が開き、「＋ ルールを追加」で足せます。見出しの ▾ でタイプを畳めます。",
-      before: () => peek("rules"),
-    },
-    {
-      target: "#find",
-      title: "絞り込み",
-      body: "id・ツール・パターン・メッセージで絞り込みます。畳んだタイプの中も探します。",
-      before: () => peek("rules"),
-    },
-    {
-      target: "#tab-judge .judge-form",
-      title: "判定を試す",
-      body: "ツールと対象（コマンドやパス）を入れて「判定」を押すと、編集中の内容でどのルールに当たるかを実行ファイルが返します。保存は要りません。「期待する判定を一括で確かめる」は、期待する判定のファイルに並べた例をまとめて確かめます。",
-      before: () => peek("judge"),
-    },
-    {
-      target: "#tab-hooks",
-      title: "hook",
-      body: ".claude/settings.json に登録された hook の一覧です。直すときは settings.json を開いて編集してください。",
-      before: () => peek("hooks"),
-    },
-    {
-      target: "#save",
-      title: "保存",
-      body: "保存すると実行ファイルが検証してから書き込みます。通らなければ、下に理由が出ます。ファイルが外で変わったときは上に帯が出るので、更新してください。",
-      before: () => peek(before()),
-    },
-    {
-      target: '[data-action="tour"]',
-      title: "案内",
-      body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
-      before: () => peek(before()),
-    },
-  ];
 }
 
 function replace(draft: Draft, section: Section, key: string, rule: RuleForm): Draft {

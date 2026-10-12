@@ -1,0 +1,172 @@
+# ルール管理画面の案内。`sample:` は案内の間だけ画面に出す見本（実際の設定ではない）。
+# ルールは rules.yml と同じ書き方。判定・期待する判定・候補は実行ファイルの JSON と同じ形（足りない項目は既定値で埋まる）。
+# `scene:` は段ごとの画面の様子。段ごとに全部を書く（前の段を引き継がない）。
+#   tab      rules / judge / hooks
+#   open     開く行の id（, で区切って複数）
+#   when     組み合わせ条件の図で選ぶ点（r は最上位、r.0 は 1 番目の子、r.0.1 はその中の 2 番目）
+#   more     「コンテキストの追加」を開く
+#   find     絞り込みの欄に入れる文字
+#   tool / subject / judge   「判定を試す」の欄の値と、出す判定の結果（sample.judges の名前）
+#   checked / suggested      期待する判定の一括確認・記録からの候補の結果を出す
+screen: rules
+
+sample:
+  rules:
+    deny:
+      - id: git-push
+        match: Bash
+        glob: "*git push*"
+        message: push はユーザが行う。ccnavi-git.sh の入口を使う
+      - id: no-rm-rf
+        match: Bash
+        regex: '\brm\s+-rf\b'
+        message: 消す前にユーザへ確かめる
+      - id: protect-env
+        match: Read|Edit|Write
+        message: 環境変数のファイルは読まない・書かない。値が要るならユーザに頼む
+        when:
+          all:
+            - regex: '(^|[\\/])\.env(\.|$)'
+            - not:
+                any:
+                  - glob: "**/.env.example"
+                  - glob: "**/.env.sample"
+    ask:
+      - id: deps-change
+        match: Write|Edit
+        glob: "**/pyproject.toml"
+        additionalContextOnce: 依存が変わる。理由を先に伝えてから直す
+        every: 1
+      - id: db-migrate
+        match: Bash
+        regex: '\bmigrate\b'
+        every: 3
+        additionalContext: 本番に向けた migrate でないかを確かめる
+    allow:
+      - id: read-docs
+        match: Read
+        glob: "**/docs/**"
+  hooks:
+    - { event: PreToolUse, matcher: "Bash|Read|Edit|Write", command: "sh .claude/hooks/ccnavi-pre.sh", timeout: 10 }
+    - { event: SessionStart, matcher: "", command: "sh .claude/hooks/ccnavi-start.sh", timeout: 30 }
+  judges:
+    env-read:
+      tool: Read
+      subject: /ws/.env
+      verdict: deny
+      code: DENY_COMMAND_PATTERN
+      rules:
+        - { id: protect-env, source: file, section: deny, kind: when, written: "all(regex …, not(any(2)))" }
+      response: "[ccnavi] DENY (rule: protect-env)\n環境変数のファイルは読まない・書かない。値が要るならユーザに頼む"
+    env-example:
+      tool: Read
+      subject: /ws/.env.example
+      verdict: ""
+      code: ""
+      rules: []
+      response: ""
+    git-push:
+      tool: Bash
+      subject: git push origin main
+      verdict: deny
+      code: DENY_COMMAND_PATTERN
+      rules:
+        - { id: git-push, source: file, section: deny, kind: glob, written: "*git push*" }
+      response: "[ccnavi] DENY (rule: git-push)\npush はユーザが行う。ccnavi-git.sh の入口を使う"
+  checked:
+    root: /ws
+    expectations_path: /ws/.ccnavi/config/common/rule-expectations.yml
+    counts:
+      deny: { ok: 3, total: 3 }
+      ask: { ok: 1, total: 2 }
+      allow: { ok: 1, total: 1 }
+    mismatches: 1
+    expectations:
+      - { expected: deny, tool: Read, subject: /ws/.env, why: 環境変数は読ませない, verdict: deny, known: true, ok: true, rules: [{ id: protect-env, source: file, section: deny, kind: when, written: "all(…)" }] }
+      - { expected: allow, tool: Read, subject: /ws/.env.example, why: 見本は読んでよい, verdict: "", known: true, ok: false, rules: [] }
+  suggested:
+    root: /ws
+    records: 14
+    logs: [/ws/logs/decisions.jsonl]
+    candidates:
+      - kind: rule
+        section: ask
+        id: suggest-npm-install
+        tool: Bash
+        count: 6
+        summary: "ルールを足す候補: Bash の npm install が 6 回、どのルールにも当たらず権限モードへ渡った"
+        layer: common
+        rules_path: /ws/.ccnavi/config/common/rules.yml
+        expectations: []
+        yaml: "rules:\n  ask:\n    - id: suggest-npm-install\n      match: Bash\n      regex: '\\bnpm\\s+install\\b'\n"
+
+courses:
+  - id: intro
+    title: 基本の案内
+    summary: 画面の見どころを順に回ります
+    steps:
+      - target: tabs
+        title: 3 つのタブ
+        body: 「ルール」タブでは deny・ask・allow のルールを確かめて直せます。「判定を試す」タブでは、編集中のルールで判定を試せます。「hook」タブでは登録内容を確かめられます。
+        scene: { tab: rules }
+      - target: rules
+        title: ルール
+        body: deny（止める）・ask（確かめる）・allow（通す）のタイプごとに並びます。判定は強い順に deny > ask > allow です。行を押すと欄が開き、「＋ ルールを追加」で足せます。見出しの ▾ でタイプを畳めます。
+        scene: { tab: rules, open: git-push }
+      - target: find
+        title: 絞り込み
+        body: id・ツール・パターン・メッセージで絞り込みます。畳んだタイプの中も探します。
+        scene: { tab: rules, find: env }
+      - target: judge-form
+        title: 判定を試す
+        body: ツールと対象（コマンドやパス）を入れて「判定」を押すと、編集中の内容でどのルールに当たるかを実行ファイルが返します。保存は要りません。「期待する判定を一括で確かめる」は、期待する判定のファイルに並べた例をまとめて確かめます。
+        scene: { tab: judge, tool: Bash, subject: git push origin main, judge: git-push }
+      - target: hooks
+        title: hook
+        body: .claude/settings.json に登録された hook の一覧です。直すときは settings.json を開いて編集してください。
+        scene: { tab: hooks }
+      - target: save
+        title: 保存
+        body: 保存すると実行ファイルが検証してから書き込みます。通らなければ、下に理由が出ます。ファイルが外で変わったときは上に帯が出るので、更新してください。
+        scene: { tab: rules }
+      - target: tour
+        title: 案内
+        body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
+        scene: { tab: rules }
+
+  - id: combo-when
+    title: 組み合わせ条件を設定する
+    summary: 「.env は止める。ただし .env.example は通す」のように、複数の条件を all / any / not で組み合わせる
+    steps:
+      - target: rule-protect-env
+        title: 組み合わせ条件のルール
+        body: glob や regex が 1 つでは書けない条件は、組み合わせ条件（when）で書きます。畳んだ行には、条件を 1 行に縮めた形（all(regex …, not(any(2)))）が出ます。この例は「.env 系のファイルに当たり、かつ .env.example / .env.sample ではない」です。
+        scene: { tab: rules }
+      - target: rule-protect-env
+        title: 図で見る
+        body: 行を開くと、条件が図になります。左端の点が最上位で、右へ枝分かれします。all は「中のすべてに当たれば当たる」、any は「どれかに当たれば当たる」、not は「中に当たらなければ当たる」です。
+        scene: { tab: rules, open: protect-env, when: r }
+      - target: when-graph
+        title: 点を選んで直す
+        body: 点を押すと選ばれ、下の操作の欄がその点に効きます。ここでは .env 系に当てる regex の点を選んでいます。文字を直すと、その場で図と要約に反映されます。
+        scene: { tab: rules, open: protect-env, when: r.0 }
+      - target: when-inspector
+        title: 子を足す・消す
+        body: all / any の点を選ぶと「＋ glob」「＋ regex」「＋ all」「＋ any」「＋ not」で子を足せます。例えば any に「＋ glob」を足せば、通す例外が 1 つ増えます。「ノードを削除」で消せます。
+        scene: { tab: rules, open: protect-env, when: r.1.0 }
+      - target: when-inspector
+        title: 包む・種類を替える
+        body: 「all で包む」「any で包む」「not で包む」で、選んだ点を新しい演算子の中へ入れられます。glob と regex、all と any は、種類の欄で入れ替えられます。
+        scene: { tab: rules, open: protect-env, when: r.1 }
+      - target: judge-form
+        title: 判定で確かめる
+        body: 組み合わせ条件は書いただけでは意図どおりか分かりません。「判定を試す」で、止めたい例（.env）と通したい例（.env.example）を打って確かめます。保存は要りません。
+        scene: { tab: judge, tool: Read, subject: /ws/.env, judge: env-read }
+      - target: judge-form
+        title: 通す例を確かめる
+        body: .env.example はどのルールにも当たらず、判定の対象外（そのまま通る）になります。
+        scene: { tab: judge, tool: Read, subject: /ws/.env.example, judge: env-example }
+      - target: save
+        title: 保存
+        body: 保存すると実行ファイルが検証してから書き込みます。空の演算子や、中が空の not のような誤りは、図の下に並んで保存前の検証で止まります。
+        scene: { tab: rules, open: protect-env }
