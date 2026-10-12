@@ -144,12 +144,15 @@ src/
     templates/Draft.css Draft.tsx の CSS（下書き 1 件）
     templates/ImportForm.css ImportForm.tsx の CSS（取り込みの欄）
     templates/Preview.css Preview.tsx の CSS（下見の答え）
+    templates/Sum.css   Sum.tsx の CSS（足し算の枠と表）
+    templates/EditPanel.css EditPanel.tsx の CSS（編集の欄）
     templates/Plan.css  Plan.tsx の CSS（計画の表）
     templates/Problems.css Problems.tsx の CSS（苦情の一覧）
     templates/post.ts   テンプレート管理の送り口。契約に無いものは型で止まる
     templates/main.tsx  テンプレート管理画面の入口。埋め込みの JSON を読んでマウントする
     templates/App.tsx   帯・ツールバー・開いている対象の層の一覧と下書き・足し算の枠、取り込みの配線、拡張ホストからのメッセージの受け。案内の間は見本を描く
     templates/Sum.tsx   足し算の枠（読み取り専用。実行ファイルの索引を、足し算を選ぶ欄と表で出す。ルール管理・リスク管理の Sum.tsx と同じ作り）
+    templates/EditPanel.tsx 編集の欄（下書きの保存・改名・削除、テンプレートの改名・移動・削除。下見を読んでから実行する）
     templates/Template.tsx テンプレート 1 件（札・計画・フロー・本文）
     templates/Draft.tsx 下書き 1 件（札と「取り込む…」）
     templates/ImportForm.tsx 取り込みの欄（取り込み先と置き換え、下見を頼む）
@@ -220,7 +223,7 @@ test/
   rules/              ルール管理（rules-doc, rules-when, hooks, testmodel と、画面を動かす rules.dom。入れ物は rules-render）
   risk/               リスク管理（risk-doc と、画面を動かす risk.dom。入れ物は risk-render）
   phases/             フェーズ管理（phases-doc, phases-layer と、画面を動かす phases.dom。入れ物は phases-render）
-  templates/          テンプレート管理（templates-model・templates-args・templates-render の単体テストと、画面を動かす templates.dom・templates-import.dom・templates-tour.dom）
+  templates/          テンプレート管理（templates-model・templates-args・templates-render の単体テストと、画面を動かす templates.dom・templates-import.dom・templates-edit.dom・templates-tour.dom、案内の見本の tour-templates）
   projects/           プロジェクト管理（projects と、画面を動かす projects.dom）
   flow/               フロー編集（flow-doc, flow-view, flow-lint, flow-match, flow-write と、書き出しを PyYAML で読み戻す flow-pyyaml（リポジトリのルートで uv run python か python3 を起動する。起動できなければ飛ばす）、画面を動かす flow.dom、線を引ける先・コピー・貼り付け・履歴・差分の flow-edit-ops、元に戻す・コピー・ミニマップ・保存前の確かめを画面で動かす flow-edit.dom、ボードのカードのボタンを動かす flow-card.dom、エージェントの下書きの取り込みと依頼のボタンを動かす flow-proposal.dom）
   workflow/           計画編集（planordermodel, workflow-view, ボードと結ぶ帳面の workflow-tabs と、画面を動かす workflow.dom）
