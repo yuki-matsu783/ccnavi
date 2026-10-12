@@ -98,6 +98,9 @@ DEPLOY_BIN_DIR="dist/ccnavi"
 # dist/ccnavi/ の外にあるので、copy_tree が配布先へコピーすることはない。
 DEPLOY_TARGET_FILE="dist/ccnavi.target"
 DEPLOY_RULES=".ccnavi/config/common/rules.yml"
+# セッションの開始（SessionStart）で ccnavi がモデルに渡す作業の決まり。文面はこの md にあり、
+# 実行ファイルは条件と差し込みを解くだけ。無いと、決まりが渡らないことを 1 行で言うだけになる。
+DEPLOY_CCNAVI_MD=".ccnavi/CCNAVI.md"
 # 設定 3 本のひな形。rules と risk は汎用なので共通レイヤー（.ccnavi/config/common/）へ配る。
 # phases はワークスペースのレイアウト（scope のパス）に依存するので、自身のレイヤー
 # （.ccnavi/config/project/）へ配る。共通レイヤーに phases を置くと、その scope が
@@ -181,7 +184,7 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
                             取り込みは通信する。1 台だけで使い、リモートに合わせる必要が無いときに指定する
 
 CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
-.ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・設定 3 本（.ccnavi/config/common/rules.yml、
+.ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・作業の決まり（.ccnavi/CCNAVI.md）・設定 3 本（.ccnavi/config/common/rules.yml、
 .ccnavi/config/common/risks.yml、.ccnavi/config/project/phases.yml）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）・使い方の文書（.ccnavi/docs/*.md）は、既定で ccnavi の根から配る。配った実行ファイルの置き場と、
 --docs の索引（**/ccnavi-index.jsonl）は、配布先の .gitignore に足す（ccnavi-index.jsonl を否定する
@@ -442,6 +445,7 @@ build_dir_rel=""
 bin_verdict=""
 launcher_verdict=""
 rules_verdict=""
+ccnavi_md_verdict=""
 risk_verdict=""
 phases_verdict=""
 scripts_todo=""
@@ -503,6 +507,14 @@ if [ -n "$deploy" ]; then
 	fi
 	rules_verdict=$(verdict "$source_root/$DEPLOY_RULES" "$rules_there")
 	note_deploy "$rules_verdict" "$DEPLOY_RULES" "$DEPLOY_RULES"
+
+	if [ -e "$root/$DEPLOY_CCNAVI_MD" ]; then
+		ccnavi_md_there=yes
+	else
+		ccnavi_md_there=no
+	fi
+	ccnavi_md_verdict=$(verdict "$source_root/$DEPLOY_CCNAVI_MD" "$ccnavi_md_there")
+	note_deploy "$ccnavi_md_verdict" "$DEPLOY_CCNAVI_MD" "$DEPLOY_CCNAVI_MD"
 
 	if [ -e "$root/$DEPLOY_RISK" ]; then
 		risk_there=yes
@@ -1290,6 +1302,11 @@ if [ "$deploy_work" = yes ]; then
 		copy_file "$source_root/$DEPLOY_RULES" "$root/$DEPLOY_RULES"
 		;;
 	esac
+	case "$ccnavi_md_verdict" in
+	copy | replace)
+		copy_file "$source_root/$DEPLOY_CCNAVI_MD" "$root/$DEPLOY_CCNAVI_MD"
+		;;
+	esac
 	case "$risk_verdict" in
 	copy | replace)
 		copy_file "$source_root/$DEPLOY_RISK" "$root/$DEPLOY_RISK"
@@ -1372,6 +1389,9 @@ unknown-* | *-unknown) ;;
 esac
 if [ ! -f "$root/$DEPLOY_RULES" ]; then
 	note_missing "${DEPLOY_RULES}（何を止めるかのルール。無いと組み込みの既定だけで判定する）"
+fi
+if [ ! -f "$root/$DEPLOY_CCNAVI_MD" ]; then
+	note_missing "${DEPLOY_CCNAVI_MD}（セッションの開始で渡す作業の決まり。無いと決まりが渡らない）"
 fi
 if [ ! -f "$root/$DEPLOY_RISK" ]; then
 	note_missing "${DEPLOY_RISK}（リスクの配点。無いと組み込みの配点で測る）"

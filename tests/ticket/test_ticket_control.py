@@ -15,7 +15,7 @@ import os
 import tempfile
 import unittest
 
-from tests import ROOT, common_path
+from tests import ROOT, common_path, put_ccnavi_md
 from tests.inproc import run_ccnavi
 
 # 不備の無いルールのファイル。ルールの中身はここの主題ではない。
@@ -47,6 +47,7 @@ class TicketControlTest(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = directory.name
         self.rules = rules_file(self.root)
+        put_ccnavi_md(self.root)
 
     def start(self, *extra, env=None):
         payload = json.dumps({"hook_event_name": "SessionStart", "session_id": "s1"})

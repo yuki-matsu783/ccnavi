@@ -142,6 +142,8 @@ BIN_DIR_PARTS = (".ccnavi", "bin")
 LAUNCHER_NAME = "ccnavi-launcher.sh"
 # 使い方の文書。配布元の .ccnavi/docs/*.md を全部配る。
 DOCS_PARTS = (".ccnavi", "docs")
+# セッションの開始で渡す作業の決まり。
+CCNAVI_MD_PARTS = (".ccnavi", "CCNAVI.md")
 DEPLOY_DOCS = ("worktree.md", "frontmatter.md")
 LAUNCHER_PARTS = (".ccnavi", "scripts", LAUNCHER_NAME)
 # CCNAVI_BIN_PATH に書くパス。固定。
@@ -1130,6 +1132,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                     encoding="utf-8",
                 ) as f:
                     f.write(f"# {name}\n")
+            with open(os.path.join(src, *CCNAVI_MD_PARTS), "w", encoding="utf-8") as f:
+                f.write("# ccnavi の作業の決まり\n")
             if docs:
                 os.makedirs(os.path.join(src, *DOCS_PARTS))
                 for name in DEPLOY_DOCS:
@@ -1204,6 +1208,15 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertTrue(os.path.isfile(self.deployed(*PHASES_PARTS)))
         for name in DEPLOY_SCRIPTS:
             self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", name)))
+
+    def test_deploys_the_session_guide(self):
+        """セッションの開始で渡す作業の決まり（.ccnavi/CCNAVI.md）を、中身を変えずに配る。"""
+        src = self.make_source()
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        with open(self.deployed(*CCNAVI_MD_PARTS), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "# ccnavi の作業の決まり\n")
+        self.assertTrue(names(section(result.stdout, "配った"), ".ccnavi/CCNAVI.md"))
 
     def test_deploys_the_usage_docs(self):
         """配布元の .ccnavi/docs/*.md を、中身を変えずに配る。"""
