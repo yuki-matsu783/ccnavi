@@ -340,7 +340,7 @@ def stop_rules_nudge(
         )
         if text:
             parts.append(text)
-            delivered.append(rule.id or f"({rules.ALLOW})")
+            delivered.append(rules.record_name(rule))
     if not parts:
         return ""
     _over_report(record)

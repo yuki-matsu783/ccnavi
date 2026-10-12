@@ -507,7 +507,6 @@ class LintTest(unittest.TestCase):
             self.root,
             rules_file(
                 self.root,
-                dict(SOUND, id=""),
                 dict(SOUND, id="重複"),
                 dict(SOUND, id="重複", glob="*rm -rf *"),
                 dict(SOUND, id="当たらないツール", match="Task|Bash"),
@@ -517,10 +516,10 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, "warn だけで非ゼロにしてはいけない")
         errors, warns = counts(result.stdout)
         self.assertEqual(errors, 0)
-        # id 無しが 1 件、重複が 1 件、当たらない match が 1 件。重複は 2 件目だけを
-        # 報告する。1 件目は、他に同じ id が無ければそのままで正しいルールだから。
-        self.assertEqual(warns, 3, result.stdout)
-        self.assertIn("id が無い", result.stdout)
+        # 重複が 1 件、当たらない match が 1 件。重複は 2 件目だけを報告する。1 件目は、
+        # 他に同じ id が無ければそのままで正しいルールだから。id の無いルールは error
+        # （test_rule_record_name の IdRequiredTest）。
+        self.assertEqual(warns, 2, result.stdout)
         self.assertIn("id が重複", result.stdout)
         self.assertIn("Task", result.stdout)
 

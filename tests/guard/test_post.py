@@ -225,7 +225,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
         self.assertIn("protected/keep.txt", result.stderr)
         # どの設定が言っているか。名指ししないと直しに行く先が決まらない。
-        self.assertIn("rule: protected", result.stderr)
+        self.assertIn("rule: .ccnavi/config/common/rules.yml:protected", result.stderr)
         # 原因となった直前の実行。
         self.assertIn("Bash(python build.py)", result.stderr)
         # 戻す手順。
@@ -277,7 +277,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(line["decision"], "deny")
         self.assertTrue(line["enforced"])
         self.assertEqual(line["paths"], ["changed protected/keep.txt"])
-        self.assertEqual(line["rules"], ["protected"])
+        self.assertEqual(line["rules"], [".ccnavi/config/common/rules.yml:protected"])
         # 文面の先頭の行と同じ理由コードを記録にも残す。
         self.assertEqual(line["code"], "POST_VIOLATION")
 

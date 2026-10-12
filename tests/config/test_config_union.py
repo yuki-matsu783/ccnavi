@@ -26,6 +26,7 @@ from __future__ import annotations
 import atexit
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -351,6 +352,37 @@ def build_template():
     return ws
 
 
+COMMON_RULE_FILE = ".ccnavi/config/common/rules.yml"
+SELF_RULE_FILE = ".ccnavi/config/project/rules.yml"
+
+
+def record_of(rule_id: str) -> str:
+    """書いた表記（`x` / `self:x` / `lib:x`）を、決定ログの記録名（`<相対パス>:<id>`）にする。"""
+    if rule_id.startswith("builtin:"):
+        return rule_id
+    layer, sep, bare = rule_id.partition(":")
+    if not sep:
+        return f"{COMMON_RULE_FILE}:{rule_id}"
+    if layer == "self":
+        return f"{SELF_RULE_FILE}:{bare}"
+    return f"projects/{layer}/{SELF_RULE_FILE}:{bare}"
+
+
+def layer_id(name: str) -> str:
+    """記録名を、書いた表記（レイヤーの前置きつき）に戻す。この 3 つの場所以外は名前のまま。"""
+    if name.startswith("builtin:"):
+        return name
+    path, _, bare = name.rpartition(":")
+    if path == COMMON_RULE_FILE:
+        return bare
+    if path == SELF_RULE_FILE:
+        return f"self:{bare}"
+    m = re.fullmatch(r"projects/([^/]+)/" + re.escape(SELF_RULE_FILE), path)
+    if m:
+        return f"{m.group(1)}:{bare}"
+    return name
+
+
 class ConfigUnionHarness(unittest.TestCase):
     """ワークスペースと 2 つのプロジェクトを配る道具。テストは持たない。"""
 
@@ -532,12 +564,12 @@ class ConfigUnionHarness(unittest.TestCase):
         """記録の `rules` のうち、レイヤーのルール。組み込みの deny（`builtin:` で始まる id。
         共通レイヤーと config の有無によらず常に当たる）は数えない。"""
         record = record if record is not None else self.last_record()
-        return [name for name in record["rules"] if not name.startswith("builtin:")]
+        return [layer_id(name) for name in record["rules"] if not name.startswith("builtin:")]
 
     def assert_denied(self, result, *ids):
         self.assertEqual(self.decision(result), "deny", result.stdout + result.stderr)
         for rule_id in ids:
-            self.assertIn(rule_id, self.reason(result))
+            self.assertIn(record_of(rule_id), self.reason(result))
 
     def assert_not_denied(self, result):
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -562,7 +594,8 @@ class WriteUnionTest(ConfigUnionHarness):
         ):
             with self.subTest(source=source, rule=rule_id):
                 denied = self.hook("Write", cwd, file_path=os.path.join(*target))
-                self.assert_denied(denied, rule_id, message)
+                self.assert_denied(denied, rule_id)
+                self.assertIn(message, self.reason(denied))
                 record = self.last_record()
                 self.assertEqual(self.hit_rules(record), [rule_id])
                 self.assertEqual(record.get("source"), source)
@@ -611,11 +644,11 @@ class WriteUnionTest(ConfigUnionHarness):
         # 順は 共通レイヤー → 自身のレイヤー → プロジェクトのレイヤー。
         # 先に当たるのは共通レイヤーの ws-src。
         # ここを「どちらでも良い」にすると、逆順に並べた実装でも通ってしまう。
-        self.assertEqual(record["rules"][0], "ws-src", record)
+        self.assertEqual(layer_id(record["rules"][0]), "ws-src", record)
 
         allowed = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "docs", "a.md"))
         self.assertEqual(self.last_record()["decision"], "allow")
-        self.assertEqual(self.last_record()["rules"], ["self:docs"])
+        self.assertEqual([layer_id(n) for n in self.last_record()["rules"]], ["self:docs"])
         # lib の docs/ に self:docs は当たらない。どのルールも言及しない。
         self.hook("Write", self.ws, file_path=os.path.join(self.lib, "docs", "a.md"))
         self.assertNotIn("self:docs", self.last_record().get("rules", []))
@@ -633,7 +666,7 @@ class WriteUnionTest(ConfigUnionHarness):
         )
         self.assert_denied(denied, "lib:notebook")
         record = self.last_record()
-        self.assertEqual(record["rules"], ["lib:notebook"])
+        self.assertEqual([layer_id(n) for n in record["rules"]], ["lib:notebook"])
         self.assertEqual(record.get("source"), "lib")
 
         # 共通レイヤーの guard-approved も NotebookEdit を持つ。プロジェクトのツリーでも当たる。
@@ -658,7 +691,7 @@ class WriteUnionTest(ConfigUnionHarness):
         self.assertEqual(self.decision(result), "ask", result.stdout + result.stderr)
         self.assertIn("ask-vendor", self.reason(result))
         record = self.last_record()
-        self.assertEqual(record["rules"][0], "ask-vendor", record)
+        self.assertEqual(layer_id(record["rules"][0]), "ask-vendor", record)
         self.assertEqual(record.get("source"), "common")
         # ワークスペースのツリーでも同じ。lib の allow はそこには足さない。
         here = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "vendor", "x.py"))
@@ -754,14 +787,14 @@ class ToolLayerTest(ConfigUnionHarness):
         self.hook("Grep", self.ws, pattern="x", path=os.path.join(self.lib, "src"))
         record = self.last_record()
         self.assertEqual(record["decision"], "allow", record)
-        self.assertEqual(record["rules"], ["lib:grep-src"], record)
+        self.assertEqual([layer_id(n) for n in record["rules"]], ["lib:grep-src"], record)
 
         # lib のレイヤーの allow は、
         # app に居る WebFetch にも当たる（パスを持たないツールは全部の和）。
         self.hook("WebFetch", self.app, url="https://docs.example.com/a", prompt="read")
         record = self.last_record()
         self.assertEqual(record["decision"], "allow", record)
-        self.assertEqual(record["rules"], ["lib:fetch-docs"], record)
+        self.assertEqual([layer_id(n) for n in record["rules"]], ["lib:fetch-docs"], record)
 
 
 class RootPlaceholderUnionTest(ConfigUnionHarness):
@@ -799,7 +832,7 @@ class RootPlaceholderUnionTest(ConfigUnionHarness):
 
         denied = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "secret.txt"))
         self.assert_denied(denied, "root-secret")
-        self.assertEqual(self.last_record()["rules"], ["root-secret"])
+        self.assertEqual([layer_id(n) for n in self.last_record()["rules"]], ["root-secret"])
         self.assertEqual(self.last_record().get("source"), "common")
 
         infos = self.problems("info", where=self.project_where("lib"))
@@ -825,7 +858,7 @@ class BashUnionTest(ConfigUnionHarness):
         """記録の `source` は判定を下したルール（`rules` の先頭）のレイヤー。"""
         self.hook("Bash", self.app, command="dropdb prod")
         record = self.last_record()
-        self.assertEqual(record["rules"][0], "self:dropdb")
+        self.assertEqual(layer_id(record["rules"][0]), "self:dropdb")
         self.assertEqual(record.get("source"), "self")
         self.hook("Bash", self.app, command="psql")
         self.assertEqual(self.last_record().get("source"), "lib")
@@ -846,7 +879,9 @@ class BashUnionTest(ConfigUnionHarness):
         both = self.hook("Bash", self.ws, command="sh deploy.sh --now")
         self.assert_denied(both, "app:deploy", "lib:deploy-any")
         record = self.last_record()
-        self.assertEqual(record["rules"], ["app:deploy", "lib:deploy-any"], record)
+        self.assertEqual(
+            [layer_id(n) for n in record["rules"]], ["app:deploy", "lib:deploy-any"], record
+        )
         self.assertEqual(record.get("source"), "app")
 
 
@@ -894,7 +929,7 @@ class DuplicateTest(ConfigUnionHarness):
         write_layer(self.lib, rules=copied)
 
         self.assert_denied(self.hook("Bash", self.lib, command="terraform apply"), "terraform")
-        self.assertEqual(self.last_record()["rules"], ["terraform"])
+        self.assertEqual([layer_id(n) for n in self.last_record()["rules"]], ["terraform"])
 
 
 class LayerFailureTest(ConfigUnionHarness):
@@ -1043,7 +1078,7 @@ class PostMonitoringUnionTest(ConfigUnionHarness):
 
         after = self.hook("Bash", self.lib, event="PostToolUse", command="python gen.py")
         self.assertEqual(after.returncode, 2, after.stdout + after.stderr)
-        self.assertIn("lib:schema", after.stderr)
+        self.assertIn("projects/lib/.ccnavi/config/project/rules.yml:schema", after.stderr)
         self.assertIn("credentials", after.stderr)
         self.assertIn("tree: lib", after.stderr)
 
@@ -1056,7 +1091,7 @@ class PostMonitoringUnionTest(ConfigUnionHarness):
         after = self.hook("Bash", tree, event="PostToolUse", command="python gen.py")
         self.assertEqual(after.returncode, 2, after.stdout + after.stderr)
         self.assertIn("POST_VIOLATION", after.stderr)
-        self.assertIn("self:generated", after.stderr)
+        self.assertIn(".ccnavi/config/project/rules.yml:generated", after.stderr)
         self.assertIn("generated/keep.py", after.stderr)
         self.assertEqual(self.last_record()["tree"], "w1")
 
@@ -1100,7 +1135,7 @@ class WiringTest(ConfigUnionHarness):
         self.assert_not_denied(allowed)
         record = self.last_record()
         self.assertEqual(record["decision"], "allow")
-        self.assertEqual(record["rules"], ["ws-src"])
+        self.assertEqual([layer_id(n) for n in record["rules"]], ["ws-src"])
         self.assertNotIn("fallback", record)
         self.assertNotIn("project", record)
 

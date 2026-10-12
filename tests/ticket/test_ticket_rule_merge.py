@@ -393,7 +393,13 @@ class PreToolUseTable(Workspace):
                     self.assertNotIn("builtin:ticket-scope", rules, rules)
                 else:
                     self.assertTrue(rules, record)
-                    self.assertEqual(rules[0], first_rule, rules)
+                    # ルールファイル由来の記録名は `<相対パス>:<id>`（表では id だけで書く）。
+                    expected = (
+                        first_rule
+                        if first_rule.startswith("builtin:")
+                        else f".ccnavi/config/common/rules.yml:{first_rule}"
+                    )
+                    self.assertEqual(rules[0], expected, rules)
 
                 if text_from == "ticket":
                     # 判定を下したのがレイヤーを持たないチケットなら、レイヤーの欄は空。
@@ -402,9 +408,12 @@ class PreToolUseTable(Workspace):
                     # deny に当たった）両方載る。
                     if rule_section in ("ask", "allow"):
                         # チケットがルールを狭めた回は、ルールの id も記録に残し、文面が名指しする。
-                        self.assertIn(f"rule-{rule_section}", rules, rules)
                         self.assertIn(
-                            f"rule: rule-{rule_section} ({rule_section}) lets this through, "
+                            f".ccnavi/config/common/rules.yml:rule-{rule_section}", rules, rules
+                        )
+                        self.assertIn(
+                            f"rule: .ccnavi/config/common/rules.yml:rule-{rule_section} "
+                            f"({rule_section}) lets this through, "
                             "but the ticket for this worktree narrows it",
                             reason,
                         )

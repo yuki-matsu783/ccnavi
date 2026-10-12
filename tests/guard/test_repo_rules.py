@@ -77,13 +77,20 @@ def judge(tool: str, subject: str, bin_path: str = "") -> dict:
     return json.loads(done.stdout)
 
 
+def written_id(name: str) -> str:
+    """記録名（`<相対パス>:<書いた id>`）から書いた id を取り出す。組み込みの名前はそのまま。"""
+    if name.startswith("builtin:"):
+        return name
+    return name.rsplit(":", 1)[-1]
+
+
 def hit(body: dict) -> list[str]:
-    return [rule["id"] for rule in body["rules"]]
+    return [written_id(rule["id"]) for rule in body["rules"]]
 
 
 def blocking(body: dict) -> set[str]:
     """deny / ask の側で当たったルール。組み込みは `section` が空で返るので、allow 以外を数える。"""
-    return {rule["id"] for rule in body["rules"] if rule.get("section") != "allow"}
+    return {written_id(rule["id"]) for rule in body["rules"] if rule.get("section") != "allow"}
 
 
 @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
@@ -792,7 +799,7 @@ class SubstRepoRulesTest(unittest.TestCase):
     def test_引用の中から切り出したコマンドに当たったときだけ断りが出る(self):
         quoted = judge("Bash", 'gh issue create --title t --body "use $(git push) here"')
         self.assertIn("inside double quotes", quoted["response"])
-        self.assertEqual(quoted.get("quoted"), ["raw-git"])
+        self.assertEqual(quoted.get("quoted"), [".ccnavi/config/common/rules.yml:raw-git"])
         # ラッパーのあるワークスペースでは、文字として渡す道もラッパーで案内する。
         self.assertIn("ccnavi-git.sh commit -F <file>", quoted["response"])
         self.assertNotIn("(git commit -F", quoted["response"])

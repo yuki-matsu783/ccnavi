@@ -85,6 +85,7 @@ def read_common(
     else:
         try:
             rule_set, problems = rules.load(rules_path, root)
+            mark_file(rule_set, relpath(rules_path, root))
         except (OSError, ValueError) as exc:
             stderr.write(f"ccnavi: ルールを読めない: {exc}\n")
             rule_set, problems = builtin.load(root, conf)
@@ -262,6 +263,7 @@ def add_layers(
             continue
         for note in notes:
             stderr.write(f"ccnavi: {note}\n")
+        mark_file(extra, relpath(layer.path, root))
         prefix_ids(extra, layer.name)
         merge_rules(rule_set, extra, layer.name)
     if broken:
@@ -363,6 +365,7 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
             view.unreadable = str(exc)
             continue
         view.problems.extend(notes)
+        mark_file(extra, relpath(layer.path, root))
         prefix_ids(extra, layer.name)
         before = {section: len(merged.section(section)) for section in rules.SECTIONS}
         view.problems.extend(merge_rules(merged, extra, layer.name))
@@ -397,6 +400,7 @@ def sum_view(stderr: TextIO, conf: settings.Settings, root: str, layer: Layer) -
         view.unreadable = str(exc)
         return view
     view.problems.extend(notes)
+    mark_file(extra, relpath(layer.path, root))
     prefix_ids(extra, layer.name)
     view.problems.extend(merge_rules(merged, extra, layer.name))
     return view
@@ -458,6 +462,24 @@ def mark_source(rule_set: rules.RuleSet, layer: str) -> None:
     """この集合のルールに、どのレイヤーから来たかを記す。記録の `source` になる。"""
     for rule in rule_set.all():
         rule.source = layer
+
+
+def relpath(path: str, root: str) -> str:
+    """ルールファイルのパスを、ワークスペースのルート（`root`）からの相対パス（`/` 区切り）にする。
+    記録名（rules.record_name）の前半になる。root が空なら作業ディレクトリを基準にする。
+    """
+    try:
+        rel = os.path.relpath(path, root or os.curdir)
+    except ValueError:
+        # Windows で別のドライブにあるなど、相対にできないときは絶対パスのまま。
+        rel = os.path.abspath(path)
+    return rel.replace(os.sep, "/")
+
+
+def mark_file(rule_set: rules.RuleSet, relpath: str) -> None:
+    """この集合のルールに、来たルールファイルの相対パスを入れる（rules.Rule.file）。"""
+    for rule in rule_set.all():
+        rule.file = relpath
 
 
 def prefix_ids(rule_set: rules.RuleSet, layer: str) -> None:

@@ -38,6 +38,7 @@ from tests.config.test_config_union import (
     HOME,
     ConfigUnionHarness,
     git,
+    layer_id,
     layer_path,
     read,
     ticket_text,
@@ -748,7 +749,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         self.assert_not_denied(allowed)
         record = self.last_record()
         self.assertEqual(record["decision"], "allow", record)
-        self.assertIn("self:wide", record["rules"], record)
+        self.assertIn("self:wide", [layer_id(n) for n in record["rules"]], record)
 
     def check_no_layer_is_borrowed(self, name):
         """`projects/<name>/` への Write が、どのレイヤーの rules でも判定されないこと。"""
@@ -759,7 +760,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
 
         record = self.last_record()
         # 穴の本体。レイヤーの名前で引くと、ここに `self:wide` が入り、decision が allow になる。
-        self.assertNotIn("self:wide", record.get("rules", []), record)
+        self.assertNotIn("self:wide", [layer_id(n) for n in record.get("rules", [])], record)
         self.assertNotEqual(record["decision"], "allow", record)
         # プロジェクトのレイヤーも足さない（レイヤー無し）。
         # 共通レイヤーに `*/secret/*` は無いので deny でもない。
@@ -780,7 +781,9 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         self.assert_not_denied(
             self.hook("Write", self.ws, file_path=os.path.join(project, "generated", "x.py"))
         )
-        self.assertNotIn("self:generated", self.last_record().get("rules", []))
+        self.assertNotIn(
+            "self:generated", [layer_id(n) for n in self.last_record().get("rules", [])]
+        )
 
     def test_a_write_into_projects_self_is_not_judged_by_the_workspace_layer(self):
         """`projects/self/` はレイヤー無し。ワークスペースのレイヤーの allow では通らない。"""
@@ -805,7 +808,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
             "lib:schema",
         )
         # 広い allow は行き先の 1 レイヤーにしか足さないので、lib には当たらない。
-        self.assertNotIn("self:wide", self.last_record().get("rules", []))
+        self.assertNotIn("self:wide", [layer_id(n) for n in self.last_record().get("rules", [])])
         self.assert_denied(self.hook("Bash", self.ws, command="psql -c 'select 1'"), "lib:raw-psql")
 
     def test_lint_names_both_reserved_names(self):

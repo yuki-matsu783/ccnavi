@@ -51,7 +51,7 @@ def _handover(tool: str, subject: str) -> str:
     )
 
 
-def _deny(subject: str, rule: str = "git-push") -> str:
+def _deny(subject: str, rule: str = ".ccnavi/config/common/rules.yml:git-push") -> str:
     return _line(
         event="PreToolUse",
         tool="Bash",

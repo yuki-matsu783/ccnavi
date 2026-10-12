@@ -220,7 +220,7 @@ class StopRulesTest(unittest.TestCase):
             self.stop(log=log)
         with open(log, encoding="utf-8") as f:
             last = json.loads(f.read().splitlines()[-1])
-        self.assertEqual(last.get("rules"), ["two"])
+        self.assertEqual(last.get("rules"), [".ccnavi/config/common/rules.yml:two"])
         self.assertEqual(last.get("code"), CODE)
 
     # --- 5c. compact・再開では数えを捨てない -------------------------------------------

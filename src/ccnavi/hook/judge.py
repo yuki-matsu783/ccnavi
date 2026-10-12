@@ -594,7 +594,7 @@ def decide_before(
     if capped:
         verdict = rules.DENY
 
-    record.rules = [rule.id or f"({verdict})" for rule in group]
+    record.rules = [rules.record_name(rule) for rule in group]
     # 当てたルールそのもの。診断（`--test`）が根拠を見せるのに読む。記録には書かない。
     record.hits = list(group)
     record.unwrapped = shellread.SEP.join(dict.fromkeys(layer for _, layer, _ in via if layer))
@@ -628,7 +628,7 @@ def decide_before(
     ticket_reason = ""
     ticket_code = ""
     if verdict != rules.DENY:
-        rule_hit = (group[0].id or f"({verdict})", verdict) if group else None
+        rule_hit = (rules.record_name(group[0]), verdict) if group else None
         ticket_decision, text, ticket_notice, code = ticket_verdict(
             conf, root, payload.tool_name, record.subject, dest, index, rule_hit
         )

@@ -522,6 +522,9 @@ class Rule:
     # id の前置きでは分けられない（`builtin:ticket-*` のように `builtin:guard-` で始まらない
     # 組み込みがある）し、`source` でも分けられない（退避した既定は共通レイヤーの名前を持つ）。
     from_file: bool = field(default=False, compare=False)
+    # file はこのルールが来たルールファイルの、ワークスペースのルートからの相対パス（`/` 区切り）。
+    # 組み込みは空。記録名（record_name）の前半になる。読んだ側（ruleload）が入れる。
+    file: str = field(default="", compare=False)
 
     # degraded_message は、ルールが書かれたとおりに組み立てられず、保護を消さないために
     # 別の形で判定に使っているときに、止められた側へ返す文面。`{!root}` を展開できなかった
@@ -618,6 +621,17 @@ class Rule:
         if self.compiled is not None:
             return self.compiled.search(subject) is not None
         return self.when is not None and self.when.hits(subject)
+
+
+def record_name(rule: Rule) -> str:
+    """決定ログの rules 欄と文面に出す名前。
+
+    ルールファイル由来は `<ワークスペースのルートからの相対パス>:<書いた id>`。
+    組み込みは id そのもの（`builtin:git-push`）。レイヤーの前置きは付けない。
+    """
+    if rule.from_file:
+        return f"{rule.file}{ID_SEPARATOR}{rule.bare_id}"
+    return rule.id
 
 
 def tool_matches(match: str, tool: str) -> bool:
@@ -765,6 +779,14 @@ def _build(
         return None, [Problem(SEVERITY_ERROR, where, "ルールがマッピングではない")]
 
     written_id = str(raw.get("id") or "")
+    if not builtin and not written_id:
+        return None, [
+            Problem(
+                SEVERITY_ERROR,
+                where,
+                "id が無い。ルールには id を書いてください（記録と文面にこの名前が出る）",
+            )
+        ]
     rule = Rule(
         id=written_id,
         bare_id=written_id,
@@ -782,7 +804,7 @@ def _build(
         root=root,
         from_file=not builtin,
     )
-    name = f"{section}:{rule.id}" if rule.id else where
+    name = f"{section}:{rule.id}"
 
     if not builtin and written_id.lower().startswith(RESERVED_ID_PREFIX):
         return None, [

@@ -565,6 +565,7 @@ allow:
 
 ### `id` と表記の決まり
 
+- `id` は必須。書かないルールは読み込まず、`--lint` が error で名指しする（記録と文面にこの名前が出るため、名前の無いルールは記録も報告も指せない）
 - `id` にコロンは書けない（レイヤーの名前を添えた `self:id` / `<プロジェクト名>:id` と見分けが付かないため）。
   `--lint` が error にし、その 1 件は読み込まれない。ルール・フェーズ定義・リスクの配点の 3 本とも同じ
 - `glob` も `regex` も、どの機械でも大文字小文字を区別せずに当てる。`*/.ccnavi/*` は `.Ccnavi/` にも当たる。
@@ -611,7 +612,8 @@ allow:
   使わない。共通レイヤーのルール自身が破損して読めないときだけ組み込みの既定を使い、そのときレイヤーは足さない
 - ワークスペースの中で共通レイヤーとして読むのは、ワークスペースルートの `.ccnavi/config/common/` だけ。プロジェクトの `.ccnavi/config/common/`
   （下のミラー）は、そのプロジェクトだけを clone したときにだけ共通レイヤーとして読まれ、そのとき `.ccnavi/config/project/` は自身のレイヤーになる
-- id にはレイヤーの名前が付く。共通レイヤーは裸の `id`、自身のレイヤーは `self:id`、プロジェクトは `<名前>:id`。記録と文面にはこの形で出る
+- id にはレイヤーの名前が付く。共通レイヤーは裸の `id`、自身のレイヤーは `self:id`、プロジェクトは `<名前>:id`。`--explain` などの画面はこの形で出す
+- 記録（決定ログの `rules` 欄）と文面に出す名前は、ルールファイル由来なら `<ワークスペースのルートからの相対パス>:<書いた id>`（例: `.ccnavi/config/common/rules.yml:raw-git`、`projects/lib/.ccnavi/config/project/rules.yml:schema`）。レイヤーの前置きは付けない。組み込みのルールは id そのもの（`builtin:git-push`）
 - 同じ宣言の重複は 1 本にまとめる。裸の `id` が同じで全欄（`{root}` を置き換えた後）が一致する定義は、後ろのレイヤーのものを
   捨て、`--lint` が info で知らせる
 - 同じ `id` で中身が違うルールは両方とも適用され、`--lint` が warn で知らせる。`deny` と `ask` は増えるほうになる。リスクの配点も両方を数え、後ろのレイヤーの項目は
@@ -2066,7 +2068,7 @@ Claude Code はそこを読まないので、ccnavi が `SessionStart` と `Suba
 | `decision` | `allow` `ask` `deny` `handover` `skip`。`handover` は権限モードに委ねた回 |
 | `enforced` | 実際に適用したか。`dry-run` は `false` |
 | `code` | 判定の根拠の種別。一覧は [設計 付録 A](docs/design/appendix.md)。よく出るのは `DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE`。実行後チェックの行は `POST_VIOLATION` などで、件が混ざった回は強いほう 1 つ |
-| `rules` | 当たったルールの id。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`builtin:ticket-scope`、`builtin:phase-review` など。判定ごとに分かれる。一覧は付録 A） |
+| `rules` | 当たったルールの名前（ルールファイル由来は `<相対パス>:<id>`、組み込みは id）。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`builtin:ticket-scope`、`builtin:phase-review` など。判定ごとに分かれる。一覧は付録 A） |
 | `reason` | `skip` の理由。`mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、`payload-unusable`、`deadline-exceeded`、`tool-cannot-write`、`worktree-unreadable`（`detail` に理由）、`no-turn-baseline` の 9 つ |
 | `tree` / `project` | 呼び出しの行き先が属するツリーとプロジェクト |
 | `permission_mode` | Claude Code から来たモード。`handover` の行と合わせて読む |
@@ -2076,7 +2078,7 @@ Claude Code はそこを読まないので、ccnavi が `SessionStart` と `Suba
 | `quoted` | 引用の中から切り出したコマンドにだけ当たったルールの id |
 | `unwrapped` | 実行役のコマンド（`env`・`sudo`・`sh -c` など）の中のコマンド、または `cd` で移った先から見たパス（設計 6.3.2）で当たったときの、そのコマンド。複数なら `\x00` でつなぐ |
 | `fallback` | ルールファイルを読めず組み込みの既定で判定した回（`detail` にパス）。自身のレイヤーやプロジェクトのレイヤーが読めなかった回は、そのレイヤーの名前（`self`、`lib` など）が入り、そのレイヤーを空として判定している |
-| `source` | 判定を下したルールのレイヤー。`common` / `self` / プロジェクトの名前。`rules` の id もレイヤーの名前付き（共通レイヤーは裸、それ以外は `self:worktrees`、`lib:schema`） |
+| `source` | 判定を下したルールのレイヤー。`common` / `self` / プロジェクトの名前。`rules` の名前にはレイヤーの前置きが付かない（相対パスで出どころが分かる） |
 
 ```sh
 jq -r 'select(.unwrapped) | .rules[]' logs/decisions.jsonl | sort | uniq -c
@@ -2245,7 +2247,7 @@ ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml --json
 | `verdict` / `code` | 判定（`deny` / `ask` / `allow` / `skip`。`--permission-mode` を渡したときは権限モードへ渡した `handover` も）と根拠コード |
 | `reason` / `degraded` / `fallback` | `skip` の理由、生の文字列に当てたかどうか、組み込みの既定で判定したかどうか。無ければ空 |
 | `unwrapped` | 実行役のコマンドが中で実行するコマンド、または `cd` で移った先から見たパスでルールに当たったときの、そのコマンド。複数なら `\x00` でつなぐ。元の形で当たったとき・当たらなかったときは空 |
-| `rules[]` | 当たったルール。`{id, source, section, kind, written, pattern}`。`source` は `file`（ルールファイルから読んだルール）か `outside`（チケットの範囲・組み込みの保護・退避した組み込みの既定のように、ルールファイルの外から来た根拠）。`outside` でもルールそのものがあれば `section` と `kind` を持ち、`written` と `pattern` は頭の 160 字に `…（全 N 字）` を添えた形に切る（組み込みの式は 2 万字を超えるものがある）。ルールの無い根拠（`builtin:ticket-scope` など）は `section` 以下が空。値はこの 2 つだけで、増やすときは `version` を上げる。`kind` は `glob`・`regex`・`when` のどれか、`written` は書いたまま（`when` は組み合わせ条件を 1 行にした形で、`when: ` は付けない）、`pattern` は翻訳後の正規表現（`when` はふつう空）。`when` のルールだけ、書いた組み合わせ条件そのものを `when` に持つ |
+| `rules[]` | 当たったルール。`{id, source, section, kind, written, pattern}`。`id` は記録の名前（ルールファイル由来は `<相対パス>:<書いた id>`、組み込みは id）。`source` は `file`（ルールファイルから読んだルール）か `outside`（チケットの範囲・組み込みの保護・退避した組み込みの既定のように、ルールファイルの外から来た根拠）。`outside` でもルールそのものがあれば `section` と `kind` を持ち、`written` と `pattern` は頭の 160 字に `…（全 N 字）` を添えた形に切る（組み込みの式は 2 万字を超えるものがある）。ルールの無い根拠（`builtin:ticket-scope` など）は `section` 以下が空。値はこの 2 つだけで、増やすときは `version` を上げる。`kind` は `glob`・`regex`・`when` のどれか、`written` は書いたまま（`when` は組み合わせ条件を 1 行にした形で、`when: ` は付けない）、`pattern` は翻訳後の正規表現（`when` はふつう空）。`when` のルールだけ、書いた組み合わせ条件そのものを `when` に持つ |
 | `response` | エージェントに返る文面そのもの。無ければ空 |
 | `quoted` | 当たったルールのうち、引用の中から切り出したコマンドにだけ当たったものの id。そういうルールがあるときだけ出る |
 | `payload` | 判定に渡した payload の欄 `{cwd, permission_mode, agent_id}`。`--cwd` / `--permission-mode` / `--agent-id` のどれかを渡したときだけ出る（渡さなければ `cwd` は `root`、ほかは空） |
@@ -2281,8 +2283,8 @@ ccnavi: 設定を検証する
 warn: (mode): dry-run なので判定しても呼び出しに手を出さない
 error: deny:no-message: 文面が無い。ルールは代わりに何をすべきかを言わなければならない
 error: deny:both: glob と regex の両方がある。どちらで判定するのか決められない
-warn: (id 無し: ask Agent|Bash *npm audit*): id が無い。記録も報告もこのルールを名指しできない
-error 2 件、warn 2 件、info 0 件
+error: ask[2]: id が無い。ルールには id を書いてください（記録と文面にこの名前が出る）
+error 3 件、warn 1 件、info 0 件
 ```
 
 先頭の数行は「何を見て検証したか」（「チケットの承認の経路を守る」はチケット制御が有効なときだけ）。モードは検証を起動した環境から
@@ -2301,7 +2303,8 @@ error 2 件、warn 2 件、info 0 件
 | error | `deny` が空（何も止めないガードは、入っているように見えて入っていない） |
 | error | `additionalContextFile` / `additionalContextOnceFile` が絶対パスか `..` で上に出るパス（実行時も読まない） |
 | warn | `allow` が空（言及の無い呼び出しが全部、権限モードへ渡る） |
-| warn | `id` の無いルール、`id` が重複するルール |
+| error | `id` の無いルール（読み込まない。記録も報告もこのルールを名指しできない） |
+| warn | `id` が重複するルール |
 | warn | 判定が対象を取り出せないツールを `match` に書いたルール |
 | warn | 本体（`glob` / `regex` 1 つ）が何にでも当たる `deny`（`.*` や `.` など。`match` のツールを丸ごと止める。`except` があれば除いたもの以外を止める。ツールごと止めると決めた `glob: "*"` ちょうどは言わない） |
 | warn | 何にでも当たる、または選択肢が 3 つ以上ある `allow` に `additionalContext`（か `additionalContextFile`）を書いたルール（当たるたびに同じ文が積まれる。`additionalContextOnce` は文脈ごとに 1 度なので指摘しない） |

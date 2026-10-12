@@ -283,11 +283,10 @@ def reason_for(
     if inner:
         degraded = ""
     code = CODE_RULE_ASK if rule.decision == rules.ASK else code_for(tool, degraded)
-    # 出所はルールの id で示す。プロジェクトのルールの id には `lib:git-push` の形で
-    # プロジェクトの名前が付くので、id だけでどのファイルを見に行けばよいかが
-    # 決まる。パスまで載せると、判定を試したときの一時ファイルのような読む値の無いパスが
-    # そのまま毎回モデルに届く。id を持たないルールだけ、代わりにファイルを示す。
-    source = f"rule: {rule.id}" if rule.id else f"rules: {rules_path}"
+    # 出所は記録名（`<ワークスペースからの相対パス>:<書いた id>`）で示す。どのファイルの
+    # どのルールかが、名前だけで決まる。判定を試したときの一時ファイルのように
+    # ワークスペースの外にあるものは、相対パスが `../` で始まる長い名前になる。
+    source = f"rule: {rules.record_name(rule)}" if rule.id else f"rules: {rules_path}"
     if rule.id == phase_forms.TICKET_APPROVAL_RULE_ID:
         # 組み込み。ルールファイルには無いので、そこを探させない。
         code, source = (

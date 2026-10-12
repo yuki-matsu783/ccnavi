@@ -17,7 +17,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 
 | 欄 | 意味 |
 |---|---|
-| `id` | 識別子。文面と記録に出す。無ければルールファイルの名前を出す |
+| `id` | 識別子。必須。文面と記録に出す。記録では `<ワークスペースのルートからの相対パス>:<id>`（組み込みは `builtin:<名前>`）。id の無いルールは読み込まず error で名指しする |
 | `match` | ツール名を `\|` でつないだもの。`Bash` `PowerShell` `Read` `Edit` `Write` `NotebookEdit` `Grep` `Glob` `Skill` `Agent` `WebFetch`。ツールでない名前として `Stop`（メインエージェントのターンの終わり）。`Stop` を書けるのは `allow` だけ（6.6） |
 | `glob` | `fnmatch` の記法。文字列全体に当たる |
 | `regex` | Python の正規表現。`re.search`。先読み・後読み・後方参照は受け付けない |

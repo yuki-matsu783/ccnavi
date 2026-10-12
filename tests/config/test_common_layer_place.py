@@ -252,7 +252,9 @@ class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
         )
         body = json.loads(done.stdout)
 
-        self.assertEqual([hit["id"] for hit in body["rules"]], ["only-in-the-other-file"])
+        self.assertEqual(
+            [hit["id"] for hit in body["rules"]], ["elsewhere/rules.yml:only-in-the-other-file"]
+        )
 
 
 class TheDefaultPlaceStaysGuardedTest(CommonLayerPlaceHarness):

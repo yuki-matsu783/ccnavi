@@ -203,7 +203,7 @@ def check(
     )
 
     record.paths = [f"{f.change.kind} {f.change.path}" for f in fresh]
-    record.rules = sorted({rule.id or "(id 無し)" for f in fresh for rule in f.group})
+    record.rules = sorted({rules.record_name(rule) for f in fresh for rule in f.group})
     # 既にある detail を先頭に残す。ルールを読めなかったときのファイル名が
     # そこに入っていて、上書きすると「どのファイルが読めなかったか」が消える。
     notes = [record.detail] if record.detail else []
@@ -435,7 +435,7 @@ def at_stop(
     record.decision, record.enforced = audit.DENY, True
     record.code = post_findings.record_code(found)
     record.paths = [f"{f.change.kind} {f.change.path}" for f in found]
-    record.rules = sorted({rule.id or "(id 無し)" for f in found for rule in f.group})
+    record.rules = sorted({rules.record_name(rule) for f in found for rule in f.group})
     # detail は足していく。読めなかったルールファイルの名前（`_read_all`）が
     # 先に入っていることがある。
     _add_detail(record, post_findings.codes_note(found))
@@ -459,7 +459,7 @@ def at_stop(
         kind = gitstate.KIND_LABELS.get(finding.change.kind, finding.change.kind)
         lines.append(
             f"  {where}{finding.change.path}（{kind}）"
-            f" 対象のルール: {rule.id or '(id 無し)'} / {how}"
+            f" 対象のルール: {rules.record_name(rule)} / {how}"
         )
     if len(found) > REPORT_LIMIT:
         lines.append(f"  ほか {len(found) - REPORT_LIMIT} 件。全部は {git} status に出ます。")

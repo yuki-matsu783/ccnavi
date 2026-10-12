@@ -133,13 +133,21 @@ class TestHitsTest(unittest.TestCase):
         self.assertEqual(plain.returncode, 1, plain.stdout)
         self.assertNotIn("ヒットしたルール", plain.stdout)
 
-    def test_rule_without_id_is_found_by_position(self):
+    def test_rule_hit_is_named_by_file_and_id(self):
+        # id は必須。記録の名前はルールファイルの相対パスと書いた id の形になる。
         rules = write(
             os.path.join(self.root, "noid.yml"),
             json.dumps(
                 {
                     "version": 1,
-                    "deny": [{"match": "Bash", "glob": "*rm -rf*", "message": "消さない"}],
+                    "deny": [
+                        {
+                            "id": "rm-build",
+                            "match": "Bash",
+                            "glob": "*rm -rf*",
+                            "message": "消さない",
+                        }
+                    ],
                 }
             ),
         )
@@ -148,7 +156,7 @@ class TestHitsTest(unittest.TestCase):
         hit = body["rules"][0]
         self.assertEqual(
             (hit["id"], hit["source"], hit["section"], hit["kind"], hit["written"]),
-            ("(deny)", "file", "deny", "glob", "*rm -rf*"),
+            ("noid.yml:rm-build", "file", "deny", "glob", "*rm -rf*"),
         )
 
     def test_same_definition_in_two_projects_shows_the_one_that_hit(self):
@@ -189,7 +197,12 @@ class TestHitsTest(unittest.TestCase):
                 hit = body["rules"][0]
                 self.assertEqual(
                     (hit["id"], hit["source"], hit["section"], hit["written"]),
-                    (f"{name}:schema", "file", "deny", "*/schema/*"),
+                    (
+                        f"projects/{name}/.ccnavi/config/project/rules.yml:schema",
+                        "file",
+                        "deny",
+                        "*/schema/*",
+                    ),
                 )
 
     # ---- 2. payload の欄

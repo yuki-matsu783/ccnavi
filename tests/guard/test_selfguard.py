@@ -828,7 +828,7 @@ class SelfGuardTest(unittest.TestCase):
         decision, reason = self.verdict(self.run_hook("PreToolUse", command=command))
 
         self.assertEqual(decision, "deny")
-        self.assertIn("rule: push", reason)
+        self.assertIn("rule: .ccnavi/config/common/rules.yml:push", reason)
         self.assertNotIn("REDIRECT_LIMIT", reason)
 
     def test_読み解けた形には上限を掛けない(self):
@@ -880,7 +880,7 @@ class SelfGuardTest(unittest.TestCase):
                     self.run_hook("PreToolUse", permission_mode=mode, command=command)
                 )
                 self.assertEqual(got, "deny")
-                self.assertIn("rule: push", reason)
+                self.assertIn("rule: .ccnavi/config/common/rules.yml:push", reason)
                 self.assertNotIn("REDIRECT_LIMIT", reason)
 
     def test_大なりは並びではなく文字の数で数える(self):
@@ -949,7 +949,9 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assert_limit_denied(result, command)
         record = self.records()[-1]
-        self.assertEqual(record["rules"], ["builtin:redirect-limit", "askme"])
+        self.assertEqual(
+            record["rules"], ["builtin:redirect-limit", ".ccnavi/config/common/rules.yml:askme"]
+        )
         self.assertEqual(record.get("source", ""), builtin_deny.get("source", ""))
         self.assertEqual(record.get("source", ""), "")
 

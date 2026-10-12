@@ -361,7 +361,7 @@ def _rules_hit(record: audit.Record) -> list[dict]:
     hits = []
     for i, name in enumerate(record.rules):
         rule = hits_of[i - offset] if i >= offset else None
-        if rule is None or (rule.id or name) != name:
+        if rule is None or rules.record_name(rule) != name:
             hits.append(
                 {
                     "id": name,
