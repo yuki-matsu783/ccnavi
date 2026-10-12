@@ -93,7 +93,9 @@ class SessionConventionsTest(unittest.TestCase):
         self.assertIn("案内が出たらそれに従い、迂回しない", text)
         self.assertIn("他セッションのもの", text)
         self.assertIn(f"sh {self.root}/.ccnavi/scripts/ccnavi-stage.sh <元のパス>", text)
-        self.assertIn("--commands が出した mv をユーザに案内する", text)
+        self.assertIn(
+            "--commands <元のパス> が出した mv（フルパス）をユーザに案内してターンを終える", text
+        )
 
     def test_ccnavi_mdが無ければ無いことだけを言う(self):
         os.remove(os.path.join(self.root, ".ccnavi", "CCNAVI.md"))
@@ -208,6 +210,12 @@ class SessionConventionsTest(unittest.TestCase):
 
         self.assertTrue(text.splitlines()[-1].startswith("（現状: CCNAVI_MODE=dry-run"), text)
         self.assertLess(text.index(HEAD), text.index("チケット制御を使っている"))
+
+    def test_チケット制御がdisableならdry_runの注記も出ない(self):
+        text = self.start("--mode", "dry-run", "--ticket-control", "disable")
+
+        self.assertIn(HEAD, text)
+        self.assertNotIn("（現状:", text)
 
     def test_サブエージェントには出さない(self):
         self.assertEqual(block(self.start("--mode", "enable", agent_id="a1")), "")

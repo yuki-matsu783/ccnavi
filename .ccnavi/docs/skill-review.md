@@ -38,7 +38,7 @@ keywords: [概念スキル, reference, 振り返り, スキル, SKILL.md, refere
 - 「X は使えない」のような、道具や機能を否定する主張
 - 途中で解消した一時的なエラーや、1回きりの作業の経緯
 - 解決しないまま終わった試行錯誤
-- CLAUDE.md・`.ccnavi/docs/`・`docs/claude/`・ADRにすでに書いてあること
+- CLAUDE.md・`.ccnavi/docs/`・ADRなど、プロジェクトの文書にすでに書いてあること
 
 ## wiki 層
 
@@ -57,7 +57,7 @@ keywords: [概念スキル, reference, 振り返り, スキル, SKILL.md, refere
 - 直す前に、対象の SKILL.md と、手を入れる references/ を読み直す。会話中の引用で済ませない
 - 1つの事実は1か所に書く。同じ規則がすでにあるなら、新しく足さずにその文を強めるか言い直す
 - 手順の流れに沿って書き、落とし穴は該当する手順に「規則 + なぜ（1 句）」で添える。日付・番号・ユーザの言葉の引用を中身にしない
-- yomiyasuスキルを `.ccnavi/docs/`・`docs/claude/`・`CLAUDE.md`・`.claude/skills/`・プロジェクトの `skills/`・`rules.yml` の `message` に当てるのは、ユーザが明示的に頼んだときだけにする。その場合も、表・箇条書き・「規則 + なぜ」の形は崩さない。yomiyasuはこれらの形を平文に崩すため
+- yomiyasuスキルを `.ccnavi/docs/`・`CLAUDE.md`・`.claude/skills/`・プロジェクトの `skills/`・`rules.yml` の `message` に当てるのは、ユーザが明示的に頼んだときだけにする。その場合も、表・箇条書き・「規則 + なぜ」の形は崩さない。yomiyasuはこれらの形を平文に崩すため
 - 誤りを見つけたら、間違った文そのものを直す
 
 ## 対象のスキル

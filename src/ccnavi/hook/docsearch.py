@@ -337,7 +337,7 @@ def _has_md(root: str) -> bool:
 
 # 案内で名指しする、触らなかった ccnavi-index.jsonl の数の上限。
 FOREIGN_SHOWN = 3
-# 引き方の案内の頭。作業の決まり（`reasons.conventions`）が、この案内を出した回にだけ
+# 引き方の案内の頭。作業の決まり（`ccnavimd.session_text`）が、この案内を出した回にだけ
 # 「詳しくは --docs で引く」を添えるのに使う。
 GUIDE_HEAD = "[ccnavi] ドキュメント（*.md）を探すときは"
 

@@ -502,15 +502,15 @@ def decide_at_start(
     # チケットの進め方など）。文面は .ccnavi/CCNAVI.md にあり、ここは条件と差し込みを解いて渡す。
     # チケット制御の有無によらず出す。サブエージェントには出さない。
     if not payload.agent_id:
-        texts.append(
-            ccnavimd.session_text(
-                conf,
-                root,
-                docs.startswith(docsearch.GUIDE_HEAD),
-                ruleload.deny_ids(conf, root),
-                mode,
-            )
+        guide = ccnavimd.session_text(
+            conf,
+            root,
+            docs.startswith(docsearch.GUIDE_HEAD),
+            ruleload.deny_ids(conf, root),
+            mode,
         )
+        if guide:
+            texts.append(guide)
     if rejects:
         texts.append(rejects)
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。

@@ -64,7 +64,7 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 追記するのは1行だけで、既存の行は変えない。追記したプロジェクトは、SessionStartの案内とstderrに名前が出る。
 `.gitignore`が未コミットの差分として残るので、そのプロジェクトのチケットの中でコミットする。
 ユーザが`!`で`ccnavi-index.jsonl`を否定している（索引を追跡している）プロジェクトには追記せず、索引の対象外として案内に名前を出す。
-追記に失敗したときも、対象外として案内する。導入スクリプト`scripts/ccnavi-setup.sh`が追記するのはワークスペースの`.gitignore`だけ
+追記に失敗したときも、対象外として案内する。ccnaviの導入スクリプト（`ccnavi-setup.sh`）が追記するのはワークスペースの`.gitignore`だけ
 
 ## 索引のファイル
 

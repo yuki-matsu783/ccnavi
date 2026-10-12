@@ -513,7 +513,7 @@ def _workspace_rules(conf: settings.Settings, root: str) -> rules.RuleSet:
 def deny_ids(conf: settings.Settings, root: str) -> set[str]:
     """共通レイヤーとワークスペース自身のレイヤーにある deny の id（書かれたままの表記）。
 
-    セッション開始の作業の決まり（`reasons.conventions`）が、その決まりを支えるルールを
+    セッション開始の作業の決まり（`ccnavimd.session_text`）が、その決まりを支えるルールを
     ワークスペースが置いているときだけ行を出すのに使う。
     """
     return {rule.bare_id or rule.id for rule in _workspace_rules(conf, root).deny if rule.id}

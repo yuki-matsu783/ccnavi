@@ -55,7 +55,7 @@ SUBSTITUTIONS = (
 _IF = re.compile(r"^\s*<!--\s*ccnavi:if\s+(\S+)\s*-->\s*$")
 _ENDIF = re.compile(r"^\s*<!--\s*ccnavi:endif\s*-->\s*$")
 _DIRECTIVE = re.compile(r"<!--\s*ccnavi:")
-_SUBSTITUTION = re.compile(r"\{\{(\w+)\}\}")
+_SUBSTITUTION = re.compile(r"\{\{\s*(\w+)\s*\}\}")
 
 
 def problems(text: str) -> list[str]:

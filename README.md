@@ -2698,7 +2698,7 @@ sh や拡張が頼るフラグや出力の形を、呼ぶ側を直さないと�
 ccnavi --docs --text マージ --format detail           # 話題で当たりを付ける
 ccnavi --docs --type adr --sort mtime -r --limit 10     # 新しい ADR から 10 本
 ccnavi --docs --tag worktree --tag git --format path    # どちらかのタグを持つもの（OR）のパスだけ
-ccnavi --docs --path docs/claude --format count         # 件数だけ
+ccnavi --docs --path .ccnavi/docs --format count         # 件数だけ
 ```
 
 md を本文ではなく頭の frontmatter で引く。grep は当たった行を返すので、そのファイルが何の文書かは開くまで分からず、
@@ -2783,7 +2783,7 @@ argparse が止めていた打ち間違いを、知らせずに通さないた�
 `index.jsonl` と `--format jsonl` の 1 行、`--format json` の配列の要素は同じ形。
 
 ```json
-{"concept_id":"docs/claude/worktree","directory":"docs/claude","frontmatter":{"type":"guide","tags":["worktree","git"]},"mtime":"2026-09-27T19:56:23"}
+{"concept_id":".ccnavi/docs/worktree","directory":".ccnavi/docs","frontmatter":{"type":"guide","tags":["worktree","git"]},"mtime":"2026-09-27T19:56:23"}
 ```
 
 | 鍵 | 何 |
