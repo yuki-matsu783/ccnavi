@@ -77,6 +77,12 @@ class CheckDecisionTest(unittest.TestCase):
         self.assertEqual(runner.check_decision_none(rows, cond)[0], runner.FAIL)
         self.assertEqual(runner.check_decision_none([], cond)[0], runner.PASS)
 
+    def test_decisions_none_subject_is_clipped_with_notice(self):
+        rows = [rec(decision="deny", tool="Edit", subject="s" * 300)]
+        v, why = runner.check_decision_none(rows, {"tool": "Edit", "decision": "deny"})
+        self.assertEqual(v, runner.FAIL)
+        self.assertIn("全 300 文字のうち先頭 200 文字。全量は logs/decisions.jsonl", why)
+
 
 class ReadDecisionsTest(unittest.TestCase):
     def test_only_the_given_sessions_are_read(self):
@@ -233,7 +239,7 @@ class EvidenceTest(unittest.TestCase):
             "stderr": stderr,
         }
 
-    def _write(self, events):
+    def _write(self, events, results=None):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         out = Path(tmp.name)
@@ -242,7 +248,7 @@ class EvidenceTest(unittest.TestCase):
         )
         scn = {"id": "UC-99", "title": "t", "expect": {"judge": ["基準A"]}}
         st = {"cost_usd": 0.0}
-        results = [("files_unchanged", "README.md", runner.PASS, "変わっていない")]
+        results = results or [("files_unchanged", "README.md", runner.PASS, "変わっていない")]
         runner.write_report(scn, out, st, results, [], "")
         return (out / "evidence.md").read_text(encoding="utf-8")
 
@@ -300,6 +306,23 @@ class EvidenceTest(unittest.TestCase):
         self.assertIn("- 成功: working tree clean", text)
         self.assertLess(text.index("## 機械判定の結果"), text.index("judge の基準"))
         self.assertIn("| files_unchanged | README.md | ", text)
+
+    def test_machine_result_table_in_evidence_is_not_clipped(self):
+        why = "理由" * 100
+        text = self._write([], results=[("state", "ls", runner.FAIL, why)])
+        self.assertIn(why, text)
+
+    def test_decision_subject_clipped_with_notice(self):
+        # write_report の rows 引数を使うため、直接呼ぶ
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            scn = {"id": "UC-99", "title": "t", "expect": {}}
+            rows = [
+                {"event": "PreToolUse", "tool": "Bash", "decision": "deny", "subject": "s" * 800}
+            ]
+            runner.write_report(scn, out, {"cost_usd": 0.0}, [], rows, "")
+            text = (out / "evidence.md").read_text(encoding="utf-8")
+        self.assertIn("全 800 文字のうち先頭 500 文字。全量は logs/decisions.jsonl", text)
 
 
 if __name__ == "__main__":

@@ -184,7 +184,7 @@ def check_decision_none(rows, cond):
         )
     ]
     if hit:
-        return FAIL, f"出ていた: {hit[0].get('subject', '')[:80]}"
+        return FAIL, f"出ていた: {_clip(hit[0].get('subject', ''), 200, 'logs/decisions.jsonl')}"
     return PASS, "出ていない"
 
 
@@ -203,7 +203,8 @@ def check_state(item, root):
     )
     out = (r.stdout or "") + (r.stderr or "")
     if "expect_contains" in item and item["expect_contains"] not in out:
-        return FAIL, f"出力に「{item['expect_contains']}」が無い: {out.strip()[:120]}"
+        tail = _clip(out.strip(), 300, "state の run を手で打ち直して確かめる")
+        return FAIL, f"出力に「{item['expect_contains']}」が無い: {tail}"
     if "expect_not_contains" in item and item["expect_not_contains"] in out:
         return FAIL, f"出力に「{item['expect_not_contains']}」がある"
     return PASS, "一致"
@@ -451,11 +452,12 @@ def summarize_hooks(hook_events, where):
     return lines, omitted
 
 
-def _results_table(results):
+def _results_table(results, limit=None):
+    cut = (lambda s: s) if limit is None else (lambda s: s[:limit])
     lines = ["| 種類 | 期待 | 判定 | 理由 |", "|---|---|---|---|"]
     for kind, cond, v, why in results:
         c = json.dumps(cond, ensure_ascii=False) if not isinstance(cond, str) else cond
-        lines.append(f"| {kind} | {c[:100]} | {v} | {why[:100]} |")
+        lines.append(f"| {kind} | {cut(c)} | {v} | {cut(why)} |")
     return lines
 
 
@@ -466,7 +468,7 @@ def write_report(scn, out, st, results, rows, raw):
         f"全体: {overall(results)}  費用: {st['cost_usd']:.3f} USD",
         "",
     ]
-    lines += _results_table(results)
+    lines += _results_table(results, 100)
     if scn.get("unconfirmed"):
         lines += ["", "## 確かめる点（unconfirmed）"] + [f"- {u}" for u in scn["unconfirmed"]]
     (out / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -512,7 +514,7 @@ def write_report(scn, out, st, results, rows, raw):
     ev += ["", "## ccnavi の判定の記録（このセッションの行）"]
     for r in rows:
         head = " ".join(str(r.get(k, "")) for k in ("event", "tool", "decision", "code", "rules"))
-        ev.append(f"- {head} {str(r.get('subject', ''))[:100]}")
+        ev.append(f"- {head} {_clip(r.get('subject', ''), 500, 'logs/decisions.jsonl')}")
     (out / "evidence.md").write_text("\n".join(ev) + "\n", encoding="utf-8")
 
 
