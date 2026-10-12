@@ -13,7 +13,7 @@ import os
 import shutil
 
 from ccnavi.tickets import approval_checks, ticket_model
-from tests.ticket.test_phases import PhaseHarness, git
+from tests.ticket.test_phases import PhaseHarness, child_text, git
 from tests.ticketsample import parent_text
 
 
@@ -55,12 +55,35 @@ class MisplacedHomeTest(PhaseHarness):
             os.path.exists(os.path.join(own, ".ccnavi", "approved", "doing", "i0003.md"))
         )
 
-    def test_a_parent_proposal_that_names_a_branch_is_not_stopped(self):
-        # `branch:` で既存のブランチを名乗る親は、ワークツリーの名前が識別子と違ってよい。
-        t = ticket_model.Ticket(
-            ticket="i0003", tree="skill-proposals", tree_root=self.stray_tree(), branch="topic/x"
+    def test_a_parent_proposal_that_names_a_branch_is_stopped_too(self):
+        # `branch:` を持つ親でも、親のワークツリーの名前は識別子。承認のあとに start で止めない。
+        stray = self.stray_tree()
+        text = parent_text("i0003", ["research"]).replace(
+            "ticket: i0003\n", "ticket: i0003\nbranch: topic/x\n", 1
         )
-        self.assertEqual(approval_checks.place_problems(self.root, self.settings(), t), [])
+        self.assertIn("branch: topic/x", text)
+        self.propose("i0003", text, tree=stray)
+        self.commit_in(stray, "propose i0003")
+        result = self.ccnavi("--agree", stdin="y\n")
+        said = result.stdout + result.stderr
+        self.assertEqual(result.returncode, 1, said)
+        self.assertIn("提案 i0003 を識別子と違う名前のワークツリー skill-proposals", said)
+        self.assertFalse(
+            os.path.exists(os.path.join(stray, ".ccnavi", "approved", "doing", "i0003.md"))
+        )
+
+    def test_a_child_proposal_outside_the_parents_worktree_is_not_approved(self):
+        self.family()
+        stray = self.stray_tree()
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/design/*",)), tree=stray
+        )
+        self.commit_in(stray, "propose child")
+        result = self.ccnavi("--agree", stdin="y\n")
+        said = result.stdout + result.stderr
+        self.assertEqual(result.returncode, 1, said)
+        self.assertIn("子の提案 i0001-01-01 を識別子と違う名前のワークツリー skill-proposals", said)
+        self.assertIn("ccnavi-worktree.sh i0001", said)
 
     def settings(self):
         from ccnavi.infra import settings

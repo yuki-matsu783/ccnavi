@@ -95,8 +95,7 @@ class PromptHintTest(PhaseHarness):
 
     def test_a_number_tied_to_a_ticket_does_not_say_start(self):
         text = with_branch(parent_text("feature-152-login", ["research"], issue=152), "topic/x")
-        self.propose("feature-152-login", text)
-        self.commit_parent("propose")
+        self.propose_own("feature-152-login", text)
         self.approve()
         said = self.prompt("#152 を直して")
         self.assertIn("すでに feature-152-login(doing)", said)
@@ -109,8 +108,7 @@ class PromptHintTest(PhaseHarness):
 
     def test_a_branch_name_with_the_number_is_not_a_mr_binding(self):
         text = with_branch(parent_text("fix-12-foo", ["research"], issue=3), "fix-12-foo")
-        self.propose("fix-12-foo", text)
-        self.commit_parent("propose")
+        self.propose_own("fix-12-foo", text)
         self.approve()
         said = self.prompt("MR !12 を見て")
         self.assertIn("--mr 12", said)
@@ -118,8 +116,7 @@ class PromptHintTest(PhaseHarness):
 
     def test_a_mr_branch_of_a_ticket_says_continue(self):
         text = with_branch(parent_text("feature-3-foo", ["research"], issue=3), "mr-12")
-        self.propose("feature-3-foo", text)
-        self.commit_parent("propose")
+        self.propose_own("feature-3-foo", text)
         self.approve()
         said = self.prompt("MR !12 を見て")
         self.assertIn("すでに feature-3-foo(doing)", said)

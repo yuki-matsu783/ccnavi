@@ -220,10 +220,10 @@ def place_problems(
     承認済みチケットは提案を書いたツリーにそのまま置かれる。親のワークツリーが識別子と違う名前だと、
     親が取り込み済みにならず、承認済みチケットの自動コミットも動かず、`start` `finish` は通っても
     `ready` で止まる。承認のあとには取り返せないので、承認の前に止める。ワークスペースルートと
-    プロジェクトの元ツリーの提案は言わない。`branch:` で既存のブランチを名乗る親も言わない
-    （ブランチ名に `/` を含み、ワークツリーの名前にできないため）。
+    プロジェクトの元ツリーの提案は言わない。`branch:` を持つ親も言う（親のワークツリーの名前は
+    `branch:` に関わらず識別子で、`start` `finish` `ready` も同じ名前を求める）。
     """
-    if not t.tree_root or (not t.is_child and t.branch):
+    if not t.tree_root:
         return []
     home = tree.tree_of(root, t.tree_root, conf.projects)
     if home is None or home.is_main:
