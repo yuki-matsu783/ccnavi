@@ -1,0 +1,745 @@
+{
+ "about": "`ccnavi --templates --json` の答えの見本。ワークスペースは tests/ticket/test_plan_templates.py の showcase（共通に feature / research / broken、自身のレイヤーに feature（共通と同じ）/ research（共通と中身が違う）/ local（定義に無い型）/ ends（終端が 2 つ）/ notes.txt、プロジェクト lib に lib）。root は <root> に置き換える。欄: version、root、layer（一覧の対象のレイヤー）、keywords、templates（共通 + layer の足し算。各テンプレートの name・layer・path・sha・valid・description・when・plan / feedback（index は計画の中の添字、number は提案に写したときの番号、after は計画の中の添字）・has_flows・flows（index・name・nodes・connections・node_types）・effective（足し算で使われるか）・usable（使われ、error も無い）・dropped（捨てた理由 reason = invalid / duplicate / conflict と detail）・writable・problems（severity と detail））、layers（共通と各レイヤーの生の中身。path・exists・unreadable・writable・problems・templates）、sums（レイヤーごとの足し算の索引）、errors / warns / infos。VS Code 拡張のテンプレート管理画面はこの形をそのまま描く。形を変えたらこの見本も一緒に直す",
+ "expect": {
+  "version": 1,
+  "root": "<root>",
+  "layer": "self",
+  "keywords": [],
+  "templates": [
+   {
+    "name": "broken",
+    "layer": "common",
+    "path": ".ccnavi/config/common/templates/broken.yml",
+    "sha": "be9c33cb743e62edb202d15a0b28fed2ec18efa48f6534ca82bf29a422c21b88",
+    "valid": false,
+    "description": "",
+    "when": "",
+    "plan": [],
+    "feedback": [],
+    "has_flows": false,
+    "flows": [],
+    "effective": false,
+    "usable": false,
+    "dropped": {
+     "reason": "invalid",
+     "detail": "YAML として読めない (did not find expected node content、2 行 1 桁)"
+    },
+    "writable": true,
+    "problems": [
+     {
+      "severity": "error",
+      "detail": "YAML として読めない (did not find expected node content、2 行 1 桁)"
+     }
+    ]
+   },
+   {
+    "name": "feature",
+    "layer": "common",
+    "path": ".ccnavi/config/common/templates/feature.yml",
+    "sha": "00ac71dc72d380685378c96b3d7990b51ebd1242d15073164ed5c32996564c5f",
+    "valid": true,
+    "description": "機能を設計から実装まで進める",
+    "when": "新しい機能を足すとき",
+    "plan": [
+     {
+      "index": 1,
+      "number": 1,
+      "type": "design",
+      "review": "",
+      "after": []
+     },
+     {
+      "index": 2,
+      "number": 2,
+      "type": "implement",
+      "review": "",
+      "after": [
+       1
+      ]
+     }
+    ],
+    "feedback": [
+     {
+      "index": 1,
+      "number": 3,
+      "type": "implement-feedback",
+      "review": "",
+      "after": []
+     }
+    ],
+    "has_flows": true,
+    "flows": [
+     {
+      "index": 2,
+      "name": "実装の手順",
+      "nodes": 3,
+      "connections": 2,
+      "node_types": {
+       "end": 1,
+       "prompt": 1,
+       "start": 1
+      }
+     }
+    ],
+    "effective": true,
+    "usable": true,
+    "dropped": null,
+    "writable": true,
+    "problems": []
+   },
+   {
+    "name": "research",
+    "layer": "common",
+    "path": ".ccnavi/config/common/templates/research.yml",
+    "sha": "eb6437bc32d6f13c70a9a48c58004d75ade89ccaab24b7be2466798f3675481c",
+    "valid": true,
+    "description": "調べてから設計する",
+    "when": "",
+    "plan": [
+     {
+      "index": 1,
+      "number": 1,
+      "type": "research",
+      "review": "",
+      "after": []
+     },
+     {
+      "index": 2,
+      "number": 2,
+      "type": "design",
+      "review": "",
+      "after": [
+       1
+      ]
+     }
+    ],
+    "feedback": [],
+    "has_flows": false,
+    "flows": [],
+    "effective": true,
+    "usable": true,
+    "dropped": null,
+    "writable": true,
+    "problems": []
+   },
+   {
+    "name": "ends",
+    "layer": "self",
+    "path": ".ccnavi/config/project/templates/ends.yml",
+    "sha": "cc20d18618c96a0916a1119df0520afa23802174fe1367203bbdc1a1bb0e6c12",
+    "valid": true,
+    "description": "終端が 2 つ",
+    "when": "",
+    "plan": [
+     {
+      "index": 1,
+      "number": 1,
+      "type": "design",
+      "review": "",
+      "after": []
+     },
+     {
+      "index": 2,
+      "number": 2,
+      "type": "acceptance",
+      "review": "",
+      "after": []
+     }
+    ],
+    "feedback": [],
+    "has_flows": false,
+    "flows": [],
+    "effective": true,
+    "usable": false,
+    "dropped": null,
+    "writable": true,
+    "problems": [
+     {
+      "severity": "error",
+      "detail": "`plan` の最後の項（2: acceptance）が 1 を待たない。終端は 1 つにしてください（最後の項がほかの全部を推移的に待つように `after` を書く。独立した作業は最後に 1 項で受けるか、一直線に並べる）"
+     }
+    ]
+   },
+   {
+    "name": "feature",
+    "layer": "self",
+    "path": ".ccnavi/config/project/templates/feature.yml",
+    "sha": "00ac71dc72d380685378c96b3d7990b51ebd1242d15073164ed5c32996564c5f",
+    "valid": true,
+    "description": "機能を設計から実装まで進める",
+    "when": "新しい機能を足すとき",
+    "plan": [
+     {
+      "index": 1,
+      "number": 1,
+      "type": "design",
+      "review": "",
+      "after": []
+     },
+     {
+      "index": 2,
+      "number": 2,
+      "type": "implement",
+      "review": "",
+      "after": [
+       1
+      ]
+     }
+    ],
+    "feedback": [
+     {
+      "index": 1,
+      "number": 3,
+      "type": "implement-feedback",
+      "review": "",
+      "after": []
+     }
+    ],
+    "has_flows": true,
+    "flows": [
+     {
+      "index": 2,
+      "name": "実装の手順",
+      "nodes": 3,
+      "connections": 2,
+      "node_types": {
+       "end": 1,
+       "prompt": 1,
+       "start": 1
+      }
+     }
+    ],
+    "effective": false,
+    "usable": false,
+    "dropped": {
+     "reason": "duplicate",
+     "detail": "`feature` は共通と全欄が同じなので、self の側を捨てた。共通の 1 本を使う"
+    },
+    "writable": true,
+    "problems": [
+     {
+      "severity": "info",
+      "detail": "`feature` は共通と全欄が同じなので、self の側を捨てた。共通の 1 本を使う"
+     }
+    ]
+   },
+   {
+    "name": "local",
+    "layer": "self",
+    "path": ".ccnavi/config/project/templates/local.yml",
+    "sha": "2749a6054a854e39e579575001b3ee08e213dd95a4521939fbbb80b059739106",
+    "valid": true,
+    "description": "このプロジェクトだけの作業",
+    "when": "",
+    "plan": [
+     {
+      "index": 1,
+      "number": 1,
+      "type": "docs",
+      "review": "",
+      "after": []
+     }
+    ],
+    "feedback": [],
+    "has_flows": false,
+    "flows": [],
+    "effective": true,
+    "usable": true,
+    "dropped": null,
+    "writable": true,
+    "problems": [
+     {
+      "severity": "warn",
+      "detail": "`plan[1]` の型 `docs` が phases.yml に無い（定義が変わったか、このレイヤーに無い。使う前に直す）"
+     }
+    ]
+   },
+   {
+    "name": "research",
+    "layer": "self",
+    "path": ".ccnavi/config/project/templates/research.yml",
+    "sha": "b85ab124cf86d19bd55fec4d0043283a150c49ca845adf1c2731278541fa96d0",
+    "valid": true,
+    "description": "調べずに設計する",
+    "when": "",
+    "plan": [
+     {
+      "index": 1,
+      "number": 1,
+      "type": "research",
+      "review": "",
+      "after": []
+     },
+     {
+      "index": 2,
+      "number": 2,
+      "type": "design",
+      "review": "",
+      "after": [
+       1
+      ]
+     }
+    ],
+    "feedback": [],
+    "has_flows": false,
+    "flows": [],
+    "effective": false,
+    "usable": false,
+    "dropped": {
+     "reason": "conflict",
+     "detail": "`research` は共通と同じ名前で中身が違う（違う欄: description）。self の `research` は使わず、共通の定義を使う。中身を変えたいなら self の側に別の名前を付ける"
+    },
+    "writable": true,
+    "problems": [
+     {
+      "severity": "error",
+      "detail": "`research` は共通と同じ名前で中身が違う（違う欄: description）。self の `research` は使わず、共通の定義を使う。中身を変えたいなら self の側に別の名前を付ける"
+     }
+    ]
+   }
+  ],
+  "layers": [
+   {
+    "name": "common",
+    "path": ".ccnavi/config/common/templates",
+    "exists": true,
+    "unreadable": "",
+    "writable": true,
+    "problems": [],
+    "templates": [
+     {
+      "name": "broken",
+      "layer": "common",
+      "path": ".ccnavi/config/common/templates/broken.yml",
+      "sha": "be9c33cb743e62edb202d15a0b28fed2ec18efa48f6534ca82bf29a422c21b88",
+      "valid": false,
+      "description": "",
+      "when": "",
+      "plan": [],
+      "feedback": [],
+      "has_flows": false,
+      "flows": [],
+      "effective": false,
+      "usable": false,
+      "dropped": {
+       "reason": "invalid",
+       "detail": "YAML として読めない (did not find expected node content、2 行 1 桁)"
+      },
+      "writable": true,
+      "problems": [
+       {
+        "severity": "error",
+        "detail": "YAML として読めない (did not find expected node content、2 行 1 桁)"
+       }
+      ]
+     },
+     {
+      "name": "feature",
+      "layer": "common",
+      "path": ".ccnavi/config/common/templates/feature.yml",
+      "sha": "00ac71dc72d380685378c96b3d7990b51ebd1242d15073164ed5c32996564c5f",
+      "valid": true,
+      "description": "機能を設計から実装まで進める",
+      "when": "新しい機能を足すとき",
+      "plan": [
+       {
+        "index": 1,
+        "number": 1,
+        "type": "design",
+        "review": "",
+        "after": []
+       },
+       {
+        "index": 2,
+        "number": 2,
+        "type": "implement",
+        "review": "",
+        "after": [
+         1
+        ]
+       }
+      ],
+      "feedback": [
+       {
+        "index": 1,
+        "number": 3,
+        "type": "implement-feedback",
+        "review": "",
+        "after": []
+       }
+      ],
+      "has_flows": true,
+      "flows": [
+       {
+        "index": 2,
+        "name": "実装の手順",
+        "nodes": 3,
+        "connections": 2,
+        "node_types": {
+         "end": 1,
+         "prompt": 1,
+         "start": 1
+        }
+       }
+      ],
+      "effective": true,
+      "usable": true,
+      "dropped": null,
+      "writable": true,
+      "problems": []
+     },
+     {
+      "name": "research",
+      "layer": "common",
+      "path": ".ccnavi/config/common/templates/research.yml",
+      "sha": "eb6437bc32d6f13c70a9a48c58004d75ade89ccaab24b7be2466798f3675481c",
+      "valid": true,
+      "description": "調べてから設計する",
+      "when": "",
+      "plan": [
+       {
+        "index": 1,
+        "number": 1,
+        "type": "research",
+        "review": "",
+        "after": []
+       },
+       {
+        "index": 2,
+        "number": 2,
+        "type": "design",
+        "review": "",
+        "after": [
+         1
+        ]
+       }
+      ],
+      "feedback": [],
+      "has_flows": false,
+      "flows": [],
+      "effective": true,
+      "usable": true,
+      "dropped": null,
+      "writable": true,
+      "problems": []
+     }
+    ]
+   },
+   {
+    "name": "self",
+    "path": ".ccnavi/config/project/templates",
+    "exists": true,
+    "unreadable": "",
+    "writable": true,
+    "problems": [
+     {
+      "severity": "warn",
+      "detail": ".ccnavi/config/project/templates/notes.txt は `.yml` でないので読まない"
+     }
+    ],
+    "templates": [
+     {
+      "name": "ends",
+      "layer": "self",
+      "path": ".ccnavi/config/project/templates/ends.yml",
+      "sha": "cc20d18618c96a0916a1119df0520afa23802174fe1367203bbdc1a1bb0e6c12",
+      "valid": true,
+      "description": "終端が 2 つ",
+      "when": "",
+      "plan": [
+       {
+        "index": 1,
+        "number": 1,
+        "type": "design",
+        "review": "",
+        "after": []
+       },
+       {
+        "index": 2,
+        "number": 2,
+        "type": "acceptance",
+        "review": "",
+        "after": []
+       }
+      ],
+      "feedback": [],
+      "has_flows": false,
+      "flows": [],
+      "effective": true,
+      "usable": false,
+      "dropped": null,
+      "writable": true,
+      "problems": [
+       {
+        "severity": "error",
+        "detail": "`plan` の最後の項（2: acceptance）が 1 を待たない。終端は 1 つにしてください（最後の項がほかの全部を推移的に待つように `after` を書く。独立した作業は最後に 1 項で受けるか、一直線に並べる）"
+       }
+      ]
+     },
+     {
+      "name": "feature",
+      "layer": "self",
+      "path": ".ccnavi/config/project/templates/feature.yml",
+      "sha": "00ac71dc72d380685378c96b3d7990b51ebd1242d15073164ed5c32996564c5f",
+      "valid": true,
+      "description": "機能を設計から実装まで進める",
+      "when": "新しい機能を足すとき",
+      "plan": [
+       {
+        "index": 1,
+        "number": 1,
+        "type": "design",
+        "review": "",
+        "after": []
+       },
+       {
+        "index": 2,
+        "number": 2,
+        "type": "implement",
+        "review": "",
+        "after": [
+         1
+        ]
+       }
+      ],
+      "feedback": [
+       {
+        "index": 1,
+        "number": 3,
+        "type": "implement-feedback",
+        "review": "",
+        "after": []
+       }
+      ],
+      "has_flows": true,
+      "flows": [
+       {
+        "index": 2,
+        "name": "実装の手順",
+        "nodes": 3,
+        "connections": 2,
+        "node_types": {
+         "end": 1,
+         "prompt": 1,
+         "start": 1
+        }
+       }
+      ],
+      "effective": false,
+      "usable": false,
+      "dropped": {
+       "reason": "duplicate",
+       "detail": "`feature` は共通と全欄が同じなので、self の側を捨てた。共通の 1 本を使う"
+      },
+      "writable": true,
+      "problems": [
+       {
+        "severity": "info",
+        "detail": "`feature` は共通と全欄が同じなので、self の側を捨てた。共通の 1 本を使う"
+       }
+      ]
+     },
+     {
+      "name": "local",
+      "layer": "self",
+      "path": ".ccnavi/config/project/templates/local.yml",
+      "sha": "2749a6054a854e39e579575001b3ee08e213dd95a4521939fbbb80b059739106",
+      "valid": true,
+      "description": "このプロジェクトだけの作業",
+      "when": "",
+      "plan": [
+       {
+        "index": 1,
+        "number": 1,
+        "type": "docs",
+        "review": "",
+        "after": []
+       }
+      ],
+      "feedback": [],
+      "has_flows": false,
+      "flows": [],
+      "effective": true,
+      "usable": true,
+      "dropped": null,
+      "writable": true,
+      "problems": [
+       {
+        "severity": "warn",
+        "detail": "`plan[1]` の型 `docs` が phases.yml に無い（定義が変わったか、このレイヤーに無い。使う前に直す）"
+       }
+      ]
+     },
+     {
+      "name": "research",
+      "layer": "self",
+      "path": ".ccnavi/config/project/templates/research.yml",
+      "sha": "b85ab124cf86d19bd55fec4d0043283a150c49ca845adf1c2731278541fa96d0",
+      "valid": true,
+      "description": "調べずに設計する",
+      "when": "",
+      "plan": [
+       {
+        "index": 1,
+        "number": 1,
+        "type": "research",
+        "review": "",
+        "after": []
+       },
+       {
+        "index": 2,
+        "number": 2,
+        "type": "design",
+        "review": "",
+        "after": [
+         1
+        ]
+       }
+      ],
+      "feedback": [],
+      "has_flows": false,
+      "flows": [],
+      "effective": false,
+      "usable": false,
+      "dropped": {
+       "reason": "conflict",
+       "detail": "`research` は共通と同じ名前で中身が違う（違う欄: description）。self の `research` は使わず、共通の定義を使う。中身を変えたいなら self の側に別の名前を付ける"
+      },
+      "writable": true,
+      "problems": [
+       {
+        "severity": "error",
+        "detail": "`research` は共通と同じ名前で中身が違う（違う欄: description）。self の `research` は使わず、共通の定義を使う。中身を変えたいなら self の側に別の名前を付ける"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "name": "lib",
+    "path": "projects/lib/.ccnavi/config/project/templates",
+    "exists": true,
+    "unreadable": "",
+    "writable": true,
+    "problems": [],
+    "templates": [
+     {
+      "name": "lib",
+      "layer": "lib",
+      "path": "projects/lib/.ccnavi/config/project/templates/lib.yml",
+      "sha": "13804326841fd10cc49a17ed565f2eb1e9fb91860edb51767e6dc961875933f8",
+      "valid": true,
+      "description": "lib の調べもの",
+      "when": "",
+      "plan": [
+       {
+        "index": 1,
+        "number": 1,
+        "type": "research",
+        "review": "",
+        "after": []
+       }
+      ],
+      "feedback": [],
+      "has_flows": false,
+      "flows": [],
+      "effective": true,
+      "usable": true,
+      "dropped": null,
+      "writable": true,
+      "problems": []
+     }
+    ]
+   }
+  ],
+  "sums": [
+   {
+    "name": "self",
+    "layers": [
+     "common",
+     "self"
+    ],
+    "templates": [
+     {
+      "name": "broken",
+      "layer": "common",
+      "effective": false,
+      "dropped": "invalid"
+     },
+     {
+      "name": "feature",
+      "layer": "common",
+      "effective": true,
+      "dropped": null
+     },
+     {
+      "name": "research",
+      "layer": "common",
+      "effective": true,
+      "dropped": null
+     },
+     {
+      "name": "ends",
+      "layer": "self",
+      "effective": true,
+      "dropped": null
+     },
+     {
+      "name": "feature",
+      "layer": "self",
+      "effective": false,
+      "dropped": "duplicate"
+     },
+     {
+      "name": "local",
+      "layer": "self",
+      "effective": true,
+      "dropped": null
+     },
+     {
+      "name": "research",
+      "layer": "self",
+      "effective": false,
+      "dropped": "conflict"
+     }
+    ]
+   },
+   {
+    "name": "lib",
+    "layers": [
+     "common",
+     "lib"
+    ],
+    "templates": [
+     {
+      "name": "broken",
+      "layer": "common",
+      "effective": false,
+      "dropped": "invalid"
+     },
+     {
+      "name": "feature",
+      "layer": "common",
+      "effective": true,
+      "dropped": null
+     },
+     {
+      "name": "research",
+      "layer": "common",
+      "effective": true,
+      "dropped": null
+     },
+     {
+      "name": "lib",
+      "layer": "lib",
+      "effective": true,
+      "dropped": null
+     }
+    ]
+   }
+  ],
+  "errors": 3,
+  "warns": 2,
+  "infos": 1
+ }
+}

@@ -196,6 +196,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.phase_scope",
                 "tickets.plan_order",
                 "tickets.plan_phases",
+                "tickets.plan_templates",
                 "tickets.scaffold",
                 "tickets.session_rejects",
             }
@@ -252,6 +253,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "entry.lint_project",
                 "entry.lint_rules",
                 "entry.cli_plan",
+                "entry.cli_templates",
+                "entry.lint_templates",
                 "entry.sh_ask",
                 "entry.status",
                 "entry.suggest",
