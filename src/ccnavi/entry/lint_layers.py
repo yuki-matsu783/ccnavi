@@ -31,7 +31,7 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
     """レイヤーに食い違いが無いか。
 
     見るのは 2 つ。レイヤーのファイルが読めることと、レイヤーをまたいだ重複と同名の衝突。
-    `.ccnavi/config/` が無いことは言わない。
+    `.ccnavi/config/project/` が無いことは言わない。
     無いのは正常（無いレイヤー = 空）で、言うと本当に言うべきものが埋もれる。
 
     共通レイヤーは `_rules` が別に見ているので、ここではレイヤーの 2 つ目以降だけを回す。
@@ -71,6 +71,39 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
     return problems
 
 
+def _legacy_places(conf: settings.Settings, root: str) -> list[Problem]:
+    """旧い置き場（`.ccnavi/common/`・`.ccnavi/config/{rules,phases,risks}.yml`）に設定が残っていないか。
+
+    設定の置き場は `.ccnavi/config/common/` と `.ccnavi/config/project/` に移った。旧い置き場の
+    ファイルは読まれないので、書いたルール・配点・フェーズ定義が黙って効かなくなる。
+    ワークスペースと、その下のプロジェクトの両方を見る。移すのはユーザで、ここは名指しするだけ。
+    """
+    problems: list[Problem] = []
+    home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
+    names = tuple(settings.LAYER_FILE_NAMES.values())
+    bases = [("", root)] + [(f"projects/{t.name} ", t.root) for t in tree.projects(conf.projects)]
+    for label, base in bases:
+        for old, new in (
+            (f"{home}/common", f"{home}/{settings.COMMON_DIR}"),
+            (f"{home}/config", f"{home}/{settings.LAYER_CONFIG_DIR}"),
+        ):
+            for name in names:
+                path = os.path.join(base, *old.split("/"), name)
+                if not os.path.isfile(path):
+                    continue
+                where = f"({label.strip() or 'legacy'})"
+                shown = f"{label.replace(' ', '/')}{old}/{name}"
+                problems.append(
+                    Problem(
+                        SEVERITY_WARN,
+                        where,
+                        f"{shown} は旧い置き場で、読まれていない。"
+                        f"{label.replace(' ', '/')}{new}/{name} へ移す",
+                    )
+                )
+    return problems
+
+
 def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
     """各レイヤーの phases / risk が、共通レイヤーと合成できるか。
 
@@ -79,7 +112,7 @@ def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
     全欄一致で捨てた重複を info で言う。共通レイヤー自身の苦情は `_phases` / `_risk` が
     別に言うので、ここではレイヤーの側だけを数える。
 
-    `.ccnavi/config/` が無いことは言わない。無いのは正常（無いレイヤー = 空）。
+    `.ccnavi/config/project/` が無いことは言わない。無いのは正常（無いレイヤー = 空）。
     """
     problems: list[Problem] = []
     names = [ruleload.LAYER_SELF]
@@ -125,7 +158,7 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
             if os.path.exists(os.path.join(origin, home, rel.replace("/", os.sep))):
                 continue
             if work.project and rel.startswith(f"{settings.COMMON_DIR}/"):
-                # プロジェクトのワークツリーの `.ccnavi/common/` は、親の着手がミラーした
+                # プロジェクトのワークツリーの `.ccnavi/config/common/` は、親の着手がミラーした
                 # 共通レイヤー。ワークスペースの中では読まれないので、言わない。
                 continue
             where = os.path.normcase(
@@ -263,7 +296,7 @@ def _layer_files(conf: settings.Settings, home_rel: str) -> list[tuple[str, str]
 
 
 def _common_rel(kind: str) -> str:
-    return f".ccnavi/common/{settings.LAYER_FILE_NAMES[kind]}"
+    return f".ccnavi/config/common/{settings.LAYER_FILE_NAMES[kind]}"
 
 
 def _same_text(a: bytes | None, b: bytes | None) -> bool:

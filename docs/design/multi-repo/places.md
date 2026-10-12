@@ -3,7 +3,7 @@ type: design
 title: 11.2 置き場
 description: ワークスペースとプロジェクトで何をどこに置くか。ルールとリスクは common と config の両方、フェーズ定義は config だけ。ファイルが無いのは設定が無い正常
 tags: [design-doc, projects]
-keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config, .ccnavi/common, ミラー, 単体 clone, 無い = 空]
+keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config/project, .ccnavi/config/common, ミラー, 単体 clone, 無い = 空]
 ---
 
 [設計書の入口](../../design.md) > [11. 複数のリポジトリ](../multi-repo.md)
@@ -13,13 +13,13 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config,
 | 何 | 場所 | git |
 |---|---|---|
 | hook の登録、実行ファイル、保護済みスクリプト、スキル、CLAUDE.md | ワークスペースルート | ワークスペース |
-| 共通レイヤーのルール / リスクの配点 | `.ccnavi/common/{rules,risks}.yml`（置き場は固定） | ワークスペース |
-| 共通レイヤーのフェーズ定義 | 置けない。`.ccnavi/common/phases.yml` があれば error（11.4.1） | |
-| ルールの期待する判定 | `.ccnavi/common/rule-expectations.yml` | ワークスペース |
-| 共通レイヤーのミラー | `projects/<名前>/.ccnavi/common/`（親の着手でワークスペースルートの `.ccnavi/common/` から配る。11.12。誰も編集しない） | プロジェクト |
-| ワークスペース自身のレイヤーの 3 本 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risks}.yml` | ワークスペース |
-| プロジェクトのレイヤーの 3 本 | `projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml` | プロジェクト |
-| 固有スクリプト（配点の `script:` が指す先） | 共通レイヤーとそのミラーは `.ccnavi/common/scripts/`。自身のレイヤーとプロジェクトのレイヤーは、それぞれの `.ccnavi/scripts/` | レイヤーと同じ |
+| 共通レイヤーのルール / リスクの配点 | `.ccnavi/config/common/{rules,risks}.yml`（置き場は固定） | ワークスペース |
+| 共通レイヤーのフェーズ定義 | 置けない。`.ccnavi/config/common/phases.yml` があれば error（11.4.1） | |
+| ルールの期待する判定 | `.ccnavi/config/common/rule-expectations.yml` | ワークスペース |
+| 共通レイヤーのミラー | `projects/<名前>/.ccnavi/config/common/`（親の着手でワークスペースルートの `.ccnavi/config/common/` から配る。11.12。誰も編集しない） | プロジェクト |
+| ワークスペース自身のレイヤーの 3 本 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml` | ワークスペース |
+| プロジェクトのレイヤーの 3 本 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | プロジェクト |
+| 固有スクリプト（配点の `script:` が指す先） | 共通レイヤーとそのミラーは `.ccnavi/config/common/scripts/`。自身のレイヤーとプロジェクトのレイヤーは、それぞれの `.ccnavi/scripts/` | レイヤーと同じ |
 | プロジェクト | `projects/<名前>/`（`projects/` は固定。ワークスペースルートからの相対）。直下で `.git` を持つディレクトリだけ。1 段に固定 | ワークスペースでは無視。プロジェクト自身の git |
 | ワークツリー | `.claude/worktrees/<識別子>/`。ワークスペースかプロジェクトから切る | 管理外 |
 | 提案 | そのツリーの `wip/proposals/<状態>/<識別子>.md`。プロジェクト向けはそのプロジェクトの git が持つ | そのツリーのリポジトリ |
@@ -29,28 +29,28 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config,
 
 `.ccnavi/` は ccnavi ディレクトリの固定の名前。この表の置き場はどれも固定で、環境変数では動かない。
 
-レイヤーは 3 種で、形は同じ。共通レイヤーはどのツリーにも適用され、ワークスペースルートの `.ccnavi/common/` に置く。
+レイヤーは 3 種で、形は同じ。共通レイヤーはどのツリーにも適用され、ワークスペースルートの `.ccnavi/config/common/` に置く。
 ユーザが持つ設定は ccnavi ディレクトリの下、記録と state は `logs/`、`.claude/` には Claude Code 自身のものだけを置く。
 共通レイヤーのファイルと期待する判定も、名指しのツールからは組み込みの deny（`*/.ccnavi/*`）が止める。
 共通レイヤーの置き場は固定。別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけで、
 それも診断（`--lint` / `--test` / `--test-expectations` / `--explain`）に限る。レイヤーを探す先を動かす `--projects` / `--project-home` も同じ。
-自身のレイヤーとプロジェクトのレイヤーはそのツリーにだけ適用され、どちらも git プロジェクトルートの下の `.ccnavi/config/` に置く。
+自身のレイヤーとプロジェクトのレイヤーはそのツリーにだけ適用され、どちらも git プロジェクトルートの下の `.ccnavi/config/project/` に置く。
 ワークスペース自身にレイヤーを分けるのは、ワークスペースのフェーズ定義（`scope: ["src/*", ...]`）がそのレイアウトにしか合わないから。
 
-**何をどこに置けるか。** ルールとリスクの配点は、共通（`.ccnavi/common/`）と config（ワークスペース自身かプロジェクトの `.ccnavi/config/`）の
+**何をどこに置けるか。** ルールとリスクの配点は、共通（`.ccnavi/config/common/`）と config（ワークスペース自身かプロジェクトの `.ccnavi/config/project/`）の
 両方に置け、効くのは和（合成は 11.4）。フェーズ定義（`phases.yml`）は config だけに置き、共通には置けない。
-ワークスペースのフェーズ定義は自身のレイヤー `<ワークスペースルート>/.ccnavi/config/phases.yml` に置き、プロジェクトのフェーズ定義は
-そのプロジェクトの `.ccnavi/config/phases.yml` に置く。どのフェーズ定義を使うかは親の `project:` が決める（11.4.1）。
+ワークスペースのフェーズ定義は自身のレイヤー `<ワークスペースルート>/.ccnavi/config/project/phases.yml` に置き、プロジェクトのフェーズ定義は
+そのプロジェクトの `.ccnavi/config/project/phases.yml` に置く。どのフェーズ定義を使うかは親の `project:` が決める（11.4.1）。
 導入スクリプトのひな形は、共通レイヤーにルールと配点、自身のレイヤーにフェーズ定義を置く（11.9）。
-自身のレイヤーの `.ccnavi/config/` もユーザの持ち物で、エージェントの Write / Edit は通らない（チケットの `allow` に `.ccnavi/*` があっても組み込みの deny が優先される）。
+自身のレイヤーの `.ccnavi/config/project/` もユーザの持ち物で、エージェントの Write / Edit は通らない（チケットの `allow` に `.ccnavi/*` があっても組み込みの deny が優先される）。
 
-**共通レイヤーのミラー。** プロジェクトの `.ccnavi/common/` は、ワークスペースルートの共通レイヤーの写しで、誰も編集しない（11.12）。
-ワークスペースの中では読まない。ワークスペースの中で共通レイヤーとして読むのは、ワークスペースルートの `.ccnavi/common/` だけ。
-プロジェクトだけを clone したときは、そのプロジェクトがルートになるので、`.ccnavi/common/`（ミラー）が共通レイヤー、`.ccnavi/config/` が自身のレイヤーとして読まれる。
+**共通レイヤーのミラー。** プロジェクトの `.ccnavi/config/common/` は、ワークスペースルートの共通レイヤーの写しで、誰も編集しない（11.12）。
+ワークスペースの中では読まない。ワークスペースの中で共通レイヤーとして読むのは、ワークスペースルートの `.ccnavi/config/common/` だけ。
+プロジェクトだけを clone したときは、そのプロジェクトがルートになるので、`.ccnavi/config/common/`（ミラー）が共通レイヤー、`.ccnavi/config/project/` が自身のレイヤーとして読まれる。
 どちらの場合も「共通 + 1 レイヤー」の和になる（11.4）。
 
 置き場を動かす環境変数は無い。ccnavi ディレクトリは git プロジェクトルートの直下の `.ccnavi` で、自身のレイヤーとプロジェクトのレイヤーに同じ名前が使われる。
-`config/` と `scripts/` と 3 本のファイル名は固定。プロジェクトの `config/` と混ぜないのは、組み込みの deny を `*/.ccnavi/*` の 1 行で済ませるため。
+`config/` と `scripts/` と 3 本のファイル名は固定。プロジェクトの `config/project/` と混ぜないのは、組み込みの deny を `*/.ccnavi/*` の 1 行で済ませるため。
 
 読むのは常に元リポジトリに checkout されている版（ブランチは問わない）。ワークツリーの中の `.ccnavi/` は、ワークスペースから切ったものも含めて読まない（REQ-MLT-04）。
 
@@ -61,11 +61,11 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config,
 土台の deny と、`.ccnavi/` などを守る `builtin-guard-*`（Write / Edit・シェルの設定保護。8.2）は別で、`builtin-guard-*` は組み込みの既定を使っている間（共通レイヤーのルールが不正な間）は外す。
 common と config の両方が無ければ、ルールは組み込みの既定だけで判定する。
 
-共通レイヤーのルール（`.ccnavi/common/rules.yml`）自身が破損して読めないときは、組み込みの既定を使い（REQ-PRE-06）、自身のレイヤーとプロジェクトのレイヤーは足さない。
+共通レイヤーのルール（`.ccnavi/config/common/rules.yml`）自身が破損して読めないときは、組み込みの既定を使い（REQ-PRE-06）、自身のレイヤーとプロジェクトのレイヤーは足さない。
 共通レイヤーのルールが「無い」ときは、これと違って組み込みの既定へは戻らず、空として config のレイヤーだけを土台の deny の上に足す。
 これは以前の「共通レイヤーに無ければ組み込みの既定に戻し、`fallback` を記録する」からの変更点。
 
-プロジェクトの git に入るのは、ccnavi ディレクトリ（`config/` の 3 本、ミラーの `common/`、配点のスクリプト）と、提案・承認済みチケット・フェーズのマーカー。
+プロジェクトの git に入るのは、ccnavi ディレクトリ（`config/project/` の 3 本、ミラーの `config/common/`、配点のスクリプト）と、提案・承認済みチケット・フェーズのマーカー。
 A が承認して B の機械で作業する流れでは、これらを共有する（9.2）。feature ブランチに乗り、squash merge で 1 コミットにまとめられる。
 git のラッパースクリプトの記録（`logs/`）はワークスペース側に残す。
 

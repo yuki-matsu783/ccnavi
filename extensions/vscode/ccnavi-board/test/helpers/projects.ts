@@ -27,7 +27,7 @@ export function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
     name: "lib",
     root: "/ws/projects/lib",
     rel: "projects/lib",
-    rulesRel: "projects/lib/.ccnavi/config/rules.yml",
+    rulesRel: "projects/lib/.ccnavi/config/project/rules.yml",
     rulesExists: true,
     hasClaudeDir: false,
     origin: "",
@@ -55,7 +55,7 @@ export function page(rows: readonly ProjectRow[], overrides: Partial<ProjectsPag
     strays: [],
     workspaceWorktrees: [],
     existingNames: rows.map((r) => r.name),
-    selfRulesRel: ".ccnavi/config/rules.yml",
+    selfRulesRel: ".ccnavi/config/project/rules.yml",
     selfRulesExists: false,
     ...overrides,
   };

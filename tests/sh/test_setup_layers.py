@@ -1,7 +1,7 @@
 """導入スクリプト（`scripts/ccnavi-setup.sh`）が配る設定のひな形の置き場。
 
-rules と risk は汎用なので共通レイヤー（`.ccnavi/common/`）へ、phases はワークスペースの
-レイアウトに依存するので自身のレイヤー（`.ccnavi/config/`）へ配る。配らないときは
+rules と risk は汎用なので共通レイヤー（`.ccnavi/config/common/`）へ、phases はワークスペースの
+レイアウトに依存するので自身のレイヤー（`.ccnavi/config/project/`）へ配る。配らないときは
 3 本とも「まだ無いもの」に名前が出る。
 """
 
@@ -77,9 +77,9 @@ class SetupTest(unittest.TestCase):
         write(os.path.join(src, "dist", "ccnavi.target"), platformtag.host_target() + "\n")
         os.makedirs(os.path.join(src, ".ccnavi", "scripts"))
         shutil.copy(LAUNCHER, os.path.join(src, ".ccnavi", "scripts", "ccnavi-launcher.sh"))
-        write(os.path.join(src, ".ccnavi", "common", "rules.yml"), "deny: []\n")
-        write(os.path.join(src, ".ccnavi", "common", "risks.yml"), COMMON_RISK)
-        write(os.path.join(src, HOME, "config", "phases.yml"), COMMON_PHASES)
+        write(os.path.join(src, ".ccnavi", "config", "common", "rules.yml"), "deny: []\n")
+        write(os.path.join(src, ".ccnavi", "config", "common", "risks.yml"), COMMON_RISK)
+        write(os.path.join(src, HOME, "config", "project", "phases.yml"), COMMON_PHASES)
         # 承認の push の sh と、端末で承認する sh も配るもの。
         # 無いと「まだ無いもの」に名前が出る。
         for name in (
@@ -117,9 +117,15 @@ class SetupTest(unittest.TestCase):
         result = self.run_setup("--mode", "enable", "--deploy", src)
         self.assertEqual(result.returncode, 0, result.stderr)
 
-        self.assertTrue(os.path.isfile(os.path.join(self.dir, ".ccnavi", "common", "rules.yml")))
-        self.assertTrue(os.path.isfile(os.path.join(self.dir, ".ccnavi", "common", "risks.yml")))
-        self.assertTrue(os.path.isfile(os.path.join(self.dir, HOME, "config", "phases.yml")))
+        self.assertTrue(
+            os.path.isfile(os.path.join(self.dir, ".ccnavi", "config", "common", "rules.yml"))
+        )
+        self.assertTrue(
+            os.path.isfile(os.path.join(self.dir, ".ccnavi", "config", "common", "risks.yml"))
+        )
+        self.assertTrue(
+            os.path.isfile(os.path.join(self.dir, HOME, "config", "project", "phases.yml"))
+        )
         self.assertNotIn("まだ無いもの", result.stdout)
 
     def test_missing_templates_are_named(self):
@@ -127,9 +133,9 @@ class SetupTest(unittest.TestCase):
         result = self.run_setup("--mode", "enable", "--no-deploy")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("まだ無いもの", result.stdout)
-        self.assertIn(".ccnavi/common/rules.yml", result.stdout)
-        self.assertIn(".ccnavi/common/risks.yml", result.stdout)
-        self.assertIn(".ccnavi/config/phases.yml", result.stdout)
+        self.assertIn(".ccnavi/config/common/rules.yml", result.stdout)
+        self.assertIn(".ccnavi/config/common/risks.yml", result.stdout)
+        self.assertIn(".ccnavi/config/project/phases.yml", result.stdout)
 
 
 if __name__ == "__main__":

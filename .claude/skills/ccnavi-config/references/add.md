@@ -135,7 +135,7 @@ Bash は実行される部分に当たる。`$( )` の中や `&&` の先も 1 �
 `additionalContextFile` / `additionalContextOnceFile`（ルートからの相対。先頭 4000 文字まで）。
 広い `allow` には書かない（呼び出しのたびに同じ文が積まれる）。lint は何にでも当たる allow と選択肢が 3 つ以上ある regex を warn にする。
 
-期待する判定を一緒に足す。ルールを 1 件足したら `.ccnavi/common/rule-expectations.yml` に、当たってほしい
+期待する判定を一緒に足す。ルールを 1 件足したら `.ccnavi/config/common/rule-expectations.yml` に、当たってほしい
 期待と当たってほしくない期待を両方足す。期待は
 `tool` `subject` `why` の 3 つで、置いたタイプが期待する判定。`subject` の `/repo` は
 ワークスペースルートに読み替わる。その下書きも `wip/scratchpad/` に置き、`--test-expectations` で
@@ -212,7 +212,7 @@ factors:
   - {id: many-files, points: 15, files_over: 10,    message: ファイルが多い}
   - {id: ci,         points: 35, glob: ".github/**", max: 35, message: CI に触った}
   - {id: deletes,    points: 20, deleted_over: 3,   message: 消したファイルが多い}
-  - {id: complexity, points: 30, script: .ccnavi/common/scripts/complexity.sh, message: 複雑度}
+  - {id: complexity, points: 30, script: .ccnavi/config/common/scripts/complexity.sh, message: 複雑度}
   - {id: untested,   points: 30, judge: テストの無い振る舞いの変更を含むか, message: テスト無し}
 ```
 
@@ -222,7 +222,7 @@ factors:
 |---|---|---|
 | `lines_over` / `files_over` / `deleted_over` | 差分の行数・ファイル数・消したファイル数が基準を超えたら加点 | 基準はこのプロジェクトの普通の子の大きさで決める。`ccnavi-git.sh log --shortstat` で最近の差分を見る。生成物やロックファイルが差分を膨らませるなら `exclude: ["*.lock"]` のように外し、一部のディレクトリだけ測るなら `include: ["src/**"]` を書く（どちらも既定は無指定＝全パス。`exclude` は `include` に当たっていても外す。バイナリは行数 0）。`*` は `/` をまたぐので `*.lock` は下の階層の `x.lock` にも当たる。`**/*.lock` はルート直下の `x.lock` に当たらない。末尾が `/` の glob はディレクトリ（`src/` は `src/**`）。`include` にワイルドカードの無い名前（`src`）を書くとそのファイルにしか当たらず点が 0 になるので、lint が warn する。rename は元のパスも見る（`include` は旧新どちらか、`exclude` は両方に当たったときだけ外す） |
 | `glob` | 当たったファイルごとに加点。`max` で上限 | 触ったらユーザが見るべき場所（CI、移行、`.claude/`）。ワークツリーのルートからの相対。`` が使える |
-| `script` | レイヤーの `scripts/` の下の sh（共通レイヤーは `.ccnavi/common/scripts/`（プロジェクトの `.ccnavi/common/` のミラーも同じ表記）、自身のレイヤーとプロジェクトのレイヤーは `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子のワークツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は重いほうとして扱われ、`points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
+| `script` | レイヤーの `scripts/` の下の sh（共通レイヤーは `.ccnavi/config/common/scripts/`（プロジェクトの `.ccnavi/config/common/` のミラーも同じ表記）、自身のレイヤーとプロジェクトのレイヤーは `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子のワークツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は重いほうとして扱われ、`points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
 | `judge` | 問いの文。親がサブエージェントに差分を読ませ、`ccnavi-ticket.sh record-risk <子> <項目> yes\|no --reason` で記録。揃うまで子は閉じられない | 差分を読んで yes / no で答えられる問いにする。「品質は十分か」は答えられない |
 
 `levels` は `medium <= high <= critical`。リスクレベルの名前は増やせない（知らない名前は warn）。
@@ -234,7 +234,7 @@ factors:
 ## ユーザに渡す形
 
 ```
-変えるもの: .ccnavi/common/rules.yml（下書き: <下書きのパス>）
+変えるもの: .ccnavi/config/common/rules.yml（下書き: <下書きのパス>）
 なぜ: <1 行>
 得るもの: <何が止まる / 通る / 変わるか>
 失うもの: <広がる沈黙、増える確認、閉じにくくなるフェーズ、など>
@@ -242,7 +242,7 @@ factors:
 検証: --lint error 0 / warn N（内容）、期待 deny a/b ask c/d allow e/f 食い違い 0
 差分:
   <本物との diff>
-期待の追加: .ccnavi/common/rule-expectations.yml に <n> 件（下書き: <パス>）
+期待の追加: .ccnavi/config/common/rule-expectations.yml に <n> 件（下書き: <パス>）
 ```
 
 置いたあとに `/ccnavi-config` の確かめる側をもう一度回す（`additionalContextFile` の相対パスや `{root}` で答えが変わる）。

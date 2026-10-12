@@ -15,10 +15,10 @@
 
     <root>/.claude/settings.json        hook の登録そのもの
     <root>/.claude/settings.local.json  同上。個人の上書き
-    共通レイヤーの 3 本                       <root>/.ccnavi/common/{rules,phases,risks}.yml
-    自身のレイヤーの 3 本                     <root>/.ccnavi/config/{rules,phases,risks}.yml
+    共通レイヤーの 3 本                       <root>/.ccnavi/config/common/{rules,phases,risks}.yml
+    自身のレイヤーの 3 本                     <root>/.ccnavi/config/project/{rules,phases,risks}.yml
     プロジェクトのレイヤーの 3 本
-    projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml
+    projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml
 
 守る場所はレイヤーの数だけ増えるが、守る対象の種類は「設定 3 本」の 1 種のまま。
 rules.yml は何を止めるかを、phases.yml はレビューが要るかを、risks.yml は点が
@@ -49,7 +49,7 @@ ccnavi ディレクトリの下のファイル数は定まらない。呼び出�
 上のファイルは追跡されているので、`.claude/worktrees/<名前>/` の中にも同じものが入る。
 このワークツリー側の設定は、今の時点では誰にも読まれない。hook の登録を読むのはセッションを
 起こしたワークスペースルートの側で、判定が読むレイヤーも元リポジトリに checkout されている版だから、
-ワークツリーの中の `settings.json` や `.ccnavi/config/rules.yml` を
+ワークツリーの中の `settings.json` や `.ccnavi/config/project/rules.yml` を
 書き換えても、その場では何も変わらない。
 
 それでも守るのは、ワークツリー側の設定が統合先へ入る経路があるから。ワークツリーで書き換えて

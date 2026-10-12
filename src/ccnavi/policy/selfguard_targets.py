@@ -194,7 +194,7 @@ def _worktree_copies(
     元リポジトリをつけて列挙する。ワークツリーはワークスペースからもプロジェクトからも
     切れて、中に入っているワークツリー側の設定は元リポジトリが追跡しているものだけになる。
     lib から切ったツリーに `.claude/settings.json` は無いし、lib のレイヤーのパスは
-    `projects/lib/.ccnavi/config/rules.yml` ではなく `.ccnavi/config/rules.yml`。
+    `projects/lib/.ccnavi/config/project/rules.yml` ではなく `.ccnavi/config/project/rules.yml`。
     ワークスペースルートからの相対で組むと、どちらの向きにも当たらない。
 
     設定の置き場は設定で動く。元リポジトリの外を指しているなら、ワークツリーの中に

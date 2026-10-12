@@ -39,12 +39,12 @@ class StageShTest(unittest.TestCase):
         os.makedirs(scripts)
         for name in ("ccnavi-stage.sh", *common_sh(SH_DIR)):
             shutil.copy(os.path.join(SH_DIR, name), scripts)
-        write(os.path.join(self.ws, ".ccnavi", "common", "rules.yml"), "version: 1\n")
+        write(os.path.join(self.ws, ".ccnavi", "config", "common", "rules.yml"), "version: 1\n")
         write(os.path.join(self.ws, ".claude", "hooks", "lint-py.sh"), "echo lint\n")
-        self.rules = os.path.join(self.ws, ".ccnavi", "common", "rules.yml")
+        self.rules = os.path.join(self.ws, ".ccnavi", "config", "common", "rules.yml")
         self.hook = os.path.join(self.ws, ".claude", "hooks", "lint-py.sh")
         self.draft_rules = os.path.join(
-            self.ws, "wip", "scratchpad", ".ccnavi", "common", "rules.yml"
+            self.ws, "wip", "scratchpad", ".ccnavi", "config", "common", "rules.yml"
         )
         self.draft_hook = os.path.join(
             self.ws, "wip", "scratchpad", ".claude", "hooks", "lint-py.sh"
@@ -64,14 +64,14 @@ class StageShTest(unittest.TestCase):
         )
 
     def test_copies_with_the_same_layout(self):
-        result = self.stage(".ccnavi/common/rules.yml", ".claude/hooks/lint-py.sh")
+        result = self.stage(".ccnavi/config/common/rules.yml", ".claude/hooks/lint-py.sh")
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("version: 1\n", read(self.draft_rules))
         self.assertEqual("echo lint\n", read(self.draft_hook))
         self.assertEqual("version: 1\n", read(self.rules), "元は触らない")
 
     def test_relative_to_cwd_and_absolute_paths(self):
-        result = self.stage("common/rules.yml", cwd=os.path.join(self.ws, ".ccnavi"))
+        result = self.stage("config/common/rules.yml", cwd=os.path.join(self.ws, ".ccnavi"))
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertTrue(os.path.isfile(self.draft_rules))
         result = self.stage(self.hook.replace(os.sep, "/"))
@@ -79,9 +79,9 @@ class StageShTest(unittest.TestCase):
         self.assertTrue(os.path.isfile(self.draft_hook))
 
     def test_does_not_overwrite_an_edited_draft(self):
-        self.stage(".ccnavi/common/rules.yml")
+        self.stage(".ccnavi/config/common/rules.yml")
         write(self.draft_rules, "version: 2\n")
-        result = self.stage(".ccnavi/common/rules.yml")
+        result = self.stage(".ccnavi/config/common/rules.yml")
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("上書きしない", result.stdout)
         self.assertEqual("version: 2\n", read(self.draft_rules))
@@ -91,7 +91,7 @@ class StageShTest(unittest.TestCase):
         write(outside, "x")
         for path, why in (
             (outside, "の下にありません"),
-            (".ccnavi/common/nothing.yml", "実在するファイルではありません"),
+            (".ccnavi/config/common/nothing.yml", "実在するファイルではありません"),
             ("wip/scratchpad/x.md", "下書きの置き場の中"),
         ):
             with self.subTest(path=path):
@@ -108,9 +108,11 @@ class StageShTest(unittest.TestCase):
         self.assertIn("引用符", result.stderr)
 
     def test_commands_print_full_path_mv_for_edited_drafts_only(self):
-        self.stage(".ccnavi/common/rules.yml", ".claude/hooks/lint-py.sh")
+        self.stage(".ccnavi/config/common/rules.yml", ".claude/hooks/lint-py.sh")
         write(self.draft_rules, "version: 2\n")
-        result = self.stage("--commands", ".ccnavi/common/rules.yml", ".claude/hooks/lint-py.sh")
+        result = self.stage(
+            "--commands", ".ccnavi/config/common/rules.yml", ".claude/hooks/lint-py.sh"
+        )
         mvs = [line for line in result.stdout.splitlines() if line.startswith("mv ")]
         self.assertEqual([f"mv '{self.draft_rules}' '{self.rules}'".replace(os.sep, "/")], mvs)
         self.assertEqual(
@@ -122,15 +124,17 @@ class StageShTest(unittest.TestCase):
         )
 
     def test_commands_all_edited_succeeds(self):
-        self.stage(".ccnavi/common/rules.yml", ".claude/hooks/lint-py.sh")
+        self.stage(".ccnavi/config/common/rules.yml", ".claude/hooks/lint-py.sh")
         write(self.draft_rules, "version: 2\n")
         write(self.draft_hook, "echo lint2\n")
-        result = self.stage("--commands", ".ccnavi/common/rules.yml", ".claude/hooks/lint-py.sh")
+        result = self.stage(
+            "--commands", ".ccnavi/config/common/rules.yml", ".claude/hooks/lint-py.sh"
+        )
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual(2, len([ln for ln in result.stdout.splitlines() if ln.startswith("mv ")]))
 
     def test_commands_without_draft_or_edit_prints_nothing(self):
-        result = self.stage("--commands", ".ccnavi/common/rules.yml")
+        result = self.stage("--commands", ".ccnavi/config/common/rules.yml")
         self.assertEqual(1, result.returncode)
         self.assertIn("下書きがまだ無い", result.stderr)
         self.assertNotIn("mv ", result.stdout)
@@ -151,10 +155,10 @@ class StageShTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.ws, "wip", "scratchpad", "link")))
 
     def test_commands_refuse_when_the_original_changed_after_staging(self):
-        self.stage(".ccnavi/common/rules.yml")
+        self.stage(".ccnavi/config/common/rules.yml")
         write(self.draft_rules, "version: 2\n")
         write(self.rules, "version: 3\n")  # 別のセッションかユーザが元を直した
-        result = self.stage("--commands", ".ccnavi/common/rules.yml")
+        result = self.stage("--commands", ".ccnavi/config/common/rules.yml")
         self.assertEqual(1, result.returncode)
         self.assertNotIn("mv ", result.stdout)
         self.assertIn("元のファイルが変わっている", result.stderr)

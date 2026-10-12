@@ -420,13 +420,13 @@ class ShAgreesTest(unittest.TestCase):
 
 
 # （ラッパーに渡す引数, 止まるか）。居場所はワークスペースルート。
-# ワークスペースには .ccnavi/scripts/ccnavi-git.sh・.ccnavi/common/rules.yml・src/a.py・
-# projects/p/.ccnavi/config/rules.yml・.claude/settings.json がある（CorePathTest.FILES）。
+# ワークスペースには .ccnavi/scripts/ccnavi-git.sh・.ccnavi/config/common/rules.yml・src/a.py・
+# projects/p/.ccnavi/config/project/rules.yml・.claude/settings.json がある（CorePathTest.FILES）。
 CORE_CASES = (
     # 消す。ラッパー自身を消すと、生の git の組み込みの止め（ラッパーがあるときだけ）も外れる。
     ("rm .ccnavi/scripts/ccnavi-git.sh", True),
     ("rm -r .ccnavi/scripts", True),
-    ("rm --cached .ccnavi/common/rules.yml", True),
+    ("rm --cached .ccnavi/config/common/rules.yml", True),
     ("rm .claude/settings.json", True),
     ("rm -r projects", True),
     ("rm *.sh", True),
@@ -440,22 +440,22 @@ CORE_CASES = (
     ("rm -r tests/logs", False),
     # 別のコミットの中身に戻す。
     ("restore --source=HEAD~5 -- .ccnavi", True),
-    ("restore -s HEAD .ccnavi/common/rules.yml", True),
+    ("restore -s HEAD .ccnavi/config/common/rules.yml", True),
     ("restore -sHEAD .claude/settings.json", True),
-    ("restore .ccnavi/common/rules.yml --source HEAD", True),
+    ("restore .ccnavi/config/common/rules.yml --source HEAD", True),
     ("restore --source=HEAD -- ./", True),
     ("restore --source=HEAD --pathspec-from-file=list.txt", True),
     ("restore --source=HEAD -- src/a.py", False),
-    ("checkout HEAD .ccnavi/common/rules.yml", True),
+    ("checkout HEAD .ccnavi/config/common/rules.yml", True),
     ("checkout HEAD src/a.py", False),
     # 索引の中身に戻す形と、衝突の解決は通す。
-    ("restore .ccnavi/common/rules.yml", False),
-    ("restore --staged .ccnavi/common/rules.yml", False),
-    ("restore --ours -- .ccnavi/common/rules.yml", False),
-    ("restore --theirs .ccnavi/common/rules.yml", False),
+    ("restore .ccnavi/config/common/rules.yml", False),
+    ("restore --staged .ccnavi/config/common/rules.yml", False),
+    ("restore --ours -- .ccnavi/config/common/rules.yml", False),
+    ("restore --theirs .ccnavi/config/common/rules.yml", False),
     ("checkout main", False),
     ("checkout -b x main", False),
-    ("add .ccnavi/common/rules.yml", False),
+    ("add .ccnavi/config/common/rules.yml", False),
 )
 
 
@@ -464,9 +464,9 @@ class CorePathTest(unittest.TestCase):
 
     FILES = (
         ".ccnavi/scripts/ccnavi-git.sh",
-        ".ccnavi/common/rules.yml",
+        ".ccnavi/config/common/rules.yml",
         "src/a.py",
-        "projects/p/.ccnavi/config/rules.yml",
+        "projects/p/.ccnavi/config/project/rules.yml",
         ".claude/settings.json",
         "tests/logs/a.txt",
         ".ccnavi/approved/phases/i0001/1.reviewed",
@@ -556,7 +556,7 @@ class CorePathTest(unittest.TestCase):
             ("restore --so HEAD~1 .claude/settings.json", "ccnavi 自身を守る場所"),
             ("rm --pathspec-from-fi=list.txt", "ccnavi 自身を守る場所"),
             # 索引の中身に戻す checkout（sh は restore を案内して断る）。文面も restore を案内する。
-            ("checkout -- .ccnavi/common/rules.yml", "restore <パス>"),
+            ("checkout -- .ccnavi/config/common/rules.yml", "restore <パス>"),
             # `--no-dry-run`（省略形も）が後ろにあれば消す形。git は後に書いたほうを採る
             # （sh は `--no-dry-run` を許可リストで断る）。
             ("rm --dry-run --no-dry-run .claude/settings.json", "ccnavi 自身を守る場所"),
@@ -658,7 +658,7 @@ class CorePathTest(unittest.TestCase):
             ("pushd .ccnavi && sh scripts/ccnavi-git.sh rm rules.yml", True),
             ('cd "$D" && sh /x/.ccnavi/scripts/ccnavi-git.sh rm a.py', True),
             ("sh .ccnavi/scripts/ccnavi-git.sh restore --source=HEAD -- $P", True),
-            ("sh .ccnavi/scripts/ccnavi-git.sh checkout $B .ccnavi/common/rules.yml", True),
+            ("sh .ccnavi/scripts/ccnavi-git.sh checkout $B .ccnavi/config/common/rules.yml", True),
             # 起点だけを変数で渡す形と、索引に戻す形は、対象が読めるので通す。
             ("sh .ccnavi/scripts/ccnavi-git.sh restore --source $R src/a.py", False),
             ("sh .ccnavi/scripts/ccnavi-git.sh checkout $B", False),

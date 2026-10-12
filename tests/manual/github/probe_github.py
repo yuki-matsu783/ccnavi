@@ -559,7 +559,7 @@ def main() -> int:
     )
     if pushed.returncode != 0:
         return finish()
-    write(os.path.join(ROOT, ".ccnavi", "common", "rules.yml"), json.dumps(RULES))
+    write(os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml"), json.dumps(RULES))
     # sh はワークスペースルートを cwd から上へ探す（.ccnavi/scripts/ccnavi-common.sh を持つ親）。
     # 一時リポジトリにも scripts を置く。追跡はしない
     shutil.copytree(

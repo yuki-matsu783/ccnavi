@@ -314,16 +314,16 @@ class RiskTest(PhaseHarness):
 
     def test_script_factor_adds_its_points_and_fails_heavy(self):
         script = write(
-            os.path.join(self.root, ".ccnavi", "common", "scripts", "count.sh"),
+            os.path.join(self.root, ".ccnavi", "config", "common", "scripts", "count.sh"),
             'printf \'{"points": 30, "message": "%s"}\' "$CCNAVI_TICKET"\n',
         )
         self.assertTrue(os.path.exists(script))
         write(
             self.risk,
             "version: 1\nfactors:\n"
-            "  - {id: counted, points: 5, script: .ccnavi/common/scripts/count.sh,"
+            "  - {id: counted, points: 5, script: .ccnavi/config/common/scripts/count.sh,"
             " message: 数えた}\n"
-            "  - {id: broken, points: 45, script: .ccnavi/common/scripts/none.sh, message: 無い}\n",
+            "  - {id: broken, points: 45, script: .ccnavi/config/common/scripts/none.sh, message: 無い}\n",  # noqa: E501
         )
         self.one_child()
         closed = self.ccnavi("ticket", "finish", "i0001-01-01")

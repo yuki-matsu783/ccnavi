@@ -106,7 +106,7 @@ class SessionConventionsTest(unittest.TestCase):
 
     def test_ワークスペース自身のレイヤーのdenyも数える(self):
         rules_file(self.root, SOUND)
-        own = os.path.join(self.root, ".ccnavi", "config", "rules.yml")
+        own = os.path.join(self.root, ".ccnavi", "config", "project", "rules.yml")
         os.makedirs(os.path.dirname(own), exist_ok=True)
         with open(own, "w", encoding="utf-8") as f:
             json.dump({"version": 1, "deny": [WORKSPACE_ROOT_RULE, RAW_GIT]}, f)
@@ -117,7 +117,7 @@ class SessionConventionsTest(unittest.TestCase):
 
     def test_allowやaskにある同じidは数えない(self):
         rules_file(self.root, SOUND)
-        own = os.path.join(self.root, ".ccnavi", "config", "rules.yml")
+        own = os.path.join(self.root, ".ccnavi", "config", "project", "rules.yml")
         os.makedirs(os.path.dirname(own), exist_ok=True)
         with open(own, "w", encoding="utf-8") as f:
             json.dump({"version": 1, "ask": [WORKSPACE_ROOT_RULE], "allow": [RAW_GIT]}, f)

@@ -24,7 +24,7 @@ export function settingsDir(row: ProjectRow): string {
   const prefix = `${row.rel}/`;
   const inside = row.rulesRel.startsWith(prefix) ? row.rulesRel.slice(prefix.length) : "";
   const cut = inside.lastIndexOf("/");
-  return cut < 0 ? ".ccnavi/config" : inside.slice(0, cut);
+  return cut < 0 ? ".ccnavi/config/project" : inside.slice(0, cut);
 }
 
 /**

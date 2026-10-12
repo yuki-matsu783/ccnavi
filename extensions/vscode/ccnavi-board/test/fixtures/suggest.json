@@ -1,7 +1,7 @@
 {
  "version": 1,
  "root": "/repo",
- "rules_path": "/repo/.ccnavi/common/rules.yml",
+ "rules_path": "/repo/.ccnavi/config/common/rules.yml",
  "logs": [
   "/repo/logs/decisions.jsonl"
  ],
@@ -15,7 +15,7 @@
    "count": 6,
    "summary": "\u30eb\u30fc\u30eb\u3092\u8db3\u3059\u5019\u88dc: Bash \u306e npm install \u304c 6 \u56de\u3001\u3069\u306e\u30eb\u30fc\u30eb\u306b\u3082\u5f53\u305f\u3089\u305a\u6a29\u9650\u30e2\u30fc\u30c9\u3078\u6e21\u3063\u305f\u3002\u6b62\u3081\u308b\u3079\u304d\u306a\u3089 deny \u306b\u79fb\u3057\u3066 message \u3092\u66f8\u304f",
    "layer": "common",
-   "rules_path": "/repo/.ccnavi/common/rules.yml",
+   "rules_path": "/repo/.ccnavi/config/common/rules.yml",
    "rule": {
     "id": "suggest-npm-install",
     "match": "Bash",
@@ -43,7 +43,7 @@
    "count": 3,
    "summary": "message \u3092\u898b\u76f4\u3059\u5019\u88dc: git-push \u304c\u540c\u3058\u547c\u3073\u51fa\u3057\u3092\u7e70\u308a\u8fd4\u3057\u6b62\u3081\u305f\uff083 \u56de\uff09\u3002\u6587\u9762\u304b\u3089\u6b21\u306e\u4e00\u624b\u304c\u8aad\u3081\u3066\u3044\u306a\u3044\u7591\u3044",
    "layer": "common",
-   "rules_path": "/repo/.ccnavi/common/rules.yml",
+   "rules_path": "/repo/.ccnavi/config/common/rules.yml",
    "rule": {
     "id": "git-push",
     "match": "Bash",

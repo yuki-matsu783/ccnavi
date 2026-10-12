@@ -1,10 +1,10 @@
 """scripts/check_rules.py が既定で指す置き場。
 
-既定のパスが `.ccnavi/common/` の実物と食い違うと、引数なしで打ったときに
+既定のパスが `.ccnavi/config/common/` の実物と食い違うと、引数なしで打ったときに
 期待する判定を読めずに失敗する。ツールを最後まで回すと、期待する判定の食い違いの有無で終了コードが変わるので、
 前半では既定のパスが実在することだけを見る。
 
-後半は、リポジトリの期待する判定（`.ccnavi/common/rule-expectations.yml`）をいまのルールで判定し、
+後半は、リポジトリの期待する判定（`.ccnavi/config/common/rule-expectations.yml`）をいまのルールで判定し、
 食い違いが 0 件であることを見る。CI が無いので、ここで見ないと `/ccnavi-config` か
 `scripts/check_rules.py` を手で打つまで食い違いに気づけない。引数はツールと同じもの
 （`arguments()`）を使い、判定は `--test-expectations` そのものに任せる。

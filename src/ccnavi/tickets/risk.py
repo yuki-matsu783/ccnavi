@@ -1,4 +1,4 @@
-"""実績で測るリスク。`.ccnavi/common/risks.yml` を読み、子を閉じるときに差分を数える。
+"""実績で測るリスク。`.ccnavi/config/common/risks.yml` を読み、子を閉じるときに差分を数える。
 
 ## 宣言ではなく実績を測る
 
@@ -36,7 +36,8 @@
       - {id: src-diff,   points: 25, lines_over: 300, include: ["src/**"], exclude: ["*.lock"]}
       - {id: ci,         points: 35, glob: ".github/", max: 35, message: CI に触った}
       - {id: deletes,    points: 20, deleted_over: 3,   message: 消したファイルが多い}
-      - {id: complexity, points: 30, script: .ccnavi/common/scripts/complexity.sh, message: 複雑度}
+      - {id: complexity, points: 30, script: .ccnavi/config/common/scripts/complexity.sh,
+      message: 複雑度}
       - {id: untested,   points: 30, judge: テストの無い振る舞いの変更を含むか, message: テスト無し}
 
 `lines_over` / `files_over` / `deleted_over` には、数えるパスを
@@ -86,7 +87,7 @@ KIND_JUDGE = "judge"
 KINDS = (KIND_LINES, KIND_FILES, KIND_DELETED, KIND_GLOB, KIND_SCRIPT, KIND_JUDGE)
 
 # スクリプトを置いてよい場所（ワークスペースルートからの相対の先頭）。guard の内側。
-SCRIPT_HOMES = (".ccnavi/common/scripts/",)
+SCRIPT_HOMES = (".ccnavi/config/common/scripts/",)
 SCRIPT_TIMEOUT_SECONDS = 30.0
 # 差分を数える git に与える時間。閉じるときにしか走らないので、判定より長くてよい。
 GIT_TIMEOUT_SECONDS = 10.0
@@ -142,7 +143,7 @@ class Factor:
         """レイヤーをまたいで「同じ項目か」を比べるための全欄。`source` と `home` は含めない。
 
         `script:` は書かれたパスではなく、そのレイヤーのスクリプトの置き場からの相対と、
-        指す先の中身で比べる。共通レイヤーは `.ccnavi/common/scripts/`、
+        指す先の中身で比べる。共通レイヤーは `.ccnavi/config/common/scripts/`、
         各レイヤーは `<ccnavi ディレクトリ>/scripts/` を指すので、
         着手で共通レイヤーをコピーした配点はパスが違う。パスで比べると同じ項目を
         `<レイヤー>:<id>` として 2 重に数える。中身まで見るのは、
@@ -275,7 +276,7 @@ def parse(
 ) -> tuple[Definition | None, list[Problem]]:
     """定義 1 本を読む。`script_homes` はこのレイヤーで `script:` に書けるパスの先頭。
 
-    共通レイヤーは `.ccnavi/common/scripts/`、
+    共通レイヤーは `.ccnavi/config/common/scripts/`、
     各レイヤーはその `<ccnavi ディレクトリ>/scripts/` だけ。
     たがいの側を指す定義はここで error にする。プロジェクトの
     リポジトリに入る定義が、ワークスペースの道具に依存する形を作らないため。

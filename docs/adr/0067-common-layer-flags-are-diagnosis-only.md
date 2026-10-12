@@ -99,7 +99,7 @@ lib の子（共通レイヤーの big-diff 25 + lib の schema 30 = 55、lib �
   5 本を「渡されなかった」値に戻す。渡されたかどうかの読み方は `cli_args._override` と揃える
   （`--rules ""` は指定と数えず、`--risk ""` は数える）
 - テストのハーネスは 3 本をフラグで渡すのをやめ、`--root` の下の既定の置き場
-  （`.ccnavi/common/{rules,phases,risks}.yml`）に置く。パスは `tests.common_path` が
+  （`.ccnavi/config/common/{rules,phases,risks}.yml`）に置く。パスは `tests.common_path` が
   実行ファイルの既定から引く
 - 受入テスト（`tests/guard/test_acceptance.py`、`tests/core/test_entry.py`、
   `tests/guard/test_permission_mode.py`）は、見本のルールを共通レイヤーに据えた一時の
@@ -134,7 +134,7 @@ deny（`builtin-guard-ticket-approval`）が止めているものの、あれは
 **テストのハーネスは、既定の置き場を使えば何も失わない。** ハーネスはもともと自分の
 一時ディレクトリを `--root` に渡している。設定をその下の既定のパスに置けば、フラグは
 要らない。むしろ受入テストは、これまでリポジトリ自身をワークスペースルートにして
-動いていた。今回の変更で、実行した機械の `.ccnavi/common/rules.yml` が判定に混ざらなくなる。
+動いていた。今回の変更で、実行した機械の `.ccnavi/config/common/rules.yml` が判定に混ざらなくなる。
 
 ## 得たもの・失ったもの
 
@@ -191,9 +191,9 @@ deny（`builtin-guard-ticket-approval`）が止めているものの、あれは
 
 ## 関連
 
-- ADR-0052（共通レイヤーの置き場を `.ccnavi/common/` に固定する）。この穴を見つけて訂正を
+- ADR-0052（共通レイヤーの置き場を `.ccnavi/config/common/` に固定する）。この穴を見つけて訂正を
   書き、制限は別に設計するとした回
-- ADR-0042（設定と記録の置き場）。共通レイヤーの既定を `.ccnavi/common/` と決めた回
+- ADR-0042（設定と記録の置き場）。共通レイヤーの既定を `.ccnavi/config/common/` と決めた回
 - ADR-0051（`regex` も大文字小文字を区別しない）。同じ場所への書き込みが経路で食い違う
   形を作らない、という判断。`common_shell_clause` を残した理由がこれ
 - issue #65

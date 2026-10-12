@@ -26,9 +26,9 @@ class EmptyEnvStillWritesTheRecordTest(unittest.TestCase):
     def setUp(self):
         self.ws = tempfile.mkdtemp(prefix="ccnavi-log-place-")
         self.addCleanup(shutil.rmtree, self.ws, ignore_errors=True)
-        os.makedirs(os.path.join(self.ws, ".ccnavi", "common"))
+        os.makedirs(os.path.join(self.ws, ".ccnavi", "config", "common"))
         with open(
-            os.path.join(self.ws, ".ccnavi", "common", "rules.yml"), "w", encoding="utf-8"
+            os.path.join(self.ws, ".ccnavi", "config", "common", "rules.yml"), "w", encoding="utf-8"
         ) as f:
             f.write('{"version": 1}')
         # 実行後の監視の控えは git のツリーに対して取る。

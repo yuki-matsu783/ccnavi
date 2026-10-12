@@ -19,7 +19,7 @@ Claude Code はワークスペースを開く。要求は [要件 REQ-MLT](../re
 - 共通と config はどちらか片方だけでも、両方無くても動く。ファイルが無いのは「設定が無い」正常で、不正なときだけ不備として出す（11.2）
 - パスを持つツールは共通レイヤー + 行き先の 1 レイヤー、パスを持たないツールは共通レイヤー + 全部のレイヤー（11.4）
 - チケットのプロジェクトは提案を置いた場所で決まり、判定はその値を見ない
-- 親の着手で、ワークスペースルートの共通レイヤーをプロジェクトの `.ccnavi/common/` へミラーする。プロジェクトの config には触れない。ワークスペースの中ではルートの共通レイヤーだけを読み、ミラーはプロジェクトを単体で clone したときだけ共通レイヤーとして読まれる（11.12）
+- 親の着手で、ワークスペースルートの共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーする。プロジェクトの config には触れない。ワークスペースの中ではルートの共通レイヤーだけを読み、ミラーはプロジェクトを単体で clone したときだけ共通レイヤーとして読まれる（11.12）
 
 ### 11.1 何を解くか
 
@@ -44,5 +44,5 @@ Claude Code はワークスペースを開く。要求は [要件 REQ-MLT](../re
 | 11.9 | [multi-repo/diagnostics.md](multi-repo/diagnostics.md) | レイヤーごとの診断と記録 |
 | 11.10 | [multi-repo/to-measure.md](multi-repo/to-measure.md) | 実装時に実測するもの |
 | 11.11 | [multi-repo/out-of-scope.md](multi-repo/out-of-scope.md) | 見ないもの、入れないもの |
-| 11.12 | [multi-repo/distribute-common.md](multi-repo/distribute-common.md) | 共通レイヤーをプロジェクトの `.ccnavi/common/` へミラーする |
+| 11.12 | [multi-repo/distribute-common.md](multi-repo/distribute-common.md) | 共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーする |
 | 11.13 | [multi-repo/skills.md](multi-repo/skills.md) | プロジェクトのスキルの置き場と目録 |

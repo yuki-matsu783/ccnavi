@@ -14,12 +14,12 @@ keywords: [診断, --explain, 記録, レイヤー]
 重複で捨てた定義は出さない。フェーズ定義と配点は `id / 出どころのレイヤー / 主な欄` の表を足す。
 
 ```
-■ rules 共通レイヤー（.ccnavi/common/rules.yml、deny 12 / ask 3 / allow 4）
+■ rules 共通レイヤー（.ccnavi/config/common/rules.yml、deny 12 / ask 3 / allow 4）
   deny  guard-hooks          Write|Edit|NotebookEdit  */.claude/hooks/*
   ...
-■ rules 自身のレイヤー（.ccnavi/config/rules.yml、deny 0 / ask 0 / allow 1）
+■ rules 自身のレイヤー（.ccnavi/config/project/rules.yml、deny 0 / ask 0 / allow 1）
   allow self:worktrees       Write|Edit               */.claude/worktrees/*
-■ rules lib（projects/lib/.ccnavi/config/rules.yml、deny 2 / ask 0 / allow 1）
+■ rules lib（projects/lib/.ccnavi/config/project/rules.yml、deny 2 / ask 0 / allow 1）
   deny  lib:schema           Write|Edit               */schema/*
 ■ phases（自身のレイヤー 7 種、lib 3 種。使うのは親の project: が指す 1 本）
   id            レイヤー     kind  title         review  scope
@@ -45,7 +45,7 @@ keywords: [診断, --explain, 記録, レイヤー]
 
 `--lint` は、`projects/` がワークスペースの `.gitignore` に入っているか、プロジェクトが `.claude/` を持たないか、
 ワークツリーの元リポジトリが承認済みチケットの `project:` と合うか、走査されないチケットの置き場が残っていないか、に加えて次を言う。
-`.ccnavi/config/` が無いことは言わない（無いのが正常）。
+`.ccnavi/config/project/` が無いことは言わない（無いのが正常）。
 
 | 深刻度 | 何を言うか |
 |---|---|

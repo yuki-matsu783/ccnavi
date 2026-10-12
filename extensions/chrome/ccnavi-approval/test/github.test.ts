@@ -32,11 +32,11 @@ test("CX-T022 パスを tree と blob に引き、tree は再帰で読む。無�
   const m = new MockGitHub(fixture());
   const c = client(m.fetch);
   const head = m.head("main") as string;
-  const objs = await gh.pathObjects(c, "acme", "widgets", head, [".ccnavi/config", ".claude/settings.json", "wip/proposals"]);
-  assert.equal(objs[".ccnavi/config"]?.type, "tree");
+  const objs = await gh.pathObjects(c, "acme", "widgets", head, [".ccnavi/config/project", ".claude/settings.json", "wip/proposals"]);
+  assert.equal(objs[".ccnavi/config/project"]?.type, "tree");
   assert.equal(objs[".claude/settings.json"]?.type, "blob");
   assert.equal(objs["wip/proposals"], null);
-  const entries = await gh.tree(c, "acme", "widgets", objs[".ccnavi/config"]?.oid as string);
+  const entries = await gh.tree(c, "acme", "widgets", objs[".ccnavi/config/project"]?.oid as string);
   // フェーズ定義は config にだけ置く（共通レイヤーには置けない）
   assert.deepEqual(entries.map((e) => e.path), ["phases.yml"]);
   const texts = await gh.blobs(c, "acme", "widgets", [entries[0].sha]);
@@ -62,10 +62,10 @@ test("CX-T024 GraphQL の文にユーザの値を継ぎ足さない（変数で�
     if (init.body) bodies.push(init.body);
     return m.fetch(url, init);
   };
-  await gh.pathObjects(client(spy), "acme", "widgets", m.head("main") as string, [".ccnavi/common"]);
+  await gh.pathObjects(client(spy), "acme", "widgets", m.head("main") as string, [".ccnavi/config/common"]);
   const { query, variables } = JSON.parse(bodies[0]);
-  assert.ok(!query.includes(".ccnavi/common"));
+  assert.ok(!query.includes(".ccnavi/config/common"));
   assert.ok(!query.includes("acme"));
-  assert.equal(variables.e0, `${m.head("main")}:.ccnavi/common`);
+  assert.equal(variables.e0, `${m.head("main")}:.ccnavi/config/common`);
   await assert.rejects(gh.blobs(client(spy), "acme", "widgets", Array(51).fill("a".repeat(40))), /50/);
 });

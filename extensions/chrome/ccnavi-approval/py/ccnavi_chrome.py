@@ -110,7 +110,7 @@ WORKTREES = ".claude/worktrees"
 
 # 統合先から読むもの（置き場のパスの設定に依らないもの）。
 # 手元の統合先の取り込み結果に書き出すものと同じリスト。
-COMMON_LAYER = ".ccnavi/common"
+COMMON_LAYER = ".ccnavi/config/common"
 SETTINGS_FILE = ".claude/settings.json"
 COMPAT_FILE = lint.SH_COMPAT_FILE.replace(os.sep, "/")
 
@@ -594,9 +594,9 @@ def _build(
 def project_layer(snap: dict, place: dict) -> dict[str, str]:
     """プロジェクトのレイヤー（プロジェクトからの相対パス → 中身）。
 
-    プロジェクトの統合先の `.ccnavi/config/` を、そのまま写す。共通レイヤーは混ぜない。
-    共通レイヤーはワークスペースの統合先の `.ccnavi/common/` だけで
-    （`_build` がワークスペースルートに置く）、プロジェクトの `.ccnavi/common/`
+    プロジェクトの統合先の `.ccnavi/config/project/` を、そのまま写す。共通レイヤーは混ぜない。
+    共通レイヤーはワークスペースの統合先の `.ccnavi/config/common/` だけで
+    （`_build` がワークスペースルートに置く）、プロジェクトの `.ccnavi/config/common/`
     （親の着手が配るミラー）は読まない。ワークスペースの中でミラーを共通として読むと、
     ミラーがずれている間、ワークスペースの共通レイヤーと違う判定になるため
     （ミラーを共通として読むのは、そのプロジェクトを単体で clone した手元だけ）。

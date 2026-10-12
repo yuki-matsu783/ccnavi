@@ -8,9 +8,9 @@
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存や作成が通った）。
  * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかはユーザが決める。
  *
- * 対象は 3 種。共通の設定の配点（`.ccnavi/common/risks.yml`。場所は固定）、
- * ワークスペースの設定の配点（既定 `.ccnavi/config/risks.yml`）、プロジェクト 1 つの設定の配点
- * （既定 `projects/<名前>/.ccnavi/config/risks.yml`）。タブは 1 枚だけで、別の対象を開くとそのタブの
+ * 対象は 3 種。共通の設定の配点（`.ccnavi/config/common/risks.yml`。場所は固定）、
+ * ワークスペースの設定の配点（既定 `.ccnavi/config/project/risks.yml`）、プロジェクト 1 つの設定の配点
+ * （既定 `projects/<名前>/.ccnavi/config/project/risks.yml`）。タブは 1 枚だけで、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[].risk`）を使い、拡張は組まない。
  * 判定は共通の設定と、親の `project:` が指す設定の和で行う。編集する 1 本とは別に、読み取り専用の足し算
@@ -54,7 +54,7 @@ import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 120;
-const DEFAULT_RISK = ".ccnavi/common/risks.yml";
+const DEFAULT_RISK = ".ccnavi/config/common/risks.yml";
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "risk";
 /** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */
@@ -273,7 +273,7 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
   /** 共通の設定とワークスペースの設定の、もう一方の配点のファイル。組み込みの配点を見せるかどうかの判断に使う */
   let other: string | undefined;
   if (target.kind === "workspace") {
-    // 共通の設定の場所は `.ccnavi/common/` 固定で、env（`CCNAVI_RISK` など）では動かせない。
+    // 共通の設定の場所は `.ccnavi/config/common/` 固定で、env（`CCNAVI_RISK` など）では動かせない。
     riskRel = DEFAULT_RISK;
     riskPath = resolveIn(root, riskRel);
     const self = board.ok ? selfLayer(board.board) : undefined;

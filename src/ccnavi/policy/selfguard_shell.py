@@ -21,7 +21,7 @@ from . import rules, selfguard_targets
 # 止める。止めるのが基本で、戻すのは止めきれなかったぶんの備えになる。
 #
 # 前半の括弧が書き込みの形で、後ろに続く場所と組で当たる。場所の名前が出ただけでは
-# 止めない。`cat .ccnavi/common/rules.yml` も `git add <パス>` も、中身を書かない。
+# 止めない。`cat .ccnavi/config/common/rules.yml` も `git add <パス>` も、中身を書かない。
 # 名前で止める形にすると、いちばんガードを直したいときにいちばん多く止められる。
 #
 #   1. リダイレクトの行き先。`>` `>>` `>|` `&>` はどれも `>` を含み、
@@ -139,7 +139,7 @@ _IN_WORD = r"[^ \x00]*"
 # 語の中の目印も終わりに数える。数えないと、`rm ".ccnavi x"` のように引用がつないだ
 # パスが通る。
 _TERM = rf"(?:[ {_NOT_A_WORD}]|$)"
-# 区切りが続く形と、そこで終わる形の両方。`.ccnavi/config/x` にも `.ccnavi` にも
+# 区切りが続く形と、そこで終わる形の両方。`.ccnavi/config/project/x` にも `.ccnavi` にも
 # 当たり、`.ccnavixyz` のような別名には当たらない。
 _END = rf"(?:[\\/ {_NOT_A_WORD}]|$)"
 # 元と行き先がある cp / ln / install のための終わり。行き先（最後の引数）だけに当てるので、
@@ -375,7 +375,7 @@ def project_home_clause(project_home: str, *, copy: bool = False) -> str:
 
     copy を立てると、cp / ln / install の行き先（最後の引数）にだけ当てる形を返す。最後の引数の
     語の頭から当て（_IN_WORD）、既定の名前の写す側（_COPY_PLACES）と同じ `_COPY_END` で閉じるので、
-    `cp <ccnavi ディレクトリ>/config/rules.yml /tmp/x` のように外へ写すだけの読みは通り、
+    `cp <ccnavi ディレクトリ>/config/project/rules.yml /tmp/x` のように外へ写すだけの読みは通り、
     行き先が ccnavi ディレクトリそのものかその下なら止まる。
     """
     parts = [re.escape(p) for p in _home_name(project_home).split("/") if p]
@@ -638,7 +638,7 @@ def common_layer_files(conf: settings.Settings) -> tuple[str, ...]:
 def common_shell_clause(root: str, path: str, *, copy: bool = False) -> str:
     """共通レイヤーの 1 本を、シェルの書き込みに当てる形に直す。
 
-    既定の置き場（`.ccnavi/common/`）は _PLACES が持っているが、`--rules` / `--phases` /
+    既定の置き場（`.ccnavi/config/common/`）は _PLACES が持っているが、`--rules` / `--phases` /
     `--risk` のフラグは任意の場所を指せる。そこを名前で拾えないと、共通レイヤーを動かした
     ワークスペースでは `echo x > <その場所>` が通る。名指しのツール
     （`common_layer_regex`）は動かした先を追うので、片方だけ外すと、同じファイルが

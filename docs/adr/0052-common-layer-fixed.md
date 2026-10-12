@@ -1,16 +1,16 @@
 ---
 type: adr
-title: 共通レイヤーの置き場を .ccnavi/common/ に固定する
+title: 共通レイヤーの置き場を .ccnavi/config/common/ に固定する
 description: 共通レイヤー（ルール、フェーズの種類、リスクの配点）の置き場を環境変数から固定に変え、3 つのレイヤーの決まり方を統一する
 tags: [config, rules]
-keywords: [共通レイヤー, 置き場, .ccnavi/common, 環境変数, 固定, ルール, フェーズ, リスク]
+keywords: [共通レイヤー, 置き場, .ccnavi/config/common, 環境変数, 固定, ルール, フェーズ, リスク]
 ---
 
-# ADR-0052: 共通レイヤーの置き場を `.ccnavi/common/` に固定する
+# ADR-0052: 共通レイヤーの置き場を `.ccnavi/config/common/` に固定する
 
 状態: 採用
 
-追記（2026-09-24）: 状況の表にある `CCNAVI_PROJECTS` と `CCNAVI_PROJECT_HOME` も、ADR-0098 で廃止した。プロジェクトのレイヤーは `projects/<名前>/.ccnavi/config/...` に固定され、3 層とも env では動かない。
+追記（2026-09-24）: 状況の表にある `CCNAVI_PROJECTS` と `CCNAVI_PROJECT_HOME` も、ADR-0098 で廃止した。プロジェクトのレイヤーは `projects/<名前>/.ccnavi/config/project/...` に固定され、3 層とも env では動かない。
 
 ## 状況
 
@@ -19,7 +19,7 @@ keywords: [共通レイヤー, 置き場, .ccnavi/common, 環境変数, 固定, 
 
 | レイヤー | 置き場の決まり方 |
 |---|---|
-| 共通レイヤー | `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`。既定は `.ccnavi/common/{rules,phases,risks}.yml` |
+| 共通レイヤー | `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`。既定は `.ccnavi/config/common/{rules,phases,risks}.yml` |
 | 自身のレイヤー | `<root>/<CCNAVI_PROJECT_HOME>/config/{rules,phases,risks}.yml` 固定 |
 | プロジェクトのレイヤー | `<CCNAVI_PROJECTS>/<名前>/<CCNAVI_PROJECT_HOME>/config/...` 固定 |
 
@@ -28,7 +28,7 @@ keywords: [共通レイヤー, 置き場, .ccnavi/common, 環境変数, 固定, 
 （配る `env`）、VS Code 拡張の 4 画面（`envFromSettingsJson`）の 6 か所。
 
 そして**その分岐は誰の役にも立っていなかった。** 導入スクリプト（`scripts/ccnavi-setup.sh`）が
-配る `settings.json` に書いていた値は既定と同一の `.ccnavi/common/rules.yml` で、
+配る `settings.json` に書いていた値は既定と同一の `.ccnavi/config/common/rules.yml` で、
 `CCNAVI_PHASES` と `CCNAVI_RISK` は `--all` を付けたときしか書かれない。つまり動いている
 どのワークスペースでも、この 3 本は既定の場所を指していた。
 
@@ -36,7 +36,7 @@ keywords: [共通レイヤー, 置き場, .ccnavi/common, 環境変数, 固定, 
 
 ## 決定
 
-共通レイヤーの置き場を `.ccnavi/common/{rules,phases,risks}.yml` に固定し、
+共通レイヤーの置き場を `.ccnavi/config/common/{rules,phases,risks}.yml` に固定し、
 `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` を廃止する。
 
 - `settings.py` から 3 つの定数と overrides 表の 3 行を落とす。**この表は環境変数と
@@ -105,7 +105,7 @@ ADR-0067 のあとは、その hook の command から動かす手段も閉じ�
   フラグを書き足すか、シンボリックリンクに頼ることになる（ADR-0067 でフラグの手段も
   閉じたので、残るのはシンボリックリンクだけ）
 - 配布済みの `settings.json` に `CCNAVI_RULES` を書いて既定の外を指していたユーザが
-  居た場合、更新後は何も知らせずに `.ccnavi/common/rules.yml` を読む。値が無視されたことは
+  居た場合、更新後は何も知らせずに `.ccnavi/config/common/rules.yml` を読む。値が無視されたことは
   どこにも出ない。効かなくなった env が `settings.json` に残っていることを `--lint` で知らせるかは決めていない
 - `tests/sh/test_setup.py` の `REQUIRED_ENV` が 1 本減り、配る `settings.json` に
   その行が在ることの検査が無くなる
@@ -114,12 +114,12 @@ ADR-0067 のあとは、その hook の command から動かす手段も閉じ�
 
 - **env は残し、`--lint` に「既定と同じ値なので書く必要が無い」と言わせるだけにする。**
   失うものが無い代わりに、非対称も 6 か所の分岐も残る
-- **3 本を 1 本にまとめる**（`CCNAVI_COMMON` で `.ccnavi/common/` 相当のディレクトリを指す）。
+- **3 本を 1 本にまとめる**（`CCNAVI_COMMON` で `.ccnavi/config/common/` 相当のディレクトリを指す）。
   動かす手段は残り、分岐は 1 つに減る。移行の手当てが要るわりに、非対称は残る
 
 ## 関連
 
-- ADR-0042（設定と記録の置き場）。共通レイヤーを `.ccnavi/common/` に置くと決めた回。
+- ADR-0042（設定と記録の置き場）。共通レイヤーを `.ccnavi/config/common/` に置くと決めた回。
   そこでは「共通レイヤーを動かすなら `CCNAVI_RULES` などで動かす」と書いたが、この ADR で
   その手段を閉じる
 - ADR-0021（selfguard）。守る対象の一覧に「`CCNAVI_RULES` が指すファイル」とある。

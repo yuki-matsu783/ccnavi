@@ -3,7 +3,7 @@
 ワークスペース 1 つとプロジェクト 2 つ（app と lib）を一時ディレクトリに作る。
 ワークスペースは Claude Code を起動した場所で、自分の git を持つ。プロジェクトは
 `projects/` の直下に clone した別のリポジトリで、それぞれレイヤーの 3 本の置き場
-（`.ccnavi/config/`）に rules.yml を持つ。
+（`.ccnavi/config/project/`）に rules.yml を持つ。
 
 見るのは 5 つ。
 
@@ -108,7 +108,7 @@ def write(path, text):
 
 
 # レイヤーの 3 本の置き場（既定の ccnavi ディレクトリ）。
-LAYER = os.path.join(".ccnavi", "config")
+LAYER = os.path.join(".ccnavi", "config", "project")
 
 
 def layer_rules(root):

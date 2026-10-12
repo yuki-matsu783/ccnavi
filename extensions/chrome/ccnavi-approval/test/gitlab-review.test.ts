@@ -244,12 +244,12 @@ test("CX-T169 GitLab の読みの上限と断り: tree は 50 ページ、discus
 
 test("CX-T170 GitLab のシンボリックリンク（mode 120000）はパスで引いても読まず、親子のチケットは決まらない", async () => {
   const f = parentOnly();
-  f.main.files[".ccnavi/common/linked.yml"] = "../../etc/passwd";
+  f.main.files[".ccnavi/config/common/linked.yml"] = "../../etc/passwd";
   const mock = new MockGitLab(f);
-  mock.linkPaths.add(".ccnavi/common/linked.yml");
+  mock.linkPaths.add(".ccnavi/config/common/linked.yml");
   const client = { host: GL, token: TOKEN, fetch: mock.fetch, counter: { rest: 0, graphql: 0 }, sleep: noWait };
-  const objs = await gl.pathObjects(client, "acme", "widgets", mock.head("main") as string, [".ccnavi/common/linked.yml"]);
-  assert.equal(objs[".ccnavi/common/linked.yml"]?.type, "link");
+  const objs = await gl.pathObjects(client, "acme", "widgets", mock.head("main") as string, [".ccnavi/config/common/linked.yml"]);
+  assert.equal(objs[".ccnavi/config/common/linked.yml"]?.type, "link");
   const b = await collectRepo(GITLAB_REPO, glDeps(mock));
   const fam = b.families.find((x) => x.family.name === "i0001");
   assert.match(fam?.result?.undecided ?? "", /シンボリックリンク/);

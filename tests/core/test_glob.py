@@ -60,7 +60,7 @@ class TranslateTest(unittest.TestCase):
             ("*git push*", "git status", False),
             ("*rm -rf *", "rm -rf /tmp/x", True),
             ("*rm -rf *", "rm -r /tmp/x", False),
-            ("*/.ccnavi/*", "/repo/.ccnavi/common/rules.yml", True),
+            ("*/.ccnavi/*", "/repo/.ccnavi/config/common/rules.yml", True),
             ("*/.ccnavi/*", "/repo/.claude/hooks/lint.sh", False),
             ("*/.current-ticket.md", "/repo/.current-ticket.md", True),
             ("*.env*", "/repo/.env.local", True),

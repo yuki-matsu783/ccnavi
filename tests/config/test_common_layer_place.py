@@ -1,8 +1,8 @@
-"""共通レイヤーの置き場は `.ccnavi/common/` 固定の受入テスト。
+"""共通レイヤーの置き場は `.ccnavi/config/common/` 固定の受入テスト。
 
 3 つのレイヤーのうち共通レイヤーだけが env（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`）
 で動き、
-自身のレイヤーとプロジェクトのレイヤーは `<ccnavi ディレクトリ>/config/` 固定、
+自身のレイヤーとプロジェクトのレイヤーは `<ccnavi ディレクトリ>/config/project/` 固定、
 という非対称を無くす。
 env を渡しても共通レイヤーは既定の置き場のままになる。
 
@@ -137,7 +137,7 @@ class EnvDoesNotMoveTheCommonLayerTest(CommonLayerPlaceHarness):
     """env は共通レイヤーを動かさない。"""
 
     def test_each_env_does_not_move_the_common_layer(self):
-        """env を 1 本渡しても、共通レイヤーのその 1 本は `.ccnavi/common/` のまま。
+        """env を 1 本渡しても、共通レイヤーのその 1 本は `.ccnavi/config/common/` のまま。
 
         `CCNAVI_RULES` → `rules.yml`、`CCNAVI_PHASES` → `phases.yml`、`CCNAVI_RISK` → `risks.yml`。
         """
@@ -259,7 +259,7 @@ class TheDefaultPlaceStaysGuardedTest(CommonLayerPlaceHarness):
     """設定ファイルの保護は既定の置き場に付く。"""
 
     def test_named_tool_writes_into_the_default_place_are_denied_while_the_env_names_another(self):
-        """env がよそを指していても、`.ccnavi/common/` の 3 本は組み込みで止まる。
+        """env がよそを指していても、`.ccnavi/config/common/` の 3 本は組み込みで止まる。
 
         守る対象は既定の置き場から組み立てる。env を読む経路が戻ると、
         `builtin-guard-common-layer` が env の指すよそへ移り、ここが失敗する。

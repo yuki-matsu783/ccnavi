@@ -34,7 +34,7 @@ ccnavi --lint --log "" --state ""
 
 ```sh
 uv run python scripts/check_rules.py            # このリポジトリ。承認済みチケットと記録を外して回す
-ccnavi --test-expectations .ccnavi/common/rule-expectations.yml --log "" --state "" --approved ""
+ccnavi --test-expectations .ccnavi/config/common/rule-expectations.yml --log "" --state "" --approved ""
 ```
 
 出力は 3 つに分かれる。

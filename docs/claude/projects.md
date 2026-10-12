@@ -31,8 +31,8 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 | 閉じたチケットの退避（`ready`がDraftを外す前に、閉じた親子のチケットの`done/`・`phases/<親>/`・`events/`・`flows/`を移す）。手元の機械にだけ残る | ワークスペースの`logs/archive/<リポジトリ>/`。ワークスペース自身は`self`、プロジェクトはその名前。その下は承認済みの領域と同じ構成 |
 | 子のフローの下書き（エージェントが書く。効力は無い） | フローを保存するツリーと同じツリーの`wip/proposals/flows/<子>.yml`。プロジェクト向けは`projects/<名前>/wip/proposals/flows/<子>.yml` |
 | 下書きと使い捨てのファイル | ワークスペースのワークツリーの`wip/scratchpad/`（追跡する。統合のときに`integrate`が外す）。コミットしたくないものは、ワークスペースの外にあるセッションのスクラッチパッド。プロジェクトの`projects/<名前>/`には`wip/`の規約が無いので、プロジェクトの作業中の下書きもワークスペース側に置く |
-| ワークスペースのルール | 共通レイヤーの`.ccnavi/common/rules.yml`。リスクの配点も同じ場所。フェーズ定義は自身のレイヤーの`.ccnavi/config/phases.yml` |
-| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/`（`rules.yml`・`phases.yml`・`risks.yml`）。ここはプロジェクト専用で、着手では上書きされない。親チケットに着手するとき、共通レイヤーはプロジェクトの`.ccnavi/common/`にミラーされる（設計11.12）。フェーズ定義は`config/`にだけ置く |
+| ワークスペースのルール | 共通レイヤーの`.ccnavi/config/common/rules.yml`。リスクの配点も同じ場所。フェーズ定義は自身のレイヤーの`.ccnavi/config/project/phases.yml` |
+| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/project/`（`rules.yml`・`phases.yml`・`risks.yml`）。ここはプロジェクト専用で、着手では上書きされない。親チケットに着手するとき、共通レイヤーはプロジェクトの`.ccnavi/config/common/`にミラーされる（設計11.12）。フェーズ定義は`config/project/`にだけ置く |
 
 プロジェクトのgitリポジトリに入るのは、提案、承認済みチケットとマーカー、プロジェクトの設定の3つ。
 承認とフェーズの進み具合は親チケットのブランチに含まれて他の機械へ届くので、cloneすれば続きから作業できる（設計9.2、REQ-MLT-14）。

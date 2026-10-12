@@ -23,7 +23,7 @@ test("CB-D10 既定は畳み、行を押すと開いて state に id が入る�
     assert.equal(dom.one(`${rowSelector("f1")} .sum .clip`).textContent, "変更した行数（追加＋削除）が 300 行を超えると加点行数が多い");
     assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, ".github/** に当てはまるファイルを 1 つ変更するごとに加点（上限 35 点）CI に触った");
     // script は「返した点を加点」で、points は測れなかったときの保険。judge は yes で加点
-    assert.equal(dom.one(`${rowSelector("f3")} .sum .clip`).textContent, "スクリプト .ccnavi/common/scripts/risk.sh が返した点を加点（点を読み取れなかったときは 10 点）");
+    assert.equal(dom.one(`${rowSelector("f3")} .sum .clip`).textContent, "スクリプト .ccnavi/config/common/scripts/risk.sh が返した点を加点（点を読み取れなかったときは 10 点）");
     assert.equal(dom.one(`${rowSelector("f4")} .sum .clip`).textContent, "質問「テストの無い変更を含むか」の答えが yes なら加点");
     dom.click(dom.one(`${rowSelector("f2")} .row-head`));
     await dom.settle();
@@ -108,7 +108,7 @@ test("CB-D13 ファイルが無ければ欄も追加も押せず、「作る」�
 test("CB-T82 ファイルが無ければ組み込みだと言って作るボタンを出し、あれば出さない", async () => {
   const missing = await openRisk({ exists: false, builtin: true });
   try {
-    assert.match(missing.one(".banner.missing").textContent, /\.ccnavi\/common\/risks\.yml がありません。実行ファイルは組み込みの配点で数えています/);
+    assert.match(missing.one(".banner.missing").textContent, /\.ccnavi\/config\/common\/risks\.yml がありません。実行ファイルは組み込みの配点で数えています/);
     assert.equal(missing.all('button[data-action="create"]').length, 1);
     assert.ok(missing.one<HTMLButtonElement>('button[data-action="open-risk"]').disabled);
   } finally {

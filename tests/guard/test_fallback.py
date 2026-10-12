@@ -126,7 +126,9 @@ class FallbackTest(unittest.TestCase):
         # あいだにガードの設定を書き換える操作なので、ユーザが 1 度見る側に置く。
         for tool in ("Read", "Write", "Edit"):
             with self.subTest(tool=tool):
-                result = run(self.root, pre_tool_use(tool, "file_path", ".ccnavi/common/rules.yml"))
+                result = run(
+                    self.root, pre_tool_use(tool, "file_path", ".ccnavi/config/common/rules.yml")
+                )
                 self.assertNotEqual(
                     out_of(self, result).get("permissionDecision"),
                     "deny",
@@ -138,7 +140,10 @@ class FallbackTest(unittest.TestCase):
         # 緩んだ既定に戻る、という順路ができる。壊す側と直す側で経路を分ける。
         out = out_of(
             self,
-            run(self.root, pre_tool_use("Bash", "command", "echo x > .ccnavi/common/rules.yml")),
+            run(
+                self.root,
+                pre_tool_use("Bash", "command", "echo x > .ccnavi/config/common/rules.yml"),
+            ),
         )
 
         self.assertEqual(out.get("permissionDecision"), "deny")
@@ -148,13 +153,13 @@ class FallbackTest(unittest.TestCase):
     def test_既定でもシェルからの書き込みは表記を変えても止まる(self):
         for command in [
             "echo x >> .claude/hooks/lint-py.sh",
-            "sed -i s/deny/allow/ .ccnavi/common/rules.yml",
+            "sed -i s/deny/allow/ .ccnavi/config/common/rules.yml",
             "cp /tmp/x .ccnavi/scripts/ccnavi-git.sh",
             "echo {} > .claude/settings.json",
             "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
             # `cd` で入ってから書く形（issue #61）。行き先のパスから場所の
             # 名前が消えるので、移った先から見たパスにも当てないと止められずに通る。
-            "cd .ccnavi/common && echo x > rules.yml",
+            "cd .ccnavi/config/common && echo x > rules.yml",
             "cd .claude && echo x > settings.json",
             "cd .claude/hooks && echo x > lint-py.sh",
             "cd .claude && rm -rf hooks",
@@ -186,10 +191,10 @@ class FallbackTest(unittest.TestCase):
         # 衝突を解いている最中は必ず既定を使っている。そこで解決の手が止まると、
         # ガードが機能しない状態から出られない。どれもファイルに新しい文面を書かない。
         for command in [
-            "sh .ccnavi/scripts/ccnavi-git.sh restore --ours -- .ccnavi/common/rules.yml",
-            "sh .ccnavi/scripts/ccnavi-git.sh add -- .ccnavi/common/rules.yml",
-            "cat .ccnavi/common/rules.yml",
-            "grep -n conflict .ccnavi/common/rules.yml",
+            "sh .ccnavi/scripts/ccnavi-git.sh restore --ours -- .ccnavi/config/common/rules.yml",
+            "sh .ccnavi/scripts/ccnavi-git.sh add -- .ccnavi/config/common/rules.yml",
+            "cat .ccnavi/config/common/rules.yml",
+            "grep -n conflict .ccnavi/config/common/rules.yml",
         ]:
             with self.subTest(command=command):
                 out = out_of(self, run(self.root, pre_tool_use("Bash", "command", command)))

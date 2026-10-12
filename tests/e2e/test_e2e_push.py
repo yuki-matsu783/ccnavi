@@ -97,8 +97,8 @@ class ApproveAndPushTest(unittest.TestCase):
         WorkspaceTest.build_workspace.__func__(WorkspaceTest, self.ws)
         # 承認は共通レイヤーのルールを読む。無いと承認は通るが「ルールを読めない」と言うので、
         # 実際のワークスペースと同じく置いておく。中身は空でよい。
-        write(os.path.join(self.ws, ".ccnavi", "common", "rules.yml"), "version: 1\n")
-        git(self.ws, "add", ".ccnavi/common/rules.yml")
+        write(os.path.join(self.ws, ".ccnavi", "config", "common", "rules.yml"), "version: 1\n")
+        git(self.ws, "add", ".ccnavi/config/common/rules.yml")
         git(self.ws, "commit", "-q", "-m", "rules")
         self.remote = os.path.join(self.tmp, "origin.git")
         git(self.tmp, "init", "-q", "--bare", self.remote)

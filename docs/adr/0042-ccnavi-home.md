@@ -1,12 +1,12 @@
 ---
 type: adr
-title: 共通レイヤーの設定は .ccnavi/common/ に
-description: 共通設定を .ccnavi/common/ に集約し、記録と state は logs ディレクトリに配置する構成
+title: 共通レイヤーの設定は .ccnavi/config/common/ に
+description: 共通設定を .ccnavi/config/common/ に集約し、記録と state は logs ディレクトリに配置する構成
 tags: [config, records]
 keywords: [共通レイヤー, .ccnavi, 設定, logs, 記録, 共有]
 ---
 
-# ADR-0042: 共通レイヤーの設定は `.ccnavi/common/` に、記録と state は `logs/` に置く
+# ADR-0042: 共通レイヤーの設定は `.ccnavi/config/common/` に、記録と state は `logs/` に置く
 
 状態: 採用
 
@@ -29,13 +29,13 @@ ccnavi の置き場が `.claude/` と `.ccnavi/` の 2 か所に分かれてい�
 
 | 何 | 前 | 後 |
 |---|---|---|
-| 共通レイヤーの 3 本（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` の既定）と見本 | `.claude/ccnavi/` | `.ccnavi/common/` |
-| 共通レイヤーの配点スクリプト | `.claude/ccnavi/`・`.claude/scripts/` | `.ccnavi/common/scripts/` |
+| 共通レイヤーの 3 本（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` の既定）と見本 | `.claude/ccnavi/` | `.ccnavi/config/common/` |
+| 共通レイヤーの配点スクリプト | `.claude/ccnavi/`・`.claude/scripts/` | `.ccnavi/config/common/scripts/` |
 | 判定の記録（`CCNAVI_LOG`） | `.claude/ccnavi/log.jsonl` | `logs/log.jsonl` |
 | state（`CCNAVI_STATE`） | `.claude/ccnavi/state` | `logs/state` |
 
-3 つのレイヤーの構造は変えない。共通レイヤーはどのツリーにも適用され、自身のレイヤー（`.ccnavi/config/`）はワークスペースの
-ツリーだけに適用される。共通レイヤーを `.ccnavi/config/` に混ぜないのは、混ぜるとプロジェクトに共通レイヤーの deny が
+3 つのレイヤーの構造は変えない。共通レイヤーはどのツリーにも適用され、自身のレイヤー（`.ccnavi/config/project/`）はワークスペースの
+ツリーだけに適用される。共通レイヤーを `.ccnavi/config/project/` に混ぜないのは、混ぜるとプロジェクトに共通レイヤーの deny が
 適用されなくなるから。`.ccnavi/` 直下（`.ccnavi/rules.yml`）にしないのは、プロジェクトの `.ccnavi/` にも
 同じ名前が置けて、共通レイヤーと見分けにくくなるから。
 

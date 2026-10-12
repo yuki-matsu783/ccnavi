@@ -812,20 +812,20 @@ class SyncTest(SyncHarness):
     def test_the_integration_mirror_copies_what_judging_reads(self):
         files = {
             ".ccnavi/approved/done/old.md": "old\n",
-            ".ccnavi/common/rules.yml": "rules\n",
-            ".ccnavi/config/phases.yml": "phases\n",
+            ".ccnavi/config/common/rules.yml": "rules\n",
+            ".ccnavi/config/project/phases.yml": "phases\n",
             ".claude/settings.json": "{}\n",
             "src/app.py": "x\n",
             # export-ignore・eol の属性があっても、コミットの中身そのものをコピーする。
-            ".gitattributes": ".ccnavi/common/rules.yml export-ignore\n*.yml eol=crlf\n",
+            ".gitattributes": ".ccnavi/config/common/rules.yml export-ignore\n*.yml eol=crlf\n",
         }
         self.put_on_main(files)
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         for rel in (
             ".ccnavi/approved/done/old.md",
-            ".ccnavi/common/rules.yml",
-            ".ccnavi/config/phases.yml",
+            ".ccnavi/config/common/rules.yml",
+            ".ccnavi/config/project/phases.yml",
             ".claude/settings.json",
         ):
             with open(os.path.join(self.mirror, rel), "rb") as f:
@@ -854,7 +854,7 @@ class SyncTest(SyncHarness):
         self.assertFalse(os.path.lexists(os.path.join(done_dir, "evil.md")))
 
     def test_the_mirror_is_kept_when_the_integration_head_is_the_same(self):
-        self.put_on_main({".ccnavi/common/rules.yml": "rules\n"})
+        self.put_on_main({".ccnavi/config/common/rules.yml": "rules\n"})
         self.assertEqual(0, self.sync(PARENT).returncode)
         marker = write(os.path.join(self.mirror, "kept-marker"), "x")
         left = os.path.join(self.state, "sync", "self", "integration.tmp.99999")
@@ -862,7 +862,7 @@ class SyncTest(SyncHarness):
         self.assertEqual(0, self.sync(PARENT).returncode)
         self.assertTrue(os.path.exists(marker), "先頭が同じなのにコピーし直した")
         self.assertFalse(os.path.exists(left), "前の回の残りを消していない")
-        self.put_on_main({".ccnavi/common/rules.yml": "rules 2\n"})
+        self.put_on_main({".ccnavi/config/common/rules.yml": "rules 2\n"})
         self.assertEqual(0, self.sync(PARENT).returncode)
         self.assertFalse(os.path.exists(marker))
 
@@ -1099,7 +1099,7 @@ class PlacesAreNotReadTest(SyncHarness):
         家族の無いプロジェクト。"""
         self.head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
         self.remote_commit("main", ".ccnavi/approved/done/old.md", "old\n")
-        self.remote_commit("main", ".ccnavi/config/phases.yml", "phases\n")
+        self.remote_commit("main", ".ccnavi/config/project/phases.yml", "phases\n")
         # 提案（wip/proposals/todo/）だけがある親。既定の提案の置き場で家族と見つける。
         other = os.path.join(self.ws, ".claude", "worktrees", "i0002")
         git(self.ws, "worktree", "add", "-q", other, "-b", "i0002", "main")
@@ -1120,8 +1120,8 @@ class PlacesAreNotReadTest(SyncHarness):
         self.assertEqual(self.head, fields(self.record)["sha"])
         other = os.path.join(self.state, "sync", "self", "families", "i0002")
         self.assertEqual("present", fields(other)["state"])
-        # 統合先の控えは既定の置き場の done/ とレイヤー（.ccnavi/config）を写す。
-        for rel in (".ccnavi/approved/done/old.md", ".ccnavi/config/phases.yml"):
+        # 統合先の控えは既定の置き場の done/ とレイヤー（.ccnavi/config/project）を写す。
+        for rel in (".ccnavi/approved/done/old.md", ".ccnavi/config/project/phases.yml"):
             self.assertTrue(os.path.isfile(os.path.join(self.mirror, rel)), rel)
         # プロジェクトは既定の projects/ の下で見つける。
         self.assertIn("p: リモートのブランチの一覧を取ってこられなかった", done.stdout)

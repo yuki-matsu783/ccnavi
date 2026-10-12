@@ -551,7 +551,8 @@ def layer_types(
     """使うフェーズ定義（親の `project:` が指す config の 1 本）と、その苦情。
 
     足し算はしない。使うのは親の承認済みチケットの `project:` が指すレイヤーの `phases.yml` だけで、
-    空ならワークスペース自身のレイヤー（単体 clone ではそのプロジェクトの `.ccnavi/config/`）。
+    空ならワークスペース自身のレイヤー（単体 clone ではそのプロジェクトの
+    `.ccnavi/config/project/`）。
     共通レイヤーの `phases.yml` は置けないので、あっても読まない（`--lint` が error で言う）。
 
     ファイルが無いのは正常（`None`、苦情なし）。壊れていれば空として扱い（`None`）、苦情を返す。

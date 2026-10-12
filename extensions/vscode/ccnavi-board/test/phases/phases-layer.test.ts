@@ -32,7 +32,7 @@ test("CB-T114 定義のファイルが無いのは正常で、不備の帯も作
 });
 
 test("CB-T239 共通の設定に phases.yml があるときは error の帯を出し、画面は開いたまま触れる。画面から消す・直す手段は出さない", async () => {
-  const dom = await openPhases({ errors: ["共通の設定に phases.yml があります（.ccnavi/common/phases.yml）。共通の設定には置けない。使われない。"] });
+  const dom = await openPhases({ errors: ["共通の設定に phases.yml があります（.ccnavi/config/common/phases.yml）。共通の設定には置けない。使われない。"] });
   try {
     assert.match(dom.one(".banner.error").textContent, /共通の設定には置けない。使われない/);
     assert.equal(dom.all(".banner.error").length, 1);

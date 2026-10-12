@@ -1,4 +1,4 @@
-"""このリポジトリの実際のルール（.ccnavi/common/rules.yml）と組み込みルールで判定する受入テスト。
+"""このリポジトリの実際のルール（.ccnavi/config/common/rules.yml）と組み込みルールで判定する受入テスト。
 
 tests/fixtures/ のルールではなく、運用に使っている rules.yml をそのまま `--test` に
 渡す。見るのは、shellread が目印を 2 つに分けたあとの判定（wip/design/shellread-sep.md
@@ -25,7 +25,7 @@ from ccnavi.infra import shellread, shellread_scan, shellread_words
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
-RULES = os.path.join(ROOT, ".ccnavi", "common", "rules.yml")
+RULES = os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml")
 
 # 期待する判定のパスに書く合言葉。--test-expectations と同じ読み替えを、ここでは自分で行う。
 PLACEHOLDER = "/repo"
@@ -106,12 +106,12 @@ class RepoRulesTest(unittest.TestCase):
         # 課題そのもの。`[^\x00]*$` が引用の空白で止まって外れていた。
         for subject in [
             'grep -n "git push" README.md',
-            'grep -n "rm -rf" /repo/.ccnavi/common/rules.yml',
-            """grep -n "regex: '(>" /repo/.ccnavi/common/rules.yml""",
+            'grep -n "rm -rf" /repo/.ccnavi/config/common/rules.yml',
+            """grep -n "regex: '(>" /repo/.ccnavi/config/common/rules.yml""",
             'grep -n "<<EOF" /repo/README.md',
             # 引用の中の `> 場所` は grep の引数。selfguard の行き先の式が語の中の目印まで
             # 一致しなくなって、はじめて allow に当たる。
-            'grep -n "> /repo/.ccnavi/common/rules.yml" f',
+            'grep -n "> /repo/.ccnavi/config/common/rules.yml" f',
         ]:
             with self.subTest(subject=subject):
                 self.assert_verdict(subject, "allow", "prefer-read-grep")
@@ -133,6 +133,15 @@ class RepoRulesTest(unittest.TestCase):
             ),
         )
 
+    def test_ワークツリー側の共通レイヤーの設定は_guard_ccnavi_config_が止める(self):
+        # 組み込みの保護も同じ入力を止める。判定だけでは取りこぼすので、当たったルールの id で見る。
+        for name in ("rules", "phases", "risks"):
+            with self.subTest(name=name):
+                path = f"/repo/.claude/worktrees/x/.ccnavi/config/common/{name}.yml"
+                body = judge("Edit", path)
+                self.assertEqual(body["verdict"], "deny", body["response"])
+                self.assertIn("guard-ccnavi-config", hit(body), body["rules"])
+
     def test_引用付きの_find_は_allow_に当たる(self):
         self.assert_verdict('find /repo -name "a b"', "allow", "prefer-glob")
 
@@ -140,7 +149,10 @@ class RepoRulesTest(unittest.TestCase):
         # 今まで穴だった側。`[^\x00]*` が引用の空白をまたげるようになる。
         for subject, rule_id in [
             ('find /repo -name "a b" -delete', "find-writes"),
-            ('sed -i "s/a b/c/" /repo/.ccnavi/common/rules.yml', "builtin-guard-setting-files"),
+            (
+                'sed -i "s/a b/c/" /repo/.ccnavi/config/common/rules.yml',
+                "builtin-guard-setting-files",
+            ),
         ]:
             with self.subTest(subject=subject):
                 self.assert_verdict(subject, "deny", rule_id)
@@ -342,11 +354,11 @@ RUNNERS = [
 
 # 組み込みの保護に当たる、中で実行されるコマンドと、当たるべきルール。
 GUARDED = [
-    ("rm -f .ccnavi/common/rules.yml", SETTING_FILES),
+    ("rm -f .ccnavi/config/common/rules.yml", SETTING_FILES),
     ("mv .claude/settings.json /tmp/settings.json", SETTING_FILES),
-    ("tee .ccnavi/common/rules.yml", SETTING_FILES),
+    ("tee .ccnavi/config/common/rules.yml", SETTING_FILES),
     ("sed -i s/a/b/ .claude/settings.json", SETTING_FILES),
-    ("cp /tmp/rules.yml .ccnavi/common/rules.yml", SETTING_FILES),
+    ("cp /tmp/rules.yml .ccnavi/config/common/rules.yml", SETTING_FILES),
     ("truncate -s 0 .claude/settings.json", SETTING_FILES),
     ("mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md", TICKET_STATE),
     ("ccnavi --agree --yes x", APPROVAL),
@@ -432,7 +444,11 @@ class RunnerTest(LauncherJudgeTest):
     def test_中で実行されるコマンドに当たったことが_unwrapped_と文面に出る(self):
         # W7。元の形のどこが問題なのかを、読み手が辿れるように。
         for subject, runner, layer in [
-            ("env rm -f .ccnavi/common/rules.yml", "env", "rm -f .ccnavi/common/rules.yml"),
+            (
+                "env rm -f .ccnavi/config/common/rules.yml",
+                "env",
+                "rm -f .ccnavi/config/common/rules.yml",
+            ),
             (
                 "env sh .ccnavi/scripts/ccnavi-agree.sh",
                 "env",
@@ -454,7 +470,7 @@ class RunnerTest(LauncherJudgeTest):
 
     def test_元の形で当たったときは_unwrapped_も文面も出ない(self):
         # W7 の反対側。
-        body = self.judge("rm -f .ccnavi/common/rules.yml")
+        body = self.judge("rm -f .ccnavi/config/common/rules.yml")
         self.assertEqual(body["verdict"], "deny", body["response"])
         self.assertIn("unwrapped", body, "JSON に unwrapped の欄が無い")
         self.assertEqual(body["unwrapped"], "")
@@ -470,10 +486,10 @@ class MovedJudgeTest(LauncherJudgeTest):
     def test_守られた場所へ入ってから書く形は止まる(self):
         # issue #61 の表。どれも表記からディレクトリの名前が消えて止められずに通っていた。
         for subject in [
-            "cd .ccnavi/common && echo x > rules.yml",
+            "cd .ccnavi/config/common && echo x > rules.yml",
             "cd .ccnavi && echo x > common/rules.yml",
-            "cd .ccnavi/common; echo x > rules.yml",
-            "(cd .ccnavi/common && echo x > rules.yml)",
+            "cd .ccnavi/config/common; echo x > rules.yml",
+            "(cd .ccnavi/config/common && echo x > rules.yml)",
             "cd .claude && echo x > settings.json",
             "cd .claude/hooks && echo x > lint-py.sh",
             "cd .claude && rm -rf hooks",
@@ -529,9 +545,9 @@ class MovedJudgeTest(LauncherJudgeTest):
         # 保護（`(^|\x00)(mv|rm|tee|…)`）が当たらなくなり、書かれた表記で今は
         # 止まっている形が止まらなくなる（敵対的レビュー）。
         for subject in [
-            'cd "$(pwd)" && rm -f /repo/.ccnavi/common/rules.yml',
-            "cd - && cp /tmp/x .ccnavi/common/rules.yml",
-            "pushd .claude && mv .ccnavi/common/rules.yml /tmp/x",
+            'cd "$(pwd)" && rm -f /repo/.ccnavi/config/common/rules.yml',
+            "cd - && cp /tmp/x .ccnavi/config/common/rules.yml",
+            "pushd .claude && mv .ccnavi/config/common/rules.yml /tmp/x",
         ]:
             with self.subTest(subject=subject):
                 body = self.assert_denied_by(subject, SETTING_FILES)
@@ -558,7 +574,7 @@ class MovedJudgeTest(LauncherJudgeTest):
             "cd .claude && dd if=/tmp/x of=settings.json",
             "builtin cd .claude && rm settings.json",
             "env -C .claude rm settings.json",
-            "sudo --chdir=.ccnavi/common rm rules.yml",
+            "sudo --chdir=.ccnavi/config/common rm rules.yml",
         ]:
             with self.subTest(subject=subject):
                 self.assert_denied_by(subject, SETTING_FILES)
@@ -638,25 +654,25 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ('echo "$(ccnavi --agree x)"', "deny", "builtin-guard-ticket-approval", ""),
                 ("ls\nccnavi --agree x", "deny", "builtin-guard-ticket-approval", ""),
                 (
-                    'echo "$(tee /repo/.ccnavi/common/rules.yml < /tmp/x)"',
+                    'echo "$(tee /repo/.ccnavi/config/common/rules.yml < /tmp/x)"',
                     "deny",
                     "builtin-guard-setting-files",
                     "",
                 ),
                 (
-                    "cat /tmp/x >(tee /repo/.ccnavi/common/rules.yml)",
+                    "cat /tmp/x >(tee /repo/.ccnavi/config/common/rules.yml)",
                     "deny",
                     "builtin-guard-setting-files",
                     "",
                 ),
                 (
-                    "ls\nsed -i s/a/b/ /repo/.ccnavi/common/rules.yml",
+                    "ls\nsed -i s/a/b/ /repo/.ccnavi/config/common/rules.yml",
                     "deny",
                     "builtin-guard-setting-files",
                     "",
                 ),
                 (
-                    'echo x > "$(pwd)/.ccnavi/common/rules.yml"',
+                    'echo x > "$(pwd)/.ccnavi/config/common/rules.yml"',
                     "deny",
                     "builtin-guard-setting-files",
                     "",

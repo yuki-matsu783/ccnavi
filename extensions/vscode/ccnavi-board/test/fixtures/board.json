@@ -46,7 +46,7 @@
   {
    "name": "common",
    "rules": {
-    "path": "<root>/.ccnavi/common/rules.yml",
+    "path": "<root>/.ccnavi/config/common/rules.yml",
     "unreadable": "",
     "deny": [
      {
@@ -65,19 +65,19 @@
    },
    "phases": [],
    "risk": {
-    "path": "<root>/.ccnavi/common/risks.yml",
+    "path": "<root>/.ccnavi/config/common/risks.yml",
     "unreadable": "",
     "factors": []
    },
    "phases_file": {
-    "path": "<root>/.ccnavi/common/phases.yml",
+    "path": "<root>/.ccnavi/config/common/phases.yml",
     "unreadable": ""
    }
   },
   {
    "name": "self",
    "rules": {
-    "path": "<root>/.ccnavi/config/rules.yml",
+    "path": "<root>/.ccnavi/config/project/rules.yml",
     "unreadable": "",
     "deny": [],
     "ask": [],
@@ -157,12 +157,12 @@
     }
    ],
    "risk": {
-    "path": "<root>/.ccnavi/config/risks.yml",
+    "path": "<root>/.ccnavi/config/project/risks.yml",
     "unreadable": "",
     "factors": []
    },
    "phases_file": {
-    "path": "<root>/.ccnavi/config/phases.yml",
+    "path": "<root>/.ccnavi/config/project/phases.yml",
     "unreadable": ""
    }
   }
@@ -175,7 +175,7 @@
     "self"
    ],
    "rules": {
-    "path": "<root>/.ccnavi/config/rules.yml",
+    "path": "<root>/.ccnavi/config/project/rules.yml",
     "unreadable": "",
     "missing": true,
     "deny": [
@@ -237,7 +237,7 @@
     "problems": []
    },
    "phases": {
-    "path": "<root>/.ccnavi/config/phases.yml",
+    "path": "<root>/.ccnavi/config/project/phases.yml",
     "unreadable": "",
     "types": [
      {

@@ -316,8 +316,8 @@ def _workspace_files():
     compat = os.path.join(".ccnavi", "scripts", "ccnavi-common.sh").replace(os.sep, "/")
     return {
         ".claude/settings.json": json.dumps({"env": {"CCNAVI_TICKET_CONTROL": "enable"}}) + "\n",
-        ".ccnavi/config/phases.yml": PHASES,
-        ".ccnavi/common/rules.yml": json.dumps(RULES),
+        ".ccnavi/config/project/phases.yml": PHASES,
+        ".ccnavi/config/common/rules.yml": json.dumps(RULES),
         compat: f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n",
     }
 

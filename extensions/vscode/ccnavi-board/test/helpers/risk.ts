@@ -35,7 +35,7 @@ factors:
     message: "CI に触った"
   - id: sh
     points: 10
-    script: ".ccnavi/common/scripts/risk.sh"
+    script: ".ccnavi/config/common/scripts/risk.sh"
   - id: q
     points: 20
     judge: "テストの無い変更を含むか"
@@ -45,7 +45,7 @@ factors:
 export function page(overrides: Partial<RiskPage> = {}): RiskPage {
   return {
     root: "/ws",
-    riskPath: ".ccnavi/common/risks.yml",
+    riskPath: ".ccnavi/config/common/risks.yml",
     exists: true,
     model: readRisk(RISK).model,
     lock: { locked: false, reason: "", doing: [] },

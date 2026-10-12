@@ -92,8 +92,8 @@ class TestHitsTest(unittest.TestCase):
     # ---- 1. 当たったルール
 
     def test_builtin_guard_is_outside_with_a_short_form(self):
-        os.makedirs(os.path.join(self.root, ".ccnavi", "common"))
-        body = self.body("Bash", "echo x > .ccnavi/common/rules.yml")
+        os.makedirs(os.path.join(self.root, ".ccnavi", "config", "common"))
+        body = self.body("Bash", "echo x > .ccnavi/config/common/rules.yml")
         self.assertEqual(body["verdict"], "deny")
         hit = body["rules"][0]
         self.assertEqual(
@@ -105,7 +105,7 @@ class TestHitsTest(unittest.TestCase):
         self.assertRegex(hit["written"], r"…（全 \d+ 字）$")
         self.assertLess(len(hit["pattern"]), 300)
 
-        plain = self.ccnavi("--test", "Bash", "echo x > .ccnavi/common/rules.yml").stdout
+        plain = self.ccnavi("--test", "Bash", "echo x > .ccnavi/config/common/rules.yml").stdout
         self.assertIn("deny:builtin-guard-setting-files（ルールファイルの外にある根拠）", plain)
         self.assertLess(max(len(line) for line in plain.splitlines()), 1000)
 
@@ -161,7 +161,10 @@ class TestHitsTest(unittest.TestCase):
             project = os.path.join(self.root, "projects", name)
             os.makedirs(project)
             git(project, "init", "--quiet", "-b", "main")
-            write(os.path.join(project, ".ccnavi", "config", "rules.yml"), json.dumps(SCHEMA))
+            write(
+                os.path.join(project, ".ccnavi", "config", "project", "rules.yml"),
+                json.dumps(SCHEMA),
+            )
         for name in ("app", "lib"):
             with self.subTest(project=name):
                 done = run_ccnavi(

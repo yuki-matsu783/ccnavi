@@ -34,11 +34,11 @@ from tests.config.test_config_union import (
 
 # 共通レイヤーに足す項目。どれも `factors:` の続きなので、COMMON_RISK の後ろに繋げる。
 COMMON_SCRIPT_FACTOR = (
-    "  - {id: common-counted, points: 5, script: .ccnavi/common/scripts/count.sh,"
+    "  - {id: common-counted, points: 5, script: .ccnavi/config/common/scripts/count.sh,"
     " message: 共通で数えた}\n"
 )
 COMMON_MISSING_SCRIPT_FACTOR = (
-    "  - {id: gone, points: 5, script: .ccnavi/common/scripts/gone.sh, message: 無い}\n"
+    "  - {id: gone, points: 5, script: .ccnavi/config/common/scripts/gone.sh, message: 無い}\n"
 )
 COMMON_JUDGE_FACTOR = "  - {id: outward, points: 10, judge: 外に出す変更か, message: 外向き}\n"
 
@@ -456,14 +456,16 @@ class RiskUnionTest(ConfigUnionHarness):
         write_layer(
             self.lib,
             risk="version: 1\nfactors:\n"
-            "  - {id: x, points: 5, script: .ccnavi/common/scripts/x.sh, message: x}\n",
+            "  - {id: x, points: 5, script: .ccnavi/config/common/scripts/x.sh, message: x}\n",
         )
         errors = self.risk_problems("error", "lib")
-        self.assertTrue(any(".ccnavi/common/scripts/x.sh" in p["detail"] for p in errors), errors)
+        self.assertTrue(
+            any(".ccnavi/config/common/scripts/x.sh" in p["detail"] for p in errors), errors
+        )
 
         write_layer(self.lib, risk=None)
         self.risk = write(
-            os.path.join(self.ws, ".ccnavi", "common", "risks.yml"),
+            os.path.join(self.ws, ".ccnavi", "config", "common", "risks.yml"),
             "version: 1\nfactors:\n"
             "  - {id: y, points: 5, script: .ccnavi/scripts/y.sh, message: y}\n",
         )
@@ -507,7 +509,7 @@ class RiskUnionTest(ConfigUnionHarness):
         """合成を通しても、
         共通レイヤーの `script:` はワークスペースルートから解いて走る。"""
         write(
-            os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh"),
+            os.path.join(self.ws, ".ccnavi", "config", "common", "scripts", "count.sh"),
             'printf \'{"points": 7, "message": "%s"}\' "$CCNAVI_TICKET"\n',
         )
         write(self.risk, COMMON_RISK + COMMON_SCRIPT_FACTOR)

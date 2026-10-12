@@ -336,6 +336,7 @@ def check(
     # レイヤーの読み込みは判定と同じ経路（ruleload.survey）を通る。読めないレイヤーの苦情は
     # そこが書く標準エラーにも出るので、受け皿で受け取って二重に言わない。
     problems.extend(lint_layers._layers(io.StringIO(), conf, root))
+    problems.extend(lint_layers._legacy_places(conf, root))
     problems.extend(lint_layers._layer_configs(conf, root))
     problems.extend(lint_layers._worktree_layers(conf, root))
     problems.extend(lint_places._ticket_places(conf, root))
@@ -496,7 +497,7 @@ def _phases(conf: settings.Settings) -> list[Problem]:
             SEVERITY_ERROR,
             "(phases)",
             f"{conf.phases} は共通レイヤーには置けない。判定に使わず、空として扱っている。"
-            "フェーズ定義は、使うレイヤーの .ccnavi/config/phases.yml に置いてください",
+            "フェーズ定義は、使うレイヤーの .ccnavi/config/project/phases.yml に置いてください",
         )
     ]
 

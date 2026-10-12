@@ -114,7 +114,7 @@
         },
         "ccnaviBoard.expectationsPath": {
           "type": "string",
-          "default": ".ccnavi/common/rule-expectations.yml",
+          "default": ".ccnavi/config/common/rule-expectations.yml",
           "description": "ルール管理画面の「期待する判定を一括で確かめる」で使う期待する判定のファイルです（deny / ask / allow のタイプに tool と subject を並べた YAML）。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
         },
         "ccnaviBoard.flowSaveReview": {

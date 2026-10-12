@@ -570,13 +570,13 @@ class MovedTest(unittest.TestCase):
 
     def test_守られた場所へ入ってから書く形(self):
         # issue #61 の表。どれも表記からディレクトリの名前が消える形。
-        rules = ".ccnavi/common/rules.yml"
+        rules = ".ccnavi/config/common/rules.yml"
         self.assert_moved(
             {
-                "cd .ccnavi/common && echo x > rules.yml": f"echo .ccnavi/common/x > {rules}",
-                "cd .ccnavi && echo x > common/rules.yml": f"echo .ccnavi/x > {rules}",
-                "cd .ccnavi/common; echo x > rules.yml": f"echo .ccnavi/common/x > {rules}",
-                "(cd .ccnavi/common && echo x > rules.yml)": f"echo .ccnavi/common/x > {rules}",
+                "cd .ccnavi/config/common && echo x > rules.yml": f"echo .ccnavi/config/common/x > {rules}",  # noqa: E501
+                "cd .ccnavi && echo x > config/common/rules.yml": f"echo .ccnavi/x > {rules}",
+                "cd .ccnavi/config/common; echo x > rules.yml": f"echo .ccnavi/config/common/x > {rules}",  # noqa: E501
+                "(cd .ccnavi/config/common && echo x > rules.yml)": f"echo .ccnavi/config/common/x > {rules}",  # noqa: E501
                 "cd .claude && echo x > settings.json": "echo .claude/x > .claude/settings.json",
                 "cd .claude/hooks && echo x > lint-py.sh": (
                     "echo .claude/hooks/x > .claude/hooks/lint-py.sh"
@@ -585,7 +585,7 @@ class MovedTest(unittest.TestCase):
                 "cd .claude && rm -rf hooks": "rm -rf .claude/hooks",
                 "cd .claude && cp /tmp/x settings.json": "cp /tmp/x .claude/settings.json",
                 # 移るのを 2 回に分けても同じ。
-                "cd .ccnavi && cd common && rm rules.yml": f"rm {rules}",
+                "cd .ccnavi && cd config/common && rm rules.yml": f"rm {rules}",
             }
         )
 
@@ -608,7 +608,7 @@ class MovedTest(unittest.TestCase):
 
     def test_移っていないコマンドは並べない(self):
         for src in [
-            "echo x > .ccnavi/common/rules.yml",
+            "echo x > .ccnavi/config/common/rules.yml",
             "ls -la",
             "rm -rf /tmp/x",
             # `cd` 自身は書き込みではないので、当てる先に並べても止めるものが無い。

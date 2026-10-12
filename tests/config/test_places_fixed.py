@@ -85,9 +85,9 @@ class PlacesHarness(unittest.TestCase):
         self.ws = os.path.join(base, "ws")
         self.elsewhere = os.path.join(base, "elsewhere")
         os.makedirs(self.elsewhere)
-        write(os.path.join(self.ws, ".ccnavi", "common", "rules.yml"), '{"version": 1}')
+        write(os.path.join(self.ws, ".ccnavi", "config", "common", "rules.yml"), '{"version": 1}')
         self.lib = os.path.join(self.ws, "projects", "lib")
-        write(os.path.join(self.lib, ".ccnavi", "config", "rules.yml"), '{"version": 1}')
+        write(os.path.join(self.lib, ".ccnavi", "config", "project", "rules.yml"), '{"version": 1}')
         for where in (self.ws, self.lib):
             subprocess.run(["git", "init", "-q"], cwd=where, check=True, capture_output=True)
 
@@ -152,7 +152,7 @@ class PlacesHarness(unittest.TestCase):
             "approved": ".ccnavi/approved",
             "projects": same(os.path.join(self.ws, "projects")),
             "counted": ["lib"],
-            "lib_rules": same(os.path.join(self.lib, ".ccnavi", "config", "rules.yml")),
+            "lib_rules": same(os.path.join(self.lib, ".ccnavi", "config", "project", "rules.yml")),
             "log": True,
             "state": True,
             "strayed": [],

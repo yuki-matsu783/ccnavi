@@ -8,9 +8,9 @@
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存が通った）。
  * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかはユーザが決める。
  *
- * 対象は 3 種。共通の設定のルール（`.ccnavi/common/rules.yml`）、
- * ワークスペースの設定のルール（既定 `.ccnavi/config/rules.yml`）、プロジェクト 1 つの設定のルール
- * （既定 `projects/<名前>/.ccnavi/config/rules.yml`）。タブは 1 枚だけで、別の対象を開くとそのタブの
+ * 対象は 3 種。共通の設定のルール（`.ccnavi/config/common/rules.yml`）、
+ * ワークスペースの設定のルール（既定 `.ccnavi/config/project/rules.yml`）、プロジェクト 1 つの設定のルール
+ * （既定 `projects/<名前>/.ccnavi/config/project/rules.yml`）。タブは 1 枚だけで、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[]`）を使い、拡張は組まない。
  * ファイルが無いのは「設定が無い」正常な状態で、空として出す（保存でファイルを作る）。
@@ -48,8 +48,8 @@ import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 120;
-const DEFAULT_RULES = ".ccnavi/common/rules.yml";
-const DEFAULT_EXPECTATIONS =".ccnavi/common/rule-expectations.yml";
+const DEFAULT_RULES = ".ccnavi/config/common/rules.yml";
+const DEFAULT_EXPECTATIONS =".ccnavi/config/common/rule-expectations.yml";
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "rules";
 /** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */
@@ -64,7 +64,7 @@ interface Loaded {
   readonly mtimeMs: number;
   readonly doc: RulesDocument;
   readonly rulesPath: string;
-  /** ワークスペースルートからの相対で見せるパス。プロジェクトなら `projects/<名前>/.ccnavi/config/rules.yml` */
+  /** ワークスペースルートからの相対で見せるパス。プロジェクトなら `projects/<名前>/.ccnavi/config/project/rules.yml` */
   readonly rulesRel: string;
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
@@ -268,7 +268,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   }
   const targets = targetOptions(board.ok ? board.board : undefined, "workspace", { kind: target.kind, name: target.kind === "project" ? target.name : "" });
   if (target.kind === "workspace") {
-    // 共通の設定の場所は `.ccnavi/common/` 固定。env（`CCNAVI_RULES` など）では動かせないので、設定ファイルは読まない。
+    // 共通の設定の場所は `.ccnavi/config/common/` 固定。env（`CCNAVI_RULES` など）では動かせないので、設定ファイルは読まない。
     rulesRel = DEFAULT_RULES;
     rulesPath = resolveIn(root, rulesRel);
   } else {

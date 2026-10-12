@@ -13,16 +13,16 @@ keywords: [要件, プロジェクト管理, プロジェクト, projects, clone
 | 何 | どう出るか、何が起きるか |
 |---|---|
 | `.gitignore` に無い | 上部に警告が出る。「.gitignore に追加」で `/projects/` の行を足す。コミットはユーザが行う |
-| 一覧 | `--explain --json` の `trees` からプロジェクト（`kind: project`）を 1 件 1 枚のカードで並べる。項目は幅に合わせて段数が変わり、横スクロールは出ない。名前・パス・origin（`git remote get-url origin` をローカルで読む）・プロジェクトの設定のルール（既定 `.ccnavi/config/rules.yml`）の有無・ワークツリー・チケット数（作業中の数。チケット制御が `disable` なら出ない）・`--lint --json` の苦情（`(projects/<名前>)` のもの）。カードに操作のボタンは無い |
+| 一覧 | `--explain --json` の `trees` からプロジェクト（`kind: project`）を 1 件 1 枚のカードで並べる。項目は幅に合わせて段数が変わり、横スクロールは出ない。名前・パス・origin（`git remote get-url origin` をローカルで読む）・プロジェクトの設定のルール（既定 `.ccnavi/config/project/rules.yml`）の有無・ワークツリー・チケット数（作業中の数。チケット制御が `disable` なら出ない）・`--lint --json` の苦情（`(projects/<名前>)` のもの）。カードに操作のボタンは無い |
 | clone | URL と名前を入れて「clone」。名前は URL の末尾から埋まり、直せる。`git clone -- <url> projects/<名前>` を「ccnavi」ターミナルにワークスペースルートで送る。認証の対話はターミナルで行う。`projects/<名前>/.git` が現れると一覧が読み直される |
 | clone を止める条件 | URL が https / ssh / `git@host:path` のどの形でもない、資格情報（`user:token@`）が入っている、名前が英数字と `. _ -` 以外を含む（先頭は英数字）、既存のツリー名と衝突する（大文字小文字だけ違う名前も）、同じリポジトリを既に clone している（origin を scheme・ユーザ・ポート・`.git` を除いた `host/path` で比べる）、clone 先が既にあって空でない |
 | プロジェクトのフォルダが無い | 画面は帯を出さない。一覧が 0 件になり「プロジェクトがありません。…」が出るだけ。`git clone` が親のディレクトリを作るので、フォルダが無いままでも clone はできる。手で作る手段は画面に持たない |
 | `projects/` がワークスペースの git に載っている | ワークスペース自身のソースに `projects/` がある（ぶつかり）か、`.gitignore` に入れる前に `git add` して入れ子のリポジトリが索引に載った（載せ忘れ）とき、`--lint` の苦情を上部にバナーで出す。直し方（ぶつかりなら `projects/` を別の名前に移す、載せ忘れなら索引から外して `.gitignore` に足す）はバナーの文に書いてあり、端末でユーザが打つ。このときは「.gitignore に追加」のボタンと「無視されていない」の警告を出さない（`.gitignore` に足すだけでは直らない） |
-| ルールの場所 | 拡張は組まない。`--explain --json` の `layers[]` が出すパス（既定 `projects/<名前>/.ccnavi/config/rules.yml`）を使う。組み方を実行ファイルとずらさないため。予約名（`common` / `self`、大文字小文字を問わない）のプロジェクトは設定の対象にならないので、場所を出さない |
-| ワークスペースの設定 | 「ワークスペース（プロジェクト外）」の枠に、ワークスペースの設定のルール（既定 `.ccnavi/config/rules.yml`）の有無だけを出す。無いのは正常なので warn の色にしない |
+| ルールの場所 | 拡張は組まない。`--explain --json` の `layers[]` が出すパス（既定 `projects/<名前>/.ccnavi/config/project/rules.yml`）を使う。組み方を実行ファイルとずらさないため。予約名（`common` / `self`、大文字小文字を問わない）のプロジェクトは設定の対象にならないので、場所を出さない |
+| ワークスペースの設定 | 「ワークスペース（プロジェクト外）」の枠に、ワークスペースの設定のルール（既定 `.ccnavi/config/project/rules.yml`）の有無だけを出す。無いのは正常なので warn の色にしない |
 | `.claude/` を持つ | 行に warn として出す。拡張は消さない |
 | プロジェクトとして認識されない git リポジトリ | ワークスペース直下を深さ 2 までたどり（`node_modules` `.venv` `.claude` `.git` の中はたどらない）、`.git` を持つのに trees に無いディレクトリを別枠に出す。プロジェクトのフォルダの外にあるか、その 2 段目以下にあるか。表示だけで操作は無い |
-| 監視 | `projects/*/.git`、その `config`、`worktrees/*`、`projects/*/.ccnavi/config/*`、`.ccnavi/config/*`、`.gitignore`、`.claude/settings.json`。変化が 300 ミリ秒止まったら読み直す。origin も読み直しのたびに読む |
+| 監視 | `projects/*/.git`、その `config`、`worktrees/*`、`projects/*/.ccnavi/config/project/*`、`.ccnavi/config/project/*`、`.gitignore`、`.claude/settings.json`。変化が 300 ミリ秒止まったら読み直す。origin も読み直しのたびに読む |
 | 読み直しの見え方 | 画面は React で、拡張ホストが渡すのは中身（`ProjectsData`）だけ。読み直しても入れ物（HTML）を入れ直さないので、打ちかけの欄もスクロール位置も開いたメニューも残る。入れ直すのは 1 枚目と、裏に回っている間だけ（`core/screen-host.ts`）。一覧から消えた行のメニューは閉じる |
 | 読み直せなかった | 一覧の代わりに文面を出す。渡せなかったぶんは画面が組み上がった（`ready`）ところで渡し直す（`redraw`）。古い画面が残っている間の「更新」は、一覧が無くても通す |
 | 操作の一言（clone の欄の下） | 失敗（赤）は次の一覧が届いたら消す。案内（「git clone を「ccnavi」ターミナルに送りました」）は残す（clone の直後は `.git` の出現で必ず読み直しが走るため） |

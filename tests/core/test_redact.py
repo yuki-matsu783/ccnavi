@@ -304,7 +304,7 @@ class RecordTest(unittest.TestCase):
 
     def test_judgement_sees_the_unredacted_command(self):
         # ルールが秘密の値そのものに当たるなら、伏せた記録ではなく伏せる前の文字列で当たる。
-        rules = os.path.join(self.dir, ".ccnavi", "common", "rules.yml")
+        rules = os.path.join(self.dir, ".ccnavi", "config", "common", "rules.yml")
         os.makedirs(os.path.dirname(rules))
         with open(rules, "w", encoding="utf-8") as f:
             f.write(
@@ -352,7 +352,7 @@ class RecordTest(unittest.TestCase):
 
     def test_redact_failure_keeps_the_deny(self):
         # 伏せる処理が失敗しても hook は 0 で終わり、出した deny が残る。
-        rules = os.path.join(self.dir, ".ccnavi", "common", "rules.yml")
+        rules = os.path.join(self.dir, ".ccnavi", "config", "common", "rules.yml")
         os.makedirs(os.path.dirname(rules))
         with open(rules, "w", encoding="utf-8") as f:
             f.write(

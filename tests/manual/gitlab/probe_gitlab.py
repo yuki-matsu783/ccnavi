@@ -399,7 +399,7 @@ def main() -> int:
     record(
         "main を push（認証画面なし）", pushed.returncode == 0, redact(pushed.stderr.strip())[:200]
     )
-    write(os.path.join(ROOT, ".ccnavi", "common", "rules.yml"), json.dumps(RULES))
+    write(os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml"), json.dumps(RULES))
 
     # ---- 1. 親 1 本と子 2 本、フェーズ 1
     parent_tree = worktree("i0001", "main")
