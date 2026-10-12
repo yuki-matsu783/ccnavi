@@ -334,6 +334,7 @@
     "reason": "t"
    },
    "proposal": null,
+   "template_draft": false,
    "blocked": "",
    "copy": {
     "status": "open",
@@ -405,6 +406,7 @@
     "reason": "t"
    },
    "proposal": null,
+   "template_draft": false,
    "blocked": "",
    "copy": {
     "status": "closed",
@@ -504,6 +506,7 @@
     "reason": "t"
    },
    "proposal": null,
+   "template_draft": false,
    "blocked": "",
    "copy": {
     "status": "open",
@@ -584,6 +587,7 @@
     "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-02-03.md",
     "has_plan": false
    },
+   "template_draft": false,
    "blocked": "",
    "copy": {
     "status": "none"
@@ -651,6 +655,7 @@
     "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-02-04.md",
     "has_plan": false
    },
+   "template_draft": false,
    "blocked": "",
    "copy": {
     "status": "review",
@@ -752,6 +757,7 @@
     "reason": "t"
    },
    "proposal": null,
+   "template_draft": false,
    "blocked": "",
    "copy": {
     "status": "closed",

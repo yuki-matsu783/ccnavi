@@ -150,6 +150,11 @@ export type BoardMessage =
    */
   | { readonly type: "workflow"; readonly ticket: string }
   /**
+   * 完了した親のカードの「テンプレートの下書きを作る」を押した。拡張ホストはいまのボードでそのカードが入口を出していることを
+   * 確かめてから、`ccnavi --templates --draft` を呼ぶ
+   */
+  | { readonly type: "templateDraft"; readonly ticket: string }
+  /**
    * 承認のオーバーレイの「計画を編集」を押した。拡張ホストはオーバーレイを閉じてから、その親の
    * 計画編集タブを開く（一覧の図にある親だけ。決めるのは承認の遷移）
    */

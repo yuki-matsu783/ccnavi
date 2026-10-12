@@ -6,7 +6,7 @@
 import type { JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
-import type { DraftEntry } from "../../core/templates-view.js";
+import type { DraftEntry, EditOp } from "../../core/templates-view.js";
 import { Flows } from "./Template.js";
 import { ImportForm, type Importing } from "./ImportForm.js";
 import { Plan } from "./Plan.js";
@@ -16,6 +16,15 @@ import { isTodo, layerLabel, treeLabel } from "./text.js";
 
 /** 同名が別のツリーにあるときの「取り込む…」の説明 */
 const AMBIGUOUS_TITLE = "同名の下書きが別のツリーにあり、名前では指せません。ccnavi --templates --import にパスを渡してください";
+/** 同名が別のツリーにあるときの編集の説明（編集・改名・削除の 3 つのボタン） */
+const AMBIGUOUS_EDIT_TITLE = "同名の下書きが別のツリーにあり、名前では指せません";
+
+/** 下書きの見出しに出す編集のボタン。順は編集・改名・削除 */
+const EDIT_BUTTONS: readonly { readonly op: EditOp; readonly label: string; readonly action: string }[] = [
+  { op: "save", label: "編集", action: "edit-draft" },
+  { op: "rename", label: "改名", action: "rename-draft" },
+  { op: "delete-draft", label: "削除", action: "delete-draft" },
+];
 
 export interface DraftProps {
   readonly draft: DraftEntry;
@@ -31,6 +40,13 @@ export interface DraftProps {
   readonly ambiguous: boolean;
   /** 取り込み先に選べる層（common を除く） */
   readonly importLayers: readonly string[];
+  /** 編集を使えるか（実行ファイルが持つか）。使えなければ理由 */
+  readonly editEnabled: boolean;
+  readonly editReason: string;
+  /** 編集の欄を開く（押した操作） */
+  readonly onEdit: (op: EditOp) => void;
+  /** 開いている編集の欄。この下書きのものでなければ null */
+  readonly editPanel: JSX.Element | null;
   readonly onOpenImport: () => void;
   readonly onCloseImport: () => void;
   readonly onImportChange: (next: Importing) => void;
@@ -55,6 +71,10 @@ export function Draft({
   importing,
   ambiguous,
   importLayers,
+  editEnabled,
+  editReason,
+  onEdit,
+  editPanel,
   onOpenImport,
   onCloseImport,
   onImportChange,
@@ -92,6 +112,23 @@ export function Draft({
         {draft.also_in.length > 0 && <span className="tag">{`ほかのツリーにも同じ下書き: ${draft.also_in.map((tree) => treeLabel(tree)).join(", ")}`}</span>}
         {todo && <span className="tag warn">TODO が残っている</span>}
         {ambiguous && <span className="tag bad">同名が別のツリーにもある</span>}
+        {EDIT_BUTTONS.map((button) => (
+          <button
+            key={button.action}
+            type="button"
+            className="action small"
+            data-action={button.action}
+            disabled={!editEnabled || ambiguous || touring}
+            title={!editEnabled ? editReason : ambiguous ? AMBIGUOUS_EDIT_TITLE : undefined}
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit(button.op);
+            }}
+            onKeyDown={(event) => event.stopPropagation()}
+          >
+            {button.label}
+          </button>
+        ))}
         {/* 見出しの開閉と混ざらないよう、このボタンの操作は見出しに伝えない（キーの Enter / Space も同じ） */}
         <button
           type="button"
@@ -109,6 +146,7 @@ export function Draft({
           取り込む…
         </button>
       </div>
+      {editPanel}
       {mine !== undefined && (
         <ImportForm
           draft={draft}

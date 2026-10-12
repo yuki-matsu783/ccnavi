@@ -140,7 +140,7 @@ test("CB-D329 外の変更の帯は changed で隠れた帯が現れ、更新は
       projectLocks: {},
     });
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
-    assert.match(text(dom.one("#lock")), /取り込みは止めています: 作業中のチケットがあります（T1）/);
+    assert.match(text(dom.one("#lock")), /取り込みと編集は止めています: 作業中のチケットがあります（T1）/);
   } finally {
     await dom.close();
   }

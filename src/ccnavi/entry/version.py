@@ -1,8 +1,9 @@
 """実行ファイルが自分について言うこと（`ccnavi --version [--json]`）。
 
-言うのは 5 つ。版・組み立ての元になったコミット・受け付けるフラグ・互換の版・読み書きする
-書式の版。VS Code 拡張と `.ccnavi/scripts/` の sh は、起動のときにこれを読んで自分と
-合っているかを見る。前は拡張が `--flow` を渡してみて、argparse の「知らない
+言うのは 6 つ。版・組み立ての元になったコミット・受け付けるフラグ・互換の版・読み書きする
+書式の版・実行ファイルが持つ振る舞い（`features`）。VS Code 拡張と `.ccnavi/scripts/` の sh は、
+起動のときにこれを読んで自分と合っているかを見る。受け付けるフラグから読めない振る舞い
+（JSON の欄の有無など）は `features` で言う。前は拡張が `--flow` を渡してみて、argparse の「知らない
 オプション」の苦情で古い実行ファイルを見分けていた。フラグ 1 本ごとに渡してみる形は、
 フラグが増えるたびに見分け方も増える。
 
@@ -50,6 +51,9 @@ VERSION = "0.1.0"
 COMPAT = 10
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
+# 実行ファイルが持つ振る舞い。旗や JSON の欄の有無を `flags` から読めないものを足す。
+# 足すだけなら COMPAT は上げない。
+FEATURES: tuple[str, ...] = ("templates.edit", "templates.draft-text", "board.template-draft")
 # 組み立ての元のコミットが分からないときの表記。
 UNKNOWN = "unknown"
 # build.py が組み立てのときに書く部品の名前。パッケージの外に置くので、ソースで動かしている
@@ -102,6 +106,7 @@ def describe(parser: argparse.ArgumentParser) -> dict[str, object]:
         "commit": commit(),
         "built": built(),
         "compat": COMPAT,
+        "features": list(FEATURES),
         "flags": flags(parser),
         "formats": formats(),
     }
@@ -122,6 +127,7 @@ def report(stdout: TextIO, parser: argparse.ArgumentParser, as_json: bool) -> in
     stdout.write(f"compat: {body['compat']}\n")
     stdout.write(f"schema: {body['schema']}\n")
     stdout.write(f"formats: {_pairs(body['formats'])}\n")
+    stdout.write(f"features: {' '.join(body['features'])}\n")
     stdout.write(f"flags: {' '.join(body['flags'])}\n")
     return EXIT_OK
 

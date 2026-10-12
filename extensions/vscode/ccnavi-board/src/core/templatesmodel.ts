@@ -8,6 +8,7 @@
 import type {
   Dropped,
   DraftEntry,
+  EditAnswer,
   FlowSummary,
   ImportAnswer,
   ImportDraftRef,
@@ -28,6 +29,7 @@ export const TEMPLATES_VERSION = 1;
 export type TemplatesParse = { readonly ok: true; readonly value: TemplatesJson } | { readonly ok: false; readonly error: string };
 export type TemplateShowParse = { readonly ok: true; readonly value: TemplateDetail } | { readonly ok: false; readonly error: string };
 export type ImportParse = { readonly ok: true; readonly value: ImportAnswer } | { readonly ok: false; readonly error: string };
+export type EditParse = { readonly ok: true; readonly value: EditAnswer } | { readonly ok: false; readonly error: string };
 
 /** `--templates --json` の答えを読む。版が違う・欄が足りないときは文面を返す */
 export function parseTemplates(text: string): TemplatesParse {
@@ -134,6 +136,48 @@ export function parseImport(text: string): ImportParse {
 }
 
 /**
+ * `--templates --save-draft` などの編集の答えを読む（`--json`。下見と実行で同じ形）。
+ * 版が違えば文面を返す。`ok` が真偽値でなければ、読めない答えとして文面を返す。
+ */
+export function parseEdit(text: string): EditParse {
+  const parsed = parseRecord(text);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  const raw = parsed.value;
+  if (raw.version !== TEMPLATES_VERSION) {
+    return { ok: false, error: versionMismatch(raw.version) };
+  }
+  if (typeof raw.ok !== "boolean") {
+    return { ok: false, error: "編集の JSON の ok 欄が真偽値ではありません" };
+  }
+  return {
+    ok: true,
+    value: {
+      ok: raw.ok,
+      op: str(raw.op),
+      name: str(raw.name),
+      on: str(raw.on),
+      layer: str(raw.layer),
+      new_name: str(raw.new_name),
+      to: str(raw.to),
+      to_layer: str(raw.to_layer),
+      source: str(raw.source),
+      target: str(raw.target),
+      sha: str(raw.sha),
+      errors: strings(raw.errors),
+      infos: strings(raw.infos),
+      problems: readProblems(raw.problems),
+      diff: strings(raw.diff),
+      new_text: str(raw.new_text),
+      written: bool(raw.written),
+      removed: bool(raw.removed),
+      new_sha: str(raw.new_sha),
+    },
+  };
+}
+
+/**
  * 読み違えを誘う文字を `\uXXXX` に直して見せる。制御文字（Cc）と書式文字（Cf）・行と段落の区切り（Zl・Zp）が対象で、
  * 改行とタブは残す。BMP の外の文字は `\UXXXXXXXX`。実行ファイルの `plan_templates.reveal` と同じ形。
  */
@@ -195,6 +239,7 @@ function readDraft(raw: Record<string, unknown>): DraftEntry {
     has_flows: bool(raw.has_flows),
     flows: readFlows(raw.flows),
     problems: readProblems(raw.problems),
+    text: str(raw.text),
     importable: bool(raw.importable),
     checked_with: str(raw.checked_with),
     exists_in: strings(raw.exists_in),

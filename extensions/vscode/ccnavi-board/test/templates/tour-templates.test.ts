@@ -15,7 +15,7 @@ const sample = parseTemplatesSample(def.sample);
 /** 画面が `data-tour` で持つ指す先の印 */
 const TARGETS = ["summary", "target", "refresh", "list", "template", "drafts", "draft", "draft-import", "import-form", "import-preview", "sum", "sum-pick", "sum-count", "sum-table", "tour"];
 
-test("CB-T559 テンプレートの見本は、self の層のテンプレート・下書き・足し算・本文・下見に読める", () => {
+test("CB-T572 テンプレートの見本は、self の層のテンプレート・下書き・足し算・本文・下見に読める", () => {
   const data = sample.page.data;
   assert.equal(data.layers.length, 1);
   assert.equal(data.layers[0].name, "self");
@@ -36,7 +36,7 @@ test("CB-T559 テンプレートの見本は、self の層のテンプレート�
   assert.equal(sample.page.lock.locked, false);
 });
 
-test("CB-T560 案内の定義は、基本の案内が先頭で、指す先は画面の印だけ。scene は見本にある名前を指す", () => {
+test("CB-T573 案内の定義は、基本の案内が先頭で、指す先は画面の印だけ。scene は見本にある名前を指す", () => {
   assert.equal(def.courses[0].id, INTRO_ID);
   const names = new Set(sample.page.data.layers[0].templates.map((t) => t.name));
   const drafts = new Set(sample.page.data.drafts.map((d) => d.name));

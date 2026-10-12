@@ -130,6 +130,7 @@ export function parseTemplatesSample(raw: unknown): TemplatesSample {
       has_flows: flows.length > 0,
       flows,
       problems: problemsOf(map.problems, `${at}.problems`),
+      text: str(map.text),
       importable: map.importable !== false,
       checked_with: "common",
       exists_in: [],
@@ -169,6 +170,8 @@ export function parseTemplatesSample(raw: unknown): TemplatesSample {
     lock: unlocked,
     projectLocks: {},
     importLayers: ["self"],
+    // 案内の間は編集の旗を出さない（見本の上で編集は始めない）
+    edit: { enabled: false, reason: "案内の間は編集できません" },
     notices: [],
   };
   const previewMap = object(root.preview, "sample.preview");

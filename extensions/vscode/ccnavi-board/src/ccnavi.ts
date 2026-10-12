@@ -13,6 +13,7 @@
  * `--templates --json`（テンプレートの一覧。テンプレート管理画面が読む）、`--templates --show <名前> --json`（1 件の本文）、
  * `--templates --import <下書き> --to … --json`（取り込みの下見。何も書かない）と
  * `--templates --import <下書き> --to … --yes --expect <ハッシュ> --via board --json`（取り込み。書くのは実行ファイル。ユーザが画面で押したときだけ）。
+ * 編集（保存・削除・改名・移動）も同じ 2 段で、下見は `--templates --save-draft … --json` などの `--json`、実行は `--yes --expect <ハッシュ> --via board --json`。
  * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
  * 判定と検証はルールファイルを差し替えられる。
  * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
@@ -24,6 +25,7 @@
  */
 import { execFile } from "node:child_process";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 
 import {
@@ -49,6 +51,9 @@ import {
   previewArgs,
   REVIEW_SCRIPT,
   templatesArgs,
+  templatesEditArgs,
+  templatesDraftArgs,
+  templatesEditYesArgs,
   templatesImportArgs,
   templatesImportYesArgs,
   templatesShowArgs,
@@ -69,15 +74,15 @@ import { binFromSettingsJson, hostTarget, locate } from "./core/locate.js";
 import { parseBoardJson, type BoardJson } from "./core/model.js";
 import { parsePlanOrder, type PlanOrder, type PlanOrderAnswer, type PlanOrderWrite } from "./core/planordermodel.js";
 import { parseSuggestJson, type SuggestJson } from "./core/suggestmodel.js";
-import type { ImportAnswer, ImportRequest, TemplateDetail, TemplatesJson } from "./core/templates-view.js";
-import { parseImport, parseTemplates, parseTemplateShow } from "./core/templatesmodel.js";
+import type { EditAnswer, EditRequest, ImportAnswer, ImportRequest, TemplateDetail, TemplatesJson } from "./core/templates-view.js";
+import { parseEdit, parseImport, parseTemplates, parseTemplateShow } from "./core/templatesmodel.js";
 import {
   parseExpectationsJson,
   parseTestJson,
   type ExpectationsJson,
   type TestJson,
 } from "./core/testmodel.js";
-import { missingFlags, parseVersionJson, type VersionProbe } from "./core/version.js";
+import { missingFeatures, missingFlags, parseVersionJson, type VersionProbe } from "./core/version.js";
 
 export type LoadResult =
   | { readonly ok: true; readonly board: BoardJson; readonly launcher: Launcher }
@@ -614,6 +619,10 @@ const PLAN_ORDER_FLAGS = ["--plan-order", "--order", "--expect", "--write"] as c
 /** テンプレート管理画面が求めるフラグ。知らない古い実行ファイルは、確かめられないとして失敗にする */
 const TEMPLATES_FLAGS = ["--templates", "--show", "--import", "--expect", "--yes", "--via"] as const;
 
+/** テンプレートの編集が求めるフラグと機能。知らない古い実行ファイルは、編集の欄を無効にして理由を出す */
+const TEMPLATES_EDIT_FLAGS = ["--save-draft", "--delete-draft", "--rename-template", "--move-template", "--delete-template", "--new-name", "--on", "--to-layer"] as const;
+const TEMPLATES_EDIT_FEATURES = ["templates.edit", "templates.draft-text"] as const;
+
 /**
  * 実行ファイルが `--plan-order` を知っているかを聞く（`--version --json`）。知っていれば undefined、知らなければ理由。
  * 計画編集タブは読み込むたびに 1 回聞く（線を変えるたびには聞かない。往復が倍になるため）
@@ -697,6 +706,18 @@ export async function checkTemplates(root: string, setting: string): Promise<str
     return NOT_FOUND;
   }
   return missingFlags(probe, TEMPLATES_FLAGS, "テンプレート管理画面", hasSource(root));
+}
+
+/** 実行ファイルが編集の旗と機能を知っているかを聞く。知っていれば undefined、知らなければ理由（編集の欄を無効にする理由） */
+export async function checkTemplatesEdit(root: string, setting: string): Promise<string | undefined> {
+  const probe = await probeVersion(root, setting);
+  if (probe === undefined) {
+    return NOT_FOUND;
+  }
+  return (
+    missingFlags(probe, TEMPLATES_EDIT_FLAGS, "テンプレートの編集", hasSource(root)) ??
+    missingFeatures(probe, TEMPLATES_EDIT_FEATURES, "テンプレートの編集", hasSource(root))
+  );
 }
 
 /** 失敗の答え（`{ok:false,error}`）の error。読めなければ空 */
@@ -804,5 +825,100 @@ export async function runTemplateImportYes(
     templatesImportYesArgs(request, expect),
     "ccnavi --templates --import --yes --json",
     "（取り込めたかは分かりません。一覧を読み直して確かめてください）",
+  );
+}
+
+/** 下書きを作った答え */
+export interface DraftMade {
+  readonly name: string;
+  /** ワークスペースルートからの相対 */
+  readonly path: string;
+  readonly notes: readonly string[];
+}
+
+/** 完了した親から下書きを作る（`--templates --draft <親> --json`）。失敗は理由の文にして返す */
+export async function runTemplateDraft(root: string, setting: string, parent: string): Promise<RunResult<DraftMade>> {
+  const what = "ccnavi --templates --draft --json";
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, templatesDraftArgs(parent), DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(ran.stdout);
+  } catch {
+    return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
+  }
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return { ok: false, error: `${what} の出力を読めません` };
+  }
+  const r = raw as Record<string, unknown>;
+  if (r.ok !== true) {
+    return { ok: false, error: typeof r.error === "string" && r.error !== "" ? r.error : `${what} が失敗しました` };
+  }
+  return {
+    ok: true,
+    value: {
+      name: typeof r.name === "string" ? r.name : "",
+      path: typeof r.path === "string" ? r.path : "",
+      notes: Array.isArray(r.notes) ? r.notes.filter((n): n is string => typeof n === "string") : [],
+    },
+  };
+}
+
+/** 編集の子プロセス（下見と実行で共有）。save の本文は一時ディレクトリの本文ファイルに書いて渡し、終わったら消す */
+async function runEdit(
+  root: string,
+  setting: string,
+  request: EditRequest,
+  build: (bodyFile: string) => readonly string[],
+  what: string,
+  killedNote: string,
+): Promise<RunResult<EditAnswer>> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-tpl-"));
+  try {
+    const bodyFile = path.join(dir, "body.yml");
+    if (request.op === "save") {
+      fs.writeFileSync(bodyFile, request.body, "utf8");
+    }
+    const ran = await run(launcher, root, build(bodyFile), DIAGNOSE_TIMEOUT_MS);
+    if (ran.killed) {
+      return { ok: false, error: `${cutOff(what, DIAGNOSE_TIMEOUT_MS)}${killedNote}` };
+    }
+    const parsed = parseEdit(ran.stdout);
+    if (parsed.ok) {
+      return { ok: true, value: parsed.value };
+    }
+    if (ran.code !== 0) {
+      return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
+    }
+    return { ok: false, error: `${what} の出力を読めません（${parsed.error}）` };
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** 編集の下見。何も書かない */
+export async function runTemplateEdit(root: string, setting: string, request: EditRequest): Promise<RunResult<EditAnswer>> {
+  return runEdit(root, setting, request, (bodyFile) => templatesEditArgs(request, bodyFile), "ccnavi --templates 編集の下見 --json", "");
+}
+
+/** 編集の実行。期限切れのときは、書けたかが分からないことを文に足す */
+export async function runTemplateEditYes(root: string, setting: string, request: EditRequest, expect: string): Promise<RunResult<EditAnswer>> {
+  return runEdit(
+    root,
+    setting,
+    request,
+    (bodyFile) => templatesEditYesArgs(request, bodyFile, expect),
+    "ccnavi --templates 編集の実行 --yes --json",
+    "（書けたかは分かりません。一覧を読み直して確かめてください）",
   );
 }

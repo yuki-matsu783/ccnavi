@@ -6,6 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  parseEdit,
   parseImport,
   parseTemplates,
   parseTemplateShow,
@@ -193,4 +194,44 @@ test("CB-T545 本文を読む層は、project なら名前、それ以外は sel
   assert.equal(templatesLayerOf({ kind: "project", name: "lib" }), "lib");
   assert.equal(templatesLayerOf({ kind: "workspace", name: "" }), "self");
   assert.equal(templatesLayerOf({ kind: "self", name: "self" }), "self");
+});
+
+test("CB-T565 編集の答え（下見・欄を全部持つ JSON）を読める", () => {
+  const text = JSON.stringify({
+    version: 1,
+    ok: true,
+    op: "rename",
+    name: "feature",
+    on: "project",
+    layer: "self",
+    new_name: "feature2",
+    to: "",
+    to_layer: "",
+    source: ".ccnavi/config/self/templates/feature.yml",
+    target: ".ccnavi/config/self/templates/feature2.yml",
+    sha: "a".repeat(64),
+    errors: [],
+    infos: ["i"],
+    problems: [{ severity: "warn", detail: "d" }],
+    diff: ["+x"],
+    new_text: "name: feature2\n",
+    written: false,
+    removed: false,
+    new_sha: "",
+  });
+  const answer = value(parseEdit(text));
+  assert.equal(answer.ok, true);
+  assert.equal(answer.op, "rename");
+  assert.equal(answer.new_name, "feature2");
+  assert.equal(answer.source, ".ccnavi/config/self/templates/feature.yml");
+  assert.equal(answer.sha, "a".repeat(64));
+  assert.deepEqual(answer.problems, [{ severity: "warn", detail: "d" }]);
+  assert.deepEqual(answer.diff, ["+x"]);
+  assert.equal(answer.written, false);
+  assert.equal(answer.removed, false);
+});
+
+test("CB-T566 編集の答えの ok が真偽値でなければ、読めない答えとして失敗する", () => {
+  const parsed = parseEdit(JSON.stringify({ version: 1, ok: "yes", op: "save" }));
+  assert.deepEqual(parsed, { ok: false, error: "編集の JSON の ok 欄が真偽値ではありません" });
 });
