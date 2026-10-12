@@ -150,7 +150,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0024](0024-parallel-tickets.md) | 並行するチケットの骨子：行き先で結ぶ、子は親の部分集合、状態は置き場 |
 | [0025](0025-reference-workflow.md) | 参考にした運用から採ったもの、採らなかったもの |
 | [0026](0026-phase-types.md) | フェーズに種類を与え、親が計画を持つ（`overlap` を例外とすることと、定義を判定のたびに `phases.yml` から読むことは ADR-0109 が改める） |
-| [0078](0078-phase-workflow-as-dag.md) | フェーズの種類に依存（`after`）を持たせ、ワークフローを DAG で書く（定義の `after` と `order`、待ち方の固定、フィードバック計画の一直線は ADR-0109 が改める） |
+| [0078](0078-phase-workflow-as-dag.md) | フェーズの種類に依存（`after`）を持たせ、ワークフローを DAG で書く（定義の `after` と `order`、待ち方の固定、フィードバック計画の一直線は ADR-0109 が、「ワークフロー」の呼び名は ADR-0127 が改める） |
 | [0027](0027-risk-by-result.md) | リスクは宣言ではなく実績で測る |
 | [0028](0028-exe-boundary.md) | 実行ファイルの境界は自分のディレクトリの中 |
 | [0029](0029-approval-path.md) | チケットの承認の経路を守る |
@@ -185,6 +185,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0110](0110-scratchpad-is-wip-scratchpad-only.md) | 下書きの置き場は wip/scratchpad/ に一本化し、integrate が取り込むときに外す |
 | [0111](0111-concept-skills-and-references.md) | スキルは標準概念ごとの入口に絞り、細かい挙動は references に溜めて ccnavi --docs で引く |
 | [0126](0126-process-skills-and-investigating.md) | 概念スキルを工程スキルと呼び、調査の工程を足す |
+| [0127](0127-plan-called-work-and-review-plan.md) | 親の計画とフィードバック計画をまとめて「作業・レビュー計画」と呼び、ワークフローの呼び名をやめる |
 | [0112](0112-ccnavi-index-jsonl-added-to-project-gitignore.md) | 索引を ccnavi-index.jsonl にし、無視の行が無いツリーには .gitignore に足して索引の対象にする |
 | [0113](0113-stop-nudges-block-in-dry-run.md) | Stop の促し（finish・match: Stop）は dry-run でも止める |
 | [0119](0119-rule-expectations-rename.md) | ルールの「見本」を「期待する判定」と呼び、名前を rule-expectations に改める |
@@ -195,7 +196,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0103](0103-issue-mr-branch-lookup.md) | issue・MR を指定された依頼では、UserPromptSubmit が指示を足し、`ccnavi-branches.sh` で紐づくブランチを探してユーザに確かめてから進める（止めない） |
 | [0104](0104-approval-leaves-the-ticket-as-is.md) | 承認はチケットの中身を変えない。状態は status で聞き、承認の知らせは外す（待ち方のファイルは ADR-0109 が改める） |
 | [0105](0105-approved-ticket-written-durably.md) | 承認済みチケットは一時ファイルに書き切って fsync してから差し替える（待ち方のファイルの記述は ADR-0109 が改める） |
-| [0109](0109-plan-order-on-plan-items.md) | フェーズの順序は親の計画の項の `after` に書き、待ち方は計画から都度計算し、計画が使う定義は親に写して固定する（採用。実行ファイルの側は実装済み。ワークフロー編集タブと図も入れた。画面の実機での確認はまだ） |
+| [0109](0109-plan-order-on-plan-items.md) | フェーズの順序は親の計画の項の `after` に書き、待ち方は計画から都度計算し、計画が使う定義は親に写して固定する（採用。実行ファイルの側は実装済み。ワークフロー編集タブと図も入れた。画面の実機での確認はまだ。画面の呼び名は ADR-0127 が「計画編集タブ」に改める） |
 | [0123](0123-parent-must-have-a-plan.md) | 親は計画を必ず持ち、計画の無い親は start が止まる |
 
 ### 複数のリポジトリと VS Code 拡張
