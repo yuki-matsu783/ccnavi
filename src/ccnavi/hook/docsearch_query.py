@@ -15,6 +15,7 @@ from typing import Any, TextIO
 from . import docsearch_index
 
 SORTS = ("path", "mtime", "type", "title")
+LEARNING_WIKI_TYPE = "learning-wiki"
 FORMATS = ("table", "path", "detail", "json", "jsonl", "count")
 # `--since` / `--until` に受ける形と、その形の読み方。書き誤った値が気づかないうちに
 # 0 件になるのを避ける。
@@ -144,6 +145,13 @@ def _until_end(until: str) -> str:
 
 
 def matches(row: dict, query: Query) -> bool:
+    # learning-wiki は手順書を作る側の材料。type で明示したときだけ引ける
+    # （作業のセッションに出さない）。
+    if _fold(_str(row, "type")) == LEARNING_WIKI_TYPE and LEARNING_WIKI_TYPE not in _needles(
+        query.types
+    ):
+        return False
+
     def exact(needles: list[str], hay: list[str]) -> bool:
         if not needles:
             return True
