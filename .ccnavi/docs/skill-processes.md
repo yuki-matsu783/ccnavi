@@ -16,7 +16,7 @@ keywords: [工程スキル, reference, references, skill-reference, 入口, desi
 | スキル | 工程 |
 |---|---|
 | `designing` | 設計・方式の検討 |
-| `investigating` | 調査(既存コードの読み解き、技術や案の比較、影響範囲の洗い出し)。不具合の原因調査は `debugging` |
+| `investigating` | 調査（既存コードの読み解き、技術や案の比較、影響範囲の洗い出し）。不具合の原因調査は `debugging` |
 | `testing` | テストの作成・実行・切り分け |
 | `debugging` | 不具合の原因調査と修正の確認 |
 | `reviewing` | 差分やチケットのレビュー |
