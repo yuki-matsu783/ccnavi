@@ -138,10 +138,10 @@ class ScriptConditionTest(unittest.TestCase):
             "ccnavi_cond_broken() { return 127; }\n"
         )
 
-        # 0 が真、1 が偽、それ以外は判定できないので真。名前の `-` は関数では `_`
+        # 0 が真、1 が偽、それ以外は判定できないので真
         self.assertEqual(
-            self.flags(self.uses("yes", "no", "has-docker", "broken")),
-            {"yes", "has-docker", "broken"},
+            self.flags(self.uses("yes", "no", "has_docker", "broken")),
+            {"yes", "has_docker", "broken"},
         )
 
     def test_関数もshも無い名前は判定できないので真(self):
@@ -178,22 +178,40 @@ class ScriptConditionTest(unittest.TestCase):
 
     def test_lintは関数のある名前を許す(self):
         self.write("ccnavi_cond_has_docker() { return 0; }\n")
-        text = self.uses("has-docker")
+        text = self.uses("has_docker")
 
         self.assertEqual(
             ccnavimd.problems(text, ccnavimd.script_names(self.conf, self.root)),  # type: ignore[arg-type]
             [],
         )
-        self.assertIn("条件 has-docker は使えない", "\n".join(ccnavimd.problems(text)))
+        self.assertIn("条件 has_docker は使えない", "\n".join(ccnavimd.problems(text)))
+
+
+class NameTest(unittest.TestCase):
+    def test_名前に使えない形は行番号つきで挙げる(self):
+        text = (
+            "<!-- ccnavi:if has-docker -->\n<!-- ccnavi:endif -->\n"
+            "<!-- ccnavi:if 1a -->\n<!-- ccnavi:endif -->\n"
+        )
+
+        found = ccnavimd.name_problems(text)
+
+        self.assertEqual(len(found), 2)
+        self.assertIn("1 行目: 条件の名前 has-docker は使えない", found[0])
+        self.assertIn("3 行目: 条件の名前 1a は使えない", found[1])
+        self.assertEqual(ccnavimd.problems(text), [])  # 名前の形は name_problems が言う
+
+    def test_組み込みの名前はすべて使える形(self):
+        self.assertTrue(all(ccnavimd.NAME.match(n) for n in ccnavimd.CONDITIONS))
 
 
 class FlagsTest(unittest.TestCase):
     def test_条件は関数の真偽で決まる(self):
         ctx = ccnavimd.Context(None, "", True, {"workspace-root"}, "dry-run")  # type: ignore[arg-type]
 
-        self.assertTrue(ccnavimd.CONDITIONS["workspace-root"](ctx))
+        self.assertTrue(ccnavimd.CONDITIONS["workspace_root"](ctx))
         self.assertTrue(ccnavimd.CONDITIONS["docs"](ctx))
-        self.assertTrue(ccnavimd.CONDITIONS["dry-run"](ctx))
+        self.assertTrue(ccnavimd.CONDITIONS["dry_run"](ctx))
 
 
 class ProblemsTest(unittest.TestCase):
@@ -233,6 +251,13 @@ class LintTest(unittest.TestCase):
 
         self.assertIn("(ccnavi-md)", out)
         self.assertIn("1 行目: 条件 nothing は使えない", out)
+
+    def test_名前に_以外の記号があればerrorで言う(self):
+        out = self.lint("<!-- ccnavi:if has-docker -->\n<!-- ccnavi:endif -->\n")
+
+        self.assertIn("(ccnavi-md)", out)
+        self.assertIn("条件の名前 has-docker は使えない", out)
+        self.assertIn("error", out.lower())
 
     def test_正しければ言わない(self):
         self.assertNotIn("(ccnavi-md)", self.lint("# 題\n"))

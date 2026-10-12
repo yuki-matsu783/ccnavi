@@ -11,10 +11,10 @@ ccnavi が前提にしている決まり。セッションの開始（起動・�
 
 ## 作業の決まり
 
-<!-- ccnavi:if workspace-root -->
+<!-- ccnavi:if workspace_root -->
   - 編集する前にワークツリー（{{worktrees}}/<名前>）を切り、その中で編集する。切り方は ccnavi-git.sh の --help（worktree add）。直接作業の名前は <先頭の語>-<番号>-<slug>（.ccnavi/docs/worktree.md）。
 <!-- ccnavi:endif -->
-<!-- ccnavi:if raw-git -->
+<!-- ccnavi:if raw_git -->
   - git は直接呼ばず {{git_sh}} を通す。止められたら迂回せず、出力の案内に従う。
 <!-- ccnavi:endif -->
 - 下書きと使い捨てのファイルは、ワークツリーの中でも {{scratch}}/ に置く（追跡され、チケットの範囲では報告されない。統合のときに integrate が外す）。コミットしたくないものはセッションのスクラッチパッドに置く。
@@ -58,7 +58,7 @@ ccnavi が前提にしている決まり。セッションの開始（起動・�
   - チケット作業（設計に触れる・複数のフェーズに分かれる・ユーザのレビューが要る）: {{tickets_dir}}/todo/ に提案を書いて承認を受ける。承認されると提案は {{approved_dir}}/doing/ へ動く。以後の操作は {{ticket_sh}} を通す（使い方は --help）。
 
   どちらで進めるか迷ったら、ユーザに聞く。
-  <!-- ccnavi:if dry-run -->
+  <!-- ccnavi:if dry_run -->
     （現状: {{mode_env}}=dry-run。deny にヒットしても止まらない。通ったことを許可と読まず、表示された案内に次からは従う。ターンの終わりの促し（Stop の block）は、このモードでも実際に止める）
   <!-- ccnavi:endif -->
 <!-- ccnavi:endif -->

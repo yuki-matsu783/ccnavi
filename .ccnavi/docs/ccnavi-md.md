@@ -30,12 +30,12 @@ keywords: [CCNAVI.md, ccnavi:if, ccnavi:else, ccnavi:endif, 条件, 差し込み
 
 | 条件の名前 | 成り立つとき |
 |---|---|
-| `workspace-root` | ワークスペースのルール（共通レイヤーか自身のレイヤー）の`deny`にid `workspace-root`がある |
-| `raw-git` | 同じく`deny`にid `raw-git`がある、または生のgitを組み込みで止める（チケット制御が有効でラッパーがある） |
+| `workspace_root` | ワークスペースのルール（共通レイヤーか自身のレイヤー）の`deny`にid `workspace-root`がある |
+| `raw_git` | 同じく`deny`にid `raw-git`がある、または生のgitを組み込みで止める（チケット制御が有効でラッパーがある） |
 | `projects` | プロジェクトの置き場に`.git`を持つプロジェクトがある |
 | `tickets` | チケット制御を使っている（`CCNAVI_TICKET_CONTROL`が`disable`でない） |
 | `docs` | mdの索引の案内（`--docs`）を出す回 |
-| `dry-run` | `CCNAVI_MODE`が`dry-run` |
+| `dry_run` | `CCNAVI_MODE`が`dry-run` |
 
 ワークツリーとgitの行は、それを支えるdenyがあるときだけ出す。ルールが無いワークスペースで出すと、文と判定が食い違う。
 共通レイヤーが読めずに組み込みの既定に戻ったときも出ない（既定にはこの2つのidが無い）。
@@ -56,7 +56,7 @@ ccnavi_cond_in_ci() {
 }
 ```
 
-mdでは`<!-- ccnavi:if has-docker -->`と書く。名前の`-`は、関数名では`_`にする。
+mdでは`<!-- ccnavi:if has_docker -->`と書く。
 
 - 戻り値0が真、1が偽。それ以外の戻り値、走らせられない、2秒で終わらないときは、判定できないので真にする
 - 関数が無い名前や、`ccnavimd.sh`が無いときも真にする。どちらも、囲んだ行をそのまま出す。黙って落とすと、載るはずの決まりが誰にも気づかれずに届かなくなるため
@@ -94,6 +94,7 @@ mdが無い・読めないときは、無いことだけを1行で言う（黙�
 `ccnavi --lint`は、次を`(ccnavi-md)`のwarnで言う。行番号が付くのは、`endif`の無い`if`を除く。
 
 - mdが無い
+- 条件の名前が、英数字と`_`だけになっていない（`has-docker`など）。これはerrorで言う。ほかはwarn
 - 組み込みにも`ccnavimd.sh`の関数にも無い条件の名前と、知らない差し込みの名前
 - 対の取れていない囲み（`endif`の無い`if`、`if`の無い`else`と`endif`）
 - 1つの`if`に2つ目の`else`

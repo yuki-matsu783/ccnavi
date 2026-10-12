@@ -16,7 +16,8 @@ md の書き方は 3 つだけ（条件 if・else と、差し込み）。
 （戻り値 0 が真、1 が偽。配布先で実行ファイルを触らずに条件を足せる）。関数が無い・判定できない
 ときは、囲んだ行をそのまま出す。
 条件は、文と判定が食い違わないための仕掛けでもある。ワークツリーと git の行は、それを支える
-deny（`workspace-root` / `raw-git`）がワークスペースのルールにあるときだけ載せる。ルールが無い
+deny（id `workspace-root` / `raw-git`）がワークスペースのルールにあるときだけ載せる（条件の名前は
+`workspace_root` / `raw_git`）。ルールが無い
 ワークスペースでその行を言うと、文と判定が食い違う。
 
 md が無い・読めないときは、無いことだけを 1 行で言う。何も言わずに黙ると、決まりが渡って
@@ -82,15 +83,15 @@ def _dry_run(ctx: Context) -> bool:
 
 # md の `<!-- ccnavi:if 名前 -->` の名前と、その真偽を返す関数。条件を足すときはここに 1 つ足す。
 CONDITIONS: dict[str, Callable[[Context], bool]] = {
-    "workspace-root": _workspace_root,
-    "raw-git": _raw_git,
+    "workspace_root": _workspace_root,
+    "raw_git": _raw_git,
     "projects": _projects,
     "tickets": _tickets,
     "docs": _docs,
-    "dry-run": _dry_run,
+    "dry_run": _dry_run,
 }
 # 配布先が足す条件は、`.ccnavi/scripts/ccnavimd.sh` に関数 `ccnavi_cond_<名前>`
-# （名前の `-` は `_`）としてまとめて書く。組み込みと同じ名前の関数は使わない。
+# としてまとめて書く。組み込みと同じ名前の関数は使わない。
 # 置き場は他の sh と同じ `.ccnavi/scripts/`。
 # エージェントの Write / Edit は止まる（ルール guard-scripts）ので、セッションの頭に載る文面を、
 # エージェントが条件の側から書き換えられない。
@@ -99,7 +100,7 @@ SCRIPT_FILE = "ccnavimd.sh"
 FUNCTION_PREFIX = "ccnavi_cond_"
 _FUNCTION = re.compile(rf"^\s*{FUNCTION_PREFIX}(\w+)\s*\(\s*\)", re.MULTILINE)
 CONDITION_TIMEOUT_SECONDS = 2.0
-_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")  # 条件の名前。sh の関数名に使える形
 SUBSTITUTIONS = (
     "worktrees",  # ワークツリーの置き場（`.claude/worktrees`）
     "git_sh",  # git のラッパー（打てる形のコマンド）
@@ -122,12 +123,28 @@ _DIRECTIVE = re.compile(r"<!--\s*ccnavi:")
 _SUBSTITUTION = re.compile(r"\{\{\s*(\w+)\s*\}\}")
 
 
+def name_problems(text: str) -> list[str]:
+    """条件の名前が、英数字と `_` だけ（先頭は数字でない）になっていない行。lint が error で言う。
+
+    sh の関数名に使えない名前（`-` を含むなど）は、組み込みでも sh でも判定できないので、
+    書き方の誤りとして扱う。
+    """
+    found: list[str] = []
+    for number, line in enumerate(text.splitlines(), 1):
+        opened = _IF.match(line)
+        if opened and not NAME.match(opened.group(1)):
+            found.append(
+                f"{number} 行目: 条件の名前 {opened.group(1)} は使えない"
+                "（英数字と _ だけ。先頭は数字にしない。`-` は _ にする）"
+            )
+    return found
+
+
 def problems(text: str, scripts: Collection[str] = ()) -> list[str]:
     """md の書き方の誤り。`ccnavi --lint` が使う。
 
-    条件の名前（組み込みか、`scripts`＝sh に書かれた関数の名前〔`-` は `_`〕にあるもの）、
-    差し込みの名前、
-    対の取れていない囲みを見る。
+    条件の名前（組み込みか、`scripts`＝sh に書かれた関数の名前にあるもの。形の誤りは
+    `name_problems`）、差し込みの名前、対の取れていない囲みを見る。
     """
     found: list[str] = []
     elses: list[bool] = []  # 囲みごとに、else を置いたか
@@ -136,7 +153,7 @@ def problems(text: str, scripts: Collection[str] = ()) -> list[str]:
         if opened:
             elses.append(False)
             name = opened.group(1)
-            if name not in CONDITIONS and name.replace("-", "_") not in scripts:
+            if NAME.match(name) and name not in CONDITIONS and name not in scripts:
                 found.append(
                     f"{number} 行目: 条件 {name} は使えない"
                     f"（組み込みの条件でも {SCRIPT_FILE} の {function_name(name)} でもない）"
@@ -220,7 +237,7 @@ def path(conf: settings.Settings, root: str) -> str:
 
 def function_name(name: str) -> str:
     """md の条件の名前に対応する、sh の関数の名前。"""
-    return FUNCTION_PREFIX + name.replace("-", "_")
+    return FUNCTION_PREFIX + name
 
 
 def script_path(conf: settings.Settings, root: str) -> str:
@@ -234,8 +251,7 @@ def script_names(conf: settings.Settings, root: str) -> set[str]:
             text = f.read()
     except (OSError, UnicodeDecodeError):
         return set()
-    builtin = {n.replace("-", "_") for n in CONDITIONS}
-    return {n for n in _FUNCTION.findall(text) if n not in builtin}
+    return {n for n in _FUNCTION.findall(text) if n not in CONDITIONS}
 
 
 def run_script(conf: settings.Settings, root: str, name: str, ctx: Context) -> bool:
@@ -280,9 +296,7 @@ def script_flags(conf: settings.Settings, root: str, raw: str, ctx: Context) -> 
     """
     available = script_names(conf, root)
     used = {m.group(1) for m in map(_IF.match, raw.splitlines()) if m} - CONDITIONS.keys()
-    return {
-        n for n in used if n.replace("-", "_") not in available or run_script(conf, root, n, ctx)
-    }
+    return {n for n in used if n not in available or run_script(conf, root, n, ctx)}
 
 
 def flags_for(
