@@ -168,6 +168,22 @@ def head(top: str, timeout: float = TIMEOUT_SECONDS) -> str:
     return done.out.strip() if done.ok else ""
 
 
+def fork_base(top: str, others: list[str], timeout: float = TIMEOUT_SECONDS) -> str:
+    """`others`（ターンの始まりに記録した別のツリーの HEAD）から、このツリーが分かれた点。
+
+    ターンの途中で切ったワークツリーは、ターンの始まりの HEAD を持たない。切った元の
+    コミットが記録済みの HEAD の祖先にあたるので、merge-base がその代わりになる。
+    どれとも共通の祖先が無い、読めない、ときは空文字（数えられない側へ倒す）。
+    """
+    if not top:
+        return ""
+    for other in others:
+        done = gitcmd.run(top, ["merge-base", "HEAD", other], timeout)
+        if done.ok and done.out.strip():
+            return done.out.strip().splitlines()[0]
+    return ""
+
+
 def branch_names(top: str, timeout: float = TIMEOUT_SECONDS) -> set[str]:
     """手元のブランチと origin のブランチの名前。
 
