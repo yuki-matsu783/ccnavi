@@ -620,6 +620,7 @@ allow:
 - プロジェクト向けの親チケットに着手するとき、ワークスペースルートの `.ccnavi/config/common/` の中身を、そのプロジェクトの `.ccnavi/config/common/` へ
   ミラーする。プロジェクトの `.ccnavi/config/project/` には触れない。ミラーは誰も編集しないので、上書きで失うものは無く、名指しも知らせも要らない。
   配点の `script:` の値は書き換えない。コピーするものがプロジェクトのレイヤーとして読めなければ、何もコピーせず着手しない。
+  共通の作業・レビュー計画のテンプレート（`.ccnavi/config/common/templates/*.yml`）も同じように写す（error のあるテンプレートは写さずに飛ばす。着手は止めない。`--lint` が error で知らせる）。
   コミットはエージェントが `ccnavi-git.sh` で行う
 
 できないこと: プロジェクトのレイヤーで共通レイヤーの `ask` を `allow` に緩める、共通レイヤーの `allow` をプロジェクトごとに外す、
@@ -2694,7 +2695,23 @@ ccnavi --templates --import <下書き> --to common|project [--layer <名前>] [
 完了した作業の計画とフローを、次の作業で使い回すためのひな形。1 ファイル（`<名前>.yml`）に、親の作業・レビュー計画
 （全体計画 `plan:` とフィードバック計画 `feedback:` の項と `after`）と、各子のフローの本文を入れる。
 一覧・検索・表示は読むだけで、何も書かないので、エージェントが打ってよい。いまの版は、読む側（一覧・検索・表示・`--lint`）と、
-溜める側（下書きの作成と取り込み）、使う側（`ticket new --template`）まで。
+溜める側（下書きの作成と取り込み）、使う側（`ticket new --template`）、案内と配布（親の `finish` の案内、共通のテンプレートのミラーと導入スクリプトでの配布）まで。
+
+**案内。** 計画を持つ親を `ticket finish` で閉じると、出力の最後に 1 行出る。`ready` で閉じると下書きの材料（`done/` と `flows/`）は
+`logs/archive/` へ退避されて拾えないので、`ready` の前に下書きを作る合図になる。
+
+```
+テンプレートにするなら、`ready` の前に `ccnavi --templates --draft i0001` で下書きを作る（ready で閉じると下書きの材料は退避されて拾えない）
+```
+
+出すのは、その親が計画を持ち、親の識別子の下書き（`wip/proposals/templates/<親>.yml`）がまだ無く、同じ計画の形（`plan` と `feedback` の項、`type`・`review`・`after`）の
+テンプレートが共通にもレイヤーにも取り込まれていないときだけ。フローの文は比べない（下書きの一般化で変わるため）。出力に足すだけで、終了コードも閉じる判定も変わらない。
+マージリクエストで見るフェーズが無い親（統合先に取り込むところまでの案内）と、Draft を外し済みの親には出さない。
+
+**配布。** 共通のテンプレートは、設定の共通レイヤーと同じ経路で配布先へ届く。プロジェクト向けの親の着手が、ワークスペースルートの
+`.ccnavi/config/common/templates/*.yml` をプロジェクトの `.ccnavi/config/common/templates/` へミラーする（単体 clone ではこれが共通として読まれる）。
+ミラーの前に、テンプレートをミラーとして読めるか（error が無いか）を確かめる。導入スクリプト（`scripts/ccnavi-setup.sh`）は、配布元の
+`.ccnavi/config/common/templates/*.yml` があれば配布先の同じ場所へ写す（既にあるものは `--force` のときだけ入れ替える）。無ければ何もしない。
 
 置き場は 2 層で、使うのは共通と 1 つのレイヤー（`--layer` を省けば自身のレイヤー `self`）の和。
 
@@ -3103,7 +3120,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/entry/cli_templates.py` | `--templates` の引数を受けて、テンプレートの一覧・検索・表示と、下書きの作成・取り込み（`--draft` / `--import`）を行う |
 | `src/ccnavi/entry/cli_plan.py` | `--plan-order` の引数を受けて答えを出す。振り直しと書き戻しは `tickets/plan_order.py` と `tickets/plan_phases.py` |
 | `build.py` | 配布物の組み立て。`dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする |
-| `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトと使い方の文書（`.ccnavi/docs/*.md`）を配る |
+| `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトと使い方の文書（`.ccnavi/docs/*.md`）と共通のテンプレート（`.ccnavi/config/common/templates/*.yml`）を配る |
 | `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |
 | `.claude/hooks/mark-ext.sh` / `test-ext.sh` | 同じく拡張のぶん。触ったことの書き残しと、ターンの終わりに関わるグループだけ回すテスト |
 | `extensions/vscode/ccnavi-board/scripts/test-groups.js` | 拡張のテストの入口。触ったファイルから回すグループを決め、コンパイルは 1 回で済ませる |
