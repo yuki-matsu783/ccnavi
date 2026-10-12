@@ -41,6 +41,10 @@ uv run python -m tests --plan          # 何をどの順で回すか出すだけ
 `python main.py --lint` で代える（ランチャーが実行ファイルを探して失敗するため）。
 
 落ちたら新しいプロセスを起こすのをやめ、落ちた 1 本の出力だけを出す。ターンの終わりの hook はこれを使わない。
+既知の失敗が残っている間は `python -m tests` で全件を見られないので、グループごとに `discover -s tests/<グループ> -t .` で回し、失敗の数を既知と比べる。
+
+`tests/<グループ>/bench_*.py` はテストではなく（`discover` は拾わない）、`uv run python -m tests.core.bench_deadline` のように名指しで回す。
+実ルールを使う bench は `*x*` 形の glob の照合が入力の長さの 2 乗で伸び、小さい入力でも数分かかる。ターンの中で回すならバックグラウンドで回す。
 
 ## 回すグループ
 
@@ -76,7 +80,7 @@ uv run python -m tests --plan          # 何をどの順で回すか出すだけ
 - 表のどの行にも当たらないファイルを変えた
 - `.ccnavi/scripts/ccnavi-common*.sh`（入口と部品）、`.ccnavi/common/`、`.ccnavi/config/`、`tests/__init__.py`、`tests/inproc.py`、
   `pyproject.toml`・`uv.lock` を変えた（ほぼ全グループが読む）
-- 統合先に取り込む前、MR に出す前
+- 統合先に取り込む前、MR に出す前（親の最後のフェーズの子を finish する前に済ませる。レビュー準備中はシェルの実行が止まるため）
 - どの行に当たるか迷った
 
 `src/` の `--json` 出力のキーや CLI の旗を変えるときは、`core` と `guard` の両方を回す。`extensions/vscode/ccnavi-board/test/fixtures/` を
