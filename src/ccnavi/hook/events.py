@@ -26,7 +26,7 @@ from ..tickets import (
     session_rejects,
     skillsync,
 )
-from . import docsearch, judge, post, post_findings, projskills, reasons, subagent
+from . import ccnavimd, docsearch, judge, post, post_findings, projskills, subagent
 
 # `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
 CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
@@ -498,20 +498,19 @@ def decide_at_start(
     # （docsearch.at_start が例外を外に出さない）。先に組むのは、作業の決まりの
     # 「詳しくは --docs で引く」を、索引の案内を出す回にだけ添えるため。
     docs = "" if payload.agent_id else docsearch.at_start(conf, root, deadline)
-    # ccnavi が前提にしている作業の決まり（ワークツリー・git の入口・下書きの置き場など）。
-    # チケット制御の有無によらず出す。サブエージェントには出さない。作業の進め方より前に
-    # 置くのは、dry-run の注記を進め方の最後の行のまま残すため。
+    # ccnavi が前提にしている作業の決まり（考え方・ワークツリー・git の入口・下書きの置き場・
+    # チケットの進め方など）。文面は .ccnavi/CCNAVI.md にあり、ここは条件と差し込みを解いて渡す。
+    # チケット制御の有無によらず出す。サブエージェントには出さない。
     if not payload.agent_id:
-        texts.append(
-            reasons.conventions(
-                conf,
-                root,
-                docs.startswith(docsearch.GUIDE_HEAD),
-                ruleload.deny_ids(conf, root),
-            )
+        guide = ccnavimd.session_text(
+            conf,
+            root,
+            docs.startswith(docsearch.GUIDE_HEAD),
+            ruleload.deny_ids(conf, root),
+            mode,
         )
-    if conf.tickets_enabled:
-        texts.append(reasons.ways_of_working(conf, root, mode))
+        if guide:
+            texts.append(guide)
     if rejects:
         texts.append(rejects)
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。

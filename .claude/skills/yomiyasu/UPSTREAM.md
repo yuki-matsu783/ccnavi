@@ -35,6 +35,6 @@ upstream の `skills/yomiyasu/` から次をそのまま写した。
   このリポジトリでは `.claude/skills/yomiyasu`。python3 が無い環境（Windows など）では
   `uv run --python 3.12 python .claude/skills/yomiyasu/scripts/yomiyasu_lint.py <対象ファイル>` で回す（`.claude/hooks/lint-py.sh` と同じ版の固定）
 - ruff にこのディレクトリのファイルを直接渡すと `exclude` が効かない。`--force-exclude` を付ける。`ruff check .` なら効く
-- 頭に frontmatter の `type` を足していない。vendored で中身を書き換えないため（`docs/claude/frontmatter.md` の「対象外」）。
+- 頭に frontmatter の `type` を足していない。vendored で中身を書き換えないため（`.ccnavi/docs/frontmatter.md` の「対象外」）。
   使う範囲の決まり（明示的に頼まれたときだけ、エージェント向けの文書には当てない）は
-  [`docs/claude/skill-review.md`](../../../docs/claude/skill-review.md) の「どこに足すか」にある
+  [`.ccnavi/docs/skill-review.md`](../../../.ccnavi/docs/skill-review.md) の「どこに足すか」にある

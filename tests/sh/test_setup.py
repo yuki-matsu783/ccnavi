@@ -140,6 +140,11 @@ PHASES_PARTS = (".ccnavi", "config", "project", "phases.yml")
 # 代わりに通る sh と同じ .ccnavi/scripts/、機械ごとの組み立ては .ccnavi/bin/<os>-<arch>/。
 BIN_DIR_PARTS = (".ccnavi", "bin")
 LAUNCHER_NAME = "ccnavi-launcher.sh"
+# 使い方の文書。配布元の .ccnavi/docs/*.md を全部配る。
+DOCS_PARTS = (".ccnavi", "docs")
+# セッションの開始で渡す作業の決まり。
+CCNAVI_MD_PARTS = (".ccnavi", "CCNAVI.md")
+DEPLOY_DOCS = ("worktree.md", "frontmatter.md")
 LAUNCHER_PARTS = (".ccnavi", "scripts", LAUNCHER_NAME)
 # CCNAVI_BIN_PATH に書くパス。固定。
 BIN_PATH = "/".join(LAUNCHER_PARTS)
@@ -1075,7 +1080,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     プロジェクトの中に実体を置く経路がこのスクリプトに要る。
     """
 
-    def make_source(self, built=True, parts=True, target=THIS_MACHINE, launcher=True):
+    def make_source(self, built=True, parts=True, target=THIS_MACHINE, launcher=True, docs=True):
         """配布元のふりをするディレクトリを作る。
 
         実物を組み立てない。PyInstaller に 11 秒かかるし、ここで見たいのは
@@ -1085,6 +1090,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         （目印の無い配布元）。
 
         launcher が偽なら、.ccnavi/scripts/ccnavi-launcher.sh だけを置かない。
+        docs が偽なら、使い方の文書の置き場（.ccnavi/docs/）を置かない。
         """
         src = tempfile.mkdtemp(prefix="ccnavi-source-")
         self.addCleanup(shutil.rmtree, src, ignore_errors=True)
@@ -1126,6 +1132,13 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                     encoding="utf-8",
                 ) as f:
                     f.write(f"# {name}\n")
+            with open(os.path.join(src, *CCNAVI_MD_PARTS), "w", encoding="utf-8") as f:
+                f.write("# ccnavi の作業の決まり\n")
+            if docs:
+                os.makedirs(os.path.join(src, *DOCS_PARTS))
+                for name in DEPLOY_DOCS:
+                    with open(os.path.join(src, *DOCS_PARTS, name), "w", encoding="utf-8") as f:
+                        f.write(f"# {name}\n")
             if launcher:
                 # 振り分けの sh は実物をコピーし、代わりに通る sh と同じ置き場に置く。配布先で
                 # 中身が同じであることを見るため。モードは外して置く。配布元の置き方に
@@ -1195,6 +1208,49 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertTrue(os.path.isfile(self.deployed(*PHASES_PARTS)))
         for name in DEPLOY_SCRIPTS:
             self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", name)))
+
+    def test_deploys_the_session_guide(self):
+        """セッションの開始で渡す作業の決まり（.ccnavi/CCNAVI.md）を、中身を変えずに配る。"""
+        src = self.make_source()
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        with open(self.deployed(*CCNAVI_MD_PARTS), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "# ccnavi の作業の決まり\n")
+        self.assertTrue(names(section(result.stdout, "配った"), ".ccnavi/CCNAVI.md"))
+
+    def test_deploys_the_usage_docs(self):
+        """配布元の .ccnavi/docs/*.md を、中身を変えずに配る。"""
+        src = self.make_source()
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for name in DEPLOY_DOCS:
+            with (
+                open(self.deployed(*DOCS_PARTS, name), encoding="utf-8") as f,
+                open(os.path.join(src, *DOCS_PARTS, name), encoding="utf-8") as g,
+            ):
+                self.assertEqual(f.read(), g.read(), name)
+        self.assertTrue(names(section(result.stdout, "配った"), ".ccnavi/docs/worktree.md"))
+
+    def test_keeps_a_usage_doc_the_project_already_has_unless_forced(self):
+        """配布先に既にある文書は入れ替えない。入れ替えるのは --force のときだけ。"""
+        src = self.make_source()
+        os.makedirs(self.deployed(*DOCS_PARTS), exist_ok=True)
+        with open(self.deployed(*DOCS_PARTS, "worktree.md"), "w", encoding="utf-8") as f:
+            f.write("# このプロジェクトで直した\n")
+        self.run_setup("--deploy", src)
+        with open(self.deployed(*DOCS_PARTS, "worktree.md"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "# このプロジェクトで直した\n")
+        self.run_setup("--deploy", src, "--force")
+        with open(self.deployed(*DOCS_PARTS, "worktree.md"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "# worktree.md\n")
+
+    def test_names_the_docs_directory_the_source_does_not_have(self):
+        """配布元に .ccnavi/docs/ が無ければ、配れないものに挙げる。"""
+        src = self.make_source(docs=False)
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        absent = section(result.stdout, "配布元に無くて配れないもの")
+        self.assertTrue(names(absent, ".ccnavi/docs/"), result.stdout)
 
     def test_says_nothing_is_missing_after_it_copied(self):
         """配ったあとは「まだ無いもの」が出ない。

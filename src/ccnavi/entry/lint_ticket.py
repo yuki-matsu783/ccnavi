@@ -248,7 +248,8 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     problems.extend(_approval_problems(root, conf, proposals, copies, closed, review))
 
     worktrees = tree.worktrees(root, conf.projects)
-    problems.extend(lint_branch._worktree_problems(root, conf, worktrees, index, copies))
+    known = frozenset(t.ticket for t in proposals + copies + closed + review)
+    problems.extend(lint_branch._worktree_problems(root, conf, worktrees, index, copies, known))
     problems.extend(lint_branch._unregistered_worktree_problems(root, worktrees))
     names = {t.name for t in worktrees}
     if any(not t.is_child for t in copies):

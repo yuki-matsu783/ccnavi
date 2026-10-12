@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT, common_relpath
+from tests import ROOT, common_relpath, put_ccnavi_md
 from tests.inproc import run_ccnavi
 
 # 不備の無いルール 1 件。ここに 1 つずつ壊した欄を足して試す。
@@ -121,6 +121,8 @@ class LintTest(unittest.TestCase):
         # 空のディレクトリをワークスペースルートに使う。設定ファイルの有無まで自分で決められないと、
         # テストが走った機械にあるファイルを報告することになる。
         self.root = directory.name
+        # 作業の決まり（.ccnavi/CCNAVI.md）が無いと warn になるので、健全なワークスペースには置く。
+        put_ccnavi_md(self.root)
 
     def test_不備が無ければ何も指摘せずに0で終わる(self):
         result = lint(self.root, rules_file(self.root, SOUND))

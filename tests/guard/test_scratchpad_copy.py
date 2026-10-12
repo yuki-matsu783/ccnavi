@@ -1,6 +1,6 @@
 """守る場所のファイルを、下書きの置き場（`wip/scratchpad/`）へ写す cp を通すことの受入テスト。
 
-守る場所を直したいときは、置き場へ写して写しを直す（docs/claude/scratchpad.md）。シェルから
+守る場所を直したいときは、置き場へ写して写しを直す（.ccnavi/docs/scratchpad.md）。シェルから
 書き込む形の保護は、cp の行き先の最後の語に守る名前があれば止めるので、`cp
 .ccnavi/scripts/ccnavi-git.sh wip/scratchpad/ccnavi-git.sh` のように同じ名前で写す形まで止まる。
 その形だけを通し、置き場を足場にして守る場所へ書く形は通さないことを確かめる。

@@ -53,7 +53,7 @@ config にあると `--lint` が error で、その config の定義は使われ
 
 ## 絶対ルール
 
-- 3 本のファイルを書き換えない。下書きはワークツリーの `wip/scratchpad/`（docs/claude/scratchpad.md）に置き、検証を通してから
+- 3 本のファイルを書き換えない。下書きはワークツリーの `wip/scratchpad/`（.ccnavi/docs/scratchpad.md）に置き、検証を通してから
   「何をなぜ変えるか」と一緒にユーザに渡す。置くのはユーザ。`dry-run` で警告だけで通っても同じ
 - 判定を目で真似しない。当たるかどうかは必ず `ccnavi --test-expectations` か `--lint` に聞く
 - 期待する判定を実際の判定に合わせて書き換えない。食い違いが出たら、ルールと期待のどちらを直すかはユーザが決める

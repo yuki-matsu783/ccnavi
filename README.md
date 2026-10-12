@@ -358,34 +358,45 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 | `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録も。実行中の印を置く | サブエージェントが自分の範囲を知らずに始める |
 | `SubagentStop` | 子のワークツリーに範囲外の変更が残っていれば 1 回だけ差し戻す。実行中の印を外す | 範囲外のコミット済みの変更が親に届く |
 
-`SessionStart` で渡す作業の決まりは次の形で、起動・再開・compact・clear のたびに届く（サブエージェントには渡さない）。
-ccnavi の動作に依存する決まりなので、ワークスペースの `CLAUDE.md` に同じことを書かなくてよい。各項目は要点の 1 行だけで、
-詳しいことは名指しした入口（`--help`、拒否の案内、`status`、`--docs`）に聞く。
+`SessionStart` で渡す作業の決まりは、`.ccnavi/CCNAVI.md` の本文で、起動・再開・compact・clear のたびに届く（サブエージェントには渡さない）。
+文面は md が持ち、実行ファイルは条件と差し込みを解いて 1 つの文にするだけ。ccnavi の動作に依存する決まりと考え方なので、
+ワークスペースの `CLAUDE.md` に同じことを書かなくてよい。導入スクリプトが `.ccnavi/docs/`（詳しい決まり）と一緒に配る。
 
-```
-[ccnavi] ccnavi が前提にしている作業の決まり。
-- 編集する前にワークツリー（.claude/worktrees/<名前>）を切り、その中で編集する。切り方は ccnavi-git.sh の --help（worktree add）。
-- git は直接呼ばず sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-git.sh を通す。止められたら迂回せず、出力の案内に従う。
-- 下書きと使い捨てのファイルはワークツリーの wip/scratchpad/ に置く（追跡されてpushされるが、範囲外の変更としては報告されない）。
-- projects/<名前>/ を直すときは、そこへ cd してから作業する（git の操作は cwd のリポジトリに向く）。
-- 実装・調査・テストはサブエージェントにバックグラウンドで任せる。メインはユーザとの相談・判断・報告を受け持つ。
-- 判定が緩む・ユーザとのやり取りの形が変わる・元に戻せない・影響範囲を読み切れない変更は、実装する前にユーザと合意する。
-- 承認済みチケットの状態は、ファイルを読んで推測せず sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-ticket.sh status [<親>] で確かめる。
-詳しい決まりは下の案内の --docs で、--keyword <語> を付けて引いてください（例: ワークツリー、下書き、サブエージェント、相談）。
-```
+md の構成は、考え方（コンテキストを清潔に保つ・判断するのはユーザ・並行する他セッションに影響しない）、作業の決まり
+（ワークツリー・git の入口・下書きの置き場・保護対象の直し方・`projects/`・`status`・`--docs`）、チケット制御を使っているときの
+作業の進め方（直接作業とチケット作業の使い分け）。詳しいことは名指しした入口（`--help`、拒否の案内、`status`、`--docs`）に聞く。
 
-行によっては、条件に合うときだけ出る。条件の無い行（下書き・サブエージェント・合意）はいつも出る。
+md の書き方は 2 つだけ。
 
-| 行 | 出る条件 |
+| 書き方 | 意味 |
 |---|---|
-| ワークツリー | ワークスペースのルール（共通レイヤーか自身のレイヤー）の `deny` に id `workspace-root` がある |
-| git | 同じく `deny` に id `raw-git` がある |
-| `projects/` | プロジェクトの置き場に `.git` を持つプロジェクトがある |
-| `status` | チケット制御を使っている（`CCNAVI_TICKET_CONTROL` が `disable` でない） |
-| 最後の行（`--docs`） | md の索引の案内（`--docs`）を出す回 |
+| `<!-- ccnavi:if 名前 -->` … `<!-- ccnavi:endif -->` | 名前が成り立つときだけ、囲んだ行を載せる（入れ子にできる） |
+| `{{名前}}` | ワークスペースごとの値に置き換える |
+
+| 条件の名前 | 成り立つとき |
+|---|---|
+| `workspace-root` | ワークスペースのルール（共通レイヤーか自身のレイヤー）の `deny` に id `workspace-root` がある |
+| `raw-git` | 同じく `deny` に id `raw-git` がある、または生の git を組み込みで止める（チケット制御が有効でラッパーがある） |
+| `projects` | プロジェクトの置き場に `.git` を持つプロジェクトがある |
+| `tickets` | チケット制御を使っている（`CCNAVI_TICKET_CONTROL` が `disable` でない） |
+| `docs` | md の索引の案内（`--docs`）を出す回 |
+| `dry-run` | `CCNAVI_MODE` が `dry-run` |
+
+| 差し込みの名前 | 値 |
+|---|---|
+| `worktrees` | ワークツリーの置き場（`.claude/worktrees`） |
+| `git_sh` / `ticket_sh` / `stage_sh` | `ccnavi-git.sh` / `ccnavi-ticket.sh` / `ccnavi-stage.sh` を打てる形にしたコマンド |
+| `scratch` | 下書きの置き場（`wip/scratchpad`） |
+| `projects` | プロジェクトの置き場（ワークスペースルートからの相対） |
+| `tickets_dir` / `approved_dir` | 提案の置き場 / 承認済みチケットの置き場 |
+| `mode_env` | `CCNAVI_MODE` |
 
 ワークツリーと git の行は、それを支える deny があるときだけ出す。ルールが無いワークスペースで出すと、文と判定が食い違う。
 共通レイヤーが読めずに組み込みの既定に戻ったときも出ない（既定にはこの 2 つの id が無い）。
+
+md が無い・読めないときは、無いことだけを 1 行で言う（黙ると、決まりが渡っていないことに誰も気づけない）。
+本文は 6000 文字で切り、切ったことを末尾に言う。`ccnavi --lint` は、md が無いこと、知らない条件や差し込みの名前、
+対の取れていない囲みを `(ccnavi-md)` の warn で行番号つきで言う。
 
 `command` を `${CCNAVI_BIN_PATH}` で書くのは、守る対象と起動する実体を 1 か所にまとめるため
 （shell form なので環境変数は shell が展開する）。その代わり、`env` からこの 1 行が消えると hook が起動しなくなる。
@@ -710,7 +721,7 @@ allow:
 
 `match: Stop` の `allow` のルールは、メインエージェントのターンの終わり（`Stop`）に当たる。
 渡す回（`every` で決まる回）にだけ `{"decision": "block", "reason": "NUDGE_STOP_RULE: …"}` で止め、ルールの文を渡す。
-振り返り（`docs/claude/skill-review.md`）のための仕組みで、`reason` の頭には実行ファイルが決まった前置きを付ける。
+振り返り（`.ccnavi/docs/skill-review.md`）のための仕組みで、`reason` の頭には実行ファイルが決まった前置きを付ける。
 前置きの中身は、タスクの続きではないこと、振り返りだけをすること、ユーザへの問いで終わったターンならその問いを最後に書き直すこと、何も無ければ「振り返り: 無し」と書くこと。
 当てる文字列は無いので `glob: "*"` と書く。
 
@@ -720,7 +731,7 @@ allow:
     match: Stop
     glob: "*"
     every: 10
-    additionalContextFile: docs/claude/skill-review.md
+    additionalContextFile: .ccnavi/docs/skill-review.md
 ```
 
 - 読むのは共通レイヤーと自身のレイヤーだけ。プロジェクトのレイヤーに書いたものは使わない（外のリポジトリの 1 行でメインのターンを止めさせない）。同じ id は 1 本だけ
@@ -1447,22 +1458,13 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
 
 チケット制御が有効なワークスペースでも、作業の進め方は 2 つある。
 
-- **直接作業**: 調査や小さな修正。チケットを起こさず、判定は全体ルールだけ。ワークスペースルート直下と、承認済みチケットの無いワークツリーがこれ
+- **直接作業**: 調査や小さな修正。チケットを起こさず、判定は全体ルールだけ。ワークスペースルート直下と、承認済みチケットの無いワークツリーがこれ。新しく切るワークツリーとブランチの名前は `<先頭の語>-<番号>-<slug>` の形にそろえる（形に合わないと `--lint` が warn で名指しする。拒否はしない）
 - **チケット作業**: 設計に触れる・複数のフェーズに分かれる・ユーザのレビューが要る修正。提案を書いて承認を受け、フェーズとリスクの配点に従って進める
 
-どちらで進めるかはモデルが決める。ccnavi は判定で強制せず、`SessionStart`（起動・再開・compact・clear）で次の案内を渡す。
+どちらで進めるかはモデルが決める。ccnavi は判定で強制せず、`SessionStart` で `.ccnavi/CCNAVI.md` の「作業の進め方」（条件 `tickets`）を渡す。
 サブエージェントには渡さない。
 
-```
-[ccnavi] このワークスペースはチケット制御を使っている。作業の進め方は 2 つ。
-- 直接作業（調査・小さな修正）: チケットを起こさずそのまま進める。判定は全体ルールだけ。
-- チケット作業（設計に触れる・複数のフェーズに分かれる・ユーザのレビューが要る）: wip/proposals/todo/ に
-  提案を書いて承認を受ける。承認されると提案は .ccnavi/approved/doing/ へ動く。以後の操作は sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-ticket.sh を通す（使い方は --help）。
-どちらで進めるか迷ったら、ユーザに聞いてください。
-（現状: CCNAVI_MODE=dry-run。deny にヒットしても止まらない。通ったことを許可と読まず、表示された案内に次からは従う）
-```
-
-最後の行は dry-run のときだけ出る。それ以外の手順（レビューの sh、`review: mr` / `chat`、配点の書き方、後工程）は、必要になった場所で改めて届く。
+最後の行（`dry-run` の条件）は dry-run のときだけ出る。それ以外の手順（レビューの sh、`review: mr` / `chat`、配点の書き方、後工程）は、必要になった場所で改めて届く。
 
 ### 置き場と状態
 
@@ -2700,11 +2702,11 @@ sh や拡張が頼るフラグや出力の形を、呼ぶ側を直さないと�
 ccnavi --docs --text マージ --format detail           # 話題で当たりを付ける
 ccnavi --docs --type adr --sort mtime -r --limit 10     # 新しい ADR から 10 本
 ccnavi --docs --tag worktree --tag git --format path    # どちらかのタグを持つもの（OR）のパスだけ
-ccnavi --docs --path docs/claude --format count         # 件数だけ
+ccnavi --docs --path .ccnavi/docs --format count         # 件数だけ
 ```
 
 md を本文ではなく頭の frontmatter で引く。grep は当たった行を返すので、そのファイルが何の文書かは開くまで分からず、
-よそからの言及も同じ重みで混ざる。frontmatter の書き方は [docs/claude/frontmatter.md](docs/claude/frontmatter.md)。
+よそからの言及も同じ重みで混ざる。frontmatter の書き方は [.ccnavi/docs/frontmatter.md](.ccnavi/docs/frontmatter.md)。
 
 `SessionStart` が渡すのは引き方の 1 行だけで、オプションの一覧と frontmatter の書き方は渡さない。書き方は、Write で新しく作った md に
 frontmatter か `type` が無いときに、`PostToolUse` が `[ccnavi] NOTICE_DOC_FRONTMATTER (<パス>)` で 1 度だけ案内する（止めない）。
@@ -2717,7 +2719,7 @@ git で決める（統合した後は統合先の索引に入るため）。
 パス（`concept_id`）はワークスペースルートから書く（`projects/lib/docs/x`）。`--path projects/lib` で 1 つのプロジェクトに絞れる。
 どのツリーもルートに `.git` を持つものだけで、`.git` の無い `projects/<名前>/` は `--docs` が標準エラーで名指しする。
 それぞれの `git ls-files --cached --others --exclude-standard` のうち `*.md` を載せ、実体の無いもの（消してまだステージしていないもの）、
-シンボリックリンク、ccnavi ディレクトリ（`.ccnavi/`）の下は載せない。ワークスペースの一覧からはプロジェクトの置き場を外す。
+シンボリックリンク、ccnavi ディレクトリ（`.ccnavi/`）の下（`.ccnavi/docs/` を除く）は載せない。ワークスペースの一覧からはプロジェクトの置き場を外す。
 実体のパスがそのツリーの外に出るディレクトリ（ジャンクションやシンボリックリンク越し）は読みも書きもしない。
 同じ `concept_id`（NFC で揃えて同じもの）は 1 本にまとめる。
 
@@ -2785,7 +2787,7 @@ argparse が止めていた打ち間違いを、知らせずに通さないた�
 `index.jsonl` と `--format jsonl` の 1 行、`--format json` の配列の要素は同じ形。
 
 ```json
-{"concept_id":"docs/claude/worktree","directory":"docs/claude","frontmatter":{"type":"guide","tags":["worktree","git"]},"mtime":"2026-09-27T19:56:23"}
+{"concept_id":".ccnavi/docs/worktree","directory":".ccnavi/docs","frontmatter":{"type":"guide","tags":["worktree","git"]},"mtime":"2026-09-27T19:56:23"}
 ```
 
 | 鍵 | 何 |
@@ -2933,6 +2935,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/hook/events.py` | hook のイベントごとの手順。1 回の起動で何が起きるかはここを上から読む |
 | `src/ccnavi/hook/judge.py` | 実行前チェック。通す・聞く・止めるを決める |
 | `src/ccnavi/hook/reasons.py` | 判定に添える文面と理由コード |
+| `src/ccnavi/hook/ccnavimd.py` | `SessionStart` で渡す作業の決まり（`.ccnavi/CCNAVI.md`）の条件と差し込みを解く。`--lint` の書き方の検査も持つ |
 | `src/ccnavi/hook/subagent.py` | SubagentStart / SubagentStop。開いている子の案内と、範囲外の変更の差し戻し |
 | `src/ccnavi/hook/docsearch.py` | `--docs` と `SessionStart` の入口。索引を置く場所（ワークスペースとプロジェクト）を決めて集め、引き方を案内する |
 | `src/ccnavi/hook/docsearch_index.py` | md の frontmatter の索引（`index.jsonl`）を組む。変わった md だけを読み直す |
@@ -2956,7 +2959,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/entry/cli_ops.py` | チケットとレビューの副命令を ops / review へ渡す。`sync` の問い合わせ |
 | `src/ccnavi/entry/cli_plan.py` | `--plan-order` の引数を受けて答えを出す。振り直しと書き戻しは `tickets/plan_order.py` と `tickets/plan_phases.py` |
 | `build.py` | 配布物の組み立て。`dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする |
-| `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトを配る |
+| `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトと使い方の文書（`.ccnavi/docs/*.md`）を配る |
 | `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |
 | `.claude/hooks/mark-ext.sh` / `test-ext.sh` | 同じく拡張のぶん。触ったことの書き残しと、ターンの終わりに関わるグループだけ回すテスト |
 | `extensions/vscode/ccnavi-board/scripts/test-groups.js` | 拡張のテストの入口。触ったファイルから回すグループを決め、コンパイルは 1 回で済ませる |
