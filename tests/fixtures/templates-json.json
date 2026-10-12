@@ -1,5 +1,5 @@
 {
- "about": "`ccnavi --templates --json` の答えの見本。ワークスペースは tests/ticket/test_plan_templates.py の showcase（共通に feature / research / broken、自身のレイヤーに feature（共通と同じ）/ research（共通と中身が違う）/ local（定義に無い型）/ ends（終端が 2 つ）/ notes.txt、プロジェクト lib に lib）。root は <root> に置き換える。欄: version、root、layer（一覧の対象のレイヤー）、keywords、templates（共通 + layer の足し算。各テンプレートの name・layer・path・sha・valid・description・when・plan / feedback（index は計画の中の添字、number は提案に写したときの番号、after は計画の中の添字）・has_flows・flows（index・name・nodes・connections・node_types）・effective（足し算で使われるか）・usable（使われ、error も無い）・dropped（捨てた理由 reason = invalid / duplicate / conflict と detail）・writable・problems（severity と detail））、layers（共通と各レイヤーの生の中身。path・exists・unreadable・writable・problems・templates）、sums（レイヤーごとの足し算の索引）、errors / warns / infos。VS Code 拡張のテンプレート管理画面はこの形をそのまま描く。形を変えたらこの見本も一緒に直す",
+ "about": "`ccnavi --templates --json` の答えの見本。ワークスペースは tests/ticket/test_plan_templates.py の showcase（共通に feature / research / broken、自身のレイヤーに feature（共通と同じ）/ research（共通と中身が違う）/ local（定義に無い型）/ ends（終端が 2 つ）/ notes.txt、プロジェクト lib に lib、下書きの置き場 wip/proposals/templates/ に login（TODO が残っている）/ research（共通と同名）/ broken）。root は <root> に置き換える。欄: version、root、layer（一覧の対象のレイヤー）、keywords、templates（共通 + layer の足し算。各テンプレートの name・layer・path・sha・valid・description・when・plan / feedback（index は計画の中の添字、number は提案に写したときの番号、after は計画の中の添字）・has_flows・flows（index・name・nodes・connections・node_types）・effective（足し算で使われるか）・usable（使われ、error も無い）・dropped（捨てた理由 reason = invalid / duplicate / conflict と detail）・writable・problems（severity と detail））、layers（共通と各レイヤーの生の中身。path・exists・unreadable・writable・problems・templates）、sums（レイヤーごとの足し算の索引）、errors / warns / infos、drafts（下書き。効力は無く、templates にも足し算にも入らない。各下書きの name・tree（置かれたツリー。ワークスペースルートは空）・path（ツリーからの相対）・sha（取り込みの --expect に使う）・valid・importable（読めて error が無い）・layer（検査に使った定義のレイヤー）・exists_in（同じ名前のテンプレートが在るレイヤー。取り込むと置き換えになる）・also_in（同じ中身の下書きを持つほかのツリー）・description・when・plan / feedback / has_flows / flows（templates と同じ）・problems（深刻度は下書きの検査のまま。--lint は error も warn に下げる））。VS Code 拡張のテンプレート管理画面はこの形をそのまま描く。形を変えたらこの見本も一緒に直す",
  "expect": {
   "version": 1,
   "root": "<root>",
@@ -740,6 +740,131 @@
   ],
   "errors": 3,
   "warns": 2,
-  "infos": 1
+  "infos": 1,
+  "drafts": [
+   {
+    "name": "broken",
+    "path": "wip/proposals/templates/broken.yml",
+    "sha": "be9c33cb743e62edb202d15a0b28fed2ec18efa48f6534ca82bf29a422c21b88",
+    "valid": false,
+    "description": "",
+    "when": "",
+    "plan": [],
+    "feedback": [],
+    "has_flows": false,
+    "flows": [],
+    "problems": [
+     {
+      "severity": "error",
+      "detail": "YAML として読めない (did not find expected node content、2 行 1 桁)"
+     }
+    ],
+    "tree": "",
+    "layer": "self",
+    "importable": false,
+    "exists_in": [
+     "common"
+    ],
+    "also_in": []
+   },
+   {
+    "name": "login",
+    "path": "wip/proposals/templates/login.yml",
+    "sha": "46afac83752340bb6322a015aebb90a19878d2f058fefbe27474a13d4fce0fce",
+    "valid": true,
+    "description": "TODO ログインを設計から実装まで進める",
+    "when": "新しい機能を足すとき",
+    "plan": [
+     {
+      "index": 1,
+      "number": 1,
+      "type": "design",
+      "review": "",
+      "after": []
+     },
+     {
+      "index": 2,
+      "number": 2,
+      "type": "implement",
+      "review": "",
+      "after": [
+       1
+      ]
+     }
+    ],
+    "feedback": [
+     {
+      "index": 1,
+      "number": 3,
+      "type": "implement-feedback",
+      "review": "",
+      "after": []
+     }
+    ],
+    "has_flows": true,
+    "flows": [
+     {
+      "index": 2,
+      "name": "実装の手順",
+      "nodes": 3,
+      "connections": 2,
+      "node_types": {
+       "end": 1,
+       "prompt": 1,
+       "start": 1
+      }
+     }
+    ],
+    "problems": [
+     {
+      "severity": "warn",
+      "detail": "`description` に TODO が残っている（固有名の一般化が済んでいない下書き）。直してから取り込む"
+     }
+    ],
+    "tree": "",
+    "layer": "self",
+    "importable": true,
+    "exists_in": [],
+    "also_in": []
+   },
+   {
+    "name": "research",
+    "path": "wip/proposals/templates/research.yml",
+    "sha": "eb6437bc32d6f13c70a9a48c58004d75ade89ccaab24b7be2466798f3675481c",
+    "valid": true,
+    "description": "調べてから設計する",
+    "when": "",
+    "plan": [
+     {
+      "index": 1,
+      "number": 1,
+      "type": "research",
+      "review": "",
+      "after": []
+     },
+     {
+      "index": 2,
+      "number": 2,
+      "type": "design",
+      "review": "",
+      "after": [
+       1
+      ]
+     }
+    ],
+    "feedback": [],
+    "has_flows": false,
+    "flows": [],
+    "problems": [],
+    "tree": "",
+    "layer": "self",
+    "importable": true,
+    "exists_in": [
+     "common",
+     "self"
+    ],
+    "also_in": []
+   }
+  ]
  }
 }

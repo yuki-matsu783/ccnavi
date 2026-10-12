@@ -35,6 +35,12 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 PUSH_SCRIPTS = ("ccnavi-push-approved.sh", *common_sh(SH_DIR))
+# ユーザがコピーするまで `.ccnavi/scripts/` に入らない版（テンプレートの下書きの削除を運ぶ）。
+# `use_staged_sh = True` のテストは、`CCNAVI_SH_DIR` が無ければこの版を写して走らせる。
+# コピーしたあとは同じ中身になるので、コピーの前後どちらでも通る。
+# `CCNAVI_SH_DIR` を渡したときはそちらを使う。
+STAGED_DIR = os.path.join(ROOT, "wip", "design", "scripts")
+USE_STAGED = not os.environ.get("CCNAVI_SH_DIR", "")
 APPROVE_SCRIPTS = (*PUSH_SCRIPTS, "ccnavi-agree.sh")
 APPROVED = ".ccnavi/approved/doing"
 MESSAGE = "ccnavi: 承認済みチケットを更新"
@@ -80,6 +86,8 @@ class Workspace(unittest.TestCase):
     """使い捨てのワークスペースと bare のリモート。テストは持たない（下の 2 つが継いで使う）。"""
 
     scripts = PUSH_SCRIPTS
+    # 写す前の版（`STAGED_DIR`）で走らせるか。
+    use_staged_sh = False
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -88,7 +96,11 @@ class Workspace(unittest.TestCase):
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
         for name in self.scripts:
-            shutil.copy(os.path.join(SH_DIR, name), scripts)
+            source = os.path.join(STAGED_DIR, name)
+            if self.use_staged_sh and USE_STAGED and os.path.isfile(source):
+                shutil.copy(source, scripts)
+            else:
+                shutil.copy(os.path.join(SH_DIR, name), scripts)
         git(self._tmp.name, "init", "-q", "-b", "main", self.ws)
         for key, value in (
             ("user.email", "t@example.invalid"),
@@ -663,6 +675,91 @@ class PushApprovedTest(Workspace):
         os.makedirs(outside)
         lost = self.push(cwd=outside)
         self.assertEqual(lost.returncode, 2, lost.stdout + lost.stderr)
+
+
+@unittest.skipUnless(SHELL and GIT, "sh と git が要る")
+class TemplateDraftCarryTest(Workspace):
+    """取り込んで消えたテンプレートの下書き（`wip/proposals/templates/`）は、フローの下書きと同じ形で
+    コミットして push する。
+
+    `wip/design/scripts/` の版（ユーザがコピーする前）で走らせる。コピーしたあとは同じ中身なので、
+    どちらの時点でも通る。いまの `.ccnavi/scripts/` の版（`CCNAVI_SH_DIR=.ccnavi/scripts`）では
+    通らない: 消えた下書きを拾わず、コミットに入らない。
+    """
+
+    use_staged_sh = True
+    drafts = "wip/proposals/templates"
+
+    def track(self, tree, *rels):
+        for rel in rels:
+            write(os.path.join(tree, *rel.split("/")), "name: x\n")
+        git(tree, "add", "--", *rels)
+        git(tree, "commit", "-q", "-m", "drafts")
+
+    def test_a_removed_template_draft_is_carried_with_the_approved_place(self):
+        tree = self.worktree("i0001")
+        taken = f"{self.drafts}/feature.yml"
+        rewritten = f"{self.drafts}/research.yml"
+        untracked = f"{self.drafts}/local.yml"
+        self.track(tree, taken, rewritten)
+        os.remove(os.path.join(tree, *taken.split("/")))
+        write(os.path.join(tree, *rewritten.split("/")), "name: x\nplan: [y]\n")
+        write(os.path.join(tree, *untracked.split("/")), "name: x\n")
+        self.place(tree)
+
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # 同じ中身の削除と新規が改名に見えないよう、2 つのパスで見る。
+        out = git(tree, "show", "--name-only", "--no-renames", "--format=", "HEAD").stdout
+        self.assertEqual(sorted(out.split()), sorted([f"{APPROVED}/i0001.md", taken]))
+        # 書き直された下書き・追跡していない下書きには触れない。
+        self.assertTrue(self.dirty(tree, rewritten))
+        self.assertTrue(self.dirty(tree, untracked))
+        self.assertEqual(self.dirty(tree, taken), "")
+        self.assertEqual(self.staged(tree), "")
+        self.assertEqual(self.remote_head("i0001"), self.head(tree))
+
+    def test_flow_and_template_drafts_are_carried_together(self):
+        tree = self.worktree("i0001")
+        flow = "wip/proposals/flows/i0001-01-01.yml"
+        template = f"{self.drafts}/feature.yml"
+        self.track(tree, flow, template)
+        os.remove(os.path.join(tree, *flow.split("/")))
+        os.remove(os.path.join(tree, *template.split("/")))
+        self.place(tree)
+
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        out = git(tree, "show", "--name-only", "--no-renames", "--format=", "HEAD").stdout
+        self.assertEqual(sorted(out.split()), sorted([f"{APPROVED}/i0001.md", flow, template]))
+
+    def test_template_drafts_alone_are_not_carried(self):
+        """承認済みチケットの置き場に変更が無ければ、下書きの削除だけではコミットしない。"""
+        tree = self.worktree("i0001")
+        taken = f"{self.drafts}/feature.yml"
+        self.track(tree, taken)
+        os.remove(os.path.join(tree, *taken.split("/")))
+        before = self.head(tree)
+
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(NOTHING, result.stdout)
+        self.assertEqual(self.head(tree), before)
+
+    def test_the_places_of_other_trees_are_not_touched(self):
+        """置き場の外（`wip/proposals/` の下の別の場所）で消えたものは運ばない。"""
+        tree = self.worktree("i0001")
+        other = "wip/proposals/notes/x.md"
+        template = f"{self.drafts}/feature.yml"
+        self.track(tree, other, template)
+        os.remove(os.path.join(tree, *other.split("/")))
+        os.remove(os.path.join(tree, *template.split("/")))
+        self.place(tree)
+
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.committed(tree), sorted([f"{APPROVED}/i0001.md", template]))
+        self.assertTrue(self.dirty(tree, other))
 
 
 @unittest.skipUnless(SHELL and GIT, "sh と git が要る")

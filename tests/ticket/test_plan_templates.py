@@ -562,6 +562,14 @@ def showcase(root: str) -> None:
         os.path.join(root, "projects", "lib", ".ccnavi/config/project/templates/lib.yml"),
         template("lib", "  - research\n", "lib の調べもの"),
     )
+    # 下書き（効力は無い）。TODO の残り・同名の既存・読めないもの。
+    drafts = os.path.join(root, "wip", "proposals", "templates") + "/"
+    write(
+        drafts + "login.yml",
+        FEATURE.replace("feature", "login").replace("機能を設計から", "TODO ログインを設計から"),
+    )
+    write(drafts + "research.yml", RESEARCH)
+    write(drafts + "broken.yml", "name: [\n")
 
 
 class ShapeTest(unittest.TestCase):
