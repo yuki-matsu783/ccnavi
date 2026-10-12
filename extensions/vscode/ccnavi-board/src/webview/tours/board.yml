@@ -418,7 +418,7 @@ courses:
 
   - id: flow
     title: 子チケットの手順や計画の順序を見直したいとき
-    summary: フローと計画編集を開くボタンの見分け方
+    summary: フローを開くボタンと計画編集を開くボタンの見分け方
     steps:
       - target: flow-create
         title: フローを作る
