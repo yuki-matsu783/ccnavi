@@ -215,6 +215,9 @@ def decide_before(
 
     subject, bare, inner, rewrites = screen(payload.tool_name, record.subject, record)
 
+    # 文面の `subject:` には、読み直す前の原文を出す。照合には読み直した後の subject を使う。
+    display_subject = record.subject
+
     if not subject:
         # コマンドは在るが、実行される部分が残らなかった。コメントだけの行が
         # これにあたる。ルールを当てる先が無いので、どのタイプにも当たらず
@@ -256,7 +259,7 @@ def decide_before(
                     reasons.builtin_refusal(
                         wrapguard.CODE_ENV,
                         wrapguard.ENV_RULE_ID,
-                        subject,
+                        display_subject,
                         wrapguard.env_message(script, names),
                     )
                 ],
@@ -281,7 +284,7 @@ def decide_before(
                     reasons.builtin_refusal(
                         wrapguard.CODE_CORE_PATH,
                         wrapguard.CORE_PATH_RULE_ID,
-                        subject,
+                        display_subject,
                         wrapguard.core_path_message(root, sub, word, kind),
                     )
                 ],
@@ -310,7 +313,7 @@ def decide_before(
                     reasons.builtin_refusal(
                         phase_forms.CODE_RECORDS_PRUNE,
                         phase_forms.RECORDS_PRUNE_RULE_ID,
-                        subject,
+                        display_subject,
                         phase_forms.prune_message(),
                     )
                 ],
@@ -340,7 +343,7 @@ def decide_before(
                     reasons.builtin_refusal(
                         phase_forms.CODE_TICKET_APPROVAL,
                         phase_forms.TICKET_APPROVAL_RULE_ID,
-                        subject,
+                        display_subject,
                         phase_forms.guard_off_message(found)
                         if kind == "guard-off"
                         else phase_forms.board_form_message(found),
@@ -368,7 +371,7 @@ def decide_before(
                     reasons.builtin_refusal(
                         phase_forms.CODE_TICKET_APPROVAL,
                         phase_forms.TICKET_APPROVAL_RULE_ID,
-                        subject,
+                        display_subject,
                         phase_forms.hidden_entry_message(entry, found),
                     )
                 ],
@@ -394,7 +397,7 @@ def decide_before(
                     reasons.builtin_refusal(
                         wrapguard.CODE_CHILD_PUSH,
                         wrapguard.CHILD_PUSH_RULE_ID,
-                        subject,
+                        display_subject,
                         wrapguard.child_push_message(name, parent),
                     )
                 ],
@@ -423,7 +426,7 @@ def decide_before(
             mode,
             record,
             rules.DENY,
-            notices + [reasons.subagent_forbidden(subject, runner, layer)],
+            notices + [reasons.subagent_forbidden(display_subject, runner, layer)],
             conf=conf,
             root=root,
         )
@@ -690,14 +693,14 @@ def decide_before(
             reasons.builtin_refusal(
                 reasons.CODE_REDIRECT_LIMIT_DENY,
                 reasons.REDIRECT_LIMIT_RULE,
-                subject,
+                display_subject,
                 selfguard_shell.REDIRECT_LIMIT_MESSAGE,
             ),
             *(
                 reasons.reason_for(
                     rule,
                     payload.tool_name,
-                    subject,
+                    display_subject,
                     source,
                     record.degraded,
                     runner,
@@ -720,7 +723,7 @@ def decide_before(
             reasons.reason_for(
                 rule,
                 payload.tool_name,
-                subject,
+                display_subject,
                 source,
                 record.degraded,
                 runner,
@@ -746,7 +749,7 @@ def decide_before(
             reasons.reason_for(
                 rule,
                 payload.tool_name,
-                subject,
+                display_subject,
                 source,
                 record.degraded,
                 runner,
@@ -775,7 +778,7 @@ def decide_before(
             else [
                 reasons.undeclared(
                     payload.tool_name,
-                    subject,
+                    display_subject,
                     source,
                     record.degraded,
                     verdict=verdict,
