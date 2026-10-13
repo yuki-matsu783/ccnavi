@@ -289,7 +289,7 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
       throw new Error(
         target.kind === "self"
           ? "ccnavi の出力にワークスペースの設定がありません"
-          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、名前が予約名の common か self です）`,
+          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下にないか、名前が予約名の common か self です）`,
       );
     }
     riskPath = resolveIn(root, layer.risk.path);
@@ -298,7 +298,7 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
       other = resolveIn(root, DEFAULT_RISK);
     }
     if (layer.risk.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読めず、この設定を空として扱っています（このファイルの配点は 1 件も数えられていません）: ${layer.risk.unreadable}`);
+      notices.push(`実行ファイルはこのファイルを読み込めず、この設定を空として扱っています（このファイルの配点は 1 件も数えられていません）: ${layer.risk.unreadable}`);
     }
   }
   let text: string;
@@ -310,7 +310,7 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
     exists = true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`配点のファイルを読めません（${riskRel}）: ${(error as Error).message}`);
+      throw new Error(`配点のファイルを読み込めません（${riskRel}）: ${(error as Error).message}`);
     }
     // 無いのは不備ではない（「設定が無い」正常な状態）。
     text = "";
@@ -710,7 +710,7 @@ async function create(current: PanelState): Promise<void> {
   } catch (error) {
     // 書けなかったのに猶予を残したままだと、その間の実際の外部変更が知らされない。
     current.wroteAt = 0;
-    fail(current, `${loaded.riskRel} に書けません: ${(error as Error).message}`);
+    fail(current, `${loaded.riskRel} に保存できません: ${(error as Error).message}`);
     return;
   }
   await reload(current);
@@ -746,7 +746,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     tmp = path.join(current.tmpDir, "risks.yml");
     fs.writeFileSync(tmp, text, "utf8");
   } catch (error) {
-    fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
+    fail(current, `編集中の内容を保存できません: ${(error as Error).message}`);
     return;
   }
 
@@ -787,7 +787,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     try {
       mtimeMs = fs.statSync(loaded.riskPath).mtimeMs;
     } catch (error) {
-      fail(current, `配点のファイルを確かめられません: ${(error as Error).message}`);
+      fail(current, `配点のファイルを確認できません: ${(error as Error).message}`);
       return;
     }
     if (mtimeMs !== loaded.mtimeMs) {
@@ -809,7 +809,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     }
   } catch (error) {
     current.wroteAt = 0;
-    fail(current, `配点のファイルに書けません: ${(error as Error).message}`);
+    fail(current, `配点のファイルに保存できません: ${(error as Error).message}`);
     return;
   }
   await reload(current);

@@ -51,7 +51,7 @@ export const WEBVIEW_SRC = path.join(__dirname, "..", "..", "..", "src", "webvie
 export function flatStyle(html: string): string {
   const found = /<style nonce="[^"]*">\n([\s\S]*?)\n<\/style>/.exec(html);
   if (found === null) {
-    throw new Error("HTML に <style nonce> が無い");
+    throw new Error("HTML に <style nonce> がありません");
   }
   return found[1].replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\s*\n\s*/g, " ").trim();
 }

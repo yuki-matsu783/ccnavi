@@ -47,7 +47,7 @@ test("CB-T252 場所は nodes の中ならノードの id と欄のパスで言�
   assert.match(openMismatchText(found), /エディタで引用符を付ける/);
   // 「開きません」は呼び手（flow-panel.ts）が頭に付ける。ここでも言うと 1 文に 2 度出る
   assert.doesNotMatch(openMismatchText(found), /開きません/);
-  assert.match(saveMismatchText(found), /書き込みません/);
+  assert.match(saveMismatchText(found), /保存しません/);
   assert.equal(flowMismatch({ connections: [{ condition: "y" }] }, { connections: [{ condition: "x" }] })?.where, "connections[0].condition");
   assert.equal(flowMismatch({ "a b": 1 }, { "a b": 2 })?.where, '["a b"]');
   assert.equal(flowMismatch("x", { nodes: [] })?.where, "最上位");

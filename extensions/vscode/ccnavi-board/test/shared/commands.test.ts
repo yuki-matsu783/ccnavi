@@ -70,7 +70,7 @@ test("CB-T18c yes は見せた識別子と、そのときの絞りを分けて�
   ]);
 });
 
-test("CB-T19 decide の引数。一覧は --preview、選んだ行き先は JSON と見せたダイジェストで渡す", () => {
+test("CB-T19 decide の引数。一覧は --preview、選んだ対応方針は JSON と見せたダイジェストで渡す", () => {
   assert.deepEqual(decidePreviewArgs(2), ["decide", "2", "--preview"]);
   assert.deepEqual(decideArgs(1, { u1: "keep", "https://x/y#z": "fix" }, "d0"), [
     "decide",
@@ -102,7 +102,7 @@ test("CB-T19b 承認の push の sh は、ワークスペースルートから�
   );
 });
 
-test("CB-T287 C1 の対象かは c1 family の target で読む。頭の c1 1 が無ければ空、CR は除く", () => {
+test("CB-T287 C1 の対象かは c1 family の target で読む。頭の c1 1 がなければ空、CR は除く", () => {
   assert.equal(c1TargetOf("c1 1\nfamily i0001\ntarget yes\ntree /ws/x y\n"), "yes");
   assert.equal(c1TargetOf("c1 1\r\nfamily i0001\r\ntarget no\r\n"), "no");
   assert.equal(c1TargetOf("usage: ccnavi ...\n"), "");
@@ -127,7 +127,7 @@ test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリ
   );
   // 止めている間の例外は sh …ccnavi-review.sh の形を単体で打ったときだけ。cd と連結する形へ誘導しない。
   // サブエージェントには常に禁止（9.12）
-  assert.ok(text.includes("cd や他のコマンドと連結せず、単体の Bash で打つ（cwd が /ws/.claude/worktrees/i0001 でなければ、先に cd だけを別の Bash で打つ）"));
+  assert.ok(text.includes("cd や他のコマンドと連結せず、単体の Bash で実行する（cwd が /ws/.claude/worktrees/i0001 でなければ、先に cd だけを別の Bash で実行する）"));
   assert.ok(text.includes("サブエージェントには渡さない"));
   assert.ok(!text.includes("&&"));
   // ユーザの判断（--reviewed / decide）を代行させず、confirm が返す方法を先取りしない
@@ -136,7 +136,7 @@ test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリ
   assert.ok(!text.includes("依頼し直す"));
   assert.ok(text.includes("confirm が一覧と次の手順を返すので、それに従う"));
   // 前の会話が無い新しいセッションでも、状況の確かめ方が分かる
-  assert.ok(text.includes("'sh /ws/.ccnavi/scripts/ccnavi-ticket.sh status i0001' で確かめる（置き場のファイルを自分で探さない）"));
+  assert.ok(text.includes("'sh /ws/.ccnavi/scripts/ccnavi-ticket.sh status i0001' で確認する（置き場のファイルを自分で探さない）"));
   // マージリクエストが無ければ行ごと省き、フェーズの表示名が無ければ番号で言う。Windows の区切りは / にそろえる
   const bare = reviewedPrompt("C:\\ws", "i0001", 3, "", "C:\\ws\\.claude\\worktrees\\i0001", "", undefined);
   assert.ok(!bare.includes("マージリクエスト:"));

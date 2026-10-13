@@ -49,7 +49,7 @@ sample:
         message: DB の変更の大きさ
       - id: no-tests
         points: 20
-        judge: テストの無い振る舞いの変更を含むか
+        judge: テストのない振る舞いの変更を含むか
         message: テストが足りない
   builtin:
     levels:
@@ -73,7 +73,7 @@ sample:
       - id: deletes
         points: 20
         deleted_over: 3
-        message: 消したファイルが多い
+        message: 削除したファイルが多い
   sums:
     - name: self
       layers: [common, self]
@@ -83,7 +83,7 @@ sample:
         - { id: many-files, source: common, kind: files_over, value: 10, points: 15, message: ファイルが多い }
         - { id: ci, source: common, kind: glob, value: ".github/**", points: 10, message: CI やエージェント定義に触った }
         - { id: db-script, source: common, kind: script, value: ".ccnavi/config/common/scripts/risk-db.sh", points: 10, message: DB の変更の大きさ }
-        - { id: no-tests, source: common, kind: judge, value: テストの無い振る舞いの変更を含むか, points: 20, message: テストが足りない }
+        - { id: no-tests, source: common, kind: judge, value: テストのない振る舞いの変更を含むか, points: 20, message: テストが足りない }
         - { id: migrations, source: self, kind: glob, value: "db/migrations/**", points: 15, message: マイグレーションに触った }
     - name: lib
       layers: [common, lib]
@@ -93,7 +93,7 @@ sample:
         - { id: many-files, source: common, kind: files_over, value: 10, points: 15, message: ファイルが多い }
         - { id: ci, source: common, kind: glob, value: ".github/**", points: 10, message: CI やエージェント定義に触った }
         - { id: db-script, source: common, kind: script, value: ".ccnavi/config/common/scripts/risk-db.sh", points: 10, message: DB の変更の大きさ }
-        - { id: no-tests, source: common, kind: judge, value: テストの無い振る舞いの変更を含むか, points: 20, message: テストが足りない }
+        - { id: no-tests, source: common, kind: judge, value: テストのない振る舞いの変更を含むか, points: 20, message: テストが足りない }
         - { id: "lib:big-diff", source: lib, kind: lines_over, value: 100, points: 15, message: lib は小さな変更でも見る }
         - { id: public-api, source: lib, kind: glob, value: "src/api/**", points: 20, message: 公開 API に触った }
 
@@ -107,10 +107,10 @@ courses:
         body: 子チケットのリスクの点がこの値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。HIGH 以上になると、レビューが終わるまでフェーズは先へ進めません。空欄なら組み込みの値を使います。
       - target: factors
         title: 項目
-        body: 子チケットを閉じるとき、その差分に当てて加点する項目です。行を押すと欄が開き、加点条件と点を直せます。「＋ 項目を追加」で足せます。
+        body: 子チケットをクローズするとき、その差分に当てて加点する項目です。行を押すと欄が開き、加点条件と点を直せます。「＋ 項目を追加」で追加できます。
       - target: save
         title: 保存
-        body: 保存すると実行ファイルが検証してから書き込みます。通らなければ、下に理由が出ます。
+        body: 保存すると、実行ファイルが検証し、通ればファイルに反映します。通らなければ、下に理由が出ます。
       - target: tour
         title: 案内
         body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
@@ -121,7 +121,7 @@ courses:
     steps:
       - target: levels
         title: 境目の点で決まること
-        body: 子チケットを閉じるとき、項目で当てはまった点を足し合わせます。合計がここの値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。LOW には境目がありません。
+        body: 子チケットをクローズするとき、項目で当てはまった点を足し合わせます。合計がここの値以上になると、リスクレベルが上がります（LOW → MEDIUM → HIGH → CRITICAL）。LOW には境目がありません。
       - target: level-high
         title: 止めるのは HIGH から
         body: HIGH 以上になったフェーズは、レビューが終わるまで先へ進めません。計画のときに「レビュー不要」と宣言していても同じです。レビューを求める基準を厳しくするなら HIGH を下げ、緩めるなら上げます。
@@ -135,18 +135,18 @@ courses:
           blank: critical
       - target: save
         title: 保存で検証する
-        body: 保存すると、実行ファイルが並び順などを検証してから書き込みます。通らなければ、下に理由が出ます。
+        body: 保存すると、実行ファイルが並び順などを検証し、通ればファイルに反映します。通らなければ、下に理由が出ます。
 
   - id: add-factor
-    title: 加点の項目を足したいとき
-    summary: 項目を足し、id・点・加点条件・理由を決めて保存する
+    title: 加点の項目を追加したいとき
+    summary: 項目を追加し、id・点・加点条件・理由を決めて保存する
     steps:
       - target: add
-        title: 項目を足す
-        body: 「＋ 項目を追加」を押すと、空の項目が末尾に足され、欄が開いて id に焦点が移ります。1 件につき加点条件は 1 つです。
+        title: 項目を追加する
+        body: 「＋ 項目を追加」を押すと、空の項目が末尾に追加され、欄が開いて id に焦点が移ります。1 件につき加点条件は 1 つです。
       - target: factor-id
         title: id を付ける
-        body: id は項目の名前です。子を閉じたときの出力や、judge の記録（record-risk）がこの名前で項目を指すので、内容が分かる短い名前にします。
+        body: id は項目の名前です。子をクローズしたときの出力や、judge の記録（record-risk）がこの名前で項目を指すので、内容が分かる短い名前にします。
         scene:
           open: big-diff
       - target: factor-points
@@ -160,13 +160,13 @@ courses:
         scene:
           open: big-diff
       - target: factor-message
-        title: 理由を書く
-        body: 加点の理由として、依頼文と閉じたときの出力に出る短い文です。空なら id をそのまま使います。
+        title: 理由を入力する
+        body: 加点の理由として、依頼文とクローズしたときの出力に出る短い文です。空なら id をそのまま使います。
         scene:
           open: big-diff
       - target: save
-        title: 保存して確かめる
-        body: 項目が揃ったら保存します。実行ファイルが検証してから書き込み、通らなければ下に理由が出ます。
+        title: 保存して確認する
+        body: 項目が揃ったら保存します。実行ファイルが検証し、通ればファイルに反映します。通らなければ下に理由が出ます。
 
   - id: kinds
     title: 加点条件を選びたいとき
@@ -174,7 +174,7 @@ courses:
     steps:
       - target: factor-kind
         title: 測りたいもので選ぶ
-        body: 差分の大きさなら lines_over / files_over / deleted_over、特定のパスに触ったかなら glob、数え方を自分で書くなら script、読まないと分からないことは judge を選びます。
+        body: 差分の大きさなら lines_over / files_over / deleted_over、特定のパスに触ったかなら glob、数え方を自分で記述するなら script、読まないと分からないことは judge を選びます。
         scene:
           open: big-diff
       - target: factor-value
@@ -184,7 +184,7 @@ courses:
           open: big-diff
       - target: factor-include
         title: 数えるパスを絞る
-        body: 対象パスを書くと、当てはまるパスだけを数えます（glob を 1 行に 1 つ）。見本では src/** だけを数えます。空なら差分全体を数えます。この欄は、差分の大きさを数える 3 つの加点条件だけにあります。
+        body: 対象パスを入力すると、当てはまるパスだけを数えます（glob を 1 行に 1 つ）。見本では src/** だけを数えます。空なら差分全体を数えます。この欄は、差分の大きさを数える 3 つの加点条件だけにあります。
         scene:
           open: big-diff
       - target: factor-exclude
@@ -199,12 +199,12 @@ courses:
           open: ci
       - target: factor-value
         title: スクリプトの点を使う（script）
-        body: .ccnavi/config/common/scripts/ の下のスクリプトが返した点を加点します。スクリプトが失敗したときと、出力を読めないときは、安全を優先して points をそのまま加点します。
+        body: .ccnavi/config/common/scripts/ の下のスクリプトが返した点を加点します。スクリプトが失敗したときと、出力を読み込めないときは、安全を優先して points をそのまま加点します。
         scene:
           open: db-script
       - target: factor-value
         title: 読んで判断させる（judge）
-        body: 差分を読んで yes か no で答えられる質問を書きます。サブエージェントが判断し、yes なら加点します。判定が揃うまで、子は閉じられません。
+        body: 差分を読んで yes か no で答えられる質問を入力します。サブエージェントが判断し、yes なら加点します。判定が揃うまで、子は閉じられません。
         scene:
           open: no-tests
 
@@ -224,20 +224,20 @@ courses:
           open: ci
       - target: factor-buttons
         title: 並べ替えと削除
-        body: ↑ ↓ で行を 1 つずつ動かし、「削除」でその項目を消します。どちらも、保存するまでファイルには書かれません。
+        body: ↑ ↓ で行を 1 つずつ動かし、「削除」でその項目を削除します。どちらも、保存するまでファイルには反映されません。
         scene:
           open: ci
       - target: save
-        title: 保存で書き込む
-        body: 未保存の間は、ヘッダに「未保存」が出ます。保存が通ると書き込まれ、ファイルのコメントは残したまま書き戻します。
+        title: 保存でファイルに反映する
+        body: 未保存の間は、ヘッダに「未保存」が出ます。保存が通るとファイルに反映され、ファイルのコメントは残ります。
 
   - id: sum
-    title: 共通の設定との足し算を確かめたいとき
-    summary: 子を閉じるときに実際に使う、共通の設定と 1 つの設定の和を読む
+    title: 共通の設定との足し算を確認したいとき
+    summary: 子をクローズするときに実際に使う、共通の設定と 1 つの設定の和を読む
     steps:
       - target: sum
         title: 足し算の枠
-        body: 子チケットを閉じるときの配点は、共通の設定と、親の project が指す設定の和です。この枠は、その結果を実行ファイルが出したまま、読み取り専用で見せます。
+        body: 子チケットをクローズするときの配点は、共通の設定と、親の project が指す設定の和です。この枠は、その結果を実行ファイルが出したまま、読み取り専用で見せます。
         scene:
           sum: self
       - target: sum-pick
@@ -247,12 +247,12 @@ courses:
           sum: lib
       - target: sum-levels
         title: 境目の点は小さいほう
-        body: 境目の点は、書かれた鍵ごとに小さいほうを採ります。見本では lib が HIGH を 30 と書いているので、共通の 40 より小さい 30 になります。どちらも書いていない鍵は組み込みの値です。
+        body: 境目の点は、記載された鍵ごとに小さいほうを採ります。見本では lib が HIGH を 30 と設定しているので、共通の 40 より小さい 30 になります。どちらも設定していない鍵は組み込みの値です。
         scene:
           sum: lib
       - target: sum-table
         title: 項目の連結と由来
-        body: 項目は両方を連結して並べ、由来の列に、共通の設定か足した設定かを出します。同じ id で中身が違うときは両方を数え、後ろの設定の側は lib:big-diff のように設定名を前に付けた名前になります。
+        body: 項目は両方を連結して並べ、由来の列に、共通の設定か追加した設定かを出します。同じ id で中身が違うときは両方を数え、後ろの設定の側は lib:big-diff のように設定名を前に付けた名前になります。
         scene:
           sum: lib
       - target: factors
@@ -261,10 +261,10 @@ courses:
 
   - id: create-file
     title: 組み込みの配点からファイルを作りたいとき
-    summary: 配点のファイルが無いときの画面の見方と、組み込みの配点からのファイルの作り方
+    summary: 配点のファイルがないときの画面の見方と、組み込みの配点からのファイルの作り方
     steps:
       - target: missing
-        title: ファイルが無いとき
+        title: ファイルがないとき
         body: 配点のファイルがまだありません。この間、実行ファイルは組み込みの配点で数えています。
         scene:
           missing: true
@@ -275,7 +275,7 @@ courses:
           missing: true
       - target: create
         title: ファイルを作る
-        body: 「組み込みの配点でファイルを作る」を押すと、組み込みと同じ値のファイルを、いま開いている設定の場所に書き出します。値が同じなので数え方は変わりません。既にファイルがあれば上書きしません。コミットは自分で行います。
+        body: 「組み込みの配点でファイルを作る」を押すと、組み込みと同じ値のファイルを、いま開いている設定の場所に作成します。値が同じなので数え方は変わりません。既にファイルがあれば上書きしません。コミットは自分で行います。
         scene:
           missing: true
       - target: levels

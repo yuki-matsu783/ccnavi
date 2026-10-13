@@ -221,9 +221,9 @@ export function reviewedPrompt(
   }
   // ボードが `decide <N> --preview` で読んだ未解決（Unresolved）の指摘。読めなかったときは有無を言わない
   if (unresolved === undefined) {
-    lines.push("- 未解決の指摘の有無は、ボードでは読めなかった。レビューの状況をエージェントが確かめる。");
+    lines.push("- 未解決の指摘の有無は、ボードでは読み込めなかった。レビューの状況をエージェントが確認する。");
   } else if (unresolved > 0) {
-    lines.push(`- 未解決の指摘があります（${unresolved} 件）。エージェントが指摘を確かめる。`);
+    lines.push(`- 未解決の指摘があります（${unresolved} 件）。エージェントが指摘を確認する。`);
   } else {
     lines.push("- 未解決の指摘はありません。");
   }
@@ -231,12 +231,12 @@ export function reviewedPrompt(
   lines.push(
     `親（メインエージェント）が、親のワークツリー ${tree} で '${scriptCommand(root, "ccnavi-review.sh")} confirm --phase ${phase}' を打ち、` +
       "レビュー済みのマーカーを置く。レビューで止まっている間はこのコマンドだけが通るので、cd や他のコマンドと連結せず、" +
-      `単体の Bash で打つ（cwd が ${tree} でなければ、先に cd だけを別の Bash で打つ）。サブエージェントには渡さない。` +
+      `単体の Bash で実行する（cwd が ${tree} でなければ、先に cd だけを別の Bash で実行する）。サブエージェントには渡さない。` +
       "未解決の指摘が残っていれば confirm が一覧と次の手順を返すので、それに従う。" +
       "マーカーが置かれて止まらなくなったら、次のフェーズへ進む。",
   );
   lines.push(
-    `前の会話が無くても、状況は '${scriptCommand(root, "ccnavi-ticket.sh")} status ${parent}' で確かめる` +
+    `前の会話が無くても、状況は '${scriptCommand(root, "ccnavi-ticket.sh")} status ${parent}' で確認する` +
       "（置き場のファイルを自分で探さない）。",
   );
   return lines.join("\n");

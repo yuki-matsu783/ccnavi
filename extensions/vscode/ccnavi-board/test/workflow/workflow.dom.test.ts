@@ -56,7 +56,7 @@ test("CB-D166 開くと、計画ごとの図を線を引ける形で出す。提
   }
 });
 
-test("CB-D167 線の × を押すと、元の番号での先行を送って答えを待つ。待つ間は線を変えられない。start と end の仮の線には × が無い", async () => {
+test("CB-D167 線の × を押すと、元の番号での先行を送って答えを待つ。待つ間は線を変えられない。start と end の仮の線には × がありません", async () => {
   const dom = await openWorkflow();
   try {
     const edges = dom.all('button[data-action="plan-remove-edge"]').map((b) => b.getAttribute("data-edge"));
@@ -66,7 +66,7 @@ test("CB-D167 線の × を押すと、元の番号での先行を送って答�
     assert.deepEqual(sent.order, { plan: { "1": [], "2": [1], "3": [], "4": [2, 3] } });
     await dom.settle();
     assert.equal(dom.all('.plan-graph[data-editable="1"]').length, 0, "答えを待つ間に線を変えられる");
-    assert.match(dom.one("#status").textContent ?? "", /確かめ/);
+    assert.match(dom.one("#status").textContent ?? "", /確認/);
     assert.equal(saveButton(dom).disabled, true);
   } finally {
     await dom.close();
@@ -177,7 +177,7 @@ test("CB-D179 子の提案を付け替えられない理由・改版の錠・計
         ...reverse,
         writable: false,
         child_problems: ["i0001-02-01 の付け替え先 i0001-03-01 が承認済みチケットと重なる"],
-        mismatched: [{ ticket: "i0001-09-01", path: "/ws/x.md", phase: 9, text: "i0001-09-01 の phase: 9 は親の計画（1〜6 番）に無い" }],
+        mismatched: [{ ticket: "i0001-09-01", path: "/ws/x.md", phase: 9, text: "i0001-09-01 の phase: 9 は親の計画（1〜6 番）にありません" }],
       },
     });
     const listed = dom.all("#workflow-problems li").map((li) => li.textContent ?? "");
@@ -248,9 +248,9 @@ test("CB-D174 提案が承認待ちから無くなったら（承認・取り下
 });
 
 test("CB-D175 読み込めなければ理由と再読込、読み込み中は一言だけ。中身が届けば図を出す", async () => {
-  const dom = await openWorkflowData({ kind: "error", error: "ccnavi --plan-order が失敗しました: 親の提案が無い" });
+  const dom = await openWorkflowData({ kind: "error", error: "ccnavi --plan-order が失敗しました: 親の提案がありません" });
   try {
-    assert.match(dom.one(".load-error").textContent ?? "", /親の提案が無い/);
+    assert.match(dom.one(".load-error").textContent ?? "", /親の提案がありません/);
     dom.click(dom.one('[data-action="reload"]'));
     await dom.settle();
     assert.deepEqual(lastPosted(dom, "reload"), { type: "reload", dirty: false });
@@ -351,7 +351,7 @@ test("CB-D183 図を出せない答え（計画が空）でも、案内の間は
     assert.equal(dom.all(".plan-graph").length, 0);
     await dom.send({ type: "tour" });
     await dom.settle();
-    assert.equal(dom.all(".tour-sample").length, 1, "見本だと分かる帯が無い");
+    assert.equal(dom.all(".tour-sample").length, 1, "見本だと分かる帯がありません");
     assert.deepEqual(
       dom.all(".plan-graph").map((graph) => [graph.getAttribute("data-part"), graph.getAttribute("data-ticket")]),
       [
@@ -371,7 +371,7 @@ test("CB-D183 図を出せない答え（計画が空）でも、案内の間は
   }
 });
 
-test("CB-D186 線を変えたら、答えを待つ間も拡張ホストに「確かめている」を知らせる（承認を止める）。答えが届けば、答えの未保存だけになる", async () => {
+test("CB-D186 線を変えたら、答えを待つ間も拡張ホストに「確認している」を知らせる（承認を止める）。答えが届けば、答えの未保存だけになる", async () => {
   const dom = await openWorkflow();
   try {
     const { seq } = removeEdge(dom, "after-1-3");

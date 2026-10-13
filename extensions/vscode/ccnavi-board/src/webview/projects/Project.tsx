@@ -90,7 +90,7 @@ export function Project({ row, ticketsEnabled, tour = false }: ProjectProps): JS
 /** プロジェクトの設定のルールファイル。プロジェクトの設定として数えられていない（予約名）なら、置く先も出さない */
 function Rules({ row }: { readonly row: ProjectRow }): JSX.Element {
   if (row.rulesRel === "") {
-    return <span className="dim">設定の対象になっていません（検証の error を確かめてください）</span>;
+    return <span className="dim">設定の対象になっていません（検証の error を確認してください）</span>;
   }
   if (row.rulesExists) {
     return (

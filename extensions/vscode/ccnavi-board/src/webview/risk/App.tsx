@@ -198,7 +198,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         </p>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
+        <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
           更新
         </button>
       </>
@@ -301,7 +301,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <div id="changed" className={changed && !touring ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={shownBusy} onClick={reload}>
           更新
         </button>
       </div>
@@ -324,7 +324,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           <button type="button" className="action" data-action="open-risk" disabled={!shownExists} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={shownBusy} onClick={reload}>
             更新
           </button>
           <button
@@ -388,7 +388,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         <details className="help">
           <summary>説明</summary>
           <p className="hint">
-            子チケットを閉じるとき、下の「項目」で当てはまった点を足し合わせて、その変更のリスクの点を出します。
+            子チケットをクローズするとき、下の「項目」で当てはまった点を合計して、その変更のリスクの点を出します。
             合計点が設定値以上になると、リスクレベルが LOW → MEDIUM → HIGH → CRITICAL の順に上がっていきます。
             <strong>HIGH 以上になったフェーズは、レビューが終わるまで先へ進めません。</strong>
             チケット作成時では「レビュー不要」と宣言した場合も、ユーザのレビューが必要になります。
@@ -443,7 +443,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           <summary>説明</summary>
           <p className="hint">
             子チケットの完了時、その子の差分（base_sha..HEAD）で判定して加点します。1 件につき加点条件は 1 つです。
-            <code>script</code> が失敗したときと出力を読めないときは、安全を優先して points をそのまま加点します。<code>judge</code> の項目があると、判定が揃うまで子を閉じられません。
+            <code>script</code> が失敗したときと出力を読み込めないときは、安全を優先して points をそのまま加点します。<code>judge</code> の項目があると、判定が揃うまで子をクローズできません。
           </p>
         </details>
         <ul className="list" id="factors" data-tour="factors">
@@ -463,7 +463,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
               onRemove={() => remove(row.key)}
             />
           ))}
-          {shownDraft.rows.length === 0 && <li className="empty">項目がありません。加点する項目が無ければ、どの子も LOW のまま閉じます</li>}
+          {shownDraft.rows.length === 0 && <li className="empty">項目がありません。加点する項目がなければ、どの子も LOW のままクローズされます</li>}
         </ul>
       </section>
       {shownPage?.sums !== undefined && (

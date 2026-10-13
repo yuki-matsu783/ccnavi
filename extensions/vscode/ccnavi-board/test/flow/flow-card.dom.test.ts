@@ -27,7 +27,7 @@ test("CB-D115 レビュー中の子のカードの「フロー」ボタンは、
   }
 });
 
-test("CB-D113 子のカードに「フロー」ボタン。言葉は 作成 / 編集 / 閲覧（着手中・終了済み）で、親のカードには無い", async () => {
+test("CB-D113 子のカードに「フロー」ボタン。言葉は 作成 / 編集 / 閲覧（着手中・終了済み）で、親のカードにはありません", async () => {
   const dom = await openBoard(withFlow("i0001-02-03", { exists: true }));
   try {
     const label = (ticket: string): string => dom.one(`[data-action="flow"][data-ticket="${ticket}"]`).textContent ?? "";
@@ -59,7 +59,7 @@ test("CB-D114 「フロー」を押すと識別子だけを拡張ホストへ返
   }
 });
 
-test("CB-D116 完了・取り消しの子でフローのファイルが無ければ、カードに「フロー」ボタンを出さない（作成させない）", async () => {
+test("CB-D116 完了・取り消しの子でフローのファイルがなければ、カードに「フロー」ボタンを出さない（作成させない）", async () => {
   // 取り消しの i0001-02-05 は実行ファイルが flow を null で返す。完了の i0001-01-01 は古い実行ファイルの答え（exists: false）
   const dom = await openBoard(withFlow("i0001-01-01", { exists: false }));
   try {

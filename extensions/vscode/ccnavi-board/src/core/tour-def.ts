@@ -81,7 +81,7 @@ export function parseTour(raw: unknown): TourParsed {
   }
   const screen = text(root.screen);
   if (screen === undefined) {
-    return { ok: false, error: "screen が無い" };
+    return { ok: false, error: "screen がありません" };
   }
   if (!Array.isArray(root.courses) || root.courses.length === 0) {
     return { ok: false, error: "courses が空" };
@@ -112,7 +112,7 @@ export function parseTour(raw: unknown): TourParsed {
     const title = text(course.title);
     const summary = text(course.summary);
     if (title === undefined || summary === undefined) {
-      return { ok: false, error: `${at} の title と summary が要る` };
+      return { ok: false, error: `${at} の title と summary が必要です` };
     }
     if (!Array.isArray(course.steps) || course.steps.length === 0) {
       return { ok: false, error: `${at}.steps が空` };
@@ -131,7 +131,7 @@ export function parseTour(raw: unknown): TourParsed {
       const stepTitle = text(step.title);
       const body = text(step.body);
       if (stepTitle === undefined || body === undefined) {
-        return { ok: false, error: `${stepAt} の title と body が要る` };
+        return { ok: false, error: `${stepAt} の title と body が必要です` };
       }
       if (step.target !== undefined && step.target !== "" && (typeof step.target !== "string" || !TARGET.test(step.target))) {
         return { ok: false, error: `${stepAt}.target は小文字の英字で始まり、英小文字・数字・- だけにする（空なら中ほどに出す）` };
@@ -160,7 +160,7 @@ export function parseTour(raw: unknown): TourParsed {
 export function tourOf(raw: unknown): TourDef {
   const parsed = parseTour(raw);
   if (!parsed.ok) {
-    throw new Error(`案内の定義が読めない: ${parsed.error}`);
+    throw new Error(`案内の定義が読み込めない: ${parsed.error}`);
   }
   return parsed.value;
 }

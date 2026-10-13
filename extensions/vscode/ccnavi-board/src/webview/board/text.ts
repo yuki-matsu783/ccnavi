@@ -20,7 +20,7 @@ export const FILTER_LABELS = {
   attention: "要対応のみ",
   attentionTitle: "ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
   archived: "アーカイブ済みチケットを表示",
-  archivedTitle: "Draft を外したとき（ccnavi-review.sh ready）に手元の logs/archive/ へ退避した、閉じたチケットを「アーカイブ」の列に表示します。初期状態では表示しません。",
+  archivedTitle: "Draft を解除したとき（ccnavi-review.sh ready）に手元の logs/archive/ へ退避した、クローズしたチケットを「アーカイブ」の列に表示します。初期状態では表示しません。",
 } as const;
 
 export const MARK_LABELS: Readonly<Record<string, string>> = {
@@ -107,7 +107,7 @@ export function isHttpUrl(url: string): boolean {
  *
  * まとめるのはこのリストに載っている見出しの次の行だけ。 知らない見出しなら何もしない。
  * 向こうの文面が変わったときに、本文の中身が気づかないうちに隠れるより、まとめられないほうが軽いため
- * （「エージェントが書いた理由」の本文を隠してはいけない）。
+ * （「エージェントが記載した理由」の本文を隠してはいけない）。
  */
 const EXPLAINED_HEADS = new Set([
   "■ このチケットで編集可能な範囲",
@@ -172,9 +172,9 @@ const HISTORY_KIND_LABELS: Readonly<Record<string, string>> = {
 
 /** 親のマーカーの呼び名 */
 const PARENT_MARK_LABELS: Readonly<Record<string, string>> = {
-  ready: "Draft を外した",
+  ready: "Draft を解除した",
   "close-early": "途中でクローズ",
-  closed: "親を閉じた",
+  closed: "親をクローズした",
 };
 
 /**
@@ -233,7 +233,7 @@ export function predecessorsBadge(card: Card): { readonly text: string; readonly
       text: `先行チケットの条件が未達成（${ids}）`,
       lead: "先行チケットの条件が未達成",
       ids: list,
-      title: `着手済みです。先行が done/ に無いか取り消されているため、先行の条件を満たしていません（作業と finish は止まりません）\n${detail}`,
+      title: `着手済みです。先行が done/ にないか取り消されているため、先行の条件を満たしていません（作業と finish は止まりません）\n${detail}`,
     };
   }
   const what = card.copyStatus === "none" ? "承認も着手も" : "着手が";

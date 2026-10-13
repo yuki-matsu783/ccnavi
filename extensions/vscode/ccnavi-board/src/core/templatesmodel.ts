@@ -81,7 +81,7 @@ export function parseTemplateShow(text: string): TemplateShowParse {
   }
   const raw = parsed.value;
   if (raw.ok === false) {
-    return { ok: false, error: str(raw.error) || "テンプレートを読めませんでした" };
+    return { ok: false, error: str(raw.error) || "テンプレートを読み込めませんでした" };
   }
   if (raw.version !== TEMPLATES_VERSION) {
     return { ok: false, error: versionMismatch(raw.version) };
@@ -327,7 +327,7 @@ function parseRecord(text: string): { readonly ok: true; readonly value: Record<
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `JSON として読めません: ${(error as Error).message}` };
+    return { ok: false, error: `JSON として解釈できません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
     return { ok: false, error: "JSON の最上位がオブジェクトではありません" };

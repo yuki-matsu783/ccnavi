@@ -22,7 +22,7 @@ factors:
     message: CI に触った
   - id: untested
     points: 30
-    judge: テストの無い振る舞いの変更を含むか
+    judge: テストのない振る舞いの変更を含むか
   # 例: 使うときにコメントを外す
   # - id: complexity
   #   points: 30
@@ -39,7 +39,7 @@ test("CB-T72 境目の点と項目を読む。加点条件は 1 つで、値は�
     [
       [0, "big-diff", "25", "lines_over", "300", "", "行数が多い"],
       [1, "ci", "35", "glob", ".github/**", "35", "CI に触った"],
-      [2, "untested", "30", "judge", "テストの無い振る舞いの変更を含むか", "", ""],
+      [2, "untested", "30", "judge", "テストのない振る舞いの変更を含むか", "", ""],
     ],
   );
 });
@@ -78,7 +78,7 @@ test("CB-T75 欄を変えても他の項目のコメントは残り、数は数�
   assert.match(out, /  # 大きい差分はユーザが見る\n  - id: big-diff/);
   assert.match(out, /  - id: ci\n    points: 40\n    glob: "\.github\/\*\*"\n    message: CI に触った\n/);
   assert.doesNotMatch(out, /max:/);
-  assert.match(out, /judge: テストの無い振る舞いの変更を含むか\n    message: テスト無し\n/);
+  assert.match(out, /judge: テストのない振る舞いの変更を含むか\n    message: テスト無し\n/);
   // 末尾の例のコメントも残る
   assert.match(out, /  # 例: 使うときにコメントを外す\n  # - id: complexity/);
   const again = readRisk(out).model.form;
@@ -91,12 +91,12 @@ test("CB-T76 加点条件を変えると前の加点条件の欄は消え、新�
   const doc = readRisk(TEXT);
   const f = doc.model.form;
   const changed: FactorForm = { ...f.factors[0], kind: "files_over", value: "10" };
-  const fresh: FactorForm = { origin: null, id: "deletes", points: "20", kind: "deleted_over", value: "3", max: "", include: "", exclude: "", message: "消したファイルが多い" };
+  const fresh: FactorForm = { origin: null, id: "deletes", points: "20", kind: "deleted_over", value: "3", max: "", include: "", exclude: "", message: "削除したファイルが多い" };
   const scripted: FactorForm = { origin: null, id: "complexity", points: "30", kind: "script", value: ".ccnavi/config/common/risk/complexity.sh", max: "", include: "", exclude: "", message: "" };
   const out = doc.apply({ levels: f.levels, factors: [changed, fresh, scripted, f.factors[2]] });
   assert.match(out, /  - id: big-diff\n    points: 25\n    files_over: 10\n    message: 行数が多い\n/);
   assert.doesNotMatch(out, /lines_over/);
-  assert.match(out, /  - id: deletes\n    points: 20\n    deleted_over: 3\n    message: 消したファイルが多い\n/);
+  assert.match(out, /  - id: deletes\n    points: 20\n    deleted_over: 3\n    message: 削除したファイルが多い\n/);
   assert.match(out, /  - id: complexity\n    points: 30\n    script: \.ccnavi\/config\/common\/risk\/complexity\.sh\n/);
   assert.doesNotMatch(out, /id: ci/);
   const again = readRisk(out).model.form;
@@ -104,7 +104,7 @@ test("CB-T76 加点条件を変えると前の加点条件の欄は消え、新�
     ["big-diff", "files_over", "10"],
     ["deletes", "deleted_over", "3"],
     ["complexity", "script", ".ccnavi/config/common/risk/complexity.sh"],
-    ["untested", "judge", "テストの無い振る舞いの変更を含むか"],
+    ["untested", "judge", "テストのない振る舞いの変更を含むか"],
   ]);
 });
 
@@ -123,7 +123,7 @@ test("CB-T77 新しい glob は引用符で囲み、空の境目の点は書か�
   assert.equal(doc.apply({ levels: { medium: "", high: "", critical: "" }, factors: [] }), "version: 1\nfactors: []\n");
 });
 
-test("CB-T78 version が無ければ苦情にして、保存で先頭に足す。不正な形は苦情にして他は出す", () => {
+test("CB-T78 version がなければ苦情にして、保存で先頭に追加する。不正な形は苦情にして他は出す", () => {
   const missing = readRisk("levels:\n  high: 40\n");
   assert.equal(missing.model.version, null);
   assert.match(missing.model.problems[0], /version がありません/);
@@ -145,7 +145,7 @@ test("CB-T78 version が無ければ苦情にして、保存で先頭に足す�
   assert.match(wrong.model.problems[0], /version 2/);
 });
 
-test("CB-T79 画面から来た内容は形を確かめてから受け取る", () => {
+test("CB-T79 画面から来た内容は形を確認してから受け取る", () => {
   const ok = asRiskForm({
     levels: { medium: 20, high: "40", critical: "" },
     factors: [
@@ -173,7 +173,7 @@ test("CB-T97 対応表でない項目が前にあっても、後ろの項目は�
   assert.equal(out, "version: 1\nfactors:\n  # a の理由\n  - id: a\n    points: 1\n    lines_over: 1\n  # b の理由\n  - id: b\n    points: 2\n    files_over: 2\n");
 });
 
-test("CB-T98 先頭の項目を消してもリストの見出しのコメントは残り、先頭に来た項目は空行を連れてこない", () => {
+test("CB-T98 先頭の項目を削除してもリストの見出しのコメントは残り、先頭に来た項目は空行を連れてこない", () => {
   const text = "version: 1\nfactors:\n  # 見出し\n  - id: a\n    points: 1\n    lines_over: 1\n\n  # b の理由\n  - id: b\n    points: 2\n    files_over: 2\n";
   const doc = readRisk(text);
   const [a, b] = doc.model.form.factors;
@@ -182,7 +182,7 @@ test("CB-T98 先頭の項目を消してもリストの見出しのコメント�
   assert.equal(doc.apply({ levels: doc.model.form.levels, factors: [b, a] }), "version: 1\nfactors:\n  # b の理由\n  - id: b\n    points: 2\n    files_over: 2\n\n  # 見出し\n  - id: a\n    points: 1\n    lines_over: 1\n");
 });
 
-test("CB-T99 同じ元ノードを 2 回送れば書き戻さない。glob 以外の max は消す。最上位が対応表でなければ苦情", () => {
+test("CB-T99 同じ元ノードを 2 回送れば書き戻さない。glob 以外の max は削除する。最上位が対応表でなければ苦情", () => {
   const doc = readRisk(TEXT);
   const f = doc.model.form;
   assert.throws(() => doc.apply({ levels: f.levels, factors: [f.factors[0], { ...f.factors[0], id: "x" }] }), /2 回送られました/);

@@ -87,8 +87,8 @@ test("CB-D221 全ユースケースの全段で、指す先が画面にあり、
         const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
         if (step.target !== "") {
-          assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面に無い`);
-          assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先が無い）`);
+          assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面にありません`);
+          assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
           // 同じ印が 2 か所にあると、先頭の 1 つを測って別の行を指してしまう
           assert.equal(dom.all(`[data-tour="${step.target}"]`).length, 1, `${at}: 指す先 ${step.target} が複数ある`);
         }
@@ -181,7 +181,7 @@ test("CB-D223 段の scene が画面の様子を替える（境目を空にす�
     await next(dom);
     assert.equal(dom.one(".factor.open .sum-id").textContent, "ci");
     assert.equal(dom.all(".factor.open input.f-max").length, 1);
-    assert.equal(dom.all('[data-tour="factor-include"]').length, 0, "glob に対象パスの欄は無い");
+    assert.equal(dom.all('[data-tour="factor-include"]').length, 0, "glob に対象パスの欄はありません");
   } finally {
     await dom.close();
   }
@@ -201,7 +201,7 @@ test("CB-D223 段の scene が画面の様子を替える（境目を空にす�
   }
 });
 
-test("CB-D224 ファイルが無い状態の案内は、組み込みの配点を読み取り専用で見せ、「作る」を押しても実際には送らない", async () => {
+test("CB-D224 ファイルがない状態の案内は、組み込みの配点を読み取り専用で見せ、「作る」を押しても実際には送らない", async () => {
   const dom = await openRisk({ sums: riskSums(sumsBoard()) });
   try {
     assert.equal(dom.all(".banner.missing").length, 0);
@@ -210,7 +210,7 @@ test("CB-D224 ファイルが無い状態の案内は、組み込みの配点を
     assert.deepEqual(factorIds(dom), ["big-diff", "many-files", "ci", "deletes"]);
     assert.ok(dom.all<HTMLInputElement>("input.f-level").every((el) => el.disabled));
     assert.ok(dom.one<HTMLButtonElement>('[data-action="add"]').disabled);
-    assert.equal(dom.all("details#sum").length, 0, "組み込みの配点に足し算は無い");
+    assert.equal(dom.all("details#sum").length, 0, "組み込みの配点に足し算はありません");
     dom.click(dom.one('[data-action="create"]'));
     await dom.settle();
     assert.deepEqual(extraPosts(dom), [], "見本の「作る」が実際に送られた");
@@ -253,7 +253,7 @@ test("CB-D225 足し算の案内は、枠を開いて見本の足し算を選ぶ
   }
 });
 
-test("CB-D226 実際にファイルが無い画面でも、案内の間は見本の配点を描き、閉じたら組み込みの配点の読み取り専用に戻る", async () => {
+test("CB-D226 実際にファイルがない画面でも、案内の間は見本の配点を描き、閉じたら組み込みの配点の読み取り専用に戻る", async () => {
   const dom = await openRisk({ exists: false, builtin: true });
   try {
     assert.equal(dom.all(".banner.missing").length, 1);

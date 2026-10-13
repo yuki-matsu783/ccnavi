@@ -60,7 +60,7 @@ export function emptyNote(exists: boolean): string {
   if (exists) {
     return "定義がありません。定義が空のファイルはccnaviで読み込めません。保存する前に、定義を1つ以上追加してください。";
   }
-  return "ファイルがありません（この設定に定義が無い、という正常な状態です）。定義を足して保存すると、ファイルが作られます";
+  return "ファイルがありません（この設定にまだ定義がない、正常な状態です）。定義を追加して保存すると、ファイルが作られます";
 }
 
 /** 共通の設定の定義と表示名が重なっているときに下部へ出す文 */
@@ -75,4 +75,4 @@ export function commonIdNote(ids: ReadonlySet<string>): string {
 }
 
 /** 共通の設定の定義の欄の見出しにつける説明 */
-export const COMMON_NOTE = "開いている設定の定義に足して使われます。この画面では編集しません（.ccnavi/config/common/phases.yml）";
+export const COMMON_NOTE = "開いている設定の定義に追加して使われます。この画面では編集しません（.ccnavi/config/common/phases.yml）";

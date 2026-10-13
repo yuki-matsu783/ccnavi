@@ -60,7 +60,7 @@ function moveTo(board: ReturnType<typeof buildBoard>, ticket: string, to: string
       const cards = column.cards.filter((card) => card.id !== ticket);
       const moving = board.columns.flatMap((c) => c.cards).find((card) => card.id === ticket);
       if (moving === undefined) {
-        throw new Error(`見本に ${ticket} が無い`);
+        throw new Error(`見本に ${ticket} がありません`);
       }
       const own = column.state === to ? [...cards, moving] : cards;
       return { ...column, cards: own, count: own.length };
@@ -79,7 +79,7 @@ function without(board: ReturnType<typeof buildBoard>, ticket: string): ReturnTy
   };
 }
 
-test("CB-T192c 1 枚目は動いた表示を付けず、列が動かない読み直しでは前の動いた表示を持ち越す", () => {
+test("CB-T192c 1 枚目は動いた表示を付けず、列が動かない再読み込みでは前の動いた表示を持ち越す", () => {
   const board = buildBoard(fixture());
 
   // 1 枚目。比べる相手が無いので、何にも動いた表示を付けない（開いた直後に全部が光ると意味が無い）
@@ -106,7 +106,7 @@ test("CB-T192c 1 枚目は動いた表示を付けず、列が動かない読み
   ]);
 });
 
-test("CB-T192d カードが消えただけの読み直しも「変わった」と数える（戻ってきたら新規起票と言える）", () => {
+test("CB-T192d カードが消えただけの再読み込みも「変わった」と数える（戻ってきたら新規起票と言える）", () => {
   const board = buildBoard(fixture());
   const first = movedStep(NOTHING_MOVED, board);
 

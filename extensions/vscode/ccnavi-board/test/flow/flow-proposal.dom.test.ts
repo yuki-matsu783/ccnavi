@@ -26,13 +26,13 @@ test("CB-D139 提案ありを開くと下書きを頼み、文の前後まで見
     dom.click(dom.one('[data-action="open-proposal"]'));
     await dom.settle();
     assert.equal(dom.posted.filter((m) => m.type === "openProposal").length, 1);
-    assert.match(dom.one("#proposal-review").textContent ?? "", /確かめています/);
-    assert.equal(dom.all('[data-action="import-proposal"]').length, 0, "確かめ終わるまで取り込めない");
+    assert.match(dom.one("#proposal-review").textContent ?? "", /確認しています/);
+    assert.equal(dom.all('[data-action="import-proposal"]').length, 0, "確認が終わるまで取り込めない");
     const draft = drafted();
     await dom.send({ type: "proposal", proposal: { doc: draft, hash: HASH, draftPath: OFFER.draftPath } });
     const review = dom.one("#proposal-review");
     // 変わった欄の名前だけでなく、文そのもの（改行も）を見せる
-    assert.match(review.textContent ?? "", /足すノード/);
+    assert.match(review.textContent ?? "", /追加するノード/);
     assert.match(review.textContent ?? "", /中身\.prompt/);
     const after = dom.all(".proposal-after pre").map((e) => e.textContent ?? "");
     assert.ok(after.includes("既存の振る舞いを読む\nそのあと要点をまとめる"), after.join(" / "));

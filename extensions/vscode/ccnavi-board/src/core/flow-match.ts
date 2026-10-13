@@ -242,7 +242,7 @@ export function openMismatchText(found: FlowMismatch): string {
 /** 保存の前に食い違ったときの文面 */
 export function saveMismatchText(found: FlowMismatch): string {
   return (
-    `書き出す本文を、実行ファイルが画面とは違う値として読みます（${found.where}。画面: ${found.screen}、実行ファイル: ${found.executable}）。` +
-    "保存すると値の意味が変わるため、書き込みません"
+    `保存する本文を、実行ファイルが画面とは違う値として読みます（${found.where}。画面: ${found.screen}、実行ファイル: ${found.executable}）。` +
+    "保存すると値の意味が変わるため、保存しません"
   );
 }

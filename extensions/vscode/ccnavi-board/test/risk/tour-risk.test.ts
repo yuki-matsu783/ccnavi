@@ -52,7 +52,7 @@ test("CB-T440 リスクの見本は、実際の読み取り（readRisk）と同�
   // 4 つの数える・触る加点条件と、script・judge が揃い、数える範囲（include / exclude）を持つ項目がある
   const kinds = new Set(real.form.factors.map((factor) => factor.kind));
   for (const kind of KINDS.filter((k) => k !== "deleted_over")) {
-    assert.ok(kinds.has(kind), `見本に ${kind} の項目が無い`);
+    assert.ok(kinds.has(kind), `見本に ${kind} の項目がありません`);
   }
   const scoped = real.form.factors.find((factor) => factor.include !== "" && factor.exclude !== "");
   assert.equal(scoped?.kind, "lines_over");
@@ -66,7 +66,7 @@ test("CB-T441 組み込みの配点の見本は、実際の組み込みの配点
   assert.equal(sample.missing.sums, undefined);
 });
 
-test("CB-T442 足し算の見本は、共通の設定の項目に足した設定の項目が続き、境目の点は小さいほう、同じ id の別の項目はレイヤー名が付く", () => {
+test("CB-T442 足し算の見本は、共通の設定の項目に追加した設定の項目が続き、境目の点は小さいほう、同じ id の別の項目はレイヤー名が付く", () => {
   const sums = sample.page.sums ?? [];
   assert.deepEqual(sums.map((sum) => sum.name), ["self", "lib"]);
   const common = sample.page.model.form.factors.map((factor) => factor.id);
@@ -101,10 +101,10 @@ test("CB-T443 リスクの案内の scene は、見本にある項目の id・�
       const at = `${course.id} の ${index + 1} 段目`;
       const scene = step.scene;
       for (const id of String(scene.open ?? "").split(",").filter((item) => item.trim() !== "")) {
-        assert.ok(ids.has(id.trim()), `${at}: open の ${id} が見本に無い`);
+        assert.ok(ids.has(id.trim()), `${at}: open の ${id} が見本にありません`);
       }
       assert.ok(scene.blank === undefined || (LEVEL_NAMES as readonly string[]).includes(String(scene.blank)), `${at}: blank`);
-      assert.ok(scene.sum === undefined || sums.has(String(scene.sum)), `${at}: sum の ${String(scene.sum)} が見本に無い`);
+      assert.ok(scene.sum === undefined || sums.has(String(scene.sum)), `${at}: sum の ${String(scene.sum)} が見本にありません`);
       assert.ok(scene.missing === undefined || scene.missing === true, `${at}: missing`);
       assert.ok(scene.find === undefined || typeof scene.find === "string");
       for (const key of Object.keys(scene)) {
@@ -129,12 +129,12 @@ test("CB-T444 リスクの案内は、基本の案内の題と順序を保ち、
   }
   for (const course of def.courses) {
     for (const step of course.steps) {
-      assert.ok(step.target === "" || TARGETS.includes(step.target), `${course.id}: 指す先 ${step.target} は画面に無い印`);
+      assert.ok(step.target === "" || TARGETS.includes(step.target), `${course.id}: 指す先 ${step.target} は画面にない印`);
     }
   }
 });
 
-test("CB-T445 項目の中を指す段は、その項目の加点条件に出る欄を指し、ファイルが無い状態の段だけが帯と「作る」を指す", () => {
+test("CB-T445 項目の中を指す段は、その項目の加点条件に出る欄を指し、ファイルがない状態の段だけが帯と「作る」を指す", () => {
   const forms = new Map(sample.page.model.form.factors.map((factor) => [factor.id, factor]));
   const counting = ["lines_over", "files_over", "deleted_over"];
   for (const course of def.courses) {
@@ -151,7 +151,7 @@ test("CB-T445 項目の中を指す段は、その項目の加点条件に出る
         assert.equal(step.scene.missing, true, at);
       }
       if (step.target.startsWith("sum")) {
-        assert.ok(step.scene.sum !== undefined, `${at}: 足し算を開く scene が要る`);
+        assert.ok(step.scene.sum !== undefined, `${at}: 足し算を開く scene が必要です`);
       }
       if (step.scene.missing === true) {
         assert.ok(["missing", "levels", "create"].includes(step.target), `${at}: 組み込みの配点の状態で指せるのは帯・境目・作るボタン`);

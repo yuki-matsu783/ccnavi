@@ -24,7 +24,7 @@ function lines(graph: PlanGraph): string[] {
 
 const DIAMOND: readonly RawItem[] = ["research", { type: "design", after: [1] }, { type: "acceptance", after: [1] }, { type: "implement", after: [2, 3] }];
 
-test("CB-T355 項ごとに点を置き、after を線にする。先行の無い項へ start から、後続の無い項から end へ仮の線を引く", () => {
+test("CB-T355 項ごとに点を置き、after を線にする。先行のない項へ start から、後続のない項から end へ仮の線を引く", () => {
   const graph = planGraphOf(plan(DIAMOND));
   assert.deepEqual(
     graph.nodes.map((node) => [node.id, node.kind, node.number]),
@@ -52,12 +52,12 @@ test("CB-T355 項ごとに点を置き、after を線にする。先行の無い
   assert.deepEqual(graph.nodes.filter((node) => node.kind === "item").map((node) => node.label), ["research", "design", "acceptance", "implement"]);
 });
 
-test("CB-T356 フィードバック計画の start は「全体計画のレビュー後」、end は「親を閉じる」。番号は全体計画の続きのまま描く", () => {
+test("CB-T356 フィードバック計画の start は「全体計画のレビュー後」、end は「親をクローズする」。番号は全体計画の続きのまま描く", () => {
   const feedback = plan(["design"], {}, ["design-feedback", "skill-improve", { type: "implement-feedback", after: [2, 3] }]);
   const graph = planGraphOf(feedback);
   assert.equal(graph.part, "feedback");
   assert.equal(graph.nodes[0].label, "全体計画のレビュー後");
-  assert.equal(graph.nodes[graph.nodes.length - 1].label, "親を閉じる");
+  assert.equal(graph.nodes[graph.nodes.length - 1].label, "親をクローズする");
   assert.deepEqual(graph.nodes.filter((node) => node.kind === "item").map((node) => node.number), [2, 3, 4]);
   assert.deepEqual(lines(graph), ["n2->n4", "n3->n4", "n4->end", "start->n2", "start->n3"].sort());
 });
@@ -156,7 +156,7 @@ test("CB-T360 振り直しの見本の表（tests/fixtures/plan-reorder.json）�
       }
     }
   }
-  assert.ok(checked > cases.length, `確かめた計画が少ない（${checked}）`);
+  assert.ok(checked > cases.length, `確認した計画が少ない（${checked}）`);
 });
 
 test("CB-T361 引ける線は項から項へだけ。自分へ・start と end に触れる線・固定した番号へ入る線・循環になる線は断る", () => {
@@ -167,14 +167,14 @@ test("CB-T361 引ける線は項から項へだけ。自分へ・start と end �
   assert.equal(canConnect(graph, "n2", "n2"), false, "自分へ");
   assert.equal(canConnect(graph, "n1", "start"), false, "start へ入る");
   assert.equal(canConnect(graph, "end", "n1"), false, "end から出る");
-  assert.equal(canConnect(graph, "start", "n4"), false, "start からの線は図が引く（先行を全部消せば出る）");
+  assert.equal(canConnect(graph, "start", "n4"), false, "start からの線は図が引く（先行を全部削除できば出る）");
   assert.equal(canConnect(graph, "n2", "end"), false, "end への線は図が引く");
   assert.equal(canConnect(graph, "n2", "n3"), false, "固定した番号へ入る");
   assert.equal(canConnect(graph, "n4", "n1"), false, "循環（1 から 4 へ辿れる）");
-  assert.equal(canConnect(graph, "n9", "n1"), false, "無い点");
+  assert.equal(canConnect(graph, "n9", "n1"), false, "ない点");
 });
 
-test("CB-T363 線を消せるのは項どうしの線（after）だけ。start と end の仮の線と、固定した番号へ入る線は消せない", () => {
+test("CB-T363 線を削除できるのは項どうしの線（after）だけ。start と end の仮の線と、固定した番号へ入る線は削除できない", () => {
   const base = plan(DIAMOND);
   const graph = planGraphOf({ ...base, items: base.items.map((item) => (item.number === 3 ? { ...item, locked: true } : item)) });
   assert.equal(canDisconnect(graph, "n1", "n2"), true);
@@ -182,7 +182,7 @@ test("CB-T363 線を消せるのは項どうしの線（after）だけ。start �
   assert.equal(canDisconnect(graph, "n1", "n3"), false, "固定した番号へ入る線");
   assert.equal(canDisconnect(graph, "start", "n1"), false, "start からの線は図が引く");
   assert.equal(canDisconnect(graph, "n4", "end"), false, "end への線は図が引く");
-  assert.equal(canDisconnect(graph, "n1", "n4"), false, "無い線");
+  assert.equal(canDisconnect(graph, "n1", "n4"), false, "ない線");
 });
 
 test("CB-T364 点は振り直す前の番号（from）を持つ。置き場所は from で覚え、番号が振り直っても同じ項は同じ場所に置く。end は右端の項の次の列", () => {

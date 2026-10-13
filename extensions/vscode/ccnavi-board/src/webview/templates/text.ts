@@ -13,7 +13,7 @@ export function severityLabel(severity: ProblemSeverity): string {
 export function droppedLabel(reason: string): string {
   switch (reason) {
     case "invalid":
-      return "読めない";
+      return "読み込めない";
     case "duplicate":
       return "共通と同じ中身";
     case "conflict":

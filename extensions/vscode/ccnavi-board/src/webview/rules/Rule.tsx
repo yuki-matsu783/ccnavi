@@ -180,7 +180,7 @@ export function Rule(props: RuleProps): JSX.Element {
                 data-action="to-when"
                 data-tour={tour("to-when")}
                 disabled={blocker !== undefined}
-                title={blocker ?? "このパターン（と除外）を、同じ意味の組み合わせ条件（when）に書き直す。除外は not の中へ移る"}
+                title={blocker ?? "このパターン（と除外）を、同じ意味の組み合わせ条件（when）に変換する。除外は not の中へ移る"}
                 onClick={() => props.onChange(toWhen(rule))}
               >
                 組み合わせ条件に変換
@@ -227,7 +227,7 @@ export function Rule(props: RuleProps): JSX.Element {
           </summary>
           <div className="sub">
             {/* 刻みは渡す文の前。ここから下の 4 欄が「何回に 1 度届くか」を決める欄なので、先に置く。
-                type は text（number ではない）。数でない値を空にしてしまうと、読めない値を
+                type は text（number ではない）。数でない値を空にしてしまうと、読み込めない値を
                 見せて直させるという欄の目的が消える */}
             <Captioned name="every" yamlKey="every" tour={tour("every")}>
               {text("every", "f-every", "5（空なら毎回渡す）")}

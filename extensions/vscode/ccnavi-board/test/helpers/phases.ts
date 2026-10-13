@@ -25,7 +25,7 @@ export const NONCE = "TEST-NONCE-123";
  * `phases-doc.test.ts` が別の見本で見る。feedback の定義の `when` には、フィードバック計画の最後に置いて
  * ほかの対応を受ける（合流する）ことを書く。
  */
-export const SAMPLE_PHASES_TEXT = `# フェーズ定義。ユーザが持つ設定で、エージェントは書き換えない。
+export const SAMPLE_PHASES_TEXT = `# フェーズ定義。ユーザが持つ設定で、エージェントは変更しない。
 #
 # 親チケットの \`plan:\` に、ここで定義したものの名前を並べる。それが全体計画で、
 # \`ccnavi --agree\` が通ることが合意になる。レビューを受けたあとは \`feedback:\` に
@@ -35,7 +35,7 @@ export const SAMPLE_PHASES_TEXT = `# フェーズ定義。ユーザが持つ設�
 # 最後の項がほかの全部を待つようにする。
 #
 # \`id\`（キー）と \`title\` はどちらも一意。重なれば --lint が error で止める。
-# このファイルが無ければ、フェーズは番号だけの挙動に戻る。
+# このファイルがなければ、フェーズは番号だけの挙動に戻る。
 #
 # 下は雛形。scope のパスはこのプロジェクトの置き場に合わせて直す。
 version: 1

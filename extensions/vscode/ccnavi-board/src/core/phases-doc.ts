@@ -48,35 +48,35 @@ export function readPhases(text: string): PhasesDocument {
   const doc = parseDocument(text, { keepSourceTokens: false });
   const problems: string[] = [];
   for (const e of doc.errors) {
-    problems.push(`YAML として読めません: ${e.message}`);
+    problems.push(`YAML として解釈できません: ${e.message}`);
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
-    problems.push("最上位がマップ（キーと値の組の集まり）ではありません。実行ファイルは読めません。保存すると中身を捨てて空のマップから始めます");
+    problems.push("最上位がマップ（キーと値の組の集まり）ではありません。実行ファイルは読み込めません。保存すると中身を捨てて空のマップから始めます");
   }
   const version = doc.get("version");
   if (version === undefined || version === null) {
-    problems.push(`version がありません。保存すると version: ${PHASES_VERSION} を先頭に足します`);
+    problems.push(`version がありません。保存すると version: ${PHASES_VERSION} を先頭に追加します`);
   } else if (version !== PHASES_VERSION) {
-    problems.push(`version ${String(version)} は実行ファイルが読めません（読むのは ${PHASES_VERSION}）。フェーズは番号だけの挙動になります`);
+    problems.push(`version ${String(version)} は実行ファイルが読み込めません（読み込むのは ${PHASES_VERSION}）。フェーズは番号だけの挙動になります`);
   }
 
   const phases: PhaseForm[] = [];
   const raw = doc.get("phases", true);
   if (raw === undefined || raw === null) {
-    problems.push("phases がありません。実行ファイルは「`phases` が無いか空か、辞書ではない」と報告します。定義を 1 つ以上足して保存してください");
+    problems.push("phases がありません。実行ファイルは「`phases` がないか空か、辞書ではない」と報告します。定義を 1 つ以上追加して保存してください");
   } else if (!isMap(raw)) {
     problems.push("phases がマップ（キーと値の組の集まり）ではありません。定義は画面に出しません。保存すると中身を捨てて空のマップから始めます");
   } else {
     raw.items.forEach((pair, index) => {
       const id = keyText(pair);
       if (!isMap(pair.value)) {
-        problems.push(`定義 ${id || `（${index + 1} 件目）`} の中身がマップ（キーと値の組の集まり）ではありません。画面に出さず、保存するとこの定義は消えます（実行ファイルも読めません）`);
+        problems.push(`定義 ${id || `（${index + 1} 件目）`} の中身がマップ（キーと値の組の集まり）ではありません。画面に出さず、保存するとこの定義は消えます（実行ファイルも読み込めません）`);
         return;
       }
       phases.push(formOf(index, id, pair.value, problems));
     });
     if (phases.length === 0 && problems.length === 0) {
-      problems.push("定義が 1 つもありません。実行ファイルは「`phases` が無いか空か、辞書ではない」と報告します");
+      problems.push("定義が 1 つもありません。実行ファイルは「`phases` がないか空か、辞書ではない」と報告します");
     }
   }
 

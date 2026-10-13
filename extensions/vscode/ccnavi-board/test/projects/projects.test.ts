@@ -95,7 +95,7 @@ test("CB-T64 プロジェクトになっていない .git を深さ 2 まで探�
   ]);
 });
 
-test("CB-T65 .gitignore の置き場の行を見つけ、無ければ足す", () => {
+test("CB-T65 .gitignore の置き場の行を見つけ、なければ追加する", () => {
   assert.equal(gitignoreHasProjects("/dist/\n/projects/\n", "projects"), true);
   assert.equal(gitignoreHasProjects("projects\n", "projects"), true);
   assert.equal(gitignoreHasProjects("/projects/lib/\n", "projects"), false);
@@ -118,7 +118,7 @@ test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引�
       problems: [
         { severity: "warn", where: "(projects)", detail: "projects/ がワークスペースの git で無視されていない" },
         { severity: "warn", where: "(projects/lib)", detail: ".claude/ がある" },
-        { severity: "error", where: "(projects/app) no-message", detail: "文面が無い" },
+        { severity: "error", where: "(projects/app) no-message", detail: "文面がありません" },
         { severity: "warn", where: "(projects/application)", detail: "別のプロジェクト" },
       ],
       errors: 1,

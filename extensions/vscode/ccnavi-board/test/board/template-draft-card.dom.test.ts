@@ -55,7 +55,7 @@ test("CB-D357 完了した計画付きの親のカードにだけ「テンプレ
   }
   const plain = await openBoard();
   try {
-    assert.equal(plain.all('[data-action="template-draft"]').length, 0, "見本（完了した計画付きの親が無い）には出ない");
+    assert.equal(plain.all('[data-action="template-draft"]').length, 0, "見本（完了した計画付きの親がありません）には出ない");
   } finally {
     await plain.close();
   }

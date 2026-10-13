@@ -49,7 +49,7 @@ const OP_TITLES: Readonly<Record<string, string>> = {
   not: "not: 中に当たらなければ当たる",
   glob: "glob: 対象をこの glob で当てる",
   regex: "regex: 対象をこの正規表現で当てる",
-  invalid: "読めないノード",
+  invalid: "読み込めないノード",
   empty: "空。押して中に入れるものを選ぶ",
 };
 
@@ -203,7 +203,7 @@ function Inspector({
   const isRoot = path.length === 0;
   const adders = (into: CondPath, index: number): JSX.Element => (
     <span className="cond-add">
-      <span className="dim">子を足す:</span>
+      <span className="dim">子を追加する:</span>
       {ADDABLE.map(({ name, make }) => (
         <button key={name} type="button" className="action small" data-add={name} onClick={() => edit(addChild(tree, into, make()), [...into, index])}>
           ＋ {name}
@@ -251,7 +251,7 @@ function Inspector({
           {node.child === null && adders(path, 0)}
           {node.child !== null && (
             <button type="button" className="action small" data-op-action="unwrap" onClick={() => edit(unwrapNot(tree, path), path)}>
-              not を外す
+              not を解除
             </button>
           )}
         </span>
@@ -267,10 +267,10 @@ function Inspector({
         </span>
       )}
       <span className="buttons">
-        <button type="button" className="action small" data-op-action="wrap-all" title="このノードを all で包む。隣に子を足して組み合わせにできる" onClick={() => edit(wrapGroup(tree, path, "all"), path)}>
+        <button type="button" className="action small" data-op-action="wrap-all" title="このノードを all で包む。隣に子を追加して組み合わせにできる" onClick={() => edit(wrapGroup(tree, path, "all"), path)}>
           all で包む
         </button>
-        <button type="button" className="action small" data-op-action="wrap-any" title="このノードを any で包む。隣に子を足して組み合わせにできる" onClick={() => edit(wrapGroup(tree, path, "any"), path)}>
+        <button type="button" className="action small" data-op-action="wrap-any" title="このノードを any で包む。隣に子を追加して組み合わせにできる" onClick={() => edit(wrapGroup(tree, path, "any"), path)}>
           any で包む
         </button>
         <button type="button" className="action small" data-op-action="wrap" onClick={() => edit(wrapNot(tree, path), path)}>
@@ -281,7 +281,7 @@ function Inspector({
           className="action small"
           data-op-action="remove"
           disabled={isRoot}
-          title={isRoot ? "最上位のノードは消せません（all / any / not で包んでから中を直すか、個別条件なら文字を直してください）" : "このノードを消す"}
+          title={isRoot ? "最上位のノードは削除できません（all / any / not で包んでから中を直すか、個別条件なら文字を直してください）" : "このノードを削除"}
           onClick={() => edit(removeAt(tree, path), path.slice(0, -1))}
         >
           ノードを削除

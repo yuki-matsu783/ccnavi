@@ -155,7 +155,7 @@ function parseTop(text: string): Top {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `JSON として読めません: ${(error as Error).message}` };
+    return { ok: false, error: `JSON として解釈できません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
     return { ok: false, error: "JSON の最上位がオブジェクトではありません" };

@@ -4,7 +4,7 @@ import { defaultSum, riskSums, rulesSums, sumLabel } from "../../src/core/sums.j
 import { targetOptions } from "../../src/core/targets.js";
 import { sumsBoard } from "../helpers/sums.js";
 
-test("CB-T307 足し算は実行ファイルの sums[] をそのまま渡す。ワークスペースが先、プロジェクトが後で、拡張は足し直さない", () => {
+test("CB-T307 足し算は実行ファイルの sums[] をそのまま渡す。ワークスペースが先、プロジェクトが後で、拡張は追加し直さない", () => {
   const board = sumsBoard();
   const rules = rulesSums(board);
   assert.deepEqual(rules.map((s) => s.name), ["self", "lib"]);

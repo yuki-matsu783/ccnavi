@@ -49,7 +49,7 @@ function names(): Named[] {
   return found;
 }
 
-test("CB-T163 テストの ID は重複しない。足すときは最後尾の次を採る", () => {
+test("CB-T163 テストの ID は重複しない。追加するときは最後尾の次を採る", () => {
   const found = names();
   assert.ok(found.length > 100, `テストを数えられていない（${found.length} 件）。置き場のパスが変わった？`);
   const seen = new Map<string, string[]>();
@@ -77,5 +77,5 @@ test("CB-T164 テストの名前は ID から始まる（名指しできない�
         }
       });
   }
-  assert.deepEqual(headless, [], "ID の無いテストがある。`test(\"CB-T<番号> …\"` の形にする");
+  assert.deepEqual(headless, [], "ID のないテストがある。`test(\"CB-T<番号> …\"` の形にする");
 });

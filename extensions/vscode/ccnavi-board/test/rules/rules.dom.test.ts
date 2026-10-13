@@ -87,7 +87,7 @@ test("CB-D08 id を打っている途中は state を書き直さず、確定（
   }
 });
 
-test("CB-D09 土台は画面のスクリプトの例外を握りつぶさない。非同期の例外も拾い、1 度投げたら消す", async () => {
+test("CB-D09 土台は画面のスクリプトの例外を握りつぶさない。非同期の例外も拾い、1 度投げたら削除", async () => {
   const dom = await openRules();
   try {
     dom.one("#find").addEventListener("input", () => {
@@ -106,7 +106,7 @@ test("CB-D09 土台は画面のスクリプトの例外を握りつぶさない�
   }
 });
 
-test("CB-D0a 絞り込み中にタイプを畳んでも矢印は開いた向きのまま。足したルールのタイプは開く", async () => {
+test("CB-D0a 絞り込み中にタイプを畳んでも矢印は開いた向きのまま。追加したルールのタイプは開く", async () => {
   const dom = await openRules();
   try {
     dom.type(dom.one("#find"), "git");
@@ -149,7 +149,7 @@ test("CB-D0b 見た目のメッセージで body のクラスが書き換わり�
   }
 });
 
-test("CB-D02 state に残した id の行は、読み直したあとも開いている", async () => {
+test("CB-D02 state に残した id の行は、再読み込みしたあとも開いている", async () => {
   const dom = await openRules({}, { open: ["deps"], tab: "rules" });
   try {
     assert.ok(dom.one(rowSelector("deps")).classList.contains("open"));
@@ -337,11 +337,11 @@ test("CB-D124 「記録から候補を出す」は suggest を送り、届いた
       id: "suggest-npm-install",
       tool: "Bash",
       count: 6,
-      summary: "ルールを足す候補",
+      summary: "ルールを追加する候補",
       layer: "common",
       rules_path: "/ws/.ccnavi/config/common/rules.yml",
       expectations: [],
-      yaml: "# ルールを足す候補\nrules:\n  ask: []\n",
+      yaml: "# ルールを追加する候補\nrules:\n  ask: []\n",
     };
     await dom.send({
       type: "suggested",
@@ -351,7 +351,7 @@ test("CB-D124 「記録から候補を出す」は suggest を送り、届いた
     assert.ok(!(dom.one('button[data-action="suggest"]') as unknown as HTMLButtonElement).disabled);
     assert.equal(dom.all("#suggest-result .candidate").length, 1);
     assert.match(dom.one("#suggest-result").textContent ?? "", /除いたもの 2 件/);
-    assert.match(dom.one('#suggest-result .candidate[data-id="suggest-npm-install"] pre').textContent ?? "", /^# ルールを足す候補/);
+    assert.match(dom.one('#suggest-result .candidate[data-id="suggest-npm-install"] pre').textContent ?? "", /^# ルールを追加する候補/);
     // 候補はルールに足さない（下書きを見せるだけ）
     assert.equal(dom.all('.rule[data-id="suggest-npm-install"]').length, 0);
   } finally {
@@ -359,7 +359,7 @@ test("CB-D124 「記録から候補を出す」は suggest を送り、届いた
   }
 });
 
-test("CB-D07 足したルールは開いて焦点が id に来る。タイプを移すと移った先でも開いたまま。保存は今の順序を送る", async () => {
+test("CB-D07 追加したルールは開いて焦点が id に来る。タイプを移すと移った先でも開いたまま。保存は今の順序を送る", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one('button[data-action="add"][data-section="allow"]'));
@@ -442,10 +442,10 @@ test("CB-D71 ファイルが外で変わったら帯を出す。錠と操作の�
   }
 });
 
-test("CB-D72 読み直せなかった画面から中身が届いたあとも、id の確定で開いた行を state に残す", async () => {
-  const dom = await openPage({ kind: "error", error: "ルールファイルを読めない" });
+test("CB-D72 再読み込みできなかった画面から中身が届いたあとも、id の確定で開いた行を state に残す", async () => {
+  const dom = await openPage({ kind: "error", error: "ルールファイルを読み込めない" });
   try {
-    assert.match(dom.one(".load-error").textContent ?? "", /ルールファイルを読めない/);
+    assert.match(dom.one(".load-error").textContent ?? "", /ルールファイルを読み込めない/);
     dom.click(dom.one('button[data-action="reload"]'));
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "reload").map((message) => message.dirty), [false]);
@@ -464,7 +464,7 @@ test("CB-D72 読み直せなかった画面から中身が届いたあとも、i
   }
 });
 
-test("CB-T50 実行ファイルが答えたモードで帯を出す。dry-run と disable は止めないことを言い、enable と答えが無いときは言わない", async () => {
+test("CB-T50 実行ファイルが答えたモードで帯を出す。dry-run と disable は止めないことを言い、enable と答えがないときは言わない", async () => {
   const banners = async (mode: string): Promise<string[]> => {
     const dom = await openRules({ mode });
     try {
@@ -508,7 +508,7 @@ test("CB-T51 保存できない理由と読み込みの苦情を出す", async (
   }
 });
 
-test("CB-T52 settings.json が無ければ hook の表にそう書く", async () => {
+test("CB-T52 settings.json がなければ hook の表にそう書く", async () => {
   const dom = await openRules({ hooks: [], hookFiles: { settings: false, settingsLocal: false } });
   try {
     assert.match(dom.one("#tab-hooks").textContent ?? "", /settings\.json がありません/);
@@ -543,11 +543,11 @@ test("CB-T71 match の候補と判定の試し打ちは、権限ルールの名�
   }
 });
 
-test("CB-T112 ルール管理画面は注意を上部に出し、無ければ出さない", async () => {
-  const dom = await openRules({ rulesPath: "projects/lib/.ccnavi/config/project/rules.yml", notices: ["実行ファイルはこのファイルを読めない: <理由>"] });
+test("CB-T112 ルール管理画面は注意を上部に出し、なければ出さない", async () => {
+  const dom = await openRules({ rulesPath: "projects/lib/.ccnavi/config/project/rules.yml", notices: ["実行ファイルはこのファイルを読み込めない: <理由>"] });
   try {
     const warned = dom.all(".banner.warn:not(.hidden)").map((banner) => banner.textContent ?? "");
-    assert.deepEqual(warned, ["実行ファイルはこのファイルを読めない: <理由>"]);
+    assert.deepEqual(warned, ["実行ファイルはこのファイルを読み込めない: <理由>"]);
     assert.equal(dom.all(".banner.warn script").length, 0, "文面から要素は生えない");
     assert.equal(dom.one(".toolbar .path").textContent, "projects/lib/.ccnavi/config/project/rules.yml");
   } finally {
@@ -701,8 +701,8 @@ test("CB-D193 使い方ごとの案内は、全部の段で指す先が画面に
         const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
         if (step.target !== "") {
-          assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面に無い`);
-          assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先が無い）`);
+          assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面にありません`);
+          assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
         }
         // 実際のルール（git-push の日本語メッセージの見本とは別の id）は出さず、見本の id が並ぶ
         const ids = dom.all(".rule").map((row) => row.getAttribute("data-id"));
@@ -782,7 +782,7 @@ test("CB-D106 読み込み中に頼まれた案内はルールが出てから始
   try {
     await dom.send({ type: "tour" });
     await dom.settle();
-    assert.equal(dom.all(".tour").length, 0, "指す先が無い読み込み中には出さない");
+    assert.equal(dom.all(".tour").length, 0, "指す先がない読み込み中には出さない");
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, "3 つのタブ");
@@ -830,7 +830,7 @@ test("CB-D150 設定の切り替えの欄は、選んだ対象を種類と名前
 test("CB-D152 読み込みに失敗した画面にも設定の切り替えの欄を出し、共通の設定へ戻れる", async () => {
   const dom = await openPage({
     kind: "error",
-    error: "ファイルを読めません",
+    error: "ファイルを読み込めません",
     target: { kind: "project", name: "app" },
     targets: [
       { kind: "workspace", name: "", label: "共通の設定" },
@@ -858,7 +858,7 @@ test("CB-T310 足し算は読み取り専用の表で出し、編集する 1 本
     const select = dom.one<HTMLSelectElement>("select#sum-select");
     assert.equal(select.value, "lib");
     assert.deepEqual([...select.options].map((o) => o.textContent), ["ワークスペースの足し算（共通の設定 + ワークスペースの設定）", "プロジェクト lib の足し算（共通の設定 + lib の設定）"]);
-    assert.match(dom.one("#sum .hint").textContent, /パスを持たないツール（Bash など）が当てるのは、全プロジェクトの設定を足した和ではありません/);
+    assert.match(dom.one("#sum .hint").textContent, /パスを持たないツール（Bash など）が当てるのは、全プロジェクトの設定を合算した和ではありません/);
     const rows = (section: string) => dom.all(`#sum .sum-section[data-section="${section}"] tbody tr`).map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
     assert.deepEqual(rows("deny").map((r) => [r[0], r[1], r[3]]), [["guard-approved", "Write|Edit", "共通の設定"], ["lib:no-tmp", "Write", "lib"]]);
     assert.deepEqual(rows("ask").map((r) => r[0]), ["lib:deps"]);
@@ -868,7 +868,7 @@ test("CB-T310 足し算は読み取り専用の表で出し、編集する 1 本
     dom.change(select, "self");
     await dom.settle();
     assert.deepEqual(rows("deny").map((r) => r[0]), ["guard-approved"]);
-    assert.equal(dom.all("#sum button").length, 0, "足し算に操作は無い");
+    assert.equal(dom.all("#sum button").length, 0, "足し算に操作はありません");
     assert.deepEqual(dom.posted.filter((m) => m.type !== "ready"), []);
     // 編集する 1 本のルールの一覧は足し算と混ざらない
     assert.equal(dom.all("#tab-rules .rule").length, 3);
@@ -877,14 +877,14 @@ test("CB-T310 足し算は読み取り専用の表で出し、編集する 1 本
   }
 });
 
-test("CB-T311 共通の設定を開いているときはワークスペースの足し算が最初に出る。足し算が無ければ（ボードを読めない）欄ごと出さない。読めない設定は空として扱っていると言う", async () => {
-  const sums = rulesSums(sumsBoard()).map((s) => (s.name === "lib" ? { ...s, unreadable: "YAML として読めない", deny: [], ask: [] } : s));
+test("CB-T311 共通の設定を開いているときはワークスペースの足し算が最初に出る。足し算がなければ（ボードを読み込めない）欄ごと出さない。読み込めない設定は空として扱っていると言う", async () => {
+  const sums = rulesSums(sumsBoard()).map((s) => (s.name === "lib" ? { ...s, unreadable: "YAML として読み込めない", deny: [], ask: [] } : s));
   const dom = await openRules({ target: { kind: "workspace", name: "" }, sums });
   try {
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
     dom.change(dom.one("select#sum-select"), "lib");
     await dom.settle();
-    assert.match(dom.one("#sum .banner.warn").textContent, /読めず、その設定を空として扱っています.*YAML として読めない/);
+    assert.match(dom.one("#sum .banner.warn").textContent, /読み込めず、その設定を空として扱っています.*YAML として読み込めない/);
   } finally {
     await dom.close();
   }
@@ -902,7 +902,7 @@ test("CB-T311 共通の設定を開いているときはワークスペースの
   }
 });
 
-test("CB-T312 ルールのファイルが無いのは正常で、不備の帯は出さず、欄は触れて保存できる。エディタで開くだけが押せない", async () => {
+test("CB-T312 ルールのファイルがないのは正常で、不備の帯は出さず、欄は触れて保存できる。エディタで開くだけが押せない", async () => {
   const dom = await openRules({ exists: false, model: readRules("").model });
   try {
     assert.equal(dom.all(".banner").filter((b) => !b.classList.contains("hidden")).length, 0);
@@ -1018,7 +1018,7 @@ test("CB-D155 組み合わせ条件のルールは、畳んだ行に組み合わ
     bad.click(bad.one(`${row} .cond-inspector button[data-add="glob"]`));
     await bad.settle();
     assert.deepEqual(bad.all(`${row} .cond-problems li`).map((li) => li.textContent), ["glob が空です"]);
-    assert.equal(bad.one(`${row} .cond-inspector`).getAttribute("data-key"), "r.1.0.0", "足した子が選ばれる");
+    assert.equal(bad.one(`${row} .cond-inspector`).getAttribute("data-key"), "r.1.0.0", "追加した子が選ばれる");
   } finally {
     await bad.close();
   }
@@ -1055,7 +1055,7 @@ test("CB-D156 図で組み合わせ条件を直して保存する（個別条件
     await pickCond(dom, "workspace-root", "r.1.0.0");
     dom.click(dom.one(`${row} .cond-inspector [data-op-action="remove"]`));
     await dom.settle();
-    assert.equal(dom.one(`${row} .cond-inspector`).getAttribute("data-key"), "r.1.0", "消したら親が選ばれる");
+    assert.equal(dom.one(`${row} .cond-inspector`).getAttribute("data-key"), "r.1.0", "削除したら親が選ばれる");
     assert.equal(dom.one(`${row} .sum-when`).textContent, "all(not(regex ^{root}[\\\\/]), not(all(2)))");
     dom.click(dom.one("#save"));
     await dom.settle();
@@ -1147,9 +1147,9 @@ deny:
   const dom = await openRules({ model: readRules(text).model }, undefined, { measure: true });
   try {
     for (const [id, why] of [
-      ["bad-except", "except の 1 件目が読めません（except の値はリストです）"],
+      ["bad-except", "except の 1 件目が読み込めません（except の値はリストです）"],
       ["group-except", "except の 1 件目が glob / regex 1 つのマップではありません"],
-      ["both-patterns", "glob と regex を両方書いています"],
+      ["both-patterns", "glob と regex を両方指定しています"],
     ]) {
       const row = rowSelector(id);
       dom.click(dom.one(`${row} .row-head`));
@@ -1172,7 +1172,7 @@ deny:
   }
 });
 
-test("CB-D159 最上位のノードが個別条件の組み合わせ条件は、all / any で包んで子を足せる。最上位のノードの削除ボタンは包む道を案内する", async () => {
+test("CB-D159 最上位のノードが個別条件の組み合わせ条件は、all / any で包んで子を追加できる。最上位のノードの削除ボタンは包む道を案内する", async () => {
   const text = `version: 1
 deny:
   - id: leaf-root
@@ -1189,7 +1189,7 @@ deny:
     const remove = dom.one<HTMLButtonElement>(`${row} .cond-inspector [data-op-action="remove"]`);
     assert.equal(remove.disabled, true);
     assert.match(remove.title, /all \/ any \/ not で包んで/);
-    assert.equal(dom.all(`${row} .cond-inspector button[data-add]`).length, 0, "個別条件には子を足せない");
+    assert.equal(dom.all(`${row} .cond-inspector button[data-add]`).length, 0, "個別条件には子を追加できない");
     dom.click(dom.one(`${row} .cond-inspector [data-op-action="wrap-any"]`));
     await dom.settle();
     assert.equal(dom.one(`${row} .cond-node[data-key="r"]`).getAttribute("data-op"), "any");
@@ -1244,7 +1244,7 @@ async function toStep(dom: DomPage, id: string, index: number): Promise<void> {
   assert.equal(dom.one("#tour-title").textContent, steps[index].title);
 }
 
-test("CB-D300 ユースケースの一覧は、基本の案内の後ろに、足したユースケースが定義の順で並び、題と要約が出る", async () => {
+test("CB-D300 ユースケースの一覧は、基本の案内の後ろに、追加したユースケースが定義の順で並び、題と要約が出る", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one('[data-action="tour"]'));
@@ -1386,7 +1386,7 @@ test("CB-D305 ルールの欄の案内は、scene の open と more で行と「
     assert.equal(dom.all('[data-tour="rule-deps-change-once"]').length, 1);
     await toStep(dom, "context-every", 6);
     assert.equal(dom.one(".pane.active").id, "tab-judge");
-    assert.match(dom.one("#judge-result .response").textContent ?? "", /migrate でないかを確かめる/);
+    assert.match(dom.one("#judge-result .response").textContent ?? "", /migrate でないかを確認する/);
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
     assert.equal(dom.all("#judge-result").length, 0, "案内の判定が残った");
@@ -1395,7 +1395,7 @@ test("CB-D305 ルールの欄の案内は、scene の open と more で行と「
   }
 });
 
-test("CB-D306 案内の間は、ルールを足す・変換するなどの編集が効かない（行が増えず、未保存にならず、拡張ホストへ何も送らない）", async () => {
+test("CB-D306 案内の間は、ルールを追加する・変換するなどの編集が効かない（行が増えず、未保存にならず、拡張ホストへ何も送らない）", async () => {
   const dom = await openRules({}, undefined, { measure: true });
   try {
     await startCourse(dom, "add-rule");
@@ -1403,7 +1403,7 @@ test("CB-D306 案内の間は、ルールを足す・変換するなどの編集
     const before = dom.all(".rule").length;
     dom.click(dom.one('[data-tour="add-deny"]'));
     await dom.settle();
-    assert.equal(dom.all(".rule").length, before, "案内の間にルールが足された");
+    assert.equal(dom.all(".rule").length, before, "案内の間にルールが追加された");
     dom.click(dom.one('[data-tour="add-deny"]'));
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
@@ -1426,7 +1426,7 @@ test("CB-D306 案内の間は、ルールを足す・変換するなどの編集
   }
 });
 
-test("CB-D320 案内の間は、案内の外の操作（開く・選ぶ・読み直す・判定・タブ・畳み・追加）が拡張ホストへも実際の state へも届かない", async () => {
+test("CB-D320 案内の間は、案内の外の操作（開く・選ぶ・再読み込みする・判定・タブ・畳み・追加）が拡張ホストへも実際の state へも届かない", async () => {
   const dom = await openRules();
   try {
     await dom.send({ type: "tour" });

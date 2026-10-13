@@ -59,7 +59,7 @@ function withWhen(sections: Sections, when: CondNode): Sections {
   return { ...sections, deny: [{ ...sections.deny[0], when }, ...sections.deny.slice(1)] };
 }
 
-test("CB-T333 when を組み合わせ条件として読み、畳んだ行の要約にする。組み合わせ条件を持たないルールには欄が無い", () => {
+test("CB-T333 when を組み合わせ条件として読み、畳んだ行の要約にする。組み合わせ条件を持たないルールには欄がありません", () => {
   const { model } = readRules(WHEN_TEXT);
   assert.deepEqual(model.problems, []);
   assert.deepEqual(model.sections.deny[0].when, EXPECTED);
@@ -126,7 +126,7 @@ deny:
 `;
   const { model } = readRules(text);
   assert.equal(model.problems.length, 1);
-  assert.match(model.problems[0], /when と glob \/ regex を両方書いています/);
+  assert.match(model.problems[0], /when と glob \/ regex を両方指定しています/);
   const tree = model.sections.deny[0].when;
   assert.ok(tree);
   const messages = condProblems(tree).map((p) => `${p.path.join(".")} ${p.message}`);
@@ -248,7 +248,7 @@ test("CB-T338 組み合わせ条件の操作（子の追加・削除・種別の
   );
 });
 
-test("CB-T339 画面が送り返した組み合わせ条件は形を確かめて受け取り、形の違う組み合わせ条件を持つルールは受け取らない", () => {
+test("CB-T339 画面が送り返した組み合わせ条件は形を確認して受け取り、形の違う組み合わせ条件を持つルールは受け取らない", () => {
   assert.deepEqual(asCond(JSON.parse(JSON.stringify(EXPECTED))), EXPECTED);
   assert.deepEqual(asCond({ op: "not", child: null }), not(null));
   assert.equal(asCond({ op: "all", children: [{ op: "glob" }] }), undefined);
@@ -259,7 +259,7 @@ test("CB-T339 画面が送り返した組み合わせ条件は形を確かめて
   assert.equal(asSections(raw), undefined);
 });
 
-test("CB-T340 個別条件の値を PyYAML が文字列以外に読む語へ差し替えると、引用符の無い個別条件でも引用符で囲む", () => {
+test("CB-T340 個別条件の値を PyYAML が文字列以外に読む語へ差し替えると、引用符のない個別条件でも引用符で囲む", () => {
   const text = `version: 1
 deny:
   - id: plain-leaf
@@ -291,7 +291,7 @@ function replaceLeaf(tree: CondNode): CondNode {
   return tree.op === "any" ? group("any", [leaf("glob"), ...tree.children.slice(1)]) : tree;
 }
 
-test("CB-T341 引用符の無い個別条件の値が YAML 1.1 で文字列以外になる語なら、読めないノードとして誤りに挙げる（except も）", () => {
+test("CB-T341 引用符のない個別条件の値が YAML 1.1 で文字列以外になる語なら、読み込めないノードとして誤りに挙げる（except も）", () => {
   const text = `version: 1
 deny:
   - id: ambiguous
@@ -374,10 +374,10 @@ ${except}
 `).model.sections.deny[0];
   assert.equal(exceptBlocker(rulesOf("").exceptNodes), undefined);
   assert.equal(exceptBlocker(rulesOf("    except:\n      - glob: '*.md'\n      - regex: 'x'").exceptNodes), undefined);
-  assert.match(exceptBlocker(rulesOf("    except: '*.md'").exceptNodes) ?? "", /except の 1 件目が読めません（except の値はリストです）/);
-  assert.match(exceptBlocker(rulesOf("    except:\n      - glob: '*.md'\n        regex: x").exceptNodes) ?? "", /1 件目が読めません/);
+  assert.match(exceptBlocker(rulesOf("    except: '*.md'").exceptNodes) ?? "", /except の 1 件目が読み込めません（except の値はリストです）/);
+  assert.match(exceptBlocker(rulesOf("    except:\n      - glob: '*.md'\n        regex: x").exceptNodes) ?? "", /1 件目が読み込めません/);
   assert.match(exceptBlocker(rulesOf("    except:\n      - glob: '*.md'\n      - any: [{glob: a}]").exceptNodes) ?? "", /2 件目が glob \/ regex 1 つのマップではありません/);
-  assert.match(exceptBlocker(rulesOf("    except:\n      - '*.md'").exceptNodes) ?? "", /1 件目が読めません/);
+  assert.match(exceptBlocker(rulesOf("    except:\n      - '*.md'").exceptNodes) ?? "", /1 件目が読み込めません/);
   assert.match(exceptBlocker(rulesOf("    except: []").exceptNodes) ?? "", /空のリスト/);
   assert.match(exceptBlocker(rulesOf("    except:\n      - glob: ''").exceptNodes) ?? "", /glob が空/);
 });
@@ -421,7 +421,7 @@ deny:
   assert.ok(unwrapped.includes("glob: '*.pem' # 行末"), unwrapped);
 });
 
-test("CB-T346 子を消してから別の子を直しても、消した子のコメントは直した子に付かない", () => {
+test("CB-T346 子を削除してから別の子を直しても、削除した子のコメントは直した子に付かない", () => {
   const text = `version: 1
 deny:
   - id: three
@@ -455,7 +455,7 @@ deny:
   assert.ok(renamed.includes("        # B の理由\n        - glob: '*/vault/*'\n"), renamed);
 });
 
-test("CB-T347 子を消して似ていない文字へ別の子を直しても、消した子のコメントは他の子へ移らない", () => {
+test("CB-T347 子を削除して似ていない文字へ別の子を直しても、削除した子のコメントは他の子へ移らない", () => {
   const text = `version: 1
 deny:
   - id: three
@@ -484,7 +484,7 @@ deny:
   assert.ok(!out3.includes("# A"), out3);
 });
 
-test("CB-T348 先頭の子を消すと、その子の前置きコメントも消える（新しい先頭に残らない）", () => {
+test("CB-T348 先頭の子を削除すると、その子の前置きコメントも消える（新しい先頭に残らない）", () => {
   const text = `version: 1
 deny:
   - id: three
@@ -507,7 +507,7 @@ deny:
   assert.ok(kept.includes("# A の理由\n        - glob: 'A'"), kept);
 });
 
-test("CB-T349 最上位でないノードを not / all / any で包む・not を外すとき、そのノードと中の子のコメントは残る", () => {
+test("CB-T349 最上位でないノードを not / all / any で包む・not を解除とき、そのノードと中の子のコメントは残る", () => {
   const text = `version: 1
 deny:
   - id: nested
@@ -567,7 +567,7 @@ deny:
   const [both, one] = doc.model.sections.deny;
   assert.equal(both.bothPatterns, true);
   assert.equal(one.bothPatterns, undefined);
-  assert.match(toWhenBlocker(both) ?? "", /glob と regex を両方書いています/);
+  assert.match(toWhenBlocker(both) ?? "", /glob と regex を両方指定しています/);
   assert.equal(toWhenBlocker(one), undefined);
   // 画面を往復しても印は残る
   const back = asSections(JSON.parse(JSON.stringify(doc.model.sections)));

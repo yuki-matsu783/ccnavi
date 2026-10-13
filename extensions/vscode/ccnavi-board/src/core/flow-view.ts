@@ -31,20 +31,20 @@ export const OPEN_LOCK: FlowLock = { locked: false, reason: "" };
 /** 実行ファイルが着手中と言った子の錠の文面。いつ外れるかまで言う */
 export function lockedReason(ticket: string): string {
   return (
-    `子チケット ${ticket} は着手中かレビュー中のため、フローを書き換えられません（ccnavi が DENY_TICKET_FLOW_LOCKED で止めています）。` +
+    `子チケット ${ticket} は着手中かレビュー中のため、フローを変更できません（ccnavi が DENY_TICKET_FLOW_LOCKED で止めています）。` +
     "担当のサブエージェントが読んでいる手順が、作業の途中で変わるのを防ぐためです。" +
-    `ロックは、${ticket} が finish で終わるか cancel で取り消されると外れます。手順を直すなら、終わってから直すか、次の子チケットのフローに書いてください`
+    `ロックは、${ticket} が finish で終わるか cancel で取り消されると外れます。手順を直すなら、終わってから直すか、次の子チケットのフローで修正してください`
   );
 }
 
 /** 置き場の途中かファイルがシンボリックリンク。読まないし書かない */
 export function linkedReason(rel: string): string {
-  return `フローの置き場（${rel}）か、そこへ至る途中のフォルダがシンボリックリンクのため、読み書きしません。リンク先は承認済みの領域の外かもしれません。リンクを外してから開き直してください`;
+  return `フローの置き場（${rel}）か、そこへ至る途中のフォルダがシンボリックリンクのため、読み込みも保存もしません。リンク先は承認済みの領域の外かもしれません。リンクを解除してから開き直してください`;
 }
 
 /** 確かめられなかったとき。書けない扱いにする */
 export function lockFromFailure(error: string): FlowLock {
-  return { locked: true, reason: `着手中かどうかを確かめられないため、書き込みません: ${error}` };
+  return { locked: true, reason: `着手中かどうかを確認できないため、保存しません: ${error}` };
 }
 
 /** ボードの JSON から引いた、この子のフロー */
@@ -76,7 +76,7 @@ export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult
     return { ok: false, error: `${ticket} は親チケットです。フローを持つのは子チケットだけです` };
   }
   if (found.flow === null) {
-    return { ok: false, error: `${ticket} のフローの置き場が実行ファイルの出力にありません（完了・取り消しの子でファイルが無いか、実行ファイルが古いかのどちらかです）` };
+    return { ok: false, error: `${ticket} のフローの置き場が実行ファイルの出力にありません（完了・取り消しの子でファイルがないか、実行ファイルが古いかのどちらかです）` };
   }
   return {
     ok: true,
@@ -163,16 +163,16 @@ export function flowRequestPrompt(request: FlowRequest): string {
   const what = request.flowPath === undefined ? "作成" : "直し";
   const head = request.title === "" ? request.ticket : `${request.ticket}（${request.title}）`;
   const lines = [`[ccnavi] ユーザが子チケット ${head} のフローの${what}を頼んだ（親 ${request.parent}）。`];
-  lines.push(`- 下書きを書く置き場: ${request.draftPath}（YAML。形はフロー編集画面が書くものと同じ: id・name・version・nodes・connections）`);
+  lines.push(`- 下書きの保存先: ${request.draftPath}（YAML。形はフロー編集画面が保存するものと同じ: id・name・version・nodes・connections）`);
   if (request.flowPath !== undefined) {
-    lines.push(`- いまのフロー: ${request.flowPath}（読んで、直すところだけ変えた全体を下書きに書く）`);
+    lines.push(`- いまのフロー: ${request.flowPath}（内容を確認し、直すところだけ変更した全体を下書きとして保存する）`);
   }
   if (request.redo) {
-    lines.push("- 前の下書きが残っている。読んで、書き直してよい");
+    lines.push("- 前の下書きが残っている。内容を確認して、作り直してよい");
   }
   lines.push(
-    `- 書いたら \`${request.lintCommand}\` で確かめ、error が無くなってからユーザに渡す`,
-    "- 効力のあるフロー（.ccnavi/approved/flows/）には書かない。書くのは下書きだけで、ユーザがフロー編集画面で差分を読んで取り込む",
+    `- 下書きを保存したら \`${request.lintCommand}\` で確認し、error が無くなってからユーザに渡す`,
+    "- 効力のあるフロー（.ccnavi/approved/flows/）には保存しない。保存するのは下書きだけで、ユーザがフロー編集画面で差分を確認して取り込む",
   );
   return lines.join("\n");
 }

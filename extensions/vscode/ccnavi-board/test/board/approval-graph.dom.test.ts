@@ -84,7 +84,7 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     assert.equal(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="start"]').textContent, "開始");
     assert.equal(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="end"]').textContent, "終了");
     assert.equal(dom.one('.plan-graph[data-part="feedback"] .react-flow__node[data-id="start"]').textContent, "全体計画のレビュー後");
-    assert.equal(dom.one('.plan-graph[data-part="feedback"] .react-flow__node[data-id="end"]').textContent, "親を閉じる");
+    assert.equal(dom.one('.plan-graph[data-part="feedback"] .react-flow__node[data-id="end"]').textContent, "親をクローズする");
 
     // 点は番号・題・見る場所。延期なら引き受け手、子が承認された番号は固定の印
     const n1 = dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n1"] .plan-node');
@@ -126,7 +126,7 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
 test("CB-D161 図は読むだけ。線を引く取っ手も、点のドラッグも、選ぶことも無く、点を押しても何も送らない", async () => {
   const dom = await openOverlay(samplePlans());
   try {
-    assert.ok(dom.all(".plan-graph .react-flow__handle").length > 0, "線の端を留める取っ手が無い（点が描けていない）");
+    assert.ok(dom.all(".plan-graph .react-flow__handle").length > 0, "線の端を留める取っ手がない（点が描けていない）");
     assert.equal(dom.all(".plan-graph .react-flow__handle.connectable").length, 0, "線を引ける取っ手がある");
     assert.equal(dom.all(".plan-graph .react-flow__node.draggable, .plan-graph .react-flow__node.selectable").length, 0, "点を動かせる・選べる");
     assert.equal(dom.all(".plan-graph .react-flow__edge.selectable").length, 0, "線を選べる");
@@ -143,7 +143,7 @@ test("CB-D161 図は読むだけ。線を引く取っ手も、点のドラッグ
   }
 });
 
-test("CB-D162 plans が無い・空なら図を出さない。見本の preview（実行ファイルの出力）の plans は、その項と線のまま描く", async () => {
+test("CB-D162 plans がない・空なら図を出さない。見本の preview（実行ファイルの出力）の plans は、その項と線のまま描く", async () => {
   const none = await openOverlay([]);
   try {
     assert.equal(none.all(".plan-graph, .plan-graphs").length, 0);
@@ -260,7 +260,7 @@ test("CB-D181 タブで保存したあとに提案が変わった親（拡張ホ
     const note = dom.one('.approval .plan-family[data-ticket="i0001"] .plan-changed');
     assert.equal(
       note.textContent,
-      "計画編集タブで保存したあとに、提案が変わっています（エージェントが書き換えた可能性があります）。図を確かめてから承認してください。",
+      "計画編集タブで保存したあとに、提案が変わっています（エージェントが変更した可能性があります）。図を確認してから承認してください。",
     );
     assert.equal(dom.one<HTMLButtonElement>('[data-action="approve-confirm"]').disabled, false);
   } finally {
@@ -278,7 +278,7 @@ test("CB-D181 タブで保存したあとに提案が変わった親（拡張ホ
 function viewportOf(dom: DomPage, part: string): { x: number; y: number; zoom: number } {
   const style = dom.one(`.plan-graph[data-part="${part}"] .react-flow__viewport`).getAttribute("style") ?? "";
   const found = /translate\(\s*(-?[\d.]+)px,\s*(-?[\d.]+)px\)\s*scale\(\s*([\d.]+)\s*\)/.exec(style);
-  assert.ok(found !== null, `viewport の transform が読めない: ${style}`);
+  assert.ok(found !== null, `viewport の transform が読み込めない: ${style}`);
   return { x: Number(found[1]), y: Number(found[2]), zoom: Number(found[3]) };
 }
 

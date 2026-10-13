@@ -580,7 +580,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     }
     setReview(undefined);
     setBusy(true);
-    setStatus({ text: "着手中でないかを確かめて保存中…", error: false });
+    setStatus({ text: "着手中でないかを確認して保存中…", error: false });
     const taken = imported.current;
     post({ type: "save", doc, ...(taken !== undefined && sameFlow(doc, taken.doc) ? { imported: taken.hash } : {}) });
   };
@@ -704,7 +704,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       {shownLock.locked && (
         <div id="lock" className="lock" data-tour="lock" role="status">
-          {shownLock.reason === "" ? "着手中かどうかを確かめられないため、読み取り専用で開いています。" : shownLock.reason}
+          {shownLock.reason === "" ? "着手中かどうかを確認できないため、読み取り専用で開いています。" : shownLock.reason}
         </div>
       )}
       <div id="changed" data-tour="changed" className={shownChanged ? "banner warn" : "banner warn hidden"}>
@@ -717,7 +717,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         <div id="offer" data-tour="offer" className="banner missing" role="status">
           <span>
             提案あり: エージェントの下書き（{shownOffer.draftPath}）が、いまのフローと違います。
-            {shownOffer.problem !== undefined && <span className="dim">（読めません: {shownOffer.problem}）</span>}
+            {shownOffer.problem !== undefined && <span className="dim">（読み込めません: {shownOffer.problem}）</span>}
           </span>
           <button type="button" className="action" data-action="open-proposal" disabled={shownBusy} onClick={openProposal}>
             提案を見る
@@ -729,7 +729,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           <span className="flow-ticket">
             <strong>{shownPage.ticket}</strong> {shownPage.title}
           </span>
-          <span className="path" title={`${shownPage.flowRel}（承認済みの領域です。書き込むのもコミットするのもユーザだけです）`}>
+          <span className="path" title={`${shownPage.flowRel}（承認済みの領域です。変更・コミットできるのはユーザだけです）`}>
             {shownPage.flowPath}
           </span>
           {!shownPage.exists && <span className="dim">（ファイルはまだありません。保存すると作られます）</span>}

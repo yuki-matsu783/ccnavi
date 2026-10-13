@@ -283,13 +283,13 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
       throw new Error(
         target.kind === "self"
           ? "ccnavi の出力にワークスペースの設定がありません"
-          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、名前が予約名の common か self です）`,
+          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下にないか、名前が予約名の common か self です）`,
       );
     }
     rulesPath = resolveIn(root, layer.rules.path);
     rulesRel = path.relative(root, rulesPath).split(path.sep).join("/");
     if (layer.rules.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読めず、この設定を空として扱っています（このファイルのルールは 1 件も判定に使われていません）: ${layer.rules.unreadable}`);
+      notices.push(`実行ファイルはこのファイルを読み込めず、この設定を空として扱っています（このファイルのルールは 1 件も判定に使われていません）: ${layer.rules.unreadable}`);
     }
   }
   let text: string;
@@ -301,7 +301,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     exists = true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`ルールファイルを読めません（${rulesRel}）: ${(error as Error).message}`);
+      throw new Error(`ルールファイルを読み込めません（${rulesRel}）: ${(error as Error).message}`);
     }
     // 無いのは不備ではない（「設定が無い」正常な状態）。空として出し、ルールを足して保存すればファイルが作られる。
     text = "";
@@ -750,7 +750,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       try {
         rules = stage(current, message.sections);
       } catch (error) {
-        fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
+        fail(current, `編集中の内容を保存できません: ${(error as Error).message}`);
         return;
       }
       const result = await runTest(root, binSetting(), rules, message.tool, message.subject);
@@ -773,7 +773,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       try {
         rules = stage(current, message.sections);
       } catch (error) {
-        fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
+        fail(current, `編集中の内容を保存できません: ${(error as Error).message}`);
         return;
       }
       const result = await runExpectations(root, binSetting(), rules, loaded.expectationsPath);
@@ -823,7 +823,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     tmp = path.join(current.tmpDir, "rules.yml");
     fs.writeFileSync(tmp, text, "utf8");
   } catch (error) {
-    fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
+    fail(current, `編集中の内容を保存できません: ${(error as Error).message}`);
     return;
   }
 
@@ -858,7 +858,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     try {
       mtimeMs = fs.statSync(loaded.rulesPath).mtimeMs;
     } catch (error) {
-      fail(current, `ルールファイルを確かめられません: ${(error as Error).message}`);
+      fail(current, `ルールファイルを確認できません: ${(error as Error).message}`);
       return;
     }
     if (mtimeMs !== loaded.mtimeMs) {
@@ -881,7 +881,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   } catch (error) {
     // 書けなかったのに猶予を残したままだと、その間の実際の外部変更が知らされない。
     current.wroteAt = 0;
-    fail(current, `ルールファイルに書けません: ${(error as Error).message}`);
+    fail(current, `ルールファイルに保存できません: ${(error as Error).message}`);
     return;
   }
   await reload(current);

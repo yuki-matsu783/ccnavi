@@ -105,7 +105,7 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
           )}
           {detail !== undefined && !detailMatches(detail, entry) && (
             <p className="hint" data-role="detail-mismatch">
-              この行の本文は読めません。実行ファイルは、足し算で使われる同名の別の層の本文を返すためです（捨てられた行など）。ファイルを直接開いて読んでください: <span className="mono">{entry.path}</span>
+              この行の本文は読み込めません。実行ファイルは、足し算で使われる同名の別の層の本文を返すためです（捨てられた行など）。ファイルを直接開いて読んでください: <span className="mono">{entry.path}</span>
             </p>
           )}
           {detailError !== "" && <p className="status failed">{detailError}</p>}
@@ -131,7 +131,7 @@ function StateTags({ entry }: { readonly entry: TemplateEntry }): JSX.Element {
       {!entry.effective && <span className="tag">使われない</span>}
       {entry.dropped !== null && <span className="tag warn">{`捨てた: ${droppedLabel(entry.dropped.reason)}`}</span>}
       {!entry.writable && <span className="tag">読み取り専用</span>}
-      {!entry.valid && <span className="tag bad">読めない</span>}
+      {!entry.valid && <span className="tag bad">読み込めない</span>}
     </>
   );
 }

@@ -60,8 +60,8 @@ test("CB-D201 全部の案内の全部の段で、指す先が画面にあり吹
         await dom.settle();
         const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
-        assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面に無い`);
-        assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先が無い）`);
+        assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面にありません`);
+        assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
         // 実際のチケットではなく見本。実際のカードは 1 枚も出ない
         assert.ok(cardIds(dom).length > 0 && cardIds(dom).every((id) => id.startsWith("sample-")), `${at}: 実際のカードが出ている`);
         assert.equal(dom.all(".banner.tour-sample").length, 1, at);
@@ -126,7 +126,7 @@ test("CB-D203 案内の間の見本の絞り込み・畳みは見本の上だけ
     // 閉じたら実際の絞り込みと畳みに戻り、state は動いていない（実際のボードにはプロジェクトが無く、欄も出ない）
     assert.equal(dom.all("#project-filter").length, 0);
     assert.equal(dom.one('.column[data-state="cancelled"]').classList.contains("folded"), true);
-    assert.equal(JSON.stringify(dom.state()), before, "案内が覚えている state を書き換えた");
+    assert.equal(JSON.stringify(dom.state()), before, "案内が覚えている state を変更した");
 
     // 列を畳む案内: 見本の完了の列が畳まれ、実際の畳み（取り消し）は見本に持ち込まない
     await start(dom, "progress");

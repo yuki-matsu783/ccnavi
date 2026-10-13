@@ -33,7 +33,7 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
       <summary>足し算（読み取り専用。共通の設定 + 1 つの設定の和）</summary>
       <p className="hint">
         判定に効くルールは、共通の設定と、その設定のルールの和です。ここは実行ファイルが出した結果をそのまま見せるだけで、直すときは画面上部の「設定」の欄で編集する 1 本に切り替えます。保存済みの内容の和で、編集中の内容は含みません。
-        パスを持たないツール（Bash など）が当てるのは、全プロジェクトの設定を足した和ではありません。
+        パスを持たないツール（Bash など）が当てるのは、全プロジェクトの設定を合算した和ではありません。
       </p>
       <label className="sum-pick" data-tour="sum-pick">
         足し算{" "}
@@ -46,9 +46,9 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
         </select>
       </label>
       {sum.unreadable !== "" && (
-        <div className="banner warn">実行ファイルは {sum.path} を読めず、その設定を空として扱っています（共通の設定のルールだけが効いています）: {sum.unreadable}</div>
+        <div className="banner warn">実行ファイルは {sum.path} を読み込めず、その設定を空として扱っています（共通の設定のルールだけが効いています）: {sum.unreadable}</div>
       )}
-      {sum.missing && sum.unreadable === "" && <p className="hint">{sum.path} は無いので、共通の設定のルールだけの和です（無いのは「設定が無い」正常な状態です）。</p>}
+      {sum.missing && sum.unreadable === "" && <p className="hint">{sum.path} はないので、共通の設定のルールだけの和です（ファイルがないのは、その設定がまだ作られていない正常な状態です）。</p>}
       <p className="count" data-count="sum" data-tour="sum-count">
         {total} 件（{sum.layers.join(" + ")}）
       </p>

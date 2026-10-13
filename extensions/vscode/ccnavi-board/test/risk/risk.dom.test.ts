@@ -24,7 +24,7 @@ test("CB-D10 既定は畳み、行を押すと開いて state に id が入る�
     assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, ".github/** に当てはまるファイルを 1 つ変更するごとに加点（上限 35 点）CI に触った");
     // script は「返した点を加点」で、points は測れなかったときの保険。judge は yes で加点
     assert.equal(dom.one(`${rowSelector("f3")} .sum .clip`).textContent, "スクリプト .ccnavi/config/common/scripts/risk.sh が返した点を加点（点を読み取れなかったときは 10 点）");
-    assert.equal(dom.one(`${rowSelector("f4")} .sum .clip`).textContent, "質問「テストの無い変更を含むか」の答えが yes なら加点");
+    assert.equal(dom.one(`${rowSelector("f4")} .sum .clip`).textContent, "質問「テストのない変更を含むか」の答えが yes なら加点");
     dom.click(dom.one(`${rowSelector("f2")} .row-head`));
     await dom.settle();
     assert.ok(dom.one(rowSelector("f2")).classList.contains("open"));
@@ -87,7 +87,7 @@ test("CB-D12 絞り込みは一致した行だけを数え、開いている行�
   }
 });
 
-test("CB-D13 ファイルが無ければ欄も追加も押せず、「作る」だけ押せる", async () => {
+test("CB-D13 ファイルがなければ欄も追加も押せず、「作る」だけ押せる", async () => {
   const dom = await openRisk({ exists: false, builtin: true });
   try {
     dom.click(dom.one(`${rowSelector("f1")} .row-head`));
@@ -105,7 +105,7 @@ test("CB-D13 ファイルが無ければ欄も追加も押せず、「作る」�
   }
 });
 
-test("CB-T82 ファイルが無ければ組み込みだと言って作るボタンを出し、あれば出さない", async () => {
+test("CB-T82 ファイルがなければ組み込みだと言って作るボタンを出し、あれば出さない", async () => {
   const missing = await openRisk({ exists: false, builtin: true });
   try {
     assert.match(missing.one(".banner.missing").textContent, /\.ccnavi\/config\/common\/risks\.yml がありません。実行ファイルは組み込みの配点で数えています/);
@@ -191,13 +191,13 @@ test("CB-T126 項目の欄名は日本語で、値の欄は加点条件で名前
   }
 });
 
-test("CB-D53 項目を足すと開いて出し、並べ替えと削除が保存に渡る形に出る", async () => {
+test("CB-D53 項目を追加すると開いて出し、並べ替えと削除が保存に渡る形に出る", async () => {
   const dom = await openRisk();
   try {
     dom.click(dom.one('button[data-action="add"]'));
     await dom.settle();
     const added = dom.all("#factors > li.factor").pop();
-    assert.ok(added !== undefined && added.classList.contains("open"), "足した項目は開いて出す");
+    assert.ok(added !== undefined && added.classList.contains("open"), "追加した項目は開いて出す");
     assert.equal(added.getAttribute("data-key"), "f5");
     // 空の欄の代わりに出す断り（未設定）は書いてある値ではないので、絞り込みでは当たらない
     assert.equal(dom.one(`${rowSelector("f5")} .sum-points`).textContent, "（未設定）");
@@ -220,7 +220,7 @@ test("CB-D53 項目を足すと開いて出し、並べ替えと削除が保存�
       savedForm(dom).factors.map((factor) => factor.id),
       ["ci", "sh", "new", "q"],
     );
-    assert.equal(savedForm(dom).factors[2].origin, null, "足した項目は元の位置を持たない");
+    assert.equal(savedForm(dom).factors[2].origin, null, "追加した項目は元の位置を持たない");
   } finally {
     await dom.close();
   }
@@ -261,18 +261,18 @@ test("CB-D55 組み上がったら ready を送り、届いた中身で編集を
   }
 });
 
-test("CB-D56 読み直せなかったら理由を出し、配点は出さない", async () => {
-  const dom = await openPage({ kind: "error", error: "配点のファイルを読めない: EACCES" });
+test("CB-D56 再読み込みできなかったら理由を出し、配点は出さない", async () => {
+  const dom = await openPage({ kind: "error", error: "配点のファイルを読み込めない: EACCES" });
   try {
     assert.match(dom.one(".empty").textContent, /リスク管理画面を読み込めませんでした/);
-    assert.equal(dom.one("pre.load-error").textContent, "配点のファイルを読めない: EACCES");
+    assert.equal(dom.one("pre.load-error").textContent, "配点のファイルを読み込めない: EACCES");
     assert.equal(dom.all("#factors").length, 0);
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D57 見た目の切り替えは body のクラスだけを書き換え、編集の途中は消えない", async () => {
+test("CB-D57 見た目の切り替えは body のクラスだけを変更、編集の途中は消えない", async () => {
   const dom = await openRisk();
   try {
     dom.type(dom.one(`${rowSelector("f1")} input.f-points`), "30");
@@ -339,7 +339,7 @@ test("CB-D65 再読込を押した時点で欄を止め、ユーザがやめた�
   }
 });
 
-test("CB-D66 読み直せなかった画面からも、再読込を頼める", async () => {
+test("CB-D66 再読み込みできなかった画面からも、再読込を頼める", async () => {
   const dom = await openPage({ kind: "error", error: "EACCES" });
   try {
     dom.click(dom.one('button[data-action="reload"]'));
@@ -379,7 +379,7 @@ test("CB-D100 拡張ホストが頼んだらリスク管理の基本の案内（
   }
 });
 
-test("CB-T313 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が 1 つだけでも出す。読み込み中と、読めなかった画面にも出る", async () => {
+test("CB-T313 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が 1 つだけでも出す。読み込み中と、読み込めなかった画面にも出る", async () => {
   const targets = [
     { kind: "workspace", name: "", label: "共通の設定" },
     { kind: "self", name: "", label: "ワークスペース" },
@@ -432,7 +432,7 @@ test("CB-T314 未保存の変更の有無が変わったら拡張ホストに伝
   }
 });
 
-test("CB-T315 配点のファイルが無いのは正常。組み込みを見せない設定（プロジェクトなど）は、不備の帯も作るボタンも出さず、空の欄を触れて保存できる", async () => {
+test("CB-T315 配点のファイルがないのは正常。組み込みを見せない設定（プロジェクトなど）は、不備の帯も作るボタンも出さず、空の欄を触れて保存できる", async () => {
   const empty = readRisk("").model;
   const dom = await openRisk({ exists: false, builtin: false, model: { ...empty, problems: [] }, target: { kind: "project", name: "lib" } });
   try {
@@ -454,12 +454,12 @@ test("CB-T315 配点のファイルが無いのは正常。組み込みを見せ
 
 test("CB-T316 足し算は読み取り専用で、境目の点・項目・由来を実行ファイルが出したまま並べる。選び直しても拡張ホストへ何も送らない", async () => {
   const sums = riskSums(sumsBoard());
-  const dom = await openRisk({ target: { kind: "project", name: "lib" }, sums, notices: ["読めない <理由>"] });
+  const dom = await openRisk({ target: { kind: "project", name: "lib" }, sums, notices: ["読み込めない <理由>"] });
   try {
-    assert.equal(dom.all(".banner.warn:not(#changed)")[0].textContent, "読めない <理由>");
+    assert.equal(dom.all(".banner.warn:not(#changed)")[0].textContent, "読み込めない <理由>");
     const select = dom.one<HTMLSelectElement>("select#sum-select");
     assert.equal(select.value, "lib");
-    assert.match(dom.one("#sum .hint").textContent, /パスを持たない判定は、全プロジェクトの設定を足した和ではありません/);
+    assert.match(dom.one("#sum .hint").textContent, /パスを持たない判定は、全プロジェクトの設定を合算した和ではありません/);
     assert.match(dom.one("#sum-levels").textContent, /MEDIUM 20.*HIGH 40.*CRITICAL 50/);
     const rows = () => dom.all("#sum tbody tr").map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
     assert.deepEqual(rows().map((r) => [r[0], r[2], r[3]]), [["big-diff", "25", "共通の設定"], ["schema", "30", "lib"]]);

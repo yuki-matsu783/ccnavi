@@ -38,7 +38,7 @@ async function previewOf(dom: DomPage, request: ImportRequest, overrides: Partia
 
 const LOGIN_COMMON: ImportRequest = { draft: "login", to: "common", layer: "", replace: false };
 
-test("CB-D335 「取り込む…」で下書きの取り込みの欄が開く。取り込み先は同名のある先頭の層（無ければ共通）、置き換えはその層に同名があるか。取り込めない下書きは押せない", async () => {
+test("CB-D335 「取り込む…」で下書きの取り込みの欄が開く。取り込み先は同名のある先頭の層（なければ共通）、置き換えはその層に同名があるか。取り込めない下書きは押せない", async () => {
   const dom = await openTemplates();
   try {
     assert.equal(dom.all('[data-role="import-form"]').length, 0);
@@ -63,7 +63,7 @@ test("CB-D335 「取り込む…」で下書きの取り込みの欄が開く。
   }
 });
 
-test("CB-D336 下見は previewImport を送り、続けて dirty を伝える。下見の往復の間は下見を押せない。取り込み先を選び直すと、その要求で下見を頼む", async () => {
+test("CB-D336 プレビューは previewImport を送り、続けて dirty を伝える。プレビューの往復の間はプレビューを押せない。取り込み先を選び直すと、その要求でプレビューを頼む", async () => {
   const dom = await openTemplates();
   try {
     await openImport(dom, "login");
@@ -96,7 +96,7 @@ test("CB-D336 下見は previewImport を送り、続けて dirty を伝える�
   }
 });
 
-test("CB-D337 下見の答えを出し、「この内容で取り込む」は見せた sha を expect にして importYes を送る", async () => {
+test("CB-D337 プレビューの答えを出し、「この内容で取り込む」は見せた sha を expect にして importYes を送る", async () => {
   const dom = await openTemplates();
   try {
     await openImport(dom, "login");
@@ -117,7 +117,7 @@ test("CB-D337 下見の答えを出し、「この内容で取り込む」は見
   }
 });
 
-test("CB-D338 同名ありの下見は差分を行ごとの色で出し、先頭の記号を残す。本文は出さない。取り込み先を選び直すと置き換えも合わせ直す", async () => {
+test("CB-D338 同名ありのプレビューは差分を行ごとの色で出し、先頭の記号を残す。本文は出さない。取り込み先を選び直すと置き換えも合わせ直す", async () => {
   const dom = await openTemplates();
   try {
     await openImport(dom, "research");
@@ -147,7 +147,7 @@ test("CB-D338 同名ありの下見は差分を行ごとの色で出し、先頭
   }
 });
 
-test("CB-D339 錠は取り込み先で選ぶ。共通は全体の錠で止まる。プロジェクトはそのプロジェクトの錠で止まり、無ければ全体の錠にそろう", async () => {
+test("CB-D339 錠は取り込み先で選ぶ。共通は全体の錠で止まる。プロジェクトはそのプロジェクトの錠で止まり、なければ全体の錠にそろう", async () => {
   // 共通への取り込みは全体の錠で止まる
   const common = await openTemplates({ lock: { locked: true, reason: "作業中のチケットがあります（T1）", doing: ["T1"] } });
   try {
@@ -193,10 +193,10 @@ test("CB-D340 答えが ok でなければ、error の行を [error] の文字�
   const dom = await openTemplates();
   try {
     await openImport(dom, "login");
-    await previewOf(dom, LOGIN_COMMON, { ok: false, errors: ["フェーズ定義に無い種類です"] });
+    await previewOf(dom, LOGIN_COMMON, { ok: false, errors: ["フェーズ定義にない種類です"] });
     const row = dom.one('[data-role="import-preview"] li.sev-error');
     assert.match(text(row.querySelector(".sev-label")), /\[error\]/);
-    assert.match(text(row), /フェーズ定義に無い種類です/);
+    assert.match(text(row), /フェーズ定義にない種類です/);
     assert.equal(dom.one('[data-action="import-yes"]').hasAttribute("disabled"), true);
   } finally {
     await dom.close();
@@ -238,7 +238,7 @@ test("CB-D342 取り込みが書けたら、結果を帯に出して欄とプレ
       error: "",
     });
     await written.settle();
-    assert.equal(text(written.one("#status")), "取り込みました: .ccnavi/config/common/templates/login.yml。下書きを消しました");
+    assert.equal(text(written.one("#status")), "取り込みました: .ccnavi/config/common/templates/login.yml。下書きを削除しました");
     assert.equal(written.all('[data-role="import-preview"]').length, 0);
     assert.equal(written.all('[data-role="import-form"]').length, 0);
     assert.deepEqual(
@@ -277,7 +277,7 @@ test("CB-D343 実行ファイルの文字列は文字としてそのまま出す
   }
 });
 
-test("CB-D344 案内の間は「取り込む…」を押しても欄を開かず、開いていた実際の欄は見本に替わって下見も出ない", async () => {
+test("CB-D344 案内の間は「取り込む…」を押しても欄を開かず、開いていた実際の欄は見本に替わってプレビューも出ない", async () => {
   const dom = await openTemplates();
   try {
     await openImport(dom, "research");
@@ -296,7 +296,7 @@ test("CB-D344 案内の間は「取り込む…」を押しても欄を開かず
   }
 });
 
-test("CB-D345 取り込みが書かずに返ったら、その答えを下見に入れ替えて「取り込めませんでした」と出す", async () => {
+test("CB-D345 取り込みが書かずに返ったら、その答えをプレビューに入れ替えて「取り込めませんでした」と出す", async () => {
   const dom = await openTemplates();
   try {
     await openImport(dom, "login");
@@ -323,7 +323,7 @@ function clickImport(dom: DomPage): void {
   dom.click(dom.one('[data-action="import-yes"]'));
 }
 
-test("CB-D347 案内の「取り込む…」は取り込める最初の 1 件（login）に付く。先頭の broken（取り込めない）には付かず、案内の下見の段は押せるボタンを指す", async () => {
+test("CB-D347 案内の「取り込む…」は取り込める最初の 1 件（login）に付く。先頭の broken（取り込めない）には付かず、案内のプレビューの段は押せるボタンを指す", async () => {
   const dom = await openTemplates();
   try {
     const marks = dom.all('[data-tour="draft-import"]');
@@ -336,7 +336,7 @@ test("CB-D347 案内の「取り込む…」は取り込める最初の 1 件（
   }
 });
 
-test("CB-D349 取り込みが書けたあとの読み直し（data）が先に届いても、「取り込みました」の帯は残る。プレビューと欄は閉じている", async () => {
+test("CB-D349 取り込みが書けたあとの再読み込み（data）が先に届いても、「取り込みました」の帯は残る。プレビューと欄は閉じている", async () => {
   const dom = await openTemplates();
   try {
     await openImport(dom, "login");
@@ -353,7 +353,7 @@ test("CB-D349 取り込みが書けたあとの読み直し（data）が先に�
       error: "",
     });
     await dom.settle();
-    assert.equal(text(dom.one("#status")), "取り込みました: .ccnavi/config/common/templates/login.yml。下書きを消しました");
+    assert.equal(text(dom.one("#status")), "取り込みました: .ccnavi/config/common/templates/login.yml。下書きを削除しました");
     assert.equal(dom.all('[data-role="import-preview"]').length, 0);
     assert.equal(dom.all('[data-role="import-form"]').length, 0);
   } finally {

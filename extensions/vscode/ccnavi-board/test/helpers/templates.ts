@@ -31,7 +31,7 @@ export function templatesHtml(data: TemplatesData, options: Partial<RenderOption
 export function fixtureJson(): TemplatesJson {
   const parsed: TemplatesParse = parseTemplates(templatesFixtureText());
   if (!parsed.ok) {
-    throw new Error(`見本を読めない: ${parsed.error}`);
+    throw new Error(`見本を読み込めない: ${parsed.error}`);
   }
   return parsed.value;
 }

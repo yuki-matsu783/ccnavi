@@ -19,7 +19,7 @@ courses:
         body: ワークスペースの projects/ の直下にある git リポジトリが、プロジェクトとして並びます。ここに件数と置き場のフォルダが出ます。
       - target: clone
         title: リポジトリを clone する
-        body: URL を入れて clone を押すと、projects/ の直下に取り込みます。名前は URL から自動で入り、手で直せます。git clone は「ccnavi」ターミナルで動くので、認証が要るときはそこで入力します。
+        body: URL を入れて clone を押すと、projects/ の直下に取り込みます。名前は URL から自動で入り、手で直せます。git clone は「ccnavi」ターミナルで動くので、認証が必要ときはそこで入力します。
       - target: list
         title: プロジェクトの一覧
         body: プロジェクトごとに、origin・設定のルール・ワークツリー・チケット・検証の結果をカードで見られます。
@@ -31,13 +31,13 @@ courses:
         body: プロジェクトの外、ワークスペース自体のワークツリーと、ワークスペースの設定のルールの有無です。
       - target: refresh
         title: 更新
-        body: 一覧を読み直します。clone や移動をターミナルで済ませたあとに押します。
+        body: 一覧を再読み込みします。clone や移動をターミナルで済ませたあとに押します。
       - target: tour
         title: 案内
         body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
 
   - id: add-project
-    title: プロジェクトを足したいとき
+    title: プロジェクトを追加したいとき
     summary: clone するか、既存のリポジトリを projects/ の下へ移して、一覧に出す
     steps:
       - target: clone-url
@@ -53,5 +53,5 @@ courses:
         title: 手で移したときは更新
         body: 既存のリポジトリを projects/ の直下へ自分で移したときは、更新を押すと一覧に出ます。ワークスペース直下などにあって認識されないリポジトリは、一覧の下に別枠で出ます。
       - target: project
-        title: 追加できたか確かめる
+        title: 追加できたか確認する
         body: 新しいカードの検証が「問題なし」なら取り込めています。error や warn が出たら、理由に従って直します。

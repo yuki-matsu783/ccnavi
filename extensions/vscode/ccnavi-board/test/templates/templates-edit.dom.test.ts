@@ -52,7 +52,7 @@ const DELETE_FEATURE: EditRequest = { op: "delete", name: "feature", on: "common
 const FEATURE_PATH = ".ccnavi/config/common/templates/feature.yml";
 const FEATURE_DELETE_ANSWER: Partial<EditAnswer> = { op: "delete", name: "feature", on: "common", source: FEATURE_PATH, target: "", sha: "d".repeat(64) };
 
-test("CB-D351 下書きの「編集」で編集の欄が開き、本文に下書きの text が入る。行は開かず、下見は body を載せた previewEdit を送る", async () => {
+test("CB-D351 下書きの「編集」で編集の欄が開き、本文に下書きの text が入る。行は開かず、プレビューは body を載せた previewEdit を送る", async () => {
   const dom = await loginPage();
   try {
     await clickAction(dom, 'li.draft[data-name="login"]', "edit-draft");
@@ -73,7 +73,7 @@ test("CB-D351 下書きの「編集」で編集の欄が開き、本文に下書
   }
 });
 
-test("CB-D352 下見の答えが同じ要求なら差分を行ごとの色で出し、「この内容で保存」は見せた sha を expect にして editYes を送る。要求が違う答えは捨てる", async () => {
+test("CB-D352 プレビューの答えが同じ要求なら差分を行ごとの色で出し、「この内容で保存」は見せた sha を expect にして editYes を送る。要求が違う答えは捨てる", async () => {
   const dom = await loginPage();
   try {
     await clickAction(dom, 'li.draft[data-name="login"]', "edit-draft");
@@ -100,7 +100,7 @@ test("CB-D352 下見の答えが同じ要求なら差分を行ごとの色で出
   }
 });
 
-test("CB-D353 欄の入力を変えると下見の答えは消え、実行のボタンも消える", async () => {
+test("CB-D353 欄の入力を変えるとプレビューの答えは消え、実行のボタンも消える", async () => {
   const dom = await loginPage();
   try {
     await clickAction(dom, 'li.draft[data-name="login"]', "edit-draft");
@@ -142,12 +142,12 @@ test("CB-D354 書けたら欄を閉じて結果を状態の欄に出す。書け
   }
 });
 
-test("CB-D355 共通のテンプレートの「削除」は下見から実行まで進む。作業中の錠が掛かると錠の帯が出て実行は押せず、下書きの削除には錠の帯が出ない", async () => {
+test("CB-D355 共通のテンプレートの「削除」はプレビューから実行まで進む。作業中の錠が掛かると錠の帯が出て実行は押せず、下書きの削除には錠の帯が出ない", async () => {
   const free = await openTemplates({ target: { kind: "workspace", name: "" } });
   try {
     await clickAction(free, 'li.template[data-name="feature"][data-layer="common"]', "delete-template");
     assert.equal(free.one('[data-role="edit-panel"]').getAttribute("data-op"), "delete");
-    assert.equal(text(free.one('[data-role="edit-confirm"]')), "feature を消します。消した中身は戻せません（git に入れていなければ復元できません）。");
+    assert.equal(text(free.one('[data-role="edit-confirm"]')), "feature を削除します。削除した中身は戻せません（git に入れていなければ復元できません）。");
     await previewOf(free, DELETE_FEATURE, FEATURE_DELETE_ANSWER);
     await clickYes(free);
     assert.deepEqual(free.posted.filter((message) => message.type === "editYes"), [
@@ -155,7 +155,7 @@ test("CB-D355 共通のテンプレートの「削除」は下見から実行ま
     ]);
     await free.send({ type: "edited", request: DELETE_FEATURE, answer: editAnswer({ ...FEATURE_DELETE_ANSWER, removed: true }), error: "" });
     assert.equal(free.all('[data-role="edit-panel"]').length, 0);
-    assert.equal(text(free.one("#status")), `消しました: ${FEATURE_PATH}`);
+    assert.equal(text(free.one("#status")), `削除しました: ${FEATURE_PATH}`);
   } finally {
     await free.close();
   }
@@ -192,7 +192,7 @@ test("CB-D356 編集が使えない（古い版）と、下書きの編集・改
   }
 });
 
-test("CB-D358 改名が途中で失敗（書けたが元を消せなかった）と、欄を残して途中で失敗した旨を状態の欄に出す。成功の扱いにはしない", async () => {
+test("CB-D358 改名が途中で失敗（書けたが元を削除できなかった）と、欄を残して途中で失敗した旨を状態の欄に出す。成功の扱いにはしない", async () => {
   const dom = await loginPage();
   try {
     await clickAction(dom, 'li.draft[data-name="login"]', "rename-draft");
@@ -203,7 +203,7 @@ test("CB-D358 改名が途中で失敗（書けたが元を消せなかった）
     await dom.send({
       type: "edited",
       request: RENAME,
-      answer: editAnswer({ op: "rename", ok: false, written: true, removed: false, errors: ["元の i0001.yml を消せなかった"] }),
+      answer: editAnswer({ op: "rename", ok: false, written: true, removed: false, errors: ["元の i0001.yml を削除できなかった"] }),
       error: "",
     });
     assert.equal(dom.all('[data-role="edit-panel"]').length, 1);

@@ -174,7 +174,7 @@ function Body({
               ) : null}
               {changed.includes(ticket) ? (
                 <p className="approval-note warn plan-changed">
-                  計画編集タブで保存したあとに、提案が変わっています（エージェントが書き換えた可能性があります）。図を確かめてから承認してください。
+                  計画編集タブで保存したあとに、提案が変わっています（エージェントが変更した可能性があります）。図を確認してから承認してください。
                 </p>
               ) : null}
               {approving ? null : (

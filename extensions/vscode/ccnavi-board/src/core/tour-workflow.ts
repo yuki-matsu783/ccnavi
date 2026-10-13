@@ -9,7 +9,7 @@
  *
  *   計画ごと   `ticket`・`part`・`source_sha`・項の `from`（番号）・`deferred`・`review_at`・`locked` は省ける。
  *              `proposed`（提案に書いてある先行）は、`base` があればその答えの同じ計画の値、無ければ `after`
- *   base       その答えを引く前の答え（先に書いた答えの名前）。書かなかった計画（plan / feedback）は `base` の計画をそのまま使う。
+ *   base       その答えを引く前の答え（先に定義した答えの名前）。書かなかった計画（plan / feedback）は `base` の計画をそのまま使う。
  *              「案に戻す」・外で変わった差分・点の置き場所の元になる。`base` を書かない答えは、開いたときの答え
  *   答え全体   `problems`・`loose` は計画の値を寄せ集め、`writable` は「断った線・検査の error・子の付け替えの問題・改版の錠が
  *              どれも無い」から決める（実行ファイルの答えと同じ関係。`test/fixtures/plan-order.json` の実例で確かめる）
@@ -76,7 +76,7 @@ function itemOf(raw: unknown, at: string): Json {
     throw new Error(`${at}.number は 1 以上の整数にする`);
   }
   if (typeof item.type !== "string" || item.type === "") {
-    throw new Error(`${at}.type が無い`);
+    throw new Error(`${at}.type がありません`);
   }
   return {
     number: item.number,
@@ -120,7 +120,7 @@ export function completeAnswer(name: string, raw: unknown, ticket: string, known
   const baseName = given.base === undefined ? "" : String(given.base);
   const base = baseName === "" ? undefined : known[baseName];
   if (baseName !== "" && base === undefined) {
-    throw new Error(`${at}.base「${baseName}」は先に書いた答えの名前にする`);
+    throw new Error(`${at}.base「${baseName}」は先に定義した答えの名前にする`);
   }
   const basePlans = array(base?.plans, `${at}.base`) as Json[];
   const plans: Json[] = [];
@@ -133,7 +133,7 @@ export function completeAnswer(name: string, raw: unknown, ticket: string, known
     }
   }
   if (plans.length === 0) {
-    throw new Error(`${at} に計画（plan / feedback）が無い`);
+    throw new Error(`${at} に計画（plan / feedback）がありません`);
   }
   const problems = given.problems ?? plans.flatMap((plan) => plan.problems as unknown[]);
   const revision = array(given.revision_problems, `${at}.revision_problems`);
@@ -161,7 +161,7 @@ export function parseWorkflowSample(raw: unknown): WorkflowSample {
   onlyKeys(root, ROOT_KEYS, "sample");
   const ticket = typeof root.ticket === "string" && root.ticket !== "" ? root.ticket : "";
   if (ticket === "") {
-    throw new Error("sample.ticket が無い");
+    throw new Error("sample.ticket がありません");
   }
   const given = object(root.answers, "sample.answers");
   const known: Record<string, Json> = {};
@@ -177,7 +177,7 @@ export function parseWorkflowSample(raw: unknown): WorkflowSample {
     answers[name] = { answer: parsed.value, base: done.base };
   }
   if (answers.open === undefined) {
-    throw new Error("sample.answers.open（開いたときの答え）が無い");
+    throw new Error("sample.answers.open（開いたときの答え）がありません");
   }
   return { ticket, answers };
 }

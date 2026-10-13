@@ -218,7 +218,7 @@ async function switchTarget(current: PanelState, target: TemplatesTarget): Promi
     }
     current.asking = true;
     const choice = await vscode.window.showWarningMessage(
-      `編集または下見を開いています。破棄して「${titleOf(target)}」に切り替えますか？`,
+      `編集またはプレビューを開いています。破棄して「${titleOf(target)}」に切り替えますか？`,
       { modal: true },
       "切り替える",
     );
@@ -584,7 +584,7 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
     case "refresh": {
       if (message.dirty) {
         const choice = await vscode.window.showWarningMessage(
-          "編集または下見を開いています。破棄して更新しますか？",
+          "編集またはプレビューを開いています。破棄して更新しますか？",
           { modal: true },
           "更新",
         );
@@ -676,7 +676,7 @@ async function importYes(current: PanelState, request: ImportRequest, expect: st
   };
   const loaded = current.loaded;
   if (loaded === undefined) {
-    refuse("画面を読み直してください");
+    refuse("画面を再読み込みしてください");
     return;
   }
   // 錠は押した時点で取り直す。キャッシュした錠は、チケットが動いてから更新されるまでの隙を通すため
@@ -729,7 +729,7 @@ async function editYes(current: PanelState, request: EditRequest, expect: string
   };
   const loaded = current.loaded;
   if (loaded === undefined) {
-    refuse("画面を読み直してください");
+    refuse("画面を再読み込みしてください");
     return;
   }
   if (!loaded.edit.enabled) {

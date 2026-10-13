@@ -30,8 +30,8 @@ sample:
   path: .ccnavi/config/project/templates/
   templates:
     - name: feature
-      description: 機能を足す親の計画
-      when: 新しい機能を足すとき
+      description: 機能を追加する親の計画
+      when: 新しい機能を追加するとき
       plan:
         - type: design
           review: required
@@ -49,8 +49,8 @@ sample:
           connections: 3
       text: |
         name: feature
-        description: 機能を足す親の計画
-        when: 新しい機能を足すとき
+        description: 機能を追加する親の計画
+        when: 新しい機能を追加するとき
     - name: research
       description: 調べものの親の計画
       when: 先に調べてから決めるとき
@@ -65,7 +65,7 @@ sample:
         name: research
   drafts:
     - name: login
-      description: ログイン画面を足す親の計画
+      description: ログイン画面を追加する親の計画
       importable: true
       problems:
         - severity: warn
@@ -83,12 +83,12 @@ sample:
       importable: false
       problems:
         - severity: error
-          detail: YAML として読めない
+          detail: YAML として読み込めない
   preview:
     target: .ccnavi/config/common/templates/login.yml
     new_text: |
       name: login
-      description: ログイン画面を足す親の計画
+      description: ログイン画面を追加する親の計画
   sums:
     - name: self
       layers: [common, self]
@@ -127,7 +127,7 @@ courses:
         scene: {}
       - target: list
         title: テンプレートの一覧
-        body: 選んだ層のテンプレートが並びます。各テンプレートに、使える・使われない・捨てた理由の札が出ます。捨てた理由は、同じ中身があるか、読めないかなどです。
+        body: 選んだ層のテンプレートが並びます。各テンプレートに、使える・使われない・捨てた理由の札が出ます。捨てた理由は、同じ中身があるか、読み込めないかなどです。
         scene: {}
       - target: template
         title: 1 件を開く
@@ -142,11 +142,11 @@ courses:
           sum: self
       - target: drafts
         title: 下書き
-        body: エージェントが書いた下書きです。効力は無く、取り込むまでテンプレートとしては使われません。
+        body: エージェントが作成した下書きです。効力は無く、取り込むまでテンプレートとしては使われません。
         scene: {}
       - target: refresh
         title: 更新
-        body: 一覧を読み直します。ファイルを外で書き換えたあとに押します。
+        body: 一覧を再読み込みします。ファイルを外で変更したあとに押します。
         scene: {}
       - target: tour
         title: 案内
@@ -154,12 +154,12 @@ courses:
         scene: {}
 
   - id: read-sum
-    title: 足し算を読むとき
+    title: 足し算を確認するとき
     summary: どの名前が使われ、どれが捨てられたかを見る
     steps:
       - target: sum
         title: 足し算の枠
-        body: 枠を開くと、共通の設定と選んだ設定を足した結果が出ます。
+        body: 枠を開くと、共通の設定と選んだ設定を追加した結果が出ます。
         scene:
           sum: self
       - target: sum-pick
@@ -179,27 +179,27 @@ courses:
           sum: self
 
   - id: read-drafts
-    title: 下書きを読むとき
+    title: 下書きを確認するとき
     summary: 下書きの検査と、取り込めるかを見る
     steps:
       - target: drafts
         title: 下書きとは
-        body: 親チケットの中で書かれた、まだ効力の無いテンプレートです。ここで中身を読んでから取り込みます。
+        body: 親チケットの中で作成された、まだ効力のないテンプレートです。ここで中身を読んでから取り込みます。
         scene:
           draft: login
       - target: draft
         title: 取り込めるか
-        body: 取り込めるは、読めて error が無いことです。同名ありは、取り込むと同じ名前のテンプレートを置き換えます。TODO が残っているものは、直してから取り込みます。
+        body: 取り込めるは、読めて error がないことです。同名ありは、取り込むと同じ名前のテンプレートを置き換えます。TODO が残っているものは、直してから取り込みます。
         scene:
           draft: login
       - target: refresh
-        title: 読み直す
-        body: 下書きを直したあとは、更新を押して読み直します。
+        title: 再読み込みする
+        body: 下書きを直したあとは、更新を押して再読み込みします。
         scene: {}
 
   - id: import
     title: 下書きを取り込むとき
-    summary: 取り込み先を選び、下見で差分を読んでから取り込む
+    summary: 取り込み先を選び、プレビューで差分を読んでから取り込む
     steps:
       - target: draft
         title: 下書きを選ぶ
@@ -213,18 +213,18 @@ courses:
           draft: login
       - target: import-form
         title: 取り込み先と置き換え
-        body: 取り込み先と置き換えを選んで「取り込み内容をプレビュー」を押します。プレビューは何も書きません。
+        body: 取り込み先と置き換えを選んで「取り込み内容をプレビュー」を押します。プレビューは何も保存しません。
         scene:
           draft: login
           import: login
       - target: import-preview
-        title: 下見を読んで取り込む
-        body: 差分か取り込む本文と指摘を読み、「この内容で取り込む」を押すと書かれます（見せた下書きが途中で書き換わっていたら書かれません）。
+        title: プレビューを読んで取り込む
+        body: 差分か取り込む本文と指摘を読み、「この内容で取り込む」を押すとテンプレートとして保存されます（見せた下書きが途中で変更されていたら保存されません）。
         scene:
           draft: login
           import: login
           preview: true
       - target: refresh
-        title: 読み直す
-        body: 下書きを直したあとや、外で書き換えたあとは、更新を押して読み直します。
+        title: 再読み込みする
+        body: 下書きを直したあとや、外で変更したあとは、更新を押して再読み込みします。
         scene: {}

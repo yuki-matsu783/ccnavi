@@ -46,16 +46,16 @@ function cardOf(json: BoardJson, id: string): Card {
       return found;
     }
   }
-  throw new Error(`カードが無い: ${id}`);
+  throw new Error(`カードがない: ${id}`);
 }
 
-test("CB-D185 カードの workflow は、計画を持つ承認待ちの親の提案（新規も改版も）だけ真。承認済みだけの親・計画の無い親・子・古い実行ファイル（has_plan が無い）は偽", () => {
+test("CB-D185 カードの workflow は、計画を持つ承認待ちの親の提案（新規も改版も）だけ真。承認済みだけの親・計画のない親・子・古い実行ファイル（has_plan がありません）は偽", () => {
   const json = withParents();
   assert.equal(cardOf(json, "i0002").workflow, true);
   assert.equal(cardOf(json, "i0001").workflow, true, "改版の提案");
   assert.equal(cardOf(json, "i0003").workflow, false);
   assert.equal(cardOf(json, "i0001-02-03").workflow, false, "子");
-  assert.equal(cardOf(withParents(false), "i0001").workflow, false, "承認済みで提案の無い親");
+  assert.equal(cardOf(withParents(false), "i0001").workflow, false, "承認済みで提案のない親");
   // レビュー待ち（review/）の提案は承認待ちではない
   const review = withParents();
   const reviewed = { ...review, tickets: review.tickets.map((t) => (t.ticket === "i0002" && t.proposal !== null ? { ...t, proposal: { ...t.proposal, state: "review" as const } } : t)) };
@@ -89,7 +89,7 @@ test("CB-D184 計画を持つ承認待ちの親の提案のカードに「計画
   }
   const plain = await openBoard();
   try {
-    assert.equal(plain.all('[data-action="workflow"]').length, 0, "見本（承認待ちの親が無い）には出ない");
+    assert.equal(plain.all('[data-action="workflow"]').length, 0, "見本（承認待ちの親がありません）には出ない");
   } finally {
     await plain.close();
   }

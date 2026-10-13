@@ -11,7 +11,7 @@ test("CB-T34 実行ファイルが作業中と答えたチケットがあれば�
   assert.match(lock.reason, /i0001-02-02/);
 });
 
-test("CB-T35 作業中が無ければ保存できる。started_at があっても実行ファイルが偽と答えれば数えない", () => {
+test("CB-T35 作業中がなければ保存できる。started_at があっても実行ファイルが偽と答えれば数えない", () => {
   const board = fixture();
   const tickets = board.tickets.map((t) =>
     t.ticket === "i0001-02-02" ? { ...t, in_progress: false } : t,
@@ -24,13 +24,13 @@ test("CB-T35 作業中が無ければ保存できる。started_at があって�
 });
 
 test("CB-T36 ボードが読めなければ閉じる側にする", () => {
-  const lock = lockFromError("実行ファイルが無い");
+  const lock = lockFromError("実行ファイルがありません");
   assert.equal(lock.locked, true);
   // 読めなかった理由をそのまま載せる。何が読めなかったかをユーザが読める
-  assert.equal(lock.reason, "作業中のチケット: 実行ファイルが無い");
+  assert.equal(lock.reason, "作業中のチケット: 実行ファイルがありません");
 });
 
-test("CB-T391 作業中かを答えない古い実行ファイルの答えでは、確かめられないので保存できない", () => {
+test("CB-T391 作業中かを答えない古い実行ファイルの答えでは、確認できないので保存できない", () => {
   const board = fixture();
   const tickets = board.tickets.map((t) => ({ ...t, in_progress: null }));
   const lock = lockFromBoard({ ...board, tickets });

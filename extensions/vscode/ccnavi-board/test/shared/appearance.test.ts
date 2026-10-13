@@ -76,14 +76,14 @@ function themeDiff(expected: Map<string, string>, actual: Map<string, string>, a
   const diffs: string[] = [];
   for (const [name, value] of expected) {
     if (!actual.has(name)) {
-      diffs.push(`${name} が browser-theme.css に無い`);
+      diffs.push(`${name} が browser-theme.css にありません`);
     } else if (actual.get(name) !== value) {
       diffs.push(`${name}: appearance.css は ${value}、browser-theme.css は ${actual.get(name)}`);
     }
   }
   for (const name of actual.keys()) {
     if (!expected.has(name) && !allowedExtra.has(name)) {
-      diffs.push(`${name} が appearance.css に無い`);
+      diffs.push(`${name} が appearance.css にありません`);
     }
   }
   return diffs;
@@ -93,7 +93,7 @@ test("CB-T393 browser-theme.css（Chrome 拡張）の配色は appearance.css �
   // browser-theme.css だけが持ってよいのは字体の 3 変数（VS Code の Webview では VS Code が渡す値）
   const fontVariables = new Set(["--vscode-font-family", "--vscode-font-size", "--vscode-editor-font-family"]);
   const [beforeDark, afterDark] = BROWSER_THEME.split("@media (prefers-color-scheme: dark)");
-  assert.notEqual(afterDark, undefined, "browser-theme.css にダークの @media が無い");
+  assert.notEqual(afterDark, undefined, "browser-theme.css にダークの @media がありません");
   const light = themeVariables(beforeDark);
   const dark = themeVariables(afterDark);
   const [darkPart, lightPart] = APPEARANCE_STYLE.split("body.ccnavi-claude-light");
@@ -105,7 +105,7 @@ test("CB-T393 browser-theme.css（Chrome 拡張）の配色は appearance.css �
   // ダークは字体を持たない（ライトの :root だけが持つ）。持つなら appearance.css に無いものとして落とす
   assert.deepEqual(themeDiff(expectedDark, dark, new Set()), [], "ダーク");
   for (const name of fontVariables) {
-    assert.ok(light.has(name), `${name} が browser-theme.css のライトに無い`);
+    assert.ok(light.has(name), `${name} が browser-theme.css のライトにありません`);
     assert.ok(!expectedLight.has(name) && !expectedDark.has(name), `${name} は appearance.css に置かない`);
   }
 });
@@ -219,7 +219,7 @@ test("CB-T183c 保持する画面は、表に戻ったところでも送り直�
   for (const name of RETAINED_PANELS) {
     const text = source(name);
     const found = /panel\.onDidChangeViewState\(\(\) => \{([\s\S]*?)\n  \}\);/.exec(text);
-    assert.ok(found !== null, `${name} に表に戻ったときの送り直しが無い`);
+    assert.ok(found !== null, `${name} に表に戻ったときの送り直しがありません`);
     assert.match(found[1], /postAppearance\(current\.host\)/, `${name} が表に戻っても見た目を送り直していない`);
   }
   for (const name of REBUILT_PANELS) {

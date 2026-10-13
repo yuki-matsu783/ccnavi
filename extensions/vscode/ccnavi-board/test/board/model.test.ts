@@ -44,7 +44,7 @@ test("CB-T3 JSON でなければ理由を返す", () => {
   const parsed = parseBoardJson("not json");
   assert.equal(parsed.ok, false);
   if (!parsed.ok) {
-    assert.match(parsed.error, /JSON として読めません/);
+    assert.match(parsed.error, /JSON として解釈できません/);
   }
   const notObject = parseBoardJson("[1]");
   assert.equal(notObject.ok, false);
@@ -69,7 +69,7 @@ test("CB-T110 layers[] からルールファイルの置き場を読み、欠け
   ]);
 });
 
-test("CB-T318 sums[] を読む。ワークスペースの足し算（共通 + 自身）が先で、欠けた欄は空で補い、古い実行ファイル（sums が無い）では空", () => {
+test("CB-T318 sums[] を読む。ワークスペースの足し算（共通 + 自身）が先で、欠けた欄は空で補い、古い実行ファイル（sums がありません）では空", () => {
   const board = fixture();
   assert.deepEqual(board.sums.map((s) => s.name), ["self"]);
   const self = board.sums[0];
@@ -127,11 +127,11 @@ test("CB-T4 欠けた項目は既定値で埋め、全体を捨てない", () =>
   }
 });
 
-test("CB-T140 blocked は欄が無ければ空。古い実行ファイルの出力でも失敗しない", () => {
+test("CB-T140 blocked は欄がなければ空。古い実行ファイルの出力でも失敗しない", () => {
   // 欄が無いのは、この欄より前の実行ファイルの出力。空なら止まっていないと読む。
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
-  tickets[0].blocked = "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）";
+  tickets[0].blocked = "親 i0001 の承認済みチケットが作業中にない（未承認か、閉じている）";
   delete tickets[1].blocked;
 
   const parsed = parseBoardJson(JSON.stringify({ ...base, tickets }));
@@ -139,11 +139,11 @@ test("CB-T140 blocked は欄が無ければ空。古い実行ファイルの出�
   if (!parsed.ok) {
     return;
   }
-  assert.match(parsed.board.tickets[0].blocked, /作業中に無い/);
+  assert.match(parsed.board.tickets[0].blocked, /作業中にない/);
   assert.equal(parsed.board.tickets[1].blocked, "");
 });
 
-test("CB-T259 history は実行ファイルの履歴をそのまま使う。欄が無ければ空、オブジェクトでない行は除き、欠けた欄は既定値で埋める", () => {
+test("CB-T259 history は実行ファイルの履歴をそのまま使う。欄がなければ空、オブジェクトでない行は除き、欠けた欄は既定値で埋める", () => {
   // 欄が無いのは、この欄より前の実行ファイルの出力。空なら履歴を出さない。
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
@@ -170,7 +170,7 @@ test("CB-T259 history は実行ファイルの履歴をそのまま使う。欄�
   assert.deepEqual(parsed.board.tickets[1].history, []);
 });
 
-test("CB-T262 predecessors_unmet は実行ファイルの答えをそのまま使う。欄が無ければ空（満たしている扱い）", () => {
+test("CB-T262 predecessors_unmet は実行ファイルの答えをそのまま使う。欄がなければ空（満たしている扱い）", () => {
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
   tickets[3].predecessors_unmet = [{ ticket: "i0001-02-02", state: "doing", label: "作業中（doing/）" }, "壊れた行"];
@@ -184,7 +184,7 @@ test("CB-T262 predecessors_unmet は実行ファイルの答えをそのまま�
   assert.deepEqual(parsed.board.tickets[1].predecessors_unmet, []);
 });
 
-test("CB-T303 archived は実行ファイルの退避の欄を写す。欄が無ければ空、オブジェクトでない行は除き、欠けた欄は既定値で埋める", () => {
+test("CB-T303 archived は実行ファイルの退避の欄を写す。欄がなければ空、オブジェクトでない行は除き、欠けた欄は既定値で埋める", () => {
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const parsed = parseBoardJson(
     JSON.stringify({
@@ -215,7 +215,7 @@ test("CB-T303 archived は実行ファイルの退避の欄を写す。欄が無
   }
 });
 
-test("CB-T385 提案の has_plan（計画を持つか）を読む。無い・真偽でない値は偽（古い実行ファイルの答え）", () => {
+test("CB-T385 提案の has_plan（計画を持つか）を読む。ない・真偽でない値は偽（古い実行ファイルの答え）", () => {
   const parsed = parseBoardJson(
     JSON.stringify({
       version: BOARD_VERSION,
@@ -236,7 +236,7 @@ test("CB-T385 提案の has_plan（計画を持つか）を読む。無い・真
   }
 });
 
-test("CB-T570 チケットの template_draft（完了した計画付きの親から下書きを作れるか）を読む。無い・真偽でない値は偽（古い実行ファイルの答え）", () => {
+test("CB-T570 チケットの template_draft（完了した計画付きの親から下書きを作れるか）を読む。ない・真偽でない値は偽（古い実行ファイルの答え）", () => {
   const parsed = parseBoardJson(
     JSON.stringify({
       version: BOARD_VERSION,

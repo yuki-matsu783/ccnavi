@@ -23,7 +23,7 @@ import {
 } from "../../src/core/workflow-view.js";
 import { planOrderSample } from "../helpers/plan-order.js";
 
-test("CB-T369 答えの線を、元の番号での直接の先行（--order の形）に戻す。先行の無い番号も空のリストで並べる", () => {
+test("CB-T369 答えの線を、元の番号での直接の先行（--order の形）に戻す。先行のない番号も空のリストで並べる", () => {
   assert.deepEqual(orderOf(planOrderSample("open")), {
     plan: { "1": [], "2": [1], "3": [1], "4": [2, 3] },
     feedback: { "5": [], "6": [5] },
@@ -32,7 +32,7 @@ test("CB-T369 答えの線を、元の番号での直接の先行（--order の�
   assert.deepEqual(orderOf(planOrderSample("reverse")).plan, { "1": [], "2": [1, 3], "3": [1], "4": [2] });
 });
 
-test("CB-T370 図で線を足す・消すと、見えている番号を元の番号に直して --order を組む。提案と同じ計画は渡さない", () => {
+test("CB-T370 図で線を追加する・削除すると、見えている番号を元の番号に直して --order を組む。提案と同じ計画は渡さない", () => {
   const open = planOrderSample("open");
   // 3 番が 2 番を待つ線を足す（見えている番号 = 元の番号）。フィードバック計画は変えていないので渡さない
   assert.deepEqual(editedOrder(open, { part: "plan", from: 2, to: 3, add: true }), { plan: { "1": [], "2": [1], "3": [1, 2], "4": [2, 3] } });
@@ -77,19 +77,19 @@ test("CB-T373 外で提案が変わったときの差分。番号ごとに、定
   // 項が増えた・減った（フィードバック計画が無くなった）
   const dropped = planDiff(before, [before[0]]);
   assert.deepEqual(dropped.map((row) => [row.part, row.number, row.after]), [
-    ["feedback", 5, "（無い）"],
-    ["feedback", 6, "（無い）"],
+    ["feedback", 5, "（なし）"],
+    ["feedback", 6, "（なし）"],
   ]);
   assert.deepEqual(planDiff(before, before), []);
 });
 
-test("CB-T374 保存できない理由。書けない答え（実行ファイルの writable）・未保存でない・確かめている途中・外で変わった・提案が無くなった", () => {
+test("CB-T374 保存できない理由。書けない答え（実行ファイルの writable）・未保存でない・確認している途中・外で変わった・提案が無くなった", () => {
   const reverse = planOrderSample("reverse");
   const calm = { pending: false, changed: false, gone: false };
   assert.equal(saveBlocker(reverse, calm), "");
   assert.match(saveBlocker(planOrderSample("open"), calm), /変えていません/);
   assert.match(saveBlocker(planOrderSample("loose"), calm), /順序の検査/);
-  assert.match(saveBlocker(reverse, { ...calm, pending: true }), /確かめ/);
+  assert.match(saveBlocker(reverse, { ...calm, pending: true }), /確認/);
   assert.match(saveBlocker(reverse, { ...calm, changed: true }), /外で変わった/);
   assert.match(saveBlocker(reverse, { ...calm, gone: true }), /承認待ち/);
   const blocked = { ...reverse, writable: false, child_problems: ["i0001-03-01 の付け替え先が承認済みチケットと重なる"] };
@@ -101,7 +101,7 @@ test("CB-T375 タブの題は未保存の間だけ頭に ● を付ける", () =
   assert.equal(workflowTitle("i0001", true), "● ccnavi 計画編集: i0001");
 });
 
-test("CB-T376 画面から届いたものを確かめる。形が崩れていれば捨てる（保存の中身が読めないものを渡さない）", () => {
+test("CB-T376 画面から届いたものを確認する。形が崩れていれば捨てる（保存の中身が読み込めないものを渡さない）", () => {
   const order = { plan: { "1": [], "2": [1] } };
   assert.deepEqual(asWorkflowMessage({ type: "ready" }), { type: "ready" });
   assert.deepEqual(asWorkflowMessage({ type: "adopt" }), { type: "adopt" });
@@ -111,7 +111,7 @@ test("CB-T376 画面から届いたものを確かめる。形が崩れていれ
   assert.deepEqual(asWorkflowMessage({ type: "order", seq: 3, order }), { type: "order", seq: 3, order });
   assert.equal(asWorkflowMessage({ type: "order", seq: "3", order }), undefined);
   assert.deepEqual(asWorkflowMessage({ type: "save", order, expect: "abc" }), { type: "save", order, expect: "abc" });
-  assert.equal(asWorkflowMessage({ type: "save", order }), undefined, "ハッシュが無ければ保存しない");
+  assert.equal(asWorkflowMessage({ type: "save", order }), undefined, "ハッシュがなければ保存しない");
   assert.deepEqual(asWorkflowMessage({ type: "draft", order: null }), { type: "draft", order: null });
   assert.deepEqual(asWorkflowMessage({ type: "draft", order }), { type: "draft", order });
   assert.equal(asWorkflowMessage({ type: "write" }), undefined);
@@ -131,7 +131,7 @@ test("CB-T377 開くコマンドに渡す親の識別子。識別子の形でな
   }
 });
 
-test("CB-T382 案内を閉じた（tourDone）は形を確かめて受ける", () => {
+test("CB-T382 案内を閉じた（tourDone）は形を確認して受ける", () => {
   assert.deepEqual(asWorkflowMessage({ type: "tourDone" }), { type: "tourDone" });
   assert.deepEqual(asWorkflowMessage({ type: "tourDone", extra: 1 }), { type: "tourDone" });
 });
@@ -141,7 +141,7 @@ test("CB-T386 未保存の知らせは、線の答えを待っている（checki
   assert.deepEqual(asWorkflowMessage({ type: "dirty", dirty: true, checking: "yes" }), { type: "dirty", dirty: true, checking: false });
 });
 
-test("CB-T387 提案が承認待ちから無くなった理由。新規の親は承認済みか取り下げかを分け、改版は分けられないので言い切らない。まだ承認待ちか、ボードに無い・確かめられないときは何も言わない", () => {
+test("CB-T387 提案が承認待ちから無くなった理由。新規の親は承認済みか取り下げかを分け、改版は分けられないので言い切らない。まだ承認待ちか、ボードにない・確認できないときは何も言わない", () => {
   assert.equal(goneReasonOf("i0001", false, { proposal: "todo", approved: false }), undefined);
   assert.equal(goneReasonOf("i0001", true, { proposal: "todo", approved: true }), undefined);
   assert.match(goneReasonOf("i0001", false, { proposal: null, approved: true }) ?? "", /^i0001 は承認済みです/);
@@ -163,7 +163,7 @@ test("CB-T388 閉じた後に戻すかを聞くのは、未保存で写しがあ
   assert.equal(restoreAsked({ ...base, loaded: false }), false);
 });
 
-test("CB-T389 保存で覚えるハッシュは、書けたときの答え（書いたあとに読み直したもの）だけ", () => {
+test("CB-T389 保存で覚えるハッシュは、書けたときの答え（書いたあとに再読み込みしたもの）だけ", () => {
   const written = planOrderSample("written", "after-write");
   assert.equal(savedShaOf({ kind: "written", answer: written }), "after-write");
   for (const kind of ["unchanged", "changed"] as const) {

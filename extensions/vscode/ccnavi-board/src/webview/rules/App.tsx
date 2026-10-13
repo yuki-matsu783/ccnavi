@@ -351,7 +351,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         </p>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={busy} onClick={reload}>
           更新
         </button>
       </>
@@ -496,7 +496,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       ))}
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={busy} onClick={reload}>
           更新
         </button>
       </div>
@@ -520,7 +520,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           <button type="button" className="action" data-action="open-rules" disabled={page?.exists === false} onClick={() => post({ type: "openFile", which: "rules" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={busy} onClick={reload}>
             更新
           </button>
           <button
@@ -691,11 +691,11 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             disabled={busy}
             onClick={() => {
               setBusy(true);
-              setStatus({ text: "期待する判定を確かめ中…", error: false });
+              setStatus({ text: "期待する判定を確認中…", error: false });
               post({ type: "expectations", sections: sectionsOf(draft) });
             }}
           >
-            期待する判定を一括で確かめる
+            期待する判定を一括で確認する
           </button>
           <span className="path">{touring ? "（見本）rule-expectations.yml" : page?.expectationsPath ?? ""}</span>
           <button type="button" className="action" data-action="open-expectations" data-tour="open-expectations" onClick={() => post({ type: "openFile", which: "expectations" })}>
@@ -718,7 +718,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           >
             記録から候補を出す
           </button>
-          <span className="hint">保存済みのルールで確かめた候補です。編集中の内容は使いません</span>
+          <span className="hint">保存済みのルールで確認した候補です。編集中の内容は使いません</span>
         </div>
         {shownSuggested !== undefined && <SuggestResult result={shownSuggested} />}
       </section>

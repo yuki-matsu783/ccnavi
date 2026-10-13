@@ -150,7 +150,7 @@ test("CB-D125 読むだけのときは元に戻す・やり直す・貼る・複
   }
 });
 
-test("CB-D126 選んだノードを Ctrl+C でコピーして Ctrl+V で貼ると、線ごと新しい id で足され、貼ったものが選ばれる。Ctrl+D は複製。開始はコピーしない", async () => {
+test("CB-D126 選んだノードを Ctrl+C でコピーして Ctrl+V で貼ると、線ごと新しい id で追加され、貼ったものが選ばれる。Ctrl+D は複製。開始はコピーしない", async () => {
   const dom = await openFlow({ doc: three() });
   try {
     assert.ok(button(dom, "copy-nodes").disabled);
@@ -225,7 +225,7 @@ test("CB-D127 ミニマップは既定で出し、ボタンで隠す・出す。
   }
 });
 
-test("CB-D128 保存前の確かめが有効なら、読み込んだ時点からの差分を一覧で見せ、「保存する」で送る。「やめる」と Esc では送らない", async () => {
+test("CB-D128 保存前の確認が有効なら、読み込んだ時点からの差分を一覧で見せ、「保存する」で送る。「キャンセル」と Esc では送らない", async () => {
   const dom = await openFlow({ doc: three(), reviewSave: true });
   try {
     dom.click(dom.one('.react-flow__node[data-id="prompt-1"]'));
@@ -240,7 +240,7 @@ test("CB-D128 保存前の確かめが有効なら、読み込んだ時点から
     assert.match(review.textContent ?? "", /追加したノード（1）/);
     assert.match(dom.one('.review-list[data-kind="added-nodes"]').textContent ?? "", /スキル（skill-1）/);
     assert.match(dom.one('.review-list[data-kind="changed-nodes"]').textContent ?? "", /読む（prompt-1）.*: 名前/);
-    assert.equal(dom.posted.filter((m) => m.type === "save").length, 0, "確かめる前は送らない");
+    assert.equal(dom.posted.filter((m) => m.type === "save").length, 0, "確認する前は送らない");
     // やめる
     dom.click(button(dom, "cancel-save"));
     await dom.settle();
@@ -324,9 +324,9 @@ function checksAsked(dom: DomPage): { seq: number; doc: FlowDoc }[] {
 
 const SHOWN = ".claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01-01.yml";
 
-test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、開始が無いことは実行ファイルの答えに寄せて 1 度だけ言う。渡る手順はプレビューに出す", async () => {
+test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、開始がないことは実行ファイルの答えに寄せて 1 度だけ言う。渡る手順はプレビューに出す", async () => {
   const checks: FlowChecks = {
-    warns: [`${SHOWN}: start が無い（どこから始めるかが決まらない）`],
+    warns: [`${SHOWN}: start がない（どこから始めるかが決まらない）`],
     rendered: ["1. [prompt] プロンプト", "2. [end] 終了"],
   };
   const doc = removeNode(three(), "start");
@@ -353,7 +353,7 @@ test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、
     assert.equal(dom.all("#flow-preview-checking").length, 1);
     assert.doesNotMatch(dom.one("#flow-notices").textContent ?? "", /古い/);
     // 答えが届く。並べられなければその理由を言う
-    await dom.send({ type: "checked", seq: asked[0].seq, checks: { warns: [`${SHOWN}: start が無い（どこから始めるかが決まらない）`, `${SHOWN}: start から届かないノードがある: スキル`], rendered: null } });
+    await dom.send({ type: "checked", seq: asked[0].seq, checks: { warns: [`${SHOWN}: start がない（どこから始めるかが決まらない）`, `${SHOWN}: start から届かないノードがある: スキル`], rendered: null } });
     assert.equal(dom.all("#flow-preview-checking").length, 0);
     assert.equal(dom.all('#flow-notices li[data-source="exe"]').length, 2);
     assert.equal(dom.all("#flow-preview pre.flow-rendered").length, 0);
@@ -363,18 +363,18 @@ test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、
     await dom.settle();
     await waitCheck(dom);
     const again = checksAsked(dom);
-    await dom.send({ type: "checked", seq: again[again.length - 1].seq, error: "実行ファイル（--lint --flow）が、フローを読めないと返しました: …" });
-    assert.match(dom.one("#flow-preview-error").textContent ?? "", /読めないと返しました/);
+    await dom.send({ type: "checked", seq: again[again.length - 1].seq, error: "実行ファイル（--lint --flow）が、フローを読み込めないと返しました: …" });
+    assert.match(dom.one("#flow-preview-error").textContent ?? "", /読み込めないと返しました/);
     assert.equal(dom.all('#flow-notices li[data-source="exe"]').length, 2);
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D132 答えの無いフロー（まだ無いファイル）は開いてすぐ確かめを頼む。古い実行ファイル（rendered が無い）ならそう言う", async () => {
+test("CB-D132 答えのないフロー（まだないファイル）は開いてすぐ確認を頼む。古い実行ファイル（rendered がありません）ならそう言う", async () => {
   const dom = await openFlow({ exists: false });
   try {
-    assert.match(dom.one("#flow-preview").textContent ?? "", /まだ実行ファイルで確かめていません/);
+    assert.match(dom.one("#flow-preview").textContent ?? "", /まだ実行ファイルで確認していません/);
     await waitCheck(dom);
     const asked = checksAsked(dom);
     assert.equal(asked.length, 1);
@@ -389,7 +389,7 @@ test("CB-D132 答えの無いフロー（まだ無いファイル）は開いて
   }
 });
 
-test("CB-D133 サブエージェントの種類とスキルの名前は候補から選べ、組み込み・プロジェクト・候補に無い、を添える。候補が無ければふつうの欄", async () => {
+test("CB-D133 サブエージェントの種類とスキルの名前は候補から選べ、組み込み・プロジェクト・候補にない、を添える。候補がなければふつうの欄", async () => {
   let doc = three();
   doc = addNode(doc, "subAgent", { x: 500, y: 300 }).doc;
   doc = addNode(doc, "skill", { x: 700, y: 300 }).doc;
@@ -440,7 +440,7 @@ test("CB-D133 サブエージェントの種類とスキルの名前は候補か
   }
 });
 
-test("CB-D134 確かめを頼んで答えを待つ間に直したら、届いた古い答えは使わず確かめ直している（のまま）と言う", async () => {
+test("CB-D134 確認を頼んで答えを待つ間に直したら、届いた古い答えは使わず再確認している（のまま）と言う", async () => {
   const dom = await openFlow({ doc: three(), checks: { warns: [], rendered: ["1. 最初"] } });
   try {
     dom.click(dom.one('[data-action="add-node"][data-type="skill"]'));
@@ -452,7 +452,7 @@ test("CB-D134 確かめを頼んで答えを待つ間に直したら、届いた
     dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
     await dom.settle();
     await dom.send({ type: "checked", seq: first[0].seq, checks: { warns: ["古いコピーの答え"], rendered: ["1. 古い"] } });
-    assert.equal(dom.all("#flow-preview-checking").length, 1, "古い答えで確かめ終わったことにしない");
+    assert.equal(dom.all("#flow-preview-checking").length, 1, "古い答えで確認が終わったことにしない");
     assert.equal(dom.one("#flow-preview pre.flow-rendered").textContent, "1. 最初");
     assert.doesNotMatch(dom.one("body").textContent ?? "", /古いコピーの答え/);
     // 今の中身に対する答えは使う
@@ -516,7 +516,7 @@ test("CB-D136 順序だけ変わって未保存のときも保存前の一覧を
   }
 });
 
-test("CB-D154 繰り返しを足すと出口が 2 つ並び、右の欄で名前・条件・上限を直せる。出口の増減と名前の編集はできず、上限は数のまま保存する", async () => {
+test("CB-D154 繰り返しを追加すると出口が 2 つ並び、右の欄で名前・条件・上限を直せる。出口の増減と名前の編集はできず、上限は数のまま保存する", async () => {
   const dom = await openFlow({ doc: three() });
   try {
     dom.click(dom.one('[data-action="add-node"][data-type="loop"]'));

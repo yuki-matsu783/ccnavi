@@ -17,7 +17,7 @@ const sample = parseBoardSample(def.sample, "/ws", "2026-10-12");
 const cards: readonly Card[] = sample.board.columns.flatMap((column) => column.cards);
 const card = (id: string): Card => {
   const found = cards.find((c) => c.id === id);
-  assert.ok(found, `見本に ${id} が無い`);
+  assert.ok(found, `見本に ${id} がありません`);
   return found;
 };
 
@@ -157,8 +157,8 @@ test("CB-T425 ボードの案内の scene は、見本にある絞り込み・�
         assert.ok(SCENE_KEYS.includes(key), `${at}: scene の鍵 ${key} を画面は読まない`);
       }
       assert.ok(scene.overlay === undefined || (OVERLAY_NAMES as readonly string[]).includes(String(scene.overlay)), `${at}: overlay ${String(scene.overlay)}`);
-      assert.ok(scene.project === undefined || scene.project === "" || sample.board.projects.includes(String(scene.project)), `${at}: project ${String(scene.project)} が見本に無い`);
-      assert.ok(scene.parent === undefined || parents.has(String(scene.parent)), `${at}: parent ${String(scene.parent)} が見本に無い`);
+      assert.ok(scene.project === undefined || scene.project === "" || sample.board.projects.includes(String(scene.project)), `${at}: project ${String(scene.project)} が見本にありません`);
+      assert.ok(scene.parent === undefined || parents.has(String(scene.parent)), `${at}: parent ${String(scene.parent)} が見本にありません`);
       assert.ok(scene.attention === undefined || typeof scene.attention === "boolean", `${at}: attention は真偽`);
       assert.ok(scene.archived === undefined || typeof scene.archived === "boolean", `${at}: archived は真偽`);
       for (const state of String(scene.fold ?? "").split(",").filter((item) => item.trim() !== "")) {
@@ -190,11 +190,11 @@ test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見
   for (const course of def.courses) {
     for (const [index, step] of course.steps.entries()) {
       const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
-      assert.ok(step.target !== "", `${at}: 指す先が無い（吹き出しが中ほどへ逃げる）`);
+      assert.ok(step.target !== "", `${at}: 指す先がない（吹き出しが中ほどへ逃げる）`);
       if (step.target.startsWith("card-")) {
-        assert.ok(cards.some((c) => `card-${c.id}` === step.target), `${at}: ${step.target} のカードが見本に無い`);
+        assert.ok(cards.some((c) => `card-${c.id}` === step.target), `${at}: ${step.target} のカードが見本にありません`);
       } else if (step.target.startsWith("column-")) {
-        assert.ok(states.has(step.target.slice("column-".length)), `${at}: ${step.target} の列が無い`);
+        assert.ok(states.has(step.target.slice("column-".length)), `${at}: ${step.target} の列がありません`);
       } else {
         assert.ok(FIXED_TARGETS.has(step.target), `${at}: 指す先 ${step.target} は画面が付ける印にない`);
       }

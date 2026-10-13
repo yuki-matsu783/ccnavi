@@ -38,7 +38,7 @@ factors:
     script: ".ccnavi/config/common/scripts/risk.sh"
   - id: q
     points: 20
-    judge: "テストの無い変更を含むか"
+    judge: "テストのない変更を含むか"
 `;
 
 /** 見本の中身。差し替えたいところだけ渡す */

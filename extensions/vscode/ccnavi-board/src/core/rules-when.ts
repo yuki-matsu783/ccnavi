@@ -300,7 +300,7 @@ export function condSummary(root: CondNode): string {
       case "any":
         return level >= 1 ? `${node.op}(${node.children.length})` : `${node.op}(${node.children.map((child) => walk(child, level + 1)).join(", ")})`;
       case "invalid":
-        return "（読めない）";
+        return "（読み込めない）";
     }
   };
   return walk(root, 0);
@@ -407,7 +407,7 @@ export function comparePaths(a: CondPath, b: CondPath): number {
  */
 export function toWhenBlocker(rule: { readonly bothPatterns?: boolean; readonly exceptNodes?: readonly CondNode[] }): string | undefined {
   if (rule.bothPatterns === true) {
-    return "glob と regex を両方書いています。ルールファイルでどちらか 1 つにしてから変換してください";
+    return "glob と regex を両方指定しています。ルールファイルでどちらか 1 つにしてから変換してください";
   }
   return exceptBlocker(rule.exceptNodes);
 }
@@ -426,7 +426,7 @@ export function exceptBlocker(excepts: readonly CondNode[] | undefined): string 
   }
   for (const [i, node] of excepts.entries()) {
     if (node.op === "invalid") {
-      return `except の ${i + 1} 件目が読めません（${node.reason}）。ルールファイルで直してから変換してください`;
+      return `except の ${i + 1} 件目が読み込めません（${node.reason}）。ルールファイルで直してから変換してください`;
     }
     if (node.op !== "glob" && node.op !== "regex") {
       return `except の ${i + 1} 件目が glob / regex 1 つのマップではありません。ルールファイルで直してから変換してください`;

@@ -45,7 +45,7 @@ function Hits({ rules }: { readonly rules: readonly RuleHitJson[] }): JSX.Elemen
           <tr>
             <th>タイプ</th>
             <th>id</th>
-            <th>書いたパターン</th>
+            <th>指定したパターン</th>
             <th>正規表現に直した形</th>
           </tr>
         </thead>
@@ -129,7 +129,7 @@ export function JudgeResult({ judged }: { readonly judged: Judged }): JSX.Elemen
         </>
       ) : (
         <p>
-          <Verdict verdict="" /> {result.tool} は判定の対象を取り出せないツールです。ルールを書いてもヒットせず、呼び出しはそのまま通ります
+          <Verdict verdict="" /> {result.tool} は判定の対象を取り出せないツールです。ルールを作成してもヒットせず、呼び出しはそのまま通ります
         </p>
       )}
       <h3>このツールで実行される hook</h3>
@@ -200,7 +200,7 @@ export function ExpectationsResult({ result }: { readonly result: ExpectationsJs
 
 /** 候補の種類の言い換え */
 const SUGGEST_KINDS: Readonly<Record<string, string>> = {
-  rule: "ルールを足す",
+  rule: "ルールを追加する",
   message: "message を見直す",
 };
 

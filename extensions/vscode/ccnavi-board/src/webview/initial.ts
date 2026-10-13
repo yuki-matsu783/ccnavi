@@ -14,6 +14,6 @@ export function readInitial<D>(id: string, reopen: string, onError: (text: strin
   try {
     return JSON.parse(text) as D;
   } catch (error) {
-    return onError(`画面に渡す中身を読めませんでした（拡張の不具合）: ${String(error)}`);
+    return onError(`画面に渡す中身を読み込めませんでした（拡張の不具合）: ${String(error)}`);
   }
 }

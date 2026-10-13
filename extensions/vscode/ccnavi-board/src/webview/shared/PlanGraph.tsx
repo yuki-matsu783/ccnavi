@@ -88,7 +88,7 @@ function reviewText(review: string): string {
 
 /** 延期した項の言葉。本文の待ちの一覧（「レビューは 4 と一緒に」）と同じ言い方 */
 function deferText(reviewAt: number | null): string {
-  return reviewAt === null ? "レビューを引き受ける項が無い" : `レビューは ${reviewAt} と一緒に`;
+  return reviewAt === null ? "レビューを引き受ける項がありません" : `レビューは ${reviewAt} と一緒に`;
 }
 
 /** 項の点。番号・定義の題・見る場所と、延期・固定・終端に当たらない印 */
@@ -172,8 +172,8 @@ function RemovableEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition,
             className="plan-remove nodrag nopan"
             data-action="plan-remove-edge"
             data-edge={id}
-            aria-label="この線を消す（待たなくする）"
-            title="この線を消す（待たなくする）"
+            aria-label="この線を削除（待たなくする）"
+            title="この線を削除（待たなくする）"
             onMouseDown={stop}
             onPointerDown={stop}
             onClick={(event) => {
@@ -264,7 +264,7 @@ function headingOf(plan: ApprovePlan): string {
 
 /** 図の下の一言。実行ファイルの値を並べるだけ */
 function Notes({ plan }: { readonly plan: ApprovePlan }): JSX.Element | null {
-  const deferred = plan.items.filter((item) => item.deferred).map((item) => (item.review_at === null ? `${item.number} は引き受ける項が無い` : `${item.number} は ${item.review_at} と一緒に`));
+  const deferred = plan.items.filter((item) => item.deferred).map((item) => (item.review_at === null ? `${item.number} は引き受ける項がありません` : `${item.number} は ${item.review_at} と一緒に`));
   const lines: { readonly text: string; readonly warn: boolean }[] = [];
   if (plan.ready.length > 0) {
     lines.push({ text: `すぐ始まる: ${plan.ready.join(", ")}`, warn: false });

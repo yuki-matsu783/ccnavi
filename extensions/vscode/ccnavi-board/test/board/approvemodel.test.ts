@@ -17,7 +17,7 @@ function fixtureText(name: string): string {
   return fs.readFileSync(path.join(__dirname, "..", "..", "..", "test", "fixtures", name), "utf8");
 }
 
-test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・対象外・読めない提案）", () => {
+test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・対象外・読み込めない提案）", () => {
   const parsed = parseApprovePreview(fixtureText("approve-preview.json"));
   assert.ok(parsed.ok);
   if (!parsed.ok) {
@@ -116,7 +116,7 @@ test("CB-T354 承認の preview の plans を読む（計画を持つ親の図�
   assert.deepEqual(fb.problems, ["最後の項がほかの項を待っていない"]);
 });
 
-test("CB-T104b 超過の欄が無い古い答えは、空の配列として読む", () => {
+test("CB-T104b 超過の欄がない古い答えは、空の配列として読む", () => {
   const parsed = parseApprovePreview(
     JSON.stringify({
       version: APPROVE_VERSION,
@@ -160,7 +160,7 @@ test("CB-T158 途中で止まった承認を読む（置いたぶんを拾い、
   const stopped = parseApproveResult(
     JSON.stringify({
       version: APPROVE_VERSION,
-      partial: { placed: ["i0001"], ticket: "i0001-01-01", reason: "書けない (…)", lines: ["  i0001 のフェーズ 1 のマーカーを消した"] },
+      partial: { placed: ["i0001"], ticket: "i0001-01-01", reason: "書けない (…)", lines: ["  i0001 のフェーズ 1 のマーカーを削除した"] },
     }),
   );
   assert.ok(!stopped.ok, "置いたぶんがあっても成功にはしない");
@@ -169,7 +169,7 @@ test("CB-T158 途中で止まった承認を読む（置いたぶんを拾い、
     assert.deepEqual(stopped.partial.placed, ["i0001"]);
     assert.equal(stopped.partial.ticket, "i0001-01-01");
     assert.ok(stopped.partial.reason.includes("書けない"));
-    assert.deepEqual(stopped.partial.lines, ["  i0001 のフェーズ 1 のマーカーを消した"]);
+    assert.deepEqual(stopped.partial.lines, ["  i0001 のフェーズ 1 のマーカーを削除した"]);
   }
   // 1 件も置かれなかった形
   const none = parseApproveResult(
@@ -183,12 +183,12 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
     placed: ["i0001"],
     ticket: "i0001-01-01",
     reason: "書けない (…)",
-    lines: ["  i0001 のフェーズ 1 のマーカーを消した"],
+    lines: ["  i0001 のフェーズ 1 のマーカーを削除した"],
   });
   assert.ok(stopped.includes("i0001-01-01 で止まりました"));
   assert.ok(stopped.includes("i0001 の 1 件は承認済みチケットに入っています"));
   assert.ok(stopped.includes("をコミット・pushするコマンドはターミナルに送信していません"));
-  assert.ok(stopped.includes("マーカーを消した"), "端末に出ていた行も渡す");
+  assert.ok(stopped.includes("マーカーを削除した"), "端末に出ていた行も渡す");
 
   // 1 件も置かれなかったときは「一部だけ置かれた」と言わない
   const none = partialMessage({ placed: [], ticket: "i0001", reason: "書けない", lines: [] });

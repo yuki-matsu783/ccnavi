@@ -50,7 +50,7 @@ export function SaveReview({ diff, onConfirm, onCancel }: SaveReviewProps): JSX.
         <h2 id="save-review-title">保存前の変更内容を確認</h2>
         <p className="dim small">読み込んだ時点からの変更です。</p>
         {isEmptyDiff(diff) && (
-          <p id="review-order-only">順序だけが変わりました（ノードと線の中身は同じで、ファイルに書く順が変わります）。</p>
+          <p id="review-order-only">順序だけが変わりました（ノードと線の中身は同じで、ファイルへの保存順が変わります）。</p>
         )}
         {diff.meta.length > 0 && (
           <>
@@ -72,7 +72,7 @@ export function SaveReview({ diff, onConfirm, onCancel }: SaveReviewProps): JSX.
         </label>
         <div className="review-actions">
           <button type="button" className="action" data-action="cancel-save" onClick={onCancel}>
-            やめる
+            キャンセル
           </button>
           <button type="button" className="action primary" data-action="confirm-save" ref={confirm} onClick={() => onConfirm(skip)}>
             保存する

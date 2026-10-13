@@ -63,7 +63,7 @@ test("CB-T460 フェーズの見本は、実際の読み取り（readPhases）�
   assert.equal(sample.page.lock.locked, false);
 });
 
-test("CB-T461 足した定義の見本は、実際の読み取りと同じ形で、新しい定義として origin が null になる", () => {
+test("CB-T461 追加した定義の見本は、実際の読み取りと同じ形で、新しい定義として origin が null になる", () => {
   const real = readPhases(stringify({ version: 1, phases: raw.added })).model;
   assert.deepEqual(real.problems, []);
   assert.equal(real.form.phases.length, 1);
@@ -71,7 +71,7 @@ test("CB-T461 足した定義の見本は、実際の読み取りと同じ形で
   // 足した定義は、計画に使えるよう id・タイトル・範囲・成果物・補足まで書いてある
   assert.ok(sample.added.id !== "" && sample.added.title !== "" && sample.added.scope.length > 0 && sample.added.deliverables.length > 0);
   assert.ok(sample.added.agent !== "" && sample.added.when !== "");
-  assert.ok(!sample.page.model.form.phases.some((phase) => phase.id === sample.added.id), "足した定義が見本の一覧にもある");
+  assert.ok(!sample.page.model.form.phases.some((phase) => phase.id === sample.added.id), "追加した定義が見本の一覧にもある");
 });
 
 test("CB-T462 フェーズの見本は、work と feedback、inherit と glob、補足の有無が揃い、id もタイトルも重ならない", () => {
@@ -103,7 +103,7 @@ test("CB-T463 作業中の文と検証の文は、見本にあり、プロジェ
   assert.ok(texts.error.includes("feedback") && texts.error.includes("review"));
 });
 
-test("CB-T464 フェーズの案内の scene は、見本にある設定・定義の id・足し方だけを指す（綴り違いが既定へ黙って戻らない）", () => {
+test("CB-T464 フェーズの案内の scene は、見本にある設定・定義の id・追加し方だけを指す（綴り違いが既定へ黙って戻らない）", () => {
   const known = ["target", "open", "more", "find", "add", "dirty", "locked", "error", "changed", "help"];
   const flags = ["dirty", "locked", "error", "changed", "help"];
   for (const course of def.courses) {
@@ -117,7 +117,7 @@ test("CB-T464 フェーズの案内の scene は、見本にある設定・定�
       const ids = new Set((scene.target === "lib" ? sample.project : sample.page).model.form.phases.map((phase) => phase.id));
       for (const key of ["open", "more"]) {
         for (const id of String((scene as Record<string, unknown>)[key] ?? "").split(",").filter((item) => item.trim() !== "")) {
-          assert.ok(ids.has(id.trim()), `${at}: ${key} の ${id} が見本に無い`);
+          assert.ok(ids.has(id.trim()), `${at}: ${key} の ${id} が見本にありません`);
         }
       }
       assert.ok(scene.add === undefined || scene.add === "blank" || scene.add === "filled", `${at}: add`);
@@ -147,7 +147,7 @@ test("CB-T465 フェーズの案内は、基本の案内の題と順序を保ち
   }
   for (const course of def.courses) {
     for (const step of course.steps) {
-      assert.ok(TARGETS.includes(step.target), `${course.id}: 指す先 ${step.target} は画面に無い印`);
+      assert.ok(TARGETS.includes(step.target), `${course.id}: 指す先 ${step.target} は画面にない印`);
     }
   }
 });
