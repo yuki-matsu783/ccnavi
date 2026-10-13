@@ -101,13 +101,13 @@ function harness(opts: { confirm?: boolean; prompt?: string | null; ops?: Partia
 
 test("CX-T219 書いた結果の一言: 結果の種類ごとの文面と data-kind・見た目", () => {
   const cases: [Outcome, string, string][] = [
-    [WRITTEN, "written", "承認を書いた（0123456）。書いた後の中身も確かめた"],
-    [{ ...WRITTEN, rounds: 3 } as Outcome, "written", "承認を書いた（0123456。途中で親のブランチの先頭が動いたので、3 回目で書いた）。書いた後の中身も確かめた"],
-    [{ kind: "changed", message: "動いた" }, "changed", "承認を書かなかった: 動いた"],
-    [{ kind: "conflict", message: "競合" }, "conflict", "承認を書けなかった（自動ではやり直さない）: 競合"],
+    [WRITTEN, "written", "承認を反映しました（コミット：0123456）。反映後の内容も確認しました。"],
+    [{ ...WRITTEN, rounds: 3 } as Outcome, "written", "承認を反映しました（コミット：0123456。途中で親のブランチの先頭が動いたので、3 回目で反映した）。反映後の内容も確認しました。"],
+    [{ kind: "changed", message: "動いた" }, "changed", "承認は反映されていません：動いた"],
+    [{ kind: "conflict", message: "競合" }, "conflict", "承認を反映できませんでした。自動再試行は行いません：競合"],
     [{ kind: "attention", message: "残った" } as Outcome, "attention", "承認は要確認になった。書けたかどうかと何が残ったかを、ホストの履歴で確かめてください: 残った"],
-    [{ kind: "refused", message: "断った" }, "refused", "承認を書かなかった: 断った"],
-    [{ kind: "failed", message: "落ちた" }, "failed", "承認を書かなかった: 落ちた"],
+    [{ kind: "refused", message: "断った" }, "refused", "承認は反映されていません：断った"],
+    [{ kind: "failed", message: "落ちた" }, "failed", "承認は反映されていません：落ちた"],
   ];
   for (const [outcome, kind, text] of cases) {
     assert.deepEqual(sayOutcome(outcome, "承認"), { kind, className: `notice ${kind === "written" ? "ok" : "error"}`, text });
@@ -137,7 +137,7 @@ test("CX-T220 読み直し: document と chrome の無いところで、差し�
   h.store.repos = [];
   await h.c.refresh();
   assert.equal(h.c.snapshot().sections.size, 0);
-  assert.equal(h.c.snapshot().status.text, "リポジトリが登録されていない。設定画面で登録してください");
+  assert.equal(h.c.snapshot().status.text, "リポジトリが登録されていません。設定画面で登録してください。");
   h.c.openOptions();
   assert.equal(h.log.options, 1);
 });
@@ -200,7 +200,7 @@ test("CX-T222 書く操作の最中は、重ねて押しても走らない。書
   await until(() => h.c.snapshot().state === "done" && !h.c.snapshot().busy, "読み直し");
   assert.equal(h.log.collect, loads + 1);
   // 操作の後の読み直しは、言ったことを消さない
-  assert.deepEqual(h.c.snapshot().result, { kind: "written", className: "notice ok", text: "承認を書いた（0123456）。書いた後の中身も確かめた" });
+  assert.deepEqual(h.c.snapshot().result, { kind: "written", className: "notice ok", text: "承認を反映しました（コミット：0123456）。反映後の内容も確認しました。" });
   assert.deepEqual(h.log.set, []);
   // 書く途中で投げたら「書けなかった」と失敗の見た目で言う
   const thrower = harness({ ops: { approveFamily: async () => Promise.reject(new Error("壊れた")) } });
@@ -224,7 +224,7 @@ test("CX-T225 書く途中で投げたら、直前が成功（緑）でも失敗
   await press("failed", "書けなかった");
   assert.deepEqual(h.c.snapshot().result, { kind: "failed", className: "notice error", text: "書けなかった: 壊れた" });
   await press("written", "書き直した");
-  assert.deepEqual(h.c.snapshot().result, { kind: "written", className: "notice ok", text: "承認を書いた（0123456）。書いた後の中身も確かめた" });
+  assert.deepEqual(h.c.snapshot().result, { kind: "written", className: "notice ok", text: "承認を反映しました（コミット：0123456）。反映後の内容も確認しました。" });
   assert.equal(plan.length, 0);
 });
 

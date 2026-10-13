@@ -96,7 +96,7 @@ export function Tokens({ revision }: { readonly revision: number }): JSX.Element
           <input id="token-value" type="password" autoComplete="off" required ref={tokenRef} />
         </label>
         <label className="field">
-          <span className="cap">期限（ホストの応答から読めないときに使う。YYYY-MM-DD）</span>
+          <span className="cap">有効期限（ホストから取得できない場合に使用。YYYY-MM-DD）</span>
           <input id="token-expires" name="expires" type="date" ref={expiresRef} />
         </label>
         <div className="buttons">
@@ -104,13 +104,13 @@ export function Tokens({ revision }: { readonly revision: number }): JSX.Element
             登録
           </button>
           <button type="button" id="token-clear" className="action" onClick={() => void clear()}>
-            消す
+            保存済みPATを削除
           </button>
         </div>
       </form>
       <Status id="token-msg" said={said} />
       <p className="hint">
-        PAT は、承認・取り下げ・レビュー済みを親のブランチへ書くのと、「始める」で issue から親のブランチを作るのに使います。GitHub では fine-grained token を作り、対象のリポジトリを絞って、Contents: Read and write（ブランチを作るのにも使う）・Metadata: Read-only・Pull requests: Read-only・Issues: Read-only を選びます。GitLab では api スコープを選びます（Commits API は write_repository では書けないため）。project access token が使えればプロジェクトを絞れます。使えなければ個人の PAT になり、プロジェクトは絞れません。期限は 90 日を選びます。エージェント用のトークンとは別に作ります。PAT はこのブラウザのプロファイルに平文で置かれ、同じ OS ユーザーのプロセスからは読めます。リポジトリを絞った最小の権限のトークンにしてください。期限はホストの応答から読みます。読めないときは上の欄の日付を使い、切れる 7 日前からボードとアイコンで知らせます。
+        PAT は、承認・取り下げ・レビュー済みを親のブランチへ書くのと、「始める」で issue から親のブランチを作るのに使います。GitHub では fine-grained token を作り、対象のリポジトリを絞って、Contents: Read and write（ブランチを作るのにも使う）・Metadata: Read-only・Pull requests: Read-only・Issues: Read-only を選びます。GitLab では api スコープを選びます（Commits API は write_repository では書けないため）。project access token が使えればプロジェクトを絞れます。使えなければ個人の PAT になり、プロジェクトは絞れません。期限は 90 日を選びます。エージェント用のトークンとは別に作ります。PAT はこのブラウザのプロファイルに平文で置かれ、同じ OS ユーザーのプロセスからは読めます。リポジトリを絞った最小の権限のトークンにしてください。期限はホストの応答から読みます。読めないときは上の欄の日付を使い、有効期限の7日前から、ボードと拡張機能のアイコンで通知します。
       </p>
       <ul id="token-links" className="links">
         {hosts.map((h) => (

@@ -47,8 +47,8 @@ function FamilyBody({ f, actions }: { f: FamilyBoard; actions?: FamilyActions })
   const others = r.closure.families.filter((n) => n !== f.family.name);
   const closure = (
     <>
-      {others.length > 0 ? <p className="closure">{`判定に入れたほかの親子のチケット（先行をたどって行き着くもの）: ${others.join(", ")}`}</p> : null}
-      {r.closure.absent.length > 0 ? <Notice kind="warn" text={`先行の親のブランチがリモートに無い: ${r.closure.absent.join(", ")}`} /> : null}
+      {others.length > 0 ? <p className="closure">{`判定に使用した関連チケット（先行チケットの依存関係をたどって参照した親子チケット）: ${others.join(", ")}`}</p> : null}
+      {r.closure.absent.length > 0 ? <Notice kind="warn" text={`先行チケットの親ブランチがリモートに見つかりません。${r.closure.absent.join(", ")}`} /> : null}
     </>
   );
   if (r.undecided || r.refused) {
@@ -66,12 +66,12 @@ function FamilyBody({ f, actions }: { f: FamilyBoard; actions?: FamilyActions })
   return (
     <>
       {closure}
-      {batch.length === 0 ? <p className="empty">承認待ちは無い</p> : null}
+      {batch.length === 0 ? <p className="empty">承認待ちのチケットはありません。</p> : null}
       {r.text ? (
         // ccnavi が出した承認の画面の本文（範囲・リスク・計画など）を、最初に開いた形で出す（範囲を最初に見せる）。
         // 閉じた details には入れない。素の文字列なので textContent
         <section className="screen" data-testid="screen">
-          <h4>承認の画面（ccnavi が出したもの。承認するとこのとおりに書く）</h4>
+          <h4>承認内容（承認すると、以下の内容が反映されます）</h4>
           <pre>{r.text}</pre>
         </section>
       ) : null}
@@ -92,7 +92,7 @@ function FamilyBody({ f, actions }: { f: FamilyBoard; actions?: FamilyActions })
       ))}
       {batch.length > 0 && r.digest ? (
         !write.allowed ? (
-          <Notice kind="warn" text={write.reason || "この親子のチケットには書けない"} />
+          <Notice kind="warn" text={write.reason || "この親子チケットには変更を反映できません。"} />
         ) : actions ? (
           <div className="actions">
             <ActionButton action="approve" onClick={() => actions.approve()}>{`承認する（${batch.map((e) => e.ticket).join(", ")}）`}</ActionButton>
@@ -114,7 +114,7 @@ function FamilyBody({ f, actions }: { f: FamilyBoard; actions?: FamilyActions })
               ) : w.problems.length > 0 ? (
                 <ul className="why-not">
                   {w.problems.map((p, i) => (
-                    <li key={i}>{`取り下げられない: ${p}`}</li>
+                    <li key={i}>{`承認を取り下げられません：${p}`}</li>
                   ))}
                 </ul>
               ) : null}
@@ -127,7 +127,7 @@ function FamilyBody({ f, actions }: { f: FamilyBoard; actions?: FamilyActions })
       ))}
       {(r.rejected ?? []).map((rej, i) => (
         <section key={i} className="rejected" data-ticket={rej.ticket}>
-          <h4>{`承認の対象にしない: ${rej.ticket}`}</h4>
+          <h4>{`承認対象外：${rej.ticket}`}</h4>
           <ul>
             {rej.problems.map((p, j) => (
               <li key={j}>{p}</li>

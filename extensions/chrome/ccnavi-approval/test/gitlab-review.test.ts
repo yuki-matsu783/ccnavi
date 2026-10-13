@@ -277,7 +277,7 @@ test("CX-T172 「要確認」の親子のチケットには、そのブラウザ
   const html = renderBoard(dom.window.document, md, b, actions, { attention: { i0001: "元に戻せなかった" } });
   const box = html.querySelector('[data-family="i0001"]') as HTMLElement;
   assert.deepEqual([...box.querySelectorAll("button")].map((x) => (x as HTMLElement).dataset.action), ["dismiss"]);
-  assert.match(box.textContent ?? "", /ほかの承認者には見えない/);
+  assert.match(box.textContent ?? "", /他の承認者には表示されません/);
   // ほかの親子のチケットは今までどおり
   assert.equal(html.querySelectorAll('[data-family="i0002"] button[data-action=approve]').length, 1);
 });

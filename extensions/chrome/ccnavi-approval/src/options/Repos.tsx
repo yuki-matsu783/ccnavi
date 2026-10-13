@@ -42,7 +42,7 @@ export function Repos({ revision }: { readonly revision: number }): JSX.Element 
         throw new Error(`ワークスペースのリポジトリ ${repo.workspace} を先に登録してください`);
       }
       await chrome.storage.local.set({ repos: [...rest, repo] });
-      setSaid({ text: `${repoKey(repo)} を登録した`, ok: true });
+      setSaid({ text: `${repoKey(repo)} を登録しました。`, ok: true });
       await reload();
     } catch (err) {
       setSaid({ text: (err as Error).message, ok: false });
@@ -64,7 +64,7 @@ export function Repos({ revision }: { readonly revision: number }): JSX.Element 
             <div className="row-head">
               <span className="text">{describe(r)}</span>
               <button type="button" className="action small" onClick={() => void remove(r)}>
-                外す
+                登録を削除
               </button>
             </div>
           </li>
@@ -82,7 +82,7 @@ export function Repos({ revision }: { readonly revision: number }): JSX.Element 
           </select>
         </label>
         <label className="field">
-          <span className="cap">owner</span>
+          <span className="cap">オーナー／グループ</span>
           <input name="owner" type="text" required />
         </label>
         <label className="field">
@@ -90,26 +90,26 @@ export function Repos({ revision }: { readonly revision: number }): JSX.Element 
           <input name="repo" type="text" required />
         </label>
         <label className="field">
-          <span className="cap">統合先の名前</span>
-          <input name="integration" type="text" placeholder="空ならデフォルトブランチ" />
+          <span className="cap">統合先ブランチ名</span>
+          <input name="integration" type="text" placeholder="未入力の場合はデフォルトブランチ" />
         </label>
         <label className="field">
           <span className="cap">直近の日数（表示用）</span>
           <input name="recentDays" type="number" min="0" max="90" defaultValue="7" className="num" />
         </label>
         <label className="field">
-          <span className="cap">指定のブランチ（表示用。空白かカンマで区切る）</span>
+          <span className="cap">追加で表示するブランチ（空白またはカンマ区切り）</span>
           <input name="extraBranches" type="text" />
         </label>
         <label className="field">
-          <span className="cap">プロジェクト名（手元の projects/ の下の名前。空ならワークスペース自身）</span>
+          <span className="cap">プロジェクト名（ローカルの projects/ 配下のディレクトリ名。未入力の場合はワークスペース本体）</span>
           <input name="project" id="repo-project" type="text" />
         </label>
         <label className="field">
           <span className="cap">ワークスペースのリポジトリ（プロジェクトを登録するとき）</span>
           {/* プロジェクトのリポジトリが選ぶワークスペース（登録したワークスペース自身のリポジトリ） */}
           <select name="workspace" id="repo-workspace">
-            <option value="">（選ぶ）</option>
+            <option value="">選択してください</option>
             {repos
               .filter((r) => !r.project)
               .map((r) => (
@@ -127,7 +127,7 @@ export function Repos({ revision }: { readonly revision: number }): JSX.Element 
       </form>
       <Status id="repo-msg" said={said} />
       <p className="hint">
-        直近の日数と指定のブランチは、承認待ちを見つけるのに使うだけです。判定には、統合先と親のブランチ、先行をたどって行き着く親のブランチだけを入れます。見せ方の設定で判定の答えが変わらないようにするためです。
+        直近の日数と指定のブランチは、承認待ちを見つけるのに使うだけです。判定には、統合先ブランチ、親チケットのブランチ、および先行チケットの依存関係をたどった先の親ブランチのみを使用します。見せ方の設定で判定の答えが変わらないようにするためです。
       </p>
       <p className="hint">
         {

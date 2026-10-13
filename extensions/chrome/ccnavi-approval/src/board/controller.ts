@@ -154,14 +154,14 @@ function newStats(): Stats {
 export function sayOutcome(outcome: Outcome, what: string): ResultLine {
   const text =
     outcome.kind === "written"
-      ? `${what}を書いた（${outcome.oid.slice(0, 7)}${outcome.rounds > 1 ? `。途中で親のブランチの先頭が動いたので、${outcome.rounds} 回目で書いた` : ""}）。書いた後の中身も確かめた`
+      ? `${what}を反映しました（コミット：${outcome.oid.slice(0, 7)}${outcome.rounds > 1 ? `。途中で親のブランチの先頭が動いたので、${outcome.rounds} 回目で反映した` : ""}）。反映後の内容も確認しました。`
       : outcome.kind === "changed"
-        ? `${what}を書かなかった: ${outcome.message}`
+        ? `${what}は反映されていません：${outcome.message}`
         : outcome.kind === "conflict"
-          ? `${what}を書けなかった（自動ではやり直さない）: ${outcome.message}`
+          ? `${what}を反映できませんでした。自動再試行は行いません：${outcome.message}`
           : outcome.kind === "attention"
             ? `${what}は要確認になった。書けたかどうかと何が残ったかを、ホストの履歴で確かめてください: ${outcome.message}`
-            : `${what}を書かなかった: ${outcome.message}`;
+            : `${what}は反映されていません：${outcome.message}`;
   return { kind: outcome.kind, className: `notice ${outcome.kind === "written" ? "ok" : "error"}`, text };
 }
 
@@ -322,7 +322,7 @@ export function createBoardController(env: BoardEnv): BoardController {
         const deps = await writeDeps(repoBoard.repo);
         const ids = r.batch.map((e) => e.ticket);
         const warn = await approvalWarning(deps, repoBoard.repo, family.family.name);
-        if (!env.confirm(`${family.family.name} に ${ids.join(", ")} の承認を 1 コミットで書く。${warn}`)) return false;
+        if (!env.confirm(`${family.family.name} に、チケット ${ids.join(", ")} の承認を1つのコミットとして反映します。承認しますか？${warn}`)) return false;
         const outcome = await ops.approveFamily(repoBoard.repo, family.family.name, { ids, digest: r.digest, only: r.only ?? null }, deps);
         await noteAttention(repoBoard.repo, family.family.name, outcome);
         say(outcome, "承認");
@@ -334,7 +334,7 @@ export function createBoardController(env: BoardEnv): BoardController {
         if (await blocked(repoBoard.repo, family.family.name)) return false;
         const deps = await writeDeps(repoBoard.repo);
         const warn = await approvalWarning(deps, repoBoard.repo, family.family.name);
-        const msg = `${family.family.name} のフェーズ ${phase} をレビュー済みにする。レビュー待ちの子を done/ へ動かし、マーカーと合わせて 1 コミットで書く。書く前に、押した時点のスレッドとレビューを読み直して確かめる。${warn}`;
+        const msg = `${family.family.name} のフェーズ ${phase} をレビュー済みにする。レビュー待ちの子チケットを done/ に移動し、レビュー済みマーカーとともに1つのコミットとして反映します。書く前に、押した時点のスレッドとレビューを読み直して確かめる。${warn}`;
         if (!env.confirm(msg)) return false;
         const outcome = await ops.confirmPhase(repoBoard.repo, family.family.name, phase, deps);
         await noteAttention(repoBoard.repo, family.family.name, outcome);
@@ -361,7 +361,7 @@ export function createBoardController(env: BoardEnv): BoardController {
         try {
           got = { list: await ops.listIssues(repoBoard.repo, await writeDeps(repoBoard.repo)), error: "" };
         } catch (err) {
-          got = { list: null, error: `issue を読めなかった: ${(err as Error).message ?? String(err)}` };
+          got = { list: null, error: `Issue一覧を取得できませんでした：${(err as Error).message ?? String(err)}` };
         }
         set({ issues: new Map(snap.issues).set(key, got) });
         drawRepo(snap.boards.get(key) ?? repoBoard, await readAttention());
@@ -379,7 +379,7 @@ export function createBoardController(env: BoardEnv): BoardController {
             className: `notice ${out.kind === "started" ? "ok" : "error"}`,
             text:
               out.kind === "started"
-                ? `親のブランチ ${out.name} を作った（${out.head.slice(0, 7)}）。エージェントに ${out.name} で作業を始めるよう頼んでください`
+                ? `親ブランチ ${out.name} を作成しました（${out.head.slice(0, 7)}）。エージェントに、このブランチで作業を開始するよう依頼してください。`
                 : `始めなかった: ${out.message}`,
           },
         });
@@ -423,7 +423,7 @@ export function createBoardController(env: BoardEnv): BoardController {
     } catch (err) {
       const why = (err as Error).message ?? String(err);
       if (fromTimer) {
-        set({ status: { ...snap.status, text: `自動の読み直しに失敗した: ${why}` } });
+        set({ status: { ...snap.status, text: `自動更新に失敗しました：${why}` } });
       } else {
         set({ sections: new Map([...before, ...snap.sections]), status: { ...snap.status, text: `ボードを読み込めなかった: ${why}` }, state: "error" });
       }
@@ -455,7 +455,7 @@ export function createBoardController(env: BoardEnv): BoardController {
     const repos = readRepos(got.repos, env.hosts);
     set({ repos });
     if (repos.length === 0) {
-      set({ sections: new Map(), status: { ...snap.status, text: "リポジトリが登録されていない。設定画面で登録してください" }, state: "done" });
+      set({ sections: new Map(), status: { ...snap.status, text: "リポジトリが登録されていません。設定画面で登録してください。" }, state: "done" });
       return;
     }
     if (!fromTimer) set({ status: { ...snap.status, text: "Python（Pyodide）を起動している…" } });

@@ -240,7 +240,7 @@ test("CX-T228 ページの決まった枠: 本物の controller が出す状態�
   };
   // 書けた: 緑
   await press();
-  assert.equal($("#result").outerHTML, '<p id="result" role="status" aria-live="polite" data-kind="written" class="notice ok">承認を書いた（0123456）。書いた後の中身も確かめた</p>');
+  assert.equal($("#result").outerHTML, '<p id="result" role="status" aria-live="polite" data-kind="written" class="notice ok">承認を反映しました（コミット：0123456）。反映後の内容も確認しました。</p>');
   // 書く途中で投げた: 赤で言う
   outcome = new Error("壊れた");
   await press();
@@ -255,7 +255,7 @@ test("CX-T228 ページの決まった枠: 本物の controller が出す状態�
   await press();
   assert.equal($("#result").dataset.kind, "written");
   assert.equal($("#result").className, "notice ok");
-  assert.match($("#result").textContent ?? "", /^承認を書いた（fedcba9）/);
+  assert.match($("#result").textContent ?? "", /^承認を反映しました（コミット：fedcba9）/);
 });
 
 /** 差し替えた外界で、本物の controller を動かす（board-controller.test.ts の harness の要約） */
