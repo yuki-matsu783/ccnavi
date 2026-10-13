@@ -24,6 +24,7 @@ keywords: [フェーズ, フェーズ定義, phases.yml, plan, after, 待ち方,
 | `review` | `none` / `mr`（既定）。そのフェーズの終わりにユーザがどこで見るか。既定であって上限ではない。`feedback` のフェーズ定義に `none` は書けない | HITL ポイント |
 | `scope` | このフェーズ定義の子が宣言できる範囲の上限（glob のリスト。20 件まで）。省略か `inherit` なら親の範囲。子 ⊆ フェーズ定義 ⊆ 親。大文字小文字はどの機械でも区別しない（チケットの範囲と同じ規則。9.3）。超えても承認は止めず、承認画面に「チケットで編集対象としているが、書き込めない場所」として出す（9.4）。判定は子の範囲をこの上限でも切り詰める（9.5） | 承認（警告）、判定 |
 | `deliverables` | フェーズを閉じる前に、親か子のワークツリーに在って追跡されているべきファイル（glob。20 件まで）。中身は見ない | `ticket finish` |
+| `learning` | `on`（既定）/ `off`。`off` の定義の子は、学びの蓄積（9.16）の着手の案内と子を閉じる検査を受けない。YAML の引用符なしの `on` / `off` も読める | `ticket start`、`ticket finish` |
 | `agent` / `when` | 案内。`agent` は `SubagentStart`、`when` は次のフェーズを促す文に出す。判定には使わない | 案内 |
 
 「使われる場所」で読むのは、承認のあとはどれも親に固定した写し（`phases:`）の定義。`scope` と `deliverables` の
@@ -201,7 +202,7 @@ VS Code の計画編集タブでは並びの逆向きの線も引けるので、
 
 計画を持つ親は、frontmatter の `phases:` に、計画（`plan:` / `feedback:`）が使うフェーズ定義**だけ**の写しを持つ。
 `phases.yml` の全定義の写しではない（調査を飛ばす親の `phases:` に `research` は入らない）。中身は定義の id を
-キーにした辞書で、各定義の欄は `phases.yml` と同じ（`kind` `title` `review` `scope` `deliverables` `agent` `when`）。
+キーにした辞書で、各定義の欄は `phases.yml` と同じ（`kind` `title` `review` `scope` `deliverables` `agent` `when` `learning`）。
 読み方も `phases.yml` の定義と同じで、形の誤りも同じ文で言う。項の `type` は `phases:` のキーを指す。
 
 ```yaml

@@ -151,6 +151,18 @@ def report(
                 f"今は {selfguard.ENABLE} として動いている",
             )
         )
+    # 学びの蓄積の切り替えも 2 値。書き誤りは disable として動くので、書いたユーザが「効いている」と
+    # 思い続けないよう warn で言う。
+    learning_declared = conf.learning_declared or ""
+    if learning_declared and learning_declared not in ("enable", "disable"):
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(learning)",
+                f"{settings.LEARNING_ENV}={learning_declared}。enable か disable しか受け付けない。"
+                "今は disable として動いている",
+            )
+        )
     # 切ってあること自体は設定として正しい。それでも言うのは、切れている状態が
     # 外から見て「ルールが揃っている状態」と区別が付かないため。
     if guard_unwatched == selfguard.DISABLE:
@@ -222,6 +234,7 @@ def report(
     stdout.write(f"  コアファイルを守る: {_shown(guard_core_files, mode)}\n")
     stdout.write(f"  確認できる者が居ないモードで守る: {guard_unwatched}\n")
     stdout.write(f"  チケット制御: {conf.ticket_control}\n")
+    stdout.write(f"  学びの蓄積: {'enable' if conf.learning_enabled else 'disable'}\n")
     if conf.tickets_enabled:
         stdout.write(f"  チケットの承認の経路を守る: {conf.guard_ticket_approval}\n")
     # 環境変数はこの起動が受け取ったものであって、セッションが受け取るものではない。

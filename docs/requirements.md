@@ -59,6 +59,7 @@ ccnavi は Claude Code の hook から呼ばれる。1 回の呼び出しは、�
 | チケットの承認 (REQ-APV) | セッション開始のイベント、およびユーザが直接起動したとき |
 | 実績で測るリスク (REQ-RSK) | ユーザが直接起動したとき（子を閉じるとき）、およびツール実行後のイベント |
 | 診断コマンド (REQ-DIA) | ユーザが直接起動したときのみ |
+| 学びの蓄積 (REQ-LRN) | ユーザが直接起動したとき（子を閉じるとき・親を閉じるとき・診断）、およびサブエージェントの開始のイベント |
 | 並行するチケット (REQ-TKT) | ツール実行前・実行後、サブエージェントの開始と終了のイベント、およびユーザが直接起動したとき |
 | 複数のリポジトリ (REQ-MLT) | すべてのイベント、およびユーザが直接起動したとき |
 | 拡張との取り決め (REQ-EXT) | VS Code 拡張が実行ファイルと sh を起動したとき、および Chrome 拡張が同梱の ccnavi の関数を呼んだとき |
@@ -84,6 +85,7 @@ ccnavi は Claude Code の hook から呼ばれる。1 回の呼び出しは、�
 | 2.11 並行するチケット | REQ-TKT | [requirements/tickets.md](requirements/tickets.md) | 複数のチケットを別々のワークツリーで並行して進めることについての要件 |
 | 2.12 複数のリポジトリ | REQ-MLT | [requirements/multi-repo.md](requirements/multi-repo.md) | ワークスペースと、その下に clone したプロジェクトのリポジトリを扱うことについての要件 |
 | 2.13 拡張との取り決め | REQ-EXT | [requirements/extension-if.md](requirements/extension-if.md) | ccnavi が VS Code 拡張と Chrome 拡張に約束すること（実行ファイルの探し方・互換の版・出力の形・Python の API） |
+| 2.14 学びの蓄積 | REQ-LRN | [requirements/learning-wiki.md](requirements/learning-wiki.md) | 子チケットの気づきを集め、learning-wiki に溜め、反映先への提案として育てることについての要件（提案まではエージェント、採るのは人間。未実装） |
 | 3 正常な流れ | — | [requirements/flows.md](requirements/flows.md) | 承認からセッション開始、ツール呼び出し、範囲外、フェーズの正常な流れ |
 | 4 適用範囲外 | — | [requirements/out-of-scope.md](requirements/out-of-scope.md) | ccnavi が約束しないこと（適用範囲外） |
 | 5 受け入れ条件 | — | [requirements/acceptance.md](requirements/acceptance.md) | 全要求を引く通し確認（受け入れ条件） |

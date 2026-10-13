@@ -1,6 +1,6 @@
 ---
 title: スキル wiki の索引
-type: skill-wiki
+type: learning-wiki
 description: スキルの振り返りで溜めたパターンの一覧。1 パターン 1 行
 tags: [skills, feedback]
 keywords: [wiki, パターン, 索引, fixtures, 改名, JSON, キー, 旗, ccnavi-git.sh, 相対パス, probe, 診断, 用語, 既存の失敗]

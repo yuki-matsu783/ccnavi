@@ -313,6 +313,10 @@ scripts in .ccnavi/scripts/, which call
          it to wip/proposals/review/ when the phase is reviewed, else to
          .ccnavi/approved/done/; cancel moves it to .ccnavi/approved/done/)
     ccnavi ticket record-risk <child> <factor> yes|no --reason <why>   (qualitative risk)
+    ccnavi ticket learn [<id>] [--note <text> [--target <kind>] [--signal <kind>]]
+        (writes the learning record scaffold and the decision-log digest into
+         wip/handoff/learnings/<id>.*; with --note appends one learning,
+         or writes it to docs/wiki/inbox/ outside a ticket. The <id> goes before the options.)
     ccnavi ticket new <id> --title <title> --plan <type,type,...> [--issue N]
         (writes the scaffold of a parent proposal to wip/proposals/todo/<id>.md of
          the worktree named <id>; run it inside that worktree. Collects the scope

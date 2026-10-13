@@ -95,6 +95,11 @@ class PhaseTypes(dict):
 # 広い範囲を紛れ込ませる手口も防ぐ。
 MAX_ENTRIES = ticket_mod.MAX_SCOPE_ENTRIES
 
+# 学びの蓄積（learning-wiki）を、この定義の子に効かせるか。`off` の子は案内と閉じる検査を受けない。
+LEARNING_ON = "on"
+LEARNING_OFF = "off"
+LEARNINGS = (LEARNING_ON, LEARNING_OFF)
+
 # 定義の範囲が「親の範囲そのまま」であることを言う表記。
 INHERIT = "inherit"
 
@@ -113,6 +118,7 @@ class PhaseType:
     deliverables: list[str] = field(default_factory=list)
     agent: str = ""
     when: str = ""
+    learning: str = LEARNING_ON
     # source はこの定義が書いてあるレイヤーの名前（`common` / `self` / プロジェクト名）。
     # id は裸のままで、レイヤーは記録と `--explain` の欄に出す。
     source: str = ""
@@ -136,6 +142,7 @@ class PhaseType:
             tuple(self.deliverables),
             self.agent,
             self.when,
+            self.learning,
         )
 
     def decide(self, rel: str) -> str:
@@ -312,6 +319,19 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
             return None, problems
     pt.agent = str(body.get("agent") or "").strip()
     pt.when = str(body.get("when") or "").strip()
+    raw_learning = body.get("learning")
+    if raw_learning is not None:
+        if raw_learning is True:
+            pt.learning = LEARNING_ON
+        elif raw_learning is False:
+            pt.learning = LEARNING_OFF
+        elif isinstance(raw_learning, str) and raw_learning.strip().lower() in LEARNINGS:
+            pt.learning = raw_learning.strip().lower()
+        else:
+            problems.append(
+                Problem(SEVERITY_ERROR, ident, f"`learning` は {' か '.join(LEARNINGS)}")
+            )
+            return None, problems
     return pt, problems
 
 
@@ -396,7 +416,7 @@ def scope_problems(child: ticket_model.Ticket, pt: PhaseType) -> list[Problem]:
 COPY_KEY = ticket_mod.PHASES_KEY
 
 # 写しの欄の名前。`PhaseType.key()` の並びと同じ（`id` を除く）。
-_KEY_FIELDS = ("title", "kind", "review", "scope", "deliverables", "agent", "when")
+_KEY_FIELDS = ("title", "kind", "review", "scope", "deliverables", "agent", "when", "learning")
 
 
 def read_copy(raw) -> tuple[PhaseTypes, list[Problem]]:
@@ -478,6 +498,8 @@ def as_copy(pt: PhaseType) -> dict:
         out["agent"] = pt.agent
     if pt.when:
         out["when"] = pt.when
+    if pt.learning != LEARNING_ON:
+        out["learning"] = pt.learning
     return out
 
 

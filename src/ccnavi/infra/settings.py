@@ -82,6 +82,9 @@ BIN_SUFFIXES = (".exe",)
 # チケットまで使うかはプロジェクトが決めるので、その宣言をここに置く。
 # 置き場のパス（承認済みチケットの置き場）とは分けてある。パスが在ることと機能を切ることは別の話。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
+# LEARNING_ENV は、学びの蓄積（learning-wiki。docs/design/tickets/learning-wiki.md）を使うか。
+# enable / disable の 2 値。既定は disable（子を閉じる操作が新しく止まるため）。
+LEARNING_ENV = "CCNAVI_LEARNING"
 # DENY_REPEAT_ENV は、同じ理由で同じ呼び出しを何回止めたら「言い換えずに相談せよ」と
 # つけるか（repeat）。既定は 3。判定は変わらず、文面とユーザへの報告が変わるだけ。
 DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
@@ -395,6 +398,8 @@ class Settings:
     # ticket_control_declared は解決する前にユーザが書いた値で、--lint がそれを名指しする。
     ticket_control: str = ""
     ticket_control_declared: str = ""
+    learning: str = ""
+    learning_declared: str = ""
 
     # tickets は提案の置き場（各作業ツリーのルートからの相対、"/" 区切り）、
     # approved は承認済みチケットの置き場（各ツリーのルートからの相対、"/" 区切り）。
@@ -446,6 +451,11 @@ class Settings:
         """
         return self.ticket_control != TICKET_CONTROL_DISABLE
 
+    @property
+    def learning_enabled(self) -> bool:
+        """学びの蓄積を使うか。enable と書かれたときだけ真。空・disable・読めない値は偽。"""
+        return self.learning == "enable"
+
 
 # ticket_control の値。modes / selfguard と同じ表記だが、settings は両方より下に
 # あるので、ここに持つ。
@@ -476,6 +486,8 @@ def load(root: str) -> tuple[Settings, list[str]]:
         fail_streak_count=os.environ.get(FAIL_STREAK_COUNT_ENV, ""),
         ticket_control=os.environ.get(TICKET_CONTROL_ENV, ""),
         ticket_control_declared=os.environ.get(TICKET_CONTROL_ENV, ""),
+        learning=os.environ.get(LEARNING_ENV, ""),
+        learning_declared=os.environ.get(LEARNING_ENV, ""),
         tickets=DEFAULT_TICKETS,
         approved=DEFAULT_APPROVED,
         phases=os.path.join(root, DEFAULT_PHASES),

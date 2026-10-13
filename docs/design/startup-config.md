@@ -71,6 +71,7 @@ keywords: [起動, hook, イベント, 設定, 動作モード, dry-run, 導入,
 こちらが `enable` でも `dry-run` として振る舞う。組み合わせの表は [要件 2.2](../requirements/common.md)。
 
 `CCNAVI_GUARD_TICKET_APPROVAL` と `CCNAVI_TICKET_CONTROL`、`CCNAVI_GUARD_UNWATCHED` は `enable` / `disable` の 2 値。
+`CCNAVI_LEARNING`（学びの蓄積。9.16）も 2 値で、`enable` のときだけ効く。書き誤りは `--lint` が warn で言い、`disable` として動く。
 
 ### 4.5 応答の形と結果
 

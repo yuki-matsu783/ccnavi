@@ -307,6 +307,10 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--template", default="")
     # `ticket new --template` が、テンプレートのフィードバック計画も書く（既定は書かない）。
     parser.add_argument("--with-feedback", action="store_true")
+    # `ticket learn [<識別子>] [--note <本文>] [--target <種類>] [--signal <信号>]`。
+    parser.add_argument("--note", default="")
+    parser.add_argument("--target", default="")
+    parser.add_argument("--signal", default="")
     parser.add_argument("--reviewed", type=int, default=None)
     parser.add_argument("--accept-unresolved", action="store_true")
     # ユーザが端末で打つ、親を早めに閉じる操作。`--agree` / `--reviewed` と同じく、

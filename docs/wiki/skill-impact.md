@@ -1,6 +1,6 @@
 ---
 title: スキル提案の採否
-type: skill-wiki
+type: learning-wiki
 description: スキルへの提案ごとの対象・要点・差分・採否の記録
 tags: [skills, feedback]
 keywords: [提案, 採否, 却下, 差分, commit, test-groups, testing, designing, reviewing, purpose]

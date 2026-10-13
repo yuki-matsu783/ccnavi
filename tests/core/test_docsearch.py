@@ -405,6 +405,19 @@ class SearchTest(unittest.TestCase):
             ids(docsearch_query.Query(types=["guide"], tags=["worktree"])), ["docs/claude/worktree"]
         )
 
+    def test_learning_wiki_only_when_typed(self):
+        row = {
+            "concept_id": "docs/wiki/inbox/a.md",
+            "mtime": "2026-01-01T00:00:00",
+            "frontmatter": {"type": "learning-wiki", "tags": [], "keywords": []},
+        }
+        guide = {**row, "frontmatter": {"type": "guide", "tags": [], "keywords": []}}
+        self.assertFalse(docsearch_query.matches(row, docsearch_query.Query()))
+        self.assertTrue(
+            docsearch_query.matches(row, docsearch_query.Query(types=["learning-wiki"]))
+        )
+        self.assertTrue(docsearch_query.matches(guide, docsearch_query.Query()))
+
     def test_path_is_part_of_the_concept_id(self):
         self.assertEqual(ids(docsearch_query.Query(paths=["CLAUDE/"])), ["docs/claude/worktree"])
 
