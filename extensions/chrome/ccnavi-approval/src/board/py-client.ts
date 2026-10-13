@@ -17,10 +17,10 @@ export function startWorker(): PyWorker {
     if (!w) return;
     waiting.delete(e.data.id);
     if (e.data.ok) w.resolve(e.data.value);
-    else w.reject(new Error(e.data.error ?? "Worker が失敗した"));
+    else w.reject(new Error(e.data.error ?? "Worker が失敗しました"));
   });
   worker.addEventListener("error", (e) => {
-    for (const w of waiting.values()) w.reject(new Error(`Worker が異常終了した: ${e.message}`));
+    for (const w of waiting.values()) w.reject(new Error(`Worker が異常終了しました：${e.message}`));
     waiting.clear();
   });
   const send = (body: Record<string, unknown>) =>

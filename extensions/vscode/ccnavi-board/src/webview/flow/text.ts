@@ -26,7 +26,7 @@ export function badgeOf(type: string): Badge | undefined {
     return {
       kind: "nest",
       text: "入れ子（上限なら戻る）",
-      title: "Agent ツールがあれば、入れ子のサブエージェントとして起動します。入れ子の上限（既定はメインの下 3 段、クラウドの環境では 1 段）に達して Agent ツールが無ければ、このノードで止まってメインに返します",
+      title: "Agent ツールがあれば、入れ子のサブエージェントとして起動します。入れ子の上限（既定はメインの下 3 段、クラウドの環境では 1 段）に達して Agent ツールがなければ、このノードで止まってメインに返します",
     };
   }
   return undefined;

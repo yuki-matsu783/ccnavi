@@ -79,8 +79,8 @@ class NextIdTest(unittest.TestCase):
             (("feature", "ab..c"), ".."),
             (("feature", "a."), "."),
             (("feature", "x.lock"), ".lock"),
-            (("feature", "x" * 45), "勧める長さ"),
-            (("feature",), "2 つで打つ"),
+            (("feature", "x" * 45), "推奨の長さ"),
+            (("feature",), "2 つで実行します。"),
         ):
             with self.subTest(words=words):
                 result = self.next_id(*words)

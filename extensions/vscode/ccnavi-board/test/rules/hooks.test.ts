@@ -47,7 +47,7 @@ test("CB-T31 matcher は空か * で全部、それ以外はツール名への�
   assert.equal(matcherHits("(", "Bash"), false);
 });
 
-test("CB-T32 ツール名で走る hook を絞る。ツール名の無いイベントは常に走る", () => {
+test("CB-T32 ツール名で走る hook を絞る。ツール名のないイベントは常に走る", () => {
   const entries = parseHooks(SETTINGS, "settings");
   assert.deepEqual(
     hooksFor(entries, "Bash").map((e) => `${e.event}:${e.command}`),

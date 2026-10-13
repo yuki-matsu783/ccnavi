@@ -1129,7 +1129,7 @@ def cleanup() -> None:
         say(f"片付けに失敗したもの（手で片付ける）: {', '.join(CLEANUP_FAILED)}")
     else:
         say(f"片付け: PR {MADE_PRS} と issue {MADE_ISSUES} を閉じた")
-        say(f"片付け: ブランチ {MADE_BRANCHES} を消した")
+        say(f"片付け: ブランチ {MADE_BRANCHES} を削除した")
 
 
 def finish() -> int:

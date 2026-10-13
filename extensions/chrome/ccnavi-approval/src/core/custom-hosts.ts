@@ -39,14 +39,14 @@ export function customHost(kind: unknown, value: unknown): Host {
   }
   const url = endpoint(value.trim(), "ホストの URL");
   if (url.pathname !== "/" && url.pathname !== "") {
-    throw new Error("ホストの URL はオリジンだけ（パスは書かない。例 https://gitlab.example.com）");
+    throw new Error("ホストの URL はオリジンのみ指定してください（パスは含められません。例 https://gitlab.example.com）");
   }
   if (url.hostname.startsWith("[") || url.hostname.includes(":")) {
-    throw new Error("IPv6 のアドレスは登録できない（名前か 127.0.0.1 で書く）");
+    throw new Error("IPv6 のアドレスは登録できません（ホスト名か 127.0.0.1 で指定してください）");
   }
   // 末尾のドットと `_` は、同じサーバーに別の id を付けさせないために拒否する
   if (url.hostname.endsWith(".") || url.hostname.includes("_")) {
-    throw new Error("ホストの名前は末尾にドットを付けず、_ を使わない形で書く");
+    throw new Error("ホスト名は、末尾にドットを付けず、_ を使わない形で指定してください");
   }
   const origin = url.origin;
   // id は `ホスト名[_ポート][_http]`。ホスト名に `_` が無いので、読み返すと一通りに決まり、

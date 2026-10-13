@@ -33,7 +33,7 @@ test("CB-T552 埋め込みの JSON に data が入り、< は生で入らない"
   const hostile = "</script><b>x</b>";
   const rendered = render({ kind: "error", error: hostile }, "n0nce");
   const embedded = /<script type="application\/json" id="ccnavi-templates-data">(.*?)<\/script>/s.exec(rendered);
-  assert.ok(embedded !== null, "埋め込みの script が無い");
+  assert.ok(embedded !== null, "埋め込みの script がありません");
   assert.ok(!embedded[1].includes("<"), "埋め込みの中に < が生で入っている");
   const data = JSON.parse(embedded[1]) as { kind: string; error: string };
   assert.equal(data.kind, "error");

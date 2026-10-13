@@ -230,7 +230,7 @@ def _bin_path(root: str, declared: object) -> list[Problem]:
                 "(project)",
                 f"{PROJECT_SETTINGS} の env の {settings.BIN_ENV}={declared} は在るが実行できない。"
                 "hook が起動しないので何も判定していない。実行ビットを付ける"
-                f"（chmod +x {declared}）か、scripts/ccnavi-setup.sh を打ち直してください",
+                f"（chmod +x {declared}）か、scripts/ccnavi-setup.sh を再実行してください",
             )
         )
     return problems

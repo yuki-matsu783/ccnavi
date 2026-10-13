@@ -204,7 +204,7 @@ class TestJsonTest(unittest.TestCase):
                             "id": "ps",
                             "match": "PowerShell",
                             "glob": "*Remove-Item*",
-                            "message": "消さない",
+                            "message": "削除しない",
                         },
                         {
                             "id": "search",

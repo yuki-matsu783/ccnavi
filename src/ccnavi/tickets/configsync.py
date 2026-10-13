@@ -185,8 +185,11 @@ def apply(changes: list[Change], base: str = "") -> str:
         if failed:
             stuck = [w.rel for w in reversed(done) if _put(w.target, w.before) != ""]
             if stuck:
-                return f"{c.rel} を書けない: {failed}（戻せなかったもの: {', '.join(stuck)}）"
-            return f"{c.rel} を書けない: {failed}（した分は戻した）"
+                return (
+                    f"{c.rel} を保存できませんでした: {failed}"
+                    f"（戻せなかったもの: {', '.join(stuck)}）"
+                )
+            return f"{c.rel} を保存できませんでした: {failed}（した分は戻した）"
         done.append(c)
     if base:
         _prune_empty(base)

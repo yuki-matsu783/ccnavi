@@ -34,7 +34,7 @@ test("CB-T547 本文の引数は --templates --show <名前> --layer <名前> --
   ]);
 });
 
-test("CB-T548 下見の引数は common・project・replace の 3 通り。--yes は付けない", () => {
+test("CB-T548 プレビューの引数は common・project・replace の 3 通り。--yes は付けない", () => {
   assert.deepEqual(templatesImportArgs(COMMON), ["--templates", "--import", "login", "--to", "common", "--json"]);
   assert.deepEqual(templatesImportArgs(PROJECT), [
     "--templates",
@@ -93,7 +93,7 @@ test("CB-T549 実行の引数は --via board が --json の前、--yes と --exp
 
 const EDIT_BASE: EditRequest = { op: "save", name: "login", on: "draft", layer: "", newName: "", to: "", toLayer: "", body: "" };
 
-test("CB-T559 下見の引数（保存）は --save-draft と --body-file。--yes は付けない", () => {
+test("CB-T559 プレビューの引数（保存）は --save-draft と --body-file。--yes は付けない", () => {
   assert.deepEqual(templatesEditArgs({ ...EDIT_BASE, op: "save" }, "/tmp/body.yml"), [
     "--templates",
     "--save-draft",

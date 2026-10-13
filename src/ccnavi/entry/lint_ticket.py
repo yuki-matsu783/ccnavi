@@ -134,7 +134,7 @@ def _start_unrecorded(conf: settings.Settings, t) -> str:
     if why or any(e.get("kind") == history.KIND_STARTED for e in entries):
         return ""
     return (
-        "着手の欄（started_at）があるのに、状態の履歴に着手（started）の行が無い。"
+        "着手の欄（started_at）があるのに、状態の履歴に着手（started）の行がありません。"
         "ccnavi-ticket.sh start を通さずに書かれた欄かもしれない"
         "（提案の段階で書いて手で動かした承認など）。"
         "ユーザに started_at と base_sha を確かめてもらってください"
@@ -422,7 +422,7 @@ def _proposal_problems(
                     f"{t.ticket} は承認済み（{current.tree or '(ワークスペースルート)'} の "
                     f"{current.state or ticket_model.DOING}/）なのに todo/ にも在る"
                     f"（{_rel(root, t.path)}）。"
-                    "計画の改版でなければ todo/ の側を消してください",
+                    "計画の改版でなければ todo/ の側を削除してください",
                 )
             )
             continue
@@ -546,7 +546,11 @@ def _review_token(root: str) -> list[Problem]:
     rc, out = gitcmd.output(root, ["remote", "get-url", "origin"], 5)
     url = out.strip() if rc == 0 else ""
     if not url:
-        return [Problem(SEVERITY_WARN, "(ticket)", "origin が無い。レビューの依頼と確認は動かない")]
+        return [
+            Problem(
+                SEVERITY_WARN, "(ticket)", "origin がありません。レビューの依頼と確認は動かない"
+            )
+        ]
     problem = review_host.transport_problem(url)
     if problem:
         return [Problem(SEVERITY_WARN, "(ticket)", f"{problem}。レビューの依頼と確認は動かない")]
@@ -579,7 +583,7 @@ def _ticket_hooks(root: str) -> list[Problem]:
                 Problem(
                     SEVERITY_WARN,
                     "(project)",
-                    f".ccnavi/scripts/{name} が無い。レビュー済みのマーカーが置かれるまで"
+                    f".ccnavi/scripts/{name} がありません。レビュー済みのマーカーが置かれるまで"
                     "シェル実行を止めている間、例外として通るはずのこの sh の操作もできなくなる",
                 )
             )

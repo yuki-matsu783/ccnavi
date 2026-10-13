@@ -230,7 +230,7 @@ async function ask<T>(call: PyCall, op: string, body: Record<string, unknown>, k
     throw new PyError(res.error);
   }
   if (res.schema !== PY_SCHEMA) {
-    throw new PyError(`Python の応答の形の版が合わない（${String(res.schema)}）`);
+    throw new PyError(`Python の応答の形式の版が一致しません（${String(res.schema)}）`);
   }
   return (key === "" ? res : res[key]) as T;
 }

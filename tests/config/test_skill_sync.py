@@ -270,7 +270,7 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertFalse(os.path.exists(os.path.join(out, "common", "old")))
         self.assertTrue(os.path.exists(os.path.join(out, "common", "note.txt")))
         self.assertEqual(read(os.path.join(out, "project", "own.md")), "プロジェクト固有\n")
-        self.assertIn("消した", started.stdout)
+        self.assertIn("削除した", started.stdout)
 
     def test_the_start_c1_carries_the_deletions(self):
         """1: 消した分も、書いたパスの一覧で置き場の外でも通す"""

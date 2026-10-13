@@ -36,7 +36,7 @@ test(`CX-T115 切れる ${WARN_DAYS} 日前から知らせ、切れたら差し�
   assert.equal(expiryNotice("github.com", { host: at(60), manual: "2026-10-02" }, NOW).level, "ok");
   const unknown = expiryNotice("github.com", {}, NOW);
   assert.equal(unknown.level, "unknown");
-  assert.match(unknown.text, /期限が分からない/);
+  assert.match(unknown.text, /期限が不明です/);
   assert.equal(badgeText([expiryNotice("a", { host: at(30) }, NOW)]), "");
   assert.equal(badgeText([expiryNotice("a", { host: at(5) }, NOW), expiryNotice("b", { host: at(2) }, NOW)]), "2d");
   assert.equal(badgeText([expiryNotice("a", { host: at(-1) }, NOW)]), "PAT!");

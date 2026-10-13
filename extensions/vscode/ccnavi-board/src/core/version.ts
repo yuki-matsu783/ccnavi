@@ -49,7 +49,7 @@ export function parseVersionJson(text: string): ParsedVersion {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `JSON として読めません: ${(error as Error).message}` };
+    return { ok: false, error: `JSON として解釈できません: ${(error as Error).message}` };
   }
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     return { ok: false, error: "JSON の最上位がオブジェクトではありません" };
@@ -122,16 +122,16 @@ export function skewMessage(probe: VersionProbe, fromSource: boolean): string | 
  */
 export function missingFlags(probe: VersionProbe, flags: readonly string[], what: string, fromSource: boolean): string | undefined {
   if (probe.kind === "failed") {
-    return `実行ファイルの版を確かめられないので ${what} を使いません: ${probe.error}`;
+    return `実行ファイルの版を確認できないので ${what} を使いません: ${probe.error}`;
   }
   if (probe.kind === "old") {
-    return `実行ファイルが古い版です（--version に対応していません）。${what} で確かめられないので進めません。${rebuildHint(fromSource)}`;
+    return `実行ファイルが古い版です（--version に対応していません）。${what} で確認できないので進めません。${rebuildHint(fromSource)}`;
   }
   const missing = flags.filter((flag) => !probe.info.flags.includes(flag));
   if (missing.length === 0) {
     return undefined;
   }
-  return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} に対応していません（古い版です）。${what} で確かめられないので進めません。${rebuildHint(fromSource)}`;
+  return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} に対応していません（古い版です）。${what} で確認できないので進めません。${rebuildHint(fromSource)}`;
 }
 
 /**
@@ -140,14 +140,14 @@ export function missingFlags(probe: VersionProbe, flags: readonly string[], what
  */
 export function missingFeatures(probe: VersionProbe, features: readonly string[], what: string, fromSource: boolean): string | undefined {
   if (probe.kind === "failed") {
-    return `実行ファイルの版を確かめられないので ${what} を使いません: ${probe.error}`;
+    return `実行ファイルの版を確認できないので ${what} を使いません: ${probe.error}`;
   }
   if (probe.kind === "old") {
-    return `実行ファイルが古い版です（--version に対応していません）。${what} で確かめられないので進めません。${rebuildHint(fromSource)}`;
+    return `実行ファイルが古い版です（--version に対応していません）。${what} で確認できないので進めません。${rebuildHint(fromSource)}`;
   }
   const missing = features.filter((feature) => !probe.info.features.includes(feature));
   if (missing.length === 0) {
     return undefined;
   }
-  return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} の機能を持ちません（古い版です）。${what} で確かめられないので進めません。${rebuildHint(fromSource)}`;
+  return `実行ファイル（${named(probe.info)}）が ${missing.join(" ")} の機能を持ちません（古い版です）。${what} で確認できないので進めません。${rebuildHint(fromSource)}`;
 }

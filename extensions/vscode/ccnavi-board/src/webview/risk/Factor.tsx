@@ -142,15 +142,15 @@ export function Factor(props: FactorProps): JSX.Element {
         {NUMERIC.includes(factor.kind) && (
           <>
             <Captioned name="対象パス" yamlKey="include" {...mark("factor-include")}>
-              {globs("include", "src/**（glob を 1 行に 1 つ。書くと、当てはまるパスだけを数える。空なら全パス）")}
+              {globs("include", "src/**（glob を 1 行に 1 つ。指定すると、当てはまるパスだけを数える。空なら全パス）")}
             </Captioned>
             <Captioned name="除外パス" yamlKey="exclude" {...mark("factor-exclude")}>
-              {globs("exclude", "*.lock（glob を 1 行に 1 つ。当てはまるパスは数えない。対象パスに当てはまっていても外す）")}
+              {globs("exclude", "*.lock（glob を 1 行に 1 つ。当てはまるパスは数えない。対象パスに当てはまっていても除外する）")}
             </Captioned>
           </>
         )}
         <Captioned name="理由" yamlKey="message" {...mark("factor-message")}>
-          {text("message", "f-message", "加点の理由として依頼文と閉じたときの出力に出る短い文です。空なら id をそのまま使います")}
+          {text("message", "f-message", "加点の理由として依頼文とクローズしたときの出力に出る短い文です。空なら id をそのまま使います")}
         </Captioned>
         <span className="buttons" {...mark("factor-buttons")}>
           <button type="button" className="action small" title="上へ" disabled={disabled} onClick={() => props.onMove(-1)}>

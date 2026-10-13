@@ -242,7 +242,7 @@ class WorktreeShTest(unittest.TestCase):
             (("taken",), 1, "既にあります"),
             ((), 2, "名前を渡してください"),
             (("a", "b"), 2, "1 本だけ"),
-            (("--bogus",), 2, "知らない引数"),
+            (("--bogus",), 2, "未対応の引数"),
         ):
             with self.subTest(args=args):
                 result = self.run_sh(*args)
@@ -254,7 +254,7 @@ class WorktreeShTest(unittest.TestCase):
         self.assertEqual(4, result.returncode, result.stderr)
         self.assertFalse(os.path.exists(self.wt("topic")), "切らずに止まる")
         self.assertIn("Could not resolve host", result.stderr, "原因の出力を見せる")
-        self.assertIn("同じコマンドを打ち直す", result.stdout)
+        self.assertIn("同じコマンドを再実行する", result.stdout)
         self.assertIn("topic --offline", result.stdout)
         self.assertIn("ユーザに", result.stdout)
 
@@ -263,7 +263,7 @@ class WorktreeShTest(unittest.TestCase):
             "topic", fail_fetch="fatal: couldn't find remote ref main", cwd=self.ws
         )
         self.assertEqual(4, result.returncode, result.stderr)
-        self.assertIn("origin に統合先 main が無い", result.stdout)
+        self.assertIn("origin に統合先 main がありません", result.stdout)
 
     def test_existing_directory_that_is_not_the_worktree_is_refused(self):
         write(os.path.join(self.wt("topic"), "stray.txt"), "x")

@@ -104,7 +104,7 @@ def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, s
     if _relative_places(conf) is None:
         return TARGET_NO, "置き場のパスが絶対パス（C1 と Chrome の対象外）", st
     if not st.imported:
-        why = "親子のチケットの取り込み状態が無い（取り込み済みでない。今の手元の動きのまま）"
+        why = "親子のチケットの取り込み状態がありません（取り込み済みでない。今の手元の動きのまま）"
         return TARGET_NO, why, st
     if _without_mr(conf, root, parent):
         why = "マージリクエストで見るフェーズが無い親子のチケット（今の手元の動きのまま）"
@@ -113,7 +113,7 @@ def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, s
         return TARGET_STOP, st.stop or "親のワークツリーが決まらない", st
     origin = gitcmd.run(st.home.root, ["config", "--get", "remote.origin.url"], _TIMEOUT)
     if not origin.ok or not origin.out.strip():
-        return TARGET_NO, "origin が無い（今の手元の動きのまま）", st
+        return TARGET_NO, "origin がありません（今の手元の動きのまま）", st
     if any(ch in st.home.root for ch in "\r\n"):
         return TARGET_STOP, "親のワークツリーのパスに改行がある", st
     return TARGET_YES, "", st

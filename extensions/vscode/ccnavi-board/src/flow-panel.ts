@@ -282,7 +282,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
     // リンクは辿らない（ツリーのルートからファイルまでの途中も）。読まないし書かない
     read = readFlowFile(target.flow.tree, filePath);
   } catch (error) {
-    throw new Error(`フローのファイルを読めません（${shown}）: ${(error as Error).message}`);
+    throw new Error(`フローのファイルを読み込めません（${shown}）: ${(error as Error).message}`);
   }
   if (read === undefined) {
     // 無いのは不備ではない（フローは任意）。雛形を見せ、保存でファイルを作る
@@ -690,7 +690,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   if (current.loaded === loaded) {
     return false;
   }
-  fail(current, "フローを読み直したため、この保存は取りやめました。読み直したフローで編集し直してください");
+  fail(current, "フローを再読み込みしたため、この保存は取りやめました。再読み込みしたフローで編集し直してください");
   return true;
 }
 
@@ -728,8 +728,8 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
       return;
     case "reload": {
       if (message.dirty) {
-        const choice = await vscode.window.showWarningMessage("未保存の変更があります。破棄して読み直しますか？", { modal: true }, "読み直す");
-        if (choice !== "読み直す") {
+        const choice = await vscode.window.showWarningMessage("未保存の変更があります。破棄して再読み込みしますか？", { modal: true }, "再読み込みする");
+        if (choice !== "再読み込みする") {
           current.host.post({ type: "cancelled" } satisfies ToFlow);
           return;
         }
@@ -896,9 +896,9 @@ function removeImported(current: PanelState, target: FlowTarget, imported: strin
   const shown = shownPath(current.folder.uri.fsPath, draft.path);
   const removed = removeDraftFile(target.flow.tree, draft.path, imported);
   if (!removed.ok) {
-    return `取り込んだ下書き ${shown} は消していません（${removed.error}）。`;
+    return `取り込んだ下書き ${shown} は削除していません（${removed.error}）。`;
   }
-  return removed.removed ? `取り込んだ下書き ${shown} を消しました（削除もコミットに入ります）。` : "";
+  return removed.removed ? `取り込んだ下書き ${shown} を削除しました（削除もコミットに入ります）。` : "";
 }
 
 async function save(current: PanelState, doc: FlowDoc, imported?: string): Promise<void> {

@@ -32,8 +32,8 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
     <details className="sum" id="sum" data-tour="sum" open={tour === undefined ? undefined : tour.open}>
       <summary>足し算（読み取り専用。共通の設定 + 1 つの設定の和）</summary>
       <p className="hint">
-        子チケットを閉じるときの配点は、共通の設定と、親の <code>project:</code> が指す設定の和です。ここは実行ファイルが出した結果をそのまま見せるだけで、直すときは画面上部の「設定」の欄で編集する 1 本に切り替えます。保存済みの配点の和で、編集中の内容は含みません。
-        パスを持たない判定は、全プロジェクトの設定を足した和ではありません（配点の合成は、親の <code>project:</code> が指す 1 つの設定だけを足します）。
+        子チケットをクローズするときの配点は、共通の設定と、親の <code>project:</code> が指す設定の和です。ここは実行ファイルが出した結果をそのまま見せるだけで、直すときは画面上部の「設定」の欄で編集する 1 本に切り替えます。保存済みの配点の和で、編集中の内容は含みません。
+        パスを持たない判定は、全プロジェクトの設定を合算した和ではありません（配点の合成は、親の <code>project:</code> が指す 1 つの設定だけを追加します）。
       </p>
       <label className="sum-pick" data-tour="sum-pick">
         足し算{" "}
@@ -65,7 +65,7 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
         項目 {sum.factors.length} 件（{sum.layers.join(" + ")}）
       </p>
       {sum.factors.length === 0 ? (
-        <p className="empty">項目がありません。加点する項目が無ければ、どの子も LOW のまま閉じます</p>
+        <p className="empty">項目がありません。加点する項目がなければ、どの子も LOW のままクローズされます</p>
       ) : (
         <div className="table-scroll" data-tour="sum-table">
           <table className="sum-table">

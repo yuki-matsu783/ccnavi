@@ -162,14 +162,14 @@ def problems(text: str, scripts: Collection[str] = ()) -> list[str]:
                 )
         elif _ELSE.match(line):
             if not elses:
-                found.append(f"{number} 行目: ccnavi:else に対応する ccnavi:if が無い")
+                found.append(f"{number} 行目: ccnavi:else に対応する ccnavi:if がありません。")
             elif elses[-1]:
                 found.append(f"{number} 行目: 1 つの ccnavi:if に ccnavi:else は 1 つだけ")
             else:
                 elses[-1] = True
         elif _ENDIF.match(line):
             if not elses:
-                found.append(f"{number} 行目: ccnavi:endif に対応する ccnavi:if が無い")
+                found.append(f"{number} 行目: ccnavi:endif に対応する ccnavi:if がありません。")
             else:
                 elses.pop()
         elif _DIRECTIVE.search(line):
@@ -178,7 +178,7 @@ def problems(text: str, scripts: Collection[str] = ()) -> list[str]:
             if name not in SUBSTITUTIONS:
                 found.append(f"{number} 行目: 差し込み {{{{{name}}}}} は使えない")
     if elses:
-        found.append("ccnavi:if に対応する ccnavi:endif が無い")
+        found.append("ccnavi:if に対応する ccnavi:endif がありません。")
     return found
 
 

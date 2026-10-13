@@ -85,7 +85,7 @@ export async function reviewPanels(
   for (const r of reviewable) {
     const panel = { phase: r.phase, mr: r.mr, host: r.host, children: r.children };
     if (r.host !== "github" && r.host !== "gitlab") {
-      out.push({ ...panel, copy: null, problems: [], error: `レビューを依頼したホストは ${r.host || "（記録なし）"}。Chrome 拡張からレビュー済みにできるのは GitHub と GitLab だけ` });
+      out.push({ ...panel, copy: null, problems: [], error: `レビューを依頼したホストは ${r.host || "（記録なし）"} です。Chrome 拡張からレビュー済みにできるのは GitHub と GitLab のみです。` });
       continue;
     }
     if (copy === null) {
@@ -94,7 +94,7 @@ export async function reviewPanels(
     }
     if (copy.host !== r.host) {
       // 依頼を記録したホストと、このリポジトリのホストが違う（別のホストの MR で依頼した）
-      out.push({ ...panel, copy: null, problems: [], error: `レビューを依頼したホスト（${r.host}）とこのリポジトリのホスト（${copy.host}）が違う。レビューを依頼し直してください` });
+      out.push({ ...panel, copy: null, problems: [], error: `レビューを依頼したホスト（${r.host}）とこのリポジトリのホスト（${copy.host}）が異なります。レビューを依頼し直してください。` });
       continue;
     }
     try {

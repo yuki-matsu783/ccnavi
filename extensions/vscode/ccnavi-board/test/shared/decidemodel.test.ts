@@ -47,7 +47,7 @@ test("CB-T207 置いた答えを読む。食い違いは mismatch、ok が真で
   assert.ok(!unknown.ok && "error" in unknown);
 });
 
-test("CB-T208 行き先は見せた指摘の全部に 1 つずつ。知らない行き先と、回せない issue は通さない", () => {
+test("CB-T208 対応方針は見せた指摘の全部に 1 つずつ。知らない対応方針と、回せない issue は通さない", () => {
   const preview = parseDecidePreview(previewJson());
   assert.ok(preview.ok);
   if (!preview.ok) return;

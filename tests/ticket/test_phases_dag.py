@@ -344,15 +344,15 @@ class PlanProblemsTest(unittest.TestCase):
                 item("docs", after=[3, 1]),
             ]
         )
-        self.assertTrue(any("引き受ける項が無い" in d for d in found), found)
+        self.assertTrue(any("引き受ける項がありません" in d for d in found), found)
 
     def test_the_taker_needs_a_review_when_the_definitions_are_given(self):
         types, _ = phasetypes.parse(DEFS)
         plan = [item("design", "defer"), item("extra", after=[1]), item("docs", after=[2])]
         found = self.problems(plan, types=types)
-        self.assertTrue(any("レビューが無い" in d for d in found), found)
+        self.assertTrue(any("レビューがありません" in d for d in found), found)
         # 定義を渡さなければ（判定の側）、定義を読む検査は当てない。
-        self.assertFalse(any("レビューが無い" in d for d in self.problems(plan)))
+        self.assertFalse(any("レビューがありません" in d for d in self.problems(plan)))
         plan[1] = item("extra", "mr", [1])
         self.assertEqual(self.problems(plan, types=types), [])
 
@@ -637,7 +637,7 @@ class DagApprovalTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", PLAN))
         self.commit_parent()
         result = self.ccnavi("--agree", stdin="n\n")
-        self.assertIn("■ 待ち方", result.stdout)
+        self.assertIn("■ フェーズ間の依存関係", result.stdout)
         self.assertIn("1: design — 何も待たない", result.stdout)
         self.assertIn("3: implement — 待つ: 1", result.stdout)
         self.assertIn("4: docs — 待つ: 1, 2, 3", result.stdout)

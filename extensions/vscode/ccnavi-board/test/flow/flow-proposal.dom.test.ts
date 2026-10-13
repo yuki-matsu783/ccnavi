@@ -26,13 +26,13 @@ test("CB-D139 提案ありを開くと下書きを頼み、文の前後まで見
     dom.click(dom.one('[data-action="open-proposal"]'));
     await dom.settle();
     assert.equal(dom.posted.filter((m) => m.type === "openProposal").length, 1);
-    assert.match(dom.one("#proposal-review").textContent ?? "", /確かめています/);
-    assert.equal(dom.all('[data-action="import-proposal"]').length, 0, "確かめ終わるまで取り込めない");
+    assert.match(dom.one("#proposal-review").textContent ?? "", /確認しています/);
+    assert.equal(dom.all('[data-action="import-proposal"]').length, 0, "確認が終わるまで取り込めない");
     const draft = drafted();
     await dom.send({ type: "proposal", proposal: { doc: draft, hash: HASH, draftPath: OFFER.draftPath } });
     const review = dom.one("#proposal-review");
     // 変わった欄の名前だけでなく、文そのもの（改行も）を見せる
-    assert.match(review.textContent ?? "", /足すノード/);
+    assert.match(review.textContent ?? "", /追加するノード/);
     assert.match(review.textContent ?? "", /中身\.prompt/);
     const after = dom.all(".proposal-after pre").map((e) => e.textContent ?? "");
     assert.ok(after.includes("既存の振る舞いを読む\nそのあと要点をまとめる"), after.join(" / "));
@@ -74,7 +74,7 @@ test("CB-D140 未保存の変更があれば捨てることを言ってから取
     await dom.settle();
     await dom.send({ type: "proposal", proposal: { doc: drafted(), hash: HASH, draftPath: OFFER.draftPath } });
     assert.match(dom.one("#proposal-dirty").textContent ?? "", /未保存の変更があります/);
-    assert.equal(dom.one('[data-action="import-proposal"]').textContent, "未保存の変更を捨てて取り込む");
+    assert.equal(dom.one('[data-action="import-proposal"]').textContent, "未保存の変更を破棄して取り込む");
     // 着手された（錠が掛かった）。取り込みも止まる
     await dom.send({ type: "lock", lock: { locked: true, reason: lockedReason("i0001-01-01") } });
     assert.ok(dom.one<HTMLButtonElement>('[data-action="import-proposal"]').disabled);

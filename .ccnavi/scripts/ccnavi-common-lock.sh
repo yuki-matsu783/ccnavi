@@ -78,7 +78,7 @@ ccnavi_lock_take() {
 			# 取った直後に強制取得された（owner を書けない・別の中身）。取れていないとして待ちに戻る。
 			ccnavi_lock_dir=""
 			ccnavi_lock_mark=""
-			log_warn 取ったロックの持ち主を書けなかった -- "lock=$ccnavi_lk_key"
+			log_warn 取ったロックの持ち主を保存できなかった -- "lock=$ccnavi_lk_key"
 		else
 			ccnavi_lk_seen=$(ccnavi_lock_owner "$ccnavi_lk_dir")
 			if ccnavi_lock_stale "$ccnavi_lk_dir" "$ccnavi_lk_host" "$ccnavi_lk_os" "$ccnavi_lk_seen"; then
@@ -169,7 +169,7 @@ ccnavi_lock_describe() {
 		fi
 		[ -n "$ccnavi_lds_at" ] || ccnavi_lds_at="$ccnavi_lds_started"
 	fi
-	printf '持ち主は pid %s・ホスト %s・開始 %s。そのプロセスが固まっているなら、ユーザに終了させてもらってから打ち直してください（持ち主のプロセスが終われば、ロックは次の実行が片付ける）\n' \
+	printf '持ち主は pid %s・ホスト %s・開始 %s。そのプロセスが固まっているなら、ユーザに終了させてもらってから再実行してください（持ち主のプロセスが終われば、ロックは次の実行が片付ける）\n' \
 		"${ccnavi_lds_pid:-?}" "${ccnavi_lds_host:-?}" "${ccnavi_lds_at:-?}"
 }
 

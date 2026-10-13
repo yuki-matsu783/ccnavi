@@ -104,7 +104,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertIn("編集対象としているが", body["text"])
         # rejected[] に残るのは形の不正な子だけ。
         self.assertEqual([r["ticket"] for r in body["rejected"]], ["i0001-05-05"])
-        self.assertTrue(any("計画に無い" in p for p in body["rejected"][0]["problems"]))
+        self.assertTrue(any("計画にありません" in p for p in body["rejected"][0]["problems"]))
         self.assertTrue(any("broken.md" in p for p in body["problems"]))
         # 見ただけ。承認済みチケットは置かれていない。
         self.assertFalse(self.copy_exists("i0001"))
@@ -131,7 +131,7 @@ class ApproveJsonTest(PhaseHarness):
         body = self.preview()
         self.assertEqual(body["batch"], [])
         self.assertEqual(body["rejected"], [])
-        self.assertIn("承認待ちのチケットは無い", body["text"])
+        self.assertIn("承認待ちのチケットはありません。", body["text"])
 
     # ---- 3. yes は一覧と一致すれば承認する
 
@@ -509,7 +509,7 @@ class ApproveJsonTest(PhaseHarness):
         # 壁を有効にしたまま。テストの標準入力は端末ではない。
         refused = self.ccnavi("--agree", "--guard-ticket-approval", "enable", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("端末", refused.stderr)
+        self.assertIn("ターミナル", refused.stderr)
         self.assertFalse(self.copy_exists("i0001"))
 
         result = self.yes(["i0001", "i0001-01-01"], "--guard-ticket-approval", "enable")
@@ -564,7 +564,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(body["version"], APPROVE_VERSION)
         self.assertEqual(body["partial"]["placed"], ["i0001"])
         self.assertEqual(body["partial"]["ticket"], "i0001-01-01")
-        self.assertIn("書けない", body["partial"]["reason"])
+        self.assertIn("保存できませんでした", body["partial"]["reason"])
         self.assertNotIn("approved", body)
         # 置いたものは戻さない。親は承認済みチケットに入ったまま。
         self.assertTrue(self.copy_exists("i0001"))

@@ -454,7 +454,7 @@ class _Writer:
         except GitFailed as exc:
             raise OSError(f"一時ファイルの置き場を git に確かめられない: {exc}") from exc
         if not ignored:
-            raise OSError(f"一時ファイルの置き場 {probe} が git に無視されないので書かない")
+            raise OSError(f"一時ファイルの置き場 {probe} が git に無視されないので反映しません")
         holder = os.path.join(parent, name)
         os.mkdir(holder, 0o700)  # 在れば失敗する（排他）
         try:
@@ -685,7 +685,7 @@ def _settle(
             writer.write(one.index_path, one.index_rel, text)
             result.written.append(one.index_rel)
     except OSError as exc:
-        result.problems.append(f"{one.index_rel} を書けない: {exc}")
+        result.problems.append(f"{one.index_rel} を保存できませんでした: {exc}")
 
 
 GITIGNORE = ".gitignore"

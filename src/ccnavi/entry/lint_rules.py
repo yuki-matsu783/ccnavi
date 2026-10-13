@@ -113,7 +113,9 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
     problems: list[Problem] = []
     for tool in _inert(rule.match):
         problems.append(
-            Problem(SEVERITY_WARN, name, f"match の {tool} には当てる対象が無い。何も止まらない")
+            Problem(
+                SEVERITY_WARN, name, f"match の {tool} には当てる対象がありません。何も止まらない"
+            )
         )
     problems.extend(_stop_problems(rule, name, project))
 
@@ -131,7 +133,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
                 SEVERITY_ERROR,
                 name,
                 f"{rule.decision} に message がある。{where}ので、モデルに渡す文は "
-                "additionalContext に書き、message は消してください",
+                "additionalContext に書き、message は削除してください",
             )
         )
 
@@ -174,7 +176,8 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
                 Problem(
                     SEVERITY_WARN,
                     name,
-                    f"{key} の {rel} が無い。ワークツリーにもルートにも無ければ何も足さない",
+                    f"{key} の {rel} がありません。"
+                    "ワークツリーにもルートにも無ければ何も追加しません。",
                 )
             )
         elif ctxfile.over_limit(full):
@@ -183,7 +186,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False
                     SEVERITY_WARN,
                     name,
                     f"{key} の {rel} は {ctxfile.MAX_CHARS} 文字を超える。"
-                    "先頭だけを渡し、切り詰めたことを末尾に書き足す",
+                    "先頭だけを渡し、切り詰めたことを末尾に追記します。",
                 )
             )
 
@@ -267,7 +270,7 @@ def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[P
             Problem(
                 SEVERITY_WARN,
                 name,
-                f"{rules.STOP_MATCH} のルールに every が無い（1 として扱う）ので使われない。"
+                f"{rules.STOP_MATCH} のルールに every がありません（1 として扱う）ので使われない。"
                 "使えばターンが終わるたびに止めることになるので、"
                 "every: 10 のように間隔を空けてください",
             )
@@ -323,7 +326,7 @@ def _except_problems(rule: rules.Rule, name: str) -> list[Problem]:
                 SEVERITY_WARN,
                 name,
                 f"{'|'.join(shells)} の except はコマンド列の全体に当たる。コマンドのどこかに"
-                "除く語を足すだけでこのルールが外れるので、except は語の位置まで狭く書くか、"
+                "除く語を追加するだけでこのルールが外れるので、except は語の位置まで狭く書くか、"
                 "ルールを分けてください",
             )
         )
@@ -468,7 +471,7 @@ def _when_problems(rule: rules.Rule, name: str) -> list[Problem]:
                 SEVERITY_WARN,
                 name,
                 f"{'|'.join(shells)} の when の not はコマンド列の全体に当たる。コマンドのどこかに"
-                "除く語を足すだけでこのルールが外れるので、not の下は語の位置まで狭く書くか、"
+                "除く語を追加するだけでこのルールが外れるので、not の下は語の位置まで狭く書くか、"
                 "ルールを分けてください",
             )
         )
@@ -507,7 +510,7 @@ def _every_problems(rule: rules.Rule, name: str) -> list[Problem]:
                 name,
                 "every があるのに渡すものが無いので、間隔を空けても何も渡らない。"
                 "additionalContext（または additionalContextOnce・…File）を書くか、"
-                "every を消してください",
+                "every を削除してください",
             )
         ]
     return []

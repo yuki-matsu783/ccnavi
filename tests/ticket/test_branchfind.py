@@ -69,7 +69,7 @@ class PromptHintTest(PhaseHarness):
         self.assertIn("ccnavi-git.sh", said)
         self.assertIn("終了コード 3（候補が複数）", said)
         self.assertIn("終了コード 4（ホストに届かない）", said)
-        self.assertIn("MCP で代行し、同じコマンドを打ち直す", said)
+        self.assertIn("MCP で代行し、同じコマンドを再実行します。", said)
         self.assertIn("終了コード 1・2 なら、出力の理由をユーザに伝える", said)
         self.assertNotIn("ccnavi-branches.sh", said)
 

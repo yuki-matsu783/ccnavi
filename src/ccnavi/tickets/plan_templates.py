@@ -288,7 +288,7 @@ def hidden_problem(text: str) -> str:
     shown = " ".join(escape_char(ch) for ch in hidden[:8])
     return (
         f"制御文字・書式文字が含まれている（{shown}{' ほか' if len(hidden) > 8 else ''}）。"
-        "右から左への上書きや幅ゼロの文字、復帰などは、読み違えを誘うので使えない。消す"
+        "右から左への上書きや幅ゼロの文字、復帰などは、読み違えを誘うので使えない。削除します。"
     )
 
 
@@ -401,7 +401,7 @@ def parse_template(raw: bytes, stem: str = "") -> tuple[Template | None, list[Pr
             error(f"`{key}` は文字列で書く")
             texts[key] = ""
     if not texts["description"] and not any(p.severity == SEVERITY_ERROR for p in problems):
-        error("`description` が無い（一覧に出す説明）")
+        error("`description` がありません（一覧に出す説明）")
 
     plan = _items(data.get("plan"), "plan", problems, stem, required=True)
     feedback = _items(data.get("feedback"), "feedback", problems, stem, required=False)
@@ -432,7 +432,7 @@ def _items(raw, key: str, problems: list[Problem], stem: str, required: bool) ->
 
     if raw is None:
         if required:
-            error(f"`{key}` が無い")
+            error(f"`{key}` がありません。")
         return None
     if not isinstance(raw, list):
         error(f"`{key}` はリストで書く")
@@ -458,7 +458,7 @@ def _items(raw, key: str, problems: list[Problem], stem: str, required: bool) ->
                 problems.append(Problem(SEVERITY_WARN, stem, text))
         kind = entry.get("type")
         if not isinstance(kind, str) or not kind.strip():
-            error(f"{where} に `type` が無い")
+            error(f"{where} に `type` がありません。")
             continue
         review = entry.get("review")
         if review is not None and not isinstance(review, str):
@@ -517,7 +517,7 @@ def dump_flow(body: dict) -> tuple[str, str]:
     try:
         text = to_yaml(body)
     except (yaml.YAMLError, RecursionError, ValueError, TypeError) as exc:
-        return "", f"YAML に書けない ({_line(exc)})"
+        return "", f"YAML に変換できません ({_line(exc)})"
     return text, ""
 
 
@@ -655,8 +655,8 @@ def _plan_problems(
                     Problem(
                         SEVERITY_WARN,
                         name,
-                        f"`{key}[{i}]` の型 `{item.type}` が phases.yml に無い"
-                        "（定義が変わったか、このレイヤーに無い。使う前に直す）",
+                        f"`{key}[{i}]` の型 `{item.type}` が phases.yml にありません"
+                        "（定義が変わったか、このレイヤーにありません。使う前に直す）",
                     )
                 )
     if not known and placeholders:

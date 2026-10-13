@@ -338,7 +338,7 @@ class PassTest(GitWrapperTest):
 
     def test_commit_goes_through(self):
         self.assertEqual(0, self.run_wrapper("add", "untracked.txt").returncode)
-        result = self.run_wrapper("commit", "-m", "足した")
+        result = self.run_wrapper("commit", "-m", "追加した")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
         self.assertTrue(result.stdout.startswith("ok  git commit"), result.stdout)
 

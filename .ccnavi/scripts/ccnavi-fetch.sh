@@ -146,7 +146,7 @@ ccnavi_fetch_or_note() {
 	[ "$ccnavi_fn_rc" -eq 0 ] && return 0
 	[ "$ccnavi_fn_rc" -eq 2 ] && return 1
 	if [ "$ccnavi_fn_rc" -eq 5 ]; then
-		printf '%s: 時間の枠（%s 秒）を過ぎたので %s を取りに行かなかった。後で sh %s/.ccnavi/scripts/ccnavi-sync.sh を打つか、もう一度セッションを始めてください\n' \
+		printf '%s: 時間の枠（%s 秒）を過ぎたので %s を取得しませんでした。後で sh %s/.ccnavi/scripts/ccnavi-sync.sh を実行するか、もう一度セッションを始めてください\n' \
 			"$(basename "$1")" "$budget" "$2" "$root"
 		return 1
 	fi
@@ -155,7 +155,7 @@ ccnavi_fetch_or_note() {
 		return 1
 	fi
 	printf '%s\n' "$3"
-	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証に失敗した（資格情報が無いか、切れているか、権限が無い）。hook は資格情報の入力を求めない。ユーザに端末で一度 'git fetch origin' を打って認証を済ませてもらえば、次のセッションから通る"
+	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証に失敗した（資格情報が無いか、切れているか、権限がありません）。hook は資格情報の入力を求めない。ユーザに端末で一度 'git fetch origin' を実行して認証を済ませてもらえば、次のセッションから通る"
 	return 1
 }
 
@@ -235,7 +235,7 @@ ccnavi_fetch_forward() {
 	ccnavi_fw_key=$(ccnavi_repo_key "$1" "$root")
 	ccnavi_fetch_or_note "$1" "$3" \
 		"${2}: リモートを取ってこられなかった。手元の版で判定する" \
-		"${2}: 親のブランチ ${3} をリモートから取ってこられなかった（リモートに無い）。sh ${root}/.ccnavi/scripts/ccnavi-sync.sh ${2} で確かめてください" ||
+		"${2}: 親のブランチ ${3} をリモートから取ってこられなかった（リモートにありません）。sh ${root}/.ccnavi/scripts/ccnavi-sync.sh ${2} で確かめてください" ||
 		return 0
 	ccnavi_fw_now=$(date +%s)
 	if [ "$((ccnavi_fw_now - started))" -ge "$budget" ]; then
@@ -250,7 +250,7 @@ ccnavi_fetch_forward() {
 	git -C "$1" merge-base --is-ancestor "$ccnavi_fw_remote" "$ccnavi_fw_local" 2>/dev/null && return 0
 	if ! git -C "$1" merge-base --is-ancestor "$ccnavi_fw_local" "$ccnavi_fw_remote" 2>/dev/null; then
 		# 分岐か、浅い clone で履歴が足りないだけかは見分けない。見るのは一致しているかどうかだけ。
-		printf '%s: リモートの最新と一致しないので、取り込みが要る（手元 %s、リモート %s。浅い clone なら git fetch --unshallow。sh %s/.ccnavi/scripts/ccnavi-sync.sh %s）\n' \
+		printf '%s: リモートの最新と一致しないので、取り込みが必要です（手元 %s、リモート %s。浅い clone なら git fetch --unshallow。sh %s/.ccnavi/scripts/ccnavi-sync.sh %s）\n' \
 			"$2" "$(git -C "$1" rev-parse --short "$ccnavi_fw_local")" \
 			"$(git -C "$1" rev-parse --short "$ccnavi_fw_remote")" "$root" "$2"
 		return 0
@@ -346,7 +346,7 @@ report=$(
 
 		ccnavi_fetch_or_note "$repo" "$default" \
 			"${name}: ワークツリーの起点になる ${default} を取ってこられなかった。手元の版から切ることになる" \
-			"${name}: ワークツリーの起点になる ${default}（統合先）がリモートに無い。CCNAVI_INTEGRATION_BRANCH を確かめてください" ||
+			"${name}: ワークツリーの起点になる ${default}（統合先）がリモートにありません。CCNAVI_INTEGRATION_BRANCH を確かめてください" ||
 			continue
 
 		old=$(git -C "$repo" rev-parse --verify --quiet "refs/heads/$default" 2>/dev/null || :)

@@ -288,7 +288,9 @@ def run(
     layer = (args.layer or plan_templates.LAYER_SELF).strip()
     known = [view.name for view in ruleload.layers(conf, root)]
     if layer not in known:
-        return _fail(stdout, stderr, args.json, f"レイヤー {layer!r} は無い（{' / '.join(known)}）")
+        return _fail(
+            stdout, stderr, args.json, f"レイヤー {layer!r} はありません（{' / '.join(known)}）"
+        )
     scanned = plan_templates.scan(conf, root)
     if args.show is not None:
         return _show(stdout, stderr, conf, root, scanned, layer, args.show.strip(), args.json)
@@ -339,7 +341,11 @@ def _list(
     rows = answer["templates"]
     stdout.write(f"ccnavi: テンプレート（共通 + {layer}）\n")
     if not rows:
-        stdout.write("  該当するテンプレートは無い\n" if keywords else "  テンプレートは無い\n")
+        stdout.write(
+            "  該当するテンプレートはありません。\n"
+            if keywords
+            else "  テンプレートはありません。\n"
+        )
     for row in rows:
         mark = ""
         if row["dropped"]:
@@ -406,7 +412,7 @@ def _draft(
         "次: description と when を固有名の無い言い方に直し、計画とフローの不要な手順を削る。"
         "効力が無い下書きで、取り込む（使えるようにする）のはユーザ\n"
         "下書きは未追跡のファイルで、残っていると親の ready が止まる。取り込むか、"
-        "ready の前に下書きを消す（またはコミットする）\n"
+        "ready の前に下書きを削除します（またはコミットする）\n"
     )
     return EXIT_OK
 
@@ -465,11 +471,11 @@ def _import_text(
         out.write(f"ccnavi: {plan_templates.reveal(line)}\n")
     if draft is None or errors:
         if draft is not None and result is None:
-            stdout.write("何も書いていない。\n")
+            stdout.write("何も反映していません。\n")
         return
     if result is None:
         _show_change(stdout, plan)
-        stdout.write("何も書いていない。この内容で取り込むなら、ユーザが次を打つ。\n")
+        stdout.write("何も反映していません。この内容で取り込むなら、ユーザが次を実行します。\n")
         flags = f"--import {draft.name} --to {plan.to}"
         if plan.to == template_drafts.TO_PROJECT:
             flags += f" --layer {plan.layer}"
@@ -481,7 +487,7 @@ def _import_text(
     for line in result.infos:
         stdout.write(f"  info  {line}\n")
     if result.removed:
-        stdout.write(f"下書き {draft.rel} を消した（取り込んだときと同じ中身だった）\n")
+        stdout.write(f"下書き {draft.rel} を削除しました（取り込んだときと同じ中身だった）\n")
     elif result.kept:
         stdout.write(f"下書き {draft.rel}: {result.kept}\n")
 
@@ -563,14 +569,14 @@ def _edit_text(
         out.write(f"ccnavi: {plan_templates.reveal(line)}\n")
     if errors:
         if result is None:
-            stdout.write("何も書いていない。\n")
+            stdout.write("何も反映していません。\n")
         return
     if result is None:
         if plan.diff:
             stdout.write(f"--- 差分（前後 {template_drafts.DIFF_CONTEXT} 行つき） ---\n")
             for line in plan.diff:
                 stdout.write(line + "\n")
-        stdout.write("何も書いていない。この内容で実行するなら、ユーザが次を打つ。\n")
+        stdout.write("何も反映していません。この内容で実行するなら、ユーザが次を実行します。\n")
         stdout.write(
             f"  ccnavi --templates {_edit_tokens(flag, plan, args)} --yes --expect {plan.sha}\n"
         )
@@ -578,9 +584,9 @@ def _edit_text(
     if plan.op == template_edit.OP_SAVE:
         stdout.write(f"書いた: {plan.target_rel}\n")
     elif plan.op in (template_edit.OP_RENAME, template_edit.OP_MOVE):
-        stdout.write(f"書いた: {plan.target_rel}（元の {plan.source_rel} を消した）\n")
+        stdout.write(f"書いた: {plan.target_rel}（元の {plan.source_rel} を削除しました）\n")
     else:
-        stdout.write(f"消した: {plan.source_rel}\n")
+        stdout.write(f"削除した: {plan.source_rel}\n")
     for line in result.infos:
         stdout.write(f"  info  {line}\n")
 
@@ -637,7 +643,9 @@ def _show(
 ) -> int:
     entry = plan_templates.find(scanned, layer, name)
     if entry is None:
-        return _fail(stdout, stderr, as_json, f"テンプレート {name!r} は無い（共通 + {layer}）")
+        return _fail(
+            stdout, stderr, as_json, f"テンプレート {name!r} はありません（共通 + {layer}）"
+        )
     if entry.layer == plan_templates.LAYER_COMMON:
         types = plan_templates.types_for(conf, root, layer)
         entry = plan_templates.recheck(entry, types, scanned.candidates)

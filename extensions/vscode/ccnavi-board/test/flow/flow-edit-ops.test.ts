@@ -70,13 +70,13 @@ function branched(): FlowDoc {
   return grouped.doc;
 }
 
-test("CB-T271 開始へ入る線・終了から出る線・グループ・自分・無いノードへは線を引かない。connect も同じ規則で断る", () => {
+test("CB-T271 開始へ入る線・終了から出る線・グループ・自分・ないノードへは線を引かない。connect も同じ規則で断る", () => {
   const doc = sample();
   assert.ok(canConnect(doc, "start-1", "end-1"));
   assert.ok(!canConnect(doc, "ask-1", "start-1"), "開始へは入らない");
   assert.ok(!canConnect(doc, "end-1", "mcp-1"), "終了からは出ない");
   assert.ok(!canConnect(doc, "ask-1", "ask-1"), "自分へは戻らない");
-  assert.ok(!canConnect(doc, "ask-1", "nothing"), "無いノードへは引かない");
+  assert.ok(!canConnect(doc, "ask-1", "nothing"), "ないノードへは引かない");
   assert.equal(connect(doc, "ask-1", "branch-0", "start-1", "input"), doc);
   assert.equal(connect(doc, "end-1", "output", "mcp-1", "input"), doc);
   assert.equal(connect(doc, "ask-1", "branch-0", "nothing", "input"), doc);
@@ -88,7 +88,7 @@ test("CB-T271 開始へ入る線・終了から出る線・グループ・自分
   assert.equal(connectionsOf(connect(bareFlow("x", ""), "start", "output", "end", "input")).length, 1, "同じ線は足さない");
 });
 
-test("CB-T272 コピーして貼ると id を振り直し、選んだノード同士の線だけ新しい id に書き換える。出口の表記と知らない欄は元のまま", () => {
+test("CB-T272 コピーして貼ると id を振り直し、選んだノード同士の線だけ新しい id に変更する。出口の表記と知らない欄は元のまま", () => {
   const doc = branched();
   const clip = copyNodes(doc, ["if-1", "p-1", "end"]);
   assert.ok(clip !== undefined);
@@ -127,7 +127,7 @@ test("CB-T272 コピーして貼ると id を振り直し、選んだノード�
 
 test("CB-T273 開始はコピーしない。グループをコピーすると中のノードも一緒にコピーされ、新しいグループの中で相対位置が同じ", () => {
   const doc = branched();
-  assert.equal(copyNodes(doc, ["start"]), undefined, "開始だけならコピーするものが無い");
+  assert.equal(copyNodes(doc, ["start"]), undefined, "開始だけならコピーするものがありません");
   assert.equal(copyNodes(doc, []), undefined);
   assert.equal(duplicateNodes(doc, ["start"]), undefined);
   const withStart = copyNodes(doc, ["start", "end"]);
@@ -225,7 +225,7 @@ test("CB-T275 同じ欄に続けて打った字は 1 件にまとめる。間が
   assert.equal(after.past.length, back.history.past.length + 1);
 });
 
-test("CB-T276 未保存の見比べはキーの順序を見ず、差分は足した・消した・変えたノードと線と、フローの欄を言う", () => {
+test("CB-T276 未保存の見比べはキーの順序を見ず、差分は追加した・削除した・変えたノードと線と、フローの欄を言う", () => {
   const doc = branched();
   assert.ok(sameFlow(doc, JSON.parse(JSON.stringify(doc)) as FlowDoc));
   assert.ok(sameValue({ a: 1, b: [1, { c: 2 }] }, { b: [1, { c: 2 }], a: 1 }));
@@ -262,7 +262,7 @@ test("CB-T292 下書きの差分は、変わった欄の名前だけでなく値
   let next = patchData(doc, "p-1", { prompt: "書く\nそのあと MCP の道具で外へ送る" });
   next = removeNode(next, "end");
   next = addNode(next, "prompt", { x: 0, y: 400 }).doc;
-  next = patchData(next, "prompt-1", { prompt: "新しく足した手順" });
+  next = patchData(next, "prompt-1", { prompt: "新しく追加した手順" });
   next = { ...next, name: "提案" };
   const diff = textDiff(doc, next);
   assert.equal(diff.problem, undefined);
@@ -276,7 +276,7 @@ test("CB-T292 下書きの差分は、変わった欄の名前だけでなく値
   // 足したノードは全部の欄を後ろだけで、消したノードは前だけで見せる
   const added = of("added-node");
   assert.equal(added.length, 1);
-  assert.ok(added[0].texts.some((t) => t.field === "中身.prompt" && t.after === "新しく足した手順" && t.before === undefined));
+  assert.ok(added[0].texts.some((t) => t.field === "中身.prompt" && t.after === "新しく追加した手順" && t.before === undefined));
   assert.ok(added[0].texts.every((t) => t.before === undefined));
   const removed = of("removed-node");
   assert.equal(removed.length, 1);
@@ -360,7 +360,7 @@ test("CB-T299 欄の表記を真似たキーで本当の変更を隠せない。
   }
 });
 
-test("CB-T277 画面から届く未保存のコピーと、保存前の確かめの設定は形を確かめてから受ける", () => {
+test("CB-T277 画面から届く未保存のコピーと、保存前の確認の設定は形を確認してから受ける", () => {
   const doc = bareFlow("i0001-01-01", "調査");
   assert.deepEqual(asFlowMessage({ type: "draft", doc }), { type: "draft", doc });
   assert.deepEqual(asFlowMessage({ type: "draft", doc: null }), { type: "draft", doc: null });
@@ -370,7 +370,7 @@ test("CB-T277 画面から届く未保存のコピーと、保存前の確かめ
   assert.equal(asFlowMessage({ type: "reviewSave", value: "no" }), undefined);
 });
 
-test("CB-T279 確かめ直しの頼みは番号と読めるコピーがあるときだけ受ける。実行ファイルの答えがあれば、開始が無いという画面の注意は出さない", () => {
+test("CB-T279 再確認しの頼みは番号と読めるコピーがあるときだけ受ける。実行ファイルの答えがあれば、開始がないという画面の注意は出さない", () => {
   const doc = bareFlow("i0001-01-01", "調査");
   assert.deepEqual(asFlowMessage({ type: "check", seq: 3, doc }), { type: "check", seq: 3, doc });
   assert.equal(asFlowMessage({ type: "check", seq: "3", doc }), undefined);

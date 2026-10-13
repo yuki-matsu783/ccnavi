@@ -100,10 +100,11 @@ class LintOpsTest(PhaseHarness):
     def test_a_parent_without_a_plan_is_warned(self):
         self.propose("i0001", bare_parent_text("i0001"))
         self.commit_parent()
-        lines = self.lint_lines("i0001", "plan が無い")
+        lines = self.lint_lines("i0001", "plan がありません")
         self.assertTrue(
             any(
-                "親 i0001 に plan が無い" in line and "proposal-format と phases を引き" in line
+                "親 i0001 に plan がありません" in line
+                and "proposal-format と phases を引き" in line
                 for line in lines
             ),
             lines,
@@ -160,7 +161,7 @@ class LintOpsTest(PhaseHarness):
         lines = self.lint_lines("leftover")
         self.assertTrue(
             any(
-                ".claude/worktrees/leftover は git に登録が無い" in line
+                ".claude/worktrees/leftover は git に登録がありません" in line
                 and "ccnavi-clean.sh leftover" in line
                 for line in lines
             ),

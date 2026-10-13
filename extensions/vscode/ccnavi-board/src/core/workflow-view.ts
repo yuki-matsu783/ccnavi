@@ -161,7 +161,7 @@ export function goneReasonOf(ticket: string, revision: boolean, now: ParentNow |
   if (now?.proposal === "todo") {
     return undefined;
   }
-  const readOnly = "この図は読むだけです";
+  const readOnly = "この図は閲覧専用です";
   if (revision && now?.approved === true) {
     return `${ticket} の改版の提案が承認待ちから無くなりました（承認されたか、取り下げ・削除されました）。順序を変えるには、改版の提案を出してからこのタブを開き直してください。${readOnly}`;
   }
@@ -318,7 +318,7 @@ export interface PlanDiffRow {
 function itemText(plan: ApprovePlan | undefined, number: number): string {
   const item = plan?.items.find((i) => i.number === number);
   if (plan === undefined || item === undefined) {
-    return "（無い）";
+    return "（なし）";
   }
   const waits = plan.after[String(number)] ?? [];
   return `${item.title || item.type}（${item.type}）${item.deferred ? "・延期" : ""}: ${waits.length === 0 ? "何も待たない" : `待つ ${waits.join(", ")}`}`;
@@ -363,7 +363,7 @@ export function saveBlocker(answer: PlanOrderAnswer, state: SaveState): string {
     return "提案が外で変わったため、保存できません。「取り込む」で新しい提案から始めてください";
   }
   if (state.pending) {
-    return "線を変えた順序を ccnavi に確かめています";
+    return "線を変えた順序を ccnavi で確認しています";
   }
   if (!isDirty(answer)) {
     return "順序を変えていません";
@@ -381,7 +381,7 @@ export function saveBlocker(answer: PlanOrderAnswer, state: SaveState): string {
 }
 
 /** 線を変えて、実行ファイルの答えを待つ間に出す一言 */
-export const CHECKING_TEXT = "線を変えた順序を ccnavi に確かめています…";
+export const CHECKING_TEXT = "線を変えた順序を ccnavi で確認しています…";
 
 /** 実行ファイルが断った線（`refused`）を言う一言。線は引く前の答えのまま、理由を実行ファイルの文で並べる */
 export function refusedText(refused: readonly PlanOrderRefusal[]): string {

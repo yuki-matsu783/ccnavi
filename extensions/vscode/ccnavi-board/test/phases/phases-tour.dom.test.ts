@@ -107,7 +107,7 @@ test("CB-D241 全ユースケースの全段で、指す先が画面に 1 つあ
         const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
         assert.equal(dom.all(`[data-tour="${step.target}"]`).length, 1, `${at}: 指す先 ${step.target} が画面に 1 つではない`);
-        assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先が無い）`);
+        assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
         const shown = ids(dom);
         for (const real of REAL_IDS) {
           assert.ok(!shown.includes(real), `${at}: 実際の定義 ${real} が出ている`);
@@ -197,14 +197,14 @@ test("CB-D242 案内の間は、画面の編集・ボタン・設定の切り替
   }
 });
 
-test("CB-D243 段の scene が画面の様子を替える（開く定義・補足・絞り込み・足した行）。scene は次の段へ引き継がない", async () => {
+test("CB-D243 段の scene が画面の様子を替える（開く定義・補足・絞り込み・追加した行）。scene は次の段へ引き継がない", async () => {
   // 開く定義と補足。phase-* の印は開いた最初の定義にだけ付く
   let dom = await openReal();
   try {
     await goto(dom, "guide-agent", 0);
     assert.equal(dom.all(".phase.open").length, 1);
     assert.equal(dom.one(".phase.open .sum-id").textContent, "acceptance");
-    assert.ok(!dom.one(".phase.open details.more").hasAttribute("open"), "補足を開く scene が無い段では畳む");
+    assert.ok(!dom.one(".phase.open details.more").hasAttribute("open"), "補足を開く scene がない段では畳む");
     await next(dom);
     assert.ok(dom.one(".phase.open details.more").hasAttribute("open"));
     assert.equal(dom.one<HTMLInputElement>('[data-tour="phase-agent"] input').value, "acceptance-tester");
@@ -236,7 +236,7 @@ test("CB-D243 段の scene が画面の様子を替える（開く定義・補�
     const added = dom.one('.phase[data-key="s-add"]');
     assert.ok(added.classList.contains("open"));
     assert.equal(dom.one<HTMLSelectElement>('[data-tour="phase-kind"] select').value, "work");
-    assert.equal(dom.one<HTMLSelectElement>('[data-tour="phase-id"] input').closest(".phase")?.getAttribute("data-key"), "s-add", "印が足した行に付いていない");
+    assert.equal(dom.one<HTMLSelectElement>('[data-tour="phase-id"] input').closest(".phase")?.getAttribute("data-key"), "s-add", "印が追加した行に付いていない");
     await next(dom);
     await next(dom);
     await next(dom);
@@ -322,7 +322,7 @@ test("CB-D244 設定の切り替えの案内は、見本のプロジェクトの
 test("CB-D245 案内の最中に読み込み中やエラーへ替わったら、案内を閉じて tourDone を返す。中身が戻っても案内は出直さない", async () => {
   for (const next of [
     { kind: "loading", text: "読み込み中…" },
-    { kind: "error", error: "読めません" },
+    { kind: "error", error: "読み込めません" },
   ] as const) {
     const dom = await openReal();
     try {
@@ -330,7 +330,7 @@ test("CB-D245 案内の最中に読み込み中やエラーへ替わったら、
       assert.equal(dom.all(".tour").length, 1);
       await dom.send({ type: "data", data: next });
       await dom.settle();
-      assert.equal(dom.all(".tour").length, 0, "指す先が無いのに案内が残った");
+      assert.equal(dom.all(".tour").length, 0, "指す先がないのに案内が残った");
       assert.equal(dom.all(".banner.tour-sample").length, 0);
       assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
       await dom.send({ type: "data", data: { kind: "page", page: page({ model: readPhases(REAL_TEXT).model }) } });

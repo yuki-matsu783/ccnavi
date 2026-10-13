@@ -14,18 +14,18 @@ import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "res
 
 const MISSING: Partial<PhasesPage> = { exists: false, model: { version: null, form: { phases: [] }, problems: [] } };
 
-test("CB-T114 定義のファイルが無いのは正常で、不備の帯も作るボタンも出さず、欄を触れるようにして最初の保存で作らせる", async () => {
-  const dom = await openPhases({ ...MISSING, notices: ["読めない <理由>"] });
+test("CB-T114 定義のファイルがないのは正常で、不備の帯も作るボタンも出さず、欄を触れるようにして最初の保存で作らせる", async () => {
+  const dom = await openPhases({ ...MISSING, notices: ["読み込めない <理由>"] });
   try {
-    assert.equal(dom.all(".banner.missing").length, 0, "ファイルが無いことを不備として出さない");
+    assert.equal(dom.all(".banner.missing").length, 0, "ファイルがないことを不備として出さない");
     assert.equal(dom.all('button[data-action="create"]').length, 0, "雛形は置かない");
-    assert.equal(dom.all('button[data-action="open-self"]').length, 0, "共通向けの「自身のレイヤーを開く」は無い");
+    assert.equal(dom.all('button[data-action="open-self"]').length, 0, "共通向けの「自身のレイヤーを開く」はありません");
     // 文面はそのまま出る（React が文字として入れるので、実体参照に変わらない）
     assert.equal(dom.all(".banner.warn:not(#changed)").length, 1);
-    assert.equal(dom.one(".banner.warn:not(#changed)").textContent, "読めない <理由>");
+    assert.equal(dom.one(".banner.warn:not(#changed)").textContent, "読み込めない <理由>");
     // 無くても定義を足して保存できる
     assert.ok(!dom.one<HTMLButtonElement>('button[data-action="add"]').disabled);
-    assert.match(dom.one("#phases .empty").textContent, /定義を足して保存すると、ファイルが作られます/);
+    assert.match(dom.one("#phases .empty").textContent, /定義を追加して保存すると、ファイルが作られます/);
     dom.click(dom.one('button[data-action="add"]'));
     await dom.settle();
     assert.ok(!dom.one<HTMLInputElement>(".phase input.f-id").disabled);
@@ -34,10 +34,10 @@ test("CB-T114 定義のファイルが無いのは正常で、不備の帯も作
   }
 });
 
-test("CB-T239 共通の設定の phases.yml を読めないときは error の帯を出し、画面は開いたまま触れる。画面から消す・直す手段は出さない", async () => {
-  const dom = await openPhases({ errors: ["共通の設定の phases.yml を読めません（.ccnavi/config/common/phases.yml）。共通の定義は空として扱われています: 壊れている"] });
+test("CB-T239 共通の設定の phases.yml を読み込めないときは error の帯を出し、画面は開いたまま触れる。画面から削除する・直す手段は出さない", async () => {
+  const dom = await openPhases({ errors: ["共通の設定の phases.yml を読み込めません（.ccnavi/config/common/phases.yml）。共通の定義は空として扱われています: 壊れている"] });
   try {
-    assert.match(dom.one(".banner.error").textContent, /共通の設定の phases.yml を読めません/);
+    assert.match(dom.one(".banner.error").textContent, /共通の設定の phases.yml を読み込めません/);
     assert.equal(dom.all(".banner.error").length, 1);
     // 画面は開いている。欄は触れる（保存を止めるのは作業中のチケットだけ）
     assert.ok(!dom.one<HTMLButtonElement>('button[data-action="add"]').disabled);
@@ -47,7 +47,7 @@ test("CB-T239 共通の設定の phases.yml を読めないときは error の�
   }
 });
 
-test("CB-T116 無いファイル（空の本文）に定義を足して書き戻すと、version と定義を持つ読めるファイルになる", () => {
+test("CB-T116 ないファイル（空の本文）に定義を追加して書き戻すと、version と定義を持つ読めるファイルになる", () => {
   const text = readPhases("").apply({
     phases: [
       {
@@ -76,7 +76,7 @@ test("CB-T116 無いファイル（空の本文）に定義を足して書き戻
 const COMMON_PLAN = { id: "plan", title: "調査", kind: "work", review: "mr", scope: ["wip/plan/*"] };
 const COMMON_IMPL = { id: "implement", title: "実装とテスト", kind: "work", review: "mr", scope: ["src/*", "tests/*"] };
 
-test("CB-T527 共通の設定の定義は、足し算（sums[].phases.types）のうち出どころが common のものだけを取る。足し算が無ければ空", () => {
+test("CB-T527 共通の設定の定義は、足し算（sums[].phases.types）のうち出どころが common のものだけを取る。足し算がなければ空", () => {
   const sum = {
     name: "self",
     layers: ["common", "self"],
@@ -93,7 +93,7 @@ test("CB-T527 共通の設定の定義は、足し算（sums[].phases.types）�
   assert.deepEqual(commonPhases(undefined), []);
 });
 
-test("CB-T528 共通の設定の定義は一覧の下に読み取り専用で並び、出どころが共通だと分かる。無ければ欄を出さない", async () => {
+test("CB-T528 共通の設定の定義は一覧の下に読み取り専用で並び、出どころが共通だと分かる。なければ欄を出さない", async () => {
   const dom = await openPhases({ common: [COMMON_IMPL] });
   try {
     const items = dom.all("#common-phases li.common-phase");

@@ -95,7 +95,7 @@ class ChildIdFormTest(unittest.TestCase):
                 self.assertIsNone(t)
                 messages = errors(problems)
                 self.assertEqual(1, len(messages), problems)
-                self.assertIn("`phase: 100` は子の識別子に書けない", messages[0])
+                self.assertIn("`phase: 100` は子の識別子に指定できません", messages[0])
                 # 書けない識別子（`i0012-100-..`）を勧めない
                 self.assertNotIn("i0012-100", messages[0])
         t, problems = ticket_mod.parse(child_text("i0012-99-01", "i0012", 99))
@@ -223,7 +223,7 @@ class FollowupRefusesTest(NextChildIdTest):
         before = self.snapshot()
         ident, failed = self.followup(100)
         self.assertEqual(ident, "")
-        self.assertIn("フェーズ 100 は子の識別子に書けない", failed)
+        self.assertIn("フェーズ 100 は子の識別子に指定できません", failed)
         self.assertEqual(before, self.snapshot())
 
     def test_an_existing_file_is_not_overwritten_even_if_unreadable(self):

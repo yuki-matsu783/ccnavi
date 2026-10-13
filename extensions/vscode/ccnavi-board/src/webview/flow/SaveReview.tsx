@@ -47,10 +47,10 @@ export function SaveReview({ diff, onConfirm, onCancel }: SaveReviewProps): JSX.
   return (
     <div className="review-backdrop">
       <section className="review" id="save-review" data-tour="review" role="dialog" aria-modal="true" aria-labelledby="save-review-title">
-        <h2 id="save-review-title">保存する前に変更を確かめる</h2>
+        <h2 id="save-review-title">保存前の変更内容を確認</h2>
         <p className="dim small">読み込んだ時点からの変更です。</p>
         {isEmptyDiff(diff) && (
-          <p id="review-order-only">順序だけが変わりました（ノードと線の中身は同じで、ファイルに書く順が変わります）。</p>
+          <p id="review-order-only">順序だけが変わりました（ノードと線の中身は同じで、ファイルへの保存順が変わります）。</p>
         )}
         {diff.meta.length > 0 && (
           <>
@@ -60,19 +60,19 @@ export function SaveReview({ diff, onConfirm, onCancel }: SaveReviewProps): JSX.
             </ul>
           </>
         )}
-        <Items title="足したノード" kind="added-nodes" items={diff.addedNodes} />
-        <Items title="消したノード" kind="removed-nodes" items={diff.removedNodes} />
-        <Items title="変えたノード" kind="changed-nodes" items={diff.changedNodes} />
-        <Items title="足した線" kind="added-connections" items={diff.addedConnections} />
-        <Items title="消した線" kind="removed-connections" items={diff.removedConnections} />
-        <Items title="変えた線" kind="changed-connections" items={diff.changedConnections} />
+        <Items title="追加したノード" kind="added-nodes" items={diff.addedNodes} />
+        <Items title="削除したノード" kind="removed-nodes" items={diff.removedNodes} />
+        <Items title="変更したノード" kind="changed-nodes" items={diff.changedNodes} />
+        <Items title="追加した接続" kind="added-connections" items={diff.addedConnections} />
+        <Items title="削除した接続" kind="removed-connections" items={diff.removedConnections} />
+        <Items title="変更した接続" kind="changed-connections" items={diff.changedConnections} />
         <label className="review-skip" data-tour="review-skip">
           <input type="checkbox" className="f-review-skip" checked={skip} onChange={(event) => setSkip(event.target.checked)} />
-          次から確かめずに保存する（設定 ccnaviBoard.flowSaveReview で戻せます）
+          次回から保存前の確認を省略（設定 ccnaviBoard.flowSaveReview で再び有効にできます）
         </label>
         <div className="review-actions">
           <button type="button" className="action" data-action="cancel-save" onClick={onCancel}>
-            やめる
+            キャンセル
           </button>
           <button type="button" className="action primary" data-action="confirm-save" ref={confirm} onClick={() => onConfirm(skip)}>
             保存する

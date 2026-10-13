@@ -22,13 +22,13 @@ test("CB-T402 案内の定義は screen と courses を持ち、先頭の案内�
 
   const bad: Array<[string, unknown, RegExp]> = [
     ["オブジェクトでない", [], /オブジェクト/],
-    ["screen が無い", { courses: [course(INTRO_ID)] }, /screen/],
+    ["screen がありません", { courses: [course(INTRO_ID)] }, /screen/],
     ["courses が空", { screen: "x", courses: [] }, /courses/],
     ["先頭が intro でない", { screen: "x", courses: [course("first")] }, /intro/],
     ["id が重なる", { screen: "x", courses: [course(INTRO_ID), course("a"), course("a")] }, /重なって/],
     ["id の形", { screen: "x", courses: [course(INTRO_ID), course("A_b")] }, /\.id は/],
     ["steps が空", { screen: "x", courses: [course(INTRO_ID, { steps: [] })] }, /steps が空/],
-    ["body が無い", { screen: "x", courses: [course(INTRO_ID, { steps: [{ target: "a", title: "t" }] })] }, /courses\[0\]\.steps\[0\] の title と body/],
+    ["body がありません", { screen: "x", courses: [course(INTRO_ID, { steps: [{ target: "a", title: "t" }] })] }, /courses\[0\]\.steps\[0\] の title と body/],
     ["段の鍵の綴り違い", { screen: "x", courses: [course(INTRO_ID, { steps: [{ ...STEP, targt: "a" }] })] }, /知らない鍵 targt/],
     ["案内の鍵の綴り違い", { screen: "x", courses: [course(INTRO_ID, { sumary: "a" })] }, /知らない鍵 sumary/],
     ["指す先に引用符", { screen: "x", courses: [course(INTRO_ID, { steps: [{ ...STEP, target: 'a"b' }] })] }, /\.target は/],
@@ -43,7 +43,7 @@ test("CB-T402 案内の定義は screen と courses を持ち、先頭の案内�
 
 test("CB-T403 案内の YAML は、ファイル名の画面を指し、どれも先頭が基本の案内で、各案内に 1 段以上ある", () => {
   const screens = tourScreens();
-  assert.ok(screens.length >= 1, "案内の YAML が 1 本も無い");
+  assert.ok(screens.length >= 1, "案内の YAML が 1 本もありません");
   for (const screen of screens) {
     const def = loadTour(screen);
     assert.equal(def.screen, screen, `${screen}.yml の screen がファイル名と違う`);

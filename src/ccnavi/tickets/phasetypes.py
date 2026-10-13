@@ -524,7 +524,7 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
         if COPY_KEY in t.raw:
             error(
                 "`phases:` は親だけの欄（計画が使うフェーズ定義の写し）。子は `phase:`（番号）で"
-                "親の計画の項を指す。子の `phases:` は消してください"
+                "親の計画の項を指す。子の `phases:` は削除してください"
             )
         return found
     fill = f"`ccnavi --plan-order {name} --fill-phases`"
@@ -535,8 +535,9 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
     types = types_of(t)
     if t.has_plan and not has_copy(t):
         error(
-            "計画（plan / feedback）があるのに、計画が使うフェーズ定義の写し `phases:` が無い。"
-            f"提案なら {fill} で差し込む。承認済みチケットなら、ユーザが `phases:` を足すか、"
+            "計画（plan / feedback）があるのに、計画が使うフェーズ定義の写し `phases:`"
+            " がありません。"
+            f"提案なら {fill} で差し込む。承認済みチケットなら、ユーザが `phases:` を追加するか、"
             "取り消して出し直す"
         )
         return found
@@ -552,7 +553,7 @@ def copy_problems(t: ticket_model.Ticket) -> list[Problem]:
             if pt is None:
                 if item.type not in named:
                     error(
-                        f"`{key}[{i}]` の定義 `{item.type}` が `phases:` に無い"
+                        f"`{key}[{i}]` の定義 `{item.type}` が `phases:` にありません"
                         f"（計画が使う定義は `phases:` に写して書く。{fill} で差し込める）"
                     )
                 continue

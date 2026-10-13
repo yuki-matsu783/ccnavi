@@ -227,9 +227,9 @@ test("CX-T234 設定画面のリポジトリ: 登録すると一覧に出し、�
   await mount();
   fill({ owner: "acme", repo: "widgets" });
   await submitRepo();
-  assert.equal(text("#repo-msg"), "github.com/acme/widgets を登録した");
+  assert.equal(text("#repo-msg"), "github.com/acme/widgets を登録しました。");
   assert.equal($("#repo-msg").className, "status ok");
-  assert.equal(text("#repo-list"), "github.com/acme/widgets（統合先 デフォルトブランチ・直近 7 日）外す");
+  assert.equal(text("#repo-list"), "github.com/acme/widgets（統合先 デフォルトブランチ・直近 7 日）登録を削除");
   assert.deepEqual(storedRepos(), [
     { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 7, extraBranches: [], project: "", workspace: "" },
   ]);
@@ -242,18 +242,18 @@ test("CX-T234 設定画面のリポジトリ: 登録すると一覧に出し、�
   // プロジェクト名を入れてワークスペースを選ばないと、登録しない
   fill({ owner: "acme", repo: "app", project: "app", workspace: "" });
   await submitRepo();
-  assert.match(text("#repo-msg"), /^プロジェクトのリポジトリには、ワークスペースのリポジトリ（<ホスト>\/<owner>\/<リポジトリ>）を選んでください$/);
+  assert.match(text("#repo-msg"), /^プロジェクトのリポジトリには、ワークスペースのリポジトリ（<ホスト>\/<オーナー>\/<リポジトリ>）を選択してください$/);
   assert.equal($("#repo-msg").className, "status error");
   assert.equal(storedRepos().length, 1);
 
   // 選べば、統合先・日数・指定のブランチと一緒に登録する
   fill({ owner: "acme", repo: "app", integration: "develop", recentDays: "0", extraBranches: "a, b  a", project: "app", workspace: "github.com/acme/widgets" });
   await submitRepo();
-  assert.equal(text("#repo-msg"), "github.com/acme/app を登録した");
+  assert.equal(text("#repo-msg"), "github.com/acme/app を登録しました。");
   assert.equal(
     text("#repo-list"),
-    "github.com/acme/widgets（統合先 デフォルトブランチ・直近 7 日）外す" +
-      "github.com/acme/app（統合先 develop・直近 0 日・指定 a, b・プロジェクト app（ワークスペース github.com/acme/widgets））外す",
+    "github.com/acme/widgets（統合先 デフォルトブランチ・直近 7 日）登録を削除" +
+      "github.com/acme/app（統合先 develop・直近 0 日・指定 a, b・プロジェクト app（ワークスペース github.com/acme/widgets））登録を削除",
   );
   assert.deepEqual(storedRepos()[1], {
     host: "github.com",
@@ -294,7 +294,7 @@ test("CX-T234 設定画面のリポジトリ: 登録すると一覧に出し、�
     storedRepos().map((r) => r.repo),
     ["widgets"],
   );
-  assert.equal(text("#repo-list"), "github.com/acme/widgets（統合先 デフォルトブランチ・直近 7 日）外す");
+  assert.equal(text("#repo-list"), "github.com/acme/widgets（統合先 デフォルトブランチ・直近 7 日）登録を削除");
   await click("#repo-list li button");
   assert.deepEqual(storedRepos(), []);
   assert.equal($("#repo-list").children.length, 0);
@@ -330,9 +330,9 @@ test("CX-T216 設定画面のリポジトリ: 直近の日数は 0〜90。外れ
   // 境目の 90 は登録する
   fill({ owner: "acme", repo: "widgets", recentDays: "90" });
   await submitRepo();
-  assert.equal(text("#repo-msg"), "github.com/acme/widgets を登録した");
+  assert.equal(text("#repo-msg"), "github.com/acme/widgets を登録しました。");
   assert.equal(storedRepos()[0]?.recentDays, 90);
-  assert.equal(text("#repo-list"), "github.com/acme/widgets（統合先 デフォルトブランチ・直近 90 日）外す");
+  assert.equal(text("#repo-list"), "github.com/acme/widgets（統合先 デフォルトブランチ・直近 90 日）登録を削除");
 });
 
 test("CX-T217 設定画面の PAT: 登録すると登録済みと期限を出し、欄を空にして画面に読み返さない。消すと未登録に戻す。形の違う PAT は断る", async () => {
@@ -352,11 +352,11 @@ test("CX-T217 設定画面の PAT: 登録すると登録済みと期限を出し
   // 期限を入れずに登録: 期限が分からないと出す
   value.value = TOKEN;
   await submitToken();
-  assert.equal(text("#token-msg"), "github.com の PAT を登録した。差し替えた場合は、古いトークンをホスト側で失効させてください");
+  assert.equal(text("#token-msg"), "github.com の PAT を登録しました。差し替えた場合は、古いトークンをホスト側で失効させてください。");
   assert.equal($("#token-msg").className, "status ok");
   assert.equal(tokens.get("github.com"), TOKEN);
   assert.equal(value.value, "");
-  assert.match(text("#token-list"), /github\.com（GitHub）: 登録済み（github\.com の PAT の期限が分からない（/);
+  assert.match(text("#token-list"), /github\.com（GitHub）: 登録済み（github\.com の PAT の期限が不明です（/);
   assert.ok(!container.innerHTML.includes(TOKEN));
   assert.ok(!document.body.innerHTML.includes(TOKEN));
 
@@ -365,7 +365,7 @@ test("CX-T217 設定画面の PAT: 登録すると登録済みと期限を出し
   value.value = TOKEN;
   $<HTMLInputElement>("#token-expires").value = "2026-10-03";
   await submitToken();
-  assert.equal(text("#token-msg"), "gitlab.com の PAT を登録した。差し替えた場合は、古いトークンをホスト側で失効させてください");
+  assert.equal(text("#token-msg"), "gitlab.com の PAT を登録しました。差し替えた場合は、古いトークンをホスト側で失効させてください。");
   assert.deepEqual(metas.get("gitlab.com"), { manual: "2026-10-03" });
   assert.equal([value.value, $<HTMLInputElement>("#token-expires").value].join(""), "");
   assert.match(text("#token-list"), /gitlab\.com（GitLab）: 登録済み（gitlab\.com の PAT はあと 3 日で切れる（2026-10-03）。/);
@@ -385,7 +385,7 @@ test("CX-T217 設定画面の PAT: 登録すると登録済みと期限を出し
 
   // 消す: 選んだホストだけ
   await click("#token-clear");
-  assert.equal(text("#token-msg"), "gitlab.com の PAT を消した。ホスト側でも失効させてください");
+  assert.equal(text("#token-msg"), "gitlab.com の PAT を削除しました。ホスト側でも失効させてください。");
   assert.equal($("#token-msg").className, "status ok");
   assert.deepEqual([...tokens.keys()], ["github.com"]);
   assert.match(text("#token-list"), /gitlab\.com（GitLab）: 未登録/);
@@ -418,7 +418,7 @@ test("CX-T218 設定画面の状態欄: 同じ一言が続いても、言い直�
   assert.ok(repo.changes() > 0);
   fill({ owner: "acme", repo: "widgets" });
   await submitRepo();
-  assert.equal(text("#repo-msg"), "github.com/acme/widgets を登録した");
+  assert.equal(text("#repo-msg"), "github.com/acme/widgets を登録しました。");
   assert.ok(repo.changes() > 0, "同じ一言の 2 回目で状態欄が作り直されていない");
   assert.notEqual($("#repo-msg").firstElementChild, first);
   // 同じ誤りが続いても同じ
@@ -460,7 +460,7 @@ const fillHost = (kind: string, url: string) => {
 };
 const submitHost = () => click("#host-form button[type=submit]");
 const hostList = () => text("#host-list");
-const EMPTY_HOSTS = "足したホストは無い（GitHub.com と GitLab.com は組み込み）";
+const EMPTY_HOSTS = "追加のホストは登録されていません（GitHub.comとGitLab.comは標準で利用できます）。";
 
 test("CX-T240 設定画面の通信先: localhost:8080 の GitLab を許可を求めてから足す。PAT の欄とリポジトリの選び先に出し、外すと PAT と許可も消える", async () => {
   await mount();
@@ -468,10 +468,10 @@ test("CX-T240 設定画面の通信先: localhost:8080 の GitLab を許可を�
   fillHost("gitlab", "http://localhost:8080/");
   await submitHost();
   assert.deepEqual(permissionCalls, [{ op: "request", origins: ["http://localhost/*"] }]);
-  assert.equal(text("#host-msg"), "http://localhost:8080（GitLab）を足した。PAT は「PAT」の節で登録する");
+  assert.equal(text("#host-msg"), "http://localhost:8080（GitLab）を追加しました。「PAT」欄でトークンを登録してください。");
   assert.equal($("#host-msg").className, "status ok");
   assert.deepEqual(storage.customHosts, [{ kind: "gitlab", url: "http://localhost:8080" }]);
-  assert.equal(hostList(), "http://localhost:8080（GitLab）外す");
+  assert.equal(hostList(), "http://localhost:8080（GitLab）削除");
   const ids = ["github.com", "gitlab.com", "localhost_8080_http"];
   assert.deepEqual(
     [...$<HTMLSelectElement>("#token-host").options].map((o) => o.value),
@@ -490,7 +490,7 @@ test("CX-T240 設定画面の通信先: localhost:8080 の GitLab を許可を�
   assert.equal(tokens.has("localhost_8080_http"), false);
   assert.deepEqual(storage.customHosts, []);
   assert.deepEqual(permissionCalls.at(-1), { op: "remove", origins: ["http://localhost/*"] });
-  assert.equal(text("#host-msg"), "localhost_8080_http を外した。PAT も消した。ホスト側でも失効させてください");
+  assert.equal(text("#host-msg"), "localhost_8080_http と、このブラウザに保存されていたPATを削除しました。ホスト側でもPATを失効させてください。");
   assert.equal(hostList(), EMPTY_HOSTS);
 });
 
@@ -499,7 +499,7 @@ test("CX-T241 設定画面の通信先: 許可を断られたら足さない。h
   grant.ok = false;
   fillHost("gitlab", "https://gitlab.example.com");
   await submitHost();
-  assert.match(text("#host-msg"), /許可しないと足せない/);
+  assert.match(text("#host-msg"), /許可しないと追加できません/);
   assert.equal($("#host-msg").className, "status error");
   assert.equal(storage.customHosts, undefined);
   assert.equal(hostList(), EMPTY_HOSTS);
@@ -511,11 +511,11 @@ test("CX-T241 設定画面の通信先: 許可を断られたら足さない。h
 
   fillHost("gitlab", "https://gitlab.com");
   await submitHost();
-  assert.match(text("#host-msg"), /足してあるか、組み込みの通信先と同じ名前/);
+  assert.match(text("#host-msg"), /登録済みか、標準の通信先と名前が重複しています。/);
 
   fillHost("gitlab", "https://gitlab.example.com/gitlab");
   await submitHost();
-  assert.match(text("#host-msg"), /オリジンだけ/);
+  assert.match(text("#host-msg"), /オリジンのみ/);
   assert.equal(storage.customHosts, undefined);
 });
 
@@ -525,7 +525,7 @@ test("CX-T242 設定画面の通信先: リポジトリが残っているホス�
   await submitHost();
   storage.repos = [{ host: "localhost_8080_http", owner: "acme", repo: "widgets", integration: "", recentDays: 7, extraBranches: [], project: "", workspace: "" }];
   await click("#host-list button");
-  assert.equal(text("#host-msg"), "localhost_8080_http のリポジトリが残っている。先にリポジトリを外してから、ホストを外す");
+  assert.equal(text("#host-msg"), "localhost_8080_http にリポジトリが登録されています。先にリポジトリの登録を削除してから、ホストを削除してください。");
   assert.deepEqual(storage.customHosts, [{ kind: "gitlab", url: "http://localhost:8080" }]);
   assert.equal(permissionCalls.some((c) => c.op === "remove"), false);
 });

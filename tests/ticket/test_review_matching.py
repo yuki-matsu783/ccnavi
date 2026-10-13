@@ -16,7 +16,7 @@ import unittest
 
 from ccnavi.tickets import review
 
-NO_MR = "ccnavi: 結果にマージリクエストが無い\n"
+NO_MR = "ccnavi: 結果にマージリクエストがありません。\n"
 
 
 class MatchingTest(unittest.TestCase):
@@ -39,7 +39,9 @@ class MatchingTest(unittest.TestCase):
         got, err = self._run("")
         self.assertIsNone(got)
         self.assertEqual(
-            err, "ccnavi: --result <json> が要る。リモートから取得した結果は sh が渡す\n"
+            err,
+            "ccnavi: --result <json> を指定してください。"
+            "リモートから取得した結果は sh が渡します。\n",
         )
 
     def test_unreadable_file_says_only_why(self):

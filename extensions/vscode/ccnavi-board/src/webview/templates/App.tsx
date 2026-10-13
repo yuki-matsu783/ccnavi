@@ -70,7 +70,7 @@ function doneText(request: EditRequest, answer: EditAnswer): string {
     case "move":
       return `移動しました: ${answer.target}`;
     default:
-      return `消しました: ${answer.source}`;
+      return `削除しました: ${answer.source}`;
   }
 }
 
@@ -182,7 +182,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
           // 書けなかった。プレビューは残して、理由を見せる
           setStatus({ text: error, error: true });
         } else if (answer !== null && answer.written) {
-          const kept = answer.removed ? "。下書きを消しました" : answer.kept !== "" ? `。下書き: ${answer.kept}` : "";
+          const kept = answer.removed ? "。下書きを削除しました" : answer.kept !== "" ? `。下書き: ${answer.kept}` : "";
           setStatus({ text: `取り込みました: ${answer.target}${kept}`, error: false });
           setPreview(undefined);
           setImporting(undefined);
@@ -213,7 +213,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
           setEditing(undefined);
         } else if (answer !== null && !answer.ok && (answer.written || answer.removed)) {
           // 途中で失敗した（新しい側は書けたが元を消せなかった、など）。欄は残し、ファイルの状態を読み直して確かめてもらう
-          setStatus({ text: `途中で失敗しました: ${answer.errors.join(" / ") || "理由は不明です"}。一覧を読み直して、ファイルの状態を確かめてください`, error: true });
+          setStatus({ text: `途中で失敗しました: ${answer.errors.join(" / ") || "理由は不明です"}。一覧を再読み込みして、ファイルの状態を確認してください`, error: true });
           if (mine && current !== undefined) {
             setEditing({ key: current.key, state: { ...current.state, answer, error: "", busy: false } });
           }
@@ -485,7 +485,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       ))}
       <div id="changed" data-banner="changed" className={changed && !touring ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください（開いているプレビューは破棄されます）。
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={refresh}>
+        <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={shownBusy} onClick={refresh}>
           更新
         </button>
       </div>
@@ -497,11 +497,11 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
             {touring ? `（見本）${layer?.path ?? ""}` : (layer?.path ?? "")}
           </span>
           <span id="dirty" className={shownDirty ? "dirty" : "dirty hidden"}>
-            編集または下見を開いています
+            編集またはプレビューを開いています
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="reload" data-tour="refresh" title="ファイルを読み直します" disabled={shownBusy} onClick={refresh}>
+          <button type="button" className="action" data-action="reload" data-tour="refresh" title="ファイルを再読み込みします" disabled={shownBusy} onClick={refresh}>
             更新
           </button>
         </div>
@@ -522,7 +522,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
         ) : (
           <>
             {!layer.exists && <p className="hint">置き場がありません</p>}
-            {layer.unreadable !== "" && <p className="status failed">読めません: {layer.unreadable}</p>}
+            {layer.unreadable !== "" && <p className="status failed">読み込めません: {layer.unreadable}</p>}
             {!layer.writable && <span className="tag">読み取り専用</span>}
             <Problems problems={layer.problems} />
             {shownTemplates.length === 0 ? (
@@ -546,9 +546,9 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
         <h2>
           下書き <span className="count">{page.data.drafts.length}</span>
         </h2>
-        <p className="hint">エージェントが書いた効力のない下書きです。取り込むまでテンプレートとしては使われません。</p>
+        <p className="hint">エージェントが作成した効力のない下書きです。取り込むまでテンプレートとしては使われません。</p>
         {page.data.drafts.length === 0 ? (
-          <p className="empty">{"下書きはありません。親チケットが閉じる前に ccnavi --templates --draft <親> で作れます。"}</p>
+          <p className="empty">{"下書きはありません。親チケットがクローズする前に ccnavi --templates --draft <親> で作れます。"}</p>
         ) : (
           <ul className="list">
             {page.data.drafts.map((draft, index) => (

@@ -141,15 +141,15 @@ def _clear_policy(path: str, phase: int, kind: str) -> dict:
             "on_fail": fsio.FAIL_STOP,
             "prefix": "",
             "message": (
-                f"フェーズ {phase} のレビュー済みのマーカー {path} を消せない（{{reason}}）。"
-                "残るとフェーズは済んだまま読まれるので、ここで止める。ユーザがマーカーを消す"
+                f"フェーズ {phase} のレビュー済みのマーカー {path} を削除できません（{{reason}}）。"
+                "残るとフェーズは済んだまま読まれるので、ここで止める。ユーザがマーカーを削除します。"
             ),
         }
     return {
         "on_fail": fsio.FAIL_WARN,
         "prefix": "",
         "message": (
-            f"フェーズ {phase} のマーカー {path} を消せなかった（{{reason}}）。"
+            f"フェーズ {phase} のマーカー {path} を削除できませんでした（{{reason}}）。"
             f"{kind} は残っていて有効なまま"
         ),
     }
@@ -311,9 +311,9 @@ def now() -> str:
 
 
 def _write(path: str, text: str) -> str:
-    with fsio.policy(message="書けない ({reason})"):
+    with fsio.policy(message="保存できませんでした ({reason})"):
         failed = fsio.write_text(path, text)
-    return f"書けない ({failed})" if failed else ""
+    return f"保存できませんでした ({failed})" if failed else ""
 
 
 def write_ticket(path: str, text: str) -> str:
@@ -322,6 +322,6 @@ def write_ticket(path: str, text: str) -> str:
     途中で中断されても前の中身か新しい中身を残す。一時ファイルに書き切って fsync してから
     差し替える（`fsio.write_text_durable`）。改行は `_write` と同じ。
     """
-    with fsio.policy(message="書けない ({reason})"):
+    with fsio.policy(message="保存できませんでした ({reason})"):
         failed = fsio.write_text_durable(path, text)
-    return f"書けない ({failed})" if failed else ""
+    return f"保存できませんでした ({failed})" if failed else ""

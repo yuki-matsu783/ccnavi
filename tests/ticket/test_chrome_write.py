@@ -116,7 +116,7 @@ class RecordsTest(ChromeWriteHarness):
         self.commit_parent()
         request = self.chrome_request("plan", "i0001")
         request["snapshot"]["branches"]["main"]["binary"] = [".ccnavi/approved/done/x.md"]
-        self.assertIn("決まらない", self.answer(request)["error"])
+        self.assertIn("判定できません", self.answer(request)["error"])
         board = self.answer({**request, "op": "board"})
         self.assertIn("バイナリ", board["undecided"])
         self.assertNotIn("batch", board)
@@ -130,7 +130,7 @@ class WriteGuardTest(ChromeWriteHarness):
         self.compat(version.COMPAT + 1)
         board = self.answer(self.chrome_request("board", "i0001"))
         self.assertFalse(board["write"]["allowed"])
-        self.assertIn("拡張を更新する", board["write"]["reason"])
+        self.assertIn("拡張を更新してください。", board["write"]["reason"])
         self.assertEqual([e["ticket"] for e in board["batch"]], ["i0001"])
         shown = {"ids": first["identifiers"], "digest": first["digest"]}
         refused = self.answer(self.chrome_request("plan", "i0001", shown=shown))
@@ -189,7 +189,7 @@ class WriteGuardTest(ChromeWriteHarness):
         }
         self.assertEqual(chrome._write_refusal(snap, "i0001"), "")
         for name in ("main", "Develop", "release-1", "trunk", "TRUNK"):
-            self.assertIn("予約の名前か統合先の名前", chrome._write_refusal(snap, name), name)
+            self.assertIn("予約された名前か統合先の名前", chrome._write_refusal(snap, name), name)
 
 
 class WrittenCopyTest(ChromeWriteHarness):

@@ -42,7 +42,7 @@ BUDGET_SECONDS = 0.5
 MAX_ENTRIES = 500
 
 APPROXIMATE_NOTE = (
-    "重なりは glob の前置に 1 文字足したパスで近似している"
+    "重なりは glob の前置に 1 文字追加したパスで近似している"
     "（項の一部だけが退けられる形は拾わない）。"
 )
 

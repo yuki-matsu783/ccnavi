@@ -57,20 +57,20 @@ sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel> <識別子> [--reason 
 sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>
 sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] [--signal <信号>]
 
-  status       承認済みチケットの状態を聞く（読むだけ。サブエージェントも打てる）。親を省けば
-               作業中・レビュー待ち・承認待ちのチケットがある親子を全部。ファイルを読んで推測せず、これを打つ
+  status       承認済みチケットの状態を聞く（読むだけ。サブエージェントからも実行できます）。親を省けば
+               作業中・レビュー待ち・承認待ちのチケットがある親子を全部。ファイルを読んで推測せず、これを実行する
 
-  next-id      issue の無い親の提案に使う識別子を決める（読むだけ。サブエージェントも打てる）。引数なしなら
+  next-id      issue の無い親の提案に使う識別子を決める（読むだけ。サブエージェントからも実行できます）。引数なしなら
                次の通し番号、<先頭の語> <slug> を渡せば <先頭の語>-<番号>-<slug> を 1 行で出す。
-               末尾が -<2 桁> になる slug や、勧める長さを超える slug は理由を言って止まる
+               末尾が -<2 桁> になる slug や、推奨される長さを超える slug を指定すると、理由を表示して終了します。
 
   start        .ccnavi/approved/doing/ の承認済みチケットに着手の時刻と基準点を書く。
-               ワークツリー .claude/worktrees/<識別子> が要る。承認済みチケットは置き場を移らない
-  finish       doing/ -> wip/proposals/review/（フェーズがレビュー要）か .ccnavi/approved/done/（不要）。
+               ワークツリー .claude/worktrees/<識別子> が必要です。承認済みチケットは置き場を移らない
+  finish       doing/ -> wip/proposals/review/（フェーズがレビュー必須）か .ccnavi/approved/done/（不要）。
                完了の時刻を書く。子は実績のリスク（差分）を数えて記録する
-  cancel       doing/ -> .ccnavi/approved/done/  --reason が要る。未承認の提案（todo/）は消せばよい
-  record-risk  定性のリスク項目の判定を記録する（親が打つ。判断はサブエージェント）
-  learn        子の気づきの記録の雛形と判定記録の要約を書く（--note なしの形）、または気づき 1 件を記録（直接作業では受信箱）に足す（--note）。
+  cancel       doing/ -> .ccnavi/approved/done/  --reason が必要です。未承認の提案（todo/）は削除すればよい
+  record-risk  定性のリスク項目の判定を記録する（親が実行します。判断はサブエージェント）
+  learn        子の気づきの記録の雛形と判定記録の要約を書く（--note なしの形）、または気づき 1 件を記録（直接作業では受信箱）に追加します（--note）。
 
   レビュー待ち（review/）から done/ へ動かすのはユーザ（ccnavi-review.sh confirm / decide、
   ccnavi --reviewed）。
@@ -107,7 +107,7 @@ esac
 case "$1" in
 status | next-id | start | finish | cancel | record-risk | learn) ;;
 *)
-	printf 'ccnavi-ticket: %s は通しません。使えるのは status / next-id / start / finish / cancel / record-risk / learn です。\n' "$1" >&2
+	printf 'ccnavi-ticket: 未対応のサブコマンドです：%s。使用できるサブコマンドは status / next-id / start / finish / cancel / record-risk / learn です。\n' "$1" >&2
 	exit 2
 	;;
 esac
@@ -129,7 +129,7 @@ if bin=$(ccnavi_bin "$root"); then
 elif [ -f "$root/src/ccnavi/__main__.py" ]; then
 	ccnavi_c1_exe() { (cd "$root" && uv run python -m ccnavi --root "$root" "$@"); }
 else
-	printf 'ccnavi-ticket: ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。\n' >&2
+	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
 fi
 
@@ -188,7 +188,7 @@ start | finish | cancel)
 	# 識別子は実行ファイル（argparse）と同じに読む（ticket_id。`start -- <親>` で C1 を経ずに通らないようにする）。
 	c1_id=$(ticket_id "$@")
 	if ! ccnavi_is_ident "$c1_id"; then
-		printf 'ccnavi-ticket: %s には識別子が要る（%s は識別子の形ではない）。\n' "$1" "${c1_id:-（無い）}" >&2
+		printf 'ccnavi-ticket: %s には識別子を指定してください（%s は識別子の形ではない）。\n' "$1" "${c1_id:-（無い）}" >&2
 		exit 2
 	fi
 	ccnavi_c1_family "$c1_id"

@@ -145,7 +145,7 @@ class TestHitsTest(unittest.TestCase):
                             "id": "rm-build",
                             "match": "Bash",
                             "glob": "*rm -rf*",
-                            "message": "消さない",
+                            "message": "削除しない",
                         }
                     ],
                 }

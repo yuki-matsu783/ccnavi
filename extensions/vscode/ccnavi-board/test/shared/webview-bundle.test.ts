@@ -31,7 +31,7 @@ test("CB-T157 バンドルした画面は、外へ出る呼び出しを持たな
   }
 });
 
-test("CB-T167 バンドルした CSS は、外の資源を読まない（url() と残った @import が無い）", () => {
+test("CB-T167 バンドルした CSS は、外の資源を読まない（url() と残った @import がありません）", () => {
   for (const name of screenNames()) {
     const style = screenStyle(name);
     // 画像やフォントを読む手段。VS Code のテーマ変数（var(--vscode-*)）だけで組む方針
@@ -67,7 +67,7 @@ test("CB-T190 バンドルした画面は、CSP に止められるやり方で�
   for (const name of screenNames()) {
     const script = screenScript(name);
     for (const pattern of CSP_BLOCKED) {
-      assert.doesNotMatch(script, pattern, `${name} の画面が ${String(pattern)} を使っている（style-src に 'unsafe-inline' が無いので黙って効かない）`);
+      assert.doesNotMatch(script, pattern, `${name} の画面が ${String(pattern)} を使っている（style-src に 'unsafe-inline' がないので黙って効かない）`);
     }
   }
 });

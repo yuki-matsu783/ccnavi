@@ -76,7 +76,7 @@ class ReviewTurnTest(PhaseHarness):
         self.assertEqual((tidy.returncode, tidy.stdout), (0, ""))
         self.assertTrue(os.path.isdir(tree))
         before = self.next_step("i0001-01-01")
-        self.assertIn("次の一手: まだレビュー準備中", before)
+        self.assertIn("次の操作: まだレビュー準備中", before)
         self.assertIn("親（メインエージェント）だけが実行する", before)
         fixture = self.remote()
         requested = self.request(fixture, 1)
@@ -88,10 +88,10 @@ class ReviewTurnTest(PhaseHarness):
         # 依頼の後に同じフェーズへ子を足して閉じた。依頼の記録は外れ、依頼し直しが要る
         _, again = self.child("i0001-01-02")
         self.assertIn("レビュー準備中", again.stdout)
-        self.assertIn("依頼し直しが要る", again.stdout)
+        self.assertIn("依頼し直しが必要です", again.stdout)
         self.assertEqual(again.stdout.count("done/ へ動"), 1, again.stdout)
         self.assertNotIn("ユーザのレビューを待つ", again.stdout)
-        self.assertIn("依頼し直しが要る", self.next_step("i0001-01-02"))
+        self.assertIn("依頼し直しが必要です", self.next_step("i0001-01-02"))
 
     def test_status_does_not_say_wait_when_the_phase_is_unknown(self):
         """子のフェーズが読めない（`review_next` が空）とき、依頼済みかが分からないので
@@ -105,7 +105,7 @@ class ReviewTurnTest(PhaseHarness):
             step = self.next_step("i0001-01-01")
         self.assertIn("依頼済みかを言えない", step)
         self.assertIn("request", step)
-        self.assertNotIn("次の一手: ユーザのレビューを待つ", step)
+        self.assertNotIn("次の操作: ユーザのレビューを待つ", step)
 
     def test_the_last_confirm_tells_the_way_to_ready_and_tidies_the_children(self):
         tree, _ = self.child("i0001-01-01")
@@ -124,7 +124,7 @@ class ReviewTurnTest(PhaseHarness):
         # confirm の後に sh が打つ片付け。done/ に動いた子のワークツリーを消し、ブランチは残す
         tidy = self.ccnavi("--cwd", self.root, "worktree", "tidy", "i0001", "--phase", "1")
         self.assertEqual(tidy.returncode, 0, tidy.stdout + tidy.stderr)
-        self.assertIn("ワークツリー i0001-01-01 を消した", tidy.stdout)
+        self.assertIn("ワークツリー i0001-01-01 を削除しました", tidy.stdout)
         self.assertFalse(os.path.exists(tree))
         self.assertEqual(git(self.root, "branch", "--list", "i0001-01-01").strip(), "i0001-01-01")
         # もう一度打っても何も起きない
@@ -164,7 +164,7 @@ class TidyTest(PhaseHarness):
         self.assertEqual(cancelled.returncode, 0, cancelled.stderr)
         tidy = self.tidy()
         self.assertEqual(tidy.returncode, 0, tidy.stdout + tidy.stderr)
-        self.assertIn("ワークツリー i0001-01-01 を消した", tidy.stdout)
+        self.assertIn("ワークツリー i0001-01-01 を削除しました", tidy.stdout)
         self.assertFalse(os.path.exists(tree))
         self.assertEqual(git(self.root, "branch", "--list", "i0001-01-01").strip(), "i0001-01-01")
 
@@ -188,7 +188,7 @@ class TidyTest(PhaseHarness):
         self.assertEqual(picked, ["i0001-01-02"])
         tidy = self.tidy()
         self.assertEqual(tidy.returncode, 0, tidy.stdout + tidy.stderr)
-        self.assertIn("ワークツリー i0001-01-02 を消した", tidy.stdout)
+        self.assertIn("ワークツリー i0001-01-02 を削除しました", tidy.stdout)
         self.assertNotIn("i0001-01-01", tidy.stdout)
         self.assertTrue(os.path.isdir(doing))
         self.assertFalse(os.path.exists(gone))
@@ -202,7 +202,7 @@ class TidyTest(PhaseHarness):
         write(os.path.join(tree, "src", "left.py"), "y = 2\n")
         tidy = self.tidy()
         self.assertEqual(tidy.returncode, 1, tidy.stdout + tidy.stderr)
-        self.assertIn("未コミットの変更があるので、何も消さなかった", tidy.stdout)
+        self.assertIn("未コミットの変更があるので、何も削除しませんでした。", tidy.stdout)
         self.assertIn("src/left.py", tidy.stdout)
         self.assertTrue(os.path.exists(os.path.join(tree, "src", "left.py")))
         # cwd が中にあれば、未コミットを見る前に止める
@@ -239,7 +239,7 @@ class ChildShapedParentTest(PhaseHarness):
         # 親の finish の後と同じ形（親の識別子で頼む）。名前の形で末尾を剥がすと rel-2026 になる
         tidy = self.ccnavi("--cwd", self.root, "worktree", "tidy", parent)
         self.assertEqual(tidy.returncode, 0, tidy.stdout + tidy.stderr)
-        self.assertIn(f"ワークツリー {child} を消した", tidy.stdout)
+        self.assertIn(f"ワークツリー {child} を削除しました", tidy.stdout)
         self.assertFalse(os.path.exists(tree))
 
 
@@ -260,7 +260,7 @@ class DropTest(PhaseHarness):
         write(os.path.join(tree, ".venv", "pyvenv.cfg"), "")
         dropped = self.drop("i0002")
         self.assertEqual(dropped.returncode, 0, dropped.stdout + dropped.stderr)
-        self.assertIn("ワークツリー i0002 を消した", dropped.stdout)
+        self.assertIn("ワークツリー i0002 を削除しました", dropped.stdout)
         self.assertIn("ブランチは残してある", dropped.stdout)
         self.assertFalse(os.path.exists(tree))
         self.assertEqual(git(self.root, "branch", "--list", "i0002").strip(), "i0002")
@@ -268,7 +268,7 @@ class DropTest(PhaseHarness):
         # 無いものを消すのは成功（打ち直し）
         absent = self.drop("i0002")
         self.assertEqual(absent.returncode, 0)
-        self.assertIn("無い", absent.stdout)
+        self.assertIn("ありません", absent.stdout)
 
     def test_keeps_the_worktree_with_ignored_files_other_than_build_outputs(self):
         """git が無視している .env などは worktree remove が黙って消すので、名指しして止める。
@@ -281,7 +281,9 @@ class DropTest(PhaseHarness):
         write(os.path.join(tree, ".env"), "TOKEN=x\n")
         dropped = self.drop("i0002")
         self.assertEqual(dropped.returncode, 1, dropped.stdout + dropped.stderr)
-        self.assertIn("git が無視しているファイルがあるので、何も消さなかった", dropped.stdout)
+        self.assertIn(
+            "git が無視しているファイルがあるので、何も削除しませんでした。", dropped.stdout
+        )
         self.assertIn(".env", dropped.stdout)
         self.assertNotIn("node_modules", dropped.stdout)
         self.assertIn("退避", dropped.stdout)
@@ -346,7 +348,7 @@ class DropTest(PhaseHarness):
         tree = self.worktree("i0002", "main")
         dropped = self.drop("i0002", cwd=tree)
         self.assertEqual(dropped.returncode, 1)
-        self.assertIn("cwd がワークツリー i0002 の中にあるので消さなかった", dropped.stdout)
+        self.assertIn("cwd がワークツリー i0002 の中にあるので削除しませんでした", dropped.stdout)
         self.assertIn("ccnavi-clean.sh --worktree i0002", dropped.stdout)
         # 分類器に止められたときの道（ユーザに頼む・ホームの設定に絞った許可を足す）も言う
         self.assertIn("~/.claude/settings.json", dropped.stdout)
@@ -401,7 +403,7 @@ class RemainingTest(PhaseHarness):
         self.assertIn("- work-a（", listed.stdout)
         self.assertIn("名前が親 i0001 と違う", listed.stdout)
         self.assertIn("未保存の下書きがある（wip/handoff/）", listed.stdout)
-        self.assertIn("消す前に確かめること", listed.stdout)
+        self.assertIn("削除する前に確かめること", listed.stdout)
         self.assertIn("ccnavi-clean.sh --worktree work-a", listed.stdout)
         # 出すだけで消さない
         self.assertTrue(os.path.exists(os.path.join(tree, "wip", "handoff", "memo.md")))

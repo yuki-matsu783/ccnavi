@@ -145,7 +145,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
             className="action primary"
             data-action="clone"
             data-tour="clone-run"
-            title="git clone を「ccnavi」ターミナルで実行します。認証が要るならターミナルで入力してください"
+            title="git clone を「ccnavi」ターミナルで実行します。認証が必要ならターミナルで入力してください"
             onClick={() => act({ type: "clone", url: clone.url, name: clone.name })}
           >
             clone

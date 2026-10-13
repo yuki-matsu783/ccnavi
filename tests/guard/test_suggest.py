@@ -187,7 +187,7 @@ class SuggestTest(unittest.TestCase):
         """記録が無ければそう言って 0 で終わる。"""
         result = self._suggest()
         self.assertEqual(0, result.returncode)
-        self.assertIn("記録が無い", result.stdout)
+        self.assertIn("記録がありません", result.stdout)
 
 
 if __name__ == "__main__":

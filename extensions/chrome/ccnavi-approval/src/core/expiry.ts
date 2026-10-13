@@ -57,7 +57,7 @@ export function expiryNotice(host: string, meta: TokenMeta | undefined, now: Dat
       expiresAt: "",
       source,
       daysLeft: null,
-      text: `${host} の PAT の期限が分からない（ホストの応答から読めず、登録のときにも入れていない）。設定画面で期限を入れてください`,
+      text: `${host} の PAT の期限が不明です（ホストの応答から取得できず、登録時にも入力されていません）。設定画面で期限を入力してください`,
     };
   }
   // 残りはミリ秒で比べる（切り捨てた日数で比べると 7 日と数時間前から知らせてしまう）。

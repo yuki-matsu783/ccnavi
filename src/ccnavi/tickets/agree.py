@@ -82,7 +82,7 @@ class Gathered:
     @property
     def text(self) -> str:
         if self.nothing_pending:
-            return "承認待ちのチケットは無い。"
+            return "承認待ちのチケットはありません。"
         return agree_screen.screen(self.batch, self.pool)
 
     @property
@@ -155,7 +155,8 @@ def gather(
         blocked = [t for t in pending if t.ticket in wanted and t.is_child and t.parent in skipped]
         if blocked:
             lines = [
-                f"{t.ticket}: 親 {t.parent} の改版が承認待ちなのに承認の対象に無い" for t in blocked
+                f"{t.ticket}: 親 {t.parent} の改版が承認待ちなのに承認の対象にありません。"
+                for t in blocked
             ]
             lines.append("何も承認しない。親の改版も承認の対象に入れてください")
             for line in lines:
@@ -241,7 +242,7 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
         return Verdict(False, VERIFY_REFUSED, head + "\n" + gathered.refused + "\n" + unreadable)
     elsewhere = _elsewhere(gathered)
     if gathered.nothing_pending:
-        text = f"\n承認待ちのチケットは無い。提案は {tickets_rel}/todo/ に置いてください"
+        text = f"\n承認待ちのチケットはありません。提案は {tickets_rel}/todo/ に置いてください"
         # 場所違いの改版を名指ししたときは「同じ名前で置いても承認待ちにならない」を言わない。
         # 改版そのものができないと読めるため（書く場所は上の段が言う）。
         text += (
@@ -355,7 +356,7 @@ class Applied:
 def _reopened_line(root: str, conf: settings.Settings, parent: str, phase_no: int):
     def announce(kinds: list[str]) -> list[str]:
         lines = [
-            f"  {parent} のフェーズ {phase_no} のマーカー（{', '.join(kinds)}）を消した。"
+            f"  {parent} のフェーズ {phase_no} のマーカー（{', '.join(kinds)}）を削除しました。"
             "全部閉じたらレビューをもう一度頼むことになる"
         ]
         lines += phase.reopen_impact(root, conf, parent, phase_no)
@@ -420,7 +421,7 @@ def _apply_steps(
                     failed = agree_digest.revise_copy(where, cand.current, t, cand.plans_feedback)
                 if failed:
                     return t.ticket, failed
-                removing = "改版の提案を todo/ から消せない ({reason})"
+                removing = "改版の提案を todo/ から削除できない ({reason})"
                 with fsio.policy(on_fail=fsio.FAIL_WARN, message=removing):
                     failed = fsio.unlink(t.path)
                 if failed:

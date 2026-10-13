@@ -136,7 +136,7 @@ async function pages(client: Client, path: string, limit: number, what: string):
   for (let page = 1; ; page += 1) {
     const { status, body } = await get(client, `${path}${sep}per_page=100&page=${page}`);
     // 404 や配列でない答えを「無い」と読むと、見落として通してしまう
-    if (status === 404) throw new HostError(`${what} を読めない（404）`, 404);
+    if (status === 404) throw new HostError(`${what} を取得できません（404）`, 404);
     if (!Array.isArray(body)) throw new HostError(`${what} の応答が配列でない`);
     all.push(...body);
     if (body.length < 100) return all;
@@ -149,7 +149,7 @@ async function pages(client: Client, path: string, limit: number, what: string):
 /** プロジェクトのデフォルトブランチ（統合先を設定していないときの既定） */
 export async function repoInfo(client: Client, owner: string, repo: string): Promise<{ defaultBranch: string }> {
   const { status, body } = await get(client, project(owner, repo));
-  if (status === 404) throw new HostError(`プロジェクト ${owner}/${repo} が見つからない（存在しないか、PAT の権限が及ばない）`, 404);
+  if (status === 404) throw new HostError(`プロジェクト ${owner}/${repo} が見つかりません（存在しないか、PAT の権限が不足しています）`, 404);
   return { defaultBranch: checkBranch((body as { default_branch?: unknown }).default_branch) };
 }
 
@@ -170,7 +170,7 @@ export async function recentRefs(client: Client, owner: string, repo: string, si
   const out: RecentRef[] = [];
   for (let page = 1; page <= REF_PAGES; page += 1) {
     const { status, body } = await get(client, `${project(owner, repo)}/repository/branches?per_page=100&page=${page}`);
-    if (status === 404 || !Array.isArray(body)) throw new HostError(`プロジェクト ${owner}/${repo} のブランチを読めない`);
+    if (status === 404 || !Array.isArray(body)) throw new HostError(`プロジェクト ${owner}/${repo} のブランチを取得できません`);
     for (const b of body as { name?: unknown; commit?: { id?: unknown; committed_date?: unknown } }[]) {
       const date = typeof b.commit?.committed_date === "string" ? b.commit.committed_date : "";
       if (!date || new Date(date).getTime() < since.getTime()) continue;
@@ -202,7 +202,7 @@ async function listTree(client: Client, owner: string, repo: string, commit: str
     if (!Array.isArray(body)) throw new HostError("tree の応答が配列でない");
     all.push(...(body as TreeItem[]));
     if (body.length < 100) return all;
-    if (page >= TREE_PAGES) throw new HostError("置き場の tree が大きすぎて取り切れない。Chrome では読めない");
+    if (page >= TREE_PAGES) throw new HostError("置き場の tree が大きすぎて取得しきれません。Chrome では読み取れません");
   }
 }
 
@@ -233,7 +233,7 @@ export async function tree(client: Client, owner: string, repo: string, _oid: st
   for (const e of items) {
     if (e.type !== "blob") continue;
     const full = checkPath(e.path);
-    if (!full.startsWith(prefix)) throw new HostError(`tree の応答に置き場の外のパスがある: ${full}`);
+    if (!full.startsWith(prefix)) throw new HostError(`tree の応答に置き場の外のパスが含まれています：${full}`);
     out.push({ path: full.slice(prefix.length), sha: checkOid(e.id), mode: typeof e.mode === "string" ? e.mode : "" });
   }
   return out;
@@ -258,7 +258,7 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
     const { status, body } = await get(client, `${project(owner, repo)}/repository/blobs/${checkOid(oid)}`);
     if (status === 404) throw new HostError(`blob ${oid} を取れなかった`);
     const b = (body ?? {}) as { content?: unknown; encoding?: unknown; size?: unknown };
-    if (b.encoding !== "base64" || typeof b.content !== "string") throw new HostError(`blob ${oid} の応答が読めない`);
+    if (b.encoding !== "base64" || typeof b.content !== "string") throw new HostError(`blob ${oid} の応答を解釈できません`);
     const bytes = fromBase64(b.content);
     if (typeof b.size === "number" && bytes.length !== b.size) throw new HostError(`blob ${oid} の本文が大きさと合わない（取り切れていない）`);
     if (bytes.includes(0)) {
@@ -278,7 +278,7 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
 export async function viewer(client: Client): Promise<string> {
   const { status, body } = await get(client, "/user");
   const name = (body as { username?: unknown } | null)?.username;
-  if (status === 404 || typeof name !== "string" || !USERNAME.test(name)) throw new HostError("PAT の持ち主を読めない");
+  if (status === 404 || typeof name !== "string" || !USERNAME.test(name)) throw new HostError("PAT の所有者を取得できません");
   return name;
 }
 
@@ -344,7 +344,7 @@ export async function commitParents(client: Client, owner: string, repo: string,
 async function projectId(client: Client, owner: string, repo: string): Promise<number> {
   const { status, body } = await get(client, project(owner, repo));
   const id = (body as { id?: unknown } | null)?.id;
-  if (status === 404 || typeof id !== "number") throw new HostError(`プロジェクト ${owner}/${repo} の id を読めない`, status);
+  if (status === 404 || typeof id !== "number") throw new HostError(`プロジェクト ${owner}/${repo} の id を取得できません`, status);
   return id;
 }
 
@@ -355,7 +355,7 @@ async function openMrs(client: Client, owner: string, repo: string, branch: stri
   const pid = await projectId(client, owner, repo);
   // API は source_project_id で絞れないので、全ページ（20 ページまで）を読んでから絞る（1 ページ目がフォークで埋まっても
   // このプロジェクトの MR を外さない。sh の find_mr と同じ）
-  const all = await pages(client, `${project(owner, repo)}/merge_requests?state=opened&source_branch=${encodeURIComponent(checkBranch(branch))}`, THREAD_PAGES, `${branch} のマージリクエストの一覧`);
+  const all = await pages(client, `${project(owner, repo)}/merge_requests?state=opened&source_branch=${encodeURIComponent(checkBranch(branch))}`, THREAD_PAGES, `${branch} のマージリクエスト一覧`);
   return (all as MrItem[]).filter((m) => m && m.source_project_id === pid);
 }
 
@@ -366,7 +366,7 @@ async function openMrs(client: Client, owner: string, repo: string, branch: stri
 export async function openMr(client: Client, owner: string, repo: string, branch: string): Promise<{ number: number; url: string } | null> {
   const first = (await openMrs(client, owner, repo, branch))[0];
   if (!first) return null;
-  if (typeof first.iid !== "number" || !Number.isInteger(first.iid)) throw new HostError("マージリクエストの番号を読めない");
+  if (typeof first.iid !== "number" || !Number.isInteger(first.iid)) throw new HostError("マージリクエストの番号を取得できません");
   return { number: first.iid, url: String(alt(first.web_url, "")) };
 }
 
@@ -444,7 +444,7 @@ export interface GitLabReviewCopy {
 /** 親のブランチの MR のスレッドとレビューを取得した結果（`ccnavi-review.sh fetch` の GitLab の枝と同じ形） */
 export async function reviewCopy(client: Client, owner: string, repo: string, branch: string): Promise<GitLabReviewCopy> {
   const mr = await openMr(client, owner, repo, branch);
-  if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する、開いているマージリクエストが無い`);
+  if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する、未クローズのマージリクエストがありません`);
   const threads = await discussions(client, owner, repo, mr.number, mr.url);
   const reviews = await reviewers(client, owner, repo, mr.number, mr.url);
   return { host: "gitlab", mr, threads, reviews, fetched_at: new Date().toISOString() };
@@ -500,7 +500,7 @@ export interface GitLabAction {
 /** `ref` の上でそのファイルを最後に変えたコミット（`repository/files/:path?ref=` の `last_commit_id`）。無ければ投げる */
 export async function lastCommit(client: Client, owner: string, repo: string, ref: string, path: string): Promise<string> {
   const { status, body } = await get(client, `${project(owner, repo)}/repository/files/${encodeURIComponent(checkPath(path))}?ref=${checkOid(ref)}`);
-  if (status === 404) throw new HostError(`${path} が ${ref.slice(0, 7)} に無い（書き換える・消すものが無い）`, HOST_REFUSED);
+  if (status === 404) throw new HostError(`${path} が ${ref.slice(0, 7)} に存在しません（書き換え・削除の対象がありません）`, HOST_REFUSED);
   return checkOid((body as { last_commit_id?: unknown } | null)?.last_commit_id);
 }
 
@@ -527,7 +527,7 @@ export async function createCommit(
 ): Promise<Written> {
   const name = checkBranch(branch);
   const now = await branchHead(client, owner, repo, name);
-  if (now !== checkOid(expected)) throw new HostError(`親のブランチ ${name} の先頭が、読んだ時点から変わっている（書く前に更新された）`, HOST_MOVED);
+  if (now !== checkOid(expected)) throw new HostError(`親のブランチ ${name} の先頭が、取得した時点から変わっています（反映前に更新されました）`, HOST_MOVED);
   // update・delete には、そのファイルを最後に変えたコミットを付ける。呼び手が知っていればそれ（元に戻すコミットでは自分の
   // コミット）、無ければ読んだ先頭の上の値。その後に他人が変えていれば GitLab が断る（400。ここでは 409 にする）
   const out: Record<string, unknown>[] = [];
@@ -548,7 +548,7 @@ export async function createCommit(
   const res = await post(client, `${project(owner, repo)}/repository/commits`, payload);
   if (res.status === 400 || res.status === 409 || res.status === 422) {
     const why = (res.body as { message?: unknown } | null)?.message;
-    throw new HostError(`GitLab が書き込みを拒否した（${res.status}）: ${typeof why === "string" ? why : "?"}`, HOST_REFUSED);
+    throw new HostError(`GitLab が書き込みを拒否しました（${res.status}）：${typeof why === "string" ? why : "?"}`, HOST_REFUSED);
   }
   if (res.status < 200 || res.status >= 300) throw new HostError(`GitLab が ${res.status} を返した: POST repository/commits`, res.status);
   const c = (res.body ?? {}) as { id?: unknown; parent_ids?: unknown };
@@ -567,7 +567,7 @@ export interface Issue {
 /** 開いた issue（新しい順に 50 件）。「始める」の一覧 */
 export async function issues(client: Client, owner: string, repo: string): Promise<Issue[]> {
   const { status, body } = await get(client, `${project(owner, repo)}/issues?state=opened&order_by=created_at&sort=desc&per_page=50`);
-  if (status === 404 || !Array.isArray(body)) throw new HostError(`プロジェクト ${owner}/${repo} の issue を読めない`, status);
+  if (status === 404 || !Array.isArray(body)) throw new HostError(`プロジェクト ${owner}/${repo} の Issue を取得できません`, status);
   const out: Issue[] = [];
   for (const i of body as { iid?: unknown; title?: unknown; web_url?: unknown }[]) {
     if (typeof i.iid !== "number" || !Number.isInteger(i.iid) || i.iid <= 0) continue;
@@ -584,7 +584,7 @@ export async function branchNames(client: Client, owner: string, repo: string): 
   const all: string[] = [];
   for (let page = 1; ; page += 1) {
     const { status, body } = await get(client, `${project(owner, repo)}/repository/branches?per_page=100&page=${page}`);
-    if (status === 404 || !Array.isArray(body)) throw new HostError(`プロジェクト ${owner}/${repo} のブランチを読めない`);
+    if (status === 404 || !Array.isArray(body)) throw new HostError(`プロジェクト ${owner}/${repo} のブランチを取得できません`);
     for (const b of body as { name?: unknown }[]) if (typeof b.name === "string") all.push(b.name);
     if (body.length < 100) return all;
     if (page >= BRANCH_PAGES) throw new HostError("ブランチが多すぎて読み切れない。「始める」は手元で行ってください");

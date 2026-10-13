@@ -20,7 +20,7 @@ const def = loadTour("workflow");
 
 function course(id: string): TourCourseDef {
   const found = def.courses.find((c) => c.id === id);
-  assert.ok(found !== undefined, `案内 ${id} が無い`);
+  assert.ok(found !== undefined, `案内 ${id} がありません`);
   return found;
 }
 
@@ -60,7 +60,7 @@ function numbers(dom: DomPage, part: string): string[] {
 function xOf(dom: DomPage, id: string): number {
   const style = dom.one(`.react-flow__node[data-id="${id}"]`).getAttribute("style") ?? "";
   const found = /translate\(\s*(-?[\d.]+)px/.exec(style);
-  assert.ok(found !== null, `${id} の置き場所が読めない: ${style}`);
+  assert.ok(found !== null, `${id} の置き場所が読み込めない: ${style}`);
   return Number(found[1]);
 }
 
@@ -108,11 +108,11 @@ test("CB-D281 全ユースケースの全段で、指す先が画面にあり吹
       await walk(dom, c.id, (index, at) => {
         const step = c.steps[index];
         if (step.target !== "") {
-          assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面に無い`);
-          assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先が無い）`);
-          assert.equal(dom.all(".tour-spot").length, 1, `${at}: 指す先を囲う枠が無い`);
+          assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面にありません`);
+          assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
+          assert.equal(dom.all(".tour-spot").length, 1, `${at}: 指す先を囲う枠がありません`);
         }
-        assert.equal(dom.all(".banner.tour-sample").length, 1, `${at}: 見本だと分かる帯が無い`);
+        assert.equal(dom.all(".banner.tour-sample").length, 1, `${at}: 見本だと分かる帯がありません`);
         assert.ok(dom.one(".toolbar .workflow-ticket").textContent?.includes("sample-a"), `${at}: 見本の親を出していない`);
         assert.ok(!(dom.one("#root").textContent ?? "").includes("i0001"), `${at}: 実際の親の識別子が出ている`);
         assert.ok(dom.all(".plan-graph").length >= 1 && dom.all(".plan-graph").every((g) => g.getAttribute("data-ticket") === "sample-a"), `${at}: 見本の図でない`);
@@ -128,7 +128,7 @@ test("CB-D281 全ユースケースの全段で、指す先が画面にあり吹
   }
 });
 
-test("CB-D282 案内の間は、実際の答え・未保存の線・保存の確かめに触れない。閉じたら実際の表示に戻り、送信も増えない", async () => {
+test("CB-D282 案内の間は、実際の答え・未保存の線・保存の確認しに触れない。閉じたら実際の表示に戻り、送信も増えない", async () => {
   const dom = await openWorkflow();
   try {
     // 実際の画面で線を 1 本消し、答え（番号の入れ替わり）を受けて未保存にする
@@ -164,7 +164,7 @@ test("CB-D282 案内の間は、実際の答え・未保存の線・保存の確
   }
 });
 
-test("CB-D283 案内の間は、線を引く・消す・保存・再読込・案に戻す・並べ直す・取り込むを押しても、画面も拡張ホストも動かない", async () => {
+test("CB-D283 案内の間は、線を引く・削除する・保存・再読込・案に戻す・並べ直す・取り込むを押しても、画面も拡張ホストも動かない", async () => {
   const dom = await openWorkflow();
   try {
     await startCourse(dom, "tools");
@@ -177,11 +177,11 @@ test("CB-D283 案内の間は、線を引く・消す・保存・再読込・案
       await dom.settle();
     }
     const cuts = dom.all('button[data-action="plan-remove-edge"]');
-    assert.ok(cuts.length > 0, "見本の図に × が無い（押せる形で見せていない）");
+    assert.ok(cuts.length > 0, "見本の図に × がない（押せる形で見せていない）");
     dom.click(cuts[0]);
     await dom.settle();
     assert.deepEqual(sentSince(dom, from), [], "案内の間に拡張ホストへ送った");
-    assert.equal(dom.all(".workflow-review").length, 0, "保存の確かめが開いた");
+    assert.equal(dom.all(".workflow-review").length, 0, "保存の確認が開いた");
     assert.equal(dom.one('.react-flow__node[data-id="n3"]').getAttribute("style"), style, "並べ直しで点が動いた");
     assert.ok(!dom.one("#dirty").classList.contains("hidden"));
     assert.equal(dom.all(".workflow-graphs .react-flow__edge").length > 0, true);
@@ -257,8 +257,8 @@ test("CB-D285 段ごとの答えで図を描き直す。線が増える・消え
     });
     assert.ok(!kept[0].includes("after-2-4") && kept[2].includes("after-2-4"), "合流の線が増えない");
     assert.ok(kept[3].includes("after-2-4") && !kept[3].includes("after-1-3"), "1 → 3 が先に出ている");
-    assert.ok(kept[4].includes("after-1-3") && kept[4].includes("after-2-3"), "1 → 3 を足した段");
-    assert.ok(!kept[5].includes("after-2-3") && kept[5].includes("after-1-3"), "2 → 3 を消した段");
+    assert.ok(kept[4].includes("after-1-3") && kept[4].includes("after-2-3"), "1 → 3 を追加した段");
+    assert.ok(!kept[5].includes("after-2-3") && kept[5].includes("after-1-3"), "2 → 3 を削除した段");
     // 一直線の置き場所のまま（2 と 3 は別の列）。並べ直した段（5）だけ、2 と 3 が同じ列に並ぶ
     assert.notEqual(xs[4][0], xs[4][1], "並べ直す前に 2 と 3 が並んだ（置き場所を動かした）");
     assert.equal(xs[5][0], xs[5][1], "並べ直した段で 2 と 3 が並ばない");
@@ -269,7 +269,7 @@ test("CB-D285 段ごとの答えで図を描き直す。線が増える・消え
   }
 });
 
-test("CB-D286 保存の確かめの段は見本の確かめを開き、焦点は案内の吹き出しに残す。番号と子の提案を並べ、閉じると確かめも消える", async () => {
+test("CB-D286 保存の確認の段は見本の確認を開き、焦点は案内の吹き出しに残す。番号と子の提案を並べ、閉じると確認も消える", async () => {
   const dom = await openWorkflow();
   try {
     await startCourse(dom, "renumber");
@@ -278,7 +278,7 @@ test("CB-D286 保存の確かめの段は見本の確かめを開き、焦点は
       const open = dom.all(".workflow-review").length === 1;
       assert.equal(open, index >= 4 && index <= 6, at);
       if (open) {
-        assert.equal(dom.document.activeElement?.getAttribute("data-action"), "tour-next", `${at}: 焦点が確かめに移った`);
+        assert.equal(dom.document.activeElement?.getAttribute("data-action"), "tour-next", `${at}: 焦点が確認しに移った`);
         assert.deepEqual(
           dom.all("#review-numbers li").map((li) => li.textContent),
           ["実装とテスト: 3 → 2", "設計: 2 → 3"],
@@ -387,7 +387,7 @@ test("CB-D289 保存と承認の案内は、答えを待つ間の一言と、保
     await startCourse(dom, "approval");
     await walk(dom, "approval", (index, at) => {
       if (index === 1) {
-        assert.match(dom.one("#status").textContent ?? "", /確かめています/, at);
+        assert.match(dom.one("#status").textContent ?? "", /確認しています/, at);
         assert.equal(dom.all('.plan-graph[data-editable="1"]').length, 0, `${at}: 答えを待つ間に線を変えられる`);
         assert.equal(dom.one<HTMLButtonElement>("#save").disabled, true, at);
       }
@@ -412,7 +412,7 @@ test("CB-D289 保存と承認の案内は、答えを待つ間の一言と、保
   }
 });
 
-test("CB-D290 保存の確かめや案内が開いている間に別の中身が届いても、案内は見本のまま続き、閉じたあとに新しい中身を描く", async () => {
+test("CB-D290 保存の確認や案内が開いている間に別の中身が届いても、案内は見本のまま続き、閉じたあとに新しい中身を描く", async () => {
   const dom = await openWorkflow();
   try {
     await startCourse(dom, "reorder");

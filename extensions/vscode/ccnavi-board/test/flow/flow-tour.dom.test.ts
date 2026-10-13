@@ -80,7 +80,7 @@ test("CB-D261 基本の案内は、今の題と順序のまま（部品箱・図
   }
 });
 
-test("CB-D262 全部の案内の全部の段で、指す先が画面にあり（吹き出しが中ほどへ逃げない）、見本の図が描かれ、実際のフローは出ない。余計な送信も無い", async () => {
+test("CB-D262 全部の案内の全部の段で、指す先が画面にあり（吹き出しが中ほどへ逃げない）、見本の図が描かれ、実際のフローは出ない。余計な送信もありません", async () => {
   for (const course of tour.courses) {
     const dom = await openFlow();
     try {
@@ -90,8 +90,8 @@ test("CB-D262 全部の案内の全部の段で、指す先が画面にあり（
         const step = course.steps[index];
         const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
-        assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面に無い`);
-        assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先が無い）`);
+        assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先 ${step.target} が画面にありません`);
+        assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
         // 実際のフロー（bareFlow の start / end だけ）ではなく、段の見本を描く
         const scene = sceneOf(sample, step.scene);
         const doc = scene.flow.doc;
@@ -319,7 +319,7 @@ test("CB-D269 読み込み中に頼まれた案内はフローが出てから始
   try {
     await dom.send({ type: "tour" });
     await dom.settle();
-    assert.equal(dom.all(".tour").length, 0, "指す先が無い読み込み中には出さない");
+    assert.equal(dom.all(".tour").length, 0, "指す先がない読み込み中には出さない");
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, "部品箱");

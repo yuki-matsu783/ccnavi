@@ -92,10 +92,10 @@ class FlowLintTest(unittest.TestCase):
         for text, reason in (
             ("", "最上位がマッピングではない"),
             ("- 1\n", "最上位がマッピングではない"),
-            ("name: x\n", "`nodes` のリストが無い"),
+            ("name: x\n", "`nodes` のリストがありません。"),
             ("nodes: [1]\n", "nodes[0] がマッピングではない"),
-            ("nodes:\n  - {type: start}\n", "nodes[0] に文字列の id が無い"),
-            ("nodes:\n  - {id: 1, type: start}\n", "nodes[0] に文字列の id が無い"),
+            ("nodes:\n  - {type: start}\n", "nodes[0] に文字列の id がありません。"),
+            ("nodes:\n  - {id: 1, type: start}\n", "nodes[0] に文字列の id がありません。"),
             ("nodes:\n  - {id: a}\n  - {id: a}\n", "ノードの id が重なっている（a）"),
             ("nodes: []\nconnections: {}\n", "`connections` がリストではない"),
             ("nodes: []\nconnections: [1]\n", "connections[0] がマッピングではない"),
@@ -329,8 +329,8 @@ connections:
 
     def test_missing_start_and_end(self):
         said = self.problems("nodes:\n  - {id: a, type: prompt}\n")
-        self.assertIn("start が無い（どこから始めるかが決まらない）", said)
-        self.assertIn("end が無い（どこで終わるかが決まらない）", said)
+        self.assertIn("start がありません（どこから始めるかが決まらない）", said)
+        self.assertIn("end がありません（どこで終わるかが決まらない）", said)
 
     def test_a_cycle_without_a_loop_node_is_warned(self):
         text = STRUCTURE_BASE + "  - {id: c5, from: p1, to: q}\n"

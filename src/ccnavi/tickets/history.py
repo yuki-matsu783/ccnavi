@@ -191,7 +191,7 @@ def note(
         )
         return failed
     template = (
-        f"{ticket_id} の履歴（{kind}）を {target} に書けない"
+        f"{ticket_id} の履歴（{kind}）を {target} に保存できませんでした"
         "（{reason}）。状態は動いた（状態は置き場で決まり、履歴は補助）"
     )
     try:

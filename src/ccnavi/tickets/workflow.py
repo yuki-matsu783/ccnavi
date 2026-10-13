@@ -169,8 +169,8 @@ def problems(
             target = wf.review_at.get(n)
             if target is None:
                 error(
-                    f"`{key}[{i}]` の延期を引き受ける項が無い"
-                    "（この項を待つ、延期していない後ろの項が要る）"
+                    f"`{key}[{i}]` の延期を引き受ける項がありません"
+                    "（この項を待つ、延期していない後ろの項が必要です）"
                 )
                 continue
             target_item = numbered[target]
@@ -180,7 +180,7 @@ def problems(
                 and tpt.review == phasetypes.REVIEW_NONE
                 and target_item.review != ticket_model.PLAN_REVIEW_MR
             ):
-                error(f"`{key}[{i}]` を延期した先の `{target_item.type}` にレビューが無い")
+                error(f"`{key}[{i}]` を延期した先の `{target_item.type}` にレビューがありません。")
     return found
 
 

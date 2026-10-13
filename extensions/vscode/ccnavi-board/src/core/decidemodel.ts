@@ -140,7 +140,7 @@ export function choicesProblem(
       return `不明な対応方針です: ${String(choice)}`;
     }
     if (choice === "issue" && !preview.can_issue) {
-      return "issue に回せるのは、フィードバック計画が承認されたあとです";
+      return "指摘をIssueとして管理できるのは、フィードバック計画の承認後です";
     }
   }
   return undefined;
@@ -155,7 +155,7 @@ function parseTop(text: string): Top {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `JSON として読めません: ${(error as Error).message}` };
+    return { ok: false, error: `JSON として解釈できません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
     return { ok: false, error: "JSON の最上位がオブジェクトではありません" };

@@ -373,7 +373,7 @@ class PhaseTest(PhaseHarness):
         self.propose("i0001-05-05", child_text("i0001-05-05", "i0001", 5, ["wip/research/*"]))
         refused = self.approve()
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("計画に無い", refused.stderr)
+        self.assertIn("計画にありません", refused.stderr)
 
     def test_phase_scope_ignores_letter_case_on_every_machine(self):
         """定義の範囲の上限は、子チケットの範囲と同じく大文字小文字を区別しない。
@@ -472,7 +472,7 @@ class PhaseTest(PhaseHarness):
             os.path.exists(os.path.join(self.approved, "doing", "i0001-01-03.md")), result.stderr
         )
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
-        self.assertIn("同じ承認で i0001-01-03 を足すので再び開く", result.stderr)
+        self.assertIn("同じ承認で i0001-01-03 を追加するので再び開く", result.stderr)
 
     def test_a_new_parent_and_a_later_phase_child_together_still_keep_the_order(self):
         """承認済みチケットの無い親と、2 番目のフェーズの子を一緒に承認しても、子は通さない。
@@ -506,7 +506,7 @@ class PhaseTest(PhaseHarness):
             os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")), result.stderr
         )
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02-02.md")))
-        self.assertIn("同じ承認で i0001-01-01 を足すが、まだ閉じていない", result.stderr)
+        self.assertIn("同じ承認で i0001-01-01 を追加するが、まだ閉じていない", result.stderr)
 
     # ---- 4. 成果物
 
@@ -594,7 +594,7 @@ class PhaseTest(PhaseHarness):
         os.makedirs(os.path.join(self.approved, "doing", "i0001-01-02.md"))
         refused = self.approve()
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("書けない", refused.stderr)
+        self.assertIn("保存できませんでした", refused.stderr)
         # 子は増えていない。だからマーカーも消えていない。
         self.assertEqual(self.board_phase(1), (False, False, ["requested", "reviewed"]))
 
@@ -774,7 +774,7 @@ class PhaseTest(PhaseHarness):
         # 子が開いている間は外せない。
         refused = self.ready(fixture)
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("Draft を外せない", refused.stderr)
+        self.assertIn("Draft を解除できません", refused.stderr)
         self.assertIn("close-early", refused.stderr)
         self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
         self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
@@ -801,7 +801,7 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertNotIn("rm -r wip", closed.stdout)
         self.assertIn("ready", closed.stdout)
-        self.assertIn("`wip/` の追跡済みのファイルを消して", closed.stdout)
+        self.assertIn("`wip/` の追跡済みのファイルを削除して", closed.stdout)
         self.assertIn("ready --parent i0001", closed.stdout)
         self.assertIn("合意した範囲に入る", closed.stdout)
         self.assertIn("確認を取り直さずに進める", closed.stdout)
@@ -1012,7 +1012,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("今期はここまで", issue)
         # 早めに閉じたので、フィードバック計画が無くても親を閉じられる。
         explained = self.ccnavi("--explain")
-        self.assertIn("ユーザが早めに閉じた", explained.stdout)
+        self.assertIn("ユーザが早めにクローズした", explained.stdout)
         closed = self.ccnavi("ticket", "finish", "i0001")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         # Draft はまだ外れていない。片付けて push してから ready で外す。
@@ -1042,7 +1042,7 @@ class PhaseTest(PhaseHarness):
             stdin="y\n",
         )
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("端末", result.stderr)
+        self.assertIn("ターミナル", result.stderr)
         for command in (
             "sh .ccnavi/scripts/ccnavi-review.sh close-early --reason x",
             "sh .ccnavi/scripts/ccnavi-review.sh ready",

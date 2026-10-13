@@ -63,22 +63,22 @@ def fill(
     # 古い計画に合わせた `phases:` が新しい本文に入らないように）。
     raw = fsio.read_bytes(target.path)
     if raw is None:
-        return Filled(f"{target.path} を読めない。何も書かない")
+        return Filled(f"{target.path} を読めない。何も反映しません。")
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError:
-        return Filled(f"{target.path} を UTF-8 として読めない。何も書かない")
+        return Filled(f"{target.path} を UTF-8 として読めない。何も反映しません。")
     read, _ = ticket_mod.parse(text)
     if read is None or read.ticket != name or read.is_child:
-        return Filled(f"{target.path} を親の提案として読めない。何も書かない")
+        return Filled(f"{target.path} を親の提案として読めない。何も反映しません。")
     read.project = target.project
     if not read.has_plan:
-        return Filled(f"{name} は計画（plan:）を持たないので、差し込む定義が無い")
+        return Filled(f"{name} は計画（plan:）を持たないので、差し込む定義がありません。")
     config = phasetypes.load_types(conf, root, target.project)
     if config is None:
         return Filled(
             f"フェーズ定義（共通レイヤーと {target.project or '自身'} のレイヤーの phases.yml）が"
-            "どちらも無いか読めないので、写せない。何も書かない"
+            "どちらも無いか読めないので、写せない。何も反映しません。"
         )
     held = _held(conf, root, current)
     copy: dict[str, dict] = {}
@@ -93,19 +93,19 @@ def fill(
         copy[item.type] = phasetypes.as_copy(pt)
     if missing:
         return Filled(
-            f"計画の項が使う定義 {', '.join(missing)} が phases.yml に無い。"
-            "計画を直すか、ユーザに phases.yml へ足してもらう。何も書かない"
+            f"計画の項が使う定義 {', '.join(missing)} が phases.yml にありません。"
+            "計画を直すか、ユーザに phases.yml へ追加してもらう。何も反映しません。"
         )
     built, why = _rebuilt(text, copy)
     if why:
-        return Filled(f"{target.path}: {why}。何も書かない")
+        return Filled(f"{target.path}: {why}。何も反映しません。")
     before = set(phasetypes.types_of(read)) if phasetypes.has_copy(read) else set()
     done = Filled(copied=list(copy), dropped=sorted(before - set(copy)), held=sorted(held))
     if built == text:
         return done
     failed = fsio.write_bytes_atomic(target.path, built.encode("utf-8"))
     if failed:
-        return Filled(f"{target.path} に書けない（{failed}）")
+        return Filled(f"{target.path} に保存できませんでした（{failed}）")
     done.changed = True
     return done
 
@@ -154,7 +154,7 @@ def _rebuilt(text: str, copy: dict[str, dict]) -> tuple[str, str]:
         if after > stop and after < end and lines[after][0] in " \t":
             return "", (
                 "`phases:` の値の中に行頭（0 桁目）のコメントがあり、値の範囲が決まらない。"
-                "コメントを字下げするか消してから打ち直す"
+                "コメントを字下げするか削除してから再実行します。"
             )
     else:
         plan = [i for i in range(1, end) if _PLAN_LINE.match(lines[i])]
@@ -174,10 +174,10 @@ def _changed_elsewhere(old: str, new: str, copy: dict[str, dict]) -> str:
     written, problems = phasetypes.read_copy(after.get(phasetypes.COPY_KEY))
     wanted, _ = phasetypes.read_copy(copy)
     if any(p.severity == rules.SEVERITY_ERROR for p in problems) or set(written) != set(wanted):
-        return "組んだ全文の phases: が差し込んだ定義と合わないので書かない"
+        return "組んだ全文の phases: が差し込んだ定義と合わないので反映しません"
     if any(not phasetypes.same(written[i], wanted[i]) for i in wanted):
-        return "組んだ全文の phases: が差し込んだ定義と合わないので書かない"
+        return "組んだ全文の phases: が差し込んだ定義と合わないので反映しません"
     ticket, _ = ticket_mod.parse(new)
     if ticket is None:
-        return "組んだ全文がチケットとして読めないので書かない"
+        return "組んだ全文がチケットとして読めないので反映しません"
     return ""

@@ -132,12 +132,13 @@ def handle(request: str, root: str = "/ws") -> str:
         req = json.loads(request)
         if not isinstance(req, dict) or req.get("schema") != SCHEMA:
             raise Refused(
-                f"要求の形の版が違う（拡張と Python の組み立てがずれている。期待 {SCHEMA}）"
+                "要求の形式の版が一致しません（拡張と Python の組み立てがずれています。"
+                f"期待する版は {SCHEMA} です）"
             )
         op = req.get("op")
         handler = _OPS.get(op) if isinstance(op, str) else None
         if handler is None:
-            raise Refused(f"未対応の操作:{op!r}")
+            raise Refused(f"未対応の操作です：{op!r}")
         body = handler(req, root)
     except Refused as exc:
         body = {"error": str(exc)}
@@ -186,29 +187,31 @@ def _op_placement(req: dict, root: str) -> dict:
 def _snapshot(req: dict) -> dict:
     snap = req.get("snapshot")
     if not isinstance(snap, dict):
-        raise Refused("snapshot が無い")
+        raise Refused("snapshot がありません")
     integ = snap.get("integration")
     branches = snap.get("branches")
     if not isinstance(integ, dict) or not isinstance(branches, dict):
-        raise Refused("snapshot の形が違う（integration と branches が要る）")
+        raise Refused("snapshot の形式が正しくありません（integration と branches が必要です）")
     name = integ.get("name")
     if not isinstance(name, str) or name not in branches:
-        raise Refused("統合先のブランチの中身が snapshot に無い")
+        raise Refused("統合先のブランチの内容が snapshot に含まれていません")
     for bname, branch in branches.items():
         _check_files(bname, branch)
     project = snap.get("project") or ""
     if project:
         if not isinstance(project, str) or not ticket_ids.is_valid_name(project):
-            raise Refused(f"プロジェクト名が読めない: {project!r}")
+            raise Refused(f"プロジェクト名が不正です：{project!r}")
         if settings.is_reserved_layer_name(project):
             raise Refused(
-                f"プロジェクト名 {project} はレイヤーの名前として予約してある（common・self）"
+                f"プロジェクト名 {project} はレイヤー名として予約されています（common・self）"
             )
         ws = snap.get("workspace")
         if not isinstance(ws, dict) or not isinstance(ws.get("integration"), dict):
-            raise Refused("プロジェクトのリポジトリにはワークスペースの統合先（workspace）が要る")
+            raise Refused(
+                "プロジェクトのリポジトリには、ワークスペースの統合先（workspace）の指定が必要です"
+            )
         if not isinstance(ws["integration"].get("name"), str):
-            raise Refused("ワークスペースの統合先の名前が無い")
+            raise Refused("ワークスペースの統合先の名前がありません")
         _check_files("(ワークスペース)", ws)
     return snap
 
@@ -216,11 +219,11 @@ def _snapshot(req: dict) -> dict:
 def _check_files(bname: str, branch: object) -> None:
     files = branch.get("files") if isinstance(branch, dict) else None
     if not isinstance(files, dict):
-        raise Refused(f"ブランチ {bname} の files が無い")
+        raise Refused(f"ブランチ {bname} の files がありません")
     for path, text in files.items():
         _check_rel(path)
         if not isinstance(text, str):
-            raise Refused(f"{bname}:{path} の本文が文字列でない")
+            raise Refused(f"{bname}:{path} の本文が文字列ではありません")
 
 
 def _project(snap: dict) -> str:
@@ -238,9 +241,9 @@ def _workspace_files(snap: dict) -> dict[str, str]:
 def _check_rel(path: object) -> str:
     """ホストから来た相対パスを、仮のツリーの外へ出ない形に限る。"""
     if not isinstance(path, str) or not path or _ROOTED.match(path) or "\\" in path:
-        raise Refused(f"読めないパス: {path!r}")
+        raise Refused(f"不正なパスです：{path!r}")
     if any(part in ("", ".", "..") for part in path.split("/")):
-        raise Refused(f"読めないパス: {path!r}")
+        raise Refused(f"不正なパスです：{path!r}")
     return path
 
 
@@ -307,10 +310,10 @@ def _family_ident(snap: dict, place: dict, name: str) -> str:
     if len(idents) == 1:
         return idents[0]
     if not idents:
-        raise Refused(f"ブランチ {name} を自分の親のブランチだと宣言する親チケットが無い")
+        raise Refused(f"ブランチ {name} を自分の親ブランチとして宣言する親チケットがありません")
     raise Refused(
-        f"ブランチ {name} を親のブランチだと宣言する親チケットが 2 つ以上ある"
-        f"（{', '.join(idents)}）。親子のチケットが決まらない"
+        f"ブランチ {name} を親ブランチとして宣言する親チケットが 2 つ以上あります"
+        f"（{', '.join(idents)}）。親子チケットを特定できません"
     )
 
 
@@ -404,7 +407,7 @@ def _op_families(req: dict, root: str) -> dict:
     closed = _closed(snap, place)
     candidates = req.get("candidates")
     if not isinstance(candidates, list):
-        raise Refused("candidates が無い")
+        raise Refused("candidates がありません")
     found = []
     for name in candidates:
         if not isinstance(name, str) or name == snap["integration"]["name"]:
@@ -422,8 +425,8 @@ def _op_families(req: dict, root: str) -> dict:
         conflict = ""
         if len(idents) > 1:
             conflict = (
-                f"ブランチ {name} を親のブランチだと宣言する親チケットが 2 つ以上ある"
-                f"（{', '.join(idents)}）。親子のチケットが決まらない"
+                f"ブランチ {name} を親ブランチとして宣言する親チケットが 2 つ以上あります"
+                f"（{', '.join(idents)}）。親子チケットを特定できません"
             )
         else:
             conflict = _rival_problem(snap, place, name, t.ticket)
@@ -452,7 +455,7 @@ def _op_closure(req: dict, root: str) -> dict:
     place = _placement()
     family = req.get("family")
     if not isinstance(family, str) or not family:
-        raise Refused("family が無い")
+        raise Refused("family がありません")
     return _closure(snap, place, family, _hints(req))
 
 
@@ -514,10 +517,10 @@ def _closure(snap: dict, place: dict, family: str, hints: dict[str, str] | None 
         "absent": sorted(absent & set(families)),
         "over_limit": over,
         "message": (
-            f"先行を辿ると {FAMILY_LIMIT} 組を超える親子のチケットに広がった"
+            f"先行チケットをたどると、{FAMILY_LIMIT} 組を超える親子チケットに広がりました"
             f"（{', '.join(families)}）。"
-            "Chrome では判定できない。計画を分けて先行を減らすか、手元で "
-            "`--agree --preview --verify` を打って確かめる"
+            "Chrome では判定できません。計画を分けて先行チケットを減らすか、手元で "
+            "`--agree --preview --verify` を実行して確認してください。"
             if over
             else ""
         ),
@@ -674,9 +677,9 @@ def records(
             ident = (idents or {}).get(name, name)
             if not ticket_ids.is_valid_id(ident):
                 raise Refused(
-                    f"ホストに無い親のブランチ {name} の親子のチケット（{ident}）が"
-                    "識別子の形でない。"
-                    "親子のチケットが決まらない"
+                    f"ホストにない親ブランチ {name} の親子チケット（{ident}）が"
+                    "識別子の形式ではありません。"
+                    "親子チケットを特定できません"
                 )
             out[f"{base}/families/{ident}"] = (
                 f"remote origin\nbranch {name}\nstate gone\n"
@@ -735,12 +738,12 @@ def _op_board(req: dict, root: str) -> dict:
     place = _placement()
     family = req.get("family")
     if not isinstance(family, str) or family not in snap["branches"]:
-        raise Refused("family のブランチが snapshot に無い")
+        raise Refused("family のブランチが snapshot にありません")
     closure = _closure(snap, place, family, _hints(req))
     if closure["over_limit"]:
         return {"family": family, "undecided": closure["message"], "closure": closure}
     if closure["need"]:
-        raise Refused(f"閉包の親子のチケットをまだ読んでいない: {', '.join(closure['need'])}")
+        raise Refused(f"閉包の親子チケットをまだ取得していません：{', '.join(closure['need'])}")
     ident = closure["idents"][family]
     rival = _rival_problem(snap, place, family, ident) or _ambiguous_problem(closure)
     if rival:
@@ -819,8 +822,9 @@ def _unreadable(snap: dict, closure: dict) -> str:
     if not found:
         return ""
     return (
-        f"判定の入力に本文を読めないファイルがある（{', '.join(found)}）。"
-        "この親子のチケットは決まらない。手元で `--agree --preview --verify` を打って確かめる"
+        f"判定の入力に、本文を取得できないファイルがあります（{', '.join(found)}）。"
+        "この親子チケットは判定できません。"
+        "手元で `--agree --preview --verify` を実行して確認してください。"
     )
 
 
@@ -832,14 +836,14 @@ def _write_refusal(snap: dict, family: str) -> str:
     """
     compat = _compat(snap)
     if not compat["same"]:
-        return f"{compat['message']}。表示だけにして、承認と取り下げのボタンは出さない"
+        return f"{compat['message']}。表示のみとし、承認と取り下げのボタンは表示しません"
     folded = family.casefold()
     if (
         folded in ticket_ids.RESERVED_BRANCH_IDS
         or folded.startswith("release-")
         or folded == snap["integration"]["name"].casefold()
     ):
-        return f"{family} は予約の名前か統合先の名前なので、Chrome からは書かない"
+        return f"{family} は予約された名前か統合先の名前のため、Chrome からは書き込めません"
     return ""
 
 
@@ -909,12 +913,12 @@ def _family_tree(req: dict, root: str) -> tuple[dict, dict, str, dict]:
     place = _placement()
     family = req.get("family")
     if not isinstance(family, str) or family not in snap["branches"]:
-        raise Refused("family のブランチが snapshot に無い")
+        raise Refused("family のブランチが snapshot にありません")
     closure = _closure(snap, place, family, _hints(req))
     if closure["over_limit"]:
         raise Refused(closure["message"])
     if closure["need"]:
-        raise Refused(f"閉包の親子のチケットをまだ読んでいない: {', '.join(closure['need'])}")
+        raise Refused(f"閉包の親子チケットをまだ取得していません：{', '.join(closure['need'])}")
     rival = _rival_problem(snap, place, family, closure["idents"][family])
     rival = rival or _ambiguous_problem(closure)
     if rival:
@@ -954,8 +958,9 @@ def _one_branch(changes: dict, family: str) -> None:
     others = sorted(k for k in (changes.get("changes") or {}) if k != family)
     if others:
         raise Refused(
-            f"書くものが親のブランチ {family} の外（{', '.join(others or ['?'])}）に及ぶ。"
-            f"提案は {family} の上に置いてから承認を頼む"
+            f"反映する内容が親ブランチ {family} の外"
+            f"（{', '.join(others or ['?'])}）に及んでいます。"
+            f"提案を {family} の上に置いてから、承認を依頼してください。"
         )
 
 
@@ -963,7 +968,7 @@ def _stamp(req: dict) -> str:
     """要求の時刻（`fsio.stamp` と同じ、オフセット付き）。読めなければ Refused。"""
     stamp = req.get("stamp")
     if not isinstance(stamp, str) or not stamp:
-        raise Refused("stamp（オフセット付きの時刻）が無い")
+        raise Refused("stamp（オフセット付きの時刻）がありません")
     try:
         with fsio.clock(stamp):
             pass
@@ -1109,7 +1114,7 @@ def _op_confirm(req: dict, root: str) -> dict:
         raise Refused("phase はフェーズの番号")
     result = review_host.Result.from_data(req.get("result"))
     if result.error:
-        raise Refused(f"result を読めない: {result.error}")
+        raise Refused(f"result を解釈できません：{result.error}")
     head = str(snap["branches"][family].get("head") or "")
     compare = req.get("compare")
     with _environ():
@@ -1184,11 +1189,16 @@ def _compat(snap: dict) -> dict:
         message = ""
     elif theirs is None:
         message = (
-            f"統合先の {COMPAT_FILE} に互換の版（CCNAVI_COMPAT）が書かれていない。拡張は互換 {ours}"
+            f"統合先の {COMPAT_FILE} に互換の版（CCNAVI_COMPAT）が記載されていません。"
+            f"拡張は互換 {ours} です"
         )
     else:
-        hint = "拡張を更新する" if theirs > ours else "リポジトリの ccnavi の更新を待つ"
-        message = f"拡張は互換 {ours}、リポジトリは互換 {theirs}。{hint}"
+        hint = (
+            "拡張を更新してください"
+            if theirs > ours
+            else "リポジトリの ccnavi の更新をお待ちください"
+        )
+        message = f"拡張は互換 {ours}、リポジトリは互換 {theirs} です。{hint}"
     return {"extension": ours, "repository": theirs, "same": theirs == ours, "message": message}
 
 
@@ -1231,12 +1241,13 @@ def _op_start(req: dict, root: str) -> dict:
     )
     if folded in {i.casefold() for i in _closed(snap, place)}:
         problems.append(
-            f"{ident} は統合先 {integ} の done/ で閉じている（閉じた識別子は使い直さない）"
+            f"{ident} は統合先 {integ} の done/ でクローズ済みです"
+            "（クローズ済みの識別子は再利用できません）"
         )
     names = [n for n in [*snap["branches"], *taken] if n != integ]
     same = sorted({n for n in names if n.casefold() == folded})
     if same:
-        problems.append(f"同じ名前のブランチが既にある（{', '.join(same)}）")
+        problems.append(f"同じ名前のブランチが既にあります（{', '.join(same)}）")
     for name in sorted(snap["branches"]):
         if name == integ:
             continue
@@ -1248,13 +1259,16 @@ def _op_start(req: dict, root: str) -> dict:
             }
         )
         if hits:
-            problems.append(f"開いた親子のチケット {name} に同じ識別子がある（{', '.join(hits)}）")
+            problems.append(
+                f"未クローズの親子チケット {name} に同じ識別子があります（{', '.join(hits)}）"
+            )
     compat = _compat(snap)
     if not compat["same"]:
         problems.append(compat["message"])
     if problems:
         problems.append(
-            "この issue からは始められない。識別子をユーザが付けて（フォールバック）始める"
+            "この Issue からは開始できません。"
+            "識別子を手動で指定して（フォールバック）開始してください。"
         )
     return {"identifier": ident, "integration": integ, "problems": problems}
 

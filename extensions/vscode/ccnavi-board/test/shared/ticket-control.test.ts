@@ -16,7 +16,7 @@ test("CB-T56 実行ファイルが disable と答えたときだけ disable", ()
   assert.equal(ticketControlOf(withValue("disable")), "disable");
 });
 
-test("CB-T57 ボードが読めない・答えが空なら enable（入口を消さない）", () => {
+test("CB-T57 ボードが読み込めない・答えが空なら enable（入口を消さない）", () => {
   assert.equal(ticketControlOf(undefined), "enable");
   assert.equal(ticketControlOf(withValue("")), "enable");
 });

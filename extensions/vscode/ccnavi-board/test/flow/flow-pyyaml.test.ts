@@ -78,7 +78,7 @@ function node(id: string, data: Record<string, unknown>): { readonly id: string;
   return { id, type: "prompt", name: id, position: { x: 80, y: 160 }, data };
 }
 
-test("CB-T248 PyYAML が裸や `|` では読めない・別の文字に読む文字列を、書き出しが読める形で書く", { skip: reader.ok ? false : reader.why }, () => {
+test("CB-T248 PyYAML が裸や `|` では読み込めない・別の文字に読む文字列を、書き出しが読める形で書く", { skip: reader.ok ? false : reader.why }, () => {
   const values = [
     "a\tb",
     "\tlead",
@@ -227,7 +227,7 @@ test("CB-T249 乱数の中身（固定の種、400 本）を書き出して PyYA
     // 画面の読み手でも同じ中身に読める（書いたものを画面が開き直せる）
     const again = parseFlowValue(shown);
     assert.ok(again.ok, `${i}`);
-    assert.equal(flowMismatch(again.value, read.data), undefined, `${i} を画面で読み直すと食い違う\n${shown}`);
+    assert.equal(flowMismatch(again.value, read.data), undefined, `${i} を画面で再読み込みすると食い違う\n${shown}`);
   });
 });
 

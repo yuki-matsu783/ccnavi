@@ -142,7 +142,7 @@ def _decision(
     parent, ph = found
     requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
     if requested_mark is None:
-        stderr.write("ccnavi: 依頼の記録が無い。先に request してください\n")
+        stderr.write("ccnavi: 依頼の記録がありません。先に request してください\n")
         return None
     tree_root = tree.worktree_path(root, parent.ticket)
     moved = review._moved_since_request(tree_root, conf, requested_mark)
@@ -284,7 +284,7 @@ def choose(
         json.dumps({"choices": choices, "digest": decision_digest(d)}, ensure_ascii=False) + "\n",
     )
     if failed:
-        stderr.write(f"ccnavi: 選んだものを {out_path} に書けない（{failed}）\n")
+        stderr.write(f"ccnavi: 選んだものを {out_path} に保存できませんでした（{failed}）\n")
         return 1
     return 0
 
@@ -358,7 +358,7 @@ def decide_yes(
     結果は JSON で返す。違えば何も置かず `mismatch` を返す。
     """
     if not digest.strip():
-        stderr.write("ccnavi: --yes には --digest（見せた指摘のダイジェスト）が要る\n")
+        stderr.write("ccnavi: --yes には --digest（見せた指摘のダイジェスト）が必要です。\n")
         return 1
     try:
         raw = json.loads(choices_text)

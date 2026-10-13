@@ -66,7 +66,7 @@ class EditCli(Drafts):
         body = self.body_file(self.edited_body())
         result = self.tpl("--templates", "--save-draft", "i0001", "--body-file", body)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("何も書いていない", result.stdout)
+        self.assertIn("何も反映していません", result.stdout)
         self.assertEqual(plan_templates.digest(self.read_draft()), self.sha)
 
     # 2. 保存

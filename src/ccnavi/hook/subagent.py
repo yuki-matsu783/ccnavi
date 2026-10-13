@@ -24,7 +24,7 @@ from . import judge, post, post_findings, projskills, reasons
 # 始まりに 1 行だけ渡す。メインはこの節を集めて振り返りに使う（.ccnavi/docs/skill-review.md）。
 CANDIDATE_NOTE = (
     "[ccnavi] 作業中に手順の見落としやすい点やスキルの誤りに気づいたら、最後の報告に"
-    "「スキル候補」の節を足して書いてください（対象のスキル・何を直すか・根拠）。"
+    "「スキル候補」の節を追加して書いてください（対象のスキル・何を直すか・根拠）。"
     "スキルのファイルは自分では書かない。"
 )
 
@@ -265,7 +265,7 @@ def _judge_stop(
     record.rules, record.code = [reasons.TICKET_RULE], post_findings.CODE_TICKET_SCOPE
     lines = [
         f"[ccnavi] {post_findings.CODE_TICKET_SCOPE}: 子チケットの範囲の外に変更が残っています（"
-        f"{len(findings)} 件）。範囲の中へ戻すか、要るなら親に伝えて次のチケットにしてください。"
+        f"{len(findings)} 件）。範囲の中へ戻すか、必要なら親に伝えて次のチケットにしてください。"
     ]
     for child, rel, found in findings[: post.REPORT_LIMIT]:
         area = ", ".join(child.paths(rules.ALLOW) + child.paths(rules.ASK)) or "(空)"
@@ -324,7 +324,7 @@ def _note_running(stderr: TextIO, conf: settings.Settings, payload: hookio.Input
     text = _mark_text(payload.session_id, [str(int(time.time()))])
     failed = fsio.write_text(_running_path(conf.state, payload.session_id, payload.agent_id), text)
     if failed:
-        stderr.write(f"ccnavi: 実行中のサブエージェントの印を書けない: {failed}\n")
+        stderr.write(f"ccnavi: 実行中のサブエージェントの印を保存できませんでした: {failed}\n")
 
 
 def _forget_running(conf: settings.Settings, payload: hookio.Input) -> None:
@@ -530,7 +530,7 @@ def unchecked_after_error(
             return
         failed = fsio.write_text(path, _mark_text(payload.session_id, []))
         if failed:
-            stderr.write(f"ccnavi: 範囲を確かめられなかった印を書けない: {failed}\n")
+            stderr.write(f"ccnavi: 範囲を確かめられなかった印を保存できませんでした: {failed}\n")
 
 
 def _unchecked_path(state_dir: str, session: str, who: str) -> str:
@@ -567,7 +567,7 @@ def _remember(stderr: TextIO, path: str, session: str, tickets: list[str]) -> No
         return
     failed = fsio.write_text(path, _mark_text(session, tickets))
     if failed:
-        stderr.write(f"ccnavi: 範囲を確かめられなかった印を書けない: {failed}\n")
+        stderr.write(f"ccnavi: 範囲を確かめられなかった印を保存できませんでした: {failed}\n")
 
 
 def _bounce_path(state_dir: str, session: str, who: str) -> str:
@@ -598,4 +598,4 @@ def _remember_bounce(stderr: TextIO, state_dir: str, session: str, who: str) -> 
         return
     failed = fsio.write_text(_bounce_path(state_dir, session, who), fsio.stamp())
     if failed:
-        stderr.write(f"ccnavi: 差し戻しの回数を書けない: {failed}\n")
+        stderr.write(f"ccnavi: 差し戻しの回数を保存できませんでした: {failed}\n")

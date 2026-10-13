@@ -155,10 +155,10 @@ class WorktreeWithoutProjectTest(unittest.TestCase):
                 self.assertEqual(len(found), 1, found)
                 detail = found[0]["where"] + found[0]["detail"]
                 self.assertIn(gitdir, detail)
-                self.assertIn("元のプロジェクトが無", detail)
+                self.assertIn("元のプロジェクトがありません", detail)
                 self.assertIn("deny が効いていない", detail)
                 self.assertIn("ワークスペースルートとして判定", detail)
-                self.assertIn("ワークツリーを消すか、プロジェクトを戻", detail)
+                self.assertIn("ワークツリーを削除するか、プロジェクトを戻", detail)
                 self.assertNotIn("孤児", detail)
 
     def test_lint_正常なワークツリーとふつうのディレクトリは名指ししない(self):
@@ -179,7 +179,7 @@ class WorktreeWithoutProjectTest(unittest.TestCase):
                 (line,) = [x for x in lines if name in x]
                 self.assertIn(gitdir, line)
                 self.assertIn("deny が効いていない", line)
-                self.assertIn("ワークツリーを消すか、プロジェクトを戻", line)
+                self.assertIn("ワークツリーを削除するか、プロジェクトを戻", line)
                 self.assertNotIn("孤児", line)
         self.assertFalse([x for x in lines if NORMAL in x or PLAIN in x], lines)
 
@@ -187,7 +187,7 @@ class WorktreeWithoutProjectTest(unittest.TestCase):
         result = ccnavi(self.root, "--explain", "--json", "--mode", "enable")
 
         self.assertNotIn(GONE, result.stdout)
-        self.assertNotIn("元のプロジェクトが無", result.stdout)
+        self.assertNotIn("元のプロジェクトがありません", result.stdout)
 
     # ---- 該当が無いとき
 
@@ -203,7 +203,7 @@ class WorktreeWithoutProjectTest(unittest.TestCase):
             problems = json.loads(ccnavi(root, "--lint", "--json", "--mode", "enable").stdout)
             explained = ccnavi(root, "--explain", "--mode", "enable").stdout
 
-        said = [p for p in problems["problems"] if "元のプロジェクトが無" in p["detail"]]
+        said = [p for p in problems["problems"] if "元のプロジェクトがありません" in p["detail"]]
         self.assertEqual(said, [])
         self.assertNotIn(HEADING, explained)
 

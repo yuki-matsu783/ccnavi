@@ -44,7 +44,7 @@ test("CB-D322 全案内の全段で、指す先が画面に 1 つあり、吹き
         const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
         assert.equal(dom.all(`[data-tour="${step.target}"]`).length, 1, `${at}: 指す先 ${step.target} が画面に 1 つではない`);
-        assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先が無い）`);
+        assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
         dom.click(dom.one('[data-action="tour-next"]'));
       }
       await dom.settle();

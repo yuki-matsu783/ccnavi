@@ -202,7 +202,7 @@ def describe(project: str, changes: list[configsync.Change]) -> list[str]:
         "共通の中身に揃えた（references/project/ などプロジェクト固有のファイルには触れていない）:"
     ]
     for c in changes:
-        state = "消した" if c.deletes else ("上書き" if c.before is not None else "新しく置いた")
+        state = "削除した" if c.deletes else ("上書き" if c.before is not None else "新しく置いた")
         lines.append(f"  - {c.rel}（{state}）")
     return lines
 

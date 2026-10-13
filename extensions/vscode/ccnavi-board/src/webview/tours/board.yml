@@ -28,7 +28,7 @@ sample:
     tickets:
       # 承認待ちの親（計画あり）と、その子。「承認」「計画編集」「フロー: 作成」を見せる
       - ticket: sample-a
-        title: "（見本）ログイン画面にパスワードの再設定を足す"
+        title: "（見本）ログイン画面にパスワードの再設定を追加する"
         proposal: { state: todo, has_plan: true }
         copy: { status: none }
         worktree: { exists: true, path: /ws/.claude/worktrees/sample-a }
@@ -50,7 +50,7 @@ sample:
         copy: { status: open, approved_at: "2026-09-26T09:00:00+0900" }
         worktree: { exists: true, path: /ws/.claude/worktrees/sample-b }
         started_at: "2026-09-26T09:30:00+0900"
-        human_review: { required: true, reason: 設計のレビューが要る }
+        human_review: { required: true, reason: 設計のレビューが必要 }
         history:
           - { at: "2026-09-26T00:00:00Z", kind: approved, from: todo, to: doing, via: board }
           - { at: "2026-09-26T00:30:00Z", kind: started, via: cli }
@@ -176,21 +176,21 @@ sample:
     approval:
       root: /ws
       batch:
-        - { ticket: sample-a, title: "（見本）ログイン画面にパスワードの再設定を足す", parent: null, phase: null, revision: false, tree: sample-a, path: /ws/.claude/worktrees/sample-a/wip/proposals/todo/sample-a.md, branch: sample-a }
+        - { ticket: sample-a, title: "（見本）ログイン画面にパスワードの再設定を追加する", parent: null, phase: null, revision: false, tree: sample-a, path: /ws/.claude/worktrees/sample-a/wip/proposals/todo/sample-a.md, branch: sample-a }
         - { ticket: sample-a-01-01, title: "（見本）再設定メールの文面を決める", parent: sample-a, phase: 1, revision: false, tree: sample-a, path: /ws/.claude/worktrees/sample-a/wip/proposals/todo/sample-a-01-01.md, branch: sample-a-01-01 }
       text: |
         チケットの承認リクエスト: 2 件
 
-        == sample-a: （見本）ログイン画面にパスワードの再設定を足す  親チケット
+        == sample-a: （見本）ログイン画面にパスワードの再設定を追加する  親チケット
         ■ このチケットで編集可能な範囲
-            下に並ぶ場所にだけ、このチケットで編集できるようになる。allow は無確認で編集できる場所、ask は確認を挟んで編集できる場所、deny はこのチケットでも編集できない場所
+            このチケットでは、以下に示す場所のみ編集できるようになります。allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、deny はこのチケットでも編集できない場所
             allow: src/*, wip/*, tests/*
         ■ 全体計画
             承認すると、この順序で進めることに合意したことになる。各フェーズの子は、そのフェーズが待つフェーズが閉じてレビューが済むまで承認できない
             1. 調査 / research  レビュー不要
-            2. 設計 / design  レビュー要: マージリクエスト
-            3. 実装とテスト / implement  レビュー要: マージリクエスト
-        ■ エージェントが書いた理由
+            2. 設計 / design  レビュー必須: マージリクエスト
+            3. 実装とテスト / implement  レビュー必須: マージリクエスト
+        ■ エージェントが記載した理由
             利用者が自分でパスワードを再設定できるようにする
 
         == sample-a-01-01: （見本）再設定メールの文面を決める  親 sample-a / フェーズ 1: 調査
@@ -214,7 +214,7 @@ sample:
       carried: true
       prompt: |
         sample-a と sample-a-01-01 を承認しました。
-        承認済みチケットを確かめ、フェーズ 1 の子チケットから着手してください。
+        承認済みチケットを確認し、フェーズ 1 の子チケットから着手してください。
     # 残った指摘の行き先（`ccnavi-review.sh decide <N> --preview` と同じ形）
     decide:
       tree: /ws/.claude/worktrees/sample-c
@@ -225,7 +225,7 @@ sample:
       digest: "0000000000000000000000000000000000000000000000000000000000000000"
       threads:
         - { key: thread-1, url: "https://example.com/sample/pulls/12#discussion_r1", path: src/log.ts, line: 42, body: "レベルの名前を定数にまとめてほしい\n同じ文字列が 3 か所にある" }
-        - { key: thread-2, url: "https://example.com/sample/pulls/12#discussion_r2", path: src/format.ts, line: 10, body: "この分岐を通るテストが無い" }
+        - { key: thread-2, url: "https://example.com/sample/pulls/12#discussion_r2", path: src/format.ts, line: 10, body: "この分岐を通るテストがありません" }
     # レビュー済みの連絡（Claude Code に渡す文）
     reviewed:
       title: フェーズ 1 のレビュー済みの連絡
@@ -233,7 +233,7 @@ sample:
       what: レビュー済みの連絡の文
       prompt: |
         sample-c のフェーズ 1 のレビューが終わりました。
-        未解決の指摘が無いことを確かめ、ccnavi-review.sh confirm --phase 1 を実行してください。
+        未解決の指摘がないことを確認し、ccnavi-review.sh confirm --phase 1 を実行してください。
 
 courses:
   - id: intro
@@ -254,7 +254,7 @@ courses:
         body: 1 枚が 1 チケットです。カードには、親か子か、フェーズの進み具合、ユーザが対応する必要がある状態を示すバッジが出ます。押すとチケットのファイルを開きます。承認とレビューの対応のボタンは、要るときだけカードに出ます。レビューの対応のボタンを押すと、「対応方針を決める」と「レビュー済み連絡」のメニューが開きます。ボタンはどれも承認と同じ大きさです。
       - target: approve
         title: 承認
-        body: 絞り込みで見えている承認待ちをまとめて承認します。押すと承認する内容がオーバーレイに出るので、確かめてから承認してください。承認のあと、Claude Code に伝える文を渡せます。
+        body: 絞り込みで見えている承認待ちをまとめて承認します。押すと承認する内容がオーバーレイに出るので、確認してから承認してください。承認のあと、Claude Code に伝える文を渡せます。
       - target: refresh
         title: 更新
         body: チケットとワークツリーの状態を更新します。前回の更新から列が変わったカードには動いた表示が付きます。
@@ -279,8 +279,8 @@ courses:
         title: まとめて承認する
         body: ヘッダの「承認待ち N 件を承認」は、絞り込みで見えている承認待ちをまとめて対象にします。絞り込み中は、見えていない承認待ちは入りません。件数はボタンに出ます。
       - target: approval-batch
-        title: 承認の対象を確かめる
-        body: 承認する提案を表で確かめます。本文には、編集できる範囲・人間レビューの要否・エージェントが書いた理由が並びます。「承認する」を押すまで何も変わらず、「やめる」か Esc で閉じます。
+        title: 承認の対象を確認する
+        body: 承認する提案を表で確認します。本文には、編集できる範囲・人間レビューの要否・エージェントが記載した理由が並びます。「承認する」を押すまで何も変わらず、「キャンセル」か Esc で閉じます。
         scene: { overlay: approval }
       - target: approval-plan
         title: 計画の順序を見る
@@ -297,7 +297,7 @@ courses:
 
   - id: review
     title: レビュー待ちのフェーズに対応したいとき
-    summary: 止まっているフェーズの見つけ方、指摘の行き先の決め方、レビュー済みの連絡
+    summary: 止まっているフェーズの見つけ方、指摘の対応方針の決め方、レビュー済みの連絡
     steps:
       - target: card-sample-c
         title: 止まっている親を見つける
@@ -307,17 +307,17 @@ courses:
         body: そのフェーズの子のカードにも「レビュー待ち」のバッジが付きます。バッジは、ユーザが対応する必要がある状態だけに付きます。
       - target: mr
         title: マージリクエストを開く
-        body: 「マージリクエスト」のリンクから、レビューの場を開きます。指摘はそこにコメントで書きます。ボードはマージリクエストの中身を読みません。
+        body: 「マージリクエスト」のリンクから、レビューの場を開きます。指摘はそこにコメントで記述します。ボードはマージリクエストの中身を読みません。
       - target: review-menu
         title: レビューの対応
         body: フェーズ行の「レビューの対応」を押すと、「対応方針を決める」と「レビュー済み連絡」のメニューが開きます。押しただけでは何も実行されません。
       - target: decide-threads
-        title: 残った指摘の行き先を選ぶ
-        body: 未解決（Unresolved）の指摘を 1 件ずつ並べ、行き先を選びます。「対応しない」は受け入れて進み、「このフェーズで直す」は続きの子チケットを起こしてフェーズを開き直します。「issue に回す」は、フィードバック計画の承認後に選べます。
+        title: 残った指摘の対応方針を選ぶ
+        body: 未解決（Unresolved）の指摘を 1 件ずつ並べ、対応方針を選びます。「対応しない」は受け入れて進み、「このフェーズで直す」は追加対応用の子チケットを作成し、このフェーズを再開します。「issue に回す」は、フィードバック計画の承認後に選べます。
         scene: { overlay: decide }
       - target: decide-confirm
         title: 方針を決める
-        body: 全部の指摘に行き先を選ぶまで、「この方針で決める」は押せません。押すと選んだ内容が置かれ、取り返せません。指摘が 0 件なら、このフェーズをレビュー済みにするだけです。
+        body: 全部の指摘に対応方針を選ぶまで、「この対応方針を確定」は押せません。押すと選んだ内容が置かれ、取り返せません。指摘が 0 件なら、このフェーズをレビュー済みにするだけです。
         scene: { overlay: decide }
       - target: approval-prompt
         title: レビュー済みの連絡
@@ -337,15 +337,15 @@ courses:
         scene: { attention: true }
       - target: badge-risk
         title: HIGH 以上のリスク
-        body: 変更の実績から測ったリスクが HIGH 以上のカードは、枠付きのバッジで出ます。MEDIUM 以下は、枠の無い薄い文字の行に出ます。
+        body: 変更の実績から測ったリスクが HIGH 以上のカードは、枠付きのバッジで出ます。MEDIUM 以下は、枠のない薄い文字の行に出ます。
         scene: { attention: true }
       - target: badge-worktree
         title: ワークツリーなし
-        body: 承認済みなのにワークツリーが無いカードに出ます。作業する場所が無いので、エージェントは書き込めません。
+        body: 承認済みなのにワークツリーがないカードに出ます。作業する場所がないので、エージェントは保存できません。
         scene: { attention: true }
       - target: issues
         title: 不備
-        body: 不備は、読み手が気づくべき食い違いを実行ファイルが文にしたものです。ボードはそのまま出し、直し方も文に書いてあります。
+        body: 不備は、読み手が気づくべき食い違いを実行ファイルが文にしたものです。ボードはそのまま出し、直し方も文に記載されています。
         scene: { attention: true }
       - target: badge-preds
         title: 先行待ち
@@ -353,7 +353,7 @@ courses:
         scene: {}
 
   - id: progress
-    title: 親チケットの進み具合を確かめたいとき
+    title: 親チケットの進み具合を確認したいとき
     summary: フェーズ一覧の読み方、動いた表示、履歴、列の畳み方
     steps:
       - target: card-sample-b
@@ -374,7 +374,7 @@ courses:
         scene: { fold: done }
       - target: refresh
         title: 更新
-        body: チケットとワークツリーの状態を読み直します。承認やチケットの終了のあとは、ひとりでに読み直されます。
+        body: チケットとワークツリーの状態を再読み込みします。承認やチケットの終了のあとは、ひとりでに再読み込みされます。
 
   - id: filter
     title: プロジェクトや親を絞って見たいとき
@@ -382,7 +382,7 @@ courses:
     steps:
       - target: filter-project
         title: プロジェクトで絞る
-        body: プロジェクトを選ぶと、そのプロジェクトのカードだけが残ります。「ワークスペース（プロジェクト外）」も選べます。プロジェクトが 1 つも無いボードでは欄が出ません。
+        body: プロジェクトを選ぶと、そのプロジェクトのカードだけが残ります。「ワークスペース（プロジェクト外）」も選べます。プロジェクトが 1 つもないボードでは欄が出ません。
         scene: { project: web }
       - target: filter-parent
         title: 親で絞る
@@ -409,7 +409,7 @@ courses:
         body: 取り消したチケットは、完了と同じ置き場に残り、取り消しの列に並びます。理由は、カードの「履歴」を開くと読めます。
       - target: filter-archived
         title: アーカイブを表示する
-        body: 入れると、右端に「アーカイブ」の列が足されます。親のレビューが済んで Draft を外したときに、手元の logs/archive/ へ退避した閉じたチケットです。既定では隠し、集計にも数えません。
+        body: 入れると、右端に「アーカイブ」の列が追加されます。親のレビューが済んで Draft を解除したときに、手元の logs/archive/ へ退避したクローズしたチケットです。初期状態では表示せず、集計にも数えません。
         scene: { archived: true }
       - target: column-archived
         title: アーカイブの列
@@ -425,10 +425,10 @@ courses:
         body: "子カードの「フロー: 作成」から、その子の作業の手順（フロー）を図で作る画面を開きます。着手する前なら、いつでも作れます。"
       - target: flow-locked
         title: 着手中のフロー
-        body: "着手すると、終わるまでフローは書き換えられません。ボタンは「フロー: 閲覧（着手中）」になり、読むだけの画面が開きます。レビュー中も同じです。"
+        body: "着手すると、終わるまでフローは変更できません。ボタンは「フロー: 閲覧（着手中）」になり、読むだけの画面が開きます。レビュー中も同じです。"
       - target: workflow-button
         title: 計画の順序を直す
-        body: 計画を持つ承認待ちの親には「計画編集」が出ます。計画の項どうしの順序（どの項がどの項を待つか）を図で直すタブを開きます。保存すると提案が書き換わるので、承認はそのあとに開き直します。
+        body: 計画を持つ承認待ちの親には「計画編集」が出ます。計画の項どうしの順序（どの項がどの項を待つか）を図で直すタブを開きます。保存すると提案内容が変更されるため、承認画面を開き直してください。
       - target: edit-workflow
         title: 承認の画面から直す
         body: 承認の一覧にも、親ごとに「計画を編集」があります。押すとオーバーレイを閉じて、編集タブを開きます。

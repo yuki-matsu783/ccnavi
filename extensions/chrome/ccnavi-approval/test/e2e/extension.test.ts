@@ -185,7 +185,7 @@ test("CX-T075 ボードで承認すると、親のブランチへ 1 コミット
   const before = mock.head("i0001");
   const proposal = mock.files("i0001")["wip/proposals/todo/i0001.md"];
   const said = await press(page, '[data-family="i0001"] button[data-action=approve]');
-  assert.match(said, /^written: 承認を書いた/);
+  assert.match(said, /^written: 承認を反映しました/);
   assert.equal(mock.commitCalls.length, 1);
   const call = mock.commitCalls[0];
   assert.deepEqual([call.branch, call.expected, call.result], ["i0001", before, "written"]);
@@ -208,7 +208,7 @@ test("CX-T076 着手前で子の無い承認は、ボードから取り下げら
   mock.push("i0001", { "wip/proposals/todo/i0001-01-01.md": null }, "子の提案を片付ける");
   const page = await openBoard();
   const said = await press(page, '[data-family="i0001"] .approved-item[data-ticket="i0001"] button[data-action=withdraw]');
-  assert.match(said, /^written: 取り下げを書いた/);
+  assert.match(said, /^written: 取り下げを反映しました/);
   const files = mock.files("i0001");
   assert.equal(files["wip/proposals/todo/i0001.md"], original);
   assert.ok(!(".ccnavi/approved/doing/i0001.md" in files));
@@ -222,7 +222,7 @@ test("CX-T076 着手前で子の無い承認は、ボードから取り下げら
 test("CX-T077 悪意のある Markdown の提案を承認しても何も動かない", async () => {
   const page = await openBoard();
   const said = await press(page, '[data-family="i0002"] button[data-action=approve]');
-  assert.match(said, /^written: 承認を書いた/);
+  assert.match(said, /^written: 承認を反映しました/);
   assert.equal(await page.evaluate(() => (window as unknown as { __pwned?: string }).__pwned ?? null), null);
   assert.match(mock.files("i0002")[".ccnavi/approved/doing/i0002.md"], /悪意のある本文/);
   const box = page.locator('[data-family="i0002"]');
@@ -282,7 +282,7 @@ test("CX-T138 レビュー済み: スレッドの悪意のある本文を描い�
   mock.attachScene("i0004", loadScene("resolved"));
   page = await openBoard();
   const said = await press(page, '[data-family="i0004"] button[data-action=review]');
-  assert.match(said, /^written: レビュー済みを書いた/);
+  assert.match(said, /^written: レビュー済みを反映しました/);
   const mark = JSON.parse(mock.files("i0004")[".ccnavi/approved/phases/i0004/1.reviewed"]);
   assert.deepEqual([mark.mr, mark.actor, mark.via], [42, LOGIN, "chrome"]);
   assert.equal(await page.locator('[data-family="i0004"] .review').count(), 0);
@@ -332,7 +332,7 @@ test("CX-T159 セルフホストの GitLab（足した通信先）: 登録して
   const before = lab.head("i0001");
   const proposal = lab.files("i0001")["wip/proposals/todo/i0001.md"];
   const said = await press(page, `${GL_REPO} [data-family="i0001"] button[data-action=approve]`);
-  assert.match(said, /^written: 承認を書いた/);
+  assert.match(said, /^written: 承認を反映しました/);
   assert.equal(lab.glCommits.length, 1);
   assert.deepEqual([lab.glCommits[0].branch, lab.glCommits[0].parent, lab.glCommits[0].result], ["i0001", before, "written"]);
   // 承認は提案の中身を変えずに動かす（REQ-APV-05）。承認したことは状態の履歴に残す
@@ -361,7 +361,7 @@ test("CX-T160 「始める」: ボードで issue を読み、押すと issue �
   await again.click(`${GL_REPO} [data-testid=start] button[data-action=issues]`);
   await again.waitForSelector(`${GL_REPO} [data-testid=start] li[data-issue="5"]`);
   const refused = await press(again, `${GL_REPO} [data-testid=start] li[data-issue="5"] button[data-action=start]`);
-  assert.match(refused, /^refused: 始めなかった: feature-5-closed は統合先 main の done\/ で閉じている/);
+  assert.match(refused, /^refused: 作業を開始できませんでした：feature-5-closed は統合先 main の done\/ でクローズ済みです/);
   assert.equal(lab.createdBranches.length, 1);
   assert.ok(!(await again.content()).includes(TOKEN));
   await again.close();
@@ -379,7 +379,7 @@ test("CX-T173 「要確認」: 描いた後に要確認が付いた親子のチ�
   }, key);
   const before = lab.glCommits.length;
   const said = await press(page, approve);
-  assert.match(said, /^refused: i0002 は要確認のまま/);
+  assert.match(said, /^refused: i0002 は確認が必要な状態のままです/);
   assert.equal(lab.glCommits.length, before);
   await page.close();
 
@@ -396,11 +396,11 @@ test("CX-T173 「要確認」: 描いた後に要確認が付いた親子のチ�
   await again.waitForFunction(() => document.body.dataset.state === "done", null, { timeout: 120_000 });
   const box = again.locator(`${GL_REPO} [data-family="i0002"]`);
   assert.deepEqual(await box.locator("button").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.action)), ["dismiss"]);
-  assert.match((await box.textContent()) ?? "", /ほかの承認者には見えない/);
+  assert.match((await box.textContent()) ?? "", /他の承認者には表示されません/);
   await box.locator("button[data-action=dismiss]").click();
   await again.waitForTimeout(300);
   assert.equal(asked.length, 1);
-  assert.match(asked[0], /要確認を外す/);
+  assert.match(asked[0], /確認が必要な状態を解除します/);
   const kept = await again.evaluate(
     async () => (await (globalThis as unknown as { chrome: { storage: { local: { get(k: string): Promise<Record<string, unknown>> } } } }).chrome.storage.local.get("attention")).attention,
   );

@@ -238,7 +238,7 @@ def test(
             "every が 2 以上のものだけ。渡す回にだけ止める\n"
         )
         if not out["rules"]:
-            stdout.write("rules: (使われるルールが無い。ターンの終わりには止めない)\n")
+            stdout.write("rules: (使われるルールがありません。ターンの終わりには止めない)\n")
             return 0
         stdout.write("rules:\n")
         for hit in out["rules"]:

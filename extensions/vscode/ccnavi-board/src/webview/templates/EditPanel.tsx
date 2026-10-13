@@ -113,7 +113,7 @@ export function EditPanel({ state, layers, lockReason, touring, onChange, onPrev
       )}
       {(request.op === "delete" || request.op === "delete-draft") && (
         <p data-role="edit-confirm">
-          {request.name} を消します。消した中身は戻せません（git に入れていなければ復元できません）。
+          {request.name} を削除します。削除した中身は戻せません（git に入れていなければ復元できません）。
         </p>
       )}
       {lockReason !== "" && (
@@ -173,7 +173,7 @@ export function EditPanel({ state, layers, lockReason, touring, onChange, onPrev
       )}
       <div className="edit-actions">
         <button type="button" className="action small" data-action="preview-edit" disabled={busy || touring || !filled(request)} onClick={onPreview}>
-          下見
+          プレビュー
         </button>
         {answer !== null && (
           <button

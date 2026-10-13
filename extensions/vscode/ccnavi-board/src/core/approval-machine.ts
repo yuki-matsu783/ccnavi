@@ -368,7 +368,7 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
               : {
                   kind: "warn",
                   text:
-                    `承認済みチケットはまだコミットされていません。${PUSH_APPROVED_SCRIPT} が無いので、` +
+                    `承認済みチケットはまだコミットされていません。${PUSH_APPROVED_SCRIPT} がないので、` +
                     "導入スクリプト（scripts/ccnavi-setup.sh）で配ってください",
                 },
             { kind: "refresh" },
@@ -424,7 +424,7 @@ function reviewed(
   if (tree === undefined || chip === undefined) {
     return stay(state, {
       kind: "warn",
-      text: `親 ${parent} のワークツリーかフェーズ ${phase} が無いので、レビュー済みの連絡文を作れません`,
+      text: `親 ${parent} のワークツリーかフェーズ ${phase} がないので、レビュー済みの連絡文を作れません`,
     });
   }
   // ボタンが出る条件（ユーザのレビュー待ち）を受け側でも持つ。待ちでなければ confirm の前提（依頼のマーカー）が無い
@@ -560,7 +560,7 @@ function decideOpened(
   if (tree === undefined || chip === undefined) {
     return stay(state, {
       kind: "warn",
-      text: `親 ${parent} のワークツリーかフェーズ ${phase} が無いので、未解決（Unresolved）の指摘を読めません`,
+      text: `親 ${parent} のワークツリーかフェーズ ${phase} がないので、未解決（Unresolved）の指摘を読み込めません`,
     });
   }
   // 残った指摘を決めるのは、依頼を出してからユーザが見ている間だけ。待ちでなければ依頼の記録が無い
@@ -632,7 +632,7 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
       effects.unshift({ kind: "warn", text: value.warning });
     }
     const note = value.followup
-      ? `直す指摘を含む続きの子チケット ${value.followup} を起票しました。フェーズを開き直しました。`
+      ? `直す指摘を含む追加対応用の子チケット ${value.followup} を作成しました。フェーズを再開しました。`
       : "フェーズはレビュー済みになりました。";
     const issued = value.issue_url ? ` issue に回した分: ${value.issue_url}` : "";
     return move(
@@ -667,7 +667,7 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
           parent: preview.parent,
           phase: preview.phase,
           tree,
-          notice: "表示した指摘と今の指摘が違います（増えたか、書き換わりました）。見直してから決めてください",
+          notice: "表示した指摘と今の指摘が違います（増えたか、変更されました）。見直してから決めてください",
         },
         only: state.only,
       },

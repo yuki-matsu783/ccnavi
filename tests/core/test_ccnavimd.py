@@ -84,7 +84,7 @@ class ElseTest(unittest.TestCase):
                 "<!-- ccnavi:else -->\n<!-- ccnavi:endif -->\n"
             )
         )
-        self.assertIn("1 行目: ccnavi:else に対応する ccnavi:if が無い", joined)
+        self.assertIn("1 行目: ccnavi:else に対応する ccnavi:if がありません。", joined)
         self.assertIn("4 行目: 1 つの ccnavi:if に ccnavi:else は 1 つだけ", joined)
 
 
@@ -224,8 +224,8 @@ class ProblemsTest(unittest.TestCase):
         joined = "\n".join(found)
         self.assertIn("1 行目: 条件 nothing は使えない", joined)
         self.assertIn("2 行目: 差し込み {{nope}} は使えない", joined)
-        self.assertIn("4 行目: ccnavi:endif に対応する ccnavi:if が無い", joined)
-        self.assertIn("ccnavi:if に対応する ccnavi:endif が無い", joined)
+        self.assertIn("4 行目: ccnavi:endif に対応する ccnavi:if がありません。", joined)
+        self.assertIn("ccnavi:if に対応する ccnavi:endif がありません。", joined)
 
     def test_このリポジトリのccnavi_mdに誤りは無い(self):
         with open(os.path.join(ROOT, ".ccnavi", "CCNAVI.md"), encoding="utf-8") as f:

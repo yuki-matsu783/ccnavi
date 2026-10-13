@@ -37,7 +37,7 @@ function canSymlink(): boolean {
 
 const NEW = { exists: false, mtimeMs: 0 } as const;
 
-test("CB-T231 無い置き場は 1 段ずつ作って入れ替えで書く。一時ファイルは残らない。読むとその中身", () => {
+test("CB-T231 ない置き場は 1 段ずつ作って入れ替えで書く。一時ファイルは残らない。読むとその中身", () => {
   const tree = scratch();
   const file = place(tree);
   const written = writeFlowFile(tree, file, '{"nodes":[]}\n', NEW);
@@ -149,7 +149,7 @@ test("CB-T236 名前付きパイプは読まずに戻る（開いて待たない
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const made = spawnSync("mkfifo", [file]);
   if (made.status !== 0) {
-    return; // mkfifo が無い機械
+    return; // mkfifo がない機械
   }
   assert.throws(() => readFlowFile(tree, file), /ふつうのファイルではない/);
   const written = writeFlowFile(tree, file, "{}", { exists: true, mtimeMs: fs.lstatSync(file).mtimeMs });
@@ -210,7 +210,7 @@ test("CB-T245 読んだバイトは UTF-8 として不正なら文字にしな�
   assert.ok(read !== undefined);
   // 読むのはバイトのまま（実行ファイルにこのバイトを確かめさせる）
   assert.deepEqual(Buffer.from(read.bytes), broken);
-  assert.deepEqual(decodeFlowBytes(read.bytes), { ok: false, error: "UTF-8 として読めません" });
+  assert.deepEqual(decodeFlowBytes(read.bytes), { ok: false, error: "UTF-8 として解釈できません" });
   // 実行ファイル（utf-8-sig）と同じく、先頭の BOM は 1 つだけ外す
   assert.deepEqual(decodeFlowBytes(Buffer.from("\uFEFFnodes: []\n", "utf8")), { ok: true, text: "nodes: []\n" });
   assert.deepEqual(decodeFlowBytes(Buffer.from("\uFEFF\uFEFFx", "utf8")), { ok: true, text: "\uFEFFx" });
@@ -226,7 +226,7 @@ function sha(text: string): string {
   return crypto.createHash("sha256").update(text).digest("hex");
 }
 
-test("CB-T297 取り込んだ下書きは、中身が取り込んだときと同じときだけ消す。書き直されていれば消さない。無ければ何もしない", () => {
+test("CB-T297 取り込んだ下書きは、中身が取り込んだときと同じときだけ削除する。書き直されていれば消さない。なければ何もしない", () => {
   const tree = scratch();
   const file = draftPlace(tree);
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -292,7 +292,7 @@ test("CB-T298 リンク・ハードリンク・ふつうのファイルでない
   }
 });
 
-test("CB-T300 確かめてから消すまでの間に書き直された下書きは、移したものを確かめ直して元へ戻し、消さない", () => {
+test("CB-T300 確認してから削除するまでの間に書き直された下書きは、移したものを再確認して元へ戻し、消さない", () => {
   const tree = scratch();
   const file = draftPlace(tree);
   fs.mkdirSync(path.dirname(file), { recursive: true });

@@ -101,13 +101,13 @@ function harness(opts: { confirm?: boolean; prompt?: string | null; ops?: Partia
 
 test("CX-T219 書いた結果の一言: 結果の種類ごとの文面と data-kind・見た目", () => {
   const cases: [Outcome, string, string][] = [
-    [WRITTEN, "written", "承認を書いた（0123456）。書いた後の中身も確かめた"],
-    [{ ...WRITTEN, rounds: 3 } as Outcome, "written", "承認を書いた（0123456。途中で親のブランチの先頭が動いたので、3 回目で書いた）。書いた後の中身も確かめた"],
-    [{ kind: "changed", message: "動いた" }, "changed", "承認を書かなかった: 動いた"],
-    [{ kind: "conflict", message: "競合" }, "conflict", "承認を書けなかった（自動ではやり直さない）: 競合"],
-    [{ kind: "attention", message: "残った" } as Outcome, "attention", "承認は要確認になった。書けたかどうかと何が残ったかを、ホストの履歴で確かめてください: 残った"],
-    [{ kind: "refused", message: "断った" }, "refused", "承認を書かなかった: 断った"],
-    [{ kind: "failed", message: "落ちた" }, "failed", "承認を書かなかった: 落ちた"],
+    [WRITTEN, "written", "承認を反映しました（コミット：0123456）。反映後の内容も確認しました。"],
+    [{ ...WRITTEN, rounds: 3 } as Outcome, "written", "承認を反映しました（コミット：0123456。途中で親のブランチの先頭が動いたので、3 回目で反映しました）。反映後の内容も確認しました。"],
+    [{ kind: "changed", message: "動いた" }, "changed", "承認は反映されていません：動いた"],
+    [{ kind: "conflict", message: "競合" }, "conflict", "承認を反映できませんでした。自動再試行は行いません：競合"],
+    [{ kind: "attention", message: "残った" } as Outcome, "attention", "承認は確認が必要な状態です。反映されたかどうかと残っている内容を、ホストの履歴で確認してください：残った"],
+    [{ kind: "refused", message: "断った" }, "refused", "承認は反映されていません：断った"],
+    [{ kind: "failed", message: "落ちた" }, "failed", "承認は反映されていません：落ちた"],
   ];
   for (const [outcome, kind, text] of cases) {
     assert.deepEqual(sayOutcome(outcome, "承認"), { kind, className: `notice ${kind === "written" ? "ok" : "error"}`, text });
@@ -128,7 +128,7 @@ test("CX-T220 読み直し: document と chrome の無いところで、差し�
   assert.equal(s.state, "done");
   assert.deepEqual([...s.sections.keys()], [KEY]);
   assert.deepEqual(s.sections.get(KEY)?.attention, {});
-  assert.deepEqual(s.status, { text: "Pyodide 0.test: 起動 10 ms・読み込み 20 ms", bootMs: 10, importMs: 20, violations: 0 });
+  assert.deepEqual(s.status, { text: "Pyodide 0.test：起動 10 ms・読み込み 20 ms", bootMs: 10, importMs: 20, violations: 0 });
   assert.deepEqual(s.banner, [{ level: "soon", className: "notice warn", text: "あと 3 日で切れる" }]);
   assert.equal(s.repos.length, 1);
   assert.ok(s.boards.has(KEY));
@@ -137,7 +137,7 @@ test("CX-T220 読み直し: document と chrome の無いところで、差し�
   h.store.repos = [];
   await h.c.refresh();
   assert.equal(h.c.snapshot().sections.size, 0);
-  assert.equal(h.c.snapshot().status.text, "リポジトリが登録されていない。設定画面で登録してください");
+  assert.equal(h.c.snapshot().status.text, "リポジトリが登録されていません。設定画面で登録してください。");
   h.c.openOptions();
   assert.equal(h.log.options, 1);
 });
@@ -200,14 +200,14 @@ test("CX-T222 書く操作の最中は、重ねて押しても走らない。書
   await until(() => h.c.snapshot().state === "done" && !h.c.snapshot().busy, "読み直し");
   assert.equal(h.log.collect, loads + 1);
   // 操作の後の読み直しは、言ったことを消さない
-  assert.deepEqual(h.c.snapshot().result, { kind: "written", className: "notice ok", text: "承認を書いた（0123456）。書いた後の中身も確かめた" });
+  assert.deepEqual(h.c.snapshot().result, { kind: "written", className: "notice ok", text: "承認を反映しました（コミット：0123456）。反映後の内容も確認しました。" });
   assert.deepEqual(h.log.set, []);
   // 書く途中で投げたら「書けなかった」と失敗の見た目で言う
   const thrower = harness({ ops: { approveFamily: async () => Promise.reject(new Error("壊れた")) } });
   await thrower.c.refresh();
   thrower.c.actions.approve(thrower.c.snapshot().boards.get(KEY) as RepoBoard, family());
   await until(() => thrower.c.snapshot().result.kind === "failed" && thrower.c.snapshot().state === "done", "書けなかった");
-  assert.deepEqual(thrower.c.snapshot().result, { kind: "failed", className: "notice error", text: "書けなかった: 壊れた" });
+  assert.deepEqual(thrower.c.snapshot().result, { kind: "failed", className: "notice error", text: "反映できませんでした：壊れた" });
 });
 
 test("CX-T225 書く途中で投げたら、直前が成功（緑）でも失敗の見た目（赤）で言う。その後に書ければ緑に戻る", async () => {
@@ -222,9 +222,9 @@ test("CX-T225 書く途中で投げたら、直前が成功（緑）でも失敗
   await press("written", "書いた");
   assert.equal(h.c.snapshot().result.className, "notice ok");
   await press("failed", "書けなかった");
-  assert.deepEqual(h.c.snapshot().result, { kind: "failed", className: "notice error", text: "書けなかった: 壊れた" });
+  assert.deepEqual(h.c.snapshot().result, { kind: "failed", className: "notice error", text: "反映できませんでした：壊れた" });
   await press("written", "書き直した");
-  assert.deepEqual(h.c.snapshot().result, { kind: "written", className: "notice ok", text: "承認を書いた（0123456）。書いた後の中身も確かめた" });
+  assert.deepEqual(h.c.snapshot().result, { kind: "written", className: "notice ok", text: "承認を反映しました（コミット：0123456）。反映後の内容も確認しました。" });
   assert.equal(plan.length, 0);
 });
 
@@ -241,7 +241,7 @@ test("CX-T223 要確認: 書いて要確認になったら残し、押す前に�
   // もう一度押しても、確認の前に断る
   h.c.actions.approve(b, family("i0002"));
   await until(() => h.c.snapshot().result.kind === "refused" && !h.c.snapshot().busy, "断る");
-  assert.match(h.c.snapshot().result.text, /^i0002 は要確認のまま/);
+  assert.match(h.c.snapshot().result.text, /^i0002 は確認が必要な状態のままです/);
   assert.equal(h.c.snapshot().result.className, "notice error");
   assert.equal(approves, 1);
   assert.equal(h.log.confirm.length, 1);
@@ -317,7 +317,7 @@ test("CX-T231 読み直しの失敗: 手動の読み直しでも、書いた後�
     // main.tsx の「更新」と同じ呼び方（void controller.refresh()）
     void h.c.refresh();
     await until(() => h.c.snapshot().state === "error", "手動の読み直しの失敗");
-    assert.equal(h.c.snapshot().status.text, "ボードを読み込めなかった: storage 壊れた");
+    assert.equal(h.c.snapshot().status.text, "ボードを読み込めませんでした：storage 壊れた");
     assert.deepEqual([...h.c.snapshot().sections.keys()], [KEY]);
     // 書いた後の読み直しの失敗
     broken = false;
@@ -327,7 +327,7 @@ test("CX-T231 読み直しの失敗: 手動の読み直しでも、書いた後�
     broken = true;
     h.c.actions.approve(b, family());
     await until(() => h.log.confirm.length === 1 && !h.c.snapshot().busy && h.c.snapshot().state === "error", "書いた後の読み直しの失敗");
-    assert.equal(h.c.snapshot().status.text, "ボードを読み込めなかった: storage 壊れた");
+    assert.equal(h.c.snapshot().status.text, "ボードを読み込めませんでした：storage 壊れた");
     assert.equal(h.c.snapshot().result.kind, "written");
     assert.deepEqual([...h.c.snapshot().sections.keys()], [KEY]);
     // 次の読み直しで戻る
@@ -345,5 +345,5 @@ test("CX-T232 境界の外で描画が落ちたら、controller が #status に�
   const h = harness();
   h.c.reportRenderError(new Error("描けない"));
   assert.equal(h.c.snapshot().state, "error");
-  assert.equal(h.c.snapshot().status.text, "ボードを描画できなかった: 描けない");
+  assert.equal(h.c.snapshot().status.text, "ボードを表示できませんでした：描けない");
 });

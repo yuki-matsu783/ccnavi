@@ -101,16 +101,16 @@ export function parseFlowSample(raw: unknown): FlowSample {
     const entry = object(value, `sample.flows.${name}`);
     const doc = asFlowDoc(entry.doc);
     if (doc === undefined) {
-      throw new Error(`sample.flows.${name}.doc を FlowDoc として読めない（ノードのリストと id が要る）`);
+      throw new Error(`sample.flows.${name}.doc を FlowDoc として読み込めない（ノードのリストと id が必要です）`);
     }
     flows[name] = { doc, checks: parseFlowChecks(entry.checks, `sample.flows.${name}.checks`) };
   }
   if (flows[MAIN_FLOW] === undefined) {
-    throw new Error(`sample.flows に ${MAIN_FLOW} が無い`);
+    throw new Error(`sample.flows に ${MAIN_FLOW} がありません`);
   }
   const proposalFlow = text(object(root.proposal, "sample.proposal").flow, "sample.proposal.flow");
   if (flows[proposalFlow] === undefined) {
-    throw new Error(`sample.proposal.flow「${proposalFlow}」が sample.flows に無い`);
+    throw new Error(`sample.proposal.flow「${proposalFlow}」が sample.flows にありません`);
   }
   const samplePage: SamplePage = {
     ticket: text(page.ticket, "sample.page.ticket"),
@@ -227,17 +227,17 @@ export function sceneProblem(sample: FlowSample, scene: Scene): string | undefin
   for (const key of ["doc", "base"] as const) {
     const value = scene[key];
     if (value !== undefined && (typeof value !== "string" || !(value in sample.flows))) {
-      return `${key} の ${String(value)} が見本のフローに無い`;
+      return `${key} の ${String(value)} が見本のフローにありません`;
     }
   }
   const flow = sample.flows[typeof scene.doc === "string" ? scene.doc : sample.main];
   if (scene.select !== undefined && selectOf(flow.doc, scene.select) === undefined) {
-    return `select の ${String(scene.select)} が見本のフロー（${typeof scene.doc === "string" ? scene.doc : sample.main}）のノード・線に無い`;
+    return `select の ${String(scene.select)} が見本のフロー（${typeof scene.doc === "string" ? scene.doc : sample.main}）のノード・線にありません`;
   }
   for (const id of ids(scene.pick)) {
     const node = flow.doc.nodes.find((n) => n.id === id);
     if (node === undefined || isGroup(node)) {
-      return `pick の ${id} が見本のフローの（グループでない）ノードに無い`;
+      return `pick の ${id} が見本のフローの（グループでない）ノードにありません`;
     }
   }
   for (const key of FLAG_KEYS) {

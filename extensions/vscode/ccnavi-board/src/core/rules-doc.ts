@@ -32,7 +32,7 @@ export function readRules(text: string): RulesDocument {
   const doc = parseDocument(text, { keepSourceTokens: false });
   const problems: string[] = [];
   for (const e of doc.errors) {
-    problems.push(`YAML として読めません: ${e.message}`);
+    problems.push(`YAML として解釈できません: ${e.message}`);
   }
   const sections = {} as Record<Section, RuleForm[]>;
   for (const section of SECTIONS) {
@@ -52,9 +52,9 @@ export function readRules(text: string): RulesDocument {
       }
       const form = formOf(section, index, item);
       if (form.when !== undefined && (item.has("glob") || item.has("regex"))) {
-        problems.push(`タイプ ${section} の ${index + 1} 件目（${form.id || "id 未設定"}）は when と glob / regex を両方書いています。どちらか 1 つにしてください`);
+        problems.push(`タイプ ${section} の ${index + 1} 件目（${form.id || "id 未設定"}）は when と glob / regex を両方指定しています。どちらか 1 つにしてください`);
       } else if (form.bothPatterns === true) {
-        problems.push(`タイプ ${section} の ${index + 1} 件目（${form.id || "id 未設定"}）は glob と regex を両方書いています。どちらか 1 つにしてください`);
+        problems.push(`タイプ ${section} の ${index + 1} 件目（${form.id || "id 未設定"}）は glob と regex を両方指定しています。どちらか 1 つにしてください`);
       }
       sections[section].push(form);
     });
@@ -118,10 +118,10 @@ function invalid(value: unknown, reason: string): CondNode {
  */
 export function condOfYaml(value: unknown, depth = 1): CondNode {
   if (depth > READ_DEPTH) {
-    return invalid(value, "入れ子が深すぎて読めません");
+    return invalid(value, "入れ子が深すぎて読み込めません");
   }
   if (!isMap(value)) {
-    return invalid(value, "ノードはマップ（キー 1 つ）で書きます");
+    return invalid(value, "ノードはマップ（キー 1 つ）で指定します");
   }
   if (value.items.length !== 1) {
     return invalid(value, `ノードのキーはちょうど 1 つです（${value.items.length} 個あります）`);

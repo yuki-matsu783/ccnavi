@@ -96,7 +96,7 @@ export const ROW = 96;
 /** start と end の名前。フィードバック計画は全体計画のレビューのあとに始まり、終われば親を閉じる */
 const ENDS: Readonly<Record<"plan" | "feedback", { readonly start: string; readonly end: string }>> = {
   plan: { start: "開始", end: "終了" },
-  feedback: { start: "全体計画のレビュー後", end: "親を閉じる" },
+  feedback: { start: "全体計画のレビュー後", end: "親をクローズする" },
 };
 
 export function nodeId(number: number): string {

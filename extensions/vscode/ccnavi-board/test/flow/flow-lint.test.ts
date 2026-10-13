@@ -41,7 +41,7 @@ function answer(problems: readonly { severity: string; where: string; detail: st
   return parsed.value;
 }
 
-test("CB-T242 本文を一時ファイルに書いて実行ファイルに渡し、(flow) の error が無ければ通す。ほかの設定の苦情では止めない", async () => {
+test("CB-T242 本文を一時ファイルに書いて実行ファイルに渡し、(flow) の error がなければ通す。ほかの設定の苦情では止めない", async () => {
   const dir = tmpDir();
   try {
     const asked: string[] = [];
@@ -116,7 +116,7 @@ test("CB-T244 lint の JSON から (flow) の苦情だけを引き、古い実�
   assert.equal(unknownOption("usage: ccnavi [--flow FLOW]\nccnavi: error: something else\n", "--flow"), false);
 });
 
-test("CB-T246 一時ファイルは呼ぶたびに別の名前で書き、終われば消す。重なった呼び出しでも互いの本文を読み違えない", async () => {
+test("CB-T246 一時ファイルは呼ぶたびに別の名前で書き、終われば削除する。重なった呼び出しでも互いの本文を読み違えない", async () => {
   const dir = tmpDir();
   try {
     const seen = new Map<string, string>();
@@ -158,7 +158,7 @@ test("CB-T246 一時ファイルは呼ぶたびに別の名前で書き、終わ
   }
 });
 
-test("CB-T247 答えに読んだ中身（flow）が無ければ通さない（実行ファイルがフローを見たか分からない）", async () => {
+test("CB-T247 答えに読んだ中身（flow）がなければ通さない（実行ファイルがフローを見たか分からない）", async () => {
   const dir = tmpDir();
   try {
     for (const flow of [ABSENT, { path: "/x" }, { path: "/x", data: null }]) {
@@ -193,7 +193,7 @@ test("CB-T278 通ったときは (flow) の warn を対象のファイルのパ�
       tmp = file;
       return {
         ok: true,
-        value: answer([{ severity: "warn", where: FLOW_WHERE, detail: `${file}: start が無い（どこから始めるかが決まらない）` }], {
+        value: answer([{ severity: "warn", where: FLOW_WHERE, detail: `${file}: start がない（どこから始めるかが決まらない）` }], {
           path: file,
           data: { nodes: [] },
           rendered: ["1. [prompt] 書く"],
@@ -202,7 +202,7 @@ test("CB-T278 通ったときは (flow) の warn を対象のファイルのパ�
       };
     });
     assert.ok(verdict.ok);
-    assert.deepEqual(verdict.checks, { warns: [`${SHOWN}: start が無い（どこから始めるかが決まらない）`], rendered: ["1. [prompt] 書く"], candidates });
+    assert.deepEqual(verdict.checks, { warns: [`${SHOWN}: start がない（どこから始めるかが決まらない）`], rendered: ["1. [prompt] 書く"], candidates });
     assert.ok(!verdict.checks.warns[0].includes(tmp));
     // 並べられなければ null のまま。古い実行ファイル（欄が無い）なら欄ごと無い
     const unreadable = await lintFlowText("nodes: []\n", dir, SHOWN, async (file) => ({ ok: true, value: answer([], { path: file, data: { nodes: [] }, rendered: null }) }));

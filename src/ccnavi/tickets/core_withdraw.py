@@ -75,7 +75,7 @@ def withdraw(
     reasons: list[tuple[str, str]] = []
     wanted = [i for i in dict.fromkeys(ids) if i]
     if not wanted:
-        reasons.append((CODE_WITHDRAW_NO_IDS, "取り下げる識別子が無い"))
+        reasons.append((CODE_WITHDRAW_NO_IDS, "取り下げる識別子がありません。"))
     for ident in wanted:
         reasons += [
             (code, f"{ident}: {p}")
@@ -111,12 +111,15 @@ def withdraw(
                 copy.tree_root, conf.tickets.replace("/", os.sep), ticket_model.TODO, ident + ".md"
             )
             with fsio.policy(
-                on_fail=fsio.FAIL_STOP, ticket=ident, message="書けない ({reason})", prefix=""
+                on_fail=fsio.FAIL_STOP,
+                ticket=ident,
+                message="保存できませんでした ({reason})",
+                prefix="",
             ):
                 fsio.write_bytes_atomic(todo, prior_proposals[ident])
                 # 消せなければ戻した提案を消して、両方に残さない（`approval_ops.admit` と同じ）。
                 with fsio.policy(
-                    message="承認済みチケットを doing/ から消せない ({reason})", undo=(todo,)
+                    message="承認済みチケットを doing/ から削除できない ({reason})", undo=(todo,)
                 ):
                     fsio.unlink(approval.copy_path(where, ident))
             history.note(
@@ -180,11 +183,13 @@ def _withdraw_reasons(
 ) -> list[tuple[str, str]]:
     """取り下げられない理由を (コード, 文面) で。`compare` なら中身の一致も見る。"""
     if copy is None:
-        return [(CODE_WITHDRAW_NOT_OPEN, "承認済みチケットが作業中（doing/）に無い")]
+        return [(CODE_WITHDRAW_NOT_OPEN, "承認済みチケットが作業中（doing/）にありません。")]
     home = copy.parent or copy.ticket
     if copy.tree != home:
         where = copy.tree or "ワークスペースルート"
-        return [(CODE_WITHDRAW_OTHER_BRANCH, f"親のブランチ {home} の doing/ に無い（{where}）")]
+        return [
+            (CODE_WITHDRAW_OTHER_BRANCH, f"親のブランチ {home} の doing/ にありません（{where}）")
+        ]
     found: list[tuple[str, str]] = []
     if copy.blocked:
         # 親子のチケットが決まらない・親のブランチの外のチケットなど。
@@ -194,7 +199,7 @@ def _withdraw_reasons(
         found.append(
             (
                 CODE_WITHDRAW_FOLLOWUP,
-                "続きの子（followup）は提案を経ずに作ったチケットなので、戻す提案が無い。"
+                "続きの子（followup）は提案を経ずに作ったチケットなので、戻す提案がありません。"
                 "取り下げられない",
             )
         )
@@ -244,7 +249,7 @@ def _withdraw_reasons(
         )
     if ident not in prior_proposals:
         found.append(
-            (CODE_WITHDRAW_NO_PRIOR, "承認コミットの親に提案が無い（承認コミットを引けない）")
+            (CODE_WITHDRAW_NO_PRIOR, "承認コミットの親に提案がありません（承認コミットを引けない）")
         )
     elif compare:
         found += [

@@ -174,7 +174,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     source = builtin.SOURCE if views[0].unreadable else conf.rules
     stdout.write(f"ccnavi: いま有効な宣言（出所 {source}）\n")
     stdout.write(
-        "  パスを持つツールは共通レイヤー + 行き先のレイヤー、"
+        "  パスを持つツールは共通レイヤー + 対象のレイヤー、"
         "持たないツールは全部のレイヤーの和で判定する"
         "\n"
     )
@@ -229,7 +229,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     for note in notes:
         stdout.write(f"  {note}\n")
     if not copies:
-        stdout.write("  承認されたチケットが無い。範囲の制限は掛かっていない\n")
+        stdout.write("  承認されたチケットがありません。範囲の制限は掛かっていない\n")
         return 0
     closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     review, _ = approval.scan_review(conf, root, raw=raw)
@@ -264,10 +264,12 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             where, parent.ticket, approval_marks.PARENT_MARK_CLOSE_EARLY
         )
         if wrapped:
-            stdout.write(f"  {parent.ticket} はユーザが早めに閉じた: {wrapped.get('reason', '')}\n")
+            stdout.write(
+                f"  {parent.ticket} はユーザが早めにクローズした: {wrapped.get('reason', '')}\n"
+            )
         if approval_marks.read_parent_mark(where, parent.ticket, approval_marks.PARENT_MARK_READY):
             stdout.write(
-                f"  {parent.ticket} のマージリクエストの Draft を外した。マージはユーザが行う\n"
+                f"  {parent.ticket} のマージリクエストの Draft を解除した。マージはユーザが行う\n"
             )
         for ph in phase.phases_of(root, conf, parent.ticket, raw=raw):
             marks = ", ".join(sorted(ph.marks)) or "マーカーなし"
@@ -288,7 +290,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             if ph.risk_line:
                 review += f" / {ph.risk_line}"
                 if ph.risk_escalates:
-                    review += "（実績でレビュー要）"
+                    review += "（実績でレビュー必須）"
             if ph.planned:
                 waits = workflow.waits_of(parent, ph.number)
                 review += f" / 待つ: {', '.join(map(str, waits))}" if waits else " / 何も待たない"

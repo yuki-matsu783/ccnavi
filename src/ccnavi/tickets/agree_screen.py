@@ -56,14 +56,16 @@ def approved_text(
     # 案内どおりに打つと「着手済み」で終わる。
     guide = "後工程を進める。"
     if any(not t.is_child and t.ticket not in revisions for t in tickets):
-        guide += f"親は自分のワークツリーで '{ticket_sh} start <親>' を先に打つ。"
+        guide += f"親は自分のワークツリーで '{ticket_sh} start <親>' を先に実行してください。"
     if any(t.is_child for t in tickets) and worktrees is None:
         guide += (
             "子はワークツリー .claude/worktrees/<識別子> を親のブランチから切り、"
-            f"'{ticket_sh} start <識別子>' で着手する（親が未着手だと止まる）。"
+            f"'{ticket_sh} start <識別子>' で開始してください（親が未着手だと止まります）。"
         )
     elif any(t.is_child for t in tickets):
-        guide += f"子は'{ticket_sh} start <識別子>' で着手する（親が未着手だと止まる）。"
+        guide += (
+            f"子は'{ticket_sh} start <識別子>' で開始してください（親が未着手だと止まります）。"
+        )
     lines.append(guide)
     if worktrees is not None:
         git_sh = settings.script_command(root, "ccnavi-git.sh")
@@ -106,7 +108,8 @@ def _child_worktree_lines(
             lines.append(f"子 {tid} のワークツリー {path} は既にある")
         else:
             lines.append(
-                f"子 {tid} のワークツリー {path} は、まだ無い（親 {t.parent} のワークツリーが無い、"
+                f"子 {tid} のワークツリー {path} は、まだありません（親 {t.parent}"
+                " のワークツリーがない、"
                 "またはプロジェクトの子）。親のワークツリーを用意し、そのブランチで "
                 f"'{git_sh} worktree add {path} -b {tid} <親のブランチ>' で作る"
             )
@@ -167,7 +170,7 @@ def screen(
             lines.append("■ この子チケットで編集可能な範囲")
             lines.append(
                 "    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、"
-                "親の範囲に無い場所がここで新しく編集できるようになることはない"
+                "親の範囲にない場所が新たに編集可能になることはありません"
             )
             head = "親の範囲: " + (
                 ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK))
@@ -181,14 +184,14 @@ def screen(
         else:
             lines.append("■ このチケットで編集可能な範囲")
             lines.append(
-                "    下に並ぶ場所にだけ、このチケットで編集できるようになる。"
-                "allow は無確認で編集できる場所、ask は確認を挟んで編集できる場所、"
+                "    このチケットでは、以下に示す場所のみ編集できるようになります。"
+                "allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、"
                 "deny はこのチケットでも編集できない場所"
             )
             # チケットの範囲はルールの allow より強い。承認するユーザは「ルールで
             # 開けてあるから範囲の外でも書ける」と読み違えやすいので、承認の前に言う。
             lines.append(
-                "    ルールの allow で許可してある場所でも、この範囲の外では止まる。"
+                "    ルールの allow で許可されていても、このチケットの範囲外では編集できません。"
                 "ルールの deny はこの範囲の中でも止まる"
             )
         for name in rules.SECTIONS:
@@ -216,14 +219,15 @@ def screen(
             if t.predecessors:
                 lines.append(f"■ 先行: {', '.join(t.predecessors)}")
                 lines.append(
-                    "    どれも done/ に在って取り消しでないこと。"
-                    "満たしていなければ、承認も着手も止まる"
+                    "    すべての先行チケットが、取り消されずに完了し、"
+                    "done/ に移動している必要があります。"
+                    "条件を満たすまで、承認・開始はできません。"
                 )
         elif t.has_plan:
             lines.append("■ 全体計画")
             lines.append(
                 "    承認すると、この順序で進めることに合意したことになる。"
-                "各フェーズの子は、そのフェーズが待つフェーズ（下の待ち方）が閉じてレビューが"
+                "各フェーズの子は、そのフェーズが待つフェーズ（下のフェーズ間の依存関係）が閉じてレビューが"
                 "済むまで承認できない"
             )
             lines += _plan_lines(t.plan, 1, cand_types)
@@ -235,7 +239,7 @@ def screen(
         if not t.is_child and t.issue is not None:
             lines.append(f"■ 課題: {ticket_mod.issue_label(t)}")
             lines.append(
-                "    この親のマージリクエストの本文に Closes として書く番号。"
+                "    この親のマージリクエストの本文に Closes として記載する番号。"
                 "マージされると、この課題も閉じる"
             )
         if not t.is_child and t.branch:
@@ -253,14 +257,14 @@ def screen(
                     "取り込み・push・マージリクエストはこのブランチで行う"
                 )
         if t.rationale.strip():
-            lines.append("■ エージェントが書いた理由")
+            lines.append("■ エージェントが記載した理由")
             lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
         lines.append(_origin_line(t))
         warnings = [p for p in cand.complaints if p.severity == rules.SEVERITY_WARN]
         if warnings:
             lines.append("■ 判定に使われない記述")
             lines.append(
-                "    提案に書いてあっても、判定はこれを読まない。"
+                "    提案に記載があっても、判定はこれを読みません。"
                 "承認しても、編集できる場所は変わらない"
             )
             lines += [f"    {p.detail}" for p in warnings]
@@ -275,12 +279,12 @@ def _plan_lines(items: list[ticket_model.PlanItem], start: int, types: dict | No
         title = pt.title if pt is not None else item.type
         review = ""
         if item.deferred:
-            review = "レビューは次と一緒に"
+            review = "次のフェーズとまとめてレビュー"
         elif item.review == ticket_model.PLAN_REVIEW_MR:
-            review = "レビュー要: 計画で強めた"
+            review = "レビュー必須：計画で追加指定"
         elif pt is not None:
             review = {
-                phasetypes.REVIEW_MR: "レビュー要: マージリクエスト",
+                phasetypes.REVIEW_MR: "レビュー必須: マージリクエスト",
             }.get(pt.review, "レビュー不要")
         lines.append(f"    {n}. {title} / {item.type}" + (f"  {review}" if review else ""))
     return lines
@@ -292,7 +296,8 @@ def _workflow_lines(t: ticket_model.Ticket, wf: ticket_model.Workflow) -> list[s
     if not found:
         return []
     return [
-        "■ 待ち方（計画の項の after から決まる。後から phases.yml を直しても変わらない）",
+        "■ フェーズ間の依存関係（計画の各項目の after で決まります。"
+        "承認後に phases.yml を変更しても変わりません）",
         *("    " + x for x in found),
     ]
 
@@ -314,7 +319,8 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
         lines.append("■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）")
         lines.append(
             "    承認したときの phases.yml と同じ中身を親に写して固定する。"
-            "後から phases.yml を直しても、この親の範囲・見る場所・成果物は変わらない"
+            "承認後に phases.yml を変更しても、この親チケットの編集可能範囲・"
+            "確認対象・成果物は変わりません。"
         )
         for ident in used:
             pt = types[ident]
@@ -334,7 +340,7 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
         lines += [f"    {types[ident].title} / {ident}" for ident in unused]
     left = [pt for ident, pt in (config or {}).items() if ident not in types]
     if left:
-        lines.append("■ この親では使わない定義（phases.yml にあるが phases: に無い）")
+        lines.append("■ この親では使わない定義（phases.yml にあるが phases: にない）")
         lines.append("    使わない: " + "、".join(f"{pt.title} / {pt.id}" for pt in left))
     return lines
 
@@ -348,13 +354,13 @@ def _copy_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket)
     lines: list[str] = []
     for ident, pt in after.items():
         if ident not in before:
-            lines.append(f"    足した: {pt.title} / {ident}")
+            lines.append(f"    追加: {pt.title} / {ident}")
         elif not phasetypes.same(pt, before[ident]):
             fields = ", ".join(phasetypes.differing(before[ident], pt))
-            lines.append(f"    変わった: {pt.title} / {ident}（{fields}）")
+            lines.append(f"    変更: {pt.title} / {ident}（{fields}）")
     for ident, pt in before.items():
         if ident not in after:
-            lines.append(f"    外した: {pt.title} / {ident}")
+            lines.append(f"    削除: {pt.title} / {ident}")
     if not lines:
         return []
     return ["■ phases: の差分（改版で親に固定する定義）", *lines]
@@ -373,7 +379,7 @@ def _plan_diff_lines(
     held, fresh = workflow.compute(current), workflow.compute(revised)
     before, after = workflow.lines(current, held), workflow.lines(revised, fresh)
     if before != after:
-        lines.append("■ 待ち方の変更")
+        lines.append("■ フェーズ間の依存関係の変更")
         lines.append("    いま:")
         lines += ["        " + x for x in before]
         lines.append("    改版:")

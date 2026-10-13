@@ -151,13 +151,13 @@ carry_family() {
 			printf 'ccnavi-push-approved: %s のロックが 10 分を超えて取られたままになっている。持ち主はまだ動いているので強制取得しない。終わるのを待つか、持ち主をユーザが確かめてください。%s\n' \
 				"$cf_p" "$(ccnavi_lock_describe "$(ccnavi_state "$root")/locks/$ccnavi_c1_repo/$cf_p")" >&2
 		else
-			printf 'ccnavi-push-approved: %s のロックを他の操作が持っている。終わってから打ち直してください。\n' "$cf_p" >&2
+			printf 'ccnavi-push-approved: %s のロックを他の操作が持っている。終わってから再実行してください。\n' "$cf_p" >&2
 		fi
 		return 1
 	fi
 	cf_busy=$(ccnavi_c1_busy "$cf_tree")
 	if [ -n "$cf_busy" ]; then
-		printf 'ccnavi-push-approved: %s の親のワークツリーに途中の操作（%s）がある。済ませてから打ち直してください。\n' "$cf_p" "$cf_busy" >&2
+		printf 'ccnavi-push-approved: %s の親のワークツリーに途中の操作（%s）がある。済ませてから再実行してください。\n' "$cf_p" "$cf_busy" >&2
 		ccnavi_lock_drop
 		return 1
 	fi
@@ -167,7 +167,7 @@ carry_family() {
 	sed 's/^/  /' "$ccnavi_c1_tmp/sync" >&2
 	cf_record=$(ccnavi_family_record "$root" "$ccnavi_c1_repo" "$cf_p")
 	if [ "$cf_rc" -ne 0 ] || [ "$(ccnavi_record_get "$cf_record" state)" != present ]; then
-		printf 'ccnavi-push-approved: %s を取り込めなかった（上の ccnavi-sync.sh の文面）。ユーザの判断はまだ送っていない。直してから打ち直してください。\n' "$cf_p" >&2
+		printf 'ccnavi-push-approved: %s を取り込めなかった（上の ccnavi-sync.sh の文面）。ユーザの判断はまだ送っていない。直してから再実行してください。\n' "$cf_p" >&2
 		ccnavi_lock_drop
 		return 1
 	fi
@@ -193,7 +193,7 @@ carry_family() {
 	fi
 	cf_head=$(git -C "$cf_tree" rev-parse HEAD)
 	if [ "$cf_head" = "$(git -C "$cf_tree" rev-parse --verify -q "refs/remotes/origin/$cf_b" 2>/dev/null || :)" ]; then
-		printf '%s: コミットして push するものは無い。\n' "$cf_p"
+		printf '%s: コミットして push するものはありません。\n' "$cf_p"
 		ccnavi_lock_drop
 		return 0
 	fi
@@ -210,7 +210,7 @@ carry_family() {
 		return 0
 	fi
 	# 失敗してもコミットは残す（ユーザが打ち直せる）。C1 は未送信を見つけて止まり、これを打ち直すよう言う。
-	printf 'ccnavi-push-approved: %s の push が通らなかった（%s）。コミットは残した。接続を戻して sh %s/ccnavi-push-approved.sh %s を打ち直してください。\n' \
+	printf 'ccnavi-push-approved: %s の push に失敗しました（%s）。コミットは残した。接続を戻して sh %s/ccnavi-push-approved.sh %s を再実行してください。\n' \
 		"$cf_p" "$(head -n 1 "$ccnavi_c1_tmp/push-err" 2>/dev/null)" "$(dirname "$0")" "$cf_p" >&2
 	ccnavi_lock_drop
 	return 1
@@ -390,14 +390,14 @@ $(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
 	if git -C "$tree" push --quiet -u origin "$branch" 2>/dev/null; then
 		printf '承認済みチケットを %s へ送った（%s）。\n' "$branch" "$name"
 	else
-		printf 'ccnavi-push-approved: %s の push が通らなかった。手で送ってください（git push -u origin %s）。\n' \
+		printf 'ccnavi-push-approved: %s の push に失敗しました。手で送ってください（git push -u origin %s）。\n' \
 			"$name" "$branch" >&2
 		printf 'fail\n' >>"$state"
 	fi
 done
 
 if [ ! -s "$state" ]; then
-	printf 'コミットして push する承認済みチケットは無い。\n'
+	printf 'コミットして push する承認済みチケットはありません。\n'
 	exit 0
 fi
 grep -q '^fail$' "$state" && exit 1

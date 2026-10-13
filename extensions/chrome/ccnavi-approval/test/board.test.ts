@@ -59,7 +59,7 @@ test("CX-T041 先行の閉包の親子のチケット（直近の外）を読み
   // 今の ccnavi の答え: 先行 i0003-01-01 が閉じていないので子は承認の対象にしない
   assert.deepEqual(f?.result?.batch?.map((e) => e.ticket), ["i0001"]);
   assert.equal(f?.result?.rejected?.[0].ticket, "i0001-01-01");
-  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /先行 i0003-01-01 が閉じていない/);
+  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /先行 i0003-01-01 が完了していない/);
   assert.equal(f?.result?.batch?.[0].path, "i0001:wip/proposals/todo/i0001.md");
 });
 
@@ -87,7 +87,7 @@ test("CX-T043 先行の親のブランチが無いときは、今の ccnavi の�
 
 test("CX-T044 統合先の名前: 設定したブランチが無ければ止めて名前を出す。設定どおりなら「設定」と出す", async () => {
   const missing = await run(fixture(), { integration: "develop" });
-  assert.equal(missing.board.error, "統合先 develop がリモートに無い。設定を直してください");
+  assert.equal(missing.board.error, "統合先 develop がリモートに見つかりません。設定を修正してください");
   assert.equal(missing.board.families.length, 0);
   const set = await run(fixture(), { integration: "main" });
   assert.equal(set.board.integration?.source, "setting");
@@ -96,11 +96,11 @@ test("CX-T044 統合先の名前: 設定したブランチが無ければ止め�
 test("CX-T045 互換のマーカーが違えば、どちらを更新するかを言う（7.3）", async () => {
   const newer = await run(fixture(COMPAT + 1));
   assert.equal(newer.board.compat?.same, false);
-  assert.equal(newer.board.compat?.message, `拡張は互換 ${COMPAT}、リポジトリは互換 ${COMPAT + 1}。拡張を更新する`);
+  assert.equal(newer.board.compat?.message, `拡張は互換 ${COMPAT}、リポジトリは互換 ${COMPAT + 1} です。拡張を更新してください`);
   const b = fixture();
   b.main.files[".ccnavi/scripts/ccnavi-common.sh"] = "#!/bin/sh\n";
   const none = await run(b);
-  assert.match(none.board.compat?.message ?? "", /互換の版（CCNAVI_COMPAT）が書かれていない/);
+  assert.match(none.board.compat?.message ?? "", /互換の版（CCNAVI_COMPAT）が記載されていません/);
 });
 
 test("CX-T046 blob は sha でキャッシュし、2 回目は tree だけを読む（8.2）", async () => {
@@ -159,7 +159,7 @@ test("CX-T049 先行の閉包が 16 組の親子のチケットを超えたら�
   const { board } = await run(b);
   const r = family(board, "i0001")?.result;
   assert.equal(r?.closure.over_limit, true);
-  assert.match(r?.undecided ?? "", /16 組を超える親子のチケット/);
+  assert.match(r?.undecided ?? "", /16 組を超える親子チケット/);
 });
 
 test("CX-T050 ボードの DOM: 承認などのボタンを出さず、悪意のある本文は消毒して描く", async () => {

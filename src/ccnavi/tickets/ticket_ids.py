@@ -63,7 +63,7 @@ EMPTY_SLUG = "issue"
 def id_problem(text: str) -> str:
     """識別子として読めない理由。読めれば空。文字・NFC・長さを見る（形は見ない）。"""
     if not isinstance(text, str) or not text:
-        return "識別子が無い"
+        return "識別子がありません。"
     if unicodedata.normalize("NFC", text) != text:
         return (
             "識別子が NFC でない（macOS で濁点が分かれた NFD の表記など）。"

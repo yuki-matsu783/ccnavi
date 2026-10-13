@@ -364,8 +364,8 @@ def record_missing(
         return False
     stderr.write(
         f"ccnavi: {found.ticket} の気づきの記録（{rel}）が、子のブランチの HEAD に無いか、"
-        "空か、リンクになっている（コミットが要る）。"
-        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} learn' を打って記録を書き、"
+        "空か、リンクになっている（コミットが必要です）。"
+        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} learn' を実行して記録を書き、"
         "git add と git commit をしてから閉じてください"
         "（気づきが無ければ learnings: none のままでよい）\n"
     )
@@ -430,7 +430,7 @@ def run(
         bad = unsafe_path(tree_root, record_rel(ident)) or unsafe_path(tree_root, digest_rel(ident))
         if bad:
             stderr.write(
-                f"ccnavi: {bad} はシンボリックリンクか、作業ツリーの外を指すので書かない\n"
+                f"ccnavi: {bad} はシンボリックリンクか、作業ツリーの外を指すので反映しません\n"
             )
             return 1
         rec_path = os.path.join(tree_root, record_rel(ident))
@@ -479,7 +479,7 @@ def run(
         bad = unsafe_path(tree_root, record_rel(ident))
         if bad:
             stderr.write(
-                f"ccnavi: {bad} はシンボリックリンクか、作業ツリーの外を指すので書かない\n"
+                f"ccnavi: {bad} はシンボリックリンクか、作業ツリーの外を指すので反映しません\n"
             )
             return 1
         rec_path = os.path.join(tree_root, record_rel(ident))
@@ -503,7 +503,9 @@ def run(
     inbox_dir = INBOX_DIR if here is not None else INBOX_DIR_ROOT
     bad = unsafe_path(tree_root, inbox_dir)
     if bad:
-        stderr.write(f"ccnavi: {bad} はシンボリックリンクか、作業ツリーの外を指すので書かない\n")
+        stderr.write(
+            f"ccnavi: {bad} はシンボリックリンクか、作業ツリーの外を指すので反映しません\n"
+        )
         return 1
     stamp = utc14()
     for n in range(INBOX_TRIES):

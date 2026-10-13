@@ -220,9 +220,9 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
                 Problem(
                     SEVERITY_ERROR,
                     where,
-                    f"統合先の取り込み結果を読めない（{integ.broken}）。閉じた識別子の再利用を確かめられない"
+                    f"統合先の取り込み結果を読めない（{integ.broken}）。クローズ済みの識別子の再利用を確かめられない"
                     "ので、このリポジトリの新規の提案は承認しない。オンラインで"
-                    f" '{settings.script_command(root, 'ccnavi-sync.sh')}' を打ち直してください",
+                    f" '{settings.script_command(root, 'ccnavi-sync.sh')}' を再実行してください",
                 )
             )
             continue
@@ -339,9 +339,9 @@ def _layer_drift(
         if _same_text(local, snapshot):
             continue
         if local is None:
-            how = "作業ツリーに無い"
+            how = "作業ツリーにありません。"
         elif snapshot is None:
-            how = "統合先に無い"
+            how = "統合先にありません。"
         else:
             how = "中身が違う"
         problems.append(

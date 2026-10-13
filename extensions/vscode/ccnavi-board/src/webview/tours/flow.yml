@@ -75,7 +75,7 @@ sample:
             type: prompt
             name: 最小限の修正を入れる
             position: {x: 720, y: 30}
-            data: {prompt: 原因の箇所だけを直し、再現手順で直ったことを確かめる}
+            data: {prompt: 原因の箇所だけを直し、再現手順で直ったことを確認する}
           - &redesign
             id: redesign
             type: prompt
@@ -96,7 +96,7 @@ sample:
           - "1. [start] 開始: 開始 → 2"
           - "2. [subAgent] 原因を調べる: ログと該当コードを突き合わせ、原因の候補を挙げる / プロンプト: 認証まわりのエラーログを読み、失敗が起きる条件を整理する。 該当するコードを探し、原因の候補を 3 件以内で挙げる。 / 種類: Explore → 3"
           - "3. [askUserQuestion] 方針を聞く: 問い: 原因は絞れました。どの方針で直しますか？ 選択肢: 最小限の修正 | 設計から見直す → 4（最小限の修正）, 5（設計から見直す）"
-          - "4. [prompt] 最小限の修正を入れる: 原因の箇所だけを直し、再現手順で直ったことを確かめる → 6"
+          - "4. [prompt] 最小限の修正を入れる: 原因の箇所だけを直し、再現手順で直ったことを確認する → 6"
           - "5. [prompt] 設計を見直す: 認証の流れを整理し直す案を書き、ユーザに見せる → 6"
           - "6. [end] 終了: 終了"
         candidates: &candidates
@@ -266,11 +266,11 @@ sample:
               evaluationTarget: 依頼の種類
               branches:
                 - {label: 不具合, condition: 動かない・エラーが出る}
-                - {label: 機能の追加, condition: 新しい動きを足したい}
+                - {label: 機能の追加, condition: 新しい動きを追加したい}
                 - {label: 既定, condition: default}
           - {id: fix-bug, type: prompt, name: 再現してから直す, position: {x: 720, y: 0}, data: {prompt: 再現手順を作ってから、原因の箇所を直す}}
-          - {id: add-feature, type: prompt, name: 仕様を確かめてから足す, position: {x: 720, y: 150}, data: {prompt: 仕様を文にして確かめてから、機能を足す}}
-          - {id: ask-more, type: prompt, name: 依頼を確かめる, position: {x: 720, y: 300}, data: {prompt: 依頼の内容が読み取れなかったことをユーザに伝える}}
+          - {id: add-feature, type: prompt, name: 仕様を確認してから追加する, position: {x: 720, y: 150}, data: {prompt: 仕様を文にして確認してから、機能を追加する}}
+          - {id: ask-more, type: prompt, name: 依頼を確認する, position: {x: 720, y: 300}, data: {prompt: 依頼の内容が読み取れなかったことをユーザに伝える}}
           - {id: end, type: end, name: 終了, position: {x: 960, y: 150}, data: {label: 終了}}
         connections:
           - {id: c-start-classify, from: start, to: classify, fromPort: output, toPort: input}
@@ -286,10 +286,10 @@ sample:
         rendered:
           - "1. [start] 開始: 開始 → 2"
           - "2. [prompt] 依頼を読む: 依頼を読み、不具合か機能の追加かを見分ける → 3"
-          - "3. [switch] 依頼の種類で分ける: 依頼の種類: 不具合=動かない・エラーが出る | 機能の追加=新しい動きを足したい | 既定=default → 4（不具合）, 5（機能の追加）, 6（既定）"
+          - "3. [switch] 依頼の種類で分ける: 依頼の種類: 不具合=動かない・エラーが出る | 機能の追加=新しい動きを追加したい | 既定=default → 4（不具合）, 5（機能の追加）, 6（既定）"
           - "4. [prompt] 再現してから直す: 再現手順を作ってから、原因の箇所を直す → 7"
-          - "5. [prompt] 仕様を確かめてから足す: 仕様を文にして確かめてから、機能を足す → 7"
-          - "6. [prompt] 依頼を確かめる: 依頼の内容が読み取れなかったことをユーザに伝える → 7"
+          - "5. [prompt] 仕様を確認してから追加する: 仕様を文にして確認してから、機能を追加する → 7"
+          - "6. [prompt] 依頼を確認する: 依頼の内容が読み取れなかったことをユーザに伝える → 7"
           - "7. [end] 終了: 終了"
         candidates: *candidates
 
@@ -389,20 +389,20 @@ sample:
             name: 原因を調べる
             position: {x: 240, y: 130}
             data: {description: ログと該当コードを突き合わせる, builtInType: Explorer, prompt: 原因の候補を挙げる}
-          - {id: orphan, type: prompt, name: あとで書く, position: {x: 240, y: 300}, data: {prompt: ""}}
+          - {id: orphan, type: prompt, name: あとで記述する, position: {x: 240, y: 300}, data: {prompt: ""}}
           - {id: end, type: end, name: 終了, position: {x: 480, y: 130}, data: {label: 終了}}
         connections:
           - {id: c-read-log-investigate, from: read-log, to: investigate, fromPort: output, toPort: input}
           - {id: c-investigate-end, from: investigate, to: end, fromPort: output, toPort: input}
       checks:
         warns:
-          - ".claude/worktrees/i0042/.ccnavi/approved/flows/i0042-01-01.yml: start が無い（どこから始めるかが決まらない）"
-          - ".claude/worktrees/i0042/.ccnavi/approved/flows/i0042-01-01.yml: ノード investigate（原因を調べる） のサブエージェントの種類 Explorer が候補に無い（組み込みと .claude/ の下に無い。書き誤りかもしれない。ユーザ・プラグインのものなら気にしなくてよい）"
+          - ".claude/worktrees/i0042/.ccnavi/approved/flows/i0042-01-01.yml: start がありません（どこから始めるかが決まらない）"
+          - ".claude/worktrees/i0042/.ccnavi/approved/flows/i0042-01-01.yml: ノード investigate（原因を調べる） のサブエージェントの種類 Explorer が候補にありません（組み込みと .claude/ の下にありません。書き誤りかもしれない。ユーザ・プラグインのものなら気にしなくてよい）"
         rendered:
           - "1. [prompt] ログを読む: 認証まわりのエラーログを読む → 2"
           - "2. [subAgent] 原因を調べる: ログと該当コードを突き合わせる / プロンプト: 原因の候補を挙げる / 種類: Explorer → 3"
           - "3. [end] 終了: 終了"
-          - 4. [prompt] あとで書く
+          - 4. [prompt] あとで記述する
         candidates: *candidates
 
     # main を編集したあと（保存前の差分の例）。説明を直し、修正の文を変え、まとめるノードを足して線をつなぎ直している
@@ -420,9 +420,9 @@ sample:
             type: prompt
             name: 最小限の修正を入れる
             position: {x: 720, y: 30}
-            data: {prompt: 原因の箇所だけを直し、再現手順で直ったことと、ほかのテストが壊れていないことを確かめる}
+            data: {prompt: 原因の箇所だけを直し、再現手順で直ったことと、ほかのテストが壊れていないことを確認する}
           - *redesign
-          - {id: summary, type: prompt, name: 結果をまとめる, position: {x: 960, y: 130}, data: {prompt: 直した内容と確かめた結果を 5 行でまとめる}}
+          - {id: summary, type: prompt, name: 結果をまとめる, position: {x: 960, y: 130}, data: {prompt: 直した内容と確認した結果を 5 行でまとめる}}
           - {id: end, type: end, name: 終了, position: {x: 1200, y: 130}, data: {label: 終了}}
         connections:
           - *c-start-investigate
@@ -438,9 +438,9 @@ sample:
           - "1. [start] 開始: 開始 → 2"
           - "2. [subAgent] 原因を調べる: ログと該当コードを突き合わせ、原因の候補を挙げる / プロンプト: 認証まわりのエラーログを読み、失敗が起きる条件を整理する。 該当するコードを探し、原因の候補を 3 件以内で挙げる。 / 種類: Explore → 3"
           - "3. [askUserQuestion] 方針を聞く: 問い: 原因は絞れました。どの方針で直しますか？ 選択肢: 最小限の修正 | 設計から見直す → 4（最小限の修正）, 5（設計から見直す）"
-          - "4. [prompt] 最小限の修正を入れる: 原因の箇所だけを直し、再現手順で直ったことと、ほかのテストが壊れていないことを確かめる → 6"
+          - "4. [prompt] 最小限の修正を入れる: 原因の箇所だけを直し、再現手順で直ったことと、ほかのテストが壊れていないことを確認する → 6"
           - "5. [prompt] 設計を見直す: 認証の流れを整理し直す案を書き、ユーザに見せる → 6"
-          - "6. [prompt] 結果をまとめる: 直した内容と確かめた結果を 5 行でまとめる → 7"
+          - "6. [prompt] 結果をまとめる: 直した内容と確認した結果を 5 行でまとめる → 7"
           - "7. [end] 終了: 終了"
         candidates: *candidates
 
@@ -460,7 +460,7 @@ sample:
             type: prompt
             name: 最小限の修正を入れる
             position: {x: 24, y: 52}
-            data: {prompt: 原因の箇所だけを直し、再現手順で直ったことを確かめる}
+            data: {prompt: 原因の箇所だけを直し、再現手順で直ったことを確認する}
             parentId: group-1
           - id: redesign
             type: prompt
@@ -476,7 +476,7 @@ sample:
           - "1. [start] 開始: 開始 → 2"
           - "2. [subAgent] 原因を調べる: ログと該当コードを突き合わせ、原因の候補を挙げる / プロンプト: 認証まわりのエラーログを読み、失敗が起きる条件を整理する。 該当するコードを探し、原因の候補を 3 件以内で挙げる。 / 種類: Explore → 3"
           - "3. [askUserQuestion] 方針を聞く: 問い: 原因は絞れました。どの方針で直しますか？ 選択肢: 最小限の修正 | 設計から見直す → 4（最小限の修正）, 5（設計から見直す）"
-          - "4. [prompt] 最小限の修正を入れる: 原因の箇所だけを直し、再現手順で直ったことを確かめる → 6"
+          - "4. [prompt] 最小限の修正を入れる: 原因の箇所だけを直し、再現手順で直ったことを確認する → 6"
           - "5. [prompt] 設計を見直す: 認証の流れを整理し直す案を書き、ユーザに見せる → 6"
           - "6. [end] 終了: 終了"
         candidates: *candidates
@@ -513,7 +513,7 @@ sample:
           - "1. [start] 開始: 開始 → 2"
           - "2. [subAgent] 原因を調べる: ログと該当コードを突き合わせ、原因の候補を挙げる / プロンプト: 認証まわりのエラーログを読み、失敗が起きる条件を整理する。 該当するコードを探し、原因の候補を 3 件以内で挙げる。 / 種類: Explore → 3"
           - "3. [askUserQuestion] 方針を聞く: 問い: 原因は絞れました。どの方針で直しますか？ 選択肢: 最小限の修正 | 設計から見直す → 4（最小限の修正）, 5（設計から見直す）"
-          - "4. [prompt] 最小限の修正を入れる: 原因の箇所だけを直し、再現手順で直ったことを確かめる → 6"
+          - "4. [prompt] 最小限の修正を入れる: 原因の箇所だけを直し、再現手順で直ったことを確認する → 6"
           - "5. [prompt] 設計を見直す: 認証の流れを整理し直す案を書き、ユーザに見せる → 6"
           - "6. [end] 終了: 終了"
           - "7. [subAgent] 原因を調べる: ログと該当コードを突き合わせ、原因の候補を挙げる / プロンプト: 認証まわりのエラーログを読み、失敗が起きる条件を整理する。 該当するコードを探し、原因の候補を 3 件以内で挙げる。 / 種類: Explore"
@@ -538,7 +538,7 @@ sample:
               prompt: |
                 認証まわりのエラーログを読み、失敗が起きる条件を整理する。
                 該当するコードを探し、原因の候補を 3 件以内で挙げる。
-                ログに無い推測は書かず、確かめられなかったことは「未確認」と書く。
+                ログにない推測は書かず、確認できなかったことは「未確認」と書く。
           - id: ask-policy
             type: askUserQuestion
             name: 方針を聞く
@@ -565,9 +565,9 @@ sample:
         warns: []
         rendered:
           - "1. [start] 開始: 開始 → 2"
-          - "2. [subAgent] 原因を調べる: ログと該当コードを突き合わせ、原因の候補を挙げる / プロンプト: 認証まわりのエラーログを読み、失敗が起きる条件を整理する。 該当するコードを探し、原因の候補を 3 件以内で挙げる。 ログに無い推測は書かず、確かめられなかったことは「未確認」と書く。 / 種類: Explore → 3"
+          - "2. [subAgent] 原因を調べる: ログと該当コードを突き合わせ、原因の候補を挙げる / プロンプト: 認証まわりのエラーログを読み、失敗が起きる条件を整理する。 該当するコードを探し、原因の候補を 3 件以内で挙げる。 ログにない推測は書かず、確認できなかったことは「未確認」と書く。 / 種類: Explore → 3"
           - "3. [askUserQuestion] 方針を聞く: 問い: 原因は絞れました。どの方針で直しますか？ 選択肢: 最小限の修正 | 設計から見直す | 様子を見る → 4（最小限の修正）, 5（設計から見直す）, 6（様子を見る）"
-          - "4. [prompt] 最小限の修正を入れる: 原因の箇所だけを直し、再現手順で直ったことを確かめる → 6"
+          - "4. [prompt] 最小限の修正を入れる: 原因の箇所だけを直し、再現手順で直ったことを確認する → 6"
           - "5. [prompt] 設計を見直す: 認証の流れを整理し直す案を書き、ユーザに見せる → 6"
           - "6. [end] 終了: 終了"
         candidates: *candidates
@@ -579,19 +579,19 @@ courses:
     steps:
       - target: palette
         title: 部品箱
-        body: 押すと、ノードが図に足されます。ユーザに聞く（askUserQuestion）ノードでは、担当のサブエージェントが手を止めてメインに返します。サブエージェントのノードは入れ子のサブエージェントとして起動し、入れ子の上限に達したらメインに返します。
+        body: 押すと、ノードが図に追加されます。ユーザに聞く（askUserQuestion）ノードでは、担当のサブエージェントが手を止めてメインに返します。サブエージェントのノードは入れ子のサブエージェントとして起動し、入れ子の上限に達したらメインに返します。
         scene: {doc: main}
       - target: graph
         title: 図
-        body: ノードの右の点から次のノードの左の点へドラッグすると、線でつながります（開始へ入る線と、終了から出る線は引けません）。ノードや線を押すと、右の欄で中身を直せます。ノードや線にポインタを載せると × が出て、押すと消せます。Shift を押しながらノードを押すか、Shift を押しながら何も無いところをドラッグして囲むと、複数のノードを選べます。選んだノードは「グループ化」で枠にまとめられます。枠の中へドラッグしたノードは枠に入り、外へドラッグすると枠から出ます。Ctrl+Z で元に戻し、Ctrl+Shift+Z（Ctrl+Y）でやり直せます。選んだノードは Ctrl+C でコピーして Ctrl+V で貼り付け、Ctrl+D で複製できます（開始はコピーしません）。
+        body: ノードの右の点から次のノードの左の点へドラッグすると、線でつながります（開始へ入る線と、終了から出る線は引けません）。ノードや線を押すと、右の欄で中身を直せます。ノードや線にポインタを載せると × が出て、押すと削除できます。Shift を押しながらノードを押すか、Shift を押しながら何もないところをドラッグして囲むと、複数のノードを選べます。選んだノードは「グループ化」で枠にまとめられます。枠の中へドラッグしたノードは枠に入り、外へドラッグすると枠から出ます。Ctrl+Z で元に戻し、Ctrl+Shift+Z（Ctrl+Y）でやり直せます。選んだノードは Ctrl+C でコピーして Ctrl+V で貼り付け、Ctrl+D で複製できます（開始はコピーしません）。
         scene: {doc: main}
       - target: inspector
         title: 欄
-        body: 選んだノードの中身（プロンプト、問いと選択肢、分岐の条件など）を直せます。この画面に入力欄が無い種類は、名前だけを直せて、中身はそのまま残ります。
+        body: 選んだノードの中身（プロンプト、問いと選択肢、分岐の条件など）を直せます。この画面に入力欄がない種類は、名前だけを直せて、中身はそのまま残ります。
         scene: {doc: main, select: ask-policy}
       - target: save
         title: 保存
-        body: 読み込んだ時点からの変更（足した・消した・変えたノードと線）を一覧で表示してから保存します。保存の直前に、子チケットが着手中でないかを ccnavi に確かめ直します。着手中なら書き込みません（担当のサブエージェントが読んでいる手順が、途中で変わるのを防ぐためです）。
+        body: 読み込んだ時点からの変更（追加した・削除した・変えたノードと線）を一覧で表示してから保存します。保存の直前に、子チケットが着手中でないかを ccnavi に再確認します。着手中なら保存しません（担当のサブエージェントが読んでいる手順が、途中で変わるのを防ぐためです）。
         scene: {doc: main, dirty: true}
       - target: tour
         title: 案内
@@ -600,19 +600,19 @@ courses:
 
   - id: build
     title: 手順を新しく組む
-    summary: 部品箱でノードを足し、中身を書いて、線でつなぐ
+    summary: 部品箱でノードを追加し、中身を入力して、線でつなぐ
     steps:
       - target: palette-prompt
-        title: 部品箱から足す
-        body: やりたい作業を 1 つずつノードにします。まず「プロンプト」を押します。足したノードは図のいちばん下に置かれ、選ばれた状態になります。開始と終了は最初から入っています。
+        title: 部品箱から追加する
+        body: やりたい作業を 1 つずつノードにします。まず「プロンプト」を押します。追加したノードは図のいちばん下に置かれ、選ばれた状態になります。開始と終了は最初から入っています。
         scene: {doc: build-1}
       - target: inspector-prompt
-        title: 中身を書く
-        body: 足したノードを選ぶと、右の欄が開きます。プロンプトには、担当のサブエージェントへの指示を書きます。名前は図の表示に使います。
+        title: 中身を入力する
+        body: 追加したノードを選ぶと、右の欄が開きます。プロンプトには、担当のサブエージェントへの指示を入力します。名前は図の表示に使います。
         scene: {doc: build-2, select: prompt-1}
       - target: node-prompt-1
         title: 線でつなぐ
-        body: 足したばかりのノードは、どこにもつながっていません。ノードの右の点から、次のノードの左の点へドラッグすると、線でつながります。開始へ入る線と、終了から出る線は引けません。
+        body: 追加したばかりのノードは、どこにもつながっていません。ノードの右の点から、次のノードの左の点へドラッグすると、線でつながります。開始へ入る線と、終了から出る線は引けません。
         scene: {doc: build-2}
       - target: graph
         title: つないだあとの図
@@ -620,11 +620,11 @@ courses:
         scene: {doc: build-3}
       - target: edge-c-prompt-1-end
         title: 線を直す
-        body: 線を押すと、右の欄で条件を書けます。ポインタを線やノードに載せると × が出て、押すと消せます。つなぎ直すときは、消してから引き直します。
+        body: 線を押すと、右の欄で条件を入力できます。ポインタを線やノードに載せると × が出て、押すと削除できます。つなぎ直すときは、削除してから引き直します。
         scene: {doc: build-3, select: "edge:c-prompt-1-end"}
       - target: preview
-        title: 担当に渡る手順を確かめる
-        body: 編集が止まると、ccnavi が手順を並べ直します。担当のサブエージェントには、ここに並んだとおりの手順が渡ります。保存は「保存前に確かめて保存する」の案内で見られます。
+        title: 担当に渡る手順を確認する
+        body: 編集が止まると、ccnavi が手順を並べ直します。担当のサブエージェントには、ここに並んだとおりの手順が渡ります。保存は「保存前に確認して保存する」の案内で見られます。
         scene: {doc: build-3}
 
   - id: ask-user
@@ -636,12 +636,12 @@ courses:
         body: 担当のサブエージェントは、ユーザに質問できません。このノードに来ると、担当は手を止め、問いと選択肢を添えてメインに返します。メインがユーザに聞き、答えを渡して同じ担当を再開させます。
         scene: {doc: main}
       - target: inspector-question
-        title: 問いを書く
-        body: 「問い」には、ユーザにそのまま見せる文を書きます。何を決めたいのか、決めると何が変わるのかが読める文にします。
+        title: 問いを入力する
+        body: 「問い」には、ユーザにそのまま見せる文を入力します。何を決めたいのか、決めると何が変わるのかが読める文にします。
         scene: {doc: main, select: ask-policy}
       - target: inspector-branches
         title: 選択肢を決める
-        body: 選択肢は 1 件ずつが出口になります。名前は短く、説明には選ぶと何が起きるかを書きます。「＋ 選択肢を足す」で足し、「消す」で消せます（最後の 1 件は消せません）。
+        body: 選択肢は 1 件ずつが出口になります。名前は短く、説明には選ぶと何が起きるかを入力します。「＋ 選択肢を追加する」で追加し、「削除」で削除できます（最後の 1 件は削除できません）。
         scene: {doc: main, select: ask-policy}
       - target: edge-c-ask-policy-fix-small
         title: 選択肢ごとに手順を分ける
@@ -652,41 +652,41 @@ courses:
         body: 「複数選択」にすると、選択肢ごとの出口はなくなり、出口は 1 つになります。いくつ選ばれても、同じ次のノードへ進みます。選ばれた内容は、次のノードが読みます。
         scene: {doc: ask-multi, select: ask-areas}
       - target: preview
-        title: 渡る手順で確かめる
-        body: 担当に渡る手順には、問いと選択肢がそのまま並びます。複数選択のときは、その旨も付きます。ユーザに見せる文が合っているかを、ここで確かめます。
+        title: 渡る手順で確認する
+        body: 担当に渡る手順には、問いと選択肢がそのまま並びます。複数選択のときは、その旨も付きます。ユーザに見せる文が合っているかを、ここで確認します。
         scene: {doc: ask-multi}
 
   - id: branch
-    title: 分岐の条件を書く
+    title: 分岐の条件を入力する
     summary: if / else・switch・繰り返しで、手順を条件で分ける
     steps:
       - target: inspector-target
-        title: 何で分けるかを書く
+        title: 何で分けるかを入力する
         body: 分岐のノードは、「何で分けるか」を 1 つ決めます。例えば「テストの結果」です。担当は、これを見て、出口のどれに進むかを決めます。
         scene: {doc: branch-if, select: check}
       - target: inspector-branches
-        title: 出口の条件を書く
-        body: 出口ごとに、名前と条件を書きます。条件は、担当が読んで判断できる文にします。if / else の出口は「真」と「偽」の 2 本で決まっていて、増やせません。増やしたいときは switch を使います。
+        title: 出口の条件を入力する
+        body: 出口ごとに、名前と条件を入力します。条件は、担当が読んで判断できる文にします。if / else の出口は「真」と「偽」の 2 本で決まっていて、増やせません。増やしたいときは switch を使います。
         scene: {doc: branch-if, select: check}
       - target: edge-c-check-summary
         title: 出口から手順へつなぐ
         body: 出口の点から、その条件のときの手順へ線を引きます。線の言葉は、出口の名前です。
         scene: {doc: branch-if}
       - target: inspector-condition
-        title: 線に条件を書く
-        body: 線を押すと、線ごとの条件も書けます。書くと、図の線の言葉が、出口の名前からこの条件に変わります。空のときは、出口の名前を条件として使います。
+        title: 線に条件を入力する
+        body: 線を押すと、線ごとの条件も入力できます。入力すると、図の線の言葉が、出口の名前からこの条件に変わります。空のときは、出口の名前を条件として使います。
         scene: {doc: branch-if, select: "edge:c-check-report"}
       - target: inspector-branches
         title: switch で出口を増やす
-        body: switch は、出口を自由に足せます。「＋ 出口を足す」で足し、「消す」で、その出口と出ている線を消します。どれにも当たらないときの出口には、条件に default と書きます。
+        body: switch は、出口を自由に追加できます。「＋ 出口を追加する」で追加し、「削除」で、その出口と出ている線を削除します。どれにも当たらないときの出口には、条件に default と入力します。
         scene: {doc: branch-switch, select: kind}
       - target: inspector-loop
         title: 繰り返しの条件と上限
         body: 繰り返しのノードには、続ける条件と、回数の上限を決めます。出口は「繰り返す」と「抜ける」の 2 本で決まっています。「繰り返す」から手順を通って、このノードへ戻る線を引きます。
         scene: {doc: branch-loop, select: fix-loop}
       - target: preview
-        title: 渡る手順で確かめる
-        body: 条件と最大回数が、手順の行に並びます。回数が 1 以上の整数でないときは、そう書かれます。
+        title: 渡る手順で確認する
+        body: 条件と最大回数が、手順の行に並びます。回数が 1 以上の整数でないときは、そう表示されます。
         scene: {doc: branch-loop}
 
   - id: subagent
@@ -694,16 +694,16 @@ courses:
     summary: 作業をサブエージェントに任せ、入れ子の上限を知っておく
     steps:
       - target: palette-sub-agent
-        title: 部品箱から足す
-        body: 手順の一部を別のサブエージェントに任せたいときは、「サブエージェント」を足します。「入れ子」の札は、起動できなければメインへ戻ることを示します。
+        title: 部品箱から追加する
+        body: 手順の一部を別のサブエージェントに任せたいときは、「サブエージェント」を追加します。「入れ子」の札は、起動できなければメインへ戻ることを示します。
         scene: {doc: main}
       - target: inspector-agent
         title: 何を任せるか・種類を決める
-        body: 「何を任せるか」を 1 行で書き、「サブエージェントの種類」を決めます。種類は ccnavi が挙げた候補（組み込みと、プロジェクトの .claude/ の下のもの）から選べます。打って決めてもかまいません。候補に無い名前は、そう表示されます。
+        body: 「何を任せるか」を 1 行で入力し、「サブエージェントの種類」を決めます。種類は ccnavi が挙げた候補（組み込みと、プロジェクトの .claude/ の下のもの）から選べます。入力して決めてもかまいません。候補にない名前は、そう表示されます。
         scene: {doc: main, select: investigate}
       - target: inspector-prompt
-        title: プロンプトを書く
-        body: プロンプトには、任せる作業の指示を書きます。フローの文は担当への案内になるので、必要なことを具体的に書きます。
+        title: プロンプトを入力する
+        body: プロンプトには、任せる作業の指示を入力します。フローの文は担当への案内になるので、必要なことを具体的に入力します。
         scene: {doc: main, select: investigate}
       - target: node-investigate
         title: 入れ子の目印
@@ -714,7 +714,7 @@ courses:
         body: 既定の上限は、メインの下 3 段です。子チケットの担当が 1 段目なので、フローの中で重ねられるのは 2 段までです。超える入れ子のあるファイルを開くと、ここに注意が出ます。保存は止めません。
         scene: {doc: deep}
       - target: preview
-        title: 任せる内容を手順で確かめる
+        title: 任せる内容を手順で確認する
         body: 担当に渡る手順には、任せる内容・プロンプト・種類が 1 行にまとまって並びます。
         scene: {doc: main}
 
@@ -724,7 +724,7 @@ courses:
     steps:
       - target: graph
         title: Shift で複数選ぶ
-        body: Shift を押しながらノードを押すと、選び足せます。Shift を押しながら何も無いところをドラッグして囲んでも選べます。ここでは「最小限の修正を入れる」と「設計を見直す」を選んでいます。
+        body: Shift を押しながらノードを押すと、選択に追加できます。Shift を押しながら何もないところをドラッグして囲んでも選べます。ここでは「最小限の修正を入れる」と「設計を見直す」を選んでいます。
         scene: {doc: main, pick: "fix-small,redesign"}
       - target: group
         title: 枠にまとめる
@@ -748,7 +748,7 @@ courses:
         scene: {doc: main-pasted, select: subAgent-1, clip: true, dirty: true, history: true}
       - target: undo
         title: 元に戻す・やり直す
-        body: 「元に戻す」（Ctrl+Z）と「やり直す」（Ctrl+Shift+Z、Ctrl+Y）で、編集の履歴をたどります。欄に続けて打った文字は、1 回でまとめて戻ります。ファイルを読み直したあとは、履歴が空になります。
+        body: 「元に戻す」（Ctrl+Z）と「やり直す」（Ctrl+Shift+Z、Ctrl+Y）で、編集の履歴をたどります。欄に続けて入力した文字は、1 回でまとめて戻ります。ファイルを再読み込みしたあとは、履歴が空になります。
         scene: {doc: main-pasted, select: subAgent-1, clip: true, dirty: true, history: true}
       - target: minimap
         title: 大きな図を見渡す
@@ -761,27 +761,27 @@ courses:
     steps:
       - target: notices
         title: 図の上の注意
-        body: 注意は 2 種類が並びます。この画面が見つけたもの（入れ子の上限など）と、ccnavi が検証して返した warn です。ここは ccnavi の warn が 2 件で、開始が無いこと、サブエージェントの種類が候補に無いことを言っています。どちらも保存は止めません。
+        body: 注意は 2 種類が並びます。この画面が見つけたもの（入れ子の上限など）と、ccnavi が検証して返した warn です。ここは ccnavi の warn が 2 件で、開始がないこと、サブエージェントの種類が候補にないことを言っています。どちらも保存は止めません。
         scene: {doc: broken}
       - target: node-orphan
         title: つながっていないノード
-        body: 開始から届かないノードは、担当に渡る手順に入りません。線でつなぐか、要らなければ × で消します。
+        body: 開始から届かないノードは、担当に渡る手順に入りません。線でつなぐか、要らなければ × で削除します。
         scene: {doc: broken}
       - target: inspector-agent
         title: 候補にない名前
-        body: サブエージェントの種類が、ccnavi の挙げた候補に無いと、欄の下にそう出ます。綴りの違いなら直します。ユーザやプラグインのものなら、そのままでかまいません。
+        body: サブエージェントの種類が、ccnavi の挙げた候補にないと、欄の下にそう出ます。綴りの違いなら直します。ユーザやプラグインのものなら、そのままでかまいません。
         scene: {doc: broken, select: investigate}
       - target: preview
-        title: 担当に渡る手順を読む
-        body: 直したら、担当に渡る手順を読み直します。開始からたどった順に、1 ノード 1 行で並びます。想定した順になっているかを確かめます。
+        title: 担当に渡る手順を確認する
+        body: 直したら、担当に渡る手順を再読み込みします。開始からたどった順に、1 ノード 1 行で並びます。想定した順になっているかを確認します。
         scene: {doc: main}
       - target: preview
-        title: 確かめ直しの間
-        body: 編集が止まると、ccnavi に確かめ直させます。確かめている間は、前回の結果を出したまま、そう表示します。
+        title: 再確認の間
+        body: 編集が止まると、ccnavi に再確認させます。確認している間は、前回の結果を出したまま、そう表示します。
         scene: {doc: main, checking: true}
 
   - id: save-review
-    title: 保存前に確かめて保存する
+    title: 保存前に確認して保存する
     summary: 未保存の変更を差分で読み、着手中や外での変更にも気づく
     steps:
       - target: dirty
@@ -790,23 +790,23 @@ courses:
         scene: {doc: main-edited, dirty: true, history: true}
       - target: save
         title: 保存を押す
-        body: 保存を押すと、書き込む前に、変更の一覧を見せます。保存の直前に、子チケットが着手中でないかを ccnavi に確かめ直します。
+        body: 保存を押すと、保存する前に、変更の一覧を見せます。保存の直前に、子チケットが着手中でないかを ccnavi に再確認します。
         scene: {doc: main-edited, dirty: true, history: true}
       - target: review
         title: 変更の一覧
-        body: 読み込んだ時点からの変更を、足したノード・消したノード・変えたノード・線ごとに並べます。意図しない変更が混じっていないかを読んでから、「保存する」を押します。
+        body: 読み込んだ時点からの変更を、追加したノード・削除したノード・変更したノード・接続ごとに並べます。意図しない変更が混じっていないかを読んでから、「保存する」を押します。
         scene: {doc: main-edited, base: main, dirty: true, history: true, review: true}
       - target: review-skip
-        title: 次から確かめずに保存する
-        body: チェックを付けて保存すると、次からは一覧を出さずに保存します。設定 ccnaviBoard.flowSaveReview で戻せます。
+        title: 次回から保存前の確認を省略
+        body: チェックを付けて保存すると、次回からは一覧を出さずに保存します。設定 ccnaviBoard.flowSaveReview で再び有効にできます。
         scene: {doc: main-edited, base: main, dirty: true, history: true, review: true}
       - target: lock
-        title: 着手中は読むだけ
-        body: 子チケットが着手中かレビュー中のあいだは、フローを書き換えられません。担当のサブエージェントが読んでいる手順が、途中で変わるのを防ぐためです。欄・部品箱・保存が止まり、終わってから直します。
+        title: 着手中は閲覧のみ
+        body: 子チケットが着手中かレビュー中のあいだは、フローを変更できません。担当のサブエージェントが読んでいる手順が、途中で変わるのを防ぐためです。欄・部品箱・保存が止まり、終わってから直します。
         scene: {doc: main, lock: true}
       - target: changed
         title: 外で変わったとき
-        body: ファイルが画面の外で変わると、この帯が出ます。編集中の内容は残りますが、戻す先が変わるので履歴は空になります。「再読込」で読み直します。
+        body: ファイルが画面の外で変わると、この帯が出ます。編集中の内容は残りますが、戻す先が変わるので履歴は空になります。「再読込」で再読み込みします。
         scene: {doc: main-edited, dirty: true, changed: true}
 
   - id: agent-draft
@@ -815,23 +815,23 @@ courses:
     steps:
       - target: request
         title: エージェントに頼む
-        body: 着手の前なら、エージェントにフローの作成や直しを頼めます。このボタンは、頼む文を組むだけです。エージェントは下書きを書くだけで、取り込むかはこの画面で決めます。
+        body: 着手の前なら、エージェントにフローの作成や直しを頼めます。このボタンは、依頼文を組むだけです。エージェントは下書きのみを作成します。取り込むかどうかは、この画面で差分を確認して判断してください。
         scene: {doc: main}
       - target: request-text
-        title: 頼む文を渡す
-        body: 文は、コピーして進行中のセッションに貼るか、新しいセッションで開いて渡します。どの子の、どこに書き、何を確かめてから渡すかが書かれています。効力のあるフローには書かせません。
+        title: 依頼文を渡す
+        body: 文は、コピーして進行中のセッションに貼るか、新しいセッションで開いて渡します。どの子の、どこに保存し、何を確認してから渡すかが記載されています。効力のあるフローには保存させません。
         scene: {doc: main, requestText: true}
       - target: offer
         title: 提案あり
         body: 下書きがいまのフローと違うと、この帯が出ます。「提案を見る」で、ccnavi が検証した下書きを開きます。
         scene: {doc: main, offer: true}
       - target: proposal
-        title: 差分を読む
+        title: 差分を確認する
         body: 変わった欄の前と後を並べます。フローの文は担当のサブエージェントへの案内になるので、外部の道具を使わせる指示などが紛れていないかを、ここで読みます。
         scene: {doc: main, base: main, proposal: true}
       - target: proposal-import
         title: 取り込む
-        body: 「取り込む」は、編集中の内容に入れるだけで、まだ書きません。元に戻すで戻せます。着手中は取り込めません。未保存の変更があるときは、捨てて取り込むと書かれます。
+        body: 「取り込む」は、編集中の内容に入れるだけで、まだ保存しません。元に戻すで戻せます。着手中は取り込めません。未保存の変更があるときは、破棄して取り込むと表示されます。
         scene: {doc: main, base: main, proposal: true}
       - target: save
         title: 取り込んだあと保存する

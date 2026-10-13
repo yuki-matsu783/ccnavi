@@ -26,9 +26,9 @@ def plan_missing(stderr: TextIO, found: ticket_model.Ticket) -> bool:
     )
     stderr.write(
         f"ccnavi: 親 {found.ticket} に plan が無いので着手できない（子や子の提案があっても同じ）。"
-        f"{where} に最小のフェーズ定義（例: work を 1 つ）を書き、親に plan: を足す。"
+        f"{where} に最小のフェーズ定義（例: work を 1 つ）を書き、親に plan: を追加します。"
         "phases.yml はユーザが持つ設定なので、書くのはユーザ。"
-        "承認済みの親に plan を足すには、plan を足した提案を改版として出し、"
+        "承認済みの親に plan を追加するには、plan を追加した提案を改版として出し、"
         "ユーザに承認し直してもらう。"
         "書き方は `ccnavi-launcher.sh --docs` の proposal-format と phases\n"
     )
@@ -58,7 +58,7 @@ def childless_notice(root: str, conf: settings.Settings, found: ticket_model.Tic
     if not labels:
         return []
     return [
-        f"子のない（子の提案も無い）フェーズがある: {', '.join(labels)}",
+        f"子のない（子の提案もありません）フェーズがある: {', '.join(labels)}",
         "フェーズごとに子チケットを作ってください（子の着手は親が着手済みであることが条件）",
         "子のないまま親で進めても、`finish` で「終わっていないフェーズがある」と止まります",
     ]

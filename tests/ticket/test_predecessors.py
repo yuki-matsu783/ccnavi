@@ -60,8 +60,10 @@ class PredecessorTest(TicketTest):
         refused = self.approve()
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("i0001-01-03 は承認の対象にしない", refused.stderr)
-        self.assertIn("先行 i0001-01-01 が閉じていない（いまは 作業中（doing/））", refused.stderr)
-        self.assertIn("predecessors から外して", refused.stderr)
+        self.assertIn(
+            "先行 i0001-01-01 が完了していない（いまは 作業中（doing/））", refused.stderr
+        )
+        self.assertIn("predecessors から削除して", refused.stderr)
         self.assertFalse(self.placed("i0001-01-03"))
 
         self.finish("i0001-01-01")  # レビュー不要のフェーズ。done/ へ動く
@@ -83,7 +85,9 @@ class PredecessorTest(TicketTest):
         self.propose("i0001-01-03", parent="i0001", phase=1, allow=("src/c/*",))
         self.propose_after("i0001-01-04", "i0001-01-03")
         refused = self.approve()
-        self.assertIn("先行 i0001-01-03 が閉じていない（いまは 承認待ち（todo/））", refused.stderr)
+        self.assertIn(
+            "先行 i0001-01-03 が完了していない（いまは 承認待ち（todo/））", refused.stderr
+        )
         self.assertTrue(self.placed("i0001-01-03"))
         self.assertFalse(self.placed("i0001-01-04"))
 
@@ -174,7 +178,7 @@ class PredecessorTest(TicketTest):
         self.assertEqual(body["batch"], [])
         rejected = {r["ticket"]: r["problems"] for r in body["rejected"]}
         self.assertTrue(
-            any("先行 i0001-01-01 が閉じていない" in p for p in rejected["i0001-01-03"])
+            any("先行 i0001-01-01 が完了していない" in p for p in rejected["i0001-01-03"])
         )
         verified = self.ccnavi("--agree", "--preview", "--verify")
         self.assertEqual(verified.returncode, modes.EXIT_ANSWER_NO, verified.stdout)
@@ -213,7 +217,7 @@ class PredecessorTest(TicketTest):
         self.worktree("i0001-01-03", "i0001")
         refused = self.ccnavi("ticket", "start", "i0001-01-03")
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("i0001-01-03 の先行が満たされていないので着手しない", refused.stderr)
+        self.assertIn("i0001-01-03 の先行が満たされていないので開始しない", refused.stderr)
         self.assertIn("- 先行 i0001-01-01: 作業中（doing/）", refused.stderr)
         ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
         self.assertIn(f"'{ticket_sh} finish <先行>'", refused.stderr)
@@ -259,7 +263,7 @@ class PredecessorTest(TicketTest):
         refused = self.ccnavi("ticket", "start", "i0001-01-03")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("- 先行 i0001-01-01: 取り消し済み", refused.stderr)
-        self.assertIn("- 先行 i0001-01-99: どの置き場にも無い", refused.stderr)
+        self.assertIn("- 先行 i0001-01-99: どの置き場にもありません", refused.stderr)
         self.assertIn("満たせない", refused.stderr)
 
     # ---- 4. ボード

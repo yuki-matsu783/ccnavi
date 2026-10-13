@@ -95,7 +95,7 @@ ccnavi_c1_family() {
 	done
 	if [ "$ccnavi_cf_any" = no ]; then
 		ccnavi_c1_family_id="$ccnavi_cf_p"
-		ccnavi_c1_why="親子のチケットの取り込み状態が無い（取り込み済みでない。今の手元の動きのまま）"
+		ccnavi_c1_why="親子のチケットの取り込み状態がありません（取り込み済みでない。今の手元の動きのまま）"
 		return 0
 	fi
 	ccnavi_c1_scratch || {
@@ -131,7 +131,7 @@ ccnavi_c1_family() {
 			ccnavi_c1_why="親のワークツリーが決まらない"
 		elif ! git -C "$ccnavi_c1_tree" remote get-url origin >/dev/null 2>&1; then
 			ccnavi_c1_target=no
-			ccnavi_c1_why="origin が無い（今の手元の動きのまま）"
+			ccnavi_c1_why="origin がありません（今の手元の動きのまま）"
 		fi
 		;;
 	no | stop) ;;
@@ -190,14 +190,14 @@ ccnavi_c1_begin() {
 		if ccnavi_lock_long "$ccnavi_cb_lock"; then
 			ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id のロックが 10 分を超えて取られたままになっている。持ち主はまだ動いているので強制取得しない。終わるのを待つか、持ち主をユーザが確かめてください。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
 		else
-			ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id のロックを他の操作が持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから打ち直してください"
+			ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id のロックを他の操作が持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから再実行してください"
 		fi
 		return 1
 		;;
 	esac
 	ccnavi_cb_busy=$(ccnavi_c1_busy "$ccnavi_c1_tree")
 	if [ -n "$ccnavi_cb_busy" ]; then
-		ccnavi_c1_say "親のワークツリーに途中の操作（${ccnavi_cb_busy}）がある。済ませるか取りやめてから打ち直してください（何も書いていない）"
+		ccnavi_c1_say "親のワークツリーに途中の操作（${ccnavi_cb_busy}）がある。済ませるか取りやめてから再実行してください（何も反映していません）"
 		ccnavi_lock_drop
 		return 1
 	fi
@@ -212,7 +212,7 @@ ccnavi_c1_begin() {
 ccnavi_c1_sort() {
 	ccnavi_c1_exe c1 sort "$ccnavi_c1_family_id" ${2:+"$2"} 2>"$ccnavi_c1_tmp/sort-err" </dev/null | tr -d '\r' >"$1" || :
 	if [ "$(head -n 1 "$1" 2>/dev/null)" != "c1 1" ]; then
-		ccnavi_c1_say "置き場の変更を見分けられなかった（$(head -n 1 "$ccnavi_c1_tmp/sort-err" 2>/dev/null)）。何も書いていない"
+		ccnavi_c1_say "置き場の変更を見分けられなかった（$(head -n 1 "$ccnavi_c1_tmp/sort-err" 2>/dev/null)）。何も反映していません"
 		return 1
 	fi
 	return 0
@@ -238,8 +238,8 @@ ccnavi_c1_prepare() {
 		# 3. C1 の外の変更を見分け、(b) を取り込みの前にコミットする。
 		ccnavi_c1_sort "$ccnavi_c1_tmp/sort" || return 1
 		ccnavi_c1_stops "$ccnavi_c1_tmp/sort" "ユーザの判断が未送信" \
-			"。承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが打つ。何も書いていない" \
-			"置き場に ccnavi の知らない変更がある" "。ユーザが確かめてください。何も書いていない" || return 1
+			"。承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが実行します。何も反映していません" \
+			"置き場に ccnavi が把握していない変更があります" "。ユーザが確かめてください。何も反映していません" || return 1
 		sed -n 's/^keep //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/keep"
 		sed -n 's/^b //p' "$ccnavi_c1_tmp/sort" >"$ccnavi_c1_tmp/b"
 		if [ -s "$ccnavi_c1_tmp/b" ]; then
@@ -255,21 +255,21 @@ ccnavi_c1_prepare() {
 				ccnavi_c1_say "取り込みが書きかけと重なった。変更の見分けからもう 1 回だけやり直す"
 				continue
 			fi
-			ccnavi_c1_say "取り込めなかった（上の ccnavi-sync.sh の文面）。何も書いていない。接続と、上に出た原因を直してから打ち直してください"
+			ccnavi_c1_say "取り込めなかった（上の ccnavi-sync.sh の文面）。何も反映していません。接続と、上に出た原因を直してから再実行してください"
 			return 1
 		fi
 		ccnavi_cp_record=$(ccnavi_family_record "$ccnavi_c1_root" "$ccnavi_c1_repo" "$ccnavi_c1_family_id")
 		ccnavi_cp_state=$(ccnavi_record_get "$ccnavi_cp_record" state)
 		if [ "$ccnavi_cp_state" != present ]; then
-			ccnavi_c1_say "取り込みの後、親子のチケットの取り込み状態が ${ccnavi_cp_state:-（無い）} になった。何も書いていない（上の ccnavi-sync.sh の文面）"
+			ccnavi_c1_say "取り込みの後、親子のチケットの取り込み状態が ${ccnavi_cp_state:-（無い）} になった。何も反映していません（上の ccnavi-sync.sh の文面）"
 			return 1
 		fi
 		# 5. 未送信の置き場の変更（(b) 以外）が残っていれば止める。
 		ccnavi_c1_sort "$ccnavi_c1_tmp/unsent" "refs/remotes/origin/$ccnavi_c1_branch" || return 1
 		ccnavi_c1_stops "$ccnavi_c1_tmp/unsent" "置き場に未送信のユーザの判断のコミットがある" \
-			"。承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが打つ。何も書いていない" \
-			"置き場に ccnavi の知らない未送信のコミットがある" \
-			"。ユーザが確かめてください。前の状態の操作が送る前に強制終了されて残ったものなら、中身を確かめてから承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）で送るか、ユーザがそのコミットを取り除く。何も書いていない" || return 1
+			"。承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）をユーザが実行します。何も反映していません" \
+			"置き場に ccnavi が把握していない未送信のコミットがあります" \
+			"。ユーザが確かめてください。前の状態の操作が送る前に強制終了されて残ったものなら、中身を確かめてから承認の push（sh $ccnavi_c1_sh/ccnavi-push-approved.sh ${ccnavi_c1_family_id}）で送るか、ユーザがそのコミットを取り除く。何も反映していません" || return 1
 		return 0
 	done
 }
@@ -301,7 +301,7 @@ ccnavi_c1_commit() {
 				printf '%s\n' "$ccnavi_cc_path" >>"$ccnavi_c1_tmp/added"
 			fi
 		elif [ -z "$(git -C "$ccnavi_c1_tree" ls-files -- ":(literal)$ccnavi_cc_path" 2>/dev/null)" ]; then
-			continue # 作って消した（git の知らない）パス
+			continue # 作って削除しました（git の知らない）パス
 		fi
 		printf '%s\n' "$ccnavi_cc_path" >>"$ccnavi_c1_tmp/paths"
 	done <"$1"
@@ -351,7 +351,7 @@ ccnavi_c1_restore_written() {
 				ccnavi_c1_say "$ccnavi_cr_path を書く前の状態に戻せなかった"
 		else
 			rm -f "$ccnavi_c1_tree/$ccnavi_cr_path" 2>/dev/null ||
-				ccnavi_c1_say "$ccnavi_cr_path を消せなかった"
+				ccnavi_c1_say "$ccnavi_cr_path を削除できませんでした。"
 		fi
 	done <"$1"
 }
@@ -382,7 +382,7 @@ ccnavi_c1_write() {
 		ccnavi_cw_try=$((ccnavi_cw_try + 1))
 		# 6. 元の先頭。
 		ccnavi_cw_h0=$(git -C "$ccnavi_c1_tree" rev-parse --verify HEAD 2>/dev/null) || {
-			ccnavi_c1_say "親のワークツリーの先頭を読めない。何も書いていない"
+			ccnavi_c1_say "親のワークツリーの先頭を読めない。何も反映していません"
 			return 1
 		}
 		# 7. 書く。
@@ -445,7 +445,7 @@ ccnavi_c1_write() {
 		fi
 		rm -f "$ccnavi_cw_list"
 		if [ "$ccnavi_cw_try" -ge 2 ]; then
-			ccnavi_c1_say "2 回目も送れなかった。書いたものは戻した。オンラインで sh $ccnavi_c1_sh/ccnavi-sync.sh $ccnavi_c1_family_id を打って取り込んでから、打ち直してください"
+			ccnavi_c1_say "2 回目も送れなかった。書いたものは戻した。オンラインで sh $ccnavi_c1_sh/ccnavi-sync.sh $ccnavi_c1_family_id を実行して取り込んでから、再実行してください"
 			log_error C1 で送れなかった -- "family=$ccnavi_c1_family_id" "reason=c1-push"
 			return 1
 		fi
@@ -488,7 +488,7 @@ ccnavi_c1_sent() {
 	if [ "$(ccnavi_record_get "$ccnavi_cn_record" state)" = present ]; then
 		ccnavi_record_write "$ccnavi_cn_record" remote origin branch "$ccnavi_c1_branch" sha "$1" \
 			fetched_at "$(ccnavi_record_get "$ccnavi_cn_record" fetched_at)" state present reason "" ||
-			ccnavi_c1_say "親子のチケットの取り込み状態（${ccnavi_cn_record}）を書けなかった"
+			ccnavi_c1_say "親子のチケットの取り込み状態（${ccnavi_cn_record}）を保存できませんでした。"
 	fi
 	ccnavi_c1_say "親子のチケット $ccnavi_c1_family_id のチケットの状態を送った（$(printf '%.12s' "$1")）"
 	log_info C1 で送った -- "family=$ccnavi_c1_family_id"

@@ -81,7 +81,7 @@ function importsOf(file: string): string[] {
     try {
       return require.resolve(spec, { paths: [path.dirname(file)] });
     } catch {
-      assert.fail(`@import の行き先が解けない: ${spec}（${file}）`);
+      assert.fail(`@import の対応方針が解けない: ${spec}（${file}）`);
     }
   });
 }
@@ -115,7 +115,7 @@ function firstSelector(file: string): string | undefined {
 
 test("CB-T127 6 つの画面は同じ骨組みの CSS（ツールバー・帯・欄・脚注）を 1 か所から持つ", () => {
   // 画面を足したら、その 1 枚を reactPages に足す（足さないと、ここから下の検査に入らない）
-  assert.deepEqual(reactPages().map(([name]) => name).sort(), screenNames(), "reactPages に無い画面がある");
+  assert.deepEqual(reactPages().map(([name]) => name).sort(), screenNames(), "reactPages にない画面がある");
   for (const [name, html] of reactPages()) {
     // 拡張が入れるのは、バンドルした 1 本（`out/webview/<名前>.css`）そのもの
     assert.ok(html.includes(screenStyle(name)), name);
@@ -172,14 +172,14 @@ test("CB-T166 画面ごとに CSS の入口があり、置いた CSS は必ず�
   const names = screenNames();
   const entries = names.map((name) => path.join(WEBVIEW_SRC, name, "style.css"));
   for (const entry of entries) {
-    assert.ok(fs.existsSync(entry), `画面の CSS の入口が無い: ${entry}`);
+    assert.ok(fs.existsSync(entry), `画面の CSS の入口がない: ${entry}`);
   }
   // 置いてあるのに、どの画面のバンドルにも入らない CSS が無い（`@import` の書き忘れ）
   const found = reachable(entries);
   const orphans = cssFiles()
     .filter((file) => !found.has(file))
     .map((file) => path.relative(WEBVIEW_SRC, file).split(path.sep).join("/"));
-  assert.deepEqual(orphans, [], "どの画面のバンドルにも入らない CSS がある。画面の style.css に @import を足す");
+  assert.deepEqual(orphans, [], "どの画面のバンドルにも入らない CSS がある。画面の style.css に @import を追加する");
   // パスだけでなく、バンドルした 1 本に中身が入っていることも見る
   const skipped: string[] = [];
   for (const name of names) {
@@ -188,7 +188,7 @@ test("CB-T166 画面ごとに CSS の入口があり、置いた CSS は必ず�
       const selector = firstSelector(file);
       if (selector === undefined) {
         // `@import` を並べるだけの入口。それ以外が来たら、当てるものを持たない CSS を置いている
-        assert.equal(path.basename(file), "style.css", `当てるものが 1 つも無い CSS: ${file}`);
+        assert.equal(path.basename(file), "style.css", `当てるものが 1 つもない CSS: ${file}`);
         skipped.push(file);
         continue;
       }
@@ -198,14 +198,14 @@ test("CB-T166 画面ごとに CSS の入口があり、置いた CSS は必ず�
   assert.equal(skipped.length, names.length, "入口（style.css）以外が中身の検査から外れている");
 });
 
-test("CB-T168 部品の CSS には、同じ名前の部品がある（部品を消したら CSS も消す）", () => {
+test("CB-T168 部品の CSS には、同じ名前の部品がある（部品を削除したら CSS も削除する）", () => {
   // 大文字で始まる CSS は部品のもの（`Card.css` は `Card.tsx`）。共通の骨組み（`styles/page.css`）と
   // 画面の入口（`style.css`）は小文字で始まるので、この決まりから外れる
   const missing = cssFiles()
     .filter((file) => /^[A-Z]/.test(path.basename(file)))
     .filter((file) => !fs.existsSync(file.replace(/\.css$/, ".tsx")))
     .map((file) => path.relative(WEBVIEW_SRC, file).split(path.sep).join("/"));
-  assert.deepEqual(missing, [], "部品が無いのに CSS だけ残っている。CSS と style.css の @import を消す");
+  assert.deepEqual(missing, [], "部品がないのに CSS だけ残っている。CSS と style.css の @import を削除");
 });
 
 test("CB-T216 案内の ? は案内のある画面（プロジェクト管理画面のほか全部）でヘッダの右上に同じ形で固定し、右端はその幅だけ空ける", () => {

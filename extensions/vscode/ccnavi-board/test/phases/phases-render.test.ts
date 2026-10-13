@@ -35,10 +35,10 @@ test("CB-T121 バンドルした画面を nonce 付きの script に流し込み
   assert.doesNotMatch(shell(rendered), /<script[^>]*\ssrc=/);
 });
 
-test("CB-T156 読み直せなかったときは定義の代わりに理由を渡す", () => {
-  const rendered = phasesHtml({ kind: "error", error: "定義のファイルを読めない" });
+test("CB-T156 再読み込みできなかったときは定義の代わりに理由を渡す", () => {
+  const rendered = phasesHtml({ kind: "error", error: "定義のファイルを読み込めない" });
   assert.match(rendered, /"kind":"error"/);
-  assert.match(rendered, /定義のファイルを読めない/);
+  assert.match(rendered, /定義のファイルを読み込めない/);
 });
 
 test("CB-T353 フェーズ管理画面は図を持たない。バンドルした画面にも CSS にも React Flow が入っていない", () => {

@@ -76,7 +76,7 @@ class MoveFileTest(unittest.TestCase):
         with open(self.target, "w", encoding="utf-8") as f:
             f.write("older\n")
         failed = approval_ops.move_file(self.source, self.target)
-        self.assertIn("行き先に既に在る", failed)
+        self.assertIn("移動先に既にある", failed)
         self.assertEqual(self.read(self.source), TEXT)
         self.assertEqual(self.read(self.target), "older\n")
 

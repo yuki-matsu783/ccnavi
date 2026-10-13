@@ -301,7 +301,7 @@ _OTHER = "other"  # 別のチケット（残す）
 _REUSED = "reused"  # 親のツリーの未着手のチケットで、退避と同じ識別子（残して止める）
 
 REUSED_REASON = (
-    "手元の退避（logs/archive/）に同じ識別子の閉じたチケットがある。閉じた識別子を別の機械で"
+    "手元の退避（logs/archive/）に同じ識別子のクローズ済みのチケットがある。クローズ済みの識別子を別の機械で"
     "使い直した可能性がある。このチケットは着手も取り消しもしていないので、退避と同じものかを"
     "見分けられない。ユーザが識別子を確かめ、使い直したなら別の識別子で提案して承認し直してください"
 )
@@ -695,11 +695,12 @@ def move(
         target = destination(root, project, rel)
         held = archived_bytes(root, project, rel)
         if held is None and os.path.lexists(target):
-            return moved, f"退避の行き先 {target} を読めない（ふつうのファイルでないかリンク）"
+            return moved, f"退避先 {target} を読めない（ふつうのファイルでないかリンク）"
         if not holds(rel, held, data):
             if held is not None and rel.startswith(f"{ticket_model.DONE}/"):
                 return moved, (
-                    f"退避の行き先 {target} に違う中身が既に在る。閉じたチケットを上書きしないので"
+                    f"退避先 {target} に違う中身が既に在る。"
+                    "クローズ済みのチケットを上書きしないので"
                     "止めた。ユーザが中身を確かめてください"
                 )
             content = data
@@ -715,7 +716,7 @@ def move(
                 return moved, failed
         failed = fsio.unlink(source)
         if failed:
-            return moved, f"{source} を消せない（{failed}）"
+            return moved, f"{source} を削除できません（{failed}）"
         moved.append(rel)
     for p in todo.parents:
         _prune_empty(os.path.join(approved_dir, PHASES_DIR, p))
@@ -790,7 +791,7 @@ def _write(root: str, project: str, rel: str, data: bytes) -> str:
         return failed
     target = destination(root, project, rel)
     if os.path.islink(target):
-        return f"退避の行き先 {target} がシンボリックリンク（辿らない）"
+        return f"退避先 {target} がシンボリックリンク（辿らない）"
     temp = os.path.join(os.path.dirname(target), f".{os.path.basename(target)}.{os.getpid()}.part")
     try:
         flags = (
@@ -808,7 +809,7 @@ def _write(root: str, project: str, rel: str, data: bytes) -> str:
     except OSError as exc:
         with contextlib.suppress(OSError):
             os.remove(temp)
-        return f"{target} に書けない（{exc}）"
+        return f"{target} に保存できませんでした（{exc}）"
     if archived_bytes(root, project, rel) != data:
         return f"{target} を読み戻すと中身が違う（書けていない）"
     return ""

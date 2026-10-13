@@ -63,7 +63,7 @@ test("CB-D333 全案内の全段で、指す先が画面に 1 つあり、吹き
         const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
         assert.equal(dom.all(`[data-tour="${step.target}"]`).length, 1, `${at}: 指す先 ${step.target} が画面に 1 つではない`);
-        assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先が無い）`);
+        assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
         assert.equal(dom.all(".banner.tour-sample").length, 1, at);
         dom.click(dom.one('[data-action="tour-next"]'));
       }
@@ -95,7 +95,7 @@ test("CB-D334 案内の間に更新・テンプレートの開閉・本文の依
   }
 });
 
-test("CB-D359 案内の間は見本を描き、実際のテンプレートは出さない。閉じたら実際の一覧に戻り、余計な送信は無い", async () => {
+test("CB-D359 案内の間は見本を描き、実際のテンプレートは出さない。閉じたら実際の一覧に戻り、余計な送信はありません", async () => {
   const dom = await openTemplates();
   try {
     assert.deepEqual(names(dom), ["ends", "feature", "local", "research"]);
@@ -139,7 +139,7 @@ test("CB-D360 段の scene が画面の様子を替える（テンプレート�
   }
 });
 
-test("CB-D361 足し算と取り込みの案内は、見本の足し算を選び、取り込みの欄と下見の見本を出す。送信はせず、閉じたら消える", async () => {
+test("CB-D361 足し算と取り込みの案内は、見本の足し算を選び、取り込みの欄とプレビューの見本を出す。送信はせず、閉じたら消える", async () => {
   const sum = await openTemplates();
   try {
     await goto(sum, "read-sum", 1);

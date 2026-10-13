@@ -71,7 +71,7 @@ class TicketStatusTest(PhaseHarness):
     def test_a_ticket_placed_by_hand_is_uncommitted_and_may_start_when_not_c1(self):
         self.by_hand()
         out = self.said("i0001")
-        self.assertIn("リモートへは取りに行かない", out)
+        self.assertIn("リモートからの取得は行いません", out)
         self.assertIn("古いかもしれない", out)
         mine = self.block(out, "i0001")
         self.assertIn("作業中（doing/）", mine)
@@ -169,7 +169,7 @@ class TicketStatusTest(PhaseHarness):
         self.commit_parent()
         self.approve()
         child = self.block(self.said("i0001"), "i0001-01-01")
-        self.assertIn("止まっている理由: 親 i0001 が未着手", child)
+        self.assertIn("止まっている理由: 親チケット i0001 が未着手", child)
         self.assertNotIn("start i0001-01-01", child)
         parent = self.block(self.said("i0001"), "i0001")
         self.assertIn("ccnavi-ticket.sh start i0001", parent)
@@ -225,7 +225,7 @@ class TicketStatusTest(PhaseHarness):
         cancelled = self.ccnavi("ticket", "cancel", "i0001-01-01", "--reason", "要らなくなった")
         self.assertEqual(cancelled.returncode, 0, cancelled.stderr)
         child = self.block(self.said("i0001"), "i0001-01-01")
-        self.assertIn("閉じた（done/）", child)
+        self.assertIn("クローズ済み（done/）", child)
         self.assertIn("取り消し", child)
         self.assertIn("要らなくなった", child)
 
@@ -244,7 +244,7 @@ class TicketStatusTest(PhaseHarness):
 
     def test_nothing_open_says_so(self):
         out = self.said()
-        self.assertIn("チケットは無い", out)
+        self.assertIn("チケットはありません。", out)
 
 
 if __name__ == "__main__":

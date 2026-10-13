@@ -366,9 +366,9 @@ def _rule_candidates(
                     tool=tool,
                     count=count,
                     summary=(
-                        f"ルールを足す候補: {tool} の {spelled} が {count} 回、"
+                        f"ルールを追加する候補: {tool} の {spelled} が {count} 回、"
                         "どのルールにも当たらず権限モードへ渡った。"
-                        "止めるべきなら deny に移して message を書いてください"
+                        "止めるべきなら deny に移して message を記載してください"
                     ),
                     rule=rule,
                     layer=ruleload.LAYER_COMMON,
@@ -470,7 +470,9 @@ def report(stdout: TextIO, conf: settings.Settings, root: str, as_json: bool) ->
         return 0
     logs = body["logs"]
     if not logs:
-        stdout.write(f"ccnavi: 記録が無い（{conf.log or '記録先が空'}）。候補を作れない\n")
+        stdout.write(
+            f"ccnavi: 記録がありません（{conf.log or '記録先が空'}）。候補を作成できません。\n"
+        )
         return 0
     stdout.write(
         f"# 記録 {len(logs)} 本・{body['records']} 行から作った候補 {len(body['candidates'])} 件"

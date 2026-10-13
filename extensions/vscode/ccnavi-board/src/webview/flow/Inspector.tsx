@@ -118,7 +118,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect,
                 onSelect(undefined);
               }}
             >
-              線を消す
+              線を削除
             </button>
           </div>
         </aside>
@@ -136,7 +136,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect,
         <span title="description">説明</span>
         <textarea className="f-flow-description" rows={3} value={str(doc.description)} disabled={readOnly} onChange={(event) => onChange(setMeta(doc, { description: event.target.value }), "flow:description")} />
       </label>
-      <p className="hint">ノードを押すと、ここに欄が出ます。ノードの右の点から左の点へドラッグすると、線でつながります。線を押すと条件を書けます。ノードや線にポインタを載せると × が出て、押すと消せます。Shift を押しながらノードを選ぶと、「グループ化」で枠にまとめられます。Ctrl+Z で元に戻せます。選んだノードは Ctrl+C でコピー、Ctrl+V で貼り付け、Ctrl+D で複製できます。</p>
+      <p className="hint">ノードを押すと、ここに欄が出ます。ノードの右の点から左の点へドラッグすると、線でつながります。線を押すと条件を入力できます。ノードや線にポインタを載せると × が出て、押すと削除できます。Shift を押しながらノードを選ぶと、「グループ化」で枠にまとめられます。Ctrl+Z で元に戻せます。選んだノードは Ctrl+C でコピー、Ctrl+V で貼り付け、Ctrl+D で複製できます。</p>
     </aside>
   );
 }
@@ -264,7 +264,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
               data-action="ungroup"
               data-tour="inspector-ungroup"
               disabled={readOnly}
-              title="枠だけ消して、中のノードはその場に残します"
+              title="枠だけ削除して、中のノードはその場に残します"
               onClick={() => {
                 onChange(ungroup(doc, node.id));
                 onSelect(undefined);
@@ -277,7 +277,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
       )}
       {!known && !group && (
         <>
-          <p className="hint">この画面に入力欄が無い種類です。名前と位置だけを変えられ、中身（data）は保存してもそのまま残ります。</p>
+          <p className="hint">この画面に入力欄がない種類です。名前と位置だけを変えられ、中身（data）は保存してもそのまま残ります。</p>
           <pre className="flow-raw">{yamlText(nodeData(node))}</pre>
         </>
       )}
@@ -292,7 +292,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
             onSelect(undefined);
           }}
         >
-          {group ? "グループを消す（中のノードは残す）" : "ノードを消す"}
+          {group ? "グループを削除（中のノードは残す）" : "ノードを削除"}
         </button>
       </div>
     </aside>
@@ -331,8 +331,8 @@ function Branches({ doc, node, readOnly, onChange }: { readonly doc: FlowDoc; re
             onChange={(event) => onChange(patchBranch(doc, node.id, index, { [second]: event.target.value }), `node:${node.id}:branch:${index}:${second}`)}
           />}
           {!fixed && (
-            <button type="button" className="action small" data-action="remove-branch" disabled={readOnly || items.length <= 1} title="この出口と、そこから出る線を消します" onClick={() => onChange(removeBranch(doc, node.id, index))}>
-              消す
+            <button type="button" className="action small" data-action="remove-branch" disabled={readOnly || items.length <= 1} title="この出口と、そこから出る線を削除します" onClick={() => onChange(removeBranch(doc, node.id, index))}>
+              削除
             </button>
           )}
         </div>
@@ -344,7 +344,7 @@ function Branches({ doc, node, readOnly, onChange }: { readonly doc: FlowDoc; re
         disabled={readOnly}
         onClick={() => onChange(addBranch(doc, node.id, options ? { label: `選択肢 ${items.length + 1}`, description: "" } : { label: `出口 ${items.length + 1}`, condition: "" }))}
       >
-        ＋ {options ? "選択肢" : "出口"}を足す
+        ＋ {options ? "選択肢" : "出口"}を追加する
       </button>}
     </fieldset>
   );

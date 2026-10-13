@@ -70,7 +70,7 @@ test("CB-T06 カードに承認済みチケット・ワークツリー・マー�
   assert.match(cancelled.openPath, /\.ccnavi\/approved\/done\/i0001-02-05\.md$/);
 });
 
-test("CB-T07 提案が無ければ承認済みチケットの置き場が列。どちらにも無ければ未着手に置き、不備の文は実行ファイルのものを出す", () => {
+test("CB-T07 提案がなければ承認済みチケットの置き場が列。どちらにもなければ未着手に置き、不備の文は実行ファイルのものを出す", () => {
   const base = fixture();
   const doing: TicketJson = {
     ...base.tickets[1],
@@ -103,7 +103,7 @@ test("CB-T07 提案が無ければ承認済みチケットの置き場が列。�
   assert.equal(buildBoard(json).issueCount, 1);
 });
 
-test("CB-T08 不備は実行ファイルの issues をそのまま持ち、ボードは足しも削りもしない", () => {
+test("CB-T08 不備は実行ファイルの issues をそのまま持ち、ボードは追加しも削りもしない", () => {
   const base = fixture();
   // 親の無い子でも、実行ファイルが言わなければボードは不備を作らない
   const stray: TicketJson = { ...base.tickets[1], ticket: "i0002-01-01", parent: "i0002" };
@@ -352,7 +352,7 @@ test("CB-T138 止まっているチケットは、理由と実行ファイルが
   // ままなので、列からも承認済みのバッジからも分からない。
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-02-02")!;
-  const blocked = "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）";
+  const blocked = "親 i0001 の承認済みチケットが作業中にない（未承認か、閉じている）";
   const stopped: TicketJson = { ...child, blocked, issues: [`書き込みが止まっています: ${blocked}`], attention: true };
   const parent = base.tickets.find((t) => t.ticket === "i0001")!;
   const card = cardsOf(buildBoard({ ...base, tickets: [parent, stopped] })).get("i0001-02-02")!;

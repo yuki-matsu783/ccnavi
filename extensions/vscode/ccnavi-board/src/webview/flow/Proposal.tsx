@@ -17,12 +17,12 @@ import { post } from "./post.js";
 
 const KIND_TITLES: Readonly<Record<TextChange["kind"], string>> = {
   meta: "フロー",
-  "added-node": "足すノード",
-  "removed-node": "消すノード",
-  "changed-node": "変えるノード",
-  "added-connection": "足す線",
-  "removed-connection": "消す線",
-  "changed-connection": "変える線",
+  "added-node": "追加するノード",
+  "removed-node": "削除するノード",
+  "changed-node": "変更するノード",
+  "added-connection": "追加する接続",
+  "removed-connection": "削除する接続",
+  "changed-connection": "変更する接続",
 };
 
 /** 開いた下書きの様子。読み込み中・取り込めない・取り込める */
@@ -88,8 +88,8 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
   return (
     <div className="review-backdrop">
       <section className="review proposal" id="proposal-review" data-tour="proposal" role="dialog" aria-modal="true" aria-labelledby="proposal-review-title">
-        <h2 id="proposal-review-title">エージェントの提案を確かめる</h2>
-        {view.kind === "loading" && <p className="dim">下書きを ccnavi で確かめています…</p>}
+        <h2 id="proposal-review-title">エージェントの提案を確認する</h2>
+        {view.kind === "loading" && <p className="dim">下書きを ccnavi で確認しています…</p>}
         {view.kind === "error" && (
           <p className="proposal-error" id="proposal-error">
             {view.error}
@@ -103,7 +103,7 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
             </p>
             {diff?.problem !== undefined && (
               <p className="proposal-error" id="proposal-problem">
-                取り込めません: {diff.problem}。下の全体の JSON を確かめ、エディタで直すか、エージェントに書き直しを頼んでください。
+                取り込めません: {diff.problem}。下の全体の JSON を確認し、エディタで直すか、エージェントに下書きの作り直しを依頼してください。
               </p>
             )}
             {changes.length === 0 && <p id="proposal-order-only">並び順だけが違います（ノードと線の中身は同じです）。</p>}
@@ -126,7 +126,7 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
           </button>
           {view.kind === "ready" && (
             <button type="button" className="action primary" data-action="import-proposal" data-tour="proposal-import" disabled={blocked} onClick={() => onImport(view.proposal)}>
-              {dirty ? "未保存の変更を捨てて取り込む" : "取り込む"}
+              {dirty ? "未保存の変更を破棄して取り込む" : "取り込む"}
             </button>
           )}
         </div>
@@ -144,10 +144,10 @@ export function RequestText({ prompt, onClose }: { readonly prompt: string; read
   return (
     <div className="review-backdrop">
       <section className="review" id="request-text" data-tour="request-text" role="dialog" aria-modal="true" aria-labelledby="request-text-title">
-        <h2 id="request-text-title">エージェントに頼む文</h2>
+        <h2 id="request-text-title">エージェントへの依頼文</h2>
         <p className="dim small">
-          コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。エージェントは下書きを書くだけで、
-          取り込むかはこの画面で差分を読んで決めます。
+          コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。エージェントは下書きのみを作成します。
+          取り込むかどうかは、この画面で差分を確認して判断してください。
         </p>
         <pre className="request-prompt">{prompt}</pre>
         <div className="review-actions">

@@ -467,7 +467,7 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
   runInTerminal(root, cloneCommand(root, page.projectsDir, remote.remote.url, name.name));
   info(
     current,
-    `git clone を「ccnavi」ターミナルに送りました（${page.projectsRel}/${name.name}）。認証が要るならターミナルで入力してください。終わると一覧が更新されます`,
+    `git clone を「ccnavi」ターミナルに送りました（${page.projectsRel}/${name.name}）。認証が必要ならターミナルで入力してください。終わると一覧が更新されます`,
     "cloned",
   );
 }
@@ -478,10 +478,10 @@ function fixIgnore(current: PanelState, page: ProjectsPage): void {
   try {
     fs.writeFileSync(file, gitignoreWithProjects(before, page.projectsRel), "utf8");
   } catch (error) {
-    fail(current, `.gitignore に書けません: ${(error as Error).message}`);
+    fail(current, `.gitignore に保存できません: ${(error as Error).message}`);
     return;
   }
-  info(current, `.gitignore に /${page.projectsRel}/ を足しました。コミットは自分でしてください`);
+  info(current, `.gitignore に /${page.projectsRel}/ を追加しました。コミットは自分でしてください`);
   void update();
 }
 

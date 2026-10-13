@@ -40,7 +40,7 @@ test("CB-D31 .gitignore の帯のボタンと clone は、それぞれの型で�
   }
 });
 
-test("CB-D32 中身は postMessage で入れ替わり、読み直せなければ文面を出す。見た目は body のクラスだけ変える", async () => {
+test("CB-D32 中身は postMessage で入れ替わり、再読み込みできなければ文面を出す。見た目は body のクラスだけ変える", async () => {
   const dom = await openProjects();
   try {
     await dom.send({ type: "data", data: { kind: "page", page: page([row({ name: "app", rel: "projects/app" })]) } });
@@ -65,8 +65,8 @@ test("CB-D34 失敗の一言は次の一覧が届いたら消える。案内は�
   try {
     const status = () => text(dom.one("#status"));
     const failed = () => dom.one("#status").className.includes("failed");
-    await dom.send({ type: "failed", message: "プロジェクト lib が一覧に無い。更新してから押し直す" });
-    assert.match(status(), /一覧に無い/);
+    await dom.send({ type: "failed", message: "プロジェクト lib が一覧にありません。更新してから押し直す" });
+    assert.match(status(), /一覧にありません/);
     assert.ok(failed());
     // 一覧が新しくなったら、それを見て言った失敗はもう今のことではない
     await dom.send({ type: "data", data: { kind: "page", page: page([row()]) } });
@@ -81,7 +81,7 @@ test("CB-D34 失敗の一言は次の一覧が届いたら消える。案内は�
   }
 });
 
-test("CB-T113 カードはレイヤーの置き場を出す。自身のレイヤーは本体の枠に出す。操作のボタンは無い", async () => {
+test("CB-T113 カードはレイヤーの置き場を出す。自身のレイヤーは本体の枠に出す。操作のボタンはありません", async () => {
   const dom = await openProjects([
     row({ name: "app", rel: "projects/app", rulesRel: "projects/app/.ccnavi/config/project/rules.yml" }),
     row({ rulesExists: false }),
@@ -116,8 +116,8 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
         hasClaudeDir: true,
         problems: [
           problem("warn", ".claude/ を持つ。Claude Code がそこのスキルを読み込み、そこへ cd するだけで別のルートのように見える"),
-          problem("warn", ".claude/settings.json を読めない: 壊れている"),
-          problem("error", "文面が無い", "(projects/lib) x"),
+          problem("warn", ".claude/settings.json を読み込めない: 壊れている"),
+          problem("error", "文面がありません", "(projects/lib) x"),
         ],
       }),
     ],
@@ -139,9 +139,9 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
     // ".claude/settings.json を読めない" のような別の warn と error は出る
     const lint = dom.all(`${cardSelector("lib")} ul.lint li`).map((li) => text(li));
     assert.ok(!lint.some((l) => /\.claude\/ を持つ/.test(l)), lint.join(" / "));
-    assert.ok(lint.some((l) => l === "warn: .claude/settings.json を読めない: 壊れている"), lint.join(" / "));
+    assert.ok(lint.some((l) => l === "warn: .claude/settings.json を読み込めない: 壊れている"), lint.join(" / "));
     assert.ok(lint.some((l) => /\.claude\/ があります。Claude Code は.*プロジェクトの設定は \.ccnavi\/config\/project\/ に置いてください/.test(l)), lint.join(" / "));
-    assert.ok(lint.some((l) => l === "error: 文面が無い"), lint.join(" / "));
+    assert.ok(lint.some((l) => l === "error: 文面がありません"), lint.join(" / "));
   } finally {
     await dom.close();
   }
@@ -173,7 +173,7 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
 const COLLISION =
   "`projects/` はワークスペースの git が追跡している（例: `projects/foo/main.py`）。ccnavi はワークスペース直下の `projects/` をプロジェクトの置き場として使い、名前は変えられない。直すには、ワークスペースの `projects/` を別の名前に移す（例: `git mv projects apps`）";
 const ADDED_BY_MISTAKE =
-  "`projects/` はワークスペースの git が追跡している（入れ子のリポジトリとして: `projects/lib`）。直すには、ワークスペースで `git rm -r --cached projects` を打ち、`.gitignore` に `/projects/` を足して、コミットする";
+  "`projects/` はワークスペースの git が追跡している（入れ子のリポジトリとして: `projects/lib`）。直すには、ワークスペースで `git rm -r --cached projects` を打ち、`.gitignore` に `/projects/` を追加して、コミットする";
 
 /** 置き場の苦情の帯・`.gitignore` の帯とボタンを見る */
 async function trackedBanners(detail: string, ignored: boolean): Promise<{ banners: string[]; fixButtons: number }> {
@@ -189,7 +189,7 @@ test("CB-D148 A10 置き場がワークスペースのソースとぶつかっ�
   const { banners, fixButtons } = await trackedBanners(COLLISION, false);
   assert.equal(fixButtons, 0);
   assert.ok(banners.includes(`warn: ${COLLISION}`), banners.join(" / "));
-  assert.ok(!banners.some((b) => /\.gitignore.*が無い/.test(b)), banners.join(" / "));
+  assert.ok(!banners.some((b) => /\.gitignore.*がない/.test(b)), banners.join(" / "));
   assert.ok(!banners.some((b) => /無視されていない/.test(b)), banners.join(" / "));
   // 別の指摘は今どおり出る
   assert.ok(banners.includes("warn: 別の指摘"), banners.join(" / "));
@@ -200,7 +200,7 @@ test("CB-D149 A10b 載せ忘れ（入れ子のリポジトリが索引に載っ�
     const { banners, fixButtons } = await trackedBanners(ADDED_BY_MISTAKE, ignored);
     assert.equal(fixButtons, 0, `ignored=${ignored}`);
     assert.ok(banners.includes(`warn: ${ADDED_BY_MISTAKE}`), `ignored=${ignored}: ${banners.join(" / ")}`);
-    assert.ok(!banners.some((b) => /\.gitignore.*が無い/.test(b)), banners.join(" / "));
+    assert.ok(!banners.some((b) => /\.gitignore.*がない/.test(b)), banners.join(" / "));
     assert.ok(!banners.some((b) => /無視されていない/.test(b)), banners.join(" / "));
   }
 });

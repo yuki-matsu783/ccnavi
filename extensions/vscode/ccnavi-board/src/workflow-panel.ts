@@ -461,8 +461,8 @@ async function handleMessage(current: PanelState, message: WorkflowMessage | und
       return;
     case "reload": {
       if (message.dirty) {
-        const choice = await vscode.window.showWarningMessage("未保存の順序があります。破棄して読み直しますか？", { modal: true }, "読み直す");
-        if (choice !== "読み直す") {
+        const choice = await vscode.window.showWarningMessage("未保存の順序があります。破棄して再読み込みしますか？", { modal: true }, "再読み込みする");
+        if (choice !== "再読み込みする") {
           current.host.post({ type: "cancelled" } satisfies ToWorkflow);
           return;
         }
@@ -514,7 +514,7 @@ async function save(current: PanelState, order: PlanOrder, expect: string): Prom
   }
   if (expect !== loaded.source_sha) {
     // 画面が別の読み込みのハッシュを送ってきた（読み直しと行き違った）。書かない
-    fail(current, "提案を読み直したため、この保存は取りやめました。読み直した提案で線を引き直してください");
+    fail(current, "提案を再読み込みしたため、この保存は取りやめました。再読み込みした提案で線を引き直してください");
     return;
   }
   const log = diaglog.get("ccnavi-board", root(current));
@@ -537,14 +537,14 @@ async function save(current: PanelState, order: PlanOrder, expect: string): Prom
       const moved = result.answer.children.filter((child) => child.ticket !== child.new_ticket).length;
       await reload(current);
       vscode.window.showInformationMessage(
-        `${current.ticket} の計画の順序を提案に書きました${moved === 0 ? "" : `（子の提案 ${moved} 本の識別子と phase: を付け替えました）`}。` +
-          "承認の画面はボードから開き直してください。書き換えた提案はコミットしていません",
+        `${current.ticket} の計画の順序を提案に反映しました${moved === 0 ? "" : `（子の提案 ${moved} 本の識別子と phase: を付け替えました）`}。` +
+          "承認の画面はボードから開き直してください。変更した提案はコミットしていません",
       );
       return;
     }
     case "unchanged":
       await reload(current);
-      vscode.window.showInformationMessage(`${current.ticket} の計画は振り直しても変わらないので、書きませんでした`);
+      vscode.window.showInformationMessage(`${current.ticket} の計画は振り直しても変わらないので、反映しませんでした`);
       return;
     case "changed": {
       current.wroteAt = 0;
@@ -552,14 +552,14 @@ async function save(current: PanelState, order: PlanOrder, expect: string): Prom
       if (!alive(current)) {
         return;
       }
-      fail(current, "提案が外で変わっていたため、書きませんでした（何も書き換えていません）");
+      fail(current, "提案が外で変わっていたため、反映しませんでした（何も変更していません）");
       current.changed = fresh.ok ? fresh.value : result.answer;
       current.host.post({ type: "changed", answer: current.changed } satisfies ToWorkflow);
       return;
     }
     case "refused":
       current.wroteAt = 0;
-      fail(current, `書きませんでした: ${result.reason}`);
+      fail(current, `反映できませんでした: ${result.reason}`);
       return;
     case "error":
       current.wroteAt = 0;

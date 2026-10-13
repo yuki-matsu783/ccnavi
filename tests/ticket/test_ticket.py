@@ -579,7 +579,7 @@ class TicketTest(unittest.TestCase):
         result = self.ccnavi("--lint")
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("i0001-01-01", result.stdout)
-        self.assertIn("親 i0001 の承認済みチケットが作業中に無い", result.stdout)
+        self.assertIn("親 i0001 の承認済みチケットが作業中にありません", result.stdout)
 
     def moved_text(self, name, **fields):
         """提案の本文の、スクリプトの欄だけを書き換えたもの（手で動かす中身）。"""
@@ -703,7 +703,7 @@ class TicketTest(unittest.TestCase):
             p["detail"] for p in json.loads(self.ccnavi("--lint", "--json").stdout)["problems"]
         ]
         self.assertTrue(
-            any("i0001-01-05" in d and "`completed_at` が無い" in d for d in details), details
+            any("i0001-01-05" in d and "`completed_at` がありません" in d for d in details), details
         )
         held, why = approval.load_copy(os.path.join(review, "i0001-01-01.md"), require_record=True)
         self.assertIsNotNone(held, why)
@@ -1373,7 +1373,7 @@ class TicketTest(unittest.TestCase):
             "--cwd", self.parent_tree, "--phase", "1", "review", "confirm", "--result", fixture
         )
         self.assertNotEqual(check.returncode, 0, check.stdout)
-        self.assertIn("行き先に既に在る", check.stderr)
+        self.assertIn("移動先に既にある", check.stderr)
         marker = os.path.join(self.approved, "phases", "i0001", "1.reviewed")
         self.assertFalse(os.path.exists(marker))
         review = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-01.md")
@@ -2650,7 +2650,7 @@ class TicketTest(unittest.TestCase):
         self.propose("i0001", allow=("src/*", "wip/*"))
         refused = self.ccnavi("--agree", "--guard-ticket-approval", "enable", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("端末", refused.stderr)
+        self.assertIn("ターミナル", refused.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
         refused = self.ccnavi(
             "--cwd",
@@ -2662,7 +2662,7 @@ class TicketTest(unittest.TestCase):
             stdin="y\n",
         )
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("端末", refused.stderr)
+        self.assertIn("ターミナル", refused.stderr)
         self.assertEqual(self.approve().returncode, 0)
 
     def test_subagent_cannot_move_state_from_powershell_either(self):
@@ -3435,10 +3435,10 @@ class TicketTest(unittest.TestCase):
             json.dumps({"hooks": {"PostToolUse": [{"hooks": [{"command": "ccnavi"}]}]}}),
         )
         result = self.ccnavi("--lint", "--mode", "enable")
-        self.assertIn("stray にチケットが無い", result.stdout)
+        self.assertIn("stray にチケットがありません。", result.stdout)
         self.assertIn("CCNAVI_GUARD_TICKET_APPROVAL=disable", result.stdout)
         self.assertIn("SubagentStop", result.stdout)
-        self.assertIn("origin が無い", result.stdout)
+        self.assertIn("origin がありません。", result.stdout)
         # 超えている子を、承認の前に名指しする。
         self.propose("i0001-01-03", parent="i0001", phase=1, allow=("docs/*",))
         result = self.ccnavi("--lint", "--mode", "enable")

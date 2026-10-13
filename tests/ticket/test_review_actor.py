@@ -311,7 +311,7 @@ class ReviewRuleTest(ActorHarness):
         done = self.request_posted(before=lambda: self.assertNotIn("mr:", self.doing_text()))
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIn("mr: 7\n", self.doing_text())
-        self.assertIn("`mr:` に MR !7 を書き足した", done.stderr)
+        self.assertIn("`mr:` に MR !7 を追記しました", done.stderr)
         # 欄の行のほかは変わっていない
         self.assertEqual(1, self.doing_text().count("mr: 7"))
 
@@ -335,7 +335,7 @@ class ReviewRuleTest(ActorHarness):
         done = self.request_posted(before=put)
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual(self.held, self.doing_text())
-        self.assertNotIn("書き足した", done.stderr)
+        self.assertNotIn("追記しました", done.stderr)
         self.assertNotIn("警告", done.stderr)
 
     def test_the_request_with_another_mr_warns_and_keeps_the_value(self):

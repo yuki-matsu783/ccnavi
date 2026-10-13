@@ -69,7 +69,7 @@ test("CB-T281 logfmt の値は空白・タブ・\"・=・改行を含むとき�
   assert.equal(formatLine("T", "INFO", "n", 1, "1 行目\n2 行目", {}), "T INFO  n[1] 1 行目\\n2 行目");
 });
 
-test("CB-T282 レベルは CCNAVI_LOG_LEVEL で絞る。大文字小文字を問わず、空と読めない値は INFO", () => {
+test("CB-T282 レベルは CCNAVI_LOG_LEVEL で絞る。大文字小文字を問わず、空と読み込めない値は INFO", () => {
   assert.equal(withLevel(undefined, () => threshold()), "INFO");
   assert.equal(withLevel("debug", () => threshold()), "DEBUG");
   assert.equal(withLevel("loud", () => threshold()), "INFO");
@@ -104,7 +104,7 @@ test("CB-T283 書けないときはエラーにせず捨て、console にも何�
     // logs がファイルなので logs/diag を作れない
     fs.writeFileSync(path.join(root, "logs"), "x");
     assert.doesNotThrow(() => get("probe", root).error("書けない", { a: "b" }));
-    assert.doesNotThrow(() => get("probe", "").error("置き場が無い"));
+    assert.doesNotThrow(() => get("probe", "").error("置き場がありません"));
   } finally {
     Object.assign(console, saved);
     fs.rmSync(root, { recursive: true, force: true });

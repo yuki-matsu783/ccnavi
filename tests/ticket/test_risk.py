@@ -247,7 +247,7 @@ class RiskTest(PhaseHarness):
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
         self.assertIn("実績のリスクが高い", self.reason(spawn))
         explained = self.ccnavi("--explain")
-        self.assertIn("実績でレビュー要", explained.stdout)
+        self.assertIn("実績でレビュー必須", explained.stdout)
         # 依頼文の先頭にリスクの行が載る。
         fixture = self.remote()
         requested = self.request(fixture, 1)

@@ -212,7 +212,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         </p>
         <TargetSelect target={data.target} targets={data.targets} onSwitch={(kind, name) => post({ type: "switchTarget", kind, name })} />
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
+        <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
           更新
         </button>
       </>
@@ -351,7 +351,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <div id="changed" data-tour="changed" className={shownChanged ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={shownBusy} onClick={reload}>
           更新
         </button>
       </div>
@@ -371,7 +371,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <button type="button" className="action" data-action="open-phases" data-tour="open-file" disabled={shownPage?.exists !== true} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={shownBusy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを再読み込みします" disabled={shownBusy} onClick={reload}>
             更新
           </button>
           <button
@@ -454,7 +454,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               <code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には使いません。編集可能な範囲と必須成果物は <code>,</code> で区切ります。
             </p>
             <p className="hint">
-              順序（どのフェーズがどれを待つか）はこのファイルには書きません。親チケットの計画の項に <code>after</code> で先行を書きます（最後の項がほかの全部を待つようにします）。
+              順序（どのフェーズがどれを待つか）はこのファイルには記載しません。親チケットの計画の項に <code>after</code> で先行を指定します（最後の項がほかの全部を待つようにします）。
               親チケットは承認のときに使う定義の写し（<code>phases:</code>）を持つので、あとでここを直しても進行中の親には反映されません。
             </p>
           </div>

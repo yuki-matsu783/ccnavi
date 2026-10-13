@@ -87,7 +87,7 @@ function renumberOf(plan: ApprovePlan): Map<number, number> {
     } else {
       pick = numbers.find((m) => !placed.has(m) && !fixed.has(m) && (preds.get(m) ?? []).every((p) => placed.has(p)));
     }
-    assert.ok(pick !== undefined, `${pos} 番に置ける項が無い（振り直せない形）`);
+    assert.ok(pick !== undefined, `${pos} 番に置ける項がない（振り直せない形）`);
     placed.set(pick, pos);
   }
   return placed;
@@ -202,7 +202,7 @@ test("CB-T504 子の提案の付け替えは、番号の変わる項の phase �
       }
     }
   }
-  assert.ok(checked >= 2, "付け替わる子の見本が無い");
+  assert.ok(checked >= 2, "付け替わる子の見本がありません");
 });
 
 test("CB-T505 見本の答えは、引く前の答え（base）と提案に書いてある先行が同じで、未保存かどうかが段の筋と合う", () => {
@@ -232,7 +232,7 @@ test("CB-T505 見本の答えは、引く前の答え（base）と提案に書�
     assert.equal(sample.answers[value.base].base, value.base, `${name}: base の base は自分自身`);
     for (const plan of value.answer.plans) {
       const before = base.plans.find((p) => p.part === plan.part);
-      assert.ok(before !== undefined, `${name}: base に ${plan.part} が無い`);
+      assert.ok(before !== undefined, `${name}: base に ${plan.part} がありません`);
       assert.deepEqual(plan.proposed, before.proposed, `${name} ${plan.part}: 提案に書いてある先行が base と違う`);
       assert.deepEqual(plan.items.map((item) => item.from).sort(), before.items.map((item) => item.from).sort(), `${name} ${plan.part}: 項の集まりが base と違う`);
     }
@@ -299,20 +299,20 @@ test("CB-T506 案内の scene は、画面が読む鍵と、見本にある答�
         assert.ok(known.includes(key), `${at}: scene の鍵 ${key} を画面は読まない`);
       }
       for (const key of ["answer", "refused", "changed"] as const) {
-        assert.ok(scene[key] === undefined || (typeof scene[key] === "string" && String(scene[key]) in sample.answers), `${at}: ${key} の ${String(scene[key])} が見本に無い`);
+        assert.ok(scene[key] === undefined || (typeof scene[key] === "string" && String(scene[key]) in sample.answers), `${at}: ${key} の ${String(scene[key])} が見本にありません`);
       }
       for (const key of ["checking", "gone", "review", "tidy", "diff"] as const) {
         assert.ok(scene[key] === undefined || typeof scene[key] === "boolean", `${at}: ${key} は真偽`);
       }
       if (scene.refused !== undefined) {
-        assert.ok(sample.answers[String(scene.refused)].answer.refused.length > 0, `${at}: refused の答えに断った線が無い`);
+        assert.ok(sample.answers[String(scene.refused)].answer.refused.length > 0, `${at}: refused の答えに断った線がありません`);
       }
       if (scene.pick !== undefined) {
         const shown = sample.answers[String(scene.answer ?? "open")].answer;
-        assert.ok(typeof scene.pick === "number" && shown.plans.some((plan) => plan.items.some((item) => item.number === scene.pick)), `${at}: pick の項が答えに無い`);
+        assert.ok(typeof scene.pick === "number" && shown.plans.some((plan) => plan.items.some((item) => item.number === scene.pick)), `${at}: pick の項が答えにありません`);
       }
       // 指す先は、その段の見本に出る印だけ（出ないものを指すと、吹き出しが中ほどへ逃げる）
-      assert.ok(step.target !== "", `${at}: 指す先が無い`);
+      assert.ok(step.target !== "", `${at}: 指す先がありません`);
       assert.ok(targetsOf(scene).has(step.target), `${at}: 指す先 ${step.target} はこの段の見本に出ない`);
       steps += 1;
     }
@@ -340,21 +340,21 @@ test("CB-T507 案内の構成。基本の案内は今の題と順序のまま。
   );
 });
 
-test("CB-T508 見本の書き間違いは読み込みで落ちる（知らない鍵・先に書いていない base・計画が無い答え・開いたときの答えが無い）", () => {
+test("CB-T508 見本の書き間違いは読み込みで落ちる（知らない鍵・先に書いていない base・計画がない答え・開いたときの答えがありません）", () => {
   const plan = { items: [{ number: 1, type: "research", title: "調査", review: "none" }], after: {}, ready: [1] };
   const ok = { ticket: "t", answers: { open: { plan } } };
   assert.ok(parseWorkflowSample(ok).answers.open.answer.writable);
   const bad: Array<[string, unknown, RegExp]> = [
     ["オブジェクトでない", [], /オブジェクトではない/],
-    ["ticket が無い", { answers: { open: { plan } } }, /ticket/],
+    ["ticket がありません", { answers: { open: { plan } } }, /ticket/],
     ["知らない鍵（根）", { ...ok, anwsers: {} }, /知らない鍵 anwsers/],
     ["知らない鍵（答え）", { ticket: "t", answers: { open: { plan, writeable: true } } }, /知らない鍵 writeable/],
     ["知らない鍵（計画）", { ticket: "t", answers: { open: { plan: { ...plan, redy: [1] } } } }, /知らない鍵 redy/],
     ["知らない鍵（項）", { ticket: "t", answers: { open: { plan: { ...plan, items: [{ number: 1, type: "a", titel: "x" }] } } } }, /知らない鍵 titel/],
-    ["base が先に無い", { ticket: "t", answers: { open: { plan }, next: { base: "later", plan }, later: { plan } } }, /base「later」/],
-    ["計画が無い", { ticket: "t", answers: { open: {} } }, /計画/],
-    ["open が無い", { ticket: "t", answers: { other: { plan } } }, /open/],
-    ["実行ファイルの形でない（項に番号が無い）", { ticket: "t", answers: { open: { plan: { ...plan, items: [{ type: "a" }] } } } }, /\.number は/],
+    ["base が先にありません", { ticket: "t", answers: { open: { plan }, next: { base: "later", plan }, later: { plan } } }, /base「later」/],
+    ["計画がありません", { ticket: "t", answers: { open: {} } }, /計画/],
+    ["open がありません", { ticket: "t", answers: { other: { plan } } }, /open/],
+    ["実行ファイルの形でない（項に番号がありません）", { ticket: "t", answers: { open: { plan: { ...plan, items: [{ type: "a" }] } } } }, /\.number は/],
   ];
   for (const [name, raw, pattern] of bad) {
     assert.throws(() => parseWorkflowSample(raw), pattern, name);
@@ -374,14 +374,14 @@ test("CB-T508 見本の書き間違いは読み込みで落ちる（知らない
   assert.deepEqual(edited.answer.plans[1], inherited.answers.open.answer.plans[1]);
 });
 
-test("CB-T509 保存できない理由の言葉は、案内の見本でも実際と同じ関数から出る。断られた線と確かめ中の一言", () => {
-  assert.equal(CHECKING_TEXT, "線を変えた順序を ccnavi に確かめています…");
+test("CB-T509 保存できない理由の言葉は、案内の見本でも実際と同じ関数から出る。断られた線と確認中の一言", () => {
+  assert.equal(CHECKING_TEXT, "線を変えた順序を ccnavi で確認しています…");
   const refused = sample.answers.unpackable.answer.refused;
   assert.equal(refusedText(refused), `この線は引けません。線は引く前のままです: ${refused[0].text}`);
   const blocked = (name: string, state = { pending: false, changed: false, gone: false }): string => saveBlocker(sample.answers[name].answer, state);
   assert.equal(blocked("open"), "順序を変えていません");
   assert.equal(blocked("swap"), "");
-  assert.match(blocked("swap", { pending: true, changed: false, gone: false }), /確かめています/);
+  assert.match(blocked("swap", { pending: true, changed: false, gone: false }), /確認しています/);
   assert.match(blocked("swap", { pending: false, changed: true, gone: false }), /外で変わった/);
   assert.match(blocked("swap", { pending: false, changed: false, gone: true }), /承認待ちにありません/);
   assert.match(blocked("loose"), /順序の検査/);

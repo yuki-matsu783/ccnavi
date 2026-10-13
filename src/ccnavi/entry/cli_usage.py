@@ -5,10 +5,9 @@ cli から分けた。cli を読まない。
 
 from __future__ import annotations
 
-USAGE = """ccnavi guards agent tool calls and guides the agent to a safer alternative.
+USAGE = """ccnaviはエージェントのツール呼び出しを制御し、より安全な操作へ誘導します。
 
-It is a hook command, not something to run by hand: it reads one hook payload
-as JSON on stdin and writes its response to stdout.
+通常はフックとして実行します。標準入力からフックのJSONデータを1件読み込み、処理結果を標準出力に出力します。
 
 Register it on PreToolUse to judge calls before they run, and on PostToolUse to
 watch the working tree for protected files that changed anyway. Exercise it with
@@ -26,7 +25,7 @@ extension compare with their own, and every flag it accepts. It reads no
 payload and no settings. The --json shape is documented in README.md
 ("版の JSON").
 
-To check the rules file and the settings without making a decision, run
+ツールの実行可否を判定せずに、ルールファイルと設定を検証するには、次のコマンドを実行します。
 
     ccnavi --lint [--json]
 
@@ -191,7 +190,8 @@ To rotate the decision log and remove old logs and finished sessions' state
 
     ccnavi --prune [--preview]
 
---preview only lists what would move. Without it, --prune needs a terminal.
+--preview を指定すると、移動予定の項目のみを表示し、実際の変更は行いません。
+指定しない場合、--prune はターミナルから実行する必要があります。
 
 To draft rules from the decision log (logs/decisions.jsonl and its rotated
 decisions.*.jsonl), run

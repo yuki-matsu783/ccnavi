@@ -140,7 +140,7 @@ test("CB-T219 編集は触ったところだけを差し替え、ほかの欄（
   assert.equal("condition" in cleared.connections[0], false);
 });
 
-test("CB-T220 雛形は 開始 → チケットを読む → 終了 の 3 ノードと線 2 本で、そのまま読み直せて注意が出ない", () => {
+test("CB-T220 雛形は 開始 → チケットを読む → 終了 の 3 ノードと線 2 本で、そのまま再読み込みできて注意が出ない", () => {
   const doc = templateFlow("i0001-01-01", "調査");
   assert.deepEqual(
     doc.nodes.map((node) => node.type),
@@ -167,9 +167,9 @@ test("CB-T220 雛形は 開始 → チケットを読む → 終了 の 3 ノー
 
 test("CB-T221 画面が断るのは描けないときだけ。正しいか（id の重なり・線の形・別名）は決めず、例外を外に出さない", () => {
   const refused: [string, RegExp][] = [
-    ["nodes: [", /画面の YAML パーサーで読めないため、図にできません/],
-    ["a: 1\na: 2\n", /画面の YAML パーサーで読めないため、図にできません/],
-    ["nodes: []\n---\nnodes: []\n", /画面の YAML パーサーで読めないため、図にできません/],
+    ["nodes: [", /画面の YAML パーサーで読み込めないため、図にできません/],
+    ["a: 1\na: 2\n", /画面の YAML パーサーで読み込めないため、図にできません/],
+    ["nodes: []\n---\nnodes: []\n", /画面の YAML パーサーで読み込めないため、図にできません/],
     ["", /描けません/],
     ["- 1\n", /描けません/],
     ["name: x\n", /描けません/],
@@ -199,7 +199,7 @@ test("CB-T221 画面が断るのは描けないときだけ。正しいか（id 
   assert.deepEqual(connectionsOf(bare.doc), []);
 });
 
-test("CB-T222 ノードを消すと線も消え、出口を消すと後ろの出口の線は番号を詰める。重なる線と自分へ戻る線は足さない", () => {
+test("CB-T222 ノードを削除すると線も消え、出口を削除すると後ろの出口の線は番号を詰める。重なる線と自分へ戻る線は足さない", () => {
   let doc = sample();
   doc = removeNode(doc, "mcp-1");
   assert.deepEqual(
@@ -282,7 +282,7 @@ test("CB-T223 入れ子の段は subAgent と subAgentFlow で 1 段ずつ数え
   assert.ok(flowNotices(nested(1)).some((n) => n.includes("サブフロー（subAgentFlows）が 1 本")));
 });
 
-test("CB-T224 出入口は種類の既定に、読んだ線が使う表記を足す。線の言葉は条件か出口の名前", () => {
+test("CB-T224 出入口は種類の既定に、読んだ線が使う表記を追加する。線の言葉は条件か出口の名前", () => {
   const doc = sample();
   const ask = doc.nodes[1];
   assert.deepEqual(portsOf(ask, connectionsOf(doc)), {
@@ -359,7 +359,7 @@ test("CB-T254 グループ化は選んだノードを外枠＋余白の枠で囲
   assert.equal(byId(doc, "c").parentId, undefined);
   // 線はそのまま。グループは注意に「欄を持たない種類」として出ない。出入口も無い
   assert.deepEqual(doc.connections, three().connections);
-  assert.deepEqual(flowNotices(doc).filter((n) => /入力欄が無い/.test(n)), []);
+  assert.deepEqual(flowNotices(doc).filter((n) => /入力欄がない/.test(n)), []);
   assert.deepEqual(portsOf(byId(doc, "group-1"), connectionsOf(doc)), { inputs: [], outputs: [] });
   // グループへは線を繋がない
   assert.equal(connect(doc, "c", "output", "group-1", "input"), doc);
@@ -383,7 +383,7 @@ test("CB-T254 グループ化は選んだノードを外枠＋余白の枠で囲
   assert.deepEqual(absolutePosition(fresh.doc, "x"), { x: 700, y: 500 });
 });
 
-test("CB-T255 グループを解く・消すと、中のノードは図の上の同じ位置で外へ出て残る。中のノードを消してもグループは残る", () => {
+test("CB-T255 グループを解く・削除すると、中のノードは図の上の同じ位置で外へ出て残る。中のノードを削除してもグループは残る", () => {
   const grouped = groupNodes(three(), ["a", "b"]);
   assert.ok(grouped !== undefined);
   for (const next of [ungroup(grouped.doc, "group-1"), removeNode(grouped.doc, "group-1")]) {
@@ -491,7 +491,7 @@ function loopFlow(): FlowDoc {
   };
 }
 
-test("CB-T322 繰り返し（loop）は部品箱の 8 番目で、足すと出口 2 つ（繰り返す / 抜ける）と上限 3 の既定で作る", () => {
+test("CB-T322 繰り返し（loop）は部品箱の 8 番目で、追加すると出口 2 つ（繰り返す / 抜ける）と上限 3 の既定で作る", () => {
   assert.deepEqual([...PALETTE], ["start", "end", "prompt", "subAgent", "askUserQuestion", "ifElse", "switch", "loop", "skill"]);
   const added = addNode(bareFlow("i0001-01-01", "調査"), "loop", { x: 1, y: 2 });
   assert.equal(added.id, "loop-1");
@@ -524,7 +524,7 @@ test("CB-T323 繰り返しの線の言葉は出口の項目の id（body / done�
   assert.deepEqual(node?.data, { label: "", condition: "テストが落ちる", maxIterations: 5, branches: [{ id: "body", label: "繰り返す" }, { id: "done", label: "抜ける" }] });
 });
 
-test("CB-T324 書き出して読み直しても maxIterations は数のまま（文字列にならない）。出口の id も残る", () => {
+test("CB-T324 書き出して再読み込みしても maxIterations は数のまま（文字列にならない）。出口の id も残る", () => {
   const doc = patchData(loopFlow(), "loop-1", { condition: "テストが落ちる", maxIterations: 7 });
   const text = serializeFlow(doc);
   assert.match(text, /maxIterations: 7\n/);
@@ -553,7 +553,7 @@ test("CB-T325 繰り返しを複製・貼り付けしても出口の項目（bod
   assert.deepEqual(portsOf(pasted.doc.nodes.find((n) => n.id === pasted.ids[0]) as FlowNode, []).outputs.map((p) => p.label), ["繰り返す", "抜ける"]);
 });
 
-test("CB-T326 項目の id（body / done）で書いた線は、branch-<番号> の出口と別に並べず、その id を出口にする。両方で書けば id の出口が足される", () => {
+test("CB-T326 項目の id（body / done）で書いた線は、branch-<番号> の出口と別に並べず、その id を出口にする。両方で書けば id の出口が追加される", () => {
   const doc = loopFlow();
   const node = doc.nodes.find((n) => n.id === "loop-1") as FlowNode;
   const byId = [

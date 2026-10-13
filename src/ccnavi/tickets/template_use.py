@@ -54,13 +54,13 @@ def resolve(conf, root: str, layer: str, name: str) -> tuple[Found | None, str]:
     scanned = plan_templates.scan(conf, root)
     if scanned.layer(layer) is None:
         known = " / ".join(view.name for view in scanned.layers) or "無い"
-        return None, f"レイヤー {layer!r} は無い（{known}）"
+        return None, f"レイヤー {layer!r} はありません（{known}）"
     entry = plan_templates.find(scanned, layer, name)
     if entry is None:
         usable = sorted(e.name for e in plan_templates.adopted(scanned, layer) if e.usable)
         listed = ", ".join(usable) or "無い"
         return None, (
-            f"テンプレート {name!r} が無い（{layer} に使えるもの: {listed}）。"
+            f"テンプレート {name!r} がありません（{layer} に使えるもの: {listed}）。"
             "一覧は 'ccnavi --templates'"
         )
     if entry.effective and entry.layer == plan_templates.LAYER_COMMON:

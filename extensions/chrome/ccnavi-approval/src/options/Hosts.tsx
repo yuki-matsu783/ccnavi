@@ -40,12 +40,12 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
       const host = customHost(form.get("kind"), form.get("url"));
       const granted = await chrome.permissions.request({ origins: [originPattern(host)] });
       if (!granted) {
-        throw new Error(`${host.web} への通信を許可しないと足せない`);
+        throw new Error(`${host.web} への通信を許可しないと追加できません。`);
       }
       const all = await loadAllHosts();
       try {
         if (all.some((h) => h.id === host.id)) {
-          throw new Error(`${host.id} は足してあるか、組み込みの通信先と同じ名前`);
+          throw new Error(`${host.id} は登録済みか、標準の通信先と名前が重複しています。`);
         }
         const rows = await loadRawCustomRows();
         await chrome.storage.local.set({ customHosts: [...rows, rowOf(host)] });
@@ -54,7 +54,7 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
         if (!patternShared(host, all)) await releasePermission(host);
         throw err;
       }
-      setSaid({ text: `${host.web}（${KIND[host.kind]}）を足した。PAT は「PAT」の節で登録する`, ok: true });
+      setSaid({ text: `${host.web}（${KIND[host.kind]}）を追加しました。「PAT」欄でトークンを登録してください。`, ok: true });
     } catch (err) {
       setSaid({ text: (err as Error).message, ok: false });
     } finally {
@@ -66,7 +66,7 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
   const remove = async (h: Host): Promise<void> => {
     const repos = await loadRepos();
     if (repos.some((r) => r.host === h.id)) {
-      setSaid({ text: `${h.id} のリポジトリが残っている。先にリポジトリを外してから、ホストを外す`, ok: false });
+      setSaid({ text: `${h.id} にリポジトリが登録されています。先にリポジトリの登録を削除してから、ホストを削除してください。`, ok: false });
       return;
     }
     try {
@@ -81,7 +81,7 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
       await chrome.storage.local.set({ customHosts: rows });
       // 同じ許可を組み込みや別の port の行も使っていれば、許可は外さない
       if (!patternShared(h, await loadAllHosts())) await releasePermission(h);
-      setSaid({ text: `${h.id} を外した。PAT も消した。ホスト側でも失効させてください`, ok: true });
+      setSaid({ text: `${h.id} と、このブラウザに保存されていたPATを削除しました。ホスト側でもPATを失効させてください。`, ok: true });
     } catch (err) {
       setSaid({ text: (err as Error).message, ok: false });
     } finally {
@@ -96,7 +96,7 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
       <ul id="host-list" className="list">
         {hosts.length === 0 ? (
           <li className="row entry">
-            <span className="text">足したホストは無い（GitHub.com と GitLab.com は組み込み）</span>
+            <span className="text">追加のホストは登録されていません（GitHub.comとGitLab.comは標準で利用できます）。</span>
           </li>
         ) : null}
         {hosts.map((h) => (
@@ -104,7 +104,7 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
             <div className="row-head">
               <span className="text">{`${h.web}（${KIND[h.kind]}）`}</span>
               <button type="button" className="action small" onClick={() => void remove(h)}>
-                外す
+                削除
               </button>
             </div>
           </li>
@@ -119,18 +119,18 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
           </select>
         </label>
         <label className="field">
-          <span className="cap">ホストの URL（オリジンだけ。例 https://gitlab.example.com・http://localhost:8080）</span>
+          <span className="cap">ホストのURL（スキーム・ホスト名・必要に応じてポート番号のみ。例 https://gitlab.example.com・http://localhost:8080）</span>
           <input name="url" id="host-url" type="text" required placeholder="https://gitlab.example.com" />
         </label>
         <div className="buttons">
           <button type="submit" className="action primary">
-            足す
+            追加
           </button>
         </div>
       </form>
       <Status id="host-msg" said={said} />
       <p className="hint">
-        足すと、そのホストへの通信を Chrome に許可してもらいます。許可したホスト名にだけ通信し、PAT もそこへだけ送ります。https のホストと、http では localhost と 127.0.0.1 を足せます。GitLab
+        追加すると、そのホストへの通信の許可を Chrome に求めます。許可したホスト名にのみ通信し、PAT も許可したホストにのみ送信します。追加できるのは https のホストと、http の localhost・127.0.0.1 です。GitLab
         は API が「ホスト/api/v4」、GitHub Enterprise Server は「ホスト/api/v3」と「ホスト/api/graphql」にあるものとして扱います。
       </p>
     </section>

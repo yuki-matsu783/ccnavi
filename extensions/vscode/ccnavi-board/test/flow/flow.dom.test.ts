@@ -66,19 +66,19 @@ test("CB-D107 図はノードと線を描き、問いには「メインに戻る
   }
 });
 
-test("CB-D108 ファイルが無ければ雛形を見せ、そのまま保存できる（保存でファイルを作る）", async () => {
+test("CB-D108 ファイルがなければ雛形を見せ、そのまま保存できる（保存でファイルを作る）", async () => {
   const dom = await openFlow({ exists: false, doc: templateFlow("i0001-01-01", "調査") });
   try {
     assert.equal(dom.all(".react-flow__node").length, 3);
     assert.match(dom.one(".toolbar").textContent ?? "", /ファイルはまだありません。保存すると作られます/);
     const save = dom.one<HTMLButtonElement>("#save");
     assert.ok(!save.disabled);
-    assert.ok(dom.one<HTMLButtonElement>('[data-action="open-flow"]').disabled, "無いファイルはエディタで開けない");
+    assert.ok(dom.one<HTMLButtonElement>('[data-action="open-flow"]').disabled, "ないファイルはエディタで開けない");
     dom.click(save);
     await dom.settle();
     assert.deepEqual(savedDoc(dom), templateFlow("i0001-01-01", "調査"));
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled, "往復の間は止める");
-    assert.match(dom.one("#status").textContent ?? "", /着手中でないかを確かめて保存中/);
+    assert.match(dom.one("#status").textContent ?? "", /着手中でないかを確認して保存中/);
     // 拡張ホストが断った（錠を聞き直したら着手中だった）
     await dom.send({ type: "failed", message: lockedReason("i0001-01-01") });
     assert.match(dom.one("#status").textContent ?? "", /DENY_TICKET_FLOW_LOCKED/);
@@ -93,12 +93,12 @@ test("CB-D109 錠が掛かっていれば読むだけ。理由の帯を出し、
   const dom = await openFlow({ ticket: "i0001-02-02", doc: marked(), lock, exists: false });
   try {
     const banner = dom.one("#lock").textContent ?? "";
-    assert.match(banner, /着手中かレビュー中のため、フローを書き換えられません/);
+    assert.match(banner, /着手中かレビュー中のため、フローを変更できません/);
     assert.match(banner, /finish で終わるか cancel で取り消されると外れます/);
     for (const button of dom.all<HTMLButtonElement>('[data-action="add-node"]')) {
       assert.ok(button.disabled);
     }
-    assert.ok(dom.one<HTMLButtonElement>("#save").disabled, "無いファイルでも、錠が掛かっていれば保存できない");
+    assert.ok(dom.one<HTMLButtonElement>("#save").disabled, "ないファイルでも、錠が掛かっていれば保存できない");
     assert.equal(dom.one("#flow-graph").getAttribute("data-readonly"), "1");
     // ノードを押して欄を見ても、欄は止まっている
     dom.click(dom.one('.react-flow__node[data-id="subAgent-1"]'));
@@ -122,7 +122,7 @@ test("CB-D109 錠が掛かっていれば読むだけ。理由の帯を出し、
   }
 });
 
-test("CB-D110 部品箱で足して欄で直して保存すると、知らない欄と知らない種類はそのまま送る", async () => {
+test("CB-D110 部品箱で追加して欄で直して保存すると、知らない欄と知らない種類はそのまま送る", async () => {
   const dom = await openFlow({ doc: sample() });
   try {
     assert.equal(dom.all(".react-flow__node").length, 4);
@@ -131,7 +131,7 @@ test("CB-D110 部品箱で足して欄で直して保存すると、知らない
     assert.equal(mcp.getAttribute("data-type"), "other");
     dom.click(dom.one('.react-flow__node[data-id="mcp-1"]'));
     await dom.settle();
-    assert.match(dom.one("#inspector").textContent ?? "", /この画面に入力欄が無い種類/);
+    assert.match(dom.one("#inspector").textContent ?? "", /この画面に入力欄がない種類/);
     assert.match(dom.one("#inspector pre.flow-raw").textContent ?? "", /serverId: srv\ntoolName: t\n/);
     // 足して、欄で直す
     dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
@@ -206,7 +206,7 @@ test("CB-D111 入れ子が子の下 2 段を超えるときだけ注意を出す
   }
 });
 
-test("CB-D112 外のファイルを取り込むボタンは無い。中身（data）が届くと編集は捨てられて未保存が消える", async () => {
+test("CB-D112 外のファイルを取り込むボタンはありません。中身（data）が届くと編集は捨てられて未保存が消える", async () => {
   const dom = await openFlow();
   try {
     assert.equal(dom.all('[data-action="import"]').length, 0);
@@ -222,15 +222,15 @@ test("CB-D112 外のファイルを取り込むボタンは無い。中身（dat
   }
 });
 
-test("CB-D117 ノードと線の × で消せる。押しても選ばない。消したものを選んでいたら欄はフローに戻る。読むだけなら × は出ない", async () => {
+test("CB-D117 ノードと線の × で削除できる。押しても選ばない。削除したものを選んでいたら欄はフローに戻る。読むだけなら × は出ない", async () => {
   const dom = await openFlow({ doc: marked() });
   try {
     // × はどのノードにもある（載せた・選んだときだけ見せるのは CSS）。線の × は載せる・選ぶまで出さない
     assert.equal(dom.all('[data-action="canvas-remove-node"]').length, 4);
     assert.equal(dom.all('[data-action="canvas-remove-edge"]').length, 0);
     const button = dom.one('.react-flow__node[data-id="askUserQuestion-1"] [data-action="canvas-remove-node"]');
-    assert.equal(button.getAttribute("aria-label"), "このノードを消す");
-    assert.equal(button.getAttribute("title"), "このノードを消す");
+    assert.equal(button.getAttribute("aria-label"), "このノードを削除");
+    assert.equal(button.getAttribute("title"), "このノードを削除");
     dom.click(button);
     await dom.settle();
     assert.equal(dom.all(".react-flow__node").length, 3);
@@ -250,7 +250,7 @@ test("CB-D117 ノードと線の × で消せる。押しても選ばない。�
     await dom.settle();
     assert.equal(dom.one("#inspector").getAttribute("data-selected"), "edge");
     const edgeButton = dom.one('[data-action="canvas-remove-edge"]');
-    assert.equal(edgeButton.getAttribute("aria-label"), "この線を消す");
+    assert.equal(edgeButton.getAttribute("aria-label"), "この線を削除");
     dom.click(edgeButton);
     await dom.settle();
     assert.equal(dom.all(".react-flow__edge").length, 0);

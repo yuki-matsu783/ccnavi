@@ -48,14 +48,14 @@ test("CB-T407 ルールの案内の scene は、見本にあるタブ・行の i
       const scene = step.scene;
       assert.ok(scene.tab === undefined || ["rules", "judge", "hooks"].includes(String(scene.tab)), `${at}: tab`);
       for (const id of String(scene.open ?? "").split(",").filter((item) => item.trim() !== "")) {
-        assert.ok(ids.has(id.trim()), `${at}: open の ${id} が見本に無い`);
+        assert.ok(ids.has(id.trim()), `${at}: open の ${id} が見本にありません`);
       }
-      assert.ok(scene.judge === undefined || String(scene.judge) in sample.judges, `${at}: judge の ${String(scene.judge)} が見本に無い`);
+      assert.ok(scene.judge === undefined || String(scene.judge) in sample.judges, `${at}: judge の ${String(scene.judge)} が見本にありません`);
       for (const section of String(scene.fold ?? "").split(",").filter((item) => item.trim() !== "")) {
         assert.ok(["deny", "ask", "allow"].includes(section.trim()), `${at}: fold の ${section} がタイプではない`);
       }
-      assert.ok(scene.sum === undefined || sample.sums.some((sum) => sum.name === scene.sum), `${at}: sum の ${String(scene.sum)} が見本に無い`);
-      assert.ok(scene.error === undefined || (scene.error === true && sample.saveError !== ""), `${at}: error は true で、見本に save_error が要る`);
+      assert.ok(scene.sum === undefined || sample.sums.some((sum) => sum.name === scene.sum), `${at}: sum の ${String(scene.sum)} が見本にありません`);
+      assert.ok(scene.error === undefined || (scene.error === true && sample.saveError !== ""), `${at}: error は true で、見本に save_error が必要です`);
       for (const key of ["checked", "suggested", "more"]) {
         assert.ok(scene[key] === undefined || scene[key] === true, `${at}: ${key} は true だけ`);
       }

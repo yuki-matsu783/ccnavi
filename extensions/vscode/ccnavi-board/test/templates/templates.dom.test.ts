@@ -48,7 +48,7 @@ test("CB-D325 足し算の枠は閉じた枠で出て、選んだ足し算の索
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
     const rows = dom.all("details#sum tbody tr").map((tr) => `${tr.getAttribute("data-layer")}/${tr.getAttribute("data-name")}`);
     assert.deepEqual(rows, ["common/broken", "common/feature", "common/research", "self/ends", "self/feature", "self/local", "self/research"]);
-    assert.match(text(dom.one('details#sum tr[data-layer="common"][data-name="broken"]')), /読めない/);
+    assert.match(text(dom.one('details#sum tr[data-layer="common"][data-name="broken"]')), /読み込めない/);
     assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="feature"]')), /使われない/);
     assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="research"]')), /共通と食い違う/);
     assert.match(text(dom.one('[data-count="sum"]')), /使われるのは 4 件（common \+ self）/);
@@ -111,7 +111,7 @@ test("CB-D327 苦情の件数と深刻度の文字（[error] [warn] [info]）が
   }
 });
 
-test("CB-D328 下書きは 3 件出て、取り込めない・TODO・同名ありを札で出す。効力が無いことを一覧の前に言う", async () => {
+test("CB-D328 下書きは 3 件出て、取り込めない・TODO・同名ありを札で出す。効力がないことを一覧の前に言う", async () => {
   const dom = await openTemplates();
   try {
     assert.equal(dom.all("li.draft").length, 3);
@@ -183,7 +183,7 @@ test("CB-D331 対象を切り替えると switchTarget を送る。共通の設�
   }
 });
 
-test("CB-D348 足し算で捨てられた行の本文は、層か sha が違えば出さず、読めない理由と直接開く先を出す。一致すれば本文を出す", async () => {
+test("CB-D348 足し算で捨てられた行の本文は、層か sha が違えば出さず、読み込めない理由と直接開く先を出す。一致すれば本文を出す", async () => {
   const dom = await openTemplates();
   try {
     await openRow(dom, 'li.template[data-name="feature"][data-layer="self"]');
@@ -197,7 +197,7 @@ test("CB-D348 足し算で捨てられた行の本文は、層か sha が違え�
     // 層が違う本文は出さない（sha は同じでも）
     await dom.send({ type: "detail", name: "feature", layer: "self", template: { ...common, text: "共通の本文" }, error: "" });
     assert.equal(dom.all("pre.tpl-text").length, 0);
-    assert.match(text(dom.one('[data-role="detail-mismatch"]')), /この行の本文は読めません/);
+    assert.match(text(dom.one('[data-role="detail-mismatch"]')), /この行の本文は読み込めません/);
     assert.match(text(dom.one('[data-role="detail-mismatch"]')), /feature\.yml/);
     // 層が同じでも sha が違う本文は出さない
     await dom.send({ type: "detail", name: "feature", layer: "self", template: { ...self, sha: "f".repeat(64), text: "別の本文" }, error: "" });

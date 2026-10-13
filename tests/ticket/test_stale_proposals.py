@@ -187,7 +187,7 @@ class StaleProposalTest(PhaseHarness):
             "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き", verify.stdout
         )
         agree = self.ccnavi("--agree", stdin="y\n")
-        self.assertIn("承認待ちのチケットは無い", agree.stdout)
+        self.assertIn("承認待ちのチケットはありません。", agree.stdout)
         self.assertIn(place_rel, agree.stderr)
         self.assertIn(
             "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き", agree.stderr

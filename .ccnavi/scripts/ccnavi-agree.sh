@@ -42,7 +42,7 @@ sh .ccnavi/scripts/ccnavi-agree.sh [<識別子>...]
   承認待ちのチケットを一覧表示し、y/N で確認を取ってから承認する。
   承認が通れば承認済みチケットをコミットして push する。
   識別子を並べると、その分だけを承認の対象にする（例: ccnavi-agree.sh i0002-01-03）。
-  端末からユーザが打つ。エージェントからは呼べない（組み込みの deny で止まる）。
+  端末からユーザが実行します。エージェントからは呼べない（組み込みの deny で止まる）。
 USAGE
 }
 
@@ -63,7 +63,7 @@ fi
 for id in "$@"; do
 	case "$id" in
 	"" | -*)
-		printf 'ccnavi-agree: 識別子でない引数は取りません (%s)。\n' "$id" >&2
+		printf 'ccnavi-agree: チケットID以外の引数は指定できません（%s）。\n' "$id" >&2
 		usage >&2
 		exit 2
 		;;
@@ -84,7 +84,7 @@ if bin=$(ccnavi_bin "$root"); then
 elif [ -f "$root/src/ccnavi/__main__.py" ]; then
 	set -- uv run python -m ccnavi --root "$root" --agree "$@"
 else
-	printf 'ccnavi-agree: ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。\n' >&2
+	printf 'ccnavi-agree: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
 fi
 

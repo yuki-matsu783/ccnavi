@@ -55,8 +55,8 @@ test("CB-T70 バンドルした画面を nonce 付きの script に流し込み�
   assert.doesNotMatch(shell(rendered), /<script[^>]*\ssrc=/);
 });
 
-test("CB-T165 読み直せなかったときは一覧の代わりに理由を渡す", () => {
-  const rendered = rulesHtml({ kind: "error", error: "ルールファイルを読めない" });
+test("CB-T165 再読み込みできなかったときは一覧の代わりに理由を渡す", () => {
+  const rendered = rulesHtml({ kind: "error", error: "ルールファイルを読み込めない" });
   assert.match(rendered, /"kind":"error"/);
-  assert.match(rendered, /ルールファイルを読めない/);
+  assert.match(rendered, /ルールファイルを読み込めない/);
 });

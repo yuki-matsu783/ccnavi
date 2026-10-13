@@ -140,10 +140,10 @@ class ErrorTest(unittest.TestCase):
         self.check("*.md", "リストではない")
         self.check(["*.md"], "except[0]", "マッピングではない")
         self.check([{"glob": "*.md", "regex": "x"}], "except[0]", "両方")
-        self.check([{"glob": "*.md"}, {}], "except[1]", "glob も regex も無い")
-        self.check([{"glob": ""}], "except[0]", "glob も regex も無い")
-        self.check([{"glob": "*.md", "why": "x"}], "except[0]", "知らないキー", "why")
-        self.check([{"match": "Write"}], "except[0]", "知らないキー")
+        self.check([{"glob": "*.md"}, {}], "except[1]", "glob も regex もありません。")
+        self.check([{"glob": ""}], "except[0]", "glob も regex もありません。")
+        self.check([{"glob": "*.md", "why": "x"}], "except[0]", "未対応のキー", "why")
+        self.check([{"match": "Write"}], "except[0]", "未対応のキー")
 
     def test_文字列でない値は誤り(self):
         # 引用符の無い `on` は真偽値に読まれる。黙って 'True' として当てない

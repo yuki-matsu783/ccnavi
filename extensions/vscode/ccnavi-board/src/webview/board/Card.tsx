@@ -207,7 +207,7 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
     facts.push(<Fact key="copy" kind={`copy-${card.copyStatus}`} text={COPY_LABELS[card.copyStatus]} />);
   }
   if (!closedInColumn) {
-    facts.push(<Fact key="review" kind="review" text={`人間レビュー${card.reviewRequired ? "要" : "不要"}`} title={card.reviewReason} />);
+    facts.push(<Fact key="review" kind="review" text={`人間レビュー${card.reviewRequired ? "必須" : "不要"}`} title={card.reviewReason} />);
   }
   // 着手の状態。`start` するのはエージェントなので、ユーザの対応を求めるバッジにはしない（issue #267）
   if (card.copyStatus === "open") {
@@ -229,7 +229,7 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
     facts.push(<Fact key="ready" kind="ready" text="Draft 解除済み" />);
   }
   if (card.wrapped) {
-    facts.push(<Fact key="wrapped" kind="wrapped" text="早めに閉じた" />);
+    facts.push(<Fact key="wrapped" kind="wrapped" text="途中でクローズ" />);
   }
   if (card.riskLevel !== "" && !isHighRisk(card.riskLevel)) {
     facts.push(<Fact key="risk" kind={`risk risk-${card.riskLevel.toLowerCase()}`} text={riskText(card)} />);
@@ -343,7 +343,7 @@ function FlowButton({ flow, id, closed }: { readonly flow: FlowJson; readonly id
       data-tour={`flow-${state}`}
       data-ticket={id}
       data-flow={state}
-      title={`子チケットの作業の手順（フロー）を図で${closed && !flow.locked ? "見ます。終了済みのため書き換える必要はありません" : flow.locked ? "見ます。着手中・レビュー中は書き換えられません" : `${flow.exists ? "直します" : "作ります"}。着手すると、終わるまで書き換えられなくなります`}（${flow.rel}）`}
+      title={`子チケットの作業の手順（フロー）を図で${closed && !flow.locked ? "見ます。終了済みのため変更する必要はありません" : flow.locked ? "見ます。着手中・レビュー中は変更できません" : `${flow.exists ? "直します" : "作ります"}。着手すると、終わるまで変更できなくなります`}（${flow.rel}）`}
       onClick={() => post({ type: "flow", ticket: id })}
     >
       {flowButtonLabel(flow, closed)}
@@ -363,7 +363,7 @@ function WorkflowButton({ id }: { readonly id: string }): JSX.Element {
       data-action="workflow"
       data-tour="workflow-button"
       data-ticket={id}
-      title="計画の項どうしの順序（どの項がどの項を待つか）を図で直す計画編集タブを開きます。保存すると提案が書き換わるので、承認はそのあとに開き直してください"
+      title="計画の項どうしの順序（どの項がどの項を待つか）を図で直す計画編集タブを開きます。保存すると提案内容が変更されるため、承認画面を開き直してください。"
       onClick={() => post({ type: "workflow", ticket: id })}
     >
       計画編集
@@ -379,7 +379,7 @@ function TemplateDraftButton({ id }: { readonly id: string }): JSX.Element {
       className="action"
       data-action="template-draft"
       data-ticket={id}
-      title="この親の計画とフローから、テンプレートの下書きを作ります。下書きに効力は無く、テンプレート管理画面で取り込むまで使われません。親を ready で閉じる前に作ってください"
+      title="この親の計画とフローから、テンプレートの下書きを作ります。下書きに効力はなく、テンプレート管理画面で取り込むまで使われません。親を ready でクローズする前に作ってください"
       onClick={() => post({ type: "templateDraft", ticket: id })}
     >
       テンプレートの下書きを作る
@@ -441,7 +441,7 @@ function ReviewMenu({ parent, phase }: { readonly parent: string; readonly phase
         data-phase={phase}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="レビューの対応を選びます。「対応方針を決める」は未解決（Unresolved）の指摘の行き先を 1 件ずつ決め、「レビュー済み連絡」はレビューを終えたことを Claude Code に伝える文を作ります"
+        title="レビューの対応を選びます。「対応方針を決める」は未解決（Unresolved）の指摘の対応方針を 1 件ずつ決め、「レビュー済み連絡」はレビューを終えたことを Claude Code に伝える文を作ります"
         onClick={() => setOpen(!open)}
       >
         レビューの対応
@@ -471,7 +471,7 @@ function ReviewMenu({ parent, phase }: { readonly parent: string; readonly phase
             data-action="reviewed"
             data-parent={parent}
             data-phase={phase}
-            title={`レビューを終えたことを Claude Code に伝える文を作ります。未解決の指摘の有無を確かめて文に書きます（エージェントが ccnavi-review.sh confirm --phase ${phase} を実行して、レビュー済みを記録します）`}
+            title={`レビューを終えたことを Claude Code に伝える文を作ります。未解決の指摘の有無を確認して文に反映します（エージェントが ccnavi-review.sh confirm --phase ${phase} を実行して、レビュー済みを記録します）`}
             onClick={() => {
               setOpen(false);
               post({ type: "reviewed", parent, phase });

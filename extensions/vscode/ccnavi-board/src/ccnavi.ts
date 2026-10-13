@@ -234,7 +234,7 @@ export async function loadBoard(root: string, setting: string): Promise<LoadResu
   const ran = await run(launcher, root, ["--explain", "--json"], EXPLAIN_TIMEOUT_MS);
   if (ran.code !== 0) {
     const why = ran.killed
-      ? `${EXPLAIN_TIMEOUT_MS / 1000} 秒たっても応答が無いため中断しました`
+      ? `${EXPLAIN_TIMEOUT_MS / 1000} 秒たっても応答がないため中断しました`
       : ran.stderr;
     return { ok: false, launcher, error: `ccnavi --explain --json が失敗しました: ${why}` };
   }
@@ -301,8 +301,8 @@ export async function runApproveYes(
       ok: false,
       error:
         `${cutOff("ccnavi --agree --yes", APPROVE_TIMEOUT_MS)}。` +
-        "一部だけ承認済みになっている可能性があります。承認済みチケットのコミットと push はターミナルに送っていません" +
-        "（送るのは承認できたときだけです）。チケット管理画面を更新して、何が承認されたかを確かめてください",
+        "一部だけ承認済みになっている可能性があります。承認済みチケットをコミット・pushするコマンドはターミナルに送信していません" +
+        "（送るのは承認できたときだけです）。チケット管理画面を更新して、何が承認されたかを確認してください",
     };
   }
   const parsed = parseApproveResult(ran.stdout);
@@ -369,7 +369,7 @@ export async function runDecideYes(
       ok: false,
       error:
         `${cutOff("ccnavi-review.sh decide", DECIDE_TIMEOUT_MS)}。` +
-        "反映できたか分かりません。チケット管理画面を更新して、フェーズの状態を確かめてください",
+        "反映できたか分かりません。チケット管理画面を更新して、フェーズの状態を確認してください",
     };
   }
   const parsed = parseDecideResult(ran.stdout.trim().split("\n").pop() ?? "");
@@ -597,7 +597,7 @@ async function lintJson(root: string, setting: string, extra: readonly string[],
   // 設定の不備などで実行ファイルが JSON ではなくユーザ向けの文面を出したときは、JSON.parse の苦情より
   // その文面（先頭行）のほうが原因を指しているので、そちらを見せる
   const said = firstLine(ran.stdout) || firstLine(ran.stderr);
-  return { ok: false, error: said === "" ? `${what} の出力を読めません（${parsed.error}）` : `${what} の出力: ${said}` };
+  return { ok: false, error: said === "" ? `${what} の出力を読み込めません（${parsed.error}）` : `${what} の出力: ${said}` };
 }
 
 /**
@@ -656,7 +656,7 @@ export async function runPlanOrder(root: string, setting: string, parent: string
     return { ok: false, error: `${what} が失敗しました: ${ran.stderr.trim() || firstLine(ran.stdout)}` };
   }
   const parsed = parsePlanOrder(ran.stdout);
-  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what} の出力を読めません（${parsed.error}）` };
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what} の出力を読み込めません（${parsed.error}）` };
 }
 
 /**
@@ -675,7 +675,7 @@ export async function runPlanOrderWrite(root: string, setting: string, parent: s
   if (ran.killed) {
     return {
       kind: "error",
-      error: `${cutOff(what, DIAGNOSE_TIMEOUT_MS)}。提案を書き換えたかは分かりません。再読込して確かめてください`,
+      error: `${cutOff(what, DIAGNOSE_TIMEOUT_MS)}。提案を変更したかは分かりません。再読込して確認してください`,
     };
   }
   const parsed = parsePlanOrder(ran.stdout);
@@ -693,7 +693,7 @@ export async function runPlanOrderWrite(root: string, setting: string, parent: s
   if (ran.code === 0) {
     return { kind: "unchanged", answer };
   }
-  return { kind: "refused", answer, reason: ran.stderr.trim() || "ccnavi が書き換えませんでした" };
+  return { kind: "refused", answer, reason: ran.stderr.trim() || "ccnavi が変更しませんでした" };
 }
 
 /**
@@ -754,7 +754,7 @@ export async function runTemplates(root: string, setting: string, layer: string)
     return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
   }
   const parsed = parseTemplates(ran.stdout);
-  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what} の出力を読めません（${parsed.error}）` };
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what} の出力を読み込めません（${parsed.error}）` };
 }
 
 /** 1 件の本文を読む（`--templates --show <名前> --layer <名前> --json`）。何も書かない */
@@ -772,7 +772,7 @@ export async function runTemplateShow(root: string, setting: string, name: strin
     return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
   }
   const parsed = parseTemplateShow(ran.stdout);
-  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what} の出力を読めません（${parsed.error}）` };
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what} の出力を読み込めません（${parsed.error}）` };
 }
 
 /**
@@ -801,7 +801,7 @@ async function runImport(
   if (ran.code !== 0) {
     return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
   }
-  return { ok: false, error: `${what} の出力を読めません（${parsed.error}）` };
+  return { ok: false, error: `${what} の出力を読み込めません（${parsed.error}）` };
 }
 
 /** 取り込みの下見（`--templates --import <下書き> --to … --json`）。何も書かない */
@@ -824,7 +824,7 @@ export async function runTemplateImportYes(
     setting,
     templatesImportYesArgs(request, expect),
     "ccnavi --templates --import --yes --json",
-    "（取り込めたかは分かりません。一覧を読み直して確かめてください）",
+    "（取り込めたかは分かりません。一覧を再読み込みして確認してください）",
   );
 }
 
@@ -854,7 +854,7 @@ export async function runTemplateDraft(root: string, setting: string, parent: st
     return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
   }
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    return { ok: false, error: `${what} の出力を読めません` };
+    return { ok: false, error: `${what} の出力を読み込めません` };
   }
   const r = raw as Record<string, unknown>;
   if (r.ok !== true) {
@@ -900,7 +900,7 @@ async function runEdit(
     if (ran.code !== 0) {
       return { ok: false, error: `${what} が失敗しました: ${failureOf(ran)}` };
     }
-    return { ok: false, error: `${what} の出力を読めません（${parsed.error}）` };
+    return { ok: false, error: `${what} の出力を読み込めません（${parsed.error}）` };
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -908,7 +908,7 @@ async function runEdit(
 
 /** 編集の下見。何も書かない */
 export async function runTemplateEdit(root: string, setting: string, request: EditRequest): Promise<RunResult<EditAnswer>> {
-  return runEdit(root, setting, request, (bodyFile) => templatesEditArgs(request, bodyFile), "ccnavi --templates 編集の下見 --json", "");
+  return runEdit(root, setting, request, (bodyFile) => templatesEditArgs(request, bodyFile), "ccnavi --templates 編集のプレビュー --json", "");
 }
 
 /** 編集の実行。期限切れのときは、書けたかが分からないことを文に足す */
@@ -919,6 +919,6 @@ export async function runTemplateEditYes(root: string, setting: string, request:
     request,
     (bodyFile) => templatesEditYesArgs(request, bodyFile, expect),
     "ccnavi --templates 編集の実行 --yes --json",
-    "（書けたかは分かりません。一覧を読み直して確かめてください）",
+    "（保存できたかは分かりません。一覧を再読み込みして確認してください）",
   );
 }

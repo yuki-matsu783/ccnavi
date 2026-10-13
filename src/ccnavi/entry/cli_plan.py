@@ -30,7 +30,7 @@ from ..tickets import approval, plan_order, plan_phases, ticket_model
 def _not_found(stderr: TextIO, conf: settings.Settings, name: str) -> int:
     stderr.write(
         f"ccnavi: {name} の親の提案が承認待ちの置き場（{conf.tickets}/{ticket_model.TODO}/）に"
-        "無い。--plan-order には承認待ちの親の識別子を渡す\n"
+        "ありません。--plan-order には承認待ちの親の識別子を指定してください。\n"
     )
     return EXIT_ERROR
 
@@ -42,7 +42,7 @@ def fill_phases(
     proposals, _ = approval.scan_proposals(conf, root)
     target, ambiguous = plan_order.pick(proposals, name)
     if ambiguous:
-        stderr.write(f"ccnavi: {ambiguous}。何も書かない\n")
+        stderr.write(f"ccnavi: {ambiguous}。何も反映しません。\n")
         return EXIT_ERROR
     if target is None:
         return _not_found(stderr, conf, name)
@@ -52,11 +52,11 @@ def fill_phases(
         stderr.write(f"ccnavi: {done.why}\n")
         return EXIT_ERROR
     if not done.changed:
-        stdout.write(f"{name} の phases: は計画が使う定義と同じ。変えない\n")
+        stdout.write(f"{name} の phases: は計画が使う定義と同じです。変更しません。\n")
         return EXIT_OK
-    line = f"{name} の phases: に {', '.join(done.copied)} を書いた"
+    line = f"{name} の phases: に {', '.join(done.copied)} を反映しました"
     if done.dropped:
-        line += f"（使わない定義を外した: {', '.join(done.dropped)}）"
+        line += f"（使わない定義を削除しました: {', '.join(done.dropped)}）"
     if done.held:
         line += f"。子が承認された番号の定義（{', '.join(done.held)}）は承認済みチケットから写した"
     stdout.write(line + "\n")
@@ -118,7 +118,7 @@ def reorder(
     if as_json:
         stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
     elif saved.written:
-        stdout.write(f"{name} の計画の順序を書き換えた（source_sha: {sha}）\n")
+        stdout.write(f"{name} の計画の順序を書き換えました（source_sha: {sha}）\n")
     elif saved.ok:
-        stdout.write(f"{name} の計画は振り直しても変わらない。書かない\n")
+        stdout.write(f"{name} の計画は振り直しても変わりません。反映しません。\n")
     return EXIT_OK if saved.ok else EXIT_ERROR

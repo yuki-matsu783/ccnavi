@@ -22,7 +22,7 @@ import { yaml11Ambiguous } from "./yaml11.js";
 /** 実行ファイルが読む版（risk.VERSION） */
 export const RISK_VERSION = 1;
 
-export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を閉じるときに、その子の差分（base_sha..HEAD）で数える。
+export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子をクローズするときに、その子の差分（base_sha..HEAD）で数える。
 #
 # 計画のときに「軽い」と思った作業が大きな変更になっていたら、宣言に関わらずレビューが
 # 要る扱いにするためのもの。リスクレベルの名前は LOW / MEDIUM / HIGH / CRITICAL で固定。
@@ -39,7 +39,7 @@ export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を�
 #                      'sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>' で記録する。
 #                      判定が揃うまで子は閉じられない。子の HEAD が動けば取り直し
 #
-# このファイルが無ければ組み込み（下の定量 4 項目と同じ値）。不正なら組み込みを使い、--lint が言う。
+# このファイルがなければ組み込み（下の定量 4 項目と同じ値）。不正なら組み込みを使い、--lint が言う。
 version: 1
 levels:
   medium: 20
@@ -62,7 +62,7 @@ factors:
   - id: deletes
     points: 20
     deleted_over: 3
-    message: 消したファイルが多い
+    message: 削除したファイルが多い
 `;
 
 export interface RiskDocument {
@@ -75,16 +75,16 @@ export function readRisk(text: string): RiskDocument {
   const doc = parseDocument(text, { keepSourceTokens: false });
   const problems: string[] = [];
   for (const e of doc.errors) {
-    problems.push(`YAML として読めません: ${e.message}`);
+    problems.push(`YAML として解釈できません: ${e.message}`);
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
     problems.push("最上位がマップ（キーと値の組の集まり）ではありません。実行ファイルは組み込みの配点を使います。保存すると中身を捨てて空のマップから始めます");
   }
   const version = doc.get("version");
   if (version === undefined || version === null) {
-    problems.push(`version がありません。保存すると version: ${RISK_VERSION} を先頭に足します`);
+    problems.push(`version がありません。保存すると version: ${RISK_VERSION} を先頭に追加します`);
   } else if (version !== RISK_VERSION) {
-    problems.push(`version ${String(version)} は実行ファイルが読めません（読むのは ${RISK_VERSION}）。組み込みの配点を使います`);
+    problems.push(`version ${String(version)} は実行ファイルが読み込めません（読み込むのは ${RISK_VERSION}）。組み込みの配点を使います`);
   }
 
   const levels = { medium: "", high: "", critical: "" } as Record<LevelName, string>;
@@ -107,7 +107,7 @@ export function readRisk(text: string): RiskDocument {
     } else {
       rawFactors.items.forEach((item, index) => {
         if (!isMap(item)) {
-          problems.push(`factors の ${index + 1} 件目がマップ（キーと値の組の集まり）ではありません。画面に出さず、保存するとこの項目は消えます（実行ファイルも読めません）`);
+          problems.push(`factors の ${index + 1} 件目がマップ（キーと値の組の集まり）ではありません。画面に出さず、保存するとこの項目は消えます（実行ファイルも読み込めません）`);
           return;
         }
         const present = KINDS.filter((k) => item.has(k));

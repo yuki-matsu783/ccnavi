@@ -62,7 +62,7 @@ class TicketNewTest(TicketNewTestBase):
         self.assertIn("error 0 件", lint.stdout)
         # 提案について言う warn は「承認待ち」と「ワークツリーにチケットが無い」だけ。
         about = [x for x in lint.stdout.splitlines() if x.startswith("warn") and IDENT in x]
-        self.assertTrue(all("承認待ち" in x or "チケットが無い" in x for x in about), about)
+        self.assertTrue(all("承認待ち" in x or "チケットがありません" in x for x in about), about)
         verify = self.ccnavi("--agree", "--preview", "--verify")
         self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
 
@@ -186,7 +186,7 @@ class TicketNewScopeTest(TicketNewTestBase):
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(os.path.exists(self.todo))
         self.assertIn("--scope", result.stderr)
-        self.assertIn("範囲を持つ型を足す必要はない", result.stderr)
+        self.assertIn("範囲を持つ型を追加する必要はありません", result.stderr)
 
     def test_scope_gives_quick_work_its_allow(self):
         result = self.new("--scope", "src/ui/error.ts", plan="quick-work")

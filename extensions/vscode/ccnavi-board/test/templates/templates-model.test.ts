@@ -72,10 +72,10 @@ test("CB-T558 下書きの login は importable・checked_with・exists_in・als
     { importable: true, checked_with: "self", exists_in: [], also_in: ["lib"] },
   );
   const broken = data.drafts.find((draft) => draft.name === "broken");
-  assert.equal(broken?.importable, false, "読めない下書きは取り込めない");
+  assert.equal(broken?.importable, false, "読み込めない下書きは取り込めない");
 });
 
-test("CB-T535 drafts 欄が無い答えは、古い実行ファイルの文で失敗する", () => {
+test("CB-T535 drafts 欄がない答えは、古い実行ファイルの文で失敗する", () => {
   const text = fixtureWith((raw) => {
     delete raw.drafts;
   });
@@ -116,13 +116,13 @@ test("CB-T538 --show の答えを読む。本文はそのまま text に入り�
   assert.equal(detail.plan[1].after[0], 1);
 });
 
-test("CB-T539 --show の失敗の答えは error をそのまま返す。template 欄や text が無いときも失敗する", () => {
+test("CB-T539 --show の失敗の答えは error をそのまま返す。template 欄や text がないときも失敗する", () => {
   assert.deepEqual(parseTemplateShow('{"version":1,"ok":false,"error":"x"}'), { ok: false, error: "x" });
   assert.equal(parseTemplateShow('{"version":1,"root":"r","layer":"self"}').ok, false);
   assert.equal(parseTemplateShow('{"version":1,"root":"r","layer":"self","template":{"name":"a"}}').ok, false);
 });
 
-test("CB-T540 下見の答え（ok・draft あり・diff と new_text）を読む", () => {
+test("CB-T540 プレビューの答え（ok・draft あり・diff と new_text）を読む", () => {
   const text = JSON.stringify({
     version: 1,
     ok: true,
@@ -150,7 +150,7 @@ test("CB-T540 下見の答え（ok・draft あり・diff と new_text）を読�
   assert.deepEqual(answer.problems, [{ severity: "warn", detail: "TODO が残っている" }]);
 });
 
-test("CB-T541 下見でエラーを返した答え（ok が偽・draft あり）は、ok:false の値として読む", () => {
+test("CB-T541 プレビューでエラーを返した答え（ok が偽・draft あり）は、ok:false の値として読む", () => {
   const text = JSON.stringify({
     version: 1,
     ok: false,
@@ -177,7 +177,7 @@ test("CB-T541 下見でエラーを返した答え（ok が偽・draft あり）
   assert.deepEqual(answer.errors, ["login は既に在る"]);
 });
 
-test("CB-T542 draft 欄の無い失敗の答えは、error を返す", () => {
+test("CB-T542 draft 欄のない失敗の答えは、error を返す", () => {
   assert.deepEqual(parseImport('{"version":1,"ok":false,"error":"y"}'), { ok: false, error: "y" });
 });
 
@@ -196,7 +196,7 @@ test("CB-T545 本文を読む層は、project なら名前、それ以外は sel
   assert.equal(templatesLayerOf({ kind: "self", name: "self" }), "self");
 });
 
-test("CB-T565 編集の答え（下見・欄を全部持つ JSON）を読める", () => {
+test("CB-T565 編集の答え（プレビュー・欄を全部持つ JSON）を読める", () => {
   const text = JSON.stringify({
     version: 1,
     ok: true,
@@ -231,7 +231,7 @@ test("CB-T565 編集の答え（下見・欄を全部持つ JSON）を読める"
   assert.equal(answer.removed, false);
 });
 
-test("CB-T566 編集の答えの ok が真偽値でなければ、読めない答えとして失敗する", () => {
+test("CB-T566 編集の答えの ok が真偽値でなければ、読み込めない答えとして失敗する", () => {
   const parsed = parseEdit(JSON.stringify({ version: 1, ok: "yes", op: "save" }));
   assert.deepEqual(parsed, { ok: false, error: "編集の JSON の ok 欄が真偽値ではありません" });
 });

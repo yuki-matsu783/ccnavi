@@ -86,7 +86,7 @@ def parent_tree(
     if not _ident_ok(stderr, "tree parent", "名前", name):
         return 1
     if not path or not os.path.isdir(path):
-        stderr.write(f"ccnavi: tree parent のツリー {path!r} が無い\n")
+        stderr.write(f"ccnavi: tree parent のツリー {path!r} が見つかりません。\n")
         return 1
     work = _tree_of(root, conf, path, name)
     answer = _holds_parent(conf, work)
@@ -164,7 +164,7 @@ def sync_closed(
         stderr.write(f"ccnavi: sync closed の統合先 {integration!r} はブランチ名の形ではない\n")
         return 1
     if not path or not os.path.isdir(path):
-        stderr.write(f"ccnavi: sync closed のツリー {path!r} が無い\n")
+        stderr.write(f"ccnavi: sync closed のツリー {path!r} が見つかりません。\n")
         return 1
     have_mine, mine = _home_copy(conf, path, family)
 

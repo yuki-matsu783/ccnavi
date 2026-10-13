@@ -21,7 +21,7 @@ _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s
 # 付け足した形で打って止まり、案内と拒否が食い違って見える。
 EXEMPT_NOTE = (
     "止めている間に通るのは、ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh を "
-    "sh で単独で打つ形だけです。cd や | tail などを前後に付けると、そのコマンドも止まります。"
+    "sh で単独で実行する形だけです。cd や | tail などを前後に付けると、そのコマンドも止まります。"
 )
 
 # ユーザとモデルに見せる文で「ターン」を初めて使うところに置く表記。LLM の用語で、
@@ -259,15 +259,15 @@ def board_form_message(found: str) -> str:
     decided = (
         "テンプレートの取り込みは、ユーザが画面か端末で下書きの差分を読んでから決めます。"
         if "--import" in found
-        else "テンプレートの下書きの保存は、ユーザが打ちます"
+        else "テンプレートの下書きの保存は、ユーザが実行します"
         "（`--body-file` の中身が出力に出るため）。下書きは Write で直接編集してください。"
         if "--save-draft" in found
         else "承認と残った指摘の対応方針は、ユーザがボードか端末で決めます。"
     )
     return (
         f"コマンド行に、ボード経由の操作用の形（{found}）が含まれています。この形はユーザがボードの"
-        "オーバーレイで押したものを拡張が打つためのもので、端末での確かめが無いので、エージェントが"
-        f"打った場合はここで止めます。{decided}"
+        "オーバーレイで押したものを拡張が実行するためのもので、端末での確かめが無いので、エージェントが"
+        f"実行した場合はここで止めます。{decided}"
         "この文字列を探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
     )
 
@@ -722,7 +722,7 @@ def _executed_entry(words: list[str], bin_base: str) -> str:
 # 止めた語が、実行の時点で何になりうるか（入口ごと）と、通る形の案内。
 _ENTRY_REASONS = {
     _ENTRY_SYNC: (
-        "1 つ目の引数として --forget（取り込み状態を消す操作）になりうる",
+        "1 つ目の引数として --forget（取り込み状態を削除する操作）になりうる",
         "取り込むだけなら、親の識別子をそのまま書けば通ります。",
     ),
     _ENTRY_REVIEW: (
@@ -742,27 +742,27 @@ def hidden_entry_message(entry: str, found: str) -> str:
     """ユーザが端末で打つ入口を、エージェントが打った形で止めた文。"""
     if found == "--forget":
         return (
-            f"{entry} の --forget（取り込み状態を消す操作）は、ユーザが端末で打ちます。"
-            "要るなら、理由を添えてユーザに依頼してください。"
+            f"{entry} の --forget（取り込み状態を削除する操作）は、ユーザが端末で実行します。"
+            "必要なら、理由を添えてユーザに依頼してください。"
         )
-    tail = "承認・残った指摘の対応方針・取り込み状態を消す操作は、ユーザが端末で打ちます。"
+    tail = "承認・残った指摘の対応方針・取り込み状態を削除する操作は、ユーザが端末で実行します。"
     if found == STDIN_SHELL:
         return (
-            f"標準入力から読むシェルに流し込む文字列に、ユーザが端末で打つ入口（{entry}）の名前が"
-            "あります。流し込んだ文字列の中は語として読めないので、何を打つかを確かめられません。"
+            f"標準入力から読むシェルに流し込む文字列に、ユーザが端末で実行する入口（{entry}）の名前が"
+            "あります。流し込んだ文字列の中は語として読めないので、何を実行するかを確かめられません。"
             "入口はコマンド行にそのまま書いてください。" + tail
         )
     if found in _FEEDERS or found.startswith("< "):
         return (
-            f"ユーザが端末で打つ入口（{entry}）に、引数か中身を外から流し込む形（{found}）が"
+            f"ユーザが端末で実行する入口（{entry}）に、引数か中身を外から流し込む形（{found}）が"
             "あります。何が渡るかを確かめられないので止めました。"
             "引数はコマンド行にそのまま書いてください。" + tail
         )
     reason, way = _ENTRY_REASONS.get(entry, ("止める操作になりうる", ""))
     return (
-        f"ユーザが端末で打つ入口（{entry}）に渡る語（{found}）が、実行の時点で、{reason}ので止めました。"
+        f"ユーザが端末で実行する入口（{entry}）に渡る語（{found}）が、実行の時点で、{reason}ので止めました。"
         "値は変数や glob で組み立てず、そのまま書いてください"
-        "（値が要るなら先に読み、次の手に書きます）。" + way + tail
+        "（値が必要なら先に読み、次の手に書きます）。" + way + tail
     )
 
 
@@ -843,11 +843,11 @@ def _previewed(text: str, cuts: set[int], start: int, end: int) -> bool:
 def prune_message() -> str:
     """`--prune` で止めた文。"""
     return (
-        "記録と state を消す 'ccnavi --prune' は、ユーザが端末から打つものです。記録は"
+        "記録と state を削除する 'ccnavi --prune' は、ユーザが端末から実行するものです。記録は"
         "「ccnavi が何を判定したか」を後から確かめるための材料なので、"
         "エージェントからは消しません。"
         "何が消える対象かを見るだけなら 'ccnavi --prune --preview' は通ります。"
-        "消す必要があれば、理由を添えてユーザに依頼してください。"
+        "削除する必要があれば、理由を添えてユーザに依頼してください。"
     )
 
 
@@ -907,25 +907,26 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
         regex=expression,
         message=(
             "ccnavi の承認・レビュー済みの受け入れ・チケットの状態の操作は、エージェントが"
-            "直接打つものではありません。状態の移動とレビューは "
+            "直接実行するものではありません。状態の移動とレビューは "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')}' と "
             f"'{settings.script_command(root, 'ccnavi-review.sh')}' を"
             "使い、承認はユーザが VS Code のボードか "
             f"'{settings.script_command(root, 'ccnavi-agree.sh')}' で、"
             "残った指摘の対応方針はユーザがボードか端末で決めます。"
             "承認済みチケットのコミットと push"
-            f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）もユーザが打ちます。"
-            "親子のチケットの取り込み状態を消す "
+            f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）"
+            "もユーザが実行します。"
+            "親子のチケットの取り込み状態を削除する "
             f"'{settings.script_command(root, 'ccnavi-sync.sh')} --forget' と、ユーザの判断の入口"
             f"（'{settings.script_command(root, 'ccnavi-review.sh')} "
-            "close-early'）もユーザが打ちます。"
+            "close-early'）もユーザが実行します。"
             "テンプレートの取り込み（'ccnavi --templates --import'）・"
-            "取り込み済みの改名/移動/削除・下書きの保存も、ユーザが打ちます。"
+            "取り込み済みの改名/移動/削除・下書きの保存も、ユーザが実行します。"
             "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
-            "エージェントは打ちません。"
+            "エージェントは実行しません。"
             "承認が済んだかどうかは "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')} status' で確かめます。"
-            "置き場のファイルを自分で探さず、承認を頼み直す前に status を打ってください。"
+            "置き場のファイルを自分で探さず、承認を頼み直す前に status を実行してください。"
             "承認待ちの一覧を見るだけなら 'ccnavi --agree --preview' は通ります。"
         ),
         decision=rules.DENY,

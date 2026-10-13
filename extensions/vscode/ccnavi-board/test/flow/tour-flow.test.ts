@@ -44,23 +44,23 @@ test("CB-T480 フローの見本は、すべて FlowDoc として読め、線の
     assert.equal(new Set(ids).size, ids.length, `${name}: ノードの id が重なっている`);
     const ports = new Set<string>();
     for (const c of connectionsOf(doc)) {
-      assert.ok(ids.includes(connectionFrom(c)) && ids.includes(connectionTo(c)), `${name}: 線 ${connectionId(c)} の端が無い`);
+      assert.ok(ids.includes(connectionFrom(c)) && ids.includes(connectionTo(c)), `${name}: 線 ${connectionId(c)} の端がありません`);
       ports.add(connectionId(c));
     }
     assert.equal(ports.size, connectionsOf(doc).length, `${name}: 線の id が重なっている`);
     for (const node of doc.nodes) {
       types.add(nodeType(node));
       if (typeof node.parentId === "string") {
-        assert.ok(doc.nodes.some((other) => other.id === node.parentId && isGroup(other)), `${name}: ${node.id} の親が無い`);
+        assert.ok(doc.nodes.some((other) => other.id === node.parentId && isGroup(other)), `${name}: ${node.id} の親がありません`);
       }
       const key = branchKey(nodeType(node));
       if (key !== undefined && (node.data as Record<string, unknown>)[key] === undefined) {
-        assert.fail(`${name}: ${node.id} に ${key} が無い`);
+        assert.fail(`${name}: ${node.id} に ${key} がありません`);
       }
     }
   }
   for (const type of ["start", "end", "prompt", "subAgent", "askUserQuestion", "ifElse", "switch", "loop", "group", "subAgentFlow"]) {
-    assert.ok(types.has(type), `見本に ${type} が無い`);
+    assert.ok(types.has(type), `見本に ${type} がありません`);
   }
 });
 
@@ -78,7 +78,7 @@ test("CB-T481 見本のフローは、YAML の本文に書き出して実際の�
 
 const exe = exeRunner();
 
-test("CB-T482 見本のフローは、実行ファイル（PyYAML）が読んでも同じ中身で、error が無い", { skip: exe.ok ? false : exe.reason }, () => {
+test("CB-T482 見本のフローは、実行ファイル（PyYAML）が読んでも同じ中身で、error がありません", { skip: exe.ok ? false : exe.reason }, () => {
   assert.ok(exe.ok);
   for (const name of names) {
     const read = exe.read(sample.flows[name].doc, sample.page.flowPath);
@@ -110,7 +110,7 @@ test("CB-T484 見本の checks の形は、実行ファイルの答えの形（F
   assert.deepEqual(sample.flows[MAIN_FLOW].checks.warns, []);
 });
 
-test("CB-T485 実際の編集の関数（addNode・groupNodes・pasteNodes）の結果と、見本の「足した直後」「グループ化したあと」「貼り付けたあと」が同じ", () => {
+test("CB-T485 実際の編集の関数（addNode・groupNodes・pasteNodes）の結果と、見本の「追加した直後」「グループ化したあと」「貼り付けたあと」が同じ", () => {
   const main = sample.flows.main.doc;
   const grouped = groupNodes(main, ["fix-small", "redesign"]);
   assert.ok(grouped !== undefined);
@@ -130,10 +130,10 @@ test("CB-T486 画面の注意（flowNotices）は、入れ子の見本（deep）
   assert.ok(deep.some((notice) => notice.includes("子の下に 3 段重なっています")), deep.join("\n"));
   // 開始が無い見本（broken）の注意は、実行ファイルの warn（start が無い）に任せ、画面は言わない
   assert.deepEqual(flowNotices(sample.flows.broken.doc, { exe: true }), []);
-  assert.ok(sample.flows.broken.checks.warns.some((warn) => warn.includes("start が無い")));
+  assert.ok(sample.flows.broken.checks.warns.some((warn) => warn.includes("start がありません")));
 });
 
-test("CB-T487 保存前の差分と下書きの差分は、見本どうしで意味のある違いになる（足した・消した・変えた）", () => {
+test("CB-T487 保存前の差分と下書きの差分は、見本どうしで意味のある違いになる（追加した・削除した・変えた）", () => {
   const edited = diffFlows(sample.flows.main.doc, sample.flows["main-edited"].doc);
   assert.ok(edited.meta.length >= 1 && edited.addedNodes.length >= 1 && edited.changedNodes.length >= 1);
   assert.ok(edited.addedConnections.length >= 1 && edited.removedConnections.length >= 1);
@@ -209,19 +209,19 @@ test("CB-T489 フローの案内の scene は、見本にある名前・ノー�
       const target = step.target;
       assert.notEqual(target, "", `${at}: 指す先が空（吹き出しが中ほどに出る）`);
       if (target.startsWith("node-")) {
-        assert.ok(doc.nodes.some((node) => `node-${node.id}` === target), `${at}: ${target} が見本（${scene.name}）のノードに無い`);
+        assert.ok(doc.nodes.some((node) => `node-${node.id}` === target), `${at}: ${target} が見本（${scene.name}）のノードにありません`);
       } else if (target.startsWith("edge-")) {
-        assert.ok(connectionsOf(doc).some((c) => `edge-${connectionId(c)}` === target), `${at}: ${target} が見本（${scene.name}）の線に無い`);
+        assert.ok(connectionsOf(doc).some((c) => `edge-${connectionId(c)}` === target), `${at}: ${target} が見本（${scene.name}）の線にありません`);
       } else if (target.startsWith("palette-")) {
         assert.ok(PALETTE_TARGETS.has(target.slice("palette-".length)), `${at}: ${target}`);
       } else {
-        assert.ok(STATIC_TARGETS.has(target), `${at}: ${target} は画面が付ける印に無い`);
+        assert.ok(STATIC_TARGETS.has(target), `${at}: ${target} は画面が付ける印にありません`);
       }
     }
   }
 });
 
-test("CB-T490 scene の綴り違い・見本に無い値は、sceneProblem が名指しする（既定へ黙って戻らない）", () => {
+test("CB-T490 scene の綴り違い・見本にない値は、sceneProblem が名指しする（既定へ黙って戻らない）", () => {
   assert.match(sceneProblem(sample, { dok: "main" }) ?? "", /dok/);
   assert.match(sceneProblem(sample, { doc: "nothing" }) ?? "", /nothing/);
   assert.match(sceneProblem(sample, { doc: "main", select: "nobody" }) ?? "", /nobody/);

@@ -11,16 +11,16 @@ import { ActionButton, Link, Notice } from "./parts.js";
 export function Start({ board, actions, issues }: { board: RepoBoard; actions: Actions; issues?: IssueList }): JSX.Element {
   return (
     <section className="start" data-testid="start">
-      <h3>issue から始める（親のブランチを統合先の先頭から作る。マージリクエストは最初の push の後に作られる）</h3>
+      <h3>Issueから作業を開始（統合先ブランチの最新コミットを起点に、親ブランチを作成します。マージリクエストは最初のpush後に作成されます）</h3>
       {!issues ? (
         <ActionButton action="issues" onClick={() => actions.loadIssues?.(board)}>
-          issue を読む
+          Issue一覧を取得
         </ActionButton>
       ) : issues.error ? (
         <Notice kind="error" text={issues.error} />
       ) : (
         <>
-          {(issues.list ?? []).length === 0 ? <p className="empty">開いている issue は無い</p> : null}
+          {(issues.list ?? []).length === 0 ? <p className="empty">未クローズのIssueはありません。</p> : null}
           <ul className="issues">
             {(issues.list ?? []).map((issue) => (
               <li key={issue.number} className="issue" data-issue={String(issue.number)}>

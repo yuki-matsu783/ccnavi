@@ -379,7 +379,7 @@ class GuardScriptTest(_Workspace):
         result = self.run_script("ccnavi-git.sh", "reset")
         self.assertEqual(2, result.returncode)
         self.assertTrue(
-            result.stderr.startswith("ccnavi-git: reset は作業中の変更やコミットを消します。")
+            result.stderr.startswith("ccnavi-git: reset は作業中の変更やコミットを削除します。")
         )
         with open(victim, encoding="utf-8") as f:
             self.assertEqual("{}\n", f.read())
@@ -388,7 +388,7 @@ class GuardScriptTest(_Workspace):
         result = self.run_script("ccnavi-review.sh", "https://u:SECRET@h")
         self.assertEqual(2, result.returncode)
         self.assertEqual(
-            "ccnavi-review: https://u:SECRET@h は通しません。"
+            "ccnavi-review: https://u:SECRET@h は使用できません。"
             "使えるのは request / confirm / comment / decide / ready / close-early / "
             "fetch / origin / merged です。\n",
             result.stderr,

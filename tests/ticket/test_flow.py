@@ -446,7 +446,7 @@ class FlowRenderTest(unittest.TestCase):
         for text, why in (
             ("", "最上位がマッピングではない"),
             ("- 1\n- 2\n", "最上位がマッピングではない"),
-            ("nodes: 3\n", "`nodes` のリストが無い"),
+            ("nodes: 3\n", "`nodes` のリストがありません。"),
             ("just text\n", "最上位がマッピングではない"),
         ):
             with self.subTest(text=text):

@@ -5,7 +5,7 @@ import { SAMPLE_PHASES_TEXT } from "../helpers/phases.js";
 import type { PhaseForm } from "../../src/core/phases-view.js";
 
 /** このリポジトリの phases.yml と同じ形。コメントの置き場と flow のリストを持つ */
-const SAMPLE = `# フェーズ定義。ユーザが持つ設定で、エージェントは書き換えない。
+const SAMPLE = `# フェーズ定義。ユーザが持つ設定で、エージェントは変更しない。
 #
 # id と title はどちらも一意。
 version: 1
@@ -62,7 +62,7 @@ function phase(id: string, over: Partial<PhaseForm> = {}): PhaseForm {
   };
 }
 
-test("CB-T86 phases.yml を定義ごとに読む。kind と review は無ければ既定、scope は inherit かリスト", () => {
+test("CB-T86 phases.yml を定義ごとに読む。kind と review はなければ既定、scope は inherit かリスト", () => {
   const doc = readPhases(SAMPLE);
   assert.equal(doc.model.version, 1);
   assert.deepEqual(doc.model.problems, []);
@@ -104,12 +104,12 @@ test("CB-T87 変えていない内容で書き戻すと 1 文字も変わらな�
 test("CB-T88 変えた欄だけが差分になり、コメントと引用符は残る", () => {
   const doc = readPhases(SAMPLE);
   const phases = doc.model.form.phases.map((p) =>
-    p.id === "design" ? { ...p, review: "none" as const, scope: ["wip/design/*"], when: "設計が要るとき" } : p,
+    p.id === "design" ? { ...p, review: "none" as const, scope: ["wip/design/*"], when: "設計が必要とき" } : p,
   );
   const out = doc.apply({ phases });
   const expected = SAMPLE.replace(
     '    review: mr\n    scope: ["wip/design/*", "docs/*"]\n',
-    '    review: none\n    scope: ["wip/design/*"]\n    when: 設計が要るとき\n',
+    '    review: none\n    scope: ["wip/design/*"]\n    when: 設計が必要とき\n',
   );
   assert.notEqual(expected, SAMPLE);
   assert.equal(out, expected);
@@ -127,7 +127,7 @@ test("CB-T89 並べ替えと改名で、定義の前のコメントが一緒に�
   assert.ok(!out.includes("  research:"));
 });
 
-test("CB-T90 足す・消す・空のリストは欄ごと消す・scope の inherit とリストを行き来する", () => {
+test("CB-T90 追加する・削除する・空のリストは欄ごと削除する・scope の inherit とリストを行き来する", () => {
   const doc = readPhases(SAMPLE);
   const phases = doc.model.form.phases
     .filter((p) => p.id !== "acceptance")
@@ -172,7 +172,7 @@ test("CB-T92a review: chat は廃止した値で、苦情が出て mr として�
   assert.ok(bad.model.problems.some((p) => p.includes("review `Mr` は none・mr のどれでもありません")));
 });
 
-test("CB-T92 version が無ければ苦情を出し、保存で先頭に足す。読めない値は苦情にして既定で出す", () => {
+test("CB-T92 version がなければ苦情を出し、保存で先頭に追加する。読み込めない値は苦情にして既定で出す", () => {
   const doc = readPhases(`phases:\n  a:\n    kind: strange\n    review: maybe\n    scope: everything\n    overlap: b\n`);
   assert.equal(doc.model.version, null);
   assert.ok(doc.model.problems.some((p) => p.startsWith("version がありません")));
@@ -189,7 +189,7 @@ test("CB-T92 version が無ければ苦情を出し、保存で先頭に足す�
   assert.match(out, /^version: 1\nphases:\n  a:\n    kind: work\n    review: mr\n    scope: inherit\n    overlap: b\n$/);
 });
 
-test("CB-T93 phases が無い、定義が無い、空のファイルは苦情になり、保存で対応表から始める", () => {
+test("CB-T93 phases がない、定義がない、空のファイルは苦情になり、保存で対応表から始める", () => {
   assert.ok(readPhases("version: 1\n").model.problems.some((p) => p.startsWith("phases がありません")));
   assert.ok(readPhases("version: 1\nphases: {}\n").model.problems.some((p) => p.startsWith("定義が 1 つもありません")));
   const empty = readPhases("");
@@ -198,7 +198,7 @@ test("CB-T93 phases が無い、定義が無い、空のファイルは苦情に
   assert.equal(out, 'version: 1\nphases:\n  implement:\n    kind: work\n    title: 実装\n    review: mr\n    scope: ["src/*"]\n');
 });
 
-test("CB-T94 画面から来た内容は形だけ確かめる。リストに文字以外が混ざれば受け取らない。順序の欄は送られても受け取らない", () => {
+test("CB-T94 画面から来た内容は形だけ確認する。リストに文字以外が混ざれば受け取らない。順序の欄は送られても受け取らない", () => {
   const ok = asPhasesForm({
     phases: [{ origin: 0, id: "a", title: 1, kind: "work", review: "mr", inherit: true, scope: ["x"], when: "w" }],
   });
@@ -228,12 +228,12 @@ test("CB-T101 scope を書いていない定義は、無関係な保存で scope
   assert.equal(doc.apply(doc.model.form), "version: 1\nphases:\n  a:\n    kind: work\n    title: A\n    scope: inherit\n  b:\n    kind: work\n    title: B\n    scope: inherit\n");
 });
 
-test("CB-T102 先頭を動かしても空白だけの行は出ず、先頭を消せば見出しのコメントは対応表に残る", () => {
+test("CB-T102 先頭を動かしても空白だけの行は出ず、先頭を削除できば見出しのコメントは対応表に残る", () => {
   const doc = readPhases(SAMPLE);
   const [research, design, ...rest] = doc.model.form.phases;
   const swapped = doc.apply({ phases: [design, research, ...rest] });
-  assert.ok(!/\n {2,}\n/.test(swapped), "空白だけの行が無い");
-  assert.match(swapped, /^# フェーズ定義。ユーザが持つ設定で、エージェントは書き換えない。\n#\n# id と title はどちらも一意。\nversion: 1\n\nphases:\n  # 触る場所が多いとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: \["wip\/design\/\*", "docs\/\*"\]\n\n  # 分からないときだけ\n  research:\n    kind: work\n/);
+  assert.ok(!/\n {2,}\n/.test(swapped), "空白だけの行がありません");
+  assert.match(swapped, /^# フェーズ定義。ユーザが持つ設定で、エージェントは変更しない。\n#\n# id と title はどちらも一意。\nversion: 1\n\nphases:\n  # 触る場所が多いとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: \["wip\/design\/\*", "docs\/\*"\]\n\n  # 分からないときだけ\n  research:\n    kind: work\n/);
   const dropped = doc.apply({ phases: [design, ...rest] });
   assert.match(dropped, /\nphases:\n  # 分からないときだけ\n  # 触る場所が多いとき\n  design:\n/);
   assert.ok(!dropped.includes("  research:"));

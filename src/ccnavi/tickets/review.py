@@ -91,7 +91,7 @@ def prepare(
         return 1
     parent, ph = found
     if not conf.state:
-        stderr.write("ccnavi: state の置き場が空。投稿する本文を置く場所が無い\n")
+        stderr.write("ccnavi: state の置き場が空。投稿する本文を置く場所がありません。\n")
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
     unmet = _unmet(tree_root, conf, ph)
@@ -196,7 +196,9 @@ def requested(
     if result is None:
         return 1
     if not result.url:
-        stderr.write("ccnavi: 結果に投稿の url が無い。投稿されていないならマーカーは置かない\n")
+        stderr.write(
+            "ccnavi: 結果に投稿の url がありません。投稿されていないならマーカーは置かない\n"
+        )
         return 1
     # 投稿とマーカーの間に HEAD が動いていないか。
     # 動いていれば、ユーザが見るものとマーカーが食い違う。
@@ -259,17 +261,20 @@ def _note_mr(
     failed, result = approval_ops.note_mr(path, number)
     if failed:
         stderr.write(
-            f"ccnavi: 警告: {parent.ticket} の `mr:` に MR !{number} を書けない: {failed}\n"
+            f"ccnavi: 警告: {parent.ticket} の `mr:` に MR !{number} を保存できませんでした:"
+            f" {failed}\n"
         )
     elif result == ticket_fields.MR_SET:
-        stderr.write(f"ccnavi: {parent.ticket} の `mr:` に MR !{number} を書き足した\n")
+        stderr.write(f"ccnavi: {parent.ticket} の `mr:` に MR !{number} を追記しました\n")
     elif result == ticket_fields.MR_DIFFERS:
         stderr.write(
             f"ccnavi: 警告: {parent.ticket} の `mr:` に別の値が既にある。上書きしない。"
             f"今回のレビューの MR は !{number}。値が合っているか、ユーザが確かめてください\n"
         )
     elif result == ticket_fields.MR_UNREADABLE:
-        stderr.write(f"ccnavi: 警告: {parent.ticket} の frontmatter を読めず、`mr:` を書けない\n")
+        stderr.write(
+            f"ccnavi: 警告: {parent.ticket} の frontmatter を読めず、`mr:` を保存できませんでした\n"
+        )
 
 
 def reviewed_mark(
@@ -297,10 +302,12 @@ def reviewed_mark(
 def matching_problems(result: review_host.Result | None, requested_mark: dict) -> list[str]:
     """依頼したのと同じマージリクエストを取得した結果か。違えばその説明（標準エラーの行）。"""
     if result is None or result.mr is None:
-        return ["ccnavi: 結果にマージリクエストが無い"]
+        return ["ccnavi: 結果にマージリクエストがありません。"]
     if not requested_mark.get("host") or not requested_mark.get("mr"):
         # 照合できない依頼の記録で通すと、別の MR のスレッドでレビュー済みにできる
-        return ["ccnavi: 依頼の記録にホストかマージリクエストの番号が無い。依頼し直してください"]
+        return [
+            "ccnavi: 依頼の記録にホストかマージリクエストの番号がありません。依頼し直してください"
+        ]
     if result.host != requested_mark.get("host"):
         return [
             f"ccnavi: 依頼したホスト（{requested_mark.get('host')}）と"
@@ -356,7 +363,7 @@ def review_problems(
         # 足せない。同じフェーズでやり直すか、別の issue に切り出すか。
         lines += [
             "フィードバック対応の最後のレビューです。選べるのは 2 つ。",
-            f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）",
+            f"  - 同じフェーズ {phase_no} に子を追加して承認を受け、やり直す（差し戻し）",
             f"  - ユーザが '{review_sh} decide {phase_no}'（ボードの「決める」）で"
             "残りを受け入れるか、別の issue に回す",
             "新しいフィードバック作業フェーズは足せません。",
@@ -518,7 +525,7 @@ def _outside_approved(
 def _diff_paths(tree_root: str, ref: str) -> tuple[list[str], str]:
     """`ref..HEAD` で変わったパス（置き場で絞らない）。2 つめは読めなかった理由。"""
     if not ref:
-        return [], "比べる相手が無い"
+        return [], "比べる相手がありません。"
     rc, out = _git(
         tree_root,
         ["diff", "--name-only", "--no-renames", "--ignore-submodules=none", "-z", f"{ref}..HEAD"],
@@ -614,8 +621,8 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
             named = "、".join(repr(r) if ("\n" in r or "\r" in r) else r for r in odd[:10])
             problems.append(
                 f"`{wip}/` の追跡済みのファイルのうち、途中のディレクトリがリンクで"
-                f"ツリーの外を指すか、名前に改行を含むものがある（{named}）。消すとツリーの外のファイルまで消すおそれがあるので止めた。"
-                "リンクを元のディレクトリに戻すか、ユーザに確かめてから打ち直してください"
+                f"ツリーの外を指すか、名前に改行を含むものがある（{named}）。削除するとツリーの外のファイルまで削除するおそれがあるので止めた。"
+                "リンクを元のディレクトリに戻すか、ユーザに確かめてから再実行してください"
             )
     untracked = _wip_untracked(tree_root)
     if untracked is None:
@@ -626,9 +633,9 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
         )
         problems.append(
             f"`{wip}/` に未追跡のファイルが {len(untracked)} 件ある（{shown}）。"
-            f"ready が消すのは `{wip}/` の追跡済みのファイルだけ（履歴から戻せるもの）で、"
-            "未追跡のものは戻せないので消さずに止めた。要るものは別の場所へ移し、"
-            "要らないものはユーザに確かめて消してから打ち直してください"
+            f"ready が削除するのは `{wip}/` の追跡済みのファイルだけ（履歴から戻せるもの）で、"
+            "未追跡のものは戻せないので削除せずに中止しました。必要なものは別の場所へ移し、"
+            "要らないものはユーザに確かめて削除してから再実行してください"
         )
     if _dirty(tree_root, conf, wip_removals=True):
         problems.append("親のワークツリーに未コミットの変更がある")
@@ -666,8 +673,8 @@ def remove_wip(tree_root: str) -> tuple[list[str], str, str]:
             [],
             "",
             "途中のディレクトリがリンクでツリーの外を指すか、名前に改行を含むので、"
-            f"何も消さなかった（{named}）。"
-            "リンクを元のディレクトリに戻すか、ユーザに確かめてから打ち直してください",
+            f"何も削除しませんでした（{named}）。"
+            "リンクを元のディレクトリに戻すか、ユーザに確かめてから再実行してください",
         )
     rc, head = _git(tree_root, ["rev-parse", "HEAD"])
     head = head.strip() if rc == 0 else ""
@@ -682,7 +689,7 @@ def remove_wip(tree_root: str) -> tuple[list[str], str, str]:
             continue
         failed = fsio.unlink(full)
         if failed:
-            return removed, head, f"{rel} を消せない（{failed}）"
+            return removed, head, f"{rel} を削除できません（{failed}）"
         removed.append(rel)
     for top in sorted({p.split("/", 1)[0] for p in names}):
         _prune_empty(os.path.join(tree_root, top))
@@ -766,7 +773,7 @@ def _covered_header(
     if risks:
         head += "このレビューのリスク: " + " / ".join(risks) + "\n"
         if ph.risk_escalates:
-            head += "（実績のリスクが高いので、宣言に関わらずレビューが要る扱い）\n"
+            head += "（実績のリスクが高いので、宣言に関わらずレビュー必須の扱い）\n"
     return head + "\n" if head else ""
 
 
@@ -813,7 +820,7 @@ def _parent_phase(
         return None
     ph = _phase(root, conf, parent, number)
     if ph is None:
-        stderr.write(f"ccnavi: {parent.ticket} にフェーズ {number} の子が無い\n")
+        stderr.write(f"ccnavi: {parent.ticket} にフェーズ {number} の子がありません。\n")
         return None
     return parent, ph
 
@@ -822,7 +829,7 @@ def _result_with_mr(stderr: TextIO, path: str) -> review_host.Result | None:
     """取得した結果を読み、マージリクエストが入っていることまで確かめる。無ければ言って None。"""
     result = _result(stderr, path)
     if result is None or result.mr is None:
-        stderr.write("ccnavi: 結果にマージリクエストが無い\n")
+        stderr.write("ccnavi: 結果にマージリクエストがありません。\n")
         return None
     return result
 
@@ -898,7 +905,10 @@ def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:
 
 def _result(stderr: TextIO, path: str) -> review_host.Result | None:
     if not path:
-        stderr.write("ccnavi: --result <json> が要る。リモートから取得した結果は sh が渡す\n")
+        stderr.write(
+            "ccnavi: --result <json> を指定してください。リモートから取得した結果は sh が渡します。"
+            "\n"
+        )
         return None
     result = review_host.Result.load(path)
     if result.error:

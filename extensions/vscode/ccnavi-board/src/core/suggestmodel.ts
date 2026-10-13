@@ -48,7 +48,7 @@ export function parseSuggestJson(text: string): Parsed<SuggestJson> {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `候補の JSON として読めません: ${(error as Error).message}` };
+    return { ok: false, error: `候補の JSON として解釈できません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
     return { ok: false, error: "候補の JSON の最上位がオブジェクトではありません" };

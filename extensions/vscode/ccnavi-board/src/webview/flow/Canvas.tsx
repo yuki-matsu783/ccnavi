@@ -157,8 +157,8 @@ function StepView({ id, data }: NodeProps<StepNode>): JSX.Element {
   const actions = useContext(Actions);
   const many = data.outputs.length > 1 || data.outputs.some((port) => port.label !== "");
   return (
-    <div className="flow-node" data-type={cssType(data.type, data.known)} data-tour={data.mark} title={data.known ? undefined : `この画面に入力欄が無い種類です（${data.type || "種類なし"}）。中身は保存してもそのまま残ります`}>
-      {!data.readOnly && <RemoveButton action="canvas-remove-node" label="このノードを消す" onRemove={() => actions.removeNode(id)} />}
+    <div className="flow-node" data-type={cssType(data.type, data.known)} data-tour={data.mark} title={data.known ? undefined : `この画面に入力欄がない種類です（${data.type || "種類なし"}）。中身は保存してもそのまま残ります`}>
+      {!data.readOnly && <RemoveButton action="canvas-remove-node" label="このノードを削除" onRemove={() => actions.removeNode(id)} />}
       {data.inputs.map((port, index) => (
         <Handle
           key={`in-${port.id}`}
@@ -211,7 +211,7 @@ function GroupView({ id, data, selected }: NodeProps<GroupNode>): JSX.Element {
       <div className="flow-group" data-type="group" data-tour={data.mark}>
         <span className="flow-group-label">{data.name}</span>
       </div>
-      {!data.readOnly && <RemoveButton action="canvas-remove-node" label="このグループを消す（中のノードは残す）" onRemove={() => actions.removeNode(id)} />}
+      {!data.readOnly && <RemoveButton action="canvas-remove-node" label="このグループを削除（中のノードは残す）" onRemove={() => actions.removeNode(id)} />}
     </>
   );
 }
@@ -253,7 +253,7 @@ function FlowEdgeView({ sourceX, sourceY, targetX, targetY, sourcePosition, targ
       {shown && (
         <EdgeLabelRenderer>
           <div className="flow-edge-tools nodrag nopan" style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY + offset}px)` }} {...handlers}>
-            <RemoveButton action="canvas-remove-edge" label="この線を消す" onRemove={() => actions.removeEdge(data.index)} />
+            <RemoveButton action="canvas-remove-edge" label="この線を削除" onRemove={() => actions.removeEdge(data.index)} />
           </div>
         </EdgeLabelRenderer>
       )}

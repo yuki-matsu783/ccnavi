@@ -93,7 +93,7 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertEqual(result.returncode, ANSWER_NO, result.stdout + result.stderr)
         self.assertIn("i0001-05-05", result.stdout)
         self.assertIn("外れる", result.stdout)
-        self.assertIn("計画に無い", result.stdout)
+        self.assertIn("計画にありません", result.stdout)
         self.assertIn("直してから", result.stdout)
         # 通るほうも同じ画面に出る。直す相手が分かるように。
         self.assertIn("通る", result.stdout)
@@ -103,7 +103,7 @@ class ApproveVerifyTest(PhaseHarness):
     def test_nothing_pending_is_a_failed_check(self):
         result = self.verify()
         self.assertEqual(result.returncode, ANSWER_NO, result.stdout + result.stderr)
-        self.assertIn("承認待ちのチケットは無い", result.stdout)
+        self.assertIn("承認待ちのチケットはありません。", result.stdout)
         self.assertIn("todo/", result.stdout)
 
     # ---- 4. 承認待ちに無い識別子
@@ -203,13 +203,13 @@ class ApproveVerifyTest(PhaseHarness):
 
         verified = self.verify()
         self.assertEqual(verified.returncode, ANSWER_NO, verified.stdout)
-        self.assertIn("計画に無い", verified.stdout)
+        self.assertIn("計画にありません", verified.stdout)
 
         lint = self.ccnavi("--lint")
         self.assertNotEqual(lint.returncode, 0, lint.stdout + lint.stderr)
         said = lint.stdout + lint.stderr
         self.assertIn("i0001-05-05: ", said)
-        self.assertIn("計画に無い", said)
+        self.assertIn("計画にありません", said)
 
     def test_lint_says_the_order_problem_too(self):
         """順序で外れる子。1 本にそろえる前の `--lint` が何も言わなかったのはここ

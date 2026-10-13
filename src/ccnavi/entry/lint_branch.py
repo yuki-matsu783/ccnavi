@@ -184,7 +184,7 @@ def _worktree_problems(
                 Problem(
                     SEVERITY_WARN,
                     "(ticket)",
-                    f"ワークツリー {t.name} にチケットが無い。"
+                    f"ワークツリー {t.name} にチケットがありません。"
                     "そこへの書き込みはルールだけで判定する",
                 )
             )
@@ -215,7 +215,7 @@ def _worktree_problems(
                     SEVERITY_WARN,
                     "(ticket)",
                     f"{t.ticket} は承認済みだがワークツリー "
-                    f"{tree.worktree_path(root, t.ticket)} が無い。"
+                    f"{tree.worktree_path(root, t.ticket)} がありません。"
                     "ワークツリーを作るまで範囲は有効にならない",
                 )
             )
@@ -265,7 +265,7 @@ def _place_problems(
                     "(ticket)",
                     f"{t.ticket}: 子の提案を {at} に書いている。親 {t.parent} のワークツリーは"
                     f"識別子と同じ名前にし、子の提案はそこに置く。ワークツリーが無ければ "
-                    f"`{cut % (t.parent, t.parent)}` で切り、提案を移して元を消す。"
+                    f"`{cut % (t.parent, t.parent)}` で切り、提案を移して元を削除します。"
                     "このままだと親が取り込み済みにならない",
                 )
             )
@@ -279,7 +279,7 @@ def _place_problems(
                     "(ticket)",
                     f"{t.ticket}: 提案 {t.ticket} を {at} に書いている。親のワークツリーは"
                     f"識別子と同じ名前にする。`{cut % (t.ticket, t.ticket)}` で切り、"
-                    "提案を移して元を消す。このままだと親が取り込み済みにならない",
+                    "提案を移して元を削除します。このままだと親が取り込み済みにならない",
                 )
             )
         if not t.has_plan:
@@ -287,10 +287,10 @@ def _place_problems(
                 Problem(
                     SEVERITY_WARN,
                     "(ticket)",
-                    f"{t.ticket}: 親 {t.ticket} に plan が無い。"
+                    f"{t.ticket}: 親 {t.ticket} に plan がありません。"
                     "plan の無い親は `ticket start` が止まる（子や子の提案があっても同じ）。"
                     "`ccnavi-launcher.sh --docs` で proposal-format と phases を引き、"
-                    "phases.yml の定義を使う plan を足す",
+                    "phases.yml の定義を使う plan を追加します。",
                 )
             )
     return problems
@@ -337,7 +337,7 @@ def _unregistered_worktree_problems(root: str, worktrees: list) -> list[Problem]
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f".claude/worktrees/{name} は git に登録が無い。中身を確かめ、要らなければ"
+                f".claude/worktrees/{name} は git に登録がありません。中身を確かめ、不要なら"
                 f"ユーザに確かめてから ccnavi-clean.sh {name}",
             )
         )

@@ -167,7 +167,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
         setPending(false);
         const got = message.answer as PlanOrderAnswer | undefined;
         if (got === undefined) {
-          setStatus({ text: `順序を確かめられませんでした。線は引く前のままです: ${String(message.error ?? "")}`, error: true });
+          setStatus({ text: `順序を確認できませんでした。線は引く前のままです: ${String(message.error ?? "")}`, error: true });
         } else if (got.refused.length > 0) {
           setStatus({ text: refusedText(got.refused), error: true });
         } else {
@@ -319,7 +319,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
     seq.current += 1;
     setPending(false);
     setAnswer(page.answer);
-    setStatus({ text: "提案に書いてある順序に戻しました", error: false });
+    setStatus({ text: "提案に記載されている順序に戻しました", error: false });
   };
 
   const relayout = (): void => {
@@ -345,7 +345,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
     }
     setReview(false);
     setBusy(true);
-    setStatus({ text: "提案を書き換えています…", error: false });
+    setStatus({ text: "提案を変更しています…", error: false });
     post({ type: "save", order: changedOrder(answer), expect: page.answer.source_sha });
   };
 
@@ -363,7 +363,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
         <div id="changed" className="banner warn" role="status" data-tour="changed">
           <span className="workflow-banner-text">
             {shownDiff
-              ? "提案が外で変わりました（エージェントが書き換えた可能性があります）。下の差分を見て、取り込むか編集を続けるかを選んでください。"
+              ? "提案が外で変わりました（エージェントが変更した可能性があります）。下の差分を見て、取り込むか編集を続けるかを選んでください。"
               : "提案が外で変わったため、保存できません。「取り込む」で新しい提案から始めてください（いまの編集は捨てます）。"}
           </span>
           <button
@@ -443,7 +443,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
             data-action="revert"
             data-tour="revert"
             disabled={!shownDirty || shownBusy || shownGone !== undefined}
-            title="提案に書いてある先行と番号に戻します"
+            title="提案に記載されている先行と番号に戻します"
             onClick={revert}
           >
             案に戻す
@@ -458,7 +458,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
             data-action="save"
             data-tour="save"
             disabled={shownBusy || blocker !== ""}
-            title={blocker === "" ? "提案の計画と、番号の変わる項を指す子の提案を書き換えます（承認はしません）" : blocker}
+            title={blocker === "" ? "提案の計画と、番号の変わる項を指す子の提案を変更します（承認はしません）" : blocker}
             onClick={() => {
               if (!touring) {
                 setReview(true);

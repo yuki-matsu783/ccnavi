@@ -75,7 +75,7 @@ function main(argv) {
 
 	const targets = findTargets(top);
 	if (targets.length === 0) {
-		console.log(`消すものはありません（${top}）`);
+		console.log(`削除するものはありません（${top}）`);
 		return 0;
 	}
 
@@ -91,14 +91,14 @@ function main(argv) {
 			console.log(`removed ${shown}`);
 		} catch (err) {
 			failed.push(shown);
-			console.error(`消せなかった: ${shown} (${err.code || err.message})`);
+			console.error(`削除できなかった: ${shown} (${err.code || err.message})`);
 		}
 	}
 
 	if (failed.length > 0) {
 		console.error(
 			"ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）は" +
-				"どのワークツリーからも消せません。テストが終わるのを待って打ち直すか、ディレクトリごと mv で" +
+				"どのワークツリーからも削除できません。テストが終わるのを待って再実行するか、ディレクトリごと mv で" +
 				" .claude/worktrees/ の外へ出してください（README.md の「実測で分かった落とし穴」）。",
 		);
 		return 1;

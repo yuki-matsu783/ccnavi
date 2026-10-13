@@ -45,7 +45,7 @@ test("CB-D21 編集可能な範囲を inherit に変えると glob の欄が消�
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "research");
     await dom.settle();
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled);
-    assert.match(dom.one("#status").textContent ?? "", /id が重なっています（research）/);
+    assert.match(dom.one("#status").textContent ?? "", /IDが重複しています（research）/);
     assert.ok(dom.one<HTMLInputElement>(`${rowSelector("p2")} input.f-id`).classList.contains("duplicate"));
     // 直せば保存できるようになり、文面も消える
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "design2");
@@ -57,7 +57,7 @@ test("CB-D21 編集可能な範囲を inherit に変えると glob の欄が消�
   }
 });
 
-test("CB-D22 絞り込みは title と scope にも当たり、開いている行は隠さず、一致した行だけを数える。足した定義は開いて焦点が id に来る", async () => {
+test("CB-D22 絞り込みは title と scope にも当たり、開いている行は隠さず、一致した行だけを数える。追加した定義は開いて焦点が id に来る", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
@@ -65,7 +65,7 @@ test("CB-D22 絞り込みは title と scope にも当たり、開いている�
     dom.type(dom.one("#find"), "設計");
     await dom.settle();
     // design は題で、acceptance は when（「設計と並行してよく」）で当たる
-    assert.equal(dom.one("#phase-count").textContent, "2 / 5（開いたまま 1）", "開いている research は一致しないので数えず、開いたままの数として添える");
+    assert.equal(dom.one("#phase-count").textContent, "2 / 5（検索条件外の展開中項目：1件）", "開いている research は一致しないので数えず、開いたままの数として添える");
     assert.ok(dom.one(rowSelector("p1")).classList.contains("hidden-by-find"));
     assert.ok(dom.one(rowSelector("p1")).classList.contains("open"));
     assert.ok(!dom.one(rowSelector("p2")).classList.contains("hidden-by-find"));
@@ -183,24 +183,24 @@ test("CB-D61 ファイルが外で変わったら帯を出し、届いた中身�
   }
 });
 
-test("CB-D62 読み直せなかったら理由を出し、定義は出さない", async () => {
-  const dom = await openPage({ kind: "error", error: "定義のファイルを読めない: EACCES" });
+test("CB-D62 再読み込みできなかったら理由を出し、定義は出さない", async () => {
+  const dom = await openPage({ kind: "error", error: "定義のファイルを読み込めない: EACCES" });
   try {
     assert.match(dom.one(".empty").textContent, /フェーズ管理画面を読み込めませんでした/);
-    assert.equal(dom.one("pre.load-error").textContent, "定義のファイルを読めない: EACCES");
+    assert.equal(dom.one("pre.load-error").textContent, "定義のファイルを読み込めない: EACCES");
     assert.equal(dom.all("#phases").length, 0);
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D63 定義が無いファイルは、保存する前に足すと言う。苦情と錠はそのまま出す", async () => {
+test("CB-D63 定義がないファイルは、保存する前に追加すると言う。苦情と錠はそのまま出す", async () => {
   const dom = await openPhases({
     model: readPhases("version: 1\nphases: nope\n").model,
     lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"] },
   });
   try {
-    assert.match(dom.one("#phases .empty").textContent, /定義がありません。定義が 1 つも無いファイルは実行ファイルが読めない/);
+    assert.match(dom.one("#phases .empty").textContent, /定義がありません。定義が空のファイルはccnaviで読み込めません/);
     assert.match(dom.one(".problems").textContent, /phases がマップ（キーと値の組の集まり）ではありません/);
     assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02-02）");
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
@@ -209,7 +209,7 @@ test("CB-D63 定義が無いファイルは、保存する前に足すと言う�
   }
 });
 
-test("CB-D67 補足は、最後の値を消しても畳まれない（打っている欄が消えない）", async () => {
+test("CB-D67 補足は、最後の値を削除しても畳まれない（打っている欄が消えない）", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
@@ -218,7 +218,7 @@ test("CB-D67 補足は、最後の値を消しても畳まれない（打って�
     assert.ok(dom.one(`${rowSelector("p1")} details.more`).hasAttribute("open"));
     dom.type(dom.one(`${rowSelector("p1")} input.f-when`), "");
     await dom.settle();
-    assert.ok(dom.one(`${rowSelector("p1")} details.more`).hasAttribute("open"), "値を消した拍子に、打っている欄ごと畳まない");
+    assert.ok(dom.one(`${rowSelector("p1")} details.more`).hasAttribute("open"), "値を削除した拍子に、打っている欄ごと畳まない");
     assert.match(dom.one(`${rowSelector("p1")} details.more > summary`).textContent, /^補足（未設定）/);
   } finally {
     await dom.close();
@@ -303,7 +303,7 @@ test("CB-D85 関係の欄（overlap・requires・after）と、その id を選�
   }
 });
 
-test("CB-D86 図・一覧と図の切り替え・全体計画の待ち方の選択は出ない。state に前の図の表示や点の位置が残っていても一覧で開き、定義を足せば足した行が見える", async () => {
+test("CB-D86 図・一覧と図の切り替え・全体計画の待ち方の選択は出ない。state に前の図の表示や点の位置が残っていても一覧で開き、定義を追加できば追加した行が見える", async () => {
   const dom = await openPhases({}, { view: "graph", spots: { design: { x: 40, y: 80 } } });
   try {
     assert.equal(dom.all("#phase-graph, .react-flow, .graph, .graph-legend, .graph-note").length, 0, "図が残っている");
@@ -321,7 +321,7 @@ test("CB-D86 図・一覧と図の切り替え・全体計画の待ち方の選�
   }
 });
 
-test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後まで進めると閉じて tourDone を返す。案内の間は見本を描き、閉じたら実際の定義に戻る。図・関係の欄・待ち方の段は無い", async () => {
+test("CB-D90 拡張ホストが頼んだら基本の案内を出し、最後まで進めると閉じて tourDone を返す。案内の間は見本を描き、閉じたら実際の定義に戻る。図・関係の欄・待ち方の段はありません", async () => {
   const dom = await openPhases();
   try {
     assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
@@ -389,7 +389,7 @@ test("CB-D91 案内は Esc か × でやめられ、やめても tourDone を返
   try {
     await dom.send({ type: "tour" });
     await dom.settle();
-    assert.equal(dom.all(".tour").length, 0, "指す先が無い読み込み中には出さない");
+    assert.equal(dom.all(".tour").length, 0, "指す先がない読み込み中には出さない");
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     await dom.settle();
     assert.equal(dom.all(".tour").length, 1);
@@ -438,7 +438,7 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッ�
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
     dom.click(dom.one('[data-action="help"]'));
     await dom.settle();
-    assert.match(dom.one("#help").textContent ?? "", /順序（どのフェーズがどれを待つか）はこのファイルには書きません。親チケットの計画の項に after で先行を書きます/);
+    assert.match(dom.one("#help").textContent ?? "", /順序（どのフェーズがどれを待つか）はこのファイルには記載しません。親チケットの計画の項に after で先行を指定します/);
     dom.click(dom.one('[data-action="tour"]'));
     await dom.settle();
     dom.click(dom.one('[data-action="tour-course"][data-course="intro"]'));
@@ -488,7 +488,7 @@ test("CB-D151 設定の切り替えの欄は、選んだ対象を種類と名前
 test("CB-D153 読み込みに失敗した画面にも設定の切り替えの欄を出し、ワークスペースの設定へ戻れる", async () => {
   const dom = await openPage({
     kind: "error",
-    error: "ファイルを読めません",
+    error: "ファイルを読み込めません",
     target: { kind: "project", name: "app" },
     targets: [
       { kind: "self", name: "", label: "ワークスペース" },

@@ -486,7 +486,7 @@ class ImportTest(Drafts):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(os.path.exists(self.common_file()))
         self.assertEqual(plan_templates.digest(self.read_draft()), self.sha)
-        self.assertIn("何も書いていない", result.stdout)
+        self.assertIn("何も反映していません", result.stdout)
         self.assertIn(self.sha, result.stdout)
         # 新しく置くときは、フローの文を含む本文を全部見せる。
         self.assertIn("先にテスト", result.stdout)
@@ -541,7 +541,7 @@ class ImportTest(Drafts):
         self.assertIn("先にテスト", shown.stdout)
         # 下書きは取り込んだ中身と同じだったので消えた。一覧の件数も無くなる。
         self.assertFalse(os.path.exists(self.draft_path()))
-        self.assertIn("消した", result.stdout)
+        self.assertIn("削除しました", result.stdout)
         self.assertEqual(self.answer()["drafts"], [])
         self.assertNotIn("下書き:", self.tpl("--templates").stdout)
 
@@ -659,7 +659,7 @@ class ImportTest(Drafts):
         self.assertTrue(before.startswith(" "), before)
         self.assertTrue(after.startswith(" "), after)
         self.assertIn("@@", out)
-        self.assertIn("何も書いていない", out)
+        self.assertIn("何も反映していません", out)
         self.assertIn("--replace --yes --expect", out)
 
     def test_replace_with_yes_and_expect_overwrites_and_removes_the_draft(self):
@@ -674,12 +674,12 @@ class ImportTest(Drafts):
         self.existing()
         result = self.import_("i0001", "--to", "common", "--replace")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("差分は無い", result.stdout)
+        self.assertIn("差分はありません", result.stdout)
 
     def test_replace_without_an_existing_template_is_a_new_one(self):
         result = self.import_("i0001", "--to", "common", "--replace", "--yes", "--expect", self.sha)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("置き換える相手は無い", result.stdout)
+        self.assertIn("置き換える相手はありません", result.stdout)
 
     def test_a_name_that_would_clash_across_layers_is_refused(self):
         # 共通へ取り込むと、中身の違う同名のレイヤーの側が使われなくなる。
@@ -731,7 +731,7 @@ class ImportTest(Drafts):
         result = template_drafts.commit(plan, self.sha)
         self.assertTrue(result.written)
         self.assertFalse(result.removed)
-        self.assertIn("消していない", result.kept)
+        self.assertIn("削除していません", result.kept)
         self.assertTrue(os.path.islink(self.draft_path()))
         self.assertTrue(os.path.exists(real))
 
@@ -835,7 +835,7 @@ class ImportTest(Drafts):
             "i0001", "--to", "common", "--yes", "--expect", self.sha, guard="enable"
         )
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("端末", result.stderr)
+        self.assertIn("ターミナル", result.stderr)
         self.assertFalse(os.path.exists(self.common_file()))
 
     def test_via_board_needs_expect_and_json(self):
@@ -919,13 +919,13 @@ class ImportTest(Drafts):
             "i0001", "--to", "common", "--yes", "--expect", self.sha, guard="enable"
         )
         self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
-        self.assertIn("端末", refused.stderr)
+        self.assertIn("ターミナル", refused.stderr)
         self.assertFalse(os.path.exists(self.common_file()))
         self.assertTrue(os.path.exists(self.draft_path()))
         # 下見は端末でなくても動く。
         preview = self.import_("i0001", "--to", "common", guard="enable")
         self.assertEqual(preview.returncode, 0, preview.stdout + preview.stderr)
-        self.assertIn("何も書いていない", preview.stdout)
+        self.assertIn("何も反映していません", preview.stdout)
         # 切り方（テスト用）を使えば書ける。
         done = self.import_("i0001", "--to", "common", "--yes", "--expect", self.sha)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)

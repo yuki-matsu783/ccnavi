@@ -34,7 +34,7 @@
     ]
    },
    "code": null,
-   "digest": "44caa6d5a87b73f18d2612f783455d1464f7b64cd8b6a919b5b63f6ca7093977",
+   "digest": "0ad0314a879996db293c33f8edf1ce98dd4ea05acde7180988f6705dc5a6a59e",
    "family": "i0001",
    "identifiers": [
     "i0001",
@@ -48,7 +48,7 @@
    "rejected": [],
    "schema": 1,
    "stopped": null,
-   "text": "チケットの承認リクエスト: 2 件\n\n== i0001: 親  親チケット\n■ このチケットで編集可能な範囲\n    下に並ぶ場所にだけ、このチケットで編集できるようになる。allow は無確認で編集できる場所、ask は確認を挟んで編集できる場所、deny はこのチケットでも編集できない場所\n    ルールの allow で許可してある場所でも、この範囲の外では止まる。ルールの deny はこの範囲の中でも止まる\n    allow: src/*, wip/*, tests/*\n■ 全体計画\n    承認すると、この順序で進めることに合意したことになる。各フェーズの子は、そのフェーズが待つフェーズ（下の待ち方）が閉じてレビューが済むまで承認できない\n    1. 調査 / research  レビュー不要\n    2. 設計 / design  レビュー要: マージリクエスト\n■ 待ち方（計画の項の after から決まる。後から phases.yml を直しても変わらない）\n    1: research — 何も待たない\n    2: design — 待つ: 1\n■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）\n    承認したときの phases.yml と同じ中身を親に写して固定する。後から phases.yml を直しても、この親の範囲・見る場所・成果物は変わらない\n    調査 / research  review: none、scope: wip/research/*、deliverables: wip/research/summary.md、使う番号: 1\n    設計 / design  review: mr、scope: wip/design/*、使う番号: 2\n■ この親では使わない定義（phases.yml にあるが phases: に無い）\n    使わない: 受入テスト作成 / acceptance、実装とテスト / implement、実装フィードバック対応 / implement-feedback、片付け / chores、片付けフィードバック対応 / chores-feedback\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md\n\n== i0001-01-01: 子 i0001-01-01  親 i0001 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲に無い場所がここで新しく編集できるようになることはない\n    親の範囲: src/*, wip/*, tests/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-01.md"
+   "text": "チケットの承認リクエスト: 2 件\n\n== i0001: 親  親チケット\n■ このチケットで編集可能な範囲\n    このチケットでは、以下に示す場所のみ編集できるようになります。allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、deny はこのチケットでも編集できない場所\n    ルールの allow で許可されていても、このチケットの範囲外では編集できません。ルールの deny はこの範囲の中でも止まる\n    allow: src/*, wip/*, tests/*\n■ 全体計画\n    承認すると、この順序で進めることに合意したことになる。各フェーズの子は、そのフェーズが待つフェーズ（下のフェーズ間の依存関係）が閉じてレビューが済むまで承認できない\n    1. 調査 / research  レビュー不要\n    2. 設計 / design  レビュー必須: マージリクエスト\n■ フェーズ間の依存関係（計画の各項目の after で決まります。承認後に phases.yml を変更しても変わりません）\n    1: research — 何も待たない\n    2: design — 待つ: 1\n■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）\n    承認したときの phases.yml と同じ中身を親に写して固定する。承認後に phases.yml を変更しても、この親チケットの編集可能範囲・確認対象・成果物は変わりません。\n    調査 / research  review: none、scope: wip/research/*、deliverables: wip/research/summary.md、使う番号: 1\n    設計 / design  review: mr、scope: wip/design/*、使う番号: 2\n■ この親では使わない定義（phases.yml にあるが phases: にない）\n    使わない: 受入テスト作成 / acceptance、実装とテスト / implement、実装フィードバック対応 / implement-feedback、片付け / chores、片付けフィードバック対応 / chores-feedback\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md\n\n== i0001-01-01: 子 i0001-01-01  親 i0001 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲にない場所が新たに編集可能になることはありません\n    親の範囲: src/*, wip/*, tests/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-01.md"
   },
   "request": {
    "family": "i0001",
@@ -116,13 +116,13 @@
     ]
    },
    "code": null,
-   "digest": "fc6c15360445b8eaa6f8a7bc759dd03d744e88255ce25c1636a82ab5e4ac80e3",
+   "digest": "7138cd902f5831fb6112b0562cb8200ef25c05bbf63aa94317e3ca0e9d539726",
    "family": "i0001",
    "identifiers": [
     "i0001-01-02"
    ],
    "lines": [
-    "  i0001 のフェーズ 1 のマーカー（requested, reviewed）を消した。全部閉じたらレビューをもう一度頼むことになる",
+    "  i0001 のフェーズ 1 のマーカー（requested, reviewed）を削除しました。全部閉じたらレビューをもう一度頼むことになる",
     "\n承認した。.ccnavi/approved/doing/ へ動かした。"
    ],
    "mismatch": null,
@@ -130,7 +130,7 @@
    "rejected": [],
    "schema": 1,
    "stopped": null,
-   "text": "チケットの承認リクエスト: 1 件\n\n== i0001-01-02: 子 i0001-01-02  親 i0001 / フェーズ 1: 設計\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲に無い場所がここで新しく編集できるようになることはない\n    親の範囲: src/*, wip/*, tests/*\n    定義「設計」の範囲: wip/design/*\n    allow: wip/design/*\n■ 人間レビュー: 要\n    理由: t\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-02.md"
+   "text": "チケットの承認リクエスト: 1 件\n\n== i0001-01-02: 子 i0001-01-02  親 i0001 / フェーズ 1: 設計\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲にない場所が新たに編集可能になることはありません\n    親の範囲: src/*, wip/*, tests/*\n    定義「設計」の範囲: wip/design/*\n    allow: wip/design/*\n■ 人間レビュー: 要\n    理由: t\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-02.md"
   },
   "request": {
    "family": "i0001",
@@ -211,13 +211,13 @@
   },
   "request": {
    "compare": {
-    "base": "7ea2729c7f840816d5b30187f5c5a2a14547d8ef",
+    "base": "d3fe18bb61671f7a1988afac1987766a04f0da38",
     "files": [
      ".ccnavi/approved/doing/i0001.md",
      ".ccnavi/approved/events/i0001.ndjson",
      ".ccnavi/approved/phases/i0001/1.requested"
     ],
-    "head": "937e307817be91b2474ce001febce5e78e269850"
+    "head": "a392b5bcee4a09e72e41cc1f318084031902bd2e"
    },
    "family": "i0001",
    "op": "confirm",
@@ -240,12 +240,12 @@
        ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"\"\nbase_sha: \"a8eb0719876bdd375956d6df7176972c7a4ee0a5\"\nmr: 7\n---\n\n本文\n",
        ".ccnavi/approved/events/i0001-01-01.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"a8eb0719876bdd375956d6df7176972c7a4ee0a5\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"finished\", \"from\": \"doing\", \"to\": \"review\", \"via\": \"cli\"}\n",
        ".ccnavi/approved/events/i0001.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"a8eb0719876bdd375956d6df7176972c7a4ee0a5\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"requested\"}\n",
-       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"7ea2729c7f840816d5b30187f5c5a2a14547d8ef\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-09-29T12:00:00+0900\"}",
+       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"d3fe18bb61671f7a1988afac1987766a04f0da38\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-09-29T12:00:00+0900\"}",
        ".ccnavi/approved/phases/i0001/i0001-01-01.flow.json": "{\n \"fingerprint\": \"absent\",\n \"path\": \".ccnavi/approved/flows/i0001-01-01.yml\",\n \"at\": \"2026-09-29T12:00:00+0900\"\n}\n",
-       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"93b1769e9bdf24fc2beba43ba5f295093e26d15c\",\n \"base\": \"a8eb0719876bdd375956d6df7176972c7a4ee0a5\",\n \"at\": \"2026-09-29T12:00:00+0900\",\n \"summary\": \"1 ファイル、+1 -0 行、消したファイル 0\"\n}",
+       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"93b1769e9bdf24fc2beba43ba5f295093e26d15c\",\n \"base\": \"a8eb0719876bdd375956d6df7176972c7a4ee0a5\",\n \"at\": \"2026-09-29T12:00:00+0900\",\n \"summary\": \"1 ファイル、+1 -0 行、削除したファイル 0\"\n}",
        "wip/proposals/review/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"2026-09-29T12:00:00+0900\"\nbase_sha: \"a8eb0719876bdd375956d6df7176972c7a4ee0a5\"\n---\n\n本文\n"
       },
-      "head": "937e307817be91b2474ce001febce5e78e269850"
+      "head": "a392b5bcee4a09e72e41cc1f318084031902bd2e"
      },
      "i0001-01-01": {
       "files": {
@@ -295,7 +295,7 @@
     ]
    },
    "code": null,
-   "digest": "5216c042c850900848cdaa9c424f6d2124f4062f9ddd7ceb1c55f46371644b9c",
+   "digest": "034ff28c64753a6eaaf0db01f6b7eadf748c71d9532954d2e08a411d6f4466cd",
    "family": "i0001",
    "identifiers": [
     "i0001"
@@ -325,10 +325,10 @@
        ".ccnavi/approved/done/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-09-29T12:00:00+0900\"\ncompleted_at: \"2026-09-29T12:00:00+0900\"\nbase_sha: \"a8eb0719876bdd375956d6df7176972c7a4ee0a5\"\n---\n\n本文\n",
        ".ccnavi/approved/events/i0001-01-01.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"a8eb0719876bdd375956d6df7176972c7a4ee0a5\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"finished\", \"from\": \"doing\", \"to\": \"review\", \"via\": \"cli\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001-01-01\", \"kind\": \"settled\", \"from\": \"review\", \"to\": \"done\", \"via\": \"cli\", \"phase\": 1}\n",
        ".ccnavi/approved/events/i0001.ndjson": "{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"approved\", \"from\": \"todo\", \"to\": \"doing\", \"via\": \"terminal\", \"tree\": \"i0001\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"started\", \"from\": \"doing\", \"to\": \"doing\", \"via\": \"cli\", \"base_sha\": \"a8eb0719876bdd375956d6df7176972c7a4ee0a5\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"requested\"}\n{\"at\": \"2026-09-29T03:00:00Z\", \"ticket\": \"i0001\", \"kind\": \"phase-mark\", \"from\": null, \"to\": null, \"via\": \"cli\", \"phase\": 1, \"mark\": \"reviewed\"}\n",
-       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"7ea2729c7f840816d5b30187f5c5a2a14547d8ef\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-09-29T12:00:00+0900\"}",
+       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"d3fe18bb61671f7a1988afac1987766a04f0da38\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-09-29T12:00:00+0900\"}",
        ".ccnavi/approved/phases/i0001/1.reviewed": "{\"mr\": 7, \"accepted\": [], \"at\": \"2026-09-29T12:00:00+0900\"}",
        ".ccnavi/approved/phases/i0001/i0001-01-01.flow.json": "{\n \"fingerprint\": \"absent\",\n \"path\": \".ccnavi/approved/flows/i0001-01-01.yml\",\n \"at\": \"2026-09-29T12:00:00+0900\"\n}\n",
-       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"93b1769e9bdf24fc2beba43ba5f295093e26d15c\",\n \"base\": \"a8eb0719876bdd375956d6df7176972c7a4ee0a5\",\n \"at\": \"2026-09-29T12:00:00+0900\",\n \"summary\": \"1 ファイル、+1 -0 行、消したファイル 0\"\n}",
+       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"93b1769e9bdf24fc2beba43ba5f295093e26d15c\",\n \"base\": \"a8eb0719876bdd375956d6df7176972c7a4ee0a5\",\n \"at\": \"2026-09-29T12:00:00+0900\",\n \"summary\": \"1 ファイル、+1 -0 行、削除したファイル 0\"\n}",
        "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope:\n    - wip/design/*\nplan:\n  - design\nfeedback: []\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n本文\n"
       },
       "head": "0000000000000000000000000000000000000000"
@@ -372,7 +372,7 @@
     ]
    },
    "code": null,
-   "digest": "42c571f3b1b2289c5d59ad9fad27852b2a56d72a7cfb9690871676584a5bc29d",
+   "digest": "4403f0a0a09bc35316c5247ab2e788725156d121c471657cca1da3d820892db6",
    "family": "i0003",
    "identifiers": [
     "i0003-01-01"
@@ -385,14 +385,14 @@
    "rejected": [
     {
      "problems": [
-      "error: i0003-01-02: 先行 i0002-01-02 が閉じていない（いまは 作業中（doing/））。i0002-01-02 が .ccnavi/approved/done/ に入る（作業を終え、レビューが要るならユーザのレビューが済む）まで承認しない。先行が要らないなら predecessors から外して出し直してください"
+      "error: i0003-01-02: 先行 i0002-01-02 が完了していない（いまは 作業中（doing/））。i0002-01-02 が .ccnavi/approved/done/ に入る（作業を終え、レビューが必要ならユーザのレビューが済む）まで承認しない。先行が不要なら predecessors から削除して出し直してください"
      ],
      "ticket": "i0003-01-02"
     }
    ],
    "schema": 1,
    "stopped": null,
-   "text": "チケットの承認リクエスト: 1 件\n\n== i0003-01-01: 子 i0003-01-01  親 i0003 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲に無い場所がここで新しく編集できるようになることはない\n    親の範囲: src/*, wip/*, tests/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ 先行: i0002-01-01\n    どれも done/ に在って取り消しでないこと。満たしていなければ、承認も着手も止まる\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0003  提案: wip/proposals/todo/i0003-01-01.md"
+   "text": "チケットの承認リクエスト: 1 件\n\n== i0003-01-01: 子 i0003-01-01  親 i0003 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲にない場所が新たに編集可能になることはありません\n    親の範囲: src/*, wip/*, tests/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ 先行: i0002-01-01\n    すべての先行チケットが、取り消されずに完了し、done/ に移動している必要があります。条件を満たすまで、承認・開始はできません。\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0003  提案: wip/proposals/todo/i0003-01-01.md"
   },
   "request": {
    "family": "i0003",
@@ -463,7 +463,7 @@
     ]
    },
    "code": null,
-   "digest": "c9b0055290d903928ed50f2c2d403ad5175856c5873929a61cabeaa7cd423bca",
+   "digest": "1769e05f5120c9e33a6bef8f12ade96f9292bcc7fe3ac40caca48c9ebedffe59",
    "family": "i0001",
    "identifiers": [
     "i0001"
@@ -477,7 +477,7 @@
    "rejected": [],
    "schema": 1,
    "stopped": null,
-   "text": "チケットの承認リクエスト: 1 件\n\n== i0001: 親  親の改版\n■ 全体計画の変更\n    いま:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー要: マージリクエスト\n    改版:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー要: マージリクエスト\n        3. 受入テスト作成 / acceptance  レビュー要: マージリクエスト\n■ 待ち方の変更\n    いま:\n        1: research — 何も待たない\n        2: design — 待つ: 1\n    改版:\n        1: research — 何も待たない\n        2: design — 待つ: 1\n        3: acceptance — 待つ: 1, 2\n■ phases: の差分（改版で親に固定する定義）\n    足した: 受入テスト作成 / acceptance\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md"
+   "text": "チケットの承認リクエスト: 1 件\n\n== i0001: 親  親の改版\n■ 全体計画の変更\n    いま:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー必須: マージリクエスト\n    改版:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー必須: マージリクエスト\n        3. 受入テスト作成 / acceptance  レビュー必須: マージリクエスト\n■ フェーズ間の依存関係の変更\n    いま:\n        1: research — 何も待たない\n        2: design — 待つ: 1\n    改版:\n        1: research — 何も待たない\n        2: design — 待つ: 1\n        3: acceptance — 待つ: 1, 2\n■ phases: の差分（改版で親に固定する定義）\n    追加: 受入テスト作成 / acceptance\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md"
   },
   "request": {
    "family": "i0001",

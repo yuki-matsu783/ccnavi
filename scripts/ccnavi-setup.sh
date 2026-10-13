@@ -1303,9 +1303,9 @@ projects_notice_of() {
 	text="${lead}（入れ子のリポジトリとして: \`${first_link}\`${more}）。"
 	text="${text}\`.gitignore\` に入れる前に \`git add\` したものとみられる。"
 	text="${text}プロジェクトは自分の git を持つので、ワークスペースの git には載せない。"
-	text="${text}載せたままだと、ワークスペースのコミットがプロジェクトの版を記録し続け、\`.gitignore\` に \`/projects/\` を足しても追跡は外れない。"
-	text="${text}直すには、ワークスペースで \`git rm -r --cached projects\` を打ち（ファイルは消えない。まだコミットしていなければ \`git reset -- projects\`）、"
-	text="${text}\`.gitignore\` に \`/projects/\` を足して（既にあればそのまま）、コミットする"
+	text="${text}載せたままだと、ワークスペースのコミットがプロジェクトの版を記録し続け、\`.gitignore\` に \`/projects/\` を追加しても追跡は外れない。"
+	text="${text}直すには、ワークスペースで \`git rm -r --cached projects\` を実行し（ファイルは消えない。まだコミットしていなければ \`git reset -- projects\`）、"
+	text="${text}\`.gitignore\` に \`/projects/\` を追加して（既にあればそのまま）、コミットする"
 	printf '%s\n' "$text"
 }
 

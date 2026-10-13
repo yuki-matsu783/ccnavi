@@ -99,7 +99,7 @@ test("CB-T44 タイプを移すとコメントごと動き、glob と regex は�
   assert.doesNotMatch(out, /glob: "\*git push\*"/);
 });
 
-test("CB-T45 新しいルールは引用符付きの glob と折り返しの message で足す。削除は消える", () => {
+test("CB-T45 新しいルールは引用符付きの glob と折り返しの message で追加する。削除は消える", () => {
   const doc = readRules(TEXT);
   const s = doc.model.sections;
   const fresh: RuleForm = {
@@ -131,7 +131,7 @@ test("CB-T46 不正なタイプは苦情にして、他のタイプは出す", (
   assert.equal(model.sections.allow.length, 1);
 });
 
-test("CB-T47 画面から来た配列は形を確かめてから受け取る", () => {
+test("CB-T47 画面から来た配列は形を確認してから受け取る", () => {
   const ok = asSections({
     deny: [{ origin: { section: "deny", index: 0 }, id: "a", match: "Bash", kind: "glob", pattern: "*", message: "m" }],
     ask: [],
@@ -259,7 +259,7 @@ allow:
   assert.equal(doc.apply(posted ?? s), text);
 });
 
-test("CB-T135 every は数に読めれば数で書き、読めなければ打ったまま、空なら欄ごと消す", () => {
+test("CB-T135 every は数に読めれば数で書き、読めなければ打ったまま、空なら欄ごと削除", () => {
   const text = `version: 1
 deny: []
 ask: []
@@ -313,7 +313,7 @@ allow:
     glob: "*"
 `;
 
-test("CB-T331 except は見せる形で読み、書いていないルールには欄が無い", () => {
+test("CB-T331 except は見せる形で読み、書いていないルールには欄がありません", () => {
   const { model } = readRules(EXCEPT_TEXT);
   assert.deepEqual(model.problems, []);
   assert.deepEqual(model.sections.deny[0].excepts, [

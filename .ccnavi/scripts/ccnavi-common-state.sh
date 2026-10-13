@@ -282,9 +282,9 @@ ccnavi_git_refusal() {
 		/^[^ \t]/ { f = 0 }
 		f && /^[ \t]+[^ \t]/ { sub(/^[ \t]+/, ""); printf "%s%s", sep, $0; sep = " " }' "$1" 2>/dev/null)
 	if [ -n "$ccnavi_gr_paths" ]; then
-		printf '書きかけの %s と重なる。コミットか退避をしてから打ち直してください' "$ccnavi_gr_paths"
+		printf '書きかけの %s と重なる。コミットか退避をしてから再実行してください' "$ccnavi_gr_paths"
 	elif grep -q 'index\.lock' "$1" 2>/dev/null; then
-		printf '索引のロック（index.lock）が残っている。別の git が動いていないか確かめ、異常終了して残ったものならユーザが消す'
+		printf '索引のロック（index.lock）が残っている。別の git が動いていないか確かめ、異常終了して残ったものならユーザが削除します。'
 	elif grep -Eqi 'tell me who you are|empty ident|user\.email|user\.name' "$1" 2>/dev/null; then
 		printf 'コミットするユーザの名前（user.name・user.email）が決まっていない'
 	elif grep -Eqi 'gpg|signing' "$1" 2>/dev/null; then

@@ -34,7 +34,7 @@ function ok(overrides: Partial<VersionInfo> = {}): VersionProbe {
   return { kind: "ok", info: info(overrides) };
 }
 
-test("CB-T268 版の JSON を読む。形の版が違う・compat か flags が無いものは読まない", () => {
+test("CB-T268 版の JSON を読む。形の版が違う・compat か flags がないものは読まない", () => {
   const body = { schema: VERSION_SCHEMA, version: "0.1.0", commit: "unknown", built: false, compat: 1, flags: ["--lint", 3], formats: {}, outputs: {} };
   const parsed = parseVersionJson(JSON.stringify(body));
   assert.ok(parsed.ok);
@@ -69,13 +69,13 @@ test("CB-T269 起動のときの知らせ。揃っていれば言わず、古い
   assert.ok(extOld.endsWith(UPDATE_EXTENSION_HINT), extOld);
 });
 
-test("CB-T270 使うフラグを実行ファイルが知っているかを版の JSON の flags で見る。確かめられなければ進めない", () => {
+test("CB-T270 使うフラグを実行ファイルが知っているかを版の JSON の flags で見る。確認できなければ進めない", () => {
   const what = "ccnavi --lint --json --flow";
   assert.equal(missingFlags(ok(), ["--flow"], what, false), undefined);
 
   const missing = missingFlags(ok({ flags: ["--lint", "--version"] }), ["--flow"], what, false) ?? "";
   assert.match(missing, /--flow に対応していません（古い版です）/);
-  assert.match(missing, /ccnavi --lint --json --flow で確かめられない/);
+  assert.match(missing, /ccnavi --lint --json --flow で確認できない/);
   assert.match(missing, /ccnavi-setup\.sh/);
 
   // `--version` を知らない実行ファイルは、`--flow` を知っていても確かめられないとして止める
@@ -97,14 +97,14 @@ test("CB-T567 版の JSON の features を読む。持たない古い JSON は f
   assert.deepEqual(without.value.features, []);
 });
 
-test("CB-T568 使う機能を実行ファイルが持つかを features で見る。足りなければ名指しし、確かめられなければ進めない", () => {
+test("CB-T568 使う機能を実行ファイルが持つかを features で見る。足りなければ名指しし、確認できなければ進めない", () => {
   const what = "テンプレートの編集";
   assert.equal(missingFeatures(ok({ features: ["templates.edit", "templates.draft-text"] }), ["templates.edit"], what, false), undefined);
 
   const missing = missingFeatures(ok({ features: ["templates.edit"] }), ["templates.edit", "templates.draft-text"], what, false) ?? "";
   assert.match(missing, /templates\.draft-text の機能を持ちません/);
   assert.doesNotMatch(missing, /templates\.edit /);
-  assert.match(missing, /テンプレートの編集 で確かめられない/);
+  assert.match(missing, /テンプレートの編集 で確認できない/);
 
   const old = missingFeatures({ kind: "old" }, ["templates.edit"], what, true) ?? "";
   assert.match(old, /--version に対応していません/);
@@ -114,6 +114,6 @@ test("CB-T568 使う機能を実行ファイルが持つかを features で見�
   assert.match(failed, /打ち切った/);
 });
 
-test("CB-T569 features の無い実行ファイルは、機能を求めると足りないと言う", () => {
+test("CB-T569 features のない実行ファイルは、機能を求めると足りないと言う", () => {
   assert.match(missingFeatures(ok(), ["templates.edit"], "テンプレートの編集", false) ?? "", /templates\.edit の機能を持ちません/);
 });

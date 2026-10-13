@@ -61,7 +61,7 @@ const DEFAULT_COMMON_PHASES = ".ccnavi/config/common/phases.yml";
 const SCREEN = "phases";
 /** ワークスペースかプロジェクトの設定のファイルを最初の保存で作るときに、先頭へ置く説明 */
 const LAYER_HEADER = [
-  "# このレイヤーのフェーズ定義。親チケットの project: がこのレイヤーを指すときに、共通レイヤーの定義に足して使われる。",
+  "# このレイヤーのフェーズ定義。親チケットの project: がこのレイヤーを指すときに、共通レイヤーの定義に追加して使われる。",
   "# 共通レイヤーと同じ id で中身が違う定義や、title が重なる定義は --lint が error にし、このファイルのその定義だけが使われない。",
   "",
 ].join("\n");
@@ -291,19 +291,19 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
       throw new Error(
         target.kind === "self"
           ? "ccnavi の出力にワークスペースの設定がありません"
-          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、名前が予約名の common か self です）`,
+          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下にないか、名前が予約名の common か self です）`,
       );
     }
     phasesPath = resolveIn(root, layer.phasesFile.path);
     phasesRel = path.relative(root, phasesPath).split(path.sep).join("/");
     if (layer.phasesFile.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読めず、この設定の定義を空として扱っています: ${layer.phasesFile.unreadable}`);
+      notices.push(`実行ファイルはこのファイルを読み込めず、この設定の定義を空として扱っています: ${layer.phasesFile.unreadable}`);
     }
   }
   // 共通の設定の phases.yml を実行ファイルが読めなければ、共通の定義は空として扱われ、--lint が error で言う。画面は開いたまま帯で知らせる。
   const commonFile = commonLayer(board.board);
   if (commonFile !== undefined && commonFile.phasesFile.unreadable !== "") {
-    errors.push(`共通の設定の phases.yml を読めません（${commonFile.phasesFile.path}）。共通の定義は空として扱われています: ${commonFile.phasesFile.unreadable}`);
+    errors.push(`共通の設定の phases.yml を読み込めません（${commonFile.phasesFile.path}）。共通の定義は空として扱われています: ${commonFile.phasesFile.unreadable}`);
   }
   // 判定に使われる和は実行ファイルが組む（`sums[]`）。出どころが共通の定義だけを読み取り専用で見せ、拡張は足し直さない。
   // 共通の設定を開いているときは、編集する定義がそのまま共通の定義なので、読み取り専用の欄は出さない。
@@ -320,7 +320,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     exists = true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`フェーズ定義のファイルを読めません（${phasesRel}）: ${(error as Error).message}`);
+      throw new Error(`フェーズ定義のファイルを読み込めません（${phasesRel}）: ${(error as Error).message}`);
     }
     // 無いのは不備ではない（無い設定は空）。画面は空を見せ、定義を足して保存すればファイルが作られる。
     text = "";
@@ -726,7 +726,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     tmp = path.join(current.tmpDir, "phases.yml");
     fs.writeFileSync(tmp, text, "utf8");
   } catch (error) {
-    fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
+    fail(current, `編集中の内容を保存できません: ${(error as Error).message}`);
     return;
   }
 
@@ -768,7 +768,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     try {
       mtimeMs = fs.statSync(loaded.phasesPath).mtimeMs;
     } catch (error) {
-      fail(current, `フェーズ定義のファイルを確かめられません: ${(error as Error).message}`);
+      fail(current, `フェーズ定義のファイルを確認できません: ${(error as Error).message}`);
       return;
     }
     if (mtimeMs !== loaded.mtimeMs) {
@@ -790,7 +790,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     }
   } catch (error) {
     current.wroteAt = 0;
-    fail(current, `フェーズ定義のファイルに書けません: ${(error as Error).message}`);
+    fail(current, `フェーズ定義のファイルに保存できません: ${(error as Error).message}`);
     return;
   }
   await reload(current);

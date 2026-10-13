@@ -599,7 +599,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
         effect.digest,
       );
       // 行き先を置くのは取り返しがつかない（続きの子が起きる）ので、受け付けたことと結果を 1 行残す
-      diaglog.get("ccnavi-board", root).info("残った指摘の行き先を置いた", {
+      diaglog.get("ccnavi-board", root).info("残った指摘の対応方針を置いた", {
         result: outcome.ok ? "decided" : "mismatch" in outcome ? "mismatch" : "error",
         phase: effect.phase,
       });

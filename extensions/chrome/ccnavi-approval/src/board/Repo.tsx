@@ -51,10 +51,10 @@ function RepoBody({ board, actions, attention, issues }: RepoProps & { attention
   const dismiss = (family: string) => (actions?.dismiss ? () => actions.dismiss?.(board, family) : undefined);
   return (
     <>
-      {board.compat && !board.compat.same ? <Notice kind="warn" text={`${board.compat.message}（表示だけにして、承認と取り下げのボタンは出さない）`} /> : null}
-      {board.missingExtras.length > 0 ? <Notice kind="warn" text={`指定したブランチがリモートに無い: ${board.missingExtras.join(", ")}`} /> : null}
-      <p className="scope">{`見たブランチ（表示用）: ${board.candidates.length === 0 ? "なし" : board.candidates.join(", ")}`}</p>
-      {board.families.length === 0 ? <p className="empty">見たブランチに親のブランチ（親子のチケット）は無い</p> : null}
+      {board.compat && !board.compat.same ? <Notice kind="warn" text={`${board.compat.message}（表示のみとし、承認と取り下げのボタンは表示しません）`} /> : null}
+      {board.missingExtras.length > 0 ? <Notice kind="warn" text={`指定したブランチがリモートに見つかりません：${board.missingExtras.join(", ")}`} /> : null}
+      <p className="scope">{`確認したブランチ（表示用）：${board.candidates.length === 0 ? "なし" : board.candidates.join(", ")}`}</p>
+      {board.families.length === 0 ? <p className="empty">確認したブランチに親ブランチ（親子チケット）はありません。</p> : null}
       {board.families.map((f) => {
         const why = attention[f.family.name];
         // 「要確認」の親子のチケットには、このブラウザでは書くボタンを出さない（ユーザが確かめて外すまで）
@@ -85,7 +85,7 @@ function RepoBody({ board, actions, attention, issues }: RepoProps & { attention
           </article>
         ))}
       {actions?.loadIssues && actions.start ? <Start board={board} actions={actions} issues={issues} /> : null}
-      <p className="stats">{`読み取り: REST ${s.rest} 回・GraphQL ${s.graphql} 回・blob ${s.blobsFetched} 件（キャッシュから ${s.blobsCached} 件）`}</p>
+      <p className="stats">{`取得回数：REST ${s.rest} 回・GraphQL ${s.graphql} 回・blob ${s.blobsFetched} 件（キャッシュから ${s.blobsCached} 件）`}</p>
     </>
   );
 }
@@ -112,7 +112,7 @@ function RecentDays({ board, set }: { board: RepoBoard; set: (repo: RepoBoard, v
         <input key={board.repo.recentDays} ref={input} type="number" name="recentDays" min="0" max={String(MAX_RECENT_DAYS)} step="1" defaultValue={String(board.repo.recentDays)} />
       </label>
       <ActionButton type="submit" action="recent-days">
-        変える
+        変更
       </ActionButton>
     </form>
   );

@@ -728,7 +728,7 @@ class ProjectsTest(Repo):
         self.assertTrue(os.path.exists(os.path.join(plain, "ccnavi-index.jsonl")))
         # 2 回目は足さない。
         again = self.ccnavi("--format", "path")
-        self.assertNotIn("を足した", again.stderr)
+        self.assertNotIn("を追加した", again.stderr)
         self.assertEqual(
             read(os.path.join(plain, ".gitignore")), "node_modules/\n**/ccnavi-index.jsonl\n"
         )
@@ -869,7 +869,7 @@ class FrontmatterHintTest(Repo):
 
     def test_a_missing_type_is_told_too(self):
         said = self.hint("docs/new.md", doc(title="t"))
-        self.assertIn("type が無い", said)
+        self.assertIn("type がありません。", said)
         self.assertEqual(self.hint("docs/ok.md", doc(type="guide")), "")
 
     def test_edits_and_overwrites_are_not_told(self):

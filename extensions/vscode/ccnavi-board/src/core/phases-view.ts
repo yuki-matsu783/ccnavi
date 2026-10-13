@@ -80,7 +80,7 @@ export const KIND_LABELS: Readonly<Record<PhaseKind, string>> = {
 
 /** レビューの既定の説明。select のラベル */
 export const REVIEW_LABELS: Readonly<Record<Review, string>> = {
-  none: "none（既定。レビューを求めない。ただし実績のリスクが HIGH 以上ならレビューが要る）",
+  none: "none（既定。レビューを求めない。ただし実績のリスクが HIGH 以上ならレビューが必要です）",
   mr: "mr（マージリクエストのレビューを受ける）",
 };
 
