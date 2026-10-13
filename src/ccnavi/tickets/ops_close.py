@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import TextIO
 
 from ..infra import gitcmd, settings, tree
@@ -364,6 +365,12 @@ def deliverables_missing(
 
 
 def _tracked(worktree: str, glob: str) -> bool:
-    """この glob に当たる追跡済みのファイルが 1 つでもあるか。ワークツリーが無ければ無い。"""
-    rc, out = gitcmd.output(worktree, ["ls-files", "--", glob], TIMEOUT_SECONDS)
-    return rc == 0 and bool(out.strip())
+    """この glob に当たる追跡済みで、作業ツリーにも在るファイルが 1 つでもあるか。
+
+    ワークツリーが無ければ無い。`ls-files` はインデックスを見るので、追跡済みのファイルを
+    消しても `git add` するまでは名前が返る。返った名前ごとに、実在するかを確かめる。
+    """
+    rc, out = gitcmd.output(worktree, ["ls-files", "-z", "--", glob], TIMEOUT_SECONDS)
+    if rc != 0:
+        return False
+    return any(name and os.path.exists(os.path.join(worktree, name)) for name in out.split("\0"))
