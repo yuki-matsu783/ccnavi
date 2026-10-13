@@ -49,13 +49,13 @@ export function hasContext(rule: RuleForm): boolean {
 export function contextSummary(rule: RuleForm): string {
   return hasContext(rule)
     ? "（設定あり）"
-    : "（未設定）。ヒットしたときにモデルへ渡すプロンプトやファイルと、何回に 1 度渡すか（every）";
+    : "（未設定）ルールに一致したときにモデルへ渡すプロンプト・ファイルと、その頻度（every）を設定します。";
 }
 
 /** ask と allow に message が残っているときに出す断り。lint が error にする */
 export function staleMessage(section: Section): string {
   const where = section === "ask" ? "ユーザの確認ダイアログにしか出ない" : "どこにも届かない";
-  return `${section} の message は${where}ので、lint が error にします。モデルに渡すプロンプトは additionalContext に移してください: `;
+  return `${section} の message は${where}ため、設定の検証（lint）でエラーになります。モデルに渡すプロンプトは additionalContext に移してください: `;
 }
 
 /**
@@ -75,5 +75,5 @@ export function countText(query: string, shown: number, total: number, kept: num
   if (query === "") {
     return String(total);
   }
-  return `${shown} / ${total}${kept > 0 ? `（開いたまま ${kept}）` : ""}`;
+  return `${shown} / ${total}${kept > 0 ? `（検索条件外の展開中項目：${kept}件）` : ""}`;
 }

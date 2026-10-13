@@ -237,7 +237,7 @@ test("CB-D128 保存前の確かめが有効なら、読み込んだ時点から
     dom.click(button(dom, "save"));
     await dom.settle();
     const review = dom.one("#save-review");
-    assert.match(review.textContent ?? "", /足したノード（1）/);
+    assert.match(review.textContent ?? "", /追加したノード（1）/);
     assert.match(dom.one('.review-list[data-kind="added-nodes"]').textContent ?? "", /スキル（skill-1）/);
     assert.match(dom.one('.review-list[data-kind="changed-nodes"]').textContent ?? "", /読む（prompt-1）.*: 名前/);
     assert.equal(dom.posted.filter((m) => m.type === "save").length, 0, "確かめる前は送らない");
@@ -265,7 +265,7 @@ test("CB-D128 保存前の確かめが有効なら、読み込んだ時点から
   }
 });
 
-test("CB-D129 「次から確かめずに保存する」を付けて保存すると設定を外すよう送り、以後は一覧を出さずに保存する", async () => {
+test("CB-D129 「次回から保存前の確認を省略」を付けて保存すると設定を外すよう送り、以後は一覧を出さずに保存する", async () => {
   const dom = await openFlow({ doc: three(), reviewSave: true });
   try {
     dom.click(dom.one('[data-action="add-node"][data-type="skill"]'));

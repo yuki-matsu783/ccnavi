@@ -11,8 +11,8 @@ export const COPY_LABELS = { none: "未承認", open: "承認済み", review: "�
 /** 承認済みチケットの着手の状態。`start` で `started_at` が入るまで、範囲は適用されない */
 export const STARTED_LABELS = { unstarted: "未着手", started: "着手済み" } as const;
 export const STARTED_TITLES = {
-  unstarted: "承認済みですが、まだ start していません。着手の時刻（started_at）が入るまで、チケットの範囲は適用されません",
-  started: "start 済みです。チケットの範囲が適用されています",
+  unstarted: "承認済みですが、未着手です。start コマンドで着手時刻（started_at）が記録されるまで、このチケットの編集可能範囲は適用されません。",
+  started: "着手済みです。このチケットの編集可能範囲が適用されています。",
 } as const;
 
 /** ツールバーの絞り込みのチェックボックスの言葉 */
@@ -20,7 +20,7 @@ export const FILTER_LABELS = {
   attention: "要対応のみ",
   attentionTitle: "ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
   archived: "アーカイブ済みチケットを表示",
-  archivedTitle: "Draft を外したとき（ccnavi-review.sh ready）に手元の logs/archive/ へ退避した、閉じたチケットを「アーカイブ」の列に表示します。既定では隠します",
+  archivedTitle: "Draft を外したとき（ccnavi-review.sh ready）に手元の logs/archive/ へ退避した、閉じたチケットを「アーカイブ」の列に表示します。初期状態では表示しません。",
 } as const;
 
 export const MARK_LABELS: Readonly<Record<string, string>> = {
@@ -83,7 +83,7 @@ export function phaseStatusItems(p: PhaseChip): string[] {
     notes.push(MARK_LABELS[m] ?? m);
   }
   if (p.reviewRequired) {
-    notes.push("レビュー要");
+    notes.push("レビュー必須");
   }
   if (p.riskLine !== "") {
     notes.push(p.riskLine);
@@ -160,20 +160,20 @@ const PLACE_LABELS: Readonly<Record<string, string>> = {
 const HISTORY_KIND_LABELS: Readonly<Record<string, string>> = {
   approved: "承認",
   revised: "計画の改版",
-  raised: "続きの子として起票",
+  raised: "追加対応用の子チケットを作成",
   started: "着手",
-  finished: "作業を終えた",
+  finished: "作業終了",
   cancelled: "取り消し",
-  settled: "レビュー済みで閉じた",
+  settled: "レビュー完了・クローズ",
   withdrawn: "承認の取り下げ",
   archived: "アーカイブへ退避",
-  "phase-reopened": "マーカーを消した（子が足された）",
+  "phase-reopened": "フェーズを再開（子チケット追加に伴うマーカー解除）",
 };
 
 /** 親のマーカーの呼び名 */
 const PARENT_MARK_LABELS: Readonly<Record<string, string>> = {
   ready: "Draft を外した",
-  "close-early": "早めに閉じた",
+  "close-early": "途中でクローズ",
   closed: "親を閉じた",
 };
 
@@ -230,8 +230,8 @@ export function predecessorsBadge(card: Card): { readonly text: string; readonly
   const started = card.startedAt !== "" || card.copyStatus === "review";
   if (started) {
     return {
-      text: `先行が未完了（${ids}）`,
-      lead: "先行が未完了",
+      text: `先行チケットの条件が未達成（${ids}）`,
+      lead: "先行チケットの条件が未達成",
       ids: list,
       title: `着手済みです。先行が done/ に無いか取り消されているため、先行の条件を満たしていません（作業と finish は止まりません）\n${detail}`,
     };
@@ -241,6 +241,6 @@ export function predecessorsBadge(card: Card): { readonly text: string; readonly
     text: `先行待ち（${ids}）`,
     lead: "先行待ち",
     ids: list,
-    title: `先行が取り消されずに done/ に入るまで、${what}止まります\n${detail}`,
+    title: `先行チケットが取り消されずに完了し、done/ に移動するまで、${what}止まります\n${detail}`,
   };
 }

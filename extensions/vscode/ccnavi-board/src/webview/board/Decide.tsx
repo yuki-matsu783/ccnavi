@@ -43,8 +43,8 @@ export function DecideBody({
         {/* 選ぶものが無いときは、選び方の注意を出さない。0 件なら押すとレビュー済みになるだけ */}
         {count === 0
           ? "このフェーズをレビュー済みにしますか？"
-          : "「このフェーズで直す」を 1 件でも選ぶと、続きの子チケットを起こしてフェーズを開き直します。"}
-        {count === 0 || preview.can_issue ? "" : " issue に回せるのは、フィードバック計画が承認されたあとです。"}
+          : "「このフェーズで直す」を 1 件でも選ぶと、追加対応用の子チケットを作成し、このフェーズを再開します。"}
+        {count === 0 || preview.can_issue ? "" : " 指摘をIssueとして管理できるのは、フィードバック計画の承認後です。"}
       </p>
       {count === 0 ? null : (
         <ol className="decide-threads" data-tour="decide-threads">
@@ -86,7 +86,7 @@ export function DecideBody({
           disabled={deciding || !done}
           onClick={() => post({ type: "decideConfirm", choices })}
         >
-          {deciding ? "反映中…" : count === 0 ? "レビュー済みにする" : "この方針で決める"}
+          {deciding ? "反映中…" : count === 0 ? "レビュー済みにする" : "この対応方針を確定"}
         </button>
         <button
           type="button"
@@ -95,7 +95,7 @@ export function DecideBody({
           disabled={deciding}
           onClick={() => post({ type: "approveCancel" })}
         >
-          やめる
+          キャンセル
         </button>
       </div>
     </>

@@ -126,7 +126,7 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
           </button>
           {view.kind === "ready" && (
             <button type="button" className="action primary" data-action="import-proposal" data-tour="proposal-import" disabled={blocked} onClick={() => onImport(view.proposal)}>
-              {dirty ? "未保存の変更を捨てて取り込む" : "取り込む"}
+              {dirty ? "未保存の変更を破棄して取り込む" : "取り込む"}
             </button>
           )}
         </div>
@@ -144,10 +144,10 @@ export function RequestText({ prompt, onClose }: { readonly prompt: string; read
   return (
     <div className="review-backdrop">
       <section className="review" id="request-text" data-tour="request-text" role="dialog" aria-modal="true" aria-labelledby="request-text-title">
-        <h2 id="request-text-title">エージェントに頼む文</h2>
+        <h2 id="request-text-title">エージェントへの依頼文</h2>
         <p className="dim small">
-          コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。エージェントは下書きを書くだけで、
-          取り込むかはこの画面で差分を読んで決めます。
+          コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。エージェントは下書きのみを作成します。
+          取り込むかどうかは、この画面で差分を確認して判断してください。
         </p>
         <pre className="request-prompt">{prompt}</pre>
         <div className="review-actions">

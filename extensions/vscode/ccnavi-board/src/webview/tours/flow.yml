@@ -794,11 +794,11 @@ courses:
         scene: {doc: main-edited, dirty: true, history: true}
       - target: review
         title: 変更の一覧
-        body: 読み込んだ時点からの変更を、足したノード・消したノード・変えたノード・線ごとに並べます。意図しない変更が混じっていないかを読んでから、「保存する」を押します。
+        body: 読み込んだ時点からの変更を、追加したノード・削除したノード・変更したノード・接続ごとに並べます。意図しない変更が混じっていないかを読んでから、「保存する」を押します。
         scene: {doc: main-edited, base: main, dirty: true, history: true, review: true}
       - target: review-skip
-        title: 次から確かめずに保存する
-        body: チェックを付けて保存すると、次からは一覧を出さずに保存します。設定 ccnaviBoard.flowSaveReview で戻せます。
+        title: 次回から保存前の確認を省略
+        body: チェックを付けて保存すると、次回からは一覧を出さずに保存します。設定 ccnaviBoard.flowSaveReview で再び有効にできます。
         scene: {doc: main-edited, base: main, dirty: true, history: true, review: true}
       - target: lock
         title: 着手中は読むだけ
@@ -815,10 +815,10 @@ courses:
     steps:
       - target: request
         title: エージェントに頼む
-        body: 着手の前なら、エージェントにフローの作成や直しを頼めます。このボタンは、頼む文を組むだけです。エージェントは下書きを書くだけで、取り込むかはこの画面で決めます。
+        body: 着手の前なら、エージェントにフローの作成や直しを頼めます。このボタンは、依頼文を組むだけです。エージェントは下書きのみを作成します。取り込むかどうかは、この画面で差分を確認して判断してください。
         scene: {doc: main}
       - target: request-text
-        title: 頼む文を渡す
+        title: 依頼文を渡す
         body: 文は、コピーして進行中のセッションに貼るか、新しいセッションで開いて渡します。どの子の、どこに書き、何を確かめてから渡すかが書かれています。効力のあるフローには書かせません。
         scene: {doc: main, requestText: true}
       - target: offer
@@ -831,7 +831,7 @@ courses:
         scene: {doc: main, base: main, proposal: true}
       - target: proposal-import
         title: 取り込む
-        body: 「取り込む」は、編集中の内容に入れるだけで、まだ書きません。元に戻すで戻せます。着手中は取り込めません。未保存の変更があるときは、捨てて取り込むと書かれます。
+        body: 「取り込む」は、編集中の内容に入れるだけで、まだ書きません。元に戻すで戻せます。着手中は取り込めません。未保存の変更があるときは、破棄して取り込むと書かれます。
         scene: {doc: main, base: main, proposal: true}
       - target: save
         title: 取り込んだあと保存する

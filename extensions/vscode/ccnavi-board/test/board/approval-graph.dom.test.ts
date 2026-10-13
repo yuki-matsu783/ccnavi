@@ -96,8 +96,8 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     const n2 = dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n2"] .plan-node');
     // 延期した項は、本文の待ちの一覧と同じ言い方で引き受け手を言い、見る場所は出さない（本文も出さない）
     assert.match(n2.textContent ?? "", /レビューは 4 と一緒に/);
-    assert.doesNotMatch(n2.textContent ?? "", /レビュー要/);
-    assert.match(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n3"] .plan-node').textContent ?? "", /レビュー要（MR）/);
+    assert.doesNotMatch(n2.textContent ?? "", /レビュー必須/);
+    assert.match(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n3"] .plan-node').textContent ?? "", /レビュー必須（MR）/);
     assert.equal(n2.getAttribute("data-locked"), "0");
 
     // 終端に当たらない項は、実行ファイルが言ったものだけに印。その項から end への線も

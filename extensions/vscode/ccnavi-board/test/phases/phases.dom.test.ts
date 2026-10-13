@@ -45,7 +45,7 @@ test("CB-D21 編集可能な範囲を inherit に変えると glob の欄が消�
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "research");
     await dom.settle();
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled);
-    assert.match(dom.one("#status").textContent ?? "", /id が重なっています（research）/);
+    assert.match(dom.one("#status").textContent ?? "", /IDが重複しています（research）/);
     assert.ok(dom.one<HTMLInputElement>(`${rowSelector("p2")} input.f-id`).classList.contains("duplicate"));
     // 直せば保存できるようになり、文面も消える
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "design2");
@@ -65,7 +65,7 @@ test("CB-D22 絞り込みは title と scope にも当たり、開いている�
     dom.type(dom.one("#find"), "設計");
     await dom.settle();
     // design は題で、acceptance は when（「設計と並行してよく」）で当たる
-    assert.equal(dom.one("#phase-count").textContent, "2 / 5（開いたまま 1）", "開いている research は一致しないので数えず、開いたままの数として添える");
+    assert.equal(dom.one("#phase-count").textContent, "2 / 5（検索条件外の展開中項目：1件）", "開いている research は一致しないので数えず、開いたままの数として添える");
     assert.ok(dom.one(rowSelector("p1")).classList.contains("hidden-by-find"));
     assert.ok(dom.one(rowSelector("p1")).classList.contains("open"));
     assert.ok(!dom.one(rowSelector("p2")).classList.contains("hidden-by-find"));
@@ -200,7 +200,7 @@ test("CB-D63 定義が無いファイルは、保存する前に足すと言う�
     lock: { locked: true, reason: "作業中のチケットがある（i0001-02-02）", doing: ["i0001-02-02"] },
   });
   try {
-    assert.match(dom.one("#phases .empty").textContent, /定義がありません。定義が 1 つも無いファイルは実行ファイルが読めない/);
+    assert.match(dom.one("#phases .empty").textContent, /定義がありません。定義が空のファイルはccnaviで読み込めません/);
     assert.match(dom.one(".problems").textContent, /phases がマップ（キーと値の組の集まり）ではありません/);
     assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02-02）");
     assert.ok(!dom.one("#lock").classList.contains("hidden"));

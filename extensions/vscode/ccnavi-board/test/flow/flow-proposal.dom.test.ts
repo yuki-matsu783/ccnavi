@@ -74,7 +74,7 @@ test("CB-D140 未保存の変更があれば捨てることを言ってから取
     await dom.settle();
     await dom.send({ type: "proposal", proposal: { doc: drafted(), hash: HASH, draftPath: OFFER.draftPath } });
     assert.match(dom.one("#proposal-dirty").textContent ?? "", /未保存の変更があります/);
-    assert.equal(dom.one('[data-action="import-proposal"]').textContent, "未保存の変更を捨てて取り込む");
+    assert.equal(dom.one('[data-action="import-proposal"]').textContent, "未保存の変更を破棄して取り込む");
     // 着手された（錠が掛かった）。取り込みも止まる
     await dom.send({ type: "lock", lock: { locked: true, reason: lockedReason("i0001-01-01") } });
     assert.ok(dom.one<HTMLButtonElement>('[data-action="import-proposal"]').disabled);

@@ -80,7 +80,7 @@ function reviewText(review: string): string {
     case "none":
       return "レビュー不要";
     case "mr":
-      return "レビュー要（MR）";
+      return "レビュー必須（MR）";
     default:
       return `レビュー: ${review === "" ? "?" : review}`;
   }

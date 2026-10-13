@@ -774,7 +774,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
               data-action="request-flow"
               data-tour="request"
               disabled={shownBusy}
-              title="エージェントへの依頼の文を組みます。エージェントは下書きを書くだけで、取り込むかはこの画面で決めます"
+              title="エージェントへの依頼の文を組みます。エージェントは下書きのみを作成します。取り込むかどうかは、この画面で差分を確認して判断してください"
               onClick={() => post({ type: "request" })}
             >
               {shownRequest}

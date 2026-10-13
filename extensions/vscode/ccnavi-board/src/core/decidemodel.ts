@@ -140,7 +140,7 @@ export function choicesProblem(
       return `不明な対応方針です: ${String(choice)}`;
     }
     if (choice === "issue" && !preview.can_issue) {
-      return "issue に回せるのは、フィードバック計画が承認されたあとです";
+      return "指摘をIssueとして管理できるのは、フィードバック計画の承認後です";
     }
   }
   return undefined;

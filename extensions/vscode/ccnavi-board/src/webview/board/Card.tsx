@@ -207,7 +207,7 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
     facts.push(<Fact key="copy" kind={`copy-${card.copyStatus}`} text={COPY_LABELS[card.copyStatus]} />);
   }
   if (!closedInColumn) {
-    facts.push(<Fact key="review" kind="review" text={`人間レビュー${card.reviewRequired ? "要" : "不要"}`} title={card.reviewReason} />);
+    facts.push(<Fact key="review" kind="review" text={`人間レビュー${card.reviewRequired ? "必須" : "不要"}`} title={card.reviewReason} />);
   }
   // 着手の状態。`start` するのはエージェントなので、ユーザの対応を求めるバッジにはしない（issue #267）
   if (card.copyStatus === "open") {
@@ -229,7 +229,7 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
     facts.push(<Fact key="ready" kind="ready" text="Draft 解除済み" />);
   }
   if (card.wrapped) {
-    facts.push(<Fact key="wrapped" kind="wrapped" text="早めに閉じた" />);
+    facts.push(<Fact key="wrapped" kind="wrapped" text="途中でクローズ" />);
   }
   if (card.riskLevel !== "" && !isHighRisk(card.riskLevel)) {
     facts.push(<Fact key="risk" kind={`risk risk-${card.riskLevel.toLowerCase()}`} text={riskText(card)} />);
@@ -363,7 +363,7 @@ function WorkflowButton({ id }: { readonly id: string }): JSX.Element {
       data-action="workflow"
       data-tour="workflow-button"
       data-ticket={id}
-      title="計画の項どうしの順序（どの項がどの項を待つか）を図で直す計画編集タブを開きます。保存すると提案が書き換わるので、承認はそのあとに開き直してください"
+      title="計画の項どうしの順序（どの項がどの項を待つか）を図で直す計画編集タブを開きます。保存すると提案内容が変更されるため、承認画面を開き直してください。"
       onClick={() => post({ type: "workflow", ticket: id })}
     >
       計画編集

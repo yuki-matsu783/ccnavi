@@ -61,7 +61,7 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
         <>
           <p className="approval-note">承認待ちの内容を読み込み中…</p>
           <div className="approval-actions">
-            <Cancel label="やめる" />
+            <Cancel label="キャンセル" />
           </div>
         </>
       );
@@ -82,7 +82,7 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
       return (
         <>
           <h2 id="approval-title">{overlay.count} 件を承認しました</h2>
-          {overlay.carried === true ? <p className="approval-note">承認済みチケットのコミットと push をターミナルに送りました。</p> : null}
+          {overlay.carried === true ? <p className="approval-note">承認済みチケットをコミット・pushするコマンドをターミナルに送信しました。</p> : null}
           <p className="approval-note">
             Claude Code に伝える文を用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。
           </p>
@@ -104,16 +104,16 @@ function Inner({ overlay, unsaved }: { readonly overlay: ApprovalOverlay; readon
         <>
           <p className="approval-note">フェーズ {overlay.phase} の未解決（Unresolved）指摘を読み込み中…</p>
           <div className="approval-actions">
-            <Cancel label="やめる" />
+            <Cancel label="キャンセル" />
           </div>
         </>
       );
     case "reviewedLoading":
       return (
         <>
-          <p className="approval-note">フェーズ {overlay.phase} の未解決（Unresolved）指摘を確かめて、連絡の文を作っています…</p>
+          <p className="approval-note">フェーズ {overlay.phase} の未解決の指摘を確認し、エージェントへの通知文を作成しています…</p>
           <div className="approval-actions">
-            <Cancel label="やめる" />
+            <Cancel label="キャンセル" />
           </div>
         </>
       );
@@ -185,7 +185,7 @@ function Body({
                     data-action="edit-workflow"
                     data-tour="edit-workflow"
                     data-ticket={ticket}
-                    title={`このオーバーレイを閉じて、${ticket} の計画の順序を直す計画編集タブを開きます。保存すると提案が書き換わるので、承認は開き直してください`}
+                    title={`このオーバーレイを閉じて、${ticket} の計画の順序を直す計画編集タブを開きます。保存すると提案内容が変更されるため、承認画面を開き直してください。`}
                     onClick={() => post({ type: "editWorkflow", ticket })}
                   >
                     計画を編集
@@ -202,7 +202,7 @@ function Body({
       <BodyText text={preview.text} />
       {preview.rejected.length > 0 ? (
         <>
-          <h3>承認の対象にしない提案</h3>
+          <h3>承認対象外の提案</h3>
           <ul className="approval-rejected">
             {preview.rejected.map((r) => (
               <li key={r.ticket}>
@@ -217,7 +217,7 @@ function Body({
       ) : null}
       {preview.problems.length > 0 ? (
         <>
-          <h3>読めなかった提案と承認済みチケット</h3>
+          <h3>読み込めなかった提案・承認済みチケット</h3>
           <ul className="approval-problems">
             {preview.problems.map((p, i) => (
               <li key={i}>{p}</li>
@@ -245,7 +245,7 @@ function Body({
             {approving ? "承認中…" : `この ${count} 件を承認する`}
           </button>
         )}
-        <Cancel label="やめる" disabled={approving} />
+        <Cancel label="キャンセル" disabled={approving} />
       </div>
     </>
   );

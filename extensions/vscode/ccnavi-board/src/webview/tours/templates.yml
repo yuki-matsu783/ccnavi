@@ -213,7 +213,7 @@ courses:
           draft: login
       - target: import-form
         title: 取り込み先と置き換え
-        body: 取り込み先と置き換えを選んで「下見」を押します。下見は何も書きません。
+        body: 取り込み先と置き換えを選んで「取り込み内容をプレビュー」を押します。プレビューは何も書きません。
         scene:
           draft: login
           import: login

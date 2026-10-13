@@ -84,10 +84,10 @@ export function ImportForm({ draft, importing, layers, busy, touring, onChange, 
         </select>
       </label>
       <label>
-        <input type="checkbox" id="import-replace" data-action="import-replace" checked={importing.replace} onChange={(event) => onChange({ ...importing, replace: event.currentTarget.checked })} /> 同名を置き換える
+        <input type="checkbox" id="import-replace" data-action="import-replace" checked={importing.replace} onChange={(event) => onChange({ ...importing, replace: event.currentTarget.checked })} /> 同名のテンプレートを置き換える
       </label>
       <button type="button" className="action small" data-action="preview-import" disabled={busy || touring} onClick={onPreview}>
-        下見
+        取り込み内容をプレビュー
       </button>
       <button type="button" className="action small" data-action="close-import" onClick={onClose}>
         閉じる
