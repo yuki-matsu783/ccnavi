@@ -40,14 +40,13 @@ import { templatesLayerOf } from "./core/templatesmodel.js";
 import { editLockReason } from "./core/templates-lock.js";
 import { renderTemplatesPage } from "./core/templates-render.js";
 import type { EditRequest, ImportRequest, TemplatesData, TemplatesJson, TemplatesMessage, ToTemplates } from "./core/templates-view.js";
-import { WATCH_PATTERNS } from "./core/watch.js";
+import { OWN_WRITE_GRACE_MS, WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
 import * as diaglog from "./log.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
-const DEBOUNCE_MS = 120;
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "templates";
 /** 1 枚の画面の「どの対象か」を画面の欄の値に写すための、対象の一覧の既定（共通の設定の欄の kind） */
@@ -90,6 +89,10 @@ interface PanelState {
   projectLocks: Record<string, Lock>;
   /** 「ファイルの変更を検知しました」を出したまま、まだ読み直していない。表に戻ったときに送り直す */
   changedPending: boolean;
+  /** 自分が書いた時刻。この直後の監視の反応は、外で変わったものとして扱わない */
+  wroteAt: number;
+  /** 取り込み・編集の実行ファイルを走らせている間は真。猶予の時間に依らず、この間の監視の反応は外で変わったものとして扱わない */
+  writing: boolean;
   /** 画面に未保存の変更があるか（画面が `dirty` で知らせる）。別の対象へ切り替えるときに聞くかを決める */
   dirty: boolean;
   /**
@@ -193,6 +196,8 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
     lock: lockFromError("確認中…"),
     projectLocks: {},
     changedPending: false,
+    wroteAt: 0,
+    writing: false,
     dirty: false,
     seq: 0,
     asking: false,
@@ -377,6 +382,9 @@ function alive(current: PanelState): boolean {
 }
 
 function scheduleChanged(current: PanelState): void {
+  if (current.writing || Date.now() - current.wroteAt < OWN_WRITE_GRACE_MS) {
+    return;
+  }
   if (current.timer !== undefined) {
     clearTimeout(current.timer);
   }
@@ -392,7 +400,7 @@ function scheduleChanged(current: PanelState): void {
     }
     current.changedPending = true;
     current.host.post({ type: "changed" } satisfies ToTemplates);
-  }, DEBOUNCE_MS);
+  }, WATCH_DEBOUNCE_MS);
 }
 
 function scheduleLock(current: PanelState): void {
@@ -404,7 +412,7 @@ function scheduleLock(current: PanelState): void {
     if (alive(current)) {
       void refreshLock(current);
     }
-  }, DEBOUNCE_MS);
+  }, WATCH_DEBOUNCE_MS);
 }
 
 /**
@@ -702,11 +710,26 @@ async function importYes(current: PanelState, request: ImportRequest, expect: st
     return;
   }
 
-  const result = await runTemplateImportYes(current.folder.uri.fsPath, binSetting(), request, expect);
+  current.writing = true;
+  current.wroteAt = Date.now();
+  let result: Awaited<ReturnType<typeof runTemplateImportYes>>;
+  try {
+    result = await runTemplateImportYes(current.folder.uri.fsPath, binSetting(), request, expect);
+  } finally {
+    current.writing = false;
+  }
   if (!alive(current)) {
     return;
   }
+  current.wroteAt = Date.now();
   const answer = result.ok ? result.value : null;
+  if (answer === null || !answer.written) {
+    current.wroteAt = 0;
+    if (answer === null) {
+      // 書けたかどうか分からない。抑制した監視の反応を取り戻すため、外で変わったときと同じ道に通す
+      scheduleChanged(current);
+    }
+  }
   if (answer !== null && answer.written) {
     // 先に読み直す。`reload` は中身を渡すと画面の状態の一言を消すので、「取り込みました」は読み直したあとに送る。
     // 読み直しの前に、画面の未保存の変更は無いものとして扱う（`reload` は確認を出さずに中身を渡すため）
@@ -765,11 +788,26 @@ async function editYes(current: PanelState, request: EditRequest, expect: string
     return;
   }
 
-  const result = await runTemplateEditYes(current.folder.uri.fsPath, binSetting(), request, expect);
+  current.writing = true;
+  current.wroteAt = Date.now();
+  let result: Awaited<ReturnType<typeof runTemplateEditYes>>;
+  try {
+    result = await runTemplateEditYes(current.folder.uri.fsPath, binSetting(), request, expect);
+  } finally {
+    current.writing = false;
+  }
   if (!alive(current)) {
     return;
   }
+  current.wroteAt = Date.now();
   const answer = result.ok ? result.value : null;
+  if (answer === null || !(answer.written || answer.removed)) {
+    current.wroteAt = 0;
+    if (answer === null) {
+      // 書けたかどうか分からない。抑制した監視の反応を取り戻すため、外で変わったときと同じ道に通す
+      scheduleChanged(current);
+    }
+  }
   if (answer !== null && (answer.written || answer.removed)) {
     // 取り込みと同じく、先に読み直してから結果を送る
     current.dirty = false;
