@@ -127,7 +127,7 @@ export class Reader {
   async read(name: string, head: string, paths: readonly string[]): Promise<Branch> {
     const branch = this.branches[name] ?? { head, files: {}, binary: [], links: [] };
     if (branch.head !== head) {
-      throw new MovedError(`${name} の先頭が、読んでいる間に更新された。読み直す`);
+      throw new MovedError(`${name} の先頭が、取得している間に更新されました。再取得します`);
     }
     const objects = await this.call<Record<string, PathObject | null>>("pathObjects", head, paths);
     const wanted: { path: string; sha: string }[] = [];
@@ -215,7 +215,7 @@ async function integrationOf(repo: RepoConfig, reader: Reader, what: string): Pr
   const source = repo.integration ? "setting" : "default";
   const head = await reader.head(name);
   if (head === null) {
-    throw new Error(`${what}統合先 ${name} がリモートに無い。設定を直してください`);
+    throw new Error(`${what}統合先 ${name} がリモートに見つかりません。設定を修正してください`);
   }
   return { name, source, head } as const;
 }
@@ -238,7 +238,7 @@ export async function readIntegration(repo: RepoConfig, reader: Reader, deps: De
 async function readProjectIntegration(repo: RepoConfig, reader: Reader, deps: Deps): Promise<IntegrationRead> {
   const ws = deps.workspace;
   if (!ws || ws.repo.project) {
-    throw new Error(`プロジェクト ${repo.project} のワークスペースのリポジトリ（${repo.workspace || "未設定"}）が設定画面に登録されていない`);
+    throw new Error(`プロジェクト ${repo.project} のワークスペースのリポジトリ（${repo.workspace || "未設定"}）が設定画面に登録されていません`);
   }
   const wsReader = new Reader(ws.repo, { ...deps, call: ws.call, workspace: undefined });
   const wsInteg = await integrationOf(ws.repo, wsReader, "ワークスペースの");
@@ -367,7 +367,7 @@ async function withdrawableHere(board: BoardResult, reader: Reader, place: Place
     }
     const prior = await findPrior((op, args) => reader.call(op, ...args), place, head, w.ticket);
     // Python の `withdraw` が同じ場合に返す理由と同じコードを載せる（押した後の答えと表記をそろえる）
-    const why = "承認コミット（親のブランチの first-parent の履歴で、この承認済みチケットを足したコミット）が見つからないか、そのコミットの親に提案が無い";
+    const why = "承認コミット（親のブランチの first-parent の履歴で、この承認済みチケットを足したコミット）が見つからないか、そのコミットの親に提案がありません";
     out.push(prior === null ? { ...w, problems: [tagged(WITHDRAW_NO_PRIOR, why)] } : w);
   }
   return { ...board, withdrawable: out };
@@ -405,7 +405,7 @@ export async function readFamily(repo: RepoConfig, family: string, deps: Deps, a
   const base = await readIntegration(repo, reader, deps);
   const head = at ?? (await reader.head(family));
   if (head === null) {
-    throw new Error(`親のブランチ ${family} がホストに無い`);
+    throw new Error(`親のブランチ ${family} がホストに見つかりません`);
   }
   await reader.read(family, head, base.place.branch_paths);
   const input = await closureInput(family, reader, base.integration, base.place, deps, familyHints.get(hintKey(repo)));

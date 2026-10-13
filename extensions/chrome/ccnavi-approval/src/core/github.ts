@@ -59,7 +59,7 @@ export function checkBranch(value: unknown): string {
 
 export function checkOid(value: unknown): string {
   if (typeof value !== "string" || !OID.test(value)) {
-    throw new HostError(`sha が読めない: ${String(value)}`);
+    throw new HostError(`sha を解釈できません：${String(value)}`);
   }
   return value;
 }
@@ -72,7 +72,7 @@ export function checkPath(value: unknown): string {
     value.includes("\\") ||
     value.split("/").some((p) => p === "" || p === "." || p === "..")
   ) {
-    throw new HostError(`パスが読めない: ${String(value)}`);
+    throw new HostError(`パスを解釈できません：${String(value)}`);
   }
   return value;
 }
@@ -134,7 +134,7 @@ export async function fetchNoRedirect(client: Pick<Client, "fetch">, url: string
     return await client.fetch(url, { ...init, redirect: "error" });
   } catch (err) {
     throw new HostError(
-      `${what} が届かなかった（通信が切れたか、別の場所へ転送された。転送先へは送らない）。通信先と、設定画面に登録した owner/repo（改名・移動していないか）を見直してください: ${(err as Error).message ?? String(err)}`,
+      `${what} が届きませんでした（通信が切れたか、別の場所へ転送されました。転送先へは送信しません）。通信先と、設定画面に登録したオーナー／リポジトリ（改名・移動していないか）を確認してください：${(err as Error).message ?? String(err)}`,
     );
   }
 }
@@ -241,7 +241,7 @@ function repoPath(owner: string, repo: string): string {
 export async function repoInfo(client: Client, owner: string, repo: string): Promise<{ defaultBranch: string }> {
   const { status, body } = await rest(client, repoPath(owner, repo));
   if (status === 404) {
-    throw new HostError(`リポジトリ ${owner}/${repo} が見つからない（存在しないか、PAT の権限が及ばない）`, 404);
+    throw new HostError(`リポジトリ ${owner}/${repo} が見つかりません（存在しないか、PAT の権限が不足しています）`, 404);
   }
   return { defaultBranch: checkBranch((body as { default_branch?: unknown }).default_branch) };
 }
@@ -283,7 +283,7 @@ export async function recentRefs(client: Client, owner: string, repo: string, si
     const data = await graphql(client, REFS, { owner: checkName(owner, "owner"), name: checkName(repo, "repo"), after });
     const refs = (data.repository as { refs?: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: unknown[] } } | null)?.refs;
     if (!refs) {
-      throw new HostError(`リポジトリ ${owner}/${repo} のブランチを読めない`);
+      throw new HostError(`リポジトリ ${owner}/${repo} のブランチを取得できません`);
     }
     let older = false;
     for (const node of refs.nodes as { name?: unknown; target?: { oid?: unknown; committedDate?: unknown } }[]) {
@@ -361,11 +361,11 @@ export const LINK_MODE = "120000";
 export async function tree(client: Client, owner: string, repo: string, oid: string): Promise<TreeEntry[]> {
   const { status, body } = await rest(client, `${repoPath(owner, repo)}/git/trees/${checkOid(oid)}?recursive=1`);
   if (status === 404) {
-    throw new HostError(`tree ${oid} が無い`);
+    throw new HostError(`tree ${oid} が見つかりません`);
   }
   const b = body as { truncated?: boolean; tree?: { path?: unknown; type?: unknown; sha?: unknown; mode?: unknown }[] };
   if (b.truncated) {
-    throw new HostError("置き場の tree が大きすぎて取り切れない（truncated）。Chrome では読めない");
+    throw new HostError("置き場の tree が大きすぎて取得しきれません（truncated）。Chrome では読み取れません");
   }
   const out: TreeEntry[] = [];
   for (const e of b.tree ?? []) {
@@ -441,7 +441,7 @@ export async function viewer(client: Client): Promise<string> {
   const data = await graphql(client, VIEWER, {});
   const login = (data.viewer as { login?: unknown } | undefined)?.login;
   if (typeof login !== "string" || !NAME.test(login)) {
-    throw new HostError("PAT の持ち主を読めない");
+    throw new HostError("PAT の所有者を取得できません");
   }
   return login;
 }
@@ -625,7 +625,7 @@ export async function openPull(client: Client, owner: string, repo: string, bran
   const first = status === 404 || !Array.isArray(body) ? undefined : (body[0] as { number?: unknown; html_url?: unknown } | undefined);
   if (!first) return null;
   if (typeof first.number !== "number" || !Number.isInteger(first.number)) {
-    throw new HostError("マージリクエストの番号を読めない");
+    throw new HostError("マージリクエストの番号を取得できません");
   }
   return { number: first.number, url: String(alt(first.html_url, "")) };
 }
@@ -651,7 +651,7 @@ export async function reviewThreads(client: Client, owner: string, repo: string,
     const data = await graphql(client, THREADS, { owner: checkName(owner, "owner"), name: checkName(repo, "repo"), number, after });
     const threads = (data.repository as { pullRequest?: { reviewThreads?: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: ThreadNode[] } } | null } | null)
       ?.pullRequest?.reviewThreads;
-    if (!threads) throw new HostError(`マージリクエスト #${number} のスレッドを読めない`);
+    if (!threads) throw new HostError(`マージリクエスト #${number} のスレッドを取得できません`);
     for (const t of threads.nodes) {
       const c = t.comments?.nodes?.[0] ?? {};
       out.push({
@@ -676,7 +676,7 @@ export async function pullReviews(client: Client, owner: string, repo: string, n
   for (let page = 1; ; page += 1) {
     const { status, body } = await rest(client, `${repoPath(owner, repo)}/pulls/${number}/reviews?per_page=${PER_PAGE}&page=${page}`);
     // 404 や配列でない答えを「レビュー無し」と読むと、変更要求を見落として通してしまう
-    if (status === 404) throw new HostError(`マージリクエスト #${number} のレビューを読めない（404）`, 404);
+    if (status === 404) throw new HostError(`マージリクエスト #${number} のレビューを取得できません（404）`, 404);
     if (!Array.isArray(body)) throw new HostError(`マージリクエスト #${number} のレビューの応答が配列でない`);
     const chunk = body as Record<string, unknown>[];
     for (const r of chunk) {
@@ -699,7 +699,7 @@ export async function pullReviews(client: Client, owner: string, repo: string, n
  */
 export async function reviewCopy(client: Client, owner: string, repo: string, branch: string): Promise<ReviewCopy> {
   const mr = await openPull(client, owner, repo, branch);
-  if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する、開いているマージリクエストが無い`);
+  if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する、未クローズのマージリクエストがありません`);
   const threads = await reviewThreads(client, owner, repo, mr.number);
   const reviews = await pullReviews(client, owner, repo, mr.number);
   return { host: "github", mr, threads, reviews, fetched_at: new Date().toISOString() };
@@ -752,7 +752,7 @@ export interface Issue {
 /** 開いた issue（新しい順に 50 件。PR は除く）。「始める」の一覧 */
 export async function issues(client: Client, owner: string, repo: string): Promise<Issue[]> {
   const { status, body } = await rest(client, `${repoPath(owner, repo)}/issues?state=open&sort=created&direction=desc&per_page=50`);
-  if (status === 404 || !Array.isArray(body)) throw new HostError(`リポジトリ ${owner}/${repo} の issue を読めない`, status);
+  if (status === 404 || !Array.isArray(body)) throw new HostError(`リポジトリ ${owner}/${repo} の Issue を取得できません`, status);
   const out: Issue[] = [];
   for (const i of body as { number?: unknown; title?: unknown; html_url?: unknown; pull_request?: unknown }[]) {
     if (i.pull_request !== undefined && i.pull_request !== null) continue;
@@ -772,7 +772,7 @@ export async function createBranch(client: Client, owner: string, repo: string, 
     { method: "POST", headers: { ...headers(client), "Content-Type": "application/json" }, body: JSON.stringify({ ref: `refs/heads/${checkBranch(name)}`, sha: checkOid(sha) }) },
     `POST ${path}`,
   );
-  if (!res.ok) throw new HostError(`GitHub がブランチを作らなかった（${res.status}。同じ名前のブランチが既にあるか、権限が無い）`, res.status);
+  if (!res.ok) throw new HostError(`GitHub がブランチを作成しませんでした（${res.status}。同じ名前のブランチが既にあるか、権限が不足しています）`, res.status);
   const made = (await res.json()) as { ref?: unknown; object?: { sha?: unknown } };
   if (made.ref !== `refs/heads/${name}`) throw new HostError("作ったブランチの名前が、頼んだ名前と違う");
   return checkOid(made.object?.sha);

@@ -40,7 +40,7 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
       const host = customHost(form.get("kind"), form.get("url"));
       const granted = await chrome.permissions.request({ origins: [originPattern(host)] });
       if (!granted) {
-        throw new Error(`${host.web} への通信を許可しないと足せない`);
+        throw new Error(`${host.web} への通信を許可しないと追加できません。`);
       }
       const all = await loadAllHosts();
       try {
@@ -130,7 +130,7 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
       </form>
       <Status id="host-msg" said={said} />
       <p className="hint">
-        足すと、そのホストへの通信を Chrome に許可してもらいます。許可したホスト名にだけ通信し、PAT もそこへだけ送ります。https のホストと、http では localhost と 127.0.0.1 を足せます。GitLab
+        追加すると、そのホストへの通信の許可を Chrome に求めます。許可したホスト名にのみ通信し、PAT も許可したホストにのみ送信します。追加できるのは https のホストと、http の localhost・127.0.0.1 です。GitLab
         は API が「ホスト/api/v4」、GitHub Enterprise Server は「ホスト/api/v3」と「ホスト/api/graphql」にあるものとして扱います。
       </p>
     </section>

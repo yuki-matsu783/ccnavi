@@ -230,7 +230,7 @@ test("CX-T228 ページの決まった枠: 本物の controller が出す状態�
   assert.equal($("#result").getAttribute("class"), null);
   await act(async () => c.refresh());
   assert.equal(doc.body.dataset.state, "done");
-  assert.equal($("#status").outerHTML, '<p id="status" role="status" data-boot-ms="10" data-import-ms="20" data-violations="0">Pyodide 0.test: 起動 10 ms・読み込み 20 ms</p>');
+  assert.equal($("#status").outerHTML, '<p id="status" role="status" data-boot-ms="10" data-import-ms="20" data-violations="0">Pyodide 0.test：起動 10 ms・読み込み 20 ms</p>');
   assert.equal($("#banner").innerHTML, '<p class="notice warn" data-level="soon">あと 3 日で切れる</p>');
   assert.equal($("#result").getAttribute("class"), null);
   const press = async () => {
@@ -246,7 +246,7 @@ test("CX-T228 ページの決まった枠: 本物の controller が出す状態�
   await press();
   assert.equal($("#result").dataset.kind, "failed");
   assert.equal($("#result").className, "notice error");
-  assert.equal($("#result").textContent, "書けなかった: 壊れた");
+  assert.equal($("#result").textContent, "反映できませんでした：壊れた");
   // 読み直しで一言を消す: data-kind を外し、見た目は前のまま
   await act(async () => c.refresh());
   assert.equal($("#result").outerHTML, '<p id="result" role="status" aria-live="polite" class="notice error"></p>');
@@ -310,7 +310,7 @@ test("CX-T229 欄を描く途中で投げても、その欄だけがエラー表
     assert.ok(repos[0].querySelector("article.family"), "壊れていない欄は残る");
     const alert = repos[1].querySelector<HTMLElement>("p.notice.error[role=alert]");
     assert.ok(alert, "壊れた欄にエラー表示");
-    assert.match(alert.textContent ?? "", /acme\/b の欄を描けなかった/);
+    assert.match(alert.textContent ?? "", /acme\/b の欄を表示できませんでした/);
     assert.equal(repos[1].querySelector("article.family"), null);
     // 壊れた欄があっても、ほかの状態変化は描く（購読は残る）
     await f.set({ status: { text: "続き" }, state: "done" });

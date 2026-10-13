@@ -216,7 +216,7 @@ test("CX-T149 連鎖競合: 元に戻す前・元に戻すあいだに同じフ�
   };
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
   assert.equal(out.kind, "attention", JSON.stringify(out));
-  assert.match(out.kind === "attention" ? out.message : "", /ホストの履歴を確かめてください/);
+  assert.match(out.kind === "attention" ? out.message : "", /ホストの履歴を確認してください/);
   // 元に戻すコミットは last_commit_id で断られ、割り込み 2 の変更は残る（PROBE-1）
   assert.deepEqual(mock.glCommits.map((c) => c.result), ["written", "error"]);
   assert.equal(mock.files("i0001")[DOING], "別の書き手が書いた\n");
@@ -263,13 +263,13 @@ test("CX-T150 「始める」: issue から feature-<番号>-<slug> のブラン
     assert.deepEqual(mock.createdBranches, [{ name: "feature-12-新しい機能", sha: mock.head("main") }]);
     const closed = await startIssue(repo, { number: 5, title: "Closed" }, b.seen ?? null, taken, d);
     assert.equal(closed.kind, "refused", host);
-    assert.match(closed.kind === "refused" ? closed.message : "", /feature-5-closed は統合先 main の done\/ で閉じている[\s\S]*フォールバック/);
+    assert.match(closed.kind === "refused" ? closed.message : "", /feature-5-closed は統合先 main の done\/ でクローズ済みです[\s\S]*フォールバック/);
     const open = await startIssue(repo, { number: 1, title: "OPEN" }, b.seen ?? null, taken, d);
-    assert.match(open.kind === "refused" ? open.message : "", /同じ名前のブランチが既にある（feature-1-open）/);
+    assert.match(open.kind === "refused" ? open.message : "", /同じ名前のブランチが既にあります（feature-1-open）/);
     const again = await startIssue(repo, list[0], b.seen ?? null, taken, d);
     assert.equal(again.kind, "refused", host);
     // 全部のブランチの名前を大文字小文字をそろえて比べる（直近 N 日の外のブランチも）
-    assert.match(again.kind === "refused" ? again.message : "", /同じ名前のブランチが既にある（feature-12-新しい機能）/);
+    assert.match(again.kind === "refused" ? again.message : "", /同じ名前のブランチが既にあります（feature-12-新しい機能）/);
     assert.equal(mock.createdBranches.length, 1, host);
   }
 });
@@ -280,8 +280,8 @@ test("CX-T151 service worker の「始める」の保護: ボードからだけ�
   const head = mock.head("main");
   const ask = (args: unknown[], sender = BOARD) => dispatch({ kind: "host", host: "gitlab.com", op: "createBranch", args }, sender, d);
   const refused: [unknown[], typeof BOARD, RegExp][] = [
-    [["acme", "widgets", "feature-12-x", head], OPTIONS, /ボードからだけ/],
-    [["acme", "other", "feature-12-x", head], BOARD, /登録していない/],
+    [["acme", "widgets", "feature-12-x", head], OPTIONS, /ボードからのみ/],
+    [["acme", "other", "feature-12-x", head], BOARD, /登録されていない/],
     [["acme", "widgets", "main", head], BOARD, /issue から作る/],
     [["acme", "widgets", "i0012", head], BOARD, /issue から作る/],
     [["acme", "widgets", "feature-012-x", head], BOARD, /issue から作る/],
@@ -290,7 +290,7 @@ test("CX-T151 service worker の「始める」の保護: ボードからだけ�
     [["acme", "widgets", "feature-12-ＡＢ", head], BOARD, /issue から作る/],
     [["acme", "widgets", "feature-12-か\u3099", head], BOARD, /issue から作る/],
     [["acme", "widgets", `feature-12-${"a".repeat(60)}`, head], BOARD, /issue から作る/],
-    [["acme", "widgets", "feature-12-x", "f".repeat(40)], BOARD, /先頭が、ボードで読んだときから更新されている/],
+    [["acme", "widgets", "feature-12-x", "f".repeat(40)], BOARD, /先頭が、ボードで取得した時点から更新されています/],
   ];
   for (const [args, sender, why] of refused) {
     const res = await ask(args, sender);
@@ -301,7 +301,7 @@ test("CX-T151 service worker の「始める」の保護: ボードからだけ�
   const made = await ask(["acme", "widgets", "feature-12-統合先の解決", head]);
   assert.ok(made.ok, JSON.stringify(made));
   const issues = await dispatch({ kind: "host", host: "gitlab.com", op: "issues", args: ["acme", "other"] }, BOARD, d);
-  assert.match((issues as { error: string }).error, /登録していない/);
+  assert.match((issues as { error: string }).error, /登録されていない/);
   // プロジェクトのリポジトリは slug の頭が `<名前>-` のものだけ
   const project: RepoConfig = { ...GITLAB_REPO, project: "web", workspace: "github.com/acme/widgets" };
   const pd: Deps = deps(mock, TOKENS, new Map(), () => new Date(NOW), [project]);
@@ -486,7 +486,7 @@ test("CX-T158 ボードの「始める」の欄と「要確認」: issue の題�
   (item.querySelector("button[data-action=start]") as HTMLElement).click();
   const marks = [...html.querySelectorAll("[data-testid=attention]")];
   assert.equal(marks.length, 2);
-  assert.match(marks[0].textContent ?? "", /要確認: 元に戻せなかった/);
+  assert.match(marks[0].textContent ?? "", /確認が必要：元に戻せなかった/);
   (marks[0].querySelector("button[data-action=dismiss]") as HTMLElement).click();
   assert.deepEqual(pressed, ["issues", "start 12", "dismiss i0001"]);
   assert.equal((dom.window as unknown as { __pwned?: string }).__pwned, undefined);

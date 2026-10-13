@@ -361,7 +361,7 @@ test("CX-T160 「始める」: ボードで issue を読み、押すと issue �
   await again.click(`${GL_REPO} [data-testid=start] button[data-action=issues]`);
   await again.waitForSelector(`${GL_REPO} [data-testid=start] li[data-issue="5"]`);
   const refused = await press(again, `${GL_REPO} [data-testid=start] li[data-issue="5"] button[data-action=start]`);
-  assert.match(refused, /^refused: 始めなかった: feature-5-closed は統合先 main の done\/ で閉じている/);
+  assert.match(refused, /^refused: 作業を開始できませんでした：feature-5-closed は統合先 main の done\/ でクローズ済みです/);
   assert.equal(lab.createdBranches.length, 1);
   assert.ok(!(await again.content()).includes(TOKEN));
   await again.close();
@@ -379,7 +379,7 @@ test("CX-T173 「要確認」: 描いた後に要確認が付いた親子のチ�
   }, key);
   const before = lab.glCommits.length;
   const said = await press(page, approve);
-  assert.match(said, /^refused: i0002 は要確認のまま/);
+  assert.match(said, /^refused: i0002 は確認が必要な状態のままです/);
   assert.equal(lab.glCommits.length, before);
   await page.close();
 
@@ -400,7 +400,7 @@ test("CX-T173 「要確認」: 描いた後に要確認が付いた親子のチ�
   await box.locator("button[data-action=dismiss]").click();
   await again.waitForTimeout(300);
   assert.equal(asked.length, 1);
-  assert.match(asked[0], /要確認を外す/);
+  assert.match(asked[0], /確認が必要な状態を解除します/);
   const kept = await again.evaluate(
     async () => (await (globalThis as unknown as { chrome: { storage: { local: { get(k: string): Promise<Record<string, unknown>> } } } }).chrome.storage.local.get("attention")).attention,
   );

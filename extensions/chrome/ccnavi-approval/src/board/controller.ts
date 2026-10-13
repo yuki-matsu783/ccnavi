@@ -154,13 +154,13 @@ function newStats(): Stats {
 export function sayOutcome(outcome: Outcome, what: string): ResultLine {
   const text =
     outcome.kind === "written"
-      ? `${what}を反映しました（コミット：${outcome.oid.slice(0, 7)}${outcome.rounds > 1 ? `。途中で親のブランチの先頭が動いたので、${outcome.rounds} 回目で反映した` : ""}）。反映後の内容も確認しました。`
+      ? `${what}を反映しました（コミット：${outcome.oid.slice(0, 7)}${outcome.rounds > 1 ? `。途中で親のブランチの先頭が動いたので、${outcome.rounds} 回目で反映しました` : ""}）。反映後の内容も確認しました。`
       : outcome.kind === "changed"
         ? `${what}は反映されていません：${outcome.message}`
         : outcome.kind === "conflict"
           ? `${what}を反映できませんでした。自動再試行は行いません：${outcome.message}`
           : outcome.kind === "attention"
-            ? `${what}は要確認になった。書けたかどうかと何が残ったかを、ホストの履歴で確かめてください: ${outcome.message}`
+            ? `${what}は確認が必要な状態です。反映されたかどうかと残っている内容を、ホストの履歴で確認してください：${outcome.message}`
             : `${what}は反映されていません：${outcome.message}`;
   return { kind: outcome.kind, className: `notice ${outcome.kind === "written" ? "ok" : "error"}`, text };
 }
@@ -252,7 +252,7 @@ export function createBoardController(env: BoardEnv): BoardController {
   async function blocked(repo: RepoConfig, family: string): Promise<boolean> {
     const why = (await readAttention())[repoKey(repo)]?.[family];
     if (!why) return false;
-    setResult({ kind: "refused", className: "notice error", text: `${family} は要確認のまま。ホストの履歴を確かめて「確かめた」を押すまで、このブラウザからは書かない` });
+    setResult({ kind: "refused", className: "notice error", text: `${family} は確認が必要な状態のままです。ホストの履歴を確認し、「確認済みとして警告を解除」を押すまで、このブラウザからは変更を反映しません。` });
     return true;
   }
 
@@ -286,7 +286,7 @@ export function createBoardController(env: BoardEnv): BoardController {
   async function approvalWarning(deps: WriteDeps, repo: RepoConfig, family: string): Promise<string> {
     try {
       const prs = (await deps.call("pullApprovals", [repo.owner, repo.repo, family])) as { number: number }[];
-      if (prs.length > 0) return `\n\n注意: マージリクエスト ${prs.map((p) => `#${p.number}`).join(", ")} に Approve が付いている。このコミットを書くと、その Approve が外れることがある`;
+      if (prs.length > 0) return `\n\n注意：マージリクエスト ${prs.map((p) => `#${p.number}`).join(", ")} に Approve が付いています。このコミットを反映すると、その Approve が解除されることがあります。`;
     } catch {
       // 読めなくても止めない（注意の表示だけ）
     }
@@ -302,7 +302,7 @@ export function createBoardController(env: BoardEnv): BoardController {
       tried = await fn();
     } catch (err) {
       // 投げて終わったら失敗の見た目にする（前のまま残すと、直前の成功の緑で失敗を言ってしまう）
-      set({ result: { kind: "failed", className: "notice error", text: `書けなかった: ${(err as Error).message ?? String(err)}` } });
+      set({ result: { kind: "failed", className: "notice error", text: `反映できませんでした：${(err as Error).message ?? String(err)}` } });
     } finally {
       if (tried) {
         set({ busy: false });
@@ -334,7 +334,7 @@ export function createBoardController(env: BoardEnv): BoardController {
         if (await blocked(repoBoard.repo, family.family.name)) return false;
         const deps = await writeDeps(repoBoard.repo);
         const warn = await approvalWarning(deps, repoBoard.repo, family.family.name);
-        const msg = `${family.family.name} のフェーズ ${phase} をレビュー済みにする。レビュー待ちの子チケットを done/ に移動し、レビュー済みマーカーとともに1つのコミットとして反映します。書く前に、押した時点のスレッドとレビューを読み直して確かめる。${warn}`;
+        const msg = `${family.family.name} のフェーズ ${phase} をレビュー済みにする。レビュー待ちの子チケットを done/ に移動し、レビュー済みマーカーとともに1つのコミットとして反映します。反映する前に、押した時点のスレッドとレビューを再取得して確認します。${warn}`;
         if (!env.confirm(msg)) return false;
         const outcome = await ops.confirmPhase(repoBoard.repo, family.family.name, phase, deps);
         await noteAttention(repoBoard.repo, family.family.name, outcome);
@@ -345,7 +345,7 @@ export function createBoardController(env: BoardEnv): BoardController {
     withdraw(repoBoard, family, ticket) {
       void act(async () => {
         if (await blocked(repoBoard.repo, family.family.name)) return false;
-        const reason = env.prompt(`${ticket} の承認を取り下げて todo/ に戻す。理由（任意）`, "");
+        const reason = env.prompt(`${ticket} の承認を取り下げて todo/ に戻します。理由を入力してください（任意）`, "");
         if (reason === null) return false;
         const deps = await writeDeps(repoBoard.repo);
         const outcome = await ops.withdrawTicket(repoBoard.repo, family.family.name, ticket, reason, deps);
@@ -369,7 +369,7 @@ export function createBoardController(env: BoardEnv): BoardController {
     },
     start(repoBoard, issue) {
       void act(async () => {
-        if (!env.confirm(`issue #${issue.number} から親のブランチを統合先 ${repoBoard.integration?.name ?? ""} の先頭に作る（マージリクエストは作らない）`)) return false;
+        if (!env.confirm(`Issue #${issue.number} から親ブランチを作成します。起点は統合先 ${repoBoard.integration?.name ?? ""} の最新コミットです（マージリクエストは作成しません）。`)) return false;
         const deps = await writeDeps(repoBoard.repo);
         const taken = [...repoBoard.candidates, ...repoBoard.families.map((f) => f.family.name)];
         const out = await ops.startIssue(repoBoard.repo, issue, repoBoard.seen ?? null, taken, deps);
@@ -380,7 +380,7 @@ export function createBoardController(env: BoardEnv): BoardController {
             text:
               out.kind === "started"
                 ? `親ブランチ ${out.name} を作成しました（${out.head.slice(0, 7)}）。エージェントに、このブランチで作業を開始するよう依頼してください。`
-                : `始めなかった: ${out.message}`,
+                : `作業を開始できませんでした：${out.message}`,
           },
         });
         return true;
@@ -391,17 +391,17 @@ export function createBoardController(env: BoardEnv): BoardController {
         const key = repoKey(repoBoard.repo);
         try {
           const days = await ops.saveRecentDays(env.storage, env.hosts, key, value);
-          set({ result: { kind: "written", className: "notice ok", text: `${key} の直近の日数を ${days} 日にした。読み直す` } });
+          set({ result: { kind: "written", className: "notice ok", text: `${key} の直近の日数を ${days} 日に変更しました。再取得します。` } });
           return true;
         } catch (err) {
-          set({ result: { kind: "refused", className: "notice error", text: `直近の日数を保存しなかった: ${(err as Error).message ?? String(err)}` } });
+          set({ result: { kind: "refused", className: "notice error", text: `直近の日数を保存できませんでした：${(err as Error).message ?? String(err)}` } });
           return false;
         }
       });
     },
     dismiss(repoBoard, family) {
       void (async () => {
-        if (!env.confirm(`${family} の要確認を外す。ホストの履歴を見て、親のブランチの置き場が正しいと確かめられたときだけ外してください`)) return;
+        if (!env.confirm(`${family} の確認が必要な状態を解除します。ホストの履歴を確認し、親ブランチの置き場が正しいと確認できた場合のみ解除してください。`)) return;
         const all = await readAttention();
         const key = repoKey(repoBoard.repo);
         if (all[key]) delete all[key][family];
@@ -425,7 +425,7 @@ export function createBoardController(env: BoardEnv): BoardController {
       if (fromTimer) {
         set({ status: { ...snap.status, text: `自動更新に失敗しました：${why}` } });
       } else {
-        set({ sections: new Map([...before, ...snap.sections]), status: { ...snap.status, text: `ボードを読み込めなかった: ${why}` }, state: "error" });
+        set({ sections: new Map([...before, ...snap.sections]), status: { ...snap.status, text: `ボードを読み込めませんでした：${why}` }, state: "error" });
       }
     }
   }
@@ -458,10 +458,10 @@ export function createBoardController(env: BoardEnv): BoardController {
       set({ sections: new Map(), status: { ...snap.status, text: "リポジトリが登録されていません。設定画面で登録してください。" }, state: "done" });
       return;
     }
-    if (!fromTimer) set({ status: { ...snap.status, text: "Python（Pyodide）を起動している…" } });
+    if (!fromTimer) set({ status: { ...snap.status, text: "Python（Pyodide）を起動しています…" } });
     const w = pyWorker();
     const t = await w.init();
-    set({ status: { text: `Pyodide ${t.pyodide}: 起動 ${t.boot_ms} ms・読み込み ${t.import_ms} ms`, bootMs: t.boot_ms, importMs: t.import_ms, violations: t.violations.length } });
+    set({ status: { text: `Pyodide ${t.pyodide}：起動 ${t.boot_ms} ms・読み込み ${t.import_ms} ms`, bootMs: t.boot_ms, importMs: t.import_ms, violations: t.violations.length } });
     const cache = await env.blobCache();
     const attention = await readAttention();
     set({ attention });
@@ -504,7 +504,7 @@ export function createBoardController(env: BoardEnv): BoardController {
       void refresh();
     },
     reportRenderError(err) {
-      set({ status: { ...snap.status, text: `ボードを描画できなかった: ${(err as Error)?.message ?? String(err)}` }, state: "error" });
+      set({ status: { ...snap.status, text: `ボードを表示できませんでした：${(err as Error)?.message ?? String(err)}` }, state: "error" });
     },
   };
 }

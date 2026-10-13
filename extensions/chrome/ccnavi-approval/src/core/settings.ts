@@ -68,7 +68,7 @@ export function normalizeRepo(raw: Record<string, unknown>, hosts: readonly Host
   }
   const workspace = project === "" ? "" : String(raw.workspace ?? "").trim();
   if (project !== "" && workspace === "") {
-    throw new Error("プロジェクトのリポジトリには、ワークスペースのリポジトリ（<ホスト>/<owner>/<リポジトリ>）を選んでください");
+    throw new Error("プロジェクトのリポジトリには、ワークスペースのリポジトリ（<ホスト>/<オーナー>/<リポジトリ>）を選択してください");
   }
   return { host: host.id, owner, repo, integration, recentDays: days, extraBranches, project, workspace };
 }

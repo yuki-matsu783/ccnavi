@@ -140,7 +140,7 @@ test("CX-T163 GitLab で応答が返らず、自分のコミットを見分け�
   };
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
   assert.equal(out.kind, "attention", JSON.stringify(out));
-  assert.match(out.kind === "attention" ? out.message : "", /見分けられなかった/);
+  assert.match(out.kind === "attention" ? out.message : "", /判別できませんでした/);
   assert.equal(mock.glCommits.length, 1);
 });
 
@@ -163,7 +163,7 @@ test("CX-T165 事後確認の途中でホストが動かなくなったら、書
   };
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
   assert.equal(out.kind, "attention", JSON.stringify(out));
-  assert.match(out.kind === "attention" ? out.message : "", /書いたが確認できなかった/);
+  assert.match(out.kind === "attention" ? out.message : "", /反映しましたが、確認できませんでした/);
 });
 
 test("CX-T166 service worker の読み取りも、設定画面で登録したリポジトリだけ受ける", async () => {
@@ -178,7 +178,7 @@ test("CX-T166 service worker の読み取りも、設定画面で登録したリ
   ] as const) {
     const res = await dispatch({ kind: "host", host: "gitlab.com", op, args }, BOARD, d);
     assert.equal(res.ok, false, op);
-    assert.match((res as { error: string }).error, /登録していないリポジトリなので読まない/, op);
+    assert.match((res as { error: string }).error, /登録されていないリポジトリのため、読み取れません/, op);
   }
   assert.equal(mock.calls.length, 0);
 });
@@ -191,7 +191,7 @@ test("CX-T167 「始める」: service worker も統合先の先頭で閉じた�
   const now = mock.head("main");
   const ask = (dd: Deps, name: string) => dispatch({ kind: "host", host: "gitlab.com", op: "createBranch", args: ["acme", "widgets", name, now] }, BOARD, dd);
   const closed = await ask(d, "feature-5-closed");
-  assert.match((closed as { error: string }).error, /feature-5-closed は統合先 main の done\/ で閉じている/);
+  assert.match((closed as { error: string }).error, /feature-5-closed は統合先 main の done\/ でクローズ済みです/);
   const skew = await ask({ ...d, compat: COMPAT + 1 }, "feature-12-x");
   assert.match((skew as { error: string }).error, /互換の版/);
   mock.branch("Feature-12-X", "main");
@@ -233,7 +233,7 @@ test("CX-T169 GitLab の読みの上限と断り: tree は 50 ページ、discus
     };
   };
   const client = (fetch: gh.Fetch) => ({ host: GL, token: TOKEN, fetch, counter: { rest: 0, graphql: 0 }, sleep: noWait });
-  await assert.rejects(gl.tree(client(answer(() => ({ status: 200, json: pageOf(100) }))), "acme", "widgets", "a".repeat(40), "b".repeat(40), "x"), /取り切れない/);
+  await assert.rejects(gl.tree(client(answer(() => ({ status: 200, json: pageOf(100) }))), "acme", "widgets", "a".repeat(40), "b".repeat(40), "x"), /取得しきれません/);
   await assert.rejects(gl.discussions(client(answer(() => ({ status: 200, json: Array(100).fill({ notes: [] }) }))), "acme", "widgets", 7, "u"), /多すぎて読み切れない/);
   const limited = answer((_, n) => (n === 1 ? { status: 429, json: {}, headers: { "retry-after": "1" } } : { status: 200, json: { id: 42, default_branch: "main" } }));
   assert.equal((await gl.repoInfo(client(limited), "acme", "widgets")).defaultBranch, "main");
@@ -294,7 +294,7 @@ test("CX-T174 応答が返らなかった後の確かめや、書いた後の確
   };
   const out = await approveFamily(GITLAB_REPO, "i0001", a.shown, a.d);
   assert.equal(out.kind, "attention", JSON.stringify(out));
-  assert.match(out.kind === "attention" ? out.message : "", /書いたかもしれないが確認できなかった/);
+  assert.match(out.kind === "attention" ? out.message : "", /反映されたかどうか確認できませんでした/);
   assert.equal(lost.glCommits.length, 1);
 
   // 割り込みは無く書けたが、書いた後の中身を読む要求が失敗する
@@ -305,7 +305,7 @@ test("CX-T174 応答が返らなかった後の確かめや、書いた後の確
   };
   const out2 = await approveFamily(GITLAB_REPO, "i0001", b.shown, b.d);
   assert.equal(out2.kind, "attention", JSON.stringify(out2));
-  assert.match(out2.kind === "attention" ? out2.message : "", /書いた後の中身を確認できなかった/);
+  assert.match(out2.kind === "attention" ? out2.message : "", /反映後の内容を確認できませんでした/);
 });
 
 test("CX-T175 元に戻すコミットを送る前の確認で先頭が動いた（412。何も送っていない）なら、上限の範囲で読み直して元に戻し直す", async () => {
@@ -355,7 +355,7 @@ test("CX-T176 GitLab で応答が返らず、先頭が読んだ先頭に届か�
   };
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
   assert.equal(out.kind, "attention", JSON.stringify(out));
-  assert.match(out.kind === "attention" ? out.message : "", /見分けられなかった/);
+  assert.match(out.kind === "attention" ? out.message : "", /判別できませんでした/);
   assert.equal(mock.head("i0001"), forged);
   assert.equal(mock.glCommits.length, 1);
 });
@@ -421,7 +421,7 @@ test("CX-T179 転送は追わない: GitHub と GitLab の要求に redirect: \"
   ] as const) {
     await assert.rejects(
       mod.repoInfo({ host, token: TOKEN, fetch: broken, counter: { rest: 0, graphql: 0 }, sleep: noWait }, "acme", "widgets"),
-      (err: Error & { status?: number }) => /転送された/.test(err.message) && /owner\/repo/.test(err.message) && /Failed to fetch/.test(err.message) && !err.status,
+      (err: Error & { status?: number }) => /転送されました/.test(err.message) && /オーナー／リポジトリ/.test(err.message) && /Failed to fetch/.test(err.message) && !err.status,
     );
   }
 });

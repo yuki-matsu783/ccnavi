@@ -47,7 +47,7 @@ export class RepoBoundary extends Component<RepoBoundaryProps, State> {
         <header className="repo-head">
           <h2>{this.props.name}</h2>
         </header>
-        <Notice kind="error" text={`${this.props.name} の欄を描けなかった: ${why}`} />
+        <Notice kind="error" text={`${this.props.name} の欄を表示できませんでした：${why}`} />
       </section>
     );
   }

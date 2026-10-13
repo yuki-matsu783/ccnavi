@@ -46,11 +46,11 @@ export function underPlaces(path: string, places: Places): boolean {
 /** 書く先の名前と書くパスを見る。書けなければ理由（空なら書ける） */
 export function writeRefusal(branch: string, integration: string, paths: readonly string[], places: Places): string {
   if (PROTECTED.test(branch) || branch.toLowerCase() === integration.toLowerCase()) {
-    return `${branch} は保護されたブランチか統合先の名前なので書かない`;
+    return `${branch} は保護されたブランチまたは統合先の名前のため、反映できません`;
   }
   const outside = paths.filter((p) => !underPlaces(p, places));
   if (outside.length > 0) {
-    return `書くパスが置き場（${places.tickets}/・${places.approved}/）の外にある（${outside.join(", ")}）`;
+    return `反映先のパスが置き場（${places.tickets}/・${places.approved}/）の外にあります（${outside.join(", ")}）`;
   }
   return "";
 }

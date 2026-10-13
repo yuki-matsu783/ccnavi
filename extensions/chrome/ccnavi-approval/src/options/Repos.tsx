@@ -131,7 +131,7 @@ export function Repos({ revision }: { readonly revision: number }): JSX.Element 
       </p>
       <p className="hint">
         {
-          "プロジェクトのリポジトリ（手元で projects/<名前> に clone するもの）を登録するときは、プロジェクト名を入れ、先に登録したワークスペースのリポジトリを選びます。共通レイヤー・設定・互換のマーカーはワークスペースの統合先から読みます。置き場のパスは既定（wip/proposals・.ccnavi/approved）に固定で、.claude/settings.json の env では変えられません。GitLab の入れ子のグループは owner に group/sub と書きます。"
+          "プロジェクトのリポジトリ（手元で projects/<名前> に clone するもの）を登録するときは、プロジェクト名を入れ、先に登録したワークスペースのリポジトリを選びます。共通レイヤー・設定・互換のマーカーは、ワークスペースの統合先から取得します。置き場のパスは既定（wip/proposals・.ccnavi/approved）に固定で、.claude/settings.json の env では変更できません。GitLab の入れ子のグループは、「オーナー／グループ」欄に group/sub の形式で入力してください。"
         }
       </p>
     </section>

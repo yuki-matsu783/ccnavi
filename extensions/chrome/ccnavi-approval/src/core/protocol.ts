@@ -127,7 +127,7 @@ const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 async function hostOf(deps: Deps, id: unknown): Promise<Host> {
   const host = (await deps.getHosts()).find((h) => h.id === id);
   if (!host) {
-    throw new github.HostError(`通信先に無いホスト（一覧にない・設定画面で足していない）: ${String(id)}`);
+    throw new github.HostError(`通信先に含まれないホストです（一覧にない、または設定画面で追加されていません）：${String(id)}`);
   }
   return host;
 }
@@ -143,7 +143,7 @@ export async function dispatch(message: unknown, sender: Sender, deps: Deps): Pr
       return { ok: false, error: "この送り手からの要求は受け付けない" };
     }
     if (msg.kind === "host" && (msg.op === "commit" || msg.op === "createBranch") && !fromBoard(sender)) {
-      return { ok: false, error: "書く要求はボードからだけ受け付ける" };
+      return { ok: false, error: "書き込みの要求はボードからのみ受け付けます" };
     }
     const host = await hostOf(deps, msg.host);
     switch (msg.kind) {
@@ -242,9 +242,9 @@ function commitArgs(args: unknown[]) {
   const [, , branch, expected, headline, body, additions, deletions] = args;
   const name = github.checkBranch(branch);
   if (!Array.isArray(additions) || !Array.isArray(deletions) || additions.length + deletions.length > MAX_FILES) {
-    throw new Error(`書くファイルは ${MAX_FILES} 件までの配列`);
+    throw new Error(`反映するファイルは ${MAX_FILES} 件までの配列で指定してください`);
   }
-  if (additions.length + deletions.length === 0) throw new Error("書くものが無い");
+  if (additions.length + deletions.length === 0) throw new Error("反映する内容がありません");
   const adds: Addition[] = additions.map((x: unknown) => {
     const e = x as { path?: unknown; contents?: unknown; op?: unknown; last?: unknown };
     if (typeof e.contents !== "string" || e.contents.length > MAX_CONTENTS || !BASE64.test(e.contents)) {
@@ -280,7 +280,7 @@ function api(client: github.Client) {
  */
 async function integrationHead(client: github.Client, cfg: RepoConfig, integ: string): Promise<string> {
   const head = await api(client).branchHead(client, cfg.owner, cfg.repo, integ);
-  if (head === null) throw new Error(`統合先 ${integ} がリモートに無い`);
+  if (head === null) throw new Error(`統合先 ${integ} がリモートに見つかりません`);
   return head;
 }
 
@@ -290,12 +290,12 @@ async function workspaceOf(deps: Deps, cfg: RepoConfig): Promise<{ client: githu
   if (!ws) throw new Error(`ワークスペースのリポジトリ ${cfg.workspace || "（未設定）"} が設定画面に登録されていない`);
   const host = await hostOf(deps, ws.host);
   const token = await deps.getToken(host.id);
-  if (!token) throw new Error(`${host.id} の PAT が無い`);
+  if (!token) throw new Error(`${host.id} の PAT が登録されていません`);
   const client: github.Client = { host, token, fetch: deps.fetch, counter: { rest: 0, graphql: 0 }, sleep: deps.sleep };
   const a = api(client);
   const integ = ws.integration || (await a.repoInfo(client, ws.owner, ws.repo)).defaultBranch;
   const head = await a.branchHead(client, ws.owner, ws.repo, integ);
-  if (head === null) throw new Error(`ワークスペースの統合先 ${integ} がリモートに無い`);
+  if (head === null) throw new Error(`ワークスペースの統合先 ${integ} がリモートに見つかりません`);
   return { client, cfg: ws, integ, head };
 }
 
@@ -304,9 +304,9 @@ async function fileAt(client: github.Client, cfg: RepoConfig, head: string, path
   const a = api(client);
   const obj = (await a.pathObjects(client, cfg.owner, cfg.repo, head, [path]))[path];
   if (!obj) return null;
-  if (obj.type !== "blob") throw new Error(`${path} を読めない（ファイルでない）`);
+  if (obj.type !== "blob") throw new Error(`${path} を取得できません（ファイルではありません）`);
   const blob = (await a.blobs(client, cfg.owner, cfg.repo, [obj.oid]))[obj.oid];
-  if (!blob || blob.binary || blob.text === null) throw new Error(`${path} を読めない`);
+  if (!blob || blob.binary || blob.text === null) throw new Error(`${path} を取得できません`);
   return blob.text;
 }
 
@@ -332,7 +332,7 @@ async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, in
   const text = await fileAt(ws.client, ws.cfg, ws.head, COMPAT_FILE);
   const theirs = text === null ? null : Number(/^CCNAVI_COMPAT=(\d+)\s*$/m.exec(text)?.[1] ?? NaN);
   if (deps.compat === undefined || theirs === null || theirs !== deps.compat) {
-    return `統合先の互換の版（${theirs ?? "無い"}）と拡張の互換の版（${deps.compat ?? "不明"}）が違うので作らない`;
+    return `統合先の互換の版（${theirs ?? "なし"}）と拡張の互換の版（${deps.compat ?? "不明"}）が異なるため、作成できません`;
   }
   const a = api(client);
   const done = `${DEFAULT_PLACES.approved}/done`;
@@ -341,7 +341,7 @@ async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, in
     const entries = client.host.kind === "gitlab" ? await gitlab.tree(client, cfg.owner, cfg.repo, obj.oid, head, done) : await github.tree(client, cfg.owner, cfg.repo, obj.oid);
     const folded = fold(name);
     const hit = entries.find((e) => !e.path.includes("/") && fold(e.path) === `${folded}.md`);
-    if (hit) return `${name} は統合先 ${integ} の done/ で閉じている（閉じた識別子は使い直さない）`;
+    if (hit) return `${name} は統合先 ${integ} の done/ でクローズ済みです（クローズ済みの識別子は再利用できません）`;
   }
   return "";
 }
@@ -381,7 +381,7 @@ function startName(name: unknown, cfg: RepoConfig): string {
 
 function text(value: unknown, what: string, max: number): string {
   if (typeof value !== "string" || value === "" || value.length > max || /[\x00-\x1f\x7f]/.test(value)) {
-    throw new github.HostError(`${what} が読めない`);
+    throw new github.HostError(`${what} を取得できません`);
   }
   return value;
 }
@@ -395,7 +395,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
   // 読み取りも、設定画面で登録したリポジトリ（プロジェクトのワークスペースも登録したもの）だけ受ける
   const known = await registeredRepo(deps, client, o, r);
   if (!known) {
-    const why = `${o}/${r} は設定画面に登録していないリポジトリなので${op === "commit" || op === "createBranch" ? "書かない" : "読まない"}`;
+    const why = `${o}/${r} は設定画面に登録されていないリポジトリのため、${op === "commit" || op === "createBranch" ? "書き込めません" : "読み取れません"}`;
     return op === "commit" || op === "createBranch" ? refuse(why) : { ok: false, error: why };
   }
   let value: unknown;
@@ -453,17 +453,17 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       // 書く先の保護: 登録したリポジトリだけ。統合先の名前はボードの値を信頼せず自分で引き、
       // 置き場のパスは既定に固定する（ボードの値も統合先の `.claude/settings.json` も読まない）
       const cfg = await registeredRepo(deps, client, o, r);
-      if (!cfg) return refuse(`${o}/${r} は設定画面に登録していないリポジトリなので書かない`);
+      if (!cfg) return refuse(`${o}/${r} は設定画面に登録されていないリポジトリのため、書き込めません`);
       const integ = cfg.integration || (await x.repoInfo(client, o, r)).defaultBranch;
       try {
         await integrationHead(client, cfg, integ);
       } catch (err) {
-        return refuse(`統合先 ${integ} を読めないので書かない（${(err as Error).message}）`);
+        return refuse(`統合先 ${integ} を取得できないため、書き込めません（${(err as Error).message}）`);
       }
       const why = writeRefusal(checked.name, integ, [...checked.adds.map((e) => e.path), ...checked.dels.map((d) => d.path)], DEFAULT_PLACES);
       if (why) return refuse(why);
       if (lab) {
-        if (checked.adds.some((e) => !e.op)) return refuse("GitLab へ書くときは作るか書き換えるか（op）が要る");
+        if (checked.adds.some((e) => !e.op)) return refuse("GitLab へ反映するときは、作成か書き換えか（op）の指定が必要です");
         const actions: gitlab.GitLabAction[] = [
           ...checked.adds.map((e) => ({ op: e.op as "create" | "update", path: e.path, contents: e.contents, ...(e.last ? { last: e.last } : {}) })),
           ...checked.dels.map((d) => ({ op: "delete" as const, path: d.path, ...(d.last ? { last: d.last } : {}) })),
@@ -521,8 +521,8 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
         return refuse(`${name} は保護されたブランチか統合先の名前なので作らない`);
       }
       const head = await x.branchHead(client, o, r, integ);
-      if (head === null) return refuse(`統合先 ${integ} がリモートに無い`);
-      if (github.checkOid(b) !== head) return refuse(`統合先 ${integ} の先頭が、ボードで読んだときから更新されている。ボードを更新してから始め直してください`);
+      if (head === null) return refuse(`統合先 ${integ} がリモートに見つかりません`);
+      if (github.checkOid(b) !== head) return refuse(`統合先 ${integ} の先頭が、ボードで取得した時点から更新されています。ボードを更新してから、もう一度開始してください`);
       // 統合先の今の先頭で確かめ直す（Python の答えを信頼しない）: 大文字小文字をそろえた重なり・閉じた識別子・互換の版
       const folded = fold(name);
       const same = (await x.branchNames(client, o, r)).filter((n) => fold(n) === folded);
@@ -531,7 +531,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       try {
         guard = await startGuard(deps, client, cfg, integ, head, name);
       } catch (err) {
-        return refuse(`統合先 ${integ} を確かめられないので作らない（${(err as Error).message}）`);
+        return refuse(`統合先 ${integ} を確認できないため、作成できません（${(err as Error).message}）`);
       }
       if (guard) return refuse(guard);
       value = { name, head: await x.createBranch(client, o, r, name, head) };

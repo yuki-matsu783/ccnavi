@@ -43,7 +43,7 @@ test("CX-T245 足すホストの誤り: 種類・URL の形・http（loopback �
     ["gitlab", "http://gitlab.example.com", /https に限る/],
     ["gitlab", "https://u:p@gitlab.example.com", /資格情報/],
     ["gitlab", "https://gitlab.example.com/?x=1", /資格情報・クエリ/],
-    ["gitlab", "https://gitlab.example.com/gitlab", /オリジンだけ/],
+    ["gitlab", "https://gitlab.example.com/gitlab", /オリジンのみ/],
     ["gitlab", "http://[::1]:8080", /IPv6/],
     
   ];

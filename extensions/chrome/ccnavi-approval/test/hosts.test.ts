@@ -45,7 +45,7 @@ test("CX-T004 一覧の誤りでビルドを止める（http・資格情報つ�
   assert.throws(() => parseHosts(one({ ...ok, api: "http://ghe.example.com/api/v3" })), /https/);
   assert.throws(() => parseHosts(one({ ...ok, api: "https://u:p@ghe.example.com/api/v3" })), /資格情報/);
   assert.throws(() => parseHosts(one({ ...ok, kind: "bitbucket" })), /kind/);
-  assert.throws(() => parseHosts(JSON.stringify({ hosts: [ok, ok] })), /重なって/);
+  assert.throws(() => parseHosts(JSON.stringify({ hosts: [ok, ok] })), /重複/);
   assert.throws(() => parseHosts(JSON.stringify({ hosts: [] })), /空/);
   // 試験用の loopback だけ http を許す
   assert.equal(parseHosts(one({ ...ok, api: "http://127.0.0.1:18787", graphql: "http://127.0.0.1:18787/graphql" }))[0].api, "http://127.0.0.1:18787");

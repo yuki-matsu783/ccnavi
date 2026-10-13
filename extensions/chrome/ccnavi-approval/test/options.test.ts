@@ -242,7 +242,7 @@ test("CX-T234 設定画面のリポジトリ: 登録すると一覧に出し、�
   // プロジェクト名を入れてワークスペースを選ばないと、登録しない
   fill({ owner: "acme", repo: "app", project: "app", workspace: "" });
   await submitRepo();
-  assert.match(text("#repo-msg"), /^プロジェクトのリポジトリには、ワークスペースのリポジトリ（<ホスト>\/<owner>\/<リポジトリ>）を選んでください$/);
+  assert.match(text("#repo-msg"), /^プロジェクトのリポジトリには、ワークスペースのリポジトリ（<ホスト>\/<オーナー>\/<リポジトリ>）を選択してください$/);
   assert.equal($("#repo-msg").className, "status error");
   assert.equal(storedRepos().length, 1);
 
@@ -352,11 +352,11 @@ test("CX-T217 設定画面の PAT: 登録すると登録済みと期限を出し
   // 期限を入れずに登録: 期限が分からないと出す
   value.value = TOKEN;
   await submitToken();
-  assert.equal(text("#token-msg"), "github.com の PAT を登録した。差し替えた場合は、古いトークンをホスト側で失効させてください");
+  assert.equal(text("#token-msg"), "github.com の PAT を登録しました。差し替えた場合は、古いトークンをホスト側で失効させてください。");
   assert.equal($("#token-msg").className, "status ok");
   assert.equal(tokens.get("github.com"), TOKEN);
   assert.equal(value.value, "");
-  assert.match(text("#token-list"), /github\.com（GitHub）: 登録済み（github\.com の PAT の期限が分からない（/);
+  assert.match(text("#token-list"), /github\.com（GitHub）: 登録済み（github\.com の PAT の期限が不明です（/);
   assert.ok(!container.innerHTML.includes(TOKEN));
   assert.ok(!document.body.innerHTML.includes(TOKEN));
 
@@ -365,7 +365,7 @@ test("CX-T217 設定画面の PAT: 登録すると登録済みと期限を出し
   value.value = TOKEN;
   $<HTMLInputElement>("#token-expires").value = "2026-10-03";
   await submitToken();
-  assert.equal(text("#token-msg"), "gitlab.com の PAT を登録した。差し替えた場合は、古いトークンをホスト側で失効させてください");
+  assert.equal(text("#token-msg"), "gitlab.com の PAT を登録しました。差し替えた場合は、古いトークンをホスト側で失効させてください。");
   assert.deepEqual(metas.get("gitlab.com"), { manual: "2026-10-03" });
   assert.equal([value.value, $<HTMLInputElement>("#token-expires").value].join(""), "");
   assert.match(text("#token-list"), /gitlab\.com（GitLab）: 登録済み（gitlab\.com の PAT はあと 3 日で切れる（2026-10-03）。/);
@@ -385,7 +385,7 @@ test("CX-T217 設定画面の PAT: 登録すると登録済みと期限を出し
 
   // 消す: 選んだホストだけ
   await click("#token-clear");
-  assert.equal(text("#token-msg"), "gitlab.com の PAT を消した。ホスト側でも失効させてください");
+  assert.equal(text("#token-msg"), "gitlab.com の PAT を削除しました。ホスト側でも失効させてください。");
   assert.equal($("#token-msg").className, "status ok");
   assert.deepEqual([...tokens.keys()], ["github.com"]);
   assert.match(text("#token-list"), /gitlab\.com（GitLab）: 未登録/);
@@ -499,7 +499,7 @@ test("CX-T241 設定画面の通信先: 許可を断られたら足さない。h
   grant.ok = false;
   fillHost("gitlab", "https://gitlab.example.com");
   await submitHost();
-  assert.match(text("#host-msg"), /許可しないと足せない/);
+  assert.match(text("#host-msg"), /許可しないと追加できません/);
   assert.equal($("#host-msg").className, "status error");
   assert.equal(storage.customHosts, undefined);
   assert.equal(hostList(), EMPTY_HOSTS);
@@ -515,7 +515,7 @@ test("CX-T241 設定画面の通信先: 許可を断られたら足さない。h
 
   fillHost("gitlab", "https://gitlab.example.com/gitlab");
   await submitHost();
-  assert.match(text("#host-msg"), /オリジンだけ/);
+  assert.match(text("#host-msg"), /オリジンのみ/);
   assert.equal(storage.customHosts, undefined);
 });
 

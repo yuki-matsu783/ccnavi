@@ -52,7 +52,7 @@ test("CX-T013 操作は名前で限る。未対応の操作・通信先の一覧
   const d = deps(mock(), new Map([["github.com", TOKEN]]));
   const call = (m: Record<string, unknown>) => dispatch(m, BOARD, d);
   assert.match(((await call({ kind: "host", host: "github.com", op: "createCommitOnBranch", args: ["acme", "widgets"] })) as { error: string }).error, /未対応の操作/);
-  assert.match(((await call({ kind: "host", host: "evil.example.com", op: "repoInfo", args: ["acme", "widgets"] })) as { error: string }).error, /通信先に無い/);
+  assert.match(((await call({ kind: "host", host: "evil.example.com", op: "repoInfo", args: ["acme", "widgets"] })) as { error: string }).error, /通信先に含まれない/);
   assert.equal((await call({ kind: "host", host: "github.com", op: "repoInfo", args: ["acme/../x", "widgets"] })).ok, false);
   assert.equal((await call({ kind: "host", host: "github.com", op: "tree", args: ["acme", "widgets", "not-a-sha"] })).ok, false);
   assert.equal((await call({ kind: "host", host: "github.com", op: "pathObjects", args: ["acme", "widgets", "a".repeat(40), ["../etc"]] })).ok, false);
@@ -95,18 +95,18 @@ test("CX-T112 書く頼み（commit）はボードからだけ、登録したリ
   };
   for (const branch of ["main", "Master", "develop", "release", "release-1.0", "release/2"]) {
     const res = await refused(commit(branch));
-    assert.match(res.error, /保護されたブランチか統合先/, branch);
+    assert.match(res.error, /保護されたブランチまたは統合先/, branch);
     assert.equal(res.status, 400);
   }
   // 統合先の名前はボードの値を信頼せず、設定（無ければホストのデフォルトブランチ）から引く
   const trunk = deps(m, new Map([["github.com", TOKEN]]), new Map(), () => new Date(), [{ ...REPOS[0], integration: "i0003" }]);
   assert.match((await refused(commit("I0003"), BOARD, trunk)).error, /統合先/);
-  assert.match((await refused(commit("i0001"), OPTIONS)).error, /ボードからだけ/);
-  assert.match((await refused(commit("i0001", []))).error, /書くものが無い/);
+  assert.match((await refused(commit("i0001"), OPTIONS)).error, /ボードからのみ/);
+  assert.match((await refused(commit("i0001", []))).error, /反映する内容がありません/);
   assert.match((await refused(commit("i0001", add("src/app.py")))).error, /置き場.*の外/);
   assert.match((await refused(commit("i0001", add("../x")))).error, /パス/);
   assert.equal((await refused(commit("i0001", [{ path: "wip/proposals/x.md", contents: "not base64!" }]))).status, 400);
-  assert.match((await refused(commit("i0001", add(), "other"))).error, /登録していない/);
+  assert.match((await refused(commit("i0001", add(), "other"))).error, /登録されていない/);
   assert.equal(m.commitCalls.length, 0);
   const ok = await dispatch(commit("i0001"), BOARD, d);
   assert.equal(ok.ok, true, JSON.stringify(ok));

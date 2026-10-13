@@ -140,7 +140,7 @@ test("CX-T123 service worker が書く頼みを断ったら（登録していな
   const d = depsFor(mock, []);
   const out = await approveFamily(REPO, "i0001", seen, d);
   assert.equal(out.kind, "failed");
-  assert.match(out.kind === "failed" ? out.message : "", /登録していない/);
+  assert.match(out.kind === "failed" ? out.message : "", /登録されていない/);
   // 読み取りも登録したリポジトリだけ受けるので、ホストに何も頼まない
   assert.equal(mock.calls.length, before);
   assert.equal(mock.commitCalls.length, 0);

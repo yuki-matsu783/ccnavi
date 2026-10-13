@@ -36,7 +36,7 @@ export function endpoint(value: unknown, what: string): URL {
     throw new Error(`${what} は https に限る（http は localhost と 127.0.0.1 だけ）: ${value}`);
   }
   if (url.username || url.password || url.search || url.hash) {
-    throw new Error(`${what} に資格情報・クエリ・# を書かない: ${value}`);
+    throw new Error(`${what} には資格情報・クエリ・# を含めないでください：${value}`);
   }
   return url;
 }
@@ -52,7 +52,7 @@ export function parseHosts(text: string): Host[] {
   return list.map((entry: Record<string, unknown>) => {
     const id = entry.id;
     if (typeof id !== "string" || !ID.test(id) || seen.has(id)) {
-      throw new Error(`id が読めないか重なっている: ${String(id)}`);
+      throw new Error(`id が不正か重複しています：${String(id)}`);
     }
     seen.add(id);
     const kind = entry.kind;
@@ -108,7 +108,7 @@ export function manifest(hosts: readonly Host[], version: string): Record<string
   return {
     manifest_version: 3,
     name: "ccnavi 承認ボード",
-    description: "リモートのブランチにある承認待ちを表示し、承認・取り下げ・レビュー済みを親のブランチへ書く。issue から親のブランチを作ることもできる（GitHub と GitLab）",
+    description: "リモートのブランチにある承認待ちを表示し、承認・取り下げ・レビュー済みを親ブランチへ反映します。Issue から親ブランチを作成することもできます（GitHub と GitLab）",
     version,
     minimum_chrome_version: "116",
     permissions: ["storage", "alarms"],

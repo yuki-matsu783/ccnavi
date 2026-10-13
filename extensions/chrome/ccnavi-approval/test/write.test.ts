@@ -150,7 +150,7 @@ test("CX-T104 決まらない親子のチケットでは書かない（読めな
   bin.mock.binaryBlobs.add(blobSha(bin.mock.files("main")[".ccnavi/approved/done/i0005.md"]));
   const fresh = depsFor(bin.mock);
   const b = await board(fresh);
-  assert.match(b.families.find((f) => f.family.name === "i0001")?.result?.undecided ?? "", /決まらない/);
+  assert.match(b.families.find((f) => f.family.name === "i0001")?.result?.undecided ?? "", /判定できません/);
   const out = await approveFamily(REPO, "i0001", shown, fresh);
   assert.equal(out.kind, "refused");
   assert.match(out.kind === "refused" ? out.message : "", /バイナリ/);
@@ -173,10 +173,10 @@ test("CX-T105 互換の版が違えば承認も取り下げも書かない（7.3
   const b = await board(d);
   const r = b.families.find((f) => f.family.name === "i0001")?.result;
   assert.equal(r?.write?.allowed, false);
-  assert.match(r?.write?.reason ?? "", /拡張を更新する/);
+  assert.match(r?.write?.reason ?? "", /拡張を更新してください/);
   const out = await approveFamily(REPO, "i0001", shownOf(b, "i0001"), d);
   assert.equal(out.kind, "refused");
-  assert.match(out.kind === "refused" ? out.message : "", /拡張を更新する/);
+  assert.match(out.kind === "refused" ? out.message : "", /拡張を更新してください/);
   const w = await withdrawTicket(REPO, "i0001", "i0001", "", d);
   assert.equal(w.kind, "refused");
   assert.equal(mock.commitCalls.length, 0);

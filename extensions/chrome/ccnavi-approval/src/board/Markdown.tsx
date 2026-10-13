@@ -12,7 +12,7 @@ export function Markdown({ text }: { text: string }): JSX.Element {
   const fill = useCallback(
     (node: HTMLDivElement | null) => {
       if (node === null) return;
-      if (md === null) throw new Error("Markdown の描き手（MarkdownContext）が無い");
+      if (md === null) throw new Error("Markdown の描画機能（MarkdownContext）が見つかりません");
       node.replaceChildren(md.markdown(text));
     },
     [md, text],
