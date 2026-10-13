@@ -39,10 +39,12 @@ import { showLoading } from "./loading.js";
 import type { ProjectsData, ProjectsMessage, ToProjects } from "./core/projects-view.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { readOrigin } from "./git.js";
+import * as diaglog from "./log.js";
 import { runInTerminal } from "./terminal.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
+/** 他の画面（WATCH_DEBOUNCE_MS = 120）より長い。理由は記録が無く未確認。変える前に、プロジェクトの一覧を読む重さを測ること */
 const DEBOUNCE_MS = 300;
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "projects";
@@ -103,6 +105,10 @@ export async function openProjects(): Promise<void> {
     localResourceRoots: [],
     retainContextWhenHidden: false,
   });
+  if (panel.options.retainContextWhenHidden !== false) {
+    // screenHost は retainContextWhenHidden が偽であることを前提にしている。真だと、裏に回っても画面が捨てられず、表裏の読み直しが働かない。診断ログにだけ残す（docs/claude/logging.md）
+    diaglog.get("ccnavi-board", folder.uri.fsPath).error("画面の前提が崩れている", { screen: SCREEN, retainContextWhenHidden: true });
+  }
   showLoading(panel, TITLE, SCREEN, "プロジェクト");
   const current: PanelState = { panel, folder, host: projectsHost(panel), watchers: [], loading: false, again: false, wasVisible: panel.visible };
   state = current;

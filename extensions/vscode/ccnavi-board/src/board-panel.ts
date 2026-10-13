@@ -33,7 +33,7 @@ import { showLoading } from "./loading.js";
 import { copyPrompt, openPromptInSession } from "./prompt-handover.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { ticketControlOf } from "./core/ticket-control.js";
-import { WATCH_PATTERNS } from "./core/watch.js";
+import { WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
 import { isTicketId } from "./core/ticket-id.js";
 import { forgetSaved, onWorkflowTabs, staleSaved, workflowTabs } from "./core/workflow-tabs.js";
 import { childWorktreeFailureText, unsavedText, type ApproveWorktree, type ChildWorktreeFailure } from "./core/approvemodel.js";
@@ -45,8 +45,6 @@ import * as diaglog from "./log.js";
 
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "board";
-/** ファイルの変化をまとめる待ち時間（ミリ秒）。参考にした拡張と同じ */
-const DEBOUNCE_MS = 120;
 const TITLE = "ccnavi チケット管理";
 
 interface PanelState {
@@ -146,6 +144,10 @@ export async function openBoard(project?: string): Promise<void> {
     localResourceRoots: [],
     retainContextWhenHidden: false,
   });
+  if (panel.options.retainContextWhenHidden !== false) {
+    // screenHost は retainContextWhenHidden が偽であることを前提にしている。真だと、裏に回っても画面が捨てられず、表裏の読み直しが働かない。診断ログにだけ残す（docs/claude/logging.md）
+    diaglog.get("ccnavi-board", folder.uri.fsPath).error("画面の前提が崩れている", { screen: SCREEN, retainContextWhenHidden: true });
+  }
   showLoading(panel, TITLE, SCREEN, "チケット");
   const current: PanelState = {
     panel,
@@ -238,7 +240,7 @@ function scheduleUpdate(): void {
     if (state === current) {
       void update();
     }
-  }, DEBOUNCE_MS);
+  }, WATCH_DEBOUNCE_MS);
 }
 
 /** 実行ファイルを走らせ直して Webview の内容を差し替える */

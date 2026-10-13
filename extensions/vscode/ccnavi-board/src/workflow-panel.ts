@@ -46,7 +46,7 @@ import { checkPlanOrder, loadBoard, runPlanOrder, runPlanOrderWrite } from "./cc
 import { loadingText } from "./core/loading-render.js";
 import type { PlanOrder, PlanOrderAnswer } from "./core/planordermodel.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
-import { WATCH_PATTERNS } from "./core/watch.js";
+import { OWN_WRITE_GRACE_MS, WATCH_PATTERNS } from "./core/watch.js";
 import { markUnsaved, rememberSaved } from "./core/workflow-tabs.js";
 import { renderWorkflowPage } from "./core/workflow-render.js";
 import {
@@ -66,11 +66,10 @@ import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
+/** 他の画面（WATCH_DEBOUNCE_MS = 120）より長い。理由は記録が無く未確認。変える前に、答えを返す実行ファイルの重さを測ること */
 const DEBOUNCE_MS = 200;
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js` */
 const SCREEN = "workflow";
-/** 自分の保存で監視が反応するのを、この間だけ「外で変わった」と言わない */
-const OWN_WRITE_GRACE_MS = 1500;
 
 /** 未保存のまま閉じた画面から戻す線。提案のハッシュが閉じたときと同じときだけ戻す */
 interface Restore {
@@ -137,7 +136,8 @@ async function openWorkflowPanel(ticket: string, restore: Restore | undefined): 
     open.panel.reveal(open.panel.viewColumn);
     if (restore !== undefined) {
       // 既に開いている画面の編集を何も言わずに差し替えない
-      void vscode.window.showWarningMessage(`${ticket} の計画編集タブは既に開いているため、閉じる前の編集を戻せませんでした。`);
+      void vscode.window.showWarningMessage(`${ticket} の計画編集タブは既に開いているため、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題の JSON ファイルとして開きます。`);
+      void openDraftAsJson(restore.draft);
     }
     return;
   }
@@ -256,6 +256,12 @@ function askRestore(current: PanelState): void {
         void openWorkflowPanel(current.ticket, restore);
       }
     });
+}
+
+/** コピーを名前の無い JSON のエディタで開く（ファイルには書かない） */
+async function openDraftAsJson(draft: PlanOrder): Promise<void> {
+  const document = await vscode.workspace.openTextDocument({ language: "json", content: `${JSON.stringify(draft, null, 2)}\n` });
+  await vscode.window.showTextDocument(document);
 }
 
 function scheduleCheck(current: PanelState): void {
@@ -397,7 +403,8 @@ async function reload(current: PanelState): Promise<void> {
       current.shownDraft = restore.draft;
     } else {
       // 閉じた後に提案が変わった。前の線を戻すと、変わった提案に古い順序を重ねることになる
-      void vscode.window.showWarningMessage(`${current.ticket} の提案は閉じた後に変わったので、閉じる前の編集を戻しませんでした。`);
+      void vscode.window.showWarningMessage(`${current.ticket} の提案は閉じた後に変わったので、閉じる前の編集を戻しませんでした。閉じる前の編集は、無題の JSON ファイルとして開きます。`);
+      void openDraftAsJson(restore.draft);
     }
   }
   show(current);
