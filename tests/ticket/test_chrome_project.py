@@ -253,7 +253,7 @@ class ChromeProjectTest(unittest.TestCase):
     def test_a_different_compat_in_the_workspace_refuses_writing(self):
         board = self.ask("board", ws=workspace(compat=version.COMPAT + 1))
         self.assertFalse(board["write"]["allowed"])
-        self.assertIn("拡張を更新する", board["write"]["reason"])
+        self.assertIn("拡張を更新してください。", board["write"]["reason"])
 
 
 class StartTest(unittest.TestCase):
@@ -336,10 +336,10 @@ class StartTest(unittest.TestCase):
 
     def test_a_closed_identifier_is_refused(self):
         body = self.start(55, done=["feature-55-login-form"])
-        self.assertTrue(any("done/ で閉じている" in p for p in body["problems"]), body)
+        self.assertTrue(any("done/ でクローズ済み" in p for p in body["problems"]), body)
         self.assertIn("フォールバック", body["problems"][-1])
         body = self.start(55, done=["Feature-55-Login-Form"])
-        self.assertTrue(any("done/ で閉じている" in p for p in body["problems"]), body)
+        self.assertTrue(any("done/ でクローズ済み" in p for p in body["problems"]), body)
         # 前の形（i0055）で閉じていても、新しい名前とは重ならない
         self.assertEqual([], self.start(55, done=["i0055"])["problems"])
 
@@ -358,7 +358,7 @@ class StartTest(unittest.TestCase):
             }
         }
         body = self.start(12, branches=other)
-        self.assertTrue(any("開いた親子のチケット topic" in p for p in body["problems"]), body)
+        self.assertTrue(any("未クローズの親子チケット topic" in p for p in body["problems"]), body)
 
     def test_a_different_compat_is_refused(self):
         body = self.start(12, compat=version.COMPAT + 1)

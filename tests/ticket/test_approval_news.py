@@ -82,7 +82,7 @@ class ApprovalToldTest(PhaseHarness):
 
         勧めたコマンドは、親が着手済みなら「着手済み」で終わる。案内どおりに打って終了コード 1 を
         受け取る文は、案内ではなく誤りの元になる。子より先に親を着手する順そのものは、
-        子の行の「親が未着手だと止まる」で残る。
+        子の行の「親が未着手だと止まります）。」で残る。
         """
         self.parent_only()
         self.next_child()
@@ -90,7 +90,7 @@ class ApprovalToldTest(PhaseHarness):
         self.next_child("i0001-01-02")
         told = self.approve_yes(["i0001-01-02"])
         self.assertNotIn("start <親>", told)
-        self.assertIn("親が未着手だと止まる", told)
+        self.assertIn("親が未着手だと止まります）。", told)
 
     def test_a_revision_is_told_by_the_prompt(self):
         self.parent_only()

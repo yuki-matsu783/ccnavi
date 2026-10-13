@@ -138,7 +138,7 @@ class ReaderTest(unittest.TestCase):
     def test_a_repository_never_taken_in_has_no_integration(self):
         self.put("sync/p/families/w0001", record_text("w0001", "present"))
         self.assertIsNone(syncstate.integration(self.state, "self"))
-        self.assertIn("無い", syncstate.integration(self.state, "p").broken)
+        self.assertIn("ありません", syncstate.integration(self.state, "p").broken)
 
     def test_names_refuse_dot_dot_and_records_are_not_cut(self):
         self.put("sync/self/integration/head", "branch main\n")
@@ -388,7 +388,7 @@ class UndecidedTest(AuthorityHarness):
         finished = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertNotEqual(0, finished.returncode)
         self.assertIn("手元と判定が違う", finished.stderr)
-        self.assertIn("打ち直して", finished.stderr)
+        self.assertIn("再実行して", finished.stderr)
         lint = json.loads(self.ccnavi("--lint", "--json").stdout)
         self.assertTrue(
             any(
@@ -748,7 +748,7 @@ class ReadyTest(AuthorityHarness):
         )
         ready = self.ccnavi("--cwd", self.parent_tree, "review", "ready", "--result", fixture)
         self.assertNotEqual(0, ready.returncode)
-        self.assertIn("done/ に無い", ready.stderr)
+        self.assertIn("done/ にありません", ready.stderr)
         self.assertIn("finish i0001", ready.stderr)
 
 

@@ -132,7 +132,8 @@ def handle(request: str, root: str = "/ws") -> str:
         req = json.loads(request)
         if not isinstance(req, dict) or req.get("schema") != SCHEMA:
             raise Refused(
-                f"要求の形式の版が一致しません（拡張と Python の組み立てがずれています。期待する版は {SCHEMA} です）"
+                "要求の形式の版が一致しません（拡張と Python の組み立てがずれています。"
+                f"期待する版は {SCHEMA} です）"
             )
         op = req.get("op")
         handler = _OPS.get(op) if isinstance(op, str) else None
@@ -206,7 +207,9 @@ def _snapshot(req: dict) -> dict:
             )
         ws = snap.get("workspace")
         if not isinstance(ws, dict) or not isinstance(ws.get("integration"), dict):
-            raise Refused("プロジェクトのリポジトリには、ワークスペースの統合先（workspace）の指定が必要です")
+            raise Refused(
+                "プロジェクトのリポジトリには、ワークスペースの統合先（workspace）の指定が必要です"
+            )
         if not isinstance(ws["integration"].get("name"), str):
             raise Refused("ワークスペースの統合先の名前がありません")
         _check_files("(ワークスペース)", ws)
@@ -820,7 +823,8 @@ def _unreadable(snap: dict, closure: dict) -> str:
         return ""
     return (
         f"判定の入力に、本文を取得できないファイルがあります（{', '.join(found)}）。"
-        "この親子チケットは判定できません。手元で `--agree --preview --verify` を実行して確認してください。"
+        "この親子チケットは判定できません。"
+        "手元で `--agree --preview --verify` を実行して確認してください。"
     )
 
 
@@ -954,7 +958,8 @@ def _one_branch(changes: dict, family: str) -> None:
     others = sorted(k for k in (changes.get("changes") or {}) if k != family)
     if others:
         raise Refused(
-            f"反映する内容が親ブランチ {family} の外（{', '.join(others or ['?'])}）に及んでいます。"
+            f"反映する内容が親ブランチ {family} の外"
+            f"（{', '.join(others or ['?'])}）に及んでいます。"
             f"提案を {family} の上に置いてから、承認を依頼してください。"
         )
 
@@ -1184,10 +1189,15 @@ def _compat(snap: dict) -> dict:
         message = ""
     elif theirs is None:
         message = (
-            f"統合先の {COMPAT_FILE} に互換の版（CCNAVI_COMPAT）が記載されていません。拡張は互換 {ours} です"
+            f"統合先の {COMPAT_FILE} に互換の版（CCNAVI_COMPAT）が記載されていません。"
+            f"拡張は互換 {ours} です"
         )
     else:
-        hint = "拡張を更新してください" if theirs > ours else "リポジトリの ccnavi の更新をお待ちください"
+        hint = (
+            "拡張を更新してください"
+            if theirs > ours
+            else "リポジトリの ccnavi の更新をお待ちください"
+        )
         message = f"拡張は互換 {ours}、リポジトリは互換 {theirs} です。{hint}"
     return {"extension": ours, "repository": theirs, "same": theirs == ours, "message": message}
 
@@ -1231,7 +1241,8 @@ def _op_start(req: dict, root: str) -> dict:
     )
     if folded in {i.casefold() for i in _closed(snap, place)}:
         problems.append(
-            f"{ident} は統合先 {integ} の done/ でクローズ済みです（クローズ済みの識別子は再利用できません）"
+            f"{ident} は統合先 {integ} の done/ でクローズ済みです"
+            "（クローズ済みの識別子は再利用できません）"
         )
     names = [n for n in [*snap["branches"], *taken] if n != integ]
     same = sorted({n for n in names if n.casefold() == folded})
@@ -1248,13 +1259,16 @@ def _op_start(req: dict, root: str) -> dict:
             }
         )
         if hits:
-            problems.append(f"未クローズの親子チケット {name} に同じ識別子があります（{', '.join(hits)}）")
+            problems.append(
+                f"未クローズの親子チケット {name} に同じ識別子があります（{', '.join(hits)}）"
+            )
     compat = _compat(snap)
     if not compat["same"]:
         problems.append(compat["message"])
     if problems:
         problems.append(
-            "この Issue からは開始できません。識別子を手動で指定して（フォールバック）開始してください。"
+            "この Issue からは開始できません。"
+            "識別子を手動で指定して（フォールバック）開始してください。"
         )
     return {"identifier": ident, "integration": integ, "problems": problems}
 

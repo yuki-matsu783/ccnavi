@@ -121,7 +121,7 @@ def parse_order(text: str, parent: ticket_model.Ticket) -> tuple[Order | None, s
         if key not in PARTS:
             return None, f"`{key}` は読まない。渡せるのは plan と feedback"
         if key not in ranges:
-            return None, "提案にフィードバック計画（feedback）が無い"
+            return None, "提案にフィードバック計画（feedback）がありません。"
         if not isinstance(value, dict):
             return None, f"`{key}` は番号 → 先行の番号のリストの辞書で渡す"
         numbers = ranges[key]
@@ -131,7 +131,7 @@ def parse_order(text: str, parent: ticket_model.Ticket) -> tuple[Order | None, s
                 isinstance(name, str) and re.fullmatch(r"[0-9]+", name) and int(name) in numbers
             ):
                 return None, (
-                    f"`{key}` の番号 {name!r} は計画に無い"
+                    f"`{key}` の番号 {name!r} は計画にありません"
                     f"（{numbers.start}〜{numbers.stop - 1} 番）"
                 )
             n = int(name)
@@ -209,7 +209,7 @@ def renumber(parent: ticket_model.Ticket, order: Order | None, fixed: set[int]) 
                     REFUSED_UNPACKABLE,
                     stuck,
                     "子が承認された番号を動かさずに番号を振れない"
-                    f"（{stuck} 番に置ける項が無い）。詰められないので、この線は引けない",
+                    f"（{stuck} 番に置ける項がありません）。詰められないので、この線は引けない",
                 )
             )
             continue
@@ -542,7 +542,8 @@ def mismatched(source: Source) -> list[dict]:
                 "ticket": child.ticket,
                 "path": child.path,
                 "phase": child.phase,
-                "text": f"{child.ticket} の phase: {child.phase} は親の計画（1〜{count} 番）に無い",
+                "text": f"{child.ticket} の phase: {child.phase} は親の計画（1〜{count} 番）"
+                "にありません。",
             }
         )
     return out
@@ -775,7 +776,7 @@ def _replace_block(text: str, key: str, block_lines: list[str]) -> tuple[str, st
     if after > stop and after < end and (lines[after][0] in " \t" or lines[after].startswith("-")):
         return text, (
             f"`{key}:` の値の中に行頭（0 桁目）のコメントがあり、値の範囲が決まらない。"
-            "コメントを字下げするか消してから打ち直す"
+            "コメントを字下げするか削除してから再実行します。"
         )
     block = [line + newline for line in block_lines]
     return "".join(lines[:start] + block + lines[stop:]), ""
@@ -814,9 +815,9 @@ def child_rebuilt(change: ChildChange) -> tuple[bytes | None, str]:
         return None, "組んだ全文の frontmatter が読めない"
     rest = [{k: v for k, v in f.items() if k not in _CHILD_KEYS} for f in (before, after)]
     if rest[0] != rest[1]:
-        return None, "差し替えると ticket・phase・predecessors のほかの欄が変わるので書かない"
+        return None, "差し替えると ticket・phase・predecessors のほかの欄が変わるので反映しません"
     if text.split(_FENCE, 2)[2:] != built.split(_FENCE, 2)[2:]:
-        return None, "差し替えると本文が変わるので書かない"
+        return None, "差し替えると本文が変わるので反映しません"
     read, _ = ticket_mod.parse(built)
     if (
         read is None
@@ -824,7 +825,7 @@ def child_rebuilt(change: ChildChange) -> tuple[bytes | None, str]:
         or read.phase != change.new_phase
         or list(read.predecessors) != list(change.new_predecessors)
     ):
-        return None, "組んだ全文が付け替えた子の提案として読めないので書かない"
+        return None, "組んだ全文が付け替えた子の提案として読めないので反映しません"
     return built.encode("utf-8"), ""
 
 
@@ -851,10 +852,10 @@ def changed_elsewhere(
     if rest_before != rest_after:
         return None, (
             f"差し替えると {'・'.join(keys)} のほかの欄が変わる（{values}にアンカーがあり、"
-            "ほかの欄が別名で指しているなど）ので書かない"
+            "ほかの欄が別名で指しているなど）ので反映しません"
         )
     if old.split(_FENCE, 2)[2:] != new.split(_FENCE, 2)[2:]:
-        return None, "差し替えると本文が変わるので書かない"
+        return None, "差し替えると本文が変わるので反映しません"
     return after, ""
 
 
@@ -865,7 +866,7 @@ def _changed_elsewhere(old: str, new: str, revised: ticket_model.Ticket) -> str:
         return why
     ticket, _ = ticket_mod.parse(new)
     if ticket is None:
-        return "組んだ全文がチケットとして読めないので書かない"
+        return "組んだ全文がチケットとして読めないので反映しません"
 
     def shape(items):
         return [(i.type, i.review, list(i.after)) for i in items or []]
@@ -873,7 +874,7 @@ def _changed_elsewhere(old: str, new: str, revised: ticket_model.Ticket) -> str:
     if shape(ticket.plan) != shape(revised.plan) or shape(ticket.feedback) != shape(
         revised.feedback
     ):
-        return "組んだ全文の計画が振り直した計画と合わないので書かない"
+        return "組んだ全文の計画が振り直した計画と合わないので反映しません"
     return ""
 
 
@@ -913,18 +914,18 @@ def write(ans: Answer, content: bytes | None) -> str:
     for path, data in final.items():
         failed = fsio.write_bytes_atomic(path, data)
         if failed:
-            done = f"{path} に書けない（{failed}）"
+            done = f"{path} に保存できませんでした（{failed}）"
             break
     if not done:
         for path in leaving:
             failed = fsio.unlink(path)
             if failed:
-                done = f"{path} を消せない（{failed}）"
+                done = f"{path} を削除できません（{failed}）"
                 break
     if not done and content is not None:
         failed = fsio.write_bytes_atomic(source.parent.path, content)
         if failed:
-            done = f"{source.parent.path} に書けない（{failed}）"
+            done = f"{source.parent.path} に保存できませんでした（{failed}）"
     if done:
         fsio.put_back(before)
         return done + "。書いたものは戻した"
@@ -966,7 +967,7 @@ def pick(proposals: list[ticket_model.Ticket], name: str) -> tuple[ticket_model.
         return mine[0], ""
     places = ", ".join(f"{t.tree or 'ワークスペースルート'}" for t in found)
     return None, (
-        f"{name} の提案が複数の場所にある（{places}）。書き換えるツリーの中から打つ"
+        f"{name} の提案が複数の場所にある（{places}）。書き換えるツリーの中から実行します"
         "（ほかのツリーの提案は書かない）"
     )
 
@@ -996,26 +997,26 @@ def save(ans: Answer, expect: str) -> Saved:
         return Saved(
             False,
             messages=[
-                "提案が外で変わった（--expect が親と子の提案の今の中身と違う）。何も書かない。"
+                "提案が外で変わった（--expect が親と子の提案の今の中身と違う）。何も反映しません。"
                 "--plan-order <親> --json で読み直す"
             ],
         )
     if ans.renumbered.refused:
         lines = [f"先行の線を引けない: {r.text}" for r in ans.renumbered.refused]
-        return Saved(False, messages=lines + ["何も書かない"])
+        return Saved(False, messages=lines + ["何も反映しません。"])
     for problems, header in (
-        (ans.problems, "振り直した計画の順序の検査に error がある。何も書かない"),
+        (ans.problems, "振り直した計画の順序の検査に error がある。何も反映しません。"),
         (
             ans.revision_problems,
-            "改版で通らない形（子が承認された番号を固定しているので、その番号の項は変えられない）。何も書かない",
+            "改版で通らない形（子が承認された番号を固定しているので、その番号の項は変えられない）。何も反映しません。",
         ),
-        (ans.child_problems, "子の提案を付け替えられない。何も書かない"),
+        (ans.child_problems, "子の提案を付け替えられない。何も反映しません。"),
     ):
         if problems:
             return Saved(False, messages=[header], details=[str(p) for p in problems])
     content, why = rebuilt(ans)
     if why:
-        return Saved(False, messages=[f"{ans.source.parent.path}: {why}。何も書かない"])
+        return Saved(False, messages=[f"{ans.source.parent.path}: {why}。何も反映しません。"])
     if content is None and not ans.changes:
         return Saved(True)
     failed = write(ans, content)

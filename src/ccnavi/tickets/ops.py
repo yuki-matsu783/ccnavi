@@ -50,9 +50,9 @@ from . import (
 # ユーザがレビュー済みにした時点で、ここまでは合意済み。外へ出る操作（push・Draft を外す）の前に
 # 確認を取り直すと、同じ流れの中で何度も許可を求めることになる。
 READY_FLOW_AGREED = (
-    "ここから Draft を外すまで（finish → push → ready。`wip/` の削除は ready に入っている）は、"
+    "ここから Draft を解除するまで（finish → push → ready。`wip/` の削除は ready に入っている）は、"
     "ユーザがレビューして合意した範囲に入る。"
-    "push と Draft を外す前に、ユーザへ確認を取り直さずに進める"
+    "push と Draft を解除する前に、ユーザへ確認を取り直さずに進める"
     "（Claude Code の自動モードの分類器に止められたときだけ、ユーザに許可を頼む）"
 )
 
@@ -120,7 +120,7 @@ def start(
     fields = {"started_at": approval_marks.now(), "base_sha": sha}
     failed = approval_ops.update_fields(found.path, fields)
     if failed:
-        stderr.write(f"ccnavi: {ticket_id} に着手の欄を書けない: {failed}\n")
+        stderr.write(f"ccnavi: {ticket_id} に着手の欄を保存できませんでした: {failed}\n")
         return 1
     history.note(
         os.path.dirname(os.path.dirname(found.path)),
@@ -156,7 +156,7 @@ def start(
     if learning.applies(root, conf, found):
         stdout.write(
             "学びの蓄積: 閉じる前に "
-            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} learn' を打ち、"
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} learn' を実行し、"
             f"wip/handoff/learnings/{found.ticket}.md に気づきを書いて git add と git commit をする"
             "（無ければ learnings: none）\n"
         )
@@ -238,7 +238,7 @@ def _sync_common(
         "共通レイヤーの中身に揃えた（プロジェクトの .ccnavi/config/project/ には触れていない）:"
     ]
     for c in changes:
-        state = "消した" if c.deletes else ("上書き" if c.before is not None else "新しく置いた")
+        state = "削除した" if c.deletes else ("上書き" if c.before is not None else "新しく置いた")
         lines.append(f"  - {c.rel}（{state}）")
     lines.append(
         f"  作業を始める前に、{worktree} で {', '.join(c.rel for c in changes)} を"
@@ -328,16 +328,16 @@ def _close_parent(
         {"reviews": {str(n): venues[n] for n in sorted(venues)}},
     )
     if failed:
-        stderr.write(f"ccnavi: 閉じた記録を書けない: {failed}\n")
+        stderr.write(f"ccnavi: クローズ済みの記録を保存できませんでした: {failed}\n")
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     wip = ticket_places.WIP_ROOT
     if phase.without_mr(root, conf, found.ticket, venues):
         stdout.write(
-            f"次は、この移動をコミットし、`{wip}/` を消して"
+            f"次は、この移動をコミットし、`{wip}/` を削除して"
             f"（'{git_sh} rm -r {wip}'）コミットし、統合先のブランチに取り込んでください。"
             "このチケットにはマージリクエストで見るフェーズが無いので、"
-            "Draft を外す手順は無い。途中の作業は既定のブランチに残さない。"
-            f"`{wip}/` で消えるのは追跡済みのファイルだけで、消す前のコミットから戻せる。"
+            "Draft を解除する手順はありません。途中の作業は既定のブランチに残さない。"
+            f"`{wip}/` で消えるのは追跡済みのファイルだけで、削除する前のコミットから戻せる。"
             f"{worktrees.classifier_note(root, f'{git_sh} rm -r {wip}')}\n"
         )
         return
@@ -347,14 +347,16 @@ def _close_parent(
     stdout.write(
         "次は、この移動をコミットして push し"
         "（取り込み済みの親子では、この finish が済ませている）、"
-        f"'{ready_command(root, found.ticket)}' で Draft を外してください"
+        f"'{ready_command(root, found.ticket)}' で Draft を解除してください"
         "（「マージに進んでよい」の合図）。"
-        "ready は Draft を外す前に、閉じたチケットとその記録"
+        "ready は Draft を解除する前に、クローズ済みのチケットとその記録"
         f"（`{conf.approved}/` の done/・phases/・events/・flows/）を手元の logs/archive/ へ移し、"
-        f"`{wip}/` の追跡済みのファイルを消して、その削除をコミットして push する"
-        f"（`{wip}/` に未追跡のファイルがあれば消さずに止まる。消したものは履歴から戻せる）。"
-        "Draft を外したあと、ready は親のワークツリーを消す（親のワークツリーの外から --parent で"
-        "打てば消える。中から --parent なしで打つと消さず、外に出てから打つコマンドを表示する）。"
+        f"`{wip}/` の追跡済みのファイルを削除して、その削除をコミットして push する"
+        f"（`{wip}/` に未追跡のファイルがあれば削除せずに止まる。削除したものは履歴から戻せる）。"
+        "Draft を解除したあと、ready は親のワークツリーを削除します（親のワークツリーの外から"
+        " --parent で"
+        "実行すれば消える。中から --parent なしで実行すると消さず、"
+        "外に出てから実行するコマンドを表示する）。"
         "途中の作業もチケットも既定のブランチに残さない。マージはユーザが squash で行う。"
         f"{READY_FLOW_AGREED}\n"
     )
@@ -367,15 +369,15 @@ def cancel(
 ) -> int:
     """`doing/` → `done/`。取り消しの時刻と理由を書く。理由が要る。"""
     if not reason.strip():
-        stderr.write("ccnavi: 取り消しには --reason <理由> が要る\n")
+        stderr.write("ccnavi: 取り消しには --reason <理由> が必要です。\n")
         return 1
     found = ops_close.find(stderr, root, conf, ticket_id)
     if found is None:
         return 1
     if found.state == ticket_model.TODO:
         stderr.write(
-            f"ccnavi: {ticket_id} は未承認の提案（todo/）。取り消しの記録は要らないので、"
-            "ファイルを消せばよい\n"
+            f"ccnavi: {ticket_id} は未承認の提案（todo/）。取り消しの記録は不要なので、"
+            "ファイルを削除すればよい\n"
         )
         return 1
     if found.state != ticket_model.DOING:
@@ -415,7 +417,7 @@ def record_risk(
         stderr.write("ccnavi: 判定は yes か no\n")
         return 1
     if not reason.strip():
-        stderr.write("ccnavi: record-risk には --reason <根拠> が要る\n")
+        stderr.write("ccnavi: record-risk には --reason <根拠> を指定してください。\n")
         return 1
     found = ops_close.find(stderr, root, conf, ticket_id)
     if found is None:
@@ -530,7 +532,7 @@ def _score_child(
                 where = path
         names = ", ".join(f.id for f in score.pending)
         stderr.write(
-            f"ccnavi: {found.ticket} を閉じる前に、定性のリスク項目の判定が要る: {names}\n"
+            f"ccnavi: {found.ticket} を閉じる前に、定性のリスク項目の判定が必要です: {names}\n"
             "  問いと差分の要約を渡してサブエージェントに判断させ、報告を "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')} record-risk {found.ticket} "
             "<項目> yes|no "
@@ -555,7 +557,7 @@ def _score_child(
     lines = score.lines()
     lines[0] += f"（{diff.summary()}、配点 {definition.source}）"
     if score.level in risk.ESCALATE_FROM:
-        lines.append("  実績のリスクが高いので、宣言に関わらずこのフェーズは人間レビューが要る")
+        lines.append("  実績のリスクが高いので、宣言に関わらずこのフェーズは人間レビューが必要です")
     return lines
 
 
@@ -572,7 +574,7 @@ def _move(
     """`doing/` の承認済みチケットに欄を書き、`review/` か `done/` へ動かす。"""
     failed = approval_ops.update_fields(found.path, fields)
     if failed:
-        stderr.write(f"ccnavi: {found.ticket} に欄を書けない: {failed}\n")
+        stderr.write(f"ccnavi: {found.ticket} に欄を保存できませんでした: {failed}\n")
         return 1
     where = os.path.dirname(os.path.dirname(found.path))
     if state == ticket_model.REVIEW:
@@ -603,7 +605,7 @@ def _move(
             (
                 phase.review_next(root, conf, moved)
                 or "まだレビュー準備中。親がレビューを依頼するまで、ユーザには回らない。"
-                "依頼の後、ユーザがレビューを終えて confirm / decide / --reviewed を打つと "
+                "依頼の後、ユーザがレビューを終えて confirm / decide / --reviewed を実行すると "
                 f"{conf.approved}/{ticket_model.DONE}/ へ動く"
             )
             + "\n"

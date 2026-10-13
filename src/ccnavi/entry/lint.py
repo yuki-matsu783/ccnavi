@@ -134,7 +134,7 @@ def report(
                 "(ticket)",
                 f"{settings.GUARD_TICKET_APPROVAL_ENV}={declared}。この設定は "
                 f"{' か '.join(selfguard.GATE_SETTINGS)} しか受け付けない"
-                "（承認は一度通れば済んでしまうので、止めずに報告するだけの値が無い）。"
+                "（承認は一度通れば済んでしまうので、止めずに報告するだけの値がありません）。"
                 f"今は {selfguard.ENABLE} として動いている",
             )
         )
@@ -181,7 +181,7 @@ def report(
                 SEVERITY_WARN,
                 "(ticket)",
                 f"{settings.GUARD_TICKET_APPROVAL_ENV}=disable。"
-                "エージェントが ccnavi の実行ファイルを直接打って、"
+                "エージェントが ccnavi の実行ファイルを直接実行して、"
                 "承認・レビュー済みの受け入れ・状態の移動を行える",
             )
         )
@@ -257,13 +257,14 @@ _CORE_FILES_VOICE = {
         "ccnavi 自身の設定ファイル（.claude/settings*.json と、共通レイヤー・自身のレイヤー・"
         "プロジェクトのレイヤーそれぞれの設定 3 本）のバックアップを取らず、"
         "書き換えられても戻さない。"
-        "ふだん実行前に足している組み込みの deny（実行ファイル・ccnavi ディレクトリ・共通レイヤーの"
-        " 3 本）も足さないので、ワークツリー側のレイヤーの設定は、"
+        "ふだん実行前に追加している組み込みの deny（実行ファイル・ccnavi ディレクトリ"
+        "・共通レイヤーの"
+        " 3 本）も追加しないので、ワークツリー側のレイヤーの設定は、"
         "ルールファイルが名指ししていなければ書き込める"
     ),
     selfguard.DRY_RUN: (
         "ccnavi 自身の設定ファイルが書き換えられても戻さない（戻すはずだったことを報告するだけ）。"
-        "実行前の deny は足したままなので、実行前に止める働きは有効なまま"
+        "実行前の deny は追加したままなので、実行前に止める働きは有効なまま"
     ),
 }
 _RESTORE_VOICE = {
@@ -455,7 +456,7 @@ def _ccnavi_md(conf: settings.Settings, root: str) -> list[Problem]:
             Problem(
                 SEVERITY_WARN,
                 "(ccnavi-md)",
-                f"{path} が無い。セッションの開始で作業の決まりが渡らない。"
+                f"{path} がありません。セッションの開始で作業の決まりが渡らない。"
                 "導入スクリプト（ccnavi-setup.sh）で配る",
             )
         ]

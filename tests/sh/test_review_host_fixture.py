@@ -708,13 +708,17 @@ class GitLabHostFixtureTest(unittest.TestCase):
             "無い": ([], 2, []),
             "値が無い": (["--eli5"], 2, []),
             "拡張子が違う": (["--eli5", notes], 2, []),
-            "ファイルが無い": (["--eli5", "wip/eli5/missing.html"], 1, ["ファイルが無い"]),
+            "ファイルが無い": (["--eli5", "wip/eli5/missing.html"], 1, ["ファイルがありません"]),
             "空": (["--eli5", blank], 1, ["中身が空"]),
-            "wip/ の外": (["--eli5", docs], 1, ["wip/eli5/ の下に無い"]),
-            "空で wip/ の外": (["--eli5", blank_docs], 1, ["中身が空", "wip/eli5/ の下に無い"]),
-            "wip/eli5/ の外の wip/": (["--eli5", design], 1, ["wip/eli5/ の下に無い"]),
-            "旧方式（wip/tmp/）": (["--eli5", old_way], 1, ["wip/eli5/ の下に無い"]),
-            "未追跡": (["--eli5", untracked], 1, ["HEAD に無い"]),
+            "wip/ の外": (["--eli5", docs], 1, ["wip/eli5/ の下にありません"]),
+            "空で wip/ の外": (
+                ["--eli5", blank_docs],
+                1,
+                ["中身が空", "wip/eli5/ の下にありません"],
+            ),
+            "wip/eli5/ の外の wip/": (["--eli5", design], 1, ["wip/eli5/ の下にありません"]),
+            "旧方式（wip/tmp/）": (["--eli5", old_way], 1, ["wip/eli5/ の下にありません"]),
+            "未追跡": (["--eli5", untracked], 1, ["HEAD にありません"]),
             "未コミット": (["--eli5", dirty], 1, ["HEAD から変わっている"]),
             "ワークツリーの外": (["--eli5", outside], 1, ["このワークツリーの外"]),
             "名前に '": (["--eli5", quote], 1, bad_name),
@@ -785,7 +789,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertIn(f"crit review {ELI5} ", said[0])
         self.assertIn(f"crit push {number} ", said[0])
         if shutil.which("crit") is None:
-            self.assertIn("PATH に crit は無い", done.stdout)
+            self.assertIn("PATH に crit はありません", done.stdout)
         with open(os.path.join(out, "args.txt"), encoding="utf-8") as f:
             passed = f.read()
         self.assertNotIn("eli5", passed)

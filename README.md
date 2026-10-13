@@ -1587,7 +1587,7 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 - `main` / `master` / `develop` / `release` / `release/*` と、そのリポジトリの統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ
   `ccnavi-sync.sh` の取り込み結果、無ければ `origin/HEAD`・`origin/main`・`origin/master`。決まらなければ固定のリストだけ）、
   ブランチをチェックアウトしていないツリーは push せず、コミットまでで止める
-- コミットするものが無ければ `コミットして push する承認済みチケットは無い。` と 1 行出す
+- コミットするものが無ければ `コミットして push する承認済みチケットはありません。` と 1 行出す
 - エージェントが打つ形は組み込みの deny（`DENY_TICKET_APPROVAL_CLI`）が止める
 
 | 終了コード | いつ |

@@ -627,14 +627,14 @@ def append(path: str, data: bytes) -> str:
     """
     if _STAGE["current"] is not None:
         if os.path.islink(path):
-            return "シンボリックリンクなので書かない"
+            return "シンボリックリンクなので反映しません"
         staged, before = _staged(path)
         if not staged:
             before = _disk_bytes(path)
         return _stage_put(Op(OP_APPEND, path, (before or b"") + data, data=data))
     try:
         if os.path.islink(path):
-            return "シンボリックリンクなので書かない"
+            return "シンボリックリンクなので反映しません"
         os.makedirs(os.path.dirname(path), exist_ok=True)
         flags = (
             os.O_APPEND

@@ -129,7 +129,7 @@ def direct_at_stop(root: str, conf: settings.Settings, cwd: str) -> Direct | Non
     if not integration:
         found.blocked = (
             "統合先の名前が決まりません（CCNAVI_INTEGRATION_BRANCH・ccnavi-sync.sh の取り込み結果・"
-            "origin/HEAD のどれも無い）。統合先をユーザに確かめ、CCNAVI_INTEGRATION_BRANCH に"
+            "origin/HEAD のどれもありません）。統合先をユーザに確かめ、CCNAVI_INTEGRATION_BRANCH に"
             "入れてもらってください"
         )
         return found
@@ -369,12 +369,12 @@ def integrate_nudge(root: str, found: Direct) -> str:
         )
     lines += [
         f"作業が終わったなら、統合先のツリー（{found.integ_tree}）で '{git_sh} integrate {n}' を"
-        "打って staged にし、そこで止めてください。hook は integrate を打ちません。",
+        "実行して staged にし、そこで止めてください。hook は integrate を実行しません。",
         "続き: ユーザに git status と git diff --staged で中身を確かめてもらい、"
         f"よければ '{git_sh} integrate-done {n} -m <メッセージ>' でコミットして片付けます。"
         f"やめるなら '{git_sh} integrate --abort {n}' で取り込む前に戻します。",
         "まだ続けるなら、続ける理由（何が残っているか）をユーザに向けて書いてから終えてください。"
-        "この案内は同じ状態では 1 回だけで、コミットを足すまで次に終えるときは止めません。",
+        "この案内は同じ状態では 1 回だけで、コミットを追加するまで次に終えるときは止めません。",
     ]
     return "\n".join(lines)
 

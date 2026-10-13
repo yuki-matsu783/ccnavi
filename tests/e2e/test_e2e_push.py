@@ -49,7 +49,7 @@ TICKET = "i0001"
 APPROVED = ".ccnavi/approved/doing"
 PROPOSAL = "wip/proposals/todo"
 MESSAGE = "ccnavi: 承認済みチケットを更新"
-NOTHING = "コミットして push する承認済みチケットは無い。"
+NOTHING = "コミットして push する承認済みチケットはありません。"
 
 PROPOSAL_TEXT = f"""---
 version: 1

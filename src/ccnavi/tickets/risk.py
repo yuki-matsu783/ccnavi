@@ -222,7 +222,7 @@ def builtin() -> Definition:
                 "max": 35,
                 "message": "CI やエージェント定義に触った",
             },
-            {"id": "deletes", "points": 20, "deleted_over": 3, "message": "消したファイルが多い"},
+            {"id": "deletes", "points": 20, "deleted_over": 3, "message": "削除したファイルが多い"},
         ],
         BUILTIN,
     )
@@ -316,7 +316,7 @@ def parse(
         unknown = sorted(set(raw_levels) - {"medium", "high", "critical", "low"})
         for name in unknown:
             problems.append(
-                Problem(SEVERITY_WARN, where, f"`levels.{name}` は知らないリスクレベル。名前は固定")
+                Problem(SEVERITY_WARN, where, f"`levels.{name}` は未対応のリスクレベル。名前は固定")
             )
     if not ordered(levels):
         problems.append(
@@ -619,7 +619,7 @@ def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
                 Problem(
                     SEVERITY_ERROR,
                     f.id,
-                    f"`script` の `{f.value}` が {f.home or '(基準なし)'} に無い。"
+                    f"`script` の `{f.value}` が {f.home or '(基準なし)'} にありません。"
                     "ワークツリーの中のものは読まないので、元リポジトリに置いてください",
                 )
             )
@@ -723,14 +723,14 @@ class Diff:
     def summary(self) -> str:
         return (
             f"{self.files} ファイル、+{sum(c.added for c in self.changes)} "
-            f"-{sum(c.deleted for c in self.changes)} 行、消したファイル {self.deleted_files}"
+            f"-{sum(c.deleted for c in self.changes)} 行、削除したファイル {self.deleted_files}"
         )
 
 
 def measure(worktree: str, base: str, head: str = "HEAD") -> tuple[Diff | None, str]:
     """`base..head` の差分を数える。読めなければ None と理由。"""
     if not base:
-        return None, "基準点（base_sha）が無い"
+        return None, "基準点（base_sha）がありません。"
     rc, out = _git(worktree, ["diff", "--numstat", "-z", f"{base}..{head}"])
     if rc != 0:
         return None, "基準点からの差分を読めない"
@@ -865,7 +865,7 @@ def evaluate(
                     Hit(
                         f.id,
                         f.points,
-                        f"{f.message}（消した {counted.deleted_files} > {f.value}）",
+                        f"{f.message}（削除した {counted.deleted_files} > {f.value}）",
                         where,
                     )
                 )
@@ -906,7 +906,7 @@ def run_script(root: str, rel: str, worktree: str, env: dict[str, str]) -> tuple
     """スクリプトを走らせて点を受け取る。測れなければ None と理由。"""
     path = os.path.join(root, rel.replace("/", os.sep))
     if not os.path.isfile(path):
-        return None, f"{rel} が無い"
+        return None, f"{rel} がありません。"
     environment = dict(os.environ)
     environment.update(env)
     try:
@@ -936,7 +936,7 @@ def run_script(root: str, rel: str, worktree: str, env: dict[str, str]) -> tuple
         points = data.get("points")
         if isinstance(points, int) and not isinstance(points, bool) and points >= 0:
             return points, str(data.get("message") or "")
-        return None, f"{rel} の JSON に `points`（0 以上の整数）が無い"
+        return None, f"{rel} の JSON に `points`（0 以上の整数）がありません。"
     if isinstance(data, int) and not isinstance(data, bool) and data >= 0:
         return data, ""
     return None, f"{rel} の出力を点として読めない: {text[:60]}"

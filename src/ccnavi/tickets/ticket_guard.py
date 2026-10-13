@@ -139,7 +139,7 @@ def raw_git_rule(root: str) -> rules.Rule:
     else:
         message = (
             "生の git は実行しません。このワークスペースには git の入口のスクリプトが無いので、"
-            "git の操作が要るときはユーザに頼んでください。"
+            "git の操作が必要なときはユーザに頼んでください。"
         )
     rule = rules.Rule(
         id=RAW_GIT_RULE_ID,

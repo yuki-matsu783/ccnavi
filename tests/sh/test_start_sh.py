@@ -383,7 +383,7 @@ class StartShTest(unittest.TestCase):
             "body: Closes #152",
             "draft: true",
             "push 済み",
-            "同じコマンドを打ち直す",
+            "同じコマンドを再実行する",
         ):
             self.assertIn(word, done.stdout)
         self.assertIn(BRANCH, self.remote_branches())
@@ -413,13 +413,13 @@ class StartShTest(unittest.TestCase):
         # → MCP で PR を作った想定 → 案内のコマンドを打ち直す
         search = self.run_sh("--issue", "152", "--slug", "login", token=False)
         self.assertEqual(search.returncode, 4, search.stdout + search.stderr)
-        _, args = self.guided_args(search.stdout, "打ち直す: ")
+        _, args = self.guided_args(search.stdout, "再実行する: ")
         self.assertIn("--mcp-checked", args)
         create = self.run_sh(*args, token=False)
         self.assertEqual(create.returncode, 4, create.stdout + create.stderr)
         self.assertIn("mcp__github__create_pull_request", create.stdout)
         self.assertEqual(self.posts(), [])
-        cmd, args = self.guided_args(create.stdout, "打ち直す: ")
+        cmd, args = self.guided_args(create.stdout, "再実行する: ")
         self.assertNotIn("--mcp-checked", cmd)
         self.assertEqual(args[:4], ["--issue", "152", "--slug", "login"])
         # エージェントが MCP で PR を作った。ホストは見られないまま、案内のコマンドを打つ
@@ -436,7 +436,7 @@ class StartShTest(unittest.TestCase):
             "--issue", "152", "--slug", "login", "--title", title, "--mcp-checked", token=False
         )
         self.assertEqual(first.returncode, 4, first.stdout + first.stderr)
-        cmd, args = self.guided_args(first.stdout, "打ち直す: ")
+        cmd, args = self.guided_args(first.stdout, "再実行する: ")
         self.assertEqual(args, ["--issue", "152", "--slug", "login", "--title", title])
         self.assertIn("'It'\\''s $HOME  \"x\" `a`'", cmd)
         again = self.run_sh(*args, token=False)

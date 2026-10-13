@@ -118,7 +118,7 @@ def decode(stream: TextIO) -> Input:
     """payload を 1 件読む。"""
     raw = stream.read()
     if not raw.strip():
-        raise NoPayload("標準入力に hook の payload が無い")
+        raise NoPayload("標準入力に hook の payload がありません。")
 
     try:
         data = json.loads(raw)
@@ -131,7 +131,7 @@ def decode(stream: TextIO) -> Input:
     if not isinstance(event, str):
         raise Unusable("payload の hook_event_name が文字列ではない")
     if not event:
-        raise Unusable("payload に hook_event_name が無い")
+        raise Unusable("payload に hook_event_name がありません。")
     # 判定の鍵になる欄が文字列でないなら、欄が無い payload として読まずに止める。
     # 無いものとして読むと、ツールの名前が分からないまま「当たるルールが無い」で通る。
     for name in ("tool_name", "session_id", "cwd", "permission_mode", "tool_use_id"):

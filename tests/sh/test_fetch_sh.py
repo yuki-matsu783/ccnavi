@@ -407,7 +407,7 @@ class FetchTest(unittest.TestCase):
         done = self.fetch()
         self.assertEqual(mine, self.sha(tree, "HEAD"))
         self.assertIn("一致しない", done.stdout)
-        self.assertIn("取り込みが要る", done.stdout)
+        self.assertIn("取り込みが必要です", done.stdout)
         self.assertIn(mine[:7], done.stdout)
         self.assertIn("ccnavi-sync.sh i0001", done.stdout)
 
@@ -445,7 +445,7 @@ class FetchTest(unittest.TestCase):
         git(pusher, "push", "-q", "origin", "--delete", "i0001")
         done = self.fetch()
         self.assertEqual(0, done.returncode, done.stderr)
-        self.assertIn("リモートに無い", done.stdout)
+        self.assertIn("リモートにありません", done.stdout)
         self.assertIn("ccnavi-sync.sh i0001", done.stdout)
         self.assertEqual(head, self.sha(self.ws, "refs/heads/main"))
 
@@ -462,7 +462,7 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(before, self.sha(tree, "HEAD"))
         self.assertEqual(main_before, self.sha(self.ws, "refs/heads/main"))
         self.assertIn("時間の枠", done.stdout)
-        self.assertIn("取りに行かなかった", done.stdout)
+        self.assertIn("取得しませんでした", done.stdout)
 
     def test_a_refusal_that_is_not_an_overlap_says_why(self):
         # 重なっていないのに「重なる」と言わない。
@@ -513,7 +513,7 @@ class FetchTest(unittest.TestCase):
         self.leave_main()
         done = self.fetch(CCNAVI_INTEGRATION_BRANCH="nope")
         self.assertEqual(0, done.returncode, done.stderr)
-        self.assertIn("nope（統合先）がリモートに無い", done.stdout)
+        self.assertIn("nope（統合先）がリモートにありません", done.stdout)
 
     def test_a_worktree_without_a_record_keeps_the_old_rule(self):
         # 取り込み状態の無い（取り込み済みでない）親子のチケットは今までどおり。

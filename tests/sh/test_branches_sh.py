@@ -258,12 +258,12 @@ class BranchesShTest(unittest.TestCase):
         self.origin("https://github.com/acme/widgets.git")
         text = self.ok("--issue", "152")
         self.assertIn("ホストは見ていない（gh が github.com で使えず", text)
-        self.assertIn("GITHUB_TOKEN も無い", text)
+        self.assertIn("GITHUB_TOKEN もありません", text)
         self.assertEqual(list(self.candidates(text)), ["feature-152-login"])
 
     def test_without_origin_says_so(self):
         text = self.ok("--issue", "152")
-        self.assertIn("ホストは見ていない（origin が無い）", text)
+        self.assertIn("ホストは見ていない（origin がありません）", text)
         self.assertEqual(list(self.candidates(text)), ["feature-152-login"])
 
     def test_a_failed_api_call_says_which_one(self):

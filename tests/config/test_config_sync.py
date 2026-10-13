@@ -237,7 +237,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         self.assertFalse(os.path.exists(mirror_of(tree, "templates/old.yml")))
         self.assertFalse(os.path.isdir(mirror_of(tree, "templates")))
-        self.assertIn("消した", started.stdout)
+        self.assertIn("削除した", started.stdout)
 
     def skipped_template_keeps_the_start(self, text):
         """3: error のあるテンプレートは写さずに飛ばす。そのために着手は止めない。"""
@@ -318,7 +318,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertFalse(os.path.exists(mirror_of(tree, "scripts/old.sh")))
         self.assertFalse(os.path.exists(mirror_of(tree, "rule-expectations.yml")))
         self.assertFalse(os.path.isdir(mirror_of(tree, "scripts")))
-        self.assertIn("消した", started.stdout)
+        self.assertIn("削除した", started.stdout)
         self.assertTrue(os.path.isfile(config_of(tree, "phases")))
 
     def test_identical_mirror_is_not_touched(self):

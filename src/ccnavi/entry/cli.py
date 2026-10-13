@@ -362,7 +362,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         stderr.write("ccnavi: --yes には識別子を渡す（値なしの --yes は --import だけ）\n")
         return EXIT_ERROR
     if args.record_tree and not args.record_writes:
-        stderr.write("ccnavi: --record-tree は --record-writes と一緒に使う\n")
+        stderr.write("ccnavi: --record-tree は --record-writes と一緒に指定してください。\n")
         return EXIT_ERROR
     if args.actor and not cli_ops._ACTOR.fullmatch(args.actor):
         stderr.write(
@@ -375,8 +375,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         and not cli_ops._decide_writes(args)
     ):
         stderr.write(
-            "ccnavi: --actor は review confirm か、書く形の decide"
-            "（--reviewed <N> --accept-unresolved）と一緒に使う\n"
+            "ccnavi: --actor は review confirm か、反映する形の decide"
+            "（--reviewed <N> --accept-unresolved）と一緒に指定してください。\n"
         )
         return EXIT_ERROR
     # 取り込みを書く形（`--templates --import --yes`）は、拡張の子プロセスから board で呼ぶ。
@@ -388,11 +388,11 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if args.via and (args.expect is None or not args.json):
             stderr.write(
                 "ccnavi: --via board は --import / --save-draft など "
-                "--yes --expect <ハッシュ> --json と一緒に使う\n"
+                "--yes --expect <ハッシュ> --json と一緒に指定してください。\n"
             )
             return EXIT_ERROR
     elif args.via and (not args.actor or not cli_ops._decide_writes(args)):
-        stderr.write("ccnavi: --via は decide の --actor と一緒に使う\n")
+        stderr.write("ccnavi: --via は decide の --actor と一緒に指定してください。\n")
         return EXIT_ERROR
     if args.via and args.via not in (history.VIA_TERMINAL, history.VIA_BOARD):
         stderr.write(f"ccnavi: --via に渡せるのは {history.VIA_TERMINAL} か {history.VIA_BOARD}\n")
@@ -400,7 +400,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 経路と食い違う組み合わせは受けない。端末で 1 件ずつ選ぶ形（--yes 無し）はボードの経路でない。
     # --yes はボードの押した選択と、C1 の中の端末の decide（選ぶのを先に済ませた形）の両方が通る
     if args.via == history.VIA_BOARD and not args.yes:
-        stderr.write("ccnavi: --via board は --yes（ボードで押した選択）と一緒に使う\n")
+        stderr.write(
+            "ccnavi: --via board は --yes（ボードで押した選択）と一緒に指定してください。\n"
+        )
         return EXIT_ERROR
     if args.record_writes and not args.version:
         return _recorded_run(stdin, stdout, stderr, parser, args)
@@ -481,7 +483,7 @@ def _recorded_run(
         reals.append(real)
     failed = _write_record(target, "".join(f"{line}\n" for line in lines))
     if failed:
-        stderr.write(f"ccnavi: 書いたパスの一覧を {target} に書けない ({failed})\n")
+        stderr.write(f"ccnavi: 反映したパスの一覧を {target} に保存できませんでした ({failed})\n")
         return EXIT_ERROR
     if args.record_tree:
         outside = _outside_places(root, args, base, reals)
@@ -694,7 +696,7 @@ def _parsed(
             continue
         name, sep, path = value.partition("=")
         if not sep or not name or not path:
-            stderr.write(f"ccnavi: {flag} は <名前>=<パス> の形で書く\n")
+            stderr.write(f"ccnavi: {flag} は <名前>=<パス> の形で指定してください。\n")
             return EXIT_ERROR
         swaps[name] = os.path.abspath(path)
 
@@ -800,7 +802,7 @@ def _parsed(
         # deny（phase_forms.ticket_approval_rule）が免除するのは `--preview` の付いた `--agree`
         # だけなので、エージェントが打てないものを案内することになる。
         if args.verify and not args.preview:
-            stderr.write("ccnavi: --verify は --agree --preview と一緒に使う\n")
+            stderr.write("ccnavi: --verify は --agree --preview と一緒に指定してください。\n")
             return EXIT_ERROR
         # 承認できる状態かを確かめるだけ。置かないのは `--preview` と同じで、違うのは
         # 通るかどうかを終了コードで返すところ。答えは 0（はい）と

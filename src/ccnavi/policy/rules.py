@@ -739,7 +739,7 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
                 f"書式は `{'` `'.join(SECTIONS)}` の 3 タイプで、"
                 "照合に使えるのは `glob` か `regex`。"
                 "`glob` は fnmatch の glob で、文字列全体と一致したときだけヒットするので、"
-                "部分一致が要るなら前後に `*` を書く",
+                "部分一致が必要なら前後に `*` を書く",
             )
         )
 
@@ -789,7 +789,7 @@ def _build(
             Problem(
                 SEVERITY_ERROR,
                 where,
-                "id が無い。ルールには id を書いてください（記録と文面にこの名前が出る）",
+                "id がありません。ルールには id を書いてください（記録と文面にこの名前が出る）",
             )
         ]
     rule = Rule(
@@ -838,11 +838,13 @@ def _build(
             Problem(
                 SEVERITY_ERROR,
                 name,
-                "message が無い。ルールには、代わりに何をすべきかを書く必要がある",
+                "message がありません。ルールには、代わりに何をすべきかを書く必要がある",
             )
         ]
     if not rule.match:
-        return None, [Problem(SEVERITY_ERROR, name, "match が無い。どのツールにもヒットしない")]
+        return None, [
+            Problem(SEVERITY_ERROR, name, "match がありません。どのツールにもヒットしない")
+        ]
     # `when` と並べたかどうかはキーの有無で見る。値の真偽で見ると `glob: ''` や `glob: 0` を
     # 添えた組み合わせ条件が通り、書いた人の意図（どちらで判定するのか）が
     # 決まらないまま読み込まれる。
@@ -858,7 +860,7 @@ def _build(
         if present
     ]
     if not bodies:
-        return None, [Problem(SEVERITY_ERROR, name, "glob も regex も when も無い")]
+        return None, [Problem(SEVERITY_ERROR, name, "glob も regex も when もありません。")]
     if len(bodies) == 2:
         return None, [
             Problem(
@@ -969,7 +971,7 @@ def _compile(glob: str, regex: str, root: str, name: str, label: str) -> _Built:
             error=Problem(
                 SEVERITY_ERROR,
                 name,
-                f"{label}`{ROOT_PLACEHOLDER}` を使うにはワークスペースルートが要る",
+                f"{label}`{ROOT_PLACEHOLDER}` を使うにはワークスペースルートが必要です",
             )
         )
 
@@ -996,7 +998,7 @@ def _compile(glob: str, regex: str, root: str, name: str, label: str) -> _Built:
                 error=Problem(
                     SEVERITY_ERROR,
                     name,
-                    f"{label}`{NOT_ROOT_PLACEHOLDER}` を使うにはワークスペースルートが要る",
+                    f"{label}`{NOT_ROOT_PLACEHOLDER}` を使うにはワークスペースルートが必要です",
                 )
             )
         suffix = _not_root_suffix(regex)
@@ -1068,7 +1070,7 @@ def _excepts(raw: dict, name: str) -> tuple[list[tuple[str, str]], Problem | Non
         return [], Problem(
             SEVERITY_ERROR,
             name,
-            f"`{EXCEPT_KEY}` が空。除くものが無いなら `{EXCEPT_KEY}` ごと消してください",
+            f"`{EXCEPT_KEY}` が空。除くものが無いなら `{EXCEPT_KEY}` ごと削除してください",
         )
     out: list[tuple[str, str]] = []
     for i, item in enumerate(written):
@@ -1085,7 +1087,7 @@ def _excepts(raw: dict, name: str) -> tuple[list[tuple[str, str]], Problem | Non
             return [], Problem(
                 SEVERITY_ERROR,
                 name,
-                f"{where} に知らないキー（{', '.join(unknown)}）がある。"
+                f"{where} に未対応のキー（{', '.join(unknown)}）がある。"
                 f"書けるのは `{'` か `'.join(EXCEPT_FIELDS)}` の 1 つだけ",
             )
         # 書いた値は文字列だけを受け取る。引用符の無い `on` は PyYAML が真偽値に読むので、
@@ -1100,7 +1102,7 @@ def _excepts(raw: dict, name: str) -> tuple[list[tuple[str, str]], Problem | Non
         glob = item.get("glob") or ""
         regex = item.get("regex") or ""
         if not glob and not regex:
-            return [], Problem(SEVERITY_ERROR, name, f"{where} に glob も regex も無い")
+            return [], Problem(SEVERITY_ERROR, name, f"{where} に glob も regex もありません。")
         if glob and regex:
             return [], Problem(
                 SEVERITY_ERROR,
@@ -1144,11 +1146,11 @@ def _when(written: object, name: str) -> tuple[Condition | None, Problem | None]
         unknown = sorted(str(k) for k in raw if k not in WHEN_KINDS)
         if unknown:
             raise _WhenError(
-                f"{where} に知らないキー（{', '.join(unknown)}）がある。"
+                f"{where} に未対応のキー（{', '.join(unknown)}）がある。"
                 f"書けるのは `{'` / `'.join(WHEN_KINDS)}` のどれか 1 つだけ"
             )
         if len(raw) != 1:
-            got = "キーが無い" if not raw else f"キーが {len(raw)} つある（{', '.join(raw)}）"
+            got = "キーがありません" if not raw else f"キーが {len(raw)} つある（{', '.join(raw)}）"
             raise _WhenError(
                 f"{where} に{got}。1 つのノードに書けるキーは 1 つだけで、"
                 f"組み合わせるなら `{WHEN_ALL}` / `{WHEN_ANY}` の下に並べてください"
@@ -1276,7 +1278,7 @@ def _ungeneratable(rule: Rule, section: str, name: str, detail: str) -> tuple[Ru
     rule.degraded_message = (
         f"{detail}。保護が消えるのを避けるため、ルール '{DEGRADED_RULE_NAME}' が見るツール"
         f"（{rule.match}）を止めています。ワークスペースをもっと浅い場所へ移すか、"
-        "ユーザに、このルールが書かれているルールファイルから外してもらってください。"
+        "ユーザに、このルールが書かれているルールファイルから削除してもらってください。"
     )
     return rule, problem
 

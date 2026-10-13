@@ -545,7 +545,7 @@ class IntegrateTest(unittest.TestCase):
         r = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
         self.assertOk(r, 1)
         self.assertIn("コミットした", r.stdout)
-        self.assertIn("ワークツリー .claude/worktrees/wt を消せなかった", r.stdout)
+        self.assertIn("ワークツリー .claude/worktrees/wt を削除できませんでした", r.stdout)
         self.assertIn("secret.local", r.stdout)
         self.assertIn("残したもの", r.stdout)
         self.assertTrue(self.has_branch())

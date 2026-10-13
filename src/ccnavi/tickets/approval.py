@@ -191,7 +191,7 @@ def load_copy(path: str, require_record: bool = False) -> tuple[ticket_model.Tic
     # 承認を正とするのは置き場で、`.ccnavi/approved/` は組み込みの保護がエージェントの書き込みを
     # 止める。欄は無いので、親子・計画・置き場の検査は `blocking_problems` が判定の側で当てる。
     if require_record and not ticket.completed_at:
-        return None, "`completed_at` が無い。`finish` を通っていない"
+        return None, "`completed_at` がありません。`finish` を通っていない"
     if not ticket.is_child and ticket.has_plan:
         ticket.workflow = workflow.compute(ticket)
     # 親に固定したフェーズ定義（`phases:`）を読んで持たせる。承認のあとの判定はこれを読み、
@@ -493,7 +493,7 @@ def revision_elsewhere_text(
     todo = f"{conf.tickets}/{ticket_model.TODO}/"
     text = (
         f"{t.ticket} の計画の違う提案が {rel} に在るが、正とするツリー（{place}）の外なので"
-        f"承認の対象にならない。改版なら {place} の {todo} に書き、古い版なら消してください"
+        f"承認の対象にならない。改版なら {place} の {todo} に書き、古い版なら削除してください"
     )
     fams = fams or syncstate.Families(conf, root)
     if fams.active:

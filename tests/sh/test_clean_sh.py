@@ -186,7 +186,7 @@ class CleanCases:
         write(os.path.join(self.worktrees, "empty", "a.txt"))
         result = self.run_clean("empty")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("消すものはありません", result.stdout)
+        self.assertIn("削除するものはありません", result.stdout)
 
     def test_rejects_anything_but_a_name(self):
         # 置き場の外に、消えてはいけない生成物を置いておく。
@@ -316,7 +316,7 @@ class WorktreeOptionTest(unittest.TestCase):
     def test_removes_the_worktree_from_outside_and_keeps_the_branch(self):
         result = self.run_clean("--worktree", "wt")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("ワークツリー wt を消した", result.stdout)
+        self.assertIn("ワークツリー wt を削除しました", result.stdout)
         self.assertFalse(os.path.exists(self.top))
         branches = subprocess.run(
             ["git", "branch", "--list", "wt"], cwd=self.ws, capture_output=True, text=True
@@ -326,7 +326,7 @@ class WorktreeOptionTest(unittest.TestCase):
     def test_keeps_the_worktree_when_the_cwd_is_inside(self):
         result = self.run_clean("--worktree", "wt", cwd=self.top)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("cwd がワークツリー wt の中にあるので消さなかった", result.stdout)
+        self.assertIn("cwd がワークツリー wt の中にあるので削除しませんでした", result.stdout)
         self.assertIn("ccnavi-clean.sh --worktree wt", result.stdout)
         self.assertTrue(os.path.exists(os.path.join(self.top, "node_modules", "x.js")))
 

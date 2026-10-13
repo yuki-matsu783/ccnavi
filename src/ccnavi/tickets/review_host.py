@@ -194,18 +194,18 @@ def transport_problem(url: str) -> str:
     if not kind:
         return f"origin ({url}) が GitHub でも GitLab でもない"
     if shutil.which("jq") is None:
-        return "jq が無い。結果の JSON を組み立てられない"
+        return "jqが見つかりません。結果の JSON を作成できません"
     cli = "gh" if kind == "github" else "glab"
     if shutil.which(cli) is not None:
         return ""
     token = GITHUB_TOKEN if kind == "github" else GITLAB_TOKEN
     if shutil.which("curl") is None:
         return (
-            f"{cli} も curl も無い。MCP などでユーザがリモートを読む形にするか、"
+            f"{cli} も curl もありません。MCP などでユーザがリモートを読む形にするか、"
             "どちらかを入れてください"
         )
     if not os.environ.get(token, ""):
-        return f"{cli} が無く、curl に付ける {token} も無い"
+        return f"{cli} が無く、curl に付ける {token} もありません。"
     return ""
 
 

@@ -216,10 +216,10 @@ def _in_index(root: str, rel: str) -> str | None:
         "`.gitignore` に入れる前に `git add` したものとみられる。"
         "プロジェクトは自分の git を持つので、ワークスペースの git には載せない。"
         "載せたままだと、ワークスペースのコミットがプロジェクトの版を記録し続け、"
-        f"`.gitignore` に `/{rel}/` を足しても追跡は外れない。"
-        f"直すには、ワークスペースで `git rm -r --cached {rel}` を打ち"
+        f"`.gitignore` に `/{rel}/` を追加しても追跡は外れない。"
+        f"直すには、ワークスペースで `git rm -r --cached {rel}` を実行し"
         f"（ファイルは消えない。まだコミットしていなければ `git reset -- {rel}`）、"
-        f"`.gitignore` に `/{rel}/` を足して（既にあればそのまま）、コミットする"
+        f"`.gitignore` に `/{rel}/` を追加して（既にあればそのまま）、コミットする"
     )
 
 

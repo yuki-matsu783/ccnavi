@@ -63,8 +63,8 @@ def operate(
         stderr.write(
             f"ccnavi: 親子のチケット {bypass} は取り込み済み（C1 の対象）。状態の操作は "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')}' か "
-            f"'{settings.script_command(root, 'ccnavi-review.sh')}' から打ってください。"
-            "C1 を通らない書き込みは親のブランチへ送られないので、何も書かずに止めた\n"
+            f"'{settings.script_command(root, 'ccnavi-review.sh')}' から実行してください。"
+            "C1 を通らない書き込みは親のブランチへ送られないので、何も反映せずに中止しました。\n"
         )
         return EXIT_ERROR
     if args.close_early:
@@ -197,7 +197,8 @@ def operate(
         # ticket record-risk <子> <項目> yes|no --reason <根拠>
         if len(words) < 5:
             stderr.write(
-                "ccnavi: ticket record-risk には <子> <項目> yes|no と --reason <根拠> が要る\n"
+                "ccnavi: ticket record-risk には <子> <項目> yes|no と --reason <根拠>"
+                " を指定してください。\n"
             )
         else:
             code = ops.record_risk(
@@ -205,12 +206,17 @@ def operate(
             )
     elif kind == "review" and verb == "prepare":
         if args.phase is None or not args.body_file:
-            stderr.write("ccnavi: review prepare には --phase <N> と --body-file <path> が要る\n")
+            stderr.write(
+                "ccnavi: review prepare には --phase <N> と --body-file <path> を指定してください。"
+                "\n"
+            )
         else:
             code = review.prepare(stdout, stderr, root, conf, cwd, args.phase, args.body_file)
     elif kind == "review" and verb in ("requested", "confirm"):
         if args.phase is None or not args.result:
-            stderr.write(f"ccnavi: review {verb} には --phase <N> と --result <json> が要る\n")
+            stderr.write(
+                f"ccnavi: review {verb} には --phase <N> と --result <json> を指定してください。\n"
+            )
         elif verb == "requested":
             code = review.requested(stdout, stderr, root, conf, cwd, args.phase, args.result)
         else:
@@ -219,7 +225,7 @@ def operate(
             )
     elif kind == "review" and verb == "ready":
         if not args.result:
-            stderr.write("ccnavi: review ready には --result <json> が要る\n")
+            stderr.write("ccnavi: review ready には --result <json> を指定してください。\n")
         else:
             code = review_close.ready(stdout, stderr, root, conf, cwd, args.result)
     else:

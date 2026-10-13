@@ -129,7 +129,7 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         busy = {home(e) for e in entries.values() if any(h.state not in _CLOSED for h in e.hits)}
         families = sorted(busy)
     if not families:
-        stdout.write("ccnavi: 作業中・レビュー待ち・承認待ちのチケットは無い\n")
+        stdout.write("ccnavi: 作業中・レビュー待ち・承認待ちのチケットはありません。\n")
         return 0
 
     pool = approval_checks.predecessor_pool_of(doing, review, closed, proposals)
@@ -141,7 +141,7 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         "ccnavi: チケットの状態。手元の置き場・状態の履歴・git だけを読む"
         "（リモートからの取得は行いません）。\n"
         "  push 済みかは手元のリモート追跡の ref（最後に取得した時点の状態）で見るので、"
-        f"古いかもしれない。最新にするには先に '{sync} <親>' を打つ\n"
+        f"古いかもしれない。最新にするには先に '{sync} <親>' を実行します。\n"
     )
     for name in families:
         members = sorted(
@@ -271,7 +271,7 @@ class _Family:
         else:
             if not _started_recorded(self.conf, t):
                 warns.append(
-                    "着手の欄（started_at）があるのに、状態の履歴に着手（started）の行が無い。"
+                    "着手の欄（started_at）があるのに、状態の履歴に着手（started）の行がありません。"
                     "start を通さずに書かれた欄かもしれない。ユーザに started_at と base_sha を"
                     "確かめてもらう"
                 )
@@ -294,7 +294,7 @@ class _Family:
         if uncommitted:
             nexts.append(
                 f"承認済みチケットが未コミット。ユーザに '{self.push_sh} {self.name}' を"
-                "打ってもらう（エージェントはコミットも push もしない）"
+                "実行してもらう（エージェントはコミットも push もしない）"
             )
         if stops:
             nexts.append("止まっている原因を解消する（ユーザに確かめる）")
@@ -306,12 +306,12 @@ class _Family:
             nexts += self._start_lines(t)
         elif t.is_child:
             nexts.append(
-                f"作業を進め、終えたら '{self.ticket_sh} finish {t.ticket}' を打つ{PARENT_ONLY}"
+                f"作業を進め、終えたら '{self.ticket_sh} finish {t.ticket}' を実行する{PARENT_ONLY}"
             )
         else:
             nexts.append(
                 "子を進める。全部のフェーズを閉じたら "
-                f"'{self.ticket_sh} finish {t.ticket}' を打つ{PARENT_ONLY}"
+                f"'{self.ticket_sh} finish {t.ticket}' を実行する{PARENT_ONLY}"
             )
         return lines + [f"    次の操作: {n}" for n in nexts]
 
@@ -324,10 +324,10 @@ class _Family:
             where = f"projects/{t.project} の中で " if t.project else ""
             base = f" {t.parent}" if t.is_child else ""
             out.append(
-                f'ワークツリーが無い。{where}\'{git} worktree add "{worktree}" -b {t.ticket}'
+                f'ワークツリーがありません。{where}\'{git} worktree add "{worktree}" -b {t.ticket}'
                 f"{base}' で作る{PARENT_ONLY}"
             )
-        out.append(f"'{self.ticket_sh} start {t.ticket}' で着手する{PARENT_ONLY}")
+        out.append(f"'{self.ticket_sh} start {t.ticket}' で開始する{PARENT_ONLY}")
         return out
 
     def _parent_not_started(self, t: ticket_model.Ticket) -> str:

@@ -41,14 +41,14 @@ def shape_problem(data) -> str:
         return "最上位がマッピングではない"
     nodes = data.get("nodes")
     if not isinstance(nodes, list):
-        return "`nodes` のリストが無い"
+        return "`nodes` のリストがありません。"
     seen: set[str] = set()
     for index, node in enumerate(nodes):
         if not isinstance(node, dict):
             return f"nodes[{index}] がマッピングではない"
         node_id = node.get("id")
         if not isinstance(node_id, str) or not node_id:
-            return f"nodes[{index}] に文字列の id が無い"
+            return f"nodes[{index}] に文字列の id がありません。"
         if node_id in seen:
             return f"ノードの id が重なっている（{flow_text._line(node_id)}）"
         seen.add(node_id)
@@ -172,9 +172,9 @@ def _structure_problems(data) -> list[str]:
         out.append(f"無いノードを指す線は…ほか {len(missing) - ITEM_LIMIT} 件")
     starts = [nid for nid in by_id if kinds[nid] == "start"]
     if not starts:
-        out.append("start が無い（どこから始めるかが決まらない）")
+        out.append("start がありません（どこから始めるかが決まらない）")
     if not any(kind == "end" for kind in kinds.values()):
-        out.append("end が無い（どこで終わるかが決まらない）")
+        out.append("end がありません（どこで終わるかが決まらない）")
     if starts:
         reached: set[str] = set()
         queue = deque(starts)
@@ -388,8 +388,8 @@ def _name_problems(data, cat: dict[str, list[dict]]) -> list[str]:
         near = [k for k in known if k.casefold() == value.casefold()]
         hint = f"。大文字小文字が違う（{flow_text._line(near[0])}）" if near else ""
         out.append(
-            f"ノード {_named(node)} の{what} {flow_text._line(value)} が候補に無い"
-            "（組み込みと .claude/ の下に無い。書き誤りかもしれない。"
+            f"ノード {_named(node)} の{what} {flow_text._line(value)} が候補にありません"
+            "（組み込みと .claude/ の下にありません。書き誤りかもしれない。"
             f"ユーザ・プラグインのものなら気にしなくてよい）{hint}"
         )
     return out

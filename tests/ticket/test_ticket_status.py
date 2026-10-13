@@ -244,7 +244,7 @@ class TicketStatusTest(PhaseHarness):
 
     def test_nothing_open_says_so(self):
         out = self.said()
-        self.assertIn("チケットは無い", out)
+        self.assertIn("チケットはありません。", out)
 
 
 if __name__ == "__main__":

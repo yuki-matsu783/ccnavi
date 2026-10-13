@@ -351,7 +351,9 @@ class AdditionalContextTest(unittest.TestCase):
         self.assertEqual(second.stdout.strip(), "")
 
         lint = self.run_ccnavi("--lint")
-        self.assertIn("warn: gone: additionalContextFile の docs/gone.md が無い", lint.stdout)
+        self.assertIn(
+            "warn: gone: additionalContextFile の docs/gone.md がありません。", lint.stdout
+        )
         self.assertIn(
             f"warn: long: additionalContextFile の docs/long.md は {ctxfile.MAX_CHARS} 文字",
             lint.stdout,

@@ -163,7 +163,7 @@ class ProposalTest(Use):
         self.assertIn("feedback（2 項）", out)
         self.assertIn("フローの下書き 1 件", out)
         self.assertIn(self.child(3), out)
-        self.assertIn("下書きには効力が無い", out)
+        self.assertIn("下書きには効力がありません。", out)
         self.assertIn("フロー編集画面", out)
         self.assertIn("ccnavi --lint", out)
 
@@ -204,7 +204,7 @@ class ProposalTest(Use):
         self.put("small", SMALL)
         result = self.new(template="small")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("フローの下書きは無い", result.stdout)
+        self.assertIn("フローの下書きはありません", result.stdout)
         self.assertFalse(os.path.exists(self.flows_dir()))
         self.assertEqual(
             front_of(self.written())["plan"], ["design", {"type": "implement", "after": [1]}]

@@ -139,7 +139,7 @@ class ReadTest(unittest.TestCase):
     def test_required_fields(self):
         for text, needle in (
             ("name: a\nplan: [x]\n", "description"),
-            ("name: a\ndescription: d\n", "`plan` が無い"),
+            ("name: a\ndescription: d\n", "`plan` がありません"),
             ("name: a\ndescription: d\nplan: []\n", "`plan` が空"),
             ("name: a\ndescription: d\nplan: [x]\nflows: [1]\n", "マッピング"),
             ("name: a\ndescription: d\nplan: [x]\nflows: {a: {}}\n", "添字"),
@@ -408,7 +408,7 @@ class CheckTest(Harness):
         )
         row = self.check(text)
         self.assertEqual(self.problems(row, "error"), [])
-        self.assertTrue(any("レビューが無い" in d for d in self.problems(row, "warn")))
+        self.assertTrue(any("レビューがありません" in d for d in self.problems(row, "warn")))
 
     def test_the_last_item_cannot_be_deferred(self):
         plan = "  - design\n  - {type: implement, after: [1], review: defer}\n"
@@ -423,7 +423,7 @@ class CheckTest(Harness):
         row = self.check(template("t", "  - docs\n"))
         self.assertEqual(self.problems(row, "error"), [])
         warns = self.problems(row, "warn")
-        self.assertTrue(any("`docs`" in d and "phases.yml に無い" in d for d in warns))
+        self.assertTrue(any("`docs`" in d and "phases.yml にありません" in d for d in warns))
         self.assertTrue(row["usable"])
 
     def test_a_kind_that_does_not_match_the_place_is_only_a_warning(self):
@@ -549,7 +549,7 @@ class CliTest(Harness):
         both = self.answer("--keyword", "調べ", "--keyword", "feat")["templates"]
         self.assertEqual(sorted(r["name"] for r in both), ["feature", "research"])
         text = self.ccnavi("--templates", "--keyword", "無い語")
-        self.assertIn("該当するテンプレートは無い", text.stdout)
+        self.assertIn("該当するテンプレートはありません。", text.stdout)
 
     def test_show_prints_the_content(self):
         out = self.ccnavi("--templates", "--show", "feature")

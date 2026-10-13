@@ -397,7 +397,7 @@ sample:
       checks:
         warns:
           - ".claude/worktrees/i0042/.ccnavi/approved/flows/i0042-01-01.yml: start がありません（どこから始めるかが決まらない）"
-          - ".claude/worktrees/i0042/.ccnavi/approved/flows/i0042-01-01.yml: ノード investigate（原因を調べる） のサブエージェントの種類 Explorer が候補にありません。（組み込みと .claude/ の下にありません。書き誤りかもしれない。ユーザ・プラグインのものなら気にしなくてよい）"
+          - ".claude/worktrees/i0042/.ccnavi/approved/flows/i0042-01-01.yml: ノード investigate（原因を調べる） のサブエージェントの種類 Explorer が候補にありません（組み込みと .claude/ の下にありません。書き誤りかもしれない。ユーザ・プラグインのものなら気にしなくてよい）"
         rendered:
           - "1. [prompt] ログを読む: 認証まわりのエラーログを読む → 2"
           - "2. [subAgent] 原因を調べる: ログと該当コードを突き合わせる / プロンプト: 原因の候補を挙げる / 種類: Explorer → 3"

@@ -344,15 +344,15 @@ class PlanProblemsTest(unittest.TestCase):
                 item("docs", after=[3, 1]),
             ]
         )
-        self.assertTrue(any("引き受ける項が無い" in d for d in found), found)
+        self.assertTrue(any("引き受ける項がありません" in d for d in found), found)
 
     def test_the_taker_needs_a_review_when_the_definitions_are_given(self):
         types, _ = phasetypes.parse(DEFS)
         plan = [item("design", "defer"), item("extra", after=[1]), item("docs", after=[2])]
         found = self.problems(plan, types=types)
-        self.assertTrue(any("レビューが無い" in d for d in found), found)
+        self.assertTrue(any("レビューがありません" in d for d in found), found)
         # 定義を渡さなければ（判定の側）、定義を読む検査は当てない。
-        self.assertFalse(any("レビューが無い" in d for d in self.problems(plan)))
+        self.assertFalse(any("レビューがありません" in d for d in self.problems(plan)))
         plan[1] = item("extra", "mr", [1])
         self.assertEqual(self.problems(plan, types=types), [])
 

@@ -50,7 +50,7 @@ class FamilyTest(AuthorityHarness):
         answer = self.ask("i0001-01-01")
         self.assertEqual(answer["family"], "i0001")
         self.assertEqual(answer["target"], "no")
-        self.assertIn("取り込み状態が無い", answer["why"])
+        self.assertIn("取り込み状態がありません", answer["why"])
         self.assertNotIn("tree", answer)
 
     def test_a_present_family_is_a_target_with_its_tree(self):

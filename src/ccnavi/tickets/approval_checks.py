@@ -60,7 +60,7 @@ def outside_reason(st: syncstate.Standing, t: ticket_model.Ticket) -> str:
         f"（{t.tree or 'ワークスペースルート'}）にしか無いチケット。"
         "取り込み済みの親子のチケットでは、親のブランチ上のチケットだけが正。ユーザがそのチケットを親のワークツリー"
         f"（.claude/worktrees/{st.family}）の同じ置き場へ移してコミットと push をし、"
-        "元のチケットを消す"
+        "元のチケットを削除します。"
     )
 
 
@@ -183,8 +183,8 @@ def misplaced_home_text(root: str, family: str, shown: str) -> str:
         f"親 {family} の承認済みチケットが親のワークツリー"
         f"（{tree.WORKTREES_DIR}/{family}）ではなく {shown} に在る。"
         "ccnavi は親のワークツリーを「名前が親の識別子のもの」として探すので、"
-        "別名のツリーで承認したチケットは、取り込み・閉じたチケットの退避・"
-        "Draft を外す ready の対象にならない。承認済みチケットは手で動かさない。直す手順: "
+        "別名のツリーで承認したチケットは、取り込み・クローズ済みのチケットの退避・"
+        "Draft を解除する ready の対象にならない。承認済みチケットは手で動かさない。直す手順: "
         f"1) 親のワークツリーが無ければ '{worktree_sh} {family}' で切る "
         f"2) {shown} にある {family} の提案（wip/proposals/ の todo/ か review/）を"
         "親のワークツリーの同じ相対位置に移す "
@@ -241,7 +241,7 @@ def place_problems(
             f"親のワークツリーは識別子と同じ名前（{family}）にする。承認済みチケットは提案を書いた"
             "ツリーに置かれるので、別名のままだと親が取り込み済みにならず、承認済みチケットの自動"
             "コミットが動かず、`ready` で止まる。承認のあとには取り返せないので、承認の前に直す: "
-            f"'{worktree_sh} {family}' で切り、提案を移して元を消してから承認を頼んでください",
+            f"'{worktree_sh} {family}' で切り、提案を移して元を削除してから承認を頼んでください",
         )
     ]
 
@@ -279,7 +279,7 @@ def integration_problems(
                 rules.SEVERITY_ERROR,
                 t.ticket,
                 f"{t.ticket} は手元の退避（{archive.ARCHIVE_DIR.replace(os.sep, '/')}/）で"
-                "閉じている。閉じた識別子を新規に承認しない。識別子を変えて出し直してください",
+                "閉じている。クローズ済みの識別子を新規に承認しない。識別子を変えて出し直してください",
             )
         ]
     fams = fams or syncstate.Families(conf, root)
@@ -296,9 +296,9 @@ def integration_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 t.ticket,
-                f"統合先の取り込み結果（sync/{repo}/integration）を読めない（{why}）。閉じた識別子の"
+                f"統合先の取り込み結果（sync/{repo}/integration）を読めない（{why}）。クローズ済みの識別子の"
                 "再利用を確かめられない。承認しない。オンラインで"
-                f" '{sync}' を打って統合先を取り込み直してください",
+                f" '{sync}' を実行して統合先を取り込み直してください",
             )
         ]
     if t.ticket in ids:
@@ -307,7 +307,7 @@ def integration_problems(
                 rules.SEVERITY_ERROR,
                 t.ticket,
                 f"{t.ticket} は統合先（{integ.branch or '?'}）の done/ で閉じている。"
-                "閉じた識別子を新規に承認しない。識別子を変えて出し直してください",
+                "クローズ済みの識別子を新規に承認しない。識別子を変えて出し直してください",
             )
         ]
     return []
@@ -365,7 +365,7 @@ PRED_LABELS = {
     ticket_model.DOING: "作業中（doing/）",
     ticket_model.REVIEW: "レビュー待ち（review/）",
     PRED_CANCELLED: "取り消し済み（done/ で cancelled_at を持つ）",
-    PRED_MISSING: "どの置き場にも無い",
+    PRED_MISSING: "どの置き場にもありません。",
     PRED_SCATTERED: "複数の場所にある",
     PRED_SELF: "自分自身",
     PRED_ANCESTOR: "自分の親",
@@ -476,7 +476,7 @@ def align_imported(
             pool[ident] = [
                 _undecided(
                     hits[0],
-                    f"親のブランチ {st.family} のワークツリーに {ident} のチケットが無い"
+                    f"親のブランチ {st.family} のワークツリーに {ident} のチケットがありません"
                     f"（{', '.join(h.tree or '(ワークスペースルート)' for h in hits)} にしか無い）",
                 )
             ]
@@ -569,10 +569,10 @@ def predecessor_problems(
                 rules.Problem(
                     rules.SEVERITY_ERROR,
                     t.ticket,
-                    f"先行 {p.ticket} が閉じていない（いまは {p.label}）。{p.ticket} が "
-                    f"{approved_rel}/{ticket_model.DONE}/ に入る（作業を終え、レビューが要るなら"
-                    "ユーザのレビューが済む）まで承認しない。先行が要らないなら "
-                    "predecessors から外して"
+                    f"先行 {p.ticket} が完了していない（いまは {p.label}）。{p.ticket} が "
+                    f"{approved_rel}/{ticket_model.DONE}/ に入る（作業を終え、レビューが必要なら"
+                    "ユーザのレビューが済む）まで承認しない。先行が不要なら "
+                    "predecessors から削除して"
                     "出し直してください",
                     rules.KIND_NOT_YET,
                 )
@@ -583,7 +583,7 @@ def predecessor_problems(
                     rules.SEVERITY_ERROR,
                     t.ticket,
                     f"先行 {p.ticket} は{p.label}。取り消した先行は満たせないので承認しない。"
-                    "predecessors から外して出し直してください",
+                    "predecessors から削除して出し直してください",
                 )
             )
         elif p.state in (PRED_SELF, PRED_ANCESTOR, PRED_CYCLE):
@@ -599,7 +599,7 @@ def predecessor_problems(
                     rules.SEVERITY_ERROR,
                     t.ticket,
                     f"先行 {p.ticket} は{PRED_LABELS[p.state]}。{why}。"
-                    "predecessors から外して出し直してください",
+                    "predecessors から削除して出し直してください",
                 )
             )
         elif p.state == PRED_UNDECIDED:
@@ -618,8 +618,8 @@ def predecessor_problems(
                 rules.Problem(
                     rules.SEVERITY_ERROR,
                     t.ticket,
-                    f"先行 {p.ticket} がどの置き場（todo/・doing/・review/・done/）にも無い。"
-                    "表記を直すか、predecessors から外して出し直してください",
+                    f"先行 {p.ticket} がどの置き場（todo/・doing/・review/・done/）にもありません。"
+                    "表記を直すか、predecessors から削除して出し直してください",
                 )
             )
         else:
@@ -707,7 +707,7 @@ def project_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 t.ticket,
-                f"`project: {t.project}` は置き場 {conf.projects or '(無し)'} に無い",
+                f"`project: {t.project}` は置き場 {conf.projects or '(無し)'} にありません。",
             )
         ]
     return []
@@ -748,7 +748,7 @@ def child_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 t.ticket,
-                f"{t.phase} 番目のフェーズは親 {parent.ticket} の計画に無い"
+                f"{t.phase} 番目のフェーズは親 {parent.ticket} の計画にありません"
                 f"（計画は {len(parent.numbered())} 番目まで）",
             )
         ]
@@ -805,7 +805,7 @@ def blocking_problems(
     problems = list(project_problems(t, pool, conf))
     problems.extend(content_problems(t))
     if t.is_child:
-        missing = f"親 {t.parent} の承認済みチケットが作業中に無い（未承認か、閉じている）"
+        missing = f"親 {t.parent} の承認済みチケットが作業中にありません（未承認か、閉じている）"
         problems.extend(child_problems(t, pool.get(t.parent), missing))
     return [p for p in problems if p.severity == rules.SEVERITY_ERROR]
 
@@ -829,7 +829,7 @@ def content_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
                 rules.SEVERITY_ERROR,
                 t.ticket,
                 f"`{ticket_model.WORKFLOW_KEY}:` の欄がある。欄は読まない（待ち方は計画の項の "
-                "`after` から決まる）。ユーザが欄を消してください",
+                "`after` から決まる）。ユーザが欄を削除してください",
             )
         )
     problems.extend(workflow.errors(t))

@@ -82,8 +82,9 @@ def _undecided(
             stderr.write(f"  {line}\n")
         if not st.stop:
             stderr.write(
-                "  親のワークツリーの外のチケットは、親のブランチへ移してコミットしてから消すか、"
-                "残ったワークツリーを片付けてから打ち直してください\n"
+                "  親のワークツリーの外のチケットは、"
+                "親のブランチへ移してコミットしてから削除するか、"
+                "残ったワークツリーを片付けてから再実行してください\n"
             )
         return
     stderr.write(
@@ -92,7 +93,7 @@ def _undecided(
     )
     stderr.write(
         "  どちらにも無いか、元ツリーより先の置き場に在るチケットがあると、どれが正か決まらない。"
-        "先に進んだ側を合流させるか、残ったワークツリーを片付けてから打ち直してください\n"
+        "先に進んだ側を合流させるか、残ったワークツリーを片付けてから再実行してください\n"
     )
 
 
@@ -159,7 +160,7 @@ def family_stopped(
             f"（{found.tree or 'ワークスペースルート'}）にしか無い。"
             "取り込み済みの親子のチケットでは親のブランチ上のチケットだけが正なので、このチケットは動かさない。\n"
             f"  ユーザがそのチケットを親のワークツリー（.claude/worktrees/{st.family}）へ移して"
-            "コミットと push をしてから打ち直す\n"
+            "コミットと push をしてから再実行します。\n"
         )
         return True
     return False
@@ -196,7 +197,7 @@ def parent_not_started(
     if parent.state == ticket_model.TODO:
         stderr.write(
             head + "がまだ承認されていない（todo/）。先にユーザに 'ccnavi --agree' を通してもらい、"
-            f"'{ticket_sh} start {found.parent}' で着手してください\n"
+            f"'{ticket_sh} start {found.parent}' で開始してください\n"
         )
         return True
     if parent.state != ticket_model.DOING:
@@ -206,7 +207,7 @@ def parent_not_started(
         return True
     if not parent.started_at:
         stderr.write(
-            head + f"が未着手（{parent.state}/）。子より先に親に着手してください。\n"
+            head + f"が未着手（{parent.state}/）。子より先に親を開始してください。\n"
             f"  '{ticket_sh} start {found.parent}'\n"
         )
         return True
@@ -227,7 +228,7 @@ def predecessors_unmet(
         return False
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
     stderr.write(
-        f"ccnavi: {found.ticket} の先行が満たされていないので着手しない"
+        f"ccnavi: {found.ticket} の先行が満たされていないので開始しない"
         f"（先行は {conf.approved}/{ticket_model.DONE}/ に在って取り消しでないこと）:\n"
     )
     for p in unmet:
@@ -235,7 +236,7 @@ def predecessors_unmet(
     if any(p.waiting for p in unmet):
         stderr.write(
             f"  先行を先に閉じてください（作業中なら '{ticket_sh} finish <先行>'。"
-            "レビューが要るならユーザのレビューが済んで done/ に入るまで待つ）\n"
+            "レビューが必要ならユーザのレビューが済んで done/ に入るまで待つ）\n"
         )
     if any(not p.waiting for p in unmet):
         stderr.write(
@@ -243,7 +244,7 @@ def predecessors_unmet(
             "複数の場所にある先行は、先に 1 つに決めてください\n"
         )
     stderr.write(
-        "  先行が要らないなら、ユーザに承認済みチケットの predecessors から外してもらうか、"
+        "  先行が不要なら、ユーザに承認済みチケットの predecessors から削除してもらうか、"
         f"'{ticket_sh} cancel {found.ticket} --reason <理由>' で取り消し、"
         "先行を外した提案を出し直して承認を受けてください\n"
     )

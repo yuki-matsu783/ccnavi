@@ -18,7 +18,7 @@ from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 FIXTURE = "rules-undeclared.yml"
-NOTE = "言い換えて打ち直さず"
+NOTE = "言い換えて再実行せず"
 
 
 def _env(**extra: str) -> dict[str, str]:

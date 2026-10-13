@@ -416,7 +416,7 @@ class LintTest(unittest.TestCase):
         result = lint(self.root, rules_file(self.root, SOUND))
 
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("`completed_at` が無い", result.stdout)
+        self.assertIn("`completed_at` がありません。", result.stdout)
         self.assertNotIn("BOM (U+FEFF)", result.stdout)
 
     def test_版が違うルールはerrorになる(self):

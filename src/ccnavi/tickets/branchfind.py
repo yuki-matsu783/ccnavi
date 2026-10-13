@@ -266,7 +266,7 @@ def _bound_line(ref: Ref, b: Bound) -> str:
     )
     return (
         f"[ccnavi] 依頼の {ref.label()} は、すでに {'・'.join(b.tickets)}（ブランチ {b.branch}）に"
-        f"結び付いている。ccnavi-start.sh は打たず、{where}。"
+        f"結び付いている。ccnavi-start.sh は実行せず、{where}。"
         "別の MR/issue を指す依頼なら、番号を言い直してもらう。"
     )
 
@@ -277,8 +277,9 @@ def _start_lines(root: str, refs: list[Ref]) -> list[str]:
     labels = "・".join(r.label() for r in refs)
     lines = [
         f"[ccnavi] 依頼に {labels} の指定がある。"
-        "着手の前に、次を打つ。既存の候補を探し、無ければ Draft MR・ワークツリー・ブランチを作る"
-        "（プロジェクトの issue・MR なら projects/<名前>/ に cd してから打つ）。"
+        "開始の前に、次を実行します。既存の候補を探し、無ければ Draft MR・ワークツリー"
+        "・ブランチを作る"
+        "（プロジェクトの issue・MR なら projects/<名前>/ に cd してから実行します）。"
     ]
     for r in refs:
         lines.append(f"- '{sh} --{r.kind} {r.number}'")
@@ -292,7 +293,7 @@ def _start_lines(root: str, refs: list[Ref]) -> list[str]:
         "2. 新しく <先頭の語>-<番号>-<slug> のブランチを切る",
         "3. やめる",
         "終了コード 4（ホストに届かない）なら、"
-        "出力の案内どおり MCP で代行し、同じコマンドを打ち直す。",
+        "出力の案内どおり MCP で代行し、同じコマンドを再実行します。",
         "終了コード 1・2 なら、出力の理由をユーザに伝える。",
         "このセッションで同じ番号を既に処理してユーザの返事を得ていれば、繰り返さなくてよい。",
     ]
@@ -388,7 +389,7 @@ def read_host(path: str) -> Host:
     形は `checked`（ホストを見たら true）・`reason`・`host`・`repo`・`mrs` の鍵を持つ JSON。
     """
     if not path:
-        return Host(reason="ホストの結果が渡されていない（--result が無い）")
+        return Host(reason="ホストの結果が渡されていない（--result がありません）")
     data, failed = fsio.read_json(path)
     if failed is not None or not isinstance(data, dict):
         return Host(reason="ホストの結果を読めない")

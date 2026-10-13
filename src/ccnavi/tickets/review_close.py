@@ -74,28 +74,29 @@ def ready(
     # 親子のチケットの判定が「決まらない」になる。それを防ぐ（判定を厳しくする向き）。
     if parent.state != ticket_model.DONE:
         problems.append(
-            f"親 {parent.ticket} の承認済みチケットが {conf.approved}/{ticket_model.DONE}/ に無い"
+            f"親 {parent.ticket} の承認済みチケットが {conf.approved}/{ticket_model.DONE}/"
+            " にありません"
             f"（いまは {parent.state}/）。先に "
             f"'{settings.script_command(root, 'ccnavi-ticket.sh')} finish {parent.ticket}' で"
-            "親を閉じ、コミットして push してから打ち直してください"
+            "親を閉じ、コミットして push してから再実行してください"
         )
     problems += review._merge_problems(tree.worktree_path(root, parent.ticket), conf, root)
     if problems:
-        stderr.write("ccnavi: まだ Draft を外せない:\n")
+        stderr.write("ccnavi: まだ Draft を解除できません:\n")
         for p in problems:
             stderr.write(f"  - {p}\n")
         stderr.write(
-            "全部片付けてから打ち直してください。"
+            "全部片付けてから再実行してください。"
             "まだ残るものを承知で早めに閉じるなら、ユーザが端末で "
             f"'{settings.script_command(root, 'ccnavi-review.sh')} close-early --reason <理由>' "
-            "を打つ\n"
+            "を実行します。\n"
         )
         return 1
     result = review._result_with_mr(stderr, result_path)
     if result is None:
         return 1
     if not conf.state:
-        stderr.write("ccnavi: state の置き場が空。コメントの下書きを置く場所が無い\n")
+        stderr.write("ccnavi: state の置き場が空。コメントの下書きを置く場所がありません。\n")
         return 1
     where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     # 退避は親のワークツリーの置き場からだけ行う（ワークスペースルートの done/ には
@@ -151,7 +152,9 @@ def _archive_closed(
     todo = archive.plan(where, parents, root, parent.project)
     _, failed = archive.move(root, parent.project, where, todo, parent.ticket, tree_root)
     if failed:
-        stderr.write(f"ccnavi: 閉じたチケットを logs/archive/ へ退避できなかった: {failed}\n")
+        stderr.write(
+            f"ccnavi: クローズ済みのチケットを logs/archive/ へ退避できなかった: {failed}\n"
+        )
         return 1
     # 途中の作業の置き場（wip/）の追跡済みのファイルも、同じ流れで消す（C1 が一緒にコミットする）。
     removed, head, failed = review.remove_wip(tree_root) if tree_root else ([], "", "")
@@ -183,23 +186,24 @@ def _archive_place_problem(
     shown = home.name if home is not None and home.name else "ワークスペースルート"
     return (
         approval_checks.misplaced_home_text(root, parent.ticket, shown)
-        + "。閉じたチケットの退避は親のワークツリーの置き場からだけ行う"
-        "（他の親子のチケットまで消さないため）。Draft はまだ外していない"
+        + "。クローズ済みのチケットの退避は親のワークツリーの置き場からだけ行う"
+        "（他の親子のチケットまで削除しないため）。Draft はまだ外していない"
     )
 
 
 def _ready_note(conf: settings.Settings, parent: str, wrapped: dict | None) -> tuple[str, str]:
     """Draft を外したときのコメントの下書きを書く。パスと、書けなかった理由（無ければ空）。"""
-    text = [review_host.MARKER_READY, f"チケット `{parent}` の作業は終わり、Draft を外した。"]
+    text = [review_host.MARKER_READY, f"チケット `{parent}` の作業は終わり、Draft を解除した。"]
     text.append(
-        f"`{ticket_places.WIP_ROOT}/` の追跡済みのファイルは ready が消した（履歴から戻せる）。"
-        "閉じたチケットとその記録"
+        f"`{ticket_places.WIP_ROOT}/` の追跡済みのファイルは ready が削除しました（履歴から戻せる）"
+        "。"
+        "クローズ済みのチケットとその記録"
         f"（`{conf.approved}/` の done/・phases/・events/・flows/）は手元の `logs/archive/` へ"
-        "退避し、このブランチからは消してある。マージするかどうかはユーザが決める。"
+        "退避し、このブランチからは削除してある。マージするかどうかはユーザが決める。"
         "取り込むときは squash で、途中のコミットを既定のブランチに残さない。"
     )
     if wrapped:
-        text.append(f"（ユーザが早めに閉じた: {wrapped.get('reason', '')}）")
+        text.append(f"（ユーザが早めにクローズした: {wrapped.get('reason', '')}）")
     path = os.path.join(conf.state, READY_FILE.format(parent=parent))
     return path, review._write_text(path, "\n".join(text) + "\n")
 
@@ -258,7 +262,8 @@ def _ready_again(
     problems = review._merge_problems(tree.worktree_path(root, parent.ticket), conf, root)
     if problems:
         stderr.write(
-            "ccnavi: まだ Draft を外せない（閉じたチケットは logs/archive/ へ退避済み）:\n"
+            "ccnavi: まだ Draft を解除できません（クローズ済みのチケットは logs/archive/"
+            " へ退避済み）:\n"
         )
         for p in problems:
             stderr.write(f"  - {p}\n")
@@ -266,7 +271,7 @@ def _ready_again(
     if review._result_with_mr(stderr, result_path) is None:
         return 1
     if not conf.state:
-        stderr.write("ccnavi: state の置き場が空。コメントの下書きを置く場所が無い\n")
+        stderr.write("ccnavi: state の置き場が空。コメントの下書きを置く場所がありません。\n")
         return 1
     # 早めに閉じたマーカーは、途中で止まった回ならツリーに、移し終えていれば退避に在る
     where = settings.approved_dir(conf, tree.worktree_path(root, parent.ticket))
@@ -311,13 +316,13 @@ def close_early(
     作業中の子がいる間は打てない。早めに閉じるのは、手が止まっているときだけ。
     """
     if not reason.strip():
-        stderr.write("ccnavi: --close-early には --reason <理由> が要る\n")
+        stderr.write("ccnavi: --close-early には --reason <理由> が必要です。\n")
         return 1
     parent = review._parent(stderr, root, conf, cwd)
     if parent is None:
         return 1
     if not conf.state:
-        stderr.write("ccnavi: state の置き場が空。下書きを置く場所が無い\n")
+        stderr.write("ccnavi: state の置き場が空。下書きを置く場所がありません。\n")
         return 1
     result = review._result_with_mr(stderr, result_path)
     if result is None:
@@ -394,8 +399,8 @@ def close_early(
     stdout.write(
         f"OK: {parent.ticket} を早めに閉じた。あとは親に、状態の移動をコミットし、"
         f"'ticket finish {parent.ticket}' で閉じて push し、"
-        "'ccnavi-review.sh ready' で Draft を外させる"
-        f"（`{ticket_places.WIP_ROOT}/` の追跡済みのファイルは ready が消す）\n"
+        "'ccnavi-review.sh ready' で Draft を解除させる"
+        f"（`{ticket_places.WIP_ROOT}/` の追跡済みのファイルは ready が削除します）\n"
     )
     return 0
 
@@ -551,7 +556,7 @@ def _close_early_drafts(
     rest += [f"- フェーズ {ph.label}: 手を付けていない" for ph in left.untouched]
     if left.unplanned:
         rest.append("- フィードバック計画は立てていない")
-    issue += rest or ["（残した作業は無い）"]
+    issue += rest or ["（残した作業はありません）"]
     issue += ["", "## 引き継ぐ指摘", ""]
     issue += [f"- {review.thread_label(t)}" for t in left.unresolved] or [
         "（未解決のスレッドは残っていない）"
@@ -563,10 +568,10 @@ def _close_early_drafts(
         return failed
     note = [
         review_host.MARKER_CLOSE_EARLY,
-        f"ユーザが早めに閉じた（{stamp}）: {reason.strip()}",
+        f"ユーザが早めにクローズした（{stamp}）: {reason.strip()}",
         f"取り消した子: {', '.join(cancelled) or '無し'} / 省略したフェーズ: "
         f"{', '.join(str(n) for n in skipped) or '無し'} / 受け入れた指摘: {len(accepted)} 件",
-        "残りは別の issue に書き出す。親が片付けて ready を打てば Draft が外れる。"
+        "残りは別の issue に書き出す。親が片付けて ready を実行すれば Draft が外れる。"
         "マージはユーザが行う。",
         "",
     ]

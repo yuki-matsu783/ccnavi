@@ -405,7 +405,9 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     what = "サブエージェントの起動" if tool == "Agent" else "このシェル実行"
     n = phase.number
-    why = "人間レビューが要る子を含みます" if not phase.planned else "レビューが要るフェーズです"
+    why = (
+        "人間レビューが必要な子を含みます" if not phase.planned else "レビューが必要なフェーズです"
+    )
     if phase.risk_escalates:
         why = f"実績のリスクが高い（{phase.risk_line}）ので、宣言に関わらずレビューが要ります"
     later = "次のフェーズの計画（wip/proposals/todo/ への提案）はレビュー前に進めて構いません。"
@@ -414,7 +416,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
         todo = (
             "やること: ユーザのレビューを待ってください。レビューが終わったら "
             f"'{review_sh} confirm --phase {n}' で確かめます。指摘が付いていたら、"
-            f"同じフェーズに子を足してやり直せます。{later}"
+            f"同じフェーズに子を追加してやり直せます。{later}"
         )
     else:
         todo = (
@@ -479,7 +481,7 @@ def announce(
                 where, parent.ticket, n, approval_marks.MARK_SKIPPED, {"deferred_to": at}
             )
             if failed:
-                stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
+                stderr.write(f"ccnavi: フェーズのマーカーを保存できませんでした: {failed}\n")
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。"
                 f"レビューは {at} 番目と一緒に見る計画なので、ここでは止めません。"
@@ -494,7 +496,7 @@ def announce(
                 {"review": phase.review_kind, **_type_source(phase, common)},
             )
             if failed:
-                stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
+                stderr.write(f"ccnavi: フェーズのマーカーを保存できませんでした: {failed}\n")
             required = [t.ticket for t in phase.tickets if t.review_required]
             covers = (
                 f"（{', '.join(str(c) for c in phase.covers)} 番目の分も含めて）"
@@ -530,7 +532,7 @@ def announce(
                 {"tickets": [t.ticket for t in phase.tickets], **_type_source(phase, common)},
             )
             if failed:
-                stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
+                stderr.write(f"ccnavi: フェーズのマーカーを保存できませんでした: {failed}\n")
             risk_note = f"{phase.risk_line}。" if phase.risk_line else ""
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{risk_note}"
@@ -549,7 +551,7 @@ def _next_hint(parent: ticket_model.Ticket, phases: list[Phase], number: int) ->
         if parent.feedback is None:
             return (
                 "全体計画のフェーズは全部終わりました。レビューが済んだら、次はフィードバック計画です。"
-                "親チケットに `feedback:` を足して（対応が無くても `[]` で）改版を提案し、"
+                "親チケットに `feedback:` を追加して（対応が無くても `[]` で）改版を提案し、"
                 "承認を受けてください。項には `after` で先に済んでいるべき項の番号"
                 "（フィードバック計画の番号だけ）を書き、最後の項がほかの全部を待つようにします。"
                 "独立した対応は最後に 1 項で受けるか、一直線に並べます。項が使う定義は "
@@ -657,15 +659,16 @@ def review_next(
         )
     if _was_requested(conf, root, child.parent, n):
         text += (
-            f"。フェーズ {owner.label} は前に依頼したが、続きの子を足したときに依頼の記録が外れた。"
-            "前回の依頼より後に閉じた子があるので、依頼し直しが要る"
+            f"。フェーズ {owner.label} は前に依頼したが、"
+            "続きの子を追加したときに依頼の記録が外れた。"
+            "前回の依頼より後に閉じた子があるので、依頼し直しが必要です"
         )
     return text + _AFTER_REQUEST.format(done=f"{conf.approved}/{ticket_model.DONE}/")
 
 
 # 依頼の前の文の結び。依頼の後に誰が done/ へ動かすか
 # （依頼済み・レビュー済みの文はそれぞれ言っている）。
-_AFTER_REQUEST = "。依頼の後、ユーザがレビューを終えて confirm / decide を打つと {done} へ動く"
+_AFTER_REQUEST = "。依頼の後、ユーザがレビューを終えて confirm / decide を実行すると {done} へ動く"
 
 
 def _later(a: str, b: str) -> bool:
@@ -761,8 +764,8 @@ def _erase_steps(
     git = settings.script_command(root, "ccnavi-git.sh")
     push = settings.script_command(root, "ccnavi-push-approved.sh")
     return (
-        "レビューをやり直すならマーカーを消してください"
-        f"（消し方: ユーザが{_marker_tree(root, conf, child)}で '{git} rm {mark}' を打ち、"
+        "レビューをやり直すならマーカーを削除してください"
+        f"（消し方: ユーザが{_marker_tree(root, conf, child)}で '{git} rm {mark}' を実行し、"
         "削除をコミットする。取り込み済みで origin があり、"
         "マージリクエストで見るフェーズがある親子なら "
         f"'{push} {child.parent}' が取り込んでから送る。それ以外は何もしないので、"
@@ -866,9 +869,9 @@ def order_problems(
             if phase.number in reopened:
                 names = ", ".join(reopened[phase.number])
                 state = (
-                    f"同じ承認で {names} を足すので再び開く"
+                    f"同じ承認で {names} を追加するので再び開く"
                     if phase.ended
-                    else f"同じ承認で {names} を足すが、まだ閉じていない"
+                    else f"同じ承認で {names} を追加するが、まだ閉じていない"
                 )
             else:
                 state = "子がまだ無い" if not phase.tickets else "子が開いている"
@@ -987,7 +990,7 @@ def stage(
         approval_marks.PARENT_MARK_CLOSE_EARLY,
     ):
         # ユーザが早めに閉じた。残りは別の issue に書き出してあるので、閉じられる。
-        return "閉じられる（ユーザが早めに閉じた）"
+        return "閉じられる（ユーザが早めにクローズした）"
     in_feedback = parent.feedback is not None and len(parent.feedback) > 0
     open_phases = [p for p in phases if not p.ended]
     if open_phases and open_phases[0].number <= len(parent.plan):

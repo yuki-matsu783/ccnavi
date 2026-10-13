@@ -11,27 +11,27 @@ from ccnavi.policy import ruleload, rules
 
 class IdRequiredTest(unittest.TestCase):
     def test_id_が無いルールは_error_で除外される(self):
-        raw = {"match": "Bash", "glob": "*rm -rf*", "message": "消さない"}
+        raw = {"match": "Bash", "glob": "*rm -rf*", "message": "削除しない"}
         found, problems = rules._build(raw, "deny", 0)
         self.assertIsNone(found)
         self.assertEqual(len(problems), 1)
         self.assertEqual(problems[0].severity, rules.SEVERITY_ERROR)
-        self.assertIn("id が無い", problems[0].detail)
+        self.assertIn("id がありません。", problems[0].detail)
 
     def test_空白だけの_id_も_error_で除外される(self):
-        raw = {"id": "  ", "match": "Bash", "glob": "*rm -rf*", "message": "消さない"}
+        raw = {"id": "  ", "match": "Bash", "glob": "*rm -rf*", "message": "削除しない"}
         found, problems = rules._build(raw, "deny", 0)
         self.assertIsNone(found)
         self.assertEqual(len(problems), 1)
         self.assertEqual(problems[0].severity, rules.SEVERITY_ERROR)
-        self.assertIn("id が無い", problems[0].detail)
+        self.assertIn("id がありません。", problems[0].detail)
 
     def test_id_が無くても他のルールは残る(self):
         rule_set, problems = rules.parse(
             {
                 "version": 1,
                 "deny": [
-                    {"match": "Bash", "glob": "*rm -rf*", "message": "消さない"},
+                    {"match": "Bash", "glob": "*rm -rf*", "message": "削除しない"},
                     {"id": "git-push", "match": "Bash", "glob": "*git push*", "message": "m"},
                 ],
             }

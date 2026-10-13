@@ -38,7 +38,7 @@ PUSH_SCRIPTS = ("ccnavi-push-approved.sh", *common_sh(SH_DIR))
 APPROVE_SCRIPTS = (*PUSH_SCRIPTS, "ccnavi-agree.sh")
 APPROVED = ".ccnavi/approved/doing"
 MESSAGE = "ccnavi: 承認済みチケットを更新"
-NOTHING = "コミットして push する承認済みチケットは無い。"
+NOTHING = "コミットして push する承認済みチケットはありません。"
 
 # 承認の代わり。STUB_ARGS があれば受けた引数を 1 行ずつ書き、STUB_EXIT が 0 でなければ失敗し、
 # STUB_TREE があればそこに承認済みチケットを置く。

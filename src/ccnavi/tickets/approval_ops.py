@@ -42,10 +42,10 @@ def admit(approved_dir: str, ticket: ticket_model.Ticket, source_tree: str) -> s
     content = fsio.read_bytes(ticket.path)
     if content is None:
         return f"提案を読めない ({ticket.path})"
-    with fsio.policy(message="書けない ({reason})", restore=()):
+    with fsio.policy(message="保存できませんでした ({reason})", restore=()):
         failed = fsio.write_bytes_atomic(target, content)
     if failed:
-        return f"書けない ({failed})"
+        return f"保存できませんでした ({failed})"
     # 消せなければ書いた側を消して戻す。承認の plan では失敗したときの枝が走らないので、
     # 同じ戻し方を Writer(FS) へ渡す。置けたと数えるのは消せたとき。
     with fsio.policy(
@@ -160,7 +160,7 @@ def carry_flow(
         return [cannot.replace("{reason}", failed)]
     kept = (
         f"{proposal.ticket} のフローを {target} へコピーした。"
-        f"元の {source} は消せなかった ({{reason}})"
+        f"元の {source} は削除できなかった ({{reason}})"
     )
     with fsio.policy(message=kept):
         failed = fsio.unlink(source)
@@ -183,7 +183,7 @@ def move_file(source: str, target: str) -> str:
     ときまで回すと、コピーできずに戻す処理が、その間に別のプロセスが置いた行き先を消す。
     """
     if fsio.exists(target):
-        return f"チケットを動かせない ({source} → {target}: 行き先に既に在る)"
+        return f"チケットを動かせない ({source} → {target}: 移動先に既にある)"
     message = f"チケットを動かせない ({source} → {target}: " + "{reason})"
     with fsio.policy(message=message):
         failed = fsio.move(source, target)
@@ -230,7 +230,9 @@ def next_child_id(conf: settings.Settings, root: str, parent_id: str, phase_no: 
     """
     top = ticket_ids.MAX_CHILD_NUMBER
     if not 0 <= phase_no <= top:
-        raise ValueError(f"フェーズ {phase_no} は子の識別子に書けない（フェーズ番号は 0〜{top}）")
+        raise ValueError(
+            f"フェーズ {phase_no} は子の識別子に指定できません（フェーズ番号は 0〜{top}）"
+        )
     seen = approval.all_tickets(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
     # 退避は親のリポジトリ（プロジェクト）のものだけを見る。親が置き場に無ければ全部を見る。
@@ -350,7 +352,7 @@ def followup(
     # 変えることには当たらない）。時刻は状態の履歴の `raised` に残る。
     front[approval.FOLLOWUP_KEY] = [c.ticket for c in children]
     body = ["", "## 引き継ぐ指摘", ""]
-    body += [f"- {item}" for item in items] or ["（指摘の一覧は無い）"]
+    body += [f"- {item}" for item in items] or ["（指摘の一覧はありません）"]
     body.append("")
     t = ticket_model.Ticket(ticket=ident, raw=front, body="\n".join(body))
     failed = approval_marks.write_ticket(approval.copy_path(where, ident), ticket_mod.render(t))

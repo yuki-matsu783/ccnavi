@@ -61,7 +61,7 @@ class FeedbackWaitsTest(unittest.TestCase):
 
     def test_a_deferred_feedback_item_without_a_taker_is_refused(self):
         found = self.problems([item("fixup", "defer"), item("fixup"), item("fixup", after=[4])])
-        self.assertTrue(any("延期を引き受ける項が無い" in d for d in found), found)
+        self.assertTrue(any("延期を引き受ける項がありません" in d for d in found), found)
 
 
 class FeedbackFlowTest(PhaseHarness):

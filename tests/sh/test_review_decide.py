@@ -295,7 +295,7 @@ class ReviewDecideShTest(unittest.TestCase):
                 refused = self.decide("x", shell=shell)
                 self.assertEqual(2, refused.returncode, refused.stderr)
                 self.assertEqual(
-                    "ccnavi-review: decide には <N>（フェーズ番号）が要る。\n", refused.stderr
+                    "ccnavi-review: decide には <N>（フェーズ番号）が必要です。\n", refused.stderr
                 )
                 shown = self.decide("1", "--preview", shell=shell)
                 self.assertEqual(0, shown.returncode, shown.stderr)

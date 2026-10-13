@@ -3,7 +3,7 @@
 ユーザが端末から `ccnavi-ticket.sh` などを打つ場面では settings.json の env が反映されず、
 CCNAVI_BIN_PATH は無いのが普通。配布先には `dist/` もソースも無く、実行ファイルは
 `.ccnavi/bin/<os>-<arch>/` にしか無い。そこを見ないと、配布先では必ず
-「実行ファイルが無い」で止まる。
+「実行ファイルが見つかりません」で止まる。
 
 ワークスペースを使い捨てで組み、実行ファイルの代わりに受け取った引数を書くだけの sh を置く。
 """
@@ -82,7 +82,7 @@ class BinLookupTest(unittest.TestCase):
     def test_nothing_to_run_says_where_it_looked(self):
         result = self.run_ticket()
         self.assertEqual(result.returncode, 2)
-        self.assertIn("実行ファイルが無い", result.stderr)
+        self.assertIn("実行ファイルが見つかりません", result.stderr)
         self.assertIn(".ccnavi/bin/", result.stderr)
 
 

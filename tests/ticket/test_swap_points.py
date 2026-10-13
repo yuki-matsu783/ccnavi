@@ -439,7 +439,7 @@ class PlanWriterTest(CoreHarness):
         self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
         _, out = self.plan_and_write()
-        self.assertIn("マーカー（requested, reviewed）を消した", out)
+        self.assertIn("マーカー（requested, reviewed）を削除しました。", out)
         self.assertFalse(os.path.exists(os.path.join(marks, "1.reviewed")))
 
     def test_a_flow_is_carried_to_the_parent_tree(self):
@@ -666,7 +666,7 @@ class WriterFailureTest(CoreHarness):
         with self.failing("unlink", lambda path: path.endswith(os.path.join("todo", "i0001.md"))):
             applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 0, out + err)
-        self.assertIn("ccnavi: i0001: 改版の提案を todo/ から消せない (わざと失敗させた)", err)
+        self.assertIn("ccnavi: i0001: 改版の提案を todo/ から削除できない (わざと失敗させた)", err)
         self.assertIn("i0001 の全体計画を改版した", out)
 
     def test_an_unwritable_history_is_a_warning(self):
@@ -708,7 +708,7 @@ class WriterFailureTest(CoreHarness):
         self.assertTrue(os.path.exists(os.path.join(marks, "1.requested")))
         self.assertTrue(os.path.exists(os.path.join(marks, "1.reviewed")))
         self.assertEqual(self.reopened_events(), [])
-        self.assertNotIn("を消した", out)
+        self.assertNotIn("を削除した", out)
 
     def test_another_mark_that_cannot_be_removed_is_said_and_left(self):
         """reviewed 以外は言って続ける。行と履歴は実際に消せた種類だけ。"""
@@ -716,15 +716,17 @@ class WriterFailureTest(CoreHarness):
         changes = self.planned()
         # 見え方（Chrome の 1 コミット）では両方消える。
         self.assertIn(
-            "  i0001 のフェーズ 1 のマーカー（requested, reviewed）を消した。"
+            "  i0001 のフェーズ 1 のマーカー（requested, reviewed）を削除しました。"
             "全部閉じたらレビューをもう一度頼むことになる",
             changes.lines,
         )
         with self.failing("unlink", lambda path: path.endswith("1.requested")):
             applied, out, err = self.write_changes(changes)
         self.assertEqual(applied.code, 0, out + err)
-        self.assertIn("消せなかった（わざと失敗させた）。requested は残っていて有効なまま", err)
-        self.assertIn("マーカー（reviewed）を消した", out)
+        self.assertIn(
+            "削除できませんでした（わざと失敗させた）。requested は残っていて有効なまま", err
+        )
+        self.assertIn("マーカー（reviewed）を削除しました", out)
         self.assertTrue(os.path.exists(os.path.join(marks, "1.requested")))
         self.assertFalse(os.path.exists(os.path.join(marks, "1.reviewed")))
         self.assertEqual([e["cleared"] for e in self.reopened_events()], [["reviewed"]])
@@ -760,7 +762,7 @@ class WriterFailureTest(CoreHarness):
         done = write(os.path.join(self.approved, "done", "i0001-01-01.md"), "other\n")
         applied, out, err = self.write_changes(checked.changes)
         self.assertEqual(applied.code, 1)
-        self.assertIn("行き先に既に在る", err)
+        self.assertIn("移動先に既にある", err)
         with open(done, encoding="utf-8") as f:
             self.assertEqual(f.read(), "other\n")
 
@@ -1361,7 +1363,7 @@ class WithdrawTest(CoreHarness):
         text = self.new_parent()
         path = os.path.join(self.approved, "doing", "i0001.md")
         forged = "ccnavi_approved: {approved_at: '', source_tree: i0001, source_path: p}\n"
-        write(path, text.replace("---\n", "---\n" + forged, 1) + "書き足した\n")
+        write(path, text.replace("---\n", "---\n" + forged, 1) + "追記しました\n")
         problems = self.problems({"i0001": text.encode()})
         self.assertTrue(any("中身が変わった" in p for p in problems), problems)
 
@@ -1384,18 +1386,20 @@ class WithdrawTest(CoreHarness):
         理由が幾つもあるときは、行ごとに自分のコードを持ち、答えの `code` は最初の理由のもの。
         """
         text = self.new_parent()
-        write(os.path.join(self.approved, "doing", "i0001.md"), text + "書き足した\n")
+        write(os.path.join(self.approved, "doing", "i0001.md"), text + "追記しました\n")
         checked = core.withdraw(self.snapshot(), ["i0001", "i0009"], {"i0001": text.encode()})
         self.assertIsNone(checked.changes)
         self.assertEqual(checked.code, "CORE_WITHDRAW_CHANGED")
         self.assertTrue(checked.problems[0].startswith("[CORE_WITHDRAW_CHANGED] i0001: "))
         self.assertIn(
-            "[CORE_WITHDRAW_NOT_OPEN] i0009: 承認済みチケットが作業中（doing/）に無い",
+            "[CORE_WITHDRAW_NOT_OPEN] i0009: 承認済みチケットが作業中（doing/）にありません。",
             checked.problems,
         )
         nothing = core.withdraw(self.snapshot(), [], {})
         self.assertEqual(nothing.code, "CORE_WITHDRAW_NO_IDS")
-        self.assertEqual(nothing.problems, ["[CORE_WITHDRAW_NO_IDS] 取り下げる識別子が無い"])
+        self.assertEqual(
+            nothing.problems, ["[CORE_WITHDRAW_NO_IDS] 取り下げる識別子がありません。"]
+        )
         # 一覧（Chrome のボード）の理由にも、押した後の答えと同じ表記でコードが載る
         todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
         write(todo, text)
@@ -1425,7 +1429,7 @@ class WithdrawTest(CoreHarness):
         self.assertEqual(checked.code, "CORE_CONFIRM_NO_PARENT")
         self.assertEqual(
             checked.problems,
-            ["ccnavi: [CORE_CONFIRM_NO_PARENT] 親 i0009 の承認済みチケットが作業中に無い"],
+            ["ccnavi: [CORE_CONFIRM_NO_PARENT] 親 i0009 の承認済みチケットが作業中にありません。"],
         )
         checked = core.confirm(self.snapshot(), "i0001", 1, None, "")
         self.assertEqual(checked.code, "CORE_CONFIRM_NOT_REQUESTED")
@@ -1537,7 +1541,7 @@ class WithdrawTest(CoreHarness):
         write(os.path.join(self.approved, "doing", "i0001-02-01.md"), child)
         self.commit_parent("moved by hand")
         problems = core.withdraw(self.snapshot(), ["i0001-02-01"], {}).problems
-        self.assertTrue(any("提案が無い" in p for p in problems), problems)
+        self.assertTrue(any("提案がありません" in p for p in problems), problems)
         self.assertFalse(any("計画編集タブ" in p for p in problems), problems)
 
     def test_a_followup_child_is_named(self):
@@ -1705,7 +1709,7 @@ class RecordWritesTest(CoreHarness):
         os.makedirs(os.path.join(target, "inside"))
         result, _ = self.record("--agree", "--preview", "--json", target=target)
         self.assertEqual(result.returncode, 1)
-        self.assertIn("書いたパスの一覧を", result.stderr)
+        self.assertIn("反映したパスの一覧を", result.stderr)
 
     def refused(self, target, *extra):
         result = self.ccnavi(*extra, "--record-writes", target, "ticket", "start", "i0001")

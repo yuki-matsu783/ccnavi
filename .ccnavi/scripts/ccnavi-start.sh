@@ -52,10 +52,10 @@ sh .ccnavi/scripts/ccnavi-start.sh (--issue <番号> | --mr <番号>) [--slug <�
 
   ホストを見られないときは、既存の MR を見落として重複を作らないよう新規作成に進まず止める（手元の候補がちょうど 1 件なら続ける）。
   GitHub の API に届かないとき（Claude remote など）は、MCP で代行する手順を標準出力に出して終了コード 4 で止まる。
-  代行したあと同じコマンドを打ち直すと、完了済みの処理をスキップし、未完了の処理から再開します。
+  代行したあと同じコマンドを再実行すると、完了済みの処理をスキップし、未完了の処理から再開します。
   冪等。cwd のリポジトリ（ワークスペース・projects/<名前>）を対象にする。
 
-終了コード: 0 完了 / 1 前提の未充足 / 2 引数か環境の誤り / 3 候補が複数 / 4 ホストに届かず代行が要る
+終了コード: 0 完了 / 1 前提の未充足 / 2 引数か環境の誤り / 3 候補が複数 / 4 ホストに届かず代行が必要です
 USAGE
 }
 
@@ -138,7 +138,7 @@ if [ "$what" = mr ] && { [ -n "$opt_slug" ] || [ -n "$opt_title" ]; }; then
 fi
 [ "$what" = issue ] || [ -z "$mcp_checked" ] || fail mr-mcp-checked "--mcp-checked は --issue のときだけ使います。--mr は元ブランチを MCP で読んでから、.ccnavi/docs/worktree.md の「ワークツリーを切る」の手順で切ってください。" 2
 
-command -v jq >/dev/null 2>&1 || fail no-jq "jq が無い。候補の JSON を読めません。" 2
+command -v jq >/dev/null 2>&1 || fail no-jq "jqが見つかりません。候補の JSON を解析できません。" 2
 
 root=$(ccnavi_workspace) ||
 	fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
@@ -146,7 +146,7 @@ ccnavi_log_root="$root"
 here="$(pwd -W 2>/dev/null || pwd)"
 top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 [ -n "$top" ] ||
-	fail not-git "cwd（${here}）が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で打ってください。"
+	fail not-git "cwd（${here}）が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で実行してください。"
 state="$root/logs/state" # 固定
 mkdir -p "$state" 2>/dev/null || fail no-state "state の置き場（${state}）を作れません。" 2
 scripts="$root/.ccnavi/scripts"
@@ -175,7 +175,7 @@ host_open() {
 	host_rc=0
 	origin=$(git remote get-url origin 2>/dev/null || :)
 	if [ -z "$origin" ]; then
-		host_why="origin が無い"
+		host_why="origin がありません。"
 		host_rc=1
 		return 1
 	fi
@@ -190,12 +190,12 @@ host_open() {
 	0) ;;
 	3) fail no-jq "jq が見つかりません。ホストからの応答を解析できません。" 2 ;;
 	4)
-		host_why="$ccnavi_h_cli_name が $ccnavi_h_host で使えず（未導入か未認証）、curl に付ける $ccnavi_h_token_name も無い"
+		host_why="$ccnavi_h_cli_name が $ccnavi_h_host で使えず（未導入か未認証）、curl に付ける $ccnavi_h_token_name もありません。"
 		host_rc=2
 		return 2
 		;;
 	*)
-		host_why="$ccnavi_h_cli_name が $ccnavi_h_host で使えず、curl も無い"
+		host_why="$ccnavi_h_cli_name が $ccnavi_h_host で使えず、curl もありません。"
 		host_rc=2
 		return 2
 		;;
@@ -235,7 +235,7 @@ issue_title_get() {
 		it_status=$(cat "$host_err.status" 2>/dev/null || :)
 		case "$it_status" in
 		401 | 403)
-			issue_why="権限が無い（HTTP ${it_status}）"
+			issue_why="権限がありません（HTTP ${it_status}）"
 			return 2
 			;;
 		404 | 410)
@@ -340,7 +340,7 @@ stop_host() {
 			if [ "$what" = issue ]; then
 				printf '  1. mcp__github__search_pull_requests を query=「repo:%s/%s is:pr is:open %s」で呼ぶ。題・本文に #%s を含むか、元ブランチの名前に %s を含む PR が、この issue に紐づく MR\n' "$sh_owner" "$sh_repo" "$number" "$number" "$number"
 				printf '  2. 見つかったら、一覧をユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞く（続けるなら .ccnavi/docs/worktree-start.md の「既にある / を含むブランチ」の手順）\n'
-				printf '  3. 紐づく PR が無いと確かめたら、同じコマンドに --mcp-checked を付けて打ち直す: %s --mcp-checked\n' "$sh_cmd"
+				printf '  3. 紐づく PR が無いと確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
 			else
 				printf '  1. mcp__github__pull_request_read を method=get owner=%s repo=%s pullNumber=%s で呼び、head.ref（元ブランチ）と head.repo.full_name を読む\n' "$sh_owner" "$sh_repo" "$number"
 				printf '  2. head.repo.full_name が %s/%s と違えばフォークの MR。元ブランチがこのリポジトリに無いので作業を始められない。ユーザに伝えて止める\n' "$sh_owner" "$sh_repo"
@@ -349,13 +349,13 @@ stop_host() {
 			;;
 		title)
 			printf '  1. mcp__github__issue_read を method=get owner=%s repo=%s issue_number=%s で呼び、題を読む\n' "$sh_owner" "$sh_repo" "$number"
-			printf '  2. 題から ASCII の小文字・数字・ハイフンの語を決め、打ち直す: %s --slug <語> --title '"'"'<題>'"'"'\n' "$sh_cmd"
+			printf '  2. 題から ASCII の小文字・数字・ハイフンの語を決め、再実行する: %s --slug <語> --title '"'"'<題>'"'"'\n' "$sh_cmd"
 			;;
 		*)
 			printf '  1. mcp__github__list_pull_requests を owner=%s repo=%s head=%s:%s state=open で呼び、このブランチの開いた PR が無いことを確かめる（あればそれが MR。2 は要らない）\n' "$sh_owner" "$sh_repo" "$sh_owner" "$stop_branch"
 			printf '  2. mcp__github__create_pull_request を次の値で呼ぶ\n'
 			printf '       owner: %s\n       repo: %s\n       head: %s\n       base: %s\n       title: %s\n       body: Closes #%s\n       draft: true\n' "$sh_owner" "$sh_repo" "$stop_branch" "$stop_target" "$stop_title" "$number"
-			printf '  3. 作れたら、同じコマンドを打ち直す: %s（ブランチとワークツリーがあるので、続きから進んでワークツリーのパスを出す）\n' "$sh_cmd"
+			printf '  3. 作れたら、同じコマンドを再実行する: %s（ブランチとワークツリーがあるので、続きから進んでワークツリーのパスを出す）\n' "$sh_cmd"
 			;;
 		esac
 	else
@@ -371,17 +371,17 @@ stop_host() {
 			printf '  なし（ブランチもワークツリーも作っていない）\n'
 		fi
 		[ -z "$stop_local" ] || printf '  手元の候補: %s\n' "$stop_local"
-		printf '手で行う手順（GitLab には MCP の案内が無い）:\n'
-		printf '  1. glab を %s に認証するか、GITLAB_TOKEN を置く（ユーザに頼む）。届くようになったら同じコマンドを打ち直す: %s\n' "${ccnavi_h_host:-?}" "$sh_cmd"
+		printf '手で行う手順（GitLab には MCP の案内がありません）:\n'
+		printf '  1. glab を %s に認証するか、GITLAB_TOKEN を置く（ユーザに頼む）。届くようになったら同じコマンドを再実行する: %s\n' "${ccnavi_h_host:-?}" "$sh_cmd"
 		case "$sh_stage" in
 		create)
-			printf '  2. 打ち直せないなら、ブラウザで %s の MR を手で作り、打ち直す。ソース: %s、ターゲット: %s、題: Draft: %s、説明: Closes #%s\n' "$ccnavi_h_path" "$stop_branch" "$stop_target" "$stop_title" "$number"
+			printf '  2. 再実行できないなら、ブラウザで %s の MR を手で作り、再実行します。ソース: %s、ターゲット: %s、題: Draft: %s、説明: Closes #%s\n' "$ccnavi_h_path" "$stop_branch" "$stop_target" "$stop_title" "$number"
 			;;
 		search)
-			printf '  2. 打ち直せないなら、ブラウザで %s の MR の一覧から、%s #%s に紐づく MR があるか確かめ、無ければ --mcp-checked を付けて打ち直す\n' "$ccnavi_h_path" "$what" "$number"
+			printf '  2. 再実行できないなら、ブラウザで %s の MR の一覧から、%s #%s に紐づく MR があるか確かめ、無ければ --mcp-checked を付けて再実行します。\n' "$ccnavi_h_path" "$what" "$number"
 			;;
 		title)
-			printf '  2. 打ち直せないなら、ブラウザで issue #%s の題を読み、%s --slug <語> --title '"'"'<題>'"'"' と打つ\n' "$number" "$sh_cmd"
+			printf '  2. 再実行できないなら、ブラウザで issue #%s の題を読み、%s --slug <語> --title '"'"'<題>'"'"' と実行します。\n' "$number" "$sh_cmd"
 			;;
 		esac
 	fi
@@ -391,7 +391,7 @@ stop_host() {
 # ---- 統合先。worktree.md の決め方（CCNAVI_INTEGRATION_BRANCH → 取り込み状態 → origin/HEAD → origin/main・master）。
 integration=$(ccnavi_integration "$top" "$root") || integration=""
 [ -n "$integration" ] ||
-	fail no-integration "統合先のブランチを決められません（CCNAVI_INTEGRATION_BRANCH も origin/HEAD も origin/main・master も無い）。CCNAVI_INTEGRATION_BRANCH に統合先の名前を渡してください。"
+	fail no-integration "統合先のブランチを決められません（CCNAVI_INTEGRATION_BRANCH も origin/HEAD も origin/main・master もありません）。CCNAVI_INTEGRATION_BRANCH に統合先の名前を渡してください。"
 
 # ---- 小道具
 ref_exists() {
@@ -441,7 +441,7 @@ ensure_worktree() {
 			switch_into "$ew_branch"
 			return 0
 		fi
-		fail worktree-busy "ワークツリーの作成先 $ew_dest が既にあり、ブランチ $ew_branch のものではありません（現在のブランチ：${ew_cur:-?}）。中を確かめ、要らなければ片付けてから打ち直してください。"
+		fail worktree-busy "ワークツリーの作成先 $ew_dest が既にあり、ブランチ $ew_branch のものではありません（現在のブランチ：${ew_cur:-?}）。中を確かめ、不要なら片付けてから再実行してください。"
 	fi
 	if [ -n "$ew_start" ]; then
 		cgit worktree add "$ew_dest" -b "$ew_branch" --no-track "$ew_start" ||
@@ -455,13 +455,13 @@ ensure_worktree() {
 		cgit fetch origin "$ew_branch" ||
 			fail fetch-failed "ブランチ $ew_branch を origin から取れなかった（上の出力を見てください）。"
 		ref_exists "refs/remotes/origin/$ew_branch" ||
-			fail branch-missing "ブランチ $ew_branch が手元にも origin にも無い。ホストにだけある MR の元ブランチ（消された後など）かもしれません。"
+			fail branch-missing "ブランチ $ew_branch が手元にも origin にもありません。ホストにだけある MR の元ブランチ（消された後など）かもしれません。"
 	fi
 	case "$ew_branch" in
 	*/*)
 		# 識別子は / を含まない（worktree.md）。識別子のブランチで切り、switch でそのブランチへ移る
 		if ref_exists "refs/heads/$ew_id"; then
-			fail identifier-exists "識別子のブランチ $ew_id が手元に既にある。要らなければ消してから、使うなら先にそのワークツリーを確かめてから打ち直してください。"
+			fail identifier-exists "識別子のブランチ $ew_id が手元に既にある。不要なら削除してから、使うなら先にそのワークツリーを確かめてから再実行してください。"
 		fi
 		if ref_exists "refs/heads/$ew_branch"; then
 			ew_from="refs/heads/$ew_branch"
@@ -564,7 +564,7 @@ report() {
 		;;
 	esac
 	if [ -n "$switched" ]; then
-		printf '案内: 名前に / を含むブランチなので、識別子 %s のブランチで切ってから switch で %s へ移した。識別子のブランチは手元に残る（要らなければユーザが消す）\n' "$(printf '%s' "$1" | tr '/' '-')" "$1"
+		printf '案内: 名前に / を含むブランチなので、識別子 %s のブランチで切ってから switch で %s へ移した。識別子のブランチは手元に残る（不要ならユーザが削除します）\n' "$(printf '%s' "$1" | tr '/' '-')" "$1"
 	fi
 }
 
@@ -638,7 +638,7 @@ if [ "$total" -eq 0 ]; then
 	if [ "$host_rc" -eq 0 ] && [ -z "$opt_title" ]; then
 		issue_title_get || issue_rc=$?
 		case "$issue_rc" in
-		2) fail issue-missing "issue #${number} が見つからない、または読む権限が無い（${issue_why}）。番号を確かめてください。" 2 ;;
+		2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。番号を確かめてください。" 2 ;;
 		3) fail issue-is-pr "#${number} は issue ではなく PR です。MR の番号なら --mr ${number} を使ってください。" 2 ;;
 		esac
 	fi
@@ -653,7 +653,7 @@ if [ "$total" -eq 0 ]; then
 				stop_host title "$(api_failed_reason)"
 			fi
 		fi
-		fail no-slug "issue の題から slug を作れない（ASCII の語が無い）。--slug <語> を付けて打ち直してください。" 2
+		fail no-slug "issue の題から slug を作れない（ASCII の語がありません）。--slug <語> を付けて再実行してください。" 2
 	fi
 	new_branch="${opt_prefix}-${number}-${slug}"
 	ccnavi_is_branch "$new_branch" || fail bad-branch "ブランチ名 ${new_branch} は使えない書き方です（--prefix・--slug を見直してください）。" 2
@@ -668,7 +668,7 @@ if [ "$total" -eq 0 ]; then
 		exit 0
 	fi
 	cgit fetch origin "$integration" || fail fetch-failed "統合先 ${integration} を origin から取れなかった（上の出力を見てください）。"
-	ref_exists "refs/remotes/origin/$integration" || fail no-origin-integration "origin/${integration} が無い。統合先の名前を確かめてください。"
+	ref_exists "refs/remotes/origin/$integration" || fail no-origin-integration "origin/${integration} がありません。統合先の名前を確かめてください。"
 	ensure_worktree "$new_branch" "origin/$integration"
 	ensure_initial_commit
 	ensure_push "$new_branch"
@@ -692,7 +692,7 @@ c_state=$(jq -r '[.candidates[0].mrs[]?.state][0] // ""' "$cand_json")
 if [ "$c_local" != true ] && [ "$c_origin" != true ] && [ "$c_mrs" -eq 0 ]; then
 	# どこにも実体が無い（チケットの提案だけ）。ユーザが決める
 	show_list
-	printf 'ccnavi-start: 候補 %s は、手元にも origin にも MR にも実体が無い（チケットの提案だけ）。何も作らずに止めた。ユーザに確かめてください。\n' "$cb"
+	printf 'ccnavi-start: 候補 %s は、手元にも origin にも MR にも実体がありません（チケットの提案だけ）。何も作らずに止めた。ユーザに確かめてください。\n' "$cb"
 	exit "$EXIT_MULTI"
 fi
 if [ "$c_local" != true ] && [ "$c_origin" != true ] && [ "$c_fork" -gt 0 ] && [ "$c_fork" -eq "$c_mrs" ]; then
@@ -717,7 +717,7 @@ if [ "$what" = issue ] && [ -z "$unchecked" ] && [ "$c_mrs" -eq 0 ]; then
 			c_subject=$(git log -1 --format=%s "$cref" 2>/dev/null || :)
 			if [ "$c_ahead" -eq 0 ]; then
 				show_list
-				printf 'ccnavi-start: 候補 %s は、統合先 %s より進んでおらず、開いた MR も無い（取り込み済みで消し忘れた古いブランチかもしれない）。何も作らずに止めた。ユーザに見せ、このブランチを使うか・新しく切るか・やめるかを聞いて、返事を待ってください。\n' "$cb" "$integration"
+				printf 'ccnavi-start: 候補 %s は、統合先 %s より進んでおらず、開いた MR もありません（取り込み済みで消し忘れた古いブランチかもしれない）。何も作らずに止めた。ユーザに見せ、このブランチを使うか・新しく切るか・やめるかを聞いて、返事を待ってください。\n' "$cb" "$integration"
 				log_info 古いブランチらしい -- "branch=$cb"
 				exit "$EXIT_MULTI"
 			fi

@@ -59,7 +59,7 @@ class TicketNewTest(PhaseHarness):
         self.assertIn("error 0 件", lint.stdout)
         # 提案について言う warn は「承認待ち」と「ワークツリーにチケットが無い」だけ。
         about = [x for x in lint.stdout.splitlines() if x.startswith("warn") and IDENT in x]
-        self.assertTrue(all("承認待ち" in x or "チケットが無い" in x for x in about), about)
+        self.assertTrue(all("承認待ち" in x or "チケットがありません" in x for x in about), about)
         verify = self.ccnavi("--agree", "--preview", "--verify")
         self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
 

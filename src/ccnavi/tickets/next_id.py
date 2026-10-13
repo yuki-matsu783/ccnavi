@@ -50,8 +50,8 @@ def identifier_problem(prefix: str, slug: str, serial: int, prefixes) -> str:
         return problem
     if len(ident) > ticket_ids.SUGGESTED_ID_LENGTH:
         return (
-            f"{ident} は {len(ident)} 文字で、勧める長さ（{ticket_ids.SUGGESTED_ID_LENGTH} 文字）を"
-            "超える。slug を短くする"
+            f"{ident} は {len(ident)} 文字で、推奨の長さ（{ticket_ids.SUGGESTED_ID_LENGTH} 文字）を"
+            "超えています。slug を短くしてください。"
         )
     return ""
 
@@ -69,7 +69,9 @@ def run(
         stdout.write(f"{serial}\n")
         return 0
     if len(args) != 2:
-        stderr.write("ccnavi: ticket next-id は引数なしか <先頭の語> <slug> の 2 つで打つ\n")
+        stderr.write(
+            "ccnavi: ticket next-id は引数なしか <先頭の語> <slug> の 2 つで実行します。\n"
+        )
         return 1
     prefix, slug = args
     problem = identifier_problem(prefix, slug, serial, conf.branch_prefixes)

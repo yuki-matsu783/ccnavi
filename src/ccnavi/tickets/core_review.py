@@ -65,7 +65,7 @@ def confirm(
     if parent is None:
         return core_base.refused(
             CODE_CONFIRM_NO_PARENT,
-            [f"ccnavi: 親 {parent_id} の承認済みチケットが作業中に無い"],
+            [f"ccnavi: 親 {parent_id} の承認済みチケットが作業中にありません。"],
         )
     # フェーズの引き方と「依頼し直す」案内の文面は review の非公開の関数を使う（手元の
     # confirm と同じ文面にするため。review の中だけの約束なので公開名にはしない）。
@@ -73,7 +73,7 @@ def confirm(
     if ph is None:
         return core_base.refused(
             CODE_CONFIRM_NO_PHASE,
-            [f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子が無い"],
+            [f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子がありません。"],
         )
     if approval_marks.MARK_REVIEWED in ph.marks:
         # 重ね打ちでマーカーと履歴を書き直さない（`_already_requested` と同じ文面の形）
@@ -83,7 +83,8 @@ def confirm(
     requested_mark = ph.marks.get(approval_marks.MARK_REQUESTED)
     if requested_mark is None:
         return core_base.refused(
-            CODE_CONFIRM_NOT_REQUESTED, ["ccnavi: 依頼の記録が無い。先に request してください"]
+            CODE_CONFIRM_NOT_REQUESTED,
+            ["ccnavi: 依頼の記録がありません。先に request してください"],
         )
     if changed_since_request:
         return core_base.refused(
@@ -195,17 +196,17 @@ def after_last_review(root: str, conf: settings.Settings, parent_id: str) -> str
     return "\n".join(
         [
             f"全部のフェーズのレビューが済み、親 {parent_id} を閉じられる。"
-            "ここから Draft を外すまでの流れ:",
+            "ここから Draft を解除するまでの流れ:",
             f"  1. '{ticket_sh} finish {parent_id}' で親を閉じる"
             "（取り込み済みの親子なら、finish が移動をコミットして push する。"
             "そうでなければ、移動をコミットして push する）。"
             "残っている子のワークツリーも片付く",
             f"  2. 親のワークツリーの外（ワークスペースルートなど）に出て、"
-            f"'{ops.ready_command(root, parent_id)}' で Draft を外す。"
-            "ready は閉じたチケットの記録と"
-            f" `{ticket_places.WIP_ROOT}/` の追跡済みのファイルを消してコミットし、push してから"
-            " Draft を外し、最後に親のワークツリーを消す"
-            "（中から --parent なしで打つと消さず、外に出てから打つコマンドを表示する）",
+            f"'{ops.ready_command(root, parent_id)}' で Draft を解除する。"
+            "ready はクローズ済みのチケットの記録と"
+            f" `{ticket_places.WIP_ROOT}/` の追跡済みのファイルを削除してコミットし、push してから"
+            " Draft を解除し、最後に親のワークツリーを削除します"
+            "（中から --parent なしで実行すると消さず、外に出てから実行するコマンドを表示する）",
             "  マージはユーザが squash で行う",
             f"  {ops.READY_FLOW_AGREED}",
         ]

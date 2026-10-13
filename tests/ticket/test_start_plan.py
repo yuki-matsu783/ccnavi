@@ -15,7 +15,7 @@ from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ticket_text
 from tests.ticketsample import child_text, parent_text
 
-HEAD = "子のない（子の提案も無い）フェーズがある"
+HEAD = "子のない（子の提案もありません）フェーズがある"
 
 
 class StartPlanTest(PhaseHarness):
@@ -98,6 +98,6 @@ class StartPlanTest(PhaseHarness):
         self.worktree("i0001-01-01", "i0001")
         refused = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertEqual(refused.returncode, 1, refused.stdout)
-        self.assertIn("子より先に親に着手してください", refused.stderr)
+        self.assertIn("子より先に親を開始してください", refused.stderr)
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
         self.assertEqual(self.ccnavi("ticket", "start", "i0001-01-01").returncode, 0)

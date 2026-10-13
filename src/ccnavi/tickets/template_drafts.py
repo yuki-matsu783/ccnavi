@@ -360,17 +360,19 @@ def make(conf: settings.Settings, root: str, parent: str, name: str = "") -> Mad
     if flow.linked(found.tree_root, directory):
         return Made(
             False,
-            error=f"下書きの置き場（{plan_templates.draft_dir_rel(conf)}/）の途中にリンクがあるので書かない",
+            error=f"下書きの置き場（{plan_templates.draft_dir_rel(conf)}/）の途中にリンクがあるので反映しません",
         )
     if os.path.lexists(place):
         rel = plan_templates.draft_rel(conf, name)
         return Made(
             False,
-            error=f"下書き {rel} が既に在る。上書きしない（別の --name を付けるか、先に消す）",
+            error=(
+                f"下書き {rel} が既に在る。上書きしない（別の --name を付けるか、先に削除します）"
+            ),
         )
     err = fsio.write_new_durable(place, plan_templates.dump(template).encode("utf-8"))
     if err:
-        return Made(False, error=f"下書きを書けない（{_line(err)}）")
+        return Made(False, error=f"下書きを保存できませんでした（{_line(err)}）")
     entry = plan_templates.read_entry(
         plan_templates.LAYER_DRAFT, found.tree_root, place, writable=True
     )
@@ -430,7 +432,7 @@ def close_notice(conf: settings.Settings, root: str, parent: str) -> str:
         "テンプレートにするなら、`ready` の前に "
         f"`ccnavi --templates --draft {parent}` で下書きを作る"
         "（ready で閉じると下書きの材料は退避されて拾えない）。"
-        "下書きは取り込むか消してから ready\n"
+        "下書きは取り込むか削除してから ready\n"
     )
 
 
@@ -488,7 +490,7 @@ def locate(conf: settings.Settings, root: str, ref: str) -> tuple[Draft | None, 
     hits = [d for d in found if d.name == name]
     if not hits:
         listed = ", ".join(sorted({d.name for d in found})) or "無い"
-        return None, f"下書き {name!r} は無い（{listed}）"
+        return None, f"下書き {name!r} はありません（{listed}）"
     if len(hits) > 1:
         paths = ", ".join(f"{tree_label(d.tree.name)}:{d.rel}" for d in hits)
         return None, f"下書き {name!r} が中身の違う形で複数ある（{paths}）。パスで指す"
@@ -503,7 +505,7 @@ def _target(conf: settings.Settings, root: str, to: str, layer: str, plan: Impor
             return "--layer は --to project のときだけ使う"
         if not plan_templates.common_writable(conf, root):
             return (
-                "共通レイヤーの置き場はミラー（共通レイヤーの写し）なので書かない。"
+                "共通レイヤーの置き場はミラー（共通レイヤーの写し）なので反映しません。"
                 "ワークスペースルートで取り込む"
             )
         directory = settings.common_templates_dir(conf, root)
@@ -513,7 +515,7 @@ def _target(conf: settings.Settings, root: str, to: str, layer: str, plan: Impor
         layer = layer or plan_templates.LAYER_SELF
         views = {view.name: view for view in ruleload.layers(conf, root)}
         if layer not in views:
-            return f"レイヤー {layer!r} は無い（{' / '.join(views)}）"
+            return f"レイヤー {layer!r} はありません（{' / '.join(views)}）"
         directory = settings.layer_templates_dir(conf, views[layer].home)
         plan.layer = layer
         plan.base = views[layer].home
@@ -581,7 +583,7 @@ def prepare(
             )
         ]
         if not plan.diff:
-            plan.infos.append("取り込み先と同じ中身（差分は無い）")
+            plan.infos.append("取り込み先と同じ中身（差分はありません）")
     # 見せる本文。書く中身は `raw`（バイト列）で、ここは変えない。
     plan.new_text = plan_templates.reveal(new_raw)
     plan.old_text = plan_templates.reveal(plan.old_text)
@@ -593,12 +595,12 @@ def _existing(plan: ImportPlan, root: str) -> None:
     if flow.linked(plan.base, os.path.dirname(plan.target)):
         plan.errors.append(
             f"取り込み先の置き場（{plan_templates.relative(root, os.path.dirname(plan.target))}）の"
-            "途中にリンクがあるので書かない"
+            "途中にリンクがあるので反映しません"
         )
         return
     if not os.path.lexists(plan.target):
         if plan.replace:
-            plan.infos.append("置き換える相手は無い（新規として置く）")
+            plan.infos.append("置き換える相手はありません（新規として置く）")
         return
     plan.exists = True
     raw, why = flow.read_bytes(plan.target, plan.base)
@@ -695,14 +697,17 @@ def commit(plan: ImportPlan, expect: str) -> Imported:
     if not expect:
         return Imported(
             False,
-            errors=["--yes には --expect <下書きのハッシュ> が要る（見せた下書きを取り込むため）"],
+            errors=[
+                "--yes には --expect <下書きのハッシュ> を指定してください"
+                "（見せた下書きを取り込むため）"
+            ],
         )
     if expect != plan.sha:
         return Imported(
             False,
             errors=[
                 "--expect が下書きの今の中身のハッシュと違う（見せたあとに下書きが書き直された）。"
-                f"何も書かない。今のハッシュ: {plan.sha}。差分を見直す"
+                f"何も反映しません。今のハッシュ: {plan.sha}。差分を見直す"
             ],
         )
     if plan.exists:
@@ -710,7 +715,7 @@ def commit(plan: ImportPlan, expect: str) -> Imported:
     else:
         err = fsio.write_new_durable(plan.target, plan.raw)
     if err:
-        return Imported(False, errors=[f"{plan.target_rel} を書けない（{_line(err)}）"])
+        return Imported(False, errors=[f"{plan.target_rel} を保存できませんでした（{_line(err)}）"])
     # 書いたものを読み直す。読めない・違うなら、下書きは消さない。
     raw, why = flow.read_bytes(plan.target, plan.base)
     if raw is None or plan_templates.digest(raw) != plan.sha:
@@ -718,8 +723,9 @@ def commit(plan: ImportPlan, expect: str) -> Imported:
             False,
             written=True,
             errors=[
-                f"{plan.target_rel} を書いたが、読み直すと取り込んだ中身と違う（{why or '内容'}）。"
-                "下書きは消していない"
+                f"{plan.target_rel} を保存したが、読み直すと取り込んだ中身と違う（{why or '内容'}）"
+                "。"
+                "下書きは削除していません。"
             ],
         )
     done = Imported(True, written=True)
@@ -733,19 +739,19 @@ def _remove_draft(plan: ImportPlan, done: Imported) -> None:
     assert draft is not None
     raw, why = flow.read_bytes(draft.path, draft.tree.root)
     if raw is None:
-        done.kept = f"下書きを読めないので消していない（{why}）"
+        done.kept = f"下書きを読めないので削除していません（{why}）"
         return
     if plan_templates.digest(raw) != plan.sha:
-        done.kept = "取り込んだあとに下書きが書き直されているので消していない"
+        done.kept = "取り込んだあとに下書きが書き直されているので削除していません。"
         return
     err = fsio.unlink(draft.path)
     if err:
-        done.kept = f"下書きを消せなかった（{_line(err)}）"
+        done.kept = f"下書きを削除できませんでした（{_line(err)}）"
         return
     done.removed = True
     if draft.also:
         others = ", ".join(tree_label(name) for name in draft.also)
-        done.infos.append(f"同じ中身の下書きがほかのツリー（{others}）にも在る。消していない")
+        done.infos.append(f"同じ中身の下書きがほかのツリー（{others}）にも在る。削除していません。")
 
 
 def plan_json(plan: ImportPlan, result: Imported | None = None) -> dict:

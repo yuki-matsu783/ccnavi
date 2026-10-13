@@ -58,7 +58,7 @@ sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--offline] [--from-origin] [--dr
 
 fetch・遅れの確認・起点の選択・worktree add を順に行う。遅れていれば origin/<統合先> から --no-track で切る。
 ワークツリーが既にあれば、パスを出すだけ（冪等）。origin に届かないときは終了コード 4 で止まり、次の手を出す。
-終了コード: 0 完了 / 1 前提の未充足か worktree add の拒否 / 2 引数か環境の誤り / 4 origin に届かず案内の手が要る
+終了コード: 0 完了 / 1 前提の未充足か worktree add の拒否 / 2 引数か環境の誤り / 4 origin に届かず案内の手が必要です
 USAGE
 }
 
@@ -109,7 +109,7 @@ root=$(ccnavi_workspace) ||
 ccnavi_log_root="$root"
 top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 [ -n "$top" ] ||
-	fail not-git "cwd が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で打ってください。"
+	fail not-git "cwd が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で実行してください。"
 scripts="$root/.ccnavi/scripts"
 dest="$root/.claude/worktrees/$name"
 integ=$(ccnavi_integration "$(ccnavi_phys "$top")" "$root") || integ=""
@@ -132,13 +132,13 @@ if [ -e "$dest" ] || [ -L "$dest" ]; then
 		/^worktree / { p = substr($0, 10) }
 		/^branch / { if (p == want) print substr($0, 8) }')
 	[ "$have" = "refs/heads/$name" ] ||
-		fail dest-exists "${dest} は既にありますが、ブランチ ${name} を開いているこのリポジトリのワークツリーではありません（${have:-ワークツリーの登録が無い}）。中身を確かめ、要らなければユーザに確かめてから片付け、別の名前で打ち直してください。"
+		fail dest-exists "${dest} は既にありますが、ブランチ ${name} を開いているこのリポジトリのワークツリーではありません（${have:-ワークツリーの登録が無い}）。中身を確かめ、不要ならユーザに確かめてから片付け、別の名前で再実行してください。"
 	printf 'ワークツリーは既にある: %s\n' "$dest"
 	log_info 既にある -- "name=$name"
 	exit 0
 fi
 if git show-ref --verify --quiet "refs/heads/$name"; then
-	fail branch-exists "ブランチ ${name} が既にあります（ワークツリーは無い）。既にあるブランチを出すなら ccnavi-git.sh worktree add .claude/worktrees/${name} ${name}、新しく切るなら別の名前にしてください。"
+	fail branch-exists "ブランチ ${name} が既にあります（ワークツリーはありません）。既にあるブランチを出すなら ccnavi-git.sh worktree add .claude/worktrees/${name} ${name}、新しく切るなら別の名前にしてください。"
 fi
 
 # ---- 起点を決める。遅れていれば origin/<統合先>、遅れていなければ <統合先>。
@@ -181,7 +181,7 @@ diverged_guard() {
 		return 0
 	fi
 	if [ -n "$from_origin" ]; then
-		diverged_note="手元の ${integ} は origin/${integ} と分岐している（先行 ${ahead} 件・遅れ ${behind} 件）が、--from-origin で origin/${integ} から切った。手元にだけある先行 ${ahead} 件を、このブランチは知らない。統合（integrate）で詰まるので、先に手元の ${integ} を origin/${integ} に揃えるようユーザに頼む。詰まって取り込みの印（.git/ccnavi-integrate/<名前>/marker）が残ったときも、ユーザが手元の ${integ} を揃えてから打ち直す。"
+		diverged_note="手元の ${integ} は origin/${integ} と分岐している（先行 ${ahead} 件・遅れ ${behind} 件）が、--from-origin で origin/${integ} から切った。手元にだけある先行 ${ahead} 件を、このブランチは知らない。統合（integrate）で詰まるので、先に手元の ${integ} を origin/${integ} に揃えるようユーザに頼む。詰まって取り込みの印（.git/ccnavi-integrate/<名前>/marker）が残ったときも、ユーザが手元の ${integ} を揃えてから再実行します。"
 		return 0
 	fi
 	log_info 分岐で止めた -- "integration=$integ" "ahead=$ahead" "behind=$behind"
@@ -189,8 +189,8 @@ diverged_guard() {
 	printf 'このまま origin/%s から切ると、手元にだけある先行 %s 件を知らないブランチになり、統合（integrate）で詰まる。\n' "$integ" "$ahead"
 	printf '次の手:\n'
 	printf '  1. 先に手元の %s を origin/%s に揃える。ccnavi は手元の統合先を進めないので、ユーザに頼む（先行分を push するか、別のブランチに退避してから揃える）\n' "$integ" "$integ"
-	printf '  2. 揃えたら同じコマンドを打ち直す: sh %s/ccnavi-worktree.sh %s\n' "$scripts" "$name"
-	printf '  3. 先行分が要らない・承知のうえなら --from-origin を付けて打ち直す（警告つきで origin/%s から切る）\n' "$integ"
+	printf '  2. 揃えたら同じコマンドを再実行する: sh %s/ccnavi-worktree.sh %s\n' "$scripts" "$name"
+	printf '  3. 先行分が不要・承知のうえなら --from-origin を付けて再実行します（警告つきで origin/%s から切る）\n' "$integ"
 	exit 1
 }
 diverged_note=""
@@ -215,13 +215,13 @@ if ! cgit fetch origin "$integ"; then
 		printf 'ワークツリーは切っていない。origin から統合先 %s を取れなかった（上の出力に原因が出ている。ネットワーク・認証・origin の設定のどれか）。\n' "$integ"
 		case "$cgit_out" in
 		*"couldn't find remote ref"*)
-			printf '注意: origin に統合先 %s が無い（名前の誤りか、統合先の設定の誤り）。--offline で切ると古い手元の統合先から切るので、先に名前を確かめる（CCNAVI_INTEGRATION_BRANCH）。\n' "$integ"
+			printf '注意: origin に統合先 %s がありません（名前の誤りか、統合先の設定の誤り）。--offline で切ると古い手元の統合先から切るので、先に名前を確かめる（CCNAVI_INTEGRATION_BRANCH）。\n' "$integ"
 			;;
 		esac
 		printf '次の手:\n'
-		printf '  1. 原因を直せるなら直して、同じコマンドを打ち直す: sh %s/ccnavi-worktree.sh %s\n' "$scripts" "$name"
-		printf '     認証や origin の設定が要るときは、ユーザに頼む（ccnavi は git config を通さない）\n'
-		printf '  2. 直せない・オフラインで続けるなら --offline を付けて打ち直す: sh %s/ccnavi-worktree.sh %s --offline\n' "$scripts" "$name"
+		printf '  1. 原因を直せるなら直して、同じコマンドを再実行する: sh %s/ccnavi-worktree.sh %s\n' "$scripts" "$name"
+		printf '     認証や origin の設定が必要なときは、ユーザに頼む（ccnavi は git config を通さない）\n'
+		printf '  2. 直せない・オフラインで続けるなら --offline を付けて再実行する: sh %s/ccnavi-worktree.sh %s --offline\n' "$scripts" "$name"
 		printf '     手元の %s から切る。origin が古いかもしれないので、切ったことをユーザに伝える\n' "$integ"
 		exit "$EXIT_NET"
 	fi

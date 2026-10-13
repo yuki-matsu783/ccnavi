@@ -124,7 +124,7 @@ def scope_findings(
     """
     worktree = tree.worktree_path(root, child.ticket)
     if not os.path.isdir(worktree):
-        return [], "ワークツリーが無い"
+        return [], "ワークツリーがありません。"
     # NUL 区切りで読む。既定の出力は非 ASCII と空白を含むパスを引用符で囲んで 8 進で
     # エスケープするので、そのまま照らし合わせると範囲の中の日本語のファイルが必ず範囲外になる。
     #

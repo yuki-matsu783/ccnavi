@@ -188,7 +188,7 @@ def run(
     """
 
     def refuse(why: str) -> int:
-        stderr.write(f"ccnavi: ticket new: {why}。何も書かない\n")
+        stderr.write(f"ccnavi: ticket new: {why}。何も反映しません。\n")
         return EXIT_ERROR
 
     problem = ticket_ids.id_problem(ident)
@@ -200,7 +200,7 @@ def run(
             "子の提案は手で書く（設計 9.3）"
         )
     if not (title or "").strip():
-        return refuse("--title <題> が要る")
+        return refuse("--title <題> が必要です")
     if any(unicodedata.category(ch) in ("Cc", "Zl", "Zp") for ch in title):
         return refuse("--title に改行や制御文字は使えない")
     if issue is not None and issue <= 0:
@@ -227,7 +227,7 @@ def run(
             f"cwd が .claude/worktrees/{ident} の中ではない。"
             "提案は識別子と同名のワークツリーに書く。"
             f"先に '{git_sh} worktree add {tree.worktree_path(root, ident)}"
-            f" -b {ident} <統合先>' で切り、そのワークツリーの中から打つ"
+            f" -b {ident} <統合先>' で切り、そのワークツリーの中から実行します。"
         )
 
     types = phasetypes.load_types(conf, root, where.project)
@@ -235,7 +235,7 @@ def run(
         return refuse(
             f"フェーズ定義（{where.project or '自身'} のレイヤーの phases.yml）が無いか読めない。"
             "plan の型の定義を読めず、承認の検査を通る plan と写し（phases:）を作れない"
-            "（設計 9.7）。phases.yml を用意してから打つ"
+            "（設計 9.7）。phases.yml を用意してから実行します。"
         )
     used: _Used | None = None
     if template:
@@ -247,7 +247,7 @@ def run(
         unknown = [n for n in dict.fromkeys(plan) if n not in types]
         if unknown:
             return refuse(
-                f"plan の型 {', '.join(unknown)} が phases.yml に無い。使える型: "
+                f"plan の型 {', '.join(unknown)} が phases.yml にありません。使える型: "
                 + ", ".join(n for n, t in types.items() if t.kind == phasetypes.KIND_WORK)
             )
         feedback = [n for n in dict.fromkeys(plan) if types[n].kind != phasetypes.KIND_WORK]
@@ -262,7 +262,8 @@ def run(
     if not allow:
         return refuse(
             f"plan の型（{', '.join(inherited)}）が scope: inherit だけで、allow に書く範囲が"
-            "集まらない。allow か ask が 1 件は要る（設計 9.3）。範囲を持つ型を plan に足す"
+            "集まらない。allow か ask が 1 件は必要です（設計 9.3）。範囲を持つ型を plan"
+            " に追加します。"
         )
     if len(allow) > ticket_mod.MAX_SCOPE_ENTRIES:
         return refuse(
@@ -294,7 +295,7 @@ def run(
         text = render_items(ident, title.strip(), used.plan, used.feedback, allow, issue)
     failed = fsio.write_new_durable(path, text.encode("utf-8"))
     if failed:
-        return refuse(f"{path} に書けない（{failed}）")
+        return refuse(f"{path} に保存できませんでした（{failed}）")
 
     # 写し（phases:）を差し込む。無いと --agree が「項の定義が写しに無い」で落ちる。
     target, _ = ticket_mod.load(path)
@@ -312,7 +313,7 @@ def run(
         problem = _agree_problem(conf, root, path, where.project)
         if problem:
             fsio.remove(path)
-            return refuse(f"テンプレートから作った提案が承認の検査を通らない（{problem}）")
+            return refuse(f"テンプレートから作った提案が承認の検査に合格しない（{problem}）")
         failed = _write_flows(conf, where.root, used, written)
         if failed:
             for rolled in written:
@@ -330,9 +331,10 @@ def run(
         stdout.write(f"  {ALLOW_MATCH} {glob}\n")
     tail = "並行させたい項は after を直す。" if used is None else "計画の項と文の固有名を直す。"
     stdout.write(
-        f"次にやること: rationale と本文を書き、allow を実際の作業に合わせて絞る・足す。{tail}"
+        "次にやること: rationale と本文を記載し、allow を実際の作業に合わせて絞る"
+        f"・追加してください。{tail}"
         "plan を変えたら "
-        f"'ccnavi --plan-order {ident} --fill-phases' で phases: を打ち直す。"
+        f"'ccnavi --plan-order {ident} --fill-phases' で phases: を再実行します。"
         "'ccnavi --lint' で確かめてから、承認をユーザに頼む\n"
     )
     return EXIT_OK
@@ -375,9 +377,9 @@ def _from_template(
     missing = [n for n in dict.fromkeys(i.type for i in plan + feedback) if n not in types]
     if missing:
         return None, (
-            f"テンプレート {name!r} の項の定義 {', '.join(missing)} が phases.yml に無い"
+            f"テンプレート {name!r} の項の定義 {', '.join(missing)} が phases.yml にありません"
             f"（{where.project or '自身'} のレイヤー）。テンプレートを直すか、"
-            "ユーザに phases.yml へ足してもらう"
+            "ユーザに phases.yml へ追加してもらう"
         )
     for key, items, kind in (
         ("plan", plan, phasetypes.KIND_WORK),
@@ -405,7 +407,7 @@ def _flow_clash(conf: settings.Settings, top: str, used: _Used) -> str:
     directory = os.path.dirname(flow.draft_file(conf, top, used.drafts[0][0]))
     if flow.linked(top, directory):
         place = f"{flow.tickets_rel(conf)}/{flow.FLOWS_DIR}"
-        return f"フロー下書きの置き場（{place}/）の途中にリンクがあるので書かない"
+        return f"フロー下書きの置き場（{place}/）の途中にリンクがあるので反映しません"
     for child, _, _ in used.drafts:
         draft = flow.draft_file(conf, top, child)
         if os.path.lexists(draft):
@@ -428,7 +430,7 @@ def _write_flows(conf: settings.Settings, top: str, used: _Used, written: list[s
             return f"{os.path.dirname(place)} を作れない（{exc}）"
         failed = fsio.write_new_durable(place, text.encode("utf-8"))
         if failed:
-            return f"フロー下書き {flow.draft_rel(conf, child)} に書けない（{failed}）"
+            return f"フロー下書き {flow.draft_rel(conf, child)} に保存できませんでした（{failed}）"
         written.append(place)
     return ""
 
@@ -470,8 +472,8 @@ def _report(stdout: TextIO, ident: str, path: str, used: _Used, written: list[st
     elif used.skipped_feedback:
         stdout.write(
             f"テンプレートにはフィードバック計画（{used.skipped_feedback} 項）がある。"
-            "全体計画のレビューを見てから足すなら、`--with-feedback` を付けて作り直すか、"
-            "提案を改版で足す\n"
+            "全体計画のレビューを見てから追加するなら、`--with-feedback` を付けて作り直すか、"
+            "提案を改版で追加します。\n"
         )
     for note in found.notes:
         stdout.write(f"note: {note}\n")
@@ -482,12 +484,12 @@ def _report(stdout: TextIO, ident: str, path: str, used: _Used, written: list[st
         for (child, index, _), place in zip(used.drafts, written, strict=True):
             stdout.write(f"  計画の {index} 番目 -> {child}: {place}\n")
         stdout.write(
-            "下書きには効力が無い。フローの文は子への案内文になるので、ユーザがフロー編集画面で"
+            "下書きには効力がありません。フローの文は子への案内文になるので、ユーザがフロー編集画面で"
             "読んで取り込むまで効かない。子の識別子は各フェーズの最初の子"
             f"（{ident}-<NN>-01）と仮定した。別の連番で子を起こすなら下書きの名前を合わせる\n"
         )
     else:
-        stdout.write("フローの下書きは無い（テンプレートに flows が無い）\n")
+        stdout.write("フローの下書きはありません（テンプレートに flows がありません）\n")
 
 
 def _existing(conf: settings.Settings, top: str, ident: str) -> str:

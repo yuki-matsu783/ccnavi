@@ -45,7 +45,7 @@ sh .ccnavi/scripts/ccnavi-branches.sh (--issue <番号> | --mr <番号>) [--json
   --mr <番号>     その MR の元ブランチ
   各候補には、チェックアウトしているワークツリーと結び付くチケットを添える。
   ホストに繋げないときは手元の候補だけを出し、「ホストは見ていない」と書く。
-  cwd のリポジトリを見る。プロジェクトの issue・MR は projects/<名前>/ に cd してから打つ。
+  cwd のリポジトリを見る。プロジェクトの issue・MR は projects/<名前>/ に cd してから実行します。
 USAGE
 }
 
@@ -89,7 +89,7 @@ root=$(ccnavi_workspace) ||
 ccnavi_log_root="$root"
 here="$(pwd -W 2>/dev/null || pwd)"
 git rev-parse --show-toplevel >/dev/null 2>&1 ||
-	fail not-git "cwd（${here}）が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で打ってください。"
+	fail not-git "cwd（${here}）が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で実行してください。"
 state="$root/logs/state" # 固定
 mkdir -p "$state" 2>/dev/null || fail no-state "state の置き場（${state}）を作れません。" 2
 result="$state/branches-host-$$.json"
@@ -103,7 +103,7 @@ if bin=$(ccnavi_bin "$root"); then
 elif [ -f "$root/src/ccnavi/__main__.py" ]; then
 	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$here" "$@"); }
 else
-	fail no-bin "ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
+	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
 fi
 
 # ---- ホスト。読めなければ理由を書いて、手元の候補だけにする。
@@ -180,7 +180,7 @@ gitlab_issue() {
 look_at_host() {
 	origin=$(git remote get-url origin 2>/dev/null || :)
 	if [ -z "$origin" ]; then
-		unchecked "origin が無い" no-origin
+		unchecked "origin がありません" no-origin
 		return 0
 	fi
 	origin_shown=$(ccnavi_mask_url "$origin")
@@ -193,15 +193,15 @@ look_at_host() {
 	case "$connect_rc" in
 	0) ;;
 	3)
-		unchecked "jq が無い" no-jq
+		unchecked "jq がありません" no-jq
 		return 0
 		;;
 	4)
-		unchecked "$ccnavi_h_cli_name が $ccnavi_h_host で使えず（未導入か未認証）、curl に付ける $ccnavi_h_token_name も無い" no-transport-token
+		unchecked "$ccnavi_h_cli_name が $ccnavi_h_host で使えず（未導入か未認証）、curl に付ける $ccnavi_h_token_name もありません" no-transport-token
 		return 0
 		;;
 	*)
-		unchecked "$ccnavi_h_cli_name が $ccnavi_h_host で使えず、curl も無い" no-transport
+		unchecked "$ccnavi_h_cli_name が $ccnavi_h_host で使えず、curl もありません" no-transport
 		return 0
 		;;
 	esac
@@ -224,5 +224,5 @@ look_at_host
 # ---- 手元の候補と合わせて出す（実行ファイル）。
 set -- branches "$kind" "$number" --result "$result"
 [ -z "$json" ] || set -- "$@" --json
-ccnavi "$@" || fail exe-failed "実行ファイルが候補を出せなかった（上の文面を見てください。古い実行ファイルは branches を知らないので、組み立て直すか配り直してください）。" 1
+ccnavi "$@" || fail exe-failed "実行ファイルが候補を出せなかった（上の文面を見てください。古い実行ファイルは branches に未対応なので、組み立て直すか配り直してください）。" 1
 log_info 候補を出した -- "kind=$kind"

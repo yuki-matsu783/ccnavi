@@ -57,7 +57,7 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     // 対象にしないのは形の正しくない子（計画に無い番号）。計画の図の見出し（`.plan-graph h3`）は数えない
     assert.deepEqual(texts(page, ".approval > h3"), ["承認対象外の提案"]);
     assert.ok(text(page, ".approval-rejected").includes("i0001-05-05"));
-    assert.ok(text(page, ".approval-rejected").includes("計画に無い"));
+    assert.ok(text(page, ".approval-rejected").includes("計画にありません"));
     assert.equal(page.all(".approval-problems").length, 0);
   } finally {
     await page.close();

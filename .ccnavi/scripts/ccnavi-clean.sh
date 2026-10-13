@@ -41,13 +41,13 @@ sh .ccnavi/scripts/ccnavi-clean.sh <名前> [--dry-run]
 sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>
 
   <名前>      .claude/worktrees/ の直下の名前。パスは書けない
-  --dry-run   消すものを並べるだけで、消さない
-  --worktree  生成物を消してから、ワークツリーそのものも消す（git worktree remove。--force なし）。
-              cwd がその中なら消さない。ブランチは残す。このときの <名前> はチケットの識別子
+  --dry-run   削除するものを並べるだけで、削除しない
+  --worktree  生成物を削除してから、ワークツリーそのものも削除します（git worktree remove。--force なし）。
+              cwd がその中なら削除しません。ブランチは残す。このときの <名前> はチケットの識別子
               （.claude/worktrees/<識別子>）だけを受ける。識別子の形でない名前は断る
 
-消すもの: node_modules / .venv / __pycache__ / .pytest_cache / .ruff_cache と、package.json の隣の out
-未コミットの変更があるワークツリーでは、何も消さずに止まる
+削除するもの: node_modules / .venv / __pycache__ / .pytest_cache / .ruff_cache と、package.json の隣の out
+未コミットの変更があるワークツリーでは、何も削除せずに止まる
 USAGE
 }
 
@@ -67,7 +67,7 @@ for arg in "$@"; do
 		whole=1
 		;;
 	-*)
-		printf 'ccnavi-clean: %s は通しません。使えるのは --dry-run と --worktree だけです。\n' "$arg" >&2
+		printf 'ccnavi-clean: %s は使用できません。使えるのは --dry-run と --worktree だけです。\n' "$arg" >&2
 		exit 2
 		;;
 	*)
@@ -101,7 +101,7 @@ root=$(ccnavi_workspace) || {
 # 生成物の掃除・worktree remove）。見つからなければソース（ccnavi のリポジトリ）で動かす。
 if [ -n "$whole" ]; then
 	if [ -n "$dry" ]; then
-		printf 'ccnavi-clean: --worktree と --dry-run は一緒に使えません（消すものを見るだけなら --dry-run だけで打つ）。\n' >&2
+		printf 'ccnavi-clean: --worktree と --dry-run は一緒に使えません（削除するものを見るだけなら --dry-run だけで実行します）。\n' >&2
 		exit 2
 	fi
 	here="$(pwd -W 2>/dev/null || pwd)"
@@ -111,7 +111,7 @@ if [ -n "$whole" ]; then
 		cd "$root"
 		exec uv run python -m ccnavi --root "$root" --cwd "$here" worktree drop "$name"
 	fi
-	printf 'ccnavi-clean: ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
+	printf 'ccnavi-clean: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
 fi
 
@@ -137,7 +137,7 @@ if [ -e "$target/.git" ]; then
 			exit 1
 		fi
 	else
-		printf 'ccnavi-clean: %s は git の登録が残っていないので、消しきれなかったディレクトリとして扱います（未コミットの変更は確かめていません）。\n' "$name" >&2
+		printf 'ccnavi-clean: %s は git の登録が残っていないので、削除しきれなかったディレクトリとして扱います（未コミットの変更は確かめていません）。\n' "$name" >&2
 	fi
 fi
 
@@ -165,7 +165,7 @@ clean_with_sh() {
 		return 1
 	}
 	if [ -n "$cw_odd" ]; then
-		printf 'ccnavi-clean: 名前に改行を含むものがあるので、sh では何も消しません。node を入れて打ち直してください。\n' >&2
+		printf 'ccnavi-clean: 名前に改行を含むものがあるので、sh では何も消しません。node を入れて再実行してください。\n' >&2
 		return 1
 	fi
 
@@ -225,7 +225,7 @@ $cw_found
 EOF
 
 	if [ -z "$cw_targets" ]; then
-		printf '消すものはありません（%s）\n' "$cw_top"
+		printf '削除するものはありません（%s）\n' "$cw_top"
 		return 0
 	fi
 
@@ -249,7 +249,7 @@ EOF
 		if [ -e "$cw_top/$cw_rel" ] || [ -L "$cw_top/$cw_rel" ]; then
 			cw_failed=1
 			cw_err=$(printf '%s\n' "$cw_err" | head -n 1)
-			printf '消せなかった: %s (%s)\n' "$cw_rel" "${cw_err:-残った}" >&2
+			printf '削除できなかった: %s (%s)\n' "$cw_rel" "${cw_err:-残った}" >&2
 		else
 			printf 'removed %s\n' "$cw_rel"
 		fi
@@ -258,7 +258,7 @@ $cw_targets
 EOF
 
 	if [ -n "$cw_failed" ]; then
-		printf 'ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）はどのワークツリーからも消せません。テストが終わるのを待って打ち直すか、ディレクトリごと mv で .claude/worktrees/ の外へ出してください（README.md の「実測で分かった落とし穴」）。\n' >&2
+		printf 'ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）はどのワークツリーからも削除できません。テストが終わるのを待って再実行するか、ディレクトリごと mv で .claude/worktrees/ の外へ出してください（README.md の「実測で分かった落とし穴」）。\n' >&2
 		return 1
 	fi
 	return 0

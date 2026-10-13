@@ -46,7 +46,7 @@ test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・
   // 対象にしないのは形の正しくない子（計画に無い番号）だけ。
   assert.equal(preview.rejected.length, 1);
   assert.equal(preview.rejected[0].ticket, "i0001-05-05");
-  assert.ok(preview.rejected[0].problems[0].includes("計画に無い"));
+  assert.ok(preview.rejected[0].problems[0].includes("計画にありません"));
   assert.deepEqual(preview.problems, []);
 });
 

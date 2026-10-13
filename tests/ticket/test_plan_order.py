@@ -451,7 +451,7 @@ class PlanOrderWriteTest(PlanOrderHarness):
         self.propose("i0001", text)
         result = self.write_order(REVERSE)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("書かない", result.stderr)
+        self.assertIn("何も反映しません", result.stderr)
         self.assertEqual(self.read(), text)
 
     def test_the_written_proposal_is_approved_and_the_old_digest_is_not(self):

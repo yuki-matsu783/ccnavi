@@ -98,7 +98,7 @@ def approve(
     if gathered.refused:
         return 1
     if gathered.nothing_pending:
-        stdout.write("承認待ちのチケットは無い。\n")
+        stdout.write("承認待ちのチケットはありません。\n")
         # 読めない提案があったなら、その旨は標準エラーに出ている。承認するものが
         # 無いのは正常だが、不正な提案を「何も無い」で通す形にはしない。
         return 1 if gathered.broken else 0
@@ -256,7 +256,7 @@ def approve_yes(
             core_base.tagged(
                 CODE_APPROVE_NO_DIGEST,
                 "ccnavi: --yes には --digest（見せた承認画面の本文・判定が読んだ中身・"
-                "承認済みチケットに書き込む中身のダイジェスト）が要る",
+                "承認済みチケットに書き込む中身のダイジェスト）が必要です",
             )
             + "\n"
         )
@@ -295,7 +295,9 @@ def approve_yes(
             )
         return 1
     if not gathered.batch:
-        stderr.write(core_base.tagged(CODE_APPROVE_NOTHING, "ccnavi: 承認するものが無い") + "\n")
+        stderr.write(
+            core_base.tagged(CODE_APPROVE_NOTHING, "ccnavi: 承認するものがありません。") + "\n"
+        )
         return 1
 
     lines = io.StringIO()

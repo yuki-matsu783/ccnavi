@@ -81,8 +81,8 @@ STATES = (STATE_PRESENT, STATE_CLOSED, STATE_GONE, STATE_BLOCKED)
 
 _LINKED = "取り込み状態の途中にシンボリックリンクがある（辿らない）"
 _NOT_DIR = "統合先の取り込み結果がディレクトリでない（リンクは辿らない）"
-_MISSING = "統合先の取り込み結果が無い（まだ取り込んでいないか、書けなかった）"
-_NO_HEAD = "統合先の取り込み結果に head が無い"
+_MISSING = "統合先の取り込み結果がありません（まだ取り込んでいないか、保存できませんでした）"
+_NO_HEAD = "統合先の取り込み結果に head がありません。"
 _SWAPPING = "統合先の取り込み結果の入れ替えが終わらない"
 # 入れ替えの一瞬を待つ回数と間隔（秒）。合わせて 0.25 秒ほど。
 _RETRIES = 5
@@ -687,7 +687,7 @@ class Families:
         elif record.state == STATE_GONE:
             stop = (
                 f"親のブランチ {record.branch or branch} がリモートに無く、"
-                "統合先にも閉じた記録が無い（取り込み状態が gone）。"
+                "統合先にもクローズ済みの記録がありません（取り込み状態が gone）。"
                 "この親子のチケットの状態を決められない"
             )
         elif record.state == STATE_BLOCKED:
@@ -696,7 +696,7 @@ class Families:
         elif self.branch_refusal(family_id, branch, project):
             stop = (
                 f"{self.branch_refusal(family_id, branch, project)}。承認済みの親チケットの "
-                "branch: が検査を通らないので、この親子のチケットの親のブランチが決まらない"
+                "branch: が検査に合格しないので、この親子のチケットの親のブランチが決まらない"
             )
         elif (
             record.branch == family_id
@@ -733,7 +733,7 @@ class Families:
                 )
             else:
                 stop = (
-                    f"親のワークツリー（{where}）が無い。"
+                    f"親のワークツリー（{where}）がありません。"
                     "取り込み済みの親子のチケットでどのチケットを正とするかが決まらない"
                     "（取り込み状態は、親のワークツリーを片付けても残る）"
                 )
@@ -898,41 +898,42 @@ def guidance(root: str, st: Standing) -> list[str]:
     branch = st.branch_name
     if st.closed:
         return [
-            f"親子のチケット {name} は閉じている。状態の操作は無い。親のワークツリーは片付けてよい"
+            f"親子のチケット {name} は閉じている。状態の操作はありません。"
+            "親のワークツリーは片付けてよい"
         ]
     record = st.record
     if record is not None and record.broken:
         return [
             f"取り込み状態（{record.path}）の中身をユーザが確かめてください。"
             f"破損していればユーザが '{sync} --forget {name}' で"
-            f"消してから、オンラインで '{sync} {name}' を打ち直してください",
+            f"削除してから、オンラインで '{sync} {name}' を再実行してください",
         ]
     if record is not None and record.state == STATE_GONE:
         return [
-            f"オンラインで '{sync} {name}' を打つと戻し方が出る。改名・消し間違いならユーザに"
+            f"オンラインで '{sync} {name}' を実行すると戻し方が出る。改名・消し間違いならユーザに"
             f"元の名前 {branch} でブランチを戻してもらい、オンラインで '{sync} {name}' を"
-            "打ち直してください",
+            "再実行してください",
             f"親子のチケットを捨てたなら、親のワークツリーを片付けて（'{git} worktree remove "
             f".claude/worktrees/{name}'）、ユーザに '{sync} --forget {name}' で"
-            "親子のチケットの取り込み状態を消してもらってください"
-            "（エージェントは打たない）",
+            "親子のチケットの取り込み状態を削除してもらってください"
+            "（エージェントは実行しません）",
         ]
     if record is not None and record.state == STATE_BLOCKED:
         return [
-            f"理由を直してから、オンラインで '{sync} {name}' を打ち直してください"
+            f"理由を直してから、オンラインで '{sync} {name}' を再実行してください"
             "（検査し直して通れば present に戻る）"
         ]
     if st.home is None and "途中の操作" in st.stop:
         return [
             "親のワークツリーの途中の操作（merge・rebase など）を済ませるか取りやめてから"
-            "打ち直してください"
+            "再実行してください"
         ]
     if "まだ送っていない（取り込み状態は" in st.stop:
         return [
             f"親のワークツリー（.claude/worktrees/{name}）で '{git} push -u origin {branch}' "
-            f"を打つと、取り込み状態が {branch} に書き直され、停止が解除される"
+            f"を実行すると、取り込み状態が {branch} に書き直され、停止が解除される"
         ]
-    if "検査を通らないので" in st.stop:
+    if "検査に合格しないので" in st.stop:
         return [
             "承認済みの親チケットの branch: をユーザが確かめてください"
             "（使えない名前か統合先の名前）。直すなら提案を出し直して承認し直す"
@@ -941,22 +942,22 @@ def guidance(root: str, st: Standing) -> list[str]:
         return [
             f"親子のチケット {name} の親チケットを、親のブランチ {branch} の上だけに"
             "残してください。"
-            "ほかのブランチ上のチケットを消すか、そのブランチを片付けるのはユーザが決めます"
+            "ほかのブランチ上のチケットを削除するか、そのブランチを片付けるのはユーザが決めます"
         ]
     if "取り込み状態の親のブランチ" in st.stop:
         return [
             "親チケットの branch: を取り込み状態の名前に戻すか、"
             "親子のチケットを捨てて切り直すならユーザに "
-            f"'{sync} --forget {name}' で取り込み状態を消してもらってください"
-            "（エージェントは打たない）"
+            f"'{sync} --forget {name}' で取り込み状態を削除してもらってください"
+            "（エージェントは実行しません）"
         ]
     return [
         f"親のワークツリーを切り直してください（'{git} fetch origin {branch}' のあと "
         f"'{git} worktree add .claude/worktrees/{name} -b {branch} origin/{branch}'）。"
         f"別のブランチに居るなら {branch} に戻してください。"
-        f"閉じた親子のチケットなら、オンラインで '{sync}' を打って"
+        f"クローズ済みの親子のチケットなら、オンラインで '{sync}' を実行して。"
         "統合先を取り込み直してください。捨てた親子のチケットなら、ユーザに "
-        f"'{sync} --forget {name}' で取り込み状態を消してもらってください",
+        f"'{sync} --forget {name}' で取り込み状態を削除してもらってください",
     ]
 
 

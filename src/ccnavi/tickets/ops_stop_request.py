@@ -207,7 +207,7 @@ def request_nudge(root: str, found: Pending) -> str:
             f"'{ticket_sh} finish {c}'" for c in found.children
         )
         todo += (
-            " を打ちます。まだ作業が残っているなら、確認を取らずに続けます。"
+            " を実行します。まだ作業が残っているなら、確認を取らずに続けます。"
             "子が全部閉じたら、親ブランチへの合流、ELI5、レビューの依頼（request）へ進みます。"
         )
     elif found.step == STEP_MERGE:
@@ -219,7 +219,7 @@ def request_nudge(root: str, found: Pending) -> str:
         todo = (
             f"親のワークツリー {found.worktree} で、子ごとに "
             + "、".join(f"'{git_sh} merge {c}'" for c in found.children)
-            + f" を打ちます。続けて ELI5 の HTML を {eli5} に書いてコミットして push し、"
+            + f" を実行します。続けて ELI5 の HTML を {eli5} に書いてコミットして push し、"
             f"{request} で依頼します。"
         )
     elif found.step == STEP_ELI5:
@@ -240,7 +240,7 @@ def request_nudge(root: str, found: Pending) -> str:
             where,
             "これは決まった道の途中で、ユーザの許可は要りません。進めてよいかを聞かずに、次を実行してください。",
             todo,
-            "ユーザの判断が本当に要る問いなら、その問いを最後に書き直して終えてください。"
+            "ユーザの判断が本当に必要な問いなら、その問いを最後に書き直して終えてください。"
             "この案内は同じ状態では 1 回だけで、作業が進むまで次に終えるときは止めません。",
         ]
     )

@@ -375,7 +375,7 @@ class EntryTest(_Base):
         old = _write(os.path.join(self.logs, "decisions.20260101-000000.jsonl"), age_days=30)
         proc = run_ccnavi(["--prune", "--preview"], env=self.env(), cwd=self.root)
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertIn("消す  logs/decisions.20260101-000000.jsonl", proc.stdout)
+        self.assertIn("削除する  logs/decisions.20260101-000000.jsonl", proc.stdout)
         self.assertTrue(os.path.exists(old))
 
     def test_prune_needs_a_terminal(self):
@@ -390,14 +390,14 @@ class EntryTest(_Base):
         env = self.env(CCNAVI_GUARD_TICKET_APPROVAL="disable")
         proc = run_ccnavi(["--prune"], env=env, cwd=self.root)
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertIn("消した  logs/decisions.20260101-000000.jsonl", proc.stdout)
+        self.assertIn("削除した  logs/decisions.20260101-000000.jsonl", proc.stdout)
         self.assertFalse(os.path.exists(old))
 
     def test_prune_with_nothing_to_do(self):
         env = self.env(CCNAVI_GUARD_TICKET_APPROVAL="disable")
         proc = run_ccnavi(["--prune"], env=env, cwd=self.root)
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertIn("動かすものは無い", proc.stdout)
+        self.assertIn("動かすものはありません。", proc.stdout)
 
     def test_tiny_keep_days_from_the_command_line_fall_back(self):
         # 1 日より短い保持は受けない。いま書いたばかりの記録が消える形になる。

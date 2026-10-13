@@ -215,7 +215,7 @@ def script_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
             rules.SEVERITY_ERROR,
             t.ticket,
             f"{names} はスクリプト（ccnavi-ticket.sh）だけが書く欄。"
-            "提案には値を書かない（空にするか消す）。改版の提案では、承認済みチケットを写したときに"
+            "提案には値を書かない（空にするか削除します）。改版の提案では、承認済みチケットを写したときに"
             "入る started_at・completed_at・base_sha・cancelled_at・cancel_reason を空にする"
             "（改版は承認済みチケットの側の値を残し、計画だけを差し替える）",
         )
@@ -237,7 +237,7 @@ def record_field_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
             rules.SEVERITY_ERROR,
             t.ticket,
             f"{names} は続きの子を起こすレビューの行き先だけが残すもの。"
-            "提案には書かない（改版の提案で承認済みチケットを写したときも消す）",
+            "提案には書かない（改版の提案で承認済みチケットを写したときも削除します）",
         )
     ]
 
@@ -311,7 +311,8 @@ def plan_problems(
                     rules.Problem(
                         rules.SEVERITY_ERROR,
                         t.ticket,
-                        f"`{key}[{i}]` の `{item.type}` はレビュー不要の定義。延期するものが無い",
+                        f"`{key}[{i}]` の `{item.type}` はレビュー不要の定義。"
+                        "延期するものがありません。",
                     )
                 )
     problems.extend(workflow.problems(t, types))
@@ -367,7 +368,7 @@ def copy_config_problems(
         if approved:
             if ref is None or not phasetypes.same(pt, ref):
                 what = (
-                    "今の phases.yml に無い"
+                    "今の phases.yml にありません。"
                     if ref is None
                     else "今の phases.yml と違う（違う欄: "
                     + ", ".join(phasetypes.differing(pt, ref))
@@ -379,14 +380,16 @@ def copy_config_problems(
                         t.ticket,
                         f"`phases:` の `{ident}` が{what}。進行中の親には反映されない（判定は"
                         "承認済みチケットの写しを読む）。反映するには、子の無い番号の定義なら"
-                        f" {fill} を打った改版を出す（計画が同じでも改版になる）。子が承認された"
+                        f" {fill} を実行した改版を出す（計画が同じでも改版になる）。子が承認された"
                         "番号の定義なら、ユーザが承認済みチケットの `phases:` を直す",
                     )
                 )
             continue
         if ref is None:
             problems.append(
-                rules.Problem(severity, t.ticket, f"`phases:` の `{ident}` は phases.yml に無い")
+                rules.Problem(
+                    severity, t.ticket, f"`phases:` の `{ident}` は phases.yml にありません。"
+                )
             )
         elif not phasetypes.same(pt, ref):
             problems.append(
@@ -481,7 +484,7 @@ def revision_problems(
                 rules.SEVERITY_ERROR,
                 revised.ticket,
                 f"フィードバック計画を{when}は全体計画を変えられない"
-                "（フィードバック計画の番号は全体計画の続きで、項を足すと番号がずれる。"
+                "（フィードバック計画の番号は全体計画の続きで、項を追加すると番号がずれる。"
                 "全体計画を変えるなら、フィードバック計画を出す前に改版する）",
             )
         )
@@ -501,7 +504,7 @@ def revision_problems(
                     rules.SEVERITY_ERROR,
                     revised.ticket,
                     "フィードバック計画は 1 回だけ。承認済みのフィードバック作業フェーズに"
-                    f"子を足してやり直すか、{elsewhere}",
+                    f"子を追加してやり直すか、{elsewhere}",
                 )
             )
         elif not phase.plan_finished(root, conf, current):
@@ -597,7 +600,7 @@ def lock_problems(
             error(
                 f"延期の引き受け手が変わる（{n} 番目の延期: {before_at or '無し'} → "
                 f"{after_at or '無し'}）。"
-                "子が承認された番号が引き受ける延期は、行き先を変えられない"
+                "子が承認された番号が引き受ける延期は、延期先を変えられない"
             )
     return problems
 
@@ -682,7 +685,8 @@ def validate(
                 rules.Problem(
                     rules.SEVERITY_ERROR,
                     t.ticket,
-                    f"{t.phase} 番目の定義 `{item.type}` が親 {parent.ticket} の `phases:` に無い",
+                    f"{t.phase} 番目の定義 `{item.type}` が親 {parent.ticket} の `phases:`"
+                    " にありません。",
                 )
             )
             return problems, overflow

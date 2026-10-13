@@ -38,7 +38,7 @@
    "name": "写しの名前が phases.yml に無い",
    "plan": ["extra"],
    "phases": {"extra": {"kind": "work", "title": "余分"}},
-   "errors": ["`extra` は phases.yml に無い"],
+   "errors": ["`extra` は phases.yml にありません"],
    "warns": []
   },
   {
@@ -47,14 +47,14 @@
    "phases": {
     "research": {"kind": "work", "title": "調査", "review": "none", "scope": ["wip/research/*"], "deliverables": ["wip/research/summary.md"]}
    },
-   "errors": ["`design` が `phases:` に無い"],
+   "errors": ["`design` が `phases:` にありません"],
    "warns": []
   },
   {
    "name": "計画があるのに写しが無い",
    "plan": ["design"],
    "phases": null,
-   "errors": ["`phases:` が無い"],
+   "errors": ["`phases:` がありません"],
    "warns": []
   },
   {

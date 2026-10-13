@@ -399,7 +399,7 @@ class SyncTest(SyncHarness):
         self.assertEqual("blocked", record["state"])
         self.assertIn("ワークツリーの外", record["reason"])
         self.assertIn("blocked にした", done.stdout)
-        self.assertIn("打ち直して", done.stdout)
+        self.assertIn("再実行して", done.stdout)
         # 理由を片付けて打ち直せば、検査し直して present に戻る。
         os.remove(stray)
         done = self.sync(PARENT, CCNAVI_BIN_PATH=launcher)
@@ -523,7 +523,7 @@ class SyncTest(SyncHarness):
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("閉じた親子のチケット", done.stdout)
+        self.assertIn("クローズ済みの親子のチケット", done.stdout)
         self.assertNotIn("戻し方", done.stdout)
         self.assertEqual("closed", fields(self.record)["state"])
 
@@ -533,7 +533,7 @@ class SyncTest(SyncHarness):
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("閉じた親子のチケット", done.stdout)
+        self.assertIn("クローズ済みの親子のチケット", done.stdout)
         self.assertNotIn("まだ送っていない", done.stdout)
         self.assertEqual("closed", fields(self.record)["state"])
 
@@ -609,7 +609,9 @@ class SyncTest(SyncHarness):
         self.assertIn("戻し方 1", done.stdout)
         self.assertIn(f"git push origin {kept}:refs/heads/{PARENT}", done.stdout)
         self.assertIn("戻し方 2", done.stdout)
-        self.assertIn("--forget i0001 を打つと親子のチケットの取り込み状態が消える", done.stdout)
+        self.assertIn(
+            "--forget i0001 を実行すると親子のチケットの取り込み状態が消える", done.stdout
+        )
         record = fields(self.record)
         self.assertEqual("gone", record["state"])
         self.assertEqual(kept, record["sha"])
@@ -654,7 +656,7 @@ class SyncTest(SyncHarness):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("マージ済み", done.stdout)
         self.assertIn("42", done.stdout)
-        self.assertIn("閉じた親子のチケット", done.stdout)
+        self.assertIn("クローズ済みの親子のチケット", done.stdout)
         self.assertNotIn("戻し方", done.stdout)
         self.assertEqual("closed", fields(self.record)["state"])
 
@@ -682,7 +684,7 @@ class SyncTest(SyncHarness):
         done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("logs/archive/self/done/", done.stdout)
-        self.assertIn("閉じた親子のチケット", done.stdout)
+        self.assertIn("クローズ済みの親子のチケット", done.stdout)
         self.assertEqual("closed", fields(self.record)["state"])
 
     def archive_the_parent(self):
@@ -763,7 +765,7 @@ class SyncTest(SyncHarness):
         git(self.ws, "worktree", "remove", "--force", self.tree)
         done = self.sync()
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertNotIn("取り込み状態を消した", done.stdout)
+        self.assertNotIn("取り込み状態を削除した", done.stdout)
         self.assertEqual("gone", fields(self.record)["state"])
         # 同じ名前で切り直しても、取り込み状態は gone のまま（push は ccnavi-git.sh が止める）。
         self.parent_tree(PARENT + "x")  # 別の親子のチケットは触らない
@@ -782,7 +784,7 @@ class SyncTest(SyncHarness):
         self.assertFalse(os.path.exists(self.record))
         again = self.sync("--forget", PARENT)
         self.assertEqual(0, again.returncode)
-        self.assertIn("取り込み状態は無い", again.stdout)
+        self.assertIn("取り込み状態はありません", again.stdout)
 
     def test_forget_needs_a_name_and_does_not_touch_the_network(self):
         self.assertEqual(2, self.sync("--forget").returncode)
@@ -882,7 +884,7 @@ class SyncTest(SyncHarness):
         before = self.sha(self.tree, "HEAD")
         done = self.sync(PARENT, CCNAVI_INTEGRATION_BRANCH="nope")
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
-        said = "統合先 nope（環境変数 CCNAVI_INTEGRATION_BRANCH）がリモートに無い"
+        said = "統合先 nope（環境変数 CCNAVI_INTEGRATION_BRANCH）がリモートにありません。"
         self.assertIn(said, done.stdout)
         self.assertEqual(before, self.sha(self.tree, "HEAD"))
         self.assertNotEqual(head, before)
@@ -945,7 +947,7 @@ class SyncTest(SyncHarness):
         git(self.ws, "remote", "remove", "origin")
         done = self.sync()
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("origin が無い", done.stdout)
+        self.assertIn("origin がありません。", done.stdout)
         self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
 
     def test_a_worktree_that_is_not_a_parent_is_refused(self):

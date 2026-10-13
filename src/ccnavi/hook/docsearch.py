@@ -240,7 +240,7 @@ def collect(
 
 
 UNIGNORED = "は .gitignore に `**/ccnavi-index.jsonl` が無く、足せなかったので索引の対象外"
-IGNORE_ADDED = "に `**/ccnavi-index.jsonl` を足した（未コミットの差分が残る）"
+IGNORE_ADDED = "に `**/ccnavi-index.jsonl` を追加しました（未コミットの差分が残る）"
 
 
 # --- 入口 ---------------------------------------------------------------------------
@@ -396,7 +396,7 @@ def fail_streak_note(conf: settings.Settings, root: str, n: int) -> str:
     """
     lead = (
         f"[ccnavi] ツール呼び出しの失敗か拒否が {n} 回続いています。"
-        "同じ操作を言い換えて打ち直したり、止められた操作の迂回を探したりせず、"
+        "同じ操作を言い換えて再実行したり、止められた操作の迂回を探したりせず、"
         "止まった理由と決まった手順を資料で確かめてください。確かめても分からなければ、"
         "ユーザに相談してください。資料は"
     )
@@ -489,8 +489,8 @@ def missing_frontmatter(conf: settings.Settings, root: str, payload: hookio.Inpu
 def _frontmatter_hint(conf: settings.Settings, root: str, shown: str, has_front: bool) -> str:
     command = _command(conf, root)
     if has_front:
-        lack = "frontmatter に type が無い"
-        todo = "既にあるキーの値と順序は変えず、type を足してください。"
+        lack = "frontmatter に type がありません。"
+        todo = "既にあるキーの値と順序は変えず、type を追加してください。"
     else:
         lack = "frontmatter が無いか読めない"
         todo = (

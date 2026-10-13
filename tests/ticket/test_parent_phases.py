@@ -112,7 +112,7 @@ class CopyAgreeTest(PhaseHarness):
         )
         result = self.propose_parent(text)
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("`extra` は phases.yml に無い", result.stderr)
+        self.assertIn("`extra` は phases.yml にありません。", result.stderr)
 
     def test_a_plan_item_whose_definition_is_not_in_the_copy_is_refused(self):
         text = with_phases(
@@ -120,12 +120,12 @@ class CopyAgreeTest(PhaseHarness):
         )
         result = self.propose_parent(text)
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("`design` が `phases:` に無い", result.stderr)
+        self.assertIn("`design` が `phases:` にありません", result.stderr)
 
     def test_a_parent_with_a_plan_and_no_copy_is_refused(self):
         result = self.propose_parent(parent_text("i0001", ["research", "design"], copy=None))
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("`phases:` が無い", result.stderr)
+        self.assertIn("`phases:` がありません。", result.stderr)
         self.assertIn("--fill-phases", result.stderr)
 
     def test_an_unused_definition_is_a_warning_and_shown_on_the_screen(self):
@@ -249,7 +249,7 @@ class CopyJudgeTest(PhaseHarness):
         self.assertIn("phases:", self.reason(result))
         lint = self.ccnavi("--lint", "--mode", "enable")
         self.assertNotEqual(lint.returncode, 0)
-        self.assertIn("`phases:` が無い", lint.stdout)
+        self.assertIn("`phases:` がありません。", lint.stdout)
 
     def test_a_child_moved_by_hand_with_phases_is_blocked(self):
         self.family(plan=("research", "design"))
@@ -463,7 +463,7 @@ class FillPhasesTest(PhaseHarness):
         self.propose("i0001", text)
         result = self.fill()
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("書かない", result.stderr)
+        self.assertIn("何も反映しません", result.stderr)
         self.assertEqual(self.read(), text)
 
     def fill_in(self, cwd, name="i0001"):

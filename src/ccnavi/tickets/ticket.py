@@ -113,7 +113,7 @@ def _plan(
             kind = _text(entry.get("type")).strip()
             review = _text(entry.get("review")).strip()
             if not kind:
-                problems.append(Problem(SEVERITY_ERROR, name, f"{where} に `type` が無い"))
+                problems.append(Problem(SEVERITY_ERROR, name, f"{where} に `type` がありません。"))
                 return None, problems
             if review and review not in ticket_model.PLAN_REVIEWS:
                 problems.append(
@@ -254,7 +254,7 @@ def parse(text: str) -> tuple[ticket_model.Ticket | None, list[Problem]]:
         body=body,
     )
     if not ticket.ticket:
-        problems.append(Problem(SEVERITY_ERROR, "ticket", "チケット識別子が無い"))
+        problems.append(Problem(SEVERITY_ERROR, "ticket", "チケット識別子がありません。"))
         return None, problems
 
     for read in (_read_identity, _read_relations, _read_review, _read_scope):
@@ -299,14 +299,16 @@ def _read_identity(ticket: ticket_model.Ticket, front: dict, problems: list[Prob
             return True
         phase = front.get("phase")
         if isinstance(phase, bool) or not isinstance(phase, int) or phase < 0:
-            problems.append(Problem(SEVERITY_ERROR, name, "子には `phase`（0 以上の整数）が要る"))
+            problems.append(
+                Problem(SEVERITY_ERROR, name, "子には `phase`（0 以上の整数）が必要です")
+            )
             return True
         if phase > ticket_ids.MAX_CHILD_NUMBER:
             problems.append(
                 Problem(
                     SEVERITY_ERROR,
                     name,
-                    f"`phase: {phase}` は子の識別子に書けない。識別子のフェーズ番号は"
+                    f"`phase: {phase}` は子の識別子に指定できません。識別子のフェーズ番号は"
                     f" 2 桁（0〜{ticket_ids.MAX_CHILD_NUMBER}）なので、"
                     f"計画を {ticket_ids.MAX_CHILD_NUMBER} "
                     "フェーズまでに分ける",
@@ -491,7 +493,7 @@ def _read_scope(ticket: ticket_model.Ticket, front: dict, problems: list[Problem
             Problem(
                 SEVERITY_ERROR,
                 name,
-                "allow にも ask にも、有効な範囲の項が 1 件も無い。このチケットは承認しても"
+                "allow にも ask にも、有効な範囲の項が 1 件もありません。このチケットは承認しても"
                 "何も書けない",
             )
         )
@@ -696,7 +698,9 @@ def _entries(front: dict, name: str) -> tuple[list[ticket_model.Entry], list[Pro
             glob = _text(raw.get("glob")).strip()
             regex = _text(raw.get("regex")).strip()
             if not glob and not regex:
-                problems.append(Problem(SEVERITY_ERROR, name, f"{where} に glob も regex も無い"))
+                problems.append(
+                    Problem(SEVERITY_ERROR, name, f"{where} に glob も regex もありません。")
+                )
                 continue
             if glob and regex:
                 problems.append(

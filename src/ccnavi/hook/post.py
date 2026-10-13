@@ -716,7 +716,7 @@ def _save_turn(
         {"baseline": sorted(baseline)[:BASELINE_LIMIT], "heads": dict(sorted(heads.items()))},
     )
     if failed:
-        stderr.write(f"ccnavi: {phase_forms.TURN_DEFINED}の基準を書けない: {failed}\n")
+        stderr.write(f"ccnavi: {phase_forms.TURN_DEFINED}の基準を保存できませんでした: {failed}\n")
 
 
 def _found(
@@ -832,7 +832,7 @@ def _save_reported(
         },
     )
     if failed:
-        stderr.write(f"ccnavi: 実行後チェックの記録を書けない: {failed}\n")
+        stderr.write(f"ccnavi: 実行後チェックの記録を保存できませんでした: {failed}\n")
         return
     # 改名の前の記録は、新しい記録に置き換わったので消す。
     fsio.remove(_legacy_reported_path(state_dir, session))

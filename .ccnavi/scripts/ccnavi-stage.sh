@@ -35,10 +35,10 @@ sh .ccnavi/scripts/ccnavi-stage.sh <パス>...
 sh .ccnavi/scripts/ccnavi-stage.sh --commands <パス>...
 
   <パス>      直したい元のファイル（ワークスペースルートの下）。cwd からの相対でも絶対でもよい
-  --commands  編集が済んだあとに打つ。下書きが元と違うものだけ、差し替えの mv をフルパスで出す
+  --commands  編集が済んだあとに実行します。下書きが元と違うものだけ、差し替えの mv をフルパスで出す
 
 下書きは wip/handoff/<ワークスペースルートからの相対パス> に cp する（既にあれば上書きしない）。
-複数ファイルを直すときは、すべての下書きを作ってから --commands を打ち、ターンを終える。
+複数ファイルを直すときは、すべての下書きを作ってから --commands を実行し、ターンを終える。
 USAGE
 }
 
@@ -53,7 +53,7 @@ case "${1:-}" in
 	shift
 	;;
 -*)
-	printf 'ccnavi-stage: %s は通しません。使えるのは --commands だけです。\n' "$1" >&2
+	printf 'ccnavi-stage: %s は使用できません。使えるのは --commands だけです。\n' "$1" >&2
 	exit 2
 	;;
 esac
@@ -165,13 +165,13 @@ if [ -z "$commands" ]; then
 	exit 0
 fi
 
-[ -z "$missing" ] || printf 'ccnavi-stage: 下書きがまだ無い（先に <パス> だけで打つ）: %s\n' "$missing" >&2
+[ -z "$missing" ] || printf 'ccnavi-stage: 下書きがまだ無い（先に <パス> だけで実行します）: %s\n' "$missing" >&2
 [ -z "$same" ] || printf 'ccnavi-stage: 下書きが元と同じ（まだ編集していない）: %s\n' "$same" >&2
 [ -z "$changed" ] || printf 'ccnavi-stage: 下書きを作った後に元のファイルが変わっている（別のセッションかユーザの変更かもしれない。mv は出さない。元の差分を確かめ、下書きに取り込んでから、下書きと %s.orig を作り直す）: %s\n' '<下書き>' "$changed" >&2
 if [ -z "$mvs" ]; then
 	printf 'ccnavi-stage: 差し替える編集済みの下書きがありません。\n' >&2
 	exit 1
 fi
-printf '差し替えは、ユーザが次を打つ（元のファイルは保護対象なので、エージェントは差し替えない）:\n'
+printf '差し替えは、ユーザが次を実行します（元のファイルは保護対象なので、エージェントは差し替えない）:\n'
 printf '%s' "$mvs"
 [ -z "$missing$same$changed" ] || exit 1

@@ -127,17 +127,17 @@ class ErrorTest(unittest.TestCase):
         self.check({"glob": "*"}, "regex と when の両方", regex=None)
         rule, problems = build({"id": "x", "match": "Write", "message": "m"})
         self.assertIsNone(rule)
-        self.assertIn("glob も regex も when も無い", errors(problems)[0])
+        self.assertIn("glob も regex も when もありません。", errors(problems)[0])
 
     def test_ノードの形(self):
         self.check(None, "when", "マッピングではない")
         self.check("*.pem", "when", "マッピングではない")
         self.check(["*.pem"], "マッピングではない")
-        self.check({}, "when", "キーが無い")
+        self.check({}, "when", "キーがありません")
         self.check({"glob": "*", "regex": "x"}, "キーが 2 つ")
-        self.check({"glob": "*", "why": "x"}, "知らないキー", "why")
-        self.check({"none": [{"glob": "*"}]}, "知らないキー", "none")
-        self.check({"all": [{"glob": "*"}, {"match": "Write"}]}, "when.all[1]", "知らないキー")
+        self.check({"glob": "*", "why": "x"}, "未対応のキー", "why")
+        self.check({"none": [{"glob": "*"}]}, "未対応のキー", "none")
+        self.check({"all": [{"glob": "*"}, {"match": "Write"}]}, "when.all[1]", "未対応のキー")
 
     def test_型と空(self):
         self.check({"all": []}, "when の all が空")
@@ -537,7 +537,7 @@ class LintTest(unittest.TestCase):
         raw = {k: v for k, v in SECRETS.items() if k != "id"}
         problems = self.lint([raw])
         errors = [p.detail for p in problems if p.severity == rules.SEVERITY_ERROR]
-        self.assertTrue(any("id が無い" in d for d in errors), errors)
+        self.assertTrue(any("id がありません" in d for d in errors), errors)
 
 
 class MergeTest(unittest.TestCase):

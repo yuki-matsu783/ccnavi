@@ -104,7 +104,7 @@ def prepare(
         _save(conf, root, plan, body)
     elif op == OP_DELETE_DRAFT:
         if plan.on != ON_DRAFT:
-            plan.errors.append("消せる下書きは on=draft だけ")
+            plan.errors.append("削除できる下書きは on=draft だけ")
     elif op == OP_RENAME:
         _rename(conf, root, plan)
     elif op == OP_MOVE:
@@ -112,7 +112,7 @@ def prepare(
     elif op == OP_DELETE:
         _delete(conf, root, plan)
     else:
-        plan.errors.append(f"操作 {op!r} は無い")
+        plan.errors.append(f"操作 {op!r} はありません。")
     return plan
 
 
@@ -140,7 +140,7 @@ def _subject(conf: settings.Settings, root: str, plan: EditPlan) -> None:
     if plan.on == ON_COMMON:
         if not plan_templates.common_writable(conf, root):
             plan.errors.append(
-                "共通レイヤーの置き場はミラー（共通レイヤーの写し）なので書かない。"
+                "共通レイヤーの置き場はミラー（共通レイヤーの写し）なので反映しません。"
                 "ワークスペースルートで操作する"
             )
             return
@@ -151,7 +151,7 @@ def _subject(conf: settings.Settings, root: str, plan: EditPlan) -> None:
         layer = plan.layer or plan_templates.LAYER_SELF
         views = {view.name: view for view in ruleload.layers(conf, root)}
         if layer not in views:
-            plan.errors.append(f"レイヤー {layer!r} は無い（{' / '.join(views)}）")
+            plan.errors.append(f"レイヤー {layer!r} はありません（{' / '.join(views)}）")
             return
         directory = settings.layer_templates_dir(conf, views[layer].home)
         plan.layer = layer
@@ -168,7 +168,7 @@ def _subject(conf: settings.Settings, root: str, plan: EditPlan) -> None:
         plan.errors.append("置き場の途中にリンクがあるので触らない")
         return
     if not os.path.lexists(plan.source):
-        plan.errors.append(f"{plan.source_rel} は無い")
+        plan.errors.append(f"{plan.source_rel} はありません。")
         return
     raw, why = flow.read_bytes(plan.source, plan.source_base)
     if raw is None:
@@ -196,7 +196,7 @@ def _show(plan: EditPlan, old: str, new: str) -> None:
     plan.old_text = plan_templates.reveal(old)
     plan.new_text = plan_templates.reveal(new)
     if not plan.diff:
-        plan.infos.append("今の中身と同じ（差分は無い）")
+        plan.infos.append("今の中身と同じ（差分はありません）")
 
 
 def _save(conf: settings.Settings, root: str, plan: EditPlan, body: bytes | None) -> None:
@@ -256,7 +256,7 @@ def _rename(conf: settings.Settings, root: str, plan: EditPlan) -> None:
     plan.target_rel = plan_templates.relative(root, target)
     plan.target_base = plan.source_base
     if flow.linked(plan.source_base, os.path.dirname(target)):
-        plan.errors.append(f"{plan.target_rel} の置き場の途中にリンクがあるので書かない")
+        plan.errors.append(f"{plan.target_rel} の置き場の途中にリンクがあるので反映しません")
         return
     if os.path.lexists(target):
         plan.errors.append(f"{plan.target_rel} が既に在る")
@@ -290,7 +290,7 @@ def _move(conf: settings.Settings, root: str, plan: EditPlan) -> None:
     if plan.to == template_drafts.TO_COMMON:
         if not plan_templates.common_writable(conf, root):
             plan.errors.append(
-                "共通レイヤーの置き場はミラー（共通レイヤーの写し）なので書かない。"
+                "共通レイヤーの置き場はミラー（共通レイヤーの写し）なので反映しません。"
                 "ワークスペースルートで操作する"
             )
             return
@@ -301,7 +301,7 @@ def _move(conf: settings.Settings, root: str, plan: EditPlan) -> None:
         layer = plan.to_layer or plan_templates.LAYER_SELF
         views = {view.name: view for view in ruleload.layers(conf, root)}
         if layer not in views:
-            plan.errors.append(f"レイヤー {layer!r} は無い（{' / '.join(views)}）")
+            plan.errors.append(f"レイヤー {layer!r} はありません（{' / '.join(views)}）")
             return
         directory = settings.layer_templates_dir(conf, views[layer].home)
         plan.to_layer = layer
@@ -314,7 +314,7 @@ def _move(conf: settings.Settings, root: str, plan: EditPlan) -> None:
     plan.target_rel = plan_templates.relative(root, plan.target)
     plan.target_base = base
     if flow.linked(base, directory):
-        plan.errors.append("移動先の置き場の途中にリンクがあるので書かない")
+        plan.errors.append("移動先の置き場の途中にリンクがあるので反映しません")
         return
     if os.path.lexists(plan.target):
         plan.errors.append(f"移動先に {plan.target_rel} が既に在る")
@@ -332,7 +332,7 @@ def _move(conf: settings.Settings, root: str, plan: EditPlan) -> None:
     types = plan_templates.types_for(conf, root, plan.to_layer)
     plan.problems = list(notes) + plan_templates.check(template, types, flow.catalog(root))
     if any(p.severity == SEVERITY_ERROR for p in plan.problems):
-        plan.errors.append("行き先の定義で error があるので移動できない（下の error を直す）")
+        plan.errors.append("移動先の定義で error があるので移動できない（下の error を直す）")
         return
     errs, infos = template_drafts.collide(
         conf, root, template, plan.to, plan.to_layer, skip=plan.source_rel
@@ -343,12 +343,14 @@ def _move(conf: settings.Settings, root: str, plan: EditPlan) -> None:
 
 def _delete(conf: settings.Settings, root: str, plan: EditPlan) -> None:
     if plan.on == ON_DRAFT:
-        plan.errors.append("取り込み済みのテンプレートだけ消せる。下書きは delete-draft")
+        plan.errors.append("取り込み済みのテンプレートだけ削除できる。下書きは delete-draft")
         return
     scanned = plan_templates.scan(conf, root)
     others = [n for n in template_drafts._item_names(scanned, plan.name) if n != plan.layer]
     if others:
-        plan.infos.append(f"ほかの層（{', '.join(others)}）に同名が在る。消すとそちらが使われる")
+        plan.infos.append(
+            f"ほかの層（{', '.join(others)}）に同名が在る。削除するとそちらが使われる"
+        )
 
 
 # ---- 書く
@@ -361,11 +363,14 @@ def commit(plan: EditPlan, expect: str) -> EditResult:
     if not expect:
         return EditResult(
             False,
-            errors=["--yes には --expect <主語のハッシュ> が要る（見せた内容を操作するため）"],
+            errors=[
+                "--yes には --expect <主語のハッシュ> を指定してください"
+                "（見せた内容を操作するため）"
+            ],
         )
     stale = (
         f"--expect が主語の今の中身のハッシュと違う（見せたあとに書き直された）。"
-        f"何も書かない。今のハッシュ: {plan.sha}"
+        f"何も反映しません。今のハッシュ: {plan.sha}"
     )
     if expect != plan.sha:
         return EditResult(False, errors=[stale])
@@ -384,14 +389,17 @@ def _commit_save(plan: EditPlan) -> EditResult:
     err = fsio.write_bytes_atomic(plan.target, plan.raw)
     if err:
         return EditResult(
-            False, errors=[f"{plan.target_rel} を書けない（{template_drafts._line(err)}）"]
+            False,
+            errors=[f"{plan.target_rel} を保存できませんでした（{template_drafts._line(err)}）"],
         )
     raw, why = flow.read_bytes(plan.target, plan.target_base)
     if raw is None or plan_templates.digest(raw) != plan_templates.digest(plan.raw):
         return EditResult(
             False,
             written=True,
-            errors=[f"{plan.target_rel} を書いたが、読み直すと書いた中身と違う（{why or '内容'}）"],
+            errors=[
+                f"{plan.target_rel} を保存したが、読み直すと書いた中身と違う（{why or '内容'}）"
+            ],
         )
     return EditResult(True, written=True, new_sha=plan_templates.digest(plan.raw))
 
@@ -400,7 +408,8 @@ def _commit_delete(plan: EditPlan) -> EditResult:
     err = fsio.unlink(plan.source)
     if err:
         return EditResult(
-            False, errors=[f"{plan.source_rel} を消せなかった（{template_drafts._line(err)}）"]
+            False,
+            errors=[f"{plan.source_rel} を削除できませんでした（{template_drafts._line(err)}）"],
         )
     return EditResult(True, removed=True, infos=list(plan.infos))
 
@@ -410,7 +419,8 @@ def _commit_copy(plan: EditPlan) -> EditResult:
     err = fsio.write_new_durable(plan.target, plan.raw)
     if err:
         return EditResult(
-            False, errors=[f"{plan.target_rel} を書けない（{template_drafts._line(err)}）"]
+            False,
+            errors=[f"{plan.target_rel} を保存できませんでした（{template_drafts._line(err)}）"],
         )
     raw, why = flow.read_bytes(plan.target, plan.target_base)
     if raw is None or plan_templates.digest(raw) != plan_templates.digest(plan.raw):
@@ -418,8 +428,8 @@ def _commit_copy(plan: EditPlan) -> EditResult:
             False,
             written=True,
             errors=[
-                f"{plan.target_rel} を書いたが、読み直すと書いた中身と違う（{why or '内容'}）。"
-                f"元は消していない（{plan.source_rel}）"
+                f"{plan.target_rel} を保存したが、読み直すと書いた中身と違う（{why or '内容'}）。"
+                f"元は削除していません（{plan.source_rel}）"
             ],
         )
     err = fsio.unlink(plan.source)
@@ -428,7 +438,7 @@ def _commit_copy(plan: EditPlan) -> EditResult:
             False,
             written=True,
             errors=[
-                f"{plan.target_rel} は書いたが、元の {plan.source_rel} を消せなかった"
+                f"{plan.target_rel} は保存したが、元の {plan.source_rel} を削除できませんでした。"
                 f"（{template_drafts._line(err)}）"
             ],
         )

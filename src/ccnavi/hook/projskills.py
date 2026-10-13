@@ -88,7 +88,7 @@ def entries(conf: settings.Settings, project_root: str) -> tuple[list[tuple[str,
             continue
         front = _front(raw)
         shown = flow_text._line(front.get("name") or name)
-        about = flow_text._line(front.get("description") or "（説明が無い）")
+        about = flow_text._line(front.get("description") or "（説明がありません）")
         # 名前は NAME で絞ってあるが、文に出るものは全部 1 行にまとめておく（念のため）。
         rel = flow_text._line(os.path.relpath(path, project_root).replace(os.sep, "/"))
         found.append((shown, about, rel))

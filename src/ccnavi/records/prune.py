@@ -177,11 +177,11 @@ def summary(report: Report) -> str:
 
 def lines(report: Report, dry_run: bool) -> list[str]:
     """ユーザに見せる行。"""
-    rotate, remove = ("ローテートする", "消す") if dry_run else ("ローテートした", "消した")
+    rotate, remove = ("ローテートする", "削除する") if dry_run else ("ローテートした", "削除した")
     out = [f"{rotate}  {src} → {dst}" for src, dst in report.rotated]
     out += [f"{remove}  {path}" for path in report.logs + report.state]
     if not out:
-        out.append("動かすものは無い")
+        out.append("動かすものはありません。")
     return out
 
 
@@ -324,7 +324,7 @@ def _prune_diag(
     for place in (os.path.dirname(directory), directory):
         if os.path.islink(place):
             report.problems.append(
-                f"{_shown(root, place)} はリンクなので辿らない（診断ログを消さない）"
+                f"{_shown(root, place)} はリンクなので辿らない（診断ログを削除しません）"
             )
             return
     try:
@@ -368,7 +368,7 @@ def _prune_state(
     """
     if os.path.islink(state_dir):
         report.problems.append(
-            f"{_shown(root, state_dir)} はリンクなので辿らない（記録を消さない）"
+            f"{_shown(root, state_dir)} はリンクなので辿らない（記録を削除しません）"
         )
         return
     groups, loose = _session_entries(report, root, state_dir)
@@ -403,7 +403,7 @@ def _session_entries(
     if os.path.islink(guard):
         # 置き場そのものと同じ理由で辿らない。
         report.problems.append(
-            f"{_shown(root, guard)} はリンクなので辿らない（バックアップを消さない）"
+            f"{_shown(root, guard)} はリンクなので辿らない（バックアップを削除しません）"
         )
     else:
         try:
@@ -485,6 +485,6 @@ def _remove(report: Report, root: str, path: str, dry_run: bool) -> bool:
         # 同じ時に始まった別のセッションが先に消した。
         return False
     except OSError as exc:
-        report.problems.append(f"{_shown(root, path)} を消せない: {exc}")
+        report.problems.append(f"{_shown(root, path)} を削除できない: {exc}")
         return False
     return True

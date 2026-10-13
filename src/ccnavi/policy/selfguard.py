@@ -261,7 +261,9 @@ def before(
             _clear_absent(state_dir, session, target)
             failed = _write_backup(state_dir, session, target, content)
             if failed:
-                outcomes.append(Outcome(target, ACTION_FAILED, f"バックアップを書けない: {failed}"))
+                outcomes.append(
+                    Outcome(target, ACTION_FAILED, f"バックアップを保存できませんでした: {failed}")
+                )
             # バックアップを取れた回は報告に出さない。毎回の呼び出しで 3 行増えると、本当に
             # 言うべき 1 行が見落とされる。記録には残る。
             continue
@@ -466,7 +468,9 @@ def at_start(
         _clear_absent(state_dir, session, target)
         failed = _write_backup(state_dir, session, target, content)
         if failed:
-            outcomes.append(Outcome(target, ACTION_FAILED, f"バックアップを書けない: {failed}"))
+            outcomes.append(
+                Outcome(target, ACTION_FAILED, f"バックアップを保存できませんでした: {failed}")
+            )
     return outcomes
 
 
@@ -823,7 +827,7 @@ def report(outcomes: list[Outcome]) -> str:
         )
     if any(outcome.action not in (ACTION_LEFT, ACTION_REBASED) for outcome in outcomes):
         lines.append(
-            "変更が要るなら、何をなぜ変えたいのかをユーザに伝えて依頼してください。"
+            "変更が必要なら、何をなぜ変えたいのかをユーザに伝えて依頼してください。"
             "自分で書き換えると、次の呼び出しで同じように戻ります。"
         )
     return "\n".join(lines)
@@ -838,7 +842,7 @@ def _recover_missing(
     「最後にコミットされた内容」。消えたものを戻すなら、近いほうから戻す。
     """
     if setting != ENABLE:
-        return Outcome(target, ACTION_WOULD, "対象が無い。本来なら戻す")
+        return Outcome(target, ACTION_WOULD, "対象がありません。本来なら戻す")
     if saved is not None:
         failed = _write(target.path, saved)
         if failed:
@@ -876,7 +880,7 @@ def _fall_back_to_git(
         return Outcome(target, ACTION_KEPT, "バックアップは無いが、コミット済みの内容と同じ")
 
     if setting != ENABLE:
-        return Outcome(target, ACTION_WOULD, "バックアップが無い。本来なら git から戻す")
+        return Outcome(target, ACTION_WOULD, "バックアップがありません。本来なら git から戻す")
 
     failed = gitstate.restore_committed(
         top, selfguard_targets._relative(top, target.path).replace(os.sep, "/")

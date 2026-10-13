@@ -91,7 +91,7 @@ def classifier_note(root: str, allow: str) -> str:
     return (
         "Claude Code の自動モードの分類器に止められたら、迂回せずにユーザに許可を頼む。"
         "以後も許可するなら、ユーザがホームの ~/.claude/settings.json の permissions.allow に、"
-        f"この操作だけに絞った許可（例 `Bash({allow})`）を足す"
+        f"この操作だけに絞った許可（例 `Bash({allow})`）を追加します"
         "（分類器はプロジェクトの .claude/settings.json を読まない。"
         f"`{settings.script_command(root, 'ccnavi-git.sh')} *` のような広い許可は push まで"
         "分類器を通さなくなるので勧めない）"
@@ -113,7 +113,7 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
     if not os.path.lexists(path):
         return Dropped(name, ABSENT, path)
     if os.path.islink(path) or _is_junction(path):
-        return Dropped(name, REFUSED, path, "リンクなので、リンクの先は消さない")
+        return Dropped(name, REFUSED, path, "リンクなので、リンクの先は削除しません。")
     if not os.path.isdir(path):
         return Dropped(name, REFUSED, path, "ディレクトリでない")
     if _inside(cwd, path):
@@ -168,37 +168,38 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
 def report(stdout: TextIO, root: str, d: Dropped) -> None:
     """drop の結果を言う。消さなかったときも標準出力へ（呼び手の操作そのものは成功している）。"""
     if d.status == REMOVED:
-        stdout.write(f"ワークツリー {d.name} を消した（{d.path}。ブランチは残してある）\n")
+        stdout.write(f"ワークツリー {d.name} を削除しました（{d.path}。ブランチは残してある）\n")
     elif d.status == ABSENT:
-        stdout.write(f"ワークツリー {d.name} は無い（消すものが無い）\n")
+        stdout.write(f"ワークツリー {d.name} はありません（削除するものがありません）\n")
     elif d.status == CWD_INSIDE:
         stdout.write(
-            f"cwd がワークツリー {d.name} の中にあるので消さなかった。"
+            f"cwd がワークツリー {d.name} の中にあるので削除しませんでした。"
             "外（ワークスペースルートなど。エージェントは ExitWorktree か cd で出る）に出てから、"
-            "次を打つ:\n"
+            "次を実行する:\n"
             f"  {retry_command(root, d.name)}\n"
             f"  {classifier_note(root, retry_command(root, d.name))}\n"
         )
     elif d.status == DIRTY:
         stdout.write(
-            f"ワークツリー {d.name} に未コミットの変更があるので、何も消さなかった"
+            f"ワークツリー {d.name} に未コミットの変更があるので、何も削除しませんでした。"
             "（別のセッションが作業している見込みがある）。ユーザに確かめてもらう:\n"
         )
         for line in d.detail.splitlines():
             stdout.write(f"  {line}\n")
     elif d.status == IGNORED:
         stdout.write(
-            f"ワークツリー {d.name} に git が無視しているファイルがあるので、何も消さなかった"
-            "（worktree remove は無視されたファイルごと消し、履歴から戻せない）:\n"
+            f"ワークツリー {d.name} に git が無視しているファイルがあるので、"
+            "何も削除しませんでした。"
+            "（worktree remove は無視されたファイルごと削除し、履歴から戻せない）:\n"
         )
         for line in d.detail.splitlines():
             stdout.write(f"  {line}\n")
         stdout.write(
-            "  残したいならワークツリーの外へ退避し、要らないなら手で消してから、"
-            f"'{retry_command(root, d.name)}' で打ち直す\n"
+            "  残したいならワークツリーの外へ退避し、不要なら手で削除してから、"
+            f"'{retry_command(root, d.name)}' で再実行します。\n"
         )
     else:
-        stdout.write(f"ワークツリー {d.name} を消さなかった: {d.detail}\n")
+        stdout.write(f"ワークツリー {d.name} を削除しなかった: {d.detail}\n")
 
 
 def run_drop(stdout: TextIO, stderr: TextIO, root: str, name: str, cwd: str) -> int:
@@ -300,11 +301,11 @@ def _leftover_facts(path: str) -> tuple[list[str], list[str]]:
     if changes:
         scratch = [c for c in changes if "wip/handoff/" in c.replace("\\", "/")]
         why.append("未保存の下書きがある（wip/handoff/）" if scratch else "未コミットの変更がある")
-        check.append(f"`git -C {path} status` で中身を見て、要るものはコミットするか退避する")
+        check.append(f"`git -C {path} status` で中身を見て、必要なものはコミットするか退避する")
     ignored, _ = _ignored(path)
     if ignored:
         why.append("git が無視しているファイル（.env など）がある")
-        check.append("無視されたファイルを見て、要るものは退避する")
+        check.append("無視されたファイルを見て、必要なものは退避する")
     return why, check
 
 
@@ -357,13 +358,15 @@ def run_remaining(stdout: TextIO, root: str, conf: settings.Settings, family: st
     left = remaining(root, conf, family, cwd)
     if not left:
         return 0
-    stdout.write("残っているワークツリー（自動では消していない。要らなければ確かめてから消す）:\n")
+    stdout.write(
+        "残っているワークツリー（自動では削除していません。不要なら確かめてから削除します）:\n"
+    )
     for item in left:
         stdout.write(f"- {item.name}（{item.path}）\n")
         stdout.write(f"  残った理由: {'。'.join(item.why)}\n")
         for line in item.check:
-            stdout.write(f"  消す前に確かめること: {line}\n")
-        stdout.write(f"  消すコマンド: {retry_command(root, item.name)}\n")
+            stdout.write(f"  削除する前に確かめること: {line}\n")
+        stdout.write(f"  削除するコマンド: {retry_command(root, item.name)}\n")
     return 0
 
 
@@ -382,7 +385,7 @@ def _ignored(top: str) -> tuple[list[str], str]:
         raw_paths=True,
     )
     if not done.ok:
-        return [], "git が無視しているファイルを読めない。消してよいかを確かめられない"
+        return [], "git が無視しているファイルを読めない。削除してよいかを確かめられない"
     return [p for p in done.out.split("\0") if p and not _is_generated(top, p)], ""
 
 
@@ -406,7 +409,7 @@ def _remove_blocked(owner: str, path: str) -> str:
     """
     done = gitcmd.run(owner, ["worktree", "list", "--porcelain"], TIMEOUT_SECONDS, raw_paths=True)
     if not done.ok:
-        return "git のワークツリーの一覧を読めない。消せるかを確かめられない"
+        return "git のワークツリーの一覧を読めない。削除できるかを確かめられない"
     want = _canonical(path)
     for block in done.out.split("\n\n"):
         lines = block.splitlines()
@@ -415,9 +418,14 @@ def _remove_blocked(owner: str, path: str) -> str:
         if _canonical(lines[0][len("worktree ") :]) != want:
             continue
         if any(line == "locked" or line.startswith("locked ") for line in lines[1:]):
-            return "ロックされている（git worktree lock）。ロックした人に確かめ、外してから打ち直す"
+            return (
+                "ロックされている（git worktree lock）。"
+                "ロックした人に確かめ、外してから再実行します。"
+            )
     if os.path.lexists(os.path.join(path, ".gitmodules")):
-        return "submodule を持つワークツリーは git worktree remove（--force なし）で消せない"
+        return (
+            "submodule を持つワークツリーは git worktree remove（--force なし）で削除できません。"
+        )
     return ""
 
 
@@ -428,7 +436,11 @@ def _owner(path: str) -> tuple[str, str]:
     それ自身がリポジトリで、ワークツリーとして消す対象ではない。
     """
     if not os.path.isfile(os.path.join(path, ".git")):
-        return "", "git のワークツリーとして登録されていない（.git のファイルが無い）ので消さない"
+        return (
+            "",
+            "git のワークツリーとして登録されていない（.git のファイルがありません）"
+            "ので削除しません。",
+        )
     done = gitcmd.run(path, ["rev-parse", "--git-common-dir"], TIMEOUT_SECONDS)
     common = done.out.strip() if done.ok else ""
     if not common:
@@ -518,7 +530,7 @@ def _clean_generated(top: str) -> str:
             top, ["ls-files", "-z", "--", f":(literal){rel}"], TIMEOUT_SECONDS, raw_paths=True
         )
         if not tracked.ok:
-            return f"{rel} が追跡されているかを読めない。何も消していない"
+            return f"{rel} が追跡されているかを読めない。何も削除していません。"
         if not tracked.out.strip("\0"):
             targets.append(rel)
     left = []
@@ -535,10 +547,10 @@ def _clean_generated(top: str) -> str:
             left.append(f"{rel}（{exc.strerror or exc}）")
     if left:
         return (
-            "生成物を消しきれなかった（"
+            "生成物を削除しきれませんでした（"
             + "、".join(left)
-            + "）。Windows では、読み込まれている DLL（uv の .venv の .pyd）は消せない。"
-            "使っているプロセスが終わってから打ち直す"
+            + "）。Windows では、読み込まれている DLL（uv の .venv の .pyd）は削除できません。"
+            "使っているプロセスが終わってから再実行します。"
         )
     return ""
 

@@ -298,7 +298,7 @@ def _save_once(stderr: TextIO, path: str, given: dict[str, int]) -> bool:
     # なる。途中で中断されたときも空のまま残り、次の起動が同じ読み違いをする。
     failed = fsio.write_json_atomic(path, {"given": dict(sorted(given.items()))})
     if failed:
-        stderr.write(f"ccnavi: 渡した回数の記録を書けない: {failed}\n")
+        stderr.write(f"ccnavi: 渡した回数の記録を保存できませんでした: {failed}\n")
     return not failed
 
 
