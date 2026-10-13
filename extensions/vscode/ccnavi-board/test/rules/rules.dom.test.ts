@@ -1323,7 +1323,7 @@ test("CB-D303 保存前の検証エラーの案内は、その段にだけ見本
     await startCourse(dom, "save-error");
     assert.equal(dom.one("#status").textContent, "");
     await toStep(dom, "save-error", 1);
-    assert.match(dom.one("#status").textContent ?? "", /--lint が error を報告しました/);
+    assert.match(dom.one("#status").textContent ?? "", /設定の検証（--lint）でエラーが見つかりました/);
     assert.match(dom.one("#status").textContent ?? "", /error: db-migrate: ask に message がある/);
     assert.ok(dom.one("footer").classList.contains("error"));
     await toStep(dom, "save-error", 2);

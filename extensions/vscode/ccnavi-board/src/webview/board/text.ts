@@ -20,7 +20,7 @@ export const FILTER_LABELS = {
   attention: "要対応のみ",
   attentionTitle: "ユーザが対応する必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
   archived: "アーカイブ済みチケットを表示",
-  archivedTitle: "Draft を解除したとき（ccnavi-review.sh ready）に手元の logs/archive/ へ退避した、クローズしたチケットを「アーカイブ」の列に表示します。初期状態では表示しません。",
+  archivedTitle: "Draft を解除したとき（ccnavi-review.sh ready）にローカルの logs/archive/ に移動した、クローズ済みのチケットを「アーカイブ」の列に表示します。初期状態では表示しません。",
 } as const;
 
 export const MARK_LABELS: Readonly<Record<string, string>> = {
@@ -233,7 +233,7 @@ export function predecessorsBadge(card: Card): { readonly text: string; readonly
       text: `先行チケットの条件が未達成（${ids}）`,
       lead: "先行チケットの条件が未達成",
       ids: list,
-      title: `着手済みです。先行が done/ にないか取り消されているため、先行の条件を満たしていません（作業と finish は止まりません）\n${detail}`,
+      title: `着手済みです。先行チケットが done/ にないか、取り消されているため、開始条件を満たしていません。ただし、着手済みの作業や finish コマンドの実行は制限されません。\n${detail}`,
     };
   }
   const what = card.copyStatus === "none" ? "承認も着手も" : "着手が";

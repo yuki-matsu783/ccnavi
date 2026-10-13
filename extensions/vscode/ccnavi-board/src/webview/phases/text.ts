@@ -12,7 +12,7 @@ export function hasMore(phase: PhaseForm): boolean {
 
 /** 「補足」の見出しにつける一言 */
 export function moreNote(phase: PhaseForm): string {
-  return hasMore(phase) ? "（設定あり）" : "（未設定）。案内するエージェント・使う場面";
+  return hasMore(phase) ? "（設定あり）" : "（未設定）推奨するエージェントと、このフェーズを使用する場面";
 }
 
 /** 要約に出す範囲。inherit ならその表記、glob が無ければ未設定と言う */
@@ -25,7 +25,7 @@ export function scopeText(phase: PhaseForm): string {
 
 /** 編集可能な範囲のツールチップ */
 export function scopeTitle(phase: PhaseForm): string {
-  return phase.inherit ? "親の編集可能な範囲そのまま" : phase.scope.join(", ");
+  return phase.inherit ? "親チケットの編集可能範囲を引き継ぎます。" : phase.scope.join(", ");
 }
 
 /** リストの欄は 1 つの欄に "," 区切りで出し、打つたびにリストへ戻す */
@@ -60,13 +60,13 @@ export function emptyNote(exists: boolean): string {
   if (exists) {
     return "定義がありません。定義が空のファイルはccnaviで読み込めません。保存する前に、定義を1つ以上追加してください。";
   }
-  return "ファイルがありません（この設定にまだ定義がない、正常な状態です）。定義を追加して保存すると、ファイルが作られます";
+  return "フェーズ定義ファイルはまだ作成されていません。未設定のため、エラーではありません。定義を追加して保存すると、ファイルが作られます";
 }
 
 /** 共通の設定の定義と表示名が重なっているときに下部へ出す文 */
 export function commonTitleNote(ids: ReadonlySet<string>): string {
   const names = Array.from(ids).map((id) => (id === "" ? "空" : id));
-  return `表示名（title）が共通の設定の定義と重なっています（${names.join(", ")}）。重なったままだと、その定義は使われません。変えるまで保存できません`;
+  return `共通設定のフェーズ定義と表示名（title）が重複しています（${names.join(", ")}）。重複している定義は使用されません。表示名を変更してから保存してください。`;
 }
 
 /** 共通の設定にも同じ id がある定義に添える文 */
@@ -75,4 +75,4 @@ export function commonIdNote(ids: ReadonlySet<string>): string {
 }
 
 /** 共通の設定の定義の欄の見出しにつける説明 */
-export const COMMON_NOTE = "開いている設定の定義に追加して使われます。この画面では編集しません（.ccnavi/config/common/phases.yml）";
+export const COMMON_NOTE = "選択中の設定と組み合わせて適用される共通のフェーズ定義です。この画面では編集できません（.ccnavi/config/common/phases.yml）";

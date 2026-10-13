@@ -835,7 +835,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   }
   if (!lint.value.ok) {
     // 苦情は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
-    fail(current, `--lint が error を報告しました。直してから保存してください:\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
+    fail(current, `設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください:\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
     return;
   }
 
