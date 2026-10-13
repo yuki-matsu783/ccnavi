@@ -91,6 +91,8 @@ interface PanelState {
   changedPending: boolean;
   /** 自分が書いた時刻。この直後の監視の反応は、外で変わったものとして扱わない */
   wroteAt: number;
+  /** 取り込み・編集の実行ファイルを走らせている間は真。猶予の時間に依らず、この間の監視の反応は外で変わったものとして扱わない */
+  writing: boolean;
   /** 画面に未保存の変更があるか（画面が `dirty` で知らせる）。別の対象へ切り替えるときに聞くかを決める */
   dirty: boolean;
   /**
@@ -195,6 +197,7 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
     projectLocks: {},
     changedPending: false,
     wroteAt: 0,
+    writing: false,
     dirty: false,
     seq: 0,
     asking: false,
@@ -379,7 +382,7 @@ function alive(current: PanelState): boolean {
 }
 
 function scheduleChanged(current: PanelState): void {
-  if (Date.now() - current.wroteAt < OWN_WRITE_GRACE_MS) {
+  if (current.writing || Date.now() - current.wroteAt < OWN_WRITE_GRACE_MS) {
     return;
   }
   if (current.timer !== undefined) {
@@ -707,8 +710,14 @@ async function importYes(current: PanelState, request: ImportRequest, expect: st
     return;
   }
 
+  current.writing = true;
   current.wroteAt = Date.now();
-  const result = await runTemplateImportYes(current.folder.uri.fsPath, binSetting(), request, expect);
+  let result: Awaited<ReturnType<typeof runTemplateImportYes>>;
+  try {
+    result = await runTemplateImportYes(current.folder.uri.fsPath, binSetting(), request, expect);
+  } finally {
+    current.writing = false;
+  }
   if (!alive(current)) {
     return;
   }
@@ -716,6 +725,10 @@ async function importYes(current: PanelState, request: ImportRequest, expect: st
   const answer = result.ok ? result.value : null;
   if (answer === null || !answer.written) {
     current.wroteAt = 0;
+    if (answer === null) {
+      // 書けたかどうか分からない。抑制した監視の反応を取り戻すため、外で変わったときと同じ道に通す
+      scheduleChanged(current);
+    }
   }
   if (answer !== null && answer.written) {
     // 先に読み直す。`reload` は中身を渡すと画面の状態の一言を消すので、「取り込みました」は読み直したあとに送る。
@@ -775,8 +788,14 @@ async function editYes(current: PanelState, request: EditRequest, expect: string
     return;
   }
 
+  current.writing = true;
   current.wroteAt = Date.now();
-  const result = await runTemplateEditYes(current.folder.uri.fsPath, binSetting(), request, expect);
+  let result: Awaited<ReturnType<typeof runTemplateEditYes>>;
+  try {
+    result = await runTemplateEditYes(current.folder.uri.fsPath, binSetting(), request, expect);
+  } finally {
+    current.writing = false;
+  }
   if (!alive(current)) {
     return;
   }
@@ -784,6 +803,10 @@ async function editYes(current: PanelState, request: EditRequest, expect: string
   const answer = result.ok ? result.value : null;
   if (answer === null || !(answer.written || answer.removed)) {
     current.wroteAt = 0;
+    if (answer === null) {
+      // 書けたかどうか分からない。抑制した監視の反応を取り戻すため、外で変わったときと同じ道に通す
+      scheduleChanged(current);
+    }
   }
   if (answer !== null && (answer.written || answer.removed)) {
     // 取り込みと同じく、先に読み直してから結果を送る

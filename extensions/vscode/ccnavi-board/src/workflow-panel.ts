@@ -260,8 +260,12 @@ function askRestore(current: PanelState): void {
 
 /** コピーを名前の無い JSON のエディタで開く（ファイルには書かない） */
 async function openDraftAsJson(draft: PlanOrder): Promise<void> {
-  const document = await vscode.workspace.openTextDocument({ language: "json", content: `${JSON.stringify(draft, null, 2)}\n` });
-  await vscode.window.showTextDocument(document);
+  try {
+    const document = await vscode.workspace.openTextDocument({ language: "json", content: `${JSON.stringify(draft, null, 2)}\n` });
+    await vscode.window.showTextDocument(document, { preserveFocus: true });
+  } catch (error) {
+    void vscode.window.showErrorMessage(`閉じる前の編集を JSON として開けませんでした: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 function scheduleCheck(current: PanelState): void {
@@ -391,9 +395,17 @@ async function reload(current: PanelState): Promise<void> {
   const refused = await checkPlanOrder(rootPath, binSetting());
   const got = refused === undefined ? await runPlanOrder(rootPath, binSetting(), current.ticket) : ({ ok: false, error: refused } as const);
   if (!alive(current) || current.seq !== seq) {
+    if (restore !== undefined) {
+      void vscode.window.showWarningMessage(`${current.ticket} の計画編集タブを読み直せなかったので、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題の JSON ファイルとして開きます。`);
+      void openDraftAsJson(restore.draft);
+    }
     return;
   }
   if (!got.ok) {
+    if (restore !== undefined) {
+      void vscode.window.showWarningMessage(`${current.ticket} の提案を読めなかったので、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題の JSON ファイルとして開きます。`);
+      void openDraftAsJson(restore.draft);
+    }
     showError(current, got.error);
     return;
   }
