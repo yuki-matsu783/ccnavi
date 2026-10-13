@@ -110,6 +110,11 @@ ticket: chore-72-skill-commit-push-retry
 human_review:
   required: true
   reason: エージェントの手順を変えるため
+phases:
+  quick-work: {kind: work, title: 小さい作業, review: mr, scope: inherit}
+plan:
+  - quick-work
+feedback: []
 title: commit スキルに push の打ち直しを足す
 rationale: |
   直す（新しく作るなら「作る」）。拾った信号と、次のセッションで何が変わるか。
@@ -120,6 +125,8 @@ allow:
 対象の SKILL.md（と references/）の差分か、新しく作るなら全文の下書き。動機になった wiki のパターンと、wiki（`patterns/`・`skill-impact.md`・`log.md`）に入れる差分も書く。
 `allow` には `docs/wiki/*` も足す。
 ```
+
+この提案は親として書いている。親は `plan:` が無いと `start` が止まるので、上のように `plan:` と、その項が使うフェーズ定義の写し `phases:` を持つ。`phases:` は手で書かず、`ccnavi --plan-order <親> --fill-phases` で写してよい。`quick-work` の範囲は `scope: inherit` で、親の `allow`（ここでは `.claude/skills/commit/*` と `docs/wiki/*`）がそのまま作業の上限になる。`allow` を空のまま出すと、範囲が集まらず子を起こせない。
 
 プロジェクトのスキルについての提案は、そのプロジェクトの提案として書き、`allow` に `skills/<スキル>/*` を書く。
 パスはプロジェクトのルートからの相対で書く。
