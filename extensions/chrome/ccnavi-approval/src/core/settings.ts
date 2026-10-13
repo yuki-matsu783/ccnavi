@@ -39,7 +39,7 @@ export function repoKey(r: Pick<RepoConfig, "host" | "owner" | "repo">): string 
 export function checkRecentDays(value: unknown): number {
   const days = Number(value);
   if (!Number.isInteger(days) || days < 0 || days > MAX_RECENT_DAYS) {
-    throw new Error(`直近の日数は 0〜${MAX_RECENT_DAYS} の整数で入れてください`);
+    throw new Error(`検索期間には、0〜${MAX_RECENT_DAYS}の整数を入力してください。`);
   }
   return days;
 }
@@ -64,7 +64,7 @@ export function normalizeRepo(raw: Record<string, unknown>, hosts: readonly Host
   const extraBranches = [...new Set(extras.map((b) => checkBranch(String(b))))];
   const project = String(raw.project ?? "").trim();
   if (project !== "" && (!PROJECT.test(project) || RESERVED_LAYER.has(project.toLowerCase()))) {
-    throw new Error("プロジェクト名は projects/ の下の名前（英数字と . _ -。common・self は使えない）");
+    throw new Error("projects/ 配下のディレクトリ名を入力してください。先頭は英数字とし、英数字・ピリオド・アンダースコア・ハイフンを使用できます。common と self は使用できません。");
   }
   const workspace = project === "" ? "" : String(raw.workspace ?? "").trim();
   if (project !== "" && workspace === "") {
@@ -109,7 +109,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 /** 1 つのリポジトリの直近の日数を書き換える（ボードの入力欄）。外れた値は投げて、何も書かない */
 export async function saveRecentDays(area: StorageArea, hosts: readonly Host[], key: string, value: unknown): Promise<number> {
   if (typeof value === "string" && value.trim() === "") {
-    throw new Error(`直近の日数は 0〜${MAX_RECENT_DAYS} の整数で入れてください`);
+    throw new Error(`検索期間には、0〜${MAX_RECENT_DAYS}の整数を入力してください。`);
   }
   const days = checkRecentDays(typeof value === "string" ? value.trim() : value);
   const got = await area.get("repos");
@@ -126,7 +126,7 @@ export async function saveRecentDays(area: StorageArea, hosts: readonly Host[], 
     }
     return row;
   });
-  if (!found) throw new Error(`${key} は登録されていない`);
+  if (!found) throw new Error(`リポジトリ ${key} は登録されていません。`);
   await area.set({ repos: next });
   return days;
 }
