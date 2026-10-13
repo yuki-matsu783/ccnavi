@@ -206,7 +206,10 @@ class FollowupRefusesTest(NextChildIdTest):
         return found
 
     def followup(self, phase_no):
-        return approval_ops.followup(self.conf, self.ws, self.parent(), phase_no, [], ["指摘"])
+        # 子は範囲を持つ（続きの子はその和を持つので、空だと読めない子になる）。
+        raw = {"allow": [{"match": "Write|Edit", "glob": "src/*"}]}
+        child = ticket_model.Ticket(ticket="i0001-02-01", raw=raw, body="")
+        return approval_ops.followup(self.conf, self.ws, self.parent(), phase_no, [child], ["指摘"])
 
     def test_a_full_phase_writes_nothing(self):
         self.put(".ccnavi/approved/done", "i0001-02-99", "i0001", 2)

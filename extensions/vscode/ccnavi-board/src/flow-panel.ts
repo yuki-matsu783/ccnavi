@@ -73,7 +73,7 @@ import {
 } from "./core/flow-view.js";
 import { loadingText } from "./core/loading-render.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
-import { WATCH_PATTERNS } from "./core/watch.js";
+import { OWN_WRITE_GRACE_MS, WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
 import * as diaglog from "./log.js";
 import { copyPrompt, openPromptInSession } from "./prompt-handover.js";
@@ -82,11 +82,8 @@ import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
-const DEBOUNCE_MS = 120;
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js` */
 const SCREEN = "flow";
-/** 自分の保存で監視が反応するのを、この間だけ「外で変わった」と言わない */
-const OWN_WRITE_GRACE_MS = 1500;
 
 interface Loaded {
   readonly target: FlowTarget;
@@ -509,7 +506,7 @@ function scheduleChanged(current: PanelState): void {
       current.changedPending = true;
       current.host.post({ type: "changed" } satisfies ToFlow);
     }
-  }, DEBOUNCE_MS);
+  }, WATCH_DEBOUNCE_MS);
 }
 
 function scheduleLock(current: PanelState): void {
@@ -521,7 +518,7 @@ function scheduleLock(current: PanelState): void {
     if (alive(current)) {
       void refreshLock(current);
     }
-  }, DEBOUNCE_MS);
+  }, WATCH_DEBOUNCE_MS);
 }
 
 /**
@@ -601,7 +598,7 @@ function scheduleOffer(current: PanelState): void {
   current.offerTimer = setTimeout(() => {
     current.offerTimer = undefined;
     postOffer(current);
-  }, DEBOUNCE_MS);
+  }, WATCH_DEBOUNCE_MS);
 }
 
 function showError(current: PanelState, error: string): void {

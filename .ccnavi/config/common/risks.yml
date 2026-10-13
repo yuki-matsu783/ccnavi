@@ -37,3 +37,30 @@ factors:
   #   points: 30
   #   judge: テストの無い振る舞いの変更を含むか
   #   message: テストの無い変更
+  # - id: breaking-change
+  #   points: 30
+  #   judge: 互換性を壊す変更（公開 API・設定の形・出力の形）を含むか
+  #   message: 互換性を壊す変更
+  #
+  # 例: 重要なパスの加点。差分が小さくても、1 つ当たるだけで HIGH（levels.high）に届く点にする。
+  # 使うときにコメントを外し、glob はこのリポジトリの置き場に合わせて直す。
+  # - id: auth-paths
+  #   points: 40
+  #   glob: "*/auth/*"
+  #   message: 認可に関わるパス
+  # - id: billing-paths
+  #   points: 40
+  #   glob: "*/billing/*"
+  #   message: 課金に関わるパス
+  # - id: db-migrations
+  #   points: 40
+  #   glob: "*/migrations/*"
+  #   message: DB 移行
+  # - id: ci-config
+  #   points: 40
+  #   glob: ".github/*"
+  #   message: CI 設定
+  # - id: public-api
+  #   points: 40
+  #   glob: "*/api/public/*"
+  #   message: 公開 API

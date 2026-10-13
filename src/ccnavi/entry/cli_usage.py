@@ -317,12 +317,15 @@ scripts in .ccnavi/scripts/, which call
         (writes the learning record scaffold and the decision-log digest into
          wip/handoff/learnings/<id>.*; with --note appends one learning,
          or writes it to docs/wiki/inbox/ outside a ticket. The <id> goes before the options.)
-    ccnavi ticket new <id> --title <title> --plan <type,type,...> [--issue N]
+    ccnavi ticket new <id> --title <title> --plan <type,type,...> [--scope <glob>]... [--issue N]
         (writes the scaffold of a parent proposal to wip/proposals/todo/<id>.md of
          the worktree named <id>; run it inside that worktree. Collects the scope
-         of the chosen phases from phases.yml into allow, chains the plan in a
-         straight line and fills phases:. Stops without phases.yml, for a child
-         id, or when allow would be empty. Typed directly, not via ccnavi-ticket.sh)
+         of the chosen phases from phases.yml into allow, adds each --scope glob
+         (the files this work touches, relative to the worktree root; repeatable),
+         chains the plan in a straight line and fills phases:. A scope: inherit
+         type such as quick-work collects nothing by itself, so pass --scope.
+         Stops without phases.yml, for a child id, or when allow would be empty.
+         Typed directly, not via ccnavi-ticket.sh)
     ccnavi ticket new <id> --title <title> --template <name> [--layer <name>]
                            [--with-feedback] [--issue N]
         (the same, but the plan and the child flow drafts come from a template

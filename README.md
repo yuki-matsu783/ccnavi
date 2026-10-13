@@ -1792,7 +1792,7 @@ feedback:                              # フィードバック計画。レビュ
   `ccnavi ticket new <識別子> --title <題> --plan "design,acceptance,implement" [--issue N]` と打つと、
   `wip/proposals/todo/<識別子>.md` に、選んだフェーズの `scope` を `phases.yml` から集めた `allow`（重複なし）、
   各項が前の項を待つ一直線の `plan`、`phases:` の写しを持つ親の提案を書く。対象は親だけ。`phases.yml` が無いとき、
-  `inherit` の型だけで `allow` が空になるとき、既に同じ識別子の提案があるときは、何も書かずに理由を言う。
+  `inherit` の型だけで `allow` が空になるとき、既に同じ識別子の提案があるときは、何も書かずに理由を言う。`quick-work` のような `scope: inherit` の型は範囲を持たないので、今回触るファイルを `--scope <glob>`（繰り返せる。ワークツリーのルートからの相対）で渡す（例: `--plan quick-work --scope src/ui/error.ts`）。渡さずに止まったときの案内は、範囲を持つ型を足すのではなく `--scope` を示す。
   `ccnavi-ticket.sh` には通さず、実行ファイルを直接打つ（`--fill-phases` と同じ）。書いたあとは rationale と本文を埋め、
   `--lint` で確かめてから承認を頼む。`--plan` の代わりに `--template <名前> [--layer <名前>] [--with-feedback]` を渡すと、溜めた
   テンプレートから計画と子のフローの下書きを作る（フィードバック計画は `--with-feedback` のときだけ書く。「作業・レビュー計画のテンプレート」の「使う」）

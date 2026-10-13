@@ -42,18 +42,15 @@ import { rulesSums, type RulesSum } from "./core/sums.js";
 import { showLoading } from "./loading.js";
 import type { RulesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
-import { WATCH_PATTERNS } from "./core/watch.js";
+import { OWN_WRITE_GRACE_MS, WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
 import * as diaglog from "./log.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
-const DEBOUNCE_MS = 120;
 const DEFAULT_RULES = ".ccnavi/config/common/rules.yml";
 const DEFAULT_EXPECTATIONS =".ccnavi/config/common/rule-expectations.yml";
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "rules";
-/** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */
-const OWN_WRITE_GRACE_MS = 1500;
 
 interface Loaded {
   /** 読んだ対象。往復の間に切り替わったかを `stale` が見る */
@@ -444,7 +441,7 @@ function scheduleChanged(current: PanelState): void {
       current.changedPending = true;
       current.host.post({ type: "changed" } satisfies ToRules);
     }
-  }, DEBOUNCE_MS);
+  }, WATCH_DEBOUNCE_MS);
 }
 
 function scheduleLock(current: PanelState): void {
@@ -456,7 +453,7 @@ function scheduleLock(current: PanelState): void {
     if (alive(current)) {
       void refreshLock(current);
     }
-  }, DEBOUNCE_MS);
+  }, WATCH_DEBOUNCE_MS);
 }
 
 /**
@@ -567,7 +564,7 @@ function rulesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<RulesDa
   if (panel.options.retainContextWhenHidden !== true) {
     // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、裏に回った画面へ
     // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/claude/logging.md）
-    diaglog.get("ccnavi-board", root).error("画面の前提が成り立っていない", { screen: "rules", retainContextWhenHidden: false });
+    diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "rules", retainContextWhenHidden: false });
   }
   return retainedHost<RulesData>(
     {

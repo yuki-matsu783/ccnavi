@@ -70,6 +70,8 @@ def _followup_from_choice(
         "フェーズは再び開かれ、マーカーは消えた。\n"
         f"次は{_followup_next(root, parent, ident)}\n"
     )
+    for line in phase.reopen_impact(root, conf, parent.ticket, ph.number):
+        stdout.write(line + "\n")
     return ident
 
 
@@ -156,7 +158,9 @@ def _decision(
     ):
         stderr.write(
             "ccnavi: 変更要求のレビューが立っている。decide でも通せない。"
-            "レビュアーの approve / dismiss を待ってください\n"
+            "変更要求があるため、レビュー済みにはできません。修正する場合は同じフェーズに"
+            "新しい子を提案し、ユーザの承認を受けてください。修正・再依頼のあと、"
+            "レビュアーの approve（または dismiss）を待ちます\n"
         )
         return None
     unresolved = review_host._unresolved(
@@ -443,6 +447,21 @@ def apply_decision(
     if picked[CHOICE_ISSUE] and not conf.state:
         stderr.write("ccnavi: state の置き場が空。issue に回す下書きを置けない\n")
         return None
+    # 直す指摘があるなら、起こす続きの子がチケットとして読めるかを、何も置く前に確かめる。
+    # 子が多いと範囲の和が上限（20 件）を超え、「起こした」のに後で読み込めない子が残る。
+    if fix:
+        settled = [t for t in ph.tickets if ph.states.get(t.ticket) in ticket_model.FINISHED]
+        problem = approval_ops.followup_problem(
+            conf,
+            root,
+            parent,
+            ph.number,
+            settled or list(ph.tickets),
+            [_thread_line(t) for t in fix],
+        )
+        if problem:
+            stderr.write(f"ccnavi: 続きの子チケットを起こせない: {problem}\n")
+            return None
     # 前の回の下書き（投稿に失敗して残ったもの）は捨てる。残すと、この回に選んでいない
     # issue やコメントを sh が投稿する
     if conf.state:

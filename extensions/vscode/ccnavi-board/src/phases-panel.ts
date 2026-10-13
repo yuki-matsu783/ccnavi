@@ -48,20 +48,17 @@ import { commonPhases } from "./core/sums.js";
 import { showLoading } from "./loading.js";
 import type { PhasesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
-import { WATCH_PATTERNS } from "./core/watch.js";
+import { OWN_WRITE_GRACE_MS, WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
 import * as diaglog from "./log.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
-const DEBOUNCE_MS = 120;
 const DEFAULT_PHASES = ".ccnavi/config/project/phases.yml";
 /** 共通の設定の定義の場所。ルール管理・リスク管理と同じく固定で、env では動かせない */
 const DEFAULT_COMMON_PHASES = ".ccnavi/config/common/phases.yml";
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "phases";
-/** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */
-const OWN_WRITE_GRACE_MS = 1500;
 /** ワークスペースかプロジェクトの設定のファイルを最初の保存で作るときに、先頭へ置く説明 */
 const LAYER_HEADER = [
   "# このレイヤーのフェーズ定義。親チケットの project: がこのレイヤーを指すときに、共通レイヤーの定義に追加して使われる。",
@@ -452,7 +449,7 @@ function scheduleChanged(current: PanelState): void {
       current.changedPending = true;
       current.host.post({ type: "changed" } satisfies ToPhases);
     }
-  }, DEBOUNCE_MS);
+  }, WATCH_DEBOUNCE_MS);
 }
 
 function scheduleLock(current: PanelState): void {
@@ -464,7 +461,7 @@ function scheduleLock(current: PanelState): void {
     if (alive(current)) {
       void refreshLock(current);
     }
-  }, DEBOUNCE_MS);
+  }, WATCH_DEBOUNCE_MS);
 }
 
 /**

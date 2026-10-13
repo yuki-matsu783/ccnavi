@@ -288,32 +288,27 @@ def existing_ticket_file(conf: settings.Settings, root: str, ident: str) -> str:
     return ""
 
 
-def followup(
+def _followup_ticket(
     conf: settings.Settings,
     root: str,
     parent: ticket_model.Ticket,
     phase_no: int,
     children: list[ticket_model.Ticket],
     items: list[str],
-) -> tuple[str, str]:
-    """レビューで残った指摘の続きの子を、ユーザの判断で `doing/` に直に起こす。
-
-    ユーザが端末で「続きの子で直す」と選んだことが承認そのもの。同じフェーズの番号に足すので、
-    そのフェーズは開き直り、マーカーは消える。範囲は見た子の範囲の和。
-    本文には指摘を書き写す。返すのは識別子と、起こせなかった理由。
-    """
+) -> tuple[str, ticket_model.Ticket | None, str]:
+    """続きの子のチケットを組む（書かない）。返すのは識別子・チケット・組めなかった理由。"""
     try:
         ident = next_child_id(conf, root, parent.ticket, phase_no)
     except ValueError as exc:
-        return "", str(exc)
+        return "", None, str(exc)
     # 同じ識別子のファイルがどこかに在れば（読めなかったものも）上書きしない。
     taken = existing_ticket_file(conf, root, ident)
     if taken:
         return (
             ident,
+            None,
             f"{ident} のファイルがすでに在る（{taken}）。上書きしないので、中身を確かめて片付ける",
         )
-    where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     front: dict = {
         "version": ticket_model.VERSION,
         "ticket": ident,
@@ -355,6 +350,64 @@ def followup(
     body += [f"- {item}" for item in items] or ["（指摘の一覧はありません）"]
     body.append("")
     t = ticket_model.Ticket(ticket=ident, raw=front, body="\n".join(body))
+    return ident, t, ""
+
+
+def followup_problem(
+    conf: settings.Settings,
+    root: str,
+    parent: ticket_model.Ticket,
+    phase_no: int,
+    children: list[ticket_model.Ticket],
+    items: list[str],
+) -> str:
+    """続きの子を起こせるかを、書く前に確かめる。起こせなければ理由、起こせれば空。
+
+    起こす子は、見た子の範囲の和を持つ。子が多いと、1 つずつは上限（20 件）に収まっていても
+    和が超えて、書いたあとにチケットとして読み込めない。「起こした」と言ったのに読めない子を
+    残さないよう、書く前に `ticket.parse` で読み直す。
+    """
+    ident, t, why = _followup_ticket(conf, root, parent, phase_no, children, items)
+    if t is None:
+        return why
+    return _unreadable(ident, ticket_mod.render(t))
+
+
+def _unreadable(ident: str, text: str) -> str:
+    """書こうとする文面をチケットとして読み直し、読めなければ理由を返す（読めれば空）。"""
+    _, problems = ticket_mod.parse(text)
+    errors = [p for p in problems if p.severity == rules.SEVERITY_ERROR]
+    if not errors:
+        return ""
+    return (
+        f"続きの子 {ident} をチケットとして読めない（{'; '.join(p.detail for p in errors)}）。"
+        "指摘への対応を複数の子に分けるか、直す指摘を選び直して範囲を絞ってください"
+        "（範囲は見た子の和で、上限は "
+        f"{ticket_mod.MAX_SCOPE_ENTRIES} 件）"
+    )
+
+
+def followup(
+    conf: settings.Settings,
+    root: str,
+    parent: ticket_model.Ticket,
+    phase_no: int,
+    children: list[ticket_model.Ticket],
+    items: list[str],
+) -> tuple[str, str]:
+    """レビューで残った指摘の続きの子を、ユーザの判断で `doing/` に直に起こす。
+
+    ユーザが端末で「続きの子で直す」と選んだことが承認そのもの。同じフェーズの番号に足すので、
+    そのフェーズは開き直り、マーカーは消える。範囲は見た子の範囲の和。
+    本文には指摘を書き写す。返すのは識別子と、起こせなかった理由。
+    """
+    ident, t, why = _followup_ticket(conf, root, parent, phase_no, children, items)
+    if t is None:
+        return ident, why
+    unreadable = _unreadable(ident, ticket_mod.render(t))
+    if unreadable:
+        return ident, unreadable
+    where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
     failed = approval_marks.write_ticket(approval.copy_path(where, ident), ticket_mod.render(t))
     if failed:
         return ident, failed

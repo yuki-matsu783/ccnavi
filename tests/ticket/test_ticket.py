@@ -33,6 +33,7 @@ from ccnavi.entry import cli
 from ccnavi.hook.subagent import CANDIDATE_NOTE
 from ccnavi.infra import settings, shellread
 from ccnavi.tickets import approval, phase_forms, phase_scope, review, ticket_fields
+from ccnavi.tickets import ticket as ticket_mod
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 from tests.ticketsample import RULES, plain_parent, write_plain_phases
@@ -1751,6 +1752,33 @@ class TicketTest(unittest.TestCase):
             posted = f.read()
         self.assertTrue(posted.startswith("<!-- ccnavi:decide -->"))
         self.assertIn("i0001-01-03", posted)
+
+    def test_decide_yes_refuses_a_followup_whose_scope_sum_is_over_the_limit(self):
+        """見た子の範囲の和が上限を超えるとき、続きの子を書く前に止める。
+
+        書いたあとに読めない子を残さない。受け入れ・マーカー・続きの子のどれも置かない。
+        """
+        fixture = self.two_threads()
+        digest = json.loads(self.decide(fixture, "--preview", "--json").stdout)["digest"]
+        choices = json.dumps({"u1": "keep", "u2": "fix"})
+        # 親は 2 件、子は 1 件と 2 件、和は 3 件。上限を 2 件にして、和だけが超える形にする。
+        second = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-02.md")
+        with open(second, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("src/b/*", text)
+        with open(second, "w", encoding="utf-8", newline="\n") as f:
+            f.write(
+                text.replace("src/b/*", 'src/b/*"\n  - match: Write|Edit\n    glob: "src/c/*', 1)
+            )
+        with mock.patch.object(ticket_mod, "MAX_SCOPE_ENTRIES", 2):
+            refused = self.decide(fixture, "--yes", choices, "--digest", digest, "--json")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("続きの子チケットを起こせない", refused.stderr)
+        self.assertIn("複数の子に分ける", refused.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-03.md")))
+        phases = os.path.join(self.approved, "phases", "i0001")
+        self.assertFalse(os.path.exists(os.path.join(phases, "accepted.json")))
+        self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
 
     def test_decide_yes_without_a_fix_marks_the_phase_reviewed(self):
         fixture = self.two_threads()

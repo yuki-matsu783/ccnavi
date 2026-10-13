@@ -13,7 +13,11 @@
 - `phases.yml` が無いか読めないときは、承認の検査を通る plan を作れない（設計 9.7）ので止まる
 - plan の型は `work` の定義だけ（`feedback` の定義は `feedback:` に置くもので、この雛形は出さない）
 - plan の `after` は一直線（各項が前の項を待つ。終端が 1 つになり、承認の検査を通る）
-- `scope: inherit` の型だけで `allow` が空になるときは止める（`allow` か `ask` が 1 件は要る）
+- `scope: inherit` の型だけで `allow` が空になるときは止める（`allow` か `ask` が 1 件は要る）。
+  止めるときは、今回の範囲を `--scope` で渡し直すよう案内する（`quick-work` のような継ぐ型を
+  選んだ人が、範囲を持つ型を足す回り道へ迷わないように）
+- `--scope <glob>`（繰り返せる）は今回の作業の範囲。型の `scope` を集めたものに足して
+  `allow` に書く。ワークツリーのルートからの相対の glob だけ（絶対パスと `..` は断る）
 - 既にある提案・承認済みチケットは上書きしない
 - 書いたあとに `plan_phases.fill` で `phases:`（定義の写し）を差し込む。無いと `--agree` が落ちる
 
@@ -91,6 +95,29 @@ def collect_allow(
                 seen.add(key)
                 globs.append(glob)
     return globs, inherited
+
+
+def parse_scope(values: list[str] | None) -> tuple[list[str], str]:
+    """`--scope` の値（繰り返し可。カンマ区切りも可）を glob の並びにする。不正なら理由を返す。"""
+    globs: list[str] = []
+    seen: set[str] = set()
+    for value in values or []:
+        for part in value.split(","):
+            glob = part.strip()
+            if not glob:
+                continue
+            if any(unicodedata.category(ch) in ("Cc", "Zl", "Zp") for ch in glob):
+                return [], f"--scope {glob!r} に改行や制御文字は使えない"
+            norm = glob.replace("\\", "/")
+            if norm.startswith("/") or re.match(r"[A-Za-z]:", norm) or ".." in norm.split("/"):
+                return [], (
+                    f"--scope {glob!r} はワークツリーのルートからの相対の glob で書く"
+                    "（絶対パスと `..` は使えない）"
+                )
+            if glob.lower() not in seen:
+                seen.add(glob.lower())
+                globs.append(glob)
+    return globs, ""
 
 
 def render(ident: str, title: str, plan: list[str], allow: list[str], issue: int | None) -> str:
@@ -179,12 +206,14 @@ def run(
     template: str = "",
     layer: str = "",
     with_feedback: bool = False,
+    scope: list[str] | None = None,
 ) -> int:
     """`ticket new` の本体。書けたら 0、書かなければ 1（理由は標準エラー）。
 
     `template` を渡すと、`--plan`（型の列）の代わりにテンプレートから計画と子のフローの下書きを作る
     （`layer` はテンプレートを足し算で引くレイヤー。省けば cwd のツリーのレイヤー）。
     フィードバック計画は `with_feedback` のときだけ書く。
+    `scope` は今回の作業の範囲（glob）。型の `scope` を集めたものに足して `allow` に書く。
     """
 
     def refuse(why: str) -> int:
@@ -259,11 +288,19 @@ def run(
         scoped = plan
 
     allow, inherited = collect_allow(types, scoped)
+    extra, why = parse_scope(scope)
+    if why:
+        return refuse(why)
+    seen = {glob.lower() for glob in allow}
+    allow += [glob for glob in extra if glob.lower() not in seen]
     if not allow:
         return refuse(
-            f"plan の型（{', '.join(inherited)}）が scope: inherit だけで、allow に書く範囲が"
-            "集まらない。allow か ask が 1 件は必要です（設計 9.3）。範囲を持つ型を plan"
-            " に追加します。"
+            f"plan の型（{', '.join(inherited)}）は scope: inherit のため、範囲を親の allow から"
+            "継承します。今回の範囲が未指定で、allow が集まりません（allow か ask が 1 件は"
+            "必要です。設計 9.3）。ユーザーに今回編集するファイルを確認し、--scope <glob> で"
+            "指定して再実行してください"
+            '（例: --plan quick-work --scope "src/ui/error.ts"）。'
+            "範囲を持つ型を追加する必要はありません"
         )
     if len(allow) > ticket_mod.MAX_SCOPE_ENTRIES:
         return refuse(

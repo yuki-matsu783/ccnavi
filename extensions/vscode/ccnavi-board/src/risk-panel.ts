@@ -46,19 +46,16 @@ import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import type { RiskTarget } from "./core/screens.js";
 import { riskSums, type RiskSum } from "./core/sums.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
-import { WATCH_PATTERNS } from "./core/watch.js";
+import { OWN_WRITE_GRACE_MS, WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
 import * as diaglog from "./log.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
-const DEBOUNCE_MS = 120;
 const DEFAULT_RISK = ".ccnavi/config/common/risks.yml";
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "risk";
-/** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */
-const OWN_WRITE_GRACE_MS = 1500;
 
 interface Loaded {
   /** 読んだ対象。往復の間に切り替わったかを `stale` が見る */
@@ -444,7 +441,7 @@ function scheduleChanged(current: PanelState): void {
       current.changedPending = true;
       current.host.post({ type: "changed" } satisfies ToRisk);
     }
-  }, DEBOUNCE_MS);
+  }, WATCH_DEBOUNCE_MS);
 }
 
 function scheduleLock(current: PanelState): void {
@@ -456,7 +453,7 @@ function scheduleLock(current: PanelState): void {
     if (alive(current)) {
       void refreshLock(current);
     }
-  }, DEBOUNCE_MS);
+  }, WATCH_DEBOUNCE_MS);
 }
 
 /**

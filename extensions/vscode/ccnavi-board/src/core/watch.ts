@@ -17,3 +17,9 @@ export const WATCH_PATTERNS = [
   ".git/worktrees/*",
   "projects/*/.git/worktrees/*",
 ] as const;
+
+/** 監視の反応をまとめる待ち時間。ほとんどの画面はこれを使う。違う値にする画面は、その場で理由を書く */
+export const WATCH_DEBOUNCE_MS = 120;
+
+/** 自分の保存で監視が反応するのを、この間だけ「ファイルの変更を検知しました」と言わない */
+export const OWN_WRITE_GRACE_MS = 1500;

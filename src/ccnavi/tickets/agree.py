@@ -353,12 +353,14 @@ class Applied:
     reason: str = ""
 
 
-def _reopened_line(parent: str, phase: int):
+def _reopened_line(root: str, conf: settings.Settings, parent: str, phase_no: int):
     def announce(kinds: list[str]) -> list[str]:
-        return [
-            f"  {parent} のフェーズ {phase} のマーカー（{', '.join(kinds)}）を削除しました。"
+        lines = [
+            f"  {parent} のフェーズ {phase_no} のマーカー（{', '.join(kinds)}）を削除しました。"
             "全部閉じたらレビューをもう一度頼むことになる"
         ]
+        lines += phase.reopen_impact(root, conf, parent, phase_no)
+        return lines
 
     return announce
 
@@ -485,7 +487,7 @@ def _apply_steps(
                     approval.home_dir(conf, root, t.parent, "", project=t.project),
                     t.parent,
                     t.phase,
-                    announce=_reopened_line(t.parent, t.phase),
+                    announce=_reopened_line(root, conf, t.parent, t.phase),
                 )
 
     stage.line(f"\n承認した。{conf.approved}/{approval.DOING_DIR}/ へ動かした。")

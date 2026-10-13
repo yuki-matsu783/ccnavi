@@ -503,8 +503,11 @@ def revision_problems(
                 rules.Problem(
                     rules.SEVERITY_ERROR,
                     revised.ticket,
-                    "フィードバック計画は 1 回だけ。承認済みのフィードバック作業フェーズに"
-                    f"子を追加してやり直すか、{elsewhere}",
+                    "フィードバック計画は 1 回だけ作成でき、変更できません。ただし、承認済みの"
+                    "フィードバック作業フェーズの定義の上限と親の範囲に収まる修正は、その"
+                    "フェーズに子チケットを追加して対応できます（設計の修正でも、定義が親の範囲の"
+                    "設計書を持つ場合は同様です）。収まらない場合は、ユーザーによる定義の変更か、"
+                    f"別作業への切り出しが必要です。切り出す場合は、{elsewhere}",
                 )
             )
         elif not phase.plan_finished(root, conf, current):

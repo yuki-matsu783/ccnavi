@@ -334,7 +334,9 @@ def close_early(
     ):
         stderr.write(
             "ccnavi: 変更要求のレビューが立っている。端末からも通せない。"
-            "レビュアーの approve / dismiss を待ってください\n"
+            "変更要求があるため、レビュー済みにはできません。修正する場合は同じフェーズに"
+            "新しい子を提案し、ユーザの承認を受けてください。修正・再依頼のあと、"
+            "レビュアーの approve（または dismiss）を待ちます\n"
         )
         return 1
     phases = phase.phases_of(root, conf, parent.ticket)
