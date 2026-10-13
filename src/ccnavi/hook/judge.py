@@ -1188,9 +1188,15 @@ def ticket_verdict(
         body = (
             "This path is inside the ticket's work area but outside its parent "
             f"{parent.ticket}. The ticket was approved with that overflow shown as a warning; "
-            "writes there stay blocked. Do the work inside the parent's area, or, if the task "
-            "genuinely needs this path, tell the parent so it can propose a ticket whose parent "
-            "covers it and ask the user to agree to it."
+            "writes there stay blocked. Widening this child's own scope does not help, and a "
+            "normal revision of the parent cannot change the parent's scope (it revises only "
+            "plan, feedback and phases), so re-proposing the child with a wider scope is "
+            "rejected again. Tell the parent (main session), which picks one of: (1) the change "
+            "can be split off as separate work: propose a new parent ticket that covers this "
+            "path; (2) the change is essential to finish this work: consult the user about "
+            "changing the parent's approved scope, with the path and the reason; (3) the path "
+            "is a protected file: use the draft and user-swap route (ccnavi-stage.sh), which is "
+            "separate from scope approval."
         )
     else:
         body = (

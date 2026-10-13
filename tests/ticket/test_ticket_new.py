@@ -22,11 +22,12 @@ from tests import config_path
 from tests.ticket.test_parent_phases import front_of
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git
+from tests.ticketsample import PHASES
 
 IDENT = "feature-9-scaffold-demo"
 
 
-class TicketNewTest(PhaseHarness):
+class TicketNewTestBase(PhaseHarness):
     def setUp(self):
         super().setUp()
         self.tree = self.worktree(IDENT, "main")
@@ -45,6 +46,8 @@ class TicketNewTest(PhaseHarness):
         with open(self.todo, encoding="utf-8") as f:
             return f.read()
 
+
+class TicketNewTest(TicketNewTestBase):
     def test_the_scaffold_passes_lint_and_the_approval_check(self):
         result = self.new("--issue", "9", plan="design,acceptance,implement")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -164,3 +167,45 @@ class TicketNewTest(PhaseHarness):
         self.assertEqual(self.new().returncode, 0)
         head = self.written().split("---\n", 2)[1]
         self.assertIsInstance(yaml.safe_load(head), dict)
+
+
+class TicketNewScopeTest(TicketNewTestBase):
+    """`--scope`: `inherit` の型（quick-work）だけの計画でも、今回の範囲を渡して雛形を作れる。"""
+
+    def setUp(self):
+        super().setUp()
+        quick_work = (
+            "\n  quick-work:\n    kind: work\n    title: 小さい作業\n    review: mr\n"
+            "    scope: inherit\n"
+        )
+        with open(config_path(self.root, "phases"), "w", encoding="utf-8", newline="\n") as f:
+            f.write(PHASES.rstrip("\n") + quick_work)
+
+    def test_quick_work_alone_stops_and_points_at_scope(self):
+        result = self.new(plan="quick-work")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(os.path.exists(self.todo))
+        self.assertIn("--scope", result.stderr)
+        self.assertIn("範囲を持つ型を足す必要はない", result.stderr)
+
+    def test_scope_gives_quick_work_its_allow(self):
+        result = self.new("--scope", "src/ui/error.ts", plan="quick-work")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        front = front_of(self.written())
+        self.assertEqual([e["glob"] for e in front["allow"]], ["src/ui/error.ts"])
+        self.assertEqual(front["plan"], ["quick-work"])
+        self.assertIn("quick-work", front["phases"])
+
+    def test_scope_is_added_after_the_collected_scope_without_duplicates(self):
+        result = self.new("--scope", "docs/a.md,SRC/*", "--scope", "docs/a.md", plan="implement")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        globs = [e["glob"] for e in front_of(self.written())["allow"]]
+        self.assertEqual(globs, ["src/*", "tests/*", "docs/a.md"])
+
+    def test_scope_must_be_relative_and_stay_inside_the_tree(self):
+        for bad in ("/etc/passwd", "../x", "a/../b", "C:/x"):
+            with self.subTest(scope=bad):
+                result = self.new("--scope", bad, plan="quick-work")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("--scope", result.stderr)
+        self.assertFalse(os.path.exists(self.todo))
