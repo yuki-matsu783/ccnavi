@@ -46,7 +46,7 @@ _GIT_TIMEOUT = 20.0
 def _ident_ok(stderr: TextIO, verb: str, what: str, value: str) -> bool:
     if ticket_ids.is_valid_id(value) and ".." not in value:
         return True
-    stderr.write(f"ccnavi: {verb} の{what} {value!r} は識別子の形ではない\n")
+    stderr.write(f"ccnavi: {verb} の{what} {value!r} は有効な識別子の形式ではありません。\n")
     return False
 
 
@@ -157,7 +157,9 @@ def sync_closed(
     if not _ident_ok(stderr, "sync closed", "識別子", family):
         return 1
     if not _REPO_NAME.fullmatch(repo) or ".." in repo:
-        stderr.write(f"ccnavi: sync closed のリポジトリ {repo!r} は識別子の形ではない\n")
+        stderr.write(
+            f"ccnavi: sync closed のリポジトリ {repo!r} は有効な識別子の形式ではありません。\n"
+        )
         return 1
     check = gitcmd.run(root, ["check-ref-format", "--branch", integration], _GIT_TIMEOUT)
     if not integration or integration.startswith("-") or not check.ok:

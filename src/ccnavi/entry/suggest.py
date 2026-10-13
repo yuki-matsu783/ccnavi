@@ -429,8 +429,8 @@ def _message_candidates(
                 count=count,
                 summary=(
                     f"message を見直す候補: {rule_id} が同じ呼び出しを繰り返し止めた"
-                    f"（{count} 回）。エージェントが文面から次に何をすればよいかを"
-                    "読み取れていない疑い"
+                    f"（{count} 回）。エージェントが次の行動を判断できていない可能性があります。"
+                    "拒否理由と代替手順の説明を見直してください。"
                 ),
                 rule=written,
                 layer=view.name,
@@ -477,7 +477,8 @@ def report(stdout: TextIO, conf: settings.Settings, root: str, as_json: bool) ->
     stdout.write(
         f"# 記録 {len(logs)} 本・{body['records']} 行から作った候補 {len(body['candidates'])} 件"
         f"（検証を通らず除いたもの {body['dropped']} 件）。\n"
-        "# どれも下書き。置くのはユーザで、置く前に /ccnavi-config の手順で確かめる。\n"
+        "# 候補はすべて下書きです。ユーザーが /ccnavi-config の手順で確認してから、"
+        "設定に反映してください。\n"
     )
     for c in body["candidates"]:
         stdout.write("---\n")

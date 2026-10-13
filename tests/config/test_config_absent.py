@@ -177,8 +177,8 @@ class AbsentRulesTest(ConfigUnionHarness):
 
         out = self.ccnavi("--explain").stdout
 
-        self.assertIn("このレイヤーは置いていない", out)
-        self.assertNotIn("読めない: ", out.split("■ rules 自身のレイヤー")[0])
+        self.assertIn("このレイヤーの設定ファイルはありません", out)
+        self.assertNotIn("読めない: ", out.split("■ rules ワークスペースのレイヤー")[0])
 
 
 GIT = "git"
