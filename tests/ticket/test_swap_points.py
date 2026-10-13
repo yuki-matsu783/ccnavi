@@ -570,7 +570,9 @@ class DurableWiringTest(CoreHarness):
         """続きの子（`followup`）は `doing/` に直に起こすので、同じ書き方で置く。"""
         parent = self.approved_parent_copy()
         with durable_writes() as seen:
-            ident, failed = approval_ops.followup(self.conf(), self.root, parent, 1, [], ["指摘"])
+            ident, failed = approval_ops.followup(
+                self.conf(), self.root, parent, 1, [parent], ["指摘"]
+            )
         self.assertEqual(failed, "")
         written = [
             p for p in seen if p.endswith(os.path.normcase(os.path.join("doing", ident + ".md")))

@@ -570,6 +570,50 @@ def _next_hint(parent: ticket_model.Ticket, phases: list[Phase], number: int) ->
     return f"次に始められるのは {names} です。子チケットを提案して承認を受けてください。{hints}"
 
 
+def downstream_touched(
+    root: str, conf: settings.Settings, parent_id: str, number: int
+) -> list[str]:
+    """N 番目を開き直したとき、影響を受けうる後続の、着手済み・レビュー済みのフェーズ。
+
+    後続は、計画の先行（`after`）で N 番目を待つフェーズ。消えるのは N 番目のマーカーだけ。
+    着手済みの実装の子や済んだ受入テストのレビュー状態は残る。`after` の見直しは無く、
+    設計の修正が後続に届いたかはユーザの判断になる。
+    返すのは「フェーズ 3（実装とテスト）: 着手済み・レビュー済み」の形の行。無ければ空。
+    """
+    phases = phases_of(root, conf, parent_id)
+    owner = next((p.owner for p in phases if p.owner is not None), None)
+    if owner is None:
+        return []
+    out: list[str] = []
+    for ph in phases:
+        if ph.number <= number or number not in workflow.waits_of(owner, ph.number):
+            continue
+        states = list(ph.states.values())
+        began = any(st in (ticket_model.DOING, *ticket_model.FINISHED) for st in states)
+        reviewed = approval_marks.MARK_REVIEWED in ph.marks
+        if not began and not reviewed:
+            continue
+        notes = [text for text, on in (("着手済み", began), ("レビュー済み", reviewed)) if on]
+        out.append(f"フェーズ {ph.label}: {'・'.join(notes)}")
+    return out
+
+
+def reopen_impact(root: str, conf: settings.Settings, parent_id: str, number: int) -> list[str]:
+    """フェーズを開き直したとき、後続の着手済み・レビュー済みのフェーズを挙げて方針を促す行。
+
+    開き直しで消えるのはそのフェーズのマーカーだけ。実装中の子を止めるか・受入テストを作り直すか・
+    どの工程を再レビューするかは、ユーザが決める。自動で取り消すことはしない。
+    """
+    touched = downstream_touched(root, conf, parent_id, number)
+    if not touched:
+        return []
+    return [
+        "  このフェーズを開き直したことが、後続の作業に影響する可能性がある。"
+        "継続・追加修正・取り消しの方針をユーザと決める（自動では取り消さない）:",
+        *[f"    - {line}" for line in touched],
+    ]
+
+
 def waits_done(parent: ticket_model.Ticket, phases: list[Phase], number: int) -> bool:
     """N 番目が待つフェーズが、全部閉じてレビューが済んでいるか。"""
     by_number = {p.number: p for p in phases}
