@@ -58,7 +58,7 @@ TICKET_OUTSIDE = "docs/x.md"
 
 # 承認画面と `--explain` がつける文面。
 APPROVAL_NOTE = (
-    "ルールの allow で許可してある場所でも、この範囲の外では止まる。"
+    "ルールの allow で許可されていても、このチケットの範囲外では編集できません。"
     "ルールの deny はこの範囲の中でも止まる"
 )
 EXPLAIN_NOTE = (

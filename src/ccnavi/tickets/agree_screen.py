@@ -181,14 +181,14 @@ def screen(
         else:
             lines.append("■ このチケットで編集可能な範囲")
             lines.append(
-                "    下に並ぶ場所にだけ、このチケットで編集できるようになる。"
-                "allow は無確認で編集できる場所、ask は確認を挟んで編集できる場所、"
+                "    このチケットでは、以下に示す場所のみ編集できるようになります。"
+                "allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、"
                 "deny はこのチケットでも編集できない場所"
             )
             # チケットの範囲はルールの allow より強い。承認するユーザは「ルールで
             # 開けてあるから範囲の外でも書ける」と読み違えやすいので、承認の前に言う。
             lines.append(
-                "    ルールの allow で許可してある場所でも、この範囲の外では止まる。"
+                "    ルールの allow で許可されていても、このチケットの範囲外では編集できません。"
                 "ルールの deny はこの範囲の中でも止まる"
             )
         for name in rules.SECTIONS:
@@ -216,14 +216,15 @@ def screen(
             if t.predecessors:
                 lines.append(f"■ 先行: {', '.join(t.predecessors)}")
                 lines.append(
-                    "    どれも done/ に在って取り消しでないこと。"
-                    "満たしていなければ、承認も着手も止まる"
+                    "    すべての先行チケットが、取り消されずに完了し、"
+                    "done/ に移動している必要があります。"
+                    "条件を満たすまで、承認・着手はできません。"
                 )
         elif t.has_plan:
             lines.append("■ 全体計画")
             lines.append(
                 "    承認すると、この順序で進めることに合意したことになる。"
-                "各フェーズの子は、そのフェーズが待つフェーズ（下の待ち方）が閉じてレビューが"
+                "各フェーズの子は、そのフェーズが待つフェーズ（下のフェーズ間の依存関係）が閉じてレビューが"
                 "済むまで承認できない"
             )
             lines += _plan_lines(t.plan, 1, cand_types)
@@ -275,9 +276,9 @@ def _plan_lines(items: list[ticket_model.PlanItem], start: int, types: dict | No
         title = pt.title if pt is not None else item.type
         review = ""
         if item.deferred:
-            review = "レビューは次と一緒に"
+            review = "次のフェーズとまとめてレビュー"
         elif item.review == ticket_model.PLAN_REVIEW_MR:
-            review = "レビュー要: 計画で強めた"
+            review = "レビュー必須：計画で追加指定"
         elif pt is not None:
             review = {
                 phasetypes.REVIEW_MR: "レビュー要: マージリクエスト",
@@ -292,7 +293,8 @@ def _workflow_lines(t: ticket_model.Ticket, wf: ticket_model.Workflow) -> list[s
     if not found:
         return []
     return [
-        "■ 待ち方（計画の項の after から決まる。後から phases.yml を直しても変わらない）",
+        "■ フェーズ間の依存関係（計画の各項目の after で決まります。"
+        "承認後に phases.yml を変更しても変わりません）",
         *("    " + x for x in found),
     ]
 
@@ -314,7 +316,8 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
         lines.append("■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）")
         lines.append(
             "    承認したときの phases.yml と同じ中身を親に写して固定する。"
-            "後から phases.yml を直しても、この親の範囲・見る場所・成果物は変わらない"
+            "承認後に phases.yml を変更しても、この親チケットの編集可能範囲・"
+            "確認対象・成果物は変わりません。"
         )
         for ident in used:
             pt = types[ident]
@@ -348,13 +351,13 @@ def _copy_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket)
     lines: list[str] = []
     for ident, pt in after.items():
         if ident not in before:
-            lines.append(f"    足した: {pt.title} / {ident}")
+            lines.append(f"    追加: {pt.title} / {ident}")
         elif not phasetypes.same(pt, before[ident]):
             fields = ", ".join(phasetypes.differing(before[ident], pt))
-            lines.append(f"    変わった: {pt.title} / {ident}（{fields}）")
+            lines.append(f"    変更: {pt.title} / {ident}（{fields}）")
     for ident, pt in before.items():
         if ident not in after:
-            lines.append(f"    外した: {pt.title} / {ident}")
+            lines.append(f"    削除: {pt.title} / {ident}")
     if not lines:
         return []
     return ["■ phases: の差分（改版で親に固定する定義）", *lines]
@@ -373,7 +376,7 @@ def _plan_diff_lines(
     held, fresh = workflow.compute(current), workflow.compute(revised)
     before, after = workflow.lines(current, held), workflow.lines(revised, fresh)
     if before != after:
-        lines.append("■ 待ち方の変更")
+        lines.append("■ フェーズ間の依存関係の変更")
         lines.append("    いま:")
         lines += ["        " + x for x in before]
         lines.append("    改版:")

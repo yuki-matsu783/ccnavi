@@ -54,7 +54,9 @@ def operate(
         # tidy はチケットを読むので、チケット制御が要る。
         return _worktree(stdout, stderr, conf, root, args, words, cwd)
     if not conf.tickets_enabled:
-        stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
+        stderr.write(
+            f"ccnavi: チケット制御が無効になっています（{settings.TICKET_CONTROL_ENV}）。\n"
+        )
         return EXIT_ERROR
     bypass = _c1_bypass(root, conf, args, cwd)
     if bypass:
@@ -67,7 +69,10 @@ def operate(
         return EXIT_ERROR
     if args.close_early:
         if not args.result:
-            stderr.write("ccnavi: --close-early には --reason <理由> と --result <json> が要る\n")
+            stderr.write(
+                "ccnavi: --close-early を実行するには、"
+                "--reason <理由> と --result <json> を指定してください。\n"
+            )
             return EXIT_ERROR
         # ユーザの判断。`--agree` / `--reviewed` と同じく端末を求める。
         if not cli_args._from_terminal(stdin, conf, stderr, "--close-early"):
@@ -82,7 +87,9 @@ def operate(
             stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
             return EXIT_ERROR
         if not args.json or not args.result:
-            stderr.write("ccnavi: ボードの経路は --json と --result <json> を付けて打つ\n")
+            stderr.write(
+                "ccnavi: ボードから実行する場合は、--json と --result <json> を指定してください。\n"
+            )
             return EXIT_ERROR
         history.set_via(history.VIA_BOARD)
         _decide_actor(args)
@@ -110,7 +117,10 @@ def operate(
         if not cli_args._inside(
             cli_args._real(os.path.abspath(args.choose_out)), cli_args._real(conf.state)
         ):
-            stderr.write("ccnavi: --choose-out の書き出し先は state の置き場の下だけ\n")
+            stderr.write(
+                "ccnavi: --choose-out の出力先には、"
+                "状態保存ディレクトリ配下のパスを指定してください。\n"
+            )
             return EXIT_ERROR
         code = review_decide.choose(
             stdin, stdout, stderr, root, conf, cwd, args.reviewed, args.result, args.choose_out
@@ -139,7 +149,7 @@ def operate(
     if kind == "ticket" and verb == "status":
         # ticket status [<親>]。読むだけ（サブエージェントにも許す）。
         if len(words) > 3:
-            stderr.write("ccnavi: ticket status に渡せる親は 1 つだけ\n")
+            stderr.write("ccnavi: ticket status に指定できる親チケットは1件のみです。\n")
         else:
             code = status.run(stdout, stderr, root, conf, c1.family_of(target) if target else "")
     elif kind == "ticket" and verb == "next-id":
@@ -251,7 +261,9 @@ def _worktree(
     if verb == "drop":
         code = worktrees.run_drop(stdout, stderr, root, target, cwd)
     elif not conf.tickets_enabled:
-        stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
+        stderr.write(
+            f"ccnavi: チケット制御が無効になっています（{settings.TICKET_CONTROL_ENV}）。\n"
+        )
         return EXIT_ERROR
     elif verb == "remaining":
         code = worktrees.run_remaining(stdout, root, conf, target, cwd)

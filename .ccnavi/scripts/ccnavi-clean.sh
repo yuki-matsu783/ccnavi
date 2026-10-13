@@ -111,7 +111,7 @@ if [ -n "$whole" ]; then
 		cd "$root"
 		exec uv run python -m ccnavi --root "$root" --cwd "$here" worktree drop "$name"
 	fi
-	printf 'ccnavi-clean: ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。\n' >&2
+	printf 'ccnavi-clean: ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
 fi
 

@@ -76,7 +76,7 @@ class ReviewTurnTest(PhaseHarness):
         self.assertEqual((tidy.returncode, tidy.stdout), (0, ""))
         self.assertTrue(os.path.isdir(tree))
         before = self.next_step("i0001-01-01")
-        self.assertIn("次の一手: まだレビュー準備中", before)
+        self.assertIn("次の操作: まだレビュー準備中", before)
         self.assertIn("親（メインエージェント）だけが実行する", before)
         fixture = self.remote()
         requested = self.request(fixture, 1)
@@ -105,7 +105,7 @@ class ReviewTurnTest(PhaseHarness):
             step = self.next_step("i0001-01-01")
         self.assertIn("依頼済みかを言えない", step)
         self.assertIn("request", step)
-        self.assertNotIn("次の一手: ユーザのレビューを待つ", step)
+        self.assertNotIn("次の操作: ユーザのレビューを待つ", step)
 
     def test_the_last_confirm_tells_the_way_to_ready_and_tidies_the_children(self):
         tree, _ = self.child("i0001-01-01")

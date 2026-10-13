@@ -2622,7 +2622,7 @@ class TicketTest(unittest.TestCase):
         self.propose("i0001", allow=("src/*", "wip/*"))
         refused = self.ccnavi("--agree", "--guard-ticket-approval", "enable", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("端末", refused.stderr)
+        self.assertIn("ターミナル", refused.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
         refused = self.ccnavi(
             "--cwd",
@@ -2634,7 +2634,7 @@ class TicketTest(unittest.TestCase):
             stdin="y\n",
         )
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("端末", refused.stderr)
+        self.assertIn("ターミナル", refused.stderr)
         self.assertEqual(self.approve().returncode, 0)
 
     def test_subagent_cannot_move_state_from_powershell_either(self):

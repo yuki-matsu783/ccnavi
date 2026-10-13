@@ -382,7 +382,7 @@ class EntryTest(_Base):
         old = _write(os.path.join(self.logs, "decisions.20260101-000000.jsonl"), age_days=30)
         proc = run_ccnavi(["--prune"], env=self.env(), cwd=self.root)
         self.assertNotEqual(proc.returncode, 0)
-        self.assertIn("--prune は端末から打つもの", proc.stderr)
+        self.assertIn("--prune はユーザーがターミナルから実行する必要があります", proc.stderr)
         self.assertTrue(os.path.exists(old))
 
     def test_prune_removes_and_says_so(self):

@@ -637,7 +637,7 @@ class DagApprovalTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", PLAN))
         self.commit_parent()
         result = self.ccnavi("--agree", stdin="n\n")
-        self.assertIn("■ 待ち方", result.stdout)
+        self.assertIn("■ フェーズ間の依存関係", result.stdout)
         self.assertIn("1: design — 何も待たない", result.stdout)
         self.assertIn("3: implement — 待つ: 1", result.stdout)
         self.assertIn("4: docs — 待つ: 1, 2, 3", result.stdout)

@@ -242,7 +242,7 @@ class WorktreeShTest(unittest.TestCase):
             (("taken",), 1, "既にあります"),
             ((), 2, "名前を渡してください"),
             (("a", "b"), 2, "1 本だけ"),
-            (("--bogus",), 2, "知らない引数"),
+            (("--bogus",), 2, "未対応の引数"),
         ):
             with self.subTest(args=args):
                 result = self.run_sh(*args)

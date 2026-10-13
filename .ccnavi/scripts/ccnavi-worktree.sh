@@ -86,7 +86,7 @@ while [ "$#" -gt 0 ]; do
 		;;
 	-*)
 		usage >&2
-		fail unknown-arg "知らない引数です（$1）。" 2
+		fail unknown-arg "未対応の引数です（$1）。" 2
 		;;
 	*)
 		[ -z "$name" ] || fail two-names "ワークツリーは 1 回に 1 本だけ指定します（${name} と ${1}）。" 2

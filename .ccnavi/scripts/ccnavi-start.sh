@@ -10,7 +10,7 @@
 #   2. 候補が 1 件ならそのブランチで続ける（ワークツリーが無ければ .claude/worktrees/<識別子> に出す）。
 #      複数なら一覧を出して終わる（ユーザが選ぶ）。0 件で --issue なら新しく作る
 #   3. 新規作成: <先頭の語>-<番号>-<slug> のブランチを統合先から切り、ワークツリー・空の初期コミット・push・Draft MR
-#   途中で失敗しても、打ち直せば出来たところを飛ばして続きから進む（ブランチ・push・MR の有無を確かめる）。
+#   途中で失敗しても、打ち直せば完了済みの処理をスキップし、未完了の処理から再開する（ブランチ・push・MR の有無を確かめる）。
 #
 # git は ccnavi-git.sh を通す（読むだけの確認は git を直接呼ぶ。他のスクリプトと同じ）。ホストへの繋ぎ方は
 # ccnavi-common-host.sh（ccnavi-review.sh・ccnavi-branches.sh と同じ）。
@@ -52,7 +52,7 @@ sh .ccnavi/scripts/ccnavi-start.sh (--issue <番号> | --mr <番号>) [--slug <�
 
   ホストを見られないときは、既存の MR を見落として重複を作らないよう新規作成に進まず止める（手元の候補がちょうど 1 件なら続ける）。
   GitHub の API に届かないとき（Claude remote など）は、MCP で代行する手順を標準出力に出して終了コード 4 で止まる。
-  代行したあと同じコマンドを打ち直すと、出来たところを飛ばして続きから進む。
+  代行したあと同じコマンドを打ち直すと、完了済みの処理をスキップし、未完了の処理から再開します。
   冪等。cwd のリポジトリ（ワークスペース・projects/<名前>）を対象にする。
 
 終了コード: 0 完了 / 1 前提の未充足 / 2 引数か環境の誤り / 3 候補が複数 / 4 ホストに届かず代行が要る
@@ -112,7 +112,7 @@ while [ "$#" -gt 0 ]; do
 		;;
 	*)
 		usage >&2
-		fail unknown-arg "知らない引数です（$1）。" 2
+		fail unknown-arg "未対応の引数です（$1）。" 2
 		;;
 	esac
 done
@@ -188,7 +188,7 @@ host_open() {
 	ccnavi_host_connect || connect_rc=$?
 	case "$connect_rc" in
 	0) ;;
-	3) fail no-jq "jq が無い。ホストの返事を読めません。" 2 ;;
+	3) fail no-jq "jq が見つかりません。ホストからの応答を解析できません。" 2 ;;
 	4)
 		host_why="$ccnavi_h_cli_name が $ccnavi_h_host で使えず（未導入か未認証）、curl に付ける $ccnavi_h_token_name も無い"
 		host_rc=2
@@ -327,7 +327,7 @@ stop_host() {
 		title) printf 'ccnavi-start: GitHub の API に届かず、issue #%s の題を読めなかった（%s）。slug を決められないので、何も作らずに止めた。MCP（mcp__github__のツール）で代行してください。\n' "$number" "$sh_why" ;;
 		*) printf 'ccnavi-start: GitHub の API に届かず、マージリクエストを作れなかった（%s）。MCP（mcp__github__のツール）で代行してください。\n' "$sh_why" ;;
 		esac
-		printf 'ここまでに出来たこと:\n'
+		printf '完了済みの処理:\n'
 		if [ "$sh_stage" = create ]; then
 			printf '  ブランチ: %s（push 済み）\n  ワークツリー: %s\n' "$stop_branch" "$stop_wt"
 		else
@@ -364,7 +364,7 @@ stop_host() {
 		title) printf 'ccnavi-start: GitLab の API に届かず、issue #%s の題を読めなかった（%s）。slug を決められないので、何も作らずに止めた。\n' "$number" "$sh_why" ;;
 		*) printf 'ccnavi-start: GitLab の API に届かず、マージリクエストを作れなかった（%s）。\n' "$sh_why" ;;
 		esac
-		printf 'ここまでに出来たこと:\n'
+		printf '完了済みの処理:\n'
 		if [ "$sh_stage" = create ]; then
 			printf '  ブランチ: %s（push 済み）\n  ワークツリー: %s\n' "$stop_branch" "$stop_wt"
 		else
@@ -441,11 +441,11 @@ ensure_worktree() {
 			switch_into "$ew_branch"
 			return 0
 		fi
-		fail worktree-busy "ワークツリーの行き先 $ew_dest が既にあり、ブランチ $ew_branch のものではありません（居るブランチ: ${ew_cur:-?}）。中を確かめ、要らなければ片付けてから打ち直してください。"
+		fail worktree-busy "ワークツリーの作成先 $ew_dest が既にあり、ブランチ $ew_branch のものではありません（現在のブランチ：${ew_cur:-?}）。中を確かめ、要らなければ片付けてから打ち直してください。"
 	fi
 	if [ -n "$ew_start" ]; then
 		cgit worktree add "$ew_dest" -b "$ew_branch" --no-track "$ew_start" ||
-			fail worktree-failed "ワークツリーを切れなかった（上の出力を見てください）。"
+			fail worktree-failed "ワークツリーを作成できませんでした（上の出力を確認してください）。"
 		wt="$ew_dest"
 		log_info ワークツリーを切った -- "branch=$ew_branch"
 		return 0
@@ -469,13 +469,13 @@ ensure_worktree() {
 			ew_from="origin/$ew_branch"
 		fi
 		cgit worktree add "$ew_dest" -b "$ew_id" --no-track "$ew_from" ||
-			fail worktree-failed "ワークツリーを切れなかった（上の出力を見てください）。"
+			fail worktree-failed "ワークツリーを作成できませんでした（上の出力を確認してください）。"
 		wt="$ew_dest"
 		switch_into "$ew_branch"
 		;;
 	*)
 		cgit worktree add "$ew_dest" "$ew_branch" ||
-			fail worktree-failed "ワークツリーを切れなかった（上の出力を見てください）。"
+			fail worktree-failed "ワークツリーを作成できませんでした（上の出力を確認してください）。"
 		wt="$ew_dest"
 		;;
 	esac

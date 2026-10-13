@@ -71,7 +71,7 @@ while [ "$#" -gt 0 ]; do
 		;;
 	*)
 		usage >&2
-		fail unknown-arg "知らない引数です（$1）。" 2
+		fail unknown-arg "未対応の引数です（$1）。" 2
 		;;
 	esac
 done
@@ -103,7 +103,7 @@ if bin=$(ccnavi_bin "$root"); then
 elif [ -f "$root/src/ccnavi/__main__.py" ]; then
 	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$here" "$@"); }
 else
-	fail no-bin "ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。" 2
+	fail no-bin "ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
 fi
 
 # ---- ホスト。読めなければ理由を書いて、手元の候補だけにする。

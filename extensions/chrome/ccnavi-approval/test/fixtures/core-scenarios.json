@@ -34,7 +34,7 @@
     ]
    },
    "code": null,
-   "digest": "44caa6d5a87b73f18d2612f783455d1464f7b64cd8b6a919b5b63f6ca7093977",
+   "digest": "205ca2996932a877065cda4ea787ec0378bc943b855cbdd0a45bdc73594f481f",
    "family": "i0001",
    "identifiers": [
     "i0001",
@@ -48,7 +48,7 @@
    "rejected": [],
    "schema": 1,
    "stopped": null,
-   "text": "チケットの承認リクエスト: 2 件\n\n== i0001: 親  親チケット\n■ このチケットで編集可能な範囲\n    下に並ぶ場所にだけ、このチケットで編集できるようになる。allow は無確認で編集できる場所、ask は確認を挟んで編集できる場所、deny はこのチケットでも編集できない場所\n    ルールの allow で許可してある場所でも、この範囲の外では止まる。ルールの deny はこの範囲の中でも止まる\n    allow: src/*, wip/*, tests/*\n■ 全体計画\n    承認すると、この順序で進めることに合意したことになる。各フェーズの子は、そのフェーズが待つフェーズ（下の待ち方）が閉じてレビューが済むまで承認できない\n    1. 調査 / research  レビュー不要\n    2. 設計 / design  レビュー要: マージリクエスト\n■ 待ち方（計画の項の after から決まる。後から phases.yml を直しても変わらない）\n    1: research — 何も待たない\n    2: design — 待つ: 1\n■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）\n    承認したときの phases.yml と同じ中身を親に写して固定する。後から phases.yml を直しても、この親の範囲・見る場所・成果物は変わらない\n    調査 / research  review: none、scope: wip/research/*、deliverables: wip/research/summary.md、使う番号: 1\n    設計 / design  review: mr、scope: wip/design/*、使う番号: 2\n■ この親では使わない定義（phases.yml にあるが phases: に無い）\n    使わない: 受入テスト作成 / acceptance、実装とテスト / implement、実装フィードバック対応 / implement-feedback、片付け / chores、片付けフィードバック対応 / chores-feedback\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md\n\n== i0001-01-01: 子 i0001-01-01  親 i0001 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲に無い場所がここで新しく編集できるようになることはない\n    親の範囲: src/*, wip/*, tests/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-01.md"
+   "text": "チケットの承認リクエスト: 2 件\n\n== i0001: 親  親チケット\n■ このチケットで編集可能な範囲\n    このチケットでは、以下に示す場所のみ編集できるようになります。allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、deny はこのチケットでも編集できない場所\n    ルールの allow で許可されていても、このチケットの範囲外では編集できません。ルールの deny はこの範囲の中でも止まる\n    allow: src/*, wip/*, tests/*\n■ 全体計画\n    承認すると、この順序で進めることに合意したことになる。各フェーズの子は、そのフェーズが待つフェーズ（下のフェーズ間の依存関係）が閉じてレビューが済むまで承認できない\n    1. 調査 / research  レビュー不要\n    2. 設計 / design  レビュー要: マージリクエスト\n■ フェーズ間の依存関係（計画の各項目の after で決まります。承認後に phases.yml を変更しても変わりません）\n    1: research — 何も待たない\n    2: design — 待つ: 1\n■ この親に固定するフェーズ定義（phases:。承認のあとの判定はこれを読む）\n    承認したときの phases.yml と同じ中身を親に写して固定する。承認後に phases.yml を変更しても、この親チケットの編集可能範囲・確認対象・成果物は変わりません。\n    調査 / research  review: none、scope: wip/research/*、deliverables: wip/research/summary.md、使う番号: 1\n    設計 / design  review: mr、scope: wip/design/*、使う番号: 2\n■ この親では使わない定義（phases.yml にあるが phases: に無い）\n    使わない: 受入テスト作成 / acceptance、実装とテスト / implement、実装フィードバック対応 / implement-feedback、片付け / chores、片付けフィードバック対応 / chores-feedback\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md\n\n== i0001-01-01: 子 i0001-01-01  親 i0001 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲に無い場所がここで新しく編集できるようになることはない\n    親の範囲: src/*, wip/*, tests/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001-01-01.md"
   },
   "request": {
    "family": "i0001",
@@ -372,7 +372,7 @@
     ]
    },
    "code": null,
-   "digest": "42c571f3b1b2289c5d59ad9fad27852b2a56d72a7cfb9690871676584a5bc29d",
+   "digest": "92bc0ac21749ac493f282e73759413bcc07de312c09fd4426db67e80a3dcb834",
    "family": "i0003",
    "identifiers": [
     "i0003-01-01"
@@ -392,7 +392,7 @@
    ],
    "schema": 1,
    "stopped": null,
-   "text": "チケットの承認リクエスト: 1 件\n\n== i0003-01-01: 子 i0003-01-01  親 i0003 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲に無い場所がここで新しく編集できるようになることはない\n    親の範囲: src/*, wip/*, tests/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ 先行: i0002-01-01\n    どれも done/ に在って取り消しでないこと。満たしていなければ、承認も着手も止まる\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0003  提案: wip/proposals/todo/i0003-01-01.md"
+   "text": "チケットの承認リクエスト: 1 件\n\n== i0003-01-01: 子 i0003-01-01  親 i0003 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲に無い場所がここで新しく編集できるようになることはない\n    親の範囲: src/*, wip/*, tests/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ 先行: i0002-01-01\n    すべての先行チケットが、取り消されずに完了し、done/ に移動している必要があります。条件を満たすまで、承認・着手はできません。\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0003  提案: wip/proposals/todo/i0003-01-01.md"
   },
   "request": {
    "family": "i0003",
@@ -463,7 +463,7 @@
     ]
    },
    "code": null,
-   "digest": "c9b0055290d903928ed50f2c2d403ad5175856c5873929a61cabeaa7cd423bca",
+   "digest": "ca4df0d50a27bbafc26554481e429b257af0cb6ac89a1596bb2be7450d5f7efa",
    "family": "i0001",
    "identifiers": [
     "i0001"
@@ -477,7 +477,7 @@
    "rejected": [],
    "schema": 1,
    "stopped": null,
-   "text": "チケットの承認リクエスト: 1 件\n\n== i0001: 親  親の改版\n■ 全体計画の変更\n    いま:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー要: マージリクエスト\n    改版:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー要: マージリクエスト\n        3. 受入テスト作成 / acceptance  レビュー要: マージリクエスト\n■ 待ち方の変更\n    いま:\n        1: research — 何も待たない\n        2: design — 待つ: 1\n    改版:\n        1: research — 何も待たない\n        2: design — 待つ: 1\n        3: acceptance — 待つ: 1, 2\n■ phases: の差分（改版で親に固定する定義）\n    足した: 受入テスト作成 / acceptance\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md"
+   "text": "チケットの承認リクエスト: 1 件\n\n== i0001: 親  親の改版\n■ 全体計画の変更\n    いま:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー要: マージリクエスト\n    改版:\n        1. 調査 / research  レビュー不要\n        2. 設計 / design  レビュー要: マージリクエスト\n        3. 受入テスト作成 / acceptance  レビュー要: マージリクエスト\n■ フェーズ間の依存関係の変更\n    いま:\n        1: research — 何も待たない\n        2: design — 待つ: 1\n    改版:\n        1: research — 何も待たない\n        2: design — 待つ: 1\n        3: acceptance — 待つ: 1, 2\n■ phases: の差分（改版で親に固定する定義）\n    追加: 受入テスト作成 / acceptance\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: wip/proposals/todo/i0001.md"
   },
   "request": {
    "family": "i0001",

@@ -64,7 +64,7 @@ PLACE_OVERRIDES = (
     ("--tickets", "tickets", ""),
 )
 # 無視したときの文面。置き場を動かすフラグで同じものを使う。制限が 2 つあるように読ませない。
-DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）でだけ使える\n"
+DIAGNOSIS_ONLY = "ccnavi: {flag} は診断時のみ使用できます。今回の指定は無視されます。\n"
 # `.ccnavi/scripts/` の sh が自分で計算して渡すパスと、渡されなかったときの値。
 # どちらも「いまどこで動いているか」で、エージェントが申告するものではない。
 #
@@ -337,8 +337,9 @@ def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag:
     # 切り方（CCNAVI_GUARD_TICKET_APPROVAL）は文面に書かない。読むのはエージェントで、書けば
     # ユーザの判断を自分で出す方法を教えることになる。切り方は README の設定の表にある。
     stderr.write(
-        f"ccnavi: {flag} は端末から打つもの。標準入力が端末ではない。"
-        "ユーザに端末で打ってもらってください\n"
+        f"ccnavi: {flag} はユーザーがターミナルから実行する必要があります。"
+        "標準入力がターミナルではないため、実行できません。"
+        "ユーザーにターミナルでの実行を依頼してください。\n"
     )
     return False
 
@@ -364,4 +365,4 @@ def _record(stderr: TextIO, log: audit.Log, record: audit.Record) -> None:
     try:
         log.write(record)
     except OSError as exc:
-        stderr.write(f"ccnavi: 記録を書けない: {exc}\n")
+        stderr.write(f"ccnavi: ログを保存できませんでした：{exc}\n")

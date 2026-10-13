@@ -509,7 +509,7 @@ class ApproveJsonTest(PhaseHarness):
         # 壁を有効にしたまま。テストの標準入力は端末ではない。
         refused = self.ccnavi("--agree", "--guard-ticket-approval", "enable", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("端末", refused.stderr)
+        self.assertIn("ターミナル", refused.stderr)
         self.assertFalse(self.copy_exists("i0001"))
 
         result = self.yes(["i0001", "i0001-01-01"], "--guard-ticket-approval", "enable")

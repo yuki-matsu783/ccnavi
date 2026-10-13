@@ -54,8 +54,8 @@ _STATE_LABELS = {
     ticket_model.TODO: "承認待ち（todo/）",
     ticket_model.DOING: "作業中（doing/）",
     ticket_model.REVIEW: "レビュー待ち（review/）",
-    ticket_model.DONE: "閉じた（done/）",
-    ticket_model.CANCELLED: "閉じた（done/）",
+    ticket_model.DONE: "クローズ済み（done/）",
+    ticket_model.CANCELLED: "クローズ済み（done/）",
 }
 _CLOSED = (ticket_model.DONE, ticket_model.CANCELLED)
 
@@ -76,7 +76,7 @@ class FileState:
             return f"push 済み（{self.upstream}）"
         if self.kind == FILE_NO_UPSTREAM:
             return "コミット済み（リモート追跡の ref が無いので、push 済みかは分からない）"
-        return "git で読めない"
+        return "Gitから状態を取得できません。"
 
 
 @dataclass
@@ -139,8 +139,8 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
     sync = settings.script_command(root, "ccnavi-sync.sh")
     stdout.write(
         "ccnavi: チケットの状態。手元の置き場・状態の履歴・git だけを読む"
-        "（リモートへは取りに行かない）。\n"
-        "  push 済みかは手元のリモート追跡の ref（最後に取り込んだときの姿）で見るので、"
+        "（リモートからの取得は行いません）。\n"
+        "  push 済みかは手元のリモート追跡の ref（最後に取得した時点の状態）で見るので、"
         f"古いかもしれない。最新にするには先に '{sync} <親>' を打つ\n"
     )
     for name in families:
@@ -184,8 +184,8 @@ class _Family:
             return [
                 f"- {e.ident}  {role}  {t.title}".rstrip(),
                 f"    置き場: 複数の場所にある（{where}）",
-                "    止まっている理由: どれが正か決まらないので、状態の操作は止まる",
-                "    次の一手: ユーザに 1 つにしてもらう（先に進んだ側を合流させるか、"
+                "    止まっている理由: 正しいチケットを特定できないため、状態を変更できません。",
+                "    次の操作: ユーザに 1 つにしてもらう（先に進んだ側を合流させるか、"
                 "残ったワークツリーを片付ける）",
             ]
         lines = [
@@ -198,7 +198,7 @@ class _Family:
         if t.state == ticket_model.TODO:
             lines.append(f"    置き場のファイル: {file_state.label()}")
             lines.append(
-                "    次の一手: ユーザの承認を待つ（ボード、端末の ccnavi-agree.sh、"
+                "    次の操作: ユーザの承認を待つ（ボード、端末の ccnavi-agree.sh、"
                 "GitHub の画面で doing/ へ動かす、のどれか）"
             )
             return lines
@@ -229,7 +229,7 @@ class _Family:
             # 子のフェーズが読めないと、依頼済みかが分からない。分からないまま「待つ」と言うと、
             # 依頼の前でもユーザに回ったと読める（依頼の打ち忘れ）。
             lines.append(
-                "    次の一手: "
+                "    次の操作: "
                 + (
                     nxt
                     or "フェーズを読めないので、レビューを依頼済みかを言えない。ユーザに回るのは、"
@@ -313,7 +313,7 @@ class _Family:
                 "子を進める。全部のフェーズを閉じたら "
                 f"'{self.ticket_sh} finish {t.ticket}' を打つ{PARENT_ONLY}"
             )
-        return lines + [f"    次の一手: {n}" for n in nexts]
+        return lines + [f"    次の操作: {n}" for n in nexts]
 
     def _start_lines(self, t: ticket_model.Ticket) -> list[str]:
         owner = tree.project_root(self.conf.projects, t.project) or self.root
@@ -344,7 +344,10 @@ class _Family:
         if parent.state != ticket_model.DOING:
             return f"親 {t.parent} は作業中ではない（{parent.state}/）"
         if not parent.started_at:
-            return f"親 {t.parent} が未着手。子より先に親に着手する"
+            return (
+                f"親チケット {t.parent} が未着手です。"
+                "子チケットより先に、親チケットを開始してください。"
+            )
         return ""
 
 

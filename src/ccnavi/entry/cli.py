@@ -766,7 +766,9 @@ def _parsed(
             stderr.write(f"ccnavi: {problem}\n")
             return EXIT_ERROR
         if not conf.tickets_enabled:
-            stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
+            stderr.write(
+                f"ccnavi: チケット制御が無効になっています（{settings.TICKET_CONTROL_ENV}）。\n"
+            )
             return EXIT_ERROR
         if args.fill_phases:
             return cli_plan.fill_phases(stdout, stderr, conf, root, args.plan_order.strip())
@@ -787,7 +789,9 @@ def _parsed(
     # 判断ではなく、これから判定に使われる範囲についての合意になる。
     if args.agree:
         if not conf.tickets_enabled:
-            stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
+            stderr.write(
+                f"ccnavi: チケット制御が無効になっています（{settings.TICKET_CONTROL_ENV}）。\n"
+            )
             return EXIT_ERROR
         if args.preview and args.yes:
             stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
@@ -1107,7 +1111,7 @@ def _hook_crashed(
         try:
             cli_args._record(stderr, so_far.log or audit.Log(conf.log), record)
         except Exception as again:  # noqa: BLE001 受け皿の中では例外を重ねない
-            stderr.write(f"ccnavi: 記録を書けない: {type(again).__name__}\n")
+            stderr.write(f"ccnavi: ログを保存できませんでした：{type(again).__name__}\n")
     stdout.write(out.getvalue())
     return code
 

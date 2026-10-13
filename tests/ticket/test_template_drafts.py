@@ -835,7 +835,7 @@ class ImportTest(Drafts):
             "i0001", "--to", "common", "--yes", "--expect", self.sha, guard="enable"
         )
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("端末", result.stderr)
+        self.assertIn("ターミナル", result.stderr)
         self.assertFalse(os.path.exists(self.common_file()))
 
     def test_via_board_needs_expect_and_json(self):
@@ -919,7 +919,7 @@ class ImportTest(Drafts):
             "i0001", "--to", "common", "--yes", "--expect", self.sha, guard="enable"
         )
         self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
-        self.assertIn("端末", refused.stderr)
+        self.assertIn("ターミナル", refused.stderr)
         self.assertFalse(os.path.exists(self.common_file()))
         self.assertTrue(os.path.exists(self.draft_path()))
         # 下見は端末でなくても動く。

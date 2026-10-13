@@ -1042,7 +1042,7 @@ class PhaseTest(PhaseHarness):
             stdin="y\n",
         )
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("端末", result.stderr)
+        self.assertIn("ターミナル", result.stderr)
         for command in (
             "sh .ccnavi/scripts/ccnavi-review.sh close-early --reason x",
             "sh .ccnavi/scripts/ccnavi-review.sh ready",

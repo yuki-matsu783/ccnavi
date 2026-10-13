@@ -802,7 +802,7 @@ class ApproveCarriesTest(Workspace):
             with self.subTest(ids=ids):
                 result = self.approve(*ids, STUB_ARGS=args, STUB_TREE=tree)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-                self.assertIn("識別子でない引数", result.stderr)
+                self.assertIn("チケットID以外の引数", result.stderr)
                 self.assertFalse(os.path.exists(args))
                 self.assertEqual(self.remote_head("i0001"), "")
 
