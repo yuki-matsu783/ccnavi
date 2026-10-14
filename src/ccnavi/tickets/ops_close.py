@@ -298,8 +298,11 @@ def close_problems(
             f"{parent_id} には開いている子がある（{', '.join(open_children)}）。"
             "子を先に閉じてください"
         ]
+    own = approval_checks.by_id(copies).get(parent_id)
     if approval_marks.read_parent_mark(
-        approval.home_dir_read(conf, root, parent_id, ""),
+        approval.home_dir_read(
+            conf, root, parent_id, "", project=own.project if own is not None else None
+        ),
         parent_id,
         approval_marks.PARENT_MARK_CLOSE_EARLY,
     ):

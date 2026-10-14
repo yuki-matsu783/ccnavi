@@ -600,16 +600,30 @@ def home_dir_read(
     parent: str,
     project: str | None = None,
 ) -> str:
-    """`home_dir` の読む側。親のワークツリーが無いときは、存在しない置き場のパスを返す。
+    """`home_dir` の読む側。親のワークツリーが決まらないときは、存在しない置き場のパスを返す。
 
-    読む側（マーカー・記録・状態の履歴）は、親のワークツリーが無ければ「何も無い」と読む。
-    ほかのツリーのコピーでは代用しない。書く側は `home_dir` を使う（無ければ止まる）。
+    読む側（マーカー・記録・状態の履歴）は、親のワークツリーが決まらなければ「何も無い」と読む。
+    決まらないのは、親のワークツリーが無い・HEAD のブランチが違う・途中の操作がある・
+    取り込みで止めた（gone・blocked）・閉じた、のどれでも同じ。フォルダが実在しても
+    （別のブランチを checkout したままなど）、その中のマーカーは読まない。
+    ほかのツリーのコピーでは代用しない。書く側は `home_dir` を使う（決まらなければ止まる）。
+    返したパスへは書かない（書くとそこに置き場ができる）。
     """
     home = parent or ticket_id
     try:
         return home_dir(conf, root, ticket_id, parent, project=project)
     except NoParentWorktree:
-        return settings.approved_dir(conf, tree.worktree_path(root, home))
+        return nowhere(conf, root, home)
+
+
+def nowhere(conf: settings.Settings, root: str, home: str) -> str:
+    """親のワークツリーが決まらないときに読む、存在しない置き場のパス。
+
+    ワークツリーの置き場（`.claude/worktrees/`）の外の、state の下の決まった名前にする。
+    誰も作らないので、読む側は「何も無い」と読む。
+    """
+    base = conf.state or os.path.join(root, settings.DEFAULT_STATE)
+    return settings.approved_dir(conf, os.path.join(base, "no-parent-worktree", home))
 
 
 def source_path(t: ticket_model.Ticket) -> str:

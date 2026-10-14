@@ -324,7 +324,9 @@ def phases_of(
             phase.states[t.ticket] = t.state
     # マーカーと記録は親のツリーに置く。子のワークツリーにも承認済みチケットは checkout されるが、
     # マーカーを子の側に書くと、同じフェーズのマーカーが複数のツリーに分かれて置かれる。
-    where = approval.home_dir_read(conf, root, parent_id, "")
+    where = approval.home_dir_read(
+        conf, root, parent_id, "", project=owner.project if owner is not None else None
+    )
     for phase in by_number.values():
         phase.marks = approval_marks.marks(where, parent_id, phase.number)
         for t in phase.tickets:
@@ -464,7 +466,12 @@ def announce(
     `raw` は `phases_of` と同じ。ここが書くのはマーカーだけで、置き場のチケットは動かさない。
     """
     texts = []
-    where = approval.home_dir_read(conf, root, parent.ticket, "", project=parent.project)
+    # マーカーを書くので、置き場は書く側の決め方で引く。決まらなければ何も言わない
+    # （読む側の存在しない置き場へ書くと、そこに置き場ができてしまう）。
+    try:
+        where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+    except approval.NoParentWorktree:
+        return ""
     phases = phases_of(root, conf, parent.ticket, raw=raw)
     # マーカーの `source` を決めるためだけに読む。判定は写しを読み、ここで読んだ定義は使わない。
     # 読むのはマーカーを置くフェーズがあるときだけ。
