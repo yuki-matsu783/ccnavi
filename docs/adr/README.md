@@ -205,6 +205,9 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0130](0130-work-review-plan-templates.md) | 完了した作業・レビュー計画と子のフローをテンプレートとして溜め、下書きから取り込んで再利用する |
 | [0134](0134-template-edit-from-board.md) | テンプレート管理画面から下書きの保存と、取り込み済みの改名・移動・削除をできるようにする（0130 の「カードからの入口は作らない」を改める） |
 | [0135](0135-learning-wiki-grows-through-tickets.md) | 気づきを子ごとの記録に溜め、learning-wiki で統合し、反映先ごとの提案にして人間が承認する |
+| [0136](0136-handoff-across-pcs-and-parent-branch-authority.md) | 親ブランチを正本にして、PC をまたいだ引き継ぎを決める（0102 の `branch:` キーと 0103 の `switch` の手順を置き換える） |
+| [0137](0137-merge-child-at-finish.md) | 子の成果の合流を finish で行い、状態と 1 つのマージコミットにして push する |
+| [0138](0138-tidy-up-when-parent-closes.md) | 親を閉じるときの片付けを ccnavi が行い、消すのは成果が失われないと確かめられたものだけにする |
 | [0123](0123-parent-must-have-a-plan.md) | 親は計画を必ず持ち、計画の無い親は start が止まる |
 
 ### 複数のリポジトリと VS Code 拡張
