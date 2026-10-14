@@ -247,6 +247,10 @@ class Ticket:
     tree: str = ""
     tree_root: str = ""
     path: str = ""
+    # source は解析したときに読んだファイルのバイト列（`ticket.load`）。承認はこれで照合し
+    # （`agree_digest.proposals_digest`）、同じバイト列を書く（`approval_ops.admit`）。
+    # 読み直すと、照合した中身と書く中身が別の読みになる。`parse` だけで組んだものは None。
+    source: bytes | None = field(default=None, repr=False, compare=False)
     # blocked は「このチケットは読めるが信じられない」理由。空でなければ判定は範囲を
     # 当てずに止める（phase_scope.scope_verdict）。承認のときにしか当たらなかった構造の検査を、
     # 判定の側でも当てるために置く（置き場を手で動かして承認すると `--agree` を通らない）。

@@ -222,7 +222,7 @@ def load(path: str) -> tuple[ticket_model.Ticket | None, list[Problem]]:
     try:
         # fsio を通す。承認の plan（書き込みを溜める段）の中では、
         # 同じ承認で動かしたチケットを動かした後の状態で読む。
-        text = fsio.load_text(path)
+        source, text = fsio.load_source(path)
     except FileNotFoundError:
         return None, []
     except OSError as exc:
@@ -230,6 +230,7 @@ def load(path: str) -> tuple[ticket_model.Ticket | None, list[Problem]]:
     ticket, problems = parse(text)
     if ticket is not None:
         ticket.path = os.path.realpath(path)
+        ticket.source = source
     return ticket, problems
 
 

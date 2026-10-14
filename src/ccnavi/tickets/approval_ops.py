@@ -29,7 +29,7 @@ from . import ticket as ticket_mod
 def admit(approved_dir: str, ticket: ticket_model.Ticket, source_tree: str) -> str:
     """承認した提案を `doing/` へ動かす。動かせなかった理由を返す。動かせたら空文字。
 
-    中身は変えない。 提案をバイト列のまま読み（`fsio.read_bytes`）、同じバイト列を `doing/` に
+    中身は変えない。 照合に使ったバイト列（`Ticket.source`）を、そのまま `doing/` に
     書いて元を消す。欄を書き足さず、改行も BOM も変えない。端末・ボード・Chrome・手で動かす、の
     どれで承認しても承認済みチケットが提案とバイト単位で同じになるように。消せなければ書いた側を
     消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で止まる。
@@ -38,7 +38,10 @@ def admit(approved_dir: str, ticket: ticket_model.Ticket, source_tree: str) -> s
     （`approval.load_copy`）。`source_tree` は提案が乗っていたブランチの名前で、状態の履歴に残す。
     """
     target = approval.copy_path(approved_dir, ticket.ticket)
-    content = fsio.read_bytes(ticket.path)
+    failed = changed_since_read(ticket)
+    if failed:
+        return failed
+    content = ticket.source if ticket.source is not None else fsio.read_bytes(ticket.path)
     if content is None:
         return f"提案を読めない ({ticket.path})"
     with fsio.policy(message="保存できませんでした ({reason})", restore=()):
@@ -65,6 +68,22 @@ def admit(approved_dir: str, ticket: ticket_model.Ticket, source_tree: str) -> s
         ticket_model.DOING,
         tree=source_tree,
     )
+    return ""
+
+
+CHANGED_SINCE_READ = "提案の内容が更新されました。表示し直してから、もう一度承認してください"
+
+
+def changed_since_read(ticket: ticket_model.Ticket) -> str:
+    """照合に使ったバイト列（`Ticket.source`）と、今の提案ファイルが違えば理由を返す。
+
+    照合のあと書く前に提案が差し替えられると、見せていない中身を承認してしまう。書くのは
+    照合したバイト列だが、元の提案を消すと差し替えた側が黙って消えるので、違えば何もしない。
+    """
+    if ticket.source is None:
+        return ""
+    if fsio.read_bytes(ticket.path) != ticket.source:
+        return f"{CHANGED_SINCE_READ} ({ticket.path})"
     return ""
 
 

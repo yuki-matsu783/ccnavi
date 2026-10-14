@@ -397,7 +397,14 @@ def _apply_steps(
 
     書けなかったときの扱い（止める・言って続ける・行を出す）は `fsio.policy` で添える。
     書き込みを溜める段では書き込みが失敗しないので、その扱いは Writer(FS) が書くときに当てる。
+
+    照合のあとで提案ファイルが差し替えられていたら、1 件も並べずに止める（照合したバイト列と
+    今のファイルが違う。`approval_ops.changed_since_read`）。一部だけ承認しないため。
     """
+    for cand in batch:
+        failed = approval_ops.changed_since_read(cand.ticket)
+        if failed:
+            return cand.ticket.ticket, failed
     for cand in batch:
         t = cand.ticket
         with fsio.policy(

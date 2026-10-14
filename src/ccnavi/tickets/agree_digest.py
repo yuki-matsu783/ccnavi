@@ -31,10 +31,15 @@ def proposals_digest(batch: list[agree_candidates.Candidate]) -> str:
 
     部分をそのままつながず、識別子と中身のハッシュを件数と並べて、そのリストのハッシュを取る。
     区切りの文字でつなぐと、その文字が中身に出たときにつなぎ目をずらせるため。
+
+    バイト列は、解析したときに読んだもの（`Ticket.source`）を使う。ここで読み直すと、照合した
+    中身と承認の対象に組んだ中身が別の読みになり、その間に書き換えられると見せていない中身が通る。
     """
     lines = []
     for cand in sorted(batch, key=lambda c: c.ticket.ticket):
-        raw = fsio.read_bytes(cand.ticket.path)
+        raw = cand.ticket.source
+        if raw is None:
+            raw = fsio.read_bytes(cand.ticket.path)
         lines.append(
             f"{cand.ticket.ticket}\n{'-' if raw is None else hashlib.sha256(raw).hexdigest()}"
         )

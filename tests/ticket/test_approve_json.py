@@ -510,6 +510,93 @@ class ApproveJsonTest(PhaseHarness):
         for name in ("i0001", "i0001-01-01", "i0001-01-02"):
             self.assertFalse(self.copy_exists(name), name)
 
+    # ---- 4d2. 照合と書き込みは同じ読みを使う（読み直しの間に差し替えられても通さない）
+
+    def yes_in_process(self, tickets, digest):
+        """`--agree --yes … --digest … --json` を同じプロセスで動かす（途中に差し替えを挟むため）。"""
+        argv = c1flag.as_c1(
+            self.root,
+            self.state,
+            self.parent_tree,
+            [
+                "--root",
+                self.root,
+                "--guard-core-files",
+                "disable",
+                "--restore-if-deny",
+                "disable",
+                "--guard-ticket-approval",
+                "disable",
+                "--agree",
+                "--yes",
+                ",".join(tickets),
+                "--digest",
+                digest,
+                "--json",
+            ],
+        )
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env.pop("CLAUDE_PROJECT_DIR", None)
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch.dict(os.environ, env, clear=True):
+            code = cli.run(io.StringIO(), out, err, list(argv))
+        return code, out.getvalue(), err.getvalue()
+
+    def swapped(self, data):
+        return data.replace("title: 子 i0001-01-01".encode(), "title: すりかえ".encode())
+
+    def test_a_proposal_swapped_after_the_check_is_not_approved(self):
+        """照合のあと書く前に提案を差し替えると、差し替えた中身を承認せずに止める。"""
+        from ccnavi.tickets import core_base
+
+        self.pending_parent_and_child()
+        shown = self.preview()
+        child = self.child_path()
+        with open(child, "rb") as f:
+            data = f.read()
+        swapped = self.swapped(data)
+        self.assertNotEqual(swapped, data)
+        real = core_base.plan
+
+        def plan(snapshot, verdict):
+            with open(child, "wb") as f:
+                f.write(swapped)
+            return real(snapshot, verdict)
+
+        with mock.patch.object(core_base, "plan", plan):
+            code, out, err = self.yes_in_process(["i0001", "i0001-01-01"], shown["digest"])
+        self.assertNotEqual(code, 0, out + err)
+        self.assertIn("内容が更新されました", err)
+        self.assertFalse(self.copy_exists("i0001-01-01"))
+        self.assertFalse(self.copy_exists("i0001"), "一部だけ承認しない")
+        with open(child, "rb") as f:
+            self.assertEqual(f.read(), swapped, "差し替えた提案は残す")
+
+    def test_the_digest_is_taken_from_the_bytes_that_were_parsed(self):
+        """解析したあと照合の前に元に戻されても、解析した中身（見せていない）を照合で通さない。"""
+        from ccnavi.tickets import agree_digest
+
+        self.pending_parent_and_child()
+        shown = self.preview()
+        child = self.child_path()
+        with open(child, "rb") as f:
+            data = f.read()
+        with open(child, "wb") as f:
+            f.write(self.swapped(data))
+        real = agree_digest.proposals_digest
+
+        def digest(batch):
+            with open(child, "wb") as f:
+                f.write(data)
+            return real(batch)
+
+        with mock.patch.object(agree_digest, "proposals_digest", digest):
+            code, out, err = self.yes_in_process(["i0001", "i0001-01-01"], shown["digest"])
+        self.assertEqual(code, 1, out + err)
+        self.assertIsNotNone(json.loads(out)["mismatch"])
+        self.assertFalse(self.copy_exists("i0001-01-01"))
+        self.assertFalse(self.copy_exists("i0001"))
+
     # ---- 4e. 端末の `--agree` も、確認の入力のあとで同じ照合をする
 
     def child_path(self):
