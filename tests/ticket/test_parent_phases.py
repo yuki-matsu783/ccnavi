@@ -128,6 +128,20 @@ class CopyAgreeTest(PhaseHarness):
         self.assertIn("`phases:` がありません。", result.stderr)
         self.assertIn("--fill-phases", result.stderr)
 
+    def test_a_parent_without_a_plan_gets_a_warning_before_the_request(self):
+        from ccnavi.tickets import agree_candidates
+
+        text = "\n".join(
+            ["---", "version: 1", "ticket: i0001", "title: t", "mr: 1", "allow:"]
+            + ["- {glob: 'src/*', match: 'Write|Edit'}", "---", ""]
+        )
+        t, _ = ticket_mod.parse(text)
+        found = agree_candidates.plan_problems(t, None)
+        self.assertEqual(["warn"], [p.severity for p in found], found)
+        self.assertIn("計画（`plan:`）がありません", found[0].detail)
+        # 承認済みの親には言わない（着手済みの古い親は今のまま）
+        self.assertEqual([], agree_candidates.plan_problems(t, None, approved=True))
+
     def test_an_unused_definition_is_a_warning_and_shown_on_the_screen(self):
         acceptance = phasecopy.definitions(PHASES)["acceptance"]
         text = with_phases(

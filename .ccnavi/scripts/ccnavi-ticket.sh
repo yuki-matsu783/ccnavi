@@ -69,6 +69,8 @@ sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] 
   next-id      issue の無い親の提案に使う識別子を決める（読むだけ。サブエージェントからも実行できます）。引数なしなら
                次の通し番号、<先頭の語> <slug> を渡せば <先頭の語>-<番号>-<slug> を 1 行で出す。
                末尾が -<2 桁> になる slug や、推奨される長さを超える slug を指定すると、理由を表示して終了します。
+               決めた識別子の提案の雛形は、実行ファイルの `ccnavi ticket new <識別子> --title <題> --plan <型,…>` が
+               識別子のワークツリーの中で作る（このスクリプトに new は無い。手で書かない）
 
   start        .ccnavi/approved/doing/ の承認済みチケットに着手の時刻と基準点を書く。
                ワークツリー .claude/worktrees/<識別子> が必要です。承認済みチケットは置き場を移らない
@@ -116,6 +118,7 @@ case "$1" in
 status | next-id | start | finish | cancel | record-risk | learn) ;;
 *)
 	printf 'ccnavi-ticket: 未対応のサブコマンドです：%s。使用できるサブコマンドは status / next-id / start / finish / cancel / record-risk / learn です。\n' "$1" >&2
+	[ "$1" != new ] || printf '親の提案の雛形は、このスクリプトではなく実行ファイルが作ります: ccnavi ticket new <識別子> --title <題> --plan <型,…> [--scope <glob>] [--mr <番号>]（識別子のワークツリーの中で打つ。識別子は next-id で決める）。\n' >&2
 	exit 2
 	;;
 esac

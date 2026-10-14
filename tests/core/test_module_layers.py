@@ -168,6 +168,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "hook.docsearch_index",
                 "hook.docsearch_query",
                 "hook.projskills",
+                "hook.proposalhint",
                 "policy.ruleload",
                 "tickets.phasetypes",
                 "tickets.workflow",

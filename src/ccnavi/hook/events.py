@@ -28,7 +28,16 @@ from ..tickets import (
     session_rejects,
     skillsync,
 )
-from . import ccnavimd, docsearch, judge, post, post_findings, projskills, subagent
+from . import (
+    ccnavimd,
+    docsearch,
+    judge,
+    post,
+    post_findings,
+    projskills,
+    proposalhint,
+    subagent,
+)
 
 # `match: Stop` のルールで止めた回の理由コード。記録の `code` と、止めた文の頭に出る。
 CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
@@ -763,6 +772,8 @@ def decide_after(
     # frontmatter の無い md を新しく作ったなら、書いた時点で 1 度だけ書き方を案内する。
     # 判定には加えない（差し戻しの有無は上の実行後チェックだけで決まる）。
     hint = docsearch.missing_frontmatter(conf, root, payload)
+    # 親の提案を手で書いたときの書式の誤りも、書いた時点で 1 度だけ案内する。
+    hint = "\n\n".join(p for p in (hint, proposalhint.hint(conf, root, payload)) if p)
     if not text and not hint:
         return EXIT_OK
 
