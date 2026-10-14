@@ -1115,6 +1115,22 @@ class WorktreeNameTest(GitWrapperTest):
         self.assertNotIn("feature-x", branches.split())
         self.assertNotIn("topic-y", branches.split())
 
+    def test_an_existing_branch_whose_identifier_cannot_be_a_parent_is_rejected(self):
+        """既にあるブランチを出す形は親のワークツリーを作る形でもあるので、識別子を確かめる。
+
+        末尾が -<2 桁>・59 文字以上・全角の字は断る。子の識別子の形は子の出し直しなので通す。
+        """
+        long_branch = "feature/" + "a" * 51
+        for branch in ("feature/8-y-05", long_branch, "feature/１２"):
+            git(self.dir, "branch", branch)
+            with self.subTest(branch=branch):
+                dest = ".claude/worktrees/" + branch.replace("/", "-")
+                result = self.assertRejected("worktree", "add", dest, branch)
+                self.assertIn("ccnavi-start.sh --mr", result.stderr)
+        git(self.dir, "branch", "i0001-01-01")
+        child = self.run_wrapper("worktree", "add", ".claude/worktrees/i0001-01-01", "i0001-01-01")
+        self.assertEqual(0, child.returncode, child.stdout + child.stderr)
+
     def test_slash_branch_in_a_wrong_named_worktree_is_rejected(self):
         git(self.dir, "branch", "feature/x")
         git(self.dir, "tag", "feature/t")

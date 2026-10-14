@@ -58,6 +58,8 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY G
 SELF="sh $0"
 # 取り込みの sh。リモートに合わせる経路はここへ案内する。
 SYNC="sh $(dirname "$0")/ccnavi-sync.sh"
+# 親のワークツリーを作る入口。既にあるブランチを親にする経路はここへ案内する。
+START="sh $(dirname "$0")/ccnavi-start.sh"
 
 # reject <識別子> <文面>。文面は標準エラーへ出す契約。識別子は拒否の種類を表す短い語で、
 # 診断ログにだけ残す。文面にはユーザの引数（URL など）が入るので、ログには写さない。
@@ -92,7 +94,8 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
             remote (-v / show / get-url のみ)  worktree (list add prune remove)
             worktree add は行き先の名前 = ブランチ名の / を - に置き換えたもの、の形だけ
                   (add <行き先> -b <ブランチ> [<起点>] か add <行き先> <既にあるブランチ>。
-                  -B / --detach / -f は不可)
+                  -B / --detach / -f は不可。既にあるブランチを出す形は、識別子が親に使えるもの
+                  （58 文字以内・末尾が -2 桁でない。子の識別子の形は 64 文字まで）だけ)
   変える    add  commit (--no-verify は不可)  rm <パス> (-f は不可)
             restore <パス>  (衝突の解決は restore --ours / --theirs -- <パス>)
             checkout / switch (ブランチを移る形だけ。-f・checkout -B・switch -C と -- <パス> は不可。
@@ -1389,6 +1392,18 @@ worktree)
 				# 名前が揃っていても、ブランチでない（タグ・sha）ならブランチの外に作る。
 				reject worktree-detach "worktree add $wt_dest $wt_base の $wt_base は手元のブランチでも origin/$wt_base でもないので、ブランチの外（detached HEAD）にワークツリーを作ります。新しく切るなら $SELF worktree add $wt_dest -b $wt_base <起点> にしてください。"
 			fi
+			# 既にあるブランチをそのまま出す形は、親のワークツリーを作る形でもある。識別子が親に使えるか
+			# （58 文字以内・末尾が -<2 桁> でない・字の種類・NFC）を実行ファイルに聞く（sh は字数と字の種類を見分けない）。
+			# 子の識別子の形（<親>-<2 桁>-<2 桁>）は子のワークツリーを出し直す形なので、64 文字と字だけを見る。
+			ccnavi_id_ask "$WS" "$wt_base" ||
+				reject worktree-id-unchecked "worktree add $wt_dest $wt_base で、$wt_base から作る識別子が使えるかを確かめられません（ccnavi の実行ファイルが答えない）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
+			if [ "$ccnavi_id_child" = yes ]; then
+				wt_id_problem="$ccnavi_id_direct"
+			else
+				wt_id_problem="$ccnavi_id_problem"
+			fi
+			[ -z "$wt_id_problem" ] ||
+				reject worktree-id "worktree add $wt_dest $wt_base は使えません。$wt_base から作る識別子 $ccnavi_id_ident は親のワークツリーに使えません（${wt_id_problem}）。既にあるブランチを親にするときは $START --mr <MR の番号> で始めてください（採用してよいかを確かめてから出します）。"
 		fi
 		# 統合先から切るなら、起点が古くないか確かめる（名前の検査を通ったあと）。
 		wt_fresh
