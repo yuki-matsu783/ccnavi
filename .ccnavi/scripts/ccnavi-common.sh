@@ -4,8 +4,8 @@
 #
 # 呼ぶ側の `set -eu` の直後に置く。`$0` は呼ばれたときのパスそのままなので、
 # `sh .ccnavi/scripts/ccnavi-git.sh` でも `sh ../../../.ccnavi/scripts/ccnavi-git.sh` でも
-# 同じディレクトリを指す。この読み込みと、下の部品の読み込みに `$0` を使う。
-# ワークスペースルートの決定でも、cwd から登る前に `$0` の置き場を先に見る（下の ccnavi_workspace）。
+# 同じディレクトリを指す。この読み込みと、下の部品の読み込みにだけ `$0` を使い、ワークスペースルートの
+# 決定には使わない（下の ccnavi_workspace の但し書き）。
 #
 # ここにあるのは 9 つ。標準出力と終了コードだけを返し、標準エラーには何も書かない。
 # 失敗したときの文面は呼ぶ側が決める（reject と fail で書き方が違うため）。
@@ -145,30 +145,27 @@ ccnavi_workspace() {
 		printf '%s\n' "$ccnavi_ws_named"
 		return 0
 	fi
-	# 実行中の sh 自身の置き場（<根>/.ccnavi/scripts/）を先に見る。cwd から登るだけだと、
-	# プロジェクトが .ccnavi/scripts/ の写しを持つとき、projects/<名前>/ の中から打ったそのプロジェクトを
-	# 根と取り違え、logs/ や state がワークスペースルートでなくプロジェクトの中にできる。
-	# ワークツリーの中のコピーは根にしない（下の登りに任せる）。
-	case "$0" in
-	*/*)
-		ccnavi_ws_self=$(ccnavi_abs "${0%/*}/../..") || ccnavi_ws_self=""
-		if [ -n "$ccnavi_ws_self" ] && [ -f "$ccnavi_ws_self/.ccnavi/scripts/ccnavi-common.sh" ]; then
-			case "$ccnavi_ws_self" in
-			*/.claude/worktrees/*) ;;
-			*)
-				printf '%s\n' "$ccnavi_ws_self"
-				return 0
-				;;
-			esac
-		fi
-		;;
-	esac
 	ccnavi_ws_here=$(ccnavi_abs .) || return 1
 	while :; do
 		if [ -f "$ccnavi_ws_here/.ccnavi/scripts/ccnavi-common.sh" ]; then
 			case "$ccnavi_ws_here" in
 			*/.claude/worktrees/*) ;; # ワークツリーの中のコピー。根ではない
 			*)
+				# プロジェクト（<根>/projects/<名前>/）が自前の .ccnavi/scripts/ の写しを持つとき、
+				# そこで止まると logs/ や state がプロジェクトの中にできる。`projects/` の親に
+				# ワークスペースがあれば、そちらを根にする。
+				ccnavi_ws_out=$(dirname "$ccnavi_ws_here")
+				ccnavi_ws_outer=$(dirname "$ccnavi_ws_out")
+				case "$ccnavi_ws_out" in
+				*/projects)
+					if [ -f "$ccnavi_ws_outer/.ccnavi/scripts/ccnavi-common.sh" ]; then
+						case "$ccnavi_ws_outer" in
+						*/.claude/worktrees/*) ;;
+						*) ccnavi_ws_here="$ccnavi_ws_outer" ;;
+						esac
+					fi
+					;;
+				esac
 				printf '%s\n' "$ccnavi_ws_here"
 				return 0
 				;;

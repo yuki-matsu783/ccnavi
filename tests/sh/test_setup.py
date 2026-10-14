@@ -2026,7 +2026,9 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
         lines = [line for line in written.splitlines() if line.strip() and not line.startswith("#")]
         # 実行ファイルの置き場のほかは、`--docs` の索引の 1 行（KeepsTheIndexOutOfGit）と、
         # 使い捨ての置き場の 1 行（KeepsTheScratchpadOutOfGit）だけ。
-        self.assertEqual(lines, [f"/.ccnavi/bin/{THIS_MACHINE}/", INDEX_LINE, SCRATCH_LINE, LOGS_LINE])
+        self.assertEqual(
+            lines, [f"/.ccnavi/bin/{THIS_MACHINE}/", INDEX_LINE, SCRATCH_LINE, LOGS_LINE]
+        )
         for wide in (
             "/.ccnavi/",
             "/.ccnavi/bin/",
@@ -2218,7 +2220,7 @@ class KeepsTheLogsOutOfGit(DeploysWhatTheProjectNeeds):
                 self.assertEqual(written.count("logs"), 1, written)
 
     def test_does_not_undo_a_negation_of_the_user(self):
-        for negation in ("!/logs/", "!logs/", "!/logs", "!logs"):
+        for negation in ("!/logs/", "!logs/", "!/logs", "!logs", "!/logs/diag", "!logs/diag/"):
             with self.subTest(negation=negation):
                 self.write_gitignore(f"{negation}\n")
                 self.make_git()
@@ -2299,7 +2301,10 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
             "!*.jsonl",
         ):
             with self.subTest(negation=negation):
-                before = f"*.log\n{negation}\n/.ccnavi/bin/{THIS_MACHINE}/\n{SCRATCH_LINE}\n{LOGS_LINE}\n"
+                before = (
+                    f"*.log\n{negation}\n/.ccnavi/bin/{THIS_MACHINE}/\n"
+                    f"{SCRATCH_LINE}\n{LOGS_LINE}\n"
+                )
                 self.write_gitignore(before)
                 self.make_git()
                 src = self.make_source()
@@ -2322,7 +2327,8 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
         for line in (f"{INDEX_LINE}\r", f"{INDEX_LINE}  ", "ccnavi-index.jsonl\t"):
             with self.subTest(line=line):
                 before = (
-                    f"node_modules/\r\n{line}\n/.ccnavi/bin/{THIS_MACHINE}/\r\n{SCRATCH_LINE}\r\n{LOGS_LINE}\r\n"
+                    f"node_modules/\r\n{line}\n/.ccnavi/bin/{THIS_MACHINE}/\r\n"
+                    f"{SCRATCH_LINE}\r\n{LOGS_LINE}\r\n"
                 )
                 self.write_gitignore(before)
                 self.make_git()

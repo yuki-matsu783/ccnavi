@@ -966,7 +966,8 @@ SCRATCH_IGNORE_LINE="/scratchpad"
 # 書かれる絶対パスとコマンド全文が入るので追跡しない。無視する行が無い配布先では、ターンの終わりの
 # 実行後チェックが logs/diag/ の新規ファイルを「守る場所の変更」として報告する。
 # ルートに固定した `/logs/` が既にあるとき、または同等以上の `/logs`・`logs/`・`logs` があるときは足さない。
-# `!/logs` のようにユーザが否定している行があれば、追跡すると決めているので足さずに伝える。
+# `!/logs`・`!/logs/diag` のようにユーザが logs の中身を否定している行があれば、追跡すると決めているので足さずに伝える
+# （除外したディレクトリの中は再包含できず、末尾に足すとその否定を無効にする）。
 LOGS_IGNORE_HEADER="# ccnavi の実行時の記録（scripts/ccnavi-setup.sh）"
 LOGS_IGNORE_LINE="/logs/"
 # ignore_todo は、表示と「揃っているか」の判定に使う全体。書き込むときは塊ごとに分けて持つ。
@@ -1017,7 +1018,7 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 		ignore_scratch_todo="$SCRATCH_IGNORE_LINE
 "
 	fi
-	logs_negated=$(gitignore_lines | grep -E '^!/?logs/?$' || true)
+	logs_negated=$(gitignore_lines | grep -E '^!/?logs(/.*)?$' || true)
 	if [ -n "$logs_negated" ]; then
 		ignore_logs_negated="$logs_negated
 "
