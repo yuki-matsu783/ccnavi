@@ -151,6 +151,18 @@ export interface RemoteJson {
   readonly mr: number | null;
 }
 
+/**
+ * このPCでは未準備の親（`ccnavi --explain --json` の `unprepared`）。取り込み状態の記録（キャッシュ）だけがあり、
+ * 親のワークツリーが無い。`branch` と `mr` は記録の控え（無ければ空と null）、`reason` は止まった理由。
+ */
+export interface UnpreparedJson {
+  readonly family: string;
+  readonly project: string;
+  readonly branch: string;
+  readonly mr: number | null;
+  readonly reason: string;
+}
+
 export interface TicketJson {
   readonly ticket: string;
   readonly parent: string;
@@ -386,6 +398,8 @@ export interface BoardJson {
   readonly parents: readonly ParentJson[];
   /** 手元の退避にある閉じたチケット（表示用）。任意の欄で、この欄を出さない古い実行ファイルでは空か無し */
   readonly archived?: readonly ArchivedTicketJson[];
+  /** このPCでは未準備の親。この欄を出さない古い実行ファイルでは空か無し */
+  readonly unprepared?: readonly UnpreparedJson[];
 }
 
 export type ParseResult =
@@ -436,6 +450,7 @@ export function parseBoardJson(text: string): ParseResult {
       tickets: list(raw.tickets).filter(isRecord).map(ticket),
       parents: list(raw.parents).filter(isRecord).map(parent),
       archived: list(raw.archived).filter(isRecord).map(archived),
+      unprepared: list(raw.unprepared).filter(isRecord).map(unprepared),
     },
   };
 }
@@ -499,6 +514,16 @@ function sum(raw: Record<string, unknown>): SumJson {
         .filter(isRecord)
         .map((t) => ({ id: str(t.id), source: str(t.source), kind: str(t.kind), title: str(t.title), review: str(t.review), scope: list(t.scope).map(str) })),
     },
+  };
+}
+
+function unprepared(raw: Record<string, unknown>): UnpreparedJson {
+  return {
+    family: str(raw.family),
+    project: str(raw.project),
+    branch: str(raw.branch),
+    mr: num(raw.mr),
+    reason: str(raw.reason),
   };
 }
 

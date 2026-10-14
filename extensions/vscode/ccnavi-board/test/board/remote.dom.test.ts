@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { buildBoard, type Board } from "../../src/core/board.js";
+import { buildBoard, unpreparedOf, type Board } from "../../src/core/board.js";
 import { movedStep, NOTHING_MOVED, syncedFamilies, syncedOf } from "../../src/core/board-moved.js";
 import type { BoardJson, RemoteJson, TicketJson } from "../../src/core/model.js";
 import { branchToId } from "../../src/core/ticket-id.js";
@@ -153,5 +153,45 @@ test("CB-T581 ブランチ名の / を - に置き換えた識別子を作る。
   assert.ok(cases.length > 0);
   for (const c of cases) {
     assert.equal(branchToId(c.branch), c.id, c.branch);
+  }
+});
+
+const UNPREPARED = {
+  family: "feature-99-x",
+  project: "",
+  branch: "feature/99-x",
+  mr: 12,
+  reason: "親のワークツリー（.claude/worktrees/feature-99-x）がありません。ほかのツリーのコピーでは代用しない（どのチケットを正とするかが決まらない）",
+};
+
+test("CB-T582 親のワークツリーが無い親は「未準備」として読み、いまのボードの一覧に在るものだけを引ける", () => {
+  const board = buildBoard({ ...fixture(), unprepared: [UNPREPARED] });
+  assert.deepEqual(board.unprepared, [UNPREPARED]);
+  assert.deepEqual(unpreparedOf(board, "feature-99-x", ""), UNPREPARED);
+  // 画面が言った識別子・プロジェクトが一覧に無ければ引けない
+  assert.equal(unpreparedOf(board, "feature-99-x", "lib"), undefined);
+  assert.equal(unpreparedOf(board, "other", ""), undefined);
+  // この欄を持たない古い実行ファイルの答えは空
+  assert.deepEqual(buildBoard(fixture()).unprepared, []);
+});
+
+test("CB-D365 未準備のカードは理由と「準備する」を出し、押すと prepare を送る。MR の番号が控えに無ければボタンは出さない", async () => {
+  const page = await openBoard({ ...fixture(), unprepared: [UNPREPARED, { ...UNPREPARED, family: "feature-98-y", project: "lib", mr: null }] });
+  try {
+    const cards = page.all("li.unprepared-card");
+    assert.equal(cards.length, 2);
+    const first = page.one('li.unprepared-card[data-family="feature-99-x"]');
+    assert.match(first.textContent ?? "", /このPCでは未準備/);
+    assert.match(first.textContent ?? "", /ブランチ feature\/99-x/);
+    assert.match(first.textContent ?? "", /MR !12/);
+    assert.match(first.querySelector(".unprepared-reason")?.textContent ?? "", /親のワークツリー/);
+    page.click(page.one('li.unprepared-card[data-family="feature-99-x"] [data-action="prepare"]'));
+    await page.settle();
+    assert.deepEqual(page.posted.filter((m) => m.type === "prepare"), [{ type: "prepare", family: "feature-99-x", project: "" }]);
+    const second = page.one('li.unprepared-card[data-family="feature-98-y"]');
+    assert.equal(second.querySelectorAll('[data-action="prepare"]').length, 0);
+    assert.match(second.querySelector(".unprepared-hint")?.textContent ?? "", /ccnavi-start\.sh --mr/);
+  } finally {
+    page.close();
   }
 });

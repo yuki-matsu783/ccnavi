@@ -135,6 +135,11 @@ export type BoardMessage =
   | { readonly type: "approveCancel" }
   | { readonly type: "promptCopy" }
   | { readonly type: "promptOpen" }
+  /**
+   * このPCでは未準備の親の「準備する」。拡張ホストは `ccnavi-start.sh --mr <番号>` をターミナルで呼ぶ
+   * （親のワークツリーを切る入口）。親はいまのボードの未準備の一覧に在るものだけ
+   */
+  | { readonly type: "prepare"; readonly family: string; readonly project: string }
   | { readonly type: "decide"; readonly parent: string; readonly phase: number }
   /** 残った指摘の行き先を決めた。鍵は指摘の `key`、値は `keep` / `fix` / `issue` */
   | { readonly type: "decideConfirm"; readonly choices: Readonly<Record<string, string>> }

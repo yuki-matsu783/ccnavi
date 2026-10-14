@@ -176,8 +176,19 @@ export interface ParentOption {
   readonly title: string;
 }
 
+/** このPCでは未準備の親（実行ファイルの `unprepared` のまま。親のワークツリーが無く、チケットは出ない） */
+export interface Unprepared {
+  readonly family: string;
+  readonly project: string;
+  readonly branch: string;
+  readonly mr: number | null;
+  readonly reason: string;
+}
+
 export interface Board {
   readonly columns: readonly BoardColumn[];
+  /** 親のワークツリーが無いPCで出す「このPCでは未準備」のカード。「準備する」は `ccnavi-start.sh --mr <mr>` を呼ぶ */
+  readonly unprepared: readonly Unprepared[];
   readonly projects: readonly string[];
   /** 親の絞り込みの候補。識別子順 */
   readonly parents: readonly ParentOption[];
@@ -214,6 +225,7 @@ export function buildBoard(json: BoardJson): Board {
   });
   return {
     columns,
+    unprepared: (json.unprepared ?? []).map((u) => ({ ...u })),
     projects: json.projects,
     parents: cards.filter((card) => card.isParent && card.column !== "archived").map((card) => ({ id: card.id, title: card.title })),
     archivedParents: cards.filter((card) => card.isParent && card.column === "archived").map((card) => ({ id: card.id, title: card.title })),
@@ -517,4 +529,9 @@ export function templateDraftCardOf(board: Board, ticket: string): Card | undefi
 /** 親の識別子とフェーズの番号から、そのフェーズ行。無ければ undefined */
 export function phaseChipOf(board: Board, parent: string, phase: number): PhaseChip | undefined {
   return parentCardOf(board, parent)?.phases.find((p) => p.number === phase);
+}
+
+/** 「準備する」を押された親が、いまのボードの未準備の一覧に在るものか。画面が言った識別子をそのまま信頼しない */
+export function unpreparedOf(board: Board, family: string, project: string): Unprepared | undefined {
+  return board.unprepared.find((u) => u.family === family && u.project === project);
 }

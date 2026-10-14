@@ -2512,6 +2512,7 @@ ccnavi --explain --json
 | `pending_approval[]` | `--agree` で承認の対象に入る識別子（承認済みチケットの無い提案と、親の改版） |
 | `tickets[]` | 識別子ごとに 1 件。提案と承認済みチケットのどちらか一方しか無くても出す |
 | `parents[]` | 承認済みチケットのある親ごとの局面とフェーズ。承認前の親はフェーズを持たないのでここに無い |
+| `unprepared[]` | このPCでは未準備の親。取り込み状態の記録（キャッシュ）だけがあり、親のワークツリー（`.claude/worktrees/<親>`）が無いもの。閉じた親は出さない。`{family, project, branch, mr, reason}`。`branch` と `mr` は記録の控え（無ければ空と null）、`reason` は止まった理由。ほかのツリーのコピーでは代用しないので、チケットは `tickets[]` に出ない。拡張は「準備する」で `ccnavi-start.sh --mr <mr>` を呼ぶ |
 | `archived[]` | 手元の退避（`logs/archive/`。`ready` が閉じた親子のチケットを移した先）にある閉じたチケット。表示のためだけの任意の欄で、判定（承認待ち・先行・局面）には混ぜない。`tickets[]` に同じ識別子があるものは出さない。`{ticket, parent, phase, title, project, path, approved_at, started_at, completed_at, cancelled_at, cancel_reason, history}`。`path` は退避したファイルの絶対パス、`history[]` は退避した履歴（`tickets[]` の `history[]` と同じ形。最後の行は `kind` が `archived`）。この欄を持たない古い実行ファイルの答えも同じ版のまま読める（拡張は無ければ空とする） |
 
 `tickets[]` の 1 件。
