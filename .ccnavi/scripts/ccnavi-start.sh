@@ -857,10 +857,12 @@ if [ "$total" -eq 0 ]; then
 		fail host-unreadable "MR を作れません（${host_why}）。origin を確かめてください。"
 	fi
 	issue_rc=0
-	if [ "$host_rc" -eq 0 ] && [ -z "$opt_title" ]; then
+	# --title を付けても issue の存在は確かめる（実在しない番号の Closes で別の課題を閉じないため）。
+	# 確かめを省けるのは、ホストに届かないとき（MCP で読んだ後の再実行）だけ
+	if [ "$host_rc" -eq 0 ]; then
 		issue_title_get || issue_rc=$?
 		case "$issue_rc" in
-		2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。番号を確かめてください。" 2 ;;
+		2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。番号を作らず、ユーザに確かめてください。issue なしで始めるなら、sh .ccnavi/scripts/ccnavi-ticket.sh next-id <先頭の語> <slug> で識別子を決め、.ccnavi/docs/worktree.md の手順で切ったワークツリーで ccnavi ticket new <識別子> --title <題> --plan <型,…> を打ちます。" 2 ;;
 		3) fail issue-is-pr "#${number} は issue ではなく PR です。MR の番号なら --mr ${number} を使ってください。" 2 ;;
 		esac
 	fi

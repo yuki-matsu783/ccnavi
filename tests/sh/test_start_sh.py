@@ -537,6 +537,17 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(again.returncode, 2, again.stdout + again.stderr)
         self.assertEqual(self.local_branches(), ["main"])
 
+    def test_issue_not_found_is_not_bypassed_by_slug_and_title(self):
+        # --title を付けても、ホストが読めるなら issue の存在を確かめる。作らず、次の手を案内する
+        self.route({PULLS: [200, []]})
+        done = self.run_sh("--issue", "999", "--slug", "memo", "--title", "メモアプリ")
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertIn("issue #999 が見つからない", done.stderr)
+        self.assertIn("ccnavi-ticket.sh next-id", done.stderr)
+        self.assertIn("ccnavi ticket new", done.stderr)
+        self.assertEqual(self.local_branches(), ["main"])
+        self.assertEqual(self.posts(), [])
+
     def test_issue_forbidden_exits_2(self):
         self.route({PULLS: [200, []], f"GET {GITHUB}/issues/152": [403, {"message": "no"}]})
         done = self.run_sh("--issue", "152")
