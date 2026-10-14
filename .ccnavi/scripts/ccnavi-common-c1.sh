@@ -125,7 +125,7 @@ ccnavi_c1_family() {
 	yes)
 		if ! ccnavi_branch_ok "$ccnavi_c1_branch" "$ccnavi_c1_family_id"; then
 			ccnavi_c1_target=stop
-			ccnavi_c1_why="実行ファイルが親のブランチ名（branch）を答えないか、ブランチ名の形でない（${ccnavi_c1_branch:-空}）。実行ファイルを新しくしてください"
+			ccnavi_c1_why="親のブランチ名（親のワークツリーの HEAD）を読めないか、ブランチ名の形でない（${ccnavi_c1_branch:-空}）"
 		elif [ -z "$ccnavi_c1_tree" ] || [ ! -d "$ccnavi_c1_tree" ]; then
 			ccnavi_c1_target=stop
 			ccnavi_c1_why="親のワークツリーが決まらない"

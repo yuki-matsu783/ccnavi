@@ -262,7 +262,7 @@ if [ "$needs_host" = yes ]; then
 fi
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 # 親の識別子。親のワークツリー（.claude/worktrees/<識別子>）の名前で、親のブランチ名
-# （親チケットの branch:）とは違うことがある。マージリクエストは居るブランチ（branch）で探して作り、
+# の / を - に置き換えたもの（ブランチ名とは違うことがある）。マージリクエストは居るブランチ（branch）で探して作り、
 # C1 の親子のチケット・下書きの名前（実行ファイルと揃える）は識別子で引く。ワークツリーの外なら前どおりブランチ名。
 family="$branch"
 review_top=$(git rev-parse --show-toplevel 2>/dev/null || :)

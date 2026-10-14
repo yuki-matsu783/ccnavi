@@ -34,37 +34,13 @@ ccnavi_repo_key() {
 
 # 親子のチケットの取り込み状態のパス。<ワークスペースルート> <リポジトリ> <P>
 #
-# 鍵は親の識別子（`/` を含まない）。親のブランチ名は取り込み状態の中の `branch` に書く。
+# 鍵は親の識別子（`/` を含まない）。親のブランチ名は取り込み状態の中の `branch` に書く（キャッシュ。
+# 判定には使わない。ブランチ名は親のワークツリーの HEAD から読む）。
 ccnavi_family_record() {
 	printf '%s/sync/%s/families/%s\n' "$(ccnavi_state "$1")" "$2" "$3"
 }
 
-# 親のブランチ名がそのブランチの親子のチケットの取り込み状態。無ければ空。<ワークスペースルート> <リポジトリ> <ブランチ>
-#
-# 取り込み状態の `branch` の行で探す（`branch` の無い前の取り込み状態は、鍵の識別子をブランチ名として読む）。
-# 識別子と違う名前の親のブランチ（`branch:`）でも、ブランチ名から取り込み状態を引ける。書きかけ（`*.tmp.*`）と
-# シンボリックリンクは読まない。当たった取り込み状態を 1 行に 1 つずつ全部出す（2 つ以上なら、2 つの親子の
-# チケットが同じブランチを宣言している。呼ぶ側は止める）。
-ccnavi_family_record_of_branch() {
-	ccnavi_fb_dir="$(ccnavi_state "$1")/sync/$2/families"
-	[ -d "$ccnavi_fb_dir" ] || return 0
-	[ -L "$ccnavi_fb_dir" ] && return 0
-	for ccnavi_fb_file in "$ccnavi_fb_dir"/*; do
-		[ -f "$ccnavi_fb_file" ] || continue
-		[ -L "$ccnavi_fb_file" ] && continue
-		case "$ccnavi_fb_file" in
-		*.tmp.*) continue ;;
-		esac
-		ccnavi_fb_branch=$(ccnavi_record_get "$ccnavi_fb_file" branch)
-		[ -n "$ccnavi_fb_branch" ] || ccnavi_fb_branch="${ccnavi_fb_file##*/}"
-		if [ "$ccnavi_fb_branch" = "$3" ]; then
-			printf '%s\n' "$ccnavi_fb_file"
-		fi
-	done
-	return 0
-}
-
-# 親子のチケット <識別子> の親のブランチ名として <名前> を受けてよいなら 0。<名前> <識別子>
+# 親のブランチ名として <名前> を受けてよいなら 0。<名前> <識別子>
 #
 # 識別子と同じ名前は識別子の検査（ccnavi_is_ident）で見る（前からの識別子は ccnavi_is_branch の予約に
 # 当たることがある）。違う名前は ccnavi_is_branch で見る。
@@ -74,6 +50,21 @@ ccnavi_branch_ok() {
 	else
 		ccnavi_is_branch "$1"
 	fi
+}
+
+# ワークツリーの HEAD が指すブランチ名。<ワークツリー> <識別子>
+#
+# 識別子からブランチ名は逆算しない。HEAD のブランチ名を変換（ccnavi_branch_to_id。/ を - に置き換え）
+# したものがフォルダ名の識別子と一致し、ブランチ名として受けてよいときだけ出す。
+# ワークツリーが無い・ブランチの外（detached HEAD）なら 1、一致しない・使えない名前なら 2。
+# 取り込み記録の branch はキャッシュで、ここでは読まない。git は読み取りの 1 回だけ。
+ccnavi_head_branch() {
+	{ [ -d "$1" ] && [ ! -L "$1" ]; } || return 1
+	ccnavi_hb_name=$(git -C "$1" symbolic-ref --quiet --short HEAD 2>/dev/null) || ccnavi_hb_name=""
+	[ -n "$ccnavi_hb_name" ] || return 1
+	[ "$(ccnavi_branch_to_id "$ccnavi_hb_name")" = "$2" ] || return 2
+	ccnavi_branch_ok "$ccnavi_hb_name" "$2" || return 2
+	printf '%s\n' "$ccnavi_hb_name"
 }
 
 # 実行ファイルに聞く。答え（標準出力）を、Windows の実行ファイルの CR を除いて出す。<ワークスペースルート> <引数>...
@@ -92,29 +83,6 @@ ccnavi_ask() {
 		return 1
 	fi
 	printf '%s\n' "$ccnavi_ak_out" | tr -d '\r'
-}
-
-# 親子のチケットの親のブランチ名。<ワークスペースルート> <識別子>
-#
-# 実行ファイルの `c1 family <識別子>` の `branch` の行（承認済みの親チケットの `branch:`、無ければ識別子。
-# 提案の `branch:` は使わない）。sh はチケットを読まない（読むのは実行ファイル）。実行ファイルが無ければ 1、
-# 在るのに答えない・`branch` の行が無い（`branch_refused`。使えない名前か統合先の名前）・答えが親のブランチ名の
-# 形でなければ 2 を返す（呼ぶ側は識別子の外へ動かさずに止める）。ソースで動かしている ccnavi の
-# リポジトリでは uv で起こす。
-ccnavi_family_branch() {
-	if ccnavi_fbr_bin=$(ccnavi_bin "$1"); then
-		ccnavi_fbr_out=$("$ccnavi_fbr_bin" --root "$1" c1 family "$2" 2>/dev/null </dev/null) || ccnavi_fbr_out=""
-	elif [ -f "$1/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
-		ccnavi_fbr_out=$(cd "$1" && uv run --quiet python -m ccnavi --root "$1" c1 family "$2" 2>/dev/null </dev/null) ||
-			ccnavi_fbr_out=""
-	else
-		return 1
-	fi
-	ccnavi_fbr_out=$(printf '%s\n' "$ccnavi_fbr_out" | tr -d '\r')
-	[ "$(printf '%s\n' "$ccnavi_fbr_out" | head -n 1)" = "c1 1" ] || return 2
-	ccnavi_fbr_name=$(printf '%s\n' "$ccnavi_fbr_out" | sed -n 's/^branch //p' | head -n 1)
-	ccnavi_branch_ok "$ccnavi_fbr_name" "$2" || return 2
-	printf '%s\n' "$ccnavi_fbr_name"
 }
 
 # 取り込み状態から 1 項目を読む。無ければ空。<ファイル> <鍵>

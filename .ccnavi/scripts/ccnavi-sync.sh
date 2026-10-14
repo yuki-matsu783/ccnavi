@@ -9,12 +9,12 @@
 # リモートから消えたかを確かめるのはここだけ（セッションの頭を待たせず、merge の書きかけも残さないため）。
 #
 # <P> は親の識別子（= .claude/worktrees/<P>）。省けば、.claude/worktrees/ の下の親のワークツリー
-# （親チケットか提案があり、親のブランチをチェックアウトしているもの）を全部。
+# （親チケットか提案があり、HEAD のブランチ名を変換した識別子がフォルダ名と合うもの）を全部。
 #
-# 親のブランチ名は親チケットの `branch:`、無ければ識別子と同じ名前。sh はチケットを読まず、
-# 実行ファイルの `c1 family <P>` の `branch` の行で知る。取り込み状態の鍵は識別子のままで、中の
-# `branch` に親のブランチ名を書く（`/` を含む名前を state の置き場のパスに入れない）。実行ファイルが無ければ
-# 識別子をブランチ名とする（前の動き）。在るのに答えなければ、その親子のチケットは取り込まずに止める。
+# 親のブランチ名は親のワークツリーの HEAD から読む（識別子からは逆算しない）。識別子はブランチ名の
+# `/` を `-` に置き換えたもの。取り込み状態の鍵は識別子で、中の `branch` に親のブランチ名を書く
+# （キャッシュ。判定には使わない。`/` を含む名前を state の置き場のパスに入れない）。HEAD から読めない・
+# 識別子と合わなければ、その親子のチケットは取り込まずに止める。
 #
 # 親子のチケットの取り込み状態は削除せずに残す。親のワークツリーを片付けても消さない。
 # 消すと、決まらないで止めていた親子のチケット（gone など）が取り込み状態の無いものに戻り、止めが外れるため。
@@ -84,7 +84,7 @@ sh .ccnavi/scripts/ccnavi-sync.sh [<P>...]
 sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...
 
   親チケット <P>（識別子。省けば .claude/worktrees/ の下の親のワークツリー全部）の親のブランチ
-  （親チケットの branch:、無ければ <P> と同じ名前）をリモートから取り込み、
+  （親のワークツリーの HEAD のブランチ。/ を - に置き換えたものが <P>）をリモートから取り込み、
   親子のチケットの取り込み状態と統合先の取り込み結果を書く。分かれていれば merge し、衝突したら取りやめてユーザに回す。
   リモートから消えた親のブランチは、統合先の done/ を見て「閉じた」か「消えた」かを決める。
   取り込んだ後、親子のチケットを判定し直し、止める理由があれば取り込み状態を blocked にする。
@@ -264,20 +264,11 @@ run_ccnavi() {
 
 # 親子のチケットの親のブランチ名。<P>
 #
-# 実行ファイルの `c1 family <P>` の `branch` の行（承認済みの親チケットの `branch:`、無ければ識別子）。
-# 実行ファイルが無ければ識別子（前の動き）。在るのに答えない・`branch` の行が無い（`branch_refused`）・
-# 答えが親のブランチ名の形でなければ 1（呼ぶ側はその親子のチケットを取り込まずに止めたと言う）。
+# 親のワークツリー（.claude/worktrees/<P>）の HEAD から読む（ccnavi_head_branch）。HEAD のブランチ名を
+# 変換（/ を - に置き換え）した識別子が <P> と一致するときだけ出す。ワークツリーが無い・ブランチの外なら 1、
+# 一致しない・使えない名前なら 2（呼ぶ側はその親子のチケットを取り込まずに止めたと言う）。
 family_branch() {
-	if [ -z "$info_from" ]; then
-		printf '%s\n' "$1"
-		return 0
-	fi
-	fb_out=$(run_ccnavi c1 family "$1" 2>/dev/null | tr -d '\r') || fb_out=""
-	[ "$(printf '%s\n' "$fb_out" | head -n 1)" = "c1 1" ] || return 1
-	fb_name=$(printf '%s\n' "$fb_out" | sed -n 's/^branch //p' | head -n 1)
-	[ -n "$fb_name" ] || return 1
-	ccnavi_branch_ok "$fb_name" "$1" || return 1
-	printf '%s\n' "$fb_name"
+	ccnavi_head_branch "$root/.claude/worktrees/$1" "$1"
 }
 approved=$(info approved)
 home=$(info home)
@@ -459,13 +450,13 @@ write_integration() {
 	[ "$wi_ok" = yes ]
 }
 
-# 親のブランチ名が決まらなかった親子のチケットの文面。<P>
+# 親のブランチ名が決まらなかった親子のチケットの文面。<P> <family_branch の終了コード>
 branch_refused() {
-	br_why=$(run_ccnavi c1 family "$1" 2>/dev/null | tr -d '\r' | sed -n 's/^branch_refused //p' | head -n 1)
-	if [ -n "$br_why" ]; then
-		printf '%s: 親のブランチ名が使えない（%s）。取り込まずに止めた。承認済みの親チケットの branch: をユーザが確かめてください\n' "$1" "$br_why"
+	if [ "$2" = 1 ]; then
+		printf '%s: 親のワークツリー（.claude/worktrees/%s）の HEAD からブランチ名を読めない（ブランチの外にいる）。取り込まずに止めた。ブランチ名の / を - に置き換えたものが %s になるブランチに戻してから再実行してください\n' "$1" "$1" "$1"
 	else
-		printf '%s: 実行ファイルが親のブランチ名を答えない（c1 family）。取り込まずに止めた。実行ファイルを新しくしてください\n' "$1"
+		printf '%s: 親のワークツリー（.claude/worktrees/%s）の HEAD のブランチ（%s）の / を - に置き換えたものが %s と合わない。取り込まずに止めた。ブランチ名の / を - に置き換えたものが %s になるブランチに戻してから再実行してください\n' \
+			"$1" "$1" "$(git -C "$root/.claude/worktrees/$1" symbolic-ref --quiet --short HEAD 2>/dev/null || :)" "$1" "$1"
 	fi
 }
 
@@ -501,14 +492,16 @@ if [ "$#" -gt 0 ]; then
 	for want in "$@"; do
 		has_family_line "$want" && continue
 		tree="$root/.claude/worktrees/$want"
-		if ! want_branch=$(family_branch "$want"); then
-			branch_refused "$want"
+		if [ ! -d "$tree" ] || [ -L "$tree" ]; then
+			printf '%s: 親のワークツリー（.claude/worktrees/%s）がありません。切り直してから再実行してください（sh %s/ccnavi-git.sh fetch origin <ブランチ> のあと worktree add .claude/worktrees/%s <ブランチ>。ブランチ名の / を - に置き換えたものが %s になる）\n' \
+				"$want" "$want" "$here_sh" "$want" "$want"
 			fail_note
 			continue
 		fi
-		if [ ! -d "$tree" ] || [ -L "$tree" ]; then
-			printf '%s: 親のワークツリー（.claude/worktrees/%s）がありません。切り直してから再実行してください（sh %s/ccnavi-git.sh fetch origin %s のあと worktree add .claude/worktrees/%s -b %s origin/%s）\n' \
-				"$want" "$want" "$here_sh" "$want_branch" "$want" "$want_branch" "$want_branch"
+		fb_rc=0
+		want_branch=$(family_branch "$want") || fb_rc=$?
+		if [ "$fb_rc" -ne 0 ]; then
+			branch_refused "$want" "$fb_rc"
 			fail_note
 			continue
 		fi
@@ -518,6 +511,11 @@ if [ "$#" -gt 0 ]; then
 		1)
 			printf '%s: .claude/worktrees/%s に親チケットも提案もありません。親のワークツリーではないので取り込まない\n' "$want" "$want"
 			fail_note
+			# 親子のチケットは取り込まないが、そのリポジトリの統合先の取り込み結果は書く。取り込み記録が
+			# （ccnavi-start.sh が MR の番号を保存して）チケットより先にあると、統合先の取り込み結果が
+			# 無いままでは最初の承認（--agree）が止まる。
+			nt_key=$(ccnavi_repo_key "$tree" "$root")
+			grep -F -x -q -- "$nt_key" "$scratch/repos" 2>/dev/null || printf '%s\n' "$nt_key" >>"$scratch/repos"
 			continue
 			;;
 		2)
@@ -546,12 +544,8 @@ else
 		branch=$(git -C "$tree" rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 		[ -n "$branch" ] && [ "$branch" != HEAD ] || continue
 		ccnavi_parent_tree "$tree" "$name" || continue
-		# 親のブランチ（承認済みの親チケットの branch:、無ければ識別子）をチェックアウトしているものだけ。
-		if ! name_branch=$(family_branch "$name"); then
-			branch_refused "$name"
-			fail_note
-			continue
-		fi
+		# HEAD のブランチ名を変換した識別子がフォルダ名と合うものだけ。
+		name_branch=$(family_branch "$name") || continue
 		[ "$branch" = "$name_branch" ] || continue
 		add_family "$name" "$tree" "$name_branch"
 	done
@@ -577,22 +571,6 @@ sync_family() {
 		fail_note
 		return 0
 	fi
-	kept_branch=$(ccnavi_record_get "$record" branch)
-	if [ "$kept_branch" = "$P" ] && [ "$B" != "$P" ]; then
-		printf '%s: 親のブランチを承認済みの branch: の %s へ移した後、まだ送っていない（取り込み状態は %s のまま）。親のワークツリーで sh %s/ccnavi-git.sh push -u origin %s を実行すると取り込み状態が書き直される。取り込まずに止めた\n' \
-			"$P" "$B" "$P" "$here_sh" "$B"
-		fail_note
-		# 移った後の push を待つだけなので、取り込みの後の検査で blocked にしない。
-		printf '%s\n' "$P" >>"$scratch/unchecked"
-		return 0
-	fi
-	if [ -n "$kept_branch" ] && [ "$kept_branch" != "$B" ]; then
-		printf '%s: 取り込み状態の親のブランチ（%s）と、親チケットが指定する親のブランチ（%s）が違う。取り込まずに止めた。branch: を取り込み状態の名前に戻すか、親子のチケットを捨てるならユーザが sh %s/ccnavi-sync.sh --forget %s で取り込み状態を削除します。\n' \
-			"$P" "$kept_branch" "$B" "$here_sh" "$P"
-		fail_note
-		return 0
-	fi
-
 	# set -e の下なので、戻り値は || で受ける（そのまま打つと、取れなかった時点で sh ごと抜ける）。
 	lock_rc=0
 	ccnavi_lock_take "$root" "$key" "$P" "$lock_wait" || lock_rc=$?
@@ -920,7 +898,6 @@ while IFS= read -r key <&4; do
 	fi
 	while IFS="$tab" read -r fam_p fam_tree fam_key fam_branch <&3; do
 		[ -n "$fam_p" ] || continue
-		grep -F -x -q -- "$fam_p" "$scratch/unchecked" 2>/dev/null && continue
 		check_family "$fam_p" "$fam_key"
 	done 3<"$scratch/these"
 done 4<"$scratch/repos"

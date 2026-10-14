@@ -268,7 +268,6 @@ NEEDS_ALTERNATIVE = (
     "grep-pager",
     "remote-option",
     "worktree-no-dest",
-    "carry-tmp",
 )
 # 代わりの手段を示している印。ラッパーか取り込みの sh の形か、ユーザに頼むこと。
 # 「ユーザに依頼してください」で終わる拒否（remote-write など）も、正しい代わりの手段として数える。
@@ -1074,8 +1073,8 @@ class WorktreeNameTest(GitWrapperTest):
         self.assertIn("-b b", stderr)
         self.assertIn("worktree add .claude/worktrees/b -b b", stderr)
         # 名前を変えると何が止まるのかを、ADR の番号に頼らず中身で言う。
-        self.assertIn("同じ名前のブランチをチェックアウトしているものとして探します", stderr)
-        self.assertIn("一度でも push したか ccnavi-sync.sh で取り込んだことがある", stderr)
+        self.assertIn("そのブランチをチェックアウトしているものとして探します", stderr)
+        self.assertIn("/ を - に置き換えたもの", stderr)
         self.assertNotIn("ADR", stderr)
 
     def test_matching_forms_pass(self):

@@ -139,10 +139,10 @@ carry_paths() {
 # 取り込み済みの親子のチケット 1 つをコミットして push する。ccnavi_c1_family を済ませた後に呼ぶ。0 送った（push するものが無いを含む）/ 1 失敗した
 #
 # 取り込み状態の鍵とロックは識別子（ccnavi_c1_family_id）、ref・push・ls-remote と取り込み状態の branch は
-# 親のブランチ名（ccnavi_c1_branch。親チケットの branch:、無ければ識別子）。
+# 親のブランチ名（ccnavi_c1_branch。親のワークツリーの HEAD から読む）。
 carry_family() {
 	cf_p="$ccnavi_c1_family_id"
-	cf_b="${ccnavi_c1_branch:-$ccnavi_c1_family_id}"
+	cf_b="$ccnavi_c1_branch"
 	cf_tree="$ccnavi_c1_tree"
 	cf_rc=0
 	ccnavi_lock_take "$root" "$ccnavi_c1_repo" "$cf_p" "$(ccnavi_c1_number "${CCNAVI_LOCK_WAIT:-}" 120)" || cf_rc=$?
@@ -304,8 +304,8 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 		continue
 	fi
 
-	# 取り込み済みの親子のチケットの親のワークツリー（ディレクトリ名 = 識別子。ブランチは親チケットの branch:、
-	# 無ければ識別子と同じ名前）は、取り込んでから送る。
+	# 取り込み済みの親子のチケットの親のワークツリー（ディレクトリ名 = 識別子。ブランチは HEAD のブランチで、
+	# その / を - に置き換えたものが識別子）は、取り込んでから送る。
 	case "$tree" in
 	"$root/.claude/worktrees/"*)
 		ccnavi_c1_family "$name"

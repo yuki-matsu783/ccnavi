@@ -961,7 +961,7 @@ class SyncTest(SyncHarness):
         done = self.sync("i0002")
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertIn("切り直して", done.stdout)
-        self.assertIn("worktree add .claude/worktrees/i0002 -b i0002 origin/i0002", done.stdout)
+        self.assertIn("worktree add .claude/worktrees/i0002 <ブランチ>", done.stdout)
 
     def test_bad_names_are_refused(self):
         for bad in ("../x", "a/b", "-x", "a..b"):
