@@ -289,6 +289,18 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(json.loads(result.stdout)["approved"], ["i0001", "i0001-01-01"])
         self.assertTrue(self.copy_exists("i0001-01-01"))
 
+    def test_yes_lists_the_paths_the_approval_wrote(self):
+        """`written` はこの承認で書いた・消したパス（ルートからの相対）。push はこれだけを送る。"""
+        self.pending_parent_and_child()
+        result = self.yes(["i0001", "i0001-01-01"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        written = json.loads(result.stdout)["written"]
+        tree = os.path.relpath(self.parent_tree, self.root).replace(os.sep, "/")
+        for name in ("i0001", "i0001-01-01"):
+            self.assertIn(f"{tree}/.ccnavi/approved/doing/{name}.md", written)
+            self.assertIn(f"{tree}/wip/proposals/todo/{name}.md", written)
+        self.assertTrue(all(not os.path.isabs(p) and not p.startswith("..") for p in written))
+
     def test_yes_refuses_when_the_shown_text_changed(self):
         """3. 見せたあとで子の中身を書き換えると、識別子が同じでも承認しない。"""
         inside = "wip/research/*"

@@ -174,8 +174,11 @@ export type ApprovalEffect =
       readonly digest: string;
       readonly only: readonly string[];
     }
-  /** 承認の push の sh をターミナルに送る */
-  | { readonly kind: "carry" }
+  /**
+   * 承認の push の sh をターミナルに送る。`paths` はこの承認で書いた・消したパスで、sh にはこれだけを
+   * コミット・push させる（同じ置き場の承認と無関係な変更を巻き込まない）。空なら古い実行ファイルで、絞らずに送る
+   */
+  | { readonly kind: "carry"; readonly paths: readonly string[] }
   /** 残った指摘を読む（`decide <N> --preview`）。返ったら `decidePreviewed` で戻す */
   | { readonly kind: "loadDecide"; readonly tree: string; readonly phase: number }
   /** 連絡の文のために残った指摘を読む（`decide <N> --preview`）。返ったら `reviewedChecked` で戻す */
@@ -364,7 +367,7 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
         ? []
         : [
             carried
-              ? { kind: "carry" }
+              ? { kind: "carry", paths: outcome.value.written }
               : {
                   kind: "warn",
                   text:
@@ -399,7 +402,12 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
     return move(
       state,
       { overlay: { kind: "error", error: partialMessage(outcome.partial, carrier && placed) }, only: state.only },
-      ...(placed ? [...(carrier ? [{ kind: "carry" } as const] : []), { kind: "refresh" } as const] : []),
+      ...(placed
+        ? [
+            ...(carrier ? [{ kind: "carry", paths: outcome.partial.written } as const] : []),
+            { kind: "refresh" } as const,
+          ]
+        : []),
     );
   }
   return move(state, { overlay: { kind: "error", error: outcome.error }, only: state.only });

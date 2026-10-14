@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 from typing import TextIO
 
 from ..infra import fsio, modes, settings
@@ -134,9 +135,11 @@ def approve(
             break
         stdout.write(f"\n{UPDATED_NOTICE}最新の承認待ちを表示し直します。\n\n")
         snapshot, verdict = latest_snapshot, core_base.judge_approval(latest_snapshot, only)
-    applied = core_base.write_fs(stdout, stderr, core_base.plan(snapshot, verdict).planned)
+    applied, written = write_recorded(
+        stdout, stderr, root, core_base.plan(snapshot, verdict).planned
+    )
     if placed_out:
-        _write_report(placed_out, placed_report(conf, root, gathered, applied), stderr)
+        _write_report(placed_out, placed_report(conf, root, gathered, applied, written), stderr)
     if applied.code == 0 and gathered.rejected:
         # 承認の対象の一部が失敗したときは、通ったぶんを置いてから失敗で終わる。置いたので
         # 繰り返してよく、失敗したものは上で名指ししてある。成功で終わると、
@@ -165,12 +168,47 @@ def copy_paths(conf: settings.Settings, root: str, batch: list, ids: list[str]) 
     return out
 
 
+def write_recorded(
+    stdout: TextIO, stderr: TextIO, root: str, planned: agree.Planned
+) -> tuple[agree.Applied, list[str]]:
+    """並べた書き込みを書き（`core_base.write_fs`）、実際に書けた・消せたパスも返す。
+
+    パスはワークスペースルートからの相対（区切りは "/"）。承認済みチケット・マーカー・履歴と、
+    承認で消した提案が入る。ルートの外は入れない。`ccnavi-push-approved.sh --path` に渡すと、
+    この承認で書いたものだけをコミットして push する（同じ置き場のほかの変更を巻き込まない）。
+    """
+    with fsio.recording() as written:
+        applied = core_base.write_fs(stdout, stderr, planned)
+    return applied, written_paths(root, written)
+
+
+def written_paths(root: str, written: list[str]) -> list[str]:
+    """書いたパス（絶対パス）を、ワークスペースルートからの相対（"/" 区切り）にする。外は除く。"""
+    base = os.path.realpath(root)
+    out = []
+    for path in written:
+        real = fsio.parent_resolved(path)
+        try:
+            rel = os.path.relpath(real, base)
+        except ValueError:
+            continue
+        if rel == os.pardir or rel.startswith(os.pardir + os.sep) or os.path.isabs(rel):
+            continue
+        out.append(rel.replace(os.sep, "/"))
+    return out
+
+
 def placed_report(
-    conf: settings.Settings, root: str, gathered: agree.Gathered, applied: agree.Applied
+    conf: settings.Settings,
+    root: str,
+    gathered: agree.Gathered,
+    applied: agree.Applied,
+    written: list[str] | None = None,
 ) -> dict:
     """承認の書き込みの結果。実際に書けたパス（`placed`）と、書けなかったもの・書かなかったもの。
 
     - `placed`: 書けた承認済みチケットのパス
+    - `written`: この承認で書いた・消したパス（ワークスペースルートからの相対。`write_recorded`）
     - `failed`: 書き込みで止まった提案（識別子と理由）。止まらなければ空
     - `unwritten`: 止まったために書かなかった提案の識別子
     - `rejected`: 検査で承認の対象にしなかった提案（識別子と理由）
@@ -190,6 +228,7 @@ def placed_report(
     return {
         "version": agree.AGREE_VERSION,
         "placed": copy_paths(conf, root, gathered.batch, applied.placed),
+        "written": list(written or []),
         "failed": failed,
         "unwritten": unwritten,
         "rejected": [
@@ -381,7 +420,9 @@ def approve_yes(
         return 1
 
     lines = io.StringIO()
-    applied = core_base.write_fs(lines, stderr, core_base.plan(snapshot, verdict).planned)
+    applied, written = write_recorded(
+        lines, stderr, root, core_base.plan(snapshot, verdict).planned
+    )
     if applied.code != 0:
         # 途中で止まった。置いたものはそのまま残るので、どこまで置いたかを返す。それを言わずに
         # 失敗を返すと、ユーザは「何も起きていない」と読む（README「承認の JSON」の `partial`）。
@@ -400,6 +441,9 @@ def approve_yes(
                     "placed": applied.placed,
                     # 実際に書けた承認済みチケットのパス（`placed` の識別子の分）
                     "paths": copy_paths(conf, root, gathered.batch, applied.placed),
+                    # この承認で書いた・消したパス（ワークスペースルートからの相対）。拡張は
+                    # これだけを `ccnavi-push-approved.sh --path` でコミット・push させる。
+                    "written": written,
                     "ticket": applied.stopped_at,
                     "reason": applied.reason,
                     # 止まるまでに出た行（マーカーを消した、改版した）。端末は stdout で見えるが、
@@ -430,6 +474,8 @@ def approve_yes(
             for t in tickets
         ],
         "lines": [line for line in lines.getvalue().splitlines() if line.strip()],
+        # この承認で書いた・消したパス（ワークスペースルートからの相対。`write_recorded`）
+        "written": written,
         "worktrees": plan,
         "prompt": prompt,
     }

@@ -11,6 +11,14 @@
  "lines": [
   "承認した。.ccnavi/approved/doing/ へ動かした。"
  ],
+ "written": [
+  ".claude/worktrees/i0001/.ccnavi/approved/doing/i0001.md",
+  ".claude/worktrees/i0001/wip/proposals/todo/i0001.md",
+  ".claude/worktrees/i0001/.ccnavi/approved/events/i0001.ndjson",
+  ".claude/worktrees/i0001/.ccnavi/approved/doing/i0001-01-01.md",
+  ".claude/worktrees/i0001/wip/proposals/todo/i0001-01-01.md",
+  ".claude/worktrees/i0001/.ccnavi/approved/events/i0001-01-01.ndjson"
+ ],
  "worktrees": [
   {
    "ticket": "i0001-01-01",

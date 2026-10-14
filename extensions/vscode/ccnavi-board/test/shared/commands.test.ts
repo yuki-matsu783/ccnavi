@@ -101,6 +101,11 @@ test("CB-T19b 承認の push の sh は、ワークスペースルートから�
     pushApprovedCommand("/ws", ["i0001"]),
     "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh' 'i0001'",
   );
+  // 承認が書いた・消したパスを並べると、そのパスだけをコミットして push する（承認の後）。
+  assert.equal(
+    pushApprovedCommand("/ws", [], [".claude/worktrees/i0001/.ccnavi/approved/doing/i0001.md", "a b/x's.md"]),
+    "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh' --path '.claude/worktrees/i0001/.ccnavi/approved/doing/i0001.md' --path 'a b/x'\\''s.md'",
+  );
 });
 
 test("CB-T583 「準備する」は ccnavi-start.sh --mr <番号> を絶対パスで送る。プロジェクトの親はそのプロジェクトに cd してから", () => {

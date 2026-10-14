@@ -578,7 +578,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
     }
     // 承認の実行ファイルは承認済みチケットを置くだけで、コミットして push するのはこの sh
     case "carry":
-      runInTerminal(root, pushApprovedCommand(root));
+      runInTerminal(root, pushApprovedCommand(root, [], effect.paths));
       return;
     case "copy":
       await copyPrompt(effect.prompt, effect.what);

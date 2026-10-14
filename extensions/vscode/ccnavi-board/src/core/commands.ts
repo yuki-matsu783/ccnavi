@@ -252,10 +252,17 @@ export function gitScriptCommand(root: string): string {
  * 絶対パスで組む。ターミナルは使い回すので、前のコマンドが別の場所へ cd していても届く。
  * `parents` を渡すとその親子のチケットだけをコミットして push する（取り込み済みのものだけが送られ、
  * そうでないものは今どおりユーザがコミットする）。
+ * `paths`（ワークスペースルートからの相対）を渡すと、置き場の変更のうちそのパスだけを送る（`--path`）。
+ * 承認が書いた・消したパスを渡し、承認と無関係な変更を承認のコミットに入れない。`parents` とは一緒に使えない
  */
-export function pushApprovedCommand(root: string, parents: readonly string[] = []): string {
+export function pushApprovedCommand(
+  root: string,
+  parents: readonly string[] = [],
+  paths: readonly string[] = [],
+): string {
   const names = parents.map((p) => ` ${shellQuote(p)}`).join("");
-  return `sh ${shellQuote(path.posix.join(toPosixPath(root), PUSH_APPROVED_SCRIPT))}${names}`;
+  const only = paths.map((p) => ` --path ${shellQuote(p)}`).join("");
+  return `sh ${shellQuote(path.posix.join(toPosixPath(root), PUSH_APPROVED_SCRIPT))}${names}${only}`;
 }
 
 /**

@@ -127,6 +127,11 @@ export interface ApproveResult {
   readonly version: number;
   readonly approved: readonly string[];
   readonly copies: readonly string[];
+  /**
+   * この承認で書いた・消したパス（ワークスペースルートからの相対、`/` 区切り）。承認の push の sh に
+   * `--path` で渡し、これだけをコミット・push させる。古い実行ファイルは返さない（空）
+   */
+  readonly written: readonly string[];
   /** ターミナルなら標準出力に出ていた行 */
   readonly lines: readonly string[];
   /** 承認した子のワークツリーの計画。`state` が `create` のものを拡張が承認の後に作る（`ccnavi-git.sh worktree add`） */
@@ -212,6 +217,8 @@ export interface ApprovePartial {
   readonly placed: readonly string[];
   /** 実際に書けた承認済みチケットのパス（`placed` の分） */
   readonly paths: readonly string[];
+  /** この承認で書いた・消したパス（ワークスペースルートからの相対）。`ApproveResult.written` と同じ */
+  readonly written: readonly string[];
   /** 止まったところの識別子 */
   readonly ticket: string;
   /** 止まった理由（実行ファイルの文面そのまま） */
@@ -296,6 +303,7 @@ export function parseApproveResult(text: string): ResultParse {
       partial: {
         placed: list(raw.partial.placed).map(str),
         paths: list(raw.partial.paths).map(str),
+        written: list(raw.partial.written).map(str),
         ticket: str(raw.partial.ticket),
         reason: str(raw.partial.reason),
         lines: list(raw.partial.lines).map(str),
@@ -308,6 +316,7 @@ export function parseApproveResult(text: string): ResultParse {
       version: top.version,
       approved: list(raw.approved).map(str),
       copies: list(raw.copies).map(str),
+      written: list(raw.written).map(str),
       lines: list(raw.lines).map(str),
       worktrees: list(raw.worktrees).filter(isRecord).map((w) => ({
         ticket: str(w.ticket),

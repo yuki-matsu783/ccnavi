@@ -94,8 +94,8 @@ function toPlanPreview(step: Step, parents: Readonly<Record<string, string>> = {
   return step(toLoading(step), { kind: "previewed", saved, result: { ok: true, value: planPreviewOf(parents) } }).state;
 }
 
-function resultOf(approved: readonly string[], prompt = "承認の文"): ApproveResult {
-  return { version: 1, approved, copies: [], lines: [], worktrees: [], prompt };
+function resultOf(approved: readonly string[], prompt = "承認の文", written: readonly string[] = []): ApproveResult {
+  return { version: 1, approved, copies: [], written, lines: [], worktrees: [], prompt };
 }
 
 function mismatchOf(expected: readonly string[], current: readonly string[]): ApproveMismatch {
@@ -643,6 +643,16 @@ test("CB-T173 承認できたら渡す文を見せ、承認の push の sh を�
   });
   assert.deepEqual(done.state.overlay, { kind: "done", count: 1, prompt: "文", carried: true });
   assert.deepEqual(kinds(done.effects), ["carry", "refresh"], "監視だけに頼らず、承認の側からも再読み込みする");
+  const wrote = approvalStep(approving, {
+    kind: "approved",
+    outcome: { ok: true, value: resultOf(["i0001"], "文", ["a/.ccnavi/approved/doing/i0001.md"]) },
+    carrier: true,
+  });
+  assert.deepEqual(
+    wrote.effects[0],
+    { kind: "carry", paths: ["a/.ccnavi/approved/doing/i0001.md"] },
+    "送るのはこの承認で書いた・消したパスだけ",
+  );
   assert.deepEqual(done.state.only, [], "承認できたら絞りは畳む");
 
   const noScript = approvalStep(approving, {
@@ -738,11 +748,17 @@ test("CB-T176b 親だけ書けて子が止まった承認は、書けた分の�
   const partial = {
     placed: ["i0001"],
     paths: [".ccnavi/approved/doing/i0001.md"],
+    written: [".ccnavi/approved/doing/i0001.md", "wip/proposals/todo/i0001.md"],
     ticket: "i0001-01-01",
     reason: "保存できませんでした",
     lines: [],
   };
   const carried = approvalStep(approving, { kind: "approved", outcome: { ok: false, partial }, carrier: true });
+  assert.deepEqual(
+    carried.effects[0],
+    { kind: "carry", paths: [".ccnavi/approved/doing/i0001.md", "wip/proposals/todo/i0001.md"] },
+    "送るのはこの承認で書いた・消したパスだけ",
+  );
   assert.equal(carried.state.overlay?.kind, "error");
   const text = carried.state.overlay?.kind === "error" ? carried.state.overlay.error : "";
   assert.ok(text.includes(".ccnavi/approved/doing/i0001.md"), "書けたパスを言う");

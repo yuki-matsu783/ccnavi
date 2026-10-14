@@ -49,10 +49,16 @@ case " $* " in
 *" c1 family "*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
 esac
 [ -z "${STUB_ARGS:-}" ] || printf '%s\\n' "$@" > "$STUB_ARGS"
-# 実行ファイルは書き込みに入ると、書けたパスの一覧を --placed-out のファイルへ書く
+# 実行ファイルは書き込みに入ると、書けたパスの一覧を --placed-out のファイルへ書く。
+# --record-writes のファイルには、書いたパス（ルートからの相対）を書く（書かなければ空）。
+record=""
 while [ $# -gt 0 ]; do
 	if [ "$1" = --placed-out ] && [ -n "${STUB_REPORT:-}" ]; then
 		printf '%s\\n' "$STUB_REPORT" > "$2"
+	fi
+	if [ "$1" = --record-writes ]; then
+		record="$2"
+		: > "$record"
 	fi
 	shift
 done
@@ -60,6 +66,8 @@ done
 [ -n "${STUB_TREE:-}" ] || exit 0
 mkdir -p "$STUB_TREE/.ccnavi/approved/doing"
 printf 'approved\\n' > "$STUB_TREE/.ccnavi/approved/doing/i0001.md"
+[ -z "$record" ] || printf '%s/.ccnavi/approved/doing/i0001.md\\n' \\
+	"${STUB_REL:-.claude/worktrees/i0001}" > "$record"
 exit "${STUB_AFTER_EXIT:-0}"
 """
 
@@ -669,6 +677,42 @@ class PushApprovedTest(Workspace):
 
     # ---- 1.2・1.3 引数と置き場
 
+    def test_path_carries_only_the_named_paths(self):
+        """`--path` を並べると、置き場の変更のうちそのパスだけをコミットして push する。"""
+        tree = self.worktree("i0001")
+        self.place(tree, "i0001")
+        self.place(tree, "i0009")
+        gone = write(os.path.join(tree, "wip", "proposals", "todo", "i0001.md"), "proposal\n")
+        git(tree, "add", "--", gone)
+        git(tree, "commit", "-q", "-m", "propose")
+        os.remove(gone)
+        review = write(os.path.join(tree, "wip", "proposals", "review", "i0008.md"), "review\n")
+        other = self.worktree("i0002")
+        self.place(other, "i0002")
+        rel = ".claude/worktrees/i0001"
+        result = self.push(
+            "--path",
+            f"{rel}/{APPROVED}/i0001.md",
+            "--path",
+            f"{rel}/wip/proposals/todo/i0001.md",
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            self.committed(tree), [f"{APPROVED}/i0001.md", "wip/proposals/todo/i0001.md"]
+        )
+        self.assertEqual(self.remote_head("i0001"), self.head(tree))
+        self.assertTrue(self.dirty(tree, f"{APPROVED}/i0009.md"))
+        self.assertTrue(self.dirty(tree, review))
+        self.assertEqual(self.remote_head("i0002"), "")
+        self.assertTrue(self.dirty(other, f"{APPROVED}/i0002.md"))
+
+    def test_path_refuses_absolute_paths_and_parent_ids_together(self):
+        self.worktree("i0001")
+        for args in (("--path",), ("--path", "/abs"), ("--path", "../x"), ("--path", "a", "i0001")):
+            with self.subTest(args=args):
+                result = self.push(*args)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+
     def test_takes_only_parent_ids_and_needs_the_workspace(self):
         self.assertEqual(self.push("--help").returncode, 0)
         for word in ("-x", "../i0001", "a/b", ""):
@@ -809,9 +853,11 @@ class ApproveCarriesTest(Workspace):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         got = self.received(args)
         self.assertEqual(got[:1], ["--root"], got)
-        # 実行ファイルには、書けたパスの一覧の書き出し先（--placed-out）も渡す
-        self.assertEqual(got[2:4], ["--agree", "--placed-out"], got)
-        self.assertEqual(got[5:], ["i0002-01-03", "i0002-01-04"], got)
+        # 実行ファイルには、書いたパスの一覧（--record-writes）と、書けたパスの報告の書き出し先
+        # （--placed-out）も渡す
+        self.assertEqual(got[2], "--record-writes", got)
+        self.assertEqual(got[4:6], ["--agree", "--placed-out"], got)
+        self.assertEqual(got[7:], ["i0002-01-03", "i0002-01-04"], got)
 
     def test_approve_without_ids_takes_all_pending(self):
         self.worktree("i0001")
@@ -819,8 +865,8 @@ class ApproveCarriesTest(Workspace):
         result = self.approve(STUB_ARGS=args)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         got = self.received(args)
-        self.assertEqual(got[2:4], ["--agree", "--placed-out"], got)
-        self.assertEqual(got[5:], [])
+        self.assertEqual(got[4:6], ["--agree", "--placed-out"], got)
+        self.assertEqual(got[7:], [])
 
     def test_approve_refuses_words_that_are_not_ids(self):
         """識別子でない語は断り、実行ファイルを呼ばない。
@@ -851,8 +897,8 @@ class ApproveCarriesTest(Workspace):
         result = self.approve("help", "i0002-01-01", STUB_ARGS=args)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         got = self.received(args)
-        self.assertEqual(got[2:4], ["--agree", "--placed-out"])
-        self.assertEqual(got[5:], ["help", "i0002-01-01"])
+        self.assertEqual(got[4:6], ["--agree", "--placed-out"])
+        self.assertEqual(got[7:], ["help", "i0002-01-01"])
         refused = self.approve("--help", "i0002-01-01")
         self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
 
@@ -922,6 +968,35 @@ class ApproveCarriesTest(Workspace):
         self.assertEqual(self.subject(tree), MESSAGE)
         self.assertIn("未送信", result.stderr)
         self.assertIn(f"{APPROVED}/i0001.md", result.stderr)
+
+    def test_approve_carries_only_what_the_approval_wrote(self):
+        """同じ置き場にある承認と無関係な変更（別の承認済みチケット、review/、別のツリー）は送らない。"""
+        tree = self.worktree("i0001")
+        self.place(tree, "i0009")
+        review = write(os.path.join(tree, "wip", "proposals", "review", "i0008.md"), "review\n")
+        other = self.worktree("i0002")
+        self.place(other, "i0002")
+        result = self.approve(STUB_TREE=tree)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.committed(tree), [f"{APPROVED}/i0001.md"])
+        self.assertEqual(self.remote_head("i0001"), self.head(tree))
+        self.assertTrue(self.dirty(tree, f"{APPROVED}/i0009.md"), "無関係な承認済みチケットは残す")
+        self.assertTrue(self.dirty(tree, review), "review/ の変更は残す")
+        self.assertEqual(self.remote_head("i0002"), "", "別のツリーは送らない")
+        self.assertTrue(self.dirty(other, f"{APPROVED}/i0002.md"))
+        self.assertNotIn("済んでいない", result.stderr)
+
+    def test_a_failed_approval_still_shows_why(self):
+        """何も置かずに失敗した（4 以外の非 0）ときも、書けなかった理由の報告は見せる。"""
+        self.worktree("i0001")
+        report = (
+            '{"version":1,"placed":[],"written":[],'
+            '"failed":[{"ticket":"i0001","reason":"提案の内容が更新されました"}],'
+            '"unwritten":[],"rejected":[]}'
+        )
+        result = self.approve(STUB_EXIT="1", STUB_REPORT=report)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("提案の内容が更新されました", result.stderr)
 
     def test_failed_push_does_not_fail_the_approval(self):
         """コミットや push の失敗で承認が失敗に見えないように、承認が通れば 0。コミットは残る。"""
