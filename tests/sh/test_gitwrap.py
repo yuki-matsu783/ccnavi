@@ -1091,6 +1091,43 @@ class WorktreeNameTest(GitWrapperTest):
                 tree = os.path.join(self.dir, ".claude", "worktrees", name)
                 self.assertEqual(name, git_out(tree, "branch", "--show-current"))
 
+    def test_slash_branch_goes_to_the_worktree_named_by_its_identifier(self):
+        """名前に / を含むブランチは、行き先を / を - に置き換えた名前にして直接出す。"""
+        git(self.dir, "branch", "feature/x")
+        for args, name, branch in (
+            (
+                ("worktree", "add", ".claude/worktrees/feature-x", "feature/x"),
+                "feature-x",
+                "feature/x",
+            ),
+            (
+                ("worktree", "add", ".claude/worktrees/topic-y", "-b", "topic/y", "HEAD"),
+                "topic-y",
+                "topic/y",
+            ),
+        ):
+            with self.subTest(args=args):
+                result = self.run_wrapper(*args)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+                tree = os.path.join(self.dir, ".claude", "worktrees", name)
+                self.assertEqual(branch, git_out(tree, "branch", "--show-current"))
+        # 識別子のブランチは作られない
+        branches = git_out(self.dir, "for-each-ref", "--format=%(refname:short)", "refs/heads")
+        self.assertNotIn("feature-x", branches.split())
+        self.assertNotIn("topic-y", branches.split())
+
+    def test_slash_branch_in_a_wrong_named_worktree_is_rejected(self):
+        git(self.dir, "branch", "feature/x")
+        git(self.dir, "tag", "feature/t")
+        for args in (
+            ("worktree", "add", ".claude/worktrees/other", "feature/x"),
+            ("worktree", "add", ".claude/worktrees/other", "-b", "feature/x", "HEAD"),
+            # タグはブランチの外（detached HEAD）に作る
+            ("worktree", "add", ".claude/worktrees/feature-t", "feature/t"),
+        ):
+            with self.subTest(args=args):
+                self.assertRejected(*args)
+
 
 class ParentWorktreeSwitchTest(GitWrapperTest):
     """親のワークツリーでは別のブランチへ移らない。

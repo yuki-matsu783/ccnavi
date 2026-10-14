@@ -249,6 +249,19 @@ class WorktreeShTest(unittest.TestCase):
                 self.assertEqual(code, result.returncode, result.stdout)
                 self.assertIn(why, result.stderr)
 
+    def test_same_name_branch_on_origin_stops_and_points_to_start(self):
+        # origin にだけ同名のブランチがある（MR の元ブランチかもしれない）。
+        # 新しく切らず ccnavi-start.sh へ案内する
+        git(self.ws, "push", "-q", self.bare, "main:refs/heads/topic")
+        result = self.run_sh("topic")
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertIn("origin にブランチ topic が既にある", result.stdout)
+        self.assertIn("ccnavi-start.sh --mr", result.stdout)
+        self.assertIn("ccnavi-start.sh --issue", result.stdout)
+        self.assertFalse(os.path.exists(self.wt("topic")))
+        # 別の名前なら切れる
+        self.assertEqual(0, self.run_sh("topic2").returncode)
+
     def test_fetch_failure_stops_with_guidance(self):
         result = self.run_sh("topic", fail_fetch=True)
         self.assertEqual(4, result.returncode, result.stderr)

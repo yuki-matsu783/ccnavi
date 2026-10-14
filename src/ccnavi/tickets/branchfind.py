@@ -288,8 +288,10 @@ def _start_lines(root: str, refs: list[Ref]) -> list[str]:
         "終了コード 3（候補が複数）なら、何も作られていない。"
         "一覧をユーザに見せ、次のどれにするかを聞いて返事を待つ。",
         "1. 既存のブランチで続ける（既存のチケットに結び付くならそのチケットで続ける。"
-        "新しい親の提案なら branch: <ブランチ> を書き、承認の後に親のワークツリーで"
-        f" '{git_sh} switch <ブランチ>' で移る。承認前の提案の branch: は使わない）",
+        "そうでなければ、ブランチを直接チェックアウトしたワークツリーを"
+        f" '{git_sh} worktree add .claude/worktrees/<ID> <ブランチ>'で出す"
+        "（<ID> はブランチ名の / を - に置き換えた名前。識別子のブランチは作らない）。"
+        "承認前の提案の branch: は使わない）",
         "2. 新しく <先頭の語>-<番号>-<slug> のブランチを切る",
         "3. やめる",
         "終了コード 4（ホストに届かない）なら、"
@@ -410,6 +412,7 @@ def read_host(path: str) -> Host:
                 "state": _clean(raw.get("state"), 20),
                 "url": _clean(raw.get("url"), 500),
                 "title": _clean(raw.get("title")),
+                "base": _clean(raw.get("base"), 250),
                 "fork": raw.get("fork") is True,
             }
         )

@@ -141,7 +141,7 @@ github_mr() {
 	printf '%s' "$got" | "$ccnavi_h_jq" --arg p "$ccnavi_h_path" '
 		[{number: .number, branch: .head.ref,
 		  state: (if .merged_at then "merged" else .state end),
-		  url: .html_url, title: .title,
+		  url: .html_url, title: .title, base: (.base.ref // ""),
 		  fork: (((.head.repo.full_name // "") | ascii_downcase) != ($p | ascii_downcase))}]'
 }
 
@@ -154,7 +154,7 @@ github_issue() {
 			 | ($t | test("(^|[^0-9A-Za-z_&/])#" + $n + "([^0-9]|$)"))
 			   or ($t | test("issues/" + $n + "([^0-9]|$)")))
 			or ((.head.ref // "") | test("(^|[^0-9])" + $n + "([^0-9]|$)")))
-		 | {number: .number, branch: .head.ref, state: .state, url: .html_url, title: .title,
+		 | {number: .number, branch: .head.ref, state: .state, url: .html_url, title: .title, base: (.base.ref // ""),
 		    fork: (((.head.repo.full_name // "") | ascii_downcase) != ($p | ascii_downcase))}]'
 }
 
@@ -164,7 +164,7 @@ gitlab_mr() {
 	got=$(ccnavi_host_api GET "projects/$(ccnavi_host_encoded_path)/merge_requests/$number") || return 1
 	printf '%s' "$got" | "$ccnavi_h_jq" --argjson pid "$pid" '
 		[{number: .iid, branch: .source_branch, state: .state, url: .web_url, title: .title,
-		  fork: (.source_project_id != $pid)}]'
+		  base: (.target_branch // ""), fork: (.source_project_id != $pid)}]'
 }
 
 # GitLab: その issue に関係する開いた MR（related_merge_requests。本文で参照した MR を含む）。
@@ -174,7 +174,7 @@ gitlab_issue() {
 	printf '%s' "$got" | "$ccnavi_h_jq" --argjson pid "$pid" '
 		[.[] | select(.state == "opened")
 		 | {number: .iid, branch: .source_branch, state: .state, url: .web_url, title: .title,
-		    fork: (.source_project_id != $pid)}]'
+		    base: (.target_branch // ""), fork: (.source_project_id != $pid)}]'
 }
 
 look_at_host() {

@@ -25,6 +25,10 @@
 # 統合で詰まる）。承知のうえなら --from-origin を付けると、警告つきで origin/<統合先> から切る。
 # fetch が失敗して --offline で続けるときは、origin/<統合先> が古いかもしれないので、止めずに警告だけにする。
 #
+# origin に同じ名前のブランチがあるときは、切らずに終了コード 1 で止まり、ccnavi-start.sh へ案内する。
+# 既にあるブランチ（MR の元ブランチなど）は、MR を探して採用する確認をしてから出す必要があり、
+# ここで新しく切ると、同じ名前の別のブランチを作ってしまう。
+#
 # --dry-run は何も作らず、切る予定の起点とパスだけを出す（fetch もしない）。
 #
 # 終了コード: 0 完了 / 1 前提の未充足か worktree add の拒否 / 2 引数か環境の誤り /
@@ -230,6 +234,25 @@ fi
 
 choose_base
 diverged_guard
+
+# ---- origin に同じ名前のブランチがあれば止める（fetch が通ったときだけ見る。届かないときは見られない）。
+if [ -z "$fetch_note" ]; then
+	remote_err="$root/logs/state/worktree-ls-remote-err-$$"
+	mkdir -p "$root/logs/state" 2>/dev/null || :
+	remote_rc=0
+	remote_out=$(ccnavi_git_timed "${CCNAVI_WORKTREE_GIT_TIMEOUT:-30}" "$remote_err" "$top" ls-remote --heads origin "refs/heads/$name") || remote_rc=$?
+	rm -f "$remote_err"
+	if [ "$remote_rc" -ne 0 ]; then
+		log_info ls-remote できず -- "name=$name"
+	elif [ -n "$remote_out" ]; then
+		log_info リモートに同名のブランチ -- "name=$name"
+		printf 'ワークツリーは切っていない。origin にブランチ %s が既にある（MR の元ブランチかもしれない）。\n' "$name"
+		printf '既にあるブランチは、MR を探して採用してよいか確かめてから出す。ccnavi-start.sh で始める:\n'
+		printf '  sh %s/ccnavi-start.sh --mr <MR の番号>\n  sh %s/ccnavi-start.sh --issue <issue の番号>\n' "$scripts" "$scripts"
+		printf '別の作業として新しく切るなら、別の名前で再実行する: sh %s/ccnavi-worktree.sh <別の名前>\n' "$scripts"
+		exit 1
+	fi
+fi
 
 # ---- worktree add。起点は省かない。拒否の文面は ccnavi-git.sh のもの（行き先・起点の直し方つき）をそのまま見せる。
 if [ -n "$track" ]; then

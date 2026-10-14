@@ -127,13 +127,16 @@ ccnavi_record_get() {
 #
 # 同じディレクトリの一時ファイルに書いてから mv で置き換える（読む側が半端な中身を見ない）。
 # 値の改行は空白に置き換える（1 行 1 項目の契約）。書けなければ 1。
+# 渡した鍵だけを書き直すが、`mr`（親を載せる MR の番号。ccnavi-start.sh が保存する）は、渡さなくても前の値を引き継ぐ。
 ccnavi_record_write() {
 	ccnavi_rw_file="$1"
 	shift
 	mkdir -p "${ccnavi_rw_file%/*}" 2>/dev/null || return 1
+	ccnavi_rw_keep=$(ccnavi_record_get "$ccnavi_rw_file" mr)
 	ccnavi_rw_tmp="$ccnavi_rw_file.tmp.$$"
 	: >"$ccnavi_rw_tmp" 2>/dev/null || return 1
 	while [ "$#" -ge 2 ]; do
+		[ "$1" != mr ] || ccnavi_rw_keep=""
 		ccnavi_rw_value=$(printf '%s' "$2" | tr '\r\n' '  ')
 		printf '%s %s\n' "$1" "$ccnavi_rw_value" >>"$ccnavi_rw_tmp" || {
 			rm -f "$ccnavi_rw_tmp"
@@ -141,8 +144,34 @@ ccnavi_record_write() {
 		}
 		shift 2
 	done
+	if [ -n "$ccnavi_rw_keep" ]; then
+		printf 'mr %s\n' "$ccnavi_rw_keep" >>"$ccnavi_rw_tmp" || {
+			rm -f "$ccnavi_rw_tmp"
+			return 1
+		}
+	fi
 	mv -f "$ccnavi_rw_tmp" "$ccnavi_rw_file" 2>/dev/null || {
 		rm -f "$ccnavi_rw_tmp"
+		return 1
+	}
+}
+
+# 取り込み状態の 1 項目だけを書き足すか書き換える。ほかの項目はそのまま。<ファイル> <鍵> <値>
+#
+# ファイルが無ければ 1（先に ccnavi_record_write で作る）。書き方は ccnavi_record_write と同じ（一時ファイル → mv）。
+ccnavi_record_put() {
+	[ -f "$1" ] || return 1
+	ccnavi_rp_tmp="$1.tmp.$$"
+	ccnavi_rp_value=$(printf '%s' "$3" | tr '\r\n' '  ')
+	{
+		sed "/^$2 /d" "$1"
+		printf '%s %s\n' "$2" "$ccnavi_rp_value"
+	} >"$ccnavi_rp_tmp" 2>/dev/null || {
+		rm -f "$ccnavi_rp_tmp"
+		return 1
+	}
+	mv -f "$ccnavi_rp_tmp" "$1" 2>/dev/null || {
+		rm -f "$ccnavi_rp_tmp"
 		return 1
 	}
 }

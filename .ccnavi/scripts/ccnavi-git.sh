@@ -1372,13 +1372,35 @@ worktree)
 		# 親チケットの branch:。行き先の名前（識別子）の承認済みチケットが宣言する
 		# ブランチ名なら、行き先の名前と違うブランチを通す（提案の branch: は使わない）。名前は実行ファイルに聞く（sh は
 		# チケットを読まない）。聞けなければ識別子と同じ名前だけを通す（厳しくする向き）。
+		# 名前に / を含むブランチは、行き先の名前をブランチ名の / を - に置き換えたもの（親の識別子）にする。
+		# 識別子のブランチは作らず、ブランチを直接チェックアウトする（ccnavi_branch_to_id）。
+		wt_slash=""
+		if [ -n "$wt_new" ]; then
+			case "$wt_new" in
+			*/*) [ "$(ccnavi_branch_to_id "$wt_new")" = "$wt_leaf" ] && wt_slash=new ;;
+			esac
+		elif [ -n "$wt_base" ]; then
+			case "$wt_base" in
+			*/*) [ "$(ccnavi_branch_to_id "$wt_base")" = "$wt_leaf" ] && wt_slash=existing ;;
+			esac
+		fi
 		wt_home=""
-		if { [ -n "$wt_new" ] && [ "$wt_new" != "$wt_leaf" ]; } ||
+		if [ -n "$wt_slash" ]; then
+			: # / を含むブランチを、識別子の名前の行き先に出す
+		elif { [ -n "$wt_new" ] && [ "$wt_new" != "$wt_leaf" ]; } ||
 			{ [ -z "$wt_new" ] && [ -n "$wt_base" ] && [ "$wt_base" != "$wt_leaf" ]; }; then
 			wt_home=$(ccnavi_family_branch "$WS" "$wt_leaf") || wt_home=""
 			[ "$wt_home" != "$wt_leaf" ] || wt_home=""
 		fi
-		if [ -n "$wt_new" ] && [ -n "$wt_home" ] && [ "$wt_new" = "$wt_home" ]; then
+		if [ "$wt_slash" = existing ]; then
+			# 既にある / を含むブランチ。ブランチでない（タグ・sha）ならブランチの外に作るので止める。
+			if ! git show-ref --verify --quiet "refs/heads/$wt_base" &&
+				! git show-ref --verify --quiet "refs/remotes/origin/$wt_base"; then
+				reject worktree-detach "worktree add $wt_dest $wt_base の $wt_base は手元のブランチでも origin/$wt_base でもないので、ブランチの外（detached HEAD）にワークツリーを作ります。新しく切るなら $SELF worktree add $wt_dest -b $wt_base <起点> にしてください。"
+			fi
+		elif [ "$wt_slash" = new ]; then
+			: # -b <a/b> で、a-b の名前の行き先に新しく切る
+		elif [ -n "$wt_new" ] && [ -n "$wt_home" ] && [ "$wt_new" = "$wt_home" ]; then
 			: # -b <branch:> で、識別子の名前の行き先に新しく切る
 		elif [ -z "$wt_new" ] && [ -n "$wt_home" ] && [ "$wt_base" = "$wt_home" ]; then
 			# 既にある branch: のブランチを、識別子の名前の行き先に出す。ブランチでない（タグ・sha）なら
