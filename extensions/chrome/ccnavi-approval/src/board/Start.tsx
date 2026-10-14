@@ -20,7 +20,7 @@ export function Start({ board, actions, issues }: { board: RepoBoard; actions: A
         <Notice kind="error" text={issues.error} />
       ) : (
         <>
-          {(issues.list ?? []).length === 0 ? <p className="empty">未クローズのIssueはありません。</p> : null}
+          {(issues.list ?? []).length === 0 ? <p className="empty">オープン状態のIssueはありません。</p> : null}
           <ul className="issues">
             {(issues.list ?? []).map((issue) => (
               <li key={issue.number} className="issue" data-issue={String(issue.number)}>

@@ -323,7 +323,7 @@ test("CX-T216 設定画面のリポジトリ: 直近の日数は 0〜90。外れ
   for (const value of ["91", "-1", "1.5"]) {
     fill({ owner: "acme", repo: "widgets", recentDays: value });
     await submitRepo();
-    assert.equal(text("#repo-msg"), "直近の日数は 0〜90 の整数で入れてください", value);
+    assert.equal(text("#repo-msg"), "検索期間には、0〜90の整数を入力してください。", value);
     assert.equal($("#repo-msg").className, "status error");
     assert.equal(storage.repos, undefined, value);
   }
@@ -428,7 +428,7 @@ test("CX-T218 設定画面の状態欄: 同じ一言が続いても、言い直�
   repo.changes();
   const err = $("#repo-msg").firstElementChild;
   await submitRepo();
-  assert.equal(text("#repo-msg"), "直近の日数は 0〜90 の整数で入れてください");
+  assert.equal(text("#repo-msg"), "検索期間には、0〜90の整数を入力してください。");
   assert.ok(repo.changes() > 0, "同じ誤りの 2 回目で状態欄が作り直されていない");
   assert.notEqual($("#repo-msg").firstElementChild, err);
   repo.stop();

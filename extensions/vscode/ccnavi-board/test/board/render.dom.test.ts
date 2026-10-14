@@ -142,7 +142,7 @@ test("CB-T205 残った指摘は 1 件ずつ対応方針を選び、全部に選
     approval: { kind: "decidePreview", preview: { ...decidePreview(false), threads: [] }, tree: "/w" },
   });
   try {
-    assert.equal(text(none, "#approval-title"), "フェーズ 2 で未解決（Unresolved）の指摘なし");
+    assert.equal(text(none, "#approval-title"), "フェーズ 2 に未解決の指摘はありません。");
     const notes = texts(none, ".approval-note").join(" ");
     assert.ok(!notes.includes("このフェーズで直す"), notes);
     assert.ok(!notes.includes("issue に回せる"), notes);
@@ -932,7 +932,7 @@ test("CB-T264 先行を満たしていないカードに「先行待ち（先行
     assert.match(css(), /\.badge-id \{ white-space: nowrap; \}/);
     assert.doesNotMatch(css(), /\.badge \{[^}]*border-radius: 999px/);
     const title = page.one('.card[data-id="i0001-02-03"] .badge.preds').getAttribute("title") ?? "";
-    assert.match(title, /承認も着手も止まります/);
+    assert.match(title, /承認・着手はできません/);
     assert.match(title, /i0001-02-02: 作業中（doing\/）/);
     assert.match(title, /i0001-01-09: どの置き場にもありません/);
     // 先行を満たしているカードには出さない
@@ -965,13 +965,13 @@ test("CB-T265 先行のバッジの言葉はカードの今で分ける。承認
   try {
     const title = (id: string) => page.one(`.card[data-id="${id}"] .badge.preds`).getAttribute("title") ?? "";
     assert.equal(text(page, '.card[data-id="i0001-02-03"] .badge.preds'), "先行待ち（i0001-01-09）");
-    assert.match(title("i0001-02-03"), /承認も着手も止まります/);
+    assert.match(title("i0001-02-03"), /承認・着手はできません/);
     assert.equal(text(page, '.card[data-id="i0001-02-02"] .badge.preds'), "先行待ち（i0001-01-09）");
-    assert.match(title("i0001-02-02"), /着手が止まります/);
+    assert.match(title("i0001-02-02"), /着手はできません/);
     assert.doesNotMatch(title("i0001-02-02"), /承認/);
     assert.equal(text(page, '.card[data-id="i0001-02-04"] .badge.preds'), "先行チケットの条件が未達成（i0001-01-09）");
     assert.match(title("i0001-02-04"), /着手済みです/);
-    assert.match(title("i0001-02-04"), /作業と finish は止まりません/);
+    assert.match(title("i0001-02-04"), /着手済みの作業や finish コマンドの実行は制限されません/);
   } finally {
     await page.close();
   }

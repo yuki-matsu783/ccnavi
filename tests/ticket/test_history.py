@@ -243,11 +243,11 @@ class HistoryTest(TicketTest):
         with history.session(history.VIA_CLI, None):
             for bad in ("../x", "a/b", ".hidden", ""):
                 failed = history.note(base, bad, history.KIND_STARTED, "doing", "doing")
-                self.assertIn("識別子の形ではない", failed)
+                self.assertIn("有効な識別子の形式ではない", failed)
                 self.assertEqual(history.path(base, bad), "")
                 entries, why = history.read(base, bad)
                 self.assertEqual(entries, [])
-                self.assertIn("識別子の形ではない", why)
+                self.assertIn("有効な識別子の形式ではない", why)
             self.assertEqual(len(history.pending_failures()), 4)
         self.assertFalse(os.path.exists(base))
 

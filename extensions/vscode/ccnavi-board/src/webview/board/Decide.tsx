@@ -34,7 +34,7 @@ export function DecideBody({
     <>
       <h2 id="approval-title">
         {count === 0
-          ? `フェーズ ${preview.phase} で未解決（Unresolved）の指摘なし`
+          ? `フェーズ ${preview.phase} に未解決の指摘はありません。`
           : `フェーズ ${preview.phase} で未解決（Unresolved）の指摘 ${count} 件の対応方針`}
       </h2>
       {notice ? <p className="approval-note warn">{notice}</p> : null}

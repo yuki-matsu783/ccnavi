@@ -186,7 +186,7 @@ async function hostCall(host: Host, op: unknown, args: unknown, deps: Deps): Pro
   }
   const token = await deps.getToken(host.id);
   if (!token) {
-    return { ok: false, error: `${host.id} の PAT が登録されていない。設定画面で登録してください`, status: 401 };
+    return { ok: false, error: `${host.id} の PAT が登録されていません。設定画面で登録してください`, status: 401 };
   }
   const counter: github.Counter = { rest: 0, graphql: 0 };
   const seen = { expiration: "" };
@@ -287,7 +287,7 @@ async function integrationHead(client: github.Client, cfg: RepoConfig, integ: st
 /** プロジェクトのリポジトリのワークスペース（設定画面で登録したもの）の統合先の先頭 */
 async function workspaceOf(deps: Deps, cfg: RepoConfig): Promise<{ client: github.Client; cfg: RepoConfig; integ: string; head: string }> {
   const ws = (await deps.getRepos()).find((x) => repoKey(x) === cfg.workspace && !x.project);
-  if (!ws) throw new Error(`ワークスペースのリポジトリ ${cfg.workspace || "（未設定）"} が設定画面に登録されていない`);
+  if (!ws) throw new Error(`ワークスペースのリポジトリ ${cfg.workspace || "（未設定）"} が設定画面に登録されていません`);
   const host = await hostOf(deps, ws.host);
   const token = await deps.getToken(host.id);
   if (!token) throw new Error(`${host.id} の PAT が登録されていません`);

@@ -1015,7 +1015,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("子のワークツリー", result.stderr)
         self.assertEqual(
-            result.stdout.count("承認済みチケットを、取り込んでから"), 1, result.stdout
+            result.stdout.count("承認済みチケットを取り込んだうえで"), 1, result.stdout
         )
         self.assertIn(rel, self.committed())
         self.assertEqual(self.remote_sha(CHILD), "")
@@ -1038,7 +1038,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         executable(os.path.join(self.remote, "hooks", "pre-receive"), "#!/bin/sh\nexit 1\n")
         result = self.sh("ccnavi-push-approved.sh", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("コミットは残した", result.stderr)
+        self.assertIn("コミットはローカルに残っています", result.stderr)
         self.assertIn(rel, self.committed())
         # 次の C1 は未送信のユーザの判断を見つけて止まり、承認の push を打ち直すよう言う。
         os.remove(os.path.join(self.remote, "hooks", "pre-receive"))
@@ -1107,7 +1107,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         self.remote_commit("src/remote.py", "y = 2\n")
         result = self.sh("ccnavi-push-approved.sh")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("承認済みチケットを、取り込んでから", result.stdout)
+        self.assertIn("承認済みチケットを取り込んだうえで", result.stdout)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
 

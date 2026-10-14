@@ -296,7 +296,7 @@ class TestHitsTest(unittest.TestCase):
         done = self.ccnavi("--explain", env=env)
         self.assertEqual(done.returncode, 0, done.stderr)
         lines = done.stdout.splitlines()
-        start = lines.index("■ どのルールも言及しない呼び出し")
+        start = lines.index("■ どのルールにも一致しないツール呼び出し")
         return lines[start : start + 10]
 
     def row(self, lines: list[str], mode: str) -> str:

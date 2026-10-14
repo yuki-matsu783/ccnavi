@@ -169,7 +169,7 @@ sample:
         expectations:
           - { tool: Bash, subject: git push origin main, why: 同じ呼び出しを繰り返し止めた形 }
         yaml: "rules:\n  deny:\n    - id: git-push\n      match: Bash\n      glob: '*git push*'\n      message: push はユーザが行う。ccnavi-git.sh の入口を使う\nexpectations:\n  deny:\n    - tool: Bash\n      subject: git push origin main\n      why: 同じ呼び出しを繰り返し止めた形\n"
-  save_error: "--lint が error を報告しました。直してから保存してください:\nerror: db-migrate: ask に message がある"
+  save_error: "設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください:\nerror: db-migrate: ask に message がある"
   sums:
     - name: self
       layers: [common, self]
@@ -240,11 +240,11 @@ courses:
         scene: { tab: rules }
       - target: rule-protect-env
         title: 図で見る
-        body: 行を開くと、条件が図になります。左端の点が最上位で、右へ枝分かれします。all は「中のすべてに当たれば当たる」、any は「どれかに当たれば当たる」、not は「中に当たらなければ当たる」です。
+        body: 行を開くと、条件が図になります。左端の点が最上位で、右へ枝分かれします。all は「すべての条件に一致」、any は「いずれかの条件に一致」、not は「指定した条件に一致しない」を表します。
         scene: { tab: rules, open: protect-env, when: r }
       - target: when-graph
         title: 点を選んで直す
-        body: 点を押すと選ばれ、下の操作の欄がその点に効きます。ここでは .env 系に当てる regex の点を選んでいます。文字を直すと、その場で図と要約に反映されます。
+        body: ノードをクリックすると選択され、下の編集欄でそのノードの条件を変更できます。ここでは .env 系に当てる regex の点を選んでいます。文字を直すと、その場で図と要約に反映されます。
         scene: { tab: rules, open: protect-env, when: r.0 }
       - target: when-inspector
         title: 子を追加する・削除
@@ -310,7 +310,7 @@ courses:
         scene: { tab: rules }
       - target: rule-db-migrate-context
         title: コンテキストの追加
-        body: 文を渡したいルールは、行の中の「コンテキストの追加」を開きます。message が止められた側への言葉なのに対し、ここは「通すが、これを踏まえて進めろ」を入力する欄で、どのタイプにも入力できます。渡す間隔（every）と、文を記載したファイルを置く欄もあります。
+        body: 文を渡したいルールは、行の中の「コンテキストの追加」を開きます。message が止められた側への言葉なのに対し、ここはツールの実行を許可する際に、エージェントへ伝える注意事項や補足を入力する欄で、どのタイプにも入力できます。渡す間隔（every）と、補足文を記載したファイルのパスを指定する欄もあります。
         scene: { tab: rules, open: db-migrate, more: true }
       - target: rule-db-migrate-every
         title: every で何回に 1 度かを決める
@@ -326,7 +326,7 @@ courses:
         scene: { tab: rules, open: deps-change, more: true }
       - target: rule-deps-change-file
         title: 長い文はファイルで渡す
-        body: 文が長いときは、additionalContextFile（毎回）と additionalContextOnceFile（最初の 1 回）に、文を記載したファイルを指せます。先頭 4000 文字までが届きます。「選択…」でダイアログからも選べます。
+        body: 文が長いときは、additionalContextFile（毎回）と additionalContextOnceFile（最初の 1 回）に、補足文を記載したファイルのパスを指定できます。先頭 4000 文字までが届きます。「選択…」でダイアログからも選べます。
         scene: { tab: rules, open: deps-change, more: true }
       - target: judge-result
         title: 届く文を判定で確認する
@@ -372,7 +372,7 @@ courses:
         scene: { tab: judge }
       - target: suggest-result
         title: 結果の読み方
-        body: 読んだ記録の本数と行数、候補の数が出ます。「検証を通らず除いたもの」は、lint と期待する判定を通らず出さなかった数です。どれも下書きで、置くのはユーザです。
+        body: 読んだ記録の本数と行数、候補の数が出ます。「検証を通らず除いたもの」は、lint と期待する判定を通らず出さなかった数です。候補はすべて下書きです。確認して設定に反映するのはユーザーです。
         scene: { tab: judge, suggested: true }
       - target: suggest-candidate
         title: 候補 1 件の中身
@@ -429,7 +429,7 @@ courses:
         scene: { tab: rules, open: protect-secrets }
 
   - id: read-sum
-    title: 共通の設定との統合結果を読みたいとき
+    title: 共通の設定との統合結果を確認したいとき
     summary: 実際に効くルールは、共通の設定と 1 つの設定の和。統合結果の枠で、由来と件数を読む
     steps:
       - target: sum
@@ -453,7 +453,7 @@ courses:
         body: 同じ共通のルール（git-push・no-rm-rf）が、どの統合結果にも入ります。統合結果を替えると、レイヤーごとに追加されるルールだけが入れ替わります。見本の self では secrets の置き場を止めるルールが追加されます。
         scene: { tab: rules, sum: self }
       - target: target
-        title: 直すのは編集する 1 本
+        title: 編集する設定ファイルを選ぶ
         body: 統合結果の枠は見せるだけです。追加されたルールを直すときは、実際の画面では上部の「設定」の欄で、直したい 1 本（共通の設定・ワークスペース・プロジェクト）に切り替えて編集します。
         scene: { tab: rules, sum: self }
 
@@ -500,7 +500,7 @@ courses:
         scene: { tab: rules }
       - target: status
         title: 理由は下に出る
-        body: '止まった理由は画面の下に出ます。「--lint が error を報告しました」に続けて、lint の報告が 1 行ずつ並び、1 行は「error: ルールの id: 内容」の形です。見本は、ask の db-migrate に message を入力して保存したときの報告です。'
+        body: '止まった理由は画面の下に出ます。「設定の検証（--lint）でエラーが見つかりました」に続けて、lint の報告が 1 行ずつ並び、1 行は「error: ルールの id: 内容」の形です。見本は、ask の db-migrate に message を入力して保存したときの報告です。'
         scene: { tab: rules, error: true }
       - target: rule-db-migrate
         title: id で直す行を探す

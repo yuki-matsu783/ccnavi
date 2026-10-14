@@ -41,7 +41,7 @@ export function Review({ panel, writable, onReview }: { panel: ReviewPanel; writ
             <p className="thread-head">
               <span className="badge">{t.resolved ? "解決済み" : "未解決"}</span>
               {" "}
-              <Link href={t.url} text={t.path ? `${t.path}:${t.line}` : "（行なし）"} />
+              <Link href={t.url} text={t.path ? `${t.path}:${t.line}` : "行の指定なし"} />
             </p>
             <Markdown text={t.body} />
           </li>

@@ -798,7 +798,7 @@ def _parsed(
             )
             return EXIT_ERROR
         if args.preview and args.yes:
-            stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
+            stderr.write("ccnavi: --preview と --yes は同時に指定できません。\n")
             return EXIT_ERROR
         # 確かめるだけの枝は `--preview` と一緒に使う。単独で打てる形にすると、組み込みの
         # deny（phase_forms.ticket_approval_rule）が免除するのは `--preview` の付いた `--agree`
@@ -864,13 +864,17 @@ def _parsed(
     # する sh）が聞くこと。読むだけで、何も書かない。
     if len(args.command) == 3 and list(args.command[:2]) == ["c1", "family"]:
         if not cli_ops._FAMILY.fullmatch(args.command[2]) or ".." in args.command[2]:
-            stderr.write(f"ccnavi: c1 family の {args.command[2]!r} は識別子の形ではない\n")
+            stderr.write(
+                f"ccnavi: c1 family の {args.command[2]!r} は有効な識別子の形式ではありません。\n"
+            )
             return EXIT_ERROR
         return EXIT_OK if c1.family(stdout, conf, root, args.command[2]) == 0 else EXIT_ERROR
     if len(args.command) in (3, 4) and list(args.command[:2]) == ["c1", "sort"]:
         since = args.command[3] if len(args.command) == 4 else ""
         if not cli_ops._FAMILY.fullmatch(args.command[2]) or ".." in args.command[2]:
-            stderr.write(f"ccnavi: c1 sort の {args.command[2]!r} は識別子の形ではない\n")
+            stderr.write(
+                f"ccnavi: c1 sort の {args.command[2]!r} は有効な識別子の形式ではありません。\n"
+            )
             return EXIT_ERROR
         if since and not cli_args._revision_ok(since):
             stderr.write(f"ccnavi: c1 sort の版 {since!r} は読めない\n")

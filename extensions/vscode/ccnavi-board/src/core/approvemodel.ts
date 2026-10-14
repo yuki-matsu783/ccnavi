@@ -174,7 +174,7 @@ export function failureReason(stderr: string, stdout: string): string {
 export function childWorktreeFailureText(failed: readonly ChildWorktreeFailure[], gitCommand: string): string {
   return failed
     .map(({ worktree: w, reason }) =>
-      `子 ${w.ticket} のワークツリー ${w.path} を作れなかった（${reason}）。` +
+      `子チケット ${w.ticket} のワークツリー ${w.path} を作成できませんでした（${reason}）。` +
       `手で作るなら: ${gitCommand} worktree add ${w.path} -b ${w.branch} ${w.base}。` +
       `ブランチ ${w.branch} が既にあるなら: ${gitCommand} worktree add ${w.path} ${w.branch}`,
     )
