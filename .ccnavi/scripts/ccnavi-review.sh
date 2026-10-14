@@ -590,8 +590,11 @@ fetch_all() {
 	[ -z "$mr" ] && fail no-mr "親ブランチ $branch に対応するマージリクエストが $host にありません。"
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
-	# 実行ファイルに渡す形は番号・url・Draft のままか（元ブランチとマージ先は依頼のときだけ sh が確かめる）
-	mr=$(printf '%s' "$mr" | "$JQ" -c '{number: .number, url: .url, draft: (.draft // false)}')
+	# Draft のままか。`ready` の打ち直しの判断にだけ使うので、結果の JSON には入れず変数に覚える
+	# （`ready` が結果に足す。Chrome が組む結果と形を揃えたまま）。
+	mr_draft=$(printf '%s' "$mr" | "$JQ" -r '.draft // false')
+	# 実行ファイルに渡す形は番号と url だけ（元ブランチとマージ先は依頼のときだけ sh が確かめる）
+	mr=$(printf '%s' "$mr" | "$JQ" -c '{number: .number, url: .url}')
 	t=$(threads "$number" "$url")
 	r=$(reviews "$number" "$url")
 	"$JQ" -n --arg host "$kind" --argjson mr "$mr" --argjson threads "$t" --argjson reviews "$r" \
@@ -1093,6 +1096,8 @@ ready)
 	# コメントを投稿する。マージはユーザ（squash。既定のブランチにチケットを残さない）。
 	c1_start "$family"
 	fetch_all >"$result"
+	# 打ち直しの判断（Draft を外し損ねたか）に、MR がまだ Draft かを結果に足す。
+	"$JQ" --argjson d "${mr_draft:-false}" '.mr.draft = $d' "$result" >"$result.draft" && mv -f "$result.draft" "$result"
 	tell_skew
 	# 互換の版が食い違っていても ready は止めない。実行ファイルは条件の確かめ・退避・wip/ の片付けを、
 	# sh は push・Draft 外し・コメントを受け持ち、契約（標準出力の形）は前の版と変わらないため。
