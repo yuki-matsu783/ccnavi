@@ -251,6 +251,9 @@ INDEX_HEADER = "# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）"
 # 使い捨ての置き場（ワークスペースルート直下の scratchpad/）を追跡から外す 1 行と見出し。
 SCRATCH_LINE = "/scratchpad"
 SCRATCH_HEADER = "# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）"
+# 実行時の記録（ワークスペースルート直下の logs/）を追跡から外す 1 行と見出し。
+LOGS_LINE = "/logs/"
+LOGS_HEADER = "# ccnavi の実行時の記録（scripts/ccnavi-setup.sh）"
 
 
 def section(stdout, heading):
@@ -2023,7 +2026,7 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
         lines = [line for line in written.splitlines() if line.strip() and not line.startswith("#")]
         # 実行ファイルの置き場のほかは、`--docs` の索引の 1 行（KeepsTheIndexOutOfGit）と、
         # 使い捨ての置き場の 1 行（KeepsTheScratchpadOutOfGit）だけ。
-        self.assertEqual(lines, [f"/.ccnavi/bin/{THIS_MACHINE}/", INDEX_LINE, SCRATCH_LINE])
+        self.assertEqual(lines, [f"/.ccnavi/bin/{THIS_MACHINE}/", INDEX_LINE, SCRATCH_LINE, LOGS_LINE])
         for wide in (
             "/.ccnavi/",
             "/.ccnavi/bin/",
@@ -2177,6 +2180,56 @@ class KeepsTheScratchpadOutOfGit(DeploysWhatTheProjectNeeds):
                 self.assertIn(f"{SCRATCH_HEADER}\n{SCRATCH_LINE}\n", self.gitignore())
 
 
+class KeepsTheLogsOutOfGit(DeploysWhatTheProjectNeeds):
+    """実行時の記録（ワークスペースルート直下の `logs/`）を .gitignore に足す。
+
+    無いと、logs/diag/ の診断ログが新規ファイルとして git に見え、実行後チェックが毎ターン報告する。
+    """
+
+    def write_gitignore(self, text):
+        with open(os.path.join(self.dir, ".gitignore"), "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+
+    def test_adds_the_line_under_its_own_header(self):
+        self.make_git()
+        result = self.run_setup("--deploy", self.make_source())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        written = self.gitignore()
+        self.assertIn(f"{LOGS_HEADER}\n{LOGS_LINE}\n", written)
+        self.assertIn(LOGS_LINE, section(result.stdout, ".gitignore に足した"))
+
+    def test_does_not_add_it_twice(self):
+        self.make_git()
+        src = self.make_source()
+        self.run_setup("--deploy", src)
+        first = self.gitignore()
+        self.run_setup("--deploy", src)
+        self.assertEqual(self.gitignore(), first)
+        self.assertEqual(first.count(LOGS_HEADER), 1)
+
+    def test_does_not_add_it_when_an_equivalent_line_is_already_there(self):
+        for existing in (LOGS_LINE, "/logs", "logs/", "logs"):
+            with self.subTest(existing=existing):
+                self.write_gitignore(f"node_modules/\n{existing}\n")
+                self.make_git()
+                self.run_setup("--deploy", self.make_source())
+                written = self.gitignore()
+                self.assertNotIn(LOGS_HEADER, written)
+                self.assertEqual(written.count("logs"), 1, written)
+
+    def test_does_not_undo_a_negation_of_the_user(self):
+        for negation in ("!/logs/", "!logs/", "!/logs", "!logs"):
+            with self.subTest(negation=negation):
+                self.write_gitignore(f"{negation}\n")
+                self.make_git()
+                result = self.run_setup("--deploy", self.make_source())
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                written = self.gitignore()
+                self.assertNotIn(LOGS_HEADER, written)
+                self.assertIn("logs を否定する行があり", result.stdout)
+                self.assertIn(negation, result.stdout)
+
+
 class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
     """`--docs` の索引（`**/ccnavi-index.jsonl`）を .gitignore に足す。
 
@@ -2246,7 +2299,7 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
             "!*.jsonl",
         ):
             with self.subTest(negation=negation):
-                before = f"*.log\n{negation}\n/.ccnavi/bin/{THIS_MACHINE}/\n{SCRATCH_LINE}\n"
+                before = f"*.log\n{negation}\n/.ccnavi/bin/{THIS_MACHINE}/\n{SCRATCH_LINE}\n{LOGS_LINE}\n"
                 self.write_gitignore(before)
                 self.make_git()
                 src = self.make_source()
@@ -2269,7 +2322,7 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
         for line in (f"{INDEX_LINE}\r", f"{INDEX_LINE}  ", "ccnavi-index.jsonl\t"):
             with self.subTest(line=line):
                 before = (
-                    f"node_modules/\r\n{line}\n/.ccnavi/bin/{THIS_MACHINE}/\r\n{SCRATCH_LINE}\r\n"
+                    f"node_modules/\r\n{line}\n/.ccnavi/bin/{THIS_MACHINE}/\r\n{SCRATCH_LINE}\r\n{LOGS_LINE}\r\n"
                 )
                 self.write_gitignore(before)
                 self.make_git()
@@ -2295,7 +2348,7 @@ class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(
             self.gitignore(),
-            f"{before}\n{INDEX_HEADER}\n{INDEX_LINE}\n\n{SCRATCH_HEADER}\n{SCRATCH_LINE}\n",
+            f"{before}\n{INDEX_HEADER}\n{INDEX_LINE}\n\n{SCRATCH_HEADER}\n{SCRATCH_LINE}\n\n{LOGS_HEADER}\n{LOGS_LINE}\n",
         )
 
     def test_does_not_join_the_last_line_without_a_newline(self):

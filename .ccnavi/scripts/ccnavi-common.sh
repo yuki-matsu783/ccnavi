@@ -145,6 +145,24 @@ ccnavi_workspace() {
 		printf '%s\n' "$ccnavi_ws_named"
 		return 0
 	fi
+	# 実行中の sh 自身の置き場（<根>/.ccnavi/scripts/）を先に見る。cwd から登るだけだと、
+	# プロジェクトが .ccnavi/scripts/ の写しを持つとき、projects/<名前>/ の中から打ったそのプロジェクトを
+	# 根と取り違え、logs/ や state がワークスペースルートでなくプロジェクトの中にできる。
+	# ワークツリーの中のコピーは根にしない（下の登りに任せる）。
+	case "$0" in
+	*/*)
+		ccnavi_ws_self=$(ccnavi_abs "${0%/*}/../..") || ccnavi_ws_self=""
+		if [ -n "$ccnavi_ws_self" ] && [ -f "$ccnavi_ws_self/.ccnavi/scripts/ccnavi-common.sh" ]; then
+			case "$ccnavi_ws_self" in
+			*/.claude/worktrees/*) ;;
+			*)
+				printf '%s\n' "$ccnavi_ws_self"
+				return 0
+				;;
+			esac
+		fi
+		;;
+	esac
 	ccnavi_ws_here=$(ccnavi_abs .) || return 1
 	while :; do
 		if [ -f "$ccnavi_ws_here/.ccnavi/scripts/ccnavi-common.sh" ]; then
