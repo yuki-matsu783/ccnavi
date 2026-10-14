@@ -824,15 +824,21 @@ def _unmet(tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str
     for child in ph.tickets:
         if ph.states.get(child.ticket) not in (ticket_model.REVIEW, ticket_model.DONE):
             continue
-        # 子のブランチは識別子と同じ名前。ワークツリーではなくブランチを引くので、
-        # ワークツリーを消しても検査から外れない。引けなければ前提の未充足。
-        rc, sha = _git(tree_root, ["rev-parse", "--verify", f"{child.ticket}^{{commit}}"])
-        if rc != 0 or not sha.strip():
-            unmet.append(f"子 {child.ticket} のブランチを確かめられない（消えている）")
+        # 取り消した子（CANCELLED）は上で外れる。cancel は子のブランチを親へ入れない。
+        # すべての子が親のブランチに合流済みか。子のブランチは見ない（ローカルの子のブランチを
+        # 消しても、別の PC で finish した子でも変わらない）。finish が書いた `merged_sha`
+        # （合流した子の先頭）が、いまの親の HEAD の祖先かで確かめる。
+        if not child.merged_sha:
+            unmet.append(
+                f"子 {child.ticket} が親のブランチに合流していない"
+                "（finish が合流した記録 merged_sha が無い）"
+            )
             continue
-        rc, _ = _git(tree_root, ["merge-base", "--is-ancestor", sha.strip(), "HEAD"])
+        rc, _ = _git(tree_root, ["merge-base", "--is-ancestor", child.merged_sha, "HEAD"])
         if rc != 0:
-            unmet.append(f"子 {child.ticket} のブランチが親に取り込まれていない")
+            unmet.append(
+                f"子 {child.ticket} の合流した先頭（{child.merged_sha[:12]}）が親の HEAD に無い"
+            )
     # 未追跡は数えない。依頼文そのものをワークツリーに置く使い方が普通にあり、未追跡で
     # 前提を満たさないと判定すると依頼文を書く場所が無くなる。未追跡はマージリクエストに載らない。
     if _dirty(tree_root, conf):

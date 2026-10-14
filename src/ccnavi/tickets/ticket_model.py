@@ -45,7 +45,14 @@ WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 # 行単位に書き換える（`ticket_fields.set_fields`）。承認は提案の中身を変えずに動かすので、
 # 提案に書いた値はそのまま承認済みチケットの値になる。だから提案に空でない値があれば
 # `--agree` と `--lint` が error にする（`agree_candidates.script_field_problems`）。
-SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "cancel_reason")
+SCRIPT_FIELDS = (
+    "started_at",
+    "completed_at",
+    "base_sha",
+    "merged_sha",
+    "cancelled_at",
+    "cancel_reason",
+)
 
 # glob のワイルドカード。これより前が字義どおりの前置。
 _WILDCARDS = "*?["
@@ -226,6 +233,9 @@ class Ticket:
     started_at: str = ""
     completed_at: str = ""
     base_sha: str = ""
+    # finish が親のブランチへ合流した子の先頭のコミット。レビュー依頼の前提は、
+    # これが親の HEAD の祖先か。
+    merged_sha: str = ""
     cancelled_at: str = ""
     cancel_reason: str = ""
     # 読んだままの frontmatter。承認済みチケットを作るときに使う。

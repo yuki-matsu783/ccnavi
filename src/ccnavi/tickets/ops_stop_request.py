@@ -1,6 +1,7 @@
 """Stop で、レビューの依頼まで進めずに終えようとしたときの促し。
 
-チケット作業の決まった道（子の `finish` → 親ブランチへ合流 → ELI5 → `ccnavi-review.sh request`）の
+チケット作業の決まった道（子の `finish`（親ブランチへ合流して push）→ すべての子が合流済みかの確認
+→ ELI5 → `ccnavi-review.sh request`）の
 途中で、エージェントが「進めてよいですか」と確認して終えてしまうのを、1 回だけ止めて次の一手を返す。
 `ops_stop.unfinished_at_stop` は `finish` の打ち忘れ専用なので、ここは別の判定にしてある。
 
@@ -136,28 +137,25 @@ def pending_at_stop(
 
 
 def _next_step(worktree: str, ph: phase.Phase) -> tuple[str, list[str]]:
-    """依頼の前の道のどこにいるか。合流していない子があれば合流、無ければ ELI5、あれば依頼。
+    """依頼の前の道のどこにいるか。合流済みでない子があれば確認、無ければ ELI5、あれば依頼。
 
-    子のブランチは識別子と同じ名前で、親のブランチ（HEAD）の祖先なら合流済み。ブランチを引けない子は
-    数えない（依頼の前提の検査 `review._unmet` が言う）。
+    合流するのは子の `finish` で、ここは「すべての子が合流済みか」を確かめるだけ。合流済みは、
+    finish が書いた `merged_sha`（合流した子の先頭）が親の HEAD の祖先であること。子のブランチは
+    見ない（依頼の前提の検査 `review._unmet` と同じ）。
     """
     unmerged: list[str] = []
     for child in sorted(ph.tickets, key=lambda t: t.ticket):
         if ph.states.get(child.ticket) not in (ticket_model.REVIEW, ticket_model.DONE):
             continue
-        rc, sha = gitcmd.output(
-            worktree,
-            ["rev-parse", "--verify", "--quiet", f"{child.ticket}^{{commit}}"],
-            ops_close.TIMEOUT_SECONDS,
+        merged = (
+            bool(child.merged_sha)
+            and gitcmd.run(
+                worktree,
+                ["merge-base", "--is-ancestor", child.merged_sha, "HEAD"],
+                ops_close.TIMEOUT_SECONDS,
+            ).ok
         )
-        if rc != 0 or not sha.strip():
-            continue
-        merged = gitcmd.run(
-            worktree,
-            ["merge-base", "--is-ancestor", sha.strip(), "HEAD"],
-            ops_close.TIMEOUT_SECONDS,
-        )
-        if not merged.ok:
+        if not merged:
             unmerged.append(child.ticket)
     if unmerged:
         return STEP_MERGE, unmerged
@@ -193,7 +191,6 @@ def request_nudge(root: str, found: Pending) -> str:
     p = found.parent
     n = found.number
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-    git_sh = settings.script_command(root, "ccnavi-git.sh")
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     phase_name = f"フェーズ {n}" + (f"（{found.title}）" if found.title else "")
     eli5 = f"wip/eli5/phase-{n}.html"
@@ -208,19 +205,21 @@ def request_nudge(root: str, found: Pending) -> str:
         )
         todo += (
             " を実行します。まだ作業が残っているなら、確認を取らずに続けます。"
-            "子が全部閉じたら、親ブランチへの合流、ELI5、レビューの依頼（request）へ進みます。"
+            "子が全部閉じて（合流は finish が済ませます）、すべての子が合流済みと確かめたら、"
+            "ELI5、レビューの依頼（request）へ進みます。"
         )
     elif found.step == STEP_MERGE:
         where = (
             f"{p.ticket} の{phase_name}は子が全部閉じていますが、レビューの依頼"
-            f"（request）がまだです。子 {', '.join(found.children)} のブランチが"
-            "親に合流していません。"
+            f"（request）がまだです。子 {', '.join(found.children)} が"
+            "親のブランチに合流済みと確かめられません（合流した先頭 merged_sha が無いか、"
+            "親の HEAD に入っていません）。"
         )
         todo = (
-            f"親のワークツリー {found.worktree} で、子ごとに "
-            + "、".join(f"'{git_sh} merge {c}'" for c in found.children)
-            + f" を実行します。続けて ELI5 の HTML を {eli5} に書いてコミットして push し、"
-            f"{request} で依頼します。"
+            f"合流は子の finish が行います。'{ticket_sh} status {p.ticket}' で子の状態を確かめ、"
+            "合流の記録が無い理由（origin が無い親、置き場を手で動かした子など）をユーザに"
+            f"伝えてください。合流済みと確かめられたら、ELI5 の HTML を {eli5} に書いて"
+            f"コミットして push し、{request} で依頼します。"
         )
     elif found.step == STEP_ELI5:
         where = (

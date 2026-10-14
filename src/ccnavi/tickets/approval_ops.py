@@ -284,7 +284,7 @@ def _followup_ticket(
                     entries.append(raw)
         if entries:
             front[name] = entries
-    front.update({"started_at": "", "completed_at": "", "base_sha": ""})
+    front.update({"started_at": "", "completed_at": "", "base_sha": "", "merged_sha": ""})
     # 続きの子の目印。提案を経ずにここで作るチケットなので、作るときに書く（承認で中身を
     # 変えることには当たらない）。時刻は状態の履歴の `raised` に残る。
     front[approval.FOLLOWUP_KEY] = [c.ticket for c in children]

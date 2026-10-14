@@ -834,6 +834,7 @@ def resumed_fields(t: ticket_model.Ticket) -> list[str]:
     """
     values = {
         "completed_at": t.completed_at,
+        "merged_sha": t.merged_sha,
         "cancelled_at": t.cancelled_at,
         "cancel_reason": t.cancel_reason,
     }

@@ -556,7 +556,7 @@ def _next_hint(parent: ticket_model.Ticket, phases: list[Phase], number: int) ->
                 "（フィードバック計画の番号だけ）を書き、最後の項がほかの全部を待つようにします。"
                 "独立した対応は最後に 1 項で受けるか、一直線に並べます。項が使う定義は "
                 f"'ccnavi --plan-order {parent.ticket} --fill-phases' で `phases:` に差し込みます。"
-                "改版の提案では `started_at`・`completed_at`・`base_sha`・"
+                "改版の提案では `started_at`・`completed_at`・`base_sha`・`merged_sha`・"
                 "`cancelled_at`・`cancel_reason` は空にします。"
             )
         return "計画のフェーズは全部終わりました。親チケットを閉じられます。"

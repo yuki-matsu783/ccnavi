@@ -27,7 +27,7 @@ from ccnavi.tickets import history
 from tests import c1flag, can_case_sensitive, common_path, config_path
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import ROOT, git, read_json, write
-from tests.ticketsample import PHASES, RULES, child_text, parent_text
+from tests.ticketsample import PHASES, RULES, child_text, parent_text, record_merge
 
 
 class PhaseHarness(unittest.TestCase):
@@ -160,6 +160,7 @@ class PhaseHarness(unittest.TestCase):
 
     def merge(self, child):
         git(self.parent_tree, "merge", "--quiet", "--no-edit", child)
+        record_merge(self.parent_tree, child)
 
     def remote(self):
         bare = os.path.join(self.root, "origin.git")

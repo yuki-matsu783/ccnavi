@@ -21,7 +21,7 @@ from ccnavi.tickets import ops_stop
 from tests.ticket import test_stop_nudge as base
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
-from tests.ticketsample import child_text
+from tests.ticketsample import child_text, record_merge
 
 CODE = "NUDGE_TICKET_REQUEST"
 FINISH_CODE = "NUDGE_TICKET_FINISH"
@@ -110,14 +110,18 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.close_children()
         review_sh = settings.script_command(self.root, "ccnavi-review.sh")
         git_sh = settings.script_command(self.root, "ccnavi-git.sh")
-        # 子 1 のコミットが親に合流していない。
+        ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
+        # 子 1 は親に合流した記録が無い（合流は finish が済ませる。ここは確かめを促すだけ）。
         reason = self.asked(self.stop(self.parent_tree))
         self.assertIn("レビューの依頼（request）がまだです", reason)
-        self.assertIn(f"'{git_sh} merge i0001-01-01'", reason)
-        self.assertNotIn("i0001-01-02'", reason)
+        self.assertIn("子 i0001-01-01 が親のブランチに合流済みと確かめられません", reason)
+        self.assertIn(f"'{ticket_sh} status i0001'", reason)
+        self.assertNotIn(f"'{git_sh} merge", reason)
+        self.assertNotIn("i0001-01-02 が", reason)
         self.assert_not_asked(self.stop(self.parent_tree))
-        # 合流すると次の一手は ELI5。
+        # 合流の記録が揃うと次の一手は ELI5。
         git(self.parent_tree, "merge", "--quiet", "--no-edit", "i0001-01-01")
+        record_merge(self.parent_tree, "i0001-01-01")
         reason = self.asked(self.stop(self.parent_tree))
         self.assertIn("wip/eli5/phase-1.html", reason)
         self.assertNotIn(f"'{git_sh} merge", reason)
