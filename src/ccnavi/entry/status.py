@@ -237,7 +237,9 @@ class _Family:
                 why = f"。理由: {t.cancel_reason}" if t.cancel_reason else ""
                 lines.append(f"    閉じ方: 取り消し（{t.cancelled_at}{why}）")
             else:
-                lines.append(f"    閉じ方: 完了（{t.completed_at or '時刻なし'}）")
+                # 合流（finish が親のブランチへ取り込んだ子の先頭）。子だけが持つ
+                merged = f"、合流 {t.merged_sha[:12]}" if t.merged_sha else ""
+                lines.append(f"    閉じ方: 完了（{t.completed_at or '時刻なし'}{merged}）")
             lines.append(f"    置き場のファイル: {file_state.label()}")
             return lines
         lines.append(

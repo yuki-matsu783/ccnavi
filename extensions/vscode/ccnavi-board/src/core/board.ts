@@ -93,6 +93,8 @@ export interface Card {
   readonly worktreeExists: boolean;
   readonly worktreePath: string;
   readonly baseSha: string;
+  /** finish が親のブランチへ合流した子の先頭。空なら合流していない（表示だけ） */
+  readonly mergedSha: string;
   readonly startedAt: string;
   readonly completedAt: string;
   /** 取り消した時刻。空でなければ取り消しの列 */
@@ -299,6 +301,7 @@ function toCard(
     worktreeExists: t.worktree.exists,
     worktreePath: t.worktree.path,
     baseSha: t.base_sha,
+    mergedSha: t.merged_sha,
     startedAt: t.started_at,
     completedAt: t.completed_at,
     cancelledAt: t.cancelled_at,
@@ -358,6 +361,7 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     worktreeExists: false,
     worktreePath: "",
     baseSha: "",
+    mergedSha: a.merged_sha ?? "",
     startedAt: a.started_at,
     completedAt: a.completed_at,
     cancelledAt: a.cancelled_at,

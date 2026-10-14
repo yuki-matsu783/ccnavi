@@ -240,6 +240,9 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
   if (card.baseSha !== "") {
     facts.push(<Fact key="sha" kind="sha" text={`base ${card.baseSha.slice(0, 7)}`} title={card.baseSha} />);
   }
+  if (card.mergedSha !== "") {
+    facts.push(<Fact key="merged" kind="sha" text={`合流 ${card.mergedSha.slice(0, 7)}`} title={card.mergedSha} />);
+  }
   if (card.project !== "") {
     facts.push(<Fact key="project" kind="project" text={`project ${card.project}`} />);
   }

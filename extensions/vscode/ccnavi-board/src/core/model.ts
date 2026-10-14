@@ -194,6 +194,8 @@ export interface TicketJson {
   readonly started_at: string;
   readonly completed_at: string;
   readonly base_sha: string;
+  /** finish が親のブランチへ合流した子の先頭。合流していなければ空（表示だけ） */
+  readonly merged_sha: string;
   readonly cancelled_at: string;
   readonly cancel_reason: string;
   /**
@@ -231,6 +233,8 @@ export interface ArchivedTicketJson {
   readonly approved_at: string;
   readonly started_at: string;
   readonly completed_at: string;
+  /** finish が親のブランチへ合流した子の先頭。合流していなければ空か無い（表示だけ） */
+  readonly merged_sha?: string;
   readonly cancelled_at: string;
   readonly cancel_reason: string;
   readonly history: readonly HistoryEntryJson[];
@@ -573,6 +577,7 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     started_at: str(raw.started_at),
     completed_at: str(raw.completed_at),
     base_sha: str(raw.base_sha),
+    merged_sha: str(raw.merged_sha),
     cancelled_at: str(raw.cancelled_at),
     cancel_reason: str(raw.cancel_reason),
     in_progress: typeof raw.in_progress === "boolean" ? raw.in_progress : null,
@@ -599,6 +604,7 @@ function archived(raw: Record<string, unknown>): ArchivedTicketJson {
     approved_at: str(raw.approved_at),
     started_at: str(raw.started_at),
     completed_at: str(raw.completed_at),
+    merged_sha: str(raw.merged_sha),
     cancelled_at: str(raw.cancelled_at),
     cancel_reason: str(raw.cancel_reason),
     history: list(raw.history).filter(isRecord).map(historyEntry),

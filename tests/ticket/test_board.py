@@ -407,6 +407,27 @@ class BoardTest(PhaseHarness):
         self.assertTrue(by_id["i0001"]["attention"])
         self.assertFalse(by_id["i0001-01-01"]["attention"])
 
+    def test_the_merged_head_of_a_child_is_shown(self):
+        """finish が書いた `merged_sha`（合流した子の先頭）をボードの JSON に載せる（表示だけ）。"""
+        from ccnavi.tickets import ticket_fields
+
+        self.scene()
+        self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
+        found = None
+        for state in ("done", "doing"):
+            path = os.path.join(self.approved, state, "i0001-02-02.md")
+            if os.path.exists(path):
+                found = path
+        if found is None:
+            found = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-02-02.md")
+        with open(found, encoding="utf-8") as f:
+            text = f.read()
+        write(found, ticket_fields.set_fields(text, {"merged_sha": "a" * 40}))
+        by_id = {t["ticket"]: t for t in self.board()["tickets"]}
+        self.assertEqual(by_id["i0001-02-02"]["merged_sha"], "a" * 40)
+        # finish で閉じた子は、合流した先頭を持つ
+        self.assertRegex(by_id["i0001-01-01"]["merged_sha"], r"^[0-9a-f]{40}$")
+
     def test_shape_matches_the_extension_fixture(self):
         self.scene()
         board = self.board()

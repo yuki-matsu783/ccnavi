@@ -225,6 +225,8 @@ def _archived_records(root: str, skip: set[tuple[str, str]], problems: list[str]
                 ),
                 "started_at": t.started_at,
                 "completed_at": t.completed_at,
+                # finish が親のブランチへ合流した子の先頭（表示だけ。閉じた子の「合流」を出す）
+                "merged_sha": t.merged_sha,
                 "cancelled_at": t.cancelled_at,
                 "cancel_reason": t.cancel_reason,
                 "history": entries,
@@ -538,6 +540,8 @@ def _ticket_record(
         "started_at": source.started_at,
         "completed_at": source.completed_at,
         "base_sha": source.base_sha,
+        # finish が親のブランチへ合流した子の先頭（表示だけ。閉じた子の「合流」を出す）
+        "merged_sha": source.merged_sha,
         "cancelled_at": source.cancelled_at,
         "cancel_reason": source.cancel_reason,
         # 作業中か。承認済みチケットが `doing/` にあり、着手していて、終わってもいないし
