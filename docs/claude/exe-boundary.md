@@ -20,6 +20,11 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   hookのtimeoutは10秒で、ネットワークを待てないため
 - 操作を止めるか通すかは、hookと実行ファイルが判定する（P13）。shがccnaviの状態を読んで操作を止める処理は、
   hookと実行ファイルの判定に重ねた2段目の確認にあたる。shに新しい判定を足したくなったら、まずhook側に置けないかを検討する
+  - gitの状態だけを見て止める処理（`ccnavi-ticket.sh`の`ensure_child_worktree`が、手元だけのコミットがある子のブランチを
+    消さずに止めるなど）は、ccnaviの状態を読まないので、この決まりの対象ではない
+  - `ccnavi_is_ident`・`ccnavi_is_branch`・`ccnavi_branch_ok`（sh）は、実行ファイルの`id_problem`・`branch_problem`の
+    ASCIIで見分けられる分だけの複製。字の種類・NFC・長さは見ないので、名前を受け入れる入口は実行ファイルの
+    `worktree id`に聞く（`ccnavi_id_ask`）。規則を変えるときは両方を直す
 - P13の例外: 入口を1本に寄せたラッパー（`ccnavi-git.sh`）の中の可否の判定（`integrate-ticket`、統合先と消えた親のブランチへの
   pushの拒否、親のワークツリーでの`checkout`・`switch`の行き先の確認）と、`integrate`・`integrate-done`の状態操作はshに置く。条件は3つで、
   生の`git`が組み込みで止まっていること、ラッパーが許可リストで読むこと、判定の材料のうちチケットの中身は実行ファイルに聞くこと
