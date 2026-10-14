@@ -132,6 +132,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         "作業ツリーとチケットの、いまの形を読む",
         frozenset(
             {
+                "hook.parentwrite",
                 "hook.wrapguard",
                 "policy.builtin",
                 "policy.ctxfile",
