@@ -998,6 +998,26 @@ class ApproveCarriesTest(Workspace):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("提案の内容が更新されました", result.stderr)
 
+    def test_source_mode_starts_uv_at_the_workspace_root(self):
+        """ソースで動かすとき、uv はワークスペースルートで起こす（cwd が中の別の場所でも）。"""
+        write(os.path.join(self.ws, "src", "ccnavi", "__main__.py"), "")
+        where = os.path.join(self._tmp.name, "uv-cwd")
+        uv = write(
+            os.path.join(self._tmp.name, "uvbin", "uv"),
+            "#!/bin/sh\n"
+            f"pwd > '{posix(where)}'\n"
+            'while [ $# -gt 0 ]; do [ "$1" != --record-writes ] || : > "$2"; shift; done\n',
+        )
+        os.chmod(uv, 0o755)
+        inner = os.path.join(self.ws, "docs")
+        os.makedirs(inner)
+        env = self.env(CCNAVI_BIN_PATH=posix(os.path.join(self._tmp.name, "none")))
+        env["PATH"] = os.pathsep.join([os.path.dirname(uv), env.get("PATH", "")])
+        result = self.run_sh("ccnavi-agree.sh", cwd=inner, env=env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        with open(where, encoding="utf-8") as f:
+            self.assertEqual(os.path.realpath(f.read().strip()), os.path.realpath(self.ws))
+
     def test_failed_push_does_not_fail_the_approval(self):
         """コミットや push の失敗で承認が失敗に見えないように、承認が通れば 0。コミットは残る。"""
         git(self.ws, "remote", "set-url", "origin", os.path.join(self._tmp.name, "missing.git"))

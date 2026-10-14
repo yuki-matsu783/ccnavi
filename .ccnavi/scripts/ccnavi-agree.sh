@@ -98,7 +98,10 @@ if bin=$(ccnavi_bin "$root"); then
 	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-agree: %s\n' "$skew" >&2
 	set -- "$bin" --root "$root" --record-writes "$written" --agree --placed-out "$report" "$@"
 elif [ -f "$root/src/ccnavi/__main__.py" ]; then
-	set -- uv run python -m ccnavi --root "$root" --record-writes "$written" --agree --placed-out "$report" "$@"
+	# ソースで動かすときは、ワークスペースルートで uv を起こす（uv はプロジェクトを cwd から探す。
+	# ccnavi-clean.sh・ccnavi_ask と同じ）。サブシェルで cd するので、この sh の cwd は動かない。
+	from_source() { (cd "$root" && uv run python -m ccnavi "$@"); }
+	set -- from_source --root "$root" --record-writes "$written" --agree --placed-out "$report" "$@"
 else
 	printf 'ccnavi-agree: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
