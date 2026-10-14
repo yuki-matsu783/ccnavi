@@ -10,7 +10,7 @@ keywords: [学び, 気づき, learning-wiki, wiki, パターン, 提案, 採否,
 
 ### 9.16 学びの蓄積（learning-wiki）
 
-状態: 一部実装済み（範囲は節末の「実装の範囲」）。要求は [要件 REQ-LRN](../../requirements/learning-wiki.md)。用語は CONTEXT.md。
+状態: 一部実装済み（範囲は節末の「実装の範囲」）。要件が約束する `CCNAVI_LEARNING` の既定 `enable` は未実装で、いまの既定は `disable`。要求は [要件 REQ-LRN](../../requirements/learning-wiki.md)。用語は CONTEXT.md。
 
 チケット作業で拾った気づきを、ルール・配点・フェーズ定義・テンプレート・スキル・文書への提案として育てる。
 育てる仕事のうち、集める・溜める・提案するまでがエージェントで、反映を受け入れるのは人間。
@@ -248,7 +248,7 @@ learning-wiki は手順書（スキル・ルール・テンプレート）を作
 
 | 項目 | 中身 |
 |---|---|
-| `CCNAVI_LEARNING` | 全体の切り替え。`enable` / `disable`、既定は `enable`（基本は ON）。`disable` のとき、着手の 1 行・子を閉じる検査・親の案内・`ticket learn`・`--learnings`・`--learning-decide`・`--lint` の検査が働かない。ユーザだけが切れる止め弁。いまの実装の既定は `disable` で、`enable` に変えると、既存のワークスペースで子を閉じる操作が新たに止まる（合意が要る変更） |
+| `CCNAVI_LEARNING` | 全体の切り替え。`enable` / `disable`、要件が約束する既定は `enable`（基本は ON。**未実装**で、いまの実装の既定は `disable`）。`disable` のとき、着手の 1 行・子を閉じる検査・親の案内・`ticket learn`・`--learnings`・`--learning-decide`・`--lint` の検査が働かない。ユーザだけが切れる止め弁。いまの実装の既定は `disable` で、`enable` に変えると、既存のワークスペースで子を閉じる操作が新たに止まる（合意が要る変更） |
 | フェーズ定義の `learning` | `on` / `off`、既定 `on`。`off` の定義の子は、着手の 1 行も閉じる検査も受けない。小さい作業（`quick-work`）など、気づきを求める意味が薄い定義に書く。定義はユーザが持つ設定で、エージェントは書き換えられない。承認のとき、親に固定する定義の写し（`phases:`）にも入るので、承認のあとに変わらない |
 | `CCNAVI_LEARNING_RECURRENCE` | 閾値。既定 3。数でない値と 2 未満は既定を使う（未実装。下の「実装の範囲」を見る） |
 | フェーズ定義 | `learning-consolidate` と `learning-apply` を共通レイヤーの `phases.yml` に置き、ミラーと導入 sh で配る（共通レイヤーの配り方に従う） |
