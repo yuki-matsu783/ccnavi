@@ -1072,6 +1072,39 @@ class C1MergeTest(C1Harness):
         self.assertEqual(self.read(secret), "USER SECRET\n")
         self.assert_untouched(before)
 
+    def assert_unrestorable_stops(self, kind):
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("finish", CHILD)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("合流を戻せない形の変更がある", result.stderr)
+        self.assertIn(kind, result.stderr)
+        self.assert_untouched(before)
+
+    def test_a_path_with_a_newline_stops_without_merging(self):
+        self.start_parent()
+        tree = self.start_child()
+        self.work(tree, "wip/design/a\nb.md", "x\n")
+        self.assert_unrestorable_stops("改行を含むパス")
+
+    def test_a_rename_that_only_changes_case_stops_without_merging(self):
+        self.start_parent()
+        self.work(self.tree, "wip/design/Note.md", "x\n")
+        git(self.tree, "push", "-q", "origin", PARENT)
+        tree = self.start_child()
+        git(tree, "mv", "wip/design/Note.md", "wip/design/note.md")
+        git(tree, "commit", "-q", "-m", "rename")
+        self.assert_unrestorable_stops("大文字小文字だけが違うパス")
+
+    def test_adding_a_submodule_stops_without_merging(self):
+        self.start_parent()
+        tree = self.start_child()
+        sha = self.sha(tree, "HEAD")
+        git(tree, "update-index", "--add", "--cacheinfo", f"160000,{sha},wip/design/sub")
+        git(tree, "commit", "-q", "-m", "submodule")
+        # 初期化していない submodule と同じ形（空のディレクトリ）にして、未コミットに見せない
+        os.makedirs(os.path.join(tree, "wip", "design", "sub"))
+        self.assert_unrestorable_stops("submodule の追加・削除")
+
     def test_an_uncommitted_change_in_the_child_stops(self):
         self.start_parent()
         tree = self.start_child()

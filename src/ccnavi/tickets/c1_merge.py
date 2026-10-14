@@ -15,7 +15,8 @@
   - 止めるのは、親のワークツリーに状態の置き場以外の未コミットの変更がある、子のワークツリーが無い・
     子のブランチにいない・未コミットの変更がある、子の仕事の始まりから先頭までの変更に置き場のパスが
     ある、範囲（子・親・フェーズ定義）の外のパスがある、子が変えたパスが親のワークツリーに
-    無視されたファイルとしてある（merge が黙って上書きし、戻すと消える）、のどれか
+    無視されたファイルとしてある（merge が黙って上書きし、戻すと消える）、合流を戻せない形の
+    変更（改行を含むパス・大文字小文字だけが違うパス・submodule の追加と削除）がある、のどれか
 - `ccnavi c1 merge-blame <子> <パス>...`: 衝突したパスを、先に親へ合流した別の子の変更から探す。
   `other <子> <パス>` を 1 パス 1 行で（パスの空白はそのまま、改行は `\\n`）。
   見つからなければ何も出さない
@@ -146,6 +147,21 @@ def plan(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> int:
             ],
         )
         return 0
+    unsafe, why = _unrestorable(child_tree, base, head)
+    if why:
+        _stop(stdout, f"子 {ident} の変更を調べられない（{why}）。何も変えずに止めた", [])
+        return 0
+    if unsafe:
+        _stop(
+            stdout,
+            f"子 {ident} のコミットに、合流を戻せない形の変更がある（{'。'.join(unsafe)}）。"
+            "push が通らなかったときに元へ戻せないので、合流しない",
+            [
+                "その変更を子のコミットから取り除くか、ユーザに伝えて別の手順で入れてください。"
+                "直してコミットしてから finish をやり直す"
+            ],
+        )
+        return 0
     done = gitcmd.run(child_tree, ["merge-base", "--is-ancestor", head, parent_head], _TIMEOUT)
     _say(stdout, "child", ident)
     stdout.write(f"tree {child_tree}\n")
@@ -260,6 +276,48 @@ def _ignored_in_parent(
     if not done.ok:
         return [], "親のワークツリーで無視されたファイルを確かめられない"
     return sorted(set(_names(done.out))), ""
+
+
+_GITLINK = "160000"
+
+
+def _unrestorable(child_tree: str, base: str, head: str) -> tuple[list[str], str]:
+    """`base..head` のうち、push が通らなかったときに sh が親のワークツリーを戻せない変更。
+
+    sh の戻し（`ccnavi_c1_undo`）はパスを 1 行 1 件で扱い、無いパスは `rm -f` で消す。
+    - 改行を含むパスは行が割れて、戻すパスを取り違える
+    - 大文字小文字だけが違うパス（大文字小文字だけの改名など）は、大文字小文字を区別しない
+      ファイルシステム（Windows・macOS の既定）で、片方を消すともう片方の中身まで消える
+    - submodule の追加・削除（ファイルとの入れ替えを含む）はディレクトリになり、
+      ファイルとして戻せない
+    返すのは理由の文（空なら戻せる）と、読めなかった理由。
+    """
+    ok, out = _git(
+        child_tree,
+        ["diff", "--raw", "--no-renames", "--ignore-submodules=none", "-z", f"{base}..{head}"],
+    )
+    if not ok:
+        return [], "子の仕事の始まりからの差分を読めない"
+    parts = out.split("\0")
+    entries: list[tuple[str, str, str]] = []
+    for meta, rel in zip(parts[0::2], parts[1::2], strict=False):
+        cols = meta.lstrip(":").split()
+        if len(cols) >= 2 and rel:
+            entries.append((cols[0], cols[1], rel))
+    reasons = []
+    broken = [rel for _, _, rel in entries if "\n" in rel or "\r" in rel]
+    if broken:
+        reasons.append(f"改行を含むパス {_shown([_one_line(p) for p in broken])}")
+    folded: dict[str, set[str]] = {}
+    for _, _, rel in entries:
+        folded.setdefault(rel.casefold(), set()).add(rel)
+    clash = sorted(p for group in folded.values() if len(group) > 1 for p in group)
+    if clash:
+        reasons.append(f"大文字小文字だけが違うパス {_shown([_one_line(p) for p in clash])}")
+    linked = [rel for old, new, rel in entries if (old == _GITLINK) != (new == _GITLINK)]
+    if linked:
+        reasons.append(f"submodule の追加・削除 {_shown([_one_line(p) for p in linked])}")
+    return reasons, ""
 
 
 def _same(a: str, b: str) -> bool:

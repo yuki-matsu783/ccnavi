@@ -632,7 +632,8 @@ ccnavi_c1_undo() {
 		ccnavi_c1_say "先頭が自分のコミット（$1）でなくなっていた（${ccnavi_cu_now}）。戻さずに止めた。ユーザが確かめてください"
 		return 1
 	fi
-	# 戻すパスは、元の先頭からこのコミットまでの変更（合流したコードを含む）。
+	# 戻すパスは、元の先頭からこのコミットまでの変更（合流したコードを含む）。1 行 1 パスで扱うので、
+	# 改行を含むパス・大文字小文字だけが違うパス・submodule の追加と削除は、合流の前の検査（c1 merge）が止める。
 	git -C "$ccnavi_c1_tree" diff --name-only --no-renames -z "$2" "$1" 2>/dev/null |
 		tr '\000' '\n' >"$ccnavi_c1_tmp/in-commit"
 	if ! git -C "$ccnavi_c1_tree" update-ref "refs/heads/$ccnavi_c1_branch" "$2" "$1" 2>"$ccnavi_c1_tmp/err"; then
