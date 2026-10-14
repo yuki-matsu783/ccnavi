@@ -62,8 +62,9 @@ sh .ccnavi/scripts/ccnavi-ticket.sh next-id [<先頭の語> <slug>]
 sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel> <識別子> [--reason <理由>]
 sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>
 sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] [--signal <信号>]
+（親の提案の雛形はこのスクリプトに無い: ccnavi ticket new <識別子> --title <題> --plan <型,…>）
 
-  status       承認済みチケットの状態を聞く（読むだけ。サブエージェントからも実行できます）。親を省けば
+  status      承認済みチケットの状態を聞く（読むだけ。サブエージェントからも実行できます）。親を省けば
                作業中・レビュー待ち・承認待ちのチケットがある親子を全部。ファイルを読んで推測せず、これを実行する
 
   next-id      issue の無い親の提案に使う識別子を決める（読むだけ。サブエージェントからも実行できます）。引数なしなら

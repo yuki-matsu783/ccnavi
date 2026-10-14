@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import os
+import re
 
 from ..infra import fsio, hookio, settings, tree
 from ..tickets import ticket, ticket_ids
@@ -50,7 +51,10 @@ def _hint(conf: settings.Settings, root: str, payload: hookio.Input) -> str:
         return ""
     rel = tree.relative(where, written)
     folder = conf.tickets.strip("/") + "/todo/"
-    if not rel.startswith(folder) or "/" in rel[len(folder) :]:
+    # ワークツリーが想定外の位置（`projects/<名前>/.claude/worktrees/<識別子>/`）にあると、
+    # 書いた先はプロジェクトのツリーの中の相対になる。その形でも案内を出す
+    inner = re.sub(r"^\.claude/worktrees/[^/]+/", "", rel)
+    if not inner.startswith(folder) or "/" in inner[len(folder) :]:
         return ""
     with open(written, encoding="utf-8") as handle:
         front = ticket.front_mapping(handle.read())

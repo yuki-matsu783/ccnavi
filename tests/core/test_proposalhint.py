@@ -63,6 +63,11 @@ class ProposalHintTest(unittest.TestCase):
         self.assertEqual("", self.hint("wip/proposals/todo/feature-1-memo.md", PARENT_FULL))
         self.assertEqual("", self.hint("wip/proposals/todo/feature-1-memo-01-01.md", CHILD))
 
+    def test_a_proposal_in_a_misplaced_worktree_inside_the_tree_is_still_told(self):
+        # ログで起きた形: ワークツリーがプロジェクトの中の `.claude/worktrees/` にできた
+        rel = ".claude/worktrees/feature-1-memo/wip/proposals/todo/feature-1-memo.md"
+        self.assertIn(proposalhint.CODE_PARENT_KEY, self.hint(rel, PARENT_WRONG))
+
     def test_other_places_and_edits_get_nothing(self):
         todo = "wip/proposals/todo/feature-1-memo.md"
         self.assertEqual("", self.hint(todo, PARENT_WRONG, kind="update"))
