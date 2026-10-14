@@ -332,6 +332,10 @@ ccnavi_is_ident() {
 
 # 親のブランチ名として受けてよい書き方なら 0。<語>
 #
+# 実行ファイルの `ticket_ids.branch_problem` の複製（ASCII で見分けられる分だけ）。C1 の対象決めなど、呼ぶたびに
+# 実行ファイルを起こせない所で使う。字の種類・NFC・長さは見ないので、名前を受け入れる入口（ccnavi-start.sh・
+# ccnavi-worktree.sh・ccnavi-git.sh の worktree add）は実行ファイルに聞く（`ccnavi_id_ask`）。規則を変えるときは両方を直す。
+#
 # 親のブランチ名は識別子の字に階層の区切りの `/` を足したもの（`feature/123-login`）。実行ファイル
 # （`ticket_ids.branch_problem`）が字と形を確かめたものを受け取る側の 2 段目の確認で、パスや ref で意味を持つ
 # 書き方を止める: 空、先頭の `-` `.` `/`、末尾の `/` `.`、`..`、`//`、`/.`（`.` で始まる階層）、`.lock` で終わる
