@@ -94,9 +94,7 @@ class HistoryTest(TicketTest):
     def test_a_board_approval_says_board(self):
         """ボードの `--agree --yes` は経路 board で残る。"""
         self.propose("i0001", allow=("src/*",))
-        shown = self.ccnavi("--agree", "--preview", "--json")
-        digest = json.loads(shown.stdout)["digest"]
-        placed = self.ccnavi("--agree", "--yes", "i0001", "--digest", digest, "--json")
+        placed = self.ccnavi("--agree", "--yes", "i0001", "--json")
         self.assertEqual(placed.returncode, 0, placed.stdout + placed.stderr)
         self.assertEqual(self.kinds("i0001"), [("approved", "todo", "doing", "board")])
 

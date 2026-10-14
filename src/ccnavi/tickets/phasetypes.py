@@ -58,7 +58,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from ..infra import fsio, globmatch, settings, tree, yamlread
+from ..infra import globmatch, settings, tree, yamlread
 from ..policy import rules
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from . import ticket as ticket_mod
@@ -161,7 +161,6 @@ def load(path: str) -> tuple[PhaseTypes | None, list[Problem]]:
         with open(path, encoding="utf-8") as f:
             text = f.read()
     except FileNotFoundError:
-        fsio.note_read(path, None)
         return None, []
     except (OSError, ValueError) as exc:
         # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、破損した
@@ -169,8 +168,6 @@ def load(path: str) -> tuple[PhaseTypes | None, list[Problem]]:
         # 実行後チェック）が例外で異常終了し、読めない定義を「定義では切り詰めない」として
         # 扱う処理まで進まない。
         return None, [Problem(SEVERITY_ERROR, "(phases)", f"{path} を読めない ({exc})")]
-    # 承認のダイジェスト（read_set）に入れる。定義は待ち方と止め方を決める判定の入力。
-    fsio.note_read(path, text)
     return parse(text, path)
 
 

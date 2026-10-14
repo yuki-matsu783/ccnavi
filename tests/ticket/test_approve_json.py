@@ -9,7 +9,9 @@ VS Code のボード拡張がオーバーレイで承認するための経路。
 2. 承認待ちが無くても `--preview` は `batch: []` で exit 0
 3. `--yes` に一覧と同じ識別子を渡すと承認済みチケットが置かれ、
    `prompt`（Claude Code に渡す文）が返る
-4. `--yes` の識別子が一覧と違えば承認済みチケットを置かず、`mismatch` で exit 1
+4. `--yes` は指した識別子だけを、承認する時点の提案を通常の検査にかけて承認する。
+   表示後に提案が変わっても、現在の内容が有効なら承認する。指した識別子が承認待ちに無い、
+   現在の提案が検査を通らないときは、何も置かず exit 1（`mismatch` は返さない）
 5. `--yes` は端末の壁を通らない。素の `--agree` は今までどおり壁で止まる
 6. 拡張側のフィクスチャ（extensions/vscode/ccnavi-board/test/fixtures/approve-*.json）と同じ形
 
@@ -38,19 +40,12 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(result.stdout)
 
-    def yes(self, tickets, *extra, digest=None):
-        """`--agree --yes <識別子,…> --digest <ダイジェスト> --json [<絞り>...]`。
-        extra は絞りかフラグ。
+    def yes(self, tickets, *extra):
+        """`--agree --yes <識別子,…> --json`。extra はフラグ。
 
-        拡張と同じく、直前に同じ extra でプレビューして、見せた本文のダイジェスト（`digest`）
-        を渡す。
-        digest を名指しすると、その値をそのまま渡す（見せたあとに提案が変わった形）。
+        承認する識別子だけを渡す。プレビューは挟まない（見せたあとの提案の変化を調べないため）。
         """
-        if digest is None:
-            digest = self.preview(*extra)["digest"]
-        return self.ccnavi(
-            "--agree", "--yes", ",".join(tickets), "--digest", digest, "--json", *extra
-        )
+        return self.ccnavi("--agree", "--yes", ",".join(tickets), "--json", *extra)
 
     def copy_exists(self, name):
         return os.path.exists(os.path.join(self.approved, "doing", name + ".md"))
@@ -159,50 +154,138 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(self.copy_exists("i0001-01-01"))
 
-    # ---- 4. 見せた一覧と違えば承認しない
+    # ---- 4. 指した識別子だけを、今の提案で承認する
 
-    def test_yes_refuses_when_the_batch_changed(self):
+    def test_yes_approves_only_the_named_tickets(self):
+        """親だけを指すと、子は承認されないまま承認待ちに残る。"""
         self.pending_parent_and_child()
-        # 拡張が見せたあとに子が 1 枚増えた形。
         result = self.yes(["i0001"])
-        self.assertEqual(result.returncode, 1)
-        body = json.loads(result.stdout)
-        self.assertEqual(body["version"], APPROVE_VERSION)
-        self.assertEqual(body["mismatch"]["expected"], ["i0001"])
-        self.assertEqual(body["mismatch"]["current"], ["i0001", "i0001-01-01"])
-        self.assertIn("ccnavi: [CORE_APPROVE_LIST_CHANGED] ", result.stderr)
-        self.assertFalse(self.copy_exists("i0001"))
-        self.assertFalse(self.copy_exists("i0001-01-01"))
-
-    def test_a_filtered_overlay_approves_only_what_it_showed(self):
-        """絞り込み中の承認。preview と yes に同じ絞りを渡し、見せた分だけを承認する。"""
-        self.pending_parent_and_child()
-        # 親だけに絞って見せる。
-        body = self.preview("i0001")
-        self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001"])
-        # 同じ絞りをつけて承認する。子は承認されない。
-        result = self.yes(["i0001"], "i0001")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(result.stdout)["approved"], ["i0001"])
         self.assertTrue(self.copy_exists("i0001"))
         self.assertFalse(self.copy_exists("i0001-01-01"))
-        # 絞りをつけずに同じことを頼めば、絞らない一覧と比べて食い違いになる。
-        self.assertEqual(self.preview()["batch"][0]["ticket"], "i0001-01-01")
+        self.assertEqual([b["ticket"] for b in self.preview()["batch"]], ["i0001-01-01"])
 
-    def test_yes_without_the_filter_compares_against_the_whole_batch(self):
-        """絞りをつけない `--yes` は、絞らない一覧と比べる。部分だけを何も言わずに通さない。"""
+    def test_yes_does_not_approve_a_proposal_added_after_preview(self):
+        """見せたあとに増えた提案は、指していなければ承認しない。"""
         self.pending_parent_and_child()
-        result = self.yes(["i0001"])
-        self.assertEqual(result.returncode, 1)
-        body = json.loads(result.stdout)
-        self.assertEqual(body["mismatch"]["current"], ["i0001", "i0001-01-01"])
-        self.assertFalse(self.copy_exists("i0001"))
+        shown = self.preview()
+        self.assertEqual([b["ticket"] for b in shown["batch"]], ["i0001", "i0001-01-01"])
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ("wip/research/*",)))
+        self.commit_parent("added after preview")
+        result = self.yes(["i0001", "i0001-01-01"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(result.stdout)["approved"], ["i0001", "i0001-01-01"])
+        self.assertTrue(self.copy_exists("i0001-01-01"))
+        self.assertFalse(self.copy_exists("i0001-01-02"))
+        self.assertEqual([b["ticket"] for b in self.preview()["batch"]], ["i0001-01-02"])
+
+    def test_yes_approves_the_current_content_when_it_changed_after_preview(self):
+        """見せたあとに提案の中身が変わっても、現在の内容が有効なら承認する（ダイジェストは見ない）。"""
+        inside = "wip/research/*"
+        beyond = "src/a/*"
+        for label, old, new in (
+            ("題", "title: 子 i0001-01-01", "title: 書き換えた題"),
+            ("理由", "rationale: r", "rationale: 書き換えた理由"),
+            ("範囲（上限の内側）", f'glob: "{inside}"', 'glob: "wip/research/sub/*"'),
+            ("本文", "---\n\n本文\n", "---\n\n書き換えた本文\n"),
+        ):
+            with self.subTest(label):
+                self.setUp()
+                self.pending_parent_and_child()
+                path = self.propose(
+                    "i0001-01-01", child_text("i0001-01-01", "i0001", 1, (inside, beyond), False)
+                )
+                self.commit_parent()
+                self.assertIn(beyond, self.preview()["text"])
+
+                with open(path, encoding="utf-8") as f:
+                    text = f.read()
+                self.assertIn(old, text)
+                write(path, text.replace(old, new, 1))
+                self.commit_parent("edit after preview")
+
+                result = self.yes(["i0001", "i0001-01-01"])
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertNotIn("mismatch", json.loads(result.stdout))
+                self.assertTrue(self.copy_exists("i0001"))
+                # 置いたのは、書き換えたあとの中身。
+                with open(
+                    os.path.join(self.approved, "doing", "i0001-01-01.md"), encoding="utf-8"
+                ) as f:
+                    self.assertIn(new, f.read())
+
+    def test_yes_refuses_an_identifier_that_left_the_pending_list(self):
+        """指した識別子が承認待ちから消えていたら、別の提案を代わりに承認しない。"""
+        self.pending_parent_and_child()
+        self.assertEqual(self.preview()["batch"][1]["ticket"], "i0001-01-01")
+        os.remove(os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-01.md"))
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ("wip/research/*",)))
+        self.commit_parent("replaced after preview")
+        result = self.yes(["i0001-01-01"])
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("ccnavi: [CORE_APPROVE_NOTHING] ", result.stderr)
+        self.assertIn("i0001-01-01", result.stderr)
+        for name in ("i0001", "i0001-01-01", "i0001-01-02"):
+            self.assertFalse(self.copy_exists(name), name)
 
     def test_yes_refuses_unknown_identifiers(self):
         self.pending_parent_and_child()
         result = self.yes(["i0001", "i0001-01-01", "i9999"])
         self.assertEqual(result.returncode, 1)
-        self.assertIn("i9999", json.loads(result.stdout)["mismatch"]["expected"])
+        self.assertIn("i9999", result.stderr)
+        self.assertIn("ccnavi: [CORE_APPROVE_NOTHING] ", result.stderr)
         self.assertFalse(self.copy_exists("i0001"))
+        self.assertFalse(self.copy_exists("i0001-01-01"))
+
+    def test_yes_refuses_when_a_named_proposal_became_invalid(self):
+        """現在の提案が通常の検査を通らなければ、残りの指定も含めて何も承認しない。"""
+        self.pending_parent_and_child()
+        # 見せたあとで子の番号を計画に無いフェーズへ書き換える（形が不正になる）。
+        os.remove(os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-01.md"))
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 5, ("wip/research/*",)))
+        self.commit_parent("invalid after preview")
+        result = self.yes(["i0001", "i0001-01-01"])
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("ccnavi: [CORE_APPROVE_NOTHING] ", result.stderr)
+        self.assertIn("i0001-01-01", result.stderr)
+        self.assertFalse(self.copy_exists("i0001"))
+        self.assertFalse(self.copy_exists("i0001-01-01"))
+
+    def test_yes_refuses_when_a_named_proposal_is_rejected_by_the_checks(self):
+        """指した提案が承認の対象から外れる（計画に無い番号）と、残りだけを承認しない。"""
+        self.pending_parent_and_child()
+        self.propose("i0001-05-05", child_text("i0001-05-05", "i0001", 5, ("wip/research/*",)))
+        self.commit_parent("rejected child")
+        result = self.yes(["i0001", "i0001-01-01", "i0001-05-05"])
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("ccnavi: [CORE_APPROVE_NOTHING] ", result.stderr)
+        self.assertIn("計画にありません", result.stderr)
+        self.assertIn("i0001-05-05", result.stderr)
+        for name in ("i0001", "i0001-01-01", "i0001-05-05"):
+            self.assertFalse(self.copy_exists(name), name)
+
+    def test_yes_keeps_the_revision_filter_check(self):
+        """親の改版を外して子だけを指すと、旧計画で検証されるので何も承認しない。"""
+        path, _ = self.pending_revision()
+        self.propose("i0001-03-01", child_text("i0001-03-01", "i0001", 3, ("wip/design/*",)))
+        self.commit_parent("child of the revised phase")
+        result = self.yes(["i0001-03-01"])
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("親 i0001 の改版が承認待ちなのに承認の対象にありません", result.stderr)
+        self.assertFalse(self.copy_exists("i0001-03-01"))
+
+    def test_yes_with_trailing_words_or_a_digest_is_a_usage_error(self):
+        """承認の対象は `--yes` だけで指す。後ろの語と `--digest` は受けない。"""
+        self.pending_parent_and_child()
+        for args in (
+            ("--agree", "--yes", "i0001", "--json", "i0001"),
+            ("--agree", "--yes", "i0001", "--digest", "0" * 64, "--json"),
+        ):
+            with self.subTest(" ".join(args)):
+                result = self.ccnavi(*args)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertFalse(self.copy_exists("i0001"))
 
     def test_yes_and_preview_together_is_a_usage_error(self):
         self.pending_parent_and_child()
@@ -212,91 +295,12 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_yes_without_json_prints_the_human_lines(self):
         self.pending_parent_and_child()
-        digest = self.preview()["digest"]
-        result = self.ccnavi("--agree", "--yes", "i0001,i0001-01-01", "--digest", digest)
+        result = self.ccnavi("--agree", "--yes", "i0001,i0001-01-01")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認した", result.stdout)
         self.assertTrue(self.copy_exists("i0001"))
 
-    # ---- 4b. 見せた本文のダイジェストを照合する（チケット approve-carry-04 の 1〜5）
-
-    def test_preview_carries_a_stable_digest_of_the_text(self):
-        """1. preview の答えに `digest`（SHA-256 の 16 進 64 文字）が載る。
-
-        覆う中身は本文に加えて、承認済みチケットとして書き出す中身（チケット approve-carry-05）。
-        値の作り方は実装が決めるので、形と、同じ状態で同じ値になることだけを見る。
-        """
-        self.pending_parent_and_child()
-        first = self.preview()
-        self.assertRegex(first["digest"], r"^[0-9a-f]{64}$")
-        # 同じ状態でもう一度見せても同じ値になる。
-        self.assertEqual(self.preview()["digest"], first["digest"])
-
-    def test_yes_with_the_shown_digest_approves(self):
-        """2. 見せた `digest` を `--yes` に渡すと承認できる。"""
-        self.pending_parent_and_child()
-        shown = self.preview()["digest"]
-        result = self.yes(["i0001", "i0001-01-01"], digest=shown)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(json.loads(result.stdout)["approved"], ["i0001", "i0001-01-01"])
-        self.assertTrue(self.copy_exists("i0001-01-01"))
-
-    def test_yes_refuses_when_the_shown_text_changed(self):
-        """3. 見せたあとで子の中身を書き換えると、識別子が同じでも承認しない。"""
-        inside = "wip/research/*"
-        beyond = "src/a/*"
-        for label, old, new in (
-            ("題", "title: 子 i0001-01-01", "title: 書き換えた題"),
-            ("理由", "rationale: r", "rationale: 書き換えた理由"),
-            ("範囲（上限の内側）", f'glob: "{inside}"', 'glob: "wip/research/sub/*"'),
-            ("範囲（上限の外）", f'glob: "{beyond}"', 'glob: "src/b/*"'),
-        ):
-            with self.subTest(label):
-                self.setUp()
-                self.pending_parent_and_child()
-                path = self.propose(
-                    "i0001-01-01", child_text("i0001-01-01", "i0001", 1, (inside, beyond), False)
-                )
-                self.commit_parent()
-                shown = self.preview()
-                self.assertIn(beyond, shown["text"])
-
-                with open(path, encoding="utf-8") as f:
-                    text = f.read()
-                self.assertIn(old, text)
-                write(path, text.replace(old, new, 1))
-                self.commit_parent("edit after preview")
-
-                result = self.yes(["i0001", "i0001-01-01"], digest=shown["digest"])
-                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-                body = json.loads(result.stdout)
-                self.assertEqual(body["version"], APPROVE_VERSION)
-                mismatch = body["mismatch"]
-                self.assertEqual(mismatch["expected"], ["i0001", "i0001-01-01"])
-                self.assertEqual(mismatch["current"], ["i0001", "i0001-01-01"])
-                self.assertEqual(mismatch["digest"]["expected"], shown["digest"])
-                self.assertNotEqual(mismatch["digest"]["current"], shown["digest"])
-                self.assertEqual(mismatch["digest"]["current"], self.preview()["digest"])
-                self.assertIn("ccnavi: [CORE_APPROVE_DIGEST_CHANGED] ", result.stderr)
-                self.assertFalse(self.copy_exists("i0001"))
-                self.assertFalse(self.copy_exists("i0001-01-01"))
-
-    def test_yes_without_a_digest_is_refused(self):
-        """4. `--yes` に `--digest` が無ければ承認しない。誤りとして言う。"""
-        self.pending_parent_and_child()
-        for args in (
-            ("--agree", "--yes", "i0001,i0001-01-01", "--json"),
-            ("--agree", "--yes", "i0001,i0001-01-01"),
-        ):
-            with self.subTest(" ".join(args)):
-                result = self.ccnavi(*args)
-                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-                self.assertIn("--digest", result.stderr)
-                self.assertIn("ccnavi: [CORE_APPROVE_NO_DIGEST] ", result.stderr)
-                self.assertFalse(self.copy_exists("i0001"))
-                self.assertFalse(self.copy_exists("i0001-01-01"))
-
-    # ---- 4c. ダイジェストは承認済みチケットに書き込む欄も覆う（チケット approve-carry-05 の 1〜5）
+    # ---- 4c. 表示後に変わった中身も、承認するときの中身が置かれる
 
     def pending_parent_with_issue_and_child(self, issue=4242):
         """`issue:` を持つ親 1 本と、フェーズ 1 の子 1 枚を提案したまま（未承認）にする。"""
@@ -306,65 +310,6 @@ class ApproveJsonTest(PhaseHarness):
         )
         self.commit_parent()
         return parent, child
-
-    def assert_refused_after_edit(self, path, old, new, shown, tickets=("i0001", "i0001-01-01")):
-        """見せたあとで path の old を new に書き換えてコミットすると、
-        見せたダイジェストでは承認しない。
-
-        tickets は見せた一括のチケットの識別子。承認済みチケットがまだ無いものは、
-        置かれないことも見る。
-        """
-        tickets = list(tickets)
-        missing = [name for name in tickets if not self.copy_exists(name)]
-        with open(path, encoding="utf-8") as f:
-            text = f.read()
-        self.assertIn(old, text)
-        write(path, text.replace(old, new, 1))
-        self.commit_parent("edit after preview")
-
-        result = self.yes(tickets, digest=shown["digest"])
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        body = json.loads(result.stdout)
-        self.assertEqual(body["version"], APPROVE_VERSION)
-        mismatch = body["mismatch"]
-        self.assertEqual(mismatch["expected"], tickets)
-        self.assertEqual(mismatch["current"], tickets)
-        self.assertEqual(mismatch["digest"]["expected"], shown["digest"])
-        self.assertNotEqual(mismatch["digest"]["current"], shown["digest"])
-        for name in missing:
-            self.assertFalse(self.copy_exists(name), name)
-
-    def test_yes_refuses_when_only_the_issue_of_the_parent_changed(self):
-        """1. 見せたあとで親の `issue:` だけを書き換えると、見せたダイジェストでは承認しない。"""
-        parent, _ = self.pending_parent_with_issue_and_child(4242)
-        shown = self.preview()
-        self.assert_refused_after_edit(parent, "issue: 4242", "issue: 4343", shown)
-
-    def test_yes_refuses_when_only_the_markdown_body_of_a_child_changed(self):
-        """2. 見せたあとで子の Markdown の本文だけを書き換えても、ダイジェストで承認しない。"""
-        self.pending_parent_and_child()
-        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-01.md")
-        shown = self.preview()
-        self.assert_refused_after_edit(child, "---\n\n本文\n", "---\n\n書き換えた本文\n", shown)
-
-    # ---- 4d. ダイジェストは画面に出ない欄と改版で書く中身も覆う（チケット approve-carry-07）
-
-    def test_yes_refuses_when_only_an_unknown_field_of_a_child_changed(self):
-        """見せたあとで、承認画面に出ない frontmatter の欄だけを書き換えると承認しない。
-
-        ccnavi の知らない欄（`note:`）は画面に出ないが、そのまま承認済みチケットに書き込まれる。
-        """
-        self.pending_parent_and_child()
-        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-01.md")
-        with open(child, encoding="utf-8") as f:
-            text = f.read()
-        write(child, text.replace("rationale: r\n", "rationale: r\nnote: x\n", 1))
-        self.commit_parent("unknown field")
-
-        shown = self.preview()
-        self.assertEqual([b["ticket"] for b in shown["batch"]], ["i0001", "i0001-01-01"])
-        self.assertNotIn("note", shown["text"])
-        self.assert_refused_after_edit(child, "note: x", "note: y", shown)
 
     def pending_revision(self):
         """親 i0001 を承認したあと、計画を足した改版を提案したまま（未承認）にする。
@@ -380,55 +325,35 @@ class ApproveJsonTest(PhaseHarness):
         self.assertTrue(shown["batch"][0]["revision"], shown["batch"][0])
         return path, shown
 
-    def test_yes_refuses_when_the_revision_proposal_changed(self):
-        """親の改版を見せたあとで、改版の提案の計画を書き換えると、見せたダイジェストでは承認しない。
-
-        書き換えたあとも改版として成り立つ順序（足す項を `design` に）にして、
-        一括のチケットに残したまま書く計画だけを変える。
-        """
-        path, shown = self.pending_revision()
+    def test_yes_places_the_issue_changed_after_preview(self):
+        """見せたあとで親の `issue:` だけが変わっても、承認するときの中身が置かれる。"""
+        parent, _ = self.pending_parent_with_issue_and_child(4242)
+        self.preview()
+        with open(parent, encoding="utf-8") as f:
+            text = f.read()
+        write(parent, text.replace("issue: 4242", "issue: 4343", 1))
+        self.commit_parent("edit after preview")
+        result = self.yes(["i0001", "i0001-01-01"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
-            before = f.read()
-        self.assert_refused_after_edit(
-            path,
-            "  - {type: acceptance, after: [2]}\n",
-            "  - {type: design, after: [2]}\n",
-            shown,
-            tickets=["i0001"],
-        )
+            self.assertIn("issue: 4343", f.read())
+
+    def test_yes_applies_the_revision_as_it_is_now(self):
+        """親の改版を見せたあとで改版の計画を書き換えても、現在の改版が検査を通れば承認する。"""
+        path, _ = self.pending_revision()
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        old = "  - {type: acceptance, after: [2]}\n"
+        self.assertIn(old, text)
+        write(path, text.replace(old, "  - {type: design, after: [2]}\n", 1))
+        self.commit_parent("edit revision after preview")
+        result = self.yes(["i0001"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), before)
-
-    def test_yes_refuses_when_the_copy_under_revision_changed(self):
-        """親の改版を見せたあとで、今の承認済みチケットの frontmatter だけが変わると承認しない。
-
-        改版で書くのは、今の承認済みチケットの frontmatter の計画だけを差し替えた中身
-        （`revise_copy`）。提案の frontmatter をそのままダイジェストに入れる実装では、
-        この書き換えを見逃す。
-        """
-        path, shown = self.pending_revision()
-        copy = os.path.join(self.approved, "doing", "i0001.md")
-        self.assert_refused_after_edit(copy, "---\n", "---\nnote: x\n", shown, tickets=["i0001"])
-
-    def test_yes_refuses_when_only_the_line_endings_of_a_proposal_changed(self):
-        """承認は提案のバイト列をそのまま動かす。見せたあとで改行だけを CRLF に変えても、
-        見せたダイジェストでは承認しない（書く中身が変わるので）。"""
-        self.pending_parent_and_child()
-        shown = self.preview()
-        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-01.md")
-        with open(child, "rb") as f:
-            data = f.read()
-        with open(child, "wb") as f:
-            f.write(data.replace(b"\n", b"\r\n"))
-        self.commit_parent("crlf after preview")
-        result = self.yes(["i0001", "i0001-01-01"], digest=shown["digest"])
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIsNotNone(json.loads(result.stdout)["mismatch"])
-        self.assertFalse(self.copy_exists("i0001-01-01"))
+            self.assertIn("- type: design\n  after:\n  - 2\n", f.read())
 
     def test_nul_in_the_markdown_body_still_approves(self):
-        """本文に生の NUL があっても、
-        見せたダイジェストで承認できる（ダイジェストは区切りの文字に頼らない）。"""
+        """本文に生の NUL があっても承認できる。"""
         self.pending_parent_and_child()
         child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-01.md")
         with open(child, encoding="utf-8") as f:
@@ -436,64 +361,8 @@ class ApproveJsonTest(PhaseHarness):
         write(child, text.replace("---\n\n本文\n", "---\n\n前\x00後\n", 1))
         self.commit_parent("nul in body")
 
-        shown = self.preview()
-        self.assertEqual([b["ticket"] for b in shown["batch"]], ["i0001", "i0001-01-01"])
-        result = self.yes(["i0001", "i0001-01-01"], digest=shown["digest"])
+        result = self.yes(["i0001", "i0001-01-01"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue(self.copy_exists("i0001-01-01"))
-
-    def test_moving_a_nul_in_the_body_after_preview_is_refused(self):
-        """見せたあとで本文の NUL の位置だけをずらすと、見せたダイジェストでは承認しない。
-
-        つなぎ目をずらす形の書き換え。区切りの文字でつないでいた頃の実装でもここは止まる
-        （各部分が frontmatter から始まるため）ので、この確かめは振る舞いを固定するためのもの。
-        """
-        self.pending_parent_and_child()
-        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-01.md")
-        with open(child, encoding="utf-8") as f:
-            text = f.read()
-        write(child, text.replace("---\n\n本文\n", "---\n\n前\x00後\n", 1))
-        self.commit_parent("nul in body")
-
-        shown = self.preview()
-        self.assert_refused_after_edit(child, "前\x00後\n", "前後\x00\n", shown)
-
-    def test_digest_changes_when_only_the_overflow_changes(self):
-        """3. 提案はそのままで、親に固定した定義の scope が変わって子の超過が増えると、
-        ダイジェストが変わる。
-
-        子の定義は親の写し（`phases:`）から引く。承認済みの親の写しをユーザが手で直すと、
-        子の提案は同じでも超過が増える。
-        """
-        self.pending_parent_and_child()
-        parent_only = self.ccnavi("--agree", "i0001", stdin="y\n")
-        self.assertEqual(parent_only.returncode, 0, parent_only.stdout + parent_only.stderr)
-        self.commit_parent("approve parent")
-        before = self.preview()
-        self.assertEqual([b["ticket"] for b in before["batch"]], ["i0001-01-01"])
-        self.assertEqual(before["batch"][0]["overflow"], [])
-
-        # 承認済みの親の写しの research の scope を、子の範囲を覆わない表記に書き換える。
-        copy = os.path.join(self.approved, "doing", "i0001.md")
-        with open(copy, encoding="utf-8") as f:
-            text = f.read()
-        narrowed = text.replace("- wip/research/*", "- wip/elsewhere/*", 1)
-        self.assertNotEqual(narrowed, text)
-        write(copy, narrowed)
-
-        after = self.preview()
-        self.assertEqual([b["ticket"] for b in after["batch"]], ["i0001-01-01"])
-        self.assertTrue(after["batch"][0]["overflow"], after["batch"][0])
-        self.assertNotEqual(after["digest"], before["digest"])
-
-    def test_yes_accepts_the_shown_digest_in_upper_case(self):
-        """4. 見せた `digest` を大文字にして `--yes` に渡しても承認できる。"""
-        self.pending_parent_and_child()
-        shown = self.preview()["digest"]
-        result = self.yes(["i0001", "i0001-01-01"], digest=shown.upper())
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(json.loads(result.stdout)["approved"], ["i0001", "i0001-01-01"])
-        self.assertTrue(self.copy_exists("i0001"))
         self.assertTrue(self.copy_exists("i0001-01-01"))
 
     def test_preview_text_shows_the_issue_of_the_parent(self):
@@ -539,13 +408,6 @@ class ApproveJsonTest(PhaseHarness):
         result = self.yes(["i0001", "i0001-01-01"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self._check_fixture("approve-yes.json", json.loads(result.stdout))
-
-        # 食い違いの形も拡張が読むので、同じく書き出す。
-        self.propose("i0001-02-03", child_text("i0001-02-03", "i0001", 2, ("wip/design/*",)))
-        self.commit_parent()
-        result = self.yes(["i0001-01-09"])
-        self.assertEqual(result.returncode, 1)
-        self._check_fixture("approve-mismatch.json", json.loads(result.stdout))
 
     def test_yes_that_stops_partway_says_what_it_placed(self):
         """途中で書けなくなっても、置いたぶんを何も言わずに捨てない
@@ -621,25 +483,6 @@ class ApproveJsonTest(PhaseHarness):
 
     # 走らせるたびに変わる欄。フィクスチャと比べるときは外す。
     VOLATILE = ("generated_at",)
-    # 本文のダイジェスト。本文は一時ディレクトリのパスを含むので、走らせるたびに値が変わる。
-    # 形（SHA-256 の 16 進）だけ確かめて、固定の文字列に置き換えてから比べる。
-    DIGEST = "<digest>"
-
-    def _mask_digests(self, portable):
-        def mask(value):
-            self.assertRegex(value, r"^[0-9a-f]{64}$")
-            return self.DIGEST
-
-        masked = dict(portable)
-        if "digest" in masked:
-            masked["digest"] = mask(masked["digest"])
-        mismatch = masked.get("mismatch")
-        if isinstance(mismatch, dict) and isinstance(mismatch.get("digest"), dict):
-            masked["mismatch"] = {
-                **mismatch,
-                "digest": {k: mask(v) for k, v in mismatch["digest"].items()},
-            }
-        return masked
 
     def _check_fixture(self, name, body):
         """拡張のフィクスチャと突き合わせる。鍵だけでなく値まで見る。
@@ -647,7 +490,7 @@ class ApproveJsonTest(PhaseHarness):
         鍵の集合だけを比べると、識別子や本文が入れ替わっても気づけない。
         機械に依らない形（`_portable`）に直したうえで、時刻の欄だけ外して比べる。
         """
-        portable = self._mask_digests(_portable(body, self.root))
+        portable = _portable(body, self.root)
         if os.environ.get("CCNAVI_BOARD_FIXTURE"):
             # 時刻は固定の文字列で書く。走らせるたびに変わる欄をそのまま置くと、
             # 形が同じでもフィクスチャに差分が出る。

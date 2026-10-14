@@ -25,32 +25,30 @@ from . import (
 # ボードの承認（`--agree --yes`）が通らなかった根拠の種別。付録 A の `CORE_APPROVE_*`。
 # 確認（`CORE_CONFIRM_*`）・取り下げ（`CORE_WITHDRAW_*`）と同じく、文面の頭に
 # `[<コード>]` で載せる。
-# `--digest` が無い。
-CODE_APPROVE_NO_DIGEST = "CORE_APPROVE_NO_DIGEST"
-# 見せた一覧（識別子）と今の一覧が違う。
-CODE_APPROVE_LIST_CHANGED = "CORE_APPROVE_LIST_CHANGED"
-# 識別子は同じで、見せた中身（ダイジェスト）が今のものと違う。
-CODE_APPROVE_DIGEST_CHANGED = "CORE_APPROVE_DIGEST_CHANGED"
-# 承認するものが無い。
+# 承認するものが無い。指定した識別子が承認待ちに無い、絞りが通らない場合も含む。
 CODE_APPROVE_NOTHING = "CORE_APPROVE_NOTHING"
 # 書く途中で止まった（置いたものは残る）。
 CODE_APPROVE_STOPPED = "CORE_APPROVE_STOPPED"
 
 
-def refusal_code(verdict: core_base.Verdict) -> str:
-    """見せたものを比べた判定（`judge_approval`）で承認が通らない根拠の種別。通るなら空。
+def not_approvable(verdict: core_base.Verdict, ids: list[str]) -> list[str]:
+    """指した識別子のうち、承認の対象に入らなかったもの（検査で外れた提案）。
+
+    承認の対象は指したものだけ。指したものが外れたまま残りだけ承認すると、指していない
+    組み合わせを承認することになるので、1 つでも外れたら何も承認しない。
+    """
+    approvable = {c.ticket.ticket for c in verdict.batch}
+    return [i for i in ids if i not in approvable]
+
+
+def refusal_code(verdict: core_base.Verdict, ids: list[str]) -> str:
+    """承認が通らない根拠の種別。通るなら空。
 
     手元の `--agree --yes`（`approve_yes`）と Chrome の `plan` が同じ答えを出すよう、
-    1 か所で決める。
-    見せたものと違えば、識別子の違い（`CORE_APPROVE_LIST_CHANGED`）を中身の違いより先に見る。
-    違わなくても、承認する対象が無いか、絞りが通らなければ `CORE_APPROVE_NOTHING`。
+    1 か所で決める。承認する対象が無いか、絞りが通らないか、指したものが検査で外れれば
+    `CORE_APPROVE_NOTHING`。
     """
-    mismatch = verdict.mismatch
-    if mismatch is not None:
-        if mismatch["expected"] != mismatch["current"]:
-            return CODE_APPROVE_LIST_CHANGED
-        return CODE_APPROVE_DIGEST_CHANGED
-    if not verdict.batch or verdict.gathered.refused:
+    if not verdict.batch or verdict.gathered.refused or not_approvable(verdict, ids):
         return CODE_APPROVE_NOTHING
     return ""
 
@@ -151,10 +149,7 @@ def preview(
             stdout.write(gathered.note + "\n\n")
         stdout.write(gathered.text + "\n")
         return 0
-    stdout.write(
-        json.dumps(agree.preview_body(conf, root, gathered, verdict.digest), ensure_ascii=False)
-        + "\n"
-    )
+    stdout.write(json.dumps(agree.preview_body(conf, root, gathered), ensure_ascii=False) + "\n")
     return 0
 
 
@@ -209,7 +204,7 @@ def verify(
     fresh = [c.ticket for c in gathered.batch if not c.is_revision and not c.ticket.is_child]
     branches = agree_candidates.existing_branch_warnings(root, conf, fresh, [], [], [])
     if as_json:
-        body = agree.preview_body(conf, root, gathered, judged.digest)
+        body = agree.preview_body(conf, root, gathered)
         body["verify"] = {"ok": verdict.ok, "reason": verdict.reason}
         body["branch_warnings"] = branches
         stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
@@ -227,76 +222,37 @@ def approve_yes(
     stderr: TextIO,
     conf: settings.Settings,
     root: str,
-    expected: list[str],
+    ids: list[str],
     as_json: bool,
-    only: list[str] | None = None,
-    digest: str = "",
 ) -> int:
-    """`--agree --yes <識別子,…> --digest <ダイジェスト> [<絞り>...]`。
+    """`--agree --yes <識別子,…>`。
 
-    拡張のオーバーレイで押した承認。
+    拡張のオーバーレイで押した承認。端末の確認は通らない。
 
-    端末の確認は通らない。代わりに、見せた一覧と今の一覧が同じであることを求める。
-    拡張が見せたあとに提案が増えていれば承認せず、食い違いを返す。見ていない
-    ものを承認する経路を使えなくするため。識別子に加えて、見せた承認画面の本文・判定が読んだ中身・
-    承認済みチケットに書き込む中身のダイジェスト（`digest`）も比べる。識別子が同じでも、見せたあとに提案の範囲や計画、
-    画面に出ない欄（`issue` など）が書き換われば承認しない。
-    ダイジェストが無ければ承認しない。
-
-    引数は 2 つに分かれる。`--yes` は「オーバーレイに出ていた識別子」で、後ろに並べる語は
-    「そのとき掛けていた絞り」（`--agree --preview` に渡したものと同じ）。分けないと検査が
-    必ず通る。絞りだけで対象を狭めて、その狭めた対象と見せた識別子を比べると、いつでも一致する。
-    絞りは preview と同じものを通し、比べるのは「その絞りで今できる一覧」と「見せた識別子」。
+    承認の対象は `ids` で指した提案だけ。承認する時点の提案を、端末の承認（`approve`）と同じ
+    検査にかけて承認する。見せたあとに提案が変わったかどうかは調べない（承認待ちの提案は、
+    ユーザが承認する間は書き換えない運用が前提）。指した識別子が承認待ちに無いとき、
+    現在の提案が検査を通らないときは、何も承認しない。`ids` に無い提案は、増えていても
+    承認しない。
     """
-    wanted = sorted({s.strip() for s in expected if s.strip()})
-    narrowed = [s.strip() for s in (only or []) if s.strip()]
-    shown = digest.strip()
-    if not shown:
+    narrowed = sorted({s.strip() for s in ids if s.strip()})
+    if not narrowed:
         stderr.write(
-            core_base.tagged(
-                CODE_APPROVE_NO_DIGEST,
-                "ccnavi: --yes には --digest（見せた承認画面の本文・判定が読んだ中身・"
-                "承認済みチケットに書き込む中身のダイジェスト）が必要です",
-            )
+            core_base.tagged(CODE_APPROVE_NOTHING, "ccnavi: 承認する識別子が指定されていません。")
             + "\n"
         )
         return 1
-    # 絞りが通らなかった（承認待ちに無い識別子が入っている、親の改版を外した）ときは、
-    # ボードが古い。拡張には食い違いとして返し、一覧を読み直させる（`judge_approval` が比べる）。
     snapshot = core_base.read_fs(conf, root)
-    verdict = core_base.judge_approval(snapshot, narrowed, shown_ids=wanted, shown_digest=digest)
+    verdict = core_base.judge_approval(snapshot, narrowed)
     stderr.write(verdict.messages)
     core_base.say_elsewhere(stderr, verdict.gathered)
     gathered = verdict.gathered
-    if verdict.mismatch is not None:
-        current = verdict.mismatch["current"]
-        if as_json:
-            body = {"version": agree.AGREE_VERSION, "mismatch": verdict.mismatch}
-            stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
-        if refusal_code(verdict) == CODE_APPROVE_LIST_CHANGED:
-            stderr.write(
-                core_base.tagged(
-                    CODE_APPROVE_LIST_CHANGED,
-                    "ccnavi: 見せた一覧と今の一覧が違う（見せた: "
-                    f"{', '.join(wanted) or '(無し)'} / 今: {', '.join(current) or '(無し)'}）。"
-                    "見直してから承認してください",
-                )
-                + "\n"
-            )
-        else:
-            stderr.write(
-                core_base.tagged(
-                    CODE_APPROVE_DIGEST_CHANGED,
-                    "ccnavi: 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに書き込む"
-                    "中身が、今のものと違う（識別子は同じで、提案か、判定が読んだ承認済みチケット・"
-                    "マーカーなどの中身が変わった）。見直してから承認してください",
-                )
-                + "\n"
-            )
-        return 1
-    if not gathered.batch:
+    if refusal_code(verdict, narrowed):
+        left = not_approvable(verdict, narrowed) if gathered.batch and not gathered.refused else []
+        why = f"（検査を通らない: {', '.join(left)}。何も承認しない）" if left else ""
         stderr.write(
-            core_base.tagged(CODE_APPROVE_NOTHING, "ccnavi: 承認するものがありません。") + "\n"
+            core_base.tagged(CODE_APPROVE_NOTHING, f"ccnavi: 承認するものがありません。{why}")
+            + "\n"
         )
         return 1
 

@@ -14,7 +14,6 @@ from __future__ import annotations
 import contextlib
 import datetime
 import errno
-import hashlib
 import json
 import os
 import re
@@ -138,12 +137,9 @@ def read_text(path: str, errors: str = "strict") -> str | None:
         return None if content is None else _decode(content, errors)
     try:
         with open(path, encoding="utf-8", errors=errors) as f:
-            text = f.read()
+            return f.read()
     except OSError:
-        note_read(path, None)
         return None
-    note_read(path, text)
-    return text
 
 
 def read_bytes(path: str) -> bytes | None:
@@ -157,12 +153,9 @@ def read_bytes(path: str) -> bytes | None:
         return content
     try:
         with open(path, "rb") as f:
-            data = f.read()
+            return f.read()
     except OSError:
-        note_read(path, None)
         return None
-    note_read(path, data)
-    return data
 
 
 # 同じ名前への書き込みが一時的に失敗する errno。同じイベントの hook は並列に走り、
@@ -487,9 +480,7 @@ def read_json(path: str) -> tuple[Any, Exception | None]:
 
     def read() -> Any:
         with open(path, encoding="utf-8") as f:
-            text = f.read()
-        note_read(path, text)
-        return json.loads(text)
+            return json.loads(f.read())
 
     for attempt in range(_READ_RETRIES + 1):
         try:
@@ -497,7 +488,6 @@ def read_json(path: str) -> tuple[Any, Exception | None]:
         except OSError as exc:
             # 無い（ENOENT）は普通の状態なので打ち直さない。待っても現れない。
             if exc.errno not in _TRANSIENT_ERRNO or attempt == _READ_RETRIES:
-                note_read(path, None)
                 return None, exc
             time.sleep(_READ_RETRY_WAIT_SECONDS)
         except ValueError as exc:
@@ -722,88 +712,8 @@ def load_text(path: str) -> str:
         if content is None:
             raise _missing(path)
         return _decode(content)
-    try:
-        with open(path, encoding="utf-8") as f:
-            text = f.read()
-    except OSError:
-        note_read(path, None)
-        raise
-    note_read(path, text)
-    return text
-
-
-# ---- 判定が読んだ中身（`read_set`。承認のダイジェストに入れる）
-#
-# 読みの関数（`read_text`・`read_bytes`・`read_json`・`load_text`）は、`reading` の中だけ、
-# 読んだファイルの中身のハッシュを記録する。無かった・読めなかったファイルも「無い」として記録する
-# （後から現れれば判定が変わりうる）。溜める段（`staging`）から読んだ分は数えない（判定の
-# 入力ではなく、plan の途中の内容）。承認のダイジェスト（`agree_digest.approval_digest`）が
-# これを使う。
-#
-# 中身は改行を LF に揃えた本文の SHA-256（UTF-8 として読めなければバイト列のまま）。機械の
-# 改行でハッシュが変わらないように（Chrome のコミットと手元の plan を LF に揃えたのと同じ理由）。
-
-# 無い・読めないファイルを表す値。
-READ_ABSENT = "-"
-_READERS: list[dict[str, str]] = []
-
-
-@contextlib.contextmanager
-def reading() -> Iterator[dict[str, str]]:
-    """この間に読んだファイル（絶対パス → 中身のハッシュか `READ_ABSENT`）を集める。
-
-    同じファイルを 2 度読んだら最初の中身を採る。入れ子にすると外側にも同じものが入る。
-    """
-    seen: dict[str, str] = {}
-    _READERS.append(seen)
-    try:
-        yield seen
-    finally:
-        # 同一性で外す（`list.remove` は等価で比べるので、中身の同じ別の記録を外しうる。
-        # 入れ子の内と外がどちらも空のときなど）。
-        for i in range(len(_READERS) - 1, -1, -1):
-            if _READERS[i] is seen:
-                del _READERS[i]
-                break
-
-
-def note_read(path: str, content: str | bytes | None) -> None:
-    """読んだ中身を記録する（`reading` の外では何もしない）。fsio を通らない読みもこれを呼ぶ。"""
-    if not _READERS:
-        return
-    key = os.path.normpath(parent_resolved(os.path.abspath(path)))
-    digest = READ_ABSENT if content is None else content_digest(content)
-    for seen in _READERS:
-        seen.setdefault(key, digest)
-
-
-def note_exact(path: str, content: bytes | None) -> None:
-    """読んだバイト列を、改行を揃えずに記録する（同じパスの前の記録を置き換える）。
-
-    承認はバイト列をそのまま動かすので、動かす提案は改行や BOM だけの違いも判定の読みとして
-    覆う（`agree_digest.carried`）。ほかの読みは `note_read` のまま（機械の改行でダイジェストが
-    変わらないように）。
-    """
-    if not _READERS:
-        return
-    key = os.path.normpath(parent_resolved(os.path.abspath(path)))
-    digest = READ_ABSENT if content is None else "bytes:" + hashlib.sha256(content).hexdigest()
-    for seen in _READERS:
-        seen[key] = digest
-
-
-def content_digest(content: str | bytes) -> str:
-    """中身のハッシュ。
-
-    改行を LF に揃えた本文の SHA-256（UTF-8 として読めなければバイト列のまま）。
-    """
-    if isinstance(content, bytes):
-        try:
-            content = content.decode("utf-8")
-        except UnicodeDecodeError:
-            return hashlib.sha256(content).hexdigest()
-    text = content.replace("\r\n", "\n").replace("\r", "\n")
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    with open(path, encoding="utf-8") as f:
+        return f.read()
 
 
 # ---- この実行で書いたパスの記録（C1 がこの一覧のパスだけをコミットする）

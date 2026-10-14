@@ -16,7 +16,7 @@ Chrome 拡張「ccnavi 承認ボード」が何をするかを書く。承認者
 |---|---|
 | 読み取りボード。統合先と置き場の読み取り、承認待ちの並べ方、直近 N 日、自動の読み直し | [requirements/board.md](requirements/board.md) |
 | 互換の版。統合先の CCNAVI_COMPAT と同梱の互換の版が違うときのふるまい | [requirements/compat.md](requirements/compat.md) |
-| 承認。承認を押したときの読み直し・照合・親のブランチへの 1 コミット | [requirements/approve.md](requirements/approve.md) |
+| 承認。承認を押したときの読み直し・検査・親のブランチへの 1 コミット | [requirements/approve.md](requirements/approve.md) |
 | 取り下げ。着手前の新規の承認を取り下げるときのふるまい | [requirements/withdraw.md](requirements/withdraw.md) |
 | レビュー済み。依頼済みのフェーズをレビュー済みにするときのふるまい | [requirements/reviewed.md](requirements/reviewed.md) |
 | PAT の期限。PAT の期限の読み方と知らせ方 | [requirements/pat.md](requirements/pat.md) |

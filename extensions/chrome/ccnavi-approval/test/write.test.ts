@@ -61,8 +61,8 @@ async function board(d: WriteDeps, repo: Partial<RepoConfig> = {}): Promise<Repo
 
 function shownOf(b: RepoBoard, family: string) {
   const r = b.families.find((f) => f.family.name === family)?.result;
-  assert.ok(r?.digest, JSON.stringify(r));
-  return { ids: (r.batch ?? []).map((e) => e.ticket), digest: r.digest, only: r.only ?? null };
+  assert.ok(r?.batch, JSON.stringify(r));
+  return (r.batch ?? []).map((e) => e.ticket);
 }
 
 const TODO = "wip/proposals/todo/i0001.md";
@@ -115,32 +115,56 @@ test("CX-T101 先頭が動いたら（expectedHeadOid の競合）新しい Snap
   assert.equal(mock.files("i0001")["src/app.py"], "print('moved')\n");
 });
 
-test("CX-T102 先頭が動いて承認待ちの中身も変わったら、書かずに preview からやり直させる", async () => {
+test("CX-T102 先頭が動いて承認待ちの中身も変わっても、現在の内容が有効なら新しい先頭で判定し直して書く", async () => {
   const { mock, d } = world();
   const shown = shownOf(await board(d), "i0001");
   mock.beforeCommit = (b) => mock.push(b, { [TODO]: mock.files(b)[TODO].replace("- **調べる**", "- **全部消す**") });
   const out = await approveFamily(REPO, "i0001", shown, d);
-  assert.equal(out.kind, "changed", JSON.stringify(out));
-  assert.equal(out.kind === "changed" && out.code, "CORE_APPROVE_DIGEST_CHANGED");
-  assert.deepEqual(mock.commitCalls.map((c) => c.result), ["stale"]);
-  assert.ok(!(DOING in mock.files("i0001")));
+  assert.equal(out.kind, "written", JSON.stringify(out));
+  assert.deepEqual(mock.commitCalls.map((c) => c.result), ["stale", "written"]);
+  // 書いたのは現在の内容（表示後に変わった内容）
+  assert.match(mock.files("i0001")[DOING], /全部消す/);
 });
 
-test("CX-T103 見せたダイジェストが今の中身と違えば、1 つも書かない", async () => {
+test("CX-T103 表示後に提案が変わっても有効なら承認する。承認待ちから消えた識別子・別の識別子の代わりは承認しない", async () => {
+  // ① 表示後に提案が変わっても、有効なら承認される
+  const a = world();
+  const shownA = shownOf(await board(a.d), "i0001");
+  a.mock.push("i0001", { [TODO]: a.mock.files("i0001")[TODO] + "\n追記\n" });
+  const ok = await approveFamily(REPO, "i0001", shownA, a.d);
+  assert.equal(ok.kind, "written", JSON.stringify(ok));
+  assert.equal(a.mock.commitCalls.length, 1);
+
+  // ② 承認待ちに無い識別子を指せば拒否し、何も書かない（別のものを代わりに承認しない）
+  const b = world();
+  const shownB = shownOf(await board(b.d), "i0001");
+  const gone = await approveFamily(REPO, "i0001", [...shownB, "i0009"], b.d);
+  assert.equal(gone.kind, "refused", JSON.stringify(gone));
+  assert.equal(gone.kind === "refused" && gone.code, "CORE_APPROVE_NOTHING");
+  assert.match(gone.message, /^\[CORE_APPROVE_NOTHING\] /);
+  assert.equal(b.mock.commitCalls.length, 0);
+  const none = await approveFamily(REPO, "i0001", [], b.d);
+  assert.equal(none.kind, "refused");
+  assert.equal(b.mock.commitCalls.length, 0);
+});
+
+test("CX-T103b 別の提案が増えても、指定した識別子だけを承認する", async () => {
   const { mock, d } = world();
   const shown = shownOf(await board(d), "i0001");
-  const out = await approveFamily(REPO, "i0001", { ...shown, digest: "0".repeat(64) }, d);
-  assert.equal(out.kind, "changed");
-  // 分岐の材料は鍵の code。文面の頭にも同じコードが載る
-  assert.equal(out.kind === "changed" && out.code, "CORE_APPROVE_DIGEST_CHANGED");
-  assert.match(out.message, /^\[CORE_APPROVE_DIGEST_CHANGED\] /);
-  // 見せた識別子が今の一覧と違えば、中身より先にそちらの種別
-  const listed = await approveFamily(REPO, "i0001", { ...shown, ids: [...shown.ids, "i0009"] }, d);
-  assert.equal(listed.kind === "changed" && listed.code, "CORE_APPROVE_LIST_CHANGED");
-  mock.push("i0001", { [TODO]: mock.files("i0001")[TODO] + "\n追記\n" });
-  const again = await approveFamily(REPO, "i0001", shown, d);
-  assert.equal(again.kind, "changed");
-  assert.equal(mock.commitCalls.length, 0);
+  const before = Object.keys(mock.files("i0001")).filter((p) => p.startsWith("wip/proposals/todo/"));
+  assert.ok(before.length >= 1);
+  // 指定を親だけにして、子の提案は残す
+  const parentOnly = shown.filter((id) => id === "i0001");
+  const out = await approveFamily(REPO, "i0001", parentOnly, d);
+  if (out.kind === "written") {
+    const files = mock.files("i0001");
+    assert.ok(!(TODO in files));
+    assert.ok(Object.keys(files).some((p) => p.startsWith("wip/proposals/todo/")), "指定していない提案は残る");
+  } else {
+    // 親だけでは検査に通らない構成なら、全体を拒否して何も書かない
+    assert.equal(out.kind, "refused", JSON.stringify(out));
+    assert.equal(mock.commitCalls.length, 0);
+  }
 });
 
 test("CX-T104 決まらない親子のチケットでは書かない（読めない入力・ホストに無い P_X の古いチケット）", async () => {

@@ -90,13 +90,12 @@ function FamilyBody({ f, actions }: { f: FamilyBoard; actions?: FamilyActions })
           <Markdown text={entry.body} />
         </section>
       ))}
-      {batch.length > 0 && r.digest ? (
+      {batch.length > 0 ? (
         !write.allowed ? (
           <Notice kind="warn" text={write.reason || "この親子チケットには変更を反映できません。"} />
         ) : actions ? (
           <div className="actions">
             <ActionButton action="approve" onClick={() => actions.approve()}>{`承認する（${batch.map((e) => e.ticket).join(", ")}）`}</ActionButton>
-            <span className="digest">{`ダイジェスト ${r.digest.slice(0, 12)}`}</span>
           </div>
         ) : null
       ) : null}

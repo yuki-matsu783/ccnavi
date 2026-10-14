@@ -50,12 +50,8 @@ class ApprovalToldTest(PhaseHarness):
         )
 
     def approve_yes(self, tickets):
-        # ボードと同じく、見せたダイジェスト（承認画面の本文・判定が読んだ中身・書き込む中身）
-        # を渡す。
-        # 渡さない `--yes` は承認しない。
-        shown = self.ccnavi("--agree", "--preview", "--json")
-        digest = json.loads(shown.stdout)["digest"]
-        result = self.ccnavi("--agree", "--yes", ",".join(tickets), "--digest", digest, "--json")
+        # ボードと同じく、承認する識別子だけを渡す。
+        result = self.ccnavi("--agree", "--yes", ",".join(tickets), "--json")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(result.stdout)["prompt"]
 
