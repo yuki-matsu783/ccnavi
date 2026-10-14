@@ -44,6 +44,9 @@ MAX_ID_LENGTH = 64
 # issue から作る識別子と、新規の提案に勧める長さ（lint の warn）。上限との差は子のフェーズ番号・
 # 連番と余裕。
 SUGGESTED_ID_LENGTH = 48
+# 既にあるブランチを親に採用するときの識別子の上限。子の識別子は「親 + 6 文字」で、
+# 64 文字に収める。
+MAX_ADOPT_ID_LENGTH = MAX_ID_LENGTH - 6
 
 # 新しい親の識別子の形。`<先頭の語>-<番号>-<slug>`。先頭の語は使えるリスト
 # （`settings.branch_prefixes`。既定は feature・hotfix・fix など）にあるものだけを形に合うと読む。
@@ -224,13 +227,18 @@ def branch_to_id(branch: str) -> str:
 def adoption_id_problem(branch: str) -> str:
     """既にあるブランチ（MR の元ブランチ）を親に採用するとき、識別子が使えない理由。使えれば空。
 
-    識別子の字と長さ（64 文字以内）に加えて、末尾が `-<2 桁>` でないことを求める
-    （子の識別子の途中と紛れる）。
+    識別子の字と長さ（58 文字以内。子は親 + 6 文字で 64 文字に収める）に加えて、末尾が
+    `-<2 桁>` でないことを求める（子の識別子の途中と紛れる）。
     """
     ident = branch_to_id(branch)
     problem = id_problem(ident)
     if problem:
         return problem
+    if len(ident) > MAX_ADOPT_ID_LENGTH:
+        return (
+            f"識別子が長すぎる（{len(ident)} 文字。子の識別子を収めるため"
+            f"採用できるのは {MAX_ADOPT_ID_LENGTH} 文字まで）"
+        )
     if _CHILD_TAIL.search(ident):
         return "識別子の末尾が `-<2 桁>` になる（子の識別子の途中と紛れる）"
     return ""

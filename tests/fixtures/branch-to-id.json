@@ -17,8 +17,12 @@
     {"branch": "feature/123-login-05-01", "ok": false, "why": "末尾が -2桁"},
     {"branch": "feature/123-login-5", "ok": true},
     {"branch": "feature/1234-login-v2", "ok": true},
-    {"branch": "feature/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "ok": false, "why": "64文字を超える"},
-    {"branch": "fe/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "ok": true},
-    {"branch": "feature/a b", "ok": false, "why": "使えない字"}
+    {"branch": "feature/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "ok": false, "why": "58文字を超える"},
+    {"branch": "fe/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "ok": false, "why": "58文字を超える"},
+    {"branch": "feature/a b", "ok": false, "why": "使えない字"},
+    {"branch": "feature/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "ok": true, "why": "ちょうど58文字"},
+    {"branch": "feature/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "ok": false, "why": "59文字（子の識別子が64文字に収まらない）"},
+    {"branch": "feature/ああああああああああああああああああああああああああああああああああああああああああああああああああ", "ok": true, "why": "日本語も1字として数える（58字）"},
+    {"branch": "feature/あああああああああああああああああああああああああああああああああああああああああああああああああああ", "ok": false, "why": "日本語59字"}
   ]
 }

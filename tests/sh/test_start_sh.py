@@ -590,6 +590,7 @@ class StartShTest(unittest.TestCase):
         long_branch = "feature/" + "a" * 60
         for branch, word in (
             (long_branch, "長すぎる"),
+            ("feature/" + "a" * 51, "長すぎる"),  # 59 文字。子の識別子が 64 文字に収まらない
             ("feature/123-login-05", "末尾"),
         ):
             with self.subTest(branch=branch):
@@ -597,6 +598,11 @@ class StartShTest(unittest.TestCase):
                 self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
                 self.assertIn("使えない", done.stderr)
                 self.assertIn(word, done.stderr)
+
+    def test_adopt_accepts_identifier_of_58_characters(self):
+        branch = "feature/" + "a" * 50
+        done = self.adopt(branch)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
     def test_adopt_stops_when_another_branch_has_the_same_identifier(self):
         # origin の全ブランチで見る（MR の無い別ブランチ、手元に無いブランチも）
