@@ -966,6 +966,22 @@ class C1MergeTest(C1Harness):
         )
         self.assertNotIn("合流", prepared.stderr, prepared.stderr)
 
+    def test_a_commit_in_a_review_childs_worktree_stops_the_request(self):
+        """review/ の子のワークツリーで後から積んだコミットは合流されないので、依頼を止める。"""
+        self.start_parent()
+        tree = self.start_child()
+        self.work(tree, "wip/design/a.md", "a\n")
+        self.assertEqual(self.ticket("finish", CHILD).returncode, 0)
+        self.assertTrue(os.path.isdir(tree), "review/ の子のワークツリーが残っていない")
+        body = write(os.path.join(self._base, "body.md"), "見てほしい\n")
+        args = ("--cwd", self.tree, "--phase", "1", "--body-file", body, "review", "prepare")
+        self.assertNotIn("合流されていない修正", self.exe(*args).stderr)
+        late = self.work(tree, "wip/design/a.md", "fixed\n", "fix after finish")
+        prepared = self.exe(*args)
+        self.assertNotEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
+        self.assertIn(f"子 {CHILD} の手元のブランチに、合流されていない修正がある", prepared.stderr)
+        self.assertIn(late[:12], prepared.stderr)
+
     # ---- 3. 止まる
 
     def test_a_ticket_place_in_the_childs_commits_stops_without_merging(self):
@@ -1343,7 +1359,7 @@ class TidyAfterFinishTest(C1Harness):
         with open(log, encoding="utf-8") as f:
             called = f.read()
         # 識別子は名前の形で剥がさずにそのまま渡す（親へ割り出すのは実行ファイル）。
-        # この子はレビュー待ち（review/）へ動いたので、指摘を直す場所としてワークツリーは残る
+        # この子はレビュー待ち（review/）へ動いたので、見返す場所としてワークツリーは残る
         # （消すのは confirm が done/ へ動かした後）
         self.assertIn(f"worktree tidy {CHILD}", called)
         self.assertIn("--cwd", called)

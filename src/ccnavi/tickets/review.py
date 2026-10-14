@@ -92,7 +92,7 @@ def prepare(
         stderr.write("ccnavi: state の置き場が空。投稿する本文を置く場所がありません。\n")
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
-    unmet = _unmet(tree_root, conf, ph)
+    unmet = _unmet(root, tree_root, conf, ph)
     body = _read_body(_resolve(cwd, body_file))
     if body is None:
         unmet.append(f"依頼文を読めない ({body_file})")
@@ -164,7 +164,7 @@ def requested(
         return 1
     # 投稿とマーカーの間に HEAD が動いていないか。
     # 動いていれば、ユーザが見るものとマーカーが食い違う。
-    unmet = _unmet(tree_root, conf, ph)
+    unmet = _unmet(root, tree_root, conf, ph)
     if unmet:
         stderr.write("ccnavi: 投稿の後に前提が成り立たなくなった。マーカーは置かない\n")
         for line in unmet:
@@ -816,7 +816,7 @@ def _parent_mark(stderr: TextIO, approved_dir: str, parent: str, name: str, data
     return True
 
 
-def _unmet(tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str]:
+def _unmet(root: str, tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str]:
     """依頼の前提のうち、ワークツリーの中で分かるもの。"""
     unmet: list[str] = []
     if not ph.ended:
@@ -839,6 +839,15 @@ def _unmet(tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str
             unmet.append(
                 f"子 {child.ticket} の合流した先頭（{child.merged_sha[:12]}）が親の HEAD に無い"
             )
+            continue
+        late = _unmerged_fix(root, tree_root, child)
+        if late:
+            unmet.append(
+                f"子 {child.ticket} の手元のブランチに、合流されていない修正がある"
+                f"（先頭 {late[:12]}。合流した先頭は {child.merged_sha[:12]}）。"
+                "finish の後に積んだコミットは親のブランチに入らない。直すときは、同じフェーズに"
+                "子を足してユーザの承認を受け、その子で直す"
+            )
     # 未追跡は数えない。依頼文そのものをワークツリーに置く使い方が普通にあり、未追跡で
     # 前提を満たさないと判定すると依頼文を書く場所が無くなる。未追跡はマージリクエストに載らない。
     if _dirty(tree_root, conf):
@@ -849,6 +858,24 @@ def _unmet(tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str
     elif _unpushed(tree_root, conf, branch):
         unmet.append("親ブランチの HEAD が push されていない")
     return unmet
+
+
+def _unmerged_fix(root: str, tree_root: str, child: ticket_model.Ticket) -> str:
+    """finish の後に子のブランチへ積まれ、親に入っていないコミットの先頭。無ければ空。
+
+    合流は finish の 1 回だけで、`review/` の子のワークツリーで後から積んだコミットは親へ
+    入らない。手元の子のブランチの先頭が `merged_sha` と違い、親の HEAD にも含まれていなければ、
+    合流されていない修正がある。子のワークツリーが無い PC（別の PC で finish した子など）では
+    判定しない。
+    """
+    if not os.path.isdir(tree.worktree_path(root, child.ticket)):
+        return ""
+    rc, out = _git(tree_root, ["rev-parse", "--verify", "--quiet", f"refs/heads/{child.ticket}"])
+    head = out.strip() if rc == 0 else ""
+    if not head or head == child.merged_sha:
+        return ""
+    rc, _ = _git(tree_root, ["merge-base", "--is-ancestor", head, "HEAD"])
+    return "" if rc == 0 else head
 
 
 def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:

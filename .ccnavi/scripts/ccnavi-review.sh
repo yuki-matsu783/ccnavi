@@ -773,8 +773,8 @@ confirm)
 	c1_start "$family"
 	fetch_all >"$result"
 	c1_ccnavi "$branch のレビュー済みを置いた" -- review confirm "$@" --result "$result"
-	# done/ へ動いた子のワークツリーを消す（C1 なら送り終えた後。push の失敗で戻ったときに、指摘を直す場所を
-	# 残すため）。消せなかったもの（cwd が中・未コミット）は名指しされるだけで、confirm は成功のまま。
+	# done/ へ動いた子のワークツリーを消す（C1 なら送り終えた後。push の失敗で戻ったときに、レビュー待ちの子の
+	# ワークツリーを残すため）。消せなかったもの（cwd が中・未コミット）は名指しされるだけで、confirm は成功のまま。
 	case "$confirm_phase" in
 	'' | *[!0-9]*) ;;
 	*) ccnavi worktree tidy "$family" --phase "$confirm_phase" || : ;;

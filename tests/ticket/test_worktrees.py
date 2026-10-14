@@ -71,7 +71,7 @@ class ReviewTurnTest(PhaseHarness):
         self.assertNotIn("ユーザのレビューを待つ", closed.stdout)
         # 誰が done/ へ動かすかは 1 度だけ言う（重ねない）
         self.assertEqual(closed.stdout.count("done/ へ動"), 1, closed.stdout)
-        # レビュー待ち（review/）の子のワークツリーは、指摘を直す場所として片付けで残る
+        # レビュー待ち（review/）の子のワークツリーは、見返す場所として片付けで残る
         tidy = self.ccnavi("--cwd", self.root, "worktree", "tidy", "i0001")
         self.assertEqual((tidy.returncode, tidy.stdout), (0, ""))
         self.assertTrue(os.path.isdir(tree))

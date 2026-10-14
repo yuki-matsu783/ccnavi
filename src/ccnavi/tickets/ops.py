@@ -9,7 +9,8 @@
 `.ccnavi/approved/done/`（不要）へ、`cancel` は `doing/` から `done/` へ動かす。
 ワークツリーはここでは消さない。子のワークツリーは、`confirm` が子を `done/` へ動かしたあとと、
 親の `finish` のあとに sh が `worktree tidy` で消す（worktrees.py）。finish の前にワークツリーを
-消すと base_sha の検査ができなくなり、レビュー待ちの間に指摘を直す場所も無くなる。
+消すと base_sha の検査ができなくなり、レビュー待ちの間に見返す場所も無くなる（そこで積んだ
+コミットは親へ合流しないので、差し戻しは同じフェーズに子を足して直す）。
 
 ここに置くのは操作の本体（`start` / `finish` / `cancel` / `record_risk`）と、`finish` が閉じるときに
 実績のリスクを数える手順。チケットを引いて閉じてよいかを検査する部分は `ops_close.py`、Stop で
