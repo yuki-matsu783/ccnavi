@@ -139,6 +139,20 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.assertNotIn("ELI5 の HTML を", reason)
         self.assert_not_asked(self.stop(self.parent_tree))
 
+    def test_a_fix_stacked_on_the_child_after_finish_is_asked_before_eli5(self):
+        """finish の後に子のブランチへ積んだコミットは親に無い。依頼の前提と同じく、それを言う。"""
+        self.family(plan=["work-mr"])
+        self.close_children()
+        git(self.parent_tree, "merge", "--quiet", "--no-edit", "i0001-01-01")
+        record_merge(self.parent_tree, "i0001-01-01")
+        self.assertIn("wip/eli5/phase-1.html", self.asked(self.stop(self.parent_tree)))
+        # レビュー待ちの子のワークツリーで、合流の後に修正を積む。
+        self.commit_work(self.child_tree(), rel="src/a/late.py")
+        reason = self.asked(self.stop(self.parent_tree))
+        self.assertIn("子 i0001-01-01 の手元のブランチに、合流されていない修正があります", reason)
+        self.assertIn("同じフェーズに子を足して", reason)
+        self.assertNotIn("ELI5 の HTML を", reason)
+
     def test_the_request_step_reminds_to_commit_and_push_first(self):
         """ELI5 が在っても未コミットかもしれない。`request` は HEAD の普通のファイルが前提。"""
         self.family(plan=["work-mr"])

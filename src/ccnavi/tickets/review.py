@@ -861,21 +861,11 @@ def _unmet(root: str, tree_root: str, conf: settings.Settings, ph: phase.Phase) 
 
 
 def _unmerged_fix(root: str, tree_root: str, child: ticket_model.Ticket) -> str:
-    """finish の後に子のブランチへ積まれ、親に入っていないコミットの先頭。無ければ空。
+    """finish の後に子のブランチへ積まれ、親に入っていないコミットの先頭。
 
-    合流は finish の 1 回だけで、`review/` の子のワークツリーで後から積んだコミットは親へ
-    入らない。手元の子のブランチの先頭が `merged_sha` と違い、親の HEAD にも含まれていなければ、
-    合流されていない修正がある。子のワークツリーが無い PC（別の PC で finish した子など）では
-    判定しない。
+    中身は `ops_close.unmerged_fix`。Stop の促しも同じ関数で確かめる。
     """
-    if not os.path.isdir(tree.worktree_path(root, child.ticket)):
-        return ""
-    rc, out = _git(tree_root, ["rev-parse", "--verify", "--quiet", f"refs/heads/{child.ticket}"])
-    head = out.strip() if rc == 0 else ""
-    if not head or head == child.merged_sha:
-        return ""
-    rc, _ = _git(tree_root, ["merge-base", "--is-ancestor", head, "HEAD"])
-    return "" if rc == 0 else head
+    return ops_close.unmerged_fix(root, tree_root, child, TIMEOUT_SECONDS)
 
 
 def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:

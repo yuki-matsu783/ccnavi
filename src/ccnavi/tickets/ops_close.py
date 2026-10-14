@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import TextIO
 
 from ..infra import gitcmd, settings, tree
@@ -25,6 +26,28 @@ from . import ticket as ticket_mod
 
 # git を読むときの待ち時間（秒）。`ops_stop.py` の git の読み取りも使う。
 TIMEOUT_SECONDS = 5.0
+
+
+def unmerged_fix(
+    root: str, tree_root: str, child: ticket_model.Ticket, timeout: float = TIMEOUT_SECONDS
+) -> str:
+    """finish の後に子のブランチへ積まれ、親に入っていないコミットの先頭。無ければ空。
+
+    合流は finish の 1 回だけで、`review/` の子のワークツリーで後から積んだコミットは親へ
+    入らない。手元の子のブランチの先頭が `merged_sha` と違い、親の HEAD（`tree_root`）にも
+    含まれていなければ、合流されていない修正がある。子のワークツリーが無い PC（別の PC で
+    finish した子など）では判定しない。レビューの依頼の前提と Stop の促しが同じ確認を使う。
+    """
+    if not os.path.isdir(tree.worktree_path(root, child.ticket)):
+        return ""
+    rc, out = gitcmd.output(
+        tree_root, ["rev-parse", "--verify", "--quiet", f"refs/heads/{child.ticket}"], timeout
+    )
+    head = out.strip() if rc == 0 else ""
+    if not head or head == child.merged_sha:
+        return ""
+    rc, _ = gitcmd.output(tree_root, ["merge-base", "--is-ancestor", head, "HEAD"], timeout)
+    return "" if rc == 0 else head
 
 
 def _places(

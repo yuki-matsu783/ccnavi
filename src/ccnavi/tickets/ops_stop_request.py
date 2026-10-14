@@ -57,6 +57,7 @@ CODE_REQUEST_NUDGE = "NUDGE_TICKET_REQUEST"
 # 次の一手の種類。
 STEP_FINISH = "finish"
 STEP_MERGE = "merge"
+STEP_LATE_FIX = "late-fix"
 STEP_ELI5 = "eli5"
 STEP_REQUEST = "request"
 
@@ -134,19 +135,22 @@ def pending_at_stop(
             continue
         if approval_marks.MARK_REQUESTED in ph.marks:
             continue
-        step, children = _next_step(here.root, ph)
+        step, children = _next_step(root, here.root, ph)
         return Pending(parent, ph.number, step, here.root, head, children, ph.title)
     return None
 
 
-def _next_step(worktree: str, ph: phase.Phase) -> tuple[str, list[str]]:
+def _next_step(root: str, worktree: str, ph: phase.Phase) -> tuple[str, list[str]]:
     """依頼の前の道のどこにいるか。合流済みでない子があれば確認、無ければ ELI5、あれば依頼。
 
     合流するのは子の `finish` で、ここは「すべての子が合流済みか」を確かめるだけ。合流済みは、
-    finish が書いた `merged_sha`（合流した子の先頭）が親の HEAD の祖先であること。子のブランチは
-    見ない（依頼の前提の検査 `review._unmet` と同じ）。
+    finish が書いた `merged_sha`（合流した子の先頭）が親の HEAD の祖先であること。
+    合流済みでも、子のワークツリーが残る PC で finish の後に子のブランチへ積んだコミットが
+    親に無ければ、合流されていない修正があると言う（`ops_close.unmerged_fix`）。
+    どちらも依頼の前提の検査 `review._unmet` と同じ確認。
     """
     unmerged: list[str] = []
+    late: list[str] = []
     for child in sorted(ph.tickets, key=lambda t: t.ticket):
         if ph.states.get(child.ticket) not in (ticket_model.REVIEW, ticket_model.DONE):
             continue
@@ -160,8 +164,12 @@ def _next_step(worktree: str, ph: phase.Phase) -> tuple[str, list[str]]:
         )
         if not merged:
             unmerged.append(child.ticket)
+        elif ops_close.unmerged_fix(root, worktree, child):
+            late.append(child.ticket)
     if unmerged:
         return STEP_MERGE, unmerged
+    if late:
+        return STEP_LATE_FIX, late
     if not os.path.isfile(os.path.join(worktree, "wip", "eli5", f"phase-{ph.number}.html")):
         return STEP_ELI5, []
     return STEP_REQUEST, []
@@ -223,6 +231,18 @@ def request_nudge(root: str, found: Pending) -> str:
             "合流の記録が無い理由（origin が無い親、置き場を手で動かした子など）をユーザに"
             f"伝えてください。合流済みと確かめられたら、ELI5 の HTML を {eli5} に書いて"
             f"コミットして push し、{request} で依頼します。"
+        )
+    elif found.step == STEP_LATE_FIX:
+        where = (
+            f"{p.ticket} の{phase_name}は子が全部閉じていますが、レビューの依頼"
+            f"（request）がまだです。子 {', '.join(found.children)} の手元のブランチに、"
+            "合流されていない修正があります"
+            "（finish の後に積んだコミットは親のブランチに入りません）。"
+        )
+        todo = (
+            "このままでは依頼できません。修正を活かすなら、同じフェーズに子を足して"
+            "ユーザの承認を受け、その子で直します。捨てるなら、そのことをユーザに伝えて"
+            "判断を仰いでください。"
         )
     elif found.step == STEP_ELI5:
         where = (
