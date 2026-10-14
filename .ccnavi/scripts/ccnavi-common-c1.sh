@@ -420,7 +420,11 @@ ccnavi_c1_merge_begin() {
 		return 0
 	fi
 	cat "$ccnavi_c1_tmp/merge-out" >>"$ccnavi_c1_tmp/merge-git-err" 2>/dev/null || :
-	ccnavi_mb_conflicts=$(git -C "$ccnavi_c1_tree" diff --name-only --diff-filter=U 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')
+	# 衝突したパスは引用符で囲ませず（core.quotePath=false）NUL 区切りで取り、1 行 1 パスの一覧にする
+	# （空白・日本語のパスを割らない。改行を含むパスは表示のために ? に置き換わる）。
+	git -C "$ccnavi_c1_tree" -c core.quotePath=false diff --name-only -z --diff-filter=U 2>/dev/null |
+		tr '\n\000' '?\n' >"$ccnavi_c1_tmp/conflicts" || :
+	ccnavi_mb_conflicts=$(awk 'length($0) > 0 { if (n++) printf ", "; printf "%s", $0 }' "$ccnavi_c1_tmp/conflicts" 2>/dev/null)
 	git -C "$ccnavi_c1_tree" merge --abort >/dev/null 2>&1 || :
 	ccnavi_c1_merging=""
 	if [ "$(git -C "$ccnavi_c1_tree" rev-parse HEAD 2>/dev/null)" != "$1" ] || [ -n "$(ccnavi_c1_busy "$ccnavi_c1_tree")" ]; then
@@ -429,7 +433,7 @@ ccnavi_c1_merge_begin() {
 	fi
 	if [ -n "$ccnavi_mb_conflicts" ]; then
 		ccnavi_c1_say "子 ${ccnavi_c1_merge_child} を親のブランチ ${ccnavi_c1_branch} へ合流すると衝突する（${ccnavi_mb_conflicts}）。合流を取りやめて、何も変えずに止めた"
-		ccnavi_c1_blame $ccnavi_mb_conflicts
+		ccnavi_c1_blame "$ccnavi_c1_tmp/conflicts"
 		ccnavi_c1_say "  子のワークツリー（.claude/worktrees/${ccnavi_c1_merge_child}）で親のブランチ ${ccnavi_c1_branch} を merge して衝突を解き、コミットしてから finish をやり直してください"
 	else
 		ccnavi_c1_say "子 ${ccnavi_c1_merge_child} を合流できなかった（$(ccnavi_git_refusal "$ccnavi_c1_tmp/merge-git-err")）。何も変えずに止めた"
@@ -438,8 +442,17 @@ ccnavi_c1_merge_begin() {
 	return 1
 }
 
-# 衝突したパスを持ち込んだ、先に合流した別の子を名指しする。<パス>...
+# 衝突したパスを持ち込んだ、先に合流した別の子を名指しする。<1 行 1 パスの一覧>
 ccnavi_c1_blame() {
+	# 一覧の 1 行を 1 つの引数にして渡す（語に割らない）。
+	ccnavi_bl_list="$1"
+	set --
+	while IFS= read -r ccnavi_bl_path; do
+		if [ -n "$ccnavi_bl_path" ]; then
+			set -- "$@" "$ccnavi_bl_path"
+		fi
+	done <"$ccnavi_bl_list"
+	[ "$#" -gt 0 ] || return 0
 	ccnavi_c1_exe c1 merge-blame "$ccnavi_c1_merge_child" "$@" 2>/dev/null </dev/null | tr -d '\r' >"$ccnavi_c1_tmp/blame" || :
 	[ "$(head -n 1 "$ccnavi_c1_tmp/blame" 2>/dev/null)" = "c1 1" ] || return 0
 	sed -n 's/^other //p' "$ccnavi_c1_tmp/blame" | while IFS= read -r ccnavi_bl_line; do

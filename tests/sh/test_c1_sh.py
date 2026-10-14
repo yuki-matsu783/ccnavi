@@ -1018,6 +1018,26 @@ class C1MergeTest(C1Harness):
         self.assertIn(f"後から finish した {CHILD_B}", result.stderr)
         self.assert_untouched(before, CHILD_B)
 
+    def test_a_conflict_on_paths_with_spaces_and_japanese_names_the_child_that_merged_first(self):
+        self.start_parent()
+        self.approve_second_child()
+        first = self.start_child()
+        second = self.start_child(CHILD_B)
+        rels = ("wip/design/a b.md", "wip/design/日本.md")
+        for tree, text in ((first, "first\n"), (second, "second\n")):
+            for rel in rels:
+                write(os.path.join(tree, *rel.split("/")), text)
+            git(tree, "add", "-A")
+            git(tree, "commit", "-q", "-m", "work")
+        self.assertEqual(self.ticket("finish", CHILD).returncode, 0)
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("finish", CHILD_B)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("wip/design/a b.md, wip/design/日本.md", result.stderr)
+        for rel in rels:
+            self.assertIn(f"先に合流した子 {CHILD} の変更と重なる（{rel}）", result.stderr)
+        self.assert_untouched(before, CHILD_B)
+
     def test_an_uncommitted_change_in_the_child_stops(self):
         self.start_parent()
         tree = self.start_child()

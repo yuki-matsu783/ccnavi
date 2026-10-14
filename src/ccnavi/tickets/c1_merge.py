@@ -16,7 +16,8 @@
     子のブランチにいない・未コミットの変更がある、子の仕事の始まりから先頭までの変更に置き場のパスが
     ある、範囲（子・親・フェーズ定義）の外のパスがある、のどれか
 - `ccnavi c1 merge-blame <子> <パス>...`: 衝突したパスを、先に親へ合流した別の子の変更から探す。
-  `other <子> <パス>...` を 1 行ずつ。見つからなければ何も出さない
+  `other <子> <パス>` を 1 パス 1 行で（パスの空白はそのまま、改行は `\\n`）。
+  見つからなければ何も出さない
 
 git は読み取りだけ。
 """
@@ -55,6 +56,11 @@ def _names(listing: str) -> list[str]:
 def _shown(paths: list[str]) -> str:
     more = f" ほか {len(paths) - _SHOWN} 件" if len(paths) > _SHOWN else ""
     return ", ".join(paths[:_SHOWN]) + more
+
+
+def _one_line(text: str) -> str:
+    """1 行 1 項目の値に、改行を混ぜない（`\\n` の 2 文字にする）。"""
+    return text.replace("\r", "\\r").replace("\n", "\\n")
 
 
 def _say(stdout: TextIO, key: str, text: str) -> None:
@@ -243,8 +249,9 @@ def blame(stdout: TextIO, conf: settings.Settings, root: str, ident: str, paths:
                 parent_tree,
                 ["diff", "--name-only", "--no-renames", "-z", commit[1], commit[0]],
             )
-            hit = sorted(wanted & set(_names(out))) if ok else []
-            if hit:
-                stdout.write(f"other {other.ticket} {' '.join(hit)}\n")
+            # 1 行に 1 パス。パスに空白があっても、sh は子の識別子（空白を含まない）の
+            # 後ろを丸ごと読む。
+            for rel in sorted(wanted & set(_names(out))) if ok else []:
+                stdout.write(f"other {other.ticket} {_one_line(rel)}\n")
             break
     return 0
