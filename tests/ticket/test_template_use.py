@@ -343,7 +343,8 @@ class RefusalTest(Use):
         self.put("small", SMALL)
         result = self.new(template="small", cwd=self.root)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("worktree add", result.stderr)
+        self.assertIn("ccnavi-start.sh --mr <MR の番号>", result.stderr)
+        self.assertNotIn("。。", result.stderr)
 
 
 class LayerTest(Use):

@@ -271,7 +271,7 @@ def run(
             f"cwd が .claude/worktrees/{ident} の中ではない。"
             "提案は親のワークツリー（識別子と同名）に書く。"
             f"先に '{start_sh} --mr <MR の番号>'（MR が無ければ '--issue <issue の番号>'）で、"
-            "親のブランチを直接チェックアウトした親のワークツリーを作り、その中から実行します。"
+            "親のブランチを直接チェックアウトした親のワークツリーを作り、その中から実行します"
         )
     if not syncstate.head_branch(where.root, ident):
         return refuse(
