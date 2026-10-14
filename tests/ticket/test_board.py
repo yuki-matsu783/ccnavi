@@ -43,9 +43,7 @@ class BoardTest(PhaseHarness):
         ほかのツリーのコピーで代用しないので、チケットは tickets[] に出ない。ワークツリーのある親
         （記録の有無を問わない）と、閉じた親は出さない。
         """
-        record = (
-            "remote origin\nbranch feature/99-x\nsha 0\nfetched_at 1\nstate present\nmr 12\n"
-        )
+        record = "remote origin\nbranch feature/99-x\nsha 0\nfetched_at 1\nstate present\nmr 12\n"
         base = os.path.join(self.state, "sync", "self", "families")
         write(os.path.join(base, "feature-99-x"), record)
         write(os.path.join(base, "i0001"), record.replace("feature/99-x", "i0001"))
