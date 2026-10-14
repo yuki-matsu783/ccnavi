@@ -317,7 +317,7 @@ find_mr() {
 	if [ "$kind" = github ]; then
 		owner="${path%%/*}"
 		api GET "repos/$path/pulls?state=open&head=$owner:$branch" |
-			"$JQ" '.[0] // empty | {number: .number, url: .html_url}'
+			"$JQ" '.[0] // empty | {number: .number, url: .html_url, source: .head.ref, target: .base.ref}'
 	else
 		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない）。
 		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても目的のものを外さない）
@@ -325,7 +325,7 @@ find_mr() {
 		mrs=$(pages "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$branch") ||
 			fail mr-list-failed "親ブランチ $branch のマージリクエストの一覧を読めない（ホストの返事は上に出ている）。"
 		printf '%s' "$mrs" |
-			"$JQ" --argjson pid "$pid" '[.[] | select(.source_project_id == $pid)][0] // empty | {number: .iid, url: .web_url}'
+			"$JQ" --argjson pid "$pid" '[.[] | select(.source_project_id == $pid)][0] // empty | {number: .iid, url: .web_url, source: .source_branch, target: .target_branch}'
 	fi
 }
 
@@ -334,7 +334,7 @@ project_id() {
 	ccnavi_host_project_id
 }
 
-# ---- マージリクエストを作る。下書きの 1 行目が題、3 行目からが本文。
+# ---- 統合先。MR のマージ先と比べる。MR は作らない（作るのは ccnavi-start.sh）。
 
 default_branch() {
 	# 統合先。ccnavi-fetch.sh がワークツリーの起点に使うのと同じ順（CCNAVI_INTEGRATION_BRANCH →
@@ -343,25 +343,6 @@ default_branch() {
 	db_tree=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	db_name=$(ccnavi_integration "${db_tree:-.}" "$root") || db_name=""
 	[ -n "$db_name" ] && printf '%s' "$db_name" || printf 'main'
-}
-
-create_mr() {
-	draft="$1"
-	target=$(default_branch)
-	if [ "$kind" = github ]; then
-		payload=$("$JQ" -n --arg h "$branch" --arg b "$target" --rawfile all "$draft" \
-			'($all | split("\n")) as $l |
-			 {head: $h, base: $b, title: ($l[0]), body: ($l[2:] | join("\n")), draft: true}')
-		api POST "repos/$path/pulls" "$payload" |
-			"$JQ" '{number: .number, url: .html_url}'
-	else
-		payload=$("$JQ" -n --arg s "$branch" --arg b "$target" --rawfile all "$draft" \
-			'($all | split("\n")) as $l |
-			 {source_branch: $s, target_branch: $b, title: ($l[0]),
-			  description: ($l[2:] | join("\n"))}')
-		api POST "projects/$(encoded_path)/merge_requests" "$payload" |
-			"$JQ" '{number: .iid, url: .web_url}'
-	fi
 }
 
 # ---- スレッド。GitHub は GraphQL でしか解決状態を読めない。GitLab は discussions。
@@ -609,6 +590,8 @@ fetch_all() {
 	[ -z "$mr" ] && fail no-mr "親ブランチ $branch に対応するマージリクエストが $host にありません。"
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
+	# 実行ファイルに渡す形は番号と url だけ（元ブランチとマージ先は依頼のときだけ sh が確かめる）
+	mr=$(printf '%s' "$mr" | "$JQ" -c '{number: .number, url: .url}')
 	t=$(threads "$number" "$url")
 	r=$(reviews "$number" "$url")
 	"$JQ" -n --arg host "$kind" --argjson mr "$mr" --argjson threads "$t" --argjson reviews "$r" \
@@ -870,22 +853,25 @@ ${eli5_how}"
 	log_debug ELI5 を確かめた -- "eli5=set"
 	# 段 0: 取り込み済みの親子のチケットなら C1 の前半（ロック・取り込み）を先に済ませる。
 	c1_start "$family"
-	# 段 1: 前提。exe が依頼の本文と、マージリクエストの下書きを書き出す。
+	# 段 1: 前提。exe が依頼の本文を書き出す。
 	tell_skew
 	prepared=$(ccnavi review prepare "$@") || exit $?
 	file=$(printf '%s\n' "$prepared" | sed -n 1p)
-	draft=$(printf '%s\n' "$prepared" | sed -n 2p)
-	# 段 1.5: マージリクエストが無ければ作る。ユーザはレビューをここで行うので、
-	# 「見る場所が無い」で止めない。統合するのはユーザなので下書きで作る。
+	# 段 1.5: マージリクエストの確認。無ければ作らずに止める（作るのは ccnavi-start.sh）。
+	# 元ブランチがこのツリーの HEAD のブランチと同じで、マージ先が統合先であること。
 	mr=$(find_mr)
-	if [ -z "$mr" ]; then
-		[ -n "$draft" ] && [ -f "$draft" ] || fail no-draft "マージリクエストの下書きを読めない ($draft)。"
-		mr=$(create_mr "$draft") || fail mr-create-failed "マージリクエストを作れなかった。ホストの返事は上に出ている。"
-		[ -z "$mr" ] && fail mr-create-empty "マージリクエストを作れなかった。"
-		printf 'マージリクエストを作った: %s\n' "$(printf '%s' "$mr" | "$JQ" -r '.url')"
-	fi
+	[ -n "$mr" ] ||
+		fail no-mr-for-request "親ブランチ $branch に対応する open のマージリクエストが $host にありません。依頼は作らずに止めた。マージリクエストは ccnavi-start.sh が作る（既存のものは --mr で採用する）。ユーザに相談してください。"
+	mr_source=$(printf '%s' "$mr" | "$JQ" -r '.source // ""')
+	mr_target=$(printf '%s' "$mr" | "$JQ" -r '.target // ""')
+	[ "$mr_source" = "$branch" ] ||
+		fail mr-source-mismatch "マージリクエストの元ブランチ（${mr_source:-不明}）がこのツリーの HEAD のブランチ（${branch}）と違う。依頼は作らずに止めた。"
+	mr_integration=$(default_branch)
+	[ "$mr_target" = "$mr_integration" ] ||
+		fail mr-target-mismatch "マージリクエストのマージ先（${mr_target:-不明}）が統合先（${mr_integration}）ではない。依頼は作らずに止めた。マージ先を直すか、ユーザに相談してください。"
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
+	mr=$(printf '%s' "$mr" | "$JQ" -c '{number: .number, url: .url}')
 	# 段 2: 投稿。同じ目印（親・フェーズ・鍵）の依頼が既にあれば投稿し直さない（打ち直しや C1 の
 	# やり直しで依頼を二重にしない）。
 	request_marker=$(head -n 1 "$file" | tr -d '\r')
@@ -1092,7 +1078,6 @@ ready)
 	# 実行ファイルの標準出力は、1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`。
 	# wip/ から消したものがあれば、続けて `wip-from <消す前の HEAD>` と `wip <パス>`（1 行 1 本）。
 	noted=$(sed -n '1p' "$ccnavi_c1_capture" 2>/dev/null || :)
-	ready_tree=$(sed -n 's/^tree //p' "$ccnavi_c1_capture" 2>/dev/null | head -n 1)
 	wip_from=$(sed -n 's/^wip-from //p' "$ccnavi_c1_capture" 2>/dev/null | head -n 1)
 	wip_gone=$(sed -n 's/^wip //p' "$ccnavi_c1_capture" 2>/dev/null || :)
 	rm -f "$ccnavi_c1_capture"
@@ -1102,33 +1087,6 @@ ready)
 		printf 'wip/ の追跡済みのファイルを削除しました（%s 件。削除する前のコミット %s から戻せる）:\n' \
 			"$(printf '%s\n' "$wip_gone" | wc -l | tr -d ' ')" "$(printf '%.12s' "$wip_from")"
 		printf '%s\n' "$wip_gone" | sed 's/^/  /'
-	fi
-	# C1 の外（取り込み済みでない親子のチケット）では、退避の削除をここでは送らない。
-	# 送る前に Draft を外すと、チケットを残したままマージされうるので、送ってから打ち直してもらう。
-	# 見るのは退避したツリー（実行ファイルが答えたもの）。古い実行ファイルが答えなければ cwd のツリー。
-	if [ "$c1_on" != yes ]; then
-		[ -n "$ready_tree" ] || ready_tree=$(git -C "$exe_cwd" rev-parse --show-toplevel 2>/dev/null || :)
-		ready_place="${ccnavi_c1_approved:-.ccnavi/approved}"
-		# wip/ は、実行ファイルが消したと答えたパス（`wip <パス>` の行）をそのまま確かめる。実行ファイルは
-		# 大文字小文字と `\` の区切りを問わずに wip/ と見る（`WIP/…`・`wip\…`）ので、固定の `wip` だけでは
-		# 見落とす。答えない古い実行ファイルのために `wip` も残す。
-		set -- ":(literal)$ready_place" ":(literal)wip"
-		while IFS= read -r ready_wip; do
-			[ -n "$ready_wip" ] && set -- "$@" ":(literal)$ready_wip"
-		done <<EOF_WIP
-$wip_gone
-EOF_WIP
-		if [ -n "$ready_tree" ] &&
-			[ -n "$(git -C "$ready_tree" status --porcelain --untracked-files=no -- "$@" 2>/dev/null)" ]; then
-			ready_git="sh ${root}/.ccnavi/scripts/ccnavi-git.sh"
-			fail ready-unsent "${ready_tree} の置き場（${ready_place}）か wip/ に未コミットの変更がある（クローズ済みのチケットを logs/archive/ へ退避した削除や、wip/ の追跡済みのファイルの削除など）。Draft はまだ外していない。
-原因: 親が取り込み済みでないため、退避と wip/ の削除を ready が自動でコミットできない（C1 が動かない）。親のワークツリーの名前が親の識別子と違うことが多い。承認済みチケットがどのツリーに在るかを確かめる（ここで見たのは ${ready_tree}）。
-次の順に実行します（${ready_tree} の中で）:
-  1) cd ${ready_tree} && ${ready_git} add -u -- ${ready_place} wip
-  2) ${ready_git} commit -m '<退避と wip/ の削除を説明する 1 行>'
-  3) ${ready_git} push
-  4) ready --parent ${family} を再実行します。"
-		fi
 	fi
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
 	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')

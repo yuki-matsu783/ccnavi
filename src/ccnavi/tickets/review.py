@@ -61,14 +61,12 @@ from . import (
     ticket_model,
     ticket_places,
 )
-from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 15.0
 
 # state の置き場に書く、投稿待ちの本文の名前。sh がこれを投稿する。
 REQUEST_FILE = "review-request-{parent}-{phase}.md"
 # まだマージリクエストが無いときに、sh がこれで作る。
-MR_FILE = "review-mr-{parent}.md"
 # 依頼の本文とマージリクエストの下書きの末尾に必ず書く一文。下書きの置き場
 # （ticket_places.HANDOFF）の変更を、レビュアーが読む対象に数えないため。
 HANDOFF_NOTE = (
@@ -127,49 +125,13 @@ def prepare(
     ).hexdigest()[:16]
     marker = f"{review_host.MARKER_REQUEST}{parent.ticket}:{phase_no} key={key} -->\n"
     path = os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
-    draft = os.path.join(conf.state, MR_FILE.format(parent=parent.ticket))
-    failed = fsio.write_text(path, marker + body, newline="\n") or fsio.write_text(
-        draft, mr_draft(parent), newline="\n"
-    )
+    failed = fsio.write_text(path, marker + body, newline="\n")
     if failed:
         stderr.write(f"ccnavi: 本文を書き出せない ({failed})\n")
         return 1
-    # 1 行目が依頼の本文、2 行目がマージリクエストの下書き。sh はこの順で読む。
-    stdout.write(path + "\n" + draft + "\n")
+    # 1 行が依頼の本文のパス。マージリクエストは作らない（無ければ sh が止める）。
+    stdout.write(path + "\n")
     return 0
-
-
-def mr_draft(parent: ticket_model.Ticket) -> str:
-    """マージリクエストの下書き。1 行目が題、空行のあとが本文。
-
-    まだ無ければ sh がこれで作る。ユーザがレビューのときに見るのはこの入れ物なので、
-    親チケットが持っている材料（題・理由・本文・元の課題）をそのまま書き写す。
-    下書き（Draft）で作るのは、統合を決めるのがユーザだから。題から Draft を外して
-    マージするところまでがユーザの手に残る。
-    """
-    title = parent.title.strip() or parent.ticket
-    lines = [f"Draft: {title}", ""]
-    if parent.issue:
-        # 別のリポジトリの課題は `Closes owner/repo#N`（`issue:` に `owner/repo#N` を許している）
-        lines += [f"Closes {ticket_mod.issue_label(parent)}", ""]
-    lines += [
-        f"チケット `{parent.ticket}`。ワークツリーは `.claude/worktrees/{parent.ticket}`。",
-        "",
-    ]
-    if parent.rationale.strip():
-        lines += ["## なぜやるか", "", parent.rationale.strip(), ""]
-    if parent.body.strip():
-        lines += [parent.body.strip(), ""]
-    lines += [
-        "---",
-        "",
-        "フェーズが終わるたびに ccnavi がレビューの依頼をこのマージリクエストに投稿する。",
-        "未解決のスレッドが残っている間、次のフェーズへは進めない。",
-        "",
-        HANDOFF_NOTE,
-        "",
-    ]
-    return "\n".join(lines)
 
 
 def requested(
