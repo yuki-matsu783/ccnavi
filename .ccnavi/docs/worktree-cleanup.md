@@ -1,9 +1,9 @@
 ---
 type: guide
 title: ワークツリーの片付け
-description: ccnaviがワークツリーを片付けるタイミングと、自分で片付けるときの手順（ccnavi-clean.sh）、自動モードの分類器に止められたとき
+description: ccnaviがワークツリーとブランチを片付けるタイミングと条件（ready の後、MRがマージされた後）、自分で片付けるときの手順（ccnavi-clean.sh）、自動モードの分類器に止められたとき
 tags: [git, worktree]
-keywords: [片付け, ワークツリー, worktree remove, ccnavi-clean.sh, 分類器, 自動モード, ready, finish, cancel, node_modules]
+keywords: [片付け, ワークツリー, worktree remove, ccnavi-clean.sh, 分類器, 自動モード, ready, finish, cancel, node_modules, retire, 子のブランチ, merged_sha, 親を閉じる, sync tidy, branch -D]
 ---
 
 # ワークツリーの片付け

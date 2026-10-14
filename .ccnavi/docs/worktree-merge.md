@@ -1,9 +1,9 @@
 ---
 type: guide
 title: ワークツリーの作業を統合先に取り込む
-description: 直接作業のワークツリーを統合先へ取り込む手順（integrate・integrate-done）と、マージリクエストに出す手順
+description: 直接作業のワークツリーを統合先へ取り込む手順（integrate・integrate-done）、子の finish が親のブランチへ合流する手順と衝突の解き方、マージリクエストに出す手順
 tags: [git, worktree]
-keywords: [統合先, 取り込み, マージ, マージリクエスト, integrate, integrate-done, squash, staged, fast-forward, ready, wip, ccnavi-git.sh, 直接作業]
+keywords: [統合先, 取り込み, マージ, マージリクエスト, integrate, integrate-done, squash, staged, fast-forward, ready, wip, ccnavi-git.sh, 直接作業, finish, 合流, merged_sha, 衝突, 子]
 ---
 
 # ワークツリーの作業を統合先に取り込む

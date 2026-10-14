@@ -39,8 +39,8 @@
 |---|---|
 | ワークツリーを切る、他セッションの変更の影響を受けた、親の正本・未準備・`mr:` を確かめる | `.ccnavi/docs/worktree.md` |
 | issue・MR を指定して作業を頼まれた | `.ccnavi/docs/worktree-start.md` |
-| `<統合先>` に取り込む、マージリクエストに出す | `.ccnavi/docs/worktree-merge.md` |
-| ワークツリーを片付ける | `.ccnavi/docs/worktree-cleanup.md` |
+| `<統合先>` に取り込む、子の finish で親へ合流する・衝突を解く、マージリクエストに出す | `.ccnavi/docs/worktree-merge.md` |
+| ワークツリーや子のブランチを片付ける、親を閉じたあとの片付け | `.ccnavi/docs/worktree-cleanup.md` |
 | 下書きや使い捨てのファイルを置く | `.ccnavi/docs/scratchpad.md` |
 | `projects/` 配下を修正する、チケット・マーカー・記録の置き場を確かめる、`rules.yml` の `message` を書く | `.ccnavi/docs/projects.md` |
 | 提案を書く、相談が要るか迷う、ccnavi に止められた、サブエージェントに任せる | `.ccnavi/docs/decisions.md` |
