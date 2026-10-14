@@ -88,7 +88,9 @@ _NOT_PREVIEW = rf"(?![^{selfguard_shell._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 _CLI_FORMS = (
     rf"(--yes\b|--(?:agree|approve)\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b|--import\b"
     r"|--(?:rename|move|delete)-template\b|--save-draft\b"
-    r"|\b(ticket|review)\s+"
+    # 副命令の前の `--`（`ticket -- finish`）は、実行ファイルが選択肢の終わりとして読み飛ばすので
+    # 同じ操作になる。
+    r"|\b(ticket|review)\s+(--\s+)?"
     r"(start|finish|cancel|record-risk|prepare|requested|confirm|ready)\b)"
 )
 CODE_TICKET_APPROVAL = "DENY_TICKET_APPROVAL_CLI"
