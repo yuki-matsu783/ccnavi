@@ -23,16 +23,9 @@ test("CB-T17 単引用符で囲み、中の単引用符を割る", () => {
   assert.equal(toPosixPath("C:\\Users\\x\\ws"), "C:/Users/x/ws");
 });
 
-test("CB-T18 承認は子プロセスの引数で、preview は見るだけ、yes は見せた識別子をそのまま返す", () => {
+test("CB-T18 承認は子プロセスの引数で、preview は見るだけ、yes は承認する識別子だけを返す", () => {
   assert.deepEqual(previewArgs(), ["--agree", "--preview", "--json"]);
-  assert.deepEqual(approveArgs(["i0001", "i0001-01-01"], "ab12"), [
-    "--agree",
-    "--yes",
-    "i0001,i0001-01-01",
-    "--digest",
-    "ab12",
-    "--json",
-  ]);
+  assert.deepEqual(approveArgs(["i0001", "i0001-01-01"]), ["--agree", "--yes", "i0001,i0001-01-01", "--json"]);
   // ターミナルに `--agree` を送る経路は消した。y/N をターミナルで押す形には戻さない。
   assert.equal((commands as Record<string, unknown>).approveCommand, undefined);
 });
@@ -48,26 +41,9 @@ test("CB-T18b preview に識別子を並べると、その分だけが対象に�
   assert.deepEqual(previewArgs([]), previewArgs());
 });
 
-test("CB-T18c yes は見せた識別子と、そのときの絞りを分けて渡す", () => {
-  // 絞り込み中。見せたのは 1 件で、絞りも同じ 1 件。
-  assert.deepEqual(approveArgs(["i0002"], "ab12", ["i0002"]), [
-    "--agree",
-    "--yes",
-    "i0002",
-    "--digest",
-    "ab12",
-    "--json",
-    "i0002",
-  ]);
-  // 絞り込み無し。絞りは空で、実行ファイルは絞らないときの対象と見せた識別子を比べる。
-  assert.deepEqual(approveArgs(["i0002", "i0002-01-01"], "ab12"), [
-    "--agree",
-    "--yes",
-    "i0002,i0002-01-01",
-    "--digest",
-    "ab12",
-    "--json",
-  ]);
+test("CB-T18c yes は識別子だけを渡す。ダイジェストも絞りの語も付けない", () => {
+  assert.deepEqual(approveArgs(["i0002"]), ["--agree", "--yes", "i0002", "--json"]);
+  assert.ok(!approveArgs(["i0002"]).includes("--digest"));
 });
 
 test("CB-T19 decide の引数。一覧は --preview、選んだ対応方針は JSON と見せたダイジェストで渡す", () => {

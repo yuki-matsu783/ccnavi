@@ -216,7 +216,6 @@ class Integration:
             fd = os.open(path, flags)
             with os.fdopen(fd, "rb") as f:
                 data = f.read()
-            fsio.note_read(path, data)
             return data, ""
         except OSError as exc:
             return None, f"{rel} を読めない（{exc.strerror or type(exc).__name__}）"
@@ -244,8 +243,6 @@ class Integration:
                 continue
             if stat.S_ISREG(mode):
                 out.append(name)
-        # 名前のリストも判定の入力（承認のダイジェストの read_set に入れる）。
-        fsio.note_read(directory, "\n".join(out))
         return out, ""
 
 
@@ -1014,7 +1011,6 @@ def _read_record(path: str) -> tuple[dict[str, str] | None, str]:
         if len(raw) > _RECORD_LIMIT:
             return None, f"取り込み状態が大きすぎる（{_RECORD_LIMIT} バイトを超える）"
         text = raw.decode("utf-8")
-        fsio.note_read(path, raw)
     except (OSError, UnicodeDecodeError) as exc:
         return None, f"取り込み状態を読めない（{type(exc).__name__}）"
     record: dict[str, str] = {}

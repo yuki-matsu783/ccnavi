@@ -214,12 +214,6 @@ class BranchFieldApprovalTest(unittest.TestCase):
         self.assertEqual((entry["branch"], entry["existing_branch"]), ("hotfix/45", False))
         self.assertIn("新しく切るブランチ", body["text"])
 
-    def test_the_field_is_in_the_digest(self):
-        self.propose(where=self.root)
-        first = self.preview()["digest"]
-        self.propose(where=self.root, branch="feature/12-other")
-        self.assertNotEqual(self.preview()["digest"], first)
-
     def test_the_integration_branch_is_refused(self):
         write(
             os.path.join(self.root, ".claude", "settings.local.json"),
@@ -410,9 +404,10 @@ class ChromeBranchFieldTest(unittest.TestCase):
         self.assertNotIn("error", board, board)
         self.assertEqual(board["ident"], PARENT)
         self.assertEqual([e["ticket"] for e in board["batch"]], [CHILD])
-        shown = {"ids": [e["ticket"] for e in board["batch"]], "digest": board["digest"]}
         body = self.ask(
-            "plan", only=board["only"], shown=shown, actor={"account": "a", "version": "1"}
+            "plan",
+            ids=[e["ticket"] for e in board["batch"]],
+            actor={"account": "a", "version": "1"},
         )
         self.assertNotIn("error", body, body)
         self.assertEqual(list(body["changes"]), [BRANCH])
@@ -433,7 +428,7 @@ class ChromeBranchFieldTest(unittest.TestCase):
         self.assertTrue(all("1 本でない" in f["conflict"] for f in found["families"]), found)
         board = self.ask("board", branches=branches, absent=[])
         self.assertIn("1 本でない", board.get("undecided", ""), board)
-        plan = self.ask("plan", branches=branches, absent=[], shown={"ids": [CHILD], "digest": "x"})
+        plan = self.ask("plan", branches=branches, absent=[], ids=[CHILD])
         self.assertIn("1 本でない", plan.get("error", ""), plan)
 
     def test_a_predecessor_family_claimed_twice_is_not_judged(self):

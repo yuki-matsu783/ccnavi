@@ -129,10 +129,6 @@ export interface BoardResult {
   readonly reviewable?: readonly Reviewable[];
   readonly batch?: readonly BatchEntry[];
   readonly text?: string;
-  /** 見せた画面のダイジェスト（承認のときに Python が読み直した中身と比べる） */
-  readonly digest?: string;
-  /** 承認するときに `plan` へ渡す絞り（ダイジェストを出したときの絞り。null なら絞らない） */
-  readonly only?: readonly string[] | null;
   readonly rejected?: readonly { readonly ticket: string; readonly problems: readonly string[] }[];
   readonly problems?: readonly string[];
 }
@@ -164,10 +160,6 @@ export interface Written {
  */
 export type ReasonCode = string | null;
 
-/** 承認: 見せた一覧（識別子）と今の一覧が違う */
-export const APPROVE_LIST_CHANGED = "CORE_APPROVE_LIST_CHANGED";
-/** 承認: 識別子は同じで、見せた中身（ダイジェスト）が今と違う */
-export const APPROVE_DIGEST_CHANGED = "CORE_APPROVE_DIGEST_CHANGED";
 /** 取り下げ: 承認コミットの親に提案が無い（承認コミットを引けない） */
 export const WITHDRAW_NO_PRIOR = "CORE_WITHDRAW_NO_PRIOR";
 
@@ -178,11 +170,9 @@ export function tagged(code: string, text: string): string {
 
 export interface PlanResult extends Written {
   readonly identifiers: readonly string[];
-  readonly digest: string;
-  readonly mismatch: unknown;
   readonly refused: string;
   readonly rejected: readonly { readonly ticket: string; readonly problems: readonly string[] }[];
-  /** `CORE_APPROVE_*`（見せたものと違う・承認するものが無い） */
+  /** `CORE_APPROVE_*`（承認するものが無い） */
   readonly code: ReasonCode;
 }
 
@@ -246,7 +236,7 @@ export const py = {
   compat: (call: PyCall, snapshot: Snapshot) => ask<Compat>(call, "compat", { snapshot }, "compat"),
   plan: (
     call: PyCall,
-    body: { snapshot: Snapshot; family: string; only: readonly string[] | null; shown: { ids: readonly string[]; digest: string }; stamp: string; actor: Actor },
+    body: { snapshot: Snapshot; family: string; ids: readonly string[]; stamp: string; actor: Actor },
   ) => ask<PlanResult>(call, "plan", { ...body }, ""),
   withdraw: (
     call: PyCall,

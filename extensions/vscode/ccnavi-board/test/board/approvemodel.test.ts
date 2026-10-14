@@ -40,9 +40,8 @@ test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・
   assert.ok(preview.batch[2].overflow[0].includes("超えている"));
   assert.ok(preview.text.startsWith("チケットの承認リクエスト: 3 件"));
   assert.ok(preview.text.includes("編集対象としているが"));
-  // 本文のダイジェスト。承認するときに --digest で返す。値はワークツリーの絶対パスに依るので、
-  // フィクスチャでは伏せてある。
-  assert.equal(preview.digest, "<digest>");
+  // 表示時点との照合はしないので、digest は持たない。
+  assert.ok(!("digest" in preview));
   // 対象にしないのは形の正しくない子（計画に無い番号）だけ。
   assert.equal(preview.rejected.length, 1);
   assert.equal(preview.rejected[0].ticket, "i0001-05-05");
@@ -127,7 +126,7 @@ test("CB-T104b 超過の欄がない古い答えは、空の配列として読�
   assert.ok(parsed.ok && parsed.value.batch[0].overflow.length === 0);
 });
 
-test("CB-T105 承認の答えを読む（承認した / 一覧が違った）", () => {
+test("CB-T105 承認の答えを読む（承認した）", () => {
   const done = parseApproveResult(fixtureText("approve-yes.json"));
   assert.ok(done.ok);
   if (done.ok) {
@@ -137,14 +136,9 @@ test("CB-T105 承認の答えを読む（承認した / 一覧が違った）", 
     assert.ok(done.value.prompt.includes("ccnavi-ticket.sh start"));
     assert.ok(done.value.lines.length > 0);
   }
-  const changed = parseApproveResult(fixtureText("approve-mismatch.json"));
-  assert.ok(!changed.ok);
-  assert.ok("mismatch" in changed);
-  if ("mismatch" in changed) {
-    assert.deepEqual(changed.mismatch.expected, ["i0001-01-09"]);
-    assert.deepEqual(changed.mismatch.current, []);
-    assert.deepEqual(changed.mismatch.digest, { expected: "<digest>", current: "<digest>" });
-  }
+  // 廃止した mismatch の形は特別に読まない（outcome に mismatch の枝は無い）
+  const old = parseApproveResult(JSON.stringify({ version: 1, mismatch: { expected: [], current: [] } }));
+  assert.ok(!("mismatch" in old));
 });
 
 test("CB-T106 版が違う・JSON でない答えは読まない", () => {

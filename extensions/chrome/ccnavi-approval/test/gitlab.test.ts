@@ -2,7 +2,7 @@
  * GitLab・プロジェクトのリポジトリ・「始める」。模擬の GitHub・GitLab と Node の上の Pyodide で回す。
  *
  * - 録ったホストの応答の見本（test/fixtures/host/gitlab/）から TS が組む結果は、sh が組んだ期待値と同じ
- * - GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子のチケット・承認待ち・ダイジェストを出す（読み取りの一致）
+ * - GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子のチケット・承認待ちを出す（読み取りの一致）
  * - GitLab への書き込みは Commits API の 1 コミット。事後確認: 書いたコミットの親が読んだ先頭と
  *   違えば、直前の状態で判定し直し、同じなら残し、違えば元に戻して読み直す。元に戻すコミットも収まらなければユーザの対応に切り替える
  * - 「始める」: issue から `feature-<番号>-<slug>` のブランチを統合先の先頭に作る。閉じた識別子・既にある名前は拒否
@@ -69,8 +69,8 @@ function parentOnly(): Record<string, FixtureBranch> {
 
 function shownOf(b: RepoBoard, family: string) {
   const r = b.families.find((f) => f.family.name === family)?.result;
-  assert.ok(r?.digest, b.error || JSON.stringify(b.families.map((f) => [f.family.name, f.error, f.result?.refused])));
-  return { ids: (r.batch ?? []).map((e) => e.ticket), digest: r.digest, only: r.only ?? null };
+  assert.ok(r?.batch, b.error || JSON.stringify(b.families.map((f) => [f.family.name, f.error, f.result?.refused])));
+  return (r.batch ?? []).map((e) => e.ticket);
 }
 
 function placeFiles(files: Record<string, string>): Record<string, string> {
@@ -95,7 +95,7 @@ test("CX-T144 手で組んだ GitLab の応答の見本ごとに、TS が組む�
   }
 });
 
-test("CX-T145 GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子のチケット・承認待ち・ダイジェスト・取り下げの可否を出す", async () => {
+test("CX-T145 GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子のチケット・承認待ち・取り下げの可否を出す", async () => {
   const hub = await collectRepo(GH_REPO, glDeps(new MockGitHub(fixture()), "github.com"));
   const lab = await collectRepo(GITLAB_REPO, glDeps(new MockGitLab(fixture())));
   assert.equal(lab.error, "", lab.error);
@@ -105,7 +105,6 @@ test("CX-T145 GitLab のボードは、GitHub と同じ見本のリポジトリ�
       error: f.error,
       batch: f.result?.batch?.map((e) => [e.ticket, e.body]),
       text: f.result?.text,
-      digest: f.result?.digest,
       rejected: f.result?.rejected,
       undecided: f.result?.undecided,
       withdrawable: f.result?.withdrawable,
@@ -175,12 +174,14 @@ test("CX-T148 事後確認: 判定の変わる書き込み（別のファイル�
   const d = glDeps(mock);
   const shown = shownOf(await collectRepo(GITLAB_REPO, d), "i0001");
   let raced = "";
-  const CHILD = "wip/proposals/todo/i0001-01-01.md";
+  // 判定が変わる割り込み: 親がもう完了済み（done/）になる。承認で書くファイルとは別のファイル
   mock.beforeCommit = (b) => {
-    raced = mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込んだ子の提案");
+    raced = mock.push(b, { ".ccnavi/approved/done/i0001.md": mock.files(b)[TODO] }, "割り込んだ完了");
   };
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
-  assert.equal(out.kind, "changed", JSON.stringify(out));
+  // 元に戻した後の読み直しで、親が完了済みなので承認するものが無く、書かずに断る
+  assert.equal(out.kind, "refused", JSON.stringify(out));
+  assert.equal(out.kind === "refused" && out.code, "CORE_APPROVE_NOTHING");
   assert.deepEqual(
     mock.glCommits.map((c) => [c.result, c.message.split("\n")[0]]),
     [
@@ -194,24 +195,25 @@ test("CX-T148 事後確認: 判定の変わる書き込み（別のファイル�
   // 元に戻した後の置き場は、割り込んだ書き込みの直後と同じ（承認は残らない）
   assert.deepEqual(placeFiles(mock.files("i0001")), placeFiles(mock.commits.get(raced)!.files));
 
-  // 同じファイル（消す提案）を割り込みが変えていれば、GitLab が断るので何も書かない（last_commit_id）
+  // 同じファイル（消す提案）を割り込みが変えていれば、GitLab が断る（last_commit_id）ので、その回は何も書かない
   const same = new MockGitLab(parentOnly());
   const sd = glDeps(same);
   const sshown = shownOf(await collectRepo(GITLAB_REPO, sd), "i0001");
   same.beforeCommit = (b) => void same.push(b, { [TODO]: `${same.files(b)[TODO]}\n割り込みで足した本文\n` }, "割り込んだ提案の書き換え");
   const sout = await approveFamily(GITLAB_REPO, "i0001", sshown, sd);
-  assert.equal(sout.kind, "changed", JSON.stringify(sout));
-  assert.deepEqual(same.glCommits.map((c) => c.result), ["error"]);
-  assert.ok(!(DOING in same.files("i0001")));
+  // 断られた後、読み直した現在の内容が有効なら、その内容で承認する
+  assert.equal(sout.kind, "written", JSON.stringify(sout));
+  assert.deepEqual(same.glCommits.map((c) => c.result), ["error", "written"]);
+  assert.match(same.files("i0001")[DOING], /割り込みで足した本文/);
 });
 
 test("CX-T149 連鎖競合: 元に戻す前・元に戻すあいだに同じファイルが変わると、止めてユーザの対応に切り替える（要確認）。他人の変更は消さない（PROBE-1）", async () => {
-  const CHILD = "wip/proposals/todo/i0001-01-01.md";
+  const DONE = ".ccnavi/approved/done/i0001.md";
   const mock = new MockGitLab(parentOnly());
   const d = glDeps(mock);
   const shown = shownOf(await collectRepo(GITLAB_REPO, d), "i0001");
   mock.beforeCommit = (b) => {
-    mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み 1");
+    mock.push(b, { [DONE]: mock.files(b)[TODO] }, "割り込み 1");
     mock.beforeCommit = (b2) => void mock.push(b2, { [DOING]: "別の書き手が書いた\n" }, "割り込み 2");
   };
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
@@ -225,7 +227,7 @@ test("CX-T149 連鎖競合: 元に戻す前・元に戻すあいだに同じフ�
   const late = new MockGitLab(parentOnly());
   const ld = glDeps(late);
   const lshown = shownOf(await collectRepo(GITLAB_REPO, ld), "i0001");
-  late.beforeCommit = (b) => void late.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み");
+  late.beforeCommit = (b) => void late.push(b, { [DONE]: late.files(b)[TODO] }, "割り込み");
   let pushed = false;
   late.onRequest = (method, u) => {
     if (!pushed && late.glCommits.length === 1 && method === "GET" && u.pathname.endsWith("/repository/branches/i0001")) {
@@ -404,7 +406,7 @@ test("CX-T154 プロジェクトのリポジトリ: ワークスペースの統�
   const b = await collectRepo(project, make());
   assert.equal(b.error, "", b.error);
   const fam = b.families.find((f) => f.family.name === "web-i0012");
-  assert.ok(fam?.result?.digest, JSON.stringify(fam));
+  assert.ok(fam?.result?.batch, JSON.stringify(fam));
   assert.deepEqual(fam.result.batch?.map((e) => e.ticket), ["web-i0012", "web-i0012-01-01"]);
   assert.equal(fam.result.write?.allowed, true);
   const out = await approveFamily(project, "web-i0012", shownOf(b, "web-i0012"), make());
