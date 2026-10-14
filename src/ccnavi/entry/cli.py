@@ -838,6 +838,8 @@ def _parsed(
         history.set_via(history.VIA_TERMINAL)
         # `--agree` の後ろに並べた語は、承認の対象に入れる識別子。無ければ承認待ち全部。
         approved = core.approve(stdin, stdout, stderr, conf, root, only=list(args.command))
+        if approved == modes.EXIT_PARTIAL:
+            return modes.EXIT_PARTIAL
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
     # チケットの状態とレビューの操作。payload を読まない。
