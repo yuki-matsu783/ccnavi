@@ -292,22 +292,22 @@ def finish(
 def _merged_sha(root: str, found: ticket_model.Ticket) -> str:
     """この finish で親のブランチに入る子の先頭。入らない（合流していない）なら空。
 
-    親のワークツリーが合流の途中（`MERGE_HEAD` が子の先頭）なら、それがこのコミットで入る先頭。
+    親のワークツリーが合流の途中なら、その `MERGE_HEAD`（finish の検査が読んだ子の先頭）が
+    このコミットで入る先頭（`_merging_head`）。検査のあとに子が積んだコミットは合流に載らないので、
+    子のいまの先頭とは比べない。
     合流の途中でなくても、子の先頭が親の先頭の祖先なら（子が先に親へ入っている）その先頭。
     どちらでもなければ、親のブランチに入らない子なので書かない（レビュー依頼の前提が言う）。
     """
     if not found.is_child:
         return ""
+    merging = _merging_head(root, found)
+    if merging:
+        return merging
     child_tree = tree.worktree_path(root, found.ticket)
     parent_tree = tree.worktree_path(root, found.parent)
     head = gitstate.head(child_tree)
     if not head:
         return ""
-    rc, merging = gitcmd.output(
-        parent_tree, ["rev-parse", "--verify", "--quiet", "MERGE_HEAD"], ops_close.TIMEOUT_SECONDS
-    )
-    if rc == 0 and merging.strip() == head:
-        return head
     parent_head = gitstate.head(parent_tree)
     if not parent_head:
         return ""
@@ -315,6 +315,28 @@ def _merged_sha(root: str, found: ticket_model.Ticket) -> str:
         child_tree, ["merge-base", "--is-ancestor", head, parent_head], ops_close.TIMEOUT_SECONDS
     )
     return head if done.ok else ""
+
+
+def _merging_head(root: str, found: ticket_model.Ticket) -> str:
+    """親のワークツリーが合流している子の先頭（`MERGE_HEAD`）。合流の途中でなければ空。
+
+    `MERGE_HEAD` が子のブランチの先頭か、その祖先のときだけ採る。親のワークツリーで
+    別のものを合流している途中（C1 の外の手作業）を、この子の合流と取り違えないため。
+    """
+    if not found.is_child:
+        return ""
+    parent_tree = tree.worktree_path(root, found.parent)
+    rc, out = gitcmd.output(
+        parent_tree, ["rev-parse", "--verify", "--quiet", "MERGE_HEAD"], ops_close.TIMEOUT_SECONDS
+    )
+    merging = out.strip() if rc == 0 else ""
+    head = gitstate.head(tree.worktree_path(root, found.ticket))
+    if not merging or not head:
+        return ""
+    done = gitcmd.run(
+        parent_tree, ["merge-base", "--is-ancestor", merging, head], ops_close.TIMEOUT_SECONDS
+    )
+    return merging if done.ok else ""
 
 
 def _needs_review(root: str, conf: settings.Settings, found: ticket_model.Ticket) -> bool:
@@ -527,8 +549,13 @@ def _score_child(
         stderr.write(f"ccnavi: {definition.fallback}\n")
     # 数えるのは子の仕事の始まり（取り込み直後の親の先頭と子の共通の祖先）から子の先頭まで。
     # 着手の基準点から数えると、衝突を解くために子へ取り込んだ親の、ほかの子の変更が混ざる。
-    base, why = gitstate.child_base(worktree, tree.worktree_path(root, found.parent))
-    diff, why = risk.measure(worktree, base) if base else (None, why)
+    # 合流の途中なら、子の先頭の代わりに合流する先頭（MERGE_HEAD）まで数える。検査のあとに
+    # 子が積んだコミットは合流に載らないので数えない。
+    head = _merging_head(root, found) or "HEAD"
+    base, why = gitstate.child_base(
+        worktree, tree.worktree_path(root, found.parent), child_head=head
+    )
+    diff, why = risk.measure(worktree, base, head) if base else (None, why)
     if diff is None:
         stderr.write(f"ccnavi: {found.ticket} のリスクを測れない: {why}\n")
         return None

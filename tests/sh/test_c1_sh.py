@@ -1201,6 +1201,29 @@ class C1MergeTest(C1Harness):
         parents = git(self.tree, "rev-list", "--parents", "-n", "1", "HEAD").stdout.split()
         self.assertEqual(parents[2], checked)
 
+    def test_a_commit_after_the_plan_still_records_the_merged_head(self):
+        """検査のあとに子がコミットしても、合流した先頭を merged_sha に書き、それまでを数える。"""
+        self.start_parent()
+        tree = self.start_child()
+        planned = self.work(tree, "wip/design/a.md", "a\n")
+        wrap = executable(
+            os.path.join(self._base, "bin", "wrap"),
+            "#!/bin/sh\n"
+            'case " $* " in *" ticket finish "*)\n'
+            f"  cd '{tree}' && echo late > wip/design/late.md && '{GIT}' add -A &&"
+            f" '{GIT}' commit -q -m late ;;\n"
+            "esac\n"
+            f"exec '{self.bin}' \"$@\"\n",
+        )
+        result = self.ticket("finish", CHILD, CCNAVI_BIN_PATH=wrap)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotEqual(self.sha(tree, "HEAD"), planned)
+        review = self.read(os.path.join(self.tree, "wip", "proposals", "review", CHILD + ".md"))
+        self.assertIn(f'merged_sha: "{planned}"', review)
+        risk = os.path.join(self.tree, *APPROVED.split("/"), "phases", PARENT, CHILD + ".risk.json")
+        summary = json.loads(self.read(risk))["summary"]
+        self.assertTrue(summary.startswith("1 ファイル、+1 -0 行"), summary)
+
 
 class TidyAfterFinishTest(C1Harness):
     """finish が通ったら、sh が実行ファイルに `worktree tidy <識別子>` を頼む。
