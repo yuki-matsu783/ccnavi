@@ -16,9 +16,10 @@
 # （キャッシュ。判定には使わない。`/` を含む名前を state の置き場のパスに入れない）。HEAD から読めない・
 # 識別子と合わなければ、その親子のチケットは取り込まずに止める。
 #
-# 親子のチケットの取り込み状態は削除せずに残す。親のワークツリーを片付けても消さない。
-# 消すと、決まらないで止めていた親子のチケット（gone など）が取り込み状態の無いものに戻り、止めが外れるため。
-# 消すのはユーザが打つ `--forget <P>` だけ（親のワークツリーを片付けた後に限る。ネットワークは使わない）。
+# 親子のチケットの取り込み状態は、親のワークツリーを片付けても消さない。消すと、決まらないで止めていた
+# 親子のチケット（gone など）が取り込み状態の無いものに戻り、止めが外れるため。消すのは、MR がマージされて
+# 手元を片付けたとき（下の手元の片付け）と、ユーザが打つ `--forget <P>`（親のワークツリーを片付けた後に限る。
+# ネットワークは使わない）だけ。
 # エージェントからは組み込みの deny（builtin:guard-ticket-approval）が止める。
 #
 # リポジトリ（ワークスペース自身と、親子のチケットの元のプロジェクト）ごとに 1 回、次の順に行う。
@@ -48,6 +49,14 @@
 #     統合先を取り直して確かめ直す（既定 3 回、5 秒おき）。それでも得られなければ、取り込み状態は書き換えずに止める。
 #     マージされていないと分かったときだけ、取り込み状態があれば gone を書いて止める
 #     （取り込み状態が無ければ gone は書かずに止める）
+#   - マージ済みと分かったら、手元を片付ける（実行ファイルの `sync tidy`。条件の確認も削除も実行ファイルが行う）。
+#     親のワークツリー（未コミットの変更や git が無視しているファイルがあれば残す）と、親の手元のブランチ
+#     （手元の先頭が MR の先頭に含まれ、未 push のコミットが無いときだけ）を消し、残ったものは理由と手で消す
+#     コマンドを 1 行ずつ言う。何も残らなければ親の取り込み記録（とロック）も消す。MR の先頭の sha はホストが
+#     答えた（ccnavi-review.sh merged <番号> <sha>）。MR の番号は取り込み記録（ccnavi-start.sh が保存）から引く
+#   - 親のワークツリーを片付けた後（ready の後）で取り込み記録が present のまま残る親子のチケットも、同じく
+#     MR がマージ済みかを聞き、マージ済みなら同じ片付けをする（マージされていなければ何もしない。確かめられな
+#     ければ推定せずに止める）。<P> を渡したときも同じ
 #
 # 統合先の取り込み結果を書いた後、present の親子のチケットごとに実行ファイルの `ccnavi sync check <P> <リポジトリ>` で
 # 判定し直す（どのチケットを正とするかの検査と、承認済みチケットの判定し直し）。error があれば
@@ -85,7 +94,9 @@ sh .ccnavi/scripts/ccnavi-sync.sh --forget <P>...
   親子のチケットの取り込み状態と統合先の取り込み結果を書く。分かれていれば merge し、衝突したら取りやめてユーザに回す。
   リモートから消えた親のブランチは、統合先の done/ を見て「閉じた」か「消えた」かを決める。
   取り込んだ後、親子のチケットを判定し直し、止める理由があれば取り込み状態を blocked にする。
-  取り込み状態は親のワークツリーを片付けても消えない（削除せずに残す）。
+  リモートから消えたブランチの MR がマージ済みなら、手元の親のブランチとワークツリー、取り込み状態を片付ける
+  （未 push のコミットや未コミットの変更があれば消さずに理由を言う）。それ以外では、取り込み状態は親のワークツリーを
+  片付けても消えない（削除せずに残す）。
 
   --forget <P>...  ユーザが実行します。捨てた親子のチケットの取り込み状態を削除します（親のワークツリーを片付けた後だけ）。
                    削除すると、その名前で切り直した親子のチケットは取り込み状態の無いものとして扱われる。
@@ -130,6 +141,8 @@ root=$(ccnavi_workspace) || {
 ccnavi_log_root="$root"
 state=$(ccnavi_state "$root")
 here_sh="$(dirname "$0")"
+# 打った場所。手元の片付けが、自分の居るワークツリーを消さないために渡す。
+sync_cwd="$(pwd -W 2>/dev/null || pwd)"
 
 number_or() {
 	case "${1:-}" in
@@ -485,10 +498,28 @@ add_family() {
 	grep -F -x -q -- "$af_key" "$scratch/repos" 2>/dev/null || printf '%s\n' "$af_key" >>"$scratch/repos"
 }
 
+# 親のワークツリーの無い親子のチケットのうち、取り込み記録が残っているもの。<P><タブ><取り込み状態の名前>
+: >"$scratch/retired"
+add_retired() {
+	for ar_record in "$state"/sync/*/families/"$1"; do
+		[ -f "$ar_record" ] && [ ! -L "$ar_record" ] || continue
+		ar_key="${ar_record%/families/*}"
+		ar_key="${ar_key##*/}"
+		[ ! -L "$state/sync/$ar_key" ] && [ ! -L "$state/sync/$ar_key/families" ] || continue
+		printf '%s\t%s\n' "$1" "$ar_key" >>"$scratch/retired"
+		grep -F -x -q -- "$ar_key" "$scratch/repos" 2>/dev/null || printf '%s\n' "$ar_key" >>"$scratch/repos"
+		return 0
+	done
+	return 1
+}
+
 if [ "$#" -gt 0 ]; then
 	for want in "$@"; do
 		has_family_line "$want" && continue
 		tree="$root/.claude/worktrees/$want"
+		if [ ! -e "$tree" ] && [ ! -L "$tree" ] && add_retired "$want"; then
+			continue
+		fi
 		if [ ! -d "$tree" ] || [ -L "$tree" ]; then
 			printf '%s: 親のワークツリー（.claude/worktrees/%s）がありません。切り直してから再実行してください（sh %s/ccnavi-git.sh fetch origin <ブランチ> のあと worktree add .claude/worktrees/%s <ブランチ>。ブランチ名の / を - に置き換えたものが %s になる）\n' \
 				"$want" "$want" "$here_sh" "$want" "$want"
@@ -545,6 +576,17 @@ else
 		name_branch=$(family_branch "$name") || continue
 		[ "$branch" = "$name_branch" ] || continue
 		add_family "$name" "$tree" "$name_branch"
+	done
+	for ar_path in "$state"/sync/*/families/*; do
+		[ -f "$ar_path" ] && [ ! -L "$ar_path" ] || continue
+		ar_name="${ar_path##*/}"
+		case "$ar_name" in
+		*.tmp.*) continue ;;
+		esac
+		ccnavi_is_ident "$ar_name" || continue
+		has_family_line "$ar_name" && continue
+		[ -e "$root/.claude/worktrees/$ar_name" ] || [ -L "$root/.claude/worktrees/$ar_name" ] && continue
+		add_retired "$ar_name" || :
 	done
 fi
 
@@ -677,6 +719,58 @@ closed_in_integration() {
 	[ "$(printf '%s\n' "$cb_out" | sed -n "s/^integration //p" | head -n 1)" = yes ]
 }
 
+# 親の MR がマージ済みかをホストに聞く（ccnavi-review.sh merged）。<リポジトリかツリーのディレクトリ>
+#
+# 取り込み記録に MR の番号（ccnavi-start.sh が保存する）があれば、その番号の MR を聞く。無ければ
+# ディレクトリのブランチを元にした MR を探す。答えは「終了コード:1 行目」で、1 行目は
+# merged <番号> <先頭の sha> / none / それ以外（道具・トークンが無い、API が失敗した）。
+ask_merged() {
+	am_mr=$(ccnavi_record_get "$record" mr)
+	case "$am_mr" in
+	'' | *[!0-9]*) am_mr="" ;;
+	esac
+	am_rc=0
+	am_out=$(cd "$1" && sh "$here_sh/ccnavi-review.sh" merged ${am_mr:+"$am_mr"} 2>/dev/null </dev/null) || am_rc=$?
+	printf '%s:%s\n' "$am_rc" "$(printf '%s\n' "$am_out" | head -n 1)"
+}
+
+# MR がマージ済みと分かった後の手元の片付け。<MR の先頭の sha>
+#
+# 親のワークツリーと手元のブランチは実行ファイル（`sync tidy`）が消す。手元の先頭が MR の先頭に含まれ
+# （未 push のコミットが無い）、未コミットの変更が無いときだけ。消さなかったものは理由と手で消すコマンドを
+# 1 行ずつ言う。親の取り込み記録は、実行ファイルが「残ったものは無い」（record yes）と答えたときだけ消す。
+# sha が分からない・実行ファイルが無いときは、含まれるか確かめられないので何も消さない。
+tidy_merged() {
+	if [ -z "$1" ]; then
+		printf '%s: マージリクエストの先頭の sha をホストから取れなかったので、手元のブランチは片付けない（含まれるか確かめられない）\n' "$P"
+		return 0
+	fi
+	if [ -z "$info_from" ]; then
+		printf '%s: 実行ファイルが無いので、手元の片付けはしなかった\n' "$P"
+		return 0
+	fi
+	tm_rc=0
+	run_ccnavi --cwd "$sync_cwd" sync tidy "$P" "$key" "$B" "$1" >"$scratch/tidy-raw" 2>"$scratch/tidy-err" || tm_rc=$?
+	tr -d '\r' <"$scratch/tidy-raw" >"$scratch/tidy"
+	if [ "$tm_rc" -ne 0 ]; then
+		printf '%s: 手元の片付けを実行できなかった（%s）。実行ファイルを新しくして再実行してください\n' "$P" "$(head -n 1 "$scratch/tidy-err" 2>/dev/null)"
+		fail_note
+		return 0
+	fi
+	sed -e '/^record /d' -e 's/^/  /' "$scratch/tidy"
+	if [ "$(tail -n 1 "$scratch/tidy")" = "record yes" ]; then
+		if rm -f "$record"; then
+			printf '%s: 片付けた。取り込み記録を削除した\n' "$P"
+			log_info マージ済みの親を片付けた -- "family=$P" "repo=$key"
+		else
+			printf '%s: 取り込み記録（%s）を削除できませんでした\n' "$P" "$record"
+			fail_note
+		fi
+	else
+		printf '%s: 消さなかったものがある。取り込み記録は残す（理由は上。直してから再実行すれば片付く）\n' "$P"
+	fi
+}
+
 # 統合先の done/ に閉じた記録があった。取り込み状態を closed にして言う。
 closed_by_integration() {
 	ccnavi_record_write "$record" remote origin branch "$B" sha "$kept_sha" \
@@ -708,15 +802,22 @@ sync_absent() {
 	# merged <番号> / none（マージされた MR が無い）/ それ以外（道具・トークンが無い、API が失敗した）。
 	# 統合先の done/ を待つ確かめ直しは、答えが得られないときだけ行う（統合先には閉じたチケットを
 	# 残さないので、マージ済みと分かれば待つものは無い）。
-	merged_rc=0
-	merged=$(cd "$tree" && sh "$here_sh/ccnavi-review.sh" merged 2>/dev/null </dev/null) || merged_rc=$?
-	merged=$(printf '%s\n' "$merged" | head -n 1)
+	merged=$(ask_merged "$tree")
+	merged_rc="${merged%%:*}"
+	merged="${merged#*:}"
 	case "$merged_rc:$merged" in
 	*:'merged '*)
-		ccnavi_record_write "$record" remote origin branch "$B" sha "$kept_sha" \
-			fetched_at "$(date +%s)" state closed reason "マージリクエスト（${merged#merged }）がマージ済み" || :
-		printf '%s: リモートから消えたが、マージリクエスト（%s）はマージ済み（クローズ済みの親子のチケット）。親のワークツリーは片付けてよい\n' \
-			"$P" "${merged#merged }"
+		merged_mr="${merged#merged }"
+		merged_sha=""
+		case "$merged_mr" in
+		*' '*)
+			merged_sha="${merged_mr#* }"
+			merged_mr="${merged_mr%% *}"
+			;;
+		esac
+		printf '%s: リモートから消えたが、マージリクエスト（%s）はマージ済み（クローズ済みの親子のチケット）。手元を片付ける\n' \
+			"$P" "$merged_mr"
+		tidy_merged "$merged_sha"
 		return 0
 		;;
 	0:none) ;;
@@ -755,12 +856,66 @@ sync_absent() {
 	return 0
 }
 
+# ---- 親のワークツリーを片付けた後の親子のチケット（取り込み記録だけが残っている）
+#
+# `ready` が親のワークツリーを片付けた後は、取り込み記録と手元のブランチだけが残る。MR がマージ済みかを
+# 聞き（取り込み記録の MR の番号を使う。ホストは、マージ後にブランチを消さないこともある）、マージ済みなら
+# 手元を片付ける。マージされていないと分かったときは何もしない。確かめられなければ、推定せずに止める。
+# <P> <取り込み状態の名前> <リポジトリ> <一覧>
+sync_retired() {
+	P="$1"
+	key="$2"
+	repo="$3"
+	heads="$4"
+	record=$(ccnavi_family_record "$root" "$key" "$P")
+	B=$(ccnavi_record_get "$record" branch)
+	[ -n "$B" ] || return 0
+	# gone・blocked・closed の記録は、止めた理由の目印として残す（ここでは触らない）。
+	[ "$(ccnavi_record_get "$record" state)" = present ] || return 0
+	lock_rc=0
+	ccnavi_lock_take "$root" "$key" "$P" "$lock_wait" || lock_rc=$?
+	if [ "$lock_rc" -ne 0 ]; then
+		printf '%s: 他の操作がロックを持っている。終わってから再実行してください\n' "$P"
+		fail_note
+		return 0
+	fi
+	merged=$(ask_merged "$repo")
+	merged_rc="${merged%%:*}"
+	merged="${merged#*:}"
+	case "$merged_rc:$merged" in
+	*:'merged '*)
+		merged_mr="${merged#merged }"
+		merged_sha=""
+		case "$merged_mr" in
+		*' '*)
+			merged_sha="${merged_mr#* }"
+			merged_mr="${merged_mr%% *}"
+			;;
+		esac
+		printf '%s: ワークツリーは片付け済み。親のブランチ %s はリモートから消え、マージリクエスト（%s）はマージ済み。手元を片付ける\n' \
+			"$P" "$B" "$merged_mr"
+		tree="$repo"
+		tidy_merged "$merged_sha"
+		;;
+	0:none) ;;
+	*)
+		printf '%s: 親のブランチ %s がリモートから消えたが、マージリクエストがマージ済みかを確かめられなかった（ccnavi-review.sh merged が結果を返さなかった。gh・glab か、curl とトークンが必要です）。手元は片付けずに止めた\n' "$P" "$B"
+		fail_note
+		;;
+	esac
+	ccnavi_lock_drop
+	rm -rf "$state/locks/$key/$P" 2>/dev/null || :
+	return 0
+}
+
 # ---- 取り込みの後の検査
 
 # present の親子のチケットを判定し直し、error があれば blocked にする。<P> <取り込み状態の名前>
 check_family() {
 	cf_record=$(ccnavi_family_record "$root" "$2" "$1")
 	[ "$(ccnavi_record_get "$cf_record" state)" = present ] || return 0
+	# 手元の片付けで親のワークツリーを消した親子のチケットは、判定し直す先が無い。
+	[ -d "$root/.claude/worktrees/$1" ] || return 0
 	if [ -z "$info_from" ]; then
 		printf '%s: 実行ファイルが無いので、取り込みの後の検査（判定し直し）はしなかった\n' "$1"
 		return 0
@@ -871,6 +1026,11 @@ while IFS= read -r key <&4; do
 		[ -n "$fam_p" ] || continue
 		sync_family "$fam_p" "$fam_tree" "$fam_key" "$repo" "$integ" "$heads" "$fam_branch"
 	done 3<"$scratch/these"
+	awk -F "$tab" -v k="$key" '$2 == k' "$scratch/retired" >"$scratch/these-retired"
+	while IFS="$tab" read -r ret_p ret_key <&3; do
+		[ -n "$ret_p" ] || continue
+		sync_retired "$ret_p" "$ret_key" "$repo" "$heads"
+	done 3<"$scratch/these-retired"
 	if ! write_integration "$repo" "$key" "$integ"; then
 		printf '%s 統合先の取り込み結果（%s/sync/%s/integration）を保存できませんでした。\n' "$label" "$state" "$key"
 		repo_fail

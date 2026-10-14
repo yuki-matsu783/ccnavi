@@ -646,23 +646,31 @@ class SyncTest(SyncHarness):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual("present", fields(self.record)["state"])
 
-    def test_a_merged_request_is_closed_without_a_done_copy(self):
+    def branches(self):
+        return git(self.ws, "branch", "--format=%(refname:short)").stdout.split()
+
+    def test_a_merged_request_cleans_up_without_a_done_copy(self):
         # 統合先には閉じたチケットを残さない（ready が退避して消し、squash でマージする）ので、
-        # MR がマージ済みと分かれば閉じた親子のチケット。消えたとは言わない。
-        self.review_says("merged 42")
+        # MR がマージ済みと分かれば閉じたと読み、手元の親のブランチと取り込み記録を片付ける。
+        head = self.sha(self.tree, "HEAD")
+        self.review_says(f"merged 42 {head}")
         self.keep_record()
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="1")
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("マージ済み", done.stdout)
         self.assertIn("42", done.stdout)
-        self.assertIn("クローズ済みの親子のチケット", done.stdout)
+        self.assertIn(f"ブランチ {PARENT} を削除しました", done.stdout)
+        self.assertIn("取り込み記録を削除した", done.stdout)
         self.assertNotIn("戻し方", done.stdout)
-        self.assertEqual("closed", fields(self.record)["state"])
+        self.assertFalse(os.path.exists(self.record))
+        self.assertFalse(os.path.exists(self.tree))
+        self.assertEqual(["main"], self.branches())
+        self.assertFalse(os.path.exists(self.lock_dir()))
 
     def test_a_merged_answer_does_not_wait_for_the_integration(self):
         # 統合先の done/ を待つ確かめ直しは、マージ済みかの答えが得られないときだけ。
-        self.review_says("merged 42")
+        self.review_says(f"merged 42 {self.sha(self.tree, 'HEAD')}")
         self.keep_record()
         self.delete_remote_branch(PARENT)
         started = time.monotonic()
@@ -670,7 +678,102 @@ class SyncTest(SyncHarness):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         # 待てば 30 秒を超える。1 回の取り込みが遅い機械（Windows）でも、待ちと見分けられる。
         self.assertLess(time.monotonic() - started, 30)
-        self.assertEqual("closed", fields(self.record)["state"])
+        self.assertFalse(os.path.exists(self.record))
+
+    def test_an_unpushed_commit_keeps_the_branch_and_the_record(self):
+        merged_head = self.sha(self.tree, "HEAD")
+        self.local_commit("notes.txt", "未 push\n")
+        self.review_says(f"merged 42 {merged_head}")
+        self.keep_record()
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertIn("未 push のコミットがある", done.stdout)
+        self.assertIn(f"branch -D {PARENT}", done.stdout)
+        self.assertIn("取り込み記録は残す", done.stdout)
+        self.assertIn(PARENT, self.branches())
+        self.assertTrue(os.path.exists(self.record))
+
+    def test_uncommitted_changes_keep_the_worktree_and_the_record(self):
+        self.review_says(f"merged 42 {self.sha(self.tree, 'HEAD')}")
+        self.keep_record()
+        write(os.path.join(self.tree, "memo.txt"), "書きかけ\n")
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        self.assertIn("未コミットの変更があるので、何も削除しませんでした", done.stdout)
+        self.assertTrue(os.path.isdir(self.tree))
+        self.assertIn(PARENT, self.branches())
+        self.assertTrue(os.path.exists(self.record))
+
+    def test_without_the_head_of_the_request_nothing_is_deleted(self):
+        self.review_says("merged 42")
+        self.keep_record()
+        self.delete_remote_branch(PARENT)
+        done = self.sync(PARENT)
+        self.assertIn("先頭の sha をホストから取れなかった", done.stdout)
+        self.assertTrue(os.path.isdir(self.tree))
+        self.assertIn(PARENT, self.branches())
+        self.assertTrue(os.path.exists(self.record))
+
+    # ---- 親のワークツリーを片付けた後（ready の後）。取り込み記録と手元のブランチが残る
+
+    def retire_tree(self):
+        """ready の後の状態にする。取り込み記録は、ワークツリーを消す前に置いておく。"""
+        git(self.ws, "worktree", "remove", self.tree)
+
+    def record_with_mr(self, number="42"):
+        self.keep_record()
+        with open(self.record, "a", encoding="utf-8", newline="\n") as f:
+            f.write(f"mr {number}\n")
+
+    def test_a_retired_family_is_cleaned_when_its_request_is_merged(self):
+        head = self.sha(self.tree, "HEAD")
+        self.record_with_mr()
+        self.retire_tree()
+        self.review_says(f"merged 42 {head}")
+        self.delete_remote_branch(PARENT)
+        done = self.sync()
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertIn("ワークツリーは片付け済み", done.stdout)
+        self.assertIn(f"ブランチ {PARENT} を削除しました", done.stdout)
+        self.assertFalse(os.path.exists(self.record))
+        self.assertEqual(["main"], self.branches())
+        # 打ち直しても何も起きない
+        again = self.sync()
+        self.assertEqual(0, again.returncode, again.stdout + again.stderr)
+
+    def test_a_retired_family_asks_by_the_request_number(self):
+        head = self.sha(self.tree, "HEAD")
+        self.record_with_mr("42")
+        self.retire_tree()
+        log = os.path.join(self._tmp.name, "review-args")
+        write(
+            os.path.join(self.scripts, "ccnavi-review.sh"),
+            f'#!/bin/sh\nprintf "%s\\n" "$*" >>\'{log}\'\nprintf "merged 42 {head}\\n"\n',
+        )
+        self.sync(PARENT)
+        with open(log, encoding="utf-8") as f:
+            self.assertEqual("merged 42", f.read().strip())
+        self.assertFalse(os.path.exists(self.record))
+
+    def test_a_retired_family_with_an_unmerged_request_is_left_alone(self):
+        self.record_with_mr()
+        self.retire_tree()
+        self.review_says("none")
+        done = self.sync()
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertTrue(os.path.exists(self.record))
+        self.assertIn(PARENT, self.branches())
+
+    def test_a_retired_family_stops_when_the_merge_cannot_be_checked(self):
+        self.record_with_mr()
+        self.retire_tree()
+        self.review_says("unknown", 3)
+        done = self.sync()
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertIn("確かめられなかった", done.stdout)
+        self.assertTrue(os.path.exists(self.record))
+        self.assertIn(PARENT, self.branches())
 
     def archive_locally(self, text):
         write(os.path.join(self.ws, "logs", "archive", "self", "done", f"{PARENT}.md"), text)

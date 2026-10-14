@@ -6,7 +6,7 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh comment --body-file <本文>
 #   sh .ccnavi/scripts/ccnavi-review.sh decide  <N>          （ユーザが端末で打つ）
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた時点の状態を JSON で見る）
-#   sh .ccnavi/scripts/ccnavi-review.sh merged                （MR がマージ済みか。ccnavi-sync.sh が使う）
+#   sh .ccnavi/scripts/ccnavi-review.sh merged [<番号>]       （MR がマージ済みか。番号で聞くこともできる。ccnavi-sync.sh が使う）
 #   sh .ccnavi/scripts/ccnavi-review.sh ready [--parent <親>]                  （閉じたチケットを logs/archive/ へ退避し、MR の Draft を外し、子と親のワークツリーと合流済みの子のブランチを片付ける）
 #   sh .ccnavi/scripts/ccnavi-review.sh close-early --reason <理由> [--no-issue]  （ユーザが端末で打つ。残りを issue に書き出して早めに閉じる）
 #   sh .ccnavi/scripts/ccnavi-review.sh origin                                 （origin をどう読んだか。ホスト・scheme・API の URL）
@@ -75,7 +75,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
   close-early  --reason <理由> [--no-issue]       まだ残っているが早めに閉じる判断（ユーザが端末で実行します）。残りを issue に書き出す。Draft は親が ready で外す
   fetch                                           リモートから取ってきた時点の状態を JSON で標準出力へ
   origin                                          origin をどう読んだか（ホスト・scheme・API の URL）
-  merged                                          いまのブランチのマージリクエストがマージ済みなら "merged <番号>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が観測ずれを確かめる）
+  merged [<番号>]                                 マージリクエスト（番号で指定、省けばいまのブランチのもの）がマージ済みなら "merged <番号> <先頭の sha>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が閉じたかを確かめる）
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が必要です。
 USAGE
@@ -680,37 +680,65 @@ fetch)
 	printf '\n'
 	;;
 merged)
-	# いまのブランチ（親のブランチ）の MR がマージ済みか。ccnavi-sync.sh が、
-	# 親のブランチがリモートから消えて統合先の done/ にも見えないときに、観測ずれかを確かめるために聞く。
-	# 読むだけで、何も書かない。答えは 3 つで、呼ぶ側は none のときだけ「マージされていない」と読む。
-	#   merged <番号>  終了コード 0
-	#   none          終了コード 0（マージ済みの MR が無いと分かった）
-	#   unknown       終了コード 3（API が失敗した・答えを読めなかった）。道具やトークンが無ければ、
-	#                 上の道具の選び方が 2 で止める（none は出さない）
+	# MR がマージ済みか。ccnavi-sync.sh が、親のブランチがリモートから消えたときに、閉じたか（第一の根拠）を
+	# 確かめ、マージ済みなら手元の片付けの条件に使う先頭の sha を取るために聞く。読むだけで、何も書かない。
+	# 引数は MR の番号（省けば、いまのブランチを元にした MR を探す）。番号があればその MR だけを聞く。
+	# 答えは 3 つで、呼ぶ側は none のときだけ「マージされていない」と読む。
+	#   merged <番号> <先頭の sha>  終了コード 0（sha はマージされた MR の元ブランチの先頭。分からなければ空）
+	#   none                        終了コード 0（マージ済みの MR が無いと分かった）
+	#   unknown                     終了コード 3（API が失敗した・答えを読めなかった）。道具やトークンが無ければ、
+	#                               上の道具の選び方が 2 で止める（none は出さない）
+	merged_number="${1:-}"
+	case "$merged_number" in
+	*[!0-9]*) fail merged-number "merged の MR の番号 (${merged_number}) は数字で渡してください。" 2 ;;
+	esac
+	found=""
 	if [ "$kind" = github ]; then
 		owner="${path%%/*}"
-		answer=$(api GET "repos/$path/pulls?state=closed&head=$owner:$branch") || {
-			printf 'unknown\n'
-			exit 3
-		}
-		found=$(printf '%s' "$answer" | "$JQ" -r '[.[] | select(.merged_at != null)][0].number // empty') || {
-			printf 'unknown\n'
-			exit 3
-		}
+		if [ -n "$merged_number" ]; then
+			answer=$(api GET "repos/$path/pulls/$merged_number") || {
+				printf 'unknown\n'
+				exit 3
+			}
+			found=$(printf '%s' "$answer" | "$JQ" -r 'select(.merged_at != null) | "\(.number) \(.head.sha // "")"') || {
+				printf 'unknown\n'
+				exit 3
+			}
+		else
+			answer=$(api GET "repos/$path/pulls?state=closed&head=$owner:$branch") || {
+				printf 'unknown\n'
+				exit 3
+			}
+			found=$(printf '%s' "$answer" | "$JQ" -r '[.[] | select(.merged_at != null)][0] | select(. != null) | "\(.number) \(.head.sha // "")"') || {
+				printf 'unknown\n'
+				exit 3
+			}
+		fi
 	else
 		pid=$(project_id) || {
 			printf 'unknown\n'
 			exit 3
 		}
-		# 全ページを読んでから絞る（フォークの MR で 1 ページ目が埋まっても見落とさない）
-		answer=$(pages "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$branch") || {
-			printf 'unknown\n'
-			exit 3
-		}
-		found=$(printf '%s' "$answer" | "$JQ" -r --argjson pid "$pid" '[.[] | select(.source_project_id == $pid)][0].iid // empty') || {
-			printf 'unknown\n'
-			exit 3
-		}
+		if [ -n "$merged_number" ]; then
+			answer=$(api GET "projects/$(encoded_path)/merge_requests/$merged_number") || {
+				printf 'unknown\n'
+				exit 3
+			}
+			found=$(printf '%s' "$answer" | "$JQ" -r --argjson pid "$pid" 'select(.state == "merged" and .source_project_id == $pid) | "\(.iid) \(.sha // "")"') || {
+				printf 'unknown\n'
+				exit 3
+			}
+		else
+			# 全ページを読んでから絞る（フォークの MR で 1 ページ目が埋まっても見落とさない）
+			answer=$(pages "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$branch") || {
+				printf 'unknown\n'
+				exit 3
+			}
+			found=$(printf '%s' "$answer" | "$JQ" -r --argjson pid "$pid" '[.[] | select(.source_project_id == $pid)][0] | select(. != null) | "\(.iid) \(.sha // "")"') || {
+				printf 'unknown\n'
+				exit 3
+			}
+		fi
 	fi
 	if [ -n "$found" ]; then
 		printf 'merged %s\n' "$found"
