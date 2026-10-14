@@ -474,7 +474,7 @@ class ProjectsTest(unittest.TestCase):
         )
         result = self.ccnavi("--agree", stdin="y\n")
         # 承認の対象の一部（子）が失敗したので、通ったぶん（親）を置いてから
-        # 1 で終わる。
+        # 4 で終わる（何も置かない失敗の 1 とは分ける）。
         self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
         self.assertIn("子は親と同じ置き場に置いて", result.stderr)
         self.assertTrue(os.path.exists(self.approved_path("doing", "i0007.md")))
