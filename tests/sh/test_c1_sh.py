@@ -211,7 +211,8 @@ class C1Harness(unittest.TestCase):
         )
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "propose")
-        done = self.exe("--agree", "--yes", f"{PARENT},{CHILD}", "--json")
+        digest = json.loads(self.exe("--agree", "--preview", "--json").stdout)["digest"]
+        done = self.exe("--agree", "--yes", f"{PARENT},{CHILD}", "--digest", digest, "--json")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "approve")
@@ -863,7 +864,8 @@ class C1MergeTest(C1Harness):
         )
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "propose b")
-        done = self.exe("--agree", "--yes", CHILD_B, "--json")
+        digest = json.loads(self.exe("--agree", "--preview", "--json").stdout)["digest"]
+        done = self.exe("--agree", "--yes", CHILD_B, "--digest", digest, "--json")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "approve b")

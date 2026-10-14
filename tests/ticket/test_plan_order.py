@@ -454,14 +454,19 @@ class PlanOrderWriteTest(PlanOrderHarness):
         self.assertIn("何も反映しません", result.stderr)
         self.assertEqual(self.read(), text)
 
-    def test_the_written_proposal_is_approved_as_it_is_now(self):
+    def test_the_written_proposal_is_approved_and_the_old_digest_is_not(self):
         self.propose("i0001", parent_text("i0001", PLAN3))
         self.commit_parent()
+        old = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
         result = self.write_order(REVERSE)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         written = self.read()
         self.commit_parent("reorder")
-        done = self.ccnavi("--agree", "--yes", "i0001", "--json")
+        stale = self.ccnavi("--agree", "--yes", "i0001", "--digest", old, "--json")
+        self.assertEqual(stale.returncode, 1, stale.stdout + stale.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
+        fresh = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
+        done = self.ccnavi("--agree", "--yes", "i0001", "--digest", fresh, "--json")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
             self.assertEqual(f.read(), written)

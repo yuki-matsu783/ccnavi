@@ -49,6 +49,13 @@ case " $* " in
 *" c1 family "*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
 esac
 [ -z "${STUB_ARGS:-}" ] || printf '%s\\n' "$@" > "$STUB_ARGS"
+# 実行ファイルは書き込みに入ると、書けたパスの一覧を --placed-out のファイルへ書く
+while [ $# -gt 0 ]; do
+	if [ "$1" = --placed-out ] && [ -n "${STUB_REPORT:-}" ]; then
+		printf '%s\\n' "$STUB_REPORT" > "$2"
+	fi
+	shift
+done
 [ "${STUB_EXIT:-0}" = 0 ] || exit "$STUB_EXIT"
 [ -n "${STUB_TREE:-}" ] || exit 0
 mkdir -p "$STUB_TREE/.ccnavi/approved/doing"
@@ -802,14 +809,18 @@ class ApproveCarriesTest(Workspace):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         got = self.received(args)
         self.assertEqual(got[:1], ["--root"], got)
-        self.assertEqual(got[2:], ["--agree", "i0002-01-03", "i0002-01-04"], got)
+        # 実行ファイルには、書けたパスの一覧の書き出し先（--placed-out）も渡す
+        self.assertEqual(got[2:4], ["--agree", "--placed-out"], got)
+        self.assertEqual(got[5:], ["i0002-01-03", "i0002-01-04"], got)
 
     def test_approve_without_ids_takes_all_pending(self):
         self.worktree("i0001")
         args = os.path.join(self._tmp.name, "args")
         result = self.approve(STUB_ARGS=args)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.received(args)[2:], ["--agree"])
+        got = self.received(args)
+        self.assertEqual(got[2:4], ["--agree", "--placed-out"], got)
+        self.assertEqual(got[5:], [])
 
     def test_approve_refuses_words_that_are_not_ids(self):
         """識別子でない語は断り、実行ファイルを呼ばない。
@@ -839,7 +850,9 @@ class ApproveCarriesTest(Workspace):
         args = os.path.join(self._tmp.name, "args")
         result = self.approve("help", "i0002-01-01", STUB_ARGS=args)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.received(args)[2:], ["--agree", "help", "i0002-01-01"])
+        got = self.received(args)
+        self.assertEqual(got[2:4], ["--agree", "--placed-out"])
+        self.assertEqual(got[5:], ["help", "i0002-01-01"])
         refused = self.approve("--help", "i0002-01-01")
         self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
 
@@ -882,6 +895,33 @@ class ApproveCarriesTest(Workspace):
         self.assertEqual(self.committed(tree), [f"{APPROVED}/i0001.md"])
         self.assertEqual(self.remote_head("i0001"), self.head(tree))
         self.assertIn("承認の一部だけが通った", result.stderr)
+
+    def test_partial_approval_reports_the_written_and_the_failed(self):
+        """親は書けて子だけ書けなかった承認。親は push され、書けた分と子の失敗が報告される。"""
+        tree = self.worktree("i0001")
+        report = (
+            '{"version":1,"placed":["/w/.ccnavi/approved/doing/i0001.md"],'
+            '"failed":[{"ticket":"i0001-01-01","reason":"保存できませんでした"}],'
+            '"unwritten":[],"rejected":[]}'
+        )
+        result = self.approve(STUB_TREE=tree, STUB_AFTER_EXIT="4", STUB_REPORT=report)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(self.committed(tree), [f"{APPROVED}/i0001.md"])
+        self.assertEqual(self.remote_head("i0001"), self.head(tree))
+        self.assertIn("/w/.ccnavi/approved/doing/i0001.md", result.stderr)
+        self.assertIn("i0001-01-01", result.stderr)
+        self.assertIn("保存できませんでした", result.stderr)
+        self.assertNotIn("未送信", result.stderr)
+
+    def test_partial_approval_whose_push_fails_names_the_unsent_paths(self):
+        """一部だけ書けて、push も失敗したときは、未送信のパスを名指しする。"""
+        tree = self.worktree("i0001")
+        git(self.ws, "remote", "set-url", "origin", os.path.join(self._tmp.name, "missing.git"))
+        result = self.approve(STUB_TREE=tree, STUB_AFTER_EXIT="4", STUB_REPORT='{"placed":[]}')
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(self.subject(tree), MESSAGE)
+        self.assertIn("未送信", result.stderr)
+        self.assertIn(f"{APPROVED}/i0001.md", result.stderr)
 
     def test_failed_push_does_not_fail_the_approval(self):
         """コミットや push の失敗で承認が失敗に見えないように、承認が通れば 0。コミットは残る。"""
