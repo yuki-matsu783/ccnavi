@@ -48,7 +48,9 @@ PARENT_TREE_RULE_ID = "builtin:subagent-parent-tree"
 
 # 保護済みの sh の名前。置き場は `.ccnavi/scripts/` に固定だが、呼び出しの綴りは
 # 絶対パス・相対パス・ワークツリーの中の写しとまちまちなので、パスではなく名前で見る。
-_SCRIPT = re.compile(r"ccnavi-[A-Za-z0-9-]+\.sh")
+# 名前の大小は問わない。Windows と macOS の既定のファイルシステムでは `CCNAVI-GIT.SH` も同じ
+# ファイルで、区別すると表記を変えるだけで外せる。
+_SCRIPT = re.compile(r"ccnavi-[A-Za-z0-9-]+\.sh", re.IGNORECASE)
 _GIT_SCRIPT = "ccnavi-git.sh"
 
 # 同じコマンド行で置いてよい変数。出力の量と待ち時間だけを変え、検査の材料には触れない。
@@ -131,7 +133,7 @@ def check_child_push(
         return "", "", ""
     for words, here in shellread.placed(subject):
         call = _script_call(words)
-        if not call or os.path.basename(call[0].replace("\\", "/")) != _GIT_SCRIPT:
+        if not call or not _is_git_script(call[0]):
             continue
         if call[1][:1] != ["push"]:
             continue
@@ -198,7 +200,7 @@ def check_parent_tree_git(
         return "", ""
     for words, here in shellread.placed(subject):
         call = _script_call(words)
-        if not call or os.path.basename(call[0].replace("\\", "/")) != _GIT_SCRIPT:
+        if not call or not _is_git_script(call[0]):
             continue
         args = call[1]
         if not args:
@@ -313,7 +315,7 @@ def check_core_paths(
     compiled = None
     for words, here in places:
         call = _script_call(words)
-        if not call or os.path.basename(call[0].replace("\\", "/")) != _GIT_SCRIPT:
+        if not call or not _is_git_script(call[0]):
             continue
         args = call[1]
         if args and _OPEN_SUB.search(args[0]):
@@ -757,6 +759,10 @@ def _script_call(words: list[str]) -> tuple[str, list[str]] | None:
             return words[k], args
         return None
     return None
+
+
+def _is_git_script(word: str) -> bool:
+    return os.path.basename(word.replace("\\", "/")).lower() == _GIT_SCRIPT
 
 
 def _is_script(word: str) -> bool:

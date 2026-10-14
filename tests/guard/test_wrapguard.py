@@ -429,6 +429,20 @@ class SubagentParentTreeTest(unittest.TestCase):
         )
         self.assertFalse(self.denied(reason), reason)
 
+    def test_the_name_of_the_wrapper_is_read_without_case(self):
+        # 大小を区別しないファイルシステムでは同じ sh が走る。表記を変えても外れない。
+        parent = self.trees["i0001"]
+        child = self.trees["i0001-01-01"]
+        upper = os.path.join(self.root, ".ccnavi", "scripts", "CCNAVI-GIT.SH")
+        mixed = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-git.SH")
+        reason = self.hook(parent, f"sh {upper} commit -m x")
+        self.assertTrue(self.denied(reason), reason)
+        reason = self.hook(child, f"sh {mixed} push")
+        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+        ticket_sh = os.path.join(self.root, ".ccnavi", "scripts", "CCNAVI-TICKET.SH")
+        reason = self.hook(child, f"sh {ticket_sh} finish i0001-01-01")
+        self.assertIn("DENY_SUBAGENT_TICKET_OP", reason)
+
     def test_push_from_a_child_is_still_refused_for_its_own_reason(self):
         reason = self.hook(self.trees["i0001-01-01"], " ".join(GIT + ["push"]))
         self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)

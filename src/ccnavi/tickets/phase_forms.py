@@ -37,7 +37,10 @@ TURN_DEFINED = "ターン（ユーザが指示を出してから Claude が応�
 _FORBIDDEN_COMMAND = re.compile(
     r"(^|[;&|]\s*)(sh|bash)(\s+-\S+)*\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
     r"(start|finish|cancel|record-risk|request|confirm|comment|decide|ready|close-early"
-    r"|push)\b"
+    r"|push)\b",
+    # 名前の大小は問わない（`CCNAVI-TICKET.SH`）。大小を区別しないファイルシステムでは
+    # 同じ sh が走る。
+    re.IGNORECASE,
 )
 
 # シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に当てる。
