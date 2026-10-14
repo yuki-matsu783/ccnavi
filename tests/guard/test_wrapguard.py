@@ -400,6 +400,33 @@ class SubagentParentTreeTest(unittest.TestCase):
         reason = self.hook(parent, "cd ../i0001-01-01 && " + " ".join(GIT + ["commit -m x"]))
         self.assertFalse(self.denied(reason), reason)
 
+    def test_the_directory_of_a_runner_is_followed(self):
+        # `env -C` と `sudo -D` は後ろのコマンドを別のディレクトリで走らせる。剥がした実行役の
+        # 行き先を居場所に入れないと、子の cwd のまま親へコミットできる。
+        parent = self.trees["i0001"]
+        child = self.trees["i0001-01-01"]
+        for head in (
+            f"env -C {parent}",
+            f"env --chdir={parent}",
+            f"env --chdir {parent}",
+            f"sudo -D {parent}",
+            f"sudo --chdir={parent}",
+            "env -C ../i0001",
+        ):
+            with self.subTest(head=head):
+                reason = self.hook(child, head + " " + " ".join(GIT + ["commit -m x"]))
+                self.assertTrue(self.denied(reason), reason)
+        # 読めない行き先は止める。子のワークツリーへ移る形は通す。
+        reason = self.hook(child, 'env -C "$D" ' + " ".join(GIT + ["commit -m x"]))
+        self.assertTrue(self.denied(reason), reason)
+        reason = self.hook(parent, f"env -C {child} " + " ".join(GIT + ["commit -m x"]))
+        self.assertFalse(self.denied(reason), reason)
+        # 子のワークツリーからの push も、実行役の行き先で見る。読めない行き先は止める。
+        reason = self.hook(parent, f"env -C {child} " + " ".join(GIT + ["push"]))
+        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+        reason = self.hook(parent, 'env -C "$D" ' + " ".join(GIT + ["push"]))
+        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+
     def test_an_untraceable_place_stops(self):
         child = self.trees["i0001-01-01"]
         reason = self.hook(child, 'cd "$X" && ' + " ".join(GIT + ["commit -m x"]))

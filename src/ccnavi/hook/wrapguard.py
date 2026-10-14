@@ -126,20 +126,21 @@ def check_child_push(
     """子チケットのワークツリーからの `ccnavi-git.sh push` なら（ツリーの名前, 親,
     見つけた文字列）。
 
-    居場所は payload の cwd から `cd` を追った先。追えなくなった先で push を
+    居場所は payload の cwd から `cd` と実行役の行き先（`env -C`・`sudo -D`）を追った先。
+    追えなくなった先で push を
     打つ形は、どのツリーから送るのかが決まらないので止める（親は `?`）。
     """
     if degraded or not cwd:
         return "", "", ""
     for words, here in shellread.placed(subject):
-        call = _script_call(words)
+        call = _script_call_at(words)
         if not call or not _is_git_script(call[0]):
             continue
         if call[1][:1] != ["push"]:
             continue
-        if here is None:
+        place = _call_place(cwd, here, call[2])
+        if place is None:
             return "?", "?", ""
-        place = here if os.path.isabs(here) else os.path.join(cwd, here)
         name = worktree_name(root, place)
         if not name:
             continue
@@ -185,7 +186,8 @@ def check_parent_tree_git(
     """サブエージェントの `ccnavi-git.sh` が親のワークツリーを書き換える形なら
     （副命令, 親のワークツリーの名前）。
 
-    居場所は payload の cwd から `cd` を追った先（子のワークツリーでのコミットと、子のワークツリーで
+    居場所は payload の cwd から `cd` と実行役の行き先（`env -C`・`sudo -D`）を追った先
+    （子のワークツリーでのコミットと、子のワークツリーで
     親のブランチを取り込む merge は通す）。居場所を追えない形（`cd` の行き先に変数・置換がある、
     読み切れないコマンド行）で書き換える副命令を打つ形は、どのツリーに当たるかが決まらないので
     止める（名前は `?`）。
@@ -199,7 +201,7 @@ def check_parent_tree_git(
                 return (sub.group(1).lower() if sub else "?"), "?"
         return "", ""
     for words, here in shellread.placed(subject):
-        call = _script_call(words)
+        call = _script_call_at(words)
         if not call or not _is_git_script(call[0]):
             continue
         args = call[1]
@@ -207,11 +209,11 @@ def check_parent_tree_git(
             continue
         if _OPEN_SUB.search(args[0]):
             return args[0], "?"
-        if args[0] not in _PARENT_WRITES:
+        if args[0].lower() not in _PARENT_WRITES:
             continue
-        if here is None or not cwd:
+        place = _call_place(cwd, here, call[2]) if cwd else None
+        if place is None:
             return args[0], "?"
-        place = here if os.path.isabs(here) else os.path.join(cwd, here)
         name = worktree_name(root, place)
         if name and ticket_role(conf, root, name)[0] == ROLE_PARENT:
             return args[0], name
@@ -731,7 +733,74 @@ def _script_call(words: list[str]) -> tuple[str, list[str]] | None:
     `sh <sh>`・`bash <sh>`・`<sh>` の直接の実行・`. <sh>`、と、それを `env` `sudo` などの
     実行役のコマンド越しに呼ぶ形。`sh -c '…'` は読み切れない形として read() が縮退させる。
     """
+    found = _script_call_at(words)
+    return (found[0], found[1]) if found else None
+
+
+# 実行役のコマンドのうち、後ろのコマンドを別のディレクトリで実行させる選択肢
+# （`env -C <dir>`・`sudo -D <dir>`。長い形はどちらも `--chdir`）。
+_CHDIR_SHORT = {"env": "C", "sudo": "D"}
+
+
+# 居場所の表記のうち、シェルが実行の時点で値を決めるもの（変数・置換・glob・`~`）。
+_UNREAD_PLACE = re.compile(r"[$`*?\[~]")
+
+
+def _call_place(cwd: str, here: str | None, chdirs: list[str]) -> str | None:
+    """sh が実際に走る場所。`cd` を追った先に、実行役の `-C` / `-D` / `--chdir` の行き先を重ねる。
+
+    どれかが読めなければ None（どこで走るかが決まらない。呼び手は止める側に倒す）。
+    """
+    if here is None:
+        return None
+    place = here if os.path.isabs(here) else os.path.join(cwd, here)
+    for target in chdirs:
+        if not target or _UNREAD_PLACE.search(target):
+            return None
+        place = os.path.join(place, target)
+    return place
+
+
+def _runner_chdirs(name: str, args: list[str]) -> list[str]:
+    """実行役が後ろのコマンドを動かすディレクトリ（書いた順）。無ければ空。"""
+    short = _CHDIR_SHORT.get(name)
+    if not short:
+        return []
+    values, _ = shellread_words._RUNNERS[name]
+    found: list[str] = []
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "--" or not arg.startswith("-") or arg == "-":
+            break
+        if arg.startswith("--"):
+            option, eq, value = arg.partition("=")
+            if option == "--chdir":
+                if eq:
+                    found.append(value)
+                elif i + 1 < len(args):
+                    found.append(args[i + 1])
+            i += shellread_words._option_width(arg, args[i + 1 :], values)
+            continue
+        letters = arg[1:]
+        for k, letter in enumerate(letters):
+            if letter == short:
+                rest = letters[k + 1 :]
+                if rest:
+                    found.append(rest)
+                elif i + 1 < len(args):
+                    found.append(args[i + 1])
+                break
+            if "-" + letter in values:
+                break
+        i += shellread_words._option_width(arg, args[i + 1 :], values)
+    return found
+
+
+def _script_call_at(words: list[str]) -> tuple[str, list[str], list[str]] | None:
+    """`_script_call` と同じ読みに、実行役が移す先のディレクトリ（書いた順）を添える。"""
     words = _strip_heads(words)
+    chdirs: list[str] = []
     depth = 0
     while words and depth <= shellread_words.UNWRAP_DEPTH:
         k = shellread_words._name_index(words)
@@ -743,6 +812,7 @@ def _script_call(words: list[str]) -> tuple[str, list[str]] | None:
             inner = shellread_words._runner_command(name, args)
             if not inner:
                 return None
+            chdirs.extend(_runner_chdirs(name, args))
             words = inner[0]
             depth += 1
             continue
@@ -753,10 +823,10 @@ def _script_call(words: list[str]) -> tuple[str, list[str]] | None:
                     i += 1
                 i += 1
             if i < len(args) and _is_script(args[i]):
-                return args[i], args[i + 1 :]
+                return args[i], args[i + 1 :], chdirs
             return None
         if _is_script(words[k]):
-            return words[k], args
+            return words[k], args, chdirs
         return None
     return None
 
