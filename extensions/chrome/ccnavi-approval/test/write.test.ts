@@ -2,8 +2,8 @@
  * Chrome からの承認と取り下げ。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
  *
  * - 1 コミットの組み立て（`createCommitOnBranch`、`expectedHeadOid` = 読んだ P の先頭）と、書いた後の確かめ
- * - 先頭が動いたら新しい Snapshot で判定と plan をやり直す。ダイジェストが同じなら見せ直さずに書き、違えば書かない
- * - 見せたダイジェストが違えば書かない。決まらない親子のチケット・版ずれでは書かない
+ * - 先頭が動いたら新しい Snapshot で判定と plan をやり直す。その内容が有効なら書き、通らなければ書かない
+ * - 指した識別子だけを、承認する時点の Snapshot で判定して書く。決まらない親子のチケット・版ずれでは書かない
  * - 取り下げ: 承認コミット（merge を飛ばす）の親の提案をそのまま戻す
  */
 import { before, test } from "node:test";
@@ -102,7 +102,7 @@ test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足
   assert.deepEqual(after?.withdrawable?.map((w) => [w.ticket, w.problems]), [["i0001", ["[CORE_WITHDRAW_HAS_CHILDREN] todo/ に子の提案がある"]]]);
 });
 
-test("CX-T101 先頭が動いたら（expectedHeadOid の競合）新しい Snapshot で判定し直し、ダイジェストが同じなら見せ直さずに書く", async () => {
+test("CX-T101 先頭が動いたら（expectedHeadOid の競合）新しい Snapshot で判定し直し、有効なら書く", async () => {
   const { mock, d } = world();
   const shown = shownOf(await board(d), "i0001");
   mock.beforeCommit = (b) => mock.push(b, { "src/app.py": "print('moved')\n" }, "コードだけの push");

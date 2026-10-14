@@ -948,9 +948,7 @@ class CoreChromeTest(CoreHarness):
         self.commit_parent()
         # 合流した子のワークツリーを片付ける。手元の判定は全ツリーの承認済みチケットを読む
         # （取り込み状態の無い親子のチケット）ので、残すと手元だけが子のツリーの古い承認済み
-        # チケットを読み、判定が読んだ中身（read_set）
-        # で作るダイジェストが Chrome（統合先と P だけを読む）と
-        # 食い違う。
+        # チケットを読み、判定が Chrome（統合先と P だけを読む）と食い違う。
         git(
             self.root,
             "worktree",
