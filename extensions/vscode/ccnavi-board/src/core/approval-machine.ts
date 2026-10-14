@@ -118,9 +118,14 @@ export type ApprovalInput =
   | { readonly kind: "previewed"; readonly result: PreviewParse; readonly saved: Readonly<Record<string, string>> }
   /**
    * 「この N 件を承認する」を押した。`unsaved` は**押した時点の**、計画編集タブに未保存の変更がある親
-   * （呼ぶ側が帳面から引いて渡す）
+   * （呼ぶ側が帳面から引いて渡す）。`digest` は押した画面に出ていた一覧のダイジェスト
    */
-  | { readonly kind: "confirm"; readonly tickets: readonly string[]; readonly unsaved: readonly string[] }
+  | {
+      readonly kind: "confirm";
+      readonly tickets: readonly string[];
+      readonly digest: string;
+      readonly unsaved: readonly string[];
+    }
   /** 一覧の図の「計画を編集」を押した。オーバーレイを閉じてから、その親のタブを開く */
   | { readonly kind: "editWorkflow"; readonly ticket: string }
   /**
@@ -227,7 +232,7 @@ export function approvalStep(state: ApprovalState, input: ApprovalInput): Approv
     case "previewed":
       return previewed(state, input.result, input.saved);
     case "confirm":
-      return confirmed(state, input.tickets, input.unsaved);
+      return confirmed(state, input.tickets, input.digest, input.unsaved);
     case "editWorkflow":
       return editWorkflow(state, input.ticket);
     case "approved":
@@ -323,16 +328,34 @@ function changedOf(preview: ApprovePreview, saved: Readonly<Record<string, strin
   return changed.length === 0 ? {} : { changedSinceSave: changed };
 }
 
+/** 押した画面の一覧と、手元の最新の一覧が違ったときに言うこと */
+export const SHOWN_STALE =
+  "内容が更新されました（押した画面の一覧は最新ではありませんでした）。何も承認していません。最新の内容を表示し直したので、見直してからもう一度承認してください";
+
 /**
  * 「この N 件を承認する」。見せた識別子とダイジェストをそのまま渡す。実行ファイルが一覧と本文の一致を
- * 確かめ、違えば何も置かずに `mismatch` を返す
+ * 確かめ、違えば何も置かずに `mismatch` を返す。
+ * 渡すダイジェストは、押した画面に出ていたもの（`digest`）。読み直しで一覧が差し替わった直後、画面が
+ * 描き直す前に押されると、手元の一覧（`state`）は画面に出ていない新しい中身になっている。そのときは
+ * 打たずに、今の一覧を表示し直す
  */
-function confirmed(state: ApprovalState, tickets: readonly string[], unsaved: readonly string[]): ApprovalStep {
+function confirmed(
+  state: ApprovalState,
+  tickets: readonly string[],
+  digest: string,
+  unsaved: readonly string[],
+): ApprovalStep {
   // 承認を打てるのは、一覧を見せているときだけ。承認中に押し直しても 2 本目は出ない
   if (state.overlay?.kind !== "preview" || tickets.length === 0) {
     return stay(state);
   }
   const preview = state.overlay.preview;
+  if (digest !== preview.digest) {
+    return move(state, {
+      overlay: { ...state.overlay, notice: SHOWN_STALE },
+      only: state.only,
+    });
+  }
   // 計画編集タブに未保存の変更がある親を含む一覧は打たない（画面のボタンも押せないが、ここでも止める）
   const blocked = unsavedParents(preview, unsaved);
   if (blocked.length > 0) {

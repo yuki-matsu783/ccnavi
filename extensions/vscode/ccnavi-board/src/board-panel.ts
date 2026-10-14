@@ -405,7 +405,12 @@ function handleMessage(message: BoardMessage | undefined): void {
       return;
     case "approveConfirm":
       // 押した時点の計画編集タブの様子を添える。未保存のタブがある親を含む一覧は遷移が打たない
-      dispatch(current, { kind: "confirm", tickets: message.tickets, unsaved: workflowTabs().unsaved });
+      dispatch(current, {
+        kind: "confirm",
+        tickets: message.tickets,
+        digest: message.digest,
+        unsaved: workflowTabs().unsaved,
+      });
       return;
     case "approveCancel":
       dispatch(current, { kind: "cancel" });
@@ -731,6 +736,7 @@ function asMessage(message: unknown): BoardMessage | undefined {
     phase?: unknown;
     tickets?: unknown;
     filtered?: unknown;
+    digest?: unknown;
     choices?: unknown;
     ticket?: unknown;
     family?: unknown;
@@ -755,8 +761,9 @@ function asMessage(message: unknown): BoardMessage | undefined {
         ? { type: "approve", tickets: m.tickets, filtered: m.filtered }
         : undefined;
     case "approveConfirm":
-      return Array.isArray(m.tickets) && m.tickets.every((t) => typeof t === "string")
-        ? { type: "approveConfirm", tickets: m.tickets as string[] }
+      // ダイジェストの無い押下は捨てる。どの一覧を見て押したかが分からないまま打たない
+      return Array.isArray(m.tickets) && m.tickets.every((t) => typeof t === "string") && typeof m.digest === "string"
+        ? { type: "approveConfirm", tickets: m.tickets as string[], digest: m.digest }
         : undefined;
     case "open":
       return typeof m.filePath === "string" ? { type: "open", filePath: m.filePath } : undefined;

@@ -131,7 +131,7 @@ export type BoardMessage =
   | { readonly type: "open"; readonly filePath: string }
   | { readonly type: "refresh" }
   | { readonly type: "approve"; readonly tickets: readonly string[]; readonly filtered: boolean }
-  | { readonly type: "approveConfirm"; readonly tickets: readonly string[] }
+  | { readonly type: "approveConfirm"; readonly tickets: readonly string[]; readonly digest: string }
   | { readonly type: "approveCancel" }
   | { readonly type: "promptCopy" }
   | { readonly type: "promptOpen" }
