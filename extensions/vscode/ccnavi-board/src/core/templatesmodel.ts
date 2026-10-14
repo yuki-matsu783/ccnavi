@@ -189,7 +189,7 @@ export function revealControls(text: string): string {
   return out;
 }
 
-/** 本文を読むときの層。`project` の対象は層の名前（その層）、それ以外は共通との足し算の self */
+/** 本文を読むときの層。`project` の対象は層の名前（その層）、それ以外は共通との統合結果の self */
 export function templatesLayerOf(target: { readonly kind: string; readonly name: string }): string {
   return target.kind === "project" ? target.name : "self";
 }

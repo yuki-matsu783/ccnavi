@@ -9,7 +9,7 @@
  *
  * 対象は 3 種。共通の設定のテンプレート（`.ccnavi/config/common/templates/`）、ワークスペースの設定のテンプレート、
  * プロジェクト 1 つの設定のテンプレート。画面は読むことと、下書きの取り込みの下見・実行を実行ファイルに任せ、
- * 拡張はファイルを書かない。読んだ中身（一覧・層ごとの中身・足し算の索引・下書き）は `ccnavi --templates --json` の答えをそのまま渡す。
+ * 拡張はファイルを書かない。読んだ中身（一覧・層ごとの中身・統合結果の索引・下書き）は `ccnavi --templates --json` の答えをそのまま渡す。
  * タブは 1 枚だけで、別の対象を開くとそのタブの中身を入れ替える（画面に未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 取り込みは実行ファイルが書き、書けたあとに一覧と下書きを読み直す。
  *
@@ -268,7 +268,7 @@ function locksOf(board: BoardJson): { readonly lock: Lock; readonly projectLocks
 }
 
 async function readPage(root: string, target: TemplatesTarget): Promise<Loaded> {
-  // 一覧の中身（層・足し算・下書き）は実行ファイルの答えをそのまま使う。層の場所も拡張は組まない。
+  // 一覧の中身（層・統合結果・下書き）は実行ファイルの答えをそのまま使う。層の場所も拡張は組まない。
   const board = await loadBoard(root, binSetting());
   if (!board.ok) {
     throw new Error(`ボードを実行ファイルから取得できません: ${board.error}`);

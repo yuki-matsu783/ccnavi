@@ -9,7 +9,7 @@
 #   tool / subject / judge   「判定を試す」の欄の値と、出す判定の結果（sample.judges の名前）
 #   checked / suggested      期待する判定の一括確認・記録からの候補の結果を出す
 #   fold     畳むタイプ（, で区切って複数。deny / ask / allow）。見出しを指す段でだけ使う（畳んだ中は指せない）
-#   sum      「足し算」の枠を開き、選ぶ足し算の名前（sample.sums の name）
+#   sum      「統合結果」の枠を開き、選ぶ統合結果の名前（sample.sums の name）
 #   error    保存前の検証エラーの見本（sample.save_error）を下の欄に出す
 # `target:` の印（画面の data-tour）:
 #   tabs / rules / find / order-hint / hooks / save / tour / target / status
@@ -17,7 +17,7 @@
 #   rule-<id>   ルールの行。開いた行の中は rule-<id>-<欄>（match / type / pattern / except / message / context / every / text / once / file / once-file / to-when / buttons）
 #   when-graph / when-inspector   組み合わせ条件の図と操作の欄（開いた行）
 #   judge-form / judge-result / expectations / expectations-counts / expectations-result / expectation-ng / open-expectations / suggest / suggest-result / suggest-candidate   「判定を試す」タブ
-#   sum / sum-pick / sum-count / sum-<タイプ>   足し算の枠 / 選ぶ欄 / 件数 / タイプごとの表
+#   sum / sum-pick / sum-count / sum-<タイプ>   統合結果の枠 / 選ぶ欄 / 件数 / タイプごとの表
 screen: rules
 
 sample:
@@ -429,16 +429,16 @@ courses:
         scene: { tab: rules, open: protect-secrets }
 
   - id: read-sum
-    title: 共通の設定との足し算を読みたいとき
-    summary: 実際に効くルールは、共通の設定と 1 つの設定の和。足し算の枠で、由来と件数を読む
+    title: 共通の設定との統合結果を読みたいとき
+    summary: 実際に効くルールは、共通の設定と 1 つの設定の和。統合結果の枠で、由来と件数を読む
     steps:
       - target: sum
-        title: 足し算とは
-        body: 判定に効くルールは、共通の設定と、ひとつの設定（ワークスペースかプロジェクト）のルールの和です。「足し算」の枠は、その和を実行ファイルが出した結果のまま見せます。読み取り専用で、保存済みの内容の和なので、編集中の内容は含みません。
+        title: 統合結果とは
+        body: 判定に効くルールは、共通の設定と、ひとつの設定（ワークスペースかプロジェクト）のルールの和です。「統合結果」の枠は、その和を実行ファイルが出した結果のまま見せます。読み取り専用で、保存済みの内容の和なので、編集中の内容は含みません。
         scene: { tab: rules, sum: web }
       - target: sum-pick
-        title: 足し算を選ぶ
-        body: 選ぶ欄で、ワークスペースの足し算（共通の設定 + ワークスペースの設定）と、プロジェクトの足し算（共通の設定 + そのプロジェクトの設定）を切り替えます。パスを持たないツール（Bash など）が当てるのは、全プロジェクトの設定を合算した和ではありません。
+        title: 統合結果を選ぶ
+        body: 選ぶ欄で、統合結果（共通 + ワークスペース）と、プロジェクトの統合結果（共通の設定 + そのプロジェクトの設定）を切り替えます。パスを持たないツール（Bash など）が当てるのは、全プロジェクトの設定を合算した和ではありません。
         scene: { tab: rules, sum: web }
       - target: sum-count
         title: 件数と追加されたレイヤー
@@ -449,12 +449,12 @@ courses:
         body: タイプごとの表に、id・ツール・パターン・由来・メッセージが並びます。「由来」は、共通の設定から来たか、そのプロジェクトの設定から来たかです。共通のルールの id はそのまま、ほかは web:no-prod-deploy のようにレイヤー名が付きます。
         scene: { tab: rules, sum: web }
       - target: sum-deny
-        title: 足し算を替えて見比べる
-        body: 同じ共通のルール（git-push・no-rm-rf）が、どの足し算にも入ります。足し算を替えると、レイヤーごとに追加されるルールだけが入れ替わります。見本の self では secrets の置き場を止めるルールが追加されます。
+        title: 統合結果を替えて見比べる
+        body: 同じ共通のルール（git-push・no-rm-rf）が、どの統合結果にも入ります。統合結果を替えると、レイヤーごとに追加されるルールだけが入れ替わります。見本の self では secrets の置き場を止めるルールが追加されます。
         scene: { tab: rules, sum: self }
       - target: target
         title: 直すのは編集する 1 本
-        body: 足し算の枠は見せるだけです。追加されたルールを直すときは、実際の画面では上部の「設定」の欄で、直したい 1 本（共通の設定・ワークスペース・プロジェクト）に切り替えて編集します。
+        body: 統合結果の枠は見せるだけです。追加されたルールを直すときは、実際の画面では上部の「設定」の欄で、直したい 1 本（共通の設定・ワークスペース・プロジェクト）に切り替えて編集します。
         scene: { tab: rules, sum: self }
 
   - id: find-fold-move

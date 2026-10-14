@@ -1,5 +1,5 @@
 /*
- * 「足し算」（`Sum.tsx`）。読み取り専用の枠と表。
+ * 「統合結果」（`Sum.tsx`）。読み取り専用の枠と表。
  */
 .sum { margin: 0 0 10px; border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 6px 10px; }
 .sum > summary { cursor: pointer; color: var(--vscode-descriptionForeground); }

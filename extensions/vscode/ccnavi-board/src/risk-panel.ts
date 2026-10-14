@@ -13,8 +13,8 @@
  * （既定 `projects/<名前>/.ccnavi/config/project/risks.yml`）。タブは 1 枚だけで、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[].risk`）を使い、拡張は組まない。
- * 判定は共通の設定と、親の `project:` が指す設定の和で行う。編集する 1 本とは別に、読み取り専用の足し算
- * （共通の設定 + ワークスペース、共通の設定 + 各プロジェクト。`sums[]`）を出す。足し算は実行ファイルが出した結果で、拡張は合成しない。
+ * 判定は共通の設定と、親の `project:` が指す設定の和で行う。編集する 1 本とは別に、読み取り専用の統合結果
+ * （共通の設定 + ワークスペース、共通の設定 + 各プロジェクト。`sums[]`）を出す。統合結果は実行ファイルが出した結果で、拡張は合成しない。
  *
  * チケット制御が disable のワークスペースでは開かない。配点は子チケットを閉じるときにしか
  * 読まれないので、disable の間は何も動かさない。入口（サイドパネル・コマンドパレット）も同じ鍵で隠れる。
@@ -75,7 +75,7 @@ interface Loaded {
   readonly notices: readonly string[];
   /** 切り替えられる対象（共通・ワークスペース・設定のあるプロジェクト） */
   readonly targets: readonly TargetOption[];
-  /** 読み取り専用の足し算（実行ファイルの `sums[]`） */
+  /** 読み取り専用の統合結果（実行ファイルの `sums[]`） */
   readonly sums: readonly RiskSum[];
 }
 
@@ -261,7 +261,7 @@ async function switchTarget(current: PanelState, target: RiskTarget): Promise<vo
 
 async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
   const notices: string[] = [];
-  // 切り替えの一覧と足し算のために、共通の設定でも実行ファイルに聞く。読めなくても共通の設定は開けるので、一覧と足し算が縮むだけ
+  // 切り替えの一覧と統合結果のために、共通の設定でも実行ファイルに聞く。読めなくても共通の設定は開けるので、一覧と統合結果が縮むだけ
   const board = await loadBoard(root, binSetting());
   const targets = targetOptions(board.ok ? board.board : undefined, "workspace", currentKey(target));
   const sums = riskSums(board.ok ? board.board : undefined);

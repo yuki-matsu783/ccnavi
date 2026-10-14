@@ -4,7 +4,7 @@
 項と `after`）と、各子のフローの本文を 1 ファイルにまとめたもの。完了した作業の形を、次の作業で
 使い回すために置く。このモジュールは読む・足す・検査するだけで、書かない（取り込み・下書き・使う側は別）。
 
-## 置き場と 2 層の足し算
+## 置き場と 2 層の統合結果
 
     共通        <ccnavi ディレクトリ>/config/common/templates/<名前>.yml
     プロジェクト <ccnavi ディレクトリ>/config/project/templates/<名前>.yml
@@ -52,7 +52,7 @@ UTF-8（BOM は 1 つ外す）で、例外は外に出さない。
 
 エージェントは下書きだけを書ける。置き場は提案の置き場の下の `templates/<名前>.yml`
 （既定は `wip/proposals/templates/`。プロジェクトのツリーならそのプロジェクトの下）。下書きに
-効力は無い（`scan` も `--templates` の足し算も読まない）。置き場のパスの関数は子のフローの下書き
+効力は無い（`scan` も `--templates` の統合結果も読まない）。置き場のパスの関数は子のフローの下書き
 （`flow.draft_rel` / `flow.draft_file`）と同じ形。下書きの作成・検査・取り込みは `template_drafts`。
 
 ## 往復
@@ -170,11 +170,11 @@ class Entry:
     sha: str = ""
     raw: bytes = b""
     template: Template | None = None
-    # 読むときと足し算の苦情。
+    # 読むときと統合結果の苦情。
     notes: list[Problem] = field(default_factory=list)
     # 計画とフローの検査の苦情（フェーズ定義が変われば変わるので、notes と分ける）。
     checks: list[Problem] = field(default_factory=list)
-    # 足し算で取り込まれたか。読めないもの・衝突で捨てたものは False。
+    # 統合結果で取り込まれたか。読めないもの・衝突で捨てたものは False。
     effective: bool = True
     dropped: str = ""
     dropped_detail: str = ""
@@ -872,7 +872,7 @@ def types_for(conf: settings.Settings, root: str, layer: str):
 
 
 def recheck(entry: Entry, types, candidates: dict | None) -> Entry:
-    """別のフェーズ定義（足し算の結果）で、検査をやり直した写し。読むときの苦情は残す。"""
+    """別のフェーズ定義（統合結果）で、検査をやり直した写し。読むときの苦情は残す。"""
     if entry.template is None or not entry.effective:
         return entry
     return dataclasses.replace(entry, checks=check(entry.template, types, candidates))
@@ -882,7 +882,7 @@ def scan(conf: settings.Settings, root: str) -> Scan:
     """共通と全レイヤー（自身のレイヤー・プロジェクト）のテンプレートを読んで検査する。
 
     各 `Entry` の検査は、そのレイヤーのフェーズ定義（共通は共通だけ、レイヤーは共通 + レイヤー）で
-    行う。足し算の結果（`merge`）の印は、レイヤーの側の `Entry` に付く。承認済みチケットの置き場は
+    行う。統合結果（`merge`）の印は、レイヤーの側の `Entry` に付く。承認済みチケットの置き場は
     読まない（`--lint` が 1 度読んだ写しを渡す走査とは別で、ここは設定の置き場だけを読む）。
     """
     candidates = flow.catalog(root)
@@ -912,7 +912,7 @@ def adopted(scan_: Scan, layer: str) -> list[Entry]:
     """`layer` を足したときの、取り込まれた・捨てた全部（共通が先、名前順）。
 
     読み込み済みの `Entry` を並べるだけ。共通の側の検査は共通だけのフェーズ定義で済んでいて、
-    足し算の結果の定義でやり直す（`recheck`）のは呼び出し側。
+    統合結果の定義でやり直す（`recheck`）のは呼び出し側。
     """
     view = scan_.layer(layer)
     if view is None:
@@ -987,7 +987,7 @@ def _flow_json(index: int, body: dict) -> dict:
 
 
 def _dropped_json(entry: Entry) -> dict | None:
-    """足し算で取り込まれなかった理由 `{reason, detail}`。取り込まれたものは None。"""
+    """統合結果で取り込まれなかった理由 `{reason, detail}`。取り込まれたものは None。"""
     if not entry.dropped:
         return None
     return {"reason": entry.dropped, "detail": entry.dropped_detail}
@@ -1037,18 +1037,18 @@ def as_json(
 ) -> dict:
     """`ccnavi --templates --json` の答え。
 
-    - `layer`: 一覧の対象のレイヤー（`templates` がその足し算の結果）
+    - `layer`: 一覧の対象のレイヤー（`templates` がその統合結果）
     - `templates`: 共通 + その 1 レイヤー。取り込まれたか（`effective`）・捨てた理由（`dropped`）・
-      検査（`problems`。足し算の結果のフェーズ定義で検査した）つき。`keywords` で絞る
+      検査（`problems`。統合結果のフェーズ定義で検査した）つき。`keywords` で絞る
     - `layers`: 共通と各レイヤーの生の中身（そのレイヤーのフェーズ定義で検査した）
-    - `sums`: レイヤーごとの足し算の結果の索引（どれが効いているか）
+    - `sums`: レイヤーごとの統合結果の索引（どれが効いているか）
     """
     keywords = keywords or []
     view = scan_.layer(layer)
     types = types_for(conf, root, layer) if view is not None else None
     chosen: list[Entry] = []
     for entry in adopted(scan_, layer):
-        # 足し算の結果で検査し直すのは共通の側（レイヤーの側は同じ定義で検査済み）。
+        # 統合結果で検査し直すのは共通の側（レイヤーの側は同じ定義で検査済み）。
         if entry.layer == LAYER_COMMON:
             entry = recheck(entry, types, scan_.candidates)
         if matches(entry, keywords):

@@ -118,7 +118,7 @@ test("CB-D359 案内の間は見本を描き、実際のテンプレートは出
   }
 });
 
-test("CB-D360 段の scene が画面の様子を替える（テンプレートを開く・本文・足し算の枠）。scene は次の段へ引き継がない", async () => {
+test("CB-D360 段の scene が画面の様子を替える（テンプレートを開く・本文・統合結果の枠）。scene は次の段へ引き継がない", async () => {
   const dom = await openTemplates();
   try {
     // intro の 4 段目（0 始まりで 3）: 見本の feature を開き、本文を出す
@@ -126,20 +126,20 @@ test("CB-D360 段の scene が画面の様子を替える（テンプレート�
     assert.equal(dom.all("li.template.open").length, 1);
     assert.match(dom.one("pre.tpl-text").textContent ?? "", /name: feature/);
     assert.equal(dom.all("details#sum[open]").length, 0);
-    // 5 段目: 足し算の枠を開く。開いたテンプレートは閉じる
+    // 5 段目: 統合結果の枠を開く。開いたテンプレートは閉じる
     await next(dom);
     assert.equal(dom.all("details#sum[open]").length, 1);
     assert.equal(dom.all("li.template.open").length, 0, "段をまたいで開いたままになった");
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
-    assert.equal(dom.all("details#sum[open]").length, 0, "閉じたあと足し算の枠が開いたまま");
+    assert.equal(dom.all("details#sum[open]").length, 0, "閉じたあと統合結果の枠が開いたまま");
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D361 足し算と取り込みの案内は、見本の足し算を選び、取り込みの欄とプレビューの見本を出す。送信はせず、閉じたら消える", async () => {
+test("CB-D361 統合結果と取り込みの案内は、見本の統合結果を選び、取り込みの欄とプレビューの見本を出す。送信はせず、閉じたら消える", async () => {
   const sum = await openTemplates();
   try {
     await goto(sum, "read-sum", 1);
