@@ -25,7 +25,7 @@ export function Family({ family: f, actions, attention }: { family: FamilyBoard;
       <h3>
         <code>{f.family.name}</code>
         {` ${f.family.title}`}
-        {/* 親チケットの branch: で識別子と違うブランチを使う親子のチケットは、識別子も出す */}
+        {/* `/` を含むブランチは識別子（`/` を `-` に置き換えたもの）と名前が違うので、識別子も出す */}
         {f.family.family && f.family.family !== f.family.name ? (
           <>
             {" （識別子 "}

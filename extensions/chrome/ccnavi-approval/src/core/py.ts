@@ -58,12 +58,12 @@ export interface Snapshot {
 export interface Family {
   /** 親のブランチ名（拡張が読み書きするブランチ） */
   readonly name: string;
-  /** 親子のチケットの識別子（親チケットの `branch:` があればブランチ名と違う） */
+  /** 親子のチケットの識別子（ブランチ名の `/` を `-` に置き換えたもの。`/` を含むブランチ名と違う） */
   readonly family?: string;
   readonly title: string;
   readonly state: string;
   readonly closed: boolean;
-  /** 親子のチケットが決まらない理由（同じ親子のチケットを宣言するブランチが 2 本以上ある など）。あればこの親子のチケットは判定しない */
+  /** 親子のチケットが決まらない理由（同じ識別子になるブランチが 2 本以上ある など）。あればこの親子のチケットは判定しない */
   readonly conflict?: string;
 }
 
@@ -72,7 +72,7 @@ export interface Closure {
   readonly families: readonly string[];
   /** ブランチ名 → 親子のチケットの識別子 */
   readonly idents?: Readonly<Record<string, string>>;
-  /** 同じ親子のチケットを宣言するブランチが無いかを確かめるために読むブランチ（判定の入力には入れない） */
+  /** 同じ識別子になる別のブランチが無いかを確かめるために読むブランチ（判定の入力には入れない） */
   readonly rivals?: readonly string[];
   readonly need: readonly string[];
   readonly absent: readonly string[];
@@ -90,10 +90,6 @@ export interface BatchEntry {
   readonly path: string;
   readonly overflow: readonly string[];
   readonly body: string;
-  /** 親のブランチ名（`branch:`、無ければ識別子） */
-  readonly branch?: string;
-  /** `branch:` が既にあるブランチを指すか */
-  readonly existing_branch?: boolean;
 }
 
 export interface Withdrawable {

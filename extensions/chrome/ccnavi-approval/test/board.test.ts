@@ -178,35 +178,36 @@ test("CX-T050 ボードの DOM: 承認などのボタンを出さず、悪意の
   assert.equal(doc.querySelector('[data-family="i0001"] pre')?.children.length, 0);
 });
 
-test("CX-T180 承認済みの親チケットの branch: で、識別子と違う名前のブランチ（/ を含む）を親子のチケットにする。承認前の提案の branch: では宣言しない。同じ親子のチケットを宣言するブランチが 2 本なら判定しない", async () => {
-  const proposal = fixture().i0001.files["wip/proposals/todo/i0001.md"].replace("ticket: i0001\n", "ticket: i0001\nbranch: feature/1-login\n");
-  // 承認前: 提案の branch: では宣言しない
-  const before = fixture();
-  before["feature/1-login"] = { ...before.i0001, files: { ...before.i0001.files, "wip/proposals/todo/i0001.md": proposal } };
-  delete before.i0001;
-  const early = await run(before);
-  assert.equal(family(early.board, "feature/1-login"), undefined);
+test("CX-T180 ブランチ名の / を - に置き換えた識別子の親チケットがあるブランチを、親子のチケットにする。別の識別子のブランチは親子のチケットにしない。同じ識別子になるブランチが 2 本なら判定しない", async () => {
+  const ID = "feature-1-login";
+  const renamed = (files: Record<string, string>): Record<string, string> =>
+    Object.fromEntries(Object.entries(files).map(([k, v]) => [k.replaceAll("i0001", ID), v.replaceAll("i0001", ID)]));
+  const files = renamed(fixture().i0001.files);
 
-  // 承認済み: 承認済みチケットの branch: で宣言する
+  // 識別子に変換できないブランチは、同じ中身でも親子のチケットにしない
+  const elsewhere = fixture();
+  elsewhere["feature/2-other"] = { ...elsewhere.i0001, files };
+  delete elsewhere.i0001;
+  const other = await run(elsewhere);
+  assert.equal(family(other.board, "feature/2-other"), undefined);
+
+  // 変換した識別子の親チケット（承認前の提案でも承認済みでも）があるブランチは親子のチケット
   const b = fixture();
-  const files: Record<string, string> = { ...b.i0001.files };
-  delete files["wip/proposals/todo/i0001.md"];
-  files[".ccnavi/approved/doing/i0001.md"] = proposal;
   b["feature/1-login"] = { ...b.i0001, files };
   delete b.i0001;
   const { board } = await run(b);
   assert.equal(board.error, "");
   const f = family(board, "feature/1-login");
-  assert.equal(f?.family.family, "i0001");
+  assert.equal(f?.family.family, ID);
   assert.equal(f?.error, "");
-  assert.equal(f?.result?.ident, "i0001");
+  assert.equal(f?.result?.ident, ID);
   assert.deepEqual(f?.result?.closure.families, ["feature/1-login", "i0003"]);
-  assert.equal(f?.result?.rejected?.[0].ticket, "i0001-01-01");
 
-  // 識別子と同じ名前のブランチにも branch: の無い承認済みチケットがあれば、同じ親子のチケットを宣言するブランチが 2 本
+  // 識別子と同じ名前のブランチにも同じ識別子の親チケットがあれば、同じ識別子になるブランチが 2 本
   const rival = fixture();
   rival["feature/1-login"] = { ...rival.i0001, files };
-  rival.i0001 = { ...rival.i0001, files: { ...rival.i0001.files, ".ccnavi/approved/doing/i0001.md": files[".ccnavi/approved/doing/i0001.md"].replace("branch: feature/1-login\n", "") } };
+  rival[ID] = { ...rival.i0001, files };
+  delete rival.i0001;
   const two = await run(rival);
   const g = family(two.board, "feature/1-login");
   assert.match(g?.error ?? "", /1 本でない/);
