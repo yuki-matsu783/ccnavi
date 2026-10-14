@@ -46,11 +46,27 @@ class FamilyTest(AuthorityHarness):
         self.assertEqual(result.stdout.splitlines()[0], c1.HEAD)
         return lines(result.stdout)
 
-    def test_no_record_is_not_a_target(self):
+    def test_a_family_without_origin_is_not_a_target(self):
         answer = self.ask("i0001-01-01")
         self.assertEqual(answer["family"], "i0001")
         self.assertEqual(answer["target"], "no")
-        self.assertIn("取り込み状態がありません", answer["why"])
+        self.assertIn("origin がありません", answer["why"])
+        self.assertNotIn("tree", answer)
+
+    def test_no_record_is_still_a_target_when_the_tree_has_origin(self):
+        # 取り込み状態（記録）は対象かの判定に使わない。親のワークツリーがあり、origin があればよい
+        git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
+        answer = self.ask("i0001-01-01")
+        self.assertEqual(answer["target"], "yes")
+        self.assertEqual(os.path.realpath(answer["tree"]), os.path.realpath(self.parent_tree))
+        self.assertNotIn("state", answer)
+
+    def test_a_family_without_the_parent_worktree_stops_instead_of_using_another_copy(self):
+        git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
+        git(self.root, "worktree", "remove", "--force", self.parent_tree)
+        answer = self.ask("i0001")
+        self.assertEqual(answer["target"], "stop")
+        self.assertIn("親のワークツリー", answer["why"])
         self.assertNotIn("tree", answer)
 
     def test_a_present_family_is_a_target_with_its_tree(self):
@@ -82,12 +98,12 @@ class WithoutMrFamilyTest(AuthorityHarness):
         super(AuthorityHarness, self).setUp()
         self.family(plan=["research"])
 
-    def test_a_family_without_a_merge_request_phase_is_not_a_target(self):
-        self.record("present")
+    def test_a_family_without_a_merge_request_phase_is_a_target_too(self):
+        # MR でレビューするフェーズが無くても、C1 の対象（外した条件）
+        git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
         result = self.ccnavi("c1", "family", "i0001")
         answer = lines(result.stdout)
-        self.assertEqual(answer["target"], "no")
-        self.assertIn("マージリクエストで見るフェーズが無い親子のチケット", answer["why"])
+        self.assertEqual(answer["target"], "yes")
 
 
 class SortTest(AuthorityHarness):
@@ -299,7 +315,10 @@ class RecordTreeTest(AuthorityHarness):
         # 承認は提案（wip/proposals/todo/）を消す。C1 の置き場の外なので error。
         self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent("propose")
-        result, listed = self.run_recorded("--agree", "--yes", "i0001-01-02", "--json")
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
+        result, listed = self.run_recorded(
+            "--agree", "--yes", "i0001-01-02", "--digest", preview["digest"], "--json"
+        )
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("置き場の外に書き込みがあった", result.stderr)
         self.assertIn("wip/proposals/todo/i0001-01-02.md", listed)
@@ -475,6 +494,8 @@ class BypassTest(AuthorityHarness):
     """C1 の対象の親子のチケット（取り込み済みで origin がある）では、
     C1 を通らない状態の操作を断る。
     """
+
+    mark_c1 = False
 
     def setUp(self):
         super().setUp()

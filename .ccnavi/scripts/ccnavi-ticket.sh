@@ -37,6 +37,12 @@
 # ロック → 途中の操作の確認 → hook のマーカーと状態の履歴を先にコミット →
 # 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
 # 通るまで完了にしない。送れなければ書いたものを戻す。record-risk は C1 にしない（その子の finish がコミットして送る）。
+#
+# 子の finish は、書く前に親のブランチへ合流する。親のワークツリーで子の先頭を `merge --no-ff --no-commit` で入れ、
+# 完了の記録と子の承認済みチケットの merged_sha（合流した子の先頭）を足して、合流と状態を 1 つのマージコミットにして push する。
+# 合流の前に、子のワークツリーに未コミットの変更が無いこと、親のワークツリーに状態の置き場以外の未コミットの変更が無いこと、
+# 子の変更（親との共通の祖先から先頭まで）に置き場のパスと範囲の外のパスが無いことを確かめる。衝突したら何も変えずに止まる。
+# push が通らなければ、合流したコードも含めて元の先頭まで戻す。cancel は合流しない。
 # それ以外の親子のチケットは今のまま（書くだけ。コミットと push はエージェント）。
 #
 # finish・cancel が通ったら、その親子の閉じた子のワークツリーを実行ファイルの `worktree tidy <親>` で
@@ -67,7 +73,9 @@ sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] 
   start        .ccnavi/approved/doing/ の承認済みチケットに着手の時刻と基準点を書く。
                ワークツリー .claude/worktrees/<識別子> が必要です。承認済みチケットは置き場を移らない
   finish       doing/ -> wip/proposals/review/（フェーズがレビュー必須）か .ccnavi/approved/done/（不要）。
-               完了の時刻を書く。子は実績のリスク（差分）を数えて記録する
+               完了の時刻を書く。子は実績のリスク（差分）を数えて記録する。子は親のブランチへ合流してから
+               push する（合流と状態は 1 つのマージコミット。子の merged_sha に合流した先頭を書く。
+               子のワークツリーの未コミットの変更・置き場や範囲の外の変更・衝突があれば、何も変えずに止まる）
   cancel       doing/ -> .ccnavi/approved/done/  --reason が必要です。未承認の提案（todo/）は削除すればよい
   record-risk  定性のリスク項目の判定を記録する（親が実行します。判断はサブエージェント）
   learn        子の気づきの記録の雛形と判定記録の要約を書く（--note なしの形）、または気づき 1 件を記録（直接作業では受信箱）に追加します（--note）。
@@ -161,8 +169,8 @@ ticket_id() {
 
 # finish・cancel が通った後に、その親子の閉じた（done/ の）子のワークツリーを全部片付ける。ワークツリーが
 # あるのは作業中の子だけにする。子の finish・cancel でも、その子に限らず同じ親子の閉じた子をまとめて消す
-# （親の finish では取りこぼしを拾う安全網）。レビュー待ち（review/）の子のものは残す（指摘を直す場所。
-# confirm が done/ へ動かした後に消える）。消せなかったもの（cwd が中・未コミット）は名指しされるだけで、
+# （親の finish では取りこぼしを拾う安全網）。レビュー待ち（review/）の子のものは残す（見返す場所。
+# そこで積んだコミットは親へ合流しないので、差し戻しは同じフェーズに子を足す。confirm が done/ へ動かした後に消える）。消せなかったもの（cwd が中・未コミット）は名指しされるだけで、
 # finish・cancel は成功のまま。
 tidy_after() {
 	case "$1" in
@@ -176,7 +184,44 @@ tidy_after() {
 	ccnavi_c1_exe --cwd "$here" worktree tidy "$ta_id" || :
 }
 
-# C1（取り込み済みの親子のチケットの start・finish・cancel）。
+# 子の start で、このPCに子のワークツリーが無ければ、取り込み直後の親ブランチ（C1 の親のワークツリーの HEAD）から作る。
+# 別のPCで承認された子でも、どのPCでも同じ場所に作る。ネットワークには出ない（git の局所の操作だけ）。
+# 子のブランチ（子の識別子の名前）が手元に残っていれば、親の先頭が含むものだけ親の先頭に揃えて使う
+# （含まない = 手元だけに積んだ仕事があるので、消さずに止める）。
+# ここで止めるのは git の状態（手元だけのコミット・作れない行き先）を見た判定で、ccnavi の状態（チケット・
+# 取り込み状態）を読んで操作を止める判定ではない。shに判定を足さない決まり（hookと実行ファイルが判定する）の外になる。
+ensure_child_worktree() {
+	ew_path="$root/.claude/worktrees/$c1_id"
+	if [ -e "$ew_path" ] || [ -L "$ew_path" ]; then
+		return 0
+	fi
+	if git -C "$ccnavi_c1_tree" show-ref --verify --quiet "refs/heads/$c1_id"; then
+		if ! git -C "$ccnavi_c1_tree" merge-base --is-ancestor "refs/heads/$c1_id" HEAD 2>/dev/null; then
+			printf 'ccnavi-ticket: 手元のブランチ %s に親のブランチ %s に無いコミットがある。子のワークツリーを作らずに止めた。内容を確かめて、親へ取り込むか、ユーザが消してから再実行してください\n' "$c1_id" "$ccnavi_c1_branch" >&2
+			log_info 子のワークツリーを作らずに止めた -- "child=$c1_id" "reason=child-branch-ahead"
+			return 1
+		fi
+		git -C "$ccnavi_c1_tree" branch -f "$c1_id" HEAD >/dev/null 2>&1 || {
+			printf 'ccnavi-ticket: 手元のブランチ %s を親のブランチの先頭に揃えられなかった\n' "$c1_id" >&2
+			log_info 子のワークツリーを作らずに止めた -- "child=$c1_id" "reason=child-branch-reset"
+			return 1
+		}
+		ew_rc=0
+		git -C "$ccnavi_c1_tree" worktree add "$ew_path" "$c1_id" >/dev/null 2>"$ccnavi_c1_tmp/ew-err" || ew_rc=$?
+	else
+		ew_rc=0
+		git -C "$ccnavi_c1_tree" worktree add "$ew_path" -b "$c1_id" HEAD >/dev/null 2>"$ccnavi_c1_tmp/ew-err" || ew_rc=$?
+	fi
+	if [ "$ew_rc" -ne 0 ]; then
+		printf 'ccnavi-ticket: 子のワークツリー %s を作れなかった（%s）\n' "$ew_path" "$(head -n 1 "$ccnavi_c1_tmp/ew-err" 2>/dev/null)" >&2
+		log_info 子のワークツリーを作れなかった -- "child=$c1_id" "reason=child-worktree-add"
+		return 1
+	fi
+	printf 'ccnavi-ticket: 子のワークツリー .claude/worktrees/%s を親のブランチ %s の先頭から作った\n' "$c1_id" "$ccnavi_c1_branch" >&2
+	log_info 子のワークツリーを作った -- "child=$c1_id" "parent=$ccnavi_c1_family_id"
+}
+
+# C1（親子のチケットの start・finish・cancel）。
 case "$1" in
 start | finish | cancel)
 	ccnavi_log_root="$root"
@@ -204,6 +249,13 @@ start | finish | cancel)
 		*) c1_words="$c1_id を取り消した" ;;
 		esac
 		ccnavi_c1_begin || exit 1
+		# 子の finish は、親のブランチへ合流してから push する。合流してよいかをここで確かめる。
+		if [ "$1" = finish ] && [ "$c1_id" != "$ccnavi_c1_family_id" ]; then
+			ccnavi_c1_merge_plan "$c1_id" || exit 1
+		fi
+		if [ "$1" = start ] && [ "$c1_id" != "$ccnavi_c1_family_id" ]; then
+			ensure_child_worktree || exit 1
+		fi
 		c1_rc=0
 		ccnavi_c1_write "ccnavi: ${c1_words}" -- ticket "$@" || c1_rc=$?
 		ccnavi_c1_end

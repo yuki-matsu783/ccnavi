@@ -222,7 +222,7 @@ def load(path: str) -> tuple[ticket_model.Ticket | None, list[Problem]]:
     try:
         # fsio を通す。承認の plan（書き込みを溜める段）の中では、
         # 同じ承認で動かしたチケットを動かした後の状態で読む。
-        text = fsio.load_text(path)
+        source, text = fsio.load_source(path)
     except FileNotFoundError:
         return None, []
     except OSError as exc:
@@ -230,6 +230,7 @@ def load(path: str) -> tuple[ticket_model.Ticket | None, list[Problem]]:
     ticket, problems = parse(text)
     if ticket is not None:
         ticket.path = os.path.realpath(path)
+        ticket.source = source
     return ticket, problems
 
 
@@ -411,28 +412,16 @@ def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Pro
         else:
             ticket.mr = mr_number
 
-    raw_branch = front.get(ticket_ids.BRANCH_KEY)
-    if raw_branch is not None:
-        if not isinstance(raw_branch, str):
-            problems.append(Problem(SEVERITY_ERROR, name, "`branch` はブランチ名を文字列で書く"))
-            return True
-        if ticket.is_child:
-            problems.append(
-                Problem(
-                    SEVERITY_WARN,
-                    name,
-                    "`branch` は親だけの欄。子では読まない（子のブランチは子の識別子）",
-                )
+    if ticket_ids.BRANCH_KEY in front:
+        problems.append(
+            Problem(
+                SEVERITY_ERROR,
+                name,
+                "`branch` は使えない欄。親のブランチ名は親のワークツリーの HEAD から読み、"
+                "親の識別子はその `/` を `-` に置き換えたもの。欄を消す",
             )
-        else:
-            spelled = raw_branch.strip()
-            why = ticket_ids.branch_problem(spelled)
-            if why:
-                problems.append(
-                    Problem(SEVERITY_ERROR, name, f"`branch: {spelled}` は使えない。{why}")
-                )
-                return True
-            ticket.branch = spelled
+        )
+        return True
     return False
 
 

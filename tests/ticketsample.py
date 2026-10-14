@@ -110,7 +110,7 @@ def parent_text(
 
 
 def _parent_text(name, plan, feedback, allow, issue):
-    lines = ["---", "version: 1", f"ticket: {name}"]
+    lines = ["---", "version: 1", f"ticket: {name}", "mr: 1"]
     if issue is not None:
         lines.append(f"issue: {issue}")
     lines.append("plan:")
@@ -214,3 +214,44 @@ def write_plain_phases(root: str) -> str:
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(PLAIN_PHASES)
     return path
+
+
+def record_merge(parent_tree: str, child: str) -> None:
+    """子を親のブランチへ合流したあとの記録（`merged_sha`）を、C1 の finish の代わりに書く。
+
+    本物の finish は、親のワークツリーで子を合流するのと同じコミットで、子の承認済みチケットに
+    合流した子の先頭を書く。sh（C1）を通らずに実行ファイルを直に起こすテストは、合流を `git merge`
+    で済ませたあと、これで同じ記録を足してコミットする。
+    """
+    import subprocess
+
+    from ccnavi.tickets import ticket_fields
+
+    def git(*args: str) -> str:
+        done = subprocess.run(
+            ["git", "-c", "user.email=t@example.com", "-c", "user.name=t", *args],
+            cwd=parent_tree,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return done.stdout.strip()
+
+    sha = git("rev-parse", child)
+    for rel in (
+        f".ccnavi/approved/done/{child}.md",
+        f".ccnavi/approved/doing/{child}.md",
+        f"wip/proposals/review/{child}.md",
+    ):
+        path = os.path.join(parent_tree, *rel.split("/"))
+        if not os.path.isfile(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(ticket_fields.set_fields(text, {"merged_sha": sha}))
+        git("add", "--", rel)
+        staged = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=parent_tree)
+        if staged.returncode != 0:
+            git("commit", "--quiet", "-m", f"merged_sha {child}")
+        return

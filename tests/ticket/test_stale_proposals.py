@@ -128,10 +128,11 @@ class StaleProposalTest(PhaseHarness):
         lines = self.lint_lines("i0001-01-07/wip/proposals/todo/i0001.md")
         self.assertEqual(lines, [])
 
-    def test_the_approved_copies_alone_decide_the_home_tree(self):
-        """承認済みチケットが元ツリー（ワークスペースルート）にしか無いとき、親の名前のワークツリーに
-        残った承認前の `todo/` を正と読まない（Chrome や他のセッションで承認され、手元の
-        ワークツリーに届いていない形）。読むと古い版が改版として承認待ちに入り、巻き戻る。
+    def test_a_copy_in_the_workspace_root_does_not_decide_the_home_tree(self):
+        """承認済みチケットが元ツリー（ワークスペースルート）にしか無くても、それを正としない。
+
+        正とするのは親のワークツリーだけ。親のワークツリーに承認前の `todo/` しか無ければ、
+        それは承認待ちの提案で、元ツリーのコピーで代用して巻き戻しを避けることはしない。
         """
         self.family(plan=("research", "design"))
         held = os.path.join(self.approved, "doing", "i0001.md")
@@ -142,17 +143,7 @@ class StaleProposalTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))  # 承認前の古い版
         self.commit_parent()
 
-        self.assertEqual(self.pending(), [])
-        lines = self.lint_lines("i0001")
-        self.assertTrue(
-            any(
-                "計画の違う提案" in line
-                and ".claude/worktrees/i0001/wip/proposals/todo/i0001.md" in line
-                and "改版なら ワークスペースルート の wip/proposals/todo/ に書き" in line
-                for line in lines
-            ),
-            lines,
-        )
+        self.assertEqual(self.pending(), ["i0001"])
 
     def test_a_closed_identifier_proposed_in_another_tree_keeps_the_reopen_guidance(self):
         """閉じた識別子を別のツリーで提案したとき、`--lint` は前と同じ再開の案内を出す。"""
@@ -246,10 +237,7 @@ class ImportedFamilyTest(AuthorityHarness):
         self.assertIn(
             "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き", verify.stdout
         )
-        self.assertIn(
-            "取り込み済みの親子のチケットなので、書いたら push してから承認を頼んでください",
-            verify.stdout,
-        )
+        self.assertIn("書いたら push してから承認を頼んでください", verify.stdout)
 
     def test_a_stopped_family_carries_the_reason_family_problems_gives(self):
         """親子のチケットが止まっている（親のツリーの HEAD がブランチを指していない）なら、
@@ -257,8 +245,10 @@ class ImportedFamilyTest(AuthorityHarness):
         self.record("present")
         git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
         verify = self.revision_in_root()
-        self.assertIn("取り込み済みの親子のチケットが止まっている", verify.stdout)
-        self.assertIn("HEAD がブランチ i0001 を指していない", verify.stdout)
+        self.assertIn("親子のチケットが止まっている", verify.stdout)
+        self.assertIn(
+            "HEAD のブランチ名を変換した識別子がフォルダ名（i0001）と合わない", verify.stdout
+        )
         self.assertIn("承認しない", verify.stdout)
         self.assertNotIn("書いたら push してから", verify.stdout)
 
@@ -275,8 +265,9 @@ class AuthorityTest(unittest.TestCase):
     def test_approved_copies_alone_decide(self):
         approved = [_t("", "doing")]
         stale = [_t("i0001", ticket_model.TODO)]
-        self.assertEqual(ticket_fold.authority(approved), "")
-        self.assertEqual(ticket_fold.fold(stale, approved), [])
+        # 親のツリーのコピーが無ければ決めない（元ツリーのコピーで代用しない）
+        self.assertIsNone(ticket_fold.authority(approved))
+        self.assertEqual(ticket_fold.fold(stale, approved), stale)
         self.assertEqual([t.tree for t in approval._authoritative(approved, approved)], [""])
 
     def test_home_tree_wins_over_the_origin(self):

@@ -5,7 +5,8 @@
 閉じた子と、Draft を外した親のワークツリーを ccnavi が消す。`tidy` が拾うのは閉じた
 （`done/` の）子だけで、完了でも取り消しでも消す（`tidy_targets`）。閉じた子の続きは、
 新しいチケットで新しいワークツリーを切る。残るのは作業中（`doing/`）の子と、レビュー待ち
-（`review/`）の子（指摘を直す場所。`confirm` が `done/` へ動かした後に消える）のもの。
+（`review/`）の子（レビューの間に見返す場所。ここで積んだコミットは親へ合流しないので、
+差し戻しは同じフェーズに子を足して直す。`confirm` が `done/` へ動かした後に消える）のもの。
 `decide`・Chrome のレビュー済みで `done/` へ動いた子のものは、その場では消さず、
 次にその親子で `finish` か `cancel` が打たれるまで残る。判断の要らない片付けを、エージェントへの
 案内（`ccnavi-clean.sh` → `worktree remove`）で済ませず、ccnavi の側に移す。呼ぶのは sh で、
@@ -23,8 +24,8 @@ C1 の中では書いたものが push の失敗で戻ることがあるので�
 
 消し方は、生成物（`node_modules` など。`ccnavi-clean.js` と同じ名前）を先に消してから
 `git worktree remove`（`--force` なし）。Windows で深い `node_modules` が `worktree remove` を
-途中で止めるのを防ぐ。ブランチは消さない（コミットは残り、squash でマージするとローカルの
-ブランチは `branch -d` で消えないので、ユーザが消す）。
+途中で止めるのを防ぐ。ブランチは `drop` では消さない。親を閉じたときのブランチの片付けは
+`retire.py`（条件を確かめてから消す）。
 
 消さないとき（何も消さずに理由を言う）:
 
@@ -165,10 +166,13 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
     return Dropped(name, REMOVED, path)
 
 
-def report(stdout: TextIO, root: str, d: Dropped) -> None:
-    """drop の結果を言う。消さなかったときも標準出力へ（呼び手の操作そのものは成功している）。"""
+def report(stdout: TextIO, root: str, d: Dropped, after: str = "。ブランチは残してある") -> None:
+    """drop の結果を言う。消さなかったときも標準出力へ（呼び手の操作そのものは成功している）。
+
+    `after` は消した行の括弧の後ろに足す一言（ブランチをどうするか）。
+    """
     if d.status == REMOVED:
-        stdout.write(f"ワークツリー {d.name} を削除しました（{d.path}。ブランチは残してある）\n")
+        stdout.write(f"ワークツリー {d.name} を削除しました（{d.path}{after}）\n")
     elif d.status == ABSENT:
         stdout.write(f"ワークツリー {d.name} はありません（削除するものがありません）\n")
     elif d.status == CWD_INSIDE:

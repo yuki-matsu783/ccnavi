@@ -64,6 +64,7 @@ case " $* " in
   printf '{{"compat": {compat}, "flags": ["--accept-unresolved", "--actor", "--via"]}}\\n'
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
+*" c1 family "*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
 esac
 for a in "$@"; do printf '%s\\n' "$a"; done >>'{log}'
 exit 0
@@ -355,6 +356,7 @@ class HostFixtureTest(unittest.TestCase):
             'case " $* " in\n'
             f'*" --version --json "*) {answer} ;;\n'
             f"*\" --version \"*) printf 'compat: {version.COMPAT}\\n'; exit 0 ;;\n"
+            "*\" c1 family \"*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;\n"
             "esac\n"
             'for a in "$@"; do case "$a" in --actor*|--via*)\n'
             f'  case " {known} " in *" ${{a%%=*}} "*) ;;\n'
@@ -536,6 +538,8 @@ class GitLabHostFixtureTest(unittest.TestCase):
             'case " $* " in *" --version "*) printf \'compat: %s\\n\' '
             + str(version.COMPAT)
             + "; exit 0 ;; esac\n"
+            + 'case " $* " in *" c1 family "*)'
+            + " printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;; esac\n"
             f"for a in \"$@\"; do printf '%s\\n' \"$a\"; done >>'{out}/args.txt'\n"
             'case " $* " in *" prepare "*)\n'
             f"  printf '<!-- ccnavi:request i0001:1 key=k -->\\n依頼\\n' >'{out}/body.md'\n"
@@ -579,17 +583,17 @@ class GitLabHostFixtureTest(unittest.TestCase):
         with open(state, encoding="utf-8") as f:
             self.assertEqual(len(json.load(f)), 1)
 
-    def created_target(self, **extra):
-        """マージリクエストが無い親で request を打ち、作るときに送った宛先（target_branch）を返す。
+    def request_on(self, branch="", **extra):
+        """request を打つ。branch を渡すとそのブランチへ移ってから（場面の MR は i0001 だけ）。
 
-        見本の場面は i0001 の MR しか持たないので、i0002 に移ると作る側へ進む。作る要求
-        （POST .../merge_requests）だけはこの試験の curl が受けて本文を書き留め、ほかは代役に回す。
-        作った後の投稿は見本に無い MR へ向かうので失敗してよい。見るのは宛先だけ。
+        マージリクエストを作る要求（POST .../merge_requests）が出たら、この試験の curl が書き留める
+        （作らない決まりなので、書き留めるものは無いはず）。返すのは結果と、書き留めたファイル。
         """
         out = os.path.join(self._tmp.name, "out")
         stub = self.request_stub(out)
         html = self.eli5()
-        subprocess.run(["git", "-C", self.ws, "checkout", "-q", "-b", "i0002"], check=True)
+        if branch:
+            subprocess.run(["git", "-C", self.ws, "checkout", "-q", "-b", branch], check=True)
         sent = os.path.join(self._tmp.name, "created.json")
         catcher = os.path.join(self._tmp.name, "bin-create")
         write(
@@ -609,53 +613,41 @@ class GitLabHostFixtureTest(unittest.TestCase):
             *("request", "--phase", "1", "--body-file", "x", "--eli5", html),
             CCNAVI_BIN_PATH=stub,
             PATH=path,
+            FAKE_GITLAB_STATE=os.path.join(self._tmp.name, "notes.json"),
             **extra,
         )
-        self.assertTrue(os.path.exists(sent), done.stdout + done.stderr)
-        with open(sent, encoding="utf-8") as f:
-            return json.load(f)["target_branch"]
+        return done, sent
 
-    def test_request_targets_the_origin_head_branch(self):
-        """宛先はデフォルトブランチ（origin/HEAD）。develop-v1.0.0 のような名前でも読む。"""
-        ref = "refs/remotes/origin/develop-v1.0.0"
-        subprocess.run(["git", "-C", self.ws, "update-ref", ref, "HEAD"], check=True)
-        subprocess.run(
-            ["git", "-C", self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", ref], check=True
-        )
-        self.assertEqual(self.created_target(), "develop-v1.0.0")
+    def test_request_stops_without_a_merge_request_and_never_creates_one(self):
+        """MR が無い親ブランチへの依頼は、作らずに止まる（MR を作るのは ccnavi-start.sh）。"""
+        done, sent = self.request_on("i0002")
+        self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("対応する open のマージリクエストが", done.stderr)
+        self.assertFalse(os.path.exists(sent), "MR を作る要求が出た")
+        self.assertNotIn("posted", done.stdout)
 
-    def test_request_targets_the_recorded_integration(self):
-        """宛先は ccnavi-fetch.sh と同じ順で決める。
+    def test_request_goes_on_when_the_target_is_the_integration(self):
+        """MR の元ブランチが HEAD のブランチで、マージ先が統合先（既定は main）なら依頼は通る。"""
+        done, sent = self.request_on()
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertFalse(os.path.exists(sent))
 
-        統合先の取り込み結果は origin/master より先に読む。
-        """
-        subprocess.run(
-            ["git", "-C", self.ws, "update-ref", "refs/remotes/origin/master", "HEAD"], check=True
-        )
+    def test_request_stops_when_the_target_is_not_the_integration(self):
+        """マージ先が統合先と違う MR には依頼を投稿しない。統合先は環境変数が先に決める。"""
+        done, sent = self.request_on(CCNAVI_INTEGRATION_BRANCH="trunk")
+        self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("マージ先（main）が統合先（trunk）ではない", done.stderr)
+        self.assertFalse(os.path.exists(sent))
+
+    def test_request_compares_with_the_recorded_integration(self):
+        """統合先は fetch と同じ順で決める。取り込み結果が develop なら main の MR は止まる。"""
         write(
             os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
             "remote origin\nbranch develop-v1.0.0\nsource default\n",
         )
-        self.assertEqual(self.created_target(), "develop-v1.0.0")
-
-    def test_request_targets_the_environment_first(self):
-        """環境変数は統合先の取り込み結果より先に読む。"""
-        write(
-            os.path.join(self.ws, "logs", "state", "sync", "self", "integration", "head"),
-            "branch develop-v1.0.0\n",
-        )
-        self.assertEqual(self.created_target(CCNAVI_INTEGRATION_BRANCH="trunk"), "trunk")
-
-    def test_request_falls_back_to_main(self):
-        """どれも決まらなければ今までどおり main。"""
-        self.assertEqual(self.created_target(), "main")
-
-    def test_request_targets_origin_master_without_origin_head(self):
-        """origin/HEAD が無く origin/master だけあれば master（以前は main を宛先にしていた）。"""
-        subprocess.run(
-            ["git", "-C", self.ws, "update-ref", "refs/remotes/origin/master", "HEAD"], check=True
-        )
-        self.assertEqual(self.created_target(), "master")
+        done, _ = self.request_on()
+        self.assertNotEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("統合先（develop-v1.0.0）", done.stderr)
 
     def test_request_stops_without_an_eli5_html(self):
         """--eli5 の誤りは 2、置き場とコミットの欠けは全部を挙げて 1 で止める。

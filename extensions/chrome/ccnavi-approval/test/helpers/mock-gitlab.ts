@@ -184,6 +184,33 @@ export class MockGitLab extends MockGitHub {
       return { status: 200, json: { file_path: path, last_commit_id: this.lastChange(ref, path) } };
     }
     if (method === "POST" && rest === "/repository/commits") return this.commitActions(JSON.parse(body || "{}"));
+    if (method === "GET" && rest === "/merge_requests" && (u.searchParams.get("state") === "merged" || (u.searchParams.get("state") === "opened" && !u.searchParams.has("source_branch")))) {
+      const merged = u.searchParams.get("state") === "merged";
+      const want = u.searchParams.get("source_branch") ?? "";
+      return this.list(
+        u,
+        this.mrs
+          .filter((m) => (merged ? m.state === "merged" && m.branch === want : m.state === "open"))
+          .map((m) => ({
+            iid: m.number,
+            title: m.title,
+            description: m.body,
+            source_branch: m.branch,
+            target_branch: m.base,
+            source_project_id: m.fork ? 99 : 42,
+            web_url: `https://gitlab.com/${this.owner}/${this.repo}/-/merge_requests/${m.number}`,
+          })),
+      );
+    }
+    if (method === "POST" && rest === "/merge_requests") {
+      const req = JSON.parse(body || "{}") as { source_branch?: string; target_branch?: string; title?: string; description?: string };
+      if (!this.heads.has(String(req.source_branch)) || !this.heads.has(String(req.target_branch))) return { status: 400, json: { message: "branch does not exist" } };
+      const number = 100 + this.createdMrs.length;
+      const made = { head: String(req.source_branch), base: String(req.target_branch), title: String(req.title ?? ""), body: String(req.description ?? ""), draft: /^Draft: /.test(String(req.title ?? "")), number };
+      this.createdMrs.push(made);
+      this.mrs.push({ number, branch: made.head, base: made.base, title: made.title, body: made.body, state: "open", fork: false });
+      return { status: 201, json: { iid: number, web_url: `https://gitlab.com/${this.owner}/${this.repo}/-/merge_requests/${number}` } };
+    }
     if (method === "GET" && rest === "/merge_requests") {
       const branch = u.searchParams.get("source_branch") ?? "";
       // フォークの MR を先に並べる（1 ページ目がフォークで埋まる形を作れるように）。ページは per_page と page で切る

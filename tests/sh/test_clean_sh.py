@@ -337,6 +337,29 @@ class WorktreeOptionTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertTrue(os.path.isdir(self.top))
 
+    def test_branch_refuses_a_branch_ccnavi_did_not_record(self):
+        # 記録に無いブランチは、確認の有無によらず消さない（git branch -D の代わりに使わせない）。
+        for args in (("--branch", "wt"), ("--branch", "wt", "--confirmed")):
+            with self.subTest(args=args):
+                result = self.run_clean(*args)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("記録したブランチではない", result.stderr)
+        branches = subprocess.run(
+            ["git", "branch", "--list", "wt"], cwd=self.ws, capture_output=True, text=True
+        )
+        self.assertEqual(branches.stdout.strip().lstrip("+ ").strip(), "wt")
+
+    def test_branch_options_are_checked(self):
+        for args in (
+            ("--branch", "wt", "--worktree"),
+            ("--branch", "wt", "--dry-run"),
+            ("--confirmed", "wt"),
+            ("--branch", "../wt"),
+        ):
+            with self.subTest(args=args):
+                result = self.run_clean(*args)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+
 
 @unittest.skipUnless(SHELL and NODE, "sh と node が要る")
 class CleanWithNodeTest(CleanCases, unittest.TestCase):

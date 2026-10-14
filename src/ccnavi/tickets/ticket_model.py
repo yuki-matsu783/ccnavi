@@ -45,7 +45,14 @@ WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 # 行単位に書き換える（`ticket_fields.set_fields`）。承認は提案の中身を変えずに動かすので、
 # 提案に書いた値はそのまま承認済みチケットの値になる。だから提案に空でない値があれば
 # `--agree` と `--lint` が error にする（`agree_candidates.script_field_problems`）。
-SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "cancel_reason")
+SCRIPT_FIELDS = (
+    "started_at",
+    "completed_at",
+    "base_sha",
+    "merged_sha",
+    "cancelled_at",
+    "cancel_reason",
+)
 
 # glob のワイルドカード。これより前が字義どおりの前置。
 _WILDCARDS = "*?["
@@ -189,10 +196,6 @@ class Ticket:
     # 依頼文の MR の番号を「すでにあるチケットに結び付く」と判定するのに使う（`branchfind`）。
     # スクリプトだけが書く欄（SCRIPT_FIELDS）ではない。
     mr: int | None = None
-    # branch は親のブランチ名。親だけが持つ任意の欄で、無ければ親のブランチ名は
-    # 識別子そのもの。識別子・ファイル名・ワークツリー名は `/` を含まないまま、`feature/123-login`
-    # のような既存のブランチで作業するために使う。承認画面に出す。
-    branch: str = ""
     # project は作業のプロジェクト（`projects/` の名前）。決めるのは提案を
     # 置いた場所で、`ticket.scan` が入れる（プロジェクトの `wip/proposals/` ならその名前、
     # ワークツリーの中ならその元リポジトリ、ワークスペースの `wip/proposals/` なら空）。
@@ -230,6 +233,9 @@ class Ticket:
     started_at: str = ""
     completed_at: str = ""
     base_sha: str = ""
+    # finish が親のブランチへ合流した子の先頭のコミット。レビュー依頼の前提は、
+    # これが親の HEAD の祖先か。
+    merged_sha: str = ""
     cancelled_at: str = ""
     cancel_reason: str = ""
     # 読んだままの frontmatter。承認済みチケットを作るときに使う。
@@ -241,10 +247,10 @@ class Ticket:
     tree: str = ""
     tree_root: str = ""
     path: str = ""
-    # 親のツリーで見つけた未着手のチケットが、手元の退避（`logs/archive/`）の閉じたチケットと
-    # 同じ識別子のときの理由（`archive.drop_archived`）。
-    # 判定は止める（`approval_checks.content_problems`）。
-    archived_clash: str = ""
+    # source は解析したときに読んだファイルのバイト列（`ticket.load`）。承認はこれで照合し
+    # （`agree_digest.proposals_digest`）、同じバイト列を書く（`approval_ops.admit`）。
+    # 読み直すと、照合した中身と書く中身が別の読みになる。`parse` だけで組んだものは None。
+    source: bytes | None = field(default=None, repr=False, compare=False)
     # blocked は「このチケットは読めるが信じられない」理由。空でなければ判定は範囲を
     # 当てずに止める（phase_scope.scope_verdict）。承認のときにしか当たらなかった構造の検査を、
     # 判定の側でも当てるために置く（置き場を手で動かして承認すると `--agree` を通らない）。

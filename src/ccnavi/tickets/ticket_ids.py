@@ -44,6 +44,9 @@ MAX_ID_LENGTH = 64
 # issue から作る識別子と、新規の提案に勧める長さ（lint の warn）。上限との差は子のフェーズ番号・
 # 連番と余裕。
 SUGGESTED_ID_LENGTH = 48
+# 既にあるブランチを親に採用するときの識別子の上限。子の識別子は「親 + 6 文字」で、
+# 64 文字に収める。
+MAX_ADOPT_ID_LENGTH = MAX_ID_LENGTH - 6
 
 # 新しい親の識別子の形。`<先頭の語>-<番号>-<slug>`。先頭の語は使えるリスト
 # （`settings.branch_prefixes`。既定は feature・hotfix・fix など）にあるものだけを形に合うと読む。
@@ -211,9 +214,65 @@ def issue_identifier(
     return ident
 
 
-# 親のブランチ名は、`branch:` が無ければ親の識別子そのもの（名前を求める関数が恒等写像なので、
-# Python・sh・TS で食い違わない）。識別子を、ブランチ名として安全で、
-# 統合先と紛れない形にそろえる。いまは `--lint` の warn だけで、承認は止めない。
+def branch_to_id(branch: str) -> str:
+    """親のブランチ名から親の識別子を作る。`/` を `-` に置き換えるだけ。
+
+    ワークツリーは `.claude/worktrees/<識別子>` に、識別子のブランチを作らず親のブランチを直接
+    チェックアウトする。この変換は Python・sh（`ccnavi_branch_to_id`）・TS（拡張の `branchToId`）に
+    同じものを置き、`tests/fixtures/branch-to-id.json` の同じ表で一致を確かめる。
+    """
+    return branch.replace("/", "-")
+
+
+def adoption_id_problem(branch: str) -> str:
+    """既にあるブランチ（MR の元ブランチ）を親に採用するとき、識別子が使えない理由。使えれば空。
+
+    識別子の字と長さ（58 文字以内。子は親 + 6 文字で 64 文字に収める）に加えて、末尾が
+    `-<2 桁>` でないことを求める（子の識別子の途中と紛れる）。
+    """
+    ident = branch_to_id(branch)
+    problem = id_problem(ident)
+    if problem:
+        return problem
+    if len(ident) > MAX_ADOPT_ID_LENGTH:
+        return (
+            f"識別子が長すぎる（{len(ident)} 文字。子の識別子を収めるため"
+            f"採用できるのは {MAX_ADOPT_ID_LENGTH} 文字まで）"
+        )
+    if _CHILD_TAIL.search(ident):
+        return "識別子の末尾が `-<2 桁>` になる（子の識別子の途中と紛れる）"
+    return ""
+
+
+def id_answer(branch: str) -> list[str]:
+    """sh の `worktree id <ブランチ>` への答え（1 行 1 項目）。
+
+    - `id <識別子>`: ブランチ名の `/` を `-` に置き換えたもの
+    - `problem <理由>`: 親のブランチとして採用できない理由（ブランチ名の字と形・識別子の字と NFC・
+      58 文字・末尾の `-<2 桁>`）。使えれば出さない
+    - `direct <理由>`: 直接作業や子のワークツリーの名前として使えない理由（ブランチ名の字と形・
+      識別子の字と NFC・64 文字）。使えれば出さない
+    - `child yes`: 子の識別子の形（`<親>-<2 桁>-<2 桁>`）
+
+    sh は字の種類と NFC と文字数を自分で確かめない（ロケールでバイト数と字数が変わる）。ここに聞く。
+    """
+    ident = branch_to_id(branch)
+    lines = [f"id {ident}"]
+    shape = branch_problem(branch)
+    problem = shape or adoption_id_problem(branch)
+    if problem:
+        lines.append(f"problem {problem}")
+    direct = shape or id_problem(ident)
+    if direct:
+        lines.append(f"direct {direct}")
+    if "/" not in branch and _CHILD.match(ident):
+        lines.append("child yes")
+    return lines
+
+
+# 親の識別子は、親のブランチ名の `/` を `-` に置き換えたもの（`branch_to_id`）。新しく切る親の
+# 識別子を、ブランチ名として安全で、統合先と紛れない形にそろえる。いまは `--lint` の warn だけで、
+# 承認は止めない。
 #
 # 統合先や保護されたブランチの名前（`ccnavi-git.sh` の push の拒否と同じリスト）。
 # 大文字小文字を区別せずに比べる。`release/*` は識別子に `/` を書けないので、
@@ -221,7 +280,8 @@ def issue_identifier(
 RESERVED_BRANCH_IDS = ("main", "master", "develop", "release")
 
 
-# 親のブランチ名のキー。
+# 使えなくなった `branch:` の欄の名前。あればチケットの読み込みが error にする
+# （`ticket._read_relations`）。
 BRANCH_KEY = "branch"
 # ブランチ名の長さの上限（文字数）。ref はパスにもなる（`.git/refs/heads/<名前>`）ので、
 # 識別子と同じく短く保つ。
@@ -235,14 +295,13 @@ _REF_PREFIXES = ("refs", "heads", "remotes", "tags", "origin", "upstream", "head
 
 
 def branch_problem(name: str) -> str:
-    """`branch:` に書いた名前を親のブランチ名に使えない理由。使えれば空。
+    """親のブランチ名として使えない理由。使えれば空。（`c1 sort` の版の検査などが使う）
 
     字は識別子の字に `/` を足したものだけ（`_BRANCH`）。そのうえで
     `git check-ref-format --branch` の形の規則（`..`・`//`・`.` で始まる階層・`.lock` で終わる階層
     など）と、統合先や保護されたブランチの名前（main・master・develop・release・release/*・
     release-*。大文字小文字は区別しない）を断る。NFC でない表記も断る（識別子と同じ。
-    見た目が同じ別の名前を作らない）。その時点の統合先の名前は、呼び手
-    （`approval_checks.branch_problems`）が比べる。
+    見た目が同じ別の名前を作らない）。
     """
     if not isinstance(name, str) or not name:
         return "ブランチ名が空"
@@ -281,16 +340,6 @@ def branch_problem(name: str) -> str:
             "それを先頭の階層に持つ main/*・release/* など、release-*）は親のブランチにしない"
         )
     return ""
-
-
-def branch_name(t: ticket_model.Ticket) -> str:
-    """親チケットの親のブランチ名。`branch:` があればその値、無ければ識別子。
-
-    子のブランチは子の識別子（子は `branch:` を持たない）。
-    """
-    if t.is_child:
-        return t.ticket
-    return t.branch or t.ticket
 
 
 def branch_name_problems(

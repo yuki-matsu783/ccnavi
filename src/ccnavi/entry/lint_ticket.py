@@ -20,6 +20,7 @@ from ..tickets import (
     ops_stop,
     phase,
     review_host,
+    syncstate,
     ticket_fold,
     ticket_model,
 )
@@ -92,6 +93,8 @@ def _copy_problems(
             # 判定には入れない（判定は git を読まない）。`start` も止めない（通れば基準点を
             # HEAD で書き直すので、止めても防げる形が無い）。ここと status が warn で知らせる。
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {off}"))
+        for p in approval_checks.mr_problems(t):
+            problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {p.detail}"))
         if t.blocked:
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
             continue
@@ -218,7 +221,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     repo_of = {
         t.name or "(ワークスペースルート)": t.project for t in tree.all_trees(root, conf.projects)
     }
-    preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals, root)
+    preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals)
     approval_checks.align_imported(conf, root, preds)
     # 統合先の done/ で閉じた識別子も閉じたものに数える（開いた親子のチケットでも統合先の
     # done/ は常に読む）。承認の対象から外れる（`agree.waiting`）ので、何も言わずに済ませず
@@ -228,9 +231,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
         _proposal_problems(proposals, copies, index, closed, done, repo_of, preds, root=root)
     )
     integration = conf.integration_branch or settings.integration_recorded(conf.state)
-    problems.extend(
-        lint_branch._place_problems(root, proposals, copies, closed, review, repo_of, integration)
-    )
+    problems.extend(lint_branch._place_problems(root, proposals, copies, closed, review, repo_of))
     problems.extend(
         lint_branch._branch_name_problems(
             proposals,
@@ -239,6 +240,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
             review,
             integration,
             conf.branch_prefixes,
+            _adopted_parents(root, proposals),
         )
     )
     problems.extend(lint_branch._prefix_setting_problems(conf))
@@ -265,6 +267,19 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
             )
         )
     return problems
+
+
+def _adopted_parents(root: str, proposals: list) -> frozenset:
+    """親のワークツリーが在り、HEAD のブランチ名を変換したものが識別子と一致する親の識別子。
+
+    ブランチは既に決まっている（既存のブランチを採用した、または切った後）ので、名前の形式の
+    警告（`lint_branch._branch_name_problems`）は言わない。
+    """
+    return frozenset(
+        t.ticket
+        for t in proposals
+        if not t.is_child and syncstate.head_branch(tree.worktree_path(root, t.ticket), t.ticket)
+    )
 
 
 def _any_copies(conf: settings.Settings, root: str) -> bool:

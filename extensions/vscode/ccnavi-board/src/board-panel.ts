@@ -9,13 +9,14 @@ import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runApprovePreview, runApproveYes, runChildWorktreeAdd, runDecidePreview, runDecideYes, runTemplateDraft } from "./ccnavi.js";
-import { buildBoard, flowCardOf, isKnownPath, parentTreeOf, phaseChipOf, templateDraftCardOf, todoParentsOf, workflowCardOf, type Board } from "./core/board.js";
+import { buildBoard, flowCardOf, isKnownPath, parentTreeOf, phaseChipOf, templateDraftCardOf, todoParentsOf, unpreparedOf, workflowCardOf, type Board } from "./core/board.js";
 import { flowTicketOf } from "./core/flow-view.js";
 import { screens } from "./core/screens.js";
 import { movedStep, NOTHING_MOVED, type MovedState } from "./core/board-moved.js";
 import {
   gitScriptCommand,
   PUSH_APPROVED_SCRIPT,
+  prepareCommand,
   pushApprovedCommand,
   type Launcher,
 } from "./core/commands.js";
@@ -404,7 +405,12 @@ function handleMessage(message: BoardMessage | undefined): void {
       return;
     case "approveConfirm":
       // 押した時点の計画編集タブの様子を添える。未保存のタブがある親を含む一覧は遷移が打たない
-      dispatch(current, { kind: "confirm", tickets: message.tickets, unsaved: workflowTabs().unsaved });
+      dispatch(current, {
+        kind: "confirm",
+        tickets: message.tickets,
+        digest: message.digest,
+        unsaved: workflowTabs().unsaved,
+      });
       return;
     case "approveCancel":
       dispatch(current, { kind: "cancel" });
@@ -413,6 +419,16 @@ function handleMessage(message: BoardMessage | undefined): void {
     case "promptOpen":
       dispatch(current, { kind: "handOver", how: message.type });
       return;
+    case "prepare": {
+      // 画面が言った親をそのまま信頼せず、いまのボードの未準備の一覧に在るものだけを扱う。
+      // MR の番号が控えに無ければ（null）ボタンは出ないが、念のためここでも断る
+      const target = current.board === undefined ? undefined : unpreparedOf(current.board, message.family, message.project);
+      if (target === undefined || target.mr === null) {
+        return;
+      }
+      runInTerminal(root, prepareCommand(root, target.mr, target.project));
+      return;
+    }
     case "decide":
       // 残った指摘の行き先を決めるオーバーレイを開く。sh が指摘を取ってきて、ユーザが指摘ごとに選ぶ。
       // ボードから引くもの（親のワークツリー・フェーズ）をつけて渡し、開いてよいかは遷移の側が決める
@@ -543,11 +559,13 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
         dispatch(current, { kind: "approved", outcome: { ok: false, error: unsavedText(blocked) }, carrier: false });
         return;
       }
-      // 承認する識別子だけを渡す。実行ファイルが、いまの提案を端末の承認と同じ検査にかける
-      const outcome = await runApproveYes(root, binSetting(), effect.tickets);
+      // 見せたときと同じ絞りを渡す。渡さないと、実行ファイルは絞らないときの対象と比べて食い違いにする。
+      // 見せたダイジェスト（提案の識別子の一覧と各提案ファイルのバイト列全体）も渡す。識別子が同じでも、
+      // 見せたあとに提案ファイルの中身（本文・改行・BOM）が変われば承認せず、最新を表示し直す
+      const outcome = await runApproveYes(root, binSetting(), effect.tickets, effect.digest, effect.only);
       // 承認済みチケットを置くのは取り返しがつかないので、受け付けたことと結果を 1 行残す
       diaglog.get("ccnavi-board", root).info("承認を打った", {
-        result: outcome.ok ? "approved" : "error",
+        result: outcome.ok ? "approved" : "mismatch" in outcome ? "mismatch" : "error",
         requested: effect.tickets.length,
         approved: outcome.ok ? outcome.value.approved.length : 0,
       });
@@ -565,7 +583,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
     }
     // 承認の実行ファイルは承認済みチケットを置くだけで、コミットして push するのはこの sh
     case "carry":
-      runInTerminal(root, pushApprovedCommand(root));
+      runInTerminal(root, pushApprovedCommand(root, [], effect.paths));
       return;
     case "copy":
       await copyPrompt(effect.prompt, effect.what);
@@ -698,6 +716,7 @@ const KNOWN: Readonly<Record<BoardMessage["type"], true>> = {
   promptOpen: true,
   decide: true,
   decideConfirm: true,
+  prepare: true,
   reviewed: true,
   flow: true,
   editWorkflow: true,
@@ -717,8 +736,11 @@ function asMessage(message: unknown): BoardMessage | undefined {
     phase?: unknown;
     tickets?: unknown;
     filtered?: unknown;
+    digest?: unknown;
     choices?: unknown;
     ticket?: unknown;
+    family?: unknown;
+    project?: unknown;
   };
   if (typeof m.type !== "string" || !(m.type in KNOWN)) {
     return undefined;
@@ -739,11 +761,16 @@ function asMessage(message: unknown): BoardMessage | undefined {
         ? { type: "approve", tickets: m.tickets, filtered: m.filtered }
         : undefined;
     case "approveConfirm":
-      return Array.isArray(m.tickets) && m.tickets.every((t) => typeof t === "string")
-        ? { type: "approveConfirm", tickets: m.tickets as string[] }
+      // ダイジェストの無い押下は捨てる。どの一覧を見て押したかが分からないまま打たない
+      return Array.isArray(m.tickets) && m.tickets.every((t) => typeof t === "string") && typeof m.digest === "string"
+        ? { type: "approveConfirm", tickets: m.tickets as string[], digest: m.digest }
         : undefined;
     case "open":
       return typeof m.filePath === "string" ? { type: "open", filePath: m.filePath } : undefined;
+    case "prepare":
+      return typeof m.family === "string" && typeof m.project === "string"
+        ? { type: "prepare", family: m.family, project: m.project }
+        : undefined;
     case "decideConfirm":
       // 値が文字列でない選択は捨てる。行き先が見せた指摘の全部に付いているかは遷移の側が見る
       return typeof m.choices === "object" &&

@@ -1,7 +1,7 @@
 """合意の手続き。ユーザが提案に合意する（承認する）までの手続きを持つ。
 
-承認の候補とその検査は `agree_candidates`、承認の画面は `agree_screen`、
-改版の書き込みは `agree_digest` に分けてある。どれも agree を読まない。
+承認の候補とその検査は `agree_candidates`、承認の画面は `agree_screen`、承認の対象の指紋と
+書く本文は `agree_digest` に分けてある。どれも agree を読まない。
 
 置き場は approval、合意の手続きは agree。approval は承認済みチケット・マーカー・子の記録が
 どこにどう置かれているかを読み書きするだけで、ここ（agree）を知らない。agree は approval の
@@ -16,7 +16,8 @@
   `validate`・`plan_problems`・`revision_problems`）はここで当てる
 - ユーザに見せる（`agree_screen.screen`・`preview_body`）。見せたものと承認するものを
   同じ答えにするため、一覧を組む関数は 1 つ（`gather`）にしてある
-- 今承認すれば通るかを確かめる（`verify_verdict`）
+- 見せたものから変わっていないかを確かめる（`agree_digest` の `proposals_digest`、
+  `verify_verdict`）
 - 置き場へ動かす（`plan_batch`）。書き込みは approval の置き場の関数を通す。新規の承認は提案の
   中身を変えずに動かすだけで、書き足すものは無い（待ち方は承認済みチケットの計画から都度計算する）
 - 承認の事実をモデルに伝える文を組む（`agree_screen.approved_text`。拡張が `--agree --yes` の
@@ -43,7 +44,6 @@ from . import (
     approval_ops,
     phase,
     plan_order,
-    ticket_ids,
     ticket_model,
 )
 
@@ -188,11 +188,12 @@ def gather(
     )
 
 
-def preview_body(conf: settings.Settings, root: str, gathered: Gathered) -> dict:
+def preview_body(conf: settings.Settings, root: str, gathered: Gathered, digest: str) -> dict:
     """`--preview --json` が返す本体。`--verify --json` も同じものに答えを足して返す。
 
     `plans` は承認の対象に入った計画を持つ親の図の中身。`--plan-order <親> --json` と同じ関数
     （`plan_order.plans`）で作り、`--order` は渡さない（承認する提案そのものの順序）。
+    `digest` は提案の識別子の一覧と各提案ファイルのバイト列のダイジェスト（承認のとき照合する）。
     """
     parents = [
         (c.ticket, c.current) for c in gathered.batch if not c.ticket.is_child and c.ticket.has_plan
@@ -203,6 +204,7 @@ def preview_body(conf: settings.Settings, root: str, gathered: Gathered) -> dict
         "generated_at": approval_marks.now(),
         "batch": [_batch_entry(c) for c in gathered.batch],
         "text": gathered.text,
+        "digest": digest,
         "rejected": [
             {"ticket": t.ticket, "problems": [str(p) for p in complaints]}
             for t, complaints in gathered.rejected
@@ -329,9 +331,6 @@ def _batch_entry(cand: agree_candidates.Candidate) -> dict:
         "revision": cand.is_revision,
         "tree": t.tree or "",
         "path": t.path,
-        # 親のブランチ名。`branch:` が無ければ識別子。
-        "branch": ticket_ids.branch_name(t),
-        "existing_branch": cand.existing_branch,
         "overflow": [p.detail for p in cand.overflow],
     }
 
@@ -398,7 +397,14 @@ def _apply_steps(
 
     書けなかったときの扱い（止める・言って続ける・行を出す）は `fsio.policy` で添える。
     書き込みを溜める段では書き込みが失敗しないので、その扱いは Writer(FS) が書くときに当てる。
+
+    照合のあとで提案ファイルが差し替えられていたら、1 件も並べずに止める（照合したバイト列と
+    今のファイルが違う。`approval_ops.changed_since_read`）。一部だけ承認しないため。
     """
+    for cand in batch:
+        failed = approval_ops.changed_since_read(cand.ticket)
+        if failed:
+            return cand.ticket.ticket, failed
     for cand in batch:
         t = cand.ticket
         with fsio.policy(
@@ -460,12 +466,6 @@ def _apply_steps(
             failed = approval_ops.admit(where, t, approval.source_branch(t))
             if failed:
                 return t.ticket, failed
-            if t.is_child:
-                group = stage.new_group()
-                with fsio.policy(on_fail=fsio.FAIL_LINE, group=group):
-                    carried = approval_ops.carry_flow(conf, root, t, where)
-                for line in carried:
-                    stage.line(f"  {line}", group=group)
             # 終わったフェーズに子を足したら、そのフェーズのマーカーは消す。マーカーは
             # 「その時点の子が全部見られた」以上の意味を持たない。
             # 消すのは置けたあと。先に消すと、書けずに終わった（置き場が塞がっている、権限が無い）

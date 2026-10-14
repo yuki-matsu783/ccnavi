@@ -58,6 +58,17 @@ export interface CommitCall {
   readonly oid?: string;
 }
 
+/** 「始める」の試験が置く MR 1 本 */
+export interface MockMr {
+  number: number;
+  branch: string;
+  base: string;
+  title: string;
+  body: string;
+  state: "open" | "closed" | "merged";
+  fork: boolean;
+}
+
 export class MockGitHub {
   readonly owner = "acme";
   readonly repo = "widgets";
@@ -93,6 +104,14 @@ export class MockGitHub {
   readonly issues: { number: number; title: string; pull?: boolean }[] = [];
   /** 作ったブランチ（「始める」の頼み。名前と元の sha） */
   readonly createdBranches: { name: string; sha: string }[] = [];
+  /** 「始める」が探す MR（開いた・マージ済み・閉じた）。`pulls`（Approve を持つ開いた MR）とは別 */
+  readonly mrs: MockMr[] = [];
+  /** 「始める」が作った Draft の MR */
+  readonly createdMrs: { head: string; base: string; title: string; body: string; draft: boolean; number: number }[] = [];
+  /** 「始める」が積んだ初期コミット（ブランチと、新しい先頭の sha） */
+  readonly startCommits: { branch: string; sha: string; parent: string }[] = [];
+  /** tree の sha → その tree の中身（`POST /git/commits` が tree から中身を引く） */
+  protected readonly treeFiles = new Map<string, Record<string, string>>();
 
   /** 見本の日時（`NOW` 基準）を、実機の試験では今の時刻へずらす */
   protected readonly shift: number;
@@ -302,6 +321,62 @@ export class MockGitHub {
       const c = this.commits.get(u.pathname.slice(`${base}/commits/`.length));
       if (!c) return { status: 404, json: { message: "Not Found" } };
       return { status: 200, json: { sha: c.sha, parents: c.parents.map((p) => ({ sha: p })), files: this.changed(c) } };
+    }
+    if (method === "GET" && u.pathname === `${base}/pulls` && (u.searchParams.get("state") === "closed" || (u.searchParams.get("state") === "open" && !u.searchParams.has("head")))) {
+      const head = u.searchParams.get("head") ?? "";
+      const want = head.startsWith(`${this.owner}:`) ? head.slice(this.owner.length + 1) : "";
+      const open = u.searchParams.get("state") === "open";
+      const list = this.mrs
+        .filter((m) => (open ? m.state === "open" : m.state !== "open" && m.branch === want))
+        .map((m) => ({
+          number: m.number,
+          title: m.title,
+          body: m.body,
+          state: m.state === "open" ? "open" : "closed",
+          merged_at: m.state === "merged" ? "2026-01-01T00:00:00Z" : null,
+          html_url: `https://github.com/${this.owner}/${this.repo}/pull/${m.number}`,
+          head: { ref: m.branch, repo: { full_name: m.fork ? `fork/${this.repo}` : `${this.owner}/${this.repo}` } },
+          base: { ref: m.base },
+        }));
+      return this.paged(u, list);
+    }
+    if (method === "GET" && u.pathname.startsWith(`${base}/git/commits/`)) {
+      const c = this.commits.get(u.pathname.slice(`${base}/git/commits/`.length));
+      if (!c) return { status: 404, json: { message: "Not Found" } };
+      const tree = sha1(`tree-of\n${JSON.stringify(c.files)}`);
+      this.treeFiles.set(tree, c.files);
+      return { status: 200, json: { sha: c.sha, tree: { sha: tree }, parents: c.parents.map((p) => ({ sha: p })) } };
+    }
+    if (method === "POST" && u.pathname === `${base}/git/commits`) {
+      const req = JSON.parse(body || "{}") as { message?: string; tree?: string; parents?: string[] };
+      const files = this.treeFiles.get(String(req.tree));
+      if (!files || !Array.isArray(req.parents) || req.parents.some((p) => !this.commits.has(p))) return { status: 422, json: { message: "Invalid tree or parents" } };
+      const sha = this.store({ parents: req.parents, files: { ...files }, date: this.now.toISOString(), message: String(req.message ?? "") });
+      return { status: 201, json: { sha } };
+    }
+    if (method === "PATCH" && u.pathname.startsWith(`${base}/git/refs/heads/`)) {
+      const name = decodeURIComponent(u.pathname.slice(`${base}/git/refs/heads/`.length));
+      const req = JSON.parse(body || "{}") as { sha?: string; force?: boolean };
+      const old = this.heads.get(name);
+      if (!old || !req.sha || !this.commits.has(req.sha)) return { status: 422, json: { message: "Reference does not exist" } };
+      // force=false は早送りだけ
+      if (!this.ancestors(req.sha).some((c) => c.sha === old)) return { status: 422, json: { message: "Update is not a fast forward" } };
+      this.heads.set(name, req.sha);
+      this.startCommits.push({ branch: name, sha: req.sha, parent: old });
+      return { status: 200, json: { ref: `refs/heads/${name}`, object: { sha: req.sha, type: "commit" } } };
+    }
+    if (method === "POST" && u.pathname === `${base}/pulls`) {
+      const req = JSON.parse(body || "{}") as { head?: string; base?: string; title?: string; body?: string; draft?: boolean };
+      const head = this.heads.get(String(req.head));
+      const into = this.heads.get(String(req.base));
+      if (!head || !into) return { status: 422, json: { message: "Validation Failed: head or base does not exist" } };
+      // 実物と同じく、差分のないブランチからは PR を作れない（head が base の祖先）
+      if (this.ancestors(into).some((c) => c.sha === head)) return { status: 422, json: { message: "Validation Failed: No commits between base and head" } };
+      const number = 100 + this.createdMrs.length;
+      const made = { head: String(req.head), base: String(req.base), title: String(req.title ?? ""), body: String(req.body ?? ""), draft: req.draft === true, number };
+      this.createdMrs.push(made);
+      this.mrs.push({ number, branch: made.head, base: made.base, title: made.title, body: made.body, state: "open", fork: false });
+      return { status: 201, json: { number, html_url: `https://github.com/${this.owner}/${this.repo}/pull/${number}` } };
     }
     if (method === "GET" && u.pathname === `${base}/pulls`) {
       const head = u.searchParams.get("head") ?? "";

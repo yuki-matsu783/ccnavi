@@ -254,7 +254,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     review, _ = approval.scan_review(conf, root, raw=raw)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals, root)
+    preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals)
     approval_checks.align_imported(conf, root, preds)
     times = approval_times.approved_times(conf, copies + review)
     for t in sorted(copies + review, key=lambda x: (x.parent or x.ticket, x.ticket)):
@@ -279,7 +279,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         where = phase.stage(root, conf, parent, raw)
         if where:
             stdout.write(f"  {parent.ticket} の局面: {where}\n")
-        where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+        where = approval.home_dir_read(conf, root, parent.ticket, "", project=parent.project)
         wrapped = approval_marks.read_parent_mark(
             where, parent.ticket, approval_marks.PARENT_MARK_CLOSE_EARLY
         )

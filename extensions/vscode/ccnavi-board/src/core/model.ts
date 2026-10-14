@@ -138,6 +138,31 @@ export interface PredecessorUnmetJson {
   readonly label: string;
 }
 
+/**
+ * 親のワークツリーのリモートとの差（`ccnavi --explain --json` の `remote`）。最後に取ってきた origin との差で、
+ * ネットワークには出ない。`ahead`（未送信）と `behind`（遅れ）は、リモート追跡の ref が無い・読めないと null。
+ * `fetched_at` は最終同期（UNIX 秒）で、0 は一度も取り込んでいない（リモート未確認）。
+ */
+export interface RemoteJson {
+  readonly branch: string;
+  readonly ahead: number | null;
+  readonly behind: number | null;
+  readonly fetched_at: number;
+  readonly mr: number | null;
+}
+
+/**
+ * このPCでは未準備の親（`ccnavi --explain --json` の `unprepared`）。取り込み状態の記録（キャッシュ）だけがあり、
+ * 親のワークツリーが無い。`branch` と `mr` は記録の控え（無ければ空と null）、`reason` は止まった理由。
+ */
+export interface UnpreparedJson {
+  readonly family: string;
+  readonly project: string;
+  readonly branch: string;
+  readonly mr: number | null;
+  readonly reason: string;
+}
+
 export interface TicketJson {
   readonly ticket: string;
   readonly parent: string;
@@ -145,6 +170,12 @@ export interface TicketJson {
   readonly title: string;
   readonly project: string;
   readonly issue: number | null;
+  /** 親だけ。親を載せる MR の番号（親チケットの `mr:`）。無ければ null。この欄を出さない古い実行ファイルも null */
+  readonly mr: number | null;
+  /** 親だけ。親のブランチ名。子と、この欄を出さない古い実行ファイルは空 */
+  readonly branch: string;
+  /** 親だけ。親のワークツリーがあるときのリモートとの差。子・ワークツリーなし・古い実行ファイルは null */
+  readonly remote: RemoteJson | null;
   readonly predecessors: readonly string[];
   /** 満たしていない先行。空なら満たしている（先行が無い・閉じたチケット・この欄を出さない古い実行ファイルも空） */
   readonly predecessors_unmet: readonly PredecessorUnmetJson[];
@@ -163,6 +194,8 @@ export interface TicketJson {
   readonly started_at: string;
   readonly completed_at: string;
   readonly base_sha: string;
+  /** finish が親のブランチへ合流した子の先頭。合流していなければ空（表示だけ） */
+  readonly merged_sha: string;
   readonly cancelled_at: string;
   readonly cancel_reason: string;
   /**
@@ -200,6 +233,8 @@ export interface ArchivedTicketJson {
   readonly approved_at: string;
   readonly started_at: string;
   readonly completed_at: string;
+  /** finish が親のブランチへ合流した子の先頭。合流していなければ空か無い（表示だけ） */
+  readonly merged_sha?: string;
   readonly cancelled_at: string;
   readonly cancel_reason: string;
   readonly history: readonly HistoryEntryJson[];
@@ -367,6 +402,8 @@ export interface BoardJson {
   readonly parents: readonly ParentJson[];
   /** 手元の退避にある閉じたチケット（表示用）。任意の欄で、この欄を出さない古い実行ファイルでは空か無し */
   readonly archived?: readonly ArchivedTicketJson[];
+  /** このPCでは未準備の親。この欄を出さない古い実行ファイルでは空か無し */
+  readonly unprepared?: readonly UnpreparedJson[];
 }
 
 export type ParseResult =
@@ -417,6 +454,7 @@ export function parseBoardJson(text: string): ParseResult {
       tickets: list(raw.tickets).filter(isRecord).map(ticket),
       parents: list(raw.parents).filter(isRecord).map(parent),
       archived: list(raw.archived).filter(isRecord).map(archived),
+      unprepared: list(raw.unprepared).filter(isRecord).map(unprepared),
     },
   };
 }
@@ -483,6 +521,26 @@ function sum(raw: Record<string, unknown>): SumJson {
   };
 }
 
+function unprepared(raw: Record<string, unknown>): UnpreparedJson {
+  return {
+    family: str(raw.family),
+    project: str(raw.project),
+    branch: str(raw.branch),
+    mr: num(raw.mr),
+    reason: str(raw.reason),
+  };
+}
+
+function remote(raw: Record<string, unknown>): RemoteJson {
+  return {
+    branch: str(raw.branch),
+    ahead: num(raw.ahead),
+    behind: num(raw.behind),
+    fetched_at: num(raw.fetched_at) ?? 0,
+    mr: num(raw.mr),
+  };
+}
+
 function ticket(raw: Record<string, unknown>): TicketJson {
   const review = isRecord(raw.human_review) ? raw.human_review : {};
   const copy = isRecord(raw.copy) ? raw.copy : {};
@@ -495,6 +553,9 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     title: str(raw.title),
     project: str(raw.project),
     issue: num(raw.issue),
+    mr: num(raw.mr),
+    branch: str(raw.branch),
+    remote: isRecord(raw.remote) ? remote(raw.remote) : null,
     predecessors: list(raw.predecessors).map(str),
     predecessors_unmet: list(raw.predecessors_unmet)
       .filter(isRecord)
@@ -516,6 +577,7 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     started_at: str(raw.started_at),
     completed_at: str(raw.completed_at),
     base_sha: str(raw.base_sha),
+    merged_sha: str(raw.merged_sha),
     cancelled_at: str(raw.cancelled_at),
     cancel_reason: str(raw.cancel_reason),
     in_progress: typeof raw.in_progress === "boolean" ? raw.in_progress : null,
@@ -542,6 +604,7 @@ function archived(raw: Record<string, unknown>): ArchivedTicketJson {
     approved_at: str(raw.approved_at),
     started_at: str(raw.started_at),
     completed_at: str(raw.completed_at),
+    merged_sha: str(raw.merged_sha),
     cancelled_at: str(raw.cancelled_at),
     cancel_reason: str(raw.cancel_reason),
     history: list(raw.history).filter(isRecord).map(historyEntry),

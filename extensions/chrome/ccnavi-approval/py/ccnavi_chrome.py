@@ -56,15 +56,16 @@ Snapshot の形は次のとおり（拡張の `src/core/snapshot.ts` と対）�
     "workspace": {"integration": {"name": ..., "source": ..., "head": ...},
                   "files": {...}, "binary": [...], "links": [...]}
 
-親子のチケットの親のブランチ名は親チケットの `branch:`（無ければ識別子）。
-要求の `family` は親のブランチ名のまま（拡張が読み書きするブランチ）で、親子のチケットの識別子は
-そのブランチの上の親チケットが自分のブランチだと宣言することで決まる（`_family_ident`）。
-仮のツリーは `.claude/worktrees/<識別子>` に組み、HEAD を親のブランチに向け、取り込み状態は
-識別子を鍵に `branch` へ親のブランチ名を書く。同じ親子のチケットを宣言するブランチが snapshot に
-2 本以上あれば、どれを正とするか決まらないとして止める。閉包の先行の親子のチケットのブランチは、
-snapshot の中で宣言するブランチを探し、無ければ要求の `hints`（識別子 → ブランチ名。ボードの
-親子のチケットの一覧から拡張が渡す）、それも無ければ識別子と同じ名前を読みに行く。読んだブランチが
-宣言しなければ使わない。
+親子のチケットの識別子は親のブランチ名の `/` を `-` に置き換えたもの（`ticket_ids.branch_to_id`）。
+要求の `family` は親のブランチ名のまま（拡張が読み書きするブランチ）で、そのブランチの上に、変換した
+識別子の親チケットがあれば、そのブランチが親のブランチ（`_family_ident`）。リモートのブランチ一覧は
+変換して親チケットの識別子と照合する。仮のツリーは `.claude/worktrees/<識別子>` に組み、HEAD を親の
+ブランチに向け、取り込み状態は識別子を鍵に `branch` へ親のブランチ名を書く（キャッシュ）。
+同じ識別子の親チケットを持つブランチが snapshot に 2 本以上あれば、どれを正とするか決まらない
+として止める。閉包の先行の親子のチケットのブランチは、snapshot の中で変換した識別子が一致する
+ブランチを探し、無ければ要求の `hints`（識別子 → ブランチ名。ボードの親子のチケットの一覧から
+拡張が渡す）、それも無ければ識別子と同じ名前を読みに行く。読んだブランチの変換した識別子が
+合わなければ使わない。
 
 「始める」の `start` も答える。issue の番号とタイトルから識別子を決め
 （手元と同じ `ticket_ids.issue_identifier`）、始められない理由（統合先の `done/` にある・同じ名前の
@@ -281,38 +282,33 @@ def family_of(ident: str) -> str:
 
 
 def _claimers(snap: dict, place: dict, name: str) -> list:
-    """ブランチ `name` を自分の親のブランチだと宣言する親チケット。
+    """ブランチ `name` が親のブランチである親チケット。
 
-    見るのはそのブランチの置き場の開いたもの（提案の todo/・review/ と承認済みの doing/）で、親が
-    宣言する名前（`_claimed`）が `name` と同じもの。
+    見るのはそのブランチの置き場の開いたもの（提案の todo/・review/ と承認済みの doing/）で、
+    識別子が `name` を変換したもの（`ticket_ids.branch_to_id`）と同じ親。
     """
     return [
         t
-        for state, t in _tickets_in(
+        for _, t in _tickets_in(
             _files(snap, name), place, (*ticket_model.STATES, ticket_model.DOING)
         )
-        if not t.is_child and _claimed(state, t) == name
+        if not t.is_child and t.ticket == ticket_ids.branch_to_id(name)
     ]
 
 
-def _claimed(state: str, t) -> str:
-    """親チケットが宣言する親のブランチ名。
-
-    承認済み（doing/・review/）は `branch:`（無ければ識別子）、承認前の提案（todo/）は識別子
-    （提案の `branch:` は承認されるまで使わない）。
-    """
-    return t.ticket if state == ticket_model.TODO else ticket_ids.branch_name(t)
-
-
 def _family_ident(snap: dict, place: dict, name: str) -> str:
-    """親のブランチ `name` の親子のチケットの識別子。宣言する親が 1 つに決まらなければ Refused。"""
+    """親のブランチ `name` の親子のチケットの識別子（`name` を変換したもの）。
+    その識別子の親チケットがブランチの上に無ければ Refused。"""
     idents = sorted({t.ticket for t in _claimers(snap, place, name)})
     if len(idents) == 1:
         return idents[0]
     if not idents:
-        raise Refused(f"ブランチ {name} を自分の親ブランチとして宣言する親チケットがありません")
+        raise Refused(
+            f"ブランチ {name} の上に、識別子が {ticket_ids.branch_to_id(name)}"
+            "（ブランチ名の `/` を `-` に置き換えたもの）の親チケットがありません"
+        )
     raise Refused(
-        f"ブランチ {name} を親ブランチとして宣言する親チケットが 2 つ以上あります"
+        f"ブランチ {name} の上に、識別子が同じ親チケットが 2 つ以上あります"
         f"（{', '.join(idents)}）。親子チケットを特定できません"
     )
 
@@ -320,19 +316,21 @@ def _family_ident(snap: dict, place: dict, name: str) -> str:
 def _tree_ident(snap: dict, place: dict, name: str) -> str:
     """仮のツリーに組むブランチ `name` の識別子（閉包の親子のチケットを含む）。
 
-    宣言する親チケットが 1 つならその識別子。宣言する親が無い（閉包の先行の親子のチケットで、
-    親の提案や承認済みチケットがそのブランチの置き場に無い）ときは、前と同じくブランチ名を識別子とする（識別子の形のときだけ）。
+    変換した識別子の親チケットがあればその識別子。親チケットが無い（閉包の先行の親子のチケットで、
+    親の提案や承認済みチケットがそのブランチの置き場に無い）ときも、変換した識別子
+    （識別子の形のときだけ）。
     """
     idents = sorted({t.ticket for t in _claimers(snap, place, name)})
     if len(idents) == 1:
         return idents[0]
-    if not idents and ticket_ids.is_valid_id(name):
-        return name
+    ident = ticket_ids.branch_to_id(name)
+    if not idents and ticket_ids.is_valid_id(ident):
+        return ident
     return _family_ident(snap, place, name)
 
 
 def _ident_branches(snap: dict, place: dict) -> dict[str, list[str]]:
-    """識別子 → それを宣言するブランチのリスト（snapshot の中の、統合先以外のブランチ）。"""
+    """識別子 → その識別子の親チケットを持つブランチのリスト（snapshot の中の、統合先以外）。"""
     integ = snap["integration"]["name"]
     out: dict[str, set[str]] = {}
     for name in snap["branches"]:
@@ -344,25 +342,24 @@ def _ident_branches(snap: dict, place: dict) -> dict[str, list[str]]:
 
 
 def _rival_problem(snap: dict, place: dict, name: str, ident: str) -> str:
-    """親子のチケット `ident` を宣言するブランチが `name` のほかにもあれば、止める理由。"""
+    """親子のチケット `ident` の親チケットを持つブランチが `name` のほかにもあれば、その理由。"""
     others = [b for b in _ident_branches(snap, place).get(ident, []) if b != name]
     if not others:
         return ""
     return (
-        f"親子のチケット {ident} の親のブランチとして宣言されているブランチが 1 本でない"
-        f"（{', '.join([name, *others])}。どれもその上の親チケットが自分のブランチだと"
-        "宣言している）。どれを正とするか決まらないので、この親子のチケットは判定しない"
-        ""
+        f"親子のチケット {ident} になるブランチが 1 本でない"
+        f"（{', '.join([name, *others])}。どれも変換すると識別子が同じで、その上に同じ識別子の"
+        "親チケットがある）。どれを正とするか決まらないので、この親子のチケットは判定しない"
     )
 
 
 def _ambiguous_problem(closure: dict) -> str:
-    """閉包の先行の親子のチケットを宣言するブランチが 2 本以上あれば、止める理由。"""
+    """閉包の先行の親子のチケットになるブランチが 2 本以上あれば、止める理由。"""
     if not closure.get("ambiguous"):
         return ""
     return (
-        f"先行の親子のチケット（{', '.join(closure['ambiguous'])}）の"
-        "親のブランチとして宣言されているブランチが 1 本でない。"
+        f"先行の親子のチケット（{', '.join(closure['ambiguous'])}）"
+        "になるブランチが 1 本でない。"
         "どれを正とするか決まらないので、この親子のチケットは判定しない"
     )
 
@@ -395,11 +392,10 @@ def _closed(snap: dict, place: dict) -> set[str]:
 def _op_families(req: dict, root: str) -> dict:
     """候補のブランチのうち、親のブランチ（親子のチケットのブランチ）であるもの。
 
-    親子のチケットのブランチ = そのブランチの置き場に、そのブランチを自分の親のブランチだと宣言する
-    親の提案か承認済みのチケットがある（`branch:` がブランチ名と同じか、`branch:` が無くて識別子が
-    ブランチ名と同じ）。閉じた親（`done/`）しか無いブランチは数えない。答えの `name` は
-    ブランチ名、`family` は親子のチケットの識別子。同じ親子のチケットを宣言するブランチが候補に
-    2 本以上ある・1 本のブランチを 2 つの親子のチケットが宣言するときは `conflict` に止める理由を
+    親子のチケットのブランチ = そのブランチの置き場に、ブランチ名を変換した（`/` を `-` に
+    置き換えた）識別子の親の提案か承認済みのチケットがある。閉じた親（`done/`）しか無い
+    ブランチは数えない。答えの `name` はブランチ名、`family` は親子のチケットの識別子。
+    同じ識別子の親チケットを持つブランチが候補に 2 本以上あるときは `conflict` に止める理由を
     入れる（拡張はその親子のチケットを判定しない）。
     """
     snap = _snapshot(req)
@@ -416,7 +412,7 @@ def _op_families(req: dict, root: str) -> dict:
         parents = [
             (state, t)
             for state, t in _tickets_in(files, place, (*ticket_model.STATES, ticket_model.DOING))
-            if not t.is_child and _claimed(state, t) == name
+            if not t.is_child and t.ticket == ticket_ids.branch_to_id(name)
         ]
         if not parents:
             continue
@@ -464,7 +460,7 @@ def _closure(snap: dict, place: dict, family: str, hints: dict[str, str] | None 
 
     `families` は親のブランチ名のリスト（先頭が `family`）、`idents` はブランチ名 →
     親子のチケットの識別子、`rivals` は親子のチケットの識別子と同じ名前のブランチ
-    （`branch:` を持つ親子のチケットで、同じ親子のチケットを宣言するブランチが無いかを確かめるために
+    （`/` を含むブランチの親子のチケットで、同じ識別子になる別のブランチが無いかを確かめるために
     読む。判定の入力には入れない）。"""
     closed = _closed(snap, place)
     absent = set(snap.get("absent") or [])
@@ -496,7 +492,7 @@ def _closure(snap: dict, place: dict, family: str, hints: dict[str, str] | None 
                     continue
                 found = owners.get(fam, [])
                 if len(found) > 1:
-                    # 先行の親子のチケットを宣言するブランチが 2 本以上。
+                    # 先行の親子のチケットになるブランチが 2 本以上。
                     # 判定する親子のチケットと同じく決まらない
                     if fam not in ambiguous:
                         ambiguous.append(fam)
@@ -673,7 +669,7 @@ def records(
             # 読みに行った名前の親子のチケット（閉包の `idents`。無ければその名前を識別子とする）。
             # 識別子の形でなければ取り込み状態を書けない。
             # 何も言わずに飛ばさず、決まらないとして止める。
-            ident = (idents or {}).get(name, name)
+            ident = (idents or {}).get(name, ticket_ids.branch_to_id(name))
             if not ticket_ids.is_valid_id(ident):
                 raise Refused(
                     f"ホストにない親ブランチ {name} の親子チケット（{ident}）が"
@@ -759,7 +755,7 @@ def _op_board(req: dict, root: str) -> dict:
     body = first
     narrowed = bool(mine) and len(mine) != len(first["batch"])
     if narrowed:
-        # 画面の本文を、この親子のチケットの分だけで組み直す
+        # 画面の本文とダイジェストを、この親子のチケットの分だけで組み直す
         # （1 回の承認は 1 つの `P`）。
         code, body, err = _preview(root, mine)
         if body is None:
@@ -781,7 +777,12 @@ def _op_board(req: dict, root: str) -> dict:
         "reviewable": _reviewable(root, place, ident),
         "batch": batch,
         # 画面の本文は提案をツリーからの相対パスで出すので、手を加えずに返す。
+        # ダイジェストはこの本文と承認済みのチケットの中身を覆い、
+        # 手元の `--agree --preview` と同じ値になる。
         "text": body["text"] if batch else "",
+        "digest": body["digest"] if batch else "",
+        # 承認するときに `plan` へ渡す絞り。このダイジェストを出したときの絞りで、絞らなければ null
+        "only": mine if narrowed else None,
         "rejected": [
             {"ticket": r["ticket"], "problems": [_relative(root, p) for p in r["problems"]]}
             for r in first["rejected"]
@@ -1018,19 +1019,29 @@ def _changes(root: str, changes: core.Changes | None) -> dict:
 def _op_plan(req: dict, root: str) -> dict:
     """親子のチケット 1 つの承認で書くもの（judge → plan）。書かない。"""
     snap, place, family, _ = _family_tree(req, root)
-    # 承認する識別子。この対象だけを、今の中身で手元の `--agree --yes` と同じ検査にかける。
-    ids = req.get("ids")
-    if not (isinstance(ids, list) and ids and all(isinstance(i, str) for i in ids)):
-        raise Refused("ids は承認する識別子のリスト（1 件以上）")
+    only = req.get("only")
+    if only is not None and not (isinstance(only, list) and all(isinstance(i, str) for i in only)):
+        raise Refused("only は識別子のリスト")
+    shown = req.get("shown")
+    shown_ids = shown_digest = None
+    if shown is not None:
+        # 見せた一覧とダイジェスト。違えば書くものを出さず、preview からやり直させる。
+        ids = shown.get("ids") if isinstance(shown, dict) else None
+        digest = shown.get("digest") if isinstance(shown, dict) else None
+        if not (isinstance(ids, list) and all(isinstance(i, str) for i in ids)) or not (
+            isinstance(digest, str) and digest
+        ):
+            raise Refused("shown は見せた識別子のリスト（ids）とダイジェスト（digest）")
+        shown_ids, shown_digest = ids, digest
     _writable(snap, family)
     notes = io.StringIO()
     with _environ():
         snapshot = _core_snapshot(req, root)
         actor = snapshot.actor
         with history.session(actor.via or history.VIA_CHROME, notes, actor.account, actor.version):
-            verdict = core.judge_approval(snapshot, ids)
+            verdict = core.judge_approval(snapshot, only, shown_ids, shown_digest)
             refused = verdict.gathered.refused
-            ready = verdict.batch and not refused and not core.approval_not_approvable(verdict, ids)
+            ready = verdict.batch and not refused and verdict.mismatch is None
             changes = core.plan(snapshot, verdict) if ready else None
     _unwritten(root, notes.getvalue())
     body = _changes(root, changes)
@@ -1039,8 +1050,10 @@ def _op_plan(req: dict, root: str) -> dict:
         "family": family,
         "identifiers": verdict.identifiers,
         "text": verdict.screen_text,
-        # 通らなかった根拠の種別（`CORE_APPROVE_NOTHING`）。通れば null
-        "code": None if changes is not None else core.approval_refusal_code(verdict, ids) or None,
+        "digest": verdict.digest,
+        "mismatch": verdict.mismatch,
+        # 通らなかった根拠の種別（`CORE_APPROVE_*`、手元の `--agree --yes` と同じ）。通れば null
+        "code": None if changes is not None else core.approval_refusal_code(verdict) or None,
         "refused": _relative(root, refused),
         "rejected": [
             {"ticket": t.ticket, "problems": [_relative(root, str(p)) for p in complaints]}
@@ -1255,6 +1268,54 @@ def _op_start(req: dict, root: str) -> dict:
     return {"identifier": ident, "integration": integ, "problems": problems}
 
 
+def _op_adopt(req: dict, root: str) -> dict:
+    """既にある MR の元ブランチを親として採用してよいか。識別子と、採用できない理由。
+
+    `ccnavi-start.sh` の採用の確認のうち、ブランチ名と識別子に関わる分を `ticket_ids` で確かめる。
+    ブランチ名が保護された名前や使えない書き方でないこと、`/` を `-` に置き換えた識別子が使えること
+    （58 文字以内、末尾が `-<2 桁>` でない）、同じ識別子になる別のブランチが無いこと
+    （`names` は origin の全ブランチの名前）、識別子が統合先の `done/` でクローズ済みでないこと、
+    互換の版が合うこと。
+    MR が open か・フォークか・マージ先・マージ済みの MR の有無は、ホストに聞く拡張の側で確かめる。
+    """
+    snap = _snapshot(req)
+    place = _placement()
+    branch = req.get("branch")
+    if not isinstance(branch, str) or not branch:
+        raise Refused("branch は MR の元ブランチの名前")
+    names = req.get("names") or []
+    if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+        raise Refused("names はブランチ名のリスト")
+    integ = snap["integration"]["name"]
+    ident = ticket_ids.branch_to_id(branch)
+    problems = []
+    if branch.casefold() == integ.casefold():
+        problems.append(f"ブランチ {branch} は統合先の名前です")
+    why = ticket_ids.branch_problem(branch)
+    if why:
+        problems.append(f"ブランチ {branch} は採用できません（{why}）")
+    why = ticket_ids.adoption_id_problem(branch)
+    if why:
+        problems.append(f"識別子 {ident} は使えません（{why}）")
+    folded = ident.casefold()
+    clash = sorted(
+        {n for n in names if n != branch and ticket_ids.branch_to_id(n).casefold() == folded}
+    )
+    if clash:
+        problems.append(
+            f"ブランチ {branch} と {', '.join(clash)} は、どちらも識別子 {ident} になります"
+        )
+    if folded in {i.casefold() for i in _closed(snap, place)}:
+        problems.append(
+            f"{ident} は統合先 {integ} の done/ でクローズ済みです"
+            "（クローズ済みの識別子は再利用できません）"
+        )
+    compat = _compat(snap)
+    if not compat["same"]:
+        problems.append(compat["message"])
+    return {"identifier": ident, "integration": integ, "problems": problems}
+
+
 def _op_version(req: dict, root: str) -> dict:
     return {"version": version.VERSION, "compat": version.COMPAT, "python": sys.version.split()[0]}
 
@@ -1269,6 +1330,7 @@ _OPS = {
     "confirm": _op_confirm,
     "compat": _op_compat,
     "start": _op_start,
+    "adopt": _op_adopt,
     "version": _op_version,
 }
 

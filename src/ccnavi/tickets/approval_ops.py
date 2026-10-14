@@ -18,7 +18,6 @@ from . import (
     approval_checks,
     approval_marks,
     archive,
-    flow,
     history,
     ticket_fields,
     ticket_ids,
@@ -30,7 +29,7 @@ from . import ticket as ticket_mod
 def admit(approved_dir: str, ticket: ticket_model.Ticket, source_tree: str) -> str:
     """承認した提案を `doing/` へ動かす。動かせなかった理由を返す。動かせたら空文字。
 
-    中身は変えない。 提案をバイト列のまま読み（`fsio.read_bytes`）、同じバイト列を `doing/` に
+    中身は変えない。 照合に使ったバイト列（`Ticket.source`）を、そのまま `doing/` に
     書いて元を消す。欄を書き足さず、改行も BOM も変えない。端末・ボード・Chrome・手で動かす、の
     どれで承認しても承認済みチケットが提案とバイト単位で同じになるように。消せなければ書いた側を
     消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で止まる。
@@ -39,7 +38,10 @@ def admit(approved_dir: str, ticket: ticket_model.Ticket, source_tree: str) -> s
     （`approval.load_copy`）。`source_tree` は提案が乗っていたブランチの名前で、状態の履歴に残す。
     """
     target = approval.copy_path(approved_dir, ticket.ticket)
-    content = fsio.read_bytes(ticket.path)
+    failed = changed_since_read(ticket)
+    if failed:
+        return failed
+    content = ticket.source if ticket.source is not None else fsio.read_bytes(ticket.path)
     if content is None:
         return f"提案を読めない ({ticket.path})"
     with fsio.policy(message="保存できませんでした ({reason})", restore=()):
@@ -66,6 +68,22 @@ def admit(approved_dir: str, ticket: ticket_model.Ticket, source_tree: str) -> s
         ticket_model.DOING,
         tree=source_tree,
     )
+    return ""
+
+
+CHANGED_SINCE_READ = "提案の内容が更新されました。表示し直してから、もう一度承認してください"
+
+
+def changed_since_read(ticket: ticket_model.Ticket) -> str:
+    """照合に使ったバイト列（`Ticket.source`）と、今の提案ファイルが違えば理由を返す。
+
+    照合のあと書く前に提案が差し替えられると、見せていない中身を承認してしまう。書くのは
+    照合したバイト列だが、元の提案を消すと差し替えた側が黙って消えるので、違えば何もしない。
+    """
+    if ticket.source is None:
+        return ""
+    if fsio.read_bytes(ticket.path) != ticket.source:
+        return f"{CHANGED_SINCE_READ} ({ticket.path})"
     return ""
 
 
@@ -110,63 +128,6 @@ def to_review(approved_dir: str, tree_root: str, tickets_rel: str, ticket_id: st
         approval.copy_path(approved_dir, ticket_id),
         approval.review_path(tree_root, tickets_rel, ticket_id),
     )
-
-
-def carry_flow(
-    conf: settings.Settings, root: str, proposal: ticket_model.Ticket, approved_dir: str
-) -> list[str]:
-    """承認した子のフローを、提案のツリーから承認済みチケットのツリーへ動かす。知らせる行を返す。
-
-    フローの置き場は承認済みチケットと同じツリー。ユーザは承認の前に、提案が在る
-    ツリーの置き場へボードで保存する。承認で子が別のツリー（親のワークツリーなど）へ動くと、
-    フローだけが元のツリーに残り、読まれなくなる。承認はユーザの操作なので、ここで一緒に
-    動かす。行き先に違う中身のフローが既に在れば上書きせず、そう言う（元のほうも残す）。
-    リンク・ふつうのファイルでないもの・ハードリンクは移さない（`flow.load` と同じ読み方）。
-    """
-    source_root = proposal.tree_root or root
-    source = flow.flow_file(conf, source_root, proposal.ticket)
-    target = os.path.normpath(
-        os.path.join(approved_dir, flow.FLOWS_DIR, f"{proposal.ticket}{flow.SUFFIX}")
-    )
-    try:
-        if not fsio.lexists(source):
-            return []
-        if os.path.normcase(os.path.realpath(source)) == os.path.normcase(os.path.realpath(target)):
-            return []
-    except (OSError, ValueError):
-        return []
-    raw, why = flow.read_bytes(source, source_root)
-    if raw is None:
-        return [
-            f"{proposal.ticket} のフロー {source} を移さなかった: {why}。"
-            "ユーザが確かめて置き直してください"
-        ]
-    if fsio.lexists(target):
-        held, _ = flow.read_bytes(target)
-        if held != raw:
-            return [
-                f"{proposal.ticket} のフローを {target} へ移さなかった: 行き先に違う中身のフローが"
-                f"既に在る（上書きしない）。{source} と見比べて、ユーザが 1 本に決める"
-            ]
-        fsio.remove(source)
-        return []
-    # 失敗したときの行は承認の plan でも同じものを出せるよう、書き込みにつける（`FAIL_LINE`）。
-    cannot = f"{proposal.ticket} のフローを {target} へ移せない ({{reason}})。{source} に残っている"
-    with fsio.policy(message=cannot):
-        # 途中で中断されても書きかけを残さない書き方で置く。在るかを確かめてから置くまでの間に
-        # ボードの保存が割り込むと上書きしうるが、書きかけのフローを残すよりよいと採った。
-        failed = fsio.write_new_durable(target, raw)
-    if failed:
-        return [cannot.replace("{reason}", failed)]
-    kept = (
-        f"{proposal.ticket} のフローを {target} へコピーした。"
-        f"元の {source} は削除できなかった ({{reason}})"
-    )
-    with fsio.policy(message=kept):
-        failed = fsio.unlink(source)
-    if failed:
-        return [kept.replace("{reason}", failed)]
-    return [f"{proposal.ticket} のフローを {source} から {target} へ動かした"]
 
 
 def move_file(source: str, target: str) -> str:
@@ -342,7 +303,7 @@ def _followup_ticket(
                     entries.append(raw)
         if entries:
             front[name] = entries
-    front.update({"started_at": "", "completed_at": "", "base_sha": ""})
+    front.update({"started_at": "", "completed_at": "", "base_sha": "", "merged_sha": ""})
     # 続きの子の目印。提案を経ずにここで作るチケットなので、作るときに書く（承認で中身を
     # 変えることには当たらない）。時刻は状態の履歴の `raised` に残る。
     front[approval.FOLLOWUP_KEY] = [c.ticket for c in children]
@@ -407,7 +368,10 @@ def followup(
     unreadable = _unreadable(ident, ticket_mod.render(t))
     if unreadable:
         return ident, unreadable
-    where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+    try:
+        where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+    except approval.NoParentWorktree as exc:
+        return ident, f"続きの子を書く親のワークツリーが決まらない（{exc}）"
     failed = approval_marks.write_ticket(approval.copy_path(where, ident), ticket_mod.render(t))
     if failed:
         return ident, failed
@@ -435,6 +399,6 @@ def predecessor_pool(conf: settings.Settings, root: str) -> dict[str, list[ticke
     review, _ = approval.scan_review(conf, root, raw=raw)
     closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    pool = approval_checks.predecessor_pool_of(open_copies, review, closed, proposals, root)
+    pool = approval_checks.predecessor_pool_of(open_copies, review, closed, proposals)
     approval_checks.align_imported(conf, root, pool)
     return pool

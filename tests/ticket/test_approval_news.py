@@ -50,8 +50,12 @@ class ApprovalToldTest(PhaseHarness):
         )
 
     def approve_yes(self, tickets):
-        # ボードと同じく、承認する識別子だけを渡す。
-        result = self.ccnavi("--agree", "--yes", ",".join(tickets), "--json")
+        # ボードと同じく、見せたダイジェスト（承認画面の本文・判定が読んだ中身・書き込む中身）
+        # を渡す。
+        # 渡さない `--yes` は承認しない。
+        shown = self.ccnavi("--agree", "--preview", "--json")
+        digest = json.loads(shown.stdout)["digest"]
+        result = self.ccnavi("--agree", "--yes", ",".join(tickets), "--digest", digest, "--json")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(result.stdout)["prompt"]
 
@@ -107,7 +111,8 @@ class ApprovalToldTest(PhaseHarness):
         self.assertNotIn("承認され", self.prompt())
         self.assertNotIn("承認され", self.before())
         self.assertNotIn("承認され", self.before(session="s2", agent_id="sub-1"))
-        self.assertNotIn("i0001-01-01", self.context(self.event("SessionStart")))
+        # セッション開始の一覧（このPCで作業中の親）は次の子を名指しする。承認の知らせは言わない
+        self.assertNotIn("承認され", self.context(self.event("SessionStart")))
         self.assertNotIn("承認され", self.prompt(session="s2"))
 
     def test_one_hook_reads_the_approved_copies_once(self):

@@ -19,6 +19,7 @@ import type {
   PhaseJson,
   ProposalState,
   ProposalJson,
+  RemoteJson,
   SeenInJson,
   TicketJson,
 } from "./model.js";
@@ -92,6 +93,8 @@ export interface Card {
   readonly worktreeExists: boolean;
   readonly worktreePath: string;
   readonly baseSha: string;
+  /** finish が親のブランチへ合流した子の先頭。空なら合流していない（表示だけ） */
+  readonly mergedSha: string;
   readonly startedAt: string;
   readonly completedAt: string;
   /** 取り消した時刻。空でなければ取り消しの列 */
@@ -124,6 +127,17 @@ export interface Card {
   /** 親だけ。フェーズの依頼のマーカーから引いたマージリクエストの URL（依頼の投稿ではなくマージリクエスト自体）。無ければ空 */
   readonly mrUrl: string;
   readonly mrNumber: number | null;
+  /** 親だけ。元になった issue の番号（親チケットの `issue:`）。無ければ null */
+  readonly issueNumber: number | null;
+  /**
+   * 親だけ。親を載せる MR の番号。親チケットの `mr:` を先に、無ければ取り込み状態の番号
+   * （`ccnavi-start.sh` が保存する）。フェーズの依頼のマーカーから引く `mrNumber` とは別の値
+   */
+  readonly parentMr: number | null;
+  /** 親だけ。親のブランチ名（ワークツリーが今いるブランチを先に、無ければ親チケットの値）。子は空 */
+  readonly branch: string;
+  /** 親だけ。親のワークツリーのリモートとの差。ワークツリーが無い・子・古い実行ファイルは null */
+  readonly remote: RemoteJson | null;
   /**
    * ユーザが動く必要があるか。「要対応のみ」の絞り込みが見る。実行ファイルの `attention` をそのまま持ち、
    * 条件はここで組み直さない（条件は ccnavi の README「ボードの JSON」）
@@ -164,8 +178,19 @@ export interface ParentOption {
   readonly title: string;
 }
 
+/** このPCでは未準備の親（実行ファイルの `unprepared` のまま。親のワークツリーが無く、チケットは出ない） */
+export interface Unprepared {
+  readonly family: string;
+  readonly project: string;
+  readonly branch: string;
+  readonly mr: number | null;
+  readonly reason: string;
+}
+
 export interface Board {
   readonly columns: readonly BoardColumn[];
+  /** 親のワークツリーが無いPCで出す「このPCでは未準備」のカード。「準備する」は `ccnavi-start.sh --mr <mr>` を呼ぶ */
+  readonly unprepared: readonly Unprepared[];
   readonly projects: readonly string[];
   /** 親の絞り込みの候補。識別子順 */
   readonly parents: readonly ParentOption[];
@@ -202,6 +227,7 @@ export function buildBoard(json: BoardJson): Board {
   });
   return {
     columns,
+    unprepared: (json.unprepared ?? []).map((u) => ({ ...u })),
     projects: json.projects,
     parents: cards.filter((card) => card.isParent && card.column !== "archived").map((card) => ({ id: card.id, title: card.title })),
     archivedParents: cards.filter((card) => card.isParent && card.column === "archived").map((card) => ({ id: card.id, title: card.title })),
@@ -275,6 +301,7 @@ function toCard(
     worktreeExists: t.worktree.exists,
     worktreePath: t.worktree.path,
     baseSha: t.base_sha,
+    mergedSha: t.merged_sha,
     startedAt: t.started_at,
     completedAt: t.completed_at,
     cancelledAt: t.cancelled_at,
@@ -296,6 +323,10 @@ function toCard(
     blocked: t.blocked,
     mrUrl: mr.url,
     mrNumber: mr.number,
+    issueNumber: isParent ? t.issue : null,
+    parentMr: isParent ? (t.mr ?? t.remote?.mr ?? null) : null,
+    branch: isParent ? (t.remote?.branch || t.branch) : "",
+    remote: isParent ? t.remote : null,
     attention: t.attention,
     flow: isParent ? null : flowOf(t.flow, column),
     workflow: isParent && t.proposal?.state === "todo" && t.proposal.has_plan === true,
@@ -330,6 +361,7 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     worktreeExists: false,
     worktreePath: "",
     baseSha: "",
+    mergedSha: a.merged_sha ?? "",
     startedAt: a.started_at,
     completedAt: a.completed_at,
     cancelledAt: a.cancelled_at,
@@ -351,6 +383,10 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     blocked: "",
     mrUrl: "",
     mrNumber: null,
+    issueNumber: null,
+    parentMr: null,
+    branch: "",
+    remote: null,
     attention: false,
     flow: null,
     workflow: false,
@@ -497,4 +533,9 @@ export function templateDraftCardOf(board: Board, ticket: string): Card | undefi
 /** 親の識別子とフェーズの番号から、そのフェーズ行。無ければ undefined */
 export function phaseChipOf(board: Board, parent: string, phase: number): PhaseChip | undefined {
   return parentCardOf(board, parent)?.phases.find((p) => p.number === phase);
+}
+
+/** 「準備する」を押された親が、いまのボードの未準備の一覧に在るものか。画面が言った識別子をそのまま信頼しない */
+export function unpreparedOf(board: Board, family: string, project: string): Unprepared | undefined {
+  return board.unprepared.find((u) => u.family === family && u.project === project);
 }

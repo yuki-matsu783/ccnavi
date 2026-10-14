@@ -4,16 +4,15 @@
  * 判定は Python（同梱の ccnavi）が出し、ここは Python が返した書くもの（Changes）を
  * 親のブランチ `P` への 1 コミットにして送るだけ。TS が判定を出すと手元と答えが 2 か所に分かれるため。流れは次のとおり。
  *
- * 1. preview: ボードが承認する識別子の一覧（`ids`）を持っている
- * 2. yes: 親子のチケット 1 組ぶんを読み直して Snapshot を組み直し、`ids` だけを対象に、
- *    今の提案を手元の `--agree --yes` と同じ検査にかける。見せたあとに提案が変わったかは調べない
- *    （承認待ちの提案は、承認する間は書き換えない運用）。検査に通らなければ書かない
+ * 1. preview: ボードが見せた画面のダイジェスト（`digest`）と一覧（`ids`）を持っている
+ * 2. yes: 親子のチケット 1 組ぶんを読み直して Snapshot を組み直し、Python に見せたものと比べさせる。
+ *    違えば書かずに「見直す」（preview からやり直し）
  * 3. `plan` の変更を `createCommitOnBranch` の 1 コミットで書く。条件は `expectedHeadOid` = 読んだ `P` の先頭
- * 4. 先頭が動いていたら、新しい先頭で Snapshot を組み直して判定と plan を必ずやり直し、新しい plan を書く。
- *    3 周しても書けなければユーザの対応に切り替える
+ * 4. 先頭が動いていたら、新しい先頭で Snapshot を組み直して判定と plan を必ずやり直す。
+ *    ダイジェストが同じなら新しい plan を書く（見せ直さない）。違えば「見直す」。3 周しても書けなければユーザの対応に切り替える
  * 5. 書いた後、新しい先頭の中身が書いたとおりか確かめる（blob の sha を突き合わせる）
  *
- * 取り下げも同じ流れで書く。毎周 Python が条件を見直す。
+ * 取り下げも同じ流れで書く。見せたダイジェストは無いが、毎周 Python が条件を見直す。
  * レビュー済みも同じ流れで、毎周 MR のスレッドとレビューを読み直して Python の `confirm`
  * （手元の `ccnavi review confirm` と同じコア）に通るかを決めさせる。
  *
@@ -22,7 +21,7 @@
  * 新しい先頭から読み直して再試行する。元に戻すコミットもさらに競合して 2 回で収まらなければ、止めてユーザの対応に切り替える（`attention`）。
  * ccnavi の書き込みどうしの競合を捕まえる seq ファイルは書かない。そのため、取り下げと子の承認が同時に通ったとき「親の無い子」が一時的に残りうる。
  */
-import { py, PyError, tagged, type Actor, type ChangeRow, type PlanResult, type ReasonCode, type Written } from "./py.js";
+import { APPROVE_DIGEST_CHANGED, APPROVE_LIST_CHANGED, py, PyError, tagged, type Actor, type ChangeRow, type PlanResult, type ReasonCode, type Written } from "./py.js";
 import type { RepoConfig } from "./settings.js";
 import { findPrior, MovedError, readFamily, type Deps as ReadDeps, type FamilyRead } from "./snapshot.js";
 import type { BlobText, FileAddition, PathObject, ReviewCopy } from "./github.js";
@@ -67,11 +66,19 @@ export function commitMessage(ids: readonly string[], verb: string, done: string
 export type Outcome =
   | { readonly kind: "written"; readonly oid: string; readonly rounds: number; readonly lines: readonly string[] }
   /** `code` は Python が返した理由コード（`CORE_*`）。文面の頭にも `[<コード>]` で載る */
+  | { readonly kind: "changed"; readonly message: string; readonly code?: string }
   | { readonly kind: "refused"; readonly message: string; readonly code?: string }
   | { readonly kind: "conflict"; readonly message: string }
   | { readonly kind: "failed"; readonly message: string }
   /** ユーザの対応に切り替える（元に戻すコミットでも競合が収まらない・書いたか確かめられない・書いた後の中身が違う）。ボードは親子のチケットを「要確認」で出す */
   | { readonly kind: "attention"; readonly message: string };
+
+export interface Shown {
+  readonly ids: readonly string[];
+  readonly digest: string;
+  /** ダイジェストを出したときの絞り（ボードの答えの `only`） */
+  readonly only: readonly string[] | null;
+}
 
 export { localStamp } from "./stamp.js";
 
@@ -439,7 +446,7 @@ async function settleRace(
   }
 }
 
-/** 書く流れの周（読み直し・書き込み・先頭が動いたときのやり直しと、GitLab の事後確認）。周ごとに親子のチケットを読み直して書くものを決め直す */
+/** 書く流れの周（読み直し・ダイジェストの比べ・書き込み・先頭が動いたときのやり直しと、GitLab の事後確認）。周ごとに親子のチケットを読み直して書くものを決め直す */
 async function writeLoop(repo: RepoConfig, family: string, deps: WriteDeps, what: string, plan: Plan): Promise<Outcome> {
   try {
     for (let round = 1; round <= MAX_ROUNDS; round += 1) {
@@ -464,7 +471,7 @@ async function writeLoop(repo: RepoConfig, family: string, deps: WriteDeps, what
 }
 
 /** 親子のチケット 1 組の承認待ちを承認する */
-export async function approveFamily(repo: RepoConfig, family: string, ids: readonly string[], deps: WriteDeps): Promise<Outcome> {
+export async function approveFamily(repo: RepoConfig, family: string, shown: Shown, deps: WriteDeps): Promise<Outcome> {
   let actor: Actor;
   try {
     actor = await actorOf(deps, repo);
@@ -475,10 +482,15 @@ export async function approveFamily(repo: RepoConfig, family: string, ids: reado
     const res = await py.plan(deps.py, {
       snapshot: read.input,
       family,
-      ids,
+      only: shown.only,
+      shown: { ids: shown.ids, digest: shown.digest },
       stamp,
       actor,
     });
+    if (res.code === APPROVE_LIST_CHANGED || res.code === APPROVE_DIGEST_CHANGED) {
+      const message = tagged(res.code, "内容が更新されました。ボードに表示した後で承認待ちの提案が変わったので、何も承認していません。最新の内容を表示し直しました。確認してから、もう一度承認してください。");
+      return { kind: "stop", outcome: { kind: "changed", message, code: res.code } };
+    }
     if (!res.changes) return { kind: "stop", outcome: { kind: "refused", message: why(res), ...codeOf(res) } };
     const rows = rowsOf(res, family, read);
     if (typeof rows === "string") return { kind: "stop", outcome: { kind: "refused", message: rows } };

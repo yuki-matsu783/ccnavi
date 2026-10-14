@@ -241,20 +241,6 @@ def screen(
                 "    この親のマージリクエストの本文に Closes として記載する番号。"
                 "マージされると、このIssueもクローズされます。"
             )
-        if not t.is_child and t.branch:
-            lines.append(f"■ ブランチ: {t.branch}")
-            if cand.existing_branch:
-                lines.append(
-                    f"    既存のブランチ {t.branch} を使う。識別子（{t.ticket}）と別の名前で、"
-                    f"ワークツリーは .claude/worktrees/{t.ticket}。"
-                    "取り込み・push・マージリクエストはこのブランチで行う"
-                )
-            else:
-                lines.append(
-                    f"    新しく切るブランチ。識別子（{t.ticket}）と別の名前で、"
-                    f"ワークツリーは .claude/worktrees/{t.ticket}。"
-                    "取り込み・push・マージリクエストはこのブランチで行う"
-                )
         if t.rationale.strip():
             lines.append("■ エージェントが記載した理由")
             lines += [f"    {line}" for line in t.rationale.strip().splitlines()]

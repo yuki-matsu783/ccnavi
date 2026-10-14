@@ -31,6 +31,7 @@ from ..tickets import (
     c1,
     history,
     ops_stop,
+    overview,
     phase,
     syncstate,
     ticket_model,
@@ -133,6 +134,8 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         return 0
 
     pool = approval_checks.predecessor_pool_of(doing, review, closed, proposals)
+    # 承認と lint と同じ引き方にする（閉じた別の親子の先行は統合先の done/ と取り込み状態で読む）。
+    approval_checks.align_imported(conf, root, pool)
     times = approval_times.approved_times(conf, doing + review + closed)
     files = _file_states(root, [h for e in entries.values() for h in e.hits])
     fams = syncstate.Families(conf, root)
@@ -143,6 +146,12 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         "  push済みかどうかは、最後に取得したリモートの状態に基づくため、"
         f"最新の状態と異なる場合があります。最新にするには先に '{sync} <親>' を実行してください。\n"
     )
+    rows = {r.ident: r for r in overview.collect(conf, root, doing, review, closed, proposals)}
+    if not family and rows:
+        # 引数なし: このPCで作業中の親を 1 行ずつ、そのあとに親ごとの詳細
+        stdout.write("\n== このPCで作業中の親\n")
+        for row in rows.values():
+            stdout.write(overview.line(row) + "\n")
     for name in families:
         members = sorted(
             (e for e in entries.values() if home(e) == name),
@@ -150,10 +159,27 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         )
         ctx = _Family(root, conf, name, entries, pool, times, files, fams, raw)
         stdout.write(f"\n== 親子 {name}\n")
+        stdout.write(f"最終取り込み: {_synced(conf, name, entries)}\n")
+        row = rows.get(name)
+        if row is not None and not family:
+            for child, state in overview.child_states(root, row, doing, review):
+                stdout.write(f"子のワークツリー: {child}  {state}\n")
         for e in members:
             for line in ctx.describe(e, e.ident in revisions):
                 stdout.write(line + "\n")
     return 0
+
+
+def _synced(conf: settings.Settings, name: str, entries: dict[str, Entry]) -> str:
+    """この親の最終取り込みの時刻。取り込み状態が無ければ「リモート未確認」。"""
+    e = entries.get(name)
+    project = e.t.project if e is not None and e.hits else ""
+    record = overview.record_of(conf, name, project)
+    fetched = int(record.fetched_at) if record and record.fetched_at else 0
+    text = overview.sync_label(fetched)
+    if fetched:
+        return text
+    return f"{text}（一度も取り込んでいない。ccnavi-sync.sh で取り込むと時刻が付く）"
 
 
 class _Family:
@@ -211,7 +237,9 @@ class _Family:
                 why = f"。理由: {t.cancel_reason}" if t.cancel_reason else ""
                 lines.append(f"    閉じ方: 取り消し（{t.cancelled_at}{why}）")
             else:
-                lines.append(f"    閉じ方: 完了（{t.completed_at or '時刻なし'}）")
+                # 合流（finish が親のブランチへ取り込んだ子の先頭）。子だけが持つ
+                merged = f"、合流 {t.merged_sha[:12]}" if t.merged_sha else ""
+                lines.append(f"    閉じ方: 完了（{t.completed_at or '時刻なし'}{merged}）")
             lines.append(f"    置き場のファイル: {file_state.label()}")
             return lines
         lines.append(
@@ -246,14 +274,14 @@ class _Family:
         stops: list[str] = []
         warns: list[str] = []
         st = approval_checks.family_standing(self.conf, self.root, t, self.fams)
-        if st.imported and st.stop:
+        if st.stop:
             stops.append(f"{st.stop}（この親子のチケットの状態は動かさない）")
             stops += syncstate.guidance(self.root, st)
         if t.blocked:
             stops.append(t.blocked)
         uncommitted = file_state.kind == FILE_UNCOMMITTED
         verdict, why = self.c1_target()
-        if verdict == c1.TARGET_STOP and not (st.imported and st.stop):
+        if verdict == c1.TARGET_STOP and not st.stop:
             # C1 の sh（ccnavi-ticket.sh）が状態の操作を断る。
             stops.append(f"C1 では状態の操作を実行できません: {why or '理由が分からない'}")
         carried = uncommitted and verdict == c1.TARGET_YES
@@ -320,13 +348,22 @@ class _Family:
         worktree = tree.worktree_path(self.root, t.ticket)
         out = []
         if not (tree.is_worktree_of(owner, worktree) and tree.exact_name(self.root, t.ticket)):
-            git = settings.script_command(self.root, "ccnavi-git.sh")
-            where = f"projects/{t.project} の中で " if t.project else ""
-            base = f" {t.parent}" if t.is_child else ""
-            out.append(
-                f'ワークツリーがありません。{where}\'{git} worktree add "{worktree}" -b {t.ticket}'
-                f"{base}' で作る{PARENT_ONLY}"
-            )
+            if t.is_child:
+                git = settings.script_command(self.root, "ccnavi-git.sh")
+                where = f"projects/{t.project} の中で " if t.project else ""
+                out.append(
+                    f'ワークツリーがありません。{where}\'{git} worktree add "{worktree}" '
+                    f"-b {t.ticket} {t.parent}' で作る{PARENT_ONLY}"
+                )
+            else:
+                # 親のワークツリーは親のブランチ（MR の元ブランチ）を直接チェックアウトする。
+                # 識別子の名前のブランチは作らない。
+                start = settings.script_command(self.root, "ccnavi-start.sh")
+                out.append(
+                    f"親のワークツリーがありません。'{start} --mr <MR の番号>'（MR が無ければ "
+                    f"'--issue <issue の番号>'）で、親のブランチを直接チェックアウトして作る"
+                    f"{PARENT_ONLY}"
+                )
         out.append(f"'{self.ticket_sh} start {t.ticket}' で開始する{PARENT_ONLY}")
         return out
 

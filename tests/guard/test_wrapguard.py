@@ -20,7 +20,7 @@ import tempfile
 import unittest
 
 from ccnavi.hook import wrapguard
-from ccnavi.infra import shellread
+from ccnavi.infra import settings, shellread
 from tests import GIT_ENV, ROOT, SH_SCRIPTS, common_path, common_sh
 from tests.inproc import run_ccnavi
 
@@ -70,6 +70,12 @@ class EnvTest(unittest.TestCase):
             "env -C /tmp CCNAVI_X=1 sh .ccnavi/scripts/ccnavi-git.sh push",
             # ループの中では、後ろに書いた代入も次の回の呼び出しに届く。
             "for i in 1 2; do sh .ccnavi/scripts/ccnavi-git.sh push; CCNAVI_X=1; done",
+            # git が操作するリポジトリと作業ツリーを変える変数。子の居場所で親へコミットできる。
+            "GIT_DIR=/p/.git GIT_WORK_TREE=/p sh .ccnavi/scripts/ccnavi-git.sh commit -m x",
+            "export GIT_WORK_TREE=/p; sh .ccnavi/scripts/ccnavi-git.sh add -A",
+            "env GIT_INDEX_FILE=/p/.git/index sh .ccnavi/scripts/ccnavi-git.sh status",
+            "GIT_COMMON_DIR=/p/.git sh .ccnavi/scripts/ccnavi-git.sh commit -m x",
+            "GIT_CEILING_DIRECTORIES=/x sh .ccnavi/scripts/ccnavi-git.sh commit -m x",
         ):
             with self.subTest(command=command):
                 self.assertTrue(self.names(command))
@@ -79,6 +85,8 @@ class EnvTest(unittest.TestCase):
             "sh .ccnavi/scripts/ccnavi-git.sh push",
             "CCNAVI_GIT_MAX_LINES=200 sh .ccnavi/scripts/ccnavi-git.sh log",
             "env CCNAVI_FETCH_TIMEOUT=5 sh .ccnavi/scripts/ccnavi-fetch.sh",
+            # 作者の名前と出力の形だけを変える git の変数は置ける。
+            "GIT_AUTHOR_NAME=a GIT_PAGER=cat sh .ccnavi/scripts/ccnavi-git.sh commit -m x",
             # 保護済みの sh を呼ばないなら、ここの話ではない。
             "CCNAVI_BIN_PATH=x uv run python -m ccnavi --lint",
             "echo CCNAVI_BIN_PATH=x && sh .ccnavi/scripts/ccnavi-git.sh status",
@@ -93,6 +101,9 @@ class EnvTest(unittest.TestCase):
         self.assertFalse(wrapguard.blocked("CCNAVI_GIT_KEEP_LOGS"))
         self.assertTrue(wrapguard.blocked("CCNAVI_GIT_SOMETHING_NEW"))
         self.assertFalse(wrapguard.blocked("PATH"))
+        self.assertTrue(wrapguard.blocked("GIT_DIR"))
+        self.assertTrue(wrapguard.blocked("GIT_SOMETHING_NEW"))
+        self.assertFalse(wrapguard.blocked("GIT_AUTHOR_NAME"))
 
 
 class EnvHookTest(unittest.TestCase):
@@ -307,6 +318,264 @@ class ChildPushTest(unittest.TestCase):
         self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
 
 
+class SubagentParentTreeTest(unittest.TestCase):
+    """サブエージェントは親のワークツリーを書き換えない。
+
+    居場所はエージェント ID と実行先のツリーで決める。
+
+    子のワークツリーでのコミットと、子のワークツリーで親のブランチを取り込む merge は通す。
+    居場所を追えない形は止める。メインエージェントには掛けない。
+    """
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp(prefix="ccnavi-wrapguard-")
+        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        os.makedirs(os.path.join(self.root, ".claude"))
+        write(common_path(self.root, "rules"), json.dumps({"version": 1}))
+        base = os.path.join(self.root, ".claude", "worktrees")
+        self.trees = {n: os.path.join(base, n) for n in ("i0001", "i0001-01-01", "plain")}
+        for path in self.trees.values():
+            os.makedirs(path)
+        parent = self.trees["i0001"]
+        write(os.path.join(parent, ".ccnavi/approved/doing/i0001.md"), ticket("i0001"))
+        write(
+            os.path.join(parent, ".ccnavi/approved/doing/i0001-01-01.md"),
+            ticket("i0001-01-01", "i0001"),
+        )
+
+    def hook(self, cwd, command, agent="a1", tool="Bash", path=""):
+        tool_input = {"command": command} if tool == "Bash" else {"file_path": path, "content": "x"}
+        payload = {
+            "hook_event_name": "PreToolUse",
+            "tool_name": tool,
+            "cwd": cwd,
+            "session_id": "s1",
+            "tool_input": tool_input,
+        }
+        if agent:
+            payload["agent_id"] = agent
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env.pop("CLAUDE_PROJECT_DIR", None)
+        result = run_ccnavi(
+            ["--root", self.root, "--mode", "enable"],
+            input=json.dumps(payload),
+            cwd=ROOT,
+            env=env,
+        )
+        if not result.stdout.strip():
+            return ""
+        out = json.loads(result.stdout).get("hookSpecificOutput", {})
+        return out.get("permissionDecisionReason") or ""
+
+    def denied(self, reason):
+        return wrapguard.CODE_PARENT_TREE in reason
+
+    def test_a_subagent_cannot_merge_commit_or_pick_in_the_parent_tree(self):
+        parent = self.trees["i0001"]
+        for sub in ("merge i0001-01-01", "commit -m x", "cherry-pick abc", "revert abc", "add a"):
+            with self.subTest(sub=sub):
+                reason = self.hook(parent, " ".join(GIT + [sub]))
+                self.assertTrue(self.denied(reason), reason)
+                self.assertIn(wrapguard.PARENT_TREE_RULE_ID, reason)
+                self.assertIn("i0001 は親のワークツリー", reason)
+
+    def test_a_subagent_commits_and_takes_in_the_parent_in_its_own_child_tree(self):
+        child = self.trees["i0001-01-01"]
+        for sub in ("commit -m x", "add a", "merge i0001"):
+            with self.subTest(sub=sub):
+                self.assertFalse(self.denied(self.hook(child, " ".join(GIT + [sub]))))
+
+    def test_a_subagent_may_read_the_parent_tree(self):
+        parent = self.trees["i0001"]
+        for sub in ("status", "log --oneline", "diff"):
+            with self.subTest(sub=sub):
+                self.assertFalse(self.denied(self.hook(parent, " ".join(GIT + [sub]))))
+
+    def test_cd_into_the_parent_tree_is_followed(self):
+        child = self.trees["i0001-01-01"]
+        reason = self.hook(child, "cd ../i0001 && " + " ".join(GIT + ["commit -m x"]))
+        self.assertTrue(self.denied(reason), reason)
+        # 親から子へ移ってから打つ形は通す。
+        parent = self.trees["i0001"]
+        reason = self.hook(parent, "cd ../i0001-01-01 && " + " ".join(GIT + ["commit -m x"]))
+        self.assertFalse(self.denied(reason), reason)
+
+    def test_a_planted_child_ticket_does_not_turn_the_parent_into_a_child(self):
+        # 役は、そのワークツリー自身のツリーにある同名のチケットだけで決める。ほかのツリーに
+        # `parent:` を持つ同名のファイルを置いても、親のワークツリーの禁止は外れない。
+        parent = self.trees["i0001"]
+        child = self.trees["i0001-01-01"]
+        write(os.path.join(child, "wip/proposals/review/i0001.md"), "parent: x\n")
+        write(os.path.join(self.trees["plain"], ".ccnavi/approved/doing/i0001.md"), "parent: x\n")
+        reason = self.hook(child, "cd ../i0001 && " + " ".join(GIT + ["commit -m x"]))
+        self.assertTrue(self.denied(reason), reason)
+        reason = self.hook(child, "", tool="Write", path=os.path.join(parent, "src", "x.py"))
+        self.assertTrue(self.denied(reason), reason)
+        # 自身のツリーで、`parent:` の無い同名のチケットと並べても親のまま（曖昧なら止める側）。
+        write(os.path.join(parent, "wip/proposals/review/i0001.md"), "parent: x\n")
+        reason = self.hook(child, "cd ../i0001 && " + " ".join(GIT + ["commit -m x"]))
+        self.assertTrue(self.denied(reason), reason)
+        # 子のワークツリーで子のチケットを持つ形は、子のまま（コミットは通る）。
+        write(
+            os.path.join(child, ".ccnavi/approved/doing/i0001-01-01.md"),
+            ticket("i0001-01-01", "i0001"),
+        )
+        reason = self.hook(child, " ".join(GIT + ["commit -m x"]))
+        self.assertFalse(self.denied(reason), reason)
+        self.assertEqual(
+            wrapguard.ticket_role(self.conf(), self.root, "i0001-01-01"),
+            (wrapguard.ROLE_CHILD, "i0001"),
+        )
+
+    def conf(self):
+        conf, _ = settings.load(self.root)
+        return conf
+
+    def test_the_directory_of_a_runner_is_followed(self):
+        # `env -C` と `sudo -D` は後ろのコマンドを別のディレクトリで走らせる。剥がした実行役の
+        # 行き先を居場所に入れないと、子の cwd のまま親へコミットできる。
+        parent = self.trees["i0001"]
+        child = self.trees["i0001-01-01"]
+        for head in (
+            f"env -C {parent}",
+            f"env --chdir={parent}",
+            f"env --chdir {parent}",
+            f"sudo -D {parent}",
+            f"sudo --chdir={parent}",
+            "env -C ../i0001",
+        ):
+            with self.subTest(head=head):
+                reason = self.hook(child, head + " " + " ".join(GIT + ["commit -m x"]))
+                self.assertTrue(self.denied(reason), reason)
+        # 読めない行き先は止める。子のワークツリーへ移る形は通す。
+        reason = self.hook(child, 'env -C "$D" ' + " ".join(GIT + ["commit -m x"]))
+        self.assertTrue(self.denied(reason), reason)
+        reason = self.hook(parent, f"env -C {child} " + " ".join(GIT + ["commit -m x"]))
+        self.assertFalse(self.denied(reason), reason)
+        # 子のワークツリーからの push も、実行役の行き先で見る。読めない行き先は止める。
+        reason = self.hook(parent, f"env -C {child} " + " ".join(GIT + ["push"]))
+        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+        reason = self.hook(parent, 'env -C "$D" ' + " ".join(GIT + ["push"]))
+        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+
+    def test_an_untraceable_place_stops(self):
+        child = self.trees["i0001-01-01"]
+        reason = self.hook(child, 'cd "$X" && ' + " ".join(GIT + ["commit -m x"]))
+        self.assertTrue(self.denied(reason), reason)
+        self.assertIn("読めません", reason)
+        reason = self.hook(child, "echo a | xargs sh .ccnavi/scripts/ccnavi-git.sh commit")
+        self.assertTrue(self.denied(reason), reason)
+
+    def test_the_main_agent_is_not_held_by_it(self):
+        parent = self.trees["i0001"]
+        reason = self.hook(parent, " ".join(GIT + ["commit -m x"]), agent="")
+        self.assertFalse(self.denied(reason), reason)
+
+    def test_a_subagent_cannot_write_into_the_parent_tree_from_the_shell(self):
+        # Bash からの書き込みも、行き先が親のワークツリーなら止める。
+        parent = self.trees["i0001"]
+        child = self.trees["i0001-01-01"]
+        x = os.path.join(parent, "src", "x.py")
+        for command in (
+            f"echo hi > {x}",
+            f"echo hi >> {x}",
+            "cd ../i0001 && echo hi > src/x.py",
+            f"cd {parent} && printf x >src/x.py",
+            f"sed -i s/a/b/ {x}",
+            f"sed -i.bak -e s/a/b/ {x}",
+            f"cp /etc/hosts {x}",
+            f"cp -t {parent}/src /etc/hosts",
+            f"mv {x} /tmp/x.py",
+            f"tee {x} < /dev/null",
+            f"echo x | tee -a {x}",
+            f"touch {x}",
+            f"rm -f {x}",
+            f"dd if=/dev/zero of={x} count=1",
+            f"env -C {parent} touch src/x.py",
+            # インタプリタに渡したコード。親のパスと書き込みを疑う語が並べば止める。
+            f"python3 -c \"open('{x}','w').write('x')\"",
+            f"node -e \"require('fs').writeFileSync('{x}','x')\"",
+            f"perl -e 'open F, \">{x}\"'",
+            "python3 -c \"open('../i0001/src/x.py','w')\"",
+            f"cd {parent} && python3 -c \"open('x','w')\"",
+            f"sh -c 'echo hi > {x}'",
+        ):
+            with self.subTest(command=command):
+                reason = self.hook(child, command)
+                self.assertTrue(self.denied(reason), reason)
+                self.assertNotIn("ccnavi-git.sh write", reason)
+        # 居場所の読めない cd の後の相対の書き込みは、どのツリーか決まらないので止める。
+        reason = self.hook(child, 'cd "$X" && echo hi > out.txt')
+        self.assertTrue(self.denied(reason), reason)
+        self.assertIn("読めません", reason)
+
+    def test_shell_writes_that_stay_out_of_the_parent_tree_pass(self):
+        # 誤って止めないこと: 子のワークツリーへの書き込み、fd の複製と /dev/null、下書きの置き場、
+        # 親のパスを読むだけのコード、メインのエージェント。
+        parent = self.trees["i0001"]
+        child = self.trees["i0001-01-01"]
+        x = os.path.join(parent, "src", "x.py")
+        for command in (
+            "echo hi > src/x.py",
+            f"echo hi > {child}/src/x.py",
+            "cd ../i0001-01-01 && sed -i s/a/b/ src/x.py",
+            f"cat {x} > src/x.py",
+            f"cp {x} src/x.py",
+            "make test 2>&1 | tail -3",
+            "ls >/dev/null 2>&1",
+            f"cd {parent} && cat src/x.py 2>&1",
+            f"cd {parent} && grep -rn a src >/dev/null",
+            f"echo note > {parent}/wip/handoff/n.md",
+            f"cp /tmp/f.yml {parent}/wip/proposals/flows/x.yml",
+            f"echo x > {parent}/wip/eli5/n.md",
+            f"python3 -c \"print(open('{x}').read())\"",
+            "python3 -c \"open('out.txt','w').write('x')\"",
+            f"diff {x} src/x.py > /tmp/d.txt",
+        ):
+            with self.subTest(command=command):
+                reason = self.hook(child, command)
+                self.assertFalse(self.denied(reason), reason)
+        reason = self.hook(child, f"echo hi > {x}", agent="")
+        self.assertFalse(self.denied(reason), reason)
+
+    def test_a_subagent_cannot_write_into_the_parent_tree(self):
+        parent = self.trees["i0001"]
+        child = self.trees["i0001-01-01"]
+        reason = self.hook(child, "", tool="Write", path=os.path.join(parent, "src", "x.py"))
+        self.assertTrue(self.denied(reason), reason)
+        # 文面はファイルの書き込みとして言う（ラッパーの副命令と取り違えない）。
+        self.assertNotIn("ccnavi-git.sh write", reason)
+        self.assertIn("書き込みません（Write）", reason)
+        reason = self.hook(child, "", tool="Write", path=os.path.join(child, "src", "x.py"))
+        self.assertFalse(self.denied(reason), reason)
+        # 提案・下書きの置き場は、置き場ごとの保護に任せる（フローの下書きを書く経路）。
+        for rel in ("wip/proposals/flows/x.yml", "wip/handoff/note.md"):
+            reason = self.hook(child, "", tool="Write", path=os.path.join(parent, *rel.split("/")))
+            self.assertFalse(self.denied(reason), reason)
+        reason = self.hook(
+            child, "", agent="", tool="Write", path=os.path.join(parent, "src", "x.py")
+        )
+        self.assertFalse(self.denied(reason), reason)
+
+    def test_the_name_of_the_wrapper_is_read_without_case(self):
+        # 大小を区別しないファイルシステムでは同じ sh が走る。表記を変えても外れない。
+        parent = self.trees["i0001"]
+        child = self.trees["i0001-01-01"]
+        upper = os.path.join(self.root, ".ccnavi", "scripts", "CCNAVI-GIT.SH")
+        mixed = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-git.SH")
+        reason = self.hook(parent, f"sh {upper} commit -m x")
+        self.assertTrue(self.denied(reason), reason)
+        reason = self.hook(child, f"sh {mixed} push")
+        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+        ticket_sh = os.path.join(self.root, ".ccnavi", "scripts", "CCNAVI-TICKET.SH")
+        reason = self.hook(child, f"sh {ticket_sh} finish i0001-01-01")
+        self.assertIn("DENY_SUBAGENT_TICKET_OP", reason)
+
+    def test_push_from_a_child_is_still_refused_for_its_own_reason(self):
+        reason = self.hook(self.trees["i0001-01-01"], " ".join(GIT + ["push"]))
+        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
+
+
 @unittest.skipIf(shutil.which("git") is None, "git が無い")
 class ShAgreesTest(unittest.TestCase):
     """同じ見本をコピーする版の sh にも渡し、2 重目として同じく止めることを確かめる。
@@ -400,6 +669,25 @@ class ShAgreesTest(unittest.TestCase):
                     self.assertEqual(stops, said, result.stderr)
                 finally:
                     os.remove(path)
+
+    def test_sh_ignores_git_location_variables(self):
+        # 子のワークツリーで、git の置き場を親に向ける変数を置いて呼んでも、ラッパーは居場所の
+        # ツリー（子）を操作する。変数が効くと、hook と sh の居場所の検査が子を見ている間に
+        # 親のワークツリーへコミットできる。
+        parent = self.trees["i0001"]
+        child = self.trees["i0001-01-01"]
+        write(os.path.join(parent, "only-in-parent.txt"), "x\n")
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env.pop("CLAUDE_PROJECT_DIR", None)
+        env.update(GIT_ENV)
+        env["PWD"] = child
+        env["GIT_DIR"] = os.path.join(self.root, ".git", "worktrees", "i0001")
+        env["GIT_WORK_TREE"] = parent
+        script = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-git.sh")
+        result = subprocess.run(
+            ["sh", script, "status", "--short"], cwd=child, env=env, capture_output=True, text=True
+        )
+        self.assertNotIn("only-in-parent.txt", result.stdout + result.stderr)
 
     def test_sh_symlinked_workspace(self):
         # ワークスペースを symlink 越しに開いたとき（macOS の /tmp → /private/tmp など）。

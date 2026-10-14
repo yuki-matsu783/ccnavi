@@ -41,10 +41,56 @@ const COLUMN_LABELS: Readonly<Record<string, string>> = Object.fromEntries(COLUM
  * 行き先は言わない。カードはもうその列に置かれていて、画面から読める。
  */
 export function movedLabel(moved: Moved): string {
-  if (moved.from === undefined) {
-    return "新規起票";
+  const base = moved.from === undefined ? "新規起票" : `${COLUMN_LABELS[moved.from] ?? moved.from} → ${COLUMN_LABELS[moved.to] ?? moved.to}`;
+  return moved.by === "sync" ? `${base}（${SYNC_MOVED_LABEL}）` : base;
+}
+
+/** `ccnavi-sync.sh` が取り込んだ分でカードが動いたときの言葉 */
+export const SYNC_MOVED_LABEL = "同期で取り込み";
+
+/**
+ * 最終同期の時刻（現地時刻）。0 以下は一度も取り込んでいない（取り込み状態が無い）ので「リモート未確認」。
+ * 実行ファイルの `overview.sync_label` と同じ書き方（`YYYY-MM-DD HH:MM`）。
+ */
+export function syncedText(fetchedAt: number): string {
+  if (!Number.isFinite(fetchedAt) || fetchedAt <= 0) {
+    return "リモート未確認";
   }
-  return `${COLUMN_LABELS[moved.from] ?? moved.from} → ${COLUMN_LABELS[moved.to] ?? moved.to}`;
+  const d = new Date(fetchedAt * 1000);
+  if (Number.isNaN(d.getTime())) {
+    return "リモート未確認";
+  }
+  const two = (n: number): string => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`;
+}
+
+/** 親のカードの、issue・MR・ブランチ名の項目。無いものは出さない */
+export function originItems(card: Card): string[] {
+  const items: string[] = [];
+  if (card.issueNumber !== null) {
+    items.push(`issue #${card.issueNumber}`);
+  }
+  if (card.parentMr !== null) {
+    items.push(`MR !${card.parentMr}`);
+  }
+  if (card.branch !== "") {
+    items.push(`ブランチ ${card.branch}`);
+  }
+  return items;
+}
+
+/**
+ * 親のカードの、リモートとの差。未送信・遅れ・最終同期。ワークツリーが無い親（`remote` が無い）は出さない。
+ * 未送信と遅れは最後に取ってきた origin との差なので古いかもしれない。読めなければ「不明」と言う。
+ * 最終同期が無ければ「リモート未確認」（一度も `ccnavi-sync.sh` で取り込んでいない）。
+ */
+export function remoteItems(card: Card): string[] {
+  const r = card.remote;
+  if (r === null) {
+    return [];
+  }
+  const count = (n: number | null): string => (n === null ? "不明" : n === 0 ? "なし" : `${n} 件`);
+  return [`未送信 ${count(r.ahead)}`, `遅れ ${count(r.behind)}`, r.fetched_at > 0 ? `最終同期 ${syncedText(r.fetched_at)}` : syncedText(0)];
 }
 
 /**

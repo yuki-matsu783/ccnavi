@@ -20,8 +20,13 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
   hookのtimeoutは10秒で、ネットワークを待てないため
 - 操作を止めるか通すかは、hookと実行ファイルが判定する（P13）。shがccnaviの状態を読んで操作を止める処理は、
   hookと実行ファイルの判定に重ねた2段目の確認にあたる。shに新しい判定を足したくなったら、まずhook側に置けないかを検討する
+  - gitの状態だけを見て止める処理（`ccnavi-ticket.sh`の`ensure_child_worktree`が、手元だけのコミットがある子のブランチを
+    消さずに止めるなど）は、ccnaviの状態を読まないので、この決まりの対象ではない
+  - `ccnavi_is_ident`・`ccnavi_is_branch`・`ccnavi_branch_ok`（sh）は、実行ファイルの`id_problem`・`branch_problem`の
+    ASCIIで見分けられる分だけの複製。字の種類・NFC・長さは見ないので、名前を受け入れる入口は実行ファイルの
+    `worktree id`に聞く（`ccnavi_id_ask`）。規則を変えるときは両方を直す
 - P13の例外: 入口を1本に寄せたラッパー（`ccnavi-git.sh`）の中の可否の判定（`integrate-ticket`、統合先と消えた親のブランチへの
-  pushの拒否、承認済みの`branch:`へ移る前提の確認）と、`integrate`・`integrate-done`の状態操作はshに置く。条件は3つで、
+  pushの拒否、親のワークツリーでの`checkout`・`switch`の行き先の確認）と、`integrate`・`integrate-done`の状態操作はshに置く。条件は3つで、
   生の`git`が組み込みで止まっていること、ラッパーが許可リストで読むこと、判定の材料のうちチケットの中身は実行ファイルに聞くこと
   （設計 9.2）。この3つを満たさない判定はshに足さない
 - shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルの副命令（`tree parent`・`c1 family`・`sync closed`・
@@ -30,10 +35,27 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
 - 実行ファイルには、ディレクトリの外へ情報を取りに行くコードを足さない。取得する処理はshに任せ、
   実行ファイルには取得した結果を読む処理だけを足す。shと実行ファイルの間の契約は、このJSONの形で決まる。
   形は設計 9.10に書いてある
+- 終了コードの 0（成功）・1（前提の未充足）・2（引数か環境の誤り。実行ファイルでは判定を書けず拒否にした）は
+  どこでも同じ意味で使う。3 と 4 は、実行ファイルとshで、shどうしでも意味が違う。読む側はどれの値かを確かめて分ける
+
+  | どこ | 3 | 4 |
+  |---|---|---|
+  | 実行ファイル | `EXIT_ANSWER_NO`（問われたことへの「いいえ」。`--agree --preview --verify`） | `EXIT_PARTIAL`（`--agree` だけ。承認済みチケットを一部だけ置いて止まった） |
+  | `ccnavi-start.sh` | 候補が複数（何も作らない） | `EXIT_HOST`（ホストに届かず、MCP などで代行が要る） |
+  | `ccnavi-worktree.sh` | — | `EXIT_NET`（origin に届かないか、ブランチ一覧を取れない。リモート未確認） |
+  | `ccnavi-review.sh merged` | `unknown`（MR がマージ済みかを確かめられない） | — |
+  | `ccnavi-sync.sh` | 止める理由があったのに取り込み状態（blocked）を書けなかった | — |
+  | `ccnavi-fetch.sh` | 常に 0（取ってこられないことは失敗ではない） | — |
+
 - 実行ファイルの標準出力をshが読む約束もある。`review ready`は1行目にコメントの下書きのパス、2行目に`tree <退避したツリーのルート>`を出し、
-  `wip/`から消したものがあれば続けて`wip-from <消す前のHEAD>`と`wip <パス>`（1行1本）を出す。shはそのツリーで未コミットの変更を
-  確かめてからDraftを外す（設計 9.10）。ファイルを`logs/archive/`へ動かすのと`wip/`の追跡済みのファイルを消すのは実行ファイルで、
+  `wip/`から消したものがあれば続けて`wip-from <消す前のHEAD>`と`wip <パス>`（1行1本）を出す。shはC1の中でこの削除を
+  コミットして送ってからDraftを外す（設計 9.10）。ファイルを`logs/archive/`へ動かすのと`wip/`の追跡済みのファイルを消すのは実行ファイルで、
   ネットワーク（push・Draftを外す・コメント）はshが受け持つ
+- 親を閉じたときのブランチの片付けも実行ファイルが行う（`worktree retire <親>`・`worktree branch <名前> [confirmed]`・
+  `sync tidy <親> <リポジトリ> <ブランチ> <sha>`。`tickets/retire.py`）。MR がマージ済みかと、その先頭の sha は sh が
+  `ccnavi-review.sh merged [<番号>]` で取って渡し、実行ファイルはその sha を基準に、手元の先頭が含まれるかなどをローカルの git で
+  確かめて消す。エージェントに `git branch -D` を開けないので、消す入口はこれらだけ（`ccnavi-clean.sh --branch`）。最後の行が
+  `record yes|no`（取り込み記録を消してよいか）で、記録を消すのは sh
 - ワークツリーの片付け（`worktree drop <名前>`・`worktree tidy <親>`）も実行ファイルが行う。消すかどうかの判断（cwdが中か、未コミットが
   あるか、gitのワークツリーか）と、生成物の掃除・`git worktree remove`はローカルの操作で、ネットワークには出ない。
   shは状態を書く操作（C1ならpushまで）が済んでから呼ぶ。`ready`ではDraftを外したあとの最後に呼ぶ

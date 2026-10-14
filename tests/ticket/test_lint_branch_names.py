@@ -39,6 +39,8 @@ def write(path, text):
 
 def ticket_text(name, *, parent="", issue=None, approved=False):
     lines = ["---", "version: 1", f"ticket: {name}", "title: t"]
+    if not parent:
+        lines.append("mr: 1")
     if parent:
         lines += [f"parent: {parent}", "phase: 1"]
     if issue is not None:

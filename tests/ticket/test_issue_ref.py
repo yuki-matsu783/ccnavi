@@ -14,7 +14,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.infra import settings
-from ccnavi.tickets import agree_candidates, review, ticket_model
+from ccnavi.tickets import agree_candidates, ticket_model
 from ccnavi.tickets import ticket as ticket_mod
 
 
@@ -59,11 +59,8 @@ class IssueRefTest(unittest.TestCase):
                 self.assertEqual(1, len(errors), raw)
                 self.assertIn("owner/repo#12", errors[0].detail)
 
-    def test_closes_names_the_repository_when_it_is_another(self):
-        same, _ = self.parse("12")
+    def test_issue_label_names_the_repository_when_it_is_another(self):
         other, _ = self.parse("acme/other#12")
-        self.assertIn("Closes #12", review.mr_draft(same).splitlines())
-        self.assertIn("Closes acme/other#12", review.mr_draft(other).splitlines())
         self.assertEqual("acme/other#12", ticket_mod.issue_label(other))
         self.assertEqual("", ticket_mod.issue_label(ticket_model.Ticket(ticket="x")))
 

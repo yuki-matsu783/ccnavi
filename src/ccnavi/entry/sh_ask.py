@@ -11,11 +11,10 @@ sh はチケットの YAML も JSON も自分で読まない。読むのは実�
   ファイルが在るのに frontmatter を読めなければ `parent unreadable`。
   `ready` の後は手元の退避（`logs/archive/<リポジトリ>/done/`）の親も数える
   （ツリーが `.claude/worktrees/` の下のときだけ）
-- `ccnavi sync closed <P> <リポジトリ> <統合先> <ツリー>`: 親子のチケット P が閉じたと言えるか。
+- `ccnavi sync closed <P> <リポジトリ> <統合先> <ツリー>`: 親子のチケット P が統合先で閉じているか。
   `integration` は統合先（`refs/remotes/origin/<統合先>`）の `done/` に、識別子が P で子でなく、
-  親のワークツリーの親チケットと同じ親と言える親チケットがあるか。`archive` は手元の退避に、
-  識別子が P で子でない親チケットがあり、親のワークツリーに承認済みの親チケットが残っていれば
-  同じ親とも言えるか。同じ親かは `syncstate.same_parent`
+  親のワークツリーの親チケットと同じ親と言える親チケットがあるか。同じ親かは
+  `syncstate.same_parent`。手元の退避からは推定しない（マージ済みかは sh がホストに聞く）
 
 git はローカルの読み取り（`show`）だけ。ネットワークには出ない。
 """
@@ -182,13 +181,6 @@ def sync_closed(
         if have_mine and _is_parent(theirs, family) and syncstate.same_parent(mine, theirs):
             closed = YES
 
-    # 親のワークツリーに承認済みの親チケットが残っていれば、同じ親と言えるときだけ。
-    held = syncstate.archived_copy(root, repo, family)
-    archived = NO
-    if _is_parent(held, family) and (not have_mine or syncstate.same_parent(mine, held)):
-        archived = YES
-
     stdout.write(CLOSED_HEAD + "\n")
     stdout.write(f"integration {closed}\n")
-    stdout.write(f"archive {archived}\n")
     return 0

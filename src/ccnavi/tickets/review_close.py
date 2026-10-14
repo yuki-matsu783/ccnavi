@@ -25,6 +25,7 @@ from . import (
     ops,
     ops_close,
     phase,
+    retire,
     review,
     review_host,
     syncstate,
@@ -149,6 +150,11 @@ def _archive_closed(
     parents = sorted(
         set(archive.closed_parents(where)) | set(archive.archived_parents(root, parent.project))
     )
+    # 閉じた子のチケットは退避へ移って見えなくなるので、親を閉じた後に片付ける子の一覧を先に書く
+    # （ワークツリーとブランチの片付け。`retire.py`）。書けなくても ready は止めない。
+    noted = retire.note(root, conf, parent.ticket, parent.project, tree_root)
+    if noted:
+        stderr.write(f"ccnavi: 注意: {noted}。子のワークツリーとブランチは手で片付ける\n")
     todo = archive.plan(where, parents, root, parent.project)
     _, failed = archive.move(root, parent.project, where, todo, parent.ticket, tree_root)
     if failed:
@@ -213,12 +219,14 @@ def _archived_parent(
 ) -> ticket_model.Ticket | None:
     """cwd のワークツリーの親が、ready の退避を始めた後なら、その親。
 
-    次の 2 つがそろうときだけ。そろわなければ None（通常の条件の確かめへ回る）。
+    途中の打ち直しかは、マージリクエストがまだ Draft かと、親のブランチのツリーの様子で決める。
+    次の 3 つがそろうときだけ。そろわなければ None（通常の条件の確かめへ回る）。
 
-    - ready のマーカー（`ready/<親>.json`）が、今のツリーで書かれたものであること
-      （`archive.ready_started`）
-    - Draft を外したマーカー（`phases/<親>/ready.json`。ツリーか退避）のマージリクエストの番号が、
-      今回の結果のものと同じであること
+    - マージリクエスト（親のブランチのもの。sh が取得した結果）がまだ Draft であること。
+      Draft が外れていれば、`ready` は終わっている
+    - 親のブランチの作業中（`doing/`）に親のチケットが無いこと
+    - ready が退避を始めた目印（`ready/<親>.json`。手元の進み具合の記録で、閉じたかの判定には
+      使わない）が、今のツリーで書かれたものであること（`archive.ready_started`）
 
     そのうえで、承認済みの領域に無く手元の退避にだけある（退避を済ませた後に Draft を外し損ねた）
     か、`done/` に残っている（退避が途中で止まった）とき。前の回が条件を確かめているので、
@@ -233,13 +241,7 @@ def _archived_parent(
     if not archive.ready_started(root, t.project, t.name, t.root):
         return None
     result = review._result(io.StringIO(), result_path)
-    if result is None or result.mr is None:
-        return None
-    marks = [
-        approval_marks.read_parent_mark(where, t.name, approval_marks.PARENT_MARK_READY)
-        for where in (approved, archive.base_dir(root, t.project))
-    ]
-    if not any(isinstance(m, dict) and m.get("mr") == result.mr.number for m in marks):
+    if result is None or result.mr is None or result.mr.draft is not True:
         return None
     if os.path.lexists(os.path.join(approved, ticket_model.DONE, f"{t.name}.md")):
         copy, _ = approval.load_copy(os.path.join(approved, ticket_model.DONE, f"{t.name}.md"))

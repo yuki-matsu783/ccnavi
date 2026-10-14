@@ -75,7 +75,7 @@ def at_start(
     review, _ = approval.scan_review(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
     # 先行を満たしたとみなすのは、承認と着手と同じく `done/` の取り消しでないものだけ。
-    preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals, root)
+    preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals)
     approval_checks.align_imported(conf, root, preds)
     lines = [
         "[ccnavi] 承認済みで開いている子チケット。"
@@ -215,7 +215,8 @@ def _judge_stop(
     """サブエージェントが終わろうとしたとき。範囲外の変更が残っていれば 1 回だけ差し戻す。
 
     見るのは、cwd が子のワークツリーならその子、親のワークツリーならその親の開いている
-    子の全部。`base_sha..HEAD` のコミット済みの差分と未コミットの両方を見る。
+    子の全部。親のワークツリーの HEAD との共通の祖先（`gitstate.child_base`）から子の HEAD までの
+    コミット済みの差分と、未コミットの両方を見る。
     範囲は実行前チェックと同じく親の範囲と定義の上限で切り詰め、子の範囲の中でも
     上限の外なら、どの上限かをパスの後ろにつける。
     """

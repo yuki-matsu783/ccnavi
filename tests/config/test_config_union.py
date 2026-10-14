@@ -275,6 +275,8 @@ def ticket_text(
     """提案の本文。親は plan を、子は parent と phase を持つ。
     project は行き先のレイヤーを決める。"""
     lines = ["---", "version: 1", f"ticket: {name}"]
+    if not parent:
+        lines.append("mr: 1")
     if project:
         lines.append(f"project: {project}")
     if parent:
@@ -418,26 +420,54 @@ class ConfigUnionHarness(unittest.TestCase):
         )
 
     def worktree(self, owner, name):
-        """`.claude/worktrees/<名前>` に、owner（ワークスペースかプロジェクト）から切る。"""
+        """`.claude/worktrees/<名前>` に、owner（ワークスペースかプロジェクト）から切る。
+
+        あれば（`propose` が親の提案を書くために切ったもの）そのまま返す。
+        """
         path = os.path.join(self.ws, ".claude", "worktrees", name)
-        git(owner, "worktree", "add", "--quiet", path, "-b", name)
+        if not os.path.isdir(path):
+            git(owner, "worktree", "add", "--quiet", path, "-b", name)
         return path
 
+    def homes(self):
+        """承認済みチケットを持ちうるツリー。ワークスペース、プロジェクト、ワークツリー。"""
+        found = [self.ws, self.lib, self.app]
+        wt = os.path.join(self.ws, ".claude", "worktrees")
+        if os.path.isdir(wt):
+            found += [os.path.join(wt, n) for n in sorted(os.listdir(wt))]
+        return found
+
     def propose(self, name, text, project=""):
-        """提案を置く。プロジェクト向けはそのプロジェクトの `wip/proposals/`。"""
+        """提案を置く。親の提案は親のワークツリー（識別子と同じ名前）の `wip/proposals/`。
+
+        親のワークツリーが無ければ、先にそのプロジェクト（ワークスペース）から切る。正とするのは
+        親のワークツリーだけなので、提案も承認済みチケットもそこに置く。
+        """
         base = os.path.join(self.projects, project) if project else self.ws
+        match = re.search(r"^parent: (\S+)$", text, re.MULTILINE)
+        owner = base
+        home = self.worktree(owner, match.group(1) if match else name)
         # 計画を持つ親には、共通レイヤーとそのレイヤーの phases.yml の和から、計画が使う定義の
         # 写し（`phases:`）を足す（`ccnavi --plan-order <親> --fill-phases` と同じ）。
         # どちらにも無ければ空の写し。
         texts = []
-        for path in (self.phases, layer_path(base, "phases")):
+        for path in (self.phases, layer_path(owner, "phases")):
             try:
                 with open(path, encoding="utf-8") as f:
                     texts.append(f.read())
             except OSError:
                 pass
         text = phasecopy.insert(text, phasecopy.combined(*texts))
-        return write(os.path.join(base, "wip", "proposals", "todo", name + ".md"), text)
+        return write(os.path.join(home, "wip", "proposals", "todo", name + ".md"), text)
+
+    def proposal_path(self, name, state=""):
+        """提案（`wip/proposals/<置き場>/<名前>.md`）のパス。在る側のツリーを探す。無ければ空。"""
+        for where in self.homes():
+            for place in [state] if state else ["todo", "review"]:
+                path = os.path.join(where, "wip", "proposals", place, name + ".md")
+                if os.path.exists(path):
+                    return path
+        return ""
 
     def approved_dir_of(self, project=""):
         """このプロジェクトの承認済みチケットの置き場。"""
@@ -446,9 +476,7 @@ class ConfigUnionHarness(unittest.TestCase):
 
     def approved_path(self, *parts, project=""):
         """承認済みチケットの置き場の下のパス。プロジェクトを渡さなければ、在る側を探す。"""
-        if project:
-            return os.path.join(self.approved_dir_of(project), *parts)
-        for where in (self.ws, self.lib, self.app):
+        for where in self.homes():
             path = os.path.join(where, ".ccnavi", "approved", *parts)
             if os.path.exists(path):
                 return path
@@ -456,9 +484,7 @@ class ConfigUnionHarness(unittest.TestCase):
 
     def approved_copy(self, name, project=""):
         """承認済みチケットのパス。プロジェクトを渡さなければ、在る側を探す。"""
-        if project:
-            return os.path.join(self.approved_dir_of(project), "doing", name + ".md")
-        for where in (self.ws, self.lib, self.app):
+        for where in self.homes():
             path = os.path.join(where, ".ccnavi", "approved", "doing", name + ".md")
             if os.path.exists(path):
                 return path
@@ -512,7 +538,15 @@ class ConfigUnionHarness(unittest.TestCase):
         return self.ccnavi("--mode", "enable", stdin=json.dumps(payload), **options)
 
     def approve(self):
-        return self.ccnavi("--agree", stdin="y\n")
+        """承認して、承認済みチケットを各ワークツリーにコミットする（本番は C1 が行う）。"""
+        done = self.ccnavi("--agree", stdin="y\n")
+        wt = os.path.join(self.ws, ".claude", "worktrees")
+        if os.path.isdir(wt):
+            for name in sorted(os.listdir(wt)):
+                path = os.path.join(wt, name)
+                git(path, "add", "-A")
+                git(path, "commit", "--quiet", "--allow-empty", "-m", "approve")
+        return done
 
     def lint_json(self, *args, **options):
         result = self.ccnavi("--lint", "--json", *args, **options)

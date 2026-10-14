@@ -34,46 +34,38 @@ ccnavi_repo_key() {
 
 # 親子のチケットの取り込み状態のパス。<ワークスペースルート> <リポジトリ> <P>
 #
-# 鍵は親の識別子（`/` を含まない）。親のブランチ名は取り込み状態の中の `branch` に書く。
+# 鍵は親の識別子（`/` を含まない）。親のブランチ名は取り込み状態の中の `branch` に書く（キャッシュ。
+# 判定には使わない。ブランチ名は親のワークツリーの HEAD から読む）。
 ccnavi_family_record() {
 	printf '%s/sync/%s/families/%s\n' "$(ccnavi_state "$1")" "$2" "$3"
 }
 
-# 親のブランチ名がそのブランチの親子のチケットの取り込み状態。無ければ空。<ワークスペースルート> <リポジトリ> <ブランチ>
-#
-# 取り込み状態の `branch` の行で探す（`branch` の無い前の取り込み状態は、鍵の識別子をブランチ名として読む）。
-# 識別子と違う名前の親のブランチ（`branch:`）でも、ブランチ名から取り込み状態を引ける。書きかけ（`*.tmp.*`）と
-# シンボリックリンクは読まない。当たった取り込み状態を 1 行に 1 つずつ全部出す（2 つ以上なら、2 つの親子の
-# チケットが同じブランチを宣言している。呼ぶ側は止める）。
-ccnavi_family_record_of_branch() {
-	ccnavi_fb_dir="$(ccnavi_state "$1")/sync/$2/families"
-	[ -d "$ccnavi_fb_dir" ] || return 0
-	[ -L "$ccnavi_fb_dir" ] && return 0
-	for ccnavi_fb_file in "$ccnavi_fb_dir"/*; do
-		[ -f "$ccnavi_fb_file" ] || continue
-		[ -L "$ccnavi_fb_file" ] && continue
-		case "$ccnavi_fb_file" in
-		*.tmp.*) continue ;;
-		esac
-		ccnavi_fb_branch=$(ccnavi_record_get "$ccnavi_fb_file" branch)
-		[ -n "$ccnavi_fb_branch" ] || ccnavi_fb_branch="${ccnavi_fb_file##*/}"
-		if [ "$ccnavi_fb_branch" = "$3" ]; then
-			printf '%s\n' "$ccnavi_fb_file"
-		fi
-	done
-	return 0
-}
-
-# 親子のチケット <識別子> の親のブランチ名として <名前> を受けてよいなら 0。<名前> <識別子>
+# 親のブランチ名として <名前> を受けてよいなら 0。<名前> <識別子>
 #
 # 識別子と同じ名前は識別子の検査（ccnavi_is_ident）で見る（前からの識別子は ccnavi_is_branch の予約に
-# 当たることがある）。違う名前は ccnavi_is_branch で見る。
+# 当たることがある）。違う名前は ccnavi_is_branch で見る。どちらも実行ファイルの検査（`ticket_ids.id_problem`・
+# `branch_problem`）の、ASCII で見分けられる分だけの複製で、受けたものを使う側の 2 段目の確認にあたる。
 ccnavi_branch_ok() {
 	if [ "$1" = "$2" ]; then
 		ccnavi_is_ident "$1"
 	else
 		ccnavi_is_branch "$1"
 	fi
+}
+
+# ワークツリーの HEAD が指すブランチ名。<ワークツリー> <識別子>
+#
+# 識別子からブランチ名は逆算しない。HEAD のブランチ名を変換（ccnavi_branch_to_id。/ を - に置き換え）
+# したものがフォルダ名の識別子と一致し、ブランチ名として受けてよいときだけ出す。
+# ワークツリーが無い・ブランチの外（detached HEAD）なら 1、一致しない・使えない名前なら 2。
+# 取り込み記録の branch はキャッシュで、ここでは読まない。git は読み取りの 1 回だけ。
+ccnavi_head_branch() {
+	{ [ -d "$1" ] && [ ! -L "$1" ]; } || return 1
+	ccnavi_hb_name=$(git -C "$1" symbolic-ref --quiet --short HEAD 2>/dev/null) || ccnavi_hb_name=""
+	[ -n "$ccnavi_hb_name" ] || return 1
+	[ "$(ccnavi_branch_to_id "$ccnavi_hb_name")" = "$2" ] || return 2
+	ccnavi_branch_ok "$ccnavi_hb_name" "$2" || return 2
+	printf '%s\n' "$ccnavi_hb_name"
 }
 
 # 実行ファイルに聞く。答え（標準出力）を、Windows の実行ファイルの CR を除いて出す。<ワークスペースルート> <引数>...
@@ -94,27 +86,40 @@ ccnavi_ask() {
 	printf '%s\n' "$ccnavi_ak_out" | tr -d '\r'
 }
 
-# 親子のチケットの親のブランチ名。<ワークスペースルート> <識別子>
+# ブランチ名から作る識別子と、それが使えるかを実行ファイル（`worktree id`）に聞く。<ワークスペースルート> <ブランチ>
 #
-# 実行ファイルの `c1 family <識別子>` の `branch` の行（承認済みの親チケットの `branch:`、無ければ識別子。
-# 提案の `branch:` は使わない）。sh はチケットを読まない（読むのは実行ファイル）。実行ファイルが無ければ 1、
-# 在るのに答えない・`branch` の行が無い（`branch_refused`。使えない名前か統合先の名前）・答えが親のブランチ名の
-# 形でなければ 2 を返す（呼ぶ側は識別子の外へ動かさずに止める）。ソースで動かしている ccnavi の
-# リポジトリでは uv で起こす。
-ccnavi_family_branch() {
-	if ccnavi_fbr_bin=$(ccnavi_bin "$1"); then
-		ccnavi_fbr_out=$("$ccnavi_fbr_bin" --root "$1" c1 family "$2" 2>/dev/null </dev/null) || ccnavi_fbr_out=""
-	elif [ -f "$1/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
-		ccnavi_fbr_out=$(cd "$1" && uv run --quiet python -m ccnavi --root "$1" c1 family "$2" 2>/dev/null </dev/null) ||
-			ccnavi_fbr_out=""
-	else
-		return 1
-	fi
-	ccnavi_fbr_out=$(printf '%s\n' "$ccnavi_fbr_out" | tr -d '\r')
-	[ "$(printf '%s\n' "$ccnavi_fbr_out" | head -n 1)" = "c1 1" ] || return 2
-	ccnavi_fbr_name=$(printf '%s\n' "$ccnavi_fbr_out" | sed -n 's/^branch //p' | head -n 1)
-	ccnavi_branch_ok "$ccnavi_fbr_name" "$2" || return 2
-	printf '%s\n' "$ccnavi_fbr_name"
+# 答えは ccnavi_id_ident（識別子）・ccnavi_id_problem（親のブランチとして採用できない理由。58 文字・末尾の
+# -<2 桁>・字の種類・NFC）・ccnavi_id_direct（直接作業や子のワークツリーとして使えない理由。64 文字・字の種類・NFC）・
+# ccnavi_id_child（子の識別子の形なら yes）に入れる。sh は字の種類と NFC と文字数を自分で確かめない
+# （`ccnavi_is_ident` と `ccnavi_is_branch` は ASCII の外のバイトを通す。`${#x}` は dash ではバイト数になる）。
+# 実行ファイルが無い・答えないなら 1（呼ぶ側は「確かめられない」として止める。誤判定する代わりの判定はしない）。
+ccnavi_id_ask() {
+	ccnavi_ia_out=$(ccnavi_ask "$1" worktree id "$2") || ccnavi_ia_out=""
+	ccnavi_id_ident=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^id //p' | head -n 1)
+	ccnavi_id_problem=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^problem //p' | head -n 1)
+	ccnavi_id_direct=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^direct //p' | head -n 1)
+	ccnavi_id_child=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^child //p' | head -n 1)
+	[ -n "$ccnavi_id_ident" ]
+}
+
+# <一覧> のブランチ名（1 行 1 本）のうち、<ブランチ> と同じ識別子になる別の名前を 1 つ出す。無ければ 1。<ブランチ> <一覧>
+#
+# 識別子（/ を - に置き換えたもの）は英字の大文字小文字をそろえて比べる。大文字小文字を区別しない機械
+# （macOS・Windows）では、`.claude/worktrees/Feature-12-x` と `feature-12-x` が同じ置き場になる。
+# 同じ識別子になる名前は長さも同じ（`${#x}` がバイト数でも字数でも、同じシェルの中では同じ数え方）なので、
+# 長さの違うものは比べずに飛ばす。
+ccnavi_id_clash() {
+	ccnavi_ic_want=$(ccnavi_branch_to_id "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+	while IFS= read -r ccnavi_ic_other; do
+		[ -n "$ccnavi_ic_other" ] || continue
+		[ "$ccnavi_ic_other" != "$1" ] || continue
+		[ "${#ccnavi_ic_other}" -eq "${#1}" ] || continue
+		if [ "$(ccnavi_branch_to_id "$ccnavi_ic_other" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')" = "$ccnavi_ic_want" ]; then
+			printf '%s\n' "$ccnavi_ic_other"
+			return 0
+		fi
+	done <"$2"
+	return 1
 }
 
 # 取り込み状態から 1 項目を読む。無ければ空。<ファイル> <鍵>
@@ -127,13 +132,16 @@ ccnavi_record_get() {
 #
 # 同じディレクトリの一時ファイルに書いてから mv で置き換える（読む側が半端な中身を見ない）。
 # 値の改行は空白に置き換える（1 行 1 項目の契約）。書けなければ 1。
+# 渡した鍵だけを書き直すが、`mr`（親を載せる MR の番号。ccnavi-start.sh が保存する）は、渡さなくても前の値を引き継ぐ。
 ccnavi_record_write() {
 	ccnavi_rw_file="$1"
 	shift
 	mkdir -p "${ccnavi_rw_file%/*}" 2>/dev/null || return 1
+	ccnavi_rw_keep=$(ccnavi_record_get "$ccnavi_rw_file" mr)
 	ccnavi_rw_tmp="$ccnavi_rw_file.tmp.$$"
 	: >"$ccnavi_rw_tmp" 2>/dev/null || return 1
 	while [ "$#" -ge 2 ]; do
+		[ "$1" != mr ] || ccnavi_rw_keep=""
 		ccnavi_rw_value=$(printf '%s' "$2" | tr '\r\n' '  ')
 		printf '%s %s\n' "$1" "$ccnavi_rw_value" >>"$ccnavi_rw_tmp" || {
 			rm -f "$ccnavi_rw_tmp"
@@ -141,8 +149,34 @@ ccnavi_record_write() {
 		}
 		shift 2
 	done
+	if [ -n "$ccnavi_rw_keep" ]; then
+		printf 'mr %s\n' "$ccnavi_rw_keep" >>"$ccnavi_rw_tmp" || {
+			rm -f "$ccnavi_rw_tmp"
+			return 1
+		}
+	fi
 	mv -f "$ccnavi_rw_tmp" "$ccnavi_rw_file" 2>/dev/null || {
 		rm -f "$ccnavi_rw_tmp"
+		return 1
+	}
+}
+
+# 取り込み状態の 1 項目だけを書き足すか書き換える。ほかの項目はそのまま。<ファイル> <鍵> <値>
+#
+# ファイルが無ければ 1（先に ccnavi_record_write で作る）。書き方は ccnavi_record_write と同じ（一時ファイル → mv）。
+ccnavi_record_put() {
+	[ -f "$1" ] || return 1
+	ccnavi_rp_tmp="$1.tmp.$$"
+	ccnavi_rp_value=$(printf '%s' "$3" | tr '\r\n' '  ')
+	{
+		sed "/^$2 /d" "$1"
+		printf '%s %s\n' "$2" "$ccnavi_rp_value"
+	} >"$ccnavi_rp_tmp" 2>/dev/null || {
+		rm -f "$ccnavi_rp_tmp"
+		return 1
+	}
+	mv -f "$ccnavi_rp_tmp" "$1" 2>/dev/null || {
+		rm -f "$ccnavi_rp_tmp"
 		return 1
 	}
 }

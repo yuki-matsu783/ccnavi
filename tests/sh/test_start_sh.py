@@ -14,6 +14,11 @@ gh / glab は使えない代役にして、curl とトークンの経路に切�
 3. フォークの MR、`/` を含むブランチ、--dry-run
 4. 途中で失敗して打ち直したときに、重複を作らず続きから進むこと
 5. GitLab の経路
+6. 既存の MR を採用するときの確認（open・フォーク・マージ先・保護されたブランチ・
+   識別子・識別子の重なり・マージ済みの MR）
+7. ワークツリーはブランチを直接チェックアウトする（識別子のブランチを残さない）。
+   毎回 fetch して早送りする
+8. 取り込み記録に MR の番号を保存する
 """
 
 from __future__ import annotations
@@ -87,6 +92,7 @@ GITHUB = "https://api.github.com/repos/acme/widgets"
 GITLAB = "https://gitlab.com/api/v4/projects/acme%2Fwidgets"
 PULLS = f"GET {GITHUB}/pulls?state=open&per_page=100&page=1"
 BRANCH = "feature-152-add-login"
+CLOSED = "state=closed&head=acme:{branch}&per_page=100&page=1"
 MR_QUERY = f"state=opened&source_branch={BRANCH}&per_page=100&page=1"
 
 
@@ -115,7 +121,13 @@ def pr(number, ref, full_name="acme/widgets", body=""):
         "merged_at": None,
         "html_url": f"https://github.com/acme/widgets/pull/{number}",
         "head": {"ref": ref, "repo": {"full_name": full_name}},
+        "base": {"ref": "main"},
     }
+
+
+def closed_pulls(branch, found=()):
+    """同じブランチ名の閉じた PR の一覧（マージ済みの確認）。found はマージ済みの PR。"""
+    return {f"GET {GITHUB}/pulls?" + CLOSED.format(branch=branch): [200, list(found)]}
 
 
 @unittest.skipIf(SHELL is None or not NEEDED, "sh・git・jq のどれかが無い")
@@ -142,7 +154,13 @@ class StartShTest(unittest.TestCase):
         git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-start.sh", "ccnavi-branches.sh", "ccnavi-git.sh", *common_sh(SH_DIR)):
+        for name in (
+            "ccnavi-start.sh",
+            "ccnavi-branches.sh",
+            "ccnavi-git.sh",
+            "ccnavi-sync.sh",
+            *common_sh(SH_DIR),
+        ):
             shutil.copy(os.path.join(SH_DIR, name), scripts)
         self.exe = write(
             os.path.join(base, "exe", "ccnavi"), EXE.format(src=SRC, python=sys.executable)
@@ -204,6 +222,14 @@ class StartShTest(unittest.TestCase):
             if line.startswith("POST ") and i + 1 < len(lines) and lines[i + 1].startswith("BODY ")
         ]
 
+    def record(self, ident):
+        """取り込み記録（logs/state/sync/self/families/<識別子>）を鍵と値の辞書で返す。無ければ空。"""
+        path = os.path.join(self.ws, "logs", "state", "sync", "self", "families", ident)
+        if not os.path.exists(path):
+            return {}
+        with open(path, encoding="utf-8") as f:
+            return dict(line.rstrip("\n").partition(" ")[::2] for line in f if line.strip())
+
     def wt(self, name):
         return os.path.join(self.ws, ".claude", "worktrees", name)
 
@@ -222,11 +248,12 @@ class StartShTest(unittest.TestCase):
         return out
 
     # GitHub で新規作成が通る代役
-    def github_new(self, title="Add login", created=True):
+    def github_new(self, title="Add login", created=True, branch=BRANCH):
         routes = {
             PULLS: [200, []],
             f"GET {GITHUB}/issues/152": [200, {"title": title}],
-            f"GET {GITHUB}/pulls?state=open&head=acme:{BRANCH}": [200, []],
+            f"GET {GITHUB}/pulls?state=open&head=acme:{branch}": [200, []],
+            **closed_pulls(branch),
         }
         if created:
             routes[f"POST {GITHUB}/pulls"] = [
@@ -257,29 +284,39 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(body["title"], "Add login")
         self.assertEqual(body["body"], "Closes #152")
         self.assertTrue(body["draft"])
-        # 提案に MR の番号を書く案内（チケットの `mr:` で、この MR の番号がチケットに結び付く）
-        self.assertIn("案内: 提案の frontmatter に mr: 7 を書く", done.stdout)
+        # 提案に MR の番号を書く（必須。チケットの `mr:` で、この MR の番号がチケットに結び付く）
+        self.assertIn("必須: 提案の frontmatter に mr: 7 を書く", done.stdout)
+        # 取り込み記録に MR の番号を保存する（ブランチ名に / が無いので、識別子もブランチ名と同じ）
+        self.assertEqual(self.record(BRANCH).get("mr"), "7")
+        self.assertEqual(self.record(BRANCH).get("branch"), BRANCH)
 
     def test_second_run_continues_without_duplicates(self):
         self.github_new()
         self.assertEqual(self.run_sh("--issue", "152").returncode, 0)
-        self.route({PULLS: [200, [pr(7, BRANCH, body="Closes #152")]]})
+        self.route({PULLS: [200, [pr(7, BRANCH, body="Closes #152")]], **closed_pulls(BRANCH)})
         before = self.posts()
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         # 既存の MR で続ける枝にも同じ案内
-        self.assertIn("案内: 提案の frontmatter に mr: 7 を書く", done.stdout)
+        self.assertIn("必須: 提案の frontmatter に mr: 7 を書く", done.stdout)
         self.assertEqual(self.fields(done.stdout)["ブランチ"], BRANCH)
         self.assertEqual(self.fields(done.stdout)["MR"], "https://github.com/acme/widgets/pull/7")
         self.assertEqual(self.posts(), before)
         self.assertEqual(self.local_branches().count(BRANCH), 1)
 
     def test_single_local_candidate_gets_a_worktree(self):
+        git(self.ws, "push", "-q", self.bare, "main:refs/heads/fix-152-other")
         git(self.ws, "branch", "fix-152-other", "origin/main")
-        self.route({PULLS: [200, [pr(3, "fix-152-other", body="Closes #152")]]})
+        self.route(
+            {
+                PULLS: [200, [pr(3, "fix-152-other", body="Closes #152")]],
+                **closed_pulls("fix-152-other"),
+            }
+        )
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertTrue(os.path.isdir(self.wt("fix-152-other")))
+        self.assertEqual(self.record("fix-152-other").get("mr"), "3")
         self.assertEqual(self.posts(), [])
         self.assertEqual(self.fields(done.stdout)["ブランチ"], "fix-152-other")
 
@@ -350,6 +387,7 @@ class StartShTest(unittest.TestCase):
                 PULLS: [200, []],
                 f"GET {GITHUB}/issues/152": [500, {"message": "boom"}],
                 f"GET {GITHUB}/pulls?state=open&head=acme:feature-152-login": [200, []],
+                **closed_pulls("feature-152-login"),
                 f"POST {GITHUB}/pulls": [
                     201,
                     {"number": 8, "html_url": "https://github.com/acme/widgets/pull/8"},
@@ -360,12 +398,56 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(self.posts()[0]["title"], "#152 login")
 
-    def test_non_ascii_title_asks_for_slug(self):
-        self.github_new(title="ログイン画面")
+    def test_a_title_of_symbols_only_falls_back_to_issue(self):
+        """題から何も残らなければ slug は issue（Chrome の「始める」と同じ作り方）。"""
+        self.github_new(title="!!!", branch="feature-152-issue")
+        done = self.run_sh("--issue", "152", "--dry-run")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("feature-152-issue", done.stdout)
+
+    def test_the_branch_from_a_title_is_the_one_chrome_makes(self):
+        """題からのブランチ名は Chrome の「始める」と同じ関数（`issue_identifier`）で作る。
+
+        末尾が `-<2 桁>` になる題は、その部分を除く（除かないと、作ったあとに採用の確認で止まり、
+        手で消すまで戻れない）。日本語の題は日本語のまま残す。
+        """
+        for title, branch in (
+            ("Update 10 20", "feature-152-update"),
+            ("Fix bug 12", "feature-152-fix-bug"),
+            ("ログイン画面", "feature-152-ログイン画面"),
+        ):
+            with self.subTest(title=title):
+                self.github_new(title=title, branch=branch)
+                done = self.run_sh("--issue", "152", "--dry-run")
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                self.assertIn(f"ブランチ: {branch}（", done.stdout)
+                self.assertEqual(self.local_branches(), ["main"])
+
+    def test_an_unusable_identifier_stops_before_anything_is_made(self):
+        """--slug で作る識別子が親に使えなければ（58 文字超・末尾が -2 桁）、何も作らずに止める。"""
+        for slug, word in (("a" * 50, "長すぎる"), ("login-12", "末尾")):
+            with self.subTest(slug=slug):
+                branch = f"feature-152-{slug}"
+                self.github_new(branch=branch)
+                done = self.run_sh("--issue", "152", "--slug", slug)
+                self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+                self.assertIn(word, done.stderr)
+                self.assertEqual(self.local_branches(), ["main"])
+                self.assertEqual(self.remote_branches(), ["main"])
+                self.assertFalse(os.path.isdir(self.wt(branch)))
+                self.assertEqual(self.posts(), [])
+
+    def test_a_merged_mr_of_the_same_name_stops_before_anything_is_made(self):
+        merged = {**pr(2, BRANCH), "merged_at": "2026-01-01T00:00:00Z", "state": "closed"}
+        self.github_new()
+        with open(self.routes, encoding="utf-8") as f:
+            routes = json.load(f)
+        self.route({**routes, **closed_pulls(BRANCH, [merged])})
         done = self.run_sh("--issue", "152")
-        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
-        self.assertIn("--slug", done.stderr)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("マージ済み MR（!2）", done.stderr)
         self.assertEqual(self.local_branches(), ["main"])
+        self.assertEqual(self.remote_branches(), ["main"])
 
     def test_github_unreachable_at_create_prints_mcp_guidance_then_rerun_continues(self):
         # MR の作成だけ届かない（POST の代役が無い）。ブランチ・ワークツリー・push は済む
@@ -503,16 +585,176 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertIn("フォーク", done.stderr)
 
-    def test_mr_with_slash_branch_uses_identifier_and_switches(self):
+    def test_mr_with_slash_branch_checks_out_directly_without_identifier_branch(self):
         git(self.ws, "push", "-q", self.bare, "main:refs/heads/topic/x")
-        self.route({f"GET {GITHUB}/pulls/5": [200, pr(5, "topic/x")]})
+        self.route({f"GET {GITHUB}/pulls/5": [200, pr(5, "topic/x")], **closed_pulls("topic/x")})
         done = self.run_sh("--mr", "5")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         got = self.fields(done.stdout)
         self.assertEqual(got["ブランチ"], "topic/x")
         self.assertTrue(got["ワークツリー"].endswith("worktrees/topic-x"))
         self.assertEqual(git(self.wt("topic-x"), "rev-parse", "--abbrev-ref", "HEAD"), "topic/x")
-        self.assertIn("switch", done.stdout)
+        # 識別子のブランチ（topic-x）は作らない。switch の回り道もしない
+        self.assertEqual(sorted(self.local_branches()), ["main", "topic/x"])
+        self.assertNotIn("switch", done.stdout)
+        self.assertIn("識別子: topic-x", done.stdout)
+        self.assertEqual(self.record("topic-x").get("mr"), "5")
+        self.assertEqual(self.record("topic-x").get("branch"), "topic/x")
+
+    # ---- 6. 既存の MR を採用するときの確認
+
+    def adopt(self, branch, mr=None, **routes):
+        """origin に branch を置いて --mr 5 を打つ。mr は pr() の上書き。"""
+        git(self.ws, "push", "-q", self.bare, f"main:refs/heads/{branch}")
+        body = {**pr(5, branch), **(mr or {})}
+        self.route({f"GET {GITHUB}/pulls/5": [200, body], **closed_pulls(branch), **routes})
+        return self.run_sh("--mr", "5")
+
+    def test_adopt_stops_when_mr_is_not_open(self):
+        for state, merged_at in (("closed", None), ("closed", "2026-01-01T00:00:00Z")):
+            with self.subTest(merged_at=merged_at):
+                done = self.adopt("topic/x", {"state": state, "merged_at": merged_at})
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn("open の MR だけ", done.stderr)
+                self.assertFalse(os.path.isdir(self.wt("topic-x")))
+
+    def test_adopt_stops_when_target_is_not_integration(self):
+        done = self.adopt("topic/x", {"base": {"ref": "develop"}})
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("マージ先は develop", done.stderr)
+        self.assertFalse(os.path.isdir(self.wt("topic-x")))
+
+    def test_adopt_stops_when_branch_is_protected(self):
+        for branch in ("release/1.0", "develop"):
+            with self.subTest(branch=branch):
+                done = self.adopt(branch)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn("保護されたブランチ", done.stderr)
+                self.assertFalse(os.path.isdir(self.wt(branch.replace("/", "-"))))
+
+    def test_adopt_stops_when_identifier_is_unusable(self):
+        long_branch = "feature/" + "a" * 60
+        for branch, word in (
+            (long_branch, "長すぎる"),
+            ("feature/" + "a" * 51, "長すぎる"),  # 59 文字。子の識別子が 64 文字に収まらない
+            ("feature/123-login-05", "末尾"),
+        ):
+            with self.subTest(branch=branch):
+                done = self.adopt(branch)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn("使えない", done.stderr)
+                self.assertIn(word, done.stderr)
+
+    def test_adopt_accepts_identifier_of_58_characters(self):
+        branch = "feature/" + "a" * 50
+        done = self.adopt(branch)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_adopt_stops_when_another_branch_has_the_same_identifier(self):
+        # origin の全ブランチで見る（MR の無い別ブランチ、手元に無いブランチも）
+        git(self.ws, "push", "-q", self.bare, "main:refs/heads/topic-x")
+        done = self.adopt("topic/x")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("topic-x", done.stderr)
+        self.assertIn("識別子 topic-x", done.stderr)
+        self.assertFalse(os.path.isdir(self.wt("topic-x")))
+
+    def test_adopt_stops_when_another_branch_differs_only_in_case(self):
+        """英字の大文字小文字だけ違う識別子も同じものとして止める（macOS・Windows で同じ場所）。"""
+        git(self.ws, "push", "-q", self.bare, "main:refs/heads/Topic-X")
+        done = self.adopt("topic/x")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("Topic-X", done.stderr)
+        self.assertFalse(os.path.isdir(self.wt("topic-x")))
+
+    def test_adopt_accepts_a_japanese_identifier_of_58_characters(self):
+        """58 文字の日本語の識別子は通す（dash の `${#x}` はバイト数なので sh では数えない）。"""
+        branch = "feature/" + "あ" * 50
+        done = self.adopt(branch)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_a_candidate_without_mr_is_checked_too(self):
+        """MR の無い候補（名前に番号を含むブランチ）も、親に使えない識別子なら出さずに止める。"""
+        tip = git(self.ws, "commit-tree", "-p", "main", "-m", "work", "main^{tree}")
+        git(self.ws, "branch", "fix-152-other-05", tip)
+        self.route({PULLS: [200, []]})
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("末尾", done.stderr)
+        self.assertFalse(os.path.isdir(self.wt("fix-152-other-05")))
+
+    def test_without_the_executable_the_identifier_is_not_guessed(self):
+        """実行ファイルが答えなければ、sh で代わりに数えず「確かめられない」と止める。"""
+        git(self.ws, "push", "-q", self.bare, "main:refs/heads/topic/x")
+        self.route({f"GET {GITHUB}/pulls/5": [200, pr(5, "topic/x")], **closed_pulls("topic/x")})
+        # `worktree id` にだけ答えない実行ファイル（古い版）
+        old = write(
+            os.path.join(self._tmp.name, "old", "ccnavi"),
+            '#!/bin/sh\ncase " $* " in *" worktree id "*) exit 0 ;; esac\n'
+            f"exec '{self.exe}' \"$@\"\n",
+        )
+        os.chmod(old, 0o755)
+        done = self.run_sh("--mr", "5", CCNAVI_BIN_PATH=old)
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("確かめられない", done.stderr)
+        self.assertFalse(os.path.isdir(self.wt("topic-x")))
+
+    def test_adopt_stops_when_a_merged_mr_has_the_same_branch_name(self):
+        merged = {**pr(2, "topic/x"), "merged_at": "2026-01-01T00:00:00Z", "state": "closed"}
+        done = self.adopt("topic/x", **closed_pulls("topic/x", [merged]))
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("マージ済み MR（!2）", done.stderr)
+        self.assertFalse(os.path.isdir(self.wt("topic-x")))
+
+    def test_adopt_merged_check_unreachable_prints_guidance_and_mcp_checked_goes_on(self):
+        git(self.ws, "push", "-q", self.bare, "main:refs/heads/topic/x")
+        self.route({f"GET {GITHUB}/pulls/5": [200, pr(5, "topic/x")]})
+        done = self.run_sh("--mr", "5")
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertIn("マージ済みの MR があるかを確かめられなかった", done.stdout)
+        self.assertIn("state=closed", done.stdout)
+        self.assertFalse(os.path.isdir(self.wt("topic-x")))
+        again = self.run_sh("--mr", "5", "--mcp-checked")
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertTrue(os.path.isdir(self.wt("topic-x")))
+
+    # ---- 7. 毎回 fetch して早送りする
+
+    def test_existing_local_branch_is_fast_forwarded_every_time(self):
+        git(self.ws, "push", "-q", self.bare, "main:refs/heads/topic/x")
+        git(self.ws, "fetch", "-q", self.bare, "topic/x:refs/heads/topic/x")
+        # origin だけ進める
+        other = os.path.join(self._tmp.name, "other")
+        git(self._tmp.name, "clone", "-q", self.bare, other)
+        for key, value in (("user.email", "t@example.invalid"), ("user.name", "t")):
+            git(other, "config", key, value)
+        git(other, "checkout", "-q", "topic/x")
+        git(other, "commit", "-q", "--allow-empty", "-m", "remote work")
+        git(other, "push", "-q", "origin", "topic/x")
+        tip = git(other, "rev-parse", "HEAD")
+        self.assertNotEqual(git(self.ws, "rev-parse", "topic/x"), tip)
+        self.route({f"GET {GITHUB}/pulls/5": [200, pr(5, "topic/x")], **closed_pulls("topic/x")})
+        done = self.run_sh("--mr", "5")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(git(self.wt("topic-x"), "rev-parse", "HEAD"), tip)
+        # 2 回目: ワークツリーがあっても取り直して早送りする
+        git(other, "commit", "-q", "--allow-empty", "-m", "remote work 2")
+        git(other, "push", "-q", "origin", "topic/x")
+        tip = git(other, "rev-parse", "HEAD")
+        again = self.run_sh("--mr", "5")
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertEqual(git(self.wt("topic-x"), "rev-parse", "HEAD"), tip)
+        self.assertIn("早送り", again.stdout)
+
+    def test_unreachable_remote_continues_and_says_unchecked(self):
+        tip = git(self.ws, "commit-tree", "-p", "main", "-m", "work", "main^{tree}")
+        git(self.ws, "branch", "fix-152-other", tip)
+        self.route({PULLS: [200, []]})
+        shutil.rmtree(self.bare)
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("リモート未確認", done.stdout)
+        self.assertTrue(os.path.isdir(self.wt("fix-152-other")))
 
     def test_dry_run_creates_nothing(self):
         self.github_new()
@@ -531,6 +773,7 @@ class StartShTest(unittest.TestCase):
                 PULLS: [200, []],
                 f"GET {GITHUB}/issues/152": [200, {"title": "Add login"}],
                 f"GET {GITHUB}/pulls?state=open&head=acme:fix-152-login": [200, []],
+                **closed_pulls("fix-152-login"),
             }
         )
         done = self.run_sh("--issue", "152", "--prefix", "fix", "--slug", "login", "--dry-run")
@@ -567,6 +810,8 @@ class StartShGitLabTest(StartShTest):
             f"GET {GITLAB}/issues/152/related_merge_requests?per_page=100&page=1": [200, []],
             f"GET {GITLAB}/issues/152": [200, {"title": "Add login"}],
             f"GET {GITLAB}/merge_requests?{MR_QUERY}": [200, []],
+            f"GET {GITLAB}/merge_requests?state=merged&source_branch={BRANCH}"
+            "&per_page=100&page=1": [200, []],
         }
         if created:
             routes[f"POST {GITLAB}/merge_requests"] = [
@@ -617,6 +862,46 @@ class StartShGitLabTest(StartShTest):
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
         self.assertIn("issue #152 が見つからない", done.stderr)
+
+    def gitlab_mr(self, **over):
+        return {
+            "iid": 9,
+            "source_branch": "topic/x",
+            "source_project_id": 42,
+            "target_branch": "main",
+            "state": "opened",
+            "title": "MR 9",
+            "web_url": "https://gitlab.com/acme/widgets/-/merge_requests/9",
+            **over,
+        }
+
+    def test_gitlab_adopt_checks_target_and_merged_mr(self):
+        git(self.ws, "push", "-q", self.bare, "main:refs/heads/topic/x")
+        merged_url = (
+            f"GET {GITLAB}/merge_requests?state=merged&source_branch=topic/x&per_page=100&page=1"
+        )
+        base = {f"GET {GITLAB}": [200, {"id": 42}], merged_url: [200, []]}
+        self.route(
+            {**base, f"GET {GITLAB}/merge_requests/9": [200, self.gitlab_mr(target_branch="dev")]}
+        )
+        done = self.run_sh("--mr", "9")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("マージ先は dev", done.stderr)
+        self.route(
+            {
+                **base,
+                merged_url: [200, [self.gitlab_mr(iid=3, state="merged")]],
+                f"GET {GITLAB}/merge_requests/9": [200, self.gitlab_mr()],
+            }
+        )
+        done = self.run_sh("--mr", "9")
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("マージ済み MR（!3）", done.stderr)
+        self.route({**base, f"GET {GITLAB}/merge_requests/9": [200, self.gitlab_mr()]})
+        done = self.run_sh("--mr", "9")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(git(self.wt("topic-x"), "rev-parse", "--abbrev-ref", "HEAD"), "topic/x")
+        self.assertEqual(self.record("topic-x").get("mr"), "9")
 
     def test_gitlab_fork_mr_is_refused(self):
         mr = {

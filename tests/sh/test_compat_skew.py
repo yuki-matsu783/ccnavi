@@ -78,7 +78,7 @@ class CompatSkewTest(unittest.TestCase):
     def run_ticket(self):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         return subprocess.run(
-            [SHELL, os.path.join(".ccnavi", "scripts", "ccnavi-ticket.sh"), "start", "x"],
+            [SHELL, os.path.join(".ccnavi", "scripts", "ccnavi-ticket.sh"), "status", "x"],
             cwd=self.ws,
             env=env,
             capture_output=True,
@@ -92,7 +92,7 @@ class CompatSkewTest(unittest.TestCase):
         result = self.run_ticket()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stderr, "")
-        self.assertIn("ticket start x", result.stdout)
+        self.assertIn("ticket status x", result.stdout)
 
     def test_v2_a_different_compat_names_both_and_the_redistribution(self):
         """V2 配布先（build.py もソースも無い）では配り直しを言い、止めずに進む。"""
@@ -100,7 +100,7 @@ class CompatSkewTest(unittest.TestCase):
         self.put_bin(STUB.format(compat=other))
         result = self.run_ticket()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("ticket start x", result.stdout)
+        self.assertIn("ticket status x", result.stdout)
         self.assertIn(f"互換 {other}", result.stderr)
         self.assertIn(f"sh は互換 {sh_compat()}", result.stderr)
         self.assertIn("scripts/ccnavi-setup.sh", result.stderr)
@@ -121,7 +121,7 @@ class CompatSkewTest(unittest.TestCase):
         self.put_bin(OLD_STUB)
         result = self.run_ticket()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("ticket start x", result.stdout)
+        self.assertIn("ticket status x", result.stdout)
         self.assertIn("古い版", result.stderr)
         self.assertNotIn("unrecognized", result.stderr)
 

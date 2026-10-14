@@ -31,6 +31,7 @@ import tempfile
 import threading
 import unittest
 
+from ccnavi.entry import version
 from tests import ROOT, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -42,6 +43,10 @@ TOKEN = "t0k"
 # 実行ファイルの代役。引数を 1 行ずつ記録し、`--preview` なら一覧、`--yes` なら下書きを書いて
 # 答える。
 STUB = """#!/bin/sh
+case " $* " in
+*" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
+*" c1 family "*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
+esac
 printf '%s\\n' "$*" >>"$STUB_LOG"
 root="$2"
 case " $* " in
@@ -184,7 +189,7 @@ class ReviewDecideShTest(unittest.TestCase):
         subprocess.run([GIT, "-C", self.tree, "remote", "add", "origin", origin], check=True)
         self.stub = os.path.join(self.work, "stub-ccnavi")
         with open(self.stub, "w", encoding="utf-8") as f:
-            f.write(STUB)
+            f.write(STUB.replace("{compat}", str(version.COMPAT)))
         os.chmod(self.stub, os.stat(self.stub).st_mode | stat.S_IXUSR)
         self.log = os.path.join(self.work, "stub.log")
 

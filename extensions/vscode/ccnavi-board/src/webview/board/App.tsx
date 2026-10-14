@@ -18,6 +18,7 @@ import boardTour from "../tours/board.yml";
 import { mutePosts, post } from "./post.js";
 import { Approval } from "./Approval.js";
 import { CardItem } from "./Card.js";
+import { UnpreparedList } from "./Unprepared.js";
 import { EMPTY, loadState, saveState, type ViewState } from "./state.js";
 import { FILTER_LABELS } from "./text.js";
 
@@ -305,6 +306,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
               ))}
             </ul>
           ) : null}
+          {/* 親のワークツリーが無いPCの親。案内の見本には出さない */}
+          {sample === undefined && board !== undefined ? <UnpreparedList items={board.unprepared} /> : null}
           {/* 退避のチケットを表示しているときは、アーカイブの列に並ぶので「チケットなし」は出さない */}
           {shown.totalCount === 0 && !(shownArchived && shown.archivedCount > 0) ? <p className="board-empty">チケットなし</p> : null}
           <div className="board" data-tour="board">

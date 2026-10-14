@@ -211,6 +211,8 @@ class NoRecordTest(AuthorityHarness):
         # 生成の時刻は秒で変わるので外す（秒の境目で比べがぶれない）。
         board = self.board()
         board.pop("generated_at", None)
+        # 親のワークツリーが無い親（記録だけがある i0099）は「未準備」に出る。ほかの答えは変わらない
+        board.pop("unprepared", None)
         return board
 
     def test_answers_do_not_change_without_a_record(self):
@@ -320,8 +322,10 @@ class PresentTest(AuthorityHarness):
         self.assertEqual("deny", self.decision(self.write_to(self.child_tree, "wip/research/a")))
         started = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertNotEqual(0, started.returncode)
-        self.assertIn("HEAD がブランチ i0001 を指していない", started.stderr)
-        self.assertIn("切り直して", started.stderr)
+        self.assertIn(
+            "HEAD のブランチ名を変換した識別子がフォルダ名（i0001）と合わない", started.stderr
+        )
+        self.assertIn("に戻してください", started.stderr)
 
     def test_a_state_operation_does_not_move_a_copy_outside_the_parent_tree(self):
         # 子のチケットが親のワークツリーから消え、元ツリーにだけ残った形。
@@ -404,12 +408,16 @@ class UndecidedTest(AuthorityHarness):
         finished = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertIn("取り込み状態が不正", finished.stderr)
 
-    def test_closed_family_does_not_move(self):
+    def test_a_closed_record_does_not_decide(self):
+        """閉じたかは MR がマージ済みかで決める。取り込み状態の closed では止めない。"""
+        from ccnavi.infra import settings
+        from ccnavi.tickets import syncstate
+
         self.record("closed")
-        finished = self.ccnavi("ticket", "finish", "i0001-01-01")
-        self.assertNotEqual(0, finished.returncode)
-        self.assertIn("閉じている", finished.stderr)
-        self.assertEqual("deny", self.decision(self.write_to(self.child_tree, "wip/research/a")))
+        conf, _ = settings.load(self.root)
+        st = syncstate.standing(conf, self.root, "i0001")
+        self.assertFalse(st.closed)
+        self.assertEqual("", st.stop)
 
     def test_review_operations_stop_too(self):
         self.record("gone")
@@ -472,7 +480,7 @@ class TombstoneTest(AuthorityHarness):
         git(self.root, "worktree", "remove", "--force", self.parent_tree)
         st = syncstate.standing(self.conf(), self.root, "i0001")
         self.assertTrue(st.stop and not st.closed, st)
-        self.assertIn("片付けても残る", st.stop)
+        self.assertIn("親のワークツリー", st.stop)
         self.integration_done_parent(f"base_sha: {mine.base_sha}\n")
         st = syncstate.standing(self.conf(), self.root, "i0001")
         self.assertTrue(st.stop and not st.closed, st)
@@ -691,10 +699,10 @@ class IntegrationDoneTest(AuthorityHarness):
 
 
 class PredecessorTest(AuthorityHarness):
-    def test_an_undecided_predecessor_family_is_not_met(self):
-        # 先行 i0002-01-01 は元ツリーの done/ にある（前の対応表では満たす）。
-        # 親子のチケット i0002 は取り込み済みだが、親のワークツリーが無い（決まらない）ので、
-        # 満たしたとみなさない。
+    def test_a_predecessor_family_without_the_parent_worktree_is_not_met(self):
+        # 先行 i0002-01-01 は元ツリーの done/ にしかない。親子のチケット i0002 は親のワークツリーが
+        # 無く（決まらない）、元ツリーのコピーでは代用しないので、満たしたとみなさない。
+        # 取り込み状態（記録）の有無は関係しない。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "done", "i0002-01-01.md"),
             child_text("i0002-01-01", "i0002", 1, ["src/*"]).replace(
@@ -706,15 +714,18 @@ class PredecessorTest(AuthorityHarness):
         )
         self.propose("i0001-01-02", text)
         self.commit_parent()
-        before = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
-        self.assertIn("i0001-01-02", [b["ticket"] for b in before["batch"]], before)
-        self.record("present", name="i0002")
-        after = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
-        self.assertNotIn("i0001-01-02", [b["ticket"] for b in after["batch"]])
-        self.assertTrue(
-            any("親子のチケットが決まらない" in " ".join(r["problems"]) for r in after["rejected"]),
-            after,
-        )
+        for record in (False, True):
+            if record:
+                self.record("present", name="i0002")
+            after = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
+            self.assertNotIn("i0001-01-02", [b["ticket"] for b in after["batch"]])
+            self.assertTrue(
+                any(
+                    "親子のチケットが決まらない" in " ".join(r["problems"])
+                    for r in after["rejected"]
+                ),
+                after,
+            )
 
     def test_the_parent_tree_does_not_loosen_a_predecessor(self):
         # 厳しくする向きだけ: 親のワークツリーで閉じていても、

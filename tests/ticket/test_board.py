@@ -37,6 +37,25 @@ class BoardTest(PhaseHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(result.stdout)
 
+    def test_unprepared_lists_a_record_without_the_parent_worktree(self):
+        """記録（キャッシュ）だけがあり、親のワークツリーが無い親は「未準備」に出す。
+
+        ほかのツリーのコピーで代用しないので、チケットは tickets[] に出ない。ワークツリーのある親
+        （記録の有無を問わない）と、閉じた親は出さない。
+        """
+        record = "remote origin\nbranch feature/99-x\nsha 0\nfetched_at 1\nstate present\nmr 12\n"
+        base = os.path.join(self.state, "sync", "self", "families")
+        write(os.path.join(base, "feature-99-x"), record)
+        write(os.path.join(base, "i0001"), record.replace("feature/99-x", "i0001"))
+        payload = self.board()
+        found = payload["unprepared"]
+        self.assertEqual([u["family"] for u in found], ["feature-99-x"])
+        self.assertEqual(found[0]["branch"], "feature/99-x")
+        self.assertEqual(found[0]["mr"], 12)
+        self.assertEqual(found[0]["project"], "")
+        self.assertIn("親のワークツリー", found[0]["reason"])
+        self.assertNotIn("feature-99-x", [t["ticket"] for t in payload["tickets"]])
+
     def scene(self):
         """親 1 本（research → design）。フェーズ 1 は閉じ、フェーズ 2 は着手済みで、
         同じフェーズに未承認の子が 1 枚ある。その子は着手済みの子のワークツリーにも入っている。"""
@@ -142,25 +161,24 @@ class BoardTest(PhaseHarness):
         os.remove(source)
         return write(os.path.join(target_tree, "wip", "proposals", state, ticket_id + ".md"), text)
 
-    def test_scattered_is_empty_when_the_home_tree_is_gone_but_the_origin_holds_one(self):
-        """親のツリーが無ければ元ツリーを正とする。片付けただけの形を散在に数えない。
-
-        親のワークツリーは合流したら片付ける。そこを行き先の無いまま数えると、片付けた
-        親子のチケットのカードが全部「複数の場所にある」になり、状態の操作も止まる。
-        """
+    def test_scattered_lists_the_copies_when_the_home_tree_is_gone_and_the_root_holds_one(self):
+        """親のツリーが無ければ、元ツリーのコピーで代用せず、決まらないものとして全部出す。"""
         self.scene()
         self.move("i0001-02-03", self.parent_tree, self.root)
 
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
-        self.assertEqual(by_id["i0001-02-03"]["scattered"], [])
-        # 複数のツリーにあること自体は残る。決まらなさだけを scattered が言う。
+        self.assertEqual(
+            sorted((s["tree"], s["state"]) for s in by_id["i0001-02-03"]["scattered"]),
+            [("", "todo"), ("i0001-02-02", "todo")],
+        )
+        # 複数のツリーにあること自体は seen_in が持つ。
         self.assertEqual(
             [(s["tree"], s["state"]) for s in by_id["i0001-02-03"]["seen_in"]],
             [("", "todo"), ("i0001-02-02", "todo")],
         )
 
     def test_scattered_lists_every_copy_when_no_authoritative_tree_holds_one(self):
-        """親のツリーにも元ツリーにも無ければ、どれが正か決まらない。候補を全部出す。"""
+        """親のツリーに無ければ、どれが正か決まらない。候補を全部出す。"""
         self.scene()
         elsewhere = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         self.move("i0001-02-03", self.parent_tree, elsewhere)
@@ -388,6 +406,27 @@ class BoardTest(PhaseHarness):
         self.assertTrue(by_id["i0001-02-02"]["attention"])
         self.assertTrue(by_id["i0001"]["attention"])
         self.assertFalse(by_id["i0001-01-01"]["attention"])
+
+    def test_the_merged_head_of_a_child_is_shown(self):
+        """finish が書いた `merged_sha`（合流した子の先頭）をボードの JSON に載せる（表示だけ）。"""
+        from ccnavi.tickets import ticket_fields
+
+        self.scene()
+        self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
+        found = None
+        for state in ("done", "doing"):
+            path = os.path.join(self.approved, state, "i0001-02-02.md")
+            if os.path.exists(path):
+                found = path
+        if found is None:
+            found = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-02-02.md")
+        with open(found, encoding="utf-8") as f:
+            text = f.read()
+        write(found, ticket_fields.set_fields(text, {"merged_sha": "a" * 40}))
+        by_id = {t["ticket"]: t for t in self.board()["tickets"]}
+        self.assertEqual(by_id["i0001-02-02"]["merged_sha"], "a" * 40)
+        # finish で閉じた子は、合流した先頭を持つ
+        self.assertRegex(by_id["i0001-01-01"]["merged_sha"], r"^[0-9a-f]{40}$")
 
     def test_shape_matches_the_extension_fixture(self):
         self.scene()

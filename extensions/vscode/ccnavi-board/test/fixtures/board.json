@@ -327,6 +327,15 @@
    "title": "親",
    "project": "",
    "issue": null,
+   "mr": null,
+   "branch": "i0001",
+   "remote": {
+    "branch": "i0001",
+    "ahead": null,
+    "behind": null,
+    "fetched_at": 0,
+    "mr": null
+   },
    "predecessors": [],
    "predecessors_unmet": [],
    "human_review": {
@@ -350,6 +359,7 @@
    "started_at": "",
    "completed_at": "",
    "base_sha": "",
+   "merged_sha": "",
    "cancelled_at": "",
    "cancel_reason": "",
    "in_progress": false,
@@ -399,6 +409,9 @@
    "title": "子 i0001-01-01",
    "project": "",
    "issue": null,
+   "mr": null,
+   "branch": "",
+   "remote": null,
    "predecessors": [],
    "predecessors_unmet": [],
    "human_review": {
@@ -422,6 +435,7 @@
    "started_at": "2026-09-13T13:50:22+0000",
    "completed_at": "2026-09-13T13:50:22+0000",
    "base_sha": "e5b468badbc7004f744ee323f41c24cb3d36baf8",
+   "merged_sha": "",
    "cancelled_at": "",
    "cancel_reason": "",
    "in_progress": false,
@@ -499,6 +513,9 @@
    "title": "子 i0001-02-02",
    "project": "",
    "issue": null,
+   "mr": null,
+   "branch": "",
+   "remote": null,
    "predecessors": [],
    "predecessors_unmet": [],
    "human_review": {
@@ -522,6 +539,7 @@
    "started_at": "2026-09-13T13:50:22+0000",
    "completed_at": "",
    "base_sha": "7b48d1c301419efae9ea26026e061fb329be1b0e",
+   "merged_sha": "",
    "cancelled_at": "",
    "cancel_reason": "",
    "in_progress": true,
@@ -574,6 +592,9 @@
    "title": "子 i0001-02-03",
    "project": "",
    "issue": null,
+   "mr": null,
+   "branch": "",
+   "remote": null,
    "predecessors": [],
    "predecessors_unmet": [],
    "human_review": {
@@ -599,6 +620,7 @@
    "started_at": "",
    "completed_at": "",
    "base_sha": "",
+   "merged_sha": "",
    "cancelled_at": "",
    "cancel_reason": "",
    "in_progress": false,
@@ -642,6 +664,9 @@
    "title": "子 i0001-02-04",
    "project": "",
    "issue": null,
+   "mr": null,
+   "branch": "",
+   "remote": null,
    "predecessors": [],
    "predecessors_unmet": [],
    "human_review": {
@@ -671,6 +696,7 @@
    "started_at": "2026-09-13T13:50:22+0000",
    "completed_at": "2026-09-13T13:50:23+0000",
    "base_sha": "7b48d1c301419efae9ea26026e061fb329be1b0e",
+   "merged_sha": "",
    "cancelled_at": "",
    "cancel_reason": "",
    "in_progress": false,
@@ -750,6 +776,9 @@
    "title": "子 i0001-02-05",
    "project": "",
    "issue": null,
+   "mr": null,
+   "branch": "",
+   "remote": null,
    "predecessors": [],
    "predecessors_unmet": [],
    "human_review": {
@@ -772,6 +801,7 @@
    "started_at": "",
    "completed_at": "",
    "base_sha": "",
+   "merged_sha": "",
    "cancelled_at": "2026-09-13T13:50:24+0000",
    "cancel_reason": "やめた",
    "in_progress": false,
@@ -888,5 +918,6 @@
    ]
   }
  ],
- "archived": []
+ "archived": [],
+ "unprepared": []
 }

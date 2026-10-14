@@ -10,6 +10,8 @@ keywords: [判定, sh, ccnavi-git.sh, integrate, integrate-done, push, carry, �
 
 状態: 採用
 
+改訂（2026-10-14）: 「承認済みの `branch:` のブランチへ移る 1 操作の前提」は、ADR-0136 が `branch:` を廃止したため無くなった。
+
 ## 状況
 
 設計原則 P13（ADR-0077）は「止める・通すの判定は hook と実行ファイルが持ち、sh が ccnavi の状態を読んで止めるのは

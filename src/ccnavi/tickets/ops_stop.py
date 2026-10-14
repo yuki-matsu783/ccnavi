@@ -43,7 +43,8 @@ def unfinished_at_stop(
     - 親なら `close_problems` が空。開いている子・レビュー準備中／レビュー待ちのフェーズ・
       フィードバック計画待ち・終わっていないフェーズがあれば `finish` は通らないので促さない
     - ワークツリーに未コミットの変更が無い（追跡していないファイルも数える）
-    - 基準点より先に、自分で作ったコミットが 1 件以上ある（`_own_commits`）
+    - 自分で作ったコミットが 1 件以上ある（`_own_commits`。親は基準点より先、
+      子は親のブランチに無いもの）
 
     git を読めなければ促さない。促しは保護ではないので、読めないときは今までどおり何も出さずに通す。
 
@@ -76,8 +77,8 @@ def unfinished_at_stop(
 def _own_commits(worktree: str, t: ticket_model.Ticket, parent_branch: str = "") -> int:
     """基準点より先の、このチケットが自分で作ったコミットの数。数えられなければ 0（促さない側）。
 
-    取り込んだだけのコミットは数えない。子なら親のブランチ（`parent_branch`。親チケットの
-    `branch:`、無ければ親の識別子）の先にあるもの、親ならワークツリーの起点のデフォルトブランチ
+    取り込んだだけのコミットは数えない。子なら親のブランチ（`parent_branch`。親のワークツリーの
+    HEAD から読んだ名前）の先にあるもの、親ならワークツリーの起点のデフォルトブランチ
     （`origin/HEAD`。セッションの頭で進める）の先にあるものを除く。取り込みで生まれたマージのコミットも除く
     （`--no-merges`）。子で親のブランチを引けなければ、自分のものか決まらないので 0 を返す。
     親で `origin/HEAD` が無い（リモートの無いリポジトリ）ときは、除くものが無いので基準点の先を
@@ -85,9 +86,11 @@ def _own_commits(worktree: str, t: ticket_model.Ticket, parent_branch: str = "")
     """
     exclude: list[str] = []
     if t.is_child:
+        if not parent_branch:
+            return 0
         rc, sha = gitcmd.output(
             worktree,
-            ["rev-parse", "--verify", "--quiet", f"{parent_branch or t.parent}^{{commit}}"],
+            ["rev-parse", "--verify", "--quiet", f"{parent_branch}^{{commit}}"],
             ops_close.TIMEOUT_SECONDS,
         )
         if rc != 0 or not sha.strip():
@@ -101,9 +104,16 @@ def _own_commits(worktree: str, t: ticket_model.Ticket, parent_branch: str = "")
         )
         if rc == 0 and sha.strip():
             exclude.append(f"^{sha.strip()}")
+    # 子は、親のブランチに入っていないコミットがそのまま自分の仕事。基準点から数えない
+    # （衝突を解くために親を取り込んでも、親にあるほかの子のコミットは除かれる）。
+    # 親は基準点（着手のときの親のワークツリーの HEAD）から数える。親のブランチは親自身の線で、
+    # 取り込みに混ざるのは統合先（上で除く `origin/HEAD`）と同じ親のブランチ（ほかの PC が送った
+    # 親の仕事）だけなので、子のような共通の祖先の取り直しは要らない。合流した子のコミットも
+    # 親の仕事として数える（ここは「閉じられる親に、送っていない仕事が残っているか」を見る）。
+    start = [] if t.is_child else [f"{t.base_sha}..HEAD"]
     rc, out = gitcmd.output(
         worktree,
-        ["rev-list", "--count", "--no-merges", f"{t.base_sha}..HEAD", *exclude],
+        ["rev-list", "--count", "--no-merges", *(start or ["HEAD"]), *exclude],
         ops_close.TIMEOUT_SECONDS,
     )
     if rc != 0 or not out.strip().isdigit():
@@ -141,8 +151,13 @@ def finish_nudge(root: str, found: Unfinished) -> str:
         [
             f"[ccnavi] {CODE_FINISH_NUDGE} (ticket: {t.ticket})",
             f"{kind} {t.ticket} は着手済みのまま作業中（{ticket_model.DOING}/）です。ワークツリー "
-            f"{found.worktree} に未コミットの変更が無く、基準点 {t.base_sha[:12]} より先に"
-            f"コミットが {found.ahead} 件あります。",
+            f"{found.worktree} に未コミットの変更が無く、"
+            + (
+                "親のブランチに無いコミットが "
+                if t.is_child
+                else f"基準点 {t.base_sha[:12]} より先にコミットが "
+            )
+            + f"{found.ahead} 件あります。",
             f"作業が終わったなら '{ticket_sh} finish {t.ticket}' を実行してから終えてください。"
             "まだ続けるなら、続ける理由（何が残っているか）をユーザに向けて書いてから終えてください。"
             "この案内は同じ HEAD では 1 回だけで、"

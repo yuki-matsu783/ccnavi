@@ -31,7 +31,7 @@ import * as path from "node:path";
 import {
   parseApprovePreview,
   parseApproveResult,
-  partialMessage,
+  type ApproveMismatch,
   type ApproveOutcome,
   type ApprovePreview,
   type ApproveResult,
@@ -277,15 +277,21 @@ export async function runApprovePreview(
 }
 
 /**
- * 指した識別子を承認する（`--agree --yes <識別子,…> --json`）。
- * 実行ファイルは、承認する時点の提案を端末の承認と同じ検査にかけ、通らなければ何も置かない。
+ * 見せた一覧をそのまま承認する（`--agree --yes <識別子,…> --digest <ダイジェスト> --json`）。
+ * 実行ファイルは見せた一覧と本文が今と同じことを求め、違えば `mismatch` を返して何も置かない。
  */
-export async function runApproveYes(root: string, setting: string, tickets: readonly string[]): Promise<ApproveOutcome> {
+export async function runApproveYes(
+  root: string,
+  setting: string,
+  tickets: readonly string[],
+  digest: string,
+  only: readonly string[] = [],
+): Promise<ApproveOutcome> {
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, approveArgs(tickets), APPROVE_TIMEOUT_MS);
+  const ran = await run(launcher, root, approveArgs(tickets, digest, only), APPROVE_TIMEOUT_MS);
   // 打ち切りは読む前に見る。承認済みチケットは 1 件ずつ置かれる（agree.py の for cand in batch）ので、
   // 途中で強制終了されると一部だけ置かれた状態が残る。stdout も途中で切れていて「読み取れない」になるため、
   // ここで拾わないと何が起きたのか伝わらない。
@@ -304,10 +310,13 @@ export async function runApproveYes(root: string, setting: string, tickets: read
       ? parsed
       : { ok: false, error: `ccnavi --agree --yes が失敗しました: ${firstLine(ran.stderr)}` };
   }
+  if ("mismatch" in parsed) {
+    return parsed;
+  }
   // 途中で止まった。置かれたぶんは残っているので、そう言う。ここで何も言わないとユーザは
   // 「何も起きていない」と読み、置かれた承認済みチケットに気づかないまま次へ進む。
   if ("partial" in parsed) {
-    return { ok: false, error: partialMessage(parsed.partial) };
+    return parsed;
   }
   const said = firstLine(ran.stderr) || firstLine(ran.stdout);
   return { ok: false, error: said === "" ? `ccnavi --agree --yes の出力を読み取れません（${parsed.error}）` : said };

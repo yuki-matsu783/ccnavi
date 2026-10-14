@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from ..infra import gitcmd, settings, tree
+from ..infra import gitcmd, gitstate, settings, tree
 from ..policy import rules
 from . import (
     phase,
@@ -118,7 +118,8 @@ def scope_findings(
 ) -> tuple[list[tuple[str, ScopeVerdict]], str]:
     """子のワークツリーに残っている範囲外の変更と、その判定。2 つめは読めなかった理由。
 
-    見るのは `base_sha..HEAD` のコミット済みの差分と、未コミットの変更の両方。
+    見るのは、子の仕事の始まり（親のワークツリーの HEAD と子の HEAD の共通の祖先。
+    `gitstate.child_base`）から HEAD までのコミット済みの差分と、未コミットの変更の両方。
     未コミットだけ見る検査では、範囲外を書いてコミットしたものが反映されない。
     範囲は実行前チェックと同じく、親の範囲と定義の上限で切り詰める（scope_verdict）。
     """
@@ -138,21 +139,23 @@ def scope_findings(
     # 乗るのはポインタの移動で、`dirty` ではそれが出力に出る。`none` にすると、submodule の
     # 中に置かれた生成物まで範囲外として報告することになる。
     paths: set[str] = set()
-    if child.base_sha:
-        rc, out = _git(
-            worktree,
-            [
-                "diff",
-                "--name-only",
-                "--no-renames",
-                "--ignore-submodules=none",
-                "-z",
-                f"{child.base_sha}..HEAD",
-            ],
-        )
-        if rc != 0:
-            return [], "基準点からの差分を読めない"
-        paths.update(p for p in out.split("\0") if p)
+    base, why = gitstate.child_base(worktree, tree.worktree_path(root, child.parent))
+    if not base:
+        return [], why
+    rc, out = _git(
+        worktree,
+        [
+            "diff",
+            "--name-only",
+            "--no-renames",
+            "--ignore-submodules=none",
+            "-z",
+            f"{base}..HEAD",
+        ],
+    )
+    if rc != 0:
+        return [], "子の仕事の始まりからの差分を読めない"
+    paths.update(p for p in out.split("\0") if p)
     rc, out = _git(
         worktree,
         [
@@ -169,6 +172,20 @@ def scope_findings(
     for entry in out.split("\0"):
         if len(entry) > 3 and entry[2] == " ":
             paths.add(entry[3:])
+    return _outside(conf, child, parent, paths, []), ""
+
+
+def _outside(
+    conf: settings.Settings,
+    child: ticket_model.Ticket,
+    parent: ticket_model.Ticket | None,
+    paths: set[str],
+    places: list[str],
+) -> list[tuple[str, ScopeVerdict]]:
+    """パスのうち、範囲の外のもの（`scope_verdict`）。
+
+    チケットの置き場に当たるものは範囲にかけず、`places` に足す。
+    """
     pt = type_for(child, parent)
     outside = []
     for rel in sorted(paths):
@@ -177,6 +194,7 @@ def scope_findings(
         # 名前のファイル 1 個が、置き場の中や範囲の中のパスと判定され、範囲外として報告されない
         # （実行前チェックも直さない）。
         if ticket_places.is_ticket_place(rel, conf.tickets, conf.approved):
+            places.append(rel)
             continue
         # 下書きの置き場（`wip/handoff/`）と ELI5 の置き場は追跡されるので、ここでも外す
         # （実行前チェックと揃える）。下書きは `integrate` が外し、`ready` が `wip/` ごと消す。
@@ -185,7 +203,51 @@ def scope_findings(
         found = scope_verdict(child, parent, pt, rel)
         if found.outside:
             outside.append((rel, found))
-    return outside, ""
+    return outside
+
+
+def merge_findings(
+    root: str,
+    conf: settings.Settings,
+    child: ticket_model.Ticket,
+    parent: ticket_model.Ticket | None,
+    head: str,
+) -> tuple[list[str], list[tuple[str, ScopeVerdict]], str]:
+    """finish が親へ合流する前の検査。`(置き場の変更, 範囲外の変更, 読めなかった理由)`。
+
+    見るのは、子の仕事の始まり（`gitstate.child_base`）から `head`（呼ぶ側が 1 回だけ読んだ子の
+    先頭）までのコミット済みの変更だけ。合流するのも同じ `head` なので、検査のあとに子が
+    コミットしても、検査していないコミットは合流に載らない。
+    未コミットの変更は、合流に載らないので別に止める（finish の手順 3）。範囲は
+    `scope_findings` と同じく親の範囲と定義の上限で切り詰める。置き場（`.ccnavi/approved/` と
+    `wip/proposals/`。フェーズのマーカーと記録を含む）の変更は、範囲の判定にかけず別に挙げる。
+    ここに挙がるものが 1 つでもあれば、合流しない（置き場はユーザの判断と ccnavi が書くもので、
+    子のコミットで親へ持ち込ませない）。
+    """
+    worktree = tree.worktree_path(root, child.ticket)
+    if not os.path.isdir(worktree):
+        return [], [], "ワークツリーがありません。"
+    base, why = gitstate.child_base(
+        worktree, tree.worktree_path(root, child.parent), child_head=head
+    )
+    if not base:
+        return [], [], why
+    rc, out = _git(
+        worktree,
+        [
+            "diff",
+            "--name-only",
+            "--no-renames",
+            "--ignore-submodules=none",
+            "-z",
+            f"{base}..{head}",
+        ],
+    )
+    if rc != 0:
+        return [], [], "子の仕事の始まりからの差分を読めない"
+    places: list[str] = []
+    outside = _outside(conf, child, parent, {p for p in out.split("\0") if p}, places)
+    return places, outside, ""
 
 
 def _git(cwd: str, args: list[str]) -> tuple[int, str]:

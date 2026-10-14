@@ -55,6 +55,7 @@ from . import (
     phasetypes,
     plan_phases,
     plan_templates,
+    syncstate,
     template_use,
     ticket_ids,
     ticket_model,
@@ -120,13 +121,20 @@ def parse_scope(values: list[str] | None) -> tuple[list[str], str]:
     return globs, ""
 
 
-def render(ident: str, title: str, plan: list[str], allow: list[str], issue: int | None) -> str:
+def render(
+    ident: str,
+    title: str,
+    plan: list[str],
+    allow: list[str],
+    issue: int | None,
+    mr: int | None = None,
+) -> str:
     """雛形の全文。`phases:` は書かない（書いたあとに `plan_phases.fill` が差し込む）。"""
     items = [
         plan_templates.Item(type=name, after=[number - 1] if number > 1 else [])
         for number, name in enumerate(plan, start=1)
     ]
-    return render_items(ident, title, items, [], allow, issue)
+    return render_items(ident, title, items, [], allow, issue, mr)
 
 
 # 引用符なしで書いてよい型の名前（YAML の真偽・null の語は除く）。
@@ -159,11 +167,15 @@ def render_items(
     feedback: list[plan_templates.Item],
     allow: list[str],
     issue: int | None,
+    mr: int | None = None,
 ) -> str:
-    """雛形の全文。`after` は提案の絶対番号（フィードバック計画は全体計画の続き）で渡す。"""
+    """雛形の全文。`mr` は親のブランチのマージリクエストの番号（親の作成と承認の前提）。
+    `after` は提案の絶対番号（フィードバック計画は全体計画の続き）で渡す。"""
     lines = [ticket_model.FENCE, f"version: {ticket_model.VERSION}", f"ticket: {ident}"]
     if issue is not None:
         lines.append(f"issue: {issue}")
+    if mr is not None:
+        lines.append(f"mr: {mr}")
     lines.append(f"title: {_quote(title)}")
     lines.append("plan:")
     lines.extend(_item_line(item) for item in plan)
@@ -207,6 +219,7 @@ def run(
     layer: str = "",
     with_feedback: bool = False,
     scope: list[str] | None = None,
+    mr: int | None = None,
 ) -> int:
     """`ticket new` の本体。書けたら 0、書かなければ 1（理由は標準エラー）。
 
@@ -234,6 +247,8 @@ def run(
         return refuse("--title に改行や制御文字は使えない")
     if issue is not None and issue <= 0:
         return refuse("--issue には正の整数を渡す")
+    if mr is not None and mr <= 0:
+        return refuse("--mr には正の整数を渡す")
     plan = parse_plan(plan_text)
     if template:
         if (plan_text or "").strip():
@@ -251,13 +266,24 @@ def run(
         or where.kind != tree.KIND_WORKTREE
         or unicodedata.normalize("NFC", where.name) != ident
     ):
-        git_sh = settings.script_command(root, "ccnavi-git.sh")
+        start_sh = settings.script_command(root, "ccnavi-start.sh")
         return refuse(
             f"cwd が .claude/worktrees/{ident} の中ではない。"
-            "提案は識別子と同名のワークツリーに書く。"
-            f"先に '{git_sh} worktree add {tree.worktree_path(root, ident)}"
-            f" -b {ident} <統合先>' で切り、そのワークツリーの中から実行します。"
+            "提案は親のワークツリー（識別子と同名）に書く。"
+            f"先に '{start_sh} --mr <MR の番号>'（MR が無ければ '--issue <issue の番号>'）で、"
+            "親のブランチを直接チェックアウトした親のワークツリーを作り、その中から実行します"
         )
+    if not syncstate.head_branch(where.root, ident):
+        return refuse(
+            f"親のワークツリー（.claude/worktrees/{ident}）の HEAD のブランチ名の `/` を `-` に"
+            f"置き換えたものが {ident} になっていない。親のブランチ名は MR のブランチ"
+            "（`ccnavi-start.sh` が出す）で、ワークツリーはそのブランチを直接チェックアウトする"
+        )
+    if mr is None:
+        # `ccnavi-start.sh` が取り込み状態（キャッシュ）に保存した MR の番号があれば使う
+        record = syncstate.family(conf.state, syncstate.repo_key(where.project), ident)
+        if record is not None and record.mr.isdigit() and int(record.mr) > 0:
+            mr = int(record.mr)
 
     types = phasetypes.load_types(conf, root, where.project)
     if types is None:
@@ -327,9 +353,9 @@ def run(
     except OSError as exc:
         return refuse(f"{os.path.dirname(path)} を作れない（{exc}）")
     if used is None:
-        text = render(ident, title.strip(), plan, allow, issue)
+        text = render(ident, title.strip(), plan, allow, issue, mr)
     else:
-        text = render_items(ident, title.strip(), used.plan, used.feedback, allow, issue)
+        text = render_items(ident, title.strip(), used.plan, used.feedback, allow, issue, mr)
     failed = fsio.write_new_durable(path, text.encode("utf-8"))
     if failed:
         return refuse(f"{path} に保存できませんでした（{failed}）")

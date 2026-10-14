@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -118,6 +119,8 @@ def layer_rules(root):
 
 def ticket_text(name, *, parent="", project="", allow=(), plan=0):
     lines = ["---", "version: 1", f"ticket: {name}"]
+    if not parent:
+        lines.append("mr: 1")
     if parent:
         lines += [f"parent: {parent}", "phase: 1"]
     if project:
@@ -162,7 +165,11 @@ class ProjectsTest(unittest.TestCase):
 
     def approved_path(self, *parts):
         """承認済みチケットの置き場の下のパス。どのツリーに置かれたかを探す。"""
-        for where in (self.ws, self.lib, self.app):
+        homes = [self.ws, self.lib, self.app]
+        wt = os.path.join(self.ws, ".claude", "worktrees")
+        if os.path.isdir(wt):
+            homes += [os.path.join(wt, n) for n in sorted(os.listdir(wt))]
+        for where in homes:
             path = os.path.join(where, ".ccnavi", "approved", *parts)
             if os.path.exists(path):
                 return path
@@ -183,8 +190,15 @@ class ProjectsTest(unittest.TestCase):
 
     def worktree(self, owner, name):
         path = os.path.join(self.ws, ".claude", "worktrees", name)
-        git(owner, "worktree", "add", "--quiet", path, "-b", name)
+        if not os.path.isdir(path):
+            git(owner, "worktree", "add", "--quiet", path, "-b", name)
         return path
+
+    def proposal_file(self, owner, name):
+        """提案を置くパス。親の提案は親のワークツリー（識別子と同名。無ければ切る）の中。"""
+        family = re.sub(r"-\d\d-\d\d$", "", name)
+        home = self.worktree(owner, family)
+        return os.path.join(home, "wip", "proposals", "todo", name + ".md")
 
     def ccnavi(self, *args, stdin="", env=None):
         """実行ファイルを 1 回起動する。
@@ -341,22 +355,29 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(record["tree"], "i0007")
         self.assertEqual(record["project"], "app")
 
+    def family_in_lib(self, parent):
+        """lib の提案として、親 1 本とその子 1 本（フェーズ 1）を書いて承認する。"""
+        write(
+            self.proposal_file(self.lib, parent),
+            ticket_text(parent, allow=("src/*",)),
+        )
+        child = f"{parent}-01-01"
+        write(
+            self.proposal_file(self.lib, child),
+            ticket_text(child, parent=parent, allow=("src/a/*",)),
+        )
+
     def test_worktree_cut_from_the_wrong_project_is_refused_by_the_ticket(self):
-        # プロジェクトの提案はそのプロジェクトの wip/proposals/ に置く。
+        # プロジェクトの提案は、親のワークツリー（そのプロジェクトから切る）の中に置く。
         # 置き場がプロジェクトを決めるので、frontmatter の project は書かなくてよい。
-        write(
-            os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
-            ticket_text("i0007", allow=("src/*",)),
-        )
-        write(
-            os.path.join(self.lib, "wip", "proposals", "todo", "i0008.md"),
-            ticket_text("i0008", allow=("src/*",)),
-        )
+        self.family_in_lib("i0007")
+        self.family_in_lib("i0008")
         approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
-        wrong = self.worktree(self.app, "i0007")
-        denied = self.hook("Write", self.ws, file_path=os.path.join(wrong, "src", "a.py"))
+        # 子のワークツリーを別のプロジェクト（app）から切ってしまった
+        wrong = self.worktree(self.app, "i0007-01-01")
+        denied = self.hook("Write", self.ws, file_path=os.path.join(wrong, "src", "a", "a.py"))
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
         self.assertIn("DENY_TICKET_PROJECT_MISMATCH", self.reason(denied))
         self.assertIn("'lib'", self.reason(denied))
@@ -365,8 +386,8 @@ class ProjectsTest(unittest.TestCase):
         # 範囲の判定ではないので、記録の名前は builtin:ticket-scope を使い回さない。
         self.assertEqual(self.last_record()["rules"], ["builtin:ticket-project"])
 
-        right = self.worktree(self.lib, "i0008")
-        allowed = self.hook("Write", self.ws, file_path=os.path.join(right, "src", "a.py"))
+        right = self.worktree(self.lib, "i0008-01-01")
+        allowed = self.hook("Write", self.ws, file_path=os.path.join(right, "src", "a", "a.py"))
         self.assertEqual(allowed.returncode, 0, allowed.stderr)
         self.assertNotIn("DENY", self.reason(allowed))
         outside = self.hook("Write", self.ws, file_path=os.path.join(right, "docs", "a.md"))
@@ -379,16 +400,13 @@ class ProjectsTest(unittest.TestCase):
         引くと、範囲の中への書き込みは別のプロジェクトのツリーでも通ってしまう。
         区別する機械でも走るように、区別しない機械の引き方へ差し替えて確かめる。
         """
-        write(
-            os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
-            ticket_text("i0007", allow=("src/*",)),
-        )
+        self.family_in_lib("i0007")
         approved = self.ccnavi("--agree", stdin="y\n")
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
-        wrong = self.worktree(self.app, "I0007")
+        wrong = self.worktree(self.app, "I0007-01-01")
         with mock.patch.object(tree, "CASE_INSENSITIVE", True):
-            denied = self.hook("Write", self.ws, file_path=os.path.join(wrong, "src", "a.py"))
+            denied = self.hook("Write", self.ws, file_path=os.path.join(wrong, "src", "a", "a.py"))
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
         self.assertIn("DENY_TICKET_PROJECT_MISMATCH", self.reason(denied))
         self.assertEqual(self.last_record()["code"], "DENY_TICKET_PROJECT_MISMATCH")
@@ -401,7 +419,7 @@ class ProjectsTest(unittest.TestCase):
         同じツリーのほかのファイルと同じ判定になる。
         """
         write(
-            os.path.join(self.lib, "wip", "proposals", "todo", "i0009.md"),
+            self.proposal_file(self.lib, "i0009"),
             ticket_text("i0009", allow=("skills/deploy/*",)),
         )
         approved = self.ccnavi("--agree", stdin="y\n")
@@ -426,11 +444,11 @@ class ProjectsTest(unittest.TestCase):
 
     def test_the_place_decides_the_project_for_parent_and_child_alike(self):
         write(
-            os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
+            self.proposal_file(self.lib, "i0007"),
             ticket_text("i0007", allow=("src/*",)),
         )
         write(
-            os.path.join(self.lib, "wip", "proposals", "todo", "i0007-01-01.md"),
+            self.proposal_file(self.lib, "i0007-01-01"),
             ticket_text("i0007-01-01", parent="i0007", allow=("src/a/*",)),
         )
         # 承認の前から、親も子も同じプロジェクトとしてボードに出る
@@ -465,7 +483,7 @@ class ProjectsTest(unittest.TestCase):
 
     def test_a_child_placed_apart_from_its_parent_is_not_approved(self):
         write(
-            os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
+            self.proposal_file(self.lib, "i0007"),
             ticket_text("i0007", allow=("src/*",)),
         )
         write(
@@ -538,16 +556,14 @@ class ProjectsTest(unittest.TestCase):
 
     def test_a_project_ticket_moves_inside_its_own_tree(self):
         write(
-            os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
+            self.proposal_file(self.lib, "i0007"),
             ticket_text("i0007", allow=("src/*",)),
         )
         self.assertEqual(self.ccnavi("--agree", stdin="y\n").returncode, 0)
         # 承認はプロジェクトの todo/ からプロジェクトの doing/ へ動かす。取り消すと done/ へ。
         # 置き場はプロジェクトの git が持つ。
-        lib_approved = os.path.join(self.lib, ".ccnavi", "approved")
-        self.assertFalse(
-            os.path.exists(os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"))
-        )
+        lib_approved = os.path.join(self.worktree(self.lib, "i0007"), ".ccnavi", "approved")
+        self.assertFalse(os.path.exists(self.proposal_file(self.lib, "i0007")))
         self.assertTrue(os.path.exists(os.path.join(lib_approved, "doing", "i0007.md")))
         cancelled = self.ccnavi("ticket", "cancel", "i0007", "--reason", "やめる")
         self.assertEqual(cancelled.returncode, 0, cancelled.stdout + cancelled.stderr)
@@ -559,13 +575,13 @@ class ProjectsTest(unittest.TestCase):
         取り込み状態は sync/<プロジェクト>/ に置く。
         """
         write(
-            os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
+            self.proposal_file(self.lib, "i0007"),
             ticket_text("i0007", allow=("src/*",)),
         )
         self.assertEqual(self.ccnavi("--agree", stdin="y\n").returncode, 0)
-        git(self.lib, "add", "-A")
-        git(self.lib, "commit", "--quiet", "-m", "approve")
         tree = self.worktree(self.lib, "i0007")
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
         target = os.path.join(tree, "src", "a.py")
         before = self.hook("Write", self.ws, file_path=target)
         self.assertNotEqual(self.decision(before), "deny", before.stdout + before.stderr)

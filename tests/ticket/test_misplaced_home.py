@@ -55,23 +55,6 @@ class MisplacedHomeTest(PhaseHarness):
             os.path.exists(os.path.join(own, ".ccnavi", "approved", "doing", "i0003.md"))
         )
 
-    def test_a_parent_proposal_that_names_a_branch_is_stopped_too(self):
-        # `branch:` を持つ親でも、親のワークツリーの名前は識別子。承認のあとに start で止めない。
-        stray = self.stray_tree()
-        text = parent_text("i0003", ["research"]).replace(
-            "ticket: i0003\n", "ticket: i0003\nbranch: topic/x\n", 1
-        )
-        self.assertIn("branch: topic/x", text)
-        self.propose("i0003", text, tree=stray)
-        self.commit_in(stray, "propose i0003")
-        result = self.ccnavi("--agree", stdin="y\n")
-        said = result.stdout + result.stderr
-        self.assertEqual(result.returncode, 1, said)
-        self.assertIn("提案 i0003 を識別子と違う名前のワークツリー skill-proposals", said)
-        self.assertFalse(
-            os.path.exists(os.path.join(stray, ".ccnavi", "approved", "doing", "i0003.md"))
-        )
-
     def test_a_child_proposal_outside_the_parents_worktree_is_not_approved(self):
         self.family()
         stray = self.stray_tree()
@@ -103,7 +86,7 @@ class MisplacedHomeTest(PhaseHarness):
         started = self.ccnavi("ticket", "start", "i0001")
         said = started.stdout + started.stderr
         self.assertEqual(started.returncode, 1, said)
-        self.assertIn("承認済みチケットが親のワークツリー", said)
+        self.assertIn("ワークツリーの外", said)
         self.assertIn("skill-proposals", said)
 
     def test_finish_stops_when_the_approved_ticket_is_in_another_worktree(self):
@@ -115,7 +98,7 @@ class MisplacedHomeTest(PhaseHarness):
         finished = self.ccnavi("ticket", "finish", "i0001")
         said = finished.stdout + finished.stderr
         self.assertEqual(finished.returncode, 1, said)
-        self.assertIn("承認済みチケットが親のワークツリー", said)
+        self.assertIn("ワークツリーの外", said)
         # 止めたので、閉じたチケットは別名のツリーの doing/ に残る（done/ へ動かない）
         self.assertTrue(
             os.path.exists(os.path.join(stray, ".ccnavi", "approved", "doing", "i0001.md"))

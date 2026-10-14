@@ -25,7 +25,7 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 
 | sh の呼び方 | 実行ファイルの段 |
 |---|---|
-| `request --phase <N> --body-file <文> --eli5 <HTML>` | sh が `--eli5` を確かめる → `review prepare` → sh がマージリクエストを作り、依頼を投稿 → `review requested` |
+| `request --phase <N> --body-file <文> --eli5 <HTML>` | sh が `--eli5` を確かめる → `review prepare` → sh が親ブランチの open のマージリクエストを探し（無ければ作らずに止める。元ブランチが HEAD と一致し、マージ先が統合先であることも確かめる）、依頼を投稿 → `review requested` |
 | `confirm --phase <N>` | sh がスレッドとレビューを取ってくる → `review confirm` |
 | `decide <N>` | ユーザが打つ。sh が取ってくる → `--reviewed N --accept-unresolved` → sh が投稿 |
 | `comment --body-file <本文>` | sh が投稿する。実行ファイルは関わらず、レビューの状態も変えない |
@@ -191,7 +191,7 @@ URL に埋めた資格情報は読み飛ばして出力では伏せる。実行�
 
 push は親だけが行う。hook は子チケットのワークツリーからの `ccnavi-git.sh push` を、誰が打っても拒み
 （`DENY_CHILD_PUSH`）、サブエージェントからの `ccnavi-git.sh push` はどこからでも拒む。リモートに置く枝は
-マージリクエストの付いた親ブランチ 1 本で、子の成果は親が手元で合流してから親のツリーで送る。
+マージリクエストの付いた親ブランチ 1 本で、子の成果は子の `finish` が親のブランチへ合流し、そのまま push する。
 
 子のワークツリーかは、push を打つ居場所（payload の cwd から `cd` を追った先、6.3.2）が `.claude/worktrees/<名前>` の
 中にあり、その `<名前>` の承認済みチケットに `parent:` の行があるかで決める。探すのはワークスペースルート・プロジェクトの

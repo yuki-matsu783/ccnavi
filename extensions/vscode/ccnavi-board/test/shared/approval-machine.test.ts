@@ -15,12 +15,13 @@ import {
   approvalStep,
   blockedBeforeApprove,
   CLOSED,
+  SHOWN_STALE,
   type ApprovalEffect,
   type ApprovalState,
   type ApprovalStep,
   type ApprovalInput,
 } from "../../src/core/approval-machine.js";
-import type { ApprovePlan, ApprovePreview, ApproveResult } from "../../src/core/approvemodel.js";
+import type { ApproveMismatch, ApprovePlan, ApprovePreview, ApproveResult } from "../../src/core/approvemodel.js";
 import type { PhaseChip } from "../../src/core/board.js";
 import type { DecidePreview } from "../../src/core/decidemodel.js";
 
@@ -37,7 +38,7 @@ function kinds(effects: readonly ApprovalEffect[]): string[] {
   return effects.map((e) => e.kind);
 }
 
-function previewOf(tickets: readonly string[]): ApprovePreview {
+function previewOf(tickets: readonly string[], digest = "d1"): ApprovePreview {
   return {
     version: 1,
     root: "/w",
@@ -53,6 +54,7 @@ function previewOf(tickets: readonly string[]): ApprovePreview {
       overflow: [],
     })),
     text: `承認画面の本文（${tickets.join(",")}）`,
+    digest,
     rejected: [],
     problems: [],
     plans: [],
@@ -93,8 +95,12 @@ function toPlanPreview(step: Step, parents: Readonly<Record<string, string>> = {
   return step(toLoading(step), { kind: "previewed", saved, result: { ok: true, value: planPreviewOf(parents) } }).state;
 }
 
-function resultOf(approved: readonly string[], prompt = "承認の文"): ApproveResult {
-  return { version: 1, approved, copies: [], lines: [], worktrees: [], prompt };
+function resultOf(approved: readonly string[], prompt = "承認の文", written: readonly string[] = []): ApproveResult {
+  return { version: 1, approved, copies: [], written, lines: [], worktrees: [], prompt };
+}
+
+function mismatchOf(expected: readonly string[], current: readonly string[]): ApproveMismatch {
+  return { expected, current, digest: { expected: "d1", current: "d2" } };
 }
 
 const TREE = "/w/.claude/worktrees/i0001";
@@ -147,7 +153,7 @@ function toPreview(step: Step, tickets: readonly string[] = ["i0001"], only: rea
 }
 
 function toApproving(step: Step, tickets: readonly string[] = ["i0001"], only: readonly string[] = []): ApprovalState {
-  return step(toPreview(step, tickets, only), { kind: "confirm", unsaved: [], tickets }).state;
+  return step(toPreview(step, tickets, only), { kind: "confirm", digest: "d1", unsaved: [], tickets }).state;
 }
 
 /**
@@ -401,14 +407,14 @@ const GUARDS: readonly Guard[] = [
       // `approving` は `preview` を持っているので、ガードを弱めても投げずに 2 本目が出る。
       // そのぶん、失敗するのが確かめのほうになる
       const approving = toApproving(step);
-      const after = step(approving, { kind: "confirm", unsaved: [], tickets: ["i0001"] });
+      const after = step(approving, { kind: "confirm", digest: "d1", unsaved: [], tickets: ["i0001"] });
       assert.equal(after.state, approving, "承認中に押し直しても、打つのは 1 本きり");
       assert.deepEqual(kinds(after.effects), []);
       // 残りの状態も全部。1 つだけ見ると、そこ以外をガードから抜かれたときに失敗せずに通る
       assertNamed(step, ["closed", "loading", "done", "error", "prompt"]);
       for (const kind of ["closed", "loading", "done", "error", "prompt"]) {
         const state = named(step, kind);
-        assert.deepEqual(kinds(step(state, { kind: "confirm", unsaved: [], tickets: ["i0001"] }).effects), [], kind);
+        assert.deepEqual(kinds(step(state, { kind: "confirm", digest: "d1", unsaved: [], tickets: ["i0001"] }).effects), [], kind);
       }
     },
   },
@@ -432,6 +438,7 @@ const GUARDS: readonly Guard[] = [
     find: 'if (state.overlay?.kind !== "loading") {',
     into: "if (false) {",
     check(step) {
+      // `approving` は `recheck` を持たない形で回す（食い違いの読み直し中ではない）
       assertNamed(step, ["closed", "preview", "approving", "done", "error", "prompt"]);
       for (const kind of ["closed", "preview", "approving", "done", "error", "prompt"]) {
         const state = named(step, kind);
@@ -534,7 +541,7 @@ const GUARDS: readonly Guard[] = [
     check(step) {
       const shown = toPlanPreview(step, { i0001: "s1", i0002: "s2" });
       for (const unsaved of [["i0001"], ["i0002"], ["i0002", "i0009"]]) {
-        const after = step(shown, { kind: "confirm", unsaved, tickets: ["i0001", "i0002"] });
+        const after = step(shown, { kind: "confirm", digest: "d1", unsaved, tickets: ["i0001", "i0002"] });
         assert.equal(after.state, shown, unsaved.join(","));
         assert.deepEqual(kinds(after.effects), ["warn"], unsaved.join(","));
       }
@@ -555,7 +562,7 @@ const GUARDS: readonly Guard[] = [
     into: 'if (overlay === undefined || !("preview" in overlay)) {',
     check(step) {
       // 承認中にタブを開くと、承認の結果を受ける場所が消える（閉じてから開くので）
-      const approving = step(toPlanPreview(step), { kind: "confirm", unsaved: [], tickets: ["i0001"] }).state;
+      const approving = step(toPlanPreview(step), { kind: "confirm", digest: "d1", unsaved: [], tickets: ["i0001"] }).state;
       assert.equal(approving.overlay?.kind, "approving");
       const after = step(approving, { kind: "editWorkflow", ticket: "i0001" });
       assert.equal(after.state, approving);
@@ -617,13 +624,27 @@ test("CB-T171 一覧が返ったら見せる。読めなければ、そう見せ
   assert.deepEqual(failed.state.overlay, { kind: "error", error: "読み込めない" });
 });
 
-test("CB-T172 「この N 件を承認する」は、承認する識別子だけを渡す（ダイジェストも絞りも渡さない）", () => {
+test("CB-T172 「この N 件を承認する」は、見せたダイジェストと絞りをそのまま渡す", () => {
   const preview = toPreview(approvalStep, ["i0001", "i0002"], ["i0001", "i0002"]);
-  const after = approvalStep(preview, { kind: "confirm", unsaved: [], tickets: ["i0001", "i0002"] });
+  const after = approvalStep(preview, { kind: "confirm", digest: "d1", unsaved: [], tickets: ["i0001", "i0002"] });
   assert.equal(after.state.overlay?.kind, "approving");
-  assert.deepEqual(after.effects, [{ kind: "approve", tickets: ["i0001", "i0002"] }]);
+  assert.deepEqual(after.effects, [
+    { kind: "approve", tickets: ["i0001", "i0002"], digest: "d1", only: ["i0001", "i0002"] },
+  ]);
   // 0 件は打たない（画面はボタンを出さないが、受け側でも持つ）
-  assert.deepEqual(approvalStep(preview, { kind: "confirm", unsaved: [], tickets: [] }).effects, []);
+  assert.deepEqual(approvalStep(preview, { kind: "confirm", digest: "d1", unsaved: [], tickets: [] }).effects, []);
+});
+
+test("CB-T172b 押した画面のダイジェストが手元の最新と違えば打たず、今の一覧を表示し直す", () => {
+  const preview = toPreview(approvalStep, ["i0001"], ["i0001"]);
+  // 読み直しで一覧が d2 に差し替わったが、画面はまだ d1 を出していた（描き直す前に押した）
+  const replaced = approvalStep(preview, { kind: "confirm", digest: "d0", unsaved: [], tickets: ["i0001"] });
+  assert.deepEqual(replaced.effects, [], "見ていない中身を承認しない");
+  assert.equal(replaced.state.overlay?.kind, "preview", "今の一覧を出し直す");
+  assert.equal(replaced.state.overlay?.kind === "preview" ? replaced.state.overlay.notice : "", SHOWN_STALE);
+  // 表示し直した一覧で押し直せば打つ
+  const again = approvalStep(replaced.state, { kind: "confirm", digest: "d1", unsaved: [], tickets: ["i0001"] });
+  assert.deepEqual(kinds(again.effects), ["approve"]);
 });
 
 test("CB-T173 承認できたら渡す文を見せ、承認の push の sh を端末に送り、ボードを再読み込みする。sh がなければ言う。0 件なら何もしない", () => {
@@ -635,6 +656,16 @@ test("CB-T173 承認できたら渡す文を見せ、承認の push の sh を�
   });
   assert.deepEqual(done.state.overlay, { kind: "done", count: 1, prompt: "文", carried: true });
   assert.deepEqual(kinds(done.effects), ["carry", "refresh"], "監視だけに頼らず、承認の側からも再読み込みする");
+  const wrote = approvalStep(approving, {
+    kind: "approved",
+    outcome: { ok: true, value: resultOf(["i0001"], "文", ["a/.ccnavi/approved/doing/i0001.md"]) },
+    carrier: true,
+  });
+  assert.deepEqual(
+    wrote.effects[0],
+    { kind: "carry", paths: ["a/.ccnavi/approved/doing/i0001.md"] },
+    "送るのはこの承認で書いた・消したパスだけ",
+  );
   assert.deepEqual(done.state.only, [], "承認できたら絞りは畳む");
 
   const noScript = approvalStep(approving, {
@@ -658,15 +689,59 @@ test("CB-T173 承認できたら渡す文を見せ、承認の push の sh を�
   assert.deepEqual(kinds(zero.effects), [], "1 件も置かれていないなら、承認の push も再読み込みもしない");
 });
 
-test("CB-T174 承認が拒否されたら（提案が検査を通らない・承認待ちに無い）、その文面を見せる。読み直しも絞り外しもしない", () => {
+test("CB-T174 食い違いは、見せたまま同じ絞りで再読み込みし、返った一覧に理由を添える", () => {
   const approving = toApproving(approvalStep, ["i0001"], ["i0001"]);
-  const failed = approvalStep(approving, {
+  const again = approvalStep(approving, {
     kind: "approved",
-    outcome: { ok: false, error: "i0001 は承認待ちにありません" },
+    outcome: { ok: false, mismatch: mismatchOf(["i0001"], ["i0001"]) },
     carrier: true,
   });
-  assert.deepEqual(failed.state.overlay, { kind: "error", error: "i0001 は承認待ちにありません" });
-  assert.deepEqual(failed.effects, [], "見せた一覧との食い違いを理由に読み直さない");
+  assert.equal(again.state.overlay?.kind, "approving", "再読み込みしている間も、見せているものは変えない");
+  assert.equal(again.redraw, false);
+  assert.deepEqual(again.effects, [{ kind: "loadPreview", only: ["i0001"] }]);
+
+  const shown = approvalStep(again.state, { kind: "previewed", saved: {}, result: { ok: true, value: previewOf(["i0001"]) } });
+  assert.equal(shown.state.overlay?.kind, "preview");
+  assert.equal(
+    shown.state.overlay?.kind === "preview" ? shown.state.overlay.notice : "",
+    "内容が更新されました（表示したあとに提案ファイルが書き換えられました）。何も承認していません。最新の内容を表示し直したので、見直してからもう一度承認してください",
+    "識別子が同じなら、変わったのは提案ファイルの中身",
+  );
+  assert.equal(shown.state.recheck, undefined);
+
+  // 識別子が増減していれば、言い方が変わる
+  const other = approvalStep(approving, {
+    kind: "approved",
+    outcome: { ok: false, mismatch: mismatchOf(["i0001"], ["i0001", "i0002"]) },
+    carrier: true,
+  });
+  const otherShown = approvalStep(other.state, {
+    kind: "previewed",
+    saved: {},
+    result: { ok: true, value: previewOf(["i0001", "i0002"]) },
+  });
+  assert.equal(
+    otherShown.state.overlay?.kind === "preview" ? otherShown.state.overlay.notice : "",
+    "内容が更新されました（表示したあとに承認待ちの提案が増えたか減りました）。何も承認していません。最新の一覧を表示し直したので、見直してからもう一度承認してください",
+  );
+});
+
+test("CB-T175 絞りが通らなくなったときだけ、1 度だけ絞りを外して再読み込みする", () => {
+  const approving = toApproving(approvalStep, ["i0001"], ["i0001"]);
+  const again = approvalStep(approving, {
+    kind: "approved",
+    outcome: { ok: false, mismatch: mismatchOf(["i0001"], []) },
+    carrier: true,
+  });
+  const dropped = approvalStep(again.state, { kind: "previewed", saved: {}, result: { ok: false, error: "絞りが通らない" } });
+  assert.deepEqual(dropped.effects, [{ kind: "loadPreview", only: [] }]);
+  assert.deepEqual(dropped.state.only, [], "絞りを外して、いま何が承認待ちかを全部見せにいく");
+  assert.equal(dropped.state.overlay?.kind, "approving");
+
+  // 外したあとも読めなければ、そこで諦めて文面を見せる（二度は外さない）
+  const failed = approvalStep(dropped.state, { kind: "previewed", saved: {}, result: { ok: false, error: "読み込めない" } });
+  assert.deepEqual(failed.state.overlay, { kind: "error", error: "読み込めない" });
+  assert.deepEqual(failed.effects, []);
 });
 
 test("CB-T176 承認が失敗したら、そのまま文面を見せる（絞りは畳まない）", () => {
@@ -679,6 +754,42 @@ test("CB-T176 承認が失敗したら、そのまま文面を見せる（絞り
   assert.deepEqual(after.state.overlay, { kind: "error", error: "途中で止まった" });
   assert.deepEqual(after.state.only, ["i0001"]);
   assert.deepEqual(after.effects, []);
+});
+
+test("CB-T176b 親だけ書けて子が止まった承認は、書けた分のコミット・pushを送り、書けなかった子を名指しする", () => {
+  const approving = toApproving(approvalStep, ["i0001", "i0001-01-01"], ["i0001", "i0001-01-01"]);
+  const partial = {
+    placed: ["i0001"],
+    paths: [".ccnavi/approved/doing/i0001.md"],
+    written: [".ccnavi/approved/doing/i0001.md", "wip/proposals/todo/i0001.md"],
+    ticket: "i0001-01-01",
+    reason: "保存できませんでした",
+    lines: [],
+  };
+  const carried = approvalStep(approving, { kind: "approved", outcome: { ok: false, partial }, carrier: true });
+  assert.deepEqual(
+    carried.effects[0],
+    { kind: "carry", paths: [".ccnavi/approved/doing/i0001.md", "wip/proposals/todo/i0001.md"] },
+    "送るのはこの承認で書いた・消したパスだけ",
+  );
+  assert.equal(carried.state.overlay?.kind, "error");
+  const text = carried.state.overlay?.kind === "error" ? carried.state.overlay.error : "";
+  assert.ok(text.includes(".ccnavi/approved/doing/i0001.md"), "書けたパスを言う");
+  assert.ok(text.includes("書けなかった: i0001-01-01"), "書けなかった子を言う");
+  assert.deepEqual(kinds(carried.effects), ["carry", "refresh"], "書けた分は送る");
+
+  // push の sh が無ければ送れない。未送信と言う
+  const missing = approvalStep(approving, { kind: "approved", outcome: { ok: false, partial }, carrier: false });
+  assert.deepEqual(kinds(missing.effects), ["refresh"]);
+  assert.ok((missing.state.overlay?.kind === "error" ? missing.state.overlay.error : "").includes("未送信"));
+
+  // 1 件も書けていなければ送らない
+  const none = approvalStep(approving, {
+    kind: "approved",
+    outcome: { ok: false, partial: { ...partial, placed: [], paths: [], ticket: "i0001" } },
+    carrier: true,
+  });
+  assert.deepEqual(kinds(none.effects), []);
 });
 
 test("CB-T177 レビュー済みの連絡は、閉じているときと、error / prompt の上にだけ出す", () => {
@@ -848,14 +959,14 @@ test("CB-T204 置けたら渡す文を見せて再読み込みする。投稿の
 
 test("CB-T378 未保存の計画編集タブがある親を含む一覧は、承認を打たずに理由を言う。タブのない親と子だけなら打てる", () => {
   const shown = toPlanPreview(approvalStep, { i0001: "s1" });
-  const blocked = approvalStep(shown, { kind: "confirm", unsaved: ["i0001"], tickets: ["i0001"] });
+  const blocked = approvalStep(shown, { kind: "confirm", digest: "d1", unsaved: ["i0001"], tickets: ["i0001"] });
   assert.equal(blocked.state, shown, "一覧を見せたまま");
   assert.equal(blocked.redraw, false);
   assert.deepEqual(blocked.effects, [
     { kind: "warn", text: "親 i0001 の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください" },
   ]);
   // 別の親のタブだけが未保存なら、この一覧は打てる
-  const other = approvalStep(shown, { kind: "confirm", unsaved: ["i0002"], tickets: ["i0001"] });
+  const other = approvalStep(shown, { kind: "confirm", digest: "d1", unsaved: ["i0002"], tickets: ["i0001"] });
   assert.equal(other.state.overlay?.kind, "approving");
   assert.deepEqual(kinds(other.effects), ["approve"]);
   // 子の識別子は親のタブと取り違えない（子だけの一覧は親を含まない）
@@ -864,9 +975,9 @@ test("CB-T378 未保存の計画編集タブがある親を含む一覧は、承
     saved: {},
     result: { ok: true, value: planPreviewOf({}, ["i0001-01-01"]) },
   }).state;
-  assert.deepEqual(kinds(approvalStep(children, { kind: "confirm", unsaved: ["i0001"], tickets: ["i0001-01-01"] }).effects), ["approve"]);
+  assert.deepEqual(kinds(approvalStep(children, { kind: "confirm", digest: "d1", unsaved: ["i0001"], tickets: ["i0001-01-01"] }).effects), ["approve"]);
   // 2 つの親が未保存なら、両方を名指しする
-  const two = approvalStep(toPlanPreview(approvalStep, { i0001: "s1", i0002: "s2" }), { kind: "confirm", unsaved: ["i0002", "i0001"], tickets: ["i0001", "i0002"] });
+  const two = approvalStep(toPlanPreview(approvalStep, { i0001: "s1", i0002: "s2" }), { kind: "confirm", digest: "d1", unsaved: ["i0002", "i0001"], tickets: ["i0001", "i0002"] });
   assert.deepEqual(two.effects, [
     { kind: "warn", text: "親 i0001, i0002 の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください" },
   ]);
@@ -885,10 +996,15 @@ test("CB-T380 一覧を開くとき、タブで保存したときのハッシュ
   const shown = toPlanPreview(approvalStep, { i0001: "s1-after-agent", i0002: "s2", i0003: "s3" }, { i0001: "s1-saved", i0002: "s2" });
   assert.equal(shown.overlay?.kind, "preview");
   assert.deepEqual(shown.overlay?.kind === "preview" ? shown.overlay.changedSinceSave : undefined, ["i0001"]);
-  assert.deepEqual(kinds(approvalStep(shown, { kind: "confirm", unsaved: [], tickets: ["i0001", "i0002", "i0003"] }).effects), ["approve"]);
+  assert.deepEqual(kinds(approvalStep(shown, { kind: "confirm", digest: "d1", unsaved: [], tickets: ["i0001", "i0002", "i0003"] }).effects), ["approve"]);
   // 変わった親が無ければ持たない
   const same = toPlanPreview(approvalStep, { i0001: "s1" }, { i0001: "s1" });
   assert.deepEqual(same.overlay?.kind === "preview" ? same.overlay.changedSinceSave ?? [] : undefined, []);
+  // 食い違いで読み直したときも比べる
+  const approving = approvalStep(toPlanPreview(approvalStep), { kind: "confirm", digest: "d1", unsaved: [], tickets: ["i0001"] }).state;
+  const again = approvalStep(approving, { kind: "approved", outcome: { ok: false, mismatch: mismatchOf(["i0001"], ["i0001"]) }, carrier: true });
+  const reshown = approvalStep(again.state, { kind: "previewed", saved: { i0001: "s0" }, result: { ok: true, value: planPreviewOf({ i0001: "s1" }) } });
+  assert.deepEqual(reshown.state.overlay?.kind === "preview" ? reshown.state.overlay.changedSinceSave : undefined, ["i0001"]);
 });
 
 test("CB-T180 ガードは全部効いている（表の 1 行ずつ）", () => {

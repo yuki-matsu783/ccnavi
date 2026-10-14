@@ -155,11 +155,13 @@ export function sayOutcome(outcome: Outcome, what: string): ResultLine {
   const text =
     outcome.kind === "written"
       ? `${what}を反映しました（コミット：${outcome.oid.slice(0, 7)}${outcome.rounds > 1 ? `。途中で親のブランチの先頭が動いたので、${outcome.rounds} 回目で反映しました` : ""}）。反映後の内容も確認しました。`
-      : outcome.kind === "conflict"
-        ? `${what}を反映できませんでした。自動再試行は行いません：${outcome.message}`
-        : outcome.kind === "attention"
-          ? `${what}は確認が必要な状態です。反映されたかどうかと残っている内容を、ホストの履歴で確認してください：${outcome.message}`
-          : `${what}は反映されていません：${outcome.message}`;
+      : outcome.kind === "changed"
+        ? `${what}は反映されていません：${outcome.message}`
+        : outcome.kind === "conflict"
+          ? `${what}を反映できませんでした。自動再試行は行いません：${outcome.message}`
+          : outcome.kind === "attention"
+            ? `${what}は確認が必要な状態です。反映されたかどうかと残っている内容を、ホストの履歴で確認してください：${outcome.message}`
+            : `${what}は反映されていません：${outcome.message}`;
   return { kind: outcome.kind, className: `notice ${outcome.kind === "written" ? "ok" : "error"}`, text };
 }
 
@@ -316,12 +318,12 @@ export function createBoardController(env: BoardEnv): BoardController {
       void act(async () => {
         if (await blocked(repoBoard.repo, family.family.name)) return false;
         const r = family.result;
-        if (!r?.batch || r.batch.length === 0) return false;
+        if (!r?.digest || !r.batch) return false;
         const deps = await writeDeps(repoBoard.repo);
         const ids = r.batch.map((e) => e.ticket);
         const warn = await approvalWarning(deps, repoBoard.repo, family.family.name);
         if (!env.confirm(`${family.family.name} に、チケット ${ids.join(", ")} の承認を1つのコミットとして反映します。承認しますか？${warn}`)) return false;
-        const outcome = await ops.approveFamily(repoBoard.repo, family.family.name, ids, deps);
+        const outcome = await ops.approveFamily(repoBoard.repo, family.family.name, { ids, digest: r.digest, only: r.only ?? null }, deps);
         await noteAttention(repoBoard.repo, family.family.name, outcome);
         say(outcome, "承認");
         return true;
@@ -367,18 +369,21 @@ export function createBoardController(env: BoardEnv): BoardController {
     },
     start(repoBoard, issue) {
       void act(async () => {
-        if (!env.confirm(`Issue #${issue.number} から親ブランチを作成します。起点は統合先 ${repoBoard.integration?.name ?? ""} の最新コミットです（マージリクエストは作成しません）。`)) return false;
+        if (!env.confirm(`Issue #${issue.number} から作業を始めます。issue に紐づく開いたマージリクエストがあれば、その元ブランチを採用します（ブランチもマージリクエストも作りません）。無ければ、統合先 ${repoBoard.integration?.name ?? ""} の最新コミットを起点に、親ブランチと Draft のマージリクエストを作成します。`)) return false;
         const deps = await writeDeps(repoBoard.repo);
         const taken = [...repoBoard.candidates, ...repoBoard.families.map((f) => f.family.name)];
         const out = await ops.startIssue(repoBoard.repo, issue, repoBoard.seen ?? null, taken, deps);
+        const done = out.kind === "started" || out.kind === "adopted";
         set({
           result: {
-            kind: out.kind === "started" ? "written" : out.kind,
-            className: `notice ${out.kind === "started" ? "ok" : "error"}`,
+            kind: done ? "written" : out.kind,
+            className: `notice ${done ? "ok" : "error"}`,
             text:
               out.kind === "started"
-                ? `親ブランチ ${out.name} を作成しました（${out.head.slice(0, 7)}）。エージェントに、このブランチで作業を開始するよう依頼してください。`
-                : `作業を開始できませんでした：${out.message}`,
+                ? `親ブランチ ${out.name} と Draft のマージリクエスト !${out.mr.number} を作成しました（${out.head.slice(0, 7)}）。親の提案の frontmatter に mr: ${out.mr.number} を必ず書き、エージェントにこのブランチで作業を開始するよう依頼してください。`
+                : out.kind === "adopted"
+                  ? `既存のマージリクエスト !${out.mr.number} の元ブランチ ${out.name}（識別子 ${out.identifier}）を採用しました。ブランチもマージリクエストも作っていません。親の提案の frontmatter に mr: ${out.mr.number} を必ず書き、エージェントにこのブランチで作業を開始するよう依頼してください。`
+                  : `作業を開始できませんでした：${out.message}`,
           },
         });
         return true;

@@ -132,6 +132,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         "作業ツリーとチケットの、いまの形を読む",
         frozenset(
             {
+                "hook.parentwrite",
                 "hook.wrapguard",
                 "policy.builtin",
                 "policy.ctxfile",
@@ -190,6 +191,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.approval_times",
                 "tickets.branchfind",
                 "tickets.configsync",
+                "tickets.overview",
                 "tickets.skillsync",
                 "tickets.phase",
                 "tickets.phase_forms",
@@ -212,6 +214,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         frozenset(
             {
                 "tickets.c1",
+                "tickets.c1_merge",
                 "tickets.core",
                 "tickets.core_approve",
                 "tickets.core_base",
@@ -228,6 +231,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "hook.post",
                 "hook.post_findings",
                 "hook.post_report",
+                "tickets.retire",
                 "tickets.review",
                 "tickets.review_close",
                 "tickets.review_decide",

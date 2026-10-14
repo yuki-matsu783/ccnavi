@@ -47,7 +47,8 @@ class LintOpsTest(PhaseHarness):
         self.assertTrue(
             any(
                 "提案 i0002 を rename-x に書いている" in line
-                and "worktree add .claude/worktrees/i0002 -b i0002 " in line
+                and "ccnavi-start.sh --mr <MR の番号>" in line
+                and "-b i0002" not in line
                 and "このままだと親が取り込み済みにならない" in line
                 for line in lines
             ),

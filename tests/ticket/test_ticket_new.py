@@ -8,7 +8,8 @@
 3. plan の各項は前の項を待つ一直線
 4. `phases.yml` が無いとき、`inherit` だけの plan で `allow` が空になるとき、子の識別子、
    feedback の型、無い型は、何も書かずに理由を言って止まる
-5. cwd が識別子と同名のワークツリーでなければ、切り方を案内して止まる
+5. cwd が識別子と同名のワークツリーでなければ、親のワークツリーの作り方
+   （ccnavi-start.sh）を案内して止まる
 6. 既にある提案を上書きしない
 """
 
@@ -18,10 +19,11 @@ import os
 
 import yaml
 
+from ccnavi.tickets import ops, ticket_model
 from tests import config_path
 from tests.ticket.test_parent_phases import front_of
 from tests.ticket.test_phases import PhaseHarness
-from tests.ticket.test_ticket import git
+from tests.ticket.test_ticket import git, write
 from tests.ticketsample import PHASES
 
 IDENT = "feature-9-scaffold-demo"
@@ -49,7 +51,7 @@ class TicketNewTestBase(PhaseHarness):
 
 class TicketNewTest(TicketNewTestBase):
     def test_the_scaffold_passes_lint_and_the_approval_check(self):
-        result = self.new("--issue", "9", plan="design,acceptance,implement")
+        result = self.new("--issue", "9", "--mr", "5", plan="design,acceptance,implement")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         front = front_of(self.written())
         self.assertEqual(front["ticket"], IDENT)
@@ -65,6 +67,21 @@ class TicketNewTest(TicketNewTestBase):
         self.assertTrue(all("承認待ち" in x or "チケットがありません" in x for x in about), about)
         verify = self.ccnavi("--agree", "--preview", "--verify")
         self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
+
+    def test_the_mr_comes_from_the_flag_or_the_cached_record(self):
+        self.assertEqual(self.new("--mr", "5").returncode, 0)
+        self.assertEqual(front_of(self.written())["mr"], 5)
+        os.remove(self.todo)
+        # 指定が無ければ、`ccnavi-start.sh` が取り込み状態に保存した番号を使う
+        record = os.path.join(self.state, "sync", "self", "families", IDENT)
+        write(record, f"remote origin\nbranch {IDENT}\nsha 0\nfetched_at 1\nstate present\nmr 7\n")
+        self.assertEqual(self.new().returncode, 0)
+        self.assertEqual(front_of(self.written())["mr"], 7)
+        os.remove(self.todo)
+        os.remove(record)
+        # 番号が無ければ書かない（承認は mr: が無いことで止まる）
+        self.assertEqual(self.new().returncode, 0)
+        self.assertNotIn("mr", front_of(self.written()))
 
     def test_a_plan_with_design_puts_the_design_scope_in_allow(self):
         self.assertEqual(self.new(plan="design,implement").returncode, 0)
@@ -144,16 +161,28 @@ class TicketNewTest(TicketNewTestBase):
     def test_outside_the_worktree_it_explains_how_to_cut_one(self):
         result = self.new(cwd=self.root)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("worktree add", result.stderr)
+        # 親のワークツリーは ccnavi-start.sh が親のブランチを直接チェックアウトして作る。
+        # 識別子の名前のブランチ（-b <識別子>）は作らせない。
+        self.assertIn("ccnavi-start.sh --mr <MR の番号>", result.stderr)
+        self.assertNotIn(f"-b {IDENT}", result.stderr)
         self.assertIn(f".claude/worktrees/{IDENT}", result.stderr)
         self.assertNotIn("sh sh", result.stderr)
         self.assertIn("'sh ", result.stderr)
         self.assertFalse(os.path.exists(self.todo))
 
+    def test_the_start_points_a_parent_without_its_worktree_at_ccnavi_start(self):
+        """`ticket start` の案内も、親には識別子の名前のブランチを作らせない。子は -b <子>。"""
+        parent = ticket_model.Ticket(ticket=IDENT)
+        child = ticket_model.Ticket(ticket=f"{IDENT}-01-01", parent=IDENT, phase=1)
+        said = ops._create_words(self.root, parent, "/w/p")
+        self.assertIn("ccnavi-start.sh --mr <MR の番号>", said)
+        self.assertNotIn("-b ", said)
+        self.assertIn(f"-b {IDENT}-01-01", ops._create_words(self.root, child, "/w/c"))
+
     def test_a_worktree_with_another_name_is_not_accepted(self):
         result = self.new(cwd=self.parent_tree)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("worktree add", result.stderr)
+        self.assertIn("ccnavi-start.sh", result.stderr)
 
     def test_an_existing_proposal_is_not_overwritten(self):
         self.assertEqual(self.new().returncode, 0)

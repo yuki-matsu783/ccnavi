@@ -24,10 +24,10 @@ import tempfile
 import unittest
 
 from ccnavi.tickets import history
-from tests import can_case_sensitive, common_path, config_path
+from tests import c1flag, can_case_sensitive, common_path, config_path
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import ROOT, git, read_json, write
-from tests.ticketsample import PHASES, RULES, child_text, parent_text
+from tests.ticketsample import PHASES, RULES, child_text, parent_text, record_merge
 
 
 class PhaseHarness(unittest.TestCase):
@@ -35,6 +35,9 @@ class PhaseHarness(unittest.TestCase):
 
     # 親の `phases:` に写す元の phases.yml の本文。phases.yml を差し替えるテストは上書きする。
     phases_text = PHASES
+    # sh（C1）を通らずに状態の操作を直に起こすテストは、C1 の印を付ける（`tests/c1flag.py`）。
+    # 印が無い呼び出しを断る検査は False にする。
+    mark_c1 = True
 
     def setUp(self):
         self.root = tempfile.mkdtemp(prefix="ccnavi-phase-")
@@ -66,6 +69,8 @@ class PhaseHarness(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
+        if self.mark_c1:
+            args = c1flag.as_c1(self.root, self.state, self.parent_tree, args)
         return run_ccnavi(
             [
                 "--root",
@@ -155,6 +160,7 @@ class PhaseHarness(unittest.TestCase):
 
     def merge(self, child):
         git(self.parent_tree, "merge", "--quiet", "--no-edit", child)
+        record_merge(self.parent_tree, child)
 
     def remote(self):
         bare = os.path.join(self.root, "origin.git")
@@ -162,7 +168,10 @@ class PhaseHarness(unittest.TestCase):
         git(self.root, "remote", "add", "origin", bare)
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         fixture = os.path.join(self.root, "fixture.json")
-        write(fixture, json.dumps({"host": "fixture", "mr": {"number": 7, "url": "u/7"}}))
+        write(
+            fixture,
+            json.dumps({"host": "fixture", "mr": {"number": 7, "url": "u/7", "draft": True}}),
+        )
         return fixture
 
     def request(self, fixture, phase):
@@ -879,7 +888,7 @@ class PhaseTest(PhaseHarness):
         mark = read_json(os.path.join(archived, "phases", "i0001", "ready.json"))
         self.assertEqual(mark["mr"], 7)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "done", "i0001.md")))
-        # 同じ親にもう 1 度打っても通る（sh が外し損ねたときの打ち直し）。
+        # 同じ親にもう 1 度打っても通る（sh が外し損ねたときの打ち直し。MR がまだ Draft のとき）。
         again = self.ready(fixture)
         self.assertEqual(again.returncode, 0, again.stderr)
 

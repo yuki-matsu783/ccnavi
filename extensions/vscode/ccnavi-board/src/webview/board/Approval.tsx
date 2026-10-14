@@ -240,7 +240,7 @@ function Body({
             data-tickets={tickets.join(",")}
             disabled={approving || blockedText !== ""}
             title={blockedText === "" ? undefined : blockedText}
-            onClick={() => post({ type: "approveConfirm", tickets })}
+            onClick={() => post({ type: "approveConfirm", tickets, digest: preview.digest })}
           >
             {approving ? "承認中…" : `この ${count} 件を承認する`}
           </button>

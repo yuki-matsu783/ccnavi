@@ -21,6 +21,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import unicodedata
 import unittest
 
 from tests import ROOT, SRC, common_sh
@@ -34,8 +35,17 @@ PYTHONPATH='{src}' exec '{python}' -m ccnavi "$@"
 """
 
 # fetch のときだけ、origin の URL を bare リポジトリへ向ける git の代役。
-# FAKE_FETCH_FAIL があれば失敗させる。
+# FAKE_FETCH_FAIL があれば失敗させる。FAKE_LS_REMOTE_FAIL があれば ls-remote だけ失敗させる。
 GIT = """#!/bin/sh
+for a in "$@"; do
+  case "$a" in
+  ls-remote)
+    if [ -n "${{FAKE_LS_REMOTE_FAIL:-}}" ]; then
+      echo "fatal: unable to access 'https://example.invalid/': timed out" >&2
+      exit 128
+    fi ;;
+  esac
+done
 for a in "$@"; do
   case "$a" in
   fetch | push | pull | ls-remote)
@@ -105,7 +115,7 @@ class WorktreeShTest(unittest.TestCase):
             write(os.path.join(self.bin, "git"), GIT.format(git=REAL_GIT, bare=self.bare)), 0o755
         )
 
-    def run_sh(self, *args, fail_fetch=False, cwd=None):
+    def run_sh(self, *args, fail_fetch=False, cwd=None, **extra):
         """fail_fetch が文字列なら、fetch はその文で失敗する。真なら名前が引けない失敗。"""
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -118,6 +128,7 @@ class WorktreeShTest(unittest.TestCase):
         )
         if fail_fetch:
             env["FAKE_FETCH_FAIL"] = fail_fetch if isinstance(fail_fetch, str) else "1"
+        env.update(extra)
         return subprocess.run(
             [SHELL, os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-worktree.sh"), *args],
             cwd=cwd or self.ws,
@@ -248,6 +259,57 @@ class WorktreeShTest(unittest.TestCase):
                 result = self.run_sh(*args)
                 self.assertEqual(code, result.returncode, result.stdout)
                 self.assertIn(why, result.stderr)
+
+    def test_same_name_branch_on_origin_stops_and_points_to_start(self):
+        # origin にだけ同名のブランチがある（MR の元ブランチかもしれない）。
+        # 新しく切らず ccnavi-start.sh へ案内する
+        git(self.ws, "push", "-q", self.bare, "main:refs/heads/topic")
+        result = self.run_sh("topic")
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertIn("origin にブランチ topic が既にある", result.stdout)
+        self.assertIn("ccnavi-start.sh --mr", result.stdout)
+        self.assertIn("ccnavi-start.sh --issue", result.stdout)
+        self.assertFalse(os.path.exists(self.wt("topic")))
+        # 別の名前なら切れる
+        self.assertEqual(0, self.run_sh("topic2").returncode)
+
+    def test_a_branch_of_the_same_identifier_on_origin_stops(self):
+        """origin に同じ識別子になるブランチ（feature/7-x、大文字小文字違い）があれば切らない。"""
+        for other, name in (("feature/7-x", "feature-7-x"), ("Topic", "topic")):
+            with self.subTest(other=other):
+                git(self.ws, "push", "-q", self.bare, f"main:refs/heads/{other}")
+                result = self.run_sh(name)
+                self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+                self.assertIn(other, result.stdout)
+                self.assertIn("ccnavi-start.sh --mr", result.stdout)
+                self.assertFalse(os.path.exists(self.wt(name)))
+
+    def test_a_local_branch_of_the_same_identifier_stops(self):
+        git(self.ws, "branch", "feature/7-x")
+        result = self.run_sh("feature-7-x")
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertIn("feature/7-x", result.stdout)
+        self.assertFalse(os.path.exists(self.wt("feature-7-x")))
+
+    def test_an_unreadable_branch_list_of_origin_stops_as_unchecked(self):
+        """ls-remote が失敗したら、リモート未確認で止める（--offline なら言って続ける）。"""
+        result = self.run_sh("topic", FAKE_LS_REMOTE_FAIL="1")
+        self.assertEqual(4, result.returncode, result.stdout + result.stderr)
+        self.assertIn("リモート未確認", result.stdout)
+        self.assertFalse(os.path.exists(self.wt("topic")))
+        offline = self.run_sh("topic", "--offline", FAKE_LS_REMOTE_FAIL="1")
+        self.assertEqual(0, offline.returncode, offline.stdout + offline.stderr)
+        self.assertIn("リモート未確認", offline.stdout)
+
+    def test_names_the_executable_refuses_are_not_cut(self):
+        """全角の字・NFD・65 文字以上の名前は、実行ファイルの検査で断る（sh の検査は通る）。"""
+        nfd = unicodedata.normalize("NFD", "feature-が")
+        for name in ("feature-１２３", nfd, "topic-" + "a" * 59):
+            with self.subTest(name=name):
+                result = self.run_sh(name)
+                self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+                self.assertIn("使えません", result.stderr)
+                self.assertFalse(os.path.exists(self.wt(name)))
 
     def test_fetch_failure_stops_with_guidance(self):
         result = self.run_sh("topic", fail_fetch=True)

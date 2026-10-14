@@ -201,8 +201,6 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
         return problems
     for repo, name in syncstate.family_names(conf.state):
         st = fams.standing(name, syncstate.project_of_key(repo))
-        if not st.imported:
-            continue
         where = f"(sync/{repo}/{name})"
         hint = " / ".join(syncstate.guidance(root, st))
         if st.closed:
@@ -233,29 +231,23 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _parent_trees_off_branch(conf: settings.Settings, root: str) -> list[Problem]:
-    """名前が親の識別子なのに、HEAD が親のブランチ（`branch:`、無ければ識別子）でないブランチを
-    指す親のワークツリー（移行の検査）。"""
+    """名前が親の識別子なのに、HEAD のブランチ名を変換した識別子が名前と合わない親のワークツリー。
+
+    ブランチ名の `/` を `-` に置き換えたものが、親のワークツリーのフォルダ名になる。"""
     problems: list[Problem] = []
-    fams = syncstate.Families(conf, root)
     for work in tree.worktrees(root, conf.projects):
         if not _holds_parent(conf, work, root):
             continue
         branch = tree.branch_of(work.root)
-        want = fams.branch(work.name, work.project)
-        if branch == want:
+        if branch and syncstate.head_branch(work.root, work.name):
             continue
-        named = (
-            f"親のブランチの名前は識別子（{work.name}）と同じ"
-            if want == work.name
-            else f"親のブランチは親チケットの branch: の {want}"
-        )
         problems.append(
             Problem(
                 SEVERITY_WARN,
                 f"({tree.WORKTREES_DIR.replace(os.sep, '/')}/{work.name})",
                 f"親 {work.name} のワークツリーが {branch or '（ブランチの外）'} の上にある。"
-                f"{named}で、取り込み（ccnavi-sync.sh）と"
-                "正とする側の検査はそのブランチだけを見る。"
+                f"親のブランチ名の `/` を `-` に置き換えたものがフォルダ名（{work.name}）になる。"
+                "取り込み（ccnavi-sync.sh）と正とする側の検査は、そのブランチだけを見る。"
                 "親が閉じるのを待ってから、ブランチを切り替えてください",
             )
         )

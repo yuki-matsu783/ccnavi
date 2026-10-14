@@ -7,9 +7,16 @@
 #
 # 流れ（.ccnavi/docs/worktree-start.md）:
 #   1. ccnavi-branches.sh --json で既存の候補（手元＋ホスト）を探す
-#   2. 候補が 1 件ならそのブランチで続ける（ワークツリーが無ければ .claude/worktrees/<識別子> に出す）。
+#   2. 候補が 1 件ならそのブランチで続ける（ワークツリーが無ければ .claude/worktrees/<識別子> に出す。識別子は
+#      ブランチ名の / を - に置き換えたもの。識別子のブランチは作らず、ブランチを直接チェックアウトする）。
+#      既存の MR を採用するときは、MR が open・フォークでない・マージ先が統合先・ブランチ名が保護されていない・
+#      識別子が使える・同じ識別子になる別のブランチが無い・同じブランチ名のマージ済み MR が無い、を確かめ、
+#      引っかかったら止める。続けるときは毎回 origin から取って早送りし、最後に ccnavi-sync.sh <識別子> を打つ。
 #      複数なら一覧を出して終わる（ユーザが選ぶ）。0 件で --issue なら新しく作る
-#   3. 新規作成: <先頭の語>-<番号>-<slug> のブランチを統合先から切り、ワークツリー・空の初期コミット・push・Draft MR
+#   3. 新規作成: <先頭の語>-<番号>-<slug> のブランチを統合先から切り、ワークツリー・空の初期コミット・push・Draft MR。
+#      slug は Chrome 拡張の「始める」と同じ作り方（実行ファイルの `worktree issue-id`。`ticket_ids.issue_identifier`）で、
+#      作る前に既存の MR を採用するときと同じ識別子の確認（使える・同じ識別子の別ブランチが無い・同名のマージ済み MR が
+#      無い）をする。作ってから後段で詰まると、打ち直しても採用の確認で止まり、手で消すまで戻れないため
 #   途中で失敗しても、打ち直せば完了済みの処理をスキップし、未完了の処理から再開する（ブランチ・push・MR の有無を確かめる）。
 #
 # git は ccnavi-git.sh を通す（読むだけの確認は git を直接呼ぶ。他のスクリプトと同じ）。ホストへの繋ぎ方は
@@ -38,17 +45,26 @@ usage() {
 sh .ccnavi/scripts/ccnavi-start.sh (--issue <番号> | --mr <番号>) [--slug <語>] [--prefix <語>] [--title <題>] [--dry-run] [--mcp-checked]
 
   issue・MR に紐づくブランチを探し（ccnavi-branches.sh）、候補に応じて進める。
-  候補が 1 件   そのブランチで続ける。ワークツリーがあればパスを出すだけ。無ければ .claude/worktrees/<識別子> に出す
-                （名前に / を含むブランチは識別子を / -> - にして切り、switch で移る）
+  候補が 1 件   そのブランチで続ける。ワークツリーが無ければ .claude/worktrees/<識別子> に、ブランチを直接
+                チェックアウトして出す（識別子はブランチ名の / を - に置き換えたもの。識別子のブランチは作らない）。
+                毎回 origin から取って早送りし、最後に ccnavi-sync.sh <識別子> を打つ。既存の MR を採用するときは
+                MR が open・フォークでない・マージ先が統合先・ブランチ名が保護されていない・識別子が使える
+                （58 文字以内で、末尾が -2 桁でない）・同じ識別子になる別のブランチが無い（origin の全ブランチで確認。
+                英字の大文字小文字は区別しない）・
+                同じブランチ名のマージ済み MR が無い、を確かめ、引っかかったら止める
   候補が複数    何も作らず一覧を出して終わる（終了コード 3）。ユーザが選ぶ
   候補が 0 件   --issue なら新しく作る。ブランチ <先頭の語>-<番号>-<slug> を統合先から切り、ワークツリー・空の初期コミット・
-                push・Draft MR（本文に Closes #<番号>）まで。--mr は元ブランチが候補なので、無ければ止める
+                push・Draft MR（本文に Closes #<番号>）まで。作る前に、識別子が使えること（58 文字以内・末尾が -2 桁でない）・
+                同じ識別子になる別のブランチが無いこと・同じ名前のマージ済み MR が無いことを確かめる。
+                --mr は元ブランチが候補なので、無ければ止める
   --mr          フォークから出た MR は元ブランチがこのリポジトリにないので、理由を出して止める
-  --slug <語>   ブランチ名の slug（小文字・数字・ハイフン）。省くと issue の題から作る（作れなければ止まる）
+  --slug <語>   ブランチ名の slug（小文字・数字・ハイフン）。省くと issue の題から作る（Chrome 拡張の「始める」と同じ
+                作り方。ccnavi の実行ファイルに聞く）
   --prefix <語> 先頭の語（既定 feature）
   --title <題>  MR の題。省くと issue の題、読めなければ「#<番号> <slug>」
   --dry-run     何も作らず、作る予定の内容だけ出す（リモートは読むだけ）
-  --mcp-checked ホストの API に届かず、既存の MR がないことを MCP などで確かめたあとに付ける
+  --mcp-checked ホストの API に届かず、既存の MR がないこと（採用する MR のブランチと同じ名前のマージ済み MR がないこと）を
+                MCP などで確かめたあとに付ける
 
   ホストを見られないときは、既存の MR を見落として重複を作らないよう新規作成に進まず止める（手元の候補がちょうど 1 件なら続ける）。
   GitHub の API に届かないとき（Claude remote など）は、MCP で代行する手順を標準出力に出して終了コード 4 で止まる。
@@ -136,7 +152,6 @@ is_word "$opt_prefix" || fail bad-prefix "--prefix は小文字・数字・ハ�
 if [ "$what" = mr ] && { [ -n "$opt_slug" ] || [ -n "$opt_title" ]; }; then
 	fail mr-with-new "--mr には --slug と --title を付けられません（既存の MR の元ブランチで続けるだけです）。" 2
 fi
-[ "$what" = issue ] || [ -z "$mcp_checked" ] || fail mr-mcp-checked "--mcp-checked は --issue のときだけ使います。--mr は元ブランチを MCP で読んでから、.ccnavi/docs/worktree.md の「ワークツリーを切る」の手順で切ってください。" 2
 
 command -v jq >/dev/null 2>&1 || fail no-jq "jqが見つかりません。候補の JSON を解析できません。" 2
 
@@ -152,7 +167,8 @@ mkdir -p "$state" 2>/dev/null || fail no-state "state の置き場（${state}）
 scripts="$root/.ccnavi/scripts"
 host_err="$state/start-host-err-$$"
 cand_json="$state/start-candidates-$$.json"
-trap 'rm -f "$host_err" "$host_err.status" "$cand_json"' EXIT
+heads_file="$state/start-heads-$$"
+trap 'rm -f "$host_err" "$host_err.status" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err"' EXIT
 log_info 始めた -- "kind=$what" "number=$number" "dry=${dry:-no}"
 
 # ---- ccnavi-git.sh 経由の git。成功は何も出さず、失敗は出力を標準エラーへ出して 1 を返す（cwd で動く）。
@@ -163,6 +179,19 @@ cgit() {
 	}
 	log_debug git を通した -- "sub=$1"
 	return 0
+}
+
+# cgit と同じく ccnavi-git.sh 経由。失敗を出さず、出力は cgit_out に残す（呼ぶ側が使い道を決める）。
+cgit_quiet() {
+	cgit_out=$(sh "$scripts/ccnavi-git.sh" "$@" 2>&1) || return 1
+	return 0
+}
+
+# origin の全ブランチ名を 1 行 1 本で $heads_file に書く（ls-remote）。読めなければ 1。
+# 識別子の重なりは、MR の有無によらず origin の全ブランチで見る。
+remote_heads() {
+	ccnavi_git_timed "${CCNAVI_START_GIT_TIMEOUT:-30}" "$heads_file.err" "$top" ls-remote --heads origin >"$heads_file.raw" || return 1
+	sed -n 's#^[0-9a-fA-F]\{1,\}[[:space:]]\{1,\}refs/heads/##p' "$heads_file.raw" | tr -d '\r' >"$heads_file"
 }
 
 # ---- ホスト。origin を読んで繋ぐ。呼ぶのは親のシェルで（結果を変数に残す）、$( ) の中では呼ばない。
@@ -257,11 +286,31 @@ issue_title_get() {
 	return 0
 }
 
-# 題から ASCII の小文字・数字・ハイフンの slug を作る（40 字まで）。作れなければ空
-slugify() {
-	printf '%s' "$1" | head -n 1 | LC_ALL=C tr 'A-Z' 'a-z' |
-		LC_ALL=C sed -e 's/[^a-z0-9]\{1,\}/-/g' -e 's/^-//' -e 's/-$//' |
-		cut -c1-40 | sed -e 's/-$//'
+# issue の番号と題から、新しい親のブランチ名（= 識別子）を実行ファイルに作らせる（`worktree issue-id`）。
+# Chrome 拡張の「始める」と同じ関数（`ticket_ids.issue_identifier`）なので、同じ issue なら同じ名前になる。
+# プロジェクト（projects/<名前>）のリポジトリなら、その名前を渡す（slug の頭に付く）。
+# 名前を issue_branch に入れる。実行ファイルが無い・答えないなら 1、作れないと言われたら 2（理由は issue_branch_why）
+issue_branch=""
+issue_branch_why=""
+issue_branch_make() {
+	issue_branch=""
+	issue_branch_why=""
+	ib_project=$(ccnavi_project "$top" "$root")
+	if ib_bin=$(ccnavi_bin "$root"); then
+		ib_rc=0
+		ib_out=$("$ib_bin" --root "$root" worktree issue-id "$number" "$opt_prefix" $ib_project --title "$1" 2>"$state/start-issue-id-$$" </dev/null) || ib_rc=$?
+	elif [ -f "$root/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
+		ib_rc=0
+		ib_out=$(cd "$root" && uv run --quiet python -m ccnavi --root "$root" worktree issue-id "$number" "$opt_prefix" $ib_project --title "$1" 2>"$state/start-issue-id-$$" </dev/null) || ib_rc=$?
+	else
+		return 1
+	fi
+	issue_branch_why=$(tr -d '\r' <"$state/start-issue-id-$$" 2>/dev/null | head -n 1 | sed 's/^ccnavi: //')
+	rm -f "$state/start-issue-id-$$"
+	issue_branch=$(printf '%s\n' "$ib_out" | tr -d '\r' | sed -n 's/^id //p' | head -n 1)
+	[ -n "$issue_branch" ] && return 0
+	[ "$ib_rc" -ne 0 ] && return 2
+	return 1
 }
 
 # 開いた MR を探す。あれば {number, url}、無ければ空。API が失敗したら 1
@@ -277,6 +326,19 @@ find_mr() {
 		[ "$fm_rc" -eq 0 ] || return 1
 		printf '%s' "$fm_got" | "$ccnavi_h_jq" --argjson pid "$fm_pid" \
 			'[.[] | select(.source_project_id == $pid)][0] // empty | {number: .iid, url: .web_url}'
+	fi
+}
+
+# 同じブランチ名のマージ済みの MR を探す。あれば {number, url}、無ければ空。API が失敗したら 1
+# 手元の退避（logs/archive/）には頼らず、ホストに聞く。
+find_merged_mr() {
+	if [ "$ccnavi_h_kind" = github ]; then
+		fx_owner="${ccnavi_h_path%%/*}"
+		fx_got=$(ccnavi_host_pages "repos/$ccnavi_h_path/pulls?state=closed&head=$fx_owner:$1") || return 1
+		printf '%s' "$fx_got" | "$ccnavi_h_jq" '[.[] | select(.merged_at != null)][0] // empty | {number: .number, url: .html_url}'
+	else
+		fx_got=$(ccnavi_host_pages "projects/$(ccnavi_host_encoded_path)/merge_requests?state=merged&source_branch=$1") || return 1
+		printf '%s' "$fx_got" | "$ccnavi_h_jq" '.[0] // empty | {number: .iid, url: .web_url}'
 	fi
 }
 
@@ -325,6 +387,7 @@ stop_host() {
 		case "$sh_stage" in
 		search) printf 'ccnavi-start: GitHub APIに接続できず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$what" "$number" "$sh_why" ;;
 		title) printf 'ccnavi-start: GitHub APIに接続できず、issue #%s の題を読めなかった（%s）。slug を決められないので、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$number" "$sh_why" ;;
+		merged) printf 'ccnavi-start: GitHub APIに接続できず、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$stop_branch" "$sh_why" ;;
 		*) printf 'ccnavi-start: GitHub APIに接続できず、マージリクエストを作れなかった（%s）。MCP（mcp__github__のツール）で代行してください。\n' "$sh_why" ;;
 		esac
 		printf '完了済みの処理:\n'
@@ -347,8 +410,13 @@ stop_host() {
 				printf '  3. 同じなら head.ref のブランチで、.ccnavi/docs/worktree-start.md の「既にある / を含むブランチ」の手順どおりにワークツリーを切る\n'
 			fi
 			;;
+		merged)
+			printf '  1. mcp__github__list_pull_requests を owner=%s repo=%s head=%s:%s state=closed で呼び、マージ済み（merged_at がある）の PR が無いことを確かめる\n' "$sh_owner" "$sh_repo" "$sh_owner" "$stop_branch"
+			printf '  2. あれば、マージ済みのブランチは再利用できない。ユーザに伝えて止める\n'
+			printf '  3. 無いと確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
+			;;
 		title)
-			printf '  1. mcp__github__issue_read を method=get owner=%s repo=%s issue_number=%s で呼び、題を読む\n' "$sh_owner" "$sh_repo" "$number"
+				printf '  1. mcp__github__issue_read を method=get owner=%s repo=%s issue_number=%s で呼び、題を読む\n' "$sh_owner" "$sh_repo" "$number"
 			printf '  2. 題から ASCII の小文字・数字・ハイフンの語を決め、再実行する: %s --slug <語> --title '"'"'<題>'"'"'\n' "$sh_cmd"
 			;;
 		*)
@@ -362,6 +430,7 @@ stop_host() {
 		case "$sh_stage" in
 		search) printf 'ccnavi-start: GitLab APIに接続できず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作成せずに処理を中断しました。\n' "$what" "$number" "$sh_why" ;;
 		title) printf 'ccnavi-start: GitLab APIに接続できず、issue #%s の題を読めなかった（%s）。slug を決められないので、何も作成せずに処理を中断しました。\n' "$number" "$sh_why" ;;
+		merged) printf 'ccnavi-start: GitLab APIに接続できず、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作成せずに処理を中断しました。\n' "$stop_branch" "$sh_why" ;;
 		*) printf 'ccnavi-start: GitLab APIに接続できず、マージリクエストを作れなかった（%s）。\n' "$sh_why" ;;
 		esac
 		printf '完了済みの処理:\n'
@@ -380,6 +449,9 @@ stop_host() {
 		search)
 			printf '  2. 再実行できないなら、ブラウザで %s の MR の一覧から、%s #%s に紐づく MR があるか確かめ、無ければ --mcp-checked を付けて再実行します。\n' "$ccnavi_h_path" "$what" "$number"
 			;;
+		merged)
+			printf '  2. 再実行できないなら、ブラウザで %s の MR の一覧から、ブランチ %s のマージ済みの MR が無いか確かめ、無ければ --mcp-checked を付けて再実行します。\n' "$ccnavi_h_path" "$stop_branch"
+				;;
 		title)
 			printf '  2. 再実行できないなら、ブラウザで issue #%s の題を読み、%s --slug <語> --title '"'"'<題>'"'"' と実行します。\n' "$number" "$sh_cmd"
 			;;
@@ -419,6 +491,9 @@ init_subject="chore: #${number} の作業を開始する"
 # ---- 作る・続ける段（どれも、出来ていれば飛ばす）
 
 # ensure_worktree <ブランチ> [<起点> 新規のとき]。出来たワークツリーのパスを wt に入れる。
+#
+# 行き先は .claude/worktrees/<識別子>（識別子はブランチ名の / を - に置き換えたもの）。既にあるブランチは
+# `worktree add <行き先> <ブランチ>` で直接チェックアウトする。識別子のブランチを作って switch で移る回り道はしない。
 wt=""
 ensure_worktree() {
 	ew_branch="$1"
@@ -428,19 +503,10 @@ ensure_worktree() {
 		log_info ワークツリーがある -- "branch=$ew_branch"
 		return 0
 	fi
-	case "$ew_branch" in
-	*/*) ew_id=$(printf '%s' "$ew_branch" | tr '/' '-') ;;
-	*) ew_id="$ew_branch" ;;
-	esac
+	ew_id=$(ccnavi_branch_to_id "$ew_branch")
 	ew_dest="$root/.claude/worktrees/$ew_id"
-	if [ -e "$ew_dest" ]; then
-		# 識別子のワークツリーが既にある。/ を含むブランチの切りかけなら、switch から続ける。
+	if [ -e "$ew_dest" ] || [ -L "$ew_dest" ]; then
 		ew_cur=$(git -C "$ew_dest" rev-parse --abbrev-ref HEAD 2>/dev/null || :)
-		if [ "$ew_cur" = "$ew_id" ] && [ "$ew_id" != "$ew_branch" ]; then
-			wt="$ew_dest"
-			switch_into "$ew_branch"
-			return 0
-		fi
 		fail worktree-busy "ワークツリーの作成先 $ew_dest が既にあり、ブランチ $ew_branch のものではありません（現在のブランチ：${ew_cur:-?}）。中を確かめ、不要なら片付けてから再実行してください。"
 	fi
 	if [ -n "$ew_start" ]; then
@@ -450,49 +516,60 @@ ensure_worktree() {
 		log_info ワークツリーを切った -- "branch=$ew_branch"
 		return 0
 	fi
-	# 既にあるブランチ。手元に無ければ origin から取る
-	if ! ref_exists "refs/heads/$ew_branch"; then
-		cgit fetch origin "$ew_branch" ||
-			fail fetch-failed "ブランチ $ew_branch を origin から取れなかった（上の出力を見てください）。"
-		ref_exists "refs/remotes/origin/$ew_branch" ||
-			fail branch-missing "ブランチ $ew_branch が手元にも origin にもありません。ホストにだけある MR の元ブランチ（消された後など）かもしれません。"
-	fi
-	case "$ew_branch" in
-	*/*)
-		# 識別子は / を含まない（worktree.md）。識別子のブランチで切り、switch でそのブランチへ移る
-		if ref_exists "refs/heads/$ew_id"; then
-			fail identifier-exists "識別子のブランチ $ew_id が手元に既にある。不要なら削除してから、使うなら先にそのワークツリーを確かめてから再実行してください。"
-		fi
-		if ref_exists "refs/heads/$ew_branch"; then
-			ew_from="refs/heads/$ew_branch"
-		else
-			ew_from="origin/$ew_branch"
-		fi
-		cgit worktree add "$ew_dest" -b "$ew_id" --no-track "$ew_from" ||
-			fail worktree-failed "ワークツリーを作成できませんでした（上の出力を確認してください）。"
-		wt="$ew_dest"
-		switch_into "$ew_branch"
-		;;
-	*)
-		cgit worktree add "$ew_dest" "$ew_branch" ||
-			fail worktree-failed "ワークツリーを作成できませんでした（上の出力を確認してください）。"
-		wt="$ew_dest"
-		;;
-	esac
+	# 既にあるブランチ。手元に無ければ origin/<ブランチ> から（git が追跡ブランチを作る）
+	ref_exists "refs/heads/$ew_branch" || ref_exists "refs/remotes/origin/$ew_branch" ||
+		fail branch-missing "ブランチ $ew_branch が手元にも origin にもありません。ホストにだけある MR の元ブランチ（消された後など）かもしれません。"
+	cgit worktree add "$ew_dest" "$ew_branch" ||
+		fail worktree-failed "ワークツリーを作成できませんでした（上の出力を確認してください）。"
+	wt="$ew_dest"
 	log_info ワークツリーを切った -- "branch=$ew_branch"
 }
 
-# ワークツリー（wt）で / を含むブランチへ移る。親チケットのワークツリーなら ccnavi-git.sh が拒否するので案内して止める
-switch_into() {
-	si_branch="$1"
-	si_rc=0
-	(cd "$wt" && cgit switch "$si_branch") || si_rc=$?
-	if [ "$si_rc" -ne 0 ]; then
-		fail switch-failed "ワークツリー $wt は作ったが、ブランチ $si_branch へ移れなかった（上の出力を見てください）。同じ名前のチケット（親）が識別子で承認待ち・承認済みだと移れない。.ccnavi/docs/worktree-start.md の「既にある / を含むブランチ」の手順に従ってください。"
+# 続けるブランチを毎回 origin から取る（手元にあっても取る）。取れなくても、手元にあれば続ける（リモート未確認と言う）。
+# 結果は remote_state（checked / gone / unchecked）に入れる。gone は origin にそのブランチが無い。
+remote_state=""
+fetch_branch() {
+	fb_branch="$1"
+	if cgit_quiet fetch origin "$fb_branch"; then
+		remote_state=checked
+		return 0
 	fi
-	switched="$si_branch"
+	case "$cgit_out" in
+	*"couldn't find remote ref"*)
+		remote_state=gone
+		;;
+	*)
+		remote_state=unchecked
+		log_info リモートを確かめられず -- "branch=$fb_branch"
+		ref_exists "refs/heads/$fb_branch" ||
+			fail fetch-failed "ブランチ $fb_branch を origin から取れなかった（$(printf '%s' "$cgit_out" | head -n 1)）。手元にも無いので続けられません。"
+		;;
+	esac
 }
-switched=""
+
+# ワークツリー（wt）の先頭を origin/<ブランチ> に早送りする。手元が先・分かれているときは動かさず言う
+# （merge は ccnavi-sync.sh の仕事）。
+ff_note=""
+fast_forward() {
+	ff_branch="$1"
+	ff_note=""
+	ref_exists "refs/remotes/origin/$ff_branch" || return 0
+	ff_local=$(git -C "$wt" rev-parse HEAD 2>/dev/null || :)
+	ff_remote=$(git -C "$wt" rev-parse "refs/remotes/origin/$ff_branch" 2>/dev/null || :)
+	[ -n "$ff_local" ] && [ -n "$ff_remote" ] && [ "$ff_local" != "$ff_remote" ] || return 0
+	if git -C "$wt" merge-base --is-ancestor "$ff_local" "$ff_remote" 2>/dev/null; then
+		if (cd "$wt" && cgit merge --ff-only "origin/$ff_branch"); then
+			ff_note="origin/$ff_branch に早送りした"
+			log_info 早送りした -- "branch=$ff_branch"
+		else
+			ff_note="origin/$ff_branch に早送りできなかった（上の出力を見てください）"
+		fi
+	elif git -C "$wt" merge-base --is-ancestor "$ff_remote" "$ff_local" 2>/dev/null; then
+		ff_note="手元が origin/$ff_branch より先に進んでいる（未送信）"
+	else
+		ff_note="手元と origin/$ff_branch が分かれている（取り込みは ccnavi-sync.sh が行う）"
+	fi
+}
 
 # ensure_initial_commit <ブランチ>。統合先より進んでいなければ、空の初期コミットを積む（wt で）
 ensure_initial_commit() {
@@ -521,6 +598,7 @@ ensure_push() {
 
 # ensure_mr <ブランチ> <題>。MR の URL を mr_url に入れる。ホストに届かなければ案内して止まる
 mr_url=""
+mr_num=""
 ensure_mr() {
 	em_branch="$1"
 	em_title="$2"
@@ -541,6 +619,7 @@ ensure_mr() {
 	[ "$em_found_rc" -eq 0 ] || stop_host create "$(api_failed_reason)"
 	if [ -n "$em_mr" ]; then
 		mr_url=$(printf '%s' "$em_mr" | jq -r '.url')
+		mr_num=$(printf '%s' "$em_mr" | jq -r '.number')
 		log_info MR は飛ばす -- "branch=$em_branch"
 		return 0
 	fi
@@ -548,23 +627,166 @@ ensure_mr() {
 	em_made=$(create_mr "$em_branch" "$integration" "$em_title" "Closes #$number") || em_made_rc=$?
 	[ "$em_made_rc" -eq 0 ] || stop_host create "$(api_failed_reason)"
 	mr_url=$(printf '%s' "$em_made" | jq -r '.url')
+	mr_num=$(printf '%s' "$em_made" | jq -r '.number')
 	log_info MR を作った -- "branch=$em_branch"
 }
 
-# 結果を 1 項目 1 行で出す。<ブランチ> <MR の URL か空>
+# 取り込み記録に MR の番号を保存する。<ブランチ> <MR の番号か空>
+#
+# 記録は ccnavi-sync.sh が書く親子のチケットの取り込み状態（鍵は識別子）。まだ無ければ、いま origin に
+# 合わせた状態（present）で作る。ccnavi-sync.sh が書き直しても mr は残る（ccnavi_record_write が引き継ぐ）。
+record_mr() {
+	rm_branch="$1"
+	rm_num="$2"
+	[ -n "$rm_num" ] || return 0
+	rm_id=$(ccnavi_branch_to_id "$rm_branch")
+	rm_file=$(ccnavi_family_record "$root" "$(ccnavi_repo_key "$top" "$root")" "$rm_id")
+	if [ -f "$rm_file" ]; then
+		ccnavi_record_put "$rm_file" mr "$rm_num" ||
+			printf 'ccnavi-start: 案内: 取り込み記録（%s）に MR の番号を保存できなかった\n' "$rm_file"
+	else
+		rm_sha=$(git -C "$wt" rev-parse --verify --quiet "refs/remotes/origin/$rm_branch" 2>/dev/null || :)
+		[ -n "$rm_sha" ] || return 0
+		ccnavi_record_write "$rm_file" remote origin branch "$rm_branch" sha "$rm_sha" \
+			fetched_at "$(date +%s)" state present reason "" mr "$rm_num" ||
+			printf 'ccnavi-start: 案内: 取り込み記録（%s）を保存できなかった\n' "$rm_file"
+	fi
+	log_info 取り込み記録に MR を保存 -- "id=$rm_id" "mr=$rm_num"
+}
+
+# 最後に ccnavi-sync.sh <識別子> を打つ。親チケットも提案もまだ無いと取り込まれないが、止めない。<ブランチ>
+sync_note=""
+run_sync() {
+	rs_id=$(ccnavi_branch_to_id "$1")
+	rs_rc=0
+	rs_out=$(sh "$scripts/ccnavi-sync.sh" "$rs_id" 2>&1) || rs_rc=$?
+	log_info ccnavi-sync を打った -- "id=$rs_id" "exit=$rs_rc"
+	if [ "$rs_rc" -eq 0 ]; then
+		printf 'ccnavi-sync.sh %s:\n' "$rs_id"
+		printf '%s\n' "$rs_out" | sed 's/^/  /'
+	else
+		printf 'ccnavi-sync.sh %s は取り込まなかった（終了コード %s）:\n' "$rs_id" "$rs_rc"
+		printf '%s\n' "$rs_out" | sed 's/^/  /'
+		sync_note="親チケットか提案が出来たら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す"
+	fi
+}
+
+# 取り込み記録に MR を保存し、ccnavi-sync.sh を打つ。<ブランチ> <MR の番号か空>
+finish_up() {
+	record_mr "$1" "$2"
+	run_sync "$1"
+}
+
+# 結果を 1 項目 1 行で出す。<ブランチ> <MR の URL か空> <MR の番号か空>
 report() {
 	printf 'ワークツリー: %s\n' "$wt"
 	printf 'ブランチ: %s\n' "$1"
+	printf '識別子: %s\n' "$(ccnavi_branch_to_id "$1")"
 	printf 'MR: %s\n' "${2:--}"
-	report_mr_number=${2##*/}
-	case "$report_mr_number" in
+	[ -z "$ff_note" ] || printf '最新化: %s\n' "$ff_note"
+	case "$remote_state" in
+	unchecked) printf '案内: リモート未確認。origin から取れなかったので、手元のブランチのまま続けた。つながったら sh %s/ccnavi-sync.sh を打つ\n' "$scripts" ;;
+	gone) printf '案内: origin にブランチ %s が無い（手元だけのブランチ）\n' "$1" ;;
+	esac
+	[ -z "$sync_note" ] || printf '案内: %s\n' "$sync_note"
+	case "${3:-}" in
 	'' | *[!0-9]*) ;;
 	*)
-		printf '案内: 提案の frontmatter に mr: %s を書く（この MR の番号。書くと、この MR の番号を含む依頼が、すでにあるチケットに結び付くと分かる）\n' "$report_mr_number"
+		printf '必須: 提案の frontmatter に mr: %s を書く（この MR の番号。書かないと、この MR の番号を含む依頼が、すでにあるチケットに結び付かない）\n' "$3"
 		;;
 	esac
-	if [ -n "$switched" ]; then
-		printf '案内: 名前に / を含むブランチなので、識別子 %s のブランチで切ってから switch で %s へ移した。識別子のブランチは手元に残る（不要ならユーザが削除します）\n' "$(printf '%s' "$1" | tr '/' '-')" "$1"
+}
+
+# 既存の MR を採用してよいか確かめる。引っかかったら止める。<ブランチ> <MR の JSON>
+#
+# 確かめるのは 7 つ。MR が open・フォークでない・マージ先が統合先・ブランチ名が保護されていない・
+# 変換した識別子が使える（58 文字以内、末尾が -2 桁でない。実行ファイルに聞く）・同じ識別子になる別のブランチが無い
+# （origin の全ブランチ。ls-remote。英字の大文字小文字は区別しない）・同じブランチ名のマージ済み MR が無い
+# （ホストに聞く。手元の退避には頼らない）。後ろの 3 つは新しく作るとき（id_check・clash_check・merged_check）も同じ。
+adopt_check() {
+	ad_branch="$1"
+	ad_mr="$2"
+	ad_num=$(printf '%s' "$ad_mr" | jq -r '.number // ""')
+	ad_state=$(printf '%s' "$ad_mr" | jq -r '.state // ""')
+	ad_base=$(printf '%s' "$ad_mr" | jq -r '.base // ""')
+	ad_fork=$(printf '%s' "$ad_mr" | jq -r '.fork // false')
+	case "$ad_state" in
+	open | opened) ;;
+	*) fail adopt-not-open "MR !${ad_num} は ${ad_state:-状態が不明}。open の MR だけ採用できます（閉じた・マージ済みの MR のブランチでは続けません）。ユーザに確かめてください。" ;;
+	esac
+	[ "$ad_fork" != true ] ||
+		fail fork-mr "MR !${ad_num} はフォークから出ている。元ブランチ ${ad_branch} はこのリポジトリに無いので、ここでは作業を始められません。フォーク側のブランチで続けるか、ユーザに相談してください。"
+	[ "$ad_base" = "$integration" ] ||
+		fail adopt-target "MR !${ad_num} のマージ先は ${ad_base:-不明} で、統合先 ${integration} ではありません。マージ先を直すか、別の作業としてユーザに相談してください。"
+	if ! ccnavi_is_branch "$ad_branch" || [ "$ad_branch" = "$integration" ]; then
+		fail adopt-protected "ブランチ ${ad_branch} は保護されたブランチ（統合先・main・master・develop・release など）か、使えない書き方です。MR の元ブランチとして採用できません。"
+	fi
+	id_check "$ad_branch"
+	clash_check "$ad_branch" strict
+	merged_check "$ad_branch"
+	log_info 既存の MR を採用してよい -- "branch=$ad_branch" "mr=$ad_num"
+}
+
+# ブランチ <ブランチ> から作る識別子が親に使えるかを実行ファイルに聞き（58 文字以内・末尾が -2 桁でない・
+# 字の種類・NFC）、使えなければ止める。答えが無ければ「確かめられない」と止める（sh の代わりの判定はしない。
+# dash の `${#x}` はバイト数を数えるので、日本語の識別子を誤って断る）。[<案内>]
+id_check() {
+	ic_branch="$1"
+	ic_hint="${2:-ブランチ名を直すか、ユーザに相談してください。}"
+	ccnavi_id_ask "$root" "$ic_branch" ||
+		fail id-unchecked "ブランチ ${ic_branch} から作る識別子が親に使えるか（58 文字以内・末尾が -2 桁でない・使える字）を確かめられない（ccnavi の実行ファイルが答えない）。何も作成せずに処理を中断しました。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
+	[ -z "$ccnavi_id_problem" ] ||
+		fail adopt-id "ブランチ ${ic_branch} から作る識別子 ${ccnavi_id_ident} は使えない（${ccnavi_id_problem}）。何も作成せずに処理を中断しました。${ic_hint}" "${3:-1}"
+}
+
+# 同じ識別子になる別のブランチ（origin の全ブランチと手元のブランチ。英字の大文字小文字は区別しない）があれば止める。
+# <ブランチ> strict|lenient。origin の一覧（ls-remote）を取れないとき、strict は止め、lenient は手元に残る
+# origin の追跡ブランチで代わりに確かめて「リモート未確認」と言う。
+clash_note=""
+clash_check() {
+	cc_branch="$1"
+	cc_mode="$2"
+	cc_remote=yes
+	if ! remote_heads; then
+		[ "$cc_mode" = lenient ] ||
+			fail adopt-heads "origin のブランチ一覧を取れなかった（$(head -n 1 "$heads_file.err" 2>/dev/null)）。同じ識別子になる別のブランチが無いか確かめられないので止めた。"
+		cc_remote=no
+		git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin 2>/dev/null | grep -v -x 'HEAD' >"$heads_file" || :
+	fi
+	{
+		cat "$heads_file"
+		git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null || :
+	} | sort -u >"$heads_file.all"
+	cc_clash=$(ccnavi_id_clash "$cc_branch" "$heads_file.all") || cc_clash=""
+	rm -f "$heads_file.all"
+	[ -z "$cc_clash" ] ||
+		fail adopt-id-clash "ブランチ ${cc_branch} と ${cc_clash} は、どちらも識別子 $(ccnavi_branch_to_id "$cc_branch")（英字の大文字小文字は区別しない）になる。ワークツリーの置き場が重なるので使えません。何も作成せずに処理を中断しました。ユーザに相談してください。"
+	if [ "$cc_remote" = no ]; then
+		clash_note="リモート未確認。origin のブランチ一覧を取れなかったので、同じ識別子になる別のブランチは手元に残る origin の追跡ブランチでだけ確かめた"
+		log_info 同じ識別子の確認でリモート未確認 -- "branch=$cc_branch"
+	fi
+}
+
+# 同じブランチ名のマージ済み MR があれば止める（ホストに聞く。手元の退避には頼らない）。<ブランチ>
+merged_check() {
+	stop_branch="$1"
+	mc_rc=0
+	host_open || mc_rc=$?
+	if [ "$mc_rc" -eq 1 ]; then
+		fail host-unreadable "同じブランチ名のマージ済み MR を確かめられません（${host_why}）。origin を確かめてください。"
+	elif [ "$mc_rc" -eq 2 ]; then
+		[ -z "$mcp_checked" ] || return 0
+		stop_host merged "$host_why"
+	fi
+	mc_merged=""
+	mc_merged_rc=0
+	mc_merged=$(find_merged_mr "$1") || mc_merged_rc=$?
+	if [ "$mc_merged_rc" -ne 0 ]; then
+		[ -z "$mcp_checked" ] || return 0
+		stop_host merged "$(api_failed_reason)"
+	fi
+	if [ -n "$mc_merged" ]; then
+		fail adopt-merged "同じブランチ名 ${1} のマージ済み MR（!$(printf '%s' "$mc_merged" | jq -r '.number')）がある。マージ済みのブランチは再利用できません。新しいブランチで始めるか、ユーザに相談してください。"
 	fi
 }
 
@@ -642,9 +864,11 @@ if [ "$total" -eq 0 ]; then
 		3) fail issue-is-pr "#${number} は issue ではなく PR です。MR の番号なら --mr ${number} を使ってください。" 2 ;;
 		esac
 	fi
-	slug="$opt_slug"
-	[ -n "$slug" ] || slug=$(slugify "${opt_title:-$issue_title_read}")
-	if [ -z "$slug" ]; then
+	if [ -n "$opt_slug" ]; then
+		slug="$opt_slug"
+		new_branch="${opt_prefix}-${number}-${slug}"
+	else
+		# 題が読めなければ slug を決められない（ホストに届かないなら代行を案内する）
 		if [ -z "$opt_title" ] && [ -z "$issue_title_read" ]; then
 			if [ "$host_rc" -eq 2 ]; then
 				stop_host title "$host_why"
@@ -653,10 +877,22 @@ if [ "$total" -eq 0 ]; then
 				stop_host title "$(api_failed_reason)"
 			fi
 		fi
-		fail no-slug "Issueのタイトルからブランチ名用のslugを生成できませんでした（使用可能なASCII英数字がありません）。--slug <語> を付けて再実行してください。" 2
+		ib_rc=0
+		issue_branch_make "${opt_title:-$issue_title_read}" || ib_rc=$?
+		case "$ib_rc" in
+		0) ;;
+		2) fail no-slug "issue #${number} からブランチ名を作れませんでした（${issue_branch_why}）。--slug <語> を付けて再実行してください。" 2 ;;
+		*) fail id-unchecked "issue #${number} からブランチ名を作れませんでした（ccnavi の実行ファイルが答えない）。何も作成せずに処理を中断しました。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行するか、--slug <語> を付けて再実行してください。" ;;
+		esac
+		new_branch="$issue_branch"
+		slug="${new_branch#"${opt_prefix}-${number}-"}"
 	fi
-	new_branch="${opt_prefix}-${number}-${slug}"
 	ccnavi_is_branch "$new_branch" || fail bad-branch "ブランチ名 ${new_branch} は使えない書き方です（--prefix・--slug を見直してください）。" 2
+	# 作る前に、既存の MR を採用するときと同じ識別子の確認をする。作ってから後段で詰まると、打ち直しても
+	# 採用の確認で止まり、手で消すまで戻れない
+	id_check "$new_branch" "--prefix・--slug を見直して再実行してください。" 2
+	clash_check "$new_branch" strict
+	merged_check "$new_branch"
 	new_title=$(make_title "$slug")
 	new_wt="$root/.claude/worktrees/$new_branch"
 	if [ -n "$dry" ]; then
@@ -673,14 +909,15 @@ if [ "$total" -eq 0 ]; then
 	ensure_initial_commit
 	ensure_push "$new_branch"
 	ensure_mr "$new_branch" "$new_title"
-	report "$new_branch" "$mr_url"
+	finish_up "$new_branch" "$mr_num"
+	report "$new_branch" "$mr_url" "$mr_num"
 	log_info 完了 -- "branch=$new_branch"
 	exit 0
 fi
 
 # ---- 3. 候補がちょうど 1 件
 cb=$(jq -r '.candidates[0].branch' "$cand_json")
-ccnavi_is_branch "$cb" || fail bad-candidate "候補のブランチ名（${cb}）が使えない書き方です。ユーザに確かめてください。"
+ccnavi_is_branch "$cb" || fail bad-candidate "候補のブランチ名（${cb}）が使えない書き方か、保護されたブランチ（統合先・main・master・develop・release など）です。ユーザに確かめてください。"
 c_local=$(jq -r '.candidates[0].local' "$cand_json")
 c_origin=$(jq -r '.candidates[0].origin' "$cand_json")
 c_mrs=$(jq '.candidates[0].mrs | length' "$cand_json")
@@ -695,11 +932,17 @@ if [ "$c_local" != true ] && [ "$c_origin" != true ] && [ "$c_mrs" -eq 0 ]; then
 	printf 'ccnavi-start: 候補 %s は、手元にも origin にも MR にも実体がありません（チケットの提案だけ）。何も作成せずに処理を中断しました。ユーザに確かめてください。\n' "$cb"
 	exit "$EXIT_MULTI"
 fi
-if [ "$c_local" != true ] && [ "$c_origin" != true ] && [ "$c_fork" -gt 0 ] && [ "$c_fork" -eq "$c_mrs" ]; then
-	fail fork-mr "MR !${c_mrnum} はフォークから出ている。元ブランチ ${cb} はこのリポジトリに無いので、ここでは作業を始められません。フォーク側のブランチで続けるか、ユーザに相談してください。"
+# 既存の MR を採用するときの確認。引っかかったら止める
+if [ "$c_mrs" -gt 0 ]; then
+	c_mr=$(jq -c '.candidates[0].mrs[0]' "$cand_json")
+	adopt_check "$cb" "$c_mr"
+else
+	# MR の無い候補（名前に番号を含む手元・origin のブランチ）も、親のワークツリーに出すので識別子の確認はする
+	# （MR が open かなど、MR に依る確認は除く）。origin の一覧を取れなければ、手元の追跡ブランチで確かめて言う
+	id_check "$cb"
+	clash_check "$cb" lenient
+	[ -z "$clash_note" ] || printf 'ccnavi-start: 案内: %s\n' "$clash_note"
 fi
-[ "$c_mrs" -eq 0 ] || [ "$c_state" = open ] || [ "$c_state" = opened ] ||
-	printf 'ccnavi-start: 案内: MR !%s は %s。元ブランチ %s で続ける\n' "$c_mrnum" "$c_state" "$cb"
 [ -z "$unchecked" ] || printf 'ccnavi-start: 案内: ホストは見ていない（%s）。手元の候補 %s だけで続ける。既存の MR があるかは確かめていない\n' "$host_reason" "$cb"
 
 # 作りかけ（ccnavi-start.sh が途中で失敗した跡）か。ホストを見ていて MR が無く、初期コミット（init_subject）だけ
@@ -735,7 +978,7 @@ if [ -n "$dry" ]; then
 	if [ -n "$existing" ]; then
 		printf 'ワークツリー: %s\n' "$existing"
 	else
-		printf 'ワークツリー: %s（無いので作る）\n' "$root/.claude/worktrees/$(printf '%s' "$cb" | tr '/' '-')"
+		printf 'ワークツリー: %s（無いので作る）\n' "$root/.claude/worktrees/$(ccnavi_branch_to_id "$cb")"
 	fi
 	printf 'ブランチ: %s\n' "$cb"
 	if [ -n "$resume" ]; then
@@ -748,7 +991,9 @@ fi
 
 if [ -n "$resume" ]; then
 	# 作りかけ。ワークツリーを出して、残りの段を続ける
+	fetch_branch "$cb"
 	ensure_worktree "$cb"
+	fast_forward "$cb"
 	host_rc=0
 	host_open || host_rc=$?
 	if [ "$host_rc" -eq 0 ] && [ -z "$opt_title" ]; then
@@ -757,13 +1002,17 @@ if [ -n "$resume" ]; then
 	ensure_initial_commit
 	ensure_push "$cb"
 	ensure_mr "$cb" "$(make_title "$cb")"
-	report "$cb" "$mr_url"
+	finish_up "$cb" "$mr_num"
+	report "$cb" "$mr_url" "$mr_num"
 	log_info 作りかけを完了 -- "branch=$cb"
 	exit 0
 fi
 
 stop_branch="$cb"
+fetch_branch "$cb"
 ensure_worktree "$cb"
-report "$cb" "$c_url"
+fast_forward "$cb"
+finish_up "$cb" "$c_mrnum"
+report "$cb" "$c_url" "$c_mrnum"
 log_info 続ける -- "branch=$cb"
 exit 0

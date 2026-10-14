@@ -34,9 +34,9 @@ from ccnavi.hook.subagent import CANDIDATE_NOTE
 from ccnavi.infra import settings, shellread
 from ccnavi.tickets import approval, phase_forms, phase_scope, review, ticket_fields
 from ccnavi.tickets import ticket as ticket_mod
-from tests import ROOT, common_path
+from tests import ROOT, c1flag, common_path
 from tests.inproc import run_ccnavi
-from tests.ticketsample import RULES, plain_parent, write_plain_phases
+from tests.ticketsample import RULES, plain_parent, record_merge, write_plain_phases
 
 
 def git(cwd, *args):
@@ -85,6 +85,8 @@ def ticket_text(
     plan=1,
 ):
     lines = ["---", "version: 1", f"ticket: {name}"]
+    if not parent:
+        lines.append("mr: 1")
     if issue is not None:
         lines.append(f"issue: {issue}")
     if parent:
@@ -138,6 +140,7 @@ class TicketTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
+        args = self.as_c1(args)
         return run_ccnavi(
             [
                 "--root",
@@ -156,6 +159,10 @@ class TicketTest(unittest.TestCase):
             cwd=ROOT,
             env=environment,
         )
+
+    def as_c1(self, args):
+        """sh を通さない呼び出しに、C1 の印を付ける（`tests/c1flag.py`）。"""
+        return c1flag.as_c1(self.root, self.state, self.parent_tree, args)
 
     def hook(
         self,
@@ -645,6 +652,16 @@ class TicketTest(unittest.TestCase):
         result = self.approve()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("だけが書く欄", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
+
+    def test_a_proposal_with_a_merged_sha_is_not_approved(self):
+        # 合流した子の先頭は finish だけが書く。提案に書けば、合流済みを装える。
+        self.propose("i0001", allow=("src/*",))
+        source = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+        write(source, self.moved_text("i0001", merged_sha="0" * 40))
+        result = self.approve()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("`merged_sha`", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
 
     def test_a_proposal_with_a_followup_mark_is_not_approved(self):
@@ -1233,6 +1250,7 @@ class TicketTest(unittest.TestCase):
         git(self.root, "remote", "add", "origin", bare)
         for child in merge:
             git(self.parent_tree, "merge", "--quiet", "--no-edit", child)
+            record_merge(self.parent_tree, child)
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         fixture = os.path.join(self.root, "fixture.json")
         write(
@@ -1249,9 +1267,8 @@ class TicketTest(unittest.TestCase):
         )
         if prepared.returncode != 0:
             return prepared
-        # 1 行目が依頼の本文、2 行目がマージリクエストの下書き。
-        body_path, draft_path = prepared.stdout.splitlines()[:2]
-        self.assertTrue(os.path.exists(draft_path), draft_path)
+        # 出力は依頼の本文のパス 1 行だけ（マージリクエストは作らない）。
+        (body_path,) = prepared.stdout.splitlines()
         with open(body_path, encoding="utf-8") as f:
             text = f.read()
         data = read_json(fixture)
@@ -1288,8 +1305,9 @@ class TicketTest(unittest.TestCase):
         refused = self.request(fixture)
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("i0001-01-02", refused.stderr)
-        self.assertIn("取り込まれていない", refused.stderr)
+        self.assertIn("合流していない", refused.stderr)
         git(self.parent_tree, "merge", "--quiet", "--no-edit", "i0001-01-02")
+        record_merge(self.parent_tree, "i0001-01-02")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
 
         ok = self.request(fixture)
@@ -1303,10 +1321,8 @@ class TicketTest(unittest.TestCase):
         note = "wip/handoff/ 配下はユーザに渡す写しで、レビューの対象外。integrate で消える。"
         self.assertTrue(posted[0]["body"].rstrip("\n").endswith(note), posted[0]["body"])
         self.assertEqual(posted[0]["body"].count(note), 1)
-        mr_drafts = [name for name in os.listdir(self.state) if name.startswith("review-mr-")]
-        self.assertEqual(len(mr_drafts), 1, mr_drafts)
-        with open(os.path.join(self.state, mr_drafts[0]), encoding="utf-8") as f:
-            self.assertIn(note, f.read())
+        # マージリクエストの下書きは作らない（MR が無ければ依頼は止まる）
+        self.assertEqual([n for n in os.listdir(self.state) if n.startswith("review-mr-")], [])
 
         again = self.request(fixture)
         self.assertIn("依頼済み", again.stderr)
@@ -1879,12 +1895,11 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(lint.returncode, 0, lint.stdout)
         self.assertIn("i0001-01-01 が複数の場所にある", lint.stdout)
 
-    def test_folding_the_parent_worktree_does_not_stop_the_operations(self):
-        """親のワークツリーを片付けても操作は通る。元ツリー上のチケットを正とする。
+    def test_folding_the_parent_worktree_stops_the_operations(self):
+        """親のワークツリーを片付けると、元ツリーのコピーで代用せずに止まる。
 
-        承認済みチケットは親のブランチに乗り、合流すると元ツリーにも入る。親のツリーが
-        消えたあとに行き先を決めないと、残った子のツリー上のチケットと並んで「どれが正か
-        決まらない」になり、片付けただけの親子のチケットの `start` / `finish` が全部止まる。
+        承認済みチケットは親のブランチに乗り、合流すると元ツリーにも入る。それでも正とするのは
+        親のワークツリー上のチケットだけで、元ツリーや子のワークツリーのコピーは読まない。
         """
         self.family()
         git(self.root, "merge", "--quiet", "--no-edit", "i0001")
@@ -1892,47 +1907,35 @@ class TicketTest(unittest.TestCase):
 
         done = self.ccnavi("ticket", "finish", "i0001-01-02")
 
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertNotIn("複数の場所にある", done.stderr)
-        # 正とする側が元ツリーなので、置き場の移動も元ツリーに書かれる。
-        moved = os.path.join(self.root, ".ccnavi", "approved", "done", "i0001-01-02.md")
-        self.assertTrue(os.path.exists(moved), moved)
-        lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertNotIn("複数の場所にある", lint.stdout)
+        self.assertNotEqual(done.returncode, 0, done.stdout)
+        self.assertIn("親のワークツリーを切り直して", done.stderr)
+        # 元ツリーのコピーは動かない。
+        self.assertFalse(
+            os.path.exists(os.path.join(self.root, ".ccnavi", "approved", "done", "i0001-01-02.md"))
+        )
 
-    def test_a_copy_ahead_of_the_origin_stops_the_operations(self):
-        """元ツリーより先の置き場に在るチケットがあれば、元ツリーを正としない。
+    def test_a_stale_copy_in_the_child_worktree_does_not_decide(self):
+        """子のワークツリーに残った古いコピーは、親のワークツリーの答えを変えない。
 
-        親のツリーで閉じ、子のツリーだけがそれを取り込み、元ツリーは 1 つ手前で
-        止まっている形。ここで元ツリーを採ると、閉じた子をもう一度閉じ、リスクの
-        記録を別の差分で書き直す。決めずに止めて、ユーザに合流させる。
+        親のツリーで閉じ、子のツリーは取り込まないまま `doing/` で止まっている形でも、
+        親のツリーのチケットだけで決まる（複数の場所にあるとは言わない）。
         """
         self.family()
         closed = self.ccnavi("ticket", "finish", "i0001-01-02")
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "close i0001-01-02")
-        # 子のツリーは閉じたところまで取り込み、元ツリーは 1 つ手前で止まる。
-        git(
-            os.path.join(self.root, ".claude", "worktrees", "i0001-01-02"),
-            "merge",
-            "--quiet",
-            "--no-edit",
-            "i0001",
-        )
-        git(self.root, "merge", "--quiet", "--no-edit", "i0001~1")
-        git(self.root, "worktree", "remove", "--force", self.parent_tree)
 
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-02")
+        stale = os.path.join(child, ".ccnavi", "approved", "doing", "i0001-01-02.md")
+        self.assertTrue(os.path.exists(stale), "子のツリーに古いコピーが残っていない")
+
+        again = self.ccnavi("ticket", "status", "i0001")
+        self.assertNotIn("複数の場所にある", again.stderr + again.stdout)
         again = self.ccnavi("ticket", "finish", "i0001-01-02")
-
-        self.assertNotEqual(again.returncode, 0, again.stdout)
-        self.assertIn("i0001-01-02 が複数の場所にある", again.stderr)
-        self.assertIn("i0001-01-02:done", again.stderr)
-        # 次の一手まで言う。どの場所のチケットも追跡されたファイルなので、「1 つにしてから」
-        # だけでは受け取った側にできることが読めない。
-        self.assertIn("合流", again.stderr)
+        self.assertNotIn("複数の場所にある", again.stderr)
         lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertIn("i0001-01-02 が複数の場所にある", lint.stdout)
+        self.assertNotIn("i0001-01-02 が複数の場所にある", lint.stdout)
 
     # 閉じた承認済みチケット 1 枚。
     CLOSED = (
@@ -3078,16 +3081,35 @@ class TicketTest(unittest.TestCase):
             os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.requested"))
         )
 
-    def test_request_refuses_when_a_child_branch_is_gone(self):
+    def test_request_does_not_read_the_child_branch(self):
+        """合流済みかは `merged_sha` が親の HEAD の祖先かで確かめる。子のブランチは見ない。"""
         self.family()
         self.close_phase()
         fixture = self.remote()
         git(self.root, "worktree", "remove", "--force", ".claude/worktrees/i0001-01-01")
         git(self.root, "branch", "-D", "i0001-01-01")
+        self.assertEqual(self.request(fixture).returncode, 0)
+
+    def test_request_refuses_a_child_whose_merged_sha_is_not_in_the_parent(self):
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        # 親のブランチに入っていない先頭（子のブランチに積んだ、合流前のコミット）を指す記録。
+        tree = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
+        write(os.path.join(tree, "src", "late.py"), "x\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "late")
+        late = git(tree, "rev-parse", "HEAD").strip()
+        path = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-01.md")
+        if not os.path.exists(path):
+            path = os.path.join(self.approved, "done", "i0001-01-01.md")
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        write(path, ticket_fields.set_fields(text, {"merged_sha": late}))
         refused = self.request(fixture)
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("i0001-01-01", refused.stderr)
-        self.assertIn("消えている", refused.stderr)
+        self.assertIn("親の HEAD に無い", refused.stderr)
 
     def test_unresolved_threads_survive_a_new_request(self):
         """指摘が残ったまま依頼をやり直しても、数から消えないこと。
@@ -3183,8 +3205,11 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(self.request(fixture).returncode, 0)
         self.assertEqual(self.confirm(fixture).returncode, 0)
 
-    def test_prepare_writes_a_merge_request_draft(self):
-        """マージリクエストが無ければ sh が作れるように、下書きを書き出すこと。"""
+    def test_prepare_writes_only_the_request_body_and_never_a_merge_request_draft(self):
+        """依頼の準備が書き出すのは依頼の本文だけ。マージリクエストの下書きは作らない。
+
+        マージリクエストが無ければ sh が止める（作るのは `ccnavi-start.sh`）。
+        """
         self.propose("i0001", allow=("src/*", "wip/*"), title="挨拶の言語を切り替える", issue=12)
         self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
         git(self.parent_tree, "add", "-A")
@@ -3209,13 +3234,8 @@ class TicketTest(unittest.TestCase):
             "prepare",
         )
         self.assertEqual(prepared.returncode, 0, prepared.stderr)
-        draft = prepared.stdout.splitlines()[1]
-        with open(draft, encoding="utf-8") as f:
-            lines = f.read().splitlines()
-        self.assertEqual(lines[0], "Draft: 挨拶の言語を切り替える")
-        self.assertEqual(lines[1], "")
-        self.assertIn("Closes #12", lines)
-        self.assertIn("i0001", "\n".join(lines))
+        self.assertEqual(len(prepared.stdout.splitlines()), 1, prepared.stdout)
+        self.assertEqual([n for n in os.listdir(self.state) if n.startswith("review-mr-")], [])
 
     def confirm(self, fixture, phase="1"):
         return self.ccnavi(
@@ -3267,7 +3287,7 @@ class TicketTest(unittest.TestCase):
             "prepare",
         )
         self.assertEqual(prepared.returncode, 0, prepared.stderr)
-        for line in prepared.stdout.splitlines()[:2]:
+        for line in prepared.stdout.splitlines():
             self.assertTrue(os.path.exists(line), line)
         unposted = self.ccnavi(
             "--cwd", self.parent_tree, "--phase", "1", "review", "requested", "--result", fixture
@@ -3469,6 +3489,12 @@ class ScriptShapeTest(unittest.TestCase):
             ticket_fields.script_shape(self.body),
             "着手の時刻と基準点は ccnavi が書く欄なので、正規化した内容に出てはいけない",
         )
+
+    def test_合流した子の先頭の欄も除かれる(self):
+        after = self.started('merged_sha: "0123456789abcdef"\n')
+
+        self.assertEqual(ticket_fields.script_shape(after), ticket_fields.script_shape(self.body))
+        self.assertEqual(ticket_fields.script_fields_set(after), ("merged_sha",))
 
     def test_スクリプトの欄の続きの行も除かれる(self):
         after = self.started("cancel_reason: |\n  複数行の\n  理由\n")

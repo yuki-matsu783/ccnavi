@@ -326,39 +326,16 @@ class SourceBranchTest(CoreHarness):
         found = [json.loads(line) for line in events["content"].decode().splitlines()]
         return [r.get("tree") for r in found if r.get("kind") == history.KIND_APPROVED]
 
-    def test_a_detached_head_falls_back_to_the_tree_name(self):
+    def test_a_detached_head_is_not_approved(self):
+        # 親のワークツリーの HEAD がブランチを指していなければ、ほかのツリーで代用せずに止まる
         git(self.parent_tree, "checkout", "--quiet", "--detach")
+        self.propose("i0001", parent_text("i0001", ["research"]))
+        self.commit_parent()
+        self.assertNotEqual(self.approve().returncode, 0)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
+
+    def test_the_branch_name_is_recorded_from_the_head(self):
         self.assertEqual(self.approve_one(), "i0001")
-
-    def test_a_broken_head_falls_back_to_the_tree_name(self):
-        gitfile = os.path.join(self.parent_tree, ".git")
-        with open(gitfile, encoding="utf-8") as f:
-            gitdir = f.read().split("gitdir:", 1)[1].strip()
-        head = os.path.join(gitdir, "HEAD")
-        with open(head, encoding="utf-8") as f:
-            kept = f.read()
-        write(head, "garbage\n")
-        try:
-            snapshot = self.snapshot()
-            self.propose("i0001", parent_text("i0001", ["research"]))
-            with history.session(history.VIA_CHROME, None):
-                changes = core.plan(snapshot, core.judge_approval(snapshot))
-            self.assertEqual(self.approved_tree(changes.per_branch()["i0001"]), ["i0001"])
-        finally:
-            write(head, kept)
-
-    def test_the_workspace_root_records_its_branch(self):
-        write(
-            os.path.join(self.root, "wip", "proposals", "todo", "i0001.md"),
-            parent_text("i0001", ["research"]),
-        )
-        snapshot = self.snapshot()
-        with history.session(history.VIA_CHROME, None):
-            changes = core.plan(snapshot, core.judge_approval(snapshot))
-        rows = [r for rows in changes.per_branch().values() for r in rows]
-        self.assertEqual(self.approved_tree(rows), ["main"])
-        copy = next(r for r in rows if r["path"].endswith("doing/i0001.md"))
-        self.assertEqual(copy["content"], parent_text("i0001", ["research"]).encode())
 
 
 class PlanWriterTest(CoreHarness):
@@ -442,43 +419,6 @@ class PlanWriterTest(CoreHarness):
         self.assertIn("マーカー（requested, reviewed）を削除しました。", out)
         self.assertFalse(os.path.exists(os.path.join(marks, "1.reviewed")))
 
-    def test_a_flow_is_carried_to_the_parent_tree(self):
-        """提案が別のツリー（ワークスペースルート）に在れば、フローも親のツリーへ移す。"""
-        self.family(plan=["design"])
-        todo = os.path.join(self.root, "wip", "proposals", "todo")
-        write(
-            os.path.join(todo, "i0001-01-01.md"),
-            child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]),
-        )
-        flow = os.path.join(self.root, ".ccnavi", "approved", "flows", "i0001-01-01.yml")
-        write(flow, "version: 1\nsteps: []\n")
-        _, out = self.plan_and_write()
-        self.assertIn("i0001-01-01 のフローを", out)
-        self.assertFalse(os.path.exists(flow))
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "flows", "i0001-01-01.yml")))
-
-    def test_a_flow_that_cannot_be_written_says_so_and_skips_the_rest(self):
-        """移せなかったフローは行で言い、元を消さない（前と同じ失敗の仕方）。"""
-        self.family(plan=["design"])
-        todo = os.path.join(self.root, "wip", "proposals", "todo")
-        write(
-            os.path.join(todo, "i0001-01-01.md"),
-            child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]),
-        )
-        flow = os.path.join(self.root, ".ccnavi", "approved", "flows", "i0001-01-01.yml")
-        write(flow, "version: 1\nsteps: []\n")
-        snapshot = self.snapshot()
-        verdict = core.judge_approval(snapshot)
-        changes = core.plan(snapshot, verdict)
-        # 並べた後で行き先にファイルを置く（書く前に別の誰かが置いた形）。
-        write(os.path.join(self.approved, "flows", "i0001-01-01.yml"), "other\n")
-        applied, out, err = self.write_changes(changes)
-        self.assertEqual(applied.code, 0, out + err)
-        self.assertIn("へ移せない", out)
-        self.assertNotIn("から", out.split("へ移せない")[1].split("\n")[0])
-        self.assertTrue(os.path.exists(flow))
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
-
 
 @contextlib.contextmanager
 def durable_writes():
@@ -520,23 +460,6 @@ class DurableWiringTest(CoreHarness):
         held = os.path.join(self.approved, "phases", "i0001", "workflow.yml")
         self.assertNotIn(_norm(held), seen)
         self.assertFalse(os.path.exists(held))
-
-    def test_a_carried_flow_is_written_durably(self):
-        self.family(plan=["design"])
-        todo = os.path.join(self.root, "wip", "proposals", "todo")
-        write(
-            os.path.join(todo, "i0001-01-01.md"),
-            child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]),
-        )
-        write(
-            os.path.join(self.root, ".ccnavi", "approved", "flows", "i0001-01-01.yml"),
-            "version: 1\nsteps: []\n",
-        )
-        changes = self.planned()
-        with durable_writes() as seen:
-            applied, out, err = self.write_changes(changes)
-        self.assertEqual(applied.code, 0, out + err)
-        self.assertIn(_norm(os.path.join(self.approved, "flows", "i0001-01-01.yml")), seen)
 
     def test_a_withdrawal_puts_the_proposal_back_durably(self):
         text = parent_text("i0001", ["research"])
@@ -882,13 +805,11 @@ class CoreChromeTest(CoreHarness):
 
     def same_as_cli(self, name, family, only=None):
         """同じ状態で、Chrome の plan と手元の CLI（preview → --yes）を比べる。"""
-        shown = json.loads(self.ccnavi("--agree", "--preview", "--json", *(only or [])).stdout)
-        ids = sorted(b["ticket"] for b in shown["batch"])
-        # 承認は指した識別子だけを対象にする。手元の下見も同じ絞りで比べる。
-        preview = json.loads(self.ccnavi("--agree", "--preview", "--json", *ids).stdout)
-        request = self.chrome_request("plan", family, ids=ids)
+        request = self.chrome_request("plan", family, **({"only": only} if only else {}))
         answer = self.ask_chrome(request)
+        preview = json.loads(self.ccnavi("--agree", "--preview", "--json", *(only or [])).stdout)
         self.assertEqual(answer["text"], preview["text"])
+        self.assertEqual(answer["digest"], preview["digest"])
         self.assertEqual(answer["identifiers"], sorted(b["ticket"] for b in preview["batch"]))
         self.assertEqual(answer["rejected"], preview["rejected"])
         before = self.disk()
@@ -896,7 +817,10 @@ class CoreChromeTest(CoreHarness):
             "--agree",
             "--yes",
             ",".join(answer["identifiers"]),
+            "--digest",
+            preview["digest"],
             "--json",
+            *(only or []),
         )
         body = json.loads(result.stdout)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -948,7 +872,9 @@ class CoreChromeTest(CoreHarness):
         self.commit_parent()
         # 合流した子のワークツリーを片付ける。手元の判定は全ツリーの承認済みチケットを読む
         # （取り込み状態の無い親子のチケット）ので、残すと手元だけが子のツリーの古い承認済み
-        # チケットを読み、判定が Chrome（統合先と P だけを読む）と食い違う。
+        # チケットを読み、判定が読んだ中身（read_set）
+        # で作るダイジェストが Chrome（統合先と P だけを読む）と
+        # 食い違う。
         git(
             self.root,
             "worktree",
@@ -1000,8 +926,7 @@ class CoreChromeTest(CoreHarness):
             git(path, "commit", "--quiet", "-m", "copies")
         answer = self.same_as_cli("predecessors", "i0003")
         self.assertEqual(answer["identifiers"], ["i0003-01-01"])
-        # 承認は指した識別子だけを対象にするので、先行が済んでいない子は対象に入らない。
-        self.assertEqual(answer["rejected"], [])
+        self.assertEqual([r["ticket"] for r in answer["rejected"]], ["i0003-01-02"])
 
     def done(self, name, parent, predecessors):
         text = child_text(name, parent, 1, ["wip/research/*"], False)
@@ -1131,10 +1056,7 @@ class CoreChromeTest(CoreHarness):
     def test_an_unreadable_stamp_is_an_error_not_an_exception(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
-        request = {
-            **self.chrome_request("plan", "i0001", ids=["i0001"]),
-            "stamp": "2026-09-29 12:00",
-        }
+        request = {**self.chrome_request("plan", "i0001"), "stamp": "2026-09-29 12:00"}
         answer = json.loads(load_chrome().handle(json.dumps(request), os.path.join(self.root, "m")))
         self.assertIn("時刻の形が違う", answer["error"])
 
@@ -1677,8 +1599,9 @@ class RecordWritesTest(CoreHarness):
             "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
         )
         self.commit_parent()
+        digest = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
         steps = [
-            ("--agree", "--yes", "i0001,i0001-01-01", "--json"),
+            ("--agree", "--yes", "i0001,i0001-01-01", "--digest", digest, "--json"),
             ("ticket", "start", "i0001"),
         ]
         for args in steps:
@@ -1758,6 +1681,7 @@ class RecordWritesTest(CoreHarness):
         self.addCleanup(os.remove, linked)
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
+        digest = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
         target = os.path.join(linked, "logs", "state", "c1", "self", "l.writes")
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
@@ -1778,6 +1702,8 @@ class RecordWritesTest(CoreHarness):
                 "--agree",
                 "--yes",
                 "i0001",
+                "--digest",
+                digest,
                 "--json",
             ],
             input="",

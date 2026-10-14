@@ -324,7 +324,9 @@ def phases_of(
             phase.states[t.ticket] = t.state
     # マーカーと記録は親のツリーに置く。子のワークツリーにも承認済みチケットは checkout されるが、
     # マーカーを子の側に書くと、同じフェーズのマーカーが複数のツリーに分かれて置かれる。
-    where = approval.home_dir(conf, root, parent_id, "")
+    where = approval.home_dir_read(
+        conf, root, parent_id, "", project=owner.project if owner is not None else None
+    )
     for phase in by_number.values():
         phase.marks = approval_marks.marks(where, parent_id, phase.number)
         for t in phase.tickets:
@@ -464,7 +466,12 @@ def announce(
     `raw` は `phases_of` と同じ。ここが書くのはマーカーだけで、置き場のチケットは動かさない。
     """
     texts = []
-    where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+    # マーカーを書くので、置き場は書く側の決め方で引く。決まらなければ何も言わない
+    # （読む側の存在しない置き場へ書くと、そこに置き場ができてしまう）。
+    try:
+        where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+    except approval.NoParentWorktree:
+        return ""
     phases = phases_of(root, conf, parent.ticket, raw=raw)
     # マーカーの `source` を決めるためだけに読む。判定は写しを読み、ここで読んだ定義は使わない。
     # 読むのはマーカーを置くフェーズがあるときだけ。
@@ -556,7 +563,7 @@ def _next_hint(parent: ticket_model.Ticket, phases: list[Phase], number: int) ->
                 "（フィードバック計画の番号だけ）を書き、最後の項がほかの全部を待つようにします。"
                 "独立した対応は最後に 1 項で受けるか、一直線に並べます。項が使う定義は "
                 f"'ccnavi --plan-order {parent.ticket} --fill-phases' で `phases:` に差し込みます。"
-                "改版の提案では `started_at`・`completed_at`・`base_sha`・"
+                "改版の提案では `started_at`・`completed_at`・`base_sha`・`merged_sha`・"
                 "`cancelled_at`・`cancel_reason` は空にします。"
             )
         return "計画のフェーズは全部終わりました。親チケットを閉じられます。"
@@ -725,7 +732,7 @@ def _later(a: str, b: str) -> bool:
 
 def _was_requested(conf: settings.Settings, root: str, parent: str, number: int) -> bool:
     """このフェーズの依頼の記録が、続きの子を足したときに消されたことがあるか（親の状態の履歴）。"""
-    where = approval.home_dir(conf, root, parent, "")
+    where = approval.home_dir_read(conf, root, parent, "")
     entries, _ = history.read(where, parent, limit=0)
     for entry in entries:
         if (
@@ -826,7 +833,7 @@ def _marker_tree(root: str, conf: settings.Settings, child: ticket_model.Ticket)
 
     置き場の設定が絶対パスなどで、ツリーのルートを引けないときは「マーカーがあるツリー」。
     """
-    where = approval.home_dir(conf, root, child.parent, "")
+    where = approval.home_dir_read(conf, root, child.parent, "")
     rel = (conf.approved or settings.DEFAULT_APPROVED).replace("/", os.sep)
     suffix = os.sep + rel
     if not where.endswith(suffix):
@@ -1029,7 +1036,7 @@ def stage(
             groups.setdefault(p.review_label, []).append(p.label)
         return "、".join(f"{label}（{'、'.join(names)}）" for label, names in groups.items())
     if approval_marks.read_parent_mark(
-        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
+        approval.home_dir_read(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         approval_marks.PARENT_MARK_CLOSE_EARLY,
     ):

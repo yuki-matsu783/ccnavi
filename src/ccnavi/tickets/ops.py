@@ -9,7 +9,8 @@
 `.ccnavi/approved/done/`（不要）へ、`cancel` は `doing/` から `done/` へ動かす。
 ワークツリーはここでは消さない。子のワークツリーは、`confirm` が子を `done/` へ動かしたあとと、
 親の `finish` のあとに sh が `worktree tidy` で消す（worktrees.py）。finish の前にワークツリーを
-消すと base_sha の検査ができなくなり、レビュー待ちの間に指摘を直す場所も無くなる。
+消すと base_sha の検査ができなくなり、レビュー待ちの間に見返す場所も無くなる（そこで積んだ
+コミットは親へ合流しないので、差し戻しは同じフェーズに子を足して直す）。
 
 ここに置くのは操作の本体（`start` / `finish` / `cancel` / `record_risk`）と、`finish` が閉じるときに
 実績のリスクを数える手順。チケットを引いて閉じてよいかを検査する部分は `ops_close.py`、Stop で
@@ -22,7 +23,7 @@ import os
 from dataclasses import replace
 from typing import TextIO
 
-from ..infra import fsio, settings, tree
+from ..infra import fsio, gitcmd, gitstate, settings, tree
 from . import (
     approval,
     approval_checks,
@@ -39,7 +40,6 @@ from . import (
     risk,
     skillsync,
     template_drafts,
-    ticket_ids,
     ticket_model,
     ticket_places,
     worktrees,
@@ -100,14 +100,11 @@ def start(
     owner = tree.project_root(conf.projects, found.project) or root
     worktree = tree.worktree_path(root, ticket_id)
     if not tree.is_worktree_of(owner, worktree) or not tree.exact_name(root, ticket_id):
-        where = f"projects/{found.project} の中で " if found.project else ""
         stderr.write(
             f"ccnavi: {ticket_id} のワークツリー {worktree} が無いか、"
             "元リポジトリが承認済みチケットの project"
             f"（{found.project or 'ワークスペース'}）と違う（大文字小文字まで同じ表記であること）。"
-            f"先に {where}'{settings.script_command(root, 'ccnavi-git.sh')} "
-            f'worktree add "{worktree}" '
-            f"{_branch_words(found)}' で作ってください\n"
+            f"{_create_words(root, found, worktree)}\n"
         )
         return 1
     sha = ops_stop.worktree_head_sha(worktree)
@@ -277,6 +274,9 @@ def finish(
     if scored is None:
         return 1
     fields = {"completed_at": approval_marks.now()}
+    merged = _merged_sha(root, found)
+    if merged:
+        fields["merged_sha"] = merged
     state = ticket_model.REVIEW if _needs_review(root, conf, found) else ticket_model.DONE
     code = _move(stdout, stderr, root, conf, found, state, fields, f"完了 {fields['completed_at']}")
     if code == 0 and scored:
@@ -285,6 +285,56 @@ def finish(
     if code == 0 and not found.is_child:
         _close_parent(stdout, stderr, root, conf, found)
     return code
+
+
+def _merged_sha(root: str, found: ticket_model.Ticket) -> str:
+    """この finish で親のブランチに入る子の先頭。入らない（合流していない）なら空。
+
+    親のワークツリーが合流の途中なら、その `MERGE_HEAD`（finish の検査が読んだ子の先頭）が
+    このコミットで入る先頭（`_merging_head`）。検査のあとに子が積んだコミットは合流に載らないので、
+    子のいまの先頭とは比べない。
+    合流の途中でなくても、子の先頭が親の先頭の祖先なら（子が先に親へ入っている）その先頭。
+    どちらでもなければ、親のブランチに入らない子なので書かない（レビュー依頼の前提が言う）。
+    """
+    if not found.is_child:
+        return ""
+    merging = _merging_head(root, found)
+    if merging:
+        return merging
+    child_tree = tree.worktree_path(root, found.ticket)
+    parent_tree = tree.worktree_path(root, found.parent)
+    head = gitstate.head(child_tree)
+    if not head:
+        return ""
+    parent_head = gitstate.head(parent_tree)
+    if not parent_head:
+        return ""
+    done = gitcmd.run(
+        child_tree, ["merge-base", "--is-ancestor", head, parent_head], ops_close.TIMEOUT_SECONDS
+    )
+    return head if done.ok else ""
+
+
+def _merging_head(root: str, found: ticket_model.Ticket) -> str:
+    """親のワークツリーが合流している子の先頭（`MERGE_HEAD`）。合流の途中でなければ空。
+
+    `MERGE_HEAD` が子のブランチの先頭か、その祖先のときだけ採る。親のワークツリーで
+    別のものを合流している途中（C1 の外の手作業）を、この子の合流と取り違えないため。
+    """
+    if not found.is_child:
+        return ""
+    parent_tree = tree.worktree_path(root, found.parent)
+    rc, out = gitcmd.output(
+        parent_tree, ["rev-parse", "--verify", "--quiet", "MERGE_HEAD"], ops_close.TIMEOUT_SECONDS
+    )
+    merging = out.strip() if rc == 0 else ""
+    head = gitstate.head(tree.worktree_path(root, found.ticket))
+    if not merging or not head:
+        return ""
+    done = gitcmd.run(
+        parent_tree, ["merge-base", "--is-ancestor", merging, head], ops_close.TIMEOUT_SECONDS
+    )
+    return merging if done.ok else ""
 
 
 def _needs_review(root: str, conf: settings.Settings, found: ticket_model.Ticket) -> bool:
@@ -495,7 +545,15 @@ def _score_child(
     definition = risk.load_definition(conf, root, _project_of(conf, root, found))
     if definition.fallback:
         stderr.write(f"ccnavi: {definition.fallback}\n")
-    diff, why = risk.measure(worktree, found.base_sha)
+    # 数えるのは子の仕事の始まり（取り込み直後の親の先頭と子の共通の祖先）から子の先頭まで。
+    # 着手の基準点から数えると、衝突を解くために子へ取り込んだ親の、ほかの子の変更が混ざる。
+    # 合流の途中なら、子の先頭の代わりに合流する先頭（MERGE_HEAD）まで数える。検査のあとに
+    # 子が積んだコミットは合流に載らないので数えない。
+    head = _merging_head(root, found) or "HEAD"
+    base, why = gitstate.child_base(
+        worktree, tree.worktree_path(root, found.parent), child_head=head
+    )
+    diff, why = risk.measure(worktree, base, head) if base else (None, why)
     if diff is None:
         stderr.write(f"ccnavi: {found.ticket} のリスクを測れない: {why}\n")
         return None
@@ -613,14 +671,21 @@ def _move(
     return 0
 
 
-def _branch_words(t: ticket_model.Ticket) -> str:
-    """ワークツリーを作る案内の、ブランチの語。
+def _create_words(root: str, t: ticket_model.Ticket, worktree: str) -> str:
+    """ワークツリーを作る案内。
 
-    親の `branch:` が識別子と違えば、そのブランチを出す（既にあればそのまま、無ければ `-b` で
-    切る。`ccnavi-git.sh worktree add` は `branch:` と一致する名前だけを通す）。ほかは今どおり
-    `-b <識別子>`。
+    子は親のブランチから `-b <子の識別子>` で切る。親は識別子の名前のブランチを作らず、
+    親のブランチ（MR の元ブランチ。`/` を `-` に置き換えると識別子になる名前）を
+    直接チェックアウトする。
+    作るのは `ccnavi-start.sh`（MR の採用の確認と取り込みも行う）。
     """
-    branch = ticket_ids.branch_name(t)
-    if branch == t.ticket:
-        return f"-b {t.ticket}"
-    return f"{branch}'（無ければ '-b {branch} <起点>'）"
+    if t.is_child:
+        where = f"projects/{t.project} の中で " if t.project else ""
+        git = settings.script_command(root, "ccnavi-git.sh")
+        return f"先に {where}'{git} worktree add \"{worktree}\" -b {t.ticket}' で作ってください"
+    start = settings.script_command(root, "ccnavi-start.sh")
+    return (
+        f"親のワークツリーは '{start} --mr <MR の番号>'"
+        "（MR が無ければ '--issue <issue の番号>'）で、"
+        "親のブランチを直接チェックアウトして作ってください（識別子の名前のブランチは作らない）"
+    )

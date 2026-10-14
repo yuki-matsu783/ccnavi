@@ -19,6 +19,10 @@
  * ホストが実際に積んだ先。GitHub では `expectedHeadOid` で読んだ先頭に決まり、GitLab では事後に確かめる。
  * 「始める」のために、読む操作 `issues` と、ボードからだけ受ける `createBranch` も受ける。`createBranch` は
  * 登録したリポジトリの統合先の今の先頭から、issue から決める形の名前でブランチを作り、予約の名前・統合先の名前は断る。
+ * `ccnavi-start.sh` と同じ手順にそろえるため、既存の MR を探す・採用を確かめる読み取り（`listOpenMrs`・`listMergedMrs`）と、
+ * ブランチを作った後の初期コミット（`startCommit`）・Draft の MR の作成（`createDraftMr`）も受ける。後の 2 つは
+ * `createBranch` と同じく、ボードからだけ・登録したリポジトリだけ・issue から決める形の名前だけで、
+ * Draft の MR は統合先へ向け、本文は `Closes #<番号>` に限る。
  */
 import { expiryNotice, parseManual, type Notice, type TokenMeta } from "./expiry.js";
 import * as github from "./github.js";
@@ -43,6 +47,10 @@ export type HostOp =
   | "issues"
   | "branchNames"
   | "createBranch"
+  | "listOpenMrs"
+  | "listMergedMrs"
+  | "startCommit"
+  | "createDraftMr"
   | "commit";
 
 export type Request =
@@ -124,6 +132,9 @@ export const MAX_HEADLINE = 200;
 const MAX_BODY = 64 * 1024;
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
+/** ホストへ書く操作。ボードからだけ、登録したリポジトリだけに受ける */
+const WRITE_OPS: ReadonlySet<string> = new Set(["commit", "createBranch", "startCommit", "createDraftMr"]);
+
 async function hostOf(deps: Deps, id: unknown): Promise<Host> {
   const host = (await deps.getHosts()).find((h) => h.id === id);
   if (!host) {
@@ -142,7 +153,7 @@ export async function dispatch(message: unknown, sender: Sender, deps: Deps): Pr
     if (!trustedSender(sender, deps.extensionId, deps.base, msg.kind === "token.set" || msg.kind === "token.clear")) {
       return { ok: false, error: "この送り手からの要求は受け付けない" };
     }
-    if (msg.kind === "host" && (msg.op === "commit" || msg.op === "createBranch") && !fromBoard(sender)) {
+    if (msg.kind === "host" && WRITE_OPS.has(String(msg.op)) && !fromBoard(sender)) {
       return { ok: false, error: "書き込みの要求はボードからのみ受け付けます" };
     }
     const host = await hostOf(deps, msg.host);
@@ -395,8 +406,9 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
   // 読み取りも、設定画面で登録したリポジトリ（プロジェクトのワークスペースも登録したもの）だけ受ける
   const known = await registeredRepo(deps, client, o, r);
   if (!known) {
-    const why = `${o}/${r} は設定画面に登録されていないリポジトリのため、${op === "commit" || op === "createBranch" ? "書き込めません" : "読み取れません"}`;
-    return op === "commit" || op === "createBranch" ? refuse(why) : { ok: false, error: why };
+    const writing = WRITE_OPS.has(String(op));
+    const why = `${o}/${r} は設定画面に登録されていないリポジトリのため、${writing ? "書き込めません" : "読み取れません"}`;
+    return writing ? refuse(why) : { ok: false, error: why };
   }
   let value: unknown;
   switch (op) {
@@ -507,7 +519,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       value = await x.issues(client, o, r);
       break;
     case "createBranch": {
-      // 「始める」: 親のブランチを統合先の今の先頭から作る。PR/MR は作らない
+      // 「始める」: 親のブランチを統合先の今の先頭から作る。初期コミットと Draft の MR は別の操作（startCommit・createDraftMr）
       const cfg = await registeredRepo(deps, client, o, r);
       if (!cfg) return refuse(`${o}/${r} は設定画面に登録していないリポジトリなのでブランチを作らない`);
       let name: string;
@@ -535,6 +547,53 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       }
       if (guard) return refuse(guard);
       value = { name, head: await x.createBranch(client, o, r, name, head) };
+      break;
+    }
+    case "listOpenMrs":
+      // 「始める」: issue に紐づく開いた MR を探す。読むだけ
+      value = await x.listOpenMrs(client, o, r);
+      break;
+    case "listMergedMrs":
+      // 「始める」: 採用する MR のブランチと同じ名前のマージ済み MR があるか。読むだけ
+      value = await x.listMergedMrs(client, o, r, github.checkBranch(a));
+      break;
+    case "startCommit": {
+      // 「始める」: 作ったばかりの親のブランチに初期コミットを積む（GitHub は差分のないブランチから PR を作れない）
+      const cfg = known;
+      let name: string;
+      try {
+        name = startName(a, cfg);
+      } catch (err) {
+        return refuse((err as Error).message);
+      }
+      const integ = cfg.integration || (await x.repoInfo(client, o, r)).defaultBranch;
+      if (PROTECTED.test(name) || name.toLowerCase() === integ.toLowerCase()) {
+        return refuse(`${name} は保護されたブランチか統合先の名前なので書き込まない`);
+      }
+      // 積んでよいのは、作ったばかりの（統合先の先頭のまま動いていない）ブランチだけ
+      const now = await x.branchHead(client, o, r, name);
+      if (now === null || now !== github.checkOid(b)) return refuse(`${name} の先頭が作った時点から動いているため、初期コミットを積まない`);
+      value = await x.startCommit(client, o, r, name, "chore: 作業を開始する");
+      break;
+    }
+    case "createDraftMr": {
+      // 「始める」: Draft の MR を作る。統合先へ向け、本文は Closes #<番号> だけ
+      const cfg = known;
+      let name: string;
+      try {
+        name = startName(a, cfg);
+      } catch (err) {
+        return refuse((err as Error).message);
+      }
+      const integ = cfg.integration || (await x.repoInfo(client, o, r)).defaultBranch;
+      if (PROTECTED.test(name) || name.toLowerCase() === integ.toLowerCase()) {
+        return refuse(`${name} は保護されたブランチか統合先の名前なので MR を作らない`);
+      }
+      if (b !== integ) return refuse(`MR のマージ先は統合先 ${integ} に限ります（${String(b)} は断る）`);
+      const title = text(c, "MR の題", 250);
+      const body = (args as unknown[])[5];
+      if (typeof body !== "string" || !/^Closes #[1-9][0-9]{0,8}$/.test(body)) return refuse("MR の本文は Closes #<issue の番号> に限ります");
+      value = await x.createDraftMr(client, o, r, name, integ, title, body);
       break;
     }
     default:

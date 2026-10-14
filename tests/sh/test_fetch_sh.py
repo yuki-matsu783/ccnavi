@@ -515,17 +515,20 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertIn("nope（統合先）がリモートにありません", done.stdout)
 
-    def test_a_worktree_without_a_record_keeps_the_old_rule(self):
-        # 取り込み状態の無い（取り込み済みでない）親子のチケットは今までどおり。
-        # 書きかけがあれば進めない。
+    def test_a_worktree_without_a_record_is_fast_forwarded_too(self):
+        # 取り込み状態（記録）の有無は早送りの対象に関係しない。HEAD のブランチ名を変換した
+        # 識別子がフォルダ名と同じ親のワークツリーは、すべて早送りする。
         tree = self.family(record=False)
         before = self.sha(tree, "HEAD")
-        self.advance(self.remote, "i0001")
+        head = self.advance(self.remote, "i0001")
         write(os.path.join(tree, "note.txt"), "書きかけ\n")
         git(tree, "add", "--", "note.txt")
         done = self.fetch()
-        self.assertEqual(before, self.sha(tree, "HEAD"))
-        self.assertIn("未コミットの変更", done.stdout)
+        self.assertNotEqual(before, self.sha(tree, "HEAD"))
+        self.assertEqual(head, self.sha(tree, "HEAD"))
+        self.assertIn("承認済みチケットとマーカーを", done.stdout)
+        # 書きかけは残る
+        self.assertTrue(os.path.exists(os.path.join(tree, "note.txt")))
 
     # ---- 何も出さないとき
 

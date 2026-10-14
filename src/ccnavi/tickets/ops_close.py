@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import TextIO
 
 from ..infra import gitcmd, settings, tree
@@ -25,6 +26,28 @@ from . import ticket as ticket_mod
 
 # git を読むときの待ち時間（秒）。`ops_stop.py` の git の読み取りも使う。
 TIMEOUT_SECONDS = 5.0
+
+
+def unmerged_fix(
+    root: str, tree_root: str, child: ticket_model.Ticket, timeout: float = TIMEOUT_SECONDS
+) -> str:
+    """finish の後に子のブランチへ積まれ、親に入っていないコミットの先頭。無ければ空。
+
+    合流は finish の 1 回だけで、`review/` の子のワークツリーで後から積んだコミットは親へ
+    入らない。手元の子のブランチの先頭が `merged_sha` と違い、親の HEAD（`tree_root`）にも
+    含まれていなければ、合流されていない修正がある。子のワークツリーが無い PC（別の PC で
+    finish した子など）では判定しない。レビューの依頼の前提と Stop の促しが同じ確認を使う。
+    """
+    if not os.path.isdir(tree.worktree_path(root, child.ticket)):
+        return ""
+    rc, out = gitcmd.output(
+        tree_root, ["rev-parse", "--verify", "--quiet", f"refs/heads/{child.ticket}"], timeout
+    )
+    head = out.strip() if rc == 0 else ""
+    if not head or head == child.merged_sha:
+        return ""
+    rc, _ = gitcmd.output(tree_root, ["merge-base", "--is-ancestor", head, "HEAD"], timeout)
+    return "" if rc == 0 else head
 
 
 def _places(
@@ -65,35 +88,25 @@ def _undecided(
     """どれが正か決まらないときの文面。次にすることまで書く。
 
     「1 つにしてから」だけだと、どのツリー上のチケットも追跡されたファイルなので、受け取った側に
-    できることが読めない。正とする側の決まり方（親のツリー → 元ツリー）と、この場面で
-    それが決まらない理由を名指しする。取り込み済みの親子のチケットでは、正とする側が親のブランチに決まって
-    いるので、取り込み状態から引いた解き方（`syncstate.guidance`）を出す。
+    できることが読めない。正とする側の決まり方（親のツリー）と、この場面で
+    それが決まらない理由を名指しする。正とする側は親のブランチ（親のワークツリー）に決まって
+    いるので、立ち位置から引いた解き方（`syncstate.guidance`）を出す。
     """
     home = hits[0].parent or hits[0].ticket
     stderr.write(head + f"が複数の場所にある: {_where(hits)}。1 つに決まるまで動かさない\n")
+    stderr.write(
+        f"  正は、親のブランチ {home} のワークツリー（.claude/worktrees/{home}）"
+        "上のチケットだけ。ほかのツリー上のチケットは読まない\n"
+    )
     st = approval_checks.family_standing(conf, root, hits[0]) if conf is not None else None
-    if st is not None and st.imported:
-        stderr.write(
-            f"  正は、親のブランチ {home} のワークツリー（.claude/worktrees/{home}）"
-            "上のチケットだけ"
-            "（取り込み済みの親子のチケット）。ほかのツリー上のチケットは読まない\n"
-        )
-        for line in syncstate.guidance(root, st) if st.stop else []:
+    if st is not None and st.stop:
+        for line in syncstate.guidance(root, st):
             stderr.write(f"  {line}\n")
-        if not st.stop:
-            stderr.write(
-                "  親のワークツリーの外のチケットは、"
-                "親のブランチへ移してコミットしてから削除するか、"
-                "残ったワークツリーを片付けてから再実行してください\n"
-            )
         return
     stderr.write(
-        f"  正は、親 {home} のワークツリー上のチケット。無ければ元ツリー"
-        "（ワークスペースルート、プロジェクトのチケットならそのプロジェクト）上のチケット\n"
-    )
-    stderr.write(
-        "  どちらにも無いか、元ツリーより先の置き場に在るチケットがあると、どれが正か決まらない。"
-        "先に進んだ側を合流させるか、残ったワークツリーを片付けてから再実行してください\n"
+        "  親のワークツリーの外のチケットは、"
+        "親のブランチへ移してコミットしてから削除するか、"
+        "残ったワークツリーを片付けてから再実行してください\n"
     )
 
 
@@ -140,15 +153,13 @@ def misplaced_home(
 def family_stopped(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
-    """取り込み済みの親子のチケットが決まらない・閉じているなら、言って True。
+    """親子のチケットが決まらない（親のワークツリーが無いなど）・閉じているなら、言って True。
 
     その親子のチケットの状態の操作（着手・終了・取り消し・記録・レビューのマーカー）は止める。引いたチケットが
     親のワークツリーの外にしか無いとき（元ツリーに未コミットで残ったチケットなど）も、信頼しないチケットを
     動かさないように止める。取り込み状態の無い親子のチケットには何も言わない（今の動きのまま）。
     """
     st = approval_checks.family_standing(conf, root, found)
-    if not st.imported:
-        return False
     if st.stop:
         stderr.write(f"ccnavi: {found.ticket}: {st.stop}。この親子のチケットの状態は動かさない\n")
         for line in syncstate.guidance(root, st):
@@ -287,8 +298,11 @@ def close_problems(
             f"{parent_id} には開いている子がある（{', '.join(open_children)}）。"
             "子を先に閉じてください"
         ]
+    own = approval_checks.by_id(copies).get(parent_id)
     if approval_marks.read_parent_mark(
-        approval.home_dir(conf, root, parent_id, ""),
+        approval.home_dir_read(
+            conf, root, parent_id, "", project=own.project if own is not None else None
+        ),
         parent_id,
         approval_marks.PARENT_MARK_CLOSE_EARLY,
     ):

@@ -40,13 +40,17 @@ from ..tickets import ticket_model
 CODE_ENV = "DENY_SCRIPT_ENV_OVERRIDE"
 CODE_CHILD_PUSH = "DENY_CHILD_PUSH"
 CODE_CORE_PATH = "DENY_WRAPPER_CORE_PATH"
+CODE_PARENT_TREE = "DENY_SUBAGENT_PARENT_TREE"
 ENV_RULE_ID = "builtin:script-env"
 CHILD_PUSH_RULE_ID = "builtin:child-push"
 CORE_PATH_RULE_ID = "builtin:guard-wrapper-paths"
+PARENT_TREE_RULE_ID = "builtin:subagent-parent-tree"
 
 # 保護済みの sh の名前。置き場は `.ccnavi/scripts/` に固定だが、呼び出しの綴りは
 # 絶対パス・相対パス・ワークツリーの中の写しとまちまちなので、パスではなく名前で見る。
-_SCRIPT = re.compile(r"ccnavi-[A-Za-z0-9-]+\.sh")
+# 名前の大小は問わない。Windows と macOS の既定のファイルシステムでは `CCNAVI-GIT.SH` も同じ
+# ファイルで、区別すると表記を変えるだけで外せる。
+_SCRIPT = re.compile(r"ccnavi-[A-Za-z0-9-]+\.sh", re.IGNORECASE)
 _GIT_SCRIPT = "ccnavi-git.sh"
 
 # 同じコマンド行で置いてよい変数。出力の量と待ち時間だけを変え、検査の材料には触れない。
@@ -61,6 +65,23 @@ PASS_THROUGH = frozenset(
 )
 # `CCNAVI_` で始まるもののほかに止める変数。sh のワークスペースルートの探し方に影響する。
 _ALSO_BLOCKED = frozenset({"CLAUDE_PROJECT_DIR"})
+# `GIT_` で始まる変数のうち、同じコマンド行で置いてよいもの。どれも作者の名前と出力の形だけを
+# 変え、git が操作するリポジトリ・作業ツリー・索引・設定には触れない。ほかの `GIT_` は止める。
+# `GIT_DIR=<親>/.git GIT_WORK_TREE=<親> sh …ccnavi-git.sh commit` を子のワークツリーで打つと、
+# 居場所の検査は子を見るのに、git は親のワークツリーへコミットする（ラッパーも先頭で外す）。
+_GIT_PASS_THROUGH = frozenset(
+    {
+        "GIT_AUTHOR_NAME",
+        "GIT_AUTHOR_EMAIL",
+        "GIT_AUTHOR_DATE",
+        "GIT_COMMITTER_NAME",
+        "GIT_COMMITTER_EMAIL",
+        "GIT_COMMITTER_DATE",
+        "GIT_PAGER",
+        "GIT_TERMINAL_PROMPT",
+        "GIT_MERGE_AUTOEDIT",
+    }
+)
 
 # 引数に変数名を取り、その変数を置く・外す・書き出すコマンド。
 _DECLARES = frozenset({"export", "declare", "typeset", "readonly", "local", "unset"})
@@ -74,9 +95,9 @@ _ENV_CLEARS = frozenset({"-i", "--ignore-environment", "-"})
 
 def blocked(name: str) -> bool:
     """同じコマンド行で置くと、保護済みの sh を呼ぶ形を止める変数か。"""
-    if name in PASS_THROUGH:
+    if name in PASS_THROUGH or name in _GIT_PASS_THROUGH:
         return False
-    return name.startswith("CCNAVI_") or name in _ALSO_BLOCKED
+    return name.startswith(("CCNAVI_", "GIT_")) or name in _ALSO_BLOCKED
 
 
 def check_env(subject: str, degraded: str) -> tuple[str, list[str]]:
@@ -105,20 +126,21 @@ def check_child_push(
     """子チケットのワークツリーからの `ccnavi-git.sh push` なら（ツリーの名前, 親,
     見つけた文字列）。
 
-    居場所は payload の cwd から `cd` を追った先。追えなくなった先で push を
+    居場所は payload の cwd から `cd` と実行役の行き先（`env -C`・`sudo -D`）を追った先。
+    追えなくなった先で push を
     打つ形は、どのツリーから送るのかが決まらないので止める（親は `?`）。
     """
     if degraded or not cwd:
         return "", "", ""
     for words, here in shellread.placed(subject):
-        call = _script_call(words)
-        if not call or os.path.basename(call[0].replace("\\", "/")) != _GIT_SCRIPT:
+        call = _script_call_at(words)
+        if not call or not _is_git_script(call[0]):
             continue
         if call[1][:1] != ["push"]:
             continue
-        if here is None:
+        place = _call_place(cwd, here, call[2])
+        if place is None:
             return "?", "?", ""
-        place = here if os.path.isabs(here) else os.path.join(cwd, here)
         name = worktree_name(root, place)
         if not name:
             continue
@@ -126,6 +148,125 @@ def check_child_push(
         if parent:
             return name, parent, found
     return "", "", ""
+
+
+# サブエージェントが親のワークツリーで打てないラッパーの副命令。親のワークツリーの作業ツリー・
+# 索引・ブランチの先頭を動かすもの。読む副命令（status・log・diff など）は止めない。
+# 合流・コミット・push はメインが finish で行う。履歴を書き換える副命令（cherry-pick・revert・
+# rebase など）はラッパーも通さないが、ここでも名指しして止める
+# （ラッパーの許可が広がっても、親のワークツリーには届かない）。
+_PARENT_WRITES = frozenset(
+    {
+        "add",
+        "rm",
+        "mv",
+        "restore",
+        "checkout",
+        "switch",
+        "stash",
+        "merge",
+        "commit",
+        "pull",
+        "cherry-pick",
+        "revert",
+        "rebase",
+        "am",
+        "apply",
+        "reset",
+        "clean",
+        "integrate",
+        "integrate-done",
+    }
+)
+
+
+def check_parent_tree_git(
+    conf: settings.Settings, root: str, cwd: str, subject: str, degraded: str
+) -> tuple[str, str]:
+    """サブエージェントの `ccnavi-git.sh` が親のワークツリーを書き換える形なら
+    （副命令, 親のワークツリーの名前）。
+
+    居場所は payload の cwd から `cd` と実行役の行き先（`env -C`・`sudo -D`）を追った先
+    （子のワークツリーでのコミットと、子のワークツリーで
+    親のブランチを取り込む merge は通す）。居場所を追えない形（`cd` の行き先に変数・置換がある、
+    読み切れないコマンド行）で書き換える副命令を打つ形は、どのツリーに当たるかが決まらないので
+    止める（名前は `?`）。
+    """
+    if _GIT_SCRIPT not in subject.lower():
+        return "", ""
+    if degraded:
+        for name in _DEGRADED_NAME.finditer(subject):
+            sub = _DEGRADED_SUB.match(subject, name.end())
+            if not sub or sub.group(1).lower() in _PARENT_WRITES:
+                return (sub.group(1).lower() if sub else "?"), "?"
+        return "", ""
+    for words, here in shellread.placed(subject):
+        call = _script_call_at(words)
+        if not call or not _is_git_script(call[0]):
+            continue
+        args = call[1]
+        if not args:
+            continue
+        if _OPEN_SUB.search(args[0]):
+            return args[0], "?"
+        if args[0].lower() not in _PARENT_WRITES:
+            continue
+        place = _call_place(cwd, here, call[2]) if cwd else None
+        if place is None:
+            return args[0], "?"
+        name = worktree_name(root, place)
+        if name and ticket_role(conf, root, name)[0] == ROLE_PARENT:
+            return args[0], name
+    return "", ""
+
+
+_PARENT_TREE_TAIL = (
+    "子のワークツリー（.claude/worktrees/<子>）で実装してコミットし、結果を報告して"
+    "終わってください。親のブランチへの合流・状態の記録・push は、メインが finish で行います。"
+    "衝突を解くときは、子のワークツリーで親のブランチを merge してコミットします。"
+)
+
+
+def parent_tree_message(sub: str, name: str) -> str:
+    """サブエージェントが `ccnavi-git.sh` で親のワークツリーを書き換えるのを止めた文。"""
+    if name == "?":
+        return (
+            f"ccnavi-git.sh {sub} をどのツリーで実行するのかが読めません"
+            "（`cd` や `env -C` の行き先に変数・置換がある、読み切れないコマンド行、など）。"
+            "サブエージェントは親のワークツリーを書き換えないので、"
+            "実行するツリーが決まらない形は使用できません。子のワークツリーに入って、"
+            "`cd` の行き先をそのまま書いて再実行してください。"
+        )
+    return (
+        f"{name} は親のワークツリーです。サブエージェントは親のワークツリーを書き換えません"
+        f"（ccnavi-git.sh {sub} も、ファイルの書き込みも）。" + _PARENT_TREE_TAIL
+    )
+
+
+def parent_write_message(what: str, name: str, kind: str = "write") -> str:
+    """サブエージェントが親のワークツリーへファイルを書き込むのを止めた文。
+
+    what は書き込みの形（ツールの名前か、シェルの書き込み先・コードの文字列）。
+    """
+    if name == "?":
+        return (
+            f"書き込み先（{what}）がどのツリーにあるかを読めません（`cd` の行き先に変数・置換が"
+            "ある、など）。サブエージェントは親のワークツリーへ書き込まないので、書き込み先が"
+            "決まらない形は使用できません。`cd` の行き先をそのまま書くか、子のワークツリーの中の"
+            "絶対パスで書いて再実行してください。"
+        )
+    if kind == "code":
+        return (
+            f"{name} は親のワークツリーです。インタプリタに渡したコード（{what}）が親の"
+            "ワークツリーを指し、書き込みを疑う語を含むので止めました。コードの中は読み切れない"
+            "ため、親のワークツリーを指す形は止める側に倒します。読むだけなら Read・Grep を"
+            "使ってください。" + _PARENT_TREE_TAIL
+        )
+    return (
+        f"{name} は親のワークツリーです。サブエージェントは親のワークツリーへ書き込みません"
+        f"（{what}）。下書き・提案・ELI5 の置き場（wip/proposals/・wip/handoff/・wip/eli5/）は"
+        "書けます。" + _PARENT_TREE_TAIL
+    )
 
 
 # ラッパーの副命令のうち、行き先のファイルを消す・別のコミットの中身に戻すもの。
@@ -206,7 +347,7 @@ def check_core_paths(
     compiled = None
     for words, here in places:
         call = _script_call(words)
-        if not call or os.path.basename(call[0].replace("\\", "/")) != _GIT_SCRIPT:
+        if not call or not _is_git_script(call[0]):
             continue
         args = call[1]
         if args and _OPEN_SUB.search(args[0]):
@@ -548,6 +689,50 @@ def worktree_name(root: str, place: str) -> str:
     return target[len(base) + 1 :].split(os.sep, 1)[0]
 
 
+ROLE_CHILD = "child"
+ROLE_PARENT = "parent"
+
+
+def ticket_role(conf: settings.Settings, root: str, name: str) -> tuple[str, str]:
+    """その名前のワークツリーの役（`ROLE_CHILD` / `ROLE_PARENT`）と、子なら親の識別子。
+
+    見るのはそのワークツリー自身のツリーにある同じ名前のチケット（`doing/`・`done/`・
+    `review/`）だけ。ほかのツリーに置いたファイルでは役を決めない（子のワークツリーに
+    `parent:` の行を持つ同名の偽のチケットを 1 つ置くだけで、親のワークツリーの禁止が
+    丸ごと外れる）。
+    見つかったものすべてに `parent:` があれば子。`parent:` の無いものが 1 つでもあるか、読めない
+    ファイルがあれば親（止める側）。チケットが無ければ役は空（直接作業のワークツリーなど）。
+    """
+    top = os.path.join(root, tree.WORKTREES_DIR, name)
+    approved = settings.approved_dir(conf, top)
+    proposals = os.path.join(top, (conf.tickets or "").replace("/", os.sep))
+    parents: list[str] = []
+    found = False
+    for path in (
+        os.path.join(approved, ticket_model.DOING, name + ".md"),
+        os.path.join(approved, ticket_model.DONE, name + ".md"),
+        os.path.join(proposals, ticket_model.REVIEW, name + ".md"),
+    ):
+        if not os.path.lexists(path):
+            continue
+        found = True
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                text = f.read()
+        except OSError:
+            return ROLE_PARENT, ""
+        match = re.search(r"^parent:[ \t]*(.*?)[ \t]*$", text, re.MULTILINE)
+        parent = match.group(1).strip("'\"") if match else ""
+        if not parent:
+            return ROLE_PARENT, ""
+        parents.append(parent)
+    if not found:
+        return "", ""
+    if len(set(parents)) != 1:
+        return ROLE_PARENT, ""
+    return ROLE_CHILD, parents[0]
+
+
 def child_parent(conf: settings.Settings, root: str, name: str) -> tuple[str, str]:
     """その名前の承認済みチケットが子なら（親, 見つけたファイル）。子でなければ空。
 
@@ -595,7 +780,74 @@ def _script_call(words: list[str]) -> tuple[str, list[str]] | None:
     `sh <sh>`・`bash <sh>`・`<sh>` の直接の実行・`. <sh>`、と、それを `env` `sudo` などの
     実行役のコマンド越しに呼ぶ形。`sh -c '…'` は読み切れない形として read() が縮退させる。
     """
+    found = _script_call_at(words)
+    return (found[0], found[1]) if found else None
+
+
+# 実行役のコマンドのうち、後ろのコマンドを別のディレクトリで実行させる選択肢
+# （`env -C <dir>`・`sudo -D <dir>`。長い形はどちらも `--chdir`）。
+_CHDIR_SHORT = {"env": "C", "sudo": "D"}
+
+
+# 居場所の表記のうち、シェルが実行の時点で値を決めるもの（変数・置換・glob・`~`）。
+_UNREAD_PLACE = re.compile(r"[$`*?\[~]")
+
+
+def _call_place(cwd: str, here: str | None, chdirs: list[str]) -> str | None:
+    """sh が実際に走る場所。`cd` を追った先に、実行役の `-C` / `-D` / `--chdir` の行き先を重ねる。
+
+    どれかが読めなければ None（どこで走るかが決まらない。呼び手は止める側に倒す）。
+    """
+    if here is None:
+        return None
+    place = here if os.path.isabs(here) else os.path.join(cwd, here)
+    for target in chdirs:
+        if not target or _UNREAD_PLACE.search(target):
+            return None
+        place = os.path.join(place, target)
+    return place
+
+
+def _runner_chdirs(name: str, args: list[str]) -> list[str]:
+    """実行役が後ろのコマンドを動かすディレクトリ（書いた順）。無ければ空。"""
+    short = _CHDIR_SHORT.get(name)
+    if not short:
+        return []
+    values, _ = shellread_words._RUNNERS[name]
+    found: list[str] = []
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "--" or not arg.startswith("-") or arg == "-":
+            break
+        if arg.startswith("--"):
+            option, eq, value = arg.partition("=")
+            if option == "--chdir":
+                if eq:
+                    found.append(value)
+                elif i + 1 < len(args):
+                    found.append(args[i + 1])
+            i += shellread_words._option_width(arg, args[i + 1 :], values)
+            continue
+        letters = arg[1:]
+        for k, letter in enumerate(letters):
+            if letter == short:
+                rest = letters[k + 1 :]
+                if rest:
+                    found.append(rest)
+                elif i + 1 < len(args):
+                    found.append(args[i + 1])
+                break
+            if "-" + letter in values:
+                break
+        i += shellread_words._option_width(arg, args[i + 1 :], values)
+    return found
+
+
+def _script_call_at(words: list[str]) -> tuple[str, list[str], list[str]] | None:
+    """`_script_call` と同じ読みに、実行役が移す先のディレクトリ（書いた順）を添える。"""
     words = _strip_heads(words)
+    chdirs: list[str] = []
     depth = 0
     while words and depth <= shellread_words.UNWRAP_DEPTH:
         k = shellread_words._name_index(words)
@@ -607,6 +859,7 @@ def _script_call(words: list[str]) -> tuple[str, list[str]] | None:
             inner = shellread_words._runner_command(name, args)
             if not inner:
                 return None
+            chdirs.extend(_runner_chdirs(name, args))
             words = inner[0]
             depth += 1
             continue
@@ -617,12 +870,16 @@ def _script_call(words: list[str]) -> tuple[str, list[str]] | None:
                     i += 1
                 i += 1
             if i < len(args) and _is_script(args[i]):
-                return args[i], args[i + 1 :]
+                return args[i], args[i + 1 :], chdirs
             return None
         if _is_script(words[k]):
-            return words[k], args
+            return words[k], args, chdirs
         return None
     return None
+
+
+def _is_git_script(word: str) -> bool:
+    return os.path.basename(word.replace("\\", "/")).lower() == _GIT_SCRIPT
 
 
 def _is_script(word: str) -> bool:
@@ -729,7 +986,8 @@ def env_message(script: str, names: list[str]) -> str:
     return (
         f"保護済みの sh（{script}）を、sh の検査の材料を変える環境変数（{shown}）と"
         "同じコマンド行で呼んでいます。この変数は sh がワークスペースルート・承認済みチケットの"
-        "置き場・実行ファイルを決めるのに使うので、書き換えると sh の検査が外れます。"
+        "置き場・実行ファイルを決めるのに使うか（CCNAVI_*）、git が操作するリポジトリと"
+        "作業ツリーを決めるのに使う（GIT_*）ので、書き換えると sh の検査が外れます。"
         "コマンド行のどこに書いても数えます（ループや関数の中では、後ろに書いた代入も次の呼び出しに"
         "届くため）。変数を置かずに、sh の呼び出しを別のコマンドに分けて実行してください。"
         "置き場が本当に違うなら、ユーザに "

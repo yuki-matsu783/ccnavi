@@ -406,6 +406,20 @@ test("CB-T263 先行待ちはカードへそのまま渡り、列と要対応は
   assert.deepEqual(before.predecessorsUnmet, []);
 });
 
+test("CB-T263b 合流した子の先頭（merged_sha）はカードへそのまま渡る。退避した子も同じ。無ければ空", () => {
+  const base = fixture();
+  const sha = "a".repeat(40);
+  const board = buildBoard({
+    ...base,
+    tickets: base.tickets.map((t) => (t.ticket === "i0001-02-03" ? { ...t, merged_sha: sha } : t)),
+    archived: [{ ...archivedJson("old-01-01", "old"), merged_sha: sha }, archivedJson("old-01-02", "old")],
+  });
+  const cards = cardsOf(board);
+  assert.equal(cards.get("i0001-02-03")!.mergedSha, sha);
+  assert.equal(cards.get("old-01-01")!.mergedSha, sha);
+  assert.equal(cards.get("old-01-02")!.mergedSha, "", "欄の無い古い答えは空");
+});
+
 function archivedJson(ticket: string, parent = ""): ArchivedTicketJson {
   return {
     ticket,

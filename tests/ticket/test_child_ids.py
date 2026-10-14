@@ -244,12 +244,30 @@ class FollowupRefusesTest(NextChildIdTest):
                 os.remove(path)
 
     def test_a_free_number_is_written(self):
-        self.put(".ccnavi/approved/done", "i0001-02-01", "i0001", 2)
+        # 続きの子は親のワークツリーの承認済みの置き場に書く（無ければ書かずに止まる）
+        for args in (
+            ["git", "-c", "user.email=t@e.invalid", "-c", "user.name=t"]
+            + ["commit", "--quiet", "--allow-empty", "-m", "init"],
+            ["git", "worktree", "add", "--quiet", ".claude/worktrees/i0001", "-b", "i0001"],
+        ):
+            subprocess.run(args, cwd=self.ws, check=True, capture_output=True)
+        home = os.path.join(self.ws, ".claude", "worktrees", "i0001")
+        path = os.path.join(home, ".ccnavi", "approved", "done", "i0001-02-01.md")
+        os.makedirs(os.path.dirname(path))
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(child_text("i0001-02-01", "i0001", 2))
         ident, failed = self.followup(2)
         self.assertEqual((ident, failed), ("i0001-02-02", ""))
         self.assertTrue(
-            os.path.exists(os.path.join(self.ws, ".ccnavi", "approved", "doing", ident + ".md"))
+            os.path.exists(os.path.join(home, ".ccnavi", "approved", "doing", ident + ".md"))
         )
+
+    def test_without_the_parent_worktree_nothing_is_written(self):
+        self.put(".ccnavi/approved/done", "i0001-02-01", "i0001", 2)
+        before = self.snapshot()
+        ident, failed = self.followup(2)
+        self.assertIn("親のワークツリーが決まらない", failed)
+        self.assertEqual(before, self.snapshot())
 
 
 if __name__ == "__main__":

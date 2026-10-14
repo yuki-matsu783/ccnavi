@@ -48,8 +48,8 @@ function parentOnly(): Record<string, FixtureBranch> {
 async function shown(d: WriteDeps, family = "i0001") {
   const b = await collectRepo(REPO, d);
   const r = b.families.find((f) => f.family.name === family)?.result;
-  assert.ok(r?.batch, JSON.stringify(r ?? b.error));
-  return (r.batch ?? []).map((e) => e.ticket);
+  assert.ok(r?.digest, JSON.stringify(r ?? b.error));
+  return { ids: (r.batch ?? []).map((e) => e.ticket), digest: r.digest, only: r.only ?? null };
 }
 
 test("CX-T118 取り下げ: GitHub が承認コミットを renamed で返しても、変更の一覧が切れていても、木を比べて「足した」と分かる", async () => {

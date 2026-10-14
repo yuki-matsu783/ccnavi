@@ -78,7 +78,9 @@ class SessionRejectsTest(PhaseHarness):
         return result.returncode, out.get("systemMessage", ""), context
 
     def approve_all(self, *names):
-        done = self.ccnavi("--agree", "--yes", ",".join(names), "--json")
+        shown = self.ccnavi("--agree", "--preview", "--json")
+        digest = json.loads(shown.stdout)["digest"]
+        done = self.ccnavi("--agree", "--yes", ",".join(names), "--digest", digest, "--json")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         copies = json.loads(done.stdout)["copies"]
         for name in names:
@@ -156,7 +158,8 @@ class SessionRejectsTest(PhaseHarness):
         for text in (system, context):
             self.assertIn("src/*", text)
             self.assertIn("フェーズ定義 research", text)
-            self.assertNotIn("親 i0001", text)
+            # 出所に親は出ない。context に載る作業中の親の一覧（親 i0001 の行）は別の話
+            self.assertNotIn("親 i0001", text.partition("[ccnavi] このPCで作業中の親:")[0])
 
     # ---- 3. 絞る
 

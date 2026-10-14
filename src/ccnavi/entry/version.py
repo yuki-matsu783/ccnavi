@@ -48,7 +48,7 @@ from ..tickets import phasetypes, risk, ticket_model
 # ccnavi の版。pyproject.toml の `version` と揃える（tests/core/test_version.py が見る）。
 VERSION = "0.1.0"
 # 実行ファイルと sh・拡張の契約の版。上げ方は冒頭の説明のとおり。
-COMPAT = 10
+COMPAT = 11
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
 # 実行ファイルが持つ振る舞い。旗や JSON の欄の有無を `flags` から読めないものを足す。

@@ -140,7 +140,7 @@ class ApproveVerifyTest(PhaseHarness):
         body = json.loads(result.stdout)
         self.assertEqual(body["version"], APPROVE_VERSION)
         self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001"])
-        self.assertNotIn("digest", body)
+        self.assertTrue(body["digest"])
         self.assertEqual(body["verify"], {"ok": True, "reason": "ok"})
 
     def test_json_says_why_it_failed(self):

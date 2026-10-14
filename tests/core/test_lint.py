@@ -323,7 +323,8 @@ class LintTest(unittest.TestCase):
         self.assertIn("i0001 が複数の場所にある", result.stdout)
         self.assertIn("(ワークスペースルート):doing", result.stdout)
         self.assertIn("(ワークスペースルート):done", result.stdout)
-        self.assertEqual(counts(result.stdout)[0], 1)
+        # 親のワークツリーが無いこと・mr: が無いことも別に error で言う
+        self.assertGreaterEqual(counts(result.stdout)[0], 1)
 
     def test_同じ識別子がdoingとreviewの両方に在ればerrorになる(self):
         # review/ は提案の走査に入るので、これは前からの振る舞い。doing と done の側を

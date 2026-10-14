@@ -232,6 +232,7 @@ _NOT_WITH_DOCS = (
     "--record-writes",
     "--record-tree",
     "--choose-out",
+    "--placed-out",
     "--integration-branch",
     "--actor",
     "--via",

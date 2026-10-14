@@ -61,14 +61,12 @@ from . import (
     ticket_model,
     ticket_places,
 )
-from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 15.0
 
 # state の置き場に書く、投稿待ちの本文の名前。sh がこれを投稿する。
 REQUEST_FILE = "review-request-{parent}-{phase}.md"
 # まだマージリクエストが無いときに、sh がこれで作る。
-MR_FILE = "review-mr-{parent}.md"
 # 依頼の本文とマージリクエストの下書きの末尾に必ず書く一文。下書きの置き場
 # （ticket_places.HANDOFF）の変更を、レビュアーが読む対象に数えないため。
 HANDOFF_NOTE = (
@@ -94,7 +92,7 @@ def prepare(
         stderr.write("ccnavi: state の置き場が空。投稿する本文を置く場所がありません。\n")
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
-    unmet = _unmet(tree_root, conf, ph)
+    unmet = _unmet(root, tree_root, conf, ph)
     body = _read_body(_resolve(cwd, body_file))
     if body is None:
         unmet.append(f"依頼文を読めない ({body_file})")
@@ -127,49 +125,13 @@ def prepare(
     ).hexdigest()[:16]
     marker = f"{review_host.MARKER_REQUEST}{parent.ticket}:{phase_no} key={key} -->\n"
     path = os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
-    draft = os.path.join(conf.state, MR_FILE.format(parent=parent.ticket))
-    failed = fsio.write_text(path, marker + body, newline="\n") or fsio.write_text(
-        draft, mr_draft(parent), newline="\n"
-    )
+    failed = fsio.write_text(path, marker + body, newline="\n")
     if failed:
         stderr.write(f"ccnavi: 本文を書き出せない ({failed})\n")
         return 1
-    # 1 行目が依頼の本文、2 行目がマージリクエストの下書き。sh はこの順で読む。
-    stdout.write(path + "\n" + draft + "\n")
+    # 1 行が依頼の本文のパス。マージリクエストは作らない（無ければ sh が止める）。
+    stdout.write(path + "\n")
     return 0
-
-
-def mr_draft(parent: ticket_model.Ticket) -> str:
-    """マージリクエストの下書き。1 行目が題、空行のあとが本文。
-
-    まだ無ければ sh がこれで作る。ユーザがレビューのときに見るのはこの入れ物なので、
-    親チケットが持っている材料（題・理由・本文・元の課題）をそのまま書き写す。
-    下書き（Draft）で作るのは、統合を決めるのがユーザだから。題から Draft を外して
-    マージするところまでがユーザの手に残る。
-    """
-    title = parent.title.strip() or parent.ticket
-    lines = [f"Draft: {title}", ""]
-    if parent.issue:
-        # 別のリポジトリの課題は `Closes owner/repo#N`（`issue:` に `owner/repo#N` を許している）
-        lines += [f"Closes {ticket_mod.issue_label(parent)}", ""]
-    lines += [
-        f"チケット `{parent.ticket}`。ワークツリーは `.claude/worktrees/{parent.ticket}`。",
-        "",
-    ]
-    if parent.rationale.strip():
-        lines += ["## なぜやるか", "", parent.rationale.strip(), ""]
-    if parent.body.strip():
-        lines += [parent.body.strip(), ""]
-    lines += [
-        "---",
-        "",
-        "フェーズが終わるたびに ccnavi がレビューの依頼をこのマージリクエストに投稿する。",
-        "未解決のスレッドが残っている間、次のフェーズへは進めない。",
-        "",
-        HANDOFF_NOTE,
-        "",
-    ]
-    return "\n".join(lines)
 
 
 def requested(
@@ -202,7 +164,7 @@ def requested(
         return 1
     # 投稿とマーカーの間に HEAD が動いていないか。
     # 動いていれば、ユーザが見るものとマーカーが食い違う。
-    unmet = _unmet(tree_root, conf, ph)
+    unmet = _unmet(root, tree_root, conf, ph)
     if unmet:
         stderr.write("ccnavi: 投稿の後に前提が成り立たなくなった。マーカーは置かない\n")
         for line in unmet:
@@ -854,7 +816,7 @@ def _parent_mark(stderr: TextIO, approved_dir: str, parent: str, name: str, data
     return True
 
 
-def _unmet(tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str]:
+def _unmet(root: str, tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str]:
     """依頼の前提のうち、ワークツリーの中で分かるもの。"""
     unmet: list[str] = []
     if not ph.ended:
@@ -862,15 +824,30 @@ def _unmet(tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str
     for child in ph.tickets:
         if ph.states.get(child.ticket) not in (ticket_model.REVIEW, ticket_model.DONE):
             continue
-        # 子のブランチは識別子と同じ名前。ワークツリーではなくブランチを引くので、
-        # ワークツリーを消しても検査から外れない。引けなければ前提の未充足。
-        rc, sha = _git(tree_root, ["rev-parse", "--verify", f"{child.ticket}^{{commit}}"])
-        if rc != 0 or not sha.strip():
-            unmet.append(f"子 {child.ticket} のブランチを確かめられない（消えている）")
+        # 取り消した子（CANCELLED）は上で外れる。cancel は子のブランチを親へ入れない。
+        # すべての子が親のブランチに合流済みか。子のブランチは見ない（ローカルの子のブランチを
+        # 消しても、別の PC で finish した子でも変わらない）。finish が書いた `merged_sha`
+        # （合流した子の先頭）が、いまの親の HEAD の祖先かで確かめる。
+        if not child.merged_sha:
+            unmet.append(
+                f"子 {child.ticket} が親のブランチに合流していない"
+                "（finish が合流した記録 merged_sha が無い）"
+            )
             continue
-        rc, _ = _git(tree_root, ["merge-base", "--is-ancestor", sha.strip(), "HEAD"])
+        rc, _ = _git(tree_root, ["merge-base", "--is-ancestor", child.merged_sha, "HEAD"])
         if rc != 0:
-            unmet.append(f"子 {child.ticket} のブランチが親に取り込まれていない")
+            unmet.append(
+                f"子 {child.ticket} の合流した先頭（{child.merged_sha[:12]}）が親の HEAD に無い"
+            )
+            continue
+        late = _unmerged_fix(root, tree_root, child)
+        if late:
+            unmet.append(
+                f"子 {child.ticket} の手元のブランチに、合流されていない修正がある"
+                f"（先頭 {late[:12]}。合流した先頭は {child.merged_sha[:12]}）。"
+                "finish の後に積んだコミットは親のブランチに入らない。直すときは、同じフェーズに"
+                "子を足してユーザの承認を受け、その子で直す"
+            )
     # 未追跡は数えない。依頼文そのものをワークツリーに置く使い方が普通にあり、未追跡で
     # 前提を満たさないと判定すると依頼文を書く場所が無くなる。未追跡はマージリクエストに載らない。
     if _dirty(tree_root, conf):
@@ -881,6 +858,14 @@ def _unmet(tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str
     elif _unpushed(tree_root, conf, branch):
         unmet.append("親ブランチの HEAD が push されていない")
     return unmet
+
+
+def _unmerged_fix(root: str, tree_root: str, child: ticket_model.Ticket) -> str:
+    """finish の後に子のブランチへ積まれ、親に入っていないコミットの先頭。
+
+    中身は `ops_close.unmerged_fix`。Stop の促しも同じ関数で確かめる。
+    """
+    return ops_close.unmerged_fix(root, tree_root, child, TIMEOUT_SECONDS)
 
 
 def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:

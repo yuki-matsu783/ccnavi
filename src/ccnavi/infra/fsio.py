@@ -702,18 +702,21 @@ def listdir(directory: str) -> list[str]:
     return [n for n in names if n not in dropped] + [n for n in added if n not in names]
 
 
-def load_text(path: str) -> str:
-    """本文を読む。読めなければ `open` と同じ例外（無ければ FileNotFoundError）。
+def load_source(path: str) -> tuple[bytes, str]:
+    """読んだバイト列と、それを `open(path, encoding="utf-8")` と同じ読み方で解いた本文を返す。
 
-    無いのと読めないのを呼び手が分けるときに使う（`ticket.load`）。
+    1 回だけ読む。解析した中身と、照合や書き込みに使うバイト列を同じ読みから取るため
+    （`ticket.load`）。読めなければ `open` と同じ例外（無ければ FileNotFoundError）を投げ、
+    無いのと読めないのを呼び手が分けられるようにする。
     """
     staged, content = _staged(path)
     if staged:
         if content is None:
             raise _missing(path)
-        return _decode(content)
-    with open(path, encoding="utf-8") as f:
-        return f.read()
+    else:
+        with open(path, "rb") as f:
+            content = f.read()
+    return content, _decode(content)
 
 
 # ---- この実行で書いたパスの記録（C1 がこの一覧のパスだけをコミットする）
@@ -783,7 +786,7 @@ def _recorded(path: str, failed: str) -> str:
 # ---- 書かずに溜める段（承認の plan。書くものを値として並べる）
 #
 # `staging` の中では、書き込みの関数はディスクに書かずに `Op` を溜め、読みの関数
-# （`read_text`・`read_bytes`・`read_json`・`exists`・`lexists`・`listdir`・`load_text`）は
+# （`read_text`・`read_bytes`・`read_json`・`exists`・`lexists`・`listdir`・`load_source`）は
 # 溜めた内容を先に見る。承認の書き込みの手順（`agree.plan_batch`）をこの中で
 # 動かすと、何をどの順に書くか（`Changes`）が値として出る。手元の Writer(FS) はそれを
 # ディスクに書き、Chrome は同じ値を 1 コミットにする。

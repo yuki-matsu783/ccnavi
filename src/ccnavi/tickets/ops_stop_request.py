@@ -1,6 +1,7 @@
 """Stop で、レビューの依頼まで進めずに終えようとしたときの促し。
 
-チケット作業の決まった道（子の `finish` → 親ブランチへ合流 → ELI5 → `ccnavi-review.sh request`）の
+チケット作業の決まった道（子の `finish`（親ブランチへ合流して push）→ すべての子が合流済みかの確認
+→ ELI5 → `ccnavi-review.sh request`）の
 途中で、エージェントが「進めてよいですか」と確認して終えてしまうのを、1 回だけ止めて次の一手を返す。
 `ops_stop.unfinished_at_stop` は `finish` の打ち忘れ専用なので、ここは別の判定にしてある。
 
@@ -56,6 +57,7 @@ CODE_REQUEST_NUDGE = "NUDGE_TICKET_REQUEST"
 # 次の一手の種類。
 STEP_FINISH = "finish"
 STEP_MERGE = "merge"
+STEP_LATE_FIX = "late-fix"
 STEP_ELI5 = "eli5"
 STEP_REQUEST = "request"
 
@@ -104,11 +106,14 @@ def pending_at_stop(
     parent = index.get(bound.parent) if bound.is_child else bound
     if parent is None or parent.is_child or parent.blocked or not parent.in_progress:
         return None
-    if approval_marks.read_parent_mark(
-        approval.home_dir(conf, root, parent.ticket, ""),
-        parent.ticket,
-        approval_marks.PARENT_MARK_CLOSE_EARLY,
-    ):
+    # 親のワークツリーが決まらない（無い・HEAD が違う・止まっている・同じ識別子が別のリポジトリに
+    # もある）親は促しの対象にしない。ここで例外を抜けさせると、Stop の後続（統合の促しと
+    # Stop のルール）まで飛ぶ。
+    try:
+        home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+    except approval.NoParentWorktree:
+        return None
+    if approval_marks.read_parent_mark(home, parent.ticket, approval_marks.PARENT_MARK_CLOSE_EARLY):
         return None
     head = ops_stop.worktree_head_sha(here.root)
     if not head:
@@ -130,37 +135,41 @@ def pending_at_stop(
             continue
         if approval_marks.MARK_REQUESTED in ph.marks:
             continue
-        step, children = _next_step(here.root, ph)
+        step, children = _next_step(root, here.root, ph)
         return Pending(parent, ph.number, step, here.root, head, children, ph.title)
     return None
 
 
-def _next_step(worktree: str, ph: phase.Phase) -> tuple[str, list[str]]:
-    """依頼の前の道のどこにいるか。合流していない子があれば合流、無ければ ELI5、あれば依頼。
+def _next_step(root: str, worktree: str, ph: phase.Phase) -> tuple[str, list[str]]:
+    """依頼の前の道のどこにいるか。合流済みでない子があれば確認、無ければ ELI5、あれば依頼。
 
-    子のブランチは識別子と同じ名前で、親のブランチ（HEAD）の祖先なら合流済み。ブランチを引けない子は
-    数えない（依頼の前提の検査 `review._unmet` が言う）。
+    合流するのは子の `finish` で、ここは「すべての子が合流済みか」を確かめるだけ。合流済みは、
+    finish が書いた `merged_sha`（合流した子の先頭）が親の HEAD の祖先であること。
+    合流済みでも、子のワークツリーが残る PC で finish の後に子のブランチへ積んだコミットが
+    親に無ければ、合流されていない修正があると言う（`ops_close.unmerged_fix`）。
+    どちらも依頼の前提の検査 `review._unmet` と同じ確認。
     """
     unmerged: list[str] = []
+    late: list[str] = []
     for child in sorted(ph.tickets, key=lambda t: t.ticket):
         if ph.states.get(child.ticket) not in (ticket_model.REVIEW, ticket_model.DONE):
             continue
-        rc, sha = gitcmd.output(
-            worktree,
-            ["rev-parse", "--verify", "--quiet", f"{child.ticket}^{{commit}}"],
-            ops_close.TIMEOUT_SECONDS,
+        merged = (
+            bool(child.merged_sha)
+            and gitcmd.run(
+                worktree,
+                ["merge-base", "--is-ancestor", child.merged_sha, "HEAD"],
+                ops_close.TIMEOUT_SECONDS,
+            ).ok
         )
-        if rc != 0 or not sha.strip():
-            continue
-        merged = gitcmd.run(
-            worktree,
-            ["merge-base", "--is-ancestor", sha.strip(), "HEAD"],
-            ops_close.TIMEOUT_SECONDS,
-        )
-        if not merged.ok:
+        if not merged:
             unmerged.append(child.ticket)
+        elif ops_close.unmerged_fix(root, worktree, child):
+            late.append(child.ticket)
     if unmerged:
         return STEP_MERGE, unmerged
+    if late:
+        return STEP_LATE_FIX, late
     if not os.path.isfile(os.path.join(worktree, "wip", "eli5", f"phase-{ph.number}.html")):
         return STEP_ELI5, []
     return STEP_REQUEST, []
@@ -193,7 +202,6 @@ def request_nudge(root: str, found: Pending) -> str:
     p = found.parent
     n = found.number
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-    git_sh = settings.script_command(root, "ccnavi-git.sh")
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     phase_name = f"フェーズ {n}" + (f"（{found.title}）" if found.title else "")
     eli5 = f"wip/eli5/phase-{n}.html"
@@ -208,19 +216,33 @@ def request_nudge(root: str, found: Pending) -> str:
         )
         todo += (
             " を実行します。まだ作業が残っているなら、確認を取らずに続けます。"
-            "子が全部閉じたら、親ブランチへの合流、ELI5、レビューの依頼（request）へ進みます。"
+            "子が全部閉じて（合流は finish が済ませます）、すべての子が合流済みと確かめたら、"
+            "ELI5、レビューの依頼（request）へ進みます。"
         )
     elif found.step == STEP_MERGE:
         where = (
             f"{p.ticket} の{phase_name}は子が全部閉じていますが、レビューの依頼"
-            f"（request）がまだです。子 {', '.join(found.children)} のブランチが"
-            "親に合流していません。"
+            f"（request）がまだです。子 {', '.join(found.children)} が"
+            "親のブランチに合流済みと確かめられません（合流した先頭 merged_sha が無いか、"
+            "親の HEAD に入っていません）。"
         )
         todo = (
-            f"親のワークツリー {found.worktree} で、子ごとに "
-            + "、".join(f"'{git_sh} merge {c}'" for c in found.children)
-            + f" を実行します。続けて ELI5 の HTML を {eli5} に書いてコミットして push し、"
-            f"{request} で依頼します。"
+            f"合流は子の finish が行います。'{ticket_sh} status {p.ticket}' で子の状態を確かめ、"
+            "合流の記録が無い理由（origin が無い親、置き場を手で動かした子など）をユーザに"
+            f"伝えてください。合流済みと確かめられたら、ELI5 の HTML を {eli5} に書いて"
+            f"コミットして push し、{request} で依頼します。"
+        )
+    elif found.step == STEP_LATE_FIX:
+        where = (
+            f"{p.ticket} の{phase_name}は子が全部閉じていますが、レビューの依頼"
+            f"（request）がまだです。子 {', '.join(found.children)} の手元のブランチに、"
+            "合流されていない修正があります"
+            "（finish の後に積んだコミットは親のブランチに入りません）。"
+        )
+        todo = (
+            "このままでは依頼できません。修正を活かすなら、同じフェーズに子を足して"
+            "ユーザの承認を受け、その子で直します。捨てるなら、そのことをユーザに伝えて"
+            "判断を仰いでください。"
         )
     elif found.step == STEP_ELI5:
         where = (

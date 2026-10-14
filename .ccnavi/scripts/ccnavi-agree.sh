@@ -20,7 +20,9 @@
 # セッションの未コミット変更があるため、それらを巻き込むと承認コミットに無関係な変更が混入する。
 #
 # 承認待ちの一覧を表示し、y/N で確認を取ってから承認する。承認が通れば（一部だけ通って終了コード 4 で終わった
-# ときも）`ccnavi-push-approved.sh` を呼び出し、コミットして push する。push が失敗しても承認自体は 0 で終わる（コミットは残り、打ち直せば送れる）。
+# ときも）`ccnavi-push-approved.sh --path <パス>...` を呼び出し、この承認が実際に書いた・消したパス
+# （実行ファイルの `--record-writes` の一覧）だけをコミットして push する。同じ置き場にある承認と無関係な変更
+# （review/ の変更や、前の失敗で残ったファイル）は巻き込まない。push が失敗しても承認自体は 0 で終わる（コミットは残り、打ち直せば送れる）。
 #
 # 統合先が保護ブランチ（main / master / develop / release / release/*）であるか、そのリポジトリの
 # 統合先ブランチ（CCNAVI_INTEGRATION_BRANCH → ccnavi-sync.sh の取り込み結果 → origin/HEAD）上にいるときは
@@ -28,7 +30,7 @@
 #
 # エージェントからは組み込みの deny（`DENY_TICKET_APPROVAL_CLI`）で止める。
 #
-# 終了コード: 0 成功（push 失敗含む） / 1 承認が通らなかった（一部だけ通ったときも。置かれたぶんは送る） / 2 引数または環境の誤り
+# 終了コード: 0 成功（push 失敗含む。未送信は文面で言う） / 1 承認が通らなかった（一部だけ通ったときも。置かれたぶんは送る） / 2 引数または環境の誤り
 
 set -eu
 
@@ -76,13 +78,30 @@ root=$(ccnavi_workspace) || {
 	exit 2
 }
 
+# 承認が実際に書けたパスの一覧（JSON）の受け皿。実行ファイルは書き込みに入ったときだけ書く。
+report=$(mktemp "${TMPDIR:-/tmp}/ccnavi-agree.XXXXXX") || {
+	printf 'ccnavi-agree: 一時ファイルが作れません。\n' >&2
+	exit 2
+}
+# この承認が書いた・消したパスの一覧（1 行 1 つ、ワークスペースルートからの相対）。実行ファイルの
+# `--record-writes` は、書き出し先を state の置き場の c1/ の下に限るので、そこに作る。
+written_dir="$(ccnavi_state "$root")/c1"
+mkdir -p "$written_dir" 2>/dev/null || :
+written="$written_dir/agree.$$"
+rm -f "$written"
+trap 'rm -f "$report" "$written"' EXIT
+trap 'rm -f "$report" "$written"; exit 130' INT TERM HUP
+
 # 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 # `set --` の右の "$@" は置き換える前の引数（並べた識別子）に展開される。
 if bin=$(ccnavi_bin "$root"); then
 	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-agree: %s\n' "$skew" >&2
-	set -- "$bin" --root "$root" --agree "$@"
+	set -- "$bin" --root "$root" --record-writes "$written" --agree --placed-out "$report" "$@"
 elif [ -f "$root/src/ccnavi/__main__.py" ]; then
-	set -- uv run python -m ccnavi --root "$root" --agree "$@"
+	# ソースで動かすときは、ワークスペースルートで uv を起こす（uv はプロジェクトを cwd から探す。
+	# ccnavi-clean.sh・ccnavi_ask と同じ）。サブシェルで cd するので、この sh の cwd は動かない。
+	from_source() { (cd "$root" && uv run python -m ccnavi "$@"); }
+	set -- from_source --root "$root" --record-writes "$written" --agree --placed-out "$report" "$@"
 else
 	printf 'ccnavi-agree: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
@@ -93,16 +112,53 @@ fi
 # 承認済みチケットが他にあっても、この承認とは無関係なので巻き込まない。
 approve_rc=0
 "$@" || approve_rc=$?
+
+# 実行ファイルが書き出した、実際に書けたパスの一覧（JSON）。書けた分、書けなかった分、
+# 書かなかった分が分かる形でそのまま見せる。何も置かずに失敗したとき（4 以外の非 0）も、
+# 書けなかった理由が入っていれば見せる。
+say_report() {
+	if [ -s "$report" ]; then
+		printf 'ccnavi-agree: 承認の結果（placed=書けたパス / written=書いた・消したパス / failed=書けなかった提案 / unwritten=止まったため書かなかった提案 / rejected=承認の対象にしなかった提案）: %s\n' \
+			"$(cat "$report")" >&2
+	fi
+}
 case "$approve_rc" in
 0 | 4) ;;
-*) exit 1 ;;
+*)
+	say_report
+	exit 1
+	;;
 esac
 
 # コミットと push は ccnavi-push-approved.sh に任せる。失敗しても承認は巻き戻さない。
-sh "$(dirname "$0")/ccnavi-push-approved.sh" || :
+# 渡すのはこの承認が書いた・消したパスだけ。書けなかった分は置かれていないので入らない。
+# 一覧が無い（古い実行ファイルが書かなかった）ときは送らずに止める。置き場の変更を全部送ると、
+# 承認と無関係な変更まで承認のコミットに入る。
+push_rc=0
+if [ -s "$written" ]; then
+	set --
+	while IFS= read -r path; do
+		[ -n "$path" ] || continue
+		set -- "$@" --path "$path"
+	done <"$written"
+	sh "$(dirname "$0")/ccnavi-push-approved.sh" "$@" || push_rc=$?
+elif [ -f "$written" ]; then
+	# 一覧はあるが空。この承認は何も書いていない。
+	printf 'コミットして push する承認済みチケットはありません。\n'
+else
+	printf 'ccnavi-agree: この承認で書いたパスの一覧が得られなかったので、コミットも push もしていない（未送信）。承認済みチケットの置き場を確かめてから、sh %s/ccnavi-push-approved.sh で送ってください。\n' "$(dirname "$0")" >&2
+	push_rc=1
+fi
+
+say_report
+if [ "$push_rc" -ne 0 ]; then
+	# push-approved はツリーごとに結果を言う（送れたツリーは「pushしました」、送れなかったツリーは理由）。
+	# 失敗はどれか 1 本でもあれば返るので、全部が未送信とは限らない。
+	printf 'ccnavi-agree: コミットか push が済んでいないツリーがある（上の push-approved の文面。「pushしました」と出たツリーは送れている）。直してから、上で名指しされたコマンドを再実行してください。\n' >&2
+fi
 
 if [ "$approve_rc" -ne 0 ]; then
-	printf 'ccnavi-agree: 承認の一部だけが通った。置かれた承認済みチケットは、上の push-approved の結果のとおりコミット・push を試した。通らなかった分は原因を直して、もう一度承認してください。\n' >&2
+	printf 'ccnavi-agree: 承認の一部だけが通った。置かれた承認済みチケットは、上の結果のとおりコミット・push を試した。通らなかった分は原因を直して、もう一度承認してください。\n' >&2
 	exit 1
 fi
 exit 0

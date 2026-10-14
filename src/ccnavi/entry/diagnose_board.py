@@ -21,8 +21,10 @@ from ..tickets import (
     archive,
     flow,
     history,
+    overview,
     phase,
     risk,
+    syncstate,
     ticket_fold,
     ticket_model,
 )
@@ -72,6 +74,9 @@ def board(
         # まだ在るもの（退避の後の push が戻されたなど）は `tickets` の側に出すので、
         # ここには出さない。
         "archived": [],
+        # このPCでは未準備の親（取り込み状態の記録だけがあり、親のワークツリーが無いもの）。
+        # 「準備する」で `ccnavi-start.sh --mr <番号>` を呼ぶ入口を出すための欄。
+        "unprepared": [],
     }
     if not conf.tickets_enabled:
         problems.append(f"{settings.TICKET_CONTROL_ENV}=disable。チケット制御を使っていない")
@@ -110,7 +115,7 @@ def board(
     )
     # 先行を引く対応表。承認と着手が使うのと同じ集め方。
     preds = approval_checks.predecessor_pool_of(
-        open_copies, review_copies, closed_copies, proposals, root
+        open_copies, review_copies, closed_copies, proposals
     )
     approval_checks.align_imported(conf, root, preds)
     payload["pending_approval"] = sorted(
@@ -131,7 +136,8 @@ def board(
     grouped = ticket_fold.by_ticket(everything)
     seen = {tid: [_where(t) for t in hits] for tid, hits in grouped.items()}
     scattered = {
-        tid: [_where(t) for t in ticket_fold.collisions(hits)] for tid, hits in grouped.items()
+        tid: [_where(t) for t in ticket_fold.collisions(hits, across_trees=True)]
+        for tid, hits in grouped.items()
     }
 
     # 承認の時刻。履歴か git から引く（承認済みチケットには書かない）。git はツリーごとに 1 回まで。
@@ -166,7 +172,34 @@ def board(
     payload["archived"] = _archived_records(
         root, {(t["project"], t["ticket"]) for t in payload["tickets"]}, problems
     )
+    payload["unprepared"] = _unprepared_records(conf, root)
     return payload
+
+
+def _unprepared_records(conf: settings.Settings, root: str) -> list[dict]:
+    """このPCに親のワークツリーが無い親（取り込み状態の記録＝キャッシュだけが残っているもの）。
+
+    ほかのツリーのコピーで代用しないので、ボードにはチケットが出ない。代わりに「このPCでは
+    未準備」として、ブランチ・MR の番号（記録の控え）・止まった理由を出す。閉じた親は出さない。
+    """
+    fams = syncstate.Families(conf, root)
+    out = []
+    for repo, name in syncstate.family_names(conf.state):
+        project = syncstate.project_of_key(repo)
+        st = fams.standing(name, project)
+        if st.home is not None or st.closed:
+            continue
+        record = st.record
+        out.append(
+            {
+                "family": name,
+                "project": project,
+                "branch": record.branch if record is not None else "",
+                "mr": int(record.mr) if record is not None and record.mr.isdigit() else None,
+                "reason": st.stop,
+            }
+        )
+    return out
 
 
 def _archived_records(root: str, skip: set[tuple[str, str]], problems: list[str]) -> list[dict]:
@@ -192,6 +225,8 @@ def _archived_records(root: str, skip: set[tuple[str, str]], problems: list[str]
                 ),
                 "started_at": t.started_at,
                 "completed_at": t.completed_at,
+                # finish が親のブランチへ合流した子の先頭（表示だけ。閉じた子の「合流」を出す）
+                "merged_sha": t.merged_sha,
                 "cancelled_at": t.cancelled_at,
                 "cancel_reason": t.cancel_reason,
                 "history": entries,
@@ -428,6 +463,19 @@ def _ticket_record(
         "title": source.title,
         "project": source.project,
         "issue": source.issue,
+        # 親を載せる MR の番号（親チケットの `mr:`）と、親のブランチ名。リモートとの差は
+        # 親のワークツリーがあるときの `remote`（子は null）。
+        "mr": source.mr,
+        "branch": (
+            syncstate.head_branch(found.root, ticket_id)
+            if found is not None and not source.is_child
+            else ""
+        ),
+        "remote": (
+            overview.remote_info(conf, ticket_id, found.root, source.project)
+            if found is not None and not source.is_child
+            else None
+        ),
         "predecessors": list(source.predecessors),
         # 満たしていない先行（`done/` に無いか取り消しのもの）。承認と着手はこれが空でなければ
         # 止まる。閉じたチケットは空。
@@ -492,6 +540,8 @@ def _ticket_record(
         "started_at": source.started_at,
         "completed_at": source.completed_at,
         "base_sha": source.base_sha,
+        # finish が親のブランチへ合流した子の先頭（表示だけ。閉じた子の「合流」を出す）
+        "merged_sha": source.merged_sha,
         "cancelled_at": source.cancelled_at,
         "cancel_reason": source.cancel_reason,
         # 作業中か。承認済みチケットが `doing/` にあり、着手していて、終わってもいないし
@@ -516,7 +566,7 @@ def _ticket_record(
         # 状態が動いた履歴の新しい側。追記するだけの補助で、状態の正は上の置き場の欄。
         "history": [],
     }
-    where = approval.home_dir(conf, root, ticket_id, source.parent, project=source.project)
+    where = approval.home_dir_read(conf, root, ticket_id, source.parent, project=source.project)
     entries, unreadable = history.read(where, ticket_id)
     record["history"] = entries
     if unreadable:
@@ -643,7 +693,7 @@ def _parent_record(
     raw: approval.Raw | None = None,
 ) -> dict:
     """親 1 件。局面、計画、親のマーカー、フェーズのリスト。`raw` は `phase.phases_of` と同じ。"""
-    where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+    where = approval.home_dir_read(conf, root, parent.ticket, "", project=parent.project)
     closed = parent.ticket in closed_index
     return {
         "ticket": parent.ticket,

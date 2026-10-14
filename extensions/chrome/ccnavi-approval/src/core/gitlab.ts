@@ -605,3 +605,74 @@ export async function createBranch(client: Client, owner: string, repo: string, 
 }
 
 export type { Host };
+
+// ---- 「始める」。既存の MR の採用と、新しい MR の作成 ----------------------------------
+
+/** 開いた MR を読むページの上限（100 × 20）。超えたら読み切れないので止める */
+export const MR_PAGES = 20;
+
+/** 採用を考える MR 1 本（`github.MrInfo` と同じ形） */
+export interface MrInfo {
+  readonly number: number;
+  readonly branch: string;
+  readonly state: string;
+  readonly url: string;
+  readonly title: string;
+  readonly body: string;
+  readonly base: string;
+  readonly fork: boolean;
+}
+
+/** 開いた MR の全部。フォークから出たものは `fork` を立てる（元ブランチがこのプロジェクトに無い）。読むだけ */
+export async function listOpenMrs(client: Client, owner: string, repo: string): Promise<MrInfo[]> {
+  const pid = await projectId(client, owner, repo);
+  const all = await pages(client, `${project(owner, repo)}/merge_requests?state=opened`, MR_PAGES, "開いたマージリクエスト一覧");
+  const out: MrInfo[] = [];
+  for (const m of all as { iid?: unknown; source_branch?: unknown; target_branch?: unknown; title?: unknown; description?: unknown; web_url?: unknown; source_project_id?: unknown }[]) {
+    if (!m || typeof m.iid !== "number" || typeof m.source_branch !== "string") continue;
+    out.push({
+      number: m.iid,
+      branch: m.source_branch,
+      state: "open",
+      url: String(alt(m.web_url, "")),
+      title: String(alt(m.title, "")),
+      body: String(alt(m.description, "")),
+      base: String(alt(m.target_branch, "")),
+      fork: m.source_project_id !== pid,
+    });
+  }
+  return out;
+}
+
+/** 同じブランチ名のマージ済み MR（`state=merged&source_branch=<branch>`）。読むだけ */
+export async function listMergedMrs(client: Client, owner: string, repo: string, branch: string): Promise<{ number: number; url: string }[]> {
+  const all = await pages(client, `${project(owner, repo)}/merge_requests?state=merged&source_branch=${encodeURIComponent(checkBranch(branch))}`, MR_PAGES, `${branch} のマージ済みマージリクエスト一覧`);
+  const out: { number: number; url: string }[] = [];
+  for (const m of all as { iid?: unknown; web_url?: unknown }[]) {
+    if (m && typeof m.iid === "number") out.push({ number: m.iid, url: String(alt(m.web_url, "")) });
+  }
+  return out;
+}
+
+/**
+ * GitLab は差分のないブランチからも MR を作れるので、初期コミットは積まない（ブランチを作った先頭のまま返す）。
+ * `github.startCommit` と呼び方を揃えるための関数。
+ */
+export async function startCommit(client: Client, owner: string, repo: string, name: string, _message: string): Promise<string> {
+  const { status, body } = await get(client, `${project(owner, repo)}/repository/branches/${encodeURIComponent(checkBranch(name))}`);
+  const id = (body as { commit?: { id?: unknown } } | null)?.commit?.id;
+  if (status === 404) throw new HostError(`ブランチ ${name} が見つかりません`, 404);
+  return checkOid(id);
+}
+
+/** Draft の MR を作る（題の頭に `Draft: ` を付ける）。番号（iid）と URL を返す */
+export async function createDraftMr(client: Client, owner: string, repo: string, head: string, base: string, title: string, body: string): Promise<{ number: number; url: string }> {
+  const res = await post(client, `${project(owner, repo)}/merge_requests`, { source_branch: checkBranch(head), target_branch: checkBranch(base), title: `Draft: ${title}`, description: body });
+  if (res.status < 200 || res.status >= 300) {
+    const why = (res.body as { message?: unknown } | null)?.message;
+    throw new HostError(`GitLab が Draft のマージリクエストを作りませんでした（${res.status}）: ${typeof why === "string" ? why : "?"}`, res.status);
+  }
+  const made = (res.body ?? {}) as { iid?: unknown; web_url?: unknown };
+  if (typeof made.iid !== "number") throw new HostError("作ったマージリクエストの番号を取得できません");
+  return { number: made.iid, url: String(alt(made.web_url, "")) };
+}

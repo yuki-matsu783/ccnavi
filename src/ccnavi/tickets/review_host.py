@@ -87,6 +87,9 @@ def effective(reviews: list[Review]) -> list[Review]:
 class MergeRequest:
     number: int = 0
     url: str = ""
+    # Draft のままか。sh が取得した結果だけが持つ（分からなければ None）。`ready` の打ち直しが、
+    # Draft を外し損ねたかを見分けるのに使う。
+    draft: bool | None = None
 
 
 @dataclass
@@ -126,7 +129,12 @@ class Result:
         mr = data.get("mr")
         found = None
         if isinstance(mr, dict) and mr.get("number"):
-            found = MergeRequest(int(mr.get("number") or 0), str(mr.get("url") or ""))
+            draft = mr.get("draft")
+            found = MergeRequest(
+                int(mr.get("number") or 0),
+                str(mr.get("url") or ""),
+                draft if isinstance(draft, bool) else None,
+            )
         return cls(
             host=str(data.get("host") or ""),
             mr=found,

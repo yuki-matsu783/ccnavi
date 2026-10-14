@@ -389,7 +389,7 @@ ccnavi は判定を返さず、Claude Code の権限モードに従う（REQ-PRE
 
 #### レビュー依頼までの道の途中で終えたとき
 
-チケット作業の道（子の `finish` → 親ブランチへ合流 → ELI5 → `ccnavi-review.sh request`）の途中で、確認を取ってターンを終えるのを `Stop` で 1 回だけ止める（REQ-PRE-18。理由コード `NUDGE_TICKET_REQUEST`。チケット側の条件と除く形は 9.6）。ルールではなく状態で決め、最後の発言も transcript も読まない。文は `STOP_PREFACE` と同じ考え方で、決まった道の途中でユーザの許可は要らないこと、状態に応じた次のコマンド、ユーザの判断が本当に要る問いなら最後に書き直すことを言う。`finish` の促しと同じく `dry-run` でも止め、同じ状態では 1 回だけ（`nudged-<セッション>.json` の `request:` で始まる鍵）。順序は `finish` の促し → この促し → 直接作業の `integrate` の促し → `match: Stop` のルール。
+チケット作業の道（子の `finish`（親ブランチへの合流を含む） → ELI5 → `ccnavi-review.sh request`）の途中で、確認を取ってターンを終えるのを `Stop` で 1 回だけ止める（REQ-PRE-18。理由コード `NUDGE_TICKET_REQUEST`。チケット側の条件と除く形は 9.6）。ルールではなく状態で決め、最後の発言も transcript も読まない。文は `STOP_PREFACE` と同じ考え方で、決まった道の途中でユーザの許可は要らないこと、状態に応じた次のコマンド、ユーザの判断が本当に要る問いなら最後に書き直すことを言う。`finish` の促しと同じく `dry-run` でも止め、同じ状態では 1 回だけ（`nudged-<セッション>.json` の `request:` で始まる鍵）。順序は `finish` の促し → この促し → 直接作業の `integrate` の促し → `match: Stop` のルール。
 
 #### 直接作業の取り込みを促す
 

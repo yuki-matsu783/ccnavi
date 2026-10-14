@@ -20,7 +20,7 @@ import os
 import unittest
 from unittest import mock
 
-from ccnavi.tickets import c1
+from ccnavi.tickets import c1, ticket_fields
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_sync_authority import record_text
 from tests.ticket.test_ticket import git, write
@@ -232,6 +232,29 @@ class TicketStatusTest(PhaseHarness):
         self.assertIn("クローズ済み（done/）", child)
         self.assertIn("取り消し", child)
         self.assertIn("要らなくなった", child)
+
+    def test_a_finished_child_shows_where_it_was_merged(self):
+        """finish で閉じた子は、親のブランチへ合流した先頭（`merged_sha`）を閉じ方に出す。"""
+        self.family(plan=["research"])
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
+        )
+        self.commit_parent()
+        self.approve()
+        self.run_child("i0001-01-01", [("wip/research/summary.md", "a\n")])
+        finished = self.close_child("i0001-01-01")
+        self.assertEqual(finished.returncode, 0, finished.stdout + finished.stderr)
+        done = next(
+            os.path.join(base, name)
+            for base, _, names in os.walk(self.root)
+            for name in names
+            if name == "i0001-01-01.md" and os.path.basename(base) == "done"
+        )
+        with open(done, encoding="utf-8") as f:
+            text = f.read()
+        write(done, ticket_fields.set_fields(text, {"merged_sha": "0123456789ab" * 3}))
+        child = self.block(self.said("i0001"), "i0001-01-01")
+        self.assertRegex(child, r"閉じ方: 完了（[^）]*、合流 0123456789ab）")
 
     # ---- 5. 親を省く・知らない親
 

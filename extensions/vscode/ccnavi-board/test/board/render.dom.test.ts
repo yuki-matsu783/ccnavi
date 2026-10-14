@@ -48,7 +48,11 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     // 見せた識別子をそのまま送る（属性に持たせるだけでなく、押したときの中身も見る）
     page.click(confirm);
     await page.settle();
-    assert.deepEqual(page.posted.at(-1), { type: "approveConfirm", tickets: ["i0001", "i0001-01-01", "i0001-01-02"] });
+    assert.deepEqual(page.posted.at(-1), {
+      type: "approveConfirm",
+      tickets: ["i0001", "i0001-01-01", "i0001-01-02"],
+      digest: preview.digest,
+    });
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
     const body = text(page, "pre.approval-text");
     assert.ok(body.startsWith("チケットの承認リクエスト"));

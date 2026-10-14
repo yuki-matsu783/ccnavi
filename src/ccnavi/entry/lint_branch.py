@@ -18,10 +18,17 @@ def _branch_name_problems(
     review: list,
     integration: str = "",
     prefixes=settings.DEFAULT_BRANCH_PREFIXES,
+    adopted: frozenset = frozenset(),
 ) -> list[Problem]:
-    """識別子を親のブランチ名にできるか（warn だけ。拒否は `ccnavi-git.sh` が受け持つ）。
+    """新しく切る親の識別子を、ブランチ名として使える形にできるか（warn だけ。拒否は
+    `ccnavi-git.sh` が受け持つ）。
 
-    親のブランチ名は親の識別子そのものにする。そのために次を名指しする。
+    親の識別子は親のブランチ名の `/` を `-` に置き換えたもの。新しく切る名前は、そのまま
+    ブランチ名にもなる。そのために次を名指しする。
+
+    既存のブランチを採用した親（`adopted`。親のワークツリーが在り、HEAD のブランチ名を変換した
+    ものが識別子と一致する）には、名前の形式（`ticket_ids.branch_name_problems`）と番号の重なりを
+    言わない。ブランチ名は採用の時点で決まっていて、こちらでは選べないため。
 
     - 新規の提案（`todo/` にあって、承認済みでも閉じてもいないもの）の識別子の形
       （`ticket_ids.branch_name_problems`）。承認済みの識別子はもう変えられないので言わない
@@ -45,6 +52,8 @@ def _branch_name_problems(
         if t.state != ticket_model.TODO or t.ticket in settled or t.ticket in said:
             continue
         said.add(t.ticket)
+        if t.ticket in adopted:
+            continue
         fresh.append(t)
         for text in ticket_ids.branch_name_problems(t, integration, serial, prefixes):
             problems.append(
@@ -229,21 +238,18 @@ def _place_problems(
     closed: list,
     review: list,
     repo_of: dict[str, str],
-    integration: str = "",
 ) -> list[Problem]:
     """未承認の親の提案の置き場所と中身の形（warn）。
 
     - 親の提案が、親の識別子と同名でないワークツリーに在る。子の提案が、親の識別子と同名の
       ワークツリーに無い。親が取り込み済みにならず、承認済みチケットの自動コミットが動かない。
-      ワークスペースルートとプロジェクトの元ツリーの提案、`branch:` で既存のブランチを名乗る
-      親は言わない
+      ワークスペースルートとプロジェクトの元ツリーの提案は言わない
     - 計画（plan）を持たない親。`ticket start` が止まる（子や子の提案があっても同じ）
     """
     settled = {t.ticket for t in list(copies) + list(closed) + list(review)}
-    cut = (
-        f"sh {root or '<ルート>'}/.ccnavi/scripts/ccnavi-git.sh worktree add "
-        f".claude/worktrees/%s -b %s {integration or '<統合先>'}"
-    )
+    # 親のワークツリーは ccnavi-start.sh が作る（MR の元ブランチを直接チェックアウトする）。
+    # 識別子の名前のブランチは作らない。
+    cut = f"sh {root or '<ルート>'}/.ccnavi/scripts/ccnavi-start.sh --mr <MR の番号>"
     problems: list[Problem] = []
     said: set[tuple[str, str]] = set()
     for t in proposals:
@@ -265,21 +271,22 @@ def _place_problems(
                     "(ticket)",
                     f"{t.ticket}: 子の提案を {at} に書いている。親 {t.parent} のワークツリーは"
                     f"識別子と同じ名前にし、子の提案はそこに置く。ワークツリーが無ければ "
-                    f"`{cut % (t.parent, t.parent)}` で切り、提案を移して元を削除します。"
+                    f"`{cut}`（MR が無ければ `--issue <issue の番号>`）で作り、"
+                    "提案を移して元を削除します。"
                     "このままだと親が取り込み済みにならない",
                 )
             )
             continue
         if t.ticket in settled:
             continue
-        if at and at != t.ticket and not t.branch:
+        if at and at != t.ticket:
             problems.append(
                 Problem(
                     SEVERITY_WARN,
                     "(ticket)",
                     f"{t.ticket}: 提案 {t.ticket} を {at} に書いている。親のワークツリーは"
-                    f"識別子と同じ名前にする。`{cut % (t.ticket, t.ticket)}` で切り、"
-                    "提案を移して元を削除します。このままだと親が取り込み済みにならない",
+                    f"識別子と同じ名前にする。`{cut}`（MR が無ければ `--issue <issue の番号>`）で"
+                    "作り、提案を移して元を削除します。このままだと親が取り込み済みにならない",
                 )
             )
         if not t.has_plan:

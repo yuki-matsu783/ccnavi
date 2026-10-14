@@ -1,7 +1,9 @@
 """ccnavi-review.sh merged の約束。
 
 ccnavi-sync.sh は答えが `none` のときだけ「マージされていない」と読み、
-親子のチケットの取り込み状態に gone を書く。
+親子のチケットの取り込み状態に gone を書く。マージ済みなら
+`merged <番号> <先頭の sha> <元ブランチ>` を返し、sync はその sha を基準に、その元ブランチの
+手元の片付けをする。MR の番号を渡せば、その MR だけを聞く。
 API が失敗した・答えを読めなかったときは `unknown`（終了コード 3）、道具やトークンが無ければ
 `none` を出さずに止まる。ホストへの道具（curl）は PATH の先頭に置いた代役に差し替える。
 """
@@ -69,7 +71,7 @@ class ReviewMergedTest(unittest.TestCase):
         )
         os.chmod(path, 0o755)
 
-    def merged(self, token="t"):
+    def merged(self, token="t", *args):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         env.pop("GITHUB_TOKEN", None)
         env.pop("GITLAB_TOKEN", None)
@@ -77,7 +79,12 @@ class ReviewMergedTest(unittest.TestCase):
             env["GITHUB_TOKEN"] = token
         env["PATH"] = os.pathsep.join([self.bin, os.environ.get("PATH", "")])
         return subprocess.run(
-            [SHELL, os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-review.sh"), "merged"],
+            [
+                SHELL,
+                os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-review.sh"),
+                "merged",
+                *args,
+            ],
             cwd=self.ws,
             env=env,
             capture_output=True,
@@ -86,11 +93,40 @@ class ReviewMergedTest(unittest.TestCase):
             errors="replace",
         )
 
-    def test_a_merged_request_is_named(self):
-        self.curl_says('[{"number": 7, "merged_at": null}, {"number": 9, "merged_at": "x"}]')
+    def test_a_merged_request_is_named_with_its_head(self):
+        self.curl_says(
+            '[{"number": 7, "merged_at": null},'
+            ' {"number": 9, "merged_at": "x", "head": {"sha": "abc123"}}]'
+        )
         done = self.merged()
         self.assertEqual(0, done.returncode, done.stderr)
-        self.assertEqual("merged 9", done.stdout.strip())
+        self.assertEqual("merged 9 abc123", done.stdout.strip())
+
+    def test_a_number_asks_only_that_request(self):
+        self.curl_says('{"number": 9, "merged_at": "x", "head": {"sha": "abc123"}}')
+        done = self.merged("t", "9")
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("merged 9 abc123", done.stdout.strip())
+
+    def test_the_source_branch_of_the_request_is_named(self):
+        self.curl_says(
+            '{"number": 9, "merged_at": "x", "head": {"sha": "abc123", "ref": "feature/12-x"}}'
+        )
+        done = self.merged("t", "9")
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("merged 9 abc123 feature/12-x", done.stdout.strip())
+
+    def test_a_number_of_an_unmerged_request_is_none(self):
+        self.curl_says('{"number": 9, "merged_at": null, "head": {"sha": "abc123"}}')
+        done = self.merged("t", "9")
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("none", done.stdout.strip())
+
+    def test_a_number_that_is_not_digits_is_refused(self):
+        self.curl_says("[]")
+        done = self.merged("t", "9; ls")
+        self.assertEqual(2, done.returncode, done.stdout + done.stderr)
+        self.assertEqual("", done.stdout.strip())
 
     def test_no_merged_request_is_none(self):
         self.curl_says("[]")
@@ -131,7 +167,7 @@ class ReviewMergedGitLabTest(ReviewMergedTest):
             check=True,
         )
 
-    def gitlab_says(self, mrs, project='{"id": 42}', project_code=0, pages=None):
+    def gitlab_says(self, mrs, project='{"id": 42}', project_code=0, pages=None, one=None):
         """URL ごとに答える curl の代役。`pages` を渡すと MR の一覧をページの番号で引く。"""
         mr_cases = (
             "".join(
@@ -140,11 +176,13 @@ class ReviewMergedGitLabTest(ReviewMergedTest):
             if pages
             else f"*merge_requests*) printf '%s' '{mrs}' ;;\n"
         )
+        one_case = f"*/merge_requests/9*) printf '%s' '{one}' ;;\n" if one else ""
         path = write(
             os.path.join(self.bin, "curl"),
             "#!/bin/sh\n"
             'for a in "$@"; do url="$a"; done\n'
             'case "$url" in\n'
+            + one_case
             + mr_cases
             + f"*/projects/o%2Fr) printf '%s' '{project}'; exit {project_code} ;;\n"
             "*) exit 22 ;;\n"
@@ -152,7 +190,7 @@ class ReviewMergedGitLabTest(ReviewMergedTest):
         )
         os.chmod(path, 0o755)
 
-    def merged(self, token="t"):
+    def merged(self, token="t", *args):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         env.pop("GITHUB_TOKEN", None)
         env.pop("GITLAB_TOKEN", None)
@@ -160,7 +198,12 @@ class ReviewMergedGitLabTest(ReviewMergedTest):
             env["GITLAB_TOKEN"] = token
         env["PATH"] = os.pathsep.join([self.bin, os.environ.get("PATH", "")])
         return subprocess.run(
-            [SHELL, os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-review.sh"), "merged"],
+            [
+                SHELL,
+                os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-review.sh"),
+                "merged",
+                *args,
+            ],
             cwd=self.ws,
             env=env,
             capture_output=True,
@@ -174,15 +217,56 @@ class ReviewMergedGitLabTest(ReviewMergedTest):
         if code:
             self.gitlab_says("", project_code=code)
         elif body.startswith("[") and "merged_at" in body:
-            self.gitlab_says('[{"iid": 9, "source_project_id": 42}]')
+            self.gitlab_says('[{"iid": 9, "source_project_id": 42, "sha": "abc123"}]')
+        elif body.startswith("{") and "merged_at" in body:
+            self.gitlab_says(
+                "[]", one='{"iid": 9, "state": "merged", "source_project_id": 42, "sha": "abc123"}'
+            )
         else:
             self.gitlab_says(body)
 
-    def test_a_merged_request_is_named(self):
-        self.gitlab_says('[{"iid": 9, "source_project_id": 42}]')
+    def test_a_merged_request_is_named_with_its_head(self):
+        self.gitlab_says('[{"iid": 9, "source_project_id": 42, "sha": "abc123"}]')
         done = self.merged()
         self.assertEqual(0, done.returncode, done.stderr)
-        self.assertEqual("merged 9", done.stdout.strip())
+        self.assertEqual("merged 9 abc123", done.stdout.strip())
+
+    def test_a_number_asks_only_that_request(self):
+        self.gitlab_says(
+            "[]", one='{"iid": 9, "state": "merged", "source_project_id": 42, "sha": "abc123"}'
+        )
+        done = self.merged("t", "9")
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("merged 9 abc123", done.stdout.strip())
+
+    def test_a_number_of_an_unmerged_request_is_none(self):
+        self.gitlab_says(
+            "[]", one='{"iid": 9, "state": "opened", "source_project_id": 42, "sha": "abc123"}'
+        )
+        done = self.merged("t", "9")
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("none", done.stdout.strip())
+
+    def test_the_source_branch_of_the_request_is_named(self):
+        self.gitlab_says(
+            "[]",
+            one='{"iid": 9, "state": "merged", "source_project_id": 42, "sha": "abc123",'
+            ' "source_branch": "feature/12-x"}',
+        )
+        done = self.merged("t", "9")
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("merged 9 abc123 feature/12-x", done.stdout.strip())
+
+    def test_a_number_of_an_unmerged_or_fork_request_is_none(self):
+        for one in (
+            '{"iid": 9, "state": "opened", "source_project_id": 42, "sha": "abc123"}',
+            '{"iid": 9, "state": "merged", "source_project_id": 99, "sha": "abc123"}',
+        ):
+            with self.subTest(one=one):
+                self.gitlab_says("[]", one=one)
+                done = self.merged("t", "9")
+                self.assertEqual(0, done.returncode, done.stderr)
+                self.assertEqual("none", done.stdout.strip())
 
     def test_a_fork_merge_request_is_not_counted(self):
         """フォーク（source_project_id 99）の同じ名前のブランチのマージ済みの MR は数えない。"""
@@ -196,10 +280,12 @@ class ReviewMergedGitLabTest(ReviewMergedTest):
         forks = (
             "[" + ", ".join(f'{{"iid": {n}, "source_project_id": 99}}' for n in range(100)) + "]"
         )
-        self.gitlab_says("", pages={1: forks, 2: '[{"iid": 300, "source_project_id": 42}]'})
+        self.gitlab_says(
+            "", pages={1: forks, 2: '[{"iid": 300, "source_project_id": 42, "sha": "def456"}]'}
+        )
         done = self.merged()
         self.assertEqual(0, done.returncode, done.stderr)
-        self.assertEqual("merged 300", done.stdout.strip())
+        self.assertEqual("merged 300 def456", done.stdout.strip())
 
     def test_an_unreadable_project_id_is_unknown(self):
         for project, code in (('{"id": "x"}', 0), ("{}", 0), ("", 22)):

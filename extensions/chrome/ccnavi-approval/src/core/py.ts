@@ -58,12 +58,12 @@ export interface Snapshot {
 export interface Family {
   /** 親のブランチ名（拡張が読み書きするブランチ） */
   readonly name: string;
-  /** 親子のチケットの識別子（親チケットの `branch:` があればブランチ名と違う） */
+  /** 親子のチケットの識別子（ブランチ名の `/` を `-` に置き換えたもの。`/` を含むブランチ名と違う） */
   readonly family?: string;
   readonly title: string;
   readonly state: string;
   readonly closed: boolean;
-  /** 親子のチケットが決まらない理由（同じ親子のチケットを宣言するブランチが 2 本以上ある など）。あればこの親子のチケットは判定しない */
+  /** 親子のチケットが決まらない理由（同じ識別子になるブランチが 2 本以上ある など）。あればこの親子のチケットは判定しない */
   readonly conflict?: string;
 }
 
@@ -72,7 +72,7 @@ export interface Closure {
   readonly families: readonly string[];
   /** ブランチ名 → 親子のチケットの識別子 */
   readonly idents?: Readonly<Record<string, string>>;
-  /** 同じ親子のチケットを宣言するブランチが無いかを確かめるために読むブランチ（判定の入力には入れない） */
+  /** 同じ識別子になる別のブランチが無いかを確かめるために読むブランチ（判定の入力には入れない） */
   readonly rivals?: readonly string[];
   readonly need: readonly string[];
   readonly absent: readonly string[];
@@ -90,10 +90,6 @@ export interface BatchEntry {
   readonly path: string;
   readonly overflow: readonly string[];
   readonly body: string;
-  /** 親のブランチ名（`branch:`、無ければ識別子） */
-  readonly branch?: string;
-  /** `branch:` が既にあるブランチを指すか */
-  readonly existing_branch?: boolean;
 }
 
 export interface Withdrawable {
@@ -129,6 +125,10 @@ export interface BoardResult {
   readonly reviewable?: readonly Reviewable[];
   readonly batch?: readonly BatchEntry[];
   readonly text?: string;
+  /** 見せた画面のダイジェスト（承認のときに Python が読み直した中身と比べる） */
+  readonly digest?: string;
+  /** 承認するときに `plan` へ渡す絞り（ダイジェストを出したときの絞り。null なら絞らない） */
+  readonly only?: readonly string[] | null;
   readonly rejected?: readonly { readonly ticket: string; readonly problems: readonly string[] }[];
   readonly problems?: readonly string[];
 }
@@ -160,6 +160,10 @@ export interface Written {
  */
 export type ReasonCode = string | null;
 
+/** 承認: 見せた一覧（識別子）と今の一覧が違う */
+export const APPROVE_LIST_CHANGED = "CORE_APPROVE_LIST_CHANGED";
+/** 承認: 識別子は同じで、見せた中身（ダイジェスト）が今と違う */
+export const APPROVE_DIGEST_CHANGED = "CORE_APPROVE_DIGEST_CHANGED";
 /** 取り下げ: 承認コミットの親に提案が無い（承認コミットを引けない） */
 export const WITHDRAW_NO_PRIOR = "CORE_WITHDRAW_NO_PRIOR";
 
@@ -170,9 +174,11 @@ export function tagged(code: string, text: string): string {
 
 export interface PlanResult extends Written {
   readonly identifiers: readonly string[];
+  readonly digest: string;
+  readonly mismatch: unknown;
   readonly refused: string;
   readonly rejected: readonly { readonly ticket: string; readonly problems: readonly string[] }[];
-  /** `CORE_APPROVE_*`（承認するものが無い） */
+  /** `CORE_APPROVE_*`（見せたものと違う・承認するものが無い） */
   readonly code: ReasonCode;
 }
 
@@ -199,6 +205,13 @@ export interface Compare {
 
 /** 「始める」の答え。`problems` が空なら `identifier` の名前でブランチを作れる */
 export interface StartResult {
+  readonly identifier: string;
+  readonly integration: string;
+  readonly problems: readonly string[];
+}
+
+/** 「始める」で既存の MR を採用してよいかの答え。`problems` が空なら `identifier` で続けられる */
+export interface AdoptResult {
   readonly identifier: string;
   readonly integration: string;
   readonly problems: readonly string[];
@@ -236,7 +249,7 @@ export const py = {
   compat: (call: PyCall, snapshot: Snapshot) => ask<Compat>(call, "compat", { snapshot }, "compat"),
   plan: (
     call: PyCall,
-    body: { snapshot: Snapshot; family: string; ids: readonly string[]; stamp: string; actor: Actor },
+    body: { snapshot: Snapshot; family: string; only: readonly string[] | null; shown: { ids: readonly string[]; digest: string }; stamp: string; actor: Actor },
   ) => ask<PlanResult>(call, "plan", { ...body }, ""),
   withdraw: (
     call: PyCall,
@@ -244,6 +257,8 @@ export const py = {
   ) => ask<WithdrawResult>(call, "withdraw", { ...body }, ""),
   start: (call: PyCall, body: { snapshot: Snapshot; issue: number; title: string; prefix?: string; taken: readonly string[] }) =>
     ask<StartResult>(call, "start", { ...body }, ""),
+  adopt: (call: PyCall, body: { snapshot: Snapshot; branch: string; names: readonly string[] }) =>
+    ask<AdoptResult>(call, "adopt", { ...body }, ""),
   confirm: (
     call: PyCall,
     body: {

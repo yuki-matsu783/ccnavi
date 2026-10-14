@@ -7,12 +7,13 @@
 
 from __future__ import annotations
 
-import os
+import contextlib
 from dataclasses import dataclass, replace
 
 from ..infra import settings, tree
 from ..policy import rules
-from . import archive, syncstate, ticket_ids, ticket_model, workflow
+from . import syncstate, ticket_ids, ticket_model, workflow
+from . import ticket as ticket_mod
 
 
 def mark_imported(
@@ -21,31 +22,26 @@ def mark_imported(
     kept: list[ticket_model.Ticket],
     fams: syncstate.Families | None = None,
 ) -> None:
-    """取り込み済みの親子のチケットに、信頼できない理由を付ける。
+    """親子のチケットのうち、信頼できないチケットに理由を付ける（全部の親子のチケットが対象）。
 
-    取り込み済みの親子のチケットとは、取り込み状態のある親子のチケットのこと。
-
-    正とするのは親のブランチ `P`（手元では `.claude/worktrees/<P>` で HEAD が `P` を指すツリー）の
+    正とするのは親のブランチ（手元では `.claude/worktrees/<P>` で HEAD のブランチ名を変換したものが
+    `P` になるツリー）の
     上のチケットだけ。次のチケットは読むが信頼しない（`blocked`。判定は範囲を使わずに止める）。
 
     - 親子のチケットが決まらない（取り込み状態が `gone`・`blocked`・破損している、
-      `present` なのに親のワークツリーが無い）
+      親のワークツリーが無い・HEAD のブランチ名がフォルダ名と合わない）
     - 親子のチケットが閉じている（統合先の `done/` を正とする）
     - 親のワークツリーの外にしか無いチケット（元ツリーに未コミットで残ったチケットなど）
 
     **チケットのリストは変えない（外さない）。
     ** 外すと「在る」ことで止まっていたもの（承認待ちの
-    重複、開いた子のある親を閉じない）が通るようになる。理由を足すだけなので、取り込み状態の無い親子のチケットと、
-    取り込み状態があってもチケットが親のワークツリーにだけある親子のチケットでは、答えは前と同じ。すでに理由（`mark_blocked`）が
+    重複、開いた子のある親を閉じない）が通るようになる。理由を足すだけで、チケットが親のワークツリーにだけある
+    親子のチケットには理由は付かない。すでに理由（`mark_blocked`）が
     あれば、理由を連ねる（前の理由を消さない）。
     """
     fams = fams or syncstate.Families(conf, root)
-    if not fams.active:
-        return
     for t in kept:
         st = family_standing(conf, root, t, fams)
-        if not st.imported:
-            continue
         why = st.stop
         if not why and st.home is not None and not syncstate.same_tree(t.tree_root, st.home.root):
             why = outside_reason(st, t)
@@ -84,18 +80,14 @@ def family_problems(
     t: ticket_model.Ticket,
     fams: syncstate.Families | None = None,
 ) -> list[rules.Problem]:
-    """取り込み済みの親子のチケットの提案を承認しない理由。
+    """親子のチケットの提案を承認しない理由。
 
-    親子のチケットが決まらない・閉じているなら承認しない。提案は親のブランチの上で書き、
+    親子のチケットが決まらない（親のワークツリーが無いなど）・閉じているなら承認しない。提案は親のブランチの上で書き、
     push してから承認を頼む決まりなので、
-    親のワークツリーの外にある提案も承認しない。取り込み状態の無い親子のチケットには何も言わない。
+    親のワークツリーの外にある提案も承認しない。
     """
     fams = fams or syncstate.Families(conf, root)
-    if not fams.active:
-        return []
     st = family_standing(conf, root, t, fams)
-    if not st.imported:
-        return []
     if st.stop:
         return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, family_stop_text(root, st))]
     if st.home is not None and not syncstate.same_tree(t.tree_root, st.home.root):
@@ -105,12 +97,31 @@ def family_problems(
                 t.ticket,
                 f"提案が親のブランチ {st.branch_name} のワークツリーの外"
                 f"（{t.tree or 'ワークスペースルート'}）にある。"
-                "取り込み済みの親子のチケットの提案は"
+                "親子のチケットの提案は"
                 f"親のワークツリー（.claude/worktrees/{st.family}）で書いて push してから"
                 "承認を頼んでください",
             )
         ]
     return []
+
+
+def mr_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
+    """親チケットに `mr:`（親ブランチのマージリクエストの番号）が記録されているか。
+
+    親の作成と承認の前提の 1 つ。番号は `ccnavi-start.sh` が出す。子には要らない。
+    """
+    if t.is_child or t.mr:
+        return []
+    return [
+        rules.Problem(
+            rules.SEVERITY_ERROR,
+            t.ticket,
+            f"親チケット {t.ticket} に mr: が記録されていない。`ccnavi-start.sh` が出したマージ"
+            "リクエストの番号を mr: に書いてください（例 `mr: 12`）。"
+            "親のブランチのマージリクエストが"
+            "無いと、レビューの依頼も正の特定もできない",
+        )
+    ]
 
 
 def branch_problems(
@@ -120,33 +131,15 @@ def branch_problems(
     fams: syncstate.Families | None = None,
     others: list[ticket_model.Ticket] | None = None,
 ) -> list[rules.Problem]:
-    """親のブランチ名を承認してよいか。
+    """親の識別子を承認してよいか。
 
-    - `branch:` がそのリポジトリの統合先の名前に当たれば承認しない。比べる名前は
-      `Families.integration_names`（環境変数・`.claude/settings.local.json`・統合先の取り込み結果・
-      `origin/HEAD`・`origin/main`・`origin/master`）。固定のリストと字の検査は
-      `ticket_ids.branch_problem` が読むときに済ませている
-    - 2 つの親子のチケットが同じブランチを宣言する（この親のブランチ名が、同じリポジトリの開いた別の
-      チケットの親のブランチ名か識別子と同じ。大文字小文字は区別しない）なら承認しない。`others` は
-      比べるチケット（承認済みと承認待ち）
+    親の識別子は親のブランチ名の `/` を `-` に置き換えたもの。2 つの親子のチケットが同じ識別子
+    （大文字小文字は区別しない）を持つなら承認しない。`others` は比べるチケット
+    （承認済みと承認待ち）
     """
     if t.is_child:
         return []
-    fams = fams or syncstate.Families(conf, root)
-    found: list[rules.Problem] = []
-    if t.branch:
-        folded = t.branch.casefold()
-        hits = [n for n in fams.integration_names(t.project or "") if n.casefold() == folded]
-        if hits:
-            found.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    t.ticket,
-                    f"`branch: {t.branch}` は統合先の名前（{', '.join(hits)}）と同じ。"
-                    "統合先を親のブランチにしない",
-                )
-            )
-    mine = ticket_ids.branch_name(t).casefold()
+    mine = t.ticket.casefold()
     clash = sorted(
         {
             o.ticket
@@ -154,21 +147,19 @@ def branch_problems(
             if o.ticket != t.ticket
             and (o.parent or o.ticket) != t.ticket
             and o.project == t.project
-            and mine in {ticket_ids.branch_name(o).casefold(), o.ticket.casefold()}
+            and mine == o.ticket.casefold()
         }
     )
     if clash:
-        found.append(
+        return [
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 t.ticket,
-                f"親のブランチ {ticket_ids.branch_name(t)} を別の親子のチケット"
-                f"（{', '.join(clash)}）も親のブランチか識別子として使っている。"
-                "2 つの親子のチケットが同じブランチを宣言すると、"
-                "どちらのチケットを正とするか決まらないので承認しない",
+                f"親の識別子 {t.ticket} と大文字小文字だけが違う識別子（{', '.join(clash)}）が"
+                "ある。ワークツリーとブランチの名前がぶつかるので承認しない",
             )
-        )
-    return found
+        ]
+    return []
 
 
 def misplaced_home_text(root: str, family: str, shown: str) -> str:
@@ -220,8 +211,8 @@ def place_problems(
     承認済みチケットは提案を書いたツリーにそのまま置かれる。親のワークツリーが識別子と違う名前だと、
     親が取り込み済みにならず、承認済みチケットの自動コミットも動かず、`start` `finish` は通っても
     `ready` で止まる。承認のあとには取り返せないので、承認の前に止める。ワークスペースルートと
-    プロジェクトの元ツリーの提案は言わない。`branch:` を持つ親も言う（親のワークツリーの名前は
-    `branch:` に関わらず識別子で、`start` `finish` `ready` も同じ名前を求める）。
+    プロジェクトの元ツリーの提案は言わない（親のワークツリーの名前は識別子で、
+    `start` `finish` `ready` も同じ名前を求める）。
     """
     if not t.tree_root:
         return []
@@ -268,20 +259,9 @@ def integration_problems(
     承認しない（何も出さずに通すことはしない）。一度も取り込んでいないリポジトリは何も言わない
     （今のまま）。
 
-    手元の退避（`logs/archive/`。`ready` が閉じた親子のチケットを移した先）にある識別子も、閉じた
-    識別子として数える。統合先には閉じたチケットを残さないので、手元ではここが閉じた記録になる
-    （別の機械では見えない）。退避は取り込み状態の有無に依らず見る。退避との比べは大文字小文字を
-    区別しない（区別しないファイルシステムでは、ブランチとワークツリーの名前がぶつかるため）。
+    手元の退避（`logs/archive/`）は見ない。閉じた識別子の使い回しは、開始時にホストへ聞く
+    「同名のブランチにマージ済みの MR が無いか」（`ccnavi-start.sh`）で確かめる。
     """
-    if any(archive.same_id(t.ticket, i) for i in archive.ids(root, t.project)):
-        return [
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                t.ticket,
-                f"{t.ticket} は手元の退避（{archive.ARCHIVE_DIR.replace(os.sep, '/')}/）で"
-                "閉じている。クローズ済みの識別子を新規に承認しない。識別子を変えて出し直してください",
-            )
-        ]
     fams = fams or syncstate.Families(conf, root)
     if not fams.active:
         return []
@@ -316,18 +296,13 @@ def integration_problems(
 def integration_closed(
     conf: settings.Settings, root: str, proposals: list[ticket_model.Ticket]
 ) -> set[str]:
-    """統合先の取り込み結果の `done/` か手元の退避に同じ識別子がある新規の提案。
+    """統合先の取り込み結果の `done/` に同じ識別子がある新規の提案。
 
     閉じた識別子の再利用を見つける。
     """
     fams = syncstate.Families(conf, root)
-    archived: dict[str, set[str]] = {}
 
     def closed(t: ticket_model.Ticket) -> bool:
-        if t.project not in archived:
-            archived[t.project] = archive.ids(root, t.project)
-        if any(archive.same_id(t.ticket, i) for i in archived[t.project]):
-            return True
         return fams.active and t.ticket in fams.done(syncstate.repo_key(t.project))[0]
 
     return {t.ticket for t in proposals if t.state == ticket_model.TODO and closed(t)}
@@ -402,7 +377,6 @@ def predecessor_pool_of(
     review: list[ticket_model.Ticket],
     closed: list[ticket_model.Ticket],
     proposals: list[ticket_model.Ticket],
-    root: str = "",
 ) -> dict[str, list[ticket_model.Ticket]]:
     """先行を引く対応表。識別子 → 正とする側のチケットの全部（`ops_close._places` と同じ集め方）。
 
@@ -410,32 +384,63 @@ def predecessor_pool_of(
     承認済みチケットがどこにも無いときだけ数える（在れば改版の候補か書き損じ）。チケットが 2 つ以上
     残れば、どれが正か決まらない。
 
-    `root`（ワークスペースルート）を渡せば、どの置き場にも無い先行を手元の退避（`logs/archive/`）の
-    `done/` から引く。`ready` が閉じた親子のチケットを退避した後も、先行を閉じたものとして読むため。
-    引くのはリストのチケットが先行に書いた識別子だけ（退避を全部は読まない）。
+    どの置き場にも無い先行（閉じて片付いた別の親子のチケット）は、ここでは引かない。閉じたかは
+    `align_imported` が統合先の `done/` と取り込み状態で決める。手元の退避（`logs/archive/`）は
+    PC ごとのもので、判定に使うと PC によって答えが割れるので読まない。
     """
     pool = _by_id(open_copies + review + closed)
     for t in proposals:
         if t.state == ticket_model.TODO and t.ticket not in pool:
             pool.setdefault(t.ticket, []).append(t)
-    if root:
-        # 引くのは、その先行を書いたチケットと同じリポジトリ（プロジェクト）の退避だけ。
-        wanted: dict[str, set[str]] = {}
-        for t in open_copies + review + closed + proposals:
-            for ident in t.predecessors:
-                if ident not in pool:
-                    wanted.setdefault(ident, set()).add(t.project)
-        for ident in sorted(wanted):
-            found = [h for p in sorted(wanted[ident]) for h in archive.find(root, ident, p)]
-            if found:
-                pool[ident] = found
     return pool
+
+
+def _family_of(ident: str) -> str:
+    """識別子が属する親子のチケット（子なら親の識別子、親ならそのまま）。"""
+    found = ticket_ids.child_pattern().fullmatch(ident)
+    return found.group("parent") if found else ident
+
+
+def _closed_elsewhere(
+    conf: settings.Settings,
+    fams: syncstate.Families,
+    ident: str,
+    projects: set[str],
+) -> list[ticket_model.Ticket]:
+    """どの置き場にも無い先行が、閉じた別の親子のチケットのものと分かれば、その閉じたチケット。
+
+    決め方は 2 つで、どちらも PC に依らない材料（リモートから取り込んだもの）だけを読む。
+
+    - 統合先の取り込み結果の `done/<識別子>.md` がある: そのチケット（取り消しの欄があれば取り消し）
+    - その先行の親子のチケットの取り込み状態が `closed`（`ccnavi-sync.sh` が閉じたと確かめた）:
+      閉じた
+
+    どちらでもなければ空（どの置き場にも無い）。手元の退避は読まない。
+    """
+    for project in sorted(projects):
+        repo = syncstate.repo_key(project)
+        ids, why = fams.done(repo)
+        integ = fams.integration(repo)
+        if not why and ident in ids and integ is not None:
+            data, bad = integ.file(f"{(conf.approved or '').strip('/')}/done/{ident}.md")
+            t = None
+            if data is not None and not bad:
+                with contextlib.suppress(UnicodeDecodeError):
+                    t, _ = ticket_mod.parse(data.decode("utf-8"))
+            if t is not None and t.ticket == ident:
+                t.state = ticket_model.CANCELLED if t.cancelled_at else ticket_model.DONE
+                t.project, t.tree, t.tree_root, t.path = project, "", "", ""
+                return [t]
+        record = syncstate.family(conf.state, repo, _family_of(ident))
+        if record is not None and not record.broken and record.state == syncstate.STATE_CLOSED:
+            return [ticket_model.Ticket(ticket=ident, state=ticket_model.DONE, project=project)]
+    return []
 
 
 def align_imported(
     conf: settings.Settings, root: str, pool: dict[str, list[ticket_model.Ticket]]
 ) -> None:
-    """取り込み済みの親子のチケットの先行を、その親のブランチ上のチケットで読み直す。
+    """親子のチケットの先行を、その親のブランチ上のチケットで読み直す。
 
     Chrome は先行を、参照の閉包にある親子のチケット `P` から引く。手元もそれに揃える。
     ただし通る向きには読み替えない（厳しくする向きだけ）。
@@ -453,16 +458,26 @@ def align_imported(
       親子のチケット: 前の対応表のまま
     """
     fams = syncstate.Families(conf, root)
-    if not fams.active:
-        return
+    # どの置き場にも無い先行を、統合先の `done/` と取り込み状態から閉じたものとして引く。
+    # 引くのは、対応表のチケットが先行に書いた識別子だけ。その先行を書いたチケットと同じ
+    # リポジトリ（プロジェクト）で引く。
+    wanted: dict[str, set[str]] = {}
+    for hits in list(pool.values()):
+        for t in hits:
+            for ident in t.predecessors:
+                if ident not in pool:
+                    wanted.setdefault(ident, set()).add(t.project)
+    elsewhere: set[str] = set()
+    for ident in sorted(wanted):
+        found = _closed_elsewhere(conf, fams, ident, wanted[ident])
+        if found:
+            pool[ident] = found
+            elsewhere.add(ident)
     for ident, hits in list(pool.items()):
-        if not hits:
-            continue
-        # 手元の退避から引いた先行は閉じたもの。親のブランチ上のチケットでは読み直さない。
-        if all(archive.is_archived_path(root, h.path) for h in hits):
+        if not hits or ident in elsewhere:
             continue
         st = family_standing(conf, root, hits[0], fams)
-        if not st.imported or st.closed:
+        if st.closed:
             continue
         if st.stop:
             pool[ident] = [_undecided(hits[0], st.stop)]
@@ -799,8 +814,6 @@ def blocking_problems(
       `--agree` の検査を通らないので、ここで止める。止めるのは承認済みチケットそのものの形の誤りで、
       承認のあとに外の何か（`phases.yml` など）が動いて起きるものではない（直せるのはユーザが
       承認済みチケットを直すときだけ）。読むのは承認済みチケットだけで、`phases.yml` は読まない
-    - 親のツリーの未着手のチケットが、手元の退避の閉じたチケットと同じ識別子
-      （`archive.drop_archived`）。使い直した識別子か、退避と同じものかを見分けられない
     """
     problems = list(project_problems(t, pool, conf))
     problems.extend(content_problems(t))
@@ -833,8 +846,6 @@ def content_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
             )
         )
     problems.extend(workflow.errors(t))
-    if t.archived_clash:
-        problems.append(rules.Problem(rules.SEVERITY_ERROR, t.ticket, t.archived_clash))
     return problems
 
 
@@ -846,6 +857,7 @@ def resumed_fields(t: ticket_model.Ticket) -> list[str]:
     """
     values = {
         "completed_at": t.completed_at,
+        "merged_sha": t.merged_sha,
         "cancelled_at": t.cancelled_at,
         "cancel_reason": t.cancel_reason,
     }
