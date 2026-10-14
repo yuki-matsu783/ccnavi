@@ -1,6 +1,6 @@
 /**
- * 足し算（`--explain --json` の `sums[]`）の見本。実行ファイルの出力の形（tests/config/test_config_absent.py が見る形）で、
- * ワークスペースの足し算（共通 + 自身）とプロジェクト lib の足し算（共通 + lib）を持つ。
+ * 統合結果（`--explain --json` の `sums[]`）の見本。実行ファイルの出力の形（tests/config/test_config_absent.py が見る形）で、
+ * ワークスペースの統合結果（共通 + 自身）とプロジェクト lib の統合結果（共通 + lib）を持つ。
  */
 import { parseBoardJson, type BoardJson } from "../../src/core/model.js";
 import { fixture } from "./fixture.js";
@@ -32,7 +32,7 @@ function sum(name: string, rules: unknown[], extra: Record<string, unknown> = {}
   };
 }
 
-/** `sums` を持つボード。ワークスペースの足し算と lib の足し算の 2 件 */
+/** `sums` を持つボード。ワークスペースの統合結果と lib の統合結果の 2 件 */
 export function sumsBoard(): BoardJson {
   const parsed = parseBoardJson(JSON.stringify({ ...JSON.parse(JSON.stringify(fixture())), sums: [sum("self", [RULE_COMMON]), sum("lib", [RULE_COMMON, RULE_LIB, RULE_ASK])] }));
   if (!parsed.ok) {

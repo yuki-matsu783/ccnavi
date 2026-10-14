@@ -843,7 +843,7 @@ class StandaloneCloneTest(ConfigUnionHarness):
 
 
 class ExplainSumsTest(ConfigUnionHarness):
-    """`--explain --json` の `sums[]`。拡張が足し算を自分で組まずに済むための合成結果。"""
+    """`--explain --json` の `sums[]`。拡張が統合結果を自分で組まずに済むための合成結果。"""
 
     def sums(self):
         body = json.loads(self.ccnavi("--explain", "--json").stdout)

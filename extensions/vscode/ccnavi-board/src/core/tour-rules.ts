@@ -21,7 +21,7 @@ export interface RulesSample {
   readonly judges: Readonly<Record<string, TestJson>>;
   readonly checked: ExpectationsJson | undefined;
   readonly suggested: SuggestJson | undefined;
-  /** 「足し算」の見本。実行ファイルが出す結果（`sums[]`）と同じ形で書き、ボードの JSON の読み取りを通す */
+  /** 「統合結果」の見本。実行ファイルが出す結果（`sums[]`）と同じ形で書き、ボードの JSON の読み取りを通す */
   readonly sums: readonly RulesSum[];
   /** 保存前の検証エラーの見本（`--lint` の報告を画面が付けた 1 文）。無ければ空 */
   readonly saveError: string;
@@ -98,7 +98,7 @@ function viaJson<T>(parse: (text: string) => { readonly ok: true; readonly value
   return parsed.value;
 }
 
-/** 足し算は実行ファイルの JSON（ボードの `sums[]`）と同じ形で書き、実際の読み取り（`parseBoardJson` → `rulesSums`）を通す */
+/** 統合結果は実行ファイルの JSON（ボードの `sums[]`）と同じ形で書き、実際の読み取り（`parseBoardJson` → `rulesSums`）を通す */
 function sumsOfRaw(raw: unknown): readonly RulesSum[] {
   if (raw === undefined) {
     return [];

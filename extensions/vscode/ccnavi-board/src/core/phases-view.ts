@@ -53,7 +53,7 @@ export interface PhasesForm {
 }
 
 /**
- * 共通の設定の定義 1 件（読み取り専用）。実行ファイルの足し算（`--explain --json` の `sums[].phases.types`）のうち、
+ * 共通の設定の定義 1 件（読み取り専用）。実行ファイルの統合結果（`--explain --json` の `sums[].phases.types`）のうち、
  * 出どころ（`source`）が共通の設定のもの。拡張は足し直さず、そのまま見せる
  */
 export interface CommonPhase {

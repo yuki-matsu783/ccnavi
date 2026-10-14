@@ -268,7 +268,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--format", default=None)
     parser.add_argument("--no-refresh", action="store_true")
     # 作業・レビュー計画のテンプレートの一覧・検索（`--keyword`）・表示（`--show`）。読むだけ。
-    # `--layer` は足し算の相手のレイヤー（self かプロジェクト名。既定は self）。
+    # `--layer` は統合結果の相手のレイヤー（self かプロジェクト名。既定は self）。
     parser.add_argument("--templates", action="store_true")
     parser.add_argument("--show", default=None, metavar="NAME")
     parser.add_argument("--layer", default="")

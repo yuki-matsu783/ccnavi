@@ -76,7 +76,7 @@ test("CB-T116 ないファイル（空の本文）に定義を追加して書き
 const COMMON_PLAN = { id: "plan", title: "調査", kind: "work", review: "mr", scope: ["wip/plan/*"] };
 const COMMON_IMPL = { id: "implement", title: "実装とテスト", kind: "work", review: "mr", scope: ["src/*", "tests/*"] };
 
-test("CB-T527 共通の設定の定義は、足し算（sums[].phases.types）のうち出どころが common のものだけを取る。足し算がなければ空", () => {
+test("CB-T527 共通の設定の定義は、統合結果（sums[].phases.types）のうち出どころが common のものだけを取る。統合結果がなければ空", () => {
   const sum = {
     name: "self",
     layers: ["common", "self"],

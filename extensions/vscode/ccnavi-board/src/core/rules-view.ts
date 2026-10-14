@@ -163,7 +163,7 @@ export interface RulesPage {
   readonly target?: { readonly kind: string; readonly name: string };
   readonly targets?: readonly TargetOption[];
   /**
-   * 読み取り専用の足し算（共通の設定 + ワークスペース、共通の設定 + 各プロジェクト）。実行ファイルが出した結果で、拡張は合成しない。
+   * 読み取り専用の統合結果（共通の設定 + ワークスペース、共通の設定 + 各プロジェクト）。実行ファイルが出した結果で、拡張は合成しない。
    * 保存済みの内容の和で、編集中の内容は含まない。ボードを読めなかったときは無い
    */
   readonly sums?: readonly RulesSum[];

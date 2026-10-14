@@ -2,7 +2,7 @@
  * リスク管理画面の案内の見本（`webview/tours/risk.yml` の `sample:`）を、画面が描く形にする。
  *
  * 配点は `risks.yml` と同じ書き方（`levels:` と `factors:`。加点条件は `lines_over:` などのキー）で見本に書き、ここで
- * `RiskPage`（画面が描く形）にする。足し算は実行ファイルの JSON と同じ形で書く。いずれも案内の間に描くだけで、保存にも判定にも使わない。
+ * `RiskPage`（画面が描く形）にする。統合結果は実行ファイルの JSON と同じ形で書く。いずれも案内の間に描くだけで、保存にも判定にも使わない。
  * `risk-doc.ts` は YAML の解析器を持つので画面から読めない。同じ読み方をここで小さく持ち、そろっていることはテストが見る。
  */
 import { KINDS, LEVEL_NAMES, type FactorForm, type FactorKind, type LevelName, type RiskForm, type RiskPage } from "./risk-view.js";

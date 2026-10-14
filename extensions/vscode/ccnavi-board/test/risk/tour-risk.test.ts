@@ -66,7 +66,7 @@ test("CB-T441 組み込みの配点の見本は、実際の組み込みの配点
   assert.equal(sample.missing.sums, undefined);
 });
 
-test("CB-T442 足し算の見本は、共通の設定の項目に追加した設定の項目が続き、境目の点は小さいほう、同じ id の別の項目はレイヤー名が付く", () => {
+test("CB-T442 統合結果の見本は、共通の設定の項目に追加した設定の項目が続き、境目の点は小さいほう、同じ id の別の項目はレイヤー名が付く", () => {
   const sums = sample.page.sums ?? [];
   assert.deepEqual(sums.map((sum) => sum.name), ["self", "lib"]);
   const common = sample.page.model.form.factors.map((factor) => factor.id);
@@ -92,7 +92,7 @@ test("CB-T442 足し算の見本は、共通の設定の項目に追加した設
   assert.ok(lib.factors.every((factor) => typeof factor.value === "string"), "値は文字にして持つ");
 });
 
-test("CB-T443 リスクの案内の scene は、見本にある項目の id・境目の名前・足し算の名前だけを指す（綴り違いが既定へ黙って戻らない）", () => {
+test("CB-T443 リスクの案内の scene は、見本にある項目の id・境目の名前・統合結果の名前だけを指す（綴り違いが既定へ黙って戻らない）", () => {
   const ids = new Set(sample.page.model.form.factors.map((factor) => factor.id));
   const sums = new Set((sample.page.sums ?? []).map((sum) => sum.name));
   const known = ["open", "find", "blank", "missing", "sum"];
@@ -151,7 +151,7 @@ test("CB-T445 項目の中を指す段は、その項目の加点条件に出る
         assert.equal(step.scene.missing, true, at);
       }
       if (step.target.startsWith("sum")) {
-        assert.ok(step.scene.sum !== undefined, `${at}: 足し算を開く scene が必要です`);
+        assert.ok(step.scene.sum !== undefined, `${at}: 統合結果を開く scene が必要です`);
       }
       if (step.scene.missing === true) {
         assert.ok(["missing", "levels", "create"].includes(step.target), `${at}: 組み込みの配点の状態で指せるのは帯・境目・作るボタン`);
