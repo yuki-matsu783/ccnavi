@@ -1156,14 +1156,16 @@ class ExplainTest(ConfigUnionHarness):
         self.assertEqual(result.returncode, 0, result.stderr)
         for heading in (
             "■ rules 共通レイヤー",
-            "■ rules 自身のレイヤー",
+            "■ rules ワークスペースのレイヤー",
             "■ rules lib",
             "■ phases",
             "■ risk",
         ):
             self.assertIn(heading, out)
-        self.assertLess(out.index("■ rules 共通レイヤー"), out.index("■ rules 自身のレイヤー"))
-        self.assertLess(out.index("■ rules 自身のレイヤー"), out.index("■ rules lib"))
+        self.assertLess(
+            out.index("■ rules 共通レイヤー"), out.index("■ rules ワークスペースのレイヤー")
+        )
+        self.assertLess(out.index("■ rules ワークスペースのレイヤー"), out.index("■ rules lib"))
         self.assertIn("self:generated", out)
         self.assertIn("lib:schema", out)
         # phases と risk は id と出どころのレイヤー。

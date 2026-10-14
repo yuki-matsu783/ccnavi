@@ -499,6 +499,8 @@ class PhaseTest(PhaseHarness):
         self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["wip/design/*"]))
         self.commit_parent()
         result = self.approve()
+        # 一部だけ置いて失敗した。何も置かずに失敗したとき（1）と分けるので 4。
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
         self.assertTrue(
             os.path.exists(os.path.join(self.approved, "doing", "i0001.md")), result.stderr
         )
@@ -527,6 +529,23 @@ class PhaseTest(PhaseHarness):
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "summary")
         self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
+
+    def test_deliverable_tracked_but_deleted_from_the_worktree_is_missing(self):
+        """追跡済みでも作業ツリーから消えていれば、成果物は無いものとして閉じない。
+
+        `git ls-files` はインデックスを見るので、削除をステージするまでは名前が返る。
+        """
+        self.family(plan=["research", "design"])
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], review=False)
+        )
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        tree = self.run_child("i0001-01-01", [("wip/research/summary.md", "x\n")])
+        os.remove(os.path.join(tree, "wip", "research", "summary.md"))
+        refused = self.close_child("i0001-01-01")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("成果物が無い", refused.stderr)
 
     # ---- 5. 延期
 

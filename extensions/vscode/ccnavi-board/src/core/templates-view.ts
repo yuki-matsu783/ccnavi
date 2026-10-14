@@ -1,5 +1,5 @@
 /**
- * テンプレート管理画面の、拡張ホストと Webview の間の契約。見せるのは `ccnavi --templates --json` の答え（テンプレートの一覧・層ごとの中身・足し算の索引・下書き）と、
+ * テンプレート管理画面の、拡張ホストと Webview の間の契約。見せるのは `ccnavi --templates --json` の答え（テンプレートの一覧・層ごとの中身・統合結果の索引・下書き）と、
  * 1 件の本文（`--templates --show <名前> --json`）と、取り込みの下見と実行（`--templates --import … --json`）の答え。形の見本は `tests/fixtures/templates-json.json`。
  *
  * 判定は実行ファイルが答え、画面は読むだけにする（有効か・捨てた理由・取り込めるかは実行ファイルが決める）。読み取りは `templatesmodel.ts` の側に置く。
@@ -41,7 +41,7 @@ export interface FlowSummary {
   readonly node_types: Readonly<Record<string, number>>;
 }
 
-/** 足し算で捨てた理由。reason は invalid / duplicate / conflict だが、知らない値も通す */
+/** 統合結果で捨てた理由。reason は invalid / duplicate / conflict だが、知らない値も通す */
 export interface Dropped {
   readonly reason: string;
   readonly detail: string;
@@ -62,7 +62,7 @@ export interface TemplateEntry {
   readonly feedback: readonly PlanItem[];
   readonly has_flows: boolean;
   readonly flows: readonly FlowSummary[];
-  /** 足し算で使われるか */
+  /** 統合結果で使われるか */
   readonly effective: boolean;
   /** 使われ、error も無い */
   readonly usable: boolean;
@@ -84,7 +84,7 @@ export interface TemplateLayer {
   readonly templates: readonly TemplateEntry[];
 }
 
-/** 足し算の索引の 1 行 */
+/** 統合結果の索引の 1 行 */
 export interface SumRow {
   readonly name: string;
   readonly layer: string;
@@ -92,15 +92,15 @@ export interface SumRow {
   readonly dropped: Dropped | null;
 }
 
-/** レイヤーごとの足し算の索引 */
+/** レイヤーごとの統合結果の索引 */
 export interface Sum {
   readonly name: string;
-  /** 足し算に入る層の名前 */
+  /** 統合結果に入る層の名前 */
   readonly layers: readonly string[];
   readonly templates: readonly SumRow[];
 }
 
-/** 下書き 1 件。効力は無く、templates にも足し算にも入らない */
+/** 下書き 1 件。効力は無く、templates にも統合結果にも入らない */
 export interface DraftEntry {
   readonly name: string;
   /** 置かれたツリー。ワークスペースルートは空 */

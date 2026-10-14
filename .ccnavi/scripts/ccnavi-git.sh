@@ -1876,7 +1876,7 @@ push)
 	# 統合はユーザがマージリクエストで行う。
 	push_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 	if [ -z "$push_branch" ] || [ "$push_branch" = "HEAD" ]; then
-		reject detached-head "いまブランチの上に居ません（detached HEAD）。送る先が決まらないので使用できません。"
+		reject detached-head "現在のHEADがブランチに属していません（detached HEAD）。送る先が決まらないので使用できません。"
 	fi
 	# 子チケットのワークツリーからは送らない。レビューはマージリクエストの実物に結び、
 	# その実物は親ブランチに 1 本だけある。子の成果は親が手元で合流してから、親の

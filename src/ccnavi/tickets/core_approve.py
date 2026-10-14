@@ -111,8 +111,8 @@ def approve(
     if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 承認しなかった\n")
         return 1
-    code = core_base.write_fs(stdout, stderr, core_base.plan(snapshot, verdict).planned).code
-    if code == 0 and gathered.rejected:
+    applied = core_base.write_fs(stdout, stderr, core_base.plan(snapshot, verdict).planned)
+    if applied.code == 0 and gathered.rejected:
         # 承認の対象の一部が失敗したときは、通ったぶんを置いてから失敗で終わる。置いたので
         # 繰り返してよく、失敗したものは上で名指ししてある。成功で終わると、
         # 端末を見ていない側（スクリプト、CI）は全部通ったと読む。
@@ -120,8 +120,11 @@ def approve(
             f"ccnavi: {len(gathered.rejected)} 件は承認の対象にしなかった。"
             "直して出し直してください（通ったぶんの承認済みチケットは置いた）\n"
         )
-        return 1
-    return code
+        return modes.EXIT_PARTIAL
+    if applied.code != 0 and applied.placed:
+        # 途中で止まったが、そこまでに置いたものは残る。
+        return modes.EXIT_PARTIAL
+    return applied.code
 
 
 def preview(

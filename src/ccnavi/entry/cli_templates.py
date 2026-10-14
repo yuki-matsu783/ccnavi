@@ -319,7 +319,7 @@ def _fail(stdout: TextIO, stderr: TextIO, as_json: bool, error: str) -> int:
 def _drafts(
     conf: settings.Settings, root: str, scanned: plan_templates.Scan, keywords: list[str]
 ) -> list[dict]:
-    """下書きの答え（`drafts[]`）。効力は無いので、足し算にも `templates[]` にも入れない。"""
+    """下書きの答え（`drafts[]`）。効力は無いので、統合結果にも `templates[]` にも入れない。"""
     found = template_drafts.scan(conf, root, scanned.candidates).drafts
     return [
         template_drafts.draft_json(d, scanned)

@@ -188,7 +188,7 @@ start | finish | cancel)
 	# 識別子は実行ファイル（argparse）と同じに読む（ticket_id。`start -- <親>` で C1 を経ずに通らないようにする）。
 	c1_id=$(ticket_id "$@")
 	if ! ccnavi_is_ident "$c1_id"; then
-		printf 'ccnavi-ticket: %s には識別子を指定してください（%s は識別子の形ではない）。\n' "$1" "${c1_id:-（無い）}" >&2
+		printf 'ccnavi-ticket: %s には識別子を指定してください（%s は有効な識別子の形式ではありません）。\n' "$1" "${c1_id:-（無い）}" >&2
 		exit 2
 	fi
 	ccnavi_c1_family "$c1_id"

@@ -444,7 +444,7 @@ export interface GitLabReviewCopy {
 /** 親のブランチの MR のスレッドとレビューを取得した結果（`ccnavi-review.sh fetch` の GitLab の枝と同じ形） */
 export async function reviewCopy(client: Client, owner: string, repo: string, branch: string): Promise<GitLabReviewCopy> {
   const mr = await openMr(client, owner, repo, branch);
-  if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する、未クローズのマージリクエストがありません`);
+  if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する、オープン状態のマージリクエストがありません`);
   const threads = await discussions(client, owner, repo, mr.number, mr.url);
   const reviews = await reviewers(client, owner, repo, mr.number, mr.url);
   return { host: "gitlab", mr, threads, reviews, fetched_at: new Date().toISOString() };

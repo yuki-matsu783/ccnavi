@@ -54,7 +54,7 @@ function RepoBody({ board, actions, attention, issues }: RepoProps & { attention
       {board.compat && !board.compat.same ? <Notice kind="warn" text={`${board.compat.message}（表示のみとし、承認と取り下げのボタンは表示しません）`} /> : null}
       {board.missingExtras.length > 0 ? <Notice kind="warn" text={`指定したブランチがリモートに見つかりません：${board.missingExtras.join(", ")}`} /> : null}
       <p className="scope">{`確認したブランチ（表示用）：${board.candidates.length === 0 ? "なし" : board.candidates.join(", ")}`}</p>
-      {board.families.length === 0 ? <p className="empty">確認したブランチに親ブランチ（親子チケット）はありません。</p> : null}
+      {board.families.length === 0 ? <p className="empty">確認したブランチの中に、親チケットに対応するブランチはありません。</p> : null}
       {board.families.map((f) => {
         const why = attention[f.family.name];
         // 「要確認」の親子のチケットには、このブラウザでは書くボタンを出さない（ユーザが確かめて外すまで）
@@ -108,7 +108,7 @@ function RecentDays({ board, set }: { board: RepoBoard; set: (repo: RepoBoard, v
       }}
     >
       <label>
-        {"直近の日数（表示用） "}
+        {"表示対象のブランチを検索する期間（過去N日） "}
         <input key={board.repo.recentDays} ref={input} type="number" name="recentDays" min="0" max={String(MAX_RECENT_DAYS)} step="1" defaultValue={String(board.repo.recentDays)} />
       </label>
       <ActionButton type="submit" action="recent-days">

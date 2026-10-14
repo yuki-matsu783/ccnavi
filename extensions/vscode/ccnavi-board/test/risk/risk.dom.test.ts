@@ -452,7 +452,7 @@ test("CB-T315 配点のファイルがないのは正常。組み込みを見せ
   }
 });
 
-test("CB-T316 足し算は読み取り専用で、境目の点・項目・由来を実行ファイルが出したまま並べる。選び直しても拡張ホストへ何も送らない", async () => {
+test("CB-T316 統合結果は読み取り専用で、境目の点・項目・由来を実行ファイルが出したまま並べる。選び直しても拡張ホストへ何も送らない", async () => {
   const sums = riskSums(sumsBoard());
   const dom = await openRisk({ target: { kind: "project", name: "lib" }, sums, notices: ["読み込めない <理由>"] });
   try {

@@ -27,7 +27,20 @@ from . import diagnose_board, diagnose_shared
 
 # レイヤーの見出し。共通レイヤーと自身のレイヤーだけ日本語の名前で出す。
 # プロジェクトは名前そのもので、それが id の前置き（`lib:schema`）と同じ表記になる。
-LAYER_LABELS = {ruleload.LAYER_COMMON: "共通レイヤー", ruleload.LAYER_SELF: "自身のレイヤー"}
+LAYER_LABELS = {
+    ruleload.LAYER_COMMON: "共通レイヤー",
+    ruleload.LAYER_SELF: "ワークスペースのレイヤー",
+}
+
+
+# レイヤー列の表示幅（全角は 2 桁）。「ワークスペースのレイヤー」が収まる幅
+_LAYER_COL = 26
+
+
+def _pad(text: str, width: int) -> str:
+    """表示幅 `width` になるまで右に空白を足す（全角は 2 桁で数える）。"""
+    used = sum(2 if unicodedata.east_asian_width(c) in "WF" else 1 for c in text)
+    return text + " " * max(0, width - used)
 
 
 # 却下の走査に使う時間の上限（秒）。SessionStart と違って期限が無いので長めに取る。
@@ -63,8 +76,13 @@ def _explain_phases(
         for v in views
     ]
     counts = "、".join(f"{layer_label(name)} {len(items)} 種" for name, items, _ in tables)
-    stdout.write(f"\n■ phases（{counts}。使うのは共通 + 親の project: が指すレイヤーの和）\n")
-    stdout.write(f"  {'id':<16}{'レイヤー':<10}{'kind':<8}{'title':<16}{'review':<8}scope\n")
+    stdout.write(
+        f"\n■ phases（{counts}。共通レイヤーと、親チケットの project: で"
+        "指定されたレイヤーを組み合わせて適用します）\n"
+    )
+    stdout.write(
+        f"  {'id':<16}{_pad('レイヤー', _LAYER_COL)}{'kind':<8}{'title':<16}{'review':<8}scope\n"
+    )
     for name, items, unreadable in tables:
         if unreadable:
             stdout.write(
@@ -74,7 +92,7 @@ def _explain_phases(
             scope = (
                 ", ".join(diagnose_shared.written(e) for e in pt.scope) if pt.scope else "inherit"
             )
-            head = f"  {pt.id:<16}{layer_label(name):<10}{pt.kind:<8}{pt.title:<16}"
+            head = f"  {pt.id:<16}{_pad(layer_label(name), _LAYER_COL)}{pt.kind:<8}{pt.title:<16}"
             stdout.write(f"{head}{pt.review:<8}{scope}\n")
 
 
@@ -98,7 +116,9 @@ def _explain_risk(
     effective = risk.effective_levels(common.levels)
     levels = " / ".join(f"{k} {effective[k]}" for k in ("medium", "high", "critical"))
     stdout.write(f"\n■ risk（levels: {levels}）\n")
-    stdout.write(f"  {'id':<16}{'レイヤー':<10}{'加点条件':<20}{'points':<8}message\n")
+    stdout.write(
+        f"  {'id':<16}{_pad('レイヤー', _LAYER_COL)}{'加点条件':<20}{'points':<8}message\n"
+    )
     for name, items, unreadable in tables:
         if unreadable:
             stdout.write(
@@ -107,7 +127,7 @@ def _explain_risk(
         for factor in items:
             how = f"{factor.kind} {factor.value}"
             stdout.write(
-                f"  {factor.id:<16}{layer_label(name):<10}{how:<20}"
+                f"  {factor.id:<16}{_pad(layer_label(name), _LAYER_COL)}{how:<20}"
                 f"{factor.points:<8}{factor.message}\n"
             )
 
@@ -134,7 +154,7 @@ def _explain_undeclared(stdout: TextIO, conf: settings.Settings) -> None:
     ここだけ古い説明が残る。`conf.guard_unwatched` は hook と同じく解いた後の値で渡される
     （cli の `_resolve_switches`）。
     """
-    stdout.write("\n■ どのルールも言及しない呼び出し\n")
+    stdout.write("\n■ どのルールにも一致しないツール呼び出し\n")
     stdout.write(
         "  ccnavi は判定を持たない。読めた呼び出しは Claude Code の権限モードに委ねる。"
         "読み切れない呼び出し（実行される部分まで読み解けず、生の文字列に当てたコマンド）は、"
@@ -175,7 +195,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     stdout.write(f"ccnavi: いま有効な宣言（出所 {source}）\n")
     stdout.write(
         "  パスを持つツールは共通レイヤー + 対象のレイヤー、"
-        "持たないツールは全部のレイヤーの和で判定する"
+        "持たないツールは全部のレイヤーを組み合わせて判定する"
         "\n"
     )
 
@@ -186,7 +206,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             stdout.write(f"  読めない: {view.unreadable}。このレイヤーは空として扱う\n")
             continue
         if view.missing:
-            stdout.write("  このレイヤーは置いていない（無い = 空）\n")
+            stdout.write("  このレイヤーの設定ファイルはありません。設定なしとして扱います。\n")
             continue
         for name in rules.SECTIONS:
             for rule in view.rule_set.section(name):
@@ -214,8 +234,8 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
 
     stdout.write("\n■ チケットの作業範囲（承認済みチケット）\n")
     stdout.write(
-        "  ワークツリーに結び付いたチケットの範囲は、ルールの allow / ask より優先される。"
-        "範囲の外は止まる\n"
+        "  ワークツリーに結び付いたチケットの範囲は、ルールの allow / ask より優先されます。"
+        "編集可能範囲の外への書き込みは拒否されます。\n"
     )
     stdout.write(f"  チケット制御: {conf.ticket_control or settings.TICKET_CONTROL_ENABLE}\n")
     stdout.write(f"  学びの蓄積: {'enable' if conf.learning_enabled else 'disable'}\n")
@@ -274,7 +294,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         for ph in phase.phases_of(root, conf, parent.ticket, raw=raw):
             marks = ", ".join(sorted(ph.marks)) or "マーカーなし"
             if not ph.tickets:
-                state = "未計画（子がまだ無い）"
+                state = "未計画（子チケットはまだありません）"
             elif ph.ended:
                 state = "終了"
             else:
@@ -293,7 +313,9 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
                     review += "（実績でレビュー必須）"
             if ph.planned:
                 waits = workflow.waits_of(parent, ph.number)
-                review += f" / 待つ: {', '.join(map(str, waits))}" if waits else " / 何も待たない"
+                review += (
+                    f" / 待つ: {', '.join(map(str, waits))}" if waits else " / 先行フェーズなし"
+                )
             stdout.write(
                 f"  {parent.ticket} フェーズ {ph.label}: {state} / {marks} / {hold}{review}\n"
             )

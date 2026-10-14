@@ -105,7 +105,7 @@ test("CB-T520 ルールの案内は、使い方ごとの案内が 4〜9 段で�
   }
 });
 
-test("CB-T521 足し算の見本は、実際のボードの JSON の読み取りと同じ RulesSum になり、共通の設定と別のレイヤーの由来を持つ", () => {
+test("CB-T521 統合結果の見本は、実際のボードの JSON の読み取りと同じ RulesSum になり、共通の設定と別のレイヤーの由来を持つ", () => {
   const raw = (loadTour("rules").sample as { sums: unknown }).sums;
   const parsed = parseBoardJson(JSON.stringify({ version: BOARD_VERSION, sums: raw }));
   assert.ok(parsed.ok);
@@ -172,9 +172,9 @@ test("CB-T525 候補の見本は、下書きの YAML が候補の id・タイプ
   }
 });
 
-test("CB-T526 保存前の検証エラーの見本は、lint の報告の形（--lint が error を報告…、続けて「error: id: 内容」）で、見本の行の id を名指しする", () => {
+test("CB-T526 保存前の検証エラーの見本は、lint の報告の形（設定の検証（--lint）でエラーが見つかりました…、続けて「error: id: 内容」）で、見本の行の id を名指しする", () => {
   const lines = sample.saveError.split("\n");
-  assert.match(lines[0], /^--lint が error を報告しました。直してから保存してください:$/);
+  assert.match(lines[0], /^設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください:$/);
   const ids = new Set([...sample.sections.deny, ...sample.sections.ask, ...sample.sections.allow].map((rule) => rule.id));
   assert.ok(lines.length >= 2);
   for (const line of lines.slice(1)) {

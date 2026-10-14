@@ -208,7 +208,7 @@ def screen(
             lines.append("■ チケットで編集対象としているが、書き込めない場所")
             lines.append(
                 "    親の範囲かフェーズ定義の上限を超えている。"
-                "承認は可能だが、編集しようとすると判定で止められる"
+                "承認はできますが、これらの場所への書き込みは拒否されます。"
             )
             lines += [f"    {p.detail}" for p in cand.overflow]
         if t.is_child:
@@ -227,8 +227,7 @@ def screen(
             lines.append("■ 全体計画")
             lines.append(
                 "    承認すると、この順序で進めることに合意したことになる。"
-                "各フェーズの子は、そのフェーズが待つフェーズ（下のフェーズ間の依存関係）が閉じてレビューが"
-                "済むまで承認できない"
+                "先行フェーズの終了と必要なレビューの完了を確認するまで、このフェーズの子チケットは承認できません。"
             )
             lines += _plan_lines(t.plan, 1, cand_types)
             if t.feedback is not None:
@@ -240,7 +239,7 @@ def screen(
             lines.append(f"■ 課題: {ticket_mod.issue_label(t)}")
             lines.append(
                 "    この親のマージリクエストの本文に Closes として記載する番号。"
-                "マージされると、この課題も閉じる"
+                "マージされると、このIssueもクローズされます。"
             )
         if not t.is_child and t.branch:
             lines.append(f"■ ブランチ: {t.branch}")
@@ -325,7 +324,9 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
         for ident in used:
             pt = types[ident]
             scope = (
-                "inherit（親の範囲そのまま）" if pt.inherits_scope else ", ".join(pt.scope_globs)
+                "inherit（親チケットの編集可能範囲を引き継ぐ）"
+                if pt.inherits_scope
+                else ", ".join(pt.scope_globs)
             )
             parts = [f"review: {pt.review}", f"scope: {scope}"]
             if pt.deliverables:

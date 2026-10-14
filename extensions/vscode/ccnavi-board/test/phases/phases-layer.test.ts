@@ -76,7 +76,7 @@ test("CB-T116 ないファイル（空の本文）に定義を追加して書き
 const COMMON_PLAN = { id: "plan", title: "調査", kind: "work", review: "mr", scope: ["wip/plan/*"] };
 const COMMON_IMPL = { id: "implement", title: "実装とテスト", kind: "work", review: "mr", scope: ["src/*", "tests/*"] };
 
-test("CB-T527 共通の設定の定義は、足し算（sums[].phases.types）のうち出どころが common のものだけを取る。足し算がなければ空", () => {
+test("CB-T527 共通の設定の定義は、統合結果（sums[].phases.types）のうち出どころが common のものだけを取る。統合結果がなければ空", () => {
   const sum = {
     name: "self",
     layers: ["common", "self"],
@@ -121,7 +121,7 @@ test("CB-T529 共通の設定の別の id と表示名が重なる定義は、id
   // 共通の plan と、見本の research（p1）の表示名「調査」が重なる
   const dom = await openPhases({ common: [COMMON_PLAN] });
   try {
-    assert.match(dom.one("#status").textContent, /表示名（title）が共通の設定の定義と重なっています（research）/);
+    assert.match(dom.one("#status").textContent, /共通設定のフェーズ定義と表示名（title）が重複しています（research）/);
     assert.ok(dom.one(".foot").className.includes("error"));
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
     await dom.settle();
@@ -148,13 +148,13 @@ test("CB-T530 id が空の行（打っている途中）は、共通の設定の
     dom.type(titles[titles.length - 1], "計画");
     await dom.settle();
     assert.equal(dom.all(".phase input.f-id.duplicate").length, 0);
-    assert.doesNotMatch(dom.one("#status").textContent ?? "", /共通の設定の定義と重なっています/);
+    assert.doesNotMatch(dom.one("#status").textContent ?? "", /共通設定のフェーズ定義と表示名（title）が重複しています/);
     // id を打てば重なりとして止める
     const ids = dom.all(".phase input.f-id");
     dom.type(ids[ids.length - 1], "planning");
     await dom.settle();
     assert.equal(dom.all(".phase input.f-id.duplicate").length, 1);
-    assert.match(dom.one("#status").textContent ?? "", /共通の設定の定義と重なっています（planning）/);
+    assert.match(dom.one("#status").textContent ?? "", /共通設定のフェーズ定義と表示名（title）が重複しています（planning）/);
   } finally {
     await dom.close();
   }

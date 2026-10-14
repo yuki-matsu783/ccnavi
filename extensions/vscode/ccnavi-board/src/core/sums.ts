@@ -1,9 +1,9 @@
 /**
- * ルール管理とリスク管理が見せる「足し算」（共通の設定 + 1 つの設定）の読み取り用の表示と、フェーズ管理が見せる共通の設定の定義を、
+ * ルール管理とリスク管理が見せる「統合結果」（共通の設定 + 1 つの設定）の読み取り用の表示と、フェーズ管理が見せる共通の設定の定義を、
  * ボードの JSON（`sums[]`）から取り出す。
  *
- * 足し算の結果は実行ファイルが判定と同じ関数で組んで出す。ここは 足し直さず、形を整えて渡すだけ
- * （拡張は判定も合成もしない）。ワークスペースの足し算は「共通の設定 + ワークスペースの設定」、プロジェクトの足し算は
+ * 統合結果は実行ファイルが判定と同じ関数で組んで出す。ここは 足し直さず、形を整えて渡すだけ
+ * （拡張は判定も合成もしない）。ワークスペースの統合結果は「共通の設定 + ワークスペースの設定」、プロジェクトの統合結果は
  * 「共通の設定 + そのプロジェクトの設定」で、パスを持たないツール（Bash など）が当てる、全プロジェクトの設定を足した和ではない。
  *
  * ここは vscode にも DOM にも触れない。拡張ホストと画面の両方から読まれる。
@@ -11,7 +11,7 @@
 import type { BoardJson, SumFactorJson, SumJson, SumRuleJson } from "./model.js";
 import type { CommonPhase } from "./phases-view.js";
 
-/** ルール管理が見せる足し算 1 件 */
+/** ルール管理が見せる統合結果 1 件 */
 export interface RulesSum {
   /** `self` / プロジェクトの名前 */
   readonly name: string;
@@ -29,7 +29,7 @@ export interface RulesSum {
   readonly allow: readonly SumRuleJson[];
 }
 
-/** リスク管理が見せる足し算 1 件 */
+/** リスク管理が見せる統合結果 1 件 */
 export interface RiskSum {
   readonly name: string;
   readonly label: string;
@@ -42,9 +42,9 @@ export interface RiskSum {
   readonly problems: readonly string[];
 }
 
-/** 足し算を選ぶ欄の表記 */
+/** 統合結果を選ぶ欄の表記 */
 export function sumLabel(name: string): string {
-  return name === "self" ? "ワークスペースの足し算（共通の設定 + ワークスペースの設定）" : `プロジェクト ${name} の足し算（共通の設定 + ${name} の設定）`;
+  return name === "self" ? "統合結果（共通 + ワークスペース）" : `統合結果（共通 + プロジェクト ${name}）`;
 }
 
 export function rulesSums(board: BoardJson | undefined): readonly RulesSum[] {
@@ -74,8 +74,8 @@ export function riskSums(board: BoardJson | undefined): readonly RiskSum[] {
 }
 
 /**
- * 最初に見せる足し算の名前。開いている対象が自身かプロジェクトならその足し算、共通の設定なら（共通だけの足し算は無いので）
- * ワークスペースの足し算。一覧に無ければ先頭。空なら空文字。
+ * 最初に見せる統合結果の名前。開いている対象が自身かプロジェクトならその統合結果、共通の設定なら（共通だけの統合結果は無いので）
+ * ワークスペースの統合結果。一覧に無ければ先頭。空なら空文字。
  */
 export function defaultSum(sums: readonly { readonly name: string }[], target: { readonly kind: string; readonly name: string } | undefined): string {
   const want = target === undefined ? "self" : target.kind === "project" ? target.name : "self";
@@ -86,8 +86,8 @@ export function defaultSum(sums: readonly { readonly name: string }[], target: {
 const COMMON_SOURCE = "common";
 
 /**
- * フェーズ管理が見せる、共通の設定の定義（読み取り専用）。足し算（`sums[].phases.types`）のうち出どころが共通のもの。
- * 足し算が無い（古い実行ファイル・その設定が対象でない）なら空。
+ * フェーズ管理が見せる、共通の設定の定義（読み取り専用）。統合結果（`sums[].phases.types`）のうち出どころが共通のもの。
+ * 統合結果が無い（古い実行ファイル・その設定が対象でない）なら空。
  */
 export function commonPhases(sum: SumJson | undefined): readonly CommonPhase[] {
   return (sum?.phases.types ?? [])

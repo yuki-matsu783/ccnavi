@@ -350,7 +350,7 @@ class PresentTest(AuthorityHarness):
     def test_the_check_refuses_a_path_like_argument(self):
         check = self.ccnavi("sync", "check", "../x")
         self.assertEqual(1, check.returncode)
-        self.assertIn("識別子の形ではない", check.stderr)
+        self.assertIn("有効な識別子の形式ではありません", check.stderr)
 
     def test_the_parent_is_written_to_the_parent_tree(self):
         self.record("present")

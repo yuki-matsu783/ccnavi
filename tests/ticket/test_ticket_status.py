@@ -72,7 +72,7 @@ class TicketStatusTest(PhaseHarness):
         self.by_hand()
         out = self.said("i0001")
         self.assertIn("リモートからの取得は行いません", out)
-        self.assertIn("古いかもしれない", out)
+        self.assertIn("最新の状態と異なる場合があります", out)
         mine = self.block(out, "i0001")
         self.assertIn("作業中（doing/）", mine)
         self.assertIn("承認: 未コミット（手で置いた）", mine)
@@ -97,7 +97,7 @@ class TicketStatusTest(PhaseHarness):
         git(self.parent_tree, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
         self.assertEqual(self.c1_target("i0001"), "yes")
         mine = self.block(self.said("i0001"), "i0001")
-        self.assertIn("ユーザがコミットして push するまで start は止まる", mine)
+        self.assertIn("ユーザがコミットして push するまで start は実行できません", mine)
         self.assertNotIn("start へ進んでよい", mine)
         self.assertNotIn("ccnavi-ticket.sh start", mine)
 
@@ -112,7 +112,8 @@ class TicketStatusTest(PhaseHarness):
         with mock.patch.object(c1, "target", return_value=stop):
             mine = self.block(self.said("i0001"), "i0001")
         self.assertIn(
-            "止まっている理由: C1 で状態の操作が止まる: 親のワークツリーが決まらない", mine
+            "止まっている理由: C1 では状態の操作を実行できません: 親のワークツリーが決まらない",
+            mine,
         )
         self.assertNotIn("start へ進んでよい", mine)
         self.assertNotIn("ccnavi-ticket.sh start", mine)
@@ -143,7 +144,7 @@ class TicketStatusTest(PhaseHarness):
     def test_committed_tickets_are_told_apart_by_the_remote_tracking_ref(self):
         self.family(plan=["research"])
         mine = self.block(self.said("i0001"), "i0001")
-        self.assertIn("リモート追跡の ref が無い", mine)
+        self.assertIn("リモート追跡参照がない", mine)
         # 承認は状態の履歴に時刻を残す
         self.assertNotIn("未コミット（手で置いた）", mine)
         self.assertNotIn("承認: 不明", mine)
@@ -157,7 +158,10 @@ class TicketStatusTest(PhaseHarness):
             text = f.read()
         write(path, text + "\n追記\n")
         self.commit_parent("touch")
-        self.assertIn("未 push（origin/i0001 より先）", self.block(self.said("i0001"), "i0001"))
+        self.assertIn(
+            "未push（origin/i0001 に未反映の変更があります）",
+            self.block(self.said("i0001"), "i0001"),
+        )
 
     # ---- 3. 止まっている理由
 

@@ -227,7 +227,7 @@ test("CB-D180 計画編集タブに未保存の変更がある親を含む一覧
   try {
     await dom.settle();
     const note = dom.one('.approval .plan-family[data-ticket="i0001"] .plan-unsaved');
-    assert.equal(note.textContent, "計画編集タブに保存していない変更があります。保存するか破棄するまで、この一覧は承認できません。");
+    assert.equal(note.textContent, "計画編集タブに保存していない変更があります。変更を保存または破棄するまで、表示中のチケットは承認できません。");
     const confirm = dom.one<HTMLButtonElement>('[data-action="approve-confirm"]');
     assert.equal(confirm.disabled, true);
     assert.equal(dom.one("#approval-blocked").textContent, "親 i0001 の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください");

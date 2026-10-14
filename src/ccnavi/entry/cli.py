@@ -268,7 +268,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--format", default=None)
     parser.add_argument("--no-refresh", action="store_true")
     # 作業・レビュー計画のテンプレートの一覧・検索（`--keyword`）・表示（`--show`）。読むだけ。
-    # `--layer` は足し算の相手のレイヤー（self かプロジェクト名。既定は self）。
+    # `--layer` は統合結果の相手のレイヤー（self かプロジェクト名。既定は self）。
     parser.add_argument("--templates", action="store_true")
     parser.add_argument("--show", default=None, metavar="NAME")
     parser.add_argument("--layer", default="")
@@ -798,7 +798,7 @@ def _parsed(
             )
             return EXIT_ERROR
         if args.preview and args.yes:
-            stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
+            stderr.write("ccnavi: --preview と --yes は同時に指定できません。\n")
             return EXIT_ERROR
         # 確かめるだけの枝は `--preview` と一緒に使う。単独で打てる形にすると、組み込みの
         # deny（phase_forms.ticket_approval_rule）が免除するのは `--preview` の付いた `--agree`
@@ -834,6 +834,8 @@ def _parsed(
         history.set_via(history.VIA_TERMINAL)
         # `--agree` の後ろに並べた語は、承認の対象に入れる識別子。無ければ承認待ち全部。
         approved = core.approve(stdin, stdout, stderr, conf, root, only=list(args.command))
+        if approved == modes.EXIT_PARTIAL:
+            return modes.EXIT_PARTIAL
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
     # チケットの状態とレビューの操作。payload を読まない。
@@ -858,13 +860,17 @@ def _parsed(
     # する sh）が聞くこと。読むだけで、何も書かない。
     if len(args.command) == 3 and list(args.command[:2]) == ["c1", "family"]:
         if not cli_ops._FAMILY.fullmatch(args.command[2]) or ".." in args.command[2]:
-            stderr.write(f"ccnavi: c1 family の {args.command[2]!r} は識別子の形ではない\n")
+            stderr.write(
+                f"ccnavi: c1 family の {args.command[2]!r} は有効な識別子の形式ではありません。\n"
+            )
             return EXIT_ERROR
         return EXIT_OK if c1.family(stdout, conf, root, args.command[2]) == 0 else EXIT_ERROR
     if len(args.command) in (3, 4) and list(args.command[:2]) == ["c1", "sort"]:
         since = args.command[3] if len(args.command) == 4 else ""
         if not cli_ops._FAMILY.fullmatch(args.command[2]) or ".." in args.command[2]:
-            stderr.write(f"ccnavi: c1 sort の {args.command[2]!r} は識別子の形ではない\n")
+            stderr.write(
+                f"ccnavi: c1 sort の {args.command[2]!r} は有効な識別子の形式ではありません。\n"
+            )
             return EXIT_ERROR
         if since and not cli_args._revision_ok(since):
             stderr.write(f"ccnavi: c1 sort の版 {since!r} は読めない\n")

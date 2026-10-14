@@ -68,7 +68,7 @@ test("CB-T421 ボードの見本の鍵はどれも読み取りが読む（綴り
   const raw = (def.sample as { board: Record<string, unknown> }).board;
   const parsed = parseBoardJson(JSON.stringify({ version: 1, root: "/ws", generated_at: "x", ...raw }));
   assert.ok(parsed.ok);
-  // 中身を実行ファイルが決める自由な欄（計画の項・印・足し算・リスクの内訳）は、鍵を数えない
+  // 中身を実行ファイルが決める自由な欄（計画の項・印・統合結果・リスクの内訳）は、鍵を数えない
   const free = new Set(["plan", "marks", "states", "risk", "judge", "feedback", "ready", "close_early"]);
   assert.deepEqual(lostKeys(raw, parsed.ok ? parsed.board : undefined, "board", free), []);
 });

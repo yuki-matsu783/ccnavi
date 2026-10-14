@@ -170,7 +170,7 @@ function Body({
           {families(preview.plans).map(([ticket, plans]) => (
             <div key={ticket} className="plan-family" data-ticket={ticket}>
               {unsaved.includes(ticket) ? (
-                <p className="approval-note warn plan-unsaved">計画編集タブに保存していない変更があります。保存するか破棄するまで、この一覧は承認できません。</p>
+                <p className="approval-note warn plan-unsaved">計画編集タブに保存していない変更があります。変更を保存または破棄するまで、表示中のチケットは承認できません。</p>
               ) : null}
               {changed.includes(ticket) ? (
                 <p className="approval-note warn plan-changed">

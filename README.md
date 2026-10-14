@@ -961,13 +961,13 @@ VS Code を使わないときは `--no-vscode` を付ける。
 `close-early` はボードに置かず、端末で打つ。組み立て方と使い方はそこの README、
 出力の形は下の「ボードの JSON」。
 
-同じ拡張の「ルール管理画面」で、ルールファイルを画面で直し、保存する前に判定を試せる。編集する 1 本（共通・ワークスペース・プロジェクト）は切り替えられ、共通+ワークスペース、共通+プロジェクトの足し算は読み取りで見られる。
+同じ拡張の「ルール管理画面」で、ルールファイルを画面で直し、保存する前に判定を試せる。編集する 1 本（共通・ワークスペース・プロジェクト）は切り替えられ、共通+ワークスペース、共通+プロジェクトの統合結果は読み取りで見られる。
 判定は `ccnavi --test --json` と `--test-expectations --json` を通る（形は「試験の JSON」）。
 hook の一覧は `.claude/settings.json` と `settings.local.json` を読むだけで書き換えない。作業中のチケット
 （承認済みチケットが `doing`）がある間は保存できない（セッションの途中で判定が変わるのを避けるため）。
 
 同じ拡張の「リスク管理画面」で、実績で測るリスクの配点（`.ccnavi/config/common/risks.yml`、ワークスペースとプロジェクトの `.ccnavi/config/project/risks.yml`）の境目の点と項目を
-画面で直せる。編集する 1 本は切り替えられ、共通+ワークスペース、共通+プロジェクトの足し算は読み取りで見られる。保存の前に `--lint` を通す（共通は `--risk`、ワークスペースとプロジェクトは `--project-risk-file` で、共通の設定と合わせて検証する）。点を数えるのは実行ファイルで、拡張は差分を数えない。
+画面で直せる。編集する 1 本は切り替えられ、共通+ワークスペース、共通+プロジェクトの統合結果は読み取りで見られる。保存の前に `--lint` を通す（共通は `--risk`、ワークスペースとプロジェクトは `--project-risk-file` で、共通の設定と合わせて検証する）。点を数えるのは実行ファイルで、拡張は差分を数えない。
 ファイルが無ければ組み込みと同じ値で作れる。`CCNAVI_TICKET_CONTROL` が `disable` なら入口ごと出ない。
 
 同じ拡張の「フェーズ管理画面」で、フェーズ定義（「フェーズ定義と計画」の節）を画面で直せる。対象は共通レイヤー（`.ccnavi/config/common/phases.yml`）、自身のレイヤー
@@ -1643,7 +1643,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh status i0002    # その親子だけ（子�
 
 - 承認の時刻は、状態の履歴の `approved`（続きの子は `raised`）、無ければ `doing/<識別子>.md` を足したコミットの時刻。
   どちらも無ければ「未コミット（手で置いた）」
-- push 済みかは手元のリモート追跡の ref で見るので、古いかもしれない。最新にしたければ先に `ccnavi-sync.sh` を打つ
+- push済みかどうかは、最後に取得したリモートの状態に基づくため、最新の状態と異なる場合があります。最新にしたければ先に `ccnavi-sync.sh` を打つ
 - 未コミットの承認済みチケットには、ユーザに `ccnavi-push-approved.sh <親>` を打ってもらうことだけを言う（エージェントは運ばない）。
   取り込み済みの親子（C1 の対象）なら「ユーザが運ぶまで `start` は止まる」、C1 の対象外なら「`start` へ進んでよい」と添える。
   C1 が状態の操作を断る親子では、その理由を止まっている理由に出す
@@ -2162,7 +2162,7 @@ ccnavi --test Bash "git push" --cwd .claude/worktrees/feat-x --permission-mode d
 ```
 ■ rules 共通レイヤー（.ccnavi/config/common/rules.yml、deny 12 / ask 3 / allow 4）
   deny  guard-hooks                  Write|Edit|NotebookEdit            */.claude/hooks/*
-■ rules 自身のレイヤー（.ccnavi/config/project/rules.yml、deny 0 / ask 0 / allow 1）
+■ rules ワークスペースのレイヤー（.ccnavi/config/project/rules.yml、deny 0 / ask 0 / allow 1）
   allow self:worktrees               Write|Edit                         */.claude/worktrees/*
 ■ rules lib（projects/lib/.ccnavi/config/project/rules.yml、deny 1 / ask 0 / allow 0）
   deny  lib:schema                   Write|Edit                         */schema/*
@@ -2175,9 +2175,9 @@ ccnavi --test Bash "git push" --cwd .claude/worktrees/feat-x --permission-mode d
 ```
 
 （件数と中身は例。）順序は判定と同じ 共通レイヤー → 自身のレイヤー → プロジェクト（名前順）で、重複として捨てた定義は出ない。
-「どのルールも言及しない呼び出し」の節は、権限モードごとに、読めた呼び出しと読み切れない呼び出し（`degraded`）の結末を 1 行ずつ出す。
+「どのルールにも一致しないツール呼び出し」の節は、権限モードごとに、読めた呼び出しと読み切れない呼び出し（`degraded`）の結末を 1 行ずつ出す。
 判定と同じ関数で組み、`CCNAVI_GUARD_UNWATCHED` も hook と同じ読み方で解いた値を使う。
-読めないレイヤーは「読めない: <理由>。このレイヤーは空として扱う」、置いていないレイヤーは「このレイヤーは置いていない（無い = 空）」と出る。
+読めないレイヤーは「読めない: <理由>。このレイヤーは空として扱う」、設定ファイルが無いレイヤーは「このレイヤーの設定ファイルはありません。設定なしとして扱います。」と出る。
 `levels` の行は共通レイヤーの値。レイヤーで `levels` を書くとキーごとに小さいほうが採られるので、チケットに適用される値はその `project:` のレイヤーで変わる。
 
 ### 期待する判定で確かめる
@@ -2485,7 +2485,7 @@ ccnavi --lint --json --project-risk-file lib=/tmp/risks.yml
 
 - `--project-rules-file <名前>=<パス>` は、その名前のプロジェクトのルールファイルの代わりに `<パス>` を読む
 - `--project-phases-file <名前>=<パス>` は、その名前のレイヤー（`self` は自身のレイヤー）のフェーズ定義の代わりに `<パス>` を読み、共通レイヤーの `phases.yml` と足した形で確かめる（同 `id` で中身が違う、`title` の重なり）。配点（risk）のレイヤーには次の `--project-risk-file` がある
-- `--project-risk-file <名前>=<パス>` は、その名前のレイヤー（`self` は自身のレイヤー）の配点の代わりに `<パス>` を読む。phases と同じく足し算なので、共通レイヤーの配点と合わせて確かめる（境目の `levels` が合成後に逆転していないか、同 `id` で中身が違う衝突の warn、`script:` が指す先がそのレイヤーの git プロジェクトルートの `.ccnavi/scripts/` に在るか）。共通レイヤーの配点は今までどおり `--risk`。ファイルの無いレイヤーに渡しても、そのレイヤーの配点として合成する
+- `--project-risk-file <名前>=<パス>` は、その名前のレイヤー（`self` は自身のレイヤー）の配点の代わりに `<パス>` を読む。phases と同じく統合結果なので、共通レイヤーの配点と合わせて確かめる（境目の `levels` が合成後に逆転していないか、同 `id` で中身が違う衝突の warn、`script:` が指す先がそのレイヤーの git プロジェクトルートの `.ccnavi/scripts/` に在るか）。共通レイヤーの配点は今までどおり `--risk`。ファイルの無いレイヤーに渡しても、そのレイヤーの配点として合成する
 - レイヤーの置き場を動かすフラグ 8 本（`--rules` / `--phases` / `--risk` / `--projects` / `--project-home` と上の 3 本）は、`--test` / `--test-expectations` /
   `--lint` / `--explain` でだけ有効になる。診断の外（hook からの判定、`ticket` / `review` の副命令）に渡すと無視し、標準エラーにその旨を出す。
   守る対象（コアファイル）も差し替えを見ない
@@ -2687,7 +2687,7 @@ sh や拡張が頼るフラグや出力の形を、呼ぶ側を直さないと�
 ccnavi --templates                          # 一覧（名前・層・説明・いつ使うか）
 ccnavi --templates --keyword 調査            # name・description・when の検索（語を重ねるとどれか）
 ccnavi --templates --show feature           # 1 本の中身（計画・フロー・検査・ファイルの本文）
-ccnavi --templates --layer lib --json       # 共通 + プロジェクト lib の足し算。画面向けの完全な答え
+ccnavi --templates --layer lib --json       # 共通 + プロジェクト lib の統合結果。画面向けの完全な答え
 ccnavi --templates --draft <親> [--name <名前>]    # 完了した親から下書きを作る（エージェントが打ってよい）
 ccnavi --templates --save-draft <名前> --body-file <ファイル>   # 下書きの保存（ユーザ専用）
 ccnavi --templates --delete-draft <名前>                        # 下書きの削除（`--yes` なしの下見はエージェントも打ってよい）
@@ -2776,7 +2776,7 @@ warn にとどめる（定義は後から変わるので、使うときの承認
      `--draft` を打ったら、取り込むか、`ready` の前に下書きを消す（またはコミットする）。出力の次の手と親の `finish` の案内にもこの 1 行がある
    - 同名の下書きがあれば上書きせず断る。作業中の親、取り消した親、`ready` で閉じて退避済み（`logs/archive/`）の親は読めないと言って終了コード 1 で終わる。
      `ready` の前に（`done/` に在るうちに）作る
-2. **下書きには効力が無い**。`--templates` の足し算にも `templates[]` にも入らない。一覧の最後に `下書き: N 件（wip/proposals/templates/）` の
+2. **下書きには効力が無い**。`--templates` の統合結果にも `templates[]` にも入らない。一覧の最後に `下書き: N 件（wip/proposals/templates/）` の
    1 行が出て、`--json` の `drafts[]` に名前・置かれたツリー・パス・ハッシュ・検査の結果が入る。`--lint` は下書きの苦情を error にせず
    warn と info だけで言う（場所は `(template-drafts)`）。下書きの置き場は判定の範囲外で、エージェントは書ける
 3. **取り込む**（ユーザ専用。`phase_forms._CLI_FORMS` が止めるので、エージェントは下見も含めて打てない）。`--yes` と `--expect` が揃うまで何も書かない。
@@ -2786,7 +2786,7 @@ warn にとどめる（定義は後から変わるので、使うときの承認
      unified diff で見せる。新規なら本文を全部見せる（フローの文は案内文になるので読む）。続けて打つ形（ハッシュ入り）を出す
    - `--to common` は `.ccnavi/config/common/templates/<名前>.yml`、`--to project` は `--layer`（既定 `self`）の
      `.ccnavi/config/project/templates/<名前>.yml`。同名が既にあれば `--replace` が要る（改訂は差分を見せたうえで置き換える）。共通とレイヤーに
-     同名で中身の違うものが並ぶ取り込みは、足し算がレイヤーの側を使わなくなるので断る
+     同名で中身の違うものが並ぶ取り込みは、統合結果がレイヤーの側を使わなくなるので断る
    - `--yes --expect <ハッシュ>` で書く。`--expect` が下書きの今の中身のハッシュと違えば（見せたあとに書き直された）書かない。
      下書きの中身は書き換えずそのまま書く。書き方は一時ファイル → fsync → 差し替えで、リンク・ハードリンク・ふつうのファイルでないものには書かない
    - 書けたら、下書きの今の中身が取り込んだときの中身と同じときだけ下書きを消す。違えば消さずにそう言う。リンクなどは消さない
@@ -2801,11 +2801,11 @@ warn にとどめる（定義は後から変わるので、使うときの承認
 |---|---|
 | `version` / `root` | 形の版（いま 1）/ ワークスペースルート |
 | `layer` / `keywords` | 一覧の対象のレイヤー（`--layer`、既定 `self`）/ 検索の語 |
-| `templates[]` | 共通 + `layer` の足し算の結果（`keywords` で絞る）。共通の側の検査は、足し算の結果のフェーズ定義で行う |
+| `templates[]` | 共通 + `layer` の統合結果（`keywords` で絞る）。共通の側の検査は、統合結果のフェーズ定義で行う |
 | `layers[]` | 共通・`self`・各プロジェクトの生の中身。`{name, path, exists, unreadable, writable, problems[], templates[]}`。検査はそのレイヤーのフェーズ定義（共通は共通だけ）で行う |
-| `sums[]` | レイヤーごとの足し算の索引。`{name, layers[], templates[{name, layer, effective, dropped}]}` |
+| `sums[]` | レイヤーごとの統合結果の索引。`{name, layers[], templates[{name, layer, effective, dropped}]}` |
 | `errors` / `warns` / `infos` | 全レイヤーの苦情の件数（下書きは数えない） |
-| `drafts[]` | 下書き（効力なし。`templates[]` にも足し算にも入らない。`keywords` で絞る）。下の表 |
+| `drafts[]` | 下書き（効力なし。`templates[]` にも統合結果にも入らない。`keywords` で絞る）。下の表 |
 
 `templates[]` と `layers[].templates[]` の 1 件。
 
@@ -2817,7 +2817,7 @@ warn にとどめる（定義は後から変わるので、使うときの承認
 | `description` / `when` | 説明 / 選ぶ手がかり |
 | `plan[]` / `feedback[]` | 項 `{index, number, type, review, after}`。`index` は計画の中の添字、`number` は提案に写したときの番号（フィードバック計画は全体計画の続き）、`after` は計画の中の添字 |
 | `has_flows` / `flows[]` | フローの有無 / `{index, name, nodes, connections, node_types}`（`index` は全体計画の添字） |
-| `effective` | 足し算で使われるか。読めないもの・衝突で捨てたものは `false` |
+| `effective` | 統合結果で使われるか。読めないもの・衝突で捨てたものは `false` |
 | `dropped` | 使われない理由 `{reason, detail}`。`reason` は `invalid`（読めない）/ `duplicate`（共通と全欄が同じ）/ `conflict`（共通と中身が違う）。使われるなら `null` |
 | `usable` | 使われていて、error も無い |
 | `writable` | 書き換えてよいか。共通は、親の着手が写したミラー（承認済みの親のワークツリーの中）では `false` |
@@ -2845,8 +2845,8 @@ ccnavi ticket new <識別子> --title <題> --template <名前> [--layer <名前
 識別子と同名のワークツリーの中で打つ（`--plan` の雛形と同じ。`ccnavi-ticket.sh` には通さず、実行ファイルを直接打つ）。
 エージェントが打ってよい（フローの下書きに効力が無く、提案も通常の承認を通るため）。
 
-1. **テンプレートを引く。** 共通 + 1 つのレイヤー（`--layer` を省けば、ワークツリーのレイヤー）の足し算から名前で引く。
-   使えるのは足し算で取り込まれていて、error が無いもの。無い・読めない・error がある・フェーズ定義（`phases.yml`）に無い型を使う・
+1. **テンプレートを引く。** 共通 + 1 つのレイヤー（`--layer` を省けば、ワークツリーのレイヤー）の統合結果から名前で引く。
+   使えるのは統合結果で取り込まれていて、error が無いもの。無い・読めない・error がある・フェーズ定義（`phases.yml`）に無い型を使う・
    `kind` が置き場と合わない、のときは理由を言って終了コード 1（何も書かない）。共通とレイヤーに同名で中身が違うものが並ぶ
    ときは共通が引かれ、使わなかったレイヤーの側を `note:` で言う
 2. **親の提案を書く。** `wip/proposals/todo/<識別子>.md` に、テンプレートの項から `plan:`（`type`・`review`・`after`）を書く。
@@ -2877,7 +2877,7 @@ plan（3 項）: 1 research / 2 design（待つ 1・defer） / 3 implement（待
 ### テンプレート管理画面
 
 同じ拡張の「テンプレート管理画面」で、テンプレートを読んで下書きを取り込める。対象は共通の設定（`.ccnavi/config/common/templates/`）、ワークスペースの設定、プロジェクトの設定の 3 種で、「設定」の欄で切り替える。
-一覧は「足し算」（共通と選んだ層で実際に使われる結果）と「層ごと」（層ごとの生の中身）を切り替えて見られる。有効か・捨てた理由・検査の結果は、実行ファイルの答えをそのまま出す。
+一覧は「統合結果」（共通と選んだ層で実際に使われる結果）と「層ごと」（層ごとの生の中身）を切り替えて見られる。有効か・捨てた理由・検査の結果は、実行ファイルの答えをそのまま出す。
 
 下書き（`wip/proposals/templates/`）は、「取り込む…」で取り込み先と置き換えを選び、「下見」で差分を読んでから「この内容で取り込む」で書く。下見は何も書かない。
 取り込みは作業中のチケットがあると止まる（共通とワークスペースの設定は、どのツリーの作業中でも止まる）。画面からの取り込みは端末の確認を出さず、見せた下書きと一致するときだけ書く。
@@ -3106,7 +3106,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/phase_forms.py` | ユーザだけが打つコマンドの形（承認・レビュー済み・ガードの切り替え・記録の片付け）を見分ける組み込みのルール |
 | `src/ccnavi/tickets/phase_scope.py` | 子チケットの範囲の当て方と、範囲の外の変更の洗い出し |
 | `src/ccnavi/tickets/phasetypes.py` | フェーズ定義（`phases.yml`）の読み込みと検証 |
-| `src/ccnavi/tickets/plan_templates.py` | 作業・レビュー計画のテンプレートの読み込み・2 層の足し算・検査・`--templates` の JSON（読む側）と、下書きの置き場 |
+| `src/ccnavi/tickets/plan_templates.py` | 作業・レビュー計画のテンプレートの読み込み・2 層の統合結果・検査・`--templates` の JSON（読む側）と、下書きの置き場 |
 | `src/ccnavi/tickets/template_drafts.py` | テンプレートの下書きの作成（完了した親から）・検査と、ユーザの取り込み（差分・`--expect`・書き込み・下書きの削除）（溜める側） |
 | `src/ccnavi/tickets/flow.py` | 子チケットのフロー（作業の手順のグラフ）。置き場・着手中のロック・読み込み・子に渡す案内 |
 | `src/ccnavi/tickets/flow_text.py` | フローに書かれた文字列の整え方。制御文字・長さ・印や囲みのなりすまし |

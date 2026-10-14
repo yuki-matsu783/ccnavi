@@ -58,7 +58,10 @@ def fill_phases(
     if done.dropped:
         line += f"（使わない定義を削除しました: {', '.join(done.dropped)}）"
     if done.held:
-        line += f"。子が承認された番号の定義（{', '.join(done.held)}）は承認済みチケットから写した"
+        line += (
+            f"。承認済みの子チケットに対応するフェーズの定義（{', '.join(done.held)}）は、"
+            "承認済みチケットからコピーしました。"
+        )
     stdout.write(line + "\n")
     return EXIT_OK
 
@@ -120,5 +123,5 @@ def reorder(
     elif saved.written:
         stdout.write(f"{name} の計画の順序を書き換えました（source_sha: {sha}）\n")
     elif saved.ok:
-        stdout.write(f"{name} の計画は振り直しても変わりません。反映しません。\n")
+        stdout.write(f"{name} の計画の順序に変更はありません。ファイルは更新しません。\n")
     return EXIT_OK if saved.ok else EXIT_ERROR

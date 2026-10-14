@@ -10,7 +10,7 @@
  * 対象は 3 種。共通の設定の定義（`.ccnavi/config/common/phases.yml`。場所は固定）、ワークスペースの設定の定義
  * （既定 `.ccnavi/config/project/phases.yml`）、プロジェクト 1 つの設定の定義（既定 `projects/<名前>/.ccnavi/config/project/phases.yml`）。
  * 判定に使われるのは、共通の設定と、親チケットの `project:` が指す設定の和。共通の設定を開いたときは、編集する定義がそのまま
- * 共通の定義になるので、読み取り専用の欄（実行ファイルの足し算のうち出どころが共通のもの）は出さない。
+ * 共通の定義になるので、読み取り専用の欄（実行ファイルの統合結果のうち出どころが共通のもの）は出さない。
  * タブは 1 枚だけで、別の対象を開くとそのタブの中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[].phases_file`）を使い、拡張は組まない。
  *
@@ -67,7 +67,7 @@ const LAYER_HEADER = [
 ].join("\n");
 /** 共通の設定のファイルを最初の保存で作るときに、先頭へ置く説明 */
 const COMMON_HEADER = [
-  "# フェーズ定義（共通レイヤー）。判定は、このファイルと親チケットの project: が指すレイヤーの phases.yml の足し算で使う。",
+  "# フェーズ定義（共通レイヤー）。判定は、このファイルと親チケットの project: が指すレイヤーの phases.yml の統合結果で使う。",
   "# 同じ id で中身が違う定義や、title が重なる定義は --lint が error にする。",
   "",
 ].join("\n");
@@ -88,7 +88,7 @@ interface Loaded {
   readonly notices: readonly string[];
   /** 上部に error の帯で出す文。共通の設定の phases.yml を読めない、など */
   readonly errors: readonly string[];
-  /** 共通の設定の定義（読み取り専用）。実行ファイルの足し算のうち出どころが共通のもの */
+  /** 共通の設定の定義（読み取り専用）。実行ファイルの統合結果のうち出どころが共通のもの */
   readonly common: readonly CommonPhase[];
   /** 切り替えられる対象（共通の設定・ワークスペース・設定のあるプロジェクト） */
   readonly targets: readonly TargetOption[];
@@ -745,7 +745,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
   }
   if (!lint.value.ok) {
     // 苦情は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
-    fail(current, `--lint が error を報告しました。直してから保存してください:\n${lint.value.report.split(tmp).join(loaded.phasesRel)}`);
+    fail(current, `設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください:\n${lint.value.report.split(tmp).join(loaded.phasesRel)}`);
     return;
   }
 

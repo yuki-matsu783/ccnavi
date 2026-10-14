@@ -246,7 +246,7 @@ test("CB-T399 作れなかった子のワークツリーは、名前と手で打
   );
   assert.equal(
     text,
-    "子 i0001-01-01 のワークツリー .claude/worktrees/i0001-01-01 を作れなかった（fatal: already exists）。" +
+    "子チケット i0001-01-01 のワークツリー .claude/worktrees/i0001-01-01 を作成できませんでした（fatal: already exists）。" +
       "手で作るなら: sh '/ws/.ccnavi/scripts/ccnavi-git.sh' worktree add .claude/worktrees/i0001-01-01 -b i0001-01-01 i0001。" +
       "ブランチ i0001-01-01 が既にあるなら: sh '/ws/.ccnavi/scripts/ccnavi-git.sh' worktree add .claude/worktrees/i0001-01-01 i0001-01-01",
   );
