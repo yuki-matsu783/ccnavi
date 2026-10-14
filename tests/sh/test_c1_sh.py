@@ -1261,6 +1261,20 @@ class C1MergeTest(C1Harness):
         again = self.ticket("finish", CHILD)
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
 
+    @unittest.skipUnless(hasattr(os, "killpg"), "TERM を捕まえさせられない（os.killpg が無い）")
+    def test_a_term_right_after_the_merge_commit_undoes_it(self):
+        self.start_parent()
+        tree = self.start_child()
+        self.work(tree, "wip/design/a.md", "a\n")
+        before = self.sha(self.tree, "HEAD")
+        err = self.term_after(" commit --quiet --no-verify -m ")
+        self.assertIn("送る前に止められた", err)
+        self.assert_rolled_back(before)
+        self.assertEqual(self.remote_sha(), before)
+        again = self.ticket("finish", CHILD)
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+
 
 class TidyAfterFinishTest(C1Harness):
     """finish が通ったら、sh が実行ファイルに `worktree tidy <識別子>` を頼む。

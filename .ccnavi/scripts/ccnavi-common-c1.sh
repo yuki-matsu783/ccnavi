@@ -497,8 +497,12 @@ ccnavi_c1_commit_merge() {
 		ccnavi_c1_say "合流のコミットができなかった（制限時間で打ち切った場合を含む）。$(ccnavi_git_refusal "$ccnavi_c1_tmp/err")"
 		return 1
 	fi
-	ccnavi_c1_merging=""
 	ccnavi_c1_committed=$(git -C "$ccnavi_c1_tree" rev-parse HEAD)
+	# 送る前に切られたら戻せるように、合流の途中の印を外す前に覚える（ccnavi_c1_end）。
+	ccnavi_c1_inflight_h0="$ccnavi_c1_merging_h0"
+	ccnavi_c1_inflight_list="$ccnavi_c1_merging_list"
+	ccnavi_c1_inflight="$ccnavi_c1_committed"
+	ccnavi_c1_merging=""
 	return 0
 }
 
@@ -652,19 +656,37 @@ ccnavi_c1_end() {
 		kill "$ccnavi_gt_dog" 2>/dev/null || :
 		wait "$ccnavi_gt_dog" 2>/dev/null || :
 		ccnavi_gt_dog=""
+		# 監視していた git（コミット・push）も止めて終わりを待つ。動いている途中のツリーを見て戻さない。
+		if [ -n "${ccnavi_gt_pid:-}" ]; then
+			kill "$ccnavi_gt_pid" 2>/dev/null || :
+			wait "$ccnavi_gt_pid" 2>/dev/null || :
+		fi
 	fi
 	if [ -n "$ccnavi_c1_inflight" ] && [ -n "$ccnavi_c1_tmp" ]; then
 		# 送る前に切られた。自分のコミットを比較つきで戻す（先頭が動いていれば戻さない）。
 		ccnavi_ce_c="$ccnavi_c1_inflight"
 		ccnavi_c1_inflight=""
+		ccnavi_c1_merging=""
 		ccnavi_c1_say "送る前に止められた。書いたものを戻す"
 		ccnavi_c1_undo "$ccnavi_ce_c" "$ccnavi_c1_inflight_h0" "$ccnavi_c1_inflight_list" || :
 		rm -f "$ccnavi_c1_inflight_list"
 	fi
 	if [ -n "$ccnavi_c1_merging" ] && [ -n "$ccnavi_c1_tmp" ]; then
-		# 合流の途中で切られた。合流を取りやめ、書いたものを戻す。
-		ccnavi_c1_say "合流の途中で止められた。合流を取りやめて、書いたものを戻す"
-		ccnavi_c1_unmerge "$ccnavi_c1_merging_h0" "$ccnavi_c1_merging_list" || :
+		ccnavi_ce_head=$(git -C "$ccnavi_c1_tree" rev-parse -q --verify HEAD 2>/dev/null || :)
+		if ! git -C "$ccnavi_c1_tree" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 &&
+			[ -n "$ccnavi_c1_merge_sha" ] &&
+			[ "$(git -C "$ccnavi_c1_tree" rev-parse -q --verify "HEAD^1" 2>/dev/null)" = "$ccnavi_c1_merging_h0" ] &&
+			[ "$(git -C "$ccnavi_c1_tree" rev-parse -q --verify "HEAD^2" 2>/dev/null)" = "$ccnavi_c1_merge_sha" ]; then
+			# 合流のコミットまで済んで、送る前の印を立てる前に切られた。そのコミットを比較つきで戻す。
+			ccnavi_c1_merging=""
+			ccnavi_c1_say "送る前に止められた。合流のコミットを戻す"
+			ccnavi_c1_undo "$ccnavi_ce_head" "$ccnavi_c1_merging_h0" "$ccnavi_c1_merging_list" || :
+			rm -f "$ccnavi_c1_merging_list"
+		else
+			# 合流の途中で切られた。合流を取りやめ、書いたものを戻す。
+			ccnavi_c1_say "合流の途中で止められた。合流を取りやめて、書いたものを戻す"
+			ccnavi_c1_unmerge "$ccnavi_c1_merging_h0" "$ccnavi_c1_merging_list" || :
+		fi
 	fi
 	ccnavi_lock_drop
 	if [ -n "$ccnavi_c1_tmp" ]; then
