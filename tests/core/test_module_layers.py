@@ -213,6 +213,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         frozenset(
             {
                 "tickets.c1",
+                "tickets.c1_merge",
                 "tickets.core",
                 "tickets.core_approve",
                 "tickets.core_base",

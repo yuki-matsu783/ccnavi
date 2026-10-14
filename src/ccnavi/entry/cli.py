@@ -30,6 +30,7 @@ from ..records import audit, diaglog
 from ..tickets import (
     branchfind,
     c1,
+    c1_merge,
     core,
     history,
     review,
@@ -878,6 +879,26 @@ def _parsed(
             stderr.write(f"ccnavi: c1 sort の版 {since!r} は読めない\n")
             return EXIT_ERROR
         code = c1.sort(stdout, stderr, conf, root, args.command[2], since)
+        return EXIT_OK if code == 0 else EXIT_ERROR
+    if len(args.command) >= 3 and list(args.command[:2]) in (
+        ["c1", "merge"],
+        ["c1", "merge-blame"],
+    ):
+        verb = args.command[1]
+        if (
+            not cli_ops._FAMILY.fullmatch(args.command[2])
+            or ".." in args.command[2]
+            or (verb == "merge" and len(args.command) != 3)
+        ):
+            stderr.write(
+                f"ccnavi: c1 {verb} の {args.command[2]!r} は有効な識別子の形式ではありません。\n"
+            )
+            return EXIT_ERROR
+        if verb == "merge":
+            return (
+                EXIT_OK if c1_merge.plan(stdout, conf, root, args.command[2]) == 0 else EXIT_ERROR
+            )
+        code = c1_merge.blame(stdout, conf, root, args.command[2], list(args.command[3:]))
         return EXIT_OK if code == 0 else EXIT_ERROR
 
     # issue・MR に紐づくブランチを探す。`ccnavi-branches.sh` が呼ぶ。
