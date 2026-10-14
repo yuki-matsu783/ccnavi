@@ -962,11 +962,22 @@ INDEX_IGNORE_LINE="**/ccnavi-index.jsonl"
 # `!/scratchpad` のようにユーザが否定している行があれば、追跡すると決めているので足さずに伝える。
 SCRATCH_IGNORE_HEADER="# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）"
 SCRATCH_IGNORE_LINE="/scratchpad"
+# ワークスペースルート直下の logs/ は、判定の記録・state・診断ログ（logs/diag/）の置き場。実行時に
+# 書かれる絶対パスとコマンド全文が入るので追跡しない。無視する行が無い配布先では、ターンの終わりの
+# 実行後チェックが logs/diag/ の新規ファイルを「守る場所の変更」として報告する。
+# ルートに固定した `/logs/` が既にあるとき、または同等以上の `/logs`・`logs/`・`logs` があるときは足さない。
+# `!/logs`・`!/logs/diag` のようにユーザが logs の中身を否定している行があれば、追跡すると決めているので足さずに伝える
+# （除外したディレクトリの中は再包含できず、末尾に足すとその否定を無効にする）。
+LOGS_IGNORE_HEADER="# ccnavi の実行時の記録（scripts/ccnavi-setup.sh）"
+LOGS_IGNORE_LINE="/logs/"
 # ignore_todo は、表示と「揃っているか」の判定に使う全体。書き込むときは塊ごとに分けて持つ。
 ignore_todo=""
 ignore_bin_todo=""
 ignore_index_todo=""
 ignore_scratch_todo=""
+ignore_logs_todo=""
+# ユーザが logs を否定している行（改行で終わる）。あれば /logs/ は足さない。
+ignore_logs_negated=""
 # ユーザが scratchpad を否定している行（改行で終わる）。あれば /scratchpad は足さない。
 ignore_scratch_negated=""
 # ユーザが ccnavi-index.jsonl を否定している行（改行で終わる）。あれば索引の行は足さない。
@@ -1007,7 +1018,15 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 		ignore_scratch_todo="$SCRATCH_IGNORE_LINE
 "
 	fi
-	ignore_todo="$ignore_bin_todo$ignore_index_todo$ignore_scratch_todo"
+	logs_negated=$(gitignore_lines | grep -E '^!/?logs(/.*)?$' || true)
+	if [ -n "$logs_negated" ]; then
+		ignore_logs_negated="$logs_negated
+"
+	elif ! ignored_already "$LOGS_IGNORE_LINE" "/logs" "logs/" "logs"; then
+		ignore_logs_todo="$LOGS_IGNORE_LINE
+"
+	fi
+	ignore_todo="$ignore_bin_todo$ignore_index_todo$ignore_scratch_todo$ignore_logs_todo"
 fi
 
 copy_tree() {
@@ -1158,6 +1177,10 @@ report_deploy() {
 	if [ -n "$ignore_scratch_negated" ]; then
 		printf '.gitignore に scratchpad を否定する行があり、ユーザが追跡しているので %s は足していません:\n' "$SCRATCH_IGNORE_LINE"
 		printf '%s' "$ignore_scratch_negated" | sed 's/^/  /'
+	fi
+	if [ -n "$ignore_logs_negated" ]; then
+		printf '.gitignore に logs を否定する行があり、ユーザが追跡しているので %s は足していません:\n' "$LOGS_IGNORE_LINE"
+		printf '%s' "$ignore_logs_negated" | sed 's/^/  /'
 	fi
 	if [ -n "$launcher_mode_todo" ]; then
 		printf '%s:\n' "$4"
@@ -1569,6 +1592,7 @@ if [ "$deploy_work" = yes ]; then
 	append_ignore "$IGNORE_HEADER" "$ignore_bin_todo"
 	append_ignore "$INDEX_IGNORE_HEADER" "$ignore_index_todo"
 	append_ignore "$SCRATCH_IGNORE_HEADER" "$ignore_scratch_todo"
+	append_ignore "$LOGS_IGNORE_HEADER" "$ignore_logs_todo"
 fi
 
 report_deploy '配った' '入れ替えた' '.gitignore に足した' '実行ビットを付けた'

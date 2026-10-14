@@ -151,6 +151,21 @@ ccnavi_workspace() {
 			case "$ccnavi_ws_here" in
 			*/.claude/worktrees/*) ;; # ワークツリーの中のコピー。根ではない
 			*)
+				# プロジェクト（<根>/projects/<名前>/）が自前の .ccnavi/scripts/ の写しを持つとき、
+				# そこで止まると logs/ や state がプロジェクトの中にできる。`projects/` の親に
+				# ワークスペースがあれば、そちらを根にする。
+				ccnavi_ws_out=$(dirname "$ccnavi_ws_here")
+				ccnavi_ws_outer=$(dirname "$ccnavi_ws_out")
+				case "$ccnavi_ws_out" in
+				*/projects)
+					if [ -f "$ccnavi_ws_outer/.ccnavi/scripts/ccnavi-common.sh" ]; then
+						case "$ccnavi_ws_outer" in
+						*/.claude/worktrees/*) ;;
+						*) ccnavi_ws_here="$ccnavi_ws_outer" ;;
+						esac
+					fi
+					;;
+				esac
 				printf '%s\n' "$ccnavi_ws_here"
 				return 0
 				;;
