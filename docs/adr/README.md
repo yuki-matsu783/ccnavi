@@ -91,7 +91,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0089](0089-rotate-prune-and-redact-records.md) | 記録は大きさでローテートし、古い記録と終わったセッションの state をセッション開始で消す。記録に書くコマンドは秘密の形を伏せる |
 | [0092](0092-rename-decision-records.md) | 判定の記録のファイル名を `logs/decisions.jsonl` にする |
 | [0099](0099-subpackages-by-role-and-agree.md) | `ccnavi/` を役割ごとの 6 つのサブパッケージに分け、置き場（approval）と合意の手続き（agree）を分けて循環を無くし、承認の CLI を `--agree` に改名する（判定のコアと C1 の見分けの置き場は ADR-0117 が改める） |
-| [0102](0102-identifier-prefix-number-slug.md) | 親の識別子を `<先頭の語>-<番号>-<slug>`（`feature-64-統合先の解決` など）にそろえ、日本語の字を使えるようにする。先頭の語は `CCNAVI_BRANCH_PREFIXES` で変えられる。既にあるブランチとのぶつかりを warn する。親チケットの `branch:` キーで、識別子と違う既存のブランチを親のブランチにできる |
+| [0102](0102-identifier-prefix-number-slug.md) | 親の識別子を `<先頭の語>-<番号>-<slug>`（`feature-64-統合先の解決` など）にそろえ、日本語の字を使えるようにする。先頭の語は `CCNAVI_BRANCH_PREFIXES` で変えられる。既にあるブランチとのぶつかりを warn する。親チケットの `branch:` キーで、識別子と違う既存のブランチを親のブランチにできる（`branch:`／`switch` の手順は 0136 が置き換え） |
 | [0106](0106-conventions-at-session-start.md) | ccnavi が前提にしている作業の決まりは、セッション開始で要点だけを渡し、詳しいことは今ある入口に聞かせる |
 | [0117](0117-approval-core-lives-in-tickets.md) | 承認・取り下げ・レビュー済みの判定のコアと C1 の見分けを `hook/` から `tickets/` へ移す |
 
@@ -198,7 +198,7 @@ keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管
 | [0122](0122-deny-unreadable-args-to-user-entries.md) | 2 段目の無いユーザの入口は、引数を読み切れなければ止める |
 | [0115](0115-drop-all-migration-reads.md) | 公開前なので、移行のための読み取りと掃除をすべて外す |
 | [0101](0101-child-id-carries-the-phase.md) | 子チケットの識別子にフェーズ番号を入れ、連番はフェーズごとに振る |
-| [0103](0103-issue-mr-branch-lookup.md) | issue・MR を指定された依頼では、UserPromptSubmit が指示を足し、`ccnavi-branches.sh` で紐づくブランチを探してユーザに確かめてから進める（止めない） |
+| [0103](0103-issue-mr-branch-lookup.md) | issue・MR を指定された依頼では、UserPromptSubmit が指示を足し、`ccnavi-branches.sh` で紐づくブランチを探してユーザに確かめてから進める（止めない）（`branch:`／`switch` の手順は 0136 が置き換え） |
 | [0104](0104-approval-leaves-the-ticket-as-is.md) | 承認はチケットの中身を変えない。状態は status で聞き、承認の知らせは外す（待ち方のファイルは ADR-0109 が改める） |
 | [0105](0105-approved-ticket-written-durably.md) | 承認済みチケットは一時ファイルに書き切って fsync してから差し替える（待ち方のファイルの記述は ADR-0109 が改める） |
 | [0109](0109-plan-order-on-plan-items.md) | フェーズの順序は親の計画の項の `after` に書き、待ち方は計画から都度計算し、計画が使う定義は親に写して固定する（採用。実行ファイルの側は実装済み。ワークフロー編集タブと図も入れた。画面の実機での確認はまだ。画面の呼び名は ADR-0127 が「計画編集タブ」に改める） |
