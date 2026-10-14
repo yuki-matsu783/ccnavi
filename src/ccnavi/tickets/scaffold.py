@@ -266,12 +266,12 @@ def run(
         or where.kind != tree.KIND_WORKTREE
         or unicodedata.normalize("NFC", where.name) != ident
     ):
-        git_sh = settings.script_command(root, "ccnavi-git.sh")
+        start_sh = settings.script_command(root, "ccnavi-start.sh")
         return refuse(
             f"cwd が .claude/worktrees/{ident} の中ではない。"
-            "提案は識別子と同名のワークツリーに書く。"
-            f"先に '{git_sh} worktree add {tree.worktree_path(root, ident)}"
-            f" -b {ident} <統合先>' で切り、そのワークツリーの中から実行します。"
+            "提案は親のワークツリー（識別子と同名）に書く。"
+            f"先に '{start_sh} --mr <MR の番号>'（MR が無ければ '--issue <issue の番号>'）で、"
+            "親のブランチを直接チェックアウトした親のワークツリーを作り、その中から実行します。"
         )
     if not syncstate.head_branch(where.root, ident):
         return refuse(

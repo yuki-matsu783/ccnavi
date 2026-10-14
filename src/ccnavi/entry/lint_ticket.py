@@ -231,9 +231,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
         _proposal_problems(proposals, copies, index, closed, done, repo_of, preds, root=root)
     )
     integration = conf.integration_branch or settings.integration_recorded(conf.state)
-    problems.extend(
-        lint_branch._place_problems(root, proposals, copies, closed, review, repo_of, integration)
-    )
+    problems.extend(lint_branch._place_problems(root, proposals, copies, closed, review, repo_of))
     problems.extend(
         lint_branch._branch_name_problems(
             proposals,

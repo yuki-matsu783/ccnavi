@@ -100,14 +100,11 @@ def start(
     owner = tree.project_root(conf.projects, found.project) or root
     worktree = tree.worktree_path(root, ticket_id)
     if not tree.is_worktree_of(owner, worktree) or not tree.exact_name(root, ticket_id):
-        where = f"projects/{found.project} の中で " if found.project else ""
         stderr.write(
             f"ccnavi: {ticket_id} のワークツリー {worktree} が無いか、"
             "元リポジトリが承認済みチケットの project"
             f"（{found.project or 'ワークスペース'}）と違う（大文字小文字まで同じ表記であること）。"
-            f"先に {where}'{settings.script_command(root, 'ccnavi-git.sh')} "
-            f'worktree add "{worktree}" '
-            f"{_branch_words(found)}' で作ってください\n"
+            f"{_create_words(root, found, worktree)}\n"
         )
         return 1
     sha = ops_stop.worktree_head_sha(worktree)
@@ -674,12 +671,21 @@ def _move(
     return 0
 
 
-def _branch_words(t: ticket_model.Ticket) -> str:
-    """ワークツリーを作る案内の、ブランチの語。
+def _create_words(root: str, t: ticket_model.Ticket, worktree: str) -> str:
+    """ワークツリーを作る案内。
 
-    新しく切るなら `-b <識別子>`。親が既にあるブランチ（`feature/123-login` のように `/` を含む名前
-    など）で続けるなら、`-b` を付けずそのブランチ名（識別子はその `/` を `-` に置き換えたもの）。
+    子は親のブランチから `-b <子の識別子>` で切る。親は識別子の名前のブランチを作らず、
+    親のブランチ（MR の元ブランチ。`/` を `-` に置き換えると識別子になる名前）を
+    直接チェックアウトする。
+    作るのは `ccnavi-start.sh`（MR の採用の確認と取り込みも行う）。
     """
     if t.is_child:
-        return f"-b {t.ticket}"
-    return f"-b {t.ticket}'（既にあるブランチで続けるなら '-b' を付けずそのブランチ名）"
+        where = f"projects/{t.project} の中で " if t.project else ""
+        git = settings.script_command(root, "ccnavi-git.sh")
+        return f"先に {where}'{git} worktree add \"{worktree}\" -b {t.ticket}' で作ってください"
+    start = settings.script_command(root, "ccnavi-start.sh")
+    return (
+        f"親のワークツリーは '{start} --mr <MR の番号>'"
+        "（MR が無ければ '--issue <issue の番号>'）で、"
+        "親のブランチを直接チェックアウトして作ってください（識別子の名前のブランチは作らない）"
+    )

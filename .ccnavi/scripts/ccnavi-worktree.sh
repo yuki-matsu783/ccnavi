@@ -1,6 +1,11 @@
 #!/bin/sh
 # ccnavi-worktree 作業用のワークツリーを統合先から切る。fetch・遅れの確認・起点の選択・worktree add を 1 本にする。
 #
+# 直接作業（チケットを使わない作業）のワークツリー用で、名前と同じブランチを新しく切る。親子のチケットの
+# 親のワークツリーには使わない。親は識別子の名前のブランチを作らず、親のブランチ（MR の元ブランチ）を直接
+# チェックアウトする（ccnavi-start.sh --mr <番号> / --issue <番号> が作る）。子のワークツリーは
+# ccnavi-ticket.sh start が親のブランチから作る。
+#
 #   sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--offline] [--from-origin] [--dry-run]
 #
 # 手で打つと、次の順になる（.ccnavi/docs/worktree.md「ワークツリーを切る」）。
@@ -54,6 +59,9 @@ sh .ccnavi/scripts/ccnavi-worktree.sh <名前> [--offline] [--from-origin] [--dr
 
   <名前>      ワークツリーの名前。ブランチ名も同じ名前で切る（/ を含められない）。行き先は
               <ワークスペースルート>/.claude/worktrees/<名前>
+
+直接作業（チケットを使わない作業）用。親子のチケットの親のワークツリーには使わない
+（親は ccnavi-start.sh --mr <番号> / --issue <番号> で、親のブランチを直接チェックアウトして作る）。
   --offline   fetch が失敗しても、手元の統合先から切って続ける（origin が古いかもしれない）
   --from-origin
               手元の統合先が origin と分岐していても、警告のうえ origin/<統合先> から切る

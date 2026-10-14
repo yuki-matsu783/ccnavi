@@ -346,13 +346,22 @@ class _Family:
         worktree = tree.worktree_path(self.root, t.ticket)
         out = []
         if not (tree.is_worktree_of(owner, worktree) and tree.exact_name(self.root, t.ticket)):
-            git = settings.script_command(self.root, "ccnavi-git.sh")
-            where = f"projects/{t.project} の中で " if t.project else ""
-            base = f" {t.parent}" if t.is_child else ""
-            out.append(
-                f'ワークツリーがありません。{where}\'{git} worktree add "{worktree}" -b {t.ticket}'
-                f"{base}' で作る{PARENT_ONLY}"
-            )
+            if t.is_child:
+                git = settings.script_command(self.root, "ccnavi-git.sh")
+                where = f"projects/{t.project} の中で " if t.project else ""
+                out.append(
+                    f'ワークツリーがありません。{where}\'{git} worktree add "{worktree}" '
+                    f"-b {t.ticket} {t.parent}' で作る{PARENT_ONLY}"
+                )
+            else:
+                # 親のワークツリーは親のブランチ（MR の元ブランチ）を直接チェックアウトする。
+                # 識別子の名前のブランチは作らない。
+                start = settings.script_command(self.root, "ccnavi-start.sh")
+                out.append(
+                    f"親のワークツリーがありません。'{start} --mr <MR の番号>'（MR が無ければ "
+                    f"'--issue <issue の番号>'）で、親のブランチを直接チェックアウトして作る"
+                    f"{PARENT_ONLY}"
+                )
         out.append(f"'{self.ticket_sh} start {t.ticket}' で開始する{PARENT_ONLY}")
         return out
 

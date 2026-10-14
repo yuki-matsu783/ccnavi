@@ -238,7 +238,6 @@ def _place_problems(
     closed: list,
     review: list,
     repo_of: dict[str, str],
-    integration: str = "",
 ) -> list[Problem]:
     """未承認の親の提案の置き場所と中身の形（warn）。
 
@@ -248,10 +247,9 @@ def _place_problems(
     - 計画（plan）を持たない親。`ticket start` が止まる（子や子の提案があっても同じ）
     """
     settled = {t.ticket for t in list(copies) + list(closed) + list(review)}
-    cut = (
-        f"sh {root or '<ルート>'}/.ccnavi/scripts/ccnavi-git.sh worktree add "
-        f".claude/worktrees/%s -b %s {integration or '<統合先>'}"
-    )
+    # 親のワークツリーは ccnavi-start.sh が作る（MR の元ブランチを直接チェックアウトする）。
+    # 識別子の名前のブランチは作らない。
+    cut = f"sh {root or '<ルート>'}/.ccnavi/scripts/ccnavi-start.sh --mr <MR の番号>"
     problems: list[Problem] = []
     said: set[tuple[str, str]] = set()
     for t in proposals:
@@ -273,7 +271,8 @@ def _place_problems(
                     "(ticket)",
                     f"{t.ticket}: 子の提案を {at} に書いている。親 {t.parent} のワークツリーは"
                     f"識別子と同じ名前にし、子の提案はそこに置く。ワークツリーが無ければ "
-                    f"`{cut % (t.parent, t.parent)}` で切り、提案を移して元を削除します。"
+                    f"`{cut}`（MR が無ければ `--issue <issue の番号>`）で作り、"
+                    "提案を移して元を削除します。"
                     "このままだと親が取り込み済みにならない",
                 )
             )
@@ -286,8 +285,8 @@ def _place_problems(
                     SEVERITY_WARN,
                     "(ticket)",
                     f"{t.ticket}: 提案 {t.ticket} を {at} に書いている。親のワークツリーは"
-                    f"識別子と同じ名前にする。`{cut % (t.ticket, t.ticket)}` で切り、"
-                    "提案を移して元を削除します。このままだと親が取り込み済みにならない",
+                    f"識別子と同じ名前にする。`{cut}`（MR が無ければ `--issue <issue の番号>`）で"
+                    "作り、提案を移して元を削除します。このままだと親が取り込み済みにならない",
                 )
             )
         if not t.has_plan:
