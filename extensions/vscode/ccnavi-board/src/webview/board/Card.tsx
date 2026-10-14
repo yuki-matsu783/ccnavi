@@ -23,6 +23,8 @@ import {
   isHttpUrl,
   movedLabel,
   mrText,
+  originItems,
+  remoteItems,
   phaseStatusItems,
   riskText,
   worktreeName,
@@ -91,6 +93,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
       {card.stage !== "" ? <div className="stage">{card.stage}</div> : null}
       <Badges card={card} />
       <Facts card={card} />
+      {card.isParent ? <Origin card={card} /> : null}
       {card.phases.length > 0 ? <Phases phases={card.phases} /> : null}
       {card.history.length > 0 ? <History entries={card.history} /> : null}
       {card.issues.length > 0 ? (
@@ -241,6 +244,39 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
     facts.push(<Fact key="project" kind="project" text={`project ${card.project}`} />);
   }
   return <div className="facts">{facts}</div>;
+}
+
+/**
+ * 親カードの出どころ（issue・MR・ブランチ名）と、リモートとの差（未送信・遅れ・最終同期）。
+ * 値は実行ファイルの JSON（`remote`・`mr`・`issue`・`branch`）のとおりで、ここで計算し直さない。
+ * 最終同期が無いときは「リモート未確認」と言う。差は最後に取ってきた origin との差で、古いかもしれない。
+ */
+function Origin({ card }: { readonly card: Card }): JSX.Element | null {
+  const origin = originItems(card);
+  const remote = remoteItems(card);
+  if (origin.length === 0 && remote.length === 0) {
+    return null;
+  }
+  const behind = card.remote !== null && card.remote.behind !== null && card.remote.behind > 0;
+  const unsent = card.remote !== null && card.remote.ahead !== null && card.remote.ahead > 0;
+  return (
+    <div className="origin" data-tour="origin">
+      {origin.length > 0 ? (
+        <div className="origin-names">
+          {origin.map((item) => (
+            <Fact key={item} kind="origin-item" text={item} />
+          ))}
+        </div>
+      ) : null}
+      {remote.length > 0 ? (
+        <div className="origin-remote" title="最後に取ってきた origin との差です。最新にするには ccnavi-sync.sh を実行します">
+          {remote.map((item, i) => (
+            <Fact key={i} kind={`remote-item${i === 0 && unsent ? " remote-unsent" : ""}${i === 1 && behind ? " remote-behind" : ""}`} text={item} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 /**

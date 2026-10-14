@@ -61,6 +61,9 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 .fact { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .fact.copy-open::before, .fact.copy-review::before, .fact.copy-closed::before, .fact.mark-reviewed::before { content: "✓ "; }
 .fact.sha { font-family: var(--vscode-editor-font-family); }
+.origin { margin-top: 3px; font-size: .85em; color: var(--vscode-descriptionForeground); }
+.origin-names, .origin-remote { display: flex; flex-wrap: wrap; gap: 2px 10px; }
+.fact.remote-unsent, .fact.remote-behind { color: var(--vscode-editorWarning-foreground); }
 /* 親のフェーズ一覧。1 フェーズ 1 行。左の丸がフェーズで、右が状態。依頼へのリンクとボタンは 2 段目（.phase-actions）。
    状態は全文（状態・マーカー・レビューの要否・リスクの点と理由）だけを出し、狭ければ折り返す。
    右の列を auto にすると状態の 1 行分の幅が行を占め、フェーズ名の列が 0 になって省略記号ごと

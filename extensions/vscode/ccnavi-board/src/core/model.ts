@@ -138,6 +138,19 @@ export interface PredecessorUnmetJson {
   readonly label: string;
 }
 
+/**
+ * 親のワークツリーのリモートとの差（`ccnavi --explain --json` の `remote`）。最後に取ってきた origin との差で、
+ * ネットワークには出ない。`ahead`（未送信）と `behind`（遅れ）は、リモート追跡の ref が無い・読めないと null。
+ * `fetched_at` は最終同期（UNIX 秒）で、0 は一度も取り込んでいない（リモート未確認）。
+ */
+export interface RemoteJson {
+  readonly branch: string;
+  readonly ahead: number | null;
+  readonly behind: number | null;
+  readonly fetched_at: number;
+  readonly mr: number | null;
+}
+
 export interface TicketJson {
   readonly ticket: string;
   readonly parent: string;
@@ -145,6 +158,12 @@ export interface TicketJson {
   readonly title: string;
   readonly project: string;
   readonly issue: number | null;
+  /** 親だけ。親を載せる MR の番号（親チケットの `mr:`）。無ければ null。この欄を出さない古い実行ファイルも null */
+  readonly mr: number | null;
+  /** 親だけ。親のブランチ名。子と、この欄を出さない古い実行ファイルは空 */
+  readonly branch: string;
+  /** 親だけ。親のワークツリーがあるときのリモートとの差。子・ワークツリーなし・古い実行ファイルは null */
+  readonly remote: RemoteJson | null;
   readonly predecessors: readonly string[];
   /** 満たしていない先行。空なら満たしている（先行が無い・閉じたチケット・この欄を出さない古い実行ファイルも空） */
   readonly predecessors_unmet: readonly PredecessorUnmetJson[];
@@ -483,6 +502,16 @@ function sum(raw: Record<string, unknown>): SumJson {
   };
 }
 
+function remote(raw: Record<string, unknown>): RemoteJson {
+  return {
+    branch: str(raw.branch),
+    ahead: num(raw.ahead),
+    behind: num(raw.behind),
+    fetched_at: num(raw.fetched_at) ?? 0,
+    mr: num(raw.mr),
+  };
+}
+
 function ticket(raw: Record<string, unknown>): TicketJson {
   const review = isRecord(raw.human_review) ? raw.human_review : {};
   const copy = isRecord(raw.copy) ? raw.copy : {};
@@ -495,6 +524,9 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     title: str(raw.title),
     project: str(raw.project),
     issue: num(raw.issue),
+    mr: num(raw.mr),
+    branch: str(raw.branch),
+    remote: isRecord(raw.remote) ? remote(raw.remote) : null,
     predecessors: list(raw.predecessors).map(str),
     predecessors_unmet: list(raw.predecessors_unmet)
       .filter(isRecord)

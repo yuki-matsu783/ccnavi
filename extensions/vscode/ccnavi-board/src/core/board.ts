@@ -19,6 +19,7 @@ import type {
   PhaseJson,
   ProposalState,
   ProposalJson,
+  RemoteJson,
   SeenInJson,
   TicketJson,
 } from "./model.js";
@@ -124,6 +125,17 @@ export interface Card {
   /** 親だけ。フェーズの依頼のマーカーから引いたマージリクエストの URL（依頼の投稿ではなくマージリクエスト自体）。無ければ空 */
   readonly mrUrl: string;
   readonly mrNumber: number | null;
+  /** 親だけ。元になった issue の番号（親チケットの `issue:`）。無ければ null */
+  readonly issueNumber: number | null;
+  /**
+   * 親だけ。親を載せる MR の番号。親チケットの `mr:` を先に、無ければ取り込み状態の番号
+   * （`ccnavi-start.sh` が保存する）。フェーズの依頼のマーカーから引く `mrNumber` とは別の値
+   */
+  readonly parentMr: number | null;
+  /** 親だけ。親のブランチ名（ワークツリーが今いるブランチを先に、無ければ親チケットの値）。子は空 */
+  readonly branch: string;
+  /** 親だけ。親のワークツリーのリモートとの差。ワークツリーが無い・子・古い実行ファイルは null */
+  readonly remote: RemoteJson | null;
   /**
    * ユーザが動く必要があるか。「要対応のみ」の絞り込みが見る。実行ファイルの `attention` をそのまま持ち、
    * 条件はここで組み直さない（条件は ccnavi の README「ボードの JSON」）
@@ -296,6 +308,10 @@ function toCard(
     blocked: t.blocked,
     mrUrl: mr.url,
     mrNumber: mr.number,
+    issueNumber: isParent ? t.issue : null,
+    parentMr: isParent ? (t.mr ?? t.remote?.mr ?? null) : null,
+    branch: isParent ? (t.remote?.branch || t.branch) : "",
+    remote: isParent ? t.remote : null,
     attention: t.attention,
     flow: isParent ? null : flowOf(t.flow, column),
     workflow: isParent && t.proposal?.state === "todo" && t.proposal.has_plan === true,
@@ -351,6 +367,10 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     blocked: "",
     mrUrl: "",
     mrNumber: null,
+    issueNumber: null,
+    parentMr: null,
+    branch: "",
+    remote: null,
     attention: false,
     flow: null,
     workflow: false,

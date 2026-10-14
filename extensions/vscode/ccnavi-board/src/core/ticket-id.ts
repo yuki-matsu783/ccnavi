@@ -10,3 +10,14 @@ const TICKET_ID = /^[A-Za-z0-9][A-Za-z0-9._\-\u3005\u3041-\u3096\u30a1-\u30fa\u3
 export function isTicketId(value: unknown): value is string {
   return typeof value === "string" && TICKET_ID.test(value);
 }
+
+/**
+ * 親のブランチ名から親の識別子を作る。`/` を `-` に置き換えるだけ。
+ *
+ * Python（`ticket_ids.branch_to_id`）・sh（`ccnavi_branch_to_id`）と同じ変換で、
+ * `tests/fixtures/branch-to-id.json` の同じ表で一致を確かめる。ワークツリーは `.claude/worktrees/<識別子>` に
+ * ブランチを直接チェックアウトする（識別子の名前のブランチは作らない）。
+ */
+export function branchToId(branch: string): string {
+  return branch.replace(/\//g, "-");
+}

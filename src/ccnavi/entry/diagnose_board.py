@@ -21,9 +21,11 @@ from ..tickets import (
     archive,
     flow,
     history,
+    overview,
     phase,
     risk,
     ticket_fold,
+    ticket_ids,
     ticket_model,
 )
 from ..tickets import ticket as ticket_mod
@@ -428,6 +430,15 @@ def _ticket_record(
         "title": source.title,
         "project": source.project,
         "issue": source.issue,
+        # 親を載せる MR の番号（親チケットの `mr:`）と、親のブランチ名。リモートとの差は
+        # 親のワークツリーがあるときの `remote`（子は null）。
+        "mr": source.mr,
+        "branch": "" if source.is_child else ticket_ids.branch_name(source),
+        "remote": (
+            overview.remote_info(conf, ticket_id, found.root, source.project)
+            if found is not None and not source.is_child
+            else None
+        ),
         "predecessors": list(source.predecessors),
         # 満たしていない先行（`done/` に無いか取り消しのもの）。承認と着手はこれが空でなければ
         # 止まる。閉じたチケットは空。

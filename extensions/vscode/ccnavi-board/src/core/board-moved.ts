@@ -23,11 +23,52 @@ import type { ProposalState } from "./model.js";
 /** どのカードがどの列に居たか。識別子 → 列 */
 export type Placement = Readonly<Record<string, ProposalState>>;
 
-/** 動いた 1 枚。`from` が無いのは、前には無くて新しく現れたカード */
+/**
+ * 動いた 1 枚。`from` が無いのは、前には無くて新しく現れたカード。`by` が "sync" なのは、
+ * 前の読み直しからこのカードの親の最終同期（`remote.fetched_at`）が進んでいるもの。
+ * `ccnavi-sync.sh` が取り込んだ承認や完了でカードが動いたことを、画面が「同期で取り込み」と言う。
+ */
 export interface Moved {
   readonly id: string;
   readonly from?: ProposalState;
   readonly to: ProposalState;
+  readonly by?: "sync";
+}
+
+/** 親ごとの最終同期（UNIX 秒）。親の識別子 → 時刻。0 は一度も取り込んでいない */
+export type Synced = Readonly<Record<string, number>>;
+
+/** いまのボードの親の最終同期。親のワークツリーが無い親（`remote` が無い）は入れない */
+export function syncedOf(board: Board): Synced {
+  const synced: Record<string, number> = {};
+  for (const column of board.columns) {
+    for (const card of column.cards) {
+      if (card.isParent && card.remote !== null && column.state !== "archived") {
+        synced[card.id] = card.remote.fetched_at;
+      }
+    }
+  }
+  return synced;
+}
+
+/** 前の読み直しから最終同期が進んだ親。前に居なかった親（新しく現れたワークツリー）は数えない */
+export function syncedFamilies(before: Synced, after: Synced): ReadonlySet<string> {
+  const advanced = new Set<string>();
+  for (const [id, at] of Object.entries(after)) {
+    const was = before[id];
+    if (was !== undefined && at > was) {
+      advanced.add(id);
+    }
+  }
+  return advanced;
+}
+
+/** 動いたカードに、親の最終同期が進んだものへ `by: "sync"` を付ける。`familyOf` はカードの識別子 → 親の識別子 */
+export function markSynced(moved: readonly Moved[], advanced: ReadonlySet<string>, familyOf: ReadonlyMap<string, string>): readonly Moved[] {
+  if (advanced.size === 0) {
+    return moved;
+  }
+  return moved.map((m) => (advanced.has(familyOf.get(m.id) ?? "") ? { ...m, by: "sync" as const } : m));
 }
 
 /** いまのボードの置き場所。列は組み立て（`board.ts`）が決めたものをそのまま読む */
@@ -81,6 +122,8 @@ export function movedCards(before: Placement, after: Placement): readonly Moved[
 export interface MovedState {
   /** 最後に読めたボードの置き場所。まだ 1 枚も読めていなければ無い */
   readonly placement?: Placement;
+  /** 最後に読めたボードの親ごとの最終同期。動いた表示に「同期で取り込み」を付けるかを決める */
+  readonly synced?: Synced;
   /** いま動いた表示を出すもの */
   readonly moved: readonly Moved[];
 }
@@ -99,12 +142,26 @@ export const NOTHING_MOVED: MovedState = { moved: [] };
  */
 export function movedStep(state: MovedState, board: Board): MovedState {
   const next = placementOf(board);
+  const nextSynced = syncedOf(board);
   const before = state.placement;
   if (before === undefined) {
-    return { placement: next, moved: [] };
+    return { placement: next, synced: nextSynced, moved: [] };
   }
   if (samePlacement(before, next)) {
-    return state;
+    // 最終同期だけが進んでも、動いた表示は変えない（動いていないので付ける先が無い）。次の比べのために時刻は覚える
+    return sameSynced(state.synced ?? {}, nextSynced) ? state : { ...state, synced: nextSynced };
   }
-  return { placement: next, moved: movedCards(before, next) };
+  const familyOf = new Map<string, string>();
+  for (const column of board.columns) {
+    for (const card of column.cards) {
+      familyOf.set(card.id, card.family);
+    }
+  }
+  const advanced = syncedFamilies(state.synced ?? {}, nextSynced);
+  return { placement: next, synced: nextSynced, moved: markSynced(movedCards(before, next), advanced, familyOf) };
+}
+
+function sameSynced(a: Synced, b: Synced): boolean {
+  const ids = Object.keys(a);
+  return ids.length === Object.keys(b).length && ids.every((id) => a[id] === b[id]);
 }

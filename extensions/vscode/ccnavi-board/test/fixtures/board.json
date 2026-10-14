@@ -327,6 +327,15 @@
    "title": "親",
    "project": "",
    "issue": null,
+   "mr": null,
+   "branch": "i0001",
+   "remote": {
+    "branch": "i0001",
+    "ahead": null,
+    "behind": null,
+    "fetched_at": 0,
+    "mr": null
+   },
    "predecessors": [],
    "predecessors_unmet": [],
    "human_review": {
@@ -399,6 +408,9 @@
    "title": "子 i0001-01-01",
    "project": "",
    "issue": null,
+   "mr": null,
+   "branch": "",
+   "remote": null,
    "predecessors": [],
    "predecessors_unmet": [],
    "human_review": {
@@ -499,6 +511,9 @@
    "title": "子 i0001-02-02",
    "project": "",
    "issue": null,
+   "mr": null,
+   "branch": "",
+   "remote": null,
    "predecessors": [],
    "predecessors_unmet": [],
    "human_review": {
@@ -574,6 +589,9 @@
    "title": "子 i0001-02-03",
    "project": "",
    "issue": null,
+   "mr": null,
+   "branch": "",
+   "remote": null,
    "predecessors": [],
    "predecessors_unmet": [],
    "human_review": {
@@ -642,6 +660,9 @@
    "title": "子 i0001-02-04",
    "project": "",
    "issue": null,
+   "mr": null,
+   "branch": "",
+   "remote": null,
    "predecessors": [],
    "predecessors_unmet": [],
    "human_review": {
@@ -750,6 +771,9 @@
    "title": "子 i0001-02-05",
    "project": "",
    "issue": null,
+   "mr": null,
+   "branch": "",
+   "remote": null,
    "predecessors": [],
    "predecessors_unmet": [],
    "human_review": {
