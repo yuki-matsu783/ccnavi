@@ -391,10 +391,10 @@ export function createBoardController(env: BoardEnv): BoardController {
         const key = repoKey(repoBoard.repo);
         try {
           const days = await ops.saveRecentDays(env.storage, env.hosts, key, value);
-          set({ result: { kind: "written", className: "notice ok", text: `${key} の直近の日数を ${days} 日に変更しました。再取得します。` } });
+          set({ result: { kind: "written", className: "notice ok", text: `${key} の検索期間を ${days} 日に変更しました。再取得します。` } });
           return true;
         } catch (err) {
-          set({ result: { kind: "refused", className: "notice error", text: `直近の日数を保存できませんでした：${(err as Error).message ?? String(err)}` } });
+          set({ result: { kind: "refused", className: "notice error", text: `検索期間を保存できませんでした：${(err as Error).message ?? String(err)}` } });
           return false;
         }
       });

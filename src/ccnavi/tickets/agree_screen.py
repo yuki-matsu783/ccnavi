@@ -324,7 +324,9 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
         for ident in used:
             pt = types[ident]
             scope = (
-                "inherit（親の範囲そのまま）" if pt.inherits_scope else ", ".join(pt.scope_globs)
+                "inherit（親チケットの編集可能範囲を引き継ぐ）"
+                if pt.inherits_scope
+                else ", ".join(pt.scope_globs)
             )
             parts = [f"review: {pt.review}", f"scope: {scope}"]
             if pt.deliverables:

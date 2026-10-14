@@ -255,7 +255,7 @@ class _Family:
         verdict, why = self.c1_target()
         if verdict == c1.TARGET_STOP and not (st.imported and st.stop):
             # C1 の sh（ccnavi-ticket.sh）が状態の操作を断る。
-            stops.append(f"C1 で状態の操作が止まる: {why or '理由が分からない'}")
+            stops.append(f"C1 では状態の操作を実行できません: {why or '理由が分からない'}")
         carried = uncommitted and verdict == c1.TARGET_YES
         if not t.started_at:
             for p in approval_checks.unmet_predecessors(t, self.pool):
@@ -266,7 +266,7 @@ class _Family:
             if carried:
                 stops.append(
                     "取り込み済みの親子（C1 の対象）で、承認済みチケットが親のブランチに"
-                    "未コミット。ユーザがコミットして push するまで start は止まる"
+                    "未コミット。ユーザがコミットして push するまで start は実行できません"
                 )
         else:
             if not _started_recorded(self.conf, t):

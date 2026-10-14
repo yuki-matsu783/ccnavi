@@ -33,6 +33,16 @@ LAYER_LABELS = {
 }
 
 
+# レイヤー列の表示幅（全角は 2 桁）。「ワークスペースのレイヤー」が収まる幅
+_LAYER_COL = 26
+
+
+def _pad(text: str, width: int) -> str:
+    """表示幅 `width` になるまで右に空白を足す（全角は 2 桁で数える）。"""
+    used = sum(2 if unicodedata.east_asian_width(c) in "WF" else 1 for c in text)
+    return text + " " * max(0, width - used)
+
+
 # 却下の走査に使う時間の上限（秒）。SessionStart と違って期限が無いので長めに取る。
 EXPLAIN_REJECTS_BUDGET = 5.0
 
@@ -70,7 +80,9 @@ def _explain_phases(
         f"\n■ phases（{counts}。共通レイヤーと、親チケットの project: で"
         "指定されたレイヤーを組み合わせて適用します）\n"
     )
-    stdout.write(f"  {'id':<16}{'レイヤー':<14}{'kind':<8}{'title':<16}{'review':<8}scope\n")
+    stdout.write(
+        f"  {'id':<16}{_pad('レイヤー', _LAYER_COL)}{'kind':<8}{'title':<16}{'review':<8}scope\n"
+    )
     for name, items, unreadable in tables:
         if unreadable:
             stdout.write(
@@ -80,7 +92,7 @@ def _explain_phases(
             scope = (
                 ", ".join(diagnose_shared.written(e) for e in pt.scope) if pt.scope else "inherit"
             )
-            head = f"  {pt.id:<16}{layer_label(name):<14}{pt.kind:<8}{pt.title:<16}"
+            head = f"  {pt.id:<16}{_pad(layer_label(name), _LAYER_COL)}{pt.kind:<8}{pt.title:<16}"
             stdout.write(f"{head}{pt.review:<8}{scope}\n")
 
 
@@ -104,7 +116,9 @@ def _explain_risk(
     effective = risk.effective_levels(common.levels)
     levels = " / ".join(f"{k} {effective[k]}" for k in ("medium", "high", "critical"))
     stdout.write(f"\n■ risk（levels: {levels}）\n")
-    stdout.write(f"  {'id':<16}{'レイヤー':<14}{'加点条件':<20}{'points':<8}message\n")
+    stdout.write(
+        f"  {'id':<16}{_pad('レイヤー', _LAYER_COL)}{'加点条件':<20}{'points':<8}message\n"
+    )
     for name, items, unreadable in tables:
         if unreadable:
             stdout.write(
@@ -113,7 +127,7 @@ def _explain_risk(
         for factor in items:
             how = f"{factor.kind} {factor.value}"
             stdout.write(
-                f"  {factor.id:<16}{layer_label(name):<14}{how:<20}"
+                f"  {factor.id:<16}{_pad(layer_label(name), _LAYER_COL)}{how:<20}"
                 f"{factor.points:<8}{factor.message}\n"
             )
 
@@ -181,7 +195,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     stdout.write(f"ccnavi: いま有効な宣言（出所 {source}）\n")
     stdout.write(
         "  パスを持つツールは共通レイヤー + 対象のレイヤー、"
-        "持たないツールは全部のレイヤーの和で判定する"
+        "持たないツールは全部のレイヤーを組み合わせて判定する"
         "\n"
     )
 

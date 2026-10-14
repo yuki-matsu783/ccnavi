@@ -100,7 +100,7 @@ async function createChildWorktrees(root: string, worktrees: readonly ApproveWor
   }
   if (failed.length > 0) {
     void vscode.window.showWarningMessage(
-      `承認した子のワークツリーを作れませんでした。\n${childWorktreeFailureText(failed, gitScriptCommand(root))}`,
+      `承認した子チケットのワークツリーを作成できませんでした。\n${childWorktreeFailureText(failed, gitScriptCommand(root))}`,
     );
   }
 }

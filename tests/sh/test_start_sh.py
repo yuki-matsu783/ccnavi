@@ -322,7 +322,7 @@ class StartShTest(unittest.TestCase):
             "mcp__github__search_pull_requests",
             "repo:acme/widgets",
             "--mcp-checked",
-            "何も作らずに止めた",
+            "何も作成せずに処理を中断しました",
         ):
             self.assertIn(word, done.stdout)
         self.assertEqual(self.local_branches(), ["main"])

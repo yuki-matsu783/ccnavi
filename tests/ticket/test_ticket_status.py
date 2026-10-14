@@ -97,7 +97,7 @@ class TicketStatusTest(PhaseHarness):
         git(self.parent_tree, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
         self.assertEqual(self.c1_target("i0001"), "yes")
         mine = self.block(self.said("i0001"), "i0001")
-        self.assertIn("ユーザがコミットして push するまで start は止まる", mine)
+        self.assertIn("ユーザがコミットして push するまで start は実行できません", mine)
         self.assertNotIn("start へ進んでよい", mine)
         self.assertNotIn("ccnavi-ticket.sh start", mine)
 
@@ -112,7 +112,8 @@ class TicketStatusTest(PhaseHarness):
         with mock.patch.object(c1, "target", return_value=stop):
             mine = self.block(self.said("i0001"), "i0001")
         self.assertIn(
-            "止まっている理由: C1 で状態の操作が止まる: 親のワークツリーが決まらない", mine
+            "止まっている理由: C1 では状態の操作を実行できません: 親のワークツリーが決まらない",
+            mine,
         )
         self.assertNotIn("start へ進んでよい", mine)
         self.assertNotIn("ccnavi-ticket.sh start", mine)

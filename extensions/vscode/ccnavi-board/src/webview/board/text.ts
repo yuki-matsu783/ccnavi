@@ -236,11 +236,11 @@ export function predecessorsBadge(card: Card): { readonly text: string; readonly
       title: `着手済みです。先行チケットが done/ にないか、取り消されているため、開始条件を満たしていません。ただし、着手済みの作業や finish コマンドの実行は制限されません。\n${detail}`,
     };
   }
-  const what = card.copyStatus === "none" ? "承認も着手も" : "着手が";
+  const what = card.copyStatus === "none" ? "承認・着手は" : "着手は";
   return {
     text: `先行待ち（${ids}）`,
     lead: "先行待ち",
     ids: list,
-    title: `先行チケットが取り消されずに完了し、done/ に移動するまで、${what}止まります\n${detail}`,
+    title: `先行チケットが取り消されずに完了し、done/ に移動するまで、${what}できません\n${detail}`,
   };
 }

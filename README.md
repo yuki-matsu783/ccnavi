@@ -1643,7 +1643,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh status i0002    # その親子だけ（子�
 
 - 承認の時刻は、状態の履歴の `approved`（続きの子は `raised`）、無ければ `doing/<識別子>.md` を足したコミットの時刻。
   どちらも無ければ「未コミット（手で置いた）」
-- push 済みかは手元のリモート追跡の ref で見るので、古いかもしれない。最新にしたければ先に `ccnavi-sync.sh` を打つ
+- push済みかどうかは、最後に取得したリモートの状態に基づくため、最新の状態と異なる場合があります。最新にしたければ先に `ccnavi-sync.sh` を打つ
 - 未コミットの承認済みチケットには、ユーザに `ccnavi-push-approved.sh <親>` を打ってもらうことだけを言う（エージェントは運ばない）。
   取り込み済みの親子（C1 の対象）なら「ユーザが運ぶまで `start` は止まる」、C1 の対象外なら「`start` へ進んでよい」と添える。
   C1 が状態の操作を断る親子では、その理由を止まっている理由に出す
@@ -2162,7 +2162,7 @@ ccnavi --test Bash "git push" --cwd .claude/worktrees/feat-x --permission-mode d
 ```
 ■ rules 共通レイヤー（.ccnavi/config/common/rules.yml、deny 12 / ask 3 / allow 4）
   deny  guard-hooks                  Write|Edit|NotebookEdit            */.claude/hooks/*
-■ rules 自身のレイヤー（.ccnavi/config/project/rules.yml、deny 0 / ask 0 / allow 1）
+■ rules ワークスペースのレイヤー（.ccnavi/config/project/rules.yml、deny 0 / ask 0 / allow 1）
   allow self:worktrees               Write|Edit                         */.claude/worktrees/*
 ■ rules lib（projects/lib/.ccnavi/config/project/rules.yml、deny 1 / ask 0 / allow 0）
   deny  lib:schema                   Write|Edit                         */schema/*
@@ -2175,9 +2175,9 @@ ccnavi --test Bash "git push" --cwd .claude/worktrees/feat-x --permission-mode d
 ```
 
 （件数と中身は例。）順序は判定と同じ 共通レイヤー → 自身のレイヤー → プロジェクト（名前順）で、重複として捨てた定義は出ない。
-「どのルールも言及しない呼び出し」の節は、権限モードごとに、読めた呼び出しと読み切れない呼び出し（`degraded`）の結末を 1 行ずつ出す。
+「どのルールにも一致しないツール呼び出し」の節は、権限モードごとに、読めた呼び出しと読み切れない呼び出し（`degraded`）の結末を 1 行ずつ出す。
 判定と同じ関数で組み、`CCNAVI_GUARD_UNWATCHED` も hook と同じ読み方で解いた値を使う。
-読めないレイヤーは「読めない: <理由>。このレイヤーは空として扱う」、置いていないレイヤーは「このレイヤーは置いていない（無い = 空）」と出る。
+読めないレイヤーは「読めない: <理由>。このレイヤーは空として扱う」、設定ファイルが無いレイヤーは「このレイヤーの設定ファイルはありません。設定なしとして扱います。」と出る。
 `levels` の行は共通レイヤーの値。レイヤーで `levels` を書くとキーごとに小さいほうが採られるので、チケットに適用される値はその `project:` のレイヤーで変わる。
 
 ### 期待する判定で確かめる
