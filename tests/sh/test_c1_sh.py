@@ -1224,6 +1224,43 @@ class C1MergeTest(C1Harness):
         summary = json.loads(self.read(risk))["summary"]
         self.assertTrue(summary.startswith("1 ファイル、+1 -0 行"), summary)
 
+    def term_after(self, pattern):
+        """git の引数が pattern に当たる呼び出しの直後に、finish へ TERM を送る。stderr を返す。"""
+        import signal
+
+        mark = os.path.join(self._base, "reached")
+        path = self.git_shim(
+            f'case " $* " in *"{pattern}"*)\n'
+            f'  "$REAL" "$@"; rc=$?; : >\'{mark}\'; sleep 3; exit $rc ;;\nesac',
+        )
+        running = subprocess.Popen(
+            [SHELL, os.path.join(self.scripts, "ccnavi-ticket.sh"), "finish", CHILD],
+            cwd=self.ws,
+            env=self.env(PATH=path),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        deadline = time.monotonic() + 60
+        while not os.path.exists(mark) and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertTrue(os.path.exists(mark), "その git の呼び出しまで届かなかった")
+        running.send_signal(signal.SIGTERM)
+        _, err = running.communicate(timeout=60)
+        return err.decode("utf-8", "replace")
+
+    @unittest.skipUnless(hasattr(os, "killpg"), "TERM を捕まえさせられない（os.killpg が無い）")
+    def test_a_term_during_the_merge_undoes_it_and_finish_can_run_again(self):
+        self.start_parent()
+        tree = self.start_child()
+        self.work(tree, "wip/design/a.md", "a\n")
+        before = self.sha(self.tree, "HEAD")
+        err = self.term_after(" merge --no-ff --no-commit ")
+        self.assertIn("合流の途中で止められた", err)
+        self.assert_rolled_back(before)
+        again = self.ticket("finish", CHILD)
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+
 
 class TidyAfterFinishTest(C1Harness):
     """finish が通ったら、sh が実行ファイルに `worktree tidy <識別子>` を頼む。

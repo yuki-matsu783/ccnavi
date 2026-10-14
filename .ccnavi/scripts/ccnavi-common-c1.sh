@@ -410,17 +410,19 @@ ccnavi_c1_merge_begin() {
 		return 0
 	fi
 	ccnavi_mb_rc=0
+	# merge の前に立てる。merge の最中にシグナルが来ても、ccnavi_c1_end が取りやめられるように。
+	ccnavi_c1_merging_h0="$1"
+	ccnavi_c1_merging_list="$2"
+	ccnavi_c1_merging=yes
 	GIT_MERGE_AUTOEDIT=no git -C "$ccnavi_c1_tree" merge --no-ff --no-commit --quiet "$ccnavi_c1_merge_sha" \
 		</dev/null >"$ccnavi_c1_tmp/merge-out" 2>"$ccnavi_c1_tmp/merge-git-err" || ccnavi_mb_rc=$?
 	if [ "$ccnavi_mb_rc" -eq 0 ]; then
-		ccnavi_c1_merging=yes
-		ccnavi_c1_merging_h0="$1"
-		ccnavi_c1_merging_list="$2"
 		return 0
 	fi
 	cat "$ccnavi_c1_tmp/merge-out" >>"$ccnavi_c1_tmp/merge-git-err" 2>/dev/null || :
 	ccnavi_mb_conflicts=$(git -C "$ccnavi_c1_tree" diff --name-only --diff-filter=U 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')
 	git -C "$ccnavi_c1_tree" merge --abort >/dev/null 2>&1 || :
+	ccnavi_c1_merging=""
 	if [ "$(git -C "$ccnavi_c1_tree" rev-parse HEAD 2>/dev/null)" != "$1" ] || [ -n "$(ccnavi_c1_busy "$ccnavi_c1_tree")" ]; then
 		ccnavi_c1_say "合流を取りやめても元に戻らなかった。親のワークツリー（${ccnavi_c1_tree}）をユーザが確かめてください"
 		return 1
@@ -449,12 +451,23 @@ ccnavi_c1_blame() {
 ccnavi_c1_unmerge() {
 	[ -n "$ccnavi_c1_merging" ] || return 0
 	ccnavi_c1_merging=""
-	# 先に merge --abort（索引と合流で入れたものを HEAD に戻す）。書いた状態のファイルは、その後に戻す
-	# （先に戻すと、索引に足した分との差が「未 add の変更」に見えて、abort が残してしまう）。
-	if ! git -C "$ccnavi_c1_tree" merge --abort >/dev/null 2>"$ccnavi_c1_tmp/err"; then
-		ccnavi_c1_say "合流を取りやめられなかった（$(head -n 1 "$ccnavi_c1_tmp/err" 2>/dev/null)）。親のワークツリー（${ccnavi_c1_tree}）をユーザが確かめてください"
+	if git -C "$ccnavi_c1_tree" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+		# 先に merge --abort（索引と合流で入れたものを HEAD に戻す）。書いた状態のファイルは、その後に戻す
+		# （先に戻すと、索引に足した分との差が「未 add の変更」に見えて、abort が残してしまう）。
+		if ! git -C "$ccnavi_c1_tree" merge --abort >/dev/null 2>"$ccnavi_c1_tmp/err"; then
+			ccnavi_c1_say "合流を取りやめられなかった（$(head -n 1 "$ccnavi_c1_tmp/err" 2>/dev/null)）。親のワークツリー（${ccnavi_c1_tree}）をユーザが確かめてください"
+			return 1
+		fi
+	elif [ "$(git -C "$ccnavi_c1_tree" rev-parse HEAD 2>/dev/null)" != "$1" ]; then
+		# 合流の記録（MERGE_HEAD）が無く、先頭も元のままでない。コミットまで済んだ形は呼ぶ側が見る。
+		ccnavi_c1_say "合流の途中の形でなくなっていた。戻さずに止めた。親のワークツリー（${ccnavi_c1_tree}）をユーザが確かめてください"
+		return 1
+	elif ! git -C "$ccnavi_c1_tree" diff --cached --quiet 2>/dev/null; then
+		# merge が始まる前か、MERGE_HEAD を書く前に切られた。索引に残ったものは誰のものか分からないので触らない。
+		ccnavi_c1_say "合流が途中で切られ、索引に変更が残っている。戻さずに止めた。親のワークツリー（${ccnavi_c1_tree}）をユーザが確かめてください"
 		return 1
 	fi
+	# MERGE_HEAD が無く先頭が元のままで、索引にも変更が無い: merge は何も残していない。
 	[ ! -f "$2" ] || ccnavi_c1_restore_written "$2" "$1"
 	log_info C1 で合流を取りやめた -- "family=$ccnavi_c1_family_id"
 	return 0
