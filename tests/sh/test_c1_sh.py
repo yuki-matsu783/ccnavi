@@ -906,7 +906,9 @@ class C1MergeTest(C1Harness):
         self.assertEqual(self.remote_sha(), head)
         self.assertEqual(self.dirty(), "")
         self.assertFalse(self.merging())
-        changed = git(self.tree, "diff", "--name-only", "--no-renames", "HEAD^1", "HEAD").stdout.split()
+        changed = git(
+            self.tree, "diff", "--name-only", "--no-renames", "HEAD^1", "HEAD"
+        ).stdout.split()
         self.assertIn("wip/design/a.md", changed)
         self.assertIn(f"{APPROVED}/doing/{CHILD}.md", changed)
         self.assertIn(f"wip/proposals/review/{CHILD}.md", changed)
