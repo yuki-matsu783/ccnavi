@@ -842,8 +842,9 @@ class ApproveCarriesTest(Workspace):
         self.assertIn(NOTHING, result.stdout)
 
     def test_failed_approval_carries_nothing(self):
-        """何も置かれなかった承認の失敗では、コミットも push もしない。"""
+        """何も置かれなかった承認の失敗では、無関係な未コミットの承認済みチケットも含めて送らない。"""
         tree = self.worktree("i0001")
+        self.place(tree)
         before = self.head(tree)
         result = self.approve(STUB_EXIT="1")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
@@ -856,12 +857,12 @@ class ApproveCarriesTest(Workspace):
         親は承認済みとして残り、子の書き込みだけ失敗した形。送らないと他のマシンに届かない。
         """
         tree = self.worktree("i0001")
-        result = self.approve(STUB_TREE=tree, STUB_AFTER_EXIT="1")
+        result = self.approve(STUB_TREE=tree, STUB_AFTER_EXIT="4")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertEqual(self.subject(tree), MESSAGE)
         self.assertEqual(self.committed(tree), [f"{APPROVED}/i0001.md"])
         self.assertEqual(self.remote_head("i0001"), self.head(tree))
-        self.assertIn("一部しか通らなかった", result.stderr)
+        self.assertIn("承認の一部だけが通った", result.stderr)
 
     def test_failed_push_does_not_fail_the_approval(self):
         """コミットや push の失敗で承認が失敗に見えないように、承認が通れば 0。コミットは残る。"""

@@ -499,6 +499,8 @@ class PhaseTest(PhaseHarness):
         self.propose("i0001-02-02", child_text("i0001-02-02", "i0001", 2, ["wip/design/*"]))
         self.commit_parent()
         result = self.approve()
+        # 一部だけ置いて失敗した。何も置かずに失敗したとき（1）と分けるので 4。
+        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
         self.assertTrue(
             os.path.exists(os.path.join(self.approved, "doing", "i0001.md")), result.stderr
         )
