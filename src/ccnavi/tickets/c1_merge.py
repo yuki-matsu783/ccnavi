@@ -81,9 +81,16 @@ def plan(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> int:
     if problem:
         _stop(stdout, *problem)
         return 0
+    # 子の先頭はここで 1 回だけ読む。検査も合流（sh の `git merge <sha>`）もこの sha を使い、
+    # 検査のあとに子が積んだコミットは合流に載せない。
+    head = gitstate.head(child_tree)
+    parent_head = gitstate.head(parent_tree)
+    if not (head and parent_head):
+        _stop(stdout, f"子 {ident} の先頭を読めない。何も変えずに止めた", [])
+        return 0
     copies, _ = approval.scan(conf, root)
     parent = approval_checks.by_id(copies).get(parent_id)
-    places, outside, why = phase_scope.merge_findings(root, conf, found, parent)
+    places, outside, why = phase_scope.merge_findings(root, conf, found, parent, head)
     if why:
         _stop(stdout, f"子 {ident} の変更を調べられない（{why}）。何も変えずに止めた", [])
         return 0
@@ -112,10 +119,8 @@ def plan(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> int:
             ],
         )
         return 0
-    head = gitstate.head(child_tree)
-    parent_head = gitstate.head(parent_tree)
-    base, why = gitstate.child_base(child_tree, parent_tree)
-    if not (head and parent_head and base):
+    base, why = gitstate.child_base(child_tree, parent_tree, child_head=head)
+    if not base:
         _stop(stdout, f"子 {ident} の先頭を読めない（{why}）。何も変えずに止めた", [])
         return 0
     done = gitcmd.run(child_tree, ["merge-base", "--is-ancestor", head, parent_head], _TIMEOUT)

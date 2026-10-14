@@ -185,7 +185,7 @@ def fork_base(top: str, others: list[str], timeout: float = TIMEOUT_SECONDS) -> 
 
 
 def child_base(
-    child_tree: str, parent_tree: str, timeout: float = TIMEOUT_SECONDS
+    child_tree: str, parent_tree: str, timeout: float = TIMEOUT_SECONDS, child_head: str = "HEAD"
 ) -> tuple[str, str]:
     """子のワークツリーで、子の仕事の始まり。`(コミット, 読めなかった理由)`。
 
@@ -194,13 +194,14 @@ def child_base(
     着手のときの基準点（`base_sha`）から数えないのは、衝突を解くために子へ親を取り込んだとき、
     親に入っているほかの子の変更が、この子の変更に混ざるから。親を取り込んだ子は、取り込んだ
     親の先頭が始まりになる。既に親へ合流した子が続きを積んだときは、合流した先頭が始まりになる。
+    `child_head` を渡すと、子の HEAD の代わりにその sha から求める（先頭を 1 回だけ読んで使う側）。
     """
     if not child_tree or not parent_tree:
         return "", "子か親のワークツリーが決まらない"
     parent = head(parent_tree, timeout)
     if not parent:
         return "", f"親のワークツリー（{parent_tree}）の HEAD を読めない"
-    done = gitcmd.run(child_tree, ["merge-base", "HEAD", parent], timeout)
+    done = gitcmd.run(child_tree, ["merge-base", child_head or "HEAD", parent], timeout)
     found = done.out.strip().splitlines()[0] if done.ok and done.out.strip() else ""
     if not found:
         return "", "子のブランチと親のブランチの共通の祖先を読めない"

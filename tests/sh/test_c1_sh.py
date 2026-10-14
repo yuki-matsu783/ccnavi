@@ -1165,6 +1165,42 @@ class C1MergeTest(C1Harness):
         summary = json.loads(self.read(risk))["summary"]
         self.assertTrue(summary.startswith("1 ファイル、+1 -0 行"), summary)
 
+    # ---- 6. 検査・合流・シグナルの隙間
+
+    def git_shim(self, body):
+        """`git` の前に body を挟む PATH。body の中の "$REAL" は本物の git。"""
+        shim = os.path.join(self._base, "shim")
+        executable(
+            os.path.join(shim, "git"),
+            f'#!/bin/sh\nREAL=\'{GIT}\'\n{body}\nexec "$REAL" "$@"\n',
+        )
+        return shim + os.pathsep + os.environ.get("PATH", "")
+
+    def test_a_commit_after_the_scope_check_is_not_merged(self):
+        """範囲の検査の直後に子がコミットしても、検査していないコミットは合流しない。"""
+        self.start_parent()
+        tree = self.start_child()
+        checked = self.work(tree, "wip/design/a.md", "a\n")
+        mark = os.path.join(self._base, "checked")
+        # 子のワークツリーで範囲の検査（diff -z）が済んだ直後に、範囲外のファイルをコミットする。
+        path = self.git_shim(
+            'case " $* " in *" diff --name-only --no-renames --ignore-submodules=none -z "*)\n'
+            f"  if [ ! -e '{mark}' ] && [ \"$(pwd -P)\" = \"$(cd '{tree}' && pwd -P)\" ]; then\n"
+            f'    "$REAL" "$@"; rc=$?; : >\'{mark}\'\n'
+            '    mkdir -p src && echo evil > src/evil.py && "$REAL" add src/evil.py >/dev/null &&'
+            ' "$REAL" commit -q -m evil >/dev/null\n'
+            "    exit $rc\n  fi ;;\nesac",
+        )
+        result = self.ticket("finish", CHILD, PATH=path)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(os.path.exists(mark), "検査の差分を読んでいない")
+        self.assertNotEqual(self.sha(tree, "HEAD"), checked)
+        self.assertNotEqual(
+            git(self.tree, "cat-file", "-e", "HEAD:src/evil.py", check=False).returncode, 0
+        )
+        parents = git(self.tree, "rev-list", "--parents", "-n", "1", "HEAD").stdout.split()
+        self.assertEqual(parents[2], checked)
+
 
 class TidyAfterFinishTest(C1Harness):
     """finish が通ったら、sh が実行ファイルに `worktree tidy <識別子>` を頼む。

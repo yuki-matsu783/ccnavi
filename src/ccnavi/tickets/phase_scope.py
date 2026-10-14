@@ -211,10 +211,13 @@ def merge_findings(
     conf: settings.Settings,
     child: ticket_model.Ticket,
     parent: ticket_model.Ticket | None,
+    head: str,
 ) -> tuple[list[str], list[tuple[str, ScopeVerdict]], str]:
     """finish が親へ合流する前の検査。`(置き場の変更, 範囲外の変更, 読めなかった理由)`。
 
-    見るのは、子の仕事の始まり（`gitstate.child_base`）から子の先頭までのコミット済みの変更だけ。
+    見るのは、子の仕事の始まり（`gitstate.child_base`）から `head`（呼ぶ側が 1 回だけ読んだ子の
+    先頭）までのコミット済みの変更だけ。合流するのも同じ `head` なので、検査のあとに子が
+    コミットしても、検査していないコミットは合流に載らない。
     未コミットの変更は、合流に載らないので別に止める（finish の手順 3）。範囲は
     `scope_findings` と同じく親の範囲と定義の上限で切り詰める。置き場（`.ccnavi/approved/` と
     `wip/proposals/`。フェーズのマーカーと記録を含む）の変更は、範囲の判定にかけず別に挙げる。
@@ -224,7 +227,9 @@ def merge_findings(
     worktree = tree.worktree_path(root, child.ticket)
     if not os.path.isdir(worktree):
         return [], [], "ワークツリーがありません。"
-    base, why = gitstate.child_base(worktree, tree.worktree_path(root, child.parent))
+    base, why = gitstate.child_base(
+        worktree, tree.worktree_path(root, child.parent), child_head=head
+    )
     if not base:
         return [], [], why
     rc, out = _git(
@@ -235,7 +240,7 @@ def merge_findings(
             "--no-renames",
             "--ignore-submodules=none",
             "-z",
-            f"{base}..HEAD",
+            f"{base}..{head}",
         ],
     )
     if rc != 0:
