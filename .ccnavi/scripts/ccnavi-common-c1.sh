@@ -12,8 +12,17 @@
 #   ccnavi_c1_begin             1 ロック 2 途中の操作 3 C1 の外の変更の見分けとコミット 4 取り込み 5 未送信の確かめ
 #   ccnavi_c1_write <文> -- <実行ファイルの引数>...
 #                               6 元の先頭 7 書く 8 コミット 9 push 10 届いたか 11 戻して 1 回だけやり直す
+#   ccnavi_c1_merge_plan <子>   子の finish だけ。begin の後、write の前に呼ぶ。子を親のブランチへ合流してよいかを
+#                               実行ファイルに聞く（c1 merge）。止めるなら 1（何も変えず、ロックも外した）。
+#                               合流するなら write が 7 の前に合流する（下の「合流」）
 #   ccnavi_c1_end               ロックを外す（trap の EXIT・INT・TERM・HUP にも置く）
 #
+# 合流（子の finish）。write の 7 の前に、親のワークツリーで子の先頭を `merge --no-ff --no-commit` で入れる。
+# 衝突したら merge を取りやめて何も変えずに止める。入れたら 7（完了の記録と子の merged_sha）を書き、8 は
+# 合流と状態を 1 つのマージコミットにする（commit --only は合流の途中では使えないので、書いたパスを add して commit）。
+# 9 以降（push・届いたかの確かめ・戻し）は同じ。戻す範囲は「元の先頭から最終の先頭まで」で、
+# `git diff --name-only <元の先頭> <コミット>` のパスの索引と作業ツリーを戻す。コミットの前に失敗・中断したときは
+# merge --abort と書いたものの復元で、合流ごと元に戻す。
 # 呼ぶ側が先に決めるもの。
 #   ccnavi_c1_root   ワークスペースルート
 #   ccnavi_c1_label  文面の頭（ccnavi-ticket など）
@@ -51,6 +60,13 @@ ccnavi_c1_tmp=""
 ccnavi_c1_capture=""
 ccnavi_c1_keep=""
 ccnavi_c1_tab=$(printf '\t')
+# 合流する子の先頭（空なら合流しない）と子の識別子。ccnavi_c1_merge_plan が決める。
+ccnavi_c1_merge_sha=""
+ccnavi_c1_merge_child=""
+# 合流の途中（merge --no-commit のあと、コミットか取りやめまで）か、その元の先頭と書いたパスの一覧。
+ccnavi_c1_merging=""
+ccnavi_c1_merging_h0=""
+ccnavi_c1_merging_list=""
 
 ccnavi_c1_say() {
 	printf '%s: %s\n' "$ccnavi_c1_label" "$*" >&2
@@ -354,6 +370,125 @@ ccnavi_c1_run() {
 	fi
 }
 
+# 子の finish の合流の前の検査。<子の識別子>。0 なら続けてよい（合流するなら ccnavi_c1_merge_sha が入る）。
+# 1 なら止めた（何も変えていない。ロックは外した）。答えられなければ止める側。
+ccnavi_c1_merge_plan() {
+	ccnavi_c1_merge_sha=""
+	ccnavi_c1_merge_child=""
+	ccnavi_c1_exe c1 merge "$1" 2>"$ccnavi_c1_tmp/merge-err" </dev/null | tr -d '\r' >"$ccnavi_c1_tmp/merge" || :
+	if [ "$(head -n 1 "$ccnavi_c1_tmp/merge" 2>/dev/null)" != "c1 1" ]; then
+		ccnavi_c1_say "合流の前の検査（c1 merge）に実行ファイルが応答しない（$(head -n 1 "$ccnavi_c1_tmp/merge-err" 2>/dev/null)）。何も反映していません。実行ファイルを新しくしてください"
+		ccnavi_lock_drop
+		return 1
+	fi
+	ccnavi_pm_stop=$(sed -n 's/^stop //p' "$ccnavi_c1_tmp/merge" | head -n 1)
+	if [ -n "$ccnavi_pm_stop" ]; then
+		ccnavi_c1_say "$ccnavi_pm_stop"
+		sed -n 's/^hint /  - /p' "$ccnavi_c1_tmp/merge" >&2
+		log_info C1 で止めた -- "family=$ccnavi_c1_family_id" "reason=c1-merge-stop"
+		ccnavi_lock_drop
+		return 1
+	fi
+	if [ "$(sed -n 's/^merge //p' "$ccnavi_c1_tmp/merge" | head -n 1)" = yes ]; then
+		ccnavi_c1_merge_child="$1"
+		ccnavi_c1_merge_sha=$(sed -n 's/^head //p' "$ccnavi_c1_tmp/merge" | head -n 1)
+		[ -n "$ccnavi_c1_merge_sha" ] || {
+			ccnavi_c1_say "合流する子の先頭を読めない。何も反映していません"
+			ccnavi_lock_drop
+			return 1
+		}
+	fi
+	return 0
+}
+
+# 親のワークツリーに子の先頭を入れる（コミットしない）。<元の先頭> <書いたパスの一覧>。0 で入れた（か、入れるものが無い）。
+# 1 は何も変えずに止めた（衝突など。merge は取りやめた）。
+ccnavi_c1_merge_begin() {
+	[ -n "$ccnavi_c1_merge_sha" ] || return 0
+	# 取り込みで、子の先頭がすでに親に入っていれば、入れるものは無い。
+	if git -C "$ccnavi_c1_tree" merge-base --is-ancestor "$ccnavi_c1_merge_sha" HEAD 2>/dev/null; then
+		return 0
+	fi
+	ccnavi_mb_rc=0
+	GIT_MERGE_AUTOEDIT=no git -C "$ccnavi_c1_tree" merge --no-ff --no-commit --quiet "$ccnavi_c1_merge_sha" \
+		</dev/null >"$ccnavi_c1_tmp/merge-out" 2>"$ccnavi_c1_tmp/merge-git-err" || ccnavi_mb_rc=$?
+	if [ "$ccnavi_mb_rc" -eq 0 ]; then
+		ccnavi_c1_merging=yes
+		ccnavi_c1_merging_h0="$1"
+		ccnavi_c1_merging_list="$2"
+		return 0
+	fi
+	cat "$ccnavi_c1_tmp/merge-out" >>"$ccnavi_c1_tmp/merge-git-err" 2>/dev/null || :
+	ccnavi_mb_conflicts=$(git -C "$ccnavi_c1_tree" diff --name-only --diff-filter=U 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')
+	git -C "$ccnavi_c1_tree" merge --abort >/dev/null 2>&1 || :
+	if [ "$(git -C "$ccnavi_c1_tree" rev-parse HEAD 2>/dev/null)" != "$1" ] || [ -n "$(ccnavi_c1_busy "$ccnavi_c1_tree")" ]; then
+		ccnavi_c1_say "合流を取りやめても元に戻らなかった。親のワークツリー（${ccnavi_c1_tree}）をユーザが確かめてください"
+		return 1
+	fi
+	if [ -n "$ccnavi_mb_conflicts" ]; then
+		ccnavi_c1_say "子 ${ccnavi_c1_merge_child} を親のブランチ ${ccnavi_c1_branch} へ合流すると衝突する（${ccnavi_mb_conflicts}）。合流を取りやめて、何も変えずに止めた"
+		ccnavi_c1_blame $ccnavi_mb_conflicts
+		ccnavi_c1_say "  子のワークツリー（.claude/worktrees/${ccnavi_c1_merge_child}）で親のブランチ ${ccnavi_c1_branch} を merge して衝突を解き、コミットしてから finish をやり直してください"
+	else
+		ccnavi_c1_say "子 ${ccnavi_c1_merge_child} を合流できなかった（$(ccnavi_git_refusal "$ccnavi_c1_tmp/merge-git-err")）。何も変えずに止めた"
+	fi
+	log_info C1 で止めた -- "family=$ccnavi_c1_family_id" "reason=c1-merge-conflict"
+	return 1
+}
+
+# 衝突したパスを持ち込んだ、先に合流した別の子を名指しする。<パス>...
+ccnavi_c1_blame() {
+	ccnavi_c1_exe c1 merge-blame "$ccnavi_c1_merge_child" "$@" 2>/dev/null </dev/null | tr -d '\r' >"$ccnavi_c1_tmp/blame" || :
+	[ "$(head -n 1 "$ccnavi_c1_tmp/blame" 2>/dev/null)" = "c1 1" ] || return 0
+	sed -n 's/^other //p' "$ccnavi_c1_tmp/blame" | while IFS= read -r ccnavi_bl_line; do
+		ccnavi_c1_say "  先に合流した子 ${ccnavi_bl_line%% *} の変更と重なる（${ccnavi_bl_line#* }）。後から finish した ${ccnavi_c1_merge_child} 側のワークツリーで解く"
+	done
+}
+
+# 合流の途中なら取りやめ、書いたものを元に戻す。<元の先頭> <書いたパスの一覧>。0 で元に戻った（か、合流の途中でない）。
+ccnavi_c1_unmerge() {
+	[ -n "$ccnavi_c1_merging" ] || return 0
+	ccnavi_c1_merging=""
+	# 先に merge --abort（索引と合流で入れたものを HEAD に戻す）。書いた状態のファイルは、その後に戻す
+	# （先に戻すと、索引に足した分との差が「未 add の変更」に見えて、abort が残してしまう）。
+	if ! git -C "$ccnavi_c1_tree" merge --abort >/dev/null 2>"$ccnavi_c1_tmp/err"; then
+		ccnavi_c1_say "合流を取りやめられなかった（$(head -n 1 "$ccnavi_c1_tmp/err" 2>/dev/null)）。親のワークツリー（${ccnavi_c1_tree}）をユーザが確かめてください"
+		return 1
+	fi
+	[ ! -f "$2" ] || ccnavi_c1_restore_written "$2" "$1"
+	log_info C1 で合流を取りやめた -- "family=$ccnavi_c1_family_id"
+	return 0
+}
+
+# 合流の途中のコミット。書いたパスを索引に足して、合流と状態を 1 つのマージコミットにする。<一覧> <文>
+# 失敗したら 1（呼ぶ側が ccnavi_c1_unmerge で戻す）。
+ccnavi_c1_commit_merge() {
+	ccnavi_c1_committed=""
+	while IFS= read -r ccnavi_cm_path; do
+		[ -n "$ccnavi_cm_path" ] || continue
+		case "$ccnavi_cm_path" in
+		/* | [A-Za-z]:*) continue ;;
+		esac
+		if [ -e "$ccnavi_c1_tree/$ccnavi_cm_path" ] || [ -L "$ccnavi_c1_tree/$ccnavi_cm_path" ]; then
+			git -C "$ccnavi_c1_tree" add -A -- ":(literal)$ccnavi_cm_path" 2>"$ccnavi_c1_tmp/err" || {
+				ccnavi_c1_say "$ccnavi_cm_path を add できなかった（$(head -n 1 "$ccnavi_c1_tmp/err")）"
+				return 1
+			}
+		else
+			git -C "$ccnavi_c1_tree" rm --cached --quiet --ignore-unmatch -- ":(literal)$ccnavi_cm_path" >/dev/null 2>&1 || :
+		fi
+	done <"$1"
+	if ! ccnavi_git_timed "$(ccnavi_c1_number "${CCNAVI_C1_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_c1_tmp/err" "$ccnavi_c1_tree" \
+		commit --quiet --no-verify -m "$2" >"$ccnavi_c1_tmp/out"; then
+		cat "$ccnavi_c1_tmp/out" >>"$ccnavi_c1_tmp/err"
+		ccnavi_c1_say "合流のコミットができなかった（制限時間で打ち切った場合を含む）。$(ccnavi_git_refusal "$ccnavi_c1_tmp/err")"
+		return 1
+	fi
+	ccnavi_c1_merging=""
+	ccnavi_c1_committed=$(git -C "$ccnavi_c1_tree" rev-parse HEAD)
+	return 0
+}
+
 # 6〜11。<文> -- <実行ファイルの引数>...。終了コードは実行ファイルのもの（C1 で失敗したら 1）。
 ccnavi_c1_write() {
 	ccnavi_cw_message="$1"
@@ -371,21 +506,33 @@ ccnavi_c1_write() {
 			ccnavi_c1_say "親のワークツリーの先頭を読めない。何も反映していません"
 			return 1
 		}
+		# 6b. 合流（子の finish）。親のワークツリーに子の先頭を入れる（コミットしない）。
+		ccnavi_c1_merge_begin "$ccnavi_cw_h0" "$ccnavi_cw_list" || return 1
 		# 7. 書く。
 		ccnavi_cw_rc=0
 		ccnavi_c1_run "$ccnavi_cw_list" "$@" || ccnavi_cw_rc=$?
 		if [ ! -f "$ccnavi_cw_list" ]; then
+			ccnavi_c1_unmerge "$ccnavi_cw_h0" "$ccnavi_cw_list" || :
 			ccnavi_c1_say "実行ファイルが書いたパスの一覧を出さなかった。書いたものが分からないのでコミットしない。親のワークツリー（${ccnavi_c1_tree}）をユーザが確かめてください"
 			return 1
 		fi
 		if [ "$ccnavi_cw_rc" -ne 0 ]; then
-			# 失敗した回は、ここまでに書いたものを戻す（コミットしない）。
+			# 失敗した回は、ここまでに書いたもの（合流を含む）を戻す（コミットしない）。
+			ccnavi_c1_unmerge "$ccnavi_cw_h0" "$ccnavi_cw_list" || :
 			ccnavi_c1_restore_written "$ccnavi_cw_list" "$ccnavi_cw_h0"
 			rm -f "$ccnavi_cw_list"
 			return "$ccnavi_cw_rc"
 		fi
-		# 8. コミット。
-		if ! ccnavi_c1_commit "$ccnavi_cw_list" "$ccnavi_cw_message"; then
+		# 8. コミット（合流の途中なら、合流と状態を 1 つのマージコミットにする）。
+		if [ -n "$ccnavi_c1_merging" ]; then
+			ccnavi_cw_ok=0
+			ccnavi_c1_commit_merge "$ccnavi_cw_list" "$ccnavi_cw_message" || ccnavi_cw_ok=1
+		else
+			ccnavi_cw_ok=0
+			ccnavi_c1_commit "$ccnavi_cw_list" "$ccnavi_cw_message" || ccnavi_cw_ok=1
+		fi
+		if [ "$ccnavi_cw_ok" -ne 0 ]; then
+			ccnavi_c1_unmerge "$ccnavi_cw_h0" "$ccnavi_cw_list" || :
 			ccnavi_c1_restore_written "$ccnavi_cw_list" "$ccnavi_cw_h0"
 			rm -f "$ccnavi_cw_list"
 			return 1
@@ -455,7 +602,8 @@ ccnavi_c1_undo() {
 		ccnavi_c1_say "先頭が自分のコミット（$1）でなくなっていた（${ccnavi_cu_now}）。戻さずに止めた。ユーザが確かめてください"
 		return 1
 	fi
-	git -C "$ccnavi_c1_tree" diff-tree --no-commit-id --name-only -r -z "$1" 2>/dev/null |
+	# 戻すパスは、元の先頭からこのコミットまでの変更（合流したコードを含む）。
+	git -C "$ccnavi_c1_tree" diff --name-only --no-renames -z "$2" "$1" 2>/dev/null |
 		tr '\000' '\n' >"$ccnavi_c1_tmp/in-commit"
 	if ! git -C "$ccnavi_c1_tree" update-ref "refs/heads/$ccnavi_c1_branch" "$2" "$1" 2>"$ccnavi_c1_tmp/err"; then
 		ccnavi_c1_say "コミットを戻せなかった（$(head -n 1 "$ccnavi_c1_tmp/err")）。ユーザが確かめてください"
@@ -463,7 +611,8 @@ ccnavi_c1_undo() {
 	fi
 	ccnavi_c1_unstage "$ccnavi_c1_tmp/in-commit" "$2"
 	ccnavi_c1_inflight=""
-	ccnavi_c1_restore_written "$3" "$2"
+	ccnavi_c1_restore_written "$ccnavi_c1_tmp/in-commit" "$2"
+	[ ! -f "$3" ] || ccnavi_c1_restore_written "$3" "$2"
 	log_info C1 で書いたものを戻した -- "family=$ccnavi_c1_family_id"
 	return 0
 }
@@ -498,6 +647,11 @@ ccnavi_c1_end() {
 		ccnavi_c1_say "送る前に止められた。書いたものを戻す"
 		ccnavi_c1_undo "$ccnavi_ce_c" "$ccnavi_c1_inflight_h0" "$ccnavi_c1_inflight_list" || :
 		rm -f "$ccnavi_c1_inflight_list"
+	fi
+	if [ -n "$ccnavi_c1_merging" ] && [ -n "$ccnavi_c1_tmp" ]; then
+		# 合流の途中で切られた。合流を取りやめ、書いたものを戻す。
+		ccnavi_c1_say "合流の途中で止められた。合流を取りやめて、書いたものを戻す"
+		ccnavi_c1_unmerge "$ccnavi_c1_merging_h0" "$ccnavi_c1_merging_list" || :
 	fi
 	ccnavi_lock_drop
 	if [ -n "$ccnavi_c1_tmp" ]; then

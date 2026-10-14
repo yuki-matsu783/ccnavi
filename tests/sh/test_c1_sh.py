@@ -835,6 +835,333 @@ class C1TicketTest(C1Harness):
         self.assertEqual(self.dirty(), "")
 
 
+CHILD_B = f"{PARENT}-01-02"
+
+
+class C1MergeTest(C1Harness):
+    """子の finish は、親のブランチへ合流してから push する（合流と状態は 1 つのマージコミット）。
+
+    1. 合流・完了の記録・子の merged_sha が 1 つのマージコミットになり、push される
+    2. 記録の無い別の PC でも、子 2 の着手で子 1 のコードが入り、finish の合流まで通る
+    3. 置き場の書き換え・範囲外のパス・衝突・未コミット（子も親も）は、何も変えずに止まる
+    4. push の失敗・コミットの失敗・シグナル中断は、合流ごと元に戻る。応答が失われた push は成功
+    5. 衝突を解くために子へ親を取り込んでも、リスクの計測にほかの子の変更が混ざらない
+    """
+
+    def start_parent(self):
+        self.assertEqual(self.ticket("start", PARENT).returncode, 0)
+
+    def start_child(self, ident=CHILD):
+        started = self.ticket("start", ident)
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        return os.path.join(self.ws, ".claude", "worktrees", ident)
+
+    def approve_second_child(self):
+        write(
+            os.path.join(self.tree, "wip", "proposals", "todo", CHILD_B + ".md"),
+            child_text(CHILD_B, PARENT, 1, ("wip/design/*",), False),
+        )
+        git(self.tree, "add", "-A")
+        git(self.tree, "commit", "-q", "-m", "propose b")
+        done = self.exe("--agree", "--yes", CHILD_B, "--json")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        git(self.tree, "add", "-A")
+        git(self.tree, "commit", "-q", "-m", "approve b")
+        git(self.tree, "push", "-q", "origin", PARENT)
+        if self.imported:
+            self.write_present_record()
+
+    def work(self, tree, rel, text, message="work"):
+        write(os.path.join(tree, *rel.split("/")), text)
+        git(tree, "add", "--", rel)
+        git(tree, "commit", "-q", "-m", message)
+        return self.sha(tree, "HEAD")
+
+    def merging(self):
+        return (
+            git(self.tree, "rev-parse", "-q", "--verify", "MERGE_HEAD", check=False).returncode == 0
+        )
+
+    def assert_untouched(self, head, ident=CHILD):
+        """止まったあと、親のワークツリー・ブランチ・リモート・チケットが何も変わっていない。"""
+        self.assertEqual(self.sha(self.tree, "HEAD"), head)
+        self.assertEqual(self.remote_sha(), head)
+        self.assertEqual(self.dirty(), "")
+        self.assertFalse(self.merging())
+        self.assertTrue(os.path.isfile(self.copy(ident)), "doing/ から動いている")
+        self.assertFalse(os.path.exists(self.lock_dir()))
+
+    # ---- 1. 合流と状態は 1 つのマージコミット
+
+    def test_finish_merges_the_child_in_one_merge_commit_and_pushes(self):
+        self.start_parent()
+        tree = self.start_child()
+        child_head = self.work(tree, "wip/design/a.md", "a\n")
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("finish", CHILD)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        head = self.sha(self.tree, "HEAD")
+        parents = git(self.tree, "rev-list", "--parents", "-n", "1", "HEAD").stdout.split()
+        self.assertEqual(parents[1:], [before, child_head])
+        self.assertEqual(self.remote_sha(), head)
+        self.assertEqual(self.dirty(), "")
+        self.assertFalse(self.merging())
+        changed = git(self.tree, "diff", "--name-only", "--no-renames", "HEAD^1", "HEAD").stdout.split()
+        self.assertIn("wip/design/a.md", changed)
+        self.assertIn(f"{APPROVED}/doing/{CHILD}.md", changed)
+        self.assertIn(f"wip/proposals/review/{CHILD}.md", changed)
+        review = self.read(os.path.join(self.tree, "wip", "proposals", "review", CHILD + ".md"))
+        self.assertIn(f'merged_sha: "{child_head}"', review)
+        self.assertEqual(fields(self.record)["sha"], head)
+        # 子の先頭は親の先頭の祖先
+        self.assertEqual(
+            git(
+                self.tree, "merge-base", "--is-ancestor", child_head, "HEAD", check=False
+            ).returncode,
+            0,
+        )
+
+    def test_a_child_already_in_the_parent_is_not_merged_again(self):
+        self.start_parent()
+        tree = self.start_child()
+        self.work(tree, "wip/design/a.md", "a\n")
+        git(self.tree, "merge", "-q", "--no-edit", CHILD)
+        git(self.tree, "push", "-q", "origin", PARENT)
+        result = self.ticket("finish", CHILD)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        parents = git(self.tree, "rev-list", "--parents", "-n", "1", "HEAD").stdout.split()
+        self.assertEqual(len(parents), 2, "合流するものが無いので、ふつうのコミット")
+        self.assertIn(
+            f'merged_sha: "{self.sha(tree, "HEAD")}"',
+            self.read(os.path.join(self.tree, "wip", "proposals", "review", CHILD + ".md")),
+        )
+
+    # ---- 2. 別の PC の子 2
+
+    def test_a_second_child_on_a_pc_without_a_record_sees_the_first_and_reaches_the_request(self):
+        self.start_parent()
+        self.approve_second_child()
+        first = self.start_child()
+        first_head = self.work(first, "wip/design/a.md", "a\n")
+        self.assertEqual(self.ticket("finish", CHILD).returncode, 0)
+        # 記録の無い PC B のつもり
+        os.remove(self.record)
+        second = self.start_child(CHILD_B)
+        self.assertTrue(os.path.isfile(os.path.join(second, "wip", "design", "a.md")))
+        second_head = self.work(second, "wip/design/b.md", "b\n")
+        result = self.ticket("finish", CHILD_B)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        head = self.sha(self.tree, "HEAD")
+        self.assertEqual(self.remote_sha(), head)
+        for sha in (first_head, second_head):
+            done = git(self.tree, "merge-base", "--is-ancestor", sha, "HEAD", check=False)
+            self.assertEqual(done.returncode, 0)
+        body = write(os.path.join(self._base, "body.md"), "見てほしい\n")
+        prepared = self.exe(
+            "--cwd", self.tree, "--phase", "1", "--body-file", body, "review", "prepare"
+        )
+        self.assertNotIn("合流", prepared.stderr, prepared.stderr)
+
+    # ---- 3. 止まる
+
+    def test_a_ticket_place_in_the_childs_commits_stops_without_merging(self):
+        self.start_parent()
+        tree = self.start_child()
+        self.work(tree, "wip/proposals/todo/evil.md", "x\n")
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("finish", CHILD)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("置き場の変更", result.stderr)
+        self.assertIn("wip/proposals/todo/evil.md", result.stderr)
+        self.assert_untouched(before)
+
+    def test_a_path_outside_the_scope_stops_without_merging(self):
+        self.start_parent()
+        tree = self.start_child()
+        self.work(tree, "src/x.py", "x = 1\n")
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("finish", CHILD)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("範囲の外のパス", result.stderr)
+        self.assertIn("src/x.py", result.stderr)
+        self.assert_untouched(before)
+
+    def test_a_conflict_is_aborted_and_changes_nothing(self):
+        self.start_parent()
+        tree = self.start_child()
+        self.work(tree, "wip/design/a.md", "child\n")
+        remote = self.remote_commit("wip/design/a.md", "remote\n")
+        result = self.ticket("finish", CHILD)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("衝突する", result.stderr)
+        self.assertIn("wip/design/a.md", result.stderr)
+        self.assertIn(f"子のワークツリー（.claude/worktrees/{CHILD}）", result.stderr)
+        # 取り込みは済んでいるが、合流は何も残していない
+        self.assert_untouched(remote)
+
+    def test_a_conflict_names_the_child_that_merged_first(self):
+        self.start_parent()
+        self.approve_second_child()
+        first = self.start_child()
+        second = self.start_child(CHILD_B)
+        self.work(first, "wip/design/a.md", "first\n")
+        self.work(second, "wip/design/a.md", "second\n")
+        self.assertEqual(self.ticket("finish", CHILD).returncode, 0)
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("finish", CHILD_B)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(f"先に合流した子 {CHILD}", result.stderr)
+        self.assertIn(f"後から finish した {CHILD_B}", result.stderr)
+        self.assert_untouched(before, CHILD_B)
+
+    def test_an_uncommitted_change_in_the_child_stops(self):
+        self.start_parent()
+        tree = self.start_child()
+        self.work(tree, "wip/design/a.md", "a\n")
+        write(os.path.join(tree, "wip", "design", "late.md"), "not committed\n")
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("finish", CHILD)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("サブエージェントの作業がコミットされていません", result.stderr)
+        self.assertIn("wip/design/late.md", result.stderr)
+        self.assert_untouched(before)
+
+    def test_an_uncommitted_change_in_the_parent_stops(self):
+        self.start_parent()
+        tree = self.start_child()
+        self.work(tree, "wip/design/a.md", "a\n")
+        write(os.path.join(self.tree, "src", "keep.py"), "print(2)\n")
+        result = self.ticket("finish", CHILD)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("親のワークツリーに未コミットの変更がある", result.stderr)
+        self.assertIn("src/keep.py", result.stderr)
+        self.assertFalse(self.merging())
+        self.assertTrue(os.path.isfile(self.copy(CHILD)))
+
+    # ---- 4. 失敗とシグナルは合流ごと戻す
+
+    def assert_rolled_back(self, before):
+        self.assertEqual(self.sha(self.tree, "HEAD"), before)
+        self.assertEqual(self.dirty(), "")
+        self.assertFalse(self.merging())
+        self.assertFalse(os.path.exists(os.path.join(self.tree, "wip", "design", "a.md")))
+        self.assertTrue(os.path.isfile(self.copy(CHILD)))
+        self.assertFalse(os.path.exists(self.lock_dir()))
+
+    def test_two_rejected_pushes_undo_the_merge(self):
+        self.start_parent()
+        tree = self.start_child()
+        self.work(tree, "wip/design/a.md", "a\n")
+        before = self.sha(self.tree, "HEAD")
+        counter = os.path.join(self._base, "rejected")
+        write(counter, "0\n")
+        executable(
+            os.path.join(self.remote, "hooks", "pre-receive"),
+            "#!/bin/sh\necho busy >&2\nexit 1\n",
+        )
+        result = self.ticket("finish", CHILD)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assert_rolled_back(before)
+        self.assertEqual(self.remote_sha(), before)
+
+    def test_a_rejected_push_is_retried_with_the_merge_done_again(self):
+        self.start_parent()
+        tree = self.start_child()
+        child_head = self.work(tree, "wip/design/a.md", "a\n")
+        before = self.sha(self.tree, "HEAD")
+        counter = os.path.join(self._base, "rejected")
+        write(counter, "0\n")
+        executable(
+            os.path.join(self.remote, "hooks", "pre-receive"),
+            "#!/bin/sh\n"
+            f"n=$(cat '{counter}'); echo $((n + 1)) > '{counter}'\n"
+            'if [ "$n" -lt 1 ]; then echo busy >&2; exit 1; fi\n',
+        )
+        result = self.ticket("finish", CHILD)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("戻した", result.stderr)
+        parents = git(self.tree, "rev-list", "--parents", "-n", "1", "HEAD").stdout.split()
+        self.assertEqual(parents[1:], [before, child_head])
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        self.assertEqual(self.dirty(), "")
+
+    def test_a_failed_commit_undoes_the_merge(self):
+        self.start_parent()
+        tree = self.start_child()
+        self.work(tree, "wip/design/a.md", "a\n")
+        before = self.sha(self.tree, "HEAD")
+        git(self.ws, "config", "commit.gpgsign", "true")
+        git(self.ws, "config", "gpg.program", "false")
+        result = self.ticket("finish", CHILD)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("合流のコミットができなかった", result.stderr)
+        self.assert_rolled_back(before)
+        self.assertEqual(self.remote_sha(), before)
+
+    @unittest.skipUnless(hasattr(os, "killpg"), "TERM を捕まえさせられない（os.killpg が無い）")
+    def test_a_term_before_the_push_undoes_the_merge(self):
+        import signal
+
+        self.start_parent()
+        tree = self.start_child()
+        self.work(tree, "wip/design/a.md", "a\n")
+        before = self.sha(self.tree, "HEAD")
+        mark = os.path.join(self._base, "pushing")
+        hooks = git(self.tree, "rev-parse", "--git-path", "hooks").stdout.strip()
+        hooks = hooks if os.path.isabs(hooks) else os.path.join(self.tree, hooks)
+        executable(os.path.join(hooks, "pre-push"), f"#!/bin/sh\n: >'{mark}'\nsleep 5\nexit 1\n")
+        running = subprocess.Popen(
+            [SHELL, os.path.join(self.scripts, "ccnavi-ticket.sh"), "finish", CHILD],
+            cwd=self.ws,
+            env=self.env(),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        deadline = time.monotonic() + 60
+        while not os.path.exists(mark) and time.monotonic() < deadline:
+            time.sleep(0.1)
+        running.send_signal(signal.SIGTERM)
+        _, err = running.communicate(timeout=60)
+        self.assertIn("送る前に止められた", err.decode("utf-8", "replace"))
+        self.assert_rolled_back(before)
+
+    def test_a_push_whose_reply_was_lost_counts_as_sent_with_the_merge(self):
+        self.start_parent()
+        tree = self.start_child()
+        child_head = self.work(tree, "wip/design/a.md", "a\n")
+        shim = os.path.join(self._base, "shim")
+        executable(os.path.join(shim, "git"), LOST_REPLY.format(git=GIT))
+        path = shim + os.pathsep + os.environ.get("PATH", "")
+        result = self.ticket("finish", CHILD, PATH=path)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("届いていた", result.stderr)
+        head = self.sha(self.tree, "HEAD")
+        self.assertEqual(self.remote_sha(), head)
+        parents = git(self.tree, "rev-list", "--parents", "-n", "1", "HEAD").stdout.split()
+        self.assertEqual(parents[2], child_head)
+
+    # ---- 5. 親を取り込んだ子でも、ほかの子の変更が混ざらない
+
+    def test_taking_the_parent_into_a_child_does_not_mix_in_the_other_childs_changes(self):
+        self.start_parent()
+        self.approve_second_child()
+        first = self.start_child()
+        second = self.start_child(CHILD_B)
+        self.work(first, "wip/design/a.md", "first\n")
+        self.work(second, "wip/design/b.md", "second\n")
+        self.assertEqual(self.ticket("finish", CHILD).returncode, 0)
+        # 衝突を解くつもりで、子 2 へ親を取り込む
+        git(second, "merge", "-q", "--no-edit", PARENT)
+        result = self.ticket("finish", CHILD_B)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        risk = os.path.join(
+            self.tree, *APPROVED.split("/"), "phases", PARENT, CHILD_B + ".risk.json"
+        )
+        summary = json.loads(self.read(risk))["summary"]
+        self.assertTrue(summary.startswith("1 ファイル、+1 -0 行"), summary)
+
+
 class TidyAfterFinishTest(C1Harness):
     """finish が通ったら、sh が実行ファイルに `worktree tidy <識別子>` を頼む。
 

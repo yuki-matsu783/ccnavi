@@ -236,6 +236,10 @@ start | finish | cancel)
 		*) c1_words="$c1_id を取り消した" ;;
 		esac
 		ccnavi_c1_begin || exit 1
+		# 子の finish は、親のブランチへ合流してから push する。合流してよいかをここで確かめる。
+		if [ "$1" = finish ] && [ "$c1_id" != "$ccnavi_c1_family_id" ]; then
+			ccnavi_c1_merge_plan "$c1_id" || exit 1
+		fi
 		if [ "$1" = start ] && [ "$c1_id" != "$ccnavi_c1_family_id" ]; then
 			ensure_child_worktree || exit 1
 		fi
