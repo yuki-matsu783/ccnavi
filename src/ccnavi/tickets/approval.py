@@ -67,7 +67,6 @@ from ..infra import fsio, settings, tree
 from ..policy import rules
 from . import (
     approval_checks,
-    archive,
     phasetypes,
     syncstate,
     ticket_fold,
@@ -305,7 +304,6 @@ def scan(
         notes = raw.closed_notes if closed else raw.open_notes
         kept = _authoritative(found, raw.everything)
         if not closed:
-            kept = archive.drop_archived(root, kept)
             approval_checks.mark_blocked(conf, kept)
             approval_checks.mark_imported(conf, root, kept)
         return kept, list(notes)
@@ -318,9 +316,6 @@ def scan(
         everything = all_tickets(conf, root, open_all=found)
     kept = _authoritative(found, everything)
     if not closed:
-        # 手元の退避にある（ready が閉じて移した）チケットの、子のワークツリーに残った古いチケットは
-        # 作業中に戻さない（archive.drop_archived）。
-        kept = archive.drop_archived(root, kept)
         # 判定が読むのは作業中の側だけ。閉じたものに理由は要らない。
         approval_checks.mark_blocked(conf, kept)
         approval_checks.mark_imported(conf, root, kept)
@@ -332,11 +327,11 @@ def scan_review(
 ) -> tuple[list[ticket_model.Ticket], list[str]]:
     """レビュー待ちのチケット。正とするツリーの側だけを残す（`scan` と同じ規則）。"""
     if raw is not None:
-        kept = archive.drop_archived(root, _authoritative(raw.review, raw.everything))
+        kept = _authoritative(raw.review, raw.everything)
         approval_checks.mark_imported(conf, root, kept)
         return kept, list(raw.review_notes)
     found, notes = review_all(conf, root)
-    kept = archive.drop_archived(root, _authoritative(found, all_tickets(conf, root, review=found)))
+    kept = _authoritative(found, all_tickets(conf, root, review=found))
     approval_checks.mark_imported(conf, root, kept)
     return kept, notes
 

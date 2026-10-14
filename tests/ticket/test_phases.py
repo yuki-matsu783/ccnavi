@@ -168,7 +168,10 @@ class PhaseHarness(unittest.TestCase):
         git(self.root, "remote", "add", "origin", bare)
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         fixture = os.path.join(self.root, "fixture.json")
-        write(fixture, json.dumps({"host": "fixture", "mr": {"number": 7, "url": "u/7"}}))
+        write(
+            fixture,
+            json.dumps({"host": "fixture", "mr": {"number": 7, "url": "u/7", "draft": True}}),
+        )
         return fixture
 
     def request(self, fixture, phase):
@@ -885,7 +888,7 @@ class PhaseTest(PhaseHarness):
         mark = read_json(os.path.join(archived, "phases", "i0001", "ready.json"))
         self.assertEqual(mark["mr"], 7)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "done", "i0001.md")))
-        # 同じ親にもう 1 度打っても通る（sh が外し損ねたときの打ち直し）。
+        # 同じ親にもう 1 度打っても通る（sh が外し損ねたときの打ち直し。MR がまだ Draft のとき）。
         again = self.ready(fixture)
         self.assertEqual(again.returncode, 0, again.stderr)
 

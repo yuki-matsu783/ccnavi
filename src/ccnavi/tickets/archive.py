@@ -16,20 +16,20 @@ Draft を外すので、squash でマージすると既定のブランチには�
 （`done/<識別子>.md`・`phases/<親>/...`・`events/<識別子>.ndjson`・`flows/<子>.yml`）にする。
 `logs/` は git が追跡しないので、退避は手元の機械にだけ残る。
 
-退避は補助の記録で、判定の正ではない。読むのは次のところだけで、どれも「閉じた」側に厳しくする向き。
+退避はバックアップで、閉じたかの判定には使わない。閉じたかは MR がマージ済みかで決める
+（`ccnavi-sync.sh` がホストに聞く）。読むのは次のところだけ。
 
-- 閉じた識別子の使い回しの検査（`approval_checks.integration_problems` / `integration_closed`）と、
-  子の連番（`approval_ops.next_child_id`）。退避にある識別子は閉じたものとして数える（同じリポジトリのものだけ）
+- 子の連番（`approval_ops.next_child_id`）。退避にある識別子は使い済みとして数える
+  （同じリポジトリのものだけ）
 - 先行を引く対応表（`approval_checks.predecessor_pool_of`）。置き場のどこにも無い先行を、
   同じリポジトリの退避の `done/` から引く
-- 判定の走査（`approval.scan`）。子のワークツリーに残った古いチケットを、退避に同じ承認のチケットが
-  あれば作業中に戻さない（`drop_archived`）
-- 取り込み（`ccnavi-sync.sh`・`syncstate`）。マージ済みかを確かめられないときと、親のワークツリーを
-  片付けた後に、退避の親を閉じた証拠として補う。親のワークツリーの見分け（`ccnavi_parent_tree`）も見る
+- `ready` の途中の打ち直しで、前の回が移し残したものを拾う（`plan`）
+- ボードの表示と、親のワークツリーの見分け（`ccnavi_parent_tree`。`ready` から
+  親のワークツリーを片付けるまでの間）
 - C1 の見分けと実行後チェック。ready のマーカー（`ready/<親>.json`）に載っている削除だけを
   ccnavi の書き込みと読む
 
-退避の置き場は手元にしか無いので、別の機械ではこれらの検査に使えない（ユーザが受け入れた）。
+退避の置き場は手元にしか無いので、別の機械ではこれらに使えない（ユーザが受け入れた）。
 
 リンクは辿らない。置き場の途中（`logs`・`archive`・`<リポジトリ>`・その下）がシンボリックリンクなら
 読まず、書きもしない。
@@ -255,81 +255,6 @@ def archived_fields(root: str, project: str, ident: str) -> syncstate.DoneCopy |
 def same_id(a: str, b: str) -> bool:
     """大文字小文字だけが違う識別子を同じと読む。"""
     return a.casefold() == b.casefold()
-
-
-def drop_archived(root: str, tickets: list[ticket_model.Ticket]) -> list[ticket_model.Ticket]:
-    """手元の退避に、同じリポジトリで同じチケットと言えるコピーがあるチケットを除く。
-
-    `ready` の後も子のワークツリーには切ったときの `doing/` のチケットが残る。親のツリーから消えた
-    識別子は、その古いチケットが権威として読まれ、作業中に戻ってしまう。閉じて退避したものは閉じた
-    ものとして扱う（判定の scan から外す）。
-
-    同じチケットかは、着手と取り消しの欄で決める（承認はチケットの中身を変えないので、
-    承認の時刻の欄は無い）。
-
-    - 着手も取り消しもしていない写し（欄が 3 つとも空）は、子のワークツリー（親のツリーではない
-      ツリー）で見つけたものに限り、退避より前の写しとして除く。子のワークツリーを切ったのは
-      着手より前で、残る写しはふつうこの形
-    - 親のツリーで見つけた、欄が 3 つとも空のチケットは除かない。`ready` は親のツリーから
-      閉じた親子を消すので、そこに残る未着手のチケットは古い写しではなく、閉じた識別子を使い直した
-      もの（手元の退避は別の機械には無いので、別の機械で承認し直せる）。気づかないうちに除くと、ユーザの
-      承認がどこにも出ずに消える。残して `Ticket.archived_clash` に理由を入れ、判定で止める
-      （`approval_checks.content_problems`）
-    - 欄があれば、統合先の `done/` の親と同じく `syncstate.same_parent` で比べ、同じと言えるときだけ
-      除く。違えば同じ識別子の別のチケットとみなして残す
-    """
-    if not root or not tickets:
-        return tickets
-    out = []
-    for t in tickets:
-        copy = archived_fields(root, t.project, t.ticket)
-        if copy is not None and copy.ticket == t.ticket:
-            verdict = _same_ticket(_mine(t), copy, in_parent_tree=_in_parent_tree(t))
-            if verdict == _SAME:
-                continue
-            if verdict == _REUSED:
-                # レビュー待ちの走査は `mark_blocked` を通らないので、理由をここでも付ける。
-                t.archived_clash = REUSED_REASON
-                t.blocked = t.blocked or REUSED_REASON
-        out.append(t)
-    return out
-
-
-# 退避の写しとの見比べの答え。
-_SAME = "same"  # 同じチケット（除く）
-_OTHER = "other"  # 別のチケット（残す）
-_REUSED = "reused"  # 親のツリーの未着手のチケットで、退避と同じ識別子（残して止める）
-
-REUSED_REASON = (
-    "手元の退避（logs/archive/）に同じ識別子のクローズ済みのチケットがある。クローズ済みの識別子を別の機械で"
-    "使い直した可能性がある。このチケットは着手も取り消しもしていないので、退避と同じものかを"
-    "見分けられない。ユーザが識別子を確かめ、使い直したなら別の識別子で提案して承認し直してください"
-)
-
-
-def _in_parent_tree(t: ticket_model.Ticket) -> bool:
-    # 親のツリー（親自身なら自分のツリー）で見つけたか。`ticket_fold.authority` と同じ見方。
-    return t.tree == (t.parent or t.ticket)
-
-
-def _same_ticket(
-    mine: syncstate.DoneCopy, archived: syncstate.DoneCopy, in_parent_tree: bool
-) -> str:
-    # 退避の写しと同じチケットか（drop_archived の説明のとおり）。
-    if not any(getattr(mine, name) for name in syncstate.MATCH_FIELDS):
-        return _REUSED if in_parent_tree else _SAME
-    return _SAME if syncstate.same_parent(mine, archived) else _OTHER
-
-
-def _mine(t: ticket_model.Ticket) -> syncstate.DoneCopy:
-    # 照合に使う欄だけを、退避の欄と同じ形で。
-    return syncstate.DoneCopy(
-        ticket=t.ticket,
-        parent=t.parent,
-        base_sha=t.base_sha,
-        started_at=t.started_at,
-        cancelled_at=t.cancelled_at,
-    )
 
 
 # ---- 移す

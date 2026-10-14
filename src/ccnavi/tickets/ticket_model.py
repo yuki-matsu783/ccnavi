@@ -247,10 +247,6 @@ class Ticket:
     tree: str = ""
     tree_root: str = ""
     path: str = ""
-    # 親のツリーで見つけた未着手のチケットが、手元の退避（`logs/archive/`）の閉じたチケットと
-    # 同じ識別子のときの理由（`archive.drop_archived`）。
-    # 判定は止める（`approval_checks.content_problems`）。
-    archived_clash: str = ""
     # blocked は「このチケットは読めるが信じられない」理由。空でなければ判定は範囲を
     # 当てずに止める（phase_scope.scope_verdict）。承認のときにしか当たらなかった構造の検査を、
     # 判定の側でも当てるために置く（置き場を手で動かして承認すると `--agree` を通らない）。

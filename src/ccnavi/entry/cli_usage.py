@@ -378,8 +378,7 @@ VS Codeのボード拡張機能は、ターミナルではなくオーバーレ�
          エラーによってファミリーが停止する場合は、終了コード1になります）
     ccnavi sync closed <parent> <repo> <integration> <tree>
         （ccnavi-sync.sh 用。"closed 1" の行に続いて、"integration yes|no"（統合先ブランチの
-         done/ に同じ親があるか）と "archive yes|no"（ローカルのアーカイブにそれがあるか）を
-         出力します。読み取り専用で、git show はローカルで実行されます）
+         done/ に同じ親があるか）を出力します。読み取り専用で、git show はローカルで実行されます）
     ccnavi tree parent <tree> <name>
         （スクリプト用。"tree 1" の行に続いて、"parent yes|no|unreadable"（そのツリーが
          親のチケットまたは提案 <name> を保持しているか）を出力します。スクリプト自身は

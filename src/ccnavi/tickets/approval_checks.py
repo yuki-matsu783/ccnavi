@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, replace
 
 from ..infra import settings, tree
@@ -258,20 +257,9 @@ def integration_problems(
     承認しない（何も出さずに通すことはしない）。一度も取り込んでいないリポジトリは何も言わない
     （今のまま）。
 
-    手元の退避（`logs/archive/`。`ready` が閉じた親子のチケットを移した先）にある識別子も、閉じた
-    識別子として数える。統合先には閉じたチケットを残さないので、手元ではここが閉じた記録になる
-    （別の機械では見えない）。退避は取り込み状態の有無に依らず見る。退避との比べは大文字小文字を
-    区別しない（区別しないファイルシステムでは、ブランチとワークツリーの名前がぶつかるため）。
+    手元の退避（`logs/archive/`）は見ない。閉じた識別子の使い回しは、開始時にホストへ聞く
+    「同名のブランチにマージ済みの MR が無いか」（`ccnavi-start.sh`）で確かめる。
     """
-    if any(archive.same_id(t.ticket, i) for i in archive.ids(root, t.project)):
-        return [
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                t.ticket,
-                f"{t.ticket} は手元の退避（{archive.ARCHIVE_DIR.replace(os.sep, '/')}/）で"
-                "閉じている。クローズ済みの識別子を新規に承認しない。識別子を変えて出し直してください",
-            )
-        ]
     fams = fams or syncstate.Families(conf, root)
     if not fams.active:
         return []
@@ -306,18 +294,13 @@ def integration_problems(
 def integration_closed(
     conf: settings.Settings, root: str, proposals: list[ticket_model.Ticket]
 ) -> set[str]:
-    """統合先の取り込み結果の `done/` か手元の退避に同じ識別子がある新規の提案。
+    """統合先の取り込み結果の `done/` に同じ識別子がある新規の提案。
 
     閉じた識別子の再利用を見つける。
     """
     fams = syncstate.Families(conf, root)
-    archived: dict[str, set[str]] = {}
 
     def closed(t: ticket_model.Ticket) -> bool:
-        if t.project not in archived:
-            archived[t.project] = archive.ids(root, t.project)
-        if any(archive.same_id(t.ticket, i) for i in archived[t.project]):
-            return True
         return fams.active and t.ticket in fams.done(syncstate.repo_key(t.project))[0]
 
     return {t.ticket for t in proposals if t.state == ticket_model.TODO and closed(t)}
@@ -787,8 +770,6 @@ def blocking_problems(
       `--agree` の検査を通らないので、ここで止める。止めるのは承認済みチケットそのものの形の誤りで、
       承認のあとに外の何か（`phases.yml` など）が動いて起きるものではない（直せるのはユーザが
       承認済みチケットを直すときだけ）。読むのは承認済みチケットだけで、`phases.yml` は読まない
-    - 親のツリーの未着手のチケットが、手元の退避の閉じたチケットと同じ識別子
-      （`archive.drop_archived`）。使い直した識別子か、退避と同じものかを見分けられない
     """
     problems = list(project_problems(t, pool, conf))
     problems.extend(content_problems(t))
@@ -821,8 +802,6 @@ def content_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
             )
         )
     problems.extend(workflow.errors(t))
-    if t.archived_clash:
-        problems.append(rules.Problem(rules.SEVERITY_ERROR, t.ticket, t.archived_clash))
     return problems
 
 

@@ -317,7 +317,7 @@ find_mr() {
 	if [ "$kind" = github ]; then
 		owner="${path%%/*}"
 		api GET "repos/$path/pulls?state=open&head=$owner:$branch" |
-			"$JQ" '.[0] // empty | {number: .number, url: .html_url, source: .head.ref, target: .base.ref}'
+			"$JQ" '.[0] // empty | {number: .number, url: .html_url, source: .head.ref, target: .base.ref, draft: (.draft // false)}'
 	else
 		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない）。
 		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても目的のものを外さない）
@@ -325,7 +325,7 @@ find_mr() {
 		mrs=$(pages "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$branch") ||
 			fail mr-list-failed "親ブランチ $branch のマージリクエストの一覧を読めない（ホストの返事は上に出ている）。"
 		printf '%s' "$mrs" |
-			"$JQ" --argjson pid "$pid" '[.[] | select(.source_project_id == $pid)][0] // empty | {number: .iid, url: .web_url, source: .source_branch, target: .target_branch}'
+			"$JQ" --argjson pid "$pid" '[.[] | select(.source_project_id == $pid)][0] // empty | {number: .iid, url: .web_url, source: .source_branch, target: .target_branch, draft: (.draft // .work_in_progress // false)}'
 	fi
 }
 
@@ -590,8 +590,8 @@ fetch_all() {
 	[ -z "$mr" ] && fail no-mr "親ブランチ $branch に対応するマージリクエストが $host にありません。"
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
-	# 実行ファイルに渡す形は番号と url だけ（元ブランチとマージ先は依頼のときだけ sh が確かめる）
-	mr=$(printf '%s' "$mr" | "$JQ" -c '{number: .number, url: .url}')
+	# 実行ファイルに渡す形は番号・url・Draft のままか（元ブランチとマージ先は依頼のときだけ sh が確かめる）
+	mr=$(printf '%s' "$mr" | "$JQ" -c '{number: .number, url: .url, draft: (.draft // false)}')
 	t=$(threads "$number" "$url")
 	r=$(reviews "$number" "$url")
 	"$JQ" -n --arg host "$kind" --argjson mr "$mr" --argjson threads "$t" --argjson reviews "$r" \

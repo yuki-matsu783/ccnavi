@@ -408,12 +408,16 @@ class UndecidedTest(AuthorityHarness):
         finished = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertIn("取り込み状態が不正", finished.stderr)
 
-    def test_closed_family_does_not_move(self):
+    def test_a_closed_record_does_not_decide(self):
+        """閉じたかは MR がマージ済みかで決める。取り込み状態の closed では止めない。"""
+        from ccnavi.infra import settings
+        from ccnavi.tickets import syncstate
+
         self.record("closed")
-        finished = self.ccnavi("ticket", "finish", "i0001-01-01")
-        self.assertNotEqual(0, finished.returncode)
-        self.assertIn("閉じている", finished.stderr)
-        self.assertEqual("deny", self.decision(self.write_to(self.child_tree, "wip/research/a")))
+        conf, _ = settings.load(self.root)
+        st = syncstate.standing(conf, self.root, "i0001")
+        self.assertFalse(st.closed)
+        self.assertEqual("", st.stop)
 
     def test_review_operations_stop_too(self):
         self.record("gone")

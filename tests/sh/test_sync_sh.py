@@ -675,17 +675,18 @@ class SyncTest(SyncHarness):
     def archive_locally(self, text):
         write(os.path.join(self.ws, "logs", "archive", "self", "done", f"{PARENT}.md"), text)
 
-    def test_a_parent_in_the_local_archive_is_closed_when_merge_is_unknown(self):
-        # マージ済みかを確かめられないときだけ、手元の退避（ready が移した先）の親で補う。
+    def test_the_local_archive_does_not_close_it_when_merge_is_unknown(self):
+        # マージ済みかを確かめられないときは、手元の退避（ready が移した先）の親があっても推定せず、
+        # 取り込み状態を変えずに止める。
         self.review_says("unknown", 3)
         self.keep_record()
         self.archive_locally(copy_text())
         self.delete_remote_branch(PARENT)
         done = self.sync(PARENT)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("logs/archive/self/done/", done.stdout)
-        self.assertIn("クローズ済みの親子のチケット", done.stdout)
-        self.assertEqual("closed", fields(self.record)["state"])
+        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertIn("確かめられなかった", done.stdout)
+        self.assertNotIn("クローズ済みの親子のチケット", done.stdout)
+        self.assertEqual("present", fields(self.record)["state"])
 
     def archive_the_parent(self):
         """ready の後の状態。親チケットをツリーから消して push し、手元の退避に置く。"""
@@ -713,39 +714,6 @@ class SyncTest(SyncHarness):
         self.delete_remote_branch(PARENT)
         self.sync(PARENT)
         self.assertEqual("gone", fields(self.record)["state"])
-
-    def test_an_archive_of_another_approval_is_not_this_family(self):
-        # 親のワークツリーに親チケットが残っていれば、着手の欄（base_sha）でも
-        # 同じ親と言えるときだけ。
-        self.review_says("unknown", 3)
-        self.keep_record()
-        self.archive_locally(copy_text(base_sha="0000000"))
-        self.delete_remote_branch(PARENT)
-        done = self.sync(PARENT)
-        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
-        self.assertEqual("present", fields(self.record)["state"])
-
-    def test_a_child_in_the_local_archive_is_not_the_parent(self):
-        self.review_says("unknown", 3)
-        self.keep_record()
-        self.archive_locally(copy_text().replace("ticket: i0001\n", "ticket: i0001\nparent: x\n"))
-        self.delete_remote_branch(PARENT)
-        self.sync(PARENT)
-        self.assertEqual("present", fields(self.record)["state"])
-
-    def test_fields_in_the_body_of_the_archive_are_not_read(self):
-        # 退避の親チケットの ticket: と parent: も frontmatter の行頭から拾う。本文に parent: の行が
-        # あっても子とは読まず、ticket: の注記は値に含めない。
-        self.review_says("unknown", 3)
-        self.keep_record()
-        archived = copy_text(body="parent: x\n").replace(
-            f"ticket: {PARENT}\n", f"ticket: {PARENT} # 親\n"
-        )
-        self.archive_locally(archived)
-        self.delete_remote_branch(PARENT)
-        done = self.sync(PARENT)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertEqual("closed", fields(self.record)["state"])
 
     def test_branch_names_are_matched_exactly(self):
         # i0001-x があっても i0001 があることにはならない（前方一致で取り違えない）。

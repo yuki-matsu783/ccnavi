@@ -1687,6 +1687,7 @@ class Host(__import__("http.server").server.BaseHTTPRequestHandler):
                         "source_project_id": 1,
                         "source_branch": PARENT,
                         "target_branch": "main",
+                        "draft": True,
                     }
                 ],
             )

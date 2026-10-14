@@ -40,15 +40,12 @@
 #     索引が HEAD と同じときだけで、衝突したら、この sh が始めた merge だけを取りやめて
 #     ユーザに回す。親子のチケットの取り込み状態を present で書く
 #   - P がリモートに無い: まず統合先の done/ にこの親子のチケットの親チケット（識別子が同じで、着手と取り消しの欄で
-#     同じ親と言えるもの。closed_in_integration）があれば閉じた親子のチケット（closed）。統合先には閉じたチケットを
+#     同じ親と言えるもの。closed_in_integration）があれば閉じた親子のチケット。統合先には閉じたチケットを
 #     残さない（ready が退避して消し、squash でマージする）ので、ふつうは統合先の done/ には無い。
 #     無く、送った形跡（取り込み状態・origin/<P>・追跡の設定）も無ければ、一度も送っていない親子のチケットで
-#     今のまま。送った形跡があれば、先に ccnavi-review.sh merged に聞き、マージ済みなら閉じた親子の
-#     チケット（closed）。答えが得られなければ観測ずれを疑い、統合先を取り直して確かめ直す（既定 3 回、
-#     5 秒おき）。それでも無ければ、手元の退避（logs/archive/<リポジトリ>/done/<P>.md。ready が閉じた
-#     親子のチケットを移した先）に親チケット（識別子が P で子でなく、ツリーにチケットが残っていれば着手と
-#     取り消しの欄でも同じ親と言えるもの）があるときだけ closed で補い、無ければ「確かめられなかった」で止める
-#     （取り込み状態は書き換えない）。
+#     今のまま。送った形跡があれば、先に ccnavi-review.sh merged に聞く。閉じたかの第一の根拠は MR がマージ済みか
+#     で、手元の退避（logs/archive/）や取り込み状態の closed からは推定しない。答えが得られなければ観測ずれを疑い、
+#     統合先を取り直して確かめ直す（既定 3 回、5 秒おき）。それでも得られなければ、取り込み状態は書き換えずに止める。
 #     マージされていないと分かったときだけ、取り込み状態があれば gone を書いて止める
 #     （取り込み状態が無ければ gone は書かずに止める）
 #
@@ -665,32 +662,19 @@ sync_present() {
 	return 0
 }
 
-# 親子のチケット P が閉じたと言えるかを実行ファイル（`sync closed`）に聞く。<integration|archive>
+# 統合先の done/ に、この親子のチケットの親チケットがあるか。
 #
-# sh はチケットの YAML を読まない。読むのは実行ファイルで、答えは 1 行 1 項目。
-#   integration  統合先の done/ に、識別子が P で子（`parent:`）でなく、親のワークツリーの親チケットと
-#                同じ親と言える親チケットがある。統合先は取ってきた後の refs/remotes/origin/<統合先>
-#   archive      手元の退避（ready が閉じた親子のチケットを移した先。logs/archive/<リポジトリ>/done/<P>.md）に
-#                識別子が P で子でない親チケットがあり、親のワークツリーに承認済みの親チケットが残っていれば
-#                同じ親とも言える。退避は手元にしか無いので、別の機械では見えない（そのときは ccnavi-review.sh merged に聞く）
-# 同じ親かは、スクリプトだけが書く欄を base_sha → started_at → cancelled_at の順に見て、最初に両方が値を持つ
-# 欄が同じかで決める（同じ識別子の古い親子のチケットを、今のものと読まない）。
+# sh はチケットの YAML を読まない。読むのは実行ファイルの `sync closed` で、答えは 1 行 1 項目
+# （`integration yes|no`）。統合先は取ってきた後の refs/remotes/origin/<統合先>。識別子が P で子（`parent:`）
+# でなく、親のワークツリーの親チケットと同じ親と言える親チケットがあれば yes。同じ親かは、スクリプトだけが
+# 書く欄を base_sha → started_at → cancelled_at の順に見て、最初に両方が値を持つ欄が同じかで決める
+# （同じ識別子の古い親子のチケットを、今のものと読まない）。手元の退避（logs/archive/）からは推定しない。
 # 実行ファイルが無い・答えない（古くて副命令を知らない）ときは閉じていない側に倒す（止めて戻し方を出す）。
-closed_by() {
+closed_in_integration() {
 	[ -n "$info_from" ] || return 1
 	cb_out=$(run_ccnavi sync closed "$P" "$key" "$integ" "$tree" 2>/dev/null | tr -d '\r') || cb_out=""
 	[ "$(printf '%s\n' "$cb_out" | head -n 1)" = "closed 1" ] || return 1
-	[ "$(printf '%s\n' "$cb_out" | sed -n "s/^$1 //p" | head -n 1)" = yes ]
-}
-
-# 統合先の done/ に、この親子のチケットの親チケットがあるか。
-closed_in_integration() {
-	closed_by integration
-}
-
-# 手元の退避に、この親子のチケットの親があるか。
-archived_locally() {
-	closed_by archive
+	[ "$(printf '%s\n' "$cb_out" | sed -n "s/^integration //p" | head -n 1)" = yes ]
 }
 
 # 統合先の done/ に閉じた記録があった。取り込み状態を closed にして言う。
@@ -748,13 +732,8 @@ sync_absent() {
 				return 0
 			fi
 		done
-		# マージ済みかを確かめられないときだけ、手元の退避（ready が移した先）を閉じた証拠として補う。
-		if archived_locally; then
-			ccnavi_record_write "$record" remote origin branch "$B" sha "$kept_sha" \
-				fetched_at "$(date +%s)" state closed reason "手元の退避（logs/archive/）に親がある" || :
-			printf '%s: リモートから消えた。マージ済みかは確かめられなかったが、手元の退避（logs/archive/%s/done/）にクローズ済みの記録がある（クローズ済みの親子のチケット）。親のワークツリーは片付けてよい\n' "$P" "$key"
-			return 0
-		fi
+		# マージ済みかを確かめられないときは、手元の退避（logs/archive/）からは推定せず、取り込み状態も
+		# 変えずに止める。
 		printf '%s: 親のブランチがリモートに無く、統合先（%s）にもクローズ済みの記録がありません。マージリクエストがマージ済みかを確かめられなかった（ccnavi-review.sh merged が結果を返さなかった。gh・glab か、curl とトークンが必要です）。取り込み状態は変えずに止めた。確かめられる道具を用意して再実行するか、ユーザが確かめてください\n' "$P" "$integ"
 		fail_note
 		return 0
