@@ -40,9 +40,11 @@ from ..tickets import ticket_model
 CODE_ENV = "DENY_SCRIPT_ENV_OVERRIDE"
 CODE_CHILD_PUSH = "DENY_CHILD_PUSH"
 CODE_CORE_PATH = "DENY_WRAPPER_CORE_PATH"
+CODE_PARENT_TREE = "DENY_SUBAGENT_PARENT_TREE"
 ENV_RULE_ID = "builtin:script-env"
 CHILD_PUSH_RULE_ID = "builtin:child-push"
 CORE_PATH_RULE_ID = "builtin:guard-wrapper-paths"
+PARENT_TREE_RULE_ID = "builtin:subagent-parent-tree"
 
 # 保護済みの sh の名前。置き場は `.ccnavi/scripts/` に固定だが、呼び出しの綴りは
 # 絶対パス・相対パス・ワークツリーの中の写しとまちまちなので、パスではなく名前で見る。
@@ -126,6 +128,94 @@ def check_child_push(
         if parent:
             return name, parent, found
     return "", "", ""
+
+
+# サブエージェントが親のワークツリーで打てないラッパーの副命令。親のワークツリーの作業ツリー・
+# 索引・ブランチの先頭を動かすもの。読む副命令（status・log・diff など）は止めない。
+# 合流・コミット・push はメインが finish で行う。履歴を書き換える副命令（cherry-pick・revert・
+# rebase など）はラッパーも通さないが、ここでも名指しして止める
+# （ラッパーの許可が広がっても、親のワークツリーには届かない）。
+_PARENT_WRITES = frozenset(
+    {
+        "add",
+        "rm",
+        "mv",
+        "restore",
+        "checkout",
+        "switch",
+        "stash",
+        "merge",
+        "commit",
+        "pull",
+        "cherry-pick",
+        "revert",
+        "rebase",
+        "am",
+        "apply",
+        "reset",
+        "clean",
+        "integrate",
+        "integrate-done",
+    }
+)
+
+
+def check_parent_tree_git(
+    conf: settings.Settings, root: str, cwd: str, subject: str, degraded: str
+) -> tuple[str, str]:
+    """サブエージェントの `ccnavi-git.sh` が親のワークツリーを書き換える形なら
+    （副命令, 親のワークツリーの名前）。
+
+    居場所は payload の cwd から `cd` を追った先（子のワークツリーでのコミットと、子のワークツリーで
+    親のブランチを取り込む merge は通す）。居場所を追えない形（`cd` の行き先に変数・置換がある、
+    読み切れないコマンド行）で書き換える副命令を打つ形は、どのツリーに当たるかが決まらないので
+    止める（名前は `?`）。
+    """
+    if _GIT_SCRIPT not in subject.lower():
+        return "", ""
+    if degraded:
+        for name in _DEGRADED_NAME.finditer(subject):
+            sub = _DEGRADED_SUB.match(subject, name.end())
+            if not sub or sub.group(1).lower() in _PARENT_WRITES:
+                return (sub.group(1).lower() if sub else "?"), "?"
+        return "", ""
+    for words, here in shellread.placed(subject):
+        call = _script_call(words)
+        if not call or os.path.basename(call[0].replace("\\", "/")) != _GIT_SCRIPT:
+            continue
+        args = call[1]
+        if not args:
+            continue
+        if _OPEN_SUB.search(args[0]):
+            return args[0], "?"
+        if args[0] not in _PARENT_WRITES:
+            continue
+        if here is None or not cwd:
+            return args[0], "?"
+        place = here if os.path.isabs(here) else os.path.join(cwd, here)
+        name = worktree_name(root, place)
+        if name and ticket_role(conf, root, name)[0] == ROLE_PARENT:
+            return args[0], name
+    return "", ""
+
+
+def parent_tree_message(sub: str, name: str) -> str:
+    """サブエージェントが親のワークツリーを書き換えるのを止めた文。"""
+    if name == "?":
+        return (
+            f"ccnavi-git.sh {sub} をどのツリーで実行するのかが読めません"
+            "（`cd` の行き先に変数・置換がある、読み切れないコマンド行、など）。"
+            "サブエージェントは親のワークツリーを書き換えないので、"
+            "実行するツリーが決まらない形は使用できません。子のワークツリーに入って、"
+            "`cd` の行き先をそのまま書いて再実行してください。"
+        )
+    return (
+        f"{name} は親のワークツリーです。サブエージェントは親のワークツリーを書き換えません"
+        f"（ccnavi-git.sh {sub} も、ファイルの書き込みも）。"
+        "子のワークツリー（.claude/worktrees/<子>）で実装してコミットし、結果を報告して"
+        "終わってください。親のブランチへの合流・状態の記録・push は、メインが finish で行います。"
+        "衝突を解くときは、子のワークツリーで親のブランチを merge してコミットします。"
+    )
 
 
 # ラッパーの副命令のうち、行き先のファイルを消す・別のコミットの中身に戻すもの。
@@ -546,6 +636,33 @@ def worktree_name(root: str, place: str) -> str:
     if not target.startswith(base + os.sep):
         return ""
     return target[len(base) + 1 :].split(os.sep, 1)[0]
+
+
+ROLE_CHILD = "child"
+ROLE_PARENT = "parent"
+
+
+def ticket_role(conf: settings.Settings, root: str, name: str) -> tuple[str, str]:
+    """その名前の承認済みチケットの役（`ROLE_CHILD` / `ROLE_PARENT`）と、子なら親の識別子。
+
+    チケットが無ければ役は空（直接作業のワークツリーなど）。探し方は `child_parent` と同じで、
+    `parent:` の行があれば子、承認済みチケットがあって `parent:` が無ければ親。読めないファイルは
+    子かもしれないとして、親は `?`。
+    """
+    parent, found = child_parent(conf, root, name)
+    if parent:
+        return ROLE_CHILD, parent
+    for top in _trees(conf, root):
+        approved = settings.approved_dir(conf, top)
+        proposals = os.path.join(top, (conf.tickets or "").replace("/", os.sep))
+        for path in (
+            os.path.join(approved, ticket_model.DOING, name + ".md"),
+            os.path.join(approved, ticket_model.DONE, name + ".md"),
+            os.path.join(proposals, ticket_model.REVIEW, name + ".md"),
+        ):
+            if os.path.isfile(path):
+                return ROLE_PARENT, ""
+    return "", ""
 
 
 def child_parent(conf: settings.Settings, root: str, name: str) -> tuple[str, str]:

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from collections.abc import Callable
 from typing import TextIO
@@ -431,6 +432,49 @@ def decide_before(
             conf=conf,
             root=root,
         )
+
+    # サブエージェントは親のワークツリーを書き換えない。合流・コミット・push はメインが finish で
+    # 行い、サブエージェントは子のワークツリーで実装してコミットするだけ。居場所（エージェント ID と
+    # 実行先のツリー）で見るので、子のワークツリーでのコミットと、子のワークツリーで親のブランチを
+    # 取り込む merge は通る。
+    if conf.tickets_enabled and payload.agent_id:
+        sub, where = "", ""
+        if payload.tool_name == "Bash":
+            sub, where = wrapguard.check_parent_tree_git(
+                conf, root, payload.cwd, record.subject, record.degraded
+            )
+        elif payload.tool_name in SCOPE_TOOLS:
+            # 書き込み先のパスが `.claude/worktrees/<名前>` の中で、その名前が親のチケットか
+            # （ワークツリーが git に登録されているかは問わない。sh の検査と同じ広さ）。
+            # 提案・下書き・ELI5 の置き場（`wip/proposals/` `wip/handoff/` `wip/eli5/` と承認済みの
+            # 領域）は対象にしない。サブエージェントがフローの下書きなどをここへ書く経路で、
+            # 置き場ごとの保護（ルールの deny とチケットの保護）が別に掛かっている。
+            name = wrapguard.worktree_name(root, record.subject)
+            if name and wrapguard.ticket_role(conf, root, name)[0] == wrapguard.ROLE_PARENT:
+                base = os.path.join(root, tree.WORKTREES_DIR, name)
+                rel = os.path.relpath(os.path.abspath(record.subject), base).replace(os.sep, "/")
+                if not ticket_places.is_unscoped(rel, conf.tickets, conf.approved):
+                    sub, where = "write", name
+        if where:
+            record.code = wrapguard.CODE_PARENT_TREE
+            record.rules = [wrapguard.PARENT_TREE_RULE_ID]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices
+                + [
+                    reasons.builtin_refusal(
+                        wrapguard.CODE_PARENT_TREE,
+                        wrapguard.PARENT_TREE_RULE_ID,
+                        display_subject,
+                        wrapguard.parent_tree_message(sub, where),
+                    )
+                ],
+                conf=conf,
+                root=root,
+            )
 
     # 承認済みチケットの置き場（`approval.read_raw`）。1 回の判定で読むのは 1 度だけにし、
     # 下のレビュー待ちの止めと範囲の索引で持ち回る。
