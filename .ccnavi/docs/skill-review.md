@@ -94,19 +94,25 @@ keywords: [工程スキル, reference, 振り返り, スキル, SKILL.md, refere
 
 提案は、その提案の識別子と同名のワークツリーに書く。提案ごとに専用のツリーなので、作業中のMRに提案のファイルは混ざらない。`skill-proposals` のような別名のツリーにまとめて書かない。承認済みチケットは提案を書いたツリーに置かれるので、別名のツリーで承認すると親が取り込み済みにならず、`ready` で止まる。承認の画面と `start`・`finish` が先に止めるが、止まってからでは承認のやり直しになる（`.ccnavi/docs/worktree.md`「直接作業からチケット作業に移るとき」）。
 
-識別子は `chore-<番号>-skill-<スキル名>-<要点>` の形にする。番号は既にある識別子の番号の続きで、`sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-ticket.sh next-id chore <スキル名と要点のslug>`が識別子そのものを出す（形に合わなければ理由が出る）。末尾を `-<2桁の数>` にしない（子の識別子`<親>-<2桁>-<2桁>`と紛れる）。
+識別子は `chore-<issueの番号>-skill-<スキル名>-<要点>` の形にする。末尾を `-<2桁の数>` にしない（子の識別子`<親>-<2桁>-<2桁>`と紛れる）。
+
+親の提案には、その仕事を載せるMRの番号（`mr:`）が要る。ワークツリーは`ccnavi-worktree.sh`（直接作業用）では切らず、
+issueを立ててから`ccnavi-start.sh`で切る。ブランチ・ワークツリー・Draft MRを作り、`mr:`に書く番号を出す
+（`.ccnavi/docs/worktree-start.md`）。
 
 | 対象 | 切り方 |
 |---|---|
-| ワークスペースのスキル | ワークスペースルートで `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-worktree.sh <識別子>`。`<統合先>`から切る |
-| プロジェクトのスキル | `cd projects/<プロジェクト>` して、`sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/<識別子> -b <識別子> <プロジェクトのブランチ>`。そのプロジェクトのブランチから切る |
+| ワークスペースのスキル | ワークスペースルートで `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue <番号> --prefix chore --slug skill-<スキル名>-<要点>` |
+| プロジェクトのスキル | `cd projects/<プロジェクト>` して、同じ `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue <番号> --prefix chore --slug skill-<スキル名>-<要点>`（そのプロジェクトのissue） |
 
-そのツリーの `wip/proposals/todo/<識別子>.md` に書いてコミットし、パスをユーザに伝えて承認を頼む。複数の提案は、1本ずつ同名のワークツリーに書く。
+そのツリーの `wip/proposals/todo/<識別子>.md` に、出力の「必須」の行の `mr: <番号>` を入れて書いてコミットし、パスをユーザに伝えて承認を頼む。複数の提案は、1本ずつ同名のワークツリーに書く。
 
 ```yaml
 ---
 version: 1
 ticket: chore-72-skill-commit-push-retry
+issue: 72
+mr: 75           # ccnavi-start.sh の出力の「必須」の行の番号
 human_review:
   required: true
   reason: エージェントの手順を変えるため
