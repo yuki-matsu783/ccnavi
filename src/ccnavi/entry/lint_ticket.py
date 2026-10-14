@@ -20,6 +20,7 @@ from ..tickets import (
     ops_stop,
     phase,
     review_host,
+    syncstate,
     ticket_fold,
     ticket_model,
 )
@@ -239,6 +240,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
             review,
             integration,
             conf.branch_prefixes,
+            _adopted_parents(root, proposals),
         )
     )
     problems.extend(lint_branch._prefix_setting_problems(conf))
@@ -265,6 +267,19 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
             )
         )
     return problems
+
+
+def _adopted_parents(root: str, proposals: list) -> frozenset:
+    """親のワークツリーが在り、HEAD のブランチ名を変換したものが識別子と一致する親の識別子。
+
+    ブランチは既に決まっている（既存のブランチを採用した、または切った後）ので、名前の形式の
+    警告（`lint_branch._branch_name_problems`）は言わない。
+    """
+    return frozenset(
+        t.ticket
+        for t in proposals
+        if not t.is_child and syncstate.head_branch(tree.worktree_path(root, t.ticket), t.ticket)
+    )
 
 
 def _any_copies(conf: settings.Settings, root: str) -> bool:

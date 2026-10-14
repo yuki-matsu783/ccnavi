@@ -12,7 +12,7 @@ from dataclasses import dataclass, replace
 
 from ..infra import settings, tree
 from ..policy import rules
-from . import archive, syncstate, ticket_ids, ticket_model, workflow
+from . import archive, syncstate, ticket_model, workflow
 
 
 def mark_imported(
@@ -25,7 +25,8 @@ def mark_imported(
 
     取り込み済みの親子のチケットとは、取り込み状態のある親子のチケットのこと。
 
-    正とするのは親のブランチ `P`（手元では `.claude/worktrees/<P>` で HEAD が `P` を指すツリー）の
+    正とするのは親のブランチ（手元では `.claude/worktrees/<P>` で HEAD のブランチ名を変換したものが
+    `P` になるツリー）の
     上のチケットだけ。次のチケットは読むが信頼しない（`blocked`。判定は範囲を使わずに止める）。
 
     - 親子のチケットが決まらない（取り込み状態が `gone`・`blocked`・破損している、
@@ -120,33 +121,15 @@ def branch_problems(
     fams: syncstate.Families | None = None,
     others: list[ticket_model.Ticket] | None = None,
 ) -> list[rules.Problem]:
-    """親のブランチ名を承認してよいか。
+    """親の識別子を承認してよいか。
 
-    - `branch:` がそのリポジトリの統合先の名前に当たれば承認しない。比べる名前は
-      `Families.integration_names`（環境変数・`.claude/settings.local.json`・統合先の取り込み結果・
-      `origin/HEAD`・`origin/main`・`origin/master`）。固定のリストと字の検査は
-      `ticket_ids.branch_problem` が読むときに済ませている
-    - 2 つの親子のチケットが同じブランチを宣言する（この親のブランチ名が、同じリポジトリの開いた別の
-      チケットの親のブランチ名か識別子と同じ。大文字小文字は区別しない）なら承認しない。`others` は
-      比べるチケット（承認済みと承認待ち）
+    親の識別子は親のブランチ名の `/` を `-` に置き換えたもの。2 つの親子のチケットが同じ識別子
+    （大文字小文字は区別しない）を持つなら承認しない。`others` は比べるチケット
+    （承認済みと承認待ち）
     """
     if t.is_child:
         return []
-    fams = fams or syncstate.Families(conf, root)
-    found: list[rules.Problem] = []
-    if t.branch:
-        folded = t.branch.casefold()
-        hits = [n for n in fams.integration_names(t.project or "") if n.casefold() == folded]
-        if hits:
-            found.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    t.ticket,
-                    f"`branch: {t.branch}` は統合先の名前（{', '.join(hits)}）と同じ。"
-                    "統合先を親のブランチにしない",
-                )
-            )
-    mine = ticket_ids.branch_name(t).casefold()
+    mine = t.ticket.casefold()
     clash = sorted(
         {
             o.ticket
@@ -154,21 +137,19 @@ def branch_problems(
             if o.ticket != t.ticket
             and (o.parent or o.ticket) != t.ticket
             and o.project == t.project
-            and mine in {ticket_ids.branch_name(o).casefold(), o.ticket.casefold()}
+            and mine == o.ticket.casefold()
         }
     )
     if clash:
-        found.append(
+        return [
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 t.ticket,
-                f"親のブランチ {ticket_ids.branch_name(t)} を別の親子のチケット"
-                f"（{', '.join(clash)}）も親のブランチか識別子として使っている。"
-                "2 つの親子のチケットが同じブランチを宣言すると、"
-                "どちらのチケットを正とするか決まらないので承認しない",
+                f"親の識別子 {t.ticket} と大文字小文字だけが違う識別子（{', '.join(clash)}）が"
+                "ある。ワークツリーとブランチの名前がぶつかるので承認しない",
             )
-        )
-    return found
+        ]
+    return []
 
 
 def misplaced_home_text(root: str, family: str, shown: str) -> str:
@@ -220,8 +201,8 @@ def place_problems(
     承認済みチケットは提案を書いたツリーにそのまま置かれる。親のワークツリーが識別子と違う名前だと、
     親が取り込み済みにならず、承認済みチケットの自動コミットも動かず、`start` `finish` は通っても
     `ready` で止まる。承認のあとには取り返せないので、承認の前に止める。ワークスペースルートと
-    プロジェクトの元ツリーの提案は言わない。`branch:` を持つ親も言う（親のワークツリーの名前は
-    `branch:` に関わらず識別子で、`start` `finish` `ready` も同じ名前を求める）。
+    プロジェクトの元ツリーの提案は言わない（親のワークツリーの名前は識別子で、
+    `start` `finish` `ready` も同じ名前を求める）。
     """
     if not t.tree_root:
         return []

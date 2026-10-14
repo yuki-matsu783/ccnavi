@@ -39,7 +39,6 @@ from . import (
     risk,
     skillsync,
     template_drafts,
-    ticket_ids,
     ticket_model,
     ticket_places,
     worktrees,
@@ -616,11 +615,9 @@ def _move(
 def _branch_words(t: ticket_model.Ticket) -> str:
     """ワークツリーを作る案内の、ブランチの語。
 
-    親の `branch:` が識別子と違えば、そのブランチを出す（既にあればそのまま、無ければ `-b` で
-    切る。`ccnavi-git.sh worktree add` は `branch:` と一致する名前だけを通す）。ほかは今どおり
-    `-b <識別子>`。
+    新しく切るなら `-b <識別子>`。親が既にあるブランチ（`feature/123-login` のように `/` を含む名前
+    など）で続けるなら、`-b` を付けずそのブランチ名（識別子はその `/` を `-` に置き換えたもの）。
     """
-    branch = ticket_ids.branch_name(t)
-    if branch == t.ticket:
+    if t.is_child:
         return f"-b {t.ticket}"
-    return f"{branch}'（無ければ '-b {branch} <起点>'）"
+    return f"-b {t.ticket}'（既にあるブランチで続けるなら '-b' を付けずそのブランチ名）"

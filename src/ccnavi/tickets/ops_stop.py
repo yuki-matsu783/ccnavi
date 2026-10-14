@@ -76,8 +76,8 @@ def unfinished_at_stop(
 def _own_commits(worktree: str, t: ticket_model.Ticket, parent_branch: str = "") -> int:
     """基準点より先の、このチケットが自分で作ったコミットの数。数えられなければ 0（促さない側）。
 
-    取り込んだだけのコミットは数えない。子なら親のブランチ（`parent_branch`。親チケットの
-    `branch:`、無ければ親の識別子）の先にあるもの、親ならワークツリーの起点のデフォルトブランチ
+    取り込んだだけのコミットは数えない。子なら親のブランチ（`parent_branch`。親のワークツリーの
+    HEAD から読んだ名前）の先にあるもの、親ならワークツリーの起点のデフォルトブランチ
     （`origin/HEAD`。セッションの頭で進める）の先にあるものを除く。取り込みで生まれたマージのコミットも除く
     （`--no-merges`）。子で親のブランチを引けなければ、自分のものか決まらないので 0 を返す。
     親で `origin/HEAD` が無い（リモートの無いリポジトリ）ときは、除くものが無いので基準点の先を
@@ -85,9 +85,11 @@ def _own_commits(worktree: str, t: ticket_model.Ticket, parent_branch: str = "")
     """
     exclude: list[str] = []
     if t.is_child:
+        if not parent_branch:
+            return 0
         rc, sha = gitcmd.output(
             worktree,
-            ["rev-parse", "--verify", "--quiet", f"{parent_branch or t.parent}^{{commit}}"],
+            ["rev-parse", "--verify", "--quiet", f"{parent_branch}^{{commit}}"],
             ops_close.TIMEOUT_SECONDS,
         )
         if rc != 0 or not sha.strip():

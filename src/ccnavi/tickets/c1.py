@@ -6,7 +6,7 @@
 ここが答えるのは 2 つだけで、どちらも 1 行 1 項目（`<鍵> <値>`。sh は jq を使わない）。
 
 - `ccnavi c1 family <識別子>`: その識別子の親子のチケットと、C1 の対象かと、親のブランチ名
-  （`branch`。親チケットの `branch:`、無ければ識別子）
+  （`branch`。親のワークツリーの HEAD から読む。変換した識別子がフォルダ名と合うときだけ）
   - 対象は、置き場のパスが相対で、取り込み状態があり（取り込み済み）、
     マージリクエストで見るフェーズが無い親子のチケットでなく、止める理由（閉じた・gone・blocked・親のワークツリーが無い
     など）の無い親子のチケット
@@ -127,13 +127,13 @@ def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> in
     verdict, why, st = target(conf, root, parent)
     lines.append(("repo", st.repo))
     # 親のブランチ名。sh は識別子からブランチ名を組み立てず、これを使う
-    # （ref・fetch・push・ls-remote・取り込み状態の `branch`）。名前は承認済みの親チケットの
-    # `branch:` だけから引き（提案の `branch:` は使わない）、`ticket_ids.branch_problem` と統合先の
-    # 名前を通らなければ `branch` の行を出さずに `branch_refused` で理由を言う（sh はその親子の
-    # チケットを識別子の外へ動かさずに止める）。
+    # （ref・fetch・push・ls-remote・取り込み状態の `branch`）。名前は親のワークツリー
+    # （`.claude/worktrees/<識別子>`）の HEAD から読み、変換した識別子がフォルダ名と合うときだけ
+    # `branch` の行を出す。読めない・合わないときは `branch_refused` で理由を言う（sh はその親子の
+    # チケットを動かさずに止める）。
     fams = syncstate.Families(conf, root)
     branch = st.branch or fams.branch_any(parent)
-    refused = fams.branch_refusal(parent, branch, _project_guess(fams, parent, st))
+    refused = _branch_refusal(parent, branch)
     if refused:
         lines.append(("branch_refused", refused))
         if verdict == TARGET_YES:
@@ -159,12 +159,15 @@ def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> in
     return 0
 
 
-def _project_guess(fams: syncstate.Families, parent: str, st: syncstate.Standing) -> str:
-    """親子のチケットのリポジトリ（プロジェクトの名前。ワークスペース自身なら空）の見当。"""
-    if st.imported:
-        return syncstate.project_of_key(st.repo)
-    named = [w for w in fams.worktrees() if w.name == parent]
-    return named[0].project if len(named) == 1 else ""
+def _branch_refusal(parent: str, branch: str) -> str:
+    """HEAD から読んだ親のブランチ名を使えない理由（使えれば空）。"""
+    if not branch:
+        return (
+            f"親のワークツリー（.claude/worktrees/{parent}）の HEAD から親のブランチ名を読めない"
+            f"（ブランチ名の `/` を `-` に置き換えたものが {parent} になるブランチに居ること）"
+        )
+    why = ticket_ids.branch_problem(branch)
+    return f"親のブランチ {branch} は使えない（{why}）" if why else ""
 
 
 def _without_mr(conf: settings.Settings, root: str, parent: str) -> bool:

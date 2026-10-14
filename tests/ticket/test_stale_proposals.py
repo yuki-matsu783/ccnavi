@@ -258,7 +258,9 @@ class ImportedFamilyTest(AuthorityHarness):
         git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
         verify = self.revision_in_root()
         self.assertIn("取り込み済みの親子のチケットが止まっている", verify.stdout)
-        self.assertIn("HEAD がブランチ i0001 を指していない", verify.stdout)
+        self.assertIn(
+            "HEAD のブランチ名を変換した識別子がフォルダ名（i0001）と合わない", verify.stdout
+        )
         self.assertIn("承認しない", verify.stdout)
         self.assertNotIn("書いたら push してから", verify.stdout)
 

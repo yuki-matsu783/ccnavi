@@ -411,28 +411,16 @@ def _read_relations(ticket: ticket_model.Ticket, front: dict, problems: list[Pro
         else:
             ticket.mr = mr_number
 
-    raw_branch = front.get(ticket_ids.BRANCH_KEY)
-    if raw_branch is not None:
-        if not isinstance(raw_branch, str):
-            problems.append(Problem(SEVERITY_ERROR, name, "`branch` はブランチ名を文字列で書く"))
-            return True
-        if ticket.is_child:
-            problems.append(
-                Problem(
-                    SEVERITY_WARN,
-                    name,
-                    "`branch` は親だけの欄。子では読まない（子のブランチは子の識別子）",
-                )
+    if ticket_ids.BRANCH_KEY in front:
+        problems.append(
+            Problem(
+                SEVERITY_ERROR,
+                name,
+                "`branch` は使えない欄。親のブランチ名は親のワークツリーの HEAD から読み、"
+                "親の識別子はその `/` を `-` に置き換えたもの。欄を消す",
             )
-        else:
-            spelled = raw_branch.strip()
-            why = ticket_ids.branch_problem(spelled)
-            if why:
-                problems.append(
-                    Problem(SEVERITY_ERROR, name, f"`branch: {spelled}` は使えない。{why}")
-                )
-                return True
-            ticket.branch = spelled
+        )
+        return True
     return False
 
 

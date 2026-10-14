@@ -236,9 +236,9 @@ def adoption_id_problem(branch: str) -> str:
     return ""
 
 
-# 親のブランチ名は、`branch:` が無ければ親の識別子そのもの（名前を求める関数が恒等写像なので、
-# Python・sh・TS で食い違わない）。識別子を、ブランチ名として安全で、
-# 統合先と紛れない形にそろえる。いまは `--lint` の warn だけで、承認は止めない。
+# 親の識別子は、親のブランチ名の `/` を `-` に置き換えたもの（`branch_to_id`）。新しく切る親の
+# 識別子を、ブランチ名として安全で、統合先と紛れない形にそろえる。いまは `--lint` の warn だけで、
+# 承認は止めない。
 #
 # 統合先や保護されたブランチの名前（`ccnavi-git.sh` の push の拒否と同じリスト）。
 # 大文字小文字を区別せずに比べる。`release/*` は識別子に `/` を書けないので、
@@ -246,7 +246,7 @@ def adoption_id_problem(branch: str) -> str:
 RESERVED_BRANCH_IDS = ("main", "master", "develop", "release")
 
 
-# 親のブランチ名のキー。
+# 古いチケットに残っている `branch:` の欄の名前（読まない。lint が警告する）。
 BRANCH_KEY = "branch"
 # ブランチ名の長さの上限（文字数）。ref はパスにもなる（`.git/refs/heads/<名前>`）ので、
 # 識別子と同じく短く保つ。
@@ -260,14 +260,13 @@ _REF_PREFIXES = ("refs", "heads", "remotes", "tags", "origin", "upstream", "head
 
 
 def branch_problem(name: str) -> str:
-    """`branch:` に書いた名前を親のブランチ名に使えない理由。使えれば空。
+    """親のブランチ名として使えない理由。使えれば空。（`c1 sort` の版の検査などが使う）
 
     字は識別子の字に `/` を足したものだけ（`_BRANCH`）。そのうえで
     `git check-ref-format --branch` の形の規則（`..`・`//`・`.` で始まる階層・`.lock` で終わる階層
     など）と、統合先や保護されたブランチの名前（main・master・develop・release・release/*・
     release-*。大文字小文字は区別しない）を断る。NFC でない表記も断る（識別子と同じ。
-    見た目が同じ別の名前を作らない）。その時点の統合先の名前は、呼び手
-    （`approval_checks.branch_problems`）が比べる。
+    見た目が同じ別の名前を作らない）。
     """
     if not isinstance(name, str) or not name:
         return "ブランチ名が空"
@@ -306,16 +305,6 @@ def branch_problem(name: str) -> str:
             "それを先頭の階層に持つ main/*・release/* など、release-*）は親のブランチにしない"
         )
     return ""
-
-
-def branch_name(t: ticket_model.Ticket) -> str:
-    """親チケットの親のブランチ名。`branch:` があればその値、無ければ識別子。
-
-    子のブランチは子の識別子（子は `branch:` を持たない）。
-    """
-    if t.is_child:
-        return t.ticket
-    return t.branch or t.ticket
 
 
 def branch_name_problems(

@@ -55,23 +55,6 @@ class MisplacedHomeTest(PhaseHarness):
             os.path.exists(os.path.join(own, ".ccnavi", "approved", "doing", "i0003.md"))
         )
 
-    def test_a_parent_proposal_that_names_a_branch_is_stopped_too(self):
-        # `branch:` を持つ親でも、親のワークツリーの名前は識別子。承認のあとに start で止めない。
-        stray = self.stray_tree()
-        text = parent_text("i0003", ["research"]).replace(
-            "ticket: i0003\n", "ticket: i0003\nbranch: topic/x\n", 1
-        )
-        self.assertIn("branch: topic/x", text)
-        self.propose("i0003", text, tree=stray)
-        self.commit_in(stray, "propose i0003")
-        result = self.ccnavi("--agree", stdin="y\n")
-        said = result.stdout + result.stderr
-        self.assertEqual(result.returncode, 1, said)
-        self.assertIn("提案 i0003 を識別子と違う名前のワークツリー skill-proposals", said)
-        self.assertFalse(
-            os.path.exists(os.path.join(stray, ".ccnavi", "approved", "doing", "i0003.md"))
-        )
-
     def test_a_child_proposal_outside_the_parents_worktree_is_not_approved(self):
         self.family()
         stray = self.stray_tree()

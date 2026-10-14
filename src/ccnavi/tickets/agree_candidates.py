@@ -48,9 +48,6 @@ class Candidate:
     config: dict | None = None
     # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
     notes: list[str] = field(default_factory=list)
-    # 親の `branch:` が既にあるブランチ（手元か origin、または提案がそのブランチの上）を指すか
-    # 。承認画面に「既存のブランチ <名前> を使う」と出す。
-    existing_branch: bool = False
 
     @property
     def is_revision(self) -> bool:
@@ -171,7 +168,6 @@ def candidates(
                 overflow=overflow,
                 types=types,
                 config=config,
-                existing_branch=bool(t.branch) and branch_exists(root, conf, t),
             )
         )
         pool[t.ticket] = t
@@ -459,15 +455,6 @@ def revision_problems(
                 "改版で変えられるのは plan・feedback・phases だけ。`mr:` が承認済みチケットと違う",
             )
         )
-    if revised.branch != current.branch:
-        problems.append(
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                revised.ticket,
-                "改版で変えられるのは plan・feedback・phases だけ。"
-                "`branch:` が承認済みチケットと違う（親のブランチは承認で決まる）",
-            )
-        )
     # 錠は番号ごと。子が承認された番号（固定した番号）の項だけを変えさせない。
     problems += lock_problems(revised, current, fixed)
     # フィードバック計画の番号は全体計画の続きなので、フィードバック計画を立てたあとに全体計画を
@@ -707,7 +694,8 @@ def validate(
 def existing_branch_warnings(
     root: str, conf: settings.Settings, proposals: list, copies: list, closed: list, review: list
 ) -> list[str]:
-    """新規の提案（親）の親のブランチ名が、手元か origin に既にあるときの文。
+    """新規の提案（親）の識別子になるブランチ（`/` を `-` に置き換えて識別子と一致するもの）が、
+    手元か origin に既にあるときの文。
 
     `--lint` と `--agree --preview --verify` が warn として出す。承認は止めない。
     提案がそのブランチの上で書かれている（`.claude/worktrees/<識別子>` がそのブランチを
@@ -721,17 +709,13 @@ def existing_branch_warnings(
         if t.state != ticket_model.TODO or t.is_child or t.ticket in settled or t.ticket in said:
             continue
         said.add(t.ticket)
-        if t.branch:
-            # `branch:` で既にあるブランチを指すのは、そのブランチで作業するという宣言。warn は
-            # 出さず、承認画面に「既存のブランチ <名前> を使う」と出す。
-            continue
-        if _written_on_own_branch(root, conf, t):
+        if own_branch(root, conf, t):
             continue
         repo = tree.project_root(conf.projects, t.project) if t.project else root
         if repo not in cache:
             cache[repo] = gitstate.branch_names(repo)
         folded = t.ticket.casefold()
-        hits = sorted(n for n in cache[repo] if n.casefold() == folded)
+        hits = sorted(n for n in cache[repo] if ticket_ids.branch_to_id(n).casefold() == folded)
         if hits:
             found.append(
                 f"{t.ticket}: 親のブランチ名と同じブランチ（{', '.join(hits)}）が既にある。"
@@ -741,27 +725,15 @@ def existing_branch_warnings(
     return found
 
 
-def _written_on_own_branch(root: str, conf: settings.Settings, t) -> bool:
-    """提案が、自分の識別子の名前のワークツリーの中にあり、そのワークツリーが親のブランチ
-    （`branch:`、無ければ識別子）の上か。"""
+def own_branch(root: str, conf: settings.Settings, t) -> str:
+    """提案が、自分の識別子の名前のワークツリーの中にあるとき、そのワークツリーの HEAD のブランチ。
+
+    HEAD のブランチ名を変換（`ticket_ids.branch_to_id`）したものが識別子と一致するときだけ。
+    そうでなければ空。Chrome の仮のツリーでは提案はいつも親のブランチの上にある。
+    """
     if not t.path:
-        return False
+        return ""
     here = tree.tree_of(root, t.path, conf.projects)
     if here is None or here.is_main or here.name != t.ticket:
-        return False
-    return tree.branch_of(here.root) == ticket_ids.branch_name(t)
-
-
-def branch_exists(root: str, conf: settings.Settings, t) -> bool:
-    """親の `branch:` のブランチが既にあるか。
-
-    提案がそのブランチの上で書かれている（`_written_on_own_branch`）か、そのリポジトリの手元か
-    origin にそのブランチがある（`tree.has_branch`。ファイルだけを読む）とき。Chrome の仮の
-    ツリーでは提案はいつも親のブランチの上にある。
-    """
-    if not t.branch:
-        return False
-    if _written_on_own_branch(root, conf, t):
-        return True
-    repo = tree.project_root(conf.projects, t.project) if t.project else root
-    return tree.has_branch(repo, t.branch)
+        return ""
+    return syncstate.head_branch(here.root, t.ticket)

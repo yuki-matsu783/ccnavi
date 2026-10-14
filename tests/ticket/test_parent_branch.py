@@ -1,19 +1,20 @@
-"""親チケットの `branch:` の読み方・承認・lint・Chrome の入口。
+"""親のブランチ名と識別子の変換（識別子 = ブランチ名の `/` を `-` に置き換えたもの）。
 
-一時ディレクトリの git で、識別子 `feature-12-login` の親に `branch: feature/12-login` を書く。
+一時ディレクトリの git で、識別子 `feature-12-login` の親が `feature/12-login` を
+直接チェックアウトする。
 見るのは次のとおり（sh を通す主な経路は tests/sh/test_branch_field_sh.py が見る）。
 
 1. 字と形（`ticket_ids.branch_problem`）。保護されたブランチの名前と git で使えない表記は error
-2. 子に書いた `branch:` は warn で読まない。使えない名前の提案は読めない（error）
-3. 承認画面と JSON: 「■ ブランチ」と「既存のブランチ <名前> を使う」/「新しく切るブランチ」、
-   `branch`・`existing_branch`。既にあるブランチとのぶつかりの warn は出さない
-4. 改版で `branch:` を変えさせない。統合先の名前に当たる `branch:` は承認しない
-5. lint: 親のワークツリーが親のブランチ（`branch:` の値）の上に居なければ warn
-6. Chrome の入口: 親子のチケットはそのブランチを宣言する承認済みの親チケットで決まり
-   （承認前の提案は識別子で宣言する）、書くものはそのブランチだけ。同じ親子のチケットを宣言する
-   ブランチが 2 本あれば、先行の親子のチケットでも決めない
-7. 承認前の提案の `branch:` は c1 family も lint も使わない。統合先（origin/HEAD を含む）と、
-   2 つの親子のチケットが同じブランチを宣言する形は承認しない
+2. チケットに `branch:` の欄があればエラー（使えない欄）。子に書いても同じ
+3. 承認画面と JSON にブランチの行は出ない。ブランチ名と同じ識別子の既存ブランチが別の所にあれば warn
+4. 識別子が大文字小文字だけ違う親は承認しない
+5. lint: 親のワークツリーの HEAD を変換した識別子がフォルダ名と合わなければ warn。既存のブランチを
+   採用した親（親のワークツリーが在り、HEAD が合う）には名前の形式の warn を出さない
+6. `c1 family` の `branch` は親のワークツリーの HEAD から読む。読めない・合わないときは
+   `branch_refused`
+7. Chrome の入口: ブランチ名を変換した識別子の親チケットがそのブランチの上にあれば親子のチケットで、
+   書くものはそのブランチだけ。同じ識別子になる別のブランチに親チケットがあれば、先行の親子のチケット
+   でも決めない
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ import unittest
 
 from ccnavi.entry import version
 from ccnavi.tickets import ticket as ticket_mod
-from ccnavi.tickets import ticket_ids, ticket_model
+from ccnavi.tickets import ticket_ids
 from tests import ROOT, common_path, config_path
 from tests.inproc import run_ccnavi
 from tests.ticket.test_swap_points import STAMP
@@ -40,7 +41,7 @@ HEAD = "0" * 40
 
 
 def with_branch(text, branch):
-    """親の提案の frontmatter に `branch:` を足す（`ticket:` の行の後ろ）。"""
+    """親の提案の frontmatter に古い `branch:` を足す（`ticket:` の行の後ろ）。"""
     lines = text.split("\n")
     at = next(i for i, line in enumerate(lines) if line.startswith("ticket:"))
     return "\n".join([*lines[: at + 1], f"branch: {branch}", *lines[at + 1 :]])
@@ -104,43 +105,32 @@ class BranchProblemTest(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertNotEqual(ticket_ids.branch_problem(name), "")
 
-    def test_the_branch_name_of_a_ticket(self):
-        parent = ticket_model.Ticket(ticket=PARENT, branch=BRANCH)
-        self.assertEqual(ticket_ids.branch_name(parent), BRANCH)
-        self.assertEqual(ticket_ids.branch_name(ticket_model.Ticket(ticket=PARENT)), PARENT)
-        child = ticket_model.Ticket(ticket=CHILD, parent=PARENT, branch=BRANCH)
-        self.assertEqual(ticket_ids.branch_name(child), CHILD)
-
 
 class BranchFieldParseTest(unittest.TestCase):
-    def test_a_parent_reads_the_field(self):
-        t, problems = ticket_mod.parse(with_branch(parent_text(PARENT, ["design"]), BRANCH))
-        self.assertIsNotNone(t)
-        self.assertEqual(t.branch, BRANCH)
-        self.assertEqual([p for p in problems if p.severity == "error"], [])
+    """`branch:` の欄は使えない（エラー）。"""
 
-    def test_a_child_does_not_read_the_field(self):
+    def test_a_parent_with_the_field_is_an_error(self):
+        t, problems = ticket_mod.parse(with_branch(parent_text(PARENT, ["design"]), BRANCH))
+        self.assertIsNone(t)
+        self.assertTrue(
+            any(p.severity == "error" and "`branch` は使えない欄" in p.detail for p in problems),
+            problems,
+        )
+
+    def test_a_child_with_the_field_is_an_error_too(self):
         text = child_text(CHILD, PARENT, 1, ("wip/*",))
         lines = text.split("\n")
         lines.insert(3, f"branch: {BRANCH}")
         t, problems = ticket_mod.parse("\n".join(lines))
-        self.assertIsNotNone(t)
-        self.assertEqual(t.branch, "")
-        self.assertTrue(any("親だけの欄" in p.detail for p in problems), problems)
-
-    def test_an_unusable_name_makes_the_proposal_unreadable(self):
-        for name in ("main", "a..b", "release/1"):
-            with self.subTest(name=name):
-                t, problems = ticket_mod.parse(with_branch(parent_text(PARENT, ["design"]), name))
-                self.assertIsNone(t)
-                self.assertTrue(any("`branch:" in p.detail for p in problems), problems)
+        self.assertIsNone(t)
+        self.assertTrue(any("`branch` は使えない欄" in p.detail for p in problems), problems)
 
 
-class BranchFieldApprovalTest(unittest.TestCase):
+class ParentBranchTest(unittest.TestCase):
     """ワークスペースと親のワークツリー（`.claude/worktrees/feature-12-login`）。"""
 
     def setUp(self):
-        self.root = tempfile.mkdtemp(prefix="ccnavi-branch-field-")
+        self.root = tempfile.mkdtemp(prefix="ccnavi-parent-branch-")
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
         os.makedirs(os.path.join(self.root, ".claude"))
         git(self.root, "init", "--quiet", "-b", "main")
@@ -178,137 +168,110 @@ class BranchFieldApprovalTest(unittest.TestCase):
         args += ["-b", branch, "main"] if create else [branch]
         git(self.root, *args)
 
-    def propose(self, branch=BRANCH, where=None, plan=("design",)):
+    def propose(self, where=None, plan=("design",), ident=PARENT, allow=("src/*", "wip/*")):
         base = where or self.tree
         write(
-            os.path.join(base, "wip", "proposals", "todo", PARENT + ".md"),
-            with_branch(parent_text(PARENT, list(plan), allow=("src/*", "wip/*")), branch),
+            os.path.join(base, "wip", "proposals", "todo", ident + ".md"),
+            parent_text(ident, list(plan), allow=allow),
         )
 
     def preview(self):
         done = self.ccnavi("--agree", "--preview", "--verify", "--json")
         return json.loads(done.stdout)
 
-    def test_the_screen_says_the_existing_branch_is_used(self):
+    def approve(self):
+        done = self.ccnavi("--agree", stdin="y\n")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def test_the_screen_has_no_branch_line(self):
         self.parent_tree()
         self.propose()
         body = self.preview()
         self.assertTrue(body["verify"]["ok"], body)
         entry = body["batch"][0]
-        self.assertEqual((entry["branch"], entry["existing_branch"]), (BRANCH, True))
-        self.assertIn(f"■ ブランチ: {BRANCH}", body["text"])
-        self.assertIn(f"既存のブランチ {BRANCH} を使う", body["text"])
+        self.assertNotIn("branch", entry)
+        self.assertNotIn("existing_branch", entry)
+        self.assertNotIn("■ ブランチ", body["text"])
         self.assertEqual(body["branch_warnings"], [])
 
-    def test_an_existing_branch_elsewhere_is_named_without_a_warning(self):
+    def test_a_branch_whose_id_is_the_identifier_elsewhere_is_warned(self):
+        """提案が別の所にあり、変換すると識別子になる既存のブランチがある。"""
         git(self.root, "branch", BRANCH)
         self.propose(where=self.root)
         body = self.preview()
-        self.assertIn(f"既存のブランチ {BRANCH} を使う", body["text"])
-        self.assertEqual(body["branch_warnings"], [])
+        self.assertEqual(len(body["branch_warnings"]), 1, body["branch_warnings"])
+        self.assertIn(BRANCH, body["branch_warnings"][0])
 
-    def test_a_branch_to_be_cut_is_said_so(self):
-        self.propose(where=self.root, branch="hotfix/45")
-        body = self.preview()
-        entry = body["batch"][0]
-        self.assertEqual((entry["branch"], entry["existing_branch"]), ("hotfix/45", False))
-        self.assertIn("新しく切るブランチ", body["text"])
-
-    def test_the_field_is_in_the_digest(self):
-        self.propose(where=self.root)
-        first = self.preview()["digest"]
-        self.propose(where=self.root, branch="feature/12-other")
-        self.assertNotEqual(self.preview()["digest"], first)
-
-    def test_the_integration_branch_is_refused(self):
-        write(
-            os.path.join(self.root, ".claude", "settings.local.json"),
-            json.dumps({"env": {"CCNAVI_INTEGRATION_BRANCH": "trunk/next"}}),
-        )
-        self.propose(where=self.root, branch="trunk/next")
-        body = self.preview()
-        self.assertFalse(body["verify"]["ok"], body)
-        problems = " ".join(" ".join(r["problems"]) for r in body["rejected"])
-        self.assertIn("統合先の名前", problems)
-
-    def test_a_revision_cannot_change_the_branch(self):
-        self.parent_tree()
+    def test_a_proposal_on_its_own_branch_is_not_warned(self):
+        git(self.root, "branch", BRANCH)
+        self.parent_tree(create=False)
         self.propose()
-        approved = self.ccnavi("--agree", stdin="y\n")
-        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        self.propose(branch="feature/12-other", plan=("design", "acceptance"))
-        body = self.preview()
-        problems = " ".join(" ".join(r["problems"]) for r in body["rejected"])
-        self.assertIn("`branch:` が承認済みチケットと違う", problems)
+        self.assertEqual(self.preview()["branch_warnings"], [])
 
-    def test_the_default_branch_from_origin_head_is_refused(self):
-        """取り込みをしていないリポジトリでも、origin/HEAD が指す統合先は親のブランチにしない。"""
-        git(self.root, "update-ref", "refs/remotes/origin/trunk", "HEAD")
-        git(self.root, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk")
-        self.propose(where=self.root, branch="trunk")
-        body = self.preview()
-        self.assertFalse(body["verify"]["ok"], body)
-        problems = " ".join(" ".join(r["problems"]) for r in body["rejected"])
-        self.assertIn("統合先の名前（trunk）", problems)
-
-    def test_two_families_cannot_claim_one_branch(self):
-        other = "feature-13-other"
-        write(
-            os.path.join(self.root, "wip", "proposals", "todo", other + ".md"),
-            parent_text(other, ["design"], allow=("src/*",)),
-        )
-        self.propose(where=self.root, branch=other)
+    def test_identifiers_differing_only_in_case_are_refused(self):
+        other = "Feature-12-Login"
+        self.propose(where=self.root, ident=other)
+        self.propose(where=self.root)
         body = self.preview()
         problems = " ".join(" ".join(r["problems"]) for r in body["rejected"])
-        self.assertIn(f"親のブランチ {other} を別の親子のチケット（{other}）も", problems)
-        # どちらの親子のチケットのブランチか決まらないので、両方とも承認しない
+        self.assertIn("大文字小文字だけが違う識別子", problems)
         self.assertEqual(sorted(r["ticket"] for r in body["rejected"]), sorted([PARENT, other]))
 
-    def test_lint_warns_when_the_parent_tree_is_off_its_branch(self):
-        # 承認前の提案の branch: は使わない: branch: のブランチの上に居れば、識別子と違うと言う
-        self.parent_tree()
-        self.propose()
-        lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertIn(f"親 {PARENT} のワークツリーが {BRANCH} の上にある", lint.stdout)
-        # 承認の後、識別子のブランチの上に居れば、承認済みの branch: と違うと言う
-        self.approve()
-        git(self.tree, "add", "-A")
-        git(self.tree, "commit", "-q", "-m", "approve")
-        git(self.tree, "checkout", "-q", "-b", PARENT)
-        lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertIn(f"親 {PARENT} のワークツリーが {PARENT} の上にある", lint.stdout)
-        self.assertIn(f"branch: の {BRANCH}", lint.stdout)
-
-    def test_lint_is_quiet_on_the_approved_branch(self):
+    def test_lint_is_quiet_on_the_branch_of_the_identifier(self):
         self.parent_tree()
         self.propose()
         self.approve()
         lint = self.ccnavi("--lint", "--mode", "enable")
         self.assertNotIn("の上にある", lint.stdout)
 
-    def approve(self):
-        done = self.ccnavi("--agree", stdin="y\n")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+    def test_lint_warns_when_the_parent_tree_is_on_another_branch(self):
+        self.parent_tree()
+        self.propose()
+        self.approve()
+        git(self.tree, "add", "-A")
+        git(self.tree, "commit", "-q", "-m", "approve")
+        git(self.tree, "checkout", "-q", "-b", "elsewhere")
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertIn(f"親 {PARENT} のワークツリーが elsewhere の上にある", lint.stdout)
+        self.assertIn(f"`/` を `-` に置き換えたものがフォルダ名（{PARENT}）", lint.stdout)
 
-    def test_c1_family_answers_only_an_approved_branch(self):
-        self.propose(where=self.root)
-        done = self.ccnavi("c1", "family", PARENT)
-        self.assertIn(f"branch {PARENT}\n", done.stdout)
+    def test_lint_names_a_left_over_field_as_an_error(self):
+        self.parent_tree()
+        write(
+            os.path.join(self.tree, "wip", "proposals", "todo", PARENT + ".md"),
+            with_branch(parent_text(PARENT, ["design"], allow=("src/*", "wip/*")), BRANCH),
+        )
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertIn("`branch` は使えない欄", lint.stdout)
+
+    def test_lint_does_not_say_the_name_form_of_an_adopted_parent(self):
+        """既存のブランチを採用した親（ワークツリーが在り、HEAD が合う）は名前の形式を言わない。"""
+        ident = "weird-login"
+        self.tree = os.path.join(self.root, ".claude", "worktrees", ident)
+        self.propose(where=self.root, ident=ident)
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertIn(f"{ident}: 親の識別子は", lint.stdout)
+        shutil.rmtree(os.path.join(self.root, "wip"))
+        git(self.root, "worktree", "add", "--quiet", self.tree, "-b", "weird/login", "main")
+        self.propose(ident=ident)
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertNotIn(f"{ident}: 親の識別子は", lint.stdout)
+
+    def test_c1_family_reads_the_branch_from_head(self):
+        self.parent_tree()
+        self.propose()
         self.approve()
         done = self.ccnavi("c1", "family", PARENT)
         self.assertIn(f"branch {BRANCH}\n", done.stdout)
-        done = self.ccnavi("c1", "family", "feature-99-none")
-        self.assertIn("branch feature-99-none\n", done.stdout)
 
-    def test_c1_family_refuses_an_unusable_approved_branch(self):
-        self.propose(where=self.root)
-        self.approve()
-        copy = os.path.join(self.root, ".ccnavi", "approved", "doing", PARENT + ".md")
-        with open(copy, encoding="utf-8") as f:
-            text = f.read()
-        write(copy, text.replace(f"branch: {BRANCH}", "branch: origin/main"))
+    def test_c1_family_refuses_without_a_matching_head(self):
+        done = self.ccnavi("c1", "family", "feature-99-none")
+        self.assertIn("branch_refused ", done.stdout)
+        self.assertNotIn("\nbranch ", done.stdout)
+        self.parent_tree()
+        git(self.tree, "checkout", "-q", "-b", "elsewhere")
         done = self.ccnavi("c1", "family", PARENT)
-        self.assertIn("branch_refused 親のブランチ origin/main は使えない", done.stdout)
+        self.assertIn("branch_refused ", done.stdout)
         self.assertNotIn("\nbranch ", done.stdout)
 
 
@@ -328,8 +291,8 @@ def _approved(text):
     )
 
 
-def _family_files(branch=BRANCH, ident=PARENT, predecessors=()):
-    """親のブランチの置き場。承認済みの親チケット（`branch:` 付き）と、承認待ちの子の提案。"""
+def _family_files(ident=PARENT, predecessors=()):
+    """親のブランチの置き場。承認済みの親チケットと、承認待ちの子の提案。"""
     child = child_text(f"{ident}-01-01", ident, 1, ["wip/research/*"], False)
     if predecessors:
         lines = child.split("\n")
@@ -337,7 +300,7 @@ def _family_files(branch=BRANCH, ident=PARENT, predecessors=()):
         child = "\n".join(lines)
     return {
         f".ccnavi/approved/doing/{ident}.md": _approved(
-            with_branch(parent_text(ident, ["research"], allow=("src/*", "wip/*")), branch)
+            parent_text(ident, ["research"], allow=("src/*", "wip/*"))
         ),
         f"wip/proposals/todo/{ident}-01-01.md": child,
     }
@@ -361,7 +324,7 @@ class ChromeBranchFieldTest(unittest.TestCase):
                     else {BRANCH: {"head": HEAD, "files": _family_files()}}
                 ),
             },
-            # 識別子と同じ名前のブランチ（同じ親子のチケットを宣言するかを確かめに読む）は
+            # 識別子と同じ名前のブランチ（同じ識別子になる別のブランチが無いかを確かめに読む）は
             # ホストに無い
             "absent": [PARENT] if absent is None else absent,
         }
@@ -376,7 +339,7 @@ class ChromeBranchFieldTest(unittest.TestCase):
         }
         return json.loads(self.chrome.handle(json.dumps(request), os.path.join(self.tmp, "memfs")))
 
-    def test_the_family_is_named_by_the_claiming_parent(self):
+    def test_the_family_is_named_by_the_converted_branch(self):
         found = self.ask("families", candidates=[BRANCH])
         self.assertNotIn("error", found, found)
         self.assertEqual(
@@ -384,24 +347,19 @@ class ChromeBranchFieldTest(unittest.TestCase):
             [(BRANCH, PARENT, "")],
         )
 
-    def test_a_proposal_claims_only_its_identifier(self):
-        """承認前の提案の branch: では宣言しない（識別子のブランチの親子のチケットとして読む）。"""
+    def test_a_proposal_is_a_family_too(self):
         proposal = {
-            f"wip/proposals/todo/{PARENT}.md": with_branch(
-                parent_text(PARENT, ["research"], allow=("src/*",)), BRANCH
-            )
+            f"wip/proposals/todo/{PARENT}.md": parent_text(PARENT, ["research"], allow=("src/*",))
         }
-        branches = {
-            BRANCH: {"head": HEAD, "files": proposal},
-            PARENT: {"head": HEAD, "files": proposal},
-        }
-        found = self.ask("families", candidates=[BRANCH, PARENT], branches=branches)
-        self.assertEqual([(f["name"], f["family"]) for f in found["families"]], [(PARENT, PARENT)])
+        branches = {BRANCH: {"head": HEAD, "files": proposal}}
+        found = self.ask("families", candidates=[BRANCH], branches=branches)
+        self.assertEqual([(f["name"], f["family"]) for f in found["families"]], [(BRANCH, PARENT)])
 
-    def test_a_branch_not_claimed_is_not_a_family(self):
-        files = _family_files(branch="feature/12-elsewhere")
+    def test_a_branch_whose_converted_name_is_not_the_identifier_is_not_a_family(self):
         found = self.ask(
-            "families", candidates=[BRANCH], branches={BRANCH: {"head": HEAD, "files": files}}
+            "families",
+            candidates=["feature/12-elsewhere"],
+            branches={"feature/12-elsewhere": {"head": HEAD, "files": _family_files()}},
         )
         self.assertEqual(found["families"], [])
 
@@ -419,7 +377,7 @@ class ChromeBranchFieldTest(unittest.TestCase):
         paths = {r["path"] for r in body["changes"][BRANCH]}
         self.assertIn(f".ccnavi/approved/doing/{CHILD}.md", paths)
 
-    def test_two_branches_claiming_one_family_are_not_judged(self):
+    def test_two_branches_with_one_identifier_are_not_judged(self):
         rival = {
             f".ccnavi/approved/doing/{PARENT}.md": _approved(
                 parent_text(PARENT, ["research"], allow=("src/*",))
@@ -436,25 +394,19 @@ class ChromeBranchFieldTest(unittest.TestCase):
         plan = self.ask("plan", branches=branches, absent=[], shown={"ids": [CHILD], "digest": "x"})
         self.assertIn("1 本でない", plan.get("error", ""), plan)
 
-    def test_a_predecessor_family_claimed_twice_is_not_judged(self):
+    def test_a_predecessor_family_with_two_branches_is_not_judged(self):
         other = "feature-20-dep"
-        dep = _family_files(branch="feature/20-dep", ident=other)
-        dep2 = {
-            f".ccnavi/approved/doing/{other}.md": _approved(
-                parent_text(other, ["research"], allow=("src/*",))
-            )
-        }
+        dep = _family_files(ident=other)
         branches = {
             BRANCH: {"head": HEAD, "files": _family_files(predecessors=(f"{other}-01-01",))},
             "feature/20-dep": {"head": HEAD, "files": dep},
-            other: {"head": HEAD, "files": dep2},
+            other: {"head": HEAD, "files": dep},
         }
         closure = self.ask("closure", branches=branches)
         self.assertEqual(closure["ambiguous"], [other])
         board = self.ask("board", branches=branches)
         self.assertIn(
-            "先行の親子のチケット（feature-20-dep）の親のブランチとして"
-            "宣言されているブランチが 1 本でない",
+            "先行の親子のチケット（feature-20-dep）になるブランチが 1 本でない",
             board["undecided"],
         )
 

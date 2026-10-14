@@ -44,7 +44,6 @@ from . import (
     approval_ops,
     phase,
     plan_order,
-    ticket_ids,
     ticket_model,
 )
 
@@ -332,9 +331,6 @@ def _batch_entry(cand: agree_candidates.Candidate) -> dict:
         "revision": cand.is_revision,
         "tree": t.tree or "",
         "path": t.path,
-        # 親のブランチ名。`branch:` が無ければ識別子。
-        "branch": ticket_ids.branch_name(t),
-        "existing_branch": cand.existing_branch,
         "overflow": [p.detail for p in cand.overflow],
     }
 

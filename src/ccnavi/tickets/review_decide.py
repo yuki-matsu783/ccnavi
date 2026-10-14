@@ -24,7 +24,7 @@ from . import (
     phase,
     review,
     review_host,
-    ticket_ids,
+    syncstate,
     ticket_model,
 )
 
@@ -88,9 +88,10 @@ def _followup_next(root: str, parent: ticket_model.Ticket, ident: str) -> str:
     """続きの子を起こしたあと、エージェントが打つ 2 手。"""
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+    base = syncstate.head_branch(tree.worktree_path(root, parent.ticket), parent.ticket)
     return (
         f"エージェントが '{git_sh} worktree add .claude/worktrees/{ident} -b {ident} "
-        f"{ticket_ids.branch_name(parent)}' でワークツリーを切り、'{ticket_sh} start {ident}' で"
+        f"{base or '<親のブランチ>'}' でワークツリーを切り、'{ticket_sh} start {ident}' で"
         "着手する"
     )
 

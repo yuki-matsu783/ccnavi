@@ -322,8 +322,10 @@ class PresentTest(AuthorityHarness):
         self.assertEqual("deny", self.decision(self.write_to(self.child_tree, "wip/research/a")))
         started = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertNotEqual(0, started.returncode)
-        self.assertIn("HEAD がブランチ i0001 を指していない", started.stderr)
-        self.assertIn("切り直して", started.stderr)
+        self.assertIn(
+            "HEAD のブランチ名を変換した識別子がフォルダ名（i0001）と合わない", started.stderr
+        )
+        self.assertIn("に戻してください", started.stderr)
 
     def test_a_state_operation_does_not_move_a_copy_outside_the_parent_tree(self):
         # 子のチケットが親のワークツリーから消え、元ツリーにだけ残った形。

@@ -24,8 +24,8 @@ from ..tickets import (
     overview,
     phase,
     risk,
+    syncstate,
     ticket_fold,
-    ticket_ids,
     ticket_model,
 )
 from ..tickets import ticket as ticket_mod
@@ -433,7 +433,11 @@ def _ticket_record(
         # 親を載せる MR の番号（親チケットの `mr:`）と、親のブランチ名。リモートとの差は
         # 親のワークツリーがあるときの `remote`（子は null）。
         "mr": source.mr,
-        "branch": "" if source.is_child else ticket_ids.branch_name(source),
+        "branch": (
+            syncstate.head_branch(found.root, ticket_id)
+            if found is not None and not source.is_child
+            else ""
+        ),
         "remote": (
             overview.remote_info(conf, ticket_id, found.root, source.project)
             if found is not None and not source.is_child

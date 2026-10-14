@@ -154,11 +154,6 @@ class Bound:
     worktrees: list[str]
 
 
-# MR の元ブランチの慣習名（`mr-12`・`pull/12`・`merge-requests/12`）。`branch:` がこの形で
-# 全体に一致するときだけ、MR の番号に結び付ける。`fix-12-foo` は番号を含むだけで MR 12 ではない。
-_MR_BRANCH = re.compile(r"(?:mr|pr|pull|merge[-_]requests?)[-_/]([1-9][0-9]{0,8})", re.I)
-
-
 def _repo_of(conf: settings.Settings, root: str, cwd: str) -> tuple[tree.Tree | None, str, str]:
     """cwd のリポジトリ（元のツリー）・プロジェクト名・読めない理由。"""
     repo_tree = tree.tree_of(root, cwd, conf.projects) if cwd else None
@@ -177,9 +172,8 @@ def _repo_of(conf: settings.Settings, root: str, cwd: str) -> tuple[tree.Tree | 
 def _bound(conf: settings.Settings, root: str, cwd: str, ref: Ref) -> Bound | None:
     """指定がすでに結び付いている先。手元の候補（`collect` と同じ集め方）だけを見る。
 
-    照合は厳密にする。issue はチケットの `issue:` の一致。MR は (1) チケットの `mr:` の一致
-    （提案も承認済みも）、(2) 承認済みチケットの `branch:` が MR の慣習名（`_MR_BRANCH`）で番号が
-    一致するとき、の順で見る。名前に番号を含むだけのブランチ
+    照合は厳密にする。issue はチケットの `issue:` の一致、MR はチケットの `mr:` の一致
+    （どちらも提案も承認済みも）。名前に番号を含むだけのブランチ
     （`fix-12-foo`）は結び付きとして数えない。読めないときは None（案内する側に倒す）。
     URL で別のリポジトリが示されているときも None（番号が同じだけの別物かもしれない）。
     """
@@ -194,21 +188,7 @@ def _bound(conf: settings.Settings, root: str, cwd: str, ref: Ref) -> Bound | No
             if "ticket" in c["sources"] and c["tickets"]:
                 links = [f"{t['ticket']}({t['state']})" for t in c["tickets"]]
                 return Bound(c["branch"], links, c["worktrees"])
-        if ref.kind == ISSUE:
-            return None
-        # MR は、`mr:` に続けて慣習名（承認済みの親の `branch:` が mr-N など）も見る
-        repo, project, failed = _repo_of(conf, root, cwd)
-        if repo is None or failed:
-            return None
-        checked_out = _checked_out(conf, root, repo)
-        for t in _tickets(conf, root, project):
-            m = _MR_BRANCH.fullmatch(t.branch or "")
-            if t.is_child or t.state == ticket_model.TODO or not m:
-                continue
-            if int(m.group(1)) == ref.number:
-                return Bound(
-                    t.branch, [f"{t.ticket}({t.state})"], sorted(checked_out.get(t.branch, []))
-                )
+        return None
     except OSError:
         return None
     return None
@@ -228,7 +208,7 @@ def prompt_context(
 ) -> str:
     """依頼文に issue・MR の指定があれば、`ccnavi-start.sh` で着手させる指示。無ければ空。
 
-    チケット制御が disable なら出さない（指示の中身が親の識別子と `branch:` の承認に寄るため）。
+    チケット制御が disable なら出さない（指示の中身が親の識別子の承認に寄るため）。
 
     同じ番号の案内は同じセッションで 1 回だけ。案内した番号は、セッション単位の一時的な
     記録（`ctxfile.told_refs`）に残す。記録を読めない・書けないときは案内する側に倒す。
@@ -290,8 +270,7 @@ def _start_lines(root: str, refs: list[Ref]) -> list[str]:
         "1. 既存のブランチで続ける（既存のチケットに結び付くならそのチケットで続ける。"
         "そうでなければ、ブランチを直接チェックアウトしたワークツリーを"
         f" '{git_sh} worktree add .claude/worktrees/<ID> <ブランチ>'で出す"
-        "（<ID> はブランチ名の / を - に置き換えた名前。識別子のブランチは作らない）。"
-        "承認前の提案の branch: は使わない）",
+        "（<ID> はブランチ名の / を - に置き換えた名前。識別子のブランチは作らない））",
         "2. 新しく <先頭の語>-<番号>-<slug> のブランチを切る",
         "3. やめる",
         "終了コード 4（ホストに届かない）なら、"
@@ -486,14 +465,18 @@ def _tickets(conf: settings.Settings, root: str, project: str) -> list[ticket_mo
     return found
 
 
-def _branch_of_ticket(t: ticket_model.Ticket, approved: bool) -> str:
+def _branch_of_ticket(t: ticket_model.Ticket, names: set[str]) -> str:
     """チケットが示すブランチ。
 
-    承認前の提案の `branch:` は使わないので識別子。
+    識別子になるブランチ（`/` を `-` に置き換えて識別子と一致する手元か origin のブランチ。
+    識別子と同じ名前を先に見る）。無ければ識別子。
     """
-    if not approved:
+    if t.ticket in names:
         return t.ticket
-    return ticket_ids.branch_name(t)
+    return next(
+        (n for n in sorted(names) if ticket_ids.branch_to_id(n) == t.ticket),
+        t.ticket,
+    )
 
 
 def collect(
@@ -531,7 +514,7 @@ def collect(
             approved = t.state != ticket_model.TODO
             link = TicketLink(t.ticket, t.state, approved, t.title, t.issue)
             issue_tickets.append(link)
-            candidate(_branch_of_ticket(t, approved)).add_source("ticket")
+            candidate(_branch_of_ticket(t, local | origin)).add_source("ticket")
         # 3. 名前に番号を含むブランチ（手元と origin）。
         for name in sorted(local | origin):
             if names_number(name, number):
@@ -544,14 +527,14 @@ def collect(
             approved = t.state != ticket_model.TODO
             link = TicketLink(t.ticket, t.state, approved, t.title, t.issue)
             issue_tickets.append(link)
-            candidate(_branch_of_ticket(t, approved)).add_source("ticket")
+            candidate(_branch_of_ticket(t, local | origin)).add_source("ticket")
     # どの候補にも、ワークツリーと結び付くチケットを添える。
     for branch, c in found.items():
         c.worktrees = sorted(checked_out.get(branch, []))
         for t in tickets:
             approved = t.state != ticket_model.TODO
-            # 承認済みの `branch:` へ移る前は、識別子のブランチ（親のワークツリー）にも結び付く
-            if branch in (_branch_of_ticket(t, approved), t.ticket):
+            # 識別子になるブランチ（`/` を `-` に置き換えて識別子と一致するもの）に結び付く
+            if ticket_ids.branch_to_id(branch) == t.ticket:
                 c.tickets.append(TicketLink(t.ticket, t.state, approved, t.title, t.issue))
     order = {"ticket": 0, "mr": 1, "name": 2}
     ranked = sorted(
