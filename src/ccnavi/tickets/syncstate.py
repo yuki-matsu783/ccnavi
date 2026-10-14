@@ -616,9 +616,14 @@ class Families:
 
 def head_branch(tree_root: str, family_id: str) -> str:
     """そのツリーの HEAD が指すブランチ名。変換（`ticket_ids.branch_to_id`）した識別子が
-    `family_id` と一致するときだけ返し、そうでなければ空。ファイルだけを読む。"""
+    `family_id` と一致するときだけ返し、そうでなければ空。ファイルだけを読む。
+
+    NFC にそろえるのはフォルダ名（`family_id`。macOS の HFS+ は名前を NFD で返す）の側だけで、
+    HEAD のブランチ名はそろえない。NFD のブランチ名は使えない名前（`ticket_ids.branch_problem`）で、
+    sh（`ccnavi_head_branch`）もバイト列のまま比べて一致としない。同じワークツリーで答えを揃える。
+    """
     head = tree.branch_of(tree_root)
-    if head and tree.nfc(ticket_ids.branch_to_id(head)) == family_id:
+    if head and ticket_ids.branch_to_id(head) == tree.nfc(family_id):
         return head
     return ""
 
