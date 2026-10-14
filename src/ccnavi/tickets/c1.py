@@ -7,10 +7,10 @@
 
 - `ccnavi c1 family <識別子>`: その識別子の親子のチケットと、C1 の対象かと、親のブランチ名
   （`branch`。親のワークツリーの HEAD から読む。変換した識別子がフォルダ名と合うときだけ）
-  - 対象は、置き場のパスが相対で、取り込み状態があり（取り込み済み）、
-    マージリクエストで見るフェーズが無い親子のチケットでなく、止める理由（閉じた・gone・blocked・親のワークツリーが無い
-    など）の無い親子のチケット
-  - 止める理由のある取り込み済みの親子のチケットは `target stop`。sh は何も書かずに止める
+  - 対象は、置き場のパスが相対で、親のワークツリーがあり、origin があり、HEAD の確認に通る
+    親子のチケット。取り込み状態（記録）の有無や、マージリクエストで見るフェーズの有無は問わない
+  - 止める理由（閉じた・gone・blocked・親のワークツリーが無い・HEAD の確認に通らないなど）のある
+    親子のチケットは `target stop`。sh は何も書かずに止める
   - origin の無い親のワークツリーは対象外（ローカルの git の設定だけを読む）
 - `ccnavi c1 sort <親> [<版>]`: 親のワークツリーの置き場（`.ccnavi/approved/`・
   `wip/proposals/review/`）の変更を次の (b)・(c)・(d) に分ける
@@ -44,7 +44,7 @@ import re
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings
-from . import approval_marks, archive, history, phase, syncstate, ticket_ids, ticket_model
+from . import approval_marks, archive, history, syncstate, ticket_ids, ticket_model
 
 # 答えの頭の行。sh はこれが無ければ「実行ファイルが C1 を知らない（古い）」と読んで止める。
 HEAD = "c1 1"
@@ -103,12 +103,6 @@ def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, s
     st = syncstate.standing_any(conf, root, parent)
     if _relative_places(conf) is None:
         return TARGET_NO, "置き場のパスが絶対パス（C1 と Chrome の対象外）", st
-    if not st.imported:
-        why = "親子のチケットの取り込み状態がありません（取り込み済みでない。今の手元の動きのまま）"
-        return TARGET_NO, why, st
-    if _without_mr(conf, root, parent):
-        why = "マージリクエストで見るフェーズが無い親子のチケット（今の手元の動きのまま）"
-        return TARGET_NO, why, st
     if st.stop or st.home is None:
         return TARGET_STOP, st.stop or "親のワークツリーが決まらない", st
     origin = gitcmd.run(st.home.root, ["config", "--get", "remote.origin.url"], _TIMEOUT)
@@ -168,13 +162,6 @@ def _branch_refusal(parent: str, branch: str) -> str:
         )
     why = ticket_ids.branch_problem(branch)
     return f"親のブランチ {branch} は使えない（{why}）" if why else ""
-
-
-def _without_mr(conf: settings.Settings, root: str, parent: str) -> bool:
-    try:
-        return phase.without_mr(root, conf, parent)
-    except (OSError, ValueError):
-        return False
 
 
 def sort(

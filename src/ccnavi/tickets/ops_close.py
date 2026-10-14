@@ -65,35 +65,25 @@ def _undecided(
     """どれが正か決まらないときの文面。次にすることまで書く。
 
     「1 つにしてから」だけだと、どのツリー上のチケットも追跡されたファイルなので、受け取った側に
-    できることが読めない。正とする側の決まり方（親のツリー → 元ツリー）と、この場面で
-    それが決まらない理由を名指しする。取り込み済みの親子のチケットでは、正とする側が親のブランチに決まって
-    いるので、取り込み状態から引いた解き方（`syncstate.guidance`）を出す。
+    できることが読めない。正とする側の決まり方（親のツリー）と、この場面で
+    それが決まらない理由を名指しする。正とする側は親のブランチ（親のワークツリー）に決まって
+    いるので、立ち位置から引いた解き方（`syncstate.guidance`）を出す。
     """
     home = hits[0].parent or hits[0].ticket
     stderr.write(head + f"が複数の場所にある: {_where(hits)}。1 つに決まるまで動かさない\n")
+    stderr.write(
+        f"  正は、親のブランチ {home} のワークツリー（.claude/worktrees/{home}）"
+        "上のチケットだけ。ほかのツリー上のチケットは読まない\n"
+    )
     st = approval_checks.family_standing(conf, root, hits[0]) if conf is not None else None
-    if st is not None and st.imported:
-        stderr.write(
-            f"  正は、親のブランチ {home} のワークツリー（.claude/worktrees/{home}）"
-            "上のチケットだけ"
-            "（取り込み済みの親子のチケット）。ほかのツリー上のチケットは読まない\n"
-        )
-        for line in syncstate.guidance(root, st) if st.stop else []:
+    if st is not None and st.stop:
+        for line in syncstate.guidance(root, st):
             stderr.write(f"  {line}\n")
-        if not st.stop:
-            stderr.write(
-                "  親のワークツリーの外のチケットは、"
-                "親のブランチへ移してコミットしてから削除するか、"
-                "残ったワークツリーを片付けてから再実行してください\n"
-            )
         return
     stderr.write(
-        f"  正は、親 {home} のワークツリー上のチケット。無ければ元ツリー"
-        "（ワークスペースルート、プロジェクトのチケットならそのプロジェクト）上のチケット\n"
-    )
-    stderr.write(
-        "  どちらにも無いか、元ツリーより先の置き場に在るチケットがあると、どれが正か決まらない。"
-        "先に進んだ側を合流させるか、残ったワークツリーを片付けてから再実行してください\n"
+        "  親のワークツリーの外のチケットは、"
+        "親のブランチへ移してコミットしてから削除するか、"
+        "残ったワークツリーを片付けてから再実行してください\n"
     )
 
 
@@ -140,15 +130,13 @@ def misplaced_home(
 def family_stopped(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_model.Ticket
 ) -> bool:
-    """取り込み済みの親子のチケットが決まらない・閉じているなら、言って True。
+    """親子のチケットが決まらない（親のワークツリーが無いなど）・閉じているなら、言って True。
 
     その親子のチケットの状態の操作（着手・終了・取り消し・記録・レビューのマーカー）は止める。引いたチケットが
     親のワークツリーの外にしか無いとき（元ツリーに未コミットで残ったチケットなど）も、信頼しないチケットを
     動かさないように止める。取り込み状態の無い親子のチケットには何も言わない（今の動きのまま）。
     """
     st = approval_checks.family_standing(conf, root, found)
-    if not st.imported:
-        return False
     if st.stop:
         stderr.write(f"ccnavi: {found.ticket}: {st.stop}。この親子のチケットの状態は動かさない\n")
         for line in syncstate.guidance(root, st):
@@ -288,7 +276,7 @@ def close_problems(
             "子を先に閉じてください"
         ]
     if approval_marks.read_parent_mark(
-        approval.home_dir(conf, root, parent_id, ""),
+        approval.home_dir_read(conf, root, parent_id, ""),
         parent_id,
         approval_marks.PARENT_MARK_CLOSE_EARLY,
     ):

@@ -416,8 +416,8 @@ class FlowParentBriefingTest(PhaseHarness):
         self.assertNotIn("i0001-01-02", own)
 
 
-class FlowCarriedOnApprovalTest(PhaseHarness):
-    """承認の前に提案のツリーへ保存したフローを、承認で承認済みチケットのツリーへ動かす。"""
+class FlowStaysOnApprovalTest(PhaseHarness):
+    """子の提案は親のワークツリーに書く。フローも同じツリーに保存し、承認で動かさない。"""
 
     def setUp(self):
         super().setUp()
@@ -425,45 +425,28 @@ class FlowCarriedOnApprovalTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["research"], allow=allow))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        # 子の提案はワークスペースルートの提案の置き場。承認で親のツリーへ動く。
-        write(
-            os.path.join(self.root, "wip", "proposals", "todo", f"{CHILD}.md"),
-            child_text(CHILD, "i0001", 1, ("wip/research/*",)),
-        )
+        self.propose(CHILD, child_text(CHILD, "i0001", 1, ("wip/research/*",)))
 
     def board(self):
         result = self.ccnavi("--explain", "--json")
         return {t["ticket"]: t for t in json.loads(result.stdout)["tickets"]}[CHILD]["flow"]
 
-    def test_the_flow_moves_with_the_ticket(self):
+    def test_the_flow_stays_in_the_parent_tree_and_is_read_by_the_child(self):
         before = self.board()
-        self.assertEqual(os.path.realpath(before["tree"]), os.path.realpath(self.root))
+        self.assertEqual(os.path.realpath(before["tree"]), os.path.realpath(self.parent_tree))
         write(before["path"], WORKFLOW_YAML)
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("フローを", result.stdout)
-        self.assertIn("へ動かした", result.stdout)
+        self.assertNotIn("フロー", result.stdout)
         after = self.board()
         self.assertEqual(os.path.realpath(after["tree"]), os.path.realpath(self.parent_tree))
+        self.assertEqual(after["path"], before["path"])
         self.assertTrue(after["exists"])
-        self.assertFalse(os.path.exists(before["path"]))
         with open(after["path"], encoding="utf-8") as f:
             self.assertEqual(yaml.safe_load(f)["name"], WORKFLOW["name"])
         child_tree = self.run_child(CHILD)
         text = self.reason(self.hook("SubagentStart", "", child_tree, agent_id="sub-1"))
         self.assertIn("3. [askUserQuestion] 方針", text)
-
-    def test_a_different_flow_at_the_destination_is_not_overwritten(self):
-        before = self.board()
-        write(before["path"], WORKFLOW_YAML)
-        held = write(os.path.join(self.approved, "flows", f"{CHILD}.yml"), "nodes: []\n")
-        result = self.approve()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("移さなかった", result.stdout)
-        self.assertIn("上書きしない", result.stdout)
-        with open(held, encoding="utf-8") as f:
-            self.assertEqual(f.read(), "nodes: []\n")
-        self.assertTrue(os.path.exists(before["path"]))
 
     def test_no_flow_means_nothing_is_said(self):
         result = self.approve()

@@ -307,8 +307,12 @@ class ReviewRuleTest(ActorHarness):
             return f.read()
 
     def test_the_request_writes_mr_into_an_empty_field_only(self):
-        # 承認済みチケットの `mr:` は無いか空。依頼で MR の番号を書き足す
-        done = self.request_posted(before=lambda: self.assertNotIn("mr:", self.doing_text()))
+        # 承認済みチケットの `mr:` が空なら、依頼で MR の番号を書き足す
+        def clear():
+            self.set_doing_mr("")
+            self.assertNotIn("mr: 1", self.doing_text())
+
+        done = self.request_posted(before=clear)
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIn("mr: 7\n", self.doing_text())
         self.assertIn("`mr:` に MR !7 を追記しました", done.stderr)
@@ -320,7 +324,9 @@ class ReviewRuleTest(ActorHarness):
         state = os.path.join(self.root, "logs", "state", "c1", "demo")
         os.makedirs(state, exist_ok=True)
         listing = os.path.join(state, "writes.txt")
-        done = self.request_posted(extra=("--record-writes", listing))
+        done = self.request_posted(
+            extra=("--record-writes", listing), before=lambda: self.set_doing_mr("")
+        )
         self.assertEqual(done.returncode, 0, done.stderr)
         with open(listing, encoding="utf-8") as f:
             listed = [os.path.normpath(line.strip()) for line in f if line.strip()]
@@ -353,7 +359,7 @@ class ReviewRuleTest(ActorHarness):
 
     def set_doing_mr(self, value):
         path = os.path.join(self.approved, "doing", "i0001.md")
-        text = self.doing_text().replace("\n---\n", f"\nmr: {value}\n---\n", 1)
+        text = self.doing_text().replace("\nmr: 1\n", f"\nmr: {value}\n" if value else "\n", 1)
         write(path, text)
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "mr")

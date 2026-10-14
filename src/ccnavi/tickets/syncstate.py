@@ -13,26 +13,21 @@
 
 `<リポジトリ>` はワークスペース自身なら `self`、プロジェクトならその名前。
 
-## 取り込み済みの親子のチケット
+## 親子のチケットの立ち位置
 
-取り込み状態のある親子のチケットを「取り込み済みの親子のチケット」と呼び、
-正とする側を親のブランチ（手元では `.claude/worktrees/<P>` で、HEAD のブランチ名の `/` を `-` に
-置き換えたものが `P` になるツリー）に固定する。取り込み状態の無い親子のチケット
-（`ccnavi-sync.sh` が入る前に送った、origin が無い、一度も push していない）は
-今の動きのまま（Chrome はリモートにある `P` しか見ないので、
-二重状態は起きない）。
-
-親子のチケットの取り込み状態は削除せずに残す（親のワークツリーを片付けても消えない。
-消すのはユーザが打つ `ccnavi-sync.sh --forget <P>` だけ）。取り込み状態と統合先の取り込み結果から、
-親子のチケットの立ち位置（`Standing`）を決める。
+正とする側は、全部の親子のチケットで同じく親のブランチに固定する。手元では
+`.claude/worktrees/<P>`（HEAD のブランチ名の `/` を `-` に置き換えたものが `P` になるツリー）で、
+ほかのツリーのコピーでは代用しない。取り込み状態（記録）はキャッシュ
+（取得した sha・同期結果・MR 番号）で、記録の有無では判定を変えない。
+記録がなくても親のワークツリーがあれば決まる。
 
 - 閉じた: 統合先の取り込み結果の `done/` に親のチケットがある（親のワークツリーが無いか、
   あれば親のチケットの承認の時刻が同じ）、または取り込み状態が `closed`。
   統合先の `done/` を正とする（マージ後にホストが `P` を
   消した正常系）
-- `gone`・`blocked`・取り込み状態が破損している・`present` なのに親のワークツリーが無い:
-  決まらない。その親子のチケットの承認も状態の操作も止める
-- `present` で親のワークツリーがある: 親のブランチ上のチケットだけが正
+- `gone`・`blocked`・取り込み状態が破損している・親のワークツリーが無い・HEAD のブランチ名が
+  フォルダ名と合わない: 決まらない。その親子のチケットの承認も状態の操作も止める
+- それ以外で親のワークツリーがある: 親のブランチ上のチケットだけが正
 
 ## 統合先の取り込み結果
 
@@ -409,7 +404,7 @@ def _copy_fields(text: str) -> DoneCopy | None:
 
 @dataclass(frozen=True)
 class Standing:
-    """親子のチケットの立ち位置。`record` が None なら取り込み済みでない（今の動きのまま）。
+    """親子のチケットの立ち位置。`record` は取り込み状態（キャッシュ）で、無くてもよい。
 
     `stop` は決まらない・閉じているので止める理由（空なら止めない）。`closed` は閉じた
     親子のチケット。
@@ -433,10 +428,6 @@ class Standing:
         それも無ければ `<ブランチ名>`。"""
         cached = self.record.branch if self.record is not None else ""
         return self.branch or cached or "<ブランチ名>"
-
-    @property
-    def imported(self) -> bool:
-        return self.record is not None
 
 
 class Families:
@@ -480,38 +471,36 @@ class Families:
         return self._standings[key]
 
     def standing_any(self, family_id: str, project: str | None = None) -> Standing:
-        """リポジトリが分かれば `standing`。分からなければ取り込み状態のあるリポジトリを全部探す。
+        """リポジトリが分かれば `standing`。分からなければ、取り込み状態か同じ名前の親の
+        ワークツリーのあるリポジトリを全部探す。
 
-        同じ識別子の親子のチケットが 2 つ以上のリポジトリにあれば、どれとも決めずに止める。
+        同じ識別子の親子のチケットが 2 つ以上のリポジトリにあれば、どれとも決めずに止める
+        （ワークスペースのユーザの付けた名前 `web-i0012` と、プロジェクト web の issue 12 の
+        親子のチケットなど）。どこにも無ければワークスペース自身として引く（親のワークツリーが
+        無いので止まる）。
         """
         if project is not None:
             return self.standing(family_id, project)
-        if not self.active:
-            return Standing(family_id, SELF)
-        hits = [
-            self.standing(family_id, project_of_key(repo))
-            for repo in repos(self.conf.state)
-            if family(self.conf.state, repo, family_id) is not None
-        ]
-        if not hits:
-            return Standing(family_id, SELF)
-        # 取り込み状態は 1 つでも、同じ名前の親のワークツリーが別のリポジトリにもあれば、
-        # どちらの親子のチケットか決めない（ワークスペースのユーザの付けた名前 `web-i0012` と、
-        # プロジェクト web の issue 12 の親子のチケットなど）
-        other = sorted(
-            {repo_key(w.project) for w in self.worktrees() if w.name == family_id}
-            - {h.repo for h in hits}
-        )
-        if len(hits) == 1 and not other:
-            return hits[0]
-        where = ", ".join([h.repo for h in hits] + other)
+        repos_found: list[str] = []
+        if self.active:
+            repos_found = [
+                r for r in repos(self.conf.state) if family(self.conf.state, r, family_id)
+            ]
+        for w in self.worktrees():
+            if w.name == family_id and repo_key(w.project) not in repos_found:
+                repos_found.append(repo_key(w.project))
+        if not repos_found:
+            return self.standing(family_id, "")
+        if len(repos_found) == 1:
+            return self.standing(family_id, project_of_key(repos_found[0]))
+        hits = [self.standing(family_id, project_of_key(r)) for r in repos_found]
+        where = ", ".join(repos_found)
         return Standing(
             family_id,
             hits[0].repo,
             hits[0].record,
             stop=(
-                f"親子のチケット {family_id} の取り込み状態が複数のリポジトリ（{where}）にある。"
-                "どれか決まらない"
+                f"親子のチケット {family_id} が複数のリポジトリ（{where}）にある。どれか決まらない"
             ),
         )
 
@@ -536,18 +525,9 @@ class Families:
     def branch_any(self, family_id: str, project: str | None = None) -> str:
         """リポジトリの分からない親子のチケットの親のブランチ名。
 
-        リポジトリが分かればそれで引く。分からなければ、取り込み済みならその取り込み状態のリポジトリ、
-        そうでなければ識別子の名前のワークツリーの元リポジトリで引く。決まらなければ空。
+        立ち位置（`standing_any`）の親のブランチ名。決まらなければ空。
         """
-        if project is None:
-            st = self.standing_any(family_id)
-            if st.imported:
-                project = project_of_key(st.repo)
-            else:
-                named = [w for w in self.worktrees() if w.name == family_id]
-                if len(named) == 1:
-                    project = named[0].project
-        return self.branch(family_id, project) if project is not None else ""
+        return self.standing_any(family_id, project).branch
 
     def _all_trees(self) -> list[tree.Tree]:
         return [tree.main_tree(self.root), *tree.projects(self.conf.projects), *self.worktrees()]
@@ -563,11 +543,11 @@ class Families:
     def _standing(self, family_id: str, project: str) -> Standing:
         repo = repo_key(project)
         record = family(self.conf.state, repo, family_id) if self.active else None
-        if record is None:
-            return Standing(family_id, repo)
         branch = self.branch(family_id, project)
         home = self.home_tree(family_id, project)
-        if record.state == STATE_CLOSED or self._closed_in_integration(repo, family_id, home):
+        if (record is not None and record.state == STATE_CLOSED) or self._closed_in_integration(
+            repo, family_id, home
+        ):
             return Standing(
                 family_id,
                 repo,
@@ -582,12 +562,11 @@ class Families:
             )
         if (
             home is None
-            and not record.broken
-            and record.state == STATE_PRESENT
+            and (record is None or (not record.broken and record.state == STATE_PRESENT))
             and self._named_tree(family_id, project) is None
             and self._archived(repo, family_id)
         ):
-            # 退避で補うのは、取り込み状態が present で、親のワークツリーを片付けた後だけ。
+            # 退避で補うのは、取り込み状態が無いか present で、親のワークツリーを片付けた後だけ。
             # gone・blocked・破損しているときは今までどおり止める。
             return Standing(
                 family_id,
@@ -600,15 +579,15 @@ class Families:
                 ),
                 closed=True,
             )
-        if record.broken:
+        if record is not None and record.broken:
             stop = f"親子のチケット {family_id} の取り込み状態が不正（{record.broken}）"
-        elif record.state == STATE_GONE:
+        elif record is not None and record.state == STATE_GONE:
             stop = (
                 f"親のブランチ {record.branch or branch or family_id} がリモートに無く、"
                 "統合先にもクローズ済みの記録がありません（取り込み状態が gone）。"
                 "この親子のチケットの状態を決められない"
             )
-        elif record.state == STATE_BLOCKED:
+        elif record is not None and record.state == STATE_BLOCKED:
             why = record.reason or "理由なし"
             stop = f"取り込みの検査で親子のチケット {family_id} を止めた（{why}）"
         elif home is None:
@@ -618,20 +597,18 @@ class Families:
             if busy:
                 stop = (
                     f"親のワークツリー（{where}）に途中の操作（{busy}）がある。"
-                    "済ませるか取りやめるまで、取り込み済みの親子のチケットでどのチケットを正とするかが"
-                    "決まらない"
+                    "済ませるか取りやめるまで、どのチケットを正とするかが決まらない"
                 )
             elif named is not None:
                 stop = (
                     f"親のワークツリー（{where}）の HEAD のブランチ名を変換した識別子が"
                     f"フォルダ名（{family_id}）と合わない。"
-                    "取り込み済みの親子のチケットでどのチケットを正とするかが決まらない"
+                    "どのチケットを正とするかが決まらない"
                 )
             else:
                 stop = (
                     f"親のワークツリー（{where}）がありません。"
-                    "取り込み済みの親子のチケットでどのチケットを正とするかが決まらない"
-                    "（取り込み状態は、親のワークツリーを片付けても残る）"
+                    "ほかのツリーのコピーでは代用しない（どのチケットを正とするかが決まらない）"
                 )
         else:
             stop = ""

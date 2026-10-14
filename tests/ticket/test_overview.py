@@ -65,7 +65,7 @@ class OverviewTest(PhaseHarness):
         self.assertIn("== このPCで作業中の親", out)
         line = self.parent_line(out)
         self.assertIn("ブランチ i0001", line)
-        self.assertIn("MR なし", line)
+        self.assertIn("MR !1", line)  # 親チケットの mr:
         self.assertIn("次の子 i0001-01-01", line)
         self.assertIn("最終取り込み リモート未確認", line)
         # origin が無いので、リモート追跡の ref が無い。送っていないものは「一度も送っていない」
@@ -76,14 +76,15 @@ class OverviewTest(PhaseHarness):
         self.record(mr="12")
         line = self.parent_line(self.said())
         self.assertIn(f"最終取り込み {label(FETCHED)}", line)
-        self.assertIn("MR !12", line)
+        # 親チケットの mr: が先。取り込み記録の mr（12）は親チケットに無いときの控え
+        self.assertIn("MR !1", line)
         self.assertNotIn("リモート未確認", line)
 
     def test_row_reads_the_mr_from_the_record(self):
         self.family(plan=["research"])
         self.record(mr="12")
         rows = self.rows()
-        self.assertEqual(rows[0].mr, "12")
+        self.assertEqual(rows[0].mr, "1")
 
     def rows(self):
         conf, _ = settings.load(self.root)
@@ -138,7 +139,7 @@ class OverviewTest(PhaseHarness):
         self.record(mr="3")
         text = overview.session_text(conf, self.root)
         self.assertTrue(text.startswith("[ccnavi] このPCで作業中の親:"), text)
-        self.assertIn("- 親 i0001  ブランチ i0001  MR !3", text)
+        self.assertIn("- 親 i0001  ブランチ i0001  MR !1", text)
         self.assertIn(f"最終取り込み {label(FETCHED)}", text)
         self.assertNotIn("リモート未確認の親は", text)
 

@@ -110,7 +110,7 @@ def parent_text(
 
 
 def _parent_text(name, plan, feedback, allow, issue):
-    lines = ["---", "version: 1", f"ticket: {name}"]
+    lines = ["---", "version: 1", f"ticket: {name}", "mr: 1"]
     if issue is not None:
         lines.append(f"issue: {issue}")
     lines.append("plan:")

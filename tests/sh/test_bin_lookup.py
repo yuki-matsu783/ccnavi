@@ -47,7 +47,7 @@ class BinLookupTest(unittest.TestCase):
         full.update(env)
         full.pop("CCNAVI_WORKSPACE", None)
         return subprocess.run(
-            [SHELL, os.path.join(".ccnavi", "scripts", "ccnavi-ticket.sh"), "start", "x"],
+            [SHELL, os.path.join(".ccnavi", "scripts", "ccnavi-ticket.sh"), "status", "x"],
             cwd=self.ws,
             env=full,
             capture_output=True,
@@ -65,7 +65,7 @@ class BinLookupTest(unittest.TestCase):
         result = self.run_ticket()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(result.stdout.startswith("bin "), result.stdout)
-        self.assertIn("ticket start x", result.stdout)
+        self.assertIn("ticket status x", result.stdout)
 
     def test_the_local_build_wins_over_the_machine_build(self):
         self.put_machine_build()

@@ -201,8 +201,6 @@ def _sync(conf: settings.Settings, root: str) -> list[Problem]:
         return problems
     for repo, name in syncstate.family_names(conf.state):
         st = fams.standing(name, syncstate.project_of_key(repo))
-        if not st.imported:
-            continue
         where = f"(sync/{repo}/{name})"
         hint = " / ".join(syncstate.guidance(root, st))
         if st.closed:

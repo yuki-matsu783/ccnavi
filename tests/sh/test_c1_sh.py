@@ -919,31 +919,96 @@ class PlacesAreNotReadTest(C1Harness):
         self.assertFalse(os.path.exists(outside), "CCNAVI_STATE を読んでいる")
 
 
+class C1ChildWorktreeTest(C1Harness):
+    """子の start で、このPCに子のワークツリーが無ければ、取り込み直後の親ブランチから作る。
+
+    別のPCで承認された子でも、どのPCでも同じ場所に作る。
+    """
+
+    def child_path(self):
+        return os.path.join(self.ws, ".claude", "worktrees", CHILD)
+
+    def start_parent(self):
+        result = self.ticket("start", PARENT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_start_creates_the_missing_child_worktree_from_the_parent_branch(self):
+        self.start_parent()
+        self.assertFalse(os.path.exists(self.child_path()))
+        parent_head = self.sha(self.tree, "HEAD")
+        result = self.ticket("start", CHILD)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(os.path.isdir(self.child_path()))
+        branch = git(self.child_path(), "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+        self.assertEqual(branch, CHILD)
+        # 子のワークツリーは、着手を書く前の（取り込み直後の）親ブランチの先頭から切れている
+        base = git(self.child_path(), "rev-parse", "HEAD").stdout.strip()
+        self.assertEqual(base, parent_head)
+        self.assertIn("子のワークツリー", result.stderr)
+
+    def test_a_child_branch_left_behind_the_parent_is_reused(self):
+        self.start_parent()
+        git(self.ws, "branch", CHILD, "main")  # 古い手元の子のブランチ（親の先頭の祖先）
+        result = self.ticket("start", CHILD)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            git(self.child_path(), "rev-parse", "HEAD").stdout.strip(),
+            self.sha(self.tree, "HEAD~1"),
+        )
+
+    def test_a_child_branch_with_its_own_commits_is_not_touched(self):
+        self.start_parent()
+        git(self.ws, "branch", CHILD, "main")
+        side = os.path.join(self._base, "side")
+        git(self.ws, "worktree", "add", "-q", side, CHILD)
+        write(os.path.join(side, "mine.txt"), "x\n")
+        git(side, "add", "-A")
+        git(side, "commit", "-q", "-m", "mine")
+        git(self.ws, "worktree", "remove", "--force", side)
+        result = self.ticket("start", CHILD)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("に無いコミットがある", result.stderr)
+        self.assertFalse(os.path.exists(self.child_path()))
+
+
 class C1NotImportedTest(C1Harness):
-    """10. 取り込み状態の無い親子のチケットは今のまま（書くだけ。コミットも push もしない）。"""
+    """10. 取り込み記録の無い PC でも、着手は C1 で取り込み・コミット・push まで行う。
+
+    取り込み記録（キャッシュ）は C1 の対象を決めない。親のワークツリーがあり、origin があり、
+    HEAD の確認に通れば対象で、記録は C1 の取り込みが作る。
+    """
 
     imported = False
 
-    def test_start_only_writes(self):
+    def test_start_fetches_commits_and_pushes_without_a_record(self):
+        self.assertFalse(os.path.exists(self.record))
         head = self.sha(self.tree, "HEAD")
-        remote = self.remote_sha()
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.sha(self.tree, "HEAD"), head)
-        self.assertEqual(self.remote_sha(), remote)
-        self.assertIn(f"{APPROVED}/doing/{PARENT}.md", self.dirty())
-        self.assertEqual(result.stderr, "")
-        self.assertFalse(os.path.exists(os.path.join(self.state, "c1")))
+        after = self.sha(self.tree, "HEAD")
+        self.assertNotEqual(after, head)
+        self.assertEqual(self.remote_sha(), after)
+        self.assertEqual(self.dirty(), "")
+        # 取り込みが記録（キャッシュ）を作る
+        self.assertEqual(fields(self.record)["state"], "present")
+        self.assertEqual(fields(self.record)["sha"], after)
 
-    def test_the_same_output_as_the_executable(self):
-        """sh を通しても、実行ファイルを直に打ったのと同じ出力と終了コード。"""
-        direct = self.exe("ticket", "cancel", CHILD, "--reason", "r")
-        git(self.tree, "checkout", "-q", "--", ".")
-        git(self.tree, "clean", "-qfd")
-        via = self.ticket("cancel", CHILD, "--reason", "r")
-        self.assertEqual(via.returncode, direct.returncode)
-        self.assertEqual(via.stdout, direct.stdout)
-        self.assertEqual(via.stderr, direct.stderr)
+    def test_finish_pushes_without_a_record_too(self):
+        self.assertEqual(self.ticket("start", PARENT).returncode, 0)
+        child_tree = self.child_tree()
+        started = self.ticket("start", CHILD)
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        # 記録を消した別の PC のつもり
+        os.remove(self.record)
+        write(os.path.join(child_tree, "wip", "design", "a.md"), "a\n")
+        git(child_tree, "add", "-A")
+        git(child_tree, "commit", "-q", "-m", "work")
+        git(self.tree, "merge", "-q", "--no-edit", CHILD)
+        git(self.tree, "push", "-q", "origin", PARENT)
+        result = self.ticket("finish", CHILD)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        self.assertEqual(fields(self.record)["state"], "present")
 
     def test_origin_less_family_with_a_record_is_not_c1(self):
         write(
@@ -959,22 +1024,19 @@ class C1NotImportedTest(C1Harness):
 
 
 class C1WithoutMrTest(C1Harness):
-    """10. マージリクエストで見るフェーズが無い親子のチケットは、
-    取り込み済みでも
-    C1 にしない。
-    """
+    """10. マージリクエストで見るフェーズが無い親子のチケットも C1 の対象（外した条件）。"""
 
     plan = ("research",)
 
-    def test_start_only_writes(self):
+    def test_start_commits_and_pushes(self):
         head = self.sha(self.tree, "HEAD")
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.sha(self.tree, "HEAD"), head)
-        self.assertIn(f"{APPROVED}/doing/{PARENT}.md", self.dirty())
+        after = self.sha(self.tree, "HEAD")
+        self.assertNotEqual(after, head)
+        self.assertEqual(self.remote_sha(), after)
         family = self.exe("c1", "family", PARENT)
-        self.assertIn("target no", family.stdout)
-        self.assertIn("マージリクエストで見るフェーズが無い親子のチケット", family.stdout)
+        self.assertIn("target yes", family.stdout)
 
 
 class PhaseOne:
@@ -1285,7 +1347,18 @@ class Host(__import__("http.server").server.BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path.endswith("/merge_requests"):
             url = f"http://127.0.0.1:{self.port}/demo/greeter/-/merge_requests/1"
-            self.reply(200, [{"iid": 1, "web_url": url, "source_project_id": 1}])
+            self.reply(
+                200,
+                [
+                    {
+                        "iid": 1,
+                        "web_url": url,
+                        "source_project_id": 1,
+                        "source_branch": PARENT,
+                        "target_branch": "main",
+                    }
+                ],
+            )
         elif path.endswith("/notes"):
             page = "page=1" in self.path
             self.reply(200, list(Host.notes) if page else [])
@@ -1874,108 +1947,6 @@ class C1ChromeConfirmTest(PhaseOne, C1Harness):
         self.assertEqual(
             again["problems"], ["ccnavi: [CORE_CONFIRM_ALREADY_REVIEWED] フェーズ 1 はレビュー済み"]
         )
-
-
-@unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
-class C1HostNotImportedTest(C1HostHarness):
-    """取り込み済みでない親子のチケットの ready。退避の削除は送らずに止め、Draft を外さない。"""
-
-    imported = False
-
-    def mover(self, tree_line):
-        return executable(
-            os.path.join(self._base, "bin", "mover"),
-            "#!/bin/sh\n"
-            'case " $* " in\n'
-            '*" review ready "*)\n'
-            '  root=""; prev=""\n'
-            '  for a in "$@"; do [ "$prev" = --root ] && root="$a"; prev="$a"; done\n'
-            '  mkdir -p "$root/logs/state"; : >"$root/logs/state/note.md"\n'
-            "  printf '%s\\n' \"$root/logs/state/note.md\"\n"
-            f"  {tree_line}\n"
-            "  exit 0 ;;\n"
-            "esac\n"
-            f"exec '{self.half}' \"$@\"\n",
-        )
-
-    def test_ready_stops_when_the_archived_tree_has_uncommitted_changes(self):
-        # 退避したツリー（実行ファイルが答える）に未コミットの削除がある。cwd が綺麗でも止める。
-        other = os.path.join(self._base, "other")
-        git(self._base, "init", "-q", "-b", "main", other)
-        for key, value in CONFIG:
-            git(other, "config", key, value)
-        write(os.path.join(other, APPROVED, "done", "old.md"), "x\n")
-        git(other, "add", "-A")
-        git(other, "commit", "-q", "-m", "old")
-        os.remove(os.path.join(other, APPROVED, "done", "old.md"))
-        ready = self.review("ready", CCNAVI_BIN_PATH=self.mover(f"printf 'tree %s\\n' '{other}'"))
-        self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
-        self.assertIn("未コミットの変更がある", ready.stderr)
-        self.assertNotIn("Draft を解除した", ready.stdout)
-
-    def test_ready_stops_when_wip_removals_are_not_sent(self):
-        # ready が消した wip/ の追跡済みのファイル（未コミット）。送るまで Draft を外さない。
-        self.eli5()
-        os.remove(os.path.join(self.tree, *ELI5.split("/")))
-        ready = self.review(
-            "ready", CCNAVI_BIN_PATH=self.mover(f"printf 'tree %s\\n' '{self.tree}'")
-        )
-        self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
-        self.assertIn("wip/ に未コミットの変更がある", ready.stderr)
-        self.assertNotIn("Draft を解除した", ready.stdout)
-
-    def test_ready_unsent_tells_the_cause_and_the_commands_to_type(self):
-        """止まるとき、原因（親が取り込み済みでない）と、次に打つ 4 手をパス入りで案内する。"""
-        self.eli5()
-        os.remove(os.path.join(self.tree, *ELI5.split("/")))
-        ready = self.review(
-            "ready", CCNAVI_BIN_PATH=self.mover(f"printf 'tree %s\\n' '{self.tree}'")
-        )
-        self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
-        err = ready.stderr
-        self.assertIn("親が取り込み済みでないため", err)
-        self.assertIn("承認済みチケットがどのツリーに在るかを確かめる", err)
-        git_sh = f"sh {os.path.realpath(self.ws)}/.ccnavi/scripts/ccnavi-git.sh"
-        self.assertIn(f"{git_sh} add -u -- {APPROVED} wip", err)
-        self.assertIn(f"1) cd {self.tree} && sh ", err)
-        self.assertIn(f"2) {git_sh} commit -m", err)
-        self.assertIn(f"3) {git_sh} push", err)
-        self.assertIn(f"4) ready --parent {PARENT} を再実行します", err)
-
-    @unittest.skipIf(os.name == "nt", "大文字違いの並存と名前の \\ は Windows では作れない")
-    def test_ready_stops_when_wip_removals_in_any_case_are_not_sent(self):
-        """実行ファイルが消した `WIP/…` や `wip\\…` の削除も、送るまで Draft を外さない。
-
-        実行ファイルは大文字小文字・\\ を問わず wip/ と見る。確かめるのは実行ファイルが出した
-        `wip <パス>` の行そのもの。
-        """
-        for rel in ("WIP/eli5/a.html", "wip\\eli5\\b.html"):
-            with self.subTest(rel=rel):
-                write(os.path.join(self.tree, rel), "<p>x</p>\n")
-                git(self.tree, "add", "--", rel)
-                git(self.tree, "commit", "-q", "-m", f"add {rel}")
-                git(self.tree, "push", "-q", "origin", PARENT)
-                os.remove(os.path.join(self.tree, rel))
-                ready = self.review(
-                    "ready",
-                    CCNAVI_BIN_PATH=self.mover(
-                        f"printf 'tree %s\\nwip-from x\\n' '{self.tree}'; "
-                        f"printf '%s\\n' 'wip {rel}'"
-                    ),
-                )
-                self.assertNotEqual(ready.returncode, 0, ready.stdout + ready.stderr)
-                self.assertIn("未コミットの変更がある", ready.stderr)
-                self.assertNotIn("Draft を解除した", ready.stdout)
-                git(self.tree, "rm", "-q", "--cached", "--", rel)
-                git(self.tree, "commit", "-q", "-m", f"rm {rel}")
-                git(self.tree, "push", "-q", "origin", PARENT)
-
-    def test_ready_goes_on_when_the_archived_tree_is_clean(self):
-        ready = self.review(
-            "ready", CCNAVI_BIN_PATH=self.mover(f"printf 'tree %s\\n' '{self.tree}'")
-        )
-        self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
-        self.assertIn("Draft を解除した", ready.stdout)
 
 
 if __name__ == "__main__":

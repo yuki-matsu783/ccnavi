@@ -133,7 +133,8 @@ def board(
     grouped = ticket_fold.by_ticket(everything)
     seen = {tid: [_where(t) for t in hits] for tid, hits in grouped.items()}
     scattered = {
-        tid: [_where(t) for t in ticket_fold.collisions(hits)] for tid, hits in grouped.items()
+        tid: [_where(t) for t in ticket_fold.collisions(hits, across_trees=True)]
+        for tid, hits in grouped.items()
     }
 
     # 承認の時刻。履歴か git から引く（承認済みチケットには書かない）。git はツリーごとに 1 回まで。
@@ -531,7 +532,7 @@ def _ticket_record(
         # 状態が動いた履歴の新しい側。追記するだけの補助で、状態の正は上の置き場の欄。
         "history": [],
     }
-    where = approval.home_dir(conf, root, ticket_id, source.parent, project=source.project)
+    where = approval.home_dir_read(conf, root, ticket_id, source.parent, project=source.project)
     entries, unreadable = history.read(where, ticket_id)
     record["history"] = entries
     if unreadable:
@@ -658,7 +659,7 @@ def _parent_record(
     raw: approval.Raw | None = None,
 ) -> dict:
     """親 1 件。局面、計画、親のマーカー、フェーズのリスト。`raw` は `phase.phases_of` と同じ。"""
-    where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+    where = approval.home_dir_read(conf, root, parent.ticket, "", project=parent.project)
     closed = parent.ticket in closed_index
     return {
         "ticket": parent.ticket,

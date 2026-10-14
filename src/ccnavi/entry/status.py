@@ -270,14 +270,14 @@ class _Family:
         stops: list[str] = []
         warns: list[str] = []
         st = approval_checks.family_standing(self.conf, self.root, t, self.fams)
-        if st.imported and st.stop:
+        if st.stop:
             stops.append(f"{st.stop}（この親子のチケットの状態は動かさない）")
             stops += syncstate.guidance(self.root, st)
         if t.blocked:
             stops.append(t.blocked)
         uncommitted = file_state.kind == FILE_UNCOMMITTED
         verdict, why = self.c1_target()
-        if verdict == c1.TARGET_STOP and not (st.imported and st.stop):
+        if verdict == c1.TARGET_STOP and not st.stop:
             # C1 の sh（ccnavi-ticket.sh）が状態の操作を断る。
             stops.append(f"C1 では状態の操作を実行できません: {why or '理由が分からない'}")
         carried = uncommitted and verdict == c1.TARGET_YES

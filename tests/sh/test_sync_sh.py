@@ -53,7 +53,7 @@ ALLOW = 'allow:\n  - match: Write\n    glob: "wip/*"\n'
 
 def copy_text(name=PARENT, base_sha=BASE_SHA, started_at=STARTED_AT, extra="", body=""):
     """着手済みの親の承認済みチケット（承認で欄を書かない形。着手の欄はスクリプトが書く）。"""
-    head = f"---\nversion: 1\nticket: {name}\n{ALLOW}"
+    head = f"---\nversion: 1\nticket: {name}\nmr: 1\n{ALLOW}"
     fields = f"base_sha: {base_sha}\n" if base_sha else ""
     fields += f"started_at: '{started_at}'\n" if started_at else ""
     return f"{head}{fields}{extra}---\n{body}"

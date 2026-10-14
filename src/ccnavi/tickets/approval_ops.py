@@ -18,7 +18,6 @@ from . import (
     approval_checks,
     approval_marks,
     archive,
-    flow,
     history,
     ticket_fields,
     ticket_ids,
@@ -110,63 +109,6 @@ def to_review(approved_dir: str, tree_root: str, tickets_rel: str, ticket_id: st
         approval.copy_path(approved_dir, ticket_id),
         approval.review_path(tree_root, tickets_rel, ticket_id),
     )
-
-
-def carry_flow(
-    conf: settings.Settings, root: str, proposal: ticket_model.Ticket, approved_dir: str
-) -> list[str]:
-    """承認した子のフローを、提案のツリーから承認済みチケットのツリーへ動かす。知らせる行を返す。
-
-    フローの置き場は承認済みチケットと同じツリー。ユーザは承認の前に、提案が在る
-    ツリーの置き場へボードで保存する。承認で子が別のツリー（親のワークツリーなど）へ動くと、
-    フローだけが元のツリーに残り、読まれなくなる。承認はユーザの操作なので、ここで一緒に
-    動かす。行き先に違う中身のフローが既に在れば上書きせず、そう言う（元のほうも残す）。
-    リンク・ふつうのファイルでないもの・ハードリンクは移さない（`flow.load` と同じ読み方）。
-    """
-    source_root = proposal.tree_root or root
-    source = flow.flow_file(conf, source_root, proposal.ticket)
-    target = os.path.normpath(
-        os.path.join(approved_dir, flow.FLOWS_DIR, f"{proposal.ticket}{flow.SUFFIX}")
-    )
-    try:
-        if not fsio.lexists(source):
-            return []
-        if os.path.normcase(os.path.realpath(source)) == os.path.normcase(os.path.realpath(target)):
-            return []
-    except (OSError, ValueError):
-        return []
-    raw, why = flow.read_bytes(source, source_root)
-    if raw is None:
-        return [
-            f"{proposal.ticket} のフロー {source} を移さなかった: {why}。"
-            "ユーザが確かめて置き直してください"
-        ]
-    if fsio.lexists(target):
-        held, _ = flow.read_bytes(target)
-        if held != raw:
-            return [
-                f"{proposal.ticket} のフローを {target} へ移さなかった: 行き先に違う中身のフローが"
-                f"既に在る（上書きしない）。{source} と見比べて、ユーザが 1 本に決める"
-            ]
-        fsio.remove(source)
-        return []
-    # 失敗したときの行は承認の plan でも同じものを出せるよう、書き込みにつける（`FAIL_LINE`）。
-    cannot = f"{proposal.ticket} のフローを {target} へ移せない ({{reason}})。{source} に残っている"
-    with fsio.policy(message=cannot):
-        # 途中で中断されても書きかけを残さない書き方で置く。在るかを確かめてから置くまでの間に
-        # ボードの保存が割り込むと上書きしうるが、書きかけのフローを残すよりよいと採った。
-        failed = fsio.write_new_durable(target, raw)
-    if failed:
-        return [cannot.replace("{reason}", failed)]
-    kept = (
-        f"{proposal.ticket} のフローを {target} へコピーした。"
-        f"元の {source} は削除できなかった ({{reason}})"
-    )
-    with fsio.policy(message=kept):
-        failed = fsio.unlink(source)
-    if failed:
-        return [kept.replace("{reason}", failed)]
-    return [f"{proposal.ticket} のフローを {source} から {target} へ動かした"]
 
 
 def move_file(source: str, target: str) -> str:
@@ -407,7 +349,10 @@ def followup(
     unreadable = _unreadable(ident, ticket_mod.render(t))
     if unreadable:
         return ident, unreadable
-    where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+    try:
+        where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+    except approval.NoParentWorktree as exc:
+        return ident, f"続きの子を書く親のワークツリーが決まらない（{exc}）"
     failed = approval_marks.write_ticket(approval.copy_path(where, ident), ticket_mod.render(t))
     if failed:
         return ident, failed

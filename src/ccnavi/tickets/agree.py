@@ -456,12 +456,6 @@ def _apply_steps(
             failed = approval_ops.admit(where, t, approval.source_branch(t))
             if failed:
                 return t.ticket, failed
-            if t.is_child:
-                group = stage.new_group()
-                with fsio.policy(on_fail=fsio.FAIL_LINE, group=group):
-                    carried = approval_ops.carry_flow(conf, root, t, where)
-                for line in carried:
-                    stage.line(f"  {line}", group=group)
             # 終わったフェーズに子を足したら、そのフェーズのマーカーは消す。マーカーは
             # 「その時点の子が全部見られた」以上の意味を持たない。
             # 消すのは置けたあと。先に消すと、書けずに終わった（置き場が塞がっている、権限が無い）

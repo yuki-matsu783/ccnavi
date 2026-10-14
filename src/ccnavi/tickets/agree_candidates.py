@@ -109,6 +109,7 @@ def candidates(
         complaints = _workflow_field(t) + script_field_problems(t) + record_field_problems(t)
         complaints += revision_problems(root, conf, t, current, config)
         complaints += approval_checks.family_problems(conf, root, t, fams)
+        complaints += approval_checks.mr_problems(t)
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
@@ -142,6 +143,7 @@ def candidates(
         complaints += approval_checks.project_problems(t, pool, conf)
         complaints += approval_checks.place_problems(root, conf, t)
         complaints += approval_checks.family_problems(conf, root, t, fams)
+        complaints += approval_checks.mr_problems(t)
         complaints += approval_checks.integration_problems(conf, root, t, fams)
         complaints += approval_checks.branch_problems(
             conf, root, t, fams, list(approved) + list(pending) + list(revisions)
@@ -267,7 +269,7 @@ def project_of(t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket]) -> 
 def feedback_notes(root: str, conf: settings.Settings, parent: ticket_model.Ticket) -> list[str]:
     """フィードバック計画の承認に添える証跡。何を見たうえでの合意かを残す。"""
     accepted = approval_marks.accepted_threads(
-        approval.home_dir(conf, root, parent.ticket, "", project=parent.project), parent.ticket
+        approval.home_dir_read(conf, root, parent.ticket, "", project=parent.project), parent.ticket
     )
     notes = [f"受け入れ済みの未解決スレッド: {len(accepted)} 件"]
     if not parent.feedback:

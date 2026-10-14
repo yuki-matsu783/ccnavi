@@ -324,7 +324,7 @@ def phases_of(
             phase.states[t.ticket] = t.state
     # マーカーと記録は親のツリーに置く。子のワークツリーにも承認済みチケットは checkout されるが、
     # マーカーを子の側に書くと、同じフェーズのマーカーが複数のツリーに分かれて置かれる。
-    where = approval.home_dir(conf, root, parent_id, "")
+    where = approval.home_dir_read(conf, root, parent_id, "")
     for phase in by_number.values():
         phase.marks = approval_marks.marks(where, parent_id, phase.number)
         for t in phase.tickets:
@@ -464,7 +464,7 @@ def announce(
     `raw` は `phases_of` と同じ。ここが書くのはマーカーだけで、置き場のチケットは動かさない。
     """
     texts = []
-    where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+    where = approval.home_dir_read(conf, root, parent.ticket, "", project=parent.project)
     phases = phases_of(root, conf, parent.ticket, raw=raw)
     # マーカーの `source` を決めるためだけに読む。判定は写しを読み、ここで読んだ定義は使わない。
     # 読むのはマーカーを置くフェーズがあるときだけ。
@@ -725,7 +725,7 @@ def _later(a: str, b: str) -> bool:
 
 def _was_requested(conf: settings.Settings, root: str, parent: str, number: int) -> bool:
     """このフェーズの依頼の記録が、続きの子を足したときに消されたことがあるか（親の状態の履歴）。"""
-    where = approval.home_dir(conf, root, parent, "")
+    where = approval.home_dir_read(conf, root, parent, "")
     entries, _ = history.read(where, parent, limit=0)
     for entry in entries:
         if (
@@ -826,7 +826,7 @@ def _marker_tree(root: str, conf: settings.Settings, child: ticket_model.Ticket)
 
     置き場の設定が絶対パスなどで、ツリーのルートを引けないときは「マーカーがあるツリー」。
     """
-    where = approval.home_dir(conf, root, child.parent, "")
+    where = approval.home_dir_read(conf, root, child.parent, "")
     rel = (conf.approved or settings.DEFAULT_APPROVED).replace("/", os.sep)
     suffix = os.sep + rel
     if not where.endswith(suffix):
@@ -1029,7 +1029,7 @@ def stage(
             groups.setdefault(p.review_label, []).append(p.label)
         return "、".join(f"{label}（{'、'.join(names)}）" for label, names in groups.items())
     if approval_marks.read_parent_mark(
-        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
+        approval.home_dir_read(conf, root, parent.ticket, "", project=parent.project),
         parent.ticket,
         approval_marks.PARENT_MARK_CLOSE_EARLY,
     ):

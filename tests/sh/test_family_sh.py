@@ -4,8 +4,8 @@
 同じく右から 2 段を剥がして親にする。親が `-` や数字を含んでも
 （`web-i0012-05-01` の親は `web-i0012`）割り出し方は 1 通りに決まる。
 
-取り込み状態の記録が無ければ、sh は実行ファイルに聞かずに割り出した親を `ccnavi_c1_family_id` に
-入れて対象外（`no`）と答える。記録があれば、その親の名前で記録を探す。
+取り込み状態の記録の有無は問わない。sh はいつも実行ファイルに聞く。聞けない（実行ファイルが無い・
+古い）ときは、割り出した親を `ccnavi_c1_family_id` に入れて `stop` と答える。
 """
 
 from __future__ import annotations
@@ -58,17 +58,15 @@ class FamilyShTest(unittest.TestCase):
             ("i0012-01", "i0012-01"),
         ):
             with self.subTest(ident=ident):
-                self.assertEqual(self.family(ident), (parent, "no"))
+                self.assertEqual(self.family(ident), (parent, "stop"))
 
-    def test_the_record_is_looked_up_by_the_parent(self):
+    def test_the_answer_does_not_depend_on_a_record(self):
         families = os.path.join(self.root, "logs", "state", "sync", "ws", "families")
         os.makedirs(families)
         with open(os.path.join(families, "web-i0012"), "w", encoding="utf-8") as f:
             f.write("")
-        family, target = self.family("web-i0012-05-01")
-        self.assertEqual(family, "web-i0012")
-        # 記録があるので実行ファイルに聞く。ここでは実行ファイルが無いので止める結果になる。
-        self.assertNotEqual(target, "no")
+        # 記録があってもなくても、実行ファイルに聞けなければ止める
+        self.assertEqual(self.family("web-i0012-05-01"), ("web-i0012", "stop"))
 
 
 if __name__ == "__main__":

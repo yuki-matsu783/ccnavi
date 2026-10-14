@@ -23,8 +23,8 @@ from tests.ticketsample import parent_text
 
 
 def with_mr(text, mr):
-    head, rest = text.split("\n", 3)[:3], text.split("\n", 3)[3]
-    return "\n".join([*head, f"mr: {mr}", rest])
+    """提案の `mr:` を差し替える（`parent_text` は `mr: 1` を持つ）。"""
+    return text.replace("\nmr: 1\n", f"\nmr: {mr}\n", 1)
 
 
 class PromptHintTest(PhaseHarness):

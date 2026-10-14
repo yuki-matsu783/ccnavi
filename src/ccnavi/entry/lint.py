@@ -604,7 +604,7 @@ def family_check(
         if ours(t) and t.blocked:
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
     where = f"(sync/{st.repo}/{family})"
-    if st.imported and st.stop and not st.closed:
+    if st.stop and not st.closed:
         problems.append(Problem(SEVERITY_ERROR, where, st.stop))
     return problems
 

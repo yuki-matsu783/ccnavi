@@ -326,39 +326,16 @@ class SourceBranchTest(CoreHarness):
         found = [json.loads(line) for line in events["content"].decode().splitlines()]
         return [r.get("tree") for r in found if r.get("kind") == history.KIND_APPROVED]
 
-    def test_a_detached_head_falls_back_to_the_tree_name(self):
+    def test_a_detached_head_is_not_approved(self):
+        # 親のワークツリーの HEAD がブランチを指していなければ、ほかのツリーで代用せずに止まる
         git(self.parent_tree, "checkout", "--quiet", "--detach")
+        self.propose("i0001", parent_text("i0001", ["research"]))
+        self.commit_parent()
+        self.assertNotEqual(self.approve().returncode, 0)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
+
+    def test_the_branch_name_is_recorded_from_the_head(self):
         self.assertEqual(self.approve_one(), "i0001")
-
-    def test_a_broken_head_falls_back_to_the_tree_name(self):
-        gitfile = os.path.join(self.parent_tree, ".git")
-        with open(gitfile, encoding="utf-8") as f:
-            gitdir = f.read().split("gitdir:", 1)[1].strip()
-        head = os.path.join(gitdir, "HEAD")
-        with open(head, encoding="utf-8") as f:
-            kept = f.read()
-        write(head, "garbage\n")
-        try:
-            snapshot = self.snapshot()
-            self.propose("i0001", parent_text("i0001", ["research"]))
-            with history.session(history.VIA_CHROME, None):
-                changes = core.plan(snapshot, core.judge_approval(snapshot))
-            self.assertEqual(self.approved_tree(changes.per_branch()["i0001"]), ["i0001"])
-        finally:
-            write(head, kept)
-
-    def test_the_workspace_root_records_its_branch(self):
-        write(
-            os.path.join(self.root, "wip", "proposals", "todo", "i0001.md"),
-            parent_text("i0001", ["research"]),
-        )
-        snapshot = self.snapshot()
-        with history.session(history.VIA_CHROME, None):
-            changes = core.plan(snapshot, core.judge_approval(snapshot))
-        rows = [r for rows in changes.per_branch().values() for r in rows]
-        self.assertEqual(self.approved_tree(rows), ["main"])
-        copy = next(r for r in rows if r["path"].endswith("doing/i0001.md"))
-        self.assertEqual(copy["content"], parent_text("i0001", ["research"]).encode())
 
 
 class PlanWriterTest(CoreHarness):
@@ -442,43 +419,6 @@ class PlanWriterTest(CoreHarness):
         self.assertIn("マーカー（requested, reviewed）を削除しました。", out)
         self.assertFalse(os.path.exists(os.path.join(marks, "1.reviewed")))
 
-    def test_a_flow_is_carried_to_the_parent_tree(self):
-        """提案が別のツリー（ワークスペースルート）に在れば、フローも親のツリーへ移す。"""
-        self.family(plan=["design"])
-        todo = os.path.join(self.root, "wip", "proposals", "todo")
-        write(
-            os.path.join(todo, "i0001-01-01.md"),
-            child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]),
-        )
-        flow = os.path.join(self.root, ".ccnavi", "approved", "flows", "i0001-01-01.yml")
-        write(flow, "version: 1\nsteps: []\n")
-        _, out = self.plan_and_write()
-        self.assertIn("i0001-01-01 のフローを", out)
-        self.assertFalse(os.path.exists(flow))
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "flows", "i0001-01-01.yml")))
-
-    def test_a_flow_that_cannot_be_written_says_so_and_skips_the_rest(self):
-        """移せなかったフローは行で言い、元を消さない（前と同じ失敗の仕方）。"""
-        self.family(plan=["design"])
-        todo = os.path.join(self.root, "wip", "proposals", "todo")
-        write(
-            os.path.join(todo, "i0001-01-01.md"),
-            child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]),
-        )
-        flow = os.path.join(self.root, ".ccnavi", "approved", "flows", "i0001-01-01.yml")
-        write(flow, "version: 1\nsteps: []\n")
-        snapshot = self.snapshot()
-        verdict = core.judge_approval(snapshot)
-        changes = core.plan(snapshot, verdict)
-        # 並べた後で行き先にファイルを置く（書く前に別の誰かが置いた形）。
-        write(os.path.join(self.approved, "flows", "i0001-01-01.yml"), "other\n")
-        applied, out, err = self.write_changes(changes)
-        self.assertEqual(applied.code, 0, out + err)
-        self.assertIn("へ移せない", out)
-        self.assertNotIn("から", out.split("へ移せない")[1].split("\n")[0])
-        self.assertTrue(os.path.exists(flow))
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01.md")))
-
 
 @contextlib.contextmanager
 def durable_writes():
@@ -520,23 +460,6 @@ class DurableWiringTest(CoreHarness):
         held = os.path.join(self.approved, "phases", "i0001", "workflow.yml")
         self.assertNotIn(_norm(held), seen)
         self.assertFalse(os.path.exists(held))
-
-    def test_a_carried_flow_is_written_durably(self):
-        self.family(plan=["design"])
-        todo = os.path.join(self.root, "wip", "proposals", "todo")
-        write(
-            os.path.join(todo, "i0001-01-01.md"),
-            child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]),
-        )
-        write(
-            os.path.join(self.root, ".ccnavi", "approved", "flows", "i0001-01-01.yml"),
-            "version: 1\nsteps: []\n",
-        )
-        changes = self.planned()
-        with durable_writes() as seen:
-            applied, out, err = self.write_changes(changes)
-        self.assertEqual(applied.code, 0, out + err)
-        self.assertIn(_norm(os.path.join(self.approved, "flows", "i0001-01-01.yml")), seen)
 
     def test_a_withdrawal_puts_the_proposal_back_durably(self):
         text = parent_text("i0001", ["research"])

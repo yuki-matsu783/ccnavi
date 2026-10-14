@@ -659,6 +659,8 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.start_parent()
         self.propose("i0002", ticket_text("i0002", project="app", allow=SCOPE), project="app")
         self.assertEqual(self.approve().returncode, 0)
+        # 親の i0002 は app のワークツリー。同じ名前で lib から切ったツリーに置き換える。
+        git(self.app, "worktree", "remove", "--force", self.worktree(self.app, "i0002"))
         other = self.worktree(self.lib, "i0002")
         target = mirror_of(other, "rules.yml")
         write(target, read(self.rules))

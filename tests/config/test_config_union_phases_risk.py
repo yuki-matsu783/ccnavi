@@ -142,7 +142,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertIn("build", refused.stderr)
         self.assertFalse(os.path.exists(self.approved_copy("i0003")))
 
-        os.remove(os.path.join(self.ws, "wip", "proposals", "todo", "i0003.md"))
+        os.remove(self.proposal_path("i0003", "todo"))
         self.propose(
             "i0004",
             ticket_text("i0004", project="lib", plan=["docs"], allow=("docs/*",)),
@@ -256,11 +256,12 @@ class PhaseUnionTest(ConfigUnionHarness):
         """`--plan-order <親> --fill-phases` は共通レイヤーとレイヤーの和から写す。"""
         write(self.phases, COMMON_PHASES)
         text = ticket_text("i0001", plan=["design", "docs"], allow=("wip/design/*", "docs/*"))
-        write(os.path.join(self.ws, "wip", "proposals", "todo", "i0001.md"), text)
+        home = self.worktree(self.ws, "i0001")
+        write(os.path.join(home, "wip", "proposals", "todo", "i0001.md"), text)
 
         filled = self.ccnavi("--plan-order", "i0001", "--fill-phases")
         self.assertEqual(filled.returncode, 0, filled.stdout + filled.stderr)
-        body = read(os.path.join(self.ws, "wip", "proposals", "todo", "i0001.md"))
+        body = read(os.path.join(home, "wip", "proposals", "todo", "i0001.md"))
         self.assertIn("設計", body)
         self.assertIn("文書", body)
         approved = self.approve()
@@ -797,7 +798,7 @@ class LayerPlaceFlagsAreDiagnosisOnlyTest(RiskUnionTest):
         self.assertIn("schema", {h["id"] for h in record["hits"]})
         self.assertIn("(CRITICAL)", closed.stdout)
         self.assertTrue(
-            os.path.exists(os.path.join(self.lib, "wip", "proposals", "review", "i0001-01-01.md")),
+            os.path.exists(self.proposal_path("i0001-01-01", "review") or "-"),
             "レビュー待ちへ動いていない",
         )
 

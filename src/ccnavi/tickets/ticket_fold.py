@@ -6,7 +6,6 @@ ticket から分けた。ticket を読まない。
 
 from __future__ import annotations
 
-from ..infra import tree
 from . import ticket_model
 
 
@@ -15,36 +14,24 @@ def fold(
 ) -> list[ticket_model.Ticket]:
     """同じ識別子のチケットを、正とするツリーの側にまとめる。
 
-    子のワークツリーは親のブランチから切るので、親の `wip/proposals/` がそのまま
-    入っている。正とするのは親のツリー（親自身なら自分のツリー）の側。そこに 1 つ
-    あればそれが正で、残りはほかのツリー上のチケット。
+    正とするのは親のツリー（親自身なら自分のツリー）の側だけ。子のワークツリーは親のブランチから
+    切るので、親の `wip/proposals/` がそのまま入っているが、子のワークツリーや元ツリー
+    （ワークスペースルート・プロジェクトのルート）に残った古いコピーは正としない。親のツリーに
+    あればそれが正で、残りはほかのツリー上のチケット（`--lint` の診断にだけ使う）。
 
-    親のツリーが無ければ元ツリー（ワークスペースルート。プロジェクトのチケットなら
-    そのプロジェクト）の側を採る。ワークツリーは片付ければ消えるが、元ツリーは消えない。
-    親のワークツリーを作る前と、合流して片付けた後がこの形で、ここで行き先を決めないと、
-    片付けただけのチケットが「複数の場所にある」になり、状態の操作が止まる。
-
-    ただし、元ツリーより先の置き場に在るチケットが 1 つでもあれば採らない。 元ツリーを
-    正としてよい根拠は「他のツリー上のチケットは合流の結果で、同じか手前の状態」であって、合流
-    していないワークツリーで先に進んだチケット（親のツリーで閉じ、子のツリーが取り込んだ形）
-    があるときは成り立たない。そこで元ツリーを採ると、閉じた子をもう一度閉じ、リスクの
-    記録を別の差分で書き直す。決めずに残し、ユーザに合流させる。
-
-    どちらも持っていなければ全部残る。残りが 2 つ以上になったら、どれを優先するか
-    決まらない（検証が「複数の場所にある」と言う状態）。
+    親のツリーに無ければ決めずに全部残す（親のワークツリーが無い・そこにチケットが無いと
+    いう状態は、立ち位置の側が「親子のチケットが決まらない」として止める）。
 
     リポジトリをまたいだ衝突はまとめない。識別子はユーザが選ぶ短い連番なので、プロジェクトが
     独立に振ればぶつかる。それは同じチケットではなく違うチケットなので、どちらかを正と
     すると、もう片方が気づかないうちに消えて `--lint` の「複数のリポジトリにある」も出なくなる。
 
     `approved` は同じ識別子の承認済みチケット（作業中・レビュー待ち・閉じた）の全部。
-    在れば、正とするツリーは承認済みチケットだけで同じ順・同じ条件で決め
+    在れば、正とするツリーは承認済みチケットだけで決め
     （`authority`。承認済みチケットの側の `approval._authoritative` と同じ関数）、そのツリーに
     在る提案だけを残す。そこに提案が無ければ何も残らない。承認で正とするツリーの `todo/` が
     消えたあと、承認の前に切ったワークツリーに残った `todo/` の提案を承認待ちや改版と読まない
-    ため。提案だけで正とする側を決めると、承認済みチケットが元ツリーにしか無いのに親の名前の
-    ワークツリーに古い `todo/` が残る形で、古い側が正になる。改版は正とするツリーの `todo/` に
-    置くので、改版は残る。
+    ため。改版は正とするツリーの `todo/` に置くので、改版は残る。
 
     `approved` を渡さないと、承認済みの識別子でも提案だけでまとめる。 正とするツリーの
     外に残った古い提案が残るので、承認待ち・改版・ボードの提案の欄を決める呼び手は
@@ -57,12 +44,7 @@ def fold(
             return hits
         home = hits[0].parent or hits[0].ticket
         at_home = [t for t in hits if t.tree == home]
-        if at_home:
-            return at_home
-        at_origin = [t for t in hits if t.tree == origin_tree(t)]
-        if not at_origin or behind(at_origin, hits):
-            return hits
-        return at_origin
+        return at_home or hits
     where = authority(approved)
     if where is None:
         return hits
@@ -72,9 +54,9 @@ def fold(
 def authority(copies: list[ticket_model.Ticket]) -> str | None:
     """同じ識別子の承認済みチケット（作業中・レビュー待ち・閉じた）から、正とするツリーの名前を決める。
 
-    親のツリー（親自身なら自分のツリー）→ 元ツリー（先へ進んだチケットが無いときだけ）の順。
-    決まらないとき（どちらにも無い、元ツリーより先のチケットがある、リポジトリをまたぐ）は None。
-    承認済みチケット（`approval._authoritative`）と、承認済みの識別子の提案（`fold`）が
+    親のツリー（親自身なら自分のツリー）だけを読む。そこに無い（親のワークツリーが無い、親の
+    ワークツリーにチケットが無い、リポジトリをまたぐ）ときは None で、ほかのツリーのコピーで
+    代用しない。承認済みチケット（`approval._authoritative`）と、承認済みの識別子の提案（`fold`）が
     この 1 つの関数で決める。
     """
     if not copies or len({t.project for t in copies}) > 1:
@@ -82,37 +64,7 @@ def authority(copies: list[ticket_model.Ticket]) -> str | None:
     for t in copies:
         if t.tree == (t.parent or t.ticket):
             return t.tree
-    at_origin = [t for t in copies if t.tree == origin_tree(t)]
-    if not at_origin or behind(at_origin, copies):
-        return None
-    return origin_tree(at_origin[0])
-
-
-def origin_tree(t: ticket_model.Ticket) -> str:
-    """このチケットの元ツリーの名前。ワークスペースなら空、プロジェクトならその名前。
-
-    ワークツリーの名前は識別子だが、元ツリーの名前はプロジェクトの名前（ワークスペース
-    から切ったものなら空）。`tree.Tree.name` と同じ表記で並ぶ。
-    """
-    return t.project or tree.MAIN
-
-
-def progress(state: str) -> int:
-    """置き場の進み具合。`todo` < `doing` < `review` < `done`。空は `doing` として読む。
-
-    承認済みチケットは置き場を持たないことがある（`state` が空）。判定と同じく
-    作業中として数える。
-    """
-    order = (ticket_model.TODO, ticket_model.DOING, ticket_model.REVIEW, ticket_model.DONE)
-    state = state or ticket_model.DOING
-    if state == ticket_model.CANCELLED:
-        state = ticket_model.DONE  # 取り消しも閉じた側。置き場は `done/`
-    return order.index(state) if state in order else 0
-
-
-def behind(some: list[ticket_model.Ticket], hits: list[ticket_model.Ticket]) -> bool:
-    """`some` より先の置き場に在るチケットが `hits` にあるか。"""
-    return max(progress(t.state) for t in hits) > max(progress(t.state) for t in some)
+    return None
 
 
 def collided_states(states: list[str]) -> list[str]:
@@ -130,18 +82,41 @@ def collided_states(states: list[str]) -> list[str]:
     return []
 
 
-def collisions(hits: list[ticket_model.Ticket]) -> list[ticket_model.Ticket]:
+def collisions(
+    hits: list[ticket_model.Ticket], across_trees: bool = False
+) -> list[ticket_model.Ticket]:
     """どれを正とするか決まらないチケットの全部。決まっていれば空。
 
-    まとめて 2 つ以上残り、かつその残りが `collided_states` に当たるときだけ入る。
-    状態の操作が「複数の場所にある」で止まるのと、`--lint` が ERROR で言うのと、
-    同じ条件（`lint_ticket._proposal_problems` も同じ関数を通る）。複数のツリーにあること自体は
-    普通なので、まとめて 1 つに決まるものは数えない。
+    まとめて 2 つ以上残り、同じツリーの中で `collided_states` に当たるときだけ入る
+    （状態の操作が「複数の場所」で止まるのと、`--lint` が ERROR で言うのとで同じ条件。
+    `lint_ticket._proposal_problems` も同じ関数を通る）。複数のツリーにあること自体は
+    普通で、親のツリーが決めるので数えない。
+
+    `across_trees` は親のツリーに無く、ほかのツリーのコピーだけが残る形も数える（ボードが
+    候補を全部出すとき）。閉じたチケットだけがほかのツリーに残っているのは数えない
+    （合流した親のコピーがワークツリーにも残る普通の形）。
     """
     folded = fold(hits)
-    if len(folded) > 1 and collided_states([t.state for t in folded]):
+    if len(folded) < 2:
+        return []
+    if len({t.tree for t in folded}) == 1:
+        return folded if collided_states([t.state for t in folded]) else []
+    if across_trees and any(progress(t.state) < progress(ticket_model.DONE) for t in folded):
         return folded
     return []
+
+
+def progress(state: str) -> int:
+    """置き場の進み具合。`todo` < `doing` < `review` < `done`。空は `doing` として読む。
+
+    承認済みチケットは置き場を持たないことがある（`state` が空）。判定と同じく
+    作業中として数える。
+    """
+    order = (ticket_model.TODO, ticket_model.DOING, ticket_model.REVIEW, ticket_model.DONE)
+    state = state or ticket_model.DOING
+    if state == ticket_model.CANCELLED:
+        state = ticket_model.DONE  # 取り消しも閉じた側。置き場は `done/`
+    return order.index(state) if state in order else 0
 
 
 def by_ticket(found: list[ticket_model.Ticket]) -> dict[str, list[ticket_model.Ticket]]:

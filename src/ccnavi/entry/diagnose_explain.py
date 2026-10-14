@@ -279,7 +279,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         where = phase.stage(root, conf, parent, raw)
         if where:
             stdout.write(f"  {parent.ticket} の局面: {where}\n")
-        where = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+        where = approval.home_dir_read(conf, root, parent.ticket, "", project=parent.project)
         wrapped = approval_marks.read_parent_mark(
             where, parent.ticket, approval_marks.PARENT_MARK_CLOSE_EARLY
         )

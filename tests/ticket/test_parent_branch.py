@@ -194,13 +194,19 @@ class ParentBranchTest(unittest.TestCase):
         self.assertNotIn("■ ブランチ", body["text"])
         self.assertEqual(body["branch_warnings"], [])
 
-    def test_a_branch_whose_id_is_the_identifier_elsewhere_is_warned(self):
-        """提案が別の所にあり、変換すると識別子になる既存のブランチがある。"""
+    def test_a_proposal_outside_the_parent_worktree_is_refused_not_warned(self):
+        """提案が親のワークツリーの外（ここではワークスペースルート）にあれば、承認の対象に入らない。
+
+        親のブランチ名の警告は、親のワークツリーの中の提案にだけ付く（その HEAD が親のブランチ）。
+        """
         git(self.root, "branch", BRANCH)
         self.propose(where=self.root)
         body = self.preview()
-        self.assertEqual(len(body["branch_warnings"]), 1, body["branch_warnings"])
-        self.assertIn(BRANCH, body["branch_warnings"][0])
+        self.assertEqual(body["batch"], [])
+        self.assertEqual(body["branch_warnings"], [])
+        self.assertTrue(
+            any("親のワークツリー" in " ".join(r["problems"]) for r in body["rejected"]), body
+        )
 
     def test_a_proposal_on_its_own_branch_is_not_warned(self):
         git(self.root, "branch", BRANCH)

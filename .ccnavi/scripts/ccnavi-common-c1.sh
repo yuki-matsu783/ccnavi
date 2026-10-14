@@ -1,12 +1,12 @@
 # ccnavi-common-c1.sh  ccnavi-common.sh が読む部品。単体では読まない（読み方は ccnavi-common.sh の冒頭）。
 #
-# C1。取り込み済みの親子のチケットの状態を書く一連の操作を 1 つにまとめる。
+# C1。親子のチケットの状態を書く一連の操作を 1 つにまとめる。
 
 # ---- C1
 #
-# 取り込み済みの親子のチケットについて、チケットの状態を書く一連の操作を 1 つの操作にまとめる。親子のチケットは
-# 親のブランチ 1 本に対応する。ここで対象にするのは、origin があり取り込み状態が present の親子のチケットのうち、
-# マージリクエストで見るフェーズが無いものを除いたもの。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に関数を呼ぶ。
+# 親子のチケットについて、チケットの状態を書く一連の操作を 1 つの操作にまとめる。親子のチケットは
+# 親のブランチ 1 本に対応する。ここで対象にするのは、親のワークツリーがあり、origin があり、HEAD の確認に通る
+# 親子のチケット。取り込み状態（記録）が無くても、取り込み（4）が作る。呼ぶ側（ccnavi-ticket.sh・ccnavi-review.sh）は次の順に関数を呼ぶ。
 #
 #   ccnavi_c1_family <識別子>   親子のチケットと、C1 の対象か（ccnavi_c1_target に yes / no / stop）
 #   ccnavi_c1_begin             1 ロック 2 途中の操作 3 C1 の外の変更の見分けとコミット 4 取り込み 5 未送信の確かめ
@@ -70,8 +70,8 @@ ccnavi_c1_number() {
 
 # 親子のチケットと、C1 の対象か。<識別子>
 #
-# ccnavi_c1_target: yes（C1 で回す）/ no（今の手元の動きのまま）/ stop（取り込み済みだが止める理由がある）。
-# 実行ファイルが答えなかった（古い・失敗した）ときは、取り込み状態があれば stop、無ければ no。
+# ccnavi_c1_target: yes（C1 で回す）/ no（origin が無い。今の手元の動きのまま）/ stop（止める理由がある）。
+# 実行ファイルが答えなかった（古い・失敗した）ときは stop。
 ccnavi_c1_family() {
 	ccnavi_c1_target=no
 	ccnavi_c1_why=""
@@ -79,25 +79,11 @@ ccnavi_c1_family() {
 	ccnavi_c1_branch=""
 	ccnavi_c1_repo=""
 	ccnavi_c1_tree=""
-	# 取り込み状態が 1 つも無ければ、実行ファイルに聞かずに対象外（一時ディレクトリも要らない）。
-	ccnavi_cf_state=$(ccnavi_state "$ccnavi_c1_root")
 	# 子の識別子（`<親>-<2 桁のフェーズ番号>-<2 桁の連番>`）なら、右から 2 段を剥がして親にする。
 	ccnavi_cf_p="$1"
 	case "$ccnavi_cf_p" in
 	?*-[0-9][0-9]-[0-9][0-9]) ccnavi_cf_p="${ccnavi_cf_p%-[0-9][0-9]-[0-9][0-9]}" ;;
 	esac
-	ccnavi_cf_any=no
-	for ccnavi_cf_rec in "$ccnavi_cf_state"/sync/*/families/"$ccnavi_cf_p"; do
-		if [ -e "$ccnavi_cf_rec" ] || [ -L "$ccnavi_cf_rec" ]; then
-			ccnavi_cf_any=yes
-			break
-		fi
-	done
-	if [ "$ccnavi_cf_any" = no ]; then
-		ccnavi_c1_family_id="$ccnavi_cf_p"
-		ccnavi_c1_why="親子のチケットの取り込み状態がありません（取り込み済みでない。今の手元の動きのまま）"
-		return 0
-	fi
 	ccnavi_c1_scratch || {
 		ccnavi_c1_target=stop
 		ccnavi_c1_why="一時ディレクトリが作れない"
@@ -109,7 +95,7 @@ ccnavi_c1_family() {
 	if [ "$(head -n 1 "$ccnavi_c1_tmp/family" 2>/dev/null)" != "c1 1" ]; then
 		ccnavi_c1_family_id="$ccnavi_cf_p"
 		ccnavi_c1_target=stop
-		ccnavi_c1_why="実行ファイルが C1 の問い合わせ（c1 family）に応答しない（$(head -n 1 "$ccnavi_c1_tmp/family-err" 2>/dev/null)）。親子のチケットの取り込み状態があるので、書かずに止める。実行ファイルを新しくしてください"
+		ccnavi_c1_why="実行ファイルが C1 の問い合わせ（c1 family）に応答しない（$(head -n 1 "$ccnavi_c1_tmp/family-err" 2>/dev/null)）。書かずに止める。実行ファイルを新しくしてください"
 		return 0
 	fi
 	ccnavi_c1_target=$(sed -n 's/^target //p' "$ccnavi_c1_tmp/family" | head -n 1)

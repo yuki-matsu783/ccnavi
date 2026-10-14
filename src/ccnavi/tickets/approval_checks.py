@@ -21,32 +21,26 @@ def mark_imported(
     kept: list[ticket_model.Ticket],
     fams: syncstate.Families | None = None,
 ) -> None:
-    """取り込み済みの親子のチケットに、信頼できない理由を付ける。
-
-    取り込み済みの親子のチケットとは、取り込み状態のある親子のチケットのこと。
+    """親子のチケットのうち、信頼できないチケットに理由を付ける（全部の親子のチケットが対象）。
 
     正とするのは親のブランチ（手元では `.claude/worktrees/<P>` で HEAD のブランチ名を変換したものが
     `P` になるツリー）の
     上のチケットだけ。次のチケットは読むが信頼しない（`blocked`。判定は範囲を使わずに止める）。
 
     - 親子のチケットが決まらない（取り込み状態が `gone`・`blocked`・破損している、
-      `present` なのに親のワークツリーが無い）
+      親のワークツリーが無い・HEAD のブランチ名がフォルダ名と合わない）
     - 親子のチケットが閉じている（統合先の `done/` を正とする）
     - 親のワークツリーの外にしか無いチケット（元ツリーに未コミットで残ったチケットなど）
 
     **チケットのリストは変えない（外さない）。
     ** 外すと「在る」ことで止まっていたもの（承認待ちの
-    重複、開いた子のある親を閉じない）が通るようになる。理由を足すだけなので、取り込み状態の無い親子のチケットと、
-    取り込み状態があってもチケットが親のワークツリーにだけある親子のチケットでは、答えは前と同じ。すでに理由（`mark_blocked`）が
+    重複、開いた子のある親を閉じない）が通るようになる。理由を足すだけで、チケットが親のワークツリーにだけある
+    親子のチケットには理由は付かない。すでに理由（`mark_blocked`）が
     あれば、理由を連ねる（前の理由を消さない）。
     """
     fams = fams or syncstate.Families(conf, root)
-    if not fams.active:
-        return
     for t in kept:
         st = family_standing(conf, root, t, fams)
-        if not st.imported:
-            continue
         why = st.stop
         if not why and st.home is not None and not syncstate.same_tree(t.tree_root, st.home.root):
             why = outside_reason(st, t)
@@ -85,18 +79,14 @@ def family_problems(
     t: ticket_model.Ticket,
     fams: syncstate.Families | None = None,
 ) -> list[rules.Problem]:
-    """取り込み済みの親子のチケットの提案を承認しない理由。
+    """親子のチケットの提案を承認しない理由。
 
-    親子のチケットが決まらない・閉じているなら承認しない。提案は親のブランチの上で書き、
+    親子のチケットが決まらない（親のワークツリーが無いなど）・閉じているなら承認しない。提案は親のブランチの上で書き、
     push してから承認を頼む決まりなので、
-    親のワークツリーの外にある提案も承認しない。取り込み状態の無い親子のチケットには何も言わない。
+    親のワークツリーの外にある提案も承認しない。
     """
     fams = fams or syncstate.Families(conf, root)
-    if not fams.active:
-        return []
     st = family_standing(conf, root, t, fams)
-    if not st.imported:
-        return []
     if st.stop:
         return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, family_stop_text(root, st))]
     if st.home is not None and not syncstate.same_tree(t.tree_root, st.home.root):
@@ -106,12 +96,31 @@ def family_problems(
                 t.ticket,
                 f"提案が親のブランチ {st.branch_name} のワークツリーの外"
                 f"（{t.tree or 'ワークスペースルート'}）にある。"
-                "取り込み済みの親子のチケットの提案は"
+                "親子のチケットの提案は"
                 f"親のワークツリー（.claude/worktrees/{st.family}）で書いて push してから"
                 "承認を頼んでください",
             )
         ]
     return []
+
+
+def mr_problems(t: ticket_model.Ticket) -> list[rules.Problem]:
+    """親チケットに `mr:`（親ブランチのマージリクエストの番号）が記録されているか。
+
+    親の作成と承認の前提の 1 つ。番号は `ccnavi-start.sh` が出す。子には要らない。
+    """
+    if t.is_child or t.mr:
+        return []
+    return [
+        rules.Problem(
+            rules.SEVERITY_ERROR,
+            t.ticket,
+            f"親チケット {t.ticket} に mr: が記録されていない。`ccnavi-start.sh` が出したマージ"
+            "リクエストの番号を mr: に書いてください（例 `mr: 12`）。"
+            "親のブランチのマージリクエストが"
+            "無いと、レビューの依頼も正の特定もできない",
+        )
+    ]
 
 
 def branch_problems(
@@ -416,7 +425,7 @@ def predecessor_pool_of(
 def align_imported(
     conf: settings.Settings, root: str, pool: dict[str, list[ticket_model.Ticket]]
 ) -> None:
-    """取り込み済みの親子のチケットの先行を、その親のブランチ上のチケットで読み直す。
+    """親子のチケットの先行を、その親のブランチ上のチケットで読み直す。
 
     Chrome は先行を、参照の閉包にある親子のチケット `P` から引く。手元もそれに揃える。
     ただし通る向きには読み替えない（厳しくする向きだけ）。
@@ -434,8 +443,6 @@ def align_imported(
       親子のチケット: 前の対応表のまま
     """
     fams = syncstate.Families(conf, root)
-    if not fams.active:
-        return
     for ident, hits in list(pool.items()):
         if not hits:
             continue
@@ -443,7 +450,7 @@ def align_imported(
         if all(archive.is_archived_path(root, h.path) for h in hits):
             continue
         st = family_standing(conf, root, hits[0], fams)
-        if not st.imported or st.closed:
+        if st.closed:
             continue
         if st.stop:
             pool[ident] = [_undecided(hits[0], st.stop)]

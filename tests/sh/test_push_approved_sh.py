@@ -29,6 +29,7 @@ import subprocess
 import tempfile
 import unittest
 
+from ccnavi.entry import version
 from tests import ROOT, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -43,6 +44,10 @@ NOTHING = "コミットして push する承認済みチケットはありませ
 # 承認の代わり。STUB_ARGS があれば受けた引数を 1 行ずつ書き、STUB_EXIT が 0 でなければ失敗し、
 # STUB_TREE があればそこに承認済みチケットを置く。
 STUB = """#!/bin/sh
+case " $* " in
+*" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
+*" c1 family "*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
+esac
 [ -z "${STUB_ARGS:-}" ] || printf '%s\\n' "$@" > "$STUB_ARGS"
 [ "${STUB_EXIT:-0}" = 0 ] || exit "$STUB_EXIT"
 [ -n "${STUB_TREE:-}" ] || exit 0
@@ -104,6 +109,16 @@ class Workspace(unittest.TestCase):
         self.remote = os.path.join(self._tmp.name, "origin.git")
         git(self._tmp.name, "init", "-q", "--bare", self.remote)
         git(self.ws, "remote", "add", "origin", self.remote)
+        # C1 の対象かを答えるだけの実行ファイルの代役（いつも対象外。ここで見るのは対象外の道）
+        self.c1_stub = write(
+            os.path.join(self._tmp.name, "c1-bin", "ccnavi"),
+            "#!/bin/sh\n"
+            'case " $* " in\n'
+            f"*\" --version \"*) printf 'compat: {version.COMPAT}\\n'; exit 0 ;;\n"
+            "*\" c1 family \"*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;\n"
+            "esac\nexit 0\n",
+        )
+        os.chmod(self.c1_stub, os.stat(self.c1_stub).st_mode | stat.S_IXUSR | stat.S_IXGRP)
 
     # ---- 道具
 
@@ -120,6 +135,7 @@ class Workspace(unittest.TestCase):
 
     def env(self, **extra):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env["CCNAVI_BIN_PATH"] = posix(self.c1_stub)
         env.update(extra)
         return env
 
@@ -758,7 +774,10 @@ class ApproveCarriesTest(Workspace):
 
     def setUp(self):
         super().setUp()
-        self.stub = write(os.path.join(self._tmp.name, "bin", "ccnavi"), STUB)
+        self.stub = write(
+            os.path.join(self._tmp.name, "bin", "ccnavi"),
+            STUB.replace("{compat}", str(version.COMPAT)),
+        )
         os.chmod(self.stub, os.stat(self.stub).st_mode | stat.S_IXUSR | stat.S_IXGRP)
 
     def approve(self, *ids, **extra):

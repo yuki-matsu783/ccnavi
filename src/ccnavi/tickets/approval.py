@@ -496,17 +496,11 @@ def revision_elsewhere_text(
         f"承認の対象にならない。改版なら {place} の {todo} に書き、古い版なら削除してください"
     )
     fams = fams or syncstate.Families(conf, root)
-    if fams.active:
-        st = approval_checks.family_standing(conf, root, t, fams)
-        if st.imported and st.stop:
-            text += (
-                "。取り込み済みの親子のチケットが止まっている: "
-                + approval_checks.family_stop_text(root, st)
-            )
-        elif st.imported and st.home is not None:
-            text += (
-                "。取り込み済みの親子のチケットなので、書いたら push してから承認を頼んでください"
-            )
+    st = approval_checks.family_standing(conf, root, t, fams)
+    if st.stop:
+        text += "。親子のチケットが止まっている: " + approval_checks.family_stop_text(root, st)
+    elif st.home is not None:
+        text += "。書いたら push してから承認を頼んでください"
     return text
 
 
@@ -553,14 +547,11 @@ def all_tickets(
 def _authoritative(
     found: list[ticket_model.Ticket], everything: list[ticket_model.Ticket]
 ) -> list[ticket_model.Ticket]:
-    # 正とするのは親のツリー → 元ツリー（先へ進んだチケットが無いときだけ）→
-    # 決まらない（全部残す）。
-    # 親のツリーが無いとき（作る前と、合流して片付けた後）は元ツリーを正とする。ワークツリーは
-    # 片付ければ消えるが、元ツリー（ワークスペースルート。プロジェクトのチケットならその
-    # プロジェクト）は消えない。リポジトリをまたいだ衝突はまとめない。違うチケットなので、
-    # 正とする側を決めるとどちらかが気づかないうちに消え、`--lint` の「複数のリポジトリにある」も
-    # 出なくなる。決め方は `ticket_fold.authority` の 1 つで、承認済みの識別子の提案
-    # （`ticket_fold.fold`）も同じ関数で決める。
+    # 正とするのは親のツリーだけ。無ければ決まらない（全部残す）。ほかのツリーのコピーで代用しない。
+    # リポジトリをまたいだ衝突はまとめない。違うチケットなので、正とする側を決めるとどちらかが
+    # 気づかないうちに消え、`--lint` の「複数のリポジトリにある」も出なくなる。決め方は
+    # `ticket_fold.authority` の 1 つで、承認済みの識別子の提案（`ticket_fold.fold`）も
+    # 同じ関数で決める。
     seen = approval_checks._by_id(everything)
     kept: list[ticket_model.Ticket] = []
     for ticket_id, hits in approval_checks._by_id(found).items():
@@ -572,6 +563,13 @@ def _authoritative(
     return kept
 
 
+class NoParentWorktree(ValueError):
+    """親のワークツリーが無い（HEAD のブランチ名がフォルダ名と合わない・止まっている）。
+
+    ほかのツリーのコピーで代用しないので、書く先が決まらない。
+    """
+
+
 def home_dir(
     conf: settings.Settings,
     root: str,
@@ -580,46 +578,43 @@ def home_dir(
     fallback_root: str = "",
     project: str | None = None,
 ) -> str:
-    """この識別子の承認済みチケットを置くツリーの置き場。
+    """この識別子の承認済みチケットを置くツリーの置き場。親のワークツリーの置き場だけ。
 
     書く先も読む先も 1 つに決めるためのもの。子のワークツリーにも checkout されるが、
-    そこへ書くと同じ識別子の承認済みチケットが 2 通りになる。
-
-    探す順は、すでに持っているツリー（親のツリー → ワークスペースかプロジェクトの
-    ルート → その他）、親のツリー、fallback_root（提案があったツリー）、
-    ワークスペースルート。すでに在る側を先に見るのは、マーカーと記録を承認済みチケットと
-    同じ場所に置くため。親のワークツリーは承認のあとに作られることがあり、そこを
-    先に見ると、承認済みチケットとマーカーが別のツリーに分かれる。
+    そこへ書くと同じ識別子の承認済みチケットが 2 通りになる。親のワークツリー以外へは切り替えない。
+    親のワークツリーが無い（HEAD のブランチ名がフォルダ名と合わない場合を含む）・親子のチケットが
+    止まっているときは `NoParentWorktree`（ほかのツリーのコピーで代用しない）。
 
     `project` はチケットのリポジトリ（ワークスペース自身なら空）。分からなければ None で、
-    取り込み状態のあるリポジトリを全部探す（同じ識別子が 2 つのリポジトリにあれば決めない）。
+    取り込み状態か同じ名前のワークツリーのあるリポジトリを全部探す（同じ識別子が 2 つの
+    リポジトリにあれば決めない）。`fallback_root` は使わない（互換のために引数だけ残す）。
     """
     home = parent or ticket_id
-    # 取り込み済みの親子のチケットは、親のブランチ（親のワークツリー）だけに書く。
-    # 正とする側のツリーが無いときに元ツリーに未コミットで書く形は、取り込み済みならやめる。
-    # 決まらない親子のチケットは、ここへ来る前に状態の操作と承認が止める。
     st = syncstate.standing_any(conf, root, home, project)
-    if st.imported and st.home is not None and not st.stop:
-        return settings.approved_dir(conf, st.home.root)
-    named = ""
-    holders: list[tuple[tree.Tree, str]] = []
-    for t in trees(conf, root):
-        where = settings.approved_dir(conf, t.root)
-        if t.name == home:
-            named = where
-        if (
-            fsio.exists(copy_path(where, ticket_id))
-            or fsio.exists(closed_path(where, ticket_id))
-            or fsio.exists(review_path(t.root, conf.tickets, ticket_id))
-        ):
-            holders.append((t, where))
-    for wanted in (lambda t: t.name == home, lambda t: t.is_main, lambda t: True):
-        for t, where in holders:
-            if wanted(t):
-                return where
-    if named:
-        return named
-    return settings.approved_dir(conf, fallback_root or tree.main_tree(root).root)
+    if st.home is None or st.stop:
+        raise NoParentWorktree(
+            st.stop or f"親のワークツリー（.claude/worktrees/{home}）がありません"
+        )
+    return settings.approved_dir(conf, st.home.root)
+
+
+def home_dir_read(
+    conf: settings.Settings,
+    root: str,
+    ticket_id: str,
+    parent: str,
+    project: str | None = None,
+) -> str:
+    """`home_dir` の読む側。親のワークツリーが無いときは、存在しない置き場のパスを返す。
+
+    読む側（マーカー・記録・状態の履歴）は、親のワークツリーが無ければ「何も無い」と読む。
+    ほかのツリーのコピーでは代用しない。書く側は `home_dir` を使う（無ければ止まる）。
+    """
+    home = parent or ticket_id
+    try:
+        return home_dir(conf, root, ticket_id, parent, project=project)
+    except NoParentWorktree:
+        return settings.approved_dir(conf, tree.worktree_path(root, home))
 
 
 def source_path(t: ticket_model.Ticket) -> str:

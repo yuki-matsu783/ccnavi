@@ -474,7 +474,7 @@ class TombstoneTest(AuthorityHarness):
         git(self.root, "worktree", "remove", "--force", self.parent_tree)
         st = syncstate.standing(self.conf(), self.root, "i0001")
         self.assertTrue(st.stop and not st.closed, st)
-        self.assertIn("片付けても残る", st.stop)
+        self.assertIn("親のワークツリー", st.stop)
         self.integration_done_parent(f"base_sha: {mine.base_sha}\n")
         st = syncstate.standing(self.conf(), self.root, "i0001")
         self.assertTrue(st.stop and not st.closed, st)
@@ -693,10 +693,10 @@ class IntegrationDoneTest(AuthorityHarness):
 
 
 class PredecessorTest(AuthorityHarness):
-    def test_an_undecided_predecessor_family_is_not_met(self):
-        # 先行 i0002-01-01 は元ツリーの done/ にある（前の対応表では満たす）。
-        # 親子のチケット i0002 は取り込み済みだが、親のワークツリーが無い（決まらない）ので、
-        # 満たしたとみなさない。
+    def test_a_predecessor_family_without_the_parent_worktree_is_not_met(self):
+        # 先行 i0002-01-01 は元ツリーの done/ にしかない。親子のチケット i0002 は親のワークツリーが
+        # 無く（決まらない）、元ツリーのコピーでは代用しないので、満たしたとみなさない。
+        # 取り込み状態（記録）の有無は関係しない。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "done", "i0002-01-01.md"),
             child_text("i0002-01-01", "i0002", 1, ["src/*"]).replace(
@@ -708,15 +708,18 @@ class PredecessorTest(AuthorityHarness):
         )
         self.propose("i0001-01-02", text)
         self.commit_parent()
-        before = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
-        self.assertIn("i0001-01-02", [b["ticket"] for b in before["batch"]], before)
-        self.record("present", name="i0002")
-        after = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
-        self.assertNotIn("i0001-01-02", [b["ticket"] for b in after["batch"]])
-        self.assertTrue(
-            any("親子のチケットが決まらない" in " ".join(r["problems"]) for r in after["rejected"]),
-            after,
-        )
+        for record in (False, True):
+            if record:
+                self.record("present", name="i0002")
+            after = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
+            self.assertNotIn("i0001-01-02", [b["ticket"] for b in after["batch"]])
+            self.assertTrue(
+                any(
+                    "親子のチケットが決まらない" in " ".join(r["problems"])
+                    for r in after["rejected"]
+                ),
+                after,
+            )
 
     def test_the_parent_tree_does_not_loosen_a_predecessor(self):
         # 厳しくする向きだけ: 親のワークツリーで閉じていても、

@@ -176,7 +176,39 @@ tidy_after() {
 	ccnavi_c1_exe --cwd "$here" worktree tidy "$ta_id" || :
 }
 
-# C1（取り込み済みの親子のチケットの start・finish・cancel）。
+# 子の start で、このPCに子のワークツリーが無ければ、取り込み直後の親ブランチ（C1 の親のワークツリーの HEAD）から作る。
+# 別のPCで承認された子でも、どのPCでも同じ場所に作る。ネットワークには出ない（git の局所の操作だけ）。
+# 子のブランチ（子の識別子の名前）が手元に残っていれば、親の先頭が含むものだけ親の先頭に揃えて使う
+# （含まない = 手元だけに積んだ仕事があるので、消さずに止める）。
+ensure_child_worktree() {
+	ew_path="$root/.claude/worktrees/$c1_id"
+	if [ -e "$ew_path" ] || [ -L "$ew_path" ]; then
+		return 0
+	fi
+	if git -C "$ccnavi_c1_tree" show-ref --verify --quiet "refs/heads/$c1_id"; then
+		if ! git -C "$ccnavi_c1_tree" merge-base --is-ancestor "refs/heads/$c1_id" HEAD 2>/dev/null; then
+			printf 'ccnavi-ticket: 手元のブランチ %s に親のブランチ %s に無いコミットがある。子のワークツリーを作らずに止めた。内容を確かめて、親へ取り込むか、ユーザが消してから再実行してください\n' "$c1_id" "$ccnavi_c1_branch" >&2
+			return 1
+		fi
+		git -C "$ccnavi_c1_tree" branch -f "$c1_id" HEAD >/dev/null 2>&1 || {
+			printf 'ccnavi-ticket: 手元のブランチ %s を親のブランチの先頭に揃えられなかった\n' "$c1_id" >&2
+			return 1
+		}
+		ew_rc=0
+		git -C "$ccnavi_c1_tree" worktree add "$ew_path" "$c1_id" >/dev/null 2>"$ccnavi_c1_tmp/ew-err" || ew_rc=$?
+	else
+		ew_rc=0
+		git -C "$ccnavi_c1_tree" worktree add "$ew_path" -b "$c1_id" HEAD >/dev/null 2>"$ccnavi_c1_tmp/ew-err" || ew_rc=$?
+	fi
+	if [ "$ew_rc" -ne 0 ]; then
+		printf 'ccnavi-ticket: 子のワークツリー %s を作れなかった（%s）\n' "$ew_path" "$(head -n 1 "$ccnavi_c1_tmp/ew-err" 2>/dev/null)" >&2
+		return 1
+	fi
+	printf 'ccnavi-ticket: 子のワークツリー .claude/worktrees/%s を親のブランチ %s の先頭から作った\n' "$c1_id" "$ccnavi_c1_branch" >&2
+	log_info 子のワークツリーを作った -- "child=$c1_id" "parent=$ccnavi_c1_family_id"
+}
+
+# C1（親子のチケットの start・finish・cancel）。
 case "$1" in
 start | finish | cancel)
 	ccnavi_log_root="$root"
@@ -204,6 +236,9 @@ start | finish | cancel)
 		*) c1_words="$c1_id を取り消した" ;;
 		esac
 		ccnavi_c1_begin || exit 1
+		if [ "$1" = start ] && [ "$c1_id" != "$ccnavi_c1_family_id" ]; then
+			ensure_child_worktree || exit 1
+		fi
 		c1_rc=0
 		ccnavi_c1_write "ccnavi: ${c1_words}" -- ticket "$@" || c1_rc=$?
 		ccnavi_c1_end

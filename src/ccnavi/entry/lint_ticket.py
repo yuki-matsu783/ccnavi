@@ -93,6 +93,8 @@ def _copy_problems(
             # 判定には入れない（判定は git を読まない）。`start` も止めない（通れば基準点を
             # HEAD で書き直すので、止めても防げる形が無い）。ここと status が warn で知らせる。
             problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {off}"))
+        for p in approval_checks.mr_problems(t):
+            problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {p.detail}"))
         if t.blocked:
             problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
             continue
