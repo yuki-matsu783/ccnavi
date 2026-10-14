@@ -43,7 +43,8 @@ def unfinished_at_stop(
     - 親なら `close_problems` が空。開いている子・レビュー準備中／レビュー待ちのフェーズ・
       フィードバック計画待ち・終わっていないフェーズがあれば `finish` は通らないので促さない
     - ワークツリーに未コミットの変更が無い（追跡していないファイルも数える）
-    - 基準点より先に、自分で作ったコミットが 1 件以上ある（`_own_commits`）
+    - 自分で作ったコミットが 1 件以上ある（`_own_commits`。親は基準点より先、
+      子は親のブランチに無いもの）
 
     git を読めなければ促さない。促しは保護ではないので、読めないときは今までどおり何も出さずに通す。
 
@@ -103,9 +104,12 @@ def _own_commits(worktree: str, t: ticket_model.Ticket, parent_branch: str = "")
         )
         if rc == 0 and sha.strip():
             exclude.append(f"^{sha.strip()}")
+    # 子は、親のブランチに入っていないコミットがそのまま自分の仕事。基準点から数えない
+    # （衝突を解くために親を取り込んでも、親にあるほかの子のコミットは除かれる）。
+    start = [] if t.is_child else [f"{t.base_sha}..HEAD"]
     rc, out = gitcmd.output(
         worktree,
-        ["rev-list", "--count", "--no-merges", f"{t.base_sha}..HEAD", *exclude],
+        ["rev-list", "--count", "--no-merges", *(start or ["HEAD"]), *exclude],
         ops_close.TIMEOUT_SECONDS,
     )
     if rc != 0 or not out.strip().isdigit():
@@ -143,8 +147,13 @@ def finish_nudge(root: str, found: Unfinished) -> str:
         [
             f"[ccnavi] {CODE_FINISH_NUDGE} (ticket: {t.ticket})",
             f"{kind} {t.ticket} は着手済みのまま作業中（{ticket_model.DOING}/）です。ワークツリー "
-            f"{found.worktree} に未コミットの変更が無く、基準点 {t.base_sha[:12]} より先に"
-            f"コミットが {found.ahead} 件あります。",
+            f"{found.worktree} に未コミットの変更が無く、"
+            + (
+                "親のブランチに無いコミットが "
+                if t.is_child
+                else f"基準点 {t.base_sha[:12]} より先にコミットが "
+            )
+            + f"{found.ahead} 件あります。",
             f"作業が終わったなら '{ticket_sh} finish {t.ticket}' を実行してから終えてください。"
             "まだ続けるなら、続ける理由（何が残っているか）をユーザに向けて書いてから終えてください。"
             "この案内は同じ HEAD では 1 回だけで、"

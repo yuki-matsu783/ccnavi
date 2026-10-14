@@ -22,7 +22,7 @@ import os
 from dataclasses import replace
 from typing import TextIO
 
-from ..infra import fsio, settings, tree
+from ..infra import fsio, gitcmd, gitstate, settings, tree
 from . import (
     approval,
     approval_checks,
@@ -276,6 +276,9 @@ def finish(
     if scored is None:
         return 1
     fields = {"completed_at": approval_marks.now()}
+    merged = _merged_sha(root, found)
+    if merged:
+        fields["merged_sha"] = merged
     state = ticket_model.REVIEW if _needs_review(root, conf, found) else ticket_model.DONE
     code = _move(stdout, stderr, root, conf, found, state, fields, f"完了 {fields['completed_at']}")
     if code == 0 and scored:
@@ -284,6 +287,34 @@ def finish(
     if code == 0 and not found.is_child:
         _close_parent(stdout, stderr, root, conf, found)
     return code
+
+
+def _merged_sha(root: str, found: ticket_model.Ticket) -> str:
+    """この finish で親のブランチに入る子の先頭。入らない（合流していない）なら空。
+
+    親のワークツリーが合流の途中（`MERGE_HEAD` が子の先頭）なら、それがこのコミットで入る先頭。
+    合流の途中でなくても、子の先頭が親の先頭の祖先なら（子が先に親へ入っている）その先頭。
+    どちらでもなければ、親のブランチに入らない子なので書かない（レビュー依頼の前提が言う）。
+    """
+    if not found.is_child:
+        return ""
+    child_tree = tree.worktree_path(root, found.ticket)
+    parent_tree = tree.worktree_path(root, found.parent)
+    head = gitstate.head(child_tree)
+    if not head:
+        return ""
+    rc, merging = gitcmd.output(
+        parent_tree, ["rev-parse", "--verify", "--quiet", "MERGE_HEAD"], ops_close.TIMEOUT_SECONDS
+    )
+    if rc == 0 and merging.strip() == head:
+        return head
+    parent_head = gitstate.head(parent_tree)
+    if not parent_head:
+        return ""
+    done = gitcmd.run(
+        child_tree, ["merge-base", "--is-ancestor", head, parent_head], ops_close.TIMEOUT_SECONDS
+    )
+    return head if done.ok else ""
 
 
 def _needs_review(root: str, conf: settings.Settings, found: ticket_model.Ticket) -> bool:
@@ -494,7 +525,10 @@ def _score_child(
     definition = risk.load_definition(conf, root, _project_of(conf, root, found))
     if definition.fallback:
         stderr.write(f"ccnavi: {definition.fallback}\n")
-    diff, why = risk.measure(worktree, found.base_sha)
+    # 数えるのは子の仕事の始まり（取り込み直後の親の先頭と子の共通の祖先）から子の先頭まで。
+    # 着手の基準点から数えると、衝突を解くために子へ取り込んだ親の、ほかの子の変更が混ざる。
+    base, why = gitstate.child_base(worktree, tree.worktree_path(root, found.parent))
+    diff, why = risk.measure(worktree, base) if base else (None, why)
     if diff is None:
         stderr.write(f"ccnavi: {found.ticket} のリスクを測れない: {why}\n")
         return None

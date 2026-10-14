@@ -5,7 +5,8 @@
 計画のときに「軽い」と思った作業が、やってみたら大きな変更になることがある。
 宣言（チケットの範囲や `human_review.required: false`）だけを信頼すると、それが
 レビューを通らずに進む。だから点は、子を閉じるときにその子のワークツリーで
-`base_sha..HEAD` の差分を数えて付ける。宣言の広さで数える点は持たない。
+子の仕事の始まり（取り込み直後の親の先頭と子の共通の祖先。`gitstate.child_base`）から
+子の先頭までの差分を数えて付ける。宣言の広さで数える点は持たない。
 宣言の広さは、親がチケットを書くときに `human_review.reason` で言えばよい。
 
 ## 点が何をするか
@@ -730,10 +731,10 @@ class Diff:
 def measure(worktree: str, base: str, head: str = "HEAD") -> tuple[Diff | None, str]:
     """`base..head` の差分を数える。読めなければ None と理由。"""
     if not base:
-        return None, "基準点（base_sha）がありません。"
+        return None, "子の仕事の始まり（親との共通の祖先）がありません。"
     rc, out = _git(worktree, ["diff", "--numstat", "-z", f"{base}..{head}"])
     if rc != 0:
-        return None, "基準点からの差分を読めない"
+        return None, "子の仕事の始まりからの差分を読めない"
     changes: dict[str, Change] = {}
     # -z の numstat は `added\tdeleted\tpath\0`。rename は `added\tdeleted\t\0old\0new\0`。
     parts = out.split("\0")
@@ -761,7 +762,7 @@ def measure(worktree: str, base: str, head: str = "HEAD") -> tuple[Diff | None, 
     # （0 件と数えると軽い側へ倒れる）。
     rc, out = _git(worktree, ["diff", "--name-status", "-z", f"{base}..{head}"])
     if rc != 0:
-        return None, "基準点からの変更の種類を読めない"
+        return None, "子の仕事の始まりからの変更の種類を読めない"
     parts = out.split("\0")
     i = 0
     while i < len(parts):
