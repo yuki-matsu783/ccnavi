@@ -28,7 +28,7 @@
 #
 # エージェントからは組み込みの deny（`DENY_TICKET_APPROVAL_CLI`）で止める。
 #
-# 終了コード: 0 成功（push 失敗含む） / 1 承認が通らなかった（一部だけ通ったときも。置かれたぶんは送る） / 2 引数または環境の誤り
+# 終了コード: 0 成功（push 失敗含む。未送信は文面で言う） / 1 承認が通らなかった（一部だけ通ったときも。置かれたぶんは送る） / 2 引数または環境の誤り
 
 set -eu
 
@@ -76,13 +76,21 @@ root=$(ccnavi_workspace) || {
 	exit 2
 }
 
+# 承認が実際に書けたパスの一覧（JSON）の受け皿。実行ファイルは書き込みに入ったときだけ書く。
+report=$(mktemp "${TMPDIR:-/tmp}/ccnavi-agree.XXXXXX") || {
+	printf 'ccnavi-agree: 一時ファイルが作れません。\n' >&2
+	exit 2
+}
+trap 'rm -f "$report"' EXIT
+trap 'rm -f "$report"; exit 130' INT TERM HUP
+
 # 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 # `set --` の右の "$@" は置き換える前の引数（並べた識別子）に展開される。
 if bin=$(ccnavi_bin "$root"); then
 	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-agree: %s\n' "$skew" >&2
-	set -- "$bin" --root "$root" --agree "$@"
+	set -- "$bin" --root "$root" --agree --placed-out "$report" "$@"
 elif [ -f "$root/src/ccnavi/__main__.py" ]; then
-	set -- uv run python -m ccnavi --root "$root" --agree "$@"
+	set -- uv run python -m ccnavi --root "$root" --agree --placed-out "$report" "$@"
 else
 	printf 'ccnavi-agree: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
@@ -99,10 +107,22 @@ case "$approve_rc" in
 esac
 
 # コミットと push は ccnavi-push-approved.sh に任せる。失敗しても承認は巻き戻さない。
-sh "$(dirname "$0")/ccnavi-push-approved.sh" || :
+# 書けた分（一部だけのときも）だけが対象になる。書けなかった分は置かれていないので入らない。
+push_rc=0
+sh "$(dirname "$0")/ccnavi-push-approved.sh" || push_rc=$?
+
+# 実行ファイルが書き出した、実際に書けたパスの一覧（JSON）。書けた分、書けなかった分、
+# 書かなかった分が分かる形でそのまま見せる。
+if [ -s "$report" ]; then
+	printf 'ccnavi-agree: 承認の結果（placed=書けたパス / failed=書けなかった提案 / unwritten=止まったため書かなかった提案 / rejected=承認の対象にしなかった提案）: %s\n' \
+		"$(cat "$report")" >&2
+fi
+if [ "$push_rc" -ne 0 ]; then
+	printf 'ccnavi-agree: 書けた承認済みチケットは push できていない（未送信）。上の push-approved の文面のとおり直してから、次を再実行してください: sh %s/ccnavi-push-approved.sh\n' "$(dirname "$0")" >&2
+fi
 
 if [ "$approve_rc" -ne 0 ]; then
-	printf 'ccnavi-agree: 承認の一部だけが通った。置かれた承認済みチケットは、上の push-approved の結果のとおりコミット・push を試した。通らなかった分は原因を直して、もう一度承認してください。\n' >&2
+	printf 'ccnavi-agree: 承認の一部だけが通った。置かれた承認済みチケットは、上の結果のとおりコミット・push を試した。通らなかった分は原因を直して、もう一度承認してください。\n' >&2
 	exit 1
 fi
 exit 0

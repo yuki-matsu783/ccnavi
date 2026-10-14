@@ -136,6 +136,16 @@ carry_paths() {
 		"$ccnavi_c1_tmp/carry-all" >"$ccnavi_c1_tmp/carry" || :
 }
 
+# まだ送れていないパス（リモートの先頭との差。リモートの先頭が無ければ直近のコミットの分）を 1 行ずつ。
+# push に失敗したとき、何が未送信かを言うため。$1 ツリー $2 ブランチ
+unsent_paths() {
+	if git -C "$1" rev-parse --verify -q "refs/remotes/origin/$2" >/dev/null 2>&1; then
+		git -C "$1" -c core.quotepath=false diff --name-only "refs/remotes/origin/$2" HEAD 2>/dev/null
+	else
+		git -C "$1" -c core.quotepath=false show --name-only --format= HEAD 2>/dev/null
+	fi | sed 's/^/  未送信: /' >&2 || :
+}
+
 # 取り込み済みの親子のチケット 1 つをコミットして push する。ccnavi_c1_family を済ませた後に呼ぶ。0 送った（push するものが無いを含む）/ 1 失敗した
 #
 # 取り込み状態の鍵とロックは識別子（ccnavi_c1_family_id）、ref・push・ls-remote と取り込み状態の branch は
@@ -212,6 +222,7 @@ carry_family() {
 	# 失敗してもコミットは残す（ユーザが打ち直せる）。C1 は未送信を見つけて止まり、これを打ち直すよう言う。
 	printf 'ccnavi-push-approved: %s の push に失敗しました（%s）。コミットはローカルに残っています。接続を確認してから、次のコマンドを再実行してください: sh %s/ccnavi-push-approved.sh %s\n' \
 		"$cf_p" "$(head -n 1 "$ccnavi_c1_tmp/push-err" 2>/dev/null)" "$(dirname "$0")" "$cf_p" >&2
+	unsent_paths "$cf_tree" "$cf_b"
 	ccnavi_lock_drop
 	return 1
 }
@@ -392,6 +403,7 @@ $(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
 	else
 		printf 'ccnavi-push-approved: %s の push に失敗しました。手で送ってください（git push -u origin %s）。\n' \
 			"$name" "$branch" >&2
+		unsent_paths "$tree" "$branch"
 		printf 'fail\n' >>"$state"
 	fi
 done
