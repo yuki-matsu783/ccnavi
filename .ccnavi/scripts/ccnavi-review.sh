@@ -75,7 +75,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
   close-early  --reason <理由> [--no-issue]       まだ残っているが早めに閉じる判断（ユーザが端末で実行します）。残りを issue に書き出す。Draft は親が ready で外す
   fetch                                           リモートから取ってきた時点の状態を JSON で標準出力へ
   origin                                          origin をどう読んだか（ホスト・scheme・API の URL）
-  merged [<番号>]                                 マージリクエスト（番号で指定、省けばいまのブランチのもの）がマージ済みなら "merged <番号> <先頭の sha>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が閉じたかを確かめる）
+  merged [<番号>]                                 マージリクエスト（番号で指定、省けばいまのブランチのもの）がマージ済みなら "merged <番号> <先頭の sha> <元ブランチ>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が閉じたかを確かめる）
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が必要です。
 USAGE
@@ -687,7 +687,9 @@ merged)
 	# 確かめ、マージ済みなら手元の片付けの条件に使う先頭の sha を取るために聞く。読むだけで、何も書かない。
 	# 引数は MR の番号（省けば、いまのブランチを元にした MR を探す）。番号があればその MR だけを聞く。
 	# 答えは 3 つで、呼ぶ側は none のときだけ「マージされていない」と読む。
-	#   merged <番号> <先頭の sha>  終了コード 0（sha はマージされた MR の元ブランチの先頭。分からなければ空）
+	#   merged <番号> <先頭の sha> <元ブランチ>
+	#                               終了コード 0（sha はマージされた MR の元ブランチの先頭、元ブランチはその名前。
+	#                               分からなければそれぞれ空）
 	#   none                        終了コード 0（マージ済みの MR が無いと分かった）
 	#   unknown                     終了コード 3（API が失敗した・答えを読めなかった）。道具やトークンが無ければ、
 	#                               上の道具の選び方が 2 で止める（none は出さない）
@@ -703,7 +705,7 @@ merged)
 				printf 'unknown\n'
 				exit 3
 			}
-			found=$(printf '%s' "$answer" | "$JQ" -r 'select(.merged_at != null) | "\(.number) \(.head.sha // "")"') || {
+			found=$(printf '%s' "$answer" | "$JQ" -r 'select(.merged_at != null) | "\(.number) \(.head.sha // "") \(.head.ref // "")"') || {
 				printf 'unknown\n'
 				exit 3
 			}
@@ -712,7 +714,7 @@ merged)
 				printf 'unknown\n'
 				exit 3
 			}
-			found=$(printf '%s' "$answer" | "$JQ" -r '[.[] | select(.merged_at != null)][0] | select(. != null) | "\(.number) \(.head.sha // "")"') || {
+			found=$(printf '%s' "$answer" | "$JQ" -r '[.[] | select(.merged_at != null)][0] | select(. != null) | "\(.number) \(.head.sha // "") \(.head.ref // "")"') || {
 				printf 'unknown\n'
 				exit 3
 			}
@@ -727,7 +729,7 @@ merged)
 				printf 'unknown\n'
 				exit 3
 			}
-			found=$(printf '%s' "$answer" | "$JQ" -r --argjson pid "$pid" 'select(.state == "merged" and .source_project_id == $pid) | "\(.iid) \(.sha // "")"') || {
+			found=$(printf '%s' "$answer" | "$JQ" -r --argjson pid "$pid" 'select(.state == "merged" and .source_project_id == $pid) | "\(.iid) \(.sha // "") \(.source_branch // "")"') || {
 				printf 'unknown\n'
 				exit 3
 			}
@@ -737,7 +739,7 @@ merged)
 				printf 'unknown\n'
 				exit 3
 			}
-			found=$(printf '%s' "$answer" | "$JQ" -r --argjson pid "$pid" '[.[] | select(.source_project_id == $pid)][0] | select(. != null) | "\(.iid) \(.sha // "")"') || {
+			found=$(printf '%s' "$answer" | "$JQ" -r --argjson pid "$pid" '[.[] | select(.source_project_id == $pid)][0] | select(. != null) | "\(.iid) \(.sha // "") \(.source_branch // "")"') || {
 				printf 'unknown\n'
 				exit 3
 			}

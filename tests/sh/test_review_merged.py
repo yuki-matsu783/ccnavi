@@ -1,8 +1,9 @@
 """ccnavi-review.sh merged の約束。
 
 ccnavi-sync.sh は答えが `none` のときだけ「マージされていない」と読み、
-親子のチケットの取り込み状態に gone を書く。マージ済みなら `merged <番号> <先頭の sha>` を返し、
-sync はその sha を基準に手元の片付けをする。MR の番号を渡せば、その MR だけを聞く。
+親子のチケットの取り込み状態に gone を書く。マージ済みなら
+`merged <番号> <先頭の sha> <元ブランチ>` を返し、sync はその sha を基準に、その元ブランチの
+手元の片付けをする。MR の番号を渡せば、その MR だけを聞く。
 API が失敗した・答えを読めなかったときは `unknown`（終了コード 3）、道具やトークンが無ければ
 `none` を出さずに止まる。ホストへの道具（curl）は PATH の先頭に置いた代役に差し替える。
 """
@@ -106,6 +107,14 @@ class ReviewMergedTest(unittest.TestCase):
         done = self.merged("t", "9")
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertEqual("merged 9 abc123", done.stdout.strip())
+
+    def test_the_source_branch_of_the_request_is_named(self):
+        self.curl_says(
+            '{"number": 9, "merged_at": "x", "head": {"sha": "abc123", "ref": "feature/12-x"}}'
+        )
+        done = self.merged("t", "9")
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("merged 9 abc123 feature/12-x", done.stdout.strip())
 
     def test_a_number_of_an_unmerged_request_is_none(self):
         self.curl_says('{"number": 9, "merged_at": null, "head": {"sha": "abc123"}}')
@@ -237,6 +246,16 @@ class ReviewMergedGitLabTest(ReviewMergedTest):
         done = self.merged("t", "9")
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertEqual("none", done.stdout.strip())
+
+    def test_the_source_branch_of_the_request_is_named(self):
+        self.gitlab_says(
+            "[]",
+            one='{"iid": 9, "state": "merged", "source_project_id": 42, "sha": "abc123",'
+            ' "source_branch": "feature/12-x"}',
+        )
+        done = self.merged("t", "9")
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("merged 9 abc123 feature/12-x", done.stdout.strip())
 
     def test_a_number_of_an_unmerged_or_fork_request_is_none(self):
         for one in (
