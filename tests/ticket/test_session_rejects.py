@@ -158,7 +158,8 @@ class SessionRejectsTest(PhaseHarness):
         for text in (system, context):
             self.assertIn("src/*", text)
             self.assertIn("フェーズ定義 research", text)
-            self.assertNotIn("親 i0001", text)
+            # 出所に親は出ない。context に載る作業中の親の一覧（親 i0001 の行）は別の話
+            self.assertNotIn("親 i0001", text.partition("[ccnavi] このPCで作業中の親:")[0])
 
     # ---- 3. 絞る
 

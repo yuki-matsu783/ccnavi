@@ -111,7 +111,8 @@ class ApprovalToldTest(PhaseHarness):
         self.assertNotIn("承認され", self.prompt())
         self.assertNotIn("承認され", self.before())
         self.assertNotIn("承認され", self.before(session="s2", agent_id="sub-1"))
-        self.assertNotIn("i0001-01-01", self.context(self.event("SessionStart")))
+        # セッション開始の一覧（このPCで作業中の親）は次の子を名指しする。承認の知らせは言わない
+        self.assertNotIn("承認され", self.context(self.event("SessionStart")))
         self.assertNotIn("承認され", self.prompt(session="s2"))
 
     def test_one_hook_reads_the_approved_copies_once(self):

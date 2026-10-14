@@ -131,6 +131,10 @@ class Family:
     path: str = ""
     # 取り込み状態に書いた親のブランチ名。前の取り込み状態は識別子と同じ名前を書いている。
     branch: str = ""
+    # 最後に取り込んだ（origin に合わせた）時刻。UNIX 秒の文字列。前の取り込み状態や読めない値は空。
+    fetched_at: str = ""
+    # 親を載せる MR の番号。ccnavi-start.sh が保存する。無ければ空。
+    mr: str = ""
 
 
 def family_path(state_dir: str, repo: str, name: str) -> str:
@@ -163,7 +167,14 @@ def family(state_dir: str, repo: str, name: str) -> Family | None:
         sha=record.get("sha", ""),
         path=path,
         branch=record.get("branch", ""),
+        fetched_at=_digits(record.get("fetched_at", "")),
+        mr=_digits(record.get("mr", "")),
     )
+
+
+def _digits(text: str) -> str:
+    """数字だけの値。それ以外（空・読めない値）は空。"""
+    return text if text.isascii() and text.isdigit() else ""
 
 
 def family_names(state_dir: str) -> list[tuple[str, str]]:

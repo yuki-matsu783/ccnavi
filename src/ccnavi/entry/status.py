@@ -31,6 +31,7 @@ from ..tickets import (
     c1,
     history,
     ops_stop,
+    overview,
     phase,
     syncstate,
     ticket_model,
@@ -143,6 +144,12 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         "  push 済みかは手元のリモート追跡の ref（最後に取得した時点の状態）で見るので、"
         f"古いかもしれない。最新にするには先に '{sync} <親>' を実行します。\n"
     )
+    rows = {r.ident: r for r in overview.collect(conf, root, doing, review, closed, proposals)}
+    if not family and rows:
+        # 引数なし: このPCで作業中の親を 1 行ずつ、そのあとに親ごとの詳細
+        stdout.write("\n== このPCで作業中の親\n")
+        for row in rows.values():
+            stdout.write(overview.line(row) + "\n")
     for name in families:
         members = sorted(
             (e for e in entries.values() if home(e) == name),
@@ -150,10 +157,27 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         )
         ctx = _Family(root, conf, name, entries, pool, times, files, fams, raw)
         stdout.write(f"\n== 親子 {name}\n")
+        stdout.write(f"最終取り込み: {_synced(conf, name, entries)}\n")
+        row = rows.get(name)
+        if row is not None and not family:
+            for child, state in overview.child_states(root, row, doing, review):
+                stdout.write(f"子のワークツリー: {child}  {state}\n")
         for e in members:
             for line in ctx.describe(e, e.ident in revisions):
                 stdout.write(line + "\n")
     return 0
+
+
+def _synced(conf: settings.Settings, name: str, entries: dict[str, Entry]) -> str:
+    """この親の最終取り込みの時刻。取り込み状態が無ければ「リモート未確認」。"""
+    e = entries.get(name)
+    project = e.t.project if e is not None and e.hits else ""
+    record = overview.record_of(conf, name, project)
+    fetched = int(record.fetched_at) if record and record.fetched_at else 0
+    text = overview.sync_label(fetched)
+    if fetched:
+        return text
+    return f"{text}（一度も取り込んでいない。ccnavi-sync.sh で取り込むと時刻が付く）"
 
 
 class _Family:

@@ -23,6 +23,7 @@ from ..tickets import (
     ops_stop,
     ops_stop_integrate,
     ops_stop_request,
+    overview,
     phase,
     session_rejects,
     skillsync,
@@ -561,6 +562,11 @@ def decide_at_start(
         )
         if guide:
             texts.append(guide)
+        # このPCで作業中の親を 1 行ずつ（親・ブランチ・MR・次の子・最終取り込み・未送信）。
+        # 読めなくても開始は止めない。
+        parents = _parents_at_start(stderr, conf, root)
+        if parents:
+            texts.append(parents)
     if rejects:
         texts.append(rejects)
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録。
@@ -572,6 +578,15 @@ def decide_at_start(
     if texts:
         hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts), system=rejects)
     return EXIT_OK
+
+
+def _parents_at_start(stderr: TextIO, conf: settings.Settings, root: str) -> str:
+    """セッション開始で渡す、このPCで作業中の親の一覧。無い・読めないなら空。"""
+    try:
+        return overview.session_text(conf, root)
+    except Exception as exc:  # noqa: BLE001 - 一覧の失敗でセッションの開始を止めない
+        stderr.write(f"ccnavi: 作業中の親の一覧を作れなかった: {exc}\n")
+        return ""
 
 
 def _reported_baseline(
