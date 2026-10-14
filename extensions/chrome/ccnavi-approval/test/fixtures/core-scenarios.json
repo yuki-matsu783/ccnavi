@@ -34,6 +34,7 @@
     ]
    },
    "code": null,
+   "digest": "d630b2b5a65978441906cab1376823f59048587a4805c3cffada78062f8b86cb",
    "family": "i0001",
    "identifiers": [
     "i0001",
@@ -42,6 +43,7 @@
    "lines": [
     "\n承認した。.ccnavi/approved/doing/ へ動かした。"
    ],
+   "mismatch": null,
    "refused": "",
    "rejected": [],
    "schema": 1,
@@ -50,10 +52,6 @@
   },
   "request": {
    "family": "i0001",
-   "ids": [
-    "i0001",
-    "i0001-01-01"
-   ],
    "op": "plan",
    "schema": 1,
    "snapshot": {
@@ -118,6 +116,7 @@
     ]
    },
    "code": null,
+   "digest": "8a706c98e2b884cbe791ade170c8e94b5306ce2e71f463d68b3bfa7340e01f01",
    "family": "i0001",
    "identifiers": [
     "i0001-01-02"
@@ -126,6 +125,7 @@
     "  i0001 のフェーズ 1 のマーカー（requested, reviewed）を削除しました。全部閉じたらレビューをもう一度頼むことになる",
     "\n承認した。.ccnavi/approved/doing/ へ動かした。"
    ],
+   "mismatch": null,
    "refused": "",
    "rejected": [],
    "schema": 1,
@@ -134,9 +134,6 @@
   },
   "request": {
    "family": "i0001",
-   "ids": [
-    "i0001-01-02"
-   ],
    "op": "plan",
    "schema": 1,
    "snapshot": {
@@ -297,6 +294,7 @@
     ]
    },
    "code": null,
+   "digest": "02922dccb25cdb491181974a07f6938121f1f23cd0de2171f00f011176a608c4",
    "family": "i0001",
    "identifiers": [
     "i0001"
@@ -306,6 +304,7 @@
     "  全体計画の最後のレビューを済ませた扱いにした。残った指摘はフィードバック作業フェーズの confirm が数える",
     "\n承認した。.ccnavi/approved/doing/ へ動かした。"
    ],
+   "mismatch": null,
    "refused": "",
    "rejected": [],
    "schema": 1,
@@ -314,9 +313,6 @@
   },
   "request": {
    "family": "i0001",
-   "ids": [
-    "i0001"
-   ],
    "op": "plan",
    "schema": 1,
    "snapshot": {
@@ -375,6 +371,7 @@
     ]
    },
    "code": null,
+   "digest": "187c1778ab574bcc22b9c3bcf236dbe503fd9c50218b8611912604cacc8d8172",
    "family": "i0003",
    "identifiers": [
     "i0003-01-01"
@@ -382,17 +379,22 @@
    "lines": [
     "\n承認した。.ccnavi/approved/doing/ へ動かした。"
    ],
+   "mismatch": null,
    "refused": "",
-   "rejected": [],
+   "rejected": [
+    {
+     "problems": [
+      "error: i0003-01-02: 先行 i0002-01-02 が完了していない（いまは 作業中（doing/））。i0002-01-02 が .ccnavi/approved/done/ に入る（作業を終え、レビューが必要ならユーザのレビューが済む）まで承認しない。先行が不要なら predecessors から削除して出し直してください"
+     ],
+     "ticket": "i0003-01-02"
+    }
+   ],
    "schema": 1,
    "stopped": null,
    "text": "チケットの承認リクエスト: 1 件\n\n== i0003-01-01: 子 i0003-01-01  親 i0003 / フェーズ 1: 調査\n■ この子チケットで編集可能な範囲\n    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、親の範囲にない場所が新たに編集可能になることはありません\n    親の範囲: src/*, wip/*, tests/*\n    定義「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ 先行: i0002-01-01\n    すべての先行チケットが、取り消されずに完了し、done/ に移動している必要があります。条件を満たすまで、承認・開始はできません。\n■ エージェントが記載した理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0003  提案: wip/proposals/todo/i0003-01-01.md"
   },
   "request": {
    "family": "i0003",
-   "ids": [
-    "i0003-01-01"
-   ],
    "op": "plan",
    "schema": 1,
    "snapshot": {
@@ -460,6 +462,7 @@
     ]
    },
    "code": null,
+   "digest": "4fb188f24b5d290e94c91350a4aebe58259f4050325398fde69914caa4e5d071",
    "family": "i0001",
    "identifiers": [
     "i0001"
@@ -468,6 +471,7 @@
     "  i0001 の全体計画を改版した",
     "\n承認した。.ccnavi/approved/doing/ へ動かした。"
    ],
+   "mismatch": null,
    "refused": "",
    "rejected": [],
    "schema": 1,
@@ -476,9 +480,6 @@
   },
   "request": {
    "family": "i0001",
-   "ids": [
-    "i0001"
-   ],
    "op": "plan",
    "schema": 1,
    "snapshot": {

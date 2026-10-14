@@ -554,11 +554,13 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
         dispatch(current, { kind: "approved", outcome: { ok: false, error: unsavedText(blocked) }, carrier: false });
         return;
       }
-      // 承認する識別子だけを渡す。実行ファイルが、いまの提案を端末の承認と同じ検査にかける
-      const outcome = await runApproveYes(root, binSetting(), effect.tickets);
+      // 見せたときと同じ絞りを渡す。渡さないと、実行ファイルは絞らないときの対象と比べて食い違いにする。
+      // 見せたダイジェスト（提案の識別子の一覧と各提案ファイルのバイト列全体）も渡す。識別子が同じでも、
+      // 見せたあとに提案ファイルの中身（本文・改行・BOM）が変われば承認せず、最新を表示し直す
+      const outcome = await runApproveYes(root, binSetting(), effect.tickets, effect.digest, effect.only);
       // 承認済みチケットを置くのは取り返しがつかないので、受け付けたことと結果を 1 行残す
       diaglog.get("ccnavi-board", root).info("承認を打った", {
-        result: outcome.ok ? "approved" : "error",
+        result: outcome.ok ? "approved" : "mismatch" in outcome ? "mismatch" : "error",
         requested: effect.tickets.length,
         approved: outcome.ok ? outcome.value.approved.length : 0,
       });

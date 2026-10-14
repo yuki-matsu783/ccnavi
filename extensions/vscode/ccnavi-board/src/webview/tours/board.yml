@@ -196,6 +196,7 @@ sample:
         == sample-a-01-01: （見本）再設定メールの文面を決める  親 sample-a / フェーズ 1: 調査
         ■ 人間レビュー: 不要
             理由: 調査だけで、コードは変わらない
+      digest: sample
       plans:
         - ticket: sample-a
           part: plan

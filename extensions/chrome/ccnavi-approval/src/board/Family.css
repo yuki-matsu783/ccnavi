@@ -22,6 +22,7 @@
 }
 .actions { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 8px 0; }
 .actions > button.action { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.actions .digest { font-family: var(--vscode-editor-font-family); font-size: .85em; color: var(--vscode-descriptionForeground); }
 .approved-item { margin: 4px 0; overflow-wrap: anywhere; }
 .approved-item > button.action { margin-left: 4px; vertical-align: middle; }
 /* 取り下げられない理由。カードの不備（`.card .issues`）と同じ警告の小さな字 */

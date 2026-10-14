@@ -19,7 +19,7 @@ function board(repo: RepoConfig = REPO): RepoBoard {
 }
 
 function family(name = "i0001"): FamilyBoard {
-  return { family: { name }, result: { batch: [{ ticket: name }] }, error: "" } as unknown as FamilyBoard;
+  return { family: { name }, result: { digest: "d1", batch: [{ ticket: name }], only: null }, error: "" } as unknown as FamilyBoard;
 }
 
 const WRITTEN: Outcome = { kind: "written", oid: "0123456789abcdef", rounds: 1, lines: [] };
@@ -103,6 +103,7 @@ test("CX-T219 書いた結果の一言: 結果の種類ごとの文面と data-k
   const cases: [Outcome, string, string][] = [
     [WRITTEN, "written", "承認を反映しました（コミット：0123456）。反映後の内容も確認しました。"],
     [{ ...WRITTEN, rounds: 3 } as Outcome, "written", "承認を反映しました（コミット：0123456。途中で親のブランチの先頭が動いたので、3 回目で反映しました）。反映後の内容も確認しました。"],
+    [{ kind: "changed", message: "動いた" }, "changed", "承認は反映されていません：動いた"],
     [{ kind: "conflict", message: "競合" }, "conflict", "承認を反映できませんでした。自動再試行は行いません：競合"],
     [{ kind: "attention", message: "残った" } as Outcome, "attention", "承認は確認が必要な状態です。反映されたかどうかと残っている内容を、ホストの履歴で確認してください：残った"],
     [{ kind: "refused", message: "断った" }, "refused", "承認は反映されていません：断った"],

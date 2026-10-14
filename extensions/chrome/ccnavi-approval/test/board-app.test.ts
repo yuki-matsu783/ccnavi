@@ -75,6 +75,8 @@ function writable(name: string): FamilyBoard {
       refused: "",
       batch: [{ ticket: `${name}-01`, title: "子", revision: false, phase: 1, path: `p/${name}-01.md`, overflow: [], body: "# 本文\n\n**太字**" }],
       text: "承認の画面",
+      digest: "0123456789abcdef",
+      only: null,
       write: { allowed: true, reason: "" },
       withdrawable: [{ ticket: name, title: "親", problems: [] }],
       rejected: [],

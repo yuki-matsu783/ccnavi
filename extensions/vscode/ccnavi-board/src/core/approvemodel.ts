@@ -84,6 +84,8 @@ export interface ApprovePreview {
   readonly batch: readonly ApproveBatchEntry[];
   /** 承認画面の本文そのまま */
   readonly text: string;
+  /** 提案の識別子の一覧と各提案ファイルの元のバイト列全体のダイジェスト（SHA-256、16 進）。中身は見ずに、承認するときに `--digest` で返す */
+  readonly digest: string;
   /** 承認の対象にしない提案と、その理由 */
   readonly rejected: readonly ApproveRejected[];
   /** 読めない提案や承認済みチケットの説明 */
@@ -179,13 +181,22 @@ export function childWorktreeFailureText(failed: readonly ChildWorktreeFailure[]
     .join("\n");
 }
 
+export interface ApproveMismatch {
+  readonly expected: readonly string[];
+  readonly current: readonly string[];
+  /** 見せたダイジェスト（渡した値）と今のダイジェスト */
+  readonly digest: { readonly expected: string; readonly current: string };
+}
+
 /**
- * `--agree --yes` の答えを、呼ぶ側が読む形にしたもの。`partial`（途中で止まった）は
- * 文面にしてから `error` に入るので、ここには出てこない（`ccnavi.ts` の `runApproveYes`）。
- * 承認のオーバーレイの遷移（`approval-machine.ts`）が入力として受けるので、契約の側に置く
+ * `--agree --yes` の答えを、呼ぶ側が読む形にしたもの。`partial`（途中で止まった）は、置けたぶんが
+ * あればコミット・pushを送るため、文面にせず遷移の側へ渡す（`approval-machine.ts` の `answered`）。
+ * 承認のオーバーレイの遷移が入力として受けるので、契約の側に置く
  */
 export type ApproveOutcome =
   | { readonly ok: true; readonly value: ApproveResult }
+  | { readonly ok: false; readonly mismatch: ApproveMismatch }
+  | { readonly ok: false; readonly partial: ApprovePartial }
   | { readonly ok: false; readonly error: string };
 
 export type PreviewParse =
@@ -199,6 +210,8 @@ export type PreviewParse =
 export interface ApprovePartial {
   /** 承認済みチケットに入ったぶん（新規は置いた、改版は書き換えた） */
   readonly placed: readonly string[];
+  /** 実際に書けた承認済みチケットのパス（`placed` の分） */
+  readonly paths: readonly string[];
   /** 止まったところの識別子 */
   readonly ticket: string;
   /** 止まった理由（実行ファイルの文面そのまま） */
@@ -212,20 +225,25 @@ export interface ApprovePartial {
  * `placed` に止まった識別子自身が入るのは、書けたあとの後始末（マーカーを置く）で
  * 失敗したとき。「i0001 で止まった…i0001 は入っている」と読めてしまうので、そこだけ言い方を変える。
  */
-export function partialMessage(partial: ApprovePartial): string {
-  const { placed, ticket, reason, lines } = partial;
+export function partialMessage(partial: ApprovePartial, carried = false): string {
+  const { placed, paths, ticket, reason, lines } = partial;
   const where = ticket === "" ? "" : placed.includes(ticket) ? `${ticket} の後始末で` : `${ticket} で`;
+  const written = paths.length === 0 ? placed.join(", ") : paths.join(", ");
+  const failed = ticket === "" || placed.includes(ticket) ? "" : `書けなかった: ${ticket}。`;
+  const sent = carried
+    ? "書けたぶんだけをコミット・pushするコマンドをターミナルに送信しました。結果はターミナルで確認してください（pushできていなければ未送信です）"
+    : "承認済みチケットをコミット・pushするコマンドは送信していません（push用のスクリプトがありません）。未送信です";
   const what =
     placed.length === 0
       ? "承認済みになったチケットはありません"
-      : `${placed.join(", ")} の ${placed.length} 件は承認済みチケットに入っています。` +
-        "承認済みチケットをコミット・pushするコマンドはターミナルに送信していません（送るのは承認できたときだけです）。チケット管理画面を更新して確認してください";
+      : `書けた承認済みチケット（${placed.length} 件）: ${written}。${failed}${sent}`;
   const done = lines.length === 0 ? "" : `\n${lines.join("\n")}`;
   return `ccnavi --agree --yes が${where === "" ? "" : ` ${where}`}止まりました: ${reason}。${what}${done}`;
 }
 
 export type ResultParse =
   | { readonly ok: true; readonly value: ApproveResult }
+  | { readonly ok: false; readonly mismatch: ApproveMismatch }
   | { readonly ok: false; readonly partial: ApprovePartial }
   | { readonly ok: false; readonly error: string };
 
@@ -243,6 +261,7 @@ export function parseApprovePreview(text: string): PreviewParse {
       generated_at: str(raw.generated_at),
       batch: list(raw.batch).filter(isRecord).map(entry),
       text: str(raw.text),
+      digest: str(raw.digest),
       rejected: list(raw.rejected)
         .filter(isRecord)
         .map((r) => ({ ticket: str(r.ticket), problems: list(r.problems).map(str) })),
@@ -252,19 +271,31 @@ export function parseApprovePreview(text: string): PreviewParse {
   };
 }
 
-/** `--yes` の答え。承認できたか、途中で止まったか、読めなかったか */
+/** `--yes` の答え。承認できたか、一覧が変わっていたか、読めなかったか */
 export function parseApproveResult(text: string): ResultParse {
   const top = parseTop(text);
   if (!top.ok) {
     return top;
   }
   const raw = top.raw;
-  // 途中で止まった。置いたものは戻らないので、成功にはしない。
+  if (isRecord(raw.mismatch)) {
+    const digest: Record<string, unknown> = isRecord(raw.mismatch.digest) ? raw.mismatch.digest : {};
+    return {
+      ok: false,
+      mismatch: {
+        expected: list(raw.mismatch.expected).map(str),
+        current: list(raw.mismatch.current).map(str),
+        digest: { expected: str(digest.expected), current: str(digest.current) },
+      },
+    };
+  }
+  // 途中で止まった。置いたものは戻らないので、mismatch と同じく成功にはしない。
   if (isRecord(raw.partial)) {
     return {
       ok: false,
       partial: {
         placed: list(raw.partial.placed).map(str),
+        paths: list(raw.partial.paths).map(str),
         ticket: str(raw.partial.ticket),
         reason: str(raw.partial.reason),
         lines: list(raw.partial.lines).map(str),

@@ -62,7 +62,7 @@
  * ガードを 1 つ消したらテストが失敗することまで見るので、ガードを足したらそちらにも足す。
  */
 import type { ApprovalOverlay } from "./board-view.js";
-import { changedSinceSave, unsavedParents, unsavedText, type ApproveOutcome, type ApprovePreview, type PreviewParse } from "./approvemodel.js";
+import { changedSinceSave, partialMessage, unsavedParents, unsavedText, type ApproveOutcome, type ApprovePreview, type PreviewParse } from "./approvemodel.js";
 import { choicesProblem, type DecideOutcome, type DecidePreviewParse } from "./decidemodel.js";
 import type { PhaseChip } from "./board.js";
 import { PUSH_APPROVED_SCRIPT, reviewedPrompt } from "./commands.js";
@@ -82,6 +82,17 @@ export interface ApprovalState {
    * 承認待ち全部になってしまう
    */
   readonly only: readonly string[];
+  /**
+   * 食い違い（`mismatch`）で一覧を読み直している最中。見せている `overlay` は `approving` のままで、
+   * 返ってきた一覧にこの `notice` をつけて `preview` に切り替える。
+   * `dropped` は、絞りが通らなかったので絞りを外して読み直したか（外したあとは、もう外さない）。
+   *
+   * 不変条件: これがあるとき `overlay` は必ず `approving`。 置くのは `answered` の食い違いの枝
+   * 1 か所だけで、そこは `overlay` を持ち越す。`approving` の間は閉じられないので、外れるのは
+   * 一覧が返って `preview` か `error` に差し替わるときだけ。型では持っていないので、
+   * `recheck` を置く枝を増やすならここを読み直すこと
+   */
+  readonly recheck?: { readonly notice: string; readonly dropped: boolean };
 }
 
 /** 閉じている状態 */
@@ -113,7 +124,7 @@ export type ApprovalInput =
   /** 一覧の図の「計画を編集」を押した。オーバーレイを閉じてから、その親のタブを開く */
   | { readonly kind: "editWorkflow"; readonly ticket: string }
   /**
-   * 承認（`--agree --yes`）の結果が返った。
+   * 承認（`--agree --yes`）の結果が返った。食い違い（`mismatch`）もここに入る。
    * `carrier` は承認の push の sh が置いてあるか（呼ぶ側が見て渡す）
    */
   | { readonly kind: "approved"; readonly outcome: ApproveOutcome; readonly carrier: boolean }
@@ -156,8 +167,13 @@ export type ApprovalInput =
 export type ApprovalEffect =
   /** 承認待ちの一覧を読む（`--agree --preview --json`）。返ったら `previewed` で戻す */
   | { readonly kind: "loadPreview"; readonly only: readonly string[] }
-  /** 承認を打つ（`--agree --yes <識別子,…>`）。返ったら `approved` で戻す */
-  | { readonly kind: "approve"; readonly tickets: readonly string[] }
+  /** 承認を打つ（`--agree --yes … --digest …`）。返ったら `approved` で戻す */
+  | {
+      readonly kind: "approve";
+      readonly tickets: readonly string[];
+      readonly digest: string;
+      readonly only: readonly string[];
+    }
   /** 承認の push の sh をターミナルに送る */
   | { readonly kind: "carry" }
   /** 残った指摘を読む（`decide <N> --preview`）。返ったら `decidePreviewed` で戻す */
@@ -268,8 +284,26 @@ function opened(
   return move(state, { overlay: { kind: "loading" }, only }, { kind: "loadPreview", only });
 }
 
-/** 一覧が返った */
+/** 一覧が返った。頼んだのが「開く」なのか「食い違いの読み直し」なのかで行き先が変わる */
 function previewed(state: ApprovalState, result: PreviewParse, saved: Readonly<Record<string, string>>): ApprovalStep {
+  const recheck = state.recheck;
+  if (recheck !== undefined) {
+    // 絞りが通らない（その識別子がもう承認待ちに無い、親の改版が承認待ちに入った）ときだけ絞りを
+    // 外し、いま何が承認待ちなのかを全部見せる。外すのは 1 度だけ
+    if (!result.ok && state.only.length > 0 && !recheck.dropped) {
+      return move(
+        state,
+        { overlay: state.overlay, only: [], recheck: { notice: recheck.notice, dropped: true } },
+        { kind: "loadPreview", only: [] },
+      );
+    }
+    return move(state, {
+      overlay: result.ok
+        ? { kind: "preview", preview: result.value, notice: recheck.notice, ...changedOf(result.value, saved) }
+        : { kind: "error", error: result.error },
+      only: state.only,
+    });
+  }
   // 頼んだときのまま（`loading`）でなければ受けない。閉じたあとに返ってきた一覧で開き直さない
   if (state.overlay?.kind !== "loading") {
     return stay(state);
@@ -287,8 +321,8 @@ function changedOf(preview: ApprovePreview, saved: Readonly<Record<string, strin
 }
 
 /**
- * 「この N 件を承認する」。承認する識別子だけを渡す。実行ファイルが、そのときの提案を
- * 端末の承認と同じ検査にかけて承認する（見せたあとの変更は調べない）
+ * 「この N 件を承認する」。見せた識別子とダイジェストをそのまま渡す。実行ファイルが一覧と本文の一致を
+ * 確かめ、違えば何も置かずに `mismatch` を返す
  */
 function confirmed(state: ApprovalState, tickets: readonly string[], unsaved: readonly string[]): ApprovalStep {
   // 承認を打てるのは、一覧を見せているときだけ。承認中に押し直しても 2 本目は出ない
@@ -304,7 +338,7 @@ function confirmed(state: ApprovalState, tickets: readonly string[], unsaved: re
   return move(
     state,
     { overlay: { kind: "approving", preview }, only: state.only },
-    { kind: "approve", tickets },
+    { kind: "approve", tickets, digest: preview.digest, only: state.only },
   );
 }
 
@@ -343,6 +377,29 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
       state,
       { overlay: { kind: "done", count, prompt: outcome.value.prompt, carried }, only: [] },
       ...effects,
+    );
+  }
+  if ("mismatch" in outcome) {
+    // まず同じ絞りで読み直す。カードの「この 1 件を承認」で全部の一覧に切り替わると、1 件のつもりで
+    // 押し続けて全部を承認しかねない。見せているのは `approving` のままで、返ったら差し替える
+    const sameIds = outcome.mismatch.expected.join(",") === outcome.mismatch.current.join(",");
+    const notice = sameIds
+      ? "内容が更新されました（表示したあとに提案ファイルが書き換えられました）。何も承認していません。最新の内容を表示し直したので、見直してからもう一度承認してください"
+      : "内容が更新されました（表示したあとに承認待ちの提案が増えたか減りました）。何も承認していません。最新の一覧を表示し直したので、見直してからもう一度承認してください";
+    return move(
+      state,
+      { overlay: state.overlay, only: state.only, recheck: { notice, dropped: false } },
+      { kind: "loadPreview", only: state.only },
+    );
+  }
+  if ("partial" in outcome) {
+    // 途中で止まった。置けたぶんは残っているので、その分だけコミット・pushを送り、何が書けて
+    // 何が書けなかったかをオーバーレイで言う。1 件も置けていなければ何も送らない
+    const placed = outcome.partial.placed.length > 0;
+    return move(
+      state,
+      { overlay: { kind: "error", error: partialMessage(outcome.partial, carrier && placed) }, only: state.only },
+      ...(placed ? [...(carrier ? [{ kind: "carry" } as const] : []), { kind: "refresh" } as const] : []),
     );
   }
   return move(state, { overlay: { kind: "error", error: outcome.error }, only: state.only });

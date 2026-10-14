@@ -40,12 +40,18 @@ export function previewArgs(tickets: readonly string[] = []): readonly string[] 
 }
 
 /**
- * `--agree --yes <識別子,…> --json`。指した識別子だけを承認する（子プロセスの引数）。
- * `tickets` は承認する識別子（オーバーレイに出ていたもの）。実行ファイルは、承認する時点の提案を
- * 端末の承認と同じ検査にかける。見せたあとに提案が変わったかは調べない。
+ * `--agree --yes <識別子,…> --digest <ダイジェスト> --json [<絞り>...]`。見せた一覧をそのまま承認する（子プロセスの引数）。
+ * `tickets` はオーバーレイに出ていた識別子、`digest` はそのとき見せたダイジェスト（提案の識別子の一覧と各提案ファイルのバイト列全体。preview の `digest`）、
+ * `only` はそのとき preview に渡した絞り。
+ * 絞りを渡さないと、実行ファイルは「絞らないときの対象」と見せた識別子を比べるので、
+ * 絞り込み中の承認がいつも食い違いになる。ダイジェストを渡さないと、実行ファイルは承認しない。
  */
-export function approveArgs(tickets: readonly string[]): readonly string[] {
-  return ["--agree", "--yes", tickets.join(","), "--json"];
+export function approveArgs(
+  tickets: readonly string[],
+  digest: string,
+  only: readonly string[] = [],
+): readonly string[] {
+  return ["--agree", "--yes", tickets.join(","), "--digest", digest, "--json", ...only];
 }
 
 /**

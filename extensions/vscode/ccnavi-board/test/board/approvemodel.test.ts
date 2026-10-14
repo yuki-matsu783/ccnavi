@@ -40,8 +40,9 @@ test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・
   assert.ok(preview.batch[2].overflow[0].includes("超えている"));
   assert.ok(preview.text.startsWith("チケットの承認リクエスト: 3 件"));
   assert.ok(preview.text.includes("編集対象としているが"));
-  // 表示時点との照合はしないので、digest は持たない。
-  assert.ok(!("digest" in preview));
+  // 本文のダイジェスト。承認するときに --digest で返す。値はワークツリーの絶対パスに依るので、
+  // フィクスチャでは伏せてある。
+  assert.equal(preview.digest, "<digest>");
   // 対象にしないのは形の正しくない子（計画に無い番号）だけ。
   assert.equal(preview.rejected.length, 1);
   assert.equal(preview.rejected[0].ticket, "i0001-05-05");
@@ -126,7 +127,7 @@ test("CB-T104b 超過の欄がない古い答えは、空の配列として読�
   assert.ok(parsed.ok && parsed.value.batch[0].overflow.length === 0);
 });
 
-test("CB-T105 承認の答えを読む（承認した）", () => {
+test("CB-T105 承認の答えを読む（承認した / 一覧が違った）", () => {
   const done = parseApproveResult(fixtureText("approve-yes.json"));
   assert.ok(done.ok);
   if (done.ok) {
@@ -136,9 +137,14 @@ test("CB-T105 承認の答えを読む（承認した）", () => {
     assert.ok(done.value.prompt.includes("ccnavi-ticket.sh start"));
     assert.ok(done.value.lines.length > 0);
   }
-  // 廃止した mismatch の形は特別に読まない（outcome に mismatch の枝は無い）
-  const old = parseApproveResult(JSON.stringify({ version: 1, mismatch: { expected: [], current: [] } }));
-  assert.ok(!("mismatch" in old));
+  const changed = parseApproveResult(fixtureText("approve-mismatch.json"));
+  assert.ok(!changed.ok);
+  assert.ok("mismatch" in changed);
+  if ("mismatch" in changed) {
+    assert.deepEqual(changed.mismatch.expected, ["i0001-01-09"]);
+    assert.deepEqual(changed.mismatch.current, []);
+    assert.deepEqual(changed.mismatch.digest, { expected: "<digest>", current: "<digest>" });
+  }
 });
 
 test("CB-T106 版が違う・JSON でない答えは読まない", () => {
@@ -154,13 +160,14 @@ test("CB-T158 途中で止まった承認を読む（置いたぶんを拾い、
   const stopped = parseApproveResult(
     JSON.stringify({
       version: APPROVE_VERSION,
-      partial: { placed: ["i0001"], ticket: "i0001-01-01", reason: "書けない (…)", lines: ["  i0001 のフェーズ 1 のマーカーを削除した"] },
+      partial: { placed: ["i0001"], paths: ["/w/.ccnavi/approved/doing/i0001.md"], ticket: "i0001-01-01", reason: "書けない (…)", lines: ["  i0001 のフェーズ 1 のマーカーを削除した"] },
     }),
   );
   assert.ok(!stopped.ok, "置いたぶんがあっても成功にはしない");
   assert.ok("partial" in stopped);
   if ("partial" in stopped) {
     assert.deepEqual(stopped.partial.placed, ["i0001"]);
+    assert.deepEqual(stopped.partial.paths, ["/w/.ccnavi/approved/doing/i0001.md"], "実際に書けたパス");
     assert.equal(stopped.partial.ticket, "i0001-01-01");
     assert.ok(stopped.partial.reason.includes("書けない"));
     assert.deepEqual(stopped.partial.lines, ["  i0001 のフェーズ 1 のマーカーを削除した"]);
@@ -175,23 +182,34 @@ test("CB-T158 途中で止まった承認を読む（置いたぶんを拾い、
 test("CB-T159 途中で止まったことを伝える文（置いた件数・後始末で止まった場合・進捗の行）", () => {
   const stopped = partialMessage({
     placed: ["i0001"],
+    paths: [".ccnavi/approved/doing/i0001.md"],
     ticket: "i0001-01-01",
     reason: "書けない (…)",
     lines: ["  i0001 のフェーズ 1 のマーカーを削除した"],
   });
   assert.ok(stopped.includes("i0001-01-01 で止まりました"));
-  assert.ok(stopped.includes("i0001 の 1 件は承認済みチケットに入っています"));
-  assert.ok(stopped.includes("をコミット・pushするコマンドはターミナルに送信していません"));
+  assert.ok(stopped.includes("書けた承認済みチケット（1 件）: .ccnavi/approved/doing/i0001.md"), "書けたパスを言う");
+  assert.ok(stopped.includes("書けなかった: i0001-01-01"), "書けなかった提案を名指しする");
+  assert.ok(stopped.includes("コミット・pushするコマンドは送信していません"), "送れていなければ未送信と言う");
+  const sent = partialMessage({
+    placed: ["i0001"],
+    paths: [".ccnavi/approved/doing/i0001.md"],
+    ticket: "i0001-01-01",
+    reason: "書けない",
+    lines: [],
+  }, true);
+  assert.ok(sent.includes("書けたぶんだけをコミット・pushするコマンドをターミナルに送信しました"), sent);
   assert.ok(stopped.includes("マーカーを削除した"), "端末に出ていた行も渡す");
 
   // 1 件も置かれなかったときは「一部だけ置かれた」と言わない
-  const none = partialMessage({ placed: [], ticket: "i0001", reason: "書けない", lines: [] });
+  const none = partialMessage({ placed: [], paths: [], ticket: "i0001", reason: "書けない", lines: [] });
   assert.ok(none.includes("承認済みになったチケットはありません"));
-  assert.ok(!none.includes("入っています"));
+  assert.ok(!none.includes("書けた承認済みチケット"));
 
   // 書けたあとの後始末（マーカーを置く）で失敗したときは、言い方を変える
   const after = partialMessage({
     placed: ["i0001"],
+    paths: [".ccnavi/approved/doing/i0001.md"],
     ticket: "i0001",
     reason: "マーカーを置けない: 書けない",
     lines: [],
@@ -202,7 +220,7 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
   // 「が」と識別子の間は空白 1 つ。止まった識別子が分からない（空）ときは空白を重ねない
   assert.ok(stopped.startsWith("ccnavi --agree --yes が i0001-01-01 で止まりました: 書けない (…)。"), stopped);
   assert.ok(after.startsWith("ccnavi --agree --yes が i0001 の後始末で止まりました: "), after);
-  const unknown = partialMessage({ placed: [], ticket: "", reason: "書けない", lines: [] });
+  const unknown = partialMessage({ placed: [], paths: [], ticket: "", reason: "書けない", lines: [] });
   assert.ok(unknown.startsWith("ccnavi --agree --yes が止まりました: 書けない。"), unknown);
   // 継ぎ目だけを見る。識別子があれば「が」のあとに空白ちょうど 1 つ、無ければ「が」の直後に「止まりました」
   assert.match(stopped, /--yes が [^\s]/, stopped);
