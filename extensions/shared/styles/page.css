@@ -36,9 +36,10 @@ code { font-family: var(--vscode-editor-font-family); font-size: .95em; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 0 4px 10px; }
 /* ツールバー（保存などのボタン）と脚注（保存の結果・エラー）は、本文をスクロールしても画面の上下に
    残す。どちらも #root の直下にあり、本文と同じ入れ物の中で貼り付く。本文が裏を通るので背景を塗る。
-   z-index は列の取っ手（1）より上、承認のオーバーレイ（10）と全画面の図（100）とツアー（1000）より下 */
+   z-index は列の取っ手（1）より上、承認のオーバーレイ（10）と全画面の図（100）とツアー（1000）より下。
+   ツールバーは脚注より上（5）に置く。案内の一覧などツールバーの中から下へ開くメニューが脚注の裏に回らないように */
 .toolbar, .foot { position: sticky; z-index: 4; background: var(--vscode-editor-background); }
-.toolbar { top: 0; padding-top: 6px; }
+.toolbar { top: 0; z-index: 5; padding-top: 6px; }
 .summary { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
 .target-select { display: inline-flex; gap: 6px; align-items: center; font-weight: 400; }
 .summary .warn { color: var(--warn-text); font-weight: 600; }
