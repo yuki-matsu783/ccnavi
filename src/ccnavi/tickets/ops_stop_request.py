@@ -105,11 +105,14 @@ def pending_at_stop(
     parent = index.get(bound.parent) if bound.is_child else bound
     if parent is None or parent.is_child or parent.blocked or not parent.in_progress:
         return None
-    if approval_marks.read_parent_mark(
-        approval.home_dir(conf, root, parent.ticket, ""),
-        parent.ticket,
-        approval_marks.PARENT_MARK_CLOSE_EARLY,
-    ):
+    # 親のワークツリーが決まらない（無い・HEAD が違う・止まっている・同じ識別子が別のリポジトリに
+    # もある）親は促しの対象にしない。ここで例外を抜けさせると、Stop の後続（統合の促しと
+    # Stop のルール）まで飛ぶ。
+    try:
+        home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+    except approval.NoParentWorktree:
+        return None
+    if approval_marks.read_parent_mark(home, parent.ticket, approval_marks.PARENT_MARK_CLOSE_EARLY):
         return None
     head = ops_stop.worktree_head_sha(here.root)
     if not head:

@@ -28,6 +28,7 @@ from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, diaglog
 from ..tickets import (
+    approval,
     branchfind,
     c1,
     c1_merge,
@@ -95,7 +96,17 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     起動を抜けるときに標準エラーへ出す（状態の履歴は補助で状態の正は置き場なので、状態の操作は止めない）。
     """
     with history.session(history.VIA_CLI, stderr):
-        return _run(stdin, stdout, stderr, argv)
+        try:
+            return _run(stdin, stdout, stderr, argv)
+        except approval.NoParentWorktree as exc:
+            # 書く側（承認・着手・完了・レビュー）の置き場が決まらない。親のワークツリーの
+            # ほかのコピーへは書かないので止める。hook の経路は自前の受け皿（`_hook`）で
+            # 終わるので、ここへは来ない。
+            stderr.write(
+                f"ccnavi: 親のワークツリーが決まらないので止めた: {exc}。"
+                "親のワークツリーを準備してから（ccnavi-start.sh）打ち直してください\n"
+            )
+            return EXIT_ERROR
 
 
 # 前の名前。「合意」を表す語を 1 つにするため `--agree` に改名した。別名にはしない（これで承認が

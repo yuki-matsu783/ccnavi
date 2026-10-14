@@ -14,10 +14,11 @@ import os
 import shutil
 import time
 import unittest
+from unittest import mock
 
 from ccnavi.hook import subagent
 from ccnavi.infra import settings
-from ccnavi.tickets import ops_stop
+from ccnavi.tickets import approval, ops_stop, ops_stop_request
 from tests.ticket import test_stop_nudge as base
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
@@ -210,6 +211,66 @@ class RequestNudgeTest(base.StopNudgeTest):
             json.dumps({"at": "2026-01-01"}),
         )
         self.assert_not_asked(self.stop(self.parent_tree))
+
+    def gone_record(self, repo):
+        """取り込み記録を gone で残す（ブランチが消えたと見た記録）。"""
+        write(
+            os.path.join(self.state, "sync", repo, "families", "i0001"),
+            "remote origin\nbranch i0001\nsha 0\nfetched_at 1\nstate gone\nreason x\n",
+        )
+
+    def test_a_record_of_the_same_id_in_another_repo_does_not_break_the_stop(self):
+        """別のリポジトリに同じ識別子の記録が残っていても、親のリポジトリで引くので促せる。
+
+        リポジトリを渡さずに引くと、2 つのリポジトリで見つかって決まらず、
+        Stop の後続ごと飛んでいた。
+        """
+        self.family()
+        self.close_children()
+        self.gone_record("web")
+        result = self.stop(self.parent_tree)
+        self.assertNotIn("internal-error", result.stdout)
+        reason = self.asked(result)
+        self.assertIn("子 i0001-01-01 が親のブランチに合流済みと確かめられません", reason)
+
+    def test_a_parent_whose_worktree_is_not_settled_is_left_out_and_the_rule_still_runs(self):
+        """親のワークツリーが決まらない親は促さない。Stop のルールは続けて動く。"""
+        with open(self.rules, encoding="utf-8") as f:
+            body = json.load(f)
+        rule = {"id": "review", "match": "Stop", "glob": "*", "every": 2}
+        body["allow"] = [*body.get("allow", []), {**rule, "additionalContext": "振り返る"}]
+        write(self.rules, json.dumps(body))
+        self.family()
+        self.close_children()
+        self.gone_record("self")
+        self.assert_not_asked(self.stop(self.root))  # ルールの 1 回目（渡さない回）
+        result = self.stop(self.parent_tree)
+        self.assertNotIn("internal-error", result.stdout)
+        self.assertNotIn(CODE, result.stdout)
+        self.assertIn("NUDGE_STOP_RULE", result.stdout)
+
+    def test_a_parent_worktree_that_cannot_be_settled_means_no_nudge(self):
+        """置き場が決まらない（`NoParentWorktree`）親は、例外を出さずに促しの対象から外す。"""
+        self.family()
+        self.close_children()
+        conf, _ = settings.load(self.root)
+        self.assertIsNotNone(ops_stop_request.pending_at_stop(self.root, conf, self.parent_tree))
+        with mock.patch.object(
+            approval, "home_dir", side_effect=approval.NoParentWorktree("決まらない")
+        ):
+            self.assertIsNone(ops_stop_request.pending_at_stop(self.root, conf, self.parent_tree))
+
+    def test_a_writer_without_a_settled_parent_worktree_stops_with_one_line(self):
+        """書く側は、置き場が決まらなければ traceback ではなく 1 行の理由で止まる（終了 1）。"""
+        self.family()
+        self.commit_work(self.child_tree())
+        with mock.patch.object(
+            approval, "home_dir", side_effect=approval.NoParentWorktree("決まらない")
+        ):
+            result = self.ccnavi("ticket", "finish", "i0001-01-01")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertIn("ccnavi: 親のワークツリーが決まらないので止めた: 決まらない。", result.stderr)
 
     # ---- 止めない回
 
