@@ -1791,10 +1791,10 @@ class C1HostTest(C1HostHarness):
         # 最後に親のワークツリーを消そうとするが、cwd が中にあるので消さず、外から打つ 1 本を出す
         with open(log, encoding="utf-8") as f:
             logged = f.read()
-        self.assertIn(f"worktree drop {PARENT}", logged)
-        # drop の後に、残っているワークツリーの一覧を頼む（出すだけで消さない）
+        self.assertIn(f"worktree retire {PARENT}", logged)
+        # retire の後に、残っているワークツリーの一覧を頼む（出すだけで消さない）
         self.assertLess(
-            logged.index(f"worktree drop {PARENT}"), logged.index(f"worktree remaining {PARENT}")
+            logged.index(f"worktree retire {PARENT}"), logged.index(f"worktree remaining {PARENT}")
         )
         self.assertIn(f"cwd がワークツリー {PARENT} の中にあるので削除しませんでした", ready.stdout)
         self.assertIn(f"ccnavi-clean.sh --worktree {PARENT}", ready.stdout)

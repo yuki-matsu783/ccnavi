@@ -23,8 +23,8 @@ C1 の中では書いたものが push の失敗で戻ることがあるので�
 
 消し方は、生成物（`node_modules` など。`ccnavi-clean.js` と同じ名前）を先に消してから
 `git worktree remove`（`--force` なし）。Windows で深い `node_modules` が `worktree remove` を
-途中で止めるのを防ぐ。ブランチは消さない（コミットは残り、squash でマージするとローカルの
-ブランチは `branch -d` で消えないので、ユーザが消す）。
+途中で止めるのを防ぐ。ブランチは `drop` では消さない。親を閉じたときのブランチの片付けは
+`retire.py`（条件を確かめてから消す）。
 
 消さないとき（何も消さずに理由を言う）:
 
@@ -165,10 +165,13 @@ def drop(root: str, name: str, cwd: str) -> Dropped:
     return Dropped(name, REMOVED, path)
 
 
-def report(stdout: TextIO, root: str, d: Dropped) -> None:
-    """drop の結果を言う。消さなかったときも標準出力へ（呼び手の操作そのものは成功している）。"""
+def report(stdout: TextIO, root: str, d: Dropped, after: str = "。ブランチは残してある") -> None:
+    """drop の結果を言う。消さなかったときも標準出力へ（呼び手の操作そのものは成功している）。
+
+    `after` は消した行の括弧の後ろに足す一言（ブランチをどうするか）。
+    """
     if d.status == REMOVED:
-        stdout.write(f"ワークツリー {d.name} を削除しました（{d.path}。ブランチは残してある）\n")
+        stdout.write(f"ワークツリー {d.name} を削除しました（{d.path}{after}）\n")
     elif d.status == ABSENT:
         stdout.write(f"ワークツリー {d.name} はありません（削除するものがありません）\n")
     elif d.status == CWD_INSIDE:

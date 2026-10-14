@@ -4,6 +4,12 @@
 #   sh .ccnavi/scripts/ccnavi-clean.sh <名前>
 #   sh .ccnavi/scripts/ccnavi-clean.sh <名前> --dry-run
 #   sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>
+#   sh .ccnavi/scripts/ccnavi-clean.sh --branch <子の識別子> [--confirmed]
+#
+# --branch は、親を閉じたときに ccnavi が片付ける子として記録した手元のブランチを、条件を確かめ直して消す
+# 入口（中身は実行ファイルの `worktree branch`）。合流した子は、ブランチの先頭が合流した先頭と同じで、それが
+# push 済みの親に含まれるときだけ消える。取り消した子は --confirmed（ユーザが消してよいと言った）が要る。
+# 記録に無いブランチは消さない。`git branch -D` を直に打たせないための入口。
 #
 # --worktree は生成物の掃除と `git worktree remove`（--force なし）を 1 本で行う。ccnavi が ready の
 # 最後や confirm の後に消せなかったワークツリー（cwd が中にあった、など）を、外から消し直すための入口。
@@ -39,8 +45,11 @@ usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-clean.sh <名前> [--dry-run]
 sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>
+sh .ccnavi/scripts/ccnavi-clean.sh --branch <子の識別子> [--confirmed]
 
   <名前>      .claude/worktrees/ の直下の名前。パスは書けない
+  --branch    親を閉じたときに片付ける子として記録した手元のブランチを、条件を確かめて削除します。
+              取り消した子は --confirmed（ユーザが確認した）が要る
   --dry-run   削除するものを並べるだけで、削除しない
   --worktree  生成物を削除してから、ワークツリーそのものも削除します（git worktree remove。--force なし）。
               cwd がその中なら削除しません。ブランチは残す。このときの <名前> はチケットの識別子
@@ -54,6 +63,8 @@ USAGE
 name=""
 dry=""
 whole=""
+branch=""
+confirmed=""
 for arg in "$@"; do
 	case "$arg" in
 	-h | --help | help)
@@ -66,8 +77,14 @@ for arg in "$@"; do
 	--worktree)
 		whole=1
 		;;
+	--branch)
+		branch=1
+		;;
+	--confirmed)
+		confirmed=1
+		;;
 	-*)
-		printf 'ccnavi-clean: %s は使用できません。使えるのは --dry-run と --worktree だけです。\n' "$arg" >&2
+		printf 'ccnavi-clean: %s は使用できません。使えるのは --dry-run・--worktree・--branch・--confirmed だけです。\n' "$arg" >&2
 		exit 2
 		;;
 	*)
@@ -96,6 +113,26 @@ root=$(ccnavi_workspace) || {
 	printf 'ccnavi-clean: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
 }
+
+if [ -n "$confirmed" ] && [ -z "$branch" ]; then
+	printf 'ccnavi-clean: --confirmed は --branch と一緒に使います。\n' >&2
+	exit 2
+fi
+if [ -n "$branch" ]; then
+	if [ -n "$whole" ] || [ -n "$dry" ]; then
+		printf 'ccnavi-clean: --branch は --worktree・--dry-run と一緒に使えません。\n' >&2
+		exit 2
+	fi
+	here="$(pwd -W 2>/dev/null || pwd)"
+	if bin=$(ccnavi_bin "$root"); then
+		exec "$bin" --root "$root" --cwd "$here" worktree branch "$name" ${confirmed:+confirmed}
+	elif [ -f "$root/src/ccnavi/__main__.py" ]; then
+		cd "$root"
+		exec uv run python -m ccnavi --root "$root" --cwd "$here" worktree branch "$name" ${confirmed:+confirmed}
+	fi
+	printf 'ccnavi-clean: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
+	exit 2
+fi
 
 # --worktree: 掃除とワークツリーの削除を実行ファイルに任せる（cwd の確かめ・未コミットの確かめ・
 # 生成物の掃除・worktree remove）。見つからなければソース（ccnavi のリポジトリ）で動かす。

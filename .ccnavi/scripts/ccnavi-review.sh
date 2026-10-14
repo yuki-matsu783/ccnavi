@@ -7,7 +7,7 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh decide  <N>          （ユーザが端末で打つ）
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた時点の状態を JSON で見る）
 #   sh .ccnavi/scripts/ccnavi-review.sh merged                （MR がマージ済みか。ccnavi-sync.sh が使う）
-#   sh .ccnavi/scripts/ccnavi-review.sh ready [--parent <親>]                  （閉じたチケットを logs/archive/ へ退避し、MR の Draft を外し、親のワークツリーを消す）
+#   sh .ccnavi/scripts/ccnavi-review.sh ready [--parent <親>]                  （閉じたチケットを logs/archive/ へ退避し、MR の Draft を外し、子と親のワークツリーと合流済みの子のブランチを片付ける）
 #   sh .ccnavi/scripts/ccnavi-review.sh close-early --reason <理由> [--no-issue]  （ユーザが端末で打つ。残りを issue に書き出して早めに閉じる）
 #   sh .ccnavi/scripts/ccnavi-review.sh origin                                 （origin をどう読んだか。ホスト・scheme・API の URL）
 #
@@ -1096,14 +1096,17 @@ ready)
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi
 	printf 'OK: Draft を解除した（%s）。マージはユーザが行う\n' "$url"
-	# 最後に親のワークツリーを片付ける。Draft を外す前には消さない（ready を打ち直せなくなる）。
-	# 打った場所（--parent なら外）を cwd として渡す。中から打っていれば実行ファイルは消さず、外に出てから
-	# 打つ 1 本を出す。消せなくても ready は成功のまま。
+	# 最後に子と親の片付けをする（`worktree retire`）。Draft を外す前には消さない（ready を打ち直せなくなる）。
+	# 閉じた子のワークツリー（レビュー待ちだったものも）、子の手元のブランチ（合流した子は条件を確かめて削除。
+	# 取り消した子は一覧を出すだけで、ユーザの確認が取れてから消す）、親のワークツリーの順。未コミットの変更や
+	# git が無視しているファイルがあるワークツリーは、理由を出して残す。条件の確認も削除も実行ファイルが行う
+	# （エージェントに git branch -D は開けない）。打った場所（--parent なら外）を cwd として渡す。中から
+	# 打っていれば実行ファイルは消さず、外に出てから打つ 1 本を出す。消せなくても ready は成功のまま。
 	if [ -n "$ready_from" ]; then
 		cd "$ready_from" || cd "$root"
 	fi
 	exe_cwd="$here"
-	ccnavi worktree drop "$family" || :
+	ccnavi worktree retire "$family" || :
 	# 親と名前が違うワークツリーや、下書きがあって消されなかった子のワークツリーは、drop では消えない。
 	# 一覧を出すだけで消さない（消すかどうかはユーザが決める）。残りが無ければ何も出ない。
 	ccnavi worktree remaining "$family" || :

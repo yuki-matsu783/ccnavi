@@ -25,6 +25,7 @@ from . import (
     ops,
     ops_close,
     phase,
+    retire,
     review,
     review_host,
     syncstate,
@@ -149,6 +150,11 @@ def _archive_closed(
     parents = sorted(
         set(archive.closed_parents(where)) | set(archive.archived_parents(root, parent.project))
     )
+    # 閉じた子のチケットは退避へ移って見えなくなるので、親を閉じた後に片付ける子の一覧を先に書く
+    # （ワークツリーとブランチの片付け。`retire.py`）。書けなくても ready は止めない。
+    noted = retire.note(root, conf, parent.ticket, parent.project, tree_root)
+    if noted:
+        stderr.write(f"ccnavi: 注意: {noted}。子のワークツリーとブランチは手で片付ける\n")
     todo = archive.plan(where, parents, root, parent.project)
     _, failed = archive.move(root, parent.project, where, todo, parent.ticket, tree_root)
     if failed:

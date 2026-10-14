@@ -12,7 +12,7 @@ import os
 import re
 from typing import TextIO
 
-from ..infra import fsio, settings
+from ..infra import fsio, gitcmd, settings
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..tickets import (
     c1,
@@ -22,6 +22,7 @@ from ..tickets import (
     next_id,
     ops,
     phase,
+    retire,
     review,
     review_close,
     review_decide,
@@ -264,10 +265,21 @@ def _worktree(
         if problem:
             stdout.write(f"problem {problem}\n")
         return EXIT_OK
-    if verb not in ("drop", "tidy", "remaining") or len(words) != 3:
+    if verb == "branch" and len(words) in (3, 4) and words[3:] in ([], ["confirmed"]):
+        # 親を閉じたときに片付ける子として記録したブランチを、条件を確かめ直して消す。
+        if not ticket_ids.is_valid_id(words[2]):
+            stderr.write(
+                f"ccnavi: worktree branch の {words[2]!r} は有効な識別子の形式ではありません。\n"
+            )
+            return EXIT_ERROR
+        code = retire.run_branch(stdout, stderr, root, conf, words[2], len(words) == 4)
+        return EXIT_OK if code == 0 else EXIT_ERROR
+    if verb not in ("drop", "tidy", "remaining", "retire") or len(words) != 3:
         stderr.write(
             "ccnavi: worktree drop <名前> か worktree tidy <親> [--phase <N>]"
-            " か worktree remaining <親> か worktree name <名前> か worktree id <ブランチ>\n"
+            " か worktree remaining <親> か worktree retire <親>"
+            " か worktree branch <名前> [confirmed]"
+            " か worktree name <名前> か worktree id <ブランチ>\n"
         )
         return EXIT_ERROR
     target = words[2]
@@ -285,6 +297,8 @@ def _worktree(
         return EXIT_ERROR
     elif verb == "remaining":
         code = worktrees.run_remaining(stdout, root, conf, target, cwd)
+    elif verb == "retire":
+        code = retire.run_retire(stdout, stderr, root, conf, target, cwd)
     else:
         code = worktrees.run_tidy(stdout, stderr, root, conf, target, args.phase, cwd)
     return EXIT_OK if code == 0 else EXIT_ERROR
@@ -392,6 +406,41 @@ _ACTOR = re.compile(r"[A-Za-z0-9_.-]{1,100}")
 # `sync check` の答えの頭の行。sh はこれが無ければ「検査を実行できなかった」（古い実行ファイルが
 # 知らない副命令を断った、など）と読み、親子のチケットを止めない（検査の error と分ける）。
 SYNC_CHECK_HEAD = "check 1"
+_SHA = re.compile(r"[0-9a-f]{7,64}")
+_GIT_TIMEOUT = 20.0
+
+
+def sync_tidy(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    cwd: str,
+    family: str,
+    repo: str,
+    branch: str,
+    head_sha: str,
+) -> int:
+    """`ccnavi-sync.sh` が、親の MR がマージ済みと分かった後に打つ片付け。
+
+    親のワークツリーと手元のブランチ、残っていた子のブランチを、条件を確かめて消す。
+    `head_sha` はマージ済みの MR の先頭（sh がホストから取ってきた）。1 行ずつ言い、最後が
+    `record yes|no`。ネットワークには出ない（`retire.run_merged`）。
+    """
+    for name, value, pattern in (
+        ("識別子", family, _FAMILY),
+        ("リポジトリ", repo, _REPO_NAME),
+        ("sha", head_sha, _SHA),
+    ):
+        if not pattern.fullmatch(value) or ".." in value:
+            stderr.write(f"ccnavi: sync tidy の{name} {value!r} は有効な形式ではありません。\n")
+            return 1
+    checked = gitcmd.run(root, ["check-ref-format", "--branch", branch], _GIT_TIMEOUT)
+    if not branch or branch.startswith("-") or not checked.ok:
+        stderr.write(f"ccnavi: sync tidy のブランチ {branch!r} はブランチ名の形ではない\n")
+        return 1
+    project = "" if repo == "self" else repo
+    return retire.run_merged(stdout, stderr, root, conf, family, project, branch, head_sha, cwd)
 
 
 def sync_check(

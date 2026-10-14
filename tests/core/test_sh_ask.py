@@ -156,7 +156,7 @@ class SyncClosedTest(Harness):
         write(os.path.join(self.tree, APPROVED, "doing", "p0001.md"), front(**fields))
 
     def test_nothing_is_not_closed(self):
-        self.assertEqual({"integration": "no", "archive": "no"}, self.closed())
+        self.assertEqual({"integration": "no"}, self.closed())
 
     def test_the_same_parent_in_the_integration_is_closed(self):
         self.mine(ticket="p0001", base_sha="abc")
@@ -177,20 +177,12 @@ class SyncClosedTest(Harness):
         self.integrate(front(ticket="p0001", parent="x", base_sha="abc"))
         self.assertEqual("no", self.closed()["integration"])
 
-    def test_the_archive_without_a_parent_in_the_tree_is_closed(self):
+    def test_the_archive_is_not_a_ground_for_closed(self):
         write(
             os.path.join(self.ws, "logs", "archive", "self", "done", "p0001.md"),
             front(ticket="p0001", base_sha="abc"),
         )
-        self.assertEqual("yes", self.closed()["archive"])
-
-    def test_the_archive_of_another_parent_is_not_closed(self):
-        self.mine(ticket="p0001", base_sha="abc")
-        write(
-            os.path.join(self.ws, "logs", "archive", "self", "done", "p0001.md"),
-            front(ticket="p0001", base_sha="def"),
-        )
-        self.assertEqual("no", self.closed()["archive"])
+        self.assertEqual({"integration": "no"}, self.closed())
 
     def test_bad_words_are_refused(self):
         for words in (
