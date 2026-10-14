@@ -1855,7 +1855,7 @@ feedback:                              # フィードバック計画。レビュ
   `todo/` に書く。** 承認済みの識別子の提案は、承認済みチケットで決めた正とするツリーの側だけを読む。
   ほかのツリー（子のワークツリー、ワークスペースルート）に書いた改版は承認待ちに入らず、`--agree` と `--lint` が
   場所と書く置き場を名指しする
-- **改版の提案では、承認済みチケットを写したときに入る `started_at`・`completed_at`・`base_sha`・`cancelled_at`・`cancel_reason` を空にする。**
+- **改版の提案では、承認済みチケットを写したときに入る `started_at`・`completed_at`・`base_sha`・`merged_sha`・`cancelled_at`・`cancel_reason` を空にする。**
   承認はチケットの中身を変えないので、提案にスクリプトだけが書く欄の値があると `--agree` と `--lint` が error にする。
   改版は承認済みチケットの側の値を残し、計画と `phases:` だけを差し替える。続きの子の目印 `followup_of` も提案に書けば error になるので消す
 - レビュー待ちで止めるのは親ごとなので、どれかの枝がレビューを待つ間は別の枝にも子を起こせない
@@ -2576,7 +2576,7 @@ ccnavi --explain --json
 | `tickets[]` | 識別子ごとに 1 件。提案と承認済みチケットのどちらか一方しか無くても出す |
 | `parents[]` | 承認済みチケットのある親ごとの局面とフェーズ。承認前の親はフェーズを持たないのでここに無い |
 | `unprepared[]` | このPCでは未準備の親。取り込み状態の記録（キャッシュ）だけがあり、親のワークツリー（`.claude/worktrees/<親>`）が無いもの。閉じた親は出さない。`{family, project, branch, mr, reason}`。`branch` と `mr` は記録の控え（無ければ空と null）、`reason` は止まった理由。ほかのツリーのコピーでは代用しないので、チケットは `tickets[]` に出ない。拡張は「準備する」で `ccnavi-start.sh --mr <mr>` を呼ぶ |
-| `archived[]` | 手元の退避（`logs/archive/`。`ready` が閉じた親子のチケットを移した先）にある閉じたチケット。表示のためだけの任意の欄で、判定（承認待ち・先行・局面）には混ぜない。`tickets[]` に同じ識別子があるものは出さない。`{ticket, parent, phase, title, project, path, approved_at, started_at, completed_at, cancelled_at, cancel_reason, history}`。`path` は退避したファイルの絶対パス、`history[]` は退避した履歴（`tickets[]` の `history[]` と同じ形。最後の行は `kind` が `archived`）。この欄を持たない古い実行ファイルの答えも同じ版のまま読める（拡張は無ければ空とする） |
+| `archived[]` | 手元の退避（`logs/archive/`。`ready` が閉じた親子のチケットを移した先）にある閉じたチケット。表示のためだけの任意の欄で、判定（承認待ち・先行・局面）には混ぜない。`tickets[]` に同じ識別子があるものは出さない。`{ticket, parent, phase, title, project, path, approved_at, started_at, completed_at, merged_sha, cancelled_at, cancel_reason, history}`。`path` は退避したファイルの絶対パス、`history[]` は退避した履歴（`tickets[]` の `history[]` と同じ形。最後の行は `kind` が `archived`）。この欄を持たない古い実行ファイルの答えも同じ版のまま読める（拡張は無ければ空とする） |
 
 `tickets[]` の 1 件。
 
@@ -2589,7 +2589,7 @@ ccnavi --explain --json
 | `copy` | `{status, approved_at, approved_from, path}`。`status` は `none`（未承認）/ `open`（`doing/`）/ `review`（`wip/proposals/review/`）/ `closed`（`done/`）。`approved_at` は承認の時刻で、承認済みチケットの欄ではなく、状態の履歴の `approved`（続きの子は `raised`）か、無ければ `doing/<識別子>.md` を足したコミットから引く。`approved_from` はどこから引いたか（`history` / `commit` / `uncommitted`（履歴もコミットも無い。手で置いてまだコミットしていない）/ 空（分からない））。`uncommitted` と空のとき `approved_at` は空。 |
 | `blocked` | 空でなければ「読めるが信じられない」理由。判定はこのチケットのワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`status` は `open` のままなので、止まっていることはこの欄でしか分からない |
 | `worktree` | `{exists, path, project}`。`.claude/worktrees/<識別子>` が実際のワークツリーか（設計 9.5 の相互参照） |
-| `started_at` / `completed_at` / `base_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄 |
+| `started_at` / `completed_at` / `base_sha` / `merged_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄。`merged_sha` は `finish` が親のブランチへ合流した子の先頭（表示だけ。ボードは閉じた子に「合流」を出す） |
 | `in_progress` | 作業中か。承認済みチケットが `doing/` にあり、着手していて、終わってもいないし取り消されてもいないとき真。`flow.locked` と同じ読み方。承認しただけで着手していないもの・レビュー待ち・閉じたものは偽。ボードはルール・配点・フェーズ定義の保存を止めるかをこれで決め、`started_at` などから組み直さない。足しただけの欄で、この欄を持たない古い実行ファイルの答えでは、ボードは作業中かを確かめられないとして保存しない |
 | `seen_in[]` | 同じ識別子のチケットがある場所の全部。`{tree, state, path}`。子のワークツリーは親のブランチから切るので、子のワークツリーにも親の提案があるのが普通 |
 | `scattered[]` | どれが正か決まらない、チケットがある場所の全部。`{tree, state, path}`。決まっていれば空。正とする側のツリー（親のツリー → 元ツリーの順）で絞り込んでも 2 つ以上残り、その残りが 2 つの置き場にまたがるか同じ置き場に重なるときに入る。状態の操作が「複数の場所にある」で止まる条件と、`--lint` が ERROR を出す条件と同じ。`seen_in` の数は食い違いを意味しない |

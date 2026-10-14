@@ -116,8 +116,9 @@ base_sha: ""
     同じ識別子の提案、子の識別子の提案・フロー・フロー下書きが在れば上書きせず断る。詳しくは 9.15
   - `ccnavi-ticket.sh` は `new` を通さない（保護対象の sh を直さないため）。`--fill-phases` と同じく実行ファイルを直接打つ。
     `new` は承認ではなく、`todo/` に書くだけなので、組み込みの止め（9.2）には当たらない
-- `started_at` `completed_at` `base_sha` `cancelled_at` `cancel_reason` はスクリプトの欄。スクリプトが
-  承認済みチケットの行を書き換える（本文とユーザの書いた行は保つ）
+- `started_at` `completed_at` `base_sha` `merged_sha` `cancelled_at` `cancel_reason` はスクリプトの欄。スクリプトが
+  承認済みチケットの行を書き換える（本文とユーザの書いた行は保つ）。`merged_sha` は `finish` が親のブランチへ合流した
+  子の先頭で、子にだけ付く
 - `mr` は親の任意の欄で、仕事を載せるマージリクエストの番号（正の整数。`"!12"`・`"#12"` も可）。同じリポジトリのものだけで、
   `owner/repo` の形や 0・数でないものは error、子に書くと warn で無視する。`issue` と並べて検索に使い、
   UserPromptSubmit の hook（`branchfind`）が依頼文の MR の番号を「すでにあるチケットに結び付く」と判定する
