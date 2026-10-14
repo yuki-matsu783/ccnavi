@@ -134,6 +134,8 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
         return 0
 
     pool = approval_checks.predecessor_pool_of(doing, review, closed, proposals)
+    # 承認と lint と同じ引き方にする（閉じた別の親子の先行は統合先の done/ と取り込み状態で読む）。
+    approval_checks.align_imported(conf, root, pool)
     times = approval_times.approved_times(conf, doing + review + closed)
     files = _file_states(root, [h for e in entries.values() for h in e.hits])
     fams = syncstate.Families(conf, root)

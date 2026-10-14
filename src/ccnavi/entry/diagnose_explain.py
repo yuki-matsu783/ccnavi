@@ -254,7 +254,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     review, _ = approval.scan_review(conf, root, raw=raw)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals, root)
+    preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals)
     approval_checks.align_imported(conf, root, preds)
     times = approval_times.approved_times(conf, copies + review)
     for t in sorted(copies + review, key=lambda x: (x.parent or x.ticket, x.ticket)):

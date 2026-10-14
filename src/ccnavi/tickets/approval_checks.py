@@ -7,11 +7,13 @@
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, replace
 
 from ..infra import settings, tree
 from ..policy import rules
-from . import archive, syncstate, ticket_model, workflow
+from . import syncstate, ticket_ids, ticket_model, workflow
+from . import ticket as ticket_mod
 
 
 def mark_imported(
@@ -375,7 +377,6 @@ def predecessor_pool_of(
     review: list[ticket_model.Ticket],
     closed: list[ticket_model.Ticket],
     proposals: list[ticket_model.Ticket],
-    root: str = "",
 ) -> dict[str, list[ticket_model.Ticket]]:
     """先行を引く対応表。識別子 → 正とする側のチケットの全部（`ops_close._places` と同じ集め方）。
 
@@ -383,26 +384,57 @@ def predecessor_pool_of(
     承認済みチケットがどこにも無いときだけ数える（在れば改版の候補か書き損じ）。チケットが 2 つ以上
     残れば、どれが正か決まらない。
 
-    `root`（ワークスペースルート）を渡せば、どの置き場にも無い先行を手元の退避（`logs/archive/`）の
-    `done/` から引く。`ready` が閉じた親子のチケットを退避した後も、先行を閉じたものとして読むため。
-    引くのはリストのチケットが先行に書いた識別子だけ（退避を全部は読まない）。
+    どの置き場にも無い先行（閉じて片付いた別の親子のチケット）は、ここでは引かない。閉じたかは
+    `align_imported` が統合先の `done/` と取り込み状態で決める。手元の退避（`logs/archive/`）は
+    PC ごとのもので、判定に使うと PC によって答えが割れるので読まない。
     """
     pool = _by_id(open_copies + review + closed)
     for t in proposals:
         if t.state == ticket_model.TODO and t.ticket not in pool:
             pool.setdefault(t.ticket, []).append(t)
-    if root:
-        # 引くのは、その先行を書いたチケットと同じリポジトリ（プロジェクト）の退避だけ。
-        wanted: dict[str, set[str]] = {}
-        for t in open_copies + review + closed + proposals:
-            for ident in t.predecessors:
-                if ident not in pool:
-                    wanted.setdefault(ident, set()).add(t.project)
-        for ident in sorted(wanted):
-            found = [h for p in sorted(wanted[ident]) for h in archive.find(root, ident, p)]
-            if found:
-                pool[ident] = found
     return pool
+
+
+def _family_of(ident: str) -> str:
+    """識別子が属する親子のチケット（子なら親の識別子、親ならそのまま）。"""
+    found = ticket_ids.child_pattern().fullmatch(ident)
+    return found.group("parent") if found else ident
+
+
+def _closed_elsewhere(
+    conf: settings.Settings,
+    fams: syncstate.Families,
+    ident: str,
+    projects: set[str],
+) -> list[ticket_model.Ticket]:
+    """どの置き場にも無い先行が、閉じた別の親子のチケットのものと分かれば、その閉じたチケット。
+
+    決め方は 2 つで、どちらも PC に依らない材料（リモートから取り込んだもの）だけを読む。
+
+    - 統合先の取り込み結果の `done/<識別子>.md` がある: そのチケット（取り消しの欄があれば取り消し）
+    - その先行の親子のチケットの取り込み状態が `closed`（`ccnavi-sync.sh` が閉じたと確かめた）:
+      閉じた
+
+    どちらでもなければ空（どの置き場にも無い）。手元の退避は読まない。
+    """
+    for project in sorted(projects):
+        repo = syncstate.repo_key(project)
+        ids, why = fams.done(repo)
+        integ = fams.integration(repo)
+        if not why and ident in ids and integ is not None:
+            data, bad = integ.file(f"{(conf.approved or '').strip('/')}/done/{ident}.md")
+            t = None
+            if data is not None and not bad:
+                with contextlib.suppress(UnicodeDecodeError):
+                    t, _ = ticket_mod.parse(data.decode("utf-8"))
+            if t is not None and t.ticket == ident:
+                t.state = ticket_model.CANCELLED if t.cancelled_at else ticket_model.DONE
+                t.project, t.tree, t.tree_root, t.path = project, "", "", ""
+                return [t]
+        record = syncstate.family(conf.state, repo, _family_of(ident))
+        if record is not None and not record.broken and record.state == syncstate.STATE_CLOSED:
+            return [ticket_model.Ticket(ticket=ident, state=ticket_model.DONE, project=project)]
+    return []
 
 
 def align_imported(
@@ -426,11 +458,23 @@ def align_imported(
       親子のチケット: 前の対応表のまま
     """
     fams = syncstate.Families(conf, root)
+    # どの置き場にも無い先行を、統合先の `done/` と取り込み状態から閉じたものとして引く。
+    # 引くのは、対応表のチケットが先行に書いた識別子だけ。その先行を書いたチケットと同じ
+    # リポジトリ（プロジェクト）で引く。
+    wanted: dict[str, set[str]] = {}
+    for hits in list(pool.values()):
+        for t in hits:
+            for ident in t.predecessors:
+                if ident not in pool:
+                    wanted.setdefault(ident, set()).add(t.project)
+    elsewhere: set[str] = set()
+    for ident in sorted(wanted):
+        found = _closed_elsewhere(conf, fams, ident, wanted[ident])
+        if found:
+            pool[ident] = found
+            elsewhere.add(ident)
     for ident, hits in list(pool.items()):
-        if not hits:
-            continue
-        # 手元の退避から引いた先行は閉じたもの。親のブランチ上のチケットでは読み直さない。
-        if all(archive.is_archived_path(root, h.path) for h in hits):
+        if not hits or ident in elsewhere:
             continue
         st = family_standing(conf, root, hits[0], fams)
         if st.closed:

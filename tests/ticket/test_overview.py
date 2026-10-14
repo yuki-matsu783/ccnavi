@@ -71,6 +71,26 @@ class OverviewTest(PhaseHarness):
         # origin が無いので、リモート追跡の ref が無い。送っていないものは「一度も送っていない」
         self.assertIn("未送信 一度も送っていないあり", line)
 
+    def test_a_predecessor_of_a_family_closed_by_the_sync_is_met_as_in_the_approval(self):
+        """閉じて片付いた別の親子の先行は、承認と同じく取り込み状態で閉じたと読む。"""
+        write(
+            os.path.join(self.state, "sync", "self", "families", "i0099"),
+            "remote origin\nbranch i0099\nsha x\nfetched_at 1\nstate closed\nreason r\n",
+        )
+        write(
+            os.path.join(self.state, "sync", "self", "integration", "head"),
+            "branch main\nsha x\nsource default\n",
+        )
+        self.family(plan=["research", "design"])
+        text = child_text("i0001-01-01", "i0001", 1, ["wip/research/*"])
+        self.propose(
+            "i0001-01-01", text.replace("phase: 1\n", "phase: 1\npredecessors: [i0099-01-01]\n")
+        )
+        self.commit_parent()
+        result = self.approve()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("次の子 i0001-01-01", self.parent_line(self.said()))
+
     def test_record_gives_the_time_and_the_mr_number(self):
         self.family(plan=["research", "design"])
         self.record(mr="12")

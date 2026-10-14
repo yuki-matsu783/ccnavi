@@ -115,7 +115,7 @@ def board(
     )
     # 先行を引く対応表。承認と着手が使うのと同じ集め方。
     preds = approval_checks.predecessor_pool_of(
-        open_copies, review_copies, closed_copies, proposals, root
+        open_copies, review_copies, closed_copies, proposals
     )
     approval_checks.align_imported(conf, root, preds)
     payload["pending_approval"] = sorted(

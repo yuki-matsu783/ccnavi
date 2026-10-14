@@ -21,8 +21,6 @@ Draft を外すので、squash でマージすると既定のブランチには�
 
 - 子の連番（`approval_ops.next_child_id`）。退避にある識別子は使い済みとして数える
   （同じリポジトリのものだけ）
-- 先行を引く対応表（`approval_checks.predecessor_pool_of`）。置き場のどこにも無い先行を、
-  同じリポジトリの退避の `done/` から引く
 - `ready` の途中の打ち直しで、前の回が移し残したものを拾う（`plan`）
 - ボードの表示と、親のワークツリーの見分け（`ccnavi_parent_tree`。`ready` から
   親のワークツリーを片付けるまでの間）

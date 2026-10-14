@@ -205,17 +205,55 @@ class ArchiveChecksTest(ChecksHarness):
             approval_ops.next_child_id(self.conf, self.root, "i0001", 1), "i0001-01-04"
         )
 
-    def test_a_predecessor_in_the_archive_is_met(self):
+    def follower(self):
         text = closed_text("i0002-01-01", "i0002", predecessors=["i0001-01-03"])
         t, problems = ticket_mod.parse(text)
         self.assertIsNotNone(t, problems)
         self.assertEqual(t.predecessors, ["i0001-01-03"])
-        pool = approval_checks.predecessor_pool_of([t], [], [], [], self.root)
-        self.assertEqual([h.state for h in pool["i0001-01-03"]], ["done"])
-        self.assertEqual(approval_checks.unmet_predecessors(t, pool), [])
-        # root を渡さなければ見ない（前のまま）
+        return t
+
+    def states(self, root, t):
+        """承認・lint と同じ引き方（対応表 → 取り込みで読み直す）で、先行の状態。"""
+        conf, _ = settings.load(root)
         pool = approval_checks.predecessor_pool_of([t], [], [], [])
-        self.assertNotIn("i0001-01-03", pool)
+        approval_checks.align_imported(conf, root, pool)
+        return [p.state for p in approval_checks.predecessor_states(t, pool)]
+
+    def other_pc(self):
+        """退避の無い別の PC（同じリポジトリの、別のワークスペース）。"""
+        root = tempfile.mkdtemp(prefix="ccnavi-archive-other-")
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        os.makedirs(os.path.join(root, ".claude"))
+        git(root, "init", "--quiet", "-b", "main")
+        return root
+
+    def test_a_predecessor_in_the_archive_is_not_read_and_pcs_agree(self):
+        """手元の退避にだけある先行は閉じたと読まない。退避の無い PC と同じ答えになる。"""
+        t = self.follower()
+        self.assertEqual(self.states(self.root, t), [approval_checks.PRED_MISSING])
+        self.assertEqual(self.states(self.other_pc(), t), [approval_checks.PRED_MISSING])
+
+    def test_a_predecessor_in_the_integration_done_is_met_on_every_pc(self):
+        t = self.follower()
+        for root in (self.root, self.other_pc()):
+            conf, _ = settings.load(root)
+            mirror = os.path.join(conf.state, "sync", "self", "integration")
+            write(os.path.join(mirror, "head"), "branch main\nsha x\nsource default\n")
+            write(
+                os.path.join(mirror, ".ccnavi", "approved", "done", "i0001-01-03.md"),
+                closed_text("i0001-01-03", "i0001"),
+            )
+            self.assertEqual(self.states(root, t), [approval_checks.PRED_DONE], root)
+
+    def test_a_predecessor_of_a_family_the_sync_closed_is_met_on_every_pc(self):
+        t = self.follower()
+        for root in (self.root, self.other_pc()):
+            conf, _ = settings.load(root)
+            write(
+                os.path.join(conf.state, "sync", "self", "families", "i0001"),
+                "remote origin\nbranch i0001\nsha x\nfetched_at 1\nstate closed\nreason r\n",
+            )
+            self.assertEqual(self.states(root, t), [approval_checks.PRED_DONE], root)
 
 
 class ReadyHarness(PhaseHarness):
@@ -534,10 +572,6 @@ class ArchivedStandingTest(ChecksHarness):
         self.assertEqual(
             [t.project for t in archive.find(self.root, "i0009-01-01", "lib")], ["lib"]
         )
-        text = closed_text("i0002-01-01", "i0002", predecessors=["i0009-01-01"])
-        t, _ = ticket_mod.parse(text)
-        pool = approval_checks.predecessor_pool_of([t], [], [], [], self.root)
-        self.assertNotIn("i0009-01-01", pool)
 
 
 class SecondReviewTest(ReadyHarness):

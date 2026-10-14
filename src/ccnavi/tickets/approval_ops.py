@@ -380,6 +380,6 @@ def predecessor_pool(conf: settings.Settings, root: str) -> dict[str, list[ticke
     review, _ = approval.scan_review(conf, root, raw=raw)
     closed, _ = approval.scan(conf, root, closed=True, raw=raw)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
-    pool = approval_checks.predecessor_pool_of(open_copies, review, closed, proposals, root)
+    pool = approval_checks.predecessor_pool_of(open_copies, review, closed, proposals)
     approval_checks.align_imported(conf, root, pool)
     return pool

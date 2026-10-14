@@ -221,7 +221,7 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     repo_of = {
         t.name or "(ワークスペースルート)": t.project for t in tree.all_trees(root, conf.projects)
     }
-    preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals, root)
+    preds = approval_checks.predecessor_pool_of(copies, review, closed, proposals)
     approval_checks.align_imported(conf, root, preds)
     # 統合先の done/ で閉じた識別子も閉じたものに数える（開いた親子のチケットでも統合先の
     # done/ は常に読む）。承認の対象から外れる（`agree.waiting`）ので、何も言わずに済ませず
