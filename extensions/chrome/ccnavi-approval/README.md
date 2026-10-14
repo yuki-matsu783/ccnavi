@@ -4,6 +4,9 @@
 issue から親のブランチを始める拡張。GitHub と GitLab の、ワークスペースとプロジェクトのリポジトリを扱う。
 GitLab で ccnavi の書き込みどうしの競合を検出する seq ファイルは、実際の GitLab で前提を確かめるまで持たない。
 
+承認者の操作を、作業者の開発環境やセッションの外に置くための入口で、判定はせず、判定のコアは手元の ccnavi と同じ Python を同梱して使う。
+同期はリアルタイムではなく、書いた結果は作業側の次の fetch / sync で届く（ccnavi の README「複数人・別 PC・別セッションで進める」）。
+
 何をするか（ふるまい）は [docs/requirements.md](docs/requirements.md)、構成は [docs/design.md](docs/design.md) にある。この README には、組み立てと試験の手順だけを書く。
 
 ## 組み立て

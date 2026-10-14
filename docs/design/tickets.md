@@ -66,3 +66,4 @@ dry-run のときは末尾に 1 行足し、通ったことを許可と読まな
 | 9.14 | [tickets/phase-management.md](tickets/phase-management.md) | フェーズ管理の全体像。定義・計画・待ち方・レビュー・局面をつなぐ入口 |
 | 9.15 | [tickets/templates.md](tickets/templates.md) | 作業・レビュー計画のテンプレート。置き場・2 層の統合結果・検査・`--templates` |
 | 9.16 | [tickets/learning-wiki.md](tickets/learning-wiki.md) | 学びの蓄積。子の気づきを learning-wiki に溜め、反映先への提案として育てる流れ（一部実装済み） |
+| 9.17 | [tickets/sharing.md](tickets/sharing.md) | 複数人・別 PC・別セッションでの作業。共有するもの・同期の手順・承認者の操作の入口・保証しないこと |
