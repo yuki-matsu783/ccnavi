@@ -9,7 +9,7 @@
   作業ツリー、Chrome は API で読んだ中身を MEMFS に組んだ仮のツリー。
   core はブランチごとの blob の表（取っていないファイルを `NOT_FETCHED` にする形）を持たない
 - 判定: `judge_approval`（実行前チェックのモジュール `ccnavi.hook.judge` と
-  紛れないように名前を変えた）は承認の対象と画面とダイジェストを返す。通らない理由を返す
+  紛れないように名前を変えた）は承認の対象と画面を返す。通らない理由を返す
   `withdraw` と `confirm` は `core_withdraw` と `core_review` にある
 - Changes: 書き込みを値として並べたもの（`plan`）。書くときの失敗の仕方（止める・言って続ける）
   もつけてある。`per_branch` はブランチごとの create / update / delete で、Chrome はこれを

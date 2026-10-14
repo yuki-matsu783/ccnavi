@@ -72,7 +72,7 @@ class Gathered:
     # 端末に出す 1 行（「承認待ち N 件のうち、指定の M 件だけを承認の対象にする」）。
     note: str = ""
     # 正とするツリーの外に在る計画の違う版の案内（`approval.revision_elsewhere_text`）。
-    # 承認待ちには入れない。書く場所を名指しするためだけに持つ（本文とダイジェストには入れない）。
+    # 承認待ちには入れない。書く場所を名指しするためだけに持つ（本文には入れない）。
     elsewhere: list[str] = field(default_factory=list)
     # 走査した提案の全部（`todo/` と `review/`）。preview の `plans` が、親の `todo/` の子の提案を
     # まとめたハッシュ（`source_sha`）を作るのに使う。

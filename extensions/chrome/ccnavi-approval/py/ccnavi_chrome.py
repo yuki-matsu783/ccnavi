@@ -759,7 +759,7 @@ def _op_board(req: dict, root: str) -> dict:
     body = first
     narrowed = bool(mine) and len(mine) != len(first["batch"])
     if narrowed:
-        # 画面の本文とダイジェストを、この親子のチケットの分だけで組み直す
+        # 画面の本文を、この親子のチケットの分だけで組み直す
         # （1 回の承認は 1 つの `P`）。
         code, body, err = _preview(root, mine)
         if body is None:

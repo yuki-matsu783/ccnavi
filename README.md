@@ -1574,7 +1574,7 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 | 経路 | 形 |
 |---|---|
 | 端末 | `sh .ccnavi/scripts/ccnavi-agree.sh [<識別子>...]`。一覧を見せて y/N を取り、通れば `ccnavi-push-approved.sh` でコミットして push する。`-` で始まる語と空の語は受けず 2 で終わる |
-| ボード | `--agree --preview --json` で読んでオーバーレイに出し、押したら `--agree --yes <識別子,…> --digest <値> --json` を打つ（「承認の JSON」）。1 件以上通れば `ccnavi-push-approved.sh` を統合ターミナルへ送る |
+| ボード | `--agree --preview --json` で読んでオーバーレイに出し、押したら `--agree --yes <識別子,…> --json` を打つ（「承認の JSON」）。1 件以上通れば `ccnavi-push-approved.sh` を統合ターミナルへ送る |
 | ファイルを動かす | 提案を `.ccnavi/approved/doing/` へ動かす。GitHub の画面しか使えないユーザ向け。承認の画面を通らないぶん、構造の検査は判定のときに行い、引っかかれば `DENY_TICKET_BLOCKED` で止まる（`--lint` とボードの JSON の `blocked` でも分かる） |
 
 エージェントが `--yes` を打つ形は組み込みの deny（`builtin:guard-ticket-approval`）が止める。`--preview` は通す。
@@ -2553,7 +2553,7 @@ ccnavi --explain --json
 ```sh
 ccnavi --agree --preview --json [<絞り>...]           # 一覧を見る（承認済みチケットは置かない）
 ccnavi --agree --preview --verify --json [<絞り>...]  # 承認できる状態かを確かめる（同上）
-ccnavi --agree --yes <識別子,…> --digest <値> --json [<絞り>...]    # 見せた一覧をそのまま承認する
+ccnavi --agree --yes <識別子,…> --json               # 指した識別子を、承認する時点の中身で承認する
 ```
 
 VS Code の拡張が、承認をボードのオーバーレイで行うための形。承認の対象を組むのは `--agree` と同じ関数で、`--explain --json` の
@@ -2570,7 +2570,6 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 | `batch[]` | 承認の対象。`{ticket, title, parent, phase, revision, tree, path, branch, existing_branch, overflow}`。`branch` は親のブランチ名（親の `branch:`、無ければ識別子。子は子の識別子）、`existing_branch` は `branch:` が既にあるブランチ（手元か origin、または提案がそのブランチの上）を指すか。`parent` と `phase` は子だけ（親は `null`）。`revision` は親の改版。空なら承認待ちが無い |
 | `batch[].overflow[]` | 範囲の超過（親の範囲・フェーズ定義の `scope` を超える項、regex の項）の説明。文字列の配列で、無ければ `[]`。承認は通るが、判定で止まる |
 | `text` | 承認画面の本文そのまま。拡張はこれを等幅で並べ、項目には分けない |
-| `digest` | 見せた中身のダイジェスト。`--yes` の `--digest` にそのまま渡す |
 | `rejected[]` | 承認の対象にしない提案。`{ticket, problems[]}`。載るのは形の不正な提案（親が承認されていない、計画に無い番号、順序、先行（`predecessors`）が `done/` に無いか取り消し済みなど）だけで、範囲の超過だけの子は `batch[]` に載る |
 | `problems[]` | 読めない提案や承認済みチケットの説明 |
 | `plans[]` | 承認の対象に入った計画を持つ親の、計画ごとの図の中身。`ccnavi --plan-order <親> --json` の `plans` と同じ関数で作る（`--order` は渡さないので、承認する提案そのものの順序）。`{ticket, part, source_sha, items[], after, proposed, current, loose, ready, problems}`。`items[]` は `{number, from, type, title, review, deferred, review_at, locked}`。形は設計 9.4（docs/design/tickets/approval.md） |
@@ -2594,18 +2593,12 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 | `approved[]` / `copies[]` | 承認した識別子と、置いた承認済みチケットのパス |
 | `lines[]` | 端末なら標準出力に出ていた行（マーカーを消したことなど） |
 | `prompt` | Claude Code に渡す文。拡張がオーバーレイの 2 ボタンで渡す。hook は承認を伝えない |
-| `mismatch` | 一覧か中身が変わっていたとき。`{expected[], current[]}`、ダイジェストが違えば `digest: {expected, current}`。このとき承認済みチケットは置かれず、終了コードは 1 |
 | `partial` | 置いている途中で止まったとき（書けない、など）。`{placed[], ticket, reason}`。`placed[]` はそこまでに承認済みチケットに入ったぶん（新規は置いた、改版は書き換えた）、`ticket` は止まったところ、`reason` は理由、`lines[]` は止まるまでに出た行（端末なら標準出力に出ていたぶん）。**置いたものは戻さない**ので、どこまで進んだかをそのまま返す。終了コードは 1。承認の push の sh（`ccnavi-push-approved.sh`）は送られていない |
 
-- `--yes` は端末を求めない代わりに、見せた一覧と今の一覧が同じで、`--digest` の値（大文字小文字は問わない）が承認のときに読み直した中身のダイジェストと
-  合うことを求める。`--digest` が無ければ承認せず、終了コードは 1
-- ダイジェストが覆うのは承認画面の本文と、判定が読んだ中身（`read_set`。承認済みチケット・提案・マーカー・フェーズ定義・取り込み状態の、
-  ブランチ名とツリーからの相対パスごとの中身のハッシュ。無かったファイルも「無い」として入る）と、一括のチケットごとに書き出す中身（新規は提案の
-  ファイルのバイト列そのもの、改版は計画と `phases:` を差し替えた承認済みチケット）。見せたあとに判定が読んだものが 1 つでも変われば、
-  画面が同じでもダイジェストは変わる
+- `--yes` は端末を求めない。承認する時点の提案を `--agree` と同じ検査にかけ、`--yes` の識別子だけを承認する。識別子が承認の対象を兼ねるので、`--digest` も後ろに並べる絞りも受けず、付けると終了コード 1
+- 表示したときの内容との一致は確かめない。表示のあとに同じ識別子の提案が変わっても、それだけを理由には拒まない（承認待ちの提案は、ユーザが承認する間は編集しない運用が前提）。指していない提案が増えても承認しない
+- 次の場合は何も置かず、終了コード 1 で標準エラーに `[CORE_APPROVE_NOTHING]` を出す。指した識別子が承認待ちに無い。絞りが通らない（親の改版を外して子だけ指す、など）。指したものが検査で承認の対象から外れた（1 つでも外れたら残りも承認しない）
 - エージェントが Bash や PowerShell で `--yes` を打つ形は、組み込みの deny（`builtin:guard-ticket-approval`）が止める。`--preview` は通す
-- 後ろの `<絞り>` は `ccnavi --agree <識別子>...` と同じで、承認の対象を狭める。`--yes` の値（ユーザが見た識別子）とは別に渡す。
-  比べるのは「その絞りで今できる一覧」と「見た識別子」
 
 ## 残った指摘の JSON
 
@@ -3107,7 +3100,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/agree.py` | 合意（承認）の手続き。承認の対象を集めて `--preview` / `--verify` に答え、書き込みを並べて置き場へ動かす。承認待ちの一覧 |
 | `src/ccnavi/tickets/agree_candidates.py` | 承認の候補と、その検査（計画・改版・欄・ブランチ） |
 | `src/ccnavi/tickets/agree_screen.py` | 承認の画面の文面と、承認を伝える文 |
-| `src/ccnavi/tickets/agree_digest.py` | 承認の対象の指紋（ダイジェストと読みの範囲）と、承認で書く本文 |
+| `src/ccnavi/tickets/agree_digest.py` | 承認で書く本文（改版の書き込み） |
 | `src/ccnavi/tickets/risk.py` | 実績で測るリスク。`risks.yml` の読み込み、差分の計測、スクリプトと定性項目 |
 | `src/ccnavi/tickets/phase.py` | フェーズの終わりと HITL ポイント。フェーズの組み立てと順序の検査、止めたときの文、親がいまどの局面にいるか |
 | `src/ccnavi/tickets/phase_forms.py` | ユーザだけが打つコマンドの形（承認・レビュー済み・ガードの切り替え・記録の片付け）を見分ける組み込みのルール |

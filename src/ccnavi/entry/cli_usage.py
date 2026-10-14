@@ -283,7 +283,7 @@ revision lock, when another field would read differently, when a new child id
 clashes with a file or ticket that stays, or when the approved side (approved
 tickets, records, markers, flows, worktrees) refers to an id that would
 change. It never approves; approving the rewritten proposal needs a fresh
-preview, since the digest changes.
+preview, since the text changes.
 
 Two things are not a no, because --agree does not drop them either: scope that
 exceeds the parent or the phase type (writes there stay blocked after approval),
@@ -295,12 +295,18 @@ that a success with nothing to do, the verify calls it a no.
 The VS Code board extension agrees from an overlay instead of the terminal:
 
     ccnavi --agree --preview --json [<id>...]  (show the batch; places nothing)
-    ccnavi --agree --yes <id,id,...> --digest <hex> --json [<id>...]
-        (agree to exactly what was shown; --digest is the preview's `digest`,
-         the trailing ids are the same filter)
+    ccnavi --agree --yes <id,id,...> --json
+        (agree to the named ids; they are also the scope. No --digest and no
+         trailing ids: either exits 1)
 
---yes needs no terminal; it refuses when the batch or the text changed since it
-was shown, and when --digest is missing.
+--yes needs no terminal. It runs the proposals as they are now through the same
+checks as a terminal --agree and agrees to the named ids only. It does not
+compare against what the preview showed: a proposal edited after the preview is
+agreed as it is now, so do not edit pending proposals while the user decides.
+It places nothing and exits 1 (`[CORE_APPROVE_NOTHING]`) when a named id is not
+pending, when the scope does not hold (a child named without its revised
+parent), or when a named one drops out of the checks (then none is agreed).
+Proposals that were not named are never agreed.
 The hooks do not tell the model about approvals. The extension hands the
 model the same text as --yes prints in `prompt`; otherwise the parent agent asks
 with `ccnavi ticket status [<parent>]`.
