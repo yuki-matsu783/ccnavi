@@ -106,7 +106,7 @@ test("CB-D221 全ユースケースの全段で、指す先が画面にあり、
       assert.equal(dom.all("#dirty:not(.hidden)").length, 0, "案内が未保存にした");
       assert.deepEqual(extraPosts(dom), [], "案内の間に余計な送信があった");
       assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
-      assert.equal(dom.all("details#sum[open]").length, 0, "閉じたあと足し算の枠が開いたまま");
+      assert.equal(dom.all("details#sum[open]").length, 0, "閉じたあと統合結果の枠が開いたまま");
     } finally {
       await dom.close();
     }
@@ -210,7 +210,7 @@ test("CB-D224 ファイルがない状態の案内は、組み込みの配点を
     assert.deepEqual(factorIds(dom), ["big-diff", "many-files", "ci", "deletes"]);
     assert.ok(dom.all<HTMLInputElement>("input.f-level").every((el) => el.disabled));
     assert.ok(dom.one<HTMLButtonElement>('[data-action="add"]').disabled);
-    assert.equal(dom.all("details#sum").length, 0, "組み込みの配点に足し算はありません");
+    assert.equal(dom.all("details#sum").length, 0, "組み込みの配点に統合結果はありません");
     dom.click(dom.one('[data-action="create"]'));
     await dom.settle();
     assert.deepEqual(extraPosts(dom), [], "見本の「作る」が実際に送られた");
@@ -225,7 +225,7 @@ test("CB-D224 ファイルがない状態の案内は、組み込みの配点を
   }
 });
 
-test("CB-D225 足し算の案内は、枠を開いて見本の足し算を選ぶ。実際の足し算は出ず、閉じたら枠も選びも実際のものに戻る", async () => {
+test("CB-D225 統合結果の案内は、枠を開いて見本の統合結果を選ぶ。実際の統合結果は出ず、閉じたら枠も選びも実際のものに戻る", async () => {
   const dom = await openRisk({ target: { kind: "project", name: "lib" }, sums: riskSums(sumsBoard()) });
   try {
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "lib");
@@ -240,13 +240,13 @@ test("CB-D225 足し算の案内は、枠を開いて見本の足し算を選ぶ
     assert.match(dom.one("#sum-levels").textContent ?? "", /HIGH\s*30/);
     await next(dom);
     assert.ok(dom.one(".sum-table").textContent?.includes("lib:big-diff"));
-    assert.ok(!dom.one(".sum-table").textContent?.includes("schema"), "実際の足し算が出ている");
+    assert.ok(!dom.one(".sum-table").textContent?.includes("schema"), "実際の統合結果が出ている");
     await next(dom);
-    assert.equal(dom.all("details#sum[open]").length, 0, "足し算に関わらない段で枠が開いたまま");
+    assert.equal(dom.all("details#sum[open]").length, 0, "統合結果に関わらない段で枠が開いたまま");
     await next(dom);
     assert.equal(dom.all(".tour").length, 0);
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "lib");
-    assert.ok(dom.one(".sum-table").textContent?.includes("schema"), "閉じたあと実際の足し算に戻らない");
+    assert.ok(dom.one(".sum-table").textContent?.includes("schema"), "閉じたあと実際の統合結果に戻らない");
     assert.deepEqual(extraPosts(dom), []);
   } finally {
     await dom.close();

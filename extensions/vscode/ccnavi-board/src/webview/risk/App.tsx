@@ -91,7 +91,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   const { draft, open } = editing;
   const page = pageOf(data);
   /**
-   * 案内の間は見本を描き、段ごとの様子（開く項目・絞り込み・足し算など）は `scene` に入れる。実際の編集中の配点や開いた行は動かさないので、
+   * 案内の間は見本を描き、段ごとの様子（開く項目・絞り込み・統合結果など）は `scene` に入れる。実際の編集中の配点や開いた行は動かさないので、
    * 閉じたあとに戻すものは無い
    */
   const [scene, setScene] = useState<Scene>(NO_SCENE);
@@ -470,7 +470,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         <Sum
           sums={shownPage.sums}
           initial={defaultSum(shownPage.sums, touring ? undefined : shownPage.target)}
-          // 見本は別の枠として作る（閉じたあと、見本で選んだ足し算が実際の枠に残らない）
+          // 見本は別の枠として作る（閉じたあと、見本で選んだ統合結果が実際の枠に残らない）
           key={touring ? "tour" : `${shownPage.target?.kind ?? ""}:${shownPage.target?.name ?? ""}`}
           tour={touring ? { open: sceneSum !== undefined, picked: sceneSum ?? shownPage.sums[0]?.name ?? "" } : undefined}
         />

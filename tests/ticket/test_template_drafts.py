@@ -5,8 +5,8 @@
 1. 下書きの置き場: `wip/proposals/templates/<名前>.yml`（ツリーごと）。flow.draft_rel と同じ形
 2. `--templates --draft <親>`: 完了した親の計画から下書きを作る。`after` を計画の中の添字に直し、
    子のフローを写し、同名は上書きせず断る。作業中・退避済み・取り消した親は読めないと言う
-3. 下書きの効力: `--templates` の足し算にも `templates[]` にも入らない。`--lint` は error にしない。
-   一覧に件数、`--json` に `drafts[]`
+3. 下書きの効力: `--templates` の統合結果にも `templates[]` にも入らない。
+   `--lint` は error にしない。一覧に件数、`--json` に `drafts[]`
 4. `--templates --import`: `--yes` と `--expect` が揃うまで何も書かない。差分は文の前後まで見せる。
    同名は `--replace`。書いた場所を `--templates` が読む。下書きは同じ中身のときだけ消す
 5. 書き方: 一時ファイル → fsync → 差し替え。リンク・ハードリンクには書かない
@@ -366,7 +366,7 @@ class MakeTest(Drafts):
 
 
 class EffectTest(Drafts):
-    """下書きには効力が無い。足し算にも一覧にも入らず、lint の error にもならない。"""
+    """下書きには効力が無い。統合結果にも一覧にも入らず、lint の error にもならない。"""
 
     def test_a_draft_is_not_in_the_templates_or_the_sums(self):
         self.done_parent(["design"])
@@ -529,7 +529,7 @@ class ImportTest(Drafts):
         self.assertIn("取り込んだ", result.stdout)
         with open(self.common_file(), "rb") as f:
             self.assertEqual(plan_templates.digest(f.read()), self.sha)
-        # 書いた場所を `--templates` が読み、足し算に入る。
+        # 書いた場所を `--templates` が読み、統合結果に入る。
         rows = {(r["layer"], r["name"]): r for r in self.answer()["templates"]}
         row = rows[("common", "i0001")]
         self.assertTrue(row["effective"])

@@ -2,19 +2,19 @@
 #   path     見本のファイルの場所（画面には「（見本）」を付けて出す）
 #   risks    見本の配点。risks.yml と同じ書き方（levels と factors）
 #   builtin  配点のファイルが無いときに画面が見せる組み込みの配点（src/core/risk-doc.ts の BUILTIN_RISK_TEXT と同じ値）
-#   sums     「足し算」の見本。実行ファイルが出す結果の形（共通の設定 + 1 つの設定の和）
+#   sums     「統合結果」の見本。実行ファイルが出す結果の形（共通の設定 + 1 つの設定の和）
 # `scene:` は段ごとの画面の様子。段ごとに全部を書く（前の段を引き継がない）。
 #   open     開く項目の id（, で区切って複数。指す先 factor-* は、開いた最初の項目に付く）
 #   find     絞り込みの欄に入れる文字
 #   blank    欄を空にして見せる境目（medium / high / critical）。空の欄には組み込みの値を薄く出す
 #   missing  配点のファイルが無い状態（組み込みの配点を読み取り専用で見せ、「作る」を出す）
-#   sum      「足し算」の枠を開き、選ぶ足し算の名前（sample.sums の name）
+#   sum      「統合結果」の枠を開き、選ぶ統合結果の名前（sample.sums の name）
 # `target:` の印（画面の data-tour）:
 #   levels / level-high   境目の点の欄全体 / HIGH の欄
 #   factors / factor-count / find / add   項目の一覧 / 項目の件数 / 絞り込みの欄 / 「＋ 項目を追加」
 #   factor-row / factor-id / factor-points / factor-kind / factor-value / factor-include / factor-exclude / factor-message / factor-buttons   開いた項目の中
 #   save / missing / create   保存 / ファイルが無いときの帯 / 「作る」ボタン
-#   sum / sum-pick / sum-levels / sum-table   足し算の枠 / 選ぶ欄 / 境目の点 / 項目の表
+#   sum / sum-pick / sum-levels / sum-table   統合結果の枠 / 選ぶ欄 / 境目の点 / 項目の表
 #   tour   「?」
 screen: risk
 
@@ -232,17 +232,17 @@ courses:
         body: 未保存の間は、ヘッダに「未保存」が出ます。保存が通るとファイルに反映され、ファイルのコメントは残ります。
 
   - id: sum
-    title: 共通の設定との足し算を確認したいとき
+    title: 共通の設定との統合結果を確認したいとき
     summary: 子をクローズするときに実際に使う、共通の設定と 1 つの設定の和を読む
     steps:
       - target: sum
-        title: 足し算の枠
+        title: 統合結果の枠
         body: 子チケットをクローズするときの配点は、共通の設定と、親の project が指す設定の和です。この枠は、その結果を実行ファイルが出したまま、読み取り専用で見せます。
         scene:
           sum: self
       - target: sum-pick
-        title: 足し算を選ぶ
-        body: ワークスペースの足し算（共通 + ワークスペース）と、プロジェクトごとの足し算（共通 + そのプロジェクト）から選びます。見本では lib の足し算を選んでいます。
+        title: 統合結果を選ぶ
+        body: ワークスペースの統合結果（共通 + ワークスペース）と、プロジェクトごとの統合結果（共通 + そのプロジェクト）から選びます。見本では lib の統合結果を選んでいます。
         scene:
           sum: lib
       - target: sum-levels
@@ -257,7 +257,7 @@ courses:
           sum: lib
       - target: factors
         title: 編集する設定ファイルを選ぶ
-        body: 足し算は読み取り専用です。直すときは、画面上部の「設定」の欄で、編集する設定を切り替えます。足し算は保存済みの配点の和で、編集中の内容は含みません。
+        body: 統合結果は読み取り専用です。直すときは、画面上部の「設定」の欄で、編集する設定を切り替えます。統合結果は保存済みの配点の和で、編集中の内容は含みません。
 
   - id: create-file
     title: 組み込みの配点からファイルを作りたいとき

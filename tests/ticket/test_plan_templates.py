@@ -4,7 +4,7 @@
 
 1. 読み込み: 書式、未知の欄の warn、読んで書いても中身が変わらない往復、フローと同じ読み手の保護
    （リンク・ハードリンク・大きさ・別名・UTF-8）
-2. 2 層の足し算: 全欄が同じなら info でレイヤーの側を捨てる、中身が違えば error で
+2. 2 層の統合結果: 全欄が同じなら info でレイヤーの側を捨てる、中身が違えば error で
    レイヤーの側だけを使わない、壊れた共通は空にしてレイヤーを使う
 3. 検査: 順序（終端・延期の引き受け手・`after` の範囲）は error、型 id・kind の食い違いは warn、
    `flows` の添字とフローの形
@@ -628,7 +628,7 @@ class CliTest(Harness):
         out = self.ccnavi("--templates").stdout
         self.assertIn("broken  [common]（使わない: invalid）  YAML として読めない", out)
         self.assertIn("notes.txt", out)
-        # 足し算の相手でないレイヤーの置き場の苦情は、一覧に混ぜない。
+        # 統合結果の相手でないレイヤーの置き場の苦情は、一覧に混ぜない。
         other = self.ccnavi("--templates", "--layer", "lib").stdout
         self.assertNotIn("notes.txt", other)
         self.assertIn("lib  [lib]", other)
@@ -684,7 +684,7 @@ class LintTest(Harness):
 
 
 def showcase(root: str) -> None:
-    """答えの形の見本にするワークスペース。足し算・衝突・壊れたファイル・検査の苦情が一通り出る。"""
+    """答えの形の見本にするワークスペース。統合結果・衝突・壊れたファイル・検査の苦情が一通り出る。"""
     write(common_path(root, "phases"), PHASES)
     base = os.path.dirname(common_path(root, "rules")) + "/templates/"
     own = os.path.dirname(config_path(root, "rules")) + "/templates/"

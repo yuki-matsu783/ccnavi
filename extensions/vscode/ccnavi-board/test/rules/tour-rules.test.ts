@@ -105,7 +105,7 @@ test("CB-T520 ルールの案内は、使い方ごとの案内が 4〜9 段で�
   }
 });
 
-test("CB-T521 足し算の見本は、実際のボードの JSON の読み取りと同じ RulesSum になり、共通の設定と別のレイヤーの由来を持つ", () => {
+test("CB-T521 統合結果の見本は、実際のボードの JSON の読み取りと同じ RulesSum になり、共通の設定と別のレイヤーの由来を持つ", () => {
   const raw = (loadTour("rules").sample as { sums: unknown }).sums;
   const parsed = parseBoardJson(JSON.stringify({ version: BOARD_VERSION, sums: raw }));
   assert.ok(parsed.ok);

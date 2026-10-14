@@ -5,8 +5,8 @@
 
 ## 何をするか
 
-- `resolve`: 共通 + 1 つのレイヤーの足し算（`plan_templates` の走査）から、名前でテンプレートを
-  引く。使えるのは足し算で取り込まれた（`effective`）もので、error が無いもの。無い・捨てた・
+- `resolve`: 共通 + 1 つのレイヤーの統合結果（`plan_templates` の走査）から、名前でテンプレートを
+  引く。使えるのは統合結果で取り込まれた（`effective`）もので、error が無いもの。無い・捨てた・
   error があるなら、理由を返す
 - `absolute`: テンプレートの `after`（計画の中の添字）を、提案の絶対番号に付け直す。全体計画は
   そのまま、フィードバック計画は全体計画の項数を足す。`template_drafts.make`（`--draft`）の
@@ -35,7 +35,7 @@ FIRST_SEQ = 1
 
 @dataclass
 class Found:
-    """引けたテンプレート。`warns` は使えるが言っておく苦情、`notes` は足し算の知らせ。"""
+    """引けたテンプレート。`warns` は使えるが言っておく苦情、`notes` は統合結果の知らせ。"""
 
     entry: plan_templates.Entry
     template: plan_templates.Template
@@ -47,7 +47,7 @@ class Found:
 def resolve(conf, root: str, layer: str, name: str) -> tuple[Found | None, str]:
     """`layer` を足した結果からテンプレートを名前で引く。使えなければ (None, 理由)。
 
-    使えるのは、足し算で取り込まれていて（衝突・重複で捨てられていない）、読めて、error の
+    使えるのは、統合結果で取り込まれていて（衝突・重複で捨てられていない）、読めて、error の
     苦情が無いもの。共通とレイヤーに同名で中身が違うものが並ぶと、レイヤーの側は使われず、
     共通の側が引かれる。そのことは `notes` で言う。
     """
@@ -64,7 +64,7 @@ def resolve(conf, root: str, layer: str, name: str) -> tuple[Found | None, str]:
             "一覧は 'ccnavi --templates'"
         )
     if entry.effective and entry.layer == plan_templates.LAYER_COMMON:
-        # 共通の側は、足し算の結果の定義で検査し直す。
+        # 共通の側は、統合結果の定義で検査し直す。
         types = plan_templates.types_for(conf, root, layer)
         entry = plan_templates.recheck(entry, types, scanned.candidates)
     if not entry.effective or entry.template is None:
