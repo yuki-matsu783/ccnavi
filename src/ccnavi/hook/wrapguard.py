@@ -664,26 +664,43 @@ ROLE_PARENT = "parent"
 
 
 def ticket_role(conf: settings.Settings, root: str, name: str) -> tuple[str, str]:
-    """その名前の承認済みチケットの役（`ROLE_CHILD` / `ROLE_PARENT`）と、子なら親の識別子。
+    """その名前のワークツリーの役（`ROLE_CHILD` / `ROLE_PARENT`）と、子なら親の識別子。
 
-    チケットが無ければ役は空（直接作業のワークツリーなど）。探し方は `child_parent` と同じで、
-    `parent:` の行があれば子、承認済みチケットがあって `parent:` が無ければ親。読めないファイルは
-    子かもしれないとして、親は `?`。
+    見るのはそのワークツリー自身のツリーにある同じ名前のチケット（`doing/`・`done/`・
+    `review/`）だけ。ほかのツリーに置いたファイルでは役を決めない（子のワークツリーに
+    `parent:` の行を持つ同名の偽のチケットを 1 つ置くだけで、親のワークツリーの禁止が
+    丸ごと外れる）。
+    見つかったものすべてに `parent:` があれば子。`parent:` の無いものが 1 つでもあるか、読めない
+    ファイルがあれば親（止める側）。チケットが無ければ役は空（直接作業のワークツリーなど）。
     """
-    parent, found = child_parent(conf, root, name)
-    if parent:
-        return ROLE_CHILD, parent
-    for top in _trees(conf, root):
-        approved = settings.approved_dir(conf, top)
-        proposals = os.path.join(top, (conf.tickets or "").replace("/", os.sep))
-        for path in (
-            os.path.join(approved, ticket_model.DOING, name + ".md"),
-            os.path.join(approved, ticket_model.DONE, name + ".md"),
-            os.path.join(proposals, ticket_model.REVIEW, name + ".md"),
-        ):
-            if os.path.isfile(path):
-                return ROLE_PARENT, ""
-    return "", ""
+    top = os.path.join(root, tree.WORKTREES_DIR, name)
+    approved = settings.approved_dir(conf, top)
+    proposals = os.path.join(top, (conf.tickets or "").replace("/", os.sep))
+    parents: list[str] = []
+    found = False
+    for path in (
+        os.path.join(approved, ticket_model.DOING, name + ".md"),
+        os.path.join(approved, ticket_model.DONE, name + ".md"),
+        os.path.join(proposals, ticket_model.REVIEW, name + ".md"),
+    ):
+        if not os.path.lexists(path):
+            continue
+        found = True
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                text = f.read()
+        except OSError:
+            return ROLE_PARENT, ""
+        match = re.search(r"^parent:[ \t]*(.*?)[ \t]*$", text, re.MULTILINE)
+        parent = match.group(1).strip("'\"") if match else ""
+        if not parent:
+            return ROLE_PARENT, ""
+        parents.append(parent)
+    if not found:
+        return "", ""
+    if len(set(parents)) != 1:
+        return ROLE_PARENT, ""
+    return ROLE_CHILD, parents[0]
 
 
 def child_parent(conf: settings.Settings, root: str, name: str) -> tuple[str, str]:

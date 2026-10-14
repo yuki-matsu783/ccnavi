@@ -20,7 +20,7 @@ import tempfile
 import unittest
 
 from ccnavi.hook import wrapguard
-from ccnavi.infra import shellread
+from ccnavi.infra import settings, shellread
 from tests import GIT_ENV, ROOT, SH_SCRIPTS, common_path, common_sh
 from tests.inproc import run_ccnavi
 
@@ -399,6 +399,37 @@ class SubagentParentTreeTest(unittest.TestCase):
         parent = self.trees["i0001"]
         reason = self.hook(parent, "cd ../i0001-01-01 && " + " ".join(GIT + ["commit -m x"]))
         self.assertFalse(self.denied(reason), reason)
+
+    def test_a_planted_child_ticket_does_not_turn_the_parent_into_a_child(self):
+        # 役は、そのワークツリー自身のツリーにある同名のチケットだけで決める。ほかのツリーに
+        # `parent:` を持つ同名のファイルを置いても、親のワークツリーの禁止は外れない。
+        parent = self.trees["i0001"]
+        child = self.trees["i0001-01-01"]
+        write(os.path.join(child, "wip/proposals/review/i0001.md"), "parent: x\n")
+        write(os.path.join(self.trees["plain"], ".ccnavi/approved/doing/i0001.md"), "parent: x\n")
+        reason = self.hook(child, "cd ../i0001 && " + " ".join(GIT + ["commit -m x"]))
+        self.assertTrue(self.denied(reason), reason)
+        reason = self.hook(child, "", tool="Write", path=os.path.join(parent, "src", "x.py"))
+        self.assertTrue(self.denied(reason), reason)
+        # 自身のツリーで、`parent:` の無い同名のチケットと並べても親のまま（曖昧なら止める側）。
+        write(os.path.join(parent, "wip/proposals/review/i0001.md"), "parent: x\n")
+        reason = self.hook(child, "cd ../i0001 && " + " ".join(GIT + ["commit -m x"]))
+        self.assertTrue(self.denied(reason), reason)
+        # 子のワークツリーで子のチケットを持つ形は、子のまま（コミットは通る）。
+        write(
+            os.path.join(child, ".ccnavi/approved/doing/i0001-01-01.md"),
+            ticket("i0001-01-01", "i0001"),
+        )
+        reason = self.hook(child, " ".join(GIT + ["commit -m x"]))
+        self.assertFalse(self.denied(reason), reason)
+        self.assertEqual(
+            wrapguard.ticket_role(self.conf(), self.root, "i0001-01-01"),
+            (wrapguard.ROLE_CHILD, "i0001"),
+        )
+
+    def conf(self):
+        conf, _ = settings.load(self.root)
+        return conf
 
     def test_the_directory_of_a_runner_is_followed(self):
         # `env -C` と `sudo -D` は後ろのコマンドを別のディレクトリで走らせる。剥がした実行役の
