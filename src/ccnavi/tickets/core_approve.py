@@ -25,30 +25,35 @@ from . import (
 # ボードの承認（`--agree --yes`）が通らなかった根拠の種別。付録 A の `CORE_APPROVE_*`。
 # 確認（`CORE_CONFIRM_*`）・取り下げ（`CORE_WITHDRAW_*`）と同じく、文面の頭に
 # `[<コード>]` で載せる。
-# 承認するものが無い。指定した識別子が承認待ちに無い、絞りが通らない場合も含む。
+# `--digest` が無い。
+CODE_APPROVE_NO_DIGEST = "CORE_APPROVE_NO_DIGEST"
+# 見せた一覧（識別子）と今の一覧が違う。
+CODE_APPROVE_LIST_CHANGED = "CORE_APPROVE_LIST_CHANGED"
+# 識別子は同じで、見せた中身（ダイジェスト）が今のものと違う。
+CODE_APPROVE_DIGEST_CHANGED = "CORE_APPROVE_DIGEST_CHANGED"
+# 承認するものが無い。
 CODE_APPROVE_NOTHING = "CORE_APPROVE_NOTHING"
 # 書く途中で止まった（置いたものは残る）。
 CODE_APPROVE_STOPPED = "CORE_APPROVE_STOPPED"
 
-
-def not_approvable(verdict: core_base.Verdict, ids: list[str]) -> list[str]:
-    """指した識別子のうち、承認の対象に入らなかったもの（検査で外れた提案）。
-
-    承認の対象は指したものだけ。指したものが外れたまま残りだけ承認すると、指していない
-    組み合わせを承認することになるので、1 つでも外れたら何も承認しない。
-    """
-    approvable = {c.ticket.ticket for c in verdict.batch}
-    return [i for i in ids if i not in approvable]
+# 見せたあとに承認待ちの提案が更新されたときに、利用者へ出す知らせ（端末・ボード・Chrome で共通）。
+UPDATED_NOTICE = "内容が更新されました。"
 
 
-def refusal_code(verdict: core_base.Verdict, ids: list[str]) -> str:
-    """承認が通らない根拠の種別。通るなら空。
+def refusal_code(verdict: core_base.Verdict) -> str:
+    """見せたものを比べた判定（`judge_approval`）で承認が通らない根拠の種別。通るなら空。
 
     手元の `--agree --yes`（`approve_yes`）と Chrome の `plan` が同じ答えを出すよう、
-    1 か所で決める。承認する対象が無いか、絞りが通らないか、指したものが検査で外れれば
-    `CORE_APPROVE_NOTHING`。
+    1 か所で決める。
+    見せたものと違えば、識別子の違い（`CORE_APPROVE_LIST_CHANGED`）を中身の違いより先に見る。
+    違わなくても、承認する対象が無いか、絞りが通らなければ `CORE_APPROVE_NOTHING`。
     """
-    if not verdict.batch or verdict.gathered.refused or not_approvable(verdict, ids):
+    mismatch = verdict.mismatch
+    if mismatch is not None:
+        if mismatch["expected"] != mismatch["current"]:
+            return CODE_APPROVE_LIST_CHANGED
+        return CODE_APPROVE_DIGEST_CHANGED
+    if not verdict.batch or verdict.gathered.refused:
         return CODE_APPROVE_NOTHING
     return ""
 
@@ -66,6 +71,7 @@ def approve(
     conf: settings.Settings,
     root: str,
     only: list[str] | None = None,
+    placed_out: str = "",
 ) -> int:
     """未承認の提案をまとめてユーザに見せ、承認されたら承認済みチケットを置く。
 
@@ -87,31 +93,50 @@ def approve(
     絞った対象に入らない親を持つ子は「親が承認されていない」で失敗する。
 
     判定と書き込みはコア（`judge_approval` → `plan` → `write_fs`）。
+
+    `placed_out` があれば、書き込みに入ったあと、実際に書けた承認済みチケットのパスと、
+    書けなかったもの・書かなかったものを JSON で書き出す（`placed_report`）。呼び手
+    （`ccnavi-agree.sh`）が、書けた分だけをコミット・push し、残りを名指しするため。
     """
     snapshot = core_base.read_fs(conf, root)
     verdict = core_base.judge_approval(snapshot, only)
-    stderr.write(verdict.messages)
-    core_base.say_elsewhere(stderr, verdict.gathered)
-    gathered = verdict.gathered
-    if gathered.refused:
-        return 1
-    if gathered.nothing_pending:
-        stdout.write("承認待ちのチケットはありません。\n")
-        # 読めない提案があったなら、その旨は標準エラーに出ている。承認するものが
-        # 無いのは正常だが、不正な提案を「何も無い」で通す形にはしない。
-        return 1 if gathered.broken else 0
-    if not gathered.batch:
-        return 1
+    while True:
+        stderr.write(verdict.messages)
+        core_base.say_elsewhere(stderr, verdict.gathered)
+        gathered = verdict.gathered
+        if gathered.refused:
+            return 1
+        if gathered.nothing_pending:
+            stdout.write("承認待ちのチケットはありません。\n")
+            # 読めない提案があったなら、その旨は標準エラーに出ている。承認するものが
+            # 無いのは正常だが、不正な提案を「何も無い」で通す形にはしない。
+            return 1 if gathered.broken else 0
+        if not gathered.batch:
+            return 1
 
-    if gathered.note:
-        stdout.write(gathered.note + "\n\n")
-    stdout.write(gathered.text + "\n\n")
-    stdout.write(f"この {len(gathered.batch)} 件を承認する場合は y、やめる場合はそれ以外: ")
-    stdout.flush()
-    if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
-        stderr.write("ccnavi: 承認しなかった\n")
-        return 1
+        if gathered.note:
+            stdout.write(gathered.note + "\n\n")
+        stdout.write(gathered.text + "\n\n")
+        stdout.write(f"この {len(gathered.batch)} 件を承認する場合は y、やめる場合はそれ以外: ")
+        stdout.flush()
+        if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
+            stderr.write("ccnavi: 承認しなかった\n")
+            return 1
+        # 確認を待つ間に提案が更新されていないか、承認の直前に最新の状態から照合する。
+        # 違えば承認せず、最新を表示し直してもう一度確認を取る（ボード・Chrome と同じ強さ）。
+        latest_snapshot = core_base.read_fs(conf, root)
+        latest = core_base.judge_approval(
+            latest_snapshot, only, gathered.identifiers, verdict.digest
+        )
+        if latest.mismatch is None:
+            snapshot, verdict = latest_snapshot, latest
+            gathered = latest.gathered
+            break
+        stdout.write(f"\n{UPDATED_NOTICE}最新の承認待ちを表示し直します。\n\n")
+        snapshot, verdict = latest_snapshot, core_base.judge_approval(latest_snapshot, only)
     applied = core_base.write_fs(stdout, stderr, core_base.plan(snapshot, verdict).planned)
+    if placed_out:
+        _write_report(placed_out, placed_report(conf, root, gathered, applied), stderr)
     if applied.code == 0 and gathered.rejected:
         # 承認の対象の一部が失敗したときは、通ったぶんを置いてから失敗で終わる。置いたので
         # 繰り返してよく、失敗したものは上で名指ししてある。成功で終わると、
@@ -125,6 +150,59 @@ def approve(
         # 途中で止まったが、そこまでに置いたものは残る。
         return modes.EXIT_PARTIAL
     return applied.code
+
+
+def copy_paths(conf: settings.Settings, root: str, batch: list, ids: list[str]) -> list[str]:
+    """承認済みチケットの置き場でのパス（識別子 `ids` の分）。承認の対象 `batch` から引く。"""
+    by_id = {c.ticket.ticket: c.ticket for c in batch}
+    out = []
+    for ident in ids:
+        t = by_id.get(ident)
+        if t is None:
+            continue
+        home = approval.home_dir(conf, root, t.ticket, t.parent, t.tree_root, project=t.project)
+        out.append(approval.copy_path(home, t.ticket))
+    return out
+
+
+def placed_report(
+    conf: settings.Settings, root: str, gathered: agree.Gathered, applied: agree.Applied
+) -> dict:
+    """承認の書き込みの結果。実際に書けたパス（`placed`）と、書けなかったもの・書かなかったもの。
+
+    - `placed`: 書けた承認済みチケットのパス
+    - `failed`: 書き込みで止まった提案（識別子と理由）。止まらなければ空
+    - `unwritten`: 止まったために書かなかった提案の識別子
+    - `rejected`: 検査で承認の対象にしなかった提案（識別子と理由）
+    """
+    ids = [c.ticket.ticket for c in gathered.batch]
+    failed = (
+        [{"ticket": applied.stopped_at, "reason": applied.reason}]
+        if applied.code != 0 and applied.stopped_at
+        else []
+    )
+    stopped = {f["ticket"] for f in failed}
+    unwritten = (
+        [i for i in ids if i not in applied.placed and i not in stopped]
+        if applied.code != 0
+        else []
+    )
+    return {
+        "version": agree.AGREE_VERSION,
+        "placed": copy_paths(conf, root, gathered.batch, applied.placed),
+        "failed": failed,
+        "unwritten": unwritten,
+        "rejected": [
+            {"ticket": t.ticket, "problems": [str(p) for p in complaints]}
+            for t, complaints in gathered.rejected
+        ],
+    }
+
+
+def _write_report(path: str, body: dict, stderr: TextIO) -> None:
+    failed = fsio.write_text_atomic(path, json.dumps(body, ensure_ascii=False) + "\n")
+    if failed:
+        stderr.write(f"ccnavi: 書けたパスの一覧を {path} に書けなかった（{failed}）\n")
 
 
 def preview(
@@ -152,7 +230,10 @@ def preview(
             stdout.write(gathered.note + "\n\n")
         stdout.write(gathered.text + "\n")
         return 0
-    stdout.write(json.dumps(agree.preview_body(conf, root, gathered), ensure_ascii=False) + "\n")
+    stdout.write(
+        json.dumps(agree.preview_body(conf, root, gathered, verdict.digest), ensure_ascii=False)
+        + "\n"
+    )
     return 0
 
 
@@ -207,7 +288,7 @@ def verify(
     fresh = [c.ticket for c in gathered.batch if not c.is_revision and not c.ticket.is_child]
     branches = agree_candidates.existing_branch_warnings(root, conf, fresh, [], [], [])
     if as_json:
-        body = agree.preview_body(conf, root, gathered)
+        body = agree.preview_body(conf, root, gathered, judged.digest)
         body["verify"] = {"ok": verdict.ok, "reason": verdict.reason}
         body["branch_warnings"] = branches
         stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
@@ -225,37 +306,77 @@ def approve_yes(
     stderr: TextIO,
     conf: settings.Settings,
     root: str,
-    ids: list[str],
+    expected: list[str],
     as_json: bool,
+    only: list[str] | None = None,
+    digest: str = "",
 ) -> int:
-    """`--agree --yes <識別子,…>`。
+    """`--agree --yes <識別子,…> --digest <ダイジェスト> [<絞り>...]`。
 
-    拡張のオーバーレイで押した承認。端末の確認は通らない。
+    拡張のオーバーレイで押した承認。
 
-    承認の対象は `ids` で指した提案だけ。承認する時点の提案を、端末の承認（`approve`）と同じ
-    検査にかけて承認する。見せたあとに提案が変わったかどうかは調べない（承認待ちの提案は、
-    ユーザが承認する間は書き換えない運用が前提）。指した識別子が承認待ちに無いとき、
-    現在の提案が検査を通らないときは、何も承認しない。`ids` に無い提案は、増えていても
-    承認しない。
+    端末の確認は通らない。代わりに、見せた一覧と今の一覧が同じであることを求める。
+    拡張が見せたあとに提案が増えていれば承認せず、食い違いを返す。見ていない
+    ものを承認する経路を使えなくするため。識別子に加えて、見せた各提案ファイルの元のバイト列全体の
+    ダイジェスト（`digest`）も比べる。識別子が同じでも、見せたあとに提案の本文・改行・BOM が
+    書き換われば承認しない。判定が読んだ中身や書き込む中身は比べない（承認の可否は、ここで最新の
+    状態から計算し直す）。違いが見つかったら何も置かずに `mismatch` を返し、
+    呼び手が最新を表示し直す。
+    ダイジェストが無ければ承認しない。
+
+    引数は 2 つに分かれる。`--yes` は「オーバーレイに出ていた識別子」で、後ろに並べる語は
+    「そのとき掛けていた絞り」（`--agree --preview` に渡したものと同じ）。分けないと検査が
+    必ず通る。絞りだけで対象を狭めて、その狭めた対象と見せた識別子を比べると、いつでも一致する。
+    絞りは preview と同じものを通し、比べるのは「その絞りで今できる一覧」と「見せた識別子」。
     """
-    narrowed = sorted({s.strip() for s in ids if s.strip()})
-    if not narrowed:
+    wanted = sorted({s.strip() for s in expected if s.strip()})
+    narrowed = [s.strip() for s in (only or []) if s.strip()]
+    shown = digest.strip()
+    if not shown:
         stderr.write(
-            core_base.tagged(CODE_APPROVE_NOTHING, "ccnavi: 承認する識別子が指定されていません。")
+            core_base.tagged(
+                CODE_APPROVE_NO_DIGEST,
+                "ccnavi: --yes には --digest（見せた提案の識別子の一覧と提案ファイルの"
+                "バイト列のダイジェスト。preview の digest）が必要です",
+            )
             + "\n"
         )
         return 1
+    # 絞りが通らなかった（承認待ちに無い識別子が入っている、親の改版を外した）ときは、
+    # ボードが古い。拡張には食い違いとして返し、一覧を読み直させる（`judge_approval` が比べる）。
     snapshot = core_base.read_fs(conf, root)
-    verdict = core_base.judge_approval(snapshot, narrowed)
+    verdict = core_base.judge_approval(snapshot, narrowed, shown_ids=wanted, shown_digest=digest)
     stderr.write(verdict.messages)
     core_base.say_elsewhere(stderr, verdict.gathered)
     gathered = verdict.gathered
-    if refusal_code(verdict, narrowed):
-        left = not_approvable(verdict, narrowed) if gathered.batch and not gathered.refused else []
-        why = f"（検査を通らない: {', '.join(left)}。何も承認しない）" if left else ""
+    if verdict.mismatch is not None:
+        current = verdict.mismatch["current"]
+        if as_json:
+            body = {"version": agree.AGREE_VERSION, "mismatch": verdict.mismatch}
+            stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
+        if refusal_code(verdict) == CODE_APPROVE_LIST_CHANGED:
+            stderr.write(
+                core_base.tagged(
+                    CODE_APPROVE_LIST_CHANGED,
+                    f"ccnavi: {UPDATED_NOTICE}見せた一覧と今の一覧が違う（見せた: "
+                    f"{', '.join(wanted) or '(無し)'} / 今: {', '.join(current) or '(無し)'}）。"
+                    "何も承認していない。最新を見直してから承認してください",
+                )
+                + "\n"
+            )
+        else:
+            stderr.write(
+                core_base.tagged(
+                    CODE_APPROVE_DIGEST_CHANGED,
+                    f"ccnavi: {UPDATED_NOTICE}識別子は同じだが、提案ファイルの中身が"
+                    "見せたときと違う。何も承認していない。最新を見直してから承認してください",
+                )
+                + "\n"
+            )
+        return 1
+    if not gathered.batch:
         stderr.write(
-            core_base.tagged(CODE_APPROVE_NOTHING, f"ccnavi: 承認するものがありません。{why}")
-            + "\n"
+            core_base.tagged(CODE_APPROVE_NOTHING, "ccnavi: 承認するものがありません。") + "\n"
         )
         return 1
 
@@ -277,6 +398,8 @@ def approve_yes(
                 "version": agree.AGREE_VERSION,
                 "partial": {
                     "placed": applied.placed,
+                    # 実際に書けた承認済みチケットのパス（`placed` の識別子の分）
+                    "paths": copy_paths(conf, root, gathered.batch, applied.placed),
                     "ticket": applied.stopped_at,
                     "reason": applied.reason,
                     # 止まるまでに出た行（マーカーを消した、改版した）。端末は stdout で見えるが、

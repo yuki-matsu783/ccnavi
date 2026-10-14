@@ -211,12 +211,15 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--order", default=None, metavar="JSON")
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--expect", default=None, metavar="SHA")
-    # 承認する識別子（カンマ区切り）。拡張のオーバーレイでユーザが押した承認。端末は要らない。
+    # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイでユーザが押した承認。端末は要らない。
     # 値なしの `--yes` は `--templates --import` だけが読む（`_run` が、ほかの経路では断る）。
     parser.add_argument("--yes", nargs="?", const=cli_templates.BARE_YES, default="")
-    # 見せた指摘のダイジェスト（`--reviewed --yes` の preview の `digest`）。`--yes` と一緒に渡す。
-    # `--agree --yes` は受けない。
+    # 見せた提案の識別子の一覧と各提案ファイルのバイト列のダイジェスト（`--agree --yes` は
+    # preview の `digest`、`--reviewed --yes` は指摘のダイジェスト）。`--yes` と一緒に渡す。
     parser.add_argument("--digest", default="")
+    # 端末の `--agree` が実際に書けたパスの一覧を JSON で書き出すファイル。画面（標準出力）は
+    # ユーザの確認に使うので別にした。`ccnavi-agree.sh` が読み、書けた分と書けなかった分を言う。
+    parser.add_argument("--placed-out", default="", metavar="FILE")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
     # `--test` の payload に載せる Claude Code の権限モードとサブエージェントの印。hook は
     # この 2 つを Claude Code から受け取り、判定がそれで変わる。呼び出しが来たディレクトリは
@@ -819,24 +822,30 @@ def _parsed(
         if args.preview:
             code = core.preview(stdout, stderr, conf, root, args.json, list(args.command))
             return EXIT_OK if code == 0 else EXIT_ERROR
-        # 拡張のオーバーレイでユーザが押した承認。端末の確認は求めず、`--yes` で指した識別子の
-        # 提案だけを、承認する時点の中身で端末の承認と同じ検査にかけて承認する。エージェントが
-        # これを Bash で打つ形は組み込みの deny（phase_forms.ticket_approval_rule）が止める。
+        # 拡張のオーバーレイでユーザが押した承認。端末の確認の代わりに、見せた一覧と今の一覧が
+        # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
+        # deny（phase_forms.ticket_approval_rule）が止める。
         if args.yes:
-            if args.command or args.digest:
-                stderr.write(
-                    "ccnavi: --agree --yes の対象は --yes <識別子,…> だけで指定してください"
-                    "（--digest と後ろに並べる語は受けない）\n"
-                )
-                return EXIT_ERROR
             history.set_via(history.VIA_BOARD)
-            code = core.approve_yes(stdout, stderr, conf, root, args.yes.split(","), args.json)
+            # 後ろに並べた語は preview に渡したのと同じ絞り。`--yes` は見せた識別子。
+            code = core.approve_yes(
+                stdout,
+                stderr,
+                conf,
+                root,
+                args.yes.split(","),
+                args.json,
+                list(args.command),
+                digest=args.digest,
+            )
             return EXIT_OK if code == 0 else EXIT_ERROR
         if not cli_args._from_terminal(stdin, conf, stderr, "--agree"):
             return EXIT_ERROR
         history.set_via(history.VIA_TERMINAL)
         # `--agree` の後ろに並べた語は、承認の対象に入れる識別子。無ければ承認待ち全部。
-        approved = core.approve(stdin, stdout, stderr, conf, root, only=list(args.command))
+        approved = core.approve(
+            stdin, stdout, stderr, conf, root, only=list(args.command), placed_out=args.placed_out
+        )
         if approved == modes.EXIT_PARTIAL:
             return modes.EXIT_PARTIAL
         return EXIT_OK if approved == 0 else EXIT_ERROR

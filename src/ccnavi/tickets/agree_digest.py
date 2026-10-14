@@ -1,17 +1,45 @@
-"""承認の改版の書き込み（承認済みチケットの計画の差し替え）。
+"""承認の照合の材料と、改版の書き込み（承認済みチケットの計画の差し替え）。
 
-承認で書く本文（改版の写し）を組む。agree から分けた。agree を読まない。
+承認の対象の指紋（`proposals_digest`）と、承認で書く本文（改版の写し）を組む。
+agree から分けた。agree を読まない。
 """
 
 from __future__ import annotations
 
+import hashlib
+
+from ..infra import fsio
 from . import (
+    agree_candidates,
     approval,
     approval_marks,
     history,
     ticket_model,
 )
 from . import ticket as ticket_mod
+
+
+def proposals_digest(batch: list[agree_candidates.Candidate]) -> str:
+    """承認の対象の指紋。提案の識別子の一覧と、各提案ファイルの元のバイト列全体の SHA-256。
+
+    値は 16 進（小文字）。
+
+    ボード・端末・Chrome の承認は、見せたときの指紋を承認の直前に取り直して比べる。
+    解析した後の値では比べず、読んだバイト列そのものを使う。BOM、改行、本文だけの
+    書き換えも拾うため。判定が読んだ中身（承認済みチケットやマーカーなど）と、承認で書く中身は
+    入れない。承認の可否は、承認の直前に最新の状態から計算し直す。
+
+    部分をそのままつながず、識別子と中身のハッシュを件数と並べて、そのリストのハッシュを取る。
+    区切りの文字でつなぐと、その文字が中身に出たときにつなぎ目をずらせるため。
+    """
+    lines = []
+    for cand in sorted(batch, key=lambda c: c.ticket.ticket):
+        raw = fsio.read_bytes(cand.ticket.path)
+        lines.append(
+            f"{cand.ticket.ticket}\n{'-' if raw is None else hashlib.sha256(raw).hexdigest()}"
+        )
+    lines.insert(0, str(len(lines)))
+    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
 
 
 def revise_copy(

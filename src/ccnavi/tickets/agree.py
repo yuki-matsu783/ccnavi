@@ -1,7 +1,7 @@
 """合意の手続き。ユーザが提案に合意する（承認する）までの手続きを持つ。
 
-承認の候補とその検査は `agree_candidates`、承認の画面は `agree_screen`、
-改版の書き込みは `agree_digest` に分けてある。どれも agree を読まない。
+承認の候補とその検査は `agree_candidates`、承認の画面は `agree_screen`、承認の対象の指紋と
+書く本文は `agree_digest` に分けてある。どれも agree を読まない。
 
 置き場は approval、合意の手続きは agree。approval は承認済みチケット・マーカー・子の記録が
 どこにどう置かれているかを読み書きするだけで、ここ（agree）を知らない。agree は approval の
@@ -16,7 +16,8 @@
   `validate`・`plan_problems`・`revision_problems`）はここで当てる
 - ユーザに見せる（`agree_screen.screen`・`preview_body`）。見せたものと承認するものを
   同じ答えにするため、一覧を組む関数は 1 つ（`gather`）にしてある
-- 今承認すれば通るかを確かめる（`verify_verdict`）
+- 見せたものから変わっていないかを確かめる（`agree_digest` の `proposals_digest`、
+  `verify_verdict`）
 - 置き場へ動かす（`plan_batch`）。書き込みは approval の置き場の関数を通す。新規の承認は提案の
   中身を変えずに動かすだけで、書き足すものは無い（待ち方は承認済みチケットの計画から都度計算する）
 - 承認の事実をモデルに伝える文を組む（`agree_screen.approved_text`。拡張が `--agree --yes` の
@@ -187,11 +188,12 @@ def gather(
     )
 
 
-def preview_body(conf: settings.Settings, root: str, gathered: Gathered) -> dict:
+def preview_body(conf: settings.Settings, root: str, gathered: Gathered, digest: str) -> dict:
     """`--preview --json` が返す本体。`--verify --json` も同じものに答えを足して返す。
 
     `plans` は承認の対象に入った計画を持つ親の図の中身。`--plan-order <親> --json` と同じ関数
     （`plan_order.plans`）で作り、`--order` は渡さない（承認する提案そのものの順序）。
+    `digest` は提案の識別子の一覧と各提案ファイルのバイト列のダイジェスト（承認のとき照合する）。
     """
     parents = [
         (c.ticket, c.current) for c in gathered.batch if not c.ticket.is_child and c.ticket.has_plan
@@ -202,6 +204,7 @@ def preview_body(conf: settings.Settings, root: str, gathered: Gathered) -> dict
         "generated_at": approval_marks.now(),
         "batch": [_batch_entry(c) for c in gathered.batch],
         "text": gathered.text,
+        "digest": digest,
         "rejected": [
             {"ticket": t.ticket, "problems": [str(p) for p in complaints]}
             for t, complaints in gathered.rejected
