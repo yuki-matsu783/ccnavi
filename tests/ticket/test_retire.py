@@ -215,6 +215,35 @@ class TidyAfterMergeTest(RetireHarness):
         self.assertIn("i0001", self.branches())
         self.assertEqual(done.stdout.splitlines()[-1], "record no")
 
+    def test_the_head_of_the_branch_itself_does_not_count_as_merged(self):
+        # 呼び手が渡す sha を信じると、未 push のブランチの先頭そのものを渡せば消せる。
+        self.closed_and_pushed()
+        git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "未 push")
+        own = git(self.parent_tree, "rev-parse", "HEAD").strip()
+        done = self.tidy(own)
+        self.assertIn("未 push のコミットがある", done.stdout)
+        self.assertIn("origin/i0001", done.stdout)
+        self.assertIn("i0001", self.branches())
+        self.assertEqual(done.stdout.splitlines()[-1], "record no")
+
+    def test_a_branch_without_a_pushed_head_is_kept(self):
+        self.closed_and_pushed()
+        head = self.pushed_head()
+        git(self.root, "update-ref", "-d", "refs/remotes/origin/i0001")
+        done = self.tidy(head)
+        self.assertIn("手元に無く、未 push のコミットが無いか確かめられない", done.stdout)
+        self.assertIn("i0001", self.branches())
+
+    def test_only_the_branch_of_the_parent_is_tidied(self):
+        # 親の識別子と別のブランチを渡しても消さない。
+        self.closed_and_pushed()
+        git(self.root, "branch", "other", "main")
+        sha = git(self.root, "rev-parse", "other").strip()
+        refused = self.ccnavi("--cwd", self.root, "sync", "tidy", "i0001", "self", "other", sha)
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertIn("親 i0001 のブランチではない", refused.stderr)
+        self.assertIn("other", self.branches())
+
     def test_a_bad_argument_is_refused(self):
         self.closed_and_pushed()
         refused = self.tidy("not-a-sha")

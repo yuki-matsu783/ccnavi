@@ -26,9 +26,10 @@
 `ccnavi-sync.sh` がホストに聞いて、マージ済みの MR の番号と先頭の sha を渡す。
 
 - 親のワークツリーが残っていれば消す（同じ条件）
-- 親の手元のブランチを消す。条件は、手元の先頭が MR の先頭に含まれること（含まれれば push 済みの
-  コミットだけで、未 push のコミットは無い）。MR の先頭が手元に無ければ、含まれるか
-  確かめられないので消さない
+- 親の手元のブランチを消す。条件は、手元の先頭が push 済みの先頭
+  （`refs/remotes/origin/<ブランチ>`）と MR の先頭の両方に含まれること。
+  MR の先頭は sh が渡す値なので、それだけでは信じない。
+  どちらかが手元に無ければ、含まれるか確かめられないので消さない
 - 残っていた子のブランチは、MR の先頭を基準に片付け 1 と同じ条件で消す
 - すべて片付いたら `record yes` を言う。sh はそれを見て、その親の取り込み記録を消す
 
@@ -418,7 +419,25 @@ def run_merged(
     tip = _tip(repo, branch)
     if tip:
         merged_head = _commit(repo, head_sha)
-        if not merged_head:
+        # 手元の先頭が push 済み（`refs/remotes/origin/<ブランチ>`）に含まれることも確かめる。
+        # MR の先頭は呼び手（sh）が渡す値で、ブランチ自身の先頭を渡せば必ず「含まれる」になる。
+        # ネットワークには出ず、手元の remote-tracking ref で見る。無ければ消さない。
+        pushed = _commit(repo, f"refs/remotes/origin/{branch}")
+        if not pushed:
+            outcome = _keep(
+                repo,
+                branch,
+                f"push 済みの先頭（origin/{branch}）が手元に無く、未 push のコミットが無いか"
+                "確かめられない",
+            )
+        elif not _is_ancestor(repo, tip, pushed):
+            outcome = _keep(
+                repo,
+                branch,
+                f"手元の先頭 {tip[:12]} が、push 済みの先頭（origin/{branch}）{pushed[:12]} に"
+                "含まれない（未 push のコミットがある）",
+            )
+        elif not merged_head:
             outcome = _keep(
                 repo,
                 branch,

@@ -439,6 +439,13 @@ def sync_tidy(
     if not branch or branch.startswith("-") or not checked.ok:
         stderr.write(f"ccnavi: sync tidy のブランチ {branch!r} はブランチ名の形ではない\n")
         return 1
+    if ticket_ids.branch_to_id(branch) != family:
+        # 親のブランチだけを消す。別のブランチを渡して消させない。
+        stderr.write(
+            f"ccnavi: sync tidy のブランチ {branch!r} は親 {family} のブランチではない"
+            f"（ブランチから作る識別子は {ticket_ids.branch_to_id(branch)!r}）\n"
+        )
+        return 1
     project = "" if repo == "self" else repo
     return retire.run_merged(stdout, stderr, root, conf, family, project, branch, head_sha, cwd)
 
