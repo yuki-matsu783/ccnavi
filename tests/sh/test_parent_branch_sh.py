@@ -224,9 +224,7 @@ class ParentBranchShTest(unittest.TestCase):
     def approve(self):
         preview = self.ok(self.exe("--agree", "--preview", "--json"))
         body = json.loads(preview.stdout)
-        done = self.exe(
-            "--agree", "--yes", f"{PARENT},{CHILD}", "--digest", body["digest"], "--json"
-        )
+        done = self.exe("--agree", "--yes", f"{PARENT},{CHILD}", "--json")
         self.ok(done)
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "approve")

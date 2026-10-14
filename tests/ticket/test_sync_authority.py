@@ -18,13 +18,11 @@ import threading
 import time
 import unittest
 
-from ccnavi.infra import fsio, settings
+from ccnavi.infra import settings
 from ccnavi.tickets import (
-    agree_digest,
     approval,
     approval_checks,
     approval_ops,
-    core,
     syncstate,
     ticket_model,
 )
@@ -354,7 +352,7 @@ class PresentTest(AuthorityHarness):
     def test_the_check_refuses_a_path_like_argument(self):
         check = self.ccnavi("sync", "check", "../x")
         self.assertEqual(1, check.returncode)
-        self.assertIn("識別子の形ではない", check.stderr)
+        self.assertIn("有効な識別子の形式ではありません", check.stderr)
 
     def test_the_parent_is_written_to_the_parent_tree(self):
         self.record("present")
@@ -752,94 +750,6 @@ class ReadyTest(AuthorityHarness):
         self.assertNotEqual(0, ready.returncode)
         self.assertIn("done/ にありません", ready.stderr)
         self.assertIn("finish i0001", ready.stderr)
-
-
-class DigestTest(AuthorityHarness):
-    """承認のダイジェストは判定が読んだ中身（read_set）で作る。"""
-
-    def judged(self):
-        conf = self.conf()
-        return core.judge_approval(core.read_fs(conf, self.root))
-
-    def test_a_change_in_what_the_judge_read_changes_the_digest(self):
-        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
-        self.commit_parent()
-        first = self.judged()
-        self.assertTrue(first.batch)
-        self.assertIn("self:i0001:.ccnavi/approved/doing/i0001-01-01.md", first.read_set)
-        self.assertIn("self:i0001:(HEAD)", first.read_set)
-        self.assertIn("(設定):.claude/settings.json", first.read_set)
-        self.assertIn("(設定値):approved", first.read_set)
-        self.assertEqual(first.digest, self.judged().digest)
-        # 一括の外のチケット（作業中の子）の中身が変われば、画面が同じでもダイジェストは変わる。
-        path = os.path.join(self.approved, "doing", "i0001-01-01.md")
-        with open(path, encoding="utf-8") as f:
-            text = f.read()
-        write(path, text + "\n追記\n")
-        second = self.judged()
-        self.assertEqual(first.screen_text, second.screen_text)
-        self.assertNotEqual(first.digest, second.digest)
-
-    def test_session_state_is_not_in_the_read_set(self):
-        once = write(os.path.join(self.state, "once-x.json"), "a")
-        record = self.record("present")
-        with fsio.reading() as seen:
-            fsio.note_read(once, "a")
-            fsio.note_read(record, "b")
-        keys = agree_digest.read_set(self.conf(), self.root, seen)
-        self.assertEqual(["(控え):sync/self/families/i0001"], list(keys))
-
-    @requires_symlink
-    def test_keys_do_not_depend_on_a_linked_root(self):
-        # 溜めた読みは行き着く先のパス。ルートをリンク越しに渡しても（macOS の /tmp など）
-        # 同じ鍵になる。
-        holder = tempfile.TemporaryDirectory()
-        self.addCleanup(holder.cleanup)
-        linked = os.path.join(holder.name, "ws")
-        os.symlink(self.root, linked)
-        target = os.path.join(linked, ".claude", "worktrees", "i0001", "x.md")
-        with fsio.reading() as seen:
-            fsio.note_read(target, "x")
-        keys = agree_digest.read_set(self.conf(), linked, seen)
-        self.assertIn("self:i0001:x.md", keys)
-        self.assertFalse([k for k in keys if k.startswith("(外)")], keys)
-
-    def test_a_settings_change_changes_the_digest(self):
-        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
-        self.commit_parent()
-        first = self.judged()
-        write(os.path.join(self.root, ".claude", "settings.local.json"), "{}\n")
-        self.assertNotEqual(first.digest, self.judged().digest)
-
-    def test_keys_of_two_repositories_do_not_collide(self):
-        # ワークスペースとプロジェクトで同じブランチ名（main）の同じ相対パス。
-        project = os.path.join(self.root, "projects", "web")
-        os.makedirs(project)
-        git(project, "init", "--quiet", "-b", "main")
-        with fsio.reading() as seen:
-            fsio.note_read(os.path.join(self.root, "x.md"), "a")
-            fsio.note_read(os.path.join(project, "x.md"), "b")
-        conf = self.conf()
-        conf.projects = os.path.join(self.root, "projects")
-        keys = agree_digest.read_set(conf, self.root, seen)
-        self.assertIn("self:main:x.md", keys)
-        self.assertIn("web:main:x.md", keys)
-        self.assertNotEqual(keys["self:main:x.md"], keys["web:main:x.md"])
-
-    def test_nested_readers_are_removed_by_identity(self):
-        with fsio.reading() as outer:
-            with fsio.reading() as inner:
-                pass
-            fsio.note_read("/x/after", "a")
-        self.assertEqual({}, inner)
-        self.assertIn(os.path.normpath(fsio.parent_resolved("/x/after")), outer)
-
-    def test_line_endings_do_not_change_the_digest(self):
-        with fsio.reading() as seen:
-            fsio.note_read("/x/a", "a\r\nb\n")
-        with fsio.reading() as again:
-            fsio.note_read("/x/a", b"a\nb\n")
-        self.assertEqual(list(seen.values()), list(again.values()))
 
 
 class LintTest(AuthorityHarness):

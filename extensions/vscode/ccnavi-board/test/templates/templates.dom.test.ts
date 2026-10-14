@@ -1,5 +1,5 @@
 /**
- * テンプレート管理画面（React）を happy-dom で動かす。一覧の札と捨てた理由、足し算の枠、
+ * テンプレート管理画面（React）を happy-dom で動かす。一覧の札と捨てた理由、統合結果の枠、
  * 1 件の計画と本文、下書き、帯と錠、エラー・読み込み中、見た目、対象の切り替えを見る。
  * 見本は `tests/fixtures/templates-json.json` の `expect`（self の層）。
  */
@@ -22,7 +22,7 @@ async function openRow(dom: DomPage, selector: string): Promise<void> {
   await dom.settle();
 }
 
-test("CB-D324 一覧は開いている対象の層のテンプレートだけを出し、捨てた理由と使えない札を行に出す。足し算の枠は別に出す", async () => {
+test("CB-D324 一覧は開いている対象の層のテンプレートだけを出し、捨てた理由と使えない札を行に出す。統合結果の枠は別に出す", async () => {
   const dom = await openTemplates();
   try {
     // 対象は self。一覧は self の層の 4 件（ends / feature / local / research）だけで、共通の層の行は出さない
@@ -40,7 +40,7 @@ test("CB-D324 一覧は開いている対象の層のテンプレートだけを
   }
 });
 
-test("CB-D325 足し算の枠は閉じた枠で出て、選んだ足し算の索引（名前・由来・状態・捨てた理由）を表に出す。足し算は欄で切り替える", async () => {
+test("CB-D325 統合結果の枠は閉じた枠で出て、選んだ統合結果の索引（名前・由来・状態・捨てた理由）を表に出す。統合結果は欄で切り替える", async () => {
   const dom = await openTemplates();
   try {
     const sum = dom.one<HTMLDetailsElement>("details#sum");
@@ -183,13 +183,13 @@ test("CB-D331 対象を切り替えると switchTarget を送る。共通の設�
   }
 });
 
-test("CB-D348 足し算で捨てられた行の本文は、層か sha が違えば出さず、読み込めない理由と直接開く先を出す。一致すれば本文を出す", async () => {
+test("CB-D348 統合結果で捨てられた行の本文は、層か sha が違えば出さず、読み込めない理由と直接開く先を出す。一致すれば本文を出す", async () => {
   const dom = await openTemplates();
   try {
     await openRow(dom, 'li.template[data-name="feature"][data-layer="self"]');
     dom.click(dom.one('li.template[data-name="feature"][data-layer="self"] [data-action="show-text"]'));
     await dom.settle();
-    // 共通と同じ中身の self の feature（捨てられた行）。実行ファイルは足し算で使われる共通の本文を返す
+    // 共通と同じ中身の self の feature（捨てられた行）。実行ファイルは統合結果で使われる共通の本文を返す
     const self = fixtureJson().templates.find((t) => t.name === "feature" && t.layer === "self");
     const common = fixtureJson().templates.find((t) => t.name === "feature" && t.layer === "common");
     assert.ok(self !== undefined && common !== undefined);

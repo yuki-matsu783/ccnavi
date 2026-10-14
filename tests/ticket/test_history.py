@@ -94,9 +94,7 @@ class HistoryTest(TicketTest):
     def test_a_board_approval_says_board(self):
         """ボードの `--agree --yes` は経路 board で残る。"""
         self.propose("i0001", allow=("src/*",))
-        shown = self.ccnavi("--agree", "--preview", "--json")
-        digest = json.loads(shown.stdout)["digest"]
-        placed = self.ccnavi("--agree", "--yes", "i0001", "--digest", digest, "--json")
+        placed = self.ccnavi("--agree", "--yes", "i0001", "--json")
         self.assertEqual(placed.returncode, 0, placed.stdout + placed.stderr)
         self.assertEqual(self.kinds("i0001"), [("approved", "todo", "doing", "board")])
 
@@ -243,11 +241,11 @@ class HistoryTest(TicketTest):
         with history.session(history.VIA_CLI, None):
             for bad in ("../x", "a/b", ".hidden", ""):
                 failed = history.note(base, bad, history.KIND_STARTED, "doing", "doing")
-                self.assertIn("識別子の形ではない", failed)
+                self.assertIn("有効な識別子の形式ではない", failed)
                 self.assertEqual(history.path(base, bad), "")
                 entries, why = history.read(base, bad)
                 self.assertEqual(entries, [])
-                self.assertIn("識別子の形ではない", why)
+                self.assertIn("有効な識別子の形式ではない", why)
             self.assertEqual(len(history.pending_failures()), 4)
         self.assertFalse(os.path.exists(base))
 

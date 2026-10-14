@@ -84,7 +84,7 @@ def operate(
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None and args.accept_unresolved and (args.preview or args.yes):
         if args.preview and args.yes:
-            stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
+            stderr.write("ccnavi: --preview と --yes は同時に指定できません。\n")
             return EXIT_ERROR
         if not args.json or not args.result:
             stderr.write(
@@ -271,7 +271,9 @@ def _worktree(
         return EXIT_ERROR
     target = words[2]
     if not ticket_ids.is_valid_id(target):
-        stderr.write(f"ccnavi: worktree {verb} の {target!r} は識別子の形ではない\n")
+        stderr.write(
+            f"ccnavi: worktree {verb} の {target!r} は有効な識別子の形式ではありません。\n"
+        )
         return EXIT_ERROR
     if verb == "drop":
         code = worktrees.run_drop(stdout, stderr, root, target, cwd)
@@ -410,7 +412,9 @@ def sync_check(
         ("リポジトリ", repo or "self", _REPO_NAME),
     ):
         if not pattern.fullmatch(value) or ".." in value:
-            stderr.write(f"ccnavi: sync check の{name} {value!r} は識別子の形ではない\n")
+            stderr.write(
+                f"ccnavi: sync check の{name} {value!r} は有効な識別子の形式ではありません。\n"
+            )
             return 1
     problems = lint.family_check(conf, root, family, repo)
     stdout.write(SYNC_CHECK_HEAD + "\n")

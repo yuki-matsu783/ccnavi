@@ -1,7 +1,7 @@
 """フェーズ定義。共通レイヤーの `phases.yml` に、親の `project:` が指す config の `phases.yml` を
 足して読む。
 
-## 足し算
+## 統合結果
 
 使う定義は、共通レイヤー（`.ccnavi/config/common/phases.yml`）と、親の `project:` が指す
 レイヤー（空ならワークスペース自身）の config の和。共通レイヤーには、どのプロジェクトでも同じ
@@ -9,7 +9,7 @@
 レイヤーに置く。どちらが無くても正常（無い = 空）で、両方無いときだけ定義が無い。
 足すだけで、レイヤーが共通レイヤーの定義を上書きすることはない。同じ id で中身が違う定義と、
 `title` がレイヤーをまたいで重なる定義は error で、レイヤーの側のその定義だけを捨てる（`merge`）。
-定義は順序を持たないので、足し算で整合を取る欄は id と `title` だけ。
+定義は順序を持たないので、統合結果で整合を取る欄は id と `title` だけ。
 
 ## 定義はユーザが持つ
 
@@ -58,7 +58,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from ..infra import fsio, globmatch, settings, tree, yamlread
+from ..infra import globmatch, settings, tree, yamlread
 from ..policy import rules
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from . import ticket as ticket_mod
@@ -161,7 +161,6 @@ def load(path: str) -> tuple[PhaseTypes | None, list[Problem]]:
         with open(path, encoding="utf-8") as f:
             text = f.read()
     except FileNotFoundError:
-        fsio.note_read(path, None)
         return None, []
     except (OSError, ValueError) as exc:
         # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、破損した
@@ -169,8 +168,6 @@ def load(path: str) -> tuple[PhaseTypes | None, list[Problem]]:
         # 実行後チェック）が例外で異常終了し、読めない定義を「定義では切り詰めない」として
         # 扱う処理まで進まない。
         return None, [Problem(SEVERITY_ERROR, "(phases)", f"{path} を読めない ({exc})")]
-    # 承認のダイジェスト（read_set）に入れる。定義は待ち方と止め方を決める判定の入力。
-    fsio.note_read(path, text)
     return parse(text, path)
 
 

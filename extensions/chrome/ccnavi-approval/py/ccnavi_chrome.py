@@ -622,8 +622,7 @@ def records(
     - 親子のチケットの取り込み状態（`sync/self/families/<P>`）: ホストに在れば `present`、
       無ければ `gone`
 
-    先頭の sha と取り込んだ時刻は書かない。判定が読んだ中身（read_set）に入り、ダイジェストが
-    関係の無い push で変わるため。手元の試験も
+    先頭の sha と取り込んだ時刻は書かない。判定に要らず、手元の試験も
     これを state の置き場に書き、同じ取り込み状態で判定させる。
     """
     integ = snap["integration"]
@@ -756,7 +755,7 @@ def _op_board(req: dict, root: str) -> dict:
     body = first
     narrowed = bool(mine) and len(mine) != len(first["batch"])
     if narrowed:
-        # 画面の本文とダイジェストを、この親子のチケットの分だけで組み直す
+        # 画面の本文を、この親子のチケットの分だけで組み直す
         # （1 回の承認は 1 つの `P`）。
         code, body, err = _preview(root, mine)
         if body is None:
@@ -778,12 +777,7 @@ def _op_board(req: dict, root: str) -> dict:
         "reviewable": _reviewable(root, place, ident),
         "batch": batch,
         # 画面の本文は提案をツリーからの相対パスで出すので、手を加えずに返す。
-        # ダイジェストはこの本文と承認済みのチケットの中身を覆い、
-        # 手元の `--agree --preview` と同じ値になる。
         "text": body["text"] if batch else "",
-        "digest": body["digest"] if batch else "",
-        # 承認するときに `plan` へ渡す絞り。このダイジェストを出したときの絞りで、絞らなければ null
-        "only": mine if narrowed else None,
         "rejected": [
             {"ticket": r["ticket"], "problems": [_relative(root, p) for p in r["problems"]]}
             for r in first["rejected"]
@@ -1020,29 +1014,19 @@ def _changes(root: str, changes: core.Changes | None) -> dict:
 def _op_plan(req: dict, root: str) -> dict:
     """親子のチケット 1 つの承認で書くもの（judge → plan）。書かない。"""
     snap, place, family, _ = _family_tree(req, root)
-    only = req.get("only")
-    if only is not None and not (isinstance(only, list) and all(isinstance(i, str) for i in only)):
-        raise Refused("only は識別子のリスト")
-    shown = req.get("shown")
-    shown_ids = shown_digest = None
-    if shown is not None:
-        # 見せた一覧とダイジェスト。違えば書くものを出さず、preview からやり直させる。
-        ids = shown.get("ids") if isinstance(shown, dict) else None
-        digest = shown.get("digest") if isinstance(shown, dict) else None
-        if not (isinstance(ids, list) and all(isinstance(i, str) for i in ids)) or not (
-            isinstance(digest, str) and digest
-        ):
-            raise Refused("shown は見せた識別子のリスト（ids）とダイジェスト（digest）")
-        shown_ids, shown_digest = ids, digest
+    # 承認する識別子。この対象だけを、今の中身で手元の `--agree --yes` と同じ検査にかける。
+    ids = req.get("ids")
+    if not (isinstance(ids, list) and ids and all(isinstance(i, str) for i in ids)):
+        raise Refused("ids は承認する識別子のリスト（1 件以上）")
     _writable(snap, family)
     notes = io.StringIO()
     with _environ():
         snapshot = _core_snapshot(req, root)
         actor = snapshot.actor
         with history.session(actor.via or history.VIA_CHROME, notes, actor.account, actor.version):
-            verdict = core.judge_approval(snapshot, only, shown_ids, shown_digest)
+            verdict = core.judge_approval(snapshot, ids)
             refused = verdict.gathered.refused
-            ready = verdict.batch and not refused and verdict.mismatch is None
+            ready = verdict.batch and not refused and not core.approval_not_approvable(verdict, ids)
             changes = core.plan(snapshot, verdict) if ready else None
     _unwritten(root, notes.getvalue())
     body = _changes(root, changes)
@@ -1051,10 +1035,8 @@ def _op_plan(req: dict, root: str) -> dict:
         "family": family,
         "identifiers": verdict.identifiers,
         "text": verdict.screen_text,
-        "digest": verdict.digest,
-        "mismatch": verdict.mismatch,
-        # 通らなかった根拠の種別（`CORE_APPROVE_*`、手元の `--agree --yes` と同じ）。通れば null
-        "code": None if changes is not None else core.approval_refusal_code(verdict) or None,
+        # 通らなかった根拠の種別（`CORE_APPROVE_NOTHING`）。通れば null
+        "code": None if changes is not None else core.approval_refusal_code(verdict, ids) or None,
         "refused": _relative(root, refused),
         "rejected": [
             {"ticket": t.ticket, "problems": [_relative(root, str(p)) for p in complaints]}

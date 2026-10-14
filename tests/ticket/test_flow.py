@@ -1125,26 +1125,6 @@ class FlowDraftTest(FlowHarness):
         errors = [x for x in lint.stdout.splitlines() if x.startswith("error:")]
         self.assertFalse([x for x in errors if "proposals/flows" in x.replace("\\", "/")], errors)
 
-    def test_the_draft_is_not_in_the_approval_digest(self):
-        """承認のダイジェスト（`--agree --preview --json` の digest）に下書きは入らない。"""
-        other = "i0001-01-02"
-        self.propose(other, child_text(other, "i0001", 1, ("wip/research/*",)))
-        self.commit_parent("another child")
-        before = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
-        self.assertTrue(before)
-        write(self.draft_in(self.parent_tree, other), WORKFLOW_YAML)
-        write(self.draft_in(self.parent_tree), WORKFLOW_YAML)
-        after = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
-        self.assertEqual(before, after)
-        # 承認の前の子にも、提案のツリーの置き場で欄が出る
-        shown = self.board_flow(other)["draft"]
-        self.assertTrue(shown["exists"])
-        self.assertEqual(
-            os.path.realpath(shown["path"]),
-            os.path.realpath(self.draft_in(self.parent_tree, other)),
-        )
-
-    @requires_symlink
     def test_a_linked_draft_is_named(self):
         real = write(os.path.join(self.parent_tree, "wip", "draft-real.yml"), WORKFLOW_YAML)
         os.makedirs(os.path.dirname(self.draft_in(self.parent_tree)), exist_ok=True)

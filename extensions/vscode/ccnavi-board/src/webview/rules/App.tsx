@@ -628,7 +628,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           );
         })}
         {touring ? (
-          // 案内の間の見本は鍵を替えて別に作る（閉じたあとの実際の枠に、案内で選んだ足し算を持ち越さない）
+          // 案内の間の見本は鍵を替えて別に作る（閉じたあとの実際の枠に、案内で選んだ統合結果を持ち越さない）
           <Sum
             sums={SAMPLE.sums}
             initial={defaultSum(SAMPLE.sums, undefined)}

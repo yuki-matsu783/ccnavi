@@ -1,7 +1,7 @@
 """設定の受入テスト。phases も risk も共通 + 1 レイヤーの和。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。
-土台の共通レイヤーは phases を持たない（足し算を見るテストが自分で置く）。自身のレイヤーに
+土台の共通レイヤーは phases を持たない（統合結果を見るテストが自分で置く）。自身のレイヤーに
 `docs`、lib のレイヤーに `design` / `build` / `release` がある。
 risk は共通レイヤーに `big-diff`、lib のレイヤーに `schema` と `levels: {critical: 50}` がある。
 
@@ -192,7 +192,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertTrue(any("設計" in p["detail"] for p in errors), errors)
 
     def test_identical_types_in_two_layers_are_both_kept(self):
-        """全欄一致でも後ろを捨てない（info も出ない）。足し算が無いので重複が起きない。"""
+        """全欄一致でも後ろを捨てない（info も出ない）。統合結果が無いので重複が起きない。"""
         write_layer(self.lib, phases=LIB_PHASES_COPIED)
 
         self.assertEqual(self.phase_problems("error"), [])

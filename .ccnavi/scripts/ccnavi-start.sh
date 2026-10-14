@@ -358,10 +358,10 @@ stop_host() {
 	fi
 	if [ "$ccnavi_h_kind" = github ]; then
 		case "$sh_stage" in
-		search) printf 'ccnavi-start: GitHub の API に届かず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作らずに止めた。MCP（mcp__github__のツール）で代行してください。\n' "$what" "$number" "$sh_why" ;;
-			title) printf 'ccnavi-start: GitHub の API に届かず、issue #%s の題を読めなかった（%s）。slug を決められないので、何も作らずに止めた。MCP（mcp__github__のツール）で代行してください。\n' "$number" "$sh_why" ;;
-		merged) printf 'ccnavi-start: GitHub の API に届かず、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作らずに止めた。MCP（mcp__github__のツール）で代行してください。\n' "$stop_branch" "$sh_why" ;;
-		*) printf 'ccnavi-start: GitHub の API に届かず、マージリクエストを作れなかった（%s）。MCP（mcp__github__のツール）で代行してください。\n' "$sh_why" ;;
+		search) printf 'ccnavi-start: GitHub APIに接続できず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$what" "$number" "$sh_why" ;;
+		title) printf 'ccnavi-start: GitHub APIに接続できず、issue #%s の題を読めなかった（%s）。slug を決められないので、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$number" "$sh_why" ;;
+		merged) printf 'ccnavi-start: GitHub APIに接続できず、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$stop_branch" "$sh_why" ;;
+		*) printf 'ccnavi-start: GitHub APIに接続できず、マージリクエストを作れなかった（%s）。MCP（mcp__github__のツール）で代行してください。\n' "$sh_why" ;;
 		esac
 		printf '完了済みの処理:\n'
 		if [ "$sh_stage" = create ]; then
@@ -401,10 +401,10 @@ stop_host() {
 		esac
 	else
 		case "$sh_stage" in
-		search) printf 'ccnavi-start: GitLab の API に届かず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作らずに止めた。\n' "$what" "$number" "$sh_why" ;;
-			title) printf 'ccnavi-start: GitLab の API に届かず、issue #%s の題を読めなかった（%s）。slug を決められないので、何も作らずに止めた。\n' "$number" "$sh_why" ;;
-		merged) printf 'ccnavi-start: GitLab の API に届かず、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作らずに止めた。\n' "$stop_branch" "$sh_why" ;;
-		*) printf 'ccnavi-start: GitLab の API に届かず、マージリクエストを作れなかった（%s）。\n' "$sh_why" ;;
+		search) printf 'ccnavi-start: GitLab APIに接続できず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作成せずに処理を中断しました。\n' "$what" "$number" "$sh_why" ;;
+		title) printf 'ccnavi-start: GitLab APIに接続できず、issue #%s の題を読めなかった（%s）。slug を決められないので、何も作成せずに処理を中断しました。\n' "$number" "$sh_why" ;;
+		merged) printf 'ccnavi-start: GitLab APIに接続できず、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作成せずに処理を中断しました。\n' "$stop_branch" "$sh_why" ;;
+		*) printf 'ccnavi-start: GitLab APIに接続できず、マージリクエストを作れなかった（%s）。\n' "$sh_why" ;;
 		esac
 		printf '完了済みの処理:\n'
 		if [ "$sh_stage" = create ]; then
@@ -788,7 +788,7 @@ fi
 
 if [ "$total" -gt 1 ]; then
 	show_list
-	printf 'ccnavi-start: 候補が %s 件ある。何も作らずに止めた。ユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞いて、返事を待ってください。\n' "$total"
+	printf 'ccnavi-start: 候補が %s 件見つかったため、何も作成せずに処理を中断しました。ユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞いて、返事を待ってください。\n' "$total"
 	log_info 候補が複数 -- "total=$total"
 	exit "$EXIT_MULTI"
 fi
@@ -806,7 +806,7 @@ if [ "$total" -eq 0 ]; then
 		host_rc=0
 		host_open || host_rc=$?
 		if [ "$host_rc" -eq 1 ]; then
-			fail host-unreadable "ホストを見られず（${host_reason}）、origin も読めない（${host_why}）。既存の MR を見落として重複を作らないため、何も作らずに止めた。"
+			fail host-unreadable "ホストを見られず（${host_reason}）、origin も読めない（${host_why}）。既存の MR を見落として重複を作らないため、何も作成せずに処理を中断しました。"
 		fi
 		stop_host search "${host_reason:-$host_why}"
 	fi
@@ -835,7 +835,7 @@ if [ "$total" -eq 0 ]; then
 				stop_host title "$(api_failed_reason)"
 			fi
 		fi
-		fail no-slug "issue の題から slug を作れない（ASCII の語がありません）。--slug <語> を付けて再実行してください。" 2
+		fail no-slug "Issueのタイトルからブランチ名用のslugを生成できませんでした（使用可能なASCII英数字がありません）。--slug <語> を付けて再実行してください。" 2
 	fi
 	new_branch="${opt_prefix}-${number}-${slug}"
 	ccnavi_is_branch "$new_branch" || fail bad-branch "ブランチ名 ${new_branch} は使えない書き方です（--prefix・--slug を見直してください）。" 2
@@ -875,7 +875,7 @@ c_state=$(jq -r '[.candidates[0].mrs[]?.state][0] // ""' "$cand_json")
 if [ "$c_local" != true ] && [ "$c_origin" != true ] && [ "$c_mrs" -eq 0 ]; then
 	# どこにも実体が無い（チケットの提案だけ）。ユーザが決める
 	show_list
-	printf 'ccnavi-start: 候補 %s は、手元にも origin にも MR にも実体がありません（チケットの提案だけ）。何も作らずに止めた。ユーザに確かめてください。\n' "$cb"
+	printf 'ccnavi-start: 候補 %s は、手元にも origin にも MR にも実体がありません（チケットの提案だけ）。何も作成せずに処理を中断しました。ユーザに確かめてください。\n' "$cb"
 	exit "$EXIT_MULTI"
 fi
 # 既存の MR を採用するときの確認。引っかかったら止める
@@ -900,7 +900,7 @@ if [ "$what" = issue ] && [ -z "$unchecked" ] && [ "$c_mrs" -eq 0 ]; then
 			c_subject=$(git log -1 --format=%s "$cref" 2>/dev/null || :)
 			if [ "$c_ahead" -eq 0 ]; then
 				show_list
-				printf 'ccnavi-start: 候補 %s は、統合先 %s より進んでおらず、開いた MR もありません（取り込み済みで消し忘れた古いブランチかもしれない）。何も作らずに止めた。ユーザに見せ、このブランチを使うか・新しく切るか・やめるかを聞いて、返事を待ってください。\n' "$cb" "$integration"
+				printf 'ccnavi-start: 候補 %s は、統合先 %s より進んでおらず、開いた MR もありません（取り込み済みで消し忘れた古いブランチかもしれない）。何も作成せずに処理を中断しました。ユーザに見せ、このブランチを使うか・新しく切るか・やめるかを聞いて、返事を待ってください。\n' "$cb" "$integration"
 				log_info 古いブランチらしい -- "branch=$cb"
 				exit "$EXIT_MULTI"
 			fi

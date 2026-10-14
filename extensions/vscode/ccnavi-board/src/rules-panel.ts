@@ -14,8 +14,8 @@
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[]`）を使い、拡張は組まない。
  * ファイルが無いのは「設定が無い」正常な状態で、空として出す（保存でファイルを作る）。
- * 編集する 1 本とは別に、読み取り専用の足し算（共通の設定 + ワークスペース、共通の設定 + 各プロジェクト。`sums[]`）を出す。
- * 足し算は実行ファイルが出した結果で、拡張は判定も合成もしない。
+ * 編集する 1 本とは別に、読み取り専用の統合結果（共通の設定 + ワークスペース、共通の設定 + 各プロジェクト。`sums[]`）を出す。
+ * 統合結果は実行ファイルが出した結果で、拡張は判定も合成もしない。
  *
  * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、共通の設定なら `--rules`、
  * ワークスペースかプロジェクトの設定なら `--project-rules-file <名前>=<パス>`（ワークスペースの設定は名前が `self`）で渡す。保存は、検証（`--lint`）を通り、
@@ -67,7 +67,7 @@ interface Loaded {
   readonly notices: readonly string[];
   /** 切り替えられる対象（共通・ワークスペース・設定のあるプロジェクト） */
   readonly targets: readonly TargetOption[];
-  /** 読み取り専用の足し算（実行ファイルの `sums[]`） */
+  /** 読み取り専用の統合結果（実行ファイルの `sums[]`） */
   readonly sums: readonly RulesSum[];
   readonly hooks: readonly HookEntry[];
   readonly hookFiles: { readonly settings: boolean; readonly settingsLocal: boolean };
@@ -835,7 +835,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   }
   if (!lint.value.ok) {
     // 苦情は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
-    fail(current, `--lint が error を報告しました。直してから保存してください:\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
+    fail(current, `設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください:\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
     return;
   }
 

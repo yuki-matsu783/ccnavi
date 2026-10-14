@@ -49,6 +49,7 @@ const TOKENS = new Map([
 const TODO = "wip/proposals/todo/i0001.md";
 const CHILD = "wip/proposals/todo/i0001-01-01.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
+const DONE = ".ccnavi/approved/done/i0001.md";
 const EVENTS = ".ccnavi/approved/events/i0001.ndjson";
 
 function glDeps(mock: MockGitHub, host = "gitlab.com", now: () => Date = () => new Date(NOW)): WriteDeps {
@@ -74,8 +75,8 @@ function parentOnly(): Record<string, FixtureBranch> {
 
 function shownOf(b: RepoBoard, family: string) {
   const r = b.families.find((f) => f.family.name === family)?.result;
-  assert.ok(r?.digest, b.error);
-  return { ids: (r.batch ?? []).map((e) => e.ticket), digest: r.digest, only: r.only ?? null };
+  assert.ok(r?.batch, b.error);
+  return (r.batch ?? []).map((e) => e.ticket);
 }
 
 async function start(mock: MockGitHub, host = "gitlab.com", repo = GITLAB_REPO, now?: () => Date) {
@@ -86,8 +87,8 @@ async function start(mock: MockGitHub, host = "gitlab.com", repo = GITLAB_REPO, 
 test("CX-T161 GitLab で応答が返らず、その上に無関係な書き込みが積まれても、自分のコミットを中身と親の組で見分けて事後確認する（PROBE-2）", async () => {
   const mock = new MockGitLab(parentOnly());
   const { d, shown } = await start(mock);
-  // 書く直前に判定の変わる書き込み（子の提案）が入り、応答が返らず、その後に無関係なコードが積まれる
-  mock.beforeCommit = (b) => void mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み X");
+  // 書く直前に判定の変わる書き込み（親が完了済みになる）が入り、応答が返らず、その後に無関係なコードが積まれる
+  mock.beforeCommit = (b) => void mock.push(b, { [DONE]: mock.files(b)[TODO] }, "割り込み X");
   mock.loseCommitResponse = true;
   let pushed = false;
   mock.onRequest = (method, u) => {
@@ -97,13 +98,14 @@ test("CX-T161 GitLab で応答が返らず、その上に無関係な書き込�
     }
   };
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
-  assert.equal(out.kind, "changed", JSON.stringify(out));
+  assert.equal(out.kind, "refused", JSON.stringify(out));
+  assert.equal(out.kind === "refused" && out.code, "CORE_APPROVE_NOTHING");
   assert.deepEqual(mock.glCommits.map((c) => [c.result, c.message.split("\n")[0]]), [
     ["written", "ccnavi: i0001 を承認（Chrome 拡張 9.9.9）"],
     ["written", "ccnavi: i0001 への書き込みを元に戻す（Chrome 拡張 9.9.9）"],
   ]);
   const files = mock.files("i0001");
-  assert.ok(!(DOING in files) && TODO in files && CHILD in files && "src/zzz.py" in files);
+  assert.ok(!(DOING in files) && TODO in files && DONE in files && "src/zzz.py" in files);
 });
 
 test("CX-T162 GitHub で応答が返らず、その上に無関係な書き込みが積まれても、親が読んだ先頭の自分のコミットだけを受け直す（PROBE-3）", async () => {
@@ -157,7 +159,7 @@ test("CX-T164 事後確認は周ごとに 1 つの時刻で判定し直す。時
 test("CX-T165 事後確認の途中でホストが動かなくなったら、書いたが確認できなかったとしてユーザの対応に切り替える（失敗とは文面を分ける）", async () => {
   const mock = new MockGitLab(parentOnly());
   const { d, shown } = await start(mock);
-  mock.beforeCommit = (b) => void mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み");
+  mock.beforeCommit = (b) => void mock.push(b, { [DONE]: mock.files(b)[TODO] }, "割り込み");
   mock.onRequest = (method, u) => {
     if (mock.glCommits.length === 1 && method === "GET" && u.pathname.endsWith("/repository/tree")) throw new Error("502 Bad Gateway");
   };
@@ -261,9 +263,10 @@ test("CX-T171 元に戻すコミットはバイト列のまま戻す（BOM も�
   f.i0001.files[EVENTS] = original;
   const mock = new MockGitLab(f);
   const { d, shown } = await start(mock);
-  mock.beforeCommit = (b) => void mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み");
+  mock.beforeCommit = (b) => void mock.push(b, { [DONE]: mock.files(b)[TODO] }, "割り込み");
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
-  assert.equal(out.kind, "changed", JSON.stringify(out));
+  assert.equal(out.kind, "refused", JSON.stringify(out));
+  assert.equal(out.kind === "refused" && out.code, "CORE_APPROVE_NOTHING");
   assert.equal(mock.glCommits.length, 2);
   assert.equal(mock.files("i0001")[EVENTS], original);
 });
@@ -311,7 +314,7 @@ test("CX-T174 応答が返らなかった後の確かめや、書いた後の確
 test("CX-T175 元に戻すコミットを送る前の確認で先頭が動いた（412。何も送っていない）なら、上限の範囲で読み直して元に戻し直す", async () => {
   const mock = new MockGitLab(parentOnly());
   const { d, shown } = await start(mock);
-  mock.beforeCommit = (b) => void mock.push(b, { [CHILD]: fixture().i0001.files[CHILD] }, "割り込み");
+  mock.beforeCommit = (b) => void mock.push(b, { [DONE]: mock.files(b)[TODO] }, "割り込み");
   const statuses: (number | undefined)[] = [];
   let commits = 0;
   const call = d.call;
@@ -328,7 +331,8 @@ test("CX-T175 元に戻すコミットを送る前の確認で先頭が動いた
     },
   };
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, wrapped);
-  assert.equal(out.kind, "changed", JSON.stringify(out));
+  assert.equal(out.kind, "refused", JSON.stringify(out));
+  assert.equal(out.kind === "refused" && out.code, "CORE_APPROVE_NOTHING");
   assert.deepEqual(statuses, [gl.HOST_MOVED]);
   assert.deepEqual(mock.glCommits.map((c) => [c.result, c.message.split("\n")[0]]), [
     ["written", "ccnavi: i0001 を承認（Chrome 拡張 9.9.9）"],

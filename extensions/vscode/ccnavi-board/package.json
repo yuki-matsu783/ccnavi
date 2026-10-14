@@ -1,7 +1,7 @@
 {
   "name": "ccnavi-board",
   "displayName": "ccnavi ボード",
-  "description": "ccnavi のチケットと、それに付随する提案・承認済みチケット・マーカー・ワークツリーをカンバンで表示します。承認する内容をオーバーレイで確認して承認でき、承認の文とレビュー済みの連絡を Claude Code に渡せます。ルールと hook を画面で確認し、ルールを直して判定を試せます。実績で測るリスクの配点とフェーズ定義も画面で直せます。projects/ のプロジェクトを一覧し、git clone をターミナルに送れます。ルール管理とリスク管理では共通・ワークスペース・プロジェクトの設定を、フェーズ管理ではワークスペース・プロジェクトの設定を切り替えて直せます。テンプレート管理では、作業・レビュー計画のテンプレートと下書きを表示し、下書きを取り込めます。ルールとリスクでは、共通の設定との足し算も読み取り専用で確認できます。",
+  "description": "ccnavi のチケットと、それに付随する提案・承認済みチケット・マーカー・ワークツリーをカンバンで表示します。承認する内容をオーバーレイで確認して承認でき、承認結果やレビュー完了の通知を Claude Code に送れます。ルールと hook を画面で確認し、ルールを直して判定を試せます。実際の変更内容に基づくリスク評価の配点や、フェーズ定義も画面で編集できます。projects/ のプロジェクトを一覧し、git clone をターミナルに送れます。ルール管理とリスク管理では共通・ワークスペース・プロジェクトの設定を、フェーズ管理ではワークスペース・プロジェクトの設定を切り替えて直せます。テンプレート管理では、作業・レビュー計画のテンプレートと下書きを表示し、下書きを取り込めます。ルールとリスクでは、共通の設定との統合結果も読み取り専用で確認できます。",
   "version": "0.11.21",
   "publisher": "local",
   "private": true,
@@ -113,7 +113,7 @@
         "ccnaviBoard.binPath": {
           "type": "string",
           "default": "",
-          "description": "ccnavi の実行ファイルのパスです。空のときは .claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.sh の順に探し、どれも無く、src/ccnavi/__main__.py があれば uv run python -m ccnavi を使います。振り分けの sh（ccnavi-launcher.sh）を指定したときは、sh を通さず、sh のあるフォルダの親の bin/<os>-<arch>/ にある、この OS と CPU 向けの実行ファイルを使います。それが無ければ次の候補へ進みます。ほかのパスは、そのまま実行ファイルとして使います。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
+          "description": "ccnavi の実行ファイルのパスです。空のときは .claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.sh の順に探し、どれも無く、src/ccnavi/__main__.py があれば uv run python -m ccnavi を使います。起動スクリプト（ccnavi-launcher.sh）を指定した場合は、スクリプトを実行せず、sh のあるフォルダの親の bin/<os>-<arch>/ にある、この OS と CPU 向けの実行ファイルを使います。それが無ければ次の候補へ進みます。ほかのパスは、そのまま実行ファイルとして使います。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
         },
         "ccnaviBoard.bashPath": {
           "type": "string",
@@ -123,7 +123,7 @@
         "ccnaviBoard.expectationsPath": {
           "type": "string",
           "default": ".ccnavi/config/common/rule-expectations.yml",
-          "description": "ルール管理画面の「期待する判定を一括で確認する」で使う期待する判定のファイルです（deny / ask / allow のタイプに tool と subject を並べた YAML）。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
+          "description": "ルール管理画面の「期待する判定を一括で確認する」で使用するテストケースのYAMLファイルです（deny / ask / allow のタイプに tool と subject を並べた YAML）。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
         },
         "ccnaviBoard.flowSaveReview": {
           "type": "boolean",

@@ -47,17 +47,15 @@ class ChromeWriteHarness(CoreHarness):
         )
 
     def preview(self, family="i0001"):
-        body = self.answer(self.chrome_request("plan", family))
-        self.assertNotIn("error", body, body)
-        return body
+        """ボードが見せる承認待ちの識別子（承認では、これを `ids` に渡す）。"""
+        board = self.answer(self.chrome_request("board", family))
+        self.assertNotIn("error", board, board)
+        return {"identifiers": sorted(e["ticket"] for e in board.get("batch", []))}
 
     def plan(self, family="i0001", **extra):
         first = self.preview(family)
-        shown = {"ids": first["identifiers"], "digest": first["digest"]}
         return self.answer(
-            self.chrome_request(
-                "plan", family, only=first["identifiers"], shown=shown, actor=ACTOR, **extra
-            )
+            self.chrome_request("plan", family, ids=first["identifiers"], actor=ACTOR, **extra)
         )
 
     def apply(self, changes, tree):
@@ -92,7 +90,7 @@ class RecordsTest(ChromeWriteHarness):
         )
         self.propose("i0001-01-01", child)
         self.commit_parent()
-        request = self.chrome_request("plan", "i0001")
+        request = self.chrome_request("plan", "i0001", ids=["i0001-01-01"])
         request["snapshot"]["absent"] = ["i0009"]
         self.mirror_records(load_chrome(), request)
         body = self.answer(request)
@@ -114,7 +112,7 @@ class RecordsTest(ChromeWriteHarness):
     def test_an_unreadable_input_stops_the_board_and_the_plan(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
-        request = self.chrome_request("plan", "i0001")
+        request = self.chrome_request("plan", "i0001", ids=["i0001"])
         request["snapshot"]["branches"]["main"]["binary"] = [".ccnavi/approved/done/x.md"]
         self.assertIn("判定できません", self.answer(request)["error"])
         board = self.answer({**request, "op": "board"})
@@ -132,44 +130,54 @@ class WriteGuardTest(ChromeWriteHarness):
         self.assertFalse(board["write"]["allowed"])
         self.assertIn("拡張を更新してください。", board["write"]["reason"])
         self.assertEqual([e["ticket"] for e in board["batch"]], ["i0001"])
-        shown = {"ids": first["identifiers"], "digest": first["digest"]}
-        refused = self.answer(self.chrome_request("plan", "i0001", shown=shown))
+        refused = self.answer(self.chrome_request("plan", "i0001", ids=first["identifiers"]))
         self.assertIn("互換", refused["error"])
         withdraw = self.answer(
             self.chrome_request("withdraw", "i0001", ids=["i0001"], prior={"i0001": "x"})
         )
         self.assertIn("互換", withdraw["error"])
 
-    def test_a_different_digest_writes_nothing(self):
+    def test_a_proposal_changed_after_the_preview_is_approved_as_it_is_now(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         first = self.preview()
-        shown = {"ids": first["identifiers"], "digest": "0" * 64}
-        body = self.answer(self.chrome_request("plan", "i0001", shown=shown))
-        self.assertIsNotNone(body["mismatch"])
-        self.assertIsNone(body["changes"])
-        self.assertEqual(body["code"], "CORE_APPROVE_DIGEST_CHANGED")
-        # 見せた識別子が今の一覧と違えば、中身より先にそちらの種別
-        shown = {"ids": ["i0001", "i0002"], "digest": first["digest"]}
-        body = self.answer(self.chrome_request("plan", "i0001", shown=shown))
-        self.assertIsNone(body["changes"])
-        self.assertEqual(body["code"], "CORE_APPROVE_LIST_CHANGED")
-        # 見せた後に提案が変われば、同じダイジェストでも書かない
+        # 見せた後に提案が変わっても、今の内容が有効なら書く（表示時点との一致は見ない）
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.commit_parent()
-        shown = {"ids": first["identifiers"], "digest": first["digest"]}
-        body = self.answer(self.chrome_request("plan", "i0001", shown=shown))
-        self.assertIsNotNone(body["mismatch"])
+        body = self.answer(self.chrome_request("plan", "i0001", ids=first["identifiers"]))
+        self.assertNotIn("error", body, body)
+        self.assertIsNotNone(body["changes"])
+        self.assertIsNone(body["code"])
+        copy = next(
+            r
+            for rows in body["changes"].values()
+            for r in rows
+            if r["path"].endswith("doing/i0001.md")
+        )
+        self.assertIn("design", copy["content"])
+
+    def test_an_identifier_that_is_not_pending_writes_nothing(self):
+        self.propose("i0001", parent_text("i0001", ["research"]))
+        self.commit_parent()
+        body = self.answer(self.chrome_request("plan", "i0001", ids=["i0001", "i0002"]))
         self.assertIsNone(body["changes"])
-        self.assertEqual(body["code"], "CORE_APPROVE_DIGEST_CHANGED")
+        self.assertEqual(body["code"], "CORE_APPROVE_NOTHING")
+
+    def test_plan_without_identifiers_is_refused(self):
+        self.propose("i0001", parent_text("i0001", ["research"]))
+        self.commit_parent()
+        for request in (
+            self.chrome_request("plan", "i0001"),
+            self.chrome_request("plan", "i0001", ids=[]),
+        ):
+            self.assertIn("ids", self.answer(request)["error"])
 
     def test_nothing_to_approve_carries_its_reason_code(self):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        body = self.answer(self.chrome_request("plan", "i0001"))
+        body = self.answer(self.chrome_request("plan", "i0001", ids=["i0001"]))
         self.assertIsNone(body["changes"])
-        self.assertIsNone(body["mismatch"])
         self.assertEqual(body["code"], "CORE_APPROVE_NOTHING")
 
     def test_writes_only_to_the_parent_branch(self):
@@ -197,7 +205,6 @@ class WrittenCopyTest(ChromeWriteHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         body = self.plan()
-        self.assertIsNone(body["mismatch"])
         self.assertIsNone(body["code"])
         self.assertEqual(sorted(body["changes"]), ["i0001"])
         events = next(
@@ -305,7 +312,7 @@ class EntryDetailTest(ChromeWriteHarness):
         self.commit_parent()
         self.compat(version.COMPAT + 1)
         for op, extra in (
-            ("plan", {}),
+            ("plan", {"ids": ["i0001"]}),
             ("withdraw", {"ids": ["i0001"], "prior": {}}),
             ("confirm", {"phase": 1, "result": {"host": "h", "mr": {"number": 1, "url": "u"}}}),
         ):
@@ -345,6 +352,6 @@ class ProjectTest(ChromeWriteHarness):
         )
         self.propose("i0001", text)
         self.commit_parent()
-        body = self.preview()
-        self.assertEqual(body["identifiers"], [])
+        self.assertEqual(self.preview()["identifiers"], [])
+        body = self.answer(self.chrome_request("board", "i0001"))
         self.assertEqual([r["ticket"] for r in body["rejected"]], ["i0001"])

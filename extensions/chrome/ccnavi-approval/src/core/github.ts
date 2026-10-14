@@ -699,7 +699,7 @@ export async function pullReviews(client: Client, owner: string, repo: string, n
  */
 export async function reviewCopy(client: Client, owner: string, repo: string, branch: string): Promise<ReviewCopy> {
   const mr = await openPull(client, owner, repo, branch);
-  if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する、未クローズのマージリクエストがありません`);
+  if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する、オープン状態のマージリクエストがありません`);
   const threads = await reviewThreads(client, owner, repo, mr.number);
   const reviews = await pullReviews(client, owner, repo, mr.number);
   return { host: "github", mr, threads, reviews, fetched_at: new Date().toISOString() };

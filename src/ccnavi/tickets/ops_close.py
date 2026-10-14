@@ -364,6 +364,17 @@ def deliverables_missing(
 
 
 def _tracked(worktree: str, glob: str) -> bool:
-    """この glob に当たる追跡済みのファイルが 1 つでもあるか。ワークツリーが無ければ無い。"""
-    rc, out = gitcmd.output(worktree, ["ls-files", "--", glob], TIMEOUT_SECONDS)
-    return rc == 0 and bool(out.strip())
+    """この glob に当たる追跡済みで、作業ツリーにも在るファイルが 1 つでもあるか。
+
+    ワークツリーが無ければ無い。`ls-files` はインデックスを見るので、追跡済みのファイルを
+    消しても `git add` するまでは名前が返る。作業ツリーから消えたもの（`--deleted`）を除く。
+    名前は同じ読み方の 2 つの出力どうしで比べ、ファイルシステムには聞かない（非 UTF-8 の名前を
+    置換文字で読んでも食い違わない）。
+    """
+    rc, out = gitcmd.output(worktree, ["ls-files", "-z", "--", glob], TIMEOUT_SECONDS)
+    if rc != 0:
+        return False
+    rc, gone = gitcmd.output(worktree, ["ls-files", "-z", "--deleted", "--", glob], TIMEOUT_SECONDS)
+    if rc != 0:
+        return False
+    return bool(set(filter(None, out.split("\0"))) - set(filter(None, gone.split("\0"))))

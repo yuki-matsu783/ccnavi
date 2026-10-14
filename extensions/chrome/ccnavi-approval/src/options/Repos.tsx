@@ -94,7 +94,7 @@ export function Repos({ revision }: { readonly revision: number }): JSX.Element 
           <input name="integration" type="text" placeholder="未入力の場合はデフォルトブランチ" />
         </label>
         <label className="field">
-          <span className="cap">直近の日数（表示用）</span>
+          <span className="cap">表示対象のブランチを検索する期間（過去N日）</span>
           <input name="recentDays" type="number" min="0" max="90" defaultValue="7" className="num" />
         </label>
         <label className="field">
@@ -127,11 +127,11 @@ export function Repos({ revision }: { readonly revision: number }): JSX.Element 
       </form>
       <Status id="repo-msg" said={said} />
       <p className="hint">
-        直近の日数と指定のブランチは、承認待ちを見つけるのに使うだけです。判定には、統合先ブランチ、親チケットのブランチ、および先行チケットの依存関係をたどった先の親ブランチのみを使用します。見せ方の設定で判定の答えが変わらないようにするためです。
+        検索期間と追加表示するブランチの設定は、承認待ちのチケットを検索するためにのみ使用します。判定には、統合先ブランチ、親チケットのブランチ、および先行チケットの依存関係をたどった先の親ブランチのみを使用します。表示条件によって承認可否の判定結果が変わることはありません。
       </p>
       <p className="hint">
         {
-          "プロジェクトのリポジトリ（手元で projects/<名前> に clone するもの）を登録するときは、プロジェクト名を入れ、先に登録したワークスペースのリポジトリを選びます。共通レイヤー・設定・互換のマーカーは、ワークスペースの統合先から取得します。置き場のパスは既定（wip/proposals・.ccnavi/approved）に固定で、.claude/settings.json の env では変更できません。GitLab の入れ子のグループは、「オーナー／グループ」欄に group/sub の形式で入力してください。"
+          "プロジェクトのリポジトリ（ローカルの projects/<名前> にクローンするリポジトリ）を登録するときは、プロジェクト名を入れ、先に登録したワークスペースのリポジトリを選びます。共通レイヤー、設定ファイル、互換性確認用のマーカーは、ワークスペースの統合先から取得します。保存先のパスは既定値（wip/proposals・.ccnavi/approved）に固定されており、.claude/settings.json の env では変更できません。GitLab の入れ子のグループは、「オーナー／グループ」欄に group/sub の形式で入力してください。"
         }
       </p>
     </section>

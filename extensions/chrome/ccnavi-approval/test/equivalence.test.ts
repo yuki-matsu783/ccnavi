@@ -57,6 +57,17 @@ test("CX-T061 判定のコアの見本（承認・マーカーの消去・改版
   }
 });
 
+test("CX-T061b 指した識別子に検査を通らないものが 1 つでもあれば、全体を拒否する（残りだけ承認しない）", async () => {
+  const pyodide = await pyodidePy();
+  const file = path.join(HERE, "test", "fixtures", "core-scenarios.json");
+  const scenarios = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, { request: Record<string, unknown> }>;
+  const request = { ...scenarios.predecessors.request, ids: ["i0003-01-01", "i0003-01-02"] };
+  const answer = await pyodide.call(request);
+  assert.equal(answer.changes, null);
+  assert.equal(answer.code, "CORE_APPROVE_NOTHING");
+  assert.equal((answer.rejected as { ticket: string }[]).map((r) => r.ticket).join(), "i0003-01-02");
+});
+
 test("CX-T062 承認と取り下げで Python に投げた要求（plan・withdraw を含む）すべてに、Pyodide と手元の CPython が同じ答えを返す", { skip: native === null ? "uv が無い" : false }, async () => {
   const pyodide = await pyodidePy();
   const log: { req: Record<string, unknown>; res: Record<string, unknown> }[] = [];
@@ -73,7 +84,7 @@ test("CX-T062 承認と取り下げで Python に投げた要求（plan・withdr
   const d = { call: hostCall(deps(mock, new Map([["github.com", TOKEN]])), stats), py: spy, cache: memoryCache(), now: () => new Date(NOW), stats, version: "9.9.9" };
   const board = await collectRepo(repo, d);
   const r = board.families.find((f) => f.family.name === "i0001")?.result;
-  const shown = { ids: (r?.batch ?? []).map((e) => e.ticket), digest: r?.digest ?? "", only: r?.only ?? null };
+  const shown = (r?.batch ?? []).map((e) => e.ticket);
   assert.equal((await approveFamily(repo, "i0001", shown, d)).kind, "written");
   assert.equal((await withdrawTicket(repo, "i0001", "i0001", "押し間違い", d)).kind, "written");
   const ops = new Set(log.map((l) => l.req.op));

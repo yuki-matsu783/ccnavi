@@ -48,6 +48,7 @@ STUB = """#!/bin/sh
 [ -n "${STUB_TREE:-}" ] || exit 0
 mkdir -p "$STUB_TREE/.ccnavi/approved/doing"
 printf 'approved\\n' > "$STUB_TREE/.ccnavi/approved/doing/i0001.md"
+exit "${STUB_AFTER_EXIT:-0}"
 """
 
 
@@ -841,6 +842,7 @@ class ApproveCarriesTest(Workspace):
         self.assertIn(NOTHING, result.stdout)
 
     def test_failed_approval_carries_nothing(self):
+        """何も置かれなかった承認の失敗では、無関係な未コミットの承認済みチケットも含めて送らない。"""
         tree = self.worktree("i0001")
         self.place(tree)
         before = self.head(tree)
@@ -848,6 +850,19 @@ class ApproveCarriesTest(Workspace):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertEqual(self.head(tree), before)
         self.assertEqual(self.remote_head("i0001"), "")
+
+    def test_partial_approval_still_carries_what_was_placed(self):
+        """一部だけ通って非 0 で終わっても、置かれた分はコミットして push する。終了コードは 1。
+
+        親は承認済みとして残り、子の書き込みだけ失敗した形。送らないと他のマシンに届かない。
+        """
+        tree = self.worktree("i0001")
+        result = self.approve(STUB_TREE=tree, STUB_AFTER_EXIT="4")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(self.subject(tree), MESSAGE)
+        self.assertEqual(self.committed(tree), [f"{APPROVED}/i0001.md"])
+        self.assertEqual(self.remote_head("i0001"), self.head(tree))
+        self.assertIn("承認の一部だけが通った", result.stderr)
 
     def test_failed_push_does_not_fail_the_approval(self):
         """コミットや push の失敗で承認が失敗に見えないように、承認が通れば 0。コミットは残る。"""

@@ -205,12 +205,12 @@ carry_family() {
 			grep -F -x -q -- "$cf_head${tab}refs/heads/$cf_b" "$ccnavi_c1_tmp/ls"; }; then
 		ccnavi_record_write "$cf_record" remote origin branch "$cf_b" sha "$cf_head" \
 			fetched_at "$(ccnavi_record_get "$cf_record" fetched_at)" state present reason "" || :
-		printf '承認済みチケットを、取り込んでから %s へ送った。\n' "$cf_b"
+		printf '承認済みチケットを取り込んだうえで、ブランチ %s にpushしました。\n' "$cf_b"
 		ccnavi_lock_drop
 		return 0
 	fi
 	# 失敗してもコミットは残す（ユーザが打ち直せる）。C1 は未送信を見つけて止まり、これを打ち直すよう言う。
-	printf 'ccnavi-push-approved: %s の push に失敗しました（%s）。コミットは残した。接続を戻して sh %s/ccnavi-push-approved.sh %s を再実行してください。\n' \
+	printf 'ccnavi-push-approved: %s の push に失敗しました（%s）。コミットはローカルに残っています。接続を確認してから、次のコマンドを再実行してください: sh %s/ccnavi-push-approved.sh %s\n' \
 		"$cf_p" "$(head -n 1 "$ccnavi_c1_tmp/push-err" 2>/dev/null)" "$(dirname "$0")" "$cf_p" >&2
 	ccnavi_lock_drop
 	return 1
@@ -299,7 +299,7 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 	name=$(basename "$tree")
 	branch=$(git -C "$tree" rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 	if [ -z "$branch" ] || [ "$branch" = "HEAD" ]; then
-		printf 'ccnavi-push-approved: %s はブランチの上に居ない。承認済みチケットは手でコミットしてください。\n' \
+		printf 'ccnavi-push-approved: %s は現在のHEADがブランチに属していません（detached HEAD）。承認済みチケットは手でコミットしてください。\n' \
 			"$name" >&2
 		continue
 	fi
@@ -371,7 +371,7 @@ $(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
 	}
 	case "$branch" in
 	main | master | develop | release | release/*)
-		printf 'ccnavi-push-approved: %s は %s の上に居るので push しません。送るかどうかはユーザが決めます。\n' \
+		printf 'ccnavi-push-approved: %s では保護対象のブランチ %s を使用しているため、pushしません。送るかどうかはユーザが決めます。\n' \
 			"$name" "$branch" >&2
 		continue
 		;;
@@ -381,14 +381,14 @@ $(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
 	# origin/main・master）で、そのツリーが属するリポジトリについて決める。決まらなければ固定のリストだけ。
 	integ=$(ccnavi_integration "$tree" "$root") || integ=""
 	if [ -n "$integ" ] && [ "$branch" = "$integ" ]; then
-		printf 'ccnavi-push-approved: %s は統合先 %s の上に居るので push しません。送るかどうかはユーザが決めます。\n' \
+		printf 'ccnavi-push-approved: %s では保護対象の統合先 %s を使用しているため、pushしません。送るかどうかはユーザが決めます。\n' \
 			"$name" "$branch" >&2
 		continue
 	fi
 
 	# push は失敗しても巻き戻さない。コミットは残るので、ユーザがもう一度送れる。
 	if git -C "$tree" push --quiet -u origin "$branch" 2>/dev/null; then
-		printf '承認済みチケットを %s へ送った（%s）。\n' "$branch" "$name"
+		printf '承認済みチケットをブランチ %s にpushしました（%s）。\n' "$branch" "$name"
 	else
 		printf 'ccnavi-push-approved: %s の push に失敗しました。手で送ってください（git push -u origin %s）。\n' \
 			"$name" "$branch" >&2

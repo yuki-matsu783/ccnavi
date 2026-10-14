@@ -9,7 +9,7 @@
   作業ツリー、Chrome は API で読んだ中身を MEMFS に組んだ仮のツリー。
   core はブランチごとの blob の表（取っていないファイルを `NOT_FETCHED` にする形）を持たない
 - 判定: `judge_approval`（実行前チェックのモジュール `ccnavi.hook.judge` と
-  紛れないように名前を変えた）は承認の対象と画面とダイジェストを返す。通らない理由を返す
+  紛れないように名前を変えた）は承認の対象と画面を返す。通らない理由を返す
   `withdraw` と `confirm` は `core_withdraw` と `core_review` にある
 - Changes: 書き込みを値として並べたもの（`plan`）。書くときの失敗の仕方（止める・言って続ける）
   もつけてある。`per_branch` はブランチごとの create / update / delete で、Chrome はこれを
@@ -40,7 +40,6 @@ from ..infra import fsio, settings, tree
 from . import (
     agree,
     agree_candidates,
-    agree_digest,
     history,
     review,
 )
@@ -81,21 +80,11 @@ def read_fs(conf: settings.Settings, root: str, stamp: str = "", actor: Actor | 
 
 @dataclass
 class Verdict:
-    """`judge_approval` の答え。`messages` は標準エラーに出す文面（呼び手が出す）。
-
-    `mismatch` は見せた一覧・ダイジェスト（`shown_ids` / `shown_digest`）と今のものが違うときの
-    中身。
-    見せたものを渡さなければ None。
-    """
+    """`judge_approval` の答え。`messages` は標準エラーに出す文面（呼び手が出す）。"""
 
     gathered: agree.Gathered
     screen_text: str
-    digest: str
     messages: str
-    mismatch: dict | None = None
-    # 判定が読んだ中身（`<ブランチ>:<相対パス>` → 中身のハッシュ）。
-    # ダイジェストはこれと本文から作る。
-    read_set: dict[str, str] = field(default_factory=dict)
 
     @property
     def batch(self) -> list[agree_candidates.Candidate]:
@@ -123,42 +112,15 @@ def say_elsewhere(stderr: TextIO, gathered: agree.Gathered) -> None:
         stderr.write(f"ccnavi: {line}\n")
 
 
-def judge_approval(
-    snapshot: Snapshot,
-    only: list[str] | None = None,
-    shown_ids: list[str] | None = None,
-    shown_digest: str | None = None,
-) -> Verdict:
-    """承認の対象を組み、画面の本文とダイジェストを出す。見せたものを渡せば、今のものと比べる。
+def judge_approval(snapshot: Snapshot, only: list[str] | None = None) -> Verdict:
+    """承認の対象を組み、画面の本文を出す。
 
-    比べ方は前の `--agree --yes` と同じ。絞り（`only`）が通らなかったときは、絞らない
-    一覧を今の一覧として比べる（ボードが古い）。識別子とダイジェストのどちらかが違えば `mismatch`。
+    `only` は承認の対象を識別子で絞る。見せたあとに提案が変わったかどうかは調べない。
+    呼んだ時点の提案を、いつもの検査にかけるだけ。
     """
     err = io.StringIO()
-    # 判定が読んだ中身（read_set）を記録し、ダイジェストに入れる。
-    with fsio.reading() as seen:
-        gathered = agree.gather(err, snapshot.conf, snapshot.root, only)
-        shown = gathered
-        if shown_ids is not None and gathered.refused:
-            shown = agree.gather(err, snapshot.conf, snapshot.root)
-        # 書き込む中身は読みの中で組む。動かす提案のバイト列を判定の読みにも入れるため。
-        carried = [agree_digest.carried(cand) for cand in shown.batch]
-    read = agree_digest.read_set(snapshot.conf, snapshot.root, seen)
-    read.update(agree_digest.settings_read_set(snapshot.conf, snapshot.root))
-    text = shown.text
-    digest = agree_digest.approval_digest(text, shown.batch, read, carried)
-    mismatch = None
-    if shown_ids is not None:
-        wanted = sorted({s.strip() for s in shown_ids if s.strip()})
-        current = shown.identifiers
-        expected = (shown_digest or "").strip()
-        if wanted != current or expected.lower() != digest:
-            mismatch = {
-                "expected": wanted,
-                "current": current,
-                "digest": {"expected": shown_digest or "", "current": digest},
-            }
-    return Verdict(gathered, text, digest, err.getvalue(), mismatch, read)
+    gathered = agree.gather(err, snapshot.conf, snapshot.root, only)
+    return Verdict(gathered, gathered.text, err.getvalue())
 
 
 # ---- 書くもの --------------------------------------------------------------------------------

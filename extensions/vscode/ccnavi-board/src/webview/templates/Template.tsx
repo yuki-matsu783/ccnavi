@@ -105,7 +105,7 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
           )}
           {detail !== undefined && !detailMatches(detail, entry) && (
             <p className="hint" data-role="detail-mismatch">
-              この行の本文は読み込めません。実行ファイルは、足し算で使われる同名の別の層の本文を返すためです（捨てられた行など）。ファイルを直接開いて読んでください: <span className="mono">{entry.path}</span>
+              この行の本文は読み込めません。実行ファイルは、統合結果で使われる同名の別の層の本文を返すためです（捨てられた行など）。ファイルを直接開いて読んでください: <span className="mono">{entry.path}</span>
             </p>
           )}
           {detailError !== "" && <p className="status failed">{detailError}</p>}
@@ -116,7 +116,7 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
 }
 
 /**
- * 届いた本文が、この行のものか。実行ファイルは層ごとでなく足し算で 1 件を返すので、捨てられた行を開くと
+ * 届いた本文が、この行のものか。実行ファイルは層ごとでなく統合結果で 1 件を返すので、捨てられた行を開くと
  * 別の層の本文が来ることがある。層と sha（読めない行は sha が空なので層だけ）で突き合わせる
  */
 function detailMatches(detail: TemplateDetail, entry: TemplateEntry): boolean {

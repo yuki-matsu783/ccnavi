@@ -72,11 +72,11 @@ class FileState:
         if self.kind == FILE_MODIFIED:
             return "コミット済みのファイルに未コミットの変更がある（着手などで書いた欄）"
         if self.kind == FILE_UNPUSHED:
-            return f"コミット済み・未 push（{self.upstream} より先）"
+            return f"コミット済み・未push（{self.upstream} に未反映の変更があります）"
         if self.kind == FILE_PUSHED:
             return f"push 済み（{self.upstream}）"
         if self.kind == FILE_NO_UPSTREAM:
-            return "コミット済み（リモート追跡の ref が無いので、push 済みかは分からない）"
+            return "コミット済み（リモート追跡参照がないため、push済みか確認できません）"
         return "Gitから状態を取得できません。"
 
 
@@ -141,8 +141,8 @@ def run(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, fami
     stdout.write(
         "ccnavi: チケットの状態。手元の置き場・状態の履歴・git だけを読む"
         "（リモートからの取得は行いません）。\n"
-        "  push 済みかは手元のリモート追跡の ref（最後に取得した時点の状態）で見るので、"
-        f"古いかもしれない。最新にするには先に '{sync} <親>' を実行します。\n"
+        "  push済みかどうかは、最後に取得したリモートの状態に基づくため、"
+        f"最新の状態と異なる場合があります。最新にするには先に '{sync} <親>' を実行してください。\n"
     )
     rows = {r.ident: r for r in overview.collect(conf, root, doing, review, closed, proposals)}
     if not family and rows:
@@ -209,8 +209,8 @@ class _Family:
                 f"- {e.ident}  {role}  {t.title}".rstrip(),
                 f"    置き場: 複数の場所にある（{where}）",
                 "    止まっている理由: 正しいチケットを特定できないため、状態を変更できません。",
-                "    次の操作: ユーザに 1 つにしてもらう（先に進んだ側を合流させるか、"
-                "残ったワークツリーを片付ける）",
+                "    次の操作: ユーザーにチケットの重複を解消してもらってください。"
+                "進行した側の変更をマージするか、不要なワークツリーを整理します。",
             ]
         lines = [
             f"- {e.ident}  {role}  {t.title}".rstrip(),
@@ -279,18 +279,18 @@ class _Family:
         verdict, why = self.c1_target()
         if verdict == c1.TARGET_STOP and not (st.imported and st.stop):
             # C1 の sh（ccnavi-ticket.sh）が状態の操作を断る。
-            stops.append(f"C1 で状態の操作が止まる: {why or '理由が分からない'}")
+            stops.append(f"C1 では状態の操作を実行できません: {why or '理由が分からない'}")
         carried = uncommitted and verdict == c1.TARGET_YES
         if not t.started_at:
             for p in approval_checks.unmet_predecessors(t, self.pool):
-                stops.append(f"先行 {p.ticket} が満たされていない（{p.label}）")
+                stops.append(f"先行チケット {p.ticket} が開始条件を満たしていません（{p.label}）")
             parent_why = self._parent_not_started(t)
             if parent_why:
                 stops.append(parent_why)
             if carried:
                 stops.append(
                     "取り込み済みの親子（C1 の対象）で、承認済みチケットが親のブランチに"
-                    "未コミット。ユーザがコミットして push するまで start は止まる"
+                    "未コミット。ユーザがコミットして push するまで start は実行できません"
                 )
         else:
             if not _started_recorded(self.conf, t):

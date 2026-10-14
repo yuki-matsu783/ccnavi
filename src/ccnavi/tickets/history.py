@@ -184,7 +184,7 @@ def note(
         entry[key] = value
     target = path(approved_dir, ticket_id)
     if not target:
-        failed = "識別子の形ではないので、ファイルの名前に使わない"
+        failed = "有効な識別子の形式ではないため、ファイルの名前に使わない"
         _state["failures"].append(
             f"{ticket_id!r} の履歴（{kind}）を書かない（{failed}）。状態は動いた"
             "（状態は置き場で決まり、履歴は補助）"
@@ -235,7 +235,7 @@ def read(approved_dir: str, ticket_id: str, limit: int = BOARD_LIMIT) -> tuple[l
     """
     target = path(approved_dir, ticket_id)
     if not target:
-        return [], f"{ticket_id!r} は識別子の形ではないので、履歴を読まない"
+        return [], f"{ticket_id!r} は有効な識別子の形式ではないため、履歴を読まない"
     try:
         if os.path.islink(target):
             return [], f"{target} はシンボリックリンクなので読まない"

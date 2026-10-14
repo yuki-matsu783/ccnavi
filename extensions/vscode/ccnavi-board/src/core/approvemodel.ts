@@ -84,8 +84,6 @@ export interface ApprovePreview {
   readonly batch: readonly ApproveBatchEntry[];
   /** 承認画面の本文そのまま */
   readonly text: string;
-  /** 承認画面の本文・判定が読んだ中身（read_set）・承認済みチケットに入る中身のダイジェスト（SHA-256、16 進）。中身は見ずに、承認するときに `--digest` で返す */
-  readonly digest: string;
   /** 承認の対象にしない提案と、その理由 */
   readonly rejected: readonly ApproveRejected[];
   /** 読めない提案や承認済みチケットの説明 */
@@ -174,18 +172,11 @@ export function failureReason(stderr: string, stdout: string): string {
 export function childWorktreeFailureText(failed: readonly ChildWorktreeFailure[], gitCommand: string): string {
   return failed
     .map(({ worktree: w, reason }) =>
-      `子 ${w.ticket} のワークツリー ${w.path} を作れなかった（${reason}）。` +
+      `子チケット ${w.ticket} のワークツリー ${w.path} を作成できませんでした（${reason}）。` +
       `手で作るなら: ${gitCommand} worktree add ${w.path} -b ${w.branch} ${w.base}。` +
       `ブランチ ${w.branch} が既にあるなら: ${gitCommand} worktree add ${w.path} ${w.branch}`,
     )
     .join("\n");
-}
-
-export interface ApproveMismatch {
-  readonly expected: readonly string[];
-  readonly current: readonly string[];
-  /** 見せたダイジェスト（渡した値）と今のダイジェスト */
-  readonly digest: { readonly expected: string; readonly current: string };
 }
 
 /**
@@ -195,7 +186,6 @@ export interface ApproveMismatch {
  */
 export type ApproveOutcome =
   | { readonly ok: true; readonly value: ApproveResult }
-  | { readonly ok: false; readonly mismatch: ApproveMismatch }
   | { readonly ok: false; readonly error: string };
 
 export type PreviewParse =
@@ -236,7 +226,6 @@ export function partialMessage(partial: ApprovePartial): string {
 
 export type ResultParse =
   | { readonly ok: true; readonly value: ApproveResult }
-  | { readonly ok: false; readonly mismatch: ApproveMismatch }
   | { readonly ok: false; readonly partial: ApprovePartial }
   | { readonly ok: false; readonly error: string };
 
@@ -254,7 +243,6 @@ export function parseApprovePreview(text: string): PreviewParse {
       generated_at: str(raw.generated_at),
       batch: list(raw.batch).filter(isRecord).map(entry),
       text: str(raw.text),
-      digest: str(raw.digest),
       rejected: list(raw.rejected)
         .filter(isRecord)
         .map((r) => ({ ticket: str(r.ticket), problems: list(r.problems).map(str) })),
@@ -264,25 +252,14 @@ export function parseApprovePreview(text: string): PreviewParse {
   };
 }
 
-/** `--yes` の答え。承認できたか、一覧が変わっていたか、読めなかったか */
+/** `--yes` の答え。承認できたか、途中で止まったか、読めなかったか */
 export function parseApproveResult(text: string): ResultParse {
   const top = parseTop(text);
   if (!top.ok) {
     return top;
   }
   const raw = top.raw;
-  if (isRecord(raw.mismatch)) {
-    const digest: Record<string, unknown> = isRecord(raw.mismatch.digest) ? raw.mismatch.digest : {};
-    return {
-      ok: false,
-      mismatch: {
-        expected: list(raw.mismatch.expected).map(str),
-        current: list(raw.mismatch.current).map(str),
-        digest: { expected: str(digest.expected), current: str(digest.current) },
-      },
-    };
-  }
-  // 途中で止まった。置いたものは戻らないので、mismatch と同じく成功にはしない。
+  // 途中で止まった。置いたものは戻らないので、成功にはしない。
   if (isRecord(raw.partial)) {
     return {
       ok: false,

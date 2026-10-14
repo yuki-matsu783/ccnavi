@@ -10,7 +10,7 @@
  * 同じ理由で、ここには VS Code の API も DOM も node も入れない。
  *
  * 編集する 1 本は、共通の設定・ワークスペースの設定・プロジェクトの設定のどれか（画面上部の「設定」の欄で切り替える。
- * タブは 1 枚）。それとは別に、読み取り専用の足し算（`RiskPage.sums`）を持つ。
+ * タブは 1 枚）。それとは別に、読み取り専用の統合結果（`RiskPage.sums`）を持つ。
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
  * 入れ物は 1 度しか入らない（入れ直すと打ちかけの編集が消える）。中身（`data`）が届くのは、画面の編集を捨ててよいとき
@@ -100,7 +100,7 @@ export interface RiskPage {
   readonly target?: { readonly kind: string; readonly name: string };
   readonly targets?: readonly TargetOption[];
   /**
-   * 読み取り専用の足し算（共通の設定 + ワークスペース、共通の設定 + 各プロジェクト）。実行ファイルが出した結果で、
+   * 読み取り専用の統合結果（共通の設定 + ワークスペース、共通の設定 + 各プロジェクト）。実行ファイルが出した結果で、
    * 拡張は合成しない。保存済みの配点の和で、編集中の内容は含まない。ボードを読めなかったときは無い
    */
   readonly sums?: readonly RiskSum[];

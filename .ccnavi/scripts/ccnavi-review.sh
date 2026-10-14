@@ -165,7 +165,7 @@ if [ "$sub" = ready ]; then
 	[ "$rp_count" -le 1 ] || fail ready-parent-twice "ready の --parent は 1 度だけ渡せる。" 2
 	if [ -n "$ready_parent" ]; then
 		ccnavi_is_ident "$ready_parent" ||
-			fail ready-parent-ident "ready の --parent の値（${ready_parent}）は識別子の形ではない。" 2
+			fail ready-parent-ident "ready の --parent の値（${ready_parent}）は有効な識別子の形式ではありません。" 2
 		ready_dir="$root/.claude/worktrees/$ready_parent"
 		[ -d "$ready_dir" ] && [ ! -L "$ready_dir" ] && [ -e "$ready_dir/.git" ] ||
 			fail ready-parent-tree "親 ${ready_parent} のワークツリー（${ready_dir}）がありません。ready は親のワークツリーで行う。" 2

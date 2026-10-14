@@ -210,11 +210,11 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--order", default=None, metavar="JSON")
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--expect", default=None, metavar="SHA")
-    # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイでユーザが押した承認。端末は要らない。
+    # 承認する識別子（カンマ区切り）。拡張のオーバーレイでユーザが押した承認。端末は要らない。
     # 値なしの `--yes` は `--templates --import` だけが読む（`_run` が、ほかの経路では断る）。
     parser.add_argument("--yes", nargs="?", const=cli_templates.BARE_YES, default="")
-    # 見せた承認画面の本文・判定が読んだ中身・承認済みチケットに書き込む中身のダイジェスト
-    # （preview の `digest`）。`--yes` と一緒に渡す。
+    # 見せた指摘のダイジェスト（`--reviewed --yes` の preview の `digest`）。`--yes` と一緒に渡す。
+    # `--agree --yes` は受けない。
     parser.add_argument("--digest", default="")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
     # `--test` の payload に載せる Claude Code の権限モードとサブエージェントの印。hook は
@@ -268,7 +268,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--format", default=None)
     parser.add_argument("--no-refresh", action="store_true")
     # 作業・レビュー計画のテンプレートの一覧・検索（`--keyword`）・表示（`--show`）。読むだけ。
-    # `--layer` は足し算の相手のレイヤー（self かプロジェクト名。既定は self）。
+    # `--layer` は統合結果の相手のレイヤー（self かプロジェクト名。既定は self）。
     parser.add_argument("--templates", action="store_true")
     parser.add_argument("--show", default=None, metavar="NAME")
     parser.add_argument("--layer", default="")
@@ -798,7 +798,7 @@ def _parsed(
             )
             return EXIT_ERROR
         if args.preview and args.yes:
-            stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
+            stderr.write("ccnavi: --preview と --yes は同時に指定できません。\n")
             return EXIT_ERROR
         # 確かめるだけの枝は `--preview` と一緒に使う。単独で打てる形にすると、組み込みの
         # deny（phase_forms.ticket_approval_rule）が免除するのは `--preview` の付いた `--agree`
@@ -816,28 +816,26 @@ def _parsed(
         if args.preview:
             code = core.preview(stdout, stderr, conf, root, args.json, list(args.command))
             return EXIT_OK if code == 0 else EXIT_ERROR
-        # 拡張のオーバーレイでユーザが押した承認。端末の確認の代わりに、見せた一覧と今の一覧が
-        # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
-        # deny（phase_forms.ticket_approval_rule）が止める。
+        # 拡張のオーバーレイでユーザが押した承認。端末の確認は求めず、`--yes` で指した識別子の
+        # 提案だけを、承認する時点の中身で端末の承認と同じ検査にかけて承認する。エージェントが
+        # これを Bash で打つ形は組み込みの deny（phase_forms.ticket_approval_rule）が止める。
         if args.yes:
+            if args.command or args.digest:
+                stderr.write(
+                    "ccnavi: --agree --yes の対象は --yes <識別子,…> だけで指定してください"
+                    "（--digest と後ろに並べる語は受けない）\n"
+                )
+                return EXIT_ERROR
             history.set_via(history.VIA_BOARD)
-            # 後ろに並べた語は preview に渡したのと同じ絞り。`--yes` は見せた識別子。
-            code = core.approve_yes(
-                stdout,
-                stderr,
-                conf,
-                root,
-                args.yes.split(","),
-                args.json,
-                list(args.command),
-                digest=args.digest,
-            )
+            code = core.approve_yes(stdout, stderr, conf, root, args.yes.split(","), args.json)
             return EXIT_OK if code == 0 else EXIT_ERROR
         if not cli_args._from_terminal(stdin, conf, stderr, "--agree"):
             return EXIT_ERROR
         history.set_via(history.VIA_TERMINAL)
         # `--agree` の後ろに並べた語は、承認の対象に入れる識別子。無ければ承認待ち全部。
         approved = core.approve(stdin, stdout, stderr, conf, root, only=list(args.command))
+        if approved == modes.EXIT_PARTIAL:
+            return modes.EXIT_PARTIAL
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
     # チケットの状態とレビューの操作。payload を読まない。
@@ -862,13 +860,17 @@ def _parsed(
     # する sh）が聞くこと。読むだけで、何も書かない。
     if len(args.command) == 3 and list(args.command[:2]) == ["c1", "family"]:
         if not cli_ops._FAMILY.fullmatch(args.command[2]) or ".." in args.command[2]:
-            stderr.write(f"ccnavi: c1 family の {args.command[2]!r} は識別子の形ではない\n")
+            stderr.write(
+                f"ccnavi: c1 family の {args.command[2]!r} は有効な識別子の形式ではありません。\n"
+            )
             return EXIT_ERROR
         return EXIT_OK if c1.family(stdout, conf, root, args.command[2]) == 0 else EXIT_ERROR
     if len(args.command) in (3, 4) and list(args.command[:2]) == ["c1", "sort"]:
         since = args.command[3] if len(args.command) == 4 else ""
         if not cli_ops._FAMILY.fullmatch(args.command[2]) or ".." in args.command[2]:
-            stderr.write(f"ccnavi: c1 sort の {args.command[2]!r} は識別子の形ではない\n")
+            stderr.write(
+                f"ccnavi: c1 sort の {args.command[2]!r} は有効な識別子の形式ではありません。\n"
+            )
             return EXIT_ERROR
         if since and not cli_args._revision_ok(since):
             stderr.write(f"ccnavi: c1 sort の版 {since!r} は読めない\n")

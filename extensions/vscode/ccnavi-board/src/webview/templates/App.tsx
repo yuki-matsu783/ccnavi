@@ -1,5 +1,5 @@
 /**
- * テンプレート管理画面の本体。帯・件数の要約・テンプレートの一覧・足し算の枠・下書きの一覧。
+ * テンプレート管理画面の本体。帯・件数の要約・テンプレートの一覧・統合結果の枠・下書きの一覧。
  *
  * 見せる中身は拡張ホストが渡す（`TemplatesData`）。画面が自分で持つのは、ユーザが触って決めるもの
  * （開いている行、本文の取り出しの結果）だけ。有効か・捨てた理由・取り込めるかは実行ファイルの答えを読むだけ。
@@ -104,7 +104,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
   /** 本文の答え（キーは `layer/name`） */
   const [details, setDetails] = useState<Readonly<Record<string, Detail>>>({});
 
-  /** 案内の間の様子（開く行・開く下書き・取り込みの欄・足し算）。実際の開閉や取り込みの欄は動かさないので、閉じたあとに戻すものは無い */
+  /** 案内の間の様子（開く行・開く下書き・取り込みの欄・統合結果）。実際の開閉や取り込みの欄は動かさないので、閉じたあとに戻すものは無い */
   const [scene, setScene] = useState<Scene>(NO_SCENE);
   const tour = useTour(data.kind === "page", {
     onStart: () => setScene(NO_SCENE),
@@ -537,7 +537,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
         <Sum
           sums={page.data.sums}
           initial={defaultSum(page.data.sums, touring ? undefined : page.target)}
-          // 見本は別の枠として作る（閉じたあと、見本で選んだ足し算が実際の枠に残らない）
+          // 見本は別の枠として作る（閉じたあと、見本で選んだ統合結果が実際の枠に残らない）
           key={touring ? "tour" : `${page.target.kind}:${page.target.name}`}
           tour={touring ? { open: sceneSum !== undefined, picked: sceneSum ?? page.data.sums[0]?.name ?? "" } : undefined}
         />

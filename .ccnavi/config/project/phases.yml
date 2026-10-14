@@ -1,6 +1,6 @@
 # フェーズ定義（自身のレイヤー）。ユーザが持つ設定で、エージェントは書き換えない。
 #
-# 判定が使う定義は、共通レイヤー（.ccnavi/config/common/phases.yml）とこのファイルの足し算になる。
+# 判定が使う定義は、共通レイヤー（.ccnavi/config/common/phases.yml）とこのファイルの統合結果になる。
 # 共通レイヤーには、どのプロジェクトでも同じ構成（`src/*`・`tests/*` など）を前提にできる定義
 # （quick・research・design・acceptance・implement・design-feedback・implement-feedback）を置く。
 # ここには、`scope` がこのワークスペースのレイアウトに依存する定義だけを置く。共通レイヤーに置くと、

@@ -267,7 +267,7 @@ export interface LayerFileJson {
 
 /**
  * レイヤー（layer）1 つ（共通・ワークスペース・プロジェクトの設定のどれか）。拡張が使うのはルール・配点・フェーズ定義の
- * ファイルの場所と、読めなかった理由だけなので、それだけを読む。宣言の中身は読まない（足し算の表示は `sums` から読む）。
+ * ファイルの場所と、読めなかった理由だけなので、それだけを読む。宣言の中身は読まない（統合結果の表示は `sums` から読む）。
  */
 export interface LayerJson {
   /** `common` / `self` / プロジェクトの名前 */
@@ -281,7 +281,7 @@ export interface LayerJson {
   readonly phasesFile: LayerFileJson;
 }
 
-/** 足し算に入ったルール 1 件（`sums[].rules` の `deny` / `ask` / `allow` の要素）。実行ファイルが出した値をそのまま持つ */
+/** 統合結果に入ったルール 1 件（`sums[].rules` の `deny` / `ask` / `allow` の要素）。実行ファイルが出した値をそのまま持つ */
 export interface SumRuleJson {
   /** レイヤー名付きの id（共通は裸、ほかは `<レイヤー>:<id>`） */
   readonly id: string;
@@ -297,7 +297,7 @@ export interface SumRuleJson {
   readonly message: string;
 }
 
-/** 足し算に入ったリスクの項目 1 件 */
+/** 統合結果に入ったリスクの項目 1 件 */
 export interface SumFactorJson {
   readonly id: string;
   readonly source: string;
@@ -308,7 +308,7 @@ export interface SumFactorJson {
   readonly message: string;
 }
 
-/** 足し算に入ったフェーズ定義 1 件 */
+/** 統合結果に入ったフェーズ定義 1 件 */
 export interface SumPhaseJson {
   readonly id: string;
   readonly source: string;
@@ -319,7 +319,7 @@ export interface SumPhaseJson {
 }
 
 /**
- * 足し算（`sums[]`）の 1 件。「共通の設定 + そのレイヤー」の読み取り用の結果で、実行ファイルが判定と同じ関数で組む。
+ * 統合結果（`sums[]`）の 1 件。「共通の設定 + そのレイヤー」の読み取り用の結果で、実行ファイルが判定と同じ関数で組む。
  * 拡張はこれを足し直さず、そのまま見せる。順は ワークスペース（`self`）→ プロジェクト（名前順）。
  * パスを持たないツール（Bash など）が当てる、全プロジェクトの設定を足した和ではない。
  */
@@ -377,7 +377,7 @@ export interface BoardJson {
   readonly trees: readonly TreeJson[];
   /** 順序は 共通の設定 → ワークスペースの設定 → プロジェクトの設定（名前順） */
   readonly layers: readonly LayerJson[];
-  /** 順序は ワークスペースの足し算 → プロジェクトの足し算（名前順）。古い実行ファイルでは空 */
+  /** 順序は ワークスペースの統合結果 → プロジェクトの統合結果（名前順）。古い実行ファイルでは空 */
   readonly sums: readonly SumJson[];
   readonly projects: readonly string[];
   readonly problems: readonly string[];

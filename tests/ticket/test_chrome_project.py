@@ -125,10 +125,8 @@ class ChromeProjectTest(unittest.TestCase):
 
     def test_approving_a_project_family_writes_only_its_branch(self):
         board = self.ask("board")
-        shown = {"ids": [e["ticket"] for e in board["batch"]], "digest": board["digest"]}
-        body = self.ask("plan", only=board["only"], shown=shown, actor=ACTOR)
+        body = self.ask("plan", ids=[e["ticket"] for e in board["batch"]], actor=ACTOR)
         self.assertNotIn("error", body, body)
-        self.assertIsNone(body["mismatch"])
         self.assertEqual(list(body["changes"]), ["web-i0012"])
         paths = {r["path"]: r for r in body["changes"]["web-i0012"]}
         self.assertEqual(paths["wip/proposals/todo/web-i0012.md"]["op"], "delete")

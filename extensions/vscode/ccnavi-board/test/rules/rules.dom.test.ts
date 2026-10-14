@@ -850,34 +850,34 @@ test("CB-D152 読み込みに失敗した画面にも設定の切り替えの欄
 });
 
 
-test("CB-T310 足し算は読み取り専用の表で出し、編集する 1 本の欄とは別にする。選んだ足し算の共通のルールと設定のルールが由来付きで並ぶ", async () => {
+test("CB-T310 統合結果は読み取り専用の表で出し、編集する 1 本の欄とは別にする。選んだ統合結果の共通のルールと設定のルールが由来付きで並ぶ", async () => {
   const sums = rulesSums(sumsBoard());
   const dom = await openRules({ target: { kind: "project", name: "lib" }, sums });
   try {
-    // 開いている対象（lib）の足し算が最初に出る。折りたたみは閉じてあるので、押して開く
+    // 開いている対象（lib）の統合結果が最初に出る。折りたたみは閉じてあるので、押して開く
     const select = dom.one<HTMLSelectElement>("select#sum-select");
     assert.equal(select.value, "lib");
-    assert.deepEqual([...select.options].map((o) => o.textContent), ["ワークスペースの足し算（共通の設定 + ワークスペースの設定）", "プロジェクト lib の足し算（共通の設定 + lib の設定）"]);
+    assert.deepEqual([...select.options].map((o) => o.textContent), ["統合結果（共通 + ワークスペース）", "統合結果（共通 + プロジェクト lib）"]);
     assert.match(dom.one("#sum .hint").textContent, /パスを持たないツール（Bash など）が当てるのは、全プロジェクトの設定を合算した和ではありません/);
     const rows = (section: string) => dom.all(`#sum .sum-section[data-section="${section}"] tbody tr`).map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
     assert.deepEqual(rows("deny").map((r) => [r[0], r[1], r[3]]), [["guard-approved", "Write|Edit", "共通の設定"], ["lib:no-tmp", "Write", "lib"]]);
     assert.deepEqual(rows("ask").map((r) => r[0]), ["lib:deps"]);
     assert.equal(dom.all('#sum .sum-section[data-section="allow"] tbody tr').length, 0);
     assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3 件（common + lib）");
-    // 足し算を切り替えても、拡張ホストへは何も送らない（見せるだけ。判定も合成もしない）
+    // 統合結果を切り替えても、拡張ホストへは何も送らない（見せるだけ。判定も合成もしない）
     dom.change(select, "self");
     await dom.settle();
     assert.deepEqual(rows("deny").map((r) => r[0]), ["guard-approved"]);
-    assert.equal(dom.all("#sum button").length, 0, "足し算に操作はありません");
+    assert.equal(dom.all("#sum button").length, 0, "統合結果に操作はありません");
     assert.deepEqual(dom.posted.filter((m) => m.type !== "ready"), []);
-    // 編集する 1 本のルールの一覧は足し算と混ざらない
+    // 編集する 1 本のルールの一覧は統合結果と混ざらない
     assert.equal(dom.all("#tab-rules .rule").length, 3);
   } finally {
     await dom.close();
   }
 });
 
-test("CB-T311 共通の設定を開いているときはワークスペースの足し算が最初に出る。足し算がなければ（ボードを読み込めない）欄ごと出さない。読み込めない設定は空として扱っていると言う", async () => {
+test("CB-T311 共通の設定を開いているときはワークスペースの統合結果が最初に出る。統合結果がなければ（ボードを読み込めない）欄ごと出さない。読み込めない設定は空として扱っていると言う", async () => {
   const sums = rulesSums(sumsBoard()).map((s) => (s.name === "lib" ? { ...s, unreadable: "YAML として読み込めない", deny: [], ask: [] } : s));
   const dom = await openRules({ target: { kind: "workspace", name: "" }, sums });
   try {
@@ -1264,7 +1264,7 @@ test("CB-D300 ユースケースの一覧は、基本の案内の後ろに、追
   }
 });
 
-test("CB-D301 案内の間の足し算は見本を出し、段の scene が枠を開いて足し算を替える。閉じたあとは実際の足し算に戻り、案内で選んだものを持ち越さない", async () => {
+test("CB-D301 案内の間の統合結果は見本を出し、段の scene が枠を開いて統合結果を替える。閉じたあとは実際の統合結果に戻り、案内で選んだものを持ち越さない", async () => {
   const sums = rulesSums(sumsBoard());
   const dom = await openRules({ target: { kind: "project", name: "lib" }, sums }, undefined, { measure: true });
   try {
@@ -1272,7 +1272,7 @@ test("CB-D301 案内の間の足し算は見本を出し、段の scene が枠�
     assert.equal(dom.one<HTMLDetailsElement>("#sum").open, false);
     await startCourse(dom, "read-sum");
     await toStep(dom, "read-sum", 0);
-    assert.equal(dom.one<HTMLDetailsElement>("#sum").open, true, "足し算の枠が開かない");
+    assert.equal(dom.one<HTMLDetailsElement>("#sum").open, true, "統合結果の枠が開かない");
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "web");
     assert.deepEqual(
       dom.all('#sum .sum-section[data-section="deny"] tbody tr').map((tr) => tr.querySelector("td")?.textContent),
@@ -1284,7 +1284,7 @@ test("CB-D301 案内の間の足し算は見本を出し、段の scene が枠�
     assert.ok(dom.all('#sum .sum-section[data-section="deny"] tbody tr').some((tr) => tr.querySelector("td")?.textContent === "self:protect-secrets"));
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
-    assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "lib", "閉じたあと案内で選んだ足し算が残る");
+    assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "lib", "閉じたあと案内で選んだ統合結果が残る");
     assert.equal(dom.one<HTMLDetailsElement>("#sum").open, false);
     assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3 件（common + lib）");
     assert.deepEqual(dom.posted.filter((message) => message.type !== "ready" && message.type !== "tourDone"), []);
@@ -1323,7 +1323,7 @@ test("CB-D303 保存前の検証エラーの案内は、その段にだけ見本
     await startCourse(dom, "save-error");
     assert.equal(dom.one("#status").textContent, "");
     await toStep(dom, "save-error", 1);
-    assert.match(dom.one("#status").textContent ?? "", /--lint が error を報告しました/);
+    assert.match(dom.one("#status").textContent ?? "", /設定の検証（--lint）でエラーが見つかりました/);
     assert.match(dom.one("#status").textContent ?? "", /error: db-migrate: ask に message がある/);
     assert.ok(dom.one("footer").classList.contains("error"));
     await toStep(dom, "save-error", 2);

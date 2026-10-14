@@ -14,8 +14,8 @@ src/
   sidebar.ts          左端のアイコンから開くサイドパネルの 6 つの入口。チケット制御が disable なら 2 つ。見た目はタイトルバーの配色のアイコンで、今の値を見出しの横に出す（vscode に依存する）
   ticket-control.ts   CCNAVI_TICKET_CONTROL を設定ファイルから読み、context key に反映する。変化を監視する（vscode に依存する）
   board-panel.ts      ボードの Webview パネルの生成・更新・破棄、監視、操作の受け付け。承認のオーバーレイと動いた表示もここが持つ（画面は作り直されるので持たせない）。計画編集タブの帳面（core/workflow-tabs.ts）を見て、未保存の親を画面に渡し、承認を打つ直前にも確かめる。オーバーレイの「計画を編集」でタブを開く（画面の帳面 screens().workflow を通す）。1 枚目は HTML ごと、以後は postMessage で中身だけ渡す（vscode に依存する）
-  rules-panel.ts      ルール管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。判定・検証・保存の受け付けと、読み取り専用の足し算（sums[]）の受け渡し（vscode に依存する）
-  risk-panel.ts       リスク管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・作成・保存の受け付けと、読み取り専用の足し算（sums[]）の受け渡し（vscode に依存する）
+  rules-panel.ts      ルール管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。判定・検証・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
+  risk-panel.ts       リスク管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・作成・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
   phases-panel.ts     フェーズ管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・保存の受け付けと、共通の設定の定義（読み取り専用。共通の設定を開いているときは並べない）と、共通の設定の phases.yml を読めないときの error の帯の受け渡し（vscode に依存する）
   templates-panel.ts  テンプレート管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。読み直し・取り込みの下見と実行の受け付けと、ファイルの監視、取り込みを止めるかの取り直し（実行ファイルの答えを並べるだけで、判定はしない）。vscode に依存する
   flow-panel.ts       フロー編集画面の Webview パネル（子ごとに 1 枚。ボードのカードから開く）。置き場と錠を実行ファイルに聞き、保存を受け付ける。エージェントの下書きの「提案あり」・取り込み・保存のあとの削除と、依頼の文もここ（vscode に依存する）
@@ -54,7 +54,7 @@ src/
     phases-doc.ts     phases.yml の読み書き（同じくコメントを残す。読まない順序の欄は名指しするだけで、書き戻しで手を付けない）
     templates-view.ts テンプレート管理の拡張ホストと画面の契約（見せる形 TemplatesPage / TemplatesData、答えの形 TemplatesJson、取り込みの要求と答え ImportRequest / ImportAnswer、押した操作 TemplatesMessage）
     templates-render.ts テンプレート管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
-    templatesmodel.ts `--templates` の答え（一覧・層ごとの中身・足し算・下書き・本文・取り込みの答え）の読み取り。判定はしない。答えの版が違えば解釈せず伝える
+    templatesmodel.ts `--templates` の答え（一覧・層ごとの中身・統合結果・下書き・本文・取り込みの答え）の読み取り。判定はしない。答えの版が違えば解釈せず伝える
     flow-doc.ts       子のフロー（YAML）の読み書きと編集（知らない欄・種類を失わない）、雛形、入れ子の段の数え方と注意。正しいかは決めない（描けないときだけ断る）
     flow-view.ts      フロー編集の拡張ホストと画面の契約（見せる形 FlowPage / FlowData、押した操作 FlowMessage とその形の確認、錠を実行ファイルの答えから引く flowTargetOf、カードのボタンの言葉、エージェントへの依頼のボタンの言葉と依頼の文）
     workflow-view.ts  計画編集の拡張ホストと画面の契約（見せる形 WorkflowPage / WorkflowData、押した操作 WorkflowMessage とその形の確認、--order の形の確認）と、答えを画面の状態に整える純関数（線を元の番号の先行に戻す、未保存、番号の変わる項、外で変わった差分、保存できない理由）。パネルの決めごとのうち VS Code に触れないもの（無くなった理由、閉じた後に戻すかを聞くか、保存で覚えるハッシュ）も。番号は振り直さない
@@ -69,14 +69,14 @@ src/
     tour-def.ts       案内の定義（YAML）の形 TourDef と検査 parseTour（画面ごとの screen / sample / courses。段は target・題・本文・scene）。見本の目印の文 SAMPLE_NOTE もここ。DOM に触れないので単体で試せる
     tour-rules.ts     ルール管理の案内の見本（tours/rules.yml の sample:）を RuleForm と実行ファイルの JSON の形にする。rules.yml と同じ書き方のルールを読む小さな読み取り（実際の readRules と同じ結果になることをテストが見る）
     tour-board.ts     ボード画面の案内の見本（tours/board.yml の sample:）を parseBoardJson / buildBoard と承認・残った指摘の読み取りに通して、画面が描く形にする。実行ファイルの JSON と同じ形で書く
-    tour-risk.ts      リスク管理の案内の見本（tours/risk.yml の sample:）を、risks.yml と同じ書き方から RiskPage（配点あり・ファイル無し・足し算）にする小さな読み取り。yaml を持たず、readRisk と同じ結果になることをテストが見る
+    tour-risk.ts      リスク管理の案内の見本（tours/risk.yml の sample:）を、risks.yml と同じ書き方から RiskPage（配点あり・ファイル無し・統合結果）にする小さな読み取り。yaml を持たず、readRisk と同じ結果になることをテストが見る
     tour-flow.ts      フロー編集の案内の見本（tours/flow.yml の sample）を FlowDoc と FlowChecks にし、段ごとの scene を読む。yaml を持たず、実際の読み取り・実行ファイルとの一致はテストが見る
     tour-workflow.ts  計画編集の案内の見本（名前付きの --plan-order の答え）を parsePlanOrder に通して、画面が描く形にする
-    tour-templates.ts テンプレート管理の案内の見本（tours/templates.yml の sample:）を、小さい書き方から TemplatesPage（自身の層のテンプレート・下書き・足し算）と本文・下見の見本にする小さな読み取り。判定はせず、見本に書いた値をそのまま使う
+    tour-templates.ts テンプレート管理の案内の見本（tours/templates.yml の sample:）を、小さい書き方から TemplatesPage（自身の層のテンプレート・下書き・統合結果）と本文・下見の見本にする小さな読み取り。判定はせず、見本に書いた値をそのまま使う
     tour-phases.ts    フェーズ管理の案内の見本（tours/phases.yml の sample:）を、phases.yml と同じ書き方から PhasesPage にする小さな読み取り。yaml を持たず、readPhases と同じ結果になることをテストが見る
     yaml11.ts         実行ファイル（PyYAML、YAML 1.1）が文字列以外に読む語の見分け。risk-doc と phases-doc が引用符を足す判断に使う
     targets.ts        ルール管理・リスク管理・フェーズ管理・テンプレート管理が切り替える設定の対象（共通・ワークスペース・プロジェクト。4 画面とも同じ 3 種）の一覧と、欄の値
-    sums.ts           ルール管理とリスク管理の足し算（共通の設定 + 1 つの設定）の表示用の形。ボードの JSON の sums[] を並べ直すだけで、足し直さない
+    sums.ts           ルール管理とリスク管理の統合結果（共通の設定 + 1 つの設定）の表示用の形。ボードの JSON の sums[] を並べ直すだけで、足し直さない
     projects.ts       プロジェクト管理の判断。URL と名前の検査、origin の鍵、clone の行、プロジェクトになっていない .git の探索、.gitignore の行の有無と追記、画面の中身の組み立て
     projects-view.ts  プロジェクト管理の拡張ホストと画面の契約（見せる形 ProjectsPage / ProjectsData、押した操作 ProjectsMessage）
     projects-render.ts プロジェクト管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
@@ -144,14 +144,14 @@ src/
     templates/Draft.css Draft.tsx の CSS（下書き 1 件）
     templates/ImportForm.css ImportForm.tsx の CSS（取り込みの欄）
     templates/Preview.css Preview.tsx の CSS（下見の答え）
-    templates/Sum.css   Sum.tsx の CSS（足し算の枠と表）
+    templates/Sum.css   Sum.tsx の CSS（統合結果の枠と表）
     templates/EditPanel.css EditPanel.tsx の CSS（編集の欄）
     templates/Plan.css  Plan.tsx の CSS（計画の表）
     templates/Problems.css Problems.tsx の CSS（苦情の一覧）
     templates/post.ts   テンプレート管理の送り口。契約に無いものは型で止まる
     templates/main.tsx  テンプレート管理画面の入口。埋め込みの JSON を読んでマウントする
-    templates/App.tsx   帯・ツールバー・開いている対象の層の一覧と下書き・足し算の枠、取り込みの配線、拡張ホストからのメッセージの受け。案内の間は見本を描く
-    templates/Sum.tsx   足し算の枠（読み取り専用。実行ファイルの索引を、足し算を選ぶ欄と表で出す。ルール管理・リスク管理の Sum.tsx と同じ作り）
+    templates/App.tsx   帯・ツールバー・開いている対象の層の一覧と下書き・統合結果の枠、取り込みの配線、拡張ホストからのメッセージの受け。案内の間は見本を描く
+    templates/Sum.tsx   統合結果の枠（読み取り専用。実行ファイルの索引を、統合結果を選ぶ欄と表で出す。ルール管理・リスク管理の Sum.tsx と同じ作り）
     templates/EditPanel.tsx 編集の欄（下書きの保存・改名・削除、テンプレートの改名・移動・削除。下見を読んでから実行する）
     templates/Template.tsx テンプレート 1 件（札・計画・フロー・本文）
     templates/Draft.tsx 下書き 1 件（札と「取り込む…」）
@@ -204,7 +204,7 @@ test/
   fixtures/board.json 実行ファイルの出力の実例。Python 側の tests/ticket/test_board.py が書き出す
   fixtures/test.json, expectations.json  --test --json / --test-expectations --json の実例。tests/core/test_test_json.py が書き出す
   fixtures/suggest.json             --suggest --json の実例。tests/guard/test_suggest.py が鍵の集合を突き合わせる
-  fixtures/approve-preview.json, approve-yes.json, approve-mismatch.json  承認の JSON の実例。tests/ticket/test_approve_json.py が書き出す
+  fixtures/approve-preview.json, approve-yes.json  承認の JSON の実例。tests/ticket/test_approve_json.py が書き出す
   fixtures/plan-order.json          --plan-order <親> --json の答えの実例（開いたとき・逆向きの線・循環・終端の検査・書いたとき・改版）。tests/ticket/test_plan_order.py が書き出す
   helpers/fixture.ts  board.json を読む
   helpers/dom.ts      画面の HTML を happy-dom に読み込み、スクリプトを走らせて postMessage と state を記録する
