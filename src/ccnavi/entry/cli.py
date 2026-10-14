@@ -302,6 +302,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--title", default="")
     parser.add_argument("--plan", default="")
     parser.add_argument("--issue", type=int, default=None)
+    # 親のブランチのマージリクエストの番号（`ccnavi-start.sh` が出す）。親の提案の `mr:` に書く。
+    parser.add_argument("--mr", type=int, default=None)
     # `ticket new --scope <glob>`（繰り返せる）。今回の作業の範囲。`inherit` の型の許可を作る。
     parser.add_argument("--scope", action="append", default=[])
     # `ticket new <識別子> --template <名前> [--layer <名前>]`。計画と子のフローの下書きを

@@ -140,7 +140,7 @@ class ProposalTest(Use):
         self.assertEqual(globs, ["wip/research/*", "wip/design/*", "src/*", "tests/*"])
 
     def test_the_proposal_passes_the_approval_checks(self):
-        self.assertEqual(self.new().returncode, 0)
+        self.assertEqual(self.new("--mr", "5").returncode, 0)
         parsed, notes = ticket_mod.parse(self.written())
         self.assertIsNotNone(parsed, notes)
         config = phasetypes.load_types(self.conf, self.root, "")

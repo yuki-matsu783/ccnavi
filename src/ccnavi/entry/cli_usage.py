@@ -323,13 +323,16 @@ VS Codeのボード拡張機能は、ターミナルではなくオーバーレ�
          --note を指定すると学習内容を1件追記します。チケット外の場合は
          docs/wiki/inbox/ に書き込みます。
          <id> はオプションの前に指定します）
-    ccnavi ticket new <id> --title <title> --plan <type,type,...> [--scope <glob>]... [--issue N]
+    ccnavi ticket new <id> --title <title> --plan <type,type,...> [--scope <glob>]...
+                           [--issue N] [--mr N]
         （<id> という名前のワークツリーの wip/proposals/todo/<id>.md に、親の提案の雛形を
          書き込みます。そのワークツリーの中で実行してください。選択したフェーズの範囲を
          phases.yml から集めて allow に入れ、--scope の glob（この作業が触れるファイル。
          ワークツリーのルートからの相対パス。複数指定可）を追加し、計画を直線状につなぎ、
          phases: を補完します。quick-work のような scope: inherit のタイプは、それ自体では
-         何も集めないため、--scope を指定してください。phases.yml がない場合、子のidを
+         何も集めないため、--scope を指定してください。--mr N は親のブランチのマージ
+         リクエストの番号（ccnavi-start.sh が出す。親の提案の mr: に書く）で、省くと
+         取り込み状態に保存された番号を使います。phases.yml がない場合、子のidを
          指定した場合、または allow が空になる場合は停止します。
          ccnavi-ticket.sh を経由せず、直接実行します）
     ccnavi ticket new <id> --title <title> --template <name> [--layer <name>]

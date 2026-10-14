@@ -175,7 +175,7 @@ def operate(
         if len(words) != 3:
             stderr.write(
                 "ccnavi: ticket new <識別子> --title <題> --plan <型,型,...>"
-                " [--scope <glob>] [--issue N]"
+                " [--scope <glob>] [--issue N] [--mr N]"
                 " か --template <名前> [--layer <名前>] [--with-feedback]\n"
             )
         else:
@@ -194,6 +194,7 @@ def operate(
                 args.layer,
                 args.with_feedback,
                 args.scope,
+                args.mr,
             )
     elif kind == "ticket" and verb == "record-risk":
         # ticket record-risk <子> <項目> yes|no --reason <根拠>
