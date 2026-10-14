@@ -63,6 +63,23 @@ PASS_THROUGH = frozenset(
 )
 # `CCNAVI_` で始まるもののほかに止める変数。sh のワークスペースルートの探し方に影響する。
 _ALSO_BLOCKED = frozenset({"CLAUDE_PROJECT_DIR"})
+# `GIT_` で始まる変数のうち、同じコマンド行で置いてよいもの。どれも作者の名前と出力の形だけを
+# 変え、git が操作するリポジトリ・作業ツリー・索引・設定には触れない。ほかの `GIT_` は止める。
+# `GIT_DIR=<親>/.git GIT_WORK_TREE=<親> sh …ccnavi-git.sh commit` を子のワークツリーで打つと、
+# 居場所の検査は子を見るのに、git は親のワークツリーへコミットする（ラッパーも先頭で外す）。
+_GIT_PASS_THROUGH = frozenset(
+    {
+        "GIT_AUTHOR_NAME",
+        "GIT_AUTHOR_EMAIL",
+        "GIT_AUTHOR_DATE",
+        "GIT_COMMITTER_NAME",
+        "GIT_COMMITTER_EMAIL",
+        "GIT_COMMITTER_DATE",
+        "GIT_PAGER",
+        "GIT_TERMINAL_PROMPT",
+        "GIT_MERGE_AUTOEDIT",
+    }
+)
 
 # 引数に変数名を取り、その変数を置く・外す・書き出すコマンド。
 _DECLARES = frozenset({"export", "declare", "typeset", "readonly", "local", "unset"})
@@ -76,9 +93,9 @@ _ENV_CLEARS = frozenset({"-i", "--ignore-environment", "-"})
 
 def blocked(name: str) -> bool:
     """同じコマンド行で置くと、保護済みの sh を呼ぶ形を止める変数か。"""
-    if name in PASS_THROUGH:
+    if name in PASS_THROUGH or name in _GIT_PASS_THROUGH:
         return False
-    return name.startswith("CCNAVI_") or name in _ALSO_BLOCKED
+    return name.startswith(("CCNAVI_", "GIT_")) or name in _ALSO_BLOCKED
 
 
 def check_env(subject: str, degraded: str) -> tuple[str, list[str]]:
@@ -846,7 +863,8 @@ def env_message(script: str, names: list[str]) -> str:
     return (
         f"保護済みの sh（{script}）を、sh の検査の材料を変える環境変数（{shown}）と"
         "同じコマンド行で呼んでいます。この変数は sh がワークスペースルート・承認済みチケットの"
-        "置き場・実行ファイルを決めるのに使うので、書き換えると sh の検査が外れます。"
+        "置き場・実行ファイルを決めるのに使うか（CCNAVI_*）、git が操作するリポジトリと"
+        "作業ツリーを決めるのに使う（GIT_*）ので、書き換えると sh の検査が外れます。"
         "コマンド行のどこに書いても数えます（ループや関数の中では、後ろに書いた代入も次の呼び出しに"
         "届くため）。変数を置かずに、sh の呼び出しを別のコマンドに分けて実行してください。"
         "置き場が本当に違うなら、ユーザに "

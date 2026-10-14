@@ -70,6 +70,12 @@ class EnvTest(unittest.TestCase):
             "env -C /tmp CCNAVI_X=1 sh .ccnavi/scripts/ccnavi-git.sh push",
             # ループの中では、後ろに書いた代入も次の回の呼び出しに届く。
             "for i in 1 2; do sh .ccnavi/scripts/ccnavi-git.sh push; CCNAVI_X=1; done",
+            # git が操作するリポジトリと作業ツリーを変える変数。子の居場所で親へコミットできる。
+            "GIT_DIR=/p/.git GIT_WORK_TREE=/p sh .ccnavi/scripts/ccnavi-git.sh commit -m x",
+            "export GIT_WORK_TREE=/p; sh .ccnavi/scripts/ccnavi-git.sh add -A",
+            "env GIT_INDEX_FILE=/p/.git/index sh .ccnavi/scripts/ccnavi-git.sh status",
+            "GIT_COMMON_DIR=/p/.git sh .ccnavi/scripts/ccnavi-git.sh commit -m x",
+            "GIT_CEILING_DIRECTORIES=/x sh .ccnavi/scripts/ccnavi-git.sh commit -m x",
         ):
             with self.subTest(command=command):
                 self.assertTrue(self.names(command))
@@ -79,6 +85,8 @@ class EnvTest(unittest.TestCase):
             "sh .ccnavi/scripts/ccnavi-git.sh push",
             "CCNAVI_GIT_MAX_LINES=200 sh .ccnavi/scripts/ccnavi-git.sh log",
             "env CCNAVI_FETCH_TIMEOUT=5 sh .ccnavi/scripts/ccnavi-fetch.sh",
+            # 作者の名前と出力の形だけを変える git の変数は置ける。
+            "GIT_AUTHOR_NAME=a GIT_PAGER=cat sh .ccnavi/scripts/ccnavi-git.sh commit -m x",
             # 保護済みの sh を呼ばないなら、ここの話ではない。
             "CCNAVI_BIN_PATH=x uv run python -m ccnavi --lint",
             "echo CCNAVI_BIN_PATH=x && sh .ccnavi/scripts/ccnavi-git.sh status",
@@ -93,6 +101,9 @@ class EnvTest(unittest.TestCase):
         self.assertFalse(wrapguard.blocked("CCNAVI_GIT_KEEP_LOGS"))
         self.assertTrue(wrapguard.blocked("CCNAVI_GIT_SOMETHING_NEW"))
         self.assertFalse(wrapguard.blocked("PATH"))
+        self.assertTrue(wrapguard.blocked("GIT_DIR"))
+        self.assertTrue(wrapguard.blocked("GIT_SOMETHING_NEW"))
+        self.assertFalse(wrapguard.blocked("GIT_AUTHOR_NAME"))
 
 
 class EnvHookTest(unittest.TestCase):
@@ -516,6 +527,25 @@ class ShAgreesTest(unittest.TestCase):
                     self.assertEqual(stops, said, result.stderr)
                 finally:
                     os.remove(path)
+
+    def test_sh_ignores_git_location_variables(self):
+        # 子のワークツリーで、git の置き場を親に向ける変数を置いて呼んでも、ラッパーは居場所の
+        # ツリー（子）を操作する。変数が効くと、hook と sh の居場所の検査が子を見ている間に
+        # 親のワークツリーへコミットできる。
+        parent = self.trees["i0001"]
+        child = self.trees["i0001-01-01"]
+        write(os.path.join(parent, "only-in-parent.txt"), "x\n")
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env.pop("CLAUDE_PROJECT_DIR", None)
+        env.update(GIT_ENV)
+        env["PWD"] = child
+        env["GIT_DIR"] = os.path.join(self.root, ".git", "worktrees", "i0001")
+        env["GIT_WORK_TREE"] = parent
+        script = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-git.sh")
+        result = subprocess.run(
+            ["sh", script, "status", "--short"], cwd=child, env=env, capture_output=True, text=True
+        )
+        self.assertNotIn("only-in-parent.txt", result.stdout + result.stderr)
 
     def test_sh_symlinked_workspace(self):
         # ワークスペースを symlink 越しに開いたとき（macOS の /tmp → /private/tmp など）。

@@ -45,6 +45,11 @@ export GIT_TERMINAL_PROMPT GIT_PAGER PAGER GIT_EDITOR
 # GIT_CONFIG_KEY_n / VALUE_n は GIT_CONFIG_COUNT が無ければ読まれないので、
 # 番号を数えて消す必要はない。GIT_CONFIG_COUNT を消せば全部読まれない。
 unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJECT_DIRECTORIES 2>/dev/null || true
+# git が操作するリポジトリと作業ツリーを、居場所（cwd）でなく環境変数で決める経路も閉じる。
+# `GIT_DIR=<親>/.git GIT_WORK_TREE=<親> sh ccnavi-git.sh commit` を子のワークツリーで打つと、
+# 居場所の検査（hook と、下の子のワークツリーの検査）は子を見るのに、git は親へコミットする。
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_NAMESPACE \
+	GIT_CEILING_DIRECTORIES GIT_DISCOVERY_ACROSS_FILESYSTEM 2>/dev/null || true
 
 # 拒否の文面で代わりの形を示すときの、自分の呼び方。生の git は PreToolUse で
 # 止まるので、案内に `git stash push -u` と書くと、案内された先でもう 1 度拒否される。
