@@ -1038,6 +1038,24 @@ class C1MergeTest(C1Harness):
             self.assertIn(f"先に合流した子 {CHILD} の変更と重なる（{rel}）", result.stderr)
         self.assert_untouched(before, CHILD_B)
 
+    def test_a_path_ignored_in_the_parent_stops_without_overwriting_it(self):
+        self.start_parent()
+        tree = self.start_child()
+        common = git(self.tree, "rev-parse", "--git-common-dir").stdout.strip()
+        common = common if os.path.isabs(common) else os.path.join(self.tree, common)
+        write(os.path.join(common, "info", "exclude"), "wip/design/secret.md\n")
+        secret = write(os.path.join(self.tree, "wip", "design", "secret.md"), "USER SECRET\n")
+        write(os.path.join(tree, "wip", "design", "secret.md"), "child\n")
+        git(tree, "add", "-f", "wip/design/secret.md")
+        git(tree, "commit", "-q", "-m", "work")
+        before = self.sha(self.tree, "HEAD")
+        result = self.ticket("finish", CHILD)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("git の無視するファイル", result.stderr)
+        self.assertIn("wip/design/secret.md", result.stderr)
+        self.assertEqual(self.read(secret), "USER SECRET\n")
+        self.assert_untouched(before)
+
     def test_an_uncommitted_change_in_the_child_stops(self):
         self.start_parent()
         tree = self.start_child()

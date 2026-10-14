@@ -14,7 +14,8 @@
     合流するものが無いので `no`）
   - 止めるのは、親のワークツリーに状態の置き場以外の未コミットの変更がある、子のワークツリーが無い・
     子のブランチにいない・未コミットの変更がある、子の仕事の始まりから先頭までの変更に置き場のパスが
-    ある、範囲（子・親・フェーズ定義）の外のパスがある、のどれか
+    ある、範囲（子・親・フェーズ定義）の外のパスがある、子が変えたパスが親のワークツリーに
+    無視されたファイルとしてある（merge が黙って上書きし、戻すと消える）、のどれか
 - `ccnavi c1 merge-blame <子> <パス>...`: 衝突したパスを、先に親へ合流した別の子の変更から探す。
   `other <子> <パス>` を 1 パス 1 行で（パスの空白はそのまま、改行は `\\n`）。
   見つからなければ何も出さない
@@ -129,6 +130,22 @@ def plan(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> int:
     if not base:
         _stop(stdout, f"子 {ident} の先頭を読めない（{why}）。何も変えずに止めた", [])
         return 0
+    ignored, why = _ignored_in_parent(parent_tree, child_tree, base, head)
+    if why:
+        _stop(stdout, f"子 {ident} の変更を調べられない（{why}）。何も変えずに止めた", [])
+        return 0
+    if ignored:
+        _stop(
+            stdout,
+            f"子 {ident} が変えたパスが、親のワークツリーに git の無視するファイルとして"
+            f"ある（{_shown(ignored)}）。合流すると黙って上書きし、戻すときに消すので、"
+            "合流しない",
+            [
+                "親のワークツリーのそのファイルを、ユーザが中身を確かめて別の場所へ移すか"
+                "消してから finish をやり直す"
+            ],
+        )
+        return 0
     done = gitcmd.run(child_tree, ["merge-base", "--is-ancestor", head, parent_head], _TIMEOUT)
     _say(stdout, "child", ident)
     stdout.write(f"tree {child_tree}\n")
@@ -214,6 +231,35 @@ def _tree_problem(
             ["サブエージェントにコミットさせるか、不要な変更を取り除いてから finish をやり直す"],
         )
     return None
+
+
+def _ignored_in_parent(
+    parent_tree: str, child_tree: str, base: str, head: str
+) -> tuple[list[str], str]:
+    """子が `base..head` で変えたパスのうち、親のワークツリーに無視されたファイルとしてあるもの。
+
+    git の merge は無視されたファイルを黙って上書きし、合流を戻すとそのパスを消す。
+    2 つめは読めなかった理由。
+    """
+    ok, out = _git(child_tree, ["diff", "--name-only", "--no-renames", "-z", f"{base}..{head}"])
+    if not ok:
+        return [], "子の仕事の始まりからの差分を読めない"
+    present = [p for p in _names(out) if os.path.lexists(os.path.join(parent_tree, p))]
+    if not present:
+        return [], ""
+    done = gitcmd.run(
+        parent_tree,
+        ["check-ignore", "-z", "--stdin"],
+        _TIMEOUT,
+        raw_paths=True,
+        input="".join(p + "\0" for p in present),
+        plain_pathspecs=True,
+    )
+    if done.code == 1 and not done.failure:
+        return [], ""
+    if not done.ok:
+        return [], "親のワークツリーで無視されたファイルを確かめられない"
+    return sorted(set(_names(done.out))), ""
 
 
 def _same(a: str, b: str) -> bool:
