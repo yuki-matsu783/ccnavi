@@ -256,10 +256,17 @@ def _worktree(
         if text:
             stdout.write(f"warn: {text}\n")
         return EXIT_OK
+    if verb == "id" and len(words) == 3:
+        # 親のブランチ名から識別子を作り、親として採用できるかを言う（sh は字と長さを判定しない）。
+        stdout.write(f"id {ticket_ids.branch_to_id(words[2])}\n")
+        problem = ticket_ids.adoption_id_problem(words[2])
+        if problem:
+            stdout.write(f"problem {problem}\n")
+        return EXIT_OK
     if verb not in ("drop", "tidy", "remaining") or len(words) != 3:
         stderr.write(
             "ccnavi: worktree drop <名前> か worktree tidy <親> [--phase <N>]"
-            " か worktree remaining <親> か worktree name <名前>\n"
+            " か worktree remaining <親> か worktree name <名前> か worktree id <ブランチ>\n"
         )
         return EXIT_ERROR
     target = words[2]

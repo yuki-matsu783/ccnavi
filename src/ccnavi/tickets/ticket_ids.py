@@ -211,6 +211,31 @@ def issue_identifier(
     return ident
 
 
+def branch_to_id(branch: str) -> str:
+    """親のブランチ名から親の識別子を作る。`/` を `-` に置き換えるだけ。
+
+    ワークツリーは `.claude/worktrees/<識別子>` に、識別子のブランチを作らず親のブランチを直接
+    チェックアウトする。この変換は Python・sh（`ccnavi_branch_to_id`）・TS（拡張の `branchToId`）に
+    同じものを置き、`tests/fixtures/branch-to-id.json` の同じ表で一致を確かめる。
+    """
+    return branch.replace("/", "-")
+
+
+def adoption_id_problem(branch: str) -> str:
+    """既にあるブランチ（MR の元ブランチ）を親に採用するとき、識別子が使えない理由。使えれば空。
+
+    識別子の字と長さ（64 文字以内）に加えて、末尾が `-<2 桁>` でないことを求める
+    （子の識別子の途中と紛れる）。
+    """
+    ident = branch_to_id(branch)
+    problem = id_problem(ident)
+    if problem:
+        return problem
+    if _CHILD_TAIL.search(ident):
+        return "識別子の末尾が `-<2 桁>` になる（子の識別子の途中と紛れる）"
+    return ""
+
+
 # 親のブランチ名は、`branch:` が無ければ親の識別子そのもの（名前を求める関数が恒等写像なので、
 # Python・sh・TS で食い違わない）。識別子を、ブランチ名として安全で、
 # 統合先と紛れない形にそろえる。いまは `--lint` の warn だけで、承認は止めない。

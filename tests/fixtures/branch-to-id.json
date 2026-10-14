@@ -1,0 +1,24 @@
+{
+  "note": "親のブランチ名 -> 親の識別子（/ を - に置き換える）。Python・sh・TS（chrome / vscode の拡張）が同じ表で一致を確かめる。",
+  "convert": [
+    {"branch": "main", "id": "main"},
+    {"branch": "feature-12-login", "id": "feature-12-login"},
+    {"branch": "feature/123-login", "id": "feature-123-login"},
+    {"branch": "feature/user/456-login", "id": "feature-user-456-login"},
+    {"branch": "fix/a.b_c", "id": "fix-a.b_c"},
+    {"branch": "feature/日本語の件", "id": "feature-日本語の件"},
+    {"branch": "a//b", "id": "a--b"},
+    {"branch": "release/1.0", "id": "release-1.0"}
+  ],
+  "adopt": [
+    {"branch": "feature/123-login", "ok": true},
+    {"branch": "feature-12-login", "ok": true},
+    {"branch": "feature/123-login-05", "ok": false, "why": "末尾が -2桁"},
+    {"branch": "feature/123-login-05-01", "ok": false, "why": "末尾が -2桁"},
+    {"branch": "feature/123-login-5", "ok": true},
+    {"branch": "feature/1234-login-v2", "ok": true},
+    {"branch": "feature/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "ok": false, "why": "64文字を超える"},
+    {"branch": "fe/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "ok": true},
+    {"branch": "feature/a b", "ok": false, "why": "使えない字"}
+  ]
+}
