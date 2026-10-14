@@ -534,6 +534,18 @@ class ProjectsAddedByMistakeTest(unittest.TestCase):
 
         self.assertTrue(any(".claude/ を持つ" in d for d in details), details)
 
+    def test_a_worktree_inside_a_project_is_named(self):
+        """プロジェクトの中の `.claude/worktrees/` のワークツリーは、走査の対象外なので言う。"""
+        self.forget()
+        os.makedirs(os.path.join(self.projects, "lib", ".claude", "worktrees", "feature-1-memo"))
+
+        details = [p["detail"] for p in self.lint() if p["where"] == "(projects/lib)"]
+
+        self.assertTrue(
+            any("プロジェクトの中にワークツリーがある（feature-1-memo）" in d for d in details),
+            details,
+        )
+
     # ---- A5c. 通常のファイルと gitlink の両方
 
     def test_a_file_and_a_gitlink_are_named_once_as_a_collision(self):

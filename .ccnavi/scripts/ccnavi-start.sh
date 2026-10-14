@@ -158,6 +158,14 @@ command -v jq >/dev/null 2>&1 || fail no-jq "jqが見つかりません。候補
 root=$(ccnavi_workspace) ||
 	fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
 ccnavi_log_root="$root"
+# ルートが projects/<名前> になったのは、プロジェクトの .ccnavi/scripts/ の写しを取り違えた
+# （ワークスペースの ccnavi が古い、または外側に写しが無い）形。このまま進むと、ワークツリーが
+# プロジェクトの中にでき、承認の走査から外れる。別のリポジトリで着手し直さず、直してから打ち直す
+case "$(dirname "$root")" in
+*/projects)
+	fail root-in-project "ワークスペースルートが ${root} と読まれました（projects/<名前> の中）。ワークスペースの ccnavi が古いか、外側に .ccnavi/scripts/ がありません。何も作成せずに処理を中断しました。別のリポジトリや別のツリーで着手し直さず、ユーザに状況を伝えてください（直し方: ワークスペースで scripts/ccnavi-setup.sh --force、または CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡す）。" 2
+	;;
+esac
 here="$(pwd -W 2>/dev/null || pwd)"
 top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 [ -n "$top" ] ||
@@ -679,6 +687,9 @@ finish_up() {
 
 # 結果を 1 項目 1 行で出す。<ブランチ> <MR の URL か空> <MR の番号か空>
 report() {
+	# 着手の対象。意図したリポジトリかを、出力を読んだ側が確かめられるようにする
+	rp_name=$(ccnavi_project "$top" "$root")
+	printf '対象リポジトリ: %s（%s）\n' "${ccnavi_h_path:-$top}" "${rp_name:-ワークスペース自身}"
 	printf 'ワークツリー: %s\n' "$wt"
 	printf 'ブランチ: %s\n' "$1"
 	printf '識別子: %s\n' "$(ccnavi_branch_to_id "$1")"
