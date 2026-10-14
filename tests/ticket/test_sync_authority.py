@@ -211,6 +211,8 @@ class NoRecordTest(AuthorityHarness):
         # 生成の時刻は秒で変わるので外す（秒の境目で比べがぶれない）。
         board = self.board()
         board.pop("generated_at", None)
+        # 親のワークツリーが無い親（記録だけがある i0099）は「未準備」に出る。ほかの答えは変わらない
+        board.pop("unprepared", None)
         return board
 
     def test_answers_do_not_change_without_a_record(self):
