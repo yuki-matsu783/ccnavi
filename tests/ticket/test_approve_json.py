@@ -513,7 +513,7 @@ class ApproveJsonTest(PhaseHarness):
     # ---- 4d2. 照合と書き込みは同じ読みを使う（読み直しの間に差し替えられても通さない）
 
     def yes_in_process(self, tickets, digest):
-        """`--agree --yes … --digest … --json` を同じプロセスで動かす（途中に差し替えを挟むため）。"""
+        """`--agree --yes … --json` を同じプロセスで動かす（途中に差し替えを挟むため）。"""
         argv = c1flag.as_c1(
             self.root,
             self.state,
