@@ -777,3 +777,95 @@ export async function createBranch(client: Client, owner: string, repo: string, 
   if (made.ref !== `refs/heads/${name}`) throw new HostError("作ったブランチの名前が、頼んだ名前と違う");
   return checkOid(made.object?.sha);
 }
+
+// ---- 「始める」。既存の MR の採用と、新しい MR の作成 ----------------------------------
+
+/** 開いた MR を読むページの上限（100 × 20）。超えたら読み切れないので止める（既存の MR を見落として重複を作らない） */
+export const MR_PAGES = 20;
+
+/** 採用を考える MR 1 本。拡張が見るのはこの欄だけ（`ccnavi-branches.sh` の `mrs` と同じ形） */
+export interface MrInfo {
+  readonly number: number;
+  readonly branch: string;
+  readonly state: string;
+  readonly url: string;
+  readonly title: string;
+  readonly body: string;
+  readonly base: string;
+  readonly fork: boolean;
+}
+
+/** 開いた MR（PR）の全部。issue に紐づく MR の探索と、採用の確認に使う。読むだけ */
+export async function listOpenMrs(client: Client, owner: string, repo: string): Promise<MrInfo[]> {
+  const { items, more } = await restPages(client, `${repoPath(owner, repo)}/pulls?state=open&per_page=100`, MR_PAGES);
+  if (more) throw new HostError("開いたマージリクエストが多すぎて読み切れない。既存の MR を見落とさないよう、「始める」は手元で行ってください");
+  const own = `${owner}/${repo}`.toLowerCase();
+  const out: MrInfo[] = [];
+  for (const p of items as { number?: unknown; title?: unknown; body?: unknown; html_url?: unknown; head?: { ref?: unknown; repo?: { full_name?: unknown } | null }; base?: { ref?: unknown } }[]) {
+    if (typeof p.number !== "number" || typeof p.head?.ref !== "string") continue;
+    out.push({
+      number: p.number,
+      branch: p.head.ref,
+      state: "open",
+      url: String(alt(p.html_url, "")),
+      title: String(alt(p.title, "")),
+      body: String(alt(p.body, "")),
+      base: String(alt(p.base?.ref, "")),
+      // フォークから出た MR は、元ブランチがこのリポジトリに無い
+      fork: String(alt(p.head.repo?.full_name, "")).toLowerCase() !== own,
+    });
+  }
+  return out;
+}
+
+/** 同じブランチ名のマージ済み MR（`head=<owner>:<branch>` の閉じた PR のうち `merged_at` があるもの）。読むだけ */
+export async function listMergedMrs(client: Client, owner: string, repo: string, branch: string): Promise<{ number: number; url: string }[]> {
+  const head = encodeURIComponent(`${checkName(owner, "owner")}:${checkBranch(branch)}`);
+  const { items, more } = await restPages(client, `${repoPath(owner, repo)}/pulls?state=closed&head=${head}&per_page=100`, MR_PAGES);
+  if (more) throw new HostError("閉じたマージリクエストが多すぎて読み切れない");
+  const out: { number: number; url: string }[] = [];
+  for (const p of items as { number?: unknown; html_url?: unknown; merged_at?: unknown }[]) {
+    if (typeof p.number === "number" && p.merged_at !== null && p.merged_at !== undefined) out.push({ number: p.number, url: String(alt(p.html_url, "")) });
+  }
+  return out;
+}
+
+/**
+ * 作ったブランチに空の初期コミットを積む（`ccnavi-start.sh` の初期コミットと同じ）。GitHub は差分のない
+ * ブランチからは PR を作れないので、MR を作る前に要る。親のコミットの tree をそのまま使う新しいコミットを作り
+ * （`POST /git/commits`）、ブランチをそこへ進める（`PATCH /git/refs/heads/<name>`）。新しい先頭の sha を返す。
+ */
+export async function startCommit(client: Client, owner: string, repo: string, name: string, message: string): Promise<string> {
+  const refName = checkBranch(name).split("/").map(encodeURIComponent).join("/");
+  const refPath = `${repoPath(owner, repo)}/git/refs/heads/${refName}`;
+  const ref = await rest(client, `${repoPath(owner, repo)}/git/ref/heads/${refName}`);
+  const parent = checkOid((ref.body as { object?: { sha?: unknown } } | null)?.object?.sha);
+  const commit = await rest(client, `${repoPath(owner, repo)}/git/commits/${parent}`);
+  const tree = checkOid((commit.body as { tree?: { sha?: unknown } } | null)?.tree?.sha);
+  const post = async (path: string, method: string, body: unknown): Promise<unknown> => {
+    client.counter.rest += 1;
+    const res = await send(client, `${client.host.api}${path}`, { method, headers: { ...headers(client), "Content-Type": "application/json" }, body: JSON.stringify(body) }, `${method} ${path}`);
+    if (!res.ok) throw new HostError(`GitHub が ${res.status} を返した: ${method} ${path}`, res.status);
+    return res.json();
+  };
+  const made = (await post(`${repoPath(owner, repo)}/git/commits`, "POST", { message, tree, parents: [parent] })) as { sha?: unknown };
+  const sha = checkOid(made.sha);
+  await post(refPath, "PATCH", { sha, force: false });
+  return sha;
+}
+
+/** Draft の MR（PR）を作る。`head` は同じリポジトリのブランチ。番号と URL を返す */
+export async function createDraftMr(client: Client, owner: string, repo: string, head: string, base: string, title: string, body: string): Promise<{ number: number; url: string }> {
+  const path = `${repoPath(owner, repo)}/pulls`;
+  client.counter.rest += 1;
+  const res = await send(
+    client,
+    `${client.host.api}${path}`,
+    { method: "POST", headers: { ...headers(client), "Content-Type": "application/json" }, body: JSON.stringify({ head: checkBranch(head), base: checkBranch(base), title, body, draft: true }) },
+    `POST ${path}`,
+  );
+  if (!res.ok) throw new HostError(`GitHub が Draft のマージリクエストを作りませんでした（${res.status}）`, res.status);
+  const made = (await res.json()) as { number?: unknown; html_url?: unknown };
+  if (typeof made.number !== "number") throw new HostError("作ったマージリクエストの番号を取得できません");
+  return { number: made.number, url: String(alt(made.html_url, "")) };
+}

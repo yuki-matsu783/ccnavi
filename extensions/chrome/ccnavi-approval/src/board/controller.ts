@@ -369,18 +369,21 @@ export function createBoardController(env: BoardEnv): BoardController {
     },
     start(repoBoard, issue) {
       void act(async () => {
-        if (!env.confirm(`Issue #${issue.number} から親ブランチを作成します。起点は統合先 ${repoBoard.integration?.name ?? ""} の最新コミットです（マージリクエストは作成しません）。`)) return false;
+        if (!env.confirm(`Issue #${issue.number} から作業を始めます。issue に紐づく開いたマージリクエストがあれば、その元ブランチを採用します（ブランチもマージリクエストも作りません）。無ければ、統合先 ${repoBoard.integration?.name ?? ""} の最新コミットを起点に、親ブランチと Draft のマージリクエストを作成します。`)) return false;
         const deps = await writeDeps(repoBoard.repo);
         const taken = [...repoBoard.candidates, ...repoBoard.families.map((f) => f.family.name)];
         const out = await ops.startIssue(repoBoard.repo, issue, repoBoard.seen ?? null, taken, deps);
+        const done = out.kind === "started" || out.kind === "adopted";
         set({
           result: {
-            kind: out.kind === "started" ? "written" : out.kind,
-            className: `notice ${out.kind === "started" ? "ok" : "error"}`,
+            kind: done ? "written" : out.kind,
+            className: `notice ${done ? "ok" : "error"}`,
             text:
               out.kind === "started"
-                ? `親ブランチ ${out.name} を作成しました（${out.head.slice(0, 7)}）。エージェントに、このブランチで作業を開始するよう依頼してください。`
-                : `作業を開始できませんでした：${out.message}`,
+                ? `親ブランチ ${out.name} と Draft のマージリクエスト !${out.mr.number} を作成しました（${out.head.slice(0, 7)}）。親の提案の frontmatter に mr: ${out.mr.number} を必ず書き、エージェントにこのブランチで作業を開始するよう依頼してください。`
+                : out.kind === "adopted"
+                  ? `既存のマージリクエスト !${out.mr.number} の元ブランチ ${out.name}（識別子 ${out.identifier}）を採用しました。ブランチもマージリクエストも作っていません。親の提案の frontmatter に mr: ${out.mr.number} を必ず書き、エージェントにこのブランチで作業を開始するよう依頼してください。`
+                  : `作業を開始できませんでした：${out.message}`,
           },
         });
         return true;

@@ -148,7 +148,7 @@ test("CX-T221 確認のダイアログで断れば何も書かない（承認・
     approveFamily: async () => (calls.push("approve"), WRITTEN),
     confirmPhase: async () => (calls.push("review"), WRITTEN),
     withdrawTicket: async () => (calls.push("withdraw"), WRITTEN),
-    startIssue: async () => (calls.push("start"), { kind: "started", name: "feature-1-x", head: "abcdef0123" }),
+    startIssue: async () => (calls.push("start"), { kind: "started", name: "feature-1-x", head: "abcdef0123", mr: { number: 7, url: "https://example.invalid/7" } }),
   };
   const h = harness({ confirm: false, prompt: null, ops });
   await h.c.refresh();

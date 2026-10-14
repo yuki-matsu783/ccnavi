@@ -1273,6 +1273,57 @@ def _op_start(req: dict, root: str) -> dict:
     return {"identifier": ident, "integration": integ, "problems": problems}
 
 
+def _op_adopt(req: dict, root: str) -> dict:
+    """既にある MR の元ブランチを親として採用してよいか。識別子と、採用できない理由。
+
+    `ccnavi-start.sh` の採用の確認のうち、ブランチ名と識別子に関わる分を `ticket_ids` で確かめる。
+    ブランチ名が保護された名前や使えない書き方でないこと、`/` を `-` に置き換えた識別子が使えること
+    （64 文字以内、末尾が `-<2 桁>` でない）、同じ識別子になる別のブランチが無いこと（`names` は origin の
+    全ブランチの名前）、識別子が統合先の `done/` でクローズ済みでないこと、互換の版が合うこと。
+    MR が open か・フォークか・マージ先・マージ済みの MR の有無は、ホストに聞く拡張の側で確かめる。
+    """
+    snap = _snapshot(req)
+    place = _placement()
+    branch = req.get("branch")
+    if not isinstance(branch, str) or not branch:
+        raise Refused("branch は MR の元ブランチの名前")
+    names = req.get("names") or []
+    if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+        raise Refused("names はブランチ名のリスト")
+    integ = snap["integration"]["name"]
+    ident = ticket_ids.branch_to_id(branch)
+    problems = []
+    if branch.casefold() == integ.casefold():
+        problems.append(f"ブランチ {branch} は統合先の名前です")
+    why = ticket_ids.branch_problem(branch)
+    if why:
+        problems.append(f"ブランチ {branch} は採用できません（{why}）")
+    why = ticket_ids.adoption_id_problem(branch)
+    if why:
+        problems.append(f"識別子 {ident} は使えません（{why}）")
+    folded = ident.casefold()
+    clash = sorted(
+        {
+            n
+            for n in names
+            if n != branch and ticket_ids.branch_to_id(n).casefold() == folded
+        }
+    )
+    if clash:
+        problems.append(
+            f"ブランチ {branch} と {', '.join(clash)} は、どちらも識別子 {ident} になります"
+        )
+    if folded in {i.casefold() for i in _closed(snap, place)}:
+        problems.append(
+            f"{ident} は統合先 {integ} の done/ でクローズ済みです"
+            "（クローズ済みの識別子は再利用できません）"
+        )
+    compat = _compat(snap)
+    if not compat["same"]:
+        problems.append(compat["message"])
+    return {"identifier": ident, "integration": integ, "problems": problems}
+
+
 def _op_version(req: dict, root: str) -> dict:
     return {"version": version.VERSION, "compat": version.COMPAT, "python": sys.version.split()[0]}
 
@@ -1287,6 +1338,7 @@ _OPS = {
     "confirm": _op_confirm,
     "compat": _op_compat,
     "start": _op_start,
+    "adopt": _op_adopt,
     "version": _op_version,
 }
 

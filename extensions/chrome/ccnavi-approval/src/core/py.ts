@@ -214,6 +214,13 @@ export interface StartResult {
   readonly problems: readonly string[];
 }
 
+/** 「始める」で既存の MR を採用してよいかの答え。`problems` が空なら `identifier` で続けられる */
+export interface AdoptResult {
+  readonly identifier: string;
+  readonly integration: string;
+  readonly problems: readonly string[];
+}
+
 export interface Actor {
   readonly account: string;
   readonly version: string;
@@ -254,6 +261,8 @@ export const py = {
   ) => ask<WithdrawResult>(call, "withdraw", { ...body }, ""),
   start: (call: PyCall, body: { snapshot: Snapshot; issue: number; title: string; prefix?: string; taken: readonly string[] }) =>
     ask<StartResult>(call, "start", { ...body }, ""),
+  adopt: (call: PyCall, body: { snapshot: Snapshot; branch: string; names: readonly string[] }) =>
+    ask<AdoptResult>(call, "adopt", { ...body }, ""),
   confirm: (
     call: PyCall,
     body: {

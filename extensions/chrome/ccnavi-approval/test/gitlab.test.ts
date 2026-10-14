@@ -259,17 +259,33 @@ test("CX-T150 「始める」: issue から feature-<番号>-<slug> のブラン
     const b = await collectRepo(repo, d);
     const taken = [...b.candidates, ...b.families.map((f) => f.family.name)];
     const out = await startIssue(repo, list[0], b.seen ?? null, taken, d);
-    assert.deepEqual(out, { kind: "started", name: "feature-12-新しい機能", head: mock.head("main") }, host);
+    // ブランチは統合先の先頭から作り、初期コミット（GitHub）を積み、Draft の MR を作る
+    assert.equal(out.kind, "started", JSON.stringify(out));
+    if (out.kind !== "started") return;
+    assert.equal(out.name, "feature-12-新しい機能", host);
+    assert.equal(out.head, mock.head("feature-12-新しい機能"), host);
     assert.deepEqual(mock.createdBranches, [{ name: "feature-12-新しい機能", sha: mock.head("main") }]);
+    assert.deepEqual(mock.startCommits.length, host === "github.com" ? 1 : 0, host);
+    assert.equal(mock.createdMrs.length, 1, host);
+    assert.equal(mock.createdMrs[0].head, "feature-12-新しい機能", host);
+    assert.equal(mock.createdMrs[0].base, "main", host);
+    assert.equal(mock.createdMrs[0].body, "Closes #12", host);
+    assert.equal(mock.createdMrs[0].draft, true, host);
+    assert.equal(out.mr.number, mock.createdMrs[0].number, host);
     const closed = await startIssue(repo, { number: 5, title: "Closed" }, b.seen ?? null, taken, d);
     assert.equal(closed.kind, "refused", host);
     assert.match(closed.kind === "refused" ? closed.message : "", /feature-5-closed は統合先 main の done\/ でクローズ済みです[\s\S]*フォールバック/);
     const open = await startIssue(repo, { number: 1, title: "OPEN" }, b.seen ?? null, taken, d);
     assert.match(open.kind === "refused" ? open.message : "", /同じ名前のブランチが既にあります（feature-1-open）/);
+    // もう一度押すと、作った Draft の MR が issue に紐づく開いた MR として見つかり、採用する（何も作らない）
     const again = await startIssue(repo, list[0], b.seen ?? null, taken, d);
-    assert.equal(again.kind, "refused", host);
-    // 全部のブランチの名前を大文字小文字をそろえて比べる（直近 N 日の外のブランチも）
-    assert.match(again.kind === "refused" ? again.message : "", /同じ名前のブランチが既にあります（feature-12-新しい機能）/);
+    assert.deepEqual(again, { kind: "adopted", name: "feature-12-新しい機能", identifier: "feature-12-新しい機能", mr: { number: out.mr.number, url: out.mr.url } }, host);
+    assert.equal(mock.createdBranches.length, 1, host);
+    assert.equal(mock.createdMrs.length, 1, host);
+    // MR が無いのに同じ名前のブランチがあれば、全部のブランチの名前を大文字小文字をそろえて比べて断る（直近 N 日の外のブランチも）
+    mock.mrs.length = 0;
+    const clash = await startIssue(repo, list[0], b.seen ?? null, taken, d);
+    assert.match(clash.kind === "refused" ? clash.message : "", /同じ名前のブランチが既にあります（feature-12-新しい機能）/, host);
     assert.equal(mock.createdBranches.length, 1, host);
   }
 });
