@@ -259,11 +259,24 @@ def _worktree(
             stdout.write(f"warn: {text}\n")
         return EXIT_OK
     if verb == "id" and len(words) == 3:
-        # 親のブランチ名から識別子を作り、親として採用できるかを言う（sh は字と長さを判定しない）。
-        stdout.write(f"id {ticket_ids.branch_to_id(words[2])}\n")
-        problem = ticket_ids.adoption_id_problem(words[2])
-        if problem:
-            stdout.write(f"problem {problem}\n")
+        # ブランチ名から識別子を作り、使えるかを言う（sh は字の種類・NFC・長さを判定しない）。
+        for line in ticket_ids.id_answer(words[2]):
+            stdout.write(line + "\n")
+        return EXIT_OK
+    if verb == "issue-id" and len(words) in (4, 5):
+        # issue から新しい親のブランチ名（= 識別子）を作る。Chrome の「始める」と同じ関数。
+        # worktree issue-id <番号> <先頭の語> [<プロジェクト>] --title <題>
+        try:
+            ident = ticket_ids.issue_identifier(
+                int(words[2]) if words[2].isdigit() else 0,
+                args.title,
+                words[4] if len(words) == 5 else "",
+                words[3],
+            )
+        except ValueError as exc:
+            stderr.write(f"ccnavi: {exc}\n")
+            return EXIT_ERROR
+        stdout.write(f"id {ident}\n")
         return EXIT_OK
     if verb == "branch" and len(words) in (3, 4) and words[3:] in ([], ["confirmed"]):
         # 親を閉じたときに片付ける子として記録したブランチを、条件を確かめ直して消す。
@@ -279,7 +292,8 @@ def _worktree(
             "ccnavi: worktree drop <名前> か worktree tidy <親> [--phase <N>]"
             " か worktree remaining <親> か worktree retire <親>"
             " か worktree branch <名前> [confirmed]"
-            " か worktree name <名前> か worktree id <ブランチ>\n"
+            " か worktree name <名前> か worktree id <ブランチ>"
+            " か worktree issue-id <番号> <先頭の語> [<プロジェクト>] --title <題>\n"
         )
         return EXIT_ERROR
     target = words[2]

@@ -85,6 +85,42 @@ ccnavi_ask() {
 	printf '%s\n' "$ccnavi_ak_out" | tr -d '\r'
 }
 
+# ブランチ名から作る識別子と、それが使えるかを実行ファイル（`worktree id`）に聞く。<ワークスペースルート> <ブランチ>
+#
+# 答えは ccnavi_id_ident（識別子）・ccnavi_id_problem（親のブランチとして採用できない理由。58 文字・末尾の
+# -<2 桁>・字の種類・NFC）・ccnavi_id_direct（直接作業や子のワークツリーとして使えない理由。64 文字・字の種類・NFC）・
+# ccnavi_id_child（子の識別子の形なら yes）に入れる。sh は字の種類と NFC と文字数を自分で確かめない
+# （`ccnavi_is_ident` と `ccnavi_is_branch` は ASCII の外のバイトを通す。`${#x}` は dash ではバイト数になる）。
+# 実行ファイルが無い・答えないなら 1（呼ぶ側は「確かめられない」として止める。誤判定する代わりの判定はしない）。
+ccnavi_id_ask() {
+	ccnavi_ia_out=$(ccnavi_ask "$1" worktree id "$2") || ccnavi_ia_out=""
+	ccnavi_id_ident=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^id //p' | head -n 1)
+	ccnavi_id_problem=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^problem //p' | head -n 1)
+	ccnavi_id_direct=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^direct //p' | head -n 1)
+	ccnavi_id_child=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^child //p' | head -n 1)
+	[ -n "$ccnavi_id_ident" ]
+}
+
+# <一覧> のブランチ名（1 行 1 本）のうち、<ブランチ> と同じ識別子になる別の名前を 1 つ出す。無ければ 1。<ブランチ> <一覧>
+#
+# 識別子（/ を - に置き換えたもの）は英字の大文字小文字をそろえて比べる。大文字小文字を区別しない機械
+# （macOS・Windows）では、`.claude/worktrees/Feature-12-x` と `feature-12-x` が同じ置き場になる。
+# 同じ識別子になる名前は長さも同じ（`${#x}` がバイト数でも字数でも、同じシェルの中では同じ数え方）なので、
+# 長さの違うものは比べずに飛ばす。
+ccnavi_id_clash() {
+	ccnavi_ic_want=$(ccnavi_branch_to_id "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+	while IFS= read -r ccnavi_ic_other; do
+		[ -n "$ccnavi_ic_other" ] || continue
+		[ "$ccnavi_ic_other" != "$1" ] || continue
+		[ "${#ccnavi_ic_other}" -eq "${#1}" ] || continue
+		if [ "$(ccnavi_branch_to_id "$ccnavi_ic_other" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')" = "$ccnavi_ic_want" ]; then
+			printf '%s\n' "$ccnavi_ic_other"
+			return 0
+		fi
+	done <"$2"
+	return 1
+}
+
 # 取り込み状態から 1 項目を読む。無ければ空。<ファイル> <鍵>
 ccnavi_record_get() {
 	[ -f "$1" ] || return 0

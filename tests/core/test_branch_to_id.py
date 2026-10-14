@@ -10,6 +10,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import unicodedata
 import unittest
 
 from ccnavi.entry import cli
@@ -48,6 +49,50 @@ class BranchToIdTest(unittest.TestCase):
                 lines = out.getvalue().splitlines()
                 self.assertEqual(lines[0], "id " + ticket_ids.branch_to_id(case["branch"]))
                 self.assertEqual(len(lines) == 1, case["ok"], out.getvalue())
+
+    def ask(self, *words):
+        root = os.path.join(ROOT, "tests", "fixtures")
+        out, err = io.StringIO(), io.StringIO()
+        code = cli.run(io.StringIO(), out, err, ["--root", root, *words])
+        return code, out.getvalue().splitlines(), err.getvalue()
+
+    def test_exe_answers_whether_a_direct_or_child_worktree_can_use_the_name(self):
+        """直接作業・子のワークツリーは 64 文字までで、末尾の -2 桁は断らない（`direct` の行）。
+
+        字の種類・NFC は親と同じに断る（sh はマルチバイトの字を見分けないので、ここに聞く）。
+        """
+        nfd = unicodedata.normalize("NFD", "feature-が")
+        for name, direct_ok, child in (
+            ("i0001-01-01", True, True),
+            ("topic-" + "a" * 58, True, False),
+            ("topic-" + "a" * 59, False, False),
+            ("feature-１２３", False, False),
+            ("feature/１２", False, False),
+            (nfd, False, False),
+        ):
+            with self.subTest(name=name):
+                code, lines, err = self.ask("worktree", "id", name)
+                self.assertEqual(code, 0, err)
+                self.assertEqual(any(x.startswith("direct ") for x in lines), not direct_ok, lines)
+                self.assertEqual("child yes" in lines, child, lines)
+
+    def test_exe_makes_the_branch_of_an_issue_as_chrome_does(self):
+        for args, title, ident in (
+            (("7", "feature"), "Update 10 20", "feature-7-update"),
+            (("7", "feature"), "Fix bug 12", "feature-7-fix-bug"),
+            (("7", "fix", "web"), "ログイン画面", "fix-7-web-ログイン画面"),
+        ):
+            with self.subTest(title=title):
+                code, lines, err = self.ask("worktree", "issue-id", *args, "--title", title)
+                self.assertEqual(code, 0, err)
+                self.assertEqual(lines, [f"id {ident}"])
+                project = args[2] if len(args) == 3 else ""
+                self.assertEqual(
+                    ticket_ids.issue_identifier(int(args[0]), title, project, args[1]), ident
+                )
+        code, lines, err = self.ask("worktree", "issue-id", "7", "Bad-Prefix", "--title", "x")
+        self.assertNotEqual(code, 0)
+        self.assertEqual(lines, [])
 
 
 if __name__ == "__main__":

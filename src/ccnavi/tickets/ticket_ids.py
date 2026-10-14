@@ -244,6 +244,32 @@ def adoption_id_problem(branch: str) -> str:
     return ""
 
 
+def id_answer(branch: str) -> list[str]:
+    """sh の `worktree id <ブランチ>` への答え（1 行 1 項目）。
+
+    - `id <識別子>`: ブランチ名の `/` を `-` に置き換えたもの
+    - `problem <理由>`: 親のブランチとして採用できない理由（ブランチ名の字と形・識別子の字と NFC・
+      58 文字・末尾の `-<2 桁>`）。使えれば出さない
+    - `direct <理由>`: 直接作業や子のワークツリーの名前として使えない理由（ブランチ名の字と形・
+      識別子の字と NFC・64 文字）。使えれば出さない
+    - `child yes`: 子の識別子の形（`<親>-<2 桁>-<2 桁>`）
+
+    sh は字の種類と NFC と文字数を自分で確かめない（ロケールでバイト数と字数が変わる）。ここに聞く。
+    """
+    ident = branch_to_id(branch)
+    lines = [f"id {ident}"]
+    shape = branch_problem(branch)
+    problem = shape or adoption_id_problem(branch)
+    if problem:
+        lines.append(f"problem {problem}")
+    direct = shape or id_problem(ident)
+    if direct:
+        lines.append(f"direct {direct}")
+    if "/" not in branch and _CHILD.match(ident):
+        lines.append("child yes")
+    return lines
+
+
 # 親の識別子は、親のブランチ名の `/` を `-` に置き換えたもの（`branch_to_id`）。新しく切る親の
 # 識別子を、ブランチ名として安全で、統合先と紛れない形にそろえる。いまは `--lint` の warn だけで、
 # 承認は止めない。
