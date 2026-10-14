@@ -471,11 +471,81 @@ class SubagentParentTreeTest(unittest.TestCase):
         reason = self.hook(parent, " ".join(GIT + ["commit -m x"]), agent="")
         self.assertFalse(self.denied(reason), reason)
 
+    def test_a_subagent_cannot_write_into_the_parent_tree_from_the_shell(self):
+        # Bash からの書き込みも、行き先が親のワークツリーなら止める。
+        parent = self.trees["i0001"]
+        child = self.trees["i0001-01-01"]
+        x = os.path.join(parent, "src", "x.py")
+        for command in (
+            f"echo hi > {x}",
+            f"echo hi >> {x}",
+            "cd ../i0001 && echo hi > src/x.py",
+            f"cd {parent} && printf x >src/x.py",
+            f"sed -i s/a/b/ {x}",
+            f"sed -i.bak -e s/a/b/ {x}",
+            f"cp /etc/hosts {x}",
+            f"cp -t {parent}/src /etc/hosts",
+            f"mv {x} /tmp/x.py",
+            f"tee {x} < /dev/null",
+            f"echo x | tee -a {x}",
+            f"touch {x}",
+            f"rm -f {x}",
+            f"dd if=/dev/zero of={x} count=1",
+            f"env -C {parent} touch src/x.py",
+            # インタプリタに渡したコード。親のパスと書き込みを疑う語が並べば止める。
+            f"python3 -c \"open('{x}','w').write('x')\"",
+            f"node -e \"require('fs').writeFileSync('{x}','x')\"",
+            f"perl -e 'open F, \">{x}\"'",
+            "python3 -c \"open('../i0001/src/x.py','w')\"",
+            f"cd {parent} && python3 -c \"open('x','w')\"",
+            f"sh -c 'echo hi > {x}'",
+        ):
+            with self.subTest(command=command):
+                reason = self.hook(child, command)
+                self.assertTrue(self.denied(reason), reason)
+                self.assertNotIn("ccnavi-git.sh write", reason)
+        # 居場所の読めない cd の後の相対の書き込みは、どのツリーか決まらないので止める。
+        reason = self.hook(child, 'cd "$X" && echo hi > out.txt')
+        self.assertTrue(self.denied(reason), reason)
+        self.assertIn("読めません", reason)
+
+    def test_shell_writes_that_stay_out_of_the_parent_tree_pass(self):
+        # 誤って止めないこと: 子のワークツリーへの書き込み、fd の複製と /dev/null、下書きの置き場、
+        # 親のパスを読むだけのコード、メインのエージェント。
+        parent = self.trees["i0001"]
+        child = self.trees["i0001-01-01"]
+        x = os.path.join(parent, "src", "x.py")
+        for command in (
+            "echo hi > src/x.py",
+            f"echo hi > {child}/src/x.py",
+            "cd ../i0001-01-01 && sed -i s/a/b/ src/x.py",
+            f"cat {x} > src/x.py",
+            f"cp {x} src/x.py",
+            "make test 2>&1 | tail -3",
+            "ls >/dev/null 2>&1",
+            f"cd {parent} && cat src/x.py 2>&1",
+            f"cd {parent} && grep -rn a src >/dev/null",
+            f"echo note > {parent}/wip/handoff/n.md",
+            f"cp /tmp/f.yml {parent}/wip/proposals/flows/x.yml",
+            f"echo x > {parent}/wip/eli5/n.md",
+            f"python3 -c \"print(open('{x}').read())\"",
+            "python3 -c \"open('out.txt','w').write('x')\"",
+            f"diff {x} src/x.py > /tmp/d.txt",
+        ):
+            with self.subTest(command=command):
+                reason = self.hook(child, command)
+                self.assertFalse(self.denied(reason), reason)
+        reason = self.hook(child, f"echo hi > {x}", agent="")
+        self.assertFalse(self.denied(reason), reason)
+
     def test_a_subagent_cannot_write_into_the_parent_tree(self):
         parent = self.trees["i0001"]
         child = self.trees["i0001-01-01"]
         reason = self.hook(child, "", tool="Write", path=os.path.join(parent, "src", "x.py"))
         self.assertTrue(self.denied(reason), reason)
+        # 文面はファイルの書き込みとして言う（ラッパーの副命令と取り違えない）。
+        self.assertNotIn("ccnavi-git.sh write", reason)
+        self.assertIn("書き込みません（Write）", reason)
         reason = self.hook(child, "", tool="Write", path=os.path.join(child, "src", "x.py"))
         self.assertFalse(self.denied(reason), reason)
         # 提案・下書きの置き場は、置き場ごとの保護に任せる（フローの下書きを書く経路）。

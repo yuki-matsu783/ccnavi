@@ -34,7 +34,7 @@ from ..tickets import (
     ticket_model,
     ticket_places,
 )
-from . import docsearch, projskills, reasons, wrapguard
+from . import docsearch, parentwrite, projskills, reasons, wrapguard
 
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
 # それより先に自前の判定を出し終えることが、遅い判定が何も返さないまま許可として扱われて
@@ -438,11 +438,26 @@ def decide_before(
     # 実行先のツリー）で見るので、子のワークツリーでのコミットと、子のワークツリーで親のブランチを
     # 取り込む merge は通る。
     if conf.tickets_enabled and payload.agent_id:
-        sub, where = "", ""
+        sub, where, message = "", "", ""
         if payload.tool_name == "Bash":
             sub, where = wrapguard.check_parent_tree_git(
                 conf, root, payload.cwd, record.subject, record.degraded
             )
+            if where:
+                message = wrapguard.parent_tree_message(sub, where)
+            else:
+                # シェルからの書き込み（リダイレクト・tee・sed -i・cp / mv の行き先、
+                # インタプリタに渡したコード）。読み方と限界は parentwrite に書いてある。
+                what, where, kind = parentwrite.check(
+                    conf,
+                    root,
+                    payload.cwd,
+                    record.subject,
+                    record.degraded,
+                    [layer.replace(shellread.SEP, "\n") for _, layer, _ in inner],
+                )
+                if where:
+                    message = wrapguard.parent_write_message(what, where, kind)
         elif payload.tool_name in SCOPE_TOOLS:
             # 書き込み先のパスが `.claude/worktrees/<名前>` の中で、その名前が親のチケットか
             # （ワークツリーが git に登録されているかは問わない。sh の検査と同じ広さ）。
@@ -454,7 +469,8 @@ def decide_before(
                 base = os.path.join(root, tree.WORKTREES_DIR, name)
                 rel = os.path.relpath(os.path.abspath(record.subject), base).replace(os.sep, "/")
                 if not ticket_places.is_unscoped(rel, conf.tickets, conf.approved):
-                    sub, where = "write", name
+                    where = name
+                    message = wrapguard.parent_write_message(payload.tool_name, name)
         if where:
             record.code = wrapguard.CODE_PARENT_TREE
             record.rules = [wrapguard.PARENT_TREE_RULE_ID]
@@ -469,7 +485,7 @@ def decide_before(
                         wrapguard.CODE_PARENT_TREE,
                         wrapguard.PARENT_TREE_RULE_ID,
                         display_subject,
-                        wrapguard.parent_tree_message(sub, where),
+                        message,
                     )
                 ],
                 conf=conf,
