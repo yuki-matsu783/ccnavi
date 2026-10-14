@@ -3,6 +3,9 @@
 
 1. 状態の操作（`ticket finish` など）は、副命令の前に `--` を挟んでも止まる。挟んだ形に
    `--record-tree` を足すと、実行ファイルの「C1 を通っていない」検査も外れる
+2. 親を閉じたときの片付け（`sync tidy`・`worktree retire`・`worktree branch`・
+   `ccnavi-clean.sh --branch` / `--confirmed`）は、メインのエージェントもサブエージェントも
+   直には打てない。呼ぶのは sh の中（hook を通らない）か、ユーザが `!` を付けて打つときだけ
 """
 
 from __future__ import annotations
@@ -72,6 +75,46 @@ class DashesBeforeTheVerbTest(HookCase):
     def test_reading_the_ticket_is_not_stopped(self):
         decision, reason = self.hook("ccnavi ticket -- status")
         self.assertNotIn(phase_forms.CODE_TICKET_APPROVAL, reason)
+
+
+class CleanupFormsTest(HookCase):
+    STOPPED = (
+        "ccnavi sync tidy i0001 self i0001 0123456789abcdef",
+        "ccnavi --cwd /x sync -- tidy i0001 self i0001 0123456789abcdef",
+        "python -m ccnavi worktree retire i0001",
+        "uv run python -m ccnavi worktree retire i0001",
+        ".ccnavi/bin/ccnavi worktree branch i0001-01-01",
+        "ccnavi --root /x worktree branch i0001-01-01 confirmed",
+        "sh .ccnavi/scripts/ccnavi-clean.sh --branch i0001-01-01 --confirmed",
+        "sh .ccnavi/scripts/ccnavi-clean.sh --branch i0001-01-01",
+        "bash -x .ccnavi/scripts/ccnavi-clean.sh --confirmed --branch i0001-01-01",
+        "cd /x && sh .ccnavi/scripts/ccnavi-clean.sh --branch i0001-01-01 --confirmed",
+    )
+    PASSED = (
+        # 生成物とワークツリーの片付け（ブランチは消さない）と、片付けを中で呼ぶ sh。
+        "sh .ccnavi/scripts/ccnavi-clean.sh --worktree i0001-01-01",
+        "sh .ccnavi/scripts/ccnavi-clean.sh i0001-01-01 --dry-run",
+        "sh .ccnavi/scripts/ccnavi-sync.sh i0001",
+        "sh .ccnavi/scripts/ccnavi-sync.sh",
+        "ccnavi worktree drop i0001-01-01",
+        "ccnavi worktree remaining i0001",
+    )
+
+    def test_the_agents_cannot_type_the_cleanup(self):
+        for command in self.STOPPED:
+            for agent in ("", "a1"):
+                with self.subTest(command=command, agent=agent):
+                    decision, reason = self.hook(command, agent)
+                    self.assertEqual(decision, "deny", reason)
+                    self.assertIn(phase_forms.CODE_TICKET_APPROVAL, reason)
+                    self.assertIn("! を付けて", reason)
+
+    def test_the_scripts_that_call_it_are_not_stopped_by_it(self):
+        # sh の中から実行ファイルを呼ぶ分は hook を通らない。sh を打つ形はこの止めに当たらない。
+        for command in self.PASSED:
+            with self.subTest(command=command):
+                _, reason = self.hook(command)
+                self.assertNotIn(phase_forms.CODE_TICKET_APPROVAL, reason)
 
 
 if __name__ == "__main__":

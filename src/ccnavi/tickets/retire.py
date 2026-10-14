@@ -17,8 +17,10 @@
 - 子のブランチ（手元）を消す。条件は子の種類で分ける
   - 合流した子: ブランチの先頭が合流した sha（`merged_sha`）と同じで、その sha が push 済みの
     親の先頭（`refs/remotes/origin/<親のブランチ>`）の祖先であること
-  - 取り消した子: ユーザに一覧を見せて確認が取れてから（`worktree branch <名前> confirmed`）。
-    確認なしでは消さない。親に無いコミットの数を添える
+  - 取り消した子: ユーザに一覧を見せ、ユーザが `!` を付けて `ccnavi-clean.sh --branch <名前>
+    --confirmed` を打ったときだけ（エージェントからは hook が止める）。確認なしでは消さない。
+    消す前に、記録の子が実際にその親の子か（チケットの `parent:`）を確かめ直す。
+    親に無いコミットの数を添える
 - 親のワークツリーを消す
 
 ## MR がマージされたと分かった後（片付け 2）
@@ -46,7 +48,7 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from ..infra import fsio, gitcmd, settings, tree
-from . import worktrees
+from . import approval, archive, worktrees
 
 STATE_DIR = "retire"
 KIND_MERGED = "merged"
@@ -228,9 +230,7 @@ def judge_child(
         if not confirmed:
             return Outcome(
                 ASK,
-                f"- {name}{extra}\n  ユーザが消してよいと言ったら: {tool}".rstrip()
-                if tool
-                else f"- {name}{extra}",
+                f"- {name}{extra}\n  ユーザが打つ: {tool}".rstrip() if tool else f"- {name}{extra}",
             )
         return _drop_branch(repo, name, tip, "取り消した子。ユーザが確認した")
     if not child.merged_sha:
@@ -288,6 +288,30 @@ def _clean_script(root: str) -> str:
     return settings.script_command(root, "ccnavi-clean.sh")
 
 
+def _confirm_command(root: str, name: str) -> str:
+    """取り消した子のブランチを消す、ユーザが打つコマンド（`!` は呼び手が付ける）。
+
+    エージェントからは hook が止める。ユーザが確認したことを、ユーザ自身が打つことで担保する。
+    """
+    return f"{_clean_script(root)} --branch {name} --confirmed"
+
+
+def _parent_of(root: str, conf: settings.Settings, project: str, ident: str) -> str:
+    """そのチケットの `parent:`。承認済みの置き場（作業中・閉じた・レビュー待ち）を先に、無ければ
+    手元の退避を見る。見つからなければ空。"""
+    raw = approval.read_raw(conf, root)
+    found = (
+        approval.scan(conf, root, raw=raw)[0]
+        + approval.scan(conf, root, closed=True, raw=raw)[0]
+        + approval.scan_review(conf, root, raw=raw)[0]
+    )
+    for t in found:
+        if t.ticket == ident:
+            return t.parent or ""
+    copy = archive.archived_fields(root, project, ident)
+    return (copy.parent or "") if copy is not None else ""
+
+
 def run_retire(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, family: str, cwd: str
 ) -> int:
@@ -317,9 +341,7 @@ def run_retire(
             stdout, root, name, cwd, "。子のブランチは条件を確かめて別に片付ける"
         ):
             code = 1
-        outcome = judge_child(
-            repo, child, reference, tool=f"{_clean_script(root)} --branch {name} --confirmed"
-        )
+        outcome = judge_child(repo, child, reference, tool=f"! {_confirm_command(root, name)}")
         if outcome.status == ASK:
             asking.append(outcome)
             continue
@@ -329,7 +351,8 @@ def run_retire(
     if asking:
         stdout.write(
             "取り消した子のブランチ（親に取り込まれていないコミットを含みうる）。"
-            "この一覧をユーザに見せて、消してよいか確かめてから消す:\n"
+            "この一覧をユーザに見せる。消すのはユーザで、消してよければ次のコマンドを"
+            "ユーザが先頭に ! を付けて打つ（エージェントからは打てない）:\n"
         )
         for outcome in asking:
             stdout.write(outcome.text + "\n")
@@ -363,7 +386,10 @@ def run_branch(
     for entry in names:
         if not entry.endswith(".json"):
             continue
-        record = read_record(conf, entry[: -len(".json")])
+        parent = entry[: -len(".json")]
+        record = read_record(conf, parent)
+        if str(record.get("parent") or "") != parent:
+            continue
         for child in _children_from(record):
             if child.ticket == name:
                 found = (record, child)
@@ -374,6 +400,16 @@ def run_branch(
         )
         return 1
     record, child = found
+    # 記録は state の置き場のファイルで、書き換えれば消す対象を広げられる。消す前に、記録の子が
+    # 実際にこの親の子か（承認済みチケットか退避の `parent:` が記録の親か）を確かめ直す。
+    parent = str(record.get("parent") or "")
+    actual = _parent_of(root, conf, child.project, name)
+    if not parent or actual != parent:
+        stderr.write(
+            f"ccnavi: {name} は、記録の親（{parent or '空'}）の子として承認済みチケットにも"
+            f"退避にも見つからない（見つかった親: {actual or 'なし'}）。記録を信じて消さない\n"
+        )
+        return 1
     branch = str(record.get("branch") or "")
     reference = f"refs/remotes/origin/{branch}" if branch else ""
     repo = repo_dir(root, conf, child.project)
@@ -383,8 +419,8 @@ def run_branch(
         return 0
     if outcome.status == ASK:
         stderr.write(
-            f"ccnavi: {name} は取り消した子のブランチ。ユーザに消してよいか確かめてから、"
-            f"'{_clean_script(root)} --branch {name} --confirmed' を実行します\n"
+            f"ccnavi: {name} は取り消した子のブランチ。消すのはユーザで、一覧を見て消してよければ"
+            f"ユーザが '! {_confirm_command(root, name)}' を打ちます\n"
         )
         return 1
     _say(stdout, outcome)
@@ -464,7 +500,7 @@ def run_merged(
             repo_dir(root, conf, child.project),
             child,
             head_sha,
-            tool=f"{_clean_script(root)} --branch {child.ticket} --confirmed",
+            tool=f"! {_confirm_command(root, child.ticket)}",
         )
         if outcome.status == ASK:
             asking.append(outcome)
@@ -472,7 +508,10 @@ def run_merged(
             _say(stdout, outcome)
             clean = clean and outcome.status == DELETED
     if asking:
-        stdout.write("取り消した子のブランチが残っている。ユーザに確かめてから消す:\n")
+        stdout.write(
+            "取り消した子のブランチが残っている。一覧をユーザに見せる。消すのはユーザで、"
+            "消してよければ次のコマンドをユーザが先頭に ! を付けて打つ:\n"
+        )
         for outcome in asking:
             stdout.write(outcome.text + "\n")
     if clean and not asking:

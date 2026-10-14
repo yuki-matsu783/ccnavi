@@ -91,7 +91,13 @@ _CLI_FORMS = (
     # 副命令の前の `--`（`ticket -- finish`）は、実行ファイルが選択肢の終わりとして読み飛ばすので
     # 同じ操作になる。
     r"|\b(ticket|review)\s+(--\s+)?"
-    r"(start|finish|cancel|record-risk|prepare|requested|confirm|ready)\b)"
+    r"(start|finish|cancel|record-risk|prepare|requested|confirm|ready)\b"
+    # 親を閉じたときの片付け。ブランチを `branch -D` で消すので、エージェント（メインも
+    # サブエージェントも）には直に打たせない。呼ぶのは sh（`ccnavi-review.sh ready` の
+    # `worktree retire`、`ccnavi-sync.sh` の `sync tidy`）の中か、ユーザが `!` を付けて
+    # 打つときだけ。sh の中の呼び出しは hook を通らない。取り消した子のブランチを消す
+    # `worktree branch … confirmed` は、ユーザが確認したことをユーザ自身が打つことで担保する。
+    r"|\bsync\s+(--\s+)?tidy\b|\bworktree\s+(--\s+)?(retire|branch)\b)"
 )
 CODE_TICKET_APPROVAL = "DENY_TICKET_APPROVAL_CLI"
 TICKET_APPROVAL_RULE_ID = "builtin:guard-ticket-approval"
@@ -872,6 +878,10 @@ _SCRIPT_FORMS = (
     # `--close-early` を起こし、最後に承認の push を呼ぶ。打つのはユーザ。
     r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-review\.sh\s+"
     r"(close-early)\b"
+    # 親を閉じたときに残した子のブランチを消す入口（中身は実行ファイルの `worktree branch`）。
+    # ユーザが `!` を付けて打つ。`--confirmed` を単なる語としてエージェントが添えて、
+    # 取り消した子のブランチを確認なしで消せないようにする。
+    r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-clean\.sh\s[^\x00]*--(branch|confirmed)\b"
 )
 
 
@@ -929,6 +939,12 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "close-early'）もユーザが実行します。"
             "テンプレートの取り込み（'ccnavi --templates --import'）・"
             "取り込み済みの改名/移動/削除・下書きの保存も、ユーザが実行します。"
+            "親を閉じたときの片付け（'ccnavi sync tidy'・'ccnavi worktree retire'・"
+            "'ccnavi worktree branch'・"
+            f"'{settings.script_command(root, 'ccnavi-clean.sh')} --branch'）は、"
+            "ccnavi-review.sh ready と ccnavi-sync.sh が中で呼びます。"
+            "残ったブランチを消すのは、ユーザが先頭に ! を付けて打つコマンドです"
+            "（案内されたコマンドをユーザに見せて、打ってもらってください）。"
             "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
             "エージェントは実行しません。"
             "承認が済んだかどうかは "

@@ -369,14 +369,19 @@ VS Codeのボード拡張機能は、ターミナルではなくオーバーレ�
         （ready が Draft を外した後に、親を閉じる片付けを行います。閉じた子のワークツリーと、
          子の手元のブランチ（合流した子: 先頭が merged_sha と同じで、それが push 済みの親に含まれる
          場合のみ）、親のワークツリーを削除します。取り消した子のブランチは一覧表示のみで、
-         ユーザーが確認した後に ccnavi-clean.sh --branch <name> --confirmed で削除します。
+         ユーザーが確認した後に、ユーザーが ! を付けて
+         ccnavi-clean.sh --branch <name> --confirmed を打って削除します。
+         ccnavi-review.sh ready が中で呼びます。エージェントからは打てません。
          未コミットの変更や、git が無視しているファイルがあるワークツリーは理由を出して残します）
     ccnavi worktree branch <name> [confirmed]
-        （retire が記録した子のブランチだけを、条件を確かめ直して削除します。取り消した子は
-         confirmed が要ります）
+        （retire が記録した子のブランチだけを、条件を確かめ直して削除します。記録の子が
+         チケットの parent: でもその親の子であることを確かめます。取り消した子は confirmed が
+         要ります。ユーザーが ! を付けて打つコマンドで、エージェントからは打てません）
     ccnavi sync tidy <parent> <repo> <branch> <sha>
         （ccnavi-sync.sh 用。親の MR がマージ済みと分かった後に、親のワークツリーと
-         手元のブランチを、手元の先頭が <sha>（MR の先頭）に含まれるときだけ削除します。
+         手元のブランチを、<branch> が親のブランチで、手元の先頭が push 済みの先頭
+         （origin/<branch>）と <sha>（MR の先頭）の両方に含まれるときだけ削除します。
+         エージェントからは打てません。
          1 行ずつ報告し、最後に
          "record yes|no"（取り込み記録を消してよいか）を出力します。ネットワークには出ません）
     ccnavi worktree name <name>

@@ -132,14 +132,25 @@ class CancelledChildTest(RetireHarness):
             {"ticket": "i0001-01-09", "kind": "cancelled", "merged_sha": "", "project": ""}
         )
         write(self.record, json.dumps(held))
+        # ready が退避へ移した、取り消した子のチケット。`worktree branch` は記録の子が実際に
+        # この親の子かを、ここ（か承認済みの置き場）で確かめ直す。
+        self.archived("i0001-01-09", "i0001")
+
+    def archived(self, name, parent):
+        path = os.path.join(self.root, "logs", "archive", "self", "done", f"{name}.md")
+        lines = ["---", "version: 1", f"ticket: {name}", f"parent: {parent}", "phase: 1"]
+        lines += ["title: t", "cancelled_at: 2026-10-01T00:00:00+09:00", "---", ""]
+        write(path, "\n".join(lines) + "\n")
 
     def test_retire_lists_it_and_keeps_it(self):
         done = self.retire()
         self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
         self.assertIn("取り消した子のブランチ", done.stdout)
-        self.assertIn("ユーザに見せて", done.stdout)
+        self.assertIn("ユーザに見せる", done.stdout)
         self.assertIn("- i0001-01-09", done.stdout)
-        self.assertIn("ccnavi-clean.sh --branch i0001-01-09 --confirmed", done.stdout)
+        # 確認はユーザが自分で打つコマンドとしてだけ取れる（エージェントからは hook が止める）。
+        self.assertIn("! を付けて打つ", done.stdout)
+        self.assertRegex(done.stdout, r"! sh \S*ccnavi-clean\.sh --branch i0001-01-09 --confirmed")
         self.assertIn("i0001-01-09", self.branches())
         # 合流した子と親のワークツリーは片付く
         self.assertNotIn(CHILD, self.branches())
@@ -148,7 +159,8 @@ class CancelledChildTest(RetireHarness):
     def test_branch_without_confirmation_does_not_delete(self):
         refused = self.retire("branch", "i0001-01-09")
         self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
-        self.assertIn("ユーザに消してよいか確かめてから", refused.stderr)
+        self.assertIn("消すのはユーザ", refused.stderr)
+        self.assertIn("'! sh ", refused.stderr)
         self.assertIn("i0001-01-09", self.branches())
 
     def test_branch_with_confirmation_deletes(self):
@@ -156,6 +168,29 @@ class CancelledChildTest(RetireHarness):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("ブランチ i0001-01-09 を削除しました", done.stdout)
         self.assertNotIn("i0001-01-09", self.branches())
+
+    def test_a_record_that_names_a_branch_outside_the_family_does_not_delete(self):
+        # 記録を書き換えて、この親の子でないブランチを足しても消さない。
+        git(self.root, "branch", "i0002-01-01", "main")
+        self.archived("i0002-01-01", "i0002")
+        held = self.read_record()
+        held["children"].append(
+            {"ticket": "i0002-01-01", "kind": "cancelled", "merged_sha": "", "project": ""}
+        )
+        write(self.record, json.dumps(held))
+        refused = self.retire("branch", "i0002-01-01", "confirmed")
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertIn("記録を信じて消さない", refused.stderr)
+        self.assertIn("i0002-01-01", self.branches())
+        # チケットの見つからない子も消さない。
+        git(self.root, "branch", "i0001-01-08", "main")
+        held["children"].append(
+            {"ticket": "i0001-01-08", "kind": "cancelled", "merged_sha": "", "project": ""}
+        )
+        write(self.record, json.dumps(held))
+        refused = self.retire("branch", "i0001-01-08", "confirmed")
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertIn("i0001-01-08", self.branches())
 
     def test_a_branch_that_was_not_recorded_is_never_deleted(self):
         git(self.root, "branch", "other", "main")
