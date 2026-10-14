@@ -137,9 +137,10 @@ def script_fields_set(text: str) -> tuple[str, ...]:
     1 度しか書かない（`ops.start` は着手済みを拒む）ので、既に値がある欄が変わったのなら、
     それは副命令が書いたものではない。
 
-    とくに `base_sha` は、サブエージェント終了時チェック（`phase_scope.scope_findings` の
-    `base_sha..HEAD`）と実績リスク（`risk.measure`）の基準点。ここを書き換えられると、
-    コミット済みの範囲外の変更が検査から消える。除く欄を「いつでも」にすると、その
+    とくに `base_sha` は着手の基準点で、親の自分のコミットの数え（`ops_stop._own_commits`）が使う。
+    子の範囲検査（`phase_scope.scope_findings`）と実績リスク（`risk.measure`）は、親のワークツリーの
+    HEAD との共通の祖先（`gitstate.child_base`）から数えるので、着手の記録は基準点にしない。
+    それでもスクリプトだけが書く欄で、書き換えられると着手の記録が偽物になる。除く欄を「いつでも」にすると、その
     書き換えが実行後チェックからも消える。
     """
     lines = text.splitlines()

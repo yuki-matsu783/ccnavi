@@ -254,7 +254,8 @@ def adoption_id_problem(branch: str) -> str:
 RESERVED_BRANCH_IDS = ("main", "master", "develop", "release")
 
 
-# 古いチケットに残っている `branch:` の欄の名前（読まない。lint が警告する）。
+# 使えなくなった `branch:` の欄の名前。あればチケットの読み込みが error にする
+# （`ticket._read_relations`）。
 BRANCH_KEY = "branch"
 # ブランチ名の長さの上限（文字数）。ref はパスにもなる（`.git/refs/heads/<名前>`）ので、
 # 識別子と同じく短く保つ。

@@ -106,6 +106,10 @@ def _own_commits(worktree: str, t: ticket_model.Ticket, parent_branch: str = "")
             exclude.append(f"^{sha.strip()}")
     # 子は、親のブランチに入っていないコミットがそのまま自分の仕事。基準点から数えない
     # （衝突を解くために親を取り込んでも、親にあるほかの子のコミットは除かれる）。
+    # 親は基準点（着手のときの親のワークツリーの HEAD）から数える。親のブランチは親自身の線で、
+    # 取り込みに混ざるのは統合先（上で除く `origin/HEAD`）と同じ親のブランチ（ほかの PC が送った
+    # 親の仕事）だけなので、子のような共通の祖先の取り直しは要らない。合流した子のコミットも
+    # 親の仕事として数える（ここは「閉じられる親に、送っていない仕事が残っているか」を見る）。
     start = [] if t.is_child else [f"{t.base_sha}..HEAD"]
     rc, out = gitcmd.output(
         worktree,
