@@ -196,10 +196,12 @@ ensure_child_worktree() {
 	if git -C "$ccnavi_c1_tree" show-ref --verify --quiet "refs/heads/$c1_id"; then
 		if ! git -C "$ccnavi_c1_tree" merge-base --is-ancestor "refs/heads/$c1_id" HEAD 2>/dev/null; then
 			printf 'ccnavi-ticket: 手元のブランチ %s に親のブランチ %s に無いコミットがある。子のワークツリーを作らずに止めた。内容を確かめて、親へ取り込むか、ユーザが消してから再実行してください\n' "$c1_id" "$ccnavi_c1_branch" >&2
+			log_info 子のワークツリーを作らずに止めた -- "child=$c1_id" "reason=child-branch-ahead"
 			return 1
 		fi
 		git -C "$ccnavi_c1_tree" branch -f "$c1_id" HEAD >/dev/null 2>&1 || {
 			printf 'ccnavi-ticket: 手元のブランチ %s を親のブランチの先頭に揃えられなかった\n' "$c1_id" >&2
+			log_info 子のワークツリーを作らずに止めた -- "child=$c1_id" "reason=child-branch-reset"
 			return 1
 		}
 		ew_rc=0
@@ -210,6 +212,7 @@ ensure_child_worktree() {
 	fi
 	if [ "$ew_rc" -ne 0 ]; then
 		printf 'ccnavi-ticket: 子のワークツリー %s を作れなかった（%s）\n' "$ew_path" "$(head -n 1 "$ccnavi_c1_tmp/ew-err" 2>/dev/null)" >&2
+		log_info 子のワークツリーを作れなかった -- "child=$c1_id" "reason=child-worktree-add"
 		return 1
 	fi
 	printf 'ccnavi-ticket: 子のワークツリー .claude/worktrees/%s を親のブランチ %s の先頭から作った\n' "$c1_id" "$ccnavi_c1_branch" >&2

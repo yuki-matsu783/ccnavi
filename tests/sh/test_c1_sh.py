@@ -98,6 +98,15 @@ def write(path, text=""):
     return path
 
 
+def diag(ws, name):
+    """ワークスペースの診断ログ（logs/diag/<出どころ>.log）。無ければ空。"""
+    path = os.path.join(ws, "logs", "diag", name + ".log")
+    if not os.path.exists(path):
+        return ""
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
 def git(cwd, *args, check=True):
     done = subprocess.run(
         ["git", *args],
@@ -1154,6 +1163,8 @@ class C1MergeTest(C1Harness):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assert_rolled_back(before)
         self.assertEqual(self.remote_sha(), before)
+        # 通らなかった push は、回ごとに診断ログに識別子で残る（拒否の理由は INFO）
+        self.assertEqual(diag(self.ws, "ccnavi-ticket").count("reason=c1-push-rejected"), 2)
 
     def test_a_rejected_push_is_retried_with_the_merge_done_again(self):
         self.start_parent()
@@ -1497,6 +1508,8 @@ class C1ChildWorktreeTest(C1Harness):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("に無いコミットがある", result.stderr)
         self.assertFalse(os.path.exists(self.child_path()))
+        # 止めた理由は診断ログに識別子で残る（拒否の理由は INFO）
+        self.assertIn("reason=child-branch-ahead", diag(self.ws, "ccnavi-ticket"))
 
 
 class C1NotImportedTest(C1Harness):

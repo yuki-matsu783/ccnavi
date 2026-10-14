@@ -598,6 +598,7 @@ ccnavi_c1_write() {
 			return 0
 		fi
 		ccnavi_c1_say "push が通らなかった（$(head -n 1 "$ccnavi_c1_tmp/push-err" 2>/dev/null)）"
+		log_info C1 で push が通らなかった -- "family=$ccnavi_c1_family_id" "try=$ccnavi_cw_try" "reason=c1-push-rejected"
 		# 11. 戻す。先頭が自分のコミットのときだけ。
 		if [ -n "$ccnavi_cw_c" ]; then
 			ccnavi_c1_inflight=""
