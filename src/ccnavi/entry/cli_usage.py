@@ -158,6 +158,25 @@ phases.yml にないタイプがある場合、--plan も指定された場合�
 のラッパースクリプトがこれらを判定して渡すため、各1回のみ指定できます。2回目の指定は、
 上書きとしては扱われず拒否されます。
 
+設定の値を上書きするフラグもあります。--mode、--ticket-control、--restore-if-deny、
+--guard-core-files、--guard-ticket-approval は環境変数と同じ値を取ります。--log、--state、
+--approved、--tickets は記録と置き場の場所を動かし、上の5つと同じく診断専用です。
+--integration-branch <name> は統合先の名前です（実行ファイルは環境変数を読まないので、
+.ccnavi/scripts/ のスクリプトが決めて渡します。--lint の識別子の予約が読みます）。
+
+.ccnavi/scripts/ のスクリプトが付けるフラグは次のとおりです。
+
+    --record-writes <file> [--record-tree <dir>]
+        （この実行で書いた・消したパスを、logs/state/c1/ の下の <file> に1行1つで
+         書き出します。--record-tree を渡すと一覧はそのツリーからの相対になり、
+         置き場の外に書いたらエラーになります。C1 と ccnavi-agree.sh が使います）
+    --placed-out <file>
+        （--agree 専用。実際に書けた承認済みチケットのパスなどを JSON で書き出します）
+    --choose-out <file>
+        （decide の前半。選択とダイジェストを書くだけで、何も置きません）
+    --via terminal|board
+        （decide が書くレビュー済みの印と、--templates --import --yes の経路）
+
 チケット、その置き場、フェーズの印、レビューの保留を機械可読な形式で一覧表示するには、
 次のコマンドを実行します（VS Codeのボード拡張機能がこれを読み込みます）。
 
@@ -402,6 +421,25 @@ VS Codeのボード拡張機能は、ターミナルではなくオーバーレ�
         （スクリプト用。"tree 1" の行に続いて、"parent yes|no|unreadable"（そのツリーが
          親のチケットまたは提案 <name> を保持しているか）を出力します。スクリプト自身は
          チケットのYAMLを読み込みません）
+    ccnavi worktree id <branch>
+        （スクリプト用。"id <識別子>"（ブランチ名の / を - に置き換えたもの）に続いて、
+         親に採用できなければ "problem <理由>"（58文字以内・末尾が -2桁でない・字の種類・NFC）、
+         直接作業や子のワークツリーに使えなければ "direct <理由>"（64文字以内・字の種類・NFC）、
+         子の識別子の形なら "child yes" を出力します）
+    ccnavi worktree issue-id <number> <prefix> [<project>] --title <title>
+        （ccnavi-start.sh 用。issue から新しい親のブランチ名（= 識別子）を作り、"id <名前>" を
+         出力します。Chrome 拡張の「始める」と同じ作り方です）
+    ccnavi c1 family <id>
+        （C1 用。"c1 1" の行に続いて、親子のチケット・リポジトリ・C1 の対象か
+         （target yes|no|stop）・親のワークツリーとブランチなどを1行ずつ出力します。読み取り専用）
+    ccnavi c1 sort <parent> [<rev>]
+        （C1 用。置き場の変更をコミットしてよいものと止めるものに分けて1行ずつ出力します）
+    ccnavi c1 merge <child>
+        （C1 用。finish が子を親のブランチへ合流する前の検査）
+    ccnavi c1 merge-blame <child> <path>...
+        （C1 用。合流で衝突したパスを持ち込んだ、先に合流した別の子を出力します）
+    ccnavi branches issue|mr <number> [--result <json>] [--json]
+        （ccnavi-branches.sh 用。issue・MR に紐づくブランチの候補を出力します。読み取り専用）
 
 ccnavi自身は、リモートに接続しません。スクリプトがマージリクエストとそのスレッド、
 レビューを取得し、--result <json> として渡します。
