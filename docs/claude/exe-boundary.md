@@ -21,7 +21,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
 - 操作を止めるか通すかは、hookと実行ファイルが判定する（P13）。shがccnaviの状態を読んで操作を止める処理は、
   hookと実行ファイルの判定に重ねた2段目の確認にあたる。shに新しい判定を足したくなったら、まずhook側に置けないかを検討する
 - P13の例外: 入口を1本に寄せたラッパー（`ccnavi-git.sh`）の中の可否の判定（`integrate-ticket`、統合先と消えた親のブランチへの
-  pushの拒否、承認済みの`branch:`へ移る前提の確認）と、`integrate`・`integrate-done`の状態操作はshに置く。条件は3つで、
+  pushの拒否、親のワークツリーでの`checkout`・`switch`の行き先の確認）と、`integrate`・`integrate-done`の状態操作はshに置く。条件は3つで、
   生の`git`が組み込みで止まっていること、ラッパーが許可リストで読むこと、判定の材料のうちチケットの中身は実行ファイルに聞くこと
   （設計 9.2）。この3つを満たさない判定はshに足さない
 - shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルの副命令（`tree parent`・`c1 family`・`sync closed`・

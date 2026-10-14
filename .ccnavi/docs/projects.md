@@ -24,7 +24,7 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 | 提案（承認待ち`todo/`、レビュー待ち`review/`） | そのツリーの`wip/proposals/<状態>/`。プロジェクト向けは`projects/<名前>/wip/proposals/<状態>/` |
 | 承認済みチケット（作業中`doing/`、閉じた`done/`）、フェーズのマーカー、子の記録（`.risk.json`など） | 親チケットのツリーの`.ccnavi/approved/`。プロジェクト向けは`projects/<名前>/.ccnavi/approved/` |
 | gitのラッパースクリプトの記録 | ワークスペースの`logs/<プロジェクト>/`。ワークスペース自身の記録は`logs/` |
-| 判定の記録とstateの置き場 | ワークスペースの`logs/decisions.jsonl`と`logs/state/`（親子のチケットの取り込み状態は`logs/state/sync/<リポジトリ>/families/<親の識別子>`で、中の`branch`に親のブランチ名） |
+| 判定の記録とstateの置き場 | ワークスペースの`logs/decisions.jsonl`と`logs/state/`（親子のチケットの取り込み状態は`logs/state/sync/<リポジトリ>/families/<親の識別子>`で、中の`branch`などはキャッシュで、判定には使わない） |
 | ワークツリー | ワークスペースの`.claude/worktrees/<名前>` |
 | 状態の履歴（いつ、どの経路で置き場が変わったか）。追記するだけの補助の記録で、今の状態はチケットがどの置き場にあるかで決まる | 承認済みチケットと同じツリーの`.ccnavi/approved/events/<識別子>.ndjson`。中身は1行に1つのJSON。マーカーの履歴は親のファイルに書く |
 | 子のフロー（担当のサブエージェントが読む手順書） | 親チケットのツリーの`.ccnavi/approved/flows/<子>.yml`。置き場は固定。中身はYAML。チケットの欄で場所を指定しない |
