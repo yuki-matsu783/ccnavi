@@ -64,17 +64,16 @@ def _hint(conf: settings.Settings, root: str, payload: hookio.Input) -> str:
     parent = str(front.get("parent") or "").strip()
     if parent:
         matched = ticket_ids.child_pattern().match(name)
-        if matched is not None and matched.group("parent") == parent:
-            return ""  # 子の提案。親の欄は求めない
         if matched is not None:
-            return ""  # 子の形で別の親を指す。読み込みのエラー文（ticket.py）が正しく言う
+            # 子の形。親の欄は求めない。別の親を指す誤りは読み込み（ticket.py）のエラー文が言う
+            return ""
         return (
             f"[ccnavi] {CODE_PARENT_KEY} ({rel}) 識別子 {name} は子の形ではないのに `parent:` が"
             "あります。親の提案なら `parent:` と `phase:` の行を消してください"
             "（子だけの欄）。雛形は `ccnavi ticket new <識別子> --title <題> --plan <型,…>`"
             " が作ります。"
         )
-    missing = [key for key in PARENT_FIELDS if key not in front]
+    missing = [key for key in PARENT_FIELDS if not front.get(key)]
     if not missing:
         return ""
     return (

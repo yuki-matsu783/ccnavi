@@ -300,8 +300,9 @@ def plan_problems(
     """
     problems = list(phasetypes.copy_problems(t))
     if not t.has_plan:
-        if not t.is_child and not approved:
-            # 承認は止めない（止まるのは `ticket start`）。承認依頼の前に気づけるよう、先に言う
+        if not t.is_child and not approved and held is None:
+            # 改版（held あり）の親は着手済みなので言わない。承認は止めない
+            # （止まるのは `ticket start`）。承認依頼の前に気づけるよう、先に言う
             problems.append(
                 rules.Problem(
                     rules.SEVERITY_WARN,

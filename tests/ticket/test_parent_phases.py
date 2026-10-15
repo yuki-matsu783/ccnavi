@@ -139,8 +139,9 @@ class CopyAgreeTest(PhaseHarness):
         found = agree_candidates.plan_problems(t, None)
         self.assertEqual(["warn"], [p.severity for p in found], found)
         self.assertIn("計画（`plan:`）がありません", found[0].detail)
-        # 承認済みの親には言わない（着手済みの古い親は今のまま）
+        # 承認済みの親と、着手済みの親の改版（held あり）には言わない
         self.assertEqual([], agree_candidates.plan_problems(t, None, approved=True))
+        self.assertEqual([], agree_candidates.plan_problems(t, None, held={}))
 
     def test_an_unused_definition_is_a_warning_and_shown_on_the_screen(self):
         acceptance = phasecopy.definitions(PHASES)["acceptance"]

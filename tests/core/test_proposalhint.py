@@ -59,6 +59,11 @@ class ProposalHintTest(unittest.TestCase):
         self.assertIn("`plan:`・`phases:`", got)
         self.assertNotIn("`mr:`", got)
 
+    def test_an_empty_plan_counts_as_missing(self):
+        text = PARENT_FULL.replace("plan: [a]", "plan: []")
+        got = self.hint("wip/proposals/todo/feature-1-memo.md", text)
+        self.assertIn("`plan:`", got)
+
     def test_a_complete_parent_and_a_child_get_nothing(self):
         self.assertEqual("", self.hint("wip/proposals/todo/feature-1-memo.md", PARENT_FULL))
         self.assertEqual("", self.hint("wip/proposals/todo/feature-1-memo-01-01.md", CHILD))
