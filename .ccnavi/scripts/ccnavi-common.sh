@@ -7,12 +7,11 @@
 # 同じディレクトリを指す。この読み込みと、下の部品の読み込みにだけ `$0` を使い、ワークスペースルートの
 # 決定には使わない（下の ccnavi_workspace の但し書き）。
 #
-# ここにあるのは 10 個。標準出力と終了コードだけを返し、標準エラーには何も書かない。
+# ここにあるのは 9 つ。標準出力と終了コードだけを返し、標準エラーには何も書かない。
 # 失敗したときの文面は呼ぶ側が決める（reject と fail で書き方が違うため）。
 #
 #   ccnavi_abs <パス>          相対を絶対に直す
 #   ccnavi_workspace           ワークスペースルートの絶対パス
-#   ccnavi_root_in_project <ルート>  ルートが projects/<名前> の中を指す形か（終了コードで返す）
 #   ccnavi_bin <ワークスペースルート>  起動する実行ファイルのパス
 #   ccnavi_compat_skew <ワークスペースルート> <実行ファイル>  実行ファイルと互換の版が食い違えば直し方を出す
 #   ccnavi_project <ディレクトリ>  そこが属するプロジェクトの名前（ワークスペース自身なら空）
@@ -176,19 +175,6 @@ ccnavi_workspace() {
 		[ "$ccnavi_ws_up" = "$ccnavi_ws_here" ] && return 1
 		ccnavi_ws_here="$ccnavi_ws_up"
 	done
-}
-
-# ルート（ccnavi_workspace の答え）が projects/<名前> の中を指しているか（0 = そう読まれた）。
-# プロジェクトの .ccnavi/scripts/ の写しを取り違えた形（ワークスペースの ccnavi が古い、または
-# 外側に写しが無い）で、ワークツリーがプロジェクトの中にでき、承認の走査から外れる。
-# CCNAVI_WORKSPACE を明示したときは指定を信じる（ワークスペース自身が projects という名前の
-# ディレクトリの下にある配置を止めない）。パスだけで決まり、ccnavi の状態は読まない。
-ccnavi_root_in_project() {
-	[ -z "${CCNAVI_WORKSPACE:-}" ] || return 1
-	case "$(dirname "$1")" in
-	*/projects) return 0 ;;
-	esac
-	return 1
 }
 
 # 起動する実行ファイルのパス。見つからなければ 1 を返す（ソースで動かすかは呼ぶ側が決める）。

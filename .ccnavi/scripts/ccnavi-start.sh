@@ -158,12 +158,6 @@ command -v jq >/dev/null 2>&1 || fail no-jq "jqが見つかりません。候補
 root=$(ccnavi_workspace) ||
 	fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
 ccnavi_log_root="$root"
-# ルートが projects/<名前> になったのは、プロジェクトの .ccnavi/scripts/ の写しを取り違えた
-# （ワークスペースの ccnavi が古い、または外側に写しが無い）形。このまま進むと、ワークツリーが
-# プロジェクトの中にでき、承認の走査から外れる。別のリポジトリで着手し直さず、直してから打ち直す
-if ccnavi_root_in_project "$root"; then
-	fail root-in-project "ワークスペースルートが ${root} と読まれました（projects/<名前> の中）。ワークスペースの ccnavi が古いか、外側に .ccnavi/scripts/ がありません。何も作成せずに処理を中断しました。別のリポジトリや別のツリーで着手し直さず、ユーザに状況を伝えてください（直し方: ワークスペースで scripts/ccnavi-setup.sh --force、または CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡す）。" 2
-fi
 here="$(pwd -W 2>/dev/null || pwd)"
 top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 [ -n "$top" ] ||
@@ -392,7 +386,7 @@ stop_host() {
 	if [ "$ccnavi_h_kind" = github ]; then
 		case "$sh_stage" in
 		search) printf 'ccnavi-start: GitHub APIに接続できず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$what" "$number" "$sh_why" ;;
-		title) printf 'ccnavi-start: GitHub APIに接続できず、issue #%s の題を読めなかった（%s）。slug を決められないので、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$number" "$sh_why" ;;
+		title) printf 'ccnavi-start: GitHub APIに接続できず、issue #%s を読めなかった（%s）。実在を確かめられないので、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$number" "$sh_why" ;;
 		merged) printf 'ccnavi-start: GitHub APIに接続できず、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$stop_branch" "$sh_why" ;;
 		*) printf 'ccnavi-start: GitHub APIに接続できず、マージリクエストを作れなかった（%s）。MCP（mcp__github__のツール）で代行してください。\n' "$sh_why" ;;
 		esac
@@ -423,8 +417,8 @@ stop_host() {
 			printf '  3. 無いと確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
 			;;
 		title)
-				printf '  1. mcp__github__issue_read を method=get owner=%s repo=%s issue_number=%s で呼び、題を読む\n' "$sh_owner" "$sh_repo" "$number"
-			printf '  2. 題から ASCII の小文字・数字・ハイフンの語を決め、再実行する: %s --slug <語> --title '"'"'<題>'"'"'\n' "$sh_cmd"
+				printf '  1. mcp__github__issue_read を method=get owner=%s repo=%s issue_number=%s で呼び、issue が実在することを確かめて題を読む（無ければ番号を作らず、ユーザに伝えて止める）\n' "$sh_owner" "$sh_repo" "$number"
+			printf '  2. 題から ASCII の小文字・数字・ハイフンの語を決め、再実行する: %s --slug <語> --title '"'"'<題>'"'"' --mcp-checked\n' "$sh_cmd"
 			;;
 		*)
 			printf '  1. mcp__github__list_pull_requests を owner=%s repo=%s head=%s:%s state=open で呼び、このブランチの開いた PR が無いことを確かめる（あればそれが MR。2 は要らない）\n' "$sh_owner" "$sh_repo" "$sh_owner" "$stop_branch"
@@ -436,7 +430,7 @@ stop_host() {
 	else
 		case "$sh_stage" in
 		search) printf 'ccnavi-start: GitLab APIに接続できず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作成せずに処理を中断しました。\n' "$what" "$number" "$sh_why" ;;
-		title) printf 'ccnavi-start: GitLab APIに接続できず、issue #%s の題を読めなかった（%s）。slug を決められないので、何も作成せずに処理を中断しました。\n' "$number" "$sh_why" ;;
+		title) printf 'ccnavi-start: GitLab APIに接続できず、issue #%s を読めなかった（%s）。実在を確かめられないので、何も作成せずに処理を中断しました。\n' "$number" "$sh_why" ;;
 		merged) printf 'ccnavi-start: GitLab APIに接続できず、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作成せずに処理を中断しました。\n' "$stop_branch" "$sh_why" ;;
 		*) printf 'ccnavi-start: GitLab APIに接続できず、マージリクエストを作れなかった（%s）。\n' "$sh_why" ;;
 		esac
@@ -460,7 +454,7 @@ stop_host() {
 			printf '  2. 再実行できないなら、ブラウザで %s の MR の一覧から、ブランチ %s のマージ済みの MR が無いか確かめ、無ければ --mcp-checked を付けて再実行します。\n' "$ccnavi_h_path" "$stop_branch"
 				;;
 		title)
-			printf '  2. 再実行できないなら、ブラウザで issue #%s の題を読み、%s --slug <語> --title '"'"'<題>'"'"' と実行します。\n' "$number" "$sh_cmd"
+			printf '  2. 再実行できないなら、ブラウザで issue #%s の題を読み、%s --slug <語> --title '"'"'<題>'"'"' と実行します（issue が実在すると確かめたあとに限り、--mcp-checked を付ける）。\n' "$number" "$sh_cmd"
 			;;
 		esac
 	fi
@@ -873,6 +867,11 @@ if [ "$total" -eq 0 ]; then
 		issue_title_get || issue_rc=$?
 		case "$issue_rc" in
 		2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。番号を作らず、ユーザに確かめてください。issue なしで始めるなら、sh .ccnavi/scripts/ccnavi-ticket.sh next-id <先頭の語> <slug> で識別子を決め、.ccnavi/docs/worktree.md の手順で切ったワークツリーで ccnavi ticket new <識別子> --title <題> --plan <型,…> を打ちます。" 2 ;;
+		1)
+			# API が失敗して実在を確かめられなかった。--slug・--title があっても無確認で進まない
+			# （確かめた後の再実行は --mcp-checked を付ける）
+			[ -n "$mcp_checked" ] || stop_host title "$(api_failed_reason)"
+			;;
 		3) fail issue-is-pr "#${number} は issue ではなく PR です。MR の番号なら --mr ${number} を使ってください。" 2 ;;
 		esac
 	fi

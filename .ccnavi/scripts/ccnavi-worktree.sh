@@ -124,10 +124,6 @@ ccnavi_is_branch "$name" || fail bad-name "名前（${name}）はブランチ名
 root=$(ccnavi_workspace) ||
 	fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
 ccnavi_log_root="$root"
-# ルートが projects/<名前> の中と読まれた形では、ワークツリーがプロジェクトの中にでき、承認の走査から外れる
-if ccnavi_root_in_project "$root"; then
-	fail root-in-project "ワークスペースルートが ${root} と読まれました（projects/<名前> の中）。ワークスペースの ccnavi が古いか、外側に .ccnavi/scripts/ がありません。何も作成せずに処理を中断しました。別のリポジトリや別のツリーで切り直さず、ユーザに状況を伝えてください（直し方: ワークスペースで scripts/ccnavi-setup.sh --force、または CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡す）。" 2
-fi
 # 名前の字の種類・NFC・長さは実行ファイルに聞く（sh の検査は ASCII の外のバイトを通す）
 ccnavi_id_ask "$root" "$name" ||
 	fail id-unchecked "名前（${name}）が使えるか（字の種類・64 文字以内）を確かめられない（ccnavi の実行ファイルが答えない）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"

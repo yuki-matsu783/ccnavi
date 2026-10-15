@@ -381,6 +381,16 @@ class StartShTest(unittest.TestCase):
         self.assertIn("--slug <語> --title", done.stdout)
         self.assertEqual(self.local_branches(), ["main"])
 
+    def test_title_unreadable_stops_even_with_slug_and_title_until_mcp_checked(self):
+        # API が失敗して実在を確かめられない間は、--slug・--title があっても無確認で進まない
+        self.route({PULLS: [200, []], f"GET {GITHUB}/issues/152": [500, {"message": "boom"}]})
+        done = self.run_sh("--issue", "152", "--slug", "login", "--title", "Add login")
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertIn("実在", done.stdout)
+        self.assertIn("--mcp-checked", done.stdout)
+        self.assertEqual(self.local_branches(), ["main"])
+        self.assertEqual(self.posts(), [])
+
     def test_title_unreadable_but_slug_given_goes_on_with_a_provisional_title(self):
         self.route(
             {
@@ -394,7 +404,8 @@ class StartShTest(unittest.TestCase):
                 ],
             }
         )
-        done = self.run_sh("--issue", "152", "--slug", "login")
+        # MCP で実在を確かめた後の再実行（--mcp-checked）なら、仮の題で進む
+        done = self.run_sh("--issue", "152", "--slug", "login", "--mcp-checked")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(self.posts()[0]["title"], "#152 login")
 
@@ -544,42 +555,6 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(
             self.fields(done.stdout)["対象リポジトリ"], "acme/widgets（ワークスペース自身）"
         )
-
-    def test_a_root_inside_projects_stops_before_anything_is_made(self):
-        # 外側に .ccnavi/scripts/ が無いと、プロジェクトの写しがルートと読まれる
-        with tempfile.TemporaryDirectory() as tmp:
-            project = os.path.join(os.path.realpath(tmp), "projects", "lib")
-            shutil.copytree(SH_DIR, os.path.join(project, ".ccnavi", "scripts"))
-            done = subprocess.run(
-                [
-                    SHELL,
-                    os.path.join(project, ".ccnavi", "scripts", "ccnavi-start.sh"),
-                    "--issue",
-                    "1",
-                ],
-                cwd=project,
-                capture_output=True,
-                text=True,
-                env={k: v for k, v in os.environ.items() if k != "CCNAVI_WORKSPACE"},
-            )
-            self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
-            self.assertIn("projects/<名前> の中", done.stderr)
-            self.assertIn("ユーザに状況を伝えてください", done.stderr)
-            self.assertFalse(os.path.exists(os.path.join(project, ".claude")))
-            # ワークスペースを明示したときは、projects という名前の下にある配置でも止めない
-            named = subprocess.run(
-                [
-                    SHELL,
-                    os.path.join(project, ".ccnavi", "scripts", "ccnavi-start.sh"),
-                    "--issue",
-                    "1",
-                ],
-                cwd=project,
-                capture_output=True,
-                text=True,
-                env={**os.environ, "CCNAVI_WORKSPACE": project},
-            )
-            self.assertNotIn("projects/<名前> の中", named.stderr)
 
     def test_issue_not_found_is_not_bypassed_by_slug_and_title(self):
         # --title を付けても、ホストが読めるなら issue の存在を確かめる。作らず、次の手を案内する
