@@ -68,6 +68,10 @@ class ProposalHintTest(unittest.TestCase):
         rel = ".claude/worktrees/feature-1-memo/wip/proposals/todo/feature-1-memo.md"
         self.assertIn(proposalhint.CODE_PARENT_KEY, self.hint(rel, PARENT_WRONG))
 
+    def test_a_child_pointing_at_another_parent_is_left_to_the_loader(self):
+        text = CHILD.replace("parent: feature-1-memo", "parent: feature-2-other")
+        self.assertEqual("", self.hint("wip/proposals/todo/feature-1-memo-01-01.md", text))
+
     def test_other_places_and_edits_get_nothing(self):
         todo = "wip/proposals/todo/feature-1-memo.md"
         self.assertEqual("", self.hint(todo, PARENT_WRONG, kind="update"))

@@ -161,8 +161,10 @@ ccnavi_log_root="$root"
 # ルートが projects/<名前> になったのは、プロジェクトの .ccnavi/scripts/ の写しを取り違えた
 # （ワークスペースの ccnavi が古い、または外側に写しが無い）形。このまま進むと、ワークツリーが
 # プロジェクトの中にでき、承認の走査から外れる。別のリポジトリで着手し直さず、直してから打ち直す
-case "$(dirname "$root")" in
-*/projects)
+# CCNAVI_WORKSPACE を明示したときは、その指定を信じて確かめない（ワークスペース自身が
+# projects という名前のディレクトリの下にある配置を止めないため）
+case "${CCNAVI_WORKSPACE:+named}:$(dirname "$root")" in
+:*/projects)
 	fail root-in-project "ワークスペースルートが ${root} と読まれました（projects/<名前> の中）。ワークスペースの ccnavi が古いか、外側に .ccnavi/scripts/ がありません。何も作成せずに処理を中断しました。別のリポジトリや別のツリーで着手し直さず、ユーザに状況を伝えてください（直し方: ワークスペースで scripts/ccnavi-setup.sh --force、または CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡す）。" 2
 	;;
 esac
@@ -411,7 +413,8 @@ stop_host() {
 			if [ "$what" = issue ]; then
 				printf '  1. mcp__github__search_pull_requests を query=「repo:%s/%s is:pr is:open %s」で呼ぶ。題・本文に #%s を含むか、元ブランチの名前に %s を含む PR が、この issue に紐づく MR\n' "$sh_owner" "$sh_repo" "$number" "$number" "$number"
 				printf '  2. 見つかったら、一覧をユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞く（続けるなら .ccnavi/docs/worktree-start.md の「既にある / を含むブランチ」の手順）\n'
-				printf '  3. 紐づく PR が無いと確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
+				printf '  3. 紐づく PR が無いと確かめたら、mcp__github__issue_read を method=get owner=%s repo=%s issue_number=%s で呼び、issue が実在することも確かめる（無ければ番号を作らず、ユーザに伝えて止める）\n' "$sh_owner" "$sh_repo" "$number"
+				printf '  4. 実在を確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
 			else
 				printf '  1. mcp__github__pull_request_read を method=get owner=%s repo=%s pullNumber=%s で呼び、head.ref（元ブランチ）と head.repo.full_name を読む\n' "$sh_owner" "$sh_repo" "$number"
 				printf '  2. head.repo.full_name が %s/%s と違えばフォークの MR。元ブランチがこのリポジトリに無いので作業を始められない。ユーザに伝えて止める\n' "$sh_owner" "$sh_repo"

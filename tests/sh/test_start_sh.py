@@ -566,6 +566,20 @@ class StartShTest(unittest.TestCase):
             self.assertIn("projects/<名前> の中", done.stderr)
             self.assertIn("ユーザに状況を伝えてください", done.stderr)
             self.assertFalse(os.path.exists(os.path.join(project, ".claude")))
+            # ワークスペースを明示したときは、projects という名前の下にある配置でも止めない
+            named = subprocess.run(
+                [
+                    SHELL,
+                    os.path.join(project, ".ccnavi", "scripts", "ccnavi-start.sh"),
+                    "--issue",
+                    "1",
+                ],
+                cwd=project,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "CCNAVI_WORKSPACE": project},
+            )
+            self.assertNotIn("projects/<名前> の中", named.stderr)
 
     def test_issue_not_found_is_not_bypassed_by_slug_and_title(self):
         # --title を付けても、ホストが読めるなら issue の存在を確かめる。作らず、次の手を案内する
