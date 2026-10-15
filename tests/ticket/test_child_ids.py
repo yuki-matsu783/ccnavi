@@ -88,6 +88,15 @@ class ChildIdFormTest(unittest.TestCase):
         self.assertIn("フェーズ番号（02）が `phase: 5` と食い違う", messages[0])
         self.assertIn("`i0012-05-<2 桁の連番>`", messages[0])
 
+    def test_a_parent_written_with_its_own_id_as_parent_is_told_to_drop_the_lines(self):
+        t, problems = ticket_mod.parse(child_text("feature-1-memo", "feature-1-memo", 0))
+        self.assertIsNone(t)
+        messages = errors(problems)
+        self.assertEqual(1, len(messages), problems)
+        self.assertIn("`parent: feature-1-memo` が自分の識別子と同じ", messages[0])
+        self.assertIn("親の提案を書いているなら、`parent:` と `phase:` の行を消す", messages[0])
+        self.assertIn("ccnavi ticket new", messages[0])
+
     def test_a_phase_of_three_digits_cannot_be_written(self):
         for name in ("i0012-99-01", "i0012-00-01"):
             with self.subTest(name=name):

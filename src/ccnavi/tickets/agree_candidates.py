@@ -300,6 +300,19 @@ def plan_problems(
     """
     problems = list(phasetypes.copy_problems(t))
     if not t.has_plan:
+        if not t.is_child and not approved and held is None:
+            # 改版（held あり）の親は着手済みなので言わない。承認は止めない
+            # （止まるのは `ticket start`）。承認依頼の前に気づけるよう、先に言う
+            problems.append(
+                rules.Problem(
+                    rules.SEVERITY_WARN,
+                    t.ticket,
+                    "親の提案に計画（`plan:`）がありません。計画の無い親は承認しても"
+                    "`ticket start` が止まります。"
+                    "`ccnavi ticket new <識別子> --title <題> --plan <型,…>`"
+                    " の雛形に揃えてください",
+                )
+            )
         return problems
     types = phasetypes.types_of(t)
     for key, items in (("plan", t.plan), ("feedback", t.feedback or [])):

@@ -88,7 +88,37 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                     f"プロジェクトの設定は {conf.project_home}/ に置いてください",
                 )
             )
+            problems.extend(_misplaced_worktrees(p, where))
     return problems
+
+
+def _misplaced_worktrees(project: tree.Tree, where: str) -> list[Problem]:
+    """プロジェクトの中の `.claude/worktrees/` にあるワークツリーを名指しする（warn）。
+
+    ワークツリーはワークスペースの `.claude/worktrees/` に置く。プロジェクトの中のものは
+    承認の走査（`tree.worktrees`）の対象外で、そこに書いた提案は「承認待ちに無い」になる。
+    ワークスペースの ccnavi が古く、プロジェクトの `ccnavi-common.sh` の写しをルートと取り違えて
+    着手すると、この形になる。原因の修正はしない（検出だけ）。
+    """
+    base = os.path.join(project.root, ".claude", "worktrees")
+    try:
+        names = sorted(n for n in os.listdir(base) if os.path.isdir(os.path.join(base, n)))
+    except OSError:
+        return []
+    if not names:
+        return []
+    return [
+        Problem(
+            SEVERITY_WARN,
+            where,
+            f"プロジェクトの中にワークツリーがある（{', '.join(names)}）。ワークツリーは"
+            "ワークスペースの `.claude/worktrees/` に置く。ここのものは承認の走査の対象外で、"
+            "書いた提案は承認待ちに並ばない。ワークスペースの ccnavi が古い"
+            "（`projects/<名前>` の写しをルートと取り違える）可能性があるので、"
+            "`scripts/ccnavi-setup.sh --force` で配り直し、"
+            "このワークツリーはユーザに伝えて片付ける",
+        )
+    ]
 
 
 def _projectless_worktrees(conf: settings.Settings, root: str) -> list[Problem]:

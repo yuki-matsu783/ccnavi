@@ -242,7 +242,7 @@ class StartShTest(unittest.TestCase):
     def fields(self, text):
         out = {}
         for line in text.splitlines():
-            for key in ("ワークツリー", "ブランチ", "MR"):
+            for key in ("ワークツリー", "ブランチ", "MR", "対象リポジトリ"):
                 if line.startswith(key + ": "):
                     out[key] = line[len(key) + 2 :]
         return out
@@ -381,6 +381,16 @@ class StartShTest(unittest.TestCase):
         self.assertIn("--slug <語> --title", done.stdout)
         self.assertEqual(self.local_branches(), ["main"])
 
+    def test_title_unreadable_stops_even_with_slug_and_title_until_mcp_checked(self):
+        # API が失敗して実在を確かめられない間は、--slug・--title があっても無確認で進まない
+        self.route({PULLS: [200, []], f"GET {GITHUB}/issues/152": [500, {"message": "boom"}]})
+        done = self.run_sh("--issue", "152", "--slug", "login", "--title", "Add login")
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertIn("実在", done.stdout)
+        self.assertIn("--mcp-checked", done.stdout)
+        self.assertEqual(self.local_branches(), ["main"])
+        self.assertEqual(self.posts(), [])
+
     def test_title_unreadable_but_slug_given_goes_on_with_a_provisional_title(self):
         self.route(
             {
@@ -394,7 +404,8 @@ class StartShTest(unittest.TestCase):
                 ],
             }
         )
-        done = self.run_sh("--issue", "152", "--slug", "login")
+        # MCP で実在を確かめた後の再実行（--mcp-checked）なら、仮の題で進む
+        done = self.run_sh("--issue", "152", "--slug", "login", "--mcp-checked")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(self.posts()[0]["title"], "#152 login")
 
@@ -536,6 +547,25 @@ class StartShTest(unittest.TestCase):
         again = self.run_sh("--issue", "152", "--slug", "login")
         self.assertEqual(again.returncode, 2, again.stdout + again.stderr)
         self.assertEqual(self.local_branches(), ["main"])
+
+    def test_the_target_repository_is_reported(self):
+        self.github_new()
+        done = self.run_sh("--issue", "152")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(
+            self.fields(done.stdout)["対象リポジトリ"], "acme/widgets（ワークスペース自身）"
+        )
+
+    def test_issue_not_found_is_not_bypassed_by_slug_and_title(self):
+        # --title を付けても、ホストが読めるなら issue の存在を確かめる。作らず、次の手を案内する
+        self.route({PULLS: [200, []]})
+        done = self.run_sh("--issue", "999", "--slug", "memo", "--title", "メモアプリ")
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertIn("issue #999 が見つからない", done.stderr)
+        self.assertIn("ccnavi-ticket.sh next-id", done.stderr)
+        self.assertIn("ccnavi ticket new", done.stderr)
+        self.assertEqual(self.local_branches(), ["main"])
+        self.assertEqual(self.posts(), [])
 
     def test_issue_forbidden_exits_2(self):
         self.route({PULLS: [200, []], f"GET {GITHUB}/issues/152": [403, {"message": "no"}]})

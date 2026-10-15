@@ -33,6 +33,10 @@
 タイプは rules.yml と同じ `deny` / `ask` / `allow` で、今判定に使われるのは Write / Edit 系の
 パスの項だけ。`match` に Bash を書いた項は「効かない」と名指しで警告する。
 
+下の例は子の提案。親の提案は `parent:` と `phase:` を書かず、`mr:`・`plan:`・`phases:` を持つ
+（全体の書式は docs/design/tickets/proposal-format.md）。手で書かず、
+`ccnavi ticket new <識別子> --title <題> --plan <型,…>` で雛形を作る。
+
     ---
     version: 1
     ticket: i0050-02-01
@@ -288,6 +292,26 @@ def _read_identity(ticket: ticket_model.Ticket, front: dict, problems: list[Prob
     if ticket.parent:
         matched = ticket_ids._CHILD.match(name)
         if matched is None or matched.group("parent") != ticket.parent:
+            if matched is None:
+                # 親のつもりで `parent:` を書いた形（`parent:` が自分の識別子のときが典型）
+                lead = (
+                    f"`parent: {ticket.parent}` が自分の識別子と同じ。"
+                    if ticket.parent == name
+                    else ""
+                )
+                example = ticket_ids.child_id(ticket.parent, 5, 1)
+                problems.append(
+                    Problem(
+                        SEVERITY_ERROR,
+                        name,
+                        f"{lead}子の識別子は `{ticket.parent}-<2 桁のフェーズ番号>-<2 桁の連番>`"
+                        f" の形で書く（フェーズ 5 の 1 枚目なら `{example}`）。"
+                        "親の提案を書いているなら、`parent:` と `phase:` の行を消す"
+                        "（この 2 つは子だけの欄）。雛形は "
+                        "`ccnavi ticket new <識別子> --title <題> --plan <型,…>` が作る",
+                    )
+                )
+                return True
             problems.append(
                 Problem(
                     SEVERITY_ERROR,

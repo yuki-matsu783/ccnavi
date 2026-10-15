@@ -386,7 +386,7 @@ stop_host() {
 	if [ "$ccnavi_h_kind" = github ]; then
 		case "$sh_stage" in
 		search) printf 'ccnavi-start: GitHub APIに接続できず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$what" "$number" "$sh_why" ;;
-		title) printf 'ccnavi-start: GitHub APIに接続できず、issue #%s の題を読めなかった（%s）。slug を決められないので、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$number" "$sh_why" ;;
+		title) printf 'ccnavi-start: GitHub APIに接続できず、issue #%s を読めなかった（%s）。実在を確かめられないので、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$number" "$sh_why" ;;
 		merged) printf 'ccnavi-start: GitHub APIに接続できず、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$stop_branch" "$sh_why" ;;
 		*) printf 'ccnavi-start: GitHub APIに接続できず、マージリクエストを作れなかった（%s）。MCP（mcp__github__のツール）で代行してください。\n' "$sh_why" ;;
 		esac
@@ -403,7 +403,8 @@ stop_host() {
 			if [ "$what" = issue ]; then
 				printf '  1. mcp__github__search_pull_requests を query=「repo:%s/%s is:pr is:open %s」で呼ぶ。題・本文に #%s を含むか、元ブランチの名前に %s を含む PR が、この issue に紐づく MR\n' "$sh_owner" "$sh_repo" "$number" "$number" "$number"
 				printf '  2. 見つかったら、一覧をユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞く（続けるなら .ccnavi/docs/worktree-start.md の「既にある / を含むブランチ」の手順）\n'
-				printf '  3. 紐づく PR が無いと確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
+				printf '  3. 紐づく PR が無いと確かめたら、mcp__github__issue_read を method=get owner=%s repo=%s issue_number=%s で呼び、issue が実在することも確かめる（無ければ番号を作らず、ユーザに伝えて止める）\n' "$sh_owner" "$sh_repo" "$number"
+				printf '  4. 実在を確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
 			else
 				printf '  1. mcp__github__pull_request_read を method=get owner=%s repo=%s pullNumber=%s で呼び、head.ref（元ブランチ）と head.repo.full_name を読む\n' "$sh_owner" "$sh_repo" "$number"
 				printf '  2. head.repo.full_name が %s/%s と違えばフォークの MR。元ブランチがこのリポジトリに無いので作業を始められない。ユーザに伝えて止める\n' "$sh_owner" "$sh_repo"
@@ -416,8 +417,8 @@ stop_host() {
 			printf '  3. 無いと確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
 			;;
 		title)
-				printf '  1. mcp__github__issue_read を method=get owner=%s repo=%s issue_number=%s で呼び、題を読む\n' "$sh_owner" "$sh_repo" "$number"
-			printf '  2. 題から ASCII の小文字・数字・ハイフンの語を決め、再実行する: %s --slug <語> --title '"'"'<題>'"'"'\n' "$sh_cmd"
+				printf '  1. mcp__github__issue_read を method=get owner=%s repo=%s issue_number=%s で呼び、issue が実在することを確かめて題を読む（無ければ番号を作らず、ユーザに伝えて止める）\n' "$sh_owner" "$sh_repo" "$number"
+			printf '  2. 題から ASCII の小文字・数字・ハイフンの語を決め、再実行する: %s --slug <語> --title '"'"'<題>'"'"' --mcp-checked\n' "$sh_cmd"
 			;;
 		*)
 			printf '  1. mcp__github__list_pull_requests を owner=%s repo=%s head=%s:%s state=open で呼び、このブランチの開いた PR が無いことを確かめる（あればそれが MR。2 は要らない）\n' "$sh_owner" "$sh_repo" "$sh_owner" "$stop_branch"
@@ -429,7 +430,7 @@ stop_host() {
 	else
 		case "$sh_stage" in
 		search) printf 'ccnavi-start: GitLab APIに接続できず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作成せずに処理を中断しました。\n' "$what" "$number" "$sh_why" ;;
-		title) printf 'ccnavi-start: GitLab APIに接続できず、issue #%s の題を読めなかった（%s）。slug を決められないので、何も作成せずに処理を中断しました。\n' "$number" "$sh_why" ;;
+		title) printf 'ccnavi-start: GitLab APIに接続できず、issue #%s を読めなかった（%s）。実在を確かめられないので、何も作成せずに処理を中断しました。\n' "$number" "$sh_why" ;;
 		merged) printf 'ccnavi-start: GitLab APIに接続できず、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作成せずに処理を中断しました。\n' "$stop_branch" "$sh_why" ;;
 		*) printf 'ccnavi-start: GitLab APIに接続できず、マージリクエストを作れなかった（%s）。\n' "$sh_why" ;;
 		esac
@@ -453,7 +454,7 @@ stop_host() {
 			printf '  2. 再実行できないなら、ブラウザで %s の MR の一覧から、ブランチ %s のマージ済みの MR が無いか確かめ、無ければ --mcp-checked を付けて再実行します。\n' "$ccnavi_h_path" "$stop_branch"
 				;;
 		title)
-			printf '  2. 再実行できないなら、ブラウザで issue #%s の題を読み、%s --slug <語> --title '"'"'<題>'"'"' と実行します。\n' "$number" "$sh_cmd"
+			printf '  2. 再実行できないなら、ブラウザで issue #%s の題を読み、%s --slug <語> --title '"'"'<題>'"'"' と実行します（issue が実在すると確かめたあとに限り、--mcp-checked を付ける）。\n' "$number" "$sh_cmd"
 			;;
 		esac
 	fi
@@ -679,6 +680,9 @@ finish_up() {
 
 # 結果を 1 項目 1 行で出す。<ブランチ> <MR の URL か空> <MR の番号か空>
 report() {
+	# 着手の対象。意図したリポジトリかを、出力を読んだ側が確かめられるようにする
+	rp_name=$(ccnavi_project "$top" "$root")
+	printf '対象リポジトリ: %s（%s）\n' "${ccnavi_h_path:-$top}" "${rp_name:-ワークスペース自身}"
 	printf 'ワークツリー: %s\n' "$wt"
 	printf 'ブランチ: %s\n' "$1"
 	printf '識別子: %s\n' "$(ccnavi_branch_to_id "$1")"
@@ -857,10 +861,17 @@ if [ "$total" -eq 0 ]; then
 		fail host-unreadable "MR を作れません（${host_why}）。origin を確かめてください。"
 	fi
 	issue_rc=0
-	if [ "$host_rc" -eq 0 ] && [ -z "$opt_title" ]; then
+	# --title を付けても issue の存在は確かめる（実在しない番号の Closes で別の課題を閉じないため）。
+	# 確かめを省けるのは、ホストに届かないとき（MCP で読んだ後の再実行）だけ
+	if [ "$host_rc" -eq 0 ]; then
 		issue_title_get || issue_rc=$?
 		case "$issue_rc" in
-		2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。番号を確かめてください。" 2 ;;
+		2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。番号を作らず、ユーザに確かめてください。issue なしで始めるなら、sh .ccnavi/scripts/ccnavi-ticket.sh next-id <先頭の語> <slug> で識別子を決め、.ccnavi/docs/worktree.md の手順で切ったワークツリーで ccnavi ticket new <識別子> --title <題> --plan <型,…> を打ちます。" 2 ;;
+		1)
+			# API が失敗して実在を確かめられなかった。--slug・--title があっても無確認で進まない
+			# （確かめた後の再実行は --mcp-checked を付ける）
+			[ -n "$mcp_checked" ] || stop_host title "$(api_failed_reason)"
+			;;
 		3) fail issue-is-pr "#${number} は issue ではなく PR です。MR の番号なら --mr ${number} を使ってください。" 2 ;;
 		esac
 	fi
