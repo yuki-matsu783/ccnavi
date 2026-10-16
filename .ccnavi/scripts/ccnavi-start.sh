@@ -718,7 +718,7 @@ report() {
 	case "${3:-}" in
 	'' | *[!0-9]*) ;;
 	*)
-		printf '必須: 提案の frontmatter に mr: %s を書く（この MR の番号。書かないと、この MR の番号を含む依頼が、すでにあるチケットに結び付かない）\n' "$3"
+		printf '必須: 提案の frontmatter に mr: %s を書く（この MR の番号。書かないと、この MR の番号を含む依頼が、すでにあるチケットに結び付かない。ccnavi ticket new の --mr が書く）\n' "$3"
 		;;
 	esac
 	[ -z "$sync_no_ticket" ] || next_ticket_lines "$1" "${3:-}"

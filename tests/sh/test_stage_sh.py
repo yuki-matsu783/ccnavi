@@ -76,6 +76,23 @@ class StageShTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertTrue(os.path.isfile(self.draft_hook))
 
+    def test_the_next_step_names_the_staged_paths(self):
+        result = self.stage(".ccnavi/config/common/rules.yml", ".claude/hooks/lint-py.sh")
+        nexts = [line for line in result.stdout.splitlines() if line.startswith("次: ")]
+        self.assertEqual(1, len(nexts), result.stdout)
+        # `<パス>` のままにせず、いま下書きを作ったパスを埋める
+        self.assertNotIn("<パス>", nexts[0])
+        self.assertTrue(
+            nexts[0].endswith(
+                "--commands .ccnavi/config/common/rules.yml .claude/hooks/lint-py.sh"
+                " を打つ（差し替えの mv が出る）"
+            ),
+            nexts[0],
+        )
+        # 下書きが既にあるだけでも、次の一手は消えない
+        again = self.stage(".ccnavi/config/common/rules.yml")
+        self.assertIn("次: ", again.stdout)
+
     def test_does_not_overwrite_an_edited_draft(self):
         self.stage(".ccnavi/config/common/rules.yml")
         write(self.draft_rules, "version: 2\n")
@@ -117,10 +134,8 @@ class StageShTest(unittest.TestCase):
             1, result.returncode, "編集していない下書きが残るので、揃っていないと知らせる"
         )
         self.assertIn("まだ編集していない", result.stderr)
-        # mv の前に、ユーザに案内してターンを終める次の一手
-        nexts = [line for line in result.stdout.splitlines() if line.startswith("次: ")]
-        self.assertEqual(1, len(nexts), result.stdout)
-        self.assertIn("ユーザに案内してターンを終える", nexts[0])
+        # 揃っていないので、ユーザに案内する次の一手は出さない
+        self.assertNotIn("次: ", result.stdout)
         self.assertEqual(
             "version: 1\n", read(self.rules), "差し替えはユーザの手。スクリプトは動かさない"
         )
@@ -134,6 +149,10 @@ class StageShTest(unittest.TestCase):
         )
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual(2, len([ln for ln in result.stdout.splitlines() if ln.startswith("mv ")]))
+        # 全件が揃ったので、mv をユーザに案内してターンを終える
+        nexts = [line for line in result.stdout.splitlines() if line.startswith("次: ")]
+        self.assertEqual(1, len(nexts), result.stdout)
+        self.assertIn("ユーザに案内してターンを終える", nexts[0])
 
     def test_commands_without_draft_or_edit_prints_nothing(self):
         result = self.stage("--commands", ".ccnavi/config/common/rules.yml")

@@ -109,6 +109,11 @@ def parse_scope(values: list[str] | None) -> tuple[list[str], str]:
                 continue
             if any(unicodedata.category(ch) in ("Cc", "Zl", "Zp") for ch in glob):
                 return [], f"--scope {glob!r} に改行や制御文字は使えない"
+            if "<" in glob or ">" in glob:
+                return [], (
+                    f"--scope {glob!r} に `<` `>` は使えない。"
+                    "`<触るファイルの glob>` のような案内の仮の値は、実際のパスに置き換える"
+                )
             norm = glob.replace("\\", "/")
             if norm.startswith("/") or re.match(r"[A-Za-z]:", norm) or ".." in norm.split("/"):
                 return [], (
@@ -245,6 +250,11 @@ def run(
         return refuse("--title <題> が必要です")
     if any(unicodedata.category(ch) in ("Cc", "Zl", "Zp") for ch in title):
         return refuse("--title に改行や制御文字は使えない")
+    stripped = title.strip()
+    if stripped.startswith("<") and stripped.endswith(">"):
+        return refuse(
+            f"--title {stripped!r} は案内の仮の値。実際の題（issue や MR の題）に置き換える"
+        )
     if issue is not None and issue <= 0:
         return refuse("--issue には正の整数を渡す")
     if mr is not None and mr <= 0:
@@ -393,14 +403,16 @@ def run(
     for glob in allow:
         stdout.write(f"  {ALLOW_MATCH} {glob}\n")
     tail = "並行させたい項は after を直す。" if used is None else "計画の項と文の固有名を直す。"
+    # ccnavi を PATH に持たない環境でも、そのまま打てるように、起動の sh 経由で書く
+    launcher = settings.script_command(root, "ccnavi-launcher.sh")
     stdout.write(
         f"次: {path} に rationale と本文を書き、allow を実際の作業に合わせて絞る・足す。{tail}"
-        "書けたら 'ccnavi --lint' で確かめ、"
-        f"'ccnavi --agree --preview --verify {ident}' が通ったら、"
+        f"書けたら '{launcher} --lint' で確かめ、"
+        f"'{launcher} --agree --preview --verify {ident}' が通ったら、"
         "承認をユーザに頼んで返事を待つ。承認が済むまで実装はしない\n"
     )
     stdout.write(
-        f"案内: plan を変えたら 'ccnavi --plan-order {ident} --fill-phases' "
+        f"案内: plan を変えたら '{launcher} --plan-order {ident} --fill-phases' "
         "で phases: を再実行します。"
         "承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる\n"
     )
