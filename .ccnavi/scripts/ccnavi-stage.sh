@@ -161,7 +161,7 @@ done
 [ "$bad" -eq 0 ] || exit 2
 
 if [ -z "$commands" ]; then
-	[ -z "$made" ] || printf '下書きを編集したら、すべて直し終えてから sh %s/.ccnavi/scripts/ccnavi-stage.sh --commands <パス>... で差し替えの mv を出す。\n' "$root"
+	[ -z "$made" ] || printf '次: 下書きを編集する。すべて直し終えたら sh %s/.ccnavi/scripts/ccnavi-stage.sh --commands <パス>... を打つ（差し替えの mv が出る）\n' "$root"
 	exit 0
 fi
 
@@ -172,6 +172,7 @@ if [ -z "$mvs" ]; then
 	printf 'ccnavi-stage: 差し替える編集済みの下書きがありません。\n' >&2
 	exit 1
 fi
-printf '差し替えは、ユーザが次を実行します（元のファイルは保護対象なので、エージェントは差し替えない）:\n'
+printf '次: 差し替えはユーザが行う。次の mv をユーザに案内してターンを終える（元のファイルは保護対象なので、エージェントは差し替えない）:\n'
 printf '%s' "$mvs"
 [ -z "$missing$same$changed" ] || exit 1
+printf '案内: 非対話セッションでは、編集済みの下書きを push し、確認と差し替えをユーザに頼んでターンを終える\n'

@@ -1189,6 +1189,7 @@ close-early)
 	fi
 	# 取り込み済みの親子のチケットなら、早めに閉じたマーカー（ユーザの判断）を承認の push で送る。
 	carry_human "$family" || exit 1
-	printf 'OK: 早めに閉じた（%s）。あとは親に、閉じて片付けて push し、ready を打たせてください。マージはユーザが行う\n' "$url"
+	printf 'OK: 早めに閉じた（%s）\n' "$url"
+	printf '次: 親に、閉じて片付けて push し、ready を打たせる。マージはユーザが行う\n'
 	;;
 esac

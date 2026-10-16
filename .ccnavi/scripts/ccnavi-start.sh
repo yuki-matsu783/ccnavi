@@ -89,13 +89,17 @@ sh_quote() {
 }
 orig_args=""
 rerun_args=""
+# --dry-run を外した同じ引数。dry-run の「次:」で、実際に作るときのコマンドとして出す
+real_args=""
 for arg in "$@"; do
 	q=$(sh_quote "$arg")
 	orig_args="$orig_args $q"
 	[ "$arg" = --mcp-checked ] || rerun_args="$rerun_args $q"
+	[ "$arg" = --dry-run ] || real_args="$real_args $q"
 done
 orig_args="${orig_args# }"
 rerun_args="${rerun_args# }"
+real_args="${real_args# }"
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 	--issue | --mr)
@@ -661,6 +665,8 @@ sync_note=""
 sync_no_ticket=""
 # ccnavi-sync.sh が取り込んだとき 1 にする（親チケットか提案が既にある）。report が状態を確かめる次の一手を出す
 sync_ok=""
+# 親チケットも提案も無い以外の理由で取り込めなかったとき、次の一手の文を入れる
+sync_next=""
 # 提案を作る次の一手に書く題。新しく作る MR の題か、採用する MR の題。分からなければ空
 next_title=""
 run_sync() {
@@ -682,7 +688,7 @@ run_sync() {
 			sync_note="親チケットか提案が出来たら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す"
 			;;
 		*)
-			sync_note="取り込めなかった理由は上の出力のとおり。直したら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す（直せないときはユーザに伝える）"
+			sync_next="取り込めなかった理由は上の出力のとおり。直したら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す（直せないときはユーザに伝える）"
 			;;
 		esac
 	fi
@@ -716,6 +722,7 @@ report() {
 		;;
 	esac
 	[ -z "$sync_no_ticket" ] || next_ticket_lines "$1" "${3:-}"
+	[ -z "$sync_next" ] || printf '次: %s\n' "$sync_next"
 	[ -z "$sync_ok" ] || printf '次: sh %s/ccnavi-ticket.sh status %s で、このチケットの状態と次の一手を確かめる\n' "$scripts" "$(ccnavi_branch_to_id "$1")"
 }
 
@@ -949,6 +956,7 @@ if [ "$total" -eq 0 ]; then
 		printf 'ワークツリー: %s\n' "$new_wt"
 		printf 'MR の題: %s（Draft。本文: Closes #%s）\n' "$new_title" "$number"
 		[ "$host_rc" -eq 0 ] || printf '案内: ホストに届かず、題は仮のもの（%s）\n' "$host_why"
+		printf '次: 問題なければ、--dry-run を外して実行する: sh %s/ccnavi-start.sh %s\n' "$scripts" "$real_args"
 		exit 0
 	fi
 	cgit fetch origin "$integration" || fail fetch-failed "統合先 ${integration} を origin から取れなかった（上の出力を見てください）。"
@@ -1035,6 +1043,7 @@ if [ -n "$dry" ]; then
 	else
 		printf 'MR: %s\n' "${c_url:--}"
 	fi
+	printf '次: 問題なければ、--dry-run を外して実行する: sh %s/ccnavi-start.sh %s\n' "$scripts" "$real_args"
 	exit 0
 fi
 

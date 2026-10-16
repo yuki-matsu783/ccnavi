@@ -117,6 +117,10 @@ class StageShTest(unittest.TestCase):
             1, result.returncode, "編集していない下書きが残るので、揃っていないと知らせる"
         )
         self.assertIn("まだ編集していない", result.stderr)
+        # mv の前に、ユーザに案内してターンを終める次の一手
+        nexts = [line for line in result.stdout.splitlines() if line.startswith("次: ")]
+        self.assertEqual(1, len(nexts), result.stdout)
+        self.assertIn("ユーザに案内してターンを終える", nexts[0])
         self.assertEqual(
             "version: 1\n", read(self.rules), "差し替えはユーザの手。スクリプトは動かさない"
         )

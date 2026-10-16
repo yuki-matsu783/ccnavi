@@ -806,6 +806,11 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(self.remote_branches(), ["main"])
         self.assertEqual(self.posts(), [])
         self.assertFalse(os.path.isdir(self.wt(BRANCH)))
+        # 次の一手は、--dry-run を外した同じコマンド
+        nexts = [line for line in done.stdout.splitlines() if line.startswith("次: ")]
+        self.assertEqual(len(nexts), 1, done.stdout)
+        self.assertIn("--dry-run を外して実行する", nexts[0])
+        self.assertTrue(nexts[0].endswith("ccnavi-start.sh '--issue' '152'"), nexts[0])
 
     def test_prefix_and_slug(self):
         self.route(
