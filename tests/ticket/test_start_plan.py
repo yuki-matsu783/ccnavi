@@ -100,4 +100,10 @@ class StartPlanTest(PhaseHarness):
         self.assertEqual(refused.returncode, 1, refused.stdout)
         self.assertIn("子より先に親を開始してください", refused.stderr)
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
-        self.assertEqual(self.ccnavi("ticket", "start", "i0001-01-01").returncode, 0)
+        child = self.ccnavi("ticket", "start", "i0001-01-01")
+        self.assertEqual(child.returncode, 0, child.stderr)
+        # 子の着手の次の一手は、サブエージェントへの実装の委任と、終わったときの finish
+        nexts = [line for line in child.stdout.splitlines() if line.startswith("次: ")]
+        self.assertEqual(len(nexts), 1, child.stdout)
+        self.assertIn("サブエージェント", nexts[0])
+        self.assertIn("finish i0001-01-01", nexts[0])

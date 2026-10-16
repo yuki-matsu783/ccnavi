@@ -394,11 +394,15 @@ def run(
         stdout.write(f"  {ALLOW_MATCH} {glob}\n")
     tail = "並行させたい項は after を直す。" if used is None else "計画の項と文の固有名を直す。"
     stdout.write(
-        "次にやること: rationale と本文を記載し、allow を実際の作業に合わせて絞る"
-        f"・追加してください。{tail}"
-        "plan を変えたら "
-        f"'ccnavi --plan-order {ident} --fill-phases' で phases: を再実行します。"
-        "'ccnavi --lint' で確かめてから、承認をユーザに頼む\n"
+        f"次: {path} に rationale と本文を書き、allow を実際の作業に合わせて絞る・足す。{tail}"
+        "書けたら 'ccnavi --lint' で確かめ、"
+        f"'ccnavi --agree --preview --verify {ident}' が通ったら、"
+        "承認をユーザに頼んで返事を待つ。承認が済むまで実装はしない\n"
+    )
+    stdout.write(
+        f"案内: plan を変えたら 'ccnavi --plan-order {ident} --fill-phases' "
+        "で phases: を再実行します。"
+        "承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる\n"
     )
     return EXIT_OK
 

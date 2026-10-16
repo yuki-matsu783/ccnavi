@@ -659,6 +659,8 @@ record_mr() {
 sync_note=""
 # ccnavi-sync.sh が「親チケットも提案もありません」で取り込まなかったとき 1 にする。report が提案を作る次の一手を出す
 sync_no_ticket=""
+# ccnavi-sync.sh が取り込んだとき 1 にする（親チケットか提案が既にある）。report が状態を確かめる次の一手を出す
+sync_ok=""
 # 提案を作る次の一手に書く題。新しく作る MR の題か、採用する MR の題。分からなければ空
 next_title=""
 run_sync() {
@@ -669,12 +671,19 @@ run_sync() {
 	if [ "$rs_rc" -eq 0 ]; then
 		printf 'ccnavi-sync.sh %s:\n' "$rs_id"
 		printf '%s\n' "$rs_out" | sed 's/^/  /'
+		sync_ok=1
 	else
 		printf 'ccnavi-sync.sh %s は取り込まなかった（終了コード %s）:\n' "$rs_id" "$rs_rc"
 		printf '%s\n' "$rs_out" | sed 's/^/  /'
-		sync_note="親チケットか提案が出来たら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す"
+		# 「親チケットも提案もありません」は ccnavi-sync.sh の文言。変えるときはここと test_start_sh.py も直す
 		case "$rs_out" in
-		*親チケットも提案もありません*) sync_no_ticket=1 ;;
+		*親チケットも提案もありません*)
+			sync_no_ticket=1
+			sync_note="親チケットか提案が出来たら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す"
+			;;
+		*)
+			sync_note="取り込めなかった理由は上の出力のとおり。直したら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す（直せないときはユーザに伝える）"
+			;;
 		esac
 	fi
 }
@@ -707,6 +716,7 @@ report() {
 		;;
 	esac
 	[ -z "$sync_no_ticket" ] || next_ticket_lines "$1" "${3:-}"
+	[ -z "$sync_ok" ] || printf '次: sh %s/ccnavi-ticket.sh status %s で、このチケットの状態と次の一手を確かめる\n' "$scripts" "$(ccnavi_branch_to_id "$1")"
 }
 
 # 親チケットも提案も無いワークツリーの次の一手。提案を作る ccnavi ticket new を、埋められる値を埋めて出す。<ブランチ> <MR の番号か空>

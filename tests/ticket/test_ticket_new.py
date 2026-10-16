@@ -224,6 +224,12 @@ class TicketNewScopeTest(TicketNewTestBase):
         self.assertEqual([e["glob"] for e in front["allow"]], ["src/ui/error.ts"])
         self.assertEqual(front["plan"], ["quick-work"])
         self.assertIn("quick-work", front["phases"])
+        # 次の一手は「次:」で始まる 1 行。承認までは実装しない
+        nexts = [line for line in result.stdout.splitlines() if line.startswith("次: ")]
+        self.assertEqual(len(nexts), 1, result.stdout)
+        self.assertIn("--agree --preview --verify", nexts[0])
+        self.assertIn("承認が済むまで実装はしない", nexts[0])
+        self.assertIn("直接実装に切り替えず", result.stdout)
 
     def test_scope_is_added_after_the_collected_scope_without_duplicates(self):
         result = self.new("--scope", "docs/a.md,SRC/*", "--scope", "docs/a.md", plan="implement")

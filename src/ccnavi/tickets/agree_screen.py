@@ -54,7 +54,7 @@ def approved_text(
     # 最初の子の着手で止まってから読むことになる。ただし勧めるのは、この回に承認された
     # 親が居るときだけ。改版と子だけの回で `start <親>` を勧めると、親は着手済みなので
     # 案内どおりに打つと「着手済み」で終わる。
-    guide = "後工程を進める。"
+    guide = "次: 後工程を進める。"
     if any(not t.is_child and t.ticket not in revisions for t in tickets):
         guide += f"親は自分のワークツリーで '{ticket_sh} start <親>' を先に実行してください。"
     if any(t.is_child for t in tickets) and worktrees is None:
