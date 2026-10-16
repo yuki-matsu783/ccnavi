@@ -2,7 +2,7 @@
 type: guide
 title: スクリプトの出力に次の一手を書く
 description: ワークフローを進めるshと実行ファイルの出力で、次の一手を「次:」で始まる行に出す決まり。行頭の語の使い分け、書き方、出さない場面、テストの型
-tags: [sh-scripts]
+tags: [sh-scripts, exe-boundary]
 keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワークフロー, ccnavi-start.sh, ticket new, printf, stdout]
 ---
 
@@ -41,6 +41,7 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワ
 - 何も動かなかったときは何も出さない、と決めているとき（`ccnavi-fetch.sh`）
 - ユーザが端末で打つスクリプト（`ccnavi-agree.sh`、`ccnavi-push-approved.sh`）。エージェントへの通知は、承認後のhookの文が受け持つ
 - 共通関数（`ccnavi-common*.sh`）。止める理由ごとに次が違うので、呼び出し元で出す
+- `ccnavi-clean.sh` の dry-run。node があると `exec` で `ccnavi-clean.js` に代わり、出力はそちらが出す。shから行を足せない
 
 ## 書き方
 
@@ -59,8 +60,12 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワ
 
 | 場面 | 出す次の一手 | 場所 |
 |---|---|---|
-| `ccnavi-start.sh` の成功、親チケットも提案も無い | `ccnavi ticket new …`（識別子・題・issue・MRを埋める） | `ccnavi-start.sh` の `next_ticket_lines` |
+| `ccnavi-start.sh` の成功、親チケットも提案も無い | `ccnavi-launcher.sh ticket new …`（識別子・題・issue・MRを埋める） | `ccnavi-start.sh` の `next_ticket_lines` |
 | `ccnavi-start.sh` の成功、チケットが既にある | `ccnavi-ticket.sh status <識別子>` | `ccnavi-start.sh` の `report` |
+| `ccnavi-start.sh` の成功、取り込みが他の理由で止まった | 理由を直して `ccnavi-sync.sh` を打ち直す | `ccnavi-start.sh` の `run_sync` |
+| `ccnavi-start.sh --dry-run` | `--dry-run` を外した同じコマンド | `ccnavi-start.sh` の `real_args` |
+| `ccnavi-stage.sh` | 下書きを編集し、`--commands` を打つ。mv が出たらユーザに案内する | `ccnavi-stage.sh` |
+| `ccnavi-review.sh` の早めに閉じた | 親に閉じて片付け、`ready` を打たせる | `ccnavi-review.sh` |
 | `ccnavi ticket new` の成功 | 提案を書き、`--lint` と `--agree --preview --verify` を通し、ユーザに承認を頼む | `tickets/scaffold.py` |
 | `ccnavi --agree --preview --verify` | 通れば承認を頼む。通らなければ提案を直して打ち直す | `tickets/agree.py` |
 | 承認後の通知 | 親の `start`、子の `start` | `tickets/agree_screen.py` |
