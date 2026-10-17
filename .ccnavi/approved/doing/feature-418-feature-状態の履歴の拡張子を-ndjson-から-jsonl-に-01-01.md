@@ -22,6 +22,8 @@ allow:
     glob: ".ccnavi/docs/projects.md"
   - match: Write|Edit
     glob: ".gitignore"
+started_at: "2026-10-18T00:18:39+0900"
+base_sha: "4bb75b755564b9c6763473ce08851eedc712d483"
 ---
 ## 変更の内容
 

@@ -1,1 +1,2 @@
 {"at": "2026-10-17T15:17:46Z", "ticket": "feature-418-feature-状態の履歴の拡張子を-ndjson-から-jsonl-に-01-01", "kind": "approved", "from": "todo", "to": "doing", "via": "board", "tree": "feature-418-feature-状態の履歴の拡張子を-ndjson-から-jsonl-に"}
+{"at": "2026-10-17T15:18:39Z", "ticket": "feature-418-feature-状態の履歴の拡張子を-ndjson-から-jsonl-に-01-01", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "4bb75b755564b9c6763473ce08851eedc712d483"}
