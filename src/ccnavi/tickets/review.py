@@ -250,6 +250,8 @@ def reviewed_mark(
     （Chrome は `via: chrome`。手元の `confirm` は `--actor` があるときだけ `actor` と `via: cli` を
     渡し、無ければマーカーは前と同じバイト列）。`stamp` が空なら `at` を
     書かず、`approval_marks.write_mark` が今の時刻を入れる。
+    `accepted` 欄は受け入れた指摘の鍵の記録で、判定には使わない（受け入れた指摘はホストで
+    解決済みにしてあり、確認はホストの状態だけを数える）。
     """
     mark: dict = {"mr": mr, "accepted": list(accepted)}
     if account:
@@ -305,15 +307,7 @@ def review_problems(
             *[f"  - {r.url}" for r in changes],
         ]
     unresolved = review_host._unresolved(
-        result.threads,
-        approval_marks.accepted_threads(
-            approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
-            parent.ticket,
-            phase_no,
-            parent,
-        ),
-        result.host,
-        _poster(parent, phase_no, root, conf),
+        result.threads, result.host, _poster(parent, phase_no, root, conf)
     )
     if not unresolved:
         return []
@@ -408,7 +402,7 @@ def _settle_children(
 
 
 def thread_key(t: review_host.Thread) -> str:
-    """選択をスレッドに対応づける鍵。受け入れの記録と同じく、URL を先に使う。"""
+    """選択をスレッドに対応づける鍵。URL を先に使い、無ければスレッドの id。"""
     return t.url or t.id
 
 

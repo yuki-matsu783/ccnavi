@@ -96,6 +96,33 @@ def _comments(state: str) -> list[dict]:
         return json.load(f)
 
 
+def _mutation(q: str, variables: dict) -> tuple[int, object]:
+    """受け入れの返信と解決（GraphQL の mutation）。
+
+    受けた問い合わせと変数を `FAKE_GITHUB_MUTATIONS` に 1 行ずつ JSON で残す（形の試験が読む）。
+    問い合わせが使う変数（`$id`・`$b`）を渡していなければ、実際のホストと同じく errors で答える。
+    `FAKE_GITHUB_FAIL_MUTATION` が `reply` か `resolve` なら、その mutation を errors で断る。
+    """
+    log = os.environ.get("FAKE_GITHUB_MUTATIONS", "")
+    if log:
+        with open(log, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"query": q, "variables": variables}, ensure_ascii=False) + "\n")
+    used = set(re.findall(r"\$([A-Za-z_]+)", q.split("{", 1)[0]))
+    missing = sorted(v for v in used if v not in variables)
+    if missing:
+        return 200, {"errors": [{"message": f"変数が無い: {', '.join(missing)}"}]}
+    fail = os.environ.get("FAKE_GITHUB_FAIL_MUTATION", "")
+    if "addPullRequestReviewThreadReply" in q:
+        if fail == "reply":
+            return 200, {"errors": [{"message": "Could not resolve to a node"}]}
+        return 200, {"data": {"addPullRequestReviewThreadReply": {"comment": {"id": "PRRC_1"}}}}
+    if "resolveReviewThread" in q:
+        if fail == "resolve":
+            return 200, {"errors": [{"message": "Could not resolve to a node"}]}
+        return 200, {"data": {"resolveReviewThread": {"thread": {"isResolved": True}}}}
+    return 200, {"errors": [{"message": "知らない mutation"}]}
+
+
 def answer(scene: str, method: str, url: str, body: str, state: str = "") -> tuple[int, object]:
     """1 つの要求への答え（状態, JSON）。"""
     meta = _load(scene, "scene.json") or {}
@@ -139,6 +166,8 @@ def answer(scene: str, method: str, url: str, body: str, state: str = "") -> tup
     if method == "POST" and path == "/graphql":
         req = json.loads(body or "{}")
         q, variables = req.get("query", ""), req.get("variables") or {}
+        if q.lstrip().startswith("mutation"):
+            return _mutation(q, variables)
         if "reviewThreads" in q and str(variables.get("n", variables.get("number"))) == number:
             missing = _missing_fields(q, THREAD_FIELDS)
             if missing:

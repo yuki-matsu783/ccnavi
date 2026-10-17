@@ -32,6 +32,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from urllib.parse import quote
 
 from tests import ROOT, SRC, common_sh
 
@@ -92,7 +93,7 @@ GITHUB = "https://api.github.com/repos/acme/widgets"
 GITLAB = "https://gitlab.com/api/v4/projects/acme%2Fwidgets"
 PULLS = f"GET {GITHUB}/pulls?state=open&per_page=100&page=1"
 BRANCH = "feature-152-add-login"
-CLOSED = "state=closed&head=acme:{branch}&per_page=100&page=1"
+CLOSED = "state=closed&head=acme%3A{branch}&per_page=100&page=1"
 MR_QUERY = f"state=opened&source_branch={BRANCH}&per_page=100&page=1"
 
 
@@ -127,7 +128,9 @@ def pr(number, ref, full_name="acme/widgets", body=""):
 
 def closed_pulls(branch, found=()):
     """同じブランチ名の閉じた PR の一覧（マージ済みの確認）。found はマージ済みの PR。"""
-    return {f"GET {GITHUB}/pulls?" + CLOSED.format(branch=branch): [200, list(found)]}
+    return {
+        f"GET {GITHUB}/pulls?" + CLOSED.format(branch=quote(branch, safe="")): [200, list(found)]
+    }
 
 
 @unittest.skipIf(SHELL is None or not NEEDED, "sh・git・jq のどれかが無い")
@@ -252,7 +255,7 @@ class StartShTest(unittest.TestCase):
         routes = {
             PULLS: [200, []],
             f"GET {GITHUB}/issues/152": [200, {"title": title}],
-            f"GET {GITHUB}/pulls?state=open&head=acme:{branch}": [200, []],
+            f"GET {GITHUB}/pulls?state=open&head=acme%3A{quote(branch, safe='')}": [200, []],
             **closed_pulls(branch),
         }
         if created:
@@ -406,7 +409,7 @@ class StartShTest(unittest.TestCase):
             {
                 PULLS: [200, []],
                 f"GET {GITHUB}/issues/152": [500, {"message": "boom"}],
-                f"GET {GITHUB}/pulls?state=open&head=acme:feature-152-login": [200, []],
+                f"GET {GITHUB}/pulls?state=open&head=acme%3Afeature-152-login": [200, []],
                 **closed_pulls("feature-152-login"),
                 f"POST {GITHUB}/pulls": [
                     201,
@@ -457,6 +460,25 @@ class StartShTest(unittest.TestCase):
                 self.assertEqual(self.remote_branches(), ["main"])
                 self.assertFalse(os.path.isdir(self.wt(branch)))
                 self.assertEqual(self.posts(), [])
+
+    def test_host_encode_percent_encodes_japanese_branch_names(self):
+        # 日本語を生でクエリに入れるとホストが HTML のエラーを返す。エンコードして渡す
+        script = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common-host.sh")
+        done = subprocess.run(
+            [
+                SHELL,
+                "-c",
+                '. "$1"; ccnavi_h_jq=$(command -v jq); ccnavi_host_encode "$2"',
+                "sh",
+                script,
+                "acme:feature-418-状態/jsonl",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(done.stdout.strip(), "acme%3Afeature-418-%E7%8A%B6%E6%85%8B%2Fjsonl")
 
     def test_a_merged_mr_of_the_same_name_stops_before_anything_is_made(self):
         merged = {**pr(2, BRANCH), "merged_at": "2026-01-01T00:00:00Z", "state": "closed"}
@@ -817,7 +839,7 @@ class StartShTest(unittest.TestCase):
             {
                 PULLS: [200, []],
                 f"GET {GITHUB}/issues/152": [200, {"title": "Add login"}],
-                f"GET {GITHUB}/pulls?state=open&head=acme:fix-152-login": [200, []],
+                f"GET {GITHUB}/pulls?state=open&head=acme%3Afix-152-login": [200, []],
                 **closed_pulls("fix-152-login"),
             }
         )
@@ -923,7 +945,7 @@ class StartShGitLabTest(StartShTest):
     def test_gitlab_adopt_checks_target_and_merged_mr(self):
         git(self.ws, "push", "-q", self.bare, "main:refs/heads/topic/x")
         merged_url = (
-            f"GET {GITLAB}/merge_requests?state=merged&source_branch=topic/x&per_page=100&page=1"
+            f"GET {GITLAB}/merge_requests?state=merged&source_branch=topic%2Fx&per_page=100&page=1"
         )
         base = {f"GET {GITLAB}": [200, {"id": 42}], merged_url: [200, []]}
         self.route(

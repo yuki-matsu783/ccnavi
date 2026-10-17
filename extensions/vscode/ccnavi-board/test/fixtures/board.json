@@ -852,7 +852,6 @@
    "close_early": null,
    "ready": null,
    "closed_record": null,
-   "accepted_threads": [],
    "phases": [
     {
      "number": 1,

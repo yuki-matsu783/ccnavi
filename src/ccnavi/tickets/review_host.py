@@ -9,6 +9,7 @@ GitHub か GitLab かを見分ける読み方だけを置く。review から分�
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -21,6 +22,8 @@ from ..infra import fsio
 MARKER_REQUEST = "<!-- ccnavi:request "
 MARKER_COMMENT = "<!-- ccnavi:comment -->"
 MARKER_DECIDE = "<!-- ccnavi:decide -->"
+# 受け入れた指摘のスレッドに残す返信の目印。返信を残したあと、sh がそのスレッドを解決する。
+MARKER_ACCEPT = "<!-- ccnavi:accept -->"
 MARKER_PREFIX = "<!-- ccnavi:"
 
 GITHUB_TOKEN = "GITHUB_TOKEN"
@@ -168,6 +171,73 @@ class Result:
         )
 
 
+# ---- 受け入れの計画。exe が書き、sh が読んで、返信と解決をホストに投稿する。
+#
+# 実行ファイルはネットワークに出ないので、受け入れたスレッドへの返信と解決は sh がする。
+# 置く前（マーカーを置く前）に済ませ、失敗したら受け入れは未完了として止める。
+# 形は `{"version": 1, "digest": <見せた指摘のダイジェスト。close-early は空>,
+#        "threads": [{"id": <スレッドの id>, "key": <鍵>, "reply": <返信の本文>}]}`。
+# `id` は GitHub ならレビューのスレッドの node id、GitLab なら discussion の id。
+# sh は `id` と `reply` だけを読む（`digest` と `key` は実行ファイルが置く側で読む）。
+ACCEPT_PLAN_VERSION = 1
+# スレッドの id に使える字。GitHub の node id（`PRRT_kw…`）と GitLab の discussion の id（16 進）の
+# どちらも収まる。sh も同じ字でしか API の経路や GraphQL の変数に使わない。
+ACCEPT_ID = re.compile(r"[A-Za-z0-9_=-]+")
+
+
+def accept_reply(why: str, issue: bool = False) -> str:
+    """受け入れたスレッドに残す返信の本文。`why` は受け入れる場面（1 行）。"""
+    lines = [MARKER_ACCEPT, f"ccnavi: {why}ので、この指摘は対応せず、受け入れて進める。"]
+    if issue:
+        lines.append("別の issue に回す（issue の下書きを置く）。このスレッドは解決済みにする。")
+    else:
+        lines.append("このスレッドは解決済みにする。")
+    return "\n".join(lines) + "\n"
+
+
+def accept_plan_problem(threads: list[Thread]) -> str:
+    """返信できない指摘があれば、その説明。
+
+    スレッドの id が無い（または API の経路に使えない字を含む）と、ホストに返信も解決もできない。
+    """
+    for t in threads:
+        if not t.id or not ACCEPT_ID.fullmatch(t.id):
+            return f"スレッドの id が無いか読めず、返信と解決ができない（{t.url or '不明'}）"
+    return ""
+
+
+def write_accept_plan(path: str, items: list[tuple[Thread, str]], digest: str = "") -> str:
+    """計画を書く。`items` は (スレッド, 返信の本文)。書けなければ理由を返す。"""
+    body = {
+        "version": ACCEPT_PLAN_VERSION,
+        "digest": digest,
+        "threads": [{"id": t.id, "key": t.url or t.id, "reply": reply} for t, reply in items],
+    }
+    return fsio.write_text(path, json.dumps(body, ensure_ascii=False) + "\n", newline="\n")
+
+
+@dataclass
+class AcceptPlan:
+    """書いた計画を読み戻したもの。"""
+
+    digest: str = ""
+    ids: list[str] = field(default_factory=list)
+    keys: list[str] = field(default_factory=list)
+
+
+def read_accept_plan(path: str) -> AcceptPlan | None:
+    """書いた計画。読めなければ None（計画の段を通っていない）。"""
+    data = fsio.read_dict(path)
+    if not data or data.get("version") != ACCEPT_PLAN_VERSION:
+        return None
+    rows = [t for t in data.get("threads") or [] if isinstance(t, dict)]
+    return AcceptPlan(
+        digest=str(data.get("digest") or ""),
+        ids=[str(t.get("id") or "") for t in rows],
+        keys=[str(t.get("key") or "") for t in rows],
+    )
+
+
 # ---- リモートに要る道具の有無。exe は使わないが、--lint が言う。
 
 # ホストにはポートが付く（`localhost:8929`）。ポートを捨てると、手元や社内に立てた
@@ -217,17 +287,16 @@ def transport_problem(url: str) -> str:
     return ""
 
 
-def _unresolved(
-    threads: list[Thread], accepted: set[str], host: str = "", poster: str = ""
-) -> list[Thread]:
+def _unresolved(threads: list[Thread], host: str = "", poster: str = "") -> list[Thread]:
     """まだ解決されていない指摘。
 
     付いた時刻では絞らない。依頼より後のものだけを数えると、
     指摘が残ったまま「子をもう 1 本足して承認してもらい、依頼をやり直す」だけで
     前回の指摘が数から消える。ユーザが解決も受け入れもしていないのに通る形になる。
 
-    数えないのは 2 つだけ。機構自身が置いた投稿と、ユーザが「未解決のまま進める」と
-    受け入れたもの。受け入れた分を数え続けると、その親が二度と通らなくなる。
+    数えないのは機構自身が置いた投稿だけ。「受け入れて進める」と選んだ指摘は、
+    返信を残してホスト側で解決済みにする（`MARKER_ACCEPT`）ので、解決済みとして数えない。
+    記録は持たない。受け入れたあとで誰かが開き直せば、未解決として数える。
 
     機構自身の投稿と見るのは、GitLab から取得した結果で、本文が目印で始まり、
     書いたのが依頼を投稿したアカウント（`poster`）のときだけ。
@@ -236,14 +305,7 @@ def _unresolved(
     投稿者が分からなければ見分けずに数える（誰でも目印を書けるので、
     本文だけで除くと未解決を隠せる）。
     """
-    return [
-        t
-        for t in threads
-        if not t.resolved
-        and not _ccnavi_post(t, host, poster)
-        and t.url not in accepted
-        and t.id not in accepted
-    ]
+    return [t for t in threads if not t.resolved and not _ccnavi_post(t, host, poster)]
 
 
 def _ccnavi_post(t: Thread, host: str, poster: str) -> bool:

@@ -1542,8 +1542,8 @@ class WithdrawTest(CoreHarness):
         """書きかけで止まって残った一時ファイルだけなら、マーカーとは数えず取り下げられる。"""
         text = self.new_parent()
         marks = os.path.join(self.approved, "phases", "i0001")
-        # 実際に残りうる名前。前の版の待ち方（write_bytes_atomic）と、受け入れた指摘の記録
-        # （write_json_atomic）の書きかけ。マーカーは一時ファイルを作らずに書く。
+        # 実際に残りうる名前。前の版の待ち方（write_bytes_atomic）と、前の版の受け入れた指摘の記録
+        # （write_json_atomic）が残した書きかけ。マーカーは一時ファイルを作らずに書く。
         write(os.path.join(marks, ".workflow.yml.abc12345.part"), "half")
         write(os.path.join(marks, ".accepted.abc12345.part.json"), "half")
         problems = self.problems({"i0001": text.encode()})

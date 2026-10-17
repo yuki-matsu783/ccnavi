@@ -12,7 +12,8 @@
 6. 待ち方のファイルは無い。承認済みチケットの計画から都度計算し、残ったファイルは読まない
 7. 手で動かした承認も `after` で読む。壊れた計画の親は判定で止まり、子も止まる
 8. 改版の見つけ方（定義・`review`・推移的な待ちの並び）と、番号ごとの錠
-9. 受け入れはそのフェーズと、それを待つ番号にだけ当てはまる。次の案内は並行の枝を挙げる
+9. 受け入れは親全体に当てはまる（`confirm` が数えるのはホスト上の未解決だけ）。
+   次の案内は並行の枝を挙げる
 """
 
 from __future__ import annotations
@@ -367,31 +368,6 @@ class PlanProblemsTest(unittest.TestCase):
         self.assertIn("すぐ始まる: 1, 2", out)
         broken = parent_of([item("design"), item("extra"), item("docs", after=[1])])
         self.assertIn("最後の項が待たない: 2", workflow.lines(broken, workflow.compute(broken)))
-
-
-class AcceptedScopeTest(unittest.TestCase):
-    def test_acceptance_reaches_only_the_phase_and_what_waits_on_it(self):
-        import shutil
-        import tempfile
-
-        home = tempfile.mkdtemp(prefix="ccnavi-accepted-")
-        self.addCleanup(shutil.rmtree, home, ignore_errors=True)
-        owner = parent_of(
-            [
-                item("design"),
-                item("acceptance", after=[1]),
-                item("implement", after=[1]),
-                item("docs", after=[2, 3]),
-            ]
-        )
-        owner.workflow = workflow.compute(owner)
-        self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-2"], 2), "")
-        self.assertEqual(approval_marks.remember_accepted(home, "i0001", ["t-all"]), "")
-        # 2（受入）で受け入れたものは、並行した 3（実装）では数えない。
-        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 3, owner), {"t-all"})
-        # 2 と、2 を待つ 4（文書）では受け入れ済み。
-        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 2, owner), {"t-2", "t-all"})
-        self.assertEqual(approval_marks.accepted_threads(home, "i0001", 4, owner), {"t-2", "t-all"})
 
 
 class NextHintTest(unittest.TestCase):
