@@ -59,6 +59,6 @@ def childless_notice(root: str, conf: settings.Settings, found: ticket_model.Tic
         return []
     return [
         f"子のない（子の提案もありません）フェーズがある: {', '.join(labels)}",
-        "フェーズごとに子チケットを作ってください（子の着手は親が着手済みであることが条件）",
+        "次: フェーズごとに子チケットを作ってください（子の着手は親が着手済みであることが条件）",
         "子のないまま親で進めても、`finish` で「終わっていないフェーズがある」と止まります",
     ]

@@ -117,6 +117,8 @@ relative_of() {
 
 bad=0
 made=""
+# 下書きがある（作った・既にあった）パスの並び。差し替えの次の一手に、そのまま埋める
+staged=""
 mvs=""
 same=""
 missing=""
@@ -142,6 +144,7 @@ for arg in "$@"; do
 		fi
 		continue
 	fi
+	staged="${staged:+$staged }$rel"
 	if [ -e "$draft" ]; then
 		if cmp -s "$orig" "$draft"; then
 			printf '下書きは既にある（元と同じ）: %s\n' "$draft"
@@ -161,7 +164,7 @@ done
 [ "$bad" -eq 0 ] || exit 2
 
 if [ -z "$commands" ]; then
-	[ -z "$made" ] || printf '下書きを編集したら、すべて直し終えてから sh %s/.ccnavi/scripts/ccnavi-stage.sh --commands <パス>... で差し替えの mv を出す。\n' "$root"
+	[ -z "$staged" ] || printf '次: 下書きを編集する。すべて直し終えたら sh %s/.ccnavi/scripts/ccnavi-stage.sh --commands %s を打つ（差し替えの mv が出る）\n' "$root" "$staged"
 	exit 0
 fi
 
@@ -175,3 +178,5 @@ fi
 printf '差し替えは、ユーザが次を実行します（元のファイルは保護対象なので、エージェントは差し替えない）:\n'
 printf '%s' "$mvs"
 [ -z "$missing$same$changed" ] || exit 1
+printf '次: 上の mv をユーザに案内してターンを終える\n'
+printf '案内: 非対話セッションでは、編集済みの下書きを push し、確認と差し替えをユーザに頼んでターンを終える\n'

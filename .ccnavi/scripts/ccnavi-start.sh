@@ -89,13 +89,17 @@ sh_quote() {
 }
 orig_args=""
 rerun_args=""
+# --dry-run を外した同じ引数。dry-run の「次:」で、実際に作るときのコマンドとして出す
+real_args=""
 for arg in "$@"; do
 	q=$(sh_quote "$arg")
 	orig_args="$orig_args $q"
 	[ "$arg" = --mcp-checked ] || rerun_args="$rerun_args $q"
+	[ "$arg" = --dry-run ] || real_args="$real_args $q"
 done
 orig_args="${orig_args# }"
 rerun_args="${rerun_args# }"
+real_args="${real_args# }"
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 	--issue | --mr)
@@ -657,6 +661,14 @@ record_mr() {
 
 # 最後に ccnavi-sync.sh <識別子> を打つ。親チケットも提案もまだ無いと取り込まれないが、止めない。<ブランチ>
 sync_note=""
+# ccnavi-sync.sh が「親チケットも提案もありません」で取り込まなかったとき 1 にする。report が提案を作る次の一手を出す
+sync_no_ticket=""
+# ccnavi-sync.sh が取り込んだとき 1 にする（親チケットか提案が既にある）。report が状態を確かめる次の一手を出す
+sync_ok=""
+# 親チケットも提案も無い以外の理由で取り込めなかったとき、次の一手の文を入れる
+sync_next=""
+# 提案を作る次の一手に書く題。新しく作る MR の題か、採用する MR の題。分からなければ空
+next_title=""
 run_sync() {
 	rs_id=$(ccnavi_branch_to_id "$1")
 	rs_rc=0
@@ -665,10 +677,20 @@ run_sync() {
 	if [ "$rs_rc" -eq 0 ]; then
 		printf 'ccnavi-sync.sh %s:\n' "$rs_id"
 		printf '%s\n' "$rs_out" | sed 's/^/  /'
+		sync_ok=1
 	else
 		printf 'ccnavi-sync.sh %s は取り込まなかった（終了コード %s）:\n' "$rs_id" "$rs_rc"
 		printf '%s\n' "$rs_out" | sed 's/^/  /'
-		sync_note="親チケットか提案が出来たら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す"
+		# 「親チケットも提案もありません」は ccnavi-sync.sh の文言。変えるときはここと test_start_sh.py も直す
+		case "$rs_out" in
+		*親チケットも提案もありません*)
+			sync_no_ticket=1
+			sync_note="親チケットか提案が出来たら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す"
+			;;
+		*)
+			sync_next="取り込めなかった理由は上の出力のとおり。直したら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す（直せないときはユーザに伝える）"
+			;;
+		esac
 	fi
 }
 
@@ -696,9 +718,31 @@ report() {
 	case "${3:-}" in
 	'' | *[!0-9]*) ;;
 	*)
-		printf '必須: 提案の frontmatter に mr: %s を書く（この MR の番号。書かないと、この MR の番号を含む依頼が、すでにあるチケットに結び付かない）\n' "$3"
+		printf '必須: 提案の frontmatter に mr: %s を書く（この MR の番号。書かないと、この MR の番号を含む依頼が、すでにあるチケットに結び付かない。ccnavi ticket new の --mr が書く）\n' "$3"
 		;;
 	esac
+	[ -z "$sync_no_ticket" ] || next_ticket_lines "$1" "${3:-}"
+	[ -z "$sync_next" ] || printf '次: %s\n' "$sync_next"
+	[ -z "$sync_ok" ] || printf '次: sh %s/ccnavi-ticket.sh status %s で、このチケットの状態と次の一手を確かめる\n' "$scripts" "$(ccnavi_branch_to_id "$1")"
+}
+
+# 親チケットも提案も無いワークツリーの次の一手。提案を作る ccnavi ticket new を、埋められる値を埋めて出す。<ブランチ> <MR の番号か空>
+# 触るファイルは依頼から読み取って --scope に書くしかないので、<触るファイルの glob> は残す。
+# 次の一手を提案づくりに絞るのは、承認が通らないなどで詰まったエージェントが、提案を諦めて直接実装に進んだことがあるため
+next_ticket_lines() {
+	nt_id=$(ccnavi_branch_to_id "$1")
+	nt_title=$(sh_quote "${next_title:-<題>}")
+	nt_issue=""
+	[ "$what" != issue ] || nt_issue=" --issue $number"
+	nt_mr=""
+	case "${2:-}" in
+	'' | *[!0-9]*) ;;
+	*) nt_mr=" --mr $2" ;;
+	esac
+	nt_scope=$(sh_quote "<触るファイルの glob>")
+	printf '次: ワークツリーの中で sh %s/ccnavi-launcher.sh ticket new %s --title %s --plan quick-work --scope %s%s%s で提案を作る。作れたら、承認をユーザに頼んで返事を待つ\n' \
+		"$scripts" "$nt_id" "$nt_title" "$nt_scope" "$nt_issue" "$nt_mr"
+	printf '案内: 小さい作業（1〜2 ファイル）は quick-work。大きい作業は --plan を design,implement のように変える（型と範囲は .ccnavi/config/common/phases.yml）。提案は手で書かず、承認が通らないなど詰まったら、直接実装に切り替えず、ユーザに報告して止まる\n'
 }
 
 # 既存の MR を採用してよいか確かめる。引っかかったら止める。<ブランチ> <MR の JSON>
@@ -912,6 +956,7 @@ if [ "$total" -eq 0 ]; then
 		printf 'ワークツリー: %s\n' "$new_wt"
 		printf 'MR の題: %s（Draft。本文: Closes #%s）\n' "$new_title" "$number"
 		[ "$host_rc" -eq 0 ] || printf '案内: ホストに届かず、題は仮のもの（%s）\n' "$host_why"
+		printf '次: 問題なければ、--dry-run を外して実行する: sh %s/ccnavi-start.sh %s\n' "$scripts" "$real_args"
 		exit 0
 	fi
 	cgit fetch origin "$integration" || fail fetch-failed "統合先 ${integration} を origin から取れなかった（上の出力を見てください）。"
@@ -920,6 +965,7 @@ if [ "$total" -eq 0 ]; then
 	ensure_initial_commit
 	ensure_push "$new_branch"
 	ensure_mr "$new_branch" "$new_title"
+	next_title="$new_title"
 	finish_up "$new_branch" "$mr_num"
 	report "$new_branch" "$mr_url" "$mr_num"
 	log_info 完了 -- "branch=$new_branch"
@@ -997,6 +1043,7 @@ if [ -n "$dry" ]; then
 	else
 		printf 'MR: %s\n' "${c_url:--}"
 	fi
+	printf '次: 問題なければ、--dry-run を外して実行する: sh %s/ccnavi-start.sh %s\n' "$scripts" "$real_args"
 	exit 0
 fi
 
@@ -1012,7 +1059,8 @@ if [ -n "$resume" ]; then
 	fi
 	ensure_initial_commit
 	ensure_push "$cb"
-	ensure_mr "$cb" "$(make_title "$cb")"
+	next_title=$(make_title "$cb")
+	ensure_mr "$cb" "$next_title"
 	finish_up "$cb" "$mr_num"
 	report "$cb" "$mr_url" "$mr_num"
 	log_info 作りかけを完了 -- "branch=$cb"
@@ -1023,6 +1071,7 @@ stop_branch="$cb"
 fetch_branch "$cb"
 ensure_worktree "$cb"
 fast_forward "$cb"
+next_title=$(jq -r '.candidates[0].mrs[0].title // ""' "$cand_json")
 finish_up "$cb" "$c_mrnum"
 report "$cb" "$c_url" "$c_mrnum"
 log_info 続ける -- "branch=$cb"

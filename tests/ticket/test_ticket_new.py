@@ -224,12 +224,37 @@ class TicketNewScopeTest(TicketNewTestBase):
         self.assertEqual([e["glob"] for e in front["allow"]], ["src/ui/error.ts"])
         self.assertEqual(front["plan"], ["quick-work"])
         self.assertIn("quick-work", front["phases"])
+        # 次の一手は「次:」で始まる 1 行。承認までは実装しない
+        nexts = [line for line in result.stdout.splitlines() if line.startswith("次: ")]
+        self.assertEqual(len(nexts), 1, result.stdout)
+        self.assertIn("--agree --preview --verify", nexts[0])
+        self.assertIn("承認が済むまで実装はしない", nexts[0])
+        self.assertIn("直接実装に切り替えず", result.stdout)
 
     def test_scope_is_added_after_the_collected_scope_without_duplicates(self):
         result = self.new("--scope", "docs/a.md,SRC/*", "--scope", "docs/a.md", plan="implement")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         globs = [e["glob"] for e in front_of(self.written())["allow"]]
         self.assertEqual(globs, ["src/*", "tests/*", "docs/a.md"])
+
+    def test_a_placeholder_from_a_guidance_line_is_refused(self):
+        # 案内の行の仮の値（`<触るファイルの glob>`・`<題>`）をそのまま打つと、
+        # 実在しない glob や題の提案ができて承認まで通る。作らずに断る
+        result = self.new("--scope", "<触るファイルの glob>", plan="quick-work")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("仮の値", result.stderr)
+        self.assertFalse(os.path.exists(self.todo))
+        result = self.new("--scope", "src/a.py", plan="quick-work", title="<題>")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("仮の値", result.stderr)
+        self.assertFalse(os.path.exists(self.todo))
+
+    def test_the_next_step_runs_through_the_launcher(self):
+        result = self.new("--scope", "src/ui/error.ts", plan="quick-work")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # ccnavi を PATH に持たなくても打てる形で書く
+        self.assertRegex(result.stdout, r"ccnavi-launcher\.sh --agree --preview --verify ")
+        self.assertRegex(result.stdout, r"ccnavi-launcher\.sh --lint")
 
     def test_scope_must_be_relative_and_stay_inside_the_tree(self):
         for bad in ("/etc/passwd", "../x", "a/../b", "C:/x"):

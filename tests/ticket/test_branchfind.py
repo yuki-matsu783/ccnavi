@@ -67,6 +67,9 @@ class PromptHintTest(PhaseHarness):
         self.assertIn("終了コード 4（ホストに届かない）", said)
         self.assertIn("MCP で代行し、同じコマンドを再実行します。", said)
         self.assertIn("終了コード 1・2 なら、出力の理由をユーザに伝える", said)
+        # 出力の「次:」（提案づくり）に従い、承認までは実装せず、直接実装へ切り替えない
+        self.assertIn("出力に「次:」の行があれば、その一手に従う", said)
+        self.assertIn("詰まっても直接実装に切り替えない", said)
         self.assertNotIn("ccnavi-branches.sh", said)
 
     def test_a_ccnavi_notice_is_not_a_reference(self):

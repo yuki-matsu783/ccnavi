@@ -286,6 +286,14 @@ class StartShTest(unittest.TestCase):
         self.assertTrue(body["draft"])
         # 提案に MR の番号を書く（必須。チケットの `mr:` で、この MR の番号がチケットに結び付く）
         self.assertIn("必須: 提案の frontmatter に mr: 7 を書く", done.stdout)
+        # 親チケットも提案も無いので、提案を作る次の一手を、埋められる値を埋めて出す
+        nexts = [line for line in done.stdout.splitlines() if line.startswith("次: ")]
+        self.assertEqual(len(nexts), 1, done.stdout)
+        self.assertIn(f"ccnavi-launcher.sh ticket new {BRANCH} --title 'Add login' ", nexts[0])
+        self.assertIn(
+            "--plan quick-work --scope '<触るファイルの glob>' --issue 152 --mr 7", nexts[0]
+        )
+        self.assertIn("直接実装に切り替えず、ユーザに報告して止まる", done.stdout)
         # 取り込み記録に MR の番号を保存する（ブランチ名に / が無いので、識別子もブランチ名と同じ）
         self.assertEqual(self.record(BRANCH).get("mr"), "7")
         self.assertEqual(self.record(BRANCH).get("branch"), BRANCH)
@@ -299,6 +307,8 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         # 既存の MR で続ける枝にも同じ案内
         self.assertIn("必須: 提案の frontmatter に mr: 7 を書く", done.stdout)
+        self.assertIn("次: ワークツリーの中で sh ", done.stdout)
+        self.assertIn(f"ticket new {BRANCH} --title ", done.stdout)
         self.assertEqual(self.fields(done.stdout)["ブランチ"], BRANCH)
         self.assertEqual(self.fields(done.stdout)["MR"], "https://github.com/acme/widgets/pull/7")
         self.assertEqual(self.posts(), before)
@@ -796,6 +806,11 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(self.remote_branches(), ["main"])
         self.assertEqual(self.posts(), [])
         self.assertFalse(os.path.isdir(self.wt(BRANCH)))
+        # 次の一手は、--dry-run を外した同じコマンド
+        nexts = [line for line in done.stdout.splitlines() if line.startswith("次: ")]
+        self.assertEqual(len(nexts), 1, done.stdout)
+        self.assertIn("--dry-run を外して実行する", nexts[0])
+        self.assertTrue(nexts[0].endswith("ccnavi-start.sh '--issue' '152'"), nexts[0])
 
     def test_prefix_and_slug(self):
         self.route(

@@ -276,12 +276,16 @@ def verify_verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
     if gathered.rejected:
         reason = VERIFY_REJECTED
         tail = (
-            f"\n{len(gathered.rejected)} 件が承認の対象にならない。"
-            "提案を直してから、ユーザに承認を依頼してください。\n"
+            f"\n{len(gathered.rejected)} 件が承認の対象にならない。\n"
+            "次: 提案を直してから、同じ --agree --preview --verify を打ち直す。"
+            "通ったら、ユーザに承認を依頼する\n"
         )
     else:
         reason = VERIFY_OK
-        tail = f"\n{len(gathered.batch)} 件が承認の対象に入る。ユーザに承認を依頼してよい。\n"
+        tail = (
+            f"\n{len(gathered.batch)} 件が承認の対象に入る。\n"
+            "次: ユーザに承認を依頼してよい。承認が済むまで実装はしない\n"
+        )
     lines.append(tail)
     return Verdict(reason == VERIFY_OK, reason, "".join(lines))
 

@@ -150,6 +150,13 @@ def start(
         stdout.write(line + "\n")
     for line in ops_plan.childless_notice(root, conf, found):
         stdout.write(line + "\n")
+    if found.is_child:
+        ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+        stdout.write(
+            "次: サブエージェントに、子のワークツリー"
+            f"（.claude/worktrees/{found.ticket}）での実装を任せる。"
+            f"終わってコミットされたら '{ticket_sh} finish {found.ticket}' を打つ\n"
+        )
     if learning.applies(root, conf, found):
         stdout.write(
             "学びの蓄積: 閉じる前に "
@@ -383,7 +390,7 @@ def _close_parent(
     wip = ticket_places.WIP_ROOT
     if phase.without_mr(root, conf, found.ticket, venues):
         stdout.write(
-            f"次は、この移動をコミットし、`{wip}/` を削除して"
+            f"次: この移動をコミットし、`{wip}/` を削除して"
             f"（'{git_sh} rm -r {wip}'）コミットし、統合先のブランチに取り込んでください。"
             "このチケットにはマージリクエストで見るフェーズが無いので、"
             "Draft を解除する手順はありません。途中の作業は既定のブランチに残さない。"
@@ -395,7 +402,7 @@ def _close_parent(
         stdout.write("Draft は外してある。マージはユーザが行う\n")
         return
     stdout.write(
-        "次は、この移動をコミットして push し"
+        "次: この移動をコミットして push し"
         "（取り込み済みの親子では、この finish が済ませている）、"
         f"'{ready_command(root, found.ticket)}' で Draft を解除してください"
         "（「マージに進んでよい」の合図）。"
@@ -667,6 +674,12 @@ def _move(
                 f"{conf.approved}/{ticket_model.DONE}/ へ動く"
             )
             + "\n"
+        )
+    elif state == ticket_model.DONE and found.is_child and not cancelled:
+        # 次の一手は status が計算する。ここで決め打ちしない
+        stdout.write(
+            f"次: '{settings.script_command(root, 'ccnavi-ticket.sh')} status {found.parent}' で、"
+            "親の次の一手を確かめる\n"
         )
     return 0
 

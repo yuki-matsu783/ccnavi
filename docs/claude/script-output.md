@@ -1,0 +1,79 @@
+---
+type: guide
+title: スクリプトの出力に次の一手を書く
+description: ワークフローを進めるshと実行ファイルの出力で、次の一手を「次:」で始まる行に出す決まり。行頭の語の使い分け、書き方、出さない場面、テストの型
+tags: [sh-scripts, exe-boundary]
+keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, ワークフロー, ccnavi-start.sh, ticket new, printf, stdout]
+---
+
+# スクリプトの出力に次の一手を書く
+
+エージェントは、スクリプトの出力を読んで次に何をするかを決める。出力が次の一手を言わないと、エージェントは
+手元の知識で手順を補う。補えなければ、決まりを外れた道（提案を手で書く、チケットを起こさずに直接実装するなど）に進む。
+`ccnavi-start.sh --issue` が「親チケットか提案が出来たら…打ち直す」としか言わず、提案を作る `ccnavi ticket new` を示さなかったために、
+提案を手書きして詰まり、直接実装に進んだ事故があった。
+
+ワークフローを進めるsh（`.ccnavi/scripts/`）と実行ファイル（`src/ccnavi/`）の出力は、次の決まりで書く。
+
+## 行頭の語
+
+| 行頭の語 | 意味 | 1回の出力での数 |
+|---|---|---|
+| `次:` | 次の一手。そのまま打てるコマンド、または次にやる行為（ユーザに頼む、サブエージェントに任せる、など） | 1行 |
+| `必須:` | 書き漏らすと、あとで承認や検査が止まる項目 | 必要なだけ |
+| `案内:` | 補足と注意。次の一手ではない | 必要なだけ |
+| `次の手:` | 次の一手が1つに決まらないときの、番号つきの選択肢の見出し | 1つ |
+| `MCP で行う手順:` | ホストに届かないときの、MCPでの代行手順（`ccnavi-start.sh`など） | 1つ |
+
+## 決まり
+
+- 成功の終わりと、「止まったが続きがある」終わり（終了コード4の代行案内など）では、次の一手が1つに決まるなら `次:` を出す
+- 次の一手が複数あって決まらないときは、`次:` にせず、`次の手:` に番号つきで並べる。決められるのはユーザなら、そう言う
+- 次がユーザの操作のときは、「ユーザに〜を頼んで返事を待つ」の形にする。エージェントが打てない操作を、エージェントへの指示として書かない
+- 識別子・題・番号・パスは、分かる値を埋めて、そのまま打てる形にする。分からない値だけ `'<触るファイルの glob>'` のように `<…>` で残し、`sh_quote` などで1語に包む
+- `<…>` の仮の値を残した次の一手を、そのまま打たれても、誤った成果物ができないようにする。受け側（`ccnavi ticket new` の `--scope` と `--title`）が `<…>` を含む値を断る。新しく仮の値を出すときは、受け側にも同じ断りを足す
+- 詰まったときの行き先も言う。承認が通らない、ホストに届かないなど、エージェントが自力で進められない場面では、「直接実装に切り替えず、ユーザに報告して止まる」と添える。決まりを外れた道を、出力が先回りして塞ぐ
+- 次の一手の中身をshが計算しない。チケットの状態から決まる次は、`ccnavi-ticket.sh status` を打つよう促す（shはチケットのYAMLを読まない。`exe-boundary.md`）
+- 文言にADR番号を書かない（`environment.md`）
+
+## 出さない場面
+
+- 状態を報告するだけで、次の一手がユーザの判断になるとき（例: `integrate-done` のあと、取り込んだコミットをリモートへ送るか）
+- 何も動かなかったときは何も出さない、と決めているとき（`ccnavi-fetch.sh`）
+- ユーザが端末で打つスクリプト（`ccnavi-agree.sh`、`ccnavi-push-approved.sh`）。エージェントへの通知は、承認後のhookの文が受け持つ
+- 共通関数（`ccnavi-common*.sh`）。止める理由ごとに次が違うので、呼び出し元で出す
+- `ccnavi-clean.sh` の dry-run。node があると `exec` で `ccnavi-clean.js` に代わり、出力はそちらが出す。shから行を足せない
+
+## 書き方
+
+- shは `printf '次: …\n' …` で標準出力へ出す。実行ファイルは `stdout.write("次: …\n")`。止まる枝も、既存の出力と同じ側に出す
+- 1行にする。長くなる補足は、別の行の `案内:` に分ける
+- 行頭の `次: ` は、機械が数える。行の途中に「次:」を書かない
+- 既存の言い方（`次は、…`、`次にやること:`）は、`次:` に付け替える。文の中身は変えない（テストが語句を見ている）
+
+## テストの型
+
+- 行頭が `次: ` の行を数えて、1行であることを見る（`tests/sh/test_start_sh.py`）
+- 値が埋まっていることを見る。識別子・題・`--issue`・`--mr` が、そのまま打てる形で並んでいる
+- 出さない場面で出ていないことを見る（既存の検査で足りることが多い）
+
+## 実装済みの場面
+
+| 場面 | 出す次の一手 | 場所 |
+|---|---|---|
+| `ccnavi-start.sh` の成功、親チケットも提案も無い | `ccnavi-launcher.sh ticket new …`（識別子・題・issue・MRを埋める） | `ccnavi-start.sh` の `next_ticket_lines` |
+| `ccnavi-start.sh` の成功、チケットが既にある | `ccnavi-ticket.sh status <識別子>` | `ccnavi-start.sh` の `report` |
+| `ccnavi-start.sh` の成功、取り込みが他の理由で止まった | 理由を直して `ccnavi-sync.sh` を打ち直す | `ccnavi-start.sh` の `run_sync` |
+| `ccnavi-start.sh --dry-run` | `--dry-run` を外した同じコマンド | `ccnavi-start.sh` の `real_args` |
+| `ccnavi-stage.sh` | 下書きを編集し、`--commands` を打つ。mv が出たらユーザに案内する | `ccnavi-stage.sh` |
+| `ccnavi-review.sh` の早めに閉じた | 親に閉じて片付け、`ready` を打たせる | `ccnavi-review.sh` |
+| `ccnavi ticket new` の成功 | 提案を書き、`--lint` と `--agree --preview --verify` を通し、ユーザに承認を頼む | `tickets/scaffold.py` |
+| `ccnavi --agree --preview --verify` | 通れば承認を頼む。通らなければ提案を直して打ち直す | `tickets/agree.py` |
+| 承認後の通知 | 親の `start`、子の `start` | `tickets/agree_screen.py` |
+| `ccnavi-ticket.sh start`（子） | サブエージェントに実装を任せ、終わったら `finish` | `tickets/ops.py` |
+| `ccnavi-ticket.sh start`（親で子の無いフェーズが残る） | フェーズごとに子チケットを作る | `tickets/ops_plan.py` |
+| `ccnavi-ticket.sh finish`（子で、レビュー不要） | 親の `status` | `tickets/ops.py` |
+| `ccnavi-ticket.sh finish`（親） | 移動をコミットして push し、Draft を解除する | `tickets/ops.py` |
+| `ccnavi-git.sh integrate` | `status` と `diff --staged` で確かめ、`integrate-done` | `ccnavi-git.sh` |
+
+issue・MRを指定された依頼文には、ccnaviのUserPromptSubmitが「出力に『次:』があればそれに従う」と足す（`tickets/branchfind.py` の `_start_lines`）。

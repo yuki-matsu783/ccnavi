@@ -165,7 +165,7 @@ class ProposalTest(Use):
         self.assertIn(self.child(3), out)
         self.assertIn("下書きには効力がありません。", out)
         self.assertIn("フロー編集画面", out)
-        self.assertIn("ccnavi --lint", out)
+        self.assertIn("ccnavi-launcher.sh --lint", out)
 
     def test_the_feedback_plan_is_not_written_unless_asked_for(self):
         result = self.new()
