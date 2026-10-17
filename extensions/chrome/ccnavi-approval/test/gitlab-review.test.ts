@@ -49,7 +49,7 @@ const TOKENS = new Map([
 const TODO = "wip/proposals/todo/i0001.md";
 const CHILD = "wip/proposals/todo/i0001-01-01.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
-const EVENTS = ".ccnavi/approved/events/i0001.ndjson";
+const EVENTS = ".ccnavi/approved/events/i0001.jsonl";
 
 function glDeps(mock: MockGitHub, host = "gitlab.com", now: () => Date = () => new Date(NOW)): WriteDeps {
   const stats = newStats();

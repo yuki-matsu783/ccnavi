@@ -104,7 +104,7 @@ export interface FlowDraftJson {
 }
 
 /**
- * 状態の履歴の 1 行。`.ccnavi/approved/events/<識別子>.ndjson` の新しい側を実行ファイルが読んで渡す。
+ * 状態の履歴の 1 行。`.ccnavi/approved/events/<識別子>.jsonl` の新しい側を実行ファイルが読んで渡す。
  * 補助の記録で、状態の正は置き場（`copy` / `proposal`）。拡張は並べるだけで、ここから状態を組み直さない。
  */
 export interface HistoryEntryJson {

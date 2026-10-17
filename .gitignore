@@ -26,10 +26,10 @@ __pycache__/
 #   logs/diag/     sh・実行ファイル・拡張の診断ログ（docs/claude/logging.md）。あとから
 #                  何が起きたかを追うための補助で、判定は読まない
 /logs/
-*.jsonl
 
-# md の frontmatter の索引（`ccnavi --docs`、SessionStart が書く）。上の `*.jsonl` にも当たるが、
-# ccnavi は git がここを無視しているときだけ書くので、`*.jsonl` を外しても索引は無視されたままにする。
+# md の frontmatter の索引（`ccnavi --docs`、SessionStart が書く）。
+# ccnavi は git がここを無視しているときだけ書くので、ここで無視する。
+# 状態の履歴（`events/*.jsonl`）は追跡するので、`*.jsonl` 全体は無視しない。
 **/ccnavi-index.jsonl
 
 # 途中を見せない書き方（一時ファイルに書いて差し替える。fsio.write_*_atomic / write_*_durable）が、

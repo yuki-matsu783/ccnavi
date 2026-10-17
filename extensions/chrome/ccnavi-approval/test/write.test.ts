@@ -67,7 +67,7 @@ function shownOf(b: RepoBoard, family: string) {
 
 const TODO = "wip/proposals/todo/i0001.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
-const EVENTS = ".ccnavi/approved/events/i0001.ndjson";
+const EVENTS = ".ccnavi/approved/events/i0001.jsonl";
 const WORKFLOW = ".ccnavi/approved/phases/i0001/workflow.yml";
 
 test("CX-T100 承認は P への 1 コミット。条件は読んだ先頭、足す・消すは Python の Changes のとおり。書いた後の中身も確かめる", async () => {
