@@ -194,7 +194,7 @@ test("CX-T075 ボードで承認すると、親のブランチへ 1 コミット
   const files = mock.files("i0001");
   assert.ok(!("wip/proposals/todo/i0001.md" in files));
   assert.equal(files[".ccnavi/approved/doing/i0001.md"], proposal);
-  const event = JSON.parse(files[".ccnavi/approved/events/i0001.ndjson"].trim().split("\n").pop() as string);
+  const event = JSON.parse(files[".ccnavi/approved/events/i0001.jsonl"].trim().split("\n").pop() as string);
   assert.deepEqual([event.kind, event.via, event.actor], ["approved", "chrome", LOGIN]);
   // 描き直したボード: i0001 は承認待ちから消え、作業中の承認済みチケットに出る
   assert.equal(await page.locator('[data-family="i0001"] .entry').count(), 0);
@@ -212,7 +212,7 @@ test("CX-T076 着手前で子の無い承認は、ボードから取り下げら
   const files = mock.files("i0001");
   assert.equal(files["wip/proposals/todo/i0001.md"], original);
   assert.ok(!(".ccnavi/approved/doing/i0001.md" in files));
-  const last = JSON.parse(files[".ccnavi/approved/events/i0001.ndjson"].trim().split("\n").pop() as string);
+  const last = JSON.parse(files[".ccnavi/approved/events/i0001.jsonl"].trim().split("\n").pop() as string);
   assert.deepEqual([last.kind, last.via, last.reason, last.actor], ["withdrawn", "chrome", "押し間違い", "alice"]);
   // 取り下げた提案はまた承認待ちに出る
   assert.equal(await page.locator('[data-family="i0001"] .entry[data-ticket="i0001"]').count(), 1);
@@ -339,7 +339,7 @@ test("CX-T159 セルフホストの GitLab（足した通信先）: 登録して
   const files = lab.files("i0001");
   assert.ok(!("wip/proposals/todo/i0001.md" in files));
   assert.equal(files[".ccnavi/approved/doing/i0001.md"], proposal);
-  const event = JSON.parse(files[".ccnavi/approved/events/i0001.ndjson"].trim().split("\n").pop() as string);
+  const event = JSON.parse(files[".ccnavi/approved/events/i0001.jsonl"].trim().split("\n").pop() as string);
   assert.deepEqual([event.kind, event.via], ["approved", "chrome"]);
   assert.ok(lab.calls.some((c) => c.endsWith("/personal_access_tokens/self")));
   assert.ok(!(await page.content()).includes(TOKEN));

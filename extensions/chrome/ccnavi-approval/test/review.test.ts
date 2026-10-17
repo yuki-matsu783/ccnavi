@@ -75,7 +75,7 @@ test("CX-T119 取り下げ: 承認コミットが P の first-parent の鎖の�
   const cd = depsFor(copy);
   assert.equal((await approveFamily(REPO, "i0001", await shown(cd), cd)).kind, "written");
   const approved = copy.files("i0001");
-  const events = ".ccnavi/approved/events/i0001.ndjson";
+  const events = ".ccnavi/approved/events/i0001.jsonl";
   // 別の枝 side で承認して P に merge する。git log -- path は side のコミットを返す
   mock.branch("side", "i0001");
   mock.push("side", { [TODO]: null, [DOING]: approved[DOING], [events]: approved[events] }, "side で承認");

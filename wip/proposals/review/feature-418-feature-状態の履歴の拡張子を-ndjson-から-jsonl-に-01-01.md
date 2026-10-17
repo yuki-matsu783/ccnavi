@@ -24,6 +24,8 @@ allow:
     glob: ".gitignore"
 started_at: "2026-10-18T00:18:39+0900"
 base_sha: "4bb75b755564b9c6763473ce08851eedc712d483"
+completed_at: "2026-10-18T01:03:19+0900"
+merged_sha: "d582a7e0b47311ba2eb5fc769576e563c3d93675"
 ---
 ## 変更の内容
 

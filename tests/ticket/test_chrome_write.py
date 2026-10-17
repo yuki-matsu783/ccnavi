@@ -201,7 +201,7 @@ class WrittenCopyTest(ChromeWriteHarness):
         self.assertIsNone(body["code"])
         self.assertEqual(sorted(body["changes"]), ["i0001"])
         events = next(
-            r for r in body["changes"]["i0001"] if r["path"].endswith("events/i0001.ndjson")
+            r for r in body["changes"]["i0001"] if r["path"].endswith("events/i0001.jsonl")
         )
         line = json.loads(events["content"].splitlines()[-1])
         self.assertEqual(
@@ -254,7 +254,7 @@ class WrittenCopyTest(ChromeWriteHarness):
         self.commit_parent()
         body = self.plan()
         self.apply(body["changes"]["i0001"], self.parent_tree)
-        events = os.path.join(self.approved, "events", "i0001.ndjson")
+        events = os.path.join(self.approved, "events", "i0001.jsonl")
         with open(events, "a", encoding="utf-8") as f:
             f.write(
                 json.dumps({"at": "x", "ticket": "i0001", "kind": "started", "via": "cli"}) + "\n"

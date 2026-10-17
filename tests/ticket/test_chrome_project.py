@@ -135,7 +135,7 @@ class ChromeProjectTest(unittest.TestCase):
         copy = paths[".ccnavi/approved/doing/web-i0012.md"]["content"]
         # 承認は提案の中身を変えない。出所（ブランチ名）は状態の履歴に残る。
         self.assertNotIn("ccnavi_approved", copy)
-        events = paths[".ccnavi/approved/events/web-i0012.ndjson"]["content"]
+        events = paths[".ccnavi/approved/events/web-i0012.jsonl"]["content"]
         self.assertIn('"tree": "web-i0012"', events)
         self.assertIn('"via": "chrome"', events)
         self.assertIn('"actor": "lab-approver"', events)

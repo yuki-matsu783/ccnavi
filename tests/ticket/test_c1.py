@@ -127,7 +127,7 @@ class SortTest(AuthorityHarness):
         return write(os.path.join(self.parent_tree, *rel.split("/")), text)
 
     def events(self):
-        return f"{APPROVED}/events/i0001.ndjson"
+        return f"{APPROVED}/events/i0001.jsonl"
 
     def append_event(self, row):
         path = os.path.join(self.parent_tree, *self.events().split("/"))
@@ -166,7 +166,7 @@ class SortTest(AuthorityHarness):
         git(self.parent_tree, "checkout", "--", self.events())
         other = f"{APPROVED}/phases/i0099/2.pending"
         wide = f"{APPROVED}/phases/i0001/２.pending"
-        fresh = f"{APPROVED}/events/i0099.ndjson"
+        fresh = f"{APPROVED}/events/i0099.jsonl"
         self.put(other, json.dumps({"review": "mr", "at": "t"}))
         self.put(wide, json.dumps({"review": "mr", "at": "t"}))
         self.put(fresh, json.dumps({"at": "t", "ticket": "i0099", "kind": "phase-mark"}) + "\n")
