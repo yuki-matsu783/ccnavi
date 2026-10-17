@@ -1044,6 +1044,14 @@ class PhaseTest(PhaseHarness):
         self.assertIn("実装とテスト", issue)
         self.assertIn("u/7#t0", issue)
         self.assertIn("今期はここまで", issue)
+        # 打ち直しても、取り消し済みの子だけになったフェーズ(2)に省略のマーカーを置かない。
+        again = self.close_early(fixture, reason="今期はここまで")
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        for number in (2, 3, 4):
+            self.assertFalse(
+                os.path.exists(os.path.join(self.approved, "phases", "i0001", f"{number}.skipped")),
+                number,
+            )
         # 早めに閉じたので、フィードバック計画が無くても親を閉じられる。
         explained = self.ccnavi("--explain")
         self.assertIn("ユーザが早めにクローズした", explained.stdout)
@@ -1058,6 +1066,32 @@ class PhaseTest(PhaseHarness):
         passed = self.ready(fixture)
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertIn("wip wip/research/summary.md", passed.stdout.splitlines())
+
+    def test_close_early_marks_a_touched_phase_so_the_hook_stays_quiet(self):
+        """未着手の子のほかにレビュー待ちの子が居るフェーズは、取り消すと終わる。省略のマーカーが
+        無いと、次の hook の告知が pending を書いて「レビューを頼め」と言い出すので、置き続ける。"""
+        self.family(plan=["design", "implement"])
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01-01")
+        # フェーズ 1 に 2 つ目の子を足して承認するが、着手はしない。
+        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent("propose 02")
+        self.assertEqual(self.approve().returncode, 0)
+        self.start_parent()
+        fixture = self.remote()
+        done = self.close_early(fixture)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        phases_dir = os.path.join(self.approved, "phases", "i0001")
+        # 手を付けたフェーズ 1 には置く。手を付けていないフェーズ 2 には置かない。
+        self.assertTrue(os.path.exists(os.path.join(phases_dir, "1.skipped")))
+        self.assertFalse(os.path.exists(os.path.join(phases_dir, "2.skipped")))
+        self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertFalse(os.path.exists(os.path.join(phases_dir, "1.pending")))
 
     def test_close_early_is_a_human_path(self):
         """close-early は端末を求める。サブエージェントと直接の exe 呼び出しは止まる。"""
