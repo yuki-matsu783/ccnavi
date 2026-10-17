@@ -51,6 +51,11 @@
 | フィードバックが届いた、`.claude/skills/` を直したくなった | `.ccnavi/docs/skill-review.md` |
 | スキルの振り返りで知識を `docs/wiki/` に溜める、wiki を読む・書く | `.ccnavi/docs/skill-wiki.md` |
 | 工程スキル（process-*）の reference を引く・足す、スキルを新しく作りたくなった | `.ccnavi/docs/skill-processes.md` |
+| ルール（rules.yml）が育つ流れ・下書きから配布までを確かめる | `.ccnavi/docs/grow-rules.md` |
+| フェーズ定義（phases.yml）が育つ流れを確かめる | `.ccnavi/docs/grow-phases.md` |
+| リスクの配点（risks.yml）が育つ流れを確かめる | `.ccnavi/docs/grow-risks.md` |
+| 作業・レビュー計画のテンプレートが育つ流れを確かめる | `.ccnavi/docs/grow-templates.md` |
+| 工程スキルの reference が育つ流れを確かめる | `.ccnavi/docs/grow-process-skills.md` |
 
 <!-- ccnavi:if tickets -->
   ## 作業の進め方
