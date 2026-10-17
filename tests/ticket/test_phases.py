@@ -1027,7 +1027,13 @@ class PhaseTest(PhaseHarness):
         mark = read_json(os.path.join(self.approved, "phases", "i0001", "close-early.json"))
         self.assertEqual(mark["reason"], "今期はここまで")
         self.assertEqual(mark["cancelled"], ["i0001-02-02"])
-        self.assertEqual(sorted(mark["skipped"]), [2, 3, 4])
+        # 手を付けていないフェーズ(2・3・4)には省略のマーカーを置かない。
+        self.assertEqual(mark["skipped"], [])
+        for number in (2, 3, 4):
+            self.assertFalse(
+                os.path.exists(os.path.join(self.approved, "phases", "i0001", f"{number}.skipped")),
+                number,
+            )
         self.assertEqual(mark["accepted"], ["u/7#t0"])
         with open(
             os.path.join(self.state, "review-close-early-issue-i0001.md"), encoding="utf-8"
