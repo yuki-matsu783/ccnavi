@@ -321,12 +321,12 @@ issue_branch_make() {
 find_mr() {
 	if [ "$ccnavi_h_kind" = github ]; then
 		fm_owner="${ccnavi_h_path%%/*}"
-		fm_got=$(ccnavi_host_api GET "repos/$ccnavi_h_path/pulls?state=open&head=$fm_owner:$1") || return 1
+		fm_got=$(ccnavi_host_api GET "repos/$ccnavi_h_path/pulls?state=open&head=$(ccnavi_host_encode "$fm_owner:$1")") || return 1
 		printf '%s' "$fm_got" | "$ccnavi_h_jq" '.[0] // empty | {number: .number, url: .html_url}'
 	else
 		fm_pid=$(ccnavi_host_project_id) || return 1
 		fm_rc=0
-		fm_got=$(ccnavi_host_pages "projects/$(ccnavi_host_encoded_path)/merge_requests?state=opened&source_branch=$1") || fm_rc=$?
+		fm_got=$(ccnavi_host_pages "projects/$(ccnavi_host_encoded_path)/merge_requests?state=opened&source_branch=$(ccnavi_host_encode "$1")") || fm_rc=$?
 		[ "$fm_rc" -eq 0 ] || return 1
 		printf '%s' "$fm_got" | "$ccnavi_h_jq" --argjson pid "$fm_pid" \
 			'[.[] | select(.source_project_id == $pid)][0] // empty | {number: .iid, url: .web_url}'
@@ -338,10 +338,10 @@ find_mr() {
 find_merged_mr() {
 	if [ "$ccnavi_h_kind" = github ]; then
 		fx_owner="${ccnavi_h_path%%/*}"
-		fx_got=$(ccnavi_host_pages "repos/$ccnavi_h_path/pulls?state=closed&head=$fx_owner:$1") || return 1
+		fx_got=$(ccnavi_host_pages "repos/$ccnavi_h_path/pulls?state=closed&head=$(ccnavi_host_encode "$fx_owner:$1")") || return 1
 		printf '%s' "$fx_got" | "$ccnavi_h_jq" '[.[] | select(.merged_at != null)][0] // empty | {number: .number, url: .html_url}'
 	else
-		fx_got=$(ccnavi_host_pages "projects/$(ccnavi_host_encoded_path)/merge_requests?state=merged&source_branch=$1") || return 1
+		fx_got=$(ccnavi_host_pages "projects/$(ccnavi_host_encoded_path)/merge_requests?state=merged&source_branch=$(ccnavi_host_encode "$1")") || return 1
 		printf '%s' "$fx_got" | "$ccnavi_h_jq" '.[0] // empty | {number: .iid, url: .web_url}'
 	fi
 }
@@ -417,6 +417,7 @@ stop_host() {
 			;;
 		merged)
 			printf '  1. mcp__github__list_pull_requests を owner=%s repo=%s head=%s:%s state=closed で呼び、マージ済み（merged_at がある）の PR が無いことを確かめる\n' "$sh_owner" "$sh_repo" "$sh_owner" "$stop_branch"
+			printf '     mcp__github__* がセッションに無いときは gh で代行する: gh api repos/%s/%s/pulls -f state=closed -f head=%s:%s（-f なら gh が値をエンコードする）\n' "$sh_owner" "$sh_repo" "$sh_owner" "$stop_branch"
 			printf '  2. あれば、マージ済みのブランチは再利用できない。ユーザに伝えて止める\n'
 			printf '  3. 無いと確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
 			;;

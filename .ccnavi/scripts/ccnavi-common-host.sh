@@ -17,6 +17,7 @@
 #   ccnavi_host_api <METHOD> <path> [<JSON>]  応答の JSON を標準出力へ。path は ccnavi_h_api_base からの相対
 #   ccnavi_host_pages <path>    100 件ずつ最後のページまで読んで 1 つの配列にする。20 ページを超えたら 2
 #   ccnavi_host_encoded_path    プロジェクトのパスを URL に入れる表記（GitLab の projects/<ここ>）
+#   ccnavi_host_encode <文字列> クエリの値に入れる文字列（ブランチ名など）のパーセントエンコード
 #   ccnavi_host_project_id      GitLab のプロジェクトの数の id。読めなければ 1
 #
 # 失敗したときの文面は呼ぶ側が決める（ここは標準エラーに何も書かない）。ccnavi_host_api が失敗したら、
@@ -193,6 +194,12 @@ ccnavi_host_pages() {
 
 ccnavi_host_encoded_path() {
 	printf '%s' "$ccnavi_h_path" | "$ccnavi_h_jq" -Rr '@uri'
+}
+
+# クエリの値に入れる文字列（ブランチ名など）をパーセントエンコードして出す。
+# 日本語を生で URL に入れると、ホストが HTML のエラーを返して JSON として読めない。
+ccnavi_host_encode() {
+	printf '%s' "$1" | "$ccnavi_h_jq" -Rr '@uri'
 }
 
 ccnavi_host_project_id() {
