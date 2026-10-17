@@ -12,7 +12,6 @@ from ..policy import rules
 from . import (
     approval,
     approval_checks,
-    approval_marks,
     approval_ops,
     phase,
     phasetypes,
@@ -117,7 +116,7 @@ def candidates(
             ticket=t, complaints=complaints, current=current, types=types, config=config
         )
         if cand.plans_feedback:
-            cand.notes = feedback_notes(root, conf, t)
+            cand.notes = feedback_notes(t)
         batch.append(cand)
         # 通った改版だけ、一緒に承認する子から見える親にする。外れた改版の計画で子を
         # 通すと、承認されない番号の子が承認済みチケットになる。
@@ -267,16 +266,16 @@ def project_of(t: ticket_model.Ticket, pool: dict[str, ticket_model.Ticket]) -> 
     return t.project
 
 
-def feedback_notes(root: str, conf: settings.Settings, parent: ticket_model.Ticket) -> list[str]:
-    """フィードバック計画の承認に添える証跡。何を見たうえでの合意かを残す。"""
-    accepted = approval_marks.accepted_threads(
-        approval.home_dir_read(conf, root, parent.ticket, "", project=parent.project), parent.ticket
-    )
-    notes = [f"受け入れ済みの未解決スレッド: {len(accepted)} 件"]
+def feedback_notes(parent: ticket_model.Ticket) -> list[str]:
+    """フィードバック計画の承認に添える証跡。何を見たうえでの合意かを残す。
+
+    受け入れた未解決スレッドの記録は持たない（ホスト側で返信を残して解決済みにする）ので、
+    件数は添えない。
+    """
+    notes: list[str] = []
     if not parent.feedback:
         notes.append("対応なし。見たうえで対応しない、という記録になる")
-        if accepted:
-            notes.append("別に追うものは issue に回したか（ccnavi-review.sh decide）")
+        notes.append("別に追うものは issue に回したか（ccnavi-review.sh decide）")
     return notes
 
 

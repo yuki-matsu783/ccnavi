@@ -34,6 +34,10 @@
 #            actor は記録で、判定には使わない。引けなければ渡さず、マーカーは前と同じ
 #   decide:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` がユーザに見せ、指摘ごとに
 #            対応しない・このフェーズで直す（続きの子チケット）・issue に回すを選ばせる
+#            → 対応しない・issue に回すと選んだ指摘は、置く前にここがスレッドへ返信を残して解決する
+#              （`ccnavi ... --accept-plan` が返信の本文を書く。ホストに書く前に結果を取り直して指摘が変わっていないことを
+#              確かめ、書いたあとにもう一度取り直して、受け入れたスレッドがホストで解決済みのときだけ置く。
+#              返信か解決ができなければ、何も置かずに止まる）
 #            → issue に回す分があればここが issue を作り、決めた内容をコメントに書き出す
 #            ボードは同じ経路を --preview（一覧を読む）と --choices --digest（押した選択を置く）で通る
 #
@@ -411,6 +415,156 @@ comment() {
 	fi
 }
 
+# ---- 受け入れた指摘のスレッドに返信を残して、解決済みにする。
+#
+# 実行ファイルが書いた計画（`--accept-plan`。{version, digest, threads: [{id, key, reply}]}）のスレッドを、
+# 全部に返信してから、全部を解決する（解決に失敗しても返信が重ならない順）。id は GitHub ならレビューの
+# スレッドの node id（GraphQL）、GitLab なら discussion の id。
+# 呼ぶのは置く前（マーカーを置く前）。1 件でもできなければ受け入れは未完了として止める。
+#
+# ホストに書く前に、計画の id が API の経路に使える字で（GitLab は 16 進）、取り直した結果に
+# 在ることを確かめる。書いたあとは結果を取り直して置く呼び出しに渡す（実行ファイルが、受け入れた
+# スレッドが全部ホストで解決済みで、ほかの未解決が増えていないことを実状態で確かめる）。
+# 打ち直すと、返信まで済んで解決できなかったスレッドには返信が重なる。
+# <スレッドの id> <返信の本文> <MR の番号>
+accept_reply() {
+	accept_id="$1"
+	accept_text="$2"
+	if [ "$kind" = github ]; then
+		accept_query=$("$JQ" -n --arg id "$accept_id" --arg b "$accept_text" '{
+			query: "mutation($id:ID!,$b:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$b}){comment{id}}}",
+			variables: {id: $id, b: $b}}')
+		accept_res=$(api POST graphql "$accept_query") || return 1
+		[ -n "$(printf '%s' "$accept_res" | "$JQ" -r '.data.addPullRequestReviewThreadReply.comment.id // empty' 2>/dev/null)" ]
+	else
+		accept_body=$("$JQ" -n --arg b "$accept_text" '{body: $b}')
+		accept_res=$(api POST "projects/$(encoded_path)/merge_requests/$3/discussions/$accept_id/notes" "$accept_body") || return 1
+		[ -n "$(printf '%s' "$accept_res" | "$JQ" -r '.id // empty' 2>/dev/null)" ]
+	fi
+}
+
+accept_resolve() {
+	accept_id="$1"
+	if [ "$kind" = github ]; then
+		accept_query=$("$JQ" -n --arg id "$accept_id" '{
+			query: "mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}",
+			variables: {id: $id}}')
+		accept_res=$(api POST graphql "$accept_query") || return 1
+		[ "$(printf '%s' "$accept_res" | "$JQ" -r '.data.resolveReviewThread.thread.isResolved // empty' 2>/dev/null)" = true ]
+	else
+		accept_res=$(api PUT "projects/$(encoded_path)/merge_requests/$2/discussions/$accept_id" '{"resolved":true}') || return 1
+		[ -n "$(printf '%s' "$accept_res" | "$JQ" -r '.id // empty' 2>/dev/null)" ]
+	fi
+}
+
+# <計画のファイル> <取り直した結果のファイル>。成功は 0、できなければ理由を標準エラーへ出して 1。
+accept_threads() {
+	accept_file="$1"
+	accept_rfile="$2"
+	accept_mr=$("$JQ" '.mr.number' "$accept_rfile")
+	accept_n=$("$JQ" '.threads | length' "$accept_file" 2>/dev/null) || {
+		printf 'ccnavi-review: 受け入れの計画を読めない（%s）。何も置いていない。\n' "$accept_file" >&2
+		return 1
+	}
+	# 1. ホストに書く前の確かめ（できなければ、ホストには何も書かない）
+	accept_i=0
+	while [ "$accept_i" -lt "$accept_n" ]; do
+		accept_id=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].id' "$accept_file")
+		case "$accept_id" in
+		'' | *[!A-Za-z0-9_=-]*)
+			printf 'ccnavi-review: 受け入れの計画のスレッドの id が読めない。ホストには何も書いていない。\n' >&2
+			return 1
+			;;
+		esac
+		if [ "$kind" != github ]; then
+			case "$accept_id" in
+			*[!0-9a-f]*)
+				printf 'ccnavi-review: 受け入れの計画のスレッドの id が GitLab の discussion の id（16 進）でない。ホストには何も書いていない。\n' >&2
+				return 1
+				;;
+			esac
+		fi
+		if [ "$("$JQ" --arg id "$accept_id" '[.threads[].id] | index($id) != null' "$accept_rfile")" != true ]; then
+			printf 'ccnavi-review: 受け入れるスレッドが取り直した結果に無い。ホストには何も書いていない。\n' >&2
+			return 1
+		fi
+		accept_i=$((accept_i + 1))
+	done
+	# 2. 全部に返信する
+	accept_i=0
+	while [ "$accept_i" -lt "$accept_n" ]; do
+		accept_id=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].id' "$accept_file")
+		accept_key=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].key' "$accept_file")
+		accept_text=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].reply' "$accept_file")
+		if ! accept_reply "$accept_id" "$accept_text" "$accept_mr"; then
+			printf 'ccnavi-review: 受け入れを完了できない。スレッド %s に返信を残せなかった。何も置いていない（返信が済んだ分は残る。解決はまだ誰もしていない）。\n' "$accept_key" >&2
+			return 1
+		fi
+		# 1 件でも書いたら、置けずに終わったとき計画を残す（accept_cleanup）
+		accept_kept="$accept_file"
+		accept_plan=""
+		accept_i=$((accept_i + 1))
+	done
+	# 3. 全部を解決する
+	accept_i=0
+	while [ "$accept_i" -lt "$accept_n" ]; do
+		accept_id=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].id' "$accept_file")
+		accept_key=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].key' "$accept_file")
+		if ! accept_resolve "$accept_id" "$accept_mr"; then
+			printf 'ccnavi-review: 受け入れを完了できない。スレッド %s を解決できなかった（返信は残した）。何も置いていない（先に解決した分は残る）。\n' "$accept_key" >&2
+			return 1
+		fi
+		accept_i=$((accept_i + 1))
+	done
+}
+
+# 取ってきた時点の状態を取り直して $result に置く。
+refetch() {
+	fetch_all >"$result.re"
+	mv -f "$result.re" "$result"
+}
+
+# 計画のスレッドに返信と解決をして、結果を取り直す。<計画のファイル>（$result は計画を書いたときの結果）
+# 受け入れるスレッドが無ければ何もしない。ホストに書いたあとは、計画を kept に移し、置くのに
+# 失敗して終わったときは残す（accept_cleanup）。置く呼び出しには $accept_file を渡す。
+accept_execute() {
+	accept_file="$1"
+	accept_count=$("$JQ" '.threads | length' "$accept_file" 2>/dev/null) || {
+		printf 'ccnavi-review: 受け入れの計画を読めない（%s）。何も置いていない。\n' "$accept_file" >&2
+		exit 1
+	}
+	[ "$accept_count" -gt 0 ] || return 0
+	accept_threads "$accept_file" "$result" || exit 1
+	refetch
+}
+
+# 抜けるときの後始末。置けて終わったら計画を消す。ホストに書いたのに置けずに終わったなら残して言う。
+accept_cleanup() {
+	[ -z "$accept_kept" ] || {
+		if [ "$1" -eq 0 ]; then
+			rm -f "$accept_kept"
+		else
+			printf 'ccnavi-review: スレッドへの返信か解決をホストに書いたが、受け入れを置けなかった。計画を残した（%s）。打ち直すと解決済みのスレッドは見せる指摘から外れるので、issue に回す選択だった分はこの計画で確かめて手で扱う。\n' "$accept_kept" >&2
+		fi
+	}
+}
+
+# decide: 選択を置く前に、受け入れる指摘（対応しない・issue に回す）へ返信を残して解決する。
+# <選択の JSON> <ダイジェスト>。計画の段（置く側の事前検査とダイジェストの照合を含む。何も置かない）
+# が通れば、返信と解決をして結果を取り直す。失敗したら（ダイジェストの不一致を含む）答えを出して抜ける。
+accept_before_place() {
+	accept_plan="$state/review-accept-$family-$n.json"
+	rm -f "$accept_plan"
+	accept_rc=0
+	accept_out=$(ccnavi --reviewed "$n" --accept-unresolved --yes "$1" --digest "$2" --json --result "$result" --accept-plan "$accept_plan") ||
+		accept_rc=$?
+	if [ "$accept_rc" -ne 0 ]; then
+		[ -z "$accept_out" ] || printf '%s\n' "$accept_out"
+		exit 1
+	fi
+	accept_execute "$accept_plan"
+}
+
 # ---- 目印で始まる投稿を探す。{url, created_at} を返す（無ければ空）。<番号> <URL> <目印>
 
 find_posted() {
@@ -611,7 +765,10 @@ result="$state/review-result-$$.json"
 # rm が失敗しても（JSON の置き場の名前がディレクトリ・権限など）、`set -e` がその失敗の値で抜けて
 # 元の終了コードを上書きしないよう、失敗を無視してから元の値で抜け直す。
 eli5_posted=""
-trap 'review_exit=$?; ccnavi_c1_end; rm -f "$result" ${eli5_posted:+"$eli5_posted"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
+accept_plan=""
+accept_kept=""
+accept_file=""
+trap 'review_exit=$?; ccnavi_c1_end; accept_cleanup "$review_exit"; rm -f "$result" "$result.re" ${eli5_posted:+"$eli5_posted"} ${accept_plan:+"$accept_plan"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
 trap 'ccnavi_c1_end; exit 130' INT TERM HUP
 
 # ---- C1 と、ユーザの判断を送る承認の push
@@ -1029,11 +1186,13 @@ decide)
 	if [ -n "$choices" ]; then
 		# 失敗の答え（見せた指摘と今の指摘が違う、など）も JSON で返すので、先に出してから終わる。
 		tell_skew
+		# 受け入れる指摘（対応しない・issue に回す）には、置く前に返信を残して解決する。できなければここで止める。
+		accept_before_place "$choices" "$digest"
 		ccnavi_c1_capture="$state/review-decide-$$.out"
 		decide_rc=0
 		# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
 		c1_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
-			--reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" $decide_who ||
+			--reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who ||
 			decide_rc=$?
 		out=$(cat "$ccnavi_c1_capture" 2>/dev/null || :)
 		rm -f "$ccnavi_c1_capture"
@@ -1052,26 +1211,37 @@ decide)
 		ccnavi_c1_refuse
 		exit 1
 		;;
-	yes)
-		# 1. ユーザが端末で選ぶ（何も置かない。選択とダイジェストを state の置き場に書くだけ）。
-		chosen="$state/review-choose-$$.json"
-		ccnavi --reviewed "$n" --accept-unresolved --choose-out "$chosen" --result "$result" || {
-			rm -f "$chosen"
-			exit 1
-		}
-		choices=$("$JQ" -c '.choices' "$chosen") && digest=$("$JQ" -r '.digest' "$chosen") || {
-			rm -f "$chosen"
-			fail decide-choose-unreadable "選んだものを読めない（${chosen}）。" 1
-		}
+	esac
+	# 1. ユーザが端末で選ぶ（何も置かない。選択とダイジェストを state の置き場に書くだけ）。
+	chosen="$state/review-choose-$$.json"
+	ccnavi --reviewed "$n" --accept-unresolved --choose-out "$chosen" --result "$result" || {
 		rm -f "$chosen"
-		# 2. C1 の中で、選んだものを置く（`--yes`。見せた指摘と今の指摘のダイジェストが同じときだけ）。
+		exit 1
+	}
+	choices=$("$JQ" -c '.choices' "$chosen") && digest=$("$JQ" -r '.digest' "$chosen") || {
+		rm -f "$chosen"
+		fail decide-choose-unreadable "選んだものを読めない（${chosen}）。" 1
+	}
+	rm -f "$chosen"
+	# 2. ホストに触る前に、ローカルで失敗しうること（C1 のロック・ツリーの確認）を済ませ、結果を取り直す。
+	#    選んでいる間に指摘が変われば、取り直した結果とのダイジェストの照合で止まる。
+	case "$ccnavi_c1_target" in
+	yes)
 		ccnavi_c1_begin || exit 1
 		c1_on=yes
+		;;
+	esac
+	refetch
+	# 3. 受け入れる指摘（対応しない・issue に回す）に返信を残して解決する。できなければ、何も置かずに止める。
+	accept_before_place "$choices" "$digest"
+	# 4. 選んだものを置く（`--yes`。取り直した結果で、見せた指摘とダイジェストが同じときだけ）。
+	case "$ccnavi_c1_target" in
+	yes)
 		ccnavi_c1_capture="$state/review-decide-$$.out"
 		decide_rc=0
 		# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
 		c1_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
-			--reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" $decide_who ||
+			--reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who ||
 			decide_rc=$?
 		out=$(cat "$ccnavi_c1_capture" 2>/dev/null || :)
 		rm -f "$ccnavi_c1_capture"
@@ -1083,8 +1253,15 @@ decide)
 		printf 'OK: フェーズ %s の指摘の行き先を置いて送った（%s）\n' "$n" "$out"
 		;;
 	*)
+		decide_rc=0
 		# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
-		ccnavi --reviewed "$n" --accept-unresolved --result "$result" $decide_who
+		out=$(ccnavi --reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who) ||
+			decide_rc=$?
+		if [ "$decide_rc" -ne 0 ]; then
+			[ -z "$out" ] || printf '%s\n' "$out"
+			exit 1
+		fi
+		printf 'OK: フェーズ %s の指摘の行き先を置いた（%s）\n' "$n" "$out"
 		;;
 	esac
 	post_decision "$n"
@@ -1170,7 +1347,22 @@ close-early)
 	fetch_all >"$result"
 	# exe はユーザに残りを見せて y/N を取るので、標準出力は端末のまま。下書きは state の
 	# 置き場の決まった名前で拾う（親の識別子。ブランチ名と違うことがある）。
-	ccnavi --close-early --reason "$reason" --result "$result" || exit $?
+	# 未解決の指摘は受け入れる。スレッドに返信を残して解決するのはここ（実行ファイルはネットワークに出ない）で、
+	# 置く前に済ませる。3 回に分けて打つ。
+	#   1 回目: 残りを見せて y/N を聞き、y なら計画を書くだけ（--accept-plan）
+	#   2 回目: 結果を取り直し、y/N の間に未解決の指摘が変わっていないかだけを確かめる（--accept-check）
+	#   ここで返信と解決をして、結果を取り直す。できなければ止める
+	#   3 回目: 計画のスレッドが全部ホストで解決済みで、ほかに未解決が無いことを確かめて、聞き直さずに置く（--accept-done）
+	accept_plan="$state/review-accept-$family.json"
+	rm -f "$accept_plan"
+	close_issue_flag=""
+	[ "$make_issue" -eq 1 ] || close_issue_flag="--no-issue"
+	# shellcheck disable=SC2086 # close_issue_flag は空か --no-issue
+	ccnavi --close-early --reason "$reason" --result "$result" --accept-plan "$accept_plan" $close_issue_flag || exit $?
+	refetch
+	ccnavi --close-early --reason "$reason" --result "$result" --accept-check "$accept_plan" || exit $?
+	accept_execute "$accept_plan"
+	ccnavi --close-early --reason "$reason" --result "$result" --accept-done "$accept_file" || exit $?
 	issue_draft="$state/review-close-early-issue-$family.md"
 	noted="$state/review-close-early-note-$family.md"
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')

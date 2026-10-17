@@ -79,8 +79,29 @@ def operate(
         if not cli_args._from_terminal(stdin, conf, stderr, "--close-early"):
             return EXIT_ERROR
         history.set_via(history.VIA_TERMINAL)
+        for flag, path in (
+            ("--accept-plan", args.accept_plan),
+            ("--accept-done", args.accept_done),
+            ("--accept-check", args.accept_check),
+        ):
+            if path and not _in_state(conf, path):
+                stderr.write(
+                    f"ccnavi: {flag} には、状態保存ディレクトリ配下のパスを指定してください。\n"
+                )
+                return EXIT_ERROR
         code = review_close.close_early(
-            stdin, stdout, stderr, root, conf, cwd, args.reason, args.result
+            stdin,
+            stdout,
+            stderr,
+            root,
+            conf,
+            cwd,
+            args.reason,
+            args.result,
+            plan_out=args.accept_plan,
+            plan_done=args.accept_done,
+            plan_check=args.accept_check,
+            no_issue=args.no_issue,
         )
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None and args.accept_unresolved and (args.preview or args.yes):
@@ -92,6 +113,14 @@ def operate(
                 "ccnavi: ボードから実行する場合は、--json と --result <json> を指定してください。\n"
             )
             return EXIT_ERROR
+        for flag, path in (
+            ("--accept-plan", args.accept_plan),
+            ("--accept-done", args.accept_done),
+        ):
+            if path and not _in_state(conf, path):
+                msg = f"ccnavi: {flag} には、状態保存ディレクトリ配下のパスを指定してください。\n"
+                stderr.write(msg)
+                return EXIT_ERROR
         history.set_via(history.VIA_BOARD)
         _decide_actor(args)
         if args.preview:
@@ -109,6 +138,8 @@ def operate(
                 args.result,
                 args.yes,
                 args.digest,
+                args.accept_plan,
+                args.accept_done,
             )
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None and args.choose_out:
@@ -327,7 +358,7 @@ def _c1_bypass(root: str, conf: settings.Settings, args: argparse.Namespace, cwd
     `--record-tree` を付けて起こす。付いていなければ、sh の引数の読み違いや直打ちで
     C1 を通っていない。
     ユーザの判断の操作（`--close-early`）と、
-    書かない形（`--preview`・`--choose-out`・`review prepare`）は見ない。
+    書かない形（`--preview`・`--choose-out`・`--accept-plan`・`review prepare`）は見ない。
     """
     if args.record_tree:
         return ""
@@ -342,6 +373,7 @@ def _c1_bypass(root: str, conf: settings.Settings, args: argparse.Namespace, cwd
         and args.accept_unresolved
         and not args.preview
         and not args.choose_out
+        and not args.accept_plan
     ):
         where = cwd[-1] if isinstance(cwd, list) and cwd else cwd
         parent = phase.parent_for_cwd(root, conf, where) if where else None
@@ -374,6 +406,11 @@ def sync_paths(stdout: TextIO, root: str, conf: settings.Settings) -> int:
     return 0
 
 
+def _in_state(conf: settings.Settings, path: str) -> bool:
+    """出力先が state の置き場の下か（`--choose-out` と同じ確かめ方）。"""
+    return cli_args._inside(cli_args._real(os.path.abspath(path)), cli_args._real(conf.state))
+
+
 def _decide_writes(args) -> bool:
     """書く形の decide か（`--reviewed N --accept-unresolved` の、見るだけでないもの）。"""
     return (
@@ -381,6 +418,7 @@ def _decide_writes(args) -> bool:
         and args.accept_unresolved
         and not args.preview
         and not args.choose_out
+        and not args.accept_plan
     )
 
 

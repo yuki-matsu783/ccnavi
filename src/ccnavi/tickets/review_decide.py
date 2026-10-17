@@ -135,8 +135,14 @@ def _decision(
     cwd: str,
     phase_no: int,
     result_path: str,
+    carry: frozenset[str] = frozenset(),
 ) -> Decision | None:
-    """残った指摘を決められる状態かを確かめ、見せる材料を組む。決められなければ None。"""
+    """残った指摘を決められる状態かを確かめ、見せる材料を組む。決められなければ None。
+
+    `carry` は受け入れ済みのスレッドの id（`--accept-done`）。sh が返信と解決をしたあとの結果では
+    解決済みになっているが、見せた指摘の一部として数え直す（見せたときと同じ並びでダイジェストを
+    組み直し、見せたあとに指摘が増えたり変わったりしていないことを確かめるため）。
+    """
     found = review._parent_phase(stderr, root, conf, cwd, phase_no)
     if found is None:
         return None
@@ -164,17 +170,13 @@ def _decision(
             "レビュアーの approve（または dismiss）を待ちます\n"
         )
         return None
-    unresolved = review_host._unresolved(
-        result.threads,
-        approval_marks.accepted_threads(
-            approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
-            parent.ticket,
-            phase_no,
-            parent,
-        ),
-        result.host,
-        str(requested_mark.get("poster") or ""),
-    )
+    open_now = {
+        id(t)
+        for t in review_host._unresolved(
+            result.threads, result.host, str(requested_mark.get("poster") or "")
+        )
+    }
+    unresolved = [t for t in result.threads if id(t) in open_now or (t.id and t.id in carry)]
     can_issue = parent.has_plan and parent.feedback is not None
     return Decision(parent, ph, result, unresolved, can_issue)
 
@@ -348,10 +350,22 @@ def decide_yes(
     result_path: str,
     choices_text: str,
     digest: str,
+    plan_out: str = "",
+    plan_done: str = "",
 ) -> int:
     """オーバーレイでユーザが押した選択を置く。
 
     形は `--yes <選択の JSON> --digest <ダイジェスト> --json`。
+
+    受け入れる指摘（対応しない・issue に回す）には、置く前に sh が返信を残して解決する。
+    実行ファイルはネットワークに出ないので、3 回に分けて呼ばれる。
+
+    1. `plan_out`（`--accept-plan <ファイル>`）あり: 何も置かずに受け入れの計画だけを書く。
+       検査は置くときと同じ（ダイジェスト、選択、置く側の事前検査）。失敗なら計画を書かない
+    2. sh が計画のスレッドに返信を残して解決し、結果を取り直す
+    3. `plan_done`（`--accept-done <ファイル>`）あり: 取り直した結果を読み、受け入れたスレッドが
+       全部ホストで解決済みであることを確かめ、受け入れたスレッドを見せた指摘に数え直して
+       ダイジェストを照合し（見せたあとに指摘が変われば止まる）、置く
 
     ユーザが端末で打つという制約の代わりに、見せた指摘と今の指摘のダイジェストが一致することを
     求める。エージェントがこれをシェルで打つ形は、組み込みの deny
@@ -371,7 +385,21 @@ def decide_yes(
     ):
         stderr.write(f"ccnavi: --yes の選択は {{鍵: {' / '.join(CHOICES)}}} の形で渡す\n")
         return 1
-    d = _decision(stderr, root, conf, cwd, phase_no, result_path)
+    planned = None
+    if plan_done:
+        planned = review_host.read_accept_plan(plan_done)
+        if planned is None:
+            stderr.write(f"ccnavi: 受け入れの計画 {plan_done} を読めない。何も置いていない\n")
+            return 1
+    d = _decision(
+        stderr,
+        root,
+        conf,
+        cwd,
+        phase_no,
+        result_path,
+        frozenset(planned.ids) if planned is not None else frozenset(),
+    )
     if d is None:
         return 1
     current = decision_digest(d)
@@ -397,6 +425,16 @@ def decide_yes(
     if not d.can_issue and CHOICE_ISSUE in raw.values():
         stderr.write("ccnavi: issue に回せるのは、フィードバック計画が承認されたあと\n")
         return 1
+    picked = {c: [t for t in d.unresolved if raw.get(review.thread_key(t)) == c] for c in CHOICES}
+    if not _precheck(stderr, root, conf, d, picked):
+        return 1
+    if plan_out:
+        return _write_plan(stderr, d, raw, plan_out, current)
+    if planned is not None:
+        problem = _plan_problem(d, raw, planned)
+        if problem:
+            stderr.write(f"ccnavi: 受け入れが済んでいない: {problem}。何も置いていない\n")
+            return 1
     notes = io.StringIO()
     summary = apply_decision(notes, stderr, root, conf, d, raw)
     if summary is None:
@@ -404,6 +442,52 @@ def decide_yes(
     stdout.write(
         json.dumps({"version": DECIDE_VERSION, "ok": True, **summary}, ensure_ascii=False) + "\n"
     )
+    return 0
+
+
+def _accepted_threads(d: Decision, choices: dict[str, str]) -> list[tuple[review_host.Thread, str]]:
+    """受け入れる指摘（対応しない・issue に回す）と、スレッドに残す返信の本文。"""
+    why = f"フェーズ {d.ph.number} の未解決の指摘を、ユーザが decide で決めた"
+    out = []
+    for t in d.unresolved:
+        choice = choices.get(review.thread_key(t))
+        if choice in (CHOICE_KEEP, CHOICE_ISSUE):
+            out.append((t, review_host.accept_reply(why, issue=choice == CHOICE_ISSUE)))
+    return out
+
+
+def _plan_problem(d: Decision, choices: dict[str, str], planned: review_host.AcceptPlan) -> str:
+    """計画と、sh が取り直した結果が合うか。合わなければ説明。
+
+    受け入れる指摘（選択が対応しない・issue に回す）と計画のスレッドが同じで、そのスレッドが
+    全部ホストで解決済みであること（ホストの実状態で確かめる）。
+    """
+    want = sorted(review.thread_key(t) for t, _ in _accepted_threads(d, choices))
+    if sorted(planned.keys) != want:
+        return "計画のスレッドと選択が合わない"
+    by_id = {t.id: t for t in d.result.threads if t.id}
+    for ident in planned.ids:
+        t = by_id.get(ident)
+        if t is None:
+            return f"スレッド {ident} が結果に無い"
+        if not t.resolved:
+            return f"スレッド {review.thread_key(t)} がホストで解決済みになっていない"
+    return ""
+
+
+def _write_plan(
+    stderr: TextIO, d: Decision, choices: dict[str, str], out_path: str, digest: str
+) -> int:
+    """受け入れの計画を書く。受け入れる指摘が無くても、空の計画を書く（sh は何もしない）。"""
+    items = _accepted_threads(d, choices)
+    problem = review_host.accept_plan_problem([t for t, _ in items])
+    if problem:
+        stderr.write(f"ccnavi: 受け入れを始められない: {problem}\n")
+        return 1
+    failed = review_host.write_accept_plan(out_path, items, digest)
+    if failed:
+        stderr.write(f"ccnavi: 受け入れの計画を {out_path} に保存できませんでした（{failed}）\n")
+        return 1
     return 0
 
 
@@ -418,36 +502,25 @@ def _decide_actor() -> tuple[str, str]:
     return (account, history.via()) if account else ("", "")
 
 
-def apply_decision(
-    stdout: TextIO,
+def _precheck(
     stderr: TextIO,
     root: str,
     conf: settings.Settings,
     d: Decision,
-    choices: dict[str, str],
-) -> dict | None:
-    """選んだ行き先を置く。端末とオーバーレイが同じここを通る。置けなければ None。
+    picked: dict[str, list[review_host.Thread]],
+) -> bool:
+    """置く前に、ローカルで失敗しうることを確かめる。通れば True。
 
-    - 対応しない・issue に回す: 受け入れの記録（`accepted.json`）に足す。次の confirm は数えない
-    - このフェーズで直す: 続きの子を同じ番号で `doing/` に起こす。受け入れないので、次の
-      confirm がまた数える。1 件でもあればフェーズは再び開かれ、レビュー済みのマーカーは置かない
-    - どれも直さないなら、レビュー済みのマーカーを置く
-
-    MR に書き込むコメントと issue の下書きは state の置き場に書き、sh が投稿する。
+    ホストに触る前（`--accept-plan` の段）にも呼ぶ。受け入れの返信と解決を済ませてから
+    「置けない」と分かると、解決済みのスレッドだけが残るため。
     """
-    assert d.result.mr is not None
     parent, ph = d.parent, d.ph
-    home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
-    picked = {
-        c: [t for t in d.unresolved if choices.get(review.thread_key(t)) == c] for c in CHOICES
-    }
-    accepted = [review.thread_key(t) for t in picked[CHOICE_KEEP] + picked[CHOICE_ISSUE]]
     fix = picked[CHOICE_FIX]
     # issue に回す分は、state の置き場に下書きを書いて sh に渡す。置き場が無ければ回せないので、
     # 何も置く前に断る（受け入れだけが残り、issue は作られない、にしない）
     if picked[CHOICE_ISSUE] and not conf.state:
         stderr.write("ccnavi: state の置き場が空。issue に回す下書きを置けない\n")
-        return None
+        return False
     # 直す指摘があるなら、起こす続きの子がチケットとして読めるかを、何も置く前に確かめる。
     # 子が多いと範囲の和が上限（20 件）を超え、「起こした」のに後で読み込めない子が残る。
     if fix:
@@ -462,7 +535,38 @@ def apply_decision(
         )
         if problem:
             stderr.write(f"ccnavi: 続きの子チケットを起こせない: {problem}\n")
-            return None
+            return False
+    return True
+
+
+def apply_decision(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    d: Decision,
+    choices: dict[str, str],
+) -> dict | None:
+    """選んだ行き先を置く。端末とオーバーレイが同じここを通る。置けなければ None。
+
+    - 対応しない・issue に回す: 受け入れる。スレッドへの返信と解決は、置く前に sh が済ませてある
+      （`--accept-plan`）。次の confirm は、ホストで解決済みのスレッドを数えない
+    - このフェーズで直す: 続きの子を同じ番号で `doing/` に起こす。受け入れないので、次の
+      confirm がまた数える。1 件でもあればフェーズは再び開かれ、レビュー済みのマーカーは置かない
+    - どれも直さないなら、レビュー済みのマーカーを置く
+
+    MR に書き込むコメントと issue の下書きは state の置き場に書き、sh が投稿する。
+    """
+    assert d.result.mr is not None
+    parent, ph = d.parent, d.ph
+    home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
+    picked = {
+        c: [t for t in d.unresolved if choices.get(review.thread_key(t)) == c] for c in CHOICES
+    }
+    accepted = [review.thread_key(t) for t in picked[CHOICE_KEEP] + picked[CHOICE_ISSUE]]
+    fix = picked[CHOICE_FIX]
+    if not _precheck(stderr, root, conf, d, picked):
+        return None
     # 前の回の下書き（投稿に失敗して残ったもの）は捨てる。残すと、この回に選んでいない
     # issue やコメントを sh が投稿する
     if conf.state:
@@ -470,13 +574,6 @@ def apply_decision(
             stale = os.path.join(conf.state, name.format(parent=parent.ticket, phase=ph.number))
             if os.path.exists(stale):
                 fsio.remove(stale)
-    # 受け入れはマーカーより先に記録へ。マーカーは上書きも一括の消去もされるので、
-    # ユーザが 1 度言った「これは承知で進める」はそちらに置かない。
-    if accepted:
-        failed = approval_marks.remember_accepted(home, parent.ticket, accepted, ph.number)
-        if failed:
-            stderr.write(f"ccnavi: 受け入れを記録できない: {failed}\n")
-            return None
     if not review._settle_children(stdout, stderr, root, conf, parent, ph):
         return None
     followup = ""

@@ -2020,10 +2020,10 @@ sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
 
 残った指摘の対応方針はユーザが決める（`decide`）。ボードの「決める」か、端末で `ccnavi-review.sh decide <N>`。
 
-- **対応しない（受け入れて進む）。** `phases/<親>/accepted.json` に記録し、次の `confirm` から数えない
+- **対応しない（受け入れて進む）。** スレッドに受け入れて進む旨の返信を残して解決済みにする（sh が置く前にする。返信か解決に失敗したら何も置かずに止まる）。次の `confirm` はホスト上の未解決だけを数える。受け入れは親全体に当てはまり、他の人が開き直せば未解決として数える
 - **このフェーズで直す。** 直す指摘を写した続きの子を、同じフェーズの番号で `.ccnavi/approved/doing/<親>-<フェーズ番号>-<そのフェーズの次の連番>.md` に直に置く
   （範囲は見た子の範囲の和）。フェーズは開き直り、マーカーは消える
-- **issue に回す。** 受け入れたうえで、その指摘を載せた issue を作る。フィードバック計画が承認されたあとだけ選べる
+- **issue に回す。** 受け入れたうえで（返信に issue の下書きを置く旨も書く）、その指摘を載せた issue を作る。フィードバック計画が承認されたあとだけ選べる
 
 どれも直さなければレビュー済みにし、1 件でも直すなら見た子を `done/` へ動かしてマーカーは置かない。決めた内容は sh がコメントに写す。
 ボードの経路は端末を求めない代わりに、見せた指摘のダイジェスト（`digest`）の一致を求め、エージェントが同じ形を打つ経路は組み込みの deny が止める。
@@ -2147,7 +2147,7 @@ MR を探す推定はせず、閉じたか判断できないと 1 行出す。�
 `logs/archive/` は記録と state の置き場の守り（`builtin:guard-records` と、シェルの側の `builtin:guard-setting-files`）が書き込みを止める。
 
 **まだ残っているが早めに閉じたいとき**は、ユーザが端末で `close-early --reason <理由>` を打つ。作業中の子がいる間は打てない。残っているものを全部
-見せてから y/N を取り、未着手の子の取り消し（理由は `close-early: <理由>`）、省略とレビュー済みのマーカー、未解決の受け入れ、残りの issue への書き出しを行う。
+見せてから y/N を取り、未着手の子の取り消し（理由は `close-early: <理由>`）、省略とレビュー済みのマーカー、未解決の受け入れ（スレッドに返信を残して解決する）、残りの issue への書き出しを行う。
 `phases/<親>/close-early.json` があれば、親はフィードバック計画が無くても閉じられる。Draft は親が片付けて push したあとの `ready` で外す。
 
 ### 実績のリスク
@@ -2723,7 +2723,6 @@ ccnavi --explain --json
 | `ticket` / `closed` / `stage` | 識別子、閉じた承認済みチケットか、いまの局面（設計 9.7 の文。閉じた親は空文字） |
 | `plan` / `feedback` | 全体計画とフィードバック計画（`null` は未計画） |
 | `close_early` / `ready` / `closed_record` | 親のマーカー `close-early.json` / `ready.json` / `closed.json` の中身。無ければ `null`。`closed.json` は親を閉じたときに置かれ、どのフェーズをどこで見たか（`reviews`）を持つ |
-| `accepted_threads[]` | ユーザが受け入れた未解決スレッド |
 | `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, review_kind, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`review_kind` はユーザがどこで見るか（`none` / `mr`）。`gate_closed` は判定が使うのと同じ値で、レビューが済むまで止めているかを示す（ユーザに見せる名前は「レビュー準備中」「レビュー待ち」）。`review_waiting` は依頼を出したのに止まったまま（ユーザのレビュー待ち）で、ボードはこれを写すだけで組み直さない。 |
 
 ## 承認の JSON
@@ -2803,7 +2802,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
  "digest": "<64 桁の 16 進>"}
 ```
 
-- `key` は選択を指摘に結び付ける鍵（URL か、無ければスレッドの id）。受け入れの記録にもこの値が入る
+- `key` は選択を指摘に結び付ける鍵（URL か、無ければスレッドの id）。`reviewed` のマーカーの `accepted` 欄にもこの値が入る
 - `can_issue` は issue に回せるか（フィードバック計画が承認されたあとだけ真）
 - `digest` は見せた指摘のダイジェスト。親・フェーズ・マージリクエストの番号・`can_issue`・各指摘の鍵と場所と本文から組む
 
@@ -3306,7 +3305,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/ticket_fields.py` | スクリプトが書く欄の、行単位の書き換えと読み取り |
 | `src/ccnavi/tickets/approval.py` | 承認済みチケットの置き場。読み込み・走査・提案の集め方・置き場の決め方 |
 | `src/ccnavi/tickets/approval_ops.py` | 承認済みチケットを動かす・書く操作。承認、欄の書き換え、閉じる、レビューへ送る、続きの子 |
-| `src/ccnavi/tickets/approval_marks.py` | フェーズのマーカー、親ごとのマーカー、子ごとの記録、受け入れたスレッドの記録（`phases/<親>/`） |
+| `src/ccnavi/tickets/approval_marks.py` | フェーズのマーカー、親ごとのマーカー、子ごとの記録（`phases/<親>/`） |
 | `src/ccnavi/tickets/approval_checks.py` | 承認済みチケットの構造の検査。親子と統合先、先行、プロジェクトの欄 |
 | `src/ccnavi/tickets/approval_times.py` | 承認の時刻（表示だけ）。状態の履歴か git から引く |
 | `src/ccnavi/tickets/agree.py` | 合意（承認）の手続き。承認の対象を集めて `--preview` / `--verify` に答え、書き込みを並べて置き場へ動かす。承認待ちの一覧 |

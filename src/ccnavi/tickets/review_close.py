@@ -301,6 +301,10 @@ def close_early(
     cwd: str,
     reason: str,
     result_path: str,
+    plan_out: str = "",
+    plan_done: str = "",
+    plan_check: str = "",
+    no_issue: bool = False,
 ) -> int:
     """ユーザが端末で打つ。「まだ残っているが、キリの良いところまでやった」と早めに閉じる。
 
@@ -309,6 +313,19 @@ def close_early(
     未着手の子を取り消し、フェーズに省略とレビュー済みのマーカーを置き、未解決を受け入れ、
     親のマーカー `close-early.json` を置く。残りを別の issue に書き出す下書きを書き、sh がそれで
     issue を作る。ユーザが知らないうちに消えるものは作らない。
+
+    未解決を受け入れるとは、スレッドに返信を残して解決すること。ネットワークに出られないので、
+    それは sh がする。置く前に済ませるため、3 回に分けて打つ（sh が間で結果を取り直す）。
+
+    1. `plan_out`（`--accept-plan`）あり: 残りを見せて y/N を聞き、y なら受け入れの計画だけを
+       書いて終わる。何も置かない
+    2. `plan_check`（`--accept-check`）あり: y/N を聞かず、取り直した結果の未解決のスレッドが
+       計画と同じかだけを確かめる。違えば（y/N を答えている間に指摘が増減した）止まる。
+       sh はこれが通ったあとで、ホストに返信と解決を書く
+    3. `plan_done`（`--accept-done`）あり: 返信と解決のあとで取り直した結果を読み、計画の
+       スレッドが全部ホストで解決済みで、ほかに未解決が残っていないことを確かめて、聞き直さずに置く
+
+    `no_issue` は返信の文言のため（残りを issue に書き出さないとき、issue に回すとは書かない）。
 
     Draft を外すのはここではなく `ready`。早めに閉じたあとに親が状態の移動をコミットして
     push する。それが済んだことを `ready` が確かめ、途中の作業の置き場を片付けてから外す。
@@ -354,12 +371,39 @@ def close_early(
             "子を閉じるか取り消してから、親を早めに閉じてください\n"
         )
         return 1
-    home = approval.home_dir(conf, root, parent.ticket, "", project=parent.project)
-    left = _leftovers(home, parent, phases, result)
-    _show_leftovers(stdout, parent, left)
-    if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
-        stderr.write("ccnavi: 早めに閉じなかった\n")
-        return 1
+    left = _leftovers(parent, phases, result)
+    if plan_done or plan_check:
+        planned = review_host.read_accept_plan(plan_done or plan_check)
+        if planned is None:
+            stderr.write(
+                f"ccnavi: 受け入れの計画 {plan_done or plan_check} を読めない。"
+                "先に --accept-plan を打つ\n"
+            )
+            return 1
+        if plan_check:
+            if sorted(planned.keys) != sorted(review.thread_key(t) for t in left.unresolved):
+                stderr.write(
+                    "ccnavi: 計画のあとで、未解決の指摘が変わった。ホストには何も書いていない。"
+                    "打ち直してください\n"
+                )
+                return 1
+            return 0
+        # 返信と解決のあとの結果。ホストの実状態で、計画のスレッドが全部解決済みで、
+        # ほかに未解決が増えていないことを確かめる
+        problem = _done_problem(left, result, planned)
+        if problem:
+            stderr.write(f"ccnavi: 受け入れが済んでいない: {problem}。何も置いていない\n")
+            return 1
+        by_id = {t.id: t for t in result.threads if t.id}
+        left.unresolved = [by_id[i] for i in planned.ids]
+    else:
+        _show_leftovers(stdout, parent, left)
+        if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
+            stderr.write("ccnavi: 早めに閉じなかった\n")
+            return 1
+        if plan_out:
+            # 返信と解決は sh がする。済んでから、`plan_done` 付きで打ち直す
+            return _write_close_plan(stderr, left, plan_out, issue=not no_issue)
     stamp = approval_marks.now()
     settled = _settle(
         stdout, stderr, root, conf, parent, phases, left, result.mr.number, stamp, reason
@@ -368,14 +412,6 @@ def close_early(
         return 1
     cancelled, skipped, reviewed_now = settled
     accepted = [review.thread_key(t) for t in left.unresolved]
-    failed = approval_marks.remember_accepted(
-        approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
-        parent.ticket,
-        accepted,
-    )
-    if failed:
-        stderr.write(f"ccnavi: 受け入れを記録できない: {failed}\n")
-        return 1
     if not review._parent_mark(
         stderr,
         approval.home_dir(conf, root, parent.ticket, "", project=parent.project),
@@ -409,6 +445,42 @@ def close_early(
     return 0
 
 
+def _done_problem(
+    left: Leftovers, result: review_host.Result, planned: review_host.AcceptPlan
+) -> str:
+    """返信と解決のあとの結果が、計画と合うか。合わなければ説明。"""
+    by_id = {t.id: t for t in result.threads if t.id}
+    for ident in planned.ids:
+        t = by_id.get(ident)
+        if t is None:
+            return f"スレッド {ident} が結果に無い"
+        if not t.resolved:
+            return f"スレッド {review.thread_key(t)} がホストで解決済みになっていない"
+    if left.unresolved:
+        return (
+            "計画のほかに未解決の指摘が残っている（"
+            + "、".join(review.thread_key(t) for t in left.unresolved)
+            + "）"
+        )
+    return ""
+
+
+def _write_close_plan(stderr: TextIO, left: Leftovers, out_path: str, issue: bool) -> int:
+    """早めに閉じるときの受け入れの計画を書く。未解決が無ければ空の計画（sh は何もしない）。"""
+    why = "ユーザが親を早めに閉じた"
+    problem = review_host.accept_plan_problem(left.unresolved)
+    if problem:
+        stderr.write(f"ccnavi: 受け入れを始められない: {problem}\n")
+        return 1
+    failed = review_host.write_accept_plan(
+        out_path, [(t, review_host.accept_reply(why, issue=issue)) for t in left.unresolved]
+    )
+    if failed:
+        stderr.write(f"ccnavi: 受け入れの計画を {out_path} に保存できませんでした（{failed}）\n")
+        return 1
+    return 0
+
+
 @dataclass
 class Leftovers:
     """早めに閉じるときに残っているもの。見せるものと、閉じたあとに issue へ書き出すもの。"""
@@ -434,7 +506,6 @@ class Leftovers:
 
 
 def _leftovers(
-    approved_dir: str,
     parent: ticket_model.Ticket,
     phases: list[phase.Phase],
     result: review_host.Result,
@@ -453,9 +524,7 @@ def _leftovers(
         ],
         unreviewed=[ph for ph in phases if ph.ended and not phase.reviewed_or_skipped(ph)],
         unplanned=parent.has_plan and parent.feedback is None,
-        unresolved=review_host._unresolved(
-            result.threads, approval_marks.accepted_threads(approved_dir, parent.ticket)
-        ),
+        unresolved=review_host._unresolved(result.threads),
     )
 
 

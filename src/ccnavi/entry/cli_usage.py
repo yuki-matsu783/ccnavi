@@ -174,6 +174,18 @@ phases.yml にないタイプがある場合、--plan も指定された場合�
         （--agree 専用。実際に書けた承認済みチケットのパスなどを JSON で書き出します）
     --choose-out <file>
         （decide の前半。選択とダイジェストを書くだけで、何も置きません）
+    --accept-plan <file>
+        （decide の --yes と --close-early 用。受け入れる指摘と、スレッドに残す返信の
+         本文を書くだけで、何も置きません。スクリプトが返信と解決を済ませてから、
+         置く呼び出しを打ちます）
+    --accept-check <file>
+        （--close-early 用。--accept-plan で書いた計画のあとで、未解決の指摘が変わっていないかを
+         確かめるだけです。何も置きません）
+    --accept-done <file>
+        （decide の --yes と --close-early 用。--accept-plan で書いた計画を読み、返信と解決が済んだ
+         結果を確かめて置きます。--close-early は y/N を聞き直しません）
+    --no-issue
+        （--close-early 用。受け入れた指摘への返信に、issue に回すと書かないようにします）
     --via terminal|board
         （decide が書くレビュー済みの印と、--templates --import --yes の経路）
 
