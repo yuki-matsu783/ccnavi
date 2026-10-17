@@ -41,7 +41,7 @@ def approved_times(
 
     次の順で引く。
 
-    1. 状態の履歴 `events/<識別子>.ndjson` の `approved`（続きの子は `raised`）の
+    1. 状態の履歴 `events/<識別子>.jsonl` の `approved`（続きの子は `raised`）の
        うち新しいものの `at`
     2. 1 で取れないチケットがあるツリーだけ、ツリーごとに 1 回
        `git log --no-renames --diff-filter=A` を打ち、`doing/<識別子>.md` を足した
