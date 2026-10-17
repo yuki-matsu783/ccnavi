@@ -416,7 +416,7 @@ class Leftovers:
     todo: list[ticket_model.Ticket]
     # 終わっていないフェーズ。手を付けたもの（取り消すと終わる）には省略のマーカーを置く。
     not_ended: list[phase.Phase]
-    # 終わっていないフェーズのうち、手を付けていないもの（子が無いか全部未着手）。
+    # 終わっていないフェーズのうち、手を付けていないもの（レビュー待ちも閉じた子も無い）。
     # マーカーは置かず、issue に書き出す。
     untouched: list[phase.Phase]
     # 終わったがレビューが済んでいないフェーズ。済んだ扱いにする。
@@ -448,8 +448,12 @@ def _leftovers(
     return Leftovers(
         todo=[t for ph in phases for t in ph.tickets if untouched(t, ph)],
         not_ended=not_ended,
+        # 取り消しても終わらないフェーズ。レビュー待ちか閉じた子が無ければ
+        # `Phase.ended` は偽のまま。取り消し済みの子が混ざっていても同じで、打ち直しでもここに入る。
         untouched=[
-            ph for ph in not_ended if not ph.tickets or all(untouched(t, ph) for t in ph.tickets)
+            ph
+            for ph in not_ended
+            if not any(s in (ticket_model.REVIEW, ticket_model.DONE) for s in ph.states.values())
         ],
         unreviewed=[ph for ph in phases if ph.ended and not phase.reviewed_or_skipped(ph)],
         unplanned=parent.has_plan and parent.feedback is None,
@@ -580,6 +584,7 @@ def _close_early_drafts(
         f"ユーザが早めにクローズした（{stamp}）: {reason.strip()}",
         f"取り消した子: {', '.join(cancelled) or '無し'} / 手を付けなかったフェーズ: "
         f"{', '.join(ph.label for ph in left.untouched) or '無し'} / "
+        f"省略のマーカーを置いたフェーズ: {', '.join(str(n) for n in skipped) or '無し'} / "
         f"受け入れた指摘: {len(accepted)} 件",
         "残りは別の issue に書き出す。親が片付けて ready を実行すれば Draft が外れる。"
         "マージはユーザが行う。",
