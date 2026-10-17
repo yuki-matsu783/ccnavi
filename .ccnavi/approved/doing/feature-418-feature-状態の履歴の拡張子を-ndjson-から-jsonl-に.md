@@ -39,6 +39,7 @@ allow:
   glob: .gitignore
 started_at: 2026-10-18T00:12:28+0900
 base_sha: 2cc24ff2d80d9e85290bc5a5a88f6767a808aa50
+feedback: []
 ---
 ## 背景
 
