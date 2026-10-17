@@ -441,7 +441,7 @@ hook の判定中はネットワークも外部プロセスも使わない（`tr
    のどれかがあれば始めない（ワークツリーでは git ディレクトリが別の所にあるので、パスを決め打ちしない）
 3. **C1 の外の変更を見分けてコミットする**（4.4）: Python が置き場の未コミットの変更を (b)・(c)・(d) に分ける。
    (c) か (d) があれば何も書かずに止める。(b) があれば `commit --only -- <(b) のパス>` で先にコミットする（新しいファイルは先に `add -- <パス>`）。
-   こうしておくと、次の取り込みの merge が hook の書きかけ（`events/<親>.ndjson` の追記など）とぶつからない
+   こうしておくと、次の取り込みの merge が hook の書きかけ（`events/<親>.jsonl` の追記など）とぶつからない
 4. **取り込み**（4.2）。merge が「local changes would be overwritten」で落ちたら（3 と 4 の間に他のセッションの hook が書いた）、3 からもう 1 回だけやり直す。2 回目も落ちたら失敗にする
 5. **未送信の置き場の変更を確かめる**: `git diff --name-only origin/P HEAD -- <置き場>` の各パスを 4.4 の見分けにかけ、(b) 以外（ユーザの判断の未送信、見分けられない変更）があれば止める。
    REQ-APV-11 の補足（下）の前提を守るため
@@ -495,7 +495,7 @@ hook の判定中はネットワークも外部プロセスも使わない（`tr
 - 3 で先にコミットした (b) と、4 の取り込みの merge は戻さない（手元に残り、次の C1 の push で送られる。5 の確かめは (b) を許すので止まらない）
 - C1 の中の sh は `ccnavi-git.sh` を通らずに git を呼ぶ（`ccnavi-git.sh` はエージェントの入口の保護）。5.2 で `restore --source` を拒否するのは
   エージェントの入口だけで、ここの戻しには当たらない
-- 限界: hook が同じ状態の履歴のファイル（`events/<識別子>.ndjson`）に 7〜11 の間に追記すると、戻しでその行が消えることがある。履歴は補助で、本物とするものではない（`history.py:3-7`）ので受け入れる
+- 限界: hook が同じ状態の履歴のファイル（`events/<識別子>.jsonl`）に 7〜11 の間に追記すると、戻しでその行が消えることがある。履歴は補助で、本物とするものではない（`history.py:3-7`）ので受け入れる
 
 #### fsio の「この実行で書いたパス」の記録レイヤー
 
@@ -546,7 +546,7 @@ C1 の 3（と 5）で、置き場（`.ccnavi/approved/`・`wip/proposals/review
 
 | 書き手 | 書くもの | 分け | 送り方 |
 |---|---|---|---|
-| hook のフェーズの終わりの告知（PostToolUse → `events.py:502` → `phase.announce` `phase.py:834-925`） | `phases/<P>/<N>.pending`・`<N>.skipped`（`approval.write_mark` `approval.py:840-850`）と状態の履歴の追記 | (b) | 次の C1 の 3 でコミット。見分けの条件（段階 2d のレビューで絞った）: パスが**その親子のチケットの** `phases/<P>/<N>.(pending\|skipped)`（`<N>` は ASCII の数字だけ）、中身が `{at}` と既知のキーだけの JSON、変更前は無い。状態の履歴は `events/<P>.ndjson` だけで、変更前が在り（新しい状態の履歴のファイルは (b) にしない）、改行を LF に揃えた変更前の中身が先頭にそのまま残り、足した行がどれも `kind` が `phase-mark`・`mark` が `pending` か `skipped`・`ticket` が `<P>` の状態の履歴の行。UTF-8 で読めない追記は (d) として理由を示す。遅くとも親の `finish`（C1）でコミットして push される |
+| hook のフェーズの終わりの告知（PostToolUse → `events.py:502` → `phase.announce` `phase.py:834-925`） | `phases/<P>/<N>.pending`・`<N>.skipped`（`approval.write_mark` `approval.py:840-850`）と状態の履歴の追記 | (b) | 次の C1 の 3 でコミット。見分けの条件（段階 2d のレビューで絞った）: パスが**その親子のチケットの** `phases/<P>/<N>.(pending\|skipped)`（`<N>` は ASCII の数字だけ）、中身が `{at}` と既知のキーだけの JSON、変更前は無い。状態の履歴は `events/<P>.jsonl` だけで、変更前が在り（新しい状態の履歴のファイルは (b) にしない）、改行を LF に揃えた変更前の中身が先頭にそのまま残り、足した行がどれも `kind` が `phase-mark`・`mark` が `pending` か `skipped`・`ticket` が `<P>` の状態の履歴の行。UTF-8 で読めない追記は (d) として理由を示す。遅くとも親の `finish`（C1）でコミットして push される |
 | フローの保存（ボード、`flows/<子>.yml`、`flow.py:1-15`） | ユーザの書いた手順 | (c) | ボードが保存の最後に承認の pushを呼ぶ（4.6） |
 | `--reviewed --chat`（端末、`review.py:1043`） | reviewed マーカー（`by: "chat"`）、子の `done/` への移動、状態の履歴 | (c) | 最後に承認の pushを呼ぶ（D27）。移動は `review/<子>.md` の削除と `done/<子>.md` の追加の組で (c) とみなす。状態の履歴の追記（読める行）も (c) |
 | `--config-synced`（端末、`cli.py:651-658`） | 見たことを示す `config-sync.json` の既読の記録 | (c) | 同上 |
@@ -780,7 +780,7 @@ reviewed_mark(mr, accepted, actor, stamp) -> dict                               
 - 手元の `--approve` は「Reader(FS) → judge → plan → Writer(FS)」、hook・lint・explain は「Reader(FS) → judge の部分関数」。
   手元の Writer(FS) は fsio を通るので、C1 の記録レイヤーがそのまま使える
 - `settle_review` の再走査は、plan の中で「このバッチで動かした後の Snapshot」を組み直して行う
-- `history.note` の 1 行も `Changes` に入れる（`events/<識別子>.ndjson` の末尾に足した中身を `update` で書く）。
+- `history.note` の 1 行も `Changes` に入れる（`events/<識別子>.jsonl` の末尾に足した中身を `update` で書く）。
   Chrome は先頭の一致を条件にした 1 コミットで書き、先頭が動いていれば必ず新しい Snapshot から plan をやり直す（8.3）ので、相手の追記を消さない
 
 同じ答えを出すことの確かめ方:
@@ -978,7 +978,7 @@ Chrome のボードに「承認を取り下げる」を置きます（D14）。�
    GitHub は `GET /commits?sha=P&path=<doing のパス>`、GitLab は `repository/commits?ref_name=P&path=` で引き、各コミットの変更で「足した」かを確かめる。
    その親のコミットの `todo/<識別子>.md` を読む。**目印は見ない**（D37）。親に提案が無い（端末で承認して別のブランチから移した場合など）ときは取り下げを出さない。
    取り下げの後に承認し直せば、次の取り下げは新しい方の承認コミットを選ぶ
-3. `events/<識別子>.ndjson` に 1 行足す: `{"kind": "withdrawn", "from": "doing", "to": "todo", "actor": <アカウント>, "via": "chrome", "version": <拡張の版>, "at": <時刻>, "reason": <任意>}`
+3. `events/<識別子>.jsonl` に 1 行足す: `{"kind": "withdrawn", "from": "doing", "to": "todo", "actor": <アカウント>, "via": "chrome", "version": <拡張の版>, "at": <時刻>, "reason": <任意>}`
 4. GitLab の 2 段目からは `seq` を更新する
 
 子の承認で消えたフェーズのマーカーは戻しません（判定が厳しくなる変更）。
@@ -1528,7 +1528,7 @@ C1（4.3・4.4）、承認の pushの改修（4.6）、ユーザの判断の入�
 | 何 | 場所 | 形 |
 |---|---|---|
 | C1 の対象の見分け（D11） | `ccnavi/c1.py` の `family`、`ccnavi c1 family <識別子>` | 1 行 1 項目で `family`（子なら親）・`repo`・`target`（`yes` / `no` / `stop`）・`why`・`tree`・置き場のパス・止めたときの `hint`。`yes` は置き場のパスが相対で、親子のチケットの取り込み状態があり、chat だけの親子のチケット（`phase.chat_only`）でなく、2c の止める理由（閉じた・gone・blocked・親のワークツリーが無い など）の無い親子のチケット。origin の有無は sh が見る。答えない古い実行ファイルでは、親子のチケットの取り込み状態があれば `stop`、無ければ `no` |
-| C1 の外の変更の見分け（4.4） | `c1.sort`・`classify`、`ccnavi c1 sort <親> [<版>]` | 置き場（承認済みと `wip/proposals/review/`）の変更を分ける。(b) は `phases/<親>/<N>.pending`・`.skipped` で変更前が無く中身が hook のキー（`at`・`review`・`source`・`deferred_to`・`tickets`）だけの JSON と、`events/<識別子>.ndjson` で変更前が前置きで足した行がどれも状態の履歴の行（`at`・`ticket`・`kind` が文字列）のもの。(c) は形で見るユーザの判断（フロー・`reviewed`・(b) でない `skipped`・`close-early.json`・`config-sync.json`・`accepted.json`・新しく置かれた `doing/` の承認済みチケット）。ほかは (d)。`keep` は未コミットの `<子>.judge.json`、`skip` は書きかけの一時ファイル。`<版>` を渡すと `<版>..HEAD` でコミットに入った分を同じ規則で見る（4.3 の 5） |
+| C1 の外の変更の見分け（4.4） | `c1.sort`・`classify`、`ccnavi c1 sort <親> [<版>]` | 置き場（承認済みと `wip/proposals/review/`）の変更を分ける。(b) は `phases/<親>/<N>.pending`・`.skipped` で変更前が無く中身が hook のキー（`at`・`review`・`source`・`deferred_to`・`tickets`）だけの JSON と、`events/<識別子>.jsonl` で変更前が前置きで足した行がどれも状態の履歴の行（`at`・`ticket`・`kind` が文字列）のもの。(c) は形で見るユーザの判断（フロー・`reviewed`・(b) でない `skipped`・`close-early.json`・`config-sync.json`・`accepted.json`・新しく置かれた `doing/` の承認済みチケット）。ほかは (d)。`keep` は未コミットの `<子>.judge.json`、`skip` は書きかけの一時ファイル。`<版>` を渡すと `<版>..HEAD` でコミットに入った分を同じ規則で見る（4.3 の 5） |
 | 書いたパスの一覧の基点と置き場の外（4.3） | `cli` の `--record-tree <親のワークツリー>` | 一覧をそのツリーからの相対にし、置き場の外に書いたら標準エラーで名指しして 1 で終わる（一覧は書く。C1 は戻すのに使う）。例外は `ticket start` の中の configsync の写したレイヤー（`configsync.is_synced_write` が内容で読めるもの。D34） |
 | record-risk の記録を finish でコミットして push する | `ops`・`fsio.note_input` | finish が読んだ `<子>.judge.json` を、書いたものと同じく一覧に載せる |
 | C1 の手順（4.3 の 1〜11） | `ccnavi-common.sh` の `ccnavi_c1_family`・`begin`・`write`・`end` | 1 ロック（待つ。`CCNAVI_LOCK_WAIT`）2 途中の操作（`MERGE_HEAD`・`CHERRY_PICK_HEAD`・`REVERT_HEAD`・`rebase-merge`・`rebase-apply`・`sequencer`・`index.lock`）3 見分け → (c)・(d) があれば止め、(b) を `commit --only` 4 取り込み（`ccnavi-sync.sh <P>` を入れ子のロックで起こす。統合先の取り込み結果も同じ回で書く）→ 親子のチケットの取り込み状態が `present` のままか確かめる 5 `origin/<P>..HEAD` の置き場の変更が (b) だけか 6 元の先頭 7 実行ファイルを `--record-writes`・`--record-tree` つきで起こす 8 一覧のパスだけ `commit --only`（新しいファイルは先に `add`）9 `push origin P`（`--force` なし）10 落ちたら `ls-remote` の完全一致で届いたかを見る 11 届いていなければ先頭が自分のコミットのときだけ `update-ref` で戻し、索引と書いたパスの中身を元に戻して、3 から 1 回だけやり直す |

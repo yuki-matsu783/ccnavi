@@ -58,7 +58,7 @@ warn で言う（判定と `start` は止めない）。マーカーを消すか
 （機構は消さない）。親を閉じても子の承認済みチケットは閉じない。
 
 **状態の履歴。** 実行ファイルが上の表の遷移とマーカーの遷移を動かすたびに、承認済みの領域の
-`events/<識別子>.ndjson` へ 1 行 1 JSON を追記する（`at` は UTC の ISO 8601、`kind`、元と先の置き場 `from` / `to`、
+`events/<識別子>.jsonl` へ 1 行 1 JSON を追記する（`at` は UTC の ISO 8601、`kind`、元と先の置き場 `from` / `to`、
 経路 `via` = `cli` / `terminal` / `board` / `hook`）。マーカーの履歴の行は親のファイルに `phase-mark` / `phase-reopened` /
 `parent-mark` で残り、`from` / `to` は `null`。書くのは動かす操作の最下段（`approval_ops.admit` など）で、書けなくても
 状態の操作は止めず、`ccnavi: 警告: …` を標準エラーに出す（入口の `cli.run` が起動を抜けるときにまとめて出す）。
