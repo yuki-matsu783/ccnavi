@@ -1253,15 +1253,28 @@ def default_root() -> str:
     return found if found else "."
 
 
+def _is_worktree_dir(directory: str) -> bool:
+    """`.../.claude/worktrees/<名前>` の位置にあるディレクトリか。"""
+    holder = os.path.dirname(directory)
+    return (
+        os.path.basename(holder) == "worktrees"
+        and os.path.basename(os.path.dirname(holder)) == ".claude"
+    )
+
+
 def _find_project_root() -> str:
     """作業ディレクトリからファイルシステムのルートまで上って .claude を探す。
-    バージョン管理が自分のルートを見つけるのと同じやり方。"""
+    バージョン管理が自分のルートを見つけるのと同じやり方。
+
+    ワークツリー（`<ワークスペースルート>/.claude/worktrees/<名前>`）は `.claude` を追跡して
+    いて自分も `.claude` を持つ。そこで止まるとワークスペースルートを取り違えるので、
+    その位置のディレクトリは飛ばして親のワークスペースルートまで上る。"""
     try:
         directory = os.getcwd()
     except OSError:
         return ""
     while True:
-        if os.path.isdir(os.path.join(directory, ".claude")):
+        if os.path.isdir(os.path.join(directory, ".claude")) and not _is_worktree_dir(directory):
             return directory
         parent = os.path.dirname(directory)
         if parent == directory:
