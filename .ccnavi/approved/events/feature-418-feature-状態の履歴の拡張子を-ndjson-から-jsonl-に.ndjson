@@ -1,3 +1,4 @@
 {"at": "2026-10-17T15:11:25Z", "ticket": "feature-418-feature-状態の履歴の拡張子を-ndjson-から-jsonl-に", "kind": "approved", "from": "todo", "to": "doing", "via": "board", "tree": "feature-418-feature-状態の履歴の拡張子を-ndjson-から-jsonl-に"}
 {"at": "2026-10-17T15:12:28Z", "ticket": "feature-418-feature-状態の履歴の拡張子を-ndjson-から-jsonl-に", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "2cc24ff2d80d9e85290bc5a5a88f6767a808aa50"}
 {"at": "2026-10-17T15:17:46Z", "ticket": "feature-418-feature-状態の履歴の拡張子を-ndjson-から-jsonl-に", "kind": "revised", "from": "doing", "to": "doing", "via": "board"}
+{"at": "2026-10-17T16:03:22Z", "ticket": "feature-418-feature-状態の履歴の拡張子を-ndjson-から-jsonl-に", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 1, "mark": "pending"}
