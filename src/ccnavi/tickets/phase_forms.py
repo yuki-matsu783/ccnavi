@@ -372,6 +372,7 @@ _EXE_DIAGNOSES = frozenset(
 # 旗を足したらここにも足す（tests/ticket/test_ticket.py が flags と比べる）。
 EXE_OPTIONS = frozenset(
     {
+        "--accept-check", "--accept-done", "--accept-plan",
         "--accept-unresolved", "--actor", "--agent-id", "--agree", "--approved", "--body-file",
         "--choose-out", "--close-early", "--cwd", "--digest", "--docs", "--draft",
         "--expect",
@@ -379,6 +380,7 @@ EXE_OPTIONS = frozenset(
         "--guard-ticket-approval", "--help", "--import", "--integration-branch", "--issue",
         "--json",
         "--keyword", "--layer", "--limit", "--lint", "--log", "--mode", "--mr", "--name",
+        "--no-issue",
         "--no-refresh",
         "--note", "--order",
         "--path",

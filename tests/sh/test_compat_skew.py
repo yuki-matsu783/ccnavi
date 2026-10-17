@@ -227,6 +227,18 @@ class CompatAgreesTest(unittest.TestCase):
         self.assertIn("--plan-order", flags)
         self.assertIn("--fill-phases", flags)
 
+    def test_v14_accepting_by_resolving_the_thread_raised_the_compat_to_12(self):
+        """V14 受け入れた未解決スレッドに、sh が返信を残して解決するようになった。
+
+        sh は実行ファイルに受け入れの計画を書かせる旗（`--accept-plan`・`--accept-done`）を渡す。
+        古い実行ファイルは知らずに落ちるか、受け入れを記録に足すだけでホストを解決済みにしないので、
+        食い違いとして知らせる。なので 12 以上。
+        """
+        self.assertGreaterEqual(version.COMPAT, 12)
+        flags = run_ccnavi(["--version"], cwd=ROOT).stdout
+        self.assertIn("--accept-plan", flags)
+        self.assertIn("--accept-done", flags)
+
 
 @unittest.skipIf(not SHELL, "sh も bash も見つからない")
 class TicketStatusPassTest(unittest.TestCase):

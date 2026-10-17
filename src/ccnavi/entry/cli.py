@@ -349,6 +349,15 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 何も置かない（state の置き場の
     # 下だけ）。ユーザが選ぶのを C1 のロックの外で済ませ、ロックを持ったままユーザを待たないため。
     parser.add_argument("--choose-out", default="")
+    # 受け入れの計画。decide の `--yes` と `--close-early` で、受け入れる指摘と返信の本文を
+    # このファイルに書くだけで、何も置かない（state の置き場の下だけ）。sh がこれで返信と解決を
+    # 済ませてから、置く呼び出しを打つ。置くときは `--accept-done` が計画を読む。
+    parser.add_argument("--accept-plan", default="")
+    parser.add_argument("--accept-done", default="")
+    # `--close-early` の 2 段目の前に、計画のあとで未解決の指摘が変わっていないかだけを確かめる
+    # （何も書かない）。`--no-issue` は返信の文言のため（残りを issue に書き出さない）。
+    parser.add_argument("--accept-check", default="")
+    parser.add_argument("--no-issue", action="store_true")
     # 統合先の名前。リポジトリには置かず、手元では環境変数 `CCNAVI_INTEGRATION_BRANCH`（未設定なら
     # ホストのデフォルトブランチ）で決まる。実行ファイルは環境変数を読まず、sh が決めて渡す。
     # いまは `--lint` の識別子の予約（統合先と同じ名前の識別子を使わせない）が読む。
