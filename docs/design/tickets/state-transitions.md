@@ -109,7 +109,7 @@ warn で言う（判定と `start` は止めない）。マーカーを消すか
 |---|---|---|
 | 無し → `pending` | `PostToolUse` の告知（cwd が親のワークツリー） | 終わっていて、マーカーが 1 つも無く、レビュー要。文を 1 度だけ返す |
 | 無し → `skipped` | 同上 | 終わっていて、マーカーが 1 つも無く、レビュー不要（または延期） |
-| 任意 → `skipped` | `ccnavi-review.sh close-early`（ユーザ） | 終わっていないフェーズの全部に置く（9.11） |
+| 任意 → `skipped` | `ccnavi-review.sh close-early`（ユーザ） | 終わっていないフェーズのうち、レビュー待ちか閉じた子が居るもの(未着手の子を取り消すと終わるもの)に置く。手を付けていないフェーズには置かず、issue に書き出す（9.11） |
 | 任意 → `requested` | `ccnavi-review.sh request`（親） | 9.10 の前提と ELI5 の HTML（`--eli5`。`wip/` の下にコミット済み）。`pending` は要らない |
 | `requested` → `reviewed` | `ccnavi-review.sh confirm`（親）、`ccnavi-review.sh decide`（ユーザ）、フィードバック計画の承認、`close-early` | 変更要求のレビューが無い。`confirm` は未解決が 0、`decide` は未解決をユーザが受け入れる（続きの子を起こす選択ではマーカーは置かず、そのフェーズのマーカーを消す）。置いたときに `review/` の子は `done/` へ動く |
 | 任意 → 無し | `ccnavi --agree` で同じ番号の子が承認された | 4 種を全部消す |

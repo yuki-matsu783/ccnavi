@@ -307,7 +307,8 @@ class PhaseHistoryTest(PhaseHarness):
         )
         parent = [(e["kind"], e.get("phase"), e.get("mark"), e["via"]) for e in self.lines("i0001")]
         self.assertIn(("parent-mark", None, "close-early", "terminal"), parent)
-        self.assertIn(("phase-mark", 2, "skipped", "terminal"), parent)
+        # 手を付けていないフェーズ 2 には省略のマーカーを置かないので、履歴にも出ない。
+        self.assertNotIn(("phase-mark", 2, "skipped", "terminal"), parent)
         self.assertEqual(
             read_json(os.path.join(self.approved, "phases", "i0001", "close-early.json"))["reason"],
             "ここまで",

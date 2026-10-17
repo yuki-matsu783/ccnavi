@@ -310,7 +310,8 @@ def close_early(
 
     残っているもの（未着手の子、子の無いフェーズ、終わっていないレビュー、
     未計画のフィードバック、未解決のスレッド）を全部見せてから y/N。y なら、
-    未着手の子を取り消し、フェーズに省略とレビュー済みのマーカーを置き、未解決を受け入れ、
+    未着手の子を取り消し、レビューが済んでいないフェーズにレビュー済みのマーカーを置き
+    （手を付けていないフェーズにはマーカーを置かない）、未解決を受け入れ、
     親のマーカー `close-early.json` を置く。残りを別の issue に書き出す下書きを書き、sh がそれで
     issue を作る。ユーザが知らないうちに消えるものは作らない。
 
@@ -487,9 +488,10 @@ class Leftovers:
 
     # 未着手の子。取り消す。
     todo: list[ticket_model.Ticket]
-    # 終わっていないフェーズ。省略のマーカーを置く。
+    # 終わっていないフェーズ。手を付けたもの（取り消すと終わる）には省略のマーカーを置く。
     not_ended: list[phase.Phase]
-    # 終わっていないフェーズのうち、手を付けていないもの（子が無いか全部未着手）。
+    # 終わっていないフェーズのうち、手を付けていないもの（レビュー待ちも閉じた子も無い）。
+    # マーカーは置かず、issue に書き出す。
     untouched: list[phase.Phase]
     # 終わったがレビューが済んでいないフェーズ。済んだ扱いにする。
     unreviewed: list[phase.Phase]
@@ -519,8 +521,12 @@ def _leftovers(
     return Leftovers(
         todo=[t for ph in phases for t in ph.tickets if untouched(t, ph)],
         not_ended=not_ended,
+        # 取り消しても終わらないフェーズ。レビュー待ちか閉じた子が無ければ
+        # `Phase.ended` は偽のまま。取り消し済みの子が混ざっていても同じで、打ち直しでもここに入る。
         untouched=[
-            ph for ph in not_ended if not ph.tickets or all(untouched(t, ph) for t in ph.tickets)
+            ph
+            for ph in not_ended
+            if not any(s in (ticket_model.REVIEW, ticket_model.DONE) for s in ph.states.values())
         ],
         unreviewed=[ph for ph in phases if ph.ended and not phase.reviewed_or_skipped(ph)],
         unplanned=parent.has_plan and parent.feedback is None,
@@ -534,7 +540,7 @@ def _show_leftovers(stdout: TextIO, parent: ticket_model.Ticket, left: Leftovers
     for t in left.todo:
         stdout.write(f"  - 未着手の子 {t.ticket}（{t.title}）→ 取り消す\n")
     for ph in left.untouched:
-        stdout.write(f"  - フェーズ {ph.label}: 手を付けていない → 省略のマーカー\n")
+        stdout.write(f"  - フェーズ {ph.label}: 手を付けていない → 残りとして issue に書き出す\n")
     for ph in left.unreviewed:
         stdout.write(f"  - フェーズ {ph.label}: レビューが済んでいない → 済んだ扱い\n")
     if left.unplanned:
@@ -561,7 +567,8 @@ def _settle(
 ) -> tuple[list[str], list[int], list[int]] | None:
     """未着手の子を取り消し、フェーズにマーカーを置く。
 
-    返すのは取り消した子、省略のマーカーを置いた番号、済んだ扱いにした番号。
+    返すのは取り消した子、省略のマーカーを置いた番号（手を付けていないフェーズは含まない）、
+    済んだ扱いにした番号。
     途中で失敗したら None。そこまでの変更は戻さない（マーカーは次に打てば重ねられる）。
     """
     cancelled: list[str] = []
@@ -571,7 +578,12 @@ def _settle(
         cancelled.append(t.ticket)
     skipped: list[int] = []
     settled: list[int] = []
-    pending = {ph.number for ph in left.not_ended}
+    # 手を付けていないフェーズ（子が無いか全部未着手）は、子を取り消しても終わらず、
+    # ゲートも告知も動かないので、マーカーを置かない。親を閉じる判定は close-early.json が迂回する。
+    # 未着手の子のほかに閉じた子が居るフェーズは、取り消すと終わった扱いになる。マーカーが無いと
+    # 次の hook の告知が「レビューを頼め」と言い出すため、省略のマーカーで抑える。
+    untouched = {ph.number for ph in left.untouched}
+    pending = {ph.number for ph in left.not_ended} - untouched
     for ph in phases:
         if ph.number in pending:
             if approval_marks.MARK_SKIPPED in ph.marks:
@@ -642,8 +654,10 @@ def _close_early_drafts(
     note = [
         review_host.MARKER_CLOSE_EARLY,
         f"ユーザが早めにクローズした（{stamp}）: {reason.strip()}",
-        f"取り消した子: {', '.join(cancelled) or '無し'} / 省略したフェーズ: "
-        f"{', '.join(str(n) for n in skipped) or '無し'} / 受け入れた指摘: {len(accepted)} 件",
+        f"取り消した子: {', '.join(cancelled) or '無し'} / 手を付けなかったフェーズ: "
+        f"{', '.join(ph.label for ph in left.untouched) or '無し'} / "
+        f"省略のマーカーを置いたフェーズ: {', '.join(str(n) for n in skipped) or '無し'} / "
+        f"受け入れた指摘: {len(accepted)} 件",
         "残りは別の issue に書き出す。親が片付けて ready を実行すれば Draft が外れる。"
         "マージはユーザが行う。",
         "",
