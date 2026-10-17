@@ -2,8 +2,12 @@
 
 `phases/<親>/<N>.<種類>` に、依頼・レビュー済み・省略・通知済みのマーカーを置く。
 レビューが済むまで止める判定（phase.py）はこれを見る。中身は JSON 1 つで、いつ誰が置いたかが入る。
-親ごとのマーカー（ready・close-early・closed）、子ごとの記録（実績のリスクと定性項目の判定）、
-ユーザが受け入れたスレッドの記録も同じ置き場にある。approval から分けた。
+親ごとのマーカー（ready・close-early・closed）、子ごとの記録（実績のリスクと定性項目の判定）も
+同じ置き場にある。approval から分けた。
+
+ユーザが受け入れた未解決スレッドは、ここには記録しない。ホスト側で返信を残して解決する
+（`review_decide`・`review_close`）。以前の版が置いた `phases/<親>/accepted.json` が
+親に残っていても読まない。
 
 ファイル名とマーカーの JSON の形は sh と拡張も読む。値と形を変えない。
 """
@@ -15,7 +19,7 @@ import os
 from dataclasses import dataclass, field
 
 from ..infra import fsio
-from . import history, ticket_model, workflow
+from . import history
 
 PHASES_DIR = "phases"
 
@@ -223,78 +227,6 @@ def write_child_record(approved_dir: str, parent: str, child: str, kind: str, da
         child_record_path(approved_dir, parent, child, kind),
         json.dumps(data, ensure_ascii=False, indent=1),
     )
-
-
-# ユーザが受け入れたスレッドの記録。フェーズのマーカーとは別の場所に、親ごとに 1 つ置く。
-ACCEPTED_FILE = "accepted.json"
-
-
-def accepted_path(approved_dir: str, parent: str) -> str:
-    return os.path.join(approved_dir, PHASES_DIR, parent, ACCEPTED_FILE)
-
-
-def accepted_threads(
-    approved_dir: str,
-    parent: str,
-    phase: int | None = None,
-    owner: ticket_model.Ticket | None = None,
-) -> set[str]:
-    """この親で、ユーザが「未解決のまま進める」と受け入れたスレッドの識別。
-
-    `phase` を渡すと、その番号のレビューで受け入れ済みと数えてよいものだけを返す。
-    受け入れはそのフェーズと、それを待つ番号（待ち方の `waits`）にだけ当てはまる（設計
-    9.8）。並行した別の枝のレビューには当てはまらない。番号を持たない受け入れ（`close-early`）は
-    親全体に当てはまる。
-    """
-    data = fsio.read_dict(accepted_path(approved_dir, parent))
-    if not data:
-        return set()
-    threads = {str(x) for x in data.get("threads") or [] if str(x)}
-    if phase is None or owner is None:
-        return threads
-    at = data.get("phases") if isinstance(data.get("phases"), dict) else {}
-    reach = {phase, *workflow.waits_of(owner, phase)}
-    kept = set()
-    for thread in threads:
-        where = at.get(thread)
-        scoped = isinstance(where, list)
-        if not scoped or any(isinstance(n, int) and n in reach for n in where):
-            kept.add(thread)
-    return kept
-
-
-def remember_accepted(
-    approved_dir: str, parent: str, threads: list[str], phase: int | None = None
-) -> str:
-    """受け入れたスレッドを記録に足す。失敗したら、その説明を返す。
-
-    フェーズのマーカーとは別の場所に置く。マーカーは 2 つの理由で消える。同じ番号のマーカーは
-    `confirm` が通るたびに上書きされ、その番号に子が足されると `clear_marks` が
-    全体を消す。どちらでも受け入れの記録が消え、ユーザがもう一度同じスレッドを
-    受け入れることになる。ユーザが 1 度言った「これは承知で進める」は、
-    取り消されるまで残す。
-    """
-    if not threads:
-        return ""
-    path = accepted_path(approved_dir, parent)
-    data = fsio.read_dict(path) or {}
-    at = dict(data.get("phases")) if isinstance(data.get("phases"), dict) else {}
-    added = {str(t) for t in threads if str(t)}
-    threads_before = accepted_threads(approved_dir, parent)
-    keep = sorted(threads_before | added)
-    for thread in added:
-        if phase is None:
-            # 番号を持たない受け入れ（`close-early`）は親全体に当てはまる。
-            at.pop(thread, None)
-        elif thread in at or thread not in threads_before:
-            # 受け入れた番号を足していく。別の枝で受け入れ直した分も数に入れる。
-            known = [n for n in at.get(thread, []) if isinstance(n, int)]
-            at[thread] = sorted(set(known) | {phase})
-    # 読んで、足して、書き戻す形。同じファイルの `_write_known` と同じく、
-    # 途中を見せない書き方で置く。
-    body = {"threads": keep, "phases": dict(sorted(at.items())), "at": now()}
-    failed = fsio.write_json_atomic(path, body, indent=1)
-    return f"{path} ({failed})" if failed else ""
 
 
 def marks(approved_dir: str, parent: str, phase: int) -> dict[str, dict]:

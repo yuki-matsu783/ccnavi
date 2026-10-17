@@ -1067,6 +1067,98 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertIn("wip wip/research/summary.md", passed.stdout.splitlines())
 
+    def test_close_early_accepts_threads_in_three_stages(self):
+        """受け入れの返信と解決は sh がする。置く前に済ませるため、3 回に分けて打つ。
+
+        1 回目（`--accept-plan`）は y/N を聞いて計画だけを書く。何も置かない。
+        2 回目（`--accept-check`）は、取り直した結果の未解決が計画と同じかだけを確かめる。
+        3 回目（`--accept-done`）は、返信と解決のあとで取り直した結果を、ホストの実状態で確かめて
+        聞き直さずに置く。
+        """
+        self.family(plan=["design"])
+        self.commit_parent()
+        fixture = self.remote()
+        data = read_json(fixture)
+        data["threads"] = [{"id": "t0", "resolved": False, "url": "u/7#t0", "body": "気になる"}]
+        write(fixture, json.dumps(data))
+        plan = os.path.join(self.state, "accept-plan.json")
+        base = ("--cwd", self.parent_tree, "--close-early", "--reason", "ここまで")
+        marker = os.path.join(self.approved, "phases", "i0001", "close-early.json")
+
+        # 計画が無いまま 2 回目・3 回目を打っても、置かない
+        for flag in ("--accept-check", "--accept-done"):
+            early = self.ccnavi(*base, "--result", fixture, flag, plan)
+            self.assertNotEqual(early.returncode, 0)
+            self.assertIn("受け入れの計画", early.stderr)
+
+        # n なら計画も書かない
+        declined = self.ccnavi(*base, "--result", fixture, "--accept-plan", plan, stdin="n\n")
+        self.assertNotEqual(declined.returncode, 0)
+        self.assertFalse(os.path.exists(plan))
+
+        planned = self.ccnavi(*base, "--result", fixture, "--accept-plan", plan, stdin="y\n")
+        self.assertEqual(planned.returncode, 0, planned.stdout + planned.stderr)
+        body = read_json(plan)
+        self.assertEqual([t["id"] for t in body["threads"]], ["t0"])
+        self.assertIn("早めに閉じた", body["threads"][0]["reply"])
+        self.assertIn("issue の下書き", body["threads"][0]["reply"])
+        self.assertFalse(os.path.exists(marker))
+
+        # y/N の間に指摘が増えていたら、ホストに触る前に止まる
+        grown = read_json(fixture)
+        grown["threads"].append({"id": "t1", "resolved": False, "url": "u/7#t1", "body": "追加"})
+        grown_fixture = os.path.join(self.state, "grown.json")
+        write(grown_fixture, json.dumps(grown))
+        stale = self.ccnavi(*base, "--result", grown_fixture, "--accept-check", plan)
+        self.assertNotEqual(stale.returncode, 0)
+        self.assertIn("未解決の指摘が変わった", stale.stderr)
+        checked = self.ccnavi(*base, "--result", fixture, "--accept-check", plan)
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        self.assertFalse(os.path.exists(marker))
+
+        # sh が解決する前（ホストは未解決のまま）に置こうとしても置かない
+        unresolved = self.ccnavi(*base, "--result", fixture, "--accept-done", plan)
+        self.assertNotEqual(unresolved.returncode, 0)
+        self.assertIn("ホストで解決済みになっていない", unresolved.stderr)
+        self.assertFalse(os.path.exists(marker))
+
+        # 解決したあとに、見せていない未解決が増えていたら置かない
+        data["threads"][0]["resolved"] = True
+        extra = json.loads(json.dumps(data))
+        extra["threads"].append({"id": "t1", "resolved": False, "url": "u/7#t1", "body": "追加"})
+        extra_fixture = os.path.join(self.state, "extra.json")
+        write(extra_fixture, json.dumps(extra))
+        more = self.ccnavi(*base, "--result", extra_fixture, "--accept-done", plan)
+        self.assertNotEqual(more.returncode, 0)
+        self.assertIn("計画のほかに未解決の指摘が残っている", more.stderr)
+        self.assertFalse(os.path.exists(marker))
+
+        # 解決済みで、ほかに増えていなければ、聞き直さずに置く（stdin は空）
+        write(fixture, json.dumps(data))
+        done = self.ccnavi(*base, "--result", fixture, "--accept-done", plan)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        mark = read_json(marker)
+        self.assertEqual(mark["accepted"], ["u/7#t0"])
+        self.assertFalse(
+            os.path.exists(os.path.join(self.approved, "phases", "i0001", "accepted.json"))
+        )
+
+    def test_close_early_reply_does_not_promise_an_issue_with_no_issue(self):
+        """`--no-issue` で残りを issue に書き出さないときは、返信に issue に回すと書かない。"""
+        self.family(plan=["design"])
+        self.commit_parent()
+        fixture = self.remote()
+        data = read_json(fixture)
+        data["threads"] = [{"id": "t0", "resolved": False, "url": "u/7#t0", "body": "気になる"}]
+        write(fixture, json.dumps(data))
+        plan = os.path.join(self.state, "accept-plan.json")
+        base = ("--cwd", self.parent_tree, "--close-early", "--reason", "ここまで")
+        planned = self.ccnavi(
+            *base, "--result", fixture, "--accept-plan", plan, "--no-issue", stdin="y\n"
+        )
+        self.assertEqual(planned.returncode, 0, planned.stdout + planned.stderr)
+        self.assertNotIn("issue", read_json(plan)["threads"][0]["reply"])
+
     def test_close_early_marks_a_touched_phase_so_the_hook_stays_quiet(self):
         """未着手の子のほかにレビュー待ちの子が居るフェーズは、取り消すと終わる。省略のマーカーが
         無いと、次の hook の告知が pending を書いて「レビューを頼め」と言い出すので、置き続ける。"""

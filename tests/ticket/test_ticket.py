@@ -1754,8 +1754,10 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(answer["followup"], "i0001-01-03")
         self.assertFalse(answer["reviewed"])
         self.assertIn("i0001-01-03", answer["prompt"])
-        kept = read_json(os.path.join(self.approved, "phases", "i0001", "accepted.json"))
-        self.assertEqual(kept["threads"], ["u1"])
+        # 受け入れの記録は持たない（ホスト側で返信を残して解決する）
+        self.assertFalse(
+            os.path.exists(os.path.join(self.approved, "phases", "i0001", "accepted.json"))
+        )
         with open(os.path.join(self.approved, "doing", "i0001-01-03.md"), encoding="utf-8") as f:
             text = f.read()
         self.assertIn("u2", text)
@@ -1815,9 +1817,157 @@ class TicketTest(unittest.TestCase):
         again = self.confirm(fixture)
         self.assertEqual(again.returncode, 1)
         self.assertIn("フェーズ 1 はレビュー済み", again.stderr)
-        # マーカーを外して確かめ直しても、受け入れた指摘は数えない
+        # マーカーを外して確かめ直す。受け入れた指摘は、ホストで解決済み（sh が返信と解決をした）
+        # なら数えない。記録は持たないので、開き直されれば未解決として数える
         os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
+        self.assertNotEqual(self.confirm(fixture).returncode, 0)
+        resolved = read_json(fixture)
+        for t in resolved["threads"]:
+            t["resolved"] = True
+        write(fixture, json.dumps(resolved))
         self.assertEqual(self.confirm(fixture).returncode, 0)
+
+    def test_accept_plan_writes_replies_for_the_accepted_threads_and_places_nothing(self):
+        """受け入れる指摘（対応しない）だけに返信の本文を付けた計画を書く。何も置かない。
+
+        直す指摘は受け入れないので載せない。実行ファイルはネットワークに出ないので、返信と解決は
+        sh がこの計画でする。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        data = read_json(fixture)
+        data["threads"] = [
+            {"id": "t1", "resolved": False, "url": "u1", "path": "src/a/x.py", "body": "命名"},
+            {"id": "t2", "resolved": False, "url": "u2", "path": "src/b/y.py", "body": "テスト"},
+            {"id": "t3", "resolved": False, "url": "u3", "path": "src/b/z.py", "body": "別件"},
+        ]
+        write(fixture, json.dumps(data))
+        digest = json.loads(self.decide(fixture, "--preview", "--json").stdout)["digest"]
+        choices = json.dumps({"u1": "keep", "u2": "fix", "u3": "keep"})
+        plan = os.path.join(self.state, "plan.json")
+        planned = self.decide(
+            fixture, "--yes", choices, "--digest", digest, "--json", "--accept-plan", plan
+        )
+        self.assertEqual(planned.returncode, 0, planned.stderr)
+        body = read_json(plan)
+        self.assertEqual([t["id"] for t in body["threads"]], ["t1", "t3"])
+        self.assertEqual([t["key"] for t in body["threads"]], ["u1", "u3"])
+        for t in body["threads"]:
+            self.assertTrue(t["reply"].startswith("<!-- ccnavi:accept -->"))
+            self.assertIn("受け入れて進める", t["reply"])
+            self.assertIn("フェーズ 1", t["reply"])
+            self.assertNotIn("issue", t["reply"])
+        phases = os.path.join(self.approved, "phases", "i0001")
+        self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-03.md")))
+        # 計画だけで置かない。同じ呼び出しを計画なしで打つと置く
+        placed = self.decide(fixture, "--yes", choices, "--digest", digest, "--json")
+        self.assertEqual(placed.returncode, 0, placed.stderr)
+
+    def test_accept_plan_stops_when_a_thread_cannot_be_replied_to(self):
+        """スレッドの id が無いと、ホストに返信も解決もできない。計画を書かずに止める。"""
+        fixture = self.two_threads()
+        data = read_json(fixture)
+        data["threads"][0]["id"] = ""
+        write(fixture, json.dumps(data))
+        digest = json.loads(self.decide(fixture, "--preview", "--json").stdout)["digest"]
+        plan = os.path.join(self.state, "plan.json")
+        choices = json.dumps({"u1": "keep", "u2": "keep"})
+        stopped = self.decide(
+            fixture, "--yes", choices, "--digest", digest, "--json", "--accept-plan", plan
+        )
+        self.assertNotEqual(stopped.returncode, 0)
+        self.assertIn("スレッドの id が無いか読めず", stopped.stderr)
+        self.assertFalse(os.path.exists(plan))
+
+    def test_accept_plan_runs_the_placing_prechecks_before_the_host_is_touched(self):
+        """置く側の事前検査（続きの子を起こせるか）を計画の段で当てる。通らなければ計画を書かない。
+
+        計画を書けば sh がホストに返信と解決を書く。そのあとで「置けない」と分かると、
+        解決済みのスレッドだけが残る。
+        """
+        fixture = self.two_threads()
+        digest = json.loads(self.decide(fixture, "--preview", "--json").stdout)["digest"]
+        choices = json.dumps({"u1": "keep", "u2": "fix"})
+        second = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-02.md")
+        with open(second, encoding="utf-8") as f:
+            text = f.read()
+        with open(second, "w", encoding="utf-8", newline="\n") as f:
+            f.write(
+                text.replace("src/b/*", 'src/b/*"\n  - match: Write|Edit\n    glob: "src/c/*', 1)
+            )
+        plan = os.path.join(self.state, "plan.json")
+        with mock.patch.object(ticket_mod, "MAX_SCOPE_ENTRIES", 2):
+            refused = self.decide(
+                fixture, "--yes", choices, "--digest", digest, "--json", "--accept-plan", plan
+            )
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("続きの子チケットを起こせない", refused.stderr)
+        self.assertFalse(os.path.exists(plan))
+
+    def test_accept_done_checks_the_host_state_and_the_shown_threads(self):
+        """置く呼び出しは、sh が返信と解決をして取り直した結果を、ホストの実状態で確かめる。
+
+        - 受け入れるスレッドがホストで解決済みでなければ置かない
+        - 受け入れたスレッドを見せた指摘に数え直したダイジェストが合うときだけ置く
+          （見せたあとに指摘が増えたり変わったりしていたら止まる）
+        """
+        fixture = self.two_threads()
+        digest = json.loads(self.decide(fixture, "--preview", "--json").stdout)["digest"]
+        choices = json.dumps({"u1": "keep", "u2": "keep"})
+        plan = os.path.join(self.state, "plan.json")
+        planned = self.decide(
+            fixture, "--yes", choices, "--digest", digest, "--json", "--accept-plan", plan
+        )
+        self.assertEqual(planned.returncode, 0, planned.stderr)
+        phases = os.path.join(self.approved, "phases", "i0001")
+        args = ("--yes", choices, "--digest", digest, "--json", "--accept-done", plan)
+
+        # sh がまだ解決していない（ホストは未解決のまま）
+        early = self.decide(fixture, *args)
+        self.assertNotEqual(early.returncode, 0)
+        self.assertIn("ホストで解決済みになっていない", early.stderr)
+        self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
+
+        # 解決したあとで、別の未解決が増えていた（見せていない指摘）
+        data = read_json(fixture)
+        for t in data["threads"]:
+            t["resolved"] = True
+        data["threads"].append(
+            {"id": "t3", "resolved": False, "url": "u3", "path": "src/c/z.py", "body": "新しい"}
+        )
+        grown = os.path.join(self.state, "grown.json")
+        write(grown, json.dumps(data))
+        changed = self.decide(grown, *args)
+        self.assertNotEqual(changed.returncode, 0)
+        self.assertTrue(json.loads(changed.stdout)["mismatch"])
+        self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
+
+        # 解決済みで、ほかに増えていなければ置く。受け入れた鍵がマーカーに残る
+        data["threads"].pop()
+        write(fixture, json.dumps(data))
+        done = self.decide(fixture, *args)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertTrue(json.loads(done.stdout)["reviewed"])
+        self.assertEqual(read_json(os.path.join(phases, "1.reviewed"))["accepted"], ["u1", "u2"])
+
+    def test_accept_plan_checks_the_digest_like_placing(self):
+        """見せたあとに指摘が変わっていたら、計画も書かない。"""
+        fixture = self.two_threads()
+        digest = json.loads(self.decide(fixture, "--preview", "--json").stdout)["digest"]
+        data = read_json(fixture)
+        data["threads"][1]["body"] = "テスト（書き換えた）"
+        write(fixture, json.dumps(data))
+        plan = os.path.join(self.state, "plan.json")
+        both = json.dumps({"u1": "keep", "u2": "keep"})
+        stopped = self.decide(
+            fixture, "--yes", both, "--digest", digest, "--json", "--accept-plan", plan
+        )
+        self.assertNotEqual(stopped.returncode, 0)
+        self.assertTrue(json.loads(stopped.stdout)["mismatch"])
+        self.assertFalse(os.path.exists(plan))
 
     def test_decide_yes_refuses_what_was_not_shown(self):
         """見せたあとに指摘が変わった、ダイジェストが無い、選択が揃っていない、issue に回せない。
@@ -1862,8 +2012,9 @@ class TicketTest(unittest.TestCase):
         done = self.decide(fixture, stdin="f\nk\n")
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIn("i0001-01-03", done.stdout)
-        kept = read_json(os.path.join(self.approved, "phases", "i0001", "accepted.json"))
-        self.assertEqual(kept["threads"], ["u2"])
+        self.assertFalse(
+            os.path.exists(os.path.join(self.approved, "phases", "i0001", "accepted.json"))
+        )
 
     def test_a_todo_with_the_same_id_as_an_approved_ticket_is_not_the_operand(self):
         """同じ識別子が todo/ にもあっても、状態の操作は doing/ の側を相手にする。"""
@@ -3147,7 +3298,8 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(again.returncode, 0)
         self.assertIn("未解決", again.stderr)
 
-        # ユーザが受け入れれば通り、受け入れた分は次から数えない。
+        # ユーザが受け入れれば通る。受け入れた分は、sh がホストで返信を残して解決済みにする。
+        # 記録は持たないので、解決済みになったことで次から数えない。
         accepted = self.ccnavi(
             "--cwd",
             self.parent_tree,
@@ -3159,17 +3311,20 @@ class TicketTest(unittest.TestCase):
             stdin="k\n",
         )
         self.assertEqual(accepted.returncode, 0, accepted.stderr)
-        # 受け入れでレビュー済みになった。マーカーを外して確かめ直しても、受け入れた分は数えない
-        # （レビュー済みのフェーズには confirm を重ねない）
+        # 受け入れでレビュー済みになった。マーカーを外して確かめ直す（レビュー済みのフェーズには
+        # confirm を重ねない）。ホストで解決済みになれば数えない
         os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
+        self.assertNotEqual(self.confirm(fixture).returncode, 0)
+        data["threads"][0]["resolved"] = True
+        write(fixture, json.dumps(data))
         self.assertEqual(self.confirm(fixture).returncode, 0)
 
-    def test_the_acceptance_survives_a_later_check(self):
-        """ユーザが受け入れたスレッドは、あとから走った check で消えないこと。
+    def test_the_acceptance_is_the_resolved_state_on_the_host(self):
+        """ユーザが受け入れたスレッドは、ホストで解決済みの間だけ数えない。
 
-        受け入れをフェーズのマーカーに書いていた版では、次に通った check が同じマーカーを
-        `accepted: []` で上書きし、記録が飛んだ。ユーザがもう一度同じスレッドを
-        受け入れることになる。記録はマーカーと別の場所に置く。
+        受け入れの記録（`accepted.json`）は持たない。受け入れたスレッドを誰かが開き直せば、
+        未解決として数える（意図どおり）。以前の版が置いた `accepted.json` が
+        親に残っていても読まない。
         """
         self.family()
         self.close_phase()
@@ -3190,20 +3345,23 @@ class TicketTest(unittest.TestCase):
         )
         self.assertEqual(accepted.returncode, 0, accepted.stderr)
         kept = os.path.join(self.approved, "phases", "i0001", "accepted.json")
-        self.assertIn("u1", read_json(kept)["threads"])
+        self.assertFalse(os.path.exists(kept))
 
-        # check が通るとマーカーは書き換わるが、記録は残る（レビュー済みには重ねないので、
-        # マーカーを外してから確かめる）。
+        # sh が返信を残して解決済みにした形。マーカーを外して確かめ直すと通る
         os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
+        data["threads"][0]["resolved"] = True
+        write(fixture, json.dumps(data))
         self.assertEqual(self.confirm(fixture).returncode, 0)
-        self.assertIn("u1", read_json(kept)["threads"])
 
-        # 依頼をやり直しても、受け入れた分は数えない。子を足したときの clear_marks と同じく、
-        # そのフェーズのマーカーを全部消してから頼み直す。
-        for kind in ("requested", "reviewed"):
-            os.remove(os.path.join(self.approved, "phases", "i0001", f"1.{kind}"))
-        self.assertEqual(self.request(fixture).returncode, 0)
-        self.assertEqual(self.confirm(fixture).returncode, 0)
+        # 誰かが開き直せば、未解決として数える
+        data["threads"][0]["resolved"] = False
+        write(fixture, json.dumps(data))
+        os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
+        self.assertNotEqual(self.confirm(fixture).returncode, 0)
+
+        # 以前の版が置いた accepted.json は読まない（あっても数えない向きに働かない）
+        write(kept, json.dumps({"threads": ["u1"], "phases": {}}))
+        self.assertNotEqual(self.confirm(fixture).returncode, 0)
 
     def test_prepare_writes_only_the_request_body_and_never_a_merge_request_draft(self):
         """依頼の準備が書き出すのは依頼の本文だけ。マージリクエストの下書きは作らない。

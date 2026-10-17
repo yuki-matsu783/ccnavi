@@ -32,6 +32,7 @@ import threading
 import unittest
 
 from ccnavi.entry import version
+from ccnavi.tickets import review_host
 from tests import ROOT, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -40,8 +41,8 @@ NEEDS = [tool for tool in ("jq", "curl") if shutil.which(tool) is None]
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 TOKEN = "t0k"
 
-# 実行ファイルの代役。引数を 1 行ずつ記録し、`--preview` なら一覧、`--yes` なら下書きを書いて
-# 答える。
+# 実行ファイルの代役。引数を 1 行ずつ記録し、`--preview` なら一覧、`--accept-plan` なら受け入れの
+# 計画（スレッド d1 に返信する）、`--yes` なら下書きを書いて答える。
 STUB = """#!/bin/sh
 case " $* " in
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
@@ -51,7 +52,15 @@ printf '%s\\n' "$*" >>"$STUB_LOG"
 root="$2"
 case " $* " in
 *" --preview "*) printf '{"version":1,"threads":[{"key":"u1"}],"digest":"d0"}\\n' ;;
+*" --accept-plan "*)
+  plan=""; prev=""
+  for a in "$@"; do [ "$prev" = --accept-plan ] && plan="$a"; prev="$a"; done
+  if [ -n "$STUB_PLAN" ]; then cp "$STUB_PLAN" "$plan"; else
+    thread='{"id":"d1","key":"u1","reply":"<!-- ccnavi:accept -->\\nok\\n"}'
+    printf '{"version":1,"digest":"d0","threads":[%s]}\\n' "$thread" >"$plan"
+  fi ;;
 *" --yes "*)
+  [ -z "$STUB_FAIL_YES" ] || { echo "置けない" >&2; exit 1; }
   printf 'issue の題\\n\\n本文\\n' >"$root/logs/state/review-issue-i0001-1.md"
   printf '<!-- ccnavi:decide -->\\n決めた\\n' >"$root/logs/state/review-decide-i0001-1.md"
   printf '{"version":1,"ok":true,"reviewed":true,"followup":""}\\n' ;;
@@ -114,6 +123,13 @@ class GitLab(http.server.BaseHTTPRequestHandler):
 
     posted: list[tuple[str, dict]] = []
     fail_notes = False
+    fail_reply = False
+    fail_resolve = False
+    # 失敗させる discussion の id（解決の PUT だけ）
+    fail_resolve_ids: set = set()
+    # discussion の id → 解決済みか。GET で返し、解決の PUT で真にする
+    discussions: dict = {}
+    fetches = 0
     port = 0
 
     def log_message(self, *args):  # 出力を出さないようにする
@@ -127,8 +143,31 @@ class GitLab(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def thread_list(self):
+        return [
+            {
+                "id": ident,
+                "notes": [
+                    {
+                        "id": 100 + i,
+                        "resolvable": True,
+                        "resolved": resolved,
+                        "body": "指摘",
+                        "created_at": "2026-09-23T00:00:00Z",
+                        "author": {"id": 5},
+                        "position": {"new_path": "src/a.py", "new_line": 3},
+                    }
+                ],
+            }
+            for i, (ident, resolved) in enumerate(GitLab.discussions.items())
+        ]
+
     def do_GET(self):
-        if "/merge_requests?" in self.path:
+        if "/discussions" in self.path and "per_page" in self.path:
+            if "page=1" in self.path:
+                GitLab.fetches += 1
+            self.reply(200, self.thread_list() if "page=1" in self.path else [])
+        elif "/merge_requests?" in self.path:
             url = f"http://127.0.0.1:{self.port}/demo/greeter/-/merge_requests/1"
             self.reply(200, [{"iid": 1, "web_url": url, "source_project_id": 1}])
         elif "/merge_requests" not in self.path and "per_page" not in self.path:
@@ -136,10 +175,31 @@ class GitLab(http.server.BaseHTTPRequestHandler):
         else:
             self.reply(200, [])
 
+    def do_PUT(self):
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        data = json.loads(self.rfile.read(length) or b"{}")
+        if "/discussions/" in self.path:
+            ident = self.path.rsplit("/", 1)[-1]
+            if GitLab.fail_resolve or ident in GitLab.fail_resolve_ids:
+                self.reply(500, {"message": "500 boom"})
+                return
+            GitLab.posted.append(("resolve", {"path": self.path, **data}))
+            if ident in GitLab.discussions:
+                GitLab.discussions[ident] = True
+            self.reply(200, {"id": ident})
+        else:
+            self.reply(405, {"message": "405"})
+
     def do_POST(self):
         length = int(self.headers.get("Content-Length", "0") or 0)
         data = json.loads(self.rfile.read(length) or b"{}")
-        if self.path.endswith("/notes"):
+        if "/discussions/" in self.path and self.path.endswith("/notes"):
+            if GitLab.fail_reply:
+                self.reply(500, {"message": "500 boom"})
+                return
+            GitLab.posted.append(("reply", {"path": self.path, **data}))
+            self.reply(201, {"id": 11})
+        elif self.path.endswith("/notes"):
             if GitLab.fail_notes:
                 self.reply(500, {"message": "500 boom"})
                 return
@@ -167,6 +227,11 @@ class ReviewDecideShTest(unittest.TestCase):
         os.makedirs(self.state)
         GitLab.posted = []
         GitLab.fail_notes = False
+        GitLab.fail_reply = False
+        GitLab.fail_resolve = False
+        GitLab.fail_resolve_ids = set()
+        GitLab.discussions = {"d1": False}
+        GitLab.fetches = 0
         server = http.server.HTTPServer(("127.0.0.1", 0), GitLab)
         GitLab.port = server.server_address[1]
         threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -193,14 +258,33 @@ class ReviewDecideShTest(unittest.TestCase):
         os.chmod(self.stub, os.stat(self.stub).st_mode | stat.S_IXUSR)
         self.log = os.path.join(self.work, "stub.log")
 
-    def decide(self, *args: str, shell: str | None = None) -> subprocess.CompletedProcess:
+    def decide(
+        self, *args: str, shell: str | None = None, **extra: str
+    ) -> subprocess.CompletedProcess:
         shell = shell or SHELL
         assert shell is not None
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         # gh / glab を PATH から外し、curl とトークンの経路を通す
         tools = os.path.join(self.work, "bin")
         os.makedirs(tools, exist_ok=True)
-        for name in ("jq", "curl", "git", "sed", "cat", "rm", "dirname", "printf", "mkdir"):
+        for name in (
+            "jq",
+            "curl",
+            "git",
+            "sed",
+            "cat",
+            "rm",
+            "dirname",
+            "printf",
+            "mkdir",
+            "tr",
+            "mktemp",
+            "head",
+            "date",
+            "grep",
+            "wc",
+            "uname",
+        ):
             found = shutil.which(name)
             if found and not os.path.exists(os.path.join(tools, name)):
                 put_tool(found, os.path.join(tools, name))
@@ -209,8 +293,11 @@ class ReviewDecideShTest(unittest.TestCase):
             CCNAVI_BIN_PATH=self.stub,
             GITLAB_TOKEN=TOKEN,
             STUB_LOG=self.log,
+            STUB_PLAN="",
+            STUB_FAIL_YES="",
             PATH=tools + os.pathsep + os.path.dirname(shell),
         )
+        env.update(extra)
         script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-review.sh")
         command = [shell, script, "decide", *args]
         if WINDOWS:
@@ -247,11 +334,21 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertTrue(answer["ok"])
         self.assertTrue(answer["issue_url"].endswith("/issues/1"))
         self.assertEqual(answer["warning"], "")
+        # 置く前に、受け入れる指摘のスレッドへ返信を残して解決する
+        self.assertIn("--accept-plan", self.calls()[-2])
         self.assertIn('--yes {"u1":"issue"} --digest d0 --json', self.calls()[-1])
+        # 置く呼び出しは計画を読み、返信と解決のあとで取り直した結果を渡される
+        self.assertIn("--accept-done", self.calls()[-1])
+        self.assertEqual(GitLab.fetches, 2)
         kinds = [kind for kind, _ in GitLab.posted]
-        self.assertEqual(kinds, ["issue", "note"])
-        self.assertEqual(GitLab.posted[0][1]["title"], "issue の題")
-        note = GitLab.posted[1][1]["body"]
+        self.assertEqual(kinds, ["reply", "resolve", "issue", "note"])
+        reply, resolve = GitLab.posted[0][1], GitLab.posted[1][1]
+        self.assertTrue(reply["path"].endswith("/merge_requests/1/discussions/d1/notes"))
+        self.assertTrue(reply["body"].startswith("<!-- ccnavi:accept -->"))
+        self.assertTrue(resolve["path"].endswith("/merge_requests/1/discussions/d1"))
+        self.assertIs(resolve["resolved"], True)
+        self.assertEqual(GitLab.posted[2][1]["title"], "issue の題")
+        note = GitLab.posted[3][1]["body"]
         self.assertTrue(note.startswith("<!-- ccnavi:decide -->"))
         self.assertIn("issue に回した分: #1", note)
         self.assertEqual(os.listdir(self.state), [])
@@ -268,7 +365,99 @@ class ReviewDecideShTest(unittest.TestCase):
         done = self.decide("01", "--choices", '{"u1":"keep"}', "--digest", "d0")
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIn("--reviewed 1 ", self.calls()[-1])
-        self.assertEqual([kind for kind, _ in GitLab.posted], ["issue", "note"])
+        self.assertEqual([kind for kind, _ in GitLab.posted], ["reply", "resolve", "issue", "note"])
+
+    def test_a_failed_reply_stops_before_anything_is_placed(self):
+        GitLab.fail_reply = True
+        stopped = self.decide("1", "--choices", '{"u1":"issue"}', "--digest", "d0")
+        self.assertEqual(stopped.returncode, 1, stopped.stderr)
+        self.assertIn("受け入れを完了できない", stopped.stderr)
+        self.assertIn("返信を残せなかった", stopped.stderr)
+        # 置く呼び出し（--yes）は打たない。issue もコメントも作らない
+        self.assertNotIn(
+            "--yes", " ".join(call for call in self.calls() if "--accept-plan" not in call)
+        )
+        self.assertEqual(GitLab.posted, [])
+        self.assertEqual(os.listdir(self.state), [])
+
+    def test_a_failed_resolve_stops_before_anything_is_placed(self):
+        GitLab.fail_resolve = True
+        stopped = self.decide("1", "--choices", '{"u1":"keep"}', "--digest", "d0")
+        self.assertEqual(stopped.returncode, 1, stopped.stderr)
+        self.assertIn("解決できなかった", stopped.stderr)
+        self.assertEqual([kind for kind, _ in GitLab.posted], ["reply"])
+        self.assertTrue(all("--accept-plan" in call for call in self.calls()))
+        # 返信は書いたので、計画を残す
+        self.assertEqual(os.listdir(self.state), ["review-accept-i0001-1.json"])
+
+    def plan_file(self, *ids: str) -> str:
+        """実物の書き手（実行ファイルが使う `review_host.write_accept_plan`）で書いた計画。
+
+        sh と実行ファイルの契約を、両側が同じ書き手と同じ読み方で通ることで確かめる。
+        """
+        path = os.path.join(self.work, "plan-in.json")
+        items = [
+            (review_host.Thread(id=i, url=f"u/{i}"), review_host.accept_reply("テスト"))
+            for i in ids
+        ]
+        self.assertEqual(review_host.write_accept_plan(path, items, "d0"), "")
+        return path
+
+    def test_all_replies_come_before_any_resolve_and_a_partial_failure_stops(self):
+        """全部に返信してから解決する。途中で解決に失敗したら、置かずに止まり、計画を残す。"""
+        GitLab.discussions = {"d1": False, "d2": False}
+        GitLab.fail_resolve_ids = {"d2"}
+        stopped = self.decide(
+            "1",
+            "--choices",
+            '{"u1":"keep"}',
+            "--digest",
+            "d0",
+            STUB_PLAN=self.plan_file("d1", "d2"),
+            STUB_FAIL_YES="",
+        )
+        self.assertEqual(stopped.returncode, 1, stopped.stderr)
+        self.assertEqual([k for k, _ in GitLab.posted], ["reply", "reply", "resolve"])
+        self.assertIn("先に解決した分は残る", stopped.stderr)
+        self.assertNotIn("--accept-done", " ".join(self.calls()))
+        # ホストに書いたので、計画は残す（打ち直すと d1 は見せる指摘から外れる）
+        self.assertIn("計画を残した", stopped.stderr)
+        self.assertEqual(os.listdir(self.state), ["review-accept-i0001-1.json"])
+
+    def test_nothing_is_written_when_the_plan_does_not_match_the_fetched_result(self):
+        """計画の id が結果に無い、または API の経路に使えない字なら、ホストに書かない。"""
+        for ident in ("abcdef", "d1/../x", "ZZ"):
+            with self.subTest(ident=ident):
+                GitLab.posted.clear()
+                stopped = self.decide(
+                    "1",
+                    "--choices",
+                    '{"u1":"keep"}',
+                    "--digest",
+                    "d0",
+                    STUB_PLAN=self.plan_file(ident),
+                )
+                self.assertEqual(stopped.returncode, 1, stopped.stderr)
+                self.assertEqual(GitLab.posted, [])
+                self.assertIn("ホストには何も書いていない", stopped.stderr)
+
+    def test_a_plan_written_by_the_real_writer_is_read_by_the_sh(self):
+        done = self.decide(
+            "1", "--choices", '{"u1":"keep"}', "--digest", "d0", STUB_PLAN=self.plan_file("d1")
+        )
+        self.assertEqual(done.returncode, 0, done.stderr)
+        reply = GitLab.posted[0][1]
+        self.assertTrue(reply["body"].startswith(review_host.MARKER_ACCEPT))
+        self.assertEqual(GitLab.discussions, {"d1": True})
+        # 置けて終わったら計画は消える
+        self.assertEqual(os.listdir(self.state), [])
+
+    def test_a_failed_placement_after_the_host_was_written_keeps_the_plan(self):
+        failed = self.decide("1", "--choices", '{"u1":"keep"}', "--digest", "d0", STUB_FAIL_YES="1")
+        self.assertEqual(failed.returncode, 1, failed.stderr)
+        self.assertEqual([k for k, _ in GitLab.posted], ["reply", "resolve"])
+        self.assertIn("置けなかった", failed.stderr)
+        self.assertEqual(os.listdir(self.state), ["review-accept-i0001-1.json"])
 
     def test_wrong_arguments_are_refused_before_anything_runs(self):
         for args in (

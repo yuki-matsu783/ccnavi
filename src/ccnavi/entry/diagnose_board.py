@@ -713,6 +713,5 @@ def _parent_record(
         "closed_record": approval_marks.read_parent_mark(
             where, parent.ticket, approval_marks.PARENT_MARK_CLOSED
         ),
-        "accepted_threads": sorted(approval_marks.accepted_threads(where, parent.ticket)),
         "phases": [_phase_record(ph) for ph in phase.phases_of(root, conf, parent.ticket, raw=raw)],
     }
