@@ -199,7 +199,7 @@ ccnavi_host_encoded_path() {
 # クエリの値に入れる文字列（ブランチ名など）をパーセントエンコードして出す。
 # 日本語を生で URL に入れると、ホストが HTML のエラーを返して JSON として読めない。
 ccnavi_host_encode() {
-	printf '%s' "$1" | "$ccnavi_h_jq" -Rr '@uri'
+	printf '%s' "$1" | "$ccnavi_h_jq" -Rr '@uri' | tr -d '\r'
 }
 
 ccnavi_host_project_id() {

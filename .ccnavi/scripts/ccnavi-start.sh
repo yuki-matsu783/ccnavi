@@ -417,7 +417,7 @@ stop_host() {
 			;;
 		merged)
 			printf '  1. mcp__github__list_pull_requests を owner=%s repo=%s head=%s:%s state=closed で呼び、マージ済み（merged_at がある）の PR が無いことを確かめる\n' "$sh_owner" "$sh_repo" "$sh_owner" "$stop_branch"
-			printf '     mcp__github__* がセッションに無いときは gh で代行する: gh api repos/%s/%s/pulls -f state=closed -f head=%s:%s（-f なら gh が値をエンコードする）\n' "$sh_owner" "$sh_repo" "$sh_owner" "$stop_branch"
+			printf '     mcp__github__* がセッションに無いときは gh で代行する: gh api -X GET repos/%s/%s/pulls -f state=closed -f per_page=100 -f head=%s:%s（-X GET を付ける。-f だけだと POST になる。-f なら gh が値をエンコードする）\n' "$sh_owner" "$sh_repo" "$sh_owner" "$stop_branch"
 			printf '  2. あれば、マージ済みのブランチは再利用できない。ユーザに伝えて止める\n'
 			printf '  3. 無いと確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
 			;;
