@@ -14,7 +14,7 @@ function course(id: string, extra: Record<string, unknown> = {}): Record<string,
   return { id, title: "題", summary: "説明", steps: [STEP], ...extra };
 }
 
-test("CB-T402 案内の定義は screen と courses を持ち、先頭の案内は intro。段の scene は文字列・数・真偽だけ", () => {
+test("CB-T402 案内の定義は screen と courses を持ち、先頭の案内は intro。手順の scene は文字列・数・真偽だけ", () => {
   const ok = parseTour({ screen: "x", sample: { any: 1 }, courses: [course(INTRO_ID, { steps: [{ ...STEP, scene: { tab: "a", n: 2, on: true } }] }), course("use-case")] });
   assert.ok(ok.ok);
   assert.equal(ok.ok && ok.value.courses[0].steps[0].scene.tab, "a");
@@ -29,7 +29,7 @@ test("CB-T402 案内の定義は screen と courses を持ち、先頭の案内�
     ["id の形", { screen: "x", courses: [course(INTRO_ID), course("A_b")] }, /\.id は/],
     ["steps が空", { screen: "x", courses: [course(INTRO_ID, { steps: [] })] }, /steps が空/],
     ["body がありません", { screen: "x", courses: [course(INTRO_ID, { steps: [{ target: "a", title: "t" }] })] }, /courses\[0\]\.steps\[0\] の title と body/],
-    ["段の鍵の綴り違い", { screen: "x", courses: [course(INTRO_ID, { steps: [{ ...STEP, targt: "a" }] })] }, /知らない鍵 targt/],
+    ["手順の鍵の綴り違い", { screen: "x", courses: [course(INTRO_ID, { steps: [{ ...STEP, targt: "a" }] })] }, /知らない鍵 targt/],
     ["案内の鍵の綴り違い", { screen: "x", courses: [course(INTRO_ID, { sumary: "a" })] }, /知らない鍵 sumary/],
     ["指す先に引用符", { screen: "x", courses: [course(INTRO_ID, { steps: [{ ...STEP, target: 'a"b' }] })] }, /\.target は/],
     ["scene の値", { screen: "x", courses: [course(INTRO_ID, { steps: [{ ...STEP, scene: { open: ["a"] } }] })] }, /scene\.open/],
@@ -41,7 +41,7 @@ test("CB-T402 案内の定義は screen と courses を持ち、先頭の案内�
   }
 });
 
-test("CB-T403 案内の YAML は、ファイル名の画面を指し、どれも先頭が基本の案内で、各案内に 1 段以上ある", () => {
+test("CB-T403 案内の YAML は、ファイル名の画面を指し、どれも先頭が基本の案内で、各案内に 1 手順以上ある", () => {
   const screens = tourScreens();
   assert.ok(screens.length >= 1, "案内の YAML が 1 本もありません");
   for (const screen of screens) {

@@ -4,10 +4,10 @@
  */
 .workflow-graphs .plan-graph-canvas { height: 360px; }
 .workflow-ticket { overflow-wrap: anywhere; }
-.workflow-notes { margin: 6px 0; padding-left: 18px; font-size: .9em; }
+.workflow-notes { margin: 6px 0; padding-left: 18px; font-size: var(--font-md); }
 .workflow-notes li { overflow-wrap: anywhere; }
 /* 外で変わったときの差分。前と後を並べる */
-.workflow-diff { border-collapse: collapse; margin: 6px 0; font-size: .9em; width: 100%; }
+.workflow-diff { border-collapse: collapse; margin: 6px 0; font-size: var(--font-md); width: 100%; }
 .workflow-diff th, .workflow-diff td { border: 1px solid var(--vscode-panel-border); padding: 2px 6px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
 .workflow-diff th { color: var(--vscode-descriptionForeground); font-weight: 600; }
 .banner .workflow-banner-text { flex: 1 1 var(--w-grow); }

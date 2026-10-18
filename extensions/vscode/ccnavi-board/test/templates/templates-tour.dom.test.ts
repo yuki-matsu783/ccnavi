@@ -24,7 +24,7 @@ async function next(dom: DomPage): Promise<void> {
   await dom.settle();
 }
 
-/** 案内を始めて、n 段目（0 始まり）まで進める */
+/** 案内を始めて、n 番目の手順（0 始まり）まで進める */
 async function goto(dom: DomPage, id: string, index: number): Promise<void> {
   await startCourse(dom, id);
   for (let i = 0; i < index; i += 1) {
@@ -53,14 +53,14 @@ test("CB-D332 テンプレート管理画面に「?」があり、初回の依�
   }
 });
 
-test("CB-D333 全案内の全段で、指す先が画面に 1 つあり、吹き出しが中ほどへ逃げない。案内の間は操作を送らない", async () => {
+test("CB-D333 全案内の全手順で、指す先が画面に 1 つあり、吹き出しが中ほどに出ない。案内の間は操作を送らない", async () => {
   for (const course of def.courses) {
     const dom = await openTemplates();
     try {
       await startCourse(dom, course.id);
       for (const [index, step] of course.steps.entries()) {
         await dom.settle();
-        const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
+        const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
         assert.equal(dom.all(`[data-tour="${step.target}"]`).length, 1, `${at}: 指す先 ${step.target} が画面に 1 つではない`);
         assert.equal(dom.all(".tour-bubble.center").length, 0, `${at}: 吹き出しが中ほどに出た（指す先がありません）`);
@@ -68,7 +68,7 @@ test("CB-D333 全案内の全段で、指す先が画面に 1 つあり、吹き
         dom.click(dom.one('[data-action="tour-next"]'));
       }
       await dom.settle();
-      assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の段で閉じない`);
+      assert.equal(dom.all(".tour").length, 0, `${course.id}: 最後の手順で閉じない`);
     } finally {
       await dom.close();
     }
@@ -118,18 +118,18 @@ test("CB-D359 案内の間は見本を描き、実際のテンプレートは出
   }
 });
 
-test("CB-D360 段の scene が画面の様子を替える（テンプレートを開く・本文・統合結果の枠）。scene は次の段へ引き継がない", async () => {
+test("CB-D360 手順の scene が画面の様子を替える（テンプレートを開く・本文・統合結果の枠）。scene は次の手順へ引き継がない", async () => {
   const dom = await openTemplates();
   try {
-    // intro の 4 段目（0 始まりで 3）: 見本の feature を開き、本文を出す
+    // intro の 4 番目の手順（0 始まりで 3）: 見本の feature を開き、本文を出す
     await goto(dom, "intro", 3);
     assert.equal(dom.all("li.template.open").length, 1);
     assert.match(dom.one("pre.tpl-text").textContent ?? "", /name: feature/);
     assert.equal(dom.all("details#sum[open]").length, 0);
-    // 5 段目: 統合結果の枠を開く。開いたテンプレートは閉じる
+    // 5 番目の手順: 統合結果の枠を開く。開いたテンプレートは閉じる
     await next(dom);
     assert.equal(dom.all("details#sum[open]").length, 1);
-    assert.equal(dom.all("li.template.open").length, 0, "段をまたいで開いたままになった");
+    assert.equal(dom.all("li.template.open").length, 0, "手順をまたいで開いたままになった");
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
@@ -165,7 +165,7 @@ test("CB-D361 統合結果と取り込みの案内は、見本の統合結果を
       [],
     );
     await next(dom);
-    assert.equal(dom.all('[data-role="import-form"]').length, 0, "段をまたいで取り込みの欄が残った");
+    assert.equal(dom.all('[data-role="import-form"]').length, 0, "手順をまたいで取り込みの欄が残った");
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
     assert.equal(dom.all('[data-role="import-preview"]').length, 0);

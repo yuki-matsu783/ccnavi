@@ -323,7 +323,7 @@ function clickImport(dom: DomPage): void {
   dom.click(dom.one('[data-action="import-yes"]'));
 }
 
-test("CB-D347 案内の「取り込む…」は取り込める最初の 1 件（login）に付く。先頭の broken（取り込めない）には付かず、案内のプレビューの段は押せるボタンを指す", async () => {
+test("CB-D347 案内の「取り込む…」は取り込める最初の 1 件（login）に付く。先頭の broken（取り込めない）には付かず、案内のプレビューの手順は押せるボタンを指す", async () => {
   const dom = await openTemplates();
   try {
     const marks = dom.all('[data-tour="draft-import"]');

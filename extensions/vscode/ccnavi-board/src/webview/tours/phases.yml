@@ -5,7 +5,7 @@
 #   phases   見本の定義。phases.yml と同じ書き方（version と phases）
 #   added    「＋ 定義を追加」で足した定義の見本。phases と同じ書き方で、phases の外に置く（scene の add: filled で末尾に足す）
 #   project  プロジェクトの設定の見本（name・path・lock・phases）。scene の target: lib で切り替える
-# `scene:` は段ごとの画面の様子。段ごとに全部を書く（前の段を引き継がない）。
+# `scene:` は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。
 #   target   開いている設定。self（ワークスペース。既定）か lib（プロジェクト lib の見本）
 #   open     開く定義の id（, で区切って複数）。指す先 phase-* は、開いた最初の定義に付く。開いた定義が無ければ最初の定義に付く
 #   more     補足（agent / when）を開く定義の id（, で区切って複数）

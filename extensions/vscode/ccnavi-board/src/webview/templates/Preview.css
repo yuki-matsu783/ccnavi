@@ -1,7 +1,7 @@
 /*
  * 取り込みの下見（`Preview.tsx`）。差分と本文は等幅で、長い行は折り返す。差分の色は背景だけに付け、文字色は前景のまま。
  */
-.import-preview { margin: 0 0 10px; padding: 8px 10px; border: 1px solid var(--vscode-panel-border); border-radius: 4px; overflow-wrap: anywhere; }
+.import-preview { margin: 0 0 10px; padding: 8px 10px; border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-md); overflow-wrap: anywhere; }
 .import-preview > p { margin: 0 0 6px; }
 .import-preview > h3 { font-size: 1em; margin: 10px 0 4px; }
 .import-preview .tpl-problems { margin-bottom: 8px; }
@@ -9,15 +9,15 @@
 .import-preview pre.new-text {
   margin: 0 0 10px; padding: 6px 8px; max-height: 360px; overflow: auto;
   white-space: pre-wrap; overflow-wrap: anywhere;
-  border: 1px solid var(--vscode-panel-border); border-radius: 4px;
-  font-family: var(--vscode-editor-font-family); font-size: .92em;
+  border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-md);
+  font-family: var(--vscode-editor-font-family); font-size: var(--font-md);
   color: var(--vscode-foreground);
 }
 .import-preview .diff > div { color: var(--vscode-foreground); padding: 0 4px; }
 .import-preview .diff > .diff-hunk { font-weight: 600; }
 .import-preview .diff > .diff-add { background: var(--vscode-diffEditor-insertedTextBackground); }
 .import-preview .diff > .diff-del { background: var(--vscode-diffEditor-removedTextBackground); }
-.import-preview .import-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.import-preview .import-actions { display: flex; flex-wrap: wrap; gap: var(--gap-3); margin-top: 8px; }
 @media (max-width: 520px) {
   .import-preview { padding: 8px 14px; }
 }

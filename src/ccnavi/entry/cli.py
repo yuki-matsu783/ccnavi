@@ -702,7 +702,7 @@ def _parsed(
     # hook からの判定にも、チケットとレビューの副命令にも差し替えの手段を残すと、
     # 設定を保存せずに緩める経路になるので、そこでは無視する。
     # 診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を
-    # 指しても実運用に漏れない。
+    # 指しても実運用に影響しない。
     diagnosing = cli_args._diagnosing(args)
     if not diagnosing:
         cli_args._drop_outside_diagnosis(stderr, args)

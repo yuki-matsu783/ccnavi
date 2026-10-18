@@ -4,8 +4,8 @@
  * 流し込む。
  *
  * ここで見るのは 3 つ。骨組み（共通の部品 `extensions/shared/styles/page.css`）が 6 画面とも 1 か所から来ていること、
- * ハイコントラストのテーマ向けの書き方が残っていること、そして置いた CSS がバンドルから漏れて
- * いないこと（`@import` を書き忘れると、見た目だけが気づかないうちに抜ける）。
+ * ハイコントラストのテーマ向けの書き方が残っていること、そして置いた CSS がすべてバンドルに入って
+ * いること（`@import` を書き忘れると、見た目だけが知らないうちに欠ける）。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -23,6 +23,9 @@ import { page as rulesPage, rulesHtml } from "../helpers/rules.js";
 import { flowHtml, page as flowPage } from "../helpers/flow.js";
 import { workflowHtml, workflowPage } from "../helpers/workflow.js";
 import { page as templatesPage, templatesHtml } from "../helpers/templates.js";
+
+/** 6 画面が共有する骨組みの CSS（重なり順の値もここ） */
+const PAGE_CSS = path.join(WEBVIEW_SRC, "..", "..", "..", "..", "shared", "styles", "page.css");
 
 /** 画面の名前と、その 1 枚。中身は画面（React）が組み、CSS と body だけを拡張が入れる */
 function reactPages(appearance?: "claude-dark"): [string, string][] {
@@ -214,6 +217,56 @@ test("CB-T216 案内の ? は案内のある画面（プロジェクト管理画
     const style = flatStyle(`<style nonce="x">\n${screenStyle(name)}\n</style>`);
     assert.match(style, /\.toolbar > \.tour-button \{[^}]*position: absolute;[^}]*top: 8px;[^}]*right: 4px;[^}]*width: 22px;/, `${name} の ? が右上に固定されていない`);
     assert.match(style, /\.toolbar \{ padding-right: 34px; \}/, `${name} のツールバーが ? の幅を空けていない`);
+  }
+});
+
+test("CB-T582 図の枠の z-index は枠の内側だけで有効で、ツールバーから開く案内の一覧が拡大ボタンの下に隠れない", () => {
+  const css = fs.readFileSync(path.join(WEBVIEW_SRC, "shared", "Maximize.css"), "utf8");
+  assert.match(css, /\.graph-max \{[^}]*isolation: isolate;/, ".graph-max が isolation: isolate を持たない");
+  assert.match(fs.readFileSync(PAGE_CSS, "utf8"), /\.toolbar \{[^}]*z-index: var\(--z-toolbar\);/, "ツールバーが重なりの単位（z-index）を持たない");
+});
+
+test("CB-T583 z-index・角丸・文字サイズ・すき間は page.css の変数で書き、画面の CSS に数値を直書きしない。z-index の値の大小は決めたとおり", () => {
+  const page = fs.readFileSync(PAGE_CSS, "utf8");
+  const level = (name: string): number => Number(new RegExp(`--z-${name}: (\\d+);`).exec(page)?.[1] ?? Number.NaN);
+  // 画面全体で比べる値は下から foot < toolbar < overlay < graph-max < tour
+  const order = ["foot", "toolbar", "overlay", "graph-max", "tour"].map(level);
+  assert.ok(order.every((n, i) => !Number.isNaN(n) && (i === 0 || order[i - 1] < n)), `値の大小が崩れている: ${order.join(",")}`);
+  // 部品の中の値は、脚注より上、ツールバーより下（本文の一覧がスクロールでツールバーの上に出ないように）
+  assert.ok(level("inline") < level("foot") && level("foot") < level("popover") && level("popover") < level("toolbar"), "inline < foot < popover < toolbar が崩れている");
+  const files: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith(".css")) files.push(full);
+    }
+  };
+  walk(WEBVIEW_SRC);
+  walk(path.join(path.dirname(PAGE_CSS), "..", "..", "chrome", "ccnavi-approval", "src"));
+  // 画面と共通の部品（ボタン・一覧）。配色の変数だけを定める appearance.css と、値を定める page.css の :root は対象外
+  files.push(path.join(path.dirname(PAGE_CSS), "button.css"), path.join(path.dirname(PAGE_CSS), "list.css"), PAGE_CSS);
+  // 数値で書いてよいのは 0・1em（等倍）・px の文字（アイコンの大きさ）だけ
+  const raw: [RegExp, string][] = [
+    [/z-index:\s*-?\d/, "z-index（--z-*）"],
+    [/border-radius:[^;}]*(?:\b[1-9]\d*px|\d*\.\d+em)/, "border-radius（--radius-*）"],
+    [/font-size:\s*(?!1em\b)\d*\.?\d+em/, "font-size（--font-*）"],
+    [/(?<![\w-])(?:row-|column-)?gap:\s*[\d.]/, "gap（--gap-*）"],
+    [/box-shadow:\s*[^;]*rgba\(0, 0, 0, \.35\)/, "ポップアップの影（--shadow-popup）"],
+  ];
+  assert.ok(files.length > 50, `検査する CSS が少なすぎる（${files.length} 本）。置き場が動いて空振りしていないか`);
+  const defined = new Set([...page.matchAll(/(--(?:z|radius|font|gap|shadow)-[a-z0-9-]+):/g)].map((m) => m[1]));
+  for (const file of files) {
+    if (file.endsWith("appearance.css")) continue;
+    // 使っている変数は page.css の :root に定義がある（未定義だと値が無効になり、気づかないうちに既定の見た目に戻る）
+    for (const used of fs.readFileSync(file, "utf8").matchAll(/var\((--(?:z|radius|font|gap|shadow)-[a-z0-9-]+)/g)) {
+      assert.ok(defined.has(used[1]), `${path.basename(file)} が定義の無い ${used[1]} を使っている`);
+    }
+    let bare = fs.readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    if (file === PAGE_CSS) bare = bare.replace(/:root \{[^}]*\}/, "");
+    for (const [pattern, what] of raw) {
+      assert.doesNotMatch(bare, pattern, `${path.basename(file)} が ${what} を数値で直書きしている`);
+    }
   }
 });
 

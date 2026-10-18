@@ -16,7 +16,7 @@ keywords: [設計, 画面, approval-machine, 見た目, ScreenHost, screenHost, 
 
 ## 見た目
 
-実装は body のクラスの下でテーマ変数を上書きするだけ（配色は `src/webview/styles/appearance.css`、切り替えは `src/core/appearance.ts` と `src/webview/appearance.ts`。画面が受けるのは `src/webview/useHostMessages.ts`）。配色もほかの中身と同じ段取り（`ScreenHost`）で送る。組み上がっていない画面と捨てられた画面には送らない。保持しない画面には作り直されたあと `ready` で、保持する画面には表に戻ったところで送り直す。ハイコントラストのテーマでは Claude の配色を適用しない。設定を書く先は、いま値が定義されている場所（フォルダ → ワークスペース → ユーザ）。
+実装は body のクラスの下でテーマ変数を上書きするだけ（配色は `src/webview/styles/appearance.css`、切り替えは `src/core/appearance.ts` と `src/webview/appearance.ts`。画面が受けるのは `src/webview/useHostMessages.ts`）。配色もほかの中身と同じ段取り（`ScreenHost`）で送る。組み上がっていない画面と捨てられた画面には送らない。保持しない画面には作り直されたあと `ready` で、保持する画面には再表示されたところで送り直す。ハイコントラストのテーマでは Claude の配色を適用しない。設定を書く先は、いま値が定義されている場所（フォルダ → ワークスペース → ユーザ）。
 
 ## 機能や画面を足すとき
 
@@ -44,14 +44,14 @@ keywords: [設計, 画面, approval-machine, 見た目, ScreenHost, screenHost, 
 
 **段取りは 2 系統ある。パネルの `retainContextWhenHidden` と対で選ぶ**。
 
-| パネル | 作るもの | 裏に回ったとき |
+| パネル | 作るもの | 非表示になったとき |
 |---|---|---|
 | `retainContextWhenHidden: false`（ボード・プロジェクト管理） | `screenHost(surface, render)` | 画面は捨てられる。入れ物ごと入れ直す |
 | `retainContextWhenHidden: true`（ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集） | `retainedHost(surface, render)` | 画面は生きている。何もしない |
 
 返る形（`ScreenHost<D>`）と呼び方（`send` / `post` / `ready` / `hidden`）は同じ。取り違えても型では止まらない（保持する画面に `screenHost` を使うと打ちかけが消え、逆だと中身が古いまま更新されない）。保持する画面のパネルは、`ScreenHost` を返す関数（`rulesHost`・`riskHost`・`phasesHost`・`templatesHost`・`flowHost`・`workflowHost`）で `retainedHost` の形に合わせる。この関数は `panel.options.retainContextWhenHidden` を見て、偽なら診断ログに残す。
 
-保持する画面には、表に戻ったところで知らせ（`lock`・`changed`）と見た目を送り直す。裏の画面に届くかどうかについて、VS Code の型定義の記述が食い違っているため。中身（`data`）は送り直さない。
+保持する画面には、再表示されたところで知らせ（`lock`・`changed`）と見た目を送り直す。非表示の画面に届くかどうかについて、VS Code の型定義の記述が一致していない。中身（`data`）は送り直さない。
 
 保持する画面に中身（`data`）を渡すのは、画面の編集を捨ててよいときだけ（ユーザが「更新」を押した、保存や作成が通って中身が入れ替わった）。監視がファイルの変化に気づいても中身は渡さず、帯（`changed`）を出してユーザに決めてもらう。
 

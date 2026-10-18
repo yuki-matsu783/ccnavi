@@ -7,7 +7,7 @@
  * からはいつでも出せる。
  *
  * 指す先は選択子で持つ。見つからない（定義が無くて行が無い、など）ときは、吹き出しを画面の中ほどに
- * 出して文だけを見せる。段ごとの `before` は、指す先を出すための下ごしらえ（一覧と図の切り替え、
+ * 出して文だけを見せる。手順ごとの `before` は、指す先を出すための下ごしらえ（一覧と図の切り替え、
  * 行を開く）。下ごしらえで描き直しが起きるので、測るのは次の刻みまで待つ。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from "react";
@@ -30,7 +30,7 @@ export interface TourStep {
  * 「?」を押すと一覧（`TourButton` のメニュー）が出て、選んだ 1 本だけが始まる。
  *
  * 案内の間、画面は今の設定ではなく案内用の見本（`core/tour-*.ts`）を描く。見本は画面の `useMemo` などで作り、
- * 段の `before` が見本の上の様子（行を開く、点を選ぶ、タブを替える）を動かす。今の設定の編集中の内容には触れない。
+ * 手順の `before` が見本の上の様子（行を開く、点を選ぶ、タブを替える）を動かす。今の設定の編集中の内容には触れない。
  */
 export interface TourCourse {
   /** 案内の鍵。画面の中で一意。テストと `data-course` に使う */
@@ -45,13 +45,13 @@ export interface TourCourse {
 /** 基本の案内の鍵。初回に自動で出る案内で、メニューの先頭に出る */
 export const INTRO_COURSE = INTRO_ID;
 
-/** 指す先の印の選択子。`target` が空の段は、どこにも当たらない選択子にして吹き出しを中ほどに出す */
+/** 指す先の印の選択子。`target` が空の手順は、どこにも一致しない選択子にして吹き出しを中ほどに出す */
 export function targetSelector(target: string): string {
   return target === "" ? "[data-tour-none]" : `[data-tour="${target}"]`;
 }
 
 /**
- * 定義（YAML）から案内の一覧を作る。段の下ごしらえは、その段の `scene` を画面の `apply` に渡すこと。
+ * 定義（YAML）から案内の一覧を作る。手順の下ごしらえは、その手順の `scene` を画面の `apply` に渡すこと。
  * 画面は `apply` で「見本の上の様子」（開く行・タブ・選ぶ点）を state に入れ、見本を描く。
  */
 export function coursesOf(def: TourDef, apply: (scene: Scene) => void): readonly TourCourse[] {
@@ -269,7 +269,7 @@ export function useTour(ready: boolean, hooks: { readonly onStart?: (course: str
 
   // 案内の最中に指す先が消えた（読み直せずエラーになった、別の対象へ切り替わって読み込み中になった、
   // 承認のオーバーレイが出た）。吹き出しは描かれなくなるので、ここで閉じたことにする。閉じずに残すと、
-  // 中身が戻ったときにユーザが始めていない案内が 1 段目から出直す
+  // 中身が戻ったときにユーザが始めていない案内が 1 番目の手順から出直す
   useEffect(() => {
     if (course !== undefined && !ready) {
       courseRef.current = undefined;
@@ -305,12 +305,12 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
   const bubble = useRef<HTMLDivElement>(null);
   const next = useRef<HTMLButtonElement>(null);
   const step = steps[index];
-  // 段の中身は呼ぶ側が描くたびに作り直すので、下ごしらえは段の番号が変わったときだけ走らせる
+  // 手順の中身は呼ぶ側が描くたびに作り直すので、下ごしらえは手順の番号が変わったときだけ走らせる
   const current = useRef(step);
   current.current = step;
 
-  // 段が変わったら下ごしらえをして、次の刻みで指す先を測る。画面の大きさが変わったときと、
-  // 裏の文書が動いたとき（覆いの上のホイール、帯が出てずれた）にも測り直す
+  // 手順が変わったら下ごしらえをして、次の刻みで指す先を測る。画面の大きさが変わったときと、
+  // 背後の文書が動いたとき（覆いの上のホイール、帯が出てずれた）にも測り直す
   useLayoutEffect(() => {
     const step = current.current;
     setMeasured(false);
@@ -330,7 +330,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
       if (el === null) {
         setSpot(undefined);
       } else {
-        // 段に入って最初の 1 回だけ、指す先を見える場所へ動かす（測り直しのたびに動かすと、ユーザのスクロールを邪魔する）
+        // 手順に入って最初の 1 回だけ、指す先を見える場所へ動かす（測り直しのたびに動かすと、ユーザのスクロールを邪魔する）
         if (!scrolled) {
           scrolled = true;
           // 画面より高い要素（長い一覧）は頭を見せる。中ほどに置くと、何を指しているのかが見えない
@@ -373,14 +373,14 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
   }, [index, measured]);
   useEffect(() => () => focusBefore?.focus?.(), [focusBefore]);
 
-  // Esc でやめる。→ で次へ、← で前へ（端の段ではどちらも何もしない。→ で最後の段を閉じると、読み終える前に消えてしまう）。
-  // Tab は吹き出しのボタンの中だけを巡る（裏の画面の「保存」などへ焦点を移さない）
+  // Esc でやめる。→ で次へ、← で前へ（端の手順ではどちらも何もしない。→ で最後の手順を閉じると、読み終える前に消えてしまう）。
+  // Tab は吹き出しのボタンの中だけを巡る（覆いの背後の画面の「保存」などへ焦点を移さない）
   const count = steps.length;
   useEscape(true, ESCAPE_LAYER.tour, onClose);
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if ((event.key === "ArrowRight" || event.key === "ArrowLeft") && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
-        // 既定の動き（裏の画面の横スクロール）を止める
+        // 既定の動き（覆いの背後の画面の横スクロール）を止める
         event.preventDefault();
         event.stopPropagation();
         const step = event.key === "ArrowRight" ? 1 : -1;

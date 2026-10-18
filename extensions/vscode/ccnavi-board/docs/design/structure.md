@@ -66,11 +66,11 @@ src/
     flow-history.ts   フロー編集の元に戻す・やり直すの履歴（直す前の中身の複製を積む。同じ欄への打ち込みをまとめる。上限 100）
     flow-diff.ts      読み込んだフローと編集中のフローの見比べ（未保存の判定と、保存前に見せる足した・消した・変えたノードと線）。下書きの取り込みの前に見せる、値の前後まで並べた差分（textDiff）
     tour-place.ts     吹き出しの案内の置き場所（画面の外に出さない）。DOM に触れないので単体で試せる
-    tour-def.ts       案内の定義（YAML）の形 TourDef と検査 parseTour（画面ごとの screen / sample / courses。段は target・題・本文・scene）。見本の目印の文 SAMPLE_NOTE もここ。DOM に触れないので単体で試せる
+    tour-def.ts       案内の定義（YAML）の形 TourDef と検査 parseTour（画面ごとの screen / sample / courses。手順は target・題・本文・scene）。見本の目印の文 SAMPLE_NOTE もここ。DOM に触れないので単体で試せる
     tour-rules.ts     ルール管理の案内の見本（tours/rules.yml の sample:）を RuleForm と実行ファイルの JSON の形にする。rules.yml と同じ書き方のルールを読む小さな読み取り（実際の readRules と同じ結果になることをテストが見る）
     tour-board.ts     ボード画面の案内の見本（tours/board.yml の sample:）を parseBoardJson / buildBoard と承認・残った指摘の読み取りに通して、画面が描く形にする。実行ファイルの JSON と同じ形で書く
     tour-risk.ts      リスク管理の案内の見本（tours/risk.yml の sample:）を、risks.yml と同じ書き方から RiskPage（配点あり・ファイル無し・統合結果）にする小さな読み取り。yaml を持たず、readRisk と同じ結果になることをテストが見る
-    tour-flow.ts      フロー編集の案内の見本（tours/flow.yml の sample）を FlowDoc と FlowChecks にし、段ごとの scene を読む。yaml を持たず、実際の読み取り・実行ファイルとの一致はテストが見る
+    tour-flow.ts      フロー編集の案内の見本（tours/flow.yml の sample）を FlowDoc と FlowChecks にし、手順ごとの scene を読む。yaml を持たず、実際の読み取り・実行ファイルとの一致はテストで検査する
     tour-workflow.ts  計画編集の案内の見本（名前付きの --plan-order の答え）を parsePlanOrder に通して、画面が描く形にする
     tour-templates.ts テンプレート管理の案内の見本（tours/templates.yml の sample:）を、小さい書き方から TemplatesPage（自身の層のテンプレート・下書き・統合結果）と本文・下見の見本にする小さな読み取り。判定はせず、見本に書いた値をそのまま使う
     tour-phases.ts    フェーズ管理の案内の見本（tours/phases.yml の sample:）を、phases.yml と同じ書き方から PhasesPage にする小さな読み取り。yaml を持たず、readPhases と同じ結果になることをテストが見る
@@ -94,13 +94,14 @@ src/
     appearance.ts     見た目の切り替え（body のクラスの書き換え）。8 画面で 1 本
     useHostMessages.ts 拡張ホストからのメッセージの受信（見た目はここで受ける）と、組み上がったときの ready。8 画面で 1 本
     useEscape.ts      Esc で閉じる面の入口。重なっているときは最も手前の面（ESCAPE_LAYER。CSS の z-index と同じ順）だけが受ける
-    tours/<画面>.yml   案内の定義（sample: 案内の間だけ描く見本、courses: 基本の案内と使い方ごとの案内。段は target=data-tour の値・題・本文・scene）。ビルドのとき esbuild のプラグインが JSON にしてバンドルへ入れる（画面に YAML の解析器は入らない）。ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集・プロジェクト管理の 8 画面（プロジェクト管理は sample: を持たない）。list.css の `.field` / `.sum` は `display: contents` で箱を持たないので、指す先がそれでも `Tour.tsx` の `boxOf` が子の枠を合わせて光らせる
-    Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。案内のある 8 画面で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。ツールバーは ScreenHeader が組み、? を最後の子に置くのでどの画面も同じ位置）で案内の一覧を開き、選んだ 1 本が出る（coursesOf が YAML の定義から案内の一覧を作る）
+    tours/<画面>.yml   案内の定義（sample: 案内の間だけ描く見本、courses: 基本の案内と使い方ごとの案内。手順は target=data-tour の値・題・本文・scene）。ビルドのとき esbuild のプラグインが JSON にしてバンドルへ入れる（画面に YAML の解析器は入らない）。ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集・プロジェクト管理の 8 画面（プロジェクト管理は sample: を持たない）。list.css の `.field` / `.sum` は `display: contents` で箱を持たないので、指す先がそれでも `Tour.tsx` の `boxOf` が子の枠を合わせて強調する
+    Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。案内のある 8 画面で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。ツールバーは ScreenHeader が組み、? を最後の子に置くのでどの画面も同じ位置）で案内の一覧を開き、選んだ 1 本が出る（coursesOf が YAML の定義から案内の一覧を作る）。画面全体を覆う `role="dialog"` は Dialog.tsx を使わず、指す先の枠の影で暗くする作りを別に持つ
     TargetSelect.tsx  ルール管理・フェーズ管理・テンプレート管理の、設定の対象を切り替える欄
     workflow/tour-marks.ts 案内の間だけ、計画の図の中の項・線に data-tour の印を付ける（共通の図の部品 shared/PlanGraph.tsx には口が無いため）
     flow/post.ts の muteForTour は、案内の間に tourDone 以外を拡張ホストへ送らない。board/post.ts の mutePosts も同じ
     Tour.css          Tour.tsx の CSS（吹き出しの案内と見本の帯）。各画面の style.css が @import する
     styles/appearance.css Claude の配色（body のクラスの下でテーマ変数を上書きする）。共通の骨組み（page.css）・ボタン（button.css）・設定 3 画面の一覧（list.css）は Chrome 拡張と共有する extensions/shared/styles/ にあり、画面の style.css が button.css（@ccnavi/shared/styles/）・appearance.css（この置き場）・page.css（@ccnavi/shared/styles/）の順に @import する。欄の幅の名前（--w-field・--w-field-wide・--w-grow）は page.css の :root にあり、画面の CSS は 320px・360px を直書きせずそれを参照する（CB-T439 が検査する）
+    （CSS の値）重なり順（--z-*）・角丸（--radius-*）・文字サイズ（--font-*）・すき間（--gap-*）・影（--shadow-popup）は page.css の :root で定め、画面の CSS には数値を直書きしない。直書きは test/shared/style.test.ts の CB-T583 が見つける（Chrome 拡張の CSS も対象。見つけるのは z-index・px の角丸・em の文字サイズ・gap の数値・影の rgba で、`font:` の省略形、rem、TSX のインライン style は見ない）
     board/style.css   ボード画面の CSS の入口。部品の CSS を @import で並べるだけ（計画の図のために React Flow の CSS と shared/PlanGraph.css も読む）
     board/App.css     App.tsx の CSS（列・取っ手・畳んだ列）
     board/Card.css    Card.tsx の CSS（カード 1 枚）
@@ -180,6 +181,10 @@ src/
     workflow/main.tsx 計画編集タブの入口。埋め込みの JSON を読んでマウントする
     workflow/App.tsx  無くなった・外で変わったの帯と差分・ツールバー（並べ直す・案に戻す・再読込・この順序に決める・?）・番号の変わる項・理由の一覧・計画ごとの図・初回の案内と、拡張ホストからのメッセージの受け
     workflow/Review.tsx 保存の前の確かめ（番号の変わる項・付け替える子の提案・計画と食い違う子）
+    shared/Dialog.tsx  画面を覆うオーバーレイの部品（背景と本体と操作の列）。承認・保存前の確かめ・エージェントの提案の確認が使う。幅は旧クラス側の `--overlay-w` で決める
+    shared/Dialog.css  Dialog.tsx の CSS（背景・本体・見出し・操作の列）
+    shared/Maximize.tsx 図を全画面で出す部品（useMaximize・MaximizeButton・RefitOnChange）
+    shared/Maximize.css Maximize.tsx の CSS。図の枠は isolation で内側の z-index を外へ及ぼさない
     shared/PlanGraph.css PlanGraph.tsx の CSS（図・点・仮の線・注意の色。React Flow の色を --vscode-* に置き換える）
     flow/Inspector.tsx 右の欄（ノード・線・フローの中身）
     flow/SaveReview.tsx 保存前の差分の一覧（保存する・やめる・次から確かめない）

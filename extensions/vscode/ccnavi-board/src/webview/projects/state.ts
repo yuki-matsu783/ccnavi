@@ -1,7 +1,7 @@
 /**
  * 画面が覚えておくもの。clone の欄に打ちかけた URL と名前、名前をユーザが触ったか。
  *
- * 置き場は Webview の state で、拡張が HTML を作り直しても（裏に回って作り直されても）残る。
+ * 置き場は Webview の state で、拡張が HTML を作り直しても（非表示になって作り直されても）残る。
  */
 import { getState, setState } from "../vscode.js";
 

@@ -865,7 +865,7 @@ class SubstRepoRulesTest(unittest.TestCase):
         self.assertEqual(len(set(responses.values())), 3, "理由の違う縮退に同じ文面を返した")
 
     def test_シェルで読みが割れる形は一律に止める(self):
-        # `coproc` は敵対的レビューで見つかった予約語の漏れ（shellread-subst-04）で、
+        # `coproc` は、敵対的レビューで一覧に無いと分かった予約語（shellread-subst-04）で、
         # NAME の読みが bash 4 と zsh で分かれる。読み分けずに止める。
         code = "DENY_AMBIGUOUS_FORM"
         self.check(

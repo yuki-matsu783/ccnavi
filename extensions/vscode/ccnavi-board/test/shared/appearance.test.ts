@@ -147,7 +147,7 @@ test("CB-T182 見た目は画面に中身を渡す段取りを通る。組み上
   assert.equal(sendAppearance(host, "claude-dark"), true);
   assert.deepEqual(spy.posted, [{ type: "appearance", value: "claude-dark" }]);
 
-  // 裏へ。画面は捨てられているので送らない。表に戻すと入れ物から作り直され、
+  // 非表示にする。画面は捨てられているので送らない。再表示すると入れ物から作り直され、
   // 組み上がった（`ready`）ところで呼ぶ側が送り直す
   spy.visible = false;
   host.hidden();
@@ -155,7 +155,7 @@ test("CB-T182 見た目は画面に中身を渡す段取りを通る。組み上
   assert.deepEqual(spy.posted, [{ type: "appearance", value: "claude-dark" }]);
 });
 
-test("CB-T182b 保持する画面は裏でも送る。1 枚目を読み込んでいる間だけ送れない", () => {
+test("CB-T182b 保持する画面は非表示でも送る。1 枚目を読み込んでいる間だけ送れない", () => {
   const spy = surface();
   const host = retainedHost<string>(spy, (data) => data);
 
@@ -165,8 +165,8 @@ test("CB-T182b 保持する画面は裏でも送る。1 枚目を読み込んで
   host.ready();
   assert.equal(sendAppearance(host, "claude-light"), true);
 
-  // 保持する画面は裏に回っても捨てられない。表裏を見ないので送れる
-  // （届くかどうかは VS Code 次第なので、表に戻ったところで呼ぶ側が送り直す）
+  // 保持する画面は非表示になっても捨てられない。表示の有無を見ないので送れる
+  // （届くかどうかは VS Code 次第なので、再表示されたところで呼ぶ側が送り直す）
   host.hidden();
   assert.equal(sendAppearance(host, "vscode"), true);
   assert.deepEqual(spy.posted, [
@@ -197,14 +197,14 @@ function source(name: string): string {
     .replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
-/** 保持しない画面（表に戻ると作り直される）と、保持する画面（作り直されない） */
+/** 保持しない画面（再表示されると作り直される）と、保持する画面（作り直されない） */
 const REBUILT_PANELS = ["board-panel.ts", "projects-panel.ts"];
 const RETAINED_PANELS = ["rules-panel.ts", "risk-panel.ts", "phases-panel.ts", "templates-panel.ts", "flow-panel.ts", "workflow-panel.ts"];
 
 test("CB-T183 見た目は段取りを通る。直に postMessage を呼ぶ道と、自前の送り直しを持たない", () => {
   const follow = source("appearance.ts");
   assert.doesNotMatch(follow, /webview\s*\.\s*postMessage/, "見た目が段取り（ScreenHost）を迂回している");
-  assert.doesNotMatch(follow, /onDidChangeViewState/, "表に戻ったときの送り直しを 2 か所で持っている");
+  assert.doesNotMatch(follow, /onDidChangeViewState/, "再表示されたときの送り直しを 2 か所で持っている");
   assert.match(follow, /export function followAppearance\(panel: vscode\.WebviewPanel, host: AppearanceSink\)/);
 });
 
@@ -217,12 +217,12 @@ test("CB-T183b 8 画面とも段取りに繋ぎ、組み上がったところで
   }
 });
 
-test("CB-T183c 保持する画面は、表に戻ったところでも送り直す（作り直されないので ready が来ない）", () => {
+test("CB-T183c 保持する画面は、再表示されたところでも送り直す（作り直されないので ready が来ない）", () => {
   for (const name of RETAINED_PANELS) {
     const text = source(name);
     const found = /panel\.onDidChangeViewState\(\(\) => \{([\s\S]*?)\n  \}\);/.exec(text);
-    assert.ok(found !== null, `${name} に表に戻ったときの送り直しがありません`);
-    assert.match(found[1], /postAppearance\(current\.host\)/, `${name} が表に戻っても見た目を送り直していない`);
+    assert.ok(found !== null, `${name} に再表示されたときの送り直しがありません`);
+    assert.match(found[1], /postAppearance\(current\.host\)/, `${name} が再表示されても見た目を送り直していない`);
   }
   for (const name of REBUILT_PANELS) {
     // 保持しない画面は作り直されるので、ここで送ると「捨てられた画面へ送る」になる

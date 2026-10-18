@@ -127,7 +127,7 @@ def assertGotPastTheRoot(case, result):
     """根の導出より先へ進んだこと。
 
     確かめられないまま合格するのを防ぐ。根の導出が誤っていると、スクリプトは実行ファイルを
-    プロジェクトの中に探して失敗する。その手前で終わった実行を「漏れなかった」
+    プロジェクトの中に探して失敗する。その手前で終わった実行を「外に出なかった」
     「作らなかった」と数えると、テストの結果が実際と食い違う。
     """
     blob = (result.stdout or "") + (result.stderr or "")
@@ -249,7 +249,7 @@ class WorkspaceTest(unittest.TestCase):
     def assertNoLogsIn(self, absolute):
         found = [n for n in files_under(os.path.join(absolute, "logs")) if n.endswith(".log")]
         self.assertEqual(
-            [], found, f"{absolute}/logs に記録が出ている（ワークスペースの外に漏れた）"
+            [], found, f"{absolute}/logs に記録が出ている（ワークスペースの外に出ている）"
         )
 
 
@@ -409,7 +409,7 @@ class CredentialTest(WorkspaceTest):
 
         「消えているつもりで残っている」形は、パスを見比べると見落とす。
         origin を読む処理まで届いたことも確かめる。届く前に失敗した実行を
-        「漏れなかった」と数えると、穴が開いたままテストが通る。
+        「外に出なかった」と数えると、検査の漏れが残ったままテストが通る。
         """
         assertGotPastTheRoot(self, result)
         blob = (result.stdout or "") + (result.stderr or "")

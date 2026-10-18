@@ -1,0 +1,20 @@
+/*
+ * 画面を覆う背景と、その上の本体（`Dialog.tsx`）。承認・保存前の確かめ・エージェントの提案の確認が共通で使う。
+ * 幅は各画面の旧クラス（`.approval` など）が `--overlay-w` で決める。インラインの style は CSP で拒否されるので使わない。
+ */
+.overlay-backdrop {
+  position: fixed; inset: 0; z-index: var(--z-overlay);
+  background: color-mix(in srgb, var(--vscode-editor-background) 70%, transparent);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.overlay {
+  width: min(var(--overlay-w, 640px), 100%); max-height: 100%; overflow: auto; box-sizing: border-box;
+  padding: 14px 16px; border-radius: var(--radius-lg);
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
+  box-shadow: var(--shadow-popup);
+}
+.overlay h2 { margin: 0 0 6px; font-size: var(--font-title); }
+.overlay h3 { margin: 10px 0 4px; font-size: var(--font-lg); color: var(--vscode-descriptionForeground); }
+.overlay-actions { display: flex; flex-wrap: wrap; gap: var(--gap-4); margin-top: 12px; justify-content: flex-end; }
+.overlay-actions button.action { margin-left: 0; }

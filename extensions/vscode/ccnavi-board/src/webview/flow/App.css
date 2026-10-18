@@ -4,7 +4,7 @@
 .flow-body {
   display: grid;
   grid-template-columns: 150px minmax(0, 1fr) 300px;
-  gap: 10px;
+  gap: var(--gap-4);
   align-items: start;
 }
 /* 左右の欄は畳める（畳むと押す札だけの細い列になる）。列の幅は畳んだかで決める */
@@ -20,18 +20,18 @@
 }
 .flow-ticket { overflow-wrap: anywhere; }
 .flow-palette {
-  display: flex; flex-direction: column; gap: 6px;
-  border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px;
+  display: flex; flex-direction: column; gap: var(--gap-3);
+  border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-lg); padding: 8px;
 }
 .flow-palette button.action.small.palette-item {
   margin-left: 0; text-align: left;
-  display: flex; gap: 2px 6px; align-items: center; justify-content: space-between;
+  display: flex; gap: var(--gap-1) var(--gap-3); align-items: center; justify-content: space-between;
   /* 列は 150px。名前と目印が並ばないときは目印を次の行へ回す（回さないと目印がボタンの外へ出る） */
   flex-wrap: wrap; white-space: normal;
 }
 /* 目印（種類の性質）。askUserQuestion はメインへ戻る、subAgent は入れ子。色だけに頼らず文字で言う */
 .flow-badge {
-  display: inline-block; padding: 0 6px; border-radius: 8px; font-size: .8em;
+  display: inline-block; padding: 0 6px; border-radius: var(--radius-lg); font-size: var(--font-xs);
   border: 1px solid var(--vscode-panel-border); color: var(--vscode-descriptionForeground);
 }
 /* 部品箱のボタンの地（secondaryBackground）は灰色で、目印の文字が 4.5:1 に届かない。目印は本文の地で塗る */

@@ -217,7 +217,7 @@ async function openFlowPanel(ticket: string, restore: Restore | undefined): Prom
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
-    // 編集の途中を持つので、タブを裏に回しても捨てない
+    // 編集の途中を持つので、タブを非表示にしても捨てない
     retainContextWhenHidden: true,
   });
   showLoading(panel, titleOf(ticket), SCREEN, `${ticket} のフロー`);
@@ -382,7 +382,7 @@ function registerPanelHandlers(current: PanelState): void {
   panel.webview.onDidReceiveMessage((message: unknown) => {
     void handleMessage(current, asFlowMessage(message));
   });
-  // フェーズ管理と同じ。表に戻ったら、いま出すべき知らせと見た目を送り直す（中身は送らない）
+  // フェーズ管理と同じ。再表示されたら、いま出すべき知らせと見た目を送り直す（中身は送らない）
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
@@ -621,7 +621,7 @@ function redraw(current: PanelState): void {
 
 function flowHost(panel: vscode.WebviewPanel, root: string): ScreenHost<FlowData> {
   if (panel.options.retainContextWhenHidden !== true) {
-    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、裏に回った画面へ
+    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、非表示になった画面へ
     // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/claude/logging.md）
     diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "flow", retainContextWhenHidden: false });
   }

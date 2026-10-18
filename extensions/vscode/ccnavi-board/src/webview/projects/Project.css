@@ -3,25 +3,25 @@
  * 設定の検証の一覧。
  */
 .project {
-  border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px;
+  border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-lg); padding: 8px 10px;
   background: var(--vscode-editorWidget-background);
 }
 .project.has-problem { border-left: 3px solid var(--vscode-editorWarning-foreground); }
-.project-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 6px; }
-.project-head .name { font-weight: 600; font-size: 1.05em; overflow-wrap: anywhere; }
+.project-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--gap-2) var(--gap-4); margin-bottom: 6px; }
+.project-head .name { font-weight: 600; font-size: var(--font-title); overflow-wrap: anywhere; }
 .project-head .rel { overflow-wrap: anywhere; }
-.project-head .flags { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
+.project-head .flags { display: flex; flex-wrap: wrap; gap: var(--gap-2); margin-left: auto; }
 /* 項目は 1 つ 240px を目安に、幅に合わせて段数が変わる。検証は長くなるので常に 1 段まるごと使う */
-.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 16px; margin: 0; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--gap-3) var(--gap-6); margin: 0; }
 .field { min-width: 0; }
 .field.wide { grid-column: 1 / -1; }
-.field dt { font-size: .85em; color: var(--vscode-descriptionForeground); }
+.field dt { font-size: var(--font-sm); color: var(--vscode-descriptionForeground); }
 .field dd { margin: 0; overflow-wrap: anywhere; }
-.badge { font-size: .82em; padding: 0 6px; border-radius: 999px; border: 1px solid var(--vscode-panel-border); white-space: nowrap; }
+.badge { font-size: var(--font-xs); padding: 0 6px; border-radius: var(--radius-pill); border: 1px solid var(--vscode-panel-border); white-space: nowrap; }
 .badge.doing { color: var(--doing-text); border-color: var(--vscode-charts-yellow); }
 .badge.warn { color: var(--warn-text); border-color: var(--vscode-editorWarning-foreground); }
 .badge.error { color: var(--error-text); border-color: var(--vscode-editorError-foreground); }
-.lint { list-style: none; margin: 0; padding: 0; font-size: .88em; }
+.lint { list-style: none; margin: 0; padding: 0; font-size: var(--font-sm); }
 .lint li { overflow-wrap: anywhere; }
 .lint li.warn { color: var(--warn-text); }
 .lint li.error { color: var(--error-text); }

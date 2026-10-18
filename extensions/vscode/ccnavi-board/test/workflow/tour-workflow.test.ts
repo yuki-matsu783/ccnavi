@@ -1,5 +1,5 @@
 /**
- * 計画編集画面の案内の見本（`tours/workflow.yml` の `sample:`）と、段の `scene`・指す先の検査。
+ * 計画編集画面の案内の見本（`tours/workflow.yml` の `sample:`）と、手順の `scene`・指す先の検査。
  *
  * 見本は実行ファイルの答え（`--plan-order <親> --json`）の形で書き、`parseWorkflowSample` が欠けた欄を埋めて
  * `parsePlanOrder` に通す。実行ファイルの答えの実例（`test/fixtures/plan-order.json`）と形がずれないこと、実行ファイルが
@@ -205,7 +205,7 @@ test("CB-T504 子の提案の付け替えは、番号の変わる項の phase �
   assert.ok(checked >= 2, "付け替わる子の見本がありません");
 });
 
-test("CB-T505 見本の答えは、引く前の答え（base）と提案に書いてある先行が同じで、未保存かどうかが段の筋と合う", () => {
+test("CB-T505 見本の答えは、引く前の答え（base）と提案に書いてある先行が同じで、未保存かどうかが手順の筋と合う", () => {
   const dirty: Record<string, boolean> = {
     open: false,
     chain: false,
@@ -288,12 +288,12 @@ function targetsOf(scene: Record<string, string | number | boolean>): Set<string
   return out;
 }
 
-test("CB-T506 案内の scene は、画面が読む鍵と、見本にある答えの名前・項の番号だけを指す。綴り違いが既定の画面へ黙って戻らない。指す先は、その段の見本に出る", () => {
+test("CB-T506 案内の scene は、画面が読む鍵と、見本にある答えの名前・項の番号だけを指す。綴り違いで既定の画面へ戻ってしまわない。指す先は、その手順の見本に出る", () => {
   const known = ["answer", "refused", "checking", "changed", "diff", "gone", "review", "pick", "tidy"];
   let steps = 0;
   for (const course of tour.courses) {
     for (const [index, step] of course.steps.entries()) {
-      const at = `${course.id} の ${index + 1} 段目（${step.title}）`;
+      const at = `${course.id} の ${index + 1} 番目の手順（${step.title}）`;
       const scene = step.scene;
       for (const key of Object.keys(scene)) {
         assert.ok(known.includes(key), `${at}: scene の鍵 ${key} を画面は読まない`);
@@ -311,16 +311,16 @@ test("CB-T506 案内の scene は、画面が読む鍵と、見本にある答�
         const shown = sample.answers[String(scene.answer ?? "open")].answer;
         assert.ok(typeof scene.pick === "number" && shown.plans.some((plan) => plan.items.some((item) => item.number === scene.pick)), `${at}: pick の項が答えにありません`);
       }
-      // 指す先は、その段の見本に出る印だけ（出ないものを指すと、吹き出しが中ほどへ逃げる）
+      // 指す先は、その手順の見本に出る印だけ（出ないものを指すと、吹き出しが中ほどに出る）
       assert.ok(step.target !== "", `${at}: 指す先がありません`);
-      assert.ok(targetsOf(scene).has(step.target), `${at}: 指す先 ${step.target} はこの段の見本に出ない`);
+      assert.ok(targetsOf(scene).has(step.target), `${at}: 指す先 ${step.target} はこの手順の見本に出ない`);
       steps += 1;
     }
   }
-  assert.ok(steps >= 40, `段が少ない（${steps}）`);
+  assert.ok(steps >= 40, `手順が少ない（${steps}）`);
 });
 
-test("CB-T507 案内の構成。基本の案内は今の題と順序のまま。ユースケースは 5〜8 本で 1 本 4〜10 段、鍵と題が重ならない", () => {
+test("CB-T507 案内の構成。基本の案内は今の題と順序のまま。ユースケースは 5〜8 本で 1 本 4〜10 手順、鍵と題が重ならない", () => {
   assert.deepEqual(
     tour.courses[0].steps.map((step) => step.title),
     ["図", "直す手段", "この順序に決める", "承認との関係", "案内"],
@@ -330,10 +330,10 @@ test("CB-T507 案内の構成。基本の案内は今の題と順序のまま。
   assert.ok(cases.length >= 5 && cases.length <= 8, `ユースケースの数 ${cases.length}`);
   assert.equal(new Set(tour.courses.map((c) => c.title)).size, tour.courses.length, "題が重なっている");
   for (const course of cases) {
-    assert.ok(course.steps.length >= 4 && course.steps.length <= 10, `${course.id}: ${course.steps.length} 段`);
-    assert.equal(new Set(course.steps.map((s) => s.title)).size, course.steps.length, `${course.id}: 段の題が重なっている`);
+    assert.ok(course.steps.length >= 4 && course.steps.length <= 10, `${course.id}: ${course.steps.length} 手順`);
+    assert.equal(new Set(course.steps.map((s) => s.title)).size, course.steps.length, `${course.id}: 手順の題が重なっている`);
   }
-  // 基本の案内の最初の 4 段は、画面の見どころ（図・ボタンの並び・保存・承認）を指す
+  // 基本の案内の最初の 4 手順は、画面の見どころ（図・ボタンの並び・保存・承認）を指す
   assert.deepEqual(
     tour.courses[0].steps.map((step) => step.target),
     ["graphs", "controls", "save", "summary", "tour"],

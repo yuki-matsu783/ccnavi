@@ -2,8 +2,8 @@
  * 「要確認」（`Attention.tsx`）。共通の `.lock`（書けない状態を言う赤い縁の帯）と同じ縁で囲む。
  */
 .attention {
-  margin: 4px 0 8px; padding: 6px 10px; border-radius: 4px;
+  margin: 4px 0 8px; padding: 6px 10px; border-radius: var(--radius-md);
   border: 1px solid var(--vscode-editorError-foreground);
 }
 .attention .notice { margin: 0 0 4px; }
-.attention .note { margin: 0 0 6px; font-size: .85em; color: var(--vscode-descriptionForeground); }
+.attention .note { margin: 0 0 6px; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); }

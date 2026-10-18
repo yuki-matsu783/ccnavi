@@ -32,7 +32,7 @@ const TOUR = tourOf(templatesTour);
 const SAMPLE = parseTemplatesSample(TOUR.sample);
 const NO_SCENE: Scene = {};
 
-/** 段の `scene` の文字列を `,` で割る */
+/** 手順の `scene` の文字列を `,` で割る */
 function sceneList(value: Scene[string] | undefined): readonly string[] {
   return typeof value === "string" && value !== "" ? value.split(",").map((item) => item.trim()) : [];
 }

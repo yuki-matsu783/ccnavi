@@ -46,7 +46,7 @@ export function renderBoards(doc: Document, md: Renderer, boards: readonly RepoB
   live.set(doc, root);
   // react-dom は描く間と描いた後の微小タスクで大域の window（いまの event）を読む。Node には無いので、この文書の window を
   // 置いたままにする。前提: 試験のファイルごとに別のプロセス（scripts/test.js が `node --test` で回す）なので、ほかのファイルへは
-  // 漏れない。同じプロセスで別の文書を使う試験と混ぜるときは、呼び手が戻す。
+  // 影響しない。同じプロセスで別の文書を使う試験と混ぜるときは、呼び手が戻す。
   // （Pyodide は Node かを process で見分けるので、window があっても変わらない）
   (globalThis as { window?: unknown }).window = doc.defaultView;
   flushSync(() => root.render(createElement(MarkdownContext, { value: md }, ...boards.map((board) => createElement(Repo, { key: `${board.repo.host}/${board.repo.owner}/${board.repo.repo}`, board, actions, attention: extras.attention, issues: extras.issues })))));

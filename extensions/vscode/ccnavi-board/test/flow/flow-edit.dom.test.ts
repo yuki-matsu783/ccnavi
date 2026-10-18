@@ -468,7 +468,7 @@ test("CB-D134 確認を頼んで答えを待つ間に直したら、届いた古
   }
 });
 
-test("CB-D135 外で変わった知らせは最初の 1 回だけ履歴を空にし、送り直し（タブを表に戻した）では空にし直さない", async () => {
+test("CB-D135 外で変わった知らせは最初の 1 回だけ履歴を空にし、送り直し（タブを再表示した）では空にし直さない", async () => {
   const dom = await openFlow({ doc: three() });
   try {
     dom.click(dom.one('[data-action="add-node"][data-type="skill"]'));

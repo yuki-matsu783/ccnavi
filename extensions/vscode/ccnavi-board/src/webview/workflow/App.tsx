@@ -17,7 +17,7 @@
  * （`layoutOf`）、「並べ直す」で今の線から組み直す。
  *
  * **案内**（`Tour.tsx`）は図が出てから始める。案内の間は今の計画ではなく、案内用の見本（`tours/workflow.yml` の `sample:`。実行ファイルの
- * 答えの形）を描く。見本は名前を付けた答えの束で、段の `scene` が描く答えを選ぶ。画面の state（実際の答え・未保存の線・置き場所・
+ * 答えの形）を描く。見本は名前を付けた答えの束で、手順の `scene` が描く答えを選ぶ。画面の state（実際の答え・未保存の線・置き場所・
  * 保存の確かめ）と拡張ホストへの送信（線の頼み・保存・再読込）には触れない。案内の間は、線も保存も効かない。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
@@ -87,7 +87,7 @@ const SAMPLE_LAYOUTS: Readonly<Record<string, { readonly kept: Readonly<Record<s
   Object.entries(SAMPLE.answers).map(([name, sample]) => [name, { kept: layoutsOf(SAMPLE.answers[sample.base].answer), tidy: layoutsOf(sample.answer) }]),
 );
 
-/** 段の `scene` が選ぶ答えの名前。無い・知らない名前は、開いたときの答え */
+/** 手順の `scene` が選ぶ答えの名前。無い・知らない名前は、開いたときの答え */
 function sampleName(value: Scene[string] | undefined, fallback = "open"): string {
   return typeof value === "string" && value in SAMPLE.answers ? value : fallback;
 }
@@ -111,7 +111,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   const [review, setReview] = useState(false);
   const seq = useRef(0);
   /**
-   * 案内の間は見本の答えを描き、段ごとの様子（描く答え・開く確かめ・選ぶ項など）は `scene` に入れる。
+   * 案内の間は見本の答えを描き、手順ごとの様子（描く答え・開く確かめ・選ぶ項など）は `scene` に入れる。
    * 実際の答え・未保存の線・置き場所・確かめは動かさないので、閉じたあとに戻すものは無い
    */
   const [scene, setScene] = useState<Scene>(NO_SCENE);
@@ -128,7 +128,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   const touring = tour.touring;
   const shownName = sampleName(scene.answer);
   const picked = typeof scene.pick === "number" ? scene.pick : undefined;
-  // 見本の図は、描く答え・並べ直した図か・選んだ項が変わるたびに作り直す（選んだ項や置き場所を前の段から持ち越さない）
+  // 見本の図は、描く答え・並べ直した図か・選んだ項が変わるたびに作り直す（選んだ項や置き場所を前の手順から持ち越さない）
   const sceneKey = `${shownName}|${scene.tidy === true ? "tidy" : "kept"}|${picked ?? ""}`;
   useGraphMarks(graphs, touring, picked, sceneKey);
 
@@ -256,7 +256,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   }
   const page = data.page;
 
-  // 案内の間は、見本の答えと、段の様子（`scene`）が描くものを使う。実際の答え・待ち・帯・確かめは使わない
+  // 案内の間は、見本の答えと、手順の様子（`scene`）が描くものを使う。実際の答え・待ち・帯・確かめは使わない
   const sample = SAMPLE.answers[shownName];
   const sampleBase = SAMPLE.answers[sample.base].answer;
   const shownAnswer = touring ? sample.answer : answer;

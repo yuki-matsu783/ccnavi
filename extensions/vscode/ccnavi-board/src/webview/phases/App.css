@@ -3,9 +3,9 @@
  */
 button.action.small { margin-left: auto; }
 input.duplicate { border-color: var(--vscode-editorError-foreground); }
-.block { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
-.block h2 { display: flex; gap: 8px; align-items: center; }
-.help-panel { margin: 6px 0 10px; padding: 8px 10px; border: 1px solid var(--vscode-panel-border); border-radius: 3px; }
+.block { border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-lg); padding: 8px 10px; margin-bottom: 10px; }
+.block h2 { display: flex; gap: var(--gap-4); align-items: center; }
+.help-panel { margin: 6px 0 10px; padding: 8px 10px; border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-sm); }
 .help-panel .hint:last-of-type { margin-bottom: 8px; }
 .help-panel button.action.small { margin-left: 0; }
 h2 button.action.small.on { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
