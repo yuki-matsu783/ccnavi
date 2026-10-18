@@ -259,10 +259,10 @@ def remember_refs(stderr: TextIO, state_dir: str, session: str, told: set[str]) 
 
 
 def told_peers(stderr: TextIO, state_dir: str, session: str, agent_id: str) -> set[str] | None:
-    """このサブエージェントに、同じ作業ツリーの相手として案内した相手の鍵。読めなければ None。
+    """このサブエージェントに、同じ作業ツリーの相手として案内済みの相手の鍵。読めなければ None。
 
     `deliver` が読み書きする `once-<セッション>-<agent_id>.json` とは別のファイルに置く。
-    同じファイルに入れると、`deliver` が書き戻すときに相手の鍵を落とし、ルールの数えと取り違える。
+    同じファイルに入れると、`deliver` が書き戻すときに相手の鍵が消え、ルールの数えと混ざる。
     掃き方は `once-*` と同じ（`forget`）。置き場が無いときは None（呼ぶ側は案内する側に倒す）。
     """
     if not state_dir or not session or not agent_id:
@@ -274,7 +274,7 @@ def told_peers(stderr: TextIO, state_dir: str, session: str, agent_id: str) -> s
 def remember_peers(
     stderr: TextIO, state_dir: str, session: str, agent_id: str, told: set[str]
 ) -> bool:
-    """案内した相手を記録に残す。書けたか。"""
+    """案内した相手を記録する。書けたかを返す。"""
     if not state_dir or not session or not agent_id:
         return False
     return _save_once(

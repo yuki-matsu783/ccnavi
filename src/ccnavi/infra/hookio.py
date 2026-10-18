@@ -91,8 +91,8 @@ class Input:
     # 許さない操作を見分けるときと、差し戻しの回数を数えるときだけ。
     agent_id: str = ""
     agent_type: str = ""
-    # tools は SubagentStart に来るかを実機で確かめていない。来たときだけ読み、編集する
-    # サブエージェントかの見分けに使う（hook/agentkind）。文字列のリスト以外は無いものとして読む。
+    # SubagentStart に tools が来るかは実機で確かめていない。来ていれば、編集するサブエージェント
+    # かの見分けに使う（hook/agentkind）。文字列のリスト以外は無いものとして読む。
     tools: list[str] | None = None
     # tool_response は PostToolUse にだけ来る。Agent の起動の後には agentId が入る。
     tool_response: dict[str, Any] = field(default_factory=dict)

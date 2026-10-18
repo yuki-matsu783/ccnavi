@@ -1,12 +1,12 @@
 """サブエージェントが、ファイルを編集するものかの見分け。
 
-同じ作業ツリーで別の編集するサブエージェントが動いていることを、起動したサブエージェントに
+同じ作業ツリーで別の編集するサブエージェントが動いていることを、新しく起動したサブエージェントに
 案内するために使う（`subagent.at_start`）。編集する（`Write` / `Edit` / `NotebookEdit` を使える）
-ものだけが案内の相手と対象になる。
+サブエージェントだけを、案内の対象と相手に数える。
 
 判定は広めにする。読み取り専用と確かめられたものだけを `READ` にし、定義が無い・読めない・
 `agent_type` が空など、見分けられないものは `EDIT` に倒す。案内は止めないので、読み取りの
-サブエージェントに出てしまうノイズより、編集するサブエージェントへ出し損ねるほうが害が大きい。
+サブエージェントに案内が出るノイズより、編集するサブエージェントに案内を出し損ねるほうが害が大きい。
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def kind_of(roots: list[str], agent_type: str, tools: object = None) -> str:
     """`EDIT` か `READ`。読み取りと確かめられなければ `EDIT`。
 
     `tools` は payload に一覧があるときだけ渡す。あれば定義より優先する。
-    `roots` は定義（`.claude/agents/*.md`）を探すルート。近いほうから。
+    `roots` は定義（`.claude/agents/*.md`）を探すルート。近いものから順に探す。
     """
     if isinstance(tools, list) and all(isinstance(t, str) for t in tools):
         return EDIT if _writes(tools) else READ
