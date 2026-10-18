@@ -45,7 +45,7 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
    文字と枠の色はどちらも文字用の色（`App.css` の `--board-*-text`）で、地に対して 4.5:1 以上 */
 .badges { display: flex; flex-wrap: wrap; gap: var(--gap-2); margin-top: 6px; }
 .badge {
-  font-size: var(--font-xs); padding: 0 6px; border-radius: .8em;
+  font-size: var(--font-xs); padding: 0 6px; border-radius: var(--radius-chip);
   border: 1px solid currentColor; color: var(--vscode-descriptionForeground);
 }
 .badge.copy-none { color: var(--board-info-text); }

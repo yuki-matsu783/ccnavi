@@ -249,7 +249,7 @@ test("CB-T583 z-index・角丸・文字サイズ・すき間は page.css の変�
   // 数値で書いてよいのは 0・1em（等倍）・px の文字（アイコンの大きさ）だけ
   const raw: [RegExp, string][] = [
     [/z-index:\s*-?\d/, "z-index（--z-*）"],
-    [/border-radius:[^;}]*\b[1-9]\d*px/, "border-radius（--radius-*）"],
+    [/border-radius:[^;}]*(?:\b[1-9]\d*px|\d*\.\d+em)/, "border-radius（--radius-*）"],
     [/font-size:\s*(?!1em\b)\d*\.?\d+em/, "font-size（--font-*）"],
     [/(?<![\w-])(?:row-|column-)?gap:\s*\d/, "gap（--gap-*）"],
     [/box-shadow:\s*[^;]*rgba\(0, 0, 0, \.35\)/, "ポップアップの影（--shadow-popup）"],

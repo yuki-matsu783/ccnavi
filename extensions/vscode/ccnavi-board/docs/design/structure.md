@@ -93,7 +93,7 @@ src/
     initial.ts        埋め込みの JSON（最初の 1 枚）を読む。画面ごとの契約に依存しない
     appearance.ts     見た目の切り替え（body のクラスの書き換え）。6 画面で 1 本
     tours/<画面>.yml   案内の定義（sample: 案内の間だけ描く見本、courses: 基本の案内と使い方ごとの案内。手順は target=data-tour の値・題・本文・scene）。ビルドのとき esbuild のプラグインが JSON にしてバンドルへ入れる（画面に YAML の解析器は入らない）。ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集・プロジェクト管理の 8 画面（プロジェクト管理は sample: を持たない）。list.css の `.field` / `.sum` は `display: contents` で箱を持たないので、指す先がそれでも `Tour.tsx` の `boxOf` が子の枠を合わせて光らせる
-    Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。案内のある画面（ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集）で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。どの画面も同じ位置）で案内の一覧を開き、選んだ 1 本が出る（coursesOf が YAML の定義から案内の一覧を作る）
+    Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。案内のある画面（ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集）で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。どの画面も同じ位置）で案内の一覧を開き、選んだ 1 本が出る（coursesOf が YAML の定義から案内の一覧を作る）。画面全体を覆う `role="dialog"` は Dialog.tsx を使わず、指す先の枠の影で暗くする作りを別に持つ
     TargetSelect.tsx  ルール管理・フェーズ管理・テンプレート管理の、設定の対象を切り替える欄
     workflow/tour-marks.ts 案内の間だけ、計画の図の中の項・線に data-tour の印を付ける（共通の図の部品 shared/PlanGraph.tsx には口が無いため）
     flow/post.ts の muteForTour は、案内の間に tourDone 以外を拡張ホストへ送らない。board/post.ts の mutePosts も同じ
