@@ -42,11 +42,33 @@ phases:
     - .ccnavi/*
     - extensions/*
     when: 振る舞いを変えるとき。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
+  staging:
+    kind: work
+    title: ユーザがコピーする版の作成
+    review: mr
+    scope:
+    - wip/design/*
+    - tests/*
+    when: 保護済みファイル（.ccnavi/scripts/、.claude/hooks/、rules.yml）を修正するとき。エージェントはそこに書けないので、完成品を
+      wip/design/scripts/ に全文で配置し、ユーザがコピーする。受入テスト作成を先に置く（計画に受入テスト作成の項も置く）
+  docs:
+    kind: work
+    title: 文書
+    review: mr
+    scope:
+    - README.md
+    - docs/*
+    - extensions/vscode/ccnavi-board/docs/*
+    - extensions/chrome/ccnavi-approval/docs/*
+    - CLAUDE.md
+    - .claude/skills/*
 plan:
   - research
   - {type: design, after: [1]}
   - {type: acceptance, after: [2]}
   - {type: implement-ccnavi, after: [3]}
+  - {type: staging, after: [4]}
+  - {type: docs, after: [5]}
 rationale: |
   チケットの移動以外で ccnavi が持つ状態（取り込み状態 sync/families と sync/integration）を廃止し、
   判定を「親ブランチの状態」だけにして、別 PC でも同じ結果になるようにする。
@@ -207,15 +229,17 @@ ccnavi は、チケットの置き場（`todo/` `doing/` `review/` `done/`）の
 
 ## 計画の理由
 
-research → design → acceptance → implement-ccnavi の一直線にした。
+research → design → acceptance → implement-ccnavi → staging → docs の一直線にした。
 
 - research: 上の 9 項目の答えが設計を左右するため、最初に置く
-- design: 消す・足す・残すを確定し、ADR（新規 1 本。既存の ADR-0093・0136・0103 は `docs/adr/README.md` の規則に従い、状態行への追記か置き換えかを決める）と設計書（`sharing.md` `places.md` ほか）と README の変更案を書く。拡張の入力形式と互換の版もここで決める
+- design: 消す・足す・残すを確定し、ADR（新規 1 本。既存の ADR-0093・0136・0103 は `docs/adr/README.md` の規則に従い、状態行への追記か置き換えかを決める）と設計書の変更案を書く。拡張の入力形式と互換の版もここで決める
 - acceptance: 共通の push 関門（3 経路）、再利用検知、レイヤーの warn、`ready` 後の片付け、拡張の判定の受入テストを先に書く。記録に依存する既存テスト（約 24 ファイル）の書き換え方針を決める
-- implement-ccnavi: 子を分ける想定。(a) 共通の push 関門と `retire/` への書き込みと warn の追加、(b) Chrome 拡張の入力形式の変更、(c) 記録と `integration/` の削除と移行、(d) ドキュメント・README・ADR の整理。追加が先に入れば削除が安全になる
+- implement-ccnavi: Python（`src/`）、Chrome 拡張、テストを直す。子を分ける想定で、(a) 共通の push 関門と `retire/` への書き込みと warn の追加、(b) Chrome 拡張の入力形式の変更、(c) 記録と `integration/` の削除と移行。追加が先に入れば削除が安全になる
+- staging: **`.ccnavi/scripts/` の sh は保護対象で、エージェントは書けない。** 完成品を `wip/design/scripts/` に全文で置き、ユーザがコピーする。sh の変更（`ccnavi-sync.sh` `ccnavi-git.sh` `ccnavi-common-c1.sh` `ccnavi-push-approved.sh` `ccnavi-start.sh` ほか）はすべてこの項で扱う。受入テストは先に書く
+- docs: `README.md`、設計書、`docs/CONTEXT.md`、`docs/requirements/extension-if.md`、ADR の整理。`README.md` は既存のフェーズ定義 `docs`（`.ccnavi/config/project/phases.yml`）の範囲に入っているので、フェーズ定義の変更は要らない
 
 ## 未解決
 
 - `mr:`（必須）はまだ書いていない。この作業を載せる MR の番号が決まったら足してから承認を頼む。
-- `README.md`（ルート直下）は、どのフェーズの `scope` にも当たらない。allow には足したが、子の範囲として使えるよう、フェーズ定義にスコープを足すかをユーザと決める。
+- `.ccnavi/scripts/` の sh を直す子は、保護対象のため staging の項で扱う（`implement-ccnavi` の範囲 `.ccnavi/*` は sh には効かない）。
 - 識別子の番号 `1` は通し番号（`ticket next-id` の答え）。issue があるなら付け替える。
