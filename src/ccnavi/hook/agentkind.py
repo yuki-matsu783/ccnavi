@@ -5,8 +5,9 @@
 サブエージェントだけを、案内の対象と相手に数える。
 
 判定は広めにする。読み取り専用と確かめられたものだけを `READ` にし、定義が無い・読めない・
-`agent_type` が空など、見分けられないものは `EDIT` に倒す。案内は止めないので、読み取りの
-サブエージェントに案内が出るノイズより、編集するサブエージェントに案内を出し損ねるほうが害が大きい。
+`agent_type` が空・`tools` に制限が無いなど、見分けられないものは `EDIT` に倒す。
+案内は止めないので、読み取りのサブエージェントに案内が出るノイズより、編集する
+サブエージェントに案内を出し損ねるほうが害が大きい。
 """
 
 from __future__ import annotations
@@ -23,8 +24,21 @@ READ = "read"
 # 組み込みで、読み取り専用のサブエージェント。
 READ_ONLY_BUILTIN = ("explore", "plan", "claude-code-guide")
 
-# 書き込み系のツール。`Bash` は数えない（コードから書く経路は読み切れない）。
-EDIT_TOOLS = ("write", "edit", "multiedit", "notebookedit")
+# 読み取り専用と確かめられているツール。一覧のツールがこれだけで構成されるときだけ `READ` にする。
+# `Bash`（コードから書く経路は読み切れない）、`*`、`Edit(src/**)` のような括弧付き、MCP のツール
+# （`mcp__` で始まる。書き込むものがありうる）、空の一覧は、読み取りと確かめられないので入れない。
+READ_TOOLS = (
+    "read",
+    "grep",
+    "glob",
+    "ls",
+    "webfetch",
+    "websearch",
+    "notebookread",
+    "todowrite",
+    "agent",
+    "task",
+)
 
 # 定義の frontmatter を読む長さの上限（バイト）。
 HEAD_LIMIT = 16384
@@ -35,32 +49,24 @@ def kind_of(roots: list[str], agent_type: str, tools: object = None) -> str:
 
     `tools` は payload に一覧があるときだけ渡す。あれば定義より優先する。
     `roots` は定義（`.claude/agents/*.md`）を探すルート。近いものから順に探す。
+    プロジェクトの定義は、同名の組み込みより優先する（同名で書き込めるものに上書きされうる）。
+    `disallowedTools` は読み取りの根拠にしない。外していないツール（`Bash` や MCP）が残るため。
     """
     if isinstance(tools, list) and all(isinstance(t, str) for t in tools):
-        return EDIT if _writes(tools) else READ
+        return READ if _only_reads(tools) else EDIT
     name = agent_type.strip().casefold()
-    if name in READ_ONLY_BUILTIN:
-        return READ
     if not name:
         return EDIT
     meta = _definition(roots, name)
-    if meta is None or "tools" not in meta and "disallowedTools" not in meta:
-        return EDIT
+    if meta is None:
+        return READ if name in READ_ONLY_BUILTIN else EDIT
     allowed = _names(meta.get("tools")) if "tools" in meta else None
-    if allowed is not None and not _writes(allowed):
-        return READ
-    denied = _names(meta.get("disallowedTools"))
-    if denied is not None and all(t in _lower(denied) for t in ("write", "edit", "notebookedit")):
-        return READ
-    return EDIT
+    return READ if allowed is not None and _only_reads(allowed) else EDIT
 
 
-def _lower(names: list[str]) -> list[str]:
-    return [n.strip().casefold() for n in names]
-
-
-def _writes(names: list[str]) -> bool:
-    return any(n in EDIT_TOOLS for n in _lower(names))
+def _only_reads(names: list[str]) -> bool:
+    """一覧が空でなく、全部が読み取りと確かめられたツールか。"""
+    return bool(names) and all(n.strip().casefold() in READ_TOOLS for n in names)
 
 
 def _names(value: object) -> list[str] | None:

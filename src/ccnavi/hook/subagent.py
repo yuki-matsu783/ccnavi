@@ -346,8 +346,8 @@ def _note_running(
     )
     if editing and here is not None:
         lines += [
-            f"{_TREE}{here.kind} {_one_line(here.name)}",
-            f"{_TYPE}{_one_line(payload.agent_type)}",
+            f"{_TREE}{here.kind} {_flat(here.name)}",
+            f"{_TYPE}{_flat(payload.agent_type)}",
         ]
     path = _running_path(conf.state, payload.session_id, payload.agent_id)
     failed = fsio.write_text_atomic(path, _mark_text(payload.session_id, lines))
@@ -474,6 +474,14 @@ def _started_at(lines: list[str]) -> float | None:
         return float(lines[1])
     except (IndexError, ValueError):
         return None
+
+
+def _flat(text: str) -> str:
+    """`splitlines` が行の区切りとみなす文字（改行、垂直タブ、改ページなど）を空白に替える。
+
+    印は `splitlines` で読むので、区切りが残ると 1 行の値が途中で切れ、相手を見つけ損ねる。
+    """
+    return " ".join(text.splitlines())
 
 
 def _one_line(session: str) -> str:
