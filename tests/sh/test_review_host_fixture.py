@@ -66,6 +66,16 @@ case " $* " in
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" c1 family "*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
 esac
+prev=""
+for a in "$@"; do
+  case "$prev" in
+  --choose-out) printf '{{"choices": {{}}, "digest": "d"}}\\n' >"$a" ;;
+  --accept-plan)
+    if [ -n "${{STUB_PLAN:-}}" ]; then cp "$STUB_PLAN" "$a"
+    else printf '{{"version": 1, "threads": []}}\\n' >"$a"; fi ;;
+  esac
+  prev="$a"
+done
 for a in "$@"; do printf '%s\\n' "$a"; done >>'{log}'
 exit 0
 """
@@ -95,7 +105,7 @@ def conclusion(copy: dict, poster: str = "") -> dict:
     changes = [
         r for r in review_host.effective(result.reviews) if r.state.upper() == "CHANGES_REQUESTED"
     ]
-    unresolved = review_host._unresolved(result.threads, set(), result.host, poster)
+    unresolved = review_host._unresolved(result.threads, result.host, poster)
     return {
         "changes_requested": sorted(r.url for r in changes),
         "unresolved": sorted(t.id for t in unresolved),
@@ -362,6 +372,11 @@ class HostFixtureTest(unittest.TestCase):
             f'  case " {known} " in *" ${{a%%=*}} "*) ;;\n'
             '  *) echo "unrecognized $a" >&2; exit 2 ;; esac ;;\n'
             "esac; done\n"
+            'prev=""\n'
+            'for a in "$@"; do case "$prev" in\n'
+            '  --choose-out) printf \'{"choices": {}, "digest": "d"}\\n\' >"$a" ;;\n'
+            '  --accept-plan) printf \'{"version": 1, "threads": []}\\n\' >"$a" ;;\n'
+            'esac; prev="$a"; done\n'
             f"for a in \"$@\"; do printf '%s\\n' \"$a\"; done >>'{self.args}'\n"
             "exit 0\n",
         )
@@ -386,6 +401,78 @@ class HostFixtureTest(unittest.TestCase):
                     self.assertFalse(any(a.startswith("--via") for a in passed), args)
                     want = confirm_actor and args[0] == "confirm"
                     self.assertEqual(any(a.startswith("--actor") for a in passed), want, args)
+
+    NODE = "PRRT_kwDOAbCdEs5AAAAB"
+
+    def accept_plan(self, *nodes):
+        """実物の書き手（実行ファイルが使う `review_host.write_accept_plan`）で書いた計画。"""
+        path = os.path.join(self._tmp.name, "plan.json")
+        items = [
+            (
+                review_host.Thread(id=node, url=f"u/{node}"),
+                review_host.accept_reply("テスト", issue=False),
+            )
+            for node in nodes
+        ]
+        self.assertEqual(review_host.write_accept_plan(path, items, "d"), "")
+        return path
+
+    def mutations(self):
+        path = os.path.join(self._tmp.name, "mutations.jsonl")
+        if not os.path.exists(path):
+            return []
+        with open(path, encoding="utf-8") as f:
+            return [json.loads(line) for line in f if line.strip()]
+
+    def decide_accepting(self, plan, **extra):
+        return self.review(
+            "resolved",
+            "decide",
+            "1",
+            "--choices",
+            "{}",
+            "--digest",
+            "d",
+            STUB_PLAN=plan,
+            FAKE_GITHUB_MUTATIONS=os.path.join(self._tmp.name, "mutations.jsonl"),
+            **extra,
+        )
+
+    def test_decide_replies_then_resolves_with_the_node_id_through_graphql(self):
+        """GitHub は GraphQL の mutation。node id を変数で渡し、全部に返信してから解決する。"""
+        other = "PRRT_kwDOAbCdEs5AAAAC"
+        plan = self.accept_plan(self.NODE, other)
+        done = self.decide_accepting(plan)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        sent = self.mutations()
+        self.assertEqual(len(sent), 4)
+        replies, resolves = sent[:2], sent[2:]
+        for call, node in zip(replies, (self.NODE, other), strict=True):
+            self.assertIn("addPullRequestReviewThreadReply", call["query"])
+            self.assertIn("pullRequestReviewThreadId:$id", call["query"])
+            self.assertEqual(call["variables"]["id"], node)
+            self.assertTrue(call["variables"]["b"].startswith("<!-- ccnavi:accept -->"))
+        for call, node in zip(resolves, (self.NODE, other), strict=True):
+            self.assertIn("resolveReviewThread(input:{threadId:$id})", call["query"])
+            self.assertEqual(call["variables"], {"id": node})
+        # 返信が先、解決はそのあと。置く呼び出しは計画を読む
+        self.assertIn("--accept-done", self.passed())
+
+    def test_decide_stops_when_the_reply_or_resolve_mutation_is_refused(self):
+        """GraphQL は 200 で errors を返す。それを失敗と見て、置く呼び出しを打たない。"""
+        for which, shown in (("reply", "返信を残せなかった"), ("resolve", "解決できなかった")):
+            with self.subTest(which=which):
+                if os.path.exists(self.args):
+                    os.remove(self.args)
+                path = os.path.join(self._tmp.name, "mutations.jsonl")
+                if os.path.exists(path):
+                    os.remove(path)
+                stopped = self.decide_accepting(
+                    self.accept_plan(self.NODE), FAKE_GITHUB_FAIL_MUTATION=which
+                )
+                self.assertEqual(stopped.returncode, 1, stopped.stdout + stopped.stderr)
+                self.assertIn(shown, stopped.stderr)
+                self.assertNotIn("--accept-done", self.passed())
 
     def test_decide_does_not_take_an_actor_from_the_caller(self):
         done = self.review("resolved", "decide", "1", "--actor=someone")

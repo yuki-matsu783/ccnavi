@@ -269,7 +269,6 @@ export interface ParentJson {
   readonly feedback: readonly unknown[] | null;
   readonly close_early: Record<string, unknown> | null;
   readonly ready: Record<string, unknown> | null;
-  readonly accepted_threads: readonly string[];
   readonly phases: readonly PhaseJson[];
 }
 
@@ -676,7 +675,6 @@ function parent(raw: Record<string, unknown>): ParentJson {
     feedback: Array.isArray(raw.feedback) ? raw.feedback : null,
     close_early: isRecord(raw.close_early) ? raw.close_early : null,
     ready: isRecord(raw.ready) ? raw.ready : null,
-    accepted_threads: list(raw.accepted_threads).map(str),
     phases: list(raw.phases).filter(isRecord).map(phase),
   };
 }

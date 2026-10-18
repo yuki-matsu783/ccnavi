@@ -5,15 +5,16 @@
 結果を前提にする。
 
 1. ワークツリーを `ccnavi-git.sh worktree add` で切り、提案（`wip/proposals/todo/`）を書いて
-   `ccnavi-git.sh` でコミットする。実行ファイルの `--agree --preview --json` が承認待ちに数える
+   `ccnavi-git.sh` でコミットし、親のブランチをリモートへ push する（承認の前から親のブランチは
+   リモートにある）。`ccnavi-sync.sh` で統合先を取り込むと、実行ファイルの
+   `--agree --preview --json` が承認待ちに数える
 2. 端末の無い `ccnavi-agree.sh` は承認の壁で止まり、何も置かず何も送らない
 3. `ccnavi-agree.sh` で承認する。承認済みチケットが `doing/` に置かれ、
    `ccnavi-push-approved.sh` が置き場（と消えた提案）だけをコミットして push する。
    同じツリーの書きかけはコミットしない。別の機械（clone）から承認済みチケットが読める
 4. コミットするものが無ければ `ccnavi-push-approved.sh` は 0 で
    「コミットして push する承認済みチケットは無い。」と言う
-5. `ccnavi-ticket.sh start` が承認済みチケットに書いた着手の欄を、
-   `ccnavi-push-approved.sh` がコミットして push する
+5. `ccnavi-ticket.sh start` が承認済みチケットに着手の欄を書き、自分でコミットして push する
 
 単体のテスト（tests/ticket/test_ticket.py、tests/ticket/test_approve_json.py、
 tests/sh/test_push_approved_sh.py）は、実行ファイルを in-process で呼ぶか、承認を stub の sh で
@@ -43,7 +44,9 @@ import subprocess
 import tempfile
 import unittest
 
+from tests import config_path
 from tests.e2e.test_e2e_sh import DIST, SH_DIR, SHELL, SKIP, WorkspaceTest, git, write
+from tests.ticketsample import PHASES, parent_text
 
 TICKET = "i0001"
 APPROVED = ".ccnavi/approved/doing"
@@ -51,25 +54,8 @@ PROPOSAL = "wip/proposals/todo"
 MESSAGE = "ccnavi: 承認済みチケットを更新"
 NOTHING = "コミットして push する承認済みチケットはありません。"
 
-PROPOSAL_TEXT = f"""---
-version: 1
-ticket: {TICKET}
-human_review:
-  required: false
-  reason: 受入テスト
-title: 承認から push まで
-rationale: |
-  承認済みチケットが別の機械に届くことを確かめる
-allow:
-  - match: Write|Edit
-    glob: "src/*"
-started_at: ""
-completed_at: ""
-base_sha: ""
----
-
-本文
-"""
+# 親の提案。`ticket start` が計画（plan）を要るので、計画を持つ形にする（mr と phases の写しも付く）
+PROPOSAL_TEXT = parent_text(TICKET, ["design"], allow=("src/*",))
 
 
 def out(cwd, *args):
@@ -98,11 +84,16 @@ class ApproveAndPushTest(unittest.TestCase):
         # 承認は共通レイヤーのルールを読む。無いと承認は通るが「ルールを読めない」と言うので、
         # 実際のワークスペースと同じく置いておく。中身は空でよい。
         write(os.path.join(self.ws, ".ccnavi", "config", "common", "rules.yml"), "version: 1\n")
-        git(self.ws, "add", ".ccnavi/config/common/rules.yml")
+        # 計画（plan）のあるチケットは、計画が使うフェーズの定義も要る
+        write(config_path(self.ws, "phases"), PHASES)
+        git(self.ws, "add", ".ccnavi/config")
         git(self.ws, "commit", "-q", "-m", "rules")
         self.remote = os.path.join(self.tmp, "origin.git")
         git(self.tmp, "init", "-q", "--bare", self.remote)
         git(self.ws, "remote", "add", "origin", self.remote)
+        # 取り込みは統合先をリモートの main から決める。リモートに main が無いと止まる
+        git(self.ws, "push", "-q", "origin", "main")
+        git(self.ws, "remote", "set-head", "origin", "main")
         self.tree = os.path.join(self.ws, ".claude", "worktrees", TICKET)
 
     # ---- 道具
@@ -168,11 +159,17 @@ class ApproveAndPushTest(unittest.TestCase):
     def test_propose_approve_and_push(self):
         # 1. 作成。ワークツリーを切り、提案を書いてコミットする（エージェントの手順）。
         where = f".claude/worktrees/{TICKET}"
+        self.ok(self.run_sh("ccnavi-git.sh", "fetch", "origin", "main"))
         self.ok(self.run_sh("ccnavi-git.sh", "worktree", "add", where, "-b", TICKET))
         write(os.path.join(self.tree, *PROPOSAL.split("/"), TICKET + ".md"), PROPOSAL_TEXT)
         self.ok(self.run_sh("ccnavi-git.sh", "add", f"{PROPOSAL}/{TICKET}.md", cwd=self.tree))
         self.ok(self.run_sh("ccnavi-git.sh", "commit", "-m", "propose", cwd=self.tree))
         proposed = out(self.tree, "rev-parse", "HEAD")
+        # 親のブランチは承認の前にリモートへ送ってある（MR の元ブランチ）。承認済みチケットは、
+        # リモートにある親のブランチに取り込んでから送る
+        self.ok(self.run_sh("ccnavi-git.sh", "push", "-u", "origin", TICKET, cwd=self.tree))
+        # 承認は統合先の取り込み結果で、閉じた識別子の再利用を確かめる。先に取り込んでおく
+        self.ok(self.run_sh("ccnavi-sync.sh"))
         preview = self.binary("--agree", "--preview", "--json")
         self.ok(preview)
         self.assertEqual([TICKET], [b["ticket"] for b in json.loads(preview.stdout)["batch"]])
@@ -184,10 +181,10 @@ class ApproveAndPushTest(unittest.TestCase):
         # 2. 端末が無いと承認の壁で止まる。承認済みチケットも、コミットも、push も出ない。
         walled = self.run_sh("ccnavi-agree.sh", stdin="y\n")
         self.assertEqual(1, walled.returncode, walled.stdout + walled.stderr)
-        self.assertIn("端末", walled.stderr)
+        self.assertIn("ターミナル", walled.stderr)
         self.assertFalse(os.path.exists(self.approved_copy()))
         self.assertEqual(proposed, out(self.tree, "rev-parse", "HEAD"))
-        self.assertEqual("", self.remote_head())
+        self.assertEqual(proposed, self.remote_head())
 
         # 3. 承認。実行ファイルが doing/ に置き、ccnavi-push-approved.sh がコミットして push する。
         approved = self.ok(
@@ -199,7 +196,11 @@ class ApproveAndPushTest(unittest.TestCase):
         self.assertNotIn("読めない", approved.stderr)
         # 承認は提案をそのまま動かす（欄を書き足さない）。
         self.assertEqual(PROPOSAL_TEXT, self.read(self.approved_copy()))
-        self.assertEqual(MESSAGE, out(self.tree, "log", "-1", "--format=%s"))
+        self.assertEqual(
+            MESSAGE,
+            out(self.tree, "log", "-1", "--format=%s"),
+            approved.stdout + approved.stderr,
+        )
         # コミットしたのは置き場と、承認の記録（events/）と、承認で todo/ から消えた提案だけ。
         events = ".ccnavi/approved/events"
         self.assertEqual(
@@ -228,14 +229,11 @@ class ApproveAndPushTest(unittest.TestCase):
         self.assertEqual(pushed, self.remote_head())
 
         # 5. 着手の欄は実行ファイルが承認済みチケットに書く。
-        # コミットして push するのは ccnavi-push-approved.sh。
+        # 親の `start` は自分で書いた置き場をコミットして push するので、あとに送るものは残らない。
         self.ok(self.run_sh("ccnavi-ticket.sh", "start", TICKET, cwd=self.tree))
         started = self.read(self.approved_copy())
         self.assertNotIn('started_at: ""', started)
         self.assertIn(pushed, started, "基準点が承認のコミットになっていない")
-        carried = self.ok(self.run_sh("ccnavi-push-approved.sh", cwd=self.tree))
-        self.assertIn(TICKET, carried.stdout)
-        self.assertNotIn(NOTHING, carried.stdout)
         self.assertEqual(
             sorted([f"{APPROVED}/{TICKET}.md", f"{events}/{TICKET}.ndjson"]), self.committed()
         )

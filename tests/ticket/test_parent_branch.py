@@ -215,6 +215,12 @@ class ParentBranchTest(unittest.TestCase):
         self.assertEqual(self.preview()["branch_warnings"], [])
 
     def test_identifiers_differing_only_in_case_are_refused(self):
+        # 大文字小文字を区別しないファイルシステム（macOS の既定）では、2 つの提案が
+        # 1 つのファイルになり、「大文字小文字だけが違う識別子」の状態を作れない
+        with tempfile.TemporaryDirectory() as probe:
+            write(os.path.join(probe, "A"), "")
+            if os.path.exists(os.path.join(probe, "a")):
+                self.skipTest("大文字小文字を区別しないファイルシステム")
         other = "Feature-12-Login"
         self.propose(where=self.root, ident=other)
         self.propose(where=self.root)

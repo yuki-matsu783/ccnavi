@@ -240,7 +240,7 @@ class CleanCases:
         self.addCleanup(os.chmod, locked, 0o755)
         result = self.run_clean("shell")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("消せなかった: node_modules", result.stderr)
+        self.assertIn("削除できなかった: node_modules", result.stderr)
         self.assertIn("消し残しがあります", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(top, ".venv")))  # 他は消す
 

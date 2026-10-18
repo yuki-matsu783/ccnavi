@@ -69,6 +69,15 @@ class BranchToIdShTest(unittest.TestCase):
                 tree = os.path.join(tmp, "wt")
                 subprocess.run([git, "init", "-q", tree], check=True)
                 subprocess.run([git, "-C", tree, "checkout", "-q", "-b", branch], check=True)
+                head = subprocess.run(
+                    [git, "-C", tree, "symbolic-ref", "--short", "HEAD"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                ).stdout.strip()
+                if head != branch:
+                    # macOS の git（core.precomposeunicode）は NFD の名前を NFC に直して作る
+                    self.skipTest("この環境の git は NFD のブランチ名を作れない")
                 py = syncstate.head_branch(tree, ident)
                 self.assertEqual(bool(py), same, branch)
                 for shell in SHELLS:

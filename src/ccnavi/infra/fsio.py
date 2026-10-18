@@ -743,7 +743,12 @@ def recording() -> Iterator[list[str]]:
     try:
         yield out
     finally:
-        _RECORDERS.remove(seen)
+        # `list.remove` は `==` で一致する最初の要素を消す。入れ子で中身が同じ間は、
+        # 内側を抜けるときに外側の記録が外れ、そのあと書いたものが外側に載らない。同一性で外す。
+        for i, recorder in enumerate(_RECORDERS):
+            if recorder is seen:
+                del _RECORDERS[i]
+                break
         out.extend(seen)
 
 

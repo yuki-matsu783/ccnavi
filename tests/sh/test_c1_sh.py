@@ -1705,6 +1705,11 @@ class C1HumanTest(PhaseOne, C1Harness):
 # 残り（`c1 family`・`c1 sort`・`sync paths` など）は実際のものに渡す。
 HALF = """#!/bin/sh
 case " $* " in
+*" --accept-plan "*)
+  plan=""; prev=""
+  for a in "$@"; do [ "$prev" = --accept-plan ] && plan="$a"; prev="$a"; done
+  printf '{{"version":1,"digest":"","threads":[]}}\\n' >"$plan"
+  exit 0 ;;
 *" --reviewed "*" --yes "*)
   list=""; tree=""; root=""
   while [ "$#" -gt 0 ]; do
@@ -1846,6 +1851,12 @@ case " $* " in
 *" review confirm "*)
   : >"$list"; put "$m/1.reviewed" '{{"mr": 1, "accepted": [], "at": "t"}}'; exit 0 ;;
 *" review ready "*) : >"$list"; put "$m/ready.json" '{{"mr": 1, "at": "t"}}'; exit 0 ;;
+*" --close-early "*" --accept-plan "*)
+  plan=""; prev=""
+  for a in "$@"; do [ "$prev" = --accept-plan ] && plan="$a"; prev="$a"; done
+  printf '{{"version":1,"digest":"","threads":[]}}\\n' >"$plan"
+  exit 0 ;;
+*" --close-early "*" --accept-check "*) exit 0 ;;
 *" --close-early "*) put "$m/2.skipped" '{{"by": "close-early", "at": "t"}}'; exit 0 ;;
 esac
 PYTHONPATH='{root}/src' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
@@ -2247,6 +2258,13 @@ class C1HostTest(C1HostHarness):
             f"  [ -d '{self.lock_dir()}' ] && echo LOCKED-WHILE-CHOOSING >&2\n"
             '  printf \'{"choices": {"u1": "keep"}, "digest": "d0"}\' >"$out"\n'
             "  exit 0 ;;\n"
+            # 受け入れる指摘の計画を立てる --yes は C1 の外で走り、何も置かない。
+            # 受け入れる指摘は無いという計画を返す（実物は依頼の記録を読むので、ここでは使わない）
+            '*" --accept-plan "*)\n'
+            '  prev=""; for a in "$@"; do\n'
+            '    [ "$prev" = --accept-plan ] && plan="$a"; prev="$a"; done\n'
+            '  printf \'{"threads": []}\' >"$plan"\n'
+            '  printf \'{"version":1,"ok":true}\\n\'; exit 0 ;;\n'
             '*" --yes "*)\n'
             '  prev=""; for a in "$@"; do\n'
             '    [ "$prev" = --record-writes ] && list="$a"\n'

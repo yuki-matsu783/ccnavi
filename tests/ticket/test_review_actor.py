@@ -253,10 +253,10 @@ class ReviewRuleTest(ActorHarness):
 
     def test_a_marker_thread_is_skipped_only_on_gitlab_by_the_poster(self):
         marker = review_host.Thread(id="t", body="<!-- ccnavi:request i0001:1 -->", author="bot")
-        self.assertEqual(review_host._unresolved([marker], set(), "github", "bot"), [marker])
-        self.assertEqual(review_host._unresolved([marker], set(), "gitlab", ""), [marker])
-        self.assertEqual(review_host._unresolved([marker], set(), "gitlab", "someone"), [marker])
-        self.assertEqual(review_host._unresolved([marker], set(), "gitlab", "bot"), [])
+        self.assertEqual(review_host._unresolved([marker], "github", "bot"), [marker])
+        self.assertEqual(review_host._unresolved([marker], "gitlab", ""), [marker])
+        self.assertEqual(review_host._unresolved([marker], "gitlab", "someone"), [marker])
+        self.assertEqual(review_host._unresolved([marker], "gitlab", "bot"), [])
 
     def test_a_crit_push_thread_is_counted_even_from_the_poster(self):
         """crit push の行のスレッドは目印で始まらないので、依頼を投稿したアカウントからでも数える。
@@ -267,7 +267,7 @@ class ReviewRuleTest(ActorHarness):
             id="d1", body="ここは X ではなく Y では", author="bot", path="wip/eli5/phase-1.html"
         )
         for host in ("github", "gitlab"):
-            self.assertEqual(review_host._unresolved([crit], set(), host, "bot"), [crit], host)
+            self.assertEqual(review_host._unresolved([crit], host, "bot"), [crit], host)
 
     def test_a_request_record_without_host_or_mr_is_not_matched(self):
         result = review_host.Result(host="github", mr=review_host.MergeRequest(7, "u"))

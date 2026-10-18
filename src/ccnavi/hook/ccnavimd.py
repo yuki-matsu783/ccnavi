@@ -279,7 +279,9 @@ def run_script(conf: settings.Settings, root: str, name: str, ctx: Context) -> b
     path = script_path(conf, root).replace("\\", "/")
     try:
         done = subprocess.run(
-            ["sh", "-c", '. "$1" && "$2"', "sh", path, function_name(name)],
+            # 読み込みの失敗は 3 で抜ける。構文の誤りで `.` が 1 を返す sh（macOS の bash）でも、
+            # 偽の 1 と取り違えずに判定できないものとして扱うため
+            ["sh", "-c", '. "$1" || exit 3; "$2"', "sh", path, function_name(name)],
             cwd=root,
             capture_output=True,
             env=environment,

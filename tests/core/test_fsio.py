@@ -569,5 +569,19 @@ class TempNameTest(unittest.TestCase):
             self.assertFalse(fsio.is_temp_name(name), name)
 
 
+class RecordingTest(unittest.TestCase):
+    def test_nested_recording_keeps_the_outer_one_after_the_inner_exits(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first = os.path.join(tmp, "first")
+            second = os.path.join(tmp, "second")
+            with fsio.recording() as outer:
+                with fsio.recording() as inner:
+                    fsio.write_text(first, "a")
+                fsio.write_text(second, "b")
+        names = [os.path.basename(p) for p in outer]
+        self.assertEqual(names, ["first", "second"])
+        self.assertEqual([os.path.basename(p) for p in inner], ["first"])
+
+
 if __name__ == "__main__":
     unittest.main()

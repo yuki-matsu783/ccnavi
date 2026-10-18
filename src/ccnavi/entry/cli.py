@@ -349,6 +349,15 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 何も置かない（state の置き場の
     # 下だけ）。ユーザが選ぶのを C1 のロックの外で済ませ、ロックを持ったままユーザを待たないため。
     parser.add_argument("--choose-out", default="")
+    # 受け入れの計画。decide の `--yes` と `--close-early` で、受け入れる指摘と返信の本文を
+    # このファイルに書くだけで、何も置かない（state の置き場の下だけ）。sh がこれで返信と解決を
+    # 済ませてから、置く呼び出しを打つ。置くときは `--accept-done` が計画を読む。
+    parser.add_argument("--accept-plan", default="")
+    parser.add_argument("--accept-done", default="")
+    # `--close-early` の 2 段目の前に、計画のあとで未解決の指摘が変わっていないかだけを確かめる
+    # （何も書かない）。`--no-issue` は返信の文言のため（残りを issue に書き出さない）。
+    parser.add_argument("--accept-check", default="")
+    parser.add_argument("--no-issue", action="store_true")
     # 統合先の名前。リポジトリには置かず、手元では環境変数 `CCNAVI_INTEGRATION_BRANCH`（未設定なら
     # ホストのデフォルトブランチ）で決まる。実行ファイルは環境変数を読まず、sh が決めて渡す。
     # いまは `--lint` の識別子の予約（統合先と同じ名前の識別子を使わせない）が読む。
@@ -470,6 +479,14 @@ def _recorded_run(
             f"ccnavi: --record-writes の書き出し先は {place}{os.sep}... の下だけ（{refused}）\n"
         )
         return EXIT_ERROR
+    # `--placed-out` の結果のファイルも、一覧のファイル自身と同じく載せない（承認が書いた
+    # 置き場ではなく、呼び手が受け取る控え。載ると sh が相対パスでない行を送ろうとして止まる）
+    placed_given = os.path.abspath(args.placed_out) if args.placed_out else ""
+    placed_target = (
+        os.path.join(cli_args._real(os.path.dirname(placed_given)), os.path.basename(placed_given))
+        if placed_given
+        else ""
+    )
     base = cli_args._real(os.path.abspath(args.record_tree)) if args.record_tree else real_root
     # 上書きした state の置き場（`--state`）も、リポジトリに入らない書き込み
     # （レビューの下書きなど）の置き場なので一覧から外す。`--state` が効くのは診断の経路だけで、
@@ -490,6 +507,7 @@ def _recorded_run(
             cli_args._inside(real, state)
             or cli_args._inside(real, moved_state)
             or cli_args._same(real, target)
+            or (placed_target and cli_args._same(real, placed_target))
         ):
             continue
         rel = real
