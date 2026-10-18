@@ -1058,7 +1058,7 @@ class ApproveCarriesTest(Workspace):
         self.assertEqual(self.subject(tree), MESSAGE)
         self.assertEqual(self.committed(tree), [f"{APPROVED}/i0001.md"])
         self.assertEqual(self.remote_head("i0001"), self.head(tree))
-        self.assertIn("承認の一部だけが通った", result.stderr)
+        self.assertIn("承認の一部だけが通りました", result.stderr)
 
     def test_partial_approval_reports_the_written_and_the_failed(self):
         """親は書けて子だけ書けなかった承認。親は push され、書けた分と子の失敗が報告される。"""
