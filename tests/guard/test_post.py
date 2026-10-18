@@ -119,6 +119,7 @@ class Harness:
         tool="Bash",
         event="PostToolUse",
         source=None,
+        prompt=None,
         **tool_input,
     ):
         body = {
@@ -127,6 +128,9 @@ class Harness:
             "tool_input": tool_input,
             "session_id": session,
         }
+        # UserPromptSubmit だけが prompt を持つ。
+        if prompt is not None:
+            body["prompt"] = prompt
         # SessionStart だけが source を持つ（startup・resume・clear・compact）。
         if source is not None:
             body["source"] = source
@@ -339,6 +343,78 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("POST_VIOLATION", result.stderr)
         self.assertIn("protected/keep.txt", result.stderr)
+
+    def test_ターンの間にユーザが直した保護領域は次の呼び出しで戻さない(self):
+        # 起動時の基準は 1 度しか取らない。ユーザの発言で今ある変更を記録に足さないと、
+        # セッションの途中でユーザが直したぶんが次のツール呼び出しの変更に見えて、
+        # コミット済みの内容へ戻される。
+        self.run_hook(event="SessionStart", source="startup")
+        self.dirty("edited by the user\n")
+
+        self.run_hook(event="UserPromptSubmit", prompt="続きをお願いします")
+        result = self.run_hook(command="ls", restore="enable")
+
+        self.assertEqual(result.returncode, 0)
+        with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "edited by the user\n", "ユーザの編集を戻してはいけない")
+
+    def test_ユーザの編集を受け入れたあとの呼び出しの変更は戻す(self):
+        self.run_hook(event="SessionStart", source="startup")
+        self.dirty("edited by the user\n")
+        self.run_hook(event="UserPromptSubmit", prompt="続きをお願いします")
+        write(os.path.join(self.repo, "protected", "new.txt"), "built\n")
+
+        result = self.run_hook(command="python build.py", restore="enable")
+
+        self.assertIn("protected/new.txt", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.repo, "protected", "new.txt")))
+        with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "edited by the user\n")
+
+    def test_バックグラウンドの完了通知ではユーザの編集として受け入れない(self):
+        # 通知も UserPromptSubmit を起こすが、その間に動いたプロセスの変更は、
+        # ユーザの変更と区別できない。受け入れずに、これまでどおり戻す。
+        self.run_hook(event="SessionStart", source="startup")
+        self.dirty("written by a background process\n")
+
+        self.run_hook(
+            event="UserPromptSubmit",
+            prompt="<task-notification>\n<status>completed</status>\n</task-notification>",
+        )
+        result = self.run_hook(command="ls", restore="enable")
+
+        self.assertEqual(result.returncode, 2)
+        with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "committed\n")
+
+    def test_受け入れたユーザの編集のうえにエージェントが書いたら言うが戻さない(self):
+        # 報告済みの記録の鍵は種類とパスだけ。指紋で見分けないと、受け入れたファイルへの
+        # 以降の書き込みが全部素通しになる。一方、戻す先のコミット済みの内容はユーザの編集より
+        # 古いので、戻すとその編集まで消える。だから言うだけにする。
+        self.run_hook(event="SessionStart", source="startup")
+        self.dirty("edited by the user\n")
+        self.run_hook(event="UserPromptSubmit", prompt="続きをお願いします")
+
+        self.dirty("overwritten by the agent\n")
+        result = self.run_hook(command="python build.py", restore="enable")
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("protected/keep.txt", result.stderr)
+        self.assertIn("already held a change the user made", result.stderr)
+        with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "overwritten by the agent\n", "ユーザの編集まで消さない")
+
+    def test_受け入れたあとの書き込みは1度言えば繰り返さない(self):
+        self.run_hook(event="SessionStart", source="startup")
+        self.dirty("edited by the user\n")
+        self.run_hook(event="UserPromptSubmit", prompt="続きをお願いします")
+        self.dirty("overwritten by the agent\n")
+        self.run_hook(command="python build.py", restore="enable")
+
+        again = self.run_hook(command="ls", restore="enable")
+
+        self.assertEqual(again.returncode, 0)
+        self.assertEqual(again.stdout, "")
 
     def test_起動時の変更が件数の上限を超えても戻さない(self):
         # 基準を件数で切ると、切った先の在る汚れが「新しい変更」になり、自動復元で消される。
