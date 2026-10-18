@@ -1749,7 +1749,7 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 
 承認したことは、拡張が渡す文と `ccnavi-ticket.sh status` で伝わる。hook は承認を伝えない。拡張は承認の文
 （`--agree --yes` の `prompt`）をオーバーレイの 2 ボタン（コピー、新しいセッションで開く）から渡せる。端末・GitLab や GitHub の画面・Chrome 拡張で
-承認したときは、ユーザがそのあとセッションに一言送る。ユーザがレビューを終えたことは、ボードの「レビュー済み連絡」が
+承認したときは、ユーザがそのあとセッションに一言送る。ユーザがレビューを終えたことは、VS Code のボードの「レビュー済み連絡」が
 「親のワークツリーで `ccnavi-review.sh confirm --phase <N>` を打て」の文を同じ 2 ボタンで渡す。マーカーを置くのはその `confirm`。
 
 **承認済みチケットの状態は `status` で聞く。** ファイルや `git status` を読んで推測せず、ccnavi に聞く。
@@ -2036,6 +2036,9 @@ sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
 - `confirm` は、依頼時の HEAD と今の HEAD が同じで push 済みであることを求め、今残っている未解決スレッドを数える（付いた時刻では絞らない）。
   未解決も変更要求も無ければレビュー済みのマーカーを置き、そのフェーズの `review/` の子を `done/` へ動かす。残るなら一覧を返す。
   変更要求はレビュアーごとに最新だけを数え、取り下げは無い扱い
+- レビュー済みにする場所は 3 つで、どれも同じ判定（`confirm`）を通る。端末の `ccnavi-review.sh confirm --phase <N>`、
+  VS Code のボードの「レビュー済み連絡」（ボードはマーカーを置かず、出た文を受けた親が `confirm` を打つ）、Chrome 拡張のボードの
+  「レビュー済み」（親のブランチへマーカーと `done/` への移動を 1 コミットで書く）
 - `comment` はこのセッションで受けた承認や判断をマージリクエストのコメントに写す
 
 残った指摘の対応方針はユーザが決める（`decide`）。ボードの「決める」か、端末で `ccnavi-review.sh decide <N>`。
