@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 
 from ..infra import fsio
+from ..policy import rules
 from . import (
     agree_candidates,
     approval,
@@ -51,10 +52,11 @@ def revise_copy(
     current: ticket_model.Ticket,
     revised: ticket_model.Ticket,
 ) -> str:
-    """承認済みチケットの計画を差し替える。
+    """承認済みチケットの計画と範囲を差し替える。
 
-    範囲と本文はそのまま（差し替えるのは計画と `phases:`。`revised_front`）。改版の時刻は
-    チケットに書かない。待ち方は書かない（承認済みチケットの計画から都度計算する）。
+    本文はそのまま（差し替えるのは計画・`phases:`・範囲。`revised_front`）。旧い範囲は
+    ccnavi の側には残らず、git の履歴だけに残る。改版の時刻はチケットに書かない。
+    待ち方は書かない（承認済みチケットの計画から都度計算する）。
     """
     current.raw = revised_front(current, revised)
     failed = approval_marks.write_ticket(
@@ -64,7 +66,7 @@ def revise_copy(
 
 
 def revised_front(current: ticket_model.Ticket, revised: ticket_model.Ticket) -> dict:
-    """改版で書く frontmatter。承認済みチケットの計画と `phases:` を差し替えたもの。
+    """改版で書く frontmatter。承認済みチケットの計画・`phases:`・範囲を差し替えたもの。
 
     `current` は書き換えない。承認画面の「`phases:` の差分」も同じものから組むので、
     画面に出した中身と書く中身が食い違わない。項の `after` も書く（`PlanItem.as_raw`）。
@@ -73,6 +75,12 @@ def revised_front(current: ticket_model.Ticket, revised: ticket_model.Ticket) ->
     承認したとたんに親と子が全部止まる。提案に `phases:` が無ければ外す。
     """
     front = dict(current.raw)
+    # 範囲は提案の値に差し替える。提案に無い項は外す（全部外れた範囲は、提案の検査が止める）。
+    for section in rules.SECTIONS:
+        if section in revised.raw:
+            front[section] = revised.raw[section]
+        else:
+            front.pop(section, None)
     front["plan"] = [item.as_raw() for item in revised.plan]
     if revised.feedback is not None:
         front["feedback"] = [item.as_raw() for item in revised.feedback]

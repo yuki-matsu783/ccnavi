@@ -423,7 +423,7 @@ def revision_problems(
 ) -> list[rules.Problem]:
     """親の改版を受けてよいか。
 
-    変えてよいのは計画（`plan:` / `feedback:`）と写し（`phases:`）。写しは、子が承認された番号
+    変えてよいのは計画（`plan:` / `feedback:`）・写し（`phases:`）・範囲。写しは、子が承認された番号
     （固定した番号）が使う定義だけ承認済みチケットの値のまま（`phases.yml` と違っていてよい）、
     ほかは今の `phases.yml` と同じ。足すのも外すのも自由。
     """
@@ -437,15 +437,21 @@ def revision_problems(
     problems = plan_problems(revised, config, held)
     if any(p.severity == rules.SEVERITY_ERROR for p in problems):
         return problems
-    # 変えられるのは計画と写しだけ。
-    if _scope_signature(revised) != _scope_signature(current):
-        problems.append(
-            rules.Problem(
-                rules.SEVERITY_ERROR,
-                revised.ticket,
-                "改版で変えられるのは plan・feedback・phases だけ。範囲が承認済みチケットと違う",
+    # 範囲を変える改版は、作業中の子が居ないときだけ。子の範囲は親の範囲の中に収まる前提で
+    # 承認されているので、親の範囲を変えるなら、子は一度取り消して出し直す。
+    if approval.scope_signature(revised) != approval.scope_signature(current):
+        busy = open_children(conf, root, current.ticket)
+        if busy:
+            problems.append(
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    revised.ticket,
+                    "範囲を変える改版は、作業中の子が居ないときだけ出せる"
+                    f"（作業中の子: {', '.join(busy)}）。"
+                    "`ccnavi-ticket.sh cancel <子> --reason <理由>` で子を取り消してから、"
+                    "改版を出し直す。範囲を変えたあとの子は、新しい子として提案する",
+                )
             )
-        )
     if (
         revised.title != current.title
         or revised.issue != current.issue
@@ -455,7 +461,7 @@ def revision_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 revised.ticket,
-                "改版で変えられるのは plan・feedback・phases だけ。"
+                "改版で変えられるのは plan・feedback・phases・範囲だけ。"
                 "題か課題番号が承認済みチケットと違う",
             )
         )
@@ -466,7 +472,8 @@ def revision_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 revised.ticket,
-                "改版で変えられるのは plan・feedback・phases だけ。`mr:` が承認済みチケットと違う",
+                "改版で変えられるのは plan・feedback・phases・範囲だけ。"
+                "`mr:` が承認済みチケットと違う",
             )
         )
     # 錠は番号ごと。子が承認された番号（固定した番号）の項だけを変えさせない。
@@ -523,8 +530,17 @@ def revision_problems(
     return problems
 
 
-def _scope_signature(t: ticket_model.Ticket) -> tuple:
-    return tuple((e.decision, e.glob, e.regex) for e in t.entries)
+def open_children(conf: settings.Settings, root: str, parent_id: str) -> list[str]:
+    """この親の子で、作業中（`doing/`）のものの識別子。範囲を変える改版を止める。
+
+    閉じた子（終わった・取り消した）とレビュー待ちの子は数えない。仕事が済んでいて、
+    親の範囲が変わっても動かす先が無いため。
+    """
+    return sorted(
+        t.ticket
+        for t in approval.all_tickets(conf, root)
+        if t.parent == parent_id and t.state == ticket_model.DOING
+    )
 
 
 def fixed_numbers(conf: settings.Settings, root: str, parent_id: str) -> set[int]:

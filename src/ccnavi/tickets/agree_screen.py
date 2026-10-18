@@ -148,6 +148,7 @@ def screen(
         cand_types = cand.types
         if cand.is_revision and cand.current is not None:
             lines += ["", f"== {t.ticket}: {t.title}  親の改版"]
+            lines += _scope_diff_lines(cand.current, t)
             lines += _plan_diff_lines(cand.current, t, cand_types)
             lines += _copy_diff_lines(cand.current, t)
             for note in cand.notes:
@@ -330,6 +331,29 @@ def _copy_lines(t: ticket_model.Ticket, types: dict | None, config: dict | None)
         lines.append("■ この親では使わない定義（phases.yml にあるが phases: にない）")
         lines.append("    使わない: " + "、".join(f"{pt.title} / {pt.id}" for pt in left))
     return lines
+
+
+def _scope_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket) -> list[str]:
+    """改版の範囲の差分。足した項・外した項を、deny / ask / allow ごとに並べる。
+
+    旧い範囲は承認のあとに上書きされ、ccnavi の側には残らない。承認する側が、何が新たに
+    書けるようになり、何が書けなくなるかをここで見られるようにする。
+    """
+    lines: list[str] = []
+    for name in rules.SECTIONS:
+        before = set(current.paths(name))
+        after = set(revised.paths(name))
+        lines += [f"    {name} 追加: {p}" for p in revised.paths(name) if p not in before]
+        lines += [f"    {name} 削除: {p}" for p in current.paths(name) if p not in after]
+    if not lines:
+        return []
+    return [
+        "■ 範囲の差分（改版で親に固定する範囲）",
+        "    allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、"
+        "deny はこのチケットでも編集できない場所。承認すると、旧い範囲は上書きされる",
+        *lines,
+        "    作業中の子は居ない（居れば改版は通らない）。新しい範囲の子は、新しい子として提案する",
+    ]
 
 
 def _copy_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket) -> list[str]:

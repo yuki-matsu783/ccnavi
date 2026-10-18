@@ -453,17 +453,27 @@ def phases_signature(t: ticket_model.Ticket) -> tuple | None:
     return tuple(sorted((ident, pt.key()) for ident, pt in types.items()))
 
 
+def scope_signature(t: ticket_model.Ticket) -> tuple:
+    """チケットの範囲（deny / ask / allow の項）の比べる形。書く順の違いは違いにしない。"""
+    return tuple(sorted((e.decision, e.glob, e.regex) for e in t.entries))
+
+
 def plan_differs(proposal: ticket_model.Ticket, current: ticket_model.Ticket) -> bool:
-    """提案の計画（全体計画かフィードバック計画）か、写し（`phases:`）が承認済みチケットと違うか。
+    """提案の計画（全体計画かフィードバック計画）・写し（`phases:`）・範囲が承認済みチケットと違うか。
     改版の条件。
 
     計画は `plan_signature` で比べる。待ち方は計画から決まるので、待ち方だけの改版は無い。
     写しは `phases_signature` で比べる。計画が同じで写しだけが違う提案も改版の候補にする
     （`--plan-order <親> --fill-phases` で今の `phases.yml` に揃えた提案を出せるように）。
+    範囲は `scope_signature` で比べる。範囲だけが違う提案も改版の候補にする。
     """
-    return phases_signature(proposal) != phases_signature(current) or any(
-        plan_signature(proposal, part) != plan_signature(current, part)
-        for part in ("plan", "feedback")
+    return (
+        phases_signature(proposal) != phases_signature(current)
+        or scope_signature(proposal) != scope_signature(current)
+        or any(
+            plan_signature(proposal, part) != plan_signature(current, part)
+            for part in ("plan", "feedback")
+        )
     )
 
 
