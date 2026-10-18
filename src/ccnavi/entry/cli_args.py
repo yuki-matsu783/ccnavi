@@ -20,6 +20,7 @@ from ..policy import selfguard
 from ..records import audit, prune
 from ..tickets import (
     ticket_ids,
+    user_only,
 )
 
 # フラグで上書きする設定の欄と、空文字を「指定した」と読むかどうか。
@@ -184,10 +185,14 @@ DOCS_FLAGS = (
     ("--no-refresh", "no_refresh", False),
 )
 DOCS_ONLY = "ccnavi: {flag} は --docs でだけ使える\n"
+# 値なしで渡された `--yes`。取り込み（`user handoff --yes`）だけが読む（ほかの経路の `--yes` は
+# 識別子を取る）。
+BARE_YES = "\x00bare"
 # `--docs` と一緒に使えないフラグ。ほかの経路と、その経路でだけ読むもの。何も出さずに無視すると、
 # 打ったユーザは反映されたと思う。
 _NOT_WITH_DOCS = (
     "--lint",
+    "--handoff",
     "--test",
     "--test-expectations",
     "--explain",
@@ -316,7 +321,7 @@ def _prune(
     Bash から打てると、しきい値の環境変数を 0 に近づけて前に並べるだけで、自分の呼び出しの
     記録を消せる。
     """
-    if not preview and not _from_terminal(stdin, conf, stderr, "--prune"):
+    if not preview and not _from_terminal(stdin, conf, stderr, user_only.terminal("prune")):
         return EXIT_ERROR
     report = prune.run(root, conf.log, conf.state, dry_run=preview)
     for line in prune.lines(report, preview):

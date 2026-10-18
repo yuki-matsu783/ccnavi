@@ -103,30 +103,19 @@ README.md（「作業・レビュー計画のテンプレート」）に記載�
 でも同じ検査を報告します。
 
 テンプレートは2段階で収集します。エージェントは --draft を実行できます。
-完了済みの親チケット（done/ にあるもの）の計画と子フローを、wip/proposals/templates/NAME.yml
-に下書きとしてコピーします。下書きは効力を持たず、上書きもされません。--import
-はユーザーだけが実行します。--yes を指定しない場合は何も書き込まず、検査結果と、
-取り込み先の同名テンプレートとの差分を表示します。--yes と、--expect
-に下書きのハッシュを指定した場合は書き込み、下書きが変更されていなければ下書きを削除します。
+完了済みの親チケット（done/ にあるもの）の計画と子フローを、親のツリーの
+wip/handoff/<取り込み先の相対パス> に下書きとしてコピーします（--to の既定は project で、
+取り込み先は .ccnavi/config/project/templates/NAME.yml。--to common なら
+.ccnavi/config/common/templates/NAME.yml、--layer PROJECT なら
+projects/PROJECT/.ccnavi/config/project/templates/NAME.yml）。下書きは効力を持たず、
+上書きもされません。取り込み先に同名のテンプレートが既にある場合も作りません。
 
-    ccnavi --templates --draft PARENT [--name NAME] [--json]
-    ccnavi --templates --import DRAFT --to common|project [--layer NAME]
-                       [--replace] [--yes --expect HASH] [--json]
+    ccnavi --templates --draft PARENT [--name NAME] [--to common|project] [--layer NAME] [--json]
 
-下書きと収集済みのテンプレートは編集もできます。--yes を指定しない場合は何も書き込まず、
-変更内容を表示します。--yes と、--expect に対象のハッシュを指定した場合は書き込みます。--yes
-はユーザーだけが実行します。--save-draft、--rename-template、--move-template、--delete-template
-はユーザー専用です（エージェントは実行できず、プレビューも実行できません。エージェントは Write
-で下書きを編集します）。--delete-draft のプレビューは、エージェントも実行できます。
-
-    ccnavi --templates --save-draft NAME --body-file FILE [--yes --expect HASH] [--json]
-    ccnavi --templates --delete-draft NAME [--yes --expect HASH] [--json]
-    ccnavi --templates --rename-template NAME --new-name NEW --on draft|common|project
-                       [--layer NAME] [--yes --expect HASH] [--json]
-    ccnavi --templates --move-template NAME --on common|project [--layer NAME]
-                       --to common|project [--to-layer NAME] [--yes --expect HASH] [--json]
-    ccnavi --templates --delete-template NAME --on common|project [--layer NAME]
-                       [--yes --expect HASH] [--json]
+下書きの取り込みは、ほかの保護対象（rules.yml・docs・hook など）と同じく、ユーザーが
+ccnavi user handoff で行います（見るだけの形も含めてユーザー専用です。実行ファイルは内部で
+--handoff に読み替えます。--handoff を直接渡すと断ります）。テンプレートの
+改名・移動・削除は、ユーザーがファイルを直接操作します。
 
 収集済みのテンプレートは、親の提案を開始するときに使用されます。
 エージェントも実行できます（フローの下書きも効力を持ちません）。
@@ -169,7 +158,7 @@ phases.yml にないタイプがある場合、--plan も指定された場合�
     --record-writes <file> [--record-tree <dir>]
         （この実行で書いた・消したパスを、logs/state/c1/ の下の <file> に1行1つで
          書き出します。--record-tree を渡すと一覧はそのツリーからの相対になり、
-         置き場の外に書いたらエラーになります。C1 と ccnavi-agree.sh が使います）
+         置き場の外に書いたらエラーになります。C1 と ccnavi-user-agree.sh が使います）
     --placed-out <file>
         （--agree 専用。実際に書けた承認済みチケットのパスなどを JSON で書き出します）
     --choose-out <file>
@@ -187,7 +176,7 @@ phases.yml にないタイプがある場合、--plan も指定された場合�
     --no-issue
         （--close-early 用。受け入れた指摘への返信に、issue に回すと書かないようにします）
     --via terminal|board
-        （decide が書くレビュー済みの印と、--templates --import --yes の経路）
+        （decide が書くレビュー済みの印と、user handoff --yes の経路。handoff は board だけ）
 
 チケット、その置き場、フェーズの印、レビューの保留を機械可読な形式で一覧表示するには、
 次のコマンドを実行します（VS Codeのボード拡張機能がこれを読み込みます）。
@@ -403,7 +392,7 @@ VS Codeのボード拡張機能は、ターミナルではなくオーバーレ�
          子の手元のブランチ（合流した子: 先頭が merged_sha と同じで、それが push 済みの親に含まれる
          場合のみ）、親のワークツリーを削除します。取り消した子のブランチは一覧表示のみで、
          ユーザーが確認した後に、ユーザーが ! を付けて
-         ccnavi-clean.sh --branch <name> --confirmed を打って削除します。
+         ccnavi-user-clean-branch.sh <name> --confirmed を打って削除します。
          ccnavi-review.sh ready が中で呼びます。エージェントからは打てません。
          未コミットの変更や、git が無視しているファイルがあるワークツリーは理由を出して残します）
     ccnavi worktree branch <name> [confirmed]
@@ -460,7 +449,7 @@ ccnavi自身は、リモートに接続しません。スクリプトがマー�
 
 未解決のレビュースレッドは、人が親のワークツリーから、次のコマンドで受け入れます。
 
-    sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh decide N
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-decide.sh N
 
 （スクリプトはワークスペースにのみ存在するため、プロジェクトから作成したワークツリーからは、
 相対パスで到達できません）
@@ -474,7 +463,7 @@ ccnavi自身は、リモートに接続しません。スクリプトがマー�
 
 人が親を早期にクローズする（「今のところ十分」とする）には、次を実行します。
 
-    sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh close-early --reason <why>
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-close-early.sh --reason <why>
 
 `ccnavi --close-early --reason <why> --result <json>` を実行した後、
 マージリクエストのDraftを解除し、残った項目を新しいissueとして登録します。

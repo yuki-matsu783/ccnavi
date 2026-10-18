@@ -35,10 +35,12 @@ from ..tickets import (
     core,
     review,
     skillsync,
+    user_only,
     via,
 )
 from . import (
     cli_args,
+    cli_handoff,
     cli_ops,
     cli_plan,
     cli_templates,
@@ -73,9 +75,9 @@ def _take_test_words(argv: list[str]) -> tuple[list[str], list[str] | None]:
 
     返すのは残りの語と、抜いた 2 語（無ければ None）。
 
-    `nargs=2` は版で扱いが違い、3.12 は 2 語の中のオプションの名前（`--test Bash
-    --permission-mode auto
-    ls`）を語として取らずに argparse の誤りで抜けてしまい、`_test_usage` の案内まで届かない。
+    `nargs=2` は版で扱いが違い、3.12 は 2 語の中のオプションの名前
+    （`--test Bash --permission-mode auto ls`）を語として取らずに argparse の誤りで抜けてしまい、
+    `_test_usage` の案内まで届かない。
     続く 2 語をそのまま取れば、版に依らず同じ形で `_test_usage` が読める。2 語に満たないときと
     `--` の後ろにあるときは、そのまま argparse に任せる。
     """
@@ -92,9 +94,8 @@ def _take_test_words(argv: list[str]) -> tuple[list[str], list[str] | None]:
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。
 
-    マーカーに書く経路（via）はここで決まる。既定はエージェントが sh から打つサブコマンド（`cli`）
-    で、
-    ユーザの判断の経路（端末・ボード）と hook は枝の中で差し替える。
+    マーカーに書く経路（via）はここで決まる。既定はエージェントが sh から打つサブコマンド
+    （`cli`）で、ユーザの判断の経路（端末・ボード）と hook は枝の中で差し替える。
     """
     with via.session(via.VIA_CLI):
         try:
@@ -115,7 +116,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
 # argparse に登録しないので、ヘルプにも `--version` の flags 一覧にも出ない。
 RENAMED_APPROVE = "--approve"
 RENAMED_APPROVE_NOTICE = (
-    "ccnavi: --approve は --agree に改名しました。sh なら ccnavi-agree.sh を使ってください。\n"
+    "ccnavi: --approve は --agree に改名しました。sh なら ccnavi-user-agree.sh を使ってください。\n"
 )
 
 
@@ -190,6 +191,13 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if _asks_renamed_approve(argv):
         stderr.write(RENAMED_APPROVE_NOTICE)
         return EXIT_BLOCK  # 2。使い方の誤り（1）と分け、案内だけで終える
+    # ユーザ専用の入口（`ccnavi user <操作>`）を、今の内部の形に読み替える。入口から来たかどうかは
+    # argparse の結果（args）には入れない。オプションで偽装できないようにするため。
+    try:
+        argv, entry = user_only.rewrite(argv)
+    except user_only.UserEntryError as exc:
+        stderr.write(f"ccnavi: {exc}\n")
+        return EXIT_BLOCK
     # 前方一致を受けない。受けると `--close` や `--review` が `--close-early` / `--reviewed` として
     # 走り、省略せずに書いた形しか見ない組み込みの deny（`phase_forms._CLI_FORMS`）に止められない。
     parser = argparse.ArgumentParser(prog="ccnavi", add_help=False, allow_abbrev=False)
@@ -224,13 +232,14 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--expect", default=None, metavar="SHA")
     # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイでユーザが押した承認。端末は要らない。
-    # 値なしの `--yes` は `--templates --import` だけが読む（`_run` が、ほかの経路では断る）。
-    parser.add_argument("--yes", nargs="?", const=cli_templates.BARE_YES, default="")
+    # 値なしの `--yes` は `user handoff` だけが読む（`_run` が、ほかの経路では断る）。
+    parser.add_argument("--yes", nargs="?", const=cli_args.BARE_YES, default="")
     # 見せた提案の識別子の一覧と各提案ファイルのバイト列のダイジェスト（`--agree --yes` は
     # preview の `digest`、`--reviewed --yes` は指摘のダイジェスト）。`--yes` と一緒に渡す。
     parser.add_argument("--digest", default="")
     # 端末の `--agree` が実際に書けたパスの一覧を JSON で書き出すファイル。画面（標準出力）は
-    # ユーザの確認に使うので別にした。`ccnavi-agree.sh` が読み、書けた分と書けなかった分を言う。
+    # ユーザの確認に使うので別にした。`ccnavi-user-agree.sh` が読み、書けた分と
+    # 書けなかった分を言う。
     parser.add_argument("--placed-out", default="", metavar="FILE")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
     # `--test` の payload に載せる Claude Code の権限モードとサブエージェントの印。hook は
@@ -288,26 +297,15 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--templates", action="store_true")
     parser.add_argument("--show", default=None, metavar="NAME")
     parser.add_argument("--layer", default="")
-    # テンプレートの溜める側。
-    # `--draft <親>` は完了した親から下書きを作る。効力が無いのでエージェントが打ってよい。
-    # `--import <下書き> --to common|project` はユーザ専用（`phase_forms._CLI_FORMS` が止める）。
-    # `--yes` と `--expect` が揃ったときだけ書く。
-    # `--name` は下書きの名前、`--replace` は取り込み先の同名の置き換え。
+    # テンプレートの下書き。`--draft <親>` は完了した親から下書きを `wip/handoff/` に作る。効力が
+    # 無いのでエージェントが打ってよい。`--name` は下書きの名前、`--to common|project` と
+    # `--layer` は取り込み先。取り込みは `user handoff`（テンプレート専用の取り込みは無い）。
     parser.add_argument("--draft", default=None, metavar="PARENT")
     parser.add_argument("--name", default="")
-    parser.add_argument("--import", dest="import_", default=None, metavar="DRAFT")
     parser.add_argument("--to", default="")
-    parser.add_argument("--replace", action="store_true")
-    # テンプレートと下書きの保存・改名・移動・削除。
-    # --import と同じく --yes と --expect が揃ったときだけ書く。
-    parser.add_argument("--save-draft", dest="save_draft", default=None, metavar="DRAFT")
-    parser.add_argument("--delete-draft", dest="delete_draft", default=None)
-    parser.add_argument("--rename-template", dest="rename_template", default=None)
-    parser.add_argument("--move-template", dest="move_template", default=None)
-    parser.add_argument("--delete-template", dest="delete_template", default=None)
-    parser.add_argument("--new-name", default="")
-    parser.add_argument("--on", default="")
-    parser.add_argument("--to-layer", default="")
+    # 保護対象の下書きの取り込み（`ccnavi user handoff [<パス>…]`）。ユーザ専用で、`user` の入口が
+    # 読み替える。パスは位置引数（`command`）で受ける。`--yes` と `--expect` が揃ったときだけ書く。
+    parser.add_argument("--handoff", action="store_true")
     # チケットの状態とレビューの操作。ユーザか、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", action="append", default=None)
@@ -371,7 +369,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # decide が書くレビュー済みのマーカーの経路（`via`）で、`terminal` か `board` を渡す。
     # `--actor` があるときだけ受け付ける。アカウントを引けなかったときに、
     # マーカーを前と同じ中身にするため。
-    # `--templates --import --yes` の board 経路（`--expect` と `--json` と組む）でも受け付ける。
+    # `user handoff --yes` の board 経路（`--expect` と `--json` と組む）でも受け付ける。
     parser.add_argument("--via", default="")
     try:
         rest, test_words = _take_test_words(_json_out_of_test(argv))
@@ -380,6 +378,13 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         return EXIT_ERROR
     if test_words is not None and args.test is None:
         args.test = test_words
+    # ユーザ専用のオプションは、`user` の入口の外では断る。見るだけの形
+    # （`--agree --preview` など）は通す。
+    if entry is None:
+        refused_here = user_only.refused(args)
+        if refused_here:
+            stderr.write(f"ccnavi: {refused_here}\n")
+            return EXIT_BLOCK
     if args.help:
         stderr.write(cli_usage.USAGE)
         return EXIT_ERROR
@@ -387,8 +392,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if refused:
         stderr.write(f"ccnavi: {refused}\n")
         return EXIT_ERROR
-    if args.yes == cli_templates.BARE_YES and not (args.templates and cli_templates.editing(args)):
-        stderr.write("ccnavi: --yes には識別子を渡す（値なしの --yes は --import だけ）\n")
+    if args.yes == cli_args.BARE_YES and not args.handoff:
+        stderr.write("ccnavi: --yes には識別子を渡す（値なしの --yes は user handoff だけ）\n")
         return EXIT_ERROR
     if args.record_tree and not args.record_writes:
         stderr.write("ccnavi: --record-tree は --record-writes と一緒に指定してください。\n")
@@ -408,18 +413,10 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             "（--reviewed <N> --accept-unresolved）と一緒に指定してください。\n"
         )
         return EXIT_ERROR
-    # 取り込みを書く形（`--templates --import --yes`）は、拡張の子プロセスから board で呼ぶ。
-    # `--actor` は読まない。`--expect` と `--json` が揃ったときだけ通す。
-    if args.templates and cli_templates.editing(args) and args.yes:
-        if args.via and args.via != via.VIA_BOARD:
-            stderr.write("ccnavi: --via は --import --yes では board だけ渡せる\n")
-            return EXIT_ERROR
-        if args.via and (args.expect is None or not args.json):
-            stderr.write(
-                "ccnavi: --via board は --import / --save-draft など "
-                "--yes --expect <ハッシュ> --json と一緒に指定してください。\n"
-            )
-            return EXIT_ERROR
+    # 取り込みを書く形（`user handoff --yes`）は、拡張の子プロセスから board で呼ぶ。`--via` の
+    # 組み合わせは取り込みの入口（cli_handoff.usage_problem）が見る（`--json` なら JSON で答える）。
+    if args.handoff:
+        pass
     elif args.via and (not args.actor or not cli_ops._decide_writes(args)):
         stderr.write("ccnavi: --via は decide の --actor と一緒に指定してください。\n")
         return EXIT_ERROR
@@ -428,7 +425,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         return EXIT_ERROR
     # 経路と食い違う組み合わせは受けない。端末で 1 件ずつ選ぶ形（--yes 無し）はボードの経路でない。
     # --yes はボードの押した選択と、C1 の中の端末の decide（選ぶのを先に済ませた形）の両方が通る
-    if args.via == via.VIA_BOARD and not args.yes:
+    if args.via == via.VIA_BOARD and not args.yes and not args.handoff:
         stderr.write(
             "ccnavi: --via board は --yes（ボードで押した選択）と一緒に指定してください。\n"
         )
@@ -701,16 +698,12 @@ def _parsed(
     # 無かったころは argparse が知らないフラグとして止めていたので、無視して先へ進めると
     # `ticket start X --limit 3` のような打ち間違いが通るようになる（`--flow` は診断の中の
     # 差し替えで、無視しても何も動かないので無視するだけにしている）。
+    # 保護対象の下書きの取り込み（`user handoff`）。書くとき（`--yes`）は、hook の文字列照合だけを
+    # 歯止めにせず、実行時にも端末の前のユーザが打ったことを確かめる（見るだけの形は求めない）。
+    # ボードの経路（`--via board`）は端末を持たないので、`--expect` の一致と hook の止めに置く。
+    if args.handoff:
+        return cli_handoff.run(stdin, stdout, stderr, parser, conf, root, args)
     if args.templates:
-        # 取り込みを書くとき（`--import --yes`）は、hook の文字列照合だけを歯止めにせず、
-        # 実行時にも端末の前のユーザが打ったことを確かめる。下見（`--yes` なし）は求めない。
-        # 承認（--agree --yes）と同じく、拡張の子プロセスは端末を持たないので、端末の確認の代わりに
-        # --expect の一致と hook の止めに置く。
-        if cli_templates.editing(args) and args.yes:
-            if args.via == via.VIA_BOARD:
-                via.set_via(via.VIA_BOARD)
-            elif not cli_args._from_terminal(stdin, conf, stderr, "--templates --yes"):
-                return EXIT_ERROR
         return cli_templates.run(stdout, stderr, conf, root, args)
     if not args.docs:
         stray = cli_args._docs_flags_given(args)
@@ -869,7 +862,7 @@ def _parsed(
                 digest=args.digest,
             )
             return EXIT_OK if code == 0 else EXIT_ERROR
-        if not cli_args._from_terminal(stdin, conf, stderr, "--agree"):
+        if not cli_args._from_terminal(stdin, conf, stderr, user_only.terminal("approve")):
             return EXIT_ERROR
         via.set_via(via.VIA_TERMINAL)
         # `--agree` の後ろに並べた語は、承認の対象に入れる識別子。無ければ承認待ち全部。
@@ -971,7 +964,7 @@ def _parsed(
         if (
             args.reviewed is not None
             and not board
-            and not cli_args._from_terminal(stdin, conf, stderr, "--reviewed")
+            and not cli_args._from_terminal(stdin, conf, stderr, user_only.terminal("reviewed"))
         ):
             return EXIT_ERROR
         return cli_ops.operate(stdin, stdout, stderr, conf, root, args)
@@ -1002,6 +995,7 @@ def _hook_route(args: argparse.Namespace) -> bool:
     """
     return not (
         args.docs
+        or args.handoff
         or cli_args._diagnosing(args)
         or args.prune
         or args.plan_order is not None

@@ -53,6 +53,7 @@ from . import (
     approval_checks,
     approval_marks,
     approval_ops,
+    handoff,
     ops_close,
     phase,
     phase_forms,
@@ -498,7 +499,7 @@ def _dirty(tree_root: str, conf: settings.Settings, wip_removals: bool = False) 
     マーカーはフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
     マーカーをコミットしろ」と言い続けることになる。
     マーカーと承認済みチケットをコミットして push するのは `ccnavi-review.sh` と
-    `ccnavi-agree.sh` の仕事で、ユーザの作業による未コミットの変更とは別に扱う。
+    `ccnavi-user-agree.sh` の仕事で、ユーザの作業による未コミットの変更とは別に扱う。
     """
     rc, status = _git(
         tree_root, ["status", "--porcelain", "-z", "--untracked-files=no", "--no-renames"]
@@ -592,6 +593,20 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
             f"ready が削除するのは `{wip}/` の追跡済みのファイルだけ（履歴から戻せるもの）で、"
             "未追跡のものは戻せないので削除せずに中止しました。必要なものは別の場所へ移し、"
             "要らないものはユーザに確かめて削除してから再実行してください"
+        )
+    # 保護対象の下書き（`wip/handoff/`）のうち、取り込み先と中身が違う（取り込んでいない）もの。
+    # ready は `wip/` の追跡済みのファイルを消すので、黙って消さずに止める。未追跡のものは上で言う。
+    told = {pathcase.fold(p) for p in untracked or []}
+    waiting = [p for p in handoff.pending(tree_root) if pathcase.fold(p) not in told]
+    if waiting:
+        shown = "、".join(waiting[:10]) + (
+            f" ほか {len(waiting) - 10} 件" if len(waiting) > 10 else ""
+        )
+        problems.append(
+            f"`{handoff.HANDOFF_REL}/` に取り込んでいない保護対象の下書きが {len(waiting)} 件ある"
+            f"（{shown}）。ready は `{wip}/` を削除するので中止しました。ユーザに"
+            "`ccnavi user handoff` で取り込んでもらうか、要らない下書きを削除してから"
+            "再実行してください"
         )
     if _dirty(tree_root, conf, wip_removals=True):
         problems.append("親のワークツリーに未コミットの変更がある")
@@ -866,7 +881,7 @@ def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:
     """ユーザが見るものが、まだリモートに届いていないか。
 
     ccnavi 自身の置き場だけが手元に残っている形は、届いていると数える。ユーザがレビューで
-    見るのはコードで、置き場をコミットして push するのは `ccnavi-push-approved.sh` の仕事
+    見るのはコードで、置き場をコミットして push するのは `ccnavi-user-push-approved.sh` の仕事
     （push が失敗してもコミットは残す）。数えると、レビュー待ちの間に失敗した push が
     次の依頼を止める。`confirm` の側（`_moved_since_request`）と同じ基準。
 
@@ -930,7 +945,7 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
     依頼のマーカーはそこに置かれ、親のブランチにコミットして他の PC に届ける前提のもの。
     数えると「依頼 → マーカー → コミット」の順のせいで、依頼の直後に必ず自分のマーカーの
     コミットで「動いた」と判定され、
-    承認の push（`ccnavi-push-approved.sh`）が置き場をまとめてコミットするので、レビューを
+    承認の push（`ccnavi-user-push-approved.sh`）が置き場をまとめてコミットするので、レビューを
     待っている間の承認でも依頼が無効になる。未コミットの側は `_dirty` が同じ理由で外しており、
     基準をそこに揃える。ユーザがレビューで見るものは 1 バイトも変わらない。
 

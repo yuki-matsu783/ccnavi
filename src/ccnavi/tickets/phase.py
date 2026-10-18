@@ -792,7 +792,7 @@ def _erase_steps(
         )
     )
     git = settings.script_command(root, "ccnavi-git.sh")
-    push = settings.script_command(root, "ccnavi-push-approved.sh")
+    push = settings.script_command(root, "ccnavi-user-push-approved.sh")
     return (
         "レビューをやり直すならマーカーを削除してください"
         f"（消し方: ユーザが{_marker_tree(root, conf, child)}で '{git} rm {mark}' を実行し、"

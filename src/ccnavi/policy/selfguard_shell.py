@@ -491,6 +491,52 @@ _HANDOFF_UNREAD = set("$`*?[]{}()<>|;&'\"\n~") | {shellread.SEP, shellread.WORD_
 _HANDOFF_SHORT_ALLOWED = set("fpvnu")
 
 
+def handoff_write_exempt(root: str) -> Callable[[str], str] | None:
+    """名指しのツール（Write / Edit）の保護から、下書きの置き場（`wip/handoff/`）の中を外す関数。
+
+    守る場所のファイルを直すときは、置き場へ写して写しを直す（.ccnavi/docs/scratchpad.md）。
+    写しは守る場所と同じ相対パス（`wip/handoff/.ccnavi/scripts/x.sh` など）に置くので、
+    パスに `.ccnavi/` や `.claude/` が入っていて、守る場所の式に当たる。写しにはルールとしての
+    効力が無く、ユーザが取り込むまで何も変わらないので、書けるようにする。
+
+    外すのは、次をすべて満たすときだけ。1 つでも外れれば対象をそのまま返す。
+
+    - ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`、
+      その中のワークツリー）の直下の `wip/handoff/` の下。`docs/wip/handoff/` のように
+      ツリーの直下でない綴りは外さない
+    - 対象に `..` の段が無く、リンクを解いた実パスが綴りと同じ（途中にリンクが無い）
+    - 既にあるファイルが、ハードリンクでほかの名前とつながっていない（つながった先が
+      守る場所なら、上書きはその先も書き換える）
+
+    root が空なら何も外さない。大文字小文字はどの機械でも区別しない。
+    """
+    if not root:
+        return None
+    base = pathcase.fold(os.path.realpath(root)).replace("\\", "/")
+    pattern = re.compile(
+        re.escape(base)
+        + r"(?:/projects/[^/]+)?(?:/\.claude/worktrees/[^/]+)?"
+        + r"/"
+        + "/".join(re.escape(part) for part in HANDOFF)
+        + r"/"
+    )
+
+    def exempt(subject: str) -> str:
+        spelled = pathcase.fold(subject).replace("\\", "/")
+        if not pattern.match(spelled) or ".." in spelled.split("/"):
+            return subject
+        try:
+            if pathcase.fold(os.path.realpath(subject)).replace("\\", "/") != spelled:
+                return subject
+            if os.path.isfile(subject) and os.stat(subject).st_nlink > 1:
+                return subject
+        except OSError:
+            return subject
+        return ""
+
+    return exempt
+
+
 def handoff_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | None:
     """シェルから書き込む形の保護から、下書きの置き場（`wip/handoff/`）へ写す cp を外す関数。
 
@@ -1017,6 +1063,7 @@ def add_rules(
                 "message": PROJECT_HOME_MESSAGE,
             },
             root,
+            exempt=handoff_write_exempt(root),
         )
     _insert(
         rule_set,

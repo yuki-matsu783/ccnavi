@@ -10,7 +10,9 @@ hook の止め（`phase_forms`）と、実行ファイルの端末要求（`entr
 - `OPS`: 操作。何をする操作か（`what`）と、実行ファイルが端末の前のユーザを求めるときの
   オプションの表示名（`terminal`）を持つ
 - `FLAGS`: オプション。実行ファイル（`where` が空）か sh スクリプト（`where` がスクリプトの名前）の
-  オプションで、どの止めに入るか（`cli`・`script`）と、所属するグループ（`groups`）を持つ
+  オプションで、どの止めに入るか（`cli`・`script`）と、所属するグループ（`groups`）を持つ。
+  `legacy` の行は、今の実行ファイルはもう受け付けないが、古い実行ファイルが手元に残っていれば
+  通ってしまう形。hook は止め続ける
 - `SCRIPTS`・`SUBS`: コマンドの位置で止める sh スクリプトと、実行ファイルのサブコマンド
 - `BOARD_COMBOS`: ボードで押した操作用のオプションの組み合わせ。コマンド行に全部並んだら止める
 
@@ -54,6 +56,14 @@ class Flag:
     # `--preview` を単独の語として隣に置いた形は、見るだけなので通す。
     preview_exempt: bool = False
     groups: tuple[str, ...] = ()
+    # 実行ファイルが `user` の入口の外で受けたら断るオプション（user_only.refused）。
+    gated: bool = False
+    # 断らない場合。"preview" は `--preview` と一緒のとき、"no-yes" は `--yes` が無いとき。
+    # 空なら、`user` の外では必ず断る。
+    unless: str = ""
+    # 今の実行ファイルは受け付けない前の形。古い実行ファイルが手元に残るときのため、
+    # hook は止め続ける。
+    legacy: bool = False
 
 
 @dataclass(frozen=True)
@@ -86,11 +96,10 @@ OPS: tuple[Op, ...] = (
     Op("forget", "親子チケットの取り込み状態の削除"),
     Op("tidy", "親を閉じたときの片付け"),
     Op("clean-branch", "残った子のブランチの削除"),
-    Op(
-        "template",
-        "テンプレートの取り込み・改名・移動・削除・下書きの保存",
-        terminal="--templates --yes",
-    ),
+    Op("handoff", "保護対象の下書きの取り込み", terminal="user handoff --yes"),
+    # 前の形（テンプレート専用の取り込み・改名・移動・削除・下書きの保存）。
+    # 今の実行ファイルには無い。
+    Op("template", "テンプレートの取り込み・改名・移動・削除・下書きの保存（前の形）"),
     Op("prune", "記録と state の削除", terminal="--prune"),
     Op("state-direct", "チケットの状態とレビューの操作を実行ファイルで直に呼ぶ形"),
     Op("guard-off", "端末要求を切る設定"),
@@ -101,27 +110,64 @@ _SYNC = "ccnavi-sync"
 _CLEAN = "ccnavi-clean"
 
 FLAGS: tuple[Flag, ...] = (
-    Flag("--yes", "confirm-yes", groups=("yes",)),
-    Flag("--agree", "approve", preview_exempt=True, groups=("approval",)),
+    Flag("--yes", "confirm-yes", gated=True, groups=("yes",)),
+    Flag(
+        "--agree",
+        "approve",
+        preview_exempt=True,
+        gated=True,
+        unless="preview",
+        groups=("approval",),
+    ),
     # 前の名前。実行ファイルはもう受け付けないが、古い実行ファイルが手元に残っていれば通ってしまう。
     # 止める側にだけ広がる。
     Flag("--approve", "approve", preview_exempt=True, groups=("approval",)),
-    Flag("--reviewed", "reviewed", groups=("approval",)),
-    Flag("--close-early", "close-early"),
+    # 見るだけの形（`--reviewed … --accept-unresolved --preview`）は、
+    # `ccnavi-review.sh decide <N> --preview` が内部で呼ぶので、`user` の外でも断らない。
+    Flag("--reviewed", "reviewed", gated=True, unless="preview", groups=("approval",)),
+    Flag("--close-early", "close-early", gated=True),
     # 記録を消す形は `phase_forms.prune_form` が別の deny で止める（_CLI_FORMS には入れない）。
-    Flag("--prune", "prune", cli=False, preview_exempt=True, groups=("prune",)),
-    # `--import` はテンプレートの下書きを取り込む形。取り込みはユーザが差分を読んで決めるので、
-    # 下見だけの形（`--yes` なし）も含めてエージェントには打たせない。下書きを作る `--draft` は
-    # 効力が無いので止めない。改名・移動・削除も同じ。`--save-draft` も止める（`--body-file` に
-    # 任意のパスを渡して、読んだ中身を下見の出力に出せるため。下書きの編集は Write でできる）。
-    Flag("--import", "template", groups=("import", "template-write")),
-    Flag("--rename-template", "template", groups=("edit", "template-write")),
-    Flag("--move-template", "template", groups=("edit", "template-write")),
-    Flag("--delete-template", "template", groups=("edit", "template-write")),
-    Flag("--save-draft", "template", groups=("edit", "save-draft", "template-write")),
-    # 下書きの置き場の中だけを消すので、`--yes` の付かない下見は止めない。
-    Flag("--delete-draft", "template", cli=False, groups=("edit", "template-write")),
-    # 単独では止めない。ボードの組み合わせの相手になるだけ。
+    Flag(
+        "--prune",
+        "prune",
+        cli=False,
+        preview_exempt=True,
+        gated=True,
+        unless="preview",
+        groups=("prune",),
+    ),
+    # 保護対象の下書きの取り込み（`user handoff`）。見るだけの形（`--yes` なし）も含めて
+    # ユーザ専用で、エージェントには打たせない（エージェントは `ccnavi-stage.sh --commands` で
+    # 下書きの状態を見られる）。
+    Flag("--handoff", "handoff", gated=True, groups=("handoff",)),
+    # ここから前の形（テンプレート専用の取り込み・編集）。取り込み・編集は `user handoff` に
+    # まとめたので今の実行ファイルは受け付けないが、古い実行ファイルが手元に残れば通るので、
+    # hook は止め続ける。`--import` は下見だけの形（`--yes` なし）も止めていた。`--save-draft` は
+    # `--body-file` に任意のパスを渡して、読んだ中身を下見の出力に出せるため止めていた。
+    Flag("--import", "template", legacy=True, groups=("legacy-import", "template-write")),
+    Flag("--rename-template", "template", legacy=True, groups=("legacy-edit", "template-write")),
+    Flag("--move-template", "template", legacy=True, groups=("legacy-edit", "template-write")),
+    Flag("--delete-template", "template", legacy=True, groups=("legacy-edit", "template-write")),
+    Flag(
+        "--save-draft",
+        "template",
+        legacy=True,
+        groups=("legacy-edit", "legacy-save-draft", "template-write"),
+    ),
+    # 下書きの置き場の中だけを消すので、`--yes` の付かない下見は止めていなかった。
+    Flag(
+        "--delete-draft",
+        "template",
+        cli=False,
+        legacy=True,
+        groups=("legacy-edit", "template-write"),
+    ),
+    # 前の形の取り込み・編集に添えたオプション。単独では止めない。
+    Flag("--replace", "template", cli=False, legacy=True, groups=("legacy-companion",)),
+    Flag("--new-name", "template", cli=False, legacy=True, groups=("legacy-companion",)),
+    Flag("--on", "template", cli=False, legacy=True, groups=("legacy-companion",)),
+    Flag("--to-layer", "template", cli=False, legacy=True, groups=("legacy-companion",)),
+    # 単独では止めない（一覧・検索・表示は今もある）。前の形のボードの組み合わせの相手になるだけ。
     Flag("--templates", "template", cli=False, groups=("templates",)),
     Flag("--guard-ticket-approval", "guard-off", cli=False, groups=("guard",)),
     Flag("--choices", "decide", where=_REVIEW, cli=False, groups=("choices",)),
@@ -164,13 +210,58 @@ SUBS: tuple[Sub, ...] = (
 
 # ボードで押した操作用のオプションの組み合わせ。グループの名前を並べる。全部のグループから
 # 1 つずつがコマンド行に並んだら止める。並びの順に見て、最初に揃った組み合わせで文面を決める。
+# 名前に依らず（名前を変えたコピーも）止める。端末を求めない経路は、これが唯一の防御になる。
 BOARD_COMBOS: tuple[tuple[str, ...], ...] = (
     ("approval", "yes"),
-    ("templates", "import", "yes"),
-    ("templates", "edit", "yes"),
-    ("templates", "save-draft"),
+    ("user", "user-board-verb", "yes"),
+    # 前の形（テンプレート専用の取り込み・編集）。古い実行ファイルが手元に残るときのため。
+    ("templates", "legacy-import", "yes"),
+    ("templates", "legacy-edit", "yes"),
+    ("templates", "legacy-save-draft"),
     ("choices", "digest"),
 )
+
+
+@dataclass(frozen=True)
+class Verb:
+    """`ccnavi user <操作>` の 1 つ。"""
+
+    # `user` の後ろに続く語。
+    words: tuple[str, ...]
+    # 読み替えた先の、内部のオプション。最後の 1 つが値を取るなら `value` を立てる。
+    internal: tuple[str, ...]
+    op: str
+    # 内部の最後のオプションが、操作の次の語を値に取る（`user reviewed 3` → `--reviewed 3`）。
+    value: bool = False
+
+
+# 実行ファイルのユーザ専用の入口。読み替えた先は今の内部の形で、argparse の文法は変えない。
+VERBS: tuple[Verb, ...] = (
+    Verb(("agree",), ("--agree",), "approve"),
+    Verb(("reviewed",), ("--reviewed",), "reviewed", value=True),
+    Verb(("close-early",), ("--close-early",), "close-early"),
+    Verb(("prune",), ("--prune",), "prune"),
+    # 続く語（ツリーからの相対パス）は、位置引数としてそのまま渡る。
+    Verb(("handoff",), ("--handoff",), "handoff"),
+)
+
+# `user` の入口の名前。
+USER_WORD = "user"
+# sh と拡張が実行ファイルを呼ぶときに、先に付ける値つきのオプション。`user` はこれらを読み飛ばした
+# 後の最初の語。実行ファイルの読み飛ばしと hook の正規表現の両方がこの一覧から作る。
+WRAPPER_OPTIONS: tuple[str, ...] = ("--root", "--cwd", "--record-writes", "--record-tree")
+
+# 語のグループ。オプションではない語（`user agree --yes` の `user` と `agree`）を、ボードの
+# 組み合わせに使うためのもの。
+WORD_GROUPS: dict[str, tuple[str, ...]] = {
+    "user": (USER_WORD,),
+    # 端末を求めない経路（`--yes`）を持つ操作。`templates` は前の形（古い実行ファイルのため）。
+    "user-board-verb": ("agree", "reviewed", "handoff", "templates"),
+}
+
+# ユーザ専用の sh の名前。位置に依らず、コマンド行に名前が出たら止める
+# （phase_forms.human_path_form）。
+USER_SCRIPT_PREFIX = "ccnavi-user-"
 
 # エージェントが sh で打てるスクリプト。止めている間でも通す（phase_forms.exempt）。
 AGENT_SCRIPTS: tuple[str, ...] = ("ticket", "review", "git")
@@ -214,6 +305,8 @@ def names(*groups: str, where: str | None = "") -> tuple[str, ...]:
     KeyError にする（空のオプションで組み合わせを作ると、何にでも当たる正規表現になる）。
     """
     found: list[str] = []
+    for group in groups:
+        found.extend(w for w in WORD_GROUPS.get(group, ()) if w not in found)
     for row in FLAGS:
         if where in (None, row.where) and set(groups) & set(row.groups) and row.name not in found:
             found.append(row.name)
@@ -271,6 +364,9 @@ def script_forms() -> str:
         else:
             tail = r"\b"
         parts.append(head + stem + tail)
+    # ユーザ専用の sh（`ccnavi-user-*.sh`）は、引数に依らずコマンドの位置で止める。
+    # 名前がコマンド行のどこにあっても止める検査は phase_forms.human_path_form が持つ。
+    parts.append(head + re.escape(USER_SCRIPT_PREFIX) + r"[\w-]+\.sh\b")
     return "|".join(parts)
 
 
@@ -299,3 +395,108 @@ def subagent_forbidden_forms() -> str:
         + "|".join(re.escape(w) for w in SUBAGENT_FORBIDDEN)
         + r")\b"
     )
+
+
+class UserEntryError(Exception):
+    """`user` の入口の使い方の誤り（操作が無い・知らない操作）。"""
+
+
+def _is_wrapper_option(word: str) -> bool:
+    return word in WRAPPER_OPTIONS or word.partition("=")[0] in WRAPPER_OPTIONS and "=" in word
+
+
+def rewrite(argv: list[str]) -> tuple[list[str], Verb | None]:
+    """`user <操作> …` を内部の形に読み替える。`user` で始まらなければそのまま返す。
+
+    `user` は、ラッパーが先に付ける値つきのオプション（`WRAPPER_OPTIONS`）を読み飛ばした後の
+    最初の語。大文字小文字は区別しない。先頭の `--` は読み飛ばさない（名前空間として扱わない）。
+    返す 2 つめは、読み替えた操作。argparse の結果には入れず、呼び出し側が別の変数で持つ。
+    """
+    at = 0
+    while at < len(argv) and _is_wrapper_option(argv[at]):
+        at += 1 if "=" in argv[at] else 2
+    if at >= len(argv) or argv[at].casefold() != USER_WORD:
+        return argv, None
+    words = [w.casefold() for w in argv[at + 1 : at + 3]]
+    for verb in VERBS:
+        if tuple(words[: len(verb.words)]) != verb.words:
+            continue
+        rest = argv[at + 1 + len(verb.words) :]
+        internal = list(verb.internal)
+        if verb.value:
+            if not rest or rest[0].startswith("-"):
+                raise UserEntryError(f"user {' '.join(verb.words)} には値が要る")
+            internal.append(rest[0])
+            rest = rest[1:]
+        return [*argv[:at], *internal, *rest], verb
+    shown = " / ".join(" ".join(v.words) for v in VERBS)
+    raise UserEntryError(f"user の操作は {shown} のどれか")
+
+
+def _unset(value: object) -> bool:
+    return value is None or value is False or (isinstance(value, str) and value == "")
+
+
+def _dest(flag: str) -> str:
+    return flag[2:].replace("-", "_")
+
+
+def refused(args: object) -> str:
+    """`user` の外でユーザ専用のオプションが読まれたときの断り文。問題が無ければ空。
+
+    argparse が読んだ結果（`args`）で見る。argv の文字列を探すと、`--keyword=--agree` のような
+    他のオプションの値まで断る。
+    """
+    # 操作に対応するオプションを先に見る。`--yes` は、どの操作にも付くので最後に回す。
+    flags = {row.name: row for row in FLAGS if row.gated}
+    for name, row in sorted(flags.items(), key=lambda item: item[0] == "--yes"):
+        if _unset(getattr(args, _dest(name), None)):
+            continue
+        if row.unless == "preview" and getattr(args, "preview", False):
+            continue
+        if row.unless == "no-yes" and _unset(getattr(args, "yes", "")):
+            continue
+        forms = [" ".join(v.words) for v in VERBS if v.internal[-1] == name]
+        if forms:
+            text = f"{name} はユーザ専用です。ユーザが `ccnavi user {forms[0]}` の形で打ちます。"
+            if row.unless == "preview":
+                text += f"見るだけなら {name} --preview です。"
+            return text
+        return f"{name} はユーザ専用です（`ccnavi user` の操作と一緒に、ユーザが打ちます）。"
+    return ""
+
+
+def _quoted_or_word() -> str:
+    return r"""(?:"[^"]*"|'[^']*'|\S+)"""
+
+
+def user_entry_forms(excluding: str = "") -> str:
+    """実行ファイルの呼び出しの `user` の入口の部分（`launcher` の後ろに続ける正規表現）。
+
+    ラッパーのオプションを読み飛ばした後の最初の語が `user`。`--` を挟んだ形も止める
+    （実行ファイルは断るが、止める側に倒す）。`excluding` は、別の deny が止める操作の名前
+    （`prune` は、チケット制御ではなくコアのファイルの保護の設定に従う）。
+    """
+    value = _quoted_or_word()
+    options = "|".join(re.escape(o) for o in WRAPPER_OPTIONS)
+    skip = rf"(?:(?:{options})(?:=\S*|\s+{value})\s+)*"
+    rest = rf"(?!\s+{re.escape(excluding)}\b)" if excluding else ""
+    return rf"\s+{skip}(?:--\s+)?{USER_WORD}\b{rest}"
+
+
+def user_verb_forms(verb: str) -> str:
+    """`user <verb>` の形の正規表現（`launcher` の後ろに続ける。`--` は読み飛ばさない）。"""
+    value = _quoted_or_word()
+    options = "|".join(re.escape(o) for o in WRAPPER_OPTIONS)
+    skip = rf"(?:(?:{options})(?:=\S*|\s+{value})\s+)*"
+    return rf"\s+{skip}(?:--\s+)?{USER_WORD}\s+{re.escape(verb)}\b"
+
+
+def legacy_names() -> tuple[str, ...]:
+    """今の実行ファイルが受け付けない前の形のオプション（`legacy` の行）。"""
+    return tuple(row.name for row in FLAGS if row.legacy and not row.where)
+
+
+def user_script_pattern() -> re.Pattern[str]:
+    """ユーザ専用の sh の名前。コマンド行のどこに出ても当てる。"""
+    return re.compile(rf"(?<![\w-]){re.escape(USER_SCRIPT_PREFIX)}[\w-]+\.sh", re.IGNORECASE)

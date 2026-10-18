@@ -25,19 +25,18 @@ import re
 from typing import TextIO
 
 from ..hook import ccnavimd, judge
-from ..infra import modes, pathcase, settings, tree
+from ..infra import modes, settings, tree
 from ..infra.modes import EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 from ..tickets import (
     approval,
     approval_checks,
+    config_check,
     flow,
     flow_render,
     flow_shape,
     flow_text,
-    phasetypes,
-    risk,
     syncstate,
     ticket_model,
 )
@@ -45,7 +44,6 @@ from . import (
     lint_layers,
     lint_places,
     lint_project,
-    lint_rules,
     lint_templates,
     lint_ticket,
     version,
@@ -347,19 +345,17 @@ def check(
     problems.extend(_sh_compat(root))
     problems.extend(_ccnavi_md(conf, root))
     problems.extend(lint_project._after(root))
-    if os.path.exists(conf.rules) or _named_rules(conf, root):
-        # 共通レイヤーのルールが無いのは「設定が無い」正常（無い = 空）。不正なときだけ言う。
-        # 診断の `--rules` で名指しされたファイルが無いのは、置き場が空なのとは別なので言う。
-        problems.extend(lint_rules._rules(conf.rules, root))
-    problems.extend(_phases(conf))
-    problems.extend(_risk(conf, root))
+    # 共通レイヤーの 3 本。検査の中身は取り込み（`user handoff`）と同じ関数（config_check）。
+    problems.extend(config_check.common_rules(conf, root))
+    problems.extend(config_check.common_phases(conf))
+    problems.extend(config_check.common_risk(conf, root))
     problems.extend(lint_ticket._ticket(conf, root))
     problems.extend(lint_places._projects(conf, root))
     # レイヤーの読み込みは判定と同じ経路（ruleload.survey）を通る。読めないレイヤーの苦情は
     # そこが書く標準エラーにも出るので、受け皿で受け取って二重に言わない。
-    problems.extend(lint_layers._layers(io.StringIO(), conf, root))
+    problems.extend(config_check.layer_rules(io.StringIO(), conf, root))
     problems.extend(lint_layers._legacy_places(conf, root))
-    problems.extend(lint_layers._layer_configs(conf, root))
+    problems.extend(config_check.layer_configs(conf, root))
     problems.extend(lint_templates._templates(conf, root))
     problems.extend(lint_layers._worktree_layers(conf, root))
     problems.extend(lint_places._ticket_places(conf, root))
@@ -367,12 +363,6 @@ def check(
     problems.extend(lint_project._local_settings(root))
     problems.extend(lint_layers._sync(conf, root))
     return problems
-
-
-def _named_rules(conf: settings.Settings, root: str) -> bool:
-    """共通レイヤーのルールの置き場が、既定の場所ではなくフラグ（`--rules`）で名指しされたものか。"""
-    default = os.path.join(root, settings.DEFAULT_RULES)
-    return pathcase.fold(os.path.abspath(conf.rules)) != pathcase.fold(os.path.abspath(default))
 
 
 # sh が互換の版を宣言する場所。`.ccnavi/scripts/` の sh はどれもこれを `.` で読むので、
@@ -469,25 +459,6 @@ def _ccnavi_md(conf: settings.Settings, root: str) -> list[Problem]:
     return errors + warns
 
 
-def _risk(conf: settings.Settings, root: str) -> list[Problem]:
-    """共通レイヤーのリスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。
-
-    `script:` が指す先が在ることも見る。走らせるときは「測れなかった」で重いほうに
-    なるが、そこで気づくのは子を閉じる時点になる。
-    """
-    if not conf.risk:
-        return []
-    definition, notes = risk.load(conf.risk)
-    problems = [Problem(p.severity, "(risk)", f"{p.rule}: {p.detail}") for p in notes]
-    if not definition.fallback:
-        risk.mark_layer(definition, settings.LAYER_COMMON, root)
-        problems += [
-            Problem(p.severity, "(risk)", f"{p.rule}: {p.detail}")
-            for p in risk.script_problems(definition)
-        ]
-    return problems
-
-
 # `--lint --flow` の苦情の場所。VS Code 拡張のフロー編集画面はこの場所の苦情だけを読む。
 FLOW_WHERE = "(flow)"
 
@@ -537,17 +508,6 @@ def flow_problems(
     warns = [Problem(SEVERITY_WARN, FLOW_WHERE, f"{shown}: {line}") for line in said]
     rendered, _ = flow_render.render(data)
     return warns, shaped, rendered
-
-
-def _phases(conf: settings.Settings) -> list[Problem]:
-    """共通レイヤーの `phases.yml` が読めるか。無いのは正常（無い = 空）で、何も言わない。
-
-    読めなければ判定は共通レイヤーを空として扱い、各レイヤーの定義だけを使う。
-    各レイヤーの `phases.yml` が読めるか、共通レイヤーと足せるかは
-    `lint_layers._layer_configs` が見る。
-    """
-    _, notes = phasetypes.common_types(conf)
-    return [Problem(p.severity, "(phases)", f"{p.rule}: {p.detail}") for p in notes]
 
 
 def family_check(

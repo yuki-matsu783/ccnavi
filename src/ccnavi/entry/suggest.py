@@ -12,7 +12,7 @@
 出すのは `deny` と `ask` の候補だけで、`allow` は出さない。記録から通す側の候補を起こすと、
 「よく来るから通す」になり、判定を緩める変更を機械が勧めることになる。
 
-出すのは検証を通ったものだけ。候補ごとに、`--lint` と同じ読み（lint_rules._rules）で
+出すのは検証を通ったものだけ。候補ごとに、`--lint` と同じ読み（rule_lint.file_problems）で
 ルールを確かめ、`--test-expectations` と同じ判定（diagnose.try_one）で期待する判定を回し、期待した
 タイプにならなかったものは除く（除いた数は出す）。ルールを足す候補は、共通レイヤーの
 ルールファイルのコピーに 1 件足した一時ファイルで試す。実際のファイルには書かない。
@@ -40,9 +40,9 @@ import yaml
 
 from ..hook import reasons
 from ..infra import hookio, settings, yamlread
-from ..policy import ruleload, rules
+from ..policy import rule_lint, ruleload, rules
 from ..records import audit, repeat
-from . import diagnose, lint_rules
+from . import diagnose
 
 # `--suggest --json` の形の版。読み手は VS Code 拡張のルール管理画面。形を変えたら上げる。
 SUGGEST_VERSION = 1
@@ -288,7 +288,7 @@ def _lint_errors(path: str, root: str, rule_id: str, layer: bool) -> bool:
     """そのルールに `--lint` の error が付くか。"""
     return any(
         p.severity == rules.SEVERITY_ERROR and p.rule == rule_id
-        for p in lint_rules._rules(path, root, layer=layer)
+        for p in rule_lint.file_problems(path, root, layer=layer)
     )
 
 

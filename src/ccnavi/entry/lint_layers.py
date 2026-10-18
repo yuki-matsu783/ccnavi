@@ -1,74 +1,22 @@
-"""`--lint` のうち、設定のレイヤー（共通レイヤー・自身のレイヤー・プロジェクトのレイヤー）の検査。
+"""`--lint` のうち、設定のレイヤーをまたぐ検査。
 
-レイヤーどうしの食い違い、各レイヤーの phases / risk が共通レイヤーと合成できるか、ワークツリーの
-ccnavi ディレクトリに元リポジトリに無いファイルが無いか、取り込み状態と統合先のレイヤーが
-手元のレイヤーと食い違っていないかを見る。
+旧い置き場に設定が残っていないか、ワークツリーの ccnavi ディレクトリに元リポジトリに無いファイルが
+無いか、取り込み状態と統合先のレイヤーが手元のレイヤーと食い違っていないかを見る。
+1 つのレイヤーの 1 本ずつの検査（ルールの読み・phases / risk の合成）は
+`tickets.config_check` にあり、保護対象の下書きの取り込み（`user handoff`）も同じものを呼ぶ。
 """
 
 from __future__ import annotations
 
 import os
-from typing import TextIO
 
 from ..infra import fsio, pathcase, settings, tree
-from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
-from ..tickets import approval, archive, phase, risk, syncstate, ticket_model
+from ..tickets import approval, archive, config_check, syncstate, ticket_model
 from ..tickets import ticket as ticket_mod
-from . import lint_rules
 
-
-def layer_where(name: str) -> str:
-    """そのレイヤーの苦情の出どころの表記。VS Code 拡張がこの前置きでプロジェクトを引く。"""
-    if name == ruleload.LAYER_COMMON:
-        return "(rules)"
-    if name == ruleload.LAYER_SELF:
-        return "(self)"
-    return f"(projects/{name})"
-
-
-def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]:
-    """レイヤーに食い違いが無いか。
-
-    見るのは 2 つ。レイヤーのファイルが読めることと、レイヤーをまたいだ重複と同名の衝突。
-    `.ccnavi/config/project/` が無いことは言わない。
-    無いのは正常（無いレイヤー = 空）で、言うと本当に言うべきものが埋もれる。
-
-    共通レイヤーは `_rules` が別に見ているので、ここではレイヤーの 2 つ目以降だけを回す。
-    """
-    problems: list[Problem] = []
-    for view in ruleload.survey(stderr, conf, root)[1:]:
-        where = layer_where(view.name)
-        if view.unreadable:
-            problems.append(
-                Problem(
-                    SEVERITY_ERROR,
-                    where,
-                    f"{view.path} を読めない ({view.unreadable})。"
-                    "このレイヤーは空として扱っている。"
-                    "共通レイヤーだけで判定しているので、ここに書いた宣言は 1 件も使われていない",
-                )
-            )
-            continue
-        if view.missing:
-            continue
-        from_file = lint_rules._rules(
-            view.path,
-            root,
-            home=_layer_home(conf, root, view.name),
-            layer=True,
-            project=view.name != ruleload.LAYER_SELF,
-        )
-        for c in from_file:
-            problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
-        # `survey` はレイヤーのファイルの苦情も `problems` に入れている。`_rules` が同じファイルを
-        # 読んで言ったものは数えない。数えると同じ苦情が 2 度並び、件数も水増しされる。
-        told = {(c.severity, c.rule, c.detail) for c in from_file}
-        for c in view.problems:
-            if (c.severity, c.rule, c.detail) in told:
-                continue
-            problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
-    return problems
+# 苦情の出どころの表記。VS Code 拡張がこの前置きでプロジェクトを引く。
+layer_where = config_check.layer_where
 
 
 def _legacy_places(conf: settings.Settings, root: str) -> list[Problem]:
@@ -101,34 +49,6 @@ def _legacy_places(conf: settings.Settings, root: str) -> list[Problem]:
                         f"{label.replace(' ', '/')}{new}/{name} へ移す",
                     )
                 )
-    return problems
-
-
-def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
-    """各レイヤーの phases / risk が、共通レイヤーと合成できるか。
-
-    見るのは合成したあとの内容。phases は同 `id` で中身が違う、`title` が共通レイヤーと重なる、
-    risk は `levels` が逆転する、`script:` がレイヤーの外を指すか指す先が無い、を error で言い、
-    phases の全欄一致で捨てた重複を info で言う。共通レイヤー自身の苦情は `lint._phases` /
-    `lint._risk` が別に言うので、ここではレイヤーの側だけを数える。自身のレイヤーとプロジェクトの
-    レイヤーどうしは合成しないので、その間の重なりは言わない。
-
-    `.ccnavi/config/project/` が無いことは言わない。無いのは正常（無いレイヤー = 空）。
-    """
-    problems: list[Problem] = []
-    names = [ruleload.LAYER_SELF]
-    names += [
-        p.name for p in tree.projects(conf.projects) if not settings.is_reserved_layer_name(p.name)
-    ]
-    for name in names:
-        where = layer_where(name)
-        project = "" if name == ruleload.LAYER_SELF else name
-        _, notes = phase.layer_types(conf, root, project)
-        for p in notes:
-            problems.append(Problem(p.severity, f"{where} (phases) {p.rule}".rstrip(), p.detail))
-        definition, notes = risk.layer_definition(conf, root, project)
-        for p in [*notes, *risk.script_problems(definition, name)]:
-            problems.append(Problem(p.severity, f"{where} (risk) {p.rule}".rstrip(), p.detail))
     return problems
 
 
@@ -356,9 +276,3 @@ def _files_under(base: str) -> list[str]:
             rel = os.path.relpath(os.path.join(parent, name), base)
             found.append(rel.replace(os.sep, "/"))
     return sorted(found)
-
-
-def _layer_home(conf: settings.Settings, root: str, name: str) -> str:
-    if name == ruleload.LAYER_SELF:
-        return root
-    return tree.project_root(conf.projects, name)

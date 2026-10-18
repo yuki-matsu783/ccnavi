@@ -27,6 +27,7 @@ from ..tickets import (
     review_decide,
     scaffold,
     ticket_ids,
+    user_only,
     via,
     worktrees,
 )
@@ -76,7 +77,7 @@ def operate(
             )
             return EXIT_ERROR
         # ユーザの判断。`--agree` / `--reviewed` と同じく端末を求める。
-        if not cli_args._from_terminal(stdin, conf, stderr, "--close-early"):
+        if not cli_args._from_terminal(stdin, conf, stderr, user_only.terminal("close-early")):
             return EXIT_ERROR
         via.set_via(via.VIA_TERMINAL)
         for flag, path in (

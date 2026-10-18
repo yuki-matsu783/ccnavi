@@ -21,6 +21,7 @@ from ..policy import (
     selfguard,
     selfguard_shell,
     selfguard_targets,
+    subjects,
 )
 from ..records import audit, failstreak, repeat
 from ..tickets import (
@@ -71,39 +72,11 @@ HANDOVER = "(handover)"
 # 実行後チェックが作業ツリーの実物を見て拾う。
 SCOPE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
-# サブエージェントの起動ツール。レビューが済むまで止める対象で、対象の文字列を持たないので
-# 見出しだけを subject にする。
-AGENT_TOOL = "Agent"
-
-# ツールごとに、ルールを当てる欄。ここに無いツールは対象を持たず、判定に届かない
-# まま通る。名前は Claude Code の権限ルール `ToolName(指定子)` から括弧の中を
-# 除いたものに揃えてある。WebSearch は指定子を持たないので載せない。順序は画面の
-# 候補の順になる。
-#
-# 対象を差し込む側（試験の diagnose と lint の probe）はこの表を読む。欄の名前を
-# subject_of の中にだけ持つと、ツールを足したときにそちらが気づかないうちに古くなる。
-SUBJECT_FIELDS: dict[str, str] = {
-    "Bash": "command",
-    "PowerShell": "command",
-    "Read": "file_path",
-    "Grep": "path",
-    "Glob": "path",
-    "Edit": "file_path",
-    "Write": "file_path",
-    "NotebookEdit": "notebook_path",
-    "Skill": "skill",
-    AGENT_TOOL: "description",
-    "WebFetch": "url",
-}
-
-# 行き着く先まで解いてから当てるツール（パスを対象にするもの）。行き先のレイヤーを選ぶ一覧と
-# 同じものを使う。
-# 別に持つと、判定はパスに当てるのにレイヤーは共通レイヤーだけ、という食い違いが起きる。
-PATH_TOOLS = ruleload.PATH_TOOLS
-
-# 探す場所を省略できるツール。省略は「いま居る場所」の意味なので、cwd を対象にする。
-# 空のままにすると、場所を書かない呼び出しがどのルールにも当たらずに通る。
-SEARCH_TOOLS = ("Grep", "Glob")
+# ルールを当てる欄の表と選び方は `policy.subjects` にある（ルールファイルの検査も同じ表を読む）。
+AGENT_TOOL = subjects.AGENT_TOOL
+SUBJECT_FIELDS = subjects.SUBJECT_FIELDS
+PATH_TOOLS = subjects.PATH_TOOLS
+SEARCH_TOOLS = subjects.SEARCH_TOOLS
 
 # シェルから書き込む形を止める組み込みの保護。どれも書き込む動詞の式
 # （selfguard_shell._WRITE_VERBS）を持ち、生の文字列では `>` の個数に対して 2 乗で遅くなる。
@@ -301,7 +274,9 @@ def decide_before(
         payload.tool_name in phase_forms.SHELL_TOOLS
         and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
-        found = phase_forms.prune_form(record.subject, conf.bin)
+        found = phase_forms.prune_form(record.subject, conf.bin) or phase_forms.user_prune_form(
+            record.subject, conf.bin
+        )
         if found:
             record.code = phase_forms.CODE_RECORDS_PRUNE
             record.rules = [phase_forms.RECORDS_PRUNE_RULE_ID]
@@ -348,6 +323,8 @@ def decide_before(
                         display_subject,
                         phase_forms.guard_off_message(found)
                         if kind == "guard-off"
+                        else phase_forms.user_script_message(found)
+                        if kind == "user-script"
                         else phase_forms.board_form_message(found),
                     )
                 ],
@@ -936,23 +913,8 @@ def fail_streak_hint(conf: settings.Settings, root: str, record: audit.Record) -
 
 
 def subject_of(payload: hookio.Input) -> str:
-    """このツールでルールを当てる欄を選ぶ。欄は SUBJECT_FIELDS が持つ。"""
-    tool = payload.tool_name
-    field = SUBJECT_FIELDS.get(tool)
-    if field is None:
-        return ""
-    if tool == AGENT_TOOL:
-        # 起動には対象の文字列が無い。レビューが済むまで止める対象なので、見出しを subject に
-        # して判定に入れる。
-        return payload.field_value(field) or payload.field_value("prompt") or "(agent)"
-    value = payload.field_value(field)
-    if tool == "NotebookEdit":
-        value = value or payload.field_value("file_path")
-    if tool in SEARCH_TOOLS:
-        value = value or "."
-    if tool in PATH_TOOLS:
-        return fsio.full_path(value, payload.cwd)
-    return value
+    """このツールでルールを当てる欄を選ぶ（`policy.subjects.subject_of`）。"""
+    return subjects.subject_of(payload)
 
 
 def screen(

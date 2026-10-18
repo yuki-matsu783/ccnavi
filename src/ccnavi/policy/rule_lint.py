@@ -1,8 +1,8 @@
-"""`--lint` のうち、ルールファイルの中身の検査。
+"""ルールファイルの中身の検査。`--lint` と、保護対象の下書きの取り込み（`user handoff`）が呼ぶ。
 
 組み上がらないルール、止めないモード、どのツールにも当たらない match、広すぎる allow などを
-名指しする。レイヤーのルールファイルも同じ読みで見る（`lint_layers`）。提案（`suggest`）も候補を
-ここに通す。
+名指しする。レイヤーのルールファイルも同じ読みで見る。提案（`suggest`）も候補をここに通す。
+入口は `file_problems`（ファイルのパスを受ける）。
 """
 
 from __future__ import annotations
@@ -10,10 +10,9 @@ from __future__ import annotations
 import os
 import re
 
-from ..hook import judge
 from ..infra import hookio
-from ..policy import ctxfile, rules
-from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
+from . import ctxfile, rules, subjects
+from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # `.ccnavi/scripts/` のヒット。直前の `./` と `../` の連なりは、相対の書き方なので手前にたどる。
 _SCRIPTS = re.compile(r"(?:\.{1,2}/)*\.ccnavi/scripts/")
@@ -37,7 +36,7 @@ def _has_relative_scripts(text: str) -> bool:
     return False
 
 
-def _rules(
+def file_problems(
     path: str, root: str, home: str = "", layer: bool = False, project: bool = False
 ) -> list[Problem]:
     """ルールファイルを、判定が読むのと同じ読み方で読んで検証する。
@@ -563,23 +562,23 @@ def _alternatives(regex: str) -> int:
 def _inert(match: str) -> list[str]:
     """match に並んだツール名のうち、判定が対象を取り出せないものを返す。
 
-    ルールを当てる文字列を選ぶのは judge.subject_of で、そこが知らないツール名では
+    ルールを当てる文字列を選ぶのは subjects.subject_of で、そこが知らないツール名では
     対象が空になり、rule.matches は必ず False を返す。つまりそのルールは
     書いてあるのに何も止めない。守っているつもりの穴なので warn で言う。
 
     ツール名の一覧を持たずに subject_of を実際に呼んで確かめている。一覧を書き写すと、
     判定側が扱うツールを増やしたときにこちらが気づかないうちに古くなり、正しいルールを
-    誤って報告するようになる。差し込む欄の名前だけは judge の表から借りる。
+    誤って報告するようになる。差し込む欄の名前だけは subjects の表から借りる。
     """
     # 対象を持つツールなら何かしら返る値を入れておく。返るかどうかだけを見る。
-    probe_input = {field: "x" for field in judge.SUBJECT_FIELDS.values()}
+    probe_input = {field: "x" for field in subjects.SUBJECT_FIELDS.values()}
     inert: list[str] = []
     for want in match.split("|"):
         tool = want.strip()
         if not tool or tool == rules.STOP_MATCH:
-            # ターンの終わりに当てる名前。当てる先は judge ではなく events.stop_rules_nudge が持つ。
+            # ターンの終わりに当てる名前。当てる先は判定ではなく events.stop_rules_nudge が持つ。
             continue
         probe = hookio.Input(tool_name=tool, tool_input=probe_input)
-        if not judge.subject_of(probe):
+        if not subjects.subject_of(probe):
             inert.append(tool)
     return inert

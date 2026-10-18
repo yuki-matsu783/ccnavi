@@ -48,12 +48,18 @@ from ..tickets import phasetypes, risk, ticket_model
 # ccnavi の版。pyproject.toml の `version` と揃える（tests/core/test_version.py が見る）。
 VERSION = "0.1.0"
 # 実行ファイルと sh・拡張の契約の版。上げ方は冒頭の説明のとおり。
-COMPAT = 12
+COMPAT = 13
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
 # 実行ファイルが持つ振る舞い。オプションや JSON の欄の有無を `flags` から読めないものを足す。
 # 足すだけなら COMPAT は上げない。
-FEATURES: tuple[str, ...] = ("templates.edit", "templates.draft-text", "board.template-draft")
+FEATURES: tuple[str, ...] = (
+    "templates.draft-text",
+    "user-entry",
+    # 保護対象の下書きの取り込み（`ccnavi user handoff`）。テンプレート専用の取り込み・編集
+    # （前の `templates.edit`・`board.template-draft`）の代わり。
+    "handoff",
+)
 # 組み立ての元のコミットが分からないときの表記。
 UNKNOWN = "unknown"
 # build.py が組み立てのときに書く部品の名前。パッケージの外に置くので、ソースで動かしている

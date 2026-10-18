@@ -12,7 +12,7 @@
 - サブエージェントも打てる（hook が止めるサブコマンドの一覧に入れていない）。実行ファイルは呼び手が
   サブエージェントかを知らないので出力を分けず、状態を動かすコマンドの行には「親（メインエージェント）
   だけが実行する」と書く
-- 未コミットの承認済みチケットは運ばない。運ぶのはユーザ（`ccnavi-push-approved.sh`）で、
+- 未コミットの承認済みチケットは運ばない。運ぶのはユーザ（`ccnavi-user-push-approved.sh`）で、
   エージェントが運ぶコマンドは出さない。取り込み済みの親子（C1 の対象）では、運ぶまで
   `start` が止まることを言う
 """
@@ -192,7 +192,7 @@ class _Family:
         self.raw = raw
         self._c1: tuple[str, str] | None = None
         self.ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
-        self.push_sh = settings.script_command(root, "ccnavi-push-approved.sh")
+        self.push_sh = settings.script_command(root, "ccnavi-user-push-approved.sh")
 
     def c1_target(self) -> tuple[str, str]:
         """この親子が C1 の対象か（`ccnavi c1 family` と同じ `c1.target`）と理由。1 度だけ引く。"""
@@ -223,7 +223,7 @@ class _Family:
         if t.state == ticket_model.TODO:
             lines.append(f"    置き場のファイル: {file_state.label()}")
             lines.append(
-                "    次の操作: ユーザの承認を待つ（ボード、端末の ccnavi-agree.sh、"
+                "    次の操作: ユーザの承認を待つ（ボード、端末の ccnavi-user-agree.sh、"
                 "GitHub の画面で doing/ へ動かす、のどれか）"
             )
             return lines
