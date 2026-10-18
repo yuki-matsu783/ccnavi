@@ -258,6 +258,30 @@ def remember_refs(stderr: TextIO, state_dir: str, session: str, told: set[str]) 
     return _save_once(stderr, _once_path(state_dir, session, "refs"), dict.fromkeys(told, 1))
 
 
+def told_peers(stderr: TextIO, state_dir: str, session: str, agent_id: str) -> set[str] | None:
+    """このサブエージェントに、同じ作業ツリーの相手として案内した相手の鍵。読めなければ None。
+
+    `deliver` が読み書きする `once-<セッション>-<agent_id>.json` とは別のファイルに置く。
+    同じファイルに入れると、`deliver` が書き戻すときに相手の鍵を落とし、ルールの数えと取り違える。
+    掃き方は `once-*` と同じ（`forget`）。置き場が無いときは None（呼ぶ側は案内する側に倒す）。
+    """
+    if not state_dir or not session or not agent_id:
+        return None
+    given = _load_once(stderr, _once_path(state_dir, session, "peers-" + agent_id))
+    return None if given is None else set(given)
+
+
+def remember_peers(
+    stderr: TextIO, state_dir: str, session: str, agent_id: str, told: set[str]
+) -> bool:
+    """案内した相手を記録に残す。書けたか。"""
+    if not state_dir or not session or not agent_id:
+        return False
+    return _save_once(
+        stderr, _once_path(state_dir, session, "peers-" + agent_id), dict.fromkeys(told, 1)
+    )
+
+
 def stop_path(state_dir: str, session: str) -> str:
     """Stop の促し（ターンの終わり N 回に 1 度）の数えの記録。
 
