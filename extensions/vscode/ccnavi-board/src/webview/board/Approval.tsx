@@ -159,7 +159,7 @@ function Body({
               <tr key={b.ticket}>
                 <td className="approval-id">{b.ticket}</td>
                 <td>{b.title}</td>
-                <td>{b.revision ? "親（計画の改訂）" : b.parent === null ? "親" : `親 ${b.parent} / フェーズ ${b.phase ?? "?"}`}</td>
+                <td>{b.revision ? "親（改版）" : b.parent === null ? "親" : `親 ${b.parent} / フェーズ ${b.phase ?? "?"}`}</td>
               </tr>
             ))}
           </tbody>
