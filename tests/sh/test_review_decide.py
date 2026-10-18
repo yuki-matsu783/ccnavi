@@ -46,7 +46,7 @@ TOKEN = "t0k"
 STUB = """#!/bin/sh
 case " $* " in
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
-*" c1 family "*) printf 'c1 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
+*" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
 esac
 printf '%s\\n' "$*" >>"$STUB_LOG"
 root="$2"

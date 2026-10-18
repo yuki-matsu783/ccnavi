@@ -1483,7 +1483,7 @@ class RecordWritesTest(CoreHarness):
     """`--record-writes`: この実行で書いたパスの一覧が、git status の変化と一致する。"""
 
     def place(self, root=None):
-        return os.path.join(root or self.root, "logs", "state", "c1")
+        return os.path.join(root or self.root, "logs", "state", "write-and-push")
 
     def record(self, *args, stdin="", target=None):
         target = target or os.path.join(self.place(), "self", "i0001.t.writes")
@@ -1535,7 +1535,8 @@ class RecordWritesTest(CoreHarness):
         self.assertTrue(listed)
 
     def test_a_failed_command_still_writes_its_list(self):
-        """コマンドが失敗しても一覧は書く（C1 が戻すのに使う）。終了コードはコマンドのもの。"""
+        """コマンドが失敗しても一覧は書く（write-and-push が戻すのに使う）。
+        終了コードはコマンドのもの。"""
         result, listed = self.record("ticket", "start", "nope")
         self.assertNotEqual(result.returncode, 0)
         self.assertTrue(os.path.exists(os.path.join(self.place(), "self", "i0001.t.writes")))
@@ -1564,10 +1565,10 @@ class RecordWritesTest(CoreHarness):
         self.assertFalse(os.path.exists(outside))
         # `--state` で置き場を動かしても、`CCNAVI_STATE` を入れても、書き出し先は動かない。
         moved = os.path.join(self.root, "wip")
-        self.refused(os.path.join(moved, "c1", "list.txt"), "--state", moved)
+        self.refused(os.path.join(moved, "write-and-push", "list.txt"), "--state", moved)
         with mock.patch.dict(os.environ, {"CCNAVI_STATE": moved}):
-            self.refused(os.path.join(moved, "c1", "list.txt"))
-        self.assertFalse(os.path.exists(os.path.join(moved, "c1")))
+            self.refused(os.path.join(moved, "write-and-push", "list.txt"))
+        self.assertFalse(os.path.exists(os.path.join(moved, "write-and-push")))
 
     @requires_symlink
     def test_links_under_the_place_are_not_followed(self):
@@ -1594,7 +1595,7 @@ class RecordWritesTest(CoreHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
         digest = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
-        target = os.path.join(linked, "logs", "state", "c1", "self", "l.writes")
+        target = os.path.join(linked, "logs", "state", "write-and-push", "self", "l.writes")
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         from tests.inproc import run_ccnavi
@@ -1638,7 +1639,7 @@ class RecordWritesTest(CoreHarness):
         # 素の書き込みを許す所と理由。
         allowed = {
             # 実行後チェックが範囲の外の変更を脇へ退ける（`gitstate.restore`）。状態の操作では
-            # なく、C1 の書いたパスの一覧に載せるものでもない。
+            # なく、write-and-push の書いたパスの一覧に載せるものでもない。
             ("gitstate", "shutil.move(source, target)"),
         }
         names = ("tickets.approval", "tickets.agree", "tickets.via", "tickets.configsync")

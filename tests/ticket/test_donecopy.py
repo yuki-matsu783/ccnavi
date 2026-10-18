@@ -10,19 +10,23 @@ from ccnavi.tickets import donecopy
 class SameParentTest(unittest.TestCase):
     def test_the_order_of_fields(self):
         copy = donecopy.DoneCopy
-        mine = copy("i0001", "", base_sha="", started_at="t1", cancelled_at="c1")
+        mine = copy("i0001", "", base_sha="", started_at="t1", cancelled_at="write-and-push")
         self.assertTrue(donecopy.same_parent(mine, copy("i0001", "", started_at="t1")))
         self.assertFalse(donecopy.same_parent(mine, copy("i0001", "", started_at="t2")))
         # started_at が片方にしか無ければ、次の cancelled_at で比べる。
-        unstarted = copy("i0001", "", cancelled_at="c1")
-        self.assertTrue(donecopy.same_parent(unstarted, copy("i0001", "", cancelled_at="c1")))
+        unstarted = copy("i0001", "", cancelled_at="write-and-push")
+        self.assertTrue(
+            donecopy.same_parent(unstarted, copy("i0001", "", cancelled_at="write-and-push"))
+        )
         self.assertTrue(donecopy.same_parent(mine, unstarted))
         self.assertFalse(donecopy.same_parent(mine, copy("i0001", "", cancelled_at="c2")))
 
     def test_nothing_to_compare_is_not_the_same(self):
         copy = donecopy.DoneCopy
         # 手元に親が無いとき、空どうしのとき（どの欄でも照合できない）は同じとしない。
-        self.assertFalse(donecopy.same_parent(None, copy("i0001", "", cancelled_at="c1")))
+        self.assertFalse(
+            donecopy.same_parent(None, copy("i0001", "", cancelled_at="write-and-push"))
+        )
         self.assertFalse(donecopy.same_parent(copy("i0001", ""), copy("i0001", "")))
 
     def test_the_first_field_both_have_decides(self):

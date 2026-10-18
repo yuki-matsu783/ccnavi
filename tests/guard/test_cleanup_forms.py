@@ -2,7 +2,7 @@
 （src/ccnavi/tickets/phase_forms.py）。
 
 1. 状態の操作（`ticket finish` など）は、副命令の前に `--` を挟んでも止まる。挟んだ形に
-   `--record-tree` を足すと、実行ファイルの「C1 を通っていない」検査も外れる
+   `--record-tree` を足すと、実行ファイルの「write-and-push を通っていない」検査も外れる
 2. 親を閉じたときの片付け（`sync tidy`・`worktree retire`・`worktree branch`・
    `ccnavi-clean.sh --branch` / `--confirmed`）は、メインのエージェントもサブエージェントも
    直には打てない。呼ぶのは sh の中（hook を通らない）か、ユーザが `!` を付けて打つときだけ

@@ -34,7 +34,7 @@ from ccnavi.hook.subagent import CANDIDATE_NOTE
 from ccnavi.infra import settings, shellread
 from ccnavi.tickets import approval, phase_forms, phase_scope, review, ticket_fields
 from ccnavi.tickets import ticket as ticket_mod
-from tests import ROOT, c1flag, common_path
+from tests import ROOT, common_path, write_and_push_flag
 from tests.inproc import run_ccnavi
 from tests.ticketsample import RULES, plain_parent, record_merge, write_plain_phases
 
@@ -140,7 +140,7 @@ class TicketTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
-        args = self.as_c1(args)
+        args = self.as_write_and_push(args)
         return run_ccnavi(
             [
                 "--root",
@@ -160,9 +160,10 @@ class TicketTest(unittest.TestCase):
             env=environment,
         )
 
-    def as_c1(self, args):
-        """sh を通さない呼び出しに、C1 の印を付ける（`tests/c1flag.py`）。"""
-        return c1flag.as_c1(self.root, self.state, self.parent_tree, args)
+    def as_write_and_push(self, args):
+        """sh を通さない呼び出しに、write-and-push
+        の印を付ける（`tests/write_and_push_flag.py`）。"""
+        return write_and_push_flag.as_write_and_push(self.root, self.state, self.parent_tree, args)
 
     def hook(
         self,

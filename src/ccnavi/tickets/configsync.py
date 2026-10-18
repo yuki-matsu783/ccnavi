@@ -329,8 +329,9 @@ def _prune_empty(base: str) -> None:
 def _put(path: str, content: bytes | None) -> str:
     """1 本を書く（None なら消す）。駄目なら理由。
 
-    書くのは一時ファイルからの置き換え。fsio を通す（C1 の記録層が、写したものを「この実行で書いた
-    パス」に数え、`start` の C1 でコミットする）。
+    書くのは一時ファイルからの置き換え。fsio を通す（write-and-push の記録層が、
+    写したものを「この実行で書いた
+    パス」に数え、`start` の write-and-push でコミットする）。
     """
     if content is None:
         if not os.path.lexists(path):

@@ -20,7 +20,7 @@ keywords: [子チケット, 識別子, フェーズ番号, 連番, 採番, next_
 識別子だけを見ても、どのフェーズの子かが分からない。
 
 識別子だけから親を割り出す箇所は 4 つあった。`ticket_ids.py` の `_CHILD`（`child_pattern()`。Chrome 拡張の
-`family_of` もこれを使う）、hook の C1 の `family_of`、`ccnavi-common.sh` の `ccnavi_c1_family`（`%-[0-9][0-9]` で
+`family_of` もこれを使う）、hook の write-and-push の `family_of`、`ccnavi-common.sh` の `ccnavi_wap_family`（`%-[0-9][0-9]` で
 末尾を剥がす）、lint の「親なのに子の形」の検査。
 
 ## 決定
@@ -81,6 +81,6 @@ ADR の本文に残る旧形式の識別子（`i0055-04` など）は、書い�
 ## 採らなかった案
 
 - **旧形式を読み続ける。** 親の割り出しが「右から 2 段、無ければ 1 段」の 2 通りになり、`foo-01` が新しい形の
-  親 `foo-01` なのか旧形式の `foo` の子なのか決まらない。lint・採番・C1・Chrome の 4 か所で扱いが要る
+  親 `foo-01` なのか旧形式の `foo` の子なのか決まらない。lint・採番・write-and-push・Chrome の 4 か所で扱いが要る
 - **フェーズ番号を `phase:` だけに置き、表示で並べ替える。** 識別子を見る場所（ブランチ名・ワークツリーの名前・コミットの
   メッセージ）では順が直らない

@@ -32,11 +32,11 @@
 # 探す順は、環境変数 CCNAVI_BIN_PATH が指すもの → ワークスペースルートの dist/ccnavi/ccnavi →
 # ソースツリーの `python -m ccnavi`。
 #
-# 取り込み済みの親子のチケット（origin があり、C1 の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）の
-# start・finish・cancel は C1 で回す。Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため、次を 1 操作にする。
+# 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）の
+# start・finish・cancel は write-and-push で回す。Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため、次を 1 操作にする。
 # ロック → 途中の操作の確認 → hook のマーカーを先にコミット →
 # 取り込み（ccnavi-sync.sh）→ 未送信の確かめ → 書く → 書いたパスだけ commit --only → push。push が
-# 通るまで完了にしない。送れなければ書いたものを戻す。record-risk は C1 にしない（その子の finish がコミットして送る）。
+# 通るまで完了にしない。送れなければ書いたものを戻す。record-risk は write-and-push にしない（その子の finish がコミットして送る）。
 #
 # 子の finish は、書く前に親のブランチへ合流する。親のワークツリーで子の先頭を `merge --no-ff --no-commit` で入れ、
 # 完了の記録と子の承認済みチケットの merged_sha（合流した子の先頭）を足して、合流と状態を 1 つのマージコミットにして push する。
@@ -46,9 +46,9 @@
 # それ以外の親子のチケットは今のまま（書くだけ。コミットと push はエージェント）。
 #
 # finish・cancel が通ったら、その親子の閉じた子のワークツリーを実行ファイルの `worktree tidy <親>` で
-# 片付ける（C1 なら送り終えた後）。未コミットの変更があるもの・cwd が中にあるものは消さずに名指しする。
+# 片付ける（write-and-push なら送り終えた後）。未コミットの変更があるもの・cwd が中にあるものは消さずに名指しする。
 # 片付けが済まなくても finish・cancel の終了コードは変えない。
-# 終了コード: 0 成功 / 1 前提の未充足（C1 で止めた・送れなかったを含む） / 2 引数か環境の誤り
+# 終了コード: 0 成功 / 1 前提の未充足（write-and-push で止めた・送れなかったを含む） / 2 引数か環境の誤り
 
 set -eu
 
@@ -137,9 +137,9 @@ root=$(ccnavi_workspace) || {
 # 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 if bin=$(ccnavi_bin "$root"); then
 	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-ticket: %s\n' "$skew" >&2
-	ccnavi_c1_exe() { "$bin" --root "$root" "$@"; }
+	ccnavi_wap_exe() { "$bin" --root "$root" "$@"; }
 elif [ -f "$root/src/ccnavi/__main__.py" ]; then
-	ccnavi_c1_exe() { (cd "$root" && uv run python -m ccnavi --root "$root" "$@"); }
+	ccnavi_wap_exe() { (cd "$root" && uv run python -m ccnavi --root "$root" "$@"); }
 else
 	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
@@ -185,90 +185,90 @@ tidy_after() {
 	ccnavi_is_ident "$ta_id" || return 0
 	# 子の識別子のまま渡す。親へ割り出すのは実行ファイル（チケットの `parent:` を読む）。名前の形で
 	# 末尾の `-<2 桁>-<2 桁>` を剥がすと、その形で終わる親の識別子（rel-2026-10-06 など）を読み違える。
-	ccnavi_c1_exe --cwd "$here" worktree tidy "$ta_id" || :
+	ccnavi_wap_exe --cwd "$here" worktree tidy "$ta_id" || :
 }
 
-# 子の start で、このPCに子のワークツリーが無ければ、取り込み直後の親ブランチ（C1 の親のワークツリーの HEAD）から作る。
+# 子の start で、このPCに子のワークツリーが無ければ、取り込み直後の親ブランチ（write-and-push の親のワークツリーの HEAD）から作る。
 # 別のPCで承認された子でも、どのPCでも同じ場所に作る。ネットワークには出ない（git の局所の操作だけ）。
 # 子のブランチ（子の識別子の名前）が手元に残っていれば、親の先頭が含むものだけ親の先頭に揃えて使う
 # （含まない = 手元だけに積んだ仕事があるので、消さずに止める）。
 # ここで止めるのは git の状態（手元だけのコミット・作れない行き先）を見た判定で、ccnavi の状態（チケット・
 # マーカー）を読んで操作を止める判定ではない。shに判定を足さない決まり（hookと実行ファイルが判定する）の外になる。
 ensure_child_worktree() {
-	ew_path="$root/.claude/worktrees/$c1_id"
+	ew_path="$root/.claude/worktrees/$wap_id"
 	if [ -e "$ew_path" ] || [ -L "$ew_path" ]; then
 		return 0
 	fi
-	if git -C "$ccnavi_c1_tree" show-ref --verify --quiet "refs/heads/$c1_id"; then
-		if ! git -C "$ccnavi_c1_tree" merge-base --is-ancestor "refs/heads/$c1_id" HEAD 2>/dev/null; then
-			printf 'ccnavi-ticket: 手元のブランチ %s に親のブランチ %s に無いコミットがある。子のワークツリーを作らずに止めた。内容を確かめて、親へ取り込むか、ユーザが消してから再実行してください\n' "$c1_id" "$ccnavi_c1_branch" >&2
-			log_info 子のワークツリーを作らずに止めた -- "child=$c1_id" "reason=child-branch-ahead"
+	if git -C "$ccnavi_wap_tree" show-ref --verify --quiet "refs/heads/$wap_id"; then
+		if ! git -C "$ccnavi_wap_tree" merge-base --is-ancestor "refs/heads/$wap_id" HEAD 2>/dev/null; then
+			printf 'ccnavi-ticket: 手元のブランチ %s に親のブランチ %s に無いコミットがある。子のワークツリーを作らずに止めた。内容を確かめて、親へ取り込むか、ユーザが消してから再実行してください\n' "$wap_id" "$ccnavi_wap_branch" >&2
+			log_info 子のワークツリーを作らずに止めた -- "child=$wap_id" "reason=child-branch-ahead"
 			return 1
 		fi
-		git -C "$ccnavi_c1_tree" branch -f "$c1_id" HEAD >/dev/null 2>&1 || {
-			printf 'ccnavi-ticket: 手元のブランチ %s を親のブランチの先頭に揃えられなかった\n' "$c1_id" >&2
-			log_info 子のワークツリーを作らずに止めた -- "child=$c1_id" "reason=child-branch-reset"
+		git -C "$ccnavi_wap_tree" branch -f "$wap_id" HEAD >/dev/null 2>&1 || {
+			printf 'ccnavi-ticket: 手元のブランチ %s を親のブランチの先頭に揃えられなかった\n' "$wap_id" >&2
+			log_info 子のワークツリーを作らずに止めた -- "child=$wap_id" "reason=child-branch-reset"
 			return 1
 		}
 		ew_rc=0
-		git -C "$ccnavi_c1_tree" worktree add "$ew_path" "$c1_id" >/dev/null 2>"$ccnavi_c1_tmp/ew-err" || ew_rc=$?
+		git -C "$ccnavi_wap_tree" worktree add "$ew_path" "$wap_id" >/dev/null 2>"$ccnavi_wap_tmp/ew-err" || ew_rc=$?
 	else
 		ew_rc=0
-		git -C "$ccnavi_c1_tree" worktree add "$ew_path" -b "$c1_id" HEAD >/dev/null 2>"$ccnavi_c1_tmp/ew-err" || ew_rc=$?
+		git -C "$ccnavi_wap_tree" worktree add "$ew_path" -b "$wap_id" HEAD >/dev/null 2>"$ccnavi_wap_tmp/ew-err" || ew_rc=$?
 	fi
 	if [ "$ew_rc" -ne 0 ]; then
-		printf 'ccnavi-ticket: 子のワークツリー %s を作れなかった（%s）\n' "$ew_path" "$(head -n 1 "$ccnavi_c1_tmp/ew-err" 2>/dev/null)" >&2
-		log_info 子のワークツリーを作れなかった -- "child=$c1_id" "reason=child-worktree-add"
+		printf 'ccnavi-ticket: 子のワークツリー %s を作れなかった（%s）\n' "$ew_path" "$(head -n 1 "$ccnavi_wap_tmp/ew-err" 2>/dev/null)" >&2
+		log_info 子のワークツリーを作れなかった -- "child=$wap_id" "reason=child-worktree-add"
 		return 1
 	fi
-	printf 'ccnavi-ticket: 子のワークツリー .claude/worktrees/%s を親のブランチ %s の先頭から作った\n' "$c1_id" "$ccnavi_c1_branch" >&2
-	log_info 子のワークツリーを作った -- "child=$c1_id" "parent=$ccnavi_c1_family_id"
+	printf 'ccnavi-ticket: 子のワークツリー .claude/worktrees/%s を親のブランチ %s の先頭から作った\n' "$wap_id" "$ccnavi_wap_branch" >&2
+	log_info 子のワークツリーを作った -- "child=$wap_id" "parent=$ccnavi_wap_family_id"
 }
 
-# C1（親子のチケットの start・finish・cancel）。
+# write-and-push（親子のチケットの start・finish・cancel）。
 case "$1" in
 start | finish | cancel)
 	ccnavi_log_root="$root"
-	ccnavi_c1_root="$root"
-	ccnavi_c1_label=ccnavi-ticket
-	ccnavi_c1_sh="$(dirname "$0")"
-	trap 'ccnavi_c1_end' EXIT
-	trap 'ccnavi_c1_end; exit 130' INT TERM HUP
-	# 識別子は実行ファイル（argparse）と同じに読む（ticket_id。`start -- <親>` で C1 を経ずに通らないようにする）。
-	c1_id=$(ticket_id "$@")
-	if ! ccnavi_is_ident "$c1_id"; then
-		printf 'ccnavi-ticket: %s には識別子を指定してください（%s は有効な識別子の形式ではありません）。\n' "$1" "${c1_id:-（無い）}" >&2
+	ccnavi_wap_root="$root"
+	ccnavi_wap_label=ccnavi-ticket
+	ccnavi_wap_sh="$(dirname "$0")"
+	trap 'ccnavi_wap_end' EXIT
+	trap 'ccnavi_wap_end; exit 130' INT TERM HUP
+	# 識別子は実行ファイル（argparse）と同じに読む（ticket_id。`start -- <親>` で write-and-push を経ずに通らないようにする）。
+	wap_id=$(ticket_id "$@")
+	if ! ccnavi_is_ident "$wap_id"; then
+		printf 'ccnavi-ticket: %s には識別子を指定してください（%s は有効な識別子の形式ではありません）。\n' "$1" "${wap_id:-（無い）}" >&2
 		exit 2
 	fi
-	ccnavi_c1_family "$c1_id"
-	case "$ccnavi_c1_target" in
+	ccnavi_wap_family "$wap_id"
+	case "$ccnavi_wap_target" in
 	stop)
-		ccnavi_c1_refuse
+		ccnavi_wap_refuse
 		exit 1
 		;;
 	yes)
 		case "$1" in
-		start) c1_words="$c1_id に着手" ;;
-		finish) c1_words="$c1_id の作業を終えた" ;;
-		*) c1_words="$c1_id を取り消した" ;;
+		start) wap_words="$wap_id に着手" ;;
+		finish) wap_words="$wap_id の作業を終えた" ;;
+		*) wap_words="$wap_id を取り消した" ;;
 		esac
-		ccnavi_c1_begin || exit 1
+		ccnavi_wap_begin || exit 1
 		# 子の finish は、親のブランチへ合流してから push する。合流してよいかをここで確かめる。
-		if [ "$1" = finish ] && [ "$c1_id" != "$ccnavi_c1_family_id" ]; then
-			ccnavi_c1_merge_plan "$c1_id" || exit 1
+		if [ "$1" = finish ] && [ "$wap_id" != "$ccnavi_wap_family_id" ]; then
+			ccnavi_wap_merge_plan "$wap_id" || exit 1
 		fi
-		if [ "$1" = start ] && [ "$c1_id" != "$ccnavi_c1_family_id" ]; then
+		if [ "$1" = start ] && [ "$wap_id" != "$ccnavi_wap_family_id" ]; then
 			ensure_child_worktree || exit 1
 		fi
-		c1_rc=0
-		ccnavi_c1_write "ccnavi: ${c1_words}" -- ticket "$@" || c1_rc=$?
-		ccnavi_c1_end
+		wap_rc=0
+		ccnavi_wap_write "ccnavi: ${wap_words}" -- ticket "$@" || wap_rc=$?
+		ccnavi_wap_end
 		trap - EXIT INT TERM HUP
-		[ "$c1_rc" -ne 0 ] || tidy_after "$@"
-		exit "$c1_rc"
+		[ "$wap_rc" -ne 0 ] || tidy_after "$@"
+		exit "$wap_rc"
 		;;
 	esac
-	ccnavi_c1_end
+	ccnavi_wap_end
 	trap - EXIT INT TERM HUP
 	;;
 esac
@@ -277,8 +277,8 @@ rc=0
 # learn は作業ディレクトリのワークツリーで書き先と識別子が決まるので、cwd を実行ファイルへ渡す
 # （ソースで動かす形は cd "$root" してから起こすため、渡さないとワークスペースルートの扱いになる）。
 case "$1" in
-learn) ccnavi_c1_exe --cwd "$here" ticket "$@" || rc=$? ;;
-*) ccnavi_c1_exe ticket "$@" || rc=$? ;;
+learn) ccnavi_wap_exe --cwd "$here" ticket "$@" || rc=$? ;;
+*) ccnavi_wap_exe ticket "$@" || rc=$? ;;
 esac
 [ "$rc" -ne 0 ] || tidy_after "$@"
 exit "$rc"

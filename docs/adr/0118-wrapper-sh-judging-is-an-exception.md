@@ -8,7 +8,7 @@ keywords: [判定, sh, ccnavi-git.sh, integrate, integrate-done, push, carry, �
 
 # ADR-0118: 入口を 1 本に寄せたラッパーの中の可否の判定は、止める・通すの原則の例外にする
 
-状態: 採用（例外の範囲を、親ブランチの共通の push 関門（C1 と `ccnavi-push-approved.sh` の push の前を含む）に広げることは ADR-0142 が改める。表の `push-gone-family`・`push-ambiguous-family` の材料だった取り込み状態の `state`・`branch`、`ig_bound` が読んでいた取り込み状態、統合先の名前の「取り込み結果」の分は、取り込み状態をやめたことで改まった）
+状態: 採用（例外の範囲を、親ブランチの共通の push 関門（write-and-push と `ccnavi-push-approved.sh` の push の前を含む）に広げることは ADR-0142 が改める。表の `push-gone-family`・`push-ambiguous-family` の材料だった取り込み状態の `state`・`branch`、`ig_bound` が読んでいた取り込み状態、統合先の名前の「取り込み結果」の分は、取り込み状態をやめたことで改まった）
 
 改訂（2026-10-14）: 「承認済みの `branch:` のブランチへ移る 1 操作の前提」は、ADR-0136 が `branch:` を廃止したため無くなった。
 
@@ -42,7 +42,7 @@ keywords: [判定, sh, ccnavi-git.sh, integrate, integrate-done, push, carry, �
    生の操作（組み込みが止める）しか無い
 2. **ラッパーは許可リストで読む。** 知らない副命令・知らないオプションは通さない。判定が見落とした形は止まる側に倒れる
 3. **判定の材料のうち、チケットの中身は実行ファイルに聞く。** sh はチケットの YAML と JSON を自分で読まない。
-   親のワークツリーかは `ccnavi tree parent`、親のブランチ名は `ccnavi c1 family`、閉じたかは `ccnavi sync closed` に聞き、
+   親のワークツリーかは `ccnavi tree parent`、親のブランチ名は `ccnavi write-and-push family`、閉じたかは `ccnavi sync closed` に聞き、
    1 行 1 項目の答えを見る。答えが得られないときは、止める側の検査は止める向きに、ツリーを動かす側は動かさない向きに倒す。
    sh が自分で読んでよいのは、sh が書いた取り込み状態（1 行 1 項目）、git の参照と作業ツリー、環境変数だけ
 
@@ -92,7 +92,7 @@ merge を続けて打つ。判定と操作の間に別のプロセス（hook の
   `origin/HEAD` の順）と取り込み状態の読み方を実行ファイルにも持つことになり、`ccnavi-fetch.sh`・`ccnavi-sync.sh`・
   `ccnavi-review.sh` が同じ順で読む `ccnavi_integration` と 2 つに分かれる。`co_carry` は判定の直後に checkout と merge を
   打つので、判定だけを移しても隙は残る。状態操作（squash・`update-ref -d`）を実行ファイルへ移すと、実行ファイルが
-  git の参照を書くことになる。実行ファイルは判定と見分けだけを持ち、コミットもしない（C1 の分担）ので、その線が動く
+  git の参照を書くことになる。実行ファイルは判定と見分けだけを持ち、コミットもしない（write-and-push の分担）ので、その線が動く
 - **判定を hook へ移す。** hook はコマンド行しか見ないので、統合先の名前や取り込み状態を読むために hook が git と
   取り込み状態を読むことになり、ツール呼び出しのたびの時間が延びる。`co_carry` の前提（作業ツリー・途中の操作）は
   打つ瞬間の状態で、hook の判定のときと違うことがある
