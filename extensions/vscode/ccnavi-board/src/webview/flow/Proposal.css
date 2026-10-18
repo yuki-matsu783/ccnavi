@@ -1,5 +1,5 @@
 /*
- * エージェントの提案の差分と、依頼の文（`Proposal.tsx`）。背景と本体は `SaveReview.css` のものを使う。
+ * エージェントの提案の差分と、依頼の文（`Proposal.tsx`）。背景と本体は `shared/Dialog.css` のものを使う。
  * 前は消える側（削除の色）、後は入る側（追加の色）で、文はそのまま折り返して見せる。
  */
 .review.proposal { --overlay-w: 820px; }

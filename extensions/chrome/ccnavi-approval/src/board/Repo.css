@@ -3,18 +3,18 @@
  * 見出し（h2）・空の表示（.empty）・不備の一覧（.problems）は共通の `page.css` のまま。
  */
 .repo { border-top: 1px solid var(--vscode-panel-border); margin-top: 12px; padding: 12px 0 4px; }
-.repo-head h2 { font-size: 1.1em; overflow-wrap: anywhere; }
+.repo-head h2 { font-size: var(--font-title); overflow-wrap: anywhere; }
 /* 事実の行（プロジェクト・統合先・見たブランチ・判定に入れた親子・読み取りの回数）。カードの `.facts` と同じ薄い小さな字 */
-.project, .integration, .scope, .stats, .closure { margin: 2px 0; color: var(--vscode-descriptionForeground); font-size: .85em; overflow-wrap: anywhere; }
+.project, .integration, .scope, .stats, .closure { margin: 2px 0; color: var(--vscode-descriptionForeground); font-size: var(--font-sm); overflow-wrap: anywhere; }
 .stats { margin-top: 8px; }
 .repo .empty { margin: 6px 0; }
-.recent-days { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin: 6px 0; }
-.recent-days label { display: inline-flex; gap: 6px; align-items: center; color: var(--vscode-descriptionForeground); }
+.recent-days { display: flex; flex-wrap: wrap; gap: var(--gap-3) var(--gap-4); align-items: center; margin: 6px 0; }
+.recent-days label { display: inline-flex; gap: var(--gap-3); align-items: center; color: var(--vscode-descriptionForeground); }
 /* 共通の骨組みが整えるのは text・search の欄だけ。設定画面（`src/options/App.css`）と同じ見た目にする */
 .recent-days input[type=number] {
   width: 6em;
   background: var(--vscode-input-background); color: var(--vscode-input-foreground);
-  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 2px;
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: var(--radius-sm);
   min-height: 24px; padding: 2px 6px; font: inherit;
 }
 .recent-days input[type=number]:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }

@@ -9,7 +9,7 @@
 .row { border-top: 1px solid var(--vscode-panel-border); }
 .row:first-child { border-top: 0; }
 .row:first-child > .row-head { border-radius: var(--radius-md) var(--radius-md) 0 0; }
-.row:last-child > .row-body, .row:last-child:not(.open) > .row-head { border-radius: 0 0 4px 4px; }
+.row:last-child > .row-body, .row:last-child:not(.open) > .row-head { border-radius: 0 0 var(--radius-md) var(--radius-md); }
 /* 絞り込みで隠す。開いている行は打っている途中で消えないよう隠さない */
 .row.hidden-by-find:not(.open) { display: none; }
 .row-head { display: grid; gap: var(--gap-4); align-items: center; padding: 5px 8px; cursor: pointer; }

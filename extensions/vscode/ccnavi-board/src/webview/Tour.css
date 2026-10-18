@@ -1,6 +1,7 @@
 /*
  * 吹き出しの案内（`Tour.tsx`）。指す先の周りだけを明るく残し、ほかを暗くする。
- * 暗くするのは指す先の枠の影（box-shadow）で、枠の外を覆う要素は作らない。
+ * 指す先があるときは、暗くするのを指す先の枠の影（box-shadow）で行い、枠の外を覆う要素は作らない。
+ * 指す先が無い手順だけ、`.tour-shade` で画面全体を暗くする。
  */
 .tour { position: fixed; inset: 0; z-index: var(--z-tour); }
 
@@ -36,7 +37,7 @@
 
 .tour-body { margin: 0 0 10px; line-height: 1.6; }
 
-/* やめる ×。どの段でも吹き出しの右上の同じ位置に出す */
+/* やめる ×。どの手順でも吹き出しの右上の同じ位置に出す */
 .tour-close {
   position: absolute;
   top: 4px;

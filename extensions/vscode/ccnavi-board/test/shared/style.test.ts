@@ -4,8 +4,8 @@
  * 流し込む。
  *
  * ここで見るのは 3 つ。骨組み（共通の部品 `extensions/shared/styles/page.css`）が 6 画面とも 1 か所から来ていること、
- * ハイコントラストのテーマ向けの書き方が残っていること、そして置いた CSS がバンドルから漏れて
- * いないこと（`@import` を書き忘れると、見た目だけが気づかないうちに抜ける）。
+ * ハイコントラストのテーマ向けの書き方が残っていること、そして置いた CSS がすべてバンドルに入って
+ * いること（`@import` を書き忘れると、見た目だけが気づかないうちに抜ける）。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -241,12 +241,13 @@ test("CB-T583 z-index・角丸・文字サイズ・すき間は page.css の変�
     }
   };
   walk(WEBVIEW_SRC);
+  walk(path.join(path.dirname(PAGE_CSS), "..", "..", "chrome", "ccnavi-approval", "src"));
   // 画面と共通の部品（ボタン・一覧）。配色の変数だけを定める appearance.css と、値を定める page.css の :root は対象外
   files.push(path.join(path.dirname(PAGE_CSS), "button.css"), path.join(path.dirname(PAGE_CSS), "list.css"), PAGE_CSS);
   // 数値で書いてよいのは 0・1em（等倍）・px の文字（アイコンの大きさ）だけ
   const raw: [RegExp, string][] = [
     [/z-index:\s*-?\d/, "z-index（--z-*）"],
-    [/border-radius:\s*[1-9]\d*px/, "border-radius（--radius-*）"],
+    [/border-radius:[^;}]*\b[1-9]\d*px/, "border-radius（--radius-*）"],
     [/font-size:\s*(?!1em\b)\d*\.?\d+em/, "font-size（--font-*）"],
     [/(?<![\w-])(?:row-|column-)?gap:\s*\d/, "gap（--gap-*）"],
     [/box-shadow:\s*[^;]*rgba\(0, 0, 0, \.35\)/, "ポップアップの影（--shadow-popup）"],

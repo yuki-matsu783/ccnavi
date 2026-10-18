@@ -12,7 +12,8 @@
 
 /*
  * 重なり順（z-index）の値。画面の CSS に数値を直書きせず、必ずこの名前で書く（直書きの検査は test/shared/style.test.ts）。
- * 画面全体で比べる値は下から --z-foot < --z-toolbar < --z-overlay < --z-graph-max < --z-tour。--z-inline と --z-popover は部品の中だけの値。
+ * 画面全体で比べる値は下から --z-foot < --z-toolbar < --z-overlay < --z-graph-max < --z-tour。--z-inline と --z-popover は部品の中の値で、
+ * --z-popover は脚注より上、ツールバーより下に置く。
  * - inline: 列の取っ手・ノードの削除ボタンなど、すぐ隣の部品の上に出るだけのもの
  * - popover: 親の重なりの単位（ツールバー・図の枠）の中で開く一覧・ボタン。中の数値は外へ及ばないので、
  *   外との前後は親の値で決まる（図の枠は isolation で、ツールバーは sticky の z-index で単位になる）
@@ -23,7 +24,7 @@
   --z-inline: 1;
   --z-popover: 5;
   --z-foot: 4;
-  --z-toolbar: 5;
+  --z-toolbar: 6;
   --z-overlay: 10;
   --z-graph-max: 100;
   --z-tour: 1000;
@@ -40,6 +41,7 @@
   --font-md: .9em;
   --font-lg: .95em;
   --font-title: 1.1em;
+  --font-h1: 1.3em;
   --gap-1: 2px;
   --gap-2: 4px;
   --gap-3: 6px;
@@ -75,9 +77,10 @@ code { font-family: var(--vscode-editor-font-family); font-size: var(--font-lg);
 .dim { color: var(--vscode-descriptionForeground); }
 .toolbar { display: flex; flex-wrap: wrap; gap: var(--gap-5) var(--gap-7); align-items: center; padding: 0 4px 10px; }
 /* ツールバー（保存などのボタン）と脚注（保存の結果・エラー）は、本文をスクロールしても画面の上下に
-   残す。どちらも #root の直下にあり、本文と同じ入れ物の中で貼り付く。本文が裏を通るので背景を塗る。
+   残す。どちらも #root の直下にあり、本文と同じ入れ物の中で貼り付く。本文が下を通るので背景を塗る。
    z-index の値は冒頭の --z-* を使う（列の取っ手より上、承認のオーバーレイ・全画面の図・ツアーより下）。
-   ツールバーは脚注より上（5）に置く。案内の一覧などツールバーの中から下へ開くメニューが脚注の下に隠れないように */
+   ツールバーは脚注より上、部品の中から開く一覧（--z-popover）よりも上に置く。案内の一覧などツールバーの中から下へ開くメニューが脚注の下に隠れず、
+   本文の一覧がスクロールでツールバーの上に出ることもないようにする */
 .toolbar, .foot { position: sticky; z-index: var(--z-foot); background: var(--vscode-editor-background); }
 .toolbar { top: 0; z-index: var(--z-toolbar); padding-top: 6px; }
 .summary { display: flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-6); align-items: baseline; }
