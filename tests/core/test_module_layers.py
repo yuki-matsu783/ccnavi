@@ -107,6 +107,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "infra.tree",
                 "infra.yamlread",
                 "records.redact",
+                "tickets.user_only",
             }
         ),
     ),

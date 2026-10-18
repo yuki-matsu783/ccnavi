@@ -11,11 +11,15 @@ import re
 
 from ..infra import settings, shellread, shellread_words
 from ..policy import rules, selfguard_shell
+from . import user_only
+
+# 何がユーザ専用かは `user_only` の表が正本。この module はその表から正規表現と旗の一覧を組み立て、
+# コマンド行に当てる。操作を足す・外すときは表の行を直し、ここの正規表現は直さない。
 
 # 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
 # コマンドの位置で `sh` から呼ぶ形だけ。名前がどこかに含まれるだけでは通さない。
 # 連結されたコマンドが 1 つでもこの形でなければ止める。
-_EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s|$)")
+_EXEMPT_COMMAND = re.compile(rf"^(sh|bash)\s+\S*{user_only.agent_script_forms()}(\s|$)")
 # 止めたときの文に添える、通る形の案内。案内どおりの 1 本に `cd … &&` や `| tail` を
 # 付けると、連結の全部が上の形でないので止まる。文が「何を打つか」だけを言うと、
 # 付け足した形で打って止まり、案内と拒否が食い違って見える。
@@ -35,9 +39,7 @@ TURN_DEFINED = "ターン（ユーザが指示を出してから Claude が応�
 # サブエージェントが親のツリーへ cd して打てばラッパースクリプトは通すので、
 # サブエージェントかどうかで止めるレイヤーをここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
-    r"(^|[;&|]\s*)(sh|bash)(\s+-\S+)*\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
-    r"(start|finish|cancel|record-risk|request|confirm|comment|decide|ready|close-early"
-    r"|push)\b",
+    user_only.subagent_forbidden_forms(),
     # 名前の大小は問わない（`CCNAVI-TICKET.SH`）。大小を区別しないファイルシステムでは
     # 同じ sh が走る。
     re.IGNORECASE,
@@ -78,27 +80,10 @@ _PREVIEW_END = rf"[ \t;&|\r\n{re.escape(shellread.SEP)}]"
 _PREVIEW_WORD = rf"[ \t]--preview(?={_PREVIEW_END}|$)"
 _NOT_PREVIEW = rf"(?![^{selfguard_shell._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 #
-# `--import` はテンプレートの下書きを取り込む形（`ccnavi --templates --import`）。取り込みはユーザが
-# 差分を読んで決めるので、下見だけの形（`--yes` なし）も含めてエージェントには打たせない。
-# 下書きを作る `--draft` は効力が無いので止めない。
-# `--rename-template`・`--move-template`・`--delete-template` も同じ。`--save-draft` も止める
-# （`--body-file` に任意のパスを渡して、読んだ中身を下見の出力に出せるため。下書きの編集は Write
-# でできる）。`--delete-draft` は下書きの置き場の中だけを消すので、
-# `--yes` の付かない下見は止めない。
-_CLI_FORMS = (
-    rf"(--yes\b|--(?:agree|approve)\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b|--import\b"
-    r"|--(?:rename|move|delete)-template\b|--save-draft\b"
-    # 副命令の前の `--`（`ticket -- finish`）は、実行ファイルが選択肢の終わりとして読み飛ばすので
-    # 同じ操作になる。
-    r"|\b(ticket|review)\s+(--\s+)?"
-    r"(start|finish|cancel|record-risk|prepare|requested|confirm|ready)\b"
-    # 親を閉じたときの片付け。ブランチを `branch -D` で消すので、エージェント（メインも
-    # サブエージェントも）には直に打たせない。呼ぶのは sh（`ccnavi-review.sh ready` の
-    # `worktree retire`、`ccnavi-sync.sh` の `sync tidy`）の中か、ユーザが `!` を付けて
-    # 打つときだけ。sh の中の呼び出しは hook を通らない。取り消した子のブランチを消す
-    # `worktree branch … confirmed` は、ユーザが確認したことをユーザ自身が打つことで担保する。
-    r"|\bsync\s+(--\s+)?tidy\b|\bworktree\s+(--\s+)?(retire|branch)\b)"
-)
+# 実行ファイルを直に呼ぶ形の旗とサブコマンドは、表（user_only.FLAGS・SUBS）から組み立てる。
+# 旗ごとの理由（テンプレートの取り込みを下見も含めて止める理由、親を閉じたときの片付けを
+# エージェントに打たせない理由）は、表の行のコメントにある。
+_CLI_FORMS = user_only.cli_forms(_NOT_PREVIEW)
 CODE_TICKET_APPROVAL = "DENY_TICKET_APPROVAL_CLI"
 TICKET_APPROVAL_RULE_ID = "builtin:guard-ticket-approval"
 
@@ -153,35 +138,8 @@ _GUARD_MENTION = re.compile(rf"(?<![A-Za-z0-9_]){_GUARD_NAME}(?![A-Za-z0-9_])", 
 _GUARD_FLAG = re.compile(
     r"--guard-ticket-approval(?:\s*=\s*|\s+)(?!enable(?![\w-]))", re.IGNORECASE
 )
-_BOARD_FORMS = (
-    re.compile(r"(?<![\w-])--(?:agree|approve|reviewed)(?![\w-])", re.IGNORECASE),
-    re.compile(r"(?<![\w-])--yes(?![\w-])", re.IGNORECASE),
-)
-_IMPORT_FORMS = (
-    re.compile(r"(?<![\w-])--templates(?![\w-])", re.IGNORECASE),
-    re.compile(r"(?<![\w-])--import(?![\w-])", re.IGNORECASE),
-    re.compile(r"(?<![\w-])--yes(?![\w-])", re.IGNORECASE),
-)
-# テンプレートの編集（保存・下書きの削除・改名・移動・削除）を `--yes` で書く形。
-# 取り込みと同じく launcher の書き方に依らず止める
-_EDIT_FORMS = (
-    re.compile(r"(?<![\w-])--templates(?![\w-])", re.IGNORECASE),
-    re.compile(
-        r"(?<![\w-])--(?:save-draft|delete-draft|rename-template|move-template|delete-template)(?![\w-])",
-        re.IGNORECASE,
-    ),
-    re.compile(r"(?<![\w-])--yes(?![\w-])", re.IGNORECASE),
-)
-# `--save-draft` は下見でも `--body-file` の中身を出力に出す。
-# launcher の書き方に依らず、`--yes` が無くても止める
-_SAVE_DRAFT_FORMS = (
-    re.compile(r"(?<![\w-])--templates(?![\w-])", re.IGNORECASE),
-    re.compile(r"(?<![\w-])--save-draft(?![\w-])", re.IGNORECASE),
-)
-_DECIDE_FORMS = (
-    re.compile(r"(?<![\w-])--choices(?![\w-])", re.IGNORECASE),
-    re.compile(r"(?<![\w-])--digest(?![\w-])", re.IGNORECASE),
-)
+# ボードの経路の旗の組。組の中身と並びは表（user_only.BOARD_COMBOS）にある。
+_BOARD_COMBOS = user_only.board_combos()
 # 表示・検索・閲覧だけをする道具。コマンドを実行する機能か変数に書く機能を持つもの（`sed` の `e`、
 # `awk` の `system()`、`git` の別名、`xargs`、`find -exec`、`printf -v`）は入れない。
 _READERS = frozenset(
@@ -257,8 +215,8 @@ def human_path_form(subject: str) -> tuple[str, str]:
     flag = _GUARD_FLAG.search(text)
     if flag:
         return "guard-off", flag.group(0).strip()
-    for pair in (_BOARD_FORMS, _IMPORT_FORMS, _EDIT_FORMS, _SAVE_DRAFT_FORMS, _DECIDE_FORMS):
-        found = [rx.search(text) for rx in pair]
+    for combo in _BOARD_COMBOS:
+        found = [rx.search(text) for rx in combo]
         if all(found):
             return "board", " … ".join(m.group(0) for m in found if m)
     return "", ""
@@ -339,19 +297,12 @@ _OPEN = re.compile(r"[$`*?\[]|\{\}")
 _OPEN_PART = re.compile(
     r"\$\{[^}]*\}?|\$\([^)]*\)?|\$[A-Za-z0-9_@*#?$!-]*|`[^`]*`?|\[[^\]]*\]?|\{\}|[*?]"
 )
-_APPROVAL_FLAGS = ("--agree", "--approve", "--reviewed")
-_YES_FLAGS = ("--yes",)
-_IMPORT_FLAGS = (
-    "--import",
-    "--save-draft",
-    "--delete-draft",
-    "--rename-template",
-    "--move-template",
-    "--delete-template",
-)
-_GUARD_FLAGS = ("--guard-ticket-approval",)
-_FORGET_FLAGS = ("--forget",)
-_CHOICES_FLAGS = ("--choices",)
+_APPROVAL_FLAGS = user_only.names("approval")
+_YES_FLAGS = user_only.names("yes")
+_IMPORT_FLAGS = user_only.names("template-write")
+_GUARD_FLAGS = user_only.names("guard")
+_FORGET_FLAGS = user_only.names("forget", where="ccnavi-sync")
+_CHOICES_FLAGS = user_only.names("choices", where="ccnavi-review")
 # 実行ファイルの診断の旗。どれも承認の経路（`--agree` / `--reviewed` / `--close-early`）より前に
 # 分かれて、承認を行わない（cli._parsed の振り分けの順）。
 _EXE_DIAGNOSES = frozenset(
@@ -797,7 +748,8 @@ def hidden_entry_message(entry: str, found: str) -> str:
 # 免除しない。免除をコマンドの中のどこかの `--preview` にすると、
 # `bash -c "ccnavi --prune" x --preview` のように、実行役の引数に置いた `--preview` で免除が
 # 成立する。
-_PRUNE_WORD = re.compile(r"(?<!\S)--prune(?!\S)")
+_PRUNE_FLAG = user_only.names("prune")[0]
+_PRUNE_WORD = re.compile(rf"(?<!\S){re.escape(_PRUNE_FLAG)}(?!\S)")
 _PREVIEW_AFTER = re.compile(r"[ \t]+--preview(?![^\s;&|])")
 _PREVIEW_BEFORE = re.compile(r"(?<!\S)--preview[ \t]+$")
 _PRUNE_SEGMENT = re.compile(r"[^;&|\n]+")
@@ -830,7 +782,7 @@ def _prune_names(bin_path: str) -> re.Pattern[str]:
 def prune_form(subject: str, bin_path: str = "") -> str:
     """記録を消す `ccnavi --prune`（`--preview` の無い形）があれば、見つけた文字列。無ければ空。"""
     text, cuts = _unquoted_marks(subject)
-    if "--prune" not in text or _only_readers(text):
+    if _PRUNE_FLAG not in text or _only_readers(text):
         return ""
     names = _prune_names(bin_path)
     for segment in _PRUNE_SEGMENT.finditer(text):
@@ -839,7 +791,7 @@ def prune_form(subject: str, bin_path: str = "") -> str:
             continue
         for word in _PRUNE_WORD.finditer(text, segment.start() + name.end(), segment.end()):
             if not _previewed(text, cuts, word.start(), word.end()):
-                return "--prune"
+                return _PRUNE_FLAG
     return ""
 
 
@@ -868,23 +820,9 @@ def prune_message() -> str:
 
 # 承認の sh・取り込み状態を消す sh・ユーザの判断の入口の sh を、コマンドの位置の表記で止める節。
 # ticket_approval_rule が使い、hidden_user_entry は同じ形をこの節に任せる（文面を 1 つにするため）。
-_SCRIPT_FORMS = (
-    # `sh -x ...` のようにシェルに選択肢を付けた形も同じに見る。
-    # `ccnavi-approve.sh` は `ccnavi-agree.sh` の前の名前。古いコピーが残っていても止める。
-    r"(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-(agree|approve|push-approved)\.sh\b"
-    # 親子のチケットの削除せずに残した取り込み状態を消す、ユーザが打つスクリプト。消すと、
-    # 止めていた親子のチケットが取り込み状態の無いものとして今の手元の動きに戻るので、
-    # 打つのはユーザ。
-    r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-sync\.sh\s[^\x00]*--forget\b"
-    # ユーザの判断に使うスクリプト。中で
-    # `--close-early` を起こし、最後に承認の push を呼ぶ。打つのはユーザ。
-    r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-review\.sh\s+"
-    r"(close-early)\b"
-    # 親を閉じたときに残した子のブランチを消す入口（中身は実行ファイルの `worktree branch`）。
-    # ユーザが `!` を付けて打つ。`--confirmed` を単なる語としてエージェントが添えて、
-    # 取り消した子のブランチを確認なしで消せないようにする。
-    r"|(^|\x00|[;&|]\s*)((sh|bash)(\s+-\S+)*\s+)?\S*ccnavi-clean\.sh\s[^\x00]*--(branch|confirmed)\b"
-)
+# `sh -x ...` のようにシェルに選択肢を付けた形も同じに見る。
+# 対象のスクリプトは表（user_only.SCRIPTS）にある。
+_SCRIPT_FORMS = user_only.script_forms()
 
 
 def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
