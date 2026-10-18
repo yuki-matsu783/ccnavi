@@ -9,6 +9,7 @@
  * - 大きさが変わると React Flow は全体を映し直さないので、`RefitOnChange` を図の中に置く。
  */
 import { useEffect, useRef, useState, type JSX, type RefObject } from "react";
+import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
 import { useReactFlow, useStore, type Viewport } from "@xyflow/react";
 
 /** 出している間 `body` に付ける属性 */
@@ -23,19 +24,11 @@ export function graphMaximized(): boolean {
 export function useMaximize(): readonly [boolean, () => void, RefObject<HTMLDivElement | null>] {
   const [maximized, setMaximized] = useState(false);
   const box = useRef<HTMLDivElement | null>(null);
+  useEscape(maximized, ESCAPE_LAYER.maximize, () => setMaximized(false));
   useEffect(() => {
     if (!maximized) {
       return;
     }
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        // 背後の Esc（承認のキャンセル・ツアーを閉じるなど）に渡さない
-        event.stopPropagation();
-        event.preventDefault();
-        setMaximized(false);
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
     const el = box.current;
     const covered: Element[] = [];
     if (el !== null) {
@@ -57,7 +50,6 @@ export function useMaximize(): readonly [boolean, () => void, RefObject<HTMLDivE
     const button = el?.querySelector<HTMLElement>('[data-action="toggle-maximize"]');
     button?.focus();
     return () => {
-      window.removeEventListener("keydown", onKey, true);
       for (const sibling of covered) {
         sibling.removeAttribute("inert");
       }
