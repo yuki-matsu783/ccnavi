@@ -21,7 +21,7 @@ import time
 import unittest
 from unittest import mock
 
-from ccnavi.infra import platformtag, settings, shellread
+from ccnavi.infra import pathcase, platformtag, settings, shellread
 from ccnavi.policy import rules, selfguard_shell, selfguard_targets
 from tests import ROOT
 from tests.inproc import run_ccnavi
@@ -1347,8 +1347,8 @@ class SelfGuardTest(unittest.TestCase):
 
         launched = platformtag.launched_executable(launcher)
         self.assertEqual(
-            os.path.normcase(os.path.realpath(launched or launcher)),
-            os.path.normcase(os.path.realpath(exe)),
+            pathcase.fold(os.path.realpath(launched or launcher)),
+            pathcase.fold(os.path.realpath(exe)),
             "バックアップする先が `../bin/<この機械>/ccnavi` になっていない",
         )
 

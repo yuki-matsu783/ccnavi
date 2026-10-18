@@ -23,7 +23,7 @@ import traceback
 from typing import TextIO
 
 from ..hook import events, judge, reasons, subagent
-from ..infra import fsio, hookio, modes, settings, tree
+from ..infra import fsio, hookio, modes, pathcase, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_ERROR, EXIT_OK
 from ..policy import selfguard
 from ..records import audit, diaglog
@@ -1259,8 +1259,8 @@ def _is_worktree_dir(directory: str) -> bool:
     大文字小文字は、どの機械でも区別しない。Windows で clone したワークツリーは
     表記が変わることがあり、機械ごとに判定が割れると Windows でだけ失敗するため。
     """
-    holder = os.path.dirname(directory).replace("\\", "/").casefold()
-    return holder.endswith("/" + tree.WORKTREES_DIR.replace(os.sep, "/").casefold())
+    holder = pathcase.fold(os.path.dirname(directory))
+    return holder.endswith(os.sep + pathcase.fold(tree.WORKTREES_DIR))
 
 
 def _find_project_root() -> str:

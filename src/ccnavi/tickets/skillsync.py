@@ -239,7 +239,7 @@ def _is_copied_skill(
 
     読めないものは外さない。
     """
-    where = tree.tree_of(root, configsync._key(path), conf.projects)
+    where = tree.tree_of(root, path, conf.projects)
     if where is None or not where.project or where.is_main:
         return False
     rel = configsync._rel(where.root, path)

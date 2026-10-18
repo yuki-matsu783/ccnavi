@@ -392,7 +392,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
 
     def test_wrong_project_is_refused_even_when_the_worktree_name_differs_in_case(self):
-        """区別しない機械では、表記違いで切ったワークツリーでも取り違えを止める。
+        """表記違いで切ったワークツリーでも（どの機械でも区別しない）取り違えを止める。
 
         範囲の判定（ticket_verdict）は表記の違いを吸収して引く。取り違えの検査だけ厳密に
         引くと、範囲の中への書き込みは別のプロジェクトのツリーでも通ってしまう。

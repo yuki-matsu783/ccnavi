@@ -683,7 +683,10 @@ def worktree_name(root: str, place: str) -> str:
     比べる。論理のパスと実際のパスを混ぜると、`/tmp` → `/private/tmp` のような場所で外れる。
     """
     rest = tree.parts_under(os.path.join(root, tree.WORKTREES_DIR), place)
-    return rest[0] if rest else ""
+    if not rest:
+        return ""
+    # 書いた綴りではなく、在るディレクトリの綴りで返す（呼び手がパスを組み直して開く）。
+    return os.path.basename(tree.worktree_path(root, rest[0]))
 
 
 ROLE_CHILD = "child"

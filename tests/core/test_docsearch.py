@@ -31,7 +31,7 @@ import unittest
 from unittest import mock
 
 from ccnavi.hook import docsearch, docsearch_index, docsearch_query
-from ccnavi.infra import hookio, settings
+from ccnavi.infra import hookio, pathcase, settings
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -1021,7 +1021,7 @@ class OutsideTest(Repo):
         self.assertEqual([r for r in built.rows if r["concept_id"].startswith("linked")], [])
 
     def test_under_refuses_a_path_outside(self):
-        base = os.path.normcase(os.path.realpath(self.root))
+        base = pathcase.fold(os.path.realpath(self.root))
         self.assertTrue(docsearch_index._under(os.path.join(self.root, "docs"), base))
         self.assertFalse(docsearch_index._under(self.outside(), base))
 
@@ -1033,9 +1033,7 @@ class OutsideTest(Repo):
         link = os.path.join(self.root, "linked")
         _winapi.CreateJunction(outside, link)
         self.addCleanup(os.rmdir, link)
-        self.assertFalse(
-            docsearch_index._under(link, os.path.normcase(os.path.realpath(self.root)))
-        )
+        self.assertFalse(docsearch_index._under(link, pathcase.fold(os.path.realpath(self.root))))
         self.put("a.md", doc(type="guide"))
         self.assert_nothing_outside(outside, docsearch_index.build(self.root))
 

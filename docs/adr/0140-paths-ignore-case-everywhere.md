@@ -2,7 +2,7 @@
 type: adr
 title: パスと名前の大文字小文字は、どの機械でも区別せず同じものとして扱う
 description: 大文字小文字だけが違うパス・名前を同一として比べ、両立させない。機械ごとの分岐（normcase・CASE_INSENSITIVE）をやめ、比べる鍵を pathcase.fold に一本化する
-tags: [environment, tree]
+tags: [environment, worktree]
 keywords: [大文字小文字, casefold, normcase, pathcase, CASE_INSENSITIVE, ワークツリー, 識別子]
 ---
 

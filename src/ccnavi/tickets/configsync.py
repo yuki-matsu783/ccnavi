@@ -221,7 +221,7 @@ def is_synced_write(
 
     読めないものは外さない。
     """
-    where = tree.tree_of(root, _key(path), conf.projects)
+    where = tree.tree_of(root, path, conf.projects)
     if where is None or not where.project or where.is_main:
         return False
     rel = _rel(where.root, path)
