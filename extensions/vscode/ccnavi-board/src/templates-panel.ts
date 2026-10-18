@@ -19,11 +19,12 @@ import * as crypto from "node:crypto";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { checkHandoff, checkTemplates, loadBoard, runTemplates, runTemplateShow } from "./ccnavi.js";
+import { checkTemplates, loadBoard, runTemplates, runTemplateShow } from "./ccnavi.js";
+import { openHandoffFrom, readHandoffEntry } from "./handoff-entry.js";
+import type { HandoffEntry } from "./core/handoff-entry.js";
 import { loadingText } from "./core/loading-render.js";
-import { MAIN_TREE_KEY } from "./core/handoffmodel.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
-import { screens, type TemplatesTarget } from "./core/screens.js";
+import type { TemplatesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
 import { templatesLayerOf } from "./core/templatesmodel.js";
 import { renderTemplatesPage } from "./core/templates-render.js";
@@ -48,7 +49,7 @@ interface Loaded {
   /** 切り替えられる対象（共通の設定・ワークスペース・設定のあるプロジェクト） */
   readonly targets: readonly TargetOption[];
   /** 取り込み待ち画面を開けるか。実行ファイルが `handoff` の機能を持たなければ理由 */
-  readonly handoff: { readonly enabled: boolean; readonly reason: string };
+  readonly handoff: HandoffEntry;
   /** 上部に出す注意。今は空のまま渡す（画面の欄を残すため） */
   readonly notices: readonly string[];
 }
@@ -199,8 +200,7 @@ async function readPage(root: string, target: TemplatesTarget): Promise<Loaded> 
     throw new Error(result.error);
   }
   // 取り込み待ち画面を開けるかは一覧とは別に確かめる。`handoff` を持たない古い実行ファイルでは、開く入口だけを無効にする
-  const handoffReason = await checkHandoff(root, binSetting());
-  const handoff = { enabled: handoffReason === undefined, reason: handoffReason ?? "" };
+  const handoff = await readHandoffEntry(root, binSetting());
   return { target, data: result.value, targets, handoff, notices: [] };
 }
 
@@ -455,13 +455,8 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
       return;
     }
     case "openHandoff": {
-      // 開けない理由（古い実行ファイル）は画面が出している。ここでも見て、開けないときは何もしない
-      if (current.loaded?.handoff.enabled !== true) {
-        return;
-      }
       // プロジェクトの設定を見ているときは、そのプロジェクトのツリーの下書きを見る。それ以外はワークスペース
-      const key = current.target.kind === "project" ? `project:${current.target.name}` : MAIN_TREE_KEY;
-      await screens().handoff(key);
+      await openHandoffFrom(current.loaded?.handoff, current.target);
       return;
     }
   }

@@ -25,6 +25,7 @@ import rulesTour from "../tours/rules.yml";
 import { Hooks } from "./Hooks.js";
 import { ExpectationsResult, JudgeResult, SuggestResult, type Judged } from "./Judge.js";
 import { TargetSelect } from "../TargetSelect.js";
+import { HandoffLink } from "../shared/HandoffLink.js";
 import { defaultSum } from "../../core/sums.js";
 import { Sum } from "./Sum.js";
 import { mutePosts, post } from "./post.js";
@@ -499,6 +500,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           </span>
         </div>
         <div className="controls">
+          <HandoffLink entry={touring ? undefined : page?.handoff} disabled={touring} onOpen={() => post({ type: "openHandoff" })} />
           <button type="button" className="action" data-action="open-rules" disabled={page?.exists === false} onClick={() => post({ type: "openFile", which: "rules" })}>
             エディタで開く
           </button>

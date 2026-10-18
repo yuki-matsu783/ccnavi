@@ -46,6 +46,8 @@ import type { CommonPhase, PhasesData, PhasesForm, PhasesMessage, ToPhases } fro
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { commonPhases } from "./core/sums.js";
 import { showLoading } from "./loading.js";
+import type { HandoffEntry } from "./core/handoff-entry.js";
+import { openHandoffFrom, readHandoffEntry } from "./handoff-entry.js";
 import type { PhasesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
 import { OWN_WRITE_GRACE_MS, WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
@@ -86,6 +88,8 @@ interface Loaded {
   readonly phasesRel: string;
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
+  /** 取り込み待ち画面を開けるか */
+  readonly handoff: HandoffEntry;
   /** 上部に error の帯で出す文。共通の設定の phases.yml を読めない、など */
   readonly errors: readonly string[];
   /** 共通の設定の定義（読み取り専用）。実行ファイルの統合結果のうち出どころが共通のもの */
@@ -330,7 +334,9 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   // 無いときの苦情（version が無い、phases が無い）は画面に出さない。
   const parsed = readPhases(text);
   const doc = exists ? parsed : { apply: parsed.apply, model: { ...parsed.model, problems: [] } };
-  return { target, text, exists, mtimeMs, doc, phasesPath, phasesRel, notices, errors, common, targets };
+  // 取り込み待ち画面を開けるかは、設定の読み込みとは別に確かめる（古い実行ファイルでは入口だけを無効にする）
+  const handoff = await readHandoffEntry(root, binSetting());
+  return { target, text, exists, mtimeMs, doc, phasesPath, phasesRel, notices, errors, common, targets, handoff };
 }
 
 function resolveIn(root: string, filePath: string): string {
@@ -500,6 +506,7 @@ function show(current: PanelState): void {
       model: loaded.doc.model,
       lock: current.lock,
       notices: loaded.notices,
+      handoff: loaded.handoff,
       errors: loaded.errors,
       common: loaded.common,
       target: { kind: loaded.target.kind, name: loaded.target.kind === "project" ? loaded.target.name : "" },
@@ -676,6 +683,11 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
       );
       return;
     }
+    case "openHandoff": {
+      // 設定のプロジェクトに合わせて、そのプロジェクトのツリーの下書きを開く
+      await openHandoffFrom(current.loaded?.handoff, current.target);
+      return;
+    }
     case "switchTarget": {
       // 一覧にある対象だけを受ける。画面が古いまま、消えたプロジェクトを指していても開かない
       const option = (current.loaded?.targets ?? targetOptions(undefined, "workspace", currentKey(current.target))).find((t) => t.kind === message.kind && t.name === message.name);
@@ -813,6 +825,7 @@ function asMessage(message: unknown): PhasesMessage | undefined {
     case "ready":
     case "openFile":
     case "tourDone":
+    case "openHandoff":
       return { type: m.type };
     case "save": {
       const form = asPhasesForm(m.form);

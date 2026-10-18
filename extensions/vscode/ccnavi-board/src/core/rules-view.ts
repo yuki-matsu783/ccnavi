@@ -14,6 +14,7 @@
  * だけ（ユーザが「再読込」を押した、保存が通って中身が入れ替わった）。ファイルが外で変わっただけの
  * ときは `changed` の帯を出し、捨てるかどうかはユーザが決める。
  */
+import type { HandoffEntry, OpenHandoffMessage } from "./handoff-entry.js";
 import type { AppearanceMessage } from "./appearance.js";
 import type { HookEntry } from "./hooks.js";
 import type { Lock } from "./lock.js";
@@ -158,6 +159,8 @@ export interface RulesPage {
   readonly lock: Lock;
   /** 上部に出す注意（実行ファイルがこの設定を読めていない、など） */
   readonly notices?: readonly string[];
+  /** 取り込み待ち画面へ進む入口（開けるか）。読み込めなかったときは無い */
+  readonly handoff?: HandoffEntry;
   /** 開いている対象と、切り替えられる対象。無ければ切り替えの欄を出さない */
   readonly target?: { readonly kind: string; readonly name: string };
   readonly targets?: readonly TargetOption[];
@@ -229,7 +232,8 @@ export type RulesMessage =
   /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
   | { readonly type: "tourDone" }
   /** 開いたまま別の設定へ切り替える。未保存の変更があれば、拡張ホストが破棄してよいかを聞く */
-  | { readonly type: "switchTarget"; readonly kind: string; readonly name: string };
+  | { readonly type: "switchTarget"; readonly kind: string; readonly name: string }
+  | OpenHandoffMessage;
 
 /** 最初の中身を埋める `<script type="application/json">` の id。画面はこれを読んで最初の 1 枚を描く */
 export const DATA_ID = "ccnavi-rules-data";

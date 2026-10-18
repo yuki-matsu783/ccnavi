@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { readPhases } from "../../src/core/phases-doc.js";
 import type { PhasesForm } from "../../src/core/phases-view.js";
 import { openPage, openPhases, page, rowSelector, SAMPLE_PHASES_TEXT } from "../helpers/phases.js";
+import { checkHandoffLink } from "../helpers/handoff-link.js";
 import type { DomPage } from "../helpers/dom.js";
 import type { HTMLButtonElement, HTMLInputElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
 
@@ -506,3 +507,6 @@ test("CB-D153 読み込みに失敗した画面にも設定の切り替えの欄
   }
 });
 
+test("CB-D383 見出しに「取り込み待ちを開く」があり、押すと openHandoff を送る。実行ファイルが handoff を持たなければ無効で、理由を出す", async () => {
+  await checkHandoffLink((handoff) => openPhases({ handoff }));
+});

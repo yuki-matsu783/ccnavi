@@ -5,6 +5,7 @@ import { readRisk } from "../../src/core/risk-doc.js";
 import type { RiskForm } from "../../src/core/risk-view.js";
 import { riskSums } from "../../src/core/sums.js";
 import { openPage, openRisk, page, rowSelector } from "../helpers/risk.js";
+import { checkHandoffLink } from "../helpers/handoff-link.js";
 import type { DomPage } from "../helpers/dom.js";
 import { sumsBoard } from "../helpers/sums.js";
 import type { HTMLButtonElement, HTMLInputElement, HTMLSelectElement } from "happy-dom" with { "resolution-mode": "import" };
@@ -480,4 +481,8 @@ test("CB-T316 統合結果は読み取り専用で、境目の点・項目・由
   } finally {
     await none.close();
   }
+});
+
+test("CB-T1139 見出しに「取り込み待ちを開く」があり、押すと openHandoff を送る。実行ファイルが handoff を持たなければ無効で、理由を出す", async () => {
+  await checkHandoffLink((handoff) => openRisk({ handoff }));
 });

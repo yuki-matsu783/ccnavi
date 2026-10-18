@@ -1,0 +1,2 @@
+/* 取り込み待ちへ進むボタン（HandoffLink.tsx）。ボタン自体の見た目は各画面の .action を使う */
+.handoff-link { margin: 4px 0 10px; }

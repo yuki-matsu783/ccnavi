@@ -13,6 +13,7 @@
 @import "../shared/Maximize.css";
 @import "@ccnavi/shared/styles/button.css";
 @import "../styles/appearance.css";
+@import "../shared/HandoffLink.css";
 @import "@ccnavi/shared/styles/page.css";
 @import "@ccnavi/shared/styles/list.css";
 @import "./App.css";

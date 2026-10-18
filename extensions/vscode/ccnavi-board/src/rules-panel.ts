@@ -40,6 +40,8 @@ import { isToolName, type RulesData, type RulesMessage, type Sections, type ToRu
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { rulesSums, type RulesSum } from "./core/sums.js";
 import { showLoading } from "./loading.js";
+import type { HandoffEntry } from "./core/handoff-entry.js";
+import { openHandoffFrom, readHandoffEntry } from "./handoff-entry.js";
 import type { RulesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
 import { OWN_WRITE_GRACE_MS, WATCH_DEBOUNCE_MS, WATCH_PATTERNS } from "./core/watch.js";
@@ -65,6 +67,8 @@ interface Loaded {
   readonly rulesRel: string;
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
+  /** 取り込み待ち画面を開けるか */
+  readonly handoff: HandoffEntry;
   /** 切り替えられる対象（共通・ワークスペース・設定のあるプロジェクト） */
   readonly targets: readonly TargetOption[];
   /** 読み取り専用の統合結果（実行ファイルの `sums[]`） */
@@ -310,8 +314,11 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     ...(localText === undefined ? [] : parseHooks(localText, "settings-local")),
   ];
   const expectationsRel = expectationsSetting();
+  // 取り込み待ち画面を開けるかは、設定の読み込みとは別に確かめる（古い実行ファイルでは入口だけを無効にする）
+  const handoff = await readHandoffEntry(root, binSetting());
   return {
     target,
+    handoff,
     exists,
     mtimeMs,
     // 無いファイルは、書式の版だけを持つ空のルールとして読む（版が無いファイルは実行ファイルが読めないので、保存で作るときに先頭へ置く）
@@ -495,6 +502,7 @@ function show(current: PanelState): void {
       expectationsPath: loaded.expectationsRel,
       lock: current.lock,
       notices: loaded.notices,
+      handoff: loaded.handoff,
       target: { kind: loaded.target.kind, name: loaded.target.kind === "project" ? loaded.target.name : "" },
       targets: loaded.targets,
       sums: loaded.sums,
@@ -684,6 +692,11 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
         }
       }
       await reload(current);
+      return;
+    }
+    case "openHandoff": {
+      // 設定のプロジェクトに合わせて、そのプロジェクトのツリーの下書きを開く
+      await openHandoffFrom(current.loaded?.handoff, current.target);
       return;
     }
     case "switchTarget": {
@@ -896,6 +909,7 @@ function asMessage(message: unknown): RulesMessage | undefined {
       return typeof m.kind === "string" && typeof m.name === "string" ? { type: "switchTarget", kind: m.kind, name: m.name } : undefined;
     case "ready":
     case "tourDone":
+    case "openHandoff":
     case "suggest":
       return { type: m.type };
     case "reload":

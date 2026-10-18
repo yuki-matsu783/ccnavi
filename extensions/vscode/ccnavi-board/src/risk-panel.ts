@@ -43,6 +43,8 @@ import { asRiskForm, BUILTIN_RISK_TEXT, readRisk, type RiskDocument } from "./co
 import { renderRiskPage } from "./core/risk-render.js";
 import type { RiskData, RiskForm, RiskMessage, ToRisk } from "./core/risk-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
+import type { HandoffEntry } from "./core/handoff-entry.js";
+import { openHandoffFrom, readHandoffEntry } from "./handoff-entry.js";
 import type { RiskTarget } from "./core/screens.js";
 import { riskSums, type RiskSum } from "./core/sums.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
@@ -73,6 +75,8 @@ interface Loaded {
   readonly riskRel: string;
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
+  /** 取り込み待ち画面を開けるか */
+  readonly handoff: HandoffEntry;
   /** 切り替えられる対象（共通・ワークスペース・設定のあるプロジェクト） */
   readonly targets: readonly TargetOption[];
   /** 読み取り専用の統合結果（実行ファイルの `sums[]`） */
@@ -323,7 +327,9 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
   // 無いときの苦情（version が無い、など）は画面に出さない。無いことは不備ではない。
   const parsed = readRisk(text);
   const doc = exists || builtin ? parsed : { apply: parsed.apply, model: { ...parsed.model, problems: [] } };
-  return { target, text, exists, builtin, mtimeMs, doc, riskPath, riskRel, notices, targets, sums };
+  // 取り込み待ち画面を開けるかは、設定の読み込みとは別に確かめる（古い実行ファイルでは入口だけを無効にする）
+  const handoff = await readHandoffEntry(root, binSetting());
+  return { target, text, exists, builtin, mtimeMs, doc, riskPath, riskRel, notices, targets, sums, handoff };
 }
 
 function resolveIn(root: string, filePath: string): string {
@@ -493,6 +499,7 @@ function show(current: PanelState): void {
       model: loaded.doc.model,
       lock: current.lock,
       notices: loaded.notices,
+      handoff: loaded.handoff,
       target: currentKey(loaded.target),
       targets: loaded.targets,
       sums: loaded.sums,
@@ -653,6 +660,11 @@ async function handleMessage(current: PanelState, message: RiskMessage | undefin
         }
       }
       await reload(current);
+      return;
+    }
+    case "openHandoff": {
+      // 設定のプロジェクトに合わせて、そのプロジェクトのツリーの下書きを開く
+      await openHandoffFrom(current.loaded?.handoff, current.target);
       return;
     }
     case "switchTarget": {
@@ -830,6 +842,7 @@ function asMessage(message: unknown): RiskMessage | undefined {
     case "openFile":
     case "create":
     case "tourDone":
+    case "openHandoff":
       return { type: m.type };
     case "save": {
       const form = asRiskForm(m.form);
