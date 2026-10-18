@@ -340,9 +340,7 @@ class ParentBranchShTest(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(self.tree, "wip", "note-1.md")))
         remote = self.remote_commit("wip/note-2.md", "2\n")
         fetched = self.ok(self.sh("ccnavi-fetch.sh"))
-        self.assertIn(
-            f"{PARENT}: 承認済みチケットとマーカーを 1 件分だけ新しくした", fetched.stdout
-        )
+        self.assertIn(f"{PARENT}: 親ブランチ {BRANCH} を 1 コミット進めた", fetched.stdout)
         self.assertEqual(self.sha(self.tree, "HEAD"), remote)
 
         lint = self.exe("--lint")
