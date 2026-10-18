@@ -15,7 +15,7 @@ from typing import TextIO
 from ..infra import fsio, hookio, modes, settings, tree
 from ..infra.modes import EXIT_BLOCK, EXIT_OK
 from ..policy import builtin, ctxfile, ruleload, rules, selfguard, selfguard_targets
-from ..records import audit, failstreak, prune, repeat
+from ..records import audit, busy, failstreak, prune, repeat
 from ..tickets import (
     approval,
     approval_checks,
@@ -73,7 +73,7 @@ def decide(
     if payload.event == hookio.POST_TOOL_USE:
         return decide_after(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.POST_TOOL_USE_FAILURE:
-        return decide_after_failure(stdout, conf, root, payload, record)
+        return decide_after_failure(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.SESSION_START:
         return decide_at_start(stdout, stderr, mode, conf, root, payload, record, deadline)
     if payload.event == hookio.USER_PROMPT_SUBMIT:
@@ -201,28 +201,39 @@ def decide_at_prompt(
     受け入れる。ccnavi 自身の設定ファイルのバックアップを今の状態に取り直し（`selfguard.accept`）、
     `deny` と宣言された場所の今の変更を報告済みの記録に足す（`post.at_prompt`）。どちらも、
     次のツール呼び出しが、ユーザの編集や削除をその呼び出しの変更として戻さないようにするため。
-    バックグラウンド作業の完了通知（`from_background_task`）も UserPromptSubmit を起こすが、
-    その間に動いたプロセスの変更はユーザの変更と区別できないので、受け入れない。ターンの基準は
-    通知でも取り直す。
+
+    ユーザの手によるものと言い切れないときは受け入れない。バックグラウンド作業の完了通知
+    （`from_background_task`）も UserPromptSubmit を起こすが、その間に動いたプロセスの変更は
+    ユーザの変更と区別できない。前のターンの終わりに、動かしている作業が残っていた
+    （`busy`。Stop の payload の `background_tasks`・`session_crons`）ときも、次の発言までの変更は
+    その作業が書いたかもしれない。どちらも、これまでどおり次のツール呼び出しの前と同じ照合
+    （`selfguard.before`）をここで行い、消えた設定ファイルは戻す。ターンの基準は受け入れの
+    有無に関わらず取り直す。
     """
-    by_user = not payload.from_background_task()
-    if by_user:
-        # 実行前・実行後の知らせ（`selfguard.report`）は「設定ファイルが変更された」と言い、
-        # 「自分で書き換えると戻る」と結ぶ。ここで返るのは取り直しの失敗だけなので、その文は使わず、
-        # モデルの文脈にも足さない。記録の `guarded` と標準エラーに残す。
-        failed = selfguard.accept(
-            modes.effective_setting(mode, conf.guard_core_files),
-            conf.state,
-            payload.session_id,
-            root,
-            selfguard_targets.targets(
-                root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
-            ),
-        )
-        if failed:
-            record.guarded = [f"{o.target.key}:{o.action}" for o in failed]
-            for o in failed:
-                stderr.write(f"ccnavi: {o.target.label}: {o.detail}\n")
+    by_user = not payload.from_background_task() and not busy.is_busy(
+        conf.state, payload.session_id
+    )
+    found = (selfguard.accept if by_user else selfguard.before)(
+        modes.effective_setting(mode, conf.guard_core_files),
+        conf.state,
+        payload.session_id,
+        root,
+        selfguard_targets.targets(
+            root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
+        ),
+    )
+    guard = ""
+    if found:
+        record.guarded = [f"{o.target.key}:{o.action}" for o in found]
+        if by_user:
+            # 受け入れの知らせは、記録の `guarded` と、失敗だけ標準エラーに残す。実行前・実行後の
+            # 知らせ（`selfguard.report`）は「設定ファイルが変更された」と言い、「自分で書き換えると
+            # 戻る」と結ぶ。受け入れの結果には合わないので、モデルの文脈には足さない。
+            for o in found:
+                if o.action == selfguard.ACTION_FAILED:
+                    stderr.write(f"ccnavi: {o.target.label}: {o.detail}\n")
+        else:
+            guard = selfguard.report(found)
     raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
     watched, scope = watch_context(stderr, conf, root, record, raw)
     post.at_prompt(
@@ -244,7 +255,7 @@ def decide_at_prompt(
     # バックグラウンドのサブエージェントが範囲を確かめられないまま終わり、そのあと親が
     # ツールを使わずにターンを終えたなら、印はここまで残っている。次の依頼の前に言う。
     unchecked = subagent.unchecked_scope(conf.state, payload) if conf.tickets_enabled else ""
-    hint = "\n\n".join(p for p in (hint, unchecked) if p)
+    hint = "\n\n".join(p for p in (guard, hint, unchecked) if p)
     if hint:
         hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, hint)
     return EXIT_OK
@@ -294,6 +305,8 @@ def decide_at_stop(
     （`ops_stop.unfinished_at_stop`）の両方に渡す。間の `post.at_stop` は報告するだけで作業ツリーを
     戻さず、`repeat.at_stop` は state を読むだけなので、置き場のファイルは動かない。
     """
+    # 動かしている作業が残っているか。次の発言での受け入れ（`decide_at_prompt`）が読む。
+    busy.record(conf.state, payload.session_id, payload.busy)
     raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
     watched, scope = watch_context(stderr, conf, root, record, raw)
     report = post.at_stop(
@@ -564,6 +577,7 @@ def decide_at_start(
     # プロセスなので、実行中の体が残りうる。Stop の数え（上）は起動だけで捨てる。
     if payload.source in ("startup", "resume"):
         subagent.forget_running(conf.state, payload.session_id)
+        busy.clear(conf.state, payload.session_id)
     if payload.source == "startup":
         _reported_baseline(stderr, conf, root, payload, record)
     # 基準を取った時の注記（読めなかったツリーなど）を消さないよう、足す。
@@ -681,31 +695,56 @@ def _written(payload: hookio.Input, record: audit.Record) -> str:
 
 def decide_after_failure(
     stdout: TextIO,
+    stderr: TextIO,
+    mode: str,
     conf: settings.Settings,
     root: str,
     payload: hookio.Input,
     record: audit.Record,
 ) -> int:
-    """ツール自体が失敗した。失敗の連続（failstreak）に数え、閾値に達した回に資料を引く案内を返す。
+    """ツール自体が失敗した。作業ツリーを見て戻し、失敗の連続（failstreak）に数える。
 
-    止められるイベントではないので、返せるのは文だけ。判定は持たない。中断（is_interrupt）は
-    ユーザが止めたもので、ツールの誤りではないので数えない。数えの失敗や案内を組む失敗で、
-    ツールの結果は変わらない。
+    失敗した呼び出しも、失敗する前に設定ファイルや保護領域を変えていることがある
+    （`rm …; false`、途中で落ちたビルドなど）。ここで実行後チェックを通さないと、その変更は
+    次の呼び出しの前までそのまま残り、次のユーザの発言で「ユーザの手による変更」として
+    受け入れられる（`decide_at_prompt`）。成功した呼び出しと同じ照合をここでも行う。中断
+    （is_interrupt）も、中断までに書かれたぶんは残るので同じ。
+
+    止められるイベントではないので、返せるのは文だけ。照合の結果は `additionalContext` で渡す。
+    連続は閾値に達した回に資料を引く案内を返す。中断はユーザが止めたもので、ツールの誤りでは
+    ないので数えない。数えの失敗や案内を組む失敗で、ツールの結果は変わらない。
     """
     record.decision, record.reason = audit.SKIP, audit.REASON_EVENT_NOT_CHECKED
-    if payload.is_interrupt:
-        return EXIT_OK
-    n = failstreak.threshold(conf.fail_streak_count)
-    try:
-        got = failstreak.fail(conf.state, payload.session_id, payload.agent_id, n)
-        if got:
-            hookio.write_context(
-                stdout,
-                hookio.POST_TOOL_USE_FAILURE,
-                docsearch.fail_streak_note(conf, root, got),
-            )
-    except Exception:  # noqa: BLE001  案内の失敗でツールの結果を変えない
-        return EXIT_OK
+    synced = functools.partial(skillsync.is_synced_write, conf, root)
+    after = functools.partial(selfguard.after, written=_written(payload, record), synced=synced)
+    texts = [judge.guard_setting_files(mode, conf, root, payload, record, after)]
+    raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
+    text, _ = post.check(
+        stderr,
+        enforcing=mode == modes.ENABLE,
+        restore=modes.effective_setting(mode, conf.restore_if_deny),
+        state_dir=conf.state,
+        mine=(conf.state, conf.log),
+        watched=watched_for(stderr, conf, root, record, payload),
+        scope=scope_guard(conf, root, raw),
+        payload=payload,
+        record=record,
+        places=(conf.tickets, conf.approved),
+        synced=synced,
+        root=root,
+    )
+    texts.append(text)
+    if not payload.is_interrupt:
+        n = failstreak.threshold(conf.fail_streak_count)
+        try:
+            got = failstreak.fail(conf.state, payload.session_id, payload.agent_id, n)
+            if got:
+                texts.append(docsearch.fail_streak_note(conf, root, got))
+        except Exception:  # noqa: BLE001  案内の失敗でツールの結果を変えない
+            pass
+    said = "\n\n".join(p for p in texts if p)
+    if said:
+        hookio.write_context(stdout, hookio.POST_TOOL_USE_FAILURE, said)
     return EXIT_OK
 
 

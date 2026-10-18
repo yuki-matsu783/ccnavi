@@ -387,6 +387,35 @@ class PostToolUseTest(Harness, unittest.TestCase):
         with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "committed\n")
 
+    def test_受け入れたユーザの編集のうえにエージェントが書いたら言うが戻さない(self):
+        # 報告済みの記録の鍵は種類とパスだけ。指紋で見分けないと、受け入れたファイルへの
+        # 以降の書き込みが全部素通しになる。一方、戻す先のコミット済みの内容はユーザの編集より
+        # 古いので、戻すとその編集まで消える。だから言うだけにする。
+        self.run_hook(event="SessionStart", source="startup")
+        self.dirty("edited by the user\n")
+        self.run_hook(event="UserPromptSubmit", prompt="続きをお願いします")
+
+        self.dirty("overwritten by the agent\n")
+        result = self.run_hook(command="python build.py", restore="enable")
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("protected/keep.txt", result.stderr)
+        self.assertIn("already held a change the user made", result.stderr)
+        with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "overwritten by the agent\n", "ユーザの編集まで消さない")
+
+    def test_受け入れたあとの書き込みは1度言えば繰り返さない(self):
+        self.run_hook(event="SessionStart", source="startup")
+        self.dirty("edited by the user\n")
+        self.run_hook(event="UserPromptSubmit", prompt="続きをお願いします")
+        self.dirty("overwritten by the agent\n")
+        self.run_hook(command="python build.py", restore="enable")
+
+        again = self.run_hook(command="ls", restore="enable")
+
+        self.assertEqual(again.returncode, 0)
+        self.assertEqual(again.stdout, "")
+
     def test_起動時の変更が件数の上限を超えても戻さない(self):
         # 基準を件数で切ると、切った先の在る汚れが「新しい変更」になり、自動復元で消される。
         names = [os.path.join(self.repo, "protected", f"gen{i:03}.txt") for i in range(520)]

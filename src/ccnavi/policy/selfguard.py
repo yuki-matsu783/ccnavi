@@ -179,6 +179,7 @@ ACTION_FAILED = "failed"  # 戻そうとして駄目だった
 ACTION_WOULD = "would-restore"  # dry-run。戻す代わりに言うだけ
 ACTION_LEFT = "left-as-repair"  # 読めないルールファイルへの修復なので戻さなかった
 ACTION_REBASED = "rebased"  # 大きい対象が変わったので、新しい版を基準に取り直した
+ACTION_ACCEPTED = "accepted"  # ユーザの発言で、消えたことを受け入れた
 
 # 共通レイヤーのルールファイルに付けるバックアップの key（_places）。
 COMMON_RULES_KEY = "rules"
@@ -276,7 +277,9 @@ def before(
             continue
 
         if _absent_noted(state_dir, session, target):
-            # 最初から無いと分かっている。何も言わない。
+            # 最初から無いと分かっている。何も言わない。印の更新時刻だけ新しくする。
+            # 全部の対象に印が付いたセッションが、掃除に古いと読まれないように。
+            _refresh(_absent_path(state_dir, session, target))
             continue
 
         saved = _read_backup(state_dir, session, target)
@@ -411,26 +414,29 @@ def accept(
     if setting == DISABLE or not state_dir:
         return []
 
+    # 受け入れた消えたことと取り直しは、記録の `guarded` に残す（呼び手）。黙って受け入れると、
+    # ユーザの正規の削除と、見逃した削除を、記録から区別できない。
     outcomes = []
     for target in found:
         if target.heavy:
-            if os.path.exists(target.path):
+            if os.path.lexists(target.path):
                 outcome = _rebase_if_changed(state_dir, session, target)
-                # 取り直したことは言わない。ユーザが再ビルドするたびに、発言のたびの
-                # 知らせが増える。取れなかったときだけ言う。
-                if outcome is not None and outcome.action == ACTION_FAILED:
+                if outcome is not None:
                     outcomes.append(outcome)
-            else:
+            elif _parse_ref(_read(_ref_path(state_dir, session, target))) is not None:
                 fsio.remove(_ref_path(state_dir, session, target))
                 _note_absent(state_dir, session, target)
+                outcomes.append(Outcome(target, ACTION_ACCEPTED, "消えたことを受け入れた"))
             continue
 
         content = _read(target.path)
         if content is None:
-            if os.path.exists(target.path):
-                # 在るのに読めない（権限、一時的な入出力の失敗）。消えたことにはしない。
-                # バックアップを捨てると、あとで本当に消されても戻せなくなる。
+            if os.path.lexists(target.path):
+                # 在るのに読めない（権限、一時的な入出力の失敗、壊れたシンボリックリンク）。
+                # 消えたことにはしない。バックアップを捨てると、あとで本当に消されても戻せなくなる。
                 continue
+            if _read_backup(state_dir, session, target) is not None:
+                outcomes.append(Outcome(target, ACTION_ACCEPTED, "消えたことを受け入れた"))
             fsio.remove(_backup_path(state_dir, session, target))
             _note_absent(state_dir, session, target)
             continue
