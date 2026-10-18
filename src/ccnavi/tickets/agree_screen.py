@@ -341,10 +341,10 @@ def _scope_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket
     """
     lines: list[str] = []
     for name in rules.SECTIONS:
-        before = set(current.paths(name))
-        after = set(revised.paths(name))
-        lines += [f"    {name} 追加: {p}" for p in revised.paths(name) if p not in before]
-        lines += [f"    {name} 削除: {p}" for p in current.paths(name) if p not in after]
+        before = _scope_shown(current, name)
+        after = _scope_shown(revised, name)
+        lines += [f"    {name} 追加: {p}" for p in after if p not in before]
+        lines += [f"    {name} 削除: {p}" for p in before if p not in after]
     if not lines:
         return []
     return [
@@ -352,8 +352,20 @@ def _scope_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket
         "    allow は確認なしで編集できる場所、ask は実行時に確認が必要な場所、"
         "deny はこのチケットでも編集できない場所。承認すると、旧い範囲は上書きされる",
         *lines,
-        "    作業中の子は居ない（居れば改版は通らない）。新しい範囲の子は、新しい子として提案する",
+        "    作業中の子は居ない（居れば改版は通らない）。新しい範囲の子は、新しい子として提案する。"
+        "狭めた場合、完了済み・レビュー待ちの子の範囲が親の外に出ることがあるが、"
+        "書き込みは親の範囲で切り詰められる",
     ]
+
+
+def _scope_shown(t: ticket_model.Ticket, name: str) -> list[str]:
+    """差分に出す項。`regex` は前置を付けて glob と区別する。
+
+    glob `src/app` と regex `src/app` は文字列が同じでも当たる範囲が違う（regex は先頭一致で、
+    `src/application.py` にも当たる）。署名が違うのに差分が空になる画面は、承認する人から
+    範囲の広がりを隠す。
+    """
+    return [f"regex:{e.regex}" if e.regex else e.glob for e in t.entries if e.decision == name]
 
 
 def _copy_diff_lines(current: ticket_model.Ticket, revised: ticket_model.Ticket) -> list[str]:

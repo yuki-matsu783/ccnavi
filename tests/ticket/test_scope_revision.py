@@ -84,6 +84,49 @@ class ScopeLockTest(unittest.TestCase):
         lookup.assert_not_called()
 
 
+class GlobRegexTest(unittest.TestCase):
+    """glob と regex は文字列が同じでも当たる範囲が違う。差分から隠さない。"""
+
+    def read_entry(self, entry):
+        text = (
+            "---\nversion: 1\nticket: login\ntitle: t\nplan: [research]\nallow:\n"
+            f'- {{{entry}, match: "Write|Edit"}}\n---\n\nb\n'
+        )
+        return ticket_mod.parse(text)[0]
+
+    def test_swapping_glob_for_regex_shows_in_the_diff(self):
+        before = self.read_entry('glob: "src/app"')
+        after = self.read_entry('regex: "src/app"')
+        self.assertTrue(approval.plan_differs(after, before))
+        text = "\n".join(agree_screen._scope_diff_lines(before, after))
+        self.assertIn("allow 追加: regex:src/app", text)
+        self.assertIn("allow 削除: src/app", text)
+
+
+class UnreadableScopeTest(unittest.TestCase):
+    def problems(self, revised):
+        conf, _ = settings.load(ROOT)
+        with (
+            mock.patch.object(agree_candidates, "plan_problems", return_value=[]),
+            mock.patch.object(agree_candidates, "open_children", return_value=[]),
+        ):
+            found = agree_candidates.revision_problems(ROOT, conf, revised, read(), None)
+        return [p for p in found if p.severity == "error"]
+
+    def test_an_entry_the_judge_cannot_read_stops_a_scope_revision(self):
+        text = parent_text(allow=("src/*", "docs/*")).replace(
+            '- {glob: "docs/*", match: "Write|Edit"}', '- {glob: "docs/*", match: "Read"}'
+        )
+        errors = self.problems(ticket_mod.parse(text)[0])
+        self.assertEqual(1, len(errors), errors)
+        self.assertIn("読めない項", errors[0].detail)
+
+    def test_a_non_list_section_stops_a_scope_revision(self):
+        text = parent_text().replace("allow:\n", "ask: oops\nallow:\n")
+        errors = self.problems(ticket_mod.parse(text)[0])
+        self.assertTrue(any("リストではない" in p.detail for p in errors), errors)
+
+
 class RevisedFrontTest(unittest.TestCase):
     def test_the_scope_is_replaced_with_the_proposal(self):
         current = read(allow=("src/*",))
@@ -159,6 +202,24 @@ class ScopeRevisionFlowTest(PhaseHarness):
         result = self.revise(("src/*", "wip/*"))
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertIn("allow 削除: tests/*", result.stdout)
+
+    def test_a_stale_copy_in_a_child_worktree_does_not_count_after_cancel(self):
+        """取り消したあとも子のワークツリーには切った時点の doing/ のコピーが残る。"""
+        self.family(plan=self.PLAN)
+        self.propose(
+            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/research/*"], review=False)
+        )
+        self.commit_parent("child")
+        self.assertEqual(0, self.approve().returncode)
+        worktree = self.run_child("i0001-01-01")
+        self.assertTrue(
+            os.path.exists(os.path.join(worktree, ".ccnavi", "approved", "doing", "i0001-01-01.md"))
+        )
+        cancelled = self.ccnavi("ticket", "cancel", "i0001-01-01", "--reason", "範囲を広げる")
+        self.assertEqual(0, cancelled.returncode, cancelled.stdout + cancelled.stderr)
+        self.commit_parent("cancel")
+        result = self.revise(self.WIDER)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     def test_a_child_in_progress_stops_the_revision_until_it_is_cancelled(self):
         self.family(plan=self.PLAN)

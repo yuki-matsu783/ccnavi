@@ -439,6 +439,10 @@ def revision_problems(
         return problems
     # 範囲を変える改版は、作業中の子が居ないときだけ。子の範囲は親の範囲の中に収まる前提で
     # 承認されているので、親の範囲を変えるなら、子は一度取り消して出し直す。
+    # 書かれる節（生の値）が違うなら、読めない項が混ざっていないかを見る。読めない項は
+    # `entries` に入らないので、署名では違いに出ない。
+    if any(revised.raw.get(s) != current.raw.get(s) for s in rules.SECTIONS):
+        problems += unreadable_scope(revised)
     if approval.scope_signature(revised) != approval.scope_signature(current):
         busy = open_children(conf, root, current.ticket)
         if busy:
@@ -530,16 +534,50 @@ def revision_problems(
     return problems
 
 
+def unreadable_scope(t: ticket_model.Ticket) -> list[rules.Problem]:
+    """範囲の節に、判定が読めない項が混ざっていないか。
+
+    改版は提案の節をそのまま承認済みチケットに書く。承認画面に出る差分は読めた項
+    （`entries`）から組むので、読めなかった項（書き込みのツールを含まない `match`、絶対パス、
+    型違いの節）は画面に出ないまま残る。数が合わなければ拒む。
+    """
+    raw = 0
+    for section in rules.SECTIONS:
+        value = t.raw.get(section)
+        if value is None:
+            continue
+        if not isinstance(value, list):
+            return [_unreadable(t, f"`{section}` がリストではない")]
+        raw += len(value)
+    if raw != len(t.entries):
+        return [
+            _unreadable(
+                t, f"判定が読めない項が {raw - len(t.entries)} 件ある（`ccnavi --lint` で確かめる）"
+            )
+        ]
+    return []
+
+
+def _unreadable(t: ticket_model.Ticket, why: str) -> rules.Problem:
+    return rules.Problem(
+        rules.SEVERITY_ERROR,
+        t.ticket,
+        f"範囲を変える改版は、範囲の項が全部読めるときだけ出せる: {why}",
+    )
+
+
 def open_children(conf: settings.Settings, root: str, parent_id: str) -> list[str]:
     """この親の子で、作業中（`doing/`）のものの識別子。範囲を変える改版を止める。
 
     閉じた子（終わった・取り消した）とレビュー待ちの子は数えない。仕事が済んでいて、
     親の範囲が変わっても動かす先が無いため。
     """
+    # `all_tickets` は子のワークツリーに checkout されたままの古い版も拾う。親のツリーで
+    # 取り消したあとも `doing/` のコピーが残るので、数えると取り消しても改版が通らない。
+    # 判定と同じく、正とするツリーの側だけを数える（`approval.scan`）。
+    opened, _ = approval.scan(conf, root)
     return sorted(
-        t.ticket
-        for t in approval.all_tickets(conf, root)
-        if t.parent == parent_id and t.state == ticket_model.DOING
+        t.ticket for t in opened if t.parent == parent_id and t.state == ticket_model.DOING
     )
 
 
