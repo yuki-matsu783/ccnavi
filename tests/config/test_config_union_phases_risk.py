@@ -73,7 +73,7 @@ phases:
     scope: ["wip/*"]
 """
 
-# 前の版の `order: dag` と定義の `after` を書いた lib の定義（どちらも読まない）。
+# 前の版の `order: dag` と定義の `after` を書いた lib の定義。
 LIB_PHASES_DAG = """\
 version: 1
 order: dag
@@ -715,7 +715,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         record = self.record()
         # 共通レイヤーの factors だけで点が付く。
-        # lib の schema は参加せず、levels も共通レイヤーのまま。
+        # levels も共通レイヤーのまま。
         self.assertEqual([h["id"] for h in record["hits"]], ["big-diff"])
         self.assertEqual(record["points"], 25)
         self.assertEqual(record.get("fallback"), "lib", record)

@@ -675,7 +675,6 @@ class ProjectsTest(unittest.TestCase):
     def test_an_empty_projects_env_still_counts_the_projects(self):
         # A3（置き場の固定）。`CCNAVI_PROJECTS=""` は「プロジェクトを数えない」と読まれていた。
         # 6 つの env を廃止したので、空文字を入れても `projects/` の下は数えられる。
-        # 実装前は赤。赤の理由は、まだ `CCNAVI_PROJECTS` の空文字を読んでいること。
         env = {"CCNAVI_PROJECTS": ""}
         denied = self.hook(
             "Write", self.ws, env=env, file_path=os.path.join(self.app, "schema", "x.sql")

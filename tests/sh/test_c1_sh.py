@@ -1957,7 +1957,7 @@ class C1HostTest(C1HostHarness):
         with open(log, encoding="utf-8") as f:
             logged = f.read()
         self.assertIn(f"worktree retire {PARENT}", logged)
-        # retire の後に、残っているワークツリーの一覧を頼む（出すだけで消さない）
+        # retire の後に、残っているワークツリーの一覧を頼む
         self.assertLess(
             logged.index(f"worktree retire {PARENT}"), logged.index(f"worktree remaining {PARENT}")
         )

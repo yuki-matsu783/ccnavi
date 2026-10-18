@@ -351,7 +351,7 @@ class FetchTest(unittest.TestCase):
         self.assertEqual("", done.stderr.strip())
 
     # ---- 取り込み済みの親子のチケット
-    # SessionStart は親のワークツリーを早送りするだけで、merge はしない。
+    # SessionStart は親のワークツリーを早送りする。
 
     def family(self, name="i0001"):
         """親のワークツリー .claude/worktrees/<name>（親チケットを送ってある）。"""

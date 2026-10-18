@@ -1266,7 +1266,7 @@ class TicketTest(unittest.TestCase):
         )
         if prepared.returncode != 0:
             return prepared
-        # 出力は依頼の本文のパス 1 行だけ（マージリクエストは作らない）。
+        # 出力は依頼の本文のパス 1 行だけ。
         (body_path,) = prepared.stdout.splitlines()
         with open(body_path, encoding="utf-8") as f:
             text = f.read()

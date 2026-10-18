@@ -37,7 +37,7 @@ class TicketStatusTest(PhaseHarness):
         return result.stdout
 
     def by_hand(self, ident="i0001", text=None):
-        """GitHub の画面で動かしたのと同じく、中身を変えずに doing/ へ置く（コミットしない）。"""
+        """GitHub の画面で動かしたのと同じく、中身を変えずに doing/ へ置く。"""
         text = text or parent_text(ident, ["research"])
         write(os.path.join(self.approved, "doing", ident + ".md"), text)
         return text
@@ -182,7 +182,7 @@ class TicketStatusTest(PhaseHarness):
         write(path, text.replace('base_sha: ""', f'base_sha: "{stray}"', 1))
         self.commit_parent("planted")
         mine = self.block(self.said("i0001"), "i0001")
-        # 基準点が HEAD の祖先でないのは warn（start は止めない）。started_at の無い base_sha は
+        # 基準点が HEAD の祖先でないのは warn。started_at の無い base_sha は
         # 判定が blocked で止めるので、止まっている理由はそちらで出る。
         self.assertIn("注意: 基準点", mine)
         self.assertIn("HEAD の祖先でない", mine)

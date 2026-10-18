@@ -151,7 +151,7 @@ API_SEQ = 0
 MADE_BRANCHES: list[str] = []
 MADE_PRS: list[int] = []
 MADE_ISSUES: list[int] = []
-# 統合先に使う使い捨てのブランチ（PR の宛先。main には触らない）
+# 統合先に使う使い捨てのブランチ（PR の宛先）
 BASE = f"ccnavi-probe-base-{STAMP}"
 
 RULES = {
@@ -561,7 +561,7 @@ def main() -> int:
         return finish()
     write(os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml"), json.dumps(RULES))
     # sh はワークスペースルートを cwd から上へ探す（.ccnavi/scripts/ccnavi-common.sh を持つ親）。
-    # 一時リポジトリにも scripts を置く。追跡はしない
+    # 一時リポジトリにも scripts を置く
     shutil.copytree(
         os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts"),
         os.path.join(ROOT, ".ccnavi", "scripts"),
@@ -963,7 +963,7 @@ def main() -> int:
     record("ready のコメントが PR にある", has_marker(comments_of(num), "<!-- ccnavi:ready -->"))
 
     # コメントを付けた行を書き換えるコミットを push すると、スレッドは古く（outdated）なり、
-    # GraphQL の line は null になる。sh は 0 に読む。force push も履歴の書き換えもしない。
+    # GraphQL の line は null になる。sh は 0 に読む。
     # push すると依頼の後に親の HEAD が動くので、依頼・confirm の段が全部済んだ ready の後でやる
     write(os.path.join(parent_tree, "src", "2", "work.py"), "# rewritten\n")
     commit_all(parent_tree, "コメントを付けた行を書き換える")

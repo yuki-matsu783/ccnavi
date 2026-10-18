@@ -188,7 +188,7 @@ class ProjectsCollisionTest(unittest.TestCase):
     | いいえ | いいえ（`projects/` が無い） | どちらでも | 何も言わない |
 
     フラグ（`--projects` など）は渡さず、`--root` の下の既定の置き場を見る。
-    A5 は実装前は赤（ぶつかりの知らせがまだ無い）。A6 は今どおりで緑（回帰の見張り）。
+    A6 は今どおりで緑（回帰の見張り）。
     """
 
     def setUp(self):

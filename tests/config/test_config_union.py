@@ -5,7 +5,7 @@
 
 レイヤーは 3 種。
 
-- 共通レイヤー: `.ccnavi/config/common/{rules,phases,risks}.yml`（置き場は固定。env では動かさない）
+- 共通レイヤー: `.ccnavi/config/common/{rules,phases,risks}.yml`（置き場は固定）
 - ワークスペース自身のレイヤー: `<ワークスペースルート>/.ccnavi/config/project/`
 - プロジェクトのレイヤー: `projects/<名前>/.ccnavi/config/project/`
 
