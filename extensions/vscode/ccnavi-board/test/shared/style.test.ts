@@ -295,10 +295,10 @@ test("CB-T439 欄の幅の上限と基準幅は page.css で定めた名前（--
   const loose: string[] = [];
   for (const file of files) {
     const text = fs.readFileSync(file, "utf8");
-    // 名前を定義する行とコメントを除き、width / max-width / flex の値に 320px・360px が残っていないかを見る
-    const code = text.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter((l) => !l.includes("--w-field: 320px"));
+    // コメントは行数を保ったまま空にし、名前を定義する行も除く。width 系と flex 系の値に 320px・360px が残っていないかを見る
+    const code = text.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, "")).split("\n").filter((l) => !l.includes("--w-field: 320px"));
     code.forEach((line, i) => {
-      if (/(?<![-\w])(?:width|max-width|flex)\s*:[^;}]*\b(?:320|360)px/.test(line) && !/(?:min|max)-height/.test(line)) {
+      if (/(?<![-\w])(?:width|max-width|min-width|flex|flex-basis)\s*:[^;}]*\b(?:320|360)px/.test(line)) {
         loose.push(`${path.relative(WEBVIEW_SRC, file)}:${i + 1} ${line.trim()}`);
       }
     });
