@@ -147,8 +147,8 @@ launcher の正規表現だけに頼る穴は、この 2 段目を持たない�
 取り込みの下見は、制御文字・書式文字を `\uXXXX` に直して見せる（差分の行・新規の本文・苦情の文面）。書く中身（バイト列）は変えない。
 そうした文字を含む下書きは、検査が error にして取り込めない。
 
-**`--templates` の一覧。** 下書きがあれば最後に `下書き: N 件（wip/proposals/templates/）` を 1 行出す。`--json` は `drafts[]` を足す
-（`templates[]` にも `layers[]` にも `sums[]` にも入れない）。1 件は `name`・`tree`・`path`・`sha`・`text`・`valid`・`importable`・`checked_with`
+**`--templates` の一覧。** 下書きがあれば最後に `下書き: N 件（wip/proposals/templates/）` を 1 行出す。`--json` は `drafts[]` を足す。
+1 件は `name`・`tree`・`path`・`sha`・`text`・`valid`・`importable`・`checked_with`
 （検査に使ったフェーズ定義の層。`templates[].layer`＝ファイルが在る層とは意味が違うので名前を分けた）・
 `exists_in`（同名のテンプレートが在るレイヤー）・`also_in`（`tree` と同じ表記で、ワークスペースルートは空。人間向けの言い方は text 出力の側で作る）・`description`・`when`・`plan`・`feedback`・`flows`・`problems`。
 
@@ -211,7 +211,7 @@ warn（`TODO` の残りなど）、次の手（rationale・固有名を直す、
 
 > テンプレートにするなら、`ready` の前に `ccnavi --templates --draft <親>` で下書きを作る（ready で閉じると下書きの材料は退避されて拾えない）。下書きは取り込むか消してから ready
 
-`template_drafts.close_notice` が文を返す（何も書かない）。出す条件は 3 つが揃ったとき。
+`template_drafts.close_notice` が文を返す。出す条件は 3 つが揃ったとき。
 
 | 条件 | 見方 |
 |---|---|

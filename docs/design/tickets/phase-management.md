@@ -37,7 +37,7 @@ keywords: [フェーズ管理, フェーズ, フェーズ定義, 計画, 全体�
         ▼
   番号の子が全部閉じた = フェーズが終わった
         │
-        ├─ review: none ─→ skipped（止めない。次へ進む）
+        ├─ review: none ─→ skipped（次へ進む）
         └─ review: mr ──→ pending ─→ request ─→ requested ─→ confirm / decide ─→ reviewed
 ```
 
