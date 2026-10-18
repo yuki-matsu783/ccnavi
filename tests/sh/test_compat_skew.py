@@ -61,7 +61,9 @@ def extension_compat() -> int:
     path = os.path.join(ROOT, "extensions", "vscode", "ccnavi-board", "src", "core", "version.ts")
     with open(path, encoding="utf-8") as f:
         found = re.search(r"^export const EXTENSION_COMPAT = ([0-9]+);$", f.read(), re.MULTILINE)
-    assert found is not None, "src/core/version.ts に EXTENSION_COMPAT が無い"
+    assert found is not None, (
+        "extensions/vscode/ccnavi-board/src/core/version.ts に EXTENSION_COMPAT が無い"
+    )
     return int(found.group(1))
 
 

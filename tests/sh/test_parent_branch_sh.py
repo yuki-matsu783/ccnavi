@@ -127,8 +127,6 @@ class ParentBranchShTest(unittest.TestCase):
         env.update(
             {
                 "CCNAVI_BIN_PATH": self.bin,
-                "CCNAVI_SYNC_RETRIES": "0",
-                "CCNAVI_SYNC_RETRY_WAIT": "0",
                 "CCNAVI_LOCK_WAIT": "2",
             }
         )
@@ -380,7 +378,7 @@ class ParentBranchShTest(unittest.TestCase):
         self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
         self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
 
-    # ---- 取り込み状態はキャッシュ
+    # ---- 旧い取り込み状態が残っていても判定に使わない
 
     def test_a_leftover_legacy_record_does_not_change_the_answer(self):
         """旧い取り込み状態（branch が別のブランチ）が残っていても、判定には使わない。

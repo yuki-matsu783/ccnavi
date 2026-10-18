@@ -1703,14 +1703,15 @@ ccnavi --agree --preview --verify i0002 i0002-01-01   # 承認できる状態か
 受け取る側では、セッション開始時に `.ccnavi/scripts/ccnavi-fetch.sh` が取ってくる。進めるのは fast-forward だけで、未コミットの変更があるツリーや
 分岐したツリーは触らず理由を 1 行で示す。取ってくるのは、チェックアウト中のブランチと、ワークツリーの起点になる統合先（`CCNAVI_INTEGRATION_BRANCH`、無ければ
 `.claude/settings.local.json` の `env`、無ければデフォルトブランチ＝`origin/HEAD`）。統合先の決め方は
-`ccnavi-common-state.sh` の `ccnavi_integration` 1 か所にあり、`ccnavi-git.sh` の push の拒否と `ccnavi-review.sh` が照らすマージリクエストのマージ先も同じ順で決める。
+`ccnavi-common-state.sh` の `ccnavi_integration` 1 か所にあり、`ccnavi-git.sh` の push の拒否と `ccnavi-review.sh` が照らすマージリクエストのマージ先も同じ順で決める
+（`ccnavi-sync.sh` だけは、デフォルトブランチを先にホストへ聞く `ls-remote --symref` で読み、読めないときに手元の `origin/HEAD`・`main`・`master` に落とす）。
 リモートに届かないときも止めず、手元の版で判定する。認証は尋ねず、fetch 1 回を `CCNAVI_FETCH_TIMEOUT` 秒（既定 15）で切る。
 認証で失敗したときはその旨を 1 行添えるので、ユーザが端末で一度 `git fetch origin` を打って資格情報を保存すれば、次のセッションから通る。
 
 親のワークツリー（`.claude/worktrees/<P>` で、HEAD のブランチ名の `/` を `-` に置き換えたものがフォルダ名と同じもの）は、
 未コミットの変更があっても早送りを試し、書きかけと重なれば重なったパスを示す。分かれていれば「取り込みが要る」と 1 行出すだけで merge はしない。
 取り込み（merge）と、親のブランチがリモートから消えたかの確かめは、ユーザが打つ `.ccnavi/scripts/ccnavi-sync.sh [<P>...]` がする。
-統合先は環境変数 `CCNAVI_INTEGRATION_BRANCH`（`.claude/settings.local.json` の `env` でもよい）、空ならホストのデフォルトブランチで、
+統合先は環境変数 `CCNAVI_INTEGRATION_BRANCH`（`.claude/settings.local.json` の `env` でもよい）、空ならホストのデフォルトブランチ（`ls-remote --symref` で聞き、読めなければ手元の `origin/HEAD`・`main`・`master`）で、
 使った名前を出力の冒頭に出す。
 取り込んだ後は親子のチケットを判定し直し（`ccnavi sync check`）、error があれば表示して終了コード 1 にする。取り込み状態は書かない。直してからオンラインで打ち直せば、次の確認は通る。
 どの親子のチケットも、親のブランチ上のチケット（親のワークツリーの中）だけを正とする。ほかのツリー（ワークスペースルート・
@@ -2863,7 +2864,7 @@ ccnavi --version --json
 | `features` | 旗から読めない振る舞いの名前（文字列の配列）。テンプレートの編集は `templates.edit`・`templates.draft-text`、ボードの親のカードの入口は `board.template-draft`。古い実行ファイルと見分けるためのもので、足しても `compat` は上げない |
 
 **互換の版**は 3 か所に同じ値で書く。実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）、sh（`ccnavi-common.sh` の
-`CCNAVI_COMPAT`）、拡張（`src/core/version.ts` の `EXTENSION_COMPAT`）。Chrome 拡張は組み立てのときに実行ファイルの値を埋め込む。
+`CCNAVI_COMPAT`）、拡張（`extensions/vscode/ccnavi-board/src/core/version.ts` の `EXTENSION_COMPAT`）。Chrome 拡張は組み立てのときに実行ファイルの値を埋め込む。
 sh や拡張が頼るフラグや出力の形を、呼ぶ側を直さないと動かない形に変えたときに上げる。データの形（承認済みの置き場に置くものの並び、
 待ち方の置き場、取り下げの条件など）が変わるときも上げる。古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）が
 新しい形のデータを読み違えるため。フラグや欄を足すだけで、データの形も変わらないなら上げない（拡張は使う前に `flags` を見る）。

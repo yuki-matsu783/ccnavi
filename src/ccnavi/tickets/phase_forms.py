@@ -854,7 +854,8 @@ def prune_message() -> str:
     )
 
 
-# 承認の sh・取り込み状態を消す sh・ユーザの判断の入口の sh を、コマンドの位置の表記で止める節。
+# 承認の sh・放棄した親の記録を消す入口（worktree retire --abandon）・ユーザの判断の入口の sh を、
+# コマンドの位置の表記で止める節。
 # ticket_approval_rule が使い、hidden_user_entry は同じ形をこの節に任せる（文面を 1 つにするため）。
 _SCRIPT_FORMS = (
     # `sh -x ...` のようにシェルに選択肢を付けた形も同じに見る。

@@ -203,7 +203,7 @@ class CancelledChildTest(RetireHarness):
 
 
 class TidyAfterMergeTest(RetireHarness):
-    """MR がマージされたと分かった後の片付け（親のブランチと取り込み記録）。"""
+    """MR がマージされたと分かった後の片付け（親のブランチと片付けの記録）。"""
 
     def tidy(self, sha):
         return self.ccnavi("--cwd", self.root, "sync", "tidy", "i0001", "self", "i0001", sha)

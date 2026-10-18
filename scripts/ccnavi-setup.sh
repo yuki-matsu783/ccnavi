@@ -136,7 +136,7 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-agree.sh は端末から承認するための sh。承認の案内（phase.py）がこのパスを表示するので、
 # 配らないと、案内どおりに実行しても動かない。
 # ccnavi-fetch.sh はセッション開始時に走る取り込み（FETCH_COMMAND）。ccnavi-sync.sh はユーザが実行する
-# 取り込み（分かれた親ブランチの merge、消えた親ブランチの確認、取り込み状態の書き出し）。
+# 取り込み（分かれた親ブランチの merge、消えた親ブランチの確認、片付けの記録の読み出し）。
 # ccnavi-git.sh の拒否の文面が ccnavi-sync.sh を案内するので、配らないと案内どおりに実行しても動かない。
 # ccnavi-clean.sh と ccnavi-clean.js は、ワークツリーを片付ける前に生成物を消すもの。Windows では
 # node_modules などが残ると worktree remove が途中で止まる。js が本体で、sh は node を探して js を渡す。

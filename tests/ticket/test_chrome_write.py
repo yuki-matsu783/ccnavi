@@ -196,7 +196,7 @@ class WrittenCopyTest(ChromeWriteHarness):
         body = self.plan()
         self.assertEqual(body["identifiers"], ["i0001", "i0001-01-01"])
         self.apply(body["changes"]["i0001"], self.parent_tree)
-        # 手元の取り込み状態は Chrome と同じ（取り込み済みの親子のチケット）。
+        # 手元の判定は Chrome と同じ仮のツリーを読む。
         # 判定し直し（C3）で error が出ない
         self.assertEqual(lint.family_check(self.conf(), self.root, "i0001", "self"), [])
         preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)

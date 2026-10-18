@@ -101,7 +101,7 @@ def os_name():
 
 
 class NoTicketYamlInShTest(unittest.TestCase):
-    """sh はチケットの YAML を自分で読まない。閉じたかの見分けは `ccnavi sync closed`、
+    """sh はチケットの YAML を自分で読まない。閉じたかは `ccnavi-review.sh merged` に、
     親のワークツリーかは `ccnavi tree parent` に聞く（答えの約束は tests/core/test_sh_ask.py）。
 
     前は sh が frontmatter を awk で読み、Python と同じ値になることを見本で確かめていた。
@@ -212,7 +212,6 @@ class SyncHarness(unittest.TestCase):
 
     def env(self, **extra):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-        env.update({"CCNAVI_SYNC_RETRIES": "0", "CCNAVI_SYNC_RETRY_WAIT": "0"})
         # sh はチケットを読まず実行ファイルに聞く（親のワークツリーか、閉じたか）ので、
         # ソースの実行ファイルを既定で渡す。実行ファイルの無い形を見るテストは自分で上書きする。
         if "CCNAVI_BIN_PATH" not in extra:
@@ -635,7 +634,7 @@ class SyncTest(SyncHarness):
         head = self.sha(self.tree, "HEAD")
         log = self.review_log(f"merged 42 {head}")
         self.delete_remote_branch(PARENT)
-        done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="1")
+        done = self.sync(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("マージ済み", done.stdout)
         self.assertIn("42", done.stdout)
@@ -646,16 +645,6 @@ class SyncTest(SyncHarness):
         self.assertFalse(os.path.exists(self.tree))
         self.assertEqual(["main"], self.branches())
         self.assertFalse(os.path.exists(self.lock_dir()))
-
-    def test_a_merged_answer_does_not_wait_for_the_integration(self):
-        # 統合先の done/ を待つ確かめ直しは、マージ済みかの答えが得られないときだけ。
-        self.review_says(f"merged 42 {self.sha(self.tree, 'HEAD')}")
-        self.delete_remote_branch(PARENT)
-        started = time.monotonic()
-        done = self.sync(PARENT, CCNAVI_SYNC_RETRIES="3", CCNAVI_SYNC_RETRY_WAIT="30")
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        # 待てば 30 秒を超える。1 回の取り込みが遅い機械（Windows）でも、待ちと見分けられる。
-        self.assertLess(time.monotonic() - started, 30)
 
     def test_an_unpushed_commit_keeps_the_branch(self):
         merged_head = self.sha(self.tree, "HEAD")
@@ -686,7 +675,7 @@ class SyncTest(SyncHarness):
         self.assertTrue(os.path.isdir(self.tree))
         self.assertIn(PARENT, self.branches())
 
-    # ---- 親のワークツリーを片付けた後（ready の後）。取り込み記録と手元のブランチが残る
+    # ---- 親のワークツリーを片付けた後（ready の後）。片付けの記録と手元のブランチが残る
 
     def retire_tree(self):
         """ready の後の状態にする。片付けの記録は、ワークツリーを消す前に置いておく。"""
@@ -921,7 +910,7 @@ class SyncTest(SyncHarness):
         self.delete_remote_branch(PARENT)
         self.assertGone(self.sync(PARENT))
 
-    # ---- 取り込み状態の寿命（削除せずに残し、消すのはユーザの `--forget` だけ）
+    # ---- 廃止した `--forget`（放棄した親の記録は `worktree retire --abandon` で消す）
 
     def test_forget_is_gone_and_says_what_to_do_instead(self):
         done = self.sync("--forget", PARENT)
@@ -1002,7 +991,7 @@ class SyncTest(SyncHarness):
         self.assertNotIn("移した", done.stdout)
 
     # ---- 統合先（設定か、無ければホストのデフォルトブランチ）と、
-    # 統合先の取り込み結果（最後に取り込んだ先頭）
+    # 統合先への取り込み（最後に取り込んだ先頭）
 
     def put_on_main(self, files):
         pusher = self.pusher()

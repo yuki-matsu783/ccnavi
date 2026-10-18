@@ -58,13 +58,15 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 `origin/HEAD` が指すもの）も、チェックアウトされていなければ `update-ref` で
 進める。統合先の決め方は `ccnavi-common-state.sh` の `ccnavi_integration` にまとめてあり、`ccnavi-git.sh` は
 その名前への直接の push を（`main` などの固定のリストと同じく）拒み、`ccnavi-review.sh` はそれをマージリクエストの宛先にする。
+ただし `ccnavi-sync.sh` だけは、デフォルトブランチをオンラインでホストに聞く（`ls-remote --symref`）のを先にして、読めないときに手元の
+`origin/HEAD`・`main`・`master` に落とす（変更前からの設計。環境変数と `settings.local.json` の `env` が先なのは同じ）。
 リモートに届かないときは手元の版で判定を続ける。fetch は 1 回ずつ時間を監視して打ち切り、hook の
 上限に当たらないようにする。
 
 親のワークツリー（`.claude/worktrees/<P>` で、HEAD のブランチ名を変換した識別子がフォルダ名と合うもの）は、SessionStart では
 早送りだけにし、ロックが取れなければ飛ばす。分かれた親子のチケットの merge と、リモートから消えた
 親のブランチの確かめ（閉じたかは MR がマージ済みかで決める。ホストに聞けなければ推定せず止まる）は、ユーザが打つ
-`ccnavi-sync.sh` が持つ。統合先は `CCNAVI_INTEGRATION_BRANCH`（無ければホストのデフォルトブランチ）で、設定した名前が
+`ccnavi-sync.sh` が持つ。統合先は `CCNAVI_INTEGRATION_BRANCH`（無ければ `.claude/settings.local.json` の `env`、無ければホストのデフォルトブランチ）で、設定した名前が
 リモートに無ければ止める。取り込みの状態は手元に持たない（旧 `logs/state/sync/` の `families/<P>` と `integration/` は
 ADR-0142 が廃止した）。親のブランチ名は、実行ファイルの `ccnavi c1 family <P>` の `branch` の行（親のワークツリーの HEAD から読んだ名前）で知る。
 `ccnavi-sync.sh` は取り込んだ後に `ccnavi sync check <P>` でその親子のチケットを判定し直し、error があれば表示して終了コード 1 にする

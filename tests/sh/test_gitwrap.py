@@ -1150,7 +1150,7 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
     親のワークツリーは .claude/worktrees/<P> で、親チケットか提案（`ticket: <P>`、`parent:` なし）が
     あるもの。別のブランチに移ると、ccnavi-sync.sh とセッション開始時の ccnavi-fetch.sh が
     リモートでの承認をこのツリーへ取り込まなくなる。親のブランチを一度でも push したか
-    ccnavi-sync.sh で取り込んだ親（取り込み状態がある親）では、親と子のチケットの承認・
+    ccnavi-sync.sh で取り込んだ親では、親と子のチケットの承認・
     状態の操作・実行前の判定も止まる。拒否文はその中身を言う。
     """
 

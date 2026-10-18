@@ -12,8 +12,7 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
 見るのは次のとおり。
 
 1. 順序: hook のマーカーを先にコミット → 取り込み → 書く →
-   書いたパスだけ commit --only → push。
-   統合先の取り込み結果も同じ回で書く
+   書いたパスだけ commit --only → push
 2. ロック: 他の操作が持っていれば何も書かずに止まる。C1 から起こす sync・承認の push は入れ子で通る
 3. 競合: リモートが進んでいれば取り込んでから書く。衝突したら取りやめて何も書かない
 4. 途中の操作（merge など）があれば始めない
@@ -218,8 +217,6 @@ class C1Harness(unittest.TestCase):
         env.update(
             {
                 "CCNAVI_BIN_PATH": self.bin,
-                "CCNAVI_SYNC_RETRIES": "0",
-                "CCNAVI_SYNC_RETRY_WAIT": "0",
                 "CCNAVI_LOCK_WAIT": "2",
             }
         )

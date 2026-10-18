@@ -10,8 +10,8 @@
 互換の版（COMPAT）は、実行ファイルと、それを呼ぶ側（`.ccnavi/scripts/` の sh と
 VS Code 拡張）との契約の版。呼ぶ側が頼っているフラグや出力の形を、呼ぶ側を直さないと
 動かない形に変えたときに 1 上げ、sh の `CCNAVI_COMPAT`（ccnavi-common.sh）と拡張の
-`EXTENSION_COMPAT`（src/core/version.ts）も同じ値に揃える。Chrome 拡張は組み立てのときに
-ここの値を埋め込む。
+`EXTENSION_COMPAT`（extensions/vscode/ccnavi-board/src/core/version.ts）も同じ値に揃える。
+Chrome 拡張は組み立てのときにここの値を埋め込む。
 
 データの形（承認済みの置き場に置くものの並び、待ち方の読み方、取り下げの条件など）が変わるときも
 上げる。古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）が新しい形のデータを読むと、
