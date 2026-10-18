@@ -385,7 +385,26 @@ _HELP_FLAGS = (
     ("templates", lambda a: a.templates),
     ("logs", lambda a: a.prune or a.suggest),
     ("agree", lambda a: a.agree or a.plan_order is not None or a.fill_phases),
-    ("scripts", lambda a: a.reviewed is not None or a.close_early),
+    (
+        "scripts",
+        lambda a: (
+            a.reviewed is not None
+            or a.close_early
+            or any(
+                getattr(a, flag)
+                for flag in (
+                    "record_writes",
+                    "placed_out",
+                    "choose_out",
+                    "accept_plan",
+                    "accept_check",
+                    "accept_done",
+                    "no_issue",
+                    "via",
+                )
+            )
+        ),
+    ),
 )
 
 
