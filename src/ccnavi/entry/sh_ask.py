@@ -32,7 +32,15 @@ import re
 from typing import TextIO
 
 from ..infra import fsio, pathcase, settings, tree
-from ..tickets import approval, approval_marks, archive, donecopy, ops_stop_integrate, ticket_ids, ticket_model
+from ..tickets import (
+    approval,
+    approval_marks,
+    archive,
+    donecopy,
+    ops_stop_integrate,
+    ticket_ids,
+    ticket_model,
+)
 from ..tickets import ticket as ticket_mod
 
 # 答えの頭の行。
@@ -126,7 +134,9 @@ def parent_tree(
 def bound_tree(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, path: str, name: str
 ) -> int:
-    """`ccnavi tree bound <ツリー> <名前>`。頭に `tree 1`、続けて `bound yes|no`、結び付くなら `why <理由>`。
+    """`ccnavi tree bound <ツリー> <名前>`。
+
+    頭に `tree 1`、続けて `bound yes|no`、結び付くなら `why <理由>`。
 
     `ccnavi-git.sh integrate` が、直接作業のワークツリーを取り込んでよいかを決めるために聞く。
     sh はチケットの置き場を自分で読まない。

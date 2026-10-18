@@ -52,8 +52,8 @@ VERSION = "0.1.0"
 # `sync migrate`）を呼ぶ。Chrome と手元の判定の規則が変わる（取り込み状態を読まない）。
 # 14: C1 を write-and-push に改名した。sh が呼ぶ副命令が `c1 family|sort|merge|merge-blame` から
 # `write-and-push …` に変わり、答えの頭の行も `c1 1` から `write-and-push 1` に変わった。
-# 15: `integrate` がチケットに結び付くかの判定を、実行ファイルの `tree bound <ツリー> <名前>` に聞くように
-# した。sh が呼ぶ副命令が増え、sh は答えの頭の行 `tree 1` が無ければ断る向きに倒す。
+# 15: `integrate` がチケットに結び付くかの判定を、実行ファイルの `tree bound` に聞くようにした。
+# sh が呼ぶ副命令が増え、sh は答えの頭の行 `tree 1` が無ければ断る向きに倒す。
 COMPAT = 15
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
