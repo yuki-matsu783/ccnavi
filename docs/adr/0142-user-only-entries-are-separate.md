@@ -1,9 +1,9 @@
 ---
 type: adr
 title: ユーザ専用の入口を、エージェントも使う入口から分離する
-description: ユーザだけが打つ操作を、実行ファイルの user 名前空間と ccnavi-user-*.sh に集め、hook は入口の名前だけで止める
+description: ユーザだけが打つ操作を、実行ファイルの user 入口と ccnavi-user-*.sh に集め、定義を表 1 つにして、hook の止めをそこから作る
 tags: [rules, approval, selfguard]
-keywords: [user, 名前空間, 入口, 分離, 表, 承認, 端末, hook, preview, 読み取り]
+keywords: [user, 入口, 分離, 表, 承認, 端末, hook, preview, 読み取り, 互換]
 ---
 
 # ADR-0142: ユーザ専用の入口を、エージェントも使う入口から分離する
@@ -13,38 +13,59 @@ keywords: [user, 名前空間, 入口, 分離, 表, 承認, 端末, hook, previe
 ## 状況
 
 ユーザだけが打つ操作（承認・レビュー済みの記録・早めに閉じる・記録の削除・テンプレートの取り込み・親を閉じたあとの
-片付けなど）は、エージェントも使う入口と同じ実行ファイル・同じ sh に同居している。同じオプションの形で、エージェントに許す形と
-許さない形が分かれている（`--agree` は止め、`--agree --preview` は通す。`ccnavi-review.sh decide <N>` は
+片付けなど）は、エージェントも使う入口と同じ実行ファイル・同じ sh に同居している。同じオプションで、エージェントに
+許す形と許さない形が分かれている（`--agree` は止め、`--agree --preview` は通す。`ccnavi-review.sh decide <N>` は
 `--preview` なら通し、`--choices` なら止める。`ccnavi-sync.sh` は `--forget` だけ止める、など）。
 
-そのため hook はオプションの綴り・並び・組み合わせを読む。免除の `--preview` を単独の語として読む後読み、ボードの経路のオプションの組み合わせ、
-引数を変数や glob で組み立てて隠す形の判定、実行ファイルのオプションの一覧（`EXE_OPTIONS`）との突き合わせがあり、
-抜け道が見つかるたびに足されてきた。ユーザ専用の定義も、hook の正規表現、オプションの一覧、実行ファイルの端末要求の呼び出し、
-拒否文、各 sh のヘルプに散らばる。
+そのため hook はオプションの綴り・並び・組み合わせを読む。免除の `--preview` を単独の語として読む後読み、
+ボードの経路のオプションの組み合わせ、引数を変数や glob で組み立てて隠す形の判定があり、抜け道が見つかるたびに
+足されてきた。ユーザ専用の定義も、hook の正規表現、オプションの一覧、実行ファイルの端末要求の呼び出し、拒否文、
+各 sh のヘルプに散らばっている。
+
+この ADR は、同じ内容の案を 1 度書いたあと、2 人の敵対的レビューを受けて書き直したもの。最初の案は
+「hook は入口の名前だけで止める」としていたが、現行の止めのうち、端末を求めない操作を名前に依らず止める文字列検査と、
+端末要求を切る形の検査が消えて、止まっている形が止まらなくなると分かった。この版は、それらを残す。
 
 ## 決定
 
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
-| ユーザ専用の実行ファイルの操作は、すべて `ccnavi user <操作>` に集める。`user` は実行ファイルの**最初の引数**のときだけ名前空間として読む（オプションの後ろの `user` は、ただの語） | hook が「ccnavi の呼び出しの最初の引数が `user`」だけを見れば止められる。オプションの綴りも組み合わせも読まない。`ccnavi --docs user` のような読み取りは最初の引数がオプションなので当たらない | `user` をコマンド行のどこでも探す（`--keyword user` まで止まる） |
-| 操作は次の対応で `user` に移す: `--agree` → `user agree [<識別子>…]`、`--reviewed <N>` → `user reviewed <N>`、`--close-early` → `user close-early`、`--prune` → `user prune`、`--templates --import/--save-draft/--delete-draft/--rename-template/--move-template/--delete-template` → `user templates import/save-draft/delete-draft/rename/move/delete`、`sync tidy` → `user sync tidy`、`worktree retire/branch` → `user worktree retire/branch`。`--yes`・`--digest`・`--expect`・`--via`・`--reason`・`--result` などの付随するオプションは、そのまま `user` の操作に付ける | 操作の中身（実装）は変えず、入口の綴りだけを変える。実行ファイルは `user <操作> …` を従来の内部のオプションの形へ読み替えて、既存の処理に渡す | 実装を作り直す |
-| `user` の外で、ユーザ専用のオプション（`--agree`（`--preview` なし）・`--reviewed`・`--close-early`・`--prune`（`--preview` なし）・`--yes`・テンプレートの書き込みのオプション・`sync tidy`・`worktree retire/branch`）が渡されたら、実行ファイルは何も動かさず終了コード 2 で断り、`user` の形を案内する | オプションの形でも動く入口を残すと、hook がオプションを読み続けることになる。実行ファイルと hook は同じ版で配られるので、オプションを断れば hook はオプションを見なくてよい | オプションの形を別名として残す |
-| エージェントも使う読み取り（`--agree --preview [--verify] [--json]`、`--prune --preview`）は `user` の外に残し、動かす側と同じ関数を呼ぶ。実行ファイルの中では、オプションの読み替えと断りを `user_only` の表 1 本で行う | 動かす実装と見せる実装が 2 つに分かれない。hook は読み取りの形を免除として読まなくてよい（そもそも止めない） | 読み取りも `user` に入れてエージェントには使わせない |
-| hook の止めは 2 種類だけにする: ① 実行ファイルの呼び出しの最初の引数が `user`（変数・glob・コマンド置換で `user` になりうる語も止める）。② `ccnavi-user-*.sh`（引数に依らず） | 入口の名前だけで決まる。オプションの組み合わせ・`--preview` の免除・隠した引数の組み合わせの判定を持たない | オプションごとの正規表現を持ち続ける |
-| ユーザ専用の sh は `ccnavi-user-<操作>.sh` に分ける: `ccnavi-agree.sh` → `ccnavi-user-agree.sh`、`ccnavi-push-approved.sh` → `ccnavi-user-push-approved.sh`、`ccnavi-sync.sh --forget` → `ccnavi-user-forget.sh`、`ccnavi-review.sh close-early` → `ccnavi-user-close-early.sh`、`ccnavi-review.sh decide` の書く側（`--choices` 経路を含む）→ `ccnavi-user-decide.sh`、`ccnavi-clean.sh --branch` → `ccnavi-user-clean-branch.sh`。もとの sh からはこれらの操作を外す。`ccnavi-review.sh decide <N> --preview`（一覧を見るだけ）はエージェントも使うので残し、共有の処理は `ccnavi-common-*.sh` に置いて両方が読む | sh も、混在をやめれば名前だけで止められる。同じ処理を複数の sh に写さない | 混在した sh の中で引数を読む |
-| 古い入口の名前（旧 sh 名と、旧 sh の中のユーザ専用のモード）は、表の `legacy` の行として hook が止め続ける。実行ファイルの旧いオプションは断る | 配布先に古い sh が残っていても、エージェントに打たせない。配布の setup が旧 sh を消す | 旧名は放置する |
-| 実行ファイルの端末要求（`_from_terminal`）は残す。オプションの表示名は表の `Op.terminal` から引く | 擬似端末を使われない限り、hook が抜けられた場合の 2 段目になる | 端末要求を外す |
-| ユーザ専用の定義は `tickets/user_only.py` の表を正本にする。hook の正規表現、実行ファイルのオプションの読み替えと断り、拒否文に載せる入口の一覧、配布の旧名の掃除は、この表から作る。表と各 sh・docs の食い違いはテストで検出する | 操作を足すとき、直す場所を 1 か所にする | 各所に正規表現を書く |
-| VS Code 拡張・Chrome 拡張・各 sh・docs・テストは、新しい入口に合わせる | 拡張の子プロセスは `user` の入口を呼ぶ。hook を通らないので影響しない | 拡張だけ旧形に残す |
+| 実行ファイルの、ユーザだけが打つ操作は `ccnavi user <操作>` に集める。対象は `agree`・`reviewed`・`close-early`・`prune`・`templates import/save-draft/delete-draft/rename/move/delete` | 入口の綴りを 1 つに揃えれば、hook も実行ファイルも「`user` かどうか」で決められる | 操作ごとに別の入口を作る |
+| `user` は、`--root`・`--cwd`・`--record-writes`・`--record-tree`（ラッパーが先に付ける、値を取るオプション。表の `WRAPPER_OPTIONS`）を読み飛ばした後の最初の語。大文字小文字は区別しない。先頭の `--` は読み飛ばさず、実行ファイルは名前空間として扱わない（hook は `--` を挟んだ形も止める） | sh と拡張は、実行ファイルを呼ぶときに必ずこれらを先頭に付ける。`user` を絶対の先頭にすると、呼び出し側の全部を作り替えることになる。オプションの一覧は実行ファイルの読み飛ばしと hook の正規表現の両方が表から作るので、食い違わない | `user` を `argv[0]` に限る。`user` をコマンド行のどこでも探す（`--keyword user` まで止まる） |
+| 実行ファイルは、argparse の前に `user <操作> …` を、今の内部の形（`user agree` → `--agree`、`user reviewed <N>` → `--reviewed <N>`、`user templates import <下書き>` → `--templates --import <下書き>` など）に書き換える。「ユーザの入口から来た」という事実は argparse の結果（`args`）には入れず、別の変数で持つ | 内部の文法を変えないので、識別子を並べる位置・`--yes` の値・`--json` など、今動いている引数の読みが変わらない。`args` に入れないので、`--user-entry` のようなオプションで偽装できない | argparse に `user` のサブコマンドを足す（位置引数の塊を 1 つしか取れず、`--agree --yes a,b --digest d --json only1` の形が壊れる） |
+| `user` の外でユーザ専用のオプションが読まれたら、実行ファイルは何も動かさず終了コード 2 で断り、`user` の形を案内する。見るだけの形は断らない: `--agree --preview [--verify]`、`--prune --preview`、`--reviewed … --preview`（`ccnavi-review.sh decide <N> --preview` が内部で呼ぶ）、`--yes` の付かない `--delete-draft` | 旧い形でも動く入口を残すと、定義が二重になる。見るだけの形はエージェントが使い、動かす形と同じ関数を呼ぶので、実装は 1 つ。断る判定は argparse の読んだ結果で行う（argv の文字列を探すと、`--keyword=--agree` のような値まで断る） | 見るだけの形も `user` に入れてエージェントに使わせない |
+| 実行ファイルを通さず sh から呼ぶだけの操作は、`user` に入れず、`sh-only` として表に残す: `ticket start/finish/cancel/record-risk/prepare/requested/confirm/ready`、`review confirm`（`--result` に偽の JSON を渡せるので、ユーザか sh が渡す）、`sync tidy`、`worktree retire/branch`。実行ファイルを直に呼ぶ形は今までどおり hook が止める | これらは sh の中から呼ばれる。ユーザ専用の入口に入れると、sh が `user` を呼ぶことになる | `user` に移す |
+| hook の止めは、すべて表から作る。手書きの正規表現を持たない。種類は次の 5 つ。(1) `user` の入口（上の位置の規則で、変数・glob・コマンド置換で `user` になりうる語も止める）。(2) `ccnavi-user-*.sh`（コマンド行のどこに名前が出ても止める。表示・検索・閲覧の道具だけが並ぶ行は通す）。(3) 旧い形（旧オプション・旧 sh 名・旧 sh の中のユーザ専用のモード。表の `legacy`）。(4) 名前に依らない文字列の検査。端末を求めない操作（`user agree/reviewed/templates` と `--yes` の組み合わせ、`--choices` と `--digest`、`--via board`、旧い形）と、端末要求を切る形（`CCNAVI_GUARD_TICKET_APPROVAL`・`--guard-ticket-approval`）。(5) `sh-only` の操作の直打ち | `--yes` を使う経路は端末を求めず、hook の文字列検査が唯一の防御。ここは名前を変えたコピー・`python -c`・`awk` の `system()` でも止まっていて、入口の名前だけにすると止まらなくなる。(3) は、古い実行ファイル・古い sh が手元に残るときのため | 入口の名前だけで止める |
+| 表の `Op` に、操作の種類（`user`・`sh-only`・`read`）、止める設定（`approval`: チケット制御と承認の止めの設定に従う。`prune`: コアのファイルの保護に従う）、端末を求めるときに表示するオプション名を持たせる | `prune` はチケット制御を切ったワークスペースでも止まる。今の動作を保つ | 一律に承認の設定で止める |
+| ユーザ専用の sh は `ccnavi-user-<操作>.sh` に分ける: `agree`・`push-approved`・`forget`（`ccnavi-sync.sh --forget`）・`close-early`（`ccnavi-review.sh close-early`）・`decide`（`ccnavi-review.sh decide` の書く側）・`clean-branch`（`ccnavi-clean.sh --branch`）。もとの sh からそれらを外す。`decide <N> --preview`（見るだけ）は `ccnavi-review.sh` に残す。書く処理（返信・解決・マーカーを置く呼び出し）は `ccnavi-user-*.sh` の中だけに置き、共通のファイルには読む側と、エージェントも使うホスト API の関数だけを置く | 共通のファイルに書く処理の関数を置くと、`sh -c '. …common….sh; 関数'` で名前の一致を外して呼べる | 混在した sh の中で引数を読む |
+| 互換: 互換の版（COMPAT）を上げ、古い sh が新しい実行ファイルの断りに当たったときは、sh の再配布を案内する。setup は、配る sh を置き換え、`legacy` の旧名の sh を消す。VS Code・Chrome の拡張は、`--version --json` の機能名（`user-entry`）で確かめ、拡張の互換の版を上げる | 古い sh が残ると、片付け（`worktree retire`）が黙って止まる。古い拡張が新しい実行ファイルを呼ぶと断られる | 互換の版を上げない |
+| 実行ファイルの端末要求（`_from_terminal`）は残す。ただし、端末を求めない経路（`--yes` の承認、ボードの指摘の対応方針、テンプレートの取り込み）では、hook の文字列検査（4）が唯一の防御で、端末要求は 2 段目ではない | 擬似端末（`script -qc`）を使われれば端末要求は通る。この穴は今もあり、この ADR では直さない | 端末要求だけに頼る |
+| ユーザ専用の定義は `tickets/user_only.py` の表を正本にする。hook の正規表現、実行ファイルの書き換えと断り、拒否文の入口の一覧、setup が消す旧名は、この表から作る。表と各 sh・docs・拡張の食い違いはテストで検出する | 操作を足すとき、直す場所を 1 か所にする | 各所に正規表現を書く |
+| `ccnavi user --help` は hook が止める。使い方は `ccnavi --docs` で引く | `user` の入口は、エージェントには打たせない | |
 
 ## 得たもの・失ったもの
 
-- 得たもの: hook の止めが入口の名前の一致だけになり、オプションの組み合わせ・免除・隠した引数の判定が要らなくなる。ユーザ専用の定義が表 1 つになる
-- 失ったもの: **コマンドの形が変わる。** 承認・レビュー済み・早めに閉じる・片付けなどを打つ手順、拡張、docs、テストが一斉に変わる。旧名は断られる（旧 sh は hook が止め続ける）
-- 失ったもの: `user` の最初の引数でない呼び出し（`ccnavi --root X user agree`）は動かない。ラッパーの sh は `user <操作>` を先頭に置く
-- 失ったもの: 名前を変えたコピー・`awk` の `system()` など、ccnavi の名前を持たない呼び出しは hook が見ない（従来どおり。実行ファイルの端末要求が 2 段目）
+- 得たもの: ユーザ専用の定義が表 1 つになり、hook・実行ファイル・拒否文・setup がそこから作られる。実行ファイルは `user` の外の旧い形を断るので、旧い形を別名として残さない。sh の混在がなくなり、ユーザ専用の sh は名前で見分けられる
+- 失ったもの: **hook は入口の名前だけでは止められない。** 端末を求めない経路のために、名前に依らない文字列検査（4）を残す。「オプションの組み合わせと免除の判定が要らなくなる」という当初の利点は、旧い形（3）が残るあいだは得られない。旧い形の行は、互換の版の下限を上げたあとの版で消す
+- 失ったもの: **コマンドの形が変わる。** 承認・レビュー済み・早めに閉じる・片付けなどを打つ手順、拡張、docs、テストが変わる。更新量は、`--agree` を含む tests と extensions が約 45 ファイル、`ccnavi-push-approved` が約 19 ファイル、`close-early` が約 14 ファイル、docs が約 45 ファイル
+- 失ったもの: 擬似端末を作る実行役（`script`・`tmux`・`screen`・`expect`）越しの呼び出しは、これまでどおり hook が読めない
+- 失ったもの: `ccnavi user --help` をエージェントが打てない
 
 ## 採らなかった案
 
 - ユーザ専用だけを別の実行ファイル（`ccnavi-user`）にする: ビルド・配布・導入 sh・拡張が 2 本になり、影響が最も広い
 - sh だけを分離して、実行ファイルのオプションは残す: オプションの定義が hook と実行ファイルに二重に残る
+- 入口の名前だけで止める（この ADR の最初の案）: レビューで退行が分かった。上の「失ったもの」を参照
+
+## 他の ADR との関係
+
+- ADR-0122（引数を読み切れない形を止める）の対象のうち、実行ファイルの承認の経路は、`user` の入口の判定（変数・glob・コマンド置換で `user` になりうる語を止める）に引き継ぐ。スクリプトの `--forget`・`decide --choices` の判定は、旧い形が残るあいだは残る
+- ADR-0080（端末要求を切る形を止める）は、そのまま残す
+
+## 実装の段階
+
+1. 表（操作の種類・止める設定・旧い形・ラッパーのオプション）、実行ファイルの `user` の書き換えと断り、hook の生成。旧い形の止めは残す
+2. テストの移行（旧い形を `user` の形に）
+3. sh の分離、setup、互換の版
+4. VS Code・Chrome の拡張
+5. docs・README・`.ccnavi/docs/`

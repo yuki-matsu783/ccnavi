@@ -451,8 +451,8 @@ md の書き方（条件 `ccnavi:if` / `ccnavi:else`、差し込み `{{名前}}`
 `--project-home`）だけで、hook からは渡らない。共通レイヤーの置き場（`.ccnavi/config/common/`）は `--project-home` で
 ccnavi ディレクトリを動かしても動かず、別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけ。
 置き場を動かすこれらのフラグ（`--projects` / `--project-home` を含む）は、どれも診断（`--lint` / `--test` / `--test-expectations` / `--explain`）に限る。
-hook からの判定と `ticket` / `review` などの副命令に渡すと無視し、標準エラーに出す。`.ccnavi/scripts/` の sh は受け取った
-引数を実行ファイルへそのまま渡すので、診断の外でも効くと、記録を止める・置き場を差し替えるといった形で副命令を動かせてしまうため。
+hook からの判定と `ticket` / `review` などのサブコマンドに渡すと無視し、標準エラーに出す。`.ccnavi/scripts/` の sh は受け取った
+引数を実行ファイルへそのまま渡すので、診断の外でも効くと、記録を止める・置き場を差し替えるといった形でサブコマンドを動かせてしまうため。
 
 以前は 6 つの環境変数（`CCNAVI_PROJECTS`・`CCNAVI_PROJECT_HOME`・`CCNAVI_TICKETS_PROPOSAL`・
 `CCNAVI_TICKETS_APPROVED`・`CCNAVI_LOG`・`CCNAVI_STATE`）で置き場を動かせたが、廃止した。
@@ -472,7 +472,7 @@ hook からの判定と `ticket` / `review` などの副命令に渡すと無視
 | `CCNAVI_FAIL_STREAK_COUNT` | ツール呼び出しの失敗か ccnavi の拒否が何回続けて起きたら、資料を引く案内（`--docs` で索引を引く）を出すか。既定は `3`。`0` なら数えも案内もしない。負数と読めない値は既定に戻る。判定は変わらない（「失敗や拒否が続いたとき」） |
 | `CCNAVI_GUARD_UNWATCHED` | `enable`（既定）、`disable`。ユーザにも classifier にも確認できないモード（`dontAsk` / `bypassPermissions`）で、ルールがどこも言及しない呼び出しを止めるか。`disable` なら判定を返さず、そのモードの取り決めに委ねる（読み切れなかった呼び出しは委ねない。「ルールが言及していない呼び出し」）。`dry-run` は無く、それ以外の値は `enable` として動き、`--lint` が指摘する |
 | `CCNAVI_BIN_PATH` | hook が起動する ccnavi 自身。指定すると守る対象に入る。既定は無い（導入スクリプトは振り分けの sh `.ccnavi/scripts/ccnavi-launcher.sh` と書き、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に入る。「実行ファイルとルールを配る」）。拡張子は書かない。Windows の `.exe` は ccnavi が補う |
-| `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--agree` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
+| `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--agree` と `ticket` / `review` のサブコマンドは動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--agree` / `--reviewed` / `--close-early` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--agree` と `--reviewed` と `--close-early` と、書くとき（`--yes`）の `--templates --import`・`--save-draft`・`--delete-draft`・`--rename-template`・`--move-template`・`--delete-template` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も同じ理由コードで止める（表示・検索の道具だけのコマンドは除く）。端末を求めない入口（`ccnavi-sync.sh`・`ccnavi-review.sh decide`・実行ファイルの `--yes`）に、変数・置換・glob で組み立てた引数や `xargs` で流し込む引数を渡す形も、読み切れないので同じ理由コードで止める。テストや端末の無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 | `CCNAVI_LEARNING` | 学びの蓄積（learning-wiki。`docs/design/tickets/learning-wiki.md`）を使うか。`enable` / `disable`、既定 `disable`。`enable` にすると、子チケットを閉じるときに気づきの記録（`wip/handoff/learnings/<子>.md`）を求め、`ticket learn` が使える |
@@ -1371,7 +1371,7 @@ ripgrep の既定の挙動で、ccnavi の側では変えられない。
 止められずに通る。実行後チェックは、走ったあとの作業ツリーを `git status` で読んでそれを拾う。設計は [7](docs/design/post-check.md)。
 
 保護領域は別に宣言しない。`match` に `Write` `Edit` `NotebookEdit` のどれかを含むルールが、そのまま保護領域の宣言になる。
-例外は ccnavi 自身の書き込み。記録と state の置き場は最初から保護領域に入らない。チケットの置き場では、ccnavi の副命令（`ticket start` / `finish` や
+例外は ccnavi 自身の書き込み。記録と state の置き場は最初から保護領域に入らない。チケットの置き場では、ccnavi のサブコマンド（`ticket start` / `finish` や
 `review request` / `ready` など）が書いたと内容から見分けられる変更だけが外れる。作業範囲・親・フェーズが変わっていれば報告する。
 
 ```
@@ -1470,8 +1470,8 @@ payload の `stop_hook_active` が真なとき、記録を置けないとき、�
   （とそれを中に含むディレクトリ）を消す・別のコミットの中身に戻す形は `builtin:guard-wrapper-paths`（`DENY_WRAPPER_CORE_PATH`）で止まる。
   衝突を解く `restore --ours / --theirs` と、索引の中身に戻す `restore` / `restore --staged`、何も消さない `rm -n` / `--dry-run` は通る
   （後ろに `--no-dry-run` を書けば消す形として見る）。
-  パスや副命令を変数・置換・glob で書いた形、標準入力から読むシェル（`echo '…' | sh`。`bash --norc`・`bash -o pipefail`・`env sh`・`command sh` も）や `xargs` に流す呼び出し、
-  居場所の読めない `cd` / `pushd` の後の相対パスは、当たるかを確かめられないので止まる。ラッパーは副命令と対象をそのまま書いて直接呼ぶ。
+  パスやサブコマンドを変数・置換・glob で書いた形、標準入力から読むシェル（`echo '…' | sh`。`bash --norc`・`bash -o pipefail`・`env sh`・`command sh` も）や `xargs` に流す呼び出し、
+  居場所の読めない `cd` / `pushd` の後の相対パスは、当たるかを確かめられないので止まる。ラッパーはサブコマンドと対象をそのまま書いて直接呼ぶ。
   `CDPATH`・`python3 -c` などの中で組み立てる形は hook では読まない（限界。設計 12.1）
   承認済みチケットの置き場（`.ccnavi/approved/`）をエージェントがラッパーで消す形も止まる（レビュー済みのマーカーを消す `rm` はユーザが端末で打つ）。
   レビュー待ちの置き場（`wip/proposals/review/`）も同じで、置き場に何かがある間はその親（`wip/`・`wip/proposals/`）を消す形も止まる。
@@ -2330,8 +2330,8 @@ ccnavi --test Bash "git push" --cwd .claude/worktrees/feat-x --permission-mode d
 | `--agent-id <id>` | `agent_id` | サブエージェントに許さない操作の止め（`DENY_SUBAGENT_TICKET_OP`） |
 
 `--permission-mode` と `--agent-id` は `--test` でだけ使える。ほかの経路（`--lint`・`--explain`・`--docs` も）に渡すと終了コード 1 で断る。
-フラグは `--test <ツール> <対象>` の前か後ろに置く。2 語の間に置く（`--test Bash --permission-mode auto '<cmd>'`）と旗の名前が対象になるので、
-ツールか対象に旗が入った形と、2 語の後ろに余った語がある形は終了コード 1 で断る。
+フラグは `--test <ツール> <対象>` の前か後ろに置く。2 語の間に置く（`--test Bash --permission-mode auto '<cmd>'`）とオプションの名前が対象になるので、
+ツールか対象にオプションが入った形と、2 語の後ろに余った語がある形は終了コード 1 で断る。
 
 いま適用されている宣言を数え上げるには `--explain`。レイヤーごとのルール、フェーズ定義とリスクの配点の表、承認されたチケットの作業範囲が出る。判定は行わない（REQ-DIA-01）。
 
@@ -2663,7 +2663,7 @@ ccnavi --lint --json --project-risk-file lib=/tmp/risks.yml
 - `--project-phases-file <名前>=<パス>` は、その名前のレイヤー（`self` は自身のレイヤー）のフェーズ定義の代わりに `<パス>` を読み、共通レイヤーの `phases.yml` と足した形で確かめる（同 `id` で中身が違う、`title` の重なり）。配点（risk）のレイヤーには次の `--project-risk-file` がある
 - `--project-risk-file <名前>=<パス>` は、その名前のレイヤー（`self` は自身のレイヤー）の配点の代わりに `<パス>` を読む。phases と同じく統合結果なので、共通レイヤーの配点と合わせて確かめる（境目の `levels` が合成後に逆転していないか、同 `id` で中身が違う衝突の warn、`script:` が指す先がそのレイヤーの git プロジェクトルートの `.ccnavi/scripts/` に在るか）。共通レイヤーの配点は今までどおり `--risk`。ファイルの無いレイヤーに渡しても、そのレイヤーの配点として合成する
 - レイヤーの置き場を動かすフラグ 8 本（`--rules` / `--phases` / `--risk` / `--projects` / `--project-home` と上の 3 本）は、`--test` / `--test-expectations` /
-  `--lint` / `--explain` でだけ有効になる。診断の外（hook からの判定、`ticket` / `review` の副命令）に渡すと無視し、標準エラーにその旨を出す。
+  `--lint` / `--explain` でだけ有効になる。診断の外（hook からの判定、`ticket` / `review` のサブコマンド）に渡すと無視し、標準エラーにその旨を出す。
   守る対象（コアファイル）も差し替えを見ない
 - `--root` と `--cwd` は 1 度しか渡せない（2 本目が在れば止める）。sh が自分のぶんを先に置くので、後勝ちの上書きを防ぐため
 
@@ -2845,7 +2845,7 @@ ccnavi --version --json
 | `compat` | 互換の版。実行ファイルと、それを呼ぶ側（sh と拡張）の契約の版（下） |
 | `flags` | 受け付けるフラグ。引数の定義から引くので、フラグを足せばここにも並ぶ |
 | `formats` | 読む書式の版。レイヤーのファイル（`rules.yml` / `phases.yml` / `risks.yml`）とチケットの頭の `version:` と比べるもの |
-| `features` | 旗から読めない振る舞いの名前（文字列の配列）。テンプレートの編集は `templates.edit`・`templates.draft-text`、ボードの親のカードの入口は `board.template-draft`。古い実行ファイルと見分けるためのもので、足しても `compat` は上げない |
+| `features` | オプションから読めない振る舞いの名前（文字列の配列）。テンプレートの編集は `templates.edit`・`templates.draft-text`、ボードの親のカードの入口は `board.template-draft`。古い実行ファイルと見分けるためのもので、足しても `compat` は上げない |
 
 **互換の版**は 3 か所に同じ値で書く。実行ファイル（`src/ccnavi/entry/version.py` の `COMPAT`）、sh（`ccnavi-common.sh` の
 `CCNAVI_COMPAT`）、拡張（`src/core/version.ts` の `EXTENSION_COMPAT`）。Chrome 拡張は組み立てのときに実行ファイルの値を埋め込む。
@@ -3087,7 +3087,7 @@ plan（3 項）: 1 research / 2 design（待つ 1・defer） / 3 implement（待
 
 - 有効にするのは `CCNAVI_LEARNING=enable`（既定は `disable`）。フェーズ定義の `learning: off` で、その定義の子だけ外せる
 - 子は閉じる前に `sh .ccnavi/scripts/ccnavi-ticket.sh learn` を打つ。気づきの記録（`wip/handoff/learnings/<子>.md`）の雛形と、判定記録の要約（`.digest.json`）ができる。記録をコミットしないと `ticket finish` が拒む。気づきが無ければ `learnings: none` のままでよい
-- 対話の中で「覚えておいて」と言うときは `/learn <内容>`（中身は `ticket learn [<識別子>] --note <本文> [--target <種類>] [--signal <信号>]`）。チケットに結び付いたワークツリーでは子の記録に追記し、直接作業のワークツリーでは `docs/wiki/inbox/` に、ワークスペースルートとプロジェクトのルートでは `wip/handoff/inbox/` に 1 件 1 ファイルで書く。識別子を付けるときは旗の前に置く
+- 対話の中で「覚えておいて」と言うときは `/learn <内容>`（中身は `ticket learn [<識別子>] --note <本文> [--target <種類>] [--signal <信号>]`）。チケットに結び付いたワークツリーでは子の記録に追記し、直接作業のワークツリーでは `docs/wiki/inbox/` に、ワークスペースルートとプロジェクトのルートでは `wip/handoff/inbox/` に 1 件 1 ファイルで書く。識別子を付けるときはオプションの前に置く
 - 本文は秘密の形を伏せ、2000 字で切る。判定記録の要約はパスとコマンドの全文と環境変数の値を持たない
 - 親のフィードバック計画で、統合（`learning-consolidate`）が learning-wiki（`docs/wiki/`）を作り、反映（`learning-apply`）が提案を作る。ルール・配点・フェーズ定義は下書きまでで、ユーザが置く
 - `type: learning-wiki` の文書は、`ccnavi --docs --type learning-wiki` と明示したときだけ引ける（作業のセッションに渡さない）
@@ -3369,8 +3369,8 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/entry/diagnose_shared.py` | diagnose のうち、explain・board・try が共有するレイヤーの読み出しとルールの書き方 |
 | `src/ccnavi/entry/cli.py` | 1 回の起動の入口。標準入出力とコマンドラインを判定や各コマンドへ振り分け、ワークスペースルートを見つける |
 | `src/ccnavi/entry/cli_usage.py` | `--help` の本文 |
-| `src/ccnavi/entry/cli_args.py` | 引数の読み分け。設定を上書きする旗・診断だけの旗・`--docs` と並べられない旗と、パスの見分け |
-| `src/ccnavi/entry/cli_ops.py` | チケットとレビューの副命令を ops / review へ渡す。`sync` の問い合わせ |
+| `src/ccnavi/entry/cli_args.py` | 引数の読み分け。設定を上書きするオプション・診断だけのオプション・`--docs` と並べられないオプションと、パスの見分け |
+| `src/ccnavi/entry/cli_ops.py` | チケットとレビューのサブコマンドを ops / review へ渡す。`sync` の問い合わせ |
 | `src/ccnavi/entry/cli_templates.py` | `--templates` の引数を受けて、テンプレートの一覧・検索・表示と、下書きの作成・取り込み（`--draft` / `--import`）を行う |
 | `src/ccnavi/entry/cli_plan.py` | `--plan-order` の引数を受けて答えを出す。振り直しと書き戻しは `tickets/plan_order.py` と `tickets/plan_phases.py` |
 | `build.py` | 配布物の組み立て。`dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へコピーする |
@@ -3382,7 +3382,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `.ccnavi/scripts/ccnavi-launcher.sh` | hook が起動する振り分けの sh（モード 100755）。原本と配布先で同じパス。1 つ上の `bin/<os>-<arch>/` から、この機械の実行ファイルを選ぶ。無ければ 127 |
 | `.ccnavi/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパースクリプト |
 | `.ccnavi/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。状態を聞く `status` と、気づきの記録を書く `learn`（状態は動かさない）は、サブエージェントも呼べる。本体は `ccnavi ticket`。取り込み済みの親子のチケットでは C1（取り込んでから書き、書いたパスだけをコミットして push するまで完了にしない） |
-| `.ccnavi/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review`。状態を書く副命令は C1 の対象の親子のチケットで C1。ユーザの判断の入口 `close-early` はユーザが打ち、C1 の対象の親子のチケットなら最後に承認の push をする |
+| `.ccnavi/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review`。状態を書くサブコマンドは C1 の対象の親子のチケットで C1。ユーザの判断の入口 `close-early` はユーザが打ち、C1 の対象の親子のチケットなら最後に承認の push をする |
 | `.ccnavi/scripts/ccnavi-agree.sh` | 承認し、`ccnavi-push-approved.sh` でコミットして push する。ユーザが端末で打つ。本体は `ccnavi --agree` |
 | `.ccnavi/scripts/ccnavi-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。ユーザが打つ（エージェントからは止まる）。端末の `ccnavi-agree.sh`・ボードの承認とフローの保存・ユーザの判断の入口のあとに呼ばれる。`[<親>...]` で親子のチケットを限る。取り込み済みの親子のチケットはロックを取り、取り込んでから送る |
 | `.ccnavi/scripts/ccnavi-fetch.sh` | セッション開始時に親ブランチと、ワークツリーの起点になるデフォルトブランチを取ってくる。進めるのは fast-forward だけ |

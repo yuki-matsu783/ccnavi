@@ -118,7 +118,7 @@ keywords: [要件, テンプレート管理, テンプレート, 作業・レビ
 
 `ccnavi --version --json` の `flags` に、テンプレート管理画面が使う引数（`--templates`・`--show`・`--import`・`--expect`・`--yes`・`--via`）が揃っていなければ、一覧を読まずに理由を画面の中に出す。
 理由には、足りない引数の名前と、ワークスペースの ccnavi を更新すれば直ることを書く。
-編集の欄は `features` の `templates.edit` と `templates.draft-text`、旗（`--save-draft`・`--delete-draft`・`--rename-template`・`--move-template`・`--delete-template`・`--new-name`・`--on`・`--to-layer`）が揃っていなければ無効にして理由を出す。取り込みの欄は影響を受けない。
+編集の欄は `features` の `templates.edit` と `templates.draft-text`、オプション（`--save-draft`・`--delete-draft`・`--rename-template`・`--move-template`・`--delete-template`・`--new-name`・`--on`・`--to-layer`）が揃っていなければ無効にして理由を出す。取り込みの欄は影響を受けない。
 
 ## 適用範囲外
 
@@ -143,5 +143,5 @@ keywords: [要件, テンプレート管理, テンプレート, 作業・レビ
 | REQ-VSC-18 | 事象 | 編集の実行を押したとき、拡張はプレビューで見せた主語のハッシュを `--expect` で渡し、`--via board` を付けて実行ファイルに書かせること。プレビューのあとに主語が変わっていたら、何も書かずに理由を出すこと |
 | REQ-VSC-19 | 状態 | 取り込み済みのテンプレートを触る操作（改名・移動・削除）は、取り込みと同じ範囲の作業中のチケットで止めること |
 | REQ-VSC-20 | 状態 | 下書きだけを触る操作（保存・削除）は、作業中のチケットで止めないこと |
-| REQ-VSC-21 | 状態 | 実行ファイルが編集の欄の `features`（`templates.edit`・`templates.draft-text`）または旗を持たない版のときは、編集の欄を無効にし、理由を出すこと。取り込みの欄は無効にしないこと |
+| REQ-VSC-21 | 状態 | 実行ファイルが編集の欄の `features`（`templates.edit`・`templates.draft-text`）またはオプションを持たない版のときは、編集の欄を無効にし、理由を出すこと。取り込みの欄は無効にしないこと |
 | REQ-VSC-22 | 状態 | 親のカードの「テンプレートの下書きを作る」は、ボードの答えの `template_draft` が真のカードにだけ出すこと |

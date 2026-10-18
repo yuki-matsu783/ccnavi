@@ -21,7 +21,7 @@ keywords: [見本, sample, rule-samples, rule-expectations, expectations, --test
 
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
-| ファイルは `.ccnavi/config/common/rule-expectations.yml`、キーは `expectations:`、旗は `--test-expectations`、拡張の設定は `ccnaviBoard.expectationsPath` | 中身（期待する判定）と名前が合い、`sample` を含む別の物と grep で分けられる | 旧名のまま、日本語だけ直す。英語と日本語の語がずれる |
+| ファイルは `.ccnavi/config/common/rule-expectations.yml`、キーは `expectations:`、オプションは `--test-expectations`、拡張の設定は `ccnaviBoard.expectationsPath` | 中身（期待する判定）と名前が合い、`sample` を含む別の物と grep で分けられる | 旧名のまま、日本語だけ直す。英語と日本語の語がずれる |
 | 旧名の別名は残さず、`--test-samples` は廃止する。旧ファイルの読み替えや警告も持たない | 展開前で、旧名を使う利用者がいない。別名は二つの名前を長く抱える | 別名で旧名を受ける。移行の警告を出す |
 | 日本語の文書・スキルでは「期待する判定」と書く（短くしてよい所は「期待」）。別の意味の「見本」（ホスト応答、初回案内のダミー、計画の見本の表、ボードの JSON の見本ファイル）は残す | 語を改めるのは意味が期待のときだけ | 「見本」を全部直す。別の物まで壊れる |
 | 直すときは語ごとに読んで手で直す。機械置換はしない | 残す側の「見本」を壊さないため | `sample` の機械置換 |

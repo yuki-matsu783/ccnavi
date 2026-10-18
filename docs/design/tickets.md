@@ -19,7 +19,7 @@ REQ-APV、REQ-RSK。用語は CONTEXT.md。
 全体ルールは全プロジェクトが使う。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・
 サブエージェントの制限・状態とレビューの操作）まで使うかは `CCNAVI_TICKET_CONTROL`
 （`enable` / `disable`、既定 `enable`）で決める。`disable` のとき、判定・実行後チェック・診断はチケットを
-一切見ず、`--agree` と `ticket` / `review` の副命令は止まり、VS Code 拡張は「チケット管理」の
+一切見ず、`--agree` と `ticket` / `review` のサブコマンドは止まり、VS Code 拡張は「チケット管理」の
 入口を出さない。承認済みチケットの置き場を空にすることでは切り替わらない。
 
 生の git は組み込みの deny（`builtin:guard-raw-git`）でいつも止め、git の入口をこのラッパー 1 本に寄せる（REQ-TKT-55）。ラッパーの中には、承認済みチケットの

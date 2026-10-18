@@ -150,7 +150,7 @@ base_sha: ""
 保存したものだけで、エージェントは書けない（エージェントが書けるのは下の下書きだけ。ユーザが差分を読んで取り込む）。承認済みの領域は、どのツリーでも `builtin:guard-project-home`（`Write` / `Edit` /
 `NotebookEdit`）と `builtin:guard-setting-files`（シェル）が止める。承認済みチケットと同じ保護。ユーザが保存した
 フローは実行後チェックでも違反として報告しない（範囲の検査は承認済みの領域を外し、呼び出しごとの実行後チェックは frontmatter の無い
-ファイルを副命令の書き込みとして外す。`post_findings._script_writes`）。コミットと push は `ccnavi-push-approved.sh` が
+ファイルをサブコマンドの書き込みとして外す。`post_findings._script_writes`）。コミットと push は `ccnavi-push-approved.sh` が
 置き場ごとまとめて行う。
 
 **エージェントの下書き。** エージェントは頼まれたときに、効力の無い下書きを提案の置き場の

@@ -85,7 +85,7 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 ミラーへの配布は「案内と配布」の節のとおり。
 
 `drafts[]` には下書きの本文そのまま（`text`）を足す（`--show --json` の `template.text` と同じ読み方）。`--version --json` は `features`
-（文字列の配列: `templates.edit`・`templates.draft-text`・`board.template-draft`）を足し、旗から読めない振る舞いを古い実行ファイルと見分ける。
+（文字列の配列: `templates.edit`・`templates.draft-text`・`board.template-draft`）を足し、オプションから読めない振る舞いを古い実行ファイルと見分ける。
 `features` を足しても互換の版（COMPAT）は上げない。ボードの JSON（`--explain --json`）のチケットは `template_draft`（真偽）を持ち、完了した（`done/` の）
 計画付きの親（取り消し以外）だけ真。親のカードは、これが真のときだけ「テンプレートの下書きを作る」ボタンを出し、押すと `--templates --draft <親> --json` を呼ぶ。
 
@@ -141,7 +141,7 @@ checkout される）1 本にまとめ、ほかのツリーを `also_in` に持�
 画面からの取り込みは作業中のチケットがあると止まる（共通とワークスペースの設定は、どのツリーの作業中のチケットでも止める。プロジェクトの設定は、そのプロジェクトの作業中のチケットだけで止める）。
 ボードのカードからテンプレート管理画面を開く入口と、親から下書きを作る入口は作らない（実行ファイルのボード JSON に「この親から下書きを作れる」欄が無いため）。
 複雑な操作による迂回（launcher の正規表現が見ない書き方、sh の中に書く形、`python -c` から呼ぶ形）は、防ぎきれない設計の限界として受け入れる。
-hook の照合の穴（launcher の正規表現が python と `-m` の間、`uv run` と python の間の旗を許さない）は、`--agree`・`--reviewed`・`--close-early` にも
+hook の照合の穴（launcher の正規表現が python と `-m` の間、`uv run` と python の間のオプションを許さない）は、`--agree`・`--reviewed`・`--close-early` にも
 効く前からの穴。取り込みの `--yes` は、承認と同じく、launcher の書き方に依らない 2 段目（`human_path_form`。`--templates` と `--import` と `--yes` の組）でも止める。
 launcher の正規表現だけに頼る穴は、この 2 段目を持たない形（`--close-early` など）に残る。穴ごとに regex を足し続けず、足すなら承認と取り込みの両方に効く形で別に決める。
 取り込みの下見は、制御文字・書式文字を `\uXXXX` に直して見せる（差分の行・新規の本文・苦情の文面）。書く中身（バイト列）は変えない。
@@ -155,7 +155,7 @@ launcher の正規表現だけに頼る穴は、この 2 段目を持たない�
 
 **`--lint`。** 下書きの苦情は `(template-drafts)` の場所で、error を warn に下げて出す（効力が無い）。深刻度は warn と info だけ。
 
-**編集（保存・改名・移動・削除）。** 旗は `--save-draft <名前> --body-file <ファイル>`（下書きの本文を置き換える）、`--delete-draft <名前>`（下書きを消す）、
+**編集（保存・改名・移動・削除）。** オプションは `--save-draft <名前> --body-file <ファイル>`（下書きの本文を置き換える）、`--delete-draft <名前>`（下書きを消す）、
 `--rename-template <名前> --new-name <新名> --on draft|common|project [--layer <層>]`（改名。`name:` も書き換え、行き先に同名があれば断る）、
 `--move-template <名前> --on common|project [--layer <層>] --to common|project [--to-layer <層>]`（層の間の移動。中身は変えず、行き先の定義で検査し、
 error があれば断る。行き先に同名があれば断る）、`--delete-template <名前> --on common|project [--layer <層>]`（取り込み済みを消す。下書きには触らず、
@@ -176,7 +176,7 @@ error があれば断る。行き先に同名があれば断る）、`--delete-t
 [--layer <名前>] [--with-feedback] [--issue N]`（`tickets/scaffold.py` の `--plan` の足場と同じ入口。`--plan` とは併用できない）。判定・組み込みの保護・
 `rules.yml` は変えない。`ticket new` は元から `phase_forms._CLI_FORMS` に無く、書くのは `todo/` の提案と下書きの置き場だけなので、
 エージェントが打ってよい。`ccnavi-ticket.sh` は `new` を通さず（実行ファイルを直接打つ）、`--template` のために sh を直す必要は無い。
-`--template` と `--with-feedback` は実行ファイルの新しい旗なので `EXE_OPTIONS` に足した。`ticket new` では `--layer` をテンプレートを引くレイヤーとして読む。
+`--template` と `--with-feedback` は実行ファイルの新しいオプションなので `EXE_OPTIONS` に足した。`ticket new` では `--layer` をテンプレートを引くレイヤーとして読む。
 
 **フィードバック計画は既定では書かない。** フィードバック計画は、全体計画の最後のレビューを見て、改版で 1 回だけ足す決まり。最初の提案に `feedback:` を入れると、
 `agree_candidates` の改版の検査が「フィードバック計画を立てたあとは全体計画を変えられない」「フィードバック計画は 1 回だけ」で拒み、承認後に全体計画を改版できなくなる。
