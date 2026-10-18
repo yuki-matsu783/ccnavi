@@ -220,13 +220,13 @@ test("CB-T216 案内の ? は案内のある画面（プロジェクト管理画
   }
 });
 
-test("CB-T582 図の枠の z-index は枠の内側だけで有効で、ツールバーから開く案内の一覧が拡大ボタンの下に隠れない", () => {
+test("CB-T584 図の枠の z-index は枠の内側だけで有効で、ツールバーから開く案内の一覧が拡大ボタンの下に隠れない", () => {
   const css = fs.readFileSync(path.join(WEBVIEW_SRC, "shared", "Maximize.css"), "utf8");
   assert.match(css, /\.graph-max \{[^}]*isolation: isolate;/, ".graph-max が isolation: isolate を持たない");
   assert.match(fs.readFileSync(PAGE_CSS, "utf8"), /\.toolbar \{[^}]*z-index: var\(--z-toolbar\);/, "ツールバーが重なりの単位（z-index）を持たない");
 });
 
-test("CB-T583 z-index・角丸・文字サイズ・すき間は page.css の変数で書き、画面の CSS に数値を直書きしない。z-index の値の大小は決めたとおり", () => {
+test("CB-T585 z-index・角丸・文字サイズ・すき間は page.css の変数で書き、画面の CSS に数値を直書きしない。z-index の値の大小は決めたとおり", () => {
   const page = fs.readFileSync(PAGE_CSS, "utf8");
   const level = (name: string): number => Number(new RegExp(`--z-${name}: (\\d+);`).exec(page)?.[1] ?? Number.NaN);
   // 画面全体で比べる値は下から foot < toolbar < overlay < graph-max < tour
