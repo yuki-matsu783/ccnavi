@@ -762,7 +762,8 @@ class CoreChromeTest(CoreHarness):
         self.assertEqual(answer["rejected"], preview["rejected"])
         before = self.disk()
         result = self.ccnavi(
-            "--agree",
+            "user",
+            "agree",
             "--yes",
             ",".join(answer["identifiers"]),
             "--digest",
@@ -1537,7 +1538,7 @@ class RecordWritesTest(CoreHarness):
         self.commit_parent()
         digest = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)["digest"]
         steps = [
-            ("--agree", "--yes", "i0001,i0001-01-01", "--digest", digest, "--json"),
+            ("user", "agree", "--yes", "i0001,i0001-01-01", "--digest", digest, "--json"),
             ("ticket", "start", "i0001"),
         ]
         for args in steps:
@@ -1627,15 +1628,16 @@ class RecordWritesTest(CoreHarness):
             [
                 "--root",
                 linked,
+                "--record-writes",
+                target,
+                "user",
+                "agree",
                 "--guard-core-files",
                 "disable",
                 "--restore-if-deny",
                 "disable",
                 "--guard-ticket-approval",
                 "disable",
-                "--record-writes",
-                target,
-                "--agree",
                 "--yes",
                 "i0001",
                 "--digest",

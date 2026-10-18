@@ -62,7 +62,7 @@ class ApproveJsonTest(PhaseHarness):
         if digest is None:
             digest = self.preview(*extra)["digest"]
         return self.ccnavi(
-            "--agree", "--yes", ",".join(tickets), "--digest", digest, "--json", *extra
+            "user", "agree", "--yes", ",".join(tickets), "--digest", digest, "--json", *extra
         )
 
     def agree_editing(self, edit, answers=("y", "y"), only=()):
@@ -88,13 +88,14 @@ class ApproveJsonTest(PhaseHarness):
             [
                 "--root",
                 self.root,
+                "user",
+                "agree",
                 "--guard-core-files",
                 "disable",
                 "--restore-if-deny",
                 "disable",
                 "--guard-ticket-approval",
                 "disable",
-                "--agree",
                 *only,
             ],
         )
@@ -273,14 +274,14 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_yes_and_preview_together_is_a_usage_error(self):
         self.pending_parent_and_child()
-        result = self.ccnavi("--agree", "--preview", "--yes", "i0001", "--json")
+        result = self.ccnavi("user", "agree", "--preview", "--yes", "i0001", "--json")
         self.assertEqual(result.returncode, 1)
         self.assertFalse(self.copy_exists("i0001"))
 
     def test_yes_without_json_prints_the_human_lines(self):
         self.pending_parent_and_child()
         digest = self.preview()["digest"]
-        result = self.ccnavi("--agree", "--yes", "i0001,i0001-01-01", "--digest", digest)
+        result = self.ccnavi("user", "agree", "--yes", "i0001,i0001-01-01", "--digest", digest)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認した", result.stdout)
         self.assertTrue(self.copy_exists("i0001"))
@@ -364,8 +365,8 @@ class ApproveJsonTest(PhaseHarness):
         """4. `--yes` に `--digest` が無ければ承認しない。誤りとして言う。"""
         self.pending_parent_and_child()
         for args in (
-            ("--agree", "--yes", "i0001,i0001-01-01", "--json"),
-            ("--agree", "--yes", "i0001,i0001-01-01"),
+            ("user", "agree", "--yes", "i0001,i0001-01-01", "--json"),
+            ("user", "agree", "--yes", "i0001,i0001-01-01"),
         ):
             with self.subTest(" ".join(args)):
                 result = self.ccnavi(*args)
@@ -557,13 +558,14 @@ class ApproveJsonTest(PhaseHarness):
             [
                 "--root",
                 self.root,
+                "user",
+                "agree",
                 "--guard-core-files",
                 "disable",
                 "--restore-if-deny",
                 "disable",
                 "--guard-ticket-approval",
                 "disable",
-                "--agree",
                 "--yes",
                 ",".join(tickets),
                 "--digest",
@@ -718,7 +720,7 @@ class ApproveJsonTest(PhaseHarness):
         self.pending_parent_and_child()
         os.makedirs(os.path.join(self.approved, "doing", "i0001-01-01.md"))
         report = os.path.join(self.root, "placed.json")
-        result = self.ccnavi("--agree", "--placed-out", report, stdin="y\n")
+        result = self.ccnavi("user", "agree", "--placed-out", report, stdin="y\n")
         self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
         with open(report, encoding="utf-8") as f:
             body = json.load(f)
@@ -770,7 +772,7 @@ class ApproveJsonTest(PhaseHarness):
         子の提案は同じでも超過が増える。
         """
         self.pending_parent_and_child()
-        parent_only = self.ccnavi("--agree", "i0001", stdin="y\n")
+        parent_only = self.ccnavi("user", "agree", "i0001", stdin="y\n")
         self.assertEqual(parent_only.returncode, 0, parent_only.stdout + parent_only.stderr)
         self.commit_parent("approve parent")
         before = self.preview()
@@ -811,7 +813,7 @@ class ApproveJsonTest(PhaseHarness):
     def test_yes_does_not_need_a_terminal_but_plain_approve_still_does(self):
         self.pending_parent_and_child()
         # 壁を有効にしたまま。テストの標準入力は端末ではない。
-        refused = self.ccnavi("--agree", "--guard-ticket-approval", "enable", stdin="y\n")
+        refused = self.ccnavi("user", "agree", "--guard-ticket-approval", "enable", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("ターミナル", refused.stderr)
         self.assertFalse(self.copy_exists("i0001"))

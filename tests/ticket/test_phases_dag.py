@@ -612,7 +612,7 @@ class DagApprovalTest(PhaseHarness):
     def test_the_approval_screen_lists_every_number(self):
         self.propose("i0001", parent_text("i0001", PLAN))
         self.commit_parent()
-        result = self.ccnavi("--agree", stdin="n\n")
+        result = self.ccnavi("user", "agree", stdin="n\n")
         self.assertIn("■ フェーズ間の依存関係", result.stdout)
         self.assertIn("1: design — 何も待たない", result.stdout)
         self.assertIn("3: implement — 待つ: 1", result.stdout)

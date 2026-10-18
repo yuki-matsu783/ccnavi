@@ -32,7 +32,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT, phasecopy
+from tests import ROOT, phasecopy, userform
 from tests.inproc import run_ccnavi
 
 # 共通レイヤー。どのツリーにも当てたい deny と、ワークスペースの allow。
@@ -509,17 +509,19 @@ class ConfigUnionHarness(unittest.TestCase):
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
         return run_ccnavi(
-            [
-                "--root",
-                self.ws,
-                "--guard-core-files",
-                guard,
-                "--restore-if-deny",
-                "disable",
-                "--guard-ticket-approval",
-                "disable",
-                *args,
-            ],
+            userform.place(
+                [
+                    "--root",
+                    self.ws,
+                    "--guard-core-files",
+                    guard,
+                    "--restore-if-deny",
+                    "disable",
+                    "--guard-ticket-approval",
+                    "disable",
+                ],
+                args,
+            ),
             input=stdin,
             cwd=ROOT,
             env=environment,
@@ -539,7 +541,7 @@ class ConfigUnionHarness(unittest.TestCase):
 
     def approve(self):
         """承認して、承認済みチケットを各ワークツリーにコミットする（本番は C1 が行う）。"""
-        done = self.ccnavi("--agree", stdin="y\n")
+        done = self.ccnavi("user", "agree", stdin="y\n")
         wt = os.path.join(self.ws, ".claude", "worktrees")
         if os.path.isdir(wt):
             for name in sorted(os.listdir(wt)):

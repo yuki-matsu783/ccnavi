@@ -14,8 +14,8 @@ import unittest
 
 import yaml
 
-from ccnavi.entry import diagnose_shared, lint_rules, suggest
-from ccnavi.policy import ruleload, rules
+from ccnavi.entry import diagnose_shared, suggest
+from ccnavi.policy import rule_lint, ruleload, rules
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -364,7 +364,7 @@ class LintTest(unittest.TestCase):
                 f,
                 allow_unicode=True,
             )
-        return lint_rules._rules(path, self.root)
+        return rule_lint.file_problems(path, self.root)
 
     def warns(self, problems: list) -> list[str]:
         return [f"{p.rule} {p.detail}" for p in problems if p.severity == rules.SEVERITY_WARN]
@@ -529,7 +529,7 @@ class LintTest(unittest.TestCase):
         self.assertTrue(any("except" in d for d in said), said)
 
     def test_共通の_rules_yml_の_no_powershell_は言わない(self):
-        problems = lint_rules._rules(common_path(ROOT, "rules"), ROOT)
+        problems = rule_lint.file_problems(common_path(ROOT, "rules"), ROOT)
         found = self.warns(problems)
         self.assertFalse(any("本体の" in d and "何にでも当たる" in d for d in found), found)
 

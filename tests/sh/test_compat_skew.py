@@ -105,6 +105,8 @@ class CompatSkewTest(unittest.TestCase):
         self.assertIn(f"sh は互換 {sh_compat()}", result.stderr)
         self.assertIn("scripts/ccnavi-setup.sh", result.stderr)
         self.assertNotIn("組み立て直して", result.stderr)
+        # sh の再配布で、ユーザが打つ sh は ccnavi-user-*.sh に入れ替わることも言う
+        self.assertIn("ccnavi-user-*.sh", result.stderr)
 
     def test_v3_in_the_ccnavi_repository_the_fix_is_a_rebuild(self):
         """V3 build.py とソースがあれば組み立て直しを言う。"""
@@ -230,8 +232,8 @@ class CompatAgreesTest(unittest.TestCase):
     def test_v14_accepting_by_resolving_the_thread_raised_the_compat_to_12(self):
         """V14 受け入れた未解決スレッドに、sh が返信を残して解決するようになった。
 
-        sh は実行ファイルに受け入れの計画を書かせるオプション（`--accept-plan`・`--accept-done`）
-        を渡す。
+        sh は実行ファイルに受け入れの計画を書かせる
+        オプション（`--accept-plan`・`--accept-done`）を渡す。
         古い実行ファイルは知らずに落ちるか、受け入れを記録に足すだけでホストを解決済みにしないので、
         食い違いとして知らせる。なので 12 以上。
         """
@@ -239,6 +241,15 @@ class CompatAgreesTest(unittest.TestCase):
         flags = run_ccnavi(["--version"], cwd=ROOT).stdout
         self.assertIn("--accept-plan", flags)
         self.assertIn("--accept-done", flags)
+
+    def test_v15_the_user_entry_raised_the_compat_to_13(self):
+        """V15 ユーザだけが打つ操作を、実行ファイルの `user <操作>` と ccnavi-user-*.sh に分けた。
+
+        新しい実行ファイルは、`user` の外のユーザ専用のオプション（`--agree`・`--reviewed --yes`
+        など）を断る。古い sh（ccnavi-agree.sh など）は断られるので、食い違いとして知らせ、
+        sh の配り直しを言う。なので 13 以上。
+        """
+        self.assertGreaterEqual(version.COMPAT, 13)
 
 
 @unittest.skipIf(not SHELL, "sh も bash も見つからない")

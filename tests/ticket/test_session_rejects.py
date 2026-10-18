@@ -80,7 +80,7 @@ class SessionRejectsTest(PhaseHarness):
     def approve_all(self, *names):
         shown = self.ccnavi("--agree", "--preview", "--json")
         digest = json.loads(shown.stdout)["digest"]
-        done = self.ccnavi("--agree", "--yes", ",".join(names), "--digest", digest, "--json")
+        done = self.ccnavi("user", "agree", "--yes", ",".join(names), "--digest", digest, "--json")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         copies = json.loads(done.stdout)["copies"]
         for name in names:

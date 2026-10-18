@@ -27,7 +27,13 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 NODE = shutil.which("node")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
-SCRIPTS = ("ccnavi-clean.sh", "ccnavi-clean.js", *common_sh(SH_DIR))
+SCRIPTS = (
+    "ccnavi-clean.sh",
+    "ccnavi-clean.js",
+    # 残った子のブランチを消す入口。前は ccnavi-clean.sh の --branch だった
+    "ccnavi-user-clean-branch.sh",
+    *common_sh(SH_DIR),
+)
 # ccnavi-clean.sh と共通部（ccnavi-common*.sh）が呼ぶ外部コマンド。
 # node を外した PATH でも見えるように残す。
 TOOLS = ("basename", "cat", "dirname", "find", "git", "head", "rm", "sed", "sleep", "sort", "tr")
@@ -299,11 +305,11 @@ class WorktreeOptionTest(unittest.TestCase):
         self.top = os.path.join(self.ws, ".claude", "worktrees", "wt")
         write(os.path.join(self.top, "node_modules", "x.js"))
 
-    def run_clean(self, *args, cwd=None):
+    def run_clean(self, *args, cwd=None, name="ccnavi-clean.sh"):
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         env.pop("CLAUDE_PROJECT_DIR", None)
         env["CCNAVI_BIN_PATH"] = self.bin
-        script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-clean.sh").replace(os.sep, "/")
+        script = os.path.join(self.ws, ".ccnavi", "scripts", name).replace(os.sep, "/")
         return subprocess.run(
             [SHELL, script, *args],
             cwd=cwd or self.ws,
@@ -337,11 +343,14 @@ class WorktreeOptionTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertTrue(os.path.isdir(self.top))
 
+    def clean_branch(self, *args):
+        return self.run_clean(*args, name="ccnavi-user-clean-branch.sh")
+
     def test_branch_refuses_a_branch_ccnavi_did_not_record(self):
         # 記録に無いブランチは、確認の有無によらず消さない（git branch -D の代わりに使わせない）。
-        for args in (("--branch", "wt"), ("--branch", "wt", "--confirmed")):
+        for args in (("wt",), ("wt", "--confirmed"), ("--confirmed", "wt")):
             with self.subTest(args=args):
-                result = self.run_clean(*args)
+                result = self.clean_branch(*args)
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                 self.assertIn("記録したブランチではない", result.stderr)
         branches = subprocess.run(
@@ -351,14 +360,35 @@ class WorktreeOptionTest(unittest.TestCase):
 
     def test_branch_options_are_checked(self):
         for args in (
-            ("--branch", "wt", "--worktree"),
-            ("--branch", "wt", "--dry-run"),
+            ("wt", "--worktree"),
+            ("wt", "--dry-run"),
+            ("wt", "other"),
+            ("../wt",),
+            ("--confirmed",),
+            (),
+        ):
+            with self.subTest(args=args):
+                result = self.clean_branch(*args)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+
+    def test_the_old_branch_mode_moves_to_the_user_script(self):
+        # ccnavi-clean.sh の --branch と --confirmed は、何も動かさずに 2 で新しい sh を案内する。
+        for args in (
+            ("--branch", "wt"),
+            ("--branch", "wt", "--confirmed"),
             ("--confirmed", "wt"),
-            ("--branch", "../wt"),
+            ("wt", "--branch"),
         ):
             with self.subTest(args=args):
                 result = self.run_clean(*args)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("ccnavi-user-clean-branch.sh", result.stderr)
+                self.assertIn("何もしていません", result.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.top, "node_modules", "x.js")))
+        branches = subprocess.run(
+            ["git", "branch", "--list", "wt"], cwd=self.ws, capture_output=True, text=True
+        )
+        self.assertEqual(branches.stdout.strip().lstrip("+ ").strip(), "wt")
 
 
 @unittest.skipUnless(SHELL and NODE, "sh と node が要る")

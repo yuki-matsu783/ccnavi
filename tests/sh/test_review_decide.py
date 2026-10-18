@@ -1,4 +1,8 @@
-"""ccnavi-review.sh decide の受入テスト。
+"""残った指摘の対応方針の受入テスト（ccnavi-user-decide.sh と ccnavi-review.sh decide --preview）。
+
+選んだものを置く形はユーザ専用の ccnavi-user-decide.sh、一覧を見るだけの形は
+ccnavi-review.sh decide <N> --preview。ccnavi-review.sh の decide の置く形は、何も動かさずに
+終了コード 2 で新しい sh を案内する。
 
 sh を外から呼び、GitLab の代役と実行ファイルの代役で 1 周させる。
 
@@ -9,7 +13,8 @@ sh を外から呼び、GitLab の代役と実行ファイルの代役で 1 周�
    書き出して下書きを消す。答えに issue の URL を足す
 3. 投稿に失敗したら下書きを残し、警告を答えに載せる（置いたことは戻さない）
 4. フェーズ番号の表記を揃える（`01` でも、実行ファイルが `1` で書いた下書きを拾う）
-5. 引数の組み合わせの誤りは、実行ファイルを起こす前に断る
+5. 引数の組み合わせの誤りは、実行ファイルを起こす前に断る。ccnavi-review.sh の decide の置く形と、
+   ccnavi-user-decide.sh の --preview も断る
 6. 抜けるときの片付け（EXIT の trap）で rm が失敗しても、元の終了コードで抜ける（dash と bash）
 
 実行ファイルは代役（引数を記録し、決まった答えと下書きを書く sh）。判定そのものは
@@ -221,7 +226,12 @@ class ReviewDecideShTest(unittest.TestCase):
         self.ws = os.path.join(self.work, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-review.sh", *common_sh(SH_DIR)):
+        for name in (
+            "ccnavi-review.sh",
+            "ccnavi-user-decide.sh",
+            "ccnavi-user-lib-review.sh",
+            *common_sh(SH_DIR),
+        ):
             shutil.copy(os.path.join(SH_DIR, name), scripts)
         self.state = os.path.join(self.ws, "logs", "state")
         os.makedirs(self.state)
@@ -259,8 +269,13 @@ class ReviewDecideShTest(unittest.TestCase):
         self.log = os.path.join(self.work, "stub.log")
 
     def decide(
-        self, *args: str, shell: str | None = None, **extra: str
+        self,
+        *args: str,
+        shell: str | None = None,
+        script: str = "ccnavi-user-decide.sh",
+        **extra: str,
     ) -> subprocess.CompletedProcess:
+        """ccnavi-user-decide.sh を打つ。script="ccnavi-review.sh" なら ccnavi-review.sh decide。"""
         shell = shell or SHELL
         assert shell is not None
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
@@ -298,8 +313,8 @@ class ReviewDecideShTest(unittest.TestCase):
             PATH=tools + os.pathsep + os.path.dirname(shell),
         )
         env.update(extra)
-        script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-review.sh")
-        command = [shell, script, "decide", *args]
+        path = os.path.join(self.ws, ".ccnavi", "scripts", script)
+        command = [shell, path, *(["decide"] if script == "ccnavi-review.sh" else []), *args]
         if WINDOWS:
             command = " ".join(quote_arg(part) for part in command)
         return subprocess.run(
@@ -321,7 +336,7 @@ class ReviewDecideShTest(unittest.TestCase):
             return f.read().splitlines()
 
     def test_preview_passes_the_answer_through_and_posts_nothing(self):
-        shown = self.decide("1", "--preview")
+        shown = self.decide("1", "--preview", script="ccnavi-review.sh")
         self.assertEqual(shown.returncode, 0, shown.stderr)
         self.assertEqual(json.loads(shown.stdout)["digest"], "d0")
         self.assertIn("--reviewed 1 --accept-unresolved --preview --json", self.calls()[-1])
@@ -337,6 +352,10 @@ class ReviewDecideShTest(unittest.TestCase):
         # 置く前に、受け入れる指摘のスレッドへ返信を残して解決する
         self.assertIn("--accept-plan", self.calls()[-2])
         self.assertIn('--yes {"u1":"issue"} --digest d0 --json', self.calls()[-1])
+        # ユーザ専用の入口（`user reviewed`）で呼ぶ。`user` の外の `--reviewed --yes` は
+        # 実行ファイルが断る
+        self.assertIn(" user reviewed 1 --accept-unresolved --yes ", self.calls()[-1])
+        self.assertIn(" user reviewed 1 --accept-unresolved --yes ", self.calls()[-2])
         # 置く呼び出しは計画を読み、返信と解決のあとで取り直した結果を渡される
         self.assertIn("--accept-done", self.calls()[-1])
         self.assertEqual(GitLab.fetches, 2)
@@ -364,7 +383,7 @@ class ReviewDecideShTest(unittest.TestCase):
     def test_the_phase_number_is_normalized(self):
         done = self.decide("01", "--choices", '{"u1":"keep"}', "--digest", "d0")
         self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertIn("--reviewed 1 ", self.calls()[-1])
+        self.assertIn("user reviewed 1 ", self.calls()[-1])
         self.assertEqual([kind for kind, _ in GitLab.posted], ["reply", "resolve", "issue", "note"])
 
     def test_a_failed_reply_stops_before_anything_is_placed(self):
@@ -473,6 +492,31 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertEqual(self.calls(), [])
         self.assertEqual(GitLab.posted, [])
 
+    def test_the_old_entry_in_ccnavi_review_moves_to_the_user_script(self):
+        """ccnavi-review.sh decide の置く形は、何も動かさずに 2 で新しい sh を案内する。"""
+        for args in (
+            ("1",),
+            ("1", "--choices", '{"u1":"keep"}', "--digest", "d0"),
+            ("1", "--preview", "--choices", "{}", "--digest", "d0"),
+            ("1", "--yes", "{}"),
+        ):
+            with self.subTest(args=args):
+                refused = self.decide(*args, script="ccnavi-review.sh")
+                self.assertEqual(refused.returncode, 2, refused.stderr)
+                self.assertIn("ccnavi-user-decide.sh", refused.stderr)
+                self.assertIn("何もしていません", refused.stderr)
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(GitLab.posted, [])
+        self.assertEqual(GitLab.fetches, 0)
+        self.assertEqual(os.listdir(self.state), [])
+
+    def test_the_user_script_points_the_preview_back(self):
+        """見るだけの --preview は ccnavi-review.sh に残る。ユーザ専用の sh は断って案内する。"""
+        refused = self.decide("1", "--preview")
+        self.assertEqual(refused.returncode, 2, refused.stderr)
+        self.assertIn("ccnavi-review.sh decide <N> --preview", refused.stderr)
+        self.assertEqual(self.calls(), [])
+
     @unittest.skipIf(WINDOWS, "rm の代役を PATH の頭に置く形は POSIX で見る")
     def test_a_failing_rm_in_the_exit_trap_keeps_the_exit_code(self):
         shells = [found for found in (shutil.which("dash"), shutil.which("bash")) if found]
@@ -486,12 +530,12 @@ class ReviewDecideShTest(unittest.TestCase):
         os.chmod(fake_rm, 0o755)
         for shell in shells:
             with self.subTest(shell=os.path.basename(shell)):
-                refused = self.decide("x", shell=shell)
+                refused = self.decide("x", shell=shell, script="ccnavi-review.sh")
                 self.assertEqual(2, refused.returncode, refused.stderr)
                 self.assertEqual(
                     "ccnavi-review: decide には <N>（フェーズ番号）が必要です。\n", refused.stderr
                 )
-                shown = self.decide("1", "--preview", shell=shell)
+                shown = self.decide("1", "--preview", shell=shell, script="ccnavi-review.sh")
                 self.assertEqual(0, shown.returncode, shown.stderr)
                 self.assertEqual("d0", json.loads(shown.stdout)["digest"])
 

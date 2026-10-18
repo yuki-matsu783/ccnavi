@@ -1,5 +1,5 @@
 {
- "about": "`ccnavi --templates --json` の答えの見本。ワークスペースは tests/ticket/test_plan_templates.py の showcase（共通に feature / research / broken、自身のレイヤーに feature（共通と同じ）/ research（共通と中身が違う）/ local（定義に無い型）/ ends（終端が 2 つ）/ notes.txt、プロジェクト lib に lib、下書きの置き場 wip/proposals/templates/ に login（TODO が残っている）/ research（共通と同名）/ broken）。root は <root> に置き換える。欄: version、root、layer（一覧の対象のレイヤー）、keywords、templates（共通 + layer の統合結果。各テンプレートの name・layer・path・sha・valid・description・when・plan / feedback（index は計画の中の添字、number は提案に写したときの番号、after は計画の中の添字）・has_flows・flows（index・name・nodes・connections・node_types）・effective（統合結果で使われるか）・usable（使われ、error も無い）・dropped（捨てた理由 reason = invalid / duplicate / conflict と detail）・writable・problems（severity と detail））、layers（共通と各レイヤーの生の中身。path・exists・unreadable・writable・problems・templates）、sums（レイヤーごとの統合結果の索引。各テンプレートの name・layer・effective・dropped。dropped は templates と同じ {reason, detail} か null）、errors / warns / infos、drafts（下書き。効力は無く、templates にも統合結果にも入らない。各下書きの name・tree（置かれたツリー。ワークスペースルートは空）・path（ツリーからの相対）・sha（取り込みの --expect に使う）・text（下書きの本文そのまま）・valid・importable（読めて error が無い）・checked_with（検査に使ったフェーズ定義の層。templates の layer＝ファイルが在る層とは別）・exists_in（同じ名前のテンプレートが在るレイヤー。取り込むと置き換えになる）・also_in（同じ中身の下書きを持つほかのツリー。表記は tree と同じで、ワークスペースルートは空）・description・when・plan / feedback / has_flows / flows（templates と同じ）・problems（深刻度は下書きの検査のまま。--lint は error も warn に下げる））。失敗（--show の無い名前、不明な --layer、--draft と --import の失敗）は、この形ではなく {version, ok: false, error} を標準出力に出して終了コード 1。同じ中身の下書きが 2 つのツリー（ワークスペースルートと lib）にあるときは、先に見つけた 1 つにまとめ、もう一方を also_in に入れる。VS Code 拡張のテンプレート管理画面はこの形をそのまま描く。形を変えたらこの見本も一緒に直す",
+ "about": "`ccnavi --templates --json` の答えの見本。ワークスペースは tests/ticket/test_plan_templates.py の showcase（共通に feature / research / broken、自身のレイヤーに feature（共通と同じ）/ research（共通と中身が違う）/ local（定義に無い型）/ ends（終端が 2 つ）/ notes.txt、プロジェクト lib に lib、下書きの置き場 wip/handoff/.ccnavi/config/project/templates/ に login（TODO が残っている）/ research（共通と同名）/ broken）。root は <root> に置き換える。欄: version、root、layer（一覧の対象のレイヤー）、keywords、templates（共通 + layer の統合結果。各テンプレートの name・layer・path・sha・valid・description・when・plan / feedback（index は計画の中の添字、number は提案に写したときの番号、after は計画の中の添字）・has_flows・flows（index・name・nodes・connections・node_types）・effective（統合結果で使われるか）・usable（使われ、error も無い）・dropped（捨てた理由 reason = invalid / duplicate / conflict と detail）・writable・problems（severity と detail））、layers（共通と各レイヤーの生の中身。path・exists・unreadable・writable・problems・templates）、sums（レイヤーごとの統合結果の索引。各テンプレートの name・layer・effective・dropped。dropped は templates と同じ {reason, detail} か null）、errors / warns / infos、drafts（下書き。効力は無く、templates にも統合結果にも入らない。各下書きの name・tree（置かれたツリー。ワークスペースルートは空）・path（下書きの、ツリーからの相対。wip/handoff/…）・target（取り込み先の、ツリーからの相対。取り込みは ccnavi user handoff <target>）・layer（取り込み先のレイヤー）・sha（下書きのハッシュ）・text（下書きの本文そのまま）・valid・importable（読めて error が無い）・checked_with（検査に使ったフェーズ定義の層。templates の layer＝ファイルが在る層とは別）・exists_in（同じ名前のテンプレートが在るレイヤー。取り込むと置き換えになる）・also_in（同じ中身の下書きを持つほかのツリー。表記は tree と同じで、ワークスペースルートは空）・description・when・plan / feedback / has_flows / flows（templates と同じ）・problems（深刻度は下書きの検査のまま。--lint は error も warn に下げる））。失敗（--show の無い名前、不明な --layer、--draft の失敗）は、この形ではなく {version, ok: false, error} を標準出力に出して終了コード 1。同じ中身の下書きが 2 つのツリー（ワークスペースルートと lib）にあるときは、先に見つけた 1 つにまとめ、もう一方を also_in に入れる。VS Code 拡張のテンプレート管理画面はこの形をそのまま描く。形を変えたらこの見本も一緒に直す",
  "expect": {
   "version": 1,
   "root": "<root>",
@@ -756,7 +756,7 @@
   "drafts": [
    {
     "name": "broken",
-    "path": "wip/proposals/templates/broken.yml",
+    "path": "wip/handoff/.ccnavi/config/project/templates/broken.yml",
     "sha": "be9c33cb743e62edb202d15a0b28fed2ec18efa48f6534ca82bf29a422c21b88",
     "valid": false,
     "description": "",
@@ -772,17 +772,19 @@
      }
     ],
     "tree": "",
+    "target": ".ccnavi/config/project/templates/broken.yml",
+    "layer": "self",
     "checked_with": "self",
-    "text": "name: [\n",
     "importable": false,
     "exists_in": [
      "common"
     ],
-    "also_in": []
+    "also_in": [],
+    "text": "name: [\n"
    },
    {
     "name": "login",
-    "path": "wip/proposals/templates/login.yml",
+    "path": "wip/handoff/.ccnavi/config/project/templates/login.yml",
     "sha": "46afac83752340bb6322a015aebb90a19878d2f058fefbe27474a13d4fce0fce",
     "valid": true,
     "description": "TODO ログインを設計から実装まで進める",
@@ -835,17 +837,19 @@
      }
     ],
     "tree": "",
+    "target": ".ccnavi/config/project/templates/login.yml",
+    "layer": "self",
     "checked_with": "self",
-    "text": "name: login\ndescription: TODO ログインを設計から実装まで進める\nwhen: 新しい機能を足すとき\nplan:\n  - design\n  - {type: implement, after: [1]}\nfeedback:\n  - implement-feedback\nflows:\n  2:\n    id: wf-impl\n    name: 実装の手順\n    version: 1.0.0\n    nodes:\n      - {id: s, type: start, name: 開始, position: {x: 0, y: 0}, data: {}}\n      - {id: p, type: prompt, name: 実装, position: {x: 1, y: 0}, data: {prompt: 先にテスト}}\n      - {id: e, type: end, name: 終了, position: {x: 2, y: 0}, data: {}}\n    connections:\n      - {id: c1, from: s, to: p, fromPort: output, toPort: input}\n      - {id: c2, from: p, to: e, fromPort: output, toPort: input}\n",
     "importable": true,
     "exists_in": [],
     "also_in": [
      "lib"
-    ]
+    ],
+    "text": "name: login\ndescription: TODO ログインを設計から実装まで進める\nwhen: 新しい機能を足すとき\nplan:\n  - design\n  - {type: implement, after: [1]}\nfeedback:\n  - implement-feedback\nflows:\n  2:\n    id: wf-impl\n    name: 実装の手順\n    version: 1.0.0\n    nodes:\n      - {id: s, type: start, name: 開始, position: {x: 0, y: 0}, data: {}}\n      - {id: p, type: prompt, name: 実装, position: {x: 1, y: 0}, data: {prompt: 先にテスト}}\n      - {id: e, type: end, name: 終了, position: {x: 2, y: 0}, data: {}}\n    connections:\n      - {id: c1, from: s, to: p, fromPort: output, toPort: input}\n      - {id: c2, from: p, to: e, fromPort: output, toPort: input}\n"
    },
    {
     "name": "research",
-    "path": "wip/proposals/templates/research.yml",
+    "path": "wip/handoff/.ccnavi/config/project/templates/research.yml",
     "sha": "eb6437bc32d6f13c70a9a48c58004d75ade89ccaab24b7be2466798f3675481c",
     "valid": true,
     "description": "調べてから設計する",
@@ -873,14 +877,16 @@
     "flows": [],
     "problems": [],
     "tree": "",
+    "target": ".ccnavi/config/project/templates/research.yml",
+    "layer": "self",
     "checked_with": "self",
-    "text": "name: research\ndescription: 調べてから設計する\nplan:\n  - research\n  - {type: design, after: [1]}\n",
     "importable": true,
     "exists_in": [
      "common",
      "self"
     ],
-    "also_in": []
+    "also_in": [],
+    "text": "name: research\ndescription: 調べてから設計する\nplan:\n  - research\n  - {type: design, after: [1]}\n"
    }
   ]
  }

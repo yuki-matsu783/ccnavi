@@ -1,4 +1,5 @@
-"""ccnavi-push-approved.sh の受入テスト。使い捨てのワークスペースを組み立てて sh を外から呼ぶ。
+"""ccnavi-user-push-approved.sh の受入テスト（前の名前は ccnavi-push-approved.sh）。
+使い捨てのワークスペースを組み立てて sh を外から呼ぶ。
 
 設計 wip/design/approve-carry.md 1 と 6.3。確かめるのは次のとおり。
 
@@ -7,8 +8,9 @@
 19. `main` の上のツリーはコミットして push しない（0、標準エラーにブランチ名）
 20. push が失敗すると 1、コミットは残る
 21. detached のツリーは飛ばす
-22. `ccnavi-agree.sh` が承認のあとコミットして push する
-23. `ccnavi-agree.sh` は並べた識別子を `--agree` の後ろに渡し、`-` で始まる語と空の語は断る
+22. `ccnavi-user-agree.sh` が承認のあとコミットして push する
+23. `ccnavi-user-agree.sh` は並べた識別子を `user agree` の後ろに渡し、`-` で始まる語と
+    空の語は断る
 
 ワークスペースは一時ディレクトリに git と bare のリモートで作る。承認そのものは
 ccnavi の実行ファイルの代わりに、承認済みチケットを 1 枚置くだけの sh（stub）で済ませる。
@@ -35,8 +37,8 @@ from tests import ROOT, common_sh
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
-PUSH_SCRIPTS = ("ccnavi-push-approved.sh", *common_sh(SH_DIR))
-APPROVE_SCRIPTS = (*PUSH_SCRIPTS, "ccnavi-agree.sh")
+PUSH_SCRIPTS = ("ccnavi-user-push-approved.sh", *common_sh(SH_DIR))
+APPROVE_SCRIPTS = (*PUSH_SCRIPTS, "ccnavi-user-agree.sh")
 APPROVED = ".ccnavi/approved/doing"
 MESSAGE = "ccnavi: 承認済みチケットを更新"
 NOTHING = "コミットして push する承認済みチケットはありません。"
@@ -167,7 +169,7 @@ class Workspace(unittest.TestCase):
         )
 
     def push(self, *args, cwd=None, env=None):
-        return self.run_sh("ccnavi-push-approved.sh", *args, cwd=cwd, env=env)
+        return self.run_sh("ccnavi-user-push-approved.sh", *args, cwd=cwd, env=env)
 
     def repository(self, path, branch):
         """ワークスペースの下に別のリポジトリを置く。bare のリモートを付けて返す。"""
@@ -536,7 +538,7 @@ class PushApprovedTest(Workspace):
     def said(self, result, name):
         """sh 自身が標準エラーに name を名指ししたか。git のエラー文に紛れた名前は数えない。"""
         return any(
-            line.startswith("ccnavi-push-approved:") and name in line
+            line.startswith("ccnavi-user-push-approved:") and name in line
             for line in result.stderr.splitlines()
         )
 
@@ -817,7 +819,7 @@ class TemplateDraftCarryTest(Workspace):
 
 @unittest.skipUnless(SHELL and GIT, "sh と git が要る")
 class ApproveCarriesTest(Workspace):
-    """22. `ccnavi-agree.sh` は承認のあと `ccnavi-push-approved.sh` で
+    """22. `ccnavi-user-agree.sh` は承認のあと `ccnavi-user-push-approved.sh` で
     コミットして push する。
     """
 
@@ -836,7 +838,7 @@ class ApproveCarriesTest(Workspace):
             CCNAVI_BIN_PATH=posix(self.stub),
             **{k: posix(v) if k in ("STUB_TREE", "STUB_ARGS") else v for k, v in extra.items()},
         )
-        return self.run_sh("ccnavi-agree.sh", *ids, env=env)
+        return self.run_sh("ccnavi-user-agree.sh", *ids, env=env)
 
     def received(self, path):
         with open(path, encoding="utf-8") as f:
@@ -856,8 +858,9 @@ class ApproveCarriesTest(Workspace):
         # 実行ファイルには、書いたパスの一覧（--record-writes）と、書けたパスの報告の書き出し先
         # （--placed-out）も渡す
         self.assertEqual(got[2], "--record-writes", got)
-        self.assertEqual(got[4:6], ["--agree", "--placed-out"], got)
-        self.assertEqual(got[7:], ["i0002-01-03", "i0002-01-04"], got)
+        # 承認は実行ファイルのユーザ専用の入口（`user agree`）で呼ぶ
+        self.assertEqual(got[4:7], ["user", "agree", "--placed-out"], got)
+        self.assertEqual(got[8:], ["i0002-01-03", "i0002-01-04"], got)
 
     def test_approve_without_ids_takes_all_pending(self):
         self.worktree("i0001")
@@ -865,8 +868,8 @@ class ApproveCarriesTest(Workspace):
         result = self.approve(STUB_ARGS=args)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         got = self.received(args)
-        self.assertEqual(got[4:6], ["--agree", "--placed-out"], got)
-        self.assertEqual(got[7:], [])
+        self.assertEqual(got[4:7], ["user", "agree", "--placed-out"], got)
+        self.assertEqual(got[8:], [])
 
     def test_approve_refuses_words_that_are_not_ids(self):
         """識別子でない語は断り、実行ファイルを呼ばない。
@@ -897,8 +900,8 @@ class ApproveCarriesTest(Workspace):
         result = self.approve("help", "i0002-01-01", STUB_ARGS=args)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         got = self.received(args)
-        self.assertEqual(got[4:6], ["--agree", "--placed-out"])
-        self.assertEqual(got[7:], ["help", "i0002-01-01"])
+        self.assertEqual(got[4:7], ["user", "agree", "--placed-out"])
+        self.assertEqual(got[8:], ["help", "i0002-01-01"])
         refused = self.approve("--help", "i0002-01-01")
         self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
 
@@ -911,7 +914,7 @@ class ApproveCarriesTest(Workspace):
         self.assertEqual(self.remote_head("i0001"), self.head(tree))
 
     def test_approve_says_when_there_is_nothing_to_carry(self):
-        """コミットと push の段は ccnavi-push-approved.sh に任せる。
+        """コミットと push の段は ccnavi-user-push-approved.sh に任せる。
         コミットするものが無ければその 1 行が出る。
         """
         self.worktree("i0001")
@@ -1013,7 +1016,7 @@ class ApproveCarriesTest(Workspace):
         os.makedirs(inner)
         env = self.env(CCNAVI_BIN_PATH=posix(os.path.join(self._tmp.name, "none")))
         env["PATH"] = os.pathsep.join([os.path.dirname(uv), env.get("PATH", "")])
-        result = self.run_sh("ccnavi-agree.sh", cwd=inner, env=env)
+        result = self.run_sh("ccnavi-user-agree.sh", cwd=inner, env=env)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         with open(where, encoding="utf-8") as f:
             self.assertEqual(os.path.realpath(f.read().strip()), os.path.realpath(self.ws))

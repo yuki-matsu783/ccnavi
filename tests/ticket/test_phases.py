@@ -23,7 +23,7 @@ import shutil
 import tempfile
 import unittest
 
-from tests import c1flag, can_case_sensitive, common_path, config_path
+from tests import c1flag, can_case_sensitive, common_path, config_path, userform
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import ROOT, git, read_json, write
 from tests.ticketsample import PHASES, RULES, child_text, parent_text, record_merge
@@ -71,17 +71,19 @@ class PhaseHarness(unittest.TestCase):
         if self.mark_c1:
             args = c1flag.as_c1(self.root, self.state, self.parent_tree, args)
         return run_ccnavi(
-            [
-                "--root",
-                self.root,
-                "--guard-core-files",
-                "disable",
-                "--restore-if-deny",
-                "disable",
-                "--guard-ticket-approval",
-                "disable",
-                *args,
-            ],
+            userform.place(
+                [
+                    "--root",
+                    self.root,
+                    "--guard-core-files",
+                    "disable",
+                    "--restore-if-deny",
+                    "disable",
+                    "--guard-ticket-approval",
+                    "disable",
+                ],
+                args,
+            ),
             input=stdin,
             cwd=ROOT,
             env=environment,
@@ -121,7 +123,7 @@ class PhaseHarness(unittest.TestCase):
         承認済みチケットは親のツリーに置かれるので、コミットするまでワークツリーは汚れたまま。
         本番で `ccnavi-agree.sh` がやることを、テストでも同じ順でたどる。
         """
-        result = self.ccnavi("--agree", stdin="y\n")
+        result = self.ccnavi("user", "agree", stdin="y\n")
         if os.path.isdir(self.approved):
             git(self.parent_tree, "add", "-A")
             git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
@@ -254,12 +256,12 @@ class ApproveOnlyTest(PhaseHarness):
         self.commit_parent()
         # 絞らないときは、改版後の計画で検証される。定義の超過は承認を拒まず、承認画面に
         # 「編集対象としているが」として出る（設計 approve-carry 3.2）。n で何も適用しない
-        whole = self.ccnavi("--agree", stdin="n\n")
+        whole = self.ccnavi("user", "agree", stdin="n\n")
         self.assertIn("編集対象としているが", whole.stdout)
         self.assertIn("超えている", whole.stdout)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-02.md")))
         # 改版を外して子だけ並べても、旧計画で通してはいけない
-        only = self.ccnavi("--agree", "i0001-01-02", stdin="y\n")
+        only = self.ccnavi("user", "agree", "i0001-01-02", stdin="y\n")
         self.assertEqual(only.returncode, 1, only.stdout + only.stderr)
         self.assertIn("改版", only.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-01-02.md")))
@@ -731,7 +733,8 @@ class PhaseTest(PhaseHarness):
         shown = self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "2",
             "--accept-unresolved",
             "--preview",
@@ -747,7 +750,8 @@ class PhaseTest(PhaseHarness):
         done = self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "2",
             "--accept-unresolved",
             "--yes",
@@ -780,7 +784,8 @@ class PhaseTest(PhaseHarness):
         return self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--close-early",
+            "user",
+            "close-early",
             "--reason",
             reason,
             "--result",
@@ -1078,7 +1083,7 @@ class PhaseTest(PhaseHarness):
         data["threads"] = [{"id": "t0", "resolved": False, "url": "u/7#t0", "body": "気になる"}]
         write(fixture, json.dumps(data))
         plan = os.path.join(self.state, "accept-plan.json")
-        base = ("--cwd", self.parent_tree, "--close-early", "--reason", "ここまで")
+        base = ("--cwd", self.parent_tree, "user", "close-early", "--reason", "ここまで")
         marker = os.path.join(self.approved, "phases", "i0001", "close-early.json")
 
         # 計画が無いまま 2 回目・3 回目を打っても、置かない
@@ -1148,7 +1153,7 @@ class PhaseTest(PhaseHarness):
         data["threads"] = [{"id": "t0", "resolved": False, "url": "u/7#t0", "body": "気になる"}]
         write(fixture, json.dumps(data))
         plan = os.path.join(self.state, "accept-plan.json")
-        base = ("--cwd", self.parent_tree, "--close-early", "--reason", "ここまで")
+        base = ("--cwd", self.parent_tree, "user", "close-early", "--reason", "ここまで")
         planned = self.ccnavi(
             *base, "--result", fixture, "--accept-plan", plan, "--no-issue", stdin="y\n"
         )
@@ -1190,7 +1195,8 @@ class PhaseTest(PhaseHarness):
             "enable",
             "--cwd",
             self.parent_tree,
-            "--close-early",
+            "user",
+            "close-early",
             "--reason",
             "r",
             "--result",

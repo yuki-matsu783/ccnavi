@@ -380,7 +380,7 @@ class EntryTest(_Base):
 
     def test_prune_needs_a_terminal(self):
         old = _write(os.path.join(self.logs, "decisions.20260101-000000.jsonl"), age_days=30)
-        proc = run_ccnavi(["--prune"], env=self.env(), cwd=self.root)
+        proc = run_ccnavi(["user", "prune"], env=self.env(), cwd=self.root)
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn("--prune はユーザーがターミナルから実行する必要があります", proc.stderr)
         self.assertTrue(os.path.exists(old))
@@ -388,14 +388,14 @@ class EntryTest(_Base):
     def test_prune_removes_and_says_so(self):
         old = _write(os.path.join(self.logs, "decisions.20260101-000000.jsonl"), age_days=30)
         env = self.env(CCNAVI_GUARD_TICKET_APPROVAL="disable")
-        proc = run_ccnavi(["--prune"], env=env, cwd=self.root)
+        proc = run_ccnavi(["user", "prune"], env=env, cwd=self.root)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("削除した  logs/decisions.20260101-000000.jsonl", proc.stdout)
         self.assertFalse(os.path.exists(old))
 
     def test_prune_with_nothing_to_do(self):
         env = self.env(CCNAVI_GUARD_TICKET_APPROVAL="disable")
-        proc = run_ccnavi(["--prune"], env=env, cwd=self.root)
+        proc = run_ccnavi(["user", "prune"], env=env, cwd=self.root)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("動かすものはありません。", proc.stdout)
 
@@ -403,7 +403,7 @@ class EntryTest(_Base):
         # 1 日より短い保持は受けない。いま書いたばかりの記録が消える形になる。
         fresh = _write(os.path.join(self.logs, "decisions.20260101-000000.jsonl"), age_days=0.5)
         env = self.env(CCNAVI_GUARD_TICKET_APPROVAL="disable", CCNAVI_LOG_KEEP_DAYS="0.0001")
-        proc = run_ccnavi(["--prune"], env=env, cwd=self.root)
+        proc = run_ccnavi(["user", "prune"], env=env, cwd=self.root)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("下限", proc.stderr)
         self.assertTrue(os.path.exists(fresh))

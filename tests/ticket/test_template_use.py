@@ -6,7 +6,8 @@
    `after` は計画の中の添字から提案の絶対番号に付け直す（フィードバック計画は全体の項数を足す）。
    `phases:` の写しが入り、`--lint` と承認の確認（`--agree --preview --verify`）、承認の検査
    （`agree_candidates.plan_problems`）が error にならない
-2. 往復: 完了した親から `--templates --draft` で作った下書きを取り込み、`--template` で使うと、
+2. 往復: 完了した親から `--templates --draft` で作った下書きを `user handoff` で取り込み、
+   `--template` で使うと、
    元の計画と同じ形・同じフローになる
 3. 子のフローの下書き: 全体計画の n 番目の項の最初の子 `<親>-<NN>-01` の
    `wip/proposals/flows/<子>.yml` に書く。`flow.load` で読める。効力が無いことを出力で言う
@@ -24,7 +25,7 @@ from ccnavi.infra import settings
 from ccnavi.tickets import agree_candidates, flow, phasetypes, plan_templates, workflow
 from ccnavi.tickets import ticket as ticket_mod
 from tests.ticket.test_parent_phases import front_of
-from tests.ticket.test_template_drafts import FLOW_IMPL, Drafts
+from tests.ticket.test_template_drafts import FLOW_IMPL, Drafts, target_rel
 from tests.ticket.test_ticket import git, write
 from tests.ticketsample import parent_text
 
@@ -413,7 +414,21 @@ class LayerTest(Use):
 
 
 class RoundTripTest(Use):
-    """完了した親 -> `--draft` -> 取り込み -> `--template` で、元の計画とフローに戻る。"""
+    """完了した親 -> `--draft` -> `user handoff` -> `--template` で、元の計画とフローに戻る。
+
+    下書きは親のツリーにできる。使う側はワークスペースルートのテンプレートを読むので、ここでは
+    下書きをワークスペースルートの `wip/handoff/` へ移してから取り込む（親のツリーで取り込んで
+    親のブランチから合流するのと同じ結果）。
+    """
+
+    to = "common"
+
+    def take(self):
+        rel = target_rel(to="common")
+        moved = os.path.join(self.root, "wip", "handoff", *rel.split("/"))
+        write(moved, self.read_draft().decode("utf-8"))
+        os.remove(self.draft_path())
+        return self.handoff(rel, tree=self.root)
 
     PLAN = [
         {"type": "research", "after": []},
@@ -442,8 +457,8 @@ class RoundTripTest(Use):
         """`--draft` -> 取り込み -> `--template ... --with-feedback`。元と作った提案を返す。"""
         self.done_parent(plan, feedback=feedback, flows={flow_child: FLOW_IMPL})
         self.assertEqual(self.draft().returncode, 0)
-        sha = self.generalize()
-        imported = self.import_("i0001", "--to", "common", "--yes", "--expect", sha)
+        self.generalize()
+        imported = self.take()
         self.assertEqual(imported.returncode, 0, imported.stdout + imported.stderr)
 
         result = self.new("--with-feedback", template="i0001")
@@ -484,10 +499,9 @@ class RoundTripTest(Use):
     def test_without_with_feedback_the_main_plan_alone_round_trips(self):
         self.done_parent(self.PLAN, feedback=self.FEEDBACK, flows={"i0001-03-01": FLOW_IMPL})
         self.assertEqual(self.draft().returncode, 0)
-        sha = self.generalize()
-        self.assertEqual(
-            self.import_("i0001", "--to", "common", "--yes", "--expect", sha).returncode, 0
-        )
+        self.generalize()
+        taken = self.take()
+        self.assertEqual(taken.returncode, 0, taken.stdout + taken.stderr)
         result = self.new(template="i0001")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         original, _ = ticket_mod.parse(parent_text("i0001", self.PLAN, self.FEEDBACK))

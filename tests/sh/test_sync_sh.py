@@ -34,7 +34,13 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 DASH = shutil.which("dash")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
-SCRIPTS = ("ccnavi-sync.sh", *common_sh(SH_DIR), "ccnavi-git.sh")
+SCRIPTS = (
+    "ccnavi-sync.sh",
+    *common_sh(SH_DIR),
+    "ccnavi-git.sh",
+    # 取り込み状態を消す、ユーザ専用の sh。前は ccnavi-sync.sh の --forget だった
+    "ccnavi-user-forget.sh",
+)
 CONFIG = (
     ("user.email", "t@example.invalid"),
     ("user.name", "t"),
@@ -208,8 +214,8 @@ class SyncHarness(unittest.TestCase):
         env.update(extra)
         return env
 
-    def sync(self, *args, shell=None, **extra):
-        script = os.path.join(self.scripts, "ccnavi-sync.sh")
+    def sync(self, *args, shell=None, name="ccnavi-sync.sh", **extra):
+        script = os.path.join(self.scripts, name)
         return subprocess.run(
             [shell or SHELL, script, *args],
             cwd=self.ws,
@@ -613,7 +619,8 @@ class SyncTest(SyncHarness):
         self.assertIn(f"git push origin {kept}:refs/heads/{PARENT}", done.stdout)
         self.assertIn("戻し方 2", done.stdout)
         self.assertIn(
-            "--forget i0001 を実行すると親子のチケットの取り込み状態が消える", done.stdout
+            "ccnavi-user-forget.sh i0001 を実行すると親子のチケットの取り込み状態が消える",
+            done.stdout,
         )
         record = fields(self.record)
         self.assertEqual("gone", record["state"])
@@ -935,7 +942,7 @@ class SyncTest(SyncHarness):
         done = self.sync(PARENT)
         self.assertEqual("gone", fields(self.record)["state"], done.stdout)
 
-    # ---- 取り込み状態の寿命（削除せずに残し、消すのはユーザの `--forget` だけ）
+    # ---- 取り込み状態の寿命（削除せずに残し、消すのはユーザの ccnavi-user-forget.sh だけ）
 
     def test_records_of_removed_worktrees_are_kept_as_tombstones(self):
         # 親のワークツリーを片付けて sync を打っても、gone の取り込み状態は消えない。
@@ -950,31 +957,47 @@ class SyncTest(SyncHarness):
         self.parent_tree(PARENT + "x")  # 別の親子のチケットは触らない
         self.assertEqual("gone", fields(self.record)["state"])
 
+    def forget(self, *args, **extra):
+        return self.sync(*args, name="ccnavi-user-forget.sh", **extra)
+
     def test_forget_removes_only_a_record_whose_parent_tree_is_gone(self):
         self.keep_record("gone")
-        refused = self.sync("--forget", PARENT)
+        refused = self.forget(PARENT)
         self.assertEqual(1, refused.returncode, refused.stdout + refused.stderr)
         self.assertIn("まだある", refused.stdout)
         self.assertTrue(os.path.exists(self.record))
         git(self.ws, "worktree", "remove", "--force", self.tree)
-        done = self.sync("--forget", PARENT)
+        done = self.forget(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("state gone", done.stdout)
         self.assertFalse(os.path.exists(self.record))
-        again = self.sync("--forget", PARENT)
+        again = self.forget(PARENT)
         self.assertEqual(0, again.returncode)
         self.assertIn("取り込み状態はありません", again.stdout)
 
     def test_forget_needs_a_name_and_does_not_touch_the_network(self):
-        self.assertEqual(2, self.sync("--forget").returncode)
-        self.assertEqual(2, self.sync("--forget", "../x").returncode)
+        self.assertEqual(2, self.forget().returncode)
+        self.assertEqual(2, self.forget("../x").returncode)
+        self.assertEqual(2, self.forget("--forget", PARENT).returncode)
         # origin が無くても消せる（ネットワークを使わない）。
         self.keep_record("gone")
         git(self.ws, "worktree", "remove", "--force", self.tree)
         git(self.ws, "remote", "remove", "origin")
-        done = self.sync("--forget", PARENT)
+        done = self.forget(PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertFalse(os.path.exists(self.record))
+
+    def test_the_old_forget_moves_to_the_user_script(self):
+        # ccnavi-sync.sh の --forget は、何も動かさずに 2 で ccnavi-user-forget.sh を案内する。
+        self.keep_record("gone")
+        git(self.ws, "worktree", "remove", "--force", self.tree)
+        for args in (("--forget", PARENT), ("--forget",)):
+            with self.subTest(args=args):
+                refused = self.sync(*args)
+                self.assertEqual(2, refused.returncode, refused.stdout + refused.stderr)
+                self.assertIn("ccnavi-user-forget.sh", refused.stderr)
+                self.assertIn("何もしていません", refused.stderr)
+                self.assertTrue(os.path.exists(self.record))
 
     # ---- 統合先（設定か、無ければホストのデフォルトブランチ）と、
     # 統合先の取り込み結果（最後に取り込んだ先頭）

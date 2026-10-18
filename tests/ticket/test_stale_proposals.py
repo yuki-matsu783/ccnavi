@@ -52,7 +52,7 @@ class StaleProposalTest(PhaseHarness):
         self.assertTrue(os.path.isfile(stale))
 
         self.assertEqual(self.pending(), [])
-        again = self.ccnavi("--agree", stdin="y\n")
+        again = self.ccnavi("user", "agree", stdin="y\n")
         self.assertNotIn("design", again.stdout)
         with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
             held = f.read()
@@ -177,7 +177,7 @@ class StaleProposalTest(PhaseHarness):
         self.assertIn(
             "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き", verify.stdout
         )
-        agree = self.ccnavi("--agree", stdin="y\n")
+        agree = self.ccnavi("user", "agree", stdin="y\n")
         self.assertIn("承認待ちのチケットはありません。", agree.stdout)
         self.assertIn(place_rel, agree.stderr)
         self.assertIn(

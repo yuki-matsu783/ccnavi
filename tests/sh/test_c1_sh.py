@@ -5,7 +5,8 @@ C1 は、取り込み済みの親子のチケットで状態を書く操作を
 Chrome が未 push の古い状態で判定しないようにする。
 
 使い捨てのワークスペースと bare のリモートを組み、sh（ccnavi-ticket.sh・ccnavi-review.sh・
-ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリーのソースを `python -m ccnavi` で
+ccnavi-user-push-approved.sh・ccnavi-user-decide.sh・ccnavi-user-close-early.sh）を外から呼ぶ。
+実行ファイルはこのツリーのソースを `python -m ccnavi` で
 起こす（実際の判定・見分け・書いたパスの一覧を通す）。リモートを動かすのは別に clone した押し手で、
 ワークスペースからは「他の機械（Chrome）が push した」ように見える。
 
@@ -25,12 +26,12 @@ ccnavi-push-approved.sh）を外から呼ぶ。実行ファイルはこのツリ
    tests/config/ が見る）
 8. hook の書きかけ（pending・skipped）はコミットし、
    ユーザの判断（c）と知らない変更（d）は止める
-9. ユーザの判断の入口（ccnavi-review.sh close-early など）は、取り込み済みの親子のチケットなら
+9. ユーザの判断の入口（ccnavi-user-close-early.sh など）は、取り込み済みの親子のチケットなら
    承認の push を自動で呼ぶ
 10. 取り込み状態の無い親子のチケット・origin の無いリポジトリ・
     マージリクエストで見るフェーズが無い親子のチケットは今のまま
     （コミットも push もしない）
-11. 承認の push（ccnavi-push-approved.sh <親>）は取り込んでから送り、失敗してもコミットを残す
+11. 承認の push（ccnavi-user-push-approved.sh <親>）は取り込んでから送り、失敗してもコミットを残す
 12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、C1 の confirm が
     書いて送ったものが、経路・時刻のほかは同じ
 
@@ -71,6 +72,21 @@ APPROVED = ".ccnavi/approved"
 
 # 実行ファイルの代わり。このツリーのソースを起こす。
 EXE = """#!/bin/sh
+# `user` の入口は、ラッパーのオプション（--root など）の後の最初の語。
+# 端末要求を切るオプションを前に置くと読み替わらないので、`user` の呼び出しでは後ろに付ける
+# （ほかは `--` を挟む呼び出しがあるので前に付ける）。
+skip=""; first=""
+for a in "$@"; do
+  if [ -n "$skip" ]; then skip=""; continue; fi
+  case "$a" in
+  --root | --cwd | --record-writes | --record-tree) skip=1 ;;
+  --root=* | --cwd=* | --record-writes=* | --record-tree=*) ;;
+  *) first="$a"; break ;;
+  esac
+done
+if [ "$first" = user ]; then
+  PYTHONPATH='{root}/src' exec '{python}' -m ccnavi "$@" --guard-ticket-approval disable
+fi
 PYTHONPATH='{root}/src' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
 """
 
@@ -213,7 +229,7 @@ class C1Harness(unittest.TestCase):
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "propose")
         digest = json.loads(self.exe("--agree", "--preview", "--json").stdout)["digest"]
-        done = self.exe("--agree", "--yes", f"{PARENT},{CHILD}", "--digest", digest, "--json")
+        done = self.exe("user", "agree", "--yes", f"{PARENT},{CHILD}", "--digest", digest, "--json")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "approve")
@@ -407,7 +423,7 @@ class C1TicketTest(C1Harness):
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("ユーザの判断が未送信", result.stderr)
-        self.assertIn(f"ccnavi-push-approved.sh {PARENT}", result.stderr)
+        self.assertIn(f"ccnavi-user-push-approved.sh {PARENT}", result.stderr)
         self.assertEqual(self.read(self.copy(PARENT)), copy)
         self.assertEqual(self.sha(self.tree, "HEAD"), head)
         self.assertFalse(os.path.exists(self.lock_dir()))
@@ -825,7 +841,7 @@ class C1MergeTest(C1Harness):
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "propose b")
         digest = json.loads(self.exe("--agree", "--preview", "--json").stdout)["digest"]
-        done = self.exe("--agree", "--yes", CHILD_B, "--digest", digest, "--json")
+        done = self.exe("user", "agree", "--yes", CHILD_B, "--digest", digest, "--json")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "-q", "-m", "approve b")
@@ -1559,7 +1575,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         write(os.path.join(self.tree, rel), "steps: []\n")
         child = self.child_tree()
         write(os.path.join(child, APPROVED, "doing", "stray.md"), "x\n")
-        result = self.sh("ccnavi-push-approved.sh")
+        result = self.sh("ccnavi-user-push-approved.sh")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("子のワークツリー", result.stderr)
         self.assertEqual(
@@ -1572,7 +1588,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         rel = f"{APPROVED}/flows/{CHILD}.yml"
         write(os.path.join(self.tree, rel), "steps: []\n")
         remote = self.remote_commit("src/remote.py", "y = 2\n")
-        result = self.sh("ccnavi-push-approved.sh", PARENT)
+        result = self.sh("ccnavi-user-push-approved.sh", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(rel, self.committed())
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
@@ -1584,7 +1600,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         rel = f"{APPROVED}/flows/{CHILD}.yml"
         write(os.path.join(self.tree, rel), "steps: []\n")
         executable(os.path.join(self.remote, "hooks", "pre-receive"), "#!/bin/sh\nexit 1\n")
-        result = self.sh("ccnavi-push-approved.sh", PARENT)
+        result = self.sh("ccnavi-user-push-approved.sh", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("コミットはローカルに残っています", result.stderr)
         self.assertIn(rel, self.committed())
@@ -1593,7 +1609,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         stopped = self.ticket("start", PARENT)
         self.assertEqual(stopped.returncode, 1, stopped.stdout + stopped.stderr)
         self.assertIn("未送信のユーザの判断", stopped.stderr)
-        again = self.sh("ccnavi-push-approved.sh", PARENT)
+        again = self.sh("ccnavi-user-push-approved.sh", PARENT)
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
         self.assertEqual(self.ticket("start", PARENT).returncode, 0)
 
@@ -1614,7 +1630,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         os.remove(os.path.join(self.tree, taken))
         write(os.path.join(self.tree, rewritten), "nodes: [x]\n")
         write(os.path.join(self.tree, untracked), "nodes: []\n")
-        result = self.sh("ccnavi-push-approved.sh", PARENT)
+        result = self.sh("ccnavi-user-push-approved.sh", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         # 同じ中身なので、改名として読まずに 2 つのパスで見る。
         out = git(self.tree, "show", "--name-only", "--no-renames", "--format=", "HEAD").stdout
@@ -1640,7 +1656,7 @@ class C1HumanTest(PhaseOne, C1Harness):
         write(os.path.join(self.tree, flow_rel), "nodes: []\n")
         os.remove(os.path.join(self.tree, taken))
         write(os.path.join(self.tree, rewritten), "name: y\n")
-        result = self.sh("ccnavi-push-approved.sh", PARENT)
+        result = self.sh("ccnavi-user-push-approved.sh", PARENT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         out = git(self.tree, "show", "--name-only", "--no-renames", "--format=", "HEAD").stdout
         self.assertEqual(sorted(out.split()), sorted([flow_rel, taken]))
@@ -1653,13 +1669,13 @@ class C1HumanTest(PhaseOne, C1Harness):
         rel = f"{APPROVED}/flows/{CHILD}.yml"
         write(os.path.join(self.tree, rel), "steps: []\n")
         self.remote_commit("src/remote.py", "y = 2\n")
-        result = self.sh("ccnavi-push-approved.sh")
+        result = self.sh("ccnavi-user-push-approved.sh")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認済みチケットを取り込んだうえで", result.stdout)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
 
 
-# 実行ファイルの半分の代役。残った指摘の行き先（`--reviewed ... --yes`）だけを代わりに書き
+# 実行ファイルの半分の代役。残った指摘の行き先（`user reviewed ... --yes`）だけを代わりに書き
 # （親のワークツリーにレビュー済みマーカーを置き、書いたパスの一覧を出し、
 # 答えの JSON と下書きを書く）、
 # 残り（`c1 family`・`c1 sort`・`sync paths` など）は実際のものに渡す。
@@ -1670,7 +1686,7 @@ case " $* " in
   for a in "$@"; do [ "$prev" = --accept-plan ] && plan="$a"; prev="$a"; done
   printf '{{"version":1,"digest":"","threads":[]}}\\n' >"$plan"
   exit 0 ;;
-*" --reviewed "*" --yes "*)
+*" user reviewed "*" --yes "*)
   list=""; tree=""; root=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -1689,6 +1705,21 @@ case " $* " in
   printf '{{"version":1,"ok":true,"reviewed":true,"followup":""}}\\n'
   exit 0 ;;
 esac
+# `user` の入口は、ラッパーのオプション（--root など）の後の最初の語。
+# 端末要求を切るオプションを前に置くと読み替わらないので、`user` の呼び出しでは後ろに付ける
+# （ほかは `--` を挟む呼び出しがあるので前に付ける）。
+skip=""; first=""
+for a in "$@"; do
+  if [ -n "$skip" ]; then skip=""; continue; fi
+  case "$a" in
+  --root | --cwd | --record-writes | --record-tree) skip=1 ;;
+  --root=* | --cwd=* | --record-writes=* | --record-tree=*) ;;
+  *) first="$a"; break ;;
+  esac
+done
+if [ "$first" = user ]; then
+  PYTHONPATH='{root}/src' exec '{python}' -m ccnavi "$@" --guard-ticket-approval disable
+fi
 PYTHONPATH='{root}/src' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
 """
 
@@ -1704,7 +1735,7 @@ exec '{git}' "$@"
 
 @unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
 class C1ReviewTest(C1Harness):
-    """ccnavi-review.sh の状態を書くサブコマンドも C1 で回す（decide を代表に見る）。"""
+    """レビューの状態を書く sh も C1 で回す（ccnavi-user-decide.sh を代表に見る）。"""
 
     def setUp(self):
         super().setUp()
@@ -1732,8 +1763,7 @@ class C1ReviewTest(C1Harness):
 
     def decide(self, *args):
         return self.sh(
-            "ccnavi-review.sh",
-            "decide",
+            "ccnavi-user-decide.sh",
             *args,
             cwd=self.tree,
             PATH=self.path,
@@ -1811,14 +1841,29 @@ case " $* " in
 *" review confirm "*)
   : >"$list"; put "$m/1.reviewed" '{{"mr": 1, "accepted": [], "at": "t"}}'; exit 0 ;;
 *" review ready "*) : >"$list"; put "$m/ready.json" '{{"mr": 1, "at": "t"}}'; exit 0 ;;
-*" --close-early "*" --accept-plan "*)
+*" user close-early "*" --accept-plan "*)
   plan=""; prev=""
   for a in "$@"; do [ "$prev" = --accept-plan ] && plan="$a"; prev="$a"; done
   printf '{{"version":1,"digest":"","threads":[]}}\\n' >"$plan"
   exit 0 ;;
-*" --close-early "*" --accept-check "*) exit 0 ;;
-*" --close-early "*) put "$m/2.skipped" '{{"by": "close-early", "at": "t"}}'; exit 0 ;;
+*" user close-early "*" --accept-check "*) exit 0 ;;
+*" user close-early "*) put "$m/2.skipped" '{{"by": "close-early", "at": "t"}}'; exit 0 ;;
 esac
+# `user` の入口は、ラッパーのオプション（--root など）の後の最初の語。
+# 端末要求を切るオプションを前に置くと読み替わらないので、`user` の呼び出しでは後ろに付ける
+# （ほかは `--` を挟む呼び出しがあるので前に付ける）。
+skip=""; first=""
+for a in "$@"; do
+  if [ -n "$skip" ]; then skip=""; continue; fi
+  case "$a" in
+  --root | --cwd | --record-writes | --record-tree) skip=1 ;;
+  --root=* | --cwd=* | --record-writes=* | --record-tree=*) ;;
+  *) first="$a"; break ;;
+  esac
+done
+if [ "$first" = user ]; then
+  PYTHONPATH='{root}/src' exec '{python}' -m ccnavi "$@" --guard-ticket-approval disable
+fi
 PYTHONPATH='{root}/src' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
 """
 
@@ -1907,7 +1952,7 @@ class C1HostHarness(C1Harness):
             HOST_HALF.format(root=ROOT, python=sys.executable),
         )
 
-    def review(self, *args, stdin="", **extra):
+    def review(self, *args, stdin="", script="ccnavi-review.sh", **extra):
         env = {
             "PATH": self.path,
             "GITLAB_TOKEN": "t0k",
@@ -1915,7 +1960,7 @@ class C1HostHarness(C1Harness):
             "HALF_TREE": self.tree,
         }
         env.update(extra)
-        return self.sh("ccnavi-review.sh", *args, cwd=self.tree, stdin=stdin, **env)
+        return self.sh(script, *args, cwd=self.tree, stdin=stdin, **env)
 
     def carried(self, rel):
         self.assertIn(rel, self.committed())
@@ -1925,7 +1970,7 @@ class C1HostHarness(C1Harness):
 
 @unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
 class C1HostTest(C1HostHarness):
-    """ホストに触るサブコマンド（request・confirm・ready・decide・close-early）の C1。"""
+    """ホストに触るサブコマンド（request・confirm・ready）と、ユーザ専用の decide・close-early。"""
 
     def test_request_confirm_and_ready_are_carried(self):
         body = write(os.path.join(self._base, "body.md"), "見てほしい\n")
@@ -2234,14 +2279,14 @@ class C1HostTest(C1HostHarness):
             "esac\n"
             f"exec '{self.half}' \"$@\"\n",
         )
-        done = self.review("decide", "1", CCNAVI_BIN_PATH=chooser)
+        done = self.review("1", script="ccnavi-user-decide.sh", CCNAVI_BIN_PATH=chooser)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("行き先を置いて送った", done.stdout)
         self.assertNotIn("LOCKED-WHILE-CHOOSING", done.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/1.reviewed")
 
     def test_close_early_hands_over_to_the_carrier(self):
-        closed = self.review("close-early", "--reason", "r", "--no-issue")
+        closed = self.review("--reason", "r", "--no-issue", script="ccnavi-user-close-early.sh")
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/2.skipped")
 

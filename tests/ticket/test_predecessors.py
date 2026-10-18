@@ -305,7 +305,8 @@ class PredecessorTest(TicketTest):
         chosen = self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--reviewed",
+            "user",
+            "reviewed",
             "1",
             "--accept-unresolved",
             "--result",

@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 
 from ccnavi.infra import settings
-from ccnavi.tickets import plan_templates, template_drafts
+from ccnavi.tickets import template_drafts
 from tests import ROOT
 from tests.inproc import run_ccnavi
 from tests.ticket.test_archive import ReadyHarness
@@ -37,8 +37,19 @@ class CloseNoticeTest(ReadyHarness):
         conf, _ = settings.load(self.root)
         return conf
 
-    def draft_file(self, name="i0001"):
-        return plan_templates.draft_file(self.conf(), self.parent_tree, name)
+    def draft_file(self, name="i0001", to="project"):
+        """親のツリーの `wip/handoff/` の、テンプレートの下書き 1 本。"""
+        layer = "common" if to == "common" else "project"
+        return os.path.join(
+            self.parent_tree,
+            "wip",
+            "handoff",
+            ".ccnavi",
+            "config",
+            layer,
+            "templates",
+            name + ".yml",
+        )
 
     def common_template(self, name, text):
         directory = settings.common_templates_dir(self.conf(), self.root)
@@ -54,7 +65,8 @@ class CloseNoticeTest(ReadyHarness):
         self.assertIn("ccnavi --templates --draft i0001", lines[0])
         self.assertIn("退避されて拾えない", lines[0])
         # 下書きを残したままでは ready が止まるので、そのことも言う。
-        self.assertIn("下書きは取り込むか削除してから ready", lines[0])
+        self.assertIn("ccnavi user handoff", lines[0])
+        self.assertIn("削除してから ready", lines[0])
         # 案内は、ready の案内の後ろに足す。
         self.assertGreater(closed.stdout.index(MARK), closed.stdout.index("logs/archive/"))
 
@@ -66,6 +78,14 @@ class CloseNoticeTest(ReadyHarness):
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertEqual(notice_lines(closed), [])
         self.assertIn("logs/archive/", closed.stdout)
+
+    def test_a_common_draft_of_the_parent_silences_it_too(self):
+        self.closable(
+            before_close=lambda: write(
+                self.draft_file(to="common"), "name: i0001\nplan: [design]\n"
+            )
+        )
+        self.assertEqual(notice_lines(self.parent_closed), [])
 
     def test_a_draft_under_another_name_does_not(self):
         self.closable(before_close=lambda: write(self.draft_file("other"), "name: other\n"))

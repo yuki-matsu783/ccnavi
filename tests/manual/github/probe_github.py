@@ -589,7 +589,7 @@ def main() -> int:
         title="b を書く",
     )
     commit_all(parent_tree, "tickets")
-    approved = exe("--agree", stdin="y\n")
+    approved = exe("user", "agree", stdin="y\n")
     record("--agree（親 1 子 2）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
 
     # 子より先に親に着手する（親が doing/ に無いと子は始められない）
@@ -1015,7 +1015,7 @@ def main() -> int:
     )
     write(os.path.join(parent2, "src", "c.py"), "print('c')\n")
     commit_all(parent2, "tickets")
-    approved = exe("--agree", stdin="y\n")
+    approved = exe("user", "agree", stdin="y\n")
     record("--agree（i0002）", approved.returncode == 0, redact(approved.stderr.strip())[:200])
     pushed2 = sh(GIT_SH, parent2, "push", "-u", "origin", "i0002")
     if pushed2.returncode == 0:

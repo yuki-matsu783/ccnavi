@@ -86,7 +86,7 @@ class ResumedReviewWarnTest(PhaseHarness):
             self.assertIn(
                 "取り込み済みで origin があり、マージリクエストで見るフェーズがある親子なら", text
             )
-            self.assertIn("ccnavi-push-approved.sh i0001", text)
+            self.assertIn("ccnavi-user-push-approved.sh i0001", text)
             self.assertIn("ユーザが自分でコミットする", text)
             self.assertIn("新しいチケットを作り直す", text)
         # マーカーは消さない

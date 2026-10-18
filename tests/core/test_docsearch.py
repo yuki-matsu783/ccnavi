@@ -604,19 +604,33 @@ class CliTest(Repo):
     def test_flags_of_other_runs_stop_docs(self):
         self.put("a.md", doc(type="guide"))
         for args in (
-            ("--yes", "i0001"),
             ("--preview",),
             ("--verify",),
             ("--result", "{}"),
             ("--tickets", "wip"),
             ("--reason", "x"),
             ("--flow", "f.yml"),
-            ("--reviewed", "0"),
         ):
             with self.subTest(args=args):
                 done = self.ccnavi("--docs", *args)
                 self.assertEqual(done.returncode, 1, done.stdout)
                 self.assertIn(f"--docs は {args[0]} と一緒に使えない", done.stderr)
+
+    def test_user_operations_do_not_go_with_docs(self):
+        """`user` の操作にも `--docs` は添えられない。`user` の外の `--yes` は先に断る。"""
+        self.put("a.md", doc(type="guide"))
+        for args, flag in (
+            (("user", "reviewed", "0", "--docs"), "--reviewed"),
+            (("user", "agree", "--yes", "i0001", "--docs"), "--agree"),
+            (("user", "prune", "--docs"), "--prune"),
+        ):
+            with self.subTest(args=args):
+                done = self.ccnavi(*args)
+                self.assertEqual(done.returncode, 1, done.stdout)
+                self.assertIn(f"--docs は {flag} と一緒に使えない", done.stderr)
+        refused = self.ccnavi("--docs", "--yes", "i0001")
+        self.assertEqual(refused.returncode, 2, refused.stdout)
+        self.assertIn("ユーザ専用", refused.stderr)
 
     def test_settings_and_wrapper_flags_stop_docs_too(self):
         """設定や sh のパスを差し替えるフラグも、何も言わずに無視せず、止める。"""

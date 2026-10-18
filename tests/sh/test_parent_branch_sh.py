@@ -50,7 +50,22 @@ CHILD = f"{PARENT}-01-01"
 APPROVED = ".ccnavi/approved"
 TODO = "wip/proposals/todo"
 
+# 実行ファイルの代わり。このツリーのソースを起こす。`user` の入口は、ラッパーのオプション
+# （--root など）の後の最初の語なので、端末要求を切るオプションは `user` の呼び出しでは
+# 後ろに付ける。
 EXE = """#!/bin/sh
+skip=""; first=""
+for a in "$@"; do
+  if [ -n "$skip" ]; then skip=""; continue; fi
+  case "$a" in
+  --root | --cwd | --record-writes | --record-tree) skip=1 ;;
+  --root=* | --cwd=* | --record-writes=* | --record-tree=*) ;;
+  *) first="$a"; break ;;
+  esac
+done
+if [ "$first" = user ]; then
+  PYTHONPATH='{src}' exec '{python}' -m ccnavi "$@" --guard-ticket-approval disable
+fi
 PYTHONPATH='{src}' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
 """
 
@@ -225,7 +240,7 @@ class ParentBranchShTest(unittest.TestCase):
         preview = self.ok(self.exe("--agree", "--preview", "--json"))
         body = json.loads(preview.stdout)
         done = self.exe(
-            "--agree", "--yes", f"{PARENT},{CHILD}", "--digest", body["digest"], "--json"
+            "user", "agree", "--yes", f"{PARENT},{CHILD}", "--digest", body["digest"], "--json"
         )
         self.ok(done)
         git(self.tree, "add", "-A")

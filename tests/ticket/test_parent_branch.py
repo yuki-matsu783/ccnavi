@@ -28,7 +28,7 @@ import unittest
 from ccnavi.entry import version
 from ccnavi.tickets import ticket as ticket_mod
 from ccnavi.tickets import ticket_ids
-from tests import ROOT, common_path, config_path
+from tests import ROOT, common_path, config_path, userform
 from tests.inproc import run_ccnavi
 from tests.ticket.test_swap_points import STAMP
 from tests.ticket.test_ticket import git, write
@@ -147,17 +147,19 @@ class ParentBranchTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         return run_ccnavi(
-            [
-                "--root",
-                self.root,
-                "--guard-core-files",
-                "disable",
-                "--restore-if-deny",
-                "disable",
-                "--guard-ticket-approval",
-                "disable",
-                *args,
-            ],
+            userform.place(
+                [
+                    "--root",
+                    self.root,
+                    "--guard-core-files",
+                    "disable",
+                    "--restore-if-deny",
+                    "disable",
+                    "--guard-ticket-approval",
+                    "disable",
+                ],
+                args,
+            ),
             input=stdin,
             cwd=ROOT,
             env=environment,
@@ -180,7 +182,7 @@ class ParentBranchTest(unittest.TestCase):
         return json.loads(done.stdout)
 
     def approve(self):
-        done = self.ccnavi("--agree", stdin="y\n")
+        done = self.ccnavi("user", "agree", stdin="y\n")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
     def test_the_screen_has_no_branch_line(self):
