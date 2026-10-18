@@ -219,9 +219,9 @@ def is_worktree_of(root: str, candidate: str) -> bool:
     gitdir = line[len("gitdir:") :].strip()
     if not os.path.isabs(gitdir):
         gitdir = os.path.join(candidate, gitdir)
-    gitdir = _canonical(gitdir)
+    gitdir = _key(gitdir)
 
-    registry = _canonical(os.path.join(root, ".git", "worktrees"))
+    registry = _key(os.path.join(root, ".git", "worktrees"))
     if not gitdir.startswith(registry + os.sep):
         return False
 
@@ -230,7 +230,7 @@ def is_worktree_of(root: str, candidate: str) -> bool:
             back = f.read().strip()
     except OSError:
         return False
-    return _canonical(back) == _canonical(gitfile)
+    return _key(back) == _key(gitfile)
 
 
 def tree_of(root: str, full: str, projects_dir: str = "") -> Tree | None:
@@ -241,10 +241,11 @@ def tree_of(root: str, full: str, projects_dir: str = "") -> Tree | None:
     """
     if not full:
         return None
-    target = _canonical(full)
+    target = _key(full)
     best: Tree | None = None
     for tree in all_trees(root, projects_dir):
-        inside = target == tree.root or target.startswith(tree.root + os.sep)
+        base = tree.root.casefold()
+        inside = target == base or target.startswith(base + os.sep)
         if inside and (best is None or len(tree.root) > len(best.root)):
             best = tree
     return best
@@ -253,16 +254,18 @@ def tree_of(root: str, full: str, projects_dir: str = "") -> Tree | None:
 def relative(tree: Tree, full: str) -> str:
     """作業ツリーのルートからの相対。区切りは "/"。ルートそのものなら空文字。
 
-    表記の大文字小文字は元のまま返す。normcase を掛けたパスから作ると、
-    区別しない機械（Windows）では全部が小文字になり、チケットが `README.md` と
-    書いた範囲に `readme.md` を当てることになって、永久に当たらない。
-    `os.path.relpath` は比較にだけ normcase を使い、返すパスは元のままなので、
-    根（normcase 済み）と突き合わせても大文字小文字は保たれる。
+    ルートとの突き合わせは、どの機械でも大文字小文字を区別しない（`_key`）。返す表記は
+    元のまま。小文字にしたパスから作ると、チケットが `README.md` と書いた範囲に
+    `readme.md` を当てることになって、永久に当たらない。
     """
-    target = _canonical(full)
-    if target == tree.root:
-        return ""
-    return os.path.relpath(_resolved(full), tree.root).replace(os.sep, "/")
+    resolved = _resolved(full)
+    root_parts = tree.root.split(os.sep)
+    parts = resolved.split(os.sep)
+    if len(parts) >= len(root_parts) and all(
+        a.casefold() == b.casefold() for a, b in zip(root_parts, parts, strict=False)
+    ):
+        return "/".join(parts[len(root_parts) :])
+    return os.path.relpath(resolved, tree.root).replace(os.sep, "/")
 
 
 def git_dir(tree_root: str) -> str | None:
@@ -412,18 +415,17 @@ def nfc(name: str) -> str:
     return unicodedata.normalize("NFC", name)
 
 
-# 大文字小文字を区別しない機械かどうか。承認済みチケットの索引を引くときに、ワークツリーの
-# 名前の表記が違っても同じ識別子として結び付けるのは、この機械だけ。
-CASE_INSENSITIVE = os.path.normcase("A") == "a"
-
-
 def lookup(index: dict, name: str):
-    """ワークツリーの名前で承認済みチケットを引く。区別しない機械では表記の違いを許す。"""
+    """ワークツリーの名前で承認済みチケットを引く。表記の大文字小文字の違いはどの機械でも許す。
+
+    先に表記までそのままの一致を取り、無いときだけ区別せずに引く。
+    """
     found = index.get(name)
-    if found is not None or not CASE_INSENSITIVE:
+    if found is not None:
         return found
+    folded = name.casefold()
     for key, value in index.items():
-        if key.lower() == name.lower():
+        if key.casefold() == folded:
             return value
     return None
 
@@ -438,5 +440,13 @@ def _resolved(path: str) -> str:
 
 
 def _canonical(path: str) -> str:
-    """同じ場所が同じ表記になる形。大文字小文字は区別しない機械のために normcase。"""
+    """ツリーのルートの表記。Windows は normcase で小文字になる。比べるときは `_key` を使う。"""
     return os.path.normcase(_resolved(path))
+
+
+def _key(path: str) -> str:
+    """同じ場所かを比べるための鍵。大文字小文字はどの機械でも区別しない。
+
+    比べるためだけに使う。ファイルを開く表記には使わない（Linux で別の場所になる）。
+    """
+    return _resolved(path).casefold()
