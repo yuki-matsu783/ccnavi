@@ -3133,7 +3133,7 @@ ccnavi --docs --tag worktree --tag git --format path    # どちらかのタグ�
 ccnavi --docs --path .ccnavi/docs --format count         # 件数だけ
 ```
 
-絞り方と出力の形式の一覧は `ccnavi --docs --help` で出る。`ccnavi --help` は話題の一覧だけを出し、話題ごとの節は `ccnavi <旗> --help`（例: `ccnavi ticket --help`）か `ccnavi --help <話題>`、全文は `ccnavi --help --all` で出る。SessionStart の案内もここを指す。
+絞り方と出力の形式の一覧は `ccnavi --docs --help` で出る。`ccnavi --help` は話題の一覧だけを出し、話題ごとの節は `ccnavi <旗> --help`（例: `ccnavi ticket --help`）か `ccnavi --help <話題>` で出す。全文は `ccnavi --help --all` で出る。SessionStart の案内もここを指す。
 
 md を本文ではなく頭の frontmatter で引く。grep は当たった行を返すので、そのファイルが何の文書かは開くまで分からず、
 よそからの言及も同じ重みで混ざる。frontmatter の書き方は [.ccnavi/docs/frontmatter.md](.ccnavi/docs/frontmatter.md)。
@@ -3390,8 +3390,8 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/entry/diagnose_board.py` | diagnose のうち、ボードの中身（`--explain --json`） |
 | `src/ccnavi/entry/diagnose_shared.py` | diagnose のうち、explain・board・try が共有するレイヤーの読み出しとルールの書き方 |
 | `src/ccnavi/entry/cli.py` | 1 回の起動の入口。標準入出力とコマンドラインを判定や各コマンドへ振り分け、ワークスペースルートを見つける |
-| `src/ccnavi/entry/cli_usage.py` | `--help` の本文。話題の一覧（`OVERVIEW`）、話題ごとの節（`TOPICS`）、全文（`USAGE`。`--help --all`）の三層 |
-| `src/ccnavi/entry/cli_args.py` | 引数の読み分け。設定を上書きする旗・診断だけの旗・`--docs` と並べられない旗と、パスの見分け。`--help` の話題の選び方（`help_text`） |
+| `src/ccnavi/entry/cli_usage.py` | `--help` の本文。話題の一覧（`OVERVIEW`）、話題ごとの節（`TOPICS`）、全文（`USAGE`。`--help --all`）の三つから成る |
+| `src/ccnavi/entry/cli_args.py` | 引数の読み分け。設定を上書きする旗、診断だけの旗、`--docs` と並べられない旗を分けるほか、パスかどうかも見分ける。`--help` の話題の選び方（`help_text`） |
 | `src/ccnavi/entry/cli_ops.py` | チケットとレビューの副命令を ops / review へ渡す。`sync` の問い合わせ |
 | `src/ccnavi/entry/cli_templates.py` | `--templates` の引数を受けて、テンプレートの一覧・検索・表示と、下書きの作成・取り込み（`--draft` / `--import`）を行う |
 | `src/ccnavi/entry/cli_plan.py` | `--plan-order` の引数を受けて答えを出す。振り直しと書き戻しは `tickets/plan_order.py` と `tickets/plan_phases.py` |

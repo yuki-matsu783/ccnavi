@@ -384,7 +384,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if test_words is not None and args.test is None:
         args.test = test_words
     if args.help:
-        # 一覧か話題の節だけ。全文は `--all`（読む量が多い）。
+        # 話題の一覧か節だけを出す。全文は `--all` で、読む量が多い。
         stderr.write(cli_args.help_text(args))
         return EXIT_ERROR
     refused = _test_usage(parser, args)

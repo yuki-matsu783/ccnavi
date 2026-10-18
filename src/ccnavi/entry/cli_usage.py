@@ -1,8 +1,8 @@
 """`ccnavi --help` の本文。
 
-`--help` は話題の一覧（`OVERVIEW`）だけを出し、`ccnavi --docs --help` のように話題の旗か副命令に
+`--help` だけなら話題の一覧（`OVERVIEW`）を出す。`ccnavi --docs --help` のように話題の旗か副命令に
 `--help` を付けると、その話題の節（`TOPICS`）だけを出す。全文は `--help --all`（`USAGE`）。
-読む量を、知りたい話題の分に絞るため。
+読む量を知りたい話題の分だけに抑えるため。
 
 cli から分けた。cli を読まない。
 """
@@ -521,10 +521,10 @@ TOPICS = (
     ("version", "ccnavi --version", "版・ビルド情報・受け付けるフラグを出す", _VERSION),
     ("lint", "ccnavi --lint", "ルール・フェーズ・リスクの設定を検証する", _LINT),
     ("test", "ccnavi --test", "ツールを動かさずにルールの判定を試す", _TEST),
-    ("explain", "ccnavi --explain", "チケットとその置き場を機械可読で一覧する", _EXPLAIN),
+    ("explain", "ccnavi --explain", "チケットとその置き場を、機械が読める形で一覧する", _EXPLAIN),
     ("docs", "ccnavi --docs", "md の frontmatter の索引を引く", _DOCS),
     ("templates", "ccnavi --templates", "作業・レビュー計画のテンプレートを扱う", _TEMPLATES),
-    ("logs", "ccnavi --prune / --suggest", "判定ログの整理と、ルールの候補づくり", _LOGS),
+    ("logs", "ccnavi --prune / --suggest", "判定ログを整理し、ルールの候補を作る", _LOGS),
     ("agree", "ccnavi --agree / --plan-order", "提案の承認と、計画の順序", _AGREE),
     ("ticket", "ccnavi ticket", "チケットの開始・終了・状態・雛形", _TICKET),
     (
@@ -535,7 +535,7 @@ TOPICS = (
     ),
 )
 
-# `--help <語>` と `ccnavi <語> --help` で話題に当てる語。話題の名前のほかに、スクリプト用の副命令。
+# `--help <語>` と `ccnavi <語> --help` で話題を選ぶ語。話題名のほか、スクリプト用の副命令も含む。
 TOPIC_WORDS = {
     **{name: name for name, *_ in TOPICS},
     **{
@@ -564,21 +564,21 @@ _HOW_WIDTH = 34
 OVERVIEW = (
     _INTRO
     + """
-話題ごとの使い方は、その話題の旗か副命令に --help を付けて出します
+話題ごとの使い方は、話題の旗か副命令に --help を付けると出ます
 （例: ccnavi --docs --help、ccnavi ticket --help）。ccnavi --help <話題> でも同じです。
-全文は ccnavi --help --all です。
+全文は ccnavi --help --all で出ます。
 
 """
     + "\n".join(f"    {name:<10} {how:<{_HOW_WIDTH}} {summary}" for name, how, summary, _ in TOPICS)
     + "\n"
 )
 
-# 全文。一覧のあとに話題を並べただけで、どの話題の節にも載らない文はない。
+# 全文は一覧のあとに各話題の節を並べたもので、節の外に残る文はない。
 USAGE = OVERVIEW + "\n" + "\n".join(body for *_, body in TOPICS)
 
 DOCS_USAGE = _DOCS
 
 
 def topic(name: str) -> str:
-    """話題の節。名前は TOPICS のもの。"""
+    """TOPICS にある話題名の節を返す。"""
     return next(body for n, _, _, body in TOPICS if n == name)

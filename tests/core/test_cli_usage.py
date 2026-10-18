@@ -1,5 +1,5 @@
-"""`ccnavi --help` の全文（`cli_usage.USAGE`）が、引数解析（`cli.py`）の受け付けるものを
-全部書いていること。
+"""`ccnavi --help` の全文（`cli_usage.USAGE`）に、引数解析（`cli.py`）の受け付けるものが
+すべて書かれていることを確かめる。
 
 フラグは `cli.py` の `add_argument` から、副命令は `cli.py` と `cli_ops.py` が見る語の組から
 拾い、本文に出てくるかを確かめる。解析にだけ足してヘルプに書き忘れると、ここで落ちる。
