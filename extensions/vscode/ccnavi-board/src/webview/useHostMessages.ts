@@ -7,7 +7,7 @@ import { applyAppearance } from "./appearance.js";
  * - `appearance` はここで受けて body のクラスを切り替える（画面の handler には渡さない）
  * - 受信の登録が済んだら `ready` を 1 回だけ呼ぶ（送る関数は画面ごとに違うので、呼ぶ側が渡す）。裏に回って捨てられた画面は、表に戻ると
  *   拡張ホストが入れてある HTML から作り直される。その HTML は少し古いことがあるので、いまの中身をもらい直す
- * - handler は毎回の描画で差し替わってよい。登録し直さないので、`ready` も 1 回きり
+ * - handler は毎回の描画で差し替わってよい。登録は 1 回だけなので、`ready` も 1 回だけ呼ぶ
  */
 export function useHostMessages<T extends { type?: string }>(handler: (message: Partial<T> & Record<string, unknown>) => void, ready: () => void): void {
   const latest = useRef(handler);

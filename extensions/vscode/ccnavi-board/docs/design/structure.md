@@ -92,7 +92,7 @@ src/
     vscode.ts         acquireVsCodeApi の窓口。画面ごとの契約に依存しない（送り口は poster<M>() で作る）
     initial.ts        埋め込みの JSON（最初の 1 枚）を読む。画面ごとの契約に依存しない
     appearance.ts     見た目の切り替え（body のクラスの書き換え）。8 画面で 1 本
-    useHostMessages.ts 拡張ホストからの message の受信（appearance はここで受ける）と、組み上がったときの ready。8 画面で 1 本
+    useHostMessages.ts 拡張ホストからのメッセージの受信（見た目はここで受ける）と、組み上がったときの ready。8 画面で 1 本
     useEscape.ts      Esc で閉じる面の入口。重なっているときは最も手前の面（ESCAPE_LAYER。CSS の z-index と同じ順）だけが受ける
     tours/<画面>.yml   案内の定義（sample: 案内の間だけ描く見本、courses: 基本の案内と使い方ごとの案内。段は target=data-tour の値・題・本文・scene）。ビルドのとき esbuild のプラグインが JSON にしてバンドルへ入れる（画面に YAML の解析器は入らない）。ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集・プロジェクト管理の 8 画面（プロジェクト管理は sample: を持たない）。list.css の `.field` / `.sum` は `display: contents` で箱を持たないので、指す先がそれでも `Tour.tsx` の `boxOf` が子の枠を合わせて光らせる
     Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。案内のある 8 画面で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。ツールバーは ScreenHeader が組み、? を最後の子に置くのでどの画面も同じ位置）で案内の一覧を開き、選んだ 1 本が出る（coursesOf が YAML の定義から案内の一覧を作る）

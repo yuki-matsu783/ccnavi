@@ -28,9 +28,9 @@ keywords: [設計, 画面, approval-machine, 見た目, ScreenHost, screenHost, 
 | ユーザが押せる操作 | `core/board-view.ts` の `BoardMessage` → 画面のボタン → `board-panel.ts` の `KNOWN`（形の確認の一覧）と `asMessage`（形の確認）と `handleMessage`（処理）。`KNOWN` か処理を書き忘れると型が合わなくなる（どちらも型で網羅を強制してある） |
 | 画面が覚えるもの | `webview/board/state.ts`（形と既定）→ `App.tsx`（読み書き）→ `test/board/board.dom.test.ts` |
 
-**画面を 1 つ足すとき、使い回せるもの。** `webviewScript` / `webviewStyle`（画面の名前で読む。拡張子は関数の側が付ける）、`poster<M>()`、`core/screen-host.ts`（`screenHost` / `retainedHost` と `embedJson`）、共通の部品 `@ccnavi/shared`（`extensions/shared/styles/` の `button.css`・`page.css`・`list.css`。画面の style.css で `button.css`・`../styles/appearance.css`・`page.css` の順に @import する）、`webview/vscode.ts`・`webview/initial.ts`・`webview/appearance.ts`、`webview/useHostMessages.ts`（拡張ホストからの受信と見た目と `ready`）・`webview/useEscape.ts`（Esc は最も手前の面だけが受ける。層は `ESCAPE_LAYER`、CSS の `z-index` と同じ順）・`webview/Tour.tsx` の `ScreenHeader`（ツールバーと「?」）、テストの共通部品（`test/helpers/dom.ts`・`test/helpers/bundle.ts`）。
+**画面を 1 つ足すとき、使い回せるもの。** `webviewScript` / `webviewStyle`（画面の名前で読む。拡張子は関数の側が付ける）、`poster<M>()`、`core/screen-host.ts`（`screenHost` / `retainedHost` と `embedJson`）、共通の部品 `@ccnavi/shared`（`extensions/shared/styles/` の `button.css`・`page.css`・`list.css`。画面の style.css で `button.css`・`../styles/appearance.css`・`page.css` の順に @import する）、`webview/vscode.ts`・`webview/initial.ts`・`webview/appearance.ts`、`webview/useHostMessages.ts`（拡張ホストからのメッセージの受信。見た目もここで受け、`ready` は呼ぶ側が渡す）・`webview/useEscape.ts`（Esc は最も手前の面だけが受ける。層は `ESCAPE_LAYER`、CSS の `z-index` と同じ順）・`webview/Tour.tsx` の `ScreenHeader`（ツールバーと「?」を組む）、テストの共通部品（`test/helpers/dom.ts`・`test/helpers/bundle.ts`）。
 
-画面ごとに要るのは、契約（`*-view.ts`）・入れ物を組む関数・画面の CSS（`webview/<名前>/style.css` と部品ごとの CSS）・`useHostMessages(handler, ready)` に渡す handler と `ready`・テストの入口（`test/helpers/<名前>.ts`）と、`test/shared/style.test.ts` の `reactPages` への 1 行（足し忘れは CB-T127 が止める）。
+画面ごとに要るのは、契約（`*-view.ts`）・入れ物を組む関数・画面の CSS（`webview/<名前>/style.css` と部品ごとの CSS）・`useHostMessages(handler, ready)` の引数（handler と `ready`）・テストの入口（`test/helpers/<名前>.ts`）と、`test/shared/style.test.ts` の `reactPages` への 1 行（足し忘れは CB-T127 が止める）。
 
 **実行ファイルへの往復がある画面（ルール管理）も、やり取りの形は同じ。** 画面は編集中の中身を付けて頼み（`judge` / `expectations`）、拡張ホストが実行ファイルの結果をそのまま返す（`judged` / `expectationsChecked`）。画面は判定の理屈を持たない。VS Code のダイアログが要る欄（`pickFile` → `picked`）も同じで、行を特定するキーは画面が渡し、拡張ホストは読まずにそのまま返す。
 

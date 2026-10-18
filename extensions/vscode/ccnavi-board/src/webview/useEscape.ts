@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 /**
- * 重なって出るものの前後。CSS の `z-index` と同じ順に並べる（大きいほど手前）。
+ * 重なって出るものの順。CSS の `z-index` と同じ順に並べる（大きいほど手前）。
  * Esc は、いま出ているもののうち最も手前の 1 つだけが受ける。
  */
 export const ESCAPE_LAYER = {
@@ -32,7 +32,7 @@ function onKey(event: KeyboardEvent): void {
   }
   let top: Entry | undefined;
   for (const entry of entries) {
-    // 同じ前後なら、あとから出たほうが手前
+    // 同じ順なら、あとから出たほうが手前
     if (top === undefined || entry.layer > top.layer || (entry.layer === top.layer && entry.order > top.order)) {
       top = entry;
     }

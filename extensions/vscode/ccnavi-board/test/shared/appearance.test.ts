@@ -208,7 +208,7 @@ test("CB-T183 見た目は段取りを通る。直に postMessage を呼ぶ道�
   assert.match(follow, /export function followAppearance\(panel: vscode\.WebviewPanel, host: AppearanceSink\)/);
 });
 
-test("CB-T183b 8 画面とも、段取りに繋いで、組み上がったところで送り直す", () => {
+test("CB-T183b 8 画面とも段取りに繋ぎ、組み上がったところで送り直す", () => {
   for (const name of [...REBUILT_PANELS, ...RETAINED_PANELS]) {
     const text = source(name);
     assert.match(text, /followAppearance\(panel, current\.host\)/, `${name} が段取りに繋いでいない`);
@@ -231,7 +231,7 @@ test("CB-T183c 保持する画面は、表に戻ったところでも送り直�
 });
 
 /**
- * 見た目のメッセージが、8 画面すべての契約（`To*`）に入っていること。tsc が見る。
+ * 見た目のメッセージが、8 画面すべての契約（`To*`）に入っていること。tsc が確かめる。
  *
  * 旧いコードは呼び出しのたびに `{ type: "appearance", value } satisfies ToBoard` と書いていて、
  * その画面の契約に入っていることをコンパイラが確かめていた。`postAppearance(host)` にそろえたときに

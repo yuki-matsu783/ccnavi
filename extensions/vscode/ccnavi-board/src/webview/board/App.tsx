@@ -100,7 +100,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     }
   };
 
-  // 拡張ホストが指す絞り込み。候補に無ければ何もしない（いまの絞り込みを外さない）
+  // 拡張ホストが指定した絞り込み。候補に無ければ何もしない（いまの絞り込みを外さない）
   const pickProject = (value: string): void => {
     if (!projectOptions(boardRef.current).includes(value)) {
       return;
@@ -109,7 +109,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   };
   useHostMessages<ToBoard>((message) => {
     if (message.type === "data" && message.data !== undefined) {
-      // 中身だけ。開いた直後の絞り込みは 1 枚目の HTML に埋まっていて、2 枚目からは filter で届く
+      // 中身だけ。開いた直後の絞り込みは 1 枚目の HTML に埋まっていて、2 枚目以降は filter のメッセージで届く
       setData(message.data);
       setRefreshing(false);
     } else if (message.type === "filter" && typeof message.project === "string") {

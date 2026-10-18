@@ -142,7 +142,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     } else if (message.type === "changed") {
       setChanged(true);
     } else if (message.type === "cancelled") {
-      // 「破棄して読み直す？」をやめた。止めた欄を戻す
+      // 「破棄して読み直す？」の確認をやめたので、止めていた欄を戻す
       setBusy(false);
       setStatus(undefined);
     } else if (message.type === "tour") {

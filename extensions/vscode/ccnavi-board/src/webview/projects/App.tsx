@@ -53,7 +53,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
   useHostMessages<ToProjects>((message) => {
     if (message.type === "data" && message.data !== undefined) {
       setData(message.data);
-      // 一覧が新しくなったので、それを見て言った失敗はもう今のことではない
+      // 一覧が新しくなったので、古い一覧を見て出た失敗は、もう今の状態ではない
       setStatus((now) => (now?.kind === "failed" ? undefined : now));
     } else if (message.type === "tour") {
       requestTour();

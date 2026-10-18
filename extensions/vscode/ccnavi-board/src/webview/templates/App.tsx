@@ -155,7 +155,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
     } else if (message.type === "changed") {
       setChanged(true);
     } else if (message.type === "cancelled") {
-      // 頼んだ往復が起きなかった。止めた欄を戻す
+      // 頼んだやりとりが起きなかったので、止めていた欄を戻す
       setBusy(false);
       setStatus(undefined);
     } else if (message.type === "tour") {

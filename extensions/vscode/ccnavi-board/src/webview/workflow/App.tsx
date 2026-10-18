@@ -200,7 +200,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
     if (draft !== undefined) {
       ask(draft);
     }
-    // 最初の 1 回だけ（`ask` は変わらない）。中身が入れ替わったときの頼み直しは "data" の受けがする
+    // 最初の 1 回だけ（`ask` は変わらない）。中身が入れ替わったときの頼み直しは、"data" の受信側が行う
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

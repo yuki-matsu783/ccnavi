@@ -202,7 +202,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       setChanged(false);
       setLock(pageOf(next)?.lock ?? NO_LOCK);
       if (next.kind === "loading") {
-        // 別の対象へ切り替わった。前の対象のルールで出した判定を、いまのルールの結果として残さない
+        // 別の対象へ切り替わった。前の対象のルールで出た判定を、いまのルールの結果として残さない
         setJudged(undefined);
         setChecked(undefined);
         setSuggested(undefined);
@@ -232,7 +232,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     } else if (message.type === "changed") {
       setChanged(true);
     } else if (message.type === "cancelled") {
-      // 「破棄して読み直す？」をやめた。止めたボタンを戻す
+      // 「破棄して読み直す？」の確認をやめたので、止めていたボタンを戻す
       setBusy(false);
       setStatus(undefined);
     } else if (message.type === "picked") {

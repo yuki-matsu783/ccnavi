@@ -2,7 +2,7 @@
  * 見た目の切り替え。拡張ホストが `{ type: "appearance", value }` を送ると body のクラスだけを切り替える。
  * 中身は作り直さないので、開いているオーバーレイも絞り込みも打ちかけの入力も消えない。
  *
- * 8 画面とも React なので。受け取るのは `useHostMessages`、、受け取る側はここ 1 本だけ。どの画面の部品からも読むため、画面ごとの契約には依存しない。
+ * 8 画面とも React で、見た目を受け取るのはここ 1 本だけ。画面では `useHostMessages` がこの関数を呼ぶ。どの画面の部品からも読むため、画面ごとの契約には依存しない。
  */
 export function applyAppearance(value: unknown): void {
   for (const name of Array.from(document.body.classList)) {
