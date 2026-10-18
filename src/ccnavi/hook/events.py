@@ -206,11 +206,23 @@ def decide_at_prompt(
     通知でも取り直す。
     """
     by_user = not payload.from_background_task()
-    guard = (
-        judge.guard_setting_files(mode, conf, root, payload, record, selfguard.accept)
-        if by_user
-        else ""
-    )
+    if by_user:
+        # 実行前・実行後の知らせ（`selfguard.report`）は「設定ファイルが変更された」と言い、
+        # 「自分で書き換えると戻る」と結ぶ。ここで返るのは取り直しの失敗だけなので、その文は使わず、
+        # モデルの文脈にも足さない。記録の `guarded` と標準エラーに残す。
+        failed = selfguard.accept(
+            modes.effective_setting(mode, conf.guard_core_files),
+            conf.state,
+            payload.session_id,
+            root,
+            selfguard_targets.targets(
+                root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
+            ),
+        )
+        if failed:
+            record.guarded = [f"{o.target.key}:{o.action}" for o in failed]
+            for o in failed:
+                stderr.write(f"ccnavi: {o.target.label}: {o.detail}\n")
     raw = approval.read_raw(conf, root) if conf.tickets_enabled else None
     watched, scope = watch_context(stderr, conf, root, record, raw)
     post.at_prompt(
@@ -229,7 +241,6 @@ def decide_at_prompt(
     hint = branchfind.prompt_context(
         conf, root, payload.prompt, payload.cwd, payload.session_id, stderr
     )
-    hint = "\n\n".join(p for p in (guard, hint) if p)
     # バックグラウンドのサブエージェントが範囲を確かめられないまま終わり、そのあと親が
     # ツールを使わずにターンを終えたなら、印はここまで残っている。次の依頼の前に言う。
     unchecked = subagent.unchecked_scope(conf.state, payload) if conf.tickets_enabled else ""

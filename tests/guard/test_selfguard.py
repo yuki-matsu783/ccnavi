@@ -1570,6 +1570,31 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(read(path), "MZ rebuilt\n")
         self.assertIn("restored", result.stdout)
 
+    def test_ユーザが消した実行ファイルがツール呼び出しの中で現れたら言うが消さない(self):
+        # 設定ファイルの「無かったところに現れた」と同じ扱い。差し替えを見逃さないよう言い、
+        # 次の実行前に新しい版として基準に入る。
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path)
+        os.remove(path)
+        self.run_hook("UserPromptSubmit", bin=path, prompt="お願いします")
+        write(path, "MZ built by a tool\n")
+
+        result = self.run_hook("PostToolUse", bin=path)
+
+        self.assertEqual(read(path), "MZ built by a tool\n", "消さない")
+        self.assertIn("実行ファイルが現れた", result.stdout)
+
+    def test_変わっていない実行ファイルの参照も古くならないよう更新時刻を新しくする(self):
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path)
+        ref = os.path.join(self.state, "selfguard", "s1", "bin.ref")
+        old = time.time() - 2 * 86400
+        os.utime(ref, (old, old))
+
+        self.run_hook("PreToolUse", bin=path)
+
+        self.assertLess(time.time() - os.stat(ref).st_mtime, 3600)
+
     def test_バックグラウンドの完了通知では消された実行ファイルを受け入れない(self):
         path = self.binary()
         self.run_hook("SessionStart", bin=path)

@@ -255,6 +255,9 @@ def before(
             # 大きい対象は、呼び出しのたびにコピーも読みもしない（数十 MB を毎回扱うと、
             # 判定より重くなる）。大きさと更新時刻が変わったときだけ、新しい版を基準に
             # 取り直す。ツールを呼ぶ前に、ccnavi の外で再ビルドされていた場合もここで取り直す。
+            # 参照は書き直さないので、掃除（`sweep`）が動いているセッションを古いと読まないよう、
+            # 更新時刻だけを新しくする。
+            _refresh(_ref_path(state_dir, session, target))
             if setting == ENABLE:
                 outcome = _rebase_if_changed(state_dir, session, target)
                 if outcome is not None:
@@ -400,6 +403,8 @@ def accept(
     消えたものを受け入れるのはここだけで、バックアップを捨てて `.absent` のマーカーを置く。
 
     バックアップを取り直すだけで、戻さない。`dry-run` でも取り直す（`at_start` と同じ理由）。
+    実行ファイルは、開始で基準が取れていて、変わっていれば取り直す。開始で取れなかったもの
+    （登録が無い、取るのに失敗した）は、ここでも取らない。
     バックグラウンド作業の完了通知では呼ばない（`hookio.Input.from_background_task`）。通知の間に
     プロセスが書いた変更は、ユーザの変更と区別できないので、受け入れずに次の照合に任せる。
     """
@@ -422,6 +427,10 @@ def accept(
 
         content = _read(target.path)
         if content is None:
+            if os.path.exists(target.path):
+                # 在るのに読めない（権限、一時的な入出力の失敗）。消えたことにはしない。
+                # バックアップを捨てると、あとで本当に消されても戻せなくなる。
+                continue
             fsio.remove(_backup_path(state_dir, session, target))
             _note_absent(state_dir, session, target)
             continue
@@ -469,12 +478,12 @@ def at_start(
     root: str,
     found: list[selfguard_targets.Target],
 ) -> list[Outcome]:
-    """セッションが始まったとき。対象をすべてバックアップする。
+    """セッションが始まったとき。大きい対象をバックアップする。
 
-    大きい対象をバックアップするのはここだけ。実行ファイルがこれにあたり、ツール呼び出しの
-    たびに数十 MB をコピーするわけにはいかないので、コピーするのはセッションに 1 度。そのあいだに
-    ツール呼び出しの外で作り直されたものは、次の実行前の照合で新しい版として基準に取り込む。
-    ツール呼び出しの中で変わったものは、実行後に、その直前の版へ戻す。
+    大きい対象は、実行ファイルがこれにあたり、ツール呼び出しのたびに数十 MB をコピーするわけには
+    いかないので、開始で 1 度コピーする。そのあいだにツール呼び出しの外で作り直されたものは、
+    次の発言（`accept`）か実行前（`before`）の照合で新しい版として基準に取り込む（そのときだけ
+    コピーし直す）。ツール呼び出しの中で変わったものは、実行後に、その直前の版へ戻す。
 
     小さいほうは取らない。最初の発言で `accept` が取る。開始から最初のツール呼び出しまでの間、
     エージェントは何も実行していないので、その間に設定ファイルが消えていても、ユーザの手による削除で、
@@ -684,6 +693,17 @@ def _check_heavy(
     """
     ref = _parse_ref(_read(_ref_path(state_dir, session, target)))
     if ref is None:
+        # ユーザが消したものを受け入れた（`accept`）あとで、この呼び出しの中で現れた。
+        # 設定ファイルの「無かったところに現れた」（`after`）と同じく、言うだけで消さない。
+        # 次の実行前に新しい版として基準に入る。判定器の実体が差し替わっていないかを、
+        # ユーザが見る機会を残す。
+        if _absent_noted(state_dir, session, target) and os.path.exists(target.path):
+            return Outcome(
+                target,
+                ACTION_MISSING,
+                "ユーザが消したあとに、実行ファイルが現れた。判定器が差し替わっているかもしれないので、"
+                "中身をユーザに見てもらってください",
+            )
         return None
     digest, size, mtime = ref
     if _same_shape(target.path, size, mtime):
