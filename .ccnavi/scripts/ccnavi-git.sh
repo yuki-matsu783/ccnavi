@@ -1910,7 +1910,7 @@ push)
 			;;
 		esac
 	done
-	# リモートから消えた親のブランチへは送らない（push の関門。C1・ccnavi-push-approved.sh と同じ）。
+	# リモートから消えた親のブランチへは送らない（push の関門。write-and-push・ccnavi-push-approved.sh と同じ）。
 	# 普通の push で作り直すと、消えた理由（改名・消し間違い・捨てた親子のチケット）を確かめないまま親子のチケットが
 	# 動き出す。送り先が origin のときだけ見る。送り先は git と同じ順で解く: 引数のリモート →
 	# branch.<b>.pushRemote → remote.pushDefault → branch.<b>.remote → origin。
@@ -1933,10 +1933,10 @@ push)
 		case "$push_top" in
 		"$push_root"/.claude/worktrees/*)
 			push_gate_rc=0
-			# 秒数は C1・ccnavi-push-approved.sh と同じ既定（60 秒。CCNAVI_C1_TIMEOUT で変えられる）。
-			case "${CCNAVI_C1_TIMEOUT:-}" in
+			# 秒数は write-and-push・ccnavi-push-approved.sh と同じ既定（60 秒。CCNAVI_WRITE_AND_PUSH_TIMEOUT で変えられる）。
+			case "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" in
 			'' | *[!0-9]*) push_gate_secs=60 ;;
-			*) push_gate_secs="$CCNAVI_C1_TIMEOUT" ;;
+			*) push_gate_secs="$CCNAVI_WRITE_AND_PUSH_TIMEOUT" ;;
 			esac
 			ccnavi_push_gate "$push_top" "$push_branch" "${push_top##*/}" "$push_root" "$push_gate_secs" || push_gate_rc=$?
 			case "$push_gate_rc" in

@@ -538,7 +538,8 @@ class ConfigUnionHarness(unittest.TestCase):
         return self.ccnavi("--mode", "enable", stdin=json.dumps(payload), **options)
 
     def approve(self):
-        """承認して、承認済みチケットを各ワークツリーにコミットする（本番は C1 が行う）。"""
+        """承認して、承認済みチケットを各ワークツリーにコミットする（本番は write-and-push
+        が行う）。"""
         done = self.ccnavi("--agree", stdin="y\n")
         wt = os.path.join(self.ws, ".claude", "worktrees")
         if os.path.isdir(wt):

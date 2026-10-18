@@ -20,7 +20,8 @@
 - `ready` が Draft を外した後（`ccnavi-review.sh ready`）: 親のワークツリー。外から
   `ready --parent <親>` で打てば消える
 
-C1 の中では書いたものが push の失敗で戻ることがあるので、C1 が送り終えてから呼ぶ。
+write-and-push の中では書いたものが push の失敗で戻ることがあるので、write-and-push
+が送り終えてから呼ぶ。
 
 消し方は、生成物（`node_modules` など。`ccnavi-clean.js` と同じ名前）を先に消してから
 `git worktree remove`（`--force` なし）。Windows で深い `node_modules` が `worktree remove` を

@@ -45,14 +45,14 @@
 # GITHUB_TOKEN / GITLAB_TOKEN。どちらも無ければ止まる。結果の組み立てには jq が要る。
 # 道具は起動時に絶対パスへ解いて固定する。PATH の細工で差し替えられないように。
 #
-# 取り込み済みの親子のチケット（origin があり、C1 の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）では、状態を書く
-# request（マーカー）・confirm・decide（--preview を除く）・ready を C1 で回す
+# 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）では、状態を書く
+# request（マーカー）・confirm・decide（--preview を除く）・ready を write-and-push で回す
 # （Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため）。
 # ロック → 途中の操作の確認 → hook のマーカーを先にコミット → 取り込み → 未送信の確かめを済ませてから
 # ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
 # ユーザの判断（close-early）は実行ファイルが書いた後、取り込み済みの親子のチケットなら
 # 承認の push（ccnavi-push-approved.sh <親>）を呼んで送る。
-# ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、承認の push の打ち直しを案内する。
+# ユーザの判断を溜めずにその場で送るためで、送れなければ次の write-and-push が止まり、承認の push の打ち直しを案内する。
 # それ以外は今のまま。
 #
 # 親のワークツリーの中で実行すること。どの親かは cwd から引く。ready だけは `--parent <親>` で
@@ -268,7 +268,7 @@ fi
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 # 親の識別子。親のワークツリー（.claude/worktrees/<識別子>）の名前で、親のブランチ名
 # の / を - に置き換えたもの（ブランチ名とは違うことがある）。マージリクエストは居るブランチ（branch）で探して作り、
-# C1 の親子のチケット・下書きの名前（実行ファイルと揃える）は識別子で引く。ワークツリーの外なら前どおりブランチ名。
+# write-and-push の親子のチケット・下書きの名前（実行ファイルと揃える）は識別子で引く。ワークツリーの外なら前どおりブランチ名。
 family="$branch"
 review_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 if [ -n "$review_top" ]; then
@@ -768,42 +768,42 @@ eli5_posted=""
 accept_plan=""
 accept_kept=""
 accept_file=""
-trap 'review_exit=$?; ccnavi_c1_end; accept_cleanup "$review_exit"; rm -f "$result" "$result.re" ${eli5_posted:+"$eli5_posted"} ${accept_plan:+"$accept_plan"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
-trap 'ccnavi_c1_end; exit 130' INT TERM HUP
+trap 'review_exit=$?; ccnavi_wap_end; accept_cleanup "$review_exit"; rm -f "$result" "$result.re" ${eli5_posted:+"$eli5_posted"} ${accept_plan:+"$accept_plan"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
+trap 'ccnavi_wap_end; exit 130' INT TERM HUP
 
-# ---- C1 と、ユーザの判断を送る承認の push
-ccnavi_c1_root="$root"
-ccnavi_c1_label=ccnavi-review
-ccnavi_c1_sh="$script_dir"
-ccnavi_c1_exe() { ccnavi "$@"; }
-c1_on=no
+# ---- write-and-push と、ユーザの判断を送る承認の push
+ccnavi_wap_root="$root"
+ccnavi_wap_label=ccnavi-review
+ccnavi_wap_sh="$script_dir"
+ccnavi_wap_exe() { ccnavi "$@"; }
+wap_on=no
 
-# C1 を始める（1〜5）。<識別子>。対象でなければ何もしない（今の手元の動き）。止める理由があれば抜ける。
-c1_start() {
-	ccnavi_c1_family "$1"
-	case "$ccnavi_c1_target" in
+# write-and-push を始める（1〜5）。<識別子>。対象でなければ何もしない（今の手元の動き）。止める理由があれば抜ける。
+wap_start() {
+	ccnavi_wap_family "$1"
+	case "$ccnavi_wap_target" in
 	stop)
-		ccnavi_c1_refuse
+		ccnavi_wap_refuse
 		exit 1
 		;;
 	yes)
-		ccnavi_c1_begin || exit 1
-		c1_on=yes
+		ccnavi_wap_begin || exit 1
+		wap_on=yes
 		;;
 	esac
 	return 0
 }
 
-# 状態を書く実行ファイルの 1 回。C1 の中なら書いたパスだけをコミットして送る（6〜11）。
-# <文> -- <実行ファイルの引数>...。ccnavi_c1_capture に書き先があれば標準出力をそこへ書く。
-c1_ccnavi() {
-	c1_words="$1"
+# 状態を書く実行ファイルの 1 回。write-and-push の中なら書いたパスだけをコミットして送る（6〜11）。
+# <文> -- <実行ファイルの引数>...。ccnavi_wap_capture に書き先があれば標準出力をそこへ書く。
+wap_ccnavi() {
+	wap_words="$1"
 	shift
 	[ "${1:-}" = "--" ] && shift
-	if [ "$c1_on" = yes ]; then
-		ccnavi_c1_write "ccnavi: ${c1_words}" -- "$@"
-	elif [ -n "$ccnavi_c1_capture" ]; then
-		ccnavi "$@" >"$ccnavi_c1_capture"
+	if [ "$wap_on" = yes ]; then
+		ccnavi_wap_write "ccnavi: ${wap_words}" -- "$@"
+	elif [ -n "$ccnavi_wap_capture" ]; then
+		ccnavi "$@" >"$ccnavi_wap_capture"
 	else
 		ccnavi "$@"
 	fi
@@ -811,17 +811,17 @@ c1_ccnavi() {
 
 # ユーザの判断をコミットして push する。取り込み済みの親子のチケットだけ、承認の push を <親> で呼ぶ。それ以外は今のまま何もしない。
 carry_human() {
-	ccnavi_c1_family "$1"
-	case "$ccnavi_c1_target" in
+	ccnavi_wap_family "$1"
+	case "$ccnavi_wap_target" in
 	yes)
-		sh "$ccnavi_c1_sh/ccnavi-push-approved.sh" "$ccnavi_c1_family_id" || {
+		sh "$ccnavi_wap_sh/ccnavi-push-approved.sh" "$ccnavi_wap_family_id" || {
 			printf 'ccnavi-review: ユーザの判断は置いたが送れなかった。接続を戻して sh %s/ccnavi-push-approved.sh %s をユーザが再実行します（送るまで、この親子のチケットの状態の操作は止まる）\n' \
-				"$ccnavi_c1_sh" "$ccnavi_c1_family_id" >&2
+				"$ccnavi_wap_sh" "$ccnavi_wap_family_id" >&2
 			return 1
 		}
 		;;
 	stop)
-		ccnavi_c1_refuse
+		ccnavi_wap_refuse
 		return 1
 		;;
 	esac
@@ -930,10 +930,10 @@ confirm)
 		esac
 		confirm_prev="$a"
 	done
-	c1_start "$family"
+	wap_start "$family"
 	fetch_all >"$result"
-	c1_ccnavi "$branch のレビュー済みを置いた" -- review confirm "$@" --result "$result"
-	# done/ へ動いた子のワークツリーを消す（C1 なら送り終えた後。push の失敗で戻ったときに、レビュー待ちの子の
+	wap_ccnavi "$branch のレビュー済みを置いた" -- review confirm "$@" --result "$result"
+	# done/ へ動いた子のワークツリーを消す（write-and-push なら送り終えた後。push の失敗で戻ったときに、レビュー待ちの子の
 	# ワークツリーを残すため）。消せなかったもの（cwd が中・未コミット）は名指しされるだけで、confirm は成功のまま。
 	case "$confirm_phase" in
 	'' | *[!0-9]*) ;;
@@ -1042,8 +1042,8 @@ request)
 		fail explainer-unmet "ELI5 の HTML ($eli5) が依頼の前提を満たさない:${eli5_unmet}
 ${eli5_how}"
 	log_debug ELI5 を確かめた -- "eli5=set"
-	# 段 0: 取り込み済みの親子のチケットなら C1 の前半（ロック・取り込み）を先に済ませる。
-	c1_start "$family"
+	# 段 0: 取り込み済みの親子のチケットなら write-and-push の前半（ロック・取り込み）を先に済ませる。
+	wap_start "$family"
 	# 段 1: 前提。exe が依頼の本文を書き出す。
 	tell_skew
 	prepared=$(ccnavi review prepare "$@") || exit $?
@@ -1063,7 +1063,7 @@ ${eli5_how}"
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
 	mr=$(printf '%s' "$mr" | "$JQ" -c '{number: .number, url: .url}')
-	# 段 2: 投稿。同じ目印（親・フェーズ・鍵）の依頼が既にあれば投稿し直さない（打ち直しや C1 の
+	# 段 2: 投稿。同じ目印（親・フェーズ・鍵）の依頼が既にあれば投稿し直さない（打ち直しや write-and-push の
 	# やり直しで依頼を二重にしない）。
 	request_marker=$(head -n 1 "$file" | tr -d '\r')
 	posted=$(find_posted "$number" "$url" "$request_marker") ||
@@ -1085,7 +1085,7 @@ ${eli5_how}"
 	"$JQ" -n --arg host "$kind" --argjson mr "$mr" --argjson posted "$posted" \
 		'{host: $host, mr: $mr} + $posted' >"$result"
 	# 段 3: マーカー。
-	c1_ccnavi "$branch のレビューを依頼した" -- review requested "$@" --result "$result"
+	wap_ccnavi "$branch のレビューを依頼した" -- review requested "$@" --result "$result"
 	# 段 4: crit の案内。crit はユーザの手元で打つ道具。
 	# crit push は crit の作業場所（打った場所）からの相対で行を送るので、ワークツリーのルートで打たせる。
 	# crit・gh・glab が PATH に無くても止めない。案内だけ出す。
@@ -1175,9 +1175,9 @@ decide)
 			decide_who="--actor=$decide_actor --via=$decide_via"
 		fi
 	fi
-	# 見るだけの --preview は何も書かないので C1 にしない。端末で選ぶ形は、選ぶのを C1 の外で先に
+	# 見るだけの --preview は何も書かないので write-and-push にしない。端末で選ぶ形は、選ぶのを write-and-push の外で先に
 	# 済ませる（ロックを持ったままユーザを待たない）ので、ここでは始めない。
-	[ "$preview" -eq 1 ] || [ -z "$choices" ] || c1_start "$family"
+	[ "$preview" -eq 1 ] || [ -z "$choices" ] || wap_start "$family"
 	fetch_all >"$result"
 	if [ "$preview" -eq 1 ]; then
 		ccnavi --reviewed "$n" --accept-unresolved --preview --json --result "$result"
@@ -1188,15 +1188,15 @@ decide)
 		tell_skew
 		# 受け入れる指摘（対応しない・issue に回す）には、置く前に返信を残して解決する。できなければここで止める。
 		accept_before_place "$choices" "$digest"
-		ccnavi_c1_capture="$state/review-decide-$$.out"
+		ccnavi_wap_capture="$state/review-decide-$$.out"
 		decide_rc=0
 		# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
-		c1_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
+		wap_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
 			--reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who ||
 			decide_rc=$?
-		out=$(cat "$ccnavi_c1_capture" 2>/dev/null || :)
-		rm -f "$ccnavi_c1_capture"
-		ccnavi_c1_capture=""
+		out=$(cat "$ccnavi_wap_capture" 2>/dev/null || :)
+		rm -f "$ccnavi_wap_capture"
+		ccnavi_wap_capture=""
 		[ "$decide_rc" -eq 0 ] || {
 			printf '%s\n' "$out"
 			exit 1
@@ -1205,10 +1205,10 @@ decide)
 		printf '%s' "$out" | "$JQ" -c --arg u "$issue_url" --arg w "$post_warning" '. + {issue_url: $u, warning: $w}'
 		exit 0
 	fi
-	ccnavi_c1_family "$family"
-	case "$ccnavi_c1_target" in
+	ccnavi_wap_family "$family"
+	case "$ccnavi_wap_target" in
 	stop)
-		ccnavi_c1_refuse
+		ccnavi_wap_refuse
 		exit 1
 		;;
 	esac
@@ -1223,29 +1223,29 @@ decide)
 		fail decide-choose-unreadable "選んだものを読めない（${chosen}）。" 1
 	}
 	rm -f "$chosen"
-	# 2. ホストに触る前に、ローカルで失敗しうること（C1 のロック・ツリーの確認）を済ませ、結果を取り直す。
+	# 2. ホストに触る前に、ローカルで失敗しうること（write-and-push のロック・ツリーの確認）を済ませ、結果を取り直す。
 	#    選んでいる間に指摘が変われば、取り直した結果とのダイジェストの照合で止まる。
-	case "$ccnavi_c1_target" in
+	case "$ccnavi_wap_target" in
 	yes)
-		ccnavi_c1_begin || exit 1
-		c1_on=yes
+		ccnavi_wap_begin || exit 1
+		wap_on=yes
 		;;
 	esac
 	refetch
 	# 3. 受け入れる指摘（対応しない・issue に回す）に返信を残して解決する。できなければ、何も置かずに止める。
 	accept_before_place "$choices" "$digest"
 	# 4. 選んだものを置く（`--yes`。取り直した結果で、見せた指摘とダイジェストが同じときだけ）。
-	case "$ccnavi_c1_target" in
+	case "$ccnavi_wap_target" in
 	yes)
-		ccnavi_c1_capture="$state/review-decide-$$.out"
+		ccnavi_wap_capture="$state/review-decide-$$.out"
 		decide_rc=0
 		# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
-		c1_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
+		wap_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
 			--reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who ||
 			decide_rc=$?
-		out=$(cat "$ccnavi_c1_capture" 2>/dev/null || :)
-		rm -f "$ccnavi_c1_capture"
-		ccnavi_c1_capture=""
+		out=$(cat "$ccnavi_wap_capture" 2>/dev/null || :)
+		rm -f "$ccnavi_wap_capture"
+		ccnavi_wap_capture=""
 		if [ "$decide_rc" -ne 0 ]; then
 			[ -z "$out" ] || printf '%s\n' "$out"
 			exit 1
@@ -1272,9 +1272,9 @@ decide)
 ready)
 	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめてマーカーとコメントの下書きを置き、
 	# 閉じた親子のチケット（done/ の親子・phases/<親>/・flows/・残っていれば旧版の events/）を手元の logs/archive/ へ
-	# 退避する（git の上では削除）。C1 の中なら、その削除をコミットして push してから、ここが外して
+	# 退避する（git の上では削除）。write-and-push の中なら、その削除をコミットして push してから、ここが外して
 	# コメントを投稿する。マージはユーザ（squash。既定のブランチにチケットを残さない）。
-	c1_start "$family"
+	wap_start "$family"
 	fetch_all >"$result"
 	# 打ち直しの判断（Draft を外し損ねたか）に、MR がまだ Draft かを結果に足す。
 	"$JQ" --argjson d "${mr_draft:-false}" '.mr.draft = $d' "$result" >"$result.draft" && mv -f "$result.draft" "$result"
@@ -1285,16 +1285,16 @@ ready)
 	if [ -n "${skew:-}" ]; then
 		printf 'ccnavi-review: 食い違いがあっても ready は続ける。エージェントは build.py を実行せず、終わったらユーザに実行ファイルの組み立て直し（または配り直し）を頼む。\n' >&2
 	fi
-	ccnavi_c1_capture="$state/review-ready-$$.out"
+	ccnavi_wap_capture="$state/review-ready-$$.out"
 	ready_rc=0
-	c1_ccnavi "$branch の Draft を解除するマーカーを置いた" -- review ready --result "$result" || ready_rc=$?
+	wap_ccnavi "$branch の Draft を解除するマーカーを置いた" -- review ready --result "$result" || ready_rc=$?
 	# 実行ファイルの標準出力は、1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`。
 	# wip/ から消したものがあれば、続けて `wip-from <消す前の HEAD>` と `wip <パス>`（1 行 1 本）。
-	noted=$(sed -n '1p' "$ccnavi_c1_capture" 2>/dev/null || :)
-	wip_from=$(sed -n 's/^wip-from //p' "$ccnavi_c1_capture" 2>/dev/null | head -n 1)
-	wip_gone=$(sed -n 's/^wip //p' "$ccnavi_c1_capture" 2>/dev/null || :)
-	rm -f "$ccnavi_c1_capture"
-	ccnavi_c1_capture=""
+	noted=$(sed -n '1p' "$ccnavi_wap_capture" 2>/dev/null || :)
+	wip_from=$(sed -n 's/^wip-from //p' "$ccnavi_wap_capture" 2>/dev/null | head -n 1)
+	wip_gone=$(sed -n 's/^wip //p' "$ccnavi_wap_capture" 2>/dev/null || :)
+	rm -f "$ccnavi_wap_capture"
+	ccnavi_wap_capture=""
 	[ "$ready_rc" -eq 0 ] || exit "$ready_rc"
 	if [ -n "$wip_gone" ]; then
 		printf 'wip/ の追跡済みのファイルを削除しました（%s 件。削除する前のコミット %s から戻せる）:\n' \

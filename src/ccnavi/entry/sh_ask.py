@@ -165,7 +165,8 @@ def _approved_parent(conf: settings.Settings, work: tree.Tree) -> tuple[str, str
     """承認済みの置き場（`doing/`・`done/`）に親チケットが在るかと、その `mr:` 欄、着手済みか。
 
     提案（`todo/`・`review/`）は数えない。push の関門が見るのは、承認された親だけ。
-    着手済みは `started_at` が空でないこと（`ticket start` は C1 で push してから完了するので、
+    着手済みは `started_at` が空でないこと（`ticket start` は write-and-push で push
+    してから完了するので、
     着手済みなら一度は push した）。親チケットが無い・読めないときは `no`。
     """
     approved = settings.approved_dir(conf, work.root)

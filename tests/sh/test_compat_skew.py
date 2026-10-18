@@ -195,7 +195,8 @@ class CompatAgreesTest(unittest.TestCase):
         self.assertGreaterEqual(version.COMPAT, 7)
 
     def test_v11_ready_removing_wip_raised_the_compat_to_8(self):
-        """V11 `review ready` が `wip/` の追跡済みのファイルを消すようになった。C1 の外では sh が
+        """V11 `review ready` が `wip/` の追跡済みのファイルを消すようになった。write-and-push
+        の外では sh が
         その削除の未コミットを確かめてから Draft を外す。なので 8 以上。
 
         確かめを持たない古い sh（互換 7）と新しい実行ファイルを組み合わせると、`wip/` の削除が
@@ -247,7 +248,8 @@ class CompatAgreesTest(unittest.TestCase):
         （`tree parent` の追加の行 `approved`・`requested`・`archived`・`mr`、`sync retired`、
         `sync migrate`）を呼ぶ。Chrome と手元の判定の規則も変わった。なので 13 以上。
 
-        旧い sh（互換 12）は取り込み状態の `present` を前提に C1 と承認の push を止める。
+        旧い sh（互換 12）は取り込み状態の `present` を前提に write-and-push と承認の push
+        を止める。
         組み合わせると、新しい実行ファイルは記録を書かないので、旧い sh が止まる。
         食い違いとして知らせる。sh の版と実行ファイルの版は揃える。
         """
@@ -257,7 +259,7 @@ class CompatAgreesTest(unittest.TestCase):
 
 @unittest.skipIf(not SHELL, "sh も bash も見つからない")
 class TicketStatusPassTest(unittest.TestCase):
-    """`ccnavi-ticket.sh status` は親を省いても実行ファイルへ渡す（C1 を通らない）。"""
+    """`ccnavi-ticket.sh status` は親を省いても実行ファイルへ渡す（write-and-push を通らない）。"""
 
     def setUp(self):
         self.ws = tempfile.mkdtemp(prefix="ccnavi-status-")

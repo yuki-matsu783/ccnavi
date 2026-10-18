@@ -266,12 +266,12 @@ export function pushApprovedCommand(
 }
 
 /**
- * `ccnavi c1 family <親>` の答えから `target`（`yes` / `no` / `stop`）を読む。頭の `c1 1` が無ければ
+ * `ccnavi write-and-push family <親>` の答えから `target`（`yes` / `no` / `stop`）を読む。頭の `write-and-push 1` が無ければ
  * 空文字（古い実行ファイル）。行末の CR は除く
  */
-export function c1TargetOf(stdout: string): string {
+export function writeAndPushTargetOf(stdout: string): string {
   const lines = stdout.split("\n").map((line) => line.replace(/\r$/, ""));
-  if (lines[0] !== "c1 1") {
+  if (lines[0] !== "write-and-push 1") {
     return "";
   }
   const found = lines.find((line) => line.startsWith("target "));

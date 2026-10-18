@@ -67,7 +67,7 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertIn("i0001", result.stdout)
         self.assertIn("通る", result.stdout)
         self.assertIn("承認を依頼してよい", result.stdout)
-        self.assertIn("次: ユーザに承認を依頼してよい", result.stdout)
+        self.assertIn("ユーザに承認を依頼してよい", result.stdout)
         self.assertNotIn("外れる", result.stdout)
         # 確かめただけ。承認済みチケットは置かれていない。
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))

@@ -63,7 +63,7 @@ sh は `<ワークスペースルート>/.ccnavi/scripts/` のものを絶対パ
 | REQ-EXT-16 | 事象 | `--test <ツール> <対象> --json` を求められたとき、ccnavi は、操作を実行せずに判定を JSON で返し、常に 0 で終わること。`--test-expectations <期待> --json` は常に 0、期待のファイルが読めなければ 1 で終わること。どちらも `--ticket-control disable --state "" --log ""` と、`--rules <パス>`・`--project-rules-file <名前\|self>=<パス>` の差し替えを受けること（REQ-DIA-02・REQ-DIA-09） |
 | REQ-EXT-17 | 事象 | `--lint` か `--lint --json` を求められたとき、ccnavi は、error があれば 1、無ければ 0 で終わること。`--rules`・`--risk`・`--phases`・`--project-rules-file`・`--project-phases-file`・`--project-risk-file` の差し替えを、hook と同じ読み手で検証すること。`--json` の苦情は `{severity, where, detail}` で、置き場の苦情は `where` を `(projects)`・`(projects/<名前>)` にすること。`--flow <パス>` を足したときは、そのフローを `SubagentStart` と同じ読み手で読み、読めた中身を `flow` に載せ、苦情の場所を `(flow)` にすること（REQ-DIA-04・REQ-DIA-08） |
 | REQ-EXT-18 | 事象 | `--suggest --json` を求められたとき、ccnavi は、記録からルールの候補を JSON で返し、何も書かずに 0 で終わること |
-| REQ-EXT-19 | 事象 | `ccnavi c1 family <親>` を求められたとき、ccnavi は、何も書かずに、1 行目に `c1 1`、続けて `<鍵> <値>` の行（`target yes`・`target no`・`target stop` を含む）を返して 0 で終わること。識別子の形でない値には 1 で終わること |
+| REQ-EXT-19 | 事象 | `ccnavi write-and-push family <親>` を求められたとき、ccnavi は、何も書かずに、1 行目に `write-and-push 1`、続けて `<鍵> <値>` の行（`target yes`・`target no`・`target stop` を含む）を返して 0 で終わること。識別子の形でない値には 1 で終わること |
 | REQ-EXT-20 | 事象 | `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-push-approved.sh [<親>...]` をユーザが打ったとき、ccnavi は、承認済みチケットの置き場の変更をコミットし、保護されたブランチでなければ push すること。親を並べたときは、その親子のチケットだけを送り、親のブランチがリモートに無ければ送らないこと（REQ-APV-10）。`--path <パス>` を並べたときは、置き場の変更のうちそのパスだけを送ること |
 | REQ-EXT-21 | 状態 | フェーズをレビューで止めている間も、ccnavi は、親のワークツリーで単体で打った `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-review.sh confirm --phase <N>` を通すこと。sh のパスは realpath で解いたワークスペースルートから `/` 区切りで書き、空白やシェルの記号を含むときだけ引用する形（`settings.script_command`）を通すこと |
 | REQ-EXT-22 | 常時 | ccnavi は、VS Code 拡張が直接読み書きするファイルを次の場所に置くこと。提案はワークスペース・プロジェクト・ワークツリーの `wip/proposals/`、承認済みチケットとマーカーは同じツリーの `.ccnavi/approved/`、閉じたチケットの退避は `logs/archive/`、共通レイヤーは `.ccnavi/config/common/` の `rules.yml`・`risks.yml`・`phases.yml`・`rule-expectations.yml`。自身のレイヤーとプロジェクトのレイヤーのパスは `--explain --json` の `layers[]` で示すこと |
@@ -82,7 +82,7 @@ REQ-EXT-14 の経路をエージェントがシェルから打つ形は、組み
 REQ-EXT-15 の答えが最後の行なのは、sh が実行ファイルの答えに投稿の結果（`issue_url`・`warning`）を足して最後に書き、
 その前に投稿の行を出すことがあるため。
 
-REQ-EXT-19 の `target` は、フローを保存した後に承認の push を送るかを VS Code 拡張が決めるのに使う。sh（C1）も同じ答えを読む。
+REQ-EXT-19 の `target` は、フローを保存した後に承認の push を送るかを VS Code 拡張が決めるのに使う。sh（write-and-push）も同じ答えを読む。
 
 ### 2.13.3 Chrome 拡張
 

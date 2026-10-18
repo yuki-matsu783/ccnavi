@@ -23,7 +23,7 @@ import shutil
 import tempfile
 import unittest
 
-from tests import c1flag, can_case_sensitive, common_path, config_path
+from tests import can_case_sensitive, common_path, config_path, write_and_push_flag
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import ROOT, git, read_json, write
 from tests.ticketsample import PHASES, RULES, child_text, parent_text, record_merge
@@ -34,9 +34,10 @@ class PhaseHarness(unittest.TestCase):
 
     # 親の `phases:` に写す元の phases.yml の本文。phases.yml を差し替えるテストは上書きする。
     phases_text = PHASES
-    # sh（C1）を通らずに状態の操作を直に起こすテストは、C1 の印を付ける（`tests/c1flag.py`）。
+    # sh（write-and-push）を通らずに状態の操作を直に起こすテストは、write-and-push
+    # の印を付ける（`tests/write_and_push_flag.py`）。
     # 印が無い呼び出しを断る検査は False にする。
-    mark_c1 = True
+    mark_write_and_push = True
 
     def setUp(self):
         self.root = tempfile.mkdtemp(prefix="ccnavi-phase-")
@@ -68,8 +69,10 @@ class PhaseHarness(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
-        if self.mark_c1:
-            args = c1flag.as_c1(self.root, self.state, self.parent_tree, args)
+        if self.mark_write_and_push:
+            args = write_and_push_flag.as_write_and_push(
+                self.root, self.state, self.parent_tree, args
+            )
         return run_ccnavi(
             [
                 "--root",
@@ -849,9 +852,10 @@ class PhaseTest(PhaseHarness):
         # push 済み。ready が通り、マーカーと note の下書きができる。
         # wip/ の追跡済みのファイルは消える。
         head = git(self.parent_tree, "rev-parse", "HEAD").strip()
-        # C1 と同じく書いたパスを集めて打つ。wip/ の削除は C1 がコミットしてよいもの
+        # write-and-push と同じく書いたパスを集めて打つ。wip/ の削除は write-and-push
+        # がコミットしてよいもの
         # （置き場の外でも止めない）
-        listed = os.path.join(self.root, "logs", "state", "c1", "ready.writes")
+        listed = os.path.join(self.root, "logs", "state", "write-and-push", "ready.writes")
         passed = self.ccnavi(
             "--record-writes",
             listed,
@@ -889,8 +893,9 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(again.returncode, 0, again.stderr)
 
     def ready_recorded(self, fixture):
-        """C1 と同じ形（書いたパスを集める・置き場の外を止める判定つき）で ready を打つ。"""
-        listed = os.path.join(self.root, "logs", "state", "c1", "ready.writes")
+        """write-and-push と同じ形（書いたパスを集める・置き場の外を止める判定つき）で ready
+        を打つ。"""
+        listed = os.path.join(self.root, "logs", "state", "write-and-push", "ready.writes")
         done = self.ccnavi(
             "--record-writes",
             listed,
@@ -932,8 +937,9 @@ class PhaseTest(PhaseHarness):
         return fixture
 
     @unittest.skipIf(os.name == "nt", "大文字違いの並存と名前の \\ は Windows では作れない")
-    def test_c1_lets_ready_remove_wip_in_any_case_but_nothing_else(self):
-        """C1 の置き場の外の検査は、ready が消す wip/ の判定（大文字小文字と \\ を問わない）と
+    def test_write_and_push_lets_ready_remove_wip_in_any_case_but_nothing_else(self):
+        """write-and-push の置き場の外の検査は、ready が消す wip/ の判定（大文字小文字と \\
+        を問わない）と
         同じ判定で、消したものだけを通す。"""
         if not can_case_sensitive():
             self.skipTest("大文字小文字を区別しないファイルシステムでは大文字違いを並べられない")
@@ -950,7 +956,7 @@ class PhaseTest(PhaseHarness):
             self.assertIn(rel, written)
             self.assertFalse(os.path.lexists(os.path.join(self.parent_tree, *rel.split("/"))))
 
-    def test_c1_still_stops_writes_outside_the_places_for_ready(self):
+    def test_write_and_push_still_stops_writes_outside_the_places_for_ready(self):
         """wip/ の例外は、今は無い wip/ の下のものだけ。
 
         在るもの・wip/ の外・ツリーの外（別の親）は通さない。

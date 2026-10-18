@@ -50,7 +50,9 @@ VERSION = "0.1.0"
 # 実行ファイルと sh・拡張の契約の版。上げ方は冒頭の説明のとおり。
 # 13: 新しい sh が実行ファイルの新しい副命令（`tree parent` の追加行、`sync retired`、
 # `sync migrate`）を呼ぶ。Chrome と手元の判定の規則が変わる（取り込み状態を読まない）。
-COMPAT = 13
+# 14: C1 を write-and-push に改名した。sh が呼ぶ副命令が `c1 family|sort|merge|merge-blame` から
+# `write-and-push …` に変わり、答えの頭の行も `c1 1` から `write-and-push 1` に変わった。
+COMPAT = 14
 # `--version --json` の形の版。欄を足すだけなら上げない。
 SCHEMA = 1
 # 実行ファイルが持つ振る舞い。旗や JSON の欄の有無を `flags` から読めないものを足す。

@@ -217,10 +217,12 @@ def write_plain_phases(root: str) -> str:
 
 
 def record_merge(parent_tree: str, child: str) -> None:
-    """子を親のブランチへ合流したあとの記録（`merged_sha`）を、C1 の finish の代わりに書く。
+    """子を親のブランチへ合流したあとの記録（`merged_sha`）を、write-and-push の finish
+    の代わりに書く。
 
     本物の finish は、親のワークツリーで子を合流するのと同じコミットで、子の承認済みチケットに
-    合流した子の先頭を書く。sh（C1）を通らずに実行ファイルを直に起こすテストは、合流を `git merge`
+    合流した子の先頭を書く。sh（write-and-push）を通らずに実行ファイルを直に起こすテストは、合流を
+    `git merge`
     で済ませたあと、これで同じ記録を足してコミットする。
     """
     import subprocess

@@ -117,7 +117,7 @@ def prepare(
     body = _covered_header(root, conf, parent, ph) + body
     body = body.rstrip("\n") + "\n\n" + HANDOFF_NOTE + "\n"
     # 目印に、本文と親のブランチの先頭から作った鍵を入れる。sh は同じ目印の投稿が MR に
-    # 既にあれば投稿し直さない（打ち直し・C1 のやり直しで依頼を二重にしない）。
+    # 既にあれば投稿し直さない（打ち直し・write-and-push のやり直しで依頼を二重にしない）。
     # 子を足してやり直した依頼は先頭が違うので、別の鍵になる。
     head = gitcmd.run(tree_root, ["rev-parse", "HEAD"])
     key = hashlib.sha256(
@@ -215,7 +215,7 @@ def _note_mr(
 
     書くのは空のときだけ。同じ値なら何もせず、違う値なら上書きせず警告する。
     書き足しに失敗してもレビューの依頼は進む（マーカーは置けている）。
-    書いたパスは `fsio` が記録するので、C1 のコミットに入る。
+    書いたパスは `fsio` が記録するので、write-and-push のコミットに入る。
     """
     path = approval.copy_path(
         approval.home_dir(conf, root, parent.ticket, "", project=parent.project), parent.ticket
@@ -512,8 +512,9 @@ def _dirty(tree_root: str, conf: settings.Settings, wip_removals: bool = False) 
     for entry in status.split("\0"):
         if len(entry) > 3 and entry[2] == " " and not _is_own_place(conf, entry[3:]):
             if wip_removals and "D" in entry[:2] and in_wip(entry[3:]):
-                # `ready` が消した（追跡済みの）`wip/` のファイル。C1 がコミットするか、
-                # C1 の外では sh がコミットと push を求めて止める。打ち直しの ready は止めない。
+                # `ready` が消した（追跡済みの）`wip/` のファイル。write-and-push がコミットするか、
+                # write-and-push の外では sh がコミットと push を求めて止める。打ち直しの ready
+                # は止めない。
                 continue
             return True
     return False
@@ -608,8 +609,10 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
 def remove_wip(tree_root: str) -> tuple[list[str], str, str]:
     """`wip` の下の追跡済みのファイルを消す（`ready` が退避と同じ流れで使う）。
 
-    返すのは（消したパス、消す前の HEAD、止まった理由）。消すのは fsio を通すので、C1 の一覧に載り、
-    C1 がコミットして push する。未追跡のものは `_merge_problems` が先に止めているので、ここでは
+    返すのは（消したパス、消す前の HEAD、止まった理由）。消すのは fsio を通すので、write-and-push
+    の一覧に載り、
+    write-and-push がコミットして push する。未追跡のものは `_merge_problems` が先に止めているので、
+    ここでは
     追跡済みのものだけを見る。消す前の HEAD は、消したものを履歴から戻すときの版（案内に使う）。
     空になったディレクトリは下から消す（git は空のディレクトリを持たない）。
     """
@@ -639,7 +642,7 @@ def remove_wip(tree_root: str) -> tuple[list[str], str, str]:
         full = os.path.join(tree_root, *rel.split("/"))
         if not os.path.lexists(full):
             # 作業ツリーから先に消えていた（削除が未コミット）。消したものとして一覧に載せ、
-            # C1 のコミットに含める。
+            # write-and-push のコミットに含める。
             fsio.note_removed(full)
             removed.append(rel)
             continue

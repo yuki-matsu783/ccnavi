@@ -221,7 +221,7 @@ ccnavi_lock_drop() {
 	fi
 	if [ -n "$ccnavi_lock_set_held" ]; then
 		# 入れ子の中で別のロック（親のワークツリーを使う別の操作のロックなど）を取ったときは、外側から渡された値に戻す。
-		# 消したままにすると、外側（C1）が持つ親子のチケットのロックを、この sh の後の段が入れ子と読めない。
+		# 消したままにすると、外側（write-and-push）が持つ親子のチケットのロックを、この sh の後の段が入れ子と読めない。
 		if [ -n "$ccnavi_lock_prev_set" ]; then
 			CCNAVI_LOCK_HELD="$ccnavi_lock_prev_held"
 			export CCNAVI_LOCK_HELD

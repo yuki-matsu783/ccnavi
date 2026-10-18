@@ -105,7 +105,7 @@ issueを立ててから`ccnavi-start.sh`で切る。ブランチ・ワークツ�
 | ワークスペースのスキル | ワークスペースルートで `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue <番号> --prefix chore --slug skill-<スキル名>-<要点>` |
 | プロジェクトのスキル | `cd projects/<プロジェクト>` して、同じ `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-start.sh --issue <番号> --prefix chore --slug skill-<スキル名>-<要点>`（そのプロジェクトのissue） |
 
-そのツリーの `wip/proposals/todo/<識別子>.md` に、出力の「必須」の行の `mr: <番号>` を入れて書いてコミットし、パスをユーザに伝えて承認を頼む。複数の提案は、1本ずつ同名のワークツリーに書く。
+そのツリーの `wip/proposals/todo/<識別子>.md` に、出力の「必須」の行の `mr: <番号>` を入れて書き、`sh <ワークスペースルートの絶対パス>/.ccnavi/scripts/ccnavi-ticket.sh propose <識別子>` で親のブランチへ送り、パスをユーザに伝えて承認を頼む。複数の提案は、1本ずつ同名のワークツリーに書く。
 
 ```yaml
 ---

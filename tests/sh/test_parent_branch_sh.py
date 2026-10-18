@@ -4,7 +4,8 @@ HEAD から読む。
 
 使い捨てのワークスペースと bare のリモートを組み、sh（ccnavi-git.sh・ccnavi-sync.sh・
 ccnavi-ticket.sh・ccnavi-fetch.sh）を外から呼ぶ。実行ファイルはこのツリーのソースを
-`python -m ccnavi` で起こす（tests/sh/test_c1_sh.py と同じ形）。ユーザが既に作ったブランチ
+`python -m ccnavi` で起こす（tests/sh/test_write_and_push_sh.py と同じ形）。
+ユーザが既に作ったブランチ
 `feature/123-login` を、`.claude/worktrees/feature-123-login` が直接チェックアウトする。
 
 見るのは次のとおり。
@@ -13,7 +14,7 @@ ccnavi-ticket.sh・ccnavi-fetch.sh）を外から呼ぶ。実行ファイルは�
    識別子のブランチは作らず、移る手順（`switch`）も無い
 2. 承認画面にブランチの行は出ず、既存のブランチとぶつかる warn も出ない
 3. 最初の push は取り込み状態を作らない
-4. 取り込み（ccnavi-sync.sh <識別子>）・着手と終える（C1）・セッションの頭の早送り
+4. 取り込み（ccnavi-sync.sh <識別子>）・着手と終える（write-and-push）・セッションの頭の早送り
    （ccnavi-fetch.sh）が、HEAD から読んだ親のブランチ名の ref を使う
 5. 親のワークツリーでは、今のブランチと、変換するとその識別子になるブランチのほかへ移れない
 6. 子のワークツリーからは送れない（子のブランチは子の識別子）
@@ -268,7 +269,7 @@ class ParentBranchShTest(unittest.TestCase):
         self.assertEqual(self.sha(self.ws, f"refs/heads/{PARENT}"), "")
 
         # 2. 親のブランチ名は HEAD から読む。承認画面にブランチの行は出ず、ぶつかりの warn も出ない
-        family = self.ok(self.exe("c1", "family", PARENT))
+        family = self.ok(self.exe("write-and-push", "family", PARENT))
         self.assertIn(f"branch {BRANCH}\n", family.stdout)
         verify = self.exe("--agree", "--preview", "--verify", "--json")
         body = json.loads(verify.stdout)
@@ -286,10 +287,10 @@ class ParentBranchShTest(unittest.TestCase):
         self.assertNotIn("取り込み状態", pushed.stdout)
         self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
-        family = self.ok(self.exe("c1", "family", PARENT))
+        family = self.ok(self.exe("write-and-push", "family", PARENT))
         self.assertIn("target yes\n", family.stdout)
 
-        # 4. 取り込みと着手（C1 は親のブランチ名へ送る）
+        # 4. 取り込みと着手（write-and-push は親のブランチ名へ送る）
         synced = self.ok(self.sh("ccnavi-sync.sh", PARENT))
         self.assertIn("リモートと同じ", synced.stdout)
         started = self.ok(self.sh("ccnavi-ticket.sh", "start", PARENT))
@@ -387,7 +388,7 @@ class ParentBranchShTest(unittest.TestCase):
             record,
             "remote origin\nbranch feature/other\nsha 0\nfetched_at 1\nstate gone\nreason \n",
         )
-        family = self.ok(self.exe("c1", "family", PARENT))
+        family = self.ok(self.exe("write-and-push", "family", PARENT))
         self.assertIn("target yes\n", family.stdout)
         self.assertIn(f"branch {BRANCH}\n", family.stdout)
         self.ok(self.sh("ccnavi-sync.sh", PARENT))
@@ -405,7 +406,7 @@ class ParentBranchShTest(unittest.TestCase):
     def test_a_head_off_the_converted_name_stops_the_family(self):
         self.imported_family()
         git(self.tree, "checkout", "-q", "-b", "elsewhere")
-        family = self.ok(self.exe("c1", "family", PARENT))
+        family = self.ok(self.exe("write-and-push", "family", PARENT))
         self.assertIn("target stop\n", family.stdout)
         self.assertIn("branch_refused ", family.stdout)
         self.assertNotIn("\nbranch ", family.stdout)

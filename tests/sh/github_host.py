@@ -16,7 +16,7 @@ Chrome と手元の sh が同じ見本から同じ JSON を組むことを見る
 - GraphQL は、見本の応答が持つ欄（`THREAD_FIELDS`・`login`）が問い合わせに語として全部あるとき
   だけ答える
 - 依頼の投稿（`GET`/`POST /repos/<o>/<r>/issues/<番号>/comments`）は、状態のファイル
-  （環境変数 `FAKE_GITHUB_STATE`）に溜めて返す（C1 のハーネスで request を通すため）
+  （環境変数 `FAKE_GITHUB_STATE`）に溜めて返す（write-and-push のハーネスで request を通すため）
 - ほかは 404
 
 sh の試験は PATH の先頭に `curl` の代役を置き、このファイルを

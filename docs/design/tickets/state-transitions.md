@@ -110,7 +110,7 @@ warn で言う（判定と `start` は止めない）。マーカーを消すか
 `ticket status` が、作業中の子のフェーズに `reviewed` が残っていると warn で言う（閉じ直したときにレビューが要らないフェーズ、つまりフェーズ定義が `review: none` で、再開された子も
 `human_review` を求めていないフェーズは言わない）。再開の意図がレビューのやり直しなら、そのフェーズのマーカーを人が手で消す
 （マーカーがあるツリー、つまり `approval.home_dir` が決めるツリーで `ccnavi-git.sh rm .ccnavi/approved/phases/<親>/<N>.reviewed`
-を打ち、削除をコミットする。C1 の対象（親のワークツリーがあり、origin があり、HEAD の確認に通る）で、マージリクエストで見るフェーズがある親子なら、
+を打ち、削除をコミットする。write-and-push の対象（親のワークツリーがあり、origin があり、HEAD の確認に通る）で、マージリクエストで見るフェーズがある親子なら、
 `ccnavi-push-approved.sh <親>` が取り込んでからコミットして送る。それ以外の親子では、名指しの
 `ccnavi-push-approved.sh <親>` は「ここではコミットも push もしない」と出して終わるので、ユーザが自分でコミットする。
 引数なしの `ccnavi-push-approved.sh` は、置き場に変更のあるツリーを全部コミットする）。

@@ -1,18 +1,21 @@
-"""C1 で sh が聞くこと。
+"""write-and-push で sh が聞くこと。
 
-状態を書く操作を「ロック → 途中の操作の確認 → C1 の外の変更の見分けとコミット → 取り込み →
-未送信の確かめ → 書く → コミット → push」の 1 操作にするのは sh（`ccnavi-common-c1.sh` の
-`ccnavi_c1_*`）。実行ファイルはネットワークに出ず、コミットもしない（判定と見分けだけを持つ）。
+状態を書く操作を「ロック → 途中の操作の確認 → write-and-push の外の変更の見分けとコミット →
+取り込み →
+未送信の確かめ → 書く → コミット → push」の 1 操作にするのは sh（`ccnavi-common-write-and-push.sh`
+の
+`ccnavi_wap_*`）。実行ファイルはネットワークに出ず、コミットもしない（判定と見分けだけを持つ）。
 ここが答えるのは 2 つだけで、どちらも 1 行 1 項目（`<鍵> <値>`。sh は jq を使わない）。
 
-- `ccnavi c1 family <識別子>`: その識別子の親子のチケットと、C1 の対象かと、親のブランチ名
+- `ccnavi write-and-push family <識別子>`: その識別子の親子のチケットと、write-and-push の対象かと、
+親のブランチ名
   （`branch`。親のワークツリーの HEAD から読む。変換した識別子がフォルダ名と合うときだけ）
   - 対象は、置き場のパスが相対で、親のワークツリーがあり、origin があり、HEAD の確認に通る
     親子のチケット。マージリクエストで見るフェーズの有無は問わない
   - 止める理由（親のワークツリーが無い・HEAD の確認に通らないなど）のある
     親子のチケットは `target stop`。sh は何も書かずに止める
   - origin の無い親のワークツリーは対象外（ローカルの git の設定だけを読む）
-- `ccnavi c1 sort <親> [<版>]`: 親のワークツリーの置き場（`.ccnavi/approved/`・
+- `ccnavi write-and-push sort <親> [<版>]`: 親のワークツリーの置き場（`.ccnavi/approved/`・
   `wip/proposals/review/`）の変更を次の (b)・(c)・(d) に分ける
   - 版が無ければ未コミットの変更（取り込みの前にコミットする分）、版があれば `<版>..HEAD` で
     コミットに入った変更（取り込みの後に未送信を確かめる分）
@@ -21,11 +24,12 @@
     もう 1 つは `ready` の退避（archive.py）が消したもの。ready のマーカー
     （`logs/archive/<リポジトリ>/ready/<親>.json`。このツリーから移したファイルの一覧）に載っている削除で、消えた中身が
     退避したコピーと同じものだけ
-  - (c) ユーザがコミットするもの（ユーザの判断）。C1 はコミットせずに止める。
+  - (c) ユーザがコミットするもの（ユーザの判断）。write-and-push はコミットせずに止める。
     ユーザの判断が一緒に書く
     移動（review/ から done/、doing/ から done/）とマーカーの消去もここ
-  - (d) 見分けられないもの。C1 は止める
-  - `keep` は record-risk が書いた `<子>.judge.json`（その子の `finish` の C1 がコミットする。
+  - (d) 見分けられないもの。write-and-push は止める
+  - `keep` は record-risk が書いた `<子>.judge.json`（その子の `finish` の write-and-push
+  がコミットする。
     未コミットのときだけ）
   - `skip` は書きかけの一時ファイル
 
@@ -45,8 +49,9 @@ from typing import TextIO
 from ..infra import fsio, gitcmd, settings, tree
 from . import approval_marks, archive, standing, ticket_ids, ticket_model
 
-# 答えの頭の行。sh はこれが無ければ「実行ファイルが C1 を知らない（古い）」と読んで止める。
-HEAD = "c1 1"
+# 答えの頭の行。sh はこれが無ければ「実行ファイルが write-and-push を知らない（古い）
+# 」と読んで止める。
+HEAD = "write-and-push 1"
 
 TARGET_YES = "yes"
 TARGET_NO = "no"
@@ -82,7 +87,7 @@ def family_of(ident: str) -> str:
 def _relative_places(conf: settings.Settings) -> tuple[str, str] | None:
     """置き場のパス（承認済み、レビュー待ち）。どちらかが絶対パスなら None。
 
-    絶対パスの置き場はブランチに乗らないので、C1 の対象にしない。
+    絶対パスの置き場はブランチに乗らないので、write-and-push の対象にしない。
     """
     approved = fsio.slashed(conf.approved or settings.DEFAULT_APPROVED).strip("/")
     tickets = fsio.slashed(conf.tickets or settings.DEFAULT_TICKETS).rstrip("/")
@@ -93,10 +98,11 @@ def _relative_places(conf: settings.Settings) -> tuple[str, str] | None:
 
 
 def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, standing.Standing]:
-    """C1 の対象か（`TARGET_YES` / `TARGET_NO` / `TARGET_STOP`）と、その理由と立ち位置。"""
+    """write-and-push の対象か（`TARGET_YES` / `TARGET_NO` / `TARGET_STOP`）と、
+    その理由と立ち位置。"""
     st = standing.standing_any(conf, root, parent)
     if _relative_places(conf) is None:
-        return TARGET_NO, "置き場のパスが絶対パス（C1 と Chrome の対象外）", st
+        return TARGET_NO, "置き場のパスが絶対パス（write-and-push と Chrome の対象外）", st
     if st.stop or st.home is None:
         return TARGET_STOP, st.stop or "親のワークツリーが決まらない", st
     origin = gitcmd.run(st.home.root, ["config", "--get", "remote.origin.url"], _TIMEOUT)
@@ -108,7 +114,7 @@ def target(conf: settings.Settings, root: str, parent: str) -> tuple[str, str, s
 
 
 def family(stdout: TextIO, conf: settings.Settings, root: str, ident: str) -> int:
-    """`ccnavi c1 family <識別子>`。親子のチケットと、C1 の対象か。"""
+    """`ccnavi write-and-push family <識別子>`。親子のチケットと、write-and-push の対象か。"""
     parent = family_of(ident)
     lines = [("family", parent)]
     places = _relative_places(conf)
@@ -164,16 +170,19 @@ def sort(
     parent: str,
     since: str = "",
 ) -> int:
-    """`ccnavi c1 sort <親> [<版>]`。置き場の変更を (b)・(c)・(d) に分けて 1 行 1 つ。"""
+    """`ccnavi write-and-push sort <親> [<版>]`。置き場の変更を (b)・(c)・(d) に分けて 1 行 1
+    つ。"""
     places = _relative_places(conf)
     st = standing.standing_any(conf, root, parent)
     if places is None or st.home is None:
-        stderr.write(f"ccnavi: c1 sort: 親子のチケット {parent} の親のワークツリーが決まらない\n")
+        stderr.write(
+            f"ccnavi: write-and-push sort: 親子のチケット {parent} の親のワークツリーが決まらない\n"
+        )
         return 1
     tree_root = st.home.root
     changed, why = _changed(tree_root, places, since)
     if why:
-        stderr.write(f"ccnavi: c1 sort: {why}\n")
+        stderr.write(f"ccnavi: write-and-push sort: {why}\n")
         return 1
     stdout.write(HEAD + "\n")
     archive_at = (root, tree.project_of_key(st.repo))
@@ -348,7 +357,7 @@ def _judge_record(parts: list[str]) -> bool:
 
 
 def _human(parts, now, before, approved_rel, review_rel, added, removed) -> bool:
-    """ユーザの判断が書くものの形。形だけで見る（(c) も (d) も C1 は止める）。
+    """ユーザの判断が書くものの形。形だけで見る（(c) も (d) も write-and-push は止める）。
 
     フローの本文、ユーザの承認で置かれた承認済みチケット、
     reviewed・(b) でない skipped・close-early・設定を見た上書きの記録、

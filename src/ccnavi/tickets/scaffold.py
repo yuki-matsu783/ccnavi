@@ -410,6 +410,8 @@ def run(
         f"次: {path} に rationale と本文を書き、allow を実際の作業に合わせて絞る・足す。{tail}"
         f"書けたら '{launcher} --lint' で確かめ、"
         f"'{launcher} --agree --preview --verify {ident}' が通ったら、"
+        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} propose {ident}' で"
+        "提案を親のブランチへ送り、"
         "承認をユーザに頼んで返事を待つ。承認が済むまで実装はしない\n"
     )
     stdout.write(

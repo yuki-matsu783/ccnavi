@@ -215,7 +215,7 @@ def is_synced_write(
     """その変更が、親の着手がミラーか工程スキルの写しとして配った書き込みだと読めるか。
 
     `configsync.is_synced_write`（共通レイヤーのミラー）に、工程スキルの写しを足した答え。
-    C1 の置き場の検査と、実行後チェック、バックアップの復元が使う。
+    write-and-push の置き場の検査と、実行後チェック、バックアップの復元が使う。
     """
     if configsync.is_synced_write(conf, root, path, content):
         return True

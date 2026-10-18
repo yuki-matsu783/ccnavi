@@ -73,7 +73,7 @@ PACKAGES: tuple[tuple[str, str], ...] = (
     (
         "tickets",
         "チケット。承認済みチケットの置き場（approval）と合意の手続き（agree）、"
-        "承認・取り下げ・レビュー済みの判定のコア（core）、C1 の見分け、フェーズ、操作",
+        "承認・取り下げ・レビュー済みの判定のコア（core）、write-and-push の見分け、フェーズ、操作",
     ),
     ("hook", "hook の判定と、その文面・実行後の監視・イベント"),
     ("entry", "入口。CLI・診断・lint・提案・版"),
@@ -218,8 +218,8 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         "判定と、チケット・レビューを動かす操作",
         frozenset(
             {
-                "tickets.c1",
-                "tickets.c1_merge",
+                "tickets.write_and_push",
+                "tickets.write_and_push_merge",
                 "tickets.core",
                 "tickets.core_approve",
                 "tickets.core_base",
@@ -227,6 +227,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
                 "tickets.core_withdraw",
                 "hook.judge",
                 "tickets.next_id",
+                "tickets.propose",
                 "tickets.ops",
                 "tickets.ops_close",
                 "tickets.ops_plan",

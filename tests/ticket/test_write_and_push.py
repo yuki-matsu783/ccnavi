@@ -1,15 +1,17 @@
-"""C1 の実行ファイルの側の受入テスト。
+"""write-and-push の実行ファイルの側の受入テスト。
 
-C1 は、親子のチケットで状態を書く操作を
+write-and-push は、親子のチケットで状態を書く操作を
 「ロック → 取り込み → 書く → コミット → push」の 1 操作にする形。
 実行ファイルは対象かの見分けと書いたパスの一覧だけを持ち、git の操作は sh が持つ。
 
-見るのは 4 つ。sh の側（ロック・取り込み・コミット・push・戻し）は tests/sh/test_c1_sh.py が見る。
+見るのは 4 つ。sh の側（ロック・取り込み・コミット・push・戻し）は
+tests/sh/test_write_and_push_sh.py が見る。
 
-1. `ccnavi c1 family <識別子>`: 親子のチケット（子なら親）と、C1 の対象か。
+1. `ccnavi write-and-push family <識別子>`: 親子のチケット（子なら親）と、write-and-push の対象か。
    origin の無い親のワークツリーと置き場が絶対パスの親子のチケットは対象外
    （マージリクエストで見るフェーズの有無は問わない）、決まらない親子のチケットは stop
-2. `ccnavi c1 sort <親> [<版>]`: 置き場の変更の見分け（ccnavi が書いたと内容で分かるもの・
+2. `ccnavi write-and-push sort <親> [<版>]`: 置き場の変更の見分け（ccnavi
+が書いたと内容で分かるもの・
    ユーザがコミットして push するもの・見分けられないもの、数えない一時ファイル、
    record-risk の記録）。未コミットとコミット済み（`<版>..HEAD`）の両方
 3. `--record-tree`: 書いたパスの一覧の基点を親のワークツリーにし、置き場の外に書けば error
@@ -24,7 +26,7 @@ from __future__ import annotations
 import json
 import os
 
-from ccnavi.tickets import c1
+from ccnavi.tickets import write_and_push
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_standing import AuthorityHarness
 from tests.ticket.test_ticket import git, read_json, write
@@ -35,15 +37,17 @@ APPROVED = ".ccnavi/approved"
 
 def lines(out):
     return dict(
-        (line.split(" ", 1) + [""])[:2] for line in out.splitlines() if line and line != c1.HEAD
+        (line.split(" ", 1) + [""])[:2]
+        for line in out.splitlines()
+        if line and line != write_and_push.HEAD
     )
 
 
 class FamilyTest(AuthorityHarness):
     def ask(self, ident):
-        result = self.ccnavi("c1", "family", ident)
+        result = self.ccnavi("write-and-push", "family", ident)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(result.stdout.splitlines()[0], c1.HEAD)
+        self.assertEqual(result.stdout.splitlines()[0], write_and_push.HEAD)
         return lines(result.stdout)
 
     def test_a_family_without_origin_is_not_a_target(self):
@@ -82,7 +86,7 @@ class FamilyTest(AuthorityHarness):
     def test_a_parent_tree_on_another_branch_stops_with_hints(self):
         git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
         git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
-        result = self.ccnavi("c1", "family", "i0001")
+        result = self.ccnavi("write-and-push", "family", "i0001")
         answer = lines(result.stdout)
         self.assertEqual(answer["target"], "stop")
         self.assertIn("合わない", answer["why"])
@@ -90,7 +94,7 @@ class FamilyTest(AuthorityHarness):
         self.assertNotIn("--forget", result.stdout)
 
     def test_a_bad_id_is_refused(self):
-        result = self.ccnavi("c1", "family", "../x")
+        result = self.ccnavi("write-and-push", "family", "../x")
         self.assertEqual(result.returncode, 1)
 
 
@@ -100,9 +104,9 @@ class WithoutMrFamilyTest(AuthorityHarness):
         self.family(plan=["research"])
 
     def test_a_family_without_a_merge_request_phase_is_a_target_too(self):
-        # MR でレビューするフェーズが無くても、C1 の対象（外した条件）
+        # MR でレビューするフェーズが無くても、write-and-push の対象（外した条件）
         git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
-        result = self.ccnavi("c1", "family", "i0001")
+        result = self.ccnavi("write-and-push", "family", "i0001")
         answer = lines(result.stdout)
         self.assertEqual(answer["target"], "yes")
 
@@ -113,9 +117,9 @@ class SortTest(AuthorityHarness):
         self.commit_parent("settle")
 
     def sort(self, since=""):
-        result = self.ccnavi("c1", "sort", "i0001", *([since] if since else []))
+        result = self.ccnavi("write-and-push", "sort", "i0001", *([since] if since else []))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(result.stdout.splitlines()[0], c1.HEAD)
+        self.assertEqual(result.stdout.splitlines()[0], write_and_push.HEAD)
         self.last_why = [line[4:] for line in result.stdout.splitlines() if line.startswith("why ")]
         return sorted(
             tuple(line.split(" ", 1))
@@ -225,7 +229,7 @@ class SortTest(AuthorityHarness):
         self.assertIn(("d", judge), self.sort(base))
 
     def test_a_bad_revision_is_refused(self):
-        result = self.ccnavi("c1", "sort", "i0001", "HEAD --output=/tmp/x")
+        result = self.ccnavi("write-and-push", "sort", "i0001", "HEAD --output=/tmp/x")
         self.assertEqual(result.returncode, 1)
 
 
@@ -235,7 +239,7 @@ class RecordTreeTest(AuthorityHarness):
         self.commit_parent("settle")
 
     def place(self):
-        return os.path.join(self.root, "logs", "state", "c1", "self")
+        return os.path.join(self.root, "logs", "state", "write-and-push", "self")
 
     def run_recorded(self, *args):
         target = os.path.join(self.place(), "i0001.t.writes")
@@ -255,7 +259,7 @@ class RecordTreeTest(AuthorityHarness):
         self.assertTrue(all(not os.path.isabs(p) for p in listed), listed)
 
     def test_writing_outside_the_places_is_an_error_and_the_list_is_kept(self):
-        # 承認は提案（wip/proposals/todo/）を消す。C1 の置き場の外なので error。
+        # 承認は提案（wip/proposals/todo/）を消す。write-and-push の置き場の外なので error。
         self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
         self.commit_parent("propose")
         preview = json.loads(self.ccnavi("--agree", "--preview", "--json").stdout)
@@ -333,7 +337,7 @@ class RecordTreeReviewTest(PhaseHarness):
         writes = any(a in args for a in self.WRITERS) or ("--yes" in args and "--reviewed" in args)
         if not writes:
             return super().ccnavi(*args, stdin=stdin)
-        target = os.path.join(self.root, "logs", "state", "c1", "self", "r.writes")
+        target = os.path.join(self.root, "logs", "state", "write-and-push", "self", "r.writes")
         result = super().ccnavi(
             "--record-writes", target, "--record-tree", self.parent_tree, *args, stdin=stdin
         )
@@ -434,22 +438,22 @@ class ChooseTest(PhaseHarness):
 
 
 class BypassTest(AuthorityHarness):
-    """C1 の対象の親子のチケット（取り込み済みで origin がある）では、
-    C1 を通らない状態の操作を断る。
+    """write-and-push の対象の親子のチケット（取り込み済みで origin がある）では、
+    write-and-push を通らない状態の操作を断る。
     """
 
-    mark_c1 = False
+    mark_write_and_push = False
 
     def setUp(self):
         super().setUp()
         git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
 
     def test_state_operations_without_record_tree_are_refused(self):
-        before = self.ccnavi("c1", "family", "i0001")
+        before = self.ccnavi("write-and-push", "family", "i0001")
         self.assertIn("target yes", before.stdout)
         refused = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
-        self.assertIn("C1 の対象", refused.stderr)
+        self.assertIn("write-and-push の対象", refused.stderr)
         fixture = write(os.path.join(self.root, "r.json"), json.dumps({"host": "x"}))
         for args in (
             ("review", "confirm", "--phase", "1", "--result", fixture),
@@ -458,8 +462,8 @@ class BypassTest(AuthorityHarness):
         ):
             result = self.ccnavi("--cwd", self.parent_tree, *args)
             self.assertEqual(result.returncode, 1, args)
-            self.assertIn("C1 の対象", result.stderr, args)
+            self.assertIn("write-and-push の対象", result.stderr, args)
 
     def test_record_risk_and_human_entries_are_not_refused_here(self):
         risk = self.ccnavi("ticket", "record-risk", "i0001-01-01", "x", "yes", "--reason", "r")
-        self.assertNotIn("C1 の対象", risk.stderr)
+        self.assertNotIn("write-and-push の対象", risk.stderr)

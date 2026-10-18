@@ -5,10 +5,11 @@
 止まっている理由・次の一手を ccnavi が言う。見るのは次のとおり。
 
 1. 手で置いて未コミットの承認: 時刻は「未コミット（手で置いた）」、ユーザに運んでもらう案内。
-   C1 の対象でなければ「start へ進んでよい」、対象なら
+   write-and-push の対象でなければ「start へ進んでよい」、対象なら
    「ユーザがコミットして push するまで start は止まる」
 2. コミット済みで未 push・push 済みを、手元のリモート追跡の ref で言い分ける
-3. 止まっている理由: 親が未着手・先行・C1 が止める親子。基準点が HEAD の祖先でないことと、
+3. 止まっている理由: 親が未着手・先行・write-and-push が止める親子。基準点が HEAD
+の祖先でないことと、
    再開で残った欄は注意
 4. 承認待ち・閉じたもの。状態を動かす行には「親（メインエージェント）だけが実行する」
 5. 親を省けば開いている親子を全部、知らない親なら終了コード 1
@@ -20,7 +21,7 @@ import os
 import unittest
 from unittest import mock
 
-from ccnavi.tickets import c1, ticket_fields
+from ccnavi.tickets import ticket_fields, write_and_push
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
 from tests.ticketsample import child_text, parent_text
@@ -42,9 +43,9 @@ class TicketStatusTest(PhaseHarness):
         write(os.path.join(self.approved, "doing", ident + ".md"), text)
         return text
 
-    def c1_target(self, ident):
-        """本物の C1 の見分け（`ccnavi c1 family`）の答え。"""
-        result = self.ccnavi("c1", "family", ident)
+    def write_and_push_target(self, ident):
+        """本物の write-and-push の見分け（`ccnavi write-and-push family`）の答え。"""
+        result = self.ccnavi("write-and-push", "family", ident)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         rows = dict((line.split(" ", 1) + [""])[:2] for line in result.stdout.splitlines())
         return rows.get("target", "")
@@ -60,7 +61,7 @@ class TicketStatusTest(PhaseHarness):
 
     # ---- 1. 手で置いて未コミット
 
-    def test_a_ticket_placed_by_hand_is_uncommitted_and_may_start_when_not_c1(self):
+    def test_a_ticket_placed_by_hand_is_uncommitted_and_may_start_when_not_write_and_push(self):
         self.by_hand()
         out = self.said("i0001")
         self.assertIn("リモートからの取得は行いません", out)
@@ -81,29 +82,31 @@ class TicketStatusTest(PhaseHarness):
         # 状態は何も動かさない
         self.assertFalse(os.path.exists(os.path.join(self.approved, "events")))
 
-    def test_an_uncommitted_ticket_of_a_c1_family_waits_for_the_user(self):
-        # マージリクエストを持つフェーズ（design）を含める。持たない親子は C1 の対象外。
+    def test_an_uncommitted_ticket_of_a_write_and_push_family_waits_for_the_user(self):
+        # マージリクエストを持つフェーズ（design）を含める。持たない親子は write-and-push の対象外。
         self.by_hand(text=parent_text("i0001", ["research", "design"]))
-        # C1 の対象にする: 親のワークツリーがあり、origin がある。
+        # write-and-push の対象にする: 親のワークツリーがあり、origin がある。
         git(self.parent_tree, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
-        self.assertEqual(self.c1_target("i0001"), "yes")
+        self.assertEqual(self.write_and_push_target("i0001"), "yes")
         mine = self.block(self.said("i0001"), "i0001")
         self.assertIn("ユーザがコミットして push するまで start は実行できません", mine)
         self.assertNotIn("start へ進んでよい", mine)
         self.assertNotIn("ccnavi-ticket.sh start", mine)
 
-    def test_a_family_c1_stops_names_the_reason_and_does_not_say_go(self):
-        # ここだけは C1 の見分けを差し替える。本物の状態で「C1 が止める」を作ると、
+    def test_a_family_write_and_push_stops_names_the_reason_and_does_not_say_go(self):
+        # ここだけは write-and-push の見分けを差し替える。本物の状態で「write-and-push
+        # が止める」を作ると、
         # 立ち位置の側（親のワークツリーが無い・別のブランチに居るなど）が先に
         # 止まる理由を持ち、status はそちらを言ってこの行を出さない（同じ理由を 2 度言わない）。
-        # 立ち位置が止めずに C1 だけが止める本物の形は、親のワークツリーのパスに改行が
+        # 立ち位置が止めずに write-and-push だけが止める本物の形は、親のワークツリーのパスに改行が
         # ある場合だけで、Windows ではそのパスを作れない。
         self.by_hand(text=parent_text("i0001", ["research", "design"]))
-        stop = (c1.TARGET_STOP, "親のワークツリーが決まらない", None)
-        with mock.patch.object(c1, "target", return_value=stop):
+        stop = (write_and_push.TARGET_STOP, "親のワークツリーが決まらない", None)
+        with mock.patch.object(write_and_push, "target", return_value=stop):
             mine = self.block(self.said("i0001"), "i0001")
         self.assertIn(
-            "止まっている理由: C1 では状態の操作を実行できません: 親のワークツリーが決まらない",
+            "止まっている理由: write-and-push では状態の操作を実行できません: "
+            "親のワークツリーが決まらない",
             mine,
         )
         self.assertNotIn("start へ進んでよい", mine)

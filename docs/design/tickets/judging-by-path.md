@@ -108,7 +108,7 @@ ELI5 の HTML の置き場（ワークツリーのルートからの相対で `w
 
 サブエージェント（`agent_id` 付き）からの `ccnavi-ticket.sh` / `ccnavi-review.sh` の操作と
 `ccnavi-git.sh push` は、ルールより先に `DENY_SUBAGENT_TICKET_OP` で止める。シェルから実行ファイルを
-`--agree` / `--reviewed` / `--close-early` 付き、または状態とレビューを動かす副命令（`ticket start|finish|cancel|record-risk`、
+`--agree` / `--reviewed` / `--close-early` 付き、または状態とレビューを動かす副命令（`ticket start|finish|cancel|propose|record-risk`、
 `review prepare|requested|confirm|ready`）付きで直接打つ形は、素性によらず
 `DENY_TICKET_APPROVAL_CLI` で止める。`ccnavi-agree.sh` と `ccnavi-push-approved.sh` を
 `sh` / `bash` で打つ形も同じ理由コードで止める。大文字小文字によらない。
