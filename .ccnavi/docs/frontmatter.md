@@ -8,7 +8,7 @@ keywords: [frontmatter, type, tags, keywords, ccnavi-index.jsonl, ccnavi --docs,
 
 # md の frontmatter の決まり
 
-`ccnavi --docs`はmdの本文ではなく、頭のfrontmatterを検索する。絞り込みは`--type` `--tag` `--keyword` `--text` `--path`、出力の形式は`--format`で選ぶ。
+`ccnavi --docs`はmdの本文ではなく、頭のfrontmatterを検索する。絞り込みは`--type` `--tag` `--keyword` `--text` `--path`、出力の形式は`--format`で選ぶ。旗の一覧は`ccnavi --docs --help`で出る。
 frontmatterが無いmdも一覧には出るが、`--type` `--tag` `--keyword`では見つからず、`--text`で照合されるのもパスと日時だけになる。
 frontmatterの書き方しだいで、文書の探しやすさがそのまま決まる。
 
