@@ -176,7 +176,7 @@ done
 [ "$bad" -eq 0 ] || exit 2
 
 if [ -z "$commands" ]; then
-	[ -z "$staged" ] || printf '次: 下書きを編集する。すべて直し終えたら sh %s/.ccnavi/scripts/ccnavi-stage.sh --commands %s を打つ（差し替えの mv が出る）\n' "$root" "$staged"
+	[ -z "$staged" ] || printf '次: 下書きを編集する。すべて直し終えたら、下書きを作ったのと同じツリーの中で sh %s/.ccnavi/scripts/ccnavi-stage.sh --commands %s を打つ（差し替えの mv が出る）\n' "$root" "$staged"
 	exit 0
 fi
 

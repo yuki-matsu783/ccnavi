@@ -3,7 +3,7 @@ type: guide
 title: 子チケット作業のユーザとエージェントの手順
 description: チケット作業（親と子）を、準備・承認・着手・実装・finish・レビュー依頼・ready・片付けまでステップごとに並べた一覧と図。各操作が何を作り、何を拒むか。詰まったときの止まり方
 tags: [ticket, worktree]
-keywords: [チケット, 親, 子, 手順, 流れ, propose, start, finish, request, confirm, decide, ready, 差し戻し, レビュー, 承認, 着手, サブエージェント, Stop, 促し, 成果物, マーカー]
+keywords: [チケット, 親, 子, 手順, 流れ, propose, start, finish, request, confirm, decide, ready, 差し戻し, レビュー, 承認, 着手, サブエージェント, Stop, 促し, 成果物]
 ---
 
 # 子チケット作業のユーザとエージェントの手順

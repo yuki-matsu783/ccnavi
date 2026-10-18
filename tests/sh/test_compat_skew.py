@@ -256,6 +256,14 @@ class CompatAgreesTest(unittest.TestCase):
         self.assertGreaterEqual(version.COMPAT, 13)
         self.assertEqual(sh_compat(), version.COMPAT)
 
+    def test_v16_integrate_tree_bound_raised_the_compat_to_15(self):
+        """V16 `integrate` がチケットに結び付くかの判定を、sh が自分で置き場を読まずに実行ファイルの
+        `tree bound` に聞くようになった。旧い実行ファイルは副命令を知らず頭の行を返さないので、
+        新しい sh は断る向きに倒す。食い違いとして知らせる。なので 15 以上。
+        """
+        self.assertGreaterEqual(version.COMPAT, 15)
+        self.assertEqual(sh_compat(), version.COMPAT)
+
 
 @unittest.skipIf(not SHELL, "sh も bash も見つからない")
 class TicketStatusPassTest(unittest.TestCase):

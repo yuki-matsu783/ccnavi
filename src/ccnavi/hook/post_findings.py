@@ -577,10 +577,12 @@ def _same_but_handoff(top: str, left: str, right: str) -> bool:
 
 
 def _ticket_bound(top: str, name: str) -> bool:
-    """その名前のチケットが承認済みか提案として在るか（チケット作業は integrate の対象外）。
+    """その名前のチケットが承認済みか提案として在るか、origin に同名のブランチが在るか。
 
-    sh の `ig_bound` の見方のうち、このツリーとワークツリーの置き場にある同名のチケットだけを見る。
-    チケットに結び付くブランチの squash を、記録を偽造して外させないため。
+    `integrate` が断る「チケットに結び付く」判定（`ops_stop_integrate.bound_reason`）の見方のうち、
+    このツリーとワークツリーの置き場にある同名のチケットと、手元の `origin/<名前>` の参照を見る
+    （片付けの後はワークツリーが無いので、親のブランチのワークツリーは参照で見分ける）。
+    手元の退避は見ない。チケットに結び付くブランチの squash を、記録を偽造して外させないため。
     """
     for place in (
         ".ccnavi/approved/doing",
@@ -591,7 +593,7 @@ def _ticket_bound(top: str, name: str) -> bool:
         for base in (top, os.path.join(top, ".claude", "worktrees", name)):
             if os.path.lexists(os.path.join(base, place, name + ".md")):
                 return True
-    return False
+    return gitcmd.run(top, ["show-ref", "--verify", "--quiet", f"refs/remotes/origin/{name}"]).ok
 
 
 def _is_worktree_at(top: str, branch: str, sha: str) -> bool:
