@@ -69,3 +69,15 @@ export async function openTemplates(overrides: Partial<TemplatesPage> = {}, init
 export function targetOption(kind: string, name: string, label: string): TargetOption {
   return { kind, name, label };
 }
+
+/**
+ * `--templates --check-file` の答えの見本（リポジトリルートの `tests/fixtures/templates-check-json.json`）。`expect` が答えで、
+ * plan 2 項（実装は設計を待つ）・feedback 1 項・全体計画の 2 番にフロー 1 本。
+ */
+export const TEMPLATES_CHECK_FIXTURE_PATH = path.join(__dirname, "..", "..", "..", "..", "..", "..", "tests", "fixtures", "templates-check-json.json");
+
+/** 見本の `expect` を、実行ファイルの標準出力と同じ文字列にして返す */
+export function templatesCheckFixtureText(): string {
+  const all = JSON.parse(fs.readFileSync(TEMPLATES_CHECK_FIXTURE_PATH, "utf8")) as { expect: unknown };
+  return JSON.stringify(all.expect);
+}

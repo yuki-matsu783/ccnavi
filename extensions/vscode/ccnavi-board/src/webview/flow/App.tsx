@@ -41,7 +41,7 @@ import {
   flowNotices,
   groupNodes,
   isGroup,
-  nodeSize,
+  nextSpot,
   PALETTE,
   PASTE_OFFSET,
   pasteNodes,
@@ -106,22 +106,6 @@ function sideFolded(side: Side): boolean {
 function rememberSideFolded(side: Side, folded: boolean): void {
   const now = (readState("folded") ?? {}) as Record<string, unknown>;
   mergeState("folded", { ...now, [side]: folded });
-}
-
-/**
- * 足したノードを置く場所。いちばん下の縁（図の上の位置で読む。グループはその枠の下の縁）のさらに下。
- * グループの枠の中に入らないよう、グループの下に置く（足したノードはどのグループにも入らない）
- */
-function nextSpot(doc: FlowDoc): { x: number; y: number } {
-  if (doc.nodes.length === 0) {
-    return { x: 80, y: 80 };
-  }
-  const spots = doc.nodes.map((node) => {
-    const at = absolutePosition(doc, node.id);
-    return { x: at.x, bottom: at.y + nodeSize(node).height };
-  });
-  const low = spots.reduce((max, spot) => (spot.bottom > max.bottom ? spot : max), spots[0]);
-  return { x: low.x, y: low.bottom + 50 };
 }
 
 /** 配列が同じか（選んだノードの id を毎回作り直さないため） */

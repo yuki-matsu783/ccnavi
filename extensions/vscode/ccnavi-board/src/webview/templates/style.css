@@ -6,14 +6,21 @@
  * バンドルするのは `scripts/bundle-webview.js`（出口は `out/webview/templates.css`）。拡張ホストはそれを読んで
  * `<style nonce>` に流し込む（`src/core/templates-render.ts`）。
  */
+@import "@xyflow/react/dist/style.css";
+@import "../shared/Maximize.css";
 @import "@ccnavi/shared/styles/button.css";
 @import "../styles/appearance.css";
 @import "@ccnavi/shared/styles/page.css";
 @import "@ccnavi/shared/styles/list.css";
+@import "../shared/PlanGraph.css";
+@import "../flow/App.css";
+@import "../flow/Canvas.css";
+@import "../flow/Inspector.css";
 @import "./App.css";
 @import "./Template.css";
 @import "./Plan.css";
 @import "./Problems.css";
 @import "./Draft.css";
 @import "./Sum.css";
+@import "./Edit.css";
 @import "../Tour.css";

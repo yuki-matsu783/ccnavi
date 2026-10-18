@@ -1,6 +1,7 @@
 /**
  * テンプレート管理画面に出す言葉。判定は実行ファイルの答えが決めていて、ここは答えの値を読みやすい言葉に直すだけ。
  */
+import { shownLayerOf } from "../../core/templatesmodel.js";
 import type { PlanItem, ProblemSeverity, FlowSummary, TemplateLayer, TemplateProblem } from "../../core/templates-view.js";
 
 /** 深刻度の言葉。表示は `[error]` の形にする（`Problems.tsx`） */
@@ -38,17 +39,9 @@ export function layerLabel(layer: string): string {
   return `プロジェクト ${layer}`;
 }
 
-/** 対象が見せる層の名前。共通の設定は common、ワークスペースは self、プロジェクトはその名前 */
-export function layerNameFor(target: { readonly kind: string; readonly name: string }): string {
-  if (target.kind === "workspace") {
-    return "common";
-  }
-  return target.kind === "project" ? target.name : "self";
-}
-
 /** 対象が見せる層。実行ファイルが返していなければ undefined */
 export function layerFor(target: { readonly kind: string; readonly name: string }, layers: readonly TemplateLayer[]): TemplateLayer | undefined {
-  const name = layerNameFor(target);
+  const name = shownLayerOf(target);
   return layers.find((layer) => layer.name === name);
 }
 

@@ -1,0 +1,21 @@
+/*
+ * テンプレートの編集欄（`Edit.tsx`・`PlanEdit.tsx`・`FlowEdit.tsx`）。図（計画の図・フローの図）の見た目は、それぞれの部品の CSS
+ * （`../shared/PlanGraph.css`・`../flow/Canvas.css`・`../flow/Inspector.css`・`../flow/App.css`）にある。
+ */
+.tpl-edit-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--gap-3) var(--gap-5); margin-bottom: 8px; }
+.tpl-edit-head h2 { margin: 0; overflow-wrap: anywhere; }
+.tpl-edit .controls { display: flex; flex-wrap: wrap; gap: var(--gap-3); }
+.tpl-edit .field { display: flex; flex-direction: column; gap: var(--gap-1); margin: 0 0 8px; }
+.tpl-edit .field textarea, .tpl-edit .field input[type=text] { width: 100%; box-sizing: border-box; }
+.tpl-edit .field textarea { resize: vertical; }
+.tpl-edit-plan, .tpl-edit-flows { margin: 14px 0; }
+.tpl-edit-items select { max-width: 100%; }
+.tpl-edit-ops { white-space: nowrap; }
+.tpl-edit-ops button.action.small { margin-left: 0; margin-right: var(--gap-2); }
+.tpl-edit-add { margin: 6px 0 0; }
+.tpl-new { margin: 4px 0 10px; }
+.tpl-new input[type=text] { width: 16em; max-width: 100%; }
+.tpl-flow-edit { margin-top: 6px; }
+.tpl-edit-flows .row-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-2) var(--gap-4); }
+.tpl-edit-flows .row.open > .row-body { display: block; padding: 8px 4px 10px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
