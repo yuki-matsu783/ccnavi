@@ -166,7 +166,7 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertEqual(head, self.sha(self.ws, "refs/heads/main"))
         self.assertEqual(1, len(self.lines(done)), done.stdout)
-        self.assertIn("統合先ブランチ", done.stdout)
+        self.assertIn("統合先ブランチ", "\n".join(self.lines(done)))
         self.assertIn("main", done.stdout)
 
     def test_default_branch_comes_from_origin_head(self):
@@ -248,7 +248,7 @@ class FetchTest(unittest.TestCase):
         done = self.fetch()
         self.assertEqual(head, self.sha(tree, "HEAD"))
         self.assertEqual("", git(tree, "status", "--porcelain").stdout.strip())
-        self.assertIn("統合先ブランチ", done.stdout)
+        self.assertIn("統合先ブランチ", "\n".join(self.lines(done)))
 
     def test_project_default_branch_advances(self):
         # プロジェクトも同じ。起点はそのプロジェクトのデフォルトブランチ。
@@ -269,7 +269,7 @@ class FetchTest(unittest.TestCase):
         head = self.advance(self.remote, "claude/x")
         done = self.fetch()
         self.assertEqual(head, self.sha(self.ws, "HEAD"))
-        self.assertIn("親ブランチ", done.stdout)
+        self.assertIn("親ブランチ", "\n".join(self.lines(done)))
 
     def test_checked_out_branch_that_does_not_match_is_named_not_merged(self):
         # 進められない理由（分岐か、浅い clone か）は見分けず、一致しないことと両方の sha を言う。
@@ -292,8 +292,8 @@ class FetchTest(unittest.TestCase):
         done = self.fetch()
         self.assertEqual(head, self.sha(self.ws, "refs/heads/main"))
         self.assertEqual(1, len(self.lines(done)), done.stdout)
-        self.assertIn("親ブランチ", done.stdout)
-        self.assertNotIn("起点", self.lines(done)[0])
+        self.assertIn("親ブランチ", "\n".join(self.lines(done)))
+        self.assertNotIn("統合先ブランチ", self.lines(done)[0])
 
     # ---- 届かないとき
 
@@ -526,7 +526,7 @@ class FetchTest(unittest.TestCase):
         done = self.fetch()
         self.assertNotEqual(before, self.sha(tree, "HEAD"))
         self.assertEqual(head, self.sha(tree, "HEAD"))
-        self.assertIn("親ブランチ", done.stdout)
+        self.assertIn("親ブランチ", "\n".join(self.lines(done)))
         # 書きかけは残る
         self.assertTrue(os.path.exists(os.path.join(tree, "note.txt")))
 
