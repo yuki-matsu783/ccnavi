@@ -414,10 +414,12 @@ def _same_todo(t: ticket_model.Ticket, u: ticket_model.Ticket) -> bool:
 
 
 def revision_elsewhere(t: ticket_model.Ticket, current: ticket_model.Ticket | None) -> bool:
-    """正とするツリーの外の `todo/` の提案が、計画の違う親の版（場所違いの改版か巻き戻しの元）か。
+    """正とするツリーの外の `todo/` の提案が、計画・写し・範囲の違う親の版か。
 
-    条件は承認の改版（`agree.waiting`）と同じく、作業中の承認済みチケットがある親で、計画か
-    フィードバック計画が違うもの。
+    場所違いの改版か、巻き戻しの元。
+
+    条件は承認の改版（`agree.waiting`）と同じく、作業中の承認済みチケットがある親で、計画・
+    フィードバック計画・写し（`phases:`）・範囲のどれかが違うもの（`plan_differs`）。
     """
     return current is not None and not t.is_child and t.has_plan and plan_differs(t, current)
 
@@ -485,7 +487,7 @@ def revision_elsewhere_text(
     where: str,
     fams: standing.Families | None = None,
 ) -> str:
-    """正とするツリーの外に在る計画の違う版の案内。ファイルの場所と、改版を書く置き場を名指しする。
+    """正とするツリーの外に在る計画・写し・範囲の違う版の案内。ファイルの場所と、改版を書く置き場を名指しする。
 
     場所はどちらもワークスペースルートからのパスで出す（ツリーの名前ではなく、
     `.claude/worktrees/<親>` や `projects/<名前>`）。`--lint` と `--agree`（`--verify` も）が
@@ -498,8 +500,9 @@ def revision_elsewhere_text(
     place = tree_path(conf, root, where, t.project)
     todo = f"{conf.tickets}/{ticket_model.TODO}/"
     text = (
-        f"{t.ticket} の計画の違う提案が {rel} に在るが、正とするツリー（{place}）の外なので"
-        f"承認の対象にならない。改版なら {place} の {todo} に書き、古い版なら削除してください"
+        f"{t.ticket} の計画・写し・範囲の違う提案が {rel} に在るが、"
+        f"正とするツリー（{place}）の外なので承認の対象にならない。"
+        f"改版なら {place} の {todo} に書き、古い版なら削除してください"
     )
     fams = fams or standing.Families(conf, root)
     st = approval_checks.family_standing(conf, root, t, fams)

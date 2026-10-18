@@ -406,7 +406,7 @@ def _proposal_problems(
                     f"{t.ticket} は承認済み（{current.tree or '(ワークスペースルート)'} の "
                     f"{current.state or ticket_model.DOING}/）なのに todo/ にも在る"
                     f"（{_rel(root, t.path)}）。"
-                    "計画の改版でなければ todo/ の側を削除してください",
+                    "改版（計画・写し・範囲）でなければ todo/ の側を削除してください",
                 )
             )
             continue

@@ -37,7 +37,7 @@ def approved_text(
     lines = ["[ccnavi] チケットが承認され、承認済みチケットの置き場（doing/）へ動いた。"]
     for t in tickets:
         if t.ticket in revisions:
-            where = "親の改版。計画が新しくなった"
+            where = "親の改版。計画・写し・範囲のどれかが新しくなった"
         elif t.is_child:
             where = f"親 {t.parent}、フェーズ {t.phase}"
         else:

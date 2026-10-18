@@ -1254,8 +1254,9 @@ def ticket_verdict(
             "can be split off as separate work: propose a new parent ticket that covers this "
             "path; (2) the change is essential to finish this work: consult the user about "
             "revising the parent's scope, with the path and the reason. A scope revision is "
-            "accepted only when no child is in progress, so every child is cancelled first "
-            "(ccnavi-ticket.sh cancel) and re-proposed after the revision; (3) the path "
+            "accepted only when no child is in progress, so every child in progress (doing/) is "
+            "cancelled first (ccnavi-ticket.sh cancel) and re-proposed after the revision; "
+            "(3) the path "
             "is a protected file: use the draft and user-swap route (ccnavi-stage.sh), which is "
             "separate from scope approval."
         )

@@ -13,7 +13,7 @@ export interface ApproveBatchEntry {
   /** 子なら親の識別子。親なら null */
   readonly parent: string | null;
   readonly phase: number | null;
-  /** 親の改版（計画の変更）か */
+  /** 親の改版（計画・写し・範囲の変更）か */
   readonly revision: boolean;
   readonly tree: string;
   readonly path: string;
