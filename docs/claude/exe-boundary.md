@@ -32,7 +32,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, h
 - P13の例外の範囲は、親のブランチの共通のpush関門（`ccnavi_push_gate`。`ccnavi-common-state.sh`）にも広げる（ADR-0142）。
   関門を通る経路は、`ccnavi-git.sh`の`push`（送り先がoriginのとき）、C1（`ccnavi-common-c1.sh`の`ccnavi_c1_prepare`）、
   `ccnavi-push-approved.sh`の3つで、後ろの2つは素の`git push`を打つ。この2つはラッパーを通らないので「ラッパーが許可リストで読むこと」を
-  満たさないが、同じ関門を共有しないと消えた親のブランチを作り直す穴になるため、関門だけを例外に入れる。関門の材料のうちチケットの中身
+  満たさないが、同じ関門を共有しないと消えた親のブランチを作り直せてしまうため、関門だけを例外に入れる。関門の材料のうちチケットの中身
   （承認済みの親チケット・`.requested`・退避の有無）は実行ファイルの`tree parent`に聞き、shは自分で読まない。関門が`ls-remote`を打つのはshの側
   （ネットワークはshの仕事）。この2経路にほかの判定は足さない
 - shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルの副命令（`tree parent`・`c1 family`・`sync retired`・
