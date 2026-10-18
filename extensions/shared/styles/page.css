@@ -10,6 +10,25 @@
  * 並べる。ここで `@import` すると、入口で並べた順とバンドルの順が食い違うため。
  */
 
+/*
+ * 重なり順（z-index）の段。画面の CSS に数値を直書きせず、必ずこの名前で書く（直書きの検査は test/shared/style.test.ts）。
+ * 画面全体で比べる段は下から --z-foot < --z-toolbar < --z-overlay < --z-graph-max < --z-tour。--z-inline と --z-popover は部品の中だけの段。
+ * - inline: 列の取っ手・ノードの削除ボタンなど、すぐ隣の部品の上に出るだけのもの
+ * - popover: 親の重なりの単位（ツールバー・図の枠）の中で開く一覧・ボタン。中の数値は外へ漏れないので、
+ *   外との前後は親の段で決まる（図の枠は isolation で、ツールバーは sticky の z-index で単位になる）
+ * - foot / toolbar: 画面の上下に貼り付く帯。ツールバーは脚注より上（中から下へ開く一覧が脚注の裏に回らないように）
+ * - overlay: 承認・保存前の確かめの幕　graph-max: 全画面の図　tour: ガイドツアー（何より手前）
+ */
+:root {
+  --z-inline: 1;
+  --z-popover: 5;
+  --z-foot: 4;
+  --z-toolbar: 5;
+  --z-overlay: 10;
+  --z-graph-max: 100;
+  --z-tour: 1000;
+}
+
 * { box-sizing: border-box; }
 body {
   margin: 0; padding: 12px;
@@ -36,10 +55,10 @@ code { font-family: var(--vscode-editor-font-family); font-size: .95em; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 0 4px 10px; }
 /* ツールバー（保存などのボタン）と脚注（保存の結果・エラー）は、本文をスクロールしても画面の上下に
    残す。どちらも #root の直下にあり、本文と同じ入れ物の中で貼り付く。本文が裏を通るので背景を塗る。
-   z-index は列の取っ手（1）より上、承認のオーバーレイ（10）と全画面の図（100）とツアー（1000）より下。
+   z-index の段は冒頭の --z-* を使う（列の取っ手より上、承認の幕・全画面の図・ツアーより下）。
    ツールバーは脚注より上（5）に置く。案内の一覧などツールバーの中から下へ開くメニューが脚注の裏に回らないように */
-.toolbar, .foot { position: sticky; z-index: 4; background: var(--vscode-editor-background); }
-.toolbar { top: 0; z-index: 5; padding-top: 6px; }
+.toolbar, .foot { position: sticky; z-index: var(--z-foot); background: var(--vscode-editor-background); }
+.toolbar { top: 0; z-index: var(--z-toolbar); padding-top: 6px; }
 .summary { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
 .target-select { display: inline-flex; gap: 6px; align-items: center; font-weight: 400; }
 .summary .warn { color: var(--warn-text); font-weight: 600; }

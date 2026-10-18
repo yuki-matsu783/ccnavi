@@ -87,7 +87,7 @@
   border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-focusBorder));
   outline: none;
 }
-.react-flow__node .flow-remove { position: absolute; top: -9px; right: -9px; z-index: 1; visibility: hidden; }
+.react-flow__node .flow-remove { position: absolute; top: -9px; right: -9px; z-index: var(--z-inline); visibility: hidden; }
 .react-flow__node:hover .flow-remove, .react-flow__node.selected .flow-remove, .react-flow__node .flow-remove:focus-visible { visibility: visible; }
 .flow-edge-tools { position: absolute; pointer-events: all; }
 /* グループ。点線の枠と名前だけ。ほかのノードより奥に描く（`Canvas.tsx` の zIndex） */

@@ -2,7 +2,7 @@
  * 吹き出しの案内（`Tour.tsx`）。指す先の周りだけを明るく残し、ほかを暗くする。
  * 暗くするのは指す先の枠の影（box-shadow）で、枠の外を覆う要素は作らない。
  */
-.tour { position: fixed; inset: 0; z-index: 1000; }
+.tour { position: fixed; inset: 0; z-index: var(--z-tour); }
 
 .tour-spot {
   position: fixed;
@@ -102,7 +102,7 @@
   position: absolute;
   top: 34px;
   right: 4px;
-  z-index: 50;
+  z-index: var(--z-popover);
   box-sizing: border-box;
   width: 320px;
   max-width: calc(100vw - 16px);

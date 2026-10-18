@@ -19,7 +19,7 @@ select.f-section { max-width: 120px; }
 .picker > input { width: 100%; box-sizing: border-box; max-width: 360px; }
 .picker > .menu { display: none; }
 .picker.open > .menu {
-  display: flex; flex-direction: column; gap: 2px; position: absolute; z-index: 5; top: 100%; left: 0; min-width: 100%;
+  display: flex; flex-direction: column; gap: 2px; position: absolute; z-index: var(--z-popover); top: 100%; left: 0; min-width: 100%;
   /* 狭い画面でも右へはみ出さない（左は欄の左端。本文の余白と欄の字下げのぶんを引く） */
   max-width: calc(100vw - 48px);
   background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));

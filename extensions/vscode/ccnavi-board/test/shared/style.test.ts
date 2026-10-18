@@ -24,6 +24,9 @@ import { flowHtml, page as flowPage } from "../helpers/flow.js";
 import { workflowHtml, workflowPage } from "../helpers/workflow.js";
 import { page as templatesPage, templatesHtml } from "../helpers/templates.js";
 
+/** 6 画面が共有する骨組みの CSS（重なり順の段もここ） */
+const PAGE_CSS = path.join(WEBVIEW_SRC, "..", "..", "..", "..", "shared", "styles", "page.css");
+
 /** 画面の名前と、その 1 枚。中身は画面（React）が組み、CSS と body だけを拡張が入れる */
 function reactPages(appearance?: "claude-dark"): [string, string][] {
   const options = appearance === undefined ? {} : { appearance };
@@ -220,9 +223,28 @@ test("CB-T216 案内の ? は案内のある画面（プロジェクト管理画
 test("CB-T582 図の枠は重なりを枠の中に閉じ込め、ツールバーから開く案内の一覧が拡大ボタンの裏に回らない", () => {
   const css = fs.readFileSync(path.join(WEBVIEW_SRC, "shared", "Maximize.css"), "utf8");
   assert.match(css, /\.graph-max \{[^}]*isolation: isolate;/, ".graph-max が isolation: isolate を持たない");
-  // ツールバー（5）の中の一覧は、枠の外では枠より手前でなければならない（枠の中の z-index は外へ漏れない）
-  const toolbar = /\.toolbar \{ top: 0; z-index: (\d+);/.exec(fs.readFileSync(path.join(WEBVIEW_SRC, "..", "..", "..", "..", "shared", "styles", "page.css"), "utf8"));
-  assert.ok(toolbar !== null && Number(toolbar[1]) > 0, "ツールバーの z-index が見つからない");
+  assert.match(fs.readFileSync(PAGE_CSS, "utf8"), /\.toolbar \{ top: 0; z-index: var\(--z-toolbar\);/, "ツールバーが重なりの単位（z-index）を持たない");
+});
+
+test("CB-T583 z-index は page.css の段（--z-*）で書き、画面の CSS に数値を直書きしない。段の並びは決めたとおり", () => {
+  const page = fs.readFileSync(PAGE_CSS, "utf8");
+  const level = (name: string): number => Number(new RegExp(`--z-${name}: (\\d+);`).exec(page)?.[1] ?? Number.NaN);
+  // 画面全体で比べる段は下から foot < toolbar < overlay < graph-max < tour
+  const order = ["foot", "toolbar", "overlay", "graph-max", "tour"].map(level);
+  assert.ok(order.every((n, i) => !Number.isNaN(n) && (i === 0 || order[i - 1] < n)), `段の並びが崩れている: ${order.join(",")}`);
+  const files: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith(".css")) files.push(full);
+    }
+  };
+  walk(WEBVIEW_SRC);
+  for (const file of files) {
+    const bare = fs.readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    assert.doesNotMatch(bare, /z-index:\s*-?\d/, `${path.relative(WEBVIEW_SRC, file)} が z-index を数値で直書きしている（--z-* を使う）`);
+  }
 });
 
 /** WCAG の相対輝度によるコントラスト比（0〜255 の 3 つ組どうし） */

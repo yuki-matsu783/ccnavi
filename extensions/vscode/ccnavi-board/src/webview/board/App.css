@@ -37,7 +37,7 @@ body {
   border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px;
 }
 .column.sized { flex: 0 0 auto; }
-.resizer { position: absolute; top: 0; bottom: 0; right: -7px; width: 12px; cursor: col-resize; z-index: 1; }
+.resizer { position: absolute; top: 0; bottom: 0; right: -7px; width: 12px; cursor: col-resize; z-index: var(--z-inline); }
 .column:last-child .resizer { right: 0; }
 .resizer::after {
   content: ""; position: absolute; top: 8px; bottom: 8px; left: 5px; width: 2px;
