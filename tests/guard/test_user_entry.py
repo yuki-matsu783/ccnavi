@@ -126,6 +126,23 @@ class RewriteTest(unittest.TestCase):
         with self.assertRaises(user_only.UserEntryError):
             user_only.rewrite(["user", "templates", "import", "d1"])
 
+    def test_only_ascii_letters_are_folded(self):
+        # `casefold` は `ſ`（U+017F）を `s` に、`ﬀ`（U+FB00）を `ff` にする。ASCII の綴りだけを
+        # 入口の語として読み、互換の読みで入口の語になる綴りは断る。
+        rewritten, entry = user_only.rewrite(["USER", "HandOff", "a.md"])
+        self.assertEqual(rewritten, ["--handoff", "a.md"])
+        for argv in (
+            ["u\u017fer", "handoff"],
+            ["\uff55ser", "agree"],
+            ["user", "hando\ufb00"],
+            ["user", "agre\u0435"],
+            ["--root", "R", "user", "\u0430gree"],
+        ):
+            with self.subTest(argv=argv), self.assertRaises(user_only.UserEntryError):
+                user_only.rewrite(argv)
+        # 互換の読みでも入口の語にならない ASCII でない語は、入口ではないだけ。
+        self.assertEqual(user_only.rewrite(["ユーザ", "agree"]), (["ユーザ", "agree"], None))
+
     def test_mistakes_say_what_is_wrong(self):
         for argv in (["user"], ["user", "bogus"], ["user", "templates"], ["user", "reviewed"]):
             with self.subTest(argv=argv), self.assertRaises(user_only.UserEntryError):
@@ -182,6 +199,13 @@ class ExecutableTest(unittest.TestCase):
                 result = run_ccnavi(argv)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertNotIn("ユーザ専用", result.stderr)
+
+    def test_a_non_ascii_spelling_of_the_entry_is_refused(self):
+        for argv in (["u\u017fer", "handoff"], ["user", "hando\ufb00"]):
+            with self.subTest(argv=argv):
+                result = run_ccnavi(argv)
+                self.assertEqual(result.returncode, EXIT_BLOCK, result.stderr)
+                self.assertIn("ASCII", result.stderr)
 
     def test_user_handoff_writing_needs_a_terminal(self):
         result = run_ccnavi(["user", "handoff", "--yes", "--expect", "x"])
@@ -290,6 +314,112 @@ class HookTest(HookCase):
             "ccnavi --templates --json",
             "ccnavi --templates --draft i0001",
             "grep -rn 'user handoff' docs",
+        ):
+            with self.subTest(command=command):
+                decision, reason = self.hook(command)
+                self.assertNotIn(phase_forms.CODE_TICKET_APPROVAL, reason)
+                self.assertNotIn(phase_forms.CODE_RECORDS_PRUNE, reason)
+
+
+class LauncherSpellingTest(HookCase):
+    """端末を求めない経路は hook の正規表現が唯一の防御なので、実行ファイルを Python から走らせる
+    表記の揺れ（インタプリタの選択肢・`ccnavi.__main__`・`py`・実行役）でも止める。"""
+
+    def assert_stopped(self, commands):
+        for command in commands:
+            with self.subTest(command=command):
+                decision, reason = self.hook(command)
+                self.assertEqual(decision, "deny", reason)
+                self.assertIn(phase_forms.CODE_TICKET_APPROVAL, reason)
+
+    def test_interpreter_options_and_module_spellings(self):
+        self.assert_stopped(
+            (
+                "python3 -u -m ccnavi user agree",
+                "python3 -I -m ccnavi user agree",
+                "python3 -OO -m ccnavi user handoff",
+                "python3 -W ignore -m ccnavi user agree",
+                "python3 -Wignore -m ccnavi user agree",
+                "python3 -X utf8 -m ccnavi user agree",
+                "python3 -Xutf8 -m ccnavi user agree",
+                "python3 -Im ccnavi user agree",
+                "python3 -mccnavi user agree",
+                "python3 -m ccnavi.__main__ user agree",
+                "/usr/bin/python3.12 -B -m ccnavi user reviewed 3",
+                "python3 main.py user agree",
+                "python3 /repo/main.py user handoff",
+                "py -m ccnavi user agree",
+                "py -3 -m ccnavi user agree",
+                "python3 -u -m ccnavi ticket finish i0001",
+            )
+        )
+
+    def test_runners_before_the_interpreter(self):
+        self.assert_stopped(
+            (
+                "uv run python -m ccnavi user agree",
+                "uv run --frozen python -m ccnavi user agree",
+                "uv run --with x --project /p python3 -u -m ccnavi user agree",
+                "uv run -m ccnavi user agree",
+                "uv run main.py user close-early",
+                "poetry run python -m ccnavi user agree",
+                "pipenv run python -m ccnavi user agree",
+                "poetry run ccnavi user agree",
+                "python3 -u -m ccnavi $X agree",
+                "poetry run ccnavi $X agree",
+            )
+        )
+
+    def test_an_expanded_option_next_to_the_user_word_is_stopped(self):
+        # 入口の表記が読めなくても（名前を変えたコピー）、`user` と展開を含む `--` の語が
+        # 並べば止める。
+        self.assert_stopped(
+            (
+                "/tmp/x user agree --y${X}es i1",
+                "/tmp/x user agree --y$(echo es) i1",
+                "/tmp/x user agree --y`echo es` i1",
+                '/tmp/x user handoff a.md "--y$X" --expect h',
+                "/tmp/x --root /w user agree --${Y}",
+            )
+        )
+
+    def test_the_board_mark_alone_is_stopped(self):
+        self.assert_stopped(
+            (
+                "/tmp/x foo --via board",
+                "/tmp/x --handoff a.md --via=board",
+                "/tmp/x --via board --json",
+                "/tmp/x user handoff a.md --y$X --expect h --via board",
+            )
+        )
+
+    def test_an_expanded_guard_variable_name_is_stopped(self):
+        for command in (
+            "env CCNAVI_GUARD_TICKET_${X}APPROVAL=disable /tmp/x user agree",
+            "env CCNAVI_GUARD_${X}=disable /tmp/x user agree --yes i1",
+            "export CCNAVI_GUARD_TICKET_$(printf APPROVAL)=disable",
+            "env CCNAVI_GUARD_TICKET_`echo APPROVAL`=disable /tmp/x",
+        ):
+            with self.subTest(command=command):
+                decision, reason = self.hook(command)
+                self.assertEqual(decision, "deny", reason)
+                self.assertIn(phase_forms.CODE_TICKET_APPROVAL, reason)
+
+    def test_reading_forms_still_pass(self):
+        for command in (
+            "python3 -u -m ccnavi --agree --preview --json",
+            "python3 -m ccnavi --prune --preview",
+            "uv run python -m ccnavi --docs --keyword user",
+            "python3 -m ccnavi --templates --draft i0001",
+            "python3 -m unittest discover -s tests/guard",
+            "uv run --frozen python -m pytest -q",
+            "py -m pip list",
+            "python3 build.py",
+            "echo user --x=$Y",
+            "echo $CCNAVI_ROOT$X",
+            "ls ${CCNAVI_HOME}",
+            "sh .ccnavi/scripts/ccnavi-ticket.sh status",
+            "sh .ccnavi/scripts/ccnavi-review.sh decide 3 --preview",
         ):
             with self.subTest(command=command):
                 decision, reason = self.hook(command)

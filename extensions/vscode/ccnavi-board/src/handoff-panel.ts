@@ -22,7 +22,7 @@ import { checkHandoff, loadBoard, runHandoff, runHandoffYes } from "./ccnavi.js"
 import { importSelected, terminalGuide, type HandoffDeps } from "./core/handoff-import.js";
 import { renderHandoffPage } from "./core/handoff-render.js";
 import type { HandoffData, HandoffList, HandoffMessage, HandoffTreeOption, ToHandoff } from "./core/handoff-view.js";
-import { findTree, keyLabel, lockForTree, MAIN_TREE_KEY, treeOptions } from "./core/handoffmodel.js";
+import { findTree, isTerminalCommand, keyLabel, lockForTree, MAIN_TREE_KEY, treeOptions } from "./core/handoffmodel.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { loadingText } from "./core/loading-render.js";
 import type { TreeJson } from "./core/model.js";
@@ -34,9 +34,6 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 /** 画面の名前。バンドルのパスは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "handoff";
-
-/** 端末で打つコマンドの頭。クリップボードへ写してよい文面の目印（画面が出したコマンド以外は写さない） */
-const COPY_PREFIX = "ccnavi user handoff ";
 
 type Loaded =
   | {
@@ -431,7 +428,7 @@ async function handleMessage(current: PanelState, message: HandoffMessage | unde
   }
   if (message.type === "copy") {
     // 画面が出した端末のコマンドだけを写す
-    if (message.text.startsWith(COPY_PREFIX)) {
+    if (isTerminalCommand(message.text)) {
       await vscode.env.clipboard.writeText(message.text);
       void vscode.window.showInformationMessage("端末で打つコマンドをコピーしました");
     }

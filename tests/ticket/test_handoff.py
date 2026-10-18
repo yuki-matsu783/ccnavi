@@ -137,7 +137,8 @@ class AllowListTest(HandoffCase):
             ("projects/lib/.ccnavi/config/project/risks.yml", handoff.KIND_LAYER_CONFIG),
             (".ccnavi/docs/a/b.md", handoff.KIND_DOCS),
             (".ccnavi/CCNAVI.md", handoff.KIND_DOCS),
-            (".claude/skills/x/SKILL.md", handoff.KIND_DOCS),
+            # スキルの frontmatter は権限や hook を持てるので、防御として端末でだけ取り込む。
+            (".claude/skills/x/SKILL.md", handoff.KIND_DEFENSE),
             (".ccnavi/scripts/ccnavi-git.sh", handoff.KIND_DEFENSE),
             (".claude/hooks/lint-py.sh", handoff.KIND_DEFENSE),
             (".claude/settings.json", handoff.KIND_DEFENSE),
@@ -703,6 +704,95 @@ class RouteTest(HandoffCase):
         result = run_ccnavi(["--root", self.root, "--handoff"], cwd=ROOT)
         self.assertEqual(result.returncode, 2)
         self.assertIn("ccnavi user handoff", result.stderr)
+
+
+class BoardDefenseRulesTest(HandoffCase):
+    """`rules.yml` の取り込みのうち、防御の記述（`guard-*` と今ある deny）を動かすものは
+    端末に限る。"""
+
+    RULES_REL = ".ccnavi/config/common/rules.yml"
+
+    def setUp(self):
+        super().setUp()
+        self.rules = {
+            **RULES,
+            "deny": [*RULES["deny"], {**RULES["deny"][0], "id": "keep-out", "glob": "*/x/*"}],
+        }
+        write(common_path(self.root, "rules"), json.dumps(self.rules))
+
+    def board(self, rules: dict) -> tuple[dict, object]:
+        self.stage(self.RULES_REL, json.dumps(rules).encode())
+        row = self.entry(self.view(), self.RULES_REL)
+        expect = self.view()["expect"]
+        result = self.run_handoff(
+            "--yes", "--expect", expect, "--via", "board", "--json", guard="enable"
+        )
+        return row, result
+
+    def assert_terminal_only(self, rules: dict) -> None:
+        before = slurp(self.target(self.RULES_REL))
+        row, result = self.board(rules)
+        self.assertFalse(row["board"], row)
+        self.assertEqual(row["kind"], "layer-config")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        answer = json.loads(result.stdout)
+        self.assertIn("防御の記述", answer["error"])
+        self.assertIn("端末", answer["error"])
+        self.assertEqual(slurp(self.target(self.RULES_REL)), before)
+        # 端末の前のユーザなら取り込める。
+        self.assertEqual(self.take().returncode, 0)
+
+    def test_changing_the_except_of_a_guard_rule_is_terminal_only(self):
+        rules = json.loads(json.dumps(self.rules))
+        rules["deny"][0]["except"] = [{"regex": ".*"}]
+        self.assert_terminal_only(rules)
+
+    def test_removing_a_deny_is_terminal_only(self):
+        rules = json.loads(json.dumps(self.rules))
+        rules["deny"] = rules["deny"][:1]
+        self.assert_terminal_only(rules)
+
+    def test_changing_a_deny_is_terminal_only(self):
+        rules = json.loads(json.dumps(self.rules))
+        rules["deny"][1]["glob"] = "*/never/*"
+        self.assert_terminal_only(rules)
+
+    def test_adding_a_guard_id_is_terminal_only(self):
+        rules = json.loads(json.dumps(self.rules))
+        rules["allow"] = [{"id": "guard-open", "match": "Write", "glob": "*"}]
+        self.assert_terminal_only(rules)
+
+    def test_moving_a_guard_rule_to_allow_is_terminal_only(self):
+        rules = json.loads(json.dumps(self.rules))
+        moved = rules["deny"].pop(0)
+        moved.pop("message")
+        rules["allow"] = [moved]
+        self.assert_terminal_only(rules)
+
+    def test_adding_a_deny_or_an_ask_is_taken_from_the_board(self):
+        rules = json.loads(json.dumps(self.rules))
+        rules["deny"].append({**RULES["deny"][0], "id": "more", "glob": "*/y/*"})
+        rules["ask"] = [{"id": "check", "match": "Bash", "regex": "make"}]
+        row, result = self.board(rules)
+        self.assertTrue(row["board"], row)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(slurp(self.target(self.RULES_REL)))["ask"], rules["ask"])
+
+    def test_the_text_view_says_it_is_terminal_only(self):
+        rules = json.loads(json.dumps(self.rules))
+        rules["deny"] = rules["deny"][:1]
+        self.stage(self.RULES_REL, json.dumps(rules).encode())
+        result = self.run_handoff()
+        self.assertIn("端末のみ", result.stdout)
+        self.assertIn("keep-out", result.stdout)
+
+    def test_a_skill_is_defense_and_refused_from_the_board(self):
+        rel = ".claude/skills/x/SKILL.md"
+        write(self.target(rel), "---\nname: x\n---\n")
+        self.stage(rel, b"---\nname: x\nallowed-tools: Bash\n---\n")
+        row = self.entry(self.view(), rel)
+        self.assertEqual(row["kind"], "defense")
+        self.assertFalse(row["board"])
 
 
 class LayerConfigTest(HandoffCase):

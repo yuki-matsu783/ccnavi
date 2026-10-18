@@ -53,7 +53,9 @@ import subprocess
 import unicodedata
 from dataclasses import dataclass, field
 
-from ..infra import fsio, pathcase, settings
+import yaml
+
+from ..infra import fsio, pathcase, settings, yamlread
 from ..policy import ruleload
 from ..policy.rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 from . import config_check, flow, plan_templates, ticket_places
@@ -138,11 +140,10 @@ KINDS: tuple[Kind, ...] = (
     ),
     Kind(
         KIND_DOCS,
-        (".ccnavi/docs/**/*.md", ".ccnavi/CCNAVI.md", ".claude/skills/**/*.md"),
+        (".ccnavi/docs/**/*.md", ".ccnavi/CCNAVI.md"),
         (
             rf"\.ccnavi/docs/{_DEEP}\.md",
             r"\.ccnavi/ccnavi\.md",
-            rf"\.claude/skills/{_DEEP}\.md",
         ),
         new=False,
         board=True,
@@ -154,12 +155,16 @@ KINDS: tuple[Kind, ...] = (
             ".claude/hooks/**",
             ".claude/settings.json",
             ".claude/settings.local.json",
+            ".claude/skills/**/*.md",
         ),
         (
             rf"\.ccnavi/scripts/{_DEEP}\.sh",
             rf"\.claude/hooks/{_DEEP}",
             r"\.claude/settings\.json",
             r"\.claude/settings\.local\.json",
+            # スキルの frontmatter は、使えるツール（allowed-tools）や hook を持てるので、
+            # 権限を広げる記述になりうる。docs ではなく防御として、端末でだけ取り込む。
+            rf"\.claude/skills/{_DEEP}\.md",
         ),
         new=False,
         board=False,
@@ -317,6 +322,14 @@ class Entry:
     conflict: bool = False
     diff: str = ""
     selected: bool = False
+    # 種類はボードで取り込めるが、中身が防御の記述を動かすので、端末に限る理由
+    # （`rules.yml` の `guard-*` の変更や deny の削除。_defense_change）。空なら種類のまま。
+    defense: str = ""
+
+    @property
+    def board(self) -> bool:
+        """ボードの経路（`--via board`）で取り込めるか。"""
+        return self.kind.board and not self.defense
 
     @property
     def orig_path(self) -> str:
@@ -593,8 +606,69 @@ def _check_contents(conf: settings.Settings, root: str, plan: Plan) -> None:
         elif entry.kind.id == KIND_LAYER_CONFIG and entry.config_kind:
             overlay = _overlay(conf, together)
             _said(entry, config_check.file_problems(overlay, root, entry.config_kind, entry.layer))
+            if entry.config_kind == settings.KIND_RULES:
+                entry.defense = _defense_change(entry.current, entry.raw)
         elif entry.kind.id == KIND_DEFENSE:
             _check_defense(entry)
+
+
+# ルールの id のうち、防御の記述の印。共通の `guard-hooks`・`guard-scripts`・`guard-settings` など。
+DEFENSE_ID_PREFIX = "guard-"
+_DECISIONS = ("deny", "ask", "allow")
+
+
+def _rule_rows(raw: bytes | None) -> dict[tuple[str, str], tuple[str, ...]] | None:
+    """ルールファイルの各ルールを、(判定, id) → 中身（キーを並べた JSON）の組にする。
+
+    id の無いルールは中身そのものを鍵にする。読めなければ None。
+    """
+    if raw is None:
+        return {}
+    try:
+        data = yamlread.safe_load(raw.decode("utf-8-sig"))
+    except (UnicodeDecodeError, yaml.YAMLError):
+        return None
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        return None
+    rows: dict[tuple[str, str], list[str]] = {}
+    for decision in _DECISIONS:
+        items = data.get(decision) or []
+        if not isinstance(items, list):
+            return None
+        for item in items:
+            body = json.dumps(item, sort_keys=True, ensure_ascii=False, default=str)
+            rule_id = item.get("id") if isinstance(item, dict) else None
+            key = (decision, str(rule_id) if rule_id else "#" + body)
+            rows.setdefault(key, []).append(body)
+    return {key: tuple(sorted(bodies)) for key, bodies in rows.items()}
+
+
+def _defense_change(current: bytes | None, raw: bytes | None) -> str:
+    """`rules.yml` の下書きが防御の記述を動かすなら、端末に限る理由。動かさなければ空。
+
+    防御の記述とみなすのは、`guard-` で始まる id のルール（足す・消す・判定を移す・`except` を
+    含む中身を変える）と、今ある deny（消す・中身を変える）。deny を足すのは止める側への変更なので
+    数えない。どちらかが読めなければ、確かめられないので端末に限る。
+    """
+    before = _rule_rows(current)
+    after = _rule_rows(raw)
+    if before is None or after is None:
+        return "ルールファイルとして読めず、防御の記述が変わるかを確かめられない"
+    moved: list[str] = []
+    for key in sorted(set(before) | set(after)):
+        if before.get(key) == after.get(key):
+            continue
+        decision, rule_id = key
+        shown = "id の無いルール" if rule_id.startswith("#") else rule_id
+        if rule_id.casefold().startswith(DEFENSE_ID_PREFIX):
+            moved.append(f"{decision} の {shown}")
+        elif decision == "deny" and key in before:
+            moved.append(f"deny の {shown}（消す・変える）")
+    if not moved:
+        return ""
+    return "防御の記述を動かす（" + "、".join(moved[:5]) + ("ほか" if len(moved) > 5 else "") + "）"
 
 
 def _check_template(
@@ -780,12 +854,14 @@ class Applied:
 
 def board_refused(plan: Plan) -> str:
     """ボードの経路で取り込めない種類を選んでいれば、その断り文。"""
-    blocked = [e for e in plan.selected if not e.kind.board]
+    blocked = [e for e in plan.selected if not e.board]
     if not blocked:
         return ""
     paths = ", ".join(e.rel for e in blocked)
+    first = blocked[0]
+    why = f"{first.kind.id} の種類で" if not first.kind.board else f"{first.defense}ので"
     return (
-        f"{paths} は {blocked[0].kind.id} の種類で、ボードからは取り込めない。"
+        f"{paths} は {why}、ボードからは取り込めない。"
         "端末で `ccnavi user handoff <パス> --yes --expect <ハッシュ>` を打つ"
     )
 
@@ -959,7 +1035,7 @@ def entry_json(entry: Entry) -> dict:
         "path": entry.rel,
         "kind": entry.kind.id,
         "state": entry.state,
-        "board": entry.kind.board,
+        "board": entry.board,
         "selected": entry.selected,
         "errors": list(entry.errors),
         "warnings": list(entry.warnings),

@@ -24,14 +24,14 @@ keywords: [自己防衛, コアファイル, 保護, バックアップ, 復元]
 
 作業・レビュー計画のテンプレート（`.ccnavi/config/{common,project}/templates/`）は、この表に足さない。`*/.ccnavi/*` の一般の保護で止める。
 
-名指しのツール（Write / Edit）の保護には、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下を除く例外がある。守る場所の写し（`wip/handoff/.ccnavi/scripts/x.sh` など）は、ユーザが `ccnavi user handoff` で取り込むまで効力が無い。例外が効くのは、`..` の段が無く、リンクを解いた実パスが綴りと同じで、既にあるファイルがハードリンクでつながっていないとき。`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。組み込みの保護（`builtin:guard-project-home`。`selfguard_shell.handoff_write_exempt`）と、リポジトリのルール（`guard-hooks`・`guard-scripts`・`guard-ccnavi-config`・`guard-settings` の `except`）が同じ範囲を除く。シェルからの書き込みの保護は変えない。
+名指しのツール（Write / Edit）の保護には、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下を除く例外がある。守る場所の写し（`wip/handoff/.ccnavi/scripts/x.sh` など）は、ユーザが `ccnavi user handoff` で取り込むまで効力が無い。例外が効くのは、`..` の段が無く、リンクを解いた実パスが綴りと同じで、既にあるファイルがハードリンクでつながっていないとき。`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。組み込みの保護（`builtin:guard-project-home`。`selfguard_shell.handoff_write_exempt`）と、リポジトリのルール（`guard-hooks`・`guard-scripts`・`guard-ccnavi-config`・`guard-settings` の `except`）が同じ範囲を除く。リポジトリのルールの `except` は式なのでファイルを見ず、ハードリンクの写しも除いてしまう。そこで、置き場の中のリンクを通る対象・ハードリンクでつながった対象・`..` を含む対象への書き込みは、組み込みの `builtin:guard-handoff-links`（`selfguard_shell.handoff_link_target`）が別に止める。置き場の中にリンクを作るシェルの形も `builtin:guard-handoff-ln` が止める（8.2）。シェルからの書き込みの保護は、ほかは変えない。
 
 上のうち追跡されているものは、その元リポジトリから切ったワークツリー側の設定も対象に入る（11.6）。
 hook スクリプトと保護済みスクリプトはここに無く、ルールの `deny` で止めている。ccnavi ディレクトリの下のスクリプトも無く、組み込みの `deny` で止める。
 
 ### 8.2 止める側
 
-`CCNAVI_GUARD_CORE_FILES` が有効な間、`deny` の先頭に最大 5 本を挿す。
+`CCNAVI_GUARD_CORE_FILES` が有効な間、`deny` の先頭に最大 7 本を挿す。
 
 | id | 足すとき | 止めるもの |
 |---|---|---|
@@ -40,6 +40,8 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 | `builtin:guard-project-home` | 常に（ccnavi ディレクトリは固定の `.ccnavi`） | 同上 |
 | `builtin:guard-common-layer` | 共通レイヤーの 3 本の置き場が決まっているとき（11.6） | 同上 |
 | `builtin:guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、閉じたチケットの退避 `logs/archive/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも当てる）。シェルの側の `builtin:guard-setting-files` と同じ場所 |
+| `builtin:guard-handoff-links` | ワークスペースルートが決まっているとき | `Write` `Edit` `NotebookEdit` で、ツリーの直下の `wip/handoff/` の下の対象のうち、リンクを通るもの・ハードリンクでほかの名前とつながったもの・`..` を含むもの。つながっていない写しと置き場の外には当たらない |
+| `builtin:guard-handoff-ln` | ワークスペースルートが決まっているとき | Bash で、リンクを作るコマンド（`ln`・`link`・`cp -l` / `-s` / `--link` / `--symbolic-link`）があり、コマンド行に `handoff` の綴りがあるか、作業ディレクトリが置き場の中の形。行き先は読み分けない（止める側に倒す） |
 
 同じ設定が有効な間、`ccnavi user prune`（旧い形は `ccnavi --prune` の `--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
 `DENY_RECORDS_PRUNE`（`builtin:guard-records-prune`）で止める（`phase_forms.prune_form`）。実行ファイルの端末要求は

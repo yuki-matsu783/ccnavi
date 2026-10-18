@@ -144,7 +144,7 @@ export async function terminalGuide(deps: Pick<HandoffDeps, "view">, shown: Hand
   if (!viewed.value.ok || viewed.value.expect === "") {
     return { command: "", error: "検査を通らないので、取り込めません" };
   }
-  return { command: terminalCommand(entry.path, viewed.value.expect), error: "" };
+  return { command: terminalCommand(entry.path, viewed.value.expect, viewed.value.tree || shown.tree), error: "" };
 }
 
 /** 状態が取り込める形でない `board` 偽の対象の、取り込めない理由（`refusalReason` は「端末で取り込む」を先に言うので、状態の分だけ取り出す） */

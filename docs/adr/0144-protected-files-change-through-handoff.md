@@ -38,9 +38,11 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 | 種類 | パス（ツリーからの相対） | 新規作成 | ボード | 検査 |
 |---|---|---|---|---|
 | `template` | `.ccnavi/config/common/templates/<名前>.yml`（共通。ワークスペースルートのツリーでだけ書ける）、`.ccnavi/config/project/templates/<名前>.yml`、`projects/<名前>/.ccnavi/config/project/templates/<名前>.yml` | できる | 可 | テンプレートの検査（`plan_templates`）。`description` と `when` の `TODO` の印は warn、制御文字は error、共通と層で同名なのに中身が違えば error、ファイル名と中身の `name:` の照合、名前の形（`NAME_RE`・`NAME_LIMIT`） |
-| `layer-config` | `.ccnavi/config/{common,project}/{rules,phases,risks}.yml`、`projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | できない | 可 | `ccnavi --lint` が同じファイルに掛ける検査と同じ水準（同じ関数を呼ぶ。後述） |
-| `docs` | `.ccnavi/docs/**/*.md`、`.ccnavi/CCNAVI.md`、`.claude/skills/**/*.md` | できない | 可 | なし（UTF-8 であること） |
-| `defense` | `.ccnavi/scripts/**/*.sh`、`.claude/hooks/**`、`.claude/settings.json`、`.claude/settings.local.json` | できない | **不可**（`--via board` は断る。端末の前のユーザだけ） | `.sh` は CRLF を error にして `sh -n`。`settings*.json` は JSON として読めること |
+| `layer-config` | `.ccnavi/config/{common,project}/{rules,phases,risks}.yml`、`projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | できない | 可（`rules.yml` で防御の記述を動かすものは不可。下記） | `ccnavi --lint` が同じファイルに掛ける検査と同じ水準（同じ関数を呼ぶ。後述） |
+| `docs` | `.ccnavi/docs/**/*.md`、`.ccnavi/CCNAVI.md` | できない | 可 | なし（UTF-8 であること） |
+| `defense` | `.ccnavi/scripts/**/*.sh`、`.claude/hooks/**`、`.claude/settings.json`、`.claude/settings.local.json`、`.claude/skills/**/*.md`（スキルの frontmatter は使えるツールや hook を持てる） | できない | **不可**（`--via board` は断る。端末の前のユーザだけ） | `.sh` は CRLF を error にして `sh -n`。`settings*.json` は JSON として読めること |
+
+`layer-config` の `rules.yml` のうち、防御の記述を動かす取り込みは、`defense` と同じく端末に限る（`--via board` は断り、`--json` の `board` は偽になる）。防御の記述とみなすのは、`guard-` で始まる id のルール（足す・消す・判定を移す・`except` を含む中身を変える）と、今ある deny（消す・中身を変える）。deny を足すのは止める側への変更なので数えない。今の中身か下書きが読めなければ、確かめられないので端末に限る（`handoff._defense_change`）。`phases.yml`・`risks.yml` はこの判定の外。
 
 表に無いものは、取り込めない。表に足すときは、行を足し、テストで表と docs の食い違いを検出する。バイナリ（NUL を含む）と、実行ファイル（`.ccnavi/bin/`）は対象外。
 
@@ -59,7 +61,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
-| `--yes` で書くときは、標準入力が端末であること。`--via board` は端末を求めず、`--expect` と `--json` が揃うこと、種類のボード欄が「可」であること、hook の止めに頼る。**`defense` の種類は `--via board` を断る** | ボードの子プロセスは端末を持たない。ボードの経路は擬似端末などの既存の穴の影響を受けるので、防御そのものを書ける入口にしない | 全種類をボードから許す |
+| `--yes` で書くときは、標準入力が端末であること。`--via board` は端末を求めず、`--expect` と `--json` が揃うこと、種類のボード欄が「可」であること、hook の止めに頼る。**`defense` の種類と、防御の記述を動かす `rules.yml` は `--via board` を断る** | ボードの子プロセスは端末を持たない。ボードの経路は擬似端末などの既存の穴の影響を受けるので、防御そのものを書ける入口にしない | 全種類をボードから許す |
 | 「作業中のチケットがある間は取り込めない」制限は、今のまま拡張の画面だけが持つ。実行ファイルには足さない。拡張の制限は、`template` と `layer-config` の種類の取り込みに掛ける（今のテンプレートの取り込みと同じ範囲） | 実行ファイルに足すと、ルールの不具合で作業が止まっているときに、ルールを直せない行き詰まりが起きる。今の `mv` にも制限は無い | 実行ファイルで止める |
 
 ### テンプレート
@@ -79,9 +81,9 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
-| ボードに、テンプレート専用の取り込み・編集の画面の代わりに、handoff の一覧の画面（`template`・`layer-config`・`docs` の種類）を置く。一覧は `user handoff --json`（見るだけ）で作り、取り込みは `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`。テンプレートの画面は、一覧・検索・表示だけにする。`defense` は一覧に出し、「端末で取り込む」ことと打つコマンドを案内する | 拡張も、同じ 1 つのコマンドを呼ぶだけ | テンプレートの画面だけ残す。拡張が直接書く |
+| ボードに、テンプレート専用の取り込み・編集の画面の代わりに、handoff の一覧の画面（`template`・`layer-config`・`docs` の種類）を置く。一覧は `user handoff --json`（見るだけ）で作り、取り込みは `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`。テンプレートの画面は、一覧・検索・表示だけにする。`defense`（と、防御の記述を動かす `rules.yml`）は一覧に出し、「端末で取り込む」ことと打つコマンド（`ccnavi --root <ツリー> user handoff <パス> --yes --expect <ハッシュ>`。引用は POSIX の sh の形）を案内する | 拡張も、同じ 1 つのコマンドを呼ぶだけ | テンプレートの画面だけ残す。拡張が直接書く |
 | `user_only.py` の表に `handoff` の操作と `--handoff` を足し、テンプレートの書き込みの操作を実行ファイルの `user` から外す。外したオプションは `legacy`（今の実行ファイルは受け付けないが、古い実行ファイルが手元に残るときのため、hook は止め続ける）にする。ボードの組み合わせの語のグループ（`user-board-verb`）に `handoff` を足し、旧い `templates` の組み合わせは `legacy` のグループで残す | 表を正本のままにする | 外したオプションの止めも消す |
-| エージェントが `wip/handoff/` の下の写しを編集できるよう、名指しのツール（Write / Edit）の保護に例外を入れる。対象は、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下だけ。組み込みの `guard-project-home` と、リポジトリのルール `guard-hooks`・`guard-scripts`・`guard-ccnavi-config`・`guard-settings` に入れる。`..` の段・リンク・ハードリンクのあるパス、`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。シェルからの書き込みの保護は変えない | `ccnavi-stage.sh` は写しを元と同じ相対パスに置く。パスに `.ccnavi/` や `.claude/` が入るので、保護の glob に当たり、エージェントが写しを編集できなかった（この手順が一般の保護対象では最初から成り立っていなかった）。写しはユーザが取り込むまで効力が無い | 例外を入れず、ユーザが写しを編集する |
+| エージェントが `wip/handoff/` の下の写しを編集できるよう、名指しのツール（Write / Edit）の保護に例外を入れる。対象は、ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`）の直下の `wip/handoff/` の下だけ。組み込みの `guard-project-home` と、リポジトリのルール `guard-hooks`・`guard-scripts`・`guard-ccnavi-config`・`guard-settings` に入れる。`..` の段・リンク・ハードリンクのあるパス、`docs/wip/handoff/` や `wip/handoffX/` のような綴りは除かない。リポジトリのルールの `except` は式でファイルを見ないので、置き場の中のリンク・ハードリンクの対象への書き込みは組み込みの `builtin:guard-handoff-links` が別に止め、置き場の中にリンクを作るシェルの形（`ln`・`link`・リンクを作る `cp`）は `builtin:guard-handoff-ln` が止める。シェルからの書き込みの保護は、ほかは変えない | `ccnavi-stage.sh` は写しを元と同じ相対パスに置く。パスに `.ccnavi/` や `.claude/` が入るので、保護の glob に当たり、エージェントが写しを編集できなかった（この手順が一般の保護対象では最初から成り立っていなかった）。写しはユーザが取り込むまで効力が無い | 例外を入れず、ユーザが写しを編集する |
 | 互換の版は、ADR-0143 と同じ 15 のまま（同じ版で出す）。`features` から `templates.edit`・`board.template-draft` を外し、`handoff` を足す | まだ出ていない版の中の変更なので、二重に上げない | 14 に上げる |
 | ボードの rules・phases・risks の画面は、今は拡張が直接書く。この ADR では変えない | 範囲を広げすぎない。画面を handoff に寄せるかは別に決める | 同時に直す |
 
@@ -91,7 +93,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, テンプレート, �
 - 失ったもの: **コマンドの形が変わる。** テンプレートの取り込み・保存・改名・移動・削除、`--draft` の置き場、ボードのテンプレート管理の編集の画面、`.ccnavi/docs/` と docs、テスト（約 50 件）が変わる。ADR-0130 と ADR-0134 の取り込み・編集の手順を置き換える
 - 失ったもの: テンプレートの改名・移動・削除を実行ファイルでできなくなる。ユーザがファイルを直接操作する（その間は衝突の検査と錠を通らない）
 - 失ったもの: 共通テンプレートの取り込みが「どのツリーの下書きでもワークスペースルートに書く」から「下書きがあるツリーに書く」に変わる。作業ツリーで取り込んだ結果は、そのブランチの変更として合流して届く
-- 失ったもの: ボードから `defense` の種類は取り込めない。端末で打つ
+- 失ったもの: ボードから `defense` の種類（スキルを含む）と、防御の記述を動かす `rules.yml` は取り込めない。端末で打つ
 
 ## 採らなかった案
 

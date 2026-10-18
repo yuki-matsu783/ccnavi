@@ -26,6 +26,7 @@ hook の止め（`phase_forms`）と、実行ファイルの端末要求（`entr
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 
 
@@ -168,6 +169,10 @@ FLAGS: tuple[Flag, ...] = (
     # 単独では止めない（一覧・検索・表示は今もある）。前の形のボードの組み合わせの相手になるだけ。
     Flag("--templates", "template", cli=False, groups=("templates",)),
     Flag("--guard-ticket-approval", "guard-off", cli=False, groups=("guard",)),
+    # ボードの経路の印（`--via board`・`--via=board`）。ボードの子プロセスだけが付け、端末を
+    # 求めない経路を選ぶ。単独では止めないが、`board` の語と並べば、操作の語や `--yes` が
+    # 読めない形（展開で組み立てた `--yes` など）でも止める（BOARD_COMBOS）。
+    Flag("--via", "confirm-yes", cli=False, groups=("via",)),
     # 放棄した親の片付けの記録を消す `worktree retire --abandon`。文字どおりの `worktree retire` は
     # SUBS が止める。ここは、引数を読み切れない形の判定（phase_forms._abandon_word）が使う。
     Flag("--abandon", "tidy", cli=False, groups=("abandon",)),
@@ -225,6 +230,9 @@ BOARD_COMBOS: tuple[tuple[str, ...], ...] = (
     ("templates", "legacy-edit", "yes"),
     ("templates", "legacy-save-draft"),
     ("choices", "digest"),
+    # ボードの経路の印だけで止める。`user` も操作の語も伴わない形（名前を変えたコピーに
+    # `--via board` だけを渡す、`--yes` を展開で隠す）も、ボードの経路として止める。
+    ("via", "board"),
 )
 
 
@@ -263,6 +271,8 @@ WORD_GROUPS: dict[str, tuple[str, ...]] = {
     "user": (USER_WORD,),
     # 端末を求めない経路（`--yes`）を持つ操作。`templates` は前の形（古い実行ファイルのため）。
     "user-board-verb": ("agree", "reviewed", "handoff", "templates"),
+    # `--via` の値のうち、端末を求めない経路を選ぶもの。
+    "board": ("board",),
 }
 
 # ユーザ専用の sh の名前。位置に依らず、コマンド行に名前が出たら止める
@@ -413,19 +423,44 @@ def _is_wrapper_option(word: str) -> bool:
     return word in WRAPPER_OPTIONS or word.partition("=")[0] in WRAPPER_OPTIONS and "=" in word
 
 
+def _ascii_lower(word: str) -> str:
+    """コマンドの語を比べる形。ASCII の大文字だけを小文字にする。
+
+    `casefold` は使わない。`casefold` は `ſ`（U+017F）を `s` に、`ﬀ`（U+FB00）を `ff` にするので、
+    `uſer`・`handoﬀ` が `user`・`handoff` と同じ語になる。hook の正規表現と実行ファイルの読みが
+    どこかで食い違うと、片方だけが入口と読む綴りができる。ここで比べるのはパスや名前ではなく
+    コマンドの語（argparse と同じく ASCII の綴り）なので、`pathcase.fold` の決まりの外にある。
+    """
+    return "".join(chr(ord(c) + 32) if "A" <= c <= "Z" else c for c in word)
+
+
+def _loose(word: str) -> str:
+    """互換の読み（NFKC と casefold）。ASCII でない綴りが入口の語に化けるかを見るためだけに使う。"""
+    return unicodedata.normalize("NFKC", word).casefold()
+
+
 def rewrite(argv: list[str]) -> tuple[list[str], Verb | None]:
     """`user <操作> …` を内部の形に読み替える。`user` で始まらなければそのまま返す。
 
     `user` は、ラッパーが先に付ける値つきのオプション（`WRAPPER_OPTIONS`）を読み飛ばした後の
-    最初の語。大文字小文字は区別しない。先頭の `--` は読み飛ばさない（名前空間として扱わない）。
-    返す 2 つめは、読み替えた操作。argparse の結果には入れず、呼び出し側が別の変数で持つ。
+    最初の語。ASCII の大文字小文字は区別しない（`_ascii_lower`）。先頭の `--` は読み飛ばさない
+    （名前空間として扱わない）。`user` の位置か操作の位置に ASCII でない語があり、Unicode の
+    互換の読み（NFKC と casefold）で `user` や操作の語になるなら、`UserEntryError` で断る
+    （`uſer`・`handoﬀ`）。返す 2 つめは、読み替えた操作。argparse の結果には入れず、
+    呼び出し側が別の変数で持つ。
     """
     at = 0
     while at < len(argv) and _is_wrapper_option(argv[at]):
         at += 1 if "=" in argv[at] else 2
-    if at >= len(argv) or argv[at].casefold() != USER_WORD:
+    if at >= len(argv):
         return argv, None
-    words = [w.casefold() for w in argv[at + 1 : at + 3]]
+    if _ascii_lower(argv[at]) != USER_WORD:
+        if not argv[at].isascii() and _loose(argv[at]) == USER_WORD:
+            raise UserEntryError(f"user の入口は ASCII の綴りで打つ（{argv[at]!r} は受け付けない）")
+        return argv, None
+    words = [_ascii_lower(w) for w in argv[at + 1 : at + 3]]
+    if words and not words[0].isascii():
+        raise UserEntryError(f"user の操作は ASCII の綴りで打つ（{words[0]!r} は受け付けない）")
     for verb in VERBS:
         if tuple(words[: len(verb.words)]) != verb.words:
             continue

@@ -136,6 +136,20 @@ _GUARD_READ = re.compile(
     re.IGNORECASE,
 )
 _GUARD_MENTION = re.compile(rf"(?<![A-Za-z0-9_]){_GUARD_NAME}(?![A-Za-z0-9_])", re.IGNORECASE)
+# `CCNAVI_` で始まる名前の途中に展開が混じる形（`env CCNAVI_GUARD_TICKET_${X}APPROVAL=disable`・
+# `export "CCNAVI_GUARD_`printf TICKET`_APPROVAL=disable"`）。実行の時点で端末要求を切る変数の
+# 名前になりうるので、名前を文字どおりに書いた形（_GUARD_MENTION）と同じに止める。前が `$`・`{` の
+# 形（`$CCNAVI_ROOT$X`・`${CCNAVI_X}`）は変数を読むだけなので数えない。
+_GUARD_EXPANDED_NAME = re.compile(r"(?<![A-Za-z0-9_${])CCNAVI_[A-Za-z0-9_]*[$`]", re.IGNORECASE)
+# 展開（`$`・バッククォート）を含む `--` で始まる語（`--y${X}es`・`--y$(echo es)`）。
+# `user` の語が同じコマンド行にあれば、入口を読めない呼び方（名前を変えたコピーなど）でも止める。
+# 入口の表記の検査（launcher）と組み合わせの検査（BOARD_COMBOS）は、展開で組み立てた語を
+# 文字として読めないため。暫定の止めで、`user` と関係の無い語の展開まで止める側に広がる。
+_EXPANDED_OPTION = re.compile(r"(?<![^\s\x00;&|(])--[^\s\x00;&|]*[$`]")
+# 単独の語の `user`（`user.email` や `--user` は数えない）。
+_USER_ALONE = re.compile(
+    rf"(?<![^\s\x00;&|(=]){user_only.USER_WORD}(?![^\s\x00;&|)])", re.IGNORECASE
+)
 _GUARD_FLAG = re.compile(
     r"--guard-ticket-approval(?:\s*=\s*|\s+)(?!enable(?![\w-]))", re.IGNORECASE
 )
@@ -153,10 +167,15 @@ _SEGMENT = re.compile(r"[;&|\n]+")
 _ASSIGNMENT_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\+?=")
 
 
-def _dequoted(subject: str) -> str:
-    """引用符とバックスラッシュを除いた文字列。分け書き（`--y""es`）と引用を同じに読む。"""
+def _dequoted(subject: str, *, keep_ticks: bool = False) -> str:
+    """引用符とバックスラッシュを除いた文字列。分け書き（`--y""es`）と引用を同じに読む。
+
+    `keep_ticks` なら、バッククォート（コマンド置換）は残す。展開の有無を見る検査が使う。
+    """
     return re.sub(
-        r"['\"`\\]", "", subject.replace(shellread.SEP, "\n").replace(shellread.WORD_SEP, " ")
+        r"['\"\\]" if keep_ticks else r"['\"`\\]",
+        "",
+        subject.replace(shellread.SEP, "\n").replace(shellread.WORD_SEP, " "),
     )
 
 
@@ -206,17 +225,23 @@ def human_path_form(subject: str) -> tuple[str, str]:
     """hook のほかに保護が無いユーザの判断の形があれば（種類, 見つけた文字列）。
     無ければ空の文字列 2 つ。
 
-    種類は `guard-off`（端末要求を切る）か `board`（ボードの経路）。
+    種類は `guard-off`（端末要求を切る）・`user-script`（ユーザ専用の sh）・
+    `board`（ボードの経路）・`expanded`（`user` の語と、展開を含む `--` の語が並ぶ）。
     """
     text = _dequoted(subject)
+    ticked = _dequoted(subject, keep_ticks=True)
     for message in _commit_messages(subject):
         text = text.replace(_dequoted(message), " ", 1)
+        ticked = ticked.replace(_dequoted(message, keep_ticks=True), " ", 1)
     if _only_readers(text):
         return "", ""
     unread = _GUARD_READ.sub("", text)
     mention = _GUARD_MENTION.search(unread)
     if mention:
         return "guard-off", mention.group(0)
+    expanded_name = _GUARD_EXPANDED_NAME.search(ticked)
+    if expanded_name:
+        return "guard-off", expanded_name.group(0)
     flag = _GUARD_FLAG.search(text)
     if flag:
         return "guard-off", flag.group(0).strip()
@@ -227,7 +252,23 @@ def human_path_form(subject: str) -> tuple[str, str]:
         found = [rx.search(text) for rx in combo]
         if all(found):
             return "board", " … ".join(m.group(0) for m in found if m)
+    option = _EXPANDED_OPTION.search(ticked)
+    if option and _USER_ALONE.search(ticked):
+        word = ticked[option.start() :].split(None, 1)[0]
+        return "expanded", word
     return "", ""
+
+
+def expanded_option_message(found: str) -> str:
+    """`user` の語と、展開を含む `--` の語が並ぶ形で止めた文。"""
+    return (
+        f"コマンド行に `user` の語と、変数やコマンド置換を含むオプションの語（{found}）が"
+        "並んでいます。ユーザ専用の入口（ccnavi user <操作>）の `--yes` などを、"
+        "実行の時点で組み立てられる形なので、"
+        "何を実行するかを確かめられず止めました。オプションは変数や置換で組み立てず、"
+        "そのまま書いてください（値が必要なら先に読み、次の手に書きます）。"
+        "ユーザ専用の操作は、ユーザが端末かボードで実行します。"
+    )
 
 
 def board_form_message(found: str) -> str:
@@ -238,6 +279,8 @@ def board_form_message(found: str) -> str:
         "保護対象の下書きの取り込み（`ccnavi user handoff`）は、ユーザがボードか端末で"
         "下書きの差分を読んでから決めます。"
         if "handoff" in lowered or "--import" in lowered or "templates" in lowered
+        else "`--via board` は、ボードの画面から押した操作を拡張が実行するときだけ付ける印です。"
+        if lowered.startswith("--via")
         else "下書きの保存は、ユーザが実行する前の形です"
         "（`--body-file` の中身が出力に出るため）。下書きは Write で直接編集してください。"
         if "--save-draft" in lowered
@@ -307,9 +350,9 @@ _ENTRY_EXE = frozenset({"ccnavi", "ccnavi.exe", "ccnavi.__main__", "ccnavi-launc
 _ENTRY_PREFIX = frozenset(
     {"sh", "bash", "dash", "zsh", "ksh", "ash", "busybox", ".", "source", "exec", "command"}
 )
-# 後ろの語を実行する、Python のツールの実行役（`uv run`・`uvx`・`pipx run`）。間に置いた
-# 選択肢と値は読み分けず、後ろに入口の名前があればコマンドの位置とみなす。
-_TOOL_RUNNERS = frozenset({"uv", "uvx", "pipx"})
+# 後ろの語を実行する、Python のツールの実行役（`uv run`・`uvx`・`pipx run`・`poetry run`・
+# `pipenv run`）。間に置いた選択肢と値は読み分けず、後ろに入口の名前があればコマンドの位置とみなす。
+_TOOL_RUNNERS = frozenset({"uv", "uvx", "pipx", "poetry", "pipenv"})
 _STDIN_SHELLS = frozenset({"sh", "bash", "dash", "zsh", "ksh", "ash"})
 _FEEDERS = frozenset({"xargs", "parallel"})
 # 展開・置換・glob・find -exec の置き場。どれもシェルか実行役が実行の時点で値を決める。
@@ -701,14 +744,21 @@ def _executed_entry(words: list[str], bin_base: str) -> str:
         if shellread_words._ASSIGNMENT_WORD.match(word):
             k += 1
             continue
-        if base in _TOOL_RUNNERS or (base == "run" and k and _base_name(words[k - 1]) == "pipx"):
+        if base in _TOOL_RUNNERS or (
+            base == "run" and k and _base_name(words[k - 1]) in _TOOL_RUNNERS
+        ):
             k += 1
             continue
         if base in _STDIN_SHELLS:
             shell = True
             k += 1
             continue
-        if base in _EXEC_PREFIX or base == "-m" or base.startswith("python"):
+        if (
+            base in _EXEC_PREFIX
+            or base == "-m"
+            or base.startswith("python")
+            or base in ("py", "py.exe")
+        ):
             k += 1
             continue
         if word[:1] in ("-", "+"):
@@ -874,6 +924,22 @@ def prune_message() -> str:
     )
 
 
+# Python から実行ファイルの中身を走らせる表記（ticket_approval_rule の launcher）。
+# - 実行役: `uv run`・`poetry run`・`pipenv run`。間に置いた選択肢と値は読み分けない
+# - インタプリタ: `python`・`python3.12`・`py`（Windows の起動役）と `.exe`
+# - インタプリタの選択肢: `-u`・`-I`・`-OO`・`-3`・`-W x`・`-Wx`・`-X utf8`・`-Xutf8`
+# - 入口: `-m ccnavi`・`-mccnavi`・`-um ccnavi`・`-m ccnavi.__main__`・配布物の入口 `main.py`
+# 拾いきれない表記（`python -c`・名前を変えたコピー）は、human_path_form と hidden_user_entry が
+# 名前に依らない検査で見る。
+_PY_RUNNER = r"(?:\S*[\\/])?(?:uv|poetry|pipenv)(?:\.exe)?\s+run\b(?:\s+[^\s\x00;&|]+)*?"
+_PY_INTERPRETER = r"(?:\S*[\\/])?(?:py|python[\w.]*)(?:\.exe)?"
+_PY_OPTIONS = r"(?:\s+(?:-[WX]\s*[^\s\x00;&|-]\S*|-[A-Za-z0-9.]+))*?"
+_PY_END = r"(?=[\s\x00;&|]|$)"
+_PY_ENTRY = (
+    rf"(?:\s+-[A-Za-z]*m\s*ccnavi(?:\.__main__)?{_PY_END}"
+    rf"|\s+(?:\S*[\\/])?main\.py{_PY_END})"
+)
+
 # 承認の sh・放棄した親の記録を消す入口（worktree retire --abandon）・ユーザの判断の入口の sh を、
 # コマンドの位置の表記で止める節。
 # ticket_approval_rule が使い、hidden_user_entry は同じ形をこの節に任せる（文面を 1 つにするため）。
@@ -908,8 +974,9 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     # 実行ファイルを直に呼ぶ形と、起動の sh（`sh .ccnavi/scripts/ccnavi-launcher.sh …`）。
     names.append(r"ccnavi-launcher\.sh")
     launcher = (
-        r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi"
-        r"|((sh|bash)(\s+-\S+)*\s+)?(\S*[\\/])?(" + "|".join(names) + "))"
+        rf"({_PY_RUNNER}{_PY_OPTIONS}{_PY_ENTRY}"
+        rf"|(?:{_PY_RUNNER}\s+)?{_PY_INTERPRETER}{_PY_OPTIONS}{_PY_ENTRY}"
+        rf"|(?:{_PY_RUNNER}\s+)?((sh|bash)(\s+-\S+)*\s+)?(\S*[\\/])?(" + "|".join(names) + "))"
     )
     script = _SCRIPT_FORMS
     # 大文字小文字を区別しない。Windows と macOS の既定のファイルシステムは名前の大小を

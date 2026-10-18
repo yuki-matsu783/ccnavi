@@ -127,6 +127,8 @@ def _plan_text(stdout: TextIO, plan: handoff.Plan, wanted: list[str] | None) -> 
             stdout.write(f"    error {line}\n")
         for line in entry.warnings:
             stdout.write(f"    warn  {line}\n")
+        if entry.defense:
+            stdout.write(f"    端末のみ {entry.defense}。ボードからは取り込めません\n")
         if entry.conflict:
             stdout.write(
                 f"    conflict 写したあとに取り込み先が変わりました"
@@ -152,9 +154,10 @@ def _plan_text(stdout: TextIO, plan: handoff.Plan, wanted: list[str] | None) -> 
     command = "ccnavi user handoff " + (paths + " " if paths else "")
     stdout.write("何も反映していません。この内容で取り込むなら、次を実行します。\n")
     stdout.write(f"  {command}--yes --expect {plan.expect}\n")
-    if any(not e.kind.board for e in chosen):
+    if any(not e.board for e in chosen):
         stdout.write(
-            "  （defense の種類を含むため、ボードからは取り込めません。端末で実行してください）\n"
+            "  （defense の種類か、防御の記述を動かす rules.yml を含むため、ボードからは"
+            "取り込めません。端末で実行してください）\n"
         )
 
 

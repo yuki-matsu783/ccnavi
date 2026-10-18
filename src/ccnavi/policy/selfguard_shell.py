@@ -492,6 +492,35 @@ _HANDOFF_UNREAD = set("$`*?[]{}()<>|;&'\"\n~") | {shellread.SEP, shellread.WORD_
 _HANDOFF_SHORT_ALLOWED = set("fpvnu")
 
 
+def _handoff_place(root: str) -> re.Pattern[str]:
+    """ツリー（ワークスペースルート、`.claude/worktrees/<名前>`、`projects/<名前>`、その中の
+    ワークツリー）の直下の `wip/handoff/` の下に当たる式。当てる先は fold して `/` 区切りにした
+    絶対パス。"""
+    base = pathcase.fold(os.path.realpath(root)).replace("\\", "/")
+    return re.compile(
+        re.escape(base)
+        + r"(?:/projects/[^/]+)?(?:/\.claude/worktrees/[^/]+)?"
+        + r"/"
+        + "/".join(re.escape(part) for part in HANDOFF)
+        + r"/"
+    )
+
+
+def _handoff_linked(subject: str, spelled: str) -> bool:
+    """置き場の中の対象が、リンクを通る・ハードリンクでほかの名前とつながる・`..` を含むか。
+
+    確かめられなければ（OSError）つながっているとみなす。
+    """
+    if ".." in spelled.split("/"):
+        return True
+    try:
+        if pathcase.fold(os.path.realpath(subject)).replace("\\", "/") != spelled:
+            return True
+        return os.path.isfile(subject) and os.stat(subject).st_nlink > 1
+    except OSError:
+        return True
+
+
 def handoff_write_exempt(root: str) -> Callable[[str], str] | None:
     """名指しのツール（Write / Edit）の保護から、下書きの置き場（`wip/handoff/`）の中を外す関数。
 
@@ -513,29 +542,101 @@ def handoff_write_exempt(root: str) -> Callable[[str], str] | None:
     """
     if not root:
         return None
-    base = pathcase.fold(os.path.realpath(root)).replace("\\", "/")
-    pattern = re.compile(
-        re.escape(base)
-        + r"(?:/projects/[^/]+)?(?:/\.claude/worktrees/[^/]+)?"
-        + r"/"
-        + "/".join(re.escape(part) for part in HANDOFF)
-        + r"/"
-    )
+    pattern = _handoff_place(root)
 
     def exempt(subject: str) -> str:
         spelled = pathcase.fold(subject).replace("\\", "/")
-        if not pattern.match(spelled) or ".." in spelled.split("/"):
-            return subject
-        try:
-            if pathcase.fold(os.path.realpath(subject)).replace("\\", "/") != spelled:
-                return subject
-            if os.path.isfile(subject) and os.stat(subject).st_nlink > 1:
-                return subject
-        except OSError:
+        if not pattern.match(spelled) or _handoff_linked(subject, spelled):
             return subject
         return ""
 
     return exempt
+
+
+def handoff_link_target(root: str) -> Callable[[str], str] | None:
+    """名指しのツールで、置き場（`wip/handoff/`）の中のリンク・ハードリンクに書く形だけを残す関数。
+
+    ルールファイルの保護（`guard-hooks`・`guard-scripts`・`guard-ccnavi-config`・`guard-settings`）は、
+    置き場の中を `except` の式で外す。式はファイルを見ないので、守る場所とハードリンクでつながった
+    写しへの書き込みも外れる。組み込みの 1 本（HANDOFF_LINK_RULE_ID）がこの関数で、置き場の中の
+    つながった対象だけを残して止める。つながっていない写しと、置き場の外は空を返す（当てない）。
+    """
+    if not root:
+        return None
+    pattern = _handoff_place(root)
+
+    def target(subject: str) -> str:
+        spelled = pathcase.fold(subject).replace("\\", "/")
+        if pattern.match(spelled) and _handoff_linked(subject, spelled):
+            return subject
+        return ""
+
+    return target
+
+
+# リンクを作るコマンド。`ln`・`link` と、リンクを作る選択肢を付けた `cp`
+# （`-l`・`-s`・`--link`・`--symbolic-link` と、その文字を含む短い選択肢の並び）。
+_LINKERS = frozenset({"ln", "link", "gln"})
+_LINK_PREFIX = frozenset(
+    {"sudo", "env", "command", "exec", "nice", "nohup", "time", "busybox", "xargs", "timeout"}
+)
+_CP_LINK_OPTIONS = ("--link", "--symbolic-link")
+_SEGMENTS = re.compile(r"[\x00;&|\n()`]+")
+
+
+def _makes_link(words: list[str]) -> bool:
+    k = 0
+    while k < len(words) and (
+        _ASSIGNMENT.match(words[k]) or _base(words[k]) in _LINK_PREFIX or words[k].startswith("-")
+    ):
+        k += 1
+    if k >= len(words):
+        return False
+    name = _base(words[k])
+    if name in _LINKERS:
+        return True
+    if name in ("cp", "gcp"):
+        for word in words[k + 1 :]:
+            option = word.partition("=")[0]
+            # GNU の長い選択肢は省略できる（`--li` は `--link`、`--sym` は `--symbolic-link`）。
+            if len(option) >= 3 and any(full.startswith(option) for full in _CP_LINK_OPTIONS):
+                return True
+            if re.fullmatch(r"-[A-Za-z]*[ls][A-Za-z]*", word):
+                return True
+    return False
+
+
+def _base(word: str) -> str:
+    name = word.replace("\\", "/").rsplit("/", 1)[-1].casefold()
+    return name[:-4] if name.endswith(".exe") else name
+
+
+_ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\+?=")
+
+
+def handoff_link_command(root: str, cwd: str = "") -> Callable[[str], str] | None:
+    """シェルで、置き場（`wip/handoff/`）の中にリンクを作る形だけを残す関数。
+
+    置き場に守る場所へのリンク（シンボリックリンクもハードリンクも）を置くと、次の 1 本で
+    リンクの先へ書ける（写しの例外は名指しのツールのパスで決めるため）。`ln`・`link`・リンクを
+    作る `cp` があり、コマンド行に `handoff` の綴りがあるか、作業ディレクトリが置き場の中なら残す
+    （止める）。行き先は変数や `cd` で組み立てられるので、読み分けず止める側に倒す。
+    """
+    if not root:
+        return None
+    pattern = _handoff_place(root)
+    here = pathcase.fold(os.path.realpath(cwd)).replace("\\", "/") + "/" if cwd else ""
+    inside = bool(here) and bool(pattern.match(here))
+
+    def target(subject: str) -> str:
+        text = subject.replace(shellread.WORD_SEP, " ")
+        if not any(_makes_link(seg.split()) for seg in _SEGMENTS.split(text)):
+            return ""
+        if inside or "handoff" in text.casefold():
+            return subject
+        return ""
+
+    return target
 
 
 def handoff_copy_exempt(root: str, cwd: str = "") -> Callable[[str], str] | None:
@@ -975,6 +1076,22 @@ RECORDS_MESSAGE = (
 
 PROJECT_HOME_RULE_ID = "builtin:guard-project-home"
 
+HANDOFF_LINK_RULE_ID = "builtin:guard-handoff-links"
+
+HANDOFF_LINK_MESSAGE = (
+    "下書きの置き場（wip/handoff/）の中の、リンクかハードリンクでほかの場所とつながったファイルです。"
+    "書くとつながった先（守る場所のことがあります）も書き換わるので、止めました。"
+    "写しは ccnavi-stage.sh <パス> で作り直してください（中身を写すので、つながりません）。"
+)
+
+HANDOFF_LN_RULE_ID = "builtin:guard-handoff-ln"
+
+HANDOFF_LN_MESSAGE = (
+    "下書きの置き場（wip/handoff/）にリンクを作る形です。置き場の中のリンクは、守る場所への"
+    "書き込みの入口になるので、エージェントは作りません。守る場所を直すときは"
+    " ccnavi-stage.sh <パス> で中身を写し、写しを Write / Edit で直してください。"
+)
+
 PROJECT_HOME_MESSAGE = (
     "レイヤーの設定の置き場です。ここに入っているルール・フェーズ定義・リスクの配点が"
     "このツリーへの判定を決めるので、エージェントが書き換えると自分の判定を緩め"
@@ -1065,6 +1182,31 @@ def add_rules(
             },
             root,
             exempt=handoff_write_exempt(root),
+        )
+    if root:
+        _insert(
+            rule_set,
+            {
+                "id": HANDOFF_LINK_RULE_ID,
+                "match": "Write|Edit|NotebookEdit",
+                # 当てる対象は関数が決める（置き場の中のつながった対象だけが残る）。
+                "regex": ".",
+                "message": HANDOFF_LINK_MESSAGE,
+            },
+            root,
+            exempt=handoff_link_target(root),
+        )
+        # 式は 1 文字で組み立てが軽いので、ツールに依らず足す（当てる対象は関数が決める）。
+        _insert(
+            rule_set,
+            {
+                "id": HANDOFF_LN_RULE_ID,
+                "match": "Bash",
+                "regex": ".",
+                "message": HANDOFF_LN_MESSAGE,
+            },
+            root,
+            exempt=handoff_link_command(root, cwd),
         )
     _insert(
         rule_set,

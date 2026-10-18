@@ -260,9 +260,26 @@ export function reconcileSelection(previous: ReadonlyMap<string, string>, entrie
   return kept;
 }
 
-/** 端末で打つ取り込みのコマンド。`expect` は、そのパスを指して見るだけをもう一度呼んで返った値 */
-export function terminalCommand(path: string, expect: string): string {
-  return `ccnavi user handoff ${quoteArg(path)} --yes --expect ${expect}`;
+/**
+ * 端末で打つ取り込みのコマンド。`expect` は、そのパスを指して見るだけをもう一度呼んで返った値。
+ * `tree` は見るだけの答えの `tree`（下書きがあるツリー）。実行ファイルは `--root` で指したツリーの
+ * `wip/handoff/` だけを見るので、ユーザが別の場所で端末を開いていても同じツリーへ取り込むように付ける。空なら付けない。
+ *
+ * 引用は POSIX の sh の形（単引用符と `'\''`）。Windows の PowerShell は単引用符の中の `'` を `''` で表し、
+ * `'\''` を読めないので、パスかツリーに `'` を含むときは、PowerShell では `'\''` を `''` に打ち直す。
+ * 空白や `\` だけなら、単引用符で囲んだ形は PowerShell でも同じに読める。
+ */
+export function terminalCommand(path: string, expect: string, tree = ""): string {
+  const root = tree === "" ? "" : `--root ${quoteArg(tree)} `;
+  return `ccnavi ${root}user handoff ${quoteArg(path)} --yes --expect ${expect}`;
+}
+
+/**
+ * `terminalCommand` が組んだ形か。クリップボードへ写してよい文面の目印に使う（画面が出したコマンド以外は写さない）。
+ * `ccnavi user handoff …` か、`ccnavi --root <ツリー> user handoff …`
+ */
+export function isTerminalCommand(text: string): boolean {
+  return /^ccnavi (?:--root (?:[A-Za-z0-9_./@%+=:,-]+|'(?:[^']|'\\'')*') )?user handoff /.test(text);
 }
 
 /**

@@ -181,7 +181,8 @@ test("CB-T1132 端末の案内は、そのパスだけを指して見るだけ�
   const guide = await terminalGuide(r.deps, shown, HOOK);
   assert.deepEqual(r.calls, [`view:${HOOK}`]);
   // 見るだけの答えの expect（この試験では集合ごとに別の値）をそのまま使う。拡張が組み直さない
-  assert.deepEqual(guide, { command: `ccnavi user handoff ${HOOK} --yes --expect expect-of(${HOOK})`, error: "" });
+  // ツリーは見るだけの答えの tree（`--root` で、下書きのあるツリーへ取り込む）
+  assert.deepEqual(guide, { command: `ccnavi --root /ws user handoff ${HOOK} --yes --expect expect-of(${HOOK})`, error: "" });
 });
 
 test("CB-T1133 端末の案内を出さない場合。ボードから取り込める対象・取り込めない状態・error・一覧にない・見せたあとの変更・見るだけの失敗", async () => {

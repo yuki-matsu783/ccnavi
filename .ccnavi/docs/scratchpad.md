@@ -61,9 +61,11 @@ Claude Codeのセッションが示すスクラッチパッド（Environment欄�
 | 種類 | 取り込み先 | 新規 | ボードから |
 |---|---|---|---|
 | `template` | `.ccnavi/config/{common,project}/templates/<名前>.yml` ほか | できる | 可 |
-| `layer-config` | `rules.yml`・`phases.yml`・`risks.yml` | できない | 可 |
-| `docs` | `.ccnavi/docs/**/*.md`・`.ccnavi/CCNAVI.md`・`.claude/skills/**/*.md` | できない | 可 |
-| `defense` | `.ccnavi/scripts/**/*.sh`・`.claude/hooks/**`・`.claude/settings*.json` | できない | 不可（端末のユーザだけ） |
+| `layer-config` | `rules.yml`・`phases.yml`・`risks.yml` | できない | 可（`rules.yml`の`guard-*`のルールか今あるdenyを動かす取り込みは不可） |
+| `docs` | `.ccnavi/docs/**/*.md`・`.ccnavi/CCNAVI.md` | できない | 可 |
+| `defense` | `.ccnavi/scripts/**/*.sh`・`.claude/hooks/**`・`.claude/settings*.json`・`.claude/skills/**/*.md` | できない | 不可（端末のユーザだけ） |
+
+`wip/handoff/`の下書きは`ccnavi-stage.sh`で写して作る。`ln`でリンクを作ったり、ハードリンクでつながった下書きを書いたりする形は止まる。
 
 写したあとに取り込み先が変わった下書き（conflict）や、検査に通らない下書きが1つでもあると、そのときは何も取り込まれない。取り込むと下書きは消える。端末の前のユーザは、`ccnavi-stage.sh --commands`が出す`mv`の代わりに`user handoff`を使える。
 

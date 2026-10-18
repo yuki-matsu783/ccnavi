@@ -326,6 +326,8 @@ def decide_before(
                         if kind == "guard-off"
                         else phase_forms.user_script_message(found)
                         if kind == "user-script"
+                        else phase_forms.expanded_option_message(found)
+                        if kind == "expanded"
                         else phase_forms.board_form_message(found),
                     )
                 ],

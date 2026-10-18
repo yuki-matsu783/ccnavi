@@ -24,6 +24,7 @@ import {
   samePath,
   selectablePaths,
   terminalCommand,
+  isTerminalCommand,
   treeKey,
   treeOptions,
 } from "../../src/core/handoffmodel.js";
@@ -219,6 +220,17 @@ test("CB-T1114 端末で打つコマンドは ccnavi user handoff <パス> --yes
   assert.equal(terminalCommand(".claude/hooks/guard.sh", "ab".repeat(32)), `ccnavi user handoff .claude/hooks/guard.sh --yes --expect ${"ab".repeat(32)}`);
   assert.equal(terminalCommand(".claude/hooks/my guard.sh", "h"), "ccnavi user handoff '.claude/hooks/my guard.sh' --yes --expect h");
   assert.equal(terminalCommand(".claude/it's.sh", "h"), "ccnavi user handoff '.claude/it'\\''s.sh' --yes --expect h");
+});
+
+test("CB-T1138 端末のコマンドは --root で下書きのあるツリーを指す。空白・単引用符のあるツリーは POSIX の形で囲む", () => {
+  assert.equal(terminalCommand(".claude/hooks/guard.sh", "h", "/ws/.claude/worktrees/a"), "ccnavi --root /ws/.claude/worktrees/a user handoff .claude/hooks/guard.sh --yes --expect h");
+  assert.equal(terminalCommand("x.sh", "h", "C:\\Users\\me\\ws"), "ccnavi --root 'C:\\Users\\me\\ws' user handoff x.sh --yes --expect h");
+  assert.equal(terminalCommand("x.sh", "h", "/w's"), "ccnavi --root '/w'\\''s' user handoff x.sh --yes --expect h");
+  for (const tree of ["", "/ws", "/my ws", "/w's"]) {
+    assert.ok(isTerminalCommand(terminalCommand("a b.sh", "h", tree)), tree);
+  }
+  assert.ok(!isTerminalCommand("rm -rf / ; ccnavi user handoff x"));
+  assert.ok(!isTerminalCommand("ccnavi --root /ws; rm x user handoff y"));
 });
 
 test("CB-T1115 パスは大文字小文字と NFC/NFD の違いを無視して比べる", () => {

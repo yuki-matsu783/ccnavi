@@ -44,9 +44,11 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可�
 | 種類 | パス（ツリーからの相対） | 新規作成 | ボード | 検査 |
 |---|---|---|---|---|
 | `template` | `.ccnavi/config/common/templates/<名前>.yml`（共通。ワークスペースルートのツリーでだけ書ける）、`.ccnavi/config/project/templates/<名前>.yml`、`projects/<名前>/.ccnavi/config/project/templates/<名前>.yml` | できる | 可 | テンプレートの検査（`plan_templates`）。`description` と `when` の `TODO` の印は warn、制御文字は error、共通と層で同名なのに中身が違えば error、ファイル名と中身の `name:` の照合、名前の形（`NAME_RE`・`NAME_LIMIT`） |
-| `layer-config` | `.ccnavi/config/{common,project}/{rules,phases,risks}.yml`、`projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | できない | 可 | `ccnavi --lint` が同じファイルに掛ける検査と同じ水準（下の「検査の共有」） |
-| `docs` | `.ccnavi/docs/**/*.md`、`.ccnavi/CCNAVI.md`、`.claude/skills/**/*.md` | できない | 可 | UTF-8 であること |
-| `defense` | `.ccnavi/scripts/**/*.sh`、`.claude/hooks/**`、`.claude/settings.json`、`.claude/settings.local.json` | できない | 不可（`--via board` は断る。端末の前のユーザだけ） | `.sh` は CRLF を error にして `sh -n`。`settings*.json` は JSON として読めること |
+| `layer-config` | `.ccnavi/config/{common,project}/{rules,phases,risks}.yml`、`projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | できない | 可（`rules.yml` で防御の記述を動かすものは不可。下記） | `ccnavi --lint` が同じファイルに掛ける検査と同じ水準（下の「検査の共有」） |
+| `docs` | `.ccnavi/docs/**/*.md`、`.ccnavi/CCNAVI.md` | できない | 可 | UTF-8 であること |
+| `defense` | `.ccnavi/scripts/**/*.sh`、`.claude/hooks/**`、`.claude/settings.json`、`.claude/settings.local.json`、`.claude/skills/**/*.md`（スキルの frontmatter は使えるツールや hook を持てる） | できない | 不可（`--via board` は断る。端末の前のユーザだけ） | `.sh` は CRLF を error にして `sh -n`。`settings*.json` は JSON として読めること |
+
+`layer-config` の `rules.yml` のうち、防御の記述を動かす取り込みは、`defense` と同じく端末に限る（`--via board` は断り、`--json` の `board` は偽になる）。防御の記述とみなすのは、`guard-` で始まる id のルール（足す・消す・判定を移す・`except` を含む中身を変える）と、今ある deny（消す・中身を変える）。deny を足すのは止める側への変更なので数えない。今の中身か下書きが読めなければ、確かめられないので端末に限る（`handoff._defense_change`）。`phases.yml`・`risks.yml` はこの判定の外。
 
 表に足すときは、行を足し、テストで表と docs の食い違いを検出する。
 
@@ -67,12 +69,12 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可�
 | 経路 | 要求 |
 |---|---|
 | 端末 | `--yes` で書くときは、標準入力が端末であること（9.18）。見るだけの形は端末を求めない |
-| ボード | `--via board` は端末を求めない。`--expect` と `--json` が揃うこと、種類のボード欄が「可」であること、hook の止めに頼る。`defense` の種類は断る |
+| ボード | `--via board` は端末を求めない。`--expect` と `--json` が揃うこと、種類のボード欄が「可」であること、hook の止めに頼る。`defense` の種類と、防御の記述を動かす `rules.yml` は断る |
 
 「作業中のチケットがある間は取り込めない」制限は、実行ファイルには無い。拡張の画面だけが持ち、`template` と `layer-config` の種類の取り込みに掛ける。
 
 **ボードの画面。** 拡張に「取り込み待ち」の画面がある。一覧は `user handoff --json`（見るだけ）で作り、`template`・`layer-config`・`docs` の種類を出す。
-取り込みは `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`。`defense` は一覧に出し、端末で取り込むことと打つコマンドを案内する。
+取り込みは `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`。`defense`（と、防御の記述を動かす `rules.yml`）は一覧に出し、端末で取り込むことと打つコマンド（`ccnavi --root <ツリー> user handoff <パス> --yes --expect <ハッシュ>`。引用は POSIX の sh の形で、PowerShell では単引用符の中の `'\''` を `''` に打ち直す）を案内する。
 テンプレート管理の画面は、一覧・検索・表示だけを行い、書き込みはしない。ボードの rules・phases・risks の画面は、拡張が直接書くまま。
 
 **表と互換。** `user_only.py` の表が `handoff` の操作と `--handoff` を持つ。テンプレート専用の書き込みのオプション（`--import` など）は、実行ファイルがもう受け付けない。
