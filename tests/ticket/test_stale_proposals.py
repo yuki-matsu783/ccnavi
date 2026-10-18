@@ -236,7 +236,7 @@ class ImportedFamilyTest(AuthorityHarness):
         self.assertIn(
             "改版なら .claude/worktrees/i0001 の wip/proposals/todo/ に書き", verify.stdout
         )
-        self.assertIn("書いたら push してから承認を頼んでください", verify.stdout)
+        self.assertIn("で親のブランチへ送ってから承認を頼んでください", verify.stdout)
 
     def test_a_stopped_family_carries_the_reason_family_problems_gives(self):
         """親子のチケットが止まっている（親のツリーの HEAD がブランチを指していない）なら、
@@ -248,7 +248,7 @@ class ImportedFamilyTest(AuthorityHarness):
             "HEAD のブランチ名を変換した識別子がフォルダ名（i0001）と合わない", verify.stdout
         )
         self.assertIn("承認しない", verify.stdout)
-        self.assertNotIn("書いたら push してから", verify.stdout)
+        self.assertNotIn("で親のブランチへ送ってから", verify.stdout)
 
 
 def _t(tree, state, project="", parent="", ticket="i0001"):
