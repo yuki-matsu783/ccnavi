@@ -3348,6 +3348,7 @@ hook の文字列一致は当たらない。そこまで防ぐなら `permission
 | `src/ccnavi/tickets/scaffold.py` | 親の提案の雛形を作る（`ticket new`）。選んだフェーズの `scope` を集めて `allow` に書き、一直線の `plan`（`--template` ならテンプレートの計画）と `phases:` の写しを入れる |
 | `src/ccnavi/tickets/template_use.py` | テンプレートを使う側。名前で引く（使えるものだけ）・`after` を提案の絶対番号に付け直す・子のフローの下書きの識別子と文面を組む |
 | `src/ccnavi/tickets/learning.py` | 学びの蓄積の記録（気づきの記録・受信箱・判定記録の要約）と、`ticket learn`、子を閉じる前の記録の検査 |
+| `src/ccnavi/tickets/propose.py` | 親子の承認待ちの提案（`todo/`）と子のフローの下書き（`flows/`）を、書いたパスの一覧に載せる（`ticket propose`）。コミットと push は sh が write-and-push の手順で行う |
 | `src/ccnavi/tickets/ops.py` | チケットの状態を動かす `ticket start / finish / cancel / record-risk`。閉じるときに実績のリスクを数える |
 | `src/ccnavi/tickets/ops_close.py` | チケットを引いて動かしてよいかの検査。置き場の引き当て、取り込み済みの親子の停止、着手の前（親・先行）と終了の前（親を閉じられる・成果物）の検査 |
 | `src/ccnavi/tickets/ops_stop.py` | Stop で `finish` の打ち忘れを促す判定と、基準点の確認（git の読み取り） |
