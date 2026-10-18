@@ -69,7 +69,9 @@ plan:
   - {type: acceptance, after: [2]}
   - {type: implement-ccnavi, after: [3]}
   - {type: staging, after: [4]}
-  - {type: docs, after: [5]}
+  - {type: implement-ccnavi, after: [5]}
+  - {type: staging, after: [6]}
+  - {type: docs, after: [7]}
 rationale: |
   チケットの移動以外で ccnavi が持つ状態（取り込み状態 sync/families と sync/integration）を廃止し、
   判定を「親ブランチの状態」だけにして、別 PC でも同じ結果になるようにする。
@@ -86,8 +88,6 @@ allow:
     glob: "tests/*"
   - match: Write|Edit
     glob: "src/*"
-  - match: Write|Edit
-    glob: ".ccnavi/*"
   - match: Write|Edit
     glob: "README.md"
   - match: Write|Edit
@@ -107,47 +107,55 @@ ccnavi は、チケットの置き場（`todo/` `doing/` `review/` `done/`）の
 
 取り込み状態は手元にだけあるので、別 PC に引き継げない。`gone` `blocked` `broken` は判定を止めるのに使われ、設計書（`docs/design/tickets/sharing.md`）の「判定には使わない」と食い違っている。実装側では、C1 の `present` 確認（`ccnavi-common-c1.sh:263`、`ccnavi-push-approved.sh:255`）と `ccnavi-git.sh push` の `gone` 拒否が、記録に頼って「消えた親ブランチの再作成」を止めている。
 
+この作業が目指すのは「**判定**が別 PC でも同じ結果になること」。親を閉じた後の片付けは、`ready` を打った PC のローカル状態（`retire/<親>.json`）に残る。
+
 ## 決定済みの方針（ユーザと合意）
 
 | 論点 | 決定 |
 |---|---|
 | 記録の扱い | `families/<P>` の記録と `integration/` コピーを廃止する。`gone` `blocked` `closed` `broken` の状態を持たない |
 | 親ブランチの消失（旧 `gone`） | 状態を持たず、**共通の push 関門**で止める（下の「push の関門」） |
-| `ready` 後の片付け | `ready` 時に `retire/<親>.json` へ `mr` と `branch` を書き、片付けの列挙元をこれだけにする。ブランチ名からの MR 探索は補助に下げる（下の「MR の特定」） |
-| 閉じた識別子の再利用検知 | オンライン専用。開始時のホスト照会（`ccnavi-start.sh`）に寄せる |
+| `ready` 後の片付け | `ready` 時に書く `retire/<親>.json`（既存の `note()` を拡張して `mr` を足す）を列挙元にする。ブランチ名からの MR 探索は補助に下げる（下の「MR の特定」） |
+| 閉じた識別子の再利用検知 | オンライン専用。開始時のホスト照会（`ccnavi-start.sh`）だけで検知する。**承認の経路では検知しない**（実行ファイルはネットワークに出ない決まりのため） |
 | レイヤーのずれ検知 | 常時の検知と `integration/` コピーを廃止する。運用で「ルール・フェーズ定義・リスク配点の変更は、先に統合先へ入れてから作業する」と決める。ずれは **warn**（停止にしない）。比べる対象は、元リポジトリのチェックアウトのレイヤーと、取得済みの `origin/<統合先>` |
-| Chrome 拡張 | **この作業に含める。** 記録を組み立てて渡す方式をやめ、拡張が持つ情報（ホストの snapshot）を判定の入力に直す。要件 REQ-EXT-32 を改め、互換の版を上げる |
+| Chrome 拡張 | **この作業に含める。** 拡張の `records()` から `families` と `integration` の記録の組み立てを削る。仮のツリーと、それを手元と同じ関数で読むこと（REQ-EXT-32）は変えない。ホストに親ブランチが無いとき、承認を止める（旧 `gone` と同じ） |
 | ロック | **外さない。** 並行する子の `finish` が共有の親ワークツリーで merge するため排他が要る。簡素化は別の作業 |
+| 識別子 | `claude-laughing-newton-necssy`（親ブランチ名 `claude/laughing-newton-necssy` の `/` を `-` に置き換えたもの）。先頭の語・番号の形に合わず `--lint` が warn を出すが、承認と子の起票は止まらない。ブランチを切り直す場合は `feature-<番号>-<slug>` に |
 
-## レビューで見つかり、設計に取り込む事項
+## 設計に取り込む事項（敵対的レビューの指摘）
 
-敵対的レビュー（2 本）で見つかったものを、設計の前提として取り込む。
+敵対的レビュー（初回 2 本、改訂後 2 本）で見つかったものを、設計の前提として取り込む。
 
 ### push の関門
 
-- 素の `git push` を打つ経路は 3 つある: `ccnavi-git.sh push`、C1（`ccnavi-common-c1.sh:592` 付近）、`ccnavi-push-approved.sh`。記録の `present` 確認を消すと、C1 と承認の push は関門を通らずに消えたブランチを再作成する。
-- 関門は 1 つの共通関数にして 3 経路で共有する。内容:
-  - 対象は親ワークツリーのブランチだけ（通常ブランチの push には掛けない）
+- 素の `git push` を打つ経路は 3 つある: `ccnavi-git.sh push`、C1（`ccnavi-common-c1.sh`。素の push の行は設計時に確かめる）、`ccnavi-push-approved.sh`。記録の `present` 確認を消すと、C1 と承認の push は関門を通らずに消えたブランチを再作成する。
+- 関門は 1 つの共通関数にして 3 経路で共有する。置き場は `ccnavi-common-state.sh`（`ccnavi_git_timed` と同じ部品）。内容:
+  - 対象は親ワークツリーのブランチだけ（通常ブランチ・子の push には掛けない。`ccnavi_parent_tree` と `ccnavi_branch_to_id` の条件を持ち込む）
   - 「追跡の形跡」は `refs/remotes/origin/<B>` の存在だけ。`branch.<B>.remote` は使わない（`origin/main` から切っただけの未 push の親が形跡ありと誤判定されるため）
-  - 形跡が無くても、承認済みチケットや `.requested` のマーカーがある親は初回扱いにしない（`fetch.prune=true` で形跡が消えるため）
+  - 形跡が無くても、承認済みチケットや `.requested` のマーカーがある親は初回扱いにしない（`fetch.prune=true` で形跡が消えるため）。**この判定はチケットとマーカーの中身を見るので、sh は自前で読まず、実行ファイルに副命令を新設して聞く**（`tree parent` の延長。sh にチケットの判定を足さない決まりを守る）
   - 形跡があるのにリモートに無いとき、`ls-remote` と `ccnavi-review.sh merged` で聞く。**マージ済みも拒否**する（閉じた名前の再作成を許さない）
   - `ls-remote` / `merged` が失敗・`unknown` のときは**拒否側に倒す**。ユーザが打つ迂回手段を 1 つ用意する
+  - `ls-remote` を打つ条件（形跡があるときだけか、形跡が無い承認済みの親でも打つか）は設計で確定する
+- sh に判定を足さない決まりの例外（`docs/claude/exe-boundary.md` の P13、ADR-0118）は、今は `ccnavi-git.sh` の中だけ。関門を C1 と `push-approved` にも置くので、**例外の範囲を明示して広げる**（`exe-boundary.md` と ADR に書く）。
 - 旧 `--forget` の代わりに、捨てた親の扱い（親のワークツリーを片付ければ関門の対象外）を案内する。
 
 ### MR の特定
 
 - ワークツリーが生きている間は、親チケットの `mr:`（必須欄）を第一とする。
-- `ready` 時に `retire/<親>.json` へ `mr` と `branch` を書く。ワークツリーを片付けた後の列挙と MR 特定はこれを使う。列挙できない親は一覧の案内だけを出し、自動では消さない。
-- ブランチ名からの MR 探索（ADR-0103 の仕組み）は補助。使うときは次を要求する: 返った MR の head sha が手元の履歴に含まれる、base が統合先、複数ヒットなら全件を見て open が 1 件でもあれば「閉じていない」。
+- `ready` 時の `retire/<親>.json`（`retire.py` の `note()` が既に `parent` `project` `branch` `children` を書く）に `mr` を足す。ワークツリーを片付けた後の列挙と MR 特定はこれを使う。
+  - sh は JSON を読まない決まりなので、列挙と `mr` の取得は実行ファイルの副命令に聞く。今の `add_retired`（`families/` の走査）と `sync_retired`（記録の `mr` を読む）を置き換える。
+  - `note()` が書けなかったときの扱いを決める（`ready` の失敗または明示の警告にする）。列挙できない親は一覧の案内だけを出し、自動では消さない。
+  - 片付けの完了で `retire/<親>.json` を消す今の動き（`retire.py` の `run_merged`）と、「まだ列挙できない」の区別を設計で決める。
+- ブランチ名からの MR 探索（ADR-0103 の仕組み）は補助。使うときは次を要求する: 返った MR の head sha が手元の履歴に含まれる、base が統合先、複数ヒットなら全件を見て open が 1 件でもあれば「閉じていない」、GitLab は `source_project_id` で絞る。
 - `tidy` はワークツリーの削除を、ブランチ確認の後に移す。同名ブランチの再利用で生きた親のワークツリーを消さない。
 - これは ADR-0136 の「推定しない」を一部改める。
 
 ### Chrome 拡張
 
-- 拡張の `ccnavi_chrome.py` の `records()` は、仮のツリーに `integration/` と `families/<P>` を組み、ホストに無いブランチには `state gone` を書く。これをやめ、判定のコアが明示的な入力（ホストの snapshot とブランチの有無）を受ける形に直す。
-- 拡張は git を起こせず `ls-remote` を打てない。ブランチの有無は拡張が既にホストから得ている情報を使う。
-- 直す対象: `ccnavi_chrome.py`、`extensions/chrome/ccnavi-approval/test/*.test.ts`（約 13 ファイル）、`VERIFY.md`、`test/fixtures`、`docs/requirements/extension-if.md` の REQ-EXT-32。
-- 互換の版（`CCNAVI_COMPAT`=12 の 3 か所: `version.py`、`ccnavi-common.sh`、VS Code 拡張の `EXTENSION_COMPAT`）を上げる。旧拡張との互換期間を置くかは設計で決める。
+- 拡張の `ccnavi_chrome.py` の `records()` は、仮のツリーに `integration/` と `families/<P>` を組み、ホストに無いブランチには `state gone` を書く。**`families` の記録と `integration` の `state` に関わる部分だけを削り、仮のツリーと、手元と同じ関数で読むこと（REQ-EXT-32）は変えない。** REQ-EXT-32 の文言は、取り込み状態に触れる記述だけを削る。
+- ホストに親ブランチが無いときは、承認を止める（旧 `gone` と同じ向き）。ブランチの有無は拡張が既にホストから得ている情報を使う。拡張は git を起こせず `ls-remote` を打てない。
+- 直す対象: `ccnavi_chrome.py`、`extensions/chrome/ccnavi-approval/test/*.test.ts`（件数は設計時に数える。初回レビューは約 13）、`VERIFY.md`、`test/fixtures`、`docs/requirements/extension-if.md`。
+- 互換の版（`CCNAVI_COMPAT`=12）は 3 か所: `src/ccnavi/entry/version.py`、`.ccnavi/scripts/ccnavi-common.sh`、VS Code 拡張の `EXTENSION_COMPAT`。拡張は統合先の sh の版が自分と違えば、書く操作（承認の取り下げ、plan）を断る。読む判定は断らない。**拡張の公開は、`staging` のコピーが統合先に入った後にする。**
 
 ### レイヤーのずれ（warn）
 
@@ -158,9 +166,21 @@ ccnavi は、チケットの置き場（`todo/` `doing/` `review/` `done/`）の
 ### 閉じた識別子の再利用検知
 
 - 現在の承認時の検知は統合先の `done/` コピーに頼るが、統合先には閉じたチケットを残さない運用なので、実際にはほとんど効いていない。失うものは小さい。
-- 承認の経路は実行ファイルがネットワークに出ない決まりのため、開始時の照会を直接呼べない。sh が先に取得して JSON で渡す形にするか、承認ではオフラインで通すかを設計で決める。
-- 開始時の照会は `ccnavi-start.sh` の経路だけにある。名前は識別子の別表記（`/` と `-`、英字の大小）を正規化して聞く。承認の経路では `--mcp-checked`（自己申告）を受けない。
+- 検知は開始時の照会（`ccnavi-start.sh`）に限る。名前は識別子の別表記（`/` と `-`、英字の大小）を正規化して聞く。承認の経路では検知しない（上の表）。
 - 先行チケットの解決（`approval_checks._closed_elsewhere`）の置き換え先を決める。
+- `--mcp-checked`（自己申告）が開始時の照会を飛ばせる点は、調査で確かめる。
+
+### 順序と互換の版
+
+sh（`.ccnavi/scripts/`）はエージェントが書けず、ユーザがコピーするまで効かない。実行ファイルだけ先に記録を消すと、旧 sh は「記録なし」を `state != present` と読み、C1 と承認の push が止まる。そこで順序は次のとおりにする。
+
+1. 実装（追加のみ）: 新しい副命令（push 関門の判定、`retire` の列挙）、warn、拡張の受け口。**既存の記録の読み書きは消さない。** 実行ファイルは「記録が無い」を既に許す
+2. staging（1 回目）: sh を新しい形にする。記録を読まず書かず、新しい副命令を使う。旧実行ファイルでも動くよう、記録が残っていても邪魔しない。互換の版は変えない
+3. 実装（削除）: `syncstate` の記録・統合先の部分、拡張の記録の組み立て、テストを消す。互換の版の上げは、実行ファイルと拡張をここで 13 にする
+4. staging（2 回目）: sh の互換の版を 13 にする小さな差し替え。**3 の MR のマージと同時にユーザがコピーする**（間は `--lint` が版の食い違いを error にする）
+5. docs
+
+拡張の公開は 4 の後。
 
 ## 変更の内容
 
@@ -175,49 +195,51 @@ ccnavi は、チケットの置き場（`todo/` `doing/` `review/` `done/`）の
 
 ### 足すもの
 
-1. 共通の push 関門（3 経路）
-2. `ready` 時の `retire/<親>.json` への `mr` `branch` の書き込みと、それを列挙元にする片付け
+1. 共通の push 関門（3 経路）と、実行ファイルの副命令（親にチケットやマーカーがあるか）
+2. `retire/<親>.json` への `mr` の追加と、実行ファイルの列挙の副命令。それを列挙元にする片付け
 3. 照会に失敗したときの迂回手段
 4. レイヤーのずれの warn（`git show` ベース）
-5. 承認の経路での再利用の扱い（調査の結果次第）
-6. 旧 `families/*` の 1 回限りの移行（`mr` と `branch` を `retire/` へ移し、旧ファイルを削除）
-7. Chrome 拡張の入力形式の変更と互換の版
+5. 旧 `families/*` の 1 回限りの移行（`ready` 済みで `note()` が無い旧親も含め、`mr` と `branch` を `retire/` へ移し、旧ファイルを削除）
+6. Chrome 拡張の記録の組み立ての削除と、ホストに親ブランチが無いときの承認の停止
 
 ### 残すもの
 
 - `ccnavi-sync.sh` の取り込み実体（fetch・早送り・merge・衝突時の取りやめ）、MR のマージ済み判定と手元の片付け（`sync tidy`）
 - ロック（`ccnavi-common-lock.sh`）、`ccnavi_record_get/write/put`（`integrate` のマーカー）、`ccnavi_repo_key`（ロックの置き場）、`retire/<親>.json`、`logs/archive/`
-- `ccnavi_integration`（統合先ブランチ名の解決）。ただし `integration/head` の枝は外す。環境変数と `settings.local.json` の `env`（sh 側でも読む）と `origin/HEAD` の順に揃える
+- `ccnavi_integration`（統合先ブランチ名の解決）。ただし `integration/head` の枝は外す。環境変数と `settings.local.json` の `env` と `origin/HEAD` の順に揃える（sh 側の `settings.local.json` の扱いは調査 1）
 
 ## 調査で確かめること（research の項）
 
-敵対的レビューで答えが出た 7 項目は、ここに結果を書いた。残る確認:
+初回レビューで答えが出ていた 7 項目（`sync check` の中身、`ready` 後の列挙元、`integrate` の束縛判定、`ccnavi_repo_key` の使い道、拡張が `sync/` の書き手であること、承認の経路から照会を呼べないこと、統合先の解決順の食い違い）は、上の設計に反映した。残る確認:
 
 1. `settings.local.json` の `env` が sh（`ccnavi-git.sh` `ccnavi-fetch.sh`）に渡るか。渡らないなら統合先の解決を実行ファイルに聞く形にする
 2. `hook` が取り込み直後のリモートの承認済みチケットを、検査の前に範囲判定へ使う窓（旧 `blocked` が埋めていた分）の大きさ。`Ticket.blocked` を hook が見るか
 3. `approval_checks._closed_elsewhere` の置き換え先。閉じた親子の子を先行に持つチケットの扱い
-4. 旧 sh と新実行ファイルの混在時の挙動（`sync check` を知らない旧版は検査が fail-open になる）。新 sh と旧実行ファイルの組み合わせ
+4. 新 sh と旧実行ファイル、旧 sh と新実行ファイルの混在時の挙動（`sync check` を知らない旧版は検査が fail-open になる）。上の「順序と互換の版」で足りるか
 5. `start` 直後〜提案作成前の `integrate` の束縛判定の窓（`ig_bound` の前段が false の間）
 6. 放棄した親（MR をマージせずに閉じた）が毎回 `sync` の終了コードを 1 にする問題の扱い
 7. `ccnavi-git.sh` のホワイトリストで、追跡設定の解除が打てるか
-8. 旧拡張との互換期間を置くか、`CCNAVI_COMPAT` で止めるか
-9. GitLab の `find_merged_mr`（`ccnavi-start.sh:344`）に `source_project_id` の絞りが無いこと（フォークの MR で誤検知）。`ccnavi-review.sh` 側は絞っている
+8. 旧拡張との互換（拡張の公開順序で足りるか）
+9. `--mcp-checked` の使われ方（承認経路で受けない方針の影響）
+10. C1 の素の push の行番号と、push 関門を差し込む位置
+11. 関門で `ls-remote` を打つ条件の確定
 
 ## メリットとデメリット
 
 得るもの:
-- 手元にだけある状態が減り、別 PC への引き継ぎで食い違わない
+- 手元にだけある状態が減り、別 PC への引き継ぎで判定が食い違わない
 - 設計書と実装の食い違い（「判定に使わない」と書いて止めに使っている）が消える
 - `syncstate.py`（776 行）の大半、`ccnavi-sync.sh` の書き込み部、`integration` コピー、Chrome 拡張の記録組み立てが消える
 - 旧 `gone` の拒否が、3 経路で同じ関門になる（今は C1 と承認の push が記録頼み）
 
 失うもの・残るもの:
 - `gone` `blocked` の永続的な検知。オフラインの hook は消失を知れず、気づくのは sync・push・セッション開始の fetch の時点になる
-- 閉じた識別子の再利用検知のオフライン動作（現状も効いていない）
+- 閉じた識別子の再利用検知のオフライン動作と、承認経路での検知（現状も効いていない）
 - 常時のレイヤーのずれ検知。warn と運用で守る。ccnavi 自身の開発では、レイヤーを変えながらそれを使う作業を別チケットに分ける
 - push の前に `ls-remote` が走る。失敗時は拒否に倒すので、認証が対話式の環境では迂回手段が要る
-- `retire/<親>.json` はローカル状態として残る。「別 PC に引き継げない状態」はゼロにならない（`ready` を打った PC にしか列挙元が無い）
-- 規模が大きい。sh 6 本以上、Python 10 ファイル以上、Chrome 拡張とそのテスト 13 ファイル以上、テスト約 24 ファイル
+- `retire/<親>.json` はローカル状態として残る。片付けの列挙元は `ready` を打った PC にしか無い
+- ユーザの手が 2 回増える（sh のコピー。ADR-0030 の趣旨に照らし、保護済みファイルの規則から避けられない）
+- 規模が大きい。sh 6 本以上、Python 10 ファイル以上、Chrome 拡張とそのテスト、記録に依存する既存テスト（件数は設計時に数える）
 
 やらなかった場合: 取り込み状態が手元だけに残り続け、別 PC で `gone` や `blocked` の食い違いが出る。設計書との食い違いも残る。
 
@@ -225,21 +247,30 @@ ccnavi は、チケットの置き場（`todo/` `doing/` `review/` `done/`）の
 
 - **`gone` だけ残して `blocked` と `closed` を消す。** オフラインの hook でも消失を知れるが、手元だけの状態は残り、方針に反する
 - **`integration/` コピーを残して `families/` だけ消す。** 変更は小さいが、レイヤーのずれ検知と再利用検知の窓口が手元のコピーに残り、別 PC に引き継げない状態が残る
-- **Chrome 拡張を別の作業に分ける。** 手元側を先に直せるが、拡張が組み立てる記録の形と食い違う期間ができ、互換の維持が要る（今回は含める判断）
+- **Chrome 拡張を別の作業に分ける。** 手元側を先に直せるが、拡張が組み立てる記録の形と食い違う期間ができる（今回は含める判断）
 - **ロックも外す。** 同一 PC の並行する子の `finish` が親ワークツリーを奪い合うため採らない
+
+## ADR と文書
+
+- ADR は新規 1 本（番号は 0142 の見込み。足す直前に `origin/main` を取って最後尾の次を採る）を **design の項**で書く。既存の ADR-0093（取り込みと C1 の D 項）、ADR-0136（記録はキャッシュ、推定しない）、ADR-0103（ブランチからの MR 探索）は、部分的に改めるだけなので、`docs/adr/README.md` の規則に従い**状態行への追記**で扱う。
+- `docs/adr/README.md` の一覧に新規の 1 行を足す（`tests/core/test_adr_numbers.py` が見る。ドキュメントだけのコミットでは回らない）。この一覧と追記は docs の項で扱う。
+- 直す文書（確認済みの語の hit）: `README.md`、`docs/design/tickets/sharing.md` `places.md`、`docs/CONTEXT.md`、`docs/requirements/extension-if.md`、`docs/claude/exe-boundary.md`、ADR-0102・0104（記録語の hit）。
+- **`.ccnavi/` の下は全部が保護対象**（`builtin:guard-project-home`）。sh だけでなく `.ccnavi/docs/*.md` も、エージェントは書けない。次の文書は、完成品を `wip/design/` に置いてユーザがコピーする（staging の項に含める）: `.ccnavi/docs/worktree-start.md`、`worktree-cleanup.md`、`projects.md`、`worktree.md`、`worktree-merge.md`（内容は未読。直す対象かは設計時に確かめる）。`.ccnavi/CCNAVI.md` は記録語の hit が無いため、直す必要があるかは設計時に確かめる。
 
 ## 計画の理由
 
-research → design → acceptance → implement-ccnavi → staging → docs の一直線にした。
+research → design → acceptance → implement-ccnavi（追加）→ staging（1 回目）→ implement-ccnavi（削除）→ staging（2 回目）→ docs の一直線にした。
 
-- research: 上の 9 項目の答えが設計を左右するため、最初に置く
-- design: 消す・足す・残すを確定し、ADR（新規 1 本。既存の ADR-0093・0136・0103 は `docs/adr/README.md` の規則に従い、状態行への追記か置き換えかを決める）と設計書の変更案を書く。拡張の入力形式と互換の版もここで決める
-- acceptance: 共通の push 関門（3 経路）、再利用検知、レイヤーの warn、`ready` 後の片付け、拡張の判定の受入テストを先に書く。記録に依存する既存テスト（約 24 ファイル）の書き換え方針を決める
-- implement-ccnavi: Python（`src/`）、Chrome 拡張、テストを直す。子を分ける想定で、(a) 共通の push 関門と `retire/` への書き込みと warn の追加、(b) Chrome 拡張の入力形式の変更、(c) 記録と `integration/` の削除と移行。追加が先に入れば削除が安全になる
-- staging: **`.ccnavi/scripts/` の sh は保護対象で、エージェントは書けない。** 完成品を `wip/design/scripts/` に全文で置き、ユーザがコピーする。sh の変更（`ccnavi-sync.sh` `ccnavi-git.sh` `ccnavi-common-c1.sh` `ccnavi-push-approved.sh` `ccnavi-start.sh` ほか）はすべてこの項で扱う。受入テストは先に書く
-- docs: `README.md`、設計書、`docs/CONTEXT.md`、`docs/requirements/extension-if.md`、ADR の整理。`README.md` は既存のフェーズ定義 `docs`（`.ccnavi/config/project/phases.yml`）の範囲に入っているので、フェーズ定義の変更は要らない
+- research: 上の 11 項目の答えが設計を左右するため、最初に置く
+- design: 消す・足す・残すを確定し、ADR と設計書の変更案を書く。拡張の入力、互換の版、push 関門の置き場、`ls-remote` の条件を決める。**research の答えで足りない判断は、design の完了条件でユーザに聞く**（「迂回手段」「放棄した親」「互換」はユーザの判断を増やすため）
+- acceptance: 共通の push 関門（3 経路）、再利用検知、レイヤーの warn、`ready` 後の片付け、拡張の判定の受入テストを先に書く。sh のテスト（`tests/sh/*`）は staging のコピーが済むまで通らない
+- implement-ccnavi（追加）: 新しい副命令と warn と拡張の受け口を足す。既存の記録の読み書きは消さない。子を分ける想定で、(a) push 関門の副命令、(b) `retire` の拡張と列挙の副命令、(c) warn、(d) 拡張の受け口
+- staging（1 回目）: **`.ccnavi/` の下（sh、`.ccnavi/docs/*.md`）はエージェントが書けない。** 完成品を `wip/design/` に全文で置き、ユーザがコピーする。旧実行ファイルでも動く形にし、互換の版は変えない
+- implement-ccnavi（削除）: 記録と `integration/` に関わる Python、拡張、テストを消し、互換の版を実行ファイルと拡張で 13 にする。1 回目の staging の sh がコピー済みであることを前提にする
+- staging（2 回目）: sh の互換の版を 13 にする差し替え。削除の MR のマージと同時にユーザがコピーする
+- docs: `README.md`、設計書、`docs/CONTEXT.md`、要件、ADR の追記と一覧。`README.md` は既存のフェーズ定義 `docs` の範囲に入っているので、フェーズ定義の変更は要らない
 
 ## 未解決
 
-- `.ccnavi/scripts/` の sh を直す子は、保護対象のため staging の項で扱う（`implement-ccnavi` の範囲 `.ccnavi/*` は sh には効かない）。
-- 識別子の番号 `1` は通し番号（`ticket next-id` の答え）。issue があるなら付け替える。
+- 親の allow から、書けない `.ccnavi/*` と、今回は触らない `build.py` `pyproject.toml` `scripts/*` を外した。`implement-ccnavi` の範囲に `.ccnavi/*` が入っているが、実際には効かない。
+- 初回の ADR の番号は、足す直前の `origin/main` で確定する。
